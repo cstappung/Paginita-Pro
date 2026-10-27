@@ -97,7 +97,7 @@ export const SOLOS = [
     modos: ["Tabla de puntaje", "Tabla de Pokédex"] },
   { id: "prodefender", tipo: "club", nombre: "PRO DEFENDER", genero: "Estrategia", icono: "🛡️", alta: "2026-10-18",
     ruta: "#solo/prodefender", reglas: "prodefender", popular: "club-prodefender", ranking: true,
-    lema: "Tower defense: 5 reinos de 100 rondas, 22 defensores, un héroe por reino y más de 30 atacantes. Cada ronda nueva de tu récord paga monedas.",
+    lema: "Tower defense: 15 reinos de 100 rondas, 27 defensores, diez héroes, pactos, eventos y más de 70 atacantes. Cada ronda nueva de tu récord paga monedas.",
     modos: ["Un récord por reino", "Hasta 10 000 🪙 por reino"] },
   { id: "propac", tipo: "club", nombre: "PRO PACMAN", genero: "Arcade", icono: "🟡", alta: "2026-10-20",
     ruta: "#solo/propac", reglas: "propac", popular: "club-propac", ranking: true,
@@ -150,7 +150,11 @@ export const SOLOS = [
   { id: "bots-bt3", tipo: "bots", juego: "bt3", nombre: "Tenkaichi 3 · un jugador", genero: "Pelea", icono: "🐉", alta: "2026-10-14",
     url: "juegos/bt3/index.html", ruta: "#solo/bt3", reglas: "bt3",   // (se juega dentro de Juegos: la página del juego necesita la sesión para el disco privado)
     lema: "Entrenamiento o contra la CPU, directo desde el disco; y desde ahí mismo, una sala de duelo o de torneo con tus amigos.",
-    modos: ["Entrenamiento", "Contra la CPU", "Duelo", "Torneo"] }
+    modos: ["Entrenamiento", "Contra la CPU", "Duelo", "Torneo"] },
+  { id: "bots-mkw", tipo: "bots", juego: "mkw", nombre: "Mario Kart Wii · un jugador", genero: "Carreras", icono: "🏁", alta: "2026-10-18",
+    url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
+    lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
+    modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -161,7 +165,7 @@ export const GENERO = {
   worms: "Artillería", reversi: "Tablero", gato: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
-  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", tulones: "Física", hero: "Ritmo", memazo: "Fiesta", pool: "Deporte"
+  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", mkw: "Carreras", tulones: "Física", hero: "Ritmo", memazo: "Fiesta", pool: "Deporte"
 };
 
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la

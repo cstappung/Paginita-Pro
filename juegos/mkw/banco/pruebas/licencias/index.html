@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licencias y respaldos</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Tu partida: <span>licencias, cargar un rksys.dat y respaldos</span></h1>
+<p>Prueba lo que hay detrás de «Tu partida» (bitácora §55) <b>sin el juego</b> y con una partida <b>inventada</b> con la
+  forma de la de Mario Kart Wii (rksys.dat: "RKSD", licencias "RKPD" cada 0x8CC0 bytes, nombre en UTF-16, VR, carreras,
+  CRC-32 al final): <code>licencias.mjs</code> la lee y la revisa, <code>guardado.mjs</code> reemplaza solo ese archivo,
+  <code>respaldos.mjs</code> guarda copias y se queda con las últimas. Usa bases de datos de prueba aparte.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { leerRksys, resumenLicencia, queArchivo, crc32, TAM_RKSYS, RUTA_RKSYS, leerRating } from '/web/navegador/licencias.mjs';
+import { crearGuardado } from '/web/navegador/guardado.mjs';
+import { crearRespaldos } from '/web/navegador/respaldos.mjs';
+import { md5, codigoDesdePid, codigoValido, limpiarCodigo } from '/web/navegador/codigo-amigo.mjs';
+
+const { ok, nota, fin } = prueba('licencias', 'Licencias, cargar partida y respaldos (sin el juego)');
+const borrarBase = n => new Promise(r => { const p = indexedDB.deleteDatabase(n); p.onsuccess = p.onerror = p.onblocked = () => r(); });
+
+// Una partida inventada: licencias en las casillas pedidas, con nombre, VR, carreras e ID de perfil
+function partidaFalsa(licencias, { crcBueno = true } = {}) {
+  const b = new Uint8Array(TAM_RKSYS), v = new DataView(b.buffer);
+  b.set([0x52, 0x4B, 0x53, 0x44, 0x30, 0x30, 0x30, 0x36]);                 // "RKSD0006"
+  for (const l of licencias) {
+    const p = 0x08 + (l.casilla - 1) * 0x8CC0;
+    b.set([0x52, 0x4B, 0x50, 0x44], p);                                     // "RKPD"
+    [...l.nombre].forEach((c, i) => v.setUint16(p + 0x14 + 2 * i, c.charCodeAt(0)));
+    v.setUint16(p + 0xB0, l.vr || 0); v.setInt32(p + 0xB4, l.carreras || 0); v.setUint32(p + 0x5C, l.pid || 0);
+  }
+  const crc = crc32(b, 0, 0x27FFC);
+  v.setUint32(0x27FFC, crcBueno ? crc : crc ^ 1);
+  return b;
+}
+
+// 1) CRC-32: el valor de referencia de "123456789" (el mismo de zip/PNG)
+ok('CRC-32 da el valor de referencia', crc32(new TextEncoder().encode('123456789')) === 0xCBF43926);
+
+// 2) Leer una partida con dos licencias (casillas 1 y 3)
+const buena = partidaFalsa([{ casilla: 1, nombre: 'Ana', vr: 5230, carreras: 812, pid: 123456789 }, { casilla: 3, nombre: 'Banco', vr: 0, carreras: 1 }]);
+const r = leerRksys(buena);
+ok('una partida bien formada es válida', r.valido && r.crcBien, r.problema);
+ok('trae 2 licencias, en las casillas 1 y 3', r.licencias.length === 2 && r.licencias[0].casilla === 1 && r.licencias[1].casilla === 3);
+ok('lee el nombre (UTF-16), el VR y las carreras', r.licencias[0].nombre === 'Ana' && r.licencias[0].vr === 5230 && r.licencias[0].carreras === 812);
+ok('arma el código de amigo desde el ID de perfil', /^\d{4}-\d{4}-\d{4}$/.test(r.licencias[0].codigoAmigo), r.licencias[0].codigoAmigo);
+// El código de amigo (codigo-amigo.mjs; antes en el visor de salas de Retro WFC, que se quitó: bitácora §64)
+{
+  const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  const txt = s => new TextEncoder().encode(s);
+  // MD5: los vectores del RFC 1321 (y uno largo, que ocupa dos bloques)
+  const vectores = [['', 'd41d8cd98f00b204e9800998ecf8427e'], ['abc', '900150983cd24fb0d6963f7d28e17f72'],
+                    ['message digest', 'f96b697d7cb7938d525a2f31aaf161d0'], ['a'.repeat(100), '36a92cc94a9e0fa21f625f8bfb007adf']];
+  const malos = vectores.filter(([e, h]) => hex(md5(txt(e))) !== h);
+  ok('MD5 da lo mismo que el estándar (RFC 1321) en 4 casos, incluido uno de dos bloques', malos.length === 0, malos.map(m => m[0].slice(0, 10)).join(', '));
+  // código de amigo desde el número de jugador (valores calculados aparte con Python/hashlib)
+  const ref = [[123456789, '2535-2652-7253'], [600000001, '2368-2320-1281'], [4000000000, '4807-4136-9856'], [1, '0214-7483-6481']];
+  const mal = ref.filter(([pid, c]) => codigoDesdePid(pid) !== c);
+  ok('código de amigo = pid con 7 bits de control del MD5 (fórmula de Tockdom): 4 de 4 iguales a la referencia', mal.length === 0,
+     mal.map(([p]) => `${p} → ${codigoDesdePid(p)}`).join(', '));
+  ok('un código bien escrito es válido, con guiones, espacios o pegado',
+     codigoValido('2535-2652-7253') && codigoValido('2535 2652 7253') && codigoValido('253526527253'));
+  ok('un código con una cifra cambiada se detecta como mal escrito (como el dígito verificador del RUT)',
+     !codigoValido('2535-2652-7254') && !codigoValido('2535-2652-7263') && !codigoValido('3535-2652-7253'));
+  ok('11 cifras, letras o vacío → inválido', !codigoValido('2535-2652-725') && !codigoValido('abcd-efgh-ijkl') && !codigoValido('') && limpiarCodigo('x') === '');
+}
+ok('sin ID de perfil, sin código de amigo', r.licencias[1].codigoAmigo === '');
+ok('el resumen de una licencia se lee bien', /^VR 5.?230 · 812 carreras$/.test(resumenLicencia(r.licencias[0])) && resumenLicencia(r.licencias[1]) === '1 carrera',
+   resumenLicencia(r.licencias[0]));
+
+// 3) Lo que NO se carga
+const danada = partidaFalsa([{ casilla: 1, nombre: 'Ana' }], { crcBueno: false });
+ok('una partida con el CRC malo NO es válida (el juego la borraría)', !leerRksys(danada).valido && /dañado/.test(leerRksys(danada).problema));
+ok('un archivo cortado NO es válido', !leerRksys(buena.slice(0, 1000)).valido);
+ok('un archivo cualquiera NO es una partida', !leerRksys(new TextEncoder().encode('hola mundo')).valido);
+
+// 4) ¿Qué archivo es? (por el contenido, no por el nombre)
+ok('reconoce rksys, paquete .mkwp, base de Mii y Mii suelto',
+   queArchivo(buena) === 'rksys' && queArchivo(new Uint8Array([0x1F, 0x8B, 8, 0])) === 'paquete' &&
+   queArchivo(new Uint8Array([0x52, 0x4E, 0x4F, 0x44, 0])) === 'rfldb' && queArchivo(new Uint8Array(74)) === 'mii' && queArchivo(new Uint8Array(10)) === 'otro');
+
+// 5) guardado.mjs: reemplazar SOLO el rksys.dat (lo demás queda) y leerlo de vuelta
+const BASE = 'mkw-prueba-licencias';
+await borrarBase(BASE);
+const g = crearGuardado({ base: BASE });
+const AJUSTES = '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6/RRGameSettings.pul';
+await g.ponerArchivo(AJUSTES, new Uint8Array([1, 2, 3]));
+await g.ponerArchivo(RUTA_RKSYS, buena);
+const vuelta = await g.leerArchivo(RUTA_RKSYS);
+ok('el rksys.dat cargado queda guardado igualito', vuelta && vuelta.length === TAM_RKSYS && crc32(vuelta) === crc32(buena));
+ok('cargar el rksys.dat no toca los otros archivos (ajustes de RR)', (await g.leerArchivo(AJUSTES))?.join() === '1,2,3');
+let fuera = false;
+try { await g.ponerArchivo('/otro/lado.bin', new Uint8Array(1)); } catch { fuera = true; }
+ok('no deja escribir fuera de las carpetas de partidas', fuera);
+
+// 6) Paquete: abrirlo para ver qué trae, sin reemplazar nada
+const paquete = await g.exportar();
+const archivos = await g.abrirPaquete(paquete);
+ok('abrir un paquete muestra lo que trae sin tocar lo guardado', archivos.length === 2 && archivos.some(([ruta]) => ruta === RUTA_RKSYS));
+let roto = false;
+try { await g.abrirPaquete(new Blob([new Uint8Array([1, 2, 3])])); } catch { roto = true; }
+ok('un paquete roto da error (y no borra nada)', roto && (await g.leerArchivo(AJUSTES)) !== null);
+
+// 7) Respaldos: guarda copias, la más nueva primero, se queda con las últimas 3 y se restauran
+const RBASE = 'mkw-prueba-respaldos';
+await borrarBase(RBASE);
+const rs = crearRespaldos({ base: RBASE, max: 3 });
+for (let i = 1; i <= 5; i++) await rs.guardar(paquete, 'copia ' + i, [{ nombre: 'Ana', vr: i }]);
+const lista = await rs.lista();
+ok('quedan solo las últimas 3 copias', lista.length === 3, lista.map(x => x.motivo).join(', '));
+ok('la más nueva va primero y recuerda qué licencias tenía', lista[0].motivo === 'copia 5' && lista[0].licencias[0].nombre === 'Ana' && lista[0].licencias[0].vr === 5);
+await g.ponerArchivo(RUTA_RKSYS, partidaFalsa([{ casilla: 2, nombre: 'Otra' }]));
+await g.importar(await rs.leer(lista[0].id));
+const restaurada = leerRksys(await g.leerArchivo(RUTA_RKSYS));
+ok('restaurar una copia devuelve la partida de antes', restaurada.valido && restaurada.licencias[0]?.nombre === 'Ana');
+nota(`paquete de prueba: ${paquete.size} bytes (la partida de 2,8 MB comprimida)`);
+
+await borrarBase(BASE); await borrarBase(RBASE);
+// RRRating.pul de Retro Rewind (falso, con la forma del de verdad): RRRT, versión 1, 100 casillas, perfil + VR/100 + BR/100
+const rr = new Uint8Array(1640), vr = new DataView(rr.buffer);
+rr.set([0x52, 0x52, 0x52, 0x54]); vr.setUint16(4, 1); vr.setUint16(6, 100);
+vr.setUint32(8, 163024427); vr.setFloat32(12, 77.77); vr.setFloat32(16, 65.43); vr.setUint32(20, 1);
+vr.setUint32(24, 5); vr.setFloat32(28, 50); vr.setFloat32(32, 50); vr.setUint32(36, 1);
+const tablaRR = leerRating(rr);
+ok('RRRating.pul: el VR de Retro Rewind por perfil (77,77 → 7.777)', tablaRR.get(163024427)?.vr === 7777 && tablaRR.get(163024427)?.br === 6543 && tablaRR.get(5)?.vr === 5000 && tablaRR.size === 2, JSON.stringify([...tablaRR]));
+ok('un archivo que no es RRRating.pul no da nada', leerRating(new Uint8Array(40)).size === 0 && leerRating(null).size === 0);
+fin();
+</script>
+</body>
+</html>

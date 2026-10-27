@@ -504,6 +504,33 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  /* Mario Kart Wii: una sola pestaña. Lo que pasa en la sala del sitio (vestíbulo, modos, llegar tarde, cortes);
+     las carreras en sí son las del juego (Retro Rewind), así que el manual no las repite. */
+  mkw: {
+    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: copas de hasta 12 amigos, y la CPU completa la parrilla.",
+    secciones: [
+      ["Cómo se juega", pasos([
+        "Abre una sala de <b>Mario Kart Wii</b> en <b>Modo copa</b> (una copa del juego: sus 4 carreras, con puntos) o <b>Modo playlist</b> (una lista de pistas que arma el anfitrión, con las sugerencias de todos) y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑).",
+        "En el vestíbulo el anfitrión elige la <b>cilindrada</b> y el <b>nivel de la CPU</b> (Fácil, Normal, Difícil, Máximo, Intenso o Imposible; Máximo por omisión: Intenso e Imposible son injustos a propósito) y aprieta <b>¡A correr!</b>; la copa o la lista se eligen en el juego. Caben 12 pilotos, como en Mario Kart en línea: si son menos, la CPU completa los 12 lugares.",
+        "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). En la copa, el anfitrión <b>elige las pistas</b> con el selector (fotos, logos y planos de cada pista).",
+        "Después, cada uno elige <b>personaje y vehículo</b> en las pantallas del juego (45 s; a quien no alcanza se le pone uno).",
+        "Todos corren <b>la misma carrera</b> y empiezan al mismo tiempo: si alguien todavía carga, los demás lo esperan. Al final la tabla de la copa queda en el vestíbulo."
+      ])],
+      ["Llegar tarde y salir", lista([
+        "Quien entra con la copa andando <b>se suma</b>: carga el juego, elige personaje en el descanso y corre desde la <b>carrera siguiente</b> (empieza con 0 puntos). Caben 12.",
+        "Si a alguien se le corta la conexión, la carrera sigue sin él (al empezar cada carrera se lo espera unos segundos más) y vuelve en la siguiente; lo mismo si recarga la página.",
+        "Si el anfitrión se va, el puesto pasa al siguiente y la copa sigue.",
+        "Cada carrera termina 30 s después de que llega el primero (a los que faltan el juego les da un tiempo), o a los 5 minutos."
+      ])],
+      ["Controles", tabla([
+        ["Teclado", "Las teclas del juego (se cambian en <b>Opciones</b> dentro de la página del juego)."],
+        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."],
+        ["Celular", "Un mando en pantalla: cada botón se mueve, se agranda o se esconde, y se pueden agregar «Mirar atrás», Z o la cruz (en <b>Controles → Celular</b> de la página del juego). También se puede dirigir inclinando el teléfono, como un volante. Se juega mejor acostado y con pantalla completa."]
+      ])],
+      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta; empieza en 5000). Cada carrera lo mueve con tu puesto entre los 12: ganarle a alguien de tu mismo VR da +13 (más si tenía más VR, menos si tenía menos) y perder resta lo mismo; la CPU también cuenta, con menos peso y con un VR fijo según su nivel. Contra <b>Intenso</b> e <b>Imposible</b>, que nadie puede ganar, la CPU no da ni quita VR: gana quien le ganó a más CPU que los otros humanos. Si te vas a mitad de carrera (o no tocas nada 30 s al empezar) pierdes contra todos, y nadie gana VR por ti. Solo, sin otro humano, el VR no se mueve."],
+      ["Qué hace falta", "Chrome o Edge en el computador, o Chrome en Android (el juego usa WebGPU; en el iPhone no funciona). En un teléfono justo puede ir lento: en <b>Avanzado → Gráficos</b> baja la resolución de salida. Es privado: solo para los amigos de la lista."]
+    ]
+  },
   /* BT3: tres pestañas (duelo, torneo y un jugador); la sala abre la de su formato (modoReglas en juegos-main.js:
      cupo 2 = duelo). Lo común va detrás: qué hace falta, los personajes prohibidos, mirar y qué hacer si algo falla. */
   bt3: {
@@ -1380,7 +1407,7 @@ const REGLAS = {
      coincidir con js/engine.js y js/data/ (reinos, rondas, torres) y con
      monedasProdefender en monedas.js. */
   prodefender: {
-    lema: "PRO DEFENDER: un tower defense de diez reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
+    lema: "PRO DEFENDER: un tower defense de quince reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
     secciones: [
       ["Cómo se juega", "Los atacantes recorren el camino de un extremo al otro, y cada uno que llega te quita vidas. Elige un defensor de la tienda, colócalo junto al camino (no encima, ni pegado a otro) y pulsa <b>▶ Ronda</b>. Al perder todas las vidas la partida se acaba."],
       ["Oro y mejoras", "Cada atacante eliminado da oro, y cada ronda superada da un bono. Con ese oro compras defensores y los mejoras: cada uno tiene <b>dos caminos de cuatro mejoras</b>, pero solo uno puede pasar del nivel 2. Vender devuelve el 75 % de lo invertido."],
@@ -1388,14 +1415,15 @@ const REGLAS = {
         "Cinco reinos: Prado Esmeralda, Dunas de Ámbar, Glaciar Cristal, Caldera Volcánica y Nexo del Vacío, cada uno con su mapa, sus atacantes y su jefe.",
         "Superar la <b>ronda 50</b> de un reino abre el siguiente, y cada reino trae dos defensas nuevas.",
         "La <b>Segunda Era</b> suma cinco reinos más (Pantano Sombrío, Cumbres Tormentosas, Fosa Abisal, Ciudadela de Engranajes y Trono del Eclipse), que se abren a todos <b>uno por día</b>, sin tener que pasar por los anteriores. Cada uno vende menos defensas clásicas y trae una nueva y su héroe.",
+        "La <b>Tercera Era</b> (Necrópolis Olvidada, Jardín de Esporas, Laberinto de Espejos, Archipiélago Celeste y La Noche Eterna) es la más difícil y también se abre un reino por día. Trae reglas propias: <b>pactos</b> al empezar y cada diez rondas (eliges uno de tres, con una ventaja y una carga para toda la partida, o ninguno), <b>eventos</b> en una ronda de cada cinco (Luna de Sangre, Apagón, Lluvia de Estrellas…, anunciados en la vista previa), el <b>Poder del Reino</b>, que se carga eliminando enemigos y se lanza donde quieras (tecla V), y el <b>héroe a elección</b> entre los diez.",
         "Hay jefes en las rondas 25, 50, 75 y 100, y rondas especiales cada diez.",
         "Si pierdes, puedes reintentar la ronda desde su comienzo hasta tres veces por partida."
       ])],
       ["Atacantes", "Algunos exigen preparar algo antes: los <b>camuflados</b> solo los ven las torres con detección, los <b>voladores</b> esquivan morteros y minas, y el <b>blindaje</b> resta daño a cada golpe. La vista previa de arriba dice qué viene en la ronda siguiente; el Almanaque, el resto."],
-      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Los cinco reinos de la Segunda Era pagan como el Vacío: 100 por ronda, 10 000 cada uno. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
+      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Los diez reinos de la Segunda y la Tercera Era pagan como el Vacío: 100 por ronda, 10 000 cada uno. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
       ["Controles", lista([
         "Clic en un defensor de la tienda y luego en el mapa para colocarlo (con Shift, varios seguidos). Clic sobre una torre para ver sus mejoras.",
-        "Teclado: Espacio empieza la ronda, F cambia la velocidad, P pausa, M silencia. 1-9, 0, - y = eligen defensor; Z y X mejoran cada camino; Supr vende y Tab cambia el objetivo.",
+        "Teclado: Espacio empieza la ronda, F cambia la velocidad, P pausa, M silencia. 1-9, 0, - y = eligen defensor; Z y X mejoran cada camino; Supr vende y Tab cambia el objetivo. En la Tercera Era, H elige héroe y V apunta el Poder del Reino.",
         "La partida se guarda sola entre rondas: puedes salir y seguir después."
       ])]
     ]

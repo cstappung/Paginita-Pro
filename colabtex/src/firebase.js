@@ -4,7 +4,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, connectAuthEmulator, getAdditionalUserInfo } from "firebase/auth";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
-import { getStorage } from "firebase/storage";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getAnalytics, logEvent, isSupported as analyticsSupported } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
@@ -38,6 +38,14 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
+/* Los emuladores de Firebase (cuentas, base y Storage) en ESTA PC: solo cuando la página la sirve el arnés local de
+   Mario Kart (juegos/mkw/herramientas/experiencia.mjs, el jugar.bat del proyecto), que pone window.__FIREBASE_EMU,
+   y solo en localhost/127.0.0.1. Así se prueba el sitio entero (iniciar sesión, salas, partidas en la nube) con las
+   reglas de verdad y cuentas de mentira, sin tocar el Firebase real. En el sitio publicado ese objeto no existe y
+   nada cambia. Con emuladores no hay App Check ni Analytics: nada sale de la PC. */
+const EMU = typeof window !== "undefined" && typeof location !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  && window.__FIREBASE_EMU && typeof window.__FIREBASE_EMU === "object" ? window.__FIREBASE_EMU : null;
+
 /* App Check: con él, la base y Storage solo atienden a peticiones que
    vienen de ESTA página en un navegador de verdad (reCAPTCHA v3, invisible),
    no a un script que copió la configuración de arriba — que es pública por
@@ -55,7 +63,7 @@ export const app = initializeApp(firebaseConfig);
    usuario, y por eso va bajo cada botón de iniciar sesión. */
 const APP_CHECK_SITE_KEY = "6LedGuEtAAAAAJil2UaHh3j8gCLGf0YP8O1Mo_Bc";
 export const AVISO_RECAPTCHA = 'Este sitio está protegido por reCAPTCHA y se aplican la <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Política de privacidad</a> y las <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Condiciones del servicio</a> de Google.';
-if (APP_CHECK_SITE_KEY && typeof window !== "undefined" && typeof document !== "undefined") {
+if (APP_CHECK_SITE_KEY && !EMU && typeof window !== "undefined" && typeof document !== "undefined") {
   try {
     if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
@@ -67,6 +75,11 @@ if (APP_CHECK_SITE_KEY && typeof window !== "undefined" && typeof document !== "
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const storage = getStorage(app);
+if (EMU) {
+  connectAuthEmulator(auth, EMU.auth, { disableWarnings: true });
+  connectDatabaseEmulator(db, EMU.db[0], EMU.db[1]);
+  connectStorageEmulator(storage, EMU.storage[0], EMU.storage[1]);
+}
 
 // Para pruebas locales con el emulador (solo en Node, nunca en el navegador)
 if (typeof process !== "undefined" && process.env && process.env.FIREBASE_EMU) {
@@ -75,7 +88,7 @@ if (typeof process !== "undefined" && process.env && process.env.FIREBASE_EMU) {
 }
 
 // Analytics solo donde el navegador lo soporta (no rompe en localhost/file)
-const analitica = analyticsSupported().then(ok => ok ? getAnalytics(app) : null).catch(() => null);
+const analitica = EMU ? Promise.resolve(null) : analyticsSupported().then(ok => ok ? getAnalytics(app) : null).catch(() => null);
 
 /* Un evento de Analytics (el embudo del invitado en Juegos: bienvenida,
    partidas sin cuenta, inicios de sesión y desde dónde). Nunca lanza ni

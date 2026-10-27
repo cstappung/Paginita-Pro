@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonido del juego</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Sonido: <span>desbloqueo, volumen y medidor</span></h1>
+<p>Prueba el módulo de sonido de la página (<code>web/navegador/sonido.mjs</code>) <b>sin el juego</b>: en vez de SDL3
+  hay un "SDL3 falso" que hace lo mismo que el de verdad (crea un AudioContext y un ScriptProcessorNode de 2048
+  muestras conectado a la salida) pero llena los bloques con un tono suave de 440 Hz, con un bloque mudo a propósito.
+  El navegador no deja sonar una página hasta que la tocas: <b>el botón de abajo es ese primer toque</b>.</p>
+<div class="caja"><div id="resumen">esperando el toque…</div><ul id="resultados"></ul></div>
+<div class="caja"><button id="empezar" class="principal">Tocar para empezar (suena un tono bajito ~1 s)</button></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearSonido } from '/web/navegador/sonido.mjs';
+
+const { ok, nota, fin } = prueba('sonido', 'Sonido (sin el juego)');
+try { localStorage.removeItem('mkw.volumen'); localStorage.removeItem('mkw.silencio'); } catch {}
+const espera = ms => new Promise(r => setTimeout(r, ms));
+
+// El módulo arranca bloqueado (como Chrome con una persona que todavía no tocó la página)
+const s = crearSonido({ simularBloqueo: true });
+s.instalar();
+ok('instalar() reemplaza AudioContext por la versión de la página', window.AudioContext.mkwPropio === true);
+
+// ---- "SDL3 falso": lo mismo que SDL_emscriptenaudio.c, pero con un tono de amplitud fija ----
+const AMPLITUD = 0.03;                 // −30 dB: bajito
+let silenciarBloque = -1;              // número de bloque que sale mudo a propósito (un "corte")
+let bloque = 0, fase = 0;
+const ctx = new AudioContext();        // = SDL3.audioContext = new AudioContext()
+const nodo = ctx.createScriptProcessor(2048, 0, 2);
+nodo.onaudioprocess = e => {
+  const mudo = bloque++ === silenciarBloque;
+  const paso = 2 * Math.PI * 440 / ctx.sampleRate;
+  const a = e.outputBuffer.getChannelData(0), b = e.outputBuffer.getChannelData(1);
+  for (let i = 0; i < a.length; i++) { const v = mudo ? 0 : AMPLITUD * Math.sin(fase); fase += paso; a[i] = b[i] = v; }
+};
+nodo.connect(ctx.destination);         // SDL3 se conecta "a la salida"… que ahora es la cadena de la página
+
+ok('SDL3 queda conectado a la cadena de la página (no directo a los parlantes)', ctx.destination instanceof AnalyserNode);
+ok('se cuenta el AudioContext y su frecuencia', s.estado.contextos === 1 && s.estado.frecuencia > 0, `${s.estado.frecuencia} Hz`);
+await espera(150);
+ok('arranca bloqueado (suspendido) hasta el primer gesto', ctx.state === 'suspended' && !s.estado.activo, ctx.state);
+ok('mientras está bloqueado, el navegador no pide bloques', s.estado.bloques === 0);
+nota('ahora falta el primer toque: el botón «Tocar para empezar»');
+
+document.getElementById('empezar').addEventListener('click', async ev => {
+  ev.target.disabled = true;
+  document.getElementById('resumen').textContent = 'probando…';
+  await espera(300);
+  ok('el primer toque lo desbloquea', ctx.state === 'running' && s.estado.activo && s.estado.desbloqueadoCon === 'pointerdown',
+     `${ctx.state}, con «${s.estado.desbloqueadoCon}»`);
+  await espera(300);
+
+  // Nivel: un seno de amplitud A tiene valor eficaz A/√2
+  const esperado = AMPLITUD / Math.SQRT2;
+  const nIn = s.nivel('entrada');
+  ok('el medidor de entrada lee el nivel del tono', Math.abs(nIn - esperado) / esperado < 0.1, `${nIn.toFixed(4)} (esperado ${esperado.toFixed(4)})`);
+
+  // Volumen 50 % → ganancia 0,25 (curva al cuadrado)
+  s.volumen(0.5);
+  await espera(250);
+  const r50 = s.nivel('salida') / s.nivel('entrada');
+  ok('volumen 50 % → la salida es 1/4 de la entrada (curva al cuadrado)', Math.abs(r50 - 0.25) < 0.03, `salida/entrada ${r50.toFixed(3)}`);
+  s.silenciar(true);
+  await espera(250);
+  ok('silencio → no sale nada, pero el medidor de entrada sigue midiendo', s.nivel('salida') < 1e-4 && s.nivel('entrada') > esperado * 0.9,
+     `salida ${s.nivel('salida').toExponential(1)}, entrada ${s.nivel('entrada').toFixed(4)}`);
+  let guardado = {}; try { guardado = { v: JSON.parse(localStorage.getItem('mkw.volumen')), m: JSON.parse(localStorage.getItem('mkw.silencio')) }; } catch {}
+  ok('volumen y silencio quedan guardados en el navegador', guardado.v === 0.5 && guardado.m === true, JSON.stringify(guardado));
+
+  // Un bloque mudo entre bloques con sonido = un hueco (corte audible)
+  const huecosAntes = s.estado.huecos;
+  silenciarBloque = bloque + 2;
+  await espera(400);
+  ok('un bloque mudo entre bloques con sonido cuenta como 1 hueco', s.estado.huecos - huecosAntes === 1, `${s.estado.huecos - huecosAntes} huecos`);
+  ok('bloques de 2048 muestras (~43 ms a 48 kHz)', s.estado.muestrasBloque === 2048, `${s.estado.muestrasBloque} muestras`);
+  ok('el costo de llenar un bloque se mide', s.estado.msBloqueMax > 0, `máx ${s.estado.msBloqueMax.toFixed(2)} ms`);
+
+  // Otro AudioContext de la página (los pitidos DNF): el volumen y el medidor siguen siendo los del juego
+  s.silenciar(false);
+  const otro = new AudioContext();
+  s.volumen(0.5);
+  await espera(250);
+  const rOtro = s.nivel('salida') / s.nivel('entrada');
+  ok('otro AudioContext de la página no le quita el volumen ni el medidor al juego', s.contexto === ctx && Math.abs(rOtro - 0.25) < 0.03,
+     `salida/entrada ${rOtro.toFixed(3)}, ${s.estado.contextos} AudioContext`);
+  await otro.close();
+  s.silenciar(false); s.volumen(0.7);
+  nodo.disconnect();
+  await ctx.close();
+  try { localStorage.removeItem('mkw.volumen'); localStorage.removeItem('mkw.silencio'); } catch {}
+  nota(`bloques: ${s.estado.bloques}, en silencio: ${s.estado.bloquesSilencio}`);
+  fin();
+});
+</script>
+</body>
+</html>

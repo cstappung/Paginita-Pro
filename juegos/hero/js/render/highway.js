@@ -55,6 +55,17 @@ function anchoCelular(w, h, strikeY, topY) {
   return w / 2 / s;
 }
 
+// el apagón de la batalla tapa desde esta distancia (0 = la barra, 1 = el fondo de la pista) hacia la barra,
+// con un borde que se funde en APAGON_BORDE: lo lejano se ve, lo que está por llegar no
+const APAGON_DESDE = 0.35, APAGON_BORDE = 0.1;
+
+// las etiquetas de teclas con dos trastes intercambiados (teclas cruzadas de la batalla)
+function cruzaEtiquetas(labels, [a, b]) {
+  const out = Object.assign(labels.slice(), labels);
+  [out[a], out[b]] = [labels[b], labels[a]];
+  return out;
+}
+
 export class HighwayRenderer {
   draw(ctx, view, p, now, song, opts) {
     // modo alto rendimiento: los mismos elementos, con efectos más sencillos
@@ -79,8 +90,7 @@ export class HighwayRenderer {
       view, drums, lanes, strikeY, topY, hw, cx: view.x + view.w / 2, celular: cel,
       laneW: (2 * hw) / lanes,
       vis: 1.45 / Math.max(0.3, opts.noteSpeed),
-      // «Zurdo» da vuelta la pista (como el ajuste de zurdo, sin tocar los controles)
-      lefty: !!opts.lefty !== !!B?.zurdo,
+      lefty: !!opts.lefty,
       colors: drums ? (lanes === 5 ? DRUM_COLORS5 : DRUM_COLORS4) : FRET_COLORS,
     };
     G.proj = (d) => {
@@ -103,10 +113,18 @@ export class HighwayRenderer {
 
     this._consumeFx(p, fx, G, now, opts);
 
-    if (B?.amp) fx.shake = Math.max(fx.shake, 3 + 2 * Math.abs(Math.sin(perf / 90)));   // amplificador saturado: la pista tiembla
+    if (B?.amp) fx.shake = Math.max(fx.shake, 9 + 7 * Math.abs(Math.sin(perf / 70)));   // amplificador saturado: la pista se sacude
     fx.shake = Math.max(0, fx.shake - dt * 28);
     ctx.save();
     if (fx.shake > 0) ctx.translate((Math.random() * 2 - 1) * fx.shake, (Math.random() * 2 - 1) * fx.shake);
+    // y además se bambolea entera: gira, se estira y se corre de lado (dos ondas para que no sea un vaivén parejo)
+    if (B?.amp) {
+      const rot = 0.075 * Math.sin(perf / 140) + 0.035 * Math.sin(perf / 53), sx = 1 + 0.07 * Math.sin(perf / 95);
+      ctx.translate(G.cx, strikeY);
+      ctx.rotate(rot);
+      ctx.scale(sx, 1 - 0.04 * Math.sin(perf / 120));
+      ctx.translate(-G.cx + Math.sin(perf / 170) * view.w * 0.05, -strikeY);
+    }
     // entrada de la autopista al empezar la canción: sube desde abajo
     G.intro = opts.introAge ?? 99;
     if (G.intro < 0.5) {
@@ -136,13 +154,16 @@ export class HighwayRenderer {
     if (drums) this._separators(ctx, G);
     else this._strings(ctx, G, e, now);
     this._rails(ctx, G, e, now, fx, mult);
-    this._strikeBar(ctx, G, e, now, fx, opts);
-    // amplificador saturado: las notas parpadean
-    if (B?.amp) ctx.globalAlpha = 0.2 + 0.8 * Math.abs(Math.sin(perf / 70));
+    // con las teclas cruzadas, las etiquetas de esas dos teclas se cambian de traste
+    const cruce = B?.cruce;
+    this._strikeBar(ctx, G, e, now, fx, cruce && opts.keyLabels ? { ...opts, keyLabels: cruzaEtiquetas(opts.keyLabels, cruce) } : opts);
+    // amplificador saturado: las notas parpadean, a ratos casi se apagan
+    if (B?.amp) ctx.globalAlpha = Math.floor(perf / 90) % 4 === 0 ? 0.06 : 0.25 + 0.75 * Math.abs(Math.sin(perf / 55)) ** 2;
     if (!drums) this._sustains(ctx, G, e, now);
     this._gems(ctx, G, e, now, opts);
     ctx.globalAlpha = 1;
-    if (B?.apagon) this._apagon(ctx, G);
+    if (B?.apagon) this._apagon(ctx, G, perf);
+    if (cruce) this._cruce(ctx, G, cruce, perf);
     if (B && B.roto >= 0) this._cuerdaRota(ctx, G, B, perf);
     this._hitBursts(ctx, G, fx, now);
     if (!opts.rewinding) this._flames(ctx, G, e, now, fx, dt);
@@ -1226,18 +1247,60 @@ export class HighwayRenderer {
   // una oleada al ganar energía y rayos alrededor cuando está lista para activarse.
   // (x, y, w, h) es el rectángulo en pantalla; horizontal = se llena de izquierda a derecha.
   /* ---------- modo batalla ---------- */
-  // Apagón: una franja negra tapa las notas justo antes de llegar
-  _apagon(ctx, G) {
-    const [s0, y0] = G.proj(0.03), [s1, y1] = G.proj(0.3), [s2, y2] = G.proj(0.48), w = G.hw * 1.1;
+  // Apagón: las notas se ven al aparecer, en la parte lejana de la pista (para adivinar dónde van a caer), y se
+  // pierden en un negro opaco que tapa desde APAGON_DESDE hasta pasada la barra donde se tocan; solo se ven
+  // las llamas y chispas de lo que aciertas, que se pintan encima
+  _apagon(ctx, G, perf) {
+    const [s0, y0] = G.proj(Math.max(G.dBottom, -0.09)), [s1, y1] = G.proj(APAGON_DESDE), [s2, y2] = G.proj(APAGON_DESDE + APAGON_BORDE), w = G.hw * 1.14;
     ctx.save();
-    const gr = ctx.createLinearGradient(0, y2, 0, y0);
-    gr.addColorStop(0, 'rgba(4,2,14,0)');
-    gr.addColorStop(Math.max(0.05, Math.min(0.95, (y1 - y2) / (y0 - y2))), 'rgba(4,2,14,0.97)');
-    gr.addColorStop(1, 'rgba(4,2,14,0.97)');
+    const gr = ctx.createLinearGradient(0, y2, 0, y1);
+    gr.addColorStop(0, 'rgba(3,2,8,0)');
+    gr.addColorStop(1, 'rgba(3,2,8,1)');
     ctx.fillStyle = gr;
     ctx.beginPath();
-    ctx.moveTo(G.cx - w * s2, y2); ctx.lineTo(G.cx + w * s2, y2); ctx.lineTo(G.cx + w * s0, y0); ctx.lineTo(G.cx - w * s0, y0);
+    ctx.moveTo(G.cx - w * s2, y2); ctx.lineTo(G.cx + w * s2, y2); ctx.lineTo(G.cx + w * s1, y1); ctx.lineTo(G.cx - w * s1, y1);
     ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#030208';
+    ctx.beginPath();
+    ctx.moveTo(G.cx - w * s1, y1 - 0.5); ctx.lineTo(G.cx + w * s1, y1 - 0.5); ctx.lineTo(G.cx + w * s0, y0); ctx.lineTo(G.cx - w * s0, y0);
+    ctx.closePath(); ctx.fill();
+    // el borde de abajo, apenas marcado (para saber dónde está la barra), y el aviso
+    const [sb, yb] = G.proj(0);
+    ctx.strokeStyle = `rgba(106,138,255,${0.18 + 0.1 * Math.sin(perf / 160)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(G.cx - G.hw * sb, yb); ctx.lineTo(G.cx + G.hw * sb, yb); ctx.stroke();
+    ctx.font = `800 ${Math.round(Math.max(14, G.laneW * 0.42))}px Rajdhani, "Segoe UI", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(106,138,255,0.35)';
+    ctx.fillText('🌑 APAGÓN', G.cx, (y1 + yb) / 2);
+    ctx.restore();
+  }
+
+  // Teclas cruzadas: una flecha doble une los dos trastes y cada uno lleva un anillo del color de la tecla que
+  // ahora lo toca
+  _cruce(ctx, G, [a, b], perf) {
+    if (a >= G.lanes || b >= G.lanes) return;
+    const [s, y] = G.proj(0), xa = G.laneX(a, s), xb = G.laneX(b, s), rx = G.laneW * 0.4, ry = rx * 0.45;
+    const k = 0.6 + 0.4 * Math.abs(Math.sin(perf / 140)), top = y - G.laneW * (0.75 + 0.18 * Math.abs(b - a));
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const [l, otro] of [[a, b], [b, a]]) {
+      const x = l === a ? xa : xb;
+      ctx.beginPath(); ctx.ellipse(x, y, rx * 1.32, ry * 1.32, 0, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(3, rx * 0.22); ctx.strokeStyle = G.colors[otro]; ctx.globalAlpha = k; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const curva = () => { ctx.beginPath(); ctx.moveTo(xa, y - ry * 1.4); ctx.quadraticCurveTo((xa + xb) / 2, top, xb, y - ry * 1.4); };
+    curva(); ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.stroke();
+    curva(); ctx.lineWidth = 4.5; ctx.strokeStyle = '#c79bff'; ctx.stroke();
+    // puntas de flecha en los dos extremos, siguiendo la curva
+    for (const x0 of [xa, xb]) {
+      const ang = Math.atan2(y - ry * 1.4 - top, x0 - (xa + xb) / 2), L = Math.max(9, rx * 0.55);
+      ctx.beginPath();
+      ctx.moveTo(x0, y - ry * 1.4);
+      ctx.lineTo(x0 - L * Math.cos(ang - 0.5), y - ry * 1.4 - L * Math.sin(ang - 0.5));
+      ctx.moveTo(x0, y - ry * 1.4);
+      ctx.lineTo(x0 - L * Math.cos(ang + 0.5), y - ry * 1.4 - L * Math.sin(ang + 0.5));
+      ctx.lineWidth = 4.5; ctx.strokeStyle = '#c79bff'; ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -1305,11 +1368,15 @@ export class HighwayRenderer {
       }
     }
     // ataques que tienes encima: íconos arriba de la autopista
-    const act = ['amp', 'zurdo', 'apagon', 'drenaje'].filter((k) => B[k]).concat(B.roto >= 0 ? ['cuerda'] : []);
+    const act = ['amp', 'cruce', 'dobles', 'apagon', 'drenaje'].filter((k) => B[k]).concat(B.roto >= 0 ? ['cuerda'] : []);
     act.forEach((k, i) => {
       const P = PODERES_BT[k], ax = G.cx + (i - (act.length - 1) / 2) * 34 * scale, ay = G.topY + 26 * scale;
       ctx.beginPath(); ctx.arc(ax, ay, 14 * scale, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = P.color; ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.stroke();
+      // el anillo se vacía con el tiempo que le queda
+      const q = B.quedan?.[k] ?? 1;
+      ctx.beginPath(); ctx.arc(ax, ay, 14 * scale, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * q);
+      ctx.lineWidth = 3; ctx.strokeStyle = P.color; ctx.stroke();
       ctx.font = `${Math.round(15 * scale)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`; ctx.fillStyle = '#fff'; ctx.fillText(P.ic, ax, ay + 1);
     });
     // el aviso: lo que te lanzaron (con cómo zafar) o el poder que ganaste

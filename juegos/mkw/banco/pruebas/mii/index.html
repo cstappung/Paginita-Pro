@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mii</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Mi Mii: <span>el formato de los Mii y su base (RFL_DB.dat)</span></h1>
+<p>Prueba <code>web/navegador/mii.mjs</code> (bitácora §55) <b>sin el juego</b>, con Mii <b>inventados</b>: armar y desarmar
+  los 74 bytes de un Mii (todos los campos de bits, también los que no se usan), la suma de control CRC-16/XMODEM de la
+  base, armar y leer la base de 100 casillas, que una base dañada se detecte, que duplicar dé un id nuevo y que la
+  vista previa sea un SVG. (Que el juego lista estos Mii al crear la licencia se comprobó con el juego andando:
+  <code>guion.mjs --mii</code>.)</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul><div id="vista"></div></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { desarmarMii, armarMii, miiNuevo, duplicarMii, leerBase, armarBase, crc16, vistaPrevia, mismoId, RASGOS, TAM_RFLDB } from '/web/navegador/mii.mjs';
+
+const { ok, nota, fin } = prueba('mii', 'Mii y base de Mii (sin el juego)');
+
+// 1) CRC-16/XMODEM: el valor de referencia de "123456789"
+ok('CRC-16/XMODEM da el valor de referencia (0x31C3)', crc16(new TextEncoder().encode('123456789')) === 0x31C3);
+
+// 2) Ida y vuelta con 300 Mii de bytes al azar (con la forma: 74 bytes): desarmar y armar devuelve los mismos bytes
+//    (salvo el nombre/creador, que se cortan en el primer 0, y la altura/peso que van de 0 a 127)
+let iguales = 0;
+const azar = n => Array.from({ length: n }, () => Math.floor(Math.random() * 256));
+for (let i = 0; i < 300; i++) {
+  const b = new Uint8Array(azar(74));
+  for (const p of [0x02, 0x36]) for (let k = 0; k < 20; k++) b[p + k] = k % 2 ? 0x41 + (i + k) % 26 : 0;   // nombres legibles
+  b[0x16] &= 0x7F; b[0x17] &= 0x7F;
+  if (armarMii(desarmarMii(b)).every((x, j) => x === b[j])) iguales++;
+}
+ok('desarmar y volver a armar un Mii da los mismos 74 bytes (300 al azar)', iguales === 300, `${iguales}/300`);
+
+// 3) Un Mii nuevo: valores del editor, id "normal" (bit alto) y dentro de los rangos del editor
+const m = miiNuevo({ nombre: 'Prueba', ahora: Date.UTC(2026, 9, 17) });
+ok('un Mii nuevo tiene el id de un Mii normal (bit alto en 1)', (m.id[0] & 0x80) !== 0);
+const fuera = Object.values(RASGOS).flat().filter(([campo, , min, max]) => {
+  const v = campo.split('.').reduce((x, k) => x[k], m);
+  return v < min || v > max;
+});
+ok('todos sus rasgos están dentro de los rangos del editor', fuera.length === 0, fuera.map(f => f[0]).join(', '));
+const d = duplicarMii(m, Date.UTC(2026, 9, 17) + 60000);
+ok('duplicar da otro id (dos Mii con el mismo id confunden a la Wii)', !mismoId(m, d));
+
+// 4) La base: 2 Mii, se leen igual; una casilla vacía no cuenta; dañada se detecta
+const base = armarBase([m, d]);
+const r = leerBase(base);
+ok('la base tiene el tamaño de la de la Wii y empieza con «RNOD»', base.length === TAM_RFLDB && String.fromCharCode(...base.subarray(0, 4)) === 'RNOD');
+ok('la base armada es válida (su CRC cuadra) y trae los 2 Mii', r.valida && r.mii.length === 2 && r.mii[0].mii.nombre === 'Prueba', r.problema);
+const danada = new Uint8Array(base); danada[200] ^= 1;
+ok('una base con un byte cambiado se detecta como dañada', !leerBase(danada).valida);
+// rearmar sobre una base "original" respeta lo que había después de los Mii (el desfile, RNHD)
+const original = new Uint8Array(base); original[0x1D10] = 0x5A;
+const rearmada = armarBase([m], original);
+ok('rearmar sobre la base original conserva lo que no son Mii (el desfile)', rearmada[0x1D10] === 0x5A && leerBase(rearmada).valida && leerBase(rearmada).mii.length === 1);
+let mucho = false;
+try { armarBase(Array.from({ length: 101 }, () => m)); } catch { mucho = true; }
+ok('no deja armar una base con más de 100 Mii', mucho);
+
+// 5) La vista previa: un SVG nuestro
+const svg = vistaPrevia(m, 120);
+ok('la vista previa es un SVG', svg.startsWith('<svg') && svg.includes('</svg>'));
+document.getElementById('vista').innerHTML = svg + vistaPrevia(Object.assign(structuredClone(m), { esChica: 1, lentes: { tipo: 3, color: 2, tam: 4, alto: 10 } }), 120);
+nota('arriba: dos vistas previas (aproximadas, dibujo de la página)');
+fin();
+</script>
+</body>
+</html>

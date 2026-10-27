@@ -29,6 +29,7 @@ test('Consumo: cada pestaña cuenta una vez, con su número más alto',()=>{
 });
 
 test('Consumo: marca una vez por día y tipo, y corta en el tope',()=>{
+  assert.equal(C.LIMITES.tope,90*MB,'el tope diario por cuenta es de 90 MB');
   let t=T0;const a=almacen(),marcas=[],topes=[];
   const m=C.crearMedidor({almacen:a,ahora:()=>t,pestaña:'p1',alMarca:(x,e)=>marcas.push([x,C.enMB(e.total)]),alTope:e=>topes.push(e.total)});
   m.cuenta(10*MB);t+=1000;m.tick();
@@ -41,18 +42,18 @@ test('Consumo: marca una vez por día y tipo, y corta en el tope',()=>{
   t+=10*60000;m.tick();
   assert.equal(marcas.length,1,'el aviso no se repite');
   /* Otro aparato de la cuenta: con eso se llega al tope. */
-  m.ponCuenta({dia:'2026-10-05',t:{p1:3*MB,movil:40*MB}});
+  m.ponCuenta({dia:'2026-10-05',t:{p1:3*MB,movil:45*MB}});
   t+=1000;const e=m.tick();
-  assert.equal(e.total,85*MB);
+  assert.equal(e.total,90*MB);
   assert.deepEqual(marcas.map(x=>x[0]),['dia','tope']);
-  assert.deepEqual(topes,[85*MB]);
+  assert.deepEqual(topes,[90*MB]);
   assert.equal(e.cortado,true);
   t+=1000;m.tick();
   assert.equal(topes.length,1,'se corta una sola vez');
   /* Una pestaña nueva el mismo día ya no marca de nuevo, pero también corta. */
   const topes2=[],marcas2=[];
   const m2=C.crearMedidor({almacen:a,ahora:()=>t,pestaña:'p3',alMarca:x=>marcas2.push(x),alTope:()=>topes2.push(1)});
-  m2.ponCuenta({dia:'2026-10-05',t:{movil:40*MB}});
+  m2.ponCuenta({dia:'2026-10-05',t:{movil:45*MB}});
   m2.tick();
   assert.deepEqual(marcas2,[]);
   assert.equal(topes2.length,1);

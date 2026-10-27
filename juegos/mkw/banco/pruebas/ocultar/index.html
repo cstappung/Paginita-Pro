@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Botones escondidos</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Botones escondidos: <span>«Retro WFC» y los «Settings» de Retro Rewind no se ven ni se pueden elegir</span></h1>
+<p>Prueba <code>ocultar.mjs</code> (bitácora §66) <b>sin el juego</b>: una memoria de Wii inventada con la forma de las
+  pantallas del juego (la página con su número y su administrador de mandos, los recuadros, los botones con su clase, su
+  número y sus bits de "quién puede elegirlo", unos dentro de la página y otros en el montón). Comprueba que en el menú
+  principal se esconden el recuadro «Retro WFC» y sus dos botones (y nada más), que en la sala en línea no se toca, que
+  en «Un jugador» se esconde «Settings», que un botón igual pero de OTRA página no se toca, y que si algo no tiene la
+  forma esperada no se escribe nada.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearOcultar, CLASE, PAGINA } from '/web/navegador/ocultar.mjs';
+
+const { ok, nota, fin } = prueba('ocultar', 'Botones del juego escondidos (sin el juego)');
+
+// ---- Una memoria de Wii falsa: palabras de 32 bits y bytes, con lector igual al de menus.mjs (u32, u8, w32, w8) ----
+function memoria() {
+  const m = new Map(), escrituras = [];
+  const u8 = a => m.get(a) ?? 0;
+  const u32 = a => ((u8(a) << 24) | (u8(a + 1) << 16) | (u8(a + 2) << 8) | u8(a + 3)) >>> 0;
+  const w8 = (a, v) => { m.set(a, v & 0xFF); escrituras.push(a); };
+  const w32 = (a, v) => { for (let i = 0; i < 4; i++) m.set(a + i, (v >>> (24 - 8 * i)) & 0xFF); escrituras.push(a); };
+  return { u8, u32, w8, w32, escrituras, poner: (a, v) => { for (let i = 0; i < 4; i++) m.set(a + i, (v >>> (24 - 8 * i)) & 0xFF); } };
+}
+// Un botón: vtable, escondido = 0, administrador de su página, número, bits de quién lo elige (jugador 1)
+function boton(mem, dir, { clase, admin, id }) {
+  mem.poner(dir, clase); mem.poner(dir + 0x234, admin); mem.poner(dir + 0x240, id >>> 0);
+  mem.poner(dir + 0x244, 1); mem.poner(dir + 0x1E4, 1);
+}
+const escondido = (mem, d) => mem.u8(d + 0x80) === 1;
+const elegible = (mem, d) => mem.u32(d + 0x244) !== 0 || mem.u32(d + 0x1E4) !== 0;
+
+// El menú principal de Retro Rewind (direcciones como las medidas en el juego, §66)
+function menuPrincipal({ claseMarco = CLASE.marcoMenu, claseBoton = CLASE.botonVideo } = {}) {
+  const mem = memoria(), pag = 0x80E3E338, admin = pag + 0x658;
+  mem.poner(pag + 4, PAGINA.menuPrincipal);
+  const marcos = { un: pag + 0x6C4, multi: pag + 0x838, wfc: pag + 0x9AC };
+  for (const d of Object.values(marcos)) mem.poner(d, claseMarco);
+  const b = {
+    atras: pag + 84, licencia: pag + 16176,
+    uno: pag + 51604, dos: pag + 79712, tres: pag + 96268, cuatro: pag + 112824, wfc1: pag + 140924, wfc2: pag + 157480,
+    ajeno: pag + 185580,     // un botón de OTRA página (la de abajo), con el mismo número 4 y la misma clase
+    lejos: pag + 0x50000,    // uno igual a wfc1 pero fuera del alcance de la búsqueda
+  };
+  boton(mem, b.atras, { clase: 0x808D374C, admin, id: -100 });
+  boton(mem, b.licencia, { clase: CLASE.pushButton, admin, id: 7 });
+  [b.uno, b.dos, b.tres, b.cuatro].forEach((d, i) => boton(mem, d, { clase: claseBoton, admin, id: i }));
+  boton(mem, b.wfc1, { clase: claseBoton, admin, id: 4 });
+  boton(mem, b.wfc2, { clase: claseBoton, admin, id: 5 });
+  boton(mem, b.ajeno, { clase: claseBoton, admin: 0x80E6B400, id: 4 });
+  return { mem, pag, marcos, b };
+}
+function unJugador() {
+  const mem = memoria(), pag = 0x80B4297C, admin = pag + 0x658;
+  mem.poner(pag + 4, PAGINA.unJugador);
+  const b = { atras: pag + 84, gp: pag + 13496, tt150: pag + 32532, tt200: pag + 51660, vs: pag + 70696, batalla: pag + 89732, ajustes: pag + 108836 };
+  boton(mem, b.atras, { clase: 0x808D374C, admin, id: -100 });
+  [b.gp, b.tt150, b.tt200, b.vs, b.batalla].forEach((d, i) => boton(mem, d, { clase: 0x808D3530, admin, id: i }));
+  boton(mem, b.ajustes, { clase: CLASE.pushButton, admin, id: 5 });
+  return { mem, pag, b };
+}
+
+// 1) Menú principal fuera de la sala: el recuadro «Retro WFC» y sus dos botones, nada más
+{
+  const { mem, pag, marcos, b } = menuPrincipal();
+  const o = crearOcultar({ lector: mem });
+  const t0 = performance.now(); const n = o.alActivar(pag); const ms = performance.now() - t0;
+  ok('menú principal: se esconde el recuadro «Retro WFC»', escondido(mem, marcos.wfc) && !escondido(mem, marcos.un) && !escondido(mem, marcos.multi));
+  ok('menú principal: «Retro WFC 1 y 2 jugadores» escondidos y nadie puede elegirlos (los dos bits en 0)',
+     escondido(mem, b.wfc1) && escondido(mem, b.wfc2) && !elegible(mem, b.wfc1) && !elegible(mem, b.wfc2));
+  ok('menú principal: Un jugador, Multijugador, «License Settings» y «Back» siguen igual',
+     [b.uno, b.dos, b.tres, b.cuatro, b.licencia, b.atras].every(d => !escondido(mem, d) && elegible(mem, d)));
+  ok('un botón igual (misma clase, número 4) pero de OTRA página no se toca', !escondido(mem, b.ajeno) && elegible(mem, b.ajeno));
+  ok('la búsqueda tiene alcance: uno igual muy lejos de la página ni se mira', o.botonesDe(pag).every(x => x.dir !== b.lejos));
+  ok('lo que dice que hizo', n === 3 && o.estado.ultima?.que?.[0] === 'Retro WFC', `${n} cosas escondidas`);
+  nota(`buscar los botones (±256 KB alrededor de la página, en esta memoria falsa): ${ms.toFixed(1)} ms`);
+}
+// 2) En la sala en línea el recuadro se deja (la página entra sola a «VS mundial» por él)
+{
+  const { mem, pag } = menuPrincipal();
+  const n = crearOcultar({ lector: mem, enLinea: true }).alActivar(pag);
+  ok('en la sala en línea no se toca nada del menú principal', n === 0 && mem.escrituras.length === 0);
+}
+// 3) «Un jugador»: el botón «Settings» de Retro Rewind
+{
+  const { mem, pag, b } = unJugador();
+  const n = crearOcultar({ lector: mem }).alActivar(pag);
+  ok('«Un jugador»: «Settings» escondido y nadie puede elegirlo', escondido(mem, b.ajustes) && !elegible(mem, b.ajustes));
+  ok('«Un jugador»: Grand Prix, TTs, VS, Battle y Back siguen igual',
+     [b.gp, b.tt150, b.tt200, b.vs, b.batalla, b.atras].every(d => !escondido(mem, d) && elegible(mem, d)), `${n} escondido`);
+}
+// 4) Otra pantalla (elegir personaje, 0x6B): no se escribe nada
+{
+  const mem = memoria(), pag = 0x80C00000;
+  mem.poner(pag + 4, 0x6B);
+  const o = crearOcultar({ lector: mem });
+  ok('otra pantalla: no se escribe nada', o.alActivar(pag) === 0 && mem.escrituras.length === 0 && o.estado.activaciones === 1);
+}
+// 5) Si el juego no tiene la forma esperada (otra versión de Retro Rewind), no se toca nada
+{
+  const { mem, pag } = menuPrincipal({ claseMarco: 0x808BEEEE, claseBoton: 0x808D0000 });
+  const n = crearOcultar({ lector: mem }).alActivar(pag);
+  ok('con otras clases (otra versión del juego) no se escribe nada', n === 0 && mem.escrituras.length === 0);
+}
+fin();
+</script>
+</body>
+</html>

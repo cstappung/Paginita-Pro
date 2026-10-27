@@ -49,7 +49,7 @@ before the first edit. Read only the docs the task needs.
 | Idiomas, traducción, i18n | `docs/claude/i18n.md` |
 | **Any Juegos work** (rooms, a new game, a game screen) | `colabtex/src/juegos/CLAUDE.md` (always), plus the game's doc below |
 | Salón / lobby, portada, fichas, invitado, rieles, chat general, novedades, modo Halloween | `docs/claude/juegos/salon.md` |
-| Perfiles, marcos, fondos, tienda, tienda de Halloween (edición limitada), clasificación/ranking, logros, monedas, recompensa diaria, referidos, códigos, color del nombre | `docs/claude/juegos/perfiles-y-economia.md` |
+| Perfiles, marcos, fondos, tienda, tienda de Halloween (edición limitada), clasificación/ranking, logros, monedas, recompensa diaria, referidos, códigos, color del nombre, cierre de la economía, archivo, descarga de la base | `docs/claude/juegos/perfiles-y-economia.md` |
 | Música, canciones, reproductor ♪, YouTube, volumen, mandos/controles | `juegos/audio/CLAUDE.md` |
 | Solo Club in general, antitrampas, castigo, modo celular | `juegos/club/CLAUDE.md` |
 | Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
@@ -84,6 +84,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Pro BoxHead (boxhead, zombis, diablos) | `juegos/boxhead/CLAUDE.md` |
 | HaxBall | `juegos/haxball/CLAUDE.md` |
 | Budokai Tenkaichi 3 (BT3, PS2 port, ISO, online rooms) | `juegos/bt3/CLAUDE.md` |
+| Mario Kart Wii (MKW, Retro Rewind, WiiCompiled port, online rooms, VR) | `juegos/mkw/CLAUDE.md` (the port) and `juegos/mkw/docs/en-linea.md` + the header of `colabtex/src/juegos/mkw.js` (the room) |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
 | Memazo (memes, plantillas, estilo Make It Meme) | `docs/claude/juegos/memazo.md` |
@@ -111,7 +112,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Frontera Batalla | `docs/claude/juegos/frontera.md` |
 | Tulones (hot-seat) | `juegos/club/tulones/CLAUDE.md` |
 | Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
-| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda era / reinos en pruebas) | `juegos/club/prodefender/CLAUDE.md` |
+| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda y tercera era, pactos, eventos, poder del reino) | `juegos/club/prodefender/CLAUDE.md` |
 | PRO PACMAN (pacman, laberinto, fantasmas, racha, turbo, pulso) | `juegos/club/propac/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.

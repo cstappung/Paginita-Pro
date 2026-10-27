@@ -590,11 +590,12 @@ test('batalla: vida, poderes por frase, ataques, cuerda rota, robo y K.O.', asyn
   for (let i = 1; i < REPARA; i++) assert.equal(b.pulsaRoto(1, 4), false);
   assert.ok(b.pulsaRoto(1, 4));
   assert.ok(!b.roto(1, 1, 4.1));
-  // los efectos vencen solos
-  b.recibe(1, { id: 50, k: 'zurdo', l: -1, de: 0 }, 5);
-  assert.ok(b.pintura(1, 6).zurdo);
-  b.tick(1, 5 + PODERES.zurdo.dur + 0.01, 0.016);
-  assert.ok(!b.pintura(1, 5 + PODERES.zurdo.dur + 0.02).zurdo);
+  // los efectos vencen solos (y el anillo de su ícono se vacía)
+  b.recibe(1, { id: 50, k: 'amp', l: -1, de: 0 }, 5);
+  assert.ok(b.pintura(1, 6).amp);
+  assert.ok(Math.abs(b.pintura(1, 5 + PODERES.amp.dur / 2).quedan.amp - 0.5) < 1e-9);
+  b.tick(1, 5 + PODERES.amp.dur + 0.01, 0.016);
+  assert.ok(!b.pintura(1, 5 + PODERES.amp.dur + 0.02).amp);
   // el robo: el que roba se queda con uno de los poderes del otro
   b.j[1].poderes = ['amp', 'apagon']; b.j[0].poderes = ['robo'];
   b.recibe(1, b.lanza(0, 20, 5), 20);
@@ -614,6 +615,46 @@ test('batalla: vida, poderes por frase, ataques, cuerda rota, robo y K.O.', asyn
   const d = new Batalla(() => 0);
   d.acierto(0); d.cierra(100, [10, 20]);
   assert.deepEqual([d.ganador, d.motivo], [0, 'vida']);
+});
+
+test('batalla: teclas cruzadas (dos trastes se cambian) y notas dobles', async () => {
+  const { Batalla, PODERES, PODERES_BATERIA, DOBLES_ANTES, dobla } = await mod('js/game/batalla.js');
+  assert.equal(PODERES.zurdo, undefined, 'el «zurdo» ya no existe: ahora se cruzan dos teclas');
+  assert.ok(!PODERES_BATERIA.includes('dobles'), 'contra la batería no salen notas dobles');
+  // el cruce elige dos carriles distintos y solo esos dos se intercambian, hasta que vence
+  for (const r of [0, 0.3, 0.55, 0.99]) {
+    const b = new Batalla(() => r);
+    b.j[0].poderes = ['cruce'];
+    const a = b.lanza(0, 2, 5);
+    b.recibe(1, a, 2);
+    const [x, y] = b.j[1].cruce;
+    assert.ok(x !== y && x >= 0 && y < 5, 'dos carriles distintos: ' + [x, y]);
+    const map = [0, 1, 2, 3, 4].map((l) => b.cruzado(1, l, 3));
+    assert.deepEqual(map.filter((c, l) => c !== l).length, 2);
+    assert.equal(map[x], y); assert.equal(map[y], x);
+    assert.deepEqual(b.pintura(1, 3).cruce, [x, y]);
+    b.tick(1, 2 + PODERES.cruce.dur + 0.01, 0.016);
+    assert.equal(b.cruzado(1, x, 2 + PODERES.cruce.dur + 0.02), x, 'vencido, cada tecla vuelve a su traste');
+    assert.equal(b.pintura(1, 2 + PODERES.cruce.dur + 0.02).cruce, null);
+  }
+  // notas dobles: las simples dentro de la ventana se vuelven acordes con el traste de al lado (los sostenidos
+  // también), una sola vez; las abiertas, los acordes y las de fuera de la ventana no cambian
+  const nota = (time, frets, extra = {}) => ({ time, frets, gems: 1, open: false, sus: [], ...extra });
+  const notas = [nota(1, 1), nota(3, 1), nota(3.5, 16), nota(4, 4, { sus: [{ mask: 4, endTime: 5 }] }), nota(4.5, 0, { open: true }), nota(5, 3, { gems: 2 }), nota(20, 2)];
+  const b = new Batalla(() => 0);
+  b.j[0].poderes = ['dobles'];
+  b.recibe(1, b.lanza(0, 2, 5), 2);
+  const [t0, t1] = b.j[1].dobles;
+  assert.deepEqual([t0, t1], [2 + DOBLES_ANTES, 2 + DOBLES_ANTES + PODERES.dobles.dur]);
+  assert.equal(dobla(notas, t0, t1), 3);
+  assert.deepEqual(notas.map((n) => n.frets), [1, 3, 24, 6, 0, 3, 2]);
+  assert.deepEqual(notas.map((n) => n.gems), [1, 2, 2, 2, 1, 2, 1]);
+  assert.equal(notas[3].sus[0].mask, 6);
+  assert.equal(dobla(notas, t0, t1), 0, 'no se doblan dos veces');
+  // en línea la ventana viaja en el estado y el rival la copia
+  const otro = new Batalla(() => 0);
+  otro.ponRemoto(1, JSON.parse(JSON.stringify(b.vista(1, 3))), 3);
+  assert.deepEqual(otro.j[1].dobles, [t0, t1]);
 });
 
 test('batalla en línea: tu estado lleva tus ataques y el del rival se copia tal cual', async () => {

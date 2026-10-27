@@ -227,6 +227,11 @@ other file of the site. Things that hold it together:
   grading `cartas/g/<uid>/<key>/<i>` = `{at: now, p: 100}`, only for a pack
   that exists. Both write-once, never deleted: they are the spending. The
   test pins the rule's timestamp to the motor's.
+- **Packs, gradings and re-rolls before the economy cierre live in
+  `archivo/`** (`docs/claude/juegos/perfiles-y-economia.md`): `e.sobres`
+  keeps only packs with a live copy (marked `cierre: true`), and packs
+  opened are counted in `e.cierre.est` per collection (`cifras`,
+  `topColecciones`). The grading rule accepts a pack that is archived.
 - **Everything that moves coins or cards is one replay: `economia(datos)`**
   (monedas.js, memoised per `datos` object). It walks, in server-time
   order (ties: pack, grading, listing, withdrawal, sale, trade), packs

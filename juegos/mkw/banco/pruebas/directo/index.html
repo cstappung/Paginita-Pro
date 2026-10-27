@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abrir directo</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Abrir directo: <span>la página pide la pantalla y el juego la abre con su propio código</span></h1>
+<p>Prueba <code>directo.mjs</code> (bitácora §71) <b>sin el juego</b>: un sistema de archivos inventado (la base de Mii
+  vacía o con dos Mii) y un juego falso con la forma de <code>directo_nativo.cpp</code> (las funciones
+  <code>_mkw_directo_*</code>, el aviso <code>mkwAlIrDirecto</code> y una memoria con el administrador de secciones y sus
+  páginas). Comprueba que con la base vacía se pone un Mii (con su suma de control) y se devuelve su CreateID y su nombre,
+  que con Mii no se escribe nada, que el salto se pide recién cuando el juego leyó el guardado y no está cambiando de
+  sección, que «sin licencia» termina en no, y que la acción de un botón solo se pide si su página está arriba y activa,
+  con la dirección de la página y del botón.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { prepararMii, crearDirecto, SECCION_DIRECTA, BOTON } from '/web/navegador/directo.mjs';
+import { leerBase, armarBase, miiNuevo, RUTA_RFLDB } from '/web/navegador/mii.mjs';
+
+const { ok, nota, fin } = prueba('directo', 'Abrir directo por código (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+
+// ---- Un sistema de archivos falso con lo que usa prepararMii (readFile, writeFile, mkdirTree) ----
+function fsFalso(inicial = {}) {
+  const archivos = new Map(Object.entries(inicial)), escritos = [], carpetas = [];
+  return {
+    readFile: r => { if (!archivos.has(r)) throw new Error('no existe ' + r); return archivos.get(r); },
+    writeFile: (r, d) => { archivos.set(r, new Uint8Array(d)); escritos.push(r); },
+    mkdirTree: c => carpetas.push(c), archivos, escritos, carpetas,
+  };
+}
+const utf16 = s => { const b = new Uint8Array(20); for (let k = 0; k < s.length && k < 10; k++) { b[2 * k] = s.charCodeAt(k) >> 8; b[2 * k + 1] = s.charCodeAt(k) & 0xFF; } return b; };
+const iguales = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+// 1) Base de Mii vacía (partida nueva): se pone un Mii nuestro con el nombre de la persona
+{
+  const FS = fsFalso();
+  const r = prepararMii(FS, 'Ana');
+  const base = leerBase(FS.archivos.get(RUTA_RFLDB) || new Uint8Array());
+  ok('base vacía: se escribe RFL_DB.dat con un Mii y la suma de control bien', base.valida && base.mii.length === 1 && FS.escritos.length === 1,
+     base.problema || `${base.mii.length} Mii`);
+  ok('…se crea su carpeta (shared2/menu/FaceLib)', FS.carpetas.some(c => c.endsWith('/FaceLib')));
+  const m = base.mii[0]?.mii;
+  ok('…y devuelve su CreateID (id del Mii + consola, 8 bytes) y su nombre en UTF-16', m && iguales([...r.createId], [...m.id, ...m.consola]) && iguales([...r.nombre], [...utf16('Ana')]));
+  ok('…con «nueva» para guardarla', !!r.nueva && r.nueva.length === FS.archivos.get(RUTA_RFLDB).length);
+  const F = fsFalso(); prepararMii(F, 'Nombremuylargo');
+  ok('un nombre largo se corta a 10 letras (lo que cabe en un Mii)', leerBase(F.archivos.get(RUTA_RFLDB)).mii[0]?.mii.nombre === 'Nombremuyl');
+}
+// 2) La base ya tiene Mii: se usa el primero y no se escribe nada
+{
+  const a = miiNuevo({ nombre: 'Primero' }), b = miiNuevo({ nombre: 'Segundo', ahora: Date.now() + 8000 });
+  const FS = fsFalso({ [RUTA_RFLDB]: armarBase([a, b]) });
+  const r = prepararMii(FS, 'Ana');
+  ok('base con Mii: no se escribe nada y se usa el primero', FS.escritos.length === 0 && !r.nueva && iguales([...r.createId], [...a.id, ...a.consola]) && iguales([...r.nombre], [...utf16('Primero')]));
+}
+
+// ---- Un juego falso: las funciones de directo_nativo.cpp y una memoria con SectionMgr → Section → páginas ----
+function juegoFalso({ listoDesde = 3, licenciaOk = true } = {}) {
+  const mem = new Map();
+  const poner = (a, v) => mem.set(a, v >>> 0);
+  const est = { seccion: 0x3F, siguiente: -1, pagina: 0x57 };
+  let consultasListo = 0;
+  const M = {
+    HEAPU8: new Uint8Array(256), pedidos: [], botones: [],
+    _mkw_directo_mii: () => 64,
+    _mkw_directo_listo: () => (++consultasListo > listoDesde ? 1 : 0),
+    _mkw_directo_ir: (s, l) => {
+      M.pedidos.push({ s, l, siguiente: est.siguiente, listo: consultasListo > listoDesde });
+      setTimeout(() => { M.mkwAlIrDirecto(s, licenciaOk ? 1 : 0); if (licenciaOk) est.seccion = s; }, 30);
+    },
+    _mkw_directo_boton: (f, p, b) => { M.botones.push({ f, p, b }); return 1; },
+  };
+  const lector = { estado: () => ({ ...est }), u32: a => mem.get(a) ?? 0 };
+  return { M, lector, est, poner };
+}
+// 3) ir() (§73): el pedido sale YA, aunque el juego todavía no haya leído el guardado ni terminado otro cambio de
+//    sección: el que espera es el juego (directo_nativo.cpp salta recién en el cuadro en que la partida está leída,
+//    sin pasar por el título ni las licencias). La página solo espera a que la sección aparezca.
+{
+  const { M, lector, est } = juegoFalso({ listoDesde: 3 });
+  est.siguiente = 0x41;                                // un cambio de sección ya en marcha
+  setTimeout(() => { est.siguiente = -1; }, 300);
+  const d = crearDirecto({ M, lector });
+  const t0 = performance.now();
+  const llego = await d.ir(SECCION_DIRECTA.unjugador);
+  const p = M.pedidos[0];
+  ok('ir(un jugador): un solo pedido, sección 0x48 con la licencia 0', M.pedidos.length === 1 && p.s === 0x48 && p.l === 0);
+  ok('…pedido enseguida, sin que la página espere el guardado (lo espera el juego)', !p.listo && p.siguiente === 0x41, `a los ${(performance.now() - t0).toFixed(0)} ms`);
+  ok('…y termina en sí cuando el juego muestra esa sección', llego === true && est.seccion === 0x48);
+  const otra = await d.ir(SECCION_DIRECTA.unjugador);
+  ok('si ya está en esa sección, no pide nada', otra === true && M.pedidos.length === 1);
+}
+// 4) Sin licencia (partida nueva y sin Mii): el juego no salta y ir() dice que no, enseguida
+{
+  const { M, lector } = juegoFalso({ listoDesde: 0, licenciaOk: false });
+  const t0 = performance.now();
+  const llego = await crearDirecto({ M, lector }).ir(SECCION_DIRECTA.enlinea, { tope: 5000 });
+  ok('sin licencia: ir() termina en no (sin esperar el tope)', llego === false && performance.now() - t0 < 1000, `${(performance.now() - t0).toFixed(0)} ms`);
+}
+// 5) ponerMii: 8 bytes de CreateID + 20 de nombre donde dice el juego
+{
+  const { M, lector } = juegoFalso();
+  const createId = Uint8Array.from([0x81, 2, 3, 4, 5, 6, 7, 8]), nombre = utf16('Beto');
+  crearDirecto({ M, lector }).ponerMii({ createId, nombre });
+  ok('ponerMii: CreateID y nombre en el buffer del juego (28 bytes)', iguales([...M.HEAPU8.subarray(64, 72)], [...createId]) && iguales([...M.HEAPU8.subarray(72, 92)], [...nombre]));
+}
+// 6) boton(): solo si su página es la de arriba, con la dirección de la página y la del botón dentro de ella
+{
+  const { M, lector, poner } = juegoFalso();
+  const sm = 0x80E00000, sec = 0x80E10000, abajo = 0x80E20000, arriba = 0x80E30000;
+  poner(0x809C1E38, sm); poner(sm, sec); poner(sec + 0x37C, 2); poner(sec + 0x354, abajo); poner(sec + 0x358, arriba);
+  poner(abajo + 4, 0x50); poner(arriba + 4, 0x8B); poner(arriba + 8, 3);      // estado 3: todavía entrando
+  const d = crearDirecto({ M, lector });
+  ok('paginaArriba(0x8B): la dirección del objeto de la página', d.paginaArriba(0x8B) === arriba && d.paginaArriba(0x50) === 0);
+  ok('mientras la página todavía entra (estado ≠ 4) no se pide nada (su OnActivate lo borraría)', d.boton(BOTON.mundial) === false && M.botones.length === 0);
+  poner(arriba + 8, 4);                                                        // estado 4: activa
+  const si = d.boton(BOTON.mundial), no = d.boton(BOTON.usarWfc);
+  const b = M.botones[0];
+  ok('boton(Mundial) con el menú Wi-Fi arriba: se pide la función del juego con la página y el botón (+0x230)',
+     si && b?.f === 0x8064BCE8 && b.p === arriba && b.b === arriba + 0x230);
+  ok('boton(«¿Usar WFC?») con otra página arriba: no se pide nada', !no && M.botones.length === 1);
+  // §72: Retro WFC como lo abre RR — «Regional» (el «Main modes» de RR, +0x484) y el VS de RR en la página de modos
+  const reg = d.boton(BOTON.regional), r = M.botones[1];
+  ok('boton(Regional) con el menú Wi-Fi arriba: OnRegionalButtonClick (0x8064BDC4) con el botón +0x484',
+     reg && r?.f === 0x8064BDC4 && r.b === arriba + 0x484);
+  ok('el VS de las retro va a la versión de Retro Rewind (0x8183FCC0, página 0x8C, botón +0x208)',
+     BOTON.vsRetros.pagina === 0x8C && BOTON.vsRetros.funcion === 0x8183FCC0 && BOTON.vsRetros.boton === 0x208);
+}
+nota('las direcciones de las funciones y de los botones salen de Pulsar (WFCConnect.hpp, WFCMenu.hpp) y del C++ traducido');
+fin();
+</script>
+</body>
+</html>

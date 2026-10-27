@@ -35,7 +35,7 @@
 export const MB = 1048576;
 export const LIMITES = {
   aviso: 40 * MB,      // en el día, sumando pestañas y aparatos: sospechoso
-  tope: 80 * MB,       // en el día: se corta la conexión hasta mañana
+  tope: 90 * MB,       // en el día: se corta la conexión hasta mañana
   rafaga: 15 * MB,     // en una sola pestaña dentro de `ventana`: sospechoso
   ventana: 5 * 60000
 };

@@ -1,0 +1,17 @@
+diff --git a/backends/imgui_impl_wgpu.cpp b/backends/imgui_impl_wgpu.cpp
+index 5072e96..cecbda0 100644
+--- a/backends/imgui_impl_wgpu.cpp
++++ b/backends/imgui_impl_wgpu.cpp
+@@ -51,10 +51,8 @@
+     #if defined(IMGUI_IMPL_WEBGPU_BACKEND_DAWN) == defined(IMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+     #error exactly one of IMGUI_IMPL_WEBGPU_BACKEND_DAWN or IMGUI_IMPL_WEBGPU_BACKEND_WGPU must be defined!
+     #endif
+-#else
+-    #if defined(IMGUI_IMPL_WEBGPU_BACKEND_DAWN) || defined(IMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+-    #error neither IMGUI_IMPL_WEBGPU_BACKEND_DAWN nor IMGUI_IMPL_WEBGPU_BACKEND_WGPU may be defined if targeting emscripten!
+-    #endif
++// MKW RETRO: con --use-port=emdawnwebgpu la API de WebGPU en Emscripten ES la de Dawn, asi que se permite
++// IMGUI_IMPL_WEBGPU_BACKEND_DAWN tambien en la web (imgui 1.92 hace lo mismo).
+ #endif
+ 
+ #ifndef IMGUI_DISABLE

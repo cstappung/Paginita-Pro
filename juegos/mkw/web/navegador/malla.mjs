@@ -1,0 +1,368 @@
+// La malla WebRTC de la sala en línea: un canal directo entre cada par de navegadores — bitácora §58 (F2).
+//
+// Resumen: es la malla del sitio (Paginita-Pro, colabtex/src/juegos/malla.js, la que usan Yemas y BT3) con dos
+// cambios para Mario Kart:
+//   - DOS canales por par en vez de uno: "udp" (sin orden ni reenvío: la carrera, 36 paquetes por segundo; uno
+//     viejo no sirve cuando ya salió el siguiente) y "tcp" (ordenado y confiable: la conexión con el servidor WFC y
+//     los mensajes de la sala, donde perder un byte rompe todo). Como tener una línea de radio y otra telefónica.
+//   - solo binario (Uint8Array): el formato lo pone red.mjs.
+// Lo demás igual que en el sitio: ofrece el uid menor; cada entrada es una sesión; cada intento lleva su número (k)
+// para tirar candidatos viejos; si un canal se cae, quien ofrece vuelve a ofrecer (pronto si había abierto, cada vez
+// más espaciado si nunca abrió). La señalización (quién está y los mensajes de oferta/respuesta/candidatos) llega por
+// `senal` y no sabe de Firebase: en el sitio la presta la página de la sala (postMessage, como BT3), en el banco un
+// buzón falso por BroadcastChannel.
+//
+// Uso:  const m = crearMalla({ uid, senal, alBinario: (de, bytes, canal) => …, alCambiar });
+//       await m.entrar();  m.enviar(uid, bytes, 'udp' | 'tcp');  m.conectados();  m.salir();
+
+// §99 (crítico de la red, H10): dos proveedores de STUN (si uno no contesta, el otro). El TURN (el repetidor de
+// Cloudflare) llega solo con el modo «🛰 Todo por Cloudflare» que prende el anfitrión (§103, soloRelevo): la página se lo
+// pide al Worker y lo pasa con ponerIce. Sin el modo no hay repetidor, ni de reserva (§103b: como en BT3)
+export const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, { urls: ['stun:stun.cloudflare.com:3478'] }];
+// bytes en cola sin enviar por "udp": más que esto y se tiran (como un router lleno). §99 (H5): en la sala, colaUdp =
+// 8 KB (un paquete viejo de la carrera no sirve; con 1 MB eran decenas de segundos de cola con una subida saturada); el
+// modo en línea del juego (Retro WFC, §58) manda ráfagas y sigue con 1 MB
+const LLENO = 1 << 20;
+const VIGILA_MS = 1000;
+
+// Red mala de mentira, SOLO para pruebas (PLAN C3, bitácora §70): ?redMala=80,20,5 en la dirección de la página = lo que
+// LLEGA por "udp" se demora 80 ms ± 20 ms (cada paquete con su propia demora: pueden llegar desordenados) y se pierde
+// el 5 %; por "tcp" solo la demora, y en orden (es el canal confiable: ahí nada se pierde ni se desordena). Como meter
+// entre dos equipos un tramo de cable largo y con ruido. Sin el parámetro no hace nada. Cuenta lo que hizo en
+// globalThis.mkwRedMala (para las pruebas).
+// §80: ?redMala=80,20,5,ida = también lo que SALE de esta página (la conexión mala es la de este jugador, en los dos
+// sentidos: los demás reciben lo suyo tarde y él lo de ellos); cuenta lo que sale en globalThis.mkwRedMalaIda.
+export function leerRedMala(busqueda = globalThis.location?.search || '') {
+  try {
+    const v = new URLSearchParams(busqueda).get('redMala');
+    if (!v) return null;
+    const partes = v.split(',');
+    const [latencia = 0, variacion = 0, perdida = 0] = partes.slice(0, 3).map(Number);
+    return { latencia: Math.max(0, latencia), variacion: Math.max(0, variacion), perdida: Math.min(1, Math.max(0, perdida / 100)),
+      ida: partes[3] === 'ida' };
+  } catch { return null; }
+}
+export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => setTimeout(f, ms), ahora = () => performance.now(), nombre = 'mkwRedMala') {
+  if (!red) return alBinario;
+  const cuenta = globalThis[nombre] = { ...red, llegados: 0, perdidos: 0, demoraMedia: 0 };
+  const ultimaTcp = new Map();      // uid → cuándo sale el último "tcp" (el siguiente no puede salir antes: en orden)
+  return (u, bytes, canal) => {
+    if (canal === 'udp' && azar() < red.perdida) { cuenta.perdidos++; return; }
+    let demora = red.latencia + (azar() * 2 - 1) * red.variacion;
+    if (canal === 'tcp') {
+      const sale = Math.max(ahora() + demora, ultimaTcp.get(u) || 0);
+      ultimaTcp.set(u, sale);
+      demora = sale - ahora();
+    }
+    demora = Math.max(0, demora);
+    cuenta.llegados++;
+    cuenta.demoraMedia += (demora - cuenta.demoraMedia) / cuenta.llegados;
+    reloj(() => alBinario(u, bytes, canal), demora);
+  };
+}
+
+export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => {}, alCambiar = () => {},
+  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala(), colaUdp = LLENO,
+  // §103, «🛰 Todo por Cloudflare» (lo prende el anfitrión: apagado por omisión, como el relevo de BT3): todas las
+  // conexiones solo por el repetidor TURN (iceTransportPolicy 'relay'), aunque la directa funcione. Hasta que llegan sus
+  // credenciales (ponerIce) no se conecta a nadie; si no llegan en esperaRelevo ms, o llegan vacías (el Worker no tiene
+  // TURN), va directo como siempre. alRelevo('relevo' | 'sin' | 'tarde') dice qué pasó
+  soloRelevo = false, esperaRelevo = 8000, alRelevo = () => {} }) {
+  alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
+  // §103: 'normal' (directo; sin TURN desde §103b) · 'esperando' (las credenciales) · 'relevo' (todo por el repetidor)
+  let modo = soloRelevo ? 'esperando' : 'normal', relojRelevo = null, pendienteIce = null;   // (las que llegaron antes de entrar)
+  const pendientes = [];                          // lo que llegó del buzón mientras se esperaban las credenciales
+  // (§100, solo pruebas: cortar('rtc') = ninguna conexión directa más, aunque siga en el buzón; cortar('rtc', u) = solo
+  // la conexión con u)
+  const quiere0 = quiere, partidaCon = new Set(); let partida = false;
+  quiere = u => !partida && !partidaCon.has(u) && quiere0(u);
+  let sesion = '', offP = null, offM = null, reloj = null, intento = 0;
+  const pares = new Map();          // uid → { pc, udp, tcp, s, k, cola, remota, abrio, malDesde }
+  const presentes = new Map();      // uid → sesión
+  const fallos = new Map();
+
+  const abierto = c => c && c.readyState === 'open';
+  const sanoX = x => {
+    if (!x || !abierto(x.udp) || !abierto(x.tcp)) return false;
+    const st = x.pc.connectionState || x.pc.iceConnectionState;
+    return st !== 'failed' && st !== 'closed' && st !== 'disconnected';
+  };
+  // §99 (H6): «disconnected» suele ser pasajero (un tirón del Wi-Fi): con los canales abiertos se sigue mandando (antes
+  // se dejaba de mandar y con dos jugadores un tirón de 2 s era un corte). Solo «failed»/«closed» cortan
+  const puedeMandar = x => {
+    if (!x || !abierto(x.udp) || !abierto(x.tcp)) return false;
+    const st = x.pc.connectionState || x.pc.iceConnectionState;
+    return st !== 'failed' && st !== 'closed';
+  };
+
+  function cierra(u) {
+    const x = pares.get(u);
+    if (!x) return;
+    pares.delete(u);
+    for (const c of [x.udp, x.tcp]) try { c.close(); } catch {}
+    try { x.pc.close(); } catch {}
+    alCambiar();
+  }
+
+  function nuevoPar(u, s, k) {
+    cierra(u);
+    const pc = new RTC(modo === 'relevo' ? { iceServers: ice, iceTransportPolicy: 'relay' } : { iceServers: ice });
+    // negociados a mano (mismo id en los dos lados): no hay que esperar al ondatachannel del otro
+    const udp = pc.createDataChannel('udp', { negotiated: true, id: 0, ordered: false, maxRetransmits: 0 });
+    const tcp = pc.createDataChannel('tcp', { negotiated: true, id: 1, ordered: true });
+    const x = { pc, udp, tcp, s, k, cola: [], remota: false, abrio: false, malDesde: ahora() };
+    pares.set(u, x);
+    const mio = () => pares.get(u) === x;
+    for (const [c, nombre] of [[udp, 'udp'], [tcp, 'tcp']]) {
+      c.binaryType = 'arraybuffer';
+      c.onopen = () => { if (mio() && sanoX(x)) { x.abrio = true; x.malDesde = 0; alCambiar(); } };
+      c.onclose = () => { if (mio()) alCambiar(); };
+      c.onmessage = ev => { if (mio() && ev.data instanceof ArrayBuffer) alBinario(u, new Uint8Array(ev.data), nombre); };
+    }
+    pc.onicecandidate = e => { if (e.candidate && mio()) senal.envia(u, { t: 'ice', s: sesion, a: s, k, d: e.candidate.toJSON() }); };
+    pc.onconnectionstatechange = () => { if (mio()) alCambiar(); };
+    return x;
+  }
+
+  async function ofrece(u, s) {
+    const k = ++intento;
+    const x = nuevoPar(u, s, k);
+    try {
+      const o = await x.pc.createOffer();
+      if (pares.get(u) !== x) return;
+      await x.pc.setLocalDescription(o);
+      senal.envia(u, { t: 'oferta', s: sesion, a: s, k, d: { type: o.type, sdp: o.sdp } });
+    } catch (e) { console.warn('[malla] oferta', e); }
+  }
+
+  async function vacia(x) {
+    x.remota = true;
+    for (const c of x.cola.splice(0)) await x.pc.addIceCandidate(c).catch(() => {});
+  }
+
+  async function alMensaje(de, m) {
+    if (!sesion || !m || m.a !== sesion || de === uid || typeof de !== 'string') return;
+    // §103: sin las credenciales del repetidor todavía, la oferta (y sus candidatos) se guardan para después
+    if (modo === 'esperando') { if (pendientes.length < 500) pendientes.push([de, m]); return; }
+    let x = pares.get(de);
+    try {
+      if (m.t === 'oferta') {
+        if (!(de < uid) || !quiere(de)) return;             // solo ofrece el menor
+        x = nuevoPar(de, m.s, m.k);
+        await x.pc.setRemoteDescription(m.d);
+        await vacia(x);
+        const r = await x.pc.createAnswer();
+        if (pares.get(de) !== x) return;
+        await x.pc.setLocalDescription(r);
+        senal.envia(de, { t: 'respuesta', s: sesion, a: m.s, k: m.k, d: { type: r.type, sdp: r.sdp } });
+      } else if (m.t === 'respuesta') {
+        if (!x || x.s !== m.s || x.k !== m.k || x.pc.signalingState !== 'have-local-offer') return;
+        await x.pc.setRemoteDescription(m.d);
+        await vacia(x);
+      } else if (m.t === 'reoferta') {
+        // §99 (H6): el otro reengancha la misma conexión (ICE restart): se contesta sobre el mismo par, sin rearmarlo
+        if (!x || x.s !== m.s || x.k !== m.k) return;
+        await x.pc.setRemoteDescription(m.d);
+        const r = await x.pc.createAnswer();
+        if (pares.get(de) !== x) return;
+        await x.pc.setLocalDescription(r);
+        senal.envia(de, { t: 'rerespuesta', s: sesion, a: m.s, k: m.k, d: { type: r.type, sdp: r.sdp } });
+      } else if (m.t === 'rerespuesta') {
+        if (!x || x.s !== m.s || x.k !== m.k || x.pc.signalingState !== 'have-local-offer') return;
+        await x.pc.setRemoteDescription(m.d);
+      } else if (m.t === 'ice') {
+        if (!x || x.s !== m.s || x.k !== m.k) return;
+        if (x.remota) await x.pc.addIceCandidate(m.d).catch(() => {}); else x.cola.push(m.d);
+      }
+    } catch (e) { console.warn('[malla] señal', m.t, e); }
+  }
+
+  function revisa() {
+    if (!sesion || modo === 'esperando') return;
+    // se cierra el par de quien ya no se quiere o volvió con OTRA sesión (recargó la página). §93: si solo dejó de verse
+    // en el buzón y la conexión directa sigue sana, se deja: una pestaña trabada unos segundos (la primera visita armando
+    // gráficos) deja de dar señales en el buzón, pero su WebRTC sigue vivo; si se fue de verdad, la conexión se cae sola
+    for (const [u, x] of [...pares]) {
+      const s = presentes.get(u);
+      if (!quiere(u) || (s !== undefined && s !== x.s) || (s === undefined && !sanoX(x))) cierra(u);
+    }
+    for (const [u, s] of presentes) if (!pares.has(u) && quiere(u) && uid < u) ofrece(u, s);
+    alCambiar();
+  }
+
+  function alPresentes(v) {
+    presentes.clear();
+    // (M22: «~…» = el estado del vestíbulo de ese piloto —la precarga, «~40», «~listo»—, no una sesión de la malla)
+    for (const [u, s] of Object.entries(v || {})) if (u !== uid && typeof s === 'string' && !s.startsWith('~')) presentes.set(u, s);
+    revisa();
+  }
+
+  function vigila() {
+    const t = ahora();
+    for (const [u, x] of [...pares]) {
+      if (sanoX(x)) { x.malDesde = 0; x.abrio = true; fallos.delete(u); continue; }
+      if (!x.malDesde) x.malDesde = t;
+      // (§93: el par que se dejó abierto de alguien que ya no está en el buzón, si se cae, se cierra: no vuelve)
+      if (!presentes.has(u)) { if (t - x.malDesde >= 4000) cierra(u); continue; }
+      if (!(uid < u)) continue;
+      // §99 (H6): la que había abierto y tambalea: primero se reengancha la misma conexión (ICE restart, busca camino de
+      // nuevo sin cerrarla: como reenganchar un interruptor sin desarmar el tablero); si a los 4 s sigue mal, se rearma
+      if (x.abrio && !x.reenganche && t - x.malDesde >= 1500 && typeof x.pc.restartIce === 'function') { reenganchar(u, x); continue; }
+      const n = fallos.get(u) || 0;
+      const espera = x.abrio ? 5500 : Math.min(60000, 10000 * 2 ** n);
+      if (t - x.malDesde < espera) continue;
+      if (!x.abrio) fallos.set(u, n + 1);
+      const s = presentes.get(u);
+      if (s && quiere(u)) ofrece(u, s); else cierra(u);
+    }
+  }
+
+  async function reenganchar(u, x) {
+    x.reenganche = true;
+    try {
+      x.pc.restartIce();
+      const o = await x.pc.createOffer({ iceRestart: true });
+      if (pares.get(u) !== x) return;
+      await x.pc.setLocalDescription(o);
+      senal.envia(u, { t: 'reoferta', s: sesion, a: x.s, k: x.k, d: { type: o.type, sdp: o.sdp } });
+    } catch (e) { console.warn('[malla] reenganche', e); }
+  }
+
+  async function entrar() {
+    if (sesion || typeof RTC !== 'function') return false;
+    sesion = Math.random().toString(36).slice(2, 10);
+    offM = senal.alMensajes(alMensaje);
+    try { await senal.entra(sesion); } catch { offM?.(); offM = null; sesion = ''; return false; }
+    if (!sesion) return false;
+    offP = senal.alPresentes(alPresentes);
+    reloj = setInterval(vigila, VIGILA_MS);
+    if (modo === 'esperando' && pendienteIce) decidir(pendienteIce, 'sin');
+    else if (modo === 'esperando') relojRelevo = setTimeout(() => decidir([], 'tarde'), esperaRelevo);
+    return true;
+  }
+
+  // §103: llegaron (o no) las credenciales del repetidor: con algún turn:/turns:, todo por él; sin ellas, directo. Lo que
+  // llegó mientras tanto se atiende ahora, en orden (la oferta antes que sus candidatos), y se conecta a los presentes
+  function decidir(servidores, porque) {
+    if (modo !== 'esperando') return;
+    clearTimeout(relojRelevo); relojRelevo = null;
+    const hay = servidores.some(s => [].concat(s?.urls || []).some(u => /^turns?:/.test(String(u))));
+    modo = hay ? 'relevo' : 'normal';
+    try { alRelevo(hay ? 'relevo' : porque); } catch {}
+    for (const [de, m] of pendientes.splice(0)) alMensaje(de, m);
+    revisa();
+  }
+
+  function salir() {
+    if (!sesion) return;
+    sesion = '';
+    clearTimeout(relojRelevo); relojRelevo = null; pendientes.length = 0;
+    offP?.(); offM?.(); offP = offM = null;
+    clearInterval(reloj);
+    for (const u of [...pares.keys()]) cierra(u);
+    presentes.clear();
+    senal.sale();
+    alCambiar();
+  }
+
+  // bytes a un par por el canal pedido; false si no se pudo (sin canal, o el UDP con la cola llena)
+  function enviar(u, bytes, canal = 'udp') {
+    const x = pares.get(u);
+    if (!puedeMandar(x)) return false;
+    const c = canal === 'tcp' ? x.tcp : x.udp;
+    if (canal === 'udp' && c.bufferedAmount > colaUdp) return false;
+    try { c.send(bytes); return true; } catch { return false; }
+  }
+
+  return {
+    entrar, salir, revisa,
+    // §80: con ?redMala=…,ida, lo que sale también va por el tramo malo (con la misma demora y pérdida)
+    enviar: redMala?.ida ? degradar((u, bytes, canal) => { enviar(u, bytes, canal); }, redMala, Math.random, (f, ms) => setTimeout(f, ms), () => performance.now(), 'mkwRedMalaIda') : enviar,
+    activa: () => !!sesion,
+    // los servidores de ICE de las conexiones que se armen desde ahora: los STUN de siempre más el TURN que pidió la
+    // página (las que andan siguen como están; las que fallan se rearman con estos). §103: con soloRelevo, estas
+    // credenciales deciden si todo va por el repetidor o directo (desde §103b, la página solo las pide en ese modo)
+    ponerIce(extra) {
+      const turn = Array.isArray(extra) ? extra.filter(s => s && s.urls) : [];
+      ice = [...ICE, ...turn];
+      if (modo === 'esperando' && sesion) decidir(turn, 'sin');
+      else if (modo === 'esperando') pendienteIce = turn;
+    },
+    // §103: 'normal' | 'esperando' | 'relevo'
+    modo: () => modo,
+    // §99 (H1, medida 6): qué camino usa cada conexión (directo / por el repetidor) y su ida y vuelta, de getStats
+    async camino(u) {
+      const x = pares.get(u);
+      if (!x) return null;
+      try {
+        const st = await x.pc.getStats();
+        let par = null; const cand = new Map();
+        st.forEach(r => { if (r.type === 'candidate-pair' && (r.nominated || r.selected) && r.state === 'succeeded') par = r; if (r.type === 'local-candidate' || r.type === 'remote-candidate') cand.set(r.id, r); });
+        if (!par) return { estado: x.pc.connectionState || '' };
+        const l = cand.get(par.localCandidateId), r = cand.get(par.remoteCandidateId);
+        return { estado: x.pc.connectionState || '', local: l?.candidateType, remoto: r?.candidateType, relevo: l?.candidateType === 'relay' || r?.candidateType === 'relay',
+          ms: par.currentRoundTripTime ? Math.round(par.currentRoundTripTime * 1000) : null, enviados: par.bytesSent, recibidos: par.bytesReceived };
+      } catch { return null; }
+    },
+    // §100, solo pruebas (prueba-desconexion): cortar la red de esta página como si se le fuera internet ('todo': sale
+    // del buzón y cierra sus conexiones) o solo la conexión directa con los demás ('rtc': sigue en el buzón; con u, solo
+    // la conexión con ese piloto: la prueba de conexión de §100, H1.2)
+    cortar(modo = 'todo', u = null) { if (modo === 'rtc') { if (u) partidaCon.add(u); else partida = true; revisa(); } else salir(); },
+    sano: u => sanoX(pares.get(u)),
+    detalle: u => { const x = pares.get(u); return x ? { pc: x.pc.connectionState || '', ice: x.pc.iceConnectionState || '', udp: x.udp.readyState, tcp: x.tcp.readyState, abrio: x.abrio } : null; },
+    presentes: () => [...presentes.keys()],
+    conectados: () => [...pares].filter(([, x]) => sanoX(x)).map(([u]) => u),
+  };
+}
+
+// ---- Señalización ----
+
+// La del sitio: la página de la sala (padre) tiene la sesión de Firebase y presta su buzón por postMessage, con el
+// mismo protocolo que BT3 (op: entra, sale, presentes, envia, mensajes). `canal` = prefijo de los mensajes.
+export function senalPadre({ canal = 'mkw', padre = globalThis.parent, origen = globalThis.location?.origin } = {}) {
+  const HIJO = canal + '-hijo', PADRE = canal + '-padre';
+  const oyentes = new Set(); let alPres = null, n = 0;
+  const esperas = new Map();
+  const manda = (op, extra = {}) => padre.postMessage({ canal: HIJO, tipo: 'senal', op, ...extra }, origen);
+  globalThis.addEventListener('message', e => {
+    if (e.source !== padre || e.origin !== origen || e.data?.canal !== PADRE) return;
+    const d = e.data;
+    if (d.tipo === 'senal-mensaje') for (const f of oyentes) f(d.de, d.m);
+    else if (d.tipo === 'senal-presentes') alPres?.(d.v);
+    else if (d.tipo === 'senal-entro') { esperas.get(d.id)?.(d.ok); esperas.delete(d.id); }
+  });
+  return {
+    entra(s) { const id = ++n; return new Promise((ok, mal) => { esperas.set(id, v => v ? ok() : mal(new Error('sin permiso'))); manda('entra', { id, s }); }); },
+    sale() { manda('sale'); },
+    alPresentes(f) { alPres = f; manda('presentes', { on: true }); return () => { alPres = null; manda('presentes', { on: false }); }; },
+    envia(para, m) { manda('envia', { para, m }); },
+    alMensajes(f) { oyentes.add(f); if (oyentes.size === 1) manda('mensajes', { on: true }); return () => { oyentes.delete(f); if (!oyentes.size) manda('mensajes', { on: false }); }; },
+  };
+}
+
+// La del banco: un "Firebase" falso con BroadcastChannel (presencia y buzón), para dos pestañas del mismo Chrome.
+// Cada pestaña repite su presencia cada segundo (así la que llega tarde ve a las de antes) y la borra al salir.
+export function senalCanal({ sala = 'mkw-banco', uid, Canal = globalThis.BroadcastChannel } = {}) {
+  const c = new Canal('mkw-senal-' + sala);
+  const oyentes = new Set(); let alPres = null, miSesion = '', reloj = null;
+  const vistos = new Map();         // uid → { s, hace }
+  const avisa = () => alPres?.(Object.fromEntries([...vistos].map(([u, v]) => [u, v.s])));
+  c.onmessage = ({ data: d }) => {
+    if (d.t === 'presente') { const antes = vistos.get(d.uid)?.s; vistos.set(d.uid, { s: d.s, hace: Date.now() }); if (antes !== d.s) avisa(); }
+    else if (d.t === 'fuera') { if (vistos.delete(d.uid)) avisa(); }
+    else if (d.t === 'msg' && d.para === uid) for (const f of oyentes) f(d.de, d.m);
+  };
+  const latido = () => {
+    if (miSesion) c.postMessage({ t: 'presente', uid, s: miSesion });
+    const t = Date.now(); let cambio = false;
+    for (const [u, v] of vistos) if (t - v.hace > 4000) { vistos.delete(u); cambio = true; }
+    if (cambio) avisa();
+  };
+  return {
+    async entra(s) { miSesion = s; latido(); reloj = setInterval(latido, 1000); },
+    sale() { c.postMessage({ t: 'fuera', uid }); miSesion = ''; clearInterval(reloj); },
+    alPresentes(f) { alPres = f; avisa(); return () => { alPres = null; }; },
+    envia(para, m) { c.postMessage({ t: 'msg', de: uid, para, m }); },
+    alMensajes(f) { oyentes.add(f); return () => oyentes.delete(f); },
+  };
+}

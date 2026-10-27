@@ -1,6 +1,6 @@
 import {ambientar} from '../sonido.js';
 import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
-import {verificaClub,DE_INVITADO} from './verifica.js';
+import {verificaClub,DE_INVITADO,pruebaGuardable} from './verifica.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase.
@@ -55,7 +55,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       /* Un pendiente de antes de la verificación (sin prueba) se descarta en
          silencio: no es trampa, es una versión vieja. */
       if(v.prueba===undefined||v.prueba===null)continue;
-      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
+      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria),ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
       if(motivo){sospecha(dato,motivo,'pendiente');continue;}
       if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba,h:v.h};
     }
@@ -156,6 +156,18 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       responde({dato:{...base,d:await pruebasFantasma.get(clave)}});
     }).catch(()=>responde({error:true}));
   }
+  /* Tu fila de una tabla y la prueba guardada con ella ({fila, d}; d = ''
+     si no hay fila, no tiene partida o su prueba no está). La lee el juego
+     (Atasco recupera sus partidas) y el verificador: la base de una prueba
+     de Atasco tiene que ser la de tu fila sin prueba (verifica/atasco.js).
+     Si la tabla aún no llegó por el oyente, se lee una vez. */
+  async function filaPropia(cat){
+    if(invitado||!fantasma)throw new Error('sin cuenta');
+    const fila=propios[cat]!==undefined?propios[cat]:((await fantasma.leerTabla(cat)).find(f=>f.uid===usuario.uid)||null);
+    if(!fila||typeof fila.partida!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(fila.partida))return{fila,d:''};
+    const v=await fantasma.leerPrueba(cat,usuario.uid,fila.partida);
+    return{fila,d:v&&typeof v.d==='string'?v.d:''};
+  }
   function mensaje(e){
     if(muerto||e.source!==frame.contentWindow||e.origin!==location.origin||e.data?.canal!=='club-child')return;
     const d=e.data;
@@ -175,9 +187,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
        récord, por si este navegador ya no las tiene (otro dispositivo,
        almacenamiento borrado). Se lee por clave, como la del fantasma. */
     if(d.tipo==='prueba-propia-pedir'){
-      const cat=String(d.categoria||''),f=propios[cat],responde=r=>enviar({tipo:'prueba-propia',categoria:cat,...r});
-      if(invitado||!fantasma||!categoriaClub(juego,cat)||!f||typeof f.partida!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(f.partida)){responde({d:''});return;}
-      fantasma.leerPrueba(cat,usuario.uid,f.partida).then(v=>responde({d:v&&typeof v.d==='string'?v.d:''}),()=>responde({error:true}));
+      const cat=String(d.categoria||''),responde=r=>enviar({tipo:'prueba-propia',categoria:cat,...r});
+      if(invitado||!fantasma||!categoriaClub(juego,cat)){responde({d:''});return;}
+      filaPropia(cat).then(r=>responde({d:r.d}),()=>responde({error:true}));
       return;
     }
     /* Un logro en vivo (Metro Rush: «Cazafantasmas»). Solo los que el juego
@@ -204,14 +216,14 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           await cargados;
           // La página cuenta cada partida, pero su aviso sale solo con una marca nueva del invitado.
           const mejoro=mejorClub(dato,pendientes[dato.categoria]);
-          if(mejoro){pendientes[dato.categoria]={...dato,prueba:d.prueba,h:Date.now()};persistir();}
+          if(mejoro){pendientes[dato.categoria]={...dato,prueba:pruebaGuardable(juego,d.prueba),h:Date.now()};persistir();}
           estado('Buena partida. Como invitado todavía no se guardó: inicia sesión y tu mejor marca pasa a la clasificación.',dato.categoria);
           if(alInvitado){try{alInvitado(dato,mejoro);}catch(err){/* el aviso no debe romper la partida */}}
         });
         return;
       }
       const prueba=d.prueba;
-      verificaClub(juego,dato,prueba,{uid:cuenta}).then(motivo=>{
+      verificaClub(juego,dato,prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria)}).then(motivo=>{
         if(muerto)return;
         if(motivo){
           sospecha(dato,motivo,'en vivo');
@@ -220,7 +232,8 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           return;
         }
         if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null,prueba);}catch(err){/* un logro no debe romper la partida */}}
-        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba,h:Date.now()};persistir();}
+        /* Pendiente queda en la forma en que se guarda (más chica: PRO DEFENDER la compacta). */
+        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba:pruebaGuardable(juego,prueba),h:Date.now()};persistir();}
         sincronizar();
       });
     }
@@ -243,7 +256,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-70&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-71&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

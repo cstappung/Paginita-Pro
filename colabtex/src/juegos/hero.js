@@ -184,7 +184,8 @@ export function crearRockHero(enviar) {
   const propias = u => rocasDe(u, d).filter(x => !x.venta).map(x => ({ b: x.b, k: x.k, t: x.t, c: x.colores }));
   function inv() {
     const u = yo(), m = monedasDe(u, d), cajas = (eco().usuarios[u] || {}).cajasRock || [];
-    return { coins: m.saldo, parada: m.parada, opened: cajas.length, last: cajas.slice(-10).reverse().map(z => z.v),
+    // `cajasPrevias`: las que un cierre de la economía ya no guarda una por una (cierre-datos.js)
+    return { coins: m.saldo, parada: m.parada, opened: cajas.length + ((eco().usuarios[u] || {}).cajasPrevias || 0), last: cajas.slice(-10).reverse().map(z => z.v),
       own: rocasDe(u, d).map(x => ({ b: x.b, k: x.k, t: x.t, c: x.colores, leg: x.leg, copia: x.c, venta: x.venta || "" })) };
   }
   function manda() {
@@ -299,7 +300,7 @@ export function crearHero({ volver, enLinea }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?v=hero-21";
+    frame.src = "juegos/hero/index.html?v=hero-23";
     host.appendChild(frame);
     frame.addEventListener("load", () => frame.contentWindow?.focus());
   }

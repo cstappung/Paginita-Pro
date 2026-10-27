@@ -21,6 +21,7 @@ function pone(v) {
   if (v === visible) return;
   visible = v;
   ponOculto("bt3", !v);   // (las vistas que nombran juegos: tienda del perfil, monedas)
+  ponOculto("mkw", !v);   // Mario Kart Wii: la misma lista de amigos (su programa sale del mismo tipo de Worker)
   for (const cb of oyentes) { try { cb(v); } catch (e) {} }
 }
 

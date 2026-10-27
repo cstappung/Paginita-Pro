@@ -173,8 +173,10 @@ export function topColecciones(datos, col) {
   const m = memoTop.get(e) || {}, v = veSerie1();
   if (m.v !== v) { m.v = v; m.por = {}; memoTop.set(e, m); }
   if (m.por[col]) return m.por[col];
-  const sobres = {};
-  for (const so of Object.values(e.sobres)) if (!so.r && PM.coleccionDe(so.k) === col) sobres[so.u] = (sobres[so.u] || 0) + 1;
+  /* Los sobres de antes del cierre de la economía vienen contados en él
+     (`e.cierre.est`); en `e.sobres` solo quedan los que aún tienen cartas. */
+  const previo = e.cierre && e.cierre.est[col], sobres = Object.assign({}, previo ? previo.s : {});
+  for (const so of Object.values(e.sobres)) if (!so.r && !so.cierre && PM.coleccionDe(so.k) === col) sobres[so.u] = (sobres[so.u] || 0) + 1;
   const por = {};
   for (const c of l) {
     if (!c.gr || c.carta.col !== col) continue;
@@ -193,8 +195,11 @@ export function topColecciones(datos, col) {
 export function cifras(datos) {
   const e = ecoDe(datos);
   let sobres = 0, dioses = 0, leyendas = 0;
+  // los de antes del cierre de la economía, ya contados (cierre.js)
+  for (const [col, x] of Object.entries((e && e.cierre && e.cierre.est) || {}))
+    if (colVisible(col)) { sobres += x.n; dioses += x.d; leyendas += x.l; }
   for (const so of Object.values((e && e.sobres) || {})) {
-    if (so.r || !colVisible(PM.coleccionDe(so.k))) continue;   // un re-roll no es un sobre abierto
+    if (so.r || so.cierre || !colVisible(PM.coleccionDe(so.k))) continue;   // un re-roll no es un sobre abierto
     const s = PM.sobre(so.u, so.k, so.at);
     sobres++; if (s.dios) dioses++;
     leyendas += s.cartas.filter(c => PM.CARDS[c.id].tier === 3).length;

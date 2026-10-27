@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonido con AudioWorklet</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Sonido: <span>AudioWorklet con cola corta</span></h1>
+<p>Prueba el camino nuevo del sonido (§88) <b>sin el juego</b>, en dos partes:</p>
+<ol>
+  <li><b>La lógica del worklet</b> (<code>web/navegador/sonido-worklet.js</code>) muestra por muestra, sin tarjeta de
+    sonido: se carga en la página con un "hilo de audio de mentira" y se le piden bloques de 128 muestras a mano.
+    Así se ve exacto: que espere a juntar la cola, que entre con fundido, que una cola vacía se apague sin clic, que el
+    objetivo suba con un tirón corto y baje con la calma, que salte lo viejo cuando llega de más, dónde sale el clic.</li>
+  <li><b>De verdad</b>, con el AudioContext y el worklet del navegador: un "juego falso" entrega un tono de 440 Hz en
+    pedazos de 3 ms como el runtime (por <code>sonido.puente</code>, lo mismo que llama <code>audio_backend.cpp</code>),
+    arranca bloqueado, el botón lo desbloquea, y se mide la cola, los cortes, un tirón de la página y la demora con el clic.</li>
+</ol>
+<div class="caja"><div id="resumen">probando la lógica…</div><ul id="resultados"></ul></div>
+<div class="caja"><button id="empezar" class="principal">Tocar para empezar (suena un tono bajito ~4 s)</button></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearSonido } from '/web/navegador/sonido.mjs';
+const { ok, nota, fin } = prueba('sonido-worklet', 'Sonido con AudioWorklet (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+try { localStorage.removeItem('mkw.volumen'); localStorage.removeItem('mkw.silencio'); } catch {}
+// El primer toque puede llegar mientras se prueba la lógica: el módulo de sonido y el botón escuchan desde ya
+const so = crearSonido({ simularBloqueo: true, worklet: true, objetivoMs: 25, arranqueMs: 0 });   // (el arranque alto: en la parte 1)
+so.instalar();
+const tocado = new Promise(r => document.getElementById('empezar').addEventListener('click', ev => { ev.target.disabled = true; r(); }, { once: true }));
+
+// ============ Parte 2a: de verdad, ANTES del toque (bloqueado) ============
+// "Juego falso": lo mismo que audio_backend.cpp. Abre el sonido por la página y entrega 3 ms de tono por vez, a
+// medida que pasa el tiempo (como el runtime, que cuenta tiempo y entrega lo que corresponde)
+const sr = so.puente.abrir();
+ok('el runtime le pide el sonido a la página y recibe la frecuencia de la tarjeta', sr > 0 && so.estado.camino === 'worklet', `${sr} Hz, camino ${so.estado.camino}`);
+ok('se cuenta un solo AudioContext (el de la página, con volumen y medidor)', so.estado.contextos === 1);
+const AMP2 = 0.03;                                    // −30 dB: bajito
+let f2 = 0, debe = 0, t0 = performance.now(), enviados = 0, marca = 0, marcaMs = 0;
+const M = { _mkw_web_sonido_marca: x => { marca = x; }, _mkw_web_sonido_marca_ms: () => marcaMs, _mkw_web_sonido_cola_ms: () => 0 };
+function juego() {
+  debe = (performance.now() - t0) * sr / 1000 - enviados;
+  while (debe >= 144) {
+    const d = new Float32Array(288);
+    for (let i = 0; i < 144; i++) {
+      let v = marca ? 0 : AMP2 * Math.sin(f2);       // midiendo la demora: mudo, salvo el clic
+      if (marca === 2 && i === 0) { v = 0.9; marcaMs = performance.now(); marca = 1; }
+      f2 += 2 * Math.PI * 440 / sr; d[2 * i] = d[2 * i + 1] = v;
+    }
+    so.puente.entregar(d);                            // (el runtime pasa una vista de su memoria; esto la copia)
+    enviados += 144; debe -= 144;
+  }
+  setTimeout(juego, 1);
+}
+juego();
+await espera(150);
+ok('bloqueado (antes del primer toque): el sonido se tira y al worklet no le llega nada', so.estado.descartadas > 0 && so.estado.recibidos === 0 && so.puente.nivelMs() < 0,
+   `${so.estado.descartadas} entregas tiradas, ${so.estado.recibidos} muestras recibidas`);
+
+// ============ Parte 1: la lógica del worklet, con un hilo de audio de mentira ============
+// En el hilo de audio existen AudioWorkletProcessor, registerProcessor, sampleRate y currentFrame: aquí se imitan
+const SR = 48000, N = 128;
+globalThis.sampleRate = SR;
+globalThis.currentFrame = 0;
+let Clase = null;
+globalThis.AudioWorkletProcessor = class { constructor() { this.port = { postMessage: m => this.port.salidos.push(m), salidos: [] }; } };
+globalThis.registerProcessor = (nombre, c) => { if (nombre === 'mkw-salida') Clase = c; };
+await import('/web/navegador/sonido-worklet.js');
+ok('el worklet se registra como «mkw-salida»', !!Clase);
+
+const p = new Clase({ processorOptions: { objetivoMs: 25, arranqueMs: 0 } });   // (el arranque alto se prueba aparte, al final)
+let fase = 0;                                         // fase del tono de prueba
+const AMP = 0.5, PASO = 2 * Math.PI * 440 / SR;
+const PENDIENTE = AMP * PASO;                         // lo más que cambia el tono de una muestra a la otra (0,029)
+// Le "entrega" ms de tono, como llegan los mensajes del juego (izq, der intercalados)
+function dar(ms, clicEn = -1, amp = AMP) {
+  const n = Math.round(ms * SR / 1000), d = new Float32Array(2 * n);
+  for (let i = 0; i < n; i++) { const v = i === clicEn ? 0.9 : amp * Math.sin(fase); fase += PASO; d[2 * i] = d[2 * i + 1] = v; }
+  p.port.onmessage({ data: d });
+}
+// Le pide bloques como la tarjeta; devuelve todo lo que salió (canal izquierdo)
+function correr(bloques) {
+  const todo = new Float32Array(bloques * N);
+  for (let b = 0; b < bloques; b++) {
+    const L = new Float32Array(N), R = new Float32Array(N);
+    p.process([], [[L, R]]);
+    todo.set(L, b * N);
+    globalThis.currentFrame += N;
+  }
+  return todo;
+}
+const saltoMax = a => { let m = 0; for (let i = 1; i < a.length; i++) m = Math.max(m, Math.abs(a[i] - a[i - 1])); return m; };
+const picoDe = a => a.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+const ms = f => (f * 1000 / SR).toFixed(1);
+const MS1 = x => Math.round(x * SR / 1000);
+// Juego "parejo": 3 ms de tono por cada ~3 ms de tarjeta (un bloque son 2,67 ms)
+function parejo(segundos) {
+  const salida = [];
+  let debe = 0;
+  for (let b = 0; b < Math.round(segundos * SR / N); b++) {
+    debe += N;
+    while (debe >= 144) { dar(3); debe -= 144; }
+    salida.push(...correr(1));
+  }
+  return Float32Array.from(salida);
+}
+
+// 1) Mientras junta la cola: silencio
+dar(10);
+let s = correr(4);
+ok('mientras junta el objetivo (25 ms) no suena nada', picoDe(s) === 0 && p.fase === 'llenando', `con ${ms(p.nivel)} ms en la cola`);
+// 2) Al juntarlo entra con fundido (sin golpe)
+dar(20);
+s = correr(1);
+ok('al juntar el objetivo empieza a sonar con un fundido de entrada (sin golpe)', p.fase === 'sonando' && Math.abs(s[0]) < 0.01 && saltoMax(s) <= PENDIENTE + 0.01,
+   `primera muestra ${s[0].toFixed(4)}, salto máximo ${saltoMax(s).toFixed(4)}`);
+// 3) Parejo 2 s: continuo, sin vaciarse, la cola cerca del objetivo
+s = parejo(2);
+ok('con el juego parejo el tono sale continuo (sin saltos ni vacíos)', saltoMax(s) <= PENDIENTE * 1.01 && p.c.vacios === 0,
+   `salto máximo ${saltoMax(s).toFixed(4)} (el tono cambia hasta ${PENDIENTE.toFixed(4)}), vacíos ${p.c.vacios}`);
+ok('la cola queda cerca del objetivo', Math.abs(p.nivel - p.objetivo) < 144 + N, `${ms(p.nivel)} ms (objetivo ${ms(p.objetivo)})`);
+// 4) El juego se traba 20 ms: la cola se vacía; la última muestra se apaga sin clic
+const objetivoAntes = p.objetivo;
+const vacia = Math.ceil(p.nivel / N) + 2;
+s = correr(vacia + Math.round(20 * SR / 1000 / N));
+ok('cola vacía: cuenta 1 vacío y 1 hueco (había sonido)', p.c.vacios === 1 && p.c.huecos === 1, `vacíos ${p.c.vacios}, huecos ${p.c.huecos}`);
+ok('…y la última muestra se apaga suave (sin clic) hasta el silencio', saltoMax(s) <= PENDIENTE * 1.01 && Math.abs(s[s.length - 1]) < 1e-4,
+   `salto máximo ${saltoMax(s).toFixed(4)}, última ${s[s.length - 1].toExponential(1)}`);
+// 5) Vuelve el sonido: el objetivo sube lo que faltó (desde que se vació hasta ahora) + 5 ms
+const falto = globalThis.currentFrame - p.vacioEn;
+dar(3);
+const subio = p.objetivo - objetivoAntes;
+ok('el objetivo sube lo que tardó en volver el sonido (+5 ms)', Math.abs(subio - falto - 5 * SR / 1000) < 1, `faltaron ${ms(falto)} ms → subió ${ms(subio)} ms, objetivo ${ms(p.objetivo)} ms`);
+s = parejo(0.5);
+ok('vuelve a sonar con fundido de entrada (sin golpe)', saltoMax(s) <= PENDIENTE * 1.01 && p.fase === 'sonando', `salto máximo ${saltoMax(s).toFixed(4)}`);
+// 6) Un tirón largo (200 ms) no sube el objetivo (ninguna cola razonable lo taparía)
+const objetivo2 = p.objetivo;
+correr(Math.ceil(p.nivel / N) + Math.round(200 * SR / 1000 / N));
+dar(3);
+ok('un tirón largo (200 ms) cuenta un hueco pero no sube el objetivo', p.c.huecos === 2 && Math.abs(p.objetivo - objetivo2) < 2, `objetivo ${ms(p.objetivo)} ms`);
+// 7) Calma: con 3 s sin cortes baja 1 ms por segundo
+parejo(1);
+const objetivo3 = p.objetivo;
+parejo(13);
+const bajo = (objetivo3 - p.objetivo) * 1000 / SR;
+ok('con calma el objetivo baja hacia el reposo (20 % de lo que sobra por segundo, mínimo 2 ms/s, pasados 3 s)', bajo > 18 && p.objetivo >= p.base,
+   `bajó ${bajo.toFixed(1)} ms en 13 s → ${ms(p.objetivo)} ms`);
+// 7b) Un vacío en SILENCIO (el juego no suena, p. ej. una carga) no se oye: no es hueco ni sube el objetivo
+p.port.onmessage({ data: { t: 'objetivo', ms: 25, ya: true } });
+parejo(1);
+for (let b = 0; b < 30; b++) { dar(2.67, -1, 0); correr(1); }   // 80 ms de silencio
+const obj7 = p.objetivo, vac7 = p.c.vacios, hue7 = p.c.huecos;
+correr(Math.ceil(p.nivel / N) + Math.round(30 * SR / 1000 / N));   // se vacía y faltan 30 ms
+dar(3, -1, 0);
+ok('un vacío en silencio no cuenta como hueco ni sube el objetivo', p.c.vacios === vac7 + 1 && p.c.huecos === hue7 && p.objetivo === obj7,
+   `vacíos +${p.c.vacios - vac7}, huecos +${p.c.huecos - hue7}, objetivo ${ms(p.objetivo)} ms`);
+// 7c) Silencio de más: se descarta enseguida hasta el objetivo (no hace falta esperar al ajuste de ritmo)
+parejo(0.5);
+for (let b = 0; b < 20; b++) { dar(2.67, -1, 0); correr(1); }      // el juego se calla (la cola: silencio al frente)
+for (let b = 0; b < 30; b++) dar(2.67, -1, 0);                      // 80 ms de silencio juntos (la cola sube a ~105 ms)
+const sal7 = p.c.saltos, sil7 = p.c.silencioSaltado;
+correr(2);
+ok('si sobra cola y viene silencio, se descarta hasta el objetivo (sin salto que se oiga)',
+   p.c.saltos === sal7 && p.c.silencioSaltado > sil7 && Math.abs(p.nivel - p.objetivo) < N + MS1(3),
+   `descartó ${ms(p.c.silencioSaltado - sil7)} ms de silencio, cola ${ms(p.nivel)} ms (objetivo ${ms(p.objetivo)})`);
+parejo(0.5);
+// 8) Llega un montón junto: se salta lo viejo con fundido cruzado
+p.port.onmessage({ data: { t: 'objetivo', ms: 25, ya: true } });
+parejo(1);
+dar(150);
+const saltosAntes = p.c.saltos;
+s = correr(1);
+ok('si llega de más (150 ms juntos) salta lo viejo hasta el objetivo', p.c.saltos === saltosAntes + 1 && Math.abs(p.nivel - p.objetivo) < 1,
+   `saltos ${p.c.saltos}, cola ${ms(p.nivel)} ms (objetivo ${ms(p.objetivo)}), tirados ${ms(p.c.tirados)} ms`);
+ok('…con un fundido cruzado (sin golpe)', saltoMax(s) < PENDIENTE + 1 / N + 0.005, `salto máximo ${saltoMax(s).toFixed(4)}`);
+// 9) La marca del clic: avisa la muestra exacta en que sale (con un tono bajito: en silencio se descartaría lo que
+//    sobra antes del clic, que es lo correcto pero corre la cuenta)
+parejo(0.3);
+for (let b = 0; b < 40; b++) { dar(2.67, -1, 0.1); correr(1); }   // 100 ms de tono bajito (0,1: no pasa el umbral del clic)
+p.port.salidos.length = 0;
+p.port.onmessage({ data: { t: 'marca' } });
+const delante = p.nivel;                              // lo que había en la cola antes del clic
+dar(3, 0, 0.1);                                       // el clic en la primera muestra de este pedazo
+const desde = globalThis.currentFrame;
+correr(Math.ceil((delante + 144) / N) + 1);
+const m = p.port.salidos.find(x => x.t === 'm');
+ok('el clic se avisa en la muestra exacta en que sale', m && m.cuadro === desde + delante, m ? `muestra ${m.cuadro} (esperada ${desde + delante})` : 'no avisó');
+const inf = p.port.salidos.filter(x => x.t === 'e');
+ok('manda su estado cada 8 bloques (~21 ms)', inf.length >= 1 && 'nivel' in inf[0] && 'objetivo' in inf[0] && 'huecos' in inf[0],
+   inf.length ? `nivel ${inf[0].nivel.toFixed(1)} ms, objetivo ${inf[0].objetivo.toFixed(1)} ms` : 'ninguno');
+// 10) Reiniciar (el sonido vuelve tras una pausa): de cero, sin contar hueco
+const huecosR = p.c.huecos;
+p.port.onmessage({ data: { t: 'reiniciar' } });
+s = correr(2);
+ok('reiniciar vacía la cola y vuelve a juntar, sin contar un hueco', p.nivel === 0 && p.fase === 'llenando' && p.c.huecos === huecosR);
+// 11) El arranque: empieza con la cola alta (80 ms) y, con calma (y sonido), baja sola al reposo (25)
+const q = new Clase({ processorOptions: { objetivoMs: 25 } });
+const objArranque = q.objetivo;
+q.port.onmessage({ data: new Float32Array(2 * MS1(90)) });            // 90 ms de silencio para juntar el objetivo
+for (let b = 0; b < Math.round(10 * SR / N); b++) {                    // 10 s de silencio parejo (el juego cargando)
+  if (b % 9 < 8) q.port.onmessage({ data: new Float32Array(2 * 144) });
+  const L = new Float32Array(N), R = new Float32Array(N); q.process([], [[L, R]]); globalThis.currentFrame += N;
+}
+ok('el silencio no cuenta como calma: tras 10 s callado el objetivo sigue alto', Math.abs(q.objetivo - objArranque) < 1, `${ms(q.objetivo)} ms`);
+// 40 s de tono, con el ajuste de ritmo del runtime imitado (su parte proporcional: 10 ms de más → entrega 0,2 % menos,
+// tope 0,6 %): la cola sigue al objetivo hacia abajo, y el objetivo espera a la cola
+let ritmoMax = 0;
+for (let b = 0, f2 = 0, acum = 0; b < Math.round(40 * SR / N); b++) {
+  const ritmo = Math.max(-0.006, Math.min(0.006, 2e-4 * (q.nivel - q.objetivo) * 1000 / SR));
+  ritmoMax = Math.max(ritmoMax, ritmo);
+  acum += N * (1 - ritmo);
+  if (acum >= 144) { const d = new Float32Array(2 * 144); for (let i = 0; i < 144; i++) { d[2 * i] = d[2 * i + 1] = 0.3 * Math.sin(f2); f2 += PASO; } q.port.onmessage({ data: d }); acum -= 144; }
+  const L = new Float32Array(N), R = new Float32Array(N); q.process([], [[L, R]]); globalThis.currentFrame += N;
+}
+ok('el arranque empieza con la cola alta (80 ms) y con calma baja sola al reposo, sin llevar el ritmo al tope', Math.abs(objArranque - MS1(80)) < 1 && q.objetivo === q.base && ritmoMax < 0.004,
+   `empezó en ${ms(objArranque)} ms, a los 40 s ${ms(q.objetivo)} ms (cola ${ms(q.nivel)} ms); ritmo hasta ${(ritmoMax * 100).toFixed(2)} %`);
+// 12) Una PC lenta: el juego entrega a los tirones (40 ms de sonido juntos cada 40 ms). La cola sube y baja 40 ms:
+// el objetivo no puede bajar a 25 (se vaciaría en cada tirón); se queda donde la cola no baja de 8 ms
+const w = new Clase({ processorOptions: { objetivoMs: 25 } });
+let f3 = 0, vaciosW = 0;
+const tono3 = n => { const d = new Float32Array(2 * n); for (let i = 0; i < n; i++) { d[2 * i] = d[2 * i + 1] = 0.3 * Math.sin(f3); f3 += PASO; } return d; };
+w.port.onmessage({ data: tono3(MS1(90)) });
+for (let b = 0, debe = 0; b < Math.round(30 * SR / N); b++) {          // 30 s
+  debe += N;
+  if (debe >= MS1(40)) { w.port.onmessage({ data: tono3(MS1(40)) }); debe -= MS1(40); }
+  const L = new Float32Array(N), R = new Float32Array(N); w.process([], [[L, R]]); globalThis.currentFrame += N;
+}
+ok('PC lenta (el juego entrega cada 40 ms): el objetivo se queda alto y la cola no se vacía', w.c.vacios === 0 && w.objetivo > w.base + MS1(5),
+   `objetivo ${ms(w.objetivo)} ms, vacíos ${w.c.vacios}`);
+
+// ============ Parte 2b: de verdad, después del primer toque ============
+document.getElementById('resumen').textContent = 'lógica probada; falta el primer toque';
+nota('ahora falta el primer toque: el botón «Tocar para empezar»');
+await tocado;
+{
+  document.getElementById('resumen').textContent = 'probando…';
+  await espera(1500);
+  const e = so.estado;
+  ok('el primer toque lo desbloquea y el worklet suena', so.contexto.state === 'running' && e.desbloqueadoCon === 'pointerdown' && e.bloques > 0,
+     `${so.contexto.state}, ${e.bloques} bloques de ${e.muestrasBloque}`);
+  ok('el medidor lee el nivel del tono que sale del worklet', Math.abs(so.nivel('entrada') - AMP2 / Math.SQRT2) < 0.15 * AMP2,
+     `${so.nivel('entrada').toFixed(4)} (esperado ${(AMP2 / Math.SQRT2).toFixed(4)})`);
+  ok('la cola del worklet queda cerca del objetivo (25 ms)', e.nivelMs > 12 && e.nivelMs < 45 && so.puente.nivelMs() > 0,
+     `promedio ${e.nivelMs.toFixed(1)} ms, mínimo ${e.nivelMinMs.toFixed(1)} ms, objetivo ${e.objetivoMs.toFixed(1)} ms`);
+  ok('sin huecos ni saltos con el juego parejo', e.huecos === 0 && e.saltos === 0, `huecos ${e.huecos}, vacíos ${e.vacios}, saltos ${e.saltos}`);
+  ok('pasar cada entrega al worklet cuesta poco', e.msBloqueTotal / e.entregas < 0.05, `${(e.msBloqueTotal / e.entregas * 1000).toFixed(1)} µs por entrega (máx ${e.msBloqueMax.toFixed(2)} ms)`);
+  // Volumen: igual que en el camino viejo (misma cadena)
+  so.volumen(0.5);
+  await espera(250);
+  const r50 = so.nivel('salida') / so.nivel('entrada');
+  ok('volumen 50 % → la salida es 1/4 (la misma cadena que el camino viejo)', Math.abs(r50 - 0.25) < 0.03, `salida/entrada ${r50.toFixed(3)}`);
+  so.volumen(0.7);
+  // Un tirón de la página: 80 ms sin soltar el hilo (el juego no entrega, la tarjeta sigue)
+  const huecosAntes = e.huecos, objAntes = e.objetivoMs;
+  const fin80 = performance.now() + 80; while (performance.now() < fin80) {}
+  await espera(400);
+  ok('un tirón de 80 ms de la página: la cola se vacía (1 hueco) y el objetivo sube', e.huecos === huecosAntes + 1 && e.objetivoMs > objAntes + 20,
+     `huecos ${e.huecos - huecosAntes}, objetivo ${objAntes.toFixed(1)} → ${e.objetivoMs.toFixed(1)} ms`);
+  // La demora con el clic (el mismo procedimiento que con el juego)
+  const d = await so.medirDemora(M, { veces: 5, pausaMs: 150 });
+  if (d) ok('la demora medida con el clic ≈ cola + lo que dice el navegador', d.n >= 4 && d.mediana > 0 && d.mediana < d.colaMs + d.chromeMs + 30,
+            `mediana ${d.mediana.toFixed(1)} ms (de ${d.min.toFixed(1)} a ${d.max.toFixed(1)}; cola ${d.colaMs.toFixed(1)} + navegador ${d.chromeMs.toFixed(1)})`);
+  else nota('la demora no se pudo medir: el navegador no da getOutputTimestamp (Chrome sin ventana con el sonido de mentira)');
+  // Otro AudioContext de la página (como los pitidos del contador DNF, dnf.mjs): tiene su cadena con el volumen, pero
+  // no le quita el lugar al del juego (antes el volumen y el medidor pasaban a ser los suyos)
+  {
+    const huecosD = e.huecos, ctxJuego = so.contexto;
+    const otro = new AudioContext();
+    await otro.resume().catch(() => {});
+    await espera(300);
+    so.volumen(0.5);
+    await espera(250);
+    const r = so.nivel('salida') / so.nivel('entrada');
+    ok('otro AudioContext de la página (los pitidos DNF) no le quita el lugar al del juego', so.contexto === ctxJuego && e.contextos === 2 &&
+       e.huecos === huecosD && Math.abs(r - 0.25) < 0.03 && otro.mkwCadena.volumen.gain.value < 0.3,
+       `contexto del juego ${so.contexto === ctxJuego ? 'igual' : 'CAMBIÓ'}, ${e.contextos} AudioContext, huecos +${e.huecos - huecosD}, ` +
+       `volumen del juego ${r.toFixed(3)}, del otro ${otro.mkwCadena.volumen.gain.value.toFixed(3)}`);
+    so.volumen(0.7);
+    await otro.close();
+  }
+  // Pausa y vuelta (el navegador suspende el sonido): vuelve de cero, sin contar un hueco
+  const huecosP = e.huecos;
+  await so.contexto.suspend();
+  await espera(200);
+  await so.contexto.resume();
+  await espera(400);
+  ok('pausa y vuelta: el worklet arranca de cero y no cuenta un hueco', e.huecos === huecosP && so.contexto.state === 'running' && e.nivelMs > 10,
+     `huecos ${e.huecos - huecosP}, cola ${e.nivelMs.toFixed(1)} ms`);
+  nota(`bloques ${e.bloques}, en silencio ${e.bloquesSilencio}, entregas ${e.entregas}, Chrome dice base ${(so.contexto.baseLatency * 1000).toFixed(1)} ms + salida ${(so.contexto.outputLatency * 1000).toFixed(1)} ms`);
+  await so.contexto.close();
+  try { localStorage.removeItem('mkw.volumen'); localStorage.removeItem('mkw.silencio'); } catch {}
+  fin();
+}
+</script>
+</body>
+</html>

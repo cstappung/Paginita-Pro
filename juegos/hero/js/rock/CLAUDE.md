@@ -60,9 +60,15 @@ true and the `admins` condition back in those two rules. In the frame,
   first `POOL_2` (169); after it come the Synyster guitars (both bodies,
   common). A future expansion needs its own cut-off (`POOL_3`,
   `CORTE_CAJAS_5`), set after the deploy. Never reorder.
-- **Synyster** (`GTYPES.synyster`): its pinstripes are a `ShapeGeometry` of
-  the body over the front face with a striped `alphaMap` (`rayasTex`,
-  `T.rayas`), painted in the guitar's second colour (`guard`); no pickguard.
+- **Synyster** (`GTYPES.synyster`): the outline `SYN_C` is traced from the
+  owner's photo (straightened; fretboard end at 0.13, strings at y = 0). Its
+  pinstripes are a `ShapeGeometry` of the body over the front face with an
+  `alphaMap` drawn at the photo's stripe heights (`RAYAS_Y`, parallel to the
+  neck, in groups), in the second colour (`guard`); no pickguard. Body, head
+  and stripes use `metalMat` (`T.metal`): toon + view-angle colour shift,
+  a camera-following highlight, a slow light sweep and a few twinkling
+  flakes, all below bloom (it is common, not legendary). The thumbnail
+  photographer shoots guitars yawed 45°: parallel stripes look tilted there.
 - **A legendary's glow follows its variant**: `legMat(kind, base, glow)`
   takes the glow from the piece's secondary colour (`guard`, `accent`,
   `color2`) through `vivo(x, def)`, which keeps the factory glow only when
@@ -197,7 +203,7 @@ drawing, `MINI.px` (192) square.
   to the old path, `miniProcesa`: rendered in a corner of the scene's canvas
   before the scene, but **one every 3 frames**.
 - Cached per piece and colours (`invId`) in localStorage under `claveMini(v)`
-  (`catalogo.js`, `rock-mini-3:<id>`: bump the number when the rocker's look
+  (`catalogo.js`, `rock-mini-4:<id>`: bump the number when the rocker's look
   changes; `limpiaMinisViejas` deletes the old prefix, since localStorage is
   ~5 MB for the whole site). The page keeps object URLs in memory and writes
   the data URL in the background (`FileReader`).

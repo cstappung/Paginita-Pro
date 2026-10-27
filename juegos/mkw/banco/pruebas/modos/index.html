@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modos de la sala</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Modos de la sala: <span>Retro WFC, copa y playlist sobre el modo en línea del juego</span></h1>
+<p>Prueba <code>modos.mjs</code> (bitácora §72) <b>sin el juego</b>: una memoria inventada con la forma de la del juego
+  (el número con que arranca el reloj de elegir, Racedata con los jugadores, sus Mii y sus puntos, y Raceinfo con la
+  etapa de la carrera y los puestos) y un reloj falso (las esperas pasan al instante). Comprueba que el reloj pasa de 30 a
+  45 s solo si encuentra el 30 del juego, que la cola de la playlist se lee bien, que los puntos de cada carrera salen del
+  juego (o de la tabla por puesto si el juego no los anotó), que la copa cuenta una carrera por cada vez que termina, que
+  la playlist le dice al juego la pista que toca, y que al final aparece la tabla y se avisa una sola vez.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { ponerReloj, pistasDe, leerCarreraOnline, sumar, crearModo, bitsDe, floatDe, RELOJ_ELEGIR, PUNTOS } from '/web/navegador/modos.mjs';
+
+const { ok, fin } = prueba('modos', 'Modos de la sala (sin el juego)');
+
+// ---- Una memoria falsa (big-endian, por bytes) con lo que lee modos.mjs ----
+function memoria() {
+  const m = new Map();
+  const L = {
+    u8: a => m.get(a >>> 0) ?? 0,
+    u16: a => (L.u8(a) << 8) | L.u8(a + 1),
+    u32: a => ((L.u16(a) << 16) | L.u16(a + 2)) >>> 0,
+    w8: (a, v) => m.set(a >>> 0, v & 0xFF),
+    w16: (a, v) => { L.w8(a, v >> 8); L.w8(a + 1, v); },
+    w32: (a, v) => { L.w16(a, v >>> 16); L.w16(a + 2, v & 0xFFFF); },
+    seccion: 0x68,
+    estado: () => ({ seccion: L.seccion, pagina: 0x90, paginas: [0x90] }),
+  };
+  return L;
+}
+const RD = 0x80800000, RI = 0x80900000, LISTA = 0x80910000;
+// una carrera con n jugadores: nombres, puestos y puntos (antes → después)
+function carrera(L, jugadores, etapa = 4) {
+  L.w32(0x809BD728, RD); L.w32(0x809BD730, RI);
+  L.w8(RD + 0x20 + 4, jugadores.length);
+  L.w32(RI + 0x28, etapa); L.w32(RI + 0xC, LISTA);
+  jugadores.forEach((j, i) => {
+    const d = RD + 0x20 + 8 + 0xF0 * i, nombre = d + 0x14 + 0x68;
+    for (let k = 0; k < 10; k++) L.w16(nombre + 2 * k, k < j.nombre.length ? j.nombre.charCodeAt(k) : 0);
+    L.w16(d + 0xD8, j.antes ?? 0); L.w16(d + 0xDA, j.ahora ?? 0);
+    const p = 0x80920000 + 0x100 * i;
+    L.w32(LISTA + 4 * i, p); L.w8(p + 0x20, j.puesto);
+  });
+}
+// un reloj falso: cada() se llama a mano con tic(), despues() pasa al dar tic() (sin esperar)
+function relojFalso() {
+  const cadas = [], pendientes = [];
+  return {
+    cada: (f) => { cadas.push(f); return cadas.length; }, parar: () => {}, despues: (f) => pendientes.push(f),
+    tic: () => { cadas.forEach(f => f()); while (pendientes.length) pendientes.shift()(); },
+  };
+}
+const juegoFalso = () => ({ pistas: [], ccs: [], _mkw_modos_pista(p) { this.pistas.push(p); }, _mkw_modos_cc(c) { this.ccs.push(c); } });
+
+// 1) el reloj de elegir
+{
+  const L = memoria();
+  L.w32(RELOJ_ELEGIR, bitsDe(30));
+  ok('el reloj: con el 30.0 del juego, queda en 45', ponerReloj(L, 45) && floatDe(L.u32(RELOJ_ELEGIR)) === 45);
+  ok('…y se puede volver a 30 (el número que pusimos nosotros)', ponerReloj(L, 30) && floatDe(L.u32(RELOJ_ELEGIR)) === 30);
+  L.w32(RELOJ_ELEGIR, 0x12345678);
+  ok('con otra cosa en esa dirección (otro programa) no se toca', !ponerReloj(L, 45) && L.u32(RELOJ_ELEGIR) === 0x12345678);
+}
+// 2) la cola de la playlist
+{
+  const p = pistasDe('13.2, 0.1,x,78.3,79.0,5.4,2.0');
+  ok('la cola: copa.fila → id de Pulsar (0x100 + 4·copa + fila), sin lo inválido', p.length === 4 && p[0].id === 0x136 && p[1].id === 0x101 && p[2].id === 0x100 + 4 * 78 + 3 && p[3].id === 0x108,
+     JSON.stringify(p.map(x => x.id.toString(16))));
+  ok('una cola vacía o sin texto: ninguna', pistasDe('').length === 0 && pistasDe(null).length === 0);
+}
+// 3) los puntos de una carrera
+{
+  const L = memoria();
+  carrera(L, [{ nombre: 'Ana', puesto: 2, antes: 10, ahora: 22 }, { nombre: 'Beto', puesto: 1, antes: 12, ahora: 27 }]);
+  const c = leerCarreraOnline(L);
+  ok('la carrera: nombre del Mii, puesto y los puntos que dio el juego (después − antes)', c && c[0].nombre === 'Ana' && c[0].puntos === 12 && c[1].nombre === 'Beto' && c[1].puntos === 15 && c[1].puesto === 1,
+     JSON.stringify(c));
+  carrera(L, [{ nombre: 'Ana', puesto: 2 }, { nombre: 'Beto', puesto: 1 }, { nombre: 'Caro', puesto: 3 }]);
+  const d = leerCarreraOnline(L);
+  ok('si el juego no anotó puntos, por puesto con la tabla de 12 (15, 12, 10…)', d && d.map(x => x.puntos).join() === [PUNTOS[1], PUNTOS[0], PUNTOS[2]].join(), JSON.stringify(d?.map(x => x.puntos)));
+  const t = sumar(sumar([], c), d);
+  ok('la tabla suma por nombre y ordena por puntos', t.length === 3 && t[0].nombre === 'Beto' && t[0].puntos === 30 && t[1].nombre === 'Ana' && t[1].puntos === 24 && t[2].puntos === 10,
+     t.map(x => `${x.nombre}:${x.puntos}`).join(','));
+  const u = sumar([], [{ i: 0, nombre: 'Piloto', puesto: 1, puntos: 15 }, { i: 1, nombre: 'Piloto', puesto: 2, puntos: 12 }]);
+  ok('dos con el mismo nombre no se juntan', u.length === 2);
+}
+// 4) la copa de 2 carreras: cuenta, suma, muestra la tabla y avisa una vez
+{
+  const L = memoria(), R = relojFalso(), M = juegoFalso();
+  L.w32(RELOJ_ELEGIR, bitsDe(30));
+  let avisos = 0, tablaFin = null;
+  const modo = crearModo({ estilo: 'copa', carreras: 2, cc: 'c150', M, lector: L, reloj: R, alTerminar: t => { avisos++; tablaFin = t; } });
+  R.tic();
+  ok('copa: el reloj queda en 45 y la cilindrada pedida va al juego (150cc = 2)', modo.estado().relojPuesto && M.ccs[0] === 2 && M.pistas.length === 0);
+  ok('…el cartel dice «carrera 1 de 2»', /carrera 1 de 2/.test(document.getElementById('mkw-modo')?.textContent || ''));
+  carrera(L, [{ nombre: 'Ana', puesto: 1, antes: 0, ahora: 15 }, { nombre: 'Beto', puesto: 2, antes: 0, ahora: 12 }], 2);
+  R.tic();
+  ok('…mientras corren (etapa 2) no cuenta nada', modo.estado().terminadas === 0);
+  carrera(L, [{ nombre: 'Ana', puesto: 1, antes: 0, ahora: 15 }, { nombre: 'Beto', puesto: 2, antes: 0, ahora: 12 }], 4);
+  R.tic(); R.tic(); R.tic();
+  ok('…al terminar (etapa 4) cuenta 1, una sola vez', modo.estado().terminadas === 1 && /carrera 2 de 2/.test(document.getElementById('mkw-modo').textContent));
+  carrera(L, [{ nombre: 'Ana', puesto: 2, antes: 15, ahora: 27 }, { nombre: 'Beto', puesto: 1, antes: 12, ahora: 27 }], 0);
+  R.tic();
+  carrera(L, [{ nombre: 'Ana', puesto: 2, antes: 15, ahora: 27 }, { nombre: 'Beto', puesto: 1, antes: 12, ahora: 27 }], 4);
+  R.tic(); R.tic();
+  const e = modo.estado(), cuadro = document.getElementById('mkw-tabla');
+  ok('…la segunda: 2 de 2, tabla final a la vista', e.terminadas === 2 && e.final && cuadro && !cuadro.hidden && cuadro.textContent.includes('Fin de la copa'));
+  ok('…con los puntos sumados (Beto 27, Ana 27: desempata el último puesto)', e.tabla.map(x => `${x.nombre}:${x.puntos}`).join() === 'Beto:27,Ana:27', e.tabla.map(x => `${x.nombre}:${x.puntos}`).join());
+  R.tic(); R.tic();
+  ok('…y avisa el fin una sola vez, con la tabla', avisos === 1 && tablaFin?.length === 2 && tablaFin[0].nombre === 'Beto');
+  modo.parar();
+  ok('parar() quita el cartel y la tabla', !document.getElementById('mkw-modo') && !document.getElementById('mkw-tabla'));
+}
+// 5) la playlist: la pista que toca va al juego antes de cada carrera; al vaciarse la cola, fin
+{
+  const L = memoria(), R = relojFalso(), M = juegoFalso();
+  L.w32(RELOJ_ELEGIR, bitsDe(30));
+  let avisos = 0;
+  const modo = crearModo({ estilo: 'playlist', pistas: pistasDe('13.2,0.1'), cc: 'espejo', M, lector: L, reloj: R,
+                           nombrePista: (c, f) => `Pista ${c}.${f}`, alTerminar: () => avisos++ });
+  R.tic();
+  ok('playlist: la primera pista de la cola y el espejo (3) van al juego', M.pistas[0] === 0x136 && M.ccs[0] === 3);
+  ok('…el cartel dice la pista que toca', /1 de 2 · Pista 13\.2/.test(document.getElementById('mkw-modo').textContent), document.getElementById('mkw-modo').textContent);
+  carrera(L, [{ nombre: 'Ana', puesto: 1, antes: 0, ahora: 15 }], 4);
+  R.tic(); R.tic();
+  ok('…terminada la primera, el juego recibe la segunda', M.pistas[M.pistas.length - 1] === 0x101 && /2 de 2 · Pista 0\.1/.test(document.getElementById('mkw-modo').textContent));
+  carrera(L, [{ nombre: 'Ana', puesto: 1, antes: 15, ahora: 30 }], 1); R.tic();
+  carrera(L, [{ nombre: 'Ana', puesto: 1, antes: 15, ahora: 30 }], 4); R.tic(); R.tic(); R.tic();
+  ok('…al vaciarse la cola: la pista vuelve a "la votación decide" (-1), tabla y un aviso', M.pistas[M.pistas.length - 1] === -1 && modo.estado().final && avisos === 1);
+  modo.parar();
+}
+// 5b) un corte: el juego sale a la sección 0x79 con el Raceinfo viejo diciendo "terminada": no cuenta
+{
+  const L = memoria(), R = relojFalso(), M = juegoFalso();
+  const modo = crearModo({ estilo: 'copa', carreras: 2, M, lector: L, reloj: R });
+  carrera(L, [{ nombre: 'Ana', puesto: 1 }], 2); R.tic();
+  L.seccion = 0x79; carrera(L, [{ nombre: 'Ana', puesto: 1 }], 4); R.tic(); R.tic();
+  ok('un corte (sección 0x79) no cuenta como carrera terminada, y se anota', modo.estado().terminadas === 0 && modo.estado().cortado);
+  // el corte deja la carrera "terminada" mientras sigue en 0x68 y recién después salta a 0x79
+  L.seccion = 0x68; carrera(L, [{ nombre: 'Ana', puesto: 1 }], 2); R.tic();
+  const R2 = { cada: R.cada, parar: R.parar, despues: f => { L.seccion = 0x79; R.despues(f); } };
+  const modo2 = crearModo({ estilo: 'copa', carreras: 2, M, lector: L, reloj: R2 });
+  carrera(L, [{ nombre: 'Ana', puesto: 1 }], 4); R.tic(); R.tic();
+  ok('…ni cuando la carrera queda "terminada" en 0x68 y el juego salta a 0x79 justo después', modo2.estado().terminadas === 0);
+  modo2.parar();
+  modo.parar();
+}
+// 6) Retro WFC (el original): solo el reloj, sin cartel ni tabla ni nada para el juego
+{
+  const L = memoria(), R = relojFalso(), M = juegoFalso();
+  L.w32(RELOJ_ELEGIR, bitsDe(30));
+  const modo = crearModo({ estilo: 'wfc', M, lector: L, reloj: R });
+  R.tic();
+  carrera(L, [{ nombre: 'Ana', puesto: 1 }], 4); R.tic(); R.tic();
+  ok('Retro WFC: el reloj en 45, sin cartel, sin cilindrada ni pista, y no cuenta carreras',
+     modo.estado().relojPuesto && !document.getElementById('mkw-modo') && M.ccs.length === 0 && M.pistas.length === 0 && modo.estado().terminadas === 0);
+  modo.parar();
+}
+fin();
+</script>
+</body>
+</html>

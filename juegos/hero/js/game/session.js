@@ -16,8 +16,10 @@ import { vistas } from './orden.js';
 import { CURVA_N } from './carrera.js';
 import { rockSitio, cargaFondo } from '../sitio/rock.js';
 import { descansos, enDescanso, humorDe } from '../rock/ritmo.js';
-import { Batalla, PODERES, MAX_PODERES, REPARA, FIN_KO } from './batalla.js';
+import { Batalla, PODERES, TIPOS, PODERES_BATERIA, MAX_PODERES, REPARA, FIN_KO, dobla } from './batalla.js';
 
+// los nombres de los trastes (FRET_COLORS), para los avisos de la batalla
+const TRASTES = ['Verde', 'Rojo', 'Amarillo', 'Azul', 'Naranja'];
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
 // Sucesos de notas que viajan en cada estado (los últimos): el canal no reenvía lo perdido
@@ -44,6 +46,7 @@ export class GameSession {
     this.paused = false;
     this.lastStateSent = 0;
     this.curva = [];
+    this.enBatalla = !!batalla && players.length === 2;
     this.players = players.map((pd, idx) => this._makePlayer(pd, idx, players.length));
     this.local = this.players.filter((p) => p.type !== 'remote');
     // modo batalla (game/batalla.js): solo de a dos; el Star Power se cambia por poderes que se lanzan al rival
@@ -74,8 +77,11 @@ export class GameSession {
     const raw = this.song.parts[pd.part]?.[pd.diff];
     // en el celular no hay rasgueo: todo taps (el modo va en la cabecera de la prueba)
     const mode = celular && pd.type !== 'remote' ? 'taps' : pd.mode || (pd.type === 'remote' ? 'normal' : settings.noteMode);
-    const track = applyNoteMode(raw, mode);
+    let track = applyNoteMode(raw, mode);
     if (!track) throw new Error(`La canción no tiene ${pd.part}/${pd.diff}`);
+    // en la batalla las «notas dobles» cambian las notas de quien las recibe: cada uno con su copia (con la
+    // misma parte y dificultad, el bot y tú compartían el arreglo y se doblaban las de los dos)
+    if (this.enBatalla && track.kind === 'guitar') track = { ...track, notes: track.notes.map((n) => ({ ...n, sus: n.sus.map((x) => ({ ...x })) })) };
     const p = {
       ...pd,
       track,
@@ -86,6 +92,7 @@ export class GameSession {
       netEvents: [],
       fxQueue: [],
       frets: 0,
+      fis: 0,   // en la batalla: los trastes que pisas de verdad (con las teclas cruzadas no son los que suenan)
       mode,
     };
     if (pd.type === 'remote') {
@@ -148,7 +155,7 @@ export class GameSession {
       else if (type === 'miss' || type === 'overstrum') this.bt.fallo(p.bq, now);
       else if (type === 'spPhrase') {
         p.fxQueue.push({ type: 'phrase', lanes: GameSession.noteLanes(p.engine.notes[b], p.engine.kind) });
-        const k = this.bt.gana(p.bq, now);
+        const r = this._rival(p), k = this.bt.gana(p.bq, now, r?.engine.kind === 'drums' ? PODERES_BATERIA : TIPOS);
         this.audio.spAwarded(!!k);
         return;
       }
@@ -534,12 +541,20 @@ export class GameSession {
     }
     if (!g) return;
     if (this.bt) {
-      // el botón de Star Power lanza tu poder; un traste con la cuerda rota no suena: cada pulsación la repara
+      // el botón de Star Power lanza tu poder; un traste con la cuerda rota no suena: cada pulsación la repara.
+      // Con las teclas cruzadas, dos trastes tocan el carril del otro
       if (act === 'sp') { if (down) this._lanzaBt(p, t); return; }
-      const l = e.kind === 'guitar' ? (act[0] === 'g' && act.length === 2 ? Number(act[1]) : -1) : act[0] === 'p' || act[0] === 'c' ? Number(act[1]) : -1;
-      if (l >= 0 && this.bt.roto(p.bq, l, t)) {
-        if (down && this.bt.pulsaRoto(p.bq, t)) this.audio.playSample('ripple', 0.5);
-        return;
+      const l0 = e.kind === 'guitar' ? (act[0] === 'g' && act.length === 2 ? Number(act[1]) : -1) : act[0] === 'p' || act[0] === 'c' ? Number(act[1]) : -1;
+      if (l0 >= 0) {
+        const l = this.bt.cruzado(p.bq, l0, t);
+        if (down && this.bt.roto(p.bq, l, t) && this.bt.pulsaRoto(p.bq, t)) this.audio.playSample('ripple', 0.5);
+        if (e.kind === 'guitar') {
+          p.fis = down ? p.fis | (1 << l0) : p.fis & ~(1 << l0);
+          this._trastesBt(p, t);
+          return;
+        }
+        if (this.bt.roto(p.bq, l, t)) return;
+        act = act[0] + l;
       }
     }
     if (e.kind === 'guitar') {
@@ -609,11 +624,26 @@ export class GameSession {
   _recibeBt(p, a, t) {
     if (!this.bt.recibe(p.bq, a, t)) return;
     p.fxQueue.push({ type: 'break', had: 40 });   // el golpe sacude su autopista
-    // la cuerda rota suelta ese traste si lo tenía pisado
-    if (a.k === 'cuerda' && p.grab && p.engine.kind === 'guitar' && p.frets & (1 << a.l)) {
-      p.frets &= ~(1 << a.l);
-      p.grab.fret(p.frets, Math.max(t, 0));
+    // la cuerda rota suelta ese traste si lo tenía pisado; las teclas cruzadas cambian lo que suena ya
+    if (p.grab && p.engine.kind === 'guitar') this._trastesBt(p, Math.max(t, 0));
+    if (a.k === 'dobles' && p.engine.kind === 'guitar') dobla(p.engine.notes, ...this.bt.j[p.bq].dobles);
+    // en la guitarra, el aviso dice cuáles se cruzaron
+    const J = this.bt.j[p.bq];
+    if (a.k === 'cruce' && p.engine.kind === 'guitar' && J.cruce && J.aviso) J.aviso.sub = `${TRASTES[J.cruce[0]]} ⇄ ${TRASTES[J.cruce[1]]}: cada uno toca el carril del otro`;
+  }
+
+  /* lo que suena en la guitarra de `p` en la batalla: lo que pisa, con las teclas cruzadas y sin la cuerda rota */
+  _trastesBt(p, t) {
+    if (!p.grab) return;
+    let m = 0;
+    for (let l = 0; l < 5; l++) {
+      if (!(p.fis & (1 << l))) continue;
+      const c = this.bt.cruzado(p.bq, l, t);
+      if (!this.bt.roto(p.bq, c, t)) m |= 1 << c;
     }
+    if (m === p.frets) return;
+    p.frets = m;
+    p.grab.fret(m, t);
   }
 
   _tickBt(now) {
@@ -621,11 +651,13 @@ export class GameSession {
     this.btT = now;
     for (const p of this.local) {
       bt.tick(p.bq, now, dt);
+      // al empezar o terminar un cruce (o vencer la cuerda) cambia lo que suena con lo que ya tienes pisado
+      if (p.grab && p.engine.kind === 'guitar' && !this.rewind) this._trastesBt(p, now);
       if (!p.bot) continue;
       // el bot también juega la batalla: lanza sus poderes al rato, los ataques lo hacen fallar y repara la cuerda
       const J = bt.j[p.bq], ef = bt.pintura(p.bq, now);
       if (J.poderes.length) { p.btLanza ??= now + 1 + Math.random() * 2.5; if (now >= p.btLanza) { p.btLanza = null; this._lanzaBt(p, now); } }
-      p.bot.torpe = ef.amp || ef.zurdo || ef.apagon ? 0.25 : 0;
+      p.bot.torpe = ef.apagon ? 0.35 : ef.amp || ef.cruce || ef.dobles ? 0.25 : 0;
       p.bot.sinTraste = ef.roto >= 0 ? 1 << ef.roto : 0;
       if (ef.roto >= 0) { p.btRepara ??= now + 2.5; if (now >= p.btRepara) { p.btRepara = null; for (let i = 0; i < REPARA; i++) bt.pulsaRoto(p.bq, now); } }
     }
@@ -699,6 +731,9 @@ export class GameSession {
     if (this.bt && m.bt && typeof m.bt === 'object') {
       const now = this.now ?? 0, yo = this._rival(p);
       this.bt.ponRemoto(p.bq, m.bt, now);
+      // sus notas dobles: su autopista en tu pantalla se dobla igual que la suya (misma ventana, mismas notas)
+      const dn = this.bt.j[p.bq].dobles;
+      if (dn && p.engine.kind === 'guitar' && p.dnHecho !== dn.join()) { p.dnHecho = dn.join(); dobla(p.engine.notes, ...dn); }
       // sus ataques (se repiten en cada paquete; cada uno se aplica una vez). En la cuenta regresiva no valen:
       // pueden ser de la canción anterior
       if (now >= 0 && yo && Array.isArray(m.bt.a)) for (const x of m.bt.a.slice(-8)) {

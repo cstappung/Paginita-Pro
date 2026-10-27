@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precalentar pipelines</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Precalentar pipelines: <span>la lista que se recuerda entre visitas</span></h1>
+<p>Prueba <code>web/navegador/pipelines.mjs</code> <b>sin el juego</b>. Un "aurora falso" (un objeto con la misma
+  memoria y las mismas tres funciones que exporta el juego) arma listas inventadas con el formato real
+  (<code>MKWPIPE1</code> + registros). Se comprueba leer la semilla y la lista de este navegador, dejarlas como archivos
+  para aurora, guardar solo cuando la lista creció, guardar al esconder la pestaña y no romperse con datos malos.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPipelines, contarLista } from '/web/navegador/pipelines.mjs';
+
+const { ok, nota, fin } = prueba('pipelines', 'Precalentar pipelines (lista falsa)');
+
+// Una lista inventada con el formato de aurora: "MKWPIPE1", cantidad, y registros (tipo, versión, cuadro, tamaño, bytes)
+function lista(n, semilla = 1) {
+  const tam = 20, b = new Uint8Array(12 + n * (16 + tam)), v = new DataView(b.buffer);
+  b.set([...'MKWPIPE1'].map(c => c.charCodeAt(0)));
+  v.setUint32(8, n, true);
+  for (let i = 0, o = 12; i < n; i++, o += 16 + tam) {
+    v.setUint32(o, i % 2, true); v.setUint32(o + 4, 7, true); v.setUint32(o + 8, i * 10, true); v.setUint32(o + 12, tam, true);
+    b.fill((i * 31 + semilla) & 255, o + 16, o + 16 + tam);
+  }
+  return b;
+}
+// El "juego" falso: su lista crece cuando se le pide, y exporta igual que aurora (armar → tamaño, datos → dónde)
+function juegoFalso(n0) {
+  const M = { n: n0, HEAPU8: new Uint8Array(1 << 20) };
+  M._mkw_web_pipelines_cuantos = () => M.n;
+  M._mkw_web_pipelines_armar = () => { const l = lista(M.n, 9); M.HEAPU8.set(l, 4096); return l.length; };
+  M._mkw_web_pipelines_datos = () => 4096;
+  return M;
+}
+const iguales = (a, b) => a && b && a.length === b.length && a.every((x, i) => x === b[i]);
+const base = 'mkw-pipelines-banco-' + Date.now();     // una base propia de esta prueba (se borra al final)
+// esperar hasta que algo pase (máx. 3 s): en una pestaña de fondo el navegador espacia los relojes
+const hasta = async (cond, ms = 3000) => { const t = performance.now(); while (!cond() && performance.now() - t < ms) await new Promise(r => setTimeout(r, 10)); return cond(); };
+const respuesta = bytes => async () => ({ ok: !!bytes, arrayBuffer: async () => bytes.buffer.slice(0) });
+
+try {
+  // 1) reconocer una lista
+  ok('una lista válida dice cuántos pipelines trae; una rota o ajena da -1',
+     contarLista(lista(5)) === 5 && contarLista(new Uint8Array(4)) === -1 &&
+     contarLista(new TextEncoder().encode('<html>no encontrado</html>')) === -1 && contarLista(null) === -1);
+
+  // 2) primera visita: hay semilla en el servidor, nada en este navegador
+  const semilla = lista(40);
+  const doc = Object.assign(new EventTarget(), { hidden: false });
+  const p = crearPipelines({ base, buscar: respuesta(semilla), cadaMs: 30, documento: doc });
+  const l1 = await p.cargar();
+  ok('primera visita: llega la semilla (40) y no hay lista propia', iguales(l1.semilla, semilla) && l1.propia === null &&
+     p.estado.semilla === 40 && p.estado.propia === 0);
+
+  // 3) quedan como archivos para aurora
+  const archivos = new Map(), carpetas = [];
+  const FS = { mkdirTree: c => carpetas.push(c), writeFile: (r, d) => archivos.set(r, d) };
+  p.escribir(FS, l1);
+  ok('se dejan en /datos/pipelines/ para que aurora las lea antes de main (solo las que hay)',
+     carpetas.includes('/datos/pipelines') && iguales(archivos.get('/datos/pipelines/semilla.bin'), semilla) &&
+     !archivos.has('/datos/pipelines/propia.bin'));
+
+  // 4) mientras se juega: guarda solo si la lista creció
+  const M = juegoFalso(40);
+  p.vigilar(M);
+  ok('lo cargado al arrancar no se vuelve a guardar (la lista no creció)', (await p.guardarAhora()) === false && p.estado.vecesGuardada === 0);
+  M.n = 52;
+  ok('cuando el juego usó pipelines nuevos (52), se guarda la lista', (await p.guardarAhora()) === true && p.estado.guardadas === 52);
+  ok('si no cambió, no se guarda otra vez (no gasta escrituras)', (await p.guardarAhora()) === false && p.estado.vecesGuardada === 1);
+  M.n = 60;
+  ok('el reloj (cada 10 s en el juego; aquí 30 ms) guarda solo cuando crece', await hasta(() => p.estado.guardadas === 60), `guardadas ${p.estado.guardadas}`);
+  M.n = 61;
+  doc.hidden = true; doc.dispatchEvent(new Event('visibilitychange'));
+  ok('al esconder la pestaña (cerrar, cambiar de app en el celular) se guarda enseguida', await hasta(() => p.estado.guardadas === 61));
+  p.detener();
+  M.n = 70;
+  await new Promise(r => setTimeout(r, 90));
+  ok('detener() apaga el reloj', p.estado.guardadas === 61);
+  ok('forzar guarda aunque no haya crecido (lo usa la prueba del juego)', (await p.guardarAhora(M, true)) === true && p.estado.vecesGuardada === 4);
+
+  // 5) segunda visita: la lista propia vuelve igual
+  const p2 = crearPipelines({ base, buscar: respuesta(null) });
+  const l2 = await p2.cargar();
+  ok('segunda visita: la lista guardada vuelve entera (70) aunque el servidor no tenga semilla',
+     l2.semilla === null && contarLista(l2.propia) === 70 && iguales(l2.propia, lista(70, 9)));
+
+  // 6) datos malos o fallas: se sigue sin precalentar (el juego anda igual)
+  const p3 = crearPipelines({ base, buscar: respuesta(new TextEncoder().encode('<html>404</html>')) });
+  ok('una "semilla" que no es lista (p. ej. una página de error) se ignora', (await p3.cargar()).semilla === null);
+  const p4 = crearPipelines({ base, buscar: async () => { throw new Error('sin red'); } });
+  ok('sin red, la semilla falta pero la lista propia igual se lee', contarLista((await p4.cargar()).propia) === 70);
+  const idbRoto = { open() { const r = {}; setTimeout(() => { r.error = new Error('bloqueado'); r.onerror(); }); return r; } };
+  const p5 = crearPipelines({ indexedDB: idbRoto, buscar: respuesta(semilla) });
+  const l5 = await p5.cargar();
+  ok('con IndexedDB bloqueado (modo incógnito estricto) no se rompe: queda la semilla y el error anotado',
+     iguales(l5.semilla, semilla) && l5.propia === null && /bloqueado/.test(p5.estado.error), p5.estado.error);
+  nota('formato: "MKWPIPE1" + cantidad + por cada pipeline (tipo, versión, primer cuadro, tamaño, configuración); ' +
+       'aurora descarta las de otra versión al leerlas');
+} catch (e) {
+  ok('la prueba corrió sin errores', false, String(e && e.stack || e));
+}
+indexedDB.deleteDatabase(base);
+fin();
+</script>
+</body>
+</html>

@@ -18,7 +18,7 @@ room picks inside that range along with anything else the game offers;
 that offers nothing passes nothing. The lobby's player-count options are
 derived from `JUEGOS` (`cupos(k)` in `juegos-main.js`), so raising a `cupo` is
 one number in `motor.js` plus the rule's ceiling
-(`partidas/$pid/cupo` `.validate`, now `<= 10`). Each ceiling is where *that*
+(`partidas/$pid/cupo` `.validate`, now `<= 12` for Mario Kart Wii). Each ceiling is where *that*
 game stops working, not a round number:
 
 - **cuadritos, 10.** Nothing on the board depends on the count; with ten a
@@ -384,7 +384,7 @@ the same in `ranks.js`).
 ## Download cap (`src/consumo.js`)
 
 The free plan gives the whole site ~360 MB of RTDB download a day, and the
-database has no per-user quota, so **each player is capped at 80 MB a day**
+database has no per-user quota, so **each player is capped at 90 MB a day**
 on the client. `consumo.js` is imported **first** in `juegos-main.js`: the
 SDK captures the `WebSocket` class when it is evaluated, but sets
 `onmessage` on every new connection, so wrapping the *setter* on
@@ -405,6 +405,34 @@ the lobby query (`orderByChild('estado')` + `equalTo('esperando')`) or by
 pid, and `vivo`, `chat`, `soloPruebas` and `mascotasEstado` only by key
 (`test-rules.mjs` pins it). A new node that clients read by key should get its `.read` at the key
 level, not on the collection.
+
+What actually spent the quota (October 2026, measured on an export) was
+`watchLogros`: every page load downloaded the whole spending history,
+~3.8 MB a tab. That is now the **economy cierre**
+(`docs/claude/juegos/perfiles-y-economia.md`): old history moves to
+`archivo/` and tabs start from a compact snapshot. A new whole-node read
+of something that only grows must get the same treatment, or stay small.
+
+**Old tabs can be told to reload** (`juegosVersion/min`, admin-written,
+`revisaVersion` in `juegos-main.js`). The `?v=` stamp only reaches new page
+loads; a tab left open keeps its old bundle. When a data change needs every
+tab on new code (the economy cierre was the first), the admin raises the
+minimum to their tab's stamp (`#admin` → Economía, and the manual cierre
+does it before archiving). Older tabs reload by themselves if hidden (once
+per version, `sessionStorage`, so a stale cached page cannot loop) or get
+a «Recargar» cover. Never from localhost: a dev stamp is newer than the
+published one and would cover the whole site (`VER_PUBLICA`). Tabs on code
+from before this switch existed cannot be reached: only waiting helps them.
+
+**A tab hidden for `OCULTA_MS` (10 min) goes offline** (`duerme` in
+`juegos-main.js`, `fb.desconecta`/`fb.reconecta`), so it stops receiving
+every bet and message of the site. Only in views where nothing waits on
+the network (`VISTAS_DORMIBLES`: lobby, ranks, logros, coins, profile,
+packs, market, pets) and never with a waiting room of yours open: its
+`onDisconnect` would delete the room. On return the SDK re-listens with a
+hash and the server resends **whole** any node that changed (the web SDK
+has no per-range hashes), which is why this only pays off with small
+nodes.
 
 ## Every game can be muted and turned down (a rule, not a nicety)
 

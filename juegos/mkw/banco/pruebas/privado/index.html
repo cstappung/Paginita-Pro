@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token del Worker</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Lo privado con token: <span>la página le pide la sesión a Juegos y se la pone a cada pedido al Worker</span></h1>
+<p>Prueba <code>privado.mjs</code> (bitácora §65) <b>sin el juego ni el sitio</b>: una «página de Juegos» falsa contesta
+  los pedidos de token (como la sala del sitio) y una red falsa hace de Worker de amigos (401 sin token o con uno vencido,
+  200 con el bueno). Comprueba que cada pedido al Worker lleva <code>Authorization: Bearer …</code>, que los demás no,
+  que con muchos pedidos juntos se pregunta UNA vez, que un token vencido se renueva una vez, que sin Juegos no se queda
+  esperando y que el programa se importa desde un blob.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPrivado } from '/web/navegador/privado.mjs';
+
+const { ok, nota, fin } = prueba('privado', 'Token de Firebase para el Worker de amigos (sin el juego)');
+const ORIGEN = 'https://disco.ejemplo/mkw', PAGINA = 'https://sitio.ejemplo';
+
+// La «ventana» del marco (solo escucha mensajes) y la «página de Juegos», que contesta con el token vigente
+function escena({ tokens = ['t-1', 't-2', 't-3'], demora = 5, contesta = true } = {}) {
+  const oyentes = new Set(), pedidosToken = [];
+  const yo = { addEventListener: (_, f) => oyentes.add(f), removeEventListener: (_, f) => oyentes.delete(f),
+              disparar: m => { for (const f of [...oyentes]) f(m); } };   // (para mandarle mensajes a mano)
+  let vigente = 0;
+  const padre = {
+    postMessage(m, destino) {
+      pedidosToken.push({ ...m, destino });
+      if (!contesta || m.canal !== 'mkw-hijo' || m.tipo !== 'token') return;
+      if (m.nuevo) vigente = Math.min(vigente + 1, tokens.length - 1);
+      const token = tokens[vigente];
+      setTimeout(() => { for (const f of [...oyentes]) f({ source: padre, origin: PAGINA, data: { canal: 'mkw-padre', tipo: 'token', token } }); }, demora);
+    },
+  };
+  // El Worker falso: acepta solo el token vigente; anota cada pedido con sus cabeceras
+  const vistos = [];
+  let aceptado = tokens[0];
+  const red = async (recurso, opciones = {}) => {
+    const url = typeof recurso === 'string' ? recurso : recurso.url;
+    const cab = new Headers(opciones.headers || undefined);
+    vistos.push({ url, auth: cab.get('Authorization'), range: cab.get('Range') });
+    if (!url.startsWith(ORIGEN)) return new Response('público', { status: 200 });
+    if (cab.get('Authorization') !== 'Bearer ' + aceptado) return new Response('inicia sesión', { status: 401 });
+    if (url.includes('/build/mkw.js')) return new Response('export default 41 + 1;', { headers: { 'Content-Type': 'text/javascript' } });
+    return new Response(url.includes('/mkw/disco/') ? new Uint8Array(10) : '{}', { status: cab.get('Range') ? 206 : 200 });
+  };
+  return { yo, padre, red, vistos, pedidosToken, venceToken() { aceptado = tokens[1]; } };
+}
+
+try {
+  // 1) cada pedido al Worker lleva el token; lo de otros orígenes no
+  {
+    const e = escena(), p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: e.red, origenPagina: PAGINA });
+    const r = await p.buscar(ORIGEN + '/manifiesto.json');
+    ok('el manifiesto sale con el token (200)', r.status === 200, `estado ${r.status}`);
+    ok('lleva Authorization: Bearer t-1', e.vistos[0].auth === 'Bearer t-1', e.vistos[0].auth);
+    ok('la pregunta va a la página de Juegos con su canal y su origen',
+       e.pedidosToken[0]?.canal === 'mkw-hijo' && e.pedidosToken[0]?.tipo === 'token' && e.pedidosToken[0]?.destino === PAGINA, JSON.stringify(e.pedidosToken[0]));
+    await p.buscar('https://otra.cosa/foto.png');
+    ok('un pedido a otro lado va SIN token (no se le regala a nadie)', e.vistos.at(-1).auth === null, e.vistos.at(-1).auth);
+    const rr = await p.buscar(ORIGEN + '/mkw/disco/files/a.szs', { headers: { Range: 'bytes=0-9' } });
+    ok('un pedazo (Range) conserva su Range y lleva el token', rr.status === 206 && e.vistos.at(-1).range === 'bytes=0-9' && e.vistos.at(-1).auth === 'Bearer t-1');
+  }
+  // 2) veinte pedidos juntos al arrancar: una sola pregunta a Juegos
+  {
+    const e = escena({ demora: 30 }), p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: e.red, origenPagina: PAGINA });
+    const rs = await Promise.all(Array.from({ length: 20 }, (_, i) => p.buscar(`${ORIGEN}/mkw/disco/files/${i}.szs`, { headers: { Range: 'bytes=0-9' } })));
+    ok('20 pedidos a la vez: todos con token', rs.every(r => r.status === 206) && e.vistos.every(v => v.auth === 'Bearer t-1'));
+    ok('…y una sola pregunta a Juegos', e.pedidosToken.length === 1, `${e.pedidosToken.length} preguntas`);
+  }
+  // 3) el token vence (dura una hora): 401 → uno nuevo (nuevo: true) y otra vez, una sola vez
+  {
+    const e = escena(), p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: e.red, origenPagina: PAGINA });
+    await p.buscar(ORIGEN + '/manifiesto.json');
+    e.venceToken();
+    const r = await p.buscar(ORIGEN + '/manifiesto.json');
+    ok('vencido: pide uno nuevo y el pedido sale bien', r.status === 200 && e.vistos.at(-1).auth === 'Bearer t-2', `${r.status} ${e.vistos.at(-1).auth}`);
+    ok('la segunda pregunta dice nuevo: true', e.pedidosToken[1]?.nuevo === true);
+    ok('el próximo pedido ya usa el nuevo sin preguntar', (await p.buscar(ORIGEN + '/x/y'), e.pedidosToken.length === 2 && e.vistos.at(-1).auth === 'Bearer t-2'));
+  }
+  // 4) quien no está en la lista: el Worker dice 403 y no se insiste
+  {
+    const e = escena();
+    const red403 = async (u, o) => { e.vistos.push({ url: u, auth: new Headers(o?.headers).get('Authorization') }); return new Response('sin acceso', { status: 403 }); };
+    const p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: red403, origenPagina: PAGINA });
+    const r = await p.buscar(ORIGEN + '/manifiesto.json');
+    ok('403 (no es amigo): se devuelve tal cual, sin reintentar', r.status === 403 && e.vistos.length === 1);
+  }
+  // 5) sin Juegos que conteste (la página suelta): espera el tope UNA vez y sigue sin token
+  {
+    const e = escena({ contesta: false }), p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: e.red, origenPagina: PAGINA, tope: 150 });
+    const t0 = performance.now();
+    const r1 = await p.buscar(ORIGEN + '/manifiesto.json');
+    const t1 = performance.now();
+    const r2 = await p.buscar(ORIGEN + '/manifiesto.json');
+    const t2 = performance.now();
+    ok('sin respuesta: sigue sin token y el Worker dice 401', r1.status === 401 && e.vistos[0].auth === null);
+    ok('esperó el tope una sola vez', t1 - t0 >= 140 && t2 - t1 < 60, `${(t1 - t0).toFixed(0)} ms y después ${(t2 - t1).toFixed(0)} ms`);
+    // un mensaje de otro origen o de otra ventana no cuenta como respuesta
+    const e2 = escena({ contesta: false }), p2 = crearPrivado({ origen: ORIGEN, padre: e2.padre, yo: e2.yo, red: e2.red, origenPagina: PAGINA, tope: 200 });
+    const espera = p2.pideToken();
+    const intrusos = [{ source: {}, origin: PAGINA, data: { canal: 'mkw-padre', tipo: 'token', token: 'robado' } },
+                      { source: e2.padre, origin: 'https://malo.ejemplo', data: { canal: 'mkw-padre', tipo: 'token', token: 'robado' } }];
+    nota('se mandan dos respuestas falsas (otra ventana, otro origen)');
+    // (privado.mjs filtra por source y origin: ninguna debe valer)
+    for (const m of intrusos) e2.yo.disparar(m);
+    const t = await espera;
+    ok('respuestas de otra ventana u otro origen no valen', t === null, String(t));
+  }
+  // 6) la página sin marco padre (padre === ella misma): ni pregunta
+  {
+    const e = escena();
+    const p = crearPrivado({ origen: ORIGEN, padre: e.yo, yo: e.yo, red: e.red, origenPagina: PAGINA });
+    await p.buscar(ORIGEN + '/manifiesto.json');
+    ok('sin marco padre no pregunta ni espera', e.pedidosToken.length === 0 && e.vistos[0].auth === null);
+  }
+  // 7) el programa se importa desde un blob, con el token
+  {
+    const e = escena(), p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: e.red, origenPagina: PAGINA });
+    const m = await p.importar(ORIGEN + '/build/mkw.js?v=b1');
+    ok('import() de mkw.js con token (desde un blob)', m.default === 42 && e.vistos.at(-1).auth === 'Bearer t-1', String(m.default));
+    let error = '';
+    e.venceToken(); e.venceToken();
+    const p2 = crearPrivado({ origen: ORIGEN, padre: { postMessage() {} }, yo: e.yo, red: e.red, origenPagina: PAGINA, tope: 50 });
+    try { await p2.importar(ORIGEN + '/build/mkw.js'); } catch (x) { error = x.message; }
+    ok('sin sesión el import dice por qué', /401/.test(error) && /sin sesión/.test(error), error);
+  }
+  // 8) instalar(): reemplaza el fetch de la «ventana»
+  {
+    const e = escena(), p = crearPrivado({ origen: ORIGEN, padre: e.padre, yo: e.yo, red: e.red, origenPagina: PAGINA });
+    p.instalar();
+    const r = await e.yo.fetch(ORIGEN + '/manifiesto.json');
+    ok('instalar(): el fetch de la página pone el token solo', r.status === 200 && e.vistos.at(-1).auth === 'Bearer t-1');
+  }
+} catch (x) {
+  ok('la prueba terminó sin errores', false, x.stack || x.message);
+}
+fin();
+</script>
+</body>
+</html>

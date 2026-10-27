@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Récords</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Récords: <span>tiempos por pista y cilindrada, aquí y en Firebase</span></h1>
+<p>Prueba <code>web/navegador/records.mjs</code> (bitácora §57) <b>sin el juego y sin Firebase</b>: una memoria de Wii
+  <b>inventada</b> con la forma de la de verdad (Raceinfo, Racedata, CupsConfig en sus direcciones) para leer el tiempo
+  final y la categoría, y un <b>Firebase falso</b> que imita las reglas de <code>docs/firebase-mkw.md</code> (cada uno
+  escribe solo su documento, solo si mejora, con tiempos razonables). Comprueba: el texto del tiempo, la cilindrada de
+  Retro Rewind, que la vigilancia avisa <b>una vez</b> por carrera terminada, el récord local, subir solo si mejora y la
+  tabla ordenada.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { textoTiempo, cilindrada, nombreCategoria, leerCarrera, vigilarCarreras, crearRecords, DIR } from '/web/navegador/records.mjs';
+
+const { ok, fin } = prueba('records', 'Récords (sin el juego, Firebase falso)');
+
+// ---- una memoria de Wii falsa: direcciones de 32 bits → valores (big-endian no importa: se guarda por tamaño) ----
+function memoriaFalsa() {
+  const m = new Map(), est = { seccion: 0x20, pagina: 0xd, paginas: [0xd] };
+  const L = { u32: a => m.get('32:' + a) || 0, u16: a => m.get('16:' + a) || 0, u8: a => m.get('8:' + a) || 0,
+              w32: (a, v) => m.set('32:' + a, v >>> 0), w16: (a, v) => m.set('16:' + a, v), w8: (a, v) => m.set('8:' + a, v), estado: () => est };
+  // Raceinfo → lista de jugadores → jugador 1 → tiempo final (Timer)
+  const RI = 0x80F00000, LISTA = 0x80F01000, J = 0x80F02000, T = 0x80F03000, RD = 0x80E00000;
+  L.w32(DIR.raceinfo, RI); L.w32(RI + 0xC, LISTA); L.w32(LISTA, J); L.w32(J + 0x40, T); L.w8(J + 0x20, 1);
+  L.w32(DIR.racedata, RD);
+  const pon = { tiempo(min, seg, mil) { L.w16(T + 4, min); L.w8(T + 6, seg); L.w16(T + 8, mil); },
+                carrera(modo, clase, banderas = 0, banderasMenu = 0) { L.w32(RD + 0xB68 + 0x8, modo); L.w32(RD + 0xB68 + 0x4, clase); L.w32(RD + 0xB68 + 0x28, banderas); L.w32(RD + 0x1780, banderasMenu); },
+                pista(p) { L.w32(DIR.cups + 0x10, p); }, est };
+  return { L, pon };
+}
+
+// 1) textos y cilindradas
+ok('el tiempo se escribe 1:07.873', textoTiempo(67873) === '1:07.873' && textoTiempo(5) === '0:00.005');
+ok('cilindradas de Retro Rewind: 150, espejo, 200, 100, 500',
+  [cilindrada(2, 0, 0), cilindrada(2, 1, 0), cilindrada(1, 0, 0), cilindrada(1, 0, 1), cilindrada(0, 0, 0)].join() === '150,espejo,200,100,500');
+ok('nombres de categoría', nombreCategoria('tt150') === 'Contrarreloj 150cc' && nombreCategoria('vsespejo') === 'Carrera 150cc espejo');
+
+// 2) leer la carrera de la memoria falsa
+const { L, pon } = memoriaFalsa();
+pon.pista(0x10e); pon.carrera(1, 2); pon.tiempo(99, 99, 999);
+let c = leerCarrera(L);
+ok('sin terminar (99:99.999) no cuenta como terminada', c && !c.terminado);
+pon.tiempo(2, 22, 846);
+c = leerCarrera(L);
+ok('terminada: lee 2:22.846, la pista y «vs150»', c.terminado && c.ms === 142846 && c.pista === 0x10e && c.cat === 'vs150', JSON.stringify(c));
+pon.carrera(2, 2);
+ok('en contrarreloj la categoría es «tt150»', leerCarrera(L).cat === 'tt150');
+pon.est.seccion = 0x41;
+ok('fuera de una carrera no lee nada', leerCarrera(L) === null);
+
+// 3) la vigilancia avisa una vez por carrera (y otra vez en la siguiente)
+const avisos = [];
+pon.est.seccion = 0x20; pon.carrera(1, 1); pon.tiempo(99, 99, 999);
+const v = vigilarCarreras({ lector: L, alTerminar: r => avisos.push(r), cadaMs: 20 });
+const espera = ms => new Promise(r => setTimeout(r, ms));
+await espera(80); pon.tiempo(1, 50, 0); await espera(150);
+ok('avisa una sola vez al terminar', avisos.length === 1 && avisos[0].cat === 'vs200', `${avisos.length} avisos`);
+pon.tiempo(99, 99, 999); await espera(80); pon.tiempo(1, 45, 500); await espera(150);
+ok('la carrera siguiente vuelve a avisar', avisos.length === 2 && avisos[1].ms === 105500);
+v.parar();
+
+// ---- Firebase falso: imita las reglas (docs/firebase-mkw.md §4) ----
+function firestoreFalso() {
+  const docs = new Map();                                     // "k/uid" → dato
+  const negar = m => { const e = new Error(m); e.code = 'permission-denied'; throw e; };
+  return {
+    docs,
+    escribir(sesion, k, uid, dato) {                          // lo que harían las reglas
+      if (!sesion || sesion !== uid) negar('no es tu documento');
+      if (dato.uid !== uid) negar('uid distinto');
+      if (!Number.isInteger(dato.ms) || dato.ms < 5000 || dato.ms > 3600000) negar('tiempo fuera de rango');
+      if (typeof dato.nombre !== 'string' || dato.nombre.length > 20) negar('nombre');
+      const antes = docs.get(k + '/' + uid);
+      if (antes && dato.ms >= antes.ms) negar('no mejora');
+      docs.set(k + '/' + uid, { ...dato });
+    },
+    almacen(sesion) {
+      return {
+        mio: async (k, uid) => docs.get(k + '/' + uid) || null,
+        guardar: async (k, uid, dato) => this.escribir(sesion, k, uid, dato),
+        top: async (k, n) => [...docs.entries()].filter(([c]) => c.startsWith(k + '/')).map(([, d]) => d).sort((a, b) => a.ms - b.ms).slice(0, n),
+      };
+    },
+  };
+}
+
+// 4) récord local y nube
+const recuerdo = { m: {}, getItem(k) { return this.m[k] ?? null; }, setItem(k, v) { this.m[k] = v; } };
+const fsf = firestoreFalso();
+const ana = crearRecords({ almacen: fsf.almacen('ana'), uid: 'ana', nombre: 'Ana', recuerdo });
+let r = await ana.registrar({ pista: 0x10e, cat: 'tt150', ms: 70000 });
+ok('el primer tiempo es récord local y se sube', r.mejoraLocal && !r.anterior && r.nube === 'subido', JSON.stringify(r));
+r = await ana.registrar({ pista: 0x10e, cat: 'tt150', ms: 72000 });
+ok('uno peor no cambia el récord ni se sube', !r.mejoraLocal && r.anterior === 70000 && r.nube === 'no mejora');
+r = await ana.registrar({ pista: 0x10e, cat: 'tt150', ms: 68500 });
+ok('uno mejor reemplaza al anterior, aquí y en la nube', r.mejoraLocal && r.anterior === 70000 && fsf.docs.get('10e-tt150/ana').ms === 68500);
+ok('el mejor local queda guardado por pista y categoría', ana.mejorLocal(0x10e, 'tt150') === 68500 && ana.mejorLocal(0x10e, 'vs150') === 0);
+ok('los mejores de una pista para la vista previa', JSON.stringify(ana.mejoresDe(0x10e)) === JSON.stringify([{ cat: 'tt150', ms: 68500 }]));
+
+// 5) las reglas: no se puede escribir el de otro, ni un tiempo absurdo
+let negado = '';
+try { fsf.escribir('ana', '10e-tt150', 'beto', { uid: 'beto', nombre: 'x', ms: 60000 }); } catch (e) { negado = e.code; }
+ok('las reglas no dejan escribir el documento de otro', negado === 'permission-denied');
+negado = '';
+try { fsf.escribir('ana', '10e-tt150', 'ana', { uid: 'ana', nombre: 'Ana', ms: 1200 }); } catch (e) { negado = e.code; }
+ok('ni un tiempo imposible (menos de 5 s)', negado === 'permission-denied');
+
+// 6) la tabla: varios pilotos, ordenada, con «tuyo»
+for (const [u, ms] of [['beto', 66000], ['caro', 69000], ['dani', 75000]]) await crearRecords({ almacen: fsf.almacen(u), uid: u, nombre: u, recuerdo: { getItem() { return null; }, setItem() {} } }).registrar({ pista: 0x10e, cat: 'tt150', ms });
+const tabla = await ana.tabla(0x10e, 'tt150', 3);
+ok('la tabla trae los 3 mejores, ordenados', tabla.map(f => f.uid).join() === 'beto,ana,caro', tabla.map(f => f.uid + ':' + f.ms).join(' '));
+ok('marca cuál es el tuyo', tabla.find(f => f.tuyo)?.uid === 'ana');
+
+// 7) sin sesión: queda solo local
+const sin = crearRecords({ recuerdo: { m: {}, getItem(k) { return this.m[k] ?? null; }, setItem(k, v) { this.m[k] = v; } } });
+r = await sin.registrar({ pista: 0x200, cat: 'vs200', ms: 100000 });
+ok('sin sesión: récord local, nada a la nube', r.mejoraLocal && r.nube === 'sin sesión');
+fin();
+</script>
+</body>
+</html>

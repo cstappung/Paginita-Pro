@@ -438,6 +438,20 @@ segundo y recibe la de los demás. Con seis en la sala son del orden de
 plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
 al mes; si se juega mucho conviene mirar el uso en la consola.
 
+### ⚠ PRO DEFENDER guarda una sola partida por reino: pide publicar otra vez (2026-10-25)
+
+Cada ronda del récord de PRO DEFENDER es una partida nueva con la prueba entera
+desde la ronda 1, y antes quedaban todas en `soloPruebas` (hasta cien copias
+crecientes por cuenta y reino, que la consola, las exportaciones y la auditoría
+bajaban). Ahora la página borra la del récord anterior apenas se guarda la fila
+nueva, y para eso la regla de `soloPruebas/$categoria/$uid/$partida` deja al
+dueño **borrar** sus pruebas **salvo la que nombra su fila** de `soloRanks`
+(nunca la del récord vigente; reescribir sigue sin poderse). Hasta publicarla,
+el borrado falla en silencio y las copias se siguen juntando como antes: nada
+se rompe. Las copias viejas que ya están ahí se pueden borrar a mano en la
+consola (cualquier partida de `soloPruebas/club-prodefender-…/<uid>` que no
+sea la `partida` de su fila).
+
 ### ⚠ El tope de descarga pide publicar otra vez
 
 El plan gratuito trae unos 360 MB de descarga al día para todo el sitio.
@@ -450,7 +464,8 @@ Dos cosas lo protegen:
   'partidas'))`) bajaba el registro de jugadas de todas las partidas de la
   historia. **Esto es lo único que el servidor hace cumplir**, y hay que
   publicar las reglas para que valga.
-- **Cada jugador tiene un tope de 80 MB al día** (`colabtex/src/consumo.js`).
+- **Cada jugador tiene un tope de 90 MB al día** (`colabtex/src/consumo.js`; eran 80 hasta el
+  25 de octubre de 2026).
   Juegos mide lo que baja por el WebSocket de la base, lo suma entre
   pestañas y aparatos de la misma cuenta (`users/<uid>/consumo`, que no
   necesita reglas nuevas) y, al llegar al tope, corta la conexión y tapa la
@@ -657,6 +672,28 @@ pelota) va por la malla WebRTC de `vivo/<pid>/rtc`, como Boxhead. Sin
 publicar, la sala de HaxBall no se puede crear. Pegar
 `firebase/database.rules.json` entero y **Publicar**.
 
+### ⚠ Mario Kart Wii pide publicar otra vez (2026-10-17)
+
+`'mkw'` tiene que estar en la lista del campo `juego` y en la de `logros`, y el
+tope de `cupo` sube de 10 a **12** (una sala en línea de Mario Kart Wii admite
+12; cada juego sigue limitando el suyo en `motor.js`). Un nodo nuevo, `mkw`:
+`mkw/vr/{uid}` (el VR y el BR de Retro Rewind de cada uno) y
+`mkw/records/{pista}-{cat}/{uid}` (su mejor tiempo por pista y categoría);
+todos leen, cada uno escribe solo lo suyo, y un récord solo se reemplaza por
+uno mejor (`juegos/mkw/docs/firebase-mkw.md` §4–6). El vestíbulo va por
+`jugadas` (`ajuste`, `anfitrion`, `empieza`, `vuelve`) y las carreras van de
+navegador a navegador por la malla WebRTC; `vivo/<pid>/rtc` solo presenta.
+Sin publicar, la sala de Mario Kart Wii no se puede crear. Pegar
+`firebase/database.rules.json` entero y **Publicar**.
+
+**Storage** (2026-10-18): `firebase/storage.rules` suma el bloque
+`match /mkw/{uid}/partidas.mkwp` — las partidas de cada persona en la nube
+(un paquete por cuenta, ~0,1 MB): solo su dueño lo lee y lo escribe, tope de
+8 MB, con `customMetadata.uid` igual al suyo y nunca HTML ni JavaScript. Sin
+publicarlo el juego funciona igual, pero las partidas quedan solo en ese
+navegador (la nube contesta «sin permiso» y el juego sigue con lo local).
+Pegar `firebase/storage.rules` entero en Storage → Reglas y **Publicar**.
+
 ### ⚠ Budokai Tenkaichi 3 pide publicar otra vez (2026-10-14)
 
 `'bt3'` tiene que estar en la lista del campo `juego` y en la de `logros`.
@@ -707,6 +744,48 @@ falla con `PERMISSION_DENIED` y el resto del Pool juega igual. El taco
 equipado va en `users/<uid>/taco` y no pide reglas. Pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
+
+### ⚠ El cierre de la economía pide publicar otra vez (2026-10-25)
+
+Cada pestaña de Juegos bajaba la historia entera de gastos (~3,8 MB) para
+calcular las monedas. Ahora un administrador la «cierra»
+(`colabtex/src/juegos/cierre.js`):
+
+- `economiaCierre` = `{v, T, d, por, at}`: el estado de la economía hasta
+  la hora `T`. Lo lee cualquiera con sesión; lo escribe solo un
+  administrador.
+- `archivo/…`: lo viejo de `casino`, `cartas` y `mercado`, con las mismas
+  rutas. Solo lo leen y escriben los administradores.
+- `juegosVersion/min`: la versión mínima de Juegos (el sello `?v=`). La
+  lee cualquiera con sesión; la escribe un administrador. Una pestaña más
+  vieja se tapa y pide recargar.
+- Además: los administradores pueden borrar en `casino`, `cartas/s|g|r` y
+  `mercado/o|t` (es lo que mueve al archivo); nadie puede volver a escribir
+  una clave archivada, y una carta de un sobre archivado se puede graduar.
+
+**El orden importa:**
+
+1. Publicar estas reglas **antes del primer cierre**: sin ellas el cierre
+   no se puede escribir.
+2. Subir el código (la página nueva ya sabe leer el cierre).
+3. El primer cierre está programado para el **lunes 26-10-2026 a la 1:30
+   (Chile)** (`PRIMER_CIERRE` en `colabtex/src/juegos/cierre.js`): lo hace
+   sola la página del primer administrador que tenga Juegos abierto desde
+   esa hora. También se puede hacer antes a mano: `juegos.html#admin` →
+   **Economía** → **Preparar cierre** → **Cerrar y archivar**. Después se
+   rehace solo cada dos días.
+
+Una pestaña abierta con la página vieja no conoce el cierre y, una vez
+archivado lo viejo, ve saldos sin esa historia: podría dejar gastar lo que
+no hay, y esa cuenta quedaría parada (se arregla con un ajuste en
+**Monedas**). Lo ideal era esperar un día tras subir el código; el dueño
+prefirió cerrar a la 1:30 y arreglar a mano lo que salga. Desde esta
+versión existe `juegosVersion/min`: el cierre manual la sube y tapa las
+pestañas con código más viejo, pero las abiertas antes de esta versión no
+la conocen.
+
+Si el panel dice que una cuenta parada frena el cierre, súmale lo que le
+falta en la pestaña **Monedas** y vuelve a prepararlo.
 
 ### ⚠ El Pueblo de Mascotas pide publicar otra vez (2026-10-22)
 

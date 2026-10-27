@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo, pacman, pool} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, mkw, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo, pacman, pool} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -114,6 +114,15 @@ pool:[e('efecto','Punto de golpe: seguir o retroceder',
   p('La pila llegó a diez','Se mantiene la especia del anuncio, pero ya no se pide un número mayor que diez.',fichas('Último anuncio',['10','rojo','AJÍ'])),
   p('Reinicia con uno, dos o tres','Puedes anunciar 1, 2 o 3 de ají. Con la pila vacía también abres del 1 al 3, pero eliges la especia.',fichas('Próximos anuncios válidos',['1','rojo','AJÍ'],['2','rojo','AJÍ'],['3','rojo','AJÍ'])))],
  bt3:[],   // (BT3 tiene un ejemplo propio por pestaña: VARIANTES.bt3)
+ mkw:[e('sala','Abrir las carreras',
+  p('Todos al vestíbulo','Abre una sala y pasa el enlace. Ana es la anfitriona (👑): elige con qué CPU se completa la parrilla y aprieta ¡A correr!.',mkw(0)),
+  p('Copa o playlist','Cada uno carga el juego. Hasta 12 pilotos corren la misma copa (o la lista de pistas) a la vez, y la CPU llena los lugares vacíos.',mkw(1))),
+ e('tarde','Llegar con la carrera andando',
+  p('Mira mientras tanto','Quien entra a la sala con una carrera en curso carga el juego y queda mirando; no hace falta que nadie espere ni vuelva a empezar.',mkw(2)),
+  p('Entra en la siguiente','Apenas termina la carrera, el juego lo suma a la siguiente (en la copa con CPU, a la tanda siguiente), como cualquier sala en línea de Mario Kart Wii.',mkw(1))),
+ e('vr','Tu VR viaja con tu cuenta',
+  p('Sube y baja','Después de cada carrera en línea (la sala sin CPU de relleno) el juego calcula tu VR (y tu BR en batalla) según cómo te fue contra los demás. La copa con CPU no lo mueve.',mkw(3)),
+  p('En cualquier aparato','La página lo guarda en tu cuenta. Al entrar desde otro computador o tu celular, el juego recibe el mismo VR antes de la primera carrera.',mkw(3)))],
  haxball:[e('saque','El saque y el primer gol',
   p('Cada uno en su mitad','Al empezar y después de cada gol todos vuelven a su lado. Saca el equipo que recibió el gol; solo él puede entrar al círculo hasta el primer toque.',haxball(0)),
   p('Patear, no empujar','Mantén Espacio o X junto a la pelota para patearla fuerte. Correr contra ella solo la empuja un poco.',haxball(1)),

@@ -96,16 +96,32 @@ Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
   «Modo: Batalla» (move `{t:"modo", m}` in `redHero`, `room.modo`; with ≠ 2
   players in the round it plays normal).
 - **No Star Power**: each completed SP phrase gives a power (max 3,
-  `PODERES`: amp overload, broken string, lefty flip, blackout, drain,
-  steal); the SP button launches the oldest at the rival (`_lanzaBt`; it
+  `PODERES`: amp overload, broken string, crossed keys, double notes,
+  blackout, drain, steal; against drums `PODERES_BATERIA`, without double
+  notes); the SP button launches the oldest at the rival (`_lanzaBt`; it
   never reaches the engine). A **life bar** replaces the SP cell: hits +,
   misses/overstrums −; 0 = K.O., the song ends `FIN_KO` s later. No K.O. →
   more life wins, then score (`cierra`).
-- Effects are **render or input only** (`p.batalla` from `bt.pintura` →
-  `highway.js`: `zurdo` flips lanes, `amp` shakes + flickers gems, `apagon`
-  hides notes before the bar, `roto` overlay); a broken string drops that
-  fret before the `Grabadora` and counts presses to repair (`REPARA`). The
-  bot is hit through `Bot.torpe` / `sinTraste` / `sinSP`.
+- Effects (`p.batalla` from `bt.pintura` → `highway.js`): `amp` shakes,
+  rotates and stretches the whole highway and strobes the gems; `apagon` lets
+  you see the notes appear on the far part of the highway (to guess where
+  they land) and covers from `APAGON_DESDE` down past the strike bar with
+  opaque black (only hit flames show; covering it all was too much); `roto` overlay; each active attack's icon has a
+  ring that empties (`quedan`).
+- **Input effects** happen before the `Grabadora`: in battle the guitar's
+  sounding frets are `_trastesBt` = what you press (`p.fis`) through
+  `cruzado` (crossed keys swap two lanes, `a·8+b` in the attack's `l`; the
+  highway rings each with the other's colour, draws ⇄ and swaps the key
+  labels) minus the broken string; it is re-applied every tick so held frets
+  follow a swap starting or ending.
+- **Double notes** are the only attack that changes the chart: `dobla(notes,
+  t0, t1)` turns every single guitar note in the window (from
+  `DOBLES_ANTES` after the hit) into a chord with the next fret, sustains
+  too, once (`nt.dbl`). So in battle `_makePlayer` gives **each player its
+  own copy of the notes** (same part and difficulty used to share the array:
+  the bot's notes doubled with yours). Online the window travels in the
+  state (`dn`) and the rival doubles your highway on their screen with it.
+- The bot is hit through `Bot.torpe` / `sinTraste` / `sinSP`.
 - **Battles are never saved** (no `prueba`, no `resultado`): no stars,
   records or coins. The results screen says who won and how.
 - **Online**: each client simulates only its own player; its state packet

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610270318"></script>
+<script src="i18n.js?v=202610270320"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -1887,6 +1887,59 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-portada-bt3{background:#0b1a48}
 .jg-bt3-marco{background:#000}
 .jg-bt3-marco[hidden]{display:none}
+/* Mario Kart Wii: la portada (una bandera a cuadros que flamea y el nombre en letras nuestras: nada del arte del
+   juego), el marco y el vestíbulo. Superficies oscuras siempre, como BT3: sin gemelo en el bloque del tema oscuro. */
+.jg-art-mkw{position:absolute;inset:0;overflow:hidden;isolation:isolate;container-type:size;
+  background:radial-gradient(ellipse 70% 60% at 50% 120%,#ff3b3b66,transparent 70%),linear-gradient(165deg,#0f1c3a 0%,#1b2f63 55%,#3a0d1a 100%)}
+.jg-art-mkw s{position:absolute;left:-10%;right:-10%;top:18%;height:26cqmin;z-index:-1;transform:skewY(-8deg);opacity:.85;
+  background:repeating-conic-gradient(#f4f6ff 0 25%,#151a24 0 50%) 0 0/8cqmin 8cqmin;
+  -webkit-mask:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);mask:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);
+  animation:jgMkwFlamea 3.2s ease-in-out infinite alternate}
+@keyframes jgMkwFlamea{from{transform:skewY(-8deg) translateY(0)}to{transform:skewY(-5deg) translateY(2cqmin)}}
+.jg-art-mkw em{position:absolute;left:0;right:0;bottom:12%;display:flex;flex-direction:column;align-items:center;font-style:normal;text-align:center}
+.jg-art-mkw em small{font:700 6.5cqmin/1 system-ui,sans-serif;letter-spacing:.3em;text-transform:uppercase;color:#ffd34d}
+.jg-art-mkw em strong{font:900 14cqmin/1.05 system-ui,sans-serif;color:#fff;text-shadow:0 .6cqmin 0 #c81d25,0 1.2cqmin 2cqmin #0008;font-style:italic}
+.jg-portada-mkw,.jg-nov-arte-mkw{background:#0f1c3a}
+.jg-mkw-marco{background:#000}
+.jg-mkw-marco[hidden]{display:none}
+.jg-mkw-escena{display:flex;flex-direction:column;gap:10px}
+.jg-mkw-vest{background:linear-gradient(160deg,#0f1c3a,#1b2f63);color:#eef2ff;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.jg-mkw-vest[hidden]{display:none}
+.jg-mkw-vest.jugando{flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px 14px}
+.jg-mkw-vest.jugando .jg-mkw-pilotos{flex:1 1 auto}
+.jg-mkw-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.jg-mkw-cab b{font-size:1.15rem}
+.jg-mkw-cab span{color:#b9c4e6;font-size:.92rem}
+.jg-mkw-pilotos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.jg-mkw-piloto{background:#ffffff10;border:1px solid #ffffff22;border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.jg-mkw-piloto.anf{border-color:#ffd34d;box-shadow:inset 0 0 0 1px #ffd34d55}
+.jg-mkw-piloto b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mkw-piloto small{color:#b9c4e6}
+.jg-mkw-dar{margin-top:4px;align-self:flex-start;font-size:.8rem;border:1px solid #ffffff44;background:transparent;color:#eef2ff;border-radius:8px;padding:2px 8px;cursor:pointer}
+.jg-mkw-cpu{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.jg-mkw-cpu span{color:#b9c4e6;margin-right:4px}
+.jg-mkw-ficha{border:1px solid #ffffff44;background:#ffffff0d;color:#eef2ff;border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit}
+.jg-mkw-ficha[aria-pressed=true]{background:#ffd34d;color:#1b1400;border-color:#ffd34d;font-weight:700}
+.jg-mkw-ficha:disabled{cursor:default;opacity:.75}
+.jg-mkw-modos{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.jg-mkw-modo{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid #ffffff33;background:#ffffff0d;color:#eef2ff;border-radius:14px;padding:10px 12px;cursor:pointer;font:inherit}
+.jg-mkw-modo b{font-size:1rem}
+.jg-mkw-modo small{color:#c8d1ef;font-size:.85rem;line-height:1.3}
+.jg-mkw-modo[aria-pressed=true]{border-color:#ffd34d;background:#ffd34d22;box-shadow:inset 0 0 0 1px #ffd34d}
+.jg-mkw-modo:disabled{cursor:default}
+.jg-mkw-modo:disabled:not([aria-pressed=true]){opacity:.6}
+.jg-mkw-ultima{border:1px solid #ffd34d55;background:#ffd34d12;border-radius:14px;padding:10px 12px}
+.jg-mkw-ultima ol{margin:6px 0 0;padding-left:1.4em}
+.jg-mkw-ultima li{padding:2px 0}
+.jg-mkw-ultima li span{margin-right:.6em}
+.jg-mkw-ultima li:first-child{color:#ffd34d;font-weight:700}
+.jg-mkw-pie{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.jg-mkw-empieza,.jg-mkw-vuelve{border:0;border-radius:12px;padding:10px 20px;font:800 1.05rem system-ui,sans-serif;cursor:pointer}
+.jg-mkw-empieza{background:#e4202e;color:#fff}
+.jg-mkw-empieza:disabled{opacity:.5;cursor:default}
+.jg-mkw-vuelve{background:#ffffff1f;color:#eef2ff}
+.jg-mkw-nota{margin:0;color:#d8def5;font-size:.95rem}
+@media (prefers-reduced-motion:reduce){.jg-art-mkw s{animation:none}}
 /* El vestíbulo de BT3, a lo Dragon Ball: el cielo de noche de las peleas (azul profundo con líneas de velocidad
    y un estallido de ki naranja arriba), títulos como el logo (Lilita One, dorado a naranja con borde oscuro),
    esferas del dragón de adorno. Siempre oscuro, como el juego: no lleva gemelo en el bloque del tema oscuro.
@@ -3030,12 +3083,13 @@ html.jg-hero .head,html.jg-hero .bar,html.jg-hero .rp-fab,html.jg-hero .jg-solo-
 html.jg-hero #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0d0820}
 .jg-hero-frame{display:block;width:100%;height:100%;border:0;background:#0d0820}
 /* BT3 «un jugador» (#solo/bt3) también: la página del juego en un marco de Juegos, que le da la sesión para el disco
-   privado (bt3.js, crearBt3Solo); su «← Juegos» vuelve. */
-html.jg-bt3solo,html.jg-bt3solo body{overflow:hidden;height:100%}
-html.jg-bt3solo .head,html.jg-bt3solo .bar,html.jg-bt3solo .rp-fab,html.jg-bt3solo .jg-solo-barra{display:none!important}
-html.jg-bt3solo #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0b1a48;display:grid}
+   privado (bt3.js, crearBt3Solo); su «← Juegos» vuelve. Mario Kart Wii «un jugador» (#solo/mkw, mkw.js crearMkwSolo)
+   usa lo mismo: su menú de inicio «JloKart Wii» y su programa salen del mismo Worker de amigos. */
+html.jg-bt3solo,html.jg-bt3solo body,html.jg-mkwsolo,html.jg-mkwsolo body{overflow:hidden;height:100%}
+html.jg-bt3solo .head,html.jg-bt3solo .bar,html.jg-bt3solo .rp-fab,html.jg-bt3solo .jg-solo-barra,html.jg-mkwsolo .head,html.jg-mkwsolo .bar,html.jg-mkwsolo .rp-fab,html.jg-mkwsolo .jg-solo-barra{display:none!important}
+html.jg-bt3solo #pantalla,html.jg-mkwsolo #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0b1a48;display:grid}
 .jg-bt3-solo{display:block;width:100%;height:100%;border:0;background:#000}
-html.jg-bt3solo #pantalla>.jg-bt3-info{place-self:center;color:#e8eaf6}
+html.jg-bt3solo #pantalla>.jg-bt3-info,html.jg-mkwsolo #pantalla>.jg-bt3-info{place-self:center;color:#e8eaf6}
 /* Modo celular de los juegos del Club (Tetris, ALETEO, FANAL): mientras se
    juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
    (club.js recibe `inmersivo` del juego). */
@@ -6832,6 +6886,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610270318"></script>
+<script src="juegos-app.js?v=202610270320"></script>
 </body>
 </html>

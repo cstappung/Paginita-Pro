@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Un lento no frena a todos</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Un lento no frena a todos: <span>retraso de cada uno, relevo y corte en dos fases (§80)</span></h1>
+<p>Prueba <code>lockstep.mjs</code> (bitácora §80) <b>sin el juego</b>. Como en el banco <code>lockstep</code>, cada
+  "consola" es un juego falso que pide los botones de todos en cada cuadro y los mezcla en su estado; pero aquí cada una
+  corre <b>a su ritmo, como el juego</b>: un cuadro cada 10 ms (el juego: cada 16,7 ms; más corto para que la prueba dure
+  menos), y si tuvo que esperar, el siguiente va en el próximo tic, sin ponerse al día. La red es falsa y se puede poner
+  mala para UN jugador (ida y vuelta, pérdidas, apagones). Se mide el <b>ritmo</b> de las consolas buenas (cuadros
+  corridos ÷ los que debían correr en ese tiempo) y que todas reciban exactamente los mismos botones en cada cuadro.</p>
+<ul>
+  <li>Dani con la red mala (30-50 ms de ida, 10 % perdido): él agranda su retraso, los demás no lo esperan.</li>
+  <li>Carla con la PC lenta (a la mitad del ritmo): la autoridad la releva y los demás siguen a 60 (sin relevo, a 30).</li>
+  <li>Un apagón de Dani de 0,6 s: una sola espera y la carrera sigue, sin cortes.</li>
+  <li>Beto se va de golpe: una sola espera (el margen) y el corte en el mismo cuadro en todas.</li>
+  <li>La autoridad con la PC lenta: le pasa el papel a otro.</li>
+  <li>§99 (C3): ponerse al día: quien se traba seguido corre seguido lo que le falta y vuelve a manejar su kart.</li>
+  <li>§99 (C1): el relevo rápido: al que se calla se lo pausa a los ~150 ms (no se lo espera el margen entero) y vuelve
+    a manejar al despertar; si no vuelve, la pausa pasa a corte.</li>
+  <li>§99: la autoridad lenta no le pasa el papel a quien recibe todo tarde (manda bien, pero inventaría los botones de
+    los sanos); y la sala elige la primera autoridad de cada carrera, igual en todas las consolas.</li>
+  <li>Un corte que llega tarde a una consola que ya había corrido más allá: esa se sale de la carrera sola.</li>
+  <li>§80b: Carla con un tirón de 40 ms cada 1,5 s. Sin la sincronía de tiempo, cada tirón la deja un poco más atrás y
+    su retraso se va subiendo; con ella (prendida desde §80b; <code>?sincroTiempo=0</code> la apaga), los demás se frenan un poco y el retraso de
+    Carla queda chico.</li>
+  <li>§101-§102: quien va atrás lo dice en sus informes (no hace bajar el retraso de los demás); si se pone al día
+    solo, no se lo espera; si su PC no alcanza (pide la ráfaga y no gana), sí.</li>
+</ul>
+<p>Toda la página también se puede correr sin la sincronía, como en §80: <code>?sincroTiempo=0</code> (y una sola parte
+  con <code>?solo=N</code>).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearLockstep } from '/web/navegador/lockstep.mjs';
+import { ratosMalos } from '/web/navegador/sala-carrera.mjs';
+const todos = [];
+const { ok, nota, fin } = prueba('relevo', 'Un lento no frena a todos (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
+const CUADRO = 10, INFORME = 250;          // ms por cuadro y entre informes (el juego: 16,7 y 500)
+
+// Una sala falsa. red(de, a) = { demora: [mín, máx] ms, perdida } de cada camino (por omisión 2-6 ms y 2 %);
+// apagones = { uid: [desde, hasta] } ms desde que se crea la sala: en ese rato nada entra ni sale de esa consola (lo
+// del canal "tcp" llega recién al terminar, como el canal confiable de WebRTC; con un tercer valor 'corta', lo del "tcp"
+// se pierde: la conexión se cayó y se rearmó, §80); bloquear(de, a, bytes) = no llega.
+// sincroTiempo: §80b (sin decir = lo que diga la dirección de la página: prendida, salvo ?sincroTiempo=0)
+// saltos = { uid: [[a los ms, salta ms], …] }: el reloj de esa consola salta hacia adelante en ese momento (§101: para
+// su lockstep pasó ese rato sin que él corriera, como una pestaña trabada); trabaPropia: §101 (false = el camino viejo);
+// alcanceReal: §102 (false = «sé ponerme al día» aunque no lo logre, como en §101)
+function crearSala(uids, { red = () => ({}), esperaCorte = 1500, esperaInicio = 3000, apagones = {}, bloquear = () => false, relevo = true, sincroTiempo, alDia = false,
+  relevoRapido = false, pausaACorte, saltos = {}, trabaPropia, alcanceReal, retraso, adaptar } = {}) {
+  const humanos = uids.map((uid, mando) => ({ uid, mando }));
+  const t0 = performance.now(), consolas = {};
+  Object.defineProperty(consolas, 't0', { enumerable: false, value: t0 });
+  const apagada = (u, t) => apagones[u] && t >= apagones[u][0] && t < apagones[u][1];
+  for (const uid of uids) {
+    const c = consolas[uid] = { uid, estado: 2166136261, cuadro: -1, fuera: false, vistos: [], cuando: [], registro: [], tcp: {}, prisa: 0, ganado: 0 };
+    let toque = 0;
+    const misSaltos = saltos[uid] || [];
+    c.ls = crearLockstep({
+      yo: uid, humanos, esperaCorte, esperaInicio, relevo, cuadroMs: CUADRO, informeCada: INFORME, pingCada: 250,
+      ...(sincroTiempo !== undefined ? { sincroTiempo } : {}), ...(trabaPropia !== undefined ? { trabaPropia } : {}),
+      ...(alcanceReal !== undefined ? { alcanceReal } : {}),
+      ...(misSaltos.length ? { ahora: () => { const t = performance.now(); return t + misSaltos.reduce((s, [a, d]) => s + (t - t0 >= a ? d : 0), 0); } } : {}),
+      ...(alDia ? { prisa: ms => { c.prisa = ms; } } : {}),          // (§99 C3: el juego falso corre seguido esos ms)
+      relevoRapido, ...(pausaACorte ? { pausaACorte } : {}), ...(retraso ? { retraso } : {}), ...(adaptar !== undefined ? { adaptar } : {}),
+      registro: t => c.registro.push(`${(performance.now() - t0).toFixed(0)} ${t}`),
+      local: () => { toque++; return [(toque * 37 + uid.charCodeAt(0)) & 0x0F7F, (toque % 255) - 128, uid.charCodeAt(0) - 100, 0, 0, toque % 7, 0]; },
+      huella: () => c.estado,
+      enviar: (a, bytes, canal) => {
+        if (c.fuera || consolas[a].fuera || bloquear(uid, a, bytes) || performance.now() < (c.dormidaHasta || 0)) return;
+        const { demora = [2, 6], perdida = 0.02 } = red(uid, a) || {};
+        const ahora = performance.now() - t0;
+        if (canal === 'udp' && (Math.random() < perdida || apagada(uid, ahora) || apagada(a, ahora))) return;
+        if (canal === 'tcp' && [uid, a].some(u => apagada(u, ahora) && apagones[u][2] === 'corta')) return;
+        let t = performance.now() + demora[0] + Math.random() * (demora[1] - demora[0]);
+        for (const u of [uid, a]) if (canal === 'tcp' && apagada(u, ahora)) t = Math.max(t, t0 + apagones[u][1] + demora[0]);
+        if (canal === 'tcp') { t = Math.max(t, (c.tcp[a] || 0) + 0.1); c.tcp[a] = t; }
+        // (§99: una pestaña trabada —tirón «callado»— no lee nada: lo que le llega lo lee al despertar)
+        if (t < (consolas[a].dormidaHasta || 0)) t = consolas[a].dormidaHasta + Math.random();
+        if (canal === 'tcp') { t = Math.max(t, (c.tcp[a] || 0) + 0.1); c.tcp[a] = t; }   // (el canal confiable, en orden)
+        setTimeout(() => { if (!consolas[a].fuera) consolas[a].ls.alBinario(uid, bytes.slice()); }, t - performance.now());
+      },
+    });
+    todos.push(c.ls);
+  }
+  return consolas;
+}
+
+// El juego falso, a su ritmo: el cuadro k empieza en el primer tic de su reloj después de terminar el k−1 (cada
+// `ritmo` × 10 ms; ritmo 2 = una PC que va a la mitad). `salirEn` = deja de jugar en ese cuadro (cierra la pestaña);
+// `mientras()` = sigue mientras sea verdad; `tirones` = { cada, dura }: cada `cada` cuadros se traba `dura` ms (§80b).
+// `prisaPorCuadro` = cuánto gana a lo más por cuadro al ponerse al día (§101: una PC justa se pone al día despacio)
+async function correr(c, { hasta, ritmo = 1, salirEn = -1, mientras = () => true, tirones = null, prisaPorCuadro = Infinity }) {
+  const paso = CUADRO * ritmo;
+  let base = performance.now();
+  let tic = 0;                                                  // el tic de reloj de este cuadro (uno por tic, nunca dos)
+  for (let k = 0; k < hasta && mientras(); k++) {
+    if (k === salirEn) { c.fuera = true; return; }
+    c.cuadro = k;
+    const d = await c.ls.pad(k);
+    for (let i = 0; i < 32; i++) c.estado = Math.imul(c.estado ^ d[i], 16777619) >>> 0;
+    c.vistos[k] = Array.from(d); c.cuando[k] = performance.now();
+    if (tirones && k % tirones.cada === tirones.cada - 1 && (tirones.desde ?? 0) <= k && k < (tirones.hasta ?? Infinity)) {
+      if (tirones.callado) c.dormidaHasta = performance.now() + tirones.dura;   // (§99: la pestaña entera trabada)
+      await espera(tirones.dura);
+    }
+    const t = performance.now();
+    tic = Math.max(tic + 1, Math.ceil((t - base) / paso));
+    // §99 (C3): ponerse al día como el runtime (vi.cpp): la grilla se corre para atrás lo que iba a esperar
+    if (c.prisa > 0) { const g = Math.min(c.prisa, prisaPorCuadro, Math.max(0, base + tic * paso - t)); base -= g; c.prisa -= g; c.ganado += g; }
+    await espera(base + tic * paso - t);
+  }
+}
+// el ritmo entre dos cuadros: cuadros corridos ÷ los que tenía que correr en ese tiempo (1 = 100 %)
+const ritmoDe = (c, a, b, paso = CUADRO) => c.cuando[b] && c.cuando[a] ? (b - a) * paso / (c.cuando[b] - c.cuando[a]) : 0;
+const pc = x => `${Math.round(100 * x)} %`;
+const igualesHasta = (a, b, n) => { for (let k = 0; k < n; k++) if (JSON.stringify(a.vistos[k]) !== JSON.stringify(b.vistos[k])) return k; return -1; };
+const conTiempo = (p, ms) => Promise.race([p, espera(ms).then(() => 'tarde')]);
+const sinDesinc = cs => cs.every(c => !c.ls.estado().desincronizado);
+// ?solo=3 = solo esa prueba (para depurar); si una falla, su registro va a la página
+const solo = new URLSearchParams(location.search).get('solo');
+const toca = n => !solo || solo.split(',').includes(String(n));
+const registros = (s, ...uids) => { for (const u of uids) nota(`${u}: ${s[u].registro.slice(-25).join(' | ')}`); };
+
+try {
+  // ---- 1) Dani con la red mala: él agranda su retraso y los demás siguen a 60 ----
+  if (toca(1)) {
+    const mala = (de, a) => de === 'dani' || a === 'dani' ? { demora: [30, 50], perdida: 0.10 } : {};
+    const s = crearSala(['ana', 'beto', 'carla', 'dani'], { red: mala });
+    await espera(2000);                                         // "los menús": los pings miden la red
+    const N = 1200, cs = Object.values(s);
+    const r = await conTiempo(Promise.all(cs.map(c => correr(c, { hasta: N }))), 60000);
+    const e = Object.fromEntries(cs.map(c => [c.uid, c.ls.estado()]));
+    const buenas = [s.ana, s.beto, s.carla], ritmos = buenas.map(c => ritmoDe(c, 300, N - 1));
+    ok('Dani con la red mala (30-50 ms de ida, 10 % perdido): Ana, Beto y Carla siguen a su ritmo (≥ 90 %)',
+       r !== 'tarde' && ritmos.every(x => x >= 0.9), `${ritmos.map(pc).join(', ')}; Dani ${pc(ritmoDe(s.dani, 300, N - 1))}`);
+    ok('las cuatro reciben los mismos botones en cada cuadro (y las huellas coinciden)',
+       cs.every(c => igualesHasta(c, s.ana, N) < 0) && sinDesinc(cs) && cs.every(c => e[c.uid].huellasIguales >= 20),
+       cs.map(c => `${c.uid} ${e[c.uid].huellasIguales}`).join(', '));
+    const rd = e.dani.retraso, otros = buenas.map(c => e[c.uid].retraso);
+    ok('el retraso lo paga Dani: el suyo creció y el de los demás quedó chico',
+       rd >= 6 && otros.every(x => x <= 5) && rd >= Math.max(...otros) + 4,
+       `Dani ${rd} cuadros (partió en ${e.dani.retrasos[1]}, máx ${e.dani.retrasoMax[1]}); Ana ${otros[0]}, Beto ${otros[1]}, Carla ${otros[2]}`);
+    ok('nadie se cortó', cs.every(c => !Object.keys(e[c.uid].cortes).length), cs.map(c => JSON.stringify(e[c.uid].cortes)).join(' '));
+    // con una red tan mala Dani termina relevado, pero lo que la autoridad pone por él son sus propios botones de hace
+    // pocos cuadros (≤ 6): su kart lo sigue manejando él, con más retraso
+    ok('…y aunque la autoridad lo releve, el kart de Dani sigue con SUS botones (casi nunca de más de 6 cuadros)',
+       e.ana.inventadosViejos <= 0.05 * N, `inventados ${e.ana.inventados}, de más de 6 cuadros ${e.ana.inventadosViejos}`);
+    nota(`esperas de Ana: ${e.ana.esperas} (máx ${e.ana.maxEspera.toFixed(0)} ms); relevos ${e.ana.relevos}, inventados ${e.ana.inventados} (de más de 6 cuadros: ${e.ana.inventadosViejos})`);
+    if (solo) for (const u of ['ana', 'beto', 'carla', 'dani']) nota(`${u}: ${s[u].registro.filter(t => /relevo a|vuelve|subo|paso la/.test(t)).join(' | ')}`);
+  }
+
+  // ---- 1b) una red mala pero no tanto (20-30 ms de ida, 5 % perdido): a Dani le alcanza su retraso y juega directo ----
+  if (toca(8)) {
+    const mala = (de, a) => de === 'dani' || a === 'dani' ? { demora: [20, 30], perdida: 0.05 } : {};
+    const s = crearSala(['ana', 'beto', 'carla', 'dani'], { red: mala });
+    await espera(2000);
+    const N = 900, cs = Object.values(s);
+    const r = await conTiempo(Promise.all(cs.map(c => correr(c, { hasta: N }))), 60000);
+    const e = Object.fromEntries(cs.map(c => [c.uid, c.ls.estado()]));
+    const ritmos = [s.ana, s.beto, s.carla].map(c => ritmoDe(c, 300, N - 1));
+    ok('red de Dani mala pero no tanto (20-30 ms, 5 %): los demás a su ritmo, Dani con su retraso más grande y al final sin relevo',
+       r !== 'tarde' && ritmos.every(x => x >= 0.9) && e.dani.retraso >= 5 && e.dani.retraso > Math.max(e.ana.retraso, e.beto.retraso, e.carla.retraso) &&
+       !e.ana.relevadosAhora.includes('dani') && cs.every(c => igualesHasta(c, s.ana, N) < 0),
+       `${ritmos.map(pc).join(', ')}; retrasos Ana ${e.ana.retraso}, Beto ${e.beto.retraso}, Carla ${e.carla.retraso}, Dani ${e.dani.retraso}; relevados al final ${JSON.stringify(e.ana.relevadosAhora)}`);
+    if (solo) for (const u of ['ana', 'dani']) nota(`${u}: ${s[u].registro.filter(t => /relevo a|vuelve|subo|paso la/.test(t)).join(' | ')}`);
+  }
+
+  // ---- 2) Carla con la PC lenta (a la mitad): con relevo los demás a 60; sin relevo, todos a su ritmo ----
+  const pcLenta = async relevo => {
+    const s = crearSala(['ana', 'beto', 'carla'], { relevo });
+    await espera(1000);
+    const N = relevo ? 1200 : 600;
+    let corriendo = 2;
+    const fin2 = () => corriendo--;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }).then(fin2), correr(s.beto, { hasta: N }).then(fin2),
+      correr(s.carla, { hasta: N, ritmo: 2, mientras: () => corriendo > 0 })]), 60000);
+    return { s, r, N, e: Object.fromEntries(Object.values(s).map(c => [c.uid, c.ls.estado()])) };
+  };
+  if (toca(2)) {
+    const { s, r, N, e } = await pcLenta(true);
+    const ritmos = [s.ana, s.beto].map(c => ritmoDe(c, 300, N - 1));
+    ok('Carla con la PC a la mitad del ritmo: Ana y Beto siguen a su ritmo (≥ 90 %)', r !== 'tarde' && ritmos.every(x => x >= 0.9),
+       `${ritmos.map(pc).join(', ')}; Carla ${pc(ritmoDe(s.carla, 50, s.carla.cuadro))} (llegó al cuadro ${s.carla.cuadro})`);
+    ok('…porque la autoridad (Ana) releva a Carla: lleva sus botones en su paquete (inventados si no llegan)',
+       e.ana.relevos >= 1 && e.ana.relevadosAhora.includes('carla') && e.ana.inventados > 0 && s.ana.vistos[N - 1][16] === 1,
+       `relevos ${e.ana.relevos}, relevados al final ${JSON.stringify(e.ana.relevadosAhora)}, inventados ${e.ana.inventados}`);
+    ok('Ana y Beto con los mismos botones en todos los cuadros; Carla, la misma carrera hasta donde llegó',
+       igualesHasta(s.ana, s.beto, N) < 0 && igualesHasta(s.carla, s.ana, s.carla.cuadro) < 0 && sinDesinc(Object.values(s)),
+       `Carla hasta el ${s.carla.cuadro}, huellas iguales Carla ${e.carla.huellasIguales}`);
+  }
+  if (toca(3)) {
+    const { s, N } = await pcLenta(false);
+    const ritmos = [s.ana, s.beto].map(c => ritmoDe(c, 200, N - 1));
+    ok('sin relevo (?relevo=0, como antes de §80) la misma PC lenta frena a todos (≤ 60 %)', ritmos.every(x => x <= 0.6), ritmos.map(pc).join(', '));
+  }
+
+  // ---- 3) un apagón de Dani de 0,6 s (nada entra ni sale): una sola espera y sigue, sin cortes ----
+  if (toca(4)) {
+    const s = crearSala(['ana', 'beto', 'carla', 'dani'], { apagones: { dani: [5000, 5600] }, esperaCorte: 1500 });
+    await espera(1000);
+    const N = 1100, cs = Object.values(s);
+    const r = await conTiempo(Promise.all(cs.map(c => correr(c, { hasta: N }))), 60000);
+    const e = Object.fromEntries(cs.map(c => [c.uid, c.ls.estado()]));
+    const buenas = [s.ana, s.beto, s.carla];
+    // el cuadro en que terminó el apagón (en la consola de Ana) y desde 1 s después, el ritmo
+    const kFin = s.ana.cuando.findIndex(t => t > s.t0 + 5600 + 1000);
+    const ritmos = buenas.map(c => ritmoDe(c, kFin, N - 1));
+    ok('un apagón de 0,6 s de Dani: la carrera espera una vez (≈ lo que duró) y no se corta a nadie',
+       r !== 'tarde' && buenas.every(c => e[c.uid].maxEspera > 300 && e[c.uid].maxEspera < 1100) && cs.every(c => !Object.keys(e[c.uid].cortes).length),
+       buenas.map(c => `${c.uid} espera máx ${e[c.uid].maxEspera.toFixed(0)} ms`).join(', '));
+    ok('…después del apagón, Ana, Beto y Carla siguen a su ritmo (≥ 90 %)', kFin > 0 && ritmos.every(x => x >= 0.9), `${ritmos.map(pc).join(', ')} desde el cuadro ${kFin}`);
+    ok('…las cuatro con los mismos botones en todos los cuadros', cs.every(c => igualesHasta(c, s.ana, N) < 0) && sinDesinc(cs));
+    nota(`relevos de Ana: ${e.ana.relevos} (relevados al final: ${JSON.stringify(e.ana.relevadosAhora)}); retraso de Dani al final ${e.dani.retraso}`);
+  }
+
+  // ---- 4) Beto se va de golpe (cierra la pestaña): una sola espera de un margen y el corte en el mismo cuadro ----
+  if (toca(5)) {
+    const MARGEN = 1000;
+    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: MARGEN });
+    await espera(1000);
+    const N = 900;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.beto, { hasta: N, salirEn: 400 }), correr(s.carla, { hasta: N })]), 60000);
+    const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+    const largas = c => c.cuando.filter((t, k) => k > 0 && t - c.cuando[k - 1] > 200).length;
+    ok('Beto se va: Ana y Carla lo esperan UNA vez (el margen de 1 s, más la ronda del corte) y siguen',
+       r !== 'tarde' && [ea, ec].every(e => e.maxEspera > 0.8 * MARGEN && e.maxEspera < MARGEN + 500) && largas(s.ana) === 1 && largas(s.carla) === 1,
+       `espera máx Ana ${ea.maxEspera.toFixed(0)} ms, Carla ${ec.maxEspera.toFixed(0)} ms; pausas de más de 200 ms: ${largas(s.ana)} y ${largas(s.carla)}`);
+    ok('…las dos lo cortan en el mismo cuadro, después del último suyo, y siguen iguales',
+       ea.cortes[1] !== undefined && ea.cortes[1] === ec.cortes[1] && ea.cortes[1] >= 400 && igualesHasta(s.ana, s.carla, N) < 0 && sinDesinc([s.ana, s.carla]),
+       `corte en el ${ea.cortes[1]} / ${ec.cortes[1]}`);
+  }
+
+  // ---- 5) la autoridad (Ana) con la PC lenta: pasa el papel y los demás siguen a 60 ----
+  if (toca(6)) {
+    const s = crearSala(['ana', 'beto', 'carla']);
+    await espera(1000);
+    const N = 1200;
+    let corriendo = 2;
+    const fin2 = () => corriendo--;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N, ritmo: 2, mientras: () => corriendo > 0 }),
+      correr(s.beto, { hasta: N }).then(fin2), correr(s.carla, { hasta: N }).then(fin2)]), 60000);
+    const ea = s.ana.ls.estado(), eb = s.beto.ls.estado(), ec = s.carla.ls.estado();
+    const ritmos = [s.beto, s.carla].map(c => ritmoDe(c, 400, N - 1));
+    ok('la autoridad (Ana) con la PC lenta le pasa el papel a otro (una vez)', ea.traspasos === 1 && eb.autoridad === ec.autoridad && eb.autoridad !== 'ana',
+       `traspasos ${ea.traspasos}; autoridad al final: Beto ve ${eb.autoridad}, Carla ve ${ec.autoridad}`);
+    ok('…y Beto y Carla siguen a su ritmo (≥ 90 %), con Ana relevada', r !== 'tarde' && ritmos.every(x => x >= 0.9) && eb.relevadosAhora.includes('ana'),
+       `${ritmos.map(pc).join(', ')}; relevados ${JSON.stringify(eb.relevadosAhora)}; Ana llegó al cuadro ${s.ana.cuadro}`);
+    ok('…la misma carrera en las tres (Ana hasta donde llegó)', igualesHasta(s.beto, s.carla, N) < 0 && igualesHasta(s.ana, s.beto, s.ana.cuadro) < 0 && sinDesinc(Object.values(s)));
+  }
+
+  // ---- 6) el corte que llega tarde: Carla tiene los últimos botones de Beto (a Ana no le llegaron) y su respuesta al
+  // decisor se pierde; Ana corta antes de lo que Carla ya corrió → la copia de Carla se separó: se sale sola ----
+  if (toca(7)) {
+    // a Ana no le llega ningún paquete con botones de Beto del cuadro 300 en adelante (venga de quien venga)
+    const ultimos = b => (b[1] === 13 || b[1] === 15) && b[3] === 1 && ((b[4] << 24 | b[5] << 16 | b[6] << 8 | b[7]) >>> 0) + b[8] > 300;
+    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 800, red: () => ({ perdida: 0 }),
+      bloquear: (de, a, b) => (a === 'ana' && ultimos(b)) || (de === 'carla' && a === 'ana' && b[1] === 6) });
+    await espera(800);
+    const N = 600;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.beto, { hasta: N, salirEn: 300 }), correr(s.carla, { hasta: N })]), 60000);
+    const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+    ok('Ana corta a Beto donde ella llega (no recibió sus últimos botones ni la respuesta de Carla) y sigue hasta el final',
+       r !== 'tarde' && ea.cortes[1] === 300 && s.ana.cuadro === N - 1 && !ea.desincronizado, `corte de Beto en el ${ea.cortes[1]}; Ana llegó al ${s.ana.cuadro}`);
+    ok('Carla ya había corrido el cuadro del corte con los botones de Beto: se sale de la carrera sola y avisa (Ana la corta)',
+       ec.fuera && ec.salidas === 1 && ea.cortes[2] !== undefined && s.carla.registro.some(t => t.includes('me salgo')),
+       `Carla fuera: ${ec.fuera}; corte de Carla en Ana: ${ea.cortes[2]}`);
+    ok('…hasta el cuadro del corte, Carla y Ana corrieron exactamente lo mismo', igualesHasta(s.carla, s.ana, 300) < 0);
+    if (!ec.fuera) registros(s, 'ana', 'carla');
+  }
+  // ---- 9) §80b: Carla con un tirón de 40 ms (4 cuadros) cada 1,5 s (150 cuadros). El juego no se pone al día: cada
+  // tirón la deja 4 cuadros más atrás de los demás. Sin la sincronía de tiempo su retraso va subiendo para cubrirlo
+  // (lo paga ella); con la sincronía, Ana y Beto se frenan un poco (un cuadro cada tanto) y el de Carla queda chico.
+  // §99: desde el crítico de la red la sincronía frena solo al que va adelante de MÁS DE LA MITAD (con uno solo atrás,
+  // el que se tiene que mover es él: C5) y ese caso lo cubre ponerse al día (C3): se compara «sin ninguna de las dos»
+  // con «las dos», como corren en la sala ----
+  if (toca(9)) {
+    const conTirones = async sincroTiempo => {
+      const s = crearSala(['ana', 'beto', 'carla'], { sincroTiempo, alDia: sincroTiempo });
+      await espera(1000);
+      const N = 1500, cs = Object.values(s);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.beto, { hasta: N }),
+        correr(s.carla, { hasta: N, tirones: { cada: 150, dura: 40 } })]), 60000);
+      return { s, r, N, cs, e: Object.fromEntries(cs.map(c => [c.uid, c.ls.estado()])) };
+    };
+    const sin = await conTirones(false), con = await conTirones(true);
+    const fila = x => `retraso de Carla al final ${x.e.carla.retraso}, en promedio ${x.e.carla.retrasoMedio.toFixed(1)} (máx ${x.e.carla.retrasoMax[1]}); Ana ${x.e.ana.retraso}, Beto ${x.e.beto.retraso}; ` +
+      `ritmo Ana ${pc(ritmoDe(x.s.ana, 300, x.N - 1))}, Beto ${pc(ritmoDe(x.s.beto, 300, x.N - 1))}; frenos Ana ${x.e.ana.frenos}, Beto ${x.e.beto.frenos}`;
+    ok('sin la sincronía ni ponerse al día, los tirones de Carla se acumulan: su retraso se va subiendo (al final ≥ 8)', sin.r !== 'tarde' && sin.e.carla.retraso >= 8, fila(sin));
+    // (un tirón de 4 cuadros pide un retraso de ~5-6 para que nadie lo espere; lo que no tiene que pasar es que se sume
+    // tirón tras tirón: se compara el promedio de la carrera)
+    // (el valor del final es una foto: puede caer justo después de la subida de un tirón; lo que dice si se acumula es el
+    // promedio de la carrera)
+    // (solo: 2,8 a 5,1 cuadros menos; con el banco entero corriendo, ~2: el umbral deja ese margen)
+    ok('con la sincronía y ponerse al día (las de la sala desde §99), el de Carla no se acumula: en promedio al menos 1,5 cuadros menos',
+       con.r !== 'tarde' && con.e.carla.retrasoMedio <= sin.e.carla.retrasoMedio - 1.5,
+       `${fila(con)}; Carla se puso al día ${con.e.carla.prisas} veces (${con.e.carla.prisaCuadros} cuadros) · sin: promedio ${sin.e.carla.retrasoMedio.toFixed(1)}`);
+    ok('…y Ana y Beto siguen a ≥ 95 % de su ritmo (se frenan poco o nada: la que se mueve es Carla)',
+       ritmoDe(con.s.ana, 300, con.N - 1) >= 0.95 && ritmoDe(con.s.beto, 300, con.N - 1) >= 0.95,
+       `frenos Ana ${con.e.ana.frenos} (${con.e.ana.msFrenado.toFixed(0)} ms), Beto ${con.e.beto.frenos}`);
+    ok('…y en las dos vueltas las tres reciben los mismos botones en cada cuadro',
+       [sin, con].every(x => x.cs.every(c => igualesHasta(c, x.s.ana, x.N) < 0) && sinDesinc(x.cs)));
+    if (solo) for (const u of ['ana', 'carla']) nota(`${u} (con): ${con.s[u].registro.filter(t => /subo|me freno/.test(t)).join(' | ')}`);
+  }
+  // ---- 10) §80, el corte que no llega: a Ana se le cae la conexión 3 s (y con ella el canal confiable: lo que iba por
+  // "tcp" se pierde). Cada lado corta al otro: Beto corta a Ana; Ana, sola, corta a Beto y a Carla. Los avisos se
+  // pierden. Al volver, los cortes se repiten cada medio segundo: sigue el lado con más jugadores (Beto y Carla) y Ana,
+  // que ya corrió más allá con sus botones, se sale de la carrera. Y nadie marca «desincronizado» por comparar la huella
+  // con la copia de Ana, que se separó a propósito ----
+  if (toca(10)) {
+    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 1000, apagones: { ana: [4000, 7000, 'corta'] }, red: () => ({ perdida: 0 }) });
+    await espera(1000);
+    const N = 1200;
+    const r = await conTiempo(Promise.all(['ana', 'beto', 'carla'].map(u => correr(s[u], { hasta: N }))), 60000);
+    const [ea, eb, ec] = ['ana', 'beto', 'carla'].map(u => s[u].ls.estado());
+    ok('a Ana se le cae la conexión 3 s: Beto y Carla la cortan en el mismo cuadro y siguen hasta el final, sin «desincronizado» y sin cortarse entre ellos',
+       r !== 'tarde' && eb.cortes[0] !== undefined && eb.cortes[0] === ec.cortes[0] && s.beto.cuadro === N - 1 && s.carla.cuadro === N - 1 &&
+       !eb.desincronizado && !ec.desincronizado && eb.cortes[1] === undefined && eb.cortes[2] === undefined && ec.cortes[1] === undefined &&
+       igualesHasta(s.beto, s.carla, N) < 0,
+       `cortes en Beto ${JSON.stringify(eb.cortes)}, en Carla ${JSON.stringify(ec.cortes)}; huellas iguales ${eb.huellasIguales}, con la cortada sin comparar ${eb.huellasDeCortados || 0}; islas ${eb.islas || 0}/${ec.islas || 0}`);
+    ok('…y Ana, al volver, se entera de su corte (aunque el aviso se perdió), en el mismo cuadro, y se sale de la carrera',
+       ea.cortes[0] === eb.cortes[0] && (ea.fuera || ea.cortado), `corte de Ana en Ana: ${ea.cortes[0]}; Ana fuera ${ea.fuera}, cortada ${ea.cortado}; Ana cortó a ${JSON.stringify(ea.cortes)}`);
+    if (solo) registros(s, 'ana', 'beto');
+  }
+  // ---- 11) §99 (D), la autoridad por estabilidad: Ana (la autoridad) con la PC lenta y a Carla le llega TODO tarde
+  // (40-60 ms de llegada; lo suyo sale bien). Antes el papel iba a Carla, que se ve bien desde afuera: inventaba los
+  // botones de los sanos y los obligaba a subir su retraso (prueba-relevo con el juego). Ahora va al que manda y recibe
+  // bien: Beto ----
+  if (toca(11)) {
+    const s = crearSala(['ana', 'beto', 'carla'], { red: (de, a) => a === 'carla' ? { demora: [40, 60], perdida: 0.03 } : {} });
+    await espera(1500);
+    const N = 1200;
+    let corriendo = 2;
+    const fin2 = () => corriendo--;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N, ritmo: 2, mientras: () => corriendo > 0 }),
+      correr(s.beto, { hasta: N }).then(fin2), correr(s.carla, { hasta: N }).then(fin2)]), 60000);
+    const ea = s.ana.ls.estado(), eb = s.beto.ls.estado(), ec = s.carla.ls.estado();
+    ok('§99: la autoridad lenta pasa el papel a Beto (manda y recibe bien), no a Carla (recibe todo tarde)',
+       r !== 'tarde' && ea.traspasos >= 1 && eb.autoridad === 'beto' && ec.autoridad === 'beto',
+       `traspasos ${ea.traspasos}; autoridad al final: Beto ve ${eb.autoridad}, Carla ve ${ec.autoridad}; estable Carla ${JSON.stringify(ec.estable)}, Beto ${JSON.stringify(eb.estable)}; delante Beto ${JSON.stringify(eb.delantes)}, Carla ${JSON.stringify(ec.delantes)}`);
+    if (!(eb.autoridad === 'beto')) registros(s, 'ana', 'beto', 'carla');
+    // (§101: la cuenta entera de la sala, ratosMalos de sala-carrera.mjs: con la PC cargada los «voy atrás» solos
+    // podían salir 0 y 0, pero la ida y vuelta de Carla igual la deja peor)
+    ok('…y en la cuenta de estabilidad que usa la sala (ratos malos, «voy atrás» y la ida y vuelta) Carla queda peor que Beto (la sala no la elige en la carrera siguiente)',
+       ratosMalos(ec.estable) > ratosMalos(eb.estable),
+       `Carla ${ratosMalos(ec.estable)} ${JSON.stringify(ec.estable)}, Beto ${ratosMalos(eb.estable)} ${JSON.stringify(eb.estable)}`);
+    if (solo) registros(s, 'ana', 'beto', 'carla');
+  }
+  // ---- 13) §99 (C3), ponerse al día: Carla se traba 300 ms cada 1,5 s. Sin ponerse al día queda atrás para siempre
+  // (el juego no recupera), la relevan y la autoridad inventa sus botones (pierde el control de su kart); con él corre
+  // seguido lo que le falta y vuelve a manejar. La carrera, igual en las tres ----
+  if (toca(13)) {
+    const vuelta = async alDia => {
+      const s = crearSala(['ana', 'beto', 'carla'], { alDia });
+      await espera(1000);
+      const N = 1200, atras = [];
+      // (cada 50 ms, cuántos cuadros va Carla detrás de Ana, mientras Ana corre)
+      const mide = setInterval(() => { if (s.ana.cuadro > 200 && s.ana.cuadro < N - 1) atras.push(Math.max(0, s.ana.cuadro - s.carla.cuadro)); }, 50);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.beto, { hasta: N }),
+        correr(s.carla, { hasta: N, tirones: { cada: 150, dura: 300 } })]), 90000);
+      clearInterval(mide);
+      const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+      return { r, s, ea, ec, atras: atras.reduce((a, b) => a + b, 0) / Math.max(1, atras.length), ritmo: ritmoDe(s.ana, 200, N - 1), inventados: ea.inventados + s.beto.ls.estado().inventados, iguales: igualesHasta(s.ana, s.carla, N) < 0 && igualesHasta(s.ana, s.beto, N) < 0 && sinDesinc(Object.values(s)) };
+    };
+    const sin = await vuelta(false), con = await vuelta(true);
+    const fila = x => `Carla atrás de Ana ${x.atras.toFixed(1)} cuadros en promedio, Ana a ${pc(x.ritmo)}, inventados ${x.inventados}, Carla se puso al día ${x.ec.prisas} veces (${x.ec.prisaCuadros} cuadros, ${x.s.carla.ganado.toFixed(0)} ms), retraso ${x.ec.retraso}`;
+    // (sin ponerse al día pasa una de dos: la relevan y queda atrás para siempre —pierde el control de su kart—, o no
+    // la relevan y la sala entera se congela en cada tirón suyo)
+    ok('§99 C3: sin ponerse al día, o Carla queda atrás (≥ 3 cuadros en promedio) o la sala se congela con sus tirones (Ana < 90 %)',
+       sin.r !== 'tarde' && sin.ec.prisas === 0 && (sin.atras >= 3 || sin.ritmo < 0.9), fila(sin));
+    // (sin ponerse al día queda 16-80 cuadros atrás; con él, medido: 0,7 solo y hasta ~5 con el banco entero corriendo)
+    ok('…ponerse al día: Carla corre seguido lo que le falta (lo pide y lo gana) y no queda atrás (menos de 8 cuadros en promedio)',
+       con.r !== 'tarde' && con.ec.prisas > 0 && con.s.carla.ganado > 0 && con.atras < 8, `${fila(con)} · sin: ${fila(sin)}`);
+    ok('…y las tres corren exactamente la misma carrera, con y sin ponerse al día', sin.iguales && con.iguales);
+    if (solo) registros(con.s, 'ana', 'carla');
+  }
+  // ---- 14) §99 (C1), el relevo rápido: a Beto se le traba la pestaña entera 1 s (no manda ni lee nada) en el cuadro
+  // 400. Antes Ana y Carla lo esperaban el segundo entero; ahora lo pausan a los ~150 ms (su kart sigue con un botón
+  // calculado igual en las tres), siguen, y cuando Beto despierta pide volver y maneja otra vez. La carrera, igual ----
+  if (toca(14)) {
+    const vuelta = async relevoRapido => {
+      const s = crearSala(['ana', 'beto', 'carla'], { relevoRapido, alDia: true });
+      await espera(1000);
+      const N = 1000;
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.beto, { hasta: N, tirones: { cada: 400, dura: 1000, callado: true, desde: 399, hasta: 401 } }),
+        correr(s.carla, { hasta: N })]), 90000);
+      const [ea, eb, ec] = ['ana', 'beto', 'carla'].map(u => s[u].ls.estado());
+      return { r, s, ea, eb, ec, iguales: igualesHasta(s.ana, s.beto, N) < 0 && igualesHasta(s.ana, s.carla, N) < 0 && sinDesinc(Object.values(s)) };
+    };
+    const sin = await vuelta(false), con = await vuelta(true);
+    const fila = x => `Ana esperó a lo más ${x.ea.maxEspera.toFixed(0)} ms; pausas ${JSON.stringify(x.ea.pausas.map(p => p.desde))}, vueltas ${x.ea.vueltas}; Beto fuera ${x.eb.fuera}, cortes ${JSON.stringify(x.ea.cortes)}`;
+    ok('§99 C1: sin el relevo rápido, la pestaña trabada de Beto (1 s) frena a Ana el segundo entero', sin.r !== 'tarde' && sin.ea.maxEspera > 800, fila(sin));
+    ok('…con el relevo rápido, Ana y Carla lo pausan y siguen: esperan a lo más medio segundo, y Beto vuelve a manejar (ni cortado ni fuera)',
+       con.r !== 'tarde' && con.ea.maxEspera < 500 && con.ec.maxEspera < 500 && con.ea.pausas.length >= 1 && con.ea.vueltas >= 1 && !con.eb.fuera &&
+       !Object.keys(con.ea.cortes).length, fila(con));
+    ok('…y las tres corren exactamente la misma carrera (el botón calculado de la pausa es igual en todas)', con.iguales && sin.iguales);
+    if (solo) registros(con.s, 'ana', 'beto');
+  }
+  // ---- 15) §99 (C1): Beto se va de golpe en el cuadro 300 (cierra la pestaña): lo pausan enseguida y, como no
+  // vuelve, la pausa se vuelve el corte de siempre (aquí a los 2 s: en la sala, 20 s). Ana y Carla, a su ritmo ----
+  if (toca(15)) {
+    const s = crearSala(['ana', 'beto', 'carla'], { relevoRapido: true, pausaACorte: 2000 });
+    await espera(1000);
+    const N = 900;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.beto, { hasta: N, salirEn: 300 }), correr(s.carla, { hasta: N })]), 90000);
+    const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+    ok('§99 C1: Beto se va: lo pausan (sin esperar 2 s), la pausa pasa a corte en el mismo cuadro en Ana y Carla, y las dos siguen iguales',
+       r !== 'tarde' && ea.pausas.length >= 1 && ea.cortes[1] !== undefined && ea.cortes[1] === ec.cortes[1] && ea.maxEspera < 500 &&
+       igualesHasta(s.ana, s.carla, N) < 0 && sinDesinc([s.ana, s.carla]),
+       `pausa ${JSON.stringify(ea.pausas.map(p => p.desde))}, corte Ana ${ea.cortes[1]} / Carla ${ec.cortes[1]}; Ana esperó a lo más ${ea.maxEspera.toFixed(0)} ms`);
+  }
+  // ---- 16) §101: Ana se traba 1,2 s MIENTRAS espera a Carla (a Carla no le sale nada 300 ms: Ana y Beto la esperan).
+  // Lo que Ana estuvo trabada no es esperar a Carla: no se lo carga (antes Carla subía su retraso de más) y no la corta
+  // por eso (Ana es la que decide los cortes de Carla y aquí su margen es 1 s). Lo cuenta como un tirón suyo. Con el
+  // camino viejo (trabaPropia: false), Ana despierta, cree que esperó 1,3 s y corta a Carla ----
+  if (toca(16)) {
+    const T = 1700;                                                  // (ms desde que se crea la sala)
+    const vuelta = async trabaPropia => {
+      let s = null;
+      const reloj = () => performance.now() - s.t0;
+      s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 1000, trabaPropia, saltos: { ana: [[T + 150, 1200]] },
+        bloquear: de => de === 'carla' && reloj() >= T && reloj() < T + 300 });
+      await espera(1000);
+      const N = 400;
+      const r = await conTiempo(Promise.all(['ana', 'beto', 'carla'].map(u => correr(s[u], { hasta: N }))), 30000);
+      const [ea, eb, ec] = ['ana', 'beto', 'carla'].map(u => s[u].ls.estado());
+      return { r, s, ea, eb, ec, cortes: [ea, eb, ec].some(e => Object.keys(e.cortes).length) || ec.fuera || ec.cortado };
+    };
+    const con = await vuelta(true), sin = await vuelta(false);
+    const fila = x => `Ana le cargó a Carla ${Math.round(x.ea.esperaDe.carla || 0)} ms y Beto ${Math.round(x.eb.esperaDe.carla || 0)}; Ana trabada esperando ${Math.round(x.ea.msCongelado || 0)} ms, tirones ${x.ea.tirones || 0}; cortes Ana ${JSON.stringify(x.ea.cortes)} Beto ${JSON.stringify(x.eb.cortes)}, Carla fuera ${x.ec.fuera}`;
+    ok('§101: Ana trabada 1,2 s mientras esperaba a Carla: no la corta (en Ana solo cuenta lo que esperó despierta) y las tres terminan sin cortes',
+       con.r !== 'tarde' && !con.cortes && con.s.carla.cuadro === 399 && igualesHasta(con.s.ana, con.s.carla, 400) < 0 && sinDesinc(Object.values(con.s)), fila(con));
+    ok('…lo trabado no se le carga a Carla (Ana le carga lo mismo que Beto, ±0,4 s) y Ana lo cuenta como un tirón suyo',
+       (con.ea.esperaDe.carla || 0) < (con.eb.esperaDe.carla || 0) + 400 && (con.ea.msCongelado || 0) >= 1000 && (con.ea.tirones || 0) >= 1, fila(con));
+    ok('…con el camino viejo (trabaPropia: false) la misma traba se le carga a Carla y Ana la corta', sin.r !== 'tarde' && sin.cortes &&
+       (sin.ea.esperaDe.carla || 0) > (sin.eb.esperaDe.carla || 0) + 800, fila(sin));
+    if (solo) registros(con.s, 'ana', 'carla');
+  }
+  // ---- 17) §101: en una sala de dos, a Carla se le traba la pestaña entera 600 ms en el cuadro 300 (Ana la pausa y
+  // sigue) y se pone al día DESPACIO (gana 2 ms por cuadro de 10: 1,2 veces, como una PC justa; con tres juegos en una
+  // PC, B va así). Mientras va atrás, sus informes lo dicen («voy atrás» y «sé ponerme al día») y Ana NO se frena por
+  // ella (antes, desde que iba menos de 20 cuadros atrás, se frenaba: la sala iba más lenta y a Ana, que se frenaba, le
+  // llegaba tarde lo de los demás y le subía el retraso). Con dos, Carla es «más de la mitad»; con tres y uno a la par,
+  // Ana ya no se frenaba por uno solo (§99, C5). Carla termina a la par ----
+  if (toca(17)) {
+    const s = crearSala(['ana', 'carla'], { alDia: true, relevoRapido: true });
+    await espera(1000);
+    const N = 1500;
+    let vio = 0, frenosAtras = 0, previo = null, retrasoAntes = null;
+    const alFinal = [];                                              // (cuántos cuadros va Carla atrás de Ana al final)
+    const mide = setInterval(() => {
+      const ea = s.ana.ls.estado();
+      if (s.ana.cuadro > N - 200 && s.ana.cuadro < N - 20) alFinal.push(s.ana.cuadro - s.carla.cuadro);
+      if (s.ana.cuadro === 290 || retrasoAntes === null && s.ana.cuadro > 290) retrasoAntes = ea.retraso;
+      if (ea.atrasados.includes('carla')) { vio++; if (previo !== null) frenosAtras += ea.frenos - previo; }
+      previo = ea.frenos;
+    }, 20);
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }),
+      correr(s.carla, { hasta: N, prisaPorCuadro: 2, tirones: { cada: 300, dura: 600, callado: true, desde: 299, hasta: 301 } })]), 90000);
+    clearInterval(mide);
+    const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+    const final = alFinal.reduce((x, y) => x + y, 0) / Math.max(1, alFinal.length);
+    const fila = `Ana vio a Carla «atrás» ${vio} veces (cada 20 ms) y se frenó ${frenosAtras} cuadros en ese rato (${ea.frenos} en toda la carrera); Carla se puso al día ${ec.prisas} veces (ganó ${s.carla.ganado.toFixed(0)} ms), al final ${final.toFixed(1)} cuadros atrás; retraso de Ana ${retrasoAntes} → ${ea.retraso}; Ana a ${pc(ritmoDe(s.ana, 310, N - 1))}`;
+    ok('§101: mientras Carla se pone al día despacio, sus informes dicen «voy atrás» y Ana no se frena por ella (a lo más 1 cuadro)',
+       r !== 'tarde' && vio >= 5 && ec.prisas >= 1 && frenosAtras <= 1, fila);
+    ok('…Ana sigue a su ritmo (≥ 90 %) sin subir su retraso, y Carla termina a la par (≤ 3 cuadros) en la misma carrera',
+       ritmoDe(s.ana, 310, N - 1) >= 0.9 && retrasoAntes !== null && ea.retraso <= retrasoAntes + 1 && alFinal.length > 0 && final <= 3 &&
+       s.carla.cuadro === N - 1 && igualesHasta(s.ana, s.carla, N) < 0 && sinDesinc(Object.values(s)), fila);
+    if (solo) registros(s, 'ana', 'carla');
+  }
+  // ---- 18) §101 (la trampa): a Carla se le traba la pestaña 1 s (la pausan) y su PC casi no puede ponerse al día
+  // (gana 0,2 ms por cuadro de 10: en la carrera no alcanza). Igual pide volver a los 3 s de la pausa y maneja otra
+  // vez: no se queda pausada hasta que la pausa pase a corte (con un arreglo que se probó y se sacó, pedía volver solo
+  // al terminar su ráfaga, que con una PC justa no terminaba nunca: B en prueba-relevo) ----
+  if (toca(18)) {
+    const s = crearSala(['ana', 'carla'], { alDia: true, relevoRapido: true, pausaACorte: 8000 });
+    await espera(1000);
+    const N = 1400;
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }),
+      correr(s.carla, { hasta: N, prisaPorCuadro: 0.2, tirones: { cada: 300, dura: 1000, callado: true, desde: 299, hasta: 301 } })]), 90000);
+    const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+    ok('§101: Carla, que no alcanza a ponerse al día, igual vuelve a manejar (pide volver a los 3 s de la pausa) y nadie la corta',
+       r !== 'tarde' && ea.pausas.length >= 1 && ea.vueltas >= 1 && !Object.keys(ea.cortes).length && !ec.fuera && igualesHasta(s.ana, s.carla, N) < 0,
+       `pausas ${JSON.stringify(ea.pausas.map(p => p.desde))}, vueltas ${ea.vueltas}; cortes ${JSON.stringify(ea.cortes)}; Carla se puso al día ${ec.prisas} veces (ganó ${s.carla.ganado.toFixed(0)} ms), fuera ${ec.fuera}`);
+    if (solo) registros(s, 'ana', 'carla');
+  }
+  // ---- 19) §102: Carla con una PC justa: una traba de 60 ms en el cuadro 299 la deja 6 cuadros atrás y después va un
+  // 2 % más lenta que el reloj (como A en prueba-sincro --sala, con 15 ms de trabajo por cuadro); su ráfaga gana a lo
+  // más 1 % (0,1 ms por cuadro de 10). Dice «voy atrás» y pide ponerse al día, pero no le sale: a los 3 ratos deja de
+  // decir «sé ponerme al día» y Ana se frena por ella (la sincronía, §80b). Las dos con retraso fijo 10 (sin relevo de
+  // por medio: en el juego, el retraso de A subía hasta 12 y tapaba el atraso). Con alcanceReal: false (§101), Ana no se
+  // frenaba y Carla quedaba cada vez más atrás ----
+  if (toca(19)) {
+    const N = 1200;
+    const carrera = async alcanceReal => {
+      const s = crearSala(['ana', 'carla'], { alDia: true, relevoRapido: true, alcanceReal, retraso: 10, adaptar: false });
+      await espera(1000);
+      let maxAtras = 0;
+      const mide = setInterval(() => {
+        if (s.ana.cuadro > 700) maxAtras = Math.max(maxAtras, s.ana.cuadro - s.carla.cuadro);
+      }, 20);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.carla, { hasta: N, ritmo: 1.02, prisaPorCuadro: 0.1, tirones: { cada: 300, dura: 60, desde: 299, hasta: 301 } })]), 90000);
+      clearInterval(mide);
+      const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+      if (solo) registros(s, 'ana', 'carla');
+      return { r, s, ea, ec, maxAtras,
+        fila: `Ana se frenó ${ea.frenos} cuadros; Carla fue a lo más ${maxAtras} cuadros atrás (desde el cuadro 700), «no alcanzo» ${ec.sinAlcance || 0} ratos, se puso al día ${ec.prisas} veces` };
+    };
+    const a = await carrera(true), b = await carrera(false);
+    ok('§102: Carla (PC justa) no alcanza a ponerse al día, lo dice, y Ana se frena por ella: Carla va a lo más 6 cuadros atrás (sin desincronizar)',
+       a.r !== 'tarde' && a.ec.sinAlcance > 0 && a.ea.frenos > 0 && a.maxAtras <= 6 && igualesHasta(a.s.ana, a.s.carla, N) < 0 && sinDesinc(Object.values(a.s)), a.fila);
+    ok('…con el camino de §101 (alcanceReal: false), Ana no se frena y Carla se queda más atrás',
+       b.r !== 'tarde' && b.maxAtras > a.maxAtras, b.fila);
+  }
+  // ---- 12) §99 (D): la sala elige la primera autoridad de la carrera (fijarCarrera(k, fuera, mando)): todas las
+  // consolas empiezan con la misma, la carrera sale igual en las tres, y si esa está fuera, la primera que sigue ----
+  if (toca(12)) {
+    const s = crearSala(['ana', 'beto', 'carla']);
+    for (const u of ['ana', 'beto', 'carla']) s[u].ls.fijarCarrera(1, [], 2);
+    await espera(800);
+    const N = 300;
+    const r = await conTiempo(Promise.all(['ana', 'beto', 'carla'].map(u => correr(s[u], { hasta: N }))), 30000);
+    const es = ['ana', 'beto', 'carla'].map(u => s[u].ls.estado());
+    ok('§99: con fijarCarrera(1, [], 2) las tres empiezan con Carla de autoridad y corren lo mismo',
+       r !== 'tarde' && es.every(e => e.autoridad === 'carla') && igualesHasta(s.ana, s.beto, N) < 0 && igualesHasta(s.ana, s.carla, N) < 0 && sinDesinc(Object.values(s)),
+       es.map(e => e.autoridad).join(', '));
+    const t = crearSala(['ana', 'beto', 'carla']);
+    for (const u of ['ana', 'beto']) t[u].ls.fijarCarrera(1, [2], 2);
+    await espera(500);
+    const r2 = await conTiempo(Promise.all(['ana', 'beto'].map(u => correr(t[u], { hasta: 200 }))), 30000);
+    ok('…y si la elegida no corre (fuera), la primera que sigue (Ana)', r2 !== 'tarde' && t.ana.ls.estado().autoridad === 'ana' && t.beto.ls.estado().autoridad === 'ana',
+       `${t.ana.ls.estado().autoridad} / ${t.beto.ls.estado().autoridad}`);
+  }
+} catch (e) {
+  ok('la prueba corrió sin errores', false, e.stack || e.message);
+}
+for (const ls of todos) ls.detener();
+fin();
+</script>
+</body>
+</html>

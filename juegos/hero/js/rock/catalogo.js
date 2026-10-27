@@ -287,7 +287,7 @@ export const invVarL = (L, k) => { const r = rutaInv(k), par = getP(L, r.split('
 export const invId = v => [v.b, v.k, v.t, ...INV_CATS[v.k].cols.map(f => v.c[f] ?? '')].join(':');
 /* la clave de la foto de una pieza en localStorage (la escena la saca; el salón de Juegos la lee, mismo origen).
    Subir el número cuando cambia cómo se ve un rockero: las fotos guardadas quedan viejas. */
-export const claveMiniId = id => 'rock-mini-3:' + id;
+export const claveMiniId = id => 'rock-mini-4:' + id;
 export const claveMini = v => claveMiniId(invId(v));
 /* borra las fotos de una versión anterior (una vez por página: localStorage tiene ~5 MB para todo el sitio) */
 let minisLimpias = false;

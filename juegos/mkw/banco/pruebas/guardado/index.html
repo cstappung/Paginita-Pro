@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partidas guardadas</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Partidas guardadas: <span>IndexedDB y paquete</span></h1>
+<p>Prueba el módulo de partidas (<code>web/navegador/guardado.mjs</code>) <b>sin el juego</b>, con el sistema de
+  archivos en memoria <b>real</b> de Emscripten: un "juego falso" en C (<code>archivos.c</code>) escribe, renombra y
+  borra archivos con <code>fopen</code>/<code>rename</code>/<code>remove</code>, igual que el juego. Se comprueba que lo
+  de las carpetas de partidas llega a IndexedDB, que vuelve al "abrir la página otra vez" (otro juego falso nuevo) y
+  que el paquete (descargar/cargar, y en el sitio subir a Firebase) conserva todo. Usa una base de datos de prueba
+  aparte: no toca tus partidas.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearGuardado } from '/web/navegador/guardado.mjs';
+import crearJuegoFalso from './archivos.js';
+
+const { ok, nota, fin } = prueba('guardado', 'Partidas guardadas (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const BASE = 'mkw-prueba-guardado', BASE2 = 'mkw-prueba-guardado-2';
+const borrarBase = n => new Promise(r => { const p = indexedDB.deleteDatabase(n); p.onsuccess = p.onerror = p.onblocked = () => r(); });
+await borrarBase(BASE); await borrarBase(BASE2);
+
+const PARTIDA = '/mkw/sd/riivolution/save/RetroWFC/RMCP/rksys.dat';
+const AJUSTES = '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6/RRGameSettings.pul';
+const FANTASMA = '/mkw/sd/RetroRewind6/Ghosts/prueba.rkg';
+const CARPETAS = ['/mkw/sd/riivolution/save/RetroWFC/RMCP', '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6',
+                  '/mkw/sd/RetroRewind6/Ghosts', '/otro', '/datos/WiiCompiled'];
+
+// "Abrir la página": un juego falso nuevo (memoria vacía) con sus carpetas
+async function abrirJuego() {
+  const M = await crearJuegoFalso();
+  CARPETAS.forEach(c => M.FS.mkdirTree(c));
+  const c = (f, ...a) => M.ccall(f, 'number', a.map(x => typeof x === 'string' ? 'string' : 'number'), a);
+  return { M, FS: M.FS, escribe: (r, n, v) => c('escribe', r, n, v), seguro: (r, t, n, v) => c('escribe_seguro', r, t, n, v),
+           borra: r => c('borra', r) };
+}
+const enBase = async (g) => g.cargar();
+
+try {
+  // ---- 1) mientras se juega: lo escrito se guarda solo ----
+  const j1 = await abrirJuego();
+  const g1 = crearGuardado({ base: BASE, esperaMs: 300 });
+  await g1.cargar();
+  g1.vigilar(j1.FS);
+  j1.escribe(PARTIDA, 100000, 7);
+  ok('el juego escribe su partida (fopen/fwrite/fclose)', j1.FS.stat(PARTIDA).size === 100000);
+  ok('no se guarda en el mismo instante (espera a que el juego termine de escribir)', g1.pendientes === 1);
+  await espera(600);
+  let base = await enBase(g1);
+  ok('medio segundo después, la partida está en IndexedDB', base.has(PARTIDA) && base.get(PARTIDA).datos.length === 100000 && base.get(PARTIDA).datos[500] === 7,
+     `${base.size} archivos`);
+
+  // varias escrituras seguidas → un solo guardado
+  const antes = g1.estado.guardadosEstaSesion;
+  for (let v = 1; v <= 5; v++) { j1.escribe(AJUSTES, 3480, v); await espera(50); }
+  await espera(600);
+  base = await enBase(g1);
+  ok('5 escrituras seguidas de los ajustes → se guardan una sola vez, con lo último', g1.estado.guardadosEstaSesion - antes === 1 && base.get(AJUSTES).datos[0] === 5,
+     `${g1.estado.guardadosEstaSesion - antes} guardado(s), valor ${base.get(AJUSTES)?.datos[0]}`);
+
+  // guardado seguro (.tmp + renombrar) como el del runtime
+  j1.seguro(PARTIDA, PARTIDA + '.nandsafe.tmp', 100000, 9);
+  await espera(600);
+  base = await enBase(g1);
+  ok('guardado seguro (.tmp y renombrar): se guarda el final y nunca el .tmp', base.get(PARTIDA).datos[0] === 9 && ![...base.keys()].some(k => k.endsWith('.tmp')));
+
+  // lo que no es partida no se guarda
+  j1.escribe('/otro/registro.log', 100, 1);
+  j1.escribe('/datos/WiiCompiled/Config.toml', 100, 1);
+  j1.escribe(FANTASMA, 2000, 3);
+  await espera(600);
+  base = await enBase(g1);
+  ok('un fantasma nuevo en la SD de Retro Rewind se guarda', base.has(FANTASMA));
+  ok('fuera de las carpetas de partidas (y Config.toml) no se guarda', !base.has('/otro/registro.log') && !base.has('/datos/WiiCompiled/Config.toml'));
+
+  // leer no es escribir
+  const n0 = g1.estado.guardadosEstaSesion;
+  j1.FS.readFile(PARTIDA);
+  const s = j1.FS.open(PARTIDA, 'r'); j1.FS.close(s);
+  await espera(500);
+  ok('abrir para leer no dispara un guardado', g1.estado.guardadosEstaSesion === n0);
+
+  // borrar
+  j1.borra(FANTASMA);
+  await espera(600);
+  base = await enBase(g1);
+  ok('si el juego borra un archivo, también se borra de IndexedDB', !base.has(FANTASMA));
+
+  // guardar ya (lo que hace la página al esconderse la pestaña)
+  j1.escribe(AJUSTES, 3480, 42);
+  await g1.guardarPendientes();
+  base = await enBase(g1);
+  ok('guardar enseguida (al esconder o cerrar la pestaña)', base.get(AJUSTES).datos[0] === 42);
+
+  // ---- 2) "abrir la página otra vez": la partida vuelve ----
+  const j2 = await abrirJuego();
+  j2.escribe(PARTIDA, 10, 0);                 // lo que traería el servidor (la partida vacía de RR)
+  const g2 = crearGuardado({ base: BASE });
+  const guardados = await g2.cargar();
+  g2.restaurar(j2.FS, guardados);
+  const p2 = j2.FS.readFile(PARTIDA), a2 = j2.FS.readFile(AJUSTES);
+  ok('al volver a abrir, la partida y los ajustes vuelven al sistema de archivos del juego (encima de la vacía)',
+     p2.length === 100000 && p2[0] === 9 && a2[0] === 42, `${guardados.size} archivos restaurados`);
+
+  // ---- 3) paquete: descargar / cargar (y en el sitio, subir a Firebase Storage) ----
+  const paquete = await g2.exportar();
+  ok('el paquete comprime (100 KB de partida casi toda igual → pocos bytes)', paquete.size < 2000, `${paquete.size} bytes`);
+  const g3 = crearGuardado({ base: BASE2 });
+  const n = await g3.importar(paquete);
+  const b3 = await g3.cargar();
+  ok('cargar el paquete en otro navegador da los mismos archivos', n === guardados.size && b3.get(PARTIDA).datos[0] === 9 && b3.get(AJUSTES).datos[0] === 42, `${n} archivos`);
+  let rechazo = '';
+  try { await g3.importar(new Blob([new Uint8Array([1, 2, 3])])); } catch (e) { rechazo = e.message; }
+  const b3b = await g3.cargar();
+  ok('un archivo que no es paquete se rechaza y no borra lo guardado', rechazo !== '' && b3b.size === b3.size, rechazo);
+
+  // ---- 4) borrar todo ----
+  await g3.borrarTodo();
+  ok('«Borrar partidas guardadas» deja la base vacía', (await g3.cargar()).size === 0);
+} catch (e) {
+  ok('la prueba corrió sin errores', false, String(e && e.stack || e));
+}
+await borrarBase(BASE); await borrarBase(BASE2);
+fin();
+</script>
+</body>
+</html>
