@@ -49,6 +49,7 @@ import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 import { crearDescargas, montarBarraDescarga } from './descargas.mjs';
 import { leerGraficos, guardarGraficos, lineasVideo, montarGraficos, montarMedidor, limitarSalida, queFrena } from './graficos.mjs';
+import { instalarPerfilGpu } from './perfil-gpu.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -319,6 +320,12 @@ if (globalThis.GPUDevice) {
   envolver('createShaderModule', ms => { pipelinesMedida.shaders++; pipelinesMedida.msShaders += ms; });
 }
 window.mkwPipelines = () => ({ ...pipelinesMedida });
+// §115: el perfil de la tarjeta (perfil-gpu.mjs): el conteo por cuadro (pasadas, dibujos, bytes subidos) con «Mostrar qué
+// frena»; y, a pedido («🔬 Perfilar la tarjeta de video», `mkw.perfilGpu`), los ms de CADA pasada medidos por la misma
+// tarjeta durante 20 s de carrera. Se instala antes de que el juego cree su dispositivo de WebGPU
+const PERFIL_TIEMPOS = (() => { try { return localStorage.getItem('mkw.perfilGpu') === '1'; } catch { return false; } })();
+const perfilGpu = (MEDIR_GPU || PERFIL_TIEMPOS) && globalThis.GPUCommandEncoder ? instalarPerfilGpu({ tiempos: PERFIL_TIEMPOS }) : null;
+window.mkwPerfilGpu = perfilGpu;
 // §114: la mediana de la tarjeta de video en los últimos `ms` (null si no se mide)
 const gpuReciente = (ms = 2000) => {
   const desde = performance.now() - ms, v = [];
@@ -823,13 +830,23 @@ function informeRendimiento() {
     enganche: { ...window.mkwEstado.fase }, memoriaJuegoMB: window.mkwHeapMB ? Math.round(window.mkwHeapMB()) : null,
     ultimos10s: { fps, juegoMs: trabajo, videoMs: gpu }, frena: queFrena({ fps, trabajo, gpu: gpu ?? undefined, hz: hz ?? undefined }),
     pipelines: { ...pipelinesMedida, ms: Math.round(pipelinesMedida.ms), msShaders: Math.round(pipelinesMedida.msShaders) },
+    // §115: el perfil de la tarjeta: los ms de cada pasada (las 15 más caras) y si se pudo medir
+    ...(perfilGpu ? { perfilTarjeta: { marcas: perfilGpu.conMarcas, estado: window.mkwEstado.perfilEstado || null, fallo: perfilGpu.fallo,
+      pasadasCaras: perfilGpu.tiempos().slice(0, 15).map(t => `#${t.n} ${t.tam}${t.etiqueta ? ' «' + t.etiqueta + '»' : ''}: ${t.ms} ms, ${t.dibujos} dibujos (×${t.veces})`) } } : {}),
     // un renglón por segundo: «s · fps · juego ms · video ms · disco ms · pipelines nuevos (ms) · dónde»
     porSegundo: h.map(x => `${x.s}s ${x.fps}fps juego${x.juego}` + (x.video === null ? '' : ` video${x.video}`) + (x.disco ? ` disco${x.disco}` : '') +
-      (x.pip ? ` pip${x.pip}(${x.pipMs}ms)` : '') + (x.shaders ? ` sh${x.shaders}` : '') + (x.lugar ? ` ${x.lugar}` : '')),
+      (x.pip ? ` pip${x.pip}(${x.pipMs}ms)` : '') + (x.shaders ? ` sh${x.shaders}` : '') +
+      (x.pasadas !== undefined ? ` pasadas${x.pasadas} dib${x.dibujos} kb${x.kb} cop${x.copias}` : '') + (x.lugar ? ` ${x.lugar}` : '')),
     ...(gpu === null ? { nota: 'sin medida de la tarjeta: prende «Mostrar qué frena» en Avanzado → Gráficos y recarga' } : {}),
   };
 }
 window.mkwInformeRendimiento = informeRendimiento;   // (para las pruebas)
+// §115: «🔬 Perfilar la tarjeta de video»: se recarga con las marcas de tiempo de la tarjeta, mide 20 s de carrera y queda
+// en el informe (después se apaga solo)
+$('perfilarGpu')?.addEventListener('click', () => {
+  try { localStorage.setItem('mkw.perfilGpu', '1'); const g = leerGraficos(); if (!g.verDetalle) guardarGraficos({ ...g, verDetalle: true }); } catch {}
+  location.reload();
+});
 $('copiarRendimiento')?.addEventListener('click', async () => {
   const texto = JSON.stringify(informeRendimiento(), null, 1);
   $('informeRendimiento').hidden = false; $('informeRendimiento').textContent = texto;
@@ -868,6 +885,7 @@ const inicio = crearInicio({
   ocupado: () => document.body.classList.contains('cajon-abierto') || !!document.querySelector('dialog[open]') ||
     aLaVista('editorMii') || aLaVista('elegirPista'),
   alElegir: que => elegirInicio(que),
+  multiEnObra: parametros.get('multi') !== '1',     // §116: Multiplayer «trabajando para usted» (?multi=1 = como antes)
 });
 window.mkwInicio = inicio;
 function mostrarInicio() {
@@ -2183,7 +2201,7 @@ async function arrancar() {
     const trabajo = dc ? ((dt - (ahora.espera - antes.espera)) / dc) : 0;
     const desde = antes.c;                     // cuadro con que empezó este segundo de medición
     ahora.disco = msEsperaDisco;
-    ahora.pip = antes.pip;                   // (se pone al día abajo, con el historial)
+    ahora.pip = antes.pip; ahora.pg = antes.pg;   // (lo del segundo anterior: se ponen al día abajo, con el historial)
     const esperaDiscoSeg = msEsperaDisco - (antes.disco || 0);   // ms de este segundo esperando el disco
     antes = ahora;
     Object.assign(window.mkwEstado, { cuadros: ahora.c, fps, trabajo });
@@ -2198,9 +2216,24 @@ async function arrancar() {
       lugar = et === 0 ? 'presentación' : et === 1 ? 'cuenta' : et === 2 ? 'carrera' : et >= 3 ? 'fin' : 'menú';
     } catch {}
     const g1 = gpuReciente(1000);
+    // (§115: por cuadro, lo que se le pidió a la tarjeta este segundo)
+    const pg = perfilGpu?.foto(), pgAntes = antes.pg;
+    ahora.pg = pg;
+    const porCuadro = (k, div = 1) => (pg && pgAntes && dc ? Math.round((pg[k] - pgAntes[k]) / dc / div) : undefined);
+    // (§115: los tiempos por pasada se miden 20 s de carrera, una vez, y se apagan solos)
+    if (perfilGpu && PERFIL_TIEMPOS) {
+      const p = window.mkwEstado.perfilEstado || (window.mkwEstado.perfilEstado = { desde: 0, listo: false });
+      if (!p.listo && lugar === 'carrera' && !p.desde) { p.desde = performance.now(); p.prendido = perfilGpu.medirTiempos(true); }
+      if (!p.listo && p.desde && performance.now() - p.desde > 20000) {
+        perfilGpu.medirTiempos(false); p.listo = true;
+        try { localStorage.removeItem('mkw.perfilGpu'); } catch {}
+        nota(`perfil de la tarjeta listo (${perfilGpu.tiempos().length} pasadas distintas)`);
+      }
+    }
     hist.push({ s: Math.round(performance.now() / 1000), fps: Math.round(fps * 10) / 10, juego: Math.round(trabajo * 10) / 10,
       video: g1 === null ? null : Math.round(g1 * 10) / 10, disco: Math.round(esperaDiscoSeg),
-      pip: pip.n + pip.nAsync - pipAntes.n - (pipAntes.nAsync || 0), pipMs: Math.round(pip.ms - pipAntes.ms), shaders: pip.shaders - (pipAntes.shaders || 0), lugar });
+      pip: pip.n + pip.nAsync - pipAntes.n - (pipAntes.nAsync || 0), pipMs: Math.round(pip.ms - pipAntes.ms), shaders: pip.shaders - (pipAntes.shaders || 0), lugar,
+      pasadas: porCuadro('pasadas'), dibujos: porCuadro('dibujos'), kb: porCuadro('bytes', 1024), copias: porCuadro('copias') });
     if (hist.length > 120) hist.shift();
     avisoGpu?.medir({ fps, trabajo, cuadros: ahora.c, esperaDisco: esperaDiscoSeg, oculta: document.hidden, enSala: enSalaGpu });
     $('fps').textContent = `${fps.toFixed(1)} fps`;

@@ -112,7 +112,11 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX, novedadPideCuenta, ordenaNovedades, ordenaEntradas } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX, novedadPideCuenta, ordenaNovedades, ordenaEntradas, SALAS_EN_OBRA } from "./juegos/salon-datos.js";
+/* Las salas «trabajando para usted» (SALAS_EN_OBRA). `?salasObra=0` en la
+   dirección las deja abrir igual, para probarlas mientras se arreglan. */
+const PROBAR_OBRA = /[?&]salasObra=0(&|$)/.test(location.search);
+const salaEnObra = k => (!PROBAR_OBRA && SALAS_EN_OBRA[k]) || null;
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
 import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
@@ -2010,6 +2014,7 @@ function cuidaLaSala(p) {
 async function crear(juego, extra) {
   const u = state.user;
   if (!u) return;
+  if (salaEnObra(juego)) return;                    // «trabajando para usted»: la ficha ya no lo ofrece; esto cierra los demás caminos
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
@@ -2046,6 +2051,7 @@ async function entrar(pid) {
   const sala = state.partida && state.pid === pid ? state.partida : state.salas.find(s => s.id === pid);
   if (sala && sala.juego === "bt3" && !bt3Visible()) return;
   if (sala && sala.juego === "mkw" && !bt3Visible()) return;   // Mario Kart Wii: la misma lista de amigos
+  if (sala && salaEnObra(sala.juego)) return;      // «trabajando para usted»: no se entra
   try {
     await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color });
     ir("#p/" + pid);
@@ -3430,7 +3436,7 @@ const entradaVes = id => entradasVes.solos.find(e => e.id === id) || entradasVes
 function salasAbiertas() {
   if (!state.user) return [];
   const mias = new Set(state.mias.map(x => x.id)), ahora = fb.ahora();
-  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()) && (s.juego !== "mkw" || bt3Visible()));
+  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()) && (s.juego !== "mkw" || bt3Visible()) && !salaEnObra(s.juego));
 }
 
 /* El podio de un juego, en su ficha: es la razón para abrir una sala de
@@ -3463,6 +3469,7 @@ const salon = crearSalon({
   equipos: ops => { if (state.user) abreEquipos({ uid: state.user.uid, formato: ops.formato }); },
   login: id => entrarConGoogle(id),
   crearSala: (k, ops) => crear(k, Object.assign(porOmision(k), ops)),
+  enObra: k => salaEnObra(k),
   entrarSala: pid => entrar(pid)
 });
 
@@ -3575,7 +3582,7 @@ function pintaVestibulo() {
      anuncio viejo es de una partida que alguien dejó a medias sin
      cerrar la pestaña: la base no lo sabe, así que se filtra aquí. */
   const fresco = fb.ahora() - fb.EN_CURSO_FRESCO;
-  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()) && (x.juego !== "mkw" || bt3Visible()));
+  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()) && (x.juego !== "mkw" || bt3Visible()) && !salaEnObra(x.juego));
   $("vesNCurso").textContent = vivas.length;
   $("vesEnCurso").innerHTML = vivas.length ? vivas.map(x => {
     const j = JUEGOS[x.juego] || {};
@@ -3642,6 +3649,19 @@ function pintaPartida() {
       revisaBt3().then(() => { bt3Revisando = false; bt3Revisada = true; if (state.vista === "partida") pintaPartida(); });
       $("jgInvita").innerHTML = '<div class="jg-invita"><b>Comprobando el acceso…</b></div>';
     }
+    return;
+  }
+  /* Una sala de un juego «trabajando para usted» (SALAS_EN_OBRA), abierta
+     por un enlace o desde «mis salas»: solo el cartel, sin el juego (está
+     roto) y con la salida para jugar solo si la hay. */
+  const obra = salaEnObra(p.juego);
+  if (obra) {
+    ambientar(""); desmontaJuego();
+    $("jgTitulo").textContent = (JUEGOS[p.juego] || {}).nombre || "Sala"; $("jgTitulo").style.color = "";
+    for (const id of ["jgMirando", "jgHost", "jgRevancha", "jgFin"]) $(id).innerHTML = "";
+    $("jgInvita").innerHTML = `<div class="jg-invita jg-obra"><b>🚧 Trabajando para usted</b>
+      <span>Las salas de ${escapeHtml((JUEGOS[p.juego] || {}).nombre || "este juego")} están en arreglo: por ahora no se juegan en línea.</span>
+      ${obra.solo ? `<a class="btn" href="${escapeHtml(obra.solo)}">▶ Jugar solo mientras tanto</a>` : ""}</div>`;
     return;
   }
 

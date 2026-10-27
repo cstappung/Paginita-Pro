@@ -598,3 +598,12 @@ there next.
 To check, filter `document.getAnimations()` to `playState === "running"` on
 the lobby. Anything running that is not transform, opacity or filter on HTML
 costs every frame.
+
+## Salas «trabajando para usted» (`SALAS_EN_OBRA`)
+
+A multiplayer game whose rooms are broken can be closed without removing it: list it in `SALAS_EN_OBRA`
+(`salon-datos.js`, `{ juego: { solo: "#ruta" } }`; Mario Kart Wii since 2026-10-27). Its card gets the yellow
+«🚧 Trabajando para usted» tag, its sheet replaces rooms/options/«Abrir sala» with the notice and, when `solo` is set,
+a «▶ Jugar solo» button; `crear()`/`entrar()` refuse it, its open rooms are left out of the lobby, and a room reached by
+a link shows only the notice (`pintaPartida`, without mounting the game). `?salasObra=0` keeps them open for testing.
+Removing the game's line reopens everything.
