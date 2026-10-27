@@ -837,8 +837,8 @@
      ampliaciones van de la más vieja a la más nueva, y una carta nueva
      siempre se agrega al final del catálogo. Con la lista vacía, todos los
      sobres ven todo. */
-  // ¡Al publicar, `hasta` = la hora del push y unos minutos más (nunca antes: un sobre ya comprado cambiaría)!
-  const AMPLIACIONES = [{ hasta: 1792890077010, n: 648 }];
+  // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);

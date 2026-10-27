@@ -15,7 +15,7 @@ export const MOTOR = PM;
 export const RAIZ = "juegos/prodrop/";
 /* El `?v=` del abridor (prodrop.js): el visor del mercado y la plantilla
    del perfil lo usan para compartir la caché. */
-export const PD_V = "pd-48";
+export const PD_V = "pd-49";
 /* La plantilla dibujada por el abridor (modo visor `?plantilla=1`), con las
    cartas de verdad: rareza, desgaste y caja si está graduada. Cada casilla
    va como `o~k.i!at!gr[!id.g.w]` (lo último, si es un re-roll), o vacía. */
