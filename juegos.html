@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610272127"></script>
+<script src="i18n.js?v=202610272130"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -1812,6 +1812,16 @@ try { var t = localStorage.getItem("jg.tema");
 @media (prefers-reduced-motion:reduce){.jg-mz-grande,.jg-mz-autor,.jg-mz-notas-vistas i,.jg-mz-reloj.urge,.jg-mz-chip i.esc,.jg-mz-revela.top .jg-mz-suma{animation:none}}
 /* ---------- Tetris ---------- */
 .jg-portada-tetris{background:radial-gradient(ellipse at center,#1b3b7a,#0a0f24 75%)}
+.jg-portada-typerace{background:radial-gradient(ellipse at 50% 35%,#3a3d45,#16171b 78%)}
+.jg-art-tr{display:flex;flex-direction:column;gap:12px;width:240px;font:500 15px/1.2 'IBM Plex Mono',monospace}
+.jg-art-tr .txt{color:#6f737b;letter-spacing:.02em}
+.jg-art-tr .txt b{color:#e8e6e1;font-weight:500}
+.jg-art-tr .txt i{font-style:normal;color:#e8e6e1;border-right:2px solid #e2b714;animation:jgTrLate 1s step-end infinite}
+.jg-art-tr .pista{position:relative;height:72px;background:repeating-linear-gradient(#ffffff00 0 22px,#ffffff22 22px 24px)}
+.jg-art-tr .pista i{position:absolute;left:calc(var(--a)*88%);font-style:normal;font-size:20px;line-height:24px;transform:scaleX(-1)}
+.jg-art-tr .pista i:nth-child(2){top:24px}.jg-art-tr .pista i:nth-child(3){top:48px}
+.jg-art-tr .ppm{align-self:flex-end;color:#e2b714;font-weight:600;font-size:22px}
+@keyframes jgTrLate{50%{border-color:transparent}}
 .jg-art-tt{position:relative;display:grid;grid-template-columns:repeat(6,16px);gap:2px}
 .jg-art-tt i{width:16px;height:16px;border-radius:2px;box-shadow:inset 2px 2px 0 #fff5,inset -2px -2px 0 #0004}
 .jg-art-tt i.p-i{background:#2fd3e8}.jg-art-tt i.p-j{background:#3b6cf6}.jg-art-tt i.p-l{background:#f59a23}.jg-art-tt i.p-o{background:#f5d432}.jg-art-tt i.p-s{background:#46d160}.jg-art-tt i.p-t{background:#b04ee8}.jg-art-tt i.p-z{background:#f0455a}.jg-art-tt i[class=""]{box-shadow:none}
@@ -2861,6 +2871,45 @@ html:has(.jg-reglas-capa) .rp-fab{display:none}
    a la regla clara sin tocarla: el tema claro sigue siendo el de
    siempre, línea por línea.
    ============================================================ */
+/* Type Race: siempre a oscuras, como Monkeytype (igual que el pozo del
+   Tetris), así que no necesita gemelo en el bloque oscuro. */
+.jg-tr{background:#25272c;border-radius:14px;padding:0 0 18px;color:#e8e6e1;--tr-fondo:#25272c;--tr-texto:#e8e6e1;--tr-tenue:#6f737b;--tr-acento:#e2b714;--tr-mal:#f0616d}
+:root .jg-tr .jg-barra{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;background:#1e2024;border:0;border-bottom:1px solid #ffffff12;border-radius:14px 14px 0 0;color:#e8e6e1}
+:root .jg-tr .jg-tablero{background:transparent;border:0;padding:18px 22px 4px}
+.jg-tr-ajustes{display:flex;flex-wrap:wrap;gap:4px 10px;color:#8b8f97;font:500 12px 'IBM Plex Mono',monospace}
+.jg-tr-ajustes span+span::before{content:"·";margin-right:10px;color:#4a4d54}
+.jg-tr-reloj{font:600 18px 'IBM Plex Mono',monospace;color:#e2b714;min-width:3.5em;text-align:right}
+.jg-tr-reloj.urge{color:#f0616d;animation:jgMzLate .5s ease-in-out infinite alternate}
+.jg-tr-pista{display:flex;flex-direction:column;gap:6px;margin-bottom:22px;width:100%}
+.jg-tr-carril{display:grid;grid-template-columns:minmax(60px,110px) 1fr 92px;align-items:center;gap:10px;font:500 13px 'IBM Plex Mono',monospace}
+.jg-tr-carril .nom{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b9b6ae}
+.jg-tr-carril.yo .nom{color:#e2b714;font-weight:600}
+.jg-tr-carril.fuera{opacity:.4}
+.jg-tr-carril .via{position:relative;height:38px;border-bottom:2px dashed #ffffff1c;margin-right:26px}
+.jg-tr-carril .meta{position:absolute;right:-26px;bottom:4px;font-size:18px}
+.jg-tr-carril .auto{position:absolute;bottom:3px;left:calc(var(--a,0) * (100% - 32px));transition:left .45s cubic-bezier(.3,.7,.4,1)}
+.jg-tr-carril .cara{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--c);border:2px solid var(--c);color:#17181b;font:700 14px system-ui,sans-serif;box-shadow:0 2px 8px #0008}
+.jg-tr-carril .cara img{width:100%;height:100%;object-fit:cover}
+.jg-tr-carril .humo{position:absolute;right:100%;top:50%;width:0;height:3px;margin-top:-1px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--c));opacity:.7;transition:width .3s}
+.jg-tr-carril.corre .humo{width:28px}
+.jg-tr-carril.llego .cara{box-shadow:0 0 0 3px #e2b71466,0 2px 8px #0008}
+.jg-tr-carril .dat{text-align:right;color:#e8e6e1;white-space:nowrap}
+.jg-tr-zona{position:relative;min-height:170px;width:100%}
+.jg-tr-vivo{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;min-height:1.6em;margin-bottom:8px;font:500 14px 'IBM Plex Mono',monospace;color:#8b8f97}
+.jg-tr-vivo b{color:#e2b714;font-size:20px;font-weight:600}
+.jg-tr-vivo small{color:#8b8f97}
+.jg-tr-hecho{color:#e8e6e1}
+.jg-tr.mirando .jg-tr-caja,.jg-tr.espera .jg-tr-caja{opacity:.35;pointer-events:none}
+.jg-tr.mirando.espera .jg-tr-caja{opacity:0}
+.jg-tr.cuenta .tr-velo,.jg-tr.espera .tr-velo,.jg-tr.mirando .tr-velo{opacity:0}
+.jg-tr-cartel{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.jg-tr-cartel b{font:800 92px/1 system-ui,sans-serif;color:#f0616d;text-shadow:0 6px 24px #000a;animation:jgTrCuenta .9s ease-out both}
+.jg-tr-cartel b.ya{color:#4ade80}
+.jg-tr-cartel .esp{background:#1e2024;border:1px solid #ffffff18;border-radius:10px;padding:10px 16px;font:500 14px system-ui,sans-serif;color:#e8e6e1}
+@keyframes jgTrCuenta{from{transform:scale(1.7);opacity:0}30%{transform:scale(1);opacity:1}}
+@media(max-width:600px){.jg-tr .jg-tablero{padding:14px 12px 4px}.jg-tr-carril{grid-template-columns:52px 1fr 70px;font-size:11px}.jg-tr-cartel b{font-size:64px}}
+@media(prefers-reduced-motion:reduce){.jg-tr-carril .auto{transition:none}.jg-tr-cartel b{animation:none}}
+
 html[data-tema=oscuro]{
   color-scheme:dark;
   --jg-ink:#ebe7f5;--jg-muted:#9d96ad;
@@ -6971,6 +7020,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610272127"></script>
+<script src="juegos-app.js?v=202610272130"></script>
 </body>
 </html>
