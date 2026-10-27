@@ -106,6 +106,7 @@ const FUT_PAIS = {
   SCO: 'Escocia', WAL: 'Gales', NIR: 'Irlanda del Norte', IE: 'Irlanda', AR: 'Argentina', IT: 'Italia', CM: 'Camerún', SI: 'Eslovenia',
   GH: 'Ghana', JP: 'Japón', CZ: 'Chequia', SK: 'Eslovaquia', GR: 'Grecia', NO: 'Noruega', EC: 'Ecuador', HU: 'Hungría', UZ: 'Uzbekistán',
   SN: 'Senegal', DZ: 'Argelia', US: 'Estados Unidos', GE: 'Georgia',
+  AM: 'Armenia', AT: 'Austria', CH: 'Suiza', CO: 'Colombia', DO: 'República Dominicana', GN: 'Guinea', MX: 'México', RS: 'Serbia', RU: 'Rusia', XK: 'Kosovo',
 };
 // la bandera es una imagen (flags/<país>.png): el emoji no se ve como bandera en Windows, solo las dos letras
 const bandera = cc => `flags/${cc.toLowerCase()}.png`;
@@ -267,11 +268,12 @@ function frontHTML(c, lazy) {
   // fútbol: la foto entera y abajo el nombre con el tipo (Base), sin rareza
   // fútbol: la foto entera y abajo el nombre con su rareza; los efectos crecen con ella
   if (M.esFutbol(c.col)) {
-    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}" style="--accent:${accentOf(c)}">
+    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}${c.especial ? ' especial esp-' + c.especial : ''}" style="--accent:${accentOf(c)}">
       <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
       ${c.tier >= 2 ? `<div class="holo"><img src="${c.img}" alt="" draggable="false"${ld}></div><div class="glitter"></div>` : ''}
       ${c.tier >= 1 ? '<div class="sweep"></div>' : ''}<div class="glare"></div>
       <div class="fu-top"><span class="fu-pos" title="${c.posiciones.map(p => M.PUESTO[p]).join(' / ')}">${c.posiciones.join(' · ')}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
+      ${c.cinta ? `<span class="fu-cinta">${c.cinta}</span>` : ''}
       ${wearHTML(c)}
       <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
       <i class="fu-marco"></i>
@@ -731,7 +733,7 @@ const TEAR_Y = 13; // % de la altura del sobre
 const SKIN = {
   profes: { badge: 'SERIE 01', sub: 'DIE COLLECTION', meta: '5 CARTAS · EDICIÓN HOLO' },
   comp: { badge: 'SERIE 02', sub: 'COMPONENTES', meta: '5 CARTAS · EDICIÓN PCB' },
-  futbol: { badge: 'SERIE 03', sub: 'FÚTBOL', meta: '5 CARTAS · MADRID, BARÇA Y PREMIER' },
+  futbol: { badge: 'SERIE 03', sub: 'FÚTBOL', meta: 'ESPECIALES · TIEMPO LIMITADO' },
   futbolplus: { badge: 'SERIE 03 · PLUS', sub: 'FÚTBOL PLUS', meta: 'ÉPICA ASEGURADA · 5 CARTAS' },
 };
 /* Los sobres de fútbol llevan siempre los mismos tres de portada, los más
@@ -739,12 +741,14 @@ const SKIN = {
    centro], como los pinta `skin-fan`. `hub` es el acceso «Sobres de Fútbol».
    Los demás sobres sacan tres cartas buenas al azar. */
 const PORTADA = {
-  futbol: [['barcelona', 'lamine-yamal'], ['realmadrid', 'bellingham'], ['realmadrid', 'mbappe']],
+  futbol: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-mvp']],
   futbolplus: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
-  hub: [['mancity', 'erling-haaland'], ['barcelona', 'lamine-yamal'], ['realmadrid', 'mbappe']],
+  hub: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-mvp']],
 };
+// una carta de la portada: por jugador (`club-id`) o, si es una especial, por su archivo (`club-id-especial`)
+const cartaDePortada = (club, id) => CARDS.find(c => c.person === club + '-' + id) || CARDS.find(c => c.uid.startsWith(club + '-' + id + '-'));
 const fanDe = (col, tier = 2) => PORTADA[col]
-  ? PORTADA[col].map(([club, id]) => CARDS.find(c => c.person === club + '-' + id))
+  ? PORTADA[col].map(([club, id]) => cartaDePortada(club, id))
   : CARDS.filter(c => c.tier >= tier && c.col === col).sort(() => Math.random() - .5).slice(0, 3);
 function skinHTML(fan, col = coleccion) {
   const k = SKIN[col] || SKIN.profes;
@@ -838,7 +842,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Todos los jugadores: Real Madrid, Barça y el Big Six inglés, una carta por jugador. Su rareza sale de su media',
+  futbol: 'Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico y Harry Kane · Balón de Oro. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -859,7 +863,7 @@ function eligeSobre(menu = 'todos') {
   document.body.classList.toggle('menu-futbol', menu === 'futbol');
   $('#chTit').textContent = menu === 'futbol' ? '⚽ Sobres de Fútbol' : 'Elige tu sobre';
   $('#chSub').textContent = menu === 'futbol'
-    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça y la Premier. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para ⚽ Mi plantilla y el re-roll.'
+    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para ⚽ Mi plantilla y el re-roll.'
     : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Un sobre gratis cada 6 horas.';
   $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
@@ -878,9 +882,9 @@ function eligeSobre(menu = 'todos') {
     const todas = M.POR_COL.futbol, tengo = todas.filter(c => col[c.uid]).length;
     const fan = fanDe('hub');
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
-      <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">${futbolistas.length} SOBRES</i></span>
+      <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Real Madrid, Barça y el Big Six: el sobre normal y el Plus, con todos los jugadores</small>
+      <small class="ch-temas">Cartas especiales por tiempo limitado: Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro. Y el sobre normal y el Plus con todos los jugadores</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -2021,7 +2025,7 @@ function pintaCompra() {
 /* El tip del sobre de fútbol: qué tan seguido sale cada rareza y qué media
    es cada una. Sale de los mismos pesos que el motor (los de su colección). */
 function tipFutbol() {
-  const P = M.POOL[coleccion], w = P.w, n = P.map(l => l.length), tot = n.reduce((a, b) => a + b, 0), E = P.esperado, plus = !!P.ultima;
+  const P = M.poolDe(M.SOBRE[coleccion].prefijo, ahora()), w = P.w, n = P.map(l => l.length), tot = n.reduce((a, b) => a + b, 0), E = P.esperado, plus = !!P.ultima;
   const pct = x => `${(x * 100).toFixed(1).replace('.', ',').replace(',0', '')} %`;
   const porCarta = w.map(x => x / 10000);
   // la quinta: rara o mejor (normal) o, en el Plus, épica o mejor con sus propios pesos
@@ -2044,11 +2048,18 @@ function tipFutbol() {
     <p>Por carta${plus ? ' (las cuatro primeras)' : ''}: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b> · <b>Legendaria ${pct(porCarta[3])}</b>.
       ${quintaTxt}</p>
     <p>${epicaTxt} El ${pct(pD)} son god packs: cinco Épicas o mejores.</p>
-    <p>Hay ${tot} jugadores (Real Madrid, Barça y el Big Six): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario.</p>
+    <p>Hay ${tot} jugadores (de ${new Set(M.POR_COL.futbol.map(c => c.club)).size} clubes): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario.</p>
     <p class="fu-pronto">⚽ Próximamente, más equipos y ligas en el mismo sobre.</p>`;
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Cartas especiales por tiempo limitado', [
+    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>) y <b>Harry Kane · Balón de Oro</b> (media <b>94</b>): dos legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen el triple de seguido que una legendaria común. Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
+  ]],
+  ['Octubre 2026 · Más clubes de la Champions', [
+    '<b>Siete clubes nuevos</b> en los sobres de fútbol: PSG, Inter, Roma, Napoli, Borussia Dortmund, Como y el Real Betis, con los jugadores de su primer equipo (cada uno con su media de EA SPORTS FC). Salen en el sobre normal y en el Plus; los sobres que ya abriste no cambian.',
+    'Siguen en camino el Atlético de Madrid y el Bayern.',
+  ]],
   ['Octubre 2026 · Un solo catálogo de fútbol', [
     '<b>Fútbol es una sola colección</b>: Real Madrid, Barça y el Big Six (Man United, Man City, Chelsea, Liverpool, Tottenham y Arsenal) en un mismo sobre. El Clásico y la Premier ya no son sobres aparte; los que ya abriste siguen siendo los mismos, y todas esas cartas valen igual en el <b>re-roll</b>, en <b>⚽ Mi plantilla</b> y en tu vitrina.',
     '<b>Dos sobres</b>: el <b>normal</b> (80) y el <b>Plus</b> (160). El Plus trae menos comunes y una <b>Épica o mejor asegurada</b> en la quinta carta. El sobre gratis es del normal.',
@@ -2279,10 +2290,10 @@ function pintaListaPl() {
   const enOnce = new Map();    // jugador -> casilla donde ya está
   pl.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== pl.casilla) enOnce.set(q, j); });
   const hay = Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
-  // una sola copia por jugador (no puede repetirse): la que ya está en el once o, si no, la mejor graduada
+  // una sola copia por carta (el jugador no puede repetirse, pero sus cartas especiales salen aparte): la que ya está en el once o, si no, la mejor graduada
   const unica = new Map();
   for (const cp of hay) {
-    const q = CARDS[cp.id].person, vista = unica.get(q), ya = pl.lista.includes(cp.key);
+    const q = CARDS[cp.id].uid, vista = unica.get(q), ya = pl.lista.includes(cp.key);
     const mejor = !vista || (ya && !pl.lista.includes(vista.key)) || (!pl.lista.includes(vista.key) && ((cp.gr ? 1 : 0) - (vista.gr ? 1 : 0) || cp.g - vista.g) > 0);
     if (mejor) unica.set(q, cp);
   }

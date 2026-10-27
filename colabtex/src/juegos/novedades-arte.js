@@ -346,17 +346,25 @@ function prodrop({ serie1 = false } = {}) {
       <b class="ep-pd-leg">★ LEGENDARIA</b></div>${chispas}</div>`;
 }
 
-/* ---------- PRODROP · Fútbol: la misma mano, con tres futbolistas y la
-   épica al centro. Las fotos del Madrid son recortadas: van sobre un fondo
-   claro (`.ep-fu`), como en el sobre. ---------- */
+/* ---------- PRODROP · Fútbol: la misma mano, con tres cartas de fútbol de
+   verdad: foto, media, nombre y la cinta de las especiales (por tiempo
+   limitado). Las tres son legendarias, con su marco dorado. La media de la
+   izquierda va a la izquierda y las otras a la derecha: la carta de al
+   medio tapa un pedazo de las de los lados, y así las tres se leen. Las
+   medias son las del motor (juegos/prodrop/motor.js; un test las compara). ---------- */
+const CARTAS_FUTBOL = [
+  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 89, cinta: "" },
+  { img: "especiales/realmadrid/mbappe-mvp", nombre: "Mbappé", media: 92, cinta: "MVP DEL CLÁSICO" },
+  { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" }
+];
 function futbol() {
-  const cartas = ["realmadrid/vini-jr", "realmadrid/mbappe", "barcelona/lamine-yamal"];
   const az = azar(31);
   let chispas = "";
   for (let i = 0; i < 12; i++) chispas += `<i class="ep-pd-chispa" style="left:${r1(az() * 100)}%;top:${r1(az() * 100)}%;animation-delay:${r1(-az() * 3)}s"></i>`;
   return `<div class="ep-pd ep-fu" aria-hidden="true"><i class="ep-pd-rayos"></i><i class="ep-pd-halo"></i>
-    <div class="ep-pd-mano">${cartas.map((c, i) => `<span class="ep-pd-carta c${i + 1}"><img src="juegos/prodrop/cards/futbol/${c}.webp" alt="" loading="lazy" decoding="async">${i === 1 ? '<i class="ep-pd-holo"></i>' : ""}</span>`).join("")}
-      <b class="ep-pd-leg">★ ÉPICA</b></div>${chispas}</div>`;
+    <div class="ep-pd-mano">${CARTAS_FUTBOL.map((c, i) => `<span class="ep-pd-carta c${i + 1}"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">${i === 1 ? '<i class="ep-pd-holo"></i>' : ""}
+      <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em></span>`).join("")}
+      <b class="ep-pd-leg">★ LEGENDARIA</b></div>${chispas}</div>`;
 }
 
 /* ---------- FANAL: el farol en la noche y lo que viene a su luz ---------- */

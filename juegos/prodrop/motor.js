@@ -247,9 +247,192 @@
     ["arsenal", "christos-tzolis", "Tzolis", "DEL", 17, "GR"], ["arsenal", "noni-madueke", "Noni Madueke", "DEL", 20, "ENG"],
     ["arsenal", "kai-havertz", "Kai Havertz", "DEL", 29, "DE"]
   ];
+  /* Los clubes de la Champions League 2026-27 que se fueron sumando (misma
+     forma de fila; fotos en `cards/champions/<club>/<id>.webp`). Las fotos
+     son retratos de las webs oficiales de cada club. Una carta nueva va
+     siempre al final y se anota en `AMPLIACIONES`. */
+  const CHAMPIONS = [
+    ["betis", "alvaro-valles", "Álvaro Valles", "POR", 1, "ES"],
+    ["betis", "diego-conde", "Diego Conde", "POR", 13, "ES"],
+    ["betis", "hector-bellerin", "H. Bellerín", "DEF", 2, "ES"],
+    ["betis", "diego-llorente", "Diego Llorente", "DEF", 3, "ES"],
+    ["betis", "natan", "Natan", "DEF", 4, "BR"],
+    ["betis", "marc-bartra", "Marc Bartra", "DEF", 5, "ES"],
+    ["betis", "fran-garcia", "Fran García", "DEF", 11, "ES"],
+    ["betis", "angel-ortiz", "Ángel Ortiz", "DEF", 12, "ES"],
+    ["betis", "valentin-gomez", "Valentín Gómez", "DEF", 16, "AR"],
+    ["betis", "junior-firpo", "Junior Firpo", "DEF", 23, "DO"],
+    ["betis", "f-bernal", "F. Bernal", "DEF", 6, "MX"],
+    ["betis", "pablo-fornals", "Pablo Fornals", "MED", 8, "ES"],
+    ["betis", "iker-losada", "Iker Losada", "MED", 14, "ES"],
+    ["betis", "n-deossa", "N. Deossa", "MED", 18, "CO"],
+    ["betis", "g-lo-celso", "G. Lo Celso", "MED", 20, "AR"],
+    ["betis", "marc-roca", "Marc Roca", "MED", 21, "ES"],
+    ["betis", "isco", "Isco", "MED", 22, "ES"],
+    ["betis", "dani-ceballos", "Dani Ceballos", "MED", 25, "ES"],
+    ["betis", "antony", "Antony", "DEL", 7, "BR"],
+    ["betis", "cucho", "Cucho", "DEL", 9, "CO"],
+    ["betis", "ez-abde", "Ez Abde", "DEL", 10, "MA"],
+    ["betis", "r-riquelme", "R. Riquelme", "DEL", 17, "ES"],
+    ["betis", "troy-parrott", "Troy Parrott", "DEL", 19, "IE"],
+    ["betis", "aitor-ruibal", "Aitor Ruibal", "DEF", 24, "ES"],
+    ["betis", "j-morante", "J. Morante", "MED", 27, "ES"],
+    ["psg", "achraf-hakimi", "Achraf Hakimi", "DEF", 2, "MA"],
+    ["psg", "lucas-beraldo", "Lucas Beraldo", "DEF", 4, "BR"],
+    ["psg", "marquinhos", "Marquinhos", "DEF", 5, "BR"],
+    ["psg", "illia-zabarnyi", "Illia Zabarnyi", "DEF", 6, "UA"],
+    ["psg", "khvicha-kvaratskhelia", "Kvaratskhelia", "DEL", 7, "GE"],
+    ["psg", "fabian-ruiz", "Fabián Ruiz", "MED", 8, "ES"],
+    ["psg", "ferran-torres", "Ferran Torres", "DEL", 9, "ES"],
+    ["psg", "ousmane-dembele", "O. Dembélé", "DEL", 10, "FR"],
+    ["psg", "maghnes-akliouche", "M. Akliouche", "MED", 11, "FR"],
+    ["psg", "lucas-digne", "Lucas Digne", "DEF", 12, "FR"],
+    ["psg", "desire-doue", "Désiré Doué", "DEL", 14, "FR"],
+    ["psg", "vitinha", "Vitinha", "MED", 17, "PT"],
+    ["psg", "lucas-hernandez", "L. Hernández", "DEF", 21, "FR"],
+    ["psg", "mika-godts", "Mika Godts", "DEL", 22, "BE"],
+    ["psg", "senny-mayulu", "Senny Mayulu", "MED", 24, "FR"],
+    ["psg", "nuno-mendes", "Nuno Mendes", "DEF", 25, "PT"],
+    ["psg", "lucas-chevalier", "L. Chevalier", "POR", 30, "FR"],
+    ["psg", "warren-zaire-emery", "W. Zaïre-Emery", "MED", 33, "FR"],
+    ["psg", "matvey-safonov", "Matvey Safonov", "POR", 39, "RU"],
+    ["psg", "willian-pacho", "Willian Pacho", "DEF", 51, "EC"],
+    ["psg", "joao-neves", "João Neves", "MED", 87, "PT"],
+    ["como", "jean-butez", "Jean Butez", "POR", 1, "FR"],
+    ["como", "mauro-vigorito", "Mauro Vigorito", "POR", 22, "IT"],
+    ["como", "robert-sanchez", "Robert Sánchez", "POR", 97, "ES"],
+    ["como", "willy-kambwala", "Willy Kambwala", "DEF", 53, "FR"],
+    ["como", "trevoh-chalobah", "T. Chalobah", "DEF", 99, "ENG"],
+    ["como", "yan-couto", "Yan Couto", "DEF", 27, "BR"],
+    ["como", "jacobo-ramon", "Jacobo Ramón", "DEF", 4, "ES"],
+    ["como", "alex-valle", "Álex Valle", "DEF", 3, "ES"],
+    ["como", "ivan-smolcic", "Ivan Smolčić", "DEF", 28, "HR"],
+    ["como", "marc-oliver-kempf", "Kempf", "DEF", 2, "DE"],
+    ["como", "edoardo-goldaniga", "E. Goldaniga", "DEF", 18, "IT"],
+    ["como", "alberto-dossena", "A. Dossena", "DEF", 13, "IT"],
+    ["como", "samuele-ricci", "Samuele Ricci", "MED", 21, "IT"],
+    ["como", "mattia-liberali", "M. Liberali", "DEL", 30, "IT"],
+    ["como", "luis-milla", "Luis Milla", "MED", 6, "ES"],
+    ["como", "martin-baturina", "M. Baturina", "MED", 20, "HR"],
+    ["como", "lucas-da-cunha", "Lucas Da Cunha", "MED", 7, "FR"],
+    ["como", "nicolas-paz", "Nicolás Paz", "MED", 10, "AR"],
+    ["como", "maxence-caqueret", "M. Caqueret", "MED", 8, "FR"],
+    ["como", "maximo-perrone", "Máximo Perrone", "MED", 5, "AR"],
+    ["como", "adrian-lahdo", "Adrian Lahdo", "MED", 15, "SE"],
+    ["como", "moise-kean", "Moise Kean", "DEL", 90, "IT"],
+    ["como", "jayden-addai", "Jayden Addai", "DEL", 42, "NL"],
+    ["como", "jesus-rodriguez", "J. Rodríguez", "DEL", 17, "ES"],
+    ["como", "assane-diao", "Assane Diao", "DEL", 11, "SN"],
+    ["como", "anastasios-douvikas", "Douvikas", "DEL", 9, "GR"],
+    ["inter", "josep-martinez", "Josep Martínez", "POR", 1, "ES"],
+    ["inter", "raffaele-di-gennaro", "R. Di Gennaro", "POR", 12, "IT"],
+    ["inter", "ivan-provedel", "Ivan Provedel", "POR", 49, "IT"],
+    ["inter", "john-stones", "John Stones", "DEF", 6, "ENG"],
+    ["inter", "manuel-akanji", "Manuel Akanji", "DEF", 25, "CH"],
+    ["inter", "benjamin-pavard", "B. Pavard", "DEF", 28, "FR"],
+    ["inter", "carlos-augusto", "Carlos Augusto", "DEF", 30, "BR"],
+    ["inter", "yann-bisseck", "Yann Bisseck", "DEF", 31, "DE"],
+    ["inter", "federico-dimarco", "F. Dimarco", "DEF", 32, "IT"],
+    ["inter", "alessandro-bastoni", "A. Bastoni", "DEF", 95, "IT"],
+    ["inter", "djed-spence", "Djed Spence", "DEF", 99, "ENG"],
+    ["inter", "aleksandar-stankovic", "Stanković", "MED", 5, "RS"],
+    ["inter", "piotr-zielinski", "P. Zieliński", "MED", 7, "PL"],
+    ["inter", "petar-sucic", "Petar Sučić", "MED", 8, "HR"],
+    ["inter", "luis-henrique", "Luis Henrique", "MED", 11, "BR"],
+    ["inter", "andy-diouf", "Andy Diouf", "MED", 17, "FR"],
+    ["inter", "hakan-calhanoglu", "H. Çalhanoğlu", "MED", 20, "TR"],
+    ["inter", "curtis-jones", "Curtis Jones", "MED", 21, "ENG"],
+    ["inter", "henrikh-mkhitaryan", "Mkhitaryan", "MED", 22, "AM"],
+    ["inter", "nicolo-barella", "Nicolò Barella", "MED", 23, "IT"],
+    ["inter", "marcus-thuram", "Marcus Thuram", "DEL", 9, "FR"],
+    ["inter", "lautaro-martinez", "L. Martínez", "DEL", 10, "AR"],
+    ["inter", "ange-yoan-bonny", "Bonny", "DEL", 14, "FR"],
+    ["inter", "pio-esposito", "Pio Esposito", "DEL", 94, "IT"],
+    ["roma", "santiago-castro", "S. Castro", "DEL", 9, "AR"],
+    ["roma", "donyell-malen", "Donyell Malen", "DEL", 14, "NL"],
+    ["roma", "matias-soule", "Matías Soulé", "DEL", 18, "AR"],
+    ["roma", "paulo-dybala", "Paulo Dybala", "DEL", 21, "AR"],
+    ["roma", "bryan-cristante", "B. Cristante", "MED", 4, "IT"],
+    ["roma", "lorenzo-pellegrini", "L. Pellegrini", "MED", 7, "IT"],
+    ["roma", "marten-de-roon", "Marten de Roon", "MED", 15, "NL"],
+    ["roma", "manu-kone", "Manu Koné", "MED", 17, "FR"],
+    ["roma", "niccolo-pisilli", "N. Pisilli", "MED", 61, "IT"],
+    ["roma", "rodrigo-mora", "Rodrigo Mora", "MED", 86, "PT"],
+    ["roma", "devyne-rensch", "Devyne Rensch", "DEF", 2, "NL"],
+    ["roma", "konstantinos-koulierakis", "Koulierakis", "DEF", 3, "GR"],
+    ["roma", "evan-ndicka", "Evan Ndicka", "DEF", 5, "CI"],
+    ["roma", "nahuel-molina", "Nahuel Molina", "DEF", 20, "AR"],
+    ["roma", "mario-hermoso", "Mario Hermoso", "DEF", 22, "ES"],
+    ["roma", "gianluca-mancini", "G. Mancini", "DEF", 23, "IT"],
+    ["roma", "leonardo-balerdi", "L. Balerdi", "DEF", 26, "AR"],
+    ["roma", "wesley", "Wesley", "DEF", 43, "BR"],
+    ["roma", "daniele-ghilardi", "D. Ghilardi", "DEF", 87, "IT"],
+    ["roma", "pierluigi-gollini", "P. Gollini", "POR", 95, "IT"],
+    ["roma", "mile-svilar", "Mile Svilar", "POR", 99, "RS"],
+    ["napoli", "alex-meret", "Alex Meret", "POR", 1, "IT"],
+    ["napoli", "nikita-contini", "Nikita Contini", "POR", 14, "UA"],
+    ["napoli", "vanja-milinkovic-savic", "V. Milinković", "POR", 32, "RS"],
+    ["napoli", "benoit-badiashile", "B. Badiashile", "DEF", 5, "FR"],
+    ["napoli", "amir-rrahmani", "Amir Rrahmani", "DEF", 13, "XK"],
+    ["napoli", "rafa-marin", "Rafa Marín", "DEF", 16, "ES"],
+    ["napoli", "mathias-olivera", "M. Olivera", "DEF", 17, "UY"],
+    ["napoli", "giovanni-di-lorenzo", "G. Di Lorenzo", "DEF", 22, "IT"],
+    ["napoli", "sam-beukema", "Sam Beukema", "DEF", 31, "NL"],
+    ["napoli", "leonardo-spinazzola", "L. Spinazzola", "DEF", 37, "IT"],
+    ["napoli", "costantino-favasuli", "C. Favasuli", "MED", 2, "IT"],
+    ["napoli", "billy-gilmour", "Billy Gilmour", "MED", 6, "SCO"],
+    ["napoli", "scott-mctominay", "S. McTominay", "MED", 8, "SCO"],
+    ["napoli", "kevin-de-bruyne", "K. De Bruyne", "MED", 11, "BE"],
+    ["napoli", "stanislav-lobotka", "S. Lobotka", "MED", 68, "SK"],
+    ["napoli", "frank-anguissa", "Frank Anguissa", "MED", 99, "CM"],
+    ["napoli", "david-neres", "David Neres", "DEL", 7, "BR"],
+    ["napoli", "rasmus-hjlund", "Rasmus Højlund", "DEL", 19, "DK"],
+    ["napoli", "lorenzo-lucca", "Lorenzo Lucca", "DEL", 20, "IT"],
+    ["napoli", "matteo-politano", "M. Politano", "DEL", 21, "IT"],
+    ["napoli", "antonio-vergara", "A. Vergara", "DEL", 26, "IT"],
+    ["napoli", "alisson-santos", "Alisson Santos", "DEL", 27, "BR"],
+    ["napoli", "noa-lang", "Noa Lang", "DEL", 70, "NL"],
+    ["dortmund", "gregor-kobel", "Gregor Kobel", "POR", 1, "CH"],
+    ["dortmund", "patrick-drewes", "Patrick Drewes", "POR", 30, "DE"],
+    ["dortmund", "alexander-meyer", "A. Meyer", "POR", 33, "DE"],
+    ["dortmund", "waldemar-anton", "Waldemar Anton", "DEF", 3, "DE"],
+    ["dortmund", "nico-schlotterbeck", "Schlotterbeck", "DEF", 4, "DE"],
+    ["dortmund", "ramy-bensebaini", "R. Bensebaini", "DEF", 5, "DZ"],
+    ["dortmund", "joane-gadou", "Joane Gadou", "DEF", 22, "FR"],
+    ["dortmund", "daniel-svensson", "D. Svensson", "DEF", 24, "SE"],
+    ["dortmund", "julian-ryerson", "Julian Ryerson", "DEF", 26, "NO"],
+    ["dortmund", "filippo-mane", "Filippo Mané", "DEF", 39, "IT"],
+    ["dortmund", "jobe-bellingham", "J. Bellingham", "MED", 7, "ENG"],
+    ["dortmund", "felix-nmecha", "Felix Nmecha", "MED", 8, "DE"],
+    ["dortmund", "carney-chukwuemeka", "Chukwuemeka", "MED", 17, "ENG"],
+    ["dortmund", "ethan-nwaneri", "Ethan Nwaneri", "DEL", 18, "ENG"],
+    ["dortmund", "konstantinos-karetsas", "Karetsas", "MED", 19, "GR"],
+    ["dortmund", "marcel-sabitzer", "M. Sabitzer", "MED", 20, "AT"],
+    ["dortmund", "emre-can", "Emre Can", "DEF", 23, "DE"],
+    ["dortmund", "joey-veerman", "Joey Veerman", "MED", 25, "NL"],
+    ["dortmund", "justin-lerma", "Justin Lerma", "MED", 28, "EC"],
+    ["dortmund", "giannis-konstantelias", "Konstantelias", "MED", 45, "GR"],
+    ["dortmund", "serhou-guirassy", "S. Guirassy", "DEL", 9, "GN"],
+    ["dortmund", "maximilian-beier", "M. Beier", "DEL", 14, "DE"],
+    ["dortmund", "fabio-silva", "Fábio Silva", "DEL", 21, "PT"]
+  ];
+  /* Cartas especiales: una versión de un jugador que sale por algo que pasó
+     (aquí, el Clásico). Es el mismo jugador (`person`: no se pone dos veces en
+     el once) pero otra carta (otra foto, otra media, su propia rareza y
+     su cinta). Séptimo elemento: { person, sub, cinta, especial, limitada, peso }.
+     `limitada`: es de tiempo limitado (el texto lo dice; sacarla del pool
+     después es a mano y con una ampliación que no cambie los sobres ya
+     comprados); `peso`: cuántas veces más salen que una legendaria
+     cualquiera. Van al final del catálogo y dentro de una ampliación, como
+     todo lo nuevo. */
+  const ESPECIALES = [
+    ["realmadrid", "mbappe-mvp", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "Real Madrid · MVP del Clásico", cinta: "MVP DEL CLÁSICO", especial: "clasico", limitada: true, peso: 3 }],
+    ["bayern", "harry-kane-balon", "Harry Kane", "DEL", 9, "ENG", { person: "bayern-harry-kane", sub: "Bayern Múnich · Balón de Oro", cinta: "BALÓN DE ORO 2026", especial: "balon", limitada: true, peso: 3 }]
+  ];
   const CLUBES = {
     realmadrid: "Real Madrid", barcelona: "FC Barcelona",
-    manutd: "Manchester United", mancity: "Manchester City", chelsea: "Chelsea", liverpool: "Liverpool", tottenham: "Tottenham", arsenal: "Arsenal"
+    manutd: "Manchester United", mancity: "Manchester City", chelsea: "Chelsea", liverpool: "Liverpool", tottenham: "Tottenham", arsenal: "Arsenal",
+    bayern: "Bayern Múnich", betis: "Real Betis", psg: "Paris Saint-Germain", como: "Como", inter: "Inter", roma: "Roma", napoli: "Napoli", dortmund: "Borussia Dortmund"
   };
 
   /* ---------- la media de cada futbolista ----------
@@ -267,7 +450,7 @@
       "trent": 86, "konate": 86, "cucurella": 84, "carreras": 80, "rudiger": 86,
       "mendy": 81, "dumfries": 84, "bellingham": 90, "camavinga": 83, "valverde": 89,
       "tchouameni": 84, "arda-guler": 81, "bernardo": 84, "vini-jr": 89,
-      "endrick": 77, "mbappe": 91, "rodrygo": 85, "espi": 68, "brahim": 82,
+      "endrick": 77, "mbappe": 91, "mbappe-mvp": 92, "rodrygo": 85, "espi": 68, "brahim": 82,
       "yan-diomande": 66
     },
     barcelona: {
@@ -321,6 +504,59 @@
       "riccardo-calafiori": 78, "myles-lewis-skelly": 78, "martin-odegaard": 87, "eberechi-eze": 83, "mikel-merino": 83,
       "martin-zubimendi": 83, "bruno-guimaraes": 86, "declan-rice": 87, "bukayo-saka": 88, "viktor-gyokeres": 87,
       "christos-tzolis": 80, "noni-madueke": 80, "kai-havertz": 82
+    },
+    betis: {
+      "alvaro-valles": 79, "diego-conde": 77, "hector-bellerin": 74, "diego-llorente": 80, "natan": 78,
+      "marc-bartra": 79, "fran-garcia": 79, "angel-ortiz": 68, "valentin-gomez": 76, "junior-firpo": 75,
+      "f-bernal": 74, "pablo-fornals": 79, "iker-losada": 72, "n-deossa": 75, "g-lo-celso": 82,
+      "marc-roca": 78, "isco": 84, "dani-ceballos": 81, "antony": 81, "cucho": 78,
+      "ez-abde": 77, "r-riquelme": 77, "troy-parrott": 74, "aitor-ruibal": 77, "j-morante": 68
+    },
+    psg: {
+      "achraf-hakimi": 89, "lucas-beraldo": 78, "marquinhos": 87, "illia-zabarnyi": 79, "khvicha-kvaratskhelia": 87,
+      "fabian-ruiz": 85, "ferran-torres": 83, "ousmane-dembele": 90, "maghnes-akliouche": 80, "lucas-digne": 80,
+      "desire-doue": 85, "vitinha": 89, "lucas-hernandez": 81, "mika-godts": 74, "senny-mayulu": 75,
+      "nuno-mendes": 86, "lucas-chevalier": 83, "warren-zaire-emery": 80, "matvey-safonov": 78, "willian-pacho": 86,
+      "joao-neves": 85
+    },
+    como: {
+      "jean-butez": 76, "mauro-vigorito": 64, "robert-sanchez": 78, "willy-kambwala": 72, "trevoh-chalobah": 79,
+      "yan-couto": 77, "jacobo-ramon": 64, "alex-valle": 72, "ivan-smolcic": 72, "marc-oliver-kempf": 73,
+      "edoardo-goldaniga": 72, "alberto-dossena": 73, "samuele-ricci": 78, "mattia-liberali": 65, "luis-milla": 79,
+      "martin-baturina": 78, "lucas-da-cunha": 74, "nicolas-paz": 79, "maxence-caqueret": 77, "maximo-perrone": 73,
+      "adrian-lahdo": 57, "moise-kean": 83, "jayden-addai": 67, "jesus-rodriguez": 74, "assane-diao": 76,
+      "anastasios-douvikas": 73
+    },
+    inter: {
+      "josep-martinez": 75, "raffaele-di-gennaro": 68, "ivan-provedel": 82, "john-stones": 82, "manuel-akanji": 82,
+      "benjamin-pavard": 84, "carlos-augusto": 81, "yann-bisseck": 76, "federico-dimarco": 85, "alessandro-bastoni": 87,
+      "djed-spence": 78, "aleksandar-stankovic": 66, "piotr-zielinski": 80, "petar-sucic": 74, "luis-henrique": 78,
+      "andy-diouf": 75, "hakan-calhanoglu": 86, "curtis-jones": 80, "henrikh-mkhitaryan": 83, "nicolo-barella": 87,
+      "marcus-thuram": 85, "lautaro-martinez": 88, "ange-yoan-bonny": 76, "pio-esposito": 71
+    },
+    roma: {
+      "santiago-castro": 76, "donyell-malen": 79, "matias-soule": 78, "paulo-dybala": 86, "bryan-cristante": 80,
+      "lorenzo-pellegrini": 80, "marten-de-roon": 81, "manu-kone": 79, "niccolo-pisilli": 72, "rodrigo-mora": 76,
+      "devyne-rensch": 74, "konstantinos-koulierakis": 77, "evan-ndicka": 81, "nahuel-molina": 79, "mario-hermoso": 80,
+      "gianluca-mancini": 83, "leonardo-balerdi": 81, "wesley": 77, "daniele-ghilardi": 72, "pierluigi-gollini": 74,
+      "mile-svilar": 82
+    },
+    napoli: {
+      "alex-meret": 82, "nikita-contini": 67, "vanja-milinkovic-savic": 79, "benoit-badiashile": 76, "amir-rrahmani": 83,
+      "rafa-marin": 70, "mathias-olivera": 78, "giovanni-di-lorenzo": 83, "sam-beukema": 78, "leonardo-spinazzola": 78,
+      "costantino-favasuli": 65, "billy-gilmour": 74, "scott-mctominay": 85, "kevin-de-bruyne": 87, "stanislav-lobotka": 83,
+      "frank-anguissa": 82, "david-neres": 81, "rasmus-hjlund": 76, "lorenzo-lucca": 76, "matteo-politano": 81,
+      "antonio-vergara": 65, "alisson-santos": 66, "noa-lang": 80
+    },
+    dortmund: {
+      "gregor-kobel": 86, "patrick-drewes": 71, "alexander-meyer": 75, "waldemar-anton": 82, "nico-schlotterbeck": 85,
+      "ramy-bensebaini": 79, "joane-gadou": 66, "daniel-svensson": 77, "julian-ryerson": 79, "filippo-mane": 62,
+      "jobe-bellingham": 74, "felix-nmecha": 82, "carney-chukwuemeka": 76, "ethan-nwaneri": 76, "konstantinos-karetsas": 70,
+      "marcel-sabitzer": 80, "emre-can": 82, "joey-veerman": 79, "justin-lerma": 64, "giannis-konstantelias": 77,
+      "serhou-guirassy": 87, "maximilian-beier": 79, "fabio-silva": 79
+    },
+    bayern: {
+      "harry-kane-balon": 94
     }
   };
   const mediaDe = (club, id) => MEDIAS[club][id];
@@ -339,7 +575,7 @@
       "carreras": "LI", "rudiger": "DFC", "mendy": "LI", "dumfries": "LD",
       "bellingham": "MC", "camavinga": "MC/LI", "valverde": "MC/LD", "tchouameni": "MC/DFC",
       "arda-guler": "MD/MC", "bernardo": "MC/MD", "vini-jr": "EI/DC", "endrick": "DC/ED",
-      "mbappe": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
+      "mbappe": "DC/EI", "mbappe-mvp": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
       "yan-diomande": "EI/ED"
     },
     barcelona: {
@@ -401,6 +637,67 @@
       "martin-odegaard": "MC", "eberechi-eze": "MC/EI", "mikel-merino": "MC/DC", "martin-zubimendi": "MC",
       "bruno-guimaraes": "MC", "declan-rice": "MC", "bukayo-saka": "ED", "viktor-gyokeres": "DC",
       "christos-tzolis": "EI", "noni-madueke": "ED", "kai-havertz": "DC/MC"
+    },
+    betis: {
+      "alvaro-valles": "POR", "diego-conde": "POR", "hector-bellerin": "LD", "diego-llorente": "DFC",
+      "natan": "DFC", "marc-bartra": "DFC", "fran-garcia": "LI", "angel-ortiz": "LD",
+      "valentin-gomez": "DFC/LI", "junior-firpo": "LI", "f-bernal": "DFC/MC", "pablo-fornals": "MC/MD",
+      "iker-losada": "MC/MD", "n-deossa": "MC", "g-lo-celso": "MC", "marc-roca": "MC",
+      "isco": "MC/MI", "dani-ceballos": "MC", "antony": "ED", "cucho": "DC/MC",
+      "ez-abde": "EI", "r-riquelme": "EI/ED", "troy-parrott": "DC", "aitor-ruibal": "LD/ED",
+      "j-morante": "MC"
+    },
+    psg: {
+      "achraf-hakimi": "LD", "lucas-beraldo": "DFC/LI", "marquinhos": "DFC", "illia-zabarnyi": "DFC",
+      "khvicha-kvaratskhelia": "EI/ED", "fabian-ruiz": "MC", "ferran-torres": "EI/ED", "ousmane-dembele": "DC/ED",
+      "maghnes-akliouche": "MD/MC", "lucas-digne": "LI", "desire-doue": "ED/EI", "vitinha": "MC",
+      "lucas-hernandez": "DFC/LI", "mika-godts": "EI", "senny-mayulu": "MC", "nuno-mendes": "LI",
+      "lucas-chevalier": "POR", "warren-zaire-emery": "MC", "matvey-safonov": "POR", "willian-pacho": "DFC",
+      "joao-neves": "MC"
+    },
+    como: {
+      "jean-butez": "POR", "mauro-vigorito": "POR", "robert-sanchez": "POR", "willy-kambwala": "DFC",
+      "trevoh-chalobah": "DFC/LD", "yan-couto": "LD", "jacobo-ramon": "DFC", "alex-valle": "LI",
+      "ivan-smolcic": "LD", "marc-oliver-kempf": "DFC", "edoardo-goldaniga": "DFC", "alberto-dossena": "DFC",
+      "samuele-ricci": "MC", "mattia-liberali": "ED/MD", "luis-milla": "MC", "martin-baturina": "MC",
+      "lucas-da-cunha": "MC", "nicolas-paz": "MC", "maxence-caqueret": "MC", "maximo-perrone": "MC",
+      "adrian-lahdo": "MC", "moise-kean": "DC", "jayden-addai": "ED", "jesus-rodriguez": "EI/ED",
+      "assane-diao": "EI/ED", "anastasios-douvikas": "DC"
+    },
+    inter: {
+      "josep-martinez": "POR", "raffaele-di-gennaro": "POR", "ivan-provedel": "POR", "john-stones": "DFC/LD",
+      "manuel-akanji": "DFC", "benjamin-pavard": "DFC", "carlos-augusto": "LI/DFC", "yann-bisseck": "DFC",
+      "federico-dimarco": "LI", "alessandro-bastoni": "DFC", "djed-spence": "LD/LI", "aleksandar-stankovic": "MC/DFC",
+      "piotr-zielinski": "MC", "petar-sucic": "MC", "luis-henrique": "MD/MI", "andy-diouf": "MC",
+      "hakan-calhanoglu": "MC", "curtis-jones": "MC", "henrikh-mkhitaryan": "MC", "nicolo-barella": "MC",
+      "marcus-thuram": "DC", "lautaro-martinez": "DC", "ange-yoan-bonny": "DC/MC", "pio-esposito": "DC"
+    },
+    roma: {
+      "santiago-castro": "DC", "donyell-malen": "ED/EI", "matias-soule": "ED/MC", "paulo-dybala": "DC/MC",
+      "bryan-cristante": "MC", "lorenzo-pellegrini": "MC", "marten-de-roon": "MC", "manu-kone": "MC",
+      "niccolo-pisilli": "MC", "rodrigo-mora": "MC/EI", "devyne-rensch": "LD/DFC", "konstantinos-koulierakis": "DFC",
+      "evan-ndicka": "DFC", "nahuel-molina": "LD", "mario-hermoso": "DFC", "gianluca-mancini": "DFC",
+      "leonardo-balerdi": "DFC", "wesley": "LD", "daniele-ghilardi": "DFC", "pierluigi-gollini": "POR",
+      "mile-svilar": "POR"
+    },
+    napoli: {
+      "alex-meret": "POR", "nikita-contini": "POR", "vanja-milinkovic-savic": "POR", "benoit-badiashile": "DFC",
+      "amir-rrahmani": "DFC", "rafa-marin": "DFC", "mathias-olivera": "LI", "giovanni-di-lorenzo": "LD/DFC",
+      "sam-beukema": "DFC", "leonardo-spinazzola": "LI", "costantino-favasuli": "MD/LD", "billy-gilmour": "MC",
+      "scott-mctominay": "MC", "kevin-de-bruyne": "MC", "stanislav-lobotka": "MC", "frank-anguissa": "MC",
+      "david-neres": "EI", "rasmus-hjlund": "DC", "lorenzo-lucca": "DC", "matteo-politano": "ED",
+      "antonio-vergara": "ED/MC", "alisson-santos": "EI/ED", "noa-lang": "EI"
+    },
+    dortmund: {
+      "gregor-kobel": "POR", "patrick-drewes": "POR", "alexander-meyer": "POR", "waldemar-anton": "DFC",
+      "nico-schlotterbeck": "DFC", "ramy-bensebaini": "LI/DFC", "joane-gadou": "DFC", "daniel-svensson": "LI/MC",
+      "julian-ryerson": "LD/LI", "filippo-mane": "DFC/LD", "jobe-bellingham": "MC", "felix-nmecha": "MC",
+      "carney-chukwuemeka": "MC", "ethan-nwaneri": "ED/MC", "konstantinos-karetsas": "MC/ED", "marcel-sabitzer": "MC",
+      "emre-can": "DFC/MC", "joey-veerman": "MC", "justin-lerma": "MI/MC", "giannis-konstantelias": "MC/ED",
+      "serhou-guirassy": "DC", "maximilian-beier": "DC/ED", "fabio-silva": "DC/EI"
+    },
+    bayern: {
+      "harry-kane-balon": "DC"
     }
   };
   const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
@@ -492,18 +789,22 @@
     });
   }));
   const BASE_FUT = CARDS.length;
-  const cartaFutbol = (col, carpeta, [club, id, name, , dorsal, pais]) => {
+  const cartaFutbol = (col, carpeta, [club, id, name, , dorsal, pais, extra = {}]) => {
     const n = CARDS.length, media = mediaDe(club, id), tier = tierDeMedia(media), t = TIERS[tier];
     const posiciones = posicionesDe(club, id), pos = POS_LINEA[posiciones[0]];
     CARDS.push({
-      n, uid: club + "-" + id + "-" + t.key, person: club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
-      col, liga: carpeta, peso: 1, tier, club, pos, posiciones, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
-      sub: CLUBES[club], acc: t.color
+      n, uid: club + "-" + id + "-" + t.key, person: extra.person || club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
+      col, liga: carpeta, peso: extra.peso || 1, tier, club, pos, posiciones, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
+      sub: extra.sub || CLUBES[club], acc: t.color,
+      ...(extra.especial ? { especial: extra.especial, cinta: extra.cinta, limitada: !!extra.limitada } : {})
     });
   };
   FUTBOLISTAS.forEach(j => cartaFutbol("futbol", "futbol", j));
   const BASE_PREM = CARDS.length;
   PREMIER.forEach(j => cartaFutbol("futbol", "premier", j));
+  const BASE_CHAMP = CARDS.length;   // = 648: las de antes no se mueven
+  CHAMPIONS.forEach(j => cartaFutbol("futbol", "champions", j));
+  ESPECIALES.forEach(j => cartaFutbol("futbol", "especiales", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
@@ -522,15 +823,33 @@
     legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp),
     futbol: pool(POR_COL.futbol, PESOS_FUTBOL.normal), futbolplus: pool(POR_COL.futbol, PESOS_FUTBOL.plus, PESOS_FUTBOL.ultimaPlus),
     // los de antes: las mismas listas y pesos de cuando se abrieron esos sobres
-    futbol1: pool(CARDS.slice(BASE_FUT, BASE_PREM), PESOS_FUTBOL.v1.futbol), premier1: pool(CARDS.slice(BASE_PREM), PESOS_FUTBOL.v1.premier)
+    futbol1: pool(CARDS.slice(BASE_FUT, BASE_PREM), PESOS_FUTBOL.v1.futbol), premier1: pool(CARDS.slice(BASE_PREM, BASE_CHAMP), PESOS_FUTBOL.v1.premier)
   };
   const POR_TIER = POOL.profes;
   /* De qué colección es un sobre o un re-roll, por su clave. Las claves
      de push empiezan con «-», así que lo de antes nunca lleva prefijo. */
   const coleccionDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : (p === "f" || p === "e" || p === "g" || p === "h") ? "futbol" : "profes"; };
-  const poolDe = clave => {
+  /* Ampliaciones del catálogo de fútbol. Un sobre `g` o `h` sale del
+     catálogo entero, así que agregar jugadores cambiaría los sobres que ya
+     se abrieron. Para que no pase, cada ampliación anota cuántas cartas
+     había (`n`: las de id menor) y hasta cuándo (`hasta`, hora del servidor
+     del sobre): un sobre comprado antes sigue viendo solo esas. Las
+     ampliaciones van de la más vieja a la más nueva, y una carta nueva
+     siempre se agrega al final del catálogo. Con la lista vacía, todos los
+     sobres ven todo. */
+  // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }];
+  const memoPool = {};
+  function poolFutbol(plus, at) {
+    const v = AMPLIACIONES.find(x => at < x.hasta);
+    if (!v) return plus ? POOL.futbolplus : POOL.futbol;
+    const k = (plus ? "h" : "g") + v.n;
+    return memoPool[k] || (memoPool[k] = pool(POR_COL.futbol.filter(c => c.n < v.n), plus ? PESOS_FUTBOL.plus : PESOS_FUTBOL.normal, plus ? PESOS_FUTBOL.ultimaPlus : null));
+  }
+  // `at`: la hora del sobre o del re-roll (sin ella, el catálogo de hoy)
+  const poolDe = (clave, at = Infinity) => {
     const p = String(clave)[0];
-    return p === "c" ? POOL.comp : p === "f" ? POOL.futbol1 : p === "e" ? POOL.premier1 : p === "g" ? POOL.futbol : p === "h" ? POOL.futbolplus : p === "p" ? POOL.profes : POOL.legado;
+    return p === "c" ? POOL.comp : p === "f" ? POOL.futbol1 : p === "e" ? POOL.premier1 : p === "g" ? poolFutbol(false, at) : p === "h" ? poolFutbol(true, at) : p === "p" ? POOL.profes : POOL.legado;
   };
   // qué sobre de la tienda es (para pintarlo al retomar uno): los de antes de fútbol cuentan como el sobre de fútbol
   const sobreDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : p === "h" ? "futbolplus" : (p === "f" || p === "e" || p === "g") ? "futbol" : "profes"; };
@@ -630,7 +949,7 @@
     const k = uid + "|" + clave + "|" + at;
     if (memo.has(k)) return memo.get(k);
     const h = sha256("prodrop:" + k), r = generador(h.slice(0, 4));
-    const dios = r.entero(10000) < DIOS, P = poolDe(clave);
+    const dios = r.entero(10000) < DIOS, P = poolDe(clave, at);
     const usadas = new Set(), cartas = [];
     let leyenda = false;
     for (let i = 0; i < 5; i++) {
@@ -751,7 +1070,7 @@
     const k = uid + "|" + clave + "|" + at + "|" + tier + "|" + notas.join(",");
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
-    const P = poolDe(clave), posibles = P[Math.min(P.tope, tier + saltoReroll(k, at, tier))];
+    const P = poolDe(clave, at), posibles = P[Math.min(P.tope, tier + saltoReroll(k, at, tier))];
     const c = elige(r, posibles, P.uniforme);
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
@@ -797,8 +1116,8 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, MEDIAS_MIN, coincide, esFutbol, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
-    coleccionDe, poolDe, sobreDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, MEDIAS_MIN, coincide, esFutbol, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
   };

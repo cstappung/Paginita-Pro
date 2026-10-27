@@ -1337,6 +1337,15 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .futbol.rare { --marco: 2.2cqw; --marco-bg: linear-gradient(135deg, #e9f8ff, #5cc8ff 30%, #1b6fb8 55%, #bfe9ff 75%, #3a9be0); }
 .futbol.epic { --marco: 2.4cqw; --marco-bg: linear-gradient(135deg, #f3dcff, #c26bff 35%, #5b1d9a 60%, #e0b3ff); }
 .futbol.legend { --marco: 2.6cqw; --marco-bg: linear-gradient(135deg, #fff6c8, #ffcc3d 30%, #a86a00 55%, #ffe58a 75%, #d99a10); }
+/* cartas especiales: marco dorado y blanco que brilla, y una cinta con lo que pasó */
+.futbol.especial { --marco: 3.2cqw; --marco-bg: linear-gradient(135deg, #fffbe6, #ffd23d 22%, #fff 40%, #c58a00 58%, #ffe58a 78%, #fff6c8); box-shadow: 0 0 0 .6cqw #ffe58a66, 0 0 7cqw #ffcc3d88; }
+.futbol.especial .fu-marco { background-size: 220% 220%; animation: espBrillo 3.2s linear infinite; }
+@keyframes espBrillo { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+.fu-cinta {
+  position: absolute; left: 4.5cqw; top: 15.5cqw; z-index: 2; max-width: 56cqw;
+  font: 800 3.1cqw/1 "Barlow Condensed", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #3a2a00;
+  background: linear-gradient(90deg, #ffe58a, #ffcc3d 60%, #e0a21a); padding: 1.1cqw 2.6cqw; border-radius: 1cqw; box-shadow: 0 .6cqw 1.6cqw #0008;
+}
 /* la rara se nota: fondo azul hielo en las fotos recortadas y un barrido más fuerte */
 .full.futbol.rare { background: radial-gradient(circle at 50% 30%, #ffffff 0, #bfe6ff 45%, #3d8fd6 100%); }
 .futbol.rare .sweep::before { mix-blend-mode: screen; opacity: .55; width: 45%; animation-duration: 3s; }
@@ -1354,8 +1363,8 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .skin-futbol .skin-fan img:nth-child(2) { transform: translate(40%, 8%) rotate(20deg); }
 
 /* la Premier: las fotos ya traen el fondo del club, así que van a sangre (como las del Barça) */
-.full.futbol.premier { background: #0d0d14; }
-.full.futbol.premier > img, .full.futbol.premier .holo img { object-fit: cover; object-position: 50% 18%; }
+.full.futbol.premier, .full.futbol.champions, .full.futbol.especiales { background: #0d0d14; }
+.full.futbol.premier > img, .full.futbol.premier .holo img, .full.futbol.champions > img, .full.futbol.champions .holo img, .full.futbol.especiales > img, .full.futbol.especiales .holo img { object-fit: cover; object-position: 50% 18%; }
 /* el envoltorio de la Premier: violeta con una cinta verde */
 .skin-futbolplus {
   background:
