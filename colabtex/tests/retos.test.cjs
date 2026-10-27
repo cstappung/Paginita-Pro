@@ -98,12 +98,15 @@ test('el premio 1 paga 50 y un sobre si las once son de quien cobra', () => {
   d.cartas.s[A] = Object.assign({}, SOBRES, { [k]: { at, p: 0, pl: EL.clave + '_1' } });
   assert.equal(monedasDe(A, d).premios, 50);
   assert.ok(economia(d).sobres[A + '~' + k], 'su sobre existe');
+  // el premio de un club deja su marco de perfil (perfil-tarjeta.js)
+  assert.deepEqual(economia(d).usuarios[A].desafios, { [EL.clave.slice(5)]: at });
   // un premio 1 que trae un sobre Plus no vale
   const dp = datos({ plantillas: { p: { [A]: { [EL.clave + '_1']: { at, c, k: 'hPremio0000' } } } } });
   assert.equal(monedasDe(A, dp).premios, 0);
   // las mismas once, cobradas por otra cuenta: nada
   const d2 = datos({ plantillas: { p: { [B]: { [EL.clave + '_1']: { at, c, k } } } } });
   assert.equal(monedasDe(B, d2).premios, 0);
+  assert.deepEqual((economia(d2).usuarios[B] || {}).desafios || {}, {}, 'sin premio no hay marco');
   // antes de tenerlas: nada
   const d3 = datos({ plantillas: { p: { [A]: { [EL.clave + '_1']: { at: T0 - H, c, k } } } } });
   assert.equal(monedasDe(A, d3).premios, 0);
@@ -138,7 +141,7 @@ test('graduadas con nota 6 o más: el premio 2 paga 100 y sus dos sobres entran,
   d.cartas.g = { [A]: g };
   d.cartas.s[A] = Object.assign({}, SOBRES, { [k]: { at, p: 0, pl: EL.clave + '_2' }, [k2]: { at, p: 0, pl: EL.clave + '_2' }, gOtra00001: { at: at + 1, p: 0, pl: EL.clave + '_2' } });
   const e = economia(d);
-  assert.equal(monedasDe(A, d).premios, 100);
+  assert.equal(monedasDe(A, d).premios, 300);
   assert.ok(e.sobres[A + '~' + k] && e.sobres[A + '~' + k2], 'los dos sobres del premio existen');
   // con un solo sobre en el reclamo, el premio 2 no vale
   const d1 = datos({ ajustes: { [A]: { x: { n: 5000 } } }, plantillas: { p: { [A]: { [EL.clave + '_2']: { at, c, k } } } } });

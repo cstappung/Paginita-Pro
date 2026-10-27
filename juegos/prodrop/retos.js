@@ -138,8 +138,8 @@
      primera en `k` y la segunda en `k2`. */
   const PREMIOS = [
     { n: 1, monedas: 50, sobres: ["futbol"], txt: "Plantilla completa y válida" },
-    { n: 2, monedas: 100, sobres: ["futbol", "futbol"], nota: 6, txt: "Las once graduadas con nota 6 o más" },
-    { n: 3, monedas: 250, sobres: ["futbolplus"], nota: 8, txt: "Las once graduadas con nota 8 o más" }
+    { n: 2, monedas: 300, sobres: ["futbol", "futbol"], nota: 6, txt: "Las once graduadas con nota 6 o más" },
+    { n: 3, monedas: 1000, sobres: ["futbolplus"], nota: 8, txt: "Las once graduadas con nota 8 o más" }
   ];
   // «un sobre», «dos sobres», «un sobre Plus»
   const textoSobres = pr => (pr.sobres[0] === "futbolplus" ? "un sobre Plus" : pr.sobres.length > 1 ? pr.sobres.length === 2 ? "dos sobres" : pr.sobres.length + " sobres" : "un sobre");

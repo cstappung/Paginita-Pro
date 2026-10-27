@@ -594,9 +594,10 @@ function alCambiarSerie1(lista, uid) {
    economía aceptó de la tienda. Perezosos y no enumerables: se calculan la
    primera vez que alguien pinta un marco, una vez por llegada. */
 function conDerivados(d) {
-  let lid = null, com = null;
+  let lid = null, com = null, des = null;
   Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
   Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  Object.defineProperty(d, "desafios", { enumerable: false, get: () => des || (des = desafiosDe(d)) });
   /* Las tablas del club que existen hoy (ranks.js): el perfil no lista
      las de versiones viejas de un juego (el Snake y el buscaminas de antes). */
   Object.defineProperty(d, "vigente", { enumerable: false, value: categoriaVigente });
@@ -614,6 +615,13 @@ function comprasDe(d) {
   if (!d.completo) return d.tienda || {};
   const out = {};
   for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.tienda && Object.keys(x.tienda).length) out[u] = x.tienda;
+  return out;
+}
+/* Los clubes cuyo Desafío de plantilla cobró cada uno (los marcos de club). */
+function desafiosDe(d) {
+  if (!d.completo) return {};
+  const out = {};
+  for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.desafios && Object.keys(x.desafios).length) out[u] = x.desafios;
   return out;
 }
 /* ---------- los tacos de Pool ----------

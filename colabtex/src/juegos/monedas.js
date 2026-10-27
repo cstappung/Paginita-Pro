@@ -671,7 +671,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, tacos: {}, cofres: [],
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, desafios: {}, tacos: {}, cofres: [],
     intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
@@ -733,6 +733,8 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (e.sobres.length !== pr.sobres.length || new Set(e.sobres).size !== e.sobres.length
         || e.sobres.some((k, i) => k[0] !== PM.SOBRE[pr.sobres[i]].prefijo)) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
+      // el de un club deja además su marco de perfil (perfil-tarjeta.js), desde el primero que valió
+      if (pt.tipo === "club") { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
       U(e.u).premios += pr.monedas;
       anota(e.u, "plantilla", pr.monedas, pt.titulo);
     } else if (e.t === "s") {
