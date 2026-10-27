@@ -118,7 +118,10 @@ const MIXTA = [
 const HEROE_TERCERA = opt('heroe', 'heroevacio');
 // --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
 if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { PD.LEVELS[li].diff = +opt('diff'); delete PD.LEVELS[li]._rounds; }
-const PACTOS_PREF = ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
+// --pactos a,b,c: otro orden de preferencia (p. ej. el de una persona); --precio P: otro
+// pactoPrecio del reino (levels.js), para comparar antes y después
+if (opt('precio', '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].pactoPrecio = +opt('precio');
+const PACTOS_PREF = opt('pactos', '') ? opt('pactos').split(',') : ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
 const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
 function eligePacto(g) {
   const ofs = g.ofertasPacto();
