@@ -20,7 +20,8 @@
 import { ambientar } from "./sonido.js";
 import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia, esCarta } from "./monedas.js";
 import { MOTOR, MAX_EXHIBIDAS, veSerie1, colVisible, copiaVisible } from "./prodrop-cartas.js";
-import { pendientesDe } from "./mercado-datos.js";
+import { pendientesDe, puedeComprar } from "./mercado-datos.js";
+import PR from "../../../juegos/prodrop/retos.js";
 
 const MAX_PRECIO = 100000;
 
@@ -37,11 +38,11 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
     return (Array.isArray(l) ? l : l && typeof l === "object" ? Object.values(l) : [])
       .filter(k => typeof k === "string").map(k => (k.includes("~") ? k : uid + "~" + k)).slice(0, MAX_EXHIBIDAS);
   }
-  const exhibidas = () => exhibidasTodas().filter(c => copiaVisible(c));
-  /* La plantilla de fútbol como once claves de copia ("" la casilla vacía).
-     Una carta que ya no es suya (re-roll, venta, intercambio) se manda
-     vacía: si no, el abridor la reenviaba al guardar y todo se rechazaba. */
-  const plantilla = () => { const l = (perfil(uid) || {}).plantilla || {}; return MOTOR.FORMACION.map((_, i) => (typeof l[i] === "string" && mia(l[i]) ? l[i] : "")); };
+  /* Las que el abridor ve como exhibidas: visibles y todavía suyas. Una
+     vendida o usada en un re-roll seguía en la lista guardada, no salía en
+     el perfil pero ocupaba cupo, y «Exhibir» quedaba apagado sin razón a la
+     vista. Al guardar la próxima vez, esas se van. */
+  const exhibidas = () => exhibidasTodas().filter(c => copiaVisible(c) && eco().dueno[c] === uid);
   /* Una copia lista para el iframe: con la hora de su sobre, que es lo que
      hace falta para rehacerla. */
   function copia(e, c) {
@@ -50,6 +51,28 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
     // la de un re-roll no se rehace con un sobre: va con su carta, en `rr`
     // (no en `id`, que en el mercado es el de la oferta)
     return Object.assign({ c, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[c] }, so.r ? { rr: { id: so.r.id, g: so.r.g, w: so.r.w } } : {});
+  }
+  // lo que es una copia para los desafíos: {id, g, gr}, de su sobre o de su re-roll
+  const fichaDe = (e, c) => { const y = copia(e, c); if (!y) return null; const f = y.rr || MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]; return { id: f.id, g: f.g, gr: y.gr }; };
+  /* Los desafíos de plantilla: lo que cada cuenta subió a cada plantilla
+     (los clubes y los retos de esta semana y la anterior), con las copias
+     que sigue teniendo (una que ya no es suya va vacía y la plantilla deja
+     de valer), y los premios que ya cobré. */
+  function retos(e, persona) {
+    const s = (d.plantillas && d.plantillas.s) || {}, semana = PR.semanaDe(fb.ahora()), subidas = {};
+    for (const [clave, porUid] of Object.entries(s)) {
+      const p = PR.plantilla(clave);
+      if (!p || (p.tipo === "reto" && p.semana < semana - 1)) continue;
+      const filas = [];
+      for (const [u, x] of Object.entries(porUid || {})) {
+        if (!x || !Number.isFinite(x.at) || (u !== uid && e.usuarios[u] && e.usuarios[u].parada)) continue;
+        const cs = MOTOR.FORMACION.map((_, i) => { const c = x.c && x.c[i]; return typeof c === "string" && e.dueno[c] === u ? copia(e, c) : null; });
+        filas.push({ u: persona(u), at: x.at, c: cs });
+      }
+      subidas[clave] = filas;
+    }
+    const mios = (d.plantillas && d.plantillas.p && d.plantillas.p[uid]) || {};
+    return { subidas, cobrados: Object.keys(mios), semana };
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -72,7 +95,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
         x.id != null ? { rr: { id: x.id, g: x.g, w: x.w } } : {})),
       sobres, gratis: proximoGratis(uid, d, fb.ahora()),
       ofertas, pendientes: pendientesDe(d, uid), gente,
-      exh: exhibidas(), plant: plantilla(), desfase: fb.ahora() - Date.now() });
+      exh: exhibidas(), retos: retos(e, persona), desfase: fb.ahora() - Date.now() });
   }
 
   const falta = p => { const s = cuenta().saldo; return s >= p ? 0 : p - s; };
@@ -159,22 +182,31 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           const ocultas = exhibidasTodas().filter(c => !copiaVisible(c) && economia(d).dueno[c] === uid);
           await fb.exhibirCartas(uid, [...new Set([...lista, ...ocultas])].slice(0, MAX_EXHIBIDAS));
           responde(true, null);
-        } else if (x.accion === "plantilla") {
-          /* Once casillas; cada una vacía o una carta de fútbol suya, sin
-             repetir. Lo que no cumple se deja vacío en vez de rechazar todo:
-             una carta que se fue en un re-roll dejaba la plantilla sin poder
-             cambiarse nunca más. */
-          const lista = Array.isArray(x.lista) ? x.lista.slice(0, MOTOR.FORMACION.length).map(c => (typeof c === "string" ? c : "")) : [];
-          const porCasilla = {}, vistas = new Set();
-          lista.forEach((c, i) => {
-            if (!c || vistas.has(c) || !mia(c)) return;
-            const q = leeCopia(c), so = q && q.tipo === "carta" && eco().sobres[q.o + "~" + q.k];
-            const id = so && (so.r ? so.r.id : MOTOR.sobre(q.o, q.k, so.at).cartas[q.i].id);
-            if (id == null || !MOTOR.esFutbol(MOTOR.CARDS[id].col)) return;
-            vistas.add(c); porCasilla[i] = c;
-          });
-          await fb.ponerPlantilla(uid, porCasilla);
-          responde(true, null);
+        } else if (x.accion === "subeReto" || x.accion === "cobraReto") {
+          /* Un desafío de plantilla: se comprueba aquí lo mismo que la
+             economía comprobará (que las once sean tuyas y la plantilla
+             valga), porque un premio mal reclamado gasta su única vez. */
+          const p = PR.plantilla(x.clave);
+          if (!p) throw new Error("Esa plantilla no existe.");
+          if (!PR.vigente(p, fb.ahora())) throw new Error("Ese reto semanal ya terminó.");
+          const lista = Array.isArray(x.lista) ? x.lista.slice(0, 11).map(String) : [];
+          if (lista.length !== 11 || new Set(lista).size !== 11 || !lista.every(c => esCarta(c) && mia(c))) throw new Error("Completa las once casillas con cartas tuyas.");
+          const fs = lista.map(c => fichaDe(e, c));
+          if (fs.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
+          const ev = PR.evalua(x.clave, fs);
+          if (!ev.valida) throw new Error((ev.checks.find(c => !c.ok) || {}).txt || "La plantilla no cumple.");
+          if (x.accion === "subeReto") {
+            const r = await fb.subirPlantillaReto(uid, x.clave, lista);
+            responde(true, { at: r && r.at, puntaje: ev.puntaje });
+          } else {
+            const n = Math.round(+x.n), pr = PR.PREMIOS[n - 1];
+            if (!pr) throw new Error("Ese premio no existe.");
+            const id = PR.claveReclamo(x.clave, n);
+            if (((d.plantillas && d.plantillas.p && d.plantillas.p[uid]) || {})[id]) throw new Error("Ese premio ya lo cobraste.");
+            if (!PR.premioOk(n, ev)) throw new Error(`Para este premio: ${pr.txt.toLowerCase()}.`);
+            const r = await fb.cobrarPlantilla(uid, id, lista, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+            responde(true, { ks: r.ks, at: r.at, n, monedas: pr.monedas, sobres: PR.textoSobres(pr) });
+          }
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
           if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
@@ -191,10 +223,20 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
             throw new Error("Esa carta ya está a la venta o dejó de ser tuya.");
           }
           responde(true, id);
+        } else if (x.accion === "compraOferta") {
+          /* Comprar una carta del mercado sin salir de los desafíos de
+             plantilla: lo mismo que hace la pestaña 🏪 Mercado. */
+          const motivo = puedeComprar(d, uid, x.oferta);
+          if (motivo) throw new Error(motivo);
+          await fb.comprarOferta(uid, x.oferta);
+          const fin = economia(d).ofertas[x.oferta];
+          if (!fin || fin.estado !== "vendida" || fin.comprador !== uid) throw new Error("Alguien se te adelantó: eso ya no está a la venta.");
+          responde(true, null);
         } else if (x.accion === "retirar") {
-          const o = e.ofertas[x.id];
+          // `oferta`: `id` es el del mensaje, y pisarlo dejaba la respuesta sin destino
+          const o = e.ofertas[x.oferta];
           if (!o || o.u !== uid || o.estado !== "activa") throw new Error("Esa oferta ya no está a la venta.");
-          await fb.retirarOferta(x.id);
+          await fb.retirarOferta(x.oferta);
           responde(true, null);
         } else throw new Error("Petición desconocida.");
       } catch (e) {
@@ -212,7 +254,8 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
     if (!x || x.canal !== "prodrop-child") return;
     if (x.tipo === "listo") { listo = true; enviaDatos(); return; }
     if (x.tipo === "volver") { volver(); return; }
-    if (x.tipo === "mercado") { ir("#mercado/prodrop"); return; }
+    // desde los desafíos de plantilla, el mercado abre filtrado a Fútbol
+    if (x.tipo === "mercado") { ir(x.col === "futbol" ? "#mercado/futbol" : "#mercado/prodrop"); return; }
     if (x.tipo === "pide") atiende(x);
   }
 
@@ -224,8 +267,8 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      // `abrir`: lo que se abre al llegar (`#cartas/plantilla` → la plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-49" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
+      frame.src = "juegos/prodrop/index.html?v=pd-58" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

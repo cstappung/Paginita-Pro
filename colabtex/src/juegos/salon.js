@@ -297,7 +297,8 @@ export function crearSalon(ctx) {
         : e.pc ? `<span class="jg-hoja-chip pc">${ICONO_PC}Solo en PC${e.pide ? ": se juega con " + esc(e.pide) : ""}</span>` : "");
     const p = e.modo === "multi" ? practicaDe(e.id) : null;
     let medio = "", pie = "";
-    const reglas = `<button class="btn2" type="button" data-f="reglas" title="Cómo se juega">📖 Reglas</button>`;
+    // una pantalla de Juegos (`tipo: "sitio"`, los desafíos) no tiene manual: su ayuda está dentro
+    const reglas = e.reglas ? `<button class="btn2" type="button" data-f="reglas" title="Cómo se juega">📖 Reglas</button>` : "";
     const obra = enObra(e);
     if (obra) {
       /* «Trabajando para usted» (SALAS_EN_OBRA): sin salas ni opciones; si
@@ -333,7 +334,7 @@ export function crearSalon(ctx) {
       medio = `<ul class="jg-hoja-modos" aria-label="Qué trae">${(e.modos || []).map(m => `<li>${esc(m)}</li>`).join("")}</ul>` +
         `<p class="jg-hoja-nota">${inv
           ? (e.modo === "bots" ? "Práctica contra la máquina: no se guarda ni puntúa, con o sin cuenta." : "Modo invitado: juegas igual, pero tu récord no se guarda ni entra en la clasificación. <button type=\"button\" class=\"jg-enlace-btn\" data-f=\"login\">Iniciar sesión</button>")
-          : (e.modo === "bots" ? "Práctica contra la máquina: no puntúa en la clasificación." : e.diario ? "Un reto nuevo cada día, igual para todos. Tu racha y tus récords quedan en tu cuenta." : "Cada modalidad tiene su clasificación. Tus récords quedan en tu cuenta.")}</p>`;
+          : (e.nota ? esc(e.nota) : e.modo === "bots" ? "Práctica contra la máquina: no puntúa en la clasificación." : e.diario ? "Un reto nuevo cada día, igual para todos. Tu racha y tus récords quedan en tu cuenta." : "Cada modalidad tiene su clasificación. Tus récords quedan en tu cuenta.")}</p>`;
       pie = `${reglas}<a class="btn jg-hoja-ya" href="${esc(e.ruta || e.url)}" data-f="juega">▶ ${e.modo === "bots" ? "Practicar" : "Jugar"}</a>`;
     }
     return `

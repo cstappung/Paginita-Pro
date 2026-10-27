@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610270649"></script>
+<script src="../../i18n.js?v=202610271702"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-49">
+<link rel="stylesheet" href="style.css?v=pd-58">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -47,6 +47,7 @@
     <h2 id="chTit">Elige tu sobre</h2>
     <p id="chSub" class="ch-sub">Cada colección tiene sus propias cartas, rarezas y animaciones. Mismo precio, mismo sobre gratis.</p>
     <div id="chooserPacks" class="ch-packs"></div>
+    <button id="chRetos" class="ch-retos" hidden></button>
   </section>
   <section id="tableView" class="table-view">
     <div class="top-line">
@@ -79,7 +80,7 @@
       <div id="cant" class="cant" role="group" aria-label="Cuántos sobres abrir juntos"></div>
       <div class="buy-btns"><button id="freeBtn" class="btn free">🎁 Sobre gratis</button><button id="buyBtn" class="btn primary">Comprar sobre</button></div>
       <p id="buyInfo" class="buy-info"></p>
-      <button id="plantBtn2" class="link" hidden>⚽ Mi plantilla</button>
+      <span class="rt-atajos"><button id="retosBtn2" class="link" hidden>🏆 Desafío de plantilla</button></span>
       <div id="fuInfo" class="fu-info" hidden><button id="fuTipBtn" class="link">ⓘ Probabilidades del sobre</button><button id="fuNovBtn" class="link">📋 Novedades</button></div>
       <button id="cambiaBtn" class="link cambia">⇄ Cambiar sobre</button>
     </div>
@@ -99,7 +100,7 @@
       <button id="againBtn" class="btn primary">Abrir otro sobre ✳</button>
       <button id="colBtn2" class="btn">Ver colección</button>
       <button id="rrBtn2" class="btn rr-btn">♻ Re-roll</button>
-      <button id="plantBtn" class="btn pl-btn" hidden>⚽ Mi plantilla</button>
+      <button id="retosBtn" class="btn pl-btn" hidden>🏆 Desafío de plantilla</button>
       <button id="cambiaBtn2" class="btn">Cambiar sobre</button>
     </div>
   </section>
@@ -140,15 +141,29 @@
     <div id="fuModalTxt" class="fu-tip"></div>
   </div>
 </div>
-<div id="plantilla" class="overlay mk" hidden>
-  <div class="mk-panel pl-panel">
+<div id="retos" class="overlay mk" hidden>
+  <div class="mk-panel rt-panel">
     <div class="mk-head">
-      <div><h2>Mi plantilla</h2><p>4-3-3 · toca una casilla para poner o cambiar un jugador. Se ve en tu perfil.</p></div>
-      <b id="plPuntos" class="pl-puntos" title="Promedio de las once: la rareza pone el techo (común 60, rara 80, épica 100) y el estado lo escala"></b>
+      <div><h2 id="rtTitulo">Desafíos de plantilla</h2><p id="rtSub"></p></div>
+      <button id="rtVolver" class="btn mk-mini" hidden>← Álbum</button>
       <button class="close" data-close aria-label="Cerrar">✕</button>
     </div>
-    <div id="plCancha" class="pl-cancha"></div>
-    <div id="plElige" class="pl-elige" hidden></div>
+    <div id="rtBody" class="rt-body"></div>
+  </div>
+  <div id="rtVer" class="rt-ver" hidden>
+    <div class="rt-ver-caja">
+      <div class="mk-head"><div><h2 id="rtVerTit"></h2><p id="rtVerSub"></p></div><button id="rtVerCerrar" class="close" aria-label="Cerrar">✕</button></div>
+      <div id="rtVerCancha" class="pl-cancha"></div>
+    </div>
+  </div>
+  <div id="rtEligeCapa" class="rt-ver" hidden>
+    <div id="rtElige" class="rt-ver-caja rt-elige"></div>
+  </div>
+  <div id="rtMercado" class="rt-ver" hidden>
+    <div class="rt-ver-caja rt-elige rt-mk">
+      <div class="pl-elige-head"><b id="rtMkTit">🏪 Mercado de fútbol</b><button class="close" data-rt-mk-cierra aria-label="Cerrar">✕</button></div>
+      <div id="rtMkBody"></div>
+    </div>
   </div>
 </div>
 <div id="ruleta" class="ruleta" hidden aria-live="polite">
@@ -165,7 +180,7 @@
   <div class="col-panel">
     <div class="col-head">
       <div><h2>Colección</h2><p id="colProgress"></p></div>
-      <div class="col-head-acc"><button id="rrBtn" class="btn rr-btn" title="Diez cartas de una rareza por una de la siguiente">♻ Re-roll</button>
+      <div class="col-head-acc"><button id="retosBtn3" class="btn rr-btn rt-btn" hidden title="Arma plantillas con tus cartas y compite por premios">🏆 Desafío de plantilla</button><button id="rrBtn" class="btn rr-btn" title="Diez cartas de una rareza por una de la siguiente">♻ Re-roll</button>
       <button class="close" data-close aria-label="Cerrar">✕</button></div>
     </div>
     <div id="colTabs" class="mk-tabs col-tabs" role="tablist" aria-label="Colección"></div>
@@ -176,8 +191,9 @@
   </div>
 </div>
 
-<script src="motor.js?v=pd-49"></script>
-<script src="app.js?v=pd-49"></script>
-<script src="revela.js?v=pd-49"></script>
+<script src="motor.js?v=pd-58"></script>
+<script src="retos.js?v=pd-58"></script>
+<script src="app.js?v=pd-58"></script>
+<script src="revela.js?v=pd-58"></script>
 </body>
 </html>

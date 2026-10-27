@@ -20,6 +20,9 @@ test('cada juego de un jugador tiene adónde ir, manual y fecha',()=>{
   assert.ok(!ids.has(s.id),'id repetido: '+s.id);ids.add(s.id);
   assert.ok(s.nombre&&s.lema&&s.genero&&s.icono,s.id+' sin textos');
   assert.ok(Number.isFinite(S.diasDesde(s.alta,Date.now())),s.id+' sin alta legible');
+  /* Una pantalla de Juegos (`sitio`, los desafíos de plantilla) no tiene
+     manual: su ayuda está dentro, y lleva a una ruta que leerRuta conoce. */
+  if(s.tipo==='sitio'){assert.ok(!s.reglas);assert.match(s.ruta,/^#cartas\/retos$/);assert.ok(S.COLOR_SOLO[s.id],s.id+' sin color');continue;}
   assert.match(reglas,new RegExp('^  "?'+s.reglas+'"?: \\{','m'),s.id+': el manual «'+s.reglas+'» no existe');
   if(s.tipo==='club'){
    /* La ruta tiene que ser una que `leerRuta` reconozca, o el clic
@@ -67,11 +70,11 @@ test('«Nuevo» marca los cuatro últimos de las dos últimas semanas, sin empat
  assert.deepEqual([...S.nuevos([{id:'x',alta:'mal'}],hoy)],[]);
 });
 
-test('el invitado juega todo lo de un jugador menos PRO HERO y Tenkaichi 3',()=>{
+test('el invitado juega todo lo de un jugador menos PRO HERO, Tenkaichi 3 y los desafíos de plantilla',()=>{
  const {multi,solos}=S.entradasSalon(J);
  for(const m of multi){assert.equal(S.bloqueado(m,true),true);assert.equal(S.bloqueado(m,false),false);}
  const cerrados=solos.filter(s=>S.bloqueado(s,true)).map(s=>s.id).sort();
- assert.deepEqual([...cerrados],['bots-bt3','heroclub']);
+ assert.deepEqual([...cerrados],['bots-bt3','desafios','heroclub']);
  assert.deepEqual([...S.CON_CUENTA_SOLO].sort(),[...cerrados],'la lista y lo que se ve con candado son lo mismo');
  assert.deepEqual([...S.DESTACADOS_INVITADO],['bbtan','aleteo','fanal','trigon']);
  for(const d of S.DESTACADOS_INVITADO)assert.ok(solos.some(s=>s.id===d&&s.ruta==='#solo/'+d),'el destacado tiene su ruta: '+d);

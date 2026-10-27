@@ -95,6 +95,7 @@ function fuentesDe(e) {
   };
   if (e.sala) modulo(e.id);
   else if (e.tipo === "bots") carpeta(path.dirname(e.url.split("?")[0]));
+  else if (e.tipo === "sitio") carpeta(e.codigo);   // una pantalla de Juegos (los desafíos): el iframe que abre
   else {
     const x = (/^#solo\/([\w-]+)$/.exec(e.ruta || "") || [])[1] || e.id;
     if (fs.existsSync(path.join(RAIZ, "juegos", "club", x))) carpeta("juegos/club/" + x);

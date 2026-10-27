@@ -35,6 +35,12 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   room); Mascotas and PRODROP (`SITIOS_BUSCA`) navigate. A new game is
   found by its name with no change; give it a row in `APODOS` (the test
   requires one for every non-bots entry).
+- **A `SOLOS` row can be a screen, not a game** (`tipo: "sitio"`: today only
+  «Desafío de plantilla», `ruta: "#cartas/retos"`). It has no manual
+  (`reglas` absent, so the ficha hides 📖), its ficha shows `nota` instead of
+  the club text, it needs an account (`CON_CUENTA_SOLO`), its cover is
+  `portadaSolo("desafios")`, and `build-controles.js` reads the folder in
+  `codigo` (`juegos/prodrop`). `salon.test.cjs` checks that branch.
 - **The banner** (`novedadesHtml` + `enganchaBanner` in `juegos-main.js`,
   `.jg-ban` in juegos.html) shows one slide at a time and advances by
   itself every `BAN_MS` (7 s), the next one entering from the right. After

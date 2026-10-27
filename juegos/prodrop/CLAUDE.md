@@ -68,7 +68,7 @@ other file of the site. Things that hold it together:
   155: Man United, Man City, Chelsea, Liverpool, Tottenham, Arsenal), 203
   players with an EA rating, **one card per player** (photos in
   `cards/futbol/…` and `cards/premier/<club>/<id>.webp`, all with `col:
-  "futbol"`). The re-roll, the collection tab, the squad and the showcase
+  "futbol"`). The re-roll, the collection tab, the challenges and the showcase
   see them as one category. **The card's rarity comes from the player's media**
   (`BANDAS` = 80 / 84 / 87: común up to 80, rara 81-84, épica 85-87,
   legendaria 88+; `tierDeMedia`), so a star is never a común. Re-roll:
@@ -171,32 +171,16 @@ other file of the site. Things that hold it together:
   and a «← Todos los sobres» button. «Cambiar sobre» goes back to the menu the
   pack came from (`menuDe()`), and a data refresh keeps you in the menu you
   were in (`menuActual`). The Plus' cover is `.skin-futbolplus`.
-- **The football squad (plantilla)**: a fixed 4-3-3 (`FORMACION` in the
-  motor: GK, 4 DEF, 3 MID, 3 FWD), any football card in any slot (the squad itself is still the 4-3-3 of the motor, with Mi plantilla's own fit marks; see below). Stored
-  public in `users/<uid>/perfil/plantilla` = `{0..10: copy key}` (rule
-  regex like `perfil/cartas`; **re-publish the rules**). The frame's
-  overlay `#plantilla` (buttons «⚽ Mi plantilla» in the summary and the
-  shop, only for Fútbol) saves each change through the postman action
-  `plantilla`, which refuses cards that are not yours or not football.
-  Its picker lists forwards, midfielders, defenders, then keepers
-  (`POS_ORDEN`), each tagged, with toggle chips that filter one line; it
-  only helps to find players, any card still goes in any slot.
-  **A card that leaves your hands stays in the stored list**, so the
-  postman sends only the ones you still own (`plantilla()` filters with
-  `mia`) and the `plantilla` action drops invalid entries instead of
-  refusing the save: refusing made the whole squad uneditable after a
-  re-roll. The re-roll panel marks squad cards (⚽), warns when one is
-  picked, sorts them last in «Elegir automático» and removes them from
-  the squad when it goes through. The profile's «✎ Editar plantilla» goes
-  to `#cartas/plantilla`, which reaches the frame as `?abre=plantilla`.
-  `editaPerfil` carries it over like `cartas`. The profile shows it with
-  the real cards (rarity, wear, slab) through the frame in visor mode
-  `?plantilla=1&pl=o~k.i!at!gr[!id.g.w],…` (`urlPlantilla` in
-  `prodrop-cartas.js`), and `plantillaDe` drops cards the account no
-  longer owns. Score (`puntosCarta`/`puntosPlantilla`): rarity caps it
-  (60/80/100) and the **hidden** grade scales it (×0.55 at 1, ×1 at 10);
-  the squad is the average of the 11, empty = 0. It leaks the hidden
-  grade to anyone who compares totals, accepted for this first version.
+- **«Mi plantilla» (the profile's football squad) was removed** (October
+  2026): its overlay, the `plantilla` postman action, `perfil/plantilla`
+  (rule and `fb.ponerPlantilla`), the profile section, the visor mode
+  `?plantilla=1`, `#cartas/plantilla` and the motor's `puntosCarta` /
+  `puntosPlantilla` / buscador are gone. The weekly challenges below took
+  its place. Data already stored in `perfil/plantilla` is ignored and
+  disappears on the next profile save (the editor no longer carries it
+  over). **Publish the rules right after the site is live and raise
+  `juegosVersion/min`**: an old tab still carrying `plantilla` on a profile
+  save would be refused, and the challenges need the new rules.
 - **Reveal animations are per collection and rarity** (`revela.js`,
   `REVELA.de(card)` gives `{antes, despues}`; its particles carry their own
   `draw` and the `fxStep` loop paints them). Profes: chalk on a
@@ -354,7 +338,11 @@ other file of the site. Things that hold it together:
   profile editor does not know them, so `editaPerfil` carries them over or
   saving the profile would erase them. They show on the profile page and
   the mini card through `exhibidasDe`, which only resolves keys that are
-  packs of that account.
+  packs of that account. The postman sends the frame only the ones still owned
+  and visible (`exhibidas()`): a sold or re-rolled card stayed in the list,
+  filled the four slots unseen and switched «Exhibir» off. With four up the
+  button stays on and replaces the oldest. Any collection can be shown,
+  football included.
 - **The Clasificación's Cartas tab is per collection** (the **Cartas**
   button under PRODROP; the key is `prodrop`, because `cartas` is already
   Cartas de los tres elementos). A chip row picks the collection (only the
@@ -383,10 +371,24 @@ other file of the site. Things that hold it together:
 
 The `cartas`, `mercado` and `prodropSerie1` nodes and `perfil/cartas` need the rules re-published.
 
-## Posiciones y buscador de la plantilla
+## Desafíos de plantilla (reto semanal, mejor plantilla y álbum de clubes)
+
+En la interfaz se llama siempre **«Desafío de plantilla»** (no «desafío semanal»: el semanal es solo uno de los tres).
+
+
+- `retos.js` (UMD `ProdropRetos`, puro, sobre el motor) lo comparten el abridor, el cartero y la economía. Plantillas: `mejor` (la **Mejor plantilla**, `tipo: "libre"`: cualquier carta, siempre abierta, sin la condición «Todos cumplen»), `club-<club>` (los clubes con ≥15 cartas: el Bayern queda fuera) y `reto-<id>-<semana>`; las reglas aceptan las tres claves; el reto de la semana es `RETOS[(semana − PRIMERA) % n]` (`PRIMERA` = 42, lunes 26-10-2026, El Clásico; luego Francia, Inglaterra, España…), así que **los retos solo se agregan al final** (y cada uno debe poder armarse con el catálogo: Oranje se descartó por no haber portero neerlandés; el test lo comprueba). Se activan solos; la pantalla no los lista abajo, sino en el modal «🔜 Próximos retos» (al lado de «Ver colección») con la fecha de cada lunes. Las selecciones llevan `bandera` (imagen de `flags/`), no el emoji. La semana empieza el lunes 03:00 UTC (`SEMANA0`). Un reto solo se sube y se cobra en su semana (`vigente`, con la hora del servidor).
+- Puntaje: (media − castigo de `M.ajuste`) × estado (graduada 0,80 + 0,02 × nota; sin graduar 0,80, para no filtrar la nota oculta), suma × 10. Un puesto «mal» no puede jugar. Sin repetir `person` (Mbappé y su especial son uno).
+- Firebase: `plantillas/s/<plantilla>/<uid>` = {at, c[11]} (la clasificación, se reescribe) y `plantillas/p/<uid>/<plantilla>_<n>` = {at, c[11], k, k2?} (premio cobrado, una vez). Premios (`PREMIOS[].sobres`): 1 = 50 + un sobre normal; 2 = 100 + dos sobres normales (las 11 graduadas ≥6; el segundo va en `k2`); 3 = 250 + un sobre Plus (≥8). Los sobres van en el mismo `update` con `p: 0, pl: <reclamo>`; la regla de cada lado mira al otro, y la del premio exige el prefijo (`g`, `h` en el 3) y `k2` solo en el 2. Se abren juntos al cobrar.
+- La economía (`monedas.js`, evento `pl`, antes que `s` a igual hora) paga el premio en `premios` (categoría `plantilla`) solo si las 11 son de quien cobra en ese momento y cumplen el nivel con lo graduado hasta ahí; cada sobre con `pl` vale solo si su premio valió y lo nombra, una vez. El cartero comprueba lo mismo antes de escribir (un reclamo mal hecho gasta su única vez).
+- **Avisos**: `enDesafios(k)` (en `app.js`) dice en qué plantillas subidas que siguen contando (clubes y el reto de esta semana) está una copia. El zoom lo muestra, la venta y el re-roll avisan que esa plantilla saldrá de la clasificación, y «Elegir automático» las deja al final. Los borradores sin subir de este navegador avisan aparte (`enBorradores`, 📝, desde el `localStorage` de cada plantilla abierta; se lee una vez por repintado). Los intercambios del Mercado de Juegos no avisan todavía.
+- **Mercado de fútbol sin salir**: «🏪 Mercado de fútbol» (álbum y editor) y «🏪 Buscar en el mercado» (en el selector de una casilla) abren el modal `#rtMercado` con las `ofertas` de fútbol que ya manda el cartero (también las tuyas, marcadas «Tu oferta» y sin botón: saltarlas hacía que el modal dijera «nadie vende» con tu propia carta publicada), de mayor a menor media; en el editor, filtradas a la plantilla y, con casilla, a quien puede jugar ahí (chips para quitarlo). Comprar pide un segundo toque y va por la acción `compraOferta` del cartero (`puedeComprar` + `fb.comprarOferta`, como la pestaña 🏪). «Abrir el mercado completo» y el 🏪 de la cabecera con los desafíos abiertos van a `#mercado/futbol` (PRODROP con la colección Fútbol elegida).
+- **El parámetro de una oferta se llama `oferta`, nunca `id`**: `Red.pide` mete `id` (el del mensaje) en el mismo objeto, y `{ id }` lo pisaba: la respuesta no llegaba y a los 20 s salía «Sin respuesta» aunque la escritura se hiciera. Le pasaba a «Retirar del mercado» del zoom, ya corregido.
+- **Entradas**: además de las de arriba, el menú de Sobres de Fútbol tiene la franja `#chRetos` (con el reto de la semana) y el Salón tiene la ficha «Desafío semanal de plantilla» en un jugador (`SOLOS`, `tipo: "sitio"`, pide cuenta; `docs/claude/juegos/salon.md`).
+- El abridor: overlay `#retos` (álbum → editor con `pintaCancha`, selector, clasificación, premios). **No se cierra tocando el fondo** (se salía sin querer; ✕ y Escape sí, y Escape cierra primero el modal de encima). El selector de jugador es un modal (`#rtEligeCapa`) sobre la cancha, no una lista abajo. Entradas: `#cartas/retos` (`?abre=retos`), el botón del resumen del sobre (`#retosBtn`, reemplazó a «Mi plantilla» ahí), el atajo de la tienda de fútbol (`#retosBtn2`), el de la colección en la pestaña Fútbol (`#retosBtn3`) y el segundo botón de las novedades de PRODROP en el Salón (`ATAJO_RETOS`). El borrador de cada plantilla vive en `localStorage` (`prodrop.reto.<uid>.<plantilla>`).
+- `tests/retos.test.cjs` cubre plantillas, puntaje y premios en la economía; `test-rules.mjs` las reglas.
+
+## Posiciones de los futbolistas
 
 - Cada futbolista tiene una o dos posiciones (`M.POSICIONES`, `"DC/EI"`; la primera es la principal): LD, LI, DFC, MC, MD, MI, ED, EI, DC y POR. Salen de EA FC (`alternatePositions` de la misma API de ratings): CDM/CM/CAM = MC, RB/RWB = LD, LB/LWB = LI, ST/CF = DC; se queda la principal y la primera alternativa de otro grupo. `c.posiciones` está en la carta y `c.pos` (línea POR/DEF/MED/DEL) es la de la principal. **No afecta a los sobres** (la rareza sale de la media). Los RM/LM de EA van de extremo cuando la web del club los pone de delanteros.
-- `M.ajuste(casilla, posiciones)` → `{nivel: ok|incomodo|mal, pen}`. «Mi plantilla» solo lo muestra (anillo verde/amarillo/rojo y «!» o «✕» en la casilla): su puntuación sigue siendo rareza + nota.
-- Buscador (`M.coincide`, `M.MEDIAS_MIN`): club, media mínima y nombre, además de la línea y «solo <puesto>»; el selector va ordenado por media, con una sola copia por jugador.
+- `M.ajuste(casilla, posiciones)` → `{nivel: ok|incomodo|mal, pen}`: la cancha de los desafíos lo muestra (anillo verde/amarillo/rojo y «!» o «✕») y `retos.js` lo usa para el castigo.
 - Un jugador no puede estar dos veces en el once: en el selector sale con su casilla y, al elegirlo, se va de ella y pasa a la nueva.
-- Hubo una prueba de concepto de «retos diarios» con mini liga (valoración por media, posición y química); se descartó y se borró. `M.ajuste`, las posiciones y el buscador salieron de ahí y se quedan.

@@ -62,6 +62,7 @@ export const APODOS = {
   heroclub: "guitar hero clone hero guitarra bajo bateria musica canciones",
   prodefender: "tower defense torres defensa bloons td estrategia reinos oleadas",
   propac: "pacman pac-man laberinto fantasmas arcade neon puntos comecocos",
+  desafios: "plantilla once futbol prodrop cartas reto semanal mejor plantilla album clubes 4-3-3 equipo alineacion",
   frontera: "pokemon batalla torre palacio fabrica esmeralda",
   orbita: "gravedad espacio planetas sondas estrellas satelites",
   escondite: "esconder buscar escondidas paisaje",

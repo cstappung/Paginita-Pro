@@ -381,6 +381,44 @@ console.log("— PRODROP: sobres y graduaciones —");
   await loginAs(A);
 }
 
+console.log("— PRODROP: desafíos de plantilla —");
+{
+  const { serverTimestamp, push, update } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const once = Array.from({ length: 11 }, (_, i) => `${ua.uid}~-Nabcdefgh${String(i).padStart(2, "0")}.0`);
+  await allowed("A sube su plantilla a la clasificación de un club", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
+  await allowed("y la reescribe al mejorarla", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
+  await denied("una plantilla con diez casillas no", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once.slice(0, 10) }));
+  await denied("ni con una clave de plantilla inventada", () => set(ref(db, `plantillas/s/club-real.madrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
+  // un premio con sus sobres (`pres`: el prefijo de cada uno) en un solo update, como fb.cobrarPlantilla
+  const premio = (id, pres, p = 0) => {
+    const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${ua.uid}`)).key);
+    const w = { [`plantillas/p/${ua.uid}/${id}`]: Object.assign({ at: serverTimestamp(), c: once, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) };
+    ks.forEach(k => { w[`cartas/s/${ua.uid}/${k}`] = { at: serverTimestamp(), p, pl: id }; });
+    return update(ref(db), w);
+  };
+  await denied("el premio 1 sin sobre no", () => set(ref(db, `plantillas/p/${ua.uid}/club-realmadrid_1`), { at: serverTimestamp(), c: once }));
+  await allowed("A cobra el premio 1 con su sobre de fútbol", () => premio("club-realmadrid_1", ["g"]));
+  await denied("el premio 1 no se cobra dos veces", () => premio("club-realmadrid_1", ["g"]));
+  await denied("ni se borra para cobrarlo de nuevo", () => remove(ref(db, `plantillas/p/${ua.uid}/club-realmadrid_1`)));
+  await denied("el premio 2 no trae un sobre Plus", () => premio("club-barcelona_2", ["h", "g"]));
+  await denied("ni un solo sobre", () => premio("club-barcelona_2", ["g"]));
+  await denied("ni sobres con precio", () => premio("club-barcelona_2", ["g", "g"], 80));
+  await allowed("A cobra el premio 2 con sus dos sobres de fútbol", () => premio("club-barcelona_2", ["g", "g"]));
+  await denied("el 3 no trae dos sobres", () => premio("club-barcelona_3", ["h", "g"]));
+  await allowed("y el 3 con su sobre Plus", () => premio("club-barcelona_3", ["h"]));
+  await allowed("un reto con nombre largo (albiceleste) vale", () => premio("reto-albiceleste-50_1", ["g"]));
+  await allowed("la mejor plantilla se sube", () => set(ref(db, `plantillas/s/mejor/${ua.uid}`), { at: serverTimestamp(), c: once }));
+  await allowed("y su premio 1 se cobra", () => premio("mejor_1", ["g"]));
+  await denied("un sobre a 0 que nombra un premio que no lo trae no cuela", () => set(ref(db, `cartas/s/${ua.uid}/g${push(ref(db, `cartas/s/${ua.uid}`)).key}`), { at: serverTimestamp(), p: 0, pl: "club-psg_2" }));
+  await denied("un premio 2 sin sus sobres tampoco", () => set(ref(db, `plantillas/p/${ua.uid}/club-psg_2`), { at: serverTimestamp(), c: once, k: "gNoExiste000", k2: "gNoExiste001" }));
+  const ub = await loginAs(B);
+  await denied("B no sube a nombre de A", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
+  await denied("ni cobra a nombre de A", () => set(ref(db, `plantillas/p/${ua.uid}/club-psg_1`), { at: serverTimestamp(), c: once, k: "gNoExiste002" }));
+  void ub;
+  await loginAs(A);
+}
+
 console.log("— PRODROP: sobre gratis, mercado e intercambios —");
 {
   const { serverTimestamp, push, update } = await import("firebase/database");

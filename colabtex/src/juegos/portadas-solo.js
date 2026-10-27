@@ -30,6 +30,21 @@ const pieSombra = u => `<rect width="400" height="300" fill="url(#sb${u})"/>`;
 const celda = (x, y, t, c) => `<rect x="${x}" y="${y}" width="${t}" height="${t}" rx="2" fill="${c}"/><rect x="${x + 2}" y="${y + 2}" width="${t - 4}" height="${(t - 4) / 3}" rx="1" fill="#fff" opacity=".35"/><rect x="${x}" y="${y + t - 4}" width="${t}" height="4" fill="#000" opacity=".25"/>`;
 
 const ARTE = {
+  /* Desafío de plantilla: una cancha con el 4-3-3 hecho de cartas y la copa. */
+  desafios: u => {
+    const carta = (x, y, c) => `<g transform="translate(${x} ${y})"><rect x="-13" y="-17" width="26" height="34" rx="3" fill="${c}" stroke="#fff" stroke-width="1.6"/><rect x="-9" y="-12" width="18" height="14" rx="2" fill="#0b2a14" opacity=".35"/><rect x="-8" y="6" width="16" height="3" rx="1" fill="#fff" opacity=".8"/></g>`;
+    const once = [[200, 248, "#8fe3ff"], [110, 206, "#c9d2e0"], [170, 212, "#c9d2e0"], [230, 212, "#c9d2e0"], [290, 206, "#c9d2e0"],
+      [140, 160, "#ffd76a"], [200, 166, "#ffd76a"], [260, 160, "#ffd76a"], [130, 110, "#ff8fd0"], [200, 104, "#ff8fd0"], [270, 110, "#ff8fd0"]];
+    let franjas = "";
+    for (let k = 0; k < 8; k++) franjas += `<rect x="0" y="${k * 40}" width="400" height="20" fill="#ffffff" opacity=".05"/>`;
+    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f8a44"/><stop offset="1" stop-color="#0d4a22"/></linearGradient>
+      <linearGradient id="c${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#ffcf33"/><stop offset="1" stop-color="#b8860b"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>${franjas}
+    <g fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"><rect x="40" y="20" width="320" height="300"/><circle cx="200" cy="20" r="46"/><rect x="140" y="250" width="120" height="60"/></g>
+    ${once.map(([x, y, c]) => carta(x, y, c)).join("")}
+    <g class="a-late" transform="translate(340 62)"><path d="M-20 -26 H20 V-6 A20 20 0 0 1 -20 -6 Z" fill="url(#c${u})"/><path d="M-20 -20 H-30 A10 10 0 0 0 -20 -2 M20 -20 H30 A10 10 0 0 1 20 -2" fill="none" stroke="#ffcf33" stroke-width="4"/>
+      <rect x="-5" y="12" width="10" height="10" fill="#ffcf33"/><rect x="-15" y="22" width="30" height="7" rx="2" fill="#b8860b"/></g>`;
+  },
   snake: u => `<defs><radialGradient id="g${u}" cx=".75" cy=".3" r=".9"><stop offset="0" stop-color="#1f8a5a"/><stop offset="1" stop-color="#08201a"/></radialGradient>
     <pattern id="r${u}" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M25 0H0V25" fill="none" stroke="#fff" stroke-opacity=".07"/></pattern></defs>
     <rect width="400" height="300" fill="url(#g${u})"/><rect width="400" height="300" fill="url(#r${u})"/>

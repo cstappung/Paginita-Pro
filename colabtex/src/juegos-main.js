@@ -731,9 +731,6 @@ async function editaPerfil(pestana) {
          sin esto, guardar el perfil las borraría. */
       const cartas = (perfiles.get(b.uid) || {}).cartas;
       if (cartas) p = Object.assign({}, p, { cartas });
-      // lo mismo la plantilla de fútbol, que se arma en PRODROP
-      const plantilla = (perfiles.get(b.uid) || {}).plantilla;
-      if (plantilla) p = Object.assign({}, p, { plantilla });
       /* La mascota la elige el editor; si no pudo ofrecerla (sin datos),
          devuelve la que había. Nunca se pierde por guardar otra cosa. */
       const mascota = (perfiles.get(b.uid) || {}).mascota;
@@ -1822,9 +1819,11 @@ function leerRuta() {
   if (h === "monedas") return { vista: "monedas", pid: "" };
   const cs = h.match(/^casino(?:\/(avion|pinguino|ruleta|blackjack|poker|plinko))?$/);
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
-  if (h === "cartas" || h === "cartas/plantilla") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : "plantilla" };
+  // `#cartas/retos` abre los desafíos de plantilla
+  if (h === "cartas" || h === "cartas/retos") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : h.slice(7) };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
-  const mk = h.match(/^mercado(?:\/(prodrop|mascotas|rock))?$/);
+  // `#mercado/futbol`: PRODROP con el filtro de la colección Fútbol (lo abren los desafíos de plantilla)
+  const mk = h.match(/^mercado(?:\/(prodrop|futbol|mascotas|rock))?$/);
   if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
@@ -2905,12 +2904,15 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    «★ Lo último» lo lleva la de `alta` más reciente (`selloNovedad`).
    Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
+/* El segundo botón de las novedades de PRODROP: los desafíos de plantilla
+   (juegos/prodrop/retos.js), que se abren dentro del abridor. */
+const ATAJO_RETOS = { ruta: "#cartas/retos", boton: "🏆 Desafío de plantilla" };
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
     gancho: "Cartas especiales por tiempo limitado",
     lema: "Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro, llegaron a los sobres de Fútbol como legendarias especiales, por tiempo limitado. En el mismo sobre están todos: Real Madrid, Barça, el Big Six y más clubes de la Champions, en el sobre normal y en el Plus (con una Épica asegurada).",
     datos: () => [["2", "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
-    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
     gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],
     lema: "Zombis y diablos de cajas en 3D, vistos desde arriba: cada baja sube el multiplicador y trae armas nuevas, la sangre se queda en el suelo y las granadas lo dejan negro. Practica solo o abre una sala para hasta ocho.",
@@ -2956,7 +2958,7 @@ const NOVEDADES = [
     gancho: "¿Te saldrá la legendaria?",
     lema: () => (veSerie1() ? "Sobres de cinco cartas, de los profes o de componentes" : "Sobres de cinco cartas") + ", y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
     datos: () => [[String(MOTOR.precioSobre(fb.ahora())), "monedas el sobre"], ["Gratis", "uno cada 6 h"], ["5", "cartas por sobre"]],
-    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-08", titulo: "FANAL · la otra orilla",
     gancho: "Lleva la última luz", datos: [["25", "jornadas"], ["7", "jefes"], ["∞", "travesía sin fin"]],
     lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
@@ -3038,6 +3040,7 @@ function novedadesHtml() {
                 ${accion}
                 ${n.reglas ? `<button class="btn2" data-nov-reglas="${n.id}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(n.titulo)}">📖</button>` : ""}
               </div>
+              ${n.atajo && !cuenta ? `<a class="jg-ban-atajo" href="${n.atajo.ruta}">${escapeHtml(n.atajo.boton)}</a>` : ""}
             </div>
           </article>`;
   };
