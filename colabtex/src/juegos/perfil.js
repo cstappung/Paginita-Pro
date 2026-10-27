@@ -291,9 +291,10 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
        quien lo compró a tiempo. */
     const hw = l => l.filter(it => it.hw && !requisito(it, est).agotado);
     const grupos = (lista, actual, attr, dentro) => [
-      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top || it.req.coleccion))],
+      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top || it.req.coleccion || it.req.desafio))],
       [`🎃 Halloween · edición limitada${tiendaHalloweenAbierta(Date.now()) && onTiendaHw ? ` <button type="button" class="jg-ped-hwir" data-ir-tienda-hw>Ver la tienda →</button>` : ""}`, hw(lista)],
       [`Tienda · ${MONEDA} ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda && !it.hw)],
+      ["⚽ Clubes · premio del Desafío de plantilla de cada club", lista.filter(it => it.req && it.req.desafio).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)],
       ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top && !juegoOculto(it.req.top)).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
     ].filter(([, l]) => l.length).map(([t, l]) => (t ? `<h4 class="jg-ped-grupo">${t}</h4>` : "") + l.map(it => op(it, actual, attr, dentro(it))).join("")).join("");
     $("#pfMarcos").innerHTML = grupos(MARCOS, marco, "marco", m => avatarMarco(f, nom, color, m.id, 54));

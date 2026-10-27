@@ -158,6 +158,18 @@ covers the charge, the champion rules and that every animated frame has its
 drawing. (It is not in `test:juegos`: its champion-frame test already
 failed for Pokelike, which has no champion frame yet.)
 
+**Club frames** (`club<club>`, `req: {desafio: <club>}`): one per club of the
+PRODROP album (15), the prize of that club's Desafío de plantilla. CSS only
+(«Marcos de club» in juegos.html): a ring in the club's colours (`--anillo`,
+`--borde`) and the card crest (`juegos/prodrop/escudos/<club>.png`) at the
+bottom. Earned, like the Halloween collector rewards, without any write or
+rule: `economia()` records `usuarios[u].desafios[<club>]` when a claim of
+`club-<club>` is accepted, `juegos-main.js` derives `datos.desafios`
+(`desafiosDe`, lazy like `compras`) and `estadisticas` carries it as
+`est.desafios`. The field travels in the cierre snapshot with the rest of
+the user and `verificaCierre` compares it. Adding a club to the album needs
+its row in `MARCOS` and its CSS line.
+
 **The Halloween shop: limited edition** (`tienda.js` for the catalogue,
 `juegos/tienda-halloween.js` for the window and the lobby strip, the
 frames in `marcos-animados.js`, the background scenes in

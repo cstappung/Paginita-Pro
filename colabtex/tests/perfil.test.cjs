@@ -51,6 +51,19 @@ test('los marcos que se ganan piden lo que dicen',()=>{
  assert.equal(new Set(P.FONDOS.map(x=>x.id)).size,P.FONDOS.length);
 });
 
+test('los marcos de club piden el premio de su desafío',()=>{
+ const club=P.MARCOS.filter(x=>x.req&&x.req.desafio);
+ assert.equal(club.length,15);
+ for(const m of club){assert.match(m.id,/^[a-z]{1,20}$/,'la regla de perfil/marco');assert.equal(m.id,'club'+m.req.desafio);}
+ const m=club.find(x=>x.req.desafio==='realmadrid');
+ const sin=P.estadisticas('a',datos),con=P.estadisticas('a',Object.assign({},datos,{desafios:{a:{realmadrid:1}}}));
+ assert.ok(!P.requisito(m,sin).ok);assert.match(P.requisito(m,sin).falta,/Desafío de plantilla del Real Madrid/);
+ assert.ok(P.requisito(m,con).ok);
+ assert.ok(!P.requisito(P.MARCOS.find(x=>x.id==='clubbarcelona'),con).ok,'el de otro club no');
+ assert.equal(P.marcoVisible({marco:'clubrealmadrid'},sin),'anillo');
+ assert.equal(P.marcoVisible({marco:'clubrealmadrid'},con),'clubrealmadrid');
+});
+
 test('la vitrina: lo elegido que existe, o lo mejor si no eligió',()=>{
  const e=P.estadisticas('a',datos);
  const ops=P.opcionesVitrina(e);
