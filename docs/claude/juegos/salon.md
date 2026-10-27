@@ -60,16 +60,17 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   link in juegos.html), with a hook line (`gancho`) and three big facts
   (`datos`) under the lema.
 - **Últimos drops legendarios · Mascotas** (`pintaDropsMascotas`, from
-  `mejoresDropsMascotas` in `mascotas-datos.js`): the legendary items of
-  valid gifts, newest first, with who and when (names `translate="no"`).
+  `mejoresDropsMascotas` in `mascotas-datos.js`): the last six (`DROPS_3D`)
+  legendary items of valid gifts, newest first, with who and when (names `translate="no"`).
   The photos come from the Mascotas viewer, requested only once the strip
   is in view (`vigilaDropsMascotas`, an IntersectionObserver): the lobby
   does not load three.js for someone who never scrolls there. Dances have
   no photo and show their emoji. A guest gets the `MOTIVO_CUENTA.mascotas`
   gate in the strip instead (the PRODROP strip is simply hidden).
 - **Últimos drops legendarios · Batalla de Rock** (`tiraRockHtml`,
-  `pintaDropsRock`, from `dropsRock` in `monedas.js`: the legendary pieces
-  of valid `cajasRock`, newest first). Photos from `rock-fotos.js` (the rock
+  `pintaDropsRock`, from `dropsRock` in `monedas.js`: the last six
+  legendary pieces of valid `cajasRock`, newest first; the PRODROP strip
+  keeps 24). Photos from `rock-fotos.js` (the rock
   scene's photographer worker; localStorage `claveMini`, shared with the
   game's editor), asked only once the strip is in view
   (`vigilaDropsRock`). Hidden for guests and when `veRock()` is false.
@@ -598,3 +599,24 @@ there next.
 To check, filter `document.getAnimations()` to `playState === "running"` on
 the lobby. Anything running that is not transform, opacity or filter on HTML
 costs every frame.
+
+**Count the GPU layers too: what is still is `animation-name:none`, not
+paused.** A paused animation keeps its composited layer, and Chrome syncs
+every layer on every frame («Commit», «Layerize»). The lobby had **926
+layers** (the 13 banner scenes, the paused avatar frames, the sleeping
+cards); now ~160. So the still frames and names, `.jg-mn.dormida`,
+`.jg-fuera-vista` and the banner slides that are not `.on` all set
+`animation-name:none`; their loops restart from zero when they come back.
+Count with CDP `LayerTree.enable` (and `LayerTree.compositingReasons`).
+
+**The banner paints only the slide on show and its neighbours**
+(`.cerca`, set in `enganchaBanner`; on a jump with the dots, every slide in
+between until `transitionend`). The track has `will-change:transform`, so
+Chrome painted all thirteen scenes. Its animated scene is still the most
+expensive thing on the page, and that cost grows with everything else
+painted on the page.
+
+**No `backdrop-filter` on what stays on screen while scrolling or under an
+animation**: the sticky mode bar, the phone tab bar and the banner's fact
+pills used to blur what moved beneath them on every frame, which is heavy on
+integrated GPUs. They were 90–95 % opaque already; now they are opaque.
