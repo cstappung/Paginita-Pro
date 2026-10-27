@@ -315,6 +315,9 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Clic perdido** | Un clic son dos mitades: apretar y soltar. Si entre las dos el botón sale de la página y vuelve (aunque sea idéntico), Chrome no da el clic. Como un pulsador que se desconecta y reconecta mientras uno lo aprieta: el circuito no ve el pulso completo. |
 | **Puntero fino / grueso** | Lo que el navegador dice que tiene la persona para señalar: «fino» es un ratón o un lápiz (exacto), «grueso» un dedo. Un teléfono tiene solo grueso; un PC con pantalla táctil tiene los dos. Por eso «teléfono» = grueso **sin** fino. |
 | **Los «30 fps justos»** | La pantalla muestra una imagen nueva solo en cada refresco (60 por segundo = cada 16,7 ms). Si el juego tarda 17 ms en una imagen, no llega al refresco y esa imagen sale en el siguiente: se ve cada 33 ms, o sea 30 por segundo. Por eso pasarse un poco del presupuesto baja de golpe de 60 a 30, y no a 58. Como un tren que sale cada 16,7 minutos: quien llega un minuto tarde no espera un minuto, espera el tren siguiente. |
+| **Pasada de dibujo (render pass)** | Cada vez que la tarjeta de video empieza a dibujar en una imagen (la pantalla, o una imagen de trabajo para un reflejo, una sombra, un desenfoque). Dentro de una pasada van los **dibujos** (draw calls: «dibuja estos triángulos con esta receta»). Un cuadro del juego son varias pasadas, una tras otra. Como las tandas de un horno: cada tanda se calienta y se descarga entera, aunque lleve un solo pan. |
+| **Dibujo por baldosas (tile-based)** | Cómo dibujan las tarjetas de los teléfonos (Mali, Adreno, PowerVR, la «Arm gen-5» del Oppo): parten la imagen en cuadraditos y dibujan cada uno en una memoria chica y rápida dentro del chip; al terminar la pasada copian todo a la memoria grande, que es lenta y gasta batería. Por eso **cada pasada nueva cuesta mucho más que en un PC**: hay que leer y escribir la imagen entera. Pocas pasadas grandes = barato; muchas pasadas o copias = caro. |
+| **Marca de tiempo de la tarjeta (timestamp-query)** | Una función opcional de WebGPU: la tarjeta anota su propio reloj (en nanosegundos) al empezar y al terminar una pasada. Restando se sabe cuánto tardó **esa pasada en la tarjeta**, sin adivinar desde afuera. Como poner un cronómetro en cada etapa de una línea de montaje en vez de medir solo la caja que sale al final. |
 | **Perfil (de un mando)** | El modelo del mando (fabricante y producto: dos números que trae su nombre). La asignación se guarda por modelo, así sirve por cable y por Bluetooth, donde el nombre entero cambia. |
 
 ---
@@ -10482,3 +10485,146 @@ Lo que dijo (Chrome 155, Android, 8 núcleos, 8 GB, «arm gen-5», salida 540 �
 **ms esperando el disco**, **pipelines nuevos y los ms que bloquearon** (`createRenderPipeline`/`createComputePipeline`/
 `…Async` y `createShaderModule` envueltos siempre: solo cuesta cuando se crea uno) y **dónde estaba el juego**
 (menú / presentación / cuenta / carrera / fin, de la etapa de Raceinfo). Con eso se ve cuál de los tres sospechosos es.
+
+### 114.9 Dos precisiones del dueño (2026-10-26)
+
+- **El tramo lento es dentro de la carrera**: los ~21 s a 20–37 fps son jugando la carrera (no la carga ni los menús).
+  Ahí el juego ve por primera vez la pista, los karts en movimiento, los objetos y sus efectos: los tres sospechosos
+  de §114.8 siguen en pie (código todavía sin optimizar, pipelines nuevos, disco). El informe de 2 min con la etapa por
+  segundo dirá cuál.
+- **Su pantalla va a 120 Hz**: el 60,4 del informe es el ritmo que Chrome le da a la página, no el de la pantalla. Para
+  el juego da igual (necesita 60). Lo único que importa de ese número es el enganche (§114.8).
+- **PR: nunca sin avisar y esperar su confirmación** (dos PR, #271 y #272, se fusionaron dando por hecho un permiso
+  anterior; el dueño lo corrigió). Anotado en `CLAUDE.md` → Reglas.
+
+## 2026-10-26 · §115 El segundo informe del Oppo: frena la tarjeta de video, y un medidor para saber qué parte
+
+### 115.1 Lo que dijo el segundo informe
+
+Con «Mostrar qué frena» prendido (§114), en la carrera: **31,7 fps, juego 33,4 ms y tarjeta 33,8 ms por cuadro**, 30
+segundos seguidos a ~30 fps con los dos números juntos (30–35 ms), y el veredicto «frena: la tarjeta de video». Lienzo
+1176×539 (salida 540), resolución interna 640×528 (1×, la de la Wii).
+
+Cómo se lee: la tarjeta tarda ~34 ms en dibujar una imagen, el doble de los 16,7 ms que hay para 60 fps, y por eso
+quedan los «30 fps justos» (Glosario). El juego marca casi lo mismo porque **espera a la tarjeta dentro de su cuadro**
+(no puede empezar el siguiente con el anterior sin terminar): no es que el procesador no alcance, es que espera. Esto
+**corrige** la primera lectura de §114.8 («el motor alcanza, es la primera vez»): ahí la tarjeta no se había medido.
+
+¿Por qué una tarjeta potente tarda tanto con una imagen de 640×528 (la Wii la dibujaba con mucho menos)? Lo más
+probable: el renderizador (aurora) hace **muchas pasadas y copias por cuadro** (la Wii copia a menudo su imagen de
+trabajo, el EFB, para reflejos, sombras, el desenfoque de velocidad y la pantalla dividida), y en una tarjeta que
+**dibuja por baldosas** (Glosario) cada pasada y cada copia obligan a ir a la memoria grande. En un PC eso casi no se
+nota; en un teléfono, sí. Pero es una sospecha: hay que medirlo antes de tocar nada.
+
+### 115.2 El medidor nuevo: `web/navegador/perfil-gpu.mjs`
+
+Se pone «al lado» de las llamadas a WebGPU (las clases del navegador) sin cambiar lo que hacen, como una pinza
+amperimétrica sin cortar el cable:
+
+- **Conteo** (siempre que «Mostrar qué frena» está prendido; casi gratis): por cuadro, pasadas, dibujos, cambios de
+  receta (`setPipeline`), copias de imágenes y KB subidos a la tarjeta (`writeBuffer`/`writeTexture`). Va en el informe
+  de rendimiento, cada segundo (`pasadasN dibN kbN copN`).
+- **Tiempos** (a pedido: Avanzado → Diagnóstico → **«🔬 Perfilar la tarjeta de video»**): recarga la página pidiendo a la
+  tarjeta las **marcas de tiempo** (Glosario), y en los primeros **20 s de la próxima carrera** anota cuánto tarda
+  **cada pasada**, con el tamaño de la imagen en que dibuja y sus dibujos. Después se apaga solo. El informe trae
+  `perfilTarjeta.pasadasCaras`: las 15 pasadas que más tiempo se llevan (por ejemplo «#3 640×528 · 9,8 ms · 210
+  dibujos»). Mientras mide, el juego puede ir algo más lento (las marcas tienen su costo).
+- Si la tarjeta no tiene marcas de tiempo, queda solo el conteo (el informe lo dice en `perfilTarjeta.marcas`).
+- Lo que el medidor hace para leer las marcas (resolver y copiar) no se cuenta como del juego. Un error del medidor
+  nunca corta la llamada del juego: se anota en `perfilTarjeta.fallo`.
+
+### 115.3 Qué tiene que hacer el dueño
+
+1. Avanzado → Diagnóstico → **«🔬 Perfilar la tarjeta de video»** (la página se recarga).
+2. Jugar una carrera (al menos 20 s, con los 12 karts como siempre).
+3. Avanzado → Diagnóstico → **«📋 Copiar el informe de rendimiento»** y pegarlo en el chat.
+
+Con eso se sabe si el tiempo se va en muchas pasadas chicas, en una pasada grande con muchos dibujos, o en las copias,
+y se optimiza **eso** (en el renderizador o en la página), sin quitar rivales ni efectos (§114.6, §114.7).
+
+### 115.4 Pruebas
+
+- Banco **`perfil-gpu`** (8/8, nuevo), con **WebGPU de verdad** (en el PC sin tarjeta, la de software de Chrome:
+  SwiftShader): 10 cuadros de 3 pasadas (640×528 con 50 dibujos, 160×132 con 3, 640×528 con 1) más subidas y una copia;
+  el conteo exacto (30 pasadas, 540 dibujos, 10 copias, 200 KB), las marcas de cada pasada con su tamaño y dibujos (la
+  de 50 dibujos tarda más que la de 3), el dibujo sale igual (el píxel sigue rojo) y sin errores de WebGPU.
+- `prueba-celular` 41/41 (nuevo: «🔬 Perfilar» recarga con la medida pedida, «Mostrar qué frena» prendido y el medidor
+  puesto). Banco `graficos` 38/38.
+
+### 115.5 El tercer informe y el código de aurora (2026-10-26): lo que se descartó y el plan
+
+El dueño mandó el informe con el registro entero («con eso es suficiente: optimiza antes de otro PR»). Lo que dice,
+leído junto al código de aurora (el commit fijado + `parches/aurora-web.diff`):
+
+- **En la carrera, cada cuadro**: 12 pasadas, 200–420 dibujos de WebGPU que juntan **5 000–12 500 dibujos de la Wii**
+  («merged» en la línea `staging` de aurora), y se suben 1,1–2,5 MB (vértices, uniformes, índices, storage).
+- **La resolución NO es**: con la escala 1×, aurora dibuja siempre en **640×528** (`window.cpp` `get_window_size`:
+  `g_frameBufferScale = 1` y `g_frameBufferAspectFit` → el tamaño de la Wii) y solo **estira** esa imagen al lienzo
+  con un shader de una lectura por pixel (`gpu.cpp` `create_copy_pipeline`). Bajar la «resolución de salida» casi no
+  cambia nada: el consejo del medidor («baja la resolución de salida») estaba mal y se sacó (`queFrena`).
+- **Lo que se ve SÍ**: con el cajón abierto el lienzo quedó en 266×539; el juego (pantalla «dinámica» de RR,
+  `dynamic_aspect.cpp`: el ancho de la vista sigue al del lienzo) ve una tajada angosta de la pista y bajó a 20 ms
+  por cuadro; a pantalla completa (2,18:1, más ancho que el 16:9 de la Wii) 34 ms. El costo sigue a lo que se dibuja.
+- **Descartado en el código**: lecturas de la tarjeta que hagan esperar al juego (la copia del EFB a la memoria
+  sincrónica, `complete_downloads`, no la llama nadie; la del destello del sol y la del Z van en segundo plano),
+  antialiasing (MSAA = 1), el estirado final.
+- **Por qué «juego» y «tarjeta» marcan igual (33 y 34 ms)**: «juego» cuenta todo lo que no es la espera del reloj VI,
+  así que incluye la pausa de presentar de aurora (esperar que el navegador tome el lienzo, §54), que se alarga si la
+  tarjeta va atrasada; y «tarjeta» (del envío a `onSubmittedWorkDone`) incluye la cola y el proceso de GPU del
+  navegador. Cada número contiene al otro: con ellos no se puede saber cuál frena.
+- **El precalentado de pipelines** (931, de a 2 por cuadro y 4 a la vez, 100–1000 ms cada uno en el teléfono) duró
+  **41 s desde el arranque** y entró a la primera carrera: coincide con el tramo lento del primer informe (§114.8).
+
+**El plan** (el dueño eligió hacerlo en la sesión del PC, donde se compila y corre el juego):
+1. Separar de verdad: (a) el cálculo puro del juego por cuadro = «juego» menos lo que esperó en
+   `mkwEsperaToma`/`mkwEsperaAtrasada` (las dos son de la página: se miden ahí); (b) el tiempo de la tarjeta por pasada
+   con las marcas de tiempo (`perfil-gpu.mjs`, §115.2). Medir en el PC con la CPU frenada (`--perfil celular` de
+   `medir-sitio.mjs`) y, si se puede, en el teléfono.
+2. Si frena el cálculo: perfilar qué parte de aurora se lleva el tiempo convirtiendo los miles de dibujos de la Wii
+   (procesador de comandos, conversión de vértices, juntar dibujos) y optimizar eso.
+3. Si frena la tarjeta: las pasadas y copias más caras (§115.2) y cómo cuestan en una tarjeta por baldosas.
+4. Además: el precalentado que no entre a la carrera en el teléfono, y el enganche del reloj VI hasta ~1 % (§114.8).
+Siempre 12 karts y todos los efectos (§114.6–114.7); nada se publica sin la confirmación del dueño.
+
+## 2026-10-27 · §116 Multiplayer «trabajando para usted» (pedido del dueño)
+
+El dueño: «el multiplayer está totalmente roto, oculta el multiplayer de la página por ahora y ponle trabajando para
+usted». En el menú de inicio «JloKart Wii» (`inicio.mjs`, §67) el botón **Multiplayer** sigue a la vista pero:
+
+- pintado de **gris** con un cartel amarillo de obra **«🚧 Trabajando para usted»** encima (gris pintado y no con un
+  filtro: un filtro gris apagaba también el cartel);
+- **no abre nada**: ni con el teclado, ni con A del mando, ni con el clic o «PRESS START» (se sacude un poco y la línea
+  de ayuda dice «Trabajando para usted: el multijugador vuelve pronto»); tampoco dentro del sitio, así que no se llega
+  ni a «Local» ni a «Online»;
+- Single Player y Options siguen igual.
+
+Es una opción del menú (`crearInicio({ multiEnObra })`, por omisión sí). **`?multi=1`** en la dirección de la página
+lo devuelve como antes, para probar el multijugador mientras se arregla. Para volver a abrirlo para todos: en
+`mkw.mjs`, `multiEnObra` en `false`.
+
+Pruebas: banco `inicio` 16/16 (nuevo §10c: gris con el cartel, no abre por teclado, mando ni clic, también en el sitio,
+la ayuda lo dice y Options sigue; las pruebas viejas de Multiplayer → Local/Online corren con `multiEnObra: false`).
+Fotos acostado y en un teléfono parado: el cartel se lee y no tapa nada.
+
+### 116.1 También las salas que se crean desde Juegos (el dueño: «tienes que ocultar también los que se crean desde juegos»)
+
+El multijugador de Mario Kart también se abre desde la página de **Juegos** (el sitio): su tarjeta en el salón abre una
+ficha con «Abrir sala e invitar», y las salas que esperan se ofrecen con «Unirme». Eso también queda «trabajando para
+usted», con una lista nueva del sitio, **`SALAS_EN_OBRA`** (`colabtex/src/juegos/salon-datos.js`: `{ mkw: { solo:
+"#solo/mkw" } }`):
+
+- **La tarjeta** del salón lleva el cartel amarillo «🚧 Trabajando para usted» (dentro de la imagen, debajo de las
+  etiquetas de jugadores y Celular/PC).
+- **La ficha** ya no tiene salas, opciones ni «Abrir sala»: un recuadro amarillo «Trabajando para usted — las salas de
+  Mario Kart Wii están en arreglo» y el botón grande **«▶ Jugar solo»** (el Mario Kart de un jugador, `#solo/mkw`, que
+  anda).
+- **Nadie abre ni entra a una sala** por otro camino: `crear()` y `entrar()` no hacen nada para un juego de la lista, y
+  las salas de Mario Kart que ya esperaban o se estaban jugando no aparecen en el vestíbulo.
+- **Quien llega por un enlace** a una sala vieja (o desde «mis salas») ve solo el cartel y «▶ Jugar solo mientras
+  tanto», sin cargar el juego.
+- `?salasObra=0` en la dirección de Juegos las deja abrir igual, para probarlas mientras se arreglan. Para volver a
+  abrirlas para todos: borrar la línea `mkw` de `SALAS_EN_OBRA`.
+
+Pruebas: sitio `mkw.test.cjs` 25/25 (nuevo §116) y `npm run test:juegos` entero; la tarjeta y la ficha dibujadas con
+el `salon.js` de verdad y las hojas de `juegos.html`, en claro y oscuro y con una tarjeta angosta (el cartel no tapa
+nada; la ficha no ofrece abrir sala y su botón va a `#solo/mkw`).

@@ -78,8 +78,13 @@ export function queFrena({ fps = null, trabajo = null, gpu = null, hz = null } =
   if (!Number.isFinite(fps) || fps <= 0) return '';
   if (fps >= 57) return 'nada (va a 60)';
   if (Number.isFinite(hz) && hz > 0 && hz < 50) return `la pantalla: refresca a ${Math.round(hz)} Hz (¿ahorro de batería?)`;
-  if (Number.isFinite(gpu) && gpu > 14) return 'la tarjeta de video: baja la resolución de salida';
-  if (Number.isFinite(trabajo) && trabajo > 14.5) return 'el procesador: el juego no alcanza a calcular un cuadro en 16,7 ms';
+  // §115: los dos números se incluyen el uno al otro (el juego espera a la tarjeta dentro de su cuadro y la tarjeta
+  // espera al juego); si los dos pasan el cuadro, no se sabe cuál frena. Y bajar la salida no ayuda: aurora dibuja
+  // siempre en 640×528 y solo estira la imagen al lienzo.
+  const gpuAlto = Number.isFinite(gpu) && gpu > 14, juegoAlto = Number.isFinite(trabajo) && trabajo > 14.5;
+  if (gpuAlto && juegoAlto) return 'el dibujo de cada cuadro (el juego y la tarjeta tardan juntos: falta separar cuál)';
+  if (gpuAlto) return 'la tarjeta de video';
+  if (juegoAlto) return 'el procesador: el juego no alcanza a calcular un cuadro en 16,7 ms';
   return 'el ritmo (ni el procesador ni la tarjeta están al tope)';
 }
 

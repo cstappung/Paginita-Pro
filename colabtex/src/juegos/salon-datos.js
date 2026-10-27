@@ -339,3 +339,12 @@ export const MOTIVO_CUENTA = {
   casino: { t: "El casino juega con tus monedas", d: "Las apuestas se pagan con las monedas que ganas jugando y los premios vuelven a tu cuenta. Inicia sesión para subirte al avión o hacer saltar al pingüino." },
   perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
 };
+
+/* Salas «trabajando para usted» (el dueño, 2026-10-27: «el multiplayer
+   está totalmente roto, ocúltalo por ahora y ponle trabajando para
+   usted»). Un juego de esta lista no abre salas: su ficha muestra el
+   cartel y, si lo tiene, el camino para jugar solo mientras tanto
+   (`solo`); las salas que esperan no se ofrecen ni se puede entrar a
+   ellas, y quien llega por un enlace ve el cartel. Para volver a
+   abrirlas, se borra la línea del juego. */
+export const SALAS_EN_OBRA = { mkw: { solo: "#solo/mkw" } };

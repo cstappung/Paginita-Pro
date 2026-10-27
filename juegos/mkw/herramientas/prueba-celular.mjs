@@ -180,6 +180,13 @@ await toca('#copiarRendimiento'); await espera(300);
 const inf = await p.evaluate(() => { try { return JSON.parse(document.getElementById('informeRendimiento').textContent); } catch { return null; } });
 ok('«📋 Copiar el informe de rendimiento»: el informe dice teléfono, pantalla, lienzo y qué frena', !!inf && inf.telefono === true && 'pantallaHz' in inf && /×/.test(inf.lienzo) && 'frena' in inf,
    JSON.stringify(inf && { telefono: inf.telefono, hz: inf.pantallaHz, lienzo: inf.lienzo, nota: inf.nota }));
+// «🔬 Perfilar la tarjeta» (§115): deja pedida la medida, prende «Mostrar qué frena» y recarga; el medidor queda
+// puesto (si el navegador tiene WebGPU) y espera la carrera para medir (aquí no hay carrera: queda pedido)
+await toca('#perfilarGpu'); await espera(1500); await andando();
+const per = await p.evaluate(() => ({ pedido: localStorage.getItem('mkw.perfilGpu'), detalle: JSON.parse(localStorage.getItem('mkw.graficos') || '{}').verDetalle,
+  puesto: !!window.mkwPerfilGpu, webgpu: !!globalThis.GPUCommandEncoder }));
+ok('«🔬 Perfilar»: recarga con la medida pedida, «Mostrar qué frena» prendido y el medidor puesto si hay WebGPU',
+   per.pedido === '1' && per.detalle === true && per.puesto === per.webgpu, JSON.stringify(per));
 ok('sin errores en la página', errores.length === 0, errores.join(' | '));
 console.log(`fin: ${bien} bien, ${mal} mal`);
 await b.close(); srv.kill();

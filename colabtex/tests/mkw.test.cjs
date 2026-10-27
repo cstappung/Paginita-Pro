@@ -488,3 +488,28 @@ test('§100 (H1.2) la prueba de conexión: el marco dice cómo le llega cada pil
  const juego=fs.readFileSync(raiz('../juegos/mkw/web/navegador/mkw.mjs'),'utf8');
  assert.match(juego,/tipo: 'conexiones',\s*de: Object\.fromEntries\(lista\.map\(c => \[c\.uid, \{ e: c\.e, ms: c\.ms \?\? null, por: c\.por \|\| null \}\]\)\)/);
 });
+
+test('§116 «trabajando para usted»: las salas de Mario Kart no se abren ni se entra a ellas; la ficha ofrece jugar solo',()=>{
+ // el dueño (2026-10-27): «el multiplayer está totalmente roto, ocúltalo por ahora y ponle trabajando para usted»
+ const datos=fs.readFileSync(raiz('src/juegos/salon-datos.js'),'utf8');
+ assert.match(datos,/export const SALAS_EN_OBRA = \{ mkw: \{ solo: "#solo\/mkw" \} \};/,'Mario Kart en obra, con su camino de un jugador');
+ const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8');
+ assert.match(main,/const salaEnObra = k => \(!PROBAR_OBRA && SALAS_EN_OBRA\[k\]\) \|\| null;/);
+ assert.match(main,/const PROBAR_OBRA = \/\[\?&\]salasObra=0\(&\|\$\)\/\.test\(location\.search\);/,'?salasObra=0 = abrirlas igual para probar');
+ assert.match(main,/async function crear\(juego, extra\) \{[\s\S]{0,120}if \(salaEnObra\(juego\)\) return;/,'crear no abre la sala');
+ assert.match(main,/if \(sala && salaEnObra\(sala\.juego\)\) return;/,'entrar no entra');
+ assert.match(main,/function salasAbiertas\(\) \{[\s\S]{0,400}&& !salaEnObra\(s\.juego\)\);/,'las que esperan no se ofrecen');
+ assert.match(main,/state\.enCurso\.filter\([^\n]*&& !salaEnObra\(x\.juego\)\);/,'ni las que se están jugando');
+ assert.match(main,/const obra = salaEnObra\(p\.juego\);\s*if \(obra\) \{\s*ambientar\(""\); desmontaJuego\(\);[\s\S]{0,700}🚧 Trabajando para usted[\s\S]{0,300}return;\s*\}/,'la sala por enlace: solo el cartel, sin el juego');
+ assert.match(main,/enObra: k => salaEnObra\(k\),/);
+ const sal=fs.readFileSync(raiz('src/juegos/salon.js'),'utf8');
+ const rama=sal.match(/if \(obra\) \{([\s\S]*?)\} else if \(bloq\) \{/);
+ assert.ok(rama,'la ficha tiene su rama «en obra» antes de la del invitado');
+ assert.match(rama[1],/<h3>Trabajando para usted<\/h3>/);
+ assert.match(rama[1],/data-f="juega">▶ Jugar solo<\/a>/,'con camino solo, el botón grande es jugar solo');
+ assert.doesNotMatch(rama[1],/data-f="sala"|data-f="unirse"|opcionesHtml|salasHtml/,'sin abrir sala, unirse ni opciones');
+ assert.match(sal,/if \(\(f === "sala" \|\| f === "unirse"\) && enObra\(e\)\) return;/);
+ assert.match(sal,/obra \? '<span class="jg-mn-etq obra" aria-hidden="true">🚧 Trabajando para usted<\/span>'/,'la tarjeta del salón lleva el cartel');
+ const html=fs.readFileSync(raiz('../juegos.html'),'utf8');
+ assert.match(html,/\.jg-mn-etq\.obra\{/);assert.match(html,/\.jg-hoja-obra\{/);assert.match(html,/html\[data-tema=oscuro\] \.jg-hoja-obra\{/);
+});
