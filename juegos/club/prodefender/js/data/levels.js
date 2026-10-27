@@ -188,6 +188,8 @@
     //    donde el jugador quiera.
     //  - Pactos cada diez rondas (engine.js: PD.PACTOS).
     //  - `ley`: la regla propia del reino (PD.LEYES, abajo), que decide la forma de ganarlo.
+    //  - `pactoPrecio` (reinos 12-15): cada pacto aceptado da esa parte más de vida a los
+    //    enemigos, sumada (engine.js: aplicaMods). La Necrópolis no lo tiene: se dejó como se jugó.
     {
       name: 'Necrópolis Olvidada', short: 'Necrópolis', slug: 'necropolis', abre: '2026-10-27', era: 3, musica: 4,
       subtitle: 'Las tumbas no guardan a nadie. Lo que cae aquí, se vuelve a levantar.',
@@ -209,7 +211,7 @@
     {
       name: 'Jardín de Esporas', short: 'Esporas', slug: 'esporas', abre: '2026-10-28', era: 3, musica: 0,
       subtitle: 'Hongos que brillan, polen que cura… y esporas que atascan tus defensas.',
-      diff: 4.8, lives: 80, cash: 1050, seed: 12161, stars: 5,
+      diff: 6.0, pactoPrecio: 0.12, lives: 80, cash: 1050, seed: 12161, stars: 5,
       theme: { bg1: '#1a1426', bg2: '#120e1c', path: '#4a3446', pathEdge: '#0e0810', deco: 'fungi', accent: '#5affc8' },
       paths: [
         [[-30, 140], [260, 140], [260, 520], [560, 520], [560, 300], [820, 300], [820, 560], [1030, 560]],
@@ -227,7 +229,7 @@
     {
       name: 'Laberinto de Espejos', short: 'Espejos', slug: 'espejos', abre: '2026-10-29', era: 3, musica: 2,
       subtitle: 'Nada es lo que parece. Cada reflejo es un enemigo más.',
-      diff: 4.2, lives: 75, cash: 1050, seed: 13171, stars: 5,
+      diff: 5.2, pactoPrecio: 0.12, lives: 75, cash: 1050, seed: 13171, stars: 5,
       theme: { bg1: '#2a3048', bg2: '#1c2236', path: '#9aaccc', pathEdge: '#3a4a7a', deco: 'mirror', accent: '#ff7ad8' },
       paths: [
         [[-30, 320], [180, 320], [180, 100], [420, 100], [420, 320], [300, 320], [300, 540], [560, 540], [700, 140, 1], [900, 140], [900, 460], [1030, 460]],
@@ -245,7 +247,7 @@
     {
       name: 'Archipiélago Celeste', short: 'Archipiélago', slug: 'archipielago', abre: '2026-10-30', era: 3, musica: 1,
       subtitle: 'Islas que flotan entre las nubes, puentes colgantes y un cielo lleno de velas.',
-      diff: 5.4, lives: 75, cash: 1100, seed: 14173, stars: 5,
+      diff: 6.7, pactoPrecio: 0.12, lives: 75, cash: 1100, seed: 14173, stars: 5,
       theme: { bg1: '#8ac8f0', bg2: '#5aa0d8', path: '#b8905a', pathEdge: '#4a2a12', deco: 'sky', accent: '#ffffff' },
       paths: [
         [[-30, 120], [220, 120], [220, 330], [80, 330], [80, 540], [340, 540], [520, 180, 1], [760, 180], [760, 400], [600, 400], [600, 560], [1030, 560]],
@@ -263,7 +265,7 @@
     {
       name: 'La Noche Eterna', short: 'Noche', slug: 'noche', abre: '2026-10-31', era: 3, musica: 3,
       subtitle: 'Tres caminos, una luna naranja y un jinete que perdió la cabeza.',
-      diff: 4.3, lives: 70, cash: 1150, seed: 15187, stars: 5,
+      diff: 5.4, pactoPrecio: 0.12, lives: 70, cash: 1150, seed: 15187, stars: 5,
       theme: { bg1: '#1a1024', bg2: '#100a18', path: '#4a3428', pathEdge: '#0c060e', deco: 'night', accent: '#ff7a1a' },
       paths: [
         [[-30, 90], [260, 90], [260, 320], [500, 320], [500, 560], [1030, 560]],

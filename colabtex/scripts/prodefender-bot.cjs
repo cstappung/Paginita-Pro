@@ -848,6 +848,9 @@ class Bot {
         const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); }
       }
       else if (k === 'm') { const t = torre(a); if (t) t.mode = b; }
+      else if (k === 'g') g.placeSpikes(a, b);
+      else if (k === 'k') { if (g.pactoPendiente()) g.elegirPacto(a); }
+      else if (k === 'x') { if (g.poderListo()) g.lanzarPoder(a, b); }
       this.gi++;
     }
     return true;

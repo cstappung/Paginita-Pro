@@ -506,6 +506,9 @@
         for (const k in P.m || {}) M[k] *= P.m[k];
         for (const k in P.set || {}) M[k] = k === 'ap' ? Math.max(M.ap, P.set.ap) : P.set[k];
       }
+      // reinos 12-15 (levels.js `pactoPrecio`): cada pacto aceptado da además más vida a los
+      // enemigos, y se suma. La Necrópolis se ganó juntando cinco pactos sin dejar pasar a nadie.
+      if (this.L.pactoPrecio) M.vidaEnem *= 1 + this.L.pactoPrecio * this.pactos.filter(p => p.id).length;
       this.mods = M;
     }
 

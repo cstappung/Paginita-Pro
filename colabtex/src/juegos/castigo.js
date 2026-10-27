@@ -63,6 +63,9 @@ export function esTrampa(s) {
      ?v= del iframe, y gente que jugó normal se llevó el castigo. Se rechaza
      igual (no entra a la tabla), pero no se castiga. */
   if (/otra versi[oó]n/i.test(m)) return false;
+  /* PRO DEFENDER: un reino jugado sin la ronda 50 del anterior en la tabla. Se rechaza, pero
+     puede ser un récord anterior que aún no subió: no es trampa. */
+  if (/sin desbloquear/.test(m)) return false;
   return true;
 }
 

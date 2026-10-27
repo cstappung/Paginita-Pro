@@ -126,6 +126,13 @@ function analiza(p) {
     else if (c === 2) { const t = torre(j[2]); if (!t) throw new Error('venta imposible'); acciones.push('−' + nombre(t.type)); g.sell(t); }
     else if (c === 3) { const t = torre(j[2]); if (t) t.mode = P.MODOS[j[3]]; }
     else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); empieza(g); }
+    else if (c === 6) { if (!g.placeSpikes(j[2], j[3])) throw new Error('pinchos imposibles'); acciones.push('pinchos'); }
+    else if (c === 7) {   // tercera era: el pacto elegido entre los tres que se ofrecían
+      const o = g.ofertasPacto();
+      acciones.push('📜 ' + (j[2] < 3 && o[j[2]] ? o[j[2]].name : 'sin pacto') + ' (de ' + o.map(x => x.id).join(', ') + ')');
+      if (!g.elegirPacto(j[2])) throw new Error('pacto imposible');
+    }
+    else if (c === 8) { if (!g.lanzarPoder(j[2], j[3])) throw new Error('el poder no estaba listo'); acciones.push('✨ Poder del Reino'); }
     else if (c === 5) {
       const snap = JSON.parse(JSON.stringify(g.snapshot()));
       snap.continues -= j[2];

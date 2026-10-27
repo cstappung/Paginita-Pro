@@ -209,13 +209,15 @@
       const prueba = enPrueba(li);
       if (li === PUB) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era !== 3).length;
-        grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día, abierto a todos y sin pasar por los anteriores: 🪙 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: 🪙 100 por ronda en cada uno'}</div>`));
+        grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día; cada uno se desbloquea llegando a la ronda ' + PD.UNLOCK_ROUND + ' del anterior: 🪙 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: 🪙 100 por ronda en cada uno'}</div>`));
       }
       if (L.era === 3 && PD.LEVELS[li - 1].era !== 3) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 3).length;
         grid.appendChild(el(`<div class="lvl-sep era3"><b>Tercera Era · La Era del Caos</b> · más difícil: <b>pactos</b> cada diez rondas, <b>eventos</b> que cambian la ronda, el <b>Poder del Reino</b> y el <b>héroe que elijas</b>. ${quedan ? 'Un reino nuevo cada día desde el 27 de octubre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'Cinco reinos de pesadilla'} · 🪙 100 por ronda</div>`));
       }
-      const locked = prueba ? !admin : !segunda(li) && li > save.unlocked;
+      // todos los reinos piden la ronda 50 del anterior (los de la segunda y la tercera era
+      // también: antes bastaba con que llegara su día)
+      const locked = prueba ? !admin : li > save.unlocked;
       const best = prueba ? 0 : save.best[li] || 0;
       const run = save.runs[li];
       const clasicas = PD.towersFor(li).filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined).length;
@@ -227,7 +229,7 @@
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
-          ${L.era === 3 ? `<div class="lc-new">${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los diez héroes (uno por partida).">♛ Héroe a elección</span><span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span></div>`
+          ${L.era === 3 ? `<div class="lc-new">${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los diez héroes (uno por partida).">♛ Héroe a elección</span>${L.pactoPrecio ? `<span title="Cada pacto aceptado da +${Math.round(L.pactoPrecio * 100)}% de vida a los enemigos, y se suma.">⚖ Pactos con precio</span>` : ''}<span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span></div>`
             : `<div class="lc-new">${realmTowers(li).concat(PD.heroOf(li) ? [PD.heroOf(li)] : []).map(id => `<span class="${PD.TOWERS[id].hero ? 'hero' : ''}" title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].hero ? '♛ ' : ''}${PD.TOWERS[id].name}</span>`).join('')}</div>`}
           ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era === 3 || PD.TOWERS[id].realm < PUB)).length} de las ${L.era === 3 ? 15 : 10} de reino</div>` : ''}
           <div class="meta">
@@ -342,7 +344,7 @@
       box.appendChild(el('<p class="alm-nota">Cada reino de la Tercera Era tiene su propia ley, que dura toda la partida y decide la forma de ganarlo: lo que funciona en uno no sirve en otro.</p>'));
       for (const [L] of era3) { const Y = PD.LEYES[L.ley]; if (Y) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${Y.icon}</span><div><h4>${Y.name}</h4><div class="sub">${L.name} · ${Y.meta}</div></div></div><p>${Y.desc}</p></div>`)); }
       box.appendChild(el('<div class="alm-sec">📜 Pactos</div>'));
-      box.appendChild(el('<p class="alm-nota">En la Tercera Era, antes de la primera ronda y cada diez rondas se ofrecen tres de estos pactos: tomas uno (o ninguno) y su ventaja y su carga duran toda la partida. No se repiten.</p>'));
+      box.appendChild(el('<p class="alm-nota">En la Tercera Era, antes de la primera ronda y cada diez rondas se ofrecen tres de estos pactos: tomas uno (o ninguno) y su ventaja y su carga duran toda la partida. No se repiten. Desde el Jardín de Esporas, además, cada pacto aceptado da +12% de vida a los enemigos (se suma): elige pocos y bien.</p>'));
       for (const P of PD.PACTOS) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${P.icon}</span><div><h4>${P.name}</h4><div class="sub" style="color:#7affb0">✔ ${P.bueno}</div><div class="sub" style="color:#ff8a8a">✘ ${P.malo}</div></div></div></div>`));
       box.appendChild(el('<div class="alm-sec">⚡ Eventos</div>'));
       box.appendChild(el('<p class="alm-nota">Una ronda de cada cinco (la 8, la 13, … la 98) trae un evento. La vista previa lo anuncia antes, para que prepares la defensa.</p>'));
@@ -494,7 +496,7 @@
       guardaQuieto(); construyePactos(); updateHud(true); updateShop(); refreshInfo();
       sfx('upgradeMax');
     };
-    modal(`<div class="big-ico">📜</div><h2>${r === 0 ? 'Un pacto para empezar' : 'Hora de un pacto'}</h2><p>${r === 0 ? 'Antes de la primera ronda' : 'Has resistido ' + r + ' rondas'}. Elige un pacto: cada uno trae una <b style="color:#7affb0">ventaja</b> y una <b style="color:#ff8a8a">carga</b> que duran toda la partida. También puedes rechazarlos.</p>`,
+    modal(`<div class="big-ico">📜</div><h2>${r === 0 ? 'Un pacto para empezar' : 'Hora de un pacto'}</h2><p>${r === 0 ? 'Antes de la primera ronda' : 'Has resistido ' + r + ' rondas'}. Elige un pacto: cada uno trae una <b style="color:#7affb0">ventaja</b> y una <b style="color:#ff8a8a">carga</b> que duran toda la partida. También puedes rechazarlos.</p>${game.L.pactoPrecio ? `<p style="color:#ffb08a">⚖ En este reino cada pacto tiene un precio: los enemigos tienen <b>+${Math.round(game.L.pactoPrecio * 100)}% de vida por cada pacto</b> que hayas aceptado (llevas ${game.pactos.filter(p => p.id).length}).</p>` : ''}`,
       ofs.map(carta).concat([{ label: 'Rechazar los pactos', cls: 'ghost', fn: () => elige(3) }]));
     $('#modal-box').classList.add('pactos');
   }
@@ -1004,7 +1006,7 @@
           toast(`<b>Ronda ${ev.round} superada</b>+${fmt(ev.bonus)} oro${ev.farm ? ` · cosecha +${fmt(ev.farm)}` : ''}`, 'good', null, 2600);
           const li = game.li, prueba = enPrueba(li);
           if (!prueba) save.best[li] = Math.max(save.best[li] || 0, ev.round);
-          if (ev.round >= PD.UNLOCK_ROUND && li < PUB - 1) save.unlocked = Math.max(save.unlocked, li + 1);
+          if (ev.round >= PD.UNLOCK_ROUND && li < PD.LEVELS.length - 1 && !prueba) save.unlocked = Math.max(save.unlocked, li + 1);
           if (!prueba) anota(li, ev.round);   // los reinos en pruebas no guardan récords
           if (game.won) { delete save.runs[li]; if (!prueba) save.won[li] = true; writeSave(); }
           else guardaPartida();
@@ -1018,10 +1020,11 @@
           const li = game.li;
           ui.autoT = -1;
           sfx('unlock');
-          if (li < PUB - 1) {
+          if (li < PD.LEVELS.length - 1 && !enPrueba(li)) {
             ui.paused = true;
             const nt = realmTowers(li + 1).map(id => PD.TOWERS[id].name).join(' y ');
-            modal(`<div class="big-ico">🔓</div><h2>¡Reino desbloqueado!</h2><p>Has resistido ${PD.UNLOCK_ROUND} rondas en <b>${game.L.name}</b>.<br>Ya puedes jugar <b>${PD.LEVELS[li + 1].name}</b>${nt ? `, con dos defensas nuevas: <b>${nt}</b>` : ''}.</p><p style="font-size:13px;color:var(--muted)">Sigue hasta la ronda 100 para conseguir el trofeo de este reino.</p>`, [
+            const sig = PD.LEVELS[li + 1].name;
+            modal(`<div class="big-ico">🔓</div><h2>¡Reino desbloqueado!</h2><p>Has resistido ${PD.UNLOCK_ROUND} rondas en <b>${game.L.name}</b>.<br>${enPrueba(li + 1) ? `Podrás jugar <b>${sig}</b> cuando se abra, ${cuandoAbre(li + 1)}` : `Ya puedes jugar <b>${sig}</b>`}${nt ? `, con dos defensas nuevas: <b>${nt}</b>` : ''}.</p><p style="font-size:13px;color:var(--muted)">Sigue hasta la ronda 100 para conseguir el trofeo de este reino.</p>`, [
               { label: 'Seguir hasta la ronda 100', cls: 'go', fn: () => { ui.paused = false; } },
               { label: `Ir a ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { exitGame(); } }
             ]);
@@ -1035,7 +1038,7 @@
           const hasta = n => PD.LEVELS.slice(0, n).every((L, i) => save.won[i]);
           const all = hasta(PD.LEVELS.length) ? 'quince' : li < PUB && hasta(PUB) ? 'cinco' : '';
           modal(`<div class="big-ico">🏆</div><h2>¡Victoria!</h2><p>Has completado las 100 rondas de <b>${game.L.name}</b>.<br>Eliminados: ${fmt(game.stats.kills)} · Vidas restantes: ${fmt(game.lives)}</p>${all ? `<p><b>¡Has conquistado los ${all} reinos! Eres un verdadero PRO DEFENDER.</b></p>` : ''}`, [
-            ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && (segunda(li + 1) || save.unlocked > li) ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
+            ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && save.unlocked > li ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
             { label: 'Volver a los reinos', fn: () => { game = null; rec = null; ui.paused = false; show('levels'); } }
           ]);
           break;
@@ -1186,7 +1189,7 @@
     nube.forEach((n, li) => {
       if (!n) return;
       if (n > (save.best[li] || 0)) { save.best[li] = n; cambio = true; }
-      if (n >= PD.UNLOCK_ROUND && li < PUB - 1 && save.unlocked < li + 1) { save.unlocked = li + 1; cambio = true; }
+      if (n >= PD.UNLOCK_ROUND && li < PD.LEVELS.length - 1 && save.unlocked < li + 1) { save.unlocked = li + 1; cambio = true; }
       if (n >= PD.MAX_ROUND && !save.won[li]) { save.won[li] = true; cambio = true; }
     });
     if (cambio) writeSave();

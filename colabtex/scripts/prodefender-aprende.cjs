@@ -19,7 +19,8 @@
    - `guiones`: por reino, la mejor partida (la que llegó más lejos; entre las
      ganadas, la que acabó con más vidas) jugada a jugada: `[ronda, cuándo, 'p',
      tipo, x, y]` poner, `[ronda, cuándo, 'u', n.º de torre, camino]` mejorar,
-     `'v'` vender, `'m'` objetivo (el n.º de torre es el orden en que se puso;
+     `'v'` vender, `'m'` objetivo, `'g'` pinchos, `'k'` pacto, `'x'` Poder del Reino
+     (el n.º de torre es el orden en que se puso;
      cuándo es -1 entre rondas o los pasos desde que empezó la ronda: hay quien
      vende y rehace a mitad de una). El bot la sigue (`--guion N`: hasta la ronda N).
 
@@ -76,6 +77,9 @@ function rehace(p) {
     else if (c === 2) { if (!t) throw new Error('venta imposible'); guion.push([g.round + 1, cuando(), 'v', todas.indexOf(info.get(t))]); g.sell(t); }
     else if (c === 3) { if (t) { t.mode = P.MODOS[j[3]]; info.get(t).modo = t.mode; guion.push([g.round + 1, cuando(), 'm', todas.indexOf(info.get(t)), t.mode]); } }
     else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); inicio = k; }
+    else if (c === 6) { if (!g.placeSpikes(j[2], j[3])) throw new Error('pinchos imposibles'); guion.push([g.round + 1, cuando(), 'g', j[2], j[3]]); }
+    else if (c === 7) { guion.push([g.round + 1, cuando(), 'k', j[2]]); if (!g.elegirPacto(j[2])) throw new Error('pacto imposible'); }
+    else if (c === 8) { guion.push([g.round + 1, cuando(), 'x', j[2], j[3]]); if (!g.lanzarPoder(j[2], j[3])) throw new Error('poder imposible'); }
     else if (c === 5) {
       const viejas = g.towers.slice();
       const snap = JSON.parse(JSON.stringify(g.snapshot()));
