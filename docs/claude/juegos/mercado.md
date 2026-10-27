@@ -94,8 +94,16 @@ Starter items have no copy key and cannot be listed.
   plus the swatch colours per item. It uses `ui/thumbs.ts`'s single
   renderer. A pet is posed with the game's `Animator`: a fresh rig has its
   tail straight up and every face expression on at once.
-- Photos are cached in memory and in `sessionStorage`. The iframe closes
-  itself after 20 s idle.
+- Photos are cached in memory and in **localStorage** (`mc.foto.<version>.<key>`,
+  the last `MAX_GUARDADAS` = 48 in `mc.fotos`, oldest out first or when
+  storage is full; another viewer version's photos are dropped). They used
+  to live in `sessionStorage`, so every new tab redid them all.
+- The iframe is same-origin, so **it runs on the page's main thread**: one
+  photo is a 100–700 ms task that cannot be split. `visor-mascota.js`
+  therefore opens the iframe and asks for photos **one at a time**, only
+  with the page idle (`requestIdleCallback`) and no scroll for `CALMA_MS`
+  (600 ms). Sent all at once, the salón's Mascotas strip froze scrolling for
+  a minute. The iframe closes itself after 20 s idle.
 - Until a photo arrives, or without WebGL, the emoji and the ★ show.
 - The **live** view (`montaVisor`) is one iframe at a time, at 12 fps.
   It pauses off screen (IntersectionObserver) and in a hidden tab, and it

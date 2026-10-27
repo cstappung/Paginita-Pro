@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610270427"></script>
+<script src="i18n.js?v=202610270400"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -1032,7 +1032,11 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-ves-lado{grid-area:lado;position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto;overscroll-behavior:contain;display:grid;gap:16px;min-width:0}
   .jg-lado-caja{background:#fff;border:1px solid #e4dfeb;border-radius:18px;overflow:hidden;min-width:0}
   .jg-lado-caja header{display:flex;align-items:center;gap:9px;padding:15px 18px;border-bottom:1px solid #efebf5}.jg-lado-caja h2{font-size:14px;margin:0;flex:1;letter-spacing:-.2px}
-  .jg-vivo{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:jgVivo 2s infinite}@keyframes jgVivo{0%{box-shadow:0 0 0 0 #22c55e80}70%,100%{box-shadow:0 0 0 7px #22c55e00}}
+  .jg-vivo{position:relative;width:8px;height:8px;border-radius:50%;background:#22c55e}
+  /* El aro que late (aquí, en las tarjetas y en la ficha) crece con transform y se apaga con opacity:
+     así lo mueve la GPU. Con box-shadow, cada punto verde repintaba la página entera en cada cuadro. */
+  .jg-vivo::after,.jg-mn-vivo i::after,.jg-hoja-salas i::after{content:"";position:absolute;inset:0;border-radius:50%;background:#22c55e80;pointer-events:none;animation:jgVivo 2s infinite}
+  @keyframes jgVivo{0%{transform:scale(1);opacity:1}70%,100%{transform:scale(2.75);opacity:0}}
   .jg-lado-n{font:600 11px 'IBM Plex Mono',monospace;background:#f2eef9;color:var(--jg-purple);border-radius:100px;padding:3px 9px}
   .jg-sala{display:flex;align-items:center;gap:12px;padding:13px 16px;box-shadow:inset 3px 0 var(--c)}.jg-sala+.jg-sala{border-top:1px solid #f1eef6}.jg-sala-mia{box-shadow:none}
   .jg-sala-ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;font-size:16px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,#fff)}
@@ -3815,15 +3819,30 @@ html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
   .jg-th-fiesta>i{display:none}
   .jg-av.jg-marco-hw::before,.jg-hw-sello::after{animation:none!important}
 }
-/* En el salón y el chat general los marcos animados están quietos y se
-   mueven con el puntero encima de su fila o su tarjeta. Las tiras de drops,
-   los tops y el top de monedas llevan decenas de fotos chicas, y cada marco
-   que se mueve repinta la página entera en cada cuadro: medido con el CSS
-   de esta hoja, 4 marcos en pantalla tenían el hilo ocupado un 25 %, 12 un
-   41 % y 30 un 92 % (la página no respondía al llegar abajo). Va con
-   !important porque varios marcos ponen `animation` entera en ::before. */
-:is(.jg-sal,.jg-cg-lista) .jg-av,:is(.jg-sal,.jg-cg-lista) .jg-av *,:is(.jg-sal,.jg-cg-lista) .jg-av::before,:is(.jg-sal,.jg-cg-lista) .jg-av::after,:is(.jg-sal,.jg-cg-lista) .jg-av *::before,:is(.jg-sal,.jg-cg-lista) .jg-av *::after{animation-play-state:paused!important}
-:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av::before,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av::after,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *::before,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *::after{animation-play-state:running!important}
+/* En el salón, el chat general y el riel de las mejores partidas los
+   marcos animados, los nombres con color animado (`.jg-nm`, que anima su
+   text-shadow), las cartas legendarias de PRODROP y el aro que gira del
+   1.º de «Últimos tops» están quietos y se mueven con el puntero encima de
+   su fila o su tarjeta. Las tiras de drops, los tops y el top de monedas
+   llevan decenas de fotos chicas, y cada marco que se mueve repinta la
+   página entera en cada cuadro: medido con el CSS de esta hoja, 4 marcos en
+   pantalla tenían el hilo ocupado un 25 %, 12 un 41 % y 30 un 92 % (la
+   página no respondía al llegar abajo). En octubre de 2026 seguía trabado
+   al hacer scroll: el riel (fuera de `.jg-sal`) tenía 64 piezas de marco
+   moviéndose y los nombres de colores otras 47; nada de eso va por GPU
+   (text-shadow, box-shadow, SVG, propiedades `--`), y basta una sola
+   animación así para que Chrome rehaga las capas de toda la página en cada
+   cuadro. Va con !important porque varios marcos ponen `animation` entera
+   en ::before. */
+:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc),:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc) *,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc)::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc)::after,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc) *::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc) *::after,.jg-sal .jg-top.p1::after{animation-play-state:paused!important}
+:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc),:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc) *,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc)::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc)::after,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc) *::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc) *::after,.jg-sal .jg-top.p1:hover::after{animation-play-state:running!important}
+/* Lo que sale de la pantalla se pausa entero (`.jg-fuera-vista`, `vigilaFueraDeVista`
+   en juegos-main.js: las secciones del salón y la cabecera): una animación
+   que no va por GPU cuesta lo mismo vista que no. */
+.jg-fuera-vista,.jg-fuera-vista *,.jg-fuera-vista::before,.jg-fuera-vista::after,.jg-fuera-vista *::before,.jg-fuera-vista *::after{animation-play-state:paused!important}
+/* La cabecera también se ve dentro de una sala o un juego del club: ahí su
+   brillo y su latido se quedan quietos (`jg-rieles` = una vista de menú). */
+html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip),html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip) *,html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip)::before,html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip)::after{animation-play-state:paused!important}
 @keyframes jgMini{from{opacity:0;transform:translateY(6px) scale(.98)}}
 @keyframes jgHoja{from{transform:translateY(110%)}}
 
@@ -4238,9 +4257,18 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 .jg-ban-c[data-ep=trigon] .jg-ban-logo{letter-spacing:.06em;color:transparent;background:linear-gradient(90deg,#fff38a,#f6d23c 40%,#ff9a3c 70%,#d77bd1);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 4px 0 #3a1c7a) drop-shadow(0 0 22px #9b7bffaa)}
 .jg-ban-c[data-ep=prodrop] .jg-ban-logo{color:transparent;background:linear-gradient(90deg,#ff5fb0,#ffcc3d);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 4px 0 #3b0f6b) drop-shadow(0 0 24px #ff5fb088)}
 .jg-ban-c[data-ep=futbol] .jg-ban-logo{color:transparent;background:linear-gradient(90deg,#fff,#9ff0b8 45%,#ffcc3d);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 4px 0 #0b3d1a) drop-shadow(0 0 24px #1a8a3a99)}
-.ep-fu .ep-pd-carta{background:radial-gradient(circle at 50% 30%,#fff,#dfe6f2 70%,#b9c7da)}
-.ep-fu .ep-pd-carta img{object-position:50% 10%}
-.ep-fu .ep-pd-leg{background:#c26bff;color:#fff}
+.ep-fu .ep-pd-carta{border-color:#ffcc3d;box-shadow:0 0 30px #ffcc3d88,0 18px 40px #000a}
+.ep-fu .ep-pd-carta.c2{box-shadow:0 0 54px #ffcc3dcc,0 20px 50px #000b}
+.ep-fu .ep-pd-carta img{object-position:50% 14%}
+.ep-fc-media{position:absolute;top:5px;right:7px;z-index:2;font:400 24px/1 Bungee,'Arial Black',sans-serif;color:#fff;text-shadow:0 2px 0 #000b,0 0 10px #000c;text-align:right}
+.ep-fc-media small{display:block;margin-top:2px;padding:2px 5px;border-radius:99px;background:#0b1a3ae0;box-shadow:0 0 0 1px #ffcc3d;font:700 7px/1 Rubik,sans-serif;letter-spacing:.14em;text-align:center}
+.ep-pd-carta.c1 .ep-fc-media{right:auto;left:7px;text-align:left}
+.ep-fc-cinta{position:absolute;left:7px;top:6px;z-index:2;max-width:68%;padding:3px 6px;border-radius:5px;background:linear-gradient(90deg,#ffe58a,#ffcc3d 60%,#e0a21a);color:#3a2a00;font:800 8px/1 'Barlow Condensed',Rubik,sans-serif;font-style:normal;letter-spacing:.12em;white-space:nowrap;box-shadow:0 2px 6px #0008}
+.ep-fc-nombre{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:22px 8px 7px;background:linear-gradient(transparent,#000d);color:#fff;font:400 14px/1 Bungee,'Arial Black',sans-serif;font-style:normal;text-shadow:0 2px 0 #000a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep-pd-carta.c3 .ep-fc-nombre{text-align:right}
+.ep-pd-carta.c1 .ep-fc-nombre{font-size:12px}
+.ep-pd-carta.c2 .ep-fc-media{font-size:30px}
+.ep-pd-carta.c2 .ep-fc-nombre{font-size:17px}
 .jg-ban-c[data-ep=fanal] .jg-ban-logo{font-family:Cinzel,Georgia,serif;font-weight:900;letter-spacing:.14em;color:transparent;background:linear-gradient(180deg,#fff3c4,#e8b866 55%,#a8682a);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 3px 0 #3a2208) drop-shadow(0 0 26px #ff9a3caa)}
 .jg-ban-c[data-ep=boxhead] .jg-ban-logo{color:#fafaf7;letter-spacing:.03em;text-shadow:0 2px 0 #cfcfcb,0 4px 0 #a7a7a3,0 6px 0 #6e6e6a,0 8px 0 #1a1a1e,0 0 34px #e23b2eaa}
 .jg-ban-c[data-ep=memazo] .jg-ban-logo{font-family:Anton,Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#fff;-webkit-text-stroke:2px #000;paint-order:stroke fill;text-shadow:0 5px 0 #6b2fb8,0 0 30px #ffd23f88}
@@ -4370,7 +4398,10 @@ html[data-tema=oscuro] .jg-ban{box-shadow:0 0 0 1px var(--os-borde),0 14px 40px 
 /* El marco dice el puesto: oro con un aura que respira para el 1.º,
    plata y cobre lisos para el 2.º y el 3.º. */
 .jg-top{position:relative;display:flex;align-items:center;gap:10px;min-width:0;padding:7px 8px;border-radius:12px;background:#f7f5fb;border:2px solid transparent}
-.jg-top.p1{border-color:#e2b23a;background:linear-gradient(90deg,#fff4cf,#fffaf0);box-shadow:0 0 0 1px #fff3c4 inset,0 0 10px 1px #f5c54299;animation:jg-top-aura 2.4s ease-in-out infinite}
+.jg-top.p1{border-color:#e2b23a;background:linear-gradient(90deg,#fff4cf,#fffaf0);box-shadow:0 0 0 1px #fff3c4 inset,0 0 8px 0 #f5c54288}
+/* El aura que respira es una capa que solo cambia de opacidad (GPU). El aro que gira (`--jg-ang`) no
+   puede ir por GPU: en el salón gira solo con el puntero encima (la regla de los marcos, más abajo). */
+.jg-top.p1::before{content:"";position:absolute;inset:-2px;border-radius:12px;box-shadow:0 0 18px 4px #f5c542cc;opacity:0;pointer-events:none;animation:jg-top-aura 2.4s ease-in-out infinite}
 .jg-top.p1:after{content:"";position:absolute;inset:-5px;border-radius:16px;pointer-events:none;background:conic-gradient(from var(--jg-ang,0deg),#ffd86b00 0 70%,#ffe9a0 82%,#ffd86b00 94%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);padding:3px;animation:jg-top-gira 3.2s linear infinite;opacity:.9}
 .jg-top.p1 .jg-top-quien{border-radius:50%;box-shadow:0 0 0 2px #e2b23a,0 0 10px 2px #f5c542aa}
 .jg-top.p2{border-color:#b9c0cb;background:linear-gradient(90deg,#eef1f5,#f7f8fa)}
@@ -4379,8 +4410,8 @@ html[data-tema=oscuro] .jg-ban{box-shadow:0 0 0 1px var(--os-borde),0 14px 40px 
 .jg-top.p3 .jg-top-quien{border-radius:50%;box-shadow:0 0 0 2px #c07a45}
 @property --jg-ang{syntax:"<angle>";inherits:false;initial-value:0deg}
 @keyframes jg-top-gira{to{--jg-ang:360deg}}
-@keyframes jg-top-aura{0%,100%{box-shadow:0 0 0 1px #fff3c4 inset,0 0 8px 0 #f5c54288}50%{box-shadow:0 0 0 1px #fff3c4 inset,0 0 18px 4px #f5c542cc}}
-@media(prefers-reduced-motion:reduce){.jg-top.p1,.jg-top.p1:after{animation:none}}
+@keyframes jg-top-aura{50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.jg-top.p1::before,.jg-top.p1:after{animation:none}}
 .jg-top-med{font-size:20px;line-height:1;flex:none}
 .jg-top-quien{flex:none;cursor:pointer;display:inline-flex}
 .jg-top-txt{min-width:0;font-size:12.5px;line-height:1.35;color:#4b4560}
@@ -4400,8 +4431,11 @@ html[data-tema=oscuro] .jg-top-txt{color:var(--os-tx2)}
 /* ---- Monedas: saldo en la cabecera, top en el vestíbulo, pestaña #monedas ---- */
 .jg-saldo{color:#f5c542!important;font-weight:700;font-variant-numeric:tabular-nums}
 .jg-racha-chip{display:inline-flex;align-items:center;margin-left:7px;padding:1px 7px 1px 5px;border-radius:99px;background:#ff7a1a26;color:#ff9a3d;font-size:12px;font-weight:800}
-.jg-racha-chip.falta{filter:grayscale(.6);animation:jgRachaTitila 1.6s ease-in-out infinite}
-@keyframes jgRachaTitila{50%{filter:none;background:#ff7a1a44}}
+/* Lo que titila va por GPU (filter y opacity): el chip está en la cabecera, también durante una partida. */
+.jg-racha-chip.falta{position:relative;isolation:isolate;filter:grayscale(.6);animation:jgRachaTitila 1.6s ease-in-out infinite}
+.jg-racha-chip.falta::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#ff7a1a44;opacity:0;pointer-events:none;animation:jgRachaLuz 1.6s ease-in-out infinite}
+@keyframes jgRachaTitila{50%{filter:none}}
+@keyframes jgRachaLuz{50%{opacity:1}}
 .jg-racha{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"f t" "b b" "d d";gap:8px 10px;align-items:center;margin:0 0 10px;padding:10px 12px;border-radius:14px;text-decoration:none!important;color:#7a2e05;background:linear-gradient(120deg,#fff3e0,#ffe2c2);border:1px solid #ffc78a}
 .jg-racha:hover{border-color:#ff9a3d}
 .jg-racha-fuego{grid-area:f;font-size:28px;line-height:1;filter:drop-shadow(0 2px 6px #ff7a1a66)}
@@ -4415,14 +4449,19 @@ html[data-tema=oscuro] .jg-top-txt{color:var(--os-tx2)}
 .jg-racha-dias{grid-area:d;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
 .jg-racha-dias i{display:block;padding:2px 0;border-radius:6px;background:#ffd9b0;color:#a0571f;font:800 10.5px/1.3 system-ui,sans-serif;font-style:normal;text-align:center}
 .jg-racha-dias i.on{color:#fff}
-.jg-racha-btn{grid-area:b;display:flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:9px 12px;border:0;border-radius:11px;cursor:pointer;font:800 14px/1.2 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#ff9a3d,#f06a0a);box-shadow:0 3px 0 #b4410a,0 6px 14px #ff7a1a55;animation:jgReclama 1.8s ease-in-out infinite}
+.jg-racha-btn{grid-area:b;display:flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:9px 12px;border:0;border-radius:11px;cursor:pointer;font:800 14px/1.2 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#ff9a3d,#f06a0a);box-shadow:0 3px 0 #b4410a,0 6px 14px #ff7a1a55;position:relative}
+/* El resplandor que respira es una capa aparte que solo cambia de opacidad (GPU); animar el box-shadow
+   del botón repintaba la página en cada cuadro, y este botón está en la columna fija del salón. */
+.jg-racha-btn::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 6px 22px #ff7a1aaa;opacity:0;pointer-events:none;animation:jgReclama 1.8s ease-in-out infinite}
 .jg-racha-btn:hover{filter:brightness(1.07)}
 .jg-racha-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #b4410a}
 .jg-racha-btn .jg-moneda{width:1.1em;height:1.1em}
+.jg-racha-btn.hecho::after,.jg-racha-btn:disabled::after{content:none}
 .jg-racha-btn.hecho,.jg-racha-btn:disabled{cursor:default;animation:none;color:#8a4a1e;background:#ffe7cc;box-shadow:none;font-size:13px;filter:none;transform:none}
-@keyframes jgReclama{0%,100%{box-shadow:0 3px 0 #b4410a,0 6px 14px #ff7a1a55}50%{box-shadow:0 3px 0 #b4410a,0 6px 22px #ff7a1aaa}}
+@keyframes jgReclama{50%{opacity:1}}
 .jg-racha-dias i.on{background:linear-gradient(90deg,#ff7a1a,#ffb23d)}
-.jg-racha-dias i.hoy{background:#ffb23d;animation:jgRachaTitila 1.2s ease-in-out infinite}
+.jg-racha-dias i.hoy{background:#ffb23d;animation:jgHoyTitila 1.2s ease-in-out infinite}
+@keyframes jgHoyTitila{50%{opacity:.45}}
 .jg-racha.peligro{border-color:#ff9a3d;box-shadow:0 0 0 3px #ff9a3d22}
 html[data-tema=oscuro] .jg-racha{background:linear-gradient(120deg,#3a1d0a,#4a250c);border-color:#7a3a10;color:#ffd2a8}
 html[data-tema=oscuro] .jg-racha-tx b{color:#ffb070}
@@ -4458,12 +4497,14 @@ html[data-tema=oscuro] .jg-racha-dias i.hoy{background:#ffb23d}
 .jg-ref-mas:focus-visible{outline:2px solid #f5c542;outline-offset:2px}
 .jg-ref-mas-k{display:none;position:absolute;top:-7px;right:-9px;z-index:2;padding:1px 4px;border-radius:99px;background:#ff3d6e;color:#fff;font:800 9px/1.2 system-ui,sans-serif;letter-spacing:.02em;box-shadow:0 0 0 2px #171522;pointer-events:none}
 .jg-ref-mas.llama .jg-ref-mas-k{display:block;animation:jgRefSalta 2.4s ease-in-out infinite}
-.jg-ref-mas.llama{animation:jgRefLatido 2.4s ease-in-out infinite}
-@keyframes jgRefLatido{0%,100%{box-shadow:inset 0 0 0 1.5px #9a6a08,0 0 0 0 #f5c542aa}50%{box-shadow:inset 0 0 0 1.5px #9a6a08,0 0 0 7px #f5c54200}}
+/* El latido es un aro aparte que crece y se apaga (transform y opacity, GPU): animar el box-shadow del
+   botón repintaba la página entera en cada cuadro, y la cabecera se ve también dentro de los juegos. */
+.jg-ref-mas.llama::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 2px #f5c542aa;pointer-events:none;animation:jgRefLatido 2.4s ease-in-out infinite}
+@keyframes jgRefLatido{0%{transform:scale(1);opacity:1}50%,100%{transform:scale(1.5);opacity:0}}
 @keyframes jgRefSalta{0%,70%,100%{transform:translateY(0)}78%{transform:translateY(-3px)}86%{transform:translateY(0)}92%{transform:translateY(-1.5px)}}
 @media(pointer:coarse){.jg-ref-mas{width:30px;height:30px}}
 @media(max-width:600px){.jg-saldo-grupo .jg-saldo{padding-left:8px;padding-right:5px}}
-@media (prefers-reduced-motion:reduce){.jg-ref-mas::after,.jg-ref-mas.llama,.jg-ref-mas.llama .jg-ref-mas-k{animation:none}}
+@media (prefers-reduced-motion:reduce){.jg-ref-mas::after,.jg-ref-mas.llama::before,.jg-ref-mas.llama .jg-ref-mas-k{animation:none}}
 .jg-ref-pop{position:fixed;z-index:65;display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 14px 40px #0f172833;color:var(--jg-ink);font-size:12.5px;animation:jgEntra .2s ease-out}
 .jg-ref-canje{display:flex;flex-direction:column;gap:4px}
 .jg-ref-t{font-size:13.5px}
@@ -4603,7 +4644,7 @@ html[data-tema=oscuro] .jg-tn-op.cerrado{background:var(--os-sup)}
 html[data-tema=oscuro] .jg-tn-op.on{border-color:#c4b1ff;box-shadow:0 0 0 2px #c4b1ff33}
 .jg-mo-toast small{display:flex;align-items:center;gap:4px}
 .jg-mo-toast .jg-moneda{width:1.05em;height:1.05em}
-@media (prefers-reduced-motion:reduce){.jg-racha-chip.falta,.jg-racha.lista .jg-racha-fuego,.jg-racha-dias i.hoy,.jg-racha-btn{animation:none}}
+@media (prefers-reduced-motion:reduce){.jg-racha-chip.falta,.jg-racha-chip.falta::before,.jg-racha.lista .jg-racha-fuego,.jg-racha-dias i.hoy,.jg-racha-btn::after{animation:none}}
 .jg-moneda{width:1.1em;height:1.1em;vertical-align:-.2em;flex:none;display:inline-block}
 .jg-mo-ves header .jg-moneda{width:20px;height:20px}
 .jg-mo-hero strong .jg-moneda{width:.8em;height:.8em;vertical-align:-.05em}
@@ -5380,7 +5421,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn-meta{display:flex;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--jg-muted);line-height:1.4}
 .jg-mn-meta>span+span:before{content:"·";margin:0 5px;opacity:.7}
 .jg-mn-vivo{color:#15803d;font-weight:650}
-.jg-mn-vivo i{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:#22c55e;vertical-align:1px;animation:jgVivo 2s infinite}
+.jg-mn-vivo i{position:relative;display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:#22c55e;vertical-align:1px}
 
 /* La insignia de modo: arriba a la izquierda en la portada, y la misma
    pieza (sin posición) en la ficha y en las novedades. */
@@ -5480,7 +5521,7 @@ html.jg-hoja-abierta .rp-fab{display:none}
 .jg-hoja-lema{margin:-4px 0 0;font-size:13.5px;line-height:1.55;color:#5f5a70}
 .jg-hoja-salas{display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;border-radius:14px;background:#ecfdf3;border:1px solid #bbf7d0;color:#14532d;font-size:12.5px;line-height:1.45}
 .jg-hoja-salas>span{flex:1;min-width:0}
-.jg-hoja-salas i{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:#22c55e;animation:jgVivo 2s infinite}
+.jg-hoja-salas i{position:relative;display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:#22c55e}
 .jg-hoja-salas.vacia{display:block;background:#f7f6fb;border-color:#ece8f3;color:var(--jg-muted)}
 .jg-hoja-ops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .jg-hoja-ops h3{grid-column:1/-1;margin:0;font:700 10.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--jg-muted)}
@@ -6884,6 +6925,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610270427"></script>
+<script src="juegos-app.js?v=202610270430"></script>
 </body>
 </html>

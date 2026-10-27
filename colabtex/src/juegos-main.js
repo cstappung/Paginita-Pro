@@ -2880,6 +2880,7 @@ function armazon() {
   enganchaBuscador(h);
   enganchaNovedades(h);
   enganchaBanner(h);
+  vigilaFueraDeVista("salon", h.querySelectorAll(".jg-sal > :not(.jg-ban)"));
   vigilaDropsMascotas(h);
   vigilaDropsRock(h);
   salon.enganchar($("vesSalon"));
@@ -2902,9 +2903,9 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
-    gancho: "Un solo sobre con todos",
-    lema: "Los sobres de Fútbol traen a todos: Real Madrid, Barça y el Big Six inglés, en un solo sobre normal y en el Plus (el doble de caro, con una Épica asegurada). Cada jugador trae su media de EA SPORTS FC, y esa media fija su rareza. Ábrelos, júntalos y arma tu once ideal para mostrarlo en tu perfil.",
-    datos: () => [[String(MOTOR.FUTBOLISTAS.length + MOTOR.PREMIER.length), "jugadores"], ["2", "sobres"], ["Épica", "asegurada en el Plus"]],
+    gancho: "Cartas especiales por tiempo limitado",
+    lema: "Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro, llegaron a los sobres de Fútbol como legendarias especiales, por tiempo limitado. En el mismo sobre están todos: Real Madrid, Barça, el Big Six y más clubes de la Champions, en el sobre normal y en el Plus (con una Épica asegurada).",
+    datos: () => [["2", "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
     gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],
@@ -3094,6 +3095,24 @@ function enganchaNovedades(h) {
    falta para pasar. Con el dedo se arrastra; un arrastre no es un clic. */
 const BAN_MS = 7000;
 let banTic = 0, banVista = null;
+/* Lo que no se ve no se anima (`.jg-fuera-vista`, la regla en juegos.html):
+   las secciones del salón y la cabecera. Una animación que no va por GPU
+   (un box-shadow, un nombre de color, un marco) hace que Chrome rehaga las
+   capas de la página entera en cada cuadro, esté o no en pantalla. El
+   banner tiene su propio `.fuera`. Cada grupo suelta lo que vigilaba antes:
+   el salón se rehace entero al volver a él. */
+let fueraVista = null;
+const vigiladosFuera = new Map();
+function vigilaFueraDeVista(grupo, els) {
+  if (typeof IntersectionObserver !== "function") return;
+  if (!fueraVista) fueraVista = new IntersectionObserver(es => {
+    for (const e of es) e.target.classList.toggle("jg-fuera-vista", !e.isIntersecting);
+  }, { rootMargin: "80px" });
+  for (const el of vigiladosFuera.get(grupo) || []) fueraVista.unobserve(el);
+  vigiladosFuera.set(grupo, [...els]);
+  for (const el of els) fueraVista.observe(el);
+}
+
 function enganchaBanner(h) {
   clearInterval(banTic);
   if (banVista) { banVista.disconnect(); banVista = null; }
@@ -3188,7 +3207,9 @@ function enganchaBanner(h) {
   pinta();
   banTic = setInterval(() => {
     if (!document.body.contains(raiz)) { clearInterval(banTic); if (banVista) { banVista.disconnect(); banVista = null; } return; }
-    if (pausado || encima || foco || arrastre || document.hidden || salon.abiertaPara()) return;
+    /* Fuera de la vista tampoco cuenta: cambiar de diapositiva ahí era trabajo (la transición, la
+       escena nueva) que nadie veía, y al volver arriba sigue la que se dejó. */
+    if (pausado || encima || foco || arrastre || document.hidden || !aLaVista || salon.abiertaPara()) return;
     t += 100;
     if (t >= BAN_MS) ve(i + 1); else llena();
   }, 100);
@@ -4250,6 +4271,9 @@ function wire() {
   wireTema();
   montaHalloween();
   wireInmersivo();
+  /* El brillo del «+» de referidos y el titilar de la racha, quietos con la cabecera fuera de pantalla. */
+  const cab = document.querySelector(".head");
+  if (cab) vigilaFueraDeVista("cabecera", [cab]);
   /* Iniciar sesión está a la vista en todas partes mientras se es
      invitado: la cabecera, la barra de modo del salón, la barra de un
      juego del club, la puerta de cada pantalla con cuenta. Todos son

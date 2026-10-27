@@ -117,14 +117,49 @@ other file of the site. Things that hold it together:
   every pack and re-roll already written derives exactly the same cards (a
   test pins ids, and the merge was checked against the previous motor on
   33,000 packs and re-rolls). **Never edit those two pools.** They are not
-  sold any more and do not appear in any menu. **Danger for the next
-  league**: `g` and `h` packs derive from the whole catalogue, so appending
-  players to it rebuilds the `g`/`h` packs already opened. Before adding
-  teams, make the pool depend on the pack's `at` (each new card carries a
-  `desde` timestamp and a pack only sees the cards that existed when it was
-  bought) or give the new league its own prefix.
+  sold any more and do not appear in any menu.
+- **Adding teams to the football catalogue** (the Champions League clubs went
+  in this way: `CHAMPIONS` rows, photos in `cards/champions/<club>/<id>.webp`,
+  same row format as `PREMIER`). `g` and `h` packs derive from the whole
+  catalogue, so a new card would change every pack already opened. That is
+  what **`AMPLIACIONES`** prevents: each entry `{ hasta, n }` says that a
+  pack (or re-roll) whose server time is before `hasta` only sees the cards
+  with id below `n`. To add a league: **append** its rows to a new array after
+  the last one (`cartaFutbol(..., "<carpeta>", j)`), add an `AMPLIACIONES`
+  entry with `n` = the card count before it and **`hasta` = the push time plus
+  a few minutes (never earlier)**, and pin the old ids in a test (the
+  `ampliaciones` test does it for the previous catalogue). Also needed per
+  league: `MEDIAS` and `POSICIONES` by `<club>/<id>`, an entry in `CLUBES`,
+  the crest in `escudos/`, the flags in `flags/` and the names in `FUT_PAIS`
+  (a test checks them), and a CSS class for its folder if its photos need a
+  different crop (`.full.futbol.champions` is like the Premier's). **Photos**:
+  portraits from the clubs' official squad pages, 470 px squares; a cut-out
+  goes on a club-coloured gradient (see the scripts described in the repo
+  history), an opaque one is cropped as it is (Betis white, Como grey,
+  Dortmund dark). Players EA FC has no rating for are left out.
+  The Champions League clubs added: Real Betis, PSG, Como, Inter, Roma, Napoli
+  and Borussia Dortmund (the clubs that play the 2026-27 league phase; Atlético
+  and Bayern were left out because their sites block automated readers).
+- **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
+  card of a player that exists for something that happened (Mbappé · MVP del
+  Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the
+  others plus a 7th element `{ person, sub, cinta, especial, limitada, peso }`:
+  `person` is the **same player's** (so the squad's no-repeat rule treats both as
+  one; Kane's is `bayern-harry-kane`, the one his base card will have when the Bayern
+  squad is added), `cinta` is the ribbon text, and the card gets `.especial` (gold
+  animated frame) and its own `uid`. `peso: 3` makes each one three times as likely
+  as an ordinary legendary. **«Limited time» is only a label** (`limitada`; the texts say «por tiempo
+  limitado» and **never give a date**): there is no automatic window or switch-off,
+  and no end date to announce, as the owner asked. Taking them out of the pool later is manual and must not change
+  packs already bought (an `AMPLIACIONES`-style cut-off, but removing cards). Pickers
+  dedupe copies by `uid`, not by player. Where the specials are shown by hand
+  (change them when the event ends): `PORTADA` in `app.js` (futbol and hub covers),
+  `SKIN.futbol.meta`, `TEMAS.futbol`, the hub tile text and `NOVEDADES_FUTBOL`; and in
+  Juegos, the salon card `futbol` in `juegos-main.js` and its art (`futbol()` in
+  `novedades-arte.js`, three real cards with media; a test compares its medias with
+  the motor's).
 - **The football pack covers are fixed** (`PORTADA` in `app.js`, read by
-  `fanDe`): normal = Lamine Yamal, Bellingham and, in the centre, Mbappé;
+  `fanDe`): (during the event: Yamal, Kane and, in the centre, Mbappé MVP; normally) normal = Lamine Yamal, Bellingham and, in the centre, Mbappé;
   Plus = Saka, Van Dijk and Haaland; the «Sobres de Fútbol» tile shows
   Haaland, Yamal and Mbappé. The order is [left, right, centre]. Profes and
   componentes still show three good cards at random. A test checks that every
