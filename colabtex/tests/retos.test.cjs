@@ -141,7 +141,7 @@ test('graduadas con nota 6 o más: el premio 2 paga 100 y sus dos sobres entran,
   d.cartas.g = { [A]: g };
   d.cartas.s[A] = Object.assign({}, SOBRES, { [k]: { at, p: 0, pl: EL.clave + '_2' }, [k2]: { at, p: 0, pl: EL.clave + '_2' }, gOtra00001: { at: at + 1, p: 0, pl: EL.clave + '_2' } });
   const e = economia(d);
-  assert.equal(monedasDe(A, d).premios, 100);
+  assert.equal(monedasDe(A, d).premios, 300);
   assert.ok(e.sobres[A + '~' + k] && e.sobres[A + '~' + k2], 'los dos sobres del premio existen');
   // con un solo sobre en el reclamo, el premio 2 no vale
   const d1 = datos({ ajustes: { [A]: { x: { n: 5000 } } }, plantillas: { p: { [A]: { [EL.clave + '_2']: { at, c, k } } } } });

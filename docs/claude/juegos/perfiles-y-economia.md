@@ -169,6 +169,8 @@ rule: `economia()` records `usuarios[u].desafios[<club>]` when a claim of
 `est.desafios`. The field travels in the cierre snapshot with the rest of
 the user and `verificaCierre` compares it. Adding a club to the album needs
 its row in `MARCOS` and its CSS line.
+The editor's «Clubes» group lists only the ones already won (plus the one
+worn): they are meant to be a surprise, not a checklist.
 
 **The Halloween shop: limited edition** (`tienda.js` for the catalogue,
 `juegos/tienda-halloween.js` for the window and the lobby strip, the
