@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610270400"></script>
+<script src="i18n.js?v=202610270649"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -3832,14 +3832,18 @@ html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
    moviéndose y los nombres de colores otras 47; nada de eso va por GPU
    (text-shadow, box-shadow, SVG, propiedades `--`), y basta una sola
    animación así para que Chrome rehaga las capas de toda la página en cada
-   cuadro. Va con !important porque varios marcos ponen `animation` entera
+   cuadro. Quietos es sin animación (`animation-name:none`), no en pausa: una
+   animación en pausa conserva su capa en la GPU, y estas eran ~150 capas
+   que Chrome sincronizaba en cada cuadro. Al pasar el puntero empiezan de
+   cero. Va con !important porque varios marcos ponen `animation` entera
    en ::before. */
-:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc),:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc) *,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc)::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc)::after,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc) *::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc) *::after,.jg-sal .jg-top.p1::after{animation-play-state:paused!important}
-:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc),:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc) *,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc)::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc)::after,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc) *::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover :is(.jg-av,.jg-nm,.jg-pdc) *::after,.jg-sal .jg-top.p1:hover::after{animation-play-state:running!important}
-/* Lo que sale de la pantalla se pausa entero (`.jg-fuera-vista`, `vigilaFueraDeVista`
-   en juegos-main.js: las secciones del salón y la cabecera): una animación
-   que no va por GPU cuesta lo mismo vista que no. */
-.jg-fuera-vista,.jg-fuera-vista *,.jg-fuera-vista::before,.jg-fuera-vista::after,.jg-fuera-vista *::before,.jg-fuera-vista *::after{animation-play-state:paused!important}
+:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc):not(:is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover *),:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc):not(:is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover *) *,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc):not(:is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover *)::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc):not(:is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover *)::after,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc):not(:is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover *) *::before,:is(.jg-sal,.jg-cg-lista,.jg-riel) :is(.jg-av,.jg-nm,.jg-pdc):not(:is(.jg-drop,.jg-top,.jg-cg-msg,.jg-rp,li,a):hover *) *::after,.jg-sal .jg-top.p1:not(:hover)::after{animation-name:none!important}
+/* Lo que sale de la pantalla se queda sin animación (`.jg-fuera-vista`,
+   `vigilaFueraDeVista` en juegos-main.js: las secciones del salón y la
+   cabecera): una animación que no va por GPU cuesta lo mismo vista que no,
+   y una en pausa conserva su capa. Al volver empiezan de cero (en estas
+   secciones todas son bucles). */
+.jg-fuera-vista,.jg-fuera-vista *,.jg-fuera-vista::before,.jg-fuera-vista::after,.jg-fuera-vista *::before,.jg-fuera-vista *::after{animation-name:none!important}
 /* La cabecera también se ve dentro de una sala o un juego del club: ahí su
    brillo y su latido se quedan quietos (`jg-rieles` = una vista de menú). */
 html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip),html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip) *,html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip)::before,html:not(.jg-rieles) .head :is(.jg-ref-mas,.jg-racha-chip)::after{animation-play-state:paused!important}
@@ -4157,7 +4161,7 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 .jg-ban-cuerpo h2.jg-ban-logo{margin:0;font:400 clamp(40px,5.2vw,68px)/.95 Bungee,'Arial Black',Impact,sans-serif;letter-spacing:.01em;color:#fff;text-shadow:0 4px 0 color-mix(in srgb,var(--c) 55%,#000),0 0 34px color-mix(in srgb,var(--c) 70%,transparent)}
 .jg-ban-logo span{display:block;margin-top:6px;font:700 italic .32em/1 'IBM Plex Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;text-shadow:none;color:color-mix(in srgb,var(--c) 55%,#fff)}
 .jg-ban-datos{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 0;padding:0;list-style:none}
-.jg-ban-datos li{display:flex;flex-direction:column;justify-content:center;min-width:74px;padding:7px 12px 8px;border-radius:12px;background:#ffffff12;border:1px solid #ffffff22;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.jg-ban-datos li{display:flex;flex-direction:column;justify-content:center;min-width:74px;padding:7px 12px 8px;border-radius:12px;background:#ffffff1c;border:1px solid #ffffff22}
 .jg-ban-datos b{font:400 21px/1.05 Bungee,'Arial Black',Impact,sans-serif;color:#fff;text-shadow:0 0 14px color-mix(in srgb,var(--c) 70%,transparent)}
 .jg-ban-datos span{margin-top:3px;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#cfc4ea}
 .jg-ban-cuerpo p{margin:0;max-width:52ch;font-size:14px;line-height:1.55;color:#e4dcf6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 8px #0008}
@@ -4177,7 +4181,7 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 /* El latido solo en la diapositiva que se ve y con el banner a la vista:
    corría en los doce botones a la vez, y sin `will-change` cada cuadro
    recomponía el salón entero. */
-.jg-ban-c:not(.on) .jg-ban-jugar:after,.jg-ban.fuera .jg-ban-jugar:after{animation-play-state:paused}
+.jg-ban-c:not(.on) .jg-ban-jugar:after,.jg-ban.fuera .jg-ban-jugar:after{animation-name:none}
 @keyframes jg-ban-latido{0%{opacity:.75;transform:scale(1)}70%,100%{opacity:0;transform:scale(1.12,1.38)}}
 .jg-ban-jugar-ico{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--tinta,#fff);color:var(--c);box-shadow:0 2px 10px #0004}
 .jg-ban-jugar-ico svg{width:20px;height:20px;margin-left:3px}
@@ -4235,12 +4239,19 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 }
 @media(prefers-reduced-motion:reduce){.jg-ban-pista,.jg-ban-puntos button,.jg-ban-puntos i,.jg-ban-jugar{transition:none}.jg-ban-jugar:after{animation:none}}
 /* ---- Las escenas de Novedades (novedades-arte.js) ----
-   Solo anima la diapositiva que se ve (`.on`, la pone enganchaBanner): las
-   otras siete quedan quietas. Al entrar, su texto llega desde la izquierda
-   en cascada; la primera no lo repite al volver el bucle (`.ya`). */
-.jg-ban-c:not(.on) .jg-ban-escena *{animation-play-state:paused!important}
+   Solo anima la diapositiva que se ve (`.on`, la pone enganchaBanner). Al
+   entrar, su texto llega desde la izquierda en cascada; la primera no lo
+   repite al volver el bucle (`.ya`).
+   Las otras no se pintan (`visibility:hidden`) salvo las vecinas (`.cerca`,
+   las que asoman al pasar o al arrastrar) y no llevan animación: ni en
+   pausa, porque una animación en pausa conserva su capa en la GPU. La pista
+   tiene `will-change`, así que Chrome pintaba las trece escenas enteras, y
+   con las pausadas la página llegaba a ~900 capas que sincronizaba en cada
+   cuadro (octubre de 2026). */
+.jg-ban-c:not(.on):not(.cerca){visibility:hidden}
+.jg-ban-c:not(.on) .jg-ban-escena *,.jg-ban-c:not(.on) .jg-ban-escena *::before,.jg-ban-c:not(.on) .jg-ban-escena *::after{animation-name:none!important}
 /* Y ninguna mientras el banner no se ve (`.fuera`, un IntersectionObserver). */
-.jg-ban.fuera .jg-ban-escena *{animation-play-state:paused!important}
+.jg-ban.fuera .jg-ban-escena *,.jg-ban.fuera .jg-ban-escena *::before,.jg-ban.fuera .jg-ban-escena *::after{animation-name:none!important}
 .jg-ban-c.on .jg-ban-cuerpo>*{animation:ep-entra .7s cubic-bezier(.2,.8,.2,1) both}
 .jg-ban-c.on .jg-ban-cuerpo>:nth-child(2){animation-delay:.06s}.jg-ban-c.on .jg-ban-cuerpo>:nth-child(3){animation-delay:.12s}
 .jg-ban-c.on .jg-ban-cuerpo>:nth-child(4){animation-delay:.18s}.jg-ban-c.on .jg-ban-cuerpo>:nth-child(5){animation-delay:.24s}
@@ -4367,13 +4378,14 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 .ep-pd-carta.c1{transform:translate(-122px,24px) rotate(-14deg);animation:ep-pd-c1 4s ease-in-out infinite}
 .ep-pd-carta.c3{transform:translate(122px,24px) rotate(14deg);animation:ep-pd-c3 4s ease-in-out infinite}
 .ep-pd-carta.c2{z-index:1;width:178px;margin:-125px 0 0 -89px;border-color:#ffcc3d;box-shadow:0 0 44px #ffcc3daa,0 20px 50px #000b;animation:ep-pd-c2 4s ease-in-out infinite}
-.ep-pd-holo{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#ffffff99 44%,#ff5fb077 50%,#5cc8ff77 56%,transparent 70%) 0 0/260% 100%;mix-blend-mode:screen;animation:ep-holo 2.8s linear infinite}
+.ep-pd-holo{position:absolute;inset:0;overflow:hidden;mix-blend-mode:screen}
+.ep-pd-holo::before{content:"";position:absolute;top:0;bottom:0;left:0;width:260%;background:linear-gradient(115deg,transparent 30%,#ffffff99 44%,#ff5fb077 50%,#5cc8ff77 56%,transparent 70%);animation:ep-holo 2.8s linear infinite}
 .ep-pd-leg{position:absolute;left:0;top:116px;z-index:2;transform:translateX(-50%);white-space:nowrap;padding:6px 13px;border-radius:99px;background:linear-gradient(90deg,#ff5fb0,#ffcc3d);color:#2a0f00;font:400 13px/1 Bungee,'Arial Black',sans-serif;box-shadow:0 4px 16px #000a}
 .ep-pd-chispa{position:absolute;width:6px;height:6px;border-radius:50%;background:#fff6c8;box-shadow:0 0 10px 2px #ffcc3d;animation:ep-titila 2.4s ease-in-out infinite}
 @keyframes ep-pd-c1{50%{transform:translate(-128px,14px) rotate(-17deg)}}
 @keyframes ep-pd-c2{50%{transform:translateY(-12px) scale(1.04)}}
 @keyframes ep-pd-c3{50%{transform:translate(128px,14px) rotate(17deg)}}
-@keyframes ep-holo{from{background-position:130% 0}to{background-position:-130% 0}}
+@keyframes ep-holo{from{transform:translateX(-80%)}to{transform:translateX(80%)}}
 @media(max-width:720px){
   .ep-pd-rayos,.ep-pd-halo,.ep-pd-mano{left:50%}
   .ep-pd-mano{top:45%;transform:scale(.64)}
@@ -5231,6 +5243,19 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal .jg-tira-m{grid-area:tiram;margin:16px 0 0}
 .jg-sal .jg-tira-r{grid-area:tirar;margin:16px 0 0}
 .jg-sal-sec{min-width:0;margin-bottom:26px}
+/* Lo que está lejos de la pantalla no se pinta (`content-visibility:auto`):
+   cada cuadro que anima el banner, Chrome rehace las capas de todo lo
+   pintado en la página, y el catálogo entero estaba pintado aunque se viera
+   solo el banner (octubre de 2026: arriba, ~25 % menos de trabajo por
+   cuadro). El tamaño es la estimación hasta que se pinta por primera vez;
+   después recuerda el real (`auto`). No va en el banner, la intro, la barra
+   de modos ni la columna fija: el contenido sticky y lo que se ve al entrar
+   no ganan nada y el sticky no puede vivir en una caja contenida. Recorta
+   lo que se salga de la sección: en estas, lo que sobresale ya lo recortan
+   sus propias filas con scroll y las portadas. */
+.jg-sal>:is(.jg-sal-solo,.jg-sal-multi,.jg-tops,.jg-tira){content-visibility:auto;contain-intrinsic-block-size:auto 340px}
+.jg-sal>.jg-sal-multi{contain-intrinsic-block-size:auto 3200px}
+.jg-sal>.jg-tops{contain-intrinsic-block-size:auto 500px}
 /* Un modo esconde la sección que sobra; las novedades no se van nunca. */
 /* La columna de salas (salas abiertas, top monedas, tus partidas) se queda
    también en «1 jugador»: el top de monedas y la recompensa diaria son de
@@ -5238,7 +5263,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal[data-modo=solo] .jg-sal-multi,.jg-sal[data-modo=multi] .jg-sal-solo{display:none}
 
 /* ---- La barra de modo ---- */
-.jg-modos{grid-area:modos;position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;margin:0 -16px 14px;padding:8px 16px;background:color-mix(in srgb,#f5f4fa 90%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.jg-modos{grid-area:modos;position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;margin:0 -16px 14px;padding:8px 16px;background:color-mix(in srgb,#f5f4fa 97%,transparent)}
 .jg-modos-sel{display:flex;flex:1;gap:3px;padding:4px;border-radius:100px;background:#ebe7f3;min-width:0}
 .jg-modos-sel button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 10px;border:0;border-radius:100px;background:transparent;font:600 13px 'IBM Plex Sans',sans-serif;color:#5c566c;cursor:pointer;white-space:nowrap;min-width:0}
 .jg-modos-sel button[aria-pressed=true]{background:#fff;color:var(--jg-ink);box-shadow:0 1px 4px #2a1e4424}
@@ -5344,7 +5369,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn{position:relative;min-width:0;container-type:inline-size;border-radius:16px;background:#fff;border:1px solid #e5e0ee;box-shadow:0 1px 2px #2a1e440a;transition:transform .2s cubic-bezier(.2,.8,.3,1),box-shadow .2s,border-color .2s}
 .jg-mn[hidden]{display:none}
 /* Fuera de pantalla, la portada no anima (`vigilaPortadas` en salon.js). */
-.jg-mn.dormida *,.jg-mn.dormida *::before,.jg-mn.dormida *::after{animation-play-state:paused!important}
+.jg-mn.dormida *,.jg-mn.dormida *::before,.jg-mn.dormida *::after{animation-name:none!important}
 .jg-mn-abre{display:flex;flex-direction:column;width:100%;height:100%;padding:0;margin:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:inherit;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
 .jg-mn-abre:focus-visible{outline:3px solid var(--c);outline-offset:3px}
 /* La portada: 4:3, y el arte (hecho a 165 px de alto) escalado según el ancho. */
@@ -5653,7 +5678,7 @@ html:has(#jgNomInv) .rp-fab{display:none!important}
   /* En las pantallas de menú las pestañas bajan al pie, fijas: el pulgar
      llega sin estirarse y quedan a la vista al hacer scroll. En una
      partida o un juego del club se van, que la pantalla es del juego. */
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#fffffff2;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid #e4dfeb;box-shadow:0 -6px 22px #2a1e4414}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#fffffffa;border-top:1px solid #e4dfeb;box-shadow:0 -6px 22px #2a1e4414}
   html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar .tab{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;border-radius:14px;font-size:10.5px;font-weight:600;color:#6b6679;background:transparent;white-space:nowrap}
   html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar .tab.on{background:#efe9fb;color:var(--jg-purple)}
   html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar .tab-i,
@@ -5731,7 +5756,7 @@ html:has(#jgNomInv) .rp-fab{display:none!important}
 }
 
 /* ---- Tema oscuro: el gemelo de cada superficie clara del salón ---- */
-html[data-tema=oscuro] .jg-modos{background:color-mix(in srgb,var(--os-fondo) 88%,transparent)}
+html[data-tema=oscuro] .jg-modos{background:color-mix(in srgb,var(--os-fondo) 96%,transparent)}
 html[data-tema=oscuro] .jg-modos-sel{background:var(--os-sup2)}
 html[data-tema=oscuro] .jg-modos-sel button{color:var(--os-tx3)}
 html[data-tema=oscuro] .jg-modos-sel button[aria-pressed=true]{background:var(--os-sup3);color:#fff;box-shadow:none}
@@ -5787,7 +5812,7 @@ html[data-tema=oscuro] .jg-reto-tira{background:#231b3d;border-color:#3e3170;col
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @media(max-width:720px){
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar{background:#15121df2;border-color:var(--os-borde);box-shadow:0 -6px 22px #0007}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar{background:#15121dfa;border-color:var(--os-borde);box-shadow:0 -6px 22px #0007}
   html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar .tab{color:var(--os-tx3)}
   html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .bar .tab.on{background:var(--os-sup3);color:#fff}
 }
@@ -6712,7 +6737,7 @@ html[data-halloween=on] .tab.on{background:#241328;color:#ffd2a8;box-shadow:inse
 html[data-halloween=on] .btn,html[data-halloween=on] .jg-btn{background:linear-gradient(180deg,#d24c0d,#a8360a)}
 html[data-halloween=on] .btn:hover,html[data-halloween=on] .jg-btn:hover{background:linear-gradient(180deg,#b9410b,#8c2c07)}
 html[data-halloween=on] .btn2:hover{border-color:var(--hw-nar2);color:var(--hw-nar2)}
-html[data-halloween=on] .jg-modos{background:color-mix(in srgb,#faf1eb 84%,transparent)}
+html[data-halloween=on] .jg-modos{background:color-mix(in srgb,#faf1eb 95%,transparent)}
 html[data-halloween=on] .jg-modos-sel{background:#efe2e6}
 html[data-halloween=on] .jg-sal-intro .jg-eyebrow{color:var(--hw-nar2)}
 html[data-halloween=on] .jg-sal-intro .jg-eyebrow::before{content:"🕸 "}
@@ -6721,7 +6746,7 @@ html[data-halloween=on] .jg-sal-multi .jg-sal-tit h2::after{content:" 👻";font
 html[data-halloween=on] .jg-lado-caja{box-shadow:0 6px 22px #3b1f4f12}
 html[data-halloween=on][data-tema=oscuro] .tab.on{background:#2a1530;color:#ffc58f}
 html[data-halloween=on][data-tema=oscuro] .btn2:hover{border-color:#ff9a4d;color:#ffb070}
-html[data-halloween=on][data-tema=oscuro] .jg-modos{background:color-mix(in srgb,#120a1c 84%,transparent)}
+html[data-halloween=on][data-tema=oscuro] .jg-modos{background:color-mix(in srgb,#120a1c 95%,transparent)}
 html[data-halloween=on][data-tema=oscuro] .jg-modos-sel{background:#1f1426}
 html[data-halloween=on][data-tema=oscuro] .jg-sal-intro .jg-eyebrow{color:#ff9a4d}
 html[data-halloween=on][data-tema=oscuro] .jg-sal-intro h1{text-shadow:0 0 26px #ff7a1a40}
@@ -6925,6 +6950,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610270430"></script>
+<script src="juegos-app.js?v=202610270649"></script>
 </body>
 </html>

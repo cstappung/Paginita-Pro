@@ -1618,10 +1618,14 @@ function dropsHtml(d) {
    entra en este paquete), y solo cuando la tira se ve: el salón no carga
    el juego entero para quien nunca baja hasta aquí. */
 let dropsMVista = false;
+/* Las tiras de Mascotas y de Batalla de Rock muestran los últimos seis
+   (la de PRODROP, 24): cada uno es una foto 3D que hay que sacar y un
+   avatar con marco, y en un PC modesto 24 por tira pesaban (dueño, oct. 2026). */
+const DROPS_3D = 6;
 function pintaDropsMascotas() {
   const caja = $("vesDropsM"), u = state.user, d = datosMonedas;
   if (!caja || !u || !d || !d.completo) return;
-  const l = mejoresDropsMascotas(d, 24);
+  const l = mejoresDropsMascotas(d, DROPS_3D);
   const ped = x => x.item.kind === "dance" ? null : pedidoObjeto(x.item);
   const firma = JSON.stringify([l.map(x => x.c), dropsMVista, l.map(x => { const p = ped(x); return !!(p && fotoDe(p.key)); })]);
   if (caja.dataset.f === firma) return;
@@ -1647,7 +1651,7 @@ let dropsRVista = false;
 function pintaDropsRock() {
   const caja = $("vesDropsR"), u = state.user, d = datosMonedas;
   if (!caja || !u || !d || !d.completo) return;
-  const l = dropsRock(d, 24);
+  const l = dropsRock(d, DROPS_3D);
   const firma = JSON.stringify([l.map(x => x.uid + x.k), dropsRVista, l.map(x => !!fotoRock(x.v))]);
   if (caja.dataset.f === firma) return;
   caja.dataset.f = firma;
@@ -3135,10 +3139,16 @@ function enganchaBanner(h) {
      veces por segundo, y el traductor de i18n.js revisaba cada cambio. */
   let lleno = null, pausaPintada = null;
   let aLaVista = true;
+  /* Solo se pintan la que se ve y sus vecinas (`.cerca`, las que asoman al
+     pasar o al arrastrar); en un salto con los puntos, también las del
+     medio hasta que termina la transición (`desde`, de dónde salió). */
+  let desde = 0;
   const llena = () => { if (lleno && aLaVista) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`; };
   const pinta = () => {
     const j = i % N;
-    diapos.forEach((d, k) => d.classList.toggle("on", k === i));
+    if (quieto) desde = i;
+    const a = Math.min(i, desde) - 1, b = Math.max(i, desde) + 1;
+    diapos.forEach((d, k) => { d.classList.toggle("on", k === i); d.classList.toggle("cerca", k !== i && k >= a && k <= b); });
     puntos.forEach((b, k) => {
       b.classList.toggle("on", k === j);
       if (b.getAttribute("aria-current") !== String(k === j)) b.setAttribute("aria-current", String(k === j));
@@ -3155,11 +3165,12 @@ function enganchaBanner(h) {
   };
   const ve = k => {
     t = 0;
+    desde = i;
     for (const d of diapos) d.classList.remove("ya");
     /* Parada en la copia (a medio pasar): se cuenta desde la primera. */
-    if (i >= N) { k -= N; i = 0; pon(0, false); void pista.offsetWidth; }
+    if (i >= N) { k -= N; i = desde = 0; pon(0, false); void pista.offsetWidth; }
     /* De la primera hacia atrás: se salta a la copia y se anima desde ahí. */
-    if (k < 0) { pon(N, false); void pista.offsetWidth; k = N - 1; }
+    if (k < 0) { desde = N; pon(N, false); void pista.offsetWidth; k = N - 1; }
     i = Math.min(k, N);
     pon(i, true);
     if (quieto && i >= N) { i = 0; pon(0, false); }   // sin transición no llega `transitionend`
@@ -3169,7 +3180,10 @@ function enganchaBanner(h) {
      se note: son idénticas. */
   pista.addEventListener("transitionend", e => {
     /* La primera ya se vio entrar (era la copia): no repite la entrada. */
-    if (e.target === pista && i >= N) { i = 0; pon(0, false); diapos[0].classList.add("ya"); pinta(); }
+    if (e.target !== pista) return;
+    desde = i >= N ? 0 : i;
+    if (i >= N) { i = 0; pon(0, false); diapos[0].classList.add("ya"); }
+    pinta();
   });
   raiz.querySelectorAll("[data-ban]").forEach(b => b.onclick = () => ve(i + Number(b.dataset.ban)));
   puntos.forEach(b => b.onclick = () => ve(Number(b.dataset.banIr)));
