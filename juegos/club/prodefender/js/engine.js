@@ -192,6 +192,7 @@
       this.era3 = this.L.era === 3;
       this.ley = this.era3 ? this.L.ley || null : null; this.contagioT = 0;
       this.pactos = []; this.mods = { ...MODS0 }; this.energia = 0;
+      if (this.L.vidaX || this.L.oroX) this.aplicaMods();
       this.evento = null; this.caidos = []; this.alzar = []; this.zonas = []; this.provoca = null;
       this.vendavalT = 0; this.apagonT = 0;
       if (snap) this.load(snap);
@@ -509,6 +510,10 @@
       // reinos 12-15 (levels.js `pactoPrecio`): cada pacto aceptado da además más vida a los
       // enemigos, y se suma. La Necrópolis se ganó juntando cinco pactos sin dejar pasar a nadie.
       if (this.L.pactoPrecio) M.vidaEnem *= 1 + this.L.pactoPrecio * this.pactos.filter(p => p.id).length;
+      // y la vida y el oro propios del reino (levels.js `vidaX`, `oroX`): la dificultad (`diff`)
+      // pone más enemigos, que dan más oro; esto los hace más duros sin dar más
+      if (this.L.vidaX) M.vidaEnem *= this.L.vidaX;
+      if (this.L.oroX) M.oro *= this.L.oroX;
       this.mods = M;
     }
 

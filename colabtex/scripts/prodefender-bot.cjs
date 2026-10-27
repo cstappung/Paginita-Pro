@@ -121,6 +121,8 @@ if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Nu
 // --pactos a,b,c: otro orden de preferencia (p. ej. el de una persona); --precio P: otro
 // pactoPrecio del reino (levels.js), para comparar antes y después
 if (opt('precio', '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].pactoPrecio = +opt('precio');
+// --vida X / --oro Y: otra vida y otro oro por enemigo del reino (levels.js vidaX, oroX)
+for (const [o, k] of [['vida', 'vidaX'], ['oro', 'oroX']]) if (opt(o, '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li][k] = +opt(o);
 const PACTOS_PREF = opt('pactos', '') ? opt('pactos').split(',') : ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
 const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
 function eligePacto(g) {
