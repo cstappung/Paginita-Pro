@@ -2462,7 +2462,7 @@ function renderEditorReto() {
     + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el primer premio que cobres te llevas el <b>marco del ${esc(p.titulo)}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
   $('#rtBody').innerHTML = `<div class="rt-editor">
     <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>
-      <div class="rt-acc"><button class="btn mk-mini" data-rt-auto>✨ Autocompletar con lo mejor</button><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
+      <div class="rt-acc"><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
     <div class="rt-der">
       <div class="rt-caja"><small>Puntaje</small><b class="rt-puntos">${fmt(ev.puntaje)}</b>
         <small>${mia ? `Subida: ${fmt(mia.ev.puntaje)} (${ev.puntaje - mia.ev.puntaje >= 0 ? '+' : ''}${fmt(ev.puntaje - mia.ev.puntaje)})` : 'Aún no la subes'}</small>
@@ -2485,7 +2485,7 @@ function renderEditorReto() {
     if (cas) cas.appendChild(accionesCarta(cps[rt.accion], 'cambiar', () => { rt.casilla = rt.accion; rt.accion = -1; renderEditorReto(); }));
   }
   const b = $('#rtBody');
-  b.querySelector('[data-rt-auto]').onclick = () => { rt.lista = RT.mejorOnce(rt.clave, misFutbol()).map(cp => (cp ? cp.key : '')); rt.casilla = -1; rt.accion = -1; guardaBorrador(); Snd.flip(); renderEditorReto(); };
+  // sin «Autocompletar»: armar el once a mano es el juego (con él bastaba un toque por plantilla para saber si se podía)
   b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; rt.accion = -1; guardaBorrador(); renderEditorReto(); };
   b.querySelector('[data-rt-subir]').onclick = () => accionReto('subeReto');
   b.querySelectorAll('[data-rt-tab]').forEach(x => x.onclick = () => { rt.tab = x.dataset.rtTab; renderEditorReto(); });
