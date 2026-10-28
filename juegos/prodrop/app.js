@@ -2127,6 +2127,11 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Podio semanal y premios nuevos', [
+    `<b>🏅 Podio de cada semana</b>: cada lunes, el 1.º, 2.º y 3.º de cada club ganan ${MONEDA}300, ${MONEDA}200 y ${MONEDA}100, y el podio del reto que se cierra ${MONEDA}1500 + tres sobres Plus, ${MONEDA}1000 + un Plus y ${MONEDA}500 + un sobre. Cuenta lo que tenías subido justo antes del lunes, con 3 personas o más en la tabla.`,
+    '<b>🎁 Premios</b>: las once graduadas con nota 6 o más dan ahora un sobre Plus, y con nota 8 o más, dos sobres Plus.',
+    '<b>🖼 Marco de club</b>: ahora se gana con las once graduadas con nota 8 o más.'
+  ]],
   ['Octubre 2026 · Llega el Bayern Múnich', [
     '<b>🔴 Bayern Múnich</b>: 20 jugadores nuevos en los sobres de fútbol, con Kane, Kimmich y Musiala legendarios. El Bayern también entra al álbum de clubes del Desafío de plantilla, con su marco de perfil.',
     '<b>✦ Especial</b>: Mbappé MVP y Kane Balón de Oro ahora tienen su propia rareza en la colección, y cada una va con su club.',
@@ -2384,9 +2389,9 @@ function tablaDe(clave) {
     return Object.assign({ cps, ev: RT.evalua(clave, cps.map(fichaCp)) }, f);
   }).filter(f => f.ev.valida).sort((a, b) => b.ev.puntaje - a.ev.puntaje || a.at - b.at);
 }
-// el marco de perfil de un club: se gana con su primer premio cobrado (perfil-tarjeta.js)
-const marcoGanado = clave => RT.PREMIOS.some(pr => cobrado(clave, pr.n));
-const chipMarco = p => p.tipo === 'club' ? `<span class="rt-chip${marcoGanado(p.clave) ? ' ok' : ''}" title="Marco de perfil del ${esc(p.titulo)}: viene con el primer premio">${marcoGanado(p.clave) ? '✓' : '○'} 🖼 Marco</span>` : '';
+// el marco de perfil de un club: se gana con el premio 3, las once graduadas con nota 8 o más (perfil-tarjeta.js)
+const marcoGanado = clave => cobrado(clave, RT.PREMIO_MARCO);
+const chipMarco = p => p.tipo === 'club' ? `<span class="rt-chip${marcoGanado(p.clave) ? ' ok' : ''}" title="Marco de perfil del ${esc(p.titulo)}: viene con el premio de las once graduadas con nota 8 o más">${marcoGanado(p.clave) ? '✓' : '○'} 🖼 Marco</span>` : '';
 // la bandera (imagen) de un reto de selección, o su emoji
 const iconoReto = (r, cls = '') => r.bandera ? `<img class="rt-icono bandera${cls}" src="flags/${r.bandera}.png" alt="">` : `<span class="rt-icono${cls}">${r.icono}</span>`;
 function fichaPlantilla(clave, extra = '') {
@@ -2404,16 +2409,54 @@ function renderAlbum() {
   $('#rtSub').textContent = 'Arma la mejor plantilla con tus cartas, súbela a la clasificación y cobra los premios.';
   $('#rtEligeCapa').hidden = true;
   $('#rtBody').innerHTML = `<div class="rt-acc"><button class="btn" data-rt-proximos>🔜 Próximos retos</button><button class="btn" data-rt-col>📚 Ver colección</button><button class="btn" data-rt-mercado>🏪 Mercado de fútbol</button><button class="link" data-rt-ayuda>¿Cómo se calcula el puntaje?</button></div>
-    <h3 class="rt-h">📅 Reto de la semana</h3><div class="rt-grid">${fichaPlantilla(clave, `<em class="rt-quedan">⏳ Termina en ${d ? d + ' d ' : ''}${h} h</em>`)}</div>
+    ${podioPasadoHTML()}
+    <h3 class="rt-h">📅 Reto de la semana</h3><div class="rt-grid">${fichaPlantilla(clave, `<em class="rt-quedan">⏳ Termina en ${d ? d + ' d ' : ''}${h} h · podio: ${MONEDA}${RT.PODIO_RETO[0].monedas} + ${RT.textoSobresPodio(RT.PODIO_RETO[0])} al 1.º</em>`)}</div>
     <h3 class="rt-h">⭐ Mejor plantilla</h3><div class="rt-grid">${fichaPlantilla(RT.MEJOR.clave, '<em class="rt-quedan">Siempre abierta · cualquier club y país</em>')}</div>
     <h3 class="rt-h">📘 Álbum de clubes</h3><div class="rt-grid">${RT.CLUBES.map(c => fichaPlantilla(RT.claveClub(c))).join('')}</div>`;
   $('#rtBody').querySelectorAll('[data-clave]').forEach(b => b.onclick = () => { Snd.init(); Snd.tick(); abreEditorReto(b.dataset.clave); });
+  const cp = $('#rtBody [data-cobra-podio]');
+  if (cp) cp.onclick = cobraPodio;
+}
+/* El podio de la semana que cerró el lunes (lo calcula la economía): el
+   del reto, con sus premios y el botón para cobrar los sobres si es tuyo, y
+   los clubes donde quedaste en el podio. Cada lunes, los clubes pagan al
+   1.º, 2.º y 3.º de su tabla (`PODIO_CLUB`, con 3 personas o más). */
+const MEDALLA = ['🥇', '🥈', '🥉'];
+function podioPasadoHTML() {
+  const pod = cuenta.retos && cuenta.retos.podio;
+  if (!pod || pod.semana < RT.PRIMERA) return '';
+  const reto = RT.claveReto(pod.semana), p = RT.plantilla(reto), tablas = pod.tablas || {}, yo = cuenta.uid;
+  const filaReto = (tablas[reto] || []).map((u, i) => `<li class="${u === yo ? 'yo' : ''}"><i>${MEDALLA[i]}</i><span translate="no">${esc(nombreDe(u))}</span><small>${MONEDA}${RT.PODIO_RETO[i].monedas} + ${RT.textoSobresPodio(RT.PODIO_RETO[i])}</small></li>`).join('');
+  const mio = pod.mio, pr = mio && RT.PODIO_RETO[mio.n - 1];
+  const boton = mio ? (mio.cobrado ? `<p class="rt-nota">✓ Ya cobraste los sobres de tu ${mio.n}.º lugar.</p>`
+    : `<button class="btn primary" data-cobra-podio${rt.ocupado ? ' disabled' : ''}>🎁 Cobrar ${RT.textoSobresPodio(pr)} (${mio.n}.º lugar)</button>`) : '';
+  const misClubes = RT.CLUBES.map(c => [c, (tablas[RT.claveClub(c)] || []).indexOf(yo)]).filter(([, i]) => i >= 0);
+  const clubes = misClubes.length ? `<p class="rt-nota">Tus podios de club: ${misClubes.map(([c, i]) => `${MEDALLA[i]} ${esc(M.CLUBES[c])} (+${RT.PODIO_CLUB[i]})`).join(' · ')}</p>` : '';
+  if (!filaReto && !clubes) return '';
+  return `<div class="rt-podio"><h3 class="rt-h">🏅 Podio de la semana pasada${p ? ` · ${esc(p.titulo)}` : ''}</h3>
+    ${filaReto ? `<ol class="rt-podio-l">${filaReto}</ol>` : `<p class="rt-nota">El reto de la semana pasada no tuvo podio (hacen falta ${RT.MIN_PODIO} personas en la tabla).</p>`}
+    ${boton}${clubes}</div>`;
+}
+async function cobraPodio() {
+  const mio = cuenta.retos && cuenta.retos.podio && cuenta.retos.podio.mio;
+  if (!mio || mio.cobrado || rt.ocupado) return;
+  rt.ocupado = true; renderAlbum();
+  try {
+    const r = await Red.pide('cobraPodio', { clave: mio.clave, n: mio.n });
+    mio.cobrado = true; Snd.coin();
+    toast(`¡Podio cobrado! ${r.sobres} por tu ${r.n}.º lugar.`);
+    rt.ocupado = false; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at })));
+    return;
+  } catch (e) { toast(e.message || 'No se pudo.', true); }
+  rt.ocupado = false;
+  if (!$('#retos').hidden) renderAlbum();
 }
 const AYUDA_RETOS = `<p><b>Las cartas son las de tu colección</b>, con su media, su rareza y sus posiciones de siempre. Dos copias de la misma carta solo se diferencian en la nota.</p>
   <p><b>Cada carta vale</b> (media − castigo de posición) × estado. Estado: graduada, 0,80 + 0,02 × nota (nota 10 = ×1,00, nota 6 = ×0,92); sin graduar, ×0,80, porque su nota está oculta.</p>
   <p><b>Posición</b>: en uno de sus puestos juega entero; incómodo (otro puesto de su línea), −3 de media; más lejos no puede jugar.</p>
   <p><b>Puntaje</b> = la suma de las once × 10. Un punto de media son 10 puntos: con la misma nota, el Mbappé del Clásico (92) le gana al de siempre (91). Empate: gana quien la subió primero.</p>
-  <p><b>Premios</b>, una vez por plantilla: ${RT.PREMIOS.map(pr => `${pr.txt.toLowerCase()}, ${MONEDA}${pr.monedas} y ${RT.textoSobres(pr)}${pr.sobres[0] === 'futbolplus' ? '' : ' de Fútbol'}`).join(' · ')}. El reto semanal solo se sube y se cobra durante su semana. En el álbum de clubes, el primer premio de cada club trae además su <b>marco de perfil</b>.</p>`;
+  <p><b>Premios</b>, una vez por plantilla: ${RT.PREMIOS.map(pr => `${pr.txt.toLowerCase()}, ${MONEDA}${pr.monedas} y ${RT.textoSobres(pr)}${pr.sobres[0] === 'futbolplus' ? '' : ' de Fútbol'}`).join(' · ')}. El reto semanal solo se sube y se cobra durante su semana. En el álbum de clubes, el premio de las once graduadas con nota 8 o más trae además el <b>marco de perfil</b> de ese club.</p>
+  <p><b>Podio de la semana</b>: cada lunes se mira la tabla como estaba justo antes. En cada club, el 1.º, 2.º y 3.º ganan ${MONEDA}${RT.PODIO_CLUB.join(`, ${MONEDA}`)}; en el reto que se cierra, ${RT.PODIO_RETO.map(x => `${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(', ')}. Hacen falta ${RT.MIN_PODIO} personas en la tabla. Las monedas llegan solas; los sobres del reto se cobran en el álbum.</p>`;
 // los retos que vienen, con el día en que empiezan (se activan solos el lunes)
 function pintaProximos() {
   const n = semanaAhora(), dia = ms => new Date(ms).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -2456,10 +2499,12 @@ function renderEditorReto() {
   const premios = RT.PREMIOS.map(pr => {
     const ya = cobrado(rt.clave, pr.n), puede = !ya && abierto && RT.premioOk(pr.n, ev);
     return `<div class="rt-premio${ya ? ' cobrado' : ''}"><span>${ya ? '✓' : puede ? '🎁' : '○'} ${esc(pr.txt)}</span>
-      <b>${MONEDA}${pr.monedas} + ${RT.textoSobres(pr)}${p.tipo === 'club' && pr.n === 1 ? ' + 🖼 marco de perfil' : ''}</b>
+      <b>${MONEDA}${pr.monedas} + ${RT.textoSobres(pr)}${p.tipo === 'club' && pr.n === RT.PREMIO_MARCO ? ' + 🖼 marco de perfil' : ''}</b>
       ${ya ? '<em>Cobrado</em>' : `<button class="btn mk-mini" data-cobra="${pr.n}"${puede && !rt.ocupado ? '' : ' disabled'}>Cobrar</button>`}</div>`;
   }).join('') + '<p class="rt-nota">Cada premio se cobra una vez por plantilla, con las once cartas que tengas puestas en ese momento.</p>'
-    + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el primer premio que cobres te llevas el <b>marco del ${esc(p.titulo)}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
+    + (p.tipo === 'club' ? `<p class="rt-nota">🏅 Cada lunes, el 1.º, 2.º y 3.º de esta tabla ganan ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
+    + (p.tipo === 'reto' ? `<p class="rt-nota">🏅 Al cerrar la semana, el podio de este reto gana: ${RT.PODIO_RETO.map((x, i) => `${MEDALLA[i]} ${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
+    + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el premio de las once graduadas con nota 8 o más te llevas el <b>marco del ${esc(p.titulo)}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
   $('#rtBody').innerHTML = `<div class="rt-editor">
     <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>
       <div class="rt-acc"><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
@@ -2583,7 +2628,7 @@ async function accionReto(accion, n) {
     const r = await Red.pide(accion, { clave: rt.clave, lista: rt.lista, n });
     if (accion === 'subeReto') { Snd.coin(); toast(`Plantilla subida: ${fmt(r.puntaje)} puntos.`); }
     else {
-      const p = RT.plantilla(rt.clave), marco = p && p.tipo === 'club' && !marcoGanado(rt.clave);
+      const p = RT.plantilla(rt.clave), marco = p && p.tipo === 'club' && n === RT.PREMIO_MARCO && !marcoGanado(rt.clave);
       Snd.coin(); cuenta.retos.cobrados.push(RT.claveReclamo(rt.clave, n));
       toast(`¡Premio cobrado! +${r.monedas} monedas y ${r.sobres}${marco ? `, y el marco del ${p.titulo} para tu perfil` : ''}.`);
       // los sobres del premio se abren al tiro, juntos, como unos comprados

@@ -138,15 +138,44 @@
      primera en `k` y la segunda en `k2`. */
   const PREMIOS = [
     { n: 1, monedas: 50, sobres: ["futbol"], txt: "Plantilla completa y válida" },
-    { n: 2, monedas: 300, sobres: ["futbol", "futbol"], nota: 6, txt: "Las once graduadas con nota 6 o más" },
-    { n: 3, monedas: 1000, sobres: ["futbolplus"], nota: 8, txt: "Las once graduadas con nota 8 o más" }
+    { n: 2, monedas: 300, sobres: ["futbolplus"], antes: ["futbol", "futbol"], nota: 6, txt: "Las once graduadas con nota 6 o más" },
+    { n: 3, monedas: 1000, sobres: ["futbolplus", "futbolplus"], antes: ["futbolplus"], nota: 8, txt: "Las once graduadas con nota 8 o más" }
   ];
+  /* `antes`: los sobres que daba ese premio hasta el 29-10-2026 (el 2, dos
+     normales; el 3, un Plus). Un reclamo ya escrito con esa forma sigue
+     valiendo; las reglas de ahora solo dejan escribir la nueva. */
+  const sobresValen = (pr, prefijos) => [pr.sobres, pr.antes].some(l => l && l.length === prefijos.length && l.every((t, i) => M.SOBRE[t].prefijo === prefijos[i]));
+  // el premio que da el marco de perfil de un club: el 3 (las once graduadas con nota 8 o más)
+  const PREMIO_MARCO = 3;
   // «un sobre», «dos sobres», «un sobre Plus»
-  const textoSobres = pr => (pr.sobres[0] === "futbolplus" ? "un sobre Plus" : pr.sobres.length > 1 ? pr.sobres.length === 2 ? "dos sobres" : pr.sobres.length + " sobres" : "un sobre");
+  const textoSobres = pr => { const n = pr.sobres.length, plus = pr.sobres[0] === "futbolplus"; return (n === 1 ? "un sobre" : n === 2 ? "dos sobres" : n + " sobres") + (plus ? " Plus" : ""); };
   const premioOk = (n, ev) => !!ev.valida && (!PREMIOS[n - 1].nota || ev.notaMin >= PREMIOS[n - 1].nota);
   // `club-realmadrid_2`: el reclamo del premio 2 de esa plantilla
   const claveReclamo = (clave, n) => clave + "_" + n;
   const leeReclamo = id => { const m = /^(.+)_([123])$/.exec(String(id || "")); return m ? { clave: m[1], n: +m[2] } : null; };
+
+  /* ---------- el podio de cada semana ----------
+     Cada lunes (al cerrar la semana, `finSemana`) la economía mira las
+     tablas tal como estaban en ese instante: las tablas de los clubes pagan
+     al 1.º, 2.º y 3.º (`PODIO_CLUB`, solo monedas) y la del reto que se
+     cierra paga su podio (`PODIO_RETO`, monedas y sobres; los sobres se
+     cobran con un botón, como los premios). Solo con `MIN_PODIO` personas
+     o más en la tabla: con menos no hay a quién ganarle. La mejor
+     plantilla no paga podio. */
+  const MIN_PODIO = 3;
+  const PODIO_CLUB = [300, 200, 100];
+  const PODIO_RETO = [
+    { n: 1, monedas: 1500, sobres: ["futbolplus", "futbolplus", "futbolplus"] },
+    { n: 2, monedas: 1000, sobres: ["futbolplus"] },
+    { n: 3, monedas: 500, sobres: ["futbol"] }
+  ];
+  // «tres sobres Plus», «un sobre Plus», «un sobre»
+  const textoSobresPodio = pr => (pr.sobres.length === 3 ? "tres sobres Plus" : pr.sobres[0] === "futbolplus" ? "un sobre Plus" : "un sobre");
+  // `reto-clasico-42_p1`: el reclamo de los sobres del 1.º del reto de la semana 42
+  const clavePodio = (clave, n) => clave + "_p" + n;
+  const leePodio = id => { const m = /^(reto-[a-z]{2,12}-[0-9]{1,5})_p([123])$/.exec(String(id || "")); return m ? { clave: m[1], n: +m[2] } : null; };
+  // el orden de una tabla: más puntaje primero; empate, quien la subió antes
+  const ordenaTabla = filas => filas.slice().sort((a, b) => b.puntaje - a.puntaje || a.at - b.at || (a.u < b.u ? -1 : a.u > b.u ? 1 : 0));
 
   /* El mejor once que se puede armar con estas copias ({key, id, g, gr}):
      cada casilla con la que más suma entre las que juegan ahí, después
@@ -173,6 +202,7 @@
   return {
     MEJOR, CLUBES, RETOS, PRIMERA, SEMANA0, SEMANA_MS, semanaDe, inicioSemana, finSemana, retoDeSemana,
     plantilla, claveClub, claveReto, vigente, encaje, estado, puntosFicha, puntaje, evalua,
-    PREMIOS, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce
+    PREMIOS, sobresValen, PREMIO_MARCO, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce,
+    MIN_PODIO, PODIO_CLUB, PODIO_RETO, textoSobresPodio, clavePodio, leePodio, ordenaTabla
   };
 });

@@ -163,8 +163,8 @@ PRODROP album (16, Bayern included), the prize of that club's Desafío de planti
 («Marcos de club» in juegos.html): a ring in the club's colours (`--anillo`,
 `--borde`) and the card crest (`juegos/prodrop/escudos/<club>.png`) at the
 bottom. Earned, like the Halloween collector rewards, without any write or
-rule: `economia()` records `usuarios[u].desafios[<club>]` when a claim of
-`club-<club>` is accepted, `juegos-main.js` derives `datos.desafios`
+rule: `economia()` records `usuarios[u].desafios[<club>]` when the claim of
+`club-<club>_3` (all eleven graded 8 or more, `PREMIO_MARCO`) is accepted, `juegos-main.js` derives `datos.desafios`
 (`desafiosDe`, lazy like `compras`) and `estadisticas` carries it as
 `est.desafios`. The field travels in the cierre snapshot with the rest of
 the user and `verificaCierre` compares it. Adding a club to the album needs

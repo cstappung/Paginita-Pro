@@ -580,7 +580,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
   /* Un premio de desafío (`pl`) va antes que su sobre (`s`), que se
      escribe en el mismo instante: el sobre vale si su premio valió. */
-  const ORDEN = { pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  /* El cierre de cada semana (`ps`) va antes que todo lo de ese instante:
+     las tablas se miran como estaban justo antes del lunes. El reclamo de
+     los sobres de un podio (`pq`) va, como el de un premio, antes que sus sobres. */
+  const ORDEN = { ps: -2, pq: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p), pl: typeof x.pl === "string" ? x.pl : "" });
@@ -590,6 +593,28 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries((d.plantillas && d.plantillas.p) || {}))
     for (const [id, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "pl", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k, x.k2].filter(k => typeof k === "string" && k) });
+  /* El podio de cada semana (retos.js): las versiones de cada subida
+     (`plantillas/v/<plantilla>/<uid>/<clave>` = {at, c}, una por subida,
+     y la fila de la tabla, `plantillas/s`) dicen qué tenía cada uno en la
+     tabla en cualquier momento; el lunes cuenta la última de antes. */
+  const versiones = {};
+  /* Algunas pruebas concatenan este archivo sin sus imports: sin retos.js no hay podios. */
+  const conRetos = typeof PR !== "undefined";
+  const ponVersion = (tpl, u, x) => {
+    if (!conRetos || !x || !Number.isFinite(x.at) || !PR.plantilla(tpl)) return;
+    const l = ((versiones[tpl] = versiones[tpl] || {})[u] = versiones[tpl][u] || []);
+    if (!l.some(y => y.at === x.at)) l.push({ at: x.at, c: comoLista(x.c).map(String) });
+  };
+  const pd = d.plantillas || {};
+  for (const [tpl, porU] of Object.entries(pd.s || {})) for (const [u, x] of Object.entries(porU || {})) ponVersion(tpl, u, x);
+  for (const [tpl, porU] of Object.entries(pd.v || {})) for (const [u, l] of Object.entries(porU || {})) for (const x of Object.values(l || {})) ponVersion(tpl, u, x);
+  for (const porU of Object.values(versiones)) for (const l of Object.values(porU)) l.sort((a, b) => a.at - b.at);
+  const tope = Math.min(hasta, Date.now());
+  if (conRetos && Object.keys(versiones).length) for (let n = PR.PRIMERA; PR.finSemana(n) <= tope; n++) ev.push({ t: "ps", at: PR.finSemana(n), n });
+  /* Los sobres de un podio del reto: `plantillas/q/<uid>/<reto>_p<n>` = {at, k, k2?, k3?}. */
+  for (const [u, l] of Object.entries(pd.q || {}))
+    for (const [id, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pq", at: x.at, u, k: id, sobres: [x.k, x.k2, x.k3].filter(k => typeof k === "string" && k) });
   for (const [u, l] of Object.entries(c.g || {}))
     for (const [k, porI] of Object.entries(l || {}))
       for (const [i, x] of Object.entries(porI || {}))
@@ -717,9 +742,49 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   // los premios de desafío que valieron, por `<uid>~<reclamo>`: cada uno de sus sobres se acepta una vez
   const reclamos = {};
   const casinoDe = (u, j) => { const pj = U(u).casino.porJuego; return pj[j] || (pj[j] = { apostado: 0, pagado: 0, rondas: 0 }); };
+  /* Los podios de cada semana que cerró, para la pantalla: semana → plantilla → [uid 1.º, 2.º, 3.º]. */
+  const podiosSemana = {};
+  /* La tabla `clave` como estaba justo antes de `T`: de cada cuenta, su
+     última subida de antes, si las once seguían siendo suyas y valía. */
+  const tablaEn = (clave, T) => {
+    const filas = [];
+    for (const [u, l] of Object.entries(versiones[clave] || {})) {
+      const x = l.filter(y => y.at < T).pop();
+      if (!x || U(u).parada || x.c.length !== 11 || new Set(x.c).size !== 11 || !x.c.every(cc => dueno[cc] === u)) continue;
+      const fs = x.c.map(cc => { const f = ficha(cc); return f && { id: f.id, g: f.g, gr: !!graduada[cc] }; });
+      if (fs.some(f => !f)) continue;
+      const ev = PR.evalua(clave, fs);
+      if (ev.valida) filas.push({ u, at: x.at, puntaje: ev.puntaje });
+    }
+    return PR.ordenaTabla(filas);
+  };
   for (const e of evs) {
     ahora = e.at;
-    if (e.t === "pl") {
+    if (e.t === "ps") {
+      /* El lunes: el podio de cada club (monedas) y el del reto que se
+         cierra (monedas, y los sobres se cobran aparte). */
+      const reto = PR.claveReto(e.n), sem = (podiosSemana[e.n] = {});
+      for (const clave of [...PR.CLUBES.map(PR.claveClub), reto]) {
+        const t = tablaEn(clave, e.at);
+        if (t.length < PR.MIN_PODIO) continue;
+        const titulo = PR.plantilla(clave).titulo;
+        sem[clave] = t.slice(0, 3).map(f => f.u);
+        t.slice(0, 3).forEach((f, i) => {
+          const x = U(f.u), monedas = clave === reto ? PR.PODIO_RETO[i].monedas : PR.PODIO_CLUB[i];
+          x.premios += monedas;
+          anota(f.u, "plantilla", monedas, `${i + 1}.º de la semana · ${titulo}`);
+          if (clave === reto) (x.podiosReto || (x.podiosReto = {}))[reto] = i + 1;
+        });
+      }
+    } else if (e.t === "pq") {
+      /* Los sobres del podio de un reto: solo quien quedó en ese puesto,
+         una vez, tantos como su puesto y cada uno con el prefijo de su tipo. */
+      const r = PR.leePodio(e.k), pr = r && PR.PODIO_RETO[r.n - 1], x = U(e.u);
+      if (!pr || !x.podiosReto || x.podiosReto[r.clave] !== r.n || reclamos[e.u + "~" + e.k]) continue;
+      if (e.sobres.length !== pr.sobres.length || new Set(e.sobres).size !== e.sobres.length
+        || e.sobres.some((k, i) => k[0] !== PM.SOBRE[pr.sobres[i]].prefijo)) continue;
+      reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
+    } else if (e.t === "pl") {
       /* Un premio vale si la plantilla está vigente (un reto, solo en su
          semana), las once son de quien reclama en ese momento y, con lo
          graduado hasta ahí, cumplen lo que pide ese nivel. Paga sus monedas
@@ -730,11 +795,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (!e.c.every(cc => dueno[cc] === e.u)) continue;
       const fs = e.c.map(cc => { const f = ficha(cc); return f && { id: f.id, g: f.g, gr: !!graduada[cc] }; });
       if (fs.some(f => !f) || !PR.premioOk(r.n, PR.evalua(r.clave, fs))) continue;
-      if (e.sobres.length !== pr.sobres.length || new Set(e.sobres).size !== e.sobres.length
-        || e.sobres.some((k, i) => k[0] !== PM.SOBRE[pr.sobres[i]].prefijo)) continue;
+      if (new Set(e.sobres).size !== e.sobres.length || !PR.sobresValen(pr, e.sobres.map(k => k[0]))) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
-      // el de un club deja además su marco de perfil (perfil-tarjeta.js), desde el primero que valió
-      if (pt.tipo === "club") { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
+      // el premio 3 de un club (las once con nota 8 o más) deja además su marco de perfil (perfil-tarjeta.js)
+      if (pt.tipo === "club" && r.n === PR.PREMIO_MARCO) { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
       U(e.u).premios += pr.monedas;
       anota(e.u, "plantilla", pr.monedas, pt.titulo);
     } else if (e.t === "s") {
@@ -895,7 +959,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
     for (const c of Object.keys(x.gasto)) x.gasto[c] = Math.round(x.gasto[c]);
     for (const z of Object.values(x.casino.porJuego)) { z.apostado = Math.round(z.apostado); z.pagado = Math.round(z.pagado * 100) / 100; }
     void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta,
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta, podiosSemana,
     cierre: base ? { T: base.T, est: base.est } : null };
   return { res, paradaDesde };
 }

@@ -72,7 +72,14 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       subidas[clave] = filas;
     }
     const mios = (d.plantillas && d.plantillas.p && d.plantillas.p[uid]) || {};
-    return { subidas, cobrados: Object.keys(mios), semana };
+    const podiosMios = (d.plantillas && d.plantillas.q && d.plantillas.q[uid]) || {};
+    /* El podio de la semana que cerró (semana − 1): clubes y reto, con
+       quién quedó 1.º, 2.º y 3.º, y los sobres del reto que me tocan. */
+    const pasada = semana - 1, pod = (e.podiosSemana || {})[pasada] || {}, podio = {};
+    for (const [clave, us] of Object.entries(pod)) podio[clave] = us.map(persona);
+    const yo = ((e.usuarios[uid] || {}).podiosReto) || {}, reto = PR.claveReto(pasada);
+    const miPodio = yo[reto] ? { clave: reto, n: yo[reto], cobrado: !!podiosMios[PR.clavePodio(reto, yo[reto])] } : null;
+    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio } };
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -207,6 +214,16 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
             const r = await fb.cobrarPlantilla(uid, id, lista, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
             responde(true, { ks: r.ks, at: r.at, n, monedas: pr.monedas, sobres: PR.textoSobres(pr) });
           }
+        } else if (x.accion === "cobraPodio") {
+          /* Los sobres de mi podio en el reto de la semana pasada: la
+             economía ya dijo en qué puesto quedé; aquí solo se escriben. */
+          const r = PR.leePodio(PR.clavePodio(String(x.clave || ""), Math.round(+x.n))), pr = r && PR.PODIO_RETO[r.n - 1];
+          const yo = ((e.usuarios[uid] || {}).podiosReto) || {};
+          if (!pr || yo[r.clave] !== r.n) throw new Error("Ese podio no es tuyo.");
+          const id = PR.clavePodio(r.clave, r.n);
+          if (((d.plantillas && d.plantillas.q && d.plantillas.q[uid]) || {})[id]) throw new Error("Esos sobres ya los cobraste.");
+          const w = await fb.cobrarPodio(uid, id, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+          responde(true, { ks: w.ks, at: w.at, n: r.n, sobres: PR.textoSobresPodio(pr) });
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
           if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
@@ -268,7 +285,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-64" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-67" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

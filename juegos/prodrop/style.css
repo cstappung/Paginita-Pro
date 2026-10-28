@@ -1596,3 +1596,13 @@ button.rt-ficha:hover { transform: translateY(-2px); border-color: #ffffff55; }
 .pl-orden { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .pl-orden .chip { padding: 5px 11px; }
 .pl-orden .chip.on { background: #6dffb0; color: #062a17; }
+
+/* El podio de la semana pasada, arriba del álbum */
+.rt-podio { margin: 4px 0 6px; padding: 10px 14px 12px; border-radius: 16px; background: linear-gradient(135deg, #3b2a0a99, #1a1030cc); box-shadow: inset 0 0 0 1px #ffd76a44; }
+.rt-podio .rt-h { margin-top: 0; }
+.rt-podio-l { list-style: none; margin: 4px 0 10px; padding: 0; display: grid; gap: 6px; }
+.rt-podio-l li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: #ffffff0d; }
+.rt-podio-l li.yo { background: #6dffb022; box-shadow: inset 0 0 0 1px #6dffb066; }
+.rt-podio-l i { font-style: normal; font-size: 20px; }
+.rt-podio-l span { font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-podio-l small { color: var(--muted); font-weight: 700; white-space: nowrap; }
