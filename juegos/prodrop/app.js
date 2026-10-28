@@ -105,7 +105,7 @@ const FUT_PAIS = {
   SCO: 'Escocia', WAL: 'Gales', NIR: 'Irlanda del Norte', IE: 'Irlanda', AR: 'Argentina', IT: 'Italia', CM: 'Camerún', SI: 'Eslovenia',
   GH: 'Ghana', JP: 'Japón', CZ: 'Chequia', SK: 'Eslovaquia', GR: 'Grecia', NO: 'Noruega', EC: 'Ecuador', HU: 'Hungría', UZ: 'Uzbekistán',
   SN: 'Senegal', DZ: 'Argelia', US: 'Estados Unidos', GE: 'Georgia',
-  KR: 'Corea del Sur', CA: 'Canadá',
+  KR: 'Corea del Sur', CA: 'Canadá', CL: 'Chile', SY: 'Siria',
   AM: 'Armenia', AT: 'Austria', CH: 'Suiza', CO: 'Colombia', DO: 'República Dominicana', GN: 'Guinea', MX: 'México', RS: 'Serbia', RU: 'Rusia', XK: 'Kosovo',
 };
 // la bandera es una imagen (flags/<país>.png): el emoji no se ve como bandera en Windows, solo las dos letras
@@ -1737,11 +1737,13 @@ function ordenAuto(lista) {
   const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || enDesafios(cp.key).length || enBorradores(cp.key).length ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
   return lista.slice().sort((a, b) => peso(a) - peso(b));
 }
+// el nombre en una mini: la primera palabra, o el apellido si va con inicial («S. Rodríguez», «J. I. Díaz»)
+const nombreCorto = n => (/^\S+\.\s/.test(n) ? n.replace(/^(\S+\.\s)+/, '') : n.split(' ')[0]);
 function miniCp(cp, extra = '') {
   const c = CARDS[cp.id];
   return `<span class="mini t${c.tier}" style="--accent:${accentOf(c)}" title="${esc(c.name + ' · ' + subtitle(c) + (cp.gr ? ' · nota ' + cp.g : ' · sin graduar'))}">
     <img src="${c.img}" alt="" loading="lazy" draggable="false">${cp.gr ? `<b style="--gc:${gradeColor(cp.g)}">${cp.g}</b>` : ''}${extra}
-    <small>${esc(c.name.split(' ')[0])}</small></span>`;
+    <small>${esc(nombreCorto(c.name))}</small></span>`;
 }
 function abreReroll() {
   if (!cuenta.listo) return;
@@ -2127,6 +2129,10 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Llega el fútbol chileno', [
+    '<b>🇨🇱 Colo-Colo, Universidad Católica y Universidad de Chile</b>: 73 jugadores nuevos en los sobres de fútbol, con las medias del FIFA: Vidal, Aránguiz, Zampedri, Medel y compañía. Los tres entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
+    '<b>🔎 Elige la copia</b>: en el selector del desafío sale la mejor copia de cada jugador, con cuántas tienes; tócala para ver todas y elegir cuál va. «Ver» abre la carta en grande, y ahí se gradúa.'
+  ]],
   ['Octubre 2026 · Podio semanal y premios nuevos', [
     `<b>🏅 Podio de cada semana</b>: cada lunes, el 1.º, 2.º y 3.º de cada club ganan ${MONEDA}300, ${MONEDA}200 y ${MONEDA}100, y el podio del reto que se cierra ${MONEDA}1500 + tres sobres Plus, ${MONEDA}1000 + un Plus y ${MONEDA}500 + un sobre. Cuenta lo que tenías subido justo antes del lunes, con 3 personas o más en la tabla.`,
     '<b>🎁 Premios</b>: las once graduadas con nota 6 o más dan ahora un sobre Plus, y con nota 8 o más, dos sobres Plus.',
@@ -2479,7 +2485,7 @@ async function cobraAlbum() {
   try {
     const r = await Red.pide('cobraAlbum', { club });
     cuenta.retos.albumes = Object.assign(albumesCobrados(), { [club]: r.at });
-    Snd.coin(); toast(`¡Álbum del ${M.CLUBES[club]} completo! +${fmt(r.monedas)} monedas y ${r.sobres}.`);
+    Snd.coin(); toast(`¡Álbum ${RT.delClub(club)} completo! +${fmt(r.monedas)} monedas y ${r.sobres}.`);
     rt.ocupado = false; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at })));
     return;
   } catch (e) { toast(e.message || 'No se pudo.', true); }
@@ -2591,7 +2597,7 @@ function renderEditorReto() {
   }).join('') + '<p class="rt-nota">Cada premio se cobra una vez por plantilla, con las once cartas que tengas puestas en ese momento.</p>'
     + (p.tipo === 'club' ? `<p class="rt-nota">🏅 Cada lunes, el 1.º, 2.º y 3.º de esta tabla ganan ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
     + (p.tipo === 'reto' ? `<p class="rt-nota">🏅 Al cerrar la semana, el podio de este reto gana: ${RT.PODIO_RETO.map((x, i) => `${MEDALLA[i]} ${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
-    + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el premio de las once graduadas con nota 8 o más te llevas el <b>marco del ${esc(p.titulo)}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
+    + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el premio de las once graduadas con nota 8 o más te llevas el <b>marco ${esc(RT.delClub(p.club))}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
   $('#rtBody').innerHTML = `<div class="rt-editor">
     <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>
       <div class="rt-acc"><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
@@ -2717,7 +2723,7 @@ async function accionReto(accion, n) {
     else {
       const p = RT.plantilla(rt.clave), marco = p && p.tipo === 'club' && n === RT.PREMIO_MARCO && !marcoGanado(rt.clave);
       Snd.coin(); cuenta.retos.cobrados.push(RT.claveReclamo(rt.clave, n));
-      toast(`¡Premio cobrado! +${r.monedas} monedas y ${r.sobres}${marco ? `, y el marco del ${p.titulo} para tu perfil` : ''}.`);
+      toast(`¡Premio cobrado! +${r.monedas} monedas y ${r.sobres}${marco ? `, y el marco ${RT.delClub(p.club)} para tu perfil` : ''}.`);
       // los sobres del premio se abren al tiro, juntos, como unos comprados
       if (r.ks && r.ks.length) { rt.ocupado = false; rt.casilla = -1; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at }))); return; }
     }

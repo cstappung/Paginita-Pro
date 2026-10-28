@@ -448,10 +448,61 @@
     ["bayern", "serge-gnabry", "S. Gnabry", "DEL", 7, "DE"], ["bayern", "harry-kane", "Harry Kane", "DEL", 9, "ENG"],
     ["bayern", "luis-diaz", "Luis Díaz", "DEL", 14, "CO"], ["bayern", "michael-olise", "M. Olise", "DEL", 17, "FR"]
   ];
+  /* ---------- los tres grandes de Chile ----------
+     Colo-Colo, la Universidad Católica y la U. de Chile, con las medias y
+     posiciones de EA FC: la Católica de FC 27 (va en la Libertadores);
+     Colo-Colo y la U de FC 26, porque FC 27 no los trae. La foto es la cara
+     del juego sobre los colores del club (cards/champions/<club>/<id>.webp);
+     los clubes no publican el plantel con fotos. Sin dorsal (0): la carta ya
+     no lo muestra. Van después del Bayern, con su propio corte en
+     `AMPLIACIONES`. */
+  const CHILE = [
+    // Colo-Colo
+    ["colocolo", "claudio-aquino", "C. Aquino", "MED", 0, "AR"], ["colocolo", "sebastian-vegas", "S. Vegas", "DEF", 0, "CL"],
+    ["colocolo", "alan-saldivia", "A. Saldivia", "DEF", 0, "UY"], ["colocolo", "lucas-cepeda", "L. Cepeda", "DEL", 0, "CL"],
+    ["colocolo", "fernando-de-paul", "F. De Paul", "POR", 0, "CL"], ["colocolo", "arturo-vidal", "Arturo Vidal", "MED", 0, "CL"],
+    ["colocolo", "alexander-oroz", "A. Oroz", "DEL", 0, "CL"], ["colocolo", "marcos-bolados", "M. Bolados", "DEL", 0, "CL"],
+    ["colocolo", "jonathan-villagra", "J. Villagra", "DEF", 0, "CL"], ["colocolo", "felipe-mendez", "F. Méndez", "MED", 0, "CL"],
+    ["colocolo", "mauricio-isla", "Mauricio Isla", "DEF", 0, "CL"], ["colocolo", "vicente-pizarro", "V. Pizarro", "MED", 0, "CL"],
+    ["colocolo", "emiliano-amor", "E. Amor", "DEF", 0, "SY"], ["colocolo", "erick-wiemberg", "E. Wiemberg", "DEF", 0, "CL"],
+    ["colocolo", "oscar-opazo", "Ó. Opazo", "DEF", 0, "CL"], ["colocolo", "esteban-pavez", "E. Pavez", "MED", 0, "CL"],
+    ["colocolo", "daniel-gutierrez", "D. Gutiérrez", "DEF", 0, "CL"], ["colocolo", "javier-correa", "J. Correa", "DEL", 0, "AR"],
+    ["colocolo", "cristian-riquelme", "C. Riquelme", "DEF", 0, "CL"], ["colocolo", "eduardo-villanueva", "E. Villanueva", "POR", 0, "CL"],
+    ["colocolo", "tomas-alarcon", "T. Alarcón", "MED", 0, "CL"], ["colocolo", "salomon-rodriguez", "S. Rodríguez", "DEL", 0, "UY"],
+    ["colocolo", "leandro-hernandez", "L. Hernández", "DEL", 0, "CL"], ["colocolo", "bruno-gutierrez", "B. Gutiérrez", "DEF", 0, "CL"],
+    // Universidad Católica
+    ["ucatolica", "fernando-zampedri", "F. Zampedri", "DEL", 0, "CL"], ["ucatolica", "agustin-garcia-basso", "García Basso", "DEF", 0, "AR"],
+    ["ucatolica", "justo-giani", "J. Giani", "MED", 0, "AR"], ["ucatolica", "branco-ampuero", "B. Ampuero", "DEF", 0, "CL"],
+    ["ucatolica", "matias-palavecino", "M. Palavecino", "MED", 0, "AR"], ["ucatolica", "clemente-montes", "C. Montes", "MED", 0, "CL"],
+    ["ucatolica", "daniel-gonzalez", "D. González", "DEF", 0, "CL"], ["ucatolica", "cristian-cuevas", "C. Cuevas", "MED", 0, "CL"],
+    ["ucatolica", "jimmy-martinez", "J. Martínez", "MED", 0, "CL"], ["ucatolica", "jhojan-valencia", "J. Valencia", "MED", 0, "CO"],
+    ["ucatolica", "eugenio-mena", "Eugenio Mena", "DEF", 0, "CL"], ["ucatolica", "juan-ignacio-diaz", "J. I. Díaz", "DEF", 0, "AR"],
+    ["ucatolica", "vicente-bernedo", "V. Bernedo", "POR", 0, "CL"], ["ucatolica", "gary-medel", "Gary Medel", "MED", 0, "CL"],
+    ["ucatolica", "fernando-zuqui", "F. Zuqui", "MED", 0, "AR"], ["ucatolica", "alfred-canales", "A. Canales", "MED", 0, "CL"],
+    ["ucatolica", "diego-valencia", "D. Valencia", "DEL", 0, "CL"], ["ucatolica", "tomas-asta-buruaga", "T. Asta-Buruaga", "DEF", 0, "CL"],
+    ["ucatolica", "bernardo-cerezo", "B. Cerezo", "DEF", 0, "CL"], ["ucatolica", "sebastian-arancibia", "S. Arancibia", "DEF", 0, "CL"],
+    ["ucatolica", "agustin-farias", "A. Farías", "MED", 0, "AR"], ["ucatolica", "juan-francisco-rossel", "J. F. Rossel", "MED", 0, "CL"],
+    ["ucatolica", "diego-corral", "D. Corral", "MED", 0, "CL"], ["ucatolica", "dario-melo", "D. Melo", "POR", 0, "CL"],
+    ["ucatolica", "martin-gomez", "M. Gómez", "MED", 0, "AR"], ["ucatolica", "axel-cerda", "A. Cerda", "DEL", 0, "CL"],
+    ["ucatolica", "francisco-valdes", "F. Valdés", "POR", 0, "CL"],
+    // Universidad de Chile
+    ["udechile", "gabriel-castellon", "G. Castellón", "POR", 0, "CL"], ["udechile", "leandro-fernandez", "L. Fernández", "DEL", 0, "AR"],
+    ["udechile", "lucas-di-yorio", "L. Di Yorio", "DEL", 0, "AR"], ["udechile", "javier-altamirano", "J. Altamirano", "MED", 0, "CL"],
+    ["udechile", "rodrigo-contreras", "R. Contreras", "DEL", 0, "AR"], ["udechile", "charles-aranguiz", "Charles Aránguiz", "MED", 0, "CL"],
+    ["udechile", "sebastian-rodriguez", "S. Rodríguez", "MED", 0, "UY"], ["udechile", "lucas-assadi", "L. Assadi", "MED", 0, "CL"],
+    ["udechile", "cristopher-toselli", "C. Toselli", "POR", 0, "CL"], ["udechile", "fabian-hormazabal", "F. Hormazábal", "DEF", 0, "CL"],
+    ["udechile", "franco-calderon", "F. Calderón", "DEF", 0, "AR"], ["udechile", "israel-poblete", "I. Poblete", "MED", 0, "CL"],
+    ["udechile", "matias-sepulveda", "M. Sepúlveda", "DEF", 0, "CL"], ["udechile", "nicolas-guerra", "N. Guerra", "DEL", 0, "CL"],
+    ["udechile", "octavio-rivero", "O. Rivero", "DEL", 0, "UY"], ["udechile", "nicolas-fernandez", "N. Fernández", "DEF", 0, "CL"],
+    ["udechile", "matias-zaldivia", "M. Zaldivia", "DEF", 0, "CL"], ["udechile", "nicolas-ramirez", "N. Ramírez", "DEF", 0, "CL"],
+    ["udechile", "marcelo-diaz", "Marcelo Díaz", "MED", 0, "CL"], ["udechile", "marcelo-morales", "M. Morales", "DEF", 0, "CL"],
+    ["udechile", "felipe-salomoni", "F. Salomoni", "DEF", 0, "AR"], ["udechile", "ignacio-tapia", "I. Tapia", "DEF", 0, "CL"]
+  ];
   const CLUBES = {
     realmadrid: "Real Madrid", barcelona: "FC Barcelona",
     manutd: "Manchester United", mancity: "Manchester City", chelsea: "Chelsea", liverpool: "Liverpool", tottenham: "Tottenham", arsenal: "Arsenal",
-    bayern: "Bayern Múnich", betis: "Real Betis", psg: "Paris Saint-Germain", como: "Como", inter: "Inter", roma: "Roma", napoli: "Napoli", dortmund: "Borussia Dortmund"
+    bayern: "Bayern Múnich", betis: "Real Betis", psg: "Paris Saint-Germain", como: "Como", inter: "Inter", roma: "Roma", napoli: "Napoli", dortmund: "Borussia Dortmund",
+    colocolo: "Colo-Colo", ucatolica: "Universidad Católica", udechile: "Universidad de Chile"
   };
 
   /* ---------- la media de cada futbolista ----------
@@ -580,6 +631,25 @@
       "jonathan-tah": 87, "alphonso-davies": 84, "hiroki-ito": 78, "sacha-boey": 77, "josip-stanisic": 78,
       "joshua-kimmich": 89, "tom-bischof": 76, "jamal-musiala": 88, "konrad-laimer": 82, "lennart-karl": 63,
       "aleksandar-pavlovic": 79, "serge-gnabry": 82, "harry-kane": 89, "luis-diaz": 85, "michael-olise": 86
+    },
+    colocolo: {
+      "claudio-aquino": 77, "sebastian-vegas": 73, "alan-saldivia": 72, "lucas-cepeda": 72, "fernando-de-paul": 71, "arturo-vidal": 73,
+      "alexander-oroz": 67, "marcos-bolados": 67, "jonathan-villagra": 67, "felipe-mendez": 71, "mauricio-isla": 71, "vicente-pizarro": 72,
+      "emiliano-amor": 70, "erick-wiemberg": 68, "oscar-opazo": 67, "esteban-pavez": 70, "daniel-gutierrez": 66, "javier-correa": 71,
+      "cristian-riquelme": 62, "eduardo-villanueva": 60, "tomas-alarcon": 69, "salomon-rodriguez": 68, "leandro-hernandez": 63, "bruno-gutierrez": 61
+    },
+    ucatolica: {
+      "fernando-zampedri": 74, "agustin-garcia-basso": 73, "justo-giani": 72, "branco-ampuero": 72, "matias-palavecino": 70, "clemente-montes": 70,
+      "daniel-gonzalez": 70, "cristian-cuevas": 69, "jimmy-martinez": 68, "jhojan-valencia": 68, "eugenio-mena": 68, "juan-ignacio-diaz": 68,
+      "vicente-bernedo": 68, "gary-medel": 68, "fernando-zuqui": 67, "alfred-canales": 67, "diego-valencia": 66, "tomas-asta-buruaga": 66,
+      "bernardo-cerezo": 65, "sebastian-arancibia": 65, "agustin-farias": 63, "juan-francisco-rossel": 63, "diego-corral": 63, "dario-melo": 62,
+      "martin-gomez": 60, "axel-cerda": 58, "francisco-valdes": 56
+    },
+    udechile: {
+      "gabriel-castellon": 72, "leandro-fernandez": 73, "lucas-di-yorio": 73, "javier-altamirano": 71, "rodrigo-contreras": 73, "charles-aranguiz": 74,
+      "sebastian-rodriguez": 75, "lucas-assadi": 66, "cristopher-toselli": 70, "fabian-hormazabal": 69, "franco-calderon": 71, "israel-poblete": 68,
+      "matias-sepulveda": 69, "nicolas-guerra": 68, "octavio-rivero": 72, "nicolas-fernandez": 66, "matias-zaldivia": 71, "nicolas-ramirez": 68,
+      "marcelo-diaz": 71, "marcelo-morales": 66, "felipe-salomoni": 64, "ignacio-tapia": 63
     }
   };
   const mediaDe = (club, id) => MEDIAS[club][id];
@@ -725,6 +795,28 @@
       "jonathan-tah": "DFC", "alphonso-davies": "LI/MI", "hiroki-ito": "DFC/LI", "sacha-boey": "LD", "josip-stanisic": "DFC/LD",
       "joshua-kimmich": "MC/LD", "tom-bischof": "MC/MD", "jamal-musiala": "MC/MI", "konrad-laimer": "MC/LD", "lennart-karl": "MC/MD",
       "aleksandar-pavlovic": "MC", "serge-gnabry": "EI/ED", "harry-kane": "DC", "luis-diaz": "EI/DC", "michael-olise": "ED"
+    },
+    colocolo: {
+      "claudio-aquino": "MC", "sebastian-vegas": "DFC/LI", "alan-saldivia": "DFC", "lucas-cepeda": "EI/MI", "fernando-de-paul": "POR",
+      "arturo-vidal": "MC", "alexander-oroz": "ED/MD", "marcos-bolados": "ED/MD", "jonathan-villagra": "DFC", "felipe-mendez": "MC/MD",
+      "mauricio-isla": "LD/MD", "vicente-pizarro": "MC", "emiliano-amor": "DFC", "erick-wiemberg": "LI/DFC", "oscar-opazo": "LD/LI",
+      "esteban-pavez": "MC", "daniel-gutierrez": "DFC/LI", "javier-correa": "DC", "cristian-riquelme": "LI/MI", "eduardo-villanueva": "POR",
+      "tomas-alarcon": "MC", "salomon-rodriguez": "DC", "leandro-hernandez": "EI/MI", "bruno-gutierrez": "LD/MD"
+    },
+    ucatolica: {
+      "fernando-zampedri": "DC", "agustin-garcia-basso": "DFC/LI", "justo-giani": "MC/EI", "branco-ampuero": "DFC/LD", "matias-palavecino": "MC/MI",
+      "clemente-montes": "MI/MD", "daniel-gonzalez": "DFC/LD", "cristian-cuevas": "MI/MC", "jimmy-martinez": "MC", "jhojan-valencia": "MC",
+      "eugenio-mena": "LI/MI", "juan-ignacio-diaz": "DFC/LI", "vicente-bernedo": "POR", "gary-medel": "MC/DFC", "fernando-zuqui": "MC",
+      "alfred-canales": "MC", "diego-valencia": "DC/EI", "tomas-asta-buruaga": "DFC/LD", "bernardo-cerezo": "LD/LI", "sebastian-arancibia": "LD",
+      "agustin-farias": "MC", "juan-francisco-rossel": "MC/MI", "diego-corral": "MI/MD", "dario-melo": "POR", "martin-gomez": "MC",
+      "axel-cerda": "DC", "francisco-valdes": "POR"
+    },
+    udechile: {
+      "gabriel-castellon": "POR", "leandro-fernandez": "DC/MI", "lucas-di-yorio": "DC", "javier-altamirano": "MC", "rodrigo-contreras": "DC",
+      "charles-aranguiz": "MC", "sebastian-rodriguez": "MC", "lucas-assadi": "MC/DC", "cristopher-toselli": "POR", "fabian-hormazabal": "LD/MD",
+      "franco-calderon": "DFC", "israel-poblete": "MC", "matias-sepulveda": "LI/MC", "nicolas-guerra": "DC", "octavio-rivero": "DC",
+      "nicolas-fernandez": "LD/MD", "matias-zaldivia": "DFC", "nicolas-ramirez": "DFC", "marcelo-diaz": "MC", "marcelo-morales": "LI/MI",
+      "felipe-salomoni": "LI/MI", "ignacio-tapia": "DFC/LD"
     }
   };
   const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
@@ -827,6 +919,7 @@
   CHAMPIONS.forEach(j => cartaFutbol("futbol", "champions", j));
   ESPECIALES.forEach(j => cartaFutbol("futbol", "especiales", j));
   BAYERN.forEach(j => cartaFutbol("futbol", "champions", j));
+  CHILE.forEach(j => cartaFutbol("futbol", "champions", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
@@ -861,7 +954,8 @@
      sobres ven todo. */
   // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
   // El Bayern Múnich (20 jugadores, publicado el 2026-10-28): el corte es media hora después del push, para que ningún sobre ya comprado cambie.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }];
+  // Colo-Colo, la Católica y la U (73 jugadores): CORTE PROVISORIO para probar en local; al publicar se cambia a la hora del push más media hora.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793260000000, n: 833 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
@@ -1131,7 +1225,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, BAYERN, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, BAYERN, CHILE, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
