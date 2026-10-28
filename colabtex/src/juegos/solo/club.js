@@ -262,7 +262,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-71&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-72&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

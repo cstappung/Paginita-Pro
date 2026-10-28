@@ -107,7 +107,7 @@ function robot(o={}){
   T=t+9;                                                              // el tránsito entre jornadas
  }
  const cat='club-fanal-travesia',tiempo=tiempoSesion(prueba);
- return {prueba,dato:{categoria:cat,puntos:Math.min(1e6,Math.round(st.pts)),tiempo,partida:'p'},jornadas:{categoria:'club-fanal-jornadas',puntos:completadas,tiempo,partida:'p'},st};
+ return {prueba,dato:{categoria:cat,puntos:Math.min(1e9,Math.round(st.pts)),tiempo,partida:'p'},jornadas:{categoria:'club-fanal-jornadas',puntos:completadas,tiempo,partida:'p'},st};
 }
 /* El tiempo de juego de la sesión, como lo declara el juego. */
 const tiempoSesion=pr=>Math.max(1,pr.J.reduce((s,x)=>s+x.g,0));
@@ -140,10 +140,10 @@ test('FANAL: travesías honestas del robot pasan (lenta, normal y rápida pero h
  }
 });
 
-test('FANAL: una travesía hasta la fase 6 pasa, con los jefes aguantando lo que aguantan en pantalla',async()=>{
- // La jornada 94 es la Nodriza de la primera vuelta en fase 6 (grado 1); la 112, la de la segunda (grado 2).
+test('FANAL: una travesía hasta la fase 7 pasa, con los jefes aguantando lo que aguantan en pantalla',async()=>{
+ // La jornada 94 es la Nodriza de la primera vuelta en fase 6 (grado 1); la 112, la de la primera en fase 7 (grado 2).
  const r=conTiempo(robot({hasta:112,semilla:21,muereEn:112,golpes:0.05,compras:'cbfcbfpbprvoivoircpaai',vidaPantalla:true}));
- assert.equal(M.jornada(112).fase,6);assert.equal(M.jornada(112).grado,2);
+ assert.equal(M.jornada(112).fase,7);assert.equal(M.jornada(112).grado,2);
  assert.ok(M.vidaJefeJuego(M.jornada(112))>M.vidaJefe(M.jornada(112)));
  const rh=FP.rehace(r.prueba);
  assert.equal(rh.motivo,undefined,String(rh.motivo));
@@ -155,7 +155,12 @@ test('FANAL: una travesía hasta la fase 6 pasa, con los jefes aguantando lo que
  assert.ok(JSON.stringify(r.prueba).length<largo/5,'empacada ocupa '+JSON.stringify(r.prueba).length+' de '+largo);
  assert.equal(await verifica(r.jornadas,r.prueba,{uid:'uid-robot'}),null);
  assert.equal(await verifica(r.dato,r.prueba,{uid:'uid-robot'}),null);
- assert.ok(r.jornadas.puntos>=111,'llegó a la segunda vuelta en fase 6: '+r.jornadas.puntos);
+ assert.ok(r.jornadas.puntos>=111,'llegó a la vuelta en fase 7: '+r.jornadas.puntos);
+ // Los puntos ya no se cortan en el millón (la tabla se llenaba de empates): van enteros.
+ assert.equal(r.dato.puntos,rh.puntos);
+ // Y lo que manda un juego viejo, en caché, con el techo de antes, también vale si la travesía lo pasó.
+ if(rh.puntos>1e6)assert.equal(await verifica(Object.assign({},r.dato,{puntos:1e6}),r.prueba,{uid:'uid-robot'}),null);
+ else assert.notEqual(await verifica(Object.assign({},r.dato,{puntos:1e6}),r.prueba,{uid:'uid-robot'}),null);
 });
 
 test('FANAL: la prueba empacada es la misma prueba (y tocarla no pasa)',async()=>{

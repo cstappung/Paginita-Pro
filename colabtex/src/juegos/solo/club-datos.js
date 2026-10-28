@@ -83,9 +83,12 @@ export function resultadoClub(juego, dato) {
   if (juego === 'sudoku' && /^club-sudoku-(facil|medio|dificil|experto)$/.test(dato.categoria) && dato.puntos !== 1) return null;
   if (dato.categoria === 'club-sudoku-racha' && dato.puntos > 1000) return null;
   if (dato.categoria === 'club-sudoku-arcade' && dato.puntos > 1000000) return null;
-  /* FANAL: los puntos de una travesía (o del sin fin) con tope 1 000 000,
-     como el arcade del sudoku; las jornadas, con el tope común de 100 000. */
-  if (juego === 'fanal' && dato.categoria !== 'club-fanal-jornadas' && dato.puntos > 1000000) return null;
+  /* FANAL: los puntos de una travesía hasta 1 000 000 000 (con el millón
+     de antes la tabla se llenó de empates y no entraba nada nuevo); los del
+     sin fin, que ya no recibe marcas, hasta 1 000 000; las jornadas, con el
+     tope común de 100 000. */
+  if (dato.categoria === 'club-fanal-travesia' && dato.puntos > 1000000000) return null;
+  if (dato.categoria === 'club-fanal-sinfin' && dato.puntos > 1000000) return null;
   if (dato.categoria === 'club-fanal-jornadas' && dato.puntos > 100000) return null;
   /* Atasco: tres estrellas por nivel; 3000 deja sitio para más pisos
      sin aceptar números absurdos (hoy son 240 niveles, 720 estrellas). */

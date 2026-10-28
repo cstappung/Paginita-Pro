@@ -204,22 +204,23 @@
   };
 
   /* Después del Sol los jefes vuelven, cambiados: fase 2 en la primera
-     vuelta, fase 3 en la segunda, fase 4 en la tercera, fase 5 en la cuarta y fase 6
-     en las que siguen (cada vuelta en la 6, un grado más dura: ver RIGOR). Cada fase
+     vuelta, fase 3 en la segunda, fase 4 en la tercera, fase 5 en la cuarta, fase 6
+     en la quinta y fase 7 en las que siguen (cada vuelta desde la 6, un grado
+     más dura: ver RIGOR). Cada fase
      tiene su epíteto (el de la tarjeta con que se presentan) y el nombre
      de la habilidad que estrena (`hab`), que se dice en pantalla cuando
      la usan. Cada fase conserva las de las anteriores. Los epítetos hablan de lo mismo que el final del
      Sol: ahora vienen ellos hacia tu luz, y vienen sabiendo. */
   const FASES = {
-    nodriza: { 2: { epiteto: "Volvió con el nido a cuestas", hab: "Nidada" }, 3: { epiteto: "Madre de lo que queda", hab: "Polvo suspendido" }, 4: { epiteto: "Subió al cielo con su enjambre", hab: "Reclamo" }, 5: { epiteto: "Amanece con las suyas", hab: "Abrazo" }, 6: { epiteto: "Dejó su piel de vidrio atrás", hab: "Muda" } },
-    faro: { 2: { epiteto: "Sembró el agua de luces", hab: "Balizas" }, 3: { epiteto: "Ya no gira a ciegas", hab: "Giro entero" }, 4: { epiteto: "Ahora alumbra de más", hab: "Deslumbre" }, 5: { epiteto: "Encendido, por fin", hab: "Prisma" }, 6: { epiteto: "Su lente se volvió vitral", hab: "Caleidoscopio" } },
-    esfinge: { 2: { epiteto: "Ahora pregunta tres veces", hab: "Espejismo" }, 3: { epiteto: "La noche, coronada", hab: "Laberinto" }, 4: { epiteto: "Su última pregunta eres tú", hab: "Tu sombra" }, 5: { epiteto: "La pregunta que queda de día", hab: "Acertijo" }, 6: { epiteto: "Se rompió y siguió preguntando", hab: "Esquirlas" } },
-    casco: { 2: { epiteto: "Echó el ancla para quedarse", hab: "Cadena" }, 3: { epiteto: "Su llama aprendió a salir", hab: "Fuego fatuo" }, 4: { epiteto: "Navega por arriba, sin agua", hab: "Bala rasa" }, 5: { epiteto: "A flote en la primera luz", hab: "Escora" }, 6: { epiteto: "Trae lo que el mar guardó en vidrio", hab: "Botellas" } },
-    crisalida: { 2: { epiteto: "Se volvió a envolver", hab: "Capullo de seda" }, 3: { epiteto: "Esta vez teje para ti", hab: "Telar" }, 4: { epiteto: "Guardó un capullo para ti", hab: "Mortaja" }, 5: { epiteto: "Late al compás del día", hab: "Compás" }, 6: { epiteto: "Teje con vidrio de colores", hab: "Vidriera" } },
-    hoguera: { 2: { epiteto: "Alguien la volvió a encender", hab: "Tizones" }, 3: { epiteto: "Arroja lo que guarda", hab: "Honda" }, 4: { epiteto: "Arde en frío", hab: "Cerco" }, 5: { epiteto: "De día ya no hace falta", hab: "Yesca" }, 6: { epiteto: "Funde los vidrios que la tenían", hab: "Colada" } },
-    luna: { 2: { epiteto: "Llena, y de sangre", hab: "Luna llena" }, 3: { epiteto: "El ojo del eclipse", hab: "Resaca de luz" }, 4: { epiteto: "Nueva, con una estrella en brazos", hab: "Horizonte" }, 5: { epiteto: "La que se queda de día", hab: "Rayo de luna" }, 6: { epiteto: "Volvió el agua un espejo", hab: "Agua de vidrio" } },
-    constelacion: { 2: { epiteto: "Volvieron en fila", hab: "Alineación" }, 3: { epiteto: "Una de ellas va a estallar", hab: "Supernova" }, 4: { epiteto: "Bajaron a rodearte", hab: "Ronda" }, 5: { epiteto: "Las últimas en apagarse", hab: "Aurora" }, 6: { epiteto: "Siete vidrios de un rosetón", hab: "Celosía" } },
-    sol: { 2: { epiteto: "Se encendió de nuevo, más rojo", hab: "Canícula" }, 3: { epiteto: "Lo que queda cuando un sol se cierra", hab: "Colapso" }, 4: { epiteto: "Lo que queda encendido", hab: "Ocaso" }, 5: { epiteto: "Otra vez, desde la orilla", hab: "Amanecer" }, 6: { epiteto: "Te mira a través de una lupa", hab: "Lupa" } }
+    nodriza: { 2: { epiteto: "Volvió con el nido a cuestas", hab: "Nidada" }, 3: { epiteto: "Madre de lo que queda", hab: "Polvo suspendido" }, 4: { epiteto: "Subió al cielo con su enjambre", hab: "Reclamo" }, 5: { epiteto: "Amanece con las suyas", hab: "Abrazo" }, 6: { epiteto: "Dejó su piel de vidrio atrás", hab: "Muda" }, 7: { epiteto: "Se rompió, y la unieron con oro", hab: "Pan de oro" } },
+    faro: { 2: { epiteto: "Sembró el agua de luces", hab: "Balizas" }, 3: { epiteto: "Ya no gira a ciegas", hab: "Giro entero" }, 4: { epiteto: "Ahora alumbra de más", hab: "Deslumbre" }, 5: { epiteto: "Encendido, por fin", hab: "Prisma" }, 6: { epiteto: "Su lente se volvió vitral", hab: "Caleidoscopio" }, 7: { epiteto: "Su lente se partió y alumbra por la grieta", hab: "Grieta" } },
+    esfinge: { 2: { epiteto: "Ahora pregunta tres veces", hab: "Espejismo" }, 3: { epiteto: "La noche, coronada", hab: "Laberinto" }, 4: { epiteto: "Su última pregunta eres tú", hab: "Tu sombra" }, 5: { epiteto: "La pregunta que queda de día", hab: "Acertijo" }, 6: { epiteto: "Se rompió y siguió preguntando", hab: "Esquirlas" }, 7: { epiteto: "Esconde la respuesta bajo un cáliz", hab: "Tres cálices" } },
+    casco: { 2: { epiteto: "Echó el ancla para quedarse", hab: "Cadena" }, 3: { epiteto: "Su llama aprendió a salir", hab: "Fuego fatuo" }, 4: { epiteto: "Navega por arriba, sin agua", hab: "Bala rasa" }, 5: { epiteto: "A flote en la primera luz", hab: "Escora" }, 6: { epiteto: "Trae lo que el mar guardó en vidrio", hab: "Botellas" }, 7: { epiteto: "Abrió el cofre que guardaba", hab: "Cofre" } },
+    crisalida: { 2: { epiteto: "Se volvió a envolver", hab: "Capullo de seda" }, 3: { epiteto: "Esta vez teje para ti", hab: "Telar" }, 4: { epiteto: "Guardó un capullo para ti", hab: "Mortaja" }, 5: { epiteto: "Late al compás del día", hab: "Compás" }, 6: { epiteto: "Teje con vidrio de colores", hab: "Vidriera" }, 7: { epiteto: "Cose lo roto con hilo de oro", hab: "Costura" } },
+    hoguera: { 2: { epiteto: "Alguien la volvió a encender", hab: "Tizones" }, 3: { epiteto: "Arroja lo que guarda", hab: "Honda" }, 4: { epiteto: "Arde en frío", hab: "Cerco" }, 5: { epiteto: "De día ya no hace falta", hab: "Yesca" }, 6: { epiteto: "Funde los vidrios que la tenían", hab: "Colada" }, 7: { epiteto: "Ya no funde vidrio: funde oro", hab: "Oro fundido" } },
+    luna: { 2: { epiteto: "Llena, y de sangre", hab: "Luna llena" }, 3: { epiteto: "El ojo del eclipse", hab: "Resaca de luz" }, 4: { epiteto: "Nueva, con una estrella en brazos", hab: "Horizonte" }, 5: { epiteto: "La que se queda de día", hab: "Rayo de luna" }, 6: { epiteto: "Volvió el agua un espejo", hab: "Agua de vidrio" }, 7: { epiteto: "Un anillo de oro la rodea", hab: "Halo" } },
+    constelacion: { 2: { epiteto: "Volvieron en fila", hab: "Alineación" }, 3: { epiteto: "Una de ellas va a estallar", hab: "Supernova" }, 4: { epiteto: "Bajaron a rodearte", hab: "Ronda" }, 5: { epiteto: "Las últimas en apagarse", hab: "Aurora" }, 6: { epiteto: "Siete vidrios de un rosetón", hab: "Celosía" }, 7: { epiteto: "El cielo, quebrado y cosido", hab: "Grietas del cielo" } },
+    sol: { 2: { epiteto: "Se encendió de nuevo, más rojo", hab: "Canícula" }, 3: { epiteto: "Lo que queda cuando un sol se cierra", hab: "Colapso" }, 4: { epiteto: "Lo que queda encendido", hab: "Ocaso" }, 5: { epiteto: "Otra vez, desde la orilla", hab: "Amanecer" }, 6: { epiteto: "Te mira a través de una lupa", hab: "Lupa" }, 7: { epiteto: "Lo único que brilla más que el oro", hab: "Fulgor" } }
   };
 
   /* Lo que se ve al apagar el Faro Ciego. Es el primer giro: lo que el
@@ -309,6 +310,11 @@
     primera: "Fase VI. Todo lo que vuelve, vuelve de vidrio.",
     otra: g => "La noche no olvida tu vuelta anterior: grado " + romano(g) + " de rigor.",
     nota: "Más vida, más fuego y escamas más rápidas, cada vuelta."
+  };
+  /* Lo que se dice al empezar la primera vuelta de una fase que trae un
+     modelo nuevo y no tiene anuncio propio (la 6 tiene el del rigor). */
+  const FASE_NUEVA = {
+    7: { t: "Fase VII. Lo que se rompió vuelve unido con oro.", nota: "Cada uno trae una habilidad más, y el rigor no se detiene." }
   };
 
   /* El taller: lo que se compra con las brasas (una por jefe vencido). Cada
@@ -405,7 +411,7 @@
     FINAL_CIERRE, FINAL_ORDEN, APAGADO, SIGUIENTE_LUZ, actoInfo,
     AVISO_HOGUERA, FINAL_HOGUERA, FINAL_HOGUERA_LIBRES, FINAL_HOGUERA_CIERRE, FINAL_HOGUERA_ORDEN,
     AVISO_SOL, FINAL_SOL, FINAL_SOL_CIERRE, FINAL_SOL_ORDEN,
-    AUGURIOS, AUGURIO_PRE, RIGOR, RAMAS, MEJORAS, LLAMA_TALLER, EVOLUCIONES,
+    AUGURIOS, AUGURIO_PRE, RIGOR, FASE_NUEVA, RAMAS, MEJORAS, LLAMA_TALLER, EVOLUCIONES,
     romano, bitacora, fragmentoSiguiente, ecoSiguiente
   };
 });
