@@ -148,6 +148,18 @@ other file of the site. Things that hold it together:
   chest on a red radial gradient in a canvas and saved as 470 px webp. Kane's
   base card is `bayern-harry-kane`, the same person as his Balón de Oro. Its
   `hasta` (1793202400000, 28-10-2026 15:46 UTC) is half an hour after the push.
+- **Chilean clubs** (`CHILE`, 73 players: Colo-Colo 24, Universidad Católica 27,
+  Universidad de Chile 22; keys `colocolo`, `ucatolica`, `udechile`; third
+  `AMPLIACIONES` entry with `n: 833`), after the Bayern, at the very end. Medias and
+  positions are EA FC's: the Católica from **FC 27** (ea.com team page, it plays the
+  Libertadores), Colo-Colo and the U from **FC 26**, because FC 27 does not have them
+  (ea.com dropped FC 26; the data came from fut.gg's API,
+  `/api/fut/players/v2/26/?club_id=<EA club id>`, base cards only). The clubs' sites
+  don't publish the squad with photos, so each card is the **in-game face** (fut.gg
+  `player-item` render, 512 px) on a radial gradient in the club's colours, made with
+  Pillow; ea.com's own portraits are missing (403) for the generic-ish faces. Positions
+  were cut to two (the test). All are **Común** (no one above 80). Dorsal 0: the card
+  no longer shows it. `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
 - **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
   Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the
