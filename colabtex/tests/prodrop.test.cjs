@@ -8,7 +8,7 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM,__MM:require('../../juegos/mascotas/motor.js')};vm.createContext(ctx);
 vm.runInContext('const PM=__PM,MM=__MM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,topColecciones,puntosGraduada,fijaSerie1,veSerie1,copiaVisible,totalVisible,plantillaDe,puntosDe}',ctx);
+ ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,topColecciones,puntosGraduada,fijaSerie1,veSerie1,copiaVisible,totalVisible}',ctx);
 const M=ctx.__M;
 // quien mira ve la Serie 01 (los profes), salvo en la prueba que dice lo contrario
 const VE_TODO={mira:{at:1,por:'adm'}};
@@ -641,22 +641,9 @@ test('cartas de fútbol: cada país tiene su bandera y cada club su escudo, como
  for(const k of clubes){assert.ok(PM.CLUBES[k],k);assert.ok(fs.existsSync(path.join(dir,'escudos',k+'.png')),'falta el escudo de '+k)}
 });
 
-test('plantilla de fútbol: 4-3-3, puntos por rareza y estado, y solo cartas de fútbol propias',()=>{
+test('la formación de los desafíos es un 4-3-3',()=>{
  assert.equal(PM.FORMACION.length,11);
  assert.deepEqual([0,1,2,3].map(f=>PM.FORMACION.filter(x=>x.fila===f).length),[1,4,3,3]);
- assert.equal(PM.puntosCarta(2,10),100);assert.equal(PM.puntosCarta(0,1),33);
- assert.equal(PM.puntosPlantilla(Array(11).fill({tier:2,g:10})),100);
- assert.equal(PM.puntosPlantilla(Array(11).fill({tier:0,g:1})),33);
- assert.equal(PM.puntosPlantilla(Array(11).fill(null)),0);
- const u='usrPLANT01',kf='f-Nplant00001',kc='c-Nplant00001',kp='e-Nplant00001';
- const d={completo:true,ranks:{},solo:{},logros:{},diario:{},mercado:{},cartas:{s:{[u]:{[kf]:{at:1792000000000,p:0},[kc]:{at:1792000000000+8*3600000,p:80},[kp]:{at:1792000000000+7*3600000,p:0}}}},clubJugadas:{}};
- const perfil={plantilla:{0:u+'~'+kf+'.0',5:u+'~'+kc+'.0',2:u+'~'+kp+'.0',9:'otro00001~'+kf+'.1'}};
- const l=M.plantillaDe(u,perfil,d);
- assert.equal(l.length,11);
- assert.ok(l[0]&&l[0].carta.col==='futbol','la de fútbol propia se ve');
- assert.ok(l[2]&&l[2].carta.col==='futbol'&&/cards\/premier\//.test(l[2].carta.img),'una de la Premier (sobre de antes) también va en la plantilla');
- assert.equal(l[5],null,'una de componentes no entra');assert.equal(l[9],null,'una ajena no entra');
- assert.equal(M.puntosDe(l),Math.round((PM.puntosCarta(l[0].carta.tier,l[0].g)+PM.puntosCarta(l[2].carta.tier,l[2].g))/11));
 });
 
 const FUT=PM.CARDS.filter(c=>PM.esFutbol(c.col));

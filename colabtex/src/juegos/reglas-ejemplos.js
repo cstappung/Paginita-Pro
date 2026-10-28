@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, mkw, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo, pacman, pool} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, mkw, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo, pacman, pool, typerace} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -286,6 +286,12 @@ pool:[e('efecto','Punto de golpe: seguir o retroceder',
  e('estrellas','Estrellas doradas y azules',
   p('Doradas y azules','Las estrellas son doradas solo en Experto, o en la dificultad más alta que tenga ese instrumento. En las demás dificultades son azules, y en la lista de canciones se ven las doradas encima de las azules.',hero(2)),
   p('Lo que pagan','Cada canción terminada paga 50 monedas (15 al día). Cada estrella dorada nueva paga 100 y cada azul 50, una sola vez; si una azul pasa a dorada, se pagan los 50 que faltaban.',fichas('Tu récord en una canción',['★★★','oro','DORADAS'],['★','azul','AZUL DE MÁS'],['350','verde','MONEDAS'])))],
+ typerace:[e('escribir','Escribir el texto',
+  p('Letra a letra','Lo bien escrito se pinta claro, lo mal escrito en rojo. El cursor amarillo marca dónde va la próxima letra.',typerace(0)),
+  p('Espacio y borrar','El espacio cierra la palabra aunque esté mal, y queda subrayada; con borrar, desde el principio de la palabra siguiente, vuelves a ella para corregirla.',typerace(0))),
+ e('pista','La carrera',
+  p('La pista','Cada corredor tiene su carril con su foto, que avanza con lo que lleva escrito. Al lado van sus palabras por minuto.',typerace(1)),
+  p('Se acaba el tiempo','Con límite de tiempo todos se detienen a la vez. Si nadie llegó a la meta, gana quien más escribió bien.',typerace(2)))],
  memazo:[e('escribir','Hacer tu meme de la ronda',
   p('Elige una de tus tres plantillas','Cada ronda te tocan tres plantillas al azar, distintas a las de los demás. Toca la que te dé más ideas, o búscala si la sala usa plantillas reales o GIFs: puedes cambiar de una a otra sin perder lo escrito.',memazo(0)),
   p('Escribe y manda','Cada plantilla tiene de uno a cuatro textos. Escríbelos, mira cómo queda y pulsa ¡Listo! Mientras quede tiempo puedes corregirlo y volver a mandarlo.',memazo(1))),

@@ -787,6 +787,33 @@ la conocen.
 Si el panel dice que una cuenta parada frena el cierre, súmale lo que le
 falta en la pestaña **Monedas** y vuelve a prepararlo.
 
+### ⚠ Type Race pide publicar otra vez (2026-10-27)
+
+`'typerace'` tiene que estar en la lista del campo `juego`, en la de
+`jugadas/$n/at` (la largada y el corte se juzgan con esa hora) y en la de
+`logros`. No hay nodo nuevo: los ajustes de la sala (`idioma`, `acentos`,
+`texto`, `largo`, `final`, `tiempo`) entran por `$otro`, la carrera va por
+`jugadas` (`arranca`, `meta`, `corta`) y la pista en vivo por
+`vivo/<pid>/t/<uid>`, el mismo nodo del Tetris. Sin publicar, la sala de Type
+Race no se puede crear (la práctica de un jugador, `juegos/typerace/`, no
+toca Firebase y funciona igual). Pegar `firebase/database.rules.json` entero y
+**Publicar**.
+
+### ⚠ Los desafíos de plantilla piden publicar otra vez (2026-10-27)
+
+Un nodo nuevo, `plantillas` (`s`: lo que cada uno sube a la clasificación
+de una plantilla; `p`: los premios cobrados, una vez cada uno), y un campo
+nuevo en `cartas/s` (`pl`: los sobres gratis que regala un premio). Sin las
+reglas publicadas, subir una plantilla o cobrar un premio falla con `PERMISSION_DENIED`
+(el resto de PRODROP sigue igual). `test-rules.mjs` tiene sus casos («PRODROP: desafíos de plantilla»).
+
+Además se quitó `users/<uid>/perfil/plantilla` («Mi plantilla» del perfil),
+así que el orden importa por los dos lados: publica las reglas **justo
+después** de que GitHub Pages sirva el sitio nuevo y sube la versión mínima
+(`#admin` → Economía) para que recarguen las pestañas viejas. Una pestaña
+vieja que guarde el perfil con su plantilla sería rechazada, y mientras las
+reglas no estén, los desafíos no suben ni cobran.
+
 ### ⚠ El Pueblo de Mascotas pide publicar otra vez (2026-10-22)
 
 Dos nodos nuevos para el Pueblo (la plaza y las visitas, estilo Pet Society):

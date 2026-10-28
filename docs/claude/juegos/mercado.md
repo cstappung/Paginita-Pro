@@ -6,7 +6,9 @@ viewer is `visor-mascota.js` + `juegos/mascotas/visor.html`. Coins and
 `juegos/prodrop/CLAUDE.md`; Mascotas in `juegos/mascotas/CLAUDE.md`.
 
 **One market for both games**, a tab of its own: `#mercado`,
-`#mercado/prodrop`, `#mercado/mascotas` (the sub-route is in
+`#mercado/prodrop`, `#mercado/mascotas`, and `#mercado/futbol` (PRODROP with
+the Fútbol collection chip already on, opened from the squad challenges)
+(the sub-route is in
 `state.perfilUid`, and it is part of the render key). It used to live inside
 the PRODROP iframe. The nodes are the same, `mercado/o` (listings) and
 `mercado/t` (trades), with the same guarantees:

@@ -66,7 +66,8 @@ function inclina(el) {
 export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) {
   const uid = usuario.uid;
   let host = null, d = null, off = null, firma = "", muerto = false, ocupado = Promise.resolve();
-  const f = Object.assign({}, FILTROS_INICIALES, { juego: juego || "todo" });
+  // `futbol` (de `#mercado/futbol`) es PRODROP con la colección Fútbol ya elegida
+  const f = Object.assign({}, FILTROS_INICIALES, juego === "futbol" ? { juego: "prodrop", col: "futbol" } : { juego: juego || "todo" });
   let tab = "comprar", max = LOTE, detalle = null, trato = null;
   /* lo que escribiste en cada precio de «Vender» (se repinta con cada cambio de la base) */
   const precios = {};

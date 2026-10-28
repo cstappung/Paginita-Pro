@@ -417,6 +417,29 @@ export const hero=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* Type Race: la caja de texto con letras bien, mal y por escribir; la
+   pista con los autos; y el corte por tiempo. */
+export const typerace=etapa=>{
+ const nombre=['Texto con letras bien escritas, una palabra en rojo subrayada y el cursor','La pista: tres carriles con la cara de cada corredor y sus ppm','El reloj llega a cero y cada uno queda donde iba'][etapa];
+ let c=`<rect x="0" y="0" width="480" height="250" rx="14" fill="#25272c"/>`;
+ /* Monoespaciada a 19 px: cada letra mide 11,4 px, así que el subrayado y
+    el cursor se pueden poner a mano. */
+ const fila=(y,trozos)=>`<text x="30" y="${y}" font-size="19" font-family="ui-monospace,Menlo,Consolas,monospace" xml:space="preserve">`+trozos.map(([t,col])=>`<tspan fill="${col}">${esc(t)}</tspan>`).join('')+`</text>`;
+ if(etapa===0){
+  c+=fila(80,[['casa ','#e8e6e1'],['tiempo ','#e8e6e1'],['mudno','#f0616d'],[' ','#6f737b'],['vi','#e8e6e1'],['da agua','#6f737b']]);
+  c+=line(30+12*11.4,88,30+17*11.4,88,'#f0616d',2)+rect(30+20*11.4,62,3,24,'#e2b714','#e2b714',1);
+  c+=fila(124,[['hablar libro fuego noche','#6f737b']]);
+  c+=txt(30,180,'Espacio: cierra la palabra',15,'#e2b714')+txt(30,206,'Borrar: vuelve a la que quedó mal',15,'#e2b714');
+ }else{
+  [['Ana','#88caff',etapa===1?.78:.86,'84 ppm'],['Tú','#ffc443',etapa===1?.55:.62,'61 ppm'],['Leo','#9be37a',etapa===1?.3:.36,'40 ppm']].forEach(([n,col,a,w],i)=>{
+   const y=50+i*60;
+   c+=txt(24,y+6,n,15,'#e8e6e1')+line(80,y+16,400,y+16,'#ffffff33',2)+txt(410,y+8,'🏁',18,'#fff')+txt(456,y+6,w,12,'#b9b6ae','end');
+   c+=circle(80+320*a,y,15,col,'#fff')+txt(80+320*a,y+6,n[0],15,'#17243b','middle');
+  });
+  c+=etapa===1?txt(240,236,'Avanza con lo que lleva escrito',14,'#e2b714','middle'):txt(240,236,'⏱ 0:00 · ¡Tiempo! Gana Ana, que escribió más',14,'#e2b714','middle');
+ }
+ return svg(nombre,c);
+};
 /* Memazo: elegir plantilla, escribir, calificar y la revelación. */
 export const memazo=etapa=>{
  const nombre=['Tres plantillas para elegir; la elegida queda marcada','La plantilla elegida con sus dos textos escritos','Un meme sin nombre y las cinco notas para calificarlo','Se revela el autor del meme y lo que sumó'][etapa];

@@ -44,7 +44,7 @@ import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -69,6 +69,7 @@ import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearMemazo } from "./juegos/memazo.js";
+import { crearTyperace } from "./juegos/typerace.js";
 import { memeHtml } from "./juegos/memazo-plantillas.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
@@ -112,7 +113,11 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX, novedadPideCuenta, ordenaNovedades, ordenaEntradas } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX, novedadPideCuenta, ordenaNovedades, ordenaEntradas, SALAS_EN_OBRA } from "./juegos/salon-datos.js";
+/* Las salas «trabajando para usted» (SALAS_EN_OBRA). `?salasObra=0` en la
+   dirección las deja abrir igual, para probarlas mientras se arreglan. */
+const PROBAR_OBRA = /[?&]salasObra=0(&|$)/.test(location.search);
+const salaEnObra = k => (!PROBAR_OBRA && SALAS_EN_OBRA[k]) || null;
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
 import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
@@ -130,10 +135,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw, pool: crearPool
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw, pool: crearPool, typerace: crearTyperace
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱", typerace: "⌨" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
@@ -295,6 +300,18 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Formato", valores: [{ v: 2, t: "1 contra 1" }, { v: 4, t: "2 contra 2" }] },
     { clave: "guia", etiqueta: "Línea guía", valores: [{ v: 1, t: "Con línea guía" }, { v: 0, t: "Sin línea guía" }] },
     { clave: "pareja", etiqueta: "Mi compañero (solo 2 contra 2)", valores: [{ v: 1, t: "El primero que entre" }, { v: 2, t: "El segundo que entre" }, { v: 3, t: "El tercero que entre" }] }
+  ],
+  /* Type Race: lo mismo que se elige en la práctica, más cómo se acaba.
+     Ninguna clave es `modo`. El libre siempre va con reloj
+     (`ajustesTyperace`), y el tiempo solo cuenta con reloj. */
+  typerace: [
+    { clave: "cupo", etiqueta: "Corredores", por: 4, valores: cupos("typerace") },
+    { clave: "idioma", etiqueta: "Idioma", por: "es", valores: [{ v: "es", t: "Español" }, { v: "en", t: "English" }] },
+    { clave: "acentos", etiqueta: "Tildes (español)", por: 1, valores: [{ v: 1, t: "Con tildes" }, { v: 0, t: "Sin tildes" }] },
+    { clave: "texto", etiqueta: "Texto", por: "palabras", valores: Object.keys(TR_TEXTOS).map(v => ({ v, t: TR_TEXTOS[v] })) },
+    { clave: "largo", etiqueta: "Largo", por: 50, valores: TR_LARGOS.map(v => ({ v, t: v ? v + " palabras" : "Libre (hasta el tiempo)" })) },
+    { clave: "final", etiqueta: "Final", por: "todos", valores: Object.keys(TR_FINALES).map(v => ({ v, t: TR_FINALES[v] })) },
+    { clave: "tiempo", etiqueta: "Límite de tiempo", por: 120, valores: TR_TIEMPOS.map(v => ({ v, t: v < 60 ? v + " s" : v / 60 + " min" })) }
   ],
   memazo: [
     { clave: "cupo", etiqueta: "Jugadores", por: 6, valores: cupos("memazo") },
@@ -577,9 +594,10 @@ function alCambiarSerie1(lista, uid) {
    economía aceptó de la tienda. Perezosos y no enumerables: se calculan la
    primera vez que alguien pinta un marco, una vez por llegada. */
 function conDerivados(d) {
-  let lid = null, com = null;
+  let lid = null, com = null, des = null;
   Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
   Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  Object.defineProperty(d, "desafios", { enumerable: false, get: () => des || (des = desafiosDe(d)) });
   /* Las tablas del club que existen hoy (ranks.js): el perfil no lista
      las de versiones viejas de un juego (el Snake y el buscaminas de antes). */
   Object.defineProperty(d, "vigente", { enumerable: false, value: categoriaVigente });
@@ -597,6 +615,13 @@ function comprasDe(d) {
   if (!d.completo) return d.tienda || {};
   const out = {};
   for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.tienda && Object.keys(x.tienda).length) out[u] = x.tienda;
+  return out;
+}
+/* Los clubes cuyo Desafío de plantilla cobró cada uno (los marcos de club). */
+function desafiosDe(d) {
+  if (!d.completo) return {};
+  const out = {};
+  for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.desafios && Object.keys(x.desafios).length) out[u] = x.desafios;
   return out;
 }
 /* ---------- los tacos de Pool ----------
@@ -727,9 +752,6 @@ async function editaPerfil(pestana) {
          sin esto, guardar el perfil las borraría. */
       const cartas = (perfiles.get(b.uid) || {}).cartas;
       if (cartas) p = Object.assign({}, p, { cartas });
-      // lo mismo la plantilla de fútbol, que se arma en PRODROP
-      const plantilla = (perfiles.get(b.uid) || {}).plantilla;
-      if (plantilla) p = Object.assign({}, p, { plantilla });
       /* La mascota la elige el editor; si no pudo ofrecerla (sin datos),
          devuelve la que había. Nunca se pierde por guardar otra cosa. */
       const mascota = (perfiles.get(b.uid) || {}).mascota;
@@ -1489,6 +1511,7 @@ async function anotar(p) {
   if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
   if (p.juego === "bt3") return;                    // BT3: el juego no dice quién ganó; la sala no clasifica
   if (p.juego === "mkw") return;                    // Mario Kart Wii: tampoco
+  if (p.juego === "typerace" && Object.keys(p.jugadores || {}).length < 2) return;   // correr solo es práctica: no clasifica
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -1614,10 +1637,14 @@ function dropsHtml(d) {
    entra en este paquete), y solo cuando la tira se ve: el salón no carga
    el juego entero para quien nunca baja hasta aquí. */
 let dropsMVista = false;
+/* Las tiras de Mascotas y de Batalla de Rock muestran los últimos seis
+   (la de PRODROP, 24): cada uno es una foto 3D que hay que sacar y un
+   avatar con marco, y en un PC modesto 24 por tira pesaban (dueño, oct. 2026). */
+const DROPS_3D = 6;
 function pintaDropsMascotas() {
   const caja = $("vesDropsM"), u = state.user, d = datosMonedas;
   if (!caja || !u || !d || !d.completo) return;
-  const l = mejoresDropsMascotas(d, 24);
+  const l = mejoresDropsMascotas(d, DROPS_3D);
   const ped = x => x.item.kind === "dance" ? null : pedidoObjeto(x.item);
   const firma = JSON.stringify([l.map(x => x.c), dropsMVista, l.map(x => { const p = ped(x); return !!(p && fotoDe(p.key)); })]);
   if (caja.dataset.f === firma) return;
@@ -1643,7 +1670,7 @@ let dropsRVista = false;
 function pintaDropsRock() {
   const caja = $("vesDropsR"), u = state.user, d = datosMonedas;
   if (!caja || !u || !d || !d.completo) return;
-  const l = dropsRock(d, 24);
+  const l = dropsRock(d, DROPS_3D);
   const firma = JSON.stringify([l.map(x => x.uid + x.k), dropsRVista, l.map(x => !!fotoRock(x.v))]);
   if (caja.dataset.f === firma) return;
   caja.dataset.f = firma;
@@ -1814,9 +1841,11 @@ function leerRuta() {
   if (h === "monedas") return { vista: "monedas", pid: "" };
   const cs = h.match(/^casino(?:\/(avion|pinguino|ruleta|blackjack|poker|plinko))?$/);
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
-  if (h === "cartas" || h === "cartas/plantilla") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : "plantilla" };
+  // `#cartas/retos` abre los desafíos de plantilla
+  if (h === "cartas" || h === "cartas/retos") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : h.slice(7) };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
-  const mk = h.match(/^mercado(?:\/(prodrop|mascotas|rock))?$/);
+  // `#mercado/futbol`: PRODROP con el filtro de la colección Fútbol (lo abren los desafíos de plantilla)
+  const mk = h.match(/^mercado(?:\/(prodrop|futbol|mascotas|rock))?$/);
   if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
@@ -2010,6 +2039,7 @@ function cuidaLaSala(p) {
 async function crear(juego, extra) {
   const u = state.user;
   if (!u) return;
+  if (salaEnObra(juego)) return;                    // «trabajando para usted»: la ficha ya no lo ofrece; esto cierra los demás caminos
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
@@ -2046,6 +2076,7 @@ async function entrar(pid) {
   const sala = state.partida && state.pid === pid ? state.partida : state.salas.find(s => s.id === pid);
   if (sala && sala.juego === "bt3" && !bt3Visible()) return;
   if (sala && sala.juego === "mkw" && !bt3Visible()) return;   // Mario Kart Wii: la misma lista de amigos
+  if (sala && salaEnObra(sala.juego)) return;      // «trabajando para usted»: no se entra
   try {
     await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color });
     ir("#p/" + pid);
@@ -2895,12 +2926,15 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    «★ Lo último» lo lleva la de `alta` más reciente (`selloNovedad`).
    Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
+/* El segundo botón de las novedades de PRODROP: los desafíos de plantilla
+   (juegos/prodrop/retos.js), que se abren dentro del abridor. */
+const ATAJO_RETOS = { ruta: "#cartas/retos", boton: "🏆 Desafío de plantilla" };
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
     gancho: "Cartas especiales por tiempo limitado",
     lema: "Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro, llegaron a los sobres de Fútbol como legendarias especiales, por tiempo limitado. En el mismo sobre están todos: Real Madrid, Barça, el Big Six y más clubes de la Champions, en el sobre normal y en el Plus (con una Épica asegurada).",
     datos: () => [["2", "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
-    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
     gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],
     lema: "Zombis y diablos de cajas en 3D, vistos desde arriba: cada baja sube el multiplicador y trae armas nuevas, la sangre se queda en el suelo y las granadas lo dejan negro. Practica solo o abre una sala para hasta ocho.",
@@ -2946,7 +2980,7 @@ const NOVEDADES = [
     gancho: "¿Te saldrá la legendaria?",
     lema: () => (veSerie1() ? "Sobres de cinco cartas, de los profes o de componentes" : "Sobres de cinco cartas") + ", y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
     datos: () => [[String(MOTOR.precioSobre(fb.ahora())), "monedas el sobre"], ["Gratis", "uno cada 6 h"], ["5", "cartas por sobre"]],
-    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-08", titulo: "FANAL · la otra orilla",
     gancho: "Lleva la última luz", datos: [["25", "jornadas"], ["7", "jefes"], ["∞", "travesía sin fin"]],
     lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
@@ -3028,6 +3062,7 @@ function novedadesHtml() {
                 ${accion}
                 ${n.reglas ? `<button class="btn2" data-nov-reglas="${n.id}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(n.titulo)}">📖</button>` : ""}
               </div>
+              ${n.atajo && !cuenta ? `<a class="jg-ban-atajo" href="${n.atajo.ruta}">${escapeHtml(n.atajo.boton)}</a>` : ""}
             </div>
           </article>`;
   };
@@ -3129,10 +3164,16 @@ function enganchaBanner(h) {
      veces por segundo, y el traductor de i18n.js revisaba cada cambio. */
   let lleno = null, pausaPintada = null;
   let aLaVista = true;
+  /* Solo se pintan la que se ve y sus vecinas (`.cerca`, las que asoman al
+     pasar o al arrastrar); en un salto con los puntos, también las del
+     medio hasta que termina la transición (`desde`, de dónde salió). */
+  let desde = 0;
   const llena = () => { if (lleno && aLaVista) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`; };
   const pinta = () => {
     const j = i % N;
-    diapos.forEach((d, k) => d.classList.toggle("on", k === i));
+    if (quieto) desde = i;
+    const a = Math.min(i, desde) - 1, b = Math.max(i, desde) + 1;
+    diapos.forEach((d, k) => { d.classList.toggle("on", k === i); d.classList.toggle("cerca", k !== i && k >= a && k <= b); });
     puntos.forEach((b, k) => {
       b.classList.toggle("on", k === j);
       if (b.getAttribute("aria-current") !== String(k === j)) b.setAttribute("aria-current", String(k === j));
@@ -3149,11 +3190,12 @@ function enganchaBanner(h) {
   };
   const ve = k => {
     t = 0;
+    desde = i;
     for (const d of diapos) d.classList.remove("ya");
     /* Parada en la copia (a medio pasar): se cuenta desde la primera. */
-    if (i >= N) { k -= N; i = 0; pon(0, false); void pista.offsetWidth; }
+    if (i >= N) { k -= N; i = desde = 0; pon(0, false); void pista.offsetWidth; }
     /* De la primera hacia atrás: se salta a la copia y se anima desde ahí. */
-    if (k < 0) { pon(N, false); void pista.offsetWidth; k = N - 1; }
+    if (k < 0) { desde = N; pon(N, false); void pista.offsetWidth; k = N - 1; }
     i = Math.min(k, N);
     pon(i, true);
     if (quieto && i >= N) { i = 0; pon(0, false); }   // sin transición no llega `transitionend`
@@ -3163,7 +3205,10 @@ function enganchaBanner(h) {
      se note: son idénticas. */
   pista.addEventListener("transitionend", e => {
     /* La primera ya se vio entrar (era la copia): no repite la entrada. */
-    if (e.target === pista && i >= N) { i = 0; pon(0, false); diapos[0].classList.add("ya"); pinta(); }
+    if (e.target !== pista) return;
+    desde = i >= N ? 0 : i;
+    if (i >= N) { i = 0; pon(0, false); diapos[0].classList.add("ya"); }
+    pinta();
   });
   raiz.querySelectorAll("[data-ban]").forEach(b => b.onclick = () => ve(i + Number(b.dataset.ban)));
   puntos.forEach(b => b.onclick = () => ve(Number(b.dataset.banIr)));
@@ -3430,7 +3475,7 @@ const entradaVes = id => entradasVes.solos.find(e => e.id === id) || entradasVes
 function salasAbiertas() {
   if (!state.user) return [];
   const mias = new Set(state.mias.map(x => x.id)), ahora = fb.ahora();
-  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()) && (s.juego !== "mkw" || bt3Visible()));
+  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()) && (s.juego !== "mkw" || bt3Visible()) && !salaEnObra(s.juego));
 }
 
 /* El podio de un juego, en su ficha: es la razón para abrir una sala de
@@ -3463,6 +3508,7 @@ const salon = crearSalon({
   equipos: ops => { if (state.user) abreEquipos({ uid: state.user.uid, formato: ops.formato }); },
   login: id => entrarConGoogle(id),
   crearSala: (k, ops) => crear(k, Object.assign(porOmision(k), ops)),
+  enObra: k => salaEnObra(k),
   entrarSala: pid => entrar(pid)
 });
 
@@ -3575,7 +3621,7 @@ function pintaVestibulo() {
      anuncio viejo es de una partida que alguien dejó a medias sin
      cerrar la pestaña: la base no lo sabe, así que se filtra aquí. */
   const fresco = fb.ahora() - fb.EN_CURSO_FRESCO;
-  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()) && (x.juego !== "mkw" || bt3Visible()));
+  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()) && (x.juego !== "mkw" || bt3Visible()) && !salaEnObra(x.juego));
   $("vesNCurso").textContent = vivas.length;
   $("vesEnCurso").innerHTML = vivas.length ? vivas.map(x => {
     const j = JUEGOS[x.juego] || {};
@@ -3642,6 +3688,19 @@ function pintaPartida() {
       revisaBt3().then(() => { bt3Revisando = false; bt3Revisada = true; if (state.vista === "partida") pintaPartida(); });
       $("jgInvita").innerHTML = '<div class="jg-invita"><b>Comprobando el acceso…</b></div>';
     }
+    return;
+  }
+  /* Una sala de un juego «trabajando para usted» (SALAS_EN_OBRA), abierta
+     por un enlace o desde «mis salas»: solo el cartel, sin el juego (está
+     roto) y con la salida para jugar solo si la hay. */
+  const obra = salaEnObra(p.juego);
+  if (obra) {
+    ambientar(""); desmontaJuego();
+    $("jgTitulo").textContent = (JUEGOS[p.juego] || {}).nombre || "Sala"; $("jgTitulo").style.color = "";
+    for (const id of ["jgMirando", "jgHost", "jgRevancha", "jgFin"]) $(id).innerHTML = "";
+    $("jgInvita").innerHTML = `<div class="jg-invita jg-obra"><b>🚧 Trabajando para usted</b>
+      <span>Las salas de ${escapeHtml((JUEGOS[p.juego] || {}).nombre || "este juego")} están en arreglo: por ahora no se juegan en línea.</span>
+      ${obra.solo ? `<a class="btn" href="${escapeHtml(obra.solo)}">▶ Jugar solo mientras tanto</a>` : ""}</div>`;
     return;
   }
 
@@ -3841,7 +3900,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600, typerace: 1300 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3962,6 +4021,8 @@ const RAZONES = {
   fichas: "Acabó con más fichas sobre el tablero.",
   empate: "Nadie sacó ventaja.",
   risas: "Sus memes sumaron más puntos que los de nadie.",
+  tecleo: "Terminó el texto antes que nadie.",
+  cronometro: "Cuando se cortó la carrera, era quien más había escrito bien.",
   victoria: "Su cuadrilla fue la última en pie.",
   apagon: "Apagón total: no quedó ninguna cuadrilla en pie.",
   reaccion: "Su reacción en cadena se tragó a todos los demás.",
@@ -4459,6 +4520,7 @@ const ESFERAS_BT3 = [
 function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
+  if (k === "typerace") return '<div class="jg-art-tr"><span class="txt"><b>rápido</b> <b>teclas</b> <i>car</i>rera</span><span class="pista"><i style="--a:.82">🏎</i><i style="--a:.55">🚗</i><i style="--a:.3">🚙</i></span><span class="ppm">128 ppm</span></div>';
   if (k === "pool") return '<div class="jg-art-pool"><span class="mesa"></span><span class="rack">' + [[1, 0], [11, 1], [8, 0], [3, 0], [14, 1], [6, 0]].map(([n, r], i) => '<i class="b' + n + (r ? " ray" : "") + '" style="--i:' + i + '"><b>' + (n > 8 ? n : n) + '</b></i>').join("") + '</span><i class="blanca"></i><span class="taco"></span></div>';
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';

@@ -722,12 +722,6 @@
      común, 81 a 84 rara, 85 a 87 épica y 88 o más legendaria. */
   const BANDAS = [80, 84, 87];
   const tierDeMedia = m => (m <= BANDAS[0] ? 0 : m <= BANDAS[1] ? 1 : m <= BANDAS[2] ? 2 : 3);
-  /* El buscador de jugadores: lo usa «Mi plantilla».
-     Filtra por club, por media mínima y por un texto (nombre o club, sin
-     tildes ni mayúsculas). */
-  const MEDIAS_MIN = [80, 83, 85, 88];
-  const plano = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const coincide = (c, f) => (!f.club || c.club === f.club) && (!f.mediaMin || c.media >= f.mediaMin) && (!f.texto || plano(c.name + " " + c.sub).includes(plano(f.texto)));
   /* Las probabilidades por carta de las colecciones de fútbol, en diez
      milésimas: como cada rareza es un grupo de jugadores de distinta
      media, aquí las más altas salen un poco más que en las otras colecciones
@@ -1077,23 +1071,15 @@
     return res;
   }
 
-  /* ---------- la plantilla de fútbol ----------
+  /* ---------- la formación de los desafíos de plantilla ----------
      Un once en 4-3-3, fijo: once casillas en este orden (portero, cuatro
-     defensas, tres medios, tres delanteros). Cualquier carta de fútbol va
-     en cualquier casilla. Cada carta vale de 0 a 100: la rareza pone el
-     techo (común 60, rara 80, épica 100) y el estado lo escala (nota 10,
-     entero; nota 1, el 55 %). La plantilla es el promedio de las once, y
-     una casilla vacía vale 0. */
+     defensas, tres medios, tres delanteros). El puntaje está en retos.js. */
   const FORMACION = [
     { pos: "POR", fila: 0 },
     { pos: "LI", fila: 1 }, { pos: "DFC", fila: 1 }, { pos: "DFC", fila: 1 }, { pos: "LD", fila: 1 },
     { pos: "MC", fila: 2 }, { pos: "MC", fila: 2 }, { pos: "MC", fila: 2 },
     { pos: "EI", fila: 3 }, { pos: "DC", fila: 3 }, { pos: "ED", fila: 3 }
   ];
-  const PUNTOS_RAREZA = [60, 80, 100, 100];
-  const puntosCarta = (tier, g) => Math.round(PUNTOS_RAREZA[tier] * (0.5 + 0.05 * g));
-  // `lista`: once {tier, g} o null
-  const puntosPlantilla = lista => Math.round(FORMACION.reduce((s, _, i) => s + (lista[i] ? puntosCarta(lista[i].tier, lista[i].g) : 0), 0) / FORMACION.length);
 
   /* ---------- lo de una cuenta ----------
      `s` = {clave: {at, p}} (los sobres), `g` = {clave: {i: {at, p}}} (lo
@@ -1116,7 +1102,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, MEDIAS_MIN, coincide, esFutbol, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

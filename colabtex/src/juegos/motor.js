@@ -250,6 +250,14 @@ export const JUEGOS = {
     minimo: 2,   // con cupo 4 (2 contra 2) hacen falta los cuatro: minimoDe
     cupo: 4,
     alta: "2026-10-20"
+  },
+  typerace: {
+    nombre: "Type Race",
+    lema: "Todos escriben el mismo texto a la vez: gana quien llega primero, como en Monkeytype pero en carrera",
+    color: "#e2b714",
+    minimo: 1,   // con uno solo, el anfitrión aprieta «Empezar» y corre contra el reloj
+    cupo: 10,
+    alta: "2026-10-27"
   }
 };
 
@@ -1061,6 +1069,7 @@ export function reducir(p) {
   if (p.juego === "memazo") return { ...base, ...redMemazo(p, js, listos) };
   if (p.juego === "mkw") return { ...base, ...redMkw(p, js) };
   if (p.juego === "pool") return { ...base, ...redPool(p, js, listos) };
+  if (p.juego === "typerace") return { ...base, ...redTyperace(p, js, listos) };
   return base;
 }
 
@@ -1151,6 +1160,9 @@ export function progreso(est, juego) {
   /* En Tulones, cuántos quedaron fuera de la torre. */
   if (juego === "tulones" && est.vivos) return c(1 - est.vivos.length / Math.max(1, (est.jugadores || []).length));
   /* En Memazo, las rondas y los memes ya calificados de la actual. */
+  /* En Type Race, lo que lleva quien va delante (lo dice la pista en vivo,
+     pero al registro solo llegan las metas: cuántos ya terminaron). */
+  if (juego === "typerace" && est.etapa) return c(est.etapa === "cierre" ? 0.9 : Object.keys(est.metas || {}).length / Math.max(1, (est.jugadores || []).length));
   if (juego === "memazo" && est.rondas) return c(((est.historial || []).length + (est.etapa === "votar" && est.total ? est.m / est.total : 0)) / est.rondas);
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   /* En el pool, cuántas de las quince bolas ya cayeron. */
@@ -8454,4 +8466,139 @@ function plEst(S, eq, listos) {
     en: S.mesa.b.filter(q => q.en && q.id !== 0).length,
     ganador: S.ganador, motivo: S.motivo
   };
+}
+
+/* ============================================================
+   Type Race
+
+   Todos escriben el mismo texto, sacado de la semilla de la sala con
+   `juegos/typerace/motor.js` (la pantalla lo genera; aquí no hace falta:
+   el reductor no ve letras). El tecleo es de cada navegador y lo que ven
+   los demás de cómo va (la pista) viaja por `vivo/<pid>/t/<uid>`,
+   desechable, como los pozos del Tetris. Al registro llega solo:
+   - `{t:"arranca", at}`: lo escribe el primer asiento activo (en relevo,
+     como el Momazo) en cuanto la sala está lista; la largada es `at` más
+     la cuenta atrás (`TR_CUENTA_MS`).
+   - `{t:"meta", uid, at, ok, c, e, p, ms}`: mi resultado. `ok` = 1 si
+     terminé el texto; si no, es hasta donde llegué cuando me cortaron.
+     `c` son los caracteres bien escritos, `e` los errores, `p` las
+     palabras buenas, `ms` lo que tardé desde la largada.
+   - `{t:"corta", at}`: cierra la carrera cuando pasó la holgura del corte
+     y alguien no mandó su meta (también en relevo).
+   El corte es el plazo (con límite de tiempo) o la meta del primero (en
+   «termina el primero»); desde ahí solo valen las metas que lleguen
+   dentro de `TR_HOLGURA_MS` y ninguna cuenta como terminada.
+   Todas las jugadas llevan `at`, que las reglas comprueban contra la hora
+   del servidor. El límite honesto es el de siempre: el tecleo no lo
+   arbitra nadie, así que una consola puede mandar una meta inventada.
+   ============================================================ */
+export const TR_CUENTA_MS = 3000;
+export const TR_HOLGURA_MS = 4000;
+export const TR_LARGOS = [10, 25, 50, 100, 200, 0];
+export const TR_TIEMPOS = [15, 30, 60, 120, 180];
+export const TR_FINALES = { todos: "Hasta que todos terminen", primero: "Termina el primero y se acaba", tiempo: "Con límite de tiempo" };
+export const TR_TEXTOS = { palabras: "Palabras al azar", frases: "Frases y refranes", cuentos: "Cuentos" };
+/* Los ajustes de la sala, recortados a lo que existe: lo mismo que
+   `ajustes()` de `juegos/typerace/motor.js` (este archivo no importa nada,
+   para que las pruebas lo evalúen tal cual). */
+export function ajustesTyperace(p) {
+  p = p || {};
+  const idioma = p.idioma === "en" ? "en" : "es";
+  const texto = TR_TEXTOS[p.texto] ? p.texto : "palabras";
+  const n = Math.floor(Number(p.largo));
+  const largo = TR_LARGOS.includes(n) ? n : 50;
+  let final = TR_FINALES[p.final] ? p.final : "todos";
+  if (largo === 0) final = "tiempo";
+  const t = Math.floor(Number(p.tiempo));
+  const tiempo = TR_TIEMPOS.includes(t) ? t : 60;
+  const acentos = idioma === "es" ? Number(p.acentos) !== 0 : true;
+  return { idioma, texto, largo, final, tiempo, acentos };
+}
+const trEntero = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+export function ppmTyperace(m) { return m && m.ms > 0 ? Math.min(400, Math.round((m.c / 5) / (m.ms / 60000))) : 0; }
+
+export function redTyperace(p, js = jugadoresDe(p), listos = true) {
+  const aj = ajustesTyperace(p);
+  const ids = js.map(j => j.uid);
+  const fuera = {}, metas = {};
+  let etapa = "arranque", salida = 0, plazo = 0, corte = 0, n = 0, ganador = null, motivo = "";
+  const hora = j => Number.isFinite(Number(j.at)) && Number(j.at) > 0 ? Number(j.at) : 0;
+  const activos = () => ids.filter(u => !fuera[u]);
+  const faltan = () => activos().filter(u => !metas[u]);
+  const cortaEn = at => { if (!corte) { corte = at; etapa = "cierre"; } };
+  function acaba(por) {
+    const orden = clasificaTyperace(metas, ids, fuera);
+    const g = orden[0];
+    if (!g || !metas[g] || !metas[g].c) { ganador = ""; motivo = por === "abandono" ? "abandono" : "empate"; }
+    else { ganador = g; motivo = metas[g].ok ? "tecleo" : "cronometro"; }
+    etapa = "fin";
+  }
+  function mira() {
+    if (ganador !== null || etapa === "arranque") return;
+    if (!activos().length) { acaba("abandono"); return; }
+    if (!faltan().length) acaba("metas");
+  }
+
+  for (const j of jugadasDe(p)) {
+    if (ganador !== null) break;
+    const u = j.uid;
+    if (!ids.includes(u)) continue;
+    if (j.t === "abandona") {
+      if (fuera[u]) continue;
+      fuera[u] = true;
+      if (listos) mira();
+      continue;
+    }
+    if (fuera[u] || !listos) continue;
+    const at = hora(j);
+    if (!at) continue;
+    if (etapa === "arranque") {
+      if (j.t === "arranca") {
+        etapa = "carrera"; salida = at + TR_CUENTA_MS;
+        plazo = aj.final === "tiempo" ? salida + aj.tiempo * 1000 : 0;
+      }
+      continue;
+    }
+    if (plazo && at >= plazo) cortaEn(plazo);
+    if (j.t === "meta") {
+      if (metas[u] || at < salida) continue;
+      if (corte && at > corte + TR_HOLGURA_MS) continue;
+      const tope = Math.max(1, at - salida + 1500);
+      const ms = Math.max(1, Math.min(tope, plazo ? aj.tiempo * 1000 : 864e5, Math.floor(Number(j.ms) || tope)));
+      const ok = Number(j.ok) === 1 && (!corte || at <= corte) ? 1 : 0;
+      metas[u] = { ok, c: trEntero(j.c, 100000), e: trEntero(j.e, 100000), p: trEntero(j.p, 20000), ms, at, n: n++ };
+      if (ok && aj.final === "primero") cortaEn(at);
+      mira();
+    } else if (j.t === "corta") {
+      if (corte && at >= corte + TR_HOLGURA_MS) acaba("corte");
+    }
+  }
+  /* Quien se fue antes de que se cerrara la sala de dos no deja a nadie
+     corriendo: en una sala de más, el resto sigue. */
+  if (listos && ganador === null && etapa === "arranque" && js.length && !activos().length) acaba("abandono");
+  const fin = ganador !== null;
+  const puntos = {};
+  for (const u of ids) puntos[u] = metas[u] ? ppmTyperace(metas[u]) : 0;
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando", turno: "",
+    etapa: fin ? "fin" : etapa, aj, salida, plazo, corte,
+    metas, fuera, puntos, orden: clasificaTyperace(metas, ids, fuera),
+    debe: fin || etapa === "arranque" ? [] : faltan(),
+    ganador, motivo
+  };
+}
+/* El orden de llegada: primero los que terminaron, por tiempo (y, si
+   empatan, por quién lo mandó antes); luego los que se quedaron a medias,
+   por cuánto escribieron bien y con menos errores; al final los que no
+   mandaron nada y los que se fueron. */
+export function clasificaTyperace(metas, ids, fuera) {
+  const peso = u => metas[u] ? (metas[u].ok ? 0 : 1) : fuera[u] ? 3 : 2;
+  return ids.slice().sort((a, b) => {
+    const pa = peso(a), pb = peso(b);
+    if (pa !== pb) return pa - pb;
+    const A = metas[a], B = metas[b];
+    if (pa === 0) return A.ms - B.ms || A.n - B.n;
+    if (pa === 1) return B.c - A.c || A.e - B.e || A.n - B.n;
+    return ids.indexOf(a) - ids.indexOf(b);
+  });
 }

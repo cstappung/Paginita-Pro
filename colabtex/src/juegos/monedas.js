@@ -53,6 +53,7 @@
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
+import PR from "../../../juegos/prodrop/retos.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { cajaRock, reembolsoRock, repetidaRock, claveRock, PRECIO_CAJA } from "./rock-datos.js";
 import { TIENDA, precioDe, aLaVenta } from "./tienda.js";
@@ -74,7 +75,7 @@ export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 export const PESO = {
   escondite: 1, gato: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
   yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
-  boxhead: 1.3, haxball: 1.2, bt3: 1.5, mkw: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, pool: 1.6, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
+  boxhead: 1.3, haxball: 1.2, bt3: 1.5, mkw: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, pool: 1.6, typerace: 1, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -91,7 +92,7 @@ export const NIVEL = {
   cadena: F + "132232", worms: F + "132323", flip7: F + "221232",
   cacho: F + "212132", uno: F + "121223", catan: F + "122213",
   presidente: F + "113322", spicy: F + "122113", tetris: F + "131332",
-  yemas: F + "133243", clue: F + "321233", boxhead: F + "232223", haxball: F + "123223", tulones: F + "232323", memazo: F + "313222",
+  yemas: F + "133243", clue: F + "321233", boxhead: F + "232223", haxball: F + "123223", tulones: F + "232323", memazo: F + "313222", typerace: F + "322312",
   /* BT3 no lleva los de la fila (no clasifica): primera anfitrion visita revancha maraton incansable
      equipo dp infinito relampago. */
   bt3: "1112342212",
@@ -577,10 +578,18 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
   /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
-  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  /* Un premio de desafío (`pl`) va antes que su sobre (`s`), que se
+     escribe en el mismo instante: el sobre vale si su premio valió. */
+  const ORDEN = { pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
-      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p), pl: typeof x.pl === "string" ? x.pl : "" });
+  /* Los premios de los desafíos de plantilla (juegos/prodrop/retos.js):
+     `plantillas/p/<uid>/<plantilla>_<nivel>` = {at, c: [once copias], k, k2?}.
+     `k` y `k2` son los sobres que regala (`k2`, el segundo del nivel 2). */
+  for (const [u, l] of Object.entries((d.plantillas && d.plantillas.p) || {}))
+    for (const [id, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pl", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k, x.k2].filter(k => typeof k === "string" && k) });
   for (const [u, l] of Object.entries(c.g || {}))
     for (const [k, porI] of Object.entries(l || {}))
       for (const [i, x] of Object.entries(porI || {}))
@@ -662,7 +671,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, tacos: {}, cofres: [],
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, desafios: {}, tacos: {}, cofres: [],
     intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
@@ -705,13 +714,39 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
     if (so.r) return q.i === 0 ? so.r : null;
     return PM.sobre(q.o, q.k, so.at).cartas[q.i];
   };
+  // los premios de desafío que valieron, por `<uid>~<reclamo>`: cada uno de sus sobres se acepta una vez
+  const reclamos = {};
   const casinoDe = (u, j) => { const pj = U(u).casino.porJuego; return pj[j] || (pj[j] = { apostado: 0, pagado: 0, rondas: 0 }); };
   for (const e of evs) {
     ahora = e.at;
-    if (e.t === "s") {
+    if (e.t === "pl") {
+      /* Un premio vale si la plantilla está vigente (un reto, solo en su
+         semana), las once son de quien reclama en ese momento y, con lo
+         graduado hasta ahí, cumplen lo que pide ese nivel. Paga sus monedas
+         como premio y deja pasar sus sobres (tantos como el nivel, cada uno
+         con el prefijo de su tipo). */
+      const r = PR.leeReclamo(e.k), pt = r && PR.plantilla(r.clave), pr = r && PR.PREMIOS[r.n - 1];
+      if (!pt || !PR.vigente(pt, e.at) || e.c.length !== 11 || new Set(e.c).size !== 11) continue;
+      if (!e.c.every(cc => dueno[cc] === e.u)) continue;
+      const fs = e.c.map(cc => { const f = ficha(cc); return f && { id: f.id, g: f.g, gr: !!graduada[cc] }; });
+      if (fs.some(f => !f) || !PR.premioOk(r.n, PR.evalua(r.clave, fs))) continue;
+      if (e.sobres.length !== pr.sobres.length || new Set(e.sobres).size !== e.sobres.length
+        || e.sobres.some((k, i) => k[0] !== PM.SOBRE[pr.sobres[i]].prefijo)) continue;
+      reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
+      // el de un club deja además su marco de perfil (perfil-tarjeta.js), desde el primero que valió
+      if (pt.tipo === "club") { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
+      U(e.u).premios += pr.monedas;
+      anota(e.u, "plantilla", pr.monedas, pt.titulo);
+    } else if (e.t === "s") {
       const x = U(e.u);
       const plus = String(e.k)[0] === "h";   // el sobre Plus de fútbol (prefijo h) vale el doble y no tiene gratis
-      if (e.p === 0) {
+      if (e.pl) {
+        // el sobre de un premio de desafío: gratis, una vez, y solo si el premio valió
+        const r = reclamos[e.u + "~" + e.pl];
+        if (e.p !== 0 || !r || !r.sobres.includes(e.k)) continue;
+        r.sobres = r.sobres.filter(k => k !== e.k);
+        x.cuenta.sobrePremio = (x.cuenta.sobrePremio || 0) + 1;
+      } else if (e.p === 0) {
         if (plus || x.parada || e.at - x.gratis < SEIS_HORAS) continue;
         x.gratis = e.at;
         x.cuenta.sobreGratis = (x.cuenta.sobreGratis || 0) + 1;

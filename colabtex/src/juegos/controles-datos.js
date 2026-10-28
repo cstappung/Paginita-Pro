@@ -12,6 +12,7 @@ export const CONTROLES = {
   "bots-clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "bots-haxball": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "bots-mkw": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
+  "bots-typerace": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "bots-worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "bots-yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"},
   "boxhead": {"movil":false,"pc":true,"pide":"teclado","por":"@controles: teclado"},
@@ -22,6 +23,7 @@ export const CONTROLES = {
   "catan": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "cuadritos": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "desafios": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "dosmil": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "electro": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "escondite": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
@@ -57,6 +59,7 @@ export const CONTROLES = {
   "trigon": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "tulones": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"@controles: raton teclado"},
   "tulonesclub": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"@controles: raton teclado"},
+  "typerace": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "uno": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"}

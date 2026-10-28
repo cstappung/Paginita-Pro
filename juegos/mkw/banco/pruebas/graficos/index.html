@@ -48,6 +48,7 @@ try {
   ok('qué frena: el procesador (el juego tarda más que un cuadro)', /^el procesador/.test(queFrena({ fps: 30, trabajo: 22, gpu: 5, hz: 120 })));
   ok('qué frena: la tarjeta de video', /^la tarjeta de video/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, hz: 60 })));
   ok('qué frena: la pantalla a 30 Hz (ahorro de batería)', /^la pantalla: refresca a 30 Hz/.test(queFrena({ fps: 30, trabajo: 9, gpu: 4, hz: 30 })));
+  ok('qué frena: el juego y la tarjeta juntos (§115: no se sabe cuál, y sin «baja la salida»)', /^el dibujo de cada cuadro/.test(queFrena({ fps: 31.7, trabajo: 33.4, gpu: 33.8, hz: 60 })) && !/salida/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, hz: 60 })));
   ok('qué frena: el ritmo (nada al tope)', /^el ritmo/.test(queFrena({ fps: 40, trabajo: 9, gpu: 4, hz: 60 })));
   ok('el medidor con el detalle: fps, juego, video, Hz, lienzo y qué frena', textoMedidor({ fps: 31.2, verFps: false, verPing: false, verDetalle: true,
      detalle: { trabajo: 22.4, gpu: 5.1, hz: 120, lienzo: '1280×720' } }) === '31 fps · juego 22.4 ms · video 5.1 ms · 120 Hz · 1280×720 · frena: el procesador: el juego no alcanza a calcular un cuadro en 16,7 ms',

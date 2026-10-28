@@ -39,6 +39,14 @@ import { CONTROLES } from "./controles-datos.js";
    puntúa en ninguna tabla. `popular` es la clave con la que la
    popularidad del vestíbulo cuenta sus partidas; `reglas` la del manual. */
 export const SOLOS = [
+  /* `tipo: "sitio"`: no es un juego del club sino una pantalla de Juegos
+     que se juega solo (sin manual propio ni clasificación del club): los
+     desafíos de plantilla de PRODROP. Su ayuda vive en su pantalla. */
+  { id: "desafios", tipo: "sitio", nombre: "Desafío de plantilla", genero: "Cartas de fútbol", icono: "🏆", alta: "2026-10-27",
+    ruta: "#cartas/retos", codigo: "juegos/prodrop", ranking: true,
+    lema: "Arma un once en 4-3-3 con tus cartas de fútbol de PRODROP para el reto de la semana, la mejor plantilla o el álbum de clubes, súbelo a su clasificación y gana monedas y sobres.",
+    nota: "Un reto nuevo cada lunes y una plantilla por club. Cada plantilla tiene su clasificación y tres premios, de 50 monedas y un sobre a 250 y un sobre Plus.",
+    modos: ["Reto de la semana", "Mejor plantilla", "Álbum de clubes", "Premios: monedas y sobres"] },
   { id: "minas", tipo: "club", nombre: "Mina Club", genero: "Estrategia", icono: "✦", alta: "2026-09-20",
     ruta: "#solo/minas", reglas: "minas", popular: "club-minas", ranking: true,
     lema: "Buscaminas en tres dificultades, con variante táctica y música que crece contigo.",
@@ -154,7 +162,11 @@ export const SOLOS = [
   { id: "bots-mkw", tipo: "bots", juego: "mkw", nombre: "Mario Kart Wii · un jugador", genero: "Carreras", icono: "🏁", alta: "2026-10-18",
     url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
     lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
-    modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] }
+    modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] },
+  { id: "bots-typerace", tipo: "bots", juego: "typerace", nombre: "Type Race · práctica", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
+    url: "juegos/typerace/index.html?v=typerace-1", reglas: "typerace",
+    lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés.",
+    modos: ["Palabras", "Frases", "Cuentos", "Libre con reloj"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -165,7 +177,7 @@ export const GENERO = {
   worms: "Artillería", reversi: "Tablero", gato: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
-  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", mkw: "Carreras", tulones: "Física", hero: "Ritmo", memazo: "Fiesta", pool: "Deporte"
+  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", mkw: "Carreras", tulones: "Física", hero: "Ritmo", memazo: "Fiesta", typerace: "Teclado", pool: "Deporte"
 };
 
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la
@@ -219,6 +231,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
+  desafios: "#3ccf6e",
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
   sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
 };
@@ -259,7 +272,7 @@ export const DESTACADOS_INVITADO = ["bbtan", "aleteo", "fanal", "trigon"];
    salón: PRO HERO (sus canciones viven en Storage y sus estrellas en la
    cuenta, por decisión de la dueña) y Tenkaichi 3 (el disco es privado).
    Todo lo demás de un jugador se juega sin cuenta y sin guardar nada. */
-export const CON_CUENTA_SOLO = ["heroclub", "bots-bt3"];
+export const CON_CUENTA_SOLO = ["heroclub", "bots-bt3", "desafios"];
 export const libreParaInvitado = id => SOLOS.some(s => s.id === id) && !CON_CUENTA_SOLO.includes(id);
 /* Lo mismo para una ruta `#solo/<juego>` (la del Tetris es `tetris`, la
    de PRO HERO `hero`): se busca la entrada que la lleva. */
@@ -339,3 +352,12 @@ export const MOTIVO_CUENTA = {
   casino: { t: "El casino juega con tus monedas", d: "Las apuestas se pagan con las monedas que ganas jugando y los premios vuelven a tu cuenta. Inicia sesión para subirte al avión o hacer saltar al pingüino." },
   perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
 };
+
+/* Salas «trabajando para usted» (el dueño, 2026-10-27: «el multiplayer
+   está totalmente roto, ocúltalo por ahora y ponle trabajando para
+   usted»). Un juego de esta lista no abre salas: su ficha muestra el
+   cartel y, si lo tiene, el camino para jugar solo mientras tanto
+   (`solo`); las salas que esperan no se ofrecen ni se puede entrar a
+   ellas, y quien llega por un enlace ve el cartel. Para volver a
+   abrirlas, se borra la línea del juego. */
+export const SALAS_EN_OBRA = { mkw: { solo: "#solo/mkw" } };

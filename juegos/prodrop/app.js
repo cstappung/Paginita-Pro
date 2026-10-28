@@ -7,7 +7,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // `?ver=1&…`: el modo visor, una sola carta viva para el mercado de Juegos (al final del archivo)
-const VER = new URLSearchParams(location.search), VISOR = VER.has('ver') || VER.has('plantilla');
+const VER = new URLSearchParams(location.search), VISOR = VER.has('ver');
 if (VISOR) document.documentElement.classList.add('visor');
 
 /* ---------------- DATOS ---------------- */
@@ -98,7 +98,6 @@ function fijaColecciones(serie1) {
 }
 /* Lo que la carta de un futbolista dice además de la foto (el catálogo
    está en el motor: M.FUTBOLISTAS). */
-const FUT_POSICION = { POR: 'Portero', DEF: 'Defensa', MED: 'Centrocampista', DEL: 'Delantero' };
 const FUT_PAIS = {
   BE: 'Bélgica', UA: 'Ucrania', ES: 'España', BR: 'Brasil', ENG: 'Inglaterra', FR: 'Francia', DE: 'Alemania', NL: 'Países Bajos',
   UY: 'Uruguay', TR: 'Turquía', PT: 'Portugal', MA: 'Marruecos', CI: 'Costa de Marfil', PL: 'Polonia', HR: 'Croacia',
@@ -218,7 +217,7 @@ function offCenter(c) {
    recibido en un intercambio, menos lo vendido o cambiado). Cada copia se
    rehace con el motor desde su sobre: `key` = `<origen>~<sobre>.<i>`. */
 const cuenta = { uid: '', saldo: 0, parada: false, falta: 0, mias: [], sobres: {}, gratis: 0, ofertas: [], ventas: [], cambios: [],
-  jugadores: {}, gente: {}, exh: [], plant: [], listo: false, desfase: 0 };
+  jugadores: {}, gente: {}, exh: [], listo: false, desfase: 0 };
 let col = {}, copies = {}, abriendo = new Set();   // los sobres en curso no entran a la colección hasta el resumen
 const ahora = () => Date.now() + cuenta.desfase;
 // una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
@@ -863,7 +862,7 @@ function eligeSobre(menu = 'todos') {
   document.body.classList.toggle('menu-futbol', menu === 'futbol');
   $('#chTit').textContent = menu === 'futbol' ? '⚽ Sobres de Fútbol' : 'Elige tu sobre';
   $('#chSub').textContent = menu === 'futbol'
-    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para ⚽ Mi plantilla y el re-roll.'
+    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para los 🏆 desafíos de plantilla y el re-roll.'
     : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Un sobre gratis cada 6 horas.';
   $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
@@ -890,6 +889,10 @@ function eligeSobre(menu = 'todos') {
   };
   box.innerHTML = menu === 'futbol' ? futbolistas.map(ficha).join('')
     : sueltas.map(ficha).join('') + (futbolistas.length ? fichaFutbol() : '');
+  // en el menú de fútbol, la entrada grande a los desafíos de plantilla, con el reto de la semana
+  const chr = $('#chRetos'), sem = window.ProdropRetos ? window.ProdropRetos.retoDeSemana(window.ProdropRetos.semanaDe(ahora())) : null;
+  chr.hidden = menu !== 'futbol' || !sem;
+  if (sem) chr.innerHTML = `<span class="ch-retos-ico">🏆</span><span><b>Desafío de plantilla</b><small>Reto de esta semana: ${esc(sem.titulo)}. Arma tu once con tus cartas, súbelo a la clasificación y gana monedas y sobres. También están la mejor plantilla y el álbum de clubes.</small></span><span class="ch-retos-ir">Jugar →</span>`;
   box.querySelectorAll('[data-col]').forEach(b => {
     b.onclick = () => {
       coleccion = b.dataset.col; Snd.init(); Snd.flip();
@@ -908,6 +911,7 @@ function eligeSobre(menu = 'todos') {
     { duration: 700, delay: i * 110, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' }));
 }
 $('#chBack').onclick = () => eligeSobre('todos');
+$('#chRetos').onclick = () => { Snd.init(); Snd.flip(); abreRetos(); };
 // «Cambiar sobre» vuelve al menú de donde vino: los de fútbol, al de fútbol
 const menuDe = () => (esFutbolPack(coleccion) && hayFutbol() ? 'futbol' : 'todos');
 $('#cambiaBtn').onclick = () => { if (phase === 'tienda' && !comprando) eligeSobre(menuDe()); };
@@ -1212,7 +1216,12 @@ stack.addEventListener('pointerup', endDrag);
 stack.addEventListener('pointercancel', () => { if (drag) { drag.el.style.transition = ''; drag.el.style.transform = 'none'; drag = null; } });
 
 addEventListener('keydown', e => {
-  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta', 'plantilla', 'fuModal'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
+  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta', 'retos', 'fuModal'].some(id => !$('#' + id).hidden)) {
+    // en los desafíos, Escape cierra primero el modal de encima (selector, plantilla ajena, próximos retos)
+    if (e.key === 'Escape' && !$('#retos').hidden && cierraModalReto()) return;
+    if (e.key === 'Escape') closeOverlays();
+    return;
+  }
   if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
     if (phase === 'pack' && e.target.tagName !== 'BUTTON') { e.preventDefault(); autoTear(); }
     else if (phase === 'reveal') { e.preventDefault(); act(); }
@@ -1300,7 +1309,9 @@ function zoomUI(recien) {
   $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
     (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '') +
     (venta ? `<br><span class="zi-venta">En el mercado por ${MONEDA}<b>${fmt(venta.p)}</b></span>` : '') +
-    (c._ajena ? `<br><span class="zi-venta">De <b>${esc(nombreDe(c._ajena))}</b></span>` : '');
+    (c._ajena ? `<br><span class="zi-venta">De <b>${esc(nombreDe(c._ajena))}</b></span>` : '') +
+    (mio && enDesafios(c._copy.key).length ? `<br><span class="zi-reto">🏆 En tu plantilla de ${esc(listaY(enDesafios(c._copy.key)))}</span>` : '') +
+    (mio && enBorradores(c._copy.key).length ? `<br><span class="zi-reto borrador">📝 En tu borrador de ${esc(listaY(enBorradores(c._copy.key)))} (sin subir)</span>` : '');
   const gb = $('#gradeBtn');
   gb.hidden = !mio || !c.grade || c.graded || !!venta;
   gb.innerHTML = `Enviar a graduar 🔍 <span class="precio">${MONEDA}${M.PRECIO.gradua}</span>`;
@@ -1319,9 +1330,11 @@ function zoomUI(recien) {
   const sb = $('#showBtn'), key = mio && c._copy.key, puesta = !!key && cuenta.exh.includes(key);
   sb.hidden = !key || enSobre;
   sb.classList.toggle('on', puesta);
-  sb.innerHTML = puesta ? '★ En tu perfil' : '☆ Exhibir';
-  sb.title = puesta ? 'Quitarla de tu perfil' : cuenta.exh.length >= MAX_EXH ? `Ya exhibes ${MAX_EXH}: quita una primero` : 'La verán todos en tu perfil de Juegos';
-  sb.disabled = !puesta && cuenta.exh.length >= MAX_EXH;
+  // con las cuatro puestas no se apaga: entra en lugar de la que lleva más tiempo (el clic hace slice(-MAX_EXH))
+  const llena = !puesta && cuenta.exh.length >= MAX_EXH;
+  sb.innerHTML = puesta ? '★ En tu perfil' : llena ? '☆ Exhibir · reemplaza la más antigua' : '☆ Exhibir';
+  sb.title = puesta ? 'Quitarla de tu perfil' : llena ? `Ya exhibes ${MAX_EXH}: esta entra en lugar de la primera que pusiste` : 'La verán todos en tu perfil de Juegos';
+  sb.disabled = false;
   // vender / retirar lo propio
   const vb = $('#sellBtn');
   vb.hidden = !mio || enSobre;
@@ -1361,11 +1374,16 @@ function closeOverlays() {
   if (!$('#zoom').hidden && zoomVuelve) { cierraZoom(); return; }
   zoomVuelve = '';
   if (!$('#ruleta').hidden) { if (!rl.girando) cierraRuleta(); return; }
-  $('#zoom').hidden = true; $('#collection').hidden = true; $('#reroll').hidden = true; $('#plantilla').hidden = true; $('#fuModal').hidden = true;
+  // la colección abierta desde los desafíos vuelve a ellos al cerrarse
+  const aRetos = !$('#collection').hidden && rt.vuelve;
+  $('#zoom').hidden = true; $('#collection').hidden = true; $('#reroll').hidden = true; $('#retos').hidden = true; $('#fuModal').hidden = true;
+  rt.vuelve = false;
+  if (aRetos) { abreRetos(); return; }
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeOverlays);
-for (const id of ['zoom', 'collection', 'reroll', 'plantilla', 'fuModal']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
+// los desafíos no se cierran tocando el fondo: un toque fallado te sacaba del editor (✕ y Escape sí)
+for (const id of ['zoom', 'collection', 'reroll', 'fuModal']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
 $('#gradeBtn').onclick = () => gradeCard();
 
 /* ---------------- VENDER ----------------
@@ -1375,12 +1393,14 @@ $('#sellBtn').onclick = async () => {
   const c = zoomC; if (!c || !c._copy || grading) return;
   if (c._copy.venta) {
     $('#sellBtn').disabled = true;
-    try { const id = c._copy.venta; await Red.pide('retirar', { id }); Snd.flip(); toast('Retirada del mercado.'); quitaVenta(id); }
+    try { const id = c._copy.venta; await Red.pide('retirar', { oferta: id }); Snd.flip(); toast('Retirada del mercado.'); quitaVenta(id); }
     catch (e) { avisoZoom(esc(e.message)); }
     $('#sellBtn').disabled = false; return;
   }
   const box = $('#sellBox'), ref = masBarata(c.uid);
   box.innerHTML = `<label>Precio de venta<span class="sell-campo">${MONEDA}<input id="sellPrecio" type="number" inputmode="numeric" min="1" max="100000" step="1" value="${ref ? ref.p : c.tier === 3 ? 1500 : c.tier === 2 ? 300 : c.tier === 1 ? 60 : 15}"></span></label>
+    ${enBorradores(c._copy.key).length ? `<p class="sell-aviso borrador">📝 Está en tu borrador de ${esc(listaY(enBorradores(c._copy.key)))} (sin subir): si se vende, esa casilla queda vacía.</p>` : ''}
+    ${enDesafios(c._copy.key).length ? `<p class="sell-aviso">🏆 Está en tu plantilla de ${esc(listaY(enDesafios(c._copy.key)))}: si se vende, esa plantilla sale de la clasificación hasta que subas otra.</p>` : ''}
     <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${copiaDe(ref).g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
     <div class="sell-btns"><button class="btn primary" id="sellOk">Publicar</button><button class="btn" id="sellNo">Cancelar</button></div>`;
   box.hidden = false; sellPara = c._copy.key;
@@ -1606,6 +1626,7 @@ function renderCollection() {
     return `<button role="tab" data-col="${co.key}" aria-selected="${co.key === colCol}">${co.label}<b>${n}/${l.length}</b></button>`;
   }).join('');
   $('#colTabs').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { colCol = b.dataset.col; renderCollection(); $('#colGrid').scrollTop = 0; });
+  $('#retosBtn3').hidden = !M.esFutbol(colCol);
   $('#colFilters').innerHTML = [[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])]
     .map(([i, l, s]) => {
       const n = todas.filter(c => (i < 0 || c.tier === i) && col[c.uid]).length, tot = todas.filter(c => i < 0 || c.tier === i).length;
@@ -1672,7 +1693,7 @@ function ordenAuto(lista) {
     const u = CARDS[cp.id].uid, m = mejor[u];
     if (!m || (cp.gr && (!m.gr || cp.g > m.g))) mejor[u] = cp;
   }
-  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || cuenta.plant.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
+  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || enDesafios(cp.key).length || enBorradores(cp.key).length ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
   return lista.slice().sort((a, b) => peso(a) - peso(b));
 }
 function miniCp(cp, extra = '') {
@@ -1714,7 +1735,7 @@ function renderReroll() {
   const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
   rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
-  const enPlant = rr.sel.filter(k => cuenta.plant.includes(k));
+  const enRetos = [...new Set(rr.sel.flatMap(enDesafios))], enBorr = [...new Set(rr.sel.flatMap(enBorradores))];
   $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
   $('#rrCols').innerHTML = COLS.map(co => {
     const n = rrTiers(co.key).reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
@@ -1744,8 +1765,10 @@ function renderReroll() {
       <button class="btn mk-mini" id="rrLimpia"${rr.sel.length ? '' : ' disabled'}>Quitar todas</button>
       <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
     </div>
-    ${enPlant.length ? `<p class="rr-aviso">⚽ ${enPlant.length === 1 ? 'Una de las que elegiste está' : `${enPlant.length} de las que elegiste están`} en tu plantilla: si haces el re-roll, ${enPlant.length === 1 ? 'sale' : 'salen'} de ella.</p>` : ''}
-    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (cuenta.plant.includes(cp.key) ? '<em class="rr-plant" title="En tu plantilla">⚽</em>' : ''))}</button>`).join('')}</div>`
+    ${enBorr.length ? `<p class="rr-aviso borrador">📝 Elegiste cartas de tu borrador de ${listaY(enBorr)} (sin subir): si haces el re-roll, esas casillas quedan vacías.</p>` : ''}
+    ${enRetos.length ? `<p class="rr-aviso">🏆 Elegiste cartas de tu plantilla subida en ${listaY(enRetos)}: si haces el re-roll, ${enRetos.length === 1 ? 'esa plantilla sale' : 'esas plantillas salen'} de la clasificación hasta que subas otra.</p>` : ''}
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (enDesafios(cp.key).length ? `<em class="rr-plant" title="En tu plantilla de ${esc(listaY(enDesafios(cp.key)))}">🏆</em>`
+      : enBorradores(cp.key).length ? `<em class="rr-plant" title="En tu borrador de ${esc(listaY(enBorradores(cp.key)))} (sin subir)">📝</em>` : ''))}</button>`).join('')}</div>`
       : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} de ${M.COL[rr.col].label} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
     <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
       <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
@@ -1786,11 +1809,6 @@ async function hazReroll() {
     cuenta.mias = cuenta.mias.filter(x => !usadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
     cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
     cuenta.exh = cuenta.exh.filter(k => !usadas.includes(k));
-    // las que estaban en la plantilla salen de ella (sin esperar: no frena la ruleta)
-    if (cuenta.plant.some(k => usadas.includes(k))) {
-      cuenta.plant = cuenta.plant.map(k => (usadas.includes(k) ? '' : k));
-      Red.pide('plantilla', { lista: cuenta.plant }).catch(() => {});
-    }
     rehazColeccion(); updateColCount();
     rr.sel = []; rr.seguro = false; rr.enviando = false;
     $('#reroll').hidden = true;
@@ -1946,7 +1964,7 @@ function alDatos(d) {
   if (!colVisible(rr.col)) { rr.col = colDe(coleccion); rr.sel = []; }
   Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), parada: !!d.parada, falta: d.falta || 0,
     mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], pendientes: d.pendientes || 0,
-    gente: d.gente || {}, exh: d.exh || [], plant: d.plant || [], desfase: d.desfase || 0, listo: true });
+    gente: d.gente || {}, exh: d.exh || [], retos: d.retos || cuenta.retos, desfase: d.desfase || 0, listo: true });
   rehazColeccion(); updateColCount(); pintaAvisos();
   if (primera) {
     $('#cargando').hidden = true;
@@ -1955,8 +1973,8 @@ function alDatos(d) {
     const vivos = ks.filter(k => cuenta.sobres[k] && colVisible(M.coleccionDe(k))).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
     if (vivos.length) newPacks(vivos);
     else eligeSobre();
-    // `?abre=plantilla`: el «Editar plantilla» del perfil
-    if (VER.get('abre') === 'plantilla') { if (!vivos.length) { coleccion = 'futbol'; tienda(); } abrePlantilla(); }
+    // `?abre=retos`: los desafíos de plantilla (el atajo del Salón y del menú)
+    if (VER.get('abre') === 'retos') { if (!vivos.length) { coleccion = 'futbol'; tienda(); } abreRetos(); }
     return;
   }
   // cambió qué colecciones ve: se vuelve a elegir sobre si estaba eligiendo
@@ -1965,6 +1983,8 @@ function alDatos(d) {
   pintaAvisos();
   if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
   if (!$('#collection').hidden) renderCollection();
+  if (!$('#retos').hidden) renderRetos();
+  if (!$('#rtMercado').hidden) pintaMercadoReto();
 }
 
 /* ---------------- COMPRA ----------------
@@ -1998,7 +2018,7 @@ const sobresTxt = n => n === 1 ? 'sobre' : `${n} sobres`;
 function pintaCompra() {
   const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, mult = M.SOBRE[coleccion].mult, promo = p1 < M.PRECIO.normal * mult, gl = gratisListo();
   pintaCantidad($('#cant'), p1); pintaCantidad($('#cant2'), p1);
-  $('#fuInfo').hidden = $('#plantBtn').hidden = $('#plantBtn2').hidden = !esFutbolPack(coleccion);
+  $('#fuInfo').hidden = $('#retosBtn').hidden = $('#retosBtn2').hidden = !esFutbolPack(coleccion);
   if (phase === 'tienda') { pintaExtras(cantidad, false); pintaKicker(cantidad); }
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
   const f = $('#freeBtn');
@@ -2053,6 +2073,10 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Desafíos de plantilla', [
+    '<b>🏆 Desafíos de plantilla</b>: arma un once en 4-3-3 con tus cartas para el reto de la semana o para el álbum de clubes, súbelo a su clasificación y cobra monedas y sobres. Entra desde el resumen del sobre, la tienda de Fútbol o la colección.',
+    '«⚽ Mi plantilla» del perfil se quitó por ahora: su lugar lo toman los desafíos.'
+  ]],
   ['Cartas especiales por tiempo limitado', [
     '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>) y <b>Harry Kane · Balón de Oro</b> (media <b>94</b>): dos legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen el triple de seguido que una legendaria común. Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
   ]],
@@ -2195,7 +2219,8 @@ function pintaAvisos() {
   $('#mktBadge').textContent = n || '';
   $('#mktBadge').hidden = !n;
 }
-$('#mktBtn').onclick = () => Red.manda({ tipo: 'mercado' });
+// con los desafíos de plantilla abiertos, el mercado se abre solo con lo de Fútbol
+$('#mktBtn').onclick = () => Red.manda({ tipo: 'mercado', col: $('#retos').hidden ? '' : 'futbol' });
 
 /* ---------------- INICIO ----------------
    Se espera a la cuenta: sin ella no se sabe el saldo ni qué cartas tienes. */
@@ -2205,22 +2230,17 @@ pintaCompra();
 if (!VISOR && EMBEBIDO) Red.manda({ tipo: 'listo' });
 else $('#cargando').innerHTML = '<p>PRODROP se abre desde <a href="../../juegos.html#cartas">Juegos</a>: ahí están tus monedas y tu colección.</p>';
 
-/* ---------------- PLANTILLA DE FÚTBOL ----------------
-   Un once en 4-3-3 (M.FORMACION) con las cartas de fútbol que tienes.
-   Cualquier jugador va en cualquier casilla. Cada cambio se guarda al tiro
-   en el perfil (público): Juegos comprueba que la carta sea tuya. La
-   puntuación es la del motor: la rareza pone el techo y el estado lo escala. */
-const pl = { lista: [], casilla: -1, recien: new Set(), guardando: false, filtro: '', puesto: false, club: '', media: 0, texto: '' };
-// el orden del selector y sus filtros: delanteros arriba, porteros al final
-const POS_ORDEN = ['DEL', 'MED', 'DEF', 'POR'];
+/* ---------------- LA CANCHA ----------------
+   El once en 4-3-3 (M.FORMACION) de los desafíos de plantilla: delanteros
+   arriba, portero abajo, con las cartas de verdad y la marca de cómo le
+   queda a cada una su casilla. («Mi plantilla», la del perfil, se quitó.) */
 const copiaPorClave = k => Object.values(copies).flat().find(cp => cp.key === k) || null;
-const puntosDeCopias = cps => M.puntosPlantilla(cps.map(cp => cp && { tier: CARDS[cp.id].tier, g: cp.g }));
 const FIT_TXT = { ok: 'En su puesto', incomodo: 'Incómodo', mal: 'Mal posicionado' };
 const FIT_CLASE = { ok: 'ok', incomodo: 'inc', mal: 'mal' };
 // cómo le queda la casilla `i` de la formación a una copia (verde, amarillo o rojo)
 const ajusteDe = (i, cp) => M.ajuste(M.FORMACION[i].pos, CARDS[cp.id].posiciones);
-// la cancha: delanteros arriba, portero abajo; `alTocar(i)` hace editable cada casilla
-function pintaCancha(box, cps, alTocar) {
+// `alTocar(i)` hace editable cada casilla
+function pintaCancha(box, cps, alTocar, activa = -1) {
   box.innerHTML = '<i class="pl-lineas" aria-hidden="true"></i>';
   for (let f = 3; f >= 0; f--) {
     const fila = document.createElement('div');
@@ -2229,7 +2249,7 @@ function pintaCancha(box, cps, alTocar) {
       if (s.fila !== f) return;
       const cas = document.createElement(alTocar ? 'button' : 'div');
       const aj = cps[i] ? ajusteDe(i, cps[i]) : null;
-      cas.className = `pl-casilla${cps[i] ? ' llena fit-' + FIT_CLASE[aj.nivel] : ''}${i === pl.casilla ? ' activa' : ''}`;
+      cas.className = `pl-casilla${cps[i] ? ' llena fit-' + FIT_CLASE[aj.nivel] : ''}${i === activa ? ' activa' : ''}`;
       if (cps[i]) { const el = makeCard(fromCopy(CARDS[cps[i].id], cps[i]), { back: false }); light(el); cas.appendChild(el); }
       else cas.innerHTML = `<span class="pl-vacia">${alTocar ? '+' : ''}</span>`;
       if (aj && aj.pen) cas.insertAdjacentHTML('beforeend', `<span class="pl-pen ${FIT_CLASE[aj.nivel]}" title="${FIT_TXT[aj.nivel]}">${aj.nivel === 'mal' ? '✕' : '!'}</span>`);
@@ -2240,93 +2260,311 @@ function pintaCancha(box, cps, alTocar) {
     box.appendChild(fila);
   }
 }
-function renderPlantilla() {
-  const cps = pl.lista.map(k => (k ? copiaPorClave(k) : null));
-  $('#plPuntos').innerHTML = `${puntosDeCopias(cps)}<small> pts</small>`;
-  pintaCancha($('#plCancha'), cps, i => { if (pl.casilla !== i) { pl.puesto = true; pl.filtro = ''; } pl.casilla = pl.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderPlantilla(); });
-  const box = $('#plElige');
-  box.hidden = pl.casilla < 0;
-  if (box.hidden) return;
-  /* El buscador: por línea (delanteros, medios, defensas, porteros), por el
-     puesto de la casilla, por club, por media mínima y por nombre. Ordenado
-     por media. Cualquiera va en cualquier casilla (los de otro puesto salen
-     en amarillo o rojo); un jugador que ya está en el once también sale:
-     al elegirlo se va de donde estaba y pasa a esta casilla. */
-  const slot = M.FORMACION[pl.casilla];
-  const todos = Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
-  const clubes = [...new Set(todos.map(cp => CARDS[cp.id].club))].sort((a, b) => M.CLUBES[a].localeCompare(M.CLUBES[b]));
-  const puesto = M.PUESTO[slot.pos];
-  const chips = POS_ORDEN.map(p => `<button class="pl-filtro" data-filtro="${p}" aria-pressed="${pl.filtro === p}" title="${FUT_POSICION[p]}">${p}</button>`).join('')
-    + `<button class="pl-filtro" data-puesto aria-pressed="${pl.puesto}" title="Solo los que juegan de ${puesto}">solo ${slot.pos}</button>`;
-  box.innerHTML = `<div class="pl-elige-head"><b>${puesto[0].toUpperCase() + puesto.slice(1)} · elige un jugador</b>
-      ${pl.lista[pl.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="link" data-cancelar>Cancelar</button></div>
-    <div class="pl-buscar"><span class="pl-filtros" role="group" aria-label="Filtrar por posición">${chips}</span>
-      <select id="plClub" aria-label="Club"><option value="">Todos los clubes</option>${clubes.map(c => `<option value="${c}"${pl.club === c ? ' selected' : ''}>${esc(M.CLUBES[c])}</option>`).join('')}</select>
-      <select id="plMedia" aria-label="Media mínima"><option value="0">Cualquier media</option>${M.MEDIAS_MIN.map(m => `<option value="${m}"${pl.media === m ? ' selected' : ''}>Media ${m}+</option>`).join('')}</select>
-      <input id="plTexto" type="search" placeholder="Buscar por nombre…" value="${esc(pl.texto)}" aria-label="Buscar por nombre"></div>
-    <div class="tc-rejilla pl-lista" id="plLista"></div>`;
-  // tocar un filtro deja solo esa línea; tocarlo otra vez vuelve a mostrar todos
-  box.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { pl.filtro = pl.filtro === b.dataset.filtro ? '' : b.dataset.filtro; Snd.tick(); renderPlantilla(); });
-  box.querySelector('[data-puesto]').onclick = () => { pl.puesto = !pl.puesto; Snd.tick(); renderPlantilla(); };
-  $('#plClub').onchange = e => { pl.club = e.target.value; renderPlantilla(); };
-  $('#plMedia').onchange = e => { pl.media = +e.target.value; renderPlantilla(); };
-  $('#plTexto').oninput = e => { pl.texto = e.target.value; pintaListaPl(); };
-  const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => pon('');
-  box.querySelector('[data-cancelar]').onclick = () => { pl.casilla = -1; renderPlantilla(); };
-  pintaListaPl();
-}
-// el mismo jugador no puede estar dos veces: se va de la casilla donde estaba
+// el jugador de una copia (el mismo no puede estar dos veces en un once)
 const jugadorDe = k => { const cp = k ? copiaPorClave(k) : null; return cp ? CARDS[cp.id].person : null; };
-function pon(k) {
-  const quien = jugadorDe(k);
-  if (quien) pl.lista.forEach((x, j) => { if (j !== pl.casilla && jugadorDe(x) === quien) pl.lista[j] = ''; });
-  pl.lista[pl.casilla] = k; pl.casilla = -1; guardaPlantilla();
-}
-function pintaListaPl() {
-  const caja = $('#plLista');
-  if (!caja) return;
-  const slot = M.FORMACION[pl.casilla];
-  const filtro = { club: pl.club, mediaMin: pl.media, texto: pl.texto };
-  const enOnce = new Map();    // jugador -> casilla donde ya está
-  pl.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== pl.casilla) enOnce.set(q, j); });
-  const hay = Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
-  // una sola copia por carta (el jugador no puede repetirse, pero sus cartas especiales salen aparte): la que ya está en el once o, si no, la mejor graduada
-  const unica = new Map();
-  for (const cp of hay) {
-    const q = CARDS[cp.id].uid, vista = unica.get(q), ya = pl.lista.includes(cp.key);
-    const mejor = !vista || (ya && !pl.lista.includes(vista.key)) || (!pl.lista.includes(vista.key) && ((cp.gr ? 1 : 0) - (vista.gr ? 1 : 0) || cp.g - vista.g) > 0);
-    if (mejor) unica.set(q, cp);
+
+/* ---------------- DESAFÍOS DE PLANTILLA ----------------
+   Un álbum de plantillas (una por club) y un reto por semana
+   (retos.js, compartido con Juegos y la economía). Cada plantilla es un
+   once en 4-3-3 con tus cartas de fútbol que cumple una condición; se sube
+   a su clasificación y paga tres premios, una vez cada uno. Las cartas son
+   las de siempre (makeCard: funda de graduada, holo, desgaste), y el
+   borrador de cada plantilla se recuerda en este navegador hasta subirlo. */
+const RT = window.ProdropRetos;
+const rt = { vista: 'album', clave: '', lista: [], casilla: -1, tab: 'clasif', vuelve: false, ocupado: false };
+const fichaCp = cp => cp && { id: cp.id, g: cp.g, gr: !!cp.gr };
+const misFutbol = () => Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
+const borrador = clave => 'prodrop.reto.' + cuenta.uid + '.' + clave;
+/* Los desafíos donde está la copia `k` en una plantilla que subiste y que
+   sigue contando (los clubes y el reto de esta semana): el re-roll, el zoom
+   y la venta lo avisan, porque sin esa carta la plantilla sale de la tabla. */
+function enDesafios(k) {
+  const subidas = (cuenta.retos && cuenta.retos.subidas) || {}, ms = ahora(), out = [];
+  for (const [clave, filas] of Object.entries(subidas)) {
+    const p = RT.plantilla(clave), mia = filas.find(f => f.u === cuenta.uid);
+    if (p && mia && RT.vigente(p, ms) && mia.c.some(x => x && x.c === k)) out.push(p.titulo);
   }
-  const libres = [...unica.values()]
-    .filter(cp => { const c = CARDS[cp.id]; return (!pl.filtro || c.pos === pl.filtro) && (!pl.puesto || c.posiciones.includes(slot.pos)) && M.coincide(c, filtro); })
-    .sort((a, b) => CARDS[b.id].media - CARDS[a.id].media || CARDS[b.id].tier - CARDS[a.id].tier
-      || pl.recien.has(b.key) - pl.recien.has(a.key) || CARDS[a.id].name.localeCompare(CARDS[b.id].name));
-  caja.innerHTML = libres.length ? libres.map(cp => {
-    const c = CARDS[cp.id], aj = ajusteDe(pl.casilla, cp), en = enOnce.get(c.person), aca = pl.lista[pl.casilla] === cp.key;
-    const nota = aca ? '<em class="pl-aca">AQUÍ</em>' : en !== undefined ? `<em class="pl-aca mueve" title="Ya está en tu once: pasa a esta casilla">↔ ${M.FORMACION[en].pos}</em>` : pl.recien.has(cp.key) ? '<em class="rr-exh">NUEVA</em>' : '';
-    return `<button class="tc-elige fit-${FIT_CLASE[aj.nivel]}" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${c.posiciones.map(p => M.PUESTO[p]).join(' / ')} · ${FIT_TXT[aj.nivel]}${aj.pen ? ' (−' + aj.pen + ')' : ''}">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</button>`;
-  }).join('')
-    : `<p class="mk-vacio">${hay.length ? 'Ningún jugador cumple esos filtros: prueba quitando «solo ' + slot.pos + '».' : 'No tienes jugadores: abre sobres de Fútbol.'}</p>`;
-  caja.querySelectorAll('[data-c]').forEach(b => b.onclick = () => pon(b.dataset.c));
+  return out;
 }
-async function guardaPlantilla() {
-  pl.guardando = true; Snd.flip(); renderPlantilla();
-  try { await Red.pide('plantilla', { lista: pl.lista }); cuenta.plant = pl.lista.slice(); }
-  catch (e) { toast(e.message || 'No se pudo guardar la plantilla.', true); pl.lista = M.FORMACION.map((_, i) => (cuenta.plant[i] && copiaPorClave(cuenta.plant[i]) ? cuenta.plant[i] : '')); }
-  pl.guardando = false; renderPlantilla();
+/* Lo mismo con los borradores sin subir de este navegador (`borrador()`
+   en localStorage, de plantillas que siguen abiertas): solo donde se
+   armaron, y sin contar los que ya avisa `enDesafios`. Se leen una vez por
+   repintado (`borradoresCache`), porque el re-roll pregunta por cada copia. */
+let borradoresCache = null;
+function enBorradores(k) {
+  if (!borradoresCache) {
+    borradoresCache = new Map();
+    const pre = 'prodrop.reto.' + cuenta.uid + '.', ms = ahora();
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const lk = localStorage.key(i);
+        if (!lk || !lk.startsWith(pre)) continue;
+        const p = RT.plantilla(lk.slice(pre.length)), l = JSON.parse(localStorage.getItem(lk) || 'null');
+        if (!p || !RT.vigente(p, ms) || !Array.isArray(l)) continue;
+        for (const c of l) if (c) borradoresCache.set(c, (borradoresCache.get(c) || []).concat(p.titulo));
+      }
+    } catch {}
+    queueMicrotask(() => { borradoresCache = null; });
+  }
+  const sub = enDesafios(k);
+  return (borradoresCache.get(k) || []).filter(t => !sub.includes(t));
 }
-function abrePlantilla(recien = []) {
+const listaY = l => (l.length > 1 ? l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1] : l[0] || '');
+const subidasDe = clave => ((cuenta.retos && cuenta.retos.subidas) || {})[clave] || [];
+const cobrado = (clave, n) => !!(cuenta.retos && cuenta.retos.cobrados.includes(RT.claveReclamo(clave, n)));
+const semanaAhora = () => RT.semanaDe(ahora());
+// la clasificación de una plantilla: solo las que siguen valiendo, de más a menos puntos (empate: quien subió antes)
+function tablaDe(clave) {
+  return subidasDe(clave).map(f => {
+    const cps = f.c.map(x => { try { return x ? copiaDe(x) : null; } catch { return null; } });
+    return Object.assign({ cps, ev: RT.evalua(clave, cps.map(fichaCp)) }, f);
+  }).filter(f => f.ev.valida).sort((a, b) => b.ev.puntaje - a.ev.puntaje || a.at - b.at);
+}
+// el marco de perfil de un club: se gana con su primer premio cobrado (perfil-tarjeta.js)
+const marcoGanado = clave => RT.PREMIOS.some(pr => cobrado(clave, pr.n));
+const chipMarco = p => p.tipo === 'club' ? `<span class="rt-chip${marcoGanado(p.clave) ? ' ok' : ''}" title="Marco de perfil del ${esc(p.titulo)}: viene con el primer premio">${marcoGanado(p.clave) ? '✓' : '○'} 🖼 Marco</span>` : '';
+// la bandera (imagen) de un reto de selección, o su emoji
+const iconoReto = (r, cls = '') => r.bandera ? `<img class="rt-icono bandera${cls}" src="flags/${r.bandera}.png" alt="">` : `<span class="rt-icono${cls}">${r.icono}</span>`;
+function fichaPlantilla(clave, extra = '') {
+  const p = RT.plantilla(clave), t = tablaDe(clave), yo = t.findIndex(f => f.u === cuenta.uid);
+  const icono = p.tipo === 'club' ? `<img class="rt-escudo" src="escudos/${p.club}.png" alt="">` : iconoReto(p);
+  const premios = RT.PREMIOS.map(pr => `<span class="rt-chip${cobrado(clave, pr.n) ? ' ok' : ''}" title="${pr.monedas} monedas y ${RT.textoSobres(pr)}">${cobrado(clave, pr.n) ? '✓' : '○'} ${MONEDA}${pr.monedas} + ${pr.sobres.length > 1 ? pr.sobres.length + '×' : ''}${pr.sobres[0] === 'futbolplus' ? '🃏Plus' : '🃏'}</span>`).join('');
+  return `<button class="rt-ficha${p.tipo === 'reto' ? ' semana' : ''}" data-clave="${clave}">${icono}
+    <b>${esc(p.titulo)}</b><small>${esc(p.desc)}</small>${extra}
+    <span class="rt-estado">${yo >= 0 ? `<span class="rt-chip oro">${fmt(t[yo].ev.puntaje)} pts · #${yo + 1} de ${t.length}</span>` : `<span class="rt-chip">${t.length ? t.length + ' en la tabla' : 'Nadie la ha subido'}</span>`}${premios}${chipMarco(p)}</span></button>`;
+}
+function renderAlbum() {
+  const n = semanaAhora(), clave = RT.claveReto(n), quedan = RT.finSemana(n) - ahora();
+  const d = Math.floor(quedan / 864e5), h = Math.floor(quedan / 36e5) % 24;
+  $('#rtTitulo').textContent = 'Desafíos de plantilla';
+  $('#rtSub').textContent = 'Arma la mejor plantilla con tus cartas, súbela a la clasificación y cobra los premios.';
+  $('#rtEligeCapa').hidden = true;
+  $('#rtBody').innerHTML = `<div class="rt-acc"><button class="btn" data-rt-proximos>🔜 Próximos retos</button><button class="btn" data-rt-col>📚 Ver colección</button><button class="btn" data-rt-mercado>🏪 Mercado de fútbol</button><button class="link" data-rt-ayuda>¿Cómo se calcula el puntaje?</button></div>
+    <h3 class="rt-h">📅 Reto de la semana</h3><div class="rt-grid">${fichaPlantilla(clave, `<em class="rt-quedan">⏳ Termina en ${d ? d + ' d ' : ''}${h} h</em>`)}</div>
+    <h3 class="rt-h">⭐ Mejor plantilla</h3><div class="rt-grid">${fichaPlantilla(RT.MEJOR.clave, '<em class="rt-quedan">Siempre abierta · cualquier club y país</em>')}</div>
+    <h3 class="rt-h">📘 Álbum de clubes</h3><div class="rt-grid">${RT.CLUBES.map(c => fichaPlantilla(RT.claveClub(c))).join('')}</div>`;
+  $('#rtBody').querySelectorAll('[data-clave]').forEach(b => b.onclick = () => { Snd.init(); Snd.tick(); abreEditorReto(b.dataset.clave); });
+}
+const AYUDA_RETOS = `<p><b>Las cartas son las de tu colección</b>, con su media, su rareza y sus posiciones de siempre. Dos copias de la misma carta solo se diferencian en la nota.</p>
+  <p><b>Cada carta vale</b> (media − castigo de posición) × estado. Estado: graduada, 0,80 + 0,02 × nota (nota 10 = ×1,00, nota 6 = ×0,92); sin graduar, ×0,80, porque su nota está oculta.</p>
+  <p><b>Posición</b>: en uno de sus puestos juega entero; incómodo (otro puesto de su línea), −3 de media; más lejos no puede jugar.</p>
+  <p><b>Puntaje</b> = la suma de las once × 10. Un punto de media son 10 puntos: con la misma nota, el Mbappé del Clásico (92) le gana al de siempre (91). Empate: gana quien la subió primero.</p>
+  <p><b>Premios</b>, una vez por plantilla: ${RT.PREMIOS.map(pr => `${pr.txt.toLowerCase()}, ${MONEDA}${pr.monedas} y ${RT.textoSobres(pr)}${pr.sobres[0] === 'futbolplus' ? '' : ' de Fútbol'}`).join(' · ')}. El reto semanal solo se sube y se cobra durante su semana. En el álbum de clubes, el primer premio de cada club trae además su <b>marco de perfil</b>.</p>`;
+// los retos que vienen, con el día en que empiezan (se activan solos el lunes)
+function pintaProximos() {
+  const n = semanaAhora(), dia = ms => new Date(ms).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#rtVerTit').textContent = '🔜 Próximos retos';
+  $('#rtVerSub').textContent = 'Cada lunes empieza uno nuevo y dura toda la semana.';
+  $('#rtVerCancha').innerHTML = `<div class="fu-tip"><ol class="rt-proximos">${[1, 2, 3, 4, 5, 6].map(k => {
+    const r = RT.retoDeSemana(n + k);
+    return `<li>${iconoReto(r)}<span><b>${esc(r.titulo)}</b><small>${esc(r.desc)}</small></span><em>${dia(RT.inicioSemana(n + k))}</em></li>`;
+  }).join('')}</ol></div>`;
+  $('#rtVer').hidden = false;
+}
+// cierra el modal que esté encima en los desafíos; false si no había ninguno
+function cierraModalReto() {
+  if (!$('#rtMercado').hidden) { $('#rtMercado').hidden = true; return true; }
+  if (!$('#rtVer').hidden) { $('#rtVer').hidden = true; return true; }
+  if (!$('#rtEligeCapa').hidden) { rt.casilla = -1; renderEditorReto(); return true; }
+  return false;
+}
+function abreEditorReto(clave) {
+  rt.vista = 'editor'; rt.clave = clave; rt.casilla = -1;
+  let guardada = null;
+  try { guardada = JSON.parse(localStorage.getItem(borrador(clave)) || 'null'); } catch {}
+  const mia = subidasDe(clave).find(f => f.u === cuenta.uid);
+  const base = Array.isArray(guardada) ? guardada : mia ? mia.c.map(x => (x ? x.c : '')) : [];
+  rt.lista = M.FORMACION.map((_, i) => (base[i] && copiaPorClave(base[i]) ? base[i] : ''));
+  renderRetos();
+  $('#retos .rt-panel').scrollTop = 0;
+}
+const guardaBorrador = () => { try { localStorage.setItem(borrador(rt.clave), JSON.stringify(rt.lista)); } catch {} };
+function renderEditorReto() {
+  const p = RT.plantilla(rt.clave);
+  if (!p) { rt.vista = 'album'; return renderAlbum(); }
+  const cps = rt.lista.map(k => (k ? copiaPorClave(k) : null)), ev = RT.evalua(rt.clave, cps.map(fichaCp));
+  const t = tablaDe(rt.clave), mia = t.find(f => f.u === cuenta.uid), abierto = RT.vigente(p, ahora());
+  $('#rtTitulo').innerHTML = (p.tipo === 'club' ? `<img class="rt-escudo chico" src="escudos/${p.club}.png" alt=""> ` : iconoReto(p, ' chico') + ' ') + esc(p.titulo) + (p.tipo === 'reto' ? ' <small>· reto semanal</small>' : '');
+  $('#rtSub').textContent = p.desc + ' Toca una casilla para poner o cambiar un jugador.';
+  const tabla = t.length ? `<ol class="rt-tabla">${t.map((f, i) => `<li class="${f.u === cuenta.uid ? 'yo' : ''}" data-fila="${i}"><i>${i + 1}</i><span translate="no">${esc(nombreDe(f.u))}<small>media ${f.ev.media.toFixed(1).replace('.', ',')} · ${f.ev.graduadas}/11 graduadas</small></span><b>${fmt(f.ev.puntaje)}</b></li>`).join('')}</ol><p class="rt-nota">Toca una fila para ver esa plantilla.</p>`
+    : '<p class="rt-nota">Nadie la ha subido todavía: la primera es tuya.</p>';
+  const premios = RT.PREMIOS.map(pr => {
+    const ya = cobrado(rt.clave, pr.n), puede = !ya && abierto && RT.premioOk(pr.n, ev);
+    return `<div class="rt-premio${ya ? ' cobrado' : ''}"><span>${ya ? '✓' : puede ? '🎁' : '○'} ${esc(pr.txt)}</span>
+      <b>${MONEDA}${pr.monedas} + ${RT.textoSobres(pr)}${p.tipo === 'club' && pr.n === 1 ? ' + 🖼 marco de perfil' : ''}</b>
+      ${ya ? '<em>Cobrado</em>' : `<button class="btn mk-mini" data-cobra="${pr.n}"${puede && !rt.ocupado ? '' : ' disabled'}>Cobrar</button>`}</div>`;
+  }).join('') + '<p class="rt-nota">Cada premio se cobra una vez por plantilla, con las once cartas que tengas puestas en ese momento.</p>'
+    + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el primer premio que cobres te llevas el <b>marco del ${esc(p.titulo)}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
+  $('#rtBody').innerHTML = `<div class="rt-editor">
+    <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>
+      <div class="rt-acc"><button class="btn mk-mini" data-rt-auto>✨ Autocompletar con lo mejor</button><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
+    <div class="rt-der">
+      <div class="rt-caja"><small>Puntaje</small><b class="rt-puntos">${fmt(ev.puntaje)}</b>
+        <small>${mia ? `Subida: ${fmt(mia.ev.puntaje)} (${ev.puntaje - mia.ev.puntaje >= 0 ? '+' : ''}${fmt(ev.puntaje - mia.ev.puntaje)})` : 'Aún no la subes'}</small>
+        <div class="rt-stats"><span><b>${ev.media ? ev.media.toFixed(1).replace('.', ',') : '–'}</b>media</span><span><b>${ev.graduadas}/11</b>graduadas</span><span><b>${ev.enPuesto}/11</b>en su puesto</span></div>
+        <ul class="rt-checks">${ev.checks.map(c => `<li class="${c.ok ? 'ok' : ''}">${esc(c.txt)}</li>`).join('')}</ul>
+        <button class="btn primary" data-rt-subir${ev.valida && abierto && !rt.ocupado ? '' : ' disabled'}>${abierto ? '⬆ Subir plantilla' : 'Este reto ya terminó'}</button></div>
+      <div class="rt-caja"><div class="mk-tabs" role="tablist"><button role="tab" data-rt-tab="clasif" aria-selected="${rt.tab === 'clasif'}">🏆 Clasificación</button><button role="tab" data-rt-tab="premios" aria-selected="${rt.tab === 'premios'}">🎯 Premios</button></div>
+        ${rt.tab === 'clasif' ? tabla : premios}</div>
+    </div></div>`;
+  pintaCancha($('#rtCancha'), cps, i => { rt.casilla = rt.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderEditorReto(); }, rt.casilla);
+  const b = $('#rtBody');
+  b.querySelector('[data-rt-auto]').onclick = () => { rt.lista = RT.mejorOnce(rt.clave, misFutbol()).map(cp => (cp ? cp.key : '')); rt.casilla = -1; guardaBorrador(); Snd.flip(); renderEditorReto(); };
+  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; guardaBorrador(); renderEditorReto(); };
+  b.querySelector('[data-rt-subir]').onclick = () => accionReto('subeReto');
+  b.querySelectorAll('[data-rt-tab]').forEach(x => x.onclick = () => { rt.tab = x.dataset.rtTab; renderEditorReto(); });
+  b.querySelectorAll('[data-cobra]').forEach(x => x.onclick = () => accionReto('cobraReto', +x.dataset.cobra));
+  b.querySelectorAll('[data-fila]').forEach(x => x.onclick = () => verPlantillaDe(t[+x.dataset.fila], +x.dataset.fila + 1));
+  pintaEligeReto();
+}
+/* El selector, en un modal sobre la cancha (abajo obligaba a bajar cada
+   vez): una copia por carta (la puesta o la mejor graduada), solo las que
+   cumplen la plantilla y pueden jugar en la casilla; primero las de su
+   puesto, después las incómodas, y dentro de mayor a menor media. */
+function pintaEligeReto() {
+  const box = $('#rtElige'), capa = $('#rtEligeCapa');
+  capa.hidden = rt.casilla < 0;
+  if (capa.hidden) return;
+  const p = RT.plantilla(rt.clave), slot = M.FORMACION[rt.casilla], usadas = new Map();
+  rt.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== rt.casilla) usadas.set(q, j); });
+  const unica = new Map();
+  for (const cp of misFutbol()) {
+    const c = CARDS[cp.id];
+    if (!p.elegible(c) || RT.encaje(rt.casilla, cp.id).nivel > 1) continue;
+    const vista = unica.get(c.uid), puesta = rt.lista.includes(cp.key);
+    if (!vista || (puesta && !rt.lista.includes(vista.key)) || (!rt.lista.includes(vista.key) && RT.puntosFicha(fichaCp(cp)) > RT.puntosFicha(fichaCp(vista)))) unica.set(c.uid, cp);
+  }
+  const lista = [...unica.values()].sort((a, b) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
+    || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
+  let grupo = -1;
+  box.innerHTML = `<div class="pl-elige-head"><b>${M.PUESTO[slot.pos][0].toUpperCase() + M.PUESTO[slot.pos].slice(1)} · elige un jugador</b>
+      <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${rt.lista[rt.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
+    <div class="tc-rejilla pl-lista">${lista.length ? lista.map(cp => {
+      const c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = rt.lista[rt.casilla] === cp.key;
+      const cab = en.nivel !== grupo ? `<h4 class="rt-grupo n${en.nivel}">${en.nivel ? `Incómodos en ${slot.pos} · −${en.pen} de media` : `De ${slot.pos}`}</h4>` : '';
+      grupo = en.nivel;
+      const nota = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
+      return `${cab}<button class="tc-elige fit-${en.nivel ? 'inc' : 'ok'}" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</button>`;
+    }).join('') : `<p class="mk-vacio">No tienes jugadores que cumplan «${esc(p.titulo)}» y puedan jugar de ${slot.pos}: abre sobres de Fútbol.</p>`}</div>`;
+  const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => ponReto('');
+  box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; renderEditorReto(); };
+  box.querySelector('[data-rt-mk-puesto]').onclick = () => abreMercadoReto();
+  box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => ponReto(x.dataset.c));
+}
+function ponReto(k) {
+  const quien = jugadorDe(k);
+  if (quien) rt.lista.forEach((x, j) => { if (j !== rt.casilla && jugadorDe(x) === quien) rt.lista[j] = ''; });
+  rt.lista[rt.casilla] = k; rt.casilla = -1; guardaBorrador(); Snd.flip(); renderEditorReto();
+}
+async function accionReto(accion, n) {
+  if (rt.ocupado) return;
+  rt.ocupado = true; renderEditorReto();
+  try {
+    const r = await Red.pide(accion, { clave: rt.clave, lista: rt.lista, n });
+    if (accion === 'subeReto') { Snd.coin(); toast(`Plantilla subida: ${fmt(r.puntaje)} puntos.`); }
+    else {
+      const p = RT.plantilla(rt.clave), marco = p && p.tipo === 'club' && !marcoGanado(rt.clave);
+      Snd.coin(); cuenta.retos.cobrados.push(RT.claveReclamo(rt.clave, n));
+      toast(`¡Premio cobrado! +${r.monedas} monedas y ${r.sobres}${marco ? `, y el marco del ${p.titulo} para tu perfil` : ''}.`);
+      // los sobres del premio se abren al tiro, juntos, como unos comprados
+      if (r.ks && r.ks.length) { rt.ocupado = false; rt.casilla = -1; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at }))); return; }
+    }
+  } catch (e) { toast(e.message || 'No se pudo.', true); }
+  rt.ocupado = false;
+  if (!$('#retos').hidden) renderEditorReto();
+}
+function verPlantillaDe(f, pos) {
+  $('#rtVerTit').innerHTML = `#${pos} · <span translate="no">${esc(nombreDe(f.u))}</span> · ${fmt(f.ev.puntaje)} pts`;
+  $('#rtVerSub').textContent = `Media ${f.ev.media.toFixed(1).replace('.', ',')} · ${f.ev.graduadas}/11 graduadas · subida ${new Date(f.at).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
+  pintaCancha($('#rtVerCancha'), f.cps, null, -1);
+  $('#rtVer').hidden = false;
+}
+/* ---------- el mercado de fútbol, sin salir del desafío ----------
+   Las cartas de fútbol a la venta (las `ofertas` que ya manda el cartero),
+   de mayor a menor media. En el editor, de entrada solo las que cumplen
+   la plantilla; con una casilla elegida, solo las que pueden jugar ahí.
+   Comprar pide confirmar (un segundo toque) y lo hace el cartero, con las
+   mismas comprobaciones que la pestaña 🏪 Mercado de Juegos. */
+const rmk = { sirve: true, puesto: true, seguro: '', comprando: '' };
+function abreMercadoReto() {
+  rmk.sirve = true; rmk.puesto = true; rmk.seguro = '';
+  Snd.init(); Snd.tick(); pintaMercadoReto();
+  $('#rtMercado').hidden = false;
+  $('#rtMercado .rt-ver-caja').scrollTop = 0;
+}
+function pintaMercadoReto() {
+  const p = rt.vista === 'editor' ? RT.plantilla(rt.clave) : null, i = p ? rt.casilla : -1;
+  // también las tuyas, marcadas «Tu oferta» (sin ellas parecía que tu carta no estaba a la venta)
+  const todas = cuenta.ofertas.filter(o => o.estado === 'activa').map(o => {
+    let cp = null; try { cp = copiaDe(o); } catch {}
+    return cp && CARDS[cp.id] && M.esFutbol(CARDS[cp.id].col) ? { o, cp, c: CARDS[cp.id] } : null;
+  }).filter(Boolean);
+  const lista = todas.filter(x => (!p || !rmk.sirve || p.elegible(x.c)) && (i < 0 || !rmk.puesto || RT.encaje(i, x.cp.id).nivel < 2))
+    .sort((a, b) => b.c.media - a.c.media || a.o.p - b.o.p);
+  const puesto = i >= 0 ? M.PUESTO[M.FORMACION[i].pos] : '';
+  $('#rtMkTit').textContent = i >= 0 ? `🏪 Mercado · ${puesto[0].toUpperCase() + puesto.slice(1)}` : '🏪 Mercado de fútbol';
+  const chips = (p ? `<button class="chip" data-rmk="sirve" aria-pressed="${rmk.sirve}">Solo «${esc(p.titulo)}»</button>` : '')
+    + (i >= 0 ? `<button class="chip" data-rmk="puesto" aria-pressed="${rmk.puesto}">Solo los que juegan de ${M.FORMACION[i].pos}</button>` : '');
+  $('#rtMkBody').innerHTML = `<p class="rt-nota">Saldo: ${MONEDA}<b>${fmt(cuenta.saldo)}</b> · ${lista.length} de ${todas.length} cartas de fútbol a la venta</p>
+    ${chips ? `<div class="rt-acc">${chips}</div>` : ''}
+    ${lista.length ? `<div class="rt-mk-lista">${lista.map(({ o, cp, c }) => {
+      const tuya = o.u === cuenta.uid, falta = cuenta.parada || cuenta.saldo < o.p, en = i >= 0 ? RT.encaje(i, cp.id) : null, seguro = rmk.seguro === o.id;
+      return `<div class="rt-mk-item">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>`)}
+        <span class="rt-mk-tx"><b>${esc(c.name)}</b><small>${esc(M.CLUBES[c.club] || '')}${en && en.nivel ? ` · incómodo, −${en.pen}` : ''}</small>
+          <small>${tuya ? '<b class="rt-mk-tuya">Tu oferta</b>' : `de <span translate="no">${esc(nombreDe(o.u))}</span>`}${cp.gr ? ` · nota ${cp.g}` : ' · sin graduar'}</small>
+          ${tuya ? `<span class="rt-mk-precio">${MONEDA}${fmt(o.p)}</span>` : `<button class="btn mk-mini${seguro ? ' primary' : ''}" data-rmk-compra="${esc(o.id)}"${falta || rmk.comprando ? ' disabled' : ''} title="${falta ? 'No te alcanza' : ''}">${rmk.comprando === o.id ? 'Comprando…' : seguro ? `¿Seguro? Comprar por ${MONEDA}${fmt(o.p)}` : `Comprar ${MONEDA}${fmt(o.p)}`}</button>`}</span></div>`;
+    }).join('')}</div>` : `<p class="mk-vacio">${todas.length ? 'Nadie vende una carta que cumpla eso: prueba quitando un filtro.' : 'Ahora nadie vende cartas de fútbol.'}</p>`}
+    <p class="rt-nota"><button class="link" data-rmk-todo>Abrir el mercado completo ↗</button> (sales de PRODROP)</p>`;
+  const b = $('#rtMkBody');
+  b.querySelectorAll('[data-rmk]').forEach(x => x.onclick = () => { rmk[x.dataset.rmk] = !rmk[x.dataset.rmk]; rmk.seguro = ''; Snd.tick(); pintaMercadoReto(); });
+  b.querySelector('[data-rmk-todo]').onclick = () => Red.manda({ tipo: 'mercado', col: 'futbol' });
+  b.querySelectorAll('[data-rmk-compra]').forEach(x => x.onclick = () => compraMercadoReto(x.dataset.rmkCompra));
+}
+async function compraMercadoReto(id) {
+  if (rmk.comprando) return;
+  if (rmk.seguro !== id) { rmk.seguro = id; Snd.tick(); return pintaMercadoReto(); }
+  rmk.comprando = id; rmk.seguro = ''; pintaMercadoReto();
+  try {
+    // `oferta`, no `id`: `id` es el del mensaje (Red.pide) y lo pisaba
+    await Red.pide('compraOferta', { oferta: id });
+    Snd.coin(); toast('¡Comprada! Ya está en tu colección.');
+    cuenta.ofertas = cuenta.ofertas.filter(o => o.id !== id);
+  } catch (e) { toast(e.message || 'No se pudo comprar.', true); }
+  rmk.comprando = '';
+  if (!$('#rtMercado').hidden) pintaMercadoReto();
+}
+function renderRetos() {
+  if (!cuenta.retos) { $('#rtBody').innerHTML = '<p class="mk-vacio">Cargando los desafíos…</p>'; return; }
+  $('#rtVolver').hidden = rt.vista === 'album';
+  rt.vista === 'album' ? renderAlbum() : renderEditorReto();
+}
+// la ayuda y «Ver colección», en el álbum y en el editor (que se repinta solo)
+$('#rtBody').addEventListener('click', e => {
+  if (e.target.closest('[data-rt-proximos]')) pintaProximos();
+  if (e.target.closest('[data-rt-mercado]')) abreMercadoReto();
+  if (e.target.closest('[data-rt-ayuda]')) { $('#rtVerTit').textContent = '¿Cómo se calcula?'; $('#rtVerSub').textContent = ''; $('#rtVerCancha').innerHTML = `<div class="fu-tip">${AYUDA_RETOS}</div>`; $('#rtVer').hidden = false; }
+  if (e.target.closest('[data-rt-col]')) {
+    $('#retos').hidden = true; rt.vuelve = true;
+    colView = null; zoomVuelve = ''; colCol = 'futbol'; renderCollection(); $('#collection').hidden = false;
+  }
+});
+function abreRetos(clave) {
   if (!cuenta.listo) return;
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
-  // solo las que siguen siendo tuyas (una que se fue en un re-roll queda vacía)
-  pl.lista = M.FORMACION.map((_, i) => (cuenta.plant[i] && copiaPorClave(cuenta.plant[i]) ? cuenta.plant[i] : ''));
-  pl.casilla = -1; pl.recien = new Set(recien);
-  renderPlantilla();
-  $('#plantilla').hidden = false;
+  rt.casilla = -1;
+  if (clave) return abreEditorReto(clave), void ($('#retos').hidden = false);
+  renderRetos();
+  $('#retos').hidden = false;
 }
-$('#plantBtn').onclick = () => abrePlantilla(pull.map(c => c._copy && c._copy.key).filter(Boolean));
-$('#plantBtn2').onclick = () => abrePlantilla();
+$('#rtVolver').onclick = () => { rt.vista = 'album'; rt.casilla = -1; Snd.tick(); renderRetos(); };
+$('#rtVerCerrar').onclick = () => { $('#rtVer').hidden = true; };
+$('#rtVer').addEventListener('click', e => { if (e.target.id === 'rtVer') $('#rtVer').hidden = true; });
+$('#rtMercado').addEventListener('click', e => { if (e.target.id === 'rtMercado' || e.target.closest('[data-rt-mk-cierra]')) $('#rtMercado').hidden = true; });
+$('#rtEligeCapa').addEventListener('click', e => { if (e.target.id === 'rtEligeCapa') { rt.casilla = -1; renderEditorReto(); } });
+$('#retosBtn').onclick = () => abreRetos();
+$('#retosBtn2').onclick = () => abreRetos();
+$('#retosBtn3').onclick = () => { $('#collection').hidden = true; rt.vuelve = false; abreRetos(); };
 
 /* ---------------- VISOR ----------------
    `index.html?ver=1&o=&k=&i=&at=&gr=1[&rr=id.g.w]`: el detalle del mercado
@@ -2349,26 +2587,4 @@ function montaVisorCarta() {
   setTilt(el.querySelector('.tilt'), document.body, 1.1);
 }
 
-/* `?plantilla=1&pl=…`: la plantilla de alguien para su perfil en Juegos.
-   Cada casilla viene como `o~k.i!at!gr[!id.g.w]` (ver urlPlantilla en
-   prodrop-cartas.js) y se dibuja con las cartas de verdad, sin editar. */
-function montaVisorPlantilla() {
-  document.body.classList.add('visor-plantilla');
-  const cps = (VER.get('pl') || '').split(',').slice(0, M.FORMACION.length).map(x => {
-    const [c, at, gr, rr] = x.split('!'), m = /^([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})\.([0-4])$/.exec(c || '');
-    if (!m) return null;
-    const r = (rr || '').split('.').map(Number);
-    try {
-      const cp = copiaDe({ o: m[1], k: m[2], i: +m[3], at: +at, gr: gr === '1', rr: r.length === 3 && r.every(Number.isFinite) ? { id: r[0], g: r[1], w: r[2] } : null });
-      return CARDS[cp.id] && M.esFutbol(CARDS[cp.id].col) ? cp : null;
-    } catch { return null; }
-  });
-  const box = document.createElement('div');
-  box.className = 'pl-cancha';
-  pintaCancha(box, cps, null);
-  $('#visor').appendChild(box);
-  $('#visor').hidden = false;
-}
-
-// al final: el visor usa la plantilla y todo lo de arriba
-if (VISOR) VER.has('plantilla') ? montaVisorPlantilla() : montaVisorCarta();
+if (VISOR) montaVisorCarta();

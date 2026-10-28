@@ -342,9 +342,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    de antes de su hora ya no está en `casino`, `cartas` ni `mercado`, así que
    sin él las cuentas saldrían mal. Si no existe (o las reglas aún no dejan
    leerlo), `cierre` queda en null y se rehace todo como siempre. */
-const NODOS_MONEDAS = 17, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+const NODOS_MONEDAS = 18, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, cierre: null }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cierre: null }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -388,7 +388,7 @@ export function watchLogros(cb, yo = () => "") {
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
     oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
-    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("economiaCierre", "cierre"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("plantillas", "plantillas"), oye("economiaCierre", "cierre"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
        llegaron todos cuando llega este, que es el que la da por completa.
@@ -535,8 +535,26 @@ export const aceptarCambio = id => set(ref(db, `mercado/t/${id}/ok`), serverTime
 export const cerrarCambio = id => set(ref(db, `mercado/t/${id}/x`), serverTimestamp());
 /* Las cartas que exhibe en su perfil: claves `<sobre>.<i>`. */
 export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/cartas`), lista.length ? lista : null);
-/* La plantilla de fútbol: {casilla (0 a 10): copia}; las vacías no se escriben. */
-export const ponerPlantilla = (uid, porCasilla) => set(ref(db, `${U}/${uid}/perfil/plantilla`), Object.keys(porCasilla).length ? porCasilla : null);
+/* Los desafíos de plantilla (juegos/prodrop/retos.js). `plantillas/s/<plantilla>/<uid>`
+   = {at, c: [once copias]} es lo que alguien subió a la clasificación (se
+   reescribe al mejorarla); `plantillas/p/<uid>/<plantilla>_<nivel>` =
+   {at, c, k, k2?} es un premio cobrado, una sola vez. Cada nivel trae sus
+   sobres (`k`, y `k2` el segundo del nivel 2, con el prefijo del sobre
+   normal o del Plus), escritos en el mismo `update` con `p: 0` y `pl`: la regla de cada lado mira el otro, y
+   la economía paga solo si las once eran de quien cobra. */
+export async function subirPlantillaReto(uid, clave, c) {
+  const r = ref(db, `plantillas/s/${clave}/${uid}`);
+  await set(r, { at: serverTimestamp(), c });
+  return (await get(r)).val();
+}
+export async function cobrarPlantilla(uid, id, c, pres) {
+  const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${uid}`)).key);
+  const w = { [`plantillas/p/${uid}/${id}`]: Object.assign({ at: serverTimestamp(), c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) };
+  ks.forEach(k => { w[`cartas/s/${uid}/${k}`] = { at: serverTimestamp(), p: 0, pl: id }; });
+  await update(ref(db), w);
+  const x = (await get(ref(db, `plantillas/p/${uid}/${id}`))).val();
+  return { ks, at: x.at };
+}
 
 /* ---------- Mascotas ----------
    Tres gastos de una sola escritura, como los sobres: `mascotas/a/<uid>/<k>`

@@ -95,24 +95,28 @@ export function crearSalon(ctx) {
     return `<span class="jg-mn-arte jg-mn-sp sp-e-${e.id}${svg ? " con-svg" : ""}" aria-hidden="true">${svg}<strong>${esc(e.nombre)} <span>${esc(e.icono)}</span></strong>${p}</span>`;
   }
 
+  /* Un multijugador «trabajando para usted» (SALAS_EN_OBRA de salon-datos.js,
+     a través de ctx: `?salasObra=0` lo apaga para probar): {solo} o null. */
+  const enObra = e => (e && e.modo === "multi" && ctx.enObra && ctx.enObra(e.id)) || null;
+
   /* `f` son las marcas de este momento: nuevo, más jugado, salas que
      esperan, invitado. La tarjeta no guarda estado: se repinta entera. */
   function tarjeta(e, f = {}) {
-    const bloq = bloqueado(e, f.invitado), ins = insignia(e);
+    const bloq = bloqueado(e, f.invitado), ins = insignia(e), obra = enObra(e);
     const meta = e.modo === "multi"
       ? `<span>${esc(e.genero)}</span>${f.salas ? `<span class="jg-mn-vivo"><i aria-hidden="true"></i>${f.salas} ${f.salas === 1 ? "sala" : "salas"}</span>` : `<span>${e.grupo ? "En grupo" : "Duelo"}</span>`}`
       : `<span>${esc(e.genero)}</span><span>${e.modo === "bots" || e.ranking === false ? "Sin ranking" : e.diario ? "📅 Reto diario" : "🏆 Ranking"}</span>`;
-    const clases = ["jg-mn", f.nuevo ? "nuevo" : "", bloq ? "bloq" : "", f.top ? "top" : "", actual && actual.id === e.id ? "sel" : ""].filter(Boolean).join(" ");
-    const etiqueta = `${e.nombre}. ${ins.largo}.${e.movil || e.pc ? " " + dondeSeJuega(e) + "." : ""}${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
+    const clases = ["jg-mn", obra ? "obra" : "", f.nuevo ? "nuevo" : "", bloq ? "bloq" : "", f.top ? "top" : "", actual && actual.id === e.id ? "sel" : ""].filter(Boolean).join(" ");
+    const etiqueta = `${e.nombre}. ${ins.largo}.${e.movil || e.pc ? " " + dondeSeJuega(e) + "." : ""}${obra ? " Trabajando para usted." : ""}${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
     return `
       <article class="${clases}" data-id="${esc(e.id)}" data-modo="${e.modo}" data-movil="${e.movil ? 1 : 0}" data-grupo="${e.modo === "multi" ? (e.grupo ? "grupo" : "duelo") : ""}" style="--c:${esc(e.color)}">
         <button class="jg-mn-abre" type="button" aria-haspopup="dialog" aria-expanded="${!!(actual && actual.id === e.id)}" aria-label="${esc(etiqueta)}">
-          ${arte(e, !bloq && e.modo === "multi" ? "Ver opciones y abrir sala →" : "")}
+          ${arte(e, obra ? "🚧 Trabajando para usted" : !bloq && e.modo === "multi" ? "Ver opciones y abrir sala →" : "")}
           <span class="jg-mn-txt"><b class="jg-mn-nombre">${esc(e.nombre)}</b><span class="jg-mn-meta">${meta}</span></span>
         </button>
         <span class="jg-mn-modo m-${e.modo}" aria-hidden="true">${ins.ico}${esc(ins.corto)}${ins.pal ? `<span class="jg-mn-pal">${ins.pal}</span>` : ""}</span>
         ${plataformas(e)}
-        ${f.nuevo ? '<span class="jg-mn-etq" aria-hidden="true">Nuevo</span>' : f.top ? '<span class="jg-mn-etq top" aria-hidden="true">★<span> Más jugado</span></span>' : ""}
+        ${obra ? '<span class="jg-mn-etq obra" aria-hidden="true">🚧 Trabajando para usted</span>' : f.nuevo ? '<span class="jg-mn-etq" aria-hidden="true">Nuevo</span>' : f.top ? '<span class="jg-mn-etq top" aria-hidden="true">★<span> Más jugado</span></span>' : ""}
         ${bloq ? `<span class="jg-mn-candado" aria-hidden="true">${CANDADO}<b>Requiere cuenta</b></span>` : ""}
         ${e.modo !== "multi" && !bloq ? `<a class="jg-mn-ya" href="${esc(e.ruta || e.url)}" aria-label="Jugar ya a ${esc(e.nombre)}" title="Jugar ya"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5z" fill="currentColor"/></svg></a>` : ""}
       </article>`;
@@ -293,8 +297,20 @@ export function crearSalon(ctx) {
         : e.pc ? `<span class="jg-hoja-chip pc">${ICONO_PC}Solo en PC${e.pide ? ": se juega con " + esc(e.pide) : ""}</span>` : "");
     const p = e.modo === "multi" ? practicaDe(e.id) : null;
     let medio = "", pie = "";
-    const reglas = `<button class="btn2" type="button" data-f="reglas" title="Cómo se juega">📖 Reglas</button>`;
-    if (bloq) {
+    // una pantalla de Juegos (`tipo: "sitio"`, los desafíos) no tiene manual: su ayuda está dentro
+    const reglas = e.reglas ? `<button class="btn2" type="button" data-f="reglas" title="Cómo se juega">📖 Reglas</button>` : "";
+    const obra = enObra(e);
+    if (obra) {
+      /* «Trabajando para usted» (SALAS_EN_OBRA): sin salas ni opciones; si
+         el juego se puede jugar solo, ese es el botón grande. */
+      medio = `<div class="jg-hoja-cuenta jg-hoja-obra">
+        <span class="jg-hoja-candado" aria-hidden="true">🚧</span>
+        <h3>Trabajando para usted</h3>
+        <p>Las salas de ${esc(e.nombre)} están en arreglo: por ahora no se pueden abrir ni unirse a una.${obra.solo ? " Mientras tanto, se juega solo." : ""}</p>
+      </div>`;
+      pie = `${reglas}${obra.solo ? `<a class="btn jg-hoja-ya" href="${esc(obra.solo)}" data-f="juega">▶ Jugar solo</a>`
+        : '<button class="btn jg-hoja-ya" type="button" disabled>🚧 Trabajando para usted</button>'}`;
+    } else if (bloq) {
       /* El choque del invitado con un multijugador: qué necesita, por qué,
          y dos salidas que no lo dejan con las manos vacías. */
       medio = `<div class="jg-hoja-cuenta">
@@ -318,7 +334,7 @@ export function crearSalon(ctx) {
       medio = `<ul class="jg-hoja-modos" aria-label="Qué trae">${(e.modos || []).map(m => `<li>${esc(m)}</li>`).join("")}</ul>` +
         `<p class="jg-hoja-nota">${inv
           ? (e.modo === "bots" ? "Práctica contra la máquina: no se guarda ni puntúa, con o sin cuenta." : "Modo invitado: juegas igual, pero tu récord no se guarda ni entra en la clasificación. <button type=\"button\" class=\"jg-enlace-btn\" data-f=\"login\">Iniciar sesión</button>")
-          : (e.modo === "bots" ? "Práctica contra la máquina: no puntúa en la clasificación." : e.diario ? "Un reto nuevo cada día, igual para todos. Tu racha y tus récords quedan en tu cuenta." : "Cada modalidad tiene su clasificación. Tus récords quedan en tu cuenta.")}</p>`;
+          : (e.nota ? esc(e.nota) : e.modo === "bots" ? "Práctica contra la máquina: no puntúa en la clasificación." : e.diario ? "Un reto nuevo cada día, igual para todos. Tu racha y tus récords quedan en tu cuenta." : "Cada modalidad tiene su clasificación. Tus récords quedan en tu cuenta.")}</p>`;
       pie = `${reglas}<a class="btn jg-hoja-ya" href="${esc(e.ruta || e.url)}" data-f="juega">▶ ${e.modo === "bots" ? "Practicar" : "Jugar"}</a>`;
     }
     return `
@@ -343,6 +359,7 @@ export function crearSalon(ctx) {
     if (f === "equipos") { ctx.equipos(leeOps()); return; }
     if (f === "login") { ctx.login(e.id); return; }
     if (f === "unirse") { cierra(false); ctx.entrarSala(b.dataset.pid); return; }
+    if ((f === "sala" || f === "unirse") && enObra(e)) return;   // («trabajando para usted»: la ficha ya no los muestra)
     if (f === "sala") { recuerda(); const o = leeOps(); cierra(false); ctx.crearSala(e.id, o); return; }
     /* «Jugar» es un enlace: navega solo. La ficha se cierra para que al
        volver al salón no siga abierta encima. */

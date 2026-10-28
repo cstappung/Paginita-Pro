@@ -8,6 +8,9 @@
 //   - Multiplayer → «Local» (este PC: 2, 3 o 4 Players, como los botones del menú principal del juego; el juego abre
 //     directo su registro de mandos, §84) u «Online» (las salas de Juegos: solo dentro del sitio, le avisa a Juegos).
 //   - Options → el cajón de la página (Controles, Partida, ajustes).
+//   - §116 (el dueño, 2026-10-27: «el multiplayer está totalmente roto, ocúltalo por ahora y ponle trabajando para
+//     usted»): con `multiEnObra` (por omisión sí) Multiplayer queda gris con el cartel «🚧 Trabajando para usted» y no
+//     abre nada; la línea de ayuda lo explica. `?multi=1` en la página lo devuelve (para probarlo mientras se arregla).
 //
 // PRIVADO: la imagen muestra a una persona real. No está en git ni en GitHub Pages: vive en la parte privada
 // (build/…/imagenes/inicio/jlokart.webp → R2 detrás del Worker de amigos, como el disco de BT3) y se baja con el token
@@ -52,6 +55,7 @@ const MENUS = {
 };
 const ANTERIOR = { multi: 'principal', local: 'multi' };   // a dónde vuelve Back (o B, Esc) desde cada menú
 const AYUDA = {
+  enObra: 'Trabajando para usted: el multijugador vuelve pronto',
   unjugador: 'Grand Prix, Contrarreloj, VS y Batalla: con los menús del juego',
   multijugador: 'En este PC con 2 a 4 mandos, o en línea con tus amigos',
   opciones: 'Controles, mandos, tu partida y ajustes',
@@ -112,6 +116,17 @@ body.cortina-mal #inicioJlo { display: none; }   /* un error del juego (sin WebG
 #inicioJlo .ij-boton.elegido::after { content: ""; position: absolute; left: -3.75cqw; top: 50%; width: 2.7cqw; height: 2.9cqw;
   translate: 0 -50%; background: #0a2470; clip-path: polygon(0 0, 100% 50%, 0 100%); z-index: -1; animation: ij-flecha .7s ease-in-out infinite alternate; }
 #inicioJlo .ij-boton:active { transform: scale(.98); }
+/* §116: Multiplayer en obra: gris, sin latido, con el cartel amarillo encima */
+#inicioJlo .ij-boton.en-obra, #inicioJlo .ij-boton.en-obra.elegido { cursor: not-allowed; animation: none; border-color: #d3d9e6cc;
+  background: linear-gradient(180deg, #8f98ab 0%, #5f677a 48%, #444b5c 100%);   /* gris pintado (un filtro apagaría también el cartel) */
+  box-shadow: 0 0 0 .2cqw #2a2f3ccc, inset 0 .25cqw 0 #ffffff40, 0 .35cqw .9cqw #00103a59; }
+#inicioJlo .ij-boton.en-obra.elegido { box-shadow: 0 0 0 .22cqw #2a2f3c, 0 0 1.2cqw .3cqw #ffd21f80, inset 0 .25cqw 0 #ffffff55; }
+#inicioJlo .ij-boton.en-obra:active { transform: scale(1.05); }
+#inicioJlo .ij-obra { position: absolute; right: 1.2cqw; top: -1.15cqw; padding: .3cqw .8cqw; border-radius: .6cqw; rotate: -4deg;
+  background: repeating-linear-gradient(-45deg, #ffd21f 0 .7cqw, #ffbf00 .7cqw 1.4cqw); color: #1a0a00; border: .12cqw solid #1a0a00;
+  font: 700 1cqw/1 'IBM Plex Sans', system-ui, sans-serif; letter-spacing: 0; white-space: nowrap; box-shadow: 0 .2cqw .4cqw #0008; }
+#inicioJlo .ij-boton.no-va { animation: ij-no .3s; }
+@keyframes ij-no { 25% { translate: -.6cqw 0; } 75% { translate: .6cqw 0; } }
 #inicioJlo .ij-boton.disparado { filter: brightness(1.6); }
 @keyframes ij-latido { 50% { box-shadow: 0 0 0 .22cqw #0b2a7c, 0 0 2cqw .7cqw #7fe0ffee, inset 0 .3cqw 0 #ffffffb0, inset 0 -.3cqw .6cqw #06205e66; } }
 @keyframes ij-flecha { to { margin-left: .5cqw; } }
@@ -137,6 +152,7 @@ body.cortina-mal #inicioJlo { display: none; }   /* un error del juego (sin WebG
     gap: 14px; padding: 0 22px; border-width: 2px; }
   #inicioJlo .ij-boton span { -webkit-text-stroke: 4px #0a2470; text-shadow: 0 2px 0 #0a2470; }
   #inicioJlo .ij-boton svg { width: 30px; height: 30px; }
+  #inicioJlo .ij-obra { right: 14px; top: -10px; padding: 3px 8px; border-radius: 6px; font-size: 12px; border-width: 1px; }
   #inicioJlo .ij-boton.elegido { transform: scale(1.03); }
   #inicioJlo .ij-boton.elegido::before, #inicioJlo .ij-boton.elegido::after { display: none; }
   #inicioJlo .ij-ayuda { position: fixed; left: 16px; right: 16px; width: auto; top: auto; bottom: calc(24px + 3 * 72px + env(safe-area-inset-bottom, 0px));
@@ -144,7 +160,7 @@ body.cortina-mal #inicioJlo { display: none; }   /* un error del juego (sin WebG
 }`;
 
 export function crearInicio({ contenedor = document.body, imagen, buscar = (...a) => fetch(...a), leerMandos = () => [],
-                              enSitio = false, ocupado = () => false, alElegir = () => {} } = {}) {
+                              enSitio = false, ocupado = () => false, alElegir = () => {}, multiEnObra = true } = {}) {
   const estado = { imagen: 'sin pedir', mostrado: 0, elecciones: [], menu: 'principal', elegido: 0 };
   let raiz = null, url = null, visible = false, menu = 'principal', elegido = 0;
   let antes = 0, repetir = 0, direccionAntes = 0, vivo = false;
@@ -181,6 +197,7 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
     raiz.querySelector('.ij-start').addEventListener('click', () => aceptar());
     contenedor.append(raiz);
   }
+  const enObra = que => multiEnObra && que === 'multijugador';
   const opciones = () => MENUS[menu].filter(([que]) => que !== 'salas' || enSitio);
   function pintar() {
     const caja = raiz.querySelector('.ij-menu');
@@ -188,7 +205,9 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
     opciones().forEach(([que, texto, icono], i) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'ij-boton'; b.dataset.que = que; b.setAttribute('role', 'menuitem');
-      b.innerHTML = `${svg(icono)}<span>${texto}</span>`;
+      const obra = enObra(que);                      // §116: Multiplayer, por ahora, «trabajando para usted»
+      b.innerHTML = `${svg(icono)}<span>${texto}</span>` + (obra ? '<small class="ij-obra">🚧 Trabajando para usted</small>' : '');
+      if (obra) { b.classList.add('en-obra'); b.setAttribute('aria-disabled', 'true'); }
       b.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') elegir(i); });
       b.addEventListener('click', () => { elegir(i); aceptar(); });
       caja.append(b);
@@ -201,7 +220,8 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
     elegido = (i + n) % n;
     estado.elegido = elegido; estado.menu = menu;
     raiz.querySelectorAll('.ij-boton').forEach((b, k) => { b.classList.toggle('elegido', k === elegido); b.setAttribute('aria-current', String(k === elegido)); });
-    raiz.querySelector('.ij-ayuda').textContent = AYUDA[opciones()[elegido][0]] || '';
+    const que = opciones()[elegido][0];
+    raiz.querySelector('.ij-ayuda').textContent = (enObra(que) ? AYUDA.enObra : AYUDA[que]) || '';
   }
   function cambiarMenu(nuevo) { menu = nuevo; elegido = 0; pintar(); }
 
@@ -211,6 +231,11 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
     const [que] = opciones()[elegido];
     const b = raiz.querySelectorAll('.ij-boton')[elegido];
     if (b) { b.classList.add('disparado'); setTimeout(() => b.classList.remove('disparado'), 180); }
+    if (enObra(que)) {                                // §116: no abre nada; se sacude y la ayuda dice por qué
+      if (b) { b.classList.remove('no-va'); void b.offsetWidth; b.classList.add('no-va'); }
+      estado.enObra = (estado.enObra || 0) + 1;
+      return;
+    }
     if (que === 'multijugador') return cambiarMenu('multi');
     if (que === 'local') return cambiarMenu('local');
     if (que === 'volver') return cambiarMenu(ANTERIOR[menu] || 'principal');

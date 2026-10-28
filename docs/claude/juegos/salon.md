@@ -35,6 +35,12 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   room); Mascotas and PRODROP (`SITIOS_BUSCA`) navigate. A new game is
   found by its name with no change; give it a row in `APODOS` (the test
   requires one for every non-bots entry).
+- **A `SOLOS` row can be a screen, not a game** (`tipo: "sitio"`: today only
+  «Desafío de plantilla», `ruta: "#cartas/retos"`). It has no manual
+  (`reglas` absent, so the ficha hides 📖), its ficha shows `nota` instead of
+  the club text, it needs an account (`CON_CUENTA_SOLO`), its cover is
+  `portadaSolo("desafios")`, and `build-controles.js` reads the folder in
+  `codigo` (`juegos/prodrop`). `salon.test.cjs` checks that branch.
 - **The banner** (`novedadesHtml` + `enganchaBanner` in `juegos-main.js`,
   `.jg-ban` in juegos.html) shows one slide at a time and advances by
   itself every `BAN_MS` (7 s), the next one entering from the right. After
@@ -60,16 +66,17 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   link in juegos.html), with a hook line (`gancho`) and three big facts
   (`datos`) under the lema.
 - **Últimos drops legendarios · Mascotas** (`pintaDropsMascotas`, from
-  `mejoresDropsMascotas` in `mascotas-datos.js`): the legendary items of
-  valid gifts, newest first, with who and when (names `translate="no"`).
+  `mejoresDropsMascotas` in `mascotas-datos.js`): the last six (`DROPS_3D`)
+  legendary items of valid gifts, newest first, with who and when (names `translate="no"`).
   The photos come from the Mascotas viewer, requested only once the strip
   is in view (`vigilaDropsMascotas`, an IntersectionObserver): the lobby
   does not load three.js for someone who never scrolls there. Dances have
   no photo and show their emoji. A guest gets the `MOTIVO_CUENTA.mascotas`
   gate in the strip instead (the PRODROP strip is simply hidden).
 - **Últimos drops legendarios · Batalla de Rock** (`tiraRockHtml`,
-  `pintaDropsRock`, from `dropsRock` in `monedas.js`: the legendary pieces
-  of valid `cajasRock`, newest first). Photos from `rock-fotos.js` (the rock
+  `pintaDropsRock`, from `dropsRock` in `monedas.js`: the last six
+  legendary pieces of valid `cajasRock`, newest first; the PRODROP strip
+  keeps 24). Photos from `rock-fotos.js` (the rock
   scene's photographer worker; localStorage `claveMini`, shared with the
   game's editor), asked only once the strip is in view
   (`vigilaDropsRock`). Hidden for guests and when `veRock()` is false.
@@ -598,3 +605,44 @@ there next.
 To check, filter `document.getAnimations()` to `playState === "running"` on
 the lobby. Anything running that is not transform, opacity or filter on HTML
 costs every frame.
+
+**Count the GPU layers too: what is still is `animation-name:none`, not
+paused.** A paused animation keeps its composited layer, and Chrome syncs
+every layer on every frame («Commit», «Layerize»). The lobby had **926
+layers** (the 13 banner scenes, the paused avatar frames, the sleeping
+cards); now ~160. So the still frames and names, `.jg-mn.dormida`,
+`.jg-fuera-vista` and the banner slides that are not `.on` all set
+`animation-name:none`; their loops restart from zero when they come back.
+Count with CDP `LayerTree.enable` (and `LayerTree.compositingReasons`).
+
+**The banner paints only the slide on show and its neighbours**
+(`.cerca`, set in `enganchaBanner`; on a jump with the dots, every slide in
+between until `transitionend`). The track has `will-change:transform`, so
+Chrome painted all thirteen scenes. Its animated scene is still the most
+expensive thing on the page, and that cost grows with everything else
+painted on the page.
+
+**Far sections are not painted** (`content-visibility:auto` on the solo
+carousel, the multiplayer catalogue, «Últimos tops» and the three strips,
+with an estimated `contain-intrinsic-block-size` that becomes the real one
+once painted). The banner, the intro, the mode bar and the sticky rooms
+column are left out: sticky cannot live in a contained box, and what is on
+screen at entry gains nothing. With the catalogue unpainted, each banner
+frame costs ~20–25 % less at the top. Paint containment clips what overflows
+these sections; today their rows scroll and their covers clip, so nothing
+shows. A full-page screenshot shows these sections empty, but scrolling to
+them paints them.
+
+**No `backdrop-filter` on what stays on screen while scrolling or under an
+animation**: the sticky mode bar, the phone tab bar and the banner's fact
+pills used to blur what moved beneath them on every frame, which is heavy on
+integrated GPUs. They were 90–95 % opaque already; now they are opaque.
+
+## Salas «trabajando para usted» (`SALAS_EN_OBRA`)
+
+A multiplayer game whose rooms are broken can be closed without removing it: list it in `SALAS_EN_OBRA`
+(`salon-datos.js`, `{ juego: { solo: "#ruta" } }`; Mario Kart Wii since 2026-10-27). Its card gets the yellow
+«🚧 Trabajando para usted» tag, its sheet replaces rooms/options/«Abrir sala» with the notice and, when `solo` is set,
+a «▶ Jugar solo» button; `crear()`/`entrar()` refuse it, its open rooms are left out of the lobby, and a room reached by
+a link shows only the notice (`pintaPartida`, without mounting the game). `?salasObra=0` keeps them open for testing.
+Removing the game's line reopens everything.

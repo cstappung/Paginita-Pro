@@ -79,7 +79,7 @@ function movimientosHtml(movs) {
   const texto = f => ({
     sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
-    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], superChat: ["💬", "Super chat en el chat general"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
+    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], superChat: ["💬", "Super chat en el chat general"], plantilla: ["🏆", `Premio de desafío de plantilla${f.d ? ` · ${f.d}` : ""}`], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
     venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `${HALLOWEEN[f.d] ? "Tienda de Halloween" : "Tienda del perfil"} · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${((TIENDA[f.d] === "marco" ? marcoDe(f.d) : fondoDe(f.d)) || {}).n || f.d}»`]
   }[f.c] || ["🪙", f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -96,7 +96,7 @@ function detalleHtml(yo) {
   const fuentes = [
     ...PARTES.filter(([k]) => k !== "ajustes" || P.ajustes).map(([k, i, t, s]) => ({ i, t, s, n: Math.max(0, P[k] || 0) })),
     { i: "💰", t: "Ventas en el mercado", s: `${nVentas} ${nVentas === 1 ? "venta" : "ventas"}`, n: yo.cobradas || 0 },
-    { i: "🎰", t: "Premios del casino", s: "lo que te pagaron las apuestas ganadas", n: yo.premios || 0 }
+    { i: "🎰", t: "Premios", s: "lo que te pagaron las apuestas ganadas y los desafíos de plantilla", n: yo.premios || 0 }
   ].sort((a, b) => b.n - a.n);
   /* Por juego */
   const juegos = Object.entries(yo.porJuego || {}).filter(([j]) => !juegoOculto(j))
@@ -214,7 +214,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
       <header class="jg-mo-hero">
         <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.saldo)} ${MONEDA}</strong>
           <p>${puesto ? `Puesto <b>${puesto}</b> de ${lista.length}` : "Todavía fuera del top"} · ${yo.logros} logros</p>
-          ${yo.gastadas || yo.cobradas || yo.premios ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b>${yo.cobradas ? ` · cobradas en el mercado <b>${formatoMonedas(yo.cobradas)}</b>` : ""}${yo.premios ? ` · premios del casino <b>${formatoMonedas(yo.premios)}</b>` : ""} · gastadas en PRODROP, la tienda, mascotas y apuestas <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}
+          ${yo.gastadas || yo.cobradas || yo.premios ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b>${yo.cobradas ? ` · cobradas en el mercado <b>${formatoMonedas(yo.cobradas)}</b>` : ""}${yo.premios ? ` · premios del casino y los desafíos <b>${formatoMonedas(yo.premios)}</b>` : ""} · gastadas en PRODROP, la tienda, mascotas y apuestas <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}
           ${yo.parada ? `<p class="jg-mo-gasto">Una compra quedó sin fondos y no vale: hasta que ganes ${formatoMonedas(yo.falta)} monedas más, nada de lo que compres después cuenta.</p>` : ""}</div>
         <div class="jg-mo-racha-c">${rachaHtml(d, hoy)}</div>
       </header>

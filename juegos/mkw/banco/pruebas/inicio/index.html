@@ -55,7 +55,7 @@ const IMAGEN = 'https://worker.ejemplo/mkw/build/imagenes/inicio/jlokart.webp';
 }
 let elegidas = [], mandos = [], ocupado = false;
 const w = worker(200);
-const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mandos, ocupado: () => ocupado, alElegir: q => elegidas.push(q) });
+const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mandos, ocupado: () => ocupado, alElegir: q => elegidas.push(q), multiEnObra: false });
 {
   const cargo = await I.cargar(), mostro = I.mostrar();
   await espera(50);
@@ -153,7 +153,7 @@ const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mand
 {
   const w2 = worker(200), e2 = [];
   I.ocultar(); await espera(450);
-  const S = crearInicio({ imagen: IMAGEN, buscar: w2.buscar, enSitio: true, alElegir: q => e2.push(q) });
+  const S = crearInicio({ imagen: IMAGEN, buscar: w2.buscar, enSitio: true, alElegir: q => e2.push(q), multiEnObra: false });
   await S.cargar(); S.mostrar(); S.elegir(1); S.aceptar();
   const opciones = S.opciones.slice(); S.elegir(1); S.aceptar();
   ok('dentro del sitio, Multiplayer trae «Online»; elegirlo avisa «salas» y el menú se queda',
@@ -164,7 +164,7 @@ const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mand
 //      dentro del panel y sin la línea de ayuda; Esc y Back vuelven a Multiplayer; «3 Players» avisa «local3» y se va
 {
   const e3 = [];
-  const L = crearInicio({ imagen: IMAGEN, buscar: worker(200).buscar, alElegir: q => e3.push(q) });
+  const L = crearInicio({ imagen: IMAGEN, buscar: worker(200).buscar, alElegir: q => e3.push(q), multiEnObra: false });
   await L.cargar(); L.mostrar(); L.elegir(1); L.aceptar(); L.elegir(0); L.aceptar();
   const opciones = L.opciones.slice(), menu = L.estado.menu;
   const raiz = [...document.querySelectorAll('#inicioJlo')].at(-1);
@@ -178,6 +178,29 @@ const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mand
      trasEsc === 'multi' && trasBack === 'multi' && e3.join() === 'local3' && !L.visible,
      `${opciones.join('/')}, cuatro ${cuatro}, sin ayuda ${sinAyuda}, Esc → ${trasEsc}, Back → ${trasBack}, avisó ${e3.join()}`);
   L.ocultar(); await espera(450);
+}
+// 10c) §116 (el dueño: «el multiplayer está totalmente roto, ocúltalo por ahora y ponle trabajando para usted»): por
+//      omisión Multiplayer queda gris con «🚧 Trabajando para usted», no abre nada (teclado, mando, clic; tampoco en el
+//      sitio) y la ayuda lo explica; Options sigue andando
+{
+  const e4 = [];
+  let m4 = [];
+  const O = crearInicio({ imagen: IMAGEN, buscar: worker(200).buscar, enSitio: true, leerMandos: () => m4, alElegir: q => e4.push(q) });
+  await O.cargar(); O.mostrar();
+  const raiz = [...document.querySelectorAll('#inicioJlo')].at(-1);
+  const boton = raiz.querySelectorAll('.ij-boton')[1];
+  O.elegir(1); O.aceptar();
+  await cuadros(3); m4 = [{ botones: 0x0100 }]; await cuadros(3); m4 = []; await cuadros(3);   // soltado y luego A del mando en Multiplayer
+  boton.click();
+  const ayuda = raiz.querySelector('.ij-ayuda').textContent;
+  const cartel = boton.querySelector('.ij-obra')?.textContent || '';
+  const quieto = O.estado.menu === 'principal' && e4.length === 0 && O.visible && O.estado.enObra === 3;
+  O.elegir(2); O.aceptar();
+  ok('Multiplayer «trabajando para usted»: gris con el cartel, no abre nada (teclado, mando ni clic, tampoco en el sitio), la ayuda lo dice y Options sigue',
+     quieto && /Trabajando para usted/.test(cartel) && /^Trabajando para usted/.test(ayuda) && boton.classList.contains('en-obra') &&
+     boton.getAttribute('aria-disabled') === 'true' && e4.join() === 'opciones',
+     `menú ${O.estado.menu}, avisos ${e4.join() || 'ninguno'}, intentos ${O.estado.enObra}, cartel «${cartel}», ayuda «${ayuda}»`);
+  O.ocultar(); await espera(450);
 }
 // 11) La forma en la pantalla: acostado (16:9) la imagen entera y los botones sobre su columna derecha; teléfono parado:
 //     los 3 botones debajo de la imagen, dentro de la pantalla, de ≥ 44 px y sin pisarse

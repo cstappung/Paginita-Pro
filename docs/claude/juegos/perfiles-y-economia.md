@@ -105,8 +105,8 @@ the Mascotas viewer (`docs/claude/juegos/mercado.md`).
   a profile page takes the iframe, and closing it gives it back.
 - The editor offers your pets not on sale and your dances (starters plus
   gift dances). Without the full economy it offers nothing and saves the
-  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas` and
-  the football `plantilla` (`juegos/prodrop/CLAUDE.md`).
+  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas`. (The
+  football `plantilla` was removed; see `juegos/prodrop/CLAUDE.md`.)
 
 `tests/perfil.test.cjs` covers the stats, the requirements, the vitrina,
 the cleaning and the pet re-check.
@@ -157,6 +157,20 @@ The `tienda` node needs the rules re-published. `tests/tienda.test.cjs`
 covers the charge, the champion rules and that every animated frame has its
 drawing. (It is not in `test:juegos`: its champion-frame test already
 failed for Pokelike, which has no champion frame yet.)
+
+**Club frames** (`club<club>`, `req: {desafio: <club>}`): one per club of the
+PRODROP album (15), the prize of that club's Desafío de plantilla. CSS only
+(«Marcos de club» in juegos.html): a ring in the club's colours (`--anillo`,
+`--borde`) and the card crest (`juegos/prodrop/escudos/<club>.png`) at the
+bottom. Earned, like the Halloween collector rewards, without any write or
+rule: `economia()` records `usuarios[u].desafios[<club>]` when a claim of
+`club-<club>` is accepted, `juegos-main.js` derives `datos.desafios`
+(`desafiosDe`, lazy like `compras`) and `estadisticas` carries it as
+`est.desafios`. The field travels in the cierre snapshot with the rest of
+the user and `verificaCierre` compares it. Adding a club to the album needs
+its row in `MARCOS` and its CSS line.
+The editor's «Clubes» group lists only the ones already won (plus the one
+worn): they are meant to be a surprise, not a checklist.
 
 **The Halloween shop: limited edition** (`tienda.js` for the catalogue,
 `juegos/tienda-halloween.js` for the window and the lobby strip, the
@@ -458,6 +472,8 @@ and `repetidaRock` keeps each piece's `invId` in a WeakMap. The memos of
 box/gift of the site on each pass, and with a cap below that total
 (it was 4000) they emptied mid-pass and never hit. A new per-event lookup
 must index by account, never scan a whole-site map.
+
+**Desafíos de plantilla** (`plantillas/p/<uid>/<plantilla>_<n>`, event `pl`, income in `premios`, category `plantilla`; its prize pack is a `p: 0` pack with `pl`): `juegos/prodrop/CLAUDE.md`. `watchLogros` reads `plantillas` whole (`NODOS_MONEDAS` is 18).
 
 **Super chats** (`superChat/<uid>/<message id>` = `{at, p}`, 100 or 300,
 event `sc`, category `superChat`; `superChats` in the replay lists the
