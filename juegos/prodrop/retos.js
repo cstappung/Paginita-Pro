@@ -157,11 +157,11 @@
      o más en la tabla: con menos no hay a quién ganarle. La mejor
      plantilla no paga podio. */
   const MIN_PODIO = 3;
-  const PODIO_CLUB = [100, 50, 25];
+  const PODIO_CLUB = [300, 200, 100];
   const PODIO_RETO = [
-    { n: 1, monedas: 1000, sobres: ["futbolplus", "futbolplus", "futbolplus"] },
-    { n: 2, monedas: 500, sobres: ["futbolplus"] },
-    { n: 3, monedas: 250, sobres: ["futbol"] }
+    { n: 1, monedas: 1500, sobres: ["futbolplus", "futbolplus", "futbolplus"] },
+    { n: 2, monedas: 1000, sobres: ["futbolplus"] },
+    { n: 3, monedas: 500, sobres: ["futbol"] }
   ];
   // «tres sobres Plus», «un sobre Plus», «un sobre»
   const textoSobresPodio = pr => (pr.sobres.length === 3 ? "tres sobres Plus" : pr.sobres[0] === "futbolplus" ? "un sobre Plus" : "un sobre");

@@ -2414,8 +2414,8 @@ function renderAlbum() {
 }
 /* El podio de la semana que cerró el lunes (lo calcula la economía): el
    del reto, con sus premios y el botón para cobrar los sobres si es tuyo, y
-   los clubes donde quedaste en el podio. Cada lunes, los clubes pagan 100,
-   50 y 25 monedas al 1.º, 2.º y 3.º de su tabla (con 3 personas o más). */
+   los clubes donde quedaste en el podio. Cada lunes, los clubes pagan al
+   1.º, 2.º y 3.º de su tabla (`PODIO_CLUB`, con 3 personas o más). */
 const MEDALLA = ['🥇', '🥈', '🥉'];
 function podioPasadoHTML() {
   const pod = cuenta.retos && cuenta.retos.podio;
