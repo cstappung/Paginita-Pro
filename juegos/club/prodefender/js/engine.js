@@ -192,6 +192,7 @@
       this.era3 = this.L.era === 3;
       this.ley = this.era3 ? this.L.ley || null : null; this.contagioT = 0;
       this.pactos = []; this.mods = { ...MODS0 }; this.energia = 0;
+      if (this.L.vidaX || this.L.oroX) this.aplicaMods();
       this.evento = null; this.caidos = []; this.alzar = []; this.zonas = []; this.provoca = null;
       this.vendavalT = 0; this.apagonT = 0;
       if (snap) this.load(snap);
@@ -506,6 +507,13 @@
         for (const k in P.m || {}) M[k] *= P.m[k];
         for (const k in P.set || {}) M[k] = k === 'ap' ? Math.max(M.ap, P.set.ap) : P.set[k];
       }
+      // reinos 12-15 (levels.js `pactoPrecio`): cada pacto aceptado da además más vida a los
+      // enemigos, y se suma. La Necrópolis se ganó juntando cinco pactos sin dejar pasar a nadie.
+      if (this.L.pactoPrecio) M.vidaEnem *= 1 + this.L.pactoPrecio * this.pactos.filter(p => p.id).length;
+      // y la vida y el oro propios del reino (levels.js `vidaX`, `oroX`): la dificultad (`diff`)
+      // pone más enemigos, que dan más oro; esto los hace más duros sin dar más
+      if (this.L.vidaX) M.vidaEnem *= this.L.vidaX;
+      if (this.L.oroX) M.oro *= this.L.oroX;
       this.mods = M;
     }
 
@@ -621,12 +629,22 @@
     }
 
     // ----------------------------- Enemigos -------------------------------
+    // Reinos 12-15 (levels.js `vidaTarde: {desde, hasta, x}`): la vida de los enemigos crece de
+    // x1 en la ronda `desde` a `x` en la `hasta`, y sigue así. El comienzo no cambia (sin oro
+    // todavía, cualquier extra rompía la apertura) y el final deja de ser un paseo: quien ganó la
+    // Necrópolis llegó a la ronda 80 con 286 000 de oro sin gastar.
+    vidaTarde() {
+      const V = this.L.vidaTarde;
+      if (!V) return 1;
+      const r = this.curRound() || 1;
+      return 1 + (V.x - 1) * Math.max(0, Math.min(1, (r - V.desde) / (V.hasta - V.desde)));
+    }
     spawn(type, path, dist, hpM, tier) {
       const d = PD.ENEMIES[type];
       const boost = PD.hpBoost(this.curRound() || 1, d.boss);
       let hp = d.hp * hpM * boost;
       if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost;
-      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) : 1;   // pactos
+      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) * this.vidaTarde() : 1;   // pactos y reino
       hp *= fv;
       const shield = (d.shield || 0) * hpM * boost * fv;
       const e = {

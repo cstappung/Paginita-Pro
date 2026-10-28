@@ -4,7 +4,7 @@
    decenas de segundos de cálculo). Carga los MISMOS archivos que el juego,
    con el mismo ?v=, y guarda en qué quedó cada partida (`cache`) para que
    cada ronda nueva solo simule lo nuevo. */
-importScripts('data/enemies.js?v=pd-9', 'data/towers.js?v=pd-9', 'data/levels.js?v=pd-9', 'engine.js?v=pd-9', 'prueba.js?v=pd-9');
+importScripts('data/enemies.js?v=pd-10', 'data/towers.js?v=pd-10', 'data/levels.js?v=pd-10', 'engine.js?v=pd-10', 'prueba.js?v=pd-10');
 const cache = new Map();
 onmessage = e => {
   const { id, p, u } = e.data || {};

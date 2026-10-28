@@ -633,3 +633,41 @@ test('tercera era: la prueba con pactos y Poder del Reino también se guarda com
  assert.equal(c.v,2,'se compacta');assert.match(c.j,/H/);assert.match(c.j,/I/);
  assert.deepEqual(VP.expande(c),p,'vuelve exacta');
 });
+
+test('cada reino pide la ronda 50 del anterior también en el verificador (y ese rechazo no castiga)',async()=>{
+ const {pruebas}=juega(1,'uidD',8,{semilla:12});
+ const x=pruebas[pruebas.length-1];
+ const dato={categoria:'club-prodefender-dunas',puntos:x.ronda,tiempo:x.tiempo,partida:'p1'};
+ const pedidas=[];
+ const con=fila=>({uid:'uidD',filaEn:async cat=>{pedidas.push(cat);return fila;}});
+ assert.equal(await V.verificaClub('prodefender',dato,x.p,con({uid:'uidD',puntos:50})),null,'con la 50 de Prado');
+ assert.deepEqual(pedidas,['club-prodefender-prado']);
+ assert.match(await V.verificaClub('prodefender',dato,x.p,con({uid:'uidD',puntos:49})),/sin desbloquear/);
+ assert.match(await V.verificaClub('prodefender',dato,x.p,con(null)),/sin desbloquear/);
+ assert.match(await V.verificaClub('prodefender',dato,x.p,{uid:'uidD',filaEn:async()=>{throw new Error('red');}}),/^No se pudo comprobar/);
+ const K=carga('src/juegos/castigo.js');
+ assert.equal(K.esTrampa({vivo:true,m:'Reino sin desbloquear: primero llega a la ronda 50 del reino anterior.'}),false,'no castiga');
+});
+
+test('reinos 12-15: cada pacto aceptado da más vida a los enemigos; la Necrópolis no cambia',()=>{
+ assert.equal(PD.LEVELS[10].pactoPrecio,undefined,'la Necrópolis se dejó como se jugó');
+ for(let li=11;li<15;li++)assert.equal(PD.LEVELS[li].pactoPrecio,0.12,PD.LEVELS[li].short);
+ for(let li=11;li<15;li++)assert.ok(PD.LEVELS[li].diff>PD.LEVELS[10].diff||li===12,PD.LEVELS[li].short+' más difícil');
+ const g=nuevo3(11);const v0=g.mods.vidaEnem;
+ g.active=false;g.round=0;assert.ok(g.pactoPendiente());g.elegirPacto(0);const P=PD.PACTOS.find(q=>q.id===g.pactos[0].id);
+ const propio=(P.m&&P.m.vidaEnem)||1;
+ assert.ok(Math.abs(g.mods.vidaEnem-v0*propio*1.12)<1e-9,'+12% por el pacto');
+ const h=nuevo3(10);h.active=false;h.round=0;h.elegirPacto(0);const Q=PD.PACTOS.find(q=>q.id===h.pactos[0].id);
+ assert.ok(Math.abs(h.mods.vidaEnem-((Q.m&&Q.m.vidaEnem)||1))<1e-9,'la Necrópolis sin precio');
+});
+
+test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis no)',()=>{
+ assert.equal(PD.LEVELS[10].vidaTarde,undefined);
+ assert.deepEqual([11,12,13,14].map(li=>PD.LEVELS[li].vidaTarde.x),[9,10,10,11]);
+ const g=new PD.Game(12,null,1);g.round=29;assert.equal(g.vidaTarde(),1,'igual hasta la 30');
+ g.round=55;assert.ok(Math.abs(g.vidaTarde()-(1+9*0.5))<1e-9,'a mitad de camino');
+ g.round=90;assert.equal(g.vidaTarde(),10,'x10 desde la 80');
+ const n=new PD.Game(10,null,1);n.round=90;assert.equal(n.vidaTarde(),1);
+ g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1);h.round=29;const f=h.spawn('robusto',0,0,1);
+ assert.ok(e.maxHp>f.maxHp*9,'la vida del enemigo sube');
+});

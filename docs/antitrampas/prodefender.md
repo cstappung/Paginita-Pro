@@ -1,6 +1,9 @@
 # Antitrampas de PRO DEFENDER
 
 Quince tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)`.
+Cada reino pide la ronda 50 del anterior: la interfaz lo bloquea y el verificador lo
+comprueba con tu fila de la tabla anterior (`ctx.filaEn`, que pasa `solo/club.js`; las
+auditorías no la tienen y no lo miran). Ese rechazo («Reino sin desbloquear…») no castiga.
 Los reinos 6–10 (la «segunda era») y 11–15 (la «tercera») se abren a todos uno por día
 (`abre` en `levels.js`, día de Chile, del 22 al 31 de octubre de 2026). Antes de su día solo los
 juegan los administradores y `main.js` no manda su resultado; esa puerta es de la

@@ -33,7 +33,8 @@ export const UNA_PRUEBA = true;
 const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/;
 const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse',
   'necropolis', 'esporas', 'espejos', 'archipielago', 'noche'];
-const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-9';
+const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-10';
+const DESBLOQUEO = 50;   // levels.js: PD.UNLOCK_ROUND
 
 /* La prueba tal como se guarda (v: 2). El juego manda la de siempre (v: 1,
    cada jugada un arreglo [paso, código, …], prueba.js) y la página la guarda
@@ -121,6 +122,15 @@ export async function verifica(dato, prueba, ctx = {}) {
   prueba = expande(prueba);   // la guardada viene compacta (v: 2)
   if (!prueba || typeof prueba !== 'object' || prueba.v !== 1 || !Array.isArray(prueba.j)) return 'La prueba de PRO DEFENDER no tiene la forma esperada.';
   if (prueba.r !== REINOS.indexOf(m[1])) return 'La prueba es de otro reino.';
+  // Cada reino se desbloquea llegando a la ronda 50 del anterior. La página lo comprueba con tu
+  // fila de la tabla anterior (`ctx.filaEn`; sin ella, en las auditorías, no se mira). Este
+  // rechazo no castiga (castigo.js: «sin desbloquear»): puede ser un récord anterior sin subir.
+  const li = prueba.r;
+  if (li > 0 && typeof ctx.filaEn === 'function') {
+    let f;
+    try { f = await ctx.filaEn('club-prodefender-' + REINOS[li - 1]); } catch (e) { return 'No se pudo comprobar el reino anterior.'; }
+    if (!f || !(f.puntos >= DESBLOQUEO)) return `Reino sin desbloquear: primero llega a la ronda ${DESBLOQUEO} del reino anterior.`;
+  }
   const { r, motivo } = await rehaz(prueba, ctx.uid);
   if (motivo) return motivo;
   if (r.ronda !== dato.puntos) return `La partida rehecha llega a la ronda ${r.ronda}, no a la ${dato.puntos}.`;

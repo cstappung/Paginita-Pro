@@ -118,7 +118,14 @@ const MIXTA = [
 const HEROE_TERCERA = opt('heroe', 'heroevacio');
 // --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
 if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { PD.LEVELS[li].diff = +opt('diff'); delete PD.LEVELS[li]._rounds; }
-const PACTOS_PREF = ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
+// --pactos a,b,c: otro orden de preferencia (p. ej. el de una persona); --precio P: otro
+// pactoPrecio del reino (levels.js), para comparar antes y después
+if (opt('precio', '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].pactoPrecio = +opt('precio');
+// --tarde desde,hasta,x: otra vidaTarde (levels.js); --vida X / --oro Y: otra vida y otro oro por
+// enemigo del reino (levels.js vidaX, oroX)
+if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].vidaTarde = x > 1 ? { desde, hasta, x } : null; }
+for (const [o, k] of [['vida', 'vidaX'], ['oro', 'oroX']]) if (opt(o, '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li][k] = +opt(o);
+const PACTOS_PREF = opt('pactos', '') ? opt('pactos').split(',') : ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
 const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
 function eligePacto(g) {
   const ofs = g.ofertasPacto();
@@ -848,6 +855,9 @@ class Bot {
         const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); }
       }
       else if (k === 'm') { const t = torre(a); if (t) t.mode = b; }
+      else if (k === 'g') g.placeSpikes(a, b);
+      else if (k === 'k') { if (g.pactoPendiente()) g.elegirPacto(a); }
+      else if (k === 'x') { if (g.poderListo()) g.lanzarPoder(a, b); }
       this.gi++;
     }
     return true;

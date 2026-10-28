@@ -151,7 +151,7 @@ kingdom, Vacío included (its opening), so that number says nothing.
 Necrópolis Olvidada, Jardín de Esporas, Laberinto de Espejos, Archipiélago Celeste
 and La Noche Eterna (`levels.js`, `era: 3`, `abre` Oct 27–31; tables `necropolis`,
 `esporas`, `espejos`, `archipielago`, `noche` = `L.slug`; 100 coins a round like
-the second era). Harder (`diff` 5.2 / 4.8 / 4.2 / 5.4 / 4.3, recalibrated with the laws so that playing each meta loses roughly what Eclipse costs, ~30–90k lives with `--ayuda 100`; single runs vary by 2× or more) and with their own rules, all gated on
+the second era). Harder (`diff` 5.2 / 6.0 / 5.2 / 6.7 / 5.4) and with their own rules, all gated on
 `game.era3` or on new enemy fields, so **kingdoms 1–10 replay identically**
 (checked: the same scripted game hashed over 280 rounds on the old and new
 engine; `VERSION` stays 4, only `?v=pd-8` moved). The `diff` values were
@@ -160,6 +160,23 @@ calibrated with `prodefender-bot --reino tercera --ayuda 100` against Eclipse
 Esporas until dragon and desintegrador left its tower list (the bot's late game
 there was only them). What they add:
 
+- **Difficulty after the first win (Oct 27).** The bot calibration (meta play ≈ Eclipse)
+  was far too soft for people: the only Necrópolis win never leaked, stacking Furia,
+  Cristal, Ofrenda, Codicia and Usura (≈2× damage; Ofrenda's quarter of lives cost
+  nothing). Necrópolis was left as played (its records replay identically); kingdoms
+  12–15 got `diff` ×1.25, `pactoPrecio: 0.12` (each accepted pact: +12 % enemy HP,
+  additive, in `aplicaMods`) and `vidaTarde: {desde: 30, hasta: 80, x: 9/10/10/11}`
+  (enemy HP ramps from ×1 at round 30 to ×x at 80; `vidaTarde()` in spawn), all shown on
+  the card. Measured by replaying that win with the bot (`--estrategia humana --libro`
+  built from its proof): `diff` alone does nothing (it adds enemies, and enemies pay
+  gold; even ×6 diff he loses 0), extra HP from round 1 breaks his opening, a late ramp
+  is what bites: at ×10 the adaptive replay wins losing 26 lives, his exact moves die
+  near round 55. `vidaX`/`oroX` exist for flat HP/gold multipliers (unused).
+- **Every kingdom needs round 50 of the previous one**, the dated ones too (before, a
+  dated kingdom only waited for its day: `locked = prueba ? !admin : li > save.unlocked`).
+  The verifier checks it as well with `ctx.filaEn` (your row of the previous table,
+  `solo/club.js`); that rejection says «sin desbloquear» and `esTrampa` lets it through
+  unpunished (a previous record may still be pending).
 - **One law per kingdom** (owner: «que la forma de ganar cada uno se sienta
   distinta»; `L.ley`, `PD.LEYES` in levels.js, constants at the top of
   engine.js): Necrópolis `purga` (non-boss enemies not finished by fire,
