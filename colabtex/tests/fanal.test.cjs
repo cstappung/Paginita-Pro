@@ -30,7 +30,7 @@ test('la travesía: veinte jornadas, una oleada y un jefe por acto, el Alba en l
  assert.ok(M.jornada(15).marea>0&&M.jornada(17).fugaces>0&&M.jornada(19).marea>0&&M.jornada(19).fugaces>0);
 });
 
-test('la curva: la historia sube de jornada en jornada; después del Sol los jefes vuelven en fase 2, 3, 4, 5 y 6',()=>{
+test('la curva: la historia sube de jornada en jornada; después del Sol los jefes vuelven en fase 2, 3, 4, 5, 6 y 7',()=>{
  const ol=M.JORNADAS.filter(j=>j.tipo==='oleada');
  for(let i=1;i<ol.length;i++)assert.ok(ol[i].fuego>=ol[i-1].fuego-0.2,'fuego jornada '+ol[i].n);
  // La primera oleada sigue siendo la más amable.
@@ -43,9 +43,10 @@ test('la curva: la historia sube de jornada en jornada; después del Sol los jef
  assert.deepEqual([21,22].map(n=>M.jornada(n).tipo),['oleada','jefe']);
  assert.deepEqual([22,24,26,28,30,32,34,36,38].map(n=>M.jornada(n).jefe),['nodriza','faro','esfinge','casco','crisalida','hoguera','luna','constelacion','sol']);
  assert.ok([21,23,25].every(n=>M.jornada(n).acto===5));
- assert.equal(M.jornada(22).fase,2);assert.equal(M.jornada(22+ciclo).fase,3);assert.equal(M.jornada(22+2*ciclo).fase,4);assert.equal(M.jornada(22+3*ciclo).fase,5);assert.equal(M.jornada(22+4*ciclo).fase,6);assert.equal(M.jornada(22+9*ciclo).fase,6);
+ assert.equal(M.jornada(22).fase,2);assert.equal(M.jornada(22+ciclo).fase,3);assert.equal(M.jornada(22+2*ciclo).fase,4);assert.equal(M.jornada(22+3*ciclo).fase,5);assert.equal(M.jornada(22+4*ciclo).fase,6);assert.equal(M.jornada(22+5*ciclo).fase,7);assert.equal(M.jornada(22+9*ciclo).fase,7);
+ assert.equal(M.jornada(110).fase,6);assert.equal(M.jornada(111).fase,7);assert.equal(M.jornada(112).fase,7);
  // La fase 4 no cambia la vida respecto de la 3 (la vida entra en la prueba): solo sube por la jornada.
- assert.equal(M.VIDA_FASE[4],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[5],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[6],M.VIDA_FASE[3]);
+ assert.equal(M.VIDA_FASE[4],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[5],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[6],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[7],M.VIDA_FASE[3]);
  assert.ok(M.vidaJefe(M.jornada(22+ciclo))>M.vidaJefe(M.jornada(22)),'el jefe vuelve más fuerte');
  assert.ok(M.vidaJefe(M.jornada(22))>M.vidaJefe(M.jornada(2)),'la fase 2 es más dura que la primera vez');
  assert.ok(M.vidaJefe(M.jornada(20))>M.vidaJefe(M.jornada(4)),'los jefes crecen con la jornada');
@@ -82,6 +83,26 @@ test('el rigor de la fase 6: cada vuelta en ella es más dura que la anterior, s
  for(const j of Object.keys(R.FASES))assert.ok(R.FASES[j][6]&&R.FASES[j][6].hab&&R.FASES[j][6].epiteto,j);
  assert.ok(S.ESCALA_FASE[6]>S.ESCALA_FASE[5]);
  assert.match(R.RIGOR.otra(3),/III/);
+});
+
+test('la fase 7: desde la sexta vuelta, con su habilidad y su modelo, y el rigor sigue contando igual',()=>{
+ const ciclo=M.CICLO_SINFIN.length*2, primera=22+5*ciclo;     // la Nodriza de la primera vuelta en fase 7
+ assert.equal(primera,112);assert.equal(M.FASE_MAX,7);
+ assert.equal(M.jornada(primera).fase,7);assert.equal(M.jornada(primera-1).fase,7,'la oleada de esa vuelta también');
+ assert.equal(M.jornada(primera-2).fase,6,'el Sol de la vuelta anterior sigue en la 6');
+ // Sumar la fase no corrió el rigor: la 6 sigue siendo el grado 1 y la 7 empieza en el 2.
+ assert.equal(M.jornada(94).grado,1);assert.equal(M.jornada(primera).grado,2);assert.equal(M.jornada(primera+ciclo).grado,3);
+ // La vida que acota el verificador es la de la fase 3 (la de pantalla, más).
+ assert.equal(M.vidaJefe(M.jornada(primera)),M.vidaJefe(M.jornada(primera-ciclo)));
+ assert.ok(M.vidaJefeJuego(M.jornada(primera))>M.vidaJefeJuego(M.jornada(primera-ciclo)));
+ for(const j of Object.keys(R.FASES))assert.ok(R.FASES[j][7]&&R.FASES[j][7].hab&&R.FASES[j][7].epiteto,j);
+ const habs=Object.values(R.FASES).map(f=>f[7].hab);assert.equal(new Set(habs).size,habs.length,'nueve nombres distintos');
+ assert.ok(R.FASE_NUEVA[7]&&/VII/.test(R.FASE_NUEVA[7].t));
+ assert.ok(S.ESCALA_FASE[7]>S.ESCALA_FASE[6]);
+ // El juego conoce las nueve habilidades y las rota con las anteriores.
+ const js=fs.readFileSync(path.join(D,'juego.js'),'utf8');
+ for(const j of Object.keys(R.FASES))assert.match(js,new RegExp('esp7'+j[0].toUpperCase()+j.slice(1)+'\\b'));
+ assert.match(js,/fase >= 7 \? \[7, 2, 3, 4, 5, 6\]/);
 });
 
 test('los augurios: uno por jornada, fijos, y cada jornada un poco más dura que la anterior',()=>{
@@ -298,13 +319,14 @@ test('las categorías de FANAL pasan por el club, por Discord y por las reglas',
  for(const m of ['travesia','sinfin','jornadas'])assert.ok(C.categoriaClub('fanal','club-fanal-'+m),m);
  assert.ok(!C.categoriaClub('fanal','club-fanal-otra'));assert.ok(!C.categoriaClub('fanal','club-sudoku-arcade'));
  const r=(categoria,puntos)=>C.resultadoClub('fanal',{categoria,puntos,tiempo:5000,partida:'abc-1'});
- assert.ok(r('club-fanal-travesia',45000));assert.ok(r('club-fanal-sinfin',1000000));assert.equal(r('club-fanal-sinfin',1000001),null);
+ assert.ok(r('club-fanal-travesia',45000));assert.ok(r('club-fanal-travesia',1500000),'la travesía pasa del millón');assert.equal(r('club-fanal-travesia',1000000001),null);assert.ok(r('club-fanal-sinfin',1000000));assert.equal(r('club-fanal-sinfin',1000001),null);
  assert.ok(r('club-fanal-jornadas',13));assert.equal(r('club-fanal-jornadas',100001),null);
  // Las reglas de Firebase conocen las tres tablas y el juego del club.
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.match(reglas,/club-fanal-\(travesia\|sinfin\|jornadas\)/);
  assert.match(reglas,/sudoku\|fanal(\|[a-z]+)*\)\$\/\)/);  // fanal en la lista de clubJugadas (puede haber juegos después)
- assert.match(reglas,/'club-fanal-travesia' \|\| \$categoria === 'club-fanal-sinfin' \|\| [^?]*\? 1000000/);
+ assert.match(reglas,/'club-fanal-sinfin' \|\| [^?]*\? 1000000 :/);
+ assert.match(reglas,/'club-fanal-travesia' \? 1000000000/,'la travesía tiene el techo de mil millones');
  // El juego carga sus piezas con versión, y la página tiene i18n.
  const html=fs.readFileSync(path.join(D,'index.html'),'utf8');
  for(const f of ['relato','motor','sprites','musica','juego'])assert.match(html,new RegExp(f+'\\.js\\?v=fanal-\\d+'));
@@ -319,13 +341,15 @@ test('la música por fase: cada fase del sin fin suena con más energía, sin ro
  // La fase 1 es la música de siempre, y fuera del juego la fase no cuenta.
  assert.deepEqual(MU.capas({modo:'juego',tension:0.3,peligro:0}),en(1));
  assert.deepEqual(MU.capas({modo:'transito',fase:5}),MU.capas({modo:'transito'}));
- assert.equal(MU.faseMusical({modo:'titulo',fase:5}),1);assert.equal(MU.faseMusical({modo:'juego',fase:9}),6);
+ assert.equal(MU.faseMusical({modo:'titulo',fase:5}),1);assert.equal(MU.faseMusical({modo:'juego',fase:9}),7);
+ // La fase 7 suma su voz (el oro) sin quitar el vidrio de la 6.
+ assert.equal(en(6).oro,0);assert.equal(en(7).oro,1);assert.equal(en(7).campanas,1);
  // El compás se acelera con la fase, pero el pulso más corto (dos corcheas) nunca baja de 0,2 s:
  // la prueba cuenta los pulsos demasiado juntos.
  for(const e of Object.values(MU.ETAPAS))for(const lat of [1,1.3,1.6]){
   const base=e.epm*lat;
   assert.equal(MU.epmDeFase(base,1),base);
-  for(let f=2;f<=6;f++){const v=MU.epmDeFase(base,f);assert.ok(v>=MU.epmDeFase(base,f-1)&&v>=base);assert.ok(120/v>0.2||v===base,'pulso de '+(120/v).toFixed(3)+' s');}
+  for(let f=2;f<=7;f++){const v=MU.epmDeFase(base,f);assert.ok(v>=MU.epmDeFase(base,f-1)&&v>=base);assert.ok(120/v>0.2||v===base,'pulso de '+(120/v).toFixed(3)+' s');}
  }
  assert.ok(MU.epmDeFase(300,5)>300*1.15);
 });
