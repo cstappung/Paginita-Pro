@@ -251,7 +251,7 @@ test('podio del reto: 1500, 1000 y 500, y los sobres se cobran una vez, según e
   assert.ok(e.sobres[p3 + '~gPodio00007'], 'el 3.º recibe su sobre');
 });
 
-test('álbum completo de un club: con una copia de cada carta paga 2000 y un sobre Plus, una vez', () => {
+test('álbum completo de un club: con una copia de cada jugador paga 2000 y dos sobres Plus, una vez', () => {
   const E = 'cuentaEEE5', s = {}, porId = {}, faltan = new Set(R.cartasAlbum('roma').map(c => c.n));
   let at = T0;
   for (let n = 0; n < 3000 && faltan.size; n++) {
@@ -261,8 +261,8 @@ test('álbum completo de un club: con una copia de cada carta paga 2000 y un sob
   }
   assert.equal(faltan.size, 0, 'se juntó la Roma entera');
   const c = R.cartasAlbum('roma').map(cd => porId[cd.n]), cuando = at + H, id = R.claveAlbum('roma');
-  const con = (lista, ks = ['hAlbum00001'], u = E) => {
-    const d = { ajustes: { [E]: { x: { n: 1e6 } } }, cartas: { s: { [E]: Object.assign({}, s) } }, plantillas: { a: { [u]: { [id]: { at: cuando, c: lista, k: ks[0] } } } } };
+  const con = (lista, ks = ['hAlbum00001', 'hAlbum00009'], u = E) => {
+    const d = { ajustes: { [E]: { x: { n: 1e6 } } }, cartas: { s: { [E]: Object.assign({}, s) } }, plantillas: { a: { [u]: { [id]: Object.assign({ at: cuando, c: lista, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) } } } };
     if (u !== E) d.cartas.s[u] = {};
     ks.forEach(k => { d.cartas.s[u][k] = { at: cuando, p: 0, pl: id }; });
     return d;
@@ -270,10 +270,11 @@ test('álbum completo de un club: con una copia de cada carta paga 2000 y un sob
   const d = con(c), e = economia(d);
   assert.equal(monedasDe(E, d).premios, 2000);
   assert.equal(e.usuarios[E].albumes.roma, cuando);
-  assert.ok(e.sobres[E + '~hAlbum00001'], 'su sobre Plus existe');
+  assert.ok(e.sobres[E + '~hAlbum00001'] && e.sobres[E + '~hAlbum00009'], 'sus dos sobres Plus existen');
+  assert.equal(monedasDe(E, con(c, ['hAlbum00008'])).premios, 0, 'con un solo Plus no');
   assert.equal(monedasDe(E, con(c.slice(1))).premios, 0, 'faltando una carta no paga');
-  assert.equal(monedasDe(E, con(c, ['gAlbum00002'])).premios, 0, 'con un sobre normal no');
-  assert.equal(monedasDe('cuentaFFF6', con(c, ['hAlbum00003'], 'cuentaFFF6')).premios, 0, 'con cartas de otro no');
+  assert.equal(monedasDe(E, con(c, ['hAlbum00002', 'gAlbum00002'])).premios, 0, 'con un sobre normal no');
+  assert.equal(monedasDe('cuentaFFF6', con(c, ['hAlbum00003', 'hAlbum00004'], 'cuentaFFF6')).premios, 0, 'con cartas de otro no');
   assert.equal(R.leeAlbum('album-nadie'), null);
   assert.ok(R.cartasAlbum('realmadrid').every(cd => !cd.especial), 'el álbum son las cartas normales');
   // se cuentan jugadores: la especial cubre el hueco de su carta normal

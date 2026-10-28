@@ -2412,14 +2412,12 @@ function renderAlbum() {
   const pestanas = `<div class="mk-tabs rt-pestanas" role="tablist"><button role="tab" data-rt-pestana="plantillas" aria-selected="${rt.pestana === 'plantillas'}">🏆 Plantillas</button><button role="tab" data-rt-pestana="album" aria-selected="${rt.pestana === 'album'}">📖 Álbum completo</button></div>`;
   const ponPestanas = () => $('#rtBody').querySelectorAll('[data-rt-pestana]').forEach(b => b.onclick = () => { rt.pestana = b.dataset.rtPestana; rt.albumClub = ''; Snd.init(); Snd.tick(); renderAlbum(); $('#rtBody').scrollTop = 0; });
   if (rt.pestana === 'album') { $('#rtBody').innerHTML = pestanas + albumCompletoHTML(); ponPestanas(); armaAlbumCompleto(); return; }
-  $('#rtBody').innerHTML = pestanas + `<div class="rt-acc"><button class="btn" data-rt-proximos>🔜 Próximos retos</button><button class="btn" data-rt-col>📚 Ver colección</button><button class="btn" data-rt-mercado>🏪 Mercado de fútbol</button><button class="link" data-rt-ayuda>¿Cómo se calcula el puntaje?</button></div>
-    ${podioPasadoHTML()}
+  const porCobrar = podioPorCobrar();
+  $('#rtBody').innerHTML = pestanas + `<div class="rt-acc"><button class="btn" data-rt-premios>🎁 Mis premios${porCobrar ? ' <i class="rt-badge">1</i>' : ''}</button><button class="btn" data-rt-proximos>🔜 Próximos retos</button><button class="btn" data-rt-col>📚 Ver colección</button><button class="btn" data-rt-mercado>🏪 Mercado de fútbol</button><button class="link" data-rt-ayuda>¿Cómo se calcula el puntaje?</button></div>
     <h3 class="rt-h">📅 Reto de la semana</h3><div class="rt-grid">${fichaPlantilla(clave, `<em class="rt-quedan">⏳ Termina en ${d ? d + ' d ' : ''}${h} h · podio: ${MONEDA}${RT.PODIO_RETO[0].monedas} + ${RT.textoSobresPodio(RT.PODIO_RETO[0])} al 1.º</em>`)}</div>
     <h3 class="rt-h">⭐ Mejor plantilla</h3><div class="rt-grid">${fichaPlantilla(RT.MEJOR.clave, '<em class="rt-quedan">Siempre abierta · cualquier club y país</em>')}</div>
     <h3 class="rt-h">📘 Álbum de clubes</h3><div class="rt-grid">${RT.CLUBES.map(c => fichaPlantilla(RT.claveClub(c))).join('')}</div>`;
   $('#rtBody').querySelectorAll('[data-clave]').forEach(b => b.onclick = () => { Snd.init(); Snd.tick(); abreEditorReto(b.dataset.clave); });
-  const cp = $('#rtBody [data-cobra-podio]');
-  if (cp) cp.onclick = cobraPodio;
   ponPestanas();
 }
 /* El álbum completo: cada club con cuántas de sus cartas tienes (una de
@@ -2493,9 +2491,27 @@ async function cobraAlbum() {
    los clubes donde quedaste en el podio. Cada lunes, los clubes pagan al
    1.º, 2.º y 3.º de su tabla (`PODIO_CLUB`, con 3 personas o más). */
 const MEDALLA = ['🥇', '🥈', '🥉'];
+// los sobres de un podio del reto que todavía no cobraste
+const podioPorCobrar = () => { const m = cuenta.retos && cuenta.retos.podio && cuenta.retos.podio.mio; return m && !m.cobrado ? m : null; };
+/* «🎁 Mis premios»: lo que ganaste en los desafíos (premios de plantilla,
+   podios de cada semana, álbumes), del más nuevo al más viejo, con el total.
+   Arriba, si quedaste en el podio del reto y no has cobrado sus sobres, el
+   podio con su botón. */
+function pintaPremios() {
+  const h = (cuenta.retos && cuenta.retos.historial) || [], total = h.reduce((s, m) => s + (m.p || 0), 0);
+  const dia = ms => new Date(ms).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
+  $('#rtVerTit').textContent = '🎁 Mis premios';
+  $('#rtVerSub').innerHTML = h.length ? `Llevas <b>${MONEDA}${fmt(total)}</b> ganadas en los desafíos.` : 'Todavía no ganas nada en los desafíos: sube una plantilla y cobra sus premios.';
+  $('#rtVerCancha').innerHTML = `<div class="fu-tip">${podioPasadoHTML()}
+    ${h.length ? `<ol class="rt-historial">${h.map(m => `<li><span><b>${esc(m.d || 'Desafío de plantilla')}</b><small>${dia(m.at)}</small></span><em>+${MONEDA}${fmt(m.p)}</em></li>`).join('')}</ol>` : ''}
+    <p class="rt-nota">Cada lunes se paga el podio de la semana: en cada club, ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)}; en el reto, ${RT.PODIO_RETO.map(x => `${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')}.</p></div>`;
+  const cp = $('#rtVerCancha [data-cobra-podio]');
+  if (cp) cp.onclick = cobraPodio;
+  $('#rtVer').hidden = false;
+}
 function podioPasadoHTML() {
   const pod = cuenta.retos && cuenta.retos.podio;
-  if (!pod || pod.semana < RT.PRIMERA) return '';
+  if (!pod || pod.semana < RT.PRIMERA || !podioPorCobrar()) return '';
   const reto = RT.claveReto(pod.semana), p = RT.plantilla(reto), tablas = pod.tablas || {}, yo = cuenta.uid;
   const filaReto = (tablas[reto] || []).map((u, i) => `<li class="${u === yo ? 'yo' : ''}"><i>${MEDALLA[i]}</i><span translate="no">${esc(nombreDe(u))}</span><small>${MONEDA}${RT.PODIO_RETO[i].monedas} + ${RT.textoSobresPodio(RT.PODIO_RETO[i])}</small></li>`).join('');
   const mio = pod.mio, pr = mio && RT.PODIO_RETO[mio.n - 1];
@@ -2511,7 +2527,7 @@ function podioPasadoHTML() {
 async function cobraPodio() {
   const mio = cuenta.retos && cuenta.retos.podio && cuenta.retos.podio.mio;
   if (!mio || mio.cobrado || rt.ocupado) return;
-  rt.ocupado = true; renderAlbum();
+  rt.ocupado = true; $('#rtVer').hidden = true; renderAlbum();
   try {
     const r = await Red.pide('cobraPodio', { clave: mio.clave, n: mio.n });
     mio.cobrado = true; Snd.coin();
@@ -2777,6 +2793,7 @@ function renderRetos() {
 // la ayuda y «Ver colección», en el álbum y en el editor (que se repinta solo)
 $('#rtBody').addEventListener('click', e => {
   if (e.target.closest('[data-rt-proximos]')) pintaProximos();
+  if (e.target.closest('[data-rt-premios]')) pintaPremios();
   if (e.target.closest('[data-rt-mercado]')) abreMercadoReto();
   if (e.target.closest('[data-rt-ayuda]')) { $('#rtVerTit').textContent = '¿Cómo se calcula?'; $('#rtVerSub').textContent = ''; $('#rtVerCancha').innerHTML = `<div class="fu-tip">${AYUDA_RETOS}</div>`; $('#rtVer').hidden = false; }
   if (e.target.closest('[data-rt-col]')) {

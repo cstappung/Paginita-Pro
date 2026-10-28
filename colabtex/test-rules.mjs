@@ -439,15 +439,16 @@ console.log("— PRODROP: desafíos de plantilla —");
   // el álbum completo de un club (fb.cobrarAlbum): la lista de copias y su sobre Plus
   const album = (id, pres, c = once.concat(once.slice(0, 4))) => {
     const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${ua.uid}`)).key);
-    const w = { [`plantillas/a/${ua.uid}/${id}`]: { at: serverTimestamp(), c, k: ks[0] } };
+    const w = { [`plantillas/a/${ua.uid}/${id}`]: Object.assign({ at: serverTimestamp(), c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) };
     ks.forEach(k => { w[`cartas/s/${ua.uid}/${k}`] = { at: serverTimestamp(), p: 0, pl: id }; });
     return update(ref(db), w);
   };
-  await denied("el álbum no trae un sobre normal", () => album("album-roma", ["g"]));
-  await denied("ni una lista corta", () => album("album-roma", ["h"], once.slice(0, 5)));
-  await allowed("A cobra el álbum de la Roma con su sobre Plus", () => album("album-roma", ["h"]));
-  await denied("una sola vez", () => album("album-roma", ["h"]));
-  await denied("ni con una clave inventada", () => album("album-Roma", ["h"]));
+  await denied("el álbum no trae un sobre normal", () => album("album-roma", ["h", "g"]));
+  await denied("ni un solo Plus", () => album("album-roma", ["h"]));
+  await denied("ni una lista corta", () => album("album-roma", ["h", "h"], once.slice(0, 5)));
+  await allowed("A cobra el álbum de la Roma con sus dos sobres Plus", () => album("album-roma", ["h", "h"]));
+  await denied("una sola vez", () => album("album-roma", ["h", "h"]));
+  await denied("ni con una clave inventada", () => album("album-Roma", ["h", "h"]));
   await denied("un sobre a 0 que nombra un álbum sin reclamo no cuela", () => set(ref(db, `cartas/s/${ua.uid}/h${push(ref(db, `cartas/s/${ua.uid}`)).key}`), { at: serverTimestamp(), p: 0, pl: "album-inter" }));
   await denied("un sobre a 0 que nombra un podio sin reclamo no cuela", () => set(ref(db, `cartas/s/${ua.uid}/h${push(ref(db, `cartas/s/${ua.uid}`)).key}`), { at: serverTimestamp(), p: 0, pl: "reto-furia-45_p2" }));
   const ub = await loginAs(B);

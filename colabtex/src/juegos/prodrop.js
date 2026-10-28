@@ -82,7 +82,9 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
     // los álbumes completos ya cobrados (por club)
     const albumes = {};
     for (const [id, x] of Object.entries((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})) { const club = PR.leeAlbum(id); if (club && x) albumes[club] = x.at || 0; }
-    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio }, albumes };
+    // lo que ganó en los desafíos (premios, podios, álbumes), del más nuevo al más viejo
+    const historial = (((e.usuarios[uid] || {}).movs) || []).filter(m => m.c === "plantilla").slice(-150).reverse();
+    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio }, albumes, historial };
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -308,7 +310,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-69" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-71" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

@@ -185,7 +185,7 @@
      (son por tiempo limitado, y el álbum quedaría imposible). El reclamo
      guarda una copia por jugador (`c`), y la economía comprueba que eran
      tuyas en ese momento. */
-  const ALBUM = { monedas: 2000, sobres: ["futbolplus"] };
+  const ALBUM = { monedas: 2000, sobres: ["futbolplus", "futbolplus"] };
   // los jugadores del álbum: la carta normal de cada uno (su `person` es el mismo que el de su especial)
   const cartasAlbum = club => M.CARDS.filter(c => M.esFutbol(c.col) && c.club === club && !c.especial);
   // la carta del álbum que cubre la carta `id` (la normal de su jugador), o null si no es de ese club

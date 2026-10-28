@@ -615,10 +615,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries(pd.q || {}))
     for (const [id, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "pq", at: x.at, u, k: id, sobres: [x.k, x.k2, x.k3].filter(k => typeof k === "string" && k) });
-  /* El álbum completo de un club: `plantillas/a/<uid>/album-<club>` = {at, c: [una copia por carta], k}. */
+  /* El álbum completo de un club: `plantillas/a/<uid>/album-<club>` = {at, c: [una copia por jugador], k, k2}. */
   for (const [u, l] of Object.entries(pd.a || {}))
     for (const [id, x] of Object.entries(l || {}))
-      if (x && Number.isFinite(x.at)) ev.push({ t: "pa", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k].filter(k => typeof k === "string" && k) });
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pa", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k, x.k2].filter(k => typeof k === "string" && k) });
   for (const [u, l] of Object.entries(c.g || {}))
     for (const [k, porI] of Object.entries(l || {}))
       for (const [i, x] of Object.entries(porI || {}))
@@ -746,6 +746,11 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   // los premios de desafío que valieron, por `<uid>~<reclamo>`: cada uno de sus sobres se acepta una vez
   const reclamos = {};
   const casinoDe = (u, j) => { const pj = U(u).casino.porJuego; return pj[j] || (pj[j] = { apostado: 0, pagado: 0, rondas: 0 }); };
+  // « + 2 sobres Plus», « + 1 sobre»: lo que trajo un premio, según el prefijo de sus sobres
+  const textoSobresDe = ks => {
+    const h = ks.filter(k => k[0] === "h").length, g = ks.length - h, t = (n, plus) => `${n} sobre${n > 1 ? "s" : ""}${plus ? " Plus" : ""}`;
+    return [h ? t(h, true) : "", g ? t(g, false) : ""].filter(Boolean).map(x => " + " + x).join("");
+  };
   /* Los podios de cada semana que cerró, para la pantalla: semana → plantilla → [uid 1.º, 2.º, 3.º]. */
   const podiosSemana = {};
   /* La tabla `clave` como estaba justo antes de `T`: de cada cuenta, su
@@ -795,11 +800,11 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (!club || x.parada || (x.albumes && x.albumes[club]) || reclamos[e.u + "~" + e.k]) continue;
       const faltan = new Set(PR.cartasAlbum(club).map(cd => cd.n));
       for (const cc of new Set(e.c)) { const f = dueno[cc] === e.u && ficha(cc), h = f && PR.huecoAlbum(club, f.id); if (h) faltan.delete(h.n); }
-      if (faltan.size || e.sobres.length !== PR.ALBUM.sobres.length || e.sobres.some((k, i) => k[0] !== PM.SOBRE[PR.ALBUM.sobres[i]].prefijo)) continue;
+      if (faltan.size || e.sobres.length !== PR.ALBUM.sobres.length || new Set(e.sobres).size !== e.sobres.length || e.sobres.some((k, i) => k[0] !== PM.SOBRE[PR.ALBUM.sobres[i]].prefijo)) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
       (x.albumes || (x.albumes = {}))[club] = e.at;
       x.premios += PR.ALBUM.monedas;
-      anota(e.u, "plantilla", PR.ALBUM.monedas, `Álbum completo · ${PM.CLUBES[club]}`);
+      anota(e.u, "plantilla", PR.ALBUM.monedas, `Álbum completo · ${PM.CLUBES[club]}${textoSobresDe(e.sobres)}`);
     } else if (e.t === "pl") {
       /* Un premio vale si la plantilla está vigente (un reto, solo en su
          semana), las once son de quien reclama en ese momento y, con lo
@@ -816,7 +821,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       // el premio 3 de un club (las once con nota 8 o más) deja además su marco de perfil (perfil-tarjeta.js)
       if (pt.tipo === "club" && r.n === PR.PREMIO_MARCO) { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
       U(e.u).premios += pr.monedas;
-      anota(e.u, "plantilla", pr.monedas, pt.titulo);
+      anota(e.u, "plantilla", pr.monedas, `${pt.titulo} · premio ${r.n}${textoSobresDe(e.sobres)}`);
     } else if (e.t === "s") {
       const x = U(e.u);
       const plus = String(e.k)[0] === "h";   // el sobre Plus de fútbol (prefijo h) vale el doble y no tiene gratis
