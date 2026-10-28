@@ -550,6 +550,16 @@ export async function subirPlantillaReto(uid, clave, c) {
   await update(ref(db), { [`plantillas/s/${clave}/${uid}`]: { at: serverTimestamp(), c }, [`plantillas/v/${clave}/${uid}/${k}`]: { at: serverTimestamp(), c } });
   return (await get(r)).val();
 }
+/* El álbum completo de un club (`plantillas/a/<uid>/album-<club>` = {at, c, k, k2}):
+   una copia de cada jugador del club y sus dos sobres Plus gratis, en un solo `update`. */
+export async function cobrarAlbum(uid, id, c, pres) {
+  const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${uid}`)).key);
+  const w = { [`plantillas/a/${uid}/${id}`]: Object.assign({ at: serverTimestamp(), c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) };
+  ks.forEach(k => { w[`cartas/s/${uid}/${k}`] = { at: serverTimestamp(), p: 0, pl: id }; });
+  await update(ref(db), w);
+  const x = (await get(ref(db, `plantillas/a/${uid}/${id}`))).val();
+  return { ks, at: x.at };
+}
 /* Los sobres del podio de un reto (`plantillas/q/<uid>/<reto>_p<n>` = {at, k, k2?, k3?}),
    escritos en el mismo `update` con sus sobres gratis (`p: 0, pl`), como un premio. */
 export async function cobrarPodio(uid, id, pres) {

@@ -250,3 +250,36 @@ test('podio del reto: 1500, 1000 y 500, y los sobres se cobran una vez, según e
   assert.ok(['hPodio00004', 'hPodio00005', 'hPodio00006'].every(k => !e.sobres[p2 + '~' + k]), 'el 2.º no puede cobrar como 1.º');
   assert.ok(e.sobres[p3 + '~gPodio00007'], 'el 3.º recibe su sobre');
 });
+
+test('álbum completo de un club: con una copia de cada jugador paga 2000 y dos sobres Plus, una vez', () => {
+  const E = 'cuentaEEE5', s = {}, porId = {}, faltan = new Set(R.cartasAlbum('roma').map(c => c.n));
+  let at = T0;
+  for (let n = 0; n < 3000 && faltan.size; n++) {
+    const k = 'g' + String(n).padStart(9, '0');
+    at = T0 + n * 60000; s[k] = { at, p: 80 };
+    PM.sobre(E, k, at).cartas.forEach((c, i) => { faltan.delete(c.id); porId[c.id] = porId[c.id] || `${E}~${k}.${i}`; });
+  }
+  assert.equal(faltan.size, 0, 'se juntó la Roma entera');
+  const c = R.cartasAlbum('roma').map(cd => porId[cd.n]), cuando = at + H, id = R.claveAlbum('roma');
+  const con = (lista, ks = ['hAlbum00001', 'hAlbum00009'], u = E) => {
+    const d = { ajustes: { [E]: { x: { n: 1e6 } } }, cartas: { s: { [E]: Object.assign({}, s) } }, plantillas: { a: { [u]: { [id]: Object.assign({ at: cuando, c: lista, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) } } } };
+    if (u !== E) d.cartas.s[u] = {};
+    ks.forEach(k => { d.cartas.s[u][k] = { at: cuando, p: 0, pl: id }; });
+    return d;
+  };
+  const d = con(c), e = economia(d);
+  assert.equal(monedasDe(E, d).premios, 2000);
+  assert.equal(e.usuarios[E].albumes.roma, cuando);
+  assert.ok(e.sobres[E + '~hAlbum00001'] && e.sobres[E + '~hAlbum00009'], 'sus dos sobres Plus existen');
+  assert.equal(monedasDe(E, con(c, ['hAlbum00008'])).premios, 0, 'con un solo Plus no');
+  assert.equal(monedasDe(E, con(c.slice(1))).premios, 0, 'faltando una carta no paga');
+  assert.equal(monedasDe(E, con(c, ['hAlbum00002', 'gAlbum00002'])).premios, 0, 'con un sobre normal no');
+  assert.equal(monedasDe('cuentaFFF6', con(c, ['hAlbum00003', 'hAlbum00004'], 'cuentaFFF6')).premios, 0, 'con cartas de otro no');
+  assert.equal(R.leeAlbum('album-nadie'), null);
+  assert.ok(R.cartasAlbum('realmadrid').every(cd => !cd.especial), 'el álbum son las cartas normales');
+  // se cuentan jugadores: la especial cubre el hueco de su carta normal
+  const mvp = PM.CARDS.find(cd => cd.especial === 'clasico'), balon = PM.CARDS.find(cd => cd.especial === 'balon');
+  assert.equal(R.huecoAlbum('realmadrid', mvp.n).uid, PM.CARDS.find(cd => cd.person === mvp.person && !cd.especial).uid);
+  assert.equal(R.huecoAlbum('bayern', balon.n).person, 'bayern-harry-kane');
+  assert.equal(R.huecoAlbum('barcelona', mvp.n), null, 'en otro club no cuenta');
+});

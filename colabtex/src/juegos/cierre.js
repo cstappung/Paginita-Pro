@@ -172,7 +172,7 @@ export function verificaCierre(datos, cierre, vivo = datos) {
     for (const k of ["saldo", "gastadas", "cobradas", "premios", "parada", "falta"])
       if (a[k] !== b[k]) dif.push(`${u}: ${k} ${a[k]} → ${b[k]}`);
     const xa = A.usuarios[u] || {}, xb = B.usuarios[u] || {};
-    for (const k of ["tienda", "desafios", "podiosReto", "tacos", "fondos", "superChats"])
+    for (const k of ["tienda", "desafios", "podiosReto", "albumes", "tacos", "fondos", "superChats"])
       if (JSON.stringify(xa[k] || {}) !== JSON.stringify(xb[k] || {})) dif.push(`${u}: ${k} distinto`);
     if ((xa.comida || 0) !== (xb.comida || 0)) dif.push(`${u}: comida ${xa.comida} → ${xb.comida}`);
     if (Math.max(0, (xa.gratis || 0)) !== Math.max(0, (xb.gratis || 0))) dif.push(`${u}: sobre gratis ${xa.gratis} → ${xb.gratis}`);
