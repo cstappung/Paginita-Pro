@@ -159,7 +159,7 @@ drawing. (It is not in `test:juegos`: its champion-frame test already
 failed for Pokelike, which has no champion frame yet.)
 
 **Club frames** (`club<club>`, `req: {desafio: <club>}`): one per club of the
-PRODROP album (15), the prize of that club's Desafío de plantilla. CSS only
+PRODROP album (16, Bayern included), the prize of that club's Desafío de plantilla. CSS only
 («Marcos de club» in juegos.html): a ring in the club's colours (`--anillo`,
 `--borde`) and the card crest (`juegos/prodrop/escudos/<club>.png`) at the
 bottom. Earned, like the Halloween collector rewards, without any write or

@@ -1237,6 +1237,9 @@ body[data-phase="elige"] .top-line { opacity: 0; }
 .col-sec:first-child { margin-top: 0; }
 .col-sec i { font-style: normal; color: var(--c); }
 .col-sec small { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); }
+/* fútbol: una sección por club, con su escudo */
+.col-sec.club { align-items: center; }
+.col-sec.club img { width: 26px; height: 26px; object-fit: contain; filter: drop-shadow(0 1px 2px #0008); }
 .slot small { font-size: 11px; font-weight: 600; opacity: .8; text-align: center; padding: 0 6px; line-height: 1.1; }
 
 /* cartas de componentes con marco: el arte ya viene apaisado (ancho/), centrado */
@@ -1387,6 +1390,13 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .menu-futbol .chooser { padding: 18px clamp(10px, 3vw, 26px) 22px; border-radius: 22px;
   background: radial-gradient(ellipse at 50% 0, #1a8a3a38 0, transparent 62%), repeating-linear-gradient(90deg, #0000 0 56px, #ffffff07 56px 112px); }
 .menu-futbol .chooser h2 { color: #9ff0b8; }
+/* El menú de fútbol no cabía con los dos sobres y el desafío abajo, cortado
+   y sin scroll: ahora el desafío va arriba, bajo el título, y el menú se
+   desplaza solo si no cabe. */
+.chooser { max-height: calc(100dvh - 84px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.menu-futbol .ch-retos { order: 1; margin: 2px auto 8px; padding: 10px 16px; }
+.menu-futbol .ch-packs { order: 2; }
+.menu-futbol .ch-retos-ico { font-size: 28px; }
 .ch-pack.hub .hub-sello {
   position: absolute; right: -8px; top: 12px; z-index: 4; transform: rotate(7deg); font-style: normal;
   font: 800 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .2em; color: #0e3a1a; background: #9ff0b8; padding: 5px 10px; border-radius: 99px;
@@ -1434,8 +1444,9 @@ button.pl-casilla:hover { transform: translateY(-3px); }
 }
 .pl-elige-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pl-elige-head b { margin-right: auto; }
+/* la posición, bajo la media: arriba a la derecha tapaba la nota */
 .pl-tag {
-  position: absolute; top: 3px; right: 3px; z-index: 2; font: 800 9px/1 "Barlow Condensed", sans-serif; font-style: normal;
+  position: absolute; top: 23px; left: 3px; z-index: 2; font: 800 9px/1 "Barlow Condensed", sans-serif; font-style: normal;
   letter-spacing: .06em; color: #fff; background: #0b1a3ad9; padding: 2px 4px; border-radius: 4px;
 }
 .pl-lista { max-height: 52vh; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 12px 8px; padding-bottom: 10px; }
@@ -1443,7 +1454,6 @@ button.pl-casilla:hover { transform: translateY(-3px); }
   position: absolute; top: 3px; left: 3px; z-index: 2; font: 800 15px/1 "Barlow Condensed", sans-serif; font-style: normal;
   color: #fff; background: #0b0618e6; padding: 2px 5px; border-radius: 5px; box-shadow: 0 0 0 1px #ffffff55;
 }
-.pl-lista .pl-tag { top: auto; right: auto; bottom: 14px; left: 3px; }
 .pl-aca { position: absolute; z-index: 3; left: 0; right: 0; top: 40%; text-align: center; font: 800 9px/1 "Barlow Condensed", sans-serif; font-style: normal; letter-spacing: .08em; background: #6dffb0; color: #062a17; padding: 2px 0; }
 .pl-aca.mueve { background: #8f6bff; color: #fff; }
 .tc-elige.fit-ok .mini { box-shadow: 0 0 0 2px #4ee08a; }
@@ -1560,3 +1570,29 @@ button.rt-ficha:hover { transform: translateY(-2px); border-color: #ffffff55; }
 .rt-proximos em { font-style: normal; font-weight: 700; color: #ffd76a; text-align: right; }
 .rt-proximos li:first-child { border-color: #ffd76a55; }
 @media (max-width: 560px) { .rt-proximos li { grid-template-columns: auto 1fr; } .rt-proximos em { grid-column: 2; text-align: left; } }
+
+/* Desafío: los botones sobre una carta (graduar ahí mismo, poner o cambiar) */
+.pl-op { position: relative; cursor: pointer; }
+.pl-op.on .mini { outline: 3px solid #ffcc3d; outline-offset: 2px; border-radius: 9px; }
+.rt-acciones { position: absolute; z-index: 5; inset: auto 2px 2px; display: flex; gap: 4px; justify-content: center; animation: rtAcc .18s var(--ease-out, ease-out); }
+.pl-casilla > .rt-acciones { inset: auto -6px 18%; }
+.rt-accion { flex: 1; min-width: 0; display: grid; place-items: center; gap: 1px; padding: 5px 2px 4px; border: 0; border-radius: 9px; cursor: pointer;
+  font: 800 15px/1 Rubik, sans-serif; color: #062a17; background: #6dffb0; box-shadow: 0 3px 10px #000a; }
+.rt-accion small { font: 800 9px/1 "Barlow Condensed", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.rt-accion.grad { background: #ffd76a; color: #3a2400; }
+.rt-accion:hover { filter: brightness(1.08); transform: translateY(-1px); }
+@keyframes rtAcc { from { opacity: 0; transform: translateY(6px); } }
+
+/* Re-roll de fútbol: orden y filtros, y media / posición en cada carta */
+.rr-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
+.rr-filtros label { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.rr-filtros select { font: inherit; color: var(--ink); background: #ffffff14; border: 1px solid #ffffff2a; border-radius: 8px; padding: 4px 8px; }
+.rr-filtros select option { color: #111; }
+.rr-ver { display: flex; flex-wrap: wrap; gap: 6px; }
+.rr-ver .chip.on { background: #6dffb0; color: #062a17; }
+.rr-filtros small { margin-left: auto; }
+
+/* El selector del desafío: ordenar por media, equipo o graduación */
+.pl-orden { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.pl-orden .chip { padding: 5px 11px; }
+.pl-orden .chip.on { background: #6dffb0; color: #062a17; }
