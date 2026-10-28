@@ -149,7 +149,7 @@ other file of the site. Things that hold it together:
   base card is `bayern-harry-kane`, the same person as his Balón de Oro. Its
   `hasta` (1793202400000, 28-10-2026 15:46 UTC) is half an hour after the push.
 - **Chile, Argentina, the MLS and Saudi Arabia** (`CHILE`, `ARGENTINA`, `MLS`, `ARABIA`,
-  277 players, third `AMPLIACIONES` entry with `n: 833`, after the Bayern): Colo-Colo 19,
+  277 players, third `AMPLIACIONES` entry with `n: 833`, `hasta` half an hour after the 2026-10-28 push, after the Bayern): Colo-Colo 19,
   Universidad Católica 27, Universidad de Chile 15; River, Boca and Estudiantes (the Argentine
   semifinalist of the 2026 Libertadores); Inter Miami (Messi), CF Montréal (Alexis Sánchez)
   and LAFC (Son); Al Nassr (Cristiano), Al Hilal and Al Ittihad — 24 best of each of those
