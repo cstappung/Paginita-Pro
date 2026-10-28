@@ -993,14 +993,21 @@
        (ver `vidria`), el borde es de luz, lo frío se vuelve joya y detrás
        llevan un rosetón (`roseton`); donde la fase 5 tenía un sol chico,
        aquí hay una roseta (`roseta`).
-     Se dibujan ya a su tamaño (×1,2, ×1,35, ×1,4, ×1,45 y ×1,5) en vez de agrandar el dibujo
+     - La fase 7 es «la de oro»: el vitral se rompió y lo unieron con oro,
+       como se arregla una cerámica (kintsugi). El cuerpo es laca negra en
+       pedazos, cruzada por vetas de oro (ver `dora`), el borde es de oro,
+       lo frío se vuelve oro, y detrás llevan una aureola de pan de oro
+       (el mismo `roseton`, que en la fase 7 se dora; la `roseta` también).
+     Se dibujan ya a su tamaño (×1,2, ×1,35, ×1,4, ×1,45, ×1,5 y ×1,55) en vez de agrandar el dibujo
      de la primera fase: con formas el tamaño es gratis, y los píxeles
      quedan parejos en vez de estirados. */
-  const ESCALA_FASE = { 1: 1, 2: 1.2, 3: 1.35, 4: 1.4, 5: 1.45, 6: 1.5 };
+  const ESCALA_FASE = { 1: 1, 2: 1.2, 3: 1.35, 4: 1.4, 5: 1.45, 6: 1.5, 7: 1.55 };
   /* El lienzo de un jefe en su fase: `W`×`H` es el tamaño de la primera;
      `margen`, los píxeles que las otras dos pueden ocupar de más por cada
      lado. El centro no se mueve (el juego dibuja al jefe centrado). */
+  let faseLienzo = 1;                     // la fase del jefe que se está dibujando (la dora `roseton`)
   function lienzoJefe(W, H, fase, margen) {
+    faseLienzo = fase || 1;
     const e = ESCALA_FASE[fase] || 1, p = fase > 1 ? margen || 0 : 0;
     const c = lienzo(Math.round((W + 2 * p) * e), Math.round((H + 2 * p) * e)), x = c.getContext("2d");
     if (x) { x.scale(e, e); x.translate(p, p); }
@@ -1122,6 +1129,7 @@
      de `a0` a `a1` (la vuelta entera si no se dicen). */
   function roseton(x, cx, cy, r0, r1, n, a0, a1) {
     a0 = a0 == null ? 0 : a0; a1 = a1 == null ? Math.PI * 2 : a1;
+    if (faseLienzo >= 7) return aureola(x, cx, cy, r0, r1, n, a0, a1);
     for (let i = 0; i < n; i++) {
       const a = a0 + (a1 - a0) * (i + 0.5) / n, ab = ((a1 - a0) / n) * 0.3, rm = r0 + (r1 - r0) * 0.45;
       const p = (rr, da) => [cx + Math.cos(a + da) * rr, cy + Math.sin(a + da) * rr];
@@ -1132,13 +1140,103 @@
   }
   /* Una roseta chica: seis pétalos alrededor de un ojo de luz. */
   function roseta(x, cx, cy, r) {
+    if (faseLienzo >= 7) {   // fase 7: una flor de oro con el ojo de laca
+      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; elipse(x, cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, r * 0.42, r * 0.42, OROS[i % 2 ? 0 : 1]); }
+      elipse(x, cx, cy, r * 0.4, r * 0.4, LACA); elipse(x, cx, cy, r * 0.16, r * 0.16, BORDE_ORO);
+      return;
+    }
     for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; elipse(x, cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, r * 0.42, r * 0.42, JOYAS[i % 2 ? 1 : 0]); }
     elipse(x, cx, cy, r * 0.38, r * 0.38, BORDE_VITRAL);
   }
-  /* La paleta con que se cuantiza un jefe: la suya y, en la fase 6, las joyas y el plomo. */
-  const paletaDe = (col, fase) => (fase >= 6 ? Object.values(col).concat(JOYAS, [PLOMO, BORDE_VITRAL]) : Object.values(col));
-  /* El final de todo jefe: a la paleta y, en las fases 4, 5 y 6, al cielo (o al vidrio). */
-  const acaba = (c, col, fase) => { const q = cuantiza(c, paletaDe(col, fase)); return fase >= 6 ? vidria(q) : fase === 5 ? amanece(q) : fase === 4 ? asciende(q, "#8fd8ff") : q; };
+  /* La fase 7: el oro. Los colores fríos de la fase 4 se vuelven oro (del
+     pálido al viejo); la laca es el negro de los pedazos, y lo dibujado
+     exactamente en laca (pupilas, bocas) se queda así, sin vetas. */
+  const OROS = ["#ffd070", "#e8a83c", "#fff0b0", "#b87828"];
+  const LACA = "#120a0e", BORDE_ORO = "#ffe8a0", VETA = "#ffc83c";
+  const LACAS = ["#1c1418", "#2a1c1c", "#171022"].map(rgb), LABIO = rgb("#4a3020");
+  const A_ORO = { "#8fd8ff": "#ffd070", "#c8f0ff": "#fff0b0", "#b48cff": "#e8a83c", "#5a6ee0": "#b87828", "#3c50b4": "#7a4818" };
+  function dorado(col) { const out = {}; for (const q in col) out[q] = A_ORO[col[q]] || col[q]; return out; }
+  /* La aureola de la fase 7: hojas de pan de oro en punta (las de `roseton`),
+     alternando dos oros, con un aro fino por dentro y una perla en cada punta. */
+  function aureola(x, cx, cy, r0, r1, n, a0, a1) {
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (a1 - a0) * (i + 0.5) / n, ab = ((a1 - a0) / n) * 0.26, rm = r0 + (r1 - r0) * 0.5, largo = i % 2 ? r0 + (r1 - r0) * 0.78 : r1;
+      const p = (rr, da) => [cx + Math.cos(a + da) * rr, cy + Math.sin(a + da) * rr];
+      poligono(x, [p(r0, -ab * 0.5), p(rm, -ab), p(largo, 0), p(rm, ab), p(r0, ab * 0.5)], OROS[i % 2 ? 1 : 0]);
+      trazo(x, [p(r0 + 1, 0), p(largo - 1.5, 0)], OROS[3], 0.6);              // el nervio de la hoja
+      const t = p(largo + 1.4, 0);
+      elipse(x, t[0], t[1], 0.8, 0.8, BORDE_ORO);
+    }
+    x.strokeStyle = OROS[0]; x.lineWidth = 0.8;
+    x.beginPath(); x.arc(cx, cy, r0 + 0.5, a0, a1); x.stroke();
+  }
+  /* `dora` llena lo oscuro del cuerpo (lo mismo que llenan las fases 4, 5
+     y 6) con laca en pedazos unidos por vetas de oro. Las vetas son grietas
+     que caminan torciéndose y a veces se abren en dos; salen de un azar con
+     semilla (el tamaño del lienzo), así cada cuadro de aleteo se quiebra
+     igual. Cada pedazo entre vetas tiene su tono de laca, el píxel debajo
+     de una veta brilla un poco (el labio del oro), alguna veta destella y el
+     borde del cuerpo es de oro. */
+  function dora(c, porVeta) {
+    const x = c.getContext("2d");
+    if (!x) return c;
+    const w = c.width, h = c.height, im = x.getImageData(0, 0, w, h), d = im.data;
+    const hay = new Uint8Array(w * h), cuerpo = new Uint8Array(w * h), [lr, lg, lb] = rgb(LACA), cuerpos = [];
+    for (let i = 0; i < w * h; i++) {
+      const q = i * 4;
+      hay[i] = d[q + 3] > 127 ? 1 : 0;
+      const laca = d[q] === lr && d[q + 1] === lg && d[q + 2] === lb;
+      cuerpo[i] = hay[i] && !laca && d[q] * 0.3 + d[q + 1] * 0.59 + d[q + 2] * 0.11 < 60 ? 1 : 0;
+      if (cuerpo[i]) cuerpos.push(i);
+    }
+    if (!cuerpos.length) return c;
+    let semilla = (Math.imul(w, 73856093) ^ Math.imul(h, 19349663)) >>> 0;
+    const azar = () => { semilla = (Math.imul(semilla, 1664525) + 1013904223) >>> 0; return semilla / 4294967296; };
+    // Las vetas.
+    const vena = new Uint8Array(w * h), pila = [], n = Math.max(2, Math.round(cuerpos.length / (porVeta || 150)));
+    for (let k = 0; k < n; k++) { const i0 = cuerpos[Math.floor(azar() * cuerpos.length)]; pila.push({ x: i0 % w, y: Math.floor(i0 / w), a: azar() * Math.PI * 2, largo: 8 + azar() * Math.max(w, h) * 0.7, rama: 2 }); }
+    while (pila.length) {
+      const g = pila.pop();
+      let px = g.x, py = g.y, fuera = 0;
+      for (let t = 0; t < g.largo; t++) {
+        const ix = Math.round(px), iy = Math.round(py);
+        if (ix < 0 || iy < 0 || ix >= w || iy >= h) break;
+        const i = iy * w + ix;
+        if (cuerpo[i]) { vena[i] = 1; fuera = 0; } else if (++fuera > 3) break;
+        g.a += (azar() - 0.5) * 0.8; px += Math.cos(g.a); py += Math.sin(g.a);
+        if (g.rama > 0 && azar() < 0.05) pila.push({ x: px, y: py, a: g.a + (azar() < 0.5 ? -1 : 1) * (0.7 + azar() * 0.6), largo: (g.largo - t) * 0.5, rama: g.rama - 1 });
+      }
+    }
+    // Los pedazos: lo que queda entre vetas, cada uno con su tono.
+    const pedazo = new Int32Array(w * h).fill(-1);
+    let nPed = 0;
+    for (const i0 of cuerpos) {
+      if (vena[i0] || pedazo[i0] >= 0) continue;
+      const cola = [i0]; pedazo[i0] = nPed;
+      while (cola.length) {
+        const i = cola.pop(), px = i % w;
+        for (const j of [px > 0 ? i - 1 : -1, px < w - 1 ? i + 1 : -1, i - w, i + w]) if (j >= 0 && j < w * h && cuerpo[j] && !vena[j] && pedazo[j] < 0) { pedazo[j] = nPed; cola.push(j); }
+      }
+      nPed++;
+    }
+    for (const i of cuerpos) {
+      const q = i * 4, px = i % w, py = Math.floor(i / w);
+      const borde = px === 0 || py === 0 || px === w - 1 || py === h - 1 || !hay[i - 1] || !hay[i + 1] || !hay[i - w] || !hay[i + w];
+      let col;
+      if (borde) col = rgb(BORDE_ORO);
+      else if (vena[i]) col = ((i * 2654435761) >>> 0) % 7 === 0 ? rgb(OROS[2]) : rgb(VETA);
+      else if (vena[i - w]) col = LABIO;
+      else col = LACAS[(((pedazo[i] + 1) * 2654435761) >>> 0) % LACAS.length];
+      d[q] = col[0]; d[q + 1] = col[1]; d[q + 2] = col[2];
+    }
+    x.putImageData(im, 0, 0);
+    return c;
+  }
+  /* La paleta con que se cuantiza un jefe: la suya y, en la fase 6, las
+     joyas y el plomo (en la 7, los oros y la laca). */
+  const paletaDe = (col, fase) => (fase >= 7 ? Object.values(col).concat(OROS, [LACA, BORDE_ORO]) : fase >= 6 ? Object.values(col).concat(JOYAS, [PLOMO, BORDE_VITRAL]) : Object.values(col));
+  /* El final de todo jefe: a la paleta y, en las fases 4 a 7, al cielo (o al vidrio, o al oro). */
+  const acaba = (c, col, fase) => { const q = cuantiza(c, paletaDe(col, fase)); return fase >= 7 ? dora(q) : fase >= 6 ? vidria(q) : fase === 5 ? amanece(q) : fase === 4 ? asciende(q, "#8fd8ff") : q; };
 
   /* La Nodriza: polilla enorme y peluda, con un racimo de huevos en el
      abdomen (arriba). Alas de vino y ámbar con medialunas claras.
@@ -1154,6 +1252,7 @@
   };
   COLORES_NODRIZA_F[5] = alba(COLORES_NODRIZA_F[4]);
   COLORES_NODRIZA_F[6] = vitral(COLORES_NODRIZA_F[4]);
+  COLORES_NODRIZA_F[7] = dorado(COLORES_NODRIZA_F[4]);
   function nodriza(k, fase) {
     fase = fase || 1;
     const W = 58, H = 40, cx = 29, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 6);
@@ -1251,6 +1350,7 @@
   };
   COLORES_FARO_F[5] = alba(COLORES_FARO_F[4]);
   COLORES_FARO_F[6] = vitral(COLORES_FARO_F[4]);
+  COLORES_FARO_F[7] = dorado(COLORES_FARO_F[4]);
   function faro(fase) {
     fase = fase || 1;
     const W = 44, H = 54, cx = 22, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 8);
@@ -1335,6 +1435,7 @@
   };
   COLORES_ESFINGE_F[5] = alba(COLORES_ESFINGE_F[4]);
   COLORES_ESFINGE_F[6] = vitral(COLORES_ESFINGE_F[4]);
+  COLORES_ESFINGE_F[7] = dorado(COLORES_ESFINGE_F[4]);
   function esfinge(k, fase) {
     fase = fase || 1;
     const W = 78, H = 44, cx = 39, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 6);
@@ -1369,7 +1470,8 @@
       // Fase 5: un sol chico en la punta de cada ala.
       if (fase === 5) { const p = m([33 * k, 8]); elipse(x, p[0], p[1], 2.6, 2.6, col.E); elipse(x, p[0], p[1], 1.3, 1.3, col.e); }
       // Fase 6: una roseta en la punta y el ala rajada, como un vidrio que se partió.
-      if (fase >= 6) { const p = m([33 * k, 8]); roseta(x, p[0], p[1], 3.2); trazo(x, [m([28 * k, 9]), m([22 * k, 15]), m([24 * k, 18]), m([16 * k, 20])], PLOMO, 0.9); }
+      // (En la 7, la misma raja, cosida con oro.)
+      if (fase >= 6) { const p = m([33 * k, 8]); roseta(x, p[0], p[1], 3.2); trazo(x, [m([28 * k, 9]), m([22 * k, 15]), m([24 * k, 18]), m([16 * k, 20])], fase >= 7 ? VETA : PLOMO, 0.9); }
     });
     // Abdomen largo y anillado (arriba), tórax y cabeza (abajo).
     poligono(x, [[cx - 4, 24], [cx - 3, 6], [cx, 1], [cx + 3, 6], [cx + 4, 24]], col.c);
@@ -1411,6 +1513,7 @@
   };
   COLORES_CASCO_F[5] = alba(COLORES_CASCO_F[4]);
   COLORES_CASCO_F[6] = vitral(COLORES_CASCO_F[4]);
+  COLORES_CASCO_F[7] = dorado(COLORES_CASCO_F[4]);
   function casco(k, fase) {
     fase = fase || 1;
     const W = 52, H = 40, cx = 26, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 7);
@@ -1496,10 +1599,12 @@
   };
   COLORES_CRISALIDA_F[5] = alba(COLORES_CRISALIDA_F[4]);
   COLORES_CRISALIDA_F[6] = vitral(COLORES_CRISALIDA_F[4]);
+  COLORES_CRISALIDA_F[7] = dorado(COLORES_CRISALIDA_F[4]);
   /* La imago de la fase 4: las alas, que en las otras son lo claro, aquí son la noche. */
   const COLORES_IMAGO_4 = { s: "#0c1434", S: "#0c1434", b: "#b48cff", B: "#5a6ee0", p: "#16225a", P: "#8fd8ff", c: "#0c1434", e: "#ffffff", a: "#b48cff", g: "#b48cff", o: "#0c1434" };
   const COLORES_IMAGO_5 = alba(COLORES_IMAGO_4);
   const COLORES_IMAGO_6 = vitral(COLORES_IMAGO_4);
+  const COLORES_IMAGO_7 = dorado(COLORES_IMAGO_4);
   function crisalida(k, fase) {
     fase = fase || 1;
     const W = 34, H = 48, cx = 17, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 6);
@@ -1544,7 +1649,7 @@
     fase = fase || 1;
     const W = 64, H = 40, cx = 32, { c, x } = lienzoJefe(W, H, fase, 7);
     if (!x) return c;
-    const col = fase >= 6 ? COLORES_IMAGO_6 : fase === 5 ? COLORES_IMAGO_5 : fase === 4 ? COLORES_IMAGO_4 : COLORES_CRISALIDA_F[fase] || COLORES_CRISALIDA;
+    const col = fase >= 7 ? COLORES_IMAGO_7 : fase >= 6 ? COLORES_IMAGO_6 : fase === 5 ? COLORES_IMAGO_5 : fase === 4 ? COLORES_IMAGO_4 : COLORES_CRISALIDA_F[fase] || COLORES_CRISALIDA;
     // Fase 3: un segundo par de alas, más abajo.
     if (fase >= 3) espejo(cx, (s, m) => {
       poligono(x, [m([4, 21]), m([23 * k, 25]), m([27 * k, 34]), m([15 * k, 40]), m([6, 31])], col.P);
@@ -1588,6 +1693,7 @@
   };
   COLORES_HOGUERA_F[5] = alba(COLORES_HOGUERA_F[4]);
   COLORES_HOGUERA_F[6] = vitral(COLORES_HOGUERA_F[4]);
+  COLORES_HOGUERA_F[7] = dorado(COLORES_HOGUERA_F[4]);
   function hoguera(k, fase) {
     fase = fase || 1;
     const W = 60, H = 44, cx = 30, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 8);
@@ -1665,6 +1771,7 @@
   };
   COLORES_LUNA_F[5] = alba(COLORES_LUNA_F[4]);
   COLORES_LUNA_F[6] = vitral(COLORES_LUNA_F[4]);
+  COLORES_LUNA_F[7] = dorado(COLORES_LUNA_F[4]);
   function luna(k, fase, llena) {
     fase = fase || 1;
     const W = 64, H = 50, cx = 32, cy = 24, { c, x } = lienzoJefe(W, H, fase, 8);
@@ -1783,6 +1890,7 @@
   };
   COLORES_HERMANA_F[5] = alba(COLORES_HERMANA_F[4]);
   COLORES_HERMANA_F[6] = { w: "#ffffff", y: "#fff6d8", o: "#ff4c9c", v: "#5cf0d8", V: "#8c5cff", p: "#ffc83c" };
+  COLORES_HERMANA_F[7] = { w: "#ffffff", y: "#fff0b0", o: "#120a0e", v: "#ffd070", V: "#7a4818", p: "#e8a83c" };
   /* Los colores de una hermana velada en las fases 2 y 3: los suyos, casi apagados. */
   function velo(col) { const out = {}; for (const q in col) out[q] = mezcla(col[q], "#1a1430", 0.68); return out; }
   function hermana(k, fase, velada) {
@@ -1830,6 +1938,7 @@
     const col = COLORES_SOL_F[fase] || COLORES_SOL;
     // La corona: doce lenguas, alternando largas y cortas (dieciséis torcidas
     // en la fase 2; veinticuatro agujas en la 3).
+    if (fase >= 7) return solDeOro(k);
     if (fase >= 6) return solDeVidrio(k);
     const n = fase >= 5 ? 16 : fase === 4 ? 8 : fase === 3 ? 24 : fase === 2 ? 16 : 12;
     // Fase 4: el aro, por detrás.
@@ -1910,6 +2019,31 @@
     trazo(x, [[cx + 11.5, cy + 1], [cx + 17, cy + 8]], col.H, 2.2);
     trazo(x, [[cx - 6, cy + 8], [cx, cy + 10], [cx + 5, cy + 8.5]], col.e, 1.3);
     return acaba(c, col, 6);
+  }
+
+  /* El Sol de la fase 7: una aureola de pan de oro, el disco de laca rota
+     y cosida con oro (lo llena `dora`) y la cara en paz: los ojos cerrados,
+     dos medialunas de oro, y la costura más grande cruzándole la cara. */
+  const COLORES_SOL_7 = { r: "#b87828", o: "#ffd070", y: "#16225a", w: "#fff0b0", e: LACA, h: VETA, g: BORDE_ORO };
+  function solDeOro(k) {
+    const W = 64, H = 64, cx = 32, cy = 32, { c, x } = lienzoJefe(W, H, 7, 9);
+    if (!x) return c;
+    const col = COLORES_SOL_7;
+    roseton(x, cx, cy, 19, 37 + k * 1.2, 14, (k % 2) * 0.11, Math.PI * 2 + (k % 2) * 0.11);
+    elipse(x, cx, cy, 21, 21, col.r);
+    elipse(x, cx, cy, 19.5, 19.5, col.o);
+    elipse(x, cx, cy, 17.6, 17.6, col.y);
+    // Los ojos cerrados y, debajo, una lágrima de oro.
+    for (const s of [-1, 1]) {
+      trazo(x, [[cx + s * 11.5, cy - 4.5], [cx + s * 7.5, cy - 1.4], [cx + s * 3.5, cy - 4.5]], col.w, 2);
+      elipse(x, cx + s * 7.5, cy + 2.6, 1.1, 1.6, col.w);
+    }
+    // La costura: de la frente a la barbilla, torcida.
+    trazo(x, [[cx - 13, cy - 13], [cx - 6, cy - 7], [cx - 1, cy + 1], [cx + 5, cy + 5], [cx + 12, cy + 14]], col.h, 1.3);
+    trazo(x, [[cx - 6, cy - 7], [cx - 9, cy + 2]], col.h, 0.9);
+    trazo(x, [[cx - 4.5, cy + 9], [cx, cy + 11], [cx + 4.5, cy + 9]], col.w, 1.6);
+    // Menos vetas que los demás: el disco es grande y la cara se perdía entre ellas.
+    return dora(cuantiza(c, paletaDe(col, 7)), 600);
   }
 
   /* ================================================================

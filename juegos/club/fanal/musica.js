@@ -244,12 +244,12 @@
      - tension: 0 con la formación entera, 1 cuando queda la última polilla
      - peligro: 0 tranquilo, 1 con escamas encima o la formación abajo
      - jefe: nombre del jefe o null
-     - fase: 1 en la historia; 2 a 6 en el sin fin (la de los jefes de esa
+     - fase: 1 en la historia; 2 a 7 en el sin fin (la de los jefes de esa
        vuelta). Cada fase suena con más energía que la anterior: ver
        `energiaDeFase` y lo que hace con ella `programaTick`. */
   function capas(est) {
     const modo = est.modo || "juego", t = clamp(est.tension || 0), p = clamp(est.peligro || 0), jefe = !!est.jefe;
-    const c = { dron: 0, latido: 0, campanas: 0, percusion: 0, melodia: 0, tensionPad: 0, leitmotiv: 0, viento: 0, arpegio: 0 };
+    const c = { dron: 0, latido: 0, campanas: 0, percusion: 0, melodia: 0, tensionPad: 0, leitmotiv: 0, viento: 0, arpegio: 0, oro: 0 };
     if (modo === "silencio") return c;                                     // los silencios también se componen
     if (modo === "titulo") return Object.assign(c, { dron: 0.6, campanas: 0.35, viento: 0.5 });
     if (modo === "transito") return Object.assign(c, { dron: 0.7, campanas: 0.25, viento: 0.6 });
@@ -270,6 +270,7 @@
     c.campanas = Math.min(1, c.campanas + 0.15 * en);
     if (fase >= 3) c.arpegio = Math.min(1, 0.5 + 0.2 * (fase - 3) + 0.2 * t);
     if (fase >= 6) c.campanas = 1;                                         // la fase de vidrio: las campanas, enteras
+    if (fase >= 7) c.oro = 1;                                              // la de oro: el gong (ver programaTick)
     if (jefe) { c.leitmotiv = 1; c.melodia = 0; }                          // el jefe trae su propia melodía
     else c.melodia = t < 0.25 ? 0 : (t - 0.25) / 0.75;                     // la melodía entra a mitad de oleada
     return c;
@@ -277,13 +278,14 @@
   const clamp = v => Math.max(0, Math.min(1, v));
   /* La fase que suena: la del estado, y solo mientras se juega (el
      tránsito, la portada y los finales suenan siempre igual). */
-  const FASE_MUSICA_MAX = 6;
+  const FASE_MUSICA_MAX = 7;
   const faseMusical = est => ((est.modo || "juego") === "juego" ? Math.max(1, Math.min(FASE_MUSICA_MAX, Math.round(est.fase || 1))) : 1);
-  /* De 0 (fase 1) a 1 (fase 5): cuánta energía de más. La 6 no suma
-     energía (ya está toda): suma una voz, el vidrio (ver programaTick). */
+  /* De 0 (fase 1) a 1 (fase 5): cuánta energía de más. La 6 y la 7 no
+     suman energía (ya está toda): suman una voz cada una, el vidrio y el
+     oro (ver programaTick). */
   const energiaDeFase = fase => (Math.max(1, Math.min(5, fase || 1)) - 1) / 4;
   /* Cuánto más rápido va el compás en cada fase: un 4 % por fase, hasta un
-     20 % en la 6. Con un techo: dos corcheas seguidas (el pulso más corto)
+     24 % en la 7. Con un techo: dos corcheas seguidas (el pulso más corto)
      nunca duran menos de 0,21 s, porque la prueba cuenta los pulsos que
      vienen a menos de 0,2 s y deja pasar muy pocos (prueba.js: pulsosJuntos). */
   const EPM_TECHO = 560;
@@ -651,6 +653,14 @@
       if (fase >= 6 && g.campanas > 0.01 && !enSilencio) {
         const gr = 7 - (absoluto % 8);
         campana(t, frecuencia(R * 8, E, gr), 0.5, (nivel > 0 ? 0.06 : 0.035) * g.campanas, { ratio: 3.7, indice: 0.7, pan: absoluto % 2 ? 0.6 : -0.6 });
+      }
+
+      // Fase 7: el oro. Un gong grave e inarmónico al empezar cada compás,
+      // con un brillo de platillo que crece hacia el compás siguiente cada
+      // dos; debajo de todo, como el vitral se oye arriba.
+      if (fase >= 7 && g.oro > 0.01 && !enSilencio) {
+        if (k === 0) campana(t, frecuencia(R, E, 0), 2.4, 0.075 * g.oro, { ratio: 1.41, indice: 2.6, ombak: 3, brillo: 0.9, pan: compas % 2 ? 0.25 : -0.25 });
+        if (k === mapa.largo - 1 && compas % 2 === 1) soplo(t - dt * 1.5, dt * 2.2, 0.05 * g.oro, 7200, 0.7, "highpass");
       }
 
       // MELODÍA o LEITMOTIV: una frase por cada dos compases.
