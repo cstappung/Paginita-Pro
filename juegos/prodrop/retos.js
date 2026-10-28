@@ -148,6 +148,29 @@
   const claveReclamo = (clave, n) => clave + "_" + n;
   const leeReclamo = id => { const m = /^(.+)_([123])$/.exec(String(id || "")); return m ? { clave: m[1], n: +m[2] } : null; };
 
+  /* ---------- el podio de cada semana ----------
+     Cada lunes (al cerrar la semana, `finSemana`) la economía mira las
+     tablas tal como estaban en ese instante: las tablas de los clubes pagan
+     al 1.º, 2.º y 3.º (`PODIO_CLUB`, solo monedas) y la del reto que se
+     cierra paga su podio (`PODIO_RETO`, monedas y sobres; los sobres se
+     cobran con un botón, como los premios). Solo con `MIN_PODIO` personas
+     o más en la tabla: con menos no hay a quién ganarle. La mejor
+     plantilla no paga podio. */
+  const MIN_PODIO = 3;
+  const PODIO_CLUB = [100, 50, 25];
+  const PODIO_RETO = [
+    { n: 1, monedas: 1000, sobres: ["futbolplus", "futbolplus", "futbolplus"] },
+    { n: 2, monedas: 500, sobres: ["futbolplus"] },
+    { n: 3, monedas: 250, sobres: ["futbol"] }
+  ];
+  // «tres sobres Plus», «un sobre Plus», «un sobre»
+  const textoSobresPodio = pr => (pr.sobres.length === 3 ? "tres sobres Plus" : pr.sobres[0] === "futbolplus" ? "un sobre Plus" : "un sobre");
+  // `reto-clasico-42_p1`: el reclamo de los sobres del 1.º del reto de la semana 42
+  const clavePodio = (clave, n) => clave + "_p" + n;
+  const leePodio = id => { const m = /^(reto-[a-z]{2,12}-[0-9]{1,5})_p([123])$/.exec(String(id || "")); return m ? { clave: m[1], n: +m[2] } : null; };
+  // el orden de una tabla: más puntaje primero; empate, quien la subió antes
+  const ordenaTabla = filas => filas.slice().sort((a, b) => b.puntaje - a.puntaje || a.at - b.at || (a.u < b.u ? -1 : a.u > b.u ? 1 : 0));
+
   /* El mejor once que se puede armar con estas copias ({key, id, g, gr}):
      cada casilla con la que más suma entre las que juegan ahí, después
      las que juegan incómodas. Para «Autocompletar». */
@@ -173,6 +196,7 @@
   return {
     MEJOR, CLUBES, RETOS, PRIMERA, SEMANA0, SEMANA_MS, semanaDe, inicioSemana, finSemana, retoDeSemana,
     plantilla, claveClub, claveReto, vigente, encaje, estado, puntosFicha, puntaje, evalua,
-    PREMIOS, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce
+    PREMIOS, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce,
+    MIN_PODIO, PODIO_CLUB, PODIO_RETO, textoSobresPodio, clavePodio, leePodio, ordenaTabla
   };
 });

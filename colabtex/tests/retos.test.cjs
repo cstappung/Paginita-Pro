@@ -150,3 +150,68 @@ test('graduadas con nota 6 o más: el premio 2 paga 100 y sus dos sobres entran,
   for (let i = 0; i < 5; i++) assert.equal(e.dueno[`${A}~${k}.${i}`], A);
   assert.equal(e.sobres[A + '~gOtra00001'], undefined, 'un segundo sobre del mismo premio no vale');
 });
+
+/* ---------- el podio de cada semana ----------
+   Tres cuentas que arman el Real Madrid y El Clásico (el reto de la semana
+   42) con sobres pagados (un ajuste del admin les da monedas), todos
+   dentro de esa semana. El lunes (fin de la semana 42) la economía mira las
+   tablas como estaban justo antes. */
+const SEM = R.PRIMERA, FIN = R.finSemana(SEM), CLUB = R.claveClub('realmadrid'), RETO = R.claveReto(SEM);
+function armaCuenta(uid, salto) {
+  const s = {}, copias = [];
+  for (let n = 0; n < 4000; n++) {
+    const k = 'g' + uid.slice(-1) + String(n).padStart(8, '0'), at = T0 + salto + n * 60000;
+    s[k] = { at, p: 80 };
+    PM.sobre(uid, k, at).cartas.forEach((c, i) => copias.push({ key: `${uid}~${k}.${i}`, id: c.id, g: c.g, gr: false }));
+    if (n % 25) continue;
+    const club = R.mejorOnce(CLUB, copias), reto = R.mejorOnce(RETO, copias);
+    if (R.evalua(CLUB, club).valida && R.evalua(RETO, reto).valida) return { s, club: club.map(f => f.key), reto: reto.map(f => f.key), pts: { club: R.evalua(CLUB, club).puntaje, reto: R.evalua(RETO, reto).puntaje } };
+  }
+  throw new Error('no se armó ' + uid);
+}
+const C3 = 'cuentaCCC3', TRES = [A, B, C3], ARM = Object.fromEntries(TRES.map((u, i) => [u, armaCuenta(u, i * 7)]));
+const conAhora = (ms, f) => { const ahora = Date.now; Date.now = () => ms; try { return f(); } finally { Date.now = ahora; } };
+function datosPodio(clave, subidas, extra = {}) {
+  const v = { [clave]: {} };
+  for (const [u, at] of Object.entries(subidas)) v[clave][u] = { ['v' + u.slice(-1) + 'Subida01']: { at, c: clave === CLUB ? ARM[u].club : ARM[u].reto } };
+  return Object.assign({
+    cartas: { s: Object.fromEntries(TRES.map(u => [u, ARM[u].s])) },
+    ajustes: Object.fromEntries(TRES.map(u => [u, { x: { n: 1e6 } }])),
+    plantillas: { v }
+  }, extra);
+}
+const orden = clave => TRES.slice().sort((a, b) => ARM[b].pts[clave === CLUB ? 'club' : 'reto'] - ARM[a].pts[clave === CLUB ? 'club' : 'reto'] || 0);
+
+test('podio semanal de un club: el lunes paga 100, 50 y 25 con lo subido justo antes', () => {
+  const antes = FIN - H, d = datosPodio(CLUB, { [A]: antes, [B]: antes + 1, [C3]: antes + 2 });
+  const [p1, p2, p3] = orden(CLUB);
+  const e = conAhora(FIN + H, () => economia(d));
+  assert.deepEqual(e.podiosSemana[SEM][CLUB], [p1, p2, p3]);
+  assert.deepEqual([p1, p2, p3].map(u => e.usuarios[u].premios), [100, 50, 25]);
+  // antes del lunes no paga nada
+  assert.ok(conAhora(FIN - 1, () => TRES.every(u => (economia(datosPodio(CLUB, { [A]: antes, [B]: antes + 1, [C3]: antes + 2 })).usuarios[u] || {}).premios === 0)));
+  // lo subido después del lunes no cuenta para esa semana: con dos en la tabla no hay podio
+  const d2 = datosPodio(CLUB, { [A]: antes, [B]: antes + 1, [C3]: FIN + 5 });
+  assert.equal(conAhora(FIN + H, () => economia(d2)).podiosSemana[SEM][CLUB], undefined);
+  // el lunes siguiente sí cuenta (y se paga otra vez)
+  const e3 = conAhora(R.finSemana(SEM + 1) + H, () => economia(Object.assign({}, d2)));   // otro objeto: economia() guarda el resultado por objeto
+  assert.deepEqual(e3.podiosSemana[SEM + 1][CLUB], [p1, p2, p3]);
+  assert.equal(e3.usuarios[p1].premios, 100 + (p1 === C3 ? 0 : 100));
+});
+
+test('podio del reto: 1000, 500 y 250, y los sobres se cobran una vez, según el puesto', () => {
+  const antes = FIN - H, [p1, p2, p3] = orden(RETO), at = FIN + 2 * H;
+  const reclamo = (u, n, ks) => ({ [R.clavePodio(RETO, n)]: Object.assign({ at, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}, ks[2] ? { k3: ks[2] } : {}) });
+  const sobres = (u, n, ks) => Object.fromEntries(ks.map(k => [k, { at, p: 0, pl: R.clavePodio(RETO, n) }]));
+  const d = datosPodio(RETO, { [A]: antes, [B]: antes + 1, [C3]: antes + 2 }, {});
+  d.plantillas.q = { [p1]: reclamo(p1, 1, ['hPodio00001', 'hPodio00002', 'hPodio00003']), [p2]: reclamo(p2, 1, ['hPodio00004', 'hPodio00005', 'hPodio00006']), [p3]: reclamo(p3, 3, ['gPodio00007']) };
+  Object.assign(d.cartas.s[p1] = Object.assign({}, d.cartas.s[p1]), sobres(p1, 1, ['hPodio00001', 'hPodio00002', 'hPodio00003']));
+  Object.assign(d.cartas.s[p2] = Object.assign({}, d.cartas.s[p2]), sobres(p2, 1, ['hPodio00004', 'hPodio00005', 'hPodio00006']));
+  Object.assign(d.cartas.s[p3] = Object.assign({}, d.cartas.s[p3]), sobres(p3, 3, ['gPodio00007']));
+  const e = conAhora(at + H, () => economia(d));
+  assert.deepEqual([p1, p2, p3].map(u => e.usuarios[u].premios), [1000, 500, 250]);
+  assert.deepEqual([p1, p2, p3].map(u => e.usuarios[u].podiosReto[RETO]), [1, 2, 3]);
+  assert.ok(['hPodio00001', 'hPodio00002', 'hPodio00003'].every(k => e.sobres[p1 + '~' + k]), 'el 1.º recibe sus tres Plus');
+  assert.ok(['hPodio00004', 'hPodio00005', 'hPodio00006'].every(k => !e.sobres[p2 + '~' + k]), 'el 2.º no puede cobrar como 1.º');
+  assert.ok(e.sobres[p3 + '~gPodio00007'], 'el 3.º recibe su sobre');
+});

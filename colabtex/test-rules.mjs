@@ -412,9 +412,35 @@ console.log("— PRODROP: desafíos de plantilla —");
   await allowed("y su premio 1 se cobra", () => premio("mejor_1", ["g"]));
   await denied("un sobre a 0 que nombra un premio que no lo trae no cuela", () => set(ref(db, `cartas/s/${ua.uid}/g${push(ref(db, `cartas/s/${ua.uid}`)).key}`), { at: serverTimestamp(), p: 0, pl: "club-psg_2" }));
   await denied("un premio 2 sin sus sobres tampoco", () => set(ref(db, `plantillas/p/${ua.uid}/club-psg_2`), { at: serverTimestamp(), c: once, k: "gNoExiste000", k2: "gNoExiste001" }));
+  // la versión de cada subida (fb.subirPlantillaReto): una vez, nunca se reescribe
+  const kv = push(ref(db, `plantillas/v/club-realmadrid/${ua.uid}`)).key;
+  await allowed("subir deja su versión en plantillas/v", () => update(ref(db), { [`plantillas/s/club-realmadrid/${ua.uid}`]: { at: serverTimestamp(), c: once }, [`plantillas/v/club-realmadrid/${ua.uid}/${kv}`]: { at: serverTimestamp(), c: once } }));
+  await denied("la versión no se reescribe", () => set(ref(db, `plantillas/v/club-realmadrid/${ua.uid}/${kv}`), { at: serverTimestamp(), c: once }));
+  await denied("ni se borra", () => remove(ref(db, `plantillas/v/club-realmadrid/${ua.uid}/${kv}`)));
+  await denied("ni lleva otra hora", () => set(ref(db, `plantillas/v/club-realmadrid/${ua.uid}/vOtraHora0001`), { at: 1, c: once }));
+  // los sobres del podio de un reto (fb.cobrarPodio)
+  const podio = (id, pres, p = 0) => {
+    const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${ua.uid}`)).key);
+    const w = { [`plantillas/q/${ua.uid}/${id}`]: Object.assign({ at: serverTimestamp(), k: ks[0] }, ks[1] ? { k2: ks[1] } : {}, ks[2] ? { k3: ks[2] } : {}) };
+    ks.forEach(k => { w[`cartas/s/${ua.uid}/${k}`] = { at: serverTimestamp(), p, pl: id }; });
+    return update(ref(db), w);
+  };
+  await denied("el 1.º del reto no cobra con dos sobres", () => podio("reto-clasico-42_p1", ["h", "h"]));
+  await denied("ni con sobres normales", () => podio("reto-clasico-42_p1", ["g", "g", "g"]));
+  await allowed("el 1.º del reto cobra sus tres sobres Plus", () => podio("reto-clasico-42_p1", ["h", "h", "h"]));
+  await denied("una sola vez", () => podio("reto-clasico-42_p1", ["h", "h", "h"]));
+  await denied("el 2.º no cobra tres", () => podio("reto-bleus-43_p2", ["h", "h", "h"]));
+  await allowed("el 2.º cobra un sobre Plus", () => podio("reto-bleus-43_p2", ["h"]));
+  await denied("el 3.º no cobra un Plus", () => podio("reto-lions-44_p3", ["h"]));
+  await allowed("el 3.º cobra un sobre normal", () => podio("reto-lions-44_p3", ["g"]));
+  await denied("un club no tiene podio con sobres", () => podio("club-psg_p1", ["h", "h", "h"]));
+  await denied("ni sobres con precio", () => podio("reto-furia-45_p2", ["h"], 160));
+  await denied("un sobre a 0 que nombra un podio sin reclamo no cuela", () => set(ref(db, `cartas/s/${ua.uid}/h${push(ref(db, `cartas/s/${ua.uid}`)).key}`), { at: serverTimestamp(), p: 0, pl: "reto-furia-45_p2" }));
   const ub = await loginAs(B);
   await denied("B no sube a nombre de A", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
   await denied("ni cobra a nombre de A", () => set(ref(db, `plantillas/p/${ua.uid}/club-psg_1`), { at: serverTimestamp(), c: once, k: "gNoExiste002" }));
+  await denied("ni escribe versiones a nombre de A", () => set(ref(db, `plantillas/v/club-realmadrid/${ua.uid}/vDeB00000001`), { at: serverTimestamp(), c: once }));
+  await denied("ni cobra un podio a nombre de A", () => set(ref(db, `plantillas/q/${ua.uid}/reto-calcio-46_p3`), { at: serverTimestamp(), k: "gNoExiste003" }));
   void ub;
   await loginAs(A);
 }
