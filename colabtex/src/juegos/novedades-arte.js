@@ -348,12 +348,13 @@ function prodrop({ serie1 = false } = {}) {
 
 /* ---------- PRODROP · Fútbol: la misma mano, con tres cartas de fútbol de
    verdad: foto, media, nombre y la cinta de las especiales (por tiempo
-   limitado). Las tres son legendarias, con su marco dorado. La media de la
+   limitado). Las especiales van con su marco dorado; Vidal, por la llegada
+   de la liga chilena, con el franjeado de «Liga Chilena» abajo. La media de la
    izquierda va a la izquierda y las otras a la derecha: la carta de al
    medio tapa un pedazo de las de los lados, y así las tres se leen. Las
    medias son las del motor (juegos/prodrop/motor.js; un test las compara). ---------- */
 const CARTAS_FUTBOL = [
-  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 89, cinta: "" },
+  { img: "champions/colocolo/arturo-vidal", nombre: "Arturo Vidal", media: 73, cinta: "COLO-COLO" },
   { img: "especiales/realmadrid/mbappe-mvp", nombre: "Mbappé", media: 92, cinta: "MVP DEL CLÁSICO" },
   { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" }
 ];
@@ -364,7 +365,8 @@ function futbol() {
   return `<div class="ep-pd ep-fu" aria-hidden="true"><i class="ep-pd-rayos"></i><i class="ep-pd-halo"></i>
     <div class="ep-pd-mano">${CARTAS_FUTBOL.map((c, i) => `<span class="ep-pd-carta c${i + 1}"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">${i === 1 ? '<i class="ep-pd-holo"></i>' : ""}
       <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em></span>`).join("")}
-      <b class="ep-pd-leg">★ LEGENDARIA</b></div>${chispas}</div>`;
+      <b class="ep-pd-leg">★ LEGENDARIA</b></div>
+    <b class="ep-fc-liga"><img src="juegos/prodrop/flags/cl.png" alt="">LIGA CHILENA</b>${chispas}</div>`;
 }
 
 /* ---------- FANAL: el farol en la noche y lo que viene a su luz ---------- */

@@ -148,18 +148,22 @@ other file of the site. Things that hold it together:
   chest on a red radial gradient in a canvas and saved as 470 px webp. Kane's
   base card is `bayern-harry-kane`, the same person as his Balón de Oro. Its
   `hasta` (1793202400000, 28-10-2026 15:46 UTC) is half an hour after the push.
-- **Chilean clubs** (`CHILE`, 73 players: Colo-Colo 24, Universidad Católica 27,
-  Universidad de Chile 22; keys `colocolo`, `ucatolica`, `udechile`; third
-  `AMPLIACIONES` entry with `n: 833`), after the Bayern, at the very end. Medias and
-  positions are EA FC's: the Católica from **FC 27** (ea.com team page, it plays the
-  Libertadores), Colo-Colo and the U from **FC 26**, because FC 27 does not have them
-  (ea.com dropped FC 26; the data came from fut.gg's API,
-  `/api/fut/players/v2/26/?club_id=<EA club id>`, base cards only). The clubs' sites
-  don't publish the squad with photos, so each card is the **in-game face** (fut.gg
-  `player-item` render, 512 px) on a radial gradient in the club's colours, made with
-  Pillow; ea.com's own portraits are missing (403) for the generic-ish faces. Positions
-  were cut to two (the test). All are **Común** (no one above 80). Dorsal 0: the card
-  no longer shows it. `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
+- **Chile and Argentina** (`CHILE` + `ARGENTINA`, 133 players, third `AMPLIACIONES`
+  entry with `n: 833`, after the Bayern): Colo-Colo 19, Universidad Católica 27,
+  Universidad de Chile 15 (keys `colocolo`, `ucatolica`, `udechile`) and River Plate,
+  Boca Juniors and Estudiantes de La Plata, their 24 best each (`river`, `boca`,
+  `estudiantes`; Estudiantes because it was the Argentine semifinalist of the 2026
+  Libertadores). Data from fut.gg's API (`/api/fut/players/v2/<game>/?club_id=<EA id>`
+  for a squad, `?name=<surname>&page=n` to find someone; base cards only). Squads are
+  **today's** (Wikipedia, Aug–Oct 2026): the Católica and the Argentines come from
+  **FC 27**; Colo-Colo and the U are not in FC 27, so each player comes from the newest
+  game that has him (FC 26, 25, 24; Lucero from FC 23, because without a second striker
+  the U could not field a valid eleven). Arrivals with no card in any FIFA are left out
+  (Eduardo Vargas, Lichnovsky, Marchant…). The clubs' sites don't publish squads with
+  photos, so each card is the **in-game face** (fut.gg `player-item` render, 512 px) on a
+  radial gradient in the club's colours, made with Pillow. Positions cut to two (the
+  test). Nearly all are **Común** (only Paredes, 81, is Rara). Dorsal 0: the card no longer
+  shows it. `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
 - **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
   Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the
@@ -419,7 +423,7 @@ The `cartas`, `mercado` and `prodropSerie1` nodes and `perfil/cartas` need the r
 En la interfaz se llama siempre **«Desafío de plantilla»** (no «desafío semanal»: el semanal es solo uno de los tres).
 
 
-- `retos.js` (UMD `ProdropRetos`, puro, sobre el motor) lo comparten el abridor, el cartero y la economía. Plantillas: `mejor` (la **Mejor plantilla**, `tipo: "libre"`: cualquier carta, siempre abierta, sin la condición «Todos cumplen»), `club-<club>` (los clubes con ≥15 cartas, el Bayern incluido) y `reto-<id>-<semana>`; las reglas aceptan las tres claves; el reto de la semana es `RETOS[(semana − PRIMERA) % n]` (`PRIMERA` = 42, lunes 26-10-2026, El Clásico; luego Francia, Inglaterra, España…), así que **los retos solo se agregan al final** (y cada uno debe poder armarse con el catálogo: Oranje se descartó por no haber portero neerlandés; el test lo comprueba). Se activan solos; la pantalla no los lista abajo, sino en el modal «🔜 Próximos retos» (al lado de «Ver colección») con la fecha de cada lunes. Las selecciones llevan `bandera` (imagen de `flags/`), no el emoji. La semana empieza el lunes 03:00 UTC (`SEMANA0`). Un reto solo se sube y se cobra en su semana (`vigente`, con la hora del servidor).
+- `retos.js` (UMD `ProdropRetos`, puro, sobre el motor) lo comparten el abridor, el cartero y la economía. Plantillas: `mejor` (la **Mejor plantilla**, `tipo: "libre"`: cualquier carta, siempre abierta, sin la condición «Todos cumplen»), `club-<club>` (los clubes con ≥15 cartas, el Bayern incluido) y `reto-<id>-<semana>`; las reglas aceptan las tres claves; el reto de la semana es `RETOS[(semana − PRIMERA) % n]` (`PRIMERA` = 42, lunes 26-10-2026, El Clásico; luego Francia, Inglaterra, España…), así que **los retos solo se agregan al final** (salvo detrás de la última semana ya jugada: La Roja, solo chilenos, entró segunda para la semana 43 cuando solo había pasado la 42) (y cada uno debe poder armarse con el catálogo: Oranje se descartó por no haber portero neerlandés; el test lo comprueba). Se activan solos; la pantalla no los lista abajo, sino en el modal «🔜 Próximos retos» (al lado de «Ver colección») con la fecha de cada lunes. Las selecciones llevan `bandera` (imagen de `flags/`), no el emoji. La semana empieza el lunes 03:00 UTC (`SEMANA0`). Un reto solo se sube y se cobra en su semana (`vigente`, con la hora del servidor).
 - Puntaje: (media − castigo de `M.ajuste`) × estado (graduada 0,80 + 0,02 × nota; sin graduar 0,80, para no filtrar la nota oculta), suma × 10. Un puesto «mal» no puede jugar. Sin repetir `person` (Mbappé y su especial son uno).
 - Firebase: `plantillas/s/<plantilla>/<uid>` = {at, c[11]} (la clasificación, se reescribe) y `plantillas/p/<uid>/<plantilla>_<n>` = {at, c[11], k, k2?} (premio cobrado, una vez). Premios (`PREMIOS[].sobres`): 1 = 50 + un sobre normal; 2 = 300 + un sobre Plus (las 11 graduadas ≥6); 3 = 1000 + dos sobres Plus (≥8; el segundo va en `k2`) y, si es de club, su marco. Hasta el 29-10-2026 el 2 daba dos normales y el 3 un Plus (`antes`): esos reclamos siguen valiendo (`sobresValen`), pero la regla solo deja escribir la forma nueva (`k` con `g` solo en el 1, `k2` con `h` solo en el 3). Las monedas solo viven en `PREMIOS` (la economía las lee de ahí; la regla no las mira), así que cambiarlas no toca Firebase y vale también para lo ya cobrado. Los sobres van en el mismo `update` con `p: 0, pl: <reclamo>`; la regla de cada lado mira al otro, y la del premio exige el prefijo y `k2` solo en el 3. Se abren juntos al cobrar.
 - La economía (`monedas.js`, evento `pl`, antes que `s` a igual hora) paga el premio en `premios` (categoría `plantilla`) solo si las 11 son de quien cobra en ese momento y cumplen el nivel con lo graduado hasta ahí; cada sobre con `pl` vale solo si su premio valió y lo nombra, una vez. El cartero comprueba lo mismo antes de escribir (un reclamo mal hecho gasta su única vez).

@@ -1402,6 +1402,13 @@ body:not(.serie1) .solo-serie1 { display: none; }
   font: 800 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .2em; color: #0e3a1a; background: #9ff0b8; padding: 5px 10px; border-radius: 99px;
   box-shadow: 0 4px 10px #0007;
 }
+/* la franja «Liga Chilena» abajo del sobre del menú (llegaron Chile y Argentina) */
+.ch-pack.hub .hub-liga {
+  position: absolute; left: 50%; bottom: 14%; z-index: 4; transform: translateX(-50%) rotate(-4deg); display: flex; align-items: center; gap: 6px;
+  font: 900 15px/1 Rubik, sans-serif; font-style: normal; letter-spacing: .04em; white-space: nowrap; color: #fff;
+  background: linear-gradient(90deg, #d52b1e, #b31d14 55%, #0b3a8c); padding: 7px 12px; border-radius: 7px; box-shadow: 0 0 0 2px #fff, 0 6px 16px #000a;
+}
+.ch-pack.hub .hub-liga img { height: 13px; border-radius: 2px; }
 /* probabilidades y novedades del sobre de fútbol: dos enlaces y un modal que se desplaza */
 .fu-info { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
 .fu-info[hidden] { display: none; }

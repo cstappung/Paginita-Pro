@@ -40,12 +40,15 @@
      es una condición sobre las once juntas. `bandera` es la imagen de
      flags/ que se pinta en vez del emoji (Windows dibuja las banderas
      emoji como dos letras). Solo se agregan al final: el
-     número de la semana elige el reto por su posición. Se activan solos el
+     número de la semana elige el reto por su posición. (La Roja entró
+     segunda, para la semana 43, cuando solo había pasado la 42: meter uno
+     antes de una semana ya jugada cambiaría su reto y sus premios.) Se activan solos el
      lunes; la pantalla los muestra en «Próximos retos» con su fecha. */
   const RETOS = [
     { id: "clasico", titulo: "El Clásico", icono: "⚔️", desc: "Solo Madrid y Barça, con al menos cinco de cada uno.", tope: 6,
       elegible: c => c.club === "realmadrid" || c.club === "barcelona",
       extra: cs => { const m = cs.filter(c => c.club === "realmadrid").length, b = cs.filter(c => c.club === "barcelona").length; return { ok: m >= 5 && b >= 5, txt: `Madrid ${m} · Barça ${b} (mínimo 5 de cada uno)` }; } },
+    { id: "laroja", titulo: "La Roja", icono: "🇨🇱", bandera: "cl", desc: "Once jugadores de la selección chilena.", elegible: c => c.pais === "CL" },
     { id: "bleus", titulo: "Les Bleus", icono: "🇫🇷", bandera: "fr", desc: "Once jugadores de la selección francesa.", elegible: c => c.pais === "FR" },
     { id: "lions", titulo: "Three Lions", icono: "🦁", bandera: "eng", desc: "Once jugadores de la selección inglesa.", elegible: c => c.pais === "ENG" },
     { id: "furia", titulo: "Furia Roja", icono: "🇪🇸", bandera: "es", desc: "Once jugadores de la selección española.", elegible: c => c.pais === "ES" },

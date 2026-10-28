@@ -2931,8 +2931,8 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
 const ATAJO_RETOS = { ruta: "#cartas/retos", boton: "🏆 Desafío de plantilla" };
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
-    gancho: "Cartas especiales por tiempo limitado",
-    lema: "Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro, llegaron a los sobres de Fútbol como legendarias especiales, por tiempo limitado. En el mismo sobre están todos: Real Madrid, Barça, el Big Six y más clubes de la Champions, en el sobre normal y en el Plus (con una Épica asegurada).",
+    gancho: "Llega la liga chilena (y River, Boca y Estudiantes)",
+    lema: "Colo-Colo, la Universidad Católica y la U. de Chile, con Vidal, Aránguiz y Zampedri, y River, Boca y Estudiantes de La Plata llegaron a los sobres de Fútbol, con las medias del FIFA. Siguen Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro, como especiales por tiempo limitado, junto a Real Madrid, Barça, el Big Six y la Champions.",
     datos: () => [["2", "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",

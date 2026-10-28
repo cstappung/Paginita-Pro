@@ -74,7 +74,8 @@ export const MARCOS = [
     ["realmadrid", "Real Madrid"], ["barcelona", "Barcelona"], ["manutd", "Manchester United"], ["mancity", "Manchester City"],
     ["chelsea", "Chelsea"], ["liverpool", "Liverpool"], ["tottenham", "Tottenham"], ["arsenal", "Arsenal"], ["betis", "Real Betis"],
     ["psg", "PSG"], ["como", "Como"], ["inter", "Inter"], ["roma", "Roma"], ["napoli", "Napoli"], ["dortmund", "Dortmund"], ["bayern", "Bayern Múnich"],
-    ["colocolo", "Colo-Colo"], ["ucatolica", "Universidad Católica"], ["udechile", "Universidad de Chile"]
+    ["colocolo", "Colo-Colo"], ["ucatolica", "Universidad Católica"], ["udechile", "Universidad de Chile"],
+    ["river", "River Plate"], ["boca", "Boca Juniors"], ["estudiantes", "Estudiantes"]
   ].map(([club, n]) => ({ id: "club" + club, n, req: { desafio: club } })),
   /* Uno por juego, para quien es n.º 1 en cualquiera de sus tablas. */
   ...[
