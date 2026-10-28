@@ -1294,6 +1294,7 @@ let prevTilt = null, zoomC = null, grading = false, gradeSpeed = 1;
 let sellPara = '';
 function openZoom(c) {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  sincronizaCopia(c);
   zoomC = c; sellPara = '';
   const z = $('#zoom'), box = $('#zoomCard');
   box.innerHTML = '';
@@ -1351,12 +1352,21 @@ function zoomUI(recien) {
   // otras copias de la misma carta
   const list = copies[c.uid] || [], base = CARDS.find(x => x.uid === c.uid), cp = $('#copies');
   cp.innerHTML = list.length > 1 && mio ? `<span>Tus copias:</span>` + list.map((x, i) =>
-    `<button data-i="${i}" class="${mismaCopia(x, c._copy) ? 'on' : ''}"${x.gr ? ` style="--gc:${gradeColor(x.g)}"` : ''}>${x.gr ? `<b>${x.g}</b>` : 'Sin graduar'}${x.venta ? ' 💰' : ''}</button>`).join('') : '';
+    `<button data-i="${i}" class="${mismaCopia(x, c._copy) ? 'on' : ''}"${x.gr ? ` style="--gc:${gradeColor(x.g)}"` : ''}>${x.gr ? `Nota <b>${x.g}</b>` : 'Sin graduar'}${enDesafios(x.key).length || enBorradores(x.key).length ? ' 🏆' : ''}${x.venta ? ' 💰' : ''}</button>`).join('') : '';
   cp.querySelectorAll('button').forEach(b => b.onclick = () => {
     const x = list[+b.dataset.i]; if (grading || mismaCopia(x, c._copy)) return;
     const pc = pull.find(p => mismaCopia(p._copy, x));
     openZoom(pc || fromCopy(base, x));
   });
+}
+/* Una carta instanciada guarda su copia de cuando se armó (las del último
+   sobre, en `pull`, viven toda la sesión): si la copia se graduó desde otra
+   vista, el zoom decía «Sin graduar» y ofrecía graduarla otra vez. Antes de
+   abrirla se toma la copia vigente de la colección. */
+function sincronizaCopia(c) {
+  if (!c || !c._copy || c._ajena) return;
+  const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy));
+  if (x && x !== c._copy) { c._copy = x; c.graded = !!x.gr; c.grade = x.g; }
 }
 // llegaron datos nuevos con el zoom abierto: la carta pudo venderse, graduarse o cambiar de dueño
 function refrescaZoom() {
@@ -1577,7 +1587,10 @@ async function gradeCard() {
   else burst(lx, ly, { n: 22, colors: ['#8b8798', '#5d596a', gc], speed: 3, kinds: ['spark'], gravity: .45 });
 
   c.graded = true;
-  if (c._copy) c._copy.gr = 1;
+  if (c._copy) {
+    c._copy.gr = 1;
+    const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy)); if (x) x.gr = 1;
+  }
   await sleep(400);
   el.classList.remove('slabbing'); front.classList.remove('shine');
   z.classList.remove('grading'); grading = false;
@@ -2605,7 +2618,7 @@ function renderEditorReto() {
         ${rt.tab === 'clasif' ? tabla : premios}</div>
     </div></div>`;
   /* Una casilla vacía abre el selector; una llena primero pregunta:
-     graduarla ahí mismo (si no lo está) o cambiarla. */
+     verla en grande o cambiarla. */
   pintaCancha($('#rtCancha'), cps, i => {
     Snd.init(); Snd.tick();
     if (rt.lista[i] && rt.accion !== i && rt.casilla !== i) { rt.accion = i; rt.casilla = -1; }
@@ -2626,22 +2639,28 @@ function renderEditorReto() {
   pintaEligeReto();
 }
 /* El selector, en un modal sobre la cancha (abajo obligaba a bajar cada
-   vez): una copia por carta (la puesta o la mejor graduada), solo las que
-   cumplen la plantilla y pueden jugar en la casilla; primero las de su
-   puesto, después las incómodas, y dentro de mayor a menor media. */
+   vez): una ficha por carta, solo las que cumplen la plantilla y pueden
+   jugar en la casilla; primero las de su puesto, después las incómodas, y
+   dentro de mayor a menor media. La ficha muestra la mejor copia (la
+   graduada con mejor nota; antes mostraba la puesta y la otra, recién
+   graduada, no se podía elegir) y, si tienes varias, cuántas: al tocarla
+   salen todas para elegir cuál va. */
 function pintaEligeReto() {
   const box = $('#rtElige'), capa = $('#rtEligeCapa');
   capa.hidden = rt.casilla < 0;
   if (capa.hidden) return;
   const p = RT.plantilla(rt.clave), slot = M.FORMACION[rt.casilla], usadas = new Map();
   rt.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== rt.casilla) usadas.set(q, j); });
-  const unica = new Map();
+  const grupos = new Map();   // uid → sus copias, la mejor primero
   for (const cp of misFutbol()) {
     const c = CARDS[cp.id];
     if (!p.elegible(c) || RT.encaje(rt.casilla, cp.id).nivel > 1) continue;
-    const vista = unica.get(c.uid), puesta = rt.lista.includes(cp.key);
-    if (!vista || (puesta && !rt.lista.includes(vista.key)) || (!rt.lista.includes(vista.key) && RT.puntosFicha(fichaCp(cp)) > RT.puntosFicha(fichaCp(vista)))) unica.set(c.uid, cp);
+    if (!grupos.has(c.uid)) grupos.set(c.uid, []);
+    grupos.get(c.uid).push(cp);
   }
+  // entre dos iguales gana la que ya está en el once
+  const valor = cp => RT.puntosFicha(fichaCp(cp)) + (rt.lista.includes(cp.key) ? .001 : 0);
+  for (const l of grupos.values()) l.sort((a, b) => valor(b) - valor(a));
   /* Dentro de cada grupo (los de su puesto, luego los incómodos): por media,
      por equipo (cada club junto, en el orden del catálogo) o por graduación
      (mejor nota primero; las sin graduar al final, por media). */
@@ -2651,18 +2670,20 @@ function pintaEligeReto() {
     club: (a, b) => ordenClub.indexOf(CARDS[a.id].club) - ordenClub.indexOf(CARDS[b.id].club),
     nota: (a, b) => nota(b) - nota(a)
   }[rt.ordenElige] || (() => 0);
-  const lista = [...unica.values()].sort((a, b) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
+  const lista = [...grupos.values()].sort(([a], [b]) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
     || porOrden(a, b) || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
+  const aqui = rt.lista[rt.casilla];
   let grupo = -1;
   box.innerHTML = `<div class="pl-elige-head"><b>${M.PUESTO[slot.pos][0].toUpperCase() + M.PUESTO[slot.pos].slice(1)} · elige un jugador</b>
-      <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${rt.lista[rt.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
+      <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${aqui ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
     <div class="pl-orden" role="group" aria-label="Ordenar">Ordenar por ${Object.entries(ORDEN_ELIGE).map(([k, l]) => `<button class="chip${rt.ordenElige === k ? ' on' : ''}" data-orden="${k}">${l}</button>`).join('')}</div>
-    <div class="tc-rejilla pl-lista">${lista.length ? lista.map(cp => {
-      const c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = rt.lista[rt.casilla] === cp.key;
+    <div class="tc-rejilla pl-lista">${lista.length ? lista.map(l => {
+      const cp = l[0], c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = l.some(x => x.key === aqui);
       const cab = en.nivel !== grupo ? `<h4 class="rt-grupo n${en.nivel}">${en.nivel ? `Incómodos en ${slot.pos} · −${en.pen} de media` : `De ${slot.pos}`}</h4>` : '';
       grupo = en.nivel;
-      const nota = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
-      return `${cab}<div class="tc-elige pl-op fit-${en.nivel ? 'inc' : 'ok'}${rt.pick === cp.key ? ' on' : ''}" role="button" tabindex="0" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</div>`;
+      const marca = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
+      const cuantas = l.length > 1 ? `<i class="pl-cuantas" title="Tienes ${l.length} copias">×${l.length}</i>` : '';
+      return `${cab}<div class="tc-elige pl-op fit-${en.nivel ? 'inc' : 'ok'}${rt.pick === c.uid ? ' on' : ''}" role="button" tabindex="0" data-c="${esc(c.uid)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${marca}${cuantas}`)}</div>`;
     }).join('') : `<p class="mk-vacio">No tienes jugadores que cumplan «${esc(p.titulo)}» y puedan jugar de ${slot.pos}: abre sobres de Fútbol.</p>`}</div>`;
   const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => ponReto('');
   box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; rt.pick = ''; renderEditorReto(); };
@@ -2672,17 +2693,35 @@ function pintaEligeReto() {
     pintaEligeReto();
   });
   box.querySelector('[data-rt-mk-puesto]').onclick = () => abreMercadoReto();
-  // tocar un jugador muestra sus botones encima de la carta: ponerlo y, si no está graduado, graduarlo
   box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => { Snd.init(); Snd.tick(); rt.pick = rt.pick === x.dataset.c ? '' : x.dataset.c; pintaEligeReto(); });
-  const sel = rt.pick && box.querySelector(`[data-c="${CSS.escape(rt.pick)}"]`);
-  if (sel) sel.appendChild(accionesCarta(copiaPorClave(rt.pick), 'poner', () => ponReto(rt.pick)));
+  const sel = rt.pick && box.querySelector(`[data-c="${CSS.escape(rt.pick)}"]`), l = sel && grupos.get(rt.pick);
+  if (!l) return;
+  // una sola copia: sus botones encima de la carta; varias: todas debajo, para elegir cuál va
+  if (l.length === 1) { sel.appendChild(accionesCarta(l[0], 'poner', () => ponReto(l[0].key))); return; }
+  sel.after(variantesHTML(l, aqui));
+  sel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+// las copias de una carta en el selector, cada una con «Poner» y «Ver»
+function variantesHTML(l, aqui) {
+  const c = CARDS[l[0].id], box = document.createElement('div');
+  box.className = 'pl-variantes';
+  box.innerHTML = `<p class="pl-var-tit">Tus ${l.length} copias de <b>${esc(c.name)}</b> · elige cuál va</p>` + l.map((x, i) => {
+    const aca = x.key === aqui, otra = !aca && rt.lista.includes(x.key);
+    return `<div class="pl-var${aca ? ' aca' : ''}">${miniCp(x)}
+      <span class="pl-var-tx"><b${x.gr ? ` style="color:${gradeColor(x.g)}"` : ''}>${x.gr ? `Nota ${x.g} · ${GRADE_WORD[x.g]}` : 'Sin graduar'}</b>
+        <small>${[i === 0 ? 'la mejor' : '', aca ? 'en esta casilla' : otra ? 'en otra casilla' : '', x.venta ? '💰 a la venta' : ''].filter(Boolean).join(' · ') || '&nbsp;'}</small></span>
+      <span class="pl-var-bt"><button class="btn mk-mini" data-var-ver="${i}">👁 Ver</button>${aca ? '<em class="pl-var-ya">✓ Puesta</em>' : `<button class="btn mk-mini primary" data-var-pon="${i}">Poner</button>`}</span></div>`;
+  }).join('');
+  box.querySelectorAll('[data-var-pon]').forEach(b => b.onclick = e => { e.stopPropagation(); ponReto(l[+b.dataset.varPon].key); });
+  box.querySelectorAll('[data-var-ver]').forEach(b => b.onclick = e => { e.stopPropagation(); verDesdeReto(l[+b.dataset.varVer]); });
+  return box;
 }
 // el orden en que pintaCancha deja las casillas en la página (de la fila de arriba a la de abajo)
 const ordenCasillas = () => [3, 2, 1, 0].flatMap(f => M.FORMACION.map((s, i) => (s.fila === f ? i : -1)).filter(i => i >= 0));
-/* Los botones sobre una carta del once o del selector: graduarla ahí mismo
-   (abre la graduación en vivo y, al cerrarla, se vuelve al desafío) y
-   ponerla o cambiarla. Son botones dentro de otro que se puede tocar: no
-   dejan pasar el toque. */
+/* Los botones sobre una carta del once o del selector: verla en grande
+   (con su nota, sus otras copias y, si no está graduada, el botón para
+   graduarla; al cerrarla se vuelve al desafío) y ponerla o cambiarla. Son
+   botones dentro de otro que se puede tocar: no dejan pasar el toque. */
 function accionesCarta(cp, que, alElegir) {
   const box = document.createElement('div');
   box.className = 'rt-acciones';
@@ -2692,16 +2731,15 @@ function accionesCarta(cp, que, alElegir) {
     b.onclick = e => { e.stopPropagation(); fn(); };
     box.appendChild(b);
   };
-  if (cp && !cp.gr && !cp.venta) boton(`🎓<small>Graduar</small>`, `Graduar (${M.PRECIO.gradua} monedas)`, () => graduaDesdeReto(cp), 'grad');
+  if (cp) boton(`<b>👁</b><small>Ver</small>`, 'Ver la carta en grande (ahí puedes graduarla)', () => verDesdeReto(cp), 'ver');
   boton(que === 'poner' ? `<b>👤＋</b><small>Poner</small>` : `<b>⇄</b><small>Cambiar</small>`, que === 'poner' ? 'Poner en la casilla' : 'Cambiar por otro jugador', alElegir, 'pon');
   box.onclick = e => e.stopPropagation();
   return box;
 }
-function graduaDesdeReto(cp) {
+function verDesdeReto(cp) {
   if (!cp) return;
-  const inst = instOf(CARDS[cp.id], cp);
-  $('#retos').hidden = true; zoomVuelve = 'retos'; openZoom(inst);
-  gradeCard();
+  Snd.init(); Snd.tick();
+  $('#retos').hidden = true; zoomVuelve = 'retos'; openZoom(instOf(CARDS[cp.id], cp));
 }
 function ponReto(k) {
   const quien = jugadorDe(k);
