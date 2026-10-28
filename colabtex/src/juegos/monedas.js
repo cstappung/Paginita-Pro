@@ -583,7 +583,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   /* El cierre de cada semana (`ps`) va antes que todo lo de ese instante:
      las tablas se miran como estaban justo antes del lunes. El reclamo de
      los sobres de un podio (`pq`) va, como el de un premio, antes que sus sobres. */
-  const ORDEN = { ps: -2, pq: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p), pl: typeof x.pl === "string" ? x.pl : "" });
@@ -615,6 +615,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries(pd.q || {}))
     for (const [id, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "pq", at: x.at, u, k: id, sobres: [x.k, x.k2, x.k3].filter(k => typeof k === "string" && k) });
+  /* El álbum completo de un club: `plantillas/a/<uid>/album-<club>` = {at, c: [una copia por carta], k}. */
+  for (const [u, l] of Object.entries(pd.a || {}))
+    for (const [id, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pa", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k].filter(k => typeof k === "string" && k) });
   for (const [u, l] of Object.entries(c.g || {}))
     for (const [k, porI] of Object.entries(l || {}))
       for (const [i, x] of Object.entries(porI || {}))
@@ -784,6 +788,18 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (e.sobres.length !== pr.sobres.length || new Set(e.sobres).size !== e.sobres.length
         || e.sobres.some((k, i) => k[0] !== PM.SOBRE[pr.sobres[i]].prefijo)) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
+    } else if (e.t === "pa") {
+      /* El álbum completo: una copia tuya de cada carta del club, en ese
+         instante, y una sola vez por club. Paga sus monedas y deja pasar su sobre. */
+      const club = conRetos && PR.leeAlbum(e.k), x = U(e.u);
+      if (!club || x.parada || (x.albumes && x.albumes[club]) || reclamos[e.u + "~" + e.k]) continue;
+      const faltan = new Set(PR.cartasAlbum(club).map(cd => cd.n));
+      for (const cc of new Set(e.c)) { const f = dueno[cc] === e.u && ficha(cc), h = f && PR.huecoAlbum(club, f.id); if (h) faltan.delete(h.n); }
+      if (faltan.size || e.sobres.length !== PR.ALBUM.sobres.length || e.sobres.some((k, i) => k[0] !== PM.SOBRE[PR.ALBUM.sobres[i]].prefijo)) continue;
+      reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
+      (x.albumes || (x.albumes = {}))[club] = e.at;
+      x.premios += PR.ALBUM.monedas;
+      anota(e.u, "plantilla", PR.ALBUM.monedas, `Álbum completo · ${PM.CLUBES[club]}`);
     } else if (e.t === "pl") {
       /* Un premio vale si la plantilla está vigente (un reto, solo en su
          semana), las once son de quien reclama en ese momento y, con lo

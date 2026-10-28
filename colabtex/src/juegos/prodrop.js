@@ -79,7 +79,10 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
     for (const [clave, us] of Object.entries(pod)) podio[clave] = us.map(persona);
     const yo = ((e.usuarios[uid] || {}).podiosReto) || {}, reto = PR.claveReto(pasada);
     const miPodio = yo[reto] ? { clave: reto, n: yo[reto], cobrado: !!podiosMios[PR.clavePodio(reto, yo[reto])] } : null;
-    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio } };
+    // los álbumes completos ya cobrados (por club)
+    const albumes = {};
+    for (const [id, x] of Object.entries((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})) { const club = PR.leeAlbum(id); if (club && x) albumes[club] = x.at || 0; }
+    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio }, albumes };
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -224,6 +227,26 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           if (((d.plantillas && d.plantillas.q && d.plantillas.q[uid]) || {})[id]) throw new Error("Esos sobres ya los cobraste.");
           const w = await fb.cobrarPodio(uid, id, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
           responde(true, { ks: w.ks, at: w.at, n: r.n, sobres: PR.textoSobresPodio(pr) });
+        } else if (x.accion === "cobraAlbum") {
+          /* El álbum completo de un club: se elige aquí una copia tuya de
+             cada carta (la que no está a la venta, si hay) y se escribe con su sobre. */
+          const club = PR.leeAlbum(PR.claveAlbum(String(x.club || "")));
+          if (!club) throw new Error("Ese club no tiene álbum.");
+          const id = PR.claveAlbum(club);
+          if (((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})[id]) throw new Error("Ese álbum ya lo cobraste.");
+          if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
+          // una copia por jugador (la especial vale por la normal), mejor una que no esté a la venta
+          const porCarta = {};
+          for (const y of copiasDe(uid, d)) {
+            const f = fichaDe(e, y.c), h = f && PR.huecoAlbum(club, f.id);
+            if (!h) continue;
+            if (!porCarta[h.n] || (porCarta[h.n].venta && !y.venta)) porCarta[h.n] = y;
+          }
+          const faltan = PR.cartasAlbum(club).filter(cd => !porCarta[cd.n]);
+          if (faltan.length) throw new Error(`Te faltan ${faltan.length} cartas del ${MOTOR.CLUBES[club]}.`);
+          const c = PR.cartasAlbum(club).map(cd => porCarta[cd.n].c);
+          const w = await fb.cobrarAlbum(uid, id, c, PR.ALBUM.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+          responde(true, { ks: w.ks, at: w.at, monedas: PR.ALBUM.monedas, sobres: PR.textoSobres(PR.ALBUM) });
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
           if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
@@ -285,7 +308,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-67" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-69" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

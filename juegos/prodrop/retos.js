@@ -177,6 +177,22 @@
   // el orden de una tabla: más puntaje primero; empate, quien la subió antes
   const ordenaTabla = filas => filas.slice().sort((a, b) => b.puntaje - a.puntaje || a.at - b.at || (a.u < b.u ? -1 : a.u > b.u ? 1 : 0));
 
+  /* ---------- el álbum completo de un club ----------
+     Tener a la vez a cada jugador del club (una copia de su carta, con
+     cualquier nota, graduada o no) paga una vez `ALBUM`. Se cuentan
+     jugadores, no cartas: la especial de un jugador (Mbappé MVP, Kane
+     Balón de Oro) vale por su carta normal, pero no hace falta tenerla
+     (son por tiempo limitado, y el álbum quedaría imposible). El reclamo
+     guarda una copia por jugador (`c`), y la economía comprueba que eran
+     tuyas en ese momento. */
+  const ALBUM = { monedas: 2000, sobres: ["futbolplus"] };
+  // los jugadores del álbum: la carta normal de cada uno (su `person` es el mismo que el de su especial)
+  const cartasAlbum = club => M.CARDS.filter(c => M.esFutbol(c.col) && c.club === club && !c.especial);
+  // la carta del álbum que cubre la carta `id` (la normal de su jugador), o null si no es de ese club
+  const huecoAlbum = (club, id) => { const c = M.CARDS[id]; return c && c.club === club ? cartasAlbum(club).find(x => x.person === c.person) || null : null; };
+  const claveAlbum = club => "album-" + club;
+  const leeAlbum = id => { const m = /^album-([a-z]{2,15})$/.exec(String(id || "")); return m && CLUBES.includes(m[1]) ? m[1] : null; };
+
   /* El mejor once que se puede armar con estas copias ({key, id, g, gr}):
      cada casilla con la que más suma entre las que juegan ahí, después
      las que juegan incómodas. Para «Autocompletar». */
@@ -203,6 +219,7 @@
     MEJOR, CLUBES, RETOS, PRIMERA, SEMANA0, SEMANA_MS, semanaDe, inicioSemana, finSemana, retoDeSemana,
     plantilla, claveClub, claveReto, vigente, encaje, estado, puntosFicha, puntaje, evalua,
     PREMIOS, sobresValen, PREMIO_MARCO, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce,
-    MIN_PODIO, PODIO_CLUB, PODIO_RETO, textoSobresPodio, clavePodio, leePodio, ordenaTabla
+    MIN_PODIO, PODIO_CLUB, PODIO_RETO, textoSobresPodio, clavePodio, leePodio, ordenaTabla,
+    ALBUM, cartasAlbum, huecoAlbum, claveAlbum, leeAlbum
   };
 });
