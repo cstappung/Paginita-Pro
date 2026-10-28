@@ -98,8 +98,8 @@ test('el premio 1 paga 50 y un sobre si las once son de quien cobra', () => {
   d.cartas.s[A] = Object.assign({}, SOBRES, { [k]: { at, p: 0, pl: EL.clave + '_1' } });
   assert.equal(monedasDe(A, d).premios, 50);
   assert.ok(economia(d).sobres[A + '~' + k], 'su sobre existe');
-  // el premio de un club deja su marco de perfil (perfil-tarjeta.js)
-  assert.deepEqual(economia(d).usuarios[A].desafios, { [EL.clave.slice(5)]: at });
+  // el premio 1 ya no da el marco del club: lo da el 3 (once con nota 8 o más)
+  assert.deepEqual(economia(d).usuarios[A].desafios, {});
   // un premio 1 que trae un sobre Plus no vale
   const dp = datos({ plantillas: { p: { [A]: { [EL.clave + '_1']: { at, c, k: 'hPremio0000' } } } } });
   assert.equal(monedasDe(A, dp).premios, 0);
@@ -149,6 +149,41 @@ test('graduadas con nota 6 o más: el premio 2 paga 100 y sus dos sobres entran,
   assert.equal(monedasDe(A, d1).premios, 0);
   for (let i = 0; i < 5; i++) assert.equal(e.dueno[`${A}~${k}.${i}`], A);
   assert.equal(e.sobres[A + '~gOtra00001'], undefined, 'un segundo sobre del mismo premio no vale');
+  // la forma de ahora: un solo sobre Plus
+  const d4 = datos({ ajustes: { [A]: { x: { n: 5000 } } }, plantillas: { p: { [A]: { [EL.clave + '_2']: { at, c, k: 'hPremio0004' } } } } });
+  d4.cartas.g = { [A]: g };
+  d4.cartas.s[A] = Object.assign({}, SOBRES, { hPremio0004: { at, p: 0, pl: EL.clave + '_2' } });
+  assert.equal(monedasDe(A, d4).premios, 300);
+  assert.ok(economia(d4).sobres[A + '~hPremio0004'], 'su sobre Plus existe');
+});
+
+test('premio 3 (once con nota 8 o más): 1000, dos sobres Plus y el marco del club', () => {
+  const D = 'cuentaDDD4', s = {}, copias = [];
+  let el = null;
+  for (let n = 0; n < 3000 && !el; n++) {
+    const k = 'g' + String(n).padStart(9, '0'), at = T0 + n * 7 * H;
+    s[k] = { at, p: 0 };
+    PM.sobre(D, k, at).cartas.forEach((c, i) => copias.push({ key: `${D}~${k}.${i}`, id: c.id, g: c.g, gr: false }));
+    if (n % 20) continue;
+    for (const club of R.CLUBES) {
+      const once = R.mejorOnce(R.claveClub(club), copias.filter(x => x.g >= 8));
+      if (R.evalua(R.claveClub(club), once).valida) { el = { clave: R.claveClub(club), once, fin: at }; break; }
+    }
+  }
+  assert.ok(el, 'sale algún club con once de nota 8 o más');
+  const at = el.fin + 2 * H, c = el.once.map(f => f.key), g = {};
+  el.once.forEach((f, i) => { const [, kk, ii] = /~(.+)\.(\d)$/.exec(f.key); (g[kk] = g[kk] || {})[ii] = { at: el.fin + H + i, p: 100 }; });
+  const con = (ks, extra = {}) => {
+    const d = { ajustes: { [D]: { x: { n: 5000 } } }, cartas: { s: { [D]: Object.assign({}, s) }, g: { [D]: g } }, plantillas: { p: { [D]: { [el.clave + '_3']: Object.assign({ at, c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) } } } };
+    ks.forEach(k => { d.cartas.s[D][k] = { at, p: 0, pl: el.clave + '_3' }; });
+    return Object.assign(d, extra);
+  };
+  const d = con(['hPremio0010', 'hPremio0011']), e = economia(d);
+  assert.equal(monedasDe(D, d).premios, 1000);
+  assert.ok(e.sobres[D + '~hPremio0010'] && e.sobres[D + '~hPremio0011'], 'sus dos sobres Plus existen');
+  assert.deepEqual(e.usuarios[D].desafios, { [el.clave.slice(5)]: at }, 'y el marco del club');
+  assert.equal(monedasDe(D, con(['hPremio0012'])).premios, 1000, 'un reclamo de antes (un solo Plus) sigue valiendo');
+  assert.equal(monedasDe(D, con(['hPremio0013', 'gPremio0014'])).premios, 0, 'un Plus y un normal no');
 });
 
 /* ---------- el podio de cada semana ----------

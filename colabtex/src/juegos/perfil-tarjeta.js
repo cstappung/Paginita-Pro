@@ -35,8 +35,8 @@ export const MAX_VITRINA = 6;
    de al menos tres personas; {primero: true} el primer puesto en una así;
    {top: <juego>} ser el n.º 1 de alguna tabla de ese juego (de dos o más
    personas; ver `campeones`); {tienda: true} haberlo comprado;
-   {desafio: <club>} haber cobrado un premio del Desafío de plantilla de
-   ese club.
+   {desafio: <club>} haber cobrado el premio 3 (las once graduadas con nota 8
+   o más) del Desafío de plantilla de ese club.
    `anim`: el marco es un dibujo animado (juegos/marcos-animados.js) que
    va encima de la foto, no solo CSS. */
 export const MARCOS = [
@@ -328,7 +328,7 @@ export function requisito(item, est, ahora = Date.now()) {
     const p = precioDe(item.id);
     return { ok: false, falta: `${p.toLocaleString("es-CL")} monedas en la tienda`, tienda: true, precio: p };
   }
-  if (r.desafio) return est.desafios && est.desafios[r.desafio] ? { ok: true, falta: "" } : { ok: false, falta: `Cobra un premio del Desafío de plantilla del ${item.n}` };
+  if (r.desafio) return est.desafios && est.desafios[r.desafio] ? { ok: true, falta: "" } : { ok: false, falta: `Cobra el premio de las once graduadas con nota 8 o más del Desafío de plantilla del ${item.n}` };
   if (r.coleccion) {
     const k = coleccionHalloween(est.compras);
     if (k >= r.coleccion) return { ok: true, falta: "" };

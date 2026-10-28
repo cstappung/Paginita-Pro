@@ -795,11 +795,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (!e.c.every(cc => dueno[cc] === e.u)) continue;
       const fs = e.c.map(cc => { const f = ficha(cc); return f && { id: f.id, g: f.g, gr: !!graduada[cc] }; });
       if (fs.some(f => !f) || !PR.premioOk(r.n, PR.evalua(r.clave, fs))) continue;
-      if (e.sobres.length !== pr.sobres.length || new Set(e.sobres).size !== e.sobres.length
-        || e.sobres.some((k, i) => k[0] !== PM.SOBRE[pr.sobres[i]].prefijo)) continue;
+      if (new Set(e.sobres).size !== e.sobres.length || !PR.sobresValen(pr, e.sobres.map(k => k[0]))) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
-      // el de un club deja además su marco de perfil (perfil-tarjeta.js), desde el primero que valió
-      if (pt.tipo === "club") { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
+      // el premio 3 de un club (las once con nota 8 o más) deja además su marco de perfil (perfil-tarjeta.js)
+      if (pt.tipo === "club" && r.n === PR.PREMIO_MARCO) { const ds = U(e.u).desafios || (U(e.u).desafios = {}); if (!ds[pt.club]) ds[pt.club] = e.at; }
       U(e.u).premios += pr.monedas;
       anota(e.u, "plantilla", pr.monedas, pt.titulo);
     } else if (e.t === "s") {

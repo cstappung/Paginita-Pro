@@ -476,14 +476,14 @@
         "$uid": {
           "$id": {
             ".write": "auth != null && ((auth.uid === $uid && !data.exists() && newData.exists()) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
-            ".validate": "$id.matches(/^(mejor|club-[a-z]{2,15}|reto-[a-z]{2,12}-[0-9]{1,5})_[123]$/) && newData.hasChildren(['at', 'c', 'k']) && newData.child('at').val() === now && newData.child('k').isString() && newData.child('k').val().beginsWith($id.endsWith('_3') ? 'h' : 'g') && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k').val()).child('pl').val() === $id && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k').val()).child('at').val() === now && ($id.endsWith('_2') ? (newData.child('k2').isString() && newData.child('k2').val().beginsWith('g') && newData.child('k2').val() !== newData.child('k').val() && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k2').val()).child('pl').val() === $id && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k2').val()).child('at').val() === now) : !newData.hasChild('k2'))",
+            ".validate": "$id.matches(/^(mejor|club-[a-z]{2,15}|reto-[a-z]{2,12}-[0-9]{1,5})_[123]$/) && newData.hasChildren(['at', 'c', 'k']) && newData.child('at').val() === now && newData.child('k').isString() && newData.child('k').val().beginsWith($id.endsWith('_1') ? 'g' : 'h') && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k').val()).child('pl').val() === $id && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k').val()).child('at').val() === now && ($id.endsWith('_3') ? (newData.child('k2').isString() && newData.child('k2').val().beginsWith('h') && newData.child('k2').val() !== newData.child('k').val() && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k2').val()).child('pl').val() === $id && newData.parent().parent().parent().parent().child('cartas').child('s').child($uid).child(newData.child('k2').val()).child('at').val() === now) : !newData.hasChild('k2'))",
             "at": { ".validate": "newData.isNumber()" },
             "c": {
               ".validate": "newData.hasChildren(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])",
               "$i": { ".validate": "$i.matches(/^([0-9]|10)$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
             },
             "k": { ".validate": "newData.isString() && newData.val().matches(/^[gh][-_A-Za-z0-9]{8,23}$/)" },
-            "k2": { ".validate": "newData.isString() && newData.val().matches(/^g[-_A-Za-z0-9]{8,23}$/)" },
+            "k2": { ".validate": "newData.isString() && newData.val().matches(/^h[-_A-Za-z0-9]{8,23}$/)" },
             "$otro": { ".validate": false }
           }
         }
