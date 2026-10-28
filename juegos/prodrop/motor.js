@@ -448,18 +448,20 @@
     ["bayern", "serge-gnabry", "S. Gnabry", "DEL", 7, "DE"], ["bayern", "harry-kane", "Harry Kane", "DEL", 9, "ENG"],
     ["bayern", "luis-diaz", "Luis Díaz", "DEL", 14, "CO"], ["bayern", "michael-olise", "M. Olise", "DEL", 17, "FR"]
   ];
-  /* ---------- Chile y Argentina ----------
-     Colo-Colo, la Universidad Católica y la U. de Chile, y River, Boca y
-     Estudiantes, con las medias y posiciones de EA FC (fut.gg). El plantel
-     es el de hoy (Wikipedia, ago–oct 2026): la Católica, River, Boca y
-     Estudiantes vienen de FC 27; Colo-Colo y la U no están en FC 27, así que
-     sus jugadores salen de la última versión que los trae (FC 26, 25 o 24),
-     y quien llegó sin carta en ningún FIFA queda fuera (Eduardo Vargas,
-     Lichnovsky, Marchant…); Lucero sale de FC 23, porque sin un segundo
-     delantero la U no armaba un once. De los argentinos, los 24 de mejor media. La
-     foto es la cara del juego sobre los colores del club
-     (cards/champions/<club>/<id>.webp). Sin dorsal (0): la carta ya no lo
-     muestra. Van después del Bayern, con su propio corte en `AMPLIACIONES`. */
+  /* ---------- Chile, Argentina, la MLS y Arabia ----------
+     Colo-Colo, la Universidad Católica y la U. de Chile; River, Boca y
+     Estudiantes; Inter Miami (Messi), CF Montréal (Alexis Sánchez) y LAFC
+     (Son); Al Nassr (Cristiano), Al Hilal y Al Ittihad. Medias y
+     posiciones de EA FC (fut.gg). El plantel es el de hoy: todos de FC 27
+     menos Colo-Colo y la U, que no están en FC 27 (sus planteles salen de
+     Wikipedia, ago–oct 2026, y cada jugador de la última versión que lo
+     trae: FC 26, 25, 24; Lucero de FC 23, porque sin un segundo delantero
+     la U no armaba un once). Quien llegó sin carta en ningún FIFA queda
+     fuera (Eduardo Vargas, Lichnovsky, Marchant…). De los demás clubes,
+     los 24 de mejor media. La foto es la cara del juego sobre los colores
+     del club (cards/champions/<club>/<id>.webp). Sin dorsal (0): la carta
+     ya no lo muestra. Van después del Bayern, con su propio corte en
+     `AMPLIACIONES`. */
   const CHILE = [
     // Colo-Colo (19)
     ["colocolo", "claudio-aquino", "C. Aquino", "MED", 0, "AR"], ["colocolo", "fernando-de-paul", "De Paul", "POR", 0, "CL"],
@@ -538,12 +540,96 @@
     ["estudiantes", "fabricio-perez", "F. Pérez", "MED", 0, "AR"], ["estudiantes", "baltasar-rodriguez", "B. Rodríguez", "MED", 0, "AR"],
     ["estudiantes", "lucas-alario", "L. Alario", "DEL", 0, "AR"], ["estudiantes", "ramiro-funes-mori", "Funes Mori", "DEF", 0, "AR"]
   ];
+  const MLS = [
+    // Inter Miami (24)
+    ["intermiami", "lionel-messi", "Messi", "MED", 0, "AR"], ["intermiami", "rodrigo-de-paul", "De Paul", "MED", 0, "AR"],
+    ["intermiami", "casemiro", "Casemiro", "MED", 0, "BR"], ["intermiami", "luis-suarez", "Luis Suárez", "DEL", 0, "UY"],
+    ["intermiami", "german-berterame", "G. Berterame", "DEL", 0, "MX"], ["intermiami", "dayne-st-clair", "St. Clair", "POR", 0, "CA"],
+    ["intermiami", "reguilon", "Reguilón", "DEF", 0, "ES"], ["intermiami", "tadeo-allende", "T. Allende", "MED", 0, "AR"],
+    ["intermiami", "facundo-mura", "F. Mura", "DEF", 0, "AR"], ["intermiami", "telasco-segovia", "T. Segovia", "MED", 0, "VE"],
+    ["intermiami", "yannick-bright", "Y. Bright", "MED", 0, "IT"], ["intermiami", "matias-galarza", "M. Galarza", "MED", 0, "PY"],
+    ["intermiami", "micael", "Micael", "DEF", 0, "BR"], ["intermiami", "david-ayala", "D. Ayala", "MED", 0, "AR"],
+    ["intermiami", "maximiliano-falcon", "M. Falcón", "DEF", 0, "UY"], ["intermiami", "gonzalo-lujan", "G. Luján", "DEF", 0, "AR"],
+    ["intermiami", "ian-fray", "I. Fray", "DEF", 0, "JM"], ["intermiami", "mateo-silvetti", "M. Silvetti", "MED", 0, "AR"],
+    ["intermiami", "luis-barraza", "L. Barraza", "POR", 0, "US"], ["intermiami", "rocco-rios-novo", "Ríos Novo", "POR", 0, "AR"],
+    ["intermiami", "daniel-pinter", "D. Pintér", "DEL", 0, "US"], ["intermiami", "santiago-morales", "S. Morales", "MED", 0, "US"],
+    ["intermiami", "fricio-caicedo", "F. Caicedo", "DEF", 0, "EC"], ["intermiami", "israel-boatwright", "I. Boatwright", "DEF", 0, "DO"],
+    // CF Montréal (24)
+    ["montreal", "alexis-sanchez", "Alexis Sánchez", "DEL", 0, "CL"], ["montreal", "prince-owusu", "P. Owusu", "DEL", 0, "GH"],
+    ["montreal", "matty-longstaff", "M. Longstaff", "MED", 0, "ENG"], ["montreal", "wikelman-carmona", "W. Carmona", "MED", 0, "VE"],
+    ["montreal", "brayan-ceballos", "B. Ceballos", "DEF", 0, "CO"], ["montreal", "brayan-vera", "B. Vera", "DEF", 0, "CO"],
+    ["montreal", "dani-pereira", "D. Pereira", "MED", 0, "VE"], ["montreal", "victor-loturi", "V. Loturi", "MED", 0, "CA"],
+    ["montreal", "dante-sealy", "D. Sealy", "MED", 0, "TT"], ["montreal", "luca-petrasso", "L. Petrasso", "DEF", 0, "CA"],
+    ["montreal", "samuel-piette", "S. Piette", "MED", 0, "CA"], ["montreal", "frankie-amaya", "F. Amaya", "MED", 0, "US"],
+    ["montreal", "jalen-neal", "J. Neal", "DEF", 0, "US"], ["montreal", "hennadii-synchuk", "H. Synchuk", "MED", 0, "UA"],
+    ["montreal", "efrain-morales", "E. Morales", "DEF", 0, "BO"], ["montreal", "dawid-bugaj", "D. Bugaj", "DEF", 0, "PL"],
+    ["montreal", "daniel-rios", "D. Ríos", "DEL", 0, "MX"], ["montreal", "sebastian-breza", "S. Breza", "POR", 0, "CA"],
+    ["montreal", "olger-escobar", "O. Escobar", "MED", 0, "GT"], ["montreal", "brandan-craig", "B. Craig", "DEF", 0, "US"],
+    ["montreal", "fabian-herbers", "F. Herbers", "MED", 0, "DE"], ["montreal", "aleksandr-guboglo", "A. Guboglo", "DEF", 0, "CA"],
+    ["montreal", "bode-hidalgo", "B. Hidalgo", "DEF", 0, "US"], ["montreal", "ivan-losenko", "I. Losenko", "MED", 0, "UA"],
+    // LAFC (24)
+    ["lafc", "son-heung-min", "Son Heung-min", "DEL", 0, "KR"], ["lafc", "denis-bouanga", "D. Bouanga", "DEL", 0, "GA"],
+    ["lafc", "hugo-lloris", "Lloris", "POR", 0, "FR"], ["lafc", "mark-delgado", "M. Delgado", "MED", 0, "US"],
+    ["lafc", "armindo-sieb", "A. Sieb", "DEL", 0, "DE"], ["lafc", "leo-walta", "L. Walta", "MED", 0, "FI"],
+    ["lafc", "ryan-hollingshead", "Hollingshead", "DEF", 0, "US"], ["lafc", "timothy-tillman", "T. Tillman", "MED", 0, "US"],
+    ["lafc", "ryan-porteous", "R. Porteous", "DEF", 0, "SCO"], ["lafc", "aaron-long", "A. Long", "DEF", 0, "US"],
+    ["lafc", "sergi-palencia", "S. Palencia", "DEF", 0, "ES"], ["lafc", "eddie-segura", "E. Segura", "DEF", 0, "CO"],
+    ["lafc", "nkosi-tafari", "N. Tafari", "DEF", 0, "US"], ["lafc", "mathieu-choiniere", "M. Choinière", "MED", 0, "CA"],
+    ["lafc", "yevgen-cheberko", "Y. Cheberko", "DEF", 0, "UA"], ["lafc", "tyler-boyd", "T. Boyd", "MED", 0, "US"],
+    ["lafc", "jeremy-ebobisse", "J. Ebobisse", "DEL", 0, "US"], ["lafc", "jacob-shaffelburg", "J. Shaffelburg", "MED", 0, "CA"],
+    ["lafc", "igor-jesus", "I. Jesus", "MED", 0, "BR"], ["lafc", "ryan-raposo", "R. Raposo", "MED", 0, "CA"],
+    ["lafc", "thomas-hasal", "T. Hasal", "POR", 0, "CA"], ["lafc", "kenny-nielsen", "K. Nielsen", "DEF", 0, "US"],
+    ["lafc", "cabral-carter", "C. Carter", "POR", 0, "US"], ["lafc", "jude-terry", "J. Terry", "MED", 0, "US"]
+  ];
+  const ARABIA = [
+    // Al Nassr (24)
+    ["alnassr", "cristiano-ronaldo", "C. Ronaldo", "DEL", 0, "PT"], ["alnassr", "joao-felix", "João Félix", "MED", 0, "PT"],
+    ["alnassr", "kingsley-coman", "K. Coman", "MED", 0, "FR"], ["alnassr", "inigo-martinez", "I. Martínez", "DEF", 0, "ES"],
+    ["alnassr", "sadio-mane", "Sadio Mané", "MED", 0, "SN"], ["alnassr", "mohamed-simakan", "M. Simakan", "DEF", 0, "FR"],
+    ["alnassr", "bento", "Bento", "POR", 0, "BR"], ["alnassr", "samu-costa", "S. Costa", "MED", 0, "PT"],
+    ["alnassr", "angelo", "Ângelo", "MED", 0, "BR"], ["alnassr", "abdulelah-al-amri", "Al Amri", "DEF", 0, "SA"],
+    ["alnassr", "sultan-al-ghannam", "Al Ghannam", "DEF", 0, "SA"], ["alnassr", "nawaf-boushal", "N. Boushal", "DEF", 0, "SA"],
+    ["alnassr", "nawaf-al-aqidi", "Al Aqidi", "POR", 0, "SA"], ["alnassr", "ayman-yahya", "A. Yahya", "DEF", 0, "SA"],
+    ["alnassr", "abdullah-al-khaibari", "Al Khaibari", "MED", 0, "SA"], ["alnassr", "abdullah-al-hamdan", "Al Hamdan", "DEL", 0, "SA"],
+    ["alnassr", "ali-al-hassan", "Al Hassan", "MED", 0, "SA"], ["alnassr", "nader-al-sharari", "Al Sharari", "DEF", 0, "SA"],
+    ["alnassr", "saad-al-nasser", "Al Nasser", "DEF", 0, "SA"], ["alnassr", "salem-al-najdi", "Al Najdi", "DEF", 0, "SA"],
+    ["alnassr", "raghid-al-najjar", "Al Najjar", "POR", 0, "SA"], ["alnassr", "sami-al-najai", "Al Najai", "MED", 0, "SA"],
+    ["alnassr", "haydeer-abdulkareem", "H. Abdulkareem", "MED", 0, "IQ"], ["alnassr", "abdulmalik-al-jaber", "Al Jaber", "MED", 0, "SA"],
+    // Al Hilal (24)
+    ["alhilal", "ruben-neves", "R. Neves", "MED", 0, "PT"], ["alhilal", "sergej-milinkovic-savic", "Milinković", "MED", 0, "RS"],
+    ["alhilal", "ollie-watkins", "O. Watkins", "DEL", 0, "ENG"], ["alhilal", "theo-hernandez", "T. Hernández", "DEF", 0, "FR"],
+    ["alhilal", "yassine-bounou", "Bounou", "POR", 0, "MA"], ["alhilal", "kalidou-koulibaly", "Koulibaly", "DEF", 0, "SN"],
+    ["alhilal", "salem-al-dawsari", "Al Dawsari", "MED", 0, "SA"], ["alhilal", "gabriel-martinelli", "G. Martinelli", "DEL", 0, "BR"],
+    ["alhilal", "crysencio-summerville", "C. Summerville", "MED", 0, "NL"], ["alhilal", "hassan-tombakti", "H. Tombakti", "DEF", 0, "SA"],
+    ["alhilal", "mohammed-kanno", "M. Kanno", "MED", 0, "SA"], ["alhilal", "mohamed-kader-meite", "Kader Meïté", "DEL", 0, "CI"],
+    ["alhilal", "sultan-mandash", "S. Mandash", "MED", 0, "SA"], ["alhilal", "ali-lajami", "A. Lajami", "DEF", 0, "SA"],
+    ["alhilal", "nasser-al-dawsari", "Al Dawsari", "MED", 0, "SA"], ["alhilal", "mohammed-al-owais", "Al Owais", "POR", 0, "SA"],
+    ["alhilal", "muteb-al-harbi", "Al Harbi", "DEF", 0, "SA"], ["alhilal", "hamad-al-yami", "Al Yami", "DEF", 0, "SA"],
+    ["alhilal", "saimon-bouabre", "S. Bouabré", "MED", 0, "FR"], ["alhilal", "yusuf-akcicek", "Y. Akçiçek", "DEF", 0, "TR"],
+    ["alhilal", "mohammed-mahzari", "M. Mahzari", "DEF", 0, "SA"], ["alhilal", "murad-hawsawi", "M. Hawsawi", "MED", 0, "SA"],
+    ["alhilal", "nawaf-al-habashi", "Al Habashi", "MED", 0, "SA"], ["alhilal", "mohammed-al-rubaie", "Al Rubaie", "POR", 0, "SA"],
+    // Al Ittihad (24)
+    ["alittihad", "danilo-pereira", "D. Pereira", "DEF", 0, "PT"], ["alittihad", "youssef-en-nesyri", "Y. En-Nesyri", "DEL", 0, "MA"],
+    ["alittihad", "richard-rios", "R. Ríos", "MED", 0, "CO"], ["alittihad", "steven-bergwijn", "S. Bergwijn", "MED", 0, "NL"],
+    ["alittihad", "houssem-aouar", "H. Aouar", "MED", 0, "DZ"], ["alittihad", "predrag-rajkovic", "P. Rajković", "POR", 0, "RS"],
+    ["alittihad", "roger-fernandes", "R. Fernandes", "MED", 0, "PT"], ["alittihad", "dion-lopy", "D. Lopy", "MED", 0, "SN"],
+    ["alittihad", "muhannad-al-shanqeeti", "Al Shanqeeti", "DEF", 0, "SA"], ["alittihad", "george-ilenikhena", "G. Ilenikhena", "DEL", 0, "NG"],
+    ["alittihad", "mahamadou-doumbia", "M. Doumbia", "MED", 0, "ML"], ["alittihad", "hassan-kadish", "H. Kadish", "DEF", 0, "SA"],
+    ["alittihad", "marwan-al-sahafi", "Al Sahafi", "DEL", 0, "SA"], ["alittihad", "jan-carlo-simic", "J. Simić", "DEF", 0, "RS"],
+    ["alittihad", "mukhtar-ali", "M. Ali", "MED", 0, "SA"], ["alittihad", "ahmed-sharahili", "A. Sharahili", "DEF", 0, "SA"],
+    ["alittihad", "saleh-al-shehri", "Al Shehri", "DEL", 0, "SA"], ["alittihad", "ahmed-al-ghamdi", "Al Ghamdi", "MED", 0, "SA"],
+    ["alittihad", "bryant-ortega", "B. Ortega", "MED", 0, "VE"], ["alittihad", "fawaz-al-sagour", "Al Sagour", "DEF", 0, "SA"],
+    ["alittihad", "faris-abdi", "F. Abdi", "DEF", 0, "SA"], ["alittihad", "saad-al-mousa", "Al Mousa", "DEF", 0, "SA"],
+    ["alittihad", "hamed-al-ghamdi", "Al Ghamdi", "MED", 0, "SA"], ["alittihad", "stephane-keller", "S. Keller", "DEF", 0, "CM"]
+  ];
   const CLUBES = {
     realmadrid: "Real Madrid", barcelona: "FC Barcelona",
     manutd: "Manchester United", mancity: "Manchester City", chelsea: "Chelsea", liverpool: "Liverpool", tottenham: "Tottenham", arsenal: "Arsenal",
     bayern: "Bayern Múnich", betis: "Real Betis", psg: "Paris Saint-Germain", como: "Como", inter: "Inter", roma: "Roma", napoli: "Napoli", dortmund: "Borussia Dortmund",
     colocolo: "Colo-Colo", ucatolica: "Universidad Católica", udechile: "Universidad de Chile",
-    river: "River Plate", boca: "Boca Juniors", estudiantes: "Estudiantes de La Plata"
+    river: "River Plate", boca: "Boca Juniors", estudiantes: "Estudiantes de La Plata",
+    intermiami: "Inter Miami", montreal: "CF Montréal", lafc: "LAFC",
+    alnassr: "Al Nassr", alhilal: "Al Hilal", alittihad: "Al Ittihad"
   };
 
   /* ---------- la media de cada futbolista ----------
@@ -708,6 +794,42 @@
       "ezequiel-piovi": 74, "eros-mancuso": 74, "santiago-nunez": 74, "gaston-benedetti": 74, "alexis-castro": 73, "brian-aguirre": 73,
       "jose-sosa": 73, "joaquin-tobio-burgos": 73, "joaquin-correa": 73, "eric-meza": 72, "santiago-arzamendia": 72, "tomas-palacios": 72,
       "jalil-elias": 71, "fabricio-iacovich": 70, "fabricio-perez": 70, "baltasar-rodriguez": 70, "lucas-alario": 70, "ramiro-funes-mori": 69
+    },
+    intermiami: {
+      "lionel-messi": 89, "rodrigo-de-paul": 83, "casemiro": 83, "luis-suarez": 78, "german-berterame": 77, "dayne-st-clair": 73,
+      "reguilon": 72, "tadeo-allende": 71, "facundo-mura": 71, "telasco-segovia": 71, "yannick-bright": 71, "matias-galarza": 69,
+      "micael": 69, "david-ayala": 68, "maximiliano-falcon": 68, "gonzalo-lujan": 68, "ian-fray": 66, "mateo-silvetti": 65,
+      "luis-barraza": 64, "rocco-rios-novo": 63, "daniel-pinter": 59, "santiago-morales": 58, "fricio-caicedo": 58, "israel-boatwright": 55
+    },
+    montreal: {
+      "alexis-sanchez": 75, "prince-owusu": 73, "matty-longstaff": 69, "wikelman-carmona": 68, "brayan-ceballos": 68, "brayan-vera": 68,
+      "dani-pereira": 67, "victor-loturi": 67, "dante-sealy": 66, "luca-petrasso": 66, "samuel-piette": 66, "frankie-amaya": 65,
+      "jalen-neal": 65, "hennadii-synchuk": 65, "efrain-morales": 64, "dawid-bugaj": 64, "daniel-rios": 64, "sebastian-breza": 61,
+      "olger-escobar": 61, "brandan-craig": 61, "fabian-herbers": 61, "aleksandr-guboglo": 60, "bode-hidalgo": 60, "ivan-losenko": 55
+    },
+    lafc: {
+      "son-heung-min": 81, "denis-bouanga": 79, "hugo-lloris": 75, "mark-delgado": 74, "armindo-sieb": 71, "leo-walta": 71,
+      "ryan-hollingshead": 71, "timothy-tillman": 71, "ryan-porteous": 71, "aaron-long": 70, "sergi-palencia": 70, "eddie-segura": 70,
+      "nkosi-tafari": 69, "mathieu-choiniere": 68, "yevgen-cheberko": 67, "tyler-boyd": 66, "jeremy-ebobisse": 66, "jacob-shaffelburg": 65,
+      "igor-jesus": 65, "ryan-raposo": 63, "thomas-hasal": 60, "kenny-nielsen": 59, "cabral-carter": 58, "jude-terry": 57
+    },
+    alnassr: {
+      "cristiano-ronaldo": 84, "joao-felix": 83, "kingsley-coman": 83, "inigo-martinez": 83, "sadio-mane": 82, "mohamed-simakan": 82,
+      "bento": 80, "samu-costa": 78, "angelo": 76, "abdulelah-al-amri": 73, "sultan-al-ghannam": 71, "nawaf-boushal": 71,
+      "nawaf-al-aqidi": 71, "ayman-yahya": 70, "abdullah-al-khaibari": 69, "abdullah-al-hamdan": 66, "ali-al-hassan": 65, "nader-al-sharari": 65,
+      "saad-al-nasser": 64, "salem-al-najdi": 62, "raghid-al-najjar": 61, "sami-al-najai": 61, "haydeer-abdulkareem": 61, "abdulmalik-al-jaber": 59
+    },
+    alhilal: {
+      "ruben-neves": 85, "sergej-milinkovic-savic": 84, "ollie-watkins": 83, "theo-hernandez": 82, "yassine-bounou": 82, "kalidou-koulibaly": 82,
+      "salem-al-dawsari": 80, "gabriel-martinelli": 80, "crysencio-summerville": 78, "hassan-tombakti": 74, "mohammed-kanno": 74, "mohamed-kader-meite": 72,
+      "sultan-mandash": 70, "ali-lajami": 69, "nasser-al-dawsari": 69, "mohammed-al-owais": 69, "muteb-al-harbi": 68, "hamad-al-yami": 66,
+      "saimon-bouabre": 66, "yusuf-akcicek": 66, "mohammed-mahzari": 65, "murad-hawsawi": 63, "nawaf-al-habashi": 62, "mohammed-al-rubaie": 62
+    },
+    alittihad: {
+      "danilo-pereira": 82, "youssef-en-nesyri": 80, "richard-rios": 78, "steven-bergwijn": 78, "houssem-aouar": 78, "predrag-rajkovic": 77,
+      "roger-fernandes": 75, "dion-lopy": 73, "muhannad-al-shanqeeti": 72, "george-ilenikhena": 72, "mahamadou-doumbia": 71, "hassan-kadish": 70,
+      "marwan-al-sahafi": 69, "jan-carlo-simic": 69, "mukhtar-ali": 68, "ahmed-sharahili": 68, "saleh-al-shehri": 68, "ahmed-al-ghamdi": 66,
+      "bryant-ortega": 66, "fawaz-al-sagour": 64, "faris-abdi": 64, "saad-al-mousa": 64, "hamed-al-ghamdi": 61, "stephane-keller": 61
     }
   };
   const mediaDe = (club, id) => MEDIAS[club][id];
@@ -893,6 +1015,48 @@
       "alexis-castro": "MC/MI", "brian-aguirre": "EI/MD", "jose-sosa": "MC/DC", "joaquin-tobio-burgos": "MI/MC", "joaquin-correa": "DC/MC",
       "eric-meza": "LD/MD", "santiago-arzamendia": "LI/MI", "tomas-palacios": "DFC", "jalil-elias": "MC/MD", "fabricio-iacovich": "POR",
       "fabricio-perez": "MI/MD", "baltasar-rodriguez": "MC/MI", "lucas-alario": "DC", "ramiro-funes-mori": "DFC"
+    },
+    intermiami: {
+      "lionel-messi": "MC/MD", "rodrigo-de-paul": "MC/MD", "casemiro": "MC", "luis-suarez": "DC/MC", "german-berterame": "DC/ED",
+      "dayne-st-clair": "POR", "reguilon": "LI", "tadeo-allende": "MD/MI", "facundo-mura": "LD/LI", "telasco-segovia": "MC/MI",
+      "yannick-bright": "MC", "matias-galarza": "MC/MI", "micael": "DFC", "david-ayala": "MC", "maximiliano-falcon": "DFC",
+      "gonzalo-lujan": "DFC/LD", "ian-fray": "LD/DFC", "mateo-silvetti": "MD/MI", "luis-barraza": "POR", "rocco-rios-novo": "POR",
+      "daniel-pinter": "EI/MD", "santiago-morales": "MC/MD", "fricio-caicedo": "DFC", "israel-boatwright": "LD"
+    },
+    montreal: {
+      "alexis-sanchez": "DC/MC", "prince-owusu": "DC", "matty-longstaff": "MC", "wikelman-carmona": "MI/MD", "brayan-ceballos": "DFC",
+      "brayan-vera": "DFC/LI", "dani-pereira": "MC", "victor-loturi": "MC", "dante-sealy": "MD/MI", "luca-petrasso": "LI/DFC",
+      "samuel-piette": "MC", "frankie-amaya": "MC", "jalen-neal": "DFC", "hennadii-synchuk": "MD/MC", "efrain-morales": "DFC",
+      "dawid-bugaj": "LD/MD", "daniel-rios": "DC", "sebastian-breza": "POR", "olger-escobar": "MC/ED", "brandan-craig": "DFC/MC",
+      "fabian-herbers": "MC/MI", "aleksandr-guboglo": "LD/LI", "bode-hidalgo": "LD/DFC", "ivan-losenko": "MC"
+    },
+    lafc: {
+      "son-heung-min": "DC/MI", "denis-bouanga": "EI/MI", "hugo-lloris": "POR", "mark-delgado": "MC", "armindo-sieb": "DC/MC",
+      "leo-walta": "MC", "ryan-hollingshead": "LI/LD", "timothy-tillman": "MC/MI", "ryan-porteous": "DFC", "aaron-long": "DFC",
+      "sergi-palencia": "LD/LI", "eddie-segura": "DFC/LD", "nkosi-tafari": "DFC", "mathieu-choiniere": "MC/MI", "yevgen-cheberko": "DFC",
+      "tyler-boyd": "MD/MI", "jeremy-ebobisse": "DC/MC", "jacob-shaffelburg": "MD/LI", "igor-jesus": "MC/DFC", "ryan-raposo": "MD/LI",
+      "thomas-hasal": "POR", "kenny-nielsen": "DFC", "cabral-carter": "POR", "jude-terry": "MC"
+    },
+    alnassr: {
+      "cristiano-ronaldo": "DC", "joao-felix": "MC/MI", "kingsley-coman": "MD/MI", "inigo-martinez": "DFC/LI", "sadio-mane": "MI/MD",
+      "mohamed-simakan": "DFC/LD", "bento": "POR", "samu-costa": "MC", "angelo": "MC/MD", "abdulelah-al-amri": "DFC",
+      "sultan-al-ghannam": "LD/MD", "nawaf-boushal": "LI/LD", "nawaf-al-aqidi": "POR", "ayman-yahya": "LI/MD", "abdullah-al-khaibari": "MC",
+      "abdullah-al-hamdan": "DC/MC", "ali-al-hassan": "MC", "nader-al-sharari": "DFC/LD", "saad-al-nasser": "LI/MC", "salem-al-najdi": "LI",
+      "raghid-al-najjar": "POR", "sami-al-najai": "MC/MD", "haydeer-abdulkareem": "MC", "abdulmalik-al-jaber": "MC"
+    },
+    alhilal: {
+      "ruben-neves": "MC/DFC", "sergej-milinkovic-savic": "MC/DC", "ollie-watkins": "DC", "theo-hernandez": "LI/MI", "yassine-bounou": "POR",
+      "kalidou-koulibaly": "DFC", "salem-al-dawsari": "MI/EI", "gabriel-martinelli": "EI/MI", "crysencio-summerville": "MI/MD", "hassan-tombakti": "DFC",
+      "mohammed-kanno": "MC/DFC", "mohamed-kader-meite": "DC", "sultan-mandash": "MD/MI", "ali-lajami": "DFC", "nasser-al-dawsari": "MC/LI",
+      "mohammed-al-owais": "POR", "muteb-al-harbi": "LI/LD", "hamad-al-yami": "LD/MD", "saimon-bouabre": "MI/MD", "yusuf-akcicek": "DFC",
+      "mohammed-mahzari": "LD/LI", "murad-hawsawi": "MC/DFC", "nawaf-al-habashi": "MI/DC", "mohammed-al-rubaie": "POR"
+    },
+    alittihad: {
+      "danilo-pereira": "DFC", "youssef-en-nesyri": "DC", "richard-rios": "MC", "steven-bergwijn": "MC/MI", "houssem-aouar": "MC/DC",
+      "predrag-rajkovic": "POR", "roger-fernandes": "MI/MD", "dion-lopy": "MC/DFC", "muhannad-al-shanqeeti": "LD/LI", "george-ilenikhena": "DC",
+      "mahamadou-doumbia": "MC", "hassan-kadish": "LI/DFC", "marwan-al-sahafi": "EI/MD", "jan-carlo-simic": "DFC", "mukhtar-ali": "MC",
+      "ahmed-sharahili": "DFC", "saleh-al-shehri": "DC", "ahmed-al-ghamdi": "MI/MD", "bryant-ortega": "MC", "fawaz-al-sagour": "LD/LI",
+      "faris-abdi": "LI", "saad-al-mousa": "DFC", "hamed-al-ghamdi": "MC", "stephane-keller": "DFC"
     }
   };
   const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
@@ -997,6 +1161,8 @@
   BAYERN.forEach(j => cartaFutbol("futbol", "champions", j));
   CHILE.forEach(j => cartaFutbol("futbol", "champions", j));
   ARGENTINA.forEach(j => cartaFutbol("futbol", "champions", j));
+  MLS.forEach(j => cartaFutbol("futbol", "champions", j));
+  ARABIA.forEach(j => cartaFutbol("futbol", "champions", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
@@ -1031,7 +1197,7 @@
      sobres ven todo. */
   // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
   // El Bayern Múnich (20 jugadores, publicado el 2026-10-28): el corte es media hora después del push, para que ningún sobre ya comprado cambie.
-  // Chile y Argentina (133 jugadores): CORTE PROVISORIO para probar en local; al publicar se cambia a la hora del push más media hora.
+  // Chile, Argentina, la MLS y Arabia (277 jugadores): CORTE PROVISORIO para probar en local; al publicar se cambia a la hora del push más media hora.
   const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793260000000, n: 833 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
@@ -1302,7 +1468,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, BAYERN, CHILE, ARGENTINA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

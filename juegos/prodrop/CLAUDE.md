@@ -148,22 +148,23 @@ other file of the site. Things that hold it together:
   chest on a red radial gradient in a canvas and saved as 470 px webp. Kane's
   base card is `bayern-harry-kane`, the same person as his Balón de Oro. Its
   `hasta` (1793202400000, 28-10-2026 15:46 UTC) is half an hour after the push.
-- **Chile and Argentina** (`CHILE` + `ARGENTINA`, 133 players, third `AMPLIACIONES`
-  entry with `n: 833`, after the Bayern): Colo-Colo 19, Universidad Católica 27,
-  Universidad de Chile 15 (keys `colocolo`, `ucatolica`, `udechile`) and River Plate,
-  Boca Juniors and Estudiantes de La Plata, their 24 best each (`river`, `boca`,
-  `estudiantes`; Estudiantes because it was the Argentine semifinalist of the 2026
-  Libertadores). Data from fut.gg's API (`/api/fut/players/v2/<game>/?club_id=<EA id>`
-  for a squad, `?name=<surname>&page=n` to find someone; base cards only). Squads are
-  **today's** (Wikipedia, Aug–Oct 2026): the Católica and the Argentines come from
-  **FC 27**; Colo-Colo and the U are not in FC 27, so each player comes from the newest
-  game that has him (FC 26, 25, 24; Lucero from FC 23, because without a second striker
-  the U could not field a valid eleven). Arrivals with no card in any FIFA are left out
-  (Eduardo Vargas, Lichnovsky, Marchant…). The clubs' sites don't publish squads with
-  photos, so each card is the **in-game face** (fut.gg `player-item` render, 512 px) on a
-  radial gradient in the club's colours, made with Pillow. Positions cut to two (the
-  test). Nearly all are **Común** (only Paredes, 81, is Rara). Dorsal 0: the card no longer
-  shows it. `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
+- **Chile, Argentina, the MLS and Saudi Arabia** (`CHILE`, `ARGENTINA`, `MLS`, `ARABIA`,
+  277 players, third `AMPLIACIONES` entry with `n: 833`, after the Bayern): Colo-Colo 19,
+  Universidad Católica 27, Universidad de Chile 15; River, Boca and Estudiantes (the Argentine
+  semifinalist of the 2026 Libertadores); Inter Miami (Messi), CF Montréal (Alexis Sánchez)
+  and LAFC (Son); Al Nassr (Cristiano), Al Hilal and Al Ittihad — 24 best of each of those
+  nine. Data from fut.gg's API (`/api/fut/players/v2/<game>/?club_id=<EA id>` for a squad,
+  `?name=<surname>&page=n` to find someone; base cards only). Everything is **FC 27** except
+  Colo-Colo and the U, which FC 27 lacks: their squads are **today's** (Wikipedia, Aug–Oct 2026)
+  and each player comes from the newest game that has him (FC 26, 25, 24; Lucero from FC 23,
+  because without a second striker the U could not field a valid eleven). Arrivals with no card
+  in any FIFA are left out (Eduardo Vargas, Lichnovsky, Marchant…). Each card is the **in-game
+  face** (fut.gg `player-item` render, 512 px) on a radial gradient in the club's colours, made
+  with Pillow. Positions cut to two (the test). Dorsal 0: the card no longer shows it.
+  `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
+- **Salón banner** (`futbol()` in `colabtex/src/juegos/novedades-arte.js`): four cards in a fan,
+  Vidal always (with the «Liga Chilena · Nuevo» tag above him) plus three random stars from
+  `ESTRELLAS_FUTBOL` on every paint; the test checks each `media` against the motor.
 - **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
   Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the

@@ -106,6 +106,7 @@ const FUT_PAIS = {
   GH: 'Ghana', JP: 'Japón', CZ: 'Chequia', SK: 'Eslovaquia', GR: 'Grecia', NO: 'Noruega', EC: 'Ecuador', HU: 'Hungría', UZ: 'Uzbekistán',
   SN: 'Senegal', DZ: 'Argelia', US: 'Estados Unidos', GE: 'Georgia',
   KR: 'Corea del Sur', CA: 'Canadá', CL: 'Chile', SY: 'Siria', PY: 'Paraguay', VE: 'Venezuela',
+  BO: 'Bolivia', FI: 'Finlandia', GA: 'Gabón', GT: 'Guatemala', IQ: 'Irak', JM: 'Jamaica', ML: 'Malí', NG: 'Nigeria', SA: 'Arabia Saudita', TT: 'Trinidad y Tobago',
   AM: 'Armenia', AT: 'Austria', CH: 'Suiza', CO: 'Colombia', DO: 'República Dominicana', GN: 'Guinea', MX: 'México', RS: 'Serbia', RU: 'Rusia', XK: 'Kosovo',
 };
 // la bandera es una imagen (flags/<país>.png): el emoji no se ve como bandera en Windows, solo las dos letras
@@ -847,7 +848,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Nuevos: Colo-Colo, la Católica, la U, River, Boca y Estudiantes. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico y Harry Kane · Balón de Oro. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
+  futbol: 'Nuevos: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico y Harry Kane · Balón de Oro. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -889,7 +890,7 @@ function eligeSobre(menu = 'todos') {
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
       <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i><i class="hub-liga"><img src="flags/cl.png" alt="">LIGA CHILENA</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Nuevos: Colo-Colo, la Católica, la U, River, Boca y Estudiantes. Y por tiempo limitado, Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro</small>
+      <small class="ch-temas">Nuevo: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -2142,9 +2143,10 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
-  ['Octubre 2026 · Llegan Chile y Argentina', [
+  ['Octubre 2026 · Llegan Chile, Argentina, la MLS y Arabia', [
     '<b>🇨🇱 Colo-Colo, Universidad Católica y Universidad de Chile</b>, con sus planteles de hoy y las medias del FIFA: Vidal, Aránguiz, Zampedri, Medel y compañía.',
-    '<b>🇦🇷 River Plate, Boca Juniors y Estudiantes de La Plata</b>: sus 24 mejores, con Paredes, Arambarri, Otamendi, Muslera y Merentiel. Los seis entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
+    '<b>🇦🇷 River Plate, Boca Juniors y Estudiantes de La Plata</b>: sus 24 mejores, con Paredes, Arambarri, Otamendi, Muslera y Merentiel. ',
+    '<b>🇺🇸 Inter Miami, CF Montréal y LAFC</b> (Messi, Alexis Sánchez y Son) y <b>🇸🇦 Al Nassr, Al Hilal y Al Ittihad</b> (Cristiano, Rúben Neves y En-Nesyri): sus 24 mejores. Los doce clubes nuevos entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
     '<b>🇨🇱 La Roja</b>: el reto de la semana del 2 de noviembre es una plantilla solo de jugadores chilenos.',
     '<b>🔎 Elige la copia</b>: en el selector del desafío sale la mejor copia de cada jugador, con cuántas tienes; tócala para ver todas y elegir cuál va. «Ver» abre la carta en grande, y ahí se gradúa.'
   ]],
