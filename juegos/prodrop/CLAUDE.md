@@ -146,9 +146,8 @@ other file of the site. Things that hold it together:
   the portraits (`img.fcbayern.com/…/spielerportraits/ganzkoerper/<name>.png`,
   1920×1080 cut-outs) were fetched from a page on localhost, cropped to head and
   chest on a red radial gradient in a canvas and saved as 470 px webp. Kane's
-  base card is `bayern-harry-kane`, the same person as his Balón de Oro. **The
-  `hasta` of that entry must be the publish time plus a few minutes** (it was a
-  provisional value while testing locally).
+  base card is `bayern-harry-kane`, the same person as his Balón de Oro. Its
+  `hasta` (1793202400000, 28-10-2026 15:46 UTC) is half an hour after the push.
 - **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
   Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the

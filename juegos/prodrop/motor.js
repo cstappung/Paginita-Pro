@@ -860,8 +860,8 @@
      siempre se agrega al final del catálogo. Con la lista vacía, todos los
      sobres ven todo. */
   // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
-  // El Bayern Múnich (20 jugadores): CORTE PROVISORIO para probar en local; al publicar se cambia a la hora del push más unos minutos.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793199600000, n: 813 }];
+  // El Bayern Múnich (20 jugadores, publicado el 2026-10-28): el corte es media hora después del push, para que ningún sobre ya comprado cambie.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
