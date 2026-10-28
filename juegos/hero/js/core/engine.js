@@ -11,7 +11,7 @@ const HOPO_STRUM_GRACE = 0.08; // rasgueo extra justo después de un HOPO no rom
 const SP_DRAIN_BEATS = 32; // la barra completa dura 32 pulsos (8 compases en 4/4)
 
 // Umbrales de estrellas (puntuación / puntuación base a 1x)
-const STAR_THRESHOLDS = [0.21, 0.46, 0.77, 1.85, 3.08, 4.52];
+export const STAR_THRESHOLDS = [0.21, 0.46, 0.77, 1.85, 3.08, 4.52];
 
 class EngineBase {
   constructor(track, tempo, opts = {}) {

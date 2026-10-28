@@ -178,6 +178,33 @@ true and the `admins` condition back in those two rules. In the frame,
   toast, back on from the pause menu); otherwise it stays at the minimum.
   Frames over 250 ms are ignored (hidden tab) **unless three come in a row**:
   ignoring them all left a starved game with the background at full level.
+- **The stage heats up with how you play** (`FUEGO` in `escena.js`): each
+  pulse carries `fuego` = one 0–1 per player from `fuegoDe(engine)`
+  (`ritmo.js`, pure, tested): 0.55·star pace (score against the max of the
+  notes already judged — 3★ pace is 0, 5.5★ is 1; needs 12 notes) + 0.45·combo
+  (120 = full) + 0.12 with Star Power. The stage follows the highest; it rises
+  slowly and drops fast. Levels at 0.3 / 0.55 / 0.78 / 0.94 (0.07 hysteresis
+  going down): 1 lighters/phones in the crowd (`Celulares`) and the cans stop
+  tracking the rockers to sweep the yard in palette colours (`PALETAS`, the
+  palette changes every 4 / 2 / 1 bars); 2 lasers from the back truss
+  (`Lasers`, `beamMat`) and spark fountains; 3 strobe, pyro bursts on strong
+  kicks, camera shake; 4 fireworks. Each new level is celebrated in
+  `subeNivel` (title only in single player). Each rocker's own value is
+  `st.fuego`: bigger moves in `animGuitar`, more jumps/spins/kicks in
+  `battle.onBar`, faster camera cuts. **Lasers and phones are hidden until
+  used: they are in `enVivo`'s warm-up list.**
+- **Lights follow the real song** (`MUS`): `session._musicaRock` renders the
+  stems once per song through an `OfflineAudioContext` (11 025 Hz, low-pass
+  150 / band-pass 900 / high-pass 3000, capped at 10 min) and
+  `analizaMusica` (`ritmo.js`) turns it into bytes at 60 fps: band energy
+  (`g m a`), onsets (`gg` kick, `gm` snare, `ga` cymbals) and section loudness
+  (`f`), normalised to that song. Sent once with `rock.musica(d)` (worker:
+  `{t:'musica', d}`, after `enVivo`, which clears it); each pulse sends the song
+  second `t`. `oyeMusica` takes the max onset since the previous scene frame
+  (onsets last one 60 fps frame; the scene runs at 15–30). With it, kick and
+  crash pulses come from the song instead of the choreography's drum pattern,
+  and quiet stretches dim the lights. Without it (no analysis, before 0 s,
+  after 10 min) the old synthetic pulse is used.
 - **Framing**: single player puts the rocker in the left third
   (`SOLO_CORRE`, `setViewOffset` per shot; the highway is in the middle) and
   skips shots that can't (`SOLO_FUERA`). In battle the two highways leave the
@@ -217,6 +244,23 @@ drawing, `MINI.px` (192) square.
   **`rock-visor.html`** in a hidden iframe (`{canal:'rock-visor-pide',
   lista}` → `{canal:'rock-visor', fotos:[{id,url}]}`, `rock.miniaturas`, ≤
   40); its import map carries `?v=hero-N` too.
+
+## Arms and hands
+
+- Fingers blend toward the requested pose (`setHand`, ~0.1 s); they used to
+  jump between poses in one frame.
+- The guitarist's free hand (`ovS`/`ovF`: raised fist, pointing, hanging)
+  fades in and its target moves smoothly (`st.ovS`, `st.ovF`). The raised fist
+  is nearly straight and punches up on the beat; its elbow pole moves to
+  `poleAlto` (out, forward, below the hand). With the strumming pole (high and
+  back) it was a chicken wing: upper arm flat to the side, forearm upright.
+- The singer has its own elbow poles (down and out). The mic hand's target is
+  the **wrist**, below and outside the handle (`S.micGrip`, `S.micArriba`,
+  `S.micFuera` from the mic's real axis), and its orientation is set in
+  `solve` with `handFrame` so the fist wraps the handle. Before, the grip
+  point was on the stand below the mic and the arm stuck straight forward.
+- `victory` raises the guitar up and to the side (`gpx/gpy/gpz`, guitar
+  position offsets in `POSE0`); rotating it 1 rad put the neck across the face.
 
 ## Traps
 
