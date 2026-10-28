@@ -2332,7 +2332,10 @@ const jugadorDe = k => { const cp = k ? copiaPorClave(k) : null; return cp ? CAR
    borrador de cada plantilla se recuerda en este navegador hasta subirlo. */
 const RT = window.ProdropRetos;
 // `accion`: la casilla llena que muestra «graduar / cambiar»; `pick`: el jugador tocado en el selector
-const rt = { vista: 'album', clave: '', lista: [], casilla: -1, accion: -1, pick: '', tab: 'clasif', vuelve: false, ocupado: false };
+const rt = { vista: 'album', clave: '', lista: [], casilla: -1, accion: -1, pick: '', tab: 'clasif', vuelve: false, ocupado: false, ordenElige: 'media' };
+// cómo se ordena el selector de jugadores (se recuerda en este navegador)
+const ORDEN_ELIGE = { media: 'Media', club: 'Equipo', nota: 'Graduación' };
+try { const o = localStorage.getItem('prodrop.ordenElige'); if (ORDEN_ELIGE[o]) rt.ordenElige = o; } catch {}
 const fichaCp = cp => cp && { id: cp.id, g: cp.g, gr: !!cp.gr };
 const misFutbol = () => Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
 const borrador = clave => 'prodrop.reto.' + cuenta.uid + '.' + clave;
@@ -2507,11 +2510,21 @@ function pintaEligeReto() {
     const vista = unica.get(c.uid), puesta = rt.lista.includes(cp.key);
     if (!vista || (puesta && !rt.lista.includes(vista.key)) || (!rt.lista.includes(vista.key) && RT.puntosFicha(fichaCp(cp)) > RT.puntosFicha(fichaCp(vista)))) unica.set(c.uid, cp);
   }
+  /* Dentro de cada grupo (los de su puesto, luego los incómodos): por media,
+     por equipo (cada club junto, en el orden del catálogo) o por graduación
+     (mejor nota primero; las sin graduar al final, por media). */
+  const ordenClub = Object.keys(M.CLUBES), nota = cp => (cp.gr ? cp.g : 0);
+  const porOrden = {
+    media: (a, b) => 0,
+    club: (a, b) => ordenClub.indexOf(CARDS[a.id].club) - ordenClub.indexOf(CARDS[b.id].club),
+    nota: (a, b) => nota(b) - nota(a)
+  }[rt.ordenElige] || (() => 0);
   const lista = [...unica.values()].sort((a, b) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
-    || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
+    || porOrden(a, b) || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
   let grupo = -1;
   box.innerHTML = `<div class="pl-elige-head"><b>${M.PUESTO[slot.pos][0].toUpperCase() + M.PUESTO[slot.pos].slice(1)} · elige un jugador</b>
       <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${rt.lista[rt.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
+    <div class="pl-orden" role="group" aria-label="Ordenar">Ordenar por ${Object.entries(ORDEN_ELIGE).map(([k, l]) => `<button class="chip${rt.ordenElige === k ? ' on' : ''}" data-orden="${k}">${l}</button>`).join('')}</div>
     <div class="tc-rejilla pl-lista">${lista.length ? lista.map(cp => {
       const c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = rt.lista[rt.casilla] === cp.key;
       const cab = en.nivel !== grupo ? `<h4 class="rt-grupo n${en.nivel}">${en.nivel ? `Incómodos en ${slot.pos} · −${en.pen} de media` : `De ${slot.pos}`}</h4>` : '';
@@ -2521,6 +2534,11 @@ function pintaEligeReto() {
     }).join('') : `<p class="mk-vacio">No tienes jugadores que cumplan «${esc(p.titulo)}» y puedan jugar de ${slot.pos}: abre sobres de Fútbol.</p>`}</div>`;
   const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => ponReto('');
   box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; rt.pick = ''; renderEditorReto(); };
+  box.querySelectorAll('[data-orden]').forEach(x => x.onclick = () => {
+    rt.ordenElige = x.dataset.orden; Snd.init(); Snd.tick();
+    try { localStorage.setItem('prodrop.ordenElige', rt.ordenElige); } catch {}
+    pintaEligeReto();
+  });
   box.querySelector('[data-rt-mk-puesto]').onclick = () => abreMercadoReto();
   // tocar un jugador muestra sus botones encima de la carta: ponerlo y, si no está graduado, graduarlo
   box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => { Snd.init(); Snd.tick(); rt.pick = rt.pick === x.dataset.c ? '' : x.dataset.c; pintaEligeReto(); });

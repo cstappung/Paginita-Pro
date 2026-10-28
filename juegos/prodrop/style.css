@@ -1592,3 +1592,8 @@ button.rt-ficha:hover { transform: translateY(-2px); border-color: #ffffff55; }
 .rr-ver .chip.on { background: #6dffb0; color: #062a17; }
 .rr-filtros small { margin-left: auto; }
 .rr-fut .pl-tag { top: auto; right: auto; bottom: 14px; left: 3px; }
+
+/* El selector del desafío: ordenar por media, equipo o graduación */
+.pl-orden { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.pl-orden .chip { padding: 5px 11px; }
+.pl-orden .chip.on { background: #6dffb0; color: #062a17; }
