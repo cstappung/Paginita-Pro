@@ -15,7 +15,7 @@ import { Tactil, TACTIL } from '../ui/tactil.js';
 import { vistas } from './orden.js';
 import { CURVA_N } from './carrera.js';
 import { rockSitio, cargaFondo } from '../sitio/rock.js';
-import { descansos, enDescanso, humorDe } from '../rock/ritmo.js';
+import { descansos, enDescanso, humorDe, fuegoDe, analizaMusica } from '../rock/ritmo.js';
 import { Batalla, PODERES, TIPOS, PODERES_BATERIA, MAX_PODERES, REPARA, FIN_KO, dobla } from './batalla.js';
 
 // los nombres de los trastes (FRET_COLORS), para los avisos de la batalla
@@ -266,8 +266,7 @@ export class GameSession {
     // la canción espera a que el escenario esté listo (rockeros armados, shaders y texturas estrenados): si no,
     // los primeros segundos se trababan mientras se preparaba. Con tope, por si el equipo es muy lento.
     aviso?.('Preparando a los rockeros…');
-    await Promise.race([
-      rock.enVivo({
+    const vivo = rock.enVivo({
         yo: { look: rockSitio.look, nombre: yo?.name },
         rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
         otros: otros.map((p, i) => ({ uid: p.id || p.name || 'p' + i, nombre: p.name, look: (p.id && rockSitio.looks.get(p.id)) || null })),
@@ -278,9 +277,50 @@ export class GameSession {
           this.ponRock(false);
           toast('Se apagó el fondo de rock: tu equipo no daba con los dos. Lo puedes volver a encender en la pausa.', 5000);
         },
-      }),
-      new Promise((ok) => setTimeout(ok, 20000)),
-    ]).catch((err) => console.warn('[hero] Batalla de Rock', err));
+      });
+    // mientras tanto se analiza la canción para que las luces sigan la música de verdad (después de enVivo,
+    // que la borra: es de la canción anterior)
+    const musica = this._musicaRock()
+      .then((m) => { if (m && this.rock === rock) rock.musica(m); })
+      .catch((err) => console.warn('[hero] Batalla de Rock: análisis de la música', err));
+    await Promise.race([Promise.all([vivo, musica]), new Promise((ok) => setTimeout(ok, 20000))])
+      .catch((err) => console.warn('[hero] Batalla de Rock', err));
+  }
+
+  // La canción filtrada en graves, medios y agudos con un OfflineAudioContext (lo renderiza el navegador,
+  // fuera del hilo del juego, a 11 025 por segundo) y resumida a 60 cuadros por segundo (ritmo.js,
+  // analizaMusica): con eso las luces de la Batalla de Rock laten con la música. Una vez por canción; las
+  // canciones de más de 10 minutos se analizan hasta ahí (después las luces siguen la coreografía).
+  async _musicaRock() {
+    if (this.rockMusica !== undefined) return this.rockMusica;
+    this.rockMusica = null;
+    const bufs = Object.values(this.audio.buffers || {});
+    const Off = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
+    if (!bufs.length || !Off) return null;
+    const SR = 11025, dur = Math.min(600, Math.max(...bufs.map((b) => b.duration)));
+    const ctx = new Off(3, Math.max(1, Math.ceil(dur * SR)), SR);
+    const mezcla = ctx.createGain();
+    mezcla.channelCount = 1;
+    mezcla.channelCountMode = 'explicit';
+    for (const b of bufs) {
+      const src = ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(mezcla);
+      src.start(0);
+    }
+    const une = ctx.createChannelMerger(3);
+    [['lowpass', 150, 0.707], ['bandpass', 900, 0.6], ['highpass', 3000, 0.707]].forEach(([type, f, q], i) => {
+      const filtro = ctx.createBiquadFilter();
+      filtro.type = type;
+      filtro.frequency.value = f;
+      filtro.Q.value = q;
+      mezcla.connect(filtro);
+      filtro.connect(une, 0, i);
+    });
+    une.connect(ctx.destination);
+    const out = await ctx.startRendering();
+    this.rockMusica = analizaMusica([0, 1, 2].map((i) => out.getChannelData(i)), SR);
+    return this.rockMusica;
   }
 
   // Desde la pausa: se apaga o se vuelve a montar sin salir de la canción
@@ -322,7 +362,9 @@ export class GameSession {
       confs = E.map((e) => Math.max(-0.85, Math.min(0.85, ((e.score || 0) - media) / Math.max(4000, 0.3 * media))));
     }
     const golpes = this.rockGolpes?.length ? this.rockGolpes.splice(0) : null;
-    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs, golpes });
+    // cuánto arde el escenario por cada uno: ritmo de estrellas + racha (ritmo.js, fuegoDe)
+    const fuego = E.map((e) => fuegoDe(e));
+    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs, golpes, t: now, fuego });
     // Star Power: cada frase completa carga la barra y manda un rayo; activarlo hace caer otro y la guitarra
     // se prende de azul mientras dure (en un mano a mano, la carga es un ataque al rival)
     // (en la batalla no: ahí las frases dan poderes y el rayo sale al lanzarlos, _lanzaBt)

@@ -781,7 +781,7 @@ function buildStage() {
     S.lanterns.push({ pivot, ph: R() * 6 });
   };
   ropes.forEach((pts, ri) => { for (const t of (ri === 0 ? [0.12, 0.33, 0.55, 0.78, 0.92] : [0.2, 0.45, 0.7])) lanternAt(pts[Math.round(t * (pts.length - 1))], rr(0.15, 0.6), rr(0.32, 0.45)); });
-  for (const i of [1, 3]) { const pl = new THREE.PointLight(0xff3a1a, 4, 11, 1.2); const lp = S.lanterns[i].pivot.position; pl.position.set(lp.x, lp.y - 1, lp.z); scene.add(pl); }
+  S.lights.farol = [1, 3].map(i => { const pl = new THREE.PointLight(0xff3a1a, 4, 11, 1.2); const lp = S.lanterns[i].pivot.position; pl.position.set(lp.x, lp.y - 1, lp.z); scene.add(pl); return pl; });
 
   const bulbPts = [];
   const strand = pts => { scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x0f2a12 }))); const curve = new THREE.CatmullRomCurve3(pts); const n = Math.floor(curve.getLength() / 0.48); for (let i = 1; i < n; i++) bulbPts.push(curve.getPointAt(i / n)); };
@@ -845,7 +845,9 @@ function buildStage() {
   mesh(mic, new THREE.CylinderGeometry(0.022, 0.03, 0.14, 10).rotateX(Math.PI / 2), toon(0x1a1a1a), { pos: [0, 0, 0.04], outline: 0.006 });
   mesh(mic, new THREE.SphereGeometry(0.038, 12, 10), toon(0x9a9aa2), { pos: [0, 0, 0.13], outline: 0.006 });
   mesh(micSet, taperTube([mb.clone().add(V(0, 0.4, 0)), V(0.3, SY + 0.05, 1.9), V(0.9, SY + 0.02, 2.1), V(1.8, SY + 0.02, 2.4)], 0.01, 0.01, 20, 5), toon(0x111111), { outline: 0 });
-  S.micGrip = new THREE.Object3D(); S.micGrip.position.set(0.0, SY + 1.6, 1.52); scene.add(S.micGrip); S.micGrip.updateMatrixWorld();
+  S.micGrip = new THREE.Object3D(); scene.add(S.micGrip);
+  mic.updateMatrixWorld(true); S.micGrip.position.copy(mic.localToWorld(V(0, 0, 0.035))); S.micGrip.updateMatrixWorld();
+  { const eje = V(0, 0, 1).transformDirection(mic.matrixWorld); S.micArriba = UP.clone().addScaledVector(eje, -eje.y).normalize(); S.micFuera = V(-1, 0, 0).addScaledVector(eje, eje.x).normalize(); }
 
   for (const s of [-1, 1]) { mesh(scene, new THREE.BoxGeometry(0.6, 1.4, 26), toon(0xffffff, { map: TX.brick }), { pos: [s * 13.5, 0.7, 6], outline: 0.03 }); mesh(scene, new THREE.BoxGeometry(1.1, 1.0, 26), toon(0xffffff, { map: TX.hedge }), { pos: [s * 13.5, 1.85, 6], outline: 0.03 }); }
   const chain = new THREE.Mesh(new THREE.PlaneGeometry(40, 2.6), new THREE.MeshBasicMaterial({ map: TX.chain, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide })); chain.position.set(0, 2.9, -7.6); scene.add(chain);
@@ -1132,7 +1134,7 @@ const HAND_POSES = {
   horns: [[0.05, 0.0], [1.6, 1.7], [1.6, 1.7], [0.05, 0.0], [0.7, 0.8]],
 };
 const POSE0 = { rootX: 0, rootY: 0, rootZ: 0, rootYaw: 0, hipX: 0, hipZ: 0, hipDrop: 0.04, pelvis: 0, bodyYaw: 0, bodyRoll: 0, lean: 0.08, torsoYaw: 0, torsoRoll: 0, headPitch: 0, headYaw: 0, headRoll: 0,
-  gx: 0, gy: 0, gz: 0, stance: 0, fwdL: 0, fwdR: 0, liftL: 0, liftR: 0, mouth: 0, brow: 0, lid: 0.36, shake: 0, kneel: 0, ovS: 0, ovF: 0, lookCam: 0, lookOpp: 0, sneer: 0, handS: 'pick', handF: 'grip' };
+  gx: 0, gy: 0, gz: 0, gpx: 0, gpy: 0, gpz: 0, stance: 0, fwdL: 0, fwdR: 0, liftL: 0, liftR: 0, mouth: 0, brow: 0, lid: 0.36, shake: 0, kneel: 0, ovS: 0, ovF: 0, lookCam: 0, lookOpp: 0, sneer: 0, handS: 'pick', handF: 'grip' };
 
 const B_HIPS = 0, B_SPINE = 1, B_CHEST = 2, B_NECK = 3, B_HEAD = 4, B_JAW = 5, B_UA = [6, 8], B_FA = [7, 9], B_TH = [10, 12], B_SH = [11, 13], B_FTW = [14, 31], B_HAND = [15, 32];   // torsión del antebrazo + mano + 5 dedos × 3 falanges por lado
 const L_UP = 0.33, L_FO = 0.31, L_TH = 0.5, L_SH = 0.47;
@@ -2639,6 +2641,12 @@ class Rocker {
       return { foot, knee: V(), ankle: V(), ft, cur: ft.clone(), yaw: side * 0.28, side };
     });
     this.poleMk = [new THREE.Object3D(), new THREE.Object3D()]; this.poleMk[0].position.set(sw + 0.45, 0.1, -0.4); this.poleMk[1].position.set(-sw - 0.35, 0.55, 0.22); torso.add(...this.poleMk);   // codo de la púa alto y atrás: el antebrazo pasa por encima del borde de la guitarra
+    /* el cantante: los codos abajo y afuera (con el polo de la púa, el brazo del micrófono quedaba estirado
+       adelante, a la altura del hombro). El puño en alto del guitarrista lleva el codo afuera y adelante, más
+       bajo que la mano (con el de la púa salía un ala de pollo: el brazo de lado y el antebrazo de pie) */
+    if (kind === 'singer') { this.poleMk[0].position.set(sw + 0.5, 0.05, -0.3); this.poleMk[1].position.set(-sw - 0.4, -0.25, -0.12); }
+    this.poleRest = this.poleMk.map(o => o.position.clone());
+    this.poleAlto = V(-sw - 0.5, 0.35, 0.55);
 
     /* ---------- extras según el papel ---------- */
     if (kind === 'guitar') {
@@ -2712,9 +2720,12 @@ class Rocker {
     }
   }
   dispose() { this.chainSk?.dispose(); this.root.traverse(o => { if (o.geometry && !Object.values(geoCache).includes(o.geometry)) o.geometry.dispose(); }); this.faceU?.uFaceTex.value.userData.glow?.dispose(); this.faceU?.uFaceTex.value.dispose(); this.root.removeFromParent(); }
-  /* dedos: flexión en las 3 falanges (hacia la palma), separación al abrir; el pulgar se opone y se dobla */
+  /* dedos: flexión en las 3 falanges (hacia la palma), separación al abrir; el pulgar se opone y se dobla.
+     Van hacia la pose pedida en ~0,1 s (antes saltaban de golpe: de la púa al puño en un cuadro) */
   setHand(i, pose, extra = 0) {
-    const H = HAND_POSES[pose], F = this.arms[i].hand.fingers, s = this.arms[i].side;
+    const T = HAND_POSES[pose], F = this.arms[i].hand.fingers, s = this.arms[i].side;
+    const H = (this.dedos ||= [null, null])[i] ||= T.map(f => [...f]), k = 1 - Math.exp(-18 * (this._dt || 0));
+    for (let f = 0; f < 5; f++) for (let j = 0; j < 2; j++) H[f][j] += (T[f][j] - H[f][j]) * k;
     for (let k = 0; k < 4; k++) {
       const [a, b] = H[k], sp = -(1.5 - k) * 0.07 * (1 - clamp(a, 0, 1));
       F[k][0].rotation.set(sp, 0, -s * (a + extra)); F[k][1].rotation.z = -s * (b + extra * 0.5); F[k][2].rotation.z = -s * b * 0.75;
@@ -2731,7 +2742,7 @@ class Rocker {
   /* ---------- capas de animación ---------- */
   update(t, mt, dt, K) {
     if (!this.root.visible) return;
-    const p = this.p; Object.assign(p, POSE0);
+    const p = this.p; Object.assign(p, POSE0); this._dt = dt;
     if (this.kind === 'guitar') this.animGuitar(t, mt, dt, K);
     else if (this.kind === 'singer') this.animSinger(t, mt, dt, K);
     else this.animDrummer(t, mt, dt, K);
@@ -2746,7 +2757,10 @@ class Rocker {
     const dip = nodCurve(K.bp, 0.62) * 0.85;
     // en un tramo sin notas de la canción (`descanso`, en vivo) no toca: la mano de la púa baja y se mueve menos
     const rest = !!st.descanso;
-    const energy = clamp(I * (0.8 + 0.35 * c), 0.2, 1.25) * (rest ? 0.45 : 1);
+    // al entrar o salir de un descanso el cuerpo se calma o se anima de a poco (antes saltaba en un cuadro)
+    st.restK = damp(st.restK ?? 0, rest ? 1 : 0, 3, dt);
+    const fu = st.fuego || 0;   // la racha: con el escenario encendido se mueve más
+    const energy = clamp(I * (0.8 + 0.35 * c) * (1 + 0.3 * fu), 0.2, 1.4) * lerp(1, 0.45, st.restK);
     // contento, levanta el puño al público al pulso; si no, la mano cuelga junto a la cadera
     if (rest) { p.ovS = 0.9; p.handS = c > 0.2 ? 'fist' : 'suelta'; st.sustainEnd = 0; if (c > 0.2) p.mouth = Math.max(p.mouth, 0.4 * Math.exp(-K.bp * 4)); }
     p.hipDrop = 0.035 + 0.06 * dip * energy + 0.04 * Math.max(0, -c);
@@ -2760,7 +2774,8 @@ class Rocker {
     p.brow = c > 0 ? 0.35 * c : 0.5 * c;
     p.lid = c > 0.2 ? 0.44 : 0.34;
     p.sneer = Math.max(0, c) * 0.6;
-    p.mouth = (I > 0.9 && dip > 0.55 ? 0.45 * energy : 0) + Math.max(0, c - 0.3) * 0.15;
+    p.mouth = (I > 0.9 && dip > 0.55 ? 0.45 * energy : 0) + Math.max(0, c - 0.3) * 0.15 + (fu > 0.5 && dip > 0.6 ? 0.3 * fu : 0);
+    p.stance += 0.04 * fu; p.headRoll += Math.sin(K.beat * Math.PI * 0.5 + this.seed) * 0.06 * fu;
     /* en vivo: rasguea cada nota que se toca de verdad (`golpes`, de PRO HERO). Con muchas seguidas, golpes más
        cortos y alternados (como púa alterna), en vez de un rasgueo entero por nota */
     if (st.real) {
@@ -2791,7 +2806,7 @@ class Rocker {
     st.riffPtr = i;
   }
   animSinger(t, mt, dt, K) {
-    const p = this.p, st = this.st, I = st.I, dip = nodCurve(K.bp, 0.62) * 0.85;
+    const p = this.p, st = this.st, I = st.I + 0.5 * FUEGO.f, dip = nodCurve(K.bp, 0.62) * 0.85;   // con el escenario encendido, la banda también se suelta
     p.hipDrop = 0.03 + 0.045 * dip * (0.4 + I); p.bodyYaw = Math.sin(t * 0.5) * 0.12; p.bodyRoll = Math.sin(K.beat * Math.PI * 0.5) * 0.04;
     const sing = K.vocal ? 1 : 0;
     const belt = sing * Math.max(0, Math.sin(t * 0.7));
@@ -2805,7 +2820,7 @@ class Rocker {
     this.handL = ph === 0 ? 'horns' : ph === 1 ? 'fist' : 'open';
   }
   animDrummer(t, mt, dt, K) {
-    const p = this.p, I = this.st.I, dip = nodCurve(K.bp, 0.62) * 0.85;
+    const p = this.p, I = this.st.I + 0.6 * FUEGO.f, dip = nodCurve(K.bp, 0.62) * 0.85;
     p.hipDrop = 0; p.bodyYaw = Math.sin(t * 0.7) * 0.06; p.lean = 0.12 + 0.06 * dip * (0.4 + I); p.torsoRoll = Math.sin(K.beat * Math.PI) * 0.03;
     p.headPitch = 0.05 + 0.3 * dip * (0.3 + I); p.headYaw = Math.sin(t * 0.5) * 0.15; p.mouth = I > 0.9 ? 0.45 : 0.08; p.lid = 0.35;
     p.liftL = 0.05 * Math.exp(-K.bp * 10);
@@ -2850,7 +2865,7 @@ class Rocker {
         case 'repair': p.headPitch += 0.55 * w; p.headYaw += 0.3 * w; p.brow = lerp(p.brow, -0.6, w); p.mouth = lerp(p.mouth, 0.25, w); p.lean += 0.15 * w; if (Math.floor(mt / 0.075) !== this.lastR) { this.lastR = Math.floor(mt / 0.075); this.strum(t, 0.03); } break;
         case 'dizzy': p.headRoll += Math.sin(t * 5) * 0.32 * w; p.bodyRoll += Math.sin(t * 5 + 1) * 0.13 * w; p.lid = lerp(p.lid, 0.7, w); p.mouth = Math.max(p.mouth, 0.35 * w); p.brow -= 0.4 * w; p.headPitch += 0.15 * w; break;
         case 'struggle': p.lean += 0.18 * w; p.headPitch += 0.2 * w; p.brow -= 0.4 * w; break;
-        case 'victory': { const j = Math.abs(Math.sin(K.beat * Math.PI)); p.rootY += j * 0.32 * w; p.gz += 1.0 * w; p.lean -= 0.3 * w; p.headPitch -= 0.5 * w; p.mouth = Math.max(p.mouth, w); p.brow += 0.4 * w; p.lid = lerp(p.lid, 0.1, w); p.ovS = w; p.liftL += j * 0.12 * w; p.liftR += j * 0.14 * w; p.handS = 'fist'; p.lookCam = w; break; }
+        case 'victory': { const j = Math.abs(Math.sin(K.beat * Math.PI)); p.rootY += j * 0.32 * w; p.gz += 0.62 * w; p.gpy += 0.12 * w; p.gpx += 0.1 * w; p.gpz += 0.08 * w; p.gy -= 0.25 * w; p.lean -= 0.3 * w; p.headPitch -= 0.5 * w; p.mouth = Math.max(p.mouth, w); p.brow += 0.4 * w; p.lid = lerp(p.lid, 0.1, w); p.ovS = w; p.liftL += j * 0.12 * w; p.liftR += j * 0.14 * w; p.handS = 'fist'; p.lookCam = w; break; }
         case 'defeat': p.kneel = Math.max(p.kneel, w); p.headPitch += 0.75 * w; p.lean += 0.45 * w; p.gz -= 0.55 * w; p.mouth = lerp(p.mouth, 0.05, w); p.brow = lerp(p.brow, -0.6, w); p.lid = lerp(p.lid, 0.6, w); p.ovS = w; p.ovF = w * 0.8; p.handS = 'open'; p.handF = 'open'; break;
         case 'charge': p.gz += 0.6 * w; p.lean -= 0.25 * w; p.headPitch -= 0.3 * w; p.mouth = Math.max(p.mouth, w); p.brow += 0.6 * w; p.lid = lerp(p.lid, 0.35, w); p.lookOpp = w; p.rootYaw += toward * 0.35 * w; break;
       }
@@ -2911,7 +2926,7 @@ class Rocker {
     // guitarra y manos
     if (this.kind === 'guitar') {
       const gb = this.gBase, gt = this.gtr;
-      gt.g.rotation.set(gb.rx + p.gx, gb.ry + p.gy, gb.rz + p.gz);
+      gt.g.rotation.set(gb.rx + p.gx, gb.ry + p.gy, gb.rz + p.gz); gt.g.position.set(gb.x + p.gpx, gb.y + p.gpy, gb.z + p.gpz);
       const ds = t - st.strumT; let sy;
       if (ds < 0.06) sy = st.strumDir * st.strumAmp * (1 - 2 * smooth(ds / 0.06)); else sy = -st.strumDir * st.strumAmp * Math.exp(-(ds - 0.06) * 7);
       gt.strum.position.set(-0.01, sy, 0.108);
@@ -2920,13 +2935,31 @@ class Rocker {
       if (st.sustainEnd && K.mt < st.sustainEnd) fy += Math.sin(t * 34) * 0.006;
       if (K.mt - st.bend < BEAT * 2) fy += smooth(clamp((K.mt - st.bend) / 0.2, 0, 1)) * 0.018;
       gt.fret.position.set(st.fx, fy, 0);
-      if (p.ovS > 0) { if (p.handS === 'suelta') this.ovS.position.set(-0.34, -0.14, 0.06); else this.ovS.position.set(p.handS === 'fist' ? -0.32 : -0.25, p.handS === 'fist' ? 0.95 + 0.08 * Math.exp(-K.bp * 6) : 0.05, p.handS === 'fist' ? 0.2 : 0.18); }
-      if (p.ovF > 0) { if (p.handF === 'open') this.ovF.position.set(0.3, 0.05, 0.16); else this.ovF.position.set(this.side === 0 ? 1.2 : 0.55, 0.75, this.side === 0 ? 0.8 : 1.1); }
-      this.setHand(1, p.ovS > 0.5 ? (p.handS === 'suelta' ? 'open' : p.handS) : 'pick');
-      this.setHand(0, p.ovF > 0.5 ? (p.handF === 'open' ? 'open' : 'point') : 'grip', Math.sin(t * 9) * 0.05);
+      /* las manos que sueltan la guitarra (el puño en alto, señalar, colgando) entran y salen suaves, y su
+         destino también se mueve suave: cambiar de 'suelta' a 'fist' ya no teletransporta la mano */
+      const kS = 1 - Math.exp(-20 * dt);
+      st.ovS = damp(st.ovS ?? 0, p.ovS, 9, dt); st.ovF = damp(st.ovF ?? 0, p.ovF, 9, dt);
+      if (st.ovS > 0.002) {
+        if (p.handS === 'suelta') _v2.set(-0.34, -0.14, 0.06);
+        /* el puño en alto: casi estirado, un poco adelante y afuera; en cada pulso golpea hacia arriba (el brazo
+           se estira del todo) y entre pulsos baja un poco doblando el codo */
+        else if (p.handS === 'fist') { const pump = Math.exp(-K.bp * 5); _v2.set(-0.34, 0.99 + 0.1 * pump, 0.25 + 0.03 * pump); }
+        else _v2.set(-0.25, 0.05, 0.18);
+        if (st.ovS < 0.05) this.ovS.position.copy(_v2); else this.ovS.position.lerp(_v2, kS);
+      }
+      if (st.ovF > 0.002) { if (p.handF === 'open') _v2.set(0.3, 0.05, 0.16); else _v2.set(this.side === 0 ? 1.2 : 0.55, 0.75, this.side === 0 ? 0.8 : 1.1); if (st.ovF < 0.05) this.ovF.position.copy(_v2); else this.ovF.position.lerp(_v2, kS); }
+      st.fistK = damp(st.fistK ?? 0, p.handS === 'fist' ? 1 : 0, 8, dt);
+      this.poleMk[1].position.copy(this.poleRest[1]).lerp(this.poleAlto, smooth(clamp(st.ovS * st.fistK, 0, 1)));
+      p.ovS = st.ovS; p.ovF = st.ovF;
+      this.setHand(1, p.ovS > 0.4 ? (p.handS === 'suelta' ? 'open' : p.handS) : 'pick');
+      this.setHand(0, p.ovF > 0.4 ? (p.handF === 'open' ? 'open' : 'point') : 'grip', Math.sin(t * 9) * 0.05);
     } else if (this.kind === 'singer') {
       this.setHand(0, this.handL || 'fist'); this.setHand(1, 'grip');
-      this.root.updateMatrixWorld(true); this.tgt[1].position.copy(this.torso.worldToLocal(S.micGrip.position.clone()));
+      /* la mano del micrófono: el puño rodea el mango (sus nudillos a lo largo del micro), con la muñeca abajo y
+         hacia afuera: el antebrazo sube desde el codo, que cuelga. El blanco es la muñeca, no el mango */
+      this.root.updateMatrixWorld(true);
+      _v3.copy(S.micGrip.position).addScaledVector(S.micFuera, 0.035).addScaledVector(S.micArriba, -0.07);
+      this.tgt[1].position.copy(this.torso.worldToLocal(_v3));
     } else { this.setHand(0, 'grip'); this.setHand(1, 'grip'); }
     // pies (con pasito al cambiar de postura)
     for (const L of this.legs) {
@@ -2972,6 +3005,11 @@ class Rocker {
           const Hg = HAND_G[i]; handFrame(_hf.copy(Hg.f).applyQuaternion(_q4), _hp.copy(Hg.p).applyQuaternion(_q4), i, _q5);
           _qa.slerp(_q5, w);
         }
+      }
+      if (this.kind === 'singer' && i === 1) {   // el puño alrededor del mango (dedos que suben y se cierran por encima)
+        r.getWorldQuaternion(_q5).invert();
+        handFrame(_hf.copy(S.micArriba).applyQuaternion(_q5), _hp.copy(S.micFuera).negate().applyQuaternion(_q5), i, _q4);
+        _qa.copy(_q4);
       }
       // el giro de muñeca se reparte: 65% en el antebrazo (hueso de torsión), el resto en la muñeca
       this.fa[i].getWorldQuaternion(_qb); r.getWorldQuaternion(_q3); _qb.premultiply(_q3.invert());
@@ -3284,7 +3322,57 @@ class Smoke {
   update(dt) { for (const q of this.s) { if (q.life <= 0) { q.sp.visible = false; continue; } q.life -= dt; const f = q.life / q.max; q.sp.position.addScaledVector(q.v, dt); q.sp.scale.setScalar(q.size * (1.6 - f)); q.sp.material.opacity = q.op * Math.min(1, f * 2) * Math.min(1, (1 - f) * 6); } }
 }
 const haze = [];
-function buildHaze() { for (let i = 0; i < 22; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.smoke, color: 0x9ab0c0, transparent: true, depthWrite: false, opacity: rr(0.05, 0.11) })); sp.position.set(rr(-8, 8), rr(SY + 0.3, SY + 3), rr(-3, 6)); sp.scale.setScalar(rr(3, 6)); scene.add(sp); haze.push({ sp, v: rr(-0.15, 0.15), y0: sp.position.y }); } }
+function buildHaze() { for (let i = 0; i < 22; i++) { const op = rr(0.05, 0.11), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.smoke, color: 0x9ab0c0, transparent: true, depthWrite: false, opacity: op })); sp.position.set(rr(-8, 8), rr(SY + 0.3, SY + 3), rr(-3, 6)); sp.scale.setScalar(rr(3, 6)); scene.add(sp); haze.push({ sp, v: rr(-0.15, 0.15), y0: sp.position.y, op }); } }
+const HAZE_C = new THREE.Color(0x9ab0c0);
+
+/* láseres desde la viga de atrás: salen con el escenario encendido (FUEGO nivel 2) y barren el patio al pulso.
+   Cada uno es un haz fino con el material de los focos (aditivo, se apaga hacia la punta) */
+class Lasers {
+  constructor(n = 8) {
+    this.g = new THREE.Group(); this.g.visible = false; scene.add(this.g); this.l = [];
+    const L = 30, geo = new THREE.CylinderGeometry(0.012, 0.07, L, 6, 1, true); geo.translate(0, -L / 2, 0); geo.rotateX(-Math.PI / 2);
+    for (let j = 0; j < n; j++) {
+      const m = new THREE.Mesh(geo, beamMat(0x53e7ff, 0)); m.position.set(lerp(-5.6, 5.6, j / (n - 1)), SY + 5.2, -3.55); m.frustumCulled = false; m.renderOrder = 5;
+      this.g.add(m); this.l.push(m);
+    }
+    this.mira = V(); this.c = new THREE.Color();
+  }
+  /* `k` 0–1 cuánto se ven; `beat` el pulso; `patron` cambia cada pocos compases; `col(j)` el color de cada uno */
+  update(t, k, beat, patron, brillo, col) {
+    this.g.visible = k > 0.01; if (!this.g.visible) return;
+    const n = this.l.length, ph = beat * Math.PI / 4;
+    this.l.forEach((m, j) => {
+      const c = j - (n - 1) / 2;
+      let x, y;
+      if (patron === 0) { x = c * 2.6 * Math.sin(ph); y = 1.2 + Math.abs(Math.cos(ph)) * 1.5; }           // abanico que abre y cierra
+      else if (patron === 1) { x = Math.sin(ph + j * 0.35) * 9; y = 0.8 + j % 2 * 1.4; }                 // barrido en ola
+      else { x = (j % 2 ? 1 : -1) * Math.sin(ph * 1.5) * 8 + c * 0.6; y = 1 + Math.abs(Math.sin(ph + j)) * 2; }   // se cruzan
+      m.lookAt(this.mira.set(x, y, 15 + Math.sin(t * 0.4 + j) * 2));
+      const u = m.material.uniforms; u.uI.value = k * brillo * 0.9; u.uColor.value.copy(col(j));
+    });
+  }
+}
+
+/* encendedores y celulares en alto entre el público (FUEGO desde el nivel 1), al compás. Un punto de luz por
+   persona elegida, solo de los que se pintan (`crowd.cuantos`) */
+class Celulares {
+  constructor(crowd) {
+    this.q = [];
+    crowd.p.forEach((P, i) => { if (R() < 0.42) this.q.push({ i, x: P.x + (R() < 0.5 ? -1 : 1) * 0.17 * P.s, y: 2.02 * P.s, z: P.z + 0.06, ph: R() * 6 }); });
+    const n = this.q.length, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    this.q.forEach((q, k) => { pos.set([q.x, q.y, q.z], k * 3); const enc = R() < 0.5; col.set(enc ? [1.6, 0.95, 0.35] : [0.75, 0.95, 1.6], k * 3); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    this.pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.3, map: TX.glow, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    this.pts.frustumCulled = false; this.pts.visible = false; scene.add(this.pts);
+  }
+  update(t, k, cuantos, beat) {
+    this.pts.visible = k > 0.01; if (!this.pts.visible) return;
+    this.pts.material.opacity = k * (0.75 + 0.25 * Math.exp(-((((beat % 1) + 1) % 1)) * 4));
+    const P = this.pts.geometry.attributes.position; let n = 0;
+    for (const q of this.q) { if (q.i >= cuantos) break; P.setX(n, q.x + Math.sin(t * 1.6 + q.ph) * 0.09); P.setY(n, q.y + Math.sin(t * 2.3 + q.ph) * 0.03); P.setZ(n, q.z); n++; }
+    this.pts.geometry.setDrawRange(0, n); P.needsUpdate = true;
+  }
+}
 
 /* =====================================================================
    TIEMPO MUSICAL (solo para sincronizar la animación — no hay audio)
@@ -3380,6 +3468,86 @@ const SONG = buildSong();
 const OPT = { L: 'violeta', Rr: 'rex', win: 'rand', cam: 'auto', titles: true, bars: true, loop: true, fixed: false };
 const PL = () => ensureRocker(OPT.L), PR = () => ensureRocker(OPT.Rr);
 let fxLight = 0;
+const lasers = new Lasers(), celus = new Celulares(crowd);
+
+/* =====================================================================
+   LA MÚSICA DE VERDAD — PRO HERO analiza la canción al cargarla (`rock.musica`, de ritmo.js: energía de graves,
+   medios y agudos, sus golpes y la fuerza del tramo, a 60 cuadros por segundo) y en cada pulso dice en qué
+   segundo va (`t`). Con eso los focos laten con el bombo de la canción y no con el de la coreografía, los tramos
+   suaves bajan la luz y los fuertes la suben. Sin análisis (o antes del segundo 0) se usa el bombo inventado.
+   ===================================================================== */
+const MUS = { d: null, ts: 0, tsAt: 0, ult: -1, hay: false, g: 0, m: 0, a: 0, f: 0.6, gg: 0, gm: 0, ga: 0 };
+const ahoraS = () => performance.now() / 1000;
+function oyeMusica(ed) {
+  const D = MUS.d; MUS.hay = false;
+  if (!D || ed || !VIVO.on) return;
+  const t = MUS.ts + Math.min(0.12, Math.max(0, ahoraS() - MUS.tsAt)), i = Math.floor(t * D.fps);
+  if (i < 0 || i >= D.n) { MUS.ult = i; return; }
+  // los golpes son de un cuadro (60 por segundo) y la escena corre a 15–30: se toma el más fuerte desde la última vez
+  let a = MUS.ult + 1; if (a > i || i - a > 30) a = i;   // volvió atrás o saltó más de medio segundo: solo este
+  let gg = 0, gm = 0, ga = 0;
+  for (let k = a; k <= i; k++) { if (D.gg[k] > gg) gg = D.gg[k]; if (D.gm[k] > gm) gm = D.gm[k]; if (D.ga[k] > ga) ga = D.ga[k]; }
+  MUS.ult = i; MUS.hay = true;
+  MUS.g = D.g[i] / 255; MUS.m = D.m[i] / 255; MUS.a = D.a[i] / 255; MUS.f = D.f[i] / 255;
+  MUS.gg = gg / 255; MUS.gm = gm / 255; MUS.ga = ga / 255;
+}
+
+/* =====================================================================
+   FUEGO — cuánto arde el escenario (0–1), de cómo vas: el ritmo de estrellas y la racha (`fuegoDe` en
+   ritmo.js, uno por jugador en `pulso({fuego})`; el escenario sigue al que más arde). Sube despacio y baja
+   rápido. Por niveles se suma: 1 encendedores y celulares en el público, los focos dejan de seguir a los
+   rockeros y barren el patio con colores; 2 láseres y fuentes de chispas; 3 estrobo, llamaradas con el
+   bombo y la cámara tiembla; 4 fuegos artificiales. Cada nivel nuevo se celebra (título de un jugador,
+   pirotecnia, humo, confeti) y el rockero se mueve más (`st.fuego`).
+   ===================================================================== */
+const FUEGO = { f: 0, nivel: 0, paleta: 0, estrobo: 0, estroboT: 0, pyroT: 0, artT: 0, pyroI: 0 };
+const NIVEL_F = [0.3, 0.55, 0.78, 0.94];
+const NIVEL_TXT = [null, ['¡SE PRENDE!', '#ffd23a'], ['¡QUÉ FUEGO!', '#ff9a2a'], ['¡EN LLAMAS!', '#ff4a2a'], ['¡MODO LEYENDA!', '#53e7ff']];
+const PALETAS = [[0xff2a8a, 0x2ad8ff], [0xff3a1a, 0xffb020], [0x7a3aff, 0x2affd0], [0x2a7aff, 0xfff2e0], [0x3aff6a, 0xd03aff], [0xff2a2a, 0xffffff]].map(p => p.map(c => new THREE.Color(c)));
+const colorPaleta = j => PALETAS[FUEGO.paleta % PALETAS.length][j % 2];
+function fuegoReset() { Object.assign(FUEGO, { f: 0, nivel: 0, paleta: 0, estrobo: 0, estroboT: 0, pyroT: 0, artT: 0 }); for (const r of Object.values(rockers)) r.st.fuego = 0; }
+function fuegosArtificiales(n = 1) {
+  for (let k = 0; k < n; k++) {
+    const p = V(rr(-15, 15), rr(12, 19), rr(-17, -8)), c = colorPaleta(Math.floor(R() * 2)).getHex();
+    parts.emit(p, 90, { color: c, color2: 0xffffff, speed: 6.5, life: 1.8, size: 0.55, grav: -2.2, drag: 1.1, bright: 3.2 });
+    parts.emit(p, 20, { color: 0xffffff, speed: 1.5, life: 0.5, size: 0.9, grav: 0, bright: 3 });
+  }
+}
+function subeNivel(n) {
+  if (battle.ko) return;
+  const mt = battle.mt();
+  crowd.cheer = Math.max(crowd.cheer, 0.6 + 0.2 * n); FUEGO.estrobo = 1;
+  if (n >= 2) for (const p of pyros) p.fire(0.9); else { pyros[1].fire(0.8); pyros[2].fire(0.8); }
+  if (n >= 3) for (const x of [-5.6, -2, 2, 5.6]) smoke.puff(V(x, SY + 0.35, 2.85), { size: 1.6, life: 2.4, op: 0.5, color: 0xdde6f0, rise: 2.4 });
+  if (n >= 4) { confetti.burst(); fuegosArtificiales(3); }
+  if (!SOLO()) return;
+  titles.call(...NIVEL_TXT[n]);
+  const L = PL();
+  if (!L.moves.some(m => m.react && mt < m.t0 + m.dur)) { if (n >= 3) { L.addMove('jump', mt, BEAT * 1.2, { react: true }); L.addMove('guitarRaise', mt + BEAT * 1.2, BAR, { react: true }); } else L.addMove('guitarRaise', mt, BAR, { react: true }); }
+  director.event('target', 0, 1.6);
+}
+/* cada cuadro: el fuego del escenario, sus niveles y lo que pasa con la música */
+function fuegoPaso(dt, sec, bar) {
+  const meta = VIVO.on && !battle.ko ? Math.max(0, ...(VIVO.fuegos || [0])) : battle.ko ? FUEGO.f : 0;
+  FUEGO.f = damp(FUEGO.f, meta, meta > FUEGO.f ? 0.7 : 2.2, dt);
+  enEscena().forEach((r, i) => { r.st.fuego = damp(r.st.fuego || 0, VIVO.on ? (VIVO.fuegos?.[i] ?? 0) : 0, 1.2, dt); });
+  const F = FUEGO.f;
+  let n = 0; while (n < 4 && F >= NIVEL_F[n] - (n < FUEGO.nivel ? 0.07 : 0)) n++;   // baja 0,07 más abajo (que no parpadee)
+  if (n > FUEGO.nivel) subeNivel(n);
+  FUEGO.nivel = n;
+  FUEGO.estrobo = Math.max(0, FUEGO.estrobo - dt * 9);
+  if (!VIVO.on || dt <= 0) return;
+  const t = clock.t, golpe = MUS.hay ? MUS.gg : kickPulse > 0.99 ? 1 : 0, fuerte = MUS.hay ? MUS.f > 0.5 : SECTION_I[sec.name] > 0.9;
+  // 2: fuentes de chispas en los bordes del escenario
+  if ((F > 0.55 || sec.name === 'solo') && R() < (sec.name === 'solo' ? 0.5 : (F - 0.45) * 1.4)) for (const x of [-6.6, 6.6]) parts.emit(V(x, SY + 0.3, 2.7), 2, { color: 0xffd080, color2: 0xffffff, speed: 1.2, dir: V(0, 5.5 + 2 * F, 0.3), life: 1.4, size: 0.045, grav: -7, drag: 0.4 });
+  // 3: estrobo y llamaradas con los bombos fuertes de un tramo fuerte; la cámara tiembla
+  if (n >= 3 && golpe > 0.8 && fuerte) {
+    if (t - FUEGO.estroboT > 0.35) { FUEGO.estroboT = t; FUEGO.estrobo = Math.max(FUEGO.estrobo, 0.55 + 0.45 * (n - 3)); director.shake = Math.max(director.shake, 0.18); }
+    if (t - FUEGO.pyroT > (n >= 4 ? 1.3 : 2.4)) { FUEGO.pyroT = t; const par = FUEGO.pyroI++ % 2 ? [0, 3] : [1, 2]; for (const k of par) pyros[k].fire(0.45); }
+  }
+  // 4: fuegos artificiales en el cielo, con los golpes
+  if (n >= 4 && (golpe > 0.6 || (MUS.hay && MUS.ga > 0.8)) && t - FUEGO.artT > 1.1 + R()) { FUEGO.artT = t; fuegosArtificiales(1); }
+}
 
 /* =====================================================================
    EN VIVO — PRO HERO maneja la escena: el pulso sale de la canción que suena (sus tiempos del chart),
@@ -3500,6 +3668,7 @@ const battle = {
   },
   update(dt) {
     const mt = this.mt();
+    if (!this.events) return;   // el bucle corrió antes del primer start (al montar)
     while (this.ei < this.events.length && this.events[this.ei].t <= mt) { const e = this.events[this.ei++]; if (!this.ko) this.attack(e.from, e.kind); }
     for (const s of this.seqs) {
       const u = mt - s.t0;
@@ -3559,17 +3728,20 @@ const battle = {
     for (const r of enEscena()) {
       if (this.ko) continue;
       if (r.busyUntil() > mt + 0.05 || r.moves.some(m => m.react && mt < m.t0 + m.dur)) continue;
-      const c = r.st.conf, I = SECTION_I[sec.name];
+      const c = r.st.conf, I = SECTION_I[sec.name], fu = r.st.fuego || 0;
       if (r.st.descanso) {   // sin notas: anima al público, cabecea o mira la guitarra, pero no toca
         const k = wpick({ none: 1.5, stomp: 0.7, headbang: 0.4, lookGuitar: 0.3, taunt: SOLO() ? 0 : 0.4 });
         if (k !== 'none') r.addMove(k, mt, k === 'headbang' ? BAR * 2 : BAR, { dir: r.side ? -1 : 1 });
         continue;
       }
       const secStart = bar === sec.bar0;
+      // en llamas: un salto cada cuatro compases (y a veces un giro al caer)
+      if (fu > 0.78 && bar % 4 === 0) { r.addMove('jump', mt, BEAT * 1.2); if (R() < 0.35 + 0.3 * fu) r.addMove(R() < 0.5 ? 'spin' : 'legKick', mt + BEAT * 1.4, BEAT * 1.5, { dir: r.side ? -1 : 1 }); continue; }
       if (secStart && (sec.name === 'chorus' || sec.name === 'outro')) { r.addMove(c > -0.1 ? 'jump' : 'stomp', mt, c > -0.1 ? BEAT * 1.2 : BAR); if (c > 0.15 && R() < 0.5) r.addMove('spin', mt + BEAT * 1.3, BEAT * 1.4, { dir: r.side ? -1 : 1 }); continue; }
-      if (sec.name === 'solo') { const lead = c >= 0; if (bar === sec.bar0 + 7 && lead) { r.addMove('kneel', mt, BAR); r.addMove('leanBack', mt, BAR); continue; } const k = wpick({ leanBack: lead ? 2 : 0.6, headbang: 1, guitarRaise: lead ? 1 : 0.2, struggle: lead ? 0 : 1.2, lookGuitar: lead ? 0.2 : 0.8 }); r.addMove(k, mt, k === 'leanBack' ? BAR * 2 : BAR); continue; }
-      const k = wpick({ none: 1.2, headbang: 1.1 * I, legKick: (c > 0 ? 0.7 : 0.15) * I, guitarRaise: c > 0 ? 0.6 : 0.1, taunt: !SOLO() && c > 0.15 ? 0.8 : 0.08, stomp: 0.5, point: !SOLO() && c > 0.3 ? 0.4 : 0, struggle: c < -0.2 ? 1.4 : 0, lookGuitar: c < -0.2 ? 0.6 : 0.05, spin: sec.name === 'chorus' && c > 0.3 ? 0.25 : 0 });
-      const dur = { headbang: BAR * 2, legKick: BEAT * 1.6, guitarRaise: BAR, taunt: BAR * 2, stomp: BAR, point: BEAT * 2.5, struggle: BAR * 2, lookGuitar: BAR, spin: BEAT * 1.4 }[k];
+      if (sec.name === 'solo') { const lead = c >= 0; if ((bar === sec.bar0 + 7 || (fu > 0.6 && (bar - sec.bar0) % 4 === 3)) && lead) { r.addMove('kneel', mt, BAR); r.addMove('leanBack', mt, BAR); continue; } const k = wpick({ leanBack: lead ? 2 : 0.6, headbang: 1, guitarRaise: (lead ? 1 : 0.2) * (1 + fu), struggle: lead ? 0 : 1.2, lookGuitar: lead ? 0.2 : 0.8 }); r.addMove(k, mt, k === 'leanBack' ? BAR * 2 : BAR); continue; }
+      // con el escenario encendido (`fu`, su racha) se queda menos quieto y se luce más
+      const k = wpick({ none: 1.2 * (1 - 0.75 * fu), headbang: 1.1 * I * (1 + 0.5 * fu), legKick: (c > 0 ? 0.7 : 0.15) * I * (1 + 1.5 * fu), guitarRaise: (c > 0 ? 0.6 : 0.1) * (1 + 1.5 * fu), taunt: !SOLO() && c > 0.15 ? 0.8 : 0.08, stomp: 0.5, point: !SOLO() && c > 0.3 ? 0.4 : 0, struggle: c < -0.2 ? 1.4 : 0, lookGuitar: c < -0.2 ? 0.6 : 0.05, spin: (sec.name === 'chorus' && c > 0.3 ? 0.25 : 0) + 0.35 * fu * fu, jump: fu > 0.5 ? 0.5 * fu : 0 });
+      const dur = { headbang: BAR * 2, legKick: BEAT * 1.6, guitarRaise: BAR, taunt: BAR * 2, stomp: BAR, point: BEAT * 2.5, struggle: BAR * 2, lookGuitar: BAR, spin: BEAT * 1.4, jump: BEAT * 1.2 }[k];
       if (k !== 'none') r.addMove(k, mt + (k === 'legKick' ? BEAT * 2 : 0), dur, { dir: r.side ? -1 : 1 });
     }
   },
@@ -3631,7 +3803,8 @@ const director = {
     const who = SOLO() ? 0 : nEx && R() < 0.4 ? 2 + Math.floor(R() * nEx) : R() < 0.6 + Math.abs(battle.mom) * 0.3 ? lead : 1 - lead;
     if (battle.ko) n = pick(['hero', 'close', 'crane', 'wide', 'crowdLow']);
     this.cut(n, { s: R() < 0.5 ? 1 : -1, who: battle.ko ? battle.winner : who });
-    this.nextBar = bar + (SECTION_I[sec.name] > 0.9 ? 1 + (R() < 0.5 ? 1 : 0) : 2);
+    // con el escenario encendido, cortes más seguidos
+    this.nextBar = bar + (FUEGO.f > 0.55 || SECTION_I[sec.name] > 0.9 ? 1 + (R() < 0.5 - 0.4 * FUEGO.f ? 1 : 0) : 2);
   },
   update(t, dt) {
     let name = this.name, r = this.r;
@@ -4345,7 +4518,7 @@ canvas.addEventListener('wheel', e => { if (!ED.open) return; e.preventDefault()
    BUCLE
    ===================================================================== */
 let last = performance.now() / 1000, kickPulse = 0, crashPulse = 0, bulbT = 0, msaaCheck = 0, msaaRoto = false;
-const _lead = new THREE.Color(), _warm = new THREE.Color(), _cc = new THREE.Color();
+const _lead = new THREE.Color(), _warm = new THREE.Color(), _cc = new THREE.Color(), _lm = V(), _lm2 = V();
 function step(dt) {
   clock.t += dt; const t = clock.t; LEG_T.value = t;
   const ed = ED.open;
@@ -4358,49 +4531,81 @@ function step(dt) {
   else VIVO.soloBar0 = -1;
   const secI = battle.ko ? 0.9 : SECTION_I[sec.name];
   const bar = Math.floor(mt / BAR);
-  if (!ed && bar !== battle.lastBar && dt > 0) { battle.lastBar = bar; battle.onBar(bar, sec, mt); director.onBar(bar, sec); }
+  if (!ed && bar !== battle.lastBar && dt > 0) {
+    battle.lastBar = bar; battle.onBar(bar, sec, mt); director.onBar(bar, sec);
+    // los colores cambian como en un show: cada 4 compases, cada 2 con el escenario en llamas, cada uno en leyenda
+    if (bar % (FUEGO.nivel >= 4 ? 1 : FUEGO.nivel >= 3 ? 2 : 4) === 0) FUEGO.paleta++;
+  }
+  oyeMusica(ed);
   const K = { mt, beat, bp, notes: SONG.notes, hands: SONG.hands, vocal: !ed && !battle.ko && ['verse', 'pre', 'chorus', 'outro', 'break'].includes(sec.name) && (beat % 8) < 6.5, lookTo: battle.ko ? (battle.winner === 0 ? -0.5 : 0.5) : 0 };
   if (dt > 0 && !ed) battle.update(dt);
   const D = SONG.drums; if (battle.visPtr > 0 && D[battle.visPtr - 1].t > mt) battle.visPtr = 0;
-  while (battle.visPtr < D.length && D[battle.visPtr].t <= mt) { const e = D[battle.visPtr++]; if (e.k === 'kick') kickPulse = 1; if (e.k === 'crash') { crashPulse = 1; S.cym[1].rotation.x = S.cym[1].userData.r0 + 0.25; } if (e.k === 'snare') S.cym[0].rotation.x = S.cym[0].userData.r0 + 0.08; }
+  // la batería de la coreografía mueve los platillos; las luces, si hay análisis, laten con la canción de verdad
+  while (battle.visPtr < D.length && D[battle.visPtr].t <= mt) { const e = D[battle.visPtr++]; if (e.k === 'kick' && !MUS.hay) kickPulse = 1; if (e.k === 'crash') { if (!MUS.hay) crashPulse = 1; S.cym[1].rotation.x = S.cym[1].userData.r0 + 0.25; } if (e.k === 'snare') S.cym[0].rotation.x = S.cym[0].userData.r0 + 0.08; }
+  if (MUS.hay) {
+    if (MUS.gg > 0.3) kickPulse = Math.max(kickPulse, Math.min(1, MUS.gg * 1.15));
+    if (MUS.ga > 0.75 && MUS.f > 0.45) crashPulse = Math.max(crashPulse, (MUS.ga - 0.6) * 1.6);
+  }
   if (battle.ko) kickPulse = Math.max(kickPulse, Math.exp(-bp * 6) * 0.8);
   kickPulse = Math.max(0, kickPulse - dt * 7); crashPulse = Math.max(0, crashPulse - dt * 2.2); fxLight = Math.max(0, fxLight - dt * 2.5);
   for (const c of S.cym) c.rotation.x = damp(c.rotation.x, c.userData.r0, 6, dt);
   S.kick.scale.setScalar(1 + kickPulse * 0.02);
   const act = ed ? (ED.rk ? [ED.rk] : []) : SOLO() ? [PL(), drummer] : [PL(), PR(), singer, drummer, ...EX()];
-  for (const r of act) r.st.I = damp(r.st.I, ed ? 0.62 : secI, 2, dt);
+  for (const r of act) r.st.I = damp(r.st.I, ed ? 0.62 : MUS.hay ? lerp(0.55, 1, MUS.f) : secI, 2, dt);
+  if (!ed) fuegoPaso(dt, sec, bar);
+  const F = ed ? 0 : FUEGO.f;
   if (dt > 0) for (const r of act) r.update(t, mt, dt, K);
   // pirotecnia en momentos clave
   if (dt > 0 && sec.name === 'chorus' && mt - sec.t0 < dt * 1.5) for (const p of pyros) p.fire(1.1);
-  if (sec.name === 'solo' && dt > 0 && R() < 0.5) for (const x of [-6.6, 6.6]) parts.emit(V(x, SY + 0.3, 2.7), 2, { color: 0xffd080, speed: 1.2, dir: V(0, 5.5, 0.3), life: 1.4, size: 0.045, grav: -7, drag: 0.4 });
+  if (ed && sec.name === 'solo' && dt > 0 && R() < 0.5) for (const x of [-6.6, 6.6]) parts.emit(V(x, SY + 0.3, 2.7), 2, { color: 0xffd080, speed: 1.2, dir: V(0, 5.5, 0.3), life: 1.4, size: 0.045, grav: -7, drag: 0.4 });
   let pyroOn = 0; for (const p of pyros) pyroOn = Math.max(pyroOn, p.update(t));
-  crowd.update(t, K, clamp(0.4 + secI * 0.5 + crashPulse * 0.2 + (VIVO.on ? VIVO.hype * 0.3 : 0), 0, 1.3), SOLO() ? 0 : battle.mom, VIVO.on ? VIVO.humor : 0.7);
+  const tramo = MUS.hay ? 0.55 + 0.45 * MUS.f : secI;
+  crowd.update(t, K, clamp(0.4 + tramo * 0.5 + crashPulse * 0.2 + (VIVO.on ? VIVO.hype * 0.3 : 0) + F * 0.35, 0, 1.5), SOLO() ? 0 : battle.mom, VIVO.on ? clamp(VIVO.humor + F * 0.4, -1, 1) : 0.7);
+  celus.update(t, ed ? 0 : smooth(clamp((F - 0.24) / 0.2, 0, 1)), crowd.cuantos, beat);
   // el Star Power encendido: chispas azules que saltan de la guitarra
   if (VIVO.on && dt > 0) for (const r of enEscena()) if (r.gtr.spAura.visible && R() < 0.7) parts.emit(r.gtr.g.localToWorld(V(rr(-0.2, 0.25), rr(-0.15, 0.15), 0.05)), 1, { color: 0x53e7ff, color2: 0xffffff, speed: 0.8, dir: V(0, 1.2, 0), life: 0.6, size: 0.035, grav: -1 });
   parts.update(dt); bolt.update(dt); cielo.update(dt); smoke.update(dt); confetti.update(dt, t);
-  for (const h of haze) { h.sp.position.x += h.v * dt; if (h.sp.position.x > 9) h.sp.position.x = -9; if (h.sp.position.x < -9) h.sp.position.x = 9; h.sp.position.y = h.y0 + Math.sin(t * 0.2 + h.v * 30) * 0.2; }
-  // luces: tintadas hacia quien lleva ventaja
-  const flash = Math.max(crashPulse, fxLight * 0.8);
+  // luces: tintadas hacia quien lleva ventaja; con el escenario encendido (`kc`) los focos dejan de seguir a los
+  // rockeros, barren el patio y toman los colores de la paleta (cambia por compases, `FUEGO.paleta`)
+  const flash = Math.max(crashPulse, fxLight * 0.8, FUEGO.estrobo * 0.8);
+  const vivo = MUS.hay ? 0.5 + 0.65 * MUS.f : 0.85 + 0.15 * secI;   // un tramo suave de la canción, más tenue
+  const kc = ed ? 0 : smooth(clamp((F - 0.22) / 0.3, 0, 1));
   _lead.set(battle.mom >= 0 || SOLO() ? ROCKERS[OPT.L].ui : ROCKERS[OPT.Rr].ui); _warm.set(0xfff0b0).lerp(_lead, Math.min(0.55, Math.abs(battle.mom) * 0.6));
-  for (const c of S.cans) {
+  HAZE_C.set(0x9ab0c0); if (kc > 0) HAZE_C.lerp(colorPaleta(0), 0.3 * kc);
+  for (const h of haze) { h.sp.position.x += h.v * dt * (1 + F); if (h.sp.position.x > 9) h.sp.position.x = -9; if (h.sp.position.x < -9) h.sp.position.x = 9; h.sp.position.y = h.y0 + Math.sin(t * 0.2 + h.v * 30) * 0.2; h.sp.material.color.copy(HAZE_C); h.sp.material.opacity = h.op * (1 + 0.5 * F + 0.3 * kickPulse * F); }
+  S.cans.forEach((c, j) => {
     const tg = ed && ED.rk ? ED.rk.root.position : SOLO() || c.tgt === 'p1' ? PL().root.position : c.tgt === 'p2' ? PR().root.position : singer.root.position;
-    c.g.lookAt(tg.x + Math.sin(t * 0.7 + c.g.position.x) * 0.4, tg.y + 1.1, tg.z + Math.cos(t * 0.6 + c.g.position.x) * 0.3);
-    c.beam.material.uniforms.uI.value = c.base * (0.75 + 0.6 * kickPulse + 0.8 * flash);
-    c.beam.material.uniforms.uColor.value.copy(_warm); c.glow.material.opacity = 0.45 + 0.35 * kickPulse;
-  }
+    _lm.set(tg.x + Math.sin(t * 0.7 + c.g.position.x) * 0.4, tg.y + 1.1, tg.z + Math.cos(t * 0.6 + c.g.position.x) * 0.3);
+    if (kc > 0) { const sp = t * (0.45 + 0.8 * F) + j * 1.9; _lm2.set(Math.sin(sp) * 8, SY + 0.4 + Math.abs(Math.sin(sp * 0.7 + j)) * 2.2, 7 + Math.cos(sp * 0.8) * 5); _lm.lerp(_lm2, kc * (j % 3 === 1 ? 0.55 : 0.85)); }
+    c.g.lookAt(_lm);
+    c.beam.material.uniforms.uI.value = c.base * (0.85 * vivo + 0.6 * kickPulse + 0.8 * flash) * (1 + 0.9 * F);
+    _cc.copy(_warm); if (kc > 0) _cc.lerp(colorPaleta(j), kc);
+    c.beam.material.uniforms.uColor.value.copy(_cc); c.glow.material.color.copy(_cc); c.glow.material.opacity = (0.45 + 0.35 * kickPulse) * (0.8 + 0.2 * vivo);
+  });
+  lasers.update(t, ed ? 0 : smooth(clamp((F - 0.5) / 0.15, 0, 1)), beat, Math.floor(bar / 4) % 3, (0.6 + 0.5 * (MUS.hay ? MUS.a : 0.6) + 0.6 * kickPulse) * (1 + FUEGO.estrobo), j => colorPaleta(j + 1));
   S.lights.spotL.target.position.copy(ed && ED.rk ? ED.rk.root.position : PL().root.position).add(V(0, 1, 0)); S.lights.spotR.target.position.copy(ed && ED.rk ? ED.rk.root.position : SOLO() ? PL().root.position : PR().root.position).add(V(0, 1, 0));
-  S.lights.spotL.intensity = 2.0 + 1.2 * kickPulse + 2 * flash + Math.max(0, battle.mom) * 1.2; S.lights.spotR.intensity = 2.0 + 1.2 * kickPulse + 2 * flash + Math.max(0, -battle.mom) * 1.2;
-  S.lights.key.intensity = 1.7 + 0.9 * flash;
+  const spot = (0.75 + 0.25 * vivo) * (1 + 0.35 * F);
+  S.lights.spotL.intensity = (2.0 + 1.2 * kickPulse + 2 * flash + Math.max(0, battle.mom) * 1.2) * spot; S.lights.spotR.intensity = (2.0 + 1.2 * kickPulse + 2 * flash + Math.max(0, -battle.mom) * 1.2) * spot;
+  _cc.set(0xffe08a); if (kc > 0) _cc.lerp(colorPaleta(0), 0.35 * kc); S.lights.spotL.color.copy(_cc); S.lights.spotR.color.copy(_cc);
+  S.lights.key.intensity = 1.7 * (0.85 + 0.15 * vivo) + 0.9 * flash + 3.5 * FUEGO.estrobo;
   if (ed) { S.lights.spotL.intensity = S.lights.spotR.intensity = 1.0; }   // en el editor los dos focos apuntan a la misma persona
   S.lights.fx.intensity = fxLight * 14;
-  S.lights.under.intensity = 5 + Math.sin(t * 13) * 0.6 + Math.sin(t * 7.3) * 0.5 + pyroOn * 4;
+  S.lights.under.intensity = 5 + Math.sin(t * 13) * 0.6 + Math.sin(t * 7.3) * 0.5 + pyroOn * 4 + (MUS.hay ? MUS.g * 2.5 : 0);
   S.lights.fire.intensity = 6 + Math.sin(t * 17) * 1 + Math.sin(t * 9.1) * 0.8;
-  bloom.strength = ed ? 0.3 : 0.42 + 0.3 * flash + 0.1 * kickPulse + pyroOn * 0.15;
-  for (const l of S.lanterns) l.pivot.rotation.set(Math.sin(t * 0.9 + l.ph) * 0.06, 0, Math.sin(t * 0.7 + l.ph) * 0.08);
-  for (const cg of S.cones) cg.position.z = 0.38 + kickPulse * 0.045;
+  for (const pl of S.lights.farol) pl.intensity = 4 * (MUS.hay ? 0.65 + 0.45 * MUS.m + 0.3 * kickPulse : 1) * (1 + 0.3 * F);
+  bloom.strength = ed ? 0.3 : 0.42 + 0.3 * flash + 0.1 * kickPulse + pyroOn * 0.15 + 0.2 * F;
+  grade.uniforms.uSat.value = 1.14 + 0.14 * F; grade.uniforms.uVig.value = 0.42 - 0.1 * F;
+  for (const l of S.lanterns) l.pivot.rotation.set(Math.sin(t * 0.9 + l.ph) * 0.06, 0, Math.sin(t * 0.7 + l.ph) * 0.08 + kickPulse * 0.02 * F);
+  for (const cg of S.cones) cg.position.z = 0.38 + kickPulse * 0.045 + (MUS.hay ? MUS.g * 0.025 : 0);
   for (const f of S.fireSprites) { const a = ((t * f.sp + f.ph) % 1); f.s.position.set(f.x * (1 - a), 0.25 + a * 1.6, f.z * (1 - a)); f.s.scale.setScalar((1 - a) * 1.1 + 0.2); f.s.material.opacity = (1 - a) * 0.9; }
-  bulbT += dt; if (bulbT > 0.22) { bulbT = 0; const B = S.bulbs, st = Math.floor(t * 4); for (let i = 0; i < B.n; i++) { const k = B.BC[i % B.BC.length]; const on = (i + st) % 7 !== 0 ? 1 : 0.25; B.mesh.setColorAt(i, _cc.setRGB(k[0] * on, k[1] * on, k[2] * on)); } B.mesh.instanceColor.needsUpdate = true; }
-  if (ed) { boxUpdate(dt); edCamera(dt); } else director.update(t, dt); if (kickPulse > 0.95 && secI > 0.9) director.shake = Math.max(director.shake, 0.2);
+  /* guirnaldas: la secuencia corre más rápido con el fuego, laten con los agudos y, encendidas, destellan con el bombo */
+  bulbT += dt;
+  if (bulbT > 0.22 / (1 + 2 * F)) {
+    bulbT = 0; const B = S.bulbs, st = Math.floor(t * 4 * (1 + 2 * F)), luz = (MUS.hay ? 0.55 + 0.6 * MUS.a : 1) * (1 + 0.5 * F) + kickPulse * 0.8 * F;
+    for (let i = 0; i < B.n; i++) { const k = B.BC[i % B.BC.length]; const on = (F > 0.55 ? ((i + st) % 4 === 0 ? 1.4 : 0.45) : (i + st) % 7 !== 0 ? 1 : 0.25) * luz; B.mesh.setColorAt(i, _cc.setRGB(k[0] * on, k[1] * on, k[2] * on)); }
+    B.mesh.instanceColor.needsUpdate = true;
+  }
+  if (ed) { boxUpdate(dt); edCamera(dt); } else director.update(t, dt); if (!MUS.hay && kickPulse > 0.95 && secI > 0.9) director.shake = Math.max(director.shake, 0.2);
   grade.uniforms.uTime.value = t;
 }
 function render(dt) {
@@ -4593,7 +4798,8 @@ export const rock = {
       LIVIANOS.add(k);
       return setRocker(k, o.look ? sanitizeLook(o.look) : deFabrica(o));
     });
-    Object.assign(VIVO, { on: true, mt: 0, raw: -1, ko: null, fin: null, hype: 0, alto: !!alto });
+    Object.assign(VIVO, { on: true, mt: 0, raw: -1, ko: null, fin: null, hype: 0, alto: !!alto, fuegos: null });
+    MUS.d = null; MUS.ult = -1; fuegoReset();
     OPT.bars = false; OPT.cam = 'auto';
     // con varios rockeros de más se empieza un nivel más abajo (el regulador sube si sobra)
     Object.assign(CAL, { nivel: Math.min(NIVELES.length - 1, (alto ? 2 : 1) + (EXTRAS.length >= 2 ? 1 : 0)), min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
@@ -4601,7 +4807,7 @@ export const rock = {
     /* shaders, texturas y sombras se estrenan ahora, en la pantalla de carga, y no en la canción: lo que está
        escondido hasta que pasa algo (los rayos, el aura azul, el confeti) se muestra mientras se compila.
        PRO HERO espera esta promesa antes de empezar la canción. */
-    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, ...enEscena().map(r => r.gtr.spAura)].filter(o => !o.visible);
+    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, lasers.g, celus.pts, ...enEscena().map(r => r.gtr.spAura)].filter(o => !o.visible);
     for (const o of ocultos) o.visible = true;
     try { if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera); } catch (err) { console.warn('[rock] compilar', err); }
     for (const o of ocultos) o.visible = false;
@@ -4612,8 +4818,11 @@ export const rock = {
   _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null, golpes = null }) {
+  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null, golpes = null, t = null, fuego = null }) {
     if (!VIVO.on) return;
+    // el segundo de la canción que suena (para la música analizada) y cuánto arde cada jugador (0–1)
+    if (Number.isFinite(t)) { MUS.ts = t; MUS.tsAt = ahoraS(); }
+    if (Array.isArray(fuego)) VIVO.fuegos = fuego.slice(0, 8).map(f => clamp(+f || 0, 0, 1));
     // las notas tocadas de verdad desde el pulso anterior: [quién, carril, acorde, duración en centésimas]
     if (Array.isArray(golpes)) for (const [q, l, a, d] of golpes.slice(0, 64)) {
       const r = (q === 0 || !VIVO.solo) && rockerDe(q | 0);
@@ -4628,6 +4837,11 @@ export const rock = {
     VIVO.raw = raw; VIVO.mt = mt; VIVO.hype = clamp(hype, 0, 1);
     battle.momT = clamp(animo, -0.85, 0.85);
   },
+  /* la canción analizada (`analizaMusica` de ritmo.js): {fps, n, g, m, a, gg, gm, ga, f}, bytes por cuadro */
+  musica(d) {
+    const ok = d && d.fps > 0 && d.n > 0 && ['g', 'm', 'a', 'gg', 'gm', 'ga', 'f'].every(k => d[k] && d[k].length >= d.n);
+    MUS.d = ok ? d : null; MUS.ult = -1;
+  },
   /* Star Power de `quien` (0 tú, 1 el rival, 2… los demás de la sala): una frase completa (`carga`) y el poder activado o no */
   carga(quien) { if (VIVO.on) battle.carga(Math.max(0, quien | 0)); },
   poder(quien, on) { if (VIVO.on) battle.poder(Math.max(0, quien | 0), on); },
@@ -4637,5 +4851,5 @@ export const rock = {
   /* fin de la canción: en batalla el ganador (0 tú, 1 el rival, 2… otro de la sala); solo, el título */
   fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = rockerDe(ganador | 0) ? ganador | 0 : 0; },
 };
-globalThis.__rock = { rock, CAL, TAM, MINI, FOTOGRAFO, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
+globalThis.__rock = { rock, CAL, TAM, MINI, FOTOGRAFO, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, MUS, FUEGO, ROCKERS, rockers, scene, camera, renderer, step, render };
 $('#loading')?.remove();

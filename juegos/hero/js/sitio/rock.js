@@ -23,7 +23,7 @@ export function cargaEscena() {
 // El fondo de una canción: la escena en un worker con un OffscreenCanvas (no le quita tiempo al hilo del
 // juego) o, si el navegador no lo permite o el worker falla, en la página. Las dos dan la misma API:
 // monta(host), desmonta(), enVivo({yo, rival, otros, alto, alDemasiado}) → promesa (cuando el escenario está listo),
-// pulso(d), carga(q), poder(q, on), ataque(q), hype(k, t, c), fin(g, t).
+// pulso(d), musica(d), carga(q), poder(q, on), ataque(q), hype(k, t, c), fin(g, t).
 let fondo = null;
 export function cargaFondo() {
   if (fondo) return fondo;
@@ -64,7 +64,8 @@ function fondoEnTrabajador() {
         w.postMessage({ t: 'vivo', yo, rival, otros, alto });
         return new Promise((fin) => { preparado = fin; });
       },
-      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, humor: d.humor, hype: d.hype, dtJuego: d.dtJuego || 0, toca: d.toca, solo: d.solo, confs: d.confs || null, golpes: d.golpes || null }); },
+      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, humor: d.humor, hype: d.hype, dtJuego: d.dtJuego || 0, toca: d.toca, solo: d.solo, confs: d.confs || null, golpes: d.golpes || null, t: d.t, fuego: d.fuego || null }); },
+      musica(d) { w.postMessage({ t: 'musica', d }); },
       carga(quien) { w.postMessage({ t: 'carga', quien }); },
       poder(quien, on) { w.postMessage({ t: 'poder', quien, on }); },
       ataque(quien) { w.postMessage({ t: 'ataque', quien }); },
