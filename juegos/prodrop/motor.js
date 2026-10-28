@@ -429,6 +429,25 @@
     ["realmadrid", "mbappe-mvp", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "Real Madrid · MVP del Clásico", cinta: "MVP DEL CLÁSICO", especial: "clasico", limitada: true, peso: 3 }],
     ["bayern", "harry-kane-balon", "Harry Kane", "DEL", 9, "ENG", { person: "bayern-harry-kane", sub: "Bayern Múnich · Balón de Oro", cinta: "BALÓN DE ORO 2026", especial: "balon", limitada: true, peso: 3 }]
   ];
+  /* ---------- el Bayern Múnich (Bundesliga) ----------
+     El primer equipo de fcbayern.com (octubre 2026), con la foto en
+     cards/champions/bayern/<id>.webp. Quedaron fuera los que EA FC no
+     tiene (N. Brown, Sapoko Ndiaye, Saibari) y el canterano David Santos,
+     sin dorsal. Va **después** de las especiales, al final del catálogo,
+     con su corte en `AMPLIACIONES`; la carta base de Kane es
+     `bayern-harry-kane`, la misma persona que su Balón de Oro. */
+  const BAYERN = [
+    ["bayern", "manuel-neuer", "M. Neuer", "POR", 1, "DE"], ["bayern", "sven-ulreich", "S. Ulreich", "POR", 26, "DE"],
+    ["bayern", "jonas-urbig", "J. Urbig", "POR", 40, "DE"], ["bayern", "dayot-upamecano", "Upamecano", "DEF", 2, "FR"],
+    ["bayern", "minjae-kim", "Kim Min-jae", "DEF", 3, "KR"], ["bayern", "jonathan-tah", "J. Tah", "DEF", 4, "DE"],
+    ["bayern", "alphonso-davies", "A. Davies", "DEF", 19, "CA"], ["bayern", "hiroki-ito", "H. Ito", "DEF", 21, "JP"],
+    ["bayern", "sacha-boey", "S. Boey", "DEF", 23, "FR"], ["bayern", "josip-stanisic", "J. Stanišić", "DEF", 44, "HR"],
+    ["bayern", "joshua-kimmich", "J. Kimmich", "MED", 6, "DE"], ["bayern", "tom-bischof", "T. Bischof", "MED", 8, "DE"],
+    ["bayern", "jamal-musiala", "J. Musiala", "MED", 10, "DE"], ["bayern", "konrad-laimer", "K. Laimer", "MED", 27, "AT"],
+    ["bayern", "lennart-karl", "L. Karl", "MED", 42, "DE"], ["bayern", "aleksandar-pavlovic", "A. Pavlović", "MED", 45, "DE"],
+    ["bayern", "serge-gnabry", "S. Gnabry", "DEL", 7, "DE"], ["bayern", "harry-kane", "Harry Kane", "DEL", 9, "ENG"],
+    ["bayern", "luis-diaz", "Luis Díaz", "DEL", 14, "CO"], ["bayern", "michael-olise", "M. Olise", "DEL", 17, "FR"]
+  ];
   const CLUBES = {
     realmadrid: "Real Madrid", barcelona: "FC Barcelona",
     manutd: "Manchester United", mancity: "Manchester City", chelsea: "Chelsea", liverpool: "Liverpool", tottenham: "Tottenham", arsenal: "Arsenal",
@@ -556,7 +575,11 @@
       "serhou-guirassy": 87, "maximilian-beier": 79, "fabio-silva": 79
     },
     bayern: {
-      "harry-kane-balon": 94
+      "harry-kane-balon": 94,
+      "manuel-neuer": 84, "sven-ulreich": 73, "jonas-urbig": 74, "dayot-upamecano": 85, "minjae-kim": 82,
+      "jonathan-tah": 87, "alphonso-davies": 84, "hiroki-ito": 78, "sacha-boey": 77, "josip-stanisic": 78,
+      "joshua-kimmich": 89, "tom-bischof": 76, "jamal-musiala": 88, "konrad-laimer": 82, "lennart-karl": 63,
+      "aleksandar-pavlovic": 79, "serge-gnabry": 82, "harry-kane": 89, "luis-diaz": 85, "michael-olise": 86
     }
   };
   const mediaDe = (club, id) => MEDIAS[club][id];
@@ -697,7 +720,11 @@
       "serhou-guirassy": "DC", "maximilian-beier": "DC/ED", "fabio-silva": "DC/EI"
     },
     bayern: {
-      "harry-kane-balon": "DC"
+      "harry-kane-balon": "DC",
+      "manuel-neuer": "POR", "sven-ulreich": "POR", "jonas-urbig": "POR", "dayot-upamecano": "DFC", "minjae-kim": "DFC",
+      "jonathan-tah": "DFC", "alphonso-davies": "LI/MI", "hiroki-ito": "DFC/LI", "sacha-boey": "LD", "josip-stanisic": "DFC/LD",
+      "joshua-kimmich": "MC/LD", "tom-bischof": "MC/MD", "jamal-musiala": "MC/MI", "konrad-laimer": "MC/LD", "lennart-karl": "MC/MD",
+      "aleksandar-pavlovic": "MC", "serge-gnabry": "EI/ED", "harry-kane": "DC", "luis-diaz": "EI/DC", "michael-olise": "ED"
     }
   };
   const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
@@ -799,6 +826,7 @@
   const BASE_CHAMP = CARDS.length;   // = 648: las de antes no se mueven
   CHAMPIONS.forEach(j => cartaFutbol("futbol", "champions", j));
   ESPECIALES.forEach(j => cartaFutbol("futbol", "especiales", j));
+  BAYERN.forEach(j => cartaFutbol("futbol", "champions", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
@@ -832,7 +860,8 @@
      siempre se agrega al final del catálogo. Con la lista vacía, todos los
      sobres ven todo. */
   // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }];
+  // El Bayern Múnich (20 jugadores): CORTE PROVISORIO para probar en local; al publicar se cambia a la hora del push más unos minutos.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793199600000, n: 813 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
@@ -1102,7 +1131,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, BAYERN, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

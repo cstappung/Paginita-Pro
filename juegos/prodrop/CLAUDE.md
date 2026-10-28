@@ -139,7 +139,16 @@ other file of the site. Things that hold it together:
   Dortmund dark). Players EA FC has no rating for are left out.
   The Champions League clubs added: Real Betis, PSG, Como, Inter, Roma, Napoli
   and Borussia Dortmund (the clubs that play the 2026-27 league phase; Atlético
-  and Bayern were left out because their sites block automated readers).
+  was left out because its site blocks automated readers).
+- **Bayern Múnich** (`BAYERN`, 20 players, photos in `cards/champions/bayern/`,
+  second `AMPLIACIONES` entry with `n: 813`). It goes **after** `ESPECIALES`,
+  at the very end. fcbayern.com answers 403 to curl, but a real browser reads it:
+  the portraits (`img.fcbayern.com/…/spielerportraits/ganzkoerper/<name>.png`,
+  1920×1080 cut-outs) were fetched from a page on localhost, cropped to head and
+  chest on a red radial gradient in a canvas and saved as 470 px webp. Kane's
+  base card is `bayern-harry-kane`, the same person as his Balón de Oro. **The
+  `hasta` of that entry must be the publish time plus a few minutes** (it was a
+  provisional value while testing locally).
 - **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
   Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the
@@ -158,6 +167,29 @@ other file of the site. Things that hold it together:
   Juegos, the salon card `futbol` in `juegos-main.js` and its art (`futbol()` in
   `novedades-arte.js`, three real cards with media; a test compares its medias with
   the motor's).
+- **«Especial» is a displayed rarity, not an engine tier**: the frame's
+  `rareza(c)` answers `ESPECIAL` (✦, gold) for `c.especial`, on the card face,
+  the banner, the zoom and the collection (its own filter chip, and the
+  Legendaria chip no longer counts them). For the motor they are still tier 3:
+  packs, odds and re-rolls are untouched, so no pack changes.
+- **The football collection goes by club** (`renderCollection`): with «Todas»
+  each club is one section (crest + name, in `CLUBES` order), its cards from the
+  lowest media to the highest, so the specials land at the end of their club.
+  The rarity chips filter across clubs and keep the club sections. A missing
+  football card shows its media and position. Profes and componentes are as
+  before (by rarity, then variant or theme).
+- **Football re-roll** (`vistaRerollFutbol`): sort (media ↓, media ↑, club),
+  club select and chips (todas / repetidas / sin graduar / graduadas); copies
+  of the same player sit together, and each card shows media, positions and
+  its grade if graded. «Elegir automático» ignores the filter.
+- **The football menu scrolls** (`.chooser` has a max-height and overflow) and
+  the Desafío de plantilla strip sits under the title, above the two packs: it
+  was cut off below them with no way to scroll.
+- **Local test page** `juegos/prodrop/_prueba.html` (**never committed**): it
+  plays the postman with a fake account kept in `localStorage`
+  (`prodrop.prueba.estado`: 50 000 coins, 160 football packs, the two specials,
+  a rival's listings) and answers every action without Firebase. Open it
+  through the static server, never `file://`.
 - **The football pack covers are fixed** (`PORTADA` in `app.js`, read by
   `fanDe`): (during the event: Yamal, Kane and, in the centre, Mbappé MVP; normally) normal = Lamine Yamal, Bellingham and, in the centre, Mbappé;
   Plus = Saka, Van Dijk and Haaland; the «Sobres de Fútbol» tile shows
@@ -376,7 +408,7 @@ The `cartas`, `mercado` and `prodropSerie1` nodes and `perfil/cartas` need the r
 En la interfaz se llama siempre **«Desafío de plantilla»** (no «desafío semanal»: el semanal es solo uno de los tres).
 
 
-- `retos.js` (UMD `ProdropRetos`, puro, sobre el motor) lo comparten el abridor, el cartero y la economía. Plantillas: `mejor` (la **Mejor plantilla**, `tipo: "libre"`: cualquier carta, siempre abierta, sin la condición «Todos cumplen»), `club-<club>` (los clubes con ≥15 cartas: el Bayern queda fuera) y `reto-<id>-<semana>`; las reglas aceptan las tres claves; el reto de la semana es `RETOS[(semana − PRIMERA) % n]` (`PRIMERA` = 42, lunes 26-10-2026, El Clásico; luego Francia, Inglaterra, España…), así que **los retos solo se agregan al final** (y cada uno debe poder armarse con el catálogo: Oranje se descartó por no haber portero neerlandés; el test lo comprueba). Se activan solos; la pantalla no los lista abajo, sino en el modal «🔜 Próximos retos» (al lado de «Ver colección») con la fecha de cada lunes. Las selecciones llevan `bandera` (imagen de `flags/`), no el emoji. La semana empieza el lunes 03:00 UTC (`SEMANA0`). Un reto solo se sube y se cobra en su semana (`vigente`, con la hora del servidor).
+- `retos.js` (UMD `ProdropRetos`, puro, sobre el motor) lo comparten el abridor, el cartero y la economía. Plantillas: `mejor` (la **Mejor plantilla**, `tipo: "libre"`: cualquier carta, siempre abierta, sin la condición «Todos cumplen»), `club-<club>` (los clubes con ≥15 cartas, el Bayern incluido) y `reto-<id>-<semana>`; las reglas aceptan las tres claves; el reto de la semana es `RETOS[(semana − PRIMERA) % n]` (`PRIMERA` = 42, lunes 26-10-2026, El Clásico; luego Francia, Inglaterra, España…), así que **los retos solo se agregan al final** (y cada uno debe poder armarse con el catálogo: Oranje se descartó por no haber portero neerlandés; el test lo comprueba). Se activan solos; la pantalla no los lista abajo, sino en el modal «🔜 Próximos retos» (al lado de «Ver colección») con la fecha de cada lunes. Las selecciones llevan `bandera` (imagen de `flags/`), no el emoji. La semana empieza el lunes 03:00 UTC (`SEMANA0`). Un reto solo se sube y se cobra en su semana (`vigente`, con la hora del servidor).
 - Puntaje: (media − castigo de `M.ajuste`) × estado (graduada 0,80 + 0,02 × nota; sin graduar 0,80, para no filtrar la nota oculta), suma × 10. Un puesto «mal» no puede jugar. Sin repetir `person` (Mbappé y su especial son uno).
 - Firebase: `plantillas/s/<plantilla>/<uid>` = {at, c[11]} (la clasificación, se reescribe) y `plantillas/p/<uid>/<plantilla>_<n>` = {at, c[11], k, k2?} (premio cobrado, una vez). Premios (`PREMIOS[].sobres`): 1 = 50 + un sobre normal (+ el marco, si es de club); 2 = 300 + dos sobres normales (las 11 graduadas ≥6; el segundo va en `k2`); 3 = 1000 + un sobre Plus (≥8). Las monedas solo viven en `PREMIOS` (la economía las lee de ahí; la regla no las mira), así que cambiarlas no toca Firebase y vale también para lo ya cobrado. Los sobres van en el mismo `update` con `p: 0, pl: <reclamo>`; la regla de cada lado mira al otro, y la del premio exige el prefijo (`g`, `h` en el 3) y `k2` solo en el 2. Se abren juntos al cobrar.
 - La economía (`monedas.js`, evento `pl`, antes que `s` a igual hora) paga el premio en `premios` (categoría `plantilla`) solo si las 11 son de quien cobra en ese momento y cumplen el nivel con lo graduado hasta ahí; cada sobre con `pl` vale solo si su premio valió y lo nombra, una vez. El cartero comprueba lo mismo antes de escribir (un reclamo mal hecho gasta su única vez).
@@ -384,6 +416,7 @@ En la interfaz se llama siempre **«Desafío de plantilla»** (no «desafío sem
 - **Mercado de fútbol sin salir**: «🏪 Mercado de fútbol» (álbum y editor) y «🏪 Buscar en el mercado» (en el selector de una casilla) abren el modal `#rtMercado` con las `ofertas` de fútbol que ya manda el cartero (también las tuyas, marcadas «Tu oferta» y sin botón: saltarlas hacía que el modal dijera «nadie vende» con tu propia carta publicada), de mayor a menor media; en el editor, filtradas a la plantilla y, con casilla, a quien puede jugar ahí (chips para quitarlo). Comprar pide un segundo toque y va por la acción `compraOferta` del cartero (`puedeComprar` + `fb.comprarOferta`, como la pestaña 🏪). «Abrir el mercado completo» y el 🏪 de la cabecera con los desafíos abiertos van a `#mercado/futbol` (PRODROP con la colección Fútbol elegida).
 - **El parámetro de una oferta se llama `oferta`, nunca `id`**: `Red.pide` mete `id` (el del mensaje) en el mismo objeto, y `{ id }` lo pisaba: la respuesta no llegaba y a los 20 s salía «Sin respuesta» aunque la escritura se hiciera. Le pasaba a «Retirar del mercado» del zoom, ya corregido.
 - **Entradas**: además de las de arriba, el menú de Sobres de Fútbol tiene la franja `#chRetos` (con el reto de la semana) y el Salón tiene la ficha «Desafío semanal de plantilla» en un jugador (`SOLOS`, `tipo: "sitio"`, pide cuenta; `docs/claude/juegos/salon.md`).
+- **Tocar una carta en el desafío**: una casilla vacía abre el selector; una llena muestra encima «🎓 Graduar» (si no está graduada ni a la venta) y «⇄ Cambiar» (`rt.accion`). En el selector, tocar un jugador muestra «🎓 Graduar» y «👤＋ Poner» sobre su carta (`rt.pick`). Graduar abre el zoom con la graduación en vivo (`graduaDesdeReto`, `zoomVuelve = 'retos'`) y al cerrarlo se vuelve al desafío con el selector como estaba. Los botones van dentro del botón de la casilla: paran el toque (`accionesCarta`).
 - El abridor: overlay `#retos` (álbum → editor con `pintaCancha`, selector, clasificación, premios). **No se cierra tocando el fondo** (se salía sin querer; ✕ y Escape sí, y Escape cierra primero el modal de encima). El selector de jugador es un modal (`#rtEligeCapa`) sobre la cancha, no una lista abajo. Entradas: `#cartas/retos` (`?abre=retos`), el botón del resumen del sobre (`#retosBtn`, reemplazó a «Mi plantilla» ahí), el atajo de la tienda de fútbol (`#retosBtn2`), el de la colección en la pestaña Fútbol (`#retosBtn3`) y el segundo botón de las novedades de PRODROP en el Salón (`ATAJO_RETOS`). El borrador de cada plantilla vive en `localStorage` (`prodrop.reto.<uid>.<plantilla>`).
 - **Marco de club**: cualquier premio que valió de una plantilla `club-<club>` deja `usuarios[u].desafios[<club>] = at` en la economía, y eso desbloquea el marco de perfil `club<club>` (`req: {desafio}` en `perfil-tarjeta.js`; detalle en `docs/claude/juegos/perfiles-y-economia.md`). No se escribe nada nuevo ni hay regla. La ficha del álbum lleva el chip «🖼 Marco» y el premio 1 lo anuncia; en el editor de perfil el grupo «Clubes» muestra solo los ganados (o el puesto), a propósito.
 - `tests/retos.test.cjs` cubre plantillas, puntaje y premios en la economía (y el `desafios` del marco); `test-rules.mjs` las reglas.

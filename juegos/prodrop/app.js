@@ -105,6 +105,7 @@ const FUT_PAIS = {
   SCO: 'Escocia', WAL: 'Gales', NIR: 'Irlanda del Norte', IE: 'Irlanda', AR: 'Argentina', IT: 'Italia', CM: 'Camerún', SI: 'Eslovenia',
   GH: 'Ghana', JP: 'Japón', CZ: 'Chequia', SK: 'Eslovaquia', GR: 'Grecia', NO: 'Noruega', EC: 'Ecuador', HU: 'Hungría', UZ: 'Uzbekistán',
   SN: 'Senegal', DZ: 'Argelia', US: 'Estados Unidos', GE: 'Georgia',
+  KR: 'Corea del Sur', CA: 'Canadá',
   AM: 'Armenia', AT: 'Austria', CH: 'Suiza', CO: 'Colombia', DO: 'República Dominicana', GN: 'Guinea', MX: 'México', RS: 'Serbia', RU: 'Rusia', XK: 'Kosovo',
 };
 // la bandera es una imagen (flags/<país>.png): el emoji no se ve como bandera en Windows, solo las dos letras
@@ -118,6 +119,11 @@ const colDe = k => M.SOBRE[k].col;
 const esFutbolPack = k => M.esFutbol(colDe(k));
 const pad = n => String(n).padStart(3, '0');
 const subtitle = c => M.subtitulo(c);
+/* La rareza que se muestra: las especiales de fútbol (Mbappé MVP, Kane
+   Balón de Oro) se ven como «Especial», aunque para el motor (sobres,
+   probabilidades, re-roll) sigan siendo legendarias. */
+const ESPECIAL = { key: 'especial', label: 'Especial', sym: '✦', color: '#ffd23d' };
+const rareza = c => (c.especial ? ESPECIAL : TIERS[c.tier]);
 // Colores dominantes de cada imagen épica/legendaria (extraídos de las imágenes)
 const PAL = {"angel-abusleme-gta":["#066cf7","#ffe871","#f7461f"],"angel-abusleme-shiny":["#42f77c","#f79963"],"christian-oberli-gta":["#67abf7","#fff27b","#f73618"],"christian-oberli-shiny":["#ff7b86","#f7dd78"],"claudia-prieto-gta":["#ff4c61","#71efff","#ff6300"],"claudia-prieto-shiny":["#f72000","#ffb90c"],"cristian-garces-gta":["#59d7ff","#f72a0f","#ffdb53"],"cristian-garces-shiny":["#64bcf7","#f774a5"],"cristian-tejos-gta":["#77d9ff","#f76203","#7183f7"],"cristian-tejos-shiny":["#f7cd00","#6fa3f7","#f7483c"],"david-watts-gta":["#74ddff","#ffdf6b","#f74134"],"david-watts-shiny":["#f77300"],"felipe-nunez-gta":["#6eb0f7","#ffde7c","#f76183"],"felipe-nunez-shiny":["#09ecf7","#f720d2","#205cf7"],"felix-rojasv2-gta":["#6ad4ff","#6a87f7","#f7d263"],"felix-rojasv2-shiny":["#9e4bf7","#f76177","#f76fde"],"javier-pereda-torres-gta":["#46daff","#5e8ef7","#ffde65"],"javier-pereda-torres-shiny":["#114bf7","#8720f7","#ff5e58"],"marilyn-cruces-gta":["#00e7ff","#ff8900","#ebf765"],"marilyn-cruces-shiny":["#00bbf7","#f72514","#6990f7"],"mario-gac-gta":["#3be0ff","#f7da5c","#f75344"],"mario-gac-shiny":["#f7695b"],"miguel-gutierrez-gta":["#ffdf72","#f75c4f"],"miguel-gutierrez-shiny":["#f70075","#3102f7","#15f700"],"pablo-irarrazaval-gta":["#64a4f7","#ffdf6a","#f72518"],"pablo-irarrazaval-shiny":["#75f700","#00c3f7","#f7cb17"],"rene-botnar-gta":["#58a4f7","#ffdb5d","#f73c2b"],"rene-botnar-shiny":["#f76c00","#f7000c"],"rodrigo-cadiz-gta":["#57e1ff","#ffde65","#f7311d"],"rodrigo-cadiz-shiny":["#00c7f7","#3e79f7","#00f78f"],"rolando-dunner-gta":["#57a5f7","#f7d157","#f76274"],"rolando-dunner-shiny":["#ff798b","#f7d44e"],"tito-arevalo-gta":["#f7425a","#ffdd60","#85d7ff"],"tito-arevalo-shiny":["#f83c44","#85ffeb"],"angel-abusleme-casino":["#f78347"],"christian-oberli-casino":["#f7875e","#f741c5"],"claudia-prieto-casino":["#f79c63"],"cristian-garces-casino":["#f79463"],"cristian-tejos-casino":["#f79863","#3780f7"],"david-watts-casino":["#f79960"],"felipe-nunez-casino":["#f77644"],"felix-rojasv2-casino":["#f79763","#f752bb"],"javier-pereda-torres-casino":["#f7915d"],"marilyn-cruces-casino":["#f78351"],"mario-gac-casino":["#f76d29"],"miguel-gutierrez-casino":["#46b5f7","#c356f7","#f78163"],"pablo-irarrazaval-casino":["#f79657"],"rene-botnar-casino":["#f79863","#5495f7"],"rodrigo-cadiz-casino":["#f79a63"],"rolando-dunner-casino":["#f79a56"],"tito-arevalo-casino":["#f78d5e"],"angel-abusleme-cyberpunk":["#4d92f7","#f78563"],"christian-oberli-cyberpunk":["#f78852","#5dd2f7"],"claudia-prieto-cyberpunk":["#f78663","#f763d2","#8a63f7"],"cristian-garces-cyberpunk":["#f79063","#7cf763"],"cristian-tejos-cyberpunk":["#f79063","#6397f7","#63f7eb"],"david-watts-cyberpunk":["#f79963"],"felipe-nunez-cyberpunk":["#f77c5f"],"felix-rojasv2-cyberpunk":["#f78d5d","#4dd1f7"],"javier-pereda-torres-cyberpunk":["#f78e5a","#6394f7"],"marilyn-cruces-cyberpunk":["#f77d63","#639bf7"],"mario-gac-cyberpunk":["#f79d5b"],"miguel-gutierrez-cyberpunk":["#f78963","#c158f7","#e7f74f"],"pablo-irarrazaval-cyberpunk":["#f79163","#63d8f7"],"rene-botnar-cyberpunk":["#f78263","#63bef7"],"rodrigo-cadiz-cyberpunk":["#f7885c","#cd5bf7"],"rolando-dunner-cyberpunk":["#637af7"],"tito-arevalo-cyberpunk":["#f77a63","#c263f7"],"angel-abusleme-starwars":["#ed6822"],"christian-oberli-starwars":["#eb7113"],"claudia-prieto-starwars":["#f0764b"],"cristian-garces-starwars":["#ef8043"],"cristian-tejos-starwars":["#f0944b"],"david-watts-starwars":["#f08f4b"],"felipe-nunez-starwars":["#eb4f13"],"felix-rojasv2-starwars":["#eb131e"],"javier-pereda-torres-starwars":["#f0884b"],"marilyn-cruces-starwars":["#1363eb"],"mario-gac-starwars":["#f09049"],"miguel-gutierrez-starwars":[],"pablo-irarrazaval-starwars":["#ed4f20"],"rene-botnar-starwars":[],"rodrigo-cadiz-starwars":[],"rolando-dunner-starwars":[],"tito-arevalo-starwars":["#ed5026","#eb1315"],"resistencia-halloween":["#f64608"],"condensador-electrolitico-halloween":["#eb2e13","#ebf04b"],"inductor-toroidal-halloween":["#eb5713"],"led-halloween":["#eb3513","#eb1329"],"transistor-bjt-halloween":["#eb3d13"],"mosfet-potencia-halloween":["#eb4413"],"timer-555-halloween":["#eb5613"],"microcontrolador-halloween":["#eb5913"],"fotoresistencia-ldr-halloween":["#eb3313","#f0a24b"],"sensor-ultrasonico-halloween":["#eb4013"],"condensador-ceramico-halloween":["#eb5113"],"potenciometro-halloween":["#eb5013"],"cristal-oscilador-halloween":["#eb131e","#f08e47","#eb1713"],"diodo-rectificador-halloween":["#eb4e13"],"mosfet-sic-to247-halloween":["#eb5a13"],"gate-driver-halloween":["#eb4813"],"amplificador-operacional-halloween":["#eb4413"],"regulador-7805-halloween":["#ed8a25","#9ceb13"],"esp32-halloween":["#eb2213","#f0b44b"],"transformador-laminado-halloween":["#ec7f1b"],"transformador-ferrita-halloween":["#edef43","#eb4e13"],"sensor-temperatura-humedad-halloween":["#ec4819"],"sensor-pir-halloween":["#f08a4b","#eb1318"],"rele-halloween":["#076ef7","#eb3713","#eb131d"],"sensor-imu-halloween":["#eb4413","#fab041"],"resistencia-dieciochero":["#eb5113","#499cf0","#eba313"],"condensador-electrolitico-dieciochero":["#eb5113"],"inductor-toroidal-dieciochero":["#eb5e13","#eb131a"],"led-dieciochero":["#eb6a13","#f30e0b"],"transistor-bjt-dieciochero":["#f0984b","#eb1314"],"mosfet-potencia-dieciochero":["#f09c4b","#eb131c"],"timer-555-dieciochero":["#f09c4b","#4b96f0","#eb1913"],"microcontrolador-dieciochero":["#f0944b","#ec2716","#eb1318"],"fotoresistencia-ldr-dieciochero":["#f0924b","#4b90f0"],"sensor-ultrasonico-dieciochero":["#eb3d13","#4b92f0"],"condensador-ceramico-dieciochero":["#f0924b"],"potenciometro-dieciochero":["#ee8139"],"cristal-oscilador-dieciochero":["#eb5a13"],"diodo-rectificador-dieciochero":["#eb6b13","#4396ef"],"mosfet-sic-to247-dieciochero":["#f09e4b","#eb1315"],"gate-driver-dieciochero":["#eb5813","#eb1317"],"amplificador-operacional-dieciochero":["#f0994b","#eb131a"],"regulador-7805-dieciochero":["#eb4b13"],"esp32-dieciochero":["#f09a4b","#eb1315"],"transformador-laminado-dieciochero":["#eb8913","#eb2913","#eb1317"],"transformador-ferrita-dieciochero":["#eb5413","#f0cf4b"],"sensor-temperatura-humedad-dieciochero":["#ed4925"],"sensor-pir-dieciochero":["#ebb013","#eb131a","#eb2513"],"rele-dieciochero":["#f0a04b","#047efa","#eb2a13"],"sensor-imu-dieciochero":["#096ef5","#f83233","#ec3f1a"],"resistencia-arcano":["#eb4c13"],"condensador-electrolitico-arcano":["#eb5d13","#1330eb"],"inductor-toroidal-arcano":["#f0874b","#4b71f0"],"led-arcano":["#eb5f13"],"transistor-bjt-arcano":["#ee7134"],"mosfet-potencia-arcano":["#eb5e13"],"timer-555-arcano":["#ec781e"],"microcontrolador-arcano":["#ef803d"],"fotoresistencia-ldr-arcano":["#f08949"],"sensor-ultrasonico-arcano":["#2865ed","#eb6a13"],"condensador-ceramico-arcano":["#ec791e"],"potenciometro-arcano":["#eb5c13"],"cristal-oscilador-arcano":[],"diodo-rectificador-arcano":["#eb4e13"],"mosfet-sic-to247-arcano":["#eb5b13"],"gate-driver-arcano":["#ec7d20","#1352eb"],"amplificador-operacional-arcano":["#eb5d13"],"regulador-7805-arcano":["#eb5813"],"esp32-arcano":["#f0994b"],"transformador-laminado-arcano":["#f0ac4a","#1351eb"],"transformador-ferrita-arcano":["#c544ef","#f04b64","#fcd53f"],"sensor-temperatura-humedad-arcano":["#f07e4b","#eb1324"],"sensor-pir-arcano":["#eb4313","#eb1319"],"rele-arcano":["#1373eb","#eb6013"],"sensor-imu-arcano":["#ed8a23","#1366eb"],"resistencia-quemado":["#eb3813"],"condensador-electrolitico-quemado":["#eb3213"],"inductor-toroidal-quemado":["#eb1f13"],"led-quemado":["#eb1913","#eb1328"],"transistor-bjt-quemado":["#eb2213"],"mosfet-potencia-quemado":["#eb1813"],"timer-555-quemado":["#eb2813"],"microcontrolador-quemado":[],"fotoresistencia-ldr-quemado":["#eb3913"],"sensor-ultrasonico-quemado":["#eb1e13"],"condensador-ceramico-quemado":["#eb4213","#eb131c"],"potenciometro-quemado":[],"cristal-oscilador-quemado":["#eb3c13"],"diodo-rectificador-quemado":["#eb1330"],"mosfet-sic-to247-quemado":[],"gate-driver-quemado":[],"amplificador-operacional-quemado":["#eb4c13"],"regulador-7805-quemado":["#eb4313"],"esp32-quemado":["#eb5913"],"transformador-laminado-quemado":["#eb4513"],"transformador-ferrita-quemado":["#eb9413","#eb4413"],"sensor-temperatura-humedad-quemado":["#f0a24b","#eb3513"],"sensor-pir-quemado":["#eb5b13"],"rele-quemado":["#1374eb","#eb131f"],"sensor-imu-quemado":["#eb1713"],"resistencia-navidad":["#f0604b","#1367eb"],"condensador-electrolitico-navidad":["#eb7313","#eb1c13"],"inductor-toroidal-navidad":["#eb6013"],"led-navidad":["#eb7613","#eb2213"],"transistor-bjt-navidad":["#f0904b","#eb1e13"],"mosfet-potencia-navidad":["#eb5213"],"timer-555-navidad":["#eb5713"],"microcontrolador-navidad":["#ec6a17"],"fotoresistencia-ldr-navidad":["#eb5a13"],"sensor-ultrasonico-navidad":["#eb5e13"],"condensador-ceramico-navidad":["#eb8213","#eb2513"],"potenciometro-navidad":["#eb7013"],"cristal-oscilador-navidad":[],"diodo-rectificador-navidad":["#eb6013"],"mosfet-sic-to247-navidad":["#138beb","#f0824b"],"gate-driver-navidad":["#eb5d13"],"amplificador-operacional-navidad":["#f0864b","#eb1314"],"regulador-7805-navidad":["#eb5513"],"esp32-navidad":["#f0964b","#eb2413"],"transformador-laminado-navidad":["#efa844","#ec2112"],"transformador-ferrita-navidad":["#f0514b","#fddc3e","#f0954b"],"sensor-temperatura-humedad-navidad":["#eb3813"],"sensor-pir-navidad":["#f07e4b"],"rele-navidad":["#067cf8","#ee8131","#eb1a13"],"sensor-imu-navidad":["#eb5813","#1375eb"]};
 const paletteOf = c => {
@@ -274,7 +280,7 @@ function frontHTML(c, lazy) {
       <div class="fu-top"><span class="fu-pos" title="${c.posiciones.map(p => M.PUESTO[p]).join(' / ')}">${c.posiciones.join(' · ')}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
       ${c.cinta ? `<span class="fu-cinta">${c.cinta}</span>` : ''}
       ${wearHTML(c)}
-      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
+      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${rareza(c).label} ${rareza(c).sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
       <i class="fu-marco"></i>
     </div>`;
   }
@@ -862,7 +868,7 @@ function eligeSobre(menu = 'todos') {
   document.body.classList.toggle('menu-futbol', menu === 'futbol');
   $('#chTit').textContent = menu === 'futbol' ? '⚽ Sobres de Fútbol' : 'Elige tu sobre';
   $('#chSub').textContent = menu === 'futbol'
-    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para los 🏆 desafíos de plantilla y el re-roll.'
+    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier, el Bayern y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para los 🏆 desafíos de plantilla y el re-roll.'
     : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Un sobre gratis cada 6 horas.';
   $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
@@ -1095,7 +1101,7 @@ function showBanner(c) {
   const b = $('#banner'), t = TIERS[c.tier];
   b.className = `banner ${t.key}`;
   b.style.setProperty('--c', accentOf(c));
-  b.querySelector('.b-tier').textContent = `${t.label.toUpperCase()} ${t.sym}`;
+  b.querySelector('.b-tier').textContent = `${rareza(c).label.toUpperCase()} ${rareza(c).sym}`;
   b.querySelector('.b-name').textContent = c.name;
   const deSobre = comprados.length > 1 ? ` · sobre ${c._sobre + 1} de ${comprados.length}` : '';
   b.querySelector('.b-var').innerHTML = `${subtitle(c)} · N.º ${pad(c.num)}${deSobre}${c._new ? '<em>NUEVA</em>' : ''}`;
@@ -1306,7 +1312,7 @@ const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M
 function zoomUI(recien) {
   const c = zoomC, t = TIERS[c.tier], mio = !!c._copy && !c._ajena;
   const venta = mio && c._copy.venta ? ofertaDe(c._copy.venta) : null;
-  $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
+  $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${rareza(c).label} ${rareza(c).sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
     (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '') +
     (venta ? `<br><span class="zi-venta">En el mercado por ${MONEDA}<b>${fmt(venta.p)}</b></span>` : '') +
     (c._ajena ? `<br><span class="zi-venta">De <b>${esc(nombreDe(c._ajena))}</b></span>` : '') +
@@ -1366,6 +1372,7 @@ let zoomVuelve = '';   // 'col': a dónde vuelve el zoom al cerrarse
 function cierraZoom() {
   $('#zoom').hidden = true; setTilt(null, null);
   if (zoomVuelve === 'col') { renderCollection(); $('#collection').hidden = false; $('#colGrid').scrollTop = colScroll; }
+  else if (zoomVuelve === 'retos') { $('#retos').hidden = false; renderEditorReto(); }
   else if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
   zoomVuelve = '';
 }
@@ -1627,23 +1634,33 @@ function renderCollection() {
   }).join('');
   $('#colTabs').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { colCol = b.dataset.col; renderCollection(); $('#colGrid').scrollTop = 0; });
   $('#retosBtn3').hidden = !M.esFutbol(colCol);
-  $('#colFilters').innerHTML = [[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])]
-    .map(([i, l, s]) => {
-      const n = todas.filter(c => (i < 0 || c.tier === i) && col[c.uid]).length, tot = todas.filter(c => i < 0 || c.tier === i).length;
-      return `<button data-f="${i}" class="${i === colFilter ? 'on' : ''}" style="--c:${i < 0 ? '#fff' : TIERS[i].color}">${s ? `<i>${s}</i>` : ''}${l} ${n}/${tot}</button>`;
+  /* En fútbol la rareza «Especial» tiene su filtro (y no cuenta como
+     legendaria), y la rejilla va por club, de la media más baja a la más
+     alta: así cada equipo sale entero una sola vez. Las demás colecciones
+     siguen por rareza y, dentro, por variante o temática. */
+  const fut = M.esFutbol(colCol);
+  const filtros = [[-1, 'Todas', '', '#fff'], ...TIERS.map((t, i) => [i, t.label, t.sym, t.color]), ...(fut ? [[4, ESPECIAL.label, ESPECIAL.sym, ESPECIAL.color]] : [])];
+  const pasa = (c, f) => f < 0 || (fut ? (f === 4 ? !!c.especial : !c.especial && c.tier === f) : c.tier === f);
+  if (!filtros.some(([i]) => i === colFilter)) colFilter = -1;
+  $('#colFilters').innerHTML = filtros.map(([i, l, s, color]) => {
+      const n = todas.filter(c => pasa(c, i) && col[c.uid]).length, tot = todas.filter(c => pasa(c, i)).length;
+      return `<button data-f="${i}" class="${i === colFilter ? 'on' : ''}" style="--c:${color}">${s ? `<i>${s}</i>` : ''}${l} ${n}/${tot}</button>`;
     }).join('');
   $('#colFilters').querySelectorAll('button').forEach(b => b.onclick = () => { colFilter = +b.dataset.f; renderCollection(); });
   const grid = $('#colGrid'); grid.innerHTML = '';
-  // de la peor rareza a la mejor; dentro, en el orden del catálogo (por variante o temática)
-  const lista = todas.filter(c => colFilter < 0 || c.tier === colFilter).sort((a, b) => a.tier - b.tier || a.n - b.n);
-  // las de fútbol van en secciones por rareza y, dentro, por club
-  const claveSec = c => (M.esFutbol(c.col) ? c.vkey + '/' + c.club : c.vkey);
+  const ordenClub = Object.keys(M.CLUBES);
+  const lista = todas.filter(c => pasa(c, colFilter)).sort(fut
+    ? (a, b) => ordenClub.indexOf(a.club) - ordenClub.indexOf(b.club) || a.media - b.media || a.n - b.n
+    : (a, b) => a.tier - b.tier || a.n - b.n);
+  const claveSec = c => (fut ? c.club : c.vkey);
   let seccion = '';
   lista.forEach(c => {
     if (claveSec(c) !== seccion) {
       seccion = claveSec(c);
       const de = lista.filter(x => claveSec(x) === seccion), n = de.filter(x => col[x.uid]).length;
-      grid.insertAdjacentHTML('beforeend', `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(M.esFutbol(c.col) ? c.sub : c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
+      grid.insertAdjacentHTML('beforeend', fut
+        ? `<h3 class="col-sec club"><img src="${escudo(c.club)}" alt="">${esc(M.CLUBES[c.club])}<small>${colFilter < 0 ? '' : filtros.find(([i]) => i === colFilter)[1] + ' · '}${n}/${de.length}</small></h3>`
+        : `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
     }
     if (col[c.uid]) {
       const cp = bestCopy(c.uid), inst = cp ? fromCopy(c, cp) : c;
@@ -1654,7 +1671,8 @@ function renderCollection() {
       el.addEventListener('click', () => colOpen(c));
       grid.appendChild(el);
     } else {
-      grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${TIERS[c.tier].color}"><b>${TIERS[c.tier].sym}</b>N.º ${pad(c.num)}<small>${esc(c.name)}</small></div>`);
+      const r = rareza(c);
+      grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${r.color}"><b>${r.sym}</b>${fut ? `${c.media} · ${esc(c.posiciones[0])}` : `N.º ${pad(c.num)}`}<small>${esc(c.name)}</small></div>`);
     }
   });
 }
@@ -1678,7 +1696,30 @@ $('#colBtn2').onclick = openCollection;
    están graduadas. */
 const NR = M.REROLL.n;
 const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
-const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false };
+const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false, orden: 'media', club: '', ver: 'todas' };
+/* Fútbol: la rejilla se ordena (por media, junta las copias del mismo
+   jugador) y se filtra por club y por estado; cada carta dice su media, su
+   posición y, si está graduada, su nota. «Elegir automático» no mira el
+   filtro: sigue tomando primero las repetidas. */
+const RR_ORDEN = { media: 'Media ↓', mediaAsc: 'Media ↑', club: 'Club' };
+const RR_VER = { todas: 'Todas', repetidas: 'Repetidas', sin: 'Sin graduar', graduadas: 'Graduadas' };
+function vistaRerollFutbol(lista) {
+  const cuantas = {};
+  for (const cp of lista) cuantas[CARDS[cp.id].uid] = (cuantas[CARDS[cp.id].uid] || 0) + 1;
+  const ordenClub = Object.keys(M.CLUBES);
+  const v = lista.filter(cp => {
+    const c = CARDS[cp.id];
+    if (rr.club && c.club !== rr.club) return false;
+    return rr.ver === 'repetidas' ? cuantas[c.uid] > 1 : rr.ver === 'sin' ? !cp.gr : rr.ver === 'graduadas' ? !!cp.gr : true;
+  });
+  const cmp = {
+    media: (a, b) => b.media - a.media,
+    mediaAsc: (a, b) => a.media - b.media,
+    club: (a, b) => ordenClub.indexOf(a.club) - ordenClub.indexOf(b.club) || b.media - a.media
+  }[rr.orden] || (() => 0);
+  // dentro del mismo jugador, las graduadas primero y de mayor nota
+  return v.sort((x, y) => { const a = CARDS[x.id], b = CARDS[y.id]; return cmp(a, b) || a.name.localeCompare(b.name) || a.n - b.n || (y.gr - x.gr) || ((y.gr ? y.g : 0) - (x.gr ? x.g : 0)); });
+}
 const keyDe = cp => cp.key;
 // las rarezas que se pueden re-rollear: todas bajo la más alta de la colección (fútbol no tiene legendarias)
 const rrTiers = (co = rr.col) => [0, 1, 2].filter(i => i < M.POOL[co].tope);
@@ -1736,6 +1777,9 @@ function renderReroll() {
   rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
   const enRetos = [...new Set(rr.sel.flatMap(enDesafios))], enBorr = [...new Set(rr.sel.flatMap(enBorradores))];
+  const fut = M.esFutbol(rr.col), vista = fut ? vistaRerollFutbol(lista) : lista;
+  const clubesRr = fut ? Object.keys(M.CLUBES).filter(k => lista.some(cp => CARDS[cp.id].club === k)) : [];
+  if (rr.club && !clubesRr.includes(rr.club)) rr.club = '';
   $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
   $('#rrCols').innerHTML = COLS.map(co => {
     const n = rrTiers(co.key).reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
@@ -1767,7 +1811,12 @@ function renderReroll() {
     </div>
     ${enBorr.length ? `<p class="rr-aviso borrador">📝 Elegiste cartas de tu borrador de ${listaY(enBorr)} (sin subir): si haces el re-roll, esas casillas quedan vacías.</p>` : ''}
     ${enRetos.length ? `<p class="rr-aviso">🏆 Elegiste cartas de tu plantilla subida en ${listaY(enRetos)}: si haces el re-roll, ${enRetos.length === 1 ? 'esa plantilla sale' : 'esas plantillas salen'} de la clasificación hasta que subas otra.</p>` : ''}
-    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (enDesafios(cp.key).length ? `<em class="rr-plant" title="En tu plantilla de ${esc(listaY(enDesafios(cp.key)))}">🏆</em>`
+    ${fut && lista.length ? `<div class="rr-filtros">
+      <label>Ordenar <select id="rrOrden">${Object.entries(RR_ORDEN).map(([k, l]) => `<option value="${k}"${rr.orden === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Club <select id="rrClub"><option value="">Todos</option>${clubesRr.map(k => `<option value="${k}"${rr.club === k ? ' selected' : ''}>${esc(M.CLUBES[k])}</option>`).join('')}</select></label>
+      <span class="rr-ver">${Object.entries(RR_VER).map(([k, l]) => `<button class="chip${rr.ver === k ? ' on' : ''}" data-rr-ver="${k}">${l}</button>`).join('')}</span>
+      <small>${vista.length} de ${lista.length}</small></div>` : ''}
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla${fut ? ' rr-fut' : ''}">${vista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (fut ? `<i class="pl-med">${CARDS[cp.id].media}</i><i class="pl-tag">${CARDS[cp.id].posiciones.join('/')}</i>` : '') + (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (enDesafios(cp.key).length ? `<em class="rr-plant" title="En tu plantilla de ${esc(listaY(enDesafios(cp.key)))}">🏆</em>`
       : enBorradores(cp.key).length ? `<em class="rr-plant" title="En tu borrador de ${esc(listaY(enBorradores(cp.key)))} (sin subir)">📝</em>` : ''))}</button>`).join('')}</div>`
       : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} de ${M.COL[rr.col].label} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
     <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
@@ -1783,6 +1832,11 @@ function renderReroll() {
     rr.seguro = false; Snd.init(); Snd.tick(); renderRerollKeep();
   };
   $('#rrBody').querySelectorAll('.tc-elige').forEach(b => b.onclick = () => toca(b.dataset.c));
+  if ($('#rrOrden')) {
+    $('#rrOrden').onchange = e => { rr.orden = e.target.value; renderReroll(); };
+    $('#rrClub').onchange = e => { rr.club = e.target.value; renderReroll(); };
+    $('#rrBody').querySelectorAll('[data-rr-ver]').forEach(b => b.onclick = () => { rr.ver = b.dataset.rrVer; renderReroll(); });
+  }
   $('#rrBody').querySelectorAll('[data-quita]').forEach(b => b.onclick = () => toca(b.dataset.quita));
   $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, NR).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
   $('#rrLimpia').onclick = () => { rr.sel = []; rr.seguro = false; renderRerollKeep(); };
@@ -2073,6 +2127,12 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Llega el Bayern Múnich', [
+    '<b>🔴 Bayern Múnich</b>: 20 jugadores nuevos en los sobres de fútbol, con Kane, Kimmich y Musiala legendarios. El Bayern también entra al álbum de clubes del Desafío de plantilla, con su marco de perfil.',
+    '<b>✦ Especial</b>: Mbappé MVP y Kane Balón de Oro ahora tienen su propia rareza en la colección, y cada una va con su club.',
+    '<b>📚 Colección por club</b>: cada equipo sale entero, de la media más baja a la más alta. Los filtros de rareza siguen ahí.',
+    '<b>🎓 Graduar desde el desafío</b>: toca una carta del once o del selector para graduarla ahí mismo o cambiarla. Y el re-roll de fútbol se ordena por media, con filtros por club y estado.'
+  ]],
   ['Octubre 2026 · Desafíos de plantilla', [
     '<b>🏆 Desafíos de plantilla</b>: arma un once en 4-3-3 con tus cartas para el reto de la semana o para el álbum de clubes, súbelo a su clasificación y cobra monedas y sobres. Entra desde el resumen del sobre, la tienda de Fútbol o la colección.',
     '«⚽ Mi plantilla» del perfil se quitó por ahora: su lugar lo toman los desafíos.'
@@ -2271,7 +2331,8 @@ const jugadorDe = k => { const cp = k ? copiaPorClave(k) : null; return cp ? CAR
    las de siempre (makeCard: funda de graduada, holo, desgaste), y el
    borrador de cada plantilla se recuerda en este navegador hasta subirlo. */
 const RT = window.ProdropRetos;
-const rt = { vista: 'album', clave: '', lista: [], casilla: -1, tab: 'clasif', vuelve: false, ocupado: false };
+// `accion`: la casilla llena que muestra «graduar / cambiar»; `pick`: el jugador tocado en el selector
+const rt = { vista: 'album', clave: '', lista: [], casilla: -1, accion: -1, pick: '', tab: 'clasif', vuelve: false, ocupado: false };
 const fichaCp = cp => cp && { id: cp.id, g: cp.g, gr: !!cp.gr };
 const misFutbol = () => Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
 const borrador = clave => 'prodrop.reto.' + cuenta.uid + '.' + clave;
@@ -2365,11 +2426,12 @@ function pintaProximos() {
 function cierraModalReto() {
   if (!$('#rtMercado').hidden) { $('#rtMercado').hidden = true; return true; }
   if (!$('#rtVer').hidden) { $('#rtVer').hidden = true; return true; }
-  if (!$('#rtEligeCapa').hidden) { rt.casilla = -1; renderEditorReto(); return true; }
+  if (!$('#rtEligeCapa').hidden) { rt.casilla = -1; rt.pick = ''; renderEditorReto(); return true; }
+  if (rt.accion >= 0) { rt.accion = -1; renderEditorReto(); return true; }
   return false;
 }
 function abreEditorReto(clave) {
-  rt.vista = 'editor'; rt.clave = clave; rt.casilla = -1;
+  rt.vista = 'editor'; rt.clave = clave; rt.casilla = -1; rt.accion = -1; rt.pick = '';
   let guardada = null;
   try { guardada = JSON.parse(localStorage.getItem(borrador(clave)) || 'null'); } catch {}
   const mia = subidasDe(clave).find(f => f.u === cuenta.uid);
@@ -2407,10 +2469,21 @@ function renderEditorReto() {
       <div class="rt-caja"><div class="mk-tabs" role="tablist"><button role="tab" data-rt-tab="clasif" aria-selected="${rt.tab === 'clasif'}">🏆 Clasificación</button><button role="tab" data-rt-tab="premios" aria-selected="${rt.tab === 'premios'}">🎯 Premios</button></div>
         ${rt.tab === 'clasif' ? tabla : premios}</div>
     </div></div>`;
-  pintaCancha($('#rtCancha'), cps, i => { rt.casilla = rt.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderEditorReto(); }, rt.casilla);
+  /* Una casilla vacía abre el selector; una llena primero pregunta:
+     graduarla ahí mismo (si no lo está) o cambiarla. */
+  pintaCancha($('#rtCancha'), cps, i => {
+    Snd.init(); Snd.tick();
+    if (rt.lista[i] && rt.accion !== i && rt.casilla !== i) { rt.accion = i; rt.casilla = -1; }
+    else { rt.accion = -1; rt.casilla = rt.casilla === i ? -1 : i; }
+    renderEditorReto();
+  }, rt.casilla >= 0 ? rt.casilla : rt.accion);
+  if (rt.accion >= 0 && cps[rt.accion]) {
+    const cas = $('#rtCancha').querySelectorAll('.pl-casilla')[ordenCasillas().indexOf(rt.accion)];
+    if (cas) cas.appendChild(accionesCarta(cps[rt.accion], 'cambiar', () => { rt.casilla = rt.accion; rt.accion = -1; renderEditorReto(); }));
+  }
   const b = $('#rtBody');
-  b.querySelector('[data-rt-auto]').onclick = () => { rt.lista = RT.mejorOnce(rt.clave, misFutbol()).map(cp => (cp ? cp.key : '')); rt.casilla = -1; guardaBorrador(); Snd.flip(); renderEditorReto(); };
-  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; guardaBorrador(); renderEditorReto(); };
+  b.querySelector('[data-rt-auto]').onclick = () => { rt.lista = RT.mejorOnce(rt.clave, misFutbol()).map(cp => (cp ? cp.key : '')); rt.casilla = -1; rt.accion = -1; guardaBorrador(); Snd.flip(); renderEditorReto(); };
+  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; rt.accion = -1; guardaBorrador(); renderEditorReto(); };
   b.querySelector('[data-rt-subir]').onclick = () => accionReto('subeReto');
   b.querySelectorAll('[data-rt-tab]').forEach(x => x.onclick = () => { rt.tab = x.dataset.rtTab; renderEditorReto(); });
   b.querySelectorAll('[data-cobra]').forEach(x => x.onclick = () => accionReto('cobraReto', +x.dataset.cobra));
@@ -2444,17 +2517,46 @@ function pintaEligeReto() {
       const cab = en.nivel !== grupo ? `<h4 class="rt-grupo n${en.nivel}">${en.nivel ? `Incómodos en ${slot.pos} · −${en.pen} de media` : `De ${slot.pos}`}</h4>` : '';
       grupo = en.nivel;
       const nota = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
-      return `${cab}<button class="tc-elige fit-${en.nivel ? 'inc' : 'ok'}" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</button>`;
+      return `${cab}<div class="tc-elige pl-op fit-${en.nivel ? 'inc' : 'ok'}${rt.pick === cp.key ? ' on' : ''}" role="button" tabindex="0" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</div>`;
     }).join('') : `<p class="mk-vacio">No tienes jugadores que cumplan «${esc(p.titulo)}» y puedan jugar de ${slot.pos}: abre sobres de Fútbol.</p>`}</div>`;
   const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => ponReto('');
-  box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; renderEditorReto(); };
+  box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; rt.pick = ''; renderEditorReto(); };
   box.querySelector('[data-rt-mk-puesto]').onclick = () => abreMercadoReto();
-  box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => ponReto(x.dataset.c));
+  // tocar un jugador muestra sus botones encima de la carta: ponerlo y, si no está graduado, graduarlo
+  box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => { Snd.init(); Snd.tick(); rt.pick = rt.pick === x.dataset.c ? '' : x.dataset.c; pintaEligeReto(); });
+  const sel = rt.pick && box.querySelector(`[data-c="${CSS.escape(rt.pick)}"]`);
+  if (sel) sel.appendChild(accionesCarta(copiaPorClave(rt.pick), 'poner', () => ponReto(rt.pick)));
+}
+// el orden en que pintaCancha deja las casillas en la página (de la fila de arriba a la de abajo)
+const ordenCasillas = () => [3, 2, 1, 0].flatMap(f => M.FORMACION.map((s, i) => (s.fila === f ? i : -1)).filter(i => i >= 0));
+/* Los botones sobre una carta del once o del selector: graduarla ahí mismo
+   (abre la graduación en vivo y, al cerrarla, se vuelve al desafío) y
+   ponerla o cambiarla. Son botones dentro de otro que se puede tocar: no
+   dejan pasar el toque. */
+function accionesCarta(cp, que, alElegir) {
+  const box = document.createElement('div');
+  box.className = 'rt-acciones';
+  const boton = (txt, tit, fn, cls = '') => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'rt-accion ' + cls; b.innerHTML = txt; b.title = tit;
+    b.onclick = e => { e.stopPropagation(); fn(); };
+    box.appendChild(b);
+  };
+  if (cp && !cp.gr && !cp.venta) boton(`🎓<small>Graduar</small>`, `Graduar (${M.PRECIO.gradua} monedas)`, () => graduaDesdeReto(cp), 'grad');
+  boton(que === 'poner' ? `<b>👤＋</b><small>Poner</small>` : `<b>⇄</b><small>Cambiar</small>`, que === 'poner' ? 'Poner en la casilla' : 'Cambiar por otro jugador', alElegir, 'pon');
+  box.onclick = e => e.stopPropagation();
+  return box;
+}
+function graduaDesdeReto(cp) {
+  if (!cp) return;
+  const inst = instOf(CARDS[cp.id], cp);
+  $('#retos').hidden = true; zoomVuelve = 'retos'; openZoom(inst);
+  gradeCard();
 }
 function ponReto(k) {
   const quien = jugadorDe(k);
   if (quien) rt.lista.forEach((x, j) => { if (j !== rt.casilla && jugadorDe(x) === quien) rt.lista[j] = ''; });
-  rt.lista[rt.casilla] = k; rt.casilla = -1; guardaBorrador(); Snd.flip(); renderEditorReto();
+  rt.lista[rt.casilla] = k; rt.casilla = -1; rt.pick = ''; guardaBorrador(); Snd.flip(); renderEditorReto();
 }
 async function accionReto(accion, n) {
   if (rt.ocupado) return;
@@ -2561,7 +2663,7 @@ $('#rtVolver').onclick = () => { rt.vista = 'album'; rt.casilla = -1; Snd.tick()
 $('#rtVerCerrar').onclick = () => { $('#rtVer').hidden = true; };
 $('#rtVer').addEventListener('click', e => { if (e.target.id === 'rtVer') $('#rtVer').hidden = true; });
 $('#rtMercado').addEventListener('click', e => { if (e.target.id === 'rtMercado' || e.target.closest('[data-rt-mk-cierra]')) $('#rtMercado').hidden = true; });
-$('#rtEligeCapa').addEventListener('click', e => { if (e.target.id === 'rtEligeCapa') { rt.casilla = -1; renderEditorReto(); } });
+$('#rtEligeCapa').addEventListener('click', e => { if (e.target.id === 'rtEligeCapa') { rt.casilla = -1; rt.pick = ''; renderEditorReto(); } });
 $('#retosBtn').onclick = () => abreRetos();
 $('#retosBtn2').onclick = () => abreRetos();
 $('#retosBtn3').onclick = () => { $('#collection').hidden = true; rt.vuelve = false; abreRetos(); };

@@ -21,7 +21,7 @@ const todas = fut.map(c => ({ key: 'x' + c.n, id: c.n, g: 10, gr: true }));
 
 test('cada club del álbum y cada reto se pueden completar con el catálogo', () => {
   assert.ok(R.CLUBES.length >= 15);
-  assert.ok(!R.CLUBES.includes('bayern'), 'el Bayern solo tiene la especial de Kane');
+  assert.ok(R.CLUBES.includes('bayern'), 'el Bayern ya tiene plantel');
   for (const club of R.CLUBES) assert.ok(R.evalua(R.claveClub(club), R.mejorOnce(R.claveClub(club), todas)).valida, club);
   // la mejor plantilla: cualquier club y país, siempre abierta, y su mejor once supera al de cualquier club
   const mejor = R.evalua('mejor', R.mejorOnce('mejor', todas));
@@ -38,7 +38,7 @@ test('la clave de un reto lleva su semana: otra semana no existe', () => {
   assert.equal(R.plantilla('reto-bleus-' + R.PRIMERA), null, 'la primera semana es de El Clásico');
   assert.equal(R.retoDeSemana(R.semanaDe(Date.UTC(2026, 9, 27, 12))).id, 'clasico', 'la semana del 26-10-2026 es El Clásico');
   assert.deepEqual([1, 2, 3].map(k => R.retoDeSemana(R.PRIMERA + k).id), ['bleus', 'lions', 'furia']);
-  assert.equal(R.plantilla('club-bayern'), null);
+  assert.equal(R.plantilla('club-bayern').club, 'bayern');
   assert.equal(R.plantilla('club-nadie'), null);
   const p = R.plantilla(R.claveReto(42));
   assert.ok(R.vigente(p, R.inicioSemana(42)) && !R.vigente(p, R.finSemana(42)) && !R.vigente(p, R.inicioSemana(42) - 1));

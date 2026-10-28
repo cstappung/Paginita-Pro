@@ -26,7 +26,7 @@
   "use strict";
 
   /* ---------- las plantillas ----------
-     Una por club con plantel (el Bayern hoy solo tiene la especial de Kane). */
+     Una por club con plantel (≥15 cartas). */
   const FUT = M.CARDS.filter(c => M.esFutbol(c.col));
   const CLUBES = Object.keys(M.CLUBES).filter(club => FUT.filter(c => c.club === club).length >= 15);
   const ITALIA = ["inter", "roma", "napoli", "como"];
