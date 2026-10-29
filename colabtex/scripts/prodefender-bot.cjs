@@ -68,6 +68,9 @@
    --rondas      una línea por ronda (oro, vidas, avance, torres).
    --fugas       además, qué enemigos se escaparon y, cada 5 rondas, las torres.
    --diff X      juega el reino con esa dificultad (levels.js `diff`), para calibrarla.
+   --hilos N     cuántas partidas a la vez, cada una en su proceso (por defecto, una por
+                 núcleo; con --rondas o --fugas, una).
+   --sin-cache   mide el campo de tiro aunque ya esté guardado (node_modules/.cache).
    --ayuda N     hasta la ronda N las vidas no se acaban (las perdidas se cuentan igual,
                  y no hay oro extra): para medir el juego tardío aunque la apertura del
                  bot, más floja que la de una persona, pierda vidas. */
@@ -81,6 +84,22 @@ for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.
 const PD = globalThis.PD;
 const STEP = 1 / 60;
 const AYUDA = +opt('ayuda', 0);
+// El campo de tiro de una torre en un reino no cambia mientras no cambien el motor, los
+// datos, el reino ni este archivo: se guarda en node_modules/.cache/prodefender-bot y la
+// próxima partida no lo mide de nuevo (unos 10-20 s). --sin-cache lo mide igual.
+const fs = require('fs'), crypto = require('crypto');
+const CACHE = args.includes('--sin-cache') ? null : path.join(__dirname, '../node_modules/.cache/prodefender-bot');
+let huellaMotor = null;
+function huellaCampo(li, type) {
+  if (!huellaMotor) {
+    const h = crypto.createHash('sha1');
+    for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js']) h.update(fs.readFileSync(path.join(MOTOR, f)));
+    huellaMotor = h.update(fs.readFileSync(__filename)).digest('hex');
+  }
+  const L = PD.nivel ? PD.nivel(li, PD.MOTOR_VE) : PD.LEVELS[li];
+  const sinCaches = (k, v) => (k[0] === '_' ? undefined : v);
+  return crypto.createHash('sha1').update(huellaMotor + li + type + JSON.stringify(L, sinCaches) + JSON.stringify(PD.TOWERS[type]) + JSON.stringify([PD.JEFE, PD.CC])).digest('hex');
+}
 const SOPORTE = { totem: 1, huerto: 1, faro: 1 };
 // de control: lo suyo (sapos, burbujas, eco, proteger) no lo mide el campo de tiro; se ponen por reglas
 const CONTROL = { bruja: 1, burbujas: 1, campanario: 1, pararrayos: 1 };
@@ -117,14 +136,18 @@ const MIXTA = [
 // pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
 const HEROE_TERCERA = opt('heroe', 'heroevacio');
 // --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
-if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { PD.LEVELS[li].diff = +opt('diff'); delete PD.LEVELS[li]._rounds; }
+// cambia un número del reino también en sus números de la versión 5 (levels.js `v5`, PD.nivel)
+const ajustaNivel = (k, v) => { for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { const L = PD.LEVELS[li]; L[k] = v; if (L.v5) L.v5[k] = v; delete L._rounds; delete L._v5; } };
+if (opt('diff', '')) ajustaNivel('diff', +opt('diff'));
 // --pactos a,b,c: otro orden de preferencia (p. ej. el de una persona); --precio P: otro
 // pactoPrecio del reino (levels.js), para comparar antes y después
-if (opt('precio', '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].pactoPrecio = +opt('precio');
+if (opt('precio', '') !== '') ajustaNivel('pactoPrecio', +opt('precio'));
+// --jefe vida,vel: otros jefes (engine.js JEFE, desde la versión 5)
+if (opt('jefe', '')) { const [v, s, b] = opt('jefe').split(',').map(Number); PD.JEFE.vida = v; PD.JEFE.vel = s; if (b) PD.JEFE.esbirros = b; }
 // --tarde desde,hasta,x: otra vidaTarde (levels.js); --vida X / --oro Y: otra vida y otro oro por
 // enemigo del reino (levels.js vidaX, oroX)
-if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].vidaTarde = x > 1 ? { desde, hasta, x } : null; }
-for (const [o, k] of [['vida', 'vidaX'], ['oro', 'oroX']]) if (opt(o, '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li][k] = +opt(o);
+if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); ajustaNivel('vidaTarde', x > 1 ? { desde, hasta, x } : null); }
+for (const [o, k] of [['vida', 'vidaX'], ['oro', 'oroX']]) if (opt(o, '') !== '') ajustaNivel(k, +opt(o));
 const PACTOS_PREF = opt('pactos', '') ? opt('pactos').split(',') : ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
 const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
 function eligePacto(g) {
@@ -269,6 +292,8 @@ class Bot {
     this.banco = {};
     this.covBanco = {};
     for (const type of this.permitidas) {
+      const archivo = CACHE && path.join(CACHE, huellaCampo(this.li, type) + '.json');
+      if (archivo && fs.existsSync(archivo)) { const x = JSON.parse(fs.readFileSync(archivo, 'utf8')); this.banco[type] = x.tabla; this.covBanco[type] = x.cov; continue; }
       const def = PD.TOWERS[type], R = def.base.range || 110;
       const s = this.sitio(type, true);
       if (!s) continue;
@@ -284,6 +309,12 @@ class Bot {
       for (const c of combinaciones(def)) tabla[c.join('')] = FILAS.map(([m, v, cada]) => tiro(this.li, type, c, s[0], s[1], m, v, cada, entradas));
       this.banco[type] = tabla;
       this.covBanco[type] = this.cobertura(s[0], s[1], R, true);
+      if (archivo) {   // a un temporal y luego renombrar: varios bots a la vez no se pisan
+        fs.mkdirSync(CACHE, { recursive: true });
+        const tmp = archivo + '.' + process.pid;
+        fs.writeFileSync(tmp, JSON.stringify({ tabla, cov: this.covBanco[type] }));
+        fs.renameSync(tmp, archivo);
+      }
     }
   }
   // Cuánto camino cubre un sitio. El tramo del medio vale más (da tiempo a disparar), el
@@ -721,8 +752,14 @@ class Bot {
           if (c2 <= g.money) cands.push({ k: 'u2', i, p, q, cost: c2 });
         }
       });
-      const res = cands.map(a => [a, this.ensaya(modo, acc.concat([a]))]);
-      const salva = res.filter(([, x]) => x.perdidas === 0).sort((a, b) => a[0].cost - b[0].cost)[0];
+      // de la más barata a la más cara (a igual precio, en el orden de cands): la primera que
+      // salva es la elegida y las demás no se ensayan; si ninguna salva, se ensayaron todas
+      const res = new Array(cands.length);
+      let salva = null;
+      for (const i of cands.map((a, i) => i).sort((i, j) => cands[i].cost - cands[j].cost)) {
+        res[i] = [cands[i], this.ensaya(modo, acc.concat([cands[i]]))];
+        if (res[i][1].perdidas === 0) { salva = res[i]; break; }
+      }
       if (salva) { acc.push(salva[0]); best = salva[1]; break; }
       let el = null, sc = 0;
       for (const [a, x] of res) { const v = (best.perdidas - x.perdidas) / a.cost; if (v > sc) { sc = v; el = [a, x]; } }
@@ -886,20 +923,58 @@ function main() {
     : reinoArg === 'tercera' ? [10, 11, 12, 13, 14] : reinoArg === 'quince' ? [...Array(15).keys()] : reinoArg.split(',').map(Number);
   const ests = estArg === 'todas' ? Object.keys(ESTRATEGIAS) : estArg.split(',');
   const semillas = String(opt('semilla', '1')).split(',').map(Number);
+  const partidas = [];
+  for (const li of reinos) for (const est of ests) for (const s of semillas) partidas.push([li, est, s]);
+  const linea = x => `${x.reino.padEnd(8)} ${x.estrategia.padEnd(8)} s${x.semilla}  ronda ${String(x.ronda).padStart(3)}${x.gano ? ' GANA' : '     '}  1ª derrota ${x.primeraDerrota ?? '-'}  reintentos ${x.reintentosUsados}  vidas ${x.vidasFinal}/${x.vidasMax}  ` +
+    `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}  ${(x.ms / 1000).toFixed(0)} s`;
+  // --hilos N: varias partidas a la vez, cada una en su proceso (por defecto, una por núcleo;
+  // con --rondas o --fugas, de a una para que no se mezclen las líneas)
+  const porRonda = args.includes('--rondas') || args.includes('--fugas');
+  const hilos = Math.min(partidas.length, +opt('hilos', porRonda ? 1 : require('os').cpus().length));
+  if (hilos > 1) return enParalelo(partidas, hilos, linea);
   const res = [];
-  for (const li of reinos) for (const est of ests) for (const s of semillas) {
+  for (const [li, est, s] of partidas) {
     const t0 = Date.now();
     const bot = new Bot(li, est, s);
     if (args.includes('--rondas')) console.log(`— ${PD.LEVELS[li].short} · ${est} · semilla ${s}`);
     const x = bot.juega(args.includes('--rondas'));
     x.ms = Date.now() - t0;
     res.push(x);
-    if (!args.includes('--json')) {
-      console.log(`${x.reino.padEnd(8)} ${x.estrategia.padEnd(8)} s${x.semilla}  ronda ${String(x.ronda).padStart(3)}${x.gano ? ' GANA' : '     '}  1ª derrota ${x.primeraDerrota ?? '-'}  reintentos ${x.reintentosUsados}  vidas ${x.vidasFinal}/${x.vidasMax}  ` +
-        `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}  ${(x.ms / 1000).toFixed(0)} s`);
-    }
+    if (!args.includes('--json')) console.log(linea(x));
   }
   if (args.includes('--json')) console.log(JSON.stringify(res));
+}
+// Cada partida en un proceso hijo (el mismo script con --json y --hilos 1); los resultados
+// salen en el orden de las partidas, cada uno apenas terminan las anteriores.
+function enParalelo(partidas, hilos, linea) {
+  const { execFile } = require('child_process');
+  const quita = { reino: 1, estrategia: 1, semilla: 1, hilos: 1 };
+  const base = [];
+  for (let i = 0; i < args.length; i++) {
+    const k = args[i].startsWith('--') && args[i].slice(2);
+    if (quita[k]) { i++; continue; }
+    if (k === 'json') continue;
+    base.push(args[i]);
+  }
+  const res = new Array(partidas.length);
+  let sig = 0, impresas = 0;
+  const imprime = () => {
+    while (impresas < partidas.length && res[impresas]) { if (!args.includes('--json')) console.log(linea(res[impresas])); impresas++; }
+    if (impresas === partidas.length && args.includes('--json')) console.log(JSON.stringify(res));
+  };
+  const lanza = () => {
+    if (sig >= partidas.length) return;
+    const i = sig++, [li, est, s] = partidas[i];
+    const hijo = [__filename, ...base, '--reino', String(li), '--estrategia', est, '--semilla', String(s), '--json', '--hilos', '1'];
+    execFile(process.execPath, hijo, { maxBuffer: 1 << 28 }, (err, out, errOut) => {
+      if (err) { process.stderr.write(`partida ${PD.LEVELS[li].short} ${est} s${s}: ${errOut || err.message}\n`); process.exitCode = 1; res[i] = null; }
+      else res[i] = JSON.parse(out.trim().split('\n').pop())[0];
+      if (!res[i]) res[i] = { reino: PD.LEVELS[li].short, estrategia: est, semilla: s, ronda: 0, gano: false, reintentosUsados: '-', vidasFinal: '-', vidasMax: '-', vidasPerdidas: [], avanceMedio: '-', ms: 0, error: true };
+      imprime();
+      lanza();
+    });
+  };
+  for (let k = 0; k < hilos; k++) lanza();
 }
 if (require.main === module) main();
 module.exports = { Bot, ESTRATEGIAS };

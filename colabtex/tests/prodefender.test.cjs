@@ -230,8 +230,8 @@ test('héroes: mejoras más caras y un nivel 5 de 60000 en un solo camino',()=>{
  assert.equal(g.canUpgrade(t,0),false,'las torres siguen llegando solo al 4');
 });
 
-test('retroceso con tope por torre: nadie vuelve para siempre, pero nadie se vuelve inmune',()=>{
- const g=new PD.Game(1,null,9);g.money=1e7;g.active=true;g.queue=[{t:1e9}];
+test('versión 4: retroceso con tope por torre: nadie vuelve para siempre, pero nadie se vuelve inmune',()=>{
+ const g=new PD.Game(1,null,9,4);g.money=1e7;g.active=true;g.queue=[{t:1e9}];
  const h=g.place('heroedunas',120,330);for(let q=0;q<4;q++)g.upgrade(h,1);   // Tormenta Eterna: todo el mapa, 360
  const e=g.spawn('robusto',0,900,1);e.hp=e.maxHp=1e9;
  let atras=0;for(let k=0;k<5;k++){const d0=e.dist;h.abilityCd=0;e.stunImm=0;g.useAbility(h);atras+=d0-e.dist;}
@@ -344,13 +344,13 @@ const ponCerca=(g,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.
 
 test('segunda era: la partida de un reino nuevo se repite igual (sus mecánicas usan el azar de la partida)',()=>{
  for(const li of [5,6,7,8,9]){
-  const G=new P.Grabadora(li,'uidN',null),g=G.game;g.money=1e7;
+  const G=new P.Grabadora(li,'uidN',null),g=G.game;g.money=1e7;g.lives=1e9;   // lo que se mide es que se repita, no que se sobreviva (los jefes x20)
   const ids=PD.towersFor(li);
   ids.forEach((id,i)=>{for(let q=0;q<300;q++){const t=G.colocar(id,40+((q*137+i*71)%920),40+((q*251+i*13)%560));if(t){for(const p of [0,0,1,1,0])G.mejorar(t,p);break;}}});
   for(let r=0;r<26&&!g.over;r++){G.ronda();while(g.active&&!g.over)G.tick();}
   assert.ok(g.round>=25,PD.LEVELS[li].short+' llega al jefe de la ronda 25');
   const snap=JSON.stringify(g.snapshot());
-  const G2=new P.Grabadora(li,'uidN',null);G2.st.s=G.st.s;G2.st.game=new PD.Game(li,null,P.semillaTramo(G.st.s,'uidN',0));G2.game.money=1e7;
+  const G2=new P.Grabadora(li,'uidN',null);G2.st.s=G.st.s;G2.st.game=new PD.Game(li,null,P.semillaTramo(G.st.s,'uidN',0));G2.game.money=1e7;G2.game.lives=1e9;
   for(const j of G.j){while(G2.paso<j[0])G2.tick();const c=j[1];if(c===0)G2.colocar(PD.TOWER_ORDER[j[2]],j[3],j[4]);else if(c===1)G2.mejorar(G2.game.towers.find(x=>x.id===j[2]),j[3]);else if(c===4)G2.ronda();}
   while(G2.paso<G.paso)G2.tick();
   assert.equal(JSON.stringify(G2.game.snapshot()),snap,PD.LEVELS[li].short+': misma semilla y mismas jugadas, misma partida');
@@ -649,25 +649,87 @@ test('cada reino pide la ronda 50 del anterior también en el verificador (y ese
  assert.equal(K.esTrampa({vivo:true,m:'Reino sin desbloquear: primero llega a la ronda 50 del reino anterior.'}),false,'no castiga');
 });
 
-test('reinos 12-15: cada pacto aceptado da más vida a los enemigos; la Necrópolis no cambia',()=>{
+test('reinos 12-15: cada pacto aceptado da más vida a los enemigos; la Necrópolis no cambia (v4 y v5)',()=>{
  assert.equal(PD.LEVELS[10].pactoPrecio,undefined,'la Necrópolis se dejó como se jugó');
- for(let li=11;li<15;li++)assert.equal(PD.LEVELS[li].pactoPrecio,0.12,PD.LEVELS[li].short);
- for(let li=11;li<15;li++)assert.ok(PD.LEVELS[li].diff>PD.LEVELS[10].diff||li===12,PD.LEVELS[li].short+' más difícil');
- const g=nuevo3(11);const v0=g.mods.vidaEnem;
- g.active=false;g.round=0;assert.ok(g.pactoPendiente());g.elegirPacto(0);const P=PD.PACTOS.find(q=>q.id===g.pactos[0].id);
- const propio=(P.m&&P.m.vidaEnem)||1;
- assert.ok(Math.abs(g.mods.vidaEnem-v0*propio*1.12)<1e-9,'+12% por el pacto');
+ for(let li=11;li<15;li++)assert.equal(PD.LEVELS[li].pactoPrecio,0.12,PD.LEVELS[li].short+' (v4)');
+ assert.deepEqual([11,12,13,14].map(li=>PD.nivel(li,5).pactoPrecio),[0.06,0.08,0.1,0.12],'v5: sube de a poco');
+ for(let li=11;li<15;li++)assert.ok(PD.nivel(li,5).diff>=PD.LEVELS[10].diff*0.9,PD.LEVELS[li].short+' no más fácil que la Necrópolis');
+ for(const ve of [4,5]){
+  const g=new PD.Game(11,null,3,ve);g.money=1e7;const v0=g.mods.vidaEnem,precio=PD.nivel(11,ve).pactoPrecio;
+  assert.ok(g.pactoPendiente());g.elegirPacto(0);const P=PD.PACTOS.find(q=>q.id===g.pactos[0].id);
+  assert.ok(Math.abs(g.mods.vidaEnem-v0*((P.m&&P.m.vidaEnem)||1)*(1+precio))<1e-9,'v'+ve+': +'+precio*100+'% por el pacto');
+ }
  const h=nuevo3(10);h.active=false;h.round=0;h.elegirPacto(0);const Q=PD.PACTOS.find(q=>q.id===h.pactos[0].id);
  assert.ok(Math.abs(h.mods.vidaEnem-((Q.m&&Q.m.vidaEnem)||1))<1e-9,'la Necrópolis sin precio');
 });
 
-test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis no)',()=>{
+test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis no); la v4 conserva sus números',()=>{
  assert.equal(PD.LEVELS[10].vidaTarde,undefined);
- assert.deepEqual([11,12,13,14].map(li=>PD.LEVELS[li].vidaTarde.x),[9,10,10,11]);
- const g=new PD.Game(12,null,1);g.round=29;assert.equal(g.vidaTarde(),1,'igual hasta la 30');
+ assert.deepEqual([11,12,13,14].map(li=>PD.LEVELS[li].vidaTarde.x),[9,10,10,11],'v4');
+ assert.deepEqual([11,12,13,14].map(li=>PD.nivel(li,5).vidaTarde.x),[2,4,6,9],'v5: escalera');
+ const g=new PD.Game(12,null,1,4);g.round=29;assert.equal(g.vidaTarde(),1,'igual hasta la 30');
  g.round=55;assert.ok(Math.abs(g.vidaTarde()-(1+9*0.5))<1e-9,'a mitad de camino');
- g.round=90;assert.equal(g.vidaTarde(),10,'x10 desde la 80');
+ g.round=90;assert.equal(g.vidaTarde(),10,'x10 desde la 80 en la v4');
+ const g5=new PD.Game(12,null,1,5);g5.round=90;assert.equal(g5.vidaTarde(),4,'x4 en la v5');
+ assert.equal(new PD.Game(12,null,1,4).L.diff,5.2);assert.equal(new PD.Game(12,null,1,5).L.diff,5.0);
+ assert.notEqual(new PD.Game(12,null,1,4).rounds,new PD.Game(12,null,1,5).rounds,'cada versión arma sus rondas');
  const n=new PD.Game(10,null,1);n.round=90;assert.equal(n.vidaTarde(),1);
- g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1);h.round=29;const f=h.spawn('robusto',0,0,1);
+ g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1,4);h.round=29;const f=h.spawn('robusto',0,0,1);
  assert.ok(e.maxHp>f.maxHp*9,'la vida del enemigo sube');
+});
+
+test('versión 5: los bufos de estructuras distintas se suman, los del mismo tipo no; la 4 sigue con el mejor',()=>{
+ assert.equal(P.VERSION,5);assert.deepEqual(P.VERSIONES,[4,5]);
+ const rod=PD.TOWERS.pararrayos;let pRod=-1,nRod=0;rod.paths.forEach((pa,i)=>pa.ups.forEach((u,n)=>{if(pRod<0&&/Carga Est/.test(u.name)){pRod=i;nRod=n+1;}}));
+ assert.ok(pRod>=0,'el Pararrayos tiene un bufo de velocidad');
+ const arma=ve=>{const g=new PD.Game(0,null,1,ve);g.money=1e9;
+  const t=ponCerca(g,'espinas',400,300),k=ponCerca(g,'totem',440,300),r=ponCerca(g,'pararrayos',360,300);
+  for(let i=0;i<nRod;i++)g.upgrade(r,pRod);
+  return {g,t,base:g.baseStats(t).cd};};
+ let {g,t,base}=arma(5);
+ const totem=PD.TOWERS.totem.base.buffRate,ra=g.towers.find(x=>x.type==='pararrayos').s.buffRate;
+ assert.ok(Math.abs(t.s.cd-base/(1+totem+ra))<1e-9,'v5: tótem + pararrayos se suman');
+ ponCerca(g,'totem',400,340);assert.ok(Math.abs(t.s.cd-base/(1+totem+ra))<1e-9,'v5: un segundo tótem no suma');
+ ({g,t,base}=arma(4));assert.ok(Math.abs(t.s.cd-base/(1+Math.max(totem,ra)))<1e-9,'v4: solo el mejor');
+});
+
+test('versión 5: los jefes tienen x20 de vida y van a un quinto de la velocidad (la 4 no cambia)',()=>{
+ const jefe=Object.keys(PD.ENEMIES).find(id=>PD.ENEMIES[id].boss&&!PD.ENEMIES[id].twins);
+ const mide=ve=>{const g=new PD.Game(0,null,1,ve);g.active=true;g.queue=[{t:1e9}];g.qi=0;g.hurryT=1e9;g.round=24;
+  const e=g.spawn(jefe,0,100,1,2);const d0=e.dist;for(let k=0;k<60;k++)g.update(1/60);return {hp:e.maxHp,avance:e.dist-d0};};
+ const v4=mide(4),v5=mide(5);
+ assert.ok(Math.abs(v5.hp/v4.hp-20)<1e-6,'x20 de vida');
+ assert.ok(v5.avance>0&&Math.abs(v5.avance/v4.avance-1/5)<0.02,'un quinto de la velocidad: '+(v5.avance/v4.avance));
+});
+
+const ponCercaG=(G,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.35){const t=G.colocar(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
+test('una partida empezada con la versión 4 se reanuda y se rehace con sus reglas',()=>{
+ const G=new P.Grabadora(0,'uidV',null);G.st.ve=4;G.st.game=new PD.Game(0,null,P.semillaTramo(G.st.s,'uidV',0),4);
+ const g=G.game;ponCercaG(G,'espinas',300,200);ponCercaG(G,'espinas',340,200);   // con el oro del comienzo: rehace empieza igual
+ for(let r=0;r<3;r++){G.ronda();while(g.active&&!g.over)G.tick();}
+ const run=JSON.parse(JSON.stringify(G.guardado()));assert.equal(run.pr.ve,4,'la guardada lleva la 4');
+ const H=new P.Grabadora(0,'uidV',run);assert.equal(H.game.ve,4,'al reanudar sigue con la 4');
+ H.ronda();while(H.game.active&&!H.game.over)H.tick();
+ const p=H.prueba();assert.equal(p.ve,4);
+ assert.equal(P.rehace(p,'uidV').ronda,H.game.round,'se rehace igual');
+ assert.throws(()=>P.rehace({...p,ve:3},'uidV'),/otra versión/);
+});
+
+test('versión 5: el control se afloja de a poco y nunca se corta; los jefes no se frenan',()=>{
+ const g=new PD.Game(1,null,9,5);g.active=true;g.queue=[{t:1e9}];g.hurryT=100;
+ const a={id:-10},f=g.spawn('robusto',0,1500,1);
+ const pasos=[];for(let k=0;k<30;k++)pasos.push(g.retrocede(f,20,a));
+ assert.ok(pasos.every((p,i)=>p>0&&(i===0||p<=pasos[i-1]+1e-9)),'rinde cada vez menos, pero nunca cero');
+ assert.ok(pasos[29]>=20*PD.CC.kbPiso-1e-9,'no baja del piso');
+ assert.ok(pasos.reduce((x,y)=>x+y,0)>PD.KB.torre(f),'puede pasar del tope de antes, despacio');
+ // la ronda eterna: el control baja en rampa hasta el piso, sin saltos
+ g.rt=100;assert.equal(g.ccF(),1);g.rt=130;assert.ok(Math.abs(g.ccF()-0.5)<1e-9);g.rt=1000;assert.equal(g.ccF(),PD.CC.piso);
+ const v4=new PD.Game(1,null,9,4);v4.hurryT=100;v4.rt=101;assert.equal(v4.ccF(),0,'en la 4, de golpe');
+ // un enemigo congelado en plena rampa avanza en parte
+ g.rt=130;const c=g.spawn('robusto',0,300,1);g.applyFreeze(c,10);const d0=c.dist;g.updateEnemies(0.5);assert.ok(c.dist>d0,'congelado, igual avanza un poco');
+ // jefes: ni frenos, ni congelación, ni aturdimiento
+ const jefe=Object.keys(PD.ENEMIES).find(id=>PD.ENEMIES[id].boss&&!PD.ENEMIES[id].twins);
+ const J=g.spawn(jefe,0,200,1,2);g.applySlow(J,0.6,5);g.applyFreeze(J,5);g.applyStun(J,5);
+ assert.equal(J.slowF,0);assert.equal(J.frozenT,0);assert.equal(J.stunT,0);
+ const J4=v4.spawn(jefe,0,200,1,2);v4.applySlow(J4,0.6,5);assert.ok(J4.slowF>0,'en la 4 sí');
 });
