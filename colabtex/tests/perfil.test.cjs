@@ -53,7 +53,7 @@ test('los marcos que se ganan piden lo que dicen',()=>{
 
 test('los marcos de club piden el premio de su desafío',()=>{
  const club=P.MARCOS.filter(x=>x.req&&x.req.desafio);
- assert.equal(club.length,29);
+ assert.equal(club.length,30);
  for(const m of club){assert.match(m.id,/^[a-z]{1,20}$/,'la regla de perfil/marco');assert.equal(m.id,'club'+m.req.desafio);}
  const m=club.find(x=>x.req.desafio==='realmadrid');
  const sin=P.estadisticas('a',datos),con=P.estadisticas('a',Object.assign({},datos,{desafios:{a:{realmadrid:1}}}));

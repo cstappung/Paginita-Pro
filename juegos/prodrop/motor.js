@@ -484,6 +484,28 @@
     ["atletico", "aleksa-puric", "A. Purić", "DEF", 0, "RS"], ["atletico", "salvi-esquivel", "S. Esquivel", "POR", 0, "ES"],
     ["atletico", "miguel-cubo", "M. Cubo", "DEL", 0, "ES"], ["atletico", "dani-martinez", "D. Martínez", "DEF", 0, "ES"]
   ];
+  /* ---------- el AC Milan (Serie A) ----------
+     Los 27 jugadores de su plantel en EA SPORTS FC 27 (en el juego se llama
+     «Milano FC»): los hombres con carta base, titulares, suplentes y la cantera,
+     con la media y las posiciones de FC 27 (fut.gg). Foto: la cara del juego sobre
+     rojo y negro (cards/champions/milan/<id>.webp). Sin dorsal (0). Va al final
+     del catálogo, después del Atlético, y sin historia (`NUEVOS`). */
+  const MILAN = [
+    ["milan", "mike-maignan", "M. Maignan", "POR", 0, "FR"], ["milan", "adrien-rabiot", "A. Rabiot", "MED", 0, "FR"],
+    ["milan", "luka-modric", "L. Modrić", "MED", 0, "HR"], ["milan", "christian-pulisic", "C. Pulisic", "DEL", 0, "US"],
+    ["milan", "mario-gila", "M. Gila", "DEF", 0, "ES"], ["milan", "fikayo-tomori", "F. Tomori", "DEF", 0, "ENG"],
+    ["milan", "alexis-saelemaekers", "A. Saelemaekers", "DEF", 0, "BE"], ["milan", "goncalo-ramos", "G. Ramos", "DEL", 0, "PT"],
+    ["milan", "matteo-gabbia", "M. Gabbia", "DEF", 0, "IT"], ["milan", "ruben-loftus-cheek", "R. Loftus-Cheek", "MED", 0, "ENG"],
+    ["milan", "diego-moreira", "D. Moreira", "DEL", 0, "BE"], ["milan", "samuel-chukwueze", "S. Chukwueze", "DEL", 0, "NG"],
+    ["milan", "strahinja-pavlovic", "S. Pavlović", "DEF", 0, "RS"], ["milan", "pervis-estupinan", "P. Estupiñán", "DEF", 0, "EC"],
+    ["milan", "ardon-jashari", "A. Jashari", "MED", 0, "CH"], ["milan", "pietro-terracciano", "P. Terracciano", "POR", 0, "IT"],
+    ["milan", "omari-hutchinson", "O. Hutchinson", "DEL", 0, "ENG"], ["milan", "koni-de-winter", "K. De Winter", "DEF", 0, "BE"],
+    ["milan", "davide-bartesaghi", "D. Bartesaghi", "DEF", 0, "IT"], ["milan", "yunus-musah", "Y. Musah", "MED", 0, "US"],
+    ["milan", "filippo-terracciano", "F. Terracciano", "DEF", 0, "IT"], ["milan", "warren-bondo", "W. Bondo", "MED", 0, "FR"],
+    ["milan", "sankhoun-diawara", "S. Diawara", "DEF", 0, "FR"], ["milan", "alphadjo-cisse", "A. Cissè", "MED", 0, "IT"],
+    ["milan", "francesco-camarda", "F. Camarda", "DEL", 0, "IT"], ["milan", "christian-comotto", "C. Comotto", "MED", 0, "IT"],
+    ["milan", "lorenzo-torriani", "L. Torriani", "POR", 0, "IT"]
+  ];
   /* ---------- el Bayern Múnich (Bundesliga) ----------
      El primer equipo de fcbayern.com (octubre 2026), con la foto en
      cards/champions/bayern/<id>.webp. Quedaron fuera los que EA FC no
@@ -684,7 +706,7 @@
     colocolo: "Colo-Colo", ucatolica: "Universidad Católica", udechile: "Universidad de Chile",
     river: "River Plate", boca: "Boca Juniors", estudiantes: "Estudiantes de La Plata",
     intermiami: "Inter Miami", montreal: "CF Montréal", lafc: "LAFC",
-    alnassr: "Al Nassr", alhilal: "Al Hilal", alittihad: "Al Ittihad", atletico: "Atlético de Madrid"
+    alnassr: "Al Nassr", alhilal: "Al Hilal", alittihad: "Al Ittihad", atletico: "Atlético de Madrid", milan: "AC Milan"
   };
 
   /* ---------- la media de cada futbolista ----------
@@ -893,6 +915,15 @@
       "giuliano": 82, "juan-musso": 82, "cristian-romero": 82, "pubill": 81, "koke": 81, "robin-le-normand": 81,
       "jonathan-david": 80, "johnny-cardoso": 80, "lee-kang-in": 80, "obed-vargas": 72, "rodri-mendoza": 71,
       "arnau-ortiz": 69, "aleksa-puric": 67, "salvi-esquivel": 64, "miguel-cubo": 63, "dani-martinez": 63
+    },
+    milan: {
+      "mike-maignan": 87, "adrien-rabiot": 85, "luka-modric": 85, "christian-pulisic": 83, "mario-gila": 81,
+      "fikayo-tomori": 80, "alexis-saelemaekers": 80, "goncalo-ramos": 80, "matteo-gabbia": 80,
+      "ruben-loftus-cheek": 79, "diego-moreira": 79, "samuel-chukwueze": 78, "strahinja-pavlovic": 78,
+      "pervis-estupinan": 78, "ardon-jashari": 76, "pietro-terracciano": 76, "omari-hutchinson": 76,
+      "koni-de-winter": 75, "davide-bartesaghi": 74, "yunus-musah": 73, "filippo-terracciano": 71, "warren-bondo": 70,
+      "sankhoun-diawara": 69, "alphadjo-cisse": 66, "francesco-camarda": 66, "christian-comotto": 65,
+      "lorenzo-torriani": 62
     }
   };
   /* Las medias de EA SPORTS FC 27 (fut.gg, cartas base, octubre 2026) de los
@@ -1239,6 +1270,15 @@
       "johnny-cardoso": "MC", "lee-kang-in": "ED/MD", "obed-vargas": "MC/MI", "rodri-mendoza": "MC",
       "arnau-ortiz": "MI/EI", "aleksa-puric": "DFC", "salvi-esquivel": "POR", "miguel-cubo": "DC",
       "dani-martinez": "DFC/LI"
+    },
+    milan: {
+      "mike-maignan": "POR", "adrien-rabiot": "MC", "luka-modric": "MC", "christian-pulisic": "ED/MC",
+      "mario-gila": "DFC", "fikayo-tomori": "DFC", "alexis-saelemaekers": "LD/MD", "goncalo-ramos": "DC",
+      "matteo-gabbia": "DFC", "ruben-loftus-cheek": "MC", "diego-moreira": "ED/MD", "samuel-chukwueze": "ED/MD",
+      "strahinja-pavlovic": "DFC", "pervis-estupinan": "LI/MI", "ardon-jashari": "MC", "pietro-terracciano": "POR",
+      "omari-hutchinson": "ED/MD", "koni-de-winter": "DFC", "davide-bartesaghi": "LI/MI", "yunus-musah": "MC",
+      "filippo-terracciano": "DFC/LD", "warren-bondo": "MC", "sankhoun-diawara": "DFC/LI", "alphadjo-cisse": "MC",
+      "francesco-camarda": "DC", "christian-comotto": "MC", "lorenzo-torriani": "POR"
     }
   };
   const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
@@ -1269,7 +1309,7 @@
   const tierDeMedia = m => tierDeBandas(BANDAS, m);
   const tierDeMediaV0 = m => tierDeBandas(BANDAS_V0, m);
   // los clubes que llegaron con las medias de FC 27 y las bandas nuevas: no tienen historia
-  const NUEVOS = new Set(["atletico"]);
+  const NUEVOS = new Set(["atletico", "milan"]);
   /* Las probabilidades por carta de las colecciones de fútbol, en diez
      milésimas: como cada rareza es un grupo de jugadores de distinta
      media, aquí las más altas salen un poco más que en las otras colecciones
@@ -1379,6 +1419,7 @@
   ESPECIALES2.forEach(j => cartaFutbol("futbol", "especiales", j));
   LEYENDAS.forEach(cartaLeyenda);
   ATLETICO.forEach(j => cartaFutbol("futbol", "champions", j));
+  MILAN.forEach(j => cartaFutbol("futbol", "champions", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null, pesoDe = c => c.peso, tierDe = c => c.tier, bandas = BANDAS, pesoRerollDe = pesoDe) => {
@@ -1424,8 +1465,8 @@
   // Chile, Argentina, la MLS y Arabia (277 jugadores, publicado el 2026-10-28): el corte (28-10-2026 21:16 UTC) es media hora después del push, para que ningún sobre ya comprado cambie.
   // Cristiano · Balón de Oro All-Time (1 carta, publicado el 2026-10-29): el corte (2026-10-29 01:39 UTC) es 15 minutos después del push, para que ningún sobre ya comprado cambie.
   // Las leyendas (43 cartas, n = 1111) y los pesos nuevos de las especiales (publicado el 2026-10-29): el corte (2026-10-29 03:40 UTC) es 12 minutos después del push, para que ningún sobre ya comprado cambie.
-  // Las medias de FC 27, las bandas nuevas de rareza y el Atlético de Madrid (n = 1154, los pesos de hoy pero todavía con la rareza de antes): ¡`hasta` es un PROVISORIO en el futuro (1-1-2027), así que por ahora los sobres siguen como hoy! Al publicar, `hasta` = la hora del push y unos minutos más (nunca antes: un sobre ya comprado cambiaría).
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }, { hasta: 1798761600000, n: 1154, hoy: true }];
+  // Las medias de FC 27, las bandas nuevas de rareza, el Atlético de Madrid y el AC Milan (n = 1154, los pesos de hoy pero todavía con la rareza de antes; publicado el 2026-10-29): el corte (2026-10-29 04:26 UTC) es 13 minutos después del push, para que ningún sobre ya comprado cambie.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }, { hasta: 1793247961952, n: 1154, hoy: true }];
   // desde este instante las cartas valen con su rareza nueva (las medias de FC 27 y las bandas nuevas)
   const CORTE_TIERS = AMPLIACIONES[AMPLIACIONES.length - 1].hasta;
   // la rareza que tenía una carta a la hora `at` (un re-roll viejo se hizo con las de entonces)
@@ -1699,7 +1740,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

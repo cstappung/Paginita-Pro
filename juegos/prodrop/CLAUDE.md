@@ -188,7 +188,7 @@ other file of the site. Things that hold it together:
   `monedas.js`, the postman in `prodrop.js`, `elegibles` in `app.js`), not `card.tier`. A club that arrives from now
   on goes in `NUEVOS` (no history: `tierAntes = tier`). **Atlético de Madrid**: `ATLETICO` (26 male base cards of the
   FC 27 squad, faces on a red/navy radial gradient, `cards/champions/atletico/`, crest from fut.gg, frame in
-  `juegos.html`, `perfil-tarjeta.js`); it is a club of its own (album and club challenge).
+  `juegos.html`, `perfil-tarjeta.js`); it is a club of its own (album and club challenge). The **AC Milan** (`MILAN`, 27 cards, ids 1180+, called «Milano FC» in FC 27, fut.gg club id 131681, faces on red/black) went in the same way.
   **Re-roll odds**: `PESO_REROLL_FUTBOL` — in a re-roll a plain legendary weighs 50 and a special card or a legend 1
   (`pesoRerollDe` of the pool; pools before `CORTE_TIERS` keep the pack weights), so about 1 in 30 re-rolls gives one.
   The re-roll roulette (`cartaTira` in `app.js`) uses the same weights and never shows more than 3 of them.

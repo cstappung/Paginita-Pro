@@ -852,7 +852,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Nuevo: el Atlético de Madrid y las medias de FC 27. Ya llegaron: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Y las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y 38 más. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
+  futbol: 'Nuevo: el Atlético de Madrid, el AC Milan y las medias de FC 27. Ya llegaron: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Y las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y 38 más. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -894,7 +894,7 @@ function eligeSobre(menu = 'todos') {
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
       <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i><i class="hub-liga"><img src="flags/cl.png" alt="">LIGA CHILENA</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Nuevo: el Atlético de Madrid y las medias de FC 27. Antes: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Figueroa y más</small>
+      <small class="ch-temas">Nuevo: el Atlético de Madrid, el AC Milan y las medias de FC 27. Antes: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Figueroa y más</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -2163,8 +2163,8 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
-  ['Octubre 2026 · Medias de FC 27 y el Atlético de Madrid', [
-    '<b>🔴 Atlético de Madrid</b>: sus 26 jugadores de EA SPORTS FC 27 (titulares, suplentes y la cantera), con Oblak, Julián Álvarez, Llorente, Koke y Grimaldo. También entra al álbum de clubes del Desafío de plantilla, con su marco de perfil.',
+  ['Octubre 2026 · Medias de FC 27, el Atlético de Madrid y el AC Milan', [
+    '<b>🔴 Atlético de Madrid</b> y <b>⚫ AC Milan</b>: sus 26 y 27 jugadores de EA SPORTS FC 27 (titulares, suplentes y la cantera), con Oblak, Julián Álvarez, Koke, Maignan, Modrić y Pulisic. También entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
     '<b>📈 Medias de FC 27</b>: pusimos las medias de EA SPORTS FC 27 a todos los jugadores. Unas suben (Courtois 90, Yan Diomandé 84, Gerard Martín 79) y otras bajan (Trent 84). Como la rareza sale de la media, ahora es: <b>Común</b> hasta 76, <b>Rara</b> 77 a 82, <b>Épica</b> 83 a 87 y <b>Legendaria</b> 88 o más.',
     '<b>🃏 Tus cartas</b>: las que ya tienes se quedan, solo cambian su media y su rareza. Los sobres que ya abriste no cambian.',
     '<b>🎰 Re-roll</b>: las especiales y las leyendas salen <b>cincuenta veces menos</b> que una legendaria común (alrededor de 1 de cada 30 re-rolls trae una), y la ruleta no muestra más de tres.'
