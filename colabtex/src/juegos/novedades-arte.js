@@ -354,7 +354,7 @@ function prodrop({ serie1 = false } = {}) {
    (juegos/prodrop/motor.js; un test las compara). ---------- */
 const ESTRELLAS_FUTBOL = [
   { img: "champions/montreal/alexis-sanchez", nombre: "Alexis Sánchez", media: 75, cinta: "" },
-  { img: "especiales/realmadrid/mbappe-mvp", nombre: "Mbappé", media: 92, cinta: "MVP DEL CLÁSICO" },
+  { img: "especiales/realmadrid/mbappe-dictador", nombre: "Mbappé", media: 91, cinta: "DICTADOR" },
   { img: "futbol/realmadrid/bellingham", nombre: "Bellingham", media: 90, cinta: "" },
   { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" },
   { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 91, cinta: "" },

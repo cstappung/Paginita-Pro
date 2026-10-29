@@ -751,9 +751,9 @@ const SKIN = {
    centro], como los pinta `skin-fan`. `hub` es el acceso «Sobres de Fútbol».
    Los demás sobres sacan tres cartas buenas al azar. */
 const PORTADA = {
-  futbol: [['colocolo', 'arturo-vidal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
-  futbolplus: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
-  hub: [['colocolo', 'arturo-vidal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
+  futbol: [['mancity', 'erling-haaland'], ['barcelona', 'lamine-yamal'], ['colocolo', 'arturo-vidal']],
+  futbolplus: [['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador'], ['alnassr', 'cristiano-balon-all-time']],
+  hub: [['colocolo', 'arturo-vidal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-mvp']],
 };
 // una carta de la portada: por jugador (`club-id`) o, si es una especial, por su archivo (`club-id-especial`)
 const cartaDePortada = (club, id) => CARDS.find(c => c.person === club + '-' + id) || CARDS.find(c => c.uid.startsWith(club + '-' + id + '-'));
@@ -878,7 +878,16 @@ function eligeSobre(menu = 'todos') {
   $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
   const box = $('#chooserPacks');
+  const enFutbol = menu === 'futbol';
   const ficha = co => {
+    if (enFutbol) {
+      const k = SKIN[co.key];
+      return `<button class="ch-pack${co.key === coleccion ? ' ultimo' : ''}" data-col="${co.key}">
+      <span class="ch-skin">${skinHTML(fanDe(co.key), co.key)}</span>
+      <b>${co.label}<span class="ch-info" tabindex="0" role="note" aria-label="${esc(TEMAS[co.key])}">i<span class="ch-tip">${TEMAS[co.key]}</span></span></b>
+      <small>${k.badge} · ${M.precioSobre(ahora(), co.mult || 1)} ${MONEDA}</small>
+    </button>`;
+    }
     const todas = M.POR_COL[co.col], tengo = todas.filter(c => col[c.uid]).length, k = SKIN[co.key];
     return `<button class="ch-pack${co.key === coleccion ? ' ultimo' : ''}" data-col="${co.key}">
       <span class="ch-skin">${skinHTML(fanDe(co.key), co.key)}</span>
@@ -900,6 +909,15 @@ function eligeSobre(menu = 'todos') {
   };
   box.innerHTML = menu === 'futbol' ? futbolistas.map(ficha).join('')
     : sueltas.map(ficha).join('') + (futbolistas.length ? fichaFutbol() : '');
+  // en el menú de fútbol, una sola barra de lo que tienes, ancha, bajo los dos sobres
+  const cht = $('#chTengo');
+  cht.hidden = !enFutbol;
+  if (enFutbol) {
+    const todas = M.POR_COL.futbol, tengo = todas.filter(c => col[c.uid]).length;
+    cht.innerHTML = `<span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length} cartas de fútbol</small>`;
+  }
+  // el globo ⓘ se abre con el toque (en el celular no hay hover) sin abrir el sobre
+  box.querySelectorAll('.ch-info').forEach(i => i.addEventListener('click', e => { e.stopPropagation(); i.classList.toggle('abierto'); }));
   // en el menú de fútbol, la entrada grande a los desafíos de plantilla, con el reto de la semana
   const chr = $('#chRetos'), sem = window.ProdropRetos ? window.ProdropRetos.retoDeSemana(window.ProdropRetos.semanaDe(ahora())) : null;
   chr.hidden = menu !== 'futbol' || !sem;
@@ -1606,6 +1624,14 @@ async function gradeCard() {
 }
 /* ---------------- COLECCIÓN ---------------- */
 let colFilter = -1, colView = null;
+/* Buscador de la colección: por nombre (sin tildes ni mayúsculas), por club
+   (solo fútbol) y por graduación. Con «graduadas» o «sin graduar» salen
+   solo las cartas que tienes con alguna copia así; los huecos no. */
+const colBusca = { q: '', club: '', grad: '' };
+const sinTildes = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+$('#colQ').oninput = e => { colBusca.q = sinTildes(e.target.value.trim()); renderCollection(); };
+$('#colClub').onchange = e => { colBusca.club = e.target.value; renderCollection(); $('#colGrid').scrollTop = 0; };
+$('#colGrad').onchange = e => { colBusca.grad = e.target.value; renderCollection(); $('#colGrid').scrollTop = 0; };
 // toca una carta: si tienes varias copias primero las ves todas; con una sola va directo al zoom
 const instOf = (c, cp) => pull.find(p => mismaCopia(p._copy, cp)) || fromCopy(c, cp);
 function colOpen(c) {
@@ -1624,6 +1650,7 @@ function renderCopies() {
   const gn = list.filter(x => x.gr).length;
   $('#colFilters').innerHTML = `<button class="cv-back">‹ Volver</button><span class="cv-title"><b>${c.name}</b> · ${subtitle(c)} · ${list.length} copias${gn ? ` · ${gn} graduada${gn > 1 ? 's' : ''}` : ''}</span>`;
   $('#colFilters .cv-back').onclick = () => { colView = null; renderCollection(); };
+  $('#colBusca').hidden = true;
   const grid = $('#colGrid'); grid.innerHTML = ''; grid.classList.add('copies-view');
   list.forEach((cp, i) => {
     const inst = instOf(c, cp), el = makeCard(inst, { back: false, lazy: true });
@@ -1665,9 +1692,29 @@ function renderCollection() {
       return `<button data-f="${i}" class="${i === colFilter ? 'on' : ''}" style="--c:${color}">${s ? `<i>${s}</i>` : ''}${l} ${n}/${tot}</button>`;
     }).join('');
   $('#colFilters').querySelectorAll('button').forEach(b => b.onclick = () => { colFilter = +b.dataset.f; renderCollection(); });
+  // el buscador: el selector de club solo en fútbol, con los clubes que tiene la colección
+  $('#colBusca').hidden = false;
+  const selClub = $('#colClub'), clubesCol = fut ? Object.keys(M.CLUBES).filter(k => todas.some(c => c.club === k)) : [];
+  if (selClub.dataset.col !== colCol) {
+    selClub.dataset.col = colCol;
+    selClub.innerHTML = `<option value="">Todos los clubes</option>${clubesCol.map(k => `<option value="${k}">${esc(M.CLUBES[k])}</option>`).join('')}${fut && todas.some(c => c.leyenda) ? '<option value="leyendas">Leyendas</option>' : ''}`;
+    if (!selClub.querySelector(`option[value="${colBusca.club}"]`)) colBusca.club = '';
+    selClub.value = colBusca.club;
+  }
+  selClub.hidden = !fut;
+  const club = fut ? colBusca.club : '';
+  const busca = c => {
+    if (colBusca.q && !sinTildes(c.name + ' ' + (c.sub || '')).includes(colBusca.q)) return false;
+    if (club && (club === 'leyendas' ? !c.leyenda : c.club !== club)) return false;
+    if (colBusca.grad) {
+      const cps = copies[c.uid] || [];
+      if (colBusca.grad === 'si' ? !cps.some(x => x.gr) : !(cps.length ? cps.some(x => !x.gr) : col[c.uid])) return false;
+    }
+    return true;
+  };
   const grid = $('#colGrid'); grid.innerHTML = '';
   const ordenClub = Object.keys(M.CLUBES);
-  const lista = todas.filter(c => pasa(c, colFilter)).sort(fut
+  const lista = todas.filter(c => pasa(c, colFilter) && busca(c)).sort(fut
     ? (a, b) => ixClub(ordenClub, a) - ixClub(ordenClub, b) || a.media - b.media || a.n - b.n
     : (a, b) => a.tier - b.tier || a.n - b.n);
   const claveSec = c => (fut ? (c.leyenda ? 'leyendas' : c.club) : c.vkey);
@@ -1690,11 +1737,14 @@ function renderCollection() {
       grid.appendChild(el);
     } else {
       const r = rareza(c);
+      if (colBusca.grad) return;
       grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${r.color}"><b>${r.sym}</b>${fut ? `${c.media} · ${esc(c.posiciones[0])}` : `N.º ${pad(c.num)}`}<small>${esc(c.name)}</small></div>`);
     }
   });
+  if (!lista.length) grid.insertAdjacentHTML('beforeend', '<p class="col-vacio">No hay cartas con esa búsqueda.</p>');
 }
 function openCollection() {
+  colBusca.q = ''; $('#colQ').value = '';
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
   colView = null; zoomVuelve = ''; colCol = colDe(coleccion);

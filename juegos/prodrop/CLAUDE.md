@@ -225,6 +225,11 @@ other file of the site. Things that hold it together:
   the banner, the zoom and the collection (its own filter chip, and the
   Legendaria chip no longer counts them). For the motor they are still tier 3:
   packs, odds and re-rolls are untouched, so no pack changes.
+- **Football menu** (`eligeSobre('futbol')`): under each pack only its name, «SERIE 03 · price»
+  and an ⓘ (`.ch-info`, hover/focus or tap) holding `TEMAS`; one wide «Tienes X/N» bar
+  (`#chTengo`) under both packs. The «todos» menu keeps its long texts.
+- **Collection search** (`#colBusca`, `colBusca`): name (accents ignored), club (football only,
+  plus «Leyendas») and graded / ungraded (only owned cards with a copy in that state; no gaps).
 - **The football collection goes by club** (`renderCollection`): with «Todas»
   each club is one section (crest + name, in `CLUBES` order), its cards from the
   lowest media to the highest, so the specials land at the end of their club.
@@ -244,9 +249,9 @@ other file of the site. Things that hold it together:
   a rival's listings) and answers every action without Firebase. Open it
   through the static server, never `file://`.
 - **The football pack covers are fixed** (`PORTADA` in `app.js`, read by
-  `fanDe`): (during the event: Yamal, Kane and, in the centre, Mbappé MVP; normally) normal = Lamine Yamal, Bellingham and, in the centre, Mbappé;
-  Plus = Saka, Van Dijk and Haaland; the «Sobres de Fútbol» tile shows
-  Haaland, Yamal and Mbappé. The order is [left, right, centre]. Profes and
+  `fanDe`): normal = Haaland, Lamine Yamal and, in the centre, Arturo Vidal;
+  Plus = Kane · Balón de Oro, Mbappé · Dictador and, in the centre, Cristiano BOAT;
+  the «Sobres de Fútbol» tile shows Vidal, Kane · Balón de Oro and Mbappé MVP. The order is [left, right, centre]. Profes and
   componentes still show three good cards at random. A test checks that every
   name exists.
 - **«Sobres de Fútbol» is its own menu.** Packs carry `grupo: "futbol"` (the
