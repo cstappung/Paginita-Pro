@@ -163,8 +163,8 @@ other file of the site. Things that hold it together:
   with Pillow. Positions cut to two (the test). Dorsal 0: the card no longer shows it.
   `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
 - **Salón banner** (`futbol()` in `colabtex/src/juegos/novedades-arte.js`): four cards in a fan,
-  Vidal always (with the «Liga Chilena · Nuevo» tag above him) plus three random stars from
-  `ESTRELLAS_FUTBOL` on every paint; the test checks each `media` against the motor.
+  the three specials (those with a `cinta`) plus one random star from
+  `ESTRELLAS_FUTBOL` on every paint (no Chilean-league tag any more); the test checks each `media` against the motor.
 - **Special cards** (`ESPECIALES` and `ESPECIALES2` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
   Clásico, media 92; Harry Kane · Balón de Oro, media 94; Cristiano Ronaldo ·
@@ -186,7 +186,7 @@ other file of the site. Things that hold it together:
   `SKIN.futbol.meta`, `TEMAS.futbol`, the hub tile text and `NOVEDADES_FUTBOL`; and in
   Juegos, the salon card `futbol` in `juegos-main.js` and its art (`futbol()` in
   `novedades-arte.js`, three real cards with media; a test compares its medias with
-  the motor's; the banner ribbon is shorter than the card's: «BALÓN DE ORO», it doesn't fit).
+  the motor's; Cristiano's ribbon is «BOAT» (Ballon d'Or All-Time) on the card and in the banner).
 - **«Especial» is a displayed rarity, not an engine tier**: the frame's
   `rareza(c)` answers `ESPECIAL` (✦, gold) for `c.especial`, on the card face,
   the banner, the zoom and the collection (its own filter chip, and the

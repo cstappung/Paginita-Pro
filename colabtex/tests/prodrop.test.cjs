@@ -591,7 +591,7 @@ test('cartas especiales por tiempo limitado: Mbappé (92), Kane (94) y Cristiano
  assert.equal(mb.name,'Mbappé');assert.equal(mb.media,base.media+1,'92: una más que el Mbappé de siempre');assert.equal(mb.tier,3);
  assert.match(mb.cinta,/MVP/);assert.equal(mb.especial,'clasico');
  assert.equal(kane.name,'Harry Kane');assert.equal(kane.media,94);assert.equal(kane.tier,3);assert.match(kane.cinta,/BAL/);assert.equal(kane.club,'bayern');assert.equal(kane.pais,'ENG');
- assert.equal(cr7.name,'C. Ronaldo');assert.equal(cr7.media,96);assert.equal(cr7.tier,3);assert.match(cr7.cinta,/ALL TIME/);assert.equal(cr7.club,'alnassr');assert.equal(cr7.pais,'PT');assert.equal(cr7.n,1110);
+ assert.equal(cr7.name,'C. Ronaldo');assert.equal(cr7.media,96);assert.equal(cr7.tier,3);assert.equal(cr7.cinta,'BOAT');assert.equal(cr7.club,'alnassr');assert.equal(cr7.pais,'PT');assert.equal(cr7.n,1110);
  assert.ok(PM.CARDS.some(c=>!c.especial&&c.person===cr7.person&&c.name==='C. Ronaldo'),'es el mismo Cristiano de Al Nassr: no se puede tener los dos en el once');
  assert.deepEqual(cr7.posiciones,['DC']);
  for(const c of [mb,kane,cr7]){
@@ -615,7 +615,7 @@ test('cartas especiales por tiempo limitado: Mbappé (92), Kane (94) y Cristiano
  // las medias del banner de la página de Juegos son estas
  const arte=fs.readFileSync(path.join(__dirname,'..','src/juegos/novedades-arte.js'),'utf8');
  const cartas=[...arte.matchAll(/img: "([^"]+)", nombre: "[^"]+", media: (\d+)/g)];
- assert.equal(cartas.length,10,'Vidal y las nueve estrellas');
+ assert.equal(cartas.length,9,'las nueve estrellas del banner');
  for(const [,img,media] of cartas){const c=PM.CARDS.find(x=>x.img==='cards/'+img+'.webp');assert.ok(c,'el banner nombra '+img+', que no está');assert.equal(c.media,+media,'el banner muestra la media de verdad: '+img);}
 });
 

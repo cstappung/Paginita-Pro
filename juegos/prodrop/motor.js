@@ -434,7 +434,7 @@
      movería los ids de lo que viene detrás) y con su corte en
      `AMPLIACIONES`. Misma forma de fila que `ESPECIALES`. */
   const ESPECIALES2 = [
-    ["alnassr", "cristiano-balon-all-time", "C. Ronaldo", "DEL", 7, "PT", { person: "alnassr-cristiano-ronaldo", sub: "Al Nassr · Balón de Oro All-Time", cinta: "BALÓN DE ORO ALL TIME", especial: "balon", limitada: true, peso: 3 }]
+    ["alnassr", "cristiano-balon-all-time", "C. Ronaldo", "DEL", 7, "PT", { person: "alnassr-cristiano-ronaldo", sub: "Al Nassr · Balón de Oro All-Time", cinta: "BOAT", especial: "balon", limitada: true, peso: 3 }]
   ];
   /* ---------- el Bayern Múnich (Bundesliga) ----------
      El primer equipo de fcbayern.com (octubre 2026), con la foto en
