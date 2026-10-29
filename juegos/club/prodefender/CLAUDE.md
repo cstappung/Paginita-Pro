@@ -303,6 +303,17 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
   Frost Cannon and Beacon before round 15, push few towers deep (Prism 4-2)
   and buy the hero late; `mixta` spams Spike Launchers and dies by round 9–27.
 
+## Engine version 5 (Oct 29): stacked buffs and slow, huge bosses
+
+- **Buffs**: in `recalcAll` the auras of one tower type keep the best (two totems do not
+  stack), but different types add up (totem +25 % rate + rod +30 % = +55 %; damage
+  multipliers add their bonuses; armour pierce caps at 100 %). Version 4 took the best of
+  all sources.
+- **Bosses** (`JEFE` in engine.js): x20 HP and a third of the speed.
+- Both only for `this.ve >= 5`. Games started on 4 keep their rules (`prueba.js`:
+  `VERSIONES = [4, 5]`, the version travels in the saved run and the proof), so no
+  half-played run was thrown away and old records still verify.
+
 ## Determinism — do not break it
 
 - The engine's randomness is `this.rnd()` (mulberry32 seeded per `Game`).

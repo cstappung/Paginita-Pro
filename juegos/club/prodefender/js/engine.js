@@ -84,6 +84,9 @@
   };
   // lo que remata los huesos de un Esqueleto (y lo único que les hace algo mientras yacen)
   const REMATA = { fire: 1, explosive: 1, arcane: 1 };
+  // Jefes desde la versión 5 (pedido del dueño): x20 de vida y un tercio de la velocidad, para que
+  // se sientan como una marcha lenta que hay que frenar entre todas las torres.
+  const JEFE = { vida: 20, vel: 1 / 3 };
   // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
   // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
   const PURGA = { dur: 2.5, hp: 0.5 };
@@ -167,7 +170,10 @@
   class Game {
     // `seed`: el azar de la partida (mulberry32). Con la misma semilla y las mismas
     // acciones en los mismos pasos, la partida sale idéntica (prueba.js la rehace).
-    constructor(li, snap, seed) {
+    // `ve`: la versión del motor con que se juega (prueba.js: VERSIONES). Una partida empezada
+    // con la 4 sigue con sus reglas hasta el final; sin ella, la última.
+    constructor(li, snap, seed, ve) {
+      this.ve = ve || PD.MOTOR_VE;
       this.li = li;
       this.rs = seed === undefined ? (Math.random() * 4294967296) >>> 0 : seed >>> 0;
       this.L = PD.LEVELS[li];
@@ -377,21 +383,31 @@
       for (const t of this.towers) t.s = this.baseStats(t);
       // apoyo: los tótems y el héroe de la Caldera (su aura de forja, radio s.aura)
       const totems = this.towers.filter(t => t.def.kind === 'support' || ((t.def.hero || t.def.kind === 'rod') && (t.s.buffDmgMult || t.s.buffRate)));
+      // Bufos (desde la versión 5): dos estructuras del mismo tipo no se suman (vale la mejor),
+      // pero las de tipos distintos sí: un Tótem con +25% y un Pararrayos con +30% dan +55%.
+      // En la 4 valía solo el mejor de todos, de cualquier tipo.
+      const suma = this.ve >= 5;
       for (const t of this.towers) {
         if (t.def.kind === 'support' || t.def.kind === 'farm') continue;
-        const b = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 };
-        let any = false;
+        const porTipo = new Map();
         for (const k of totems) {
           if (k === t || Math.hypot(k.x - t.x, k.y - t.y) > (k.s.aura || k.s.range)) continue;
-          any = true;
-          const ks = k.s;
-          b.rate = Math.max(b.rate, ks.buffRate || 0);
-          b.range = Math.max(b.range, ks.buffRange || 0);
-          b.camo = b.camo || !!ks.buffCamo;
-          b.dmg = Math.max(b.dmg, ks.buffDmg || 0);
-          b.mult = Math.max(b.mult, ks.buffDmgMult || 1);
-          b.ap = Math.max(b.ap, ks.buffArmor || 0);
-          b.pierce = Math.max(b.pierce, ks.buffPierce || 0);
+          const ks = k.s, clave = suma ? k.type : '';
+          let p = porTipo.get(clave);
+          if (!p) porTipo.set(clave, p = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 });
+          p.rate = Math.max(p.rate, ks.buffRate || 0);
+          p.range = Math.max(p.range, ks.buffRange || 0);
+          p.camo = p.camo || !!ks.buffCamo;
+          p.dmg = Math.max(p.dmg, ks.buffDmg || 0);
+          p.mult = Math.max(p.mult, ks.buffDmgMult || 1);
+          p.ap = Math.max(p.ap, ks.buffArmor || 0);
+          p.pierce = Math.max(p.pierce, ks.buffPierce || 0);
+        }
+        const any = porTipo.size > 0;
+        const b = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 };
+        for (const p of porTipo.values()) {
+          b.rate += p.rate; b.range += p.range; b.camo = b.camo || p.camo; b.dmg += p.dmg;
+          b.mult += p.mult - 1; b.ap = Math.min(1, b.ap + p.ap); b.pierce += p.pierce;
         }
         t.buffed = any;
         if (!any) continue;
@@ -643,7 +659,7 @@
       const d = PD.ENEMIES[type];
       const boost = PD.hpBoost(this.curRound() || 1, d.boss);
       let hp = d.hp * hpM * boost;
-      if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost;
+      if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost * (this.ve >= 5 ? JEFE.vida : 1);
       const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) * this.vidaTarde() : 1;   // pactos y reino
       hp *= fv;
       const shield = (d.shield || 0) * hpM * boost * fv;
@@ -1150,7 +1166,7 @@
         if (this.era3 && this.terceraEra(e, d, dt, mudo, cur, hurry)) continue;
         // movimiento
         let sp = 0;
-        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1);
+        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1) * (d.boss && this.ve >= 5 ? JEFE.vel : 1);
         if (hurry) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
         else if (e.frozenT <= 0 && e.stunT <= 0) {
           sp = vel * (1 - e.slowF) * e.haste;
@@ -2918,5 +2934,7 @@
     }
   }
 
+  // la versión del motor de las partidas nuevas (prueba.js: VERSION)
+  PD.MOTOR_VE = 5;
   PD.Game = Game;
 })();

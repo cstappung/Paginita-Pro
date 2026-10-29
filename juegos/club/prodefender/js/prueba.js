@@ -41,7 +41,10 @@
   const MAX_JUGADAS = 8000, MAX_PASOS = 30000000;
   // Sube con cada cambio del motor, los datos o esta regla de pasos: una prueba
   // grabada con otro motor no se rehace igual (y eso es caché, no trampa).
-  const VERSION = 4;
+  // VERSIONES: las que se pueden rehacer. La 5 suma los bufos de estructuras distintas
+  // (engine.js: recalcAll); la 4 sigue valiendo para las partidas empezadas antes, que se
+  // juegan y se rehacen con su regla (el motor recibe la versión: new PD.Game(…, ve)).
+  const VERSION = 5, VERSIONES = [4, 5];
 
   const categoria = r => 'club-prodefender-' + REINOS[r];
   const reinoDe = cat => { const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || '')); return m ? REINOS.indexOf(m[1]) : -1; };
@@ -114,11 +117,12 @@
     snap.continues -= c;
     st.tramo++;
     st.pasos += st.k;
-    st.game = new PD.Game(st.r, snap, semillaTramo(st.s, st.u, st.tramo));
+    st.game = new PD.Game(st.r, snap, semillaTramo(st.s, st.u, st.tramo), st.ve);
     st.k = 0; st.q = 0;
   }
-  function nuevo(r, s, u) {
-    return { r, s: s >>> 0, u: String(u), game: new PD.Game(r, null, semillaTramo(s, u, 0)), k: 0, q: 0, tramo: 0, pasos: 0 };
+  function nuevo(r, s, u, ve) {
+    ve = ve || VERSION;
+    return { r, s: s >>> 0, u: String(u), ve, game: new PD.Game(r, null, semillaTramo(s, u, 0), ve), k: 0, q: 0, tramo: 0, pasos: 0 };
   }
   const tiempoDe = st => Math.max(1, Math.round((st.pasos + st.k) * 1000 / 60));
 
@@ -128,7 +132,7 @@
     constructor(r, u, run) {
       if (run && run.pr && Array.isArray(run.pr.j)) {
         const pr = run.pr;
-        this.st = nuevo(r, pr.s, u);
+        this.st = nuevo(r, pr.s, u, VERSIONES.includes(pr.ve) ? pr.ve : VERSION);
         this.j = pr.j.slice(0, pr.n);
         this.j.push([pr.k, 5, pr.c ? 1 : 0]);
         this.st.tramo = this.j.filter(x => x[1] === 5).length - 1;
@@ -185,7 +189,7 @@
     // Lo que se guarda para reanudar. Entre rondas, la foto de ahora; a mitad
     // de una ronda (o tras perderla), la del comienzo de esa ronda.
     guardado() {
-      const g = this.game, pr = n => ({ ve: VERSION, s: this.st.s, j: this.j.slice(0, n), n, k: 0, c: 0 });
+      const g = this.game, pr = n => ({ ve: this.st.ve, s: this.st.s, j: this.j.slice(0, n), n, k: 0, c: 0 });
       if (quieto(g) && !g.over) { const p = pr(this.j.length); p.k = this.st.k; return { snap: g.snapshot(), pr: p }; }
       const R = this.reintento;
       if (!R) return null;
@@ -193,7 +197,7 @@
       return { snap: clona(R.snap), pr: p };
     }
     tiempo() { return tiempoDe(this.st); }
-    prueba() { return { v: 1, ve: VERSION, u: this.st.u, r: this.st.r, s: this.st.s, j: this.j.slice(), k: this.st.k }; }
+    prueba() { return { v: 1, ve: this.st.ve, u: this.st.u, r: this.st.r, s: this.st.s, j: this.j.slice(), k: this.st.k }; }
   }
 
   // -------------------------------- Rehacer ---------------------------------
@@ -206,10 +210,10 @@
     if (!p || p.v !== 1 || !Number.isInteger(p.r) || p.r < 0 || p.r >= REINOS.length ||
       !Number.isInteger(p.s) || p.s < 0 || p.s > 4294967295 || !Array.isArray(p.j) || p.j.length > MAX_JUGADAS ||
       !Number.isInteger(p.k) || p.k < 0 || p.k > MAX_PASOS) throw new Error('La prueba no tiene la forma esperada.');
-    if (p.ve !== VERSION) throw new Error('La prueba es de otra versión del juego (recarga la página).');
+    if (!VERSIONES.includes(p.ve)) throw new Error('La prueba es de otra versión del juego (recarga la página).');
     if (String(p.u) !== String(u)) throw new Error('La prueba es de otra cuenta.');
     for (const j of p.j) if (!Array.isArray(j) || j.length < 2 || j.length > 5 || !j.every(Number.isInteger) || j[0] < 0 || j[0] > MAX_PASOS) throw new Error('Una jugada no tiene la forma esperada.');
-    const clave = u + '|' + p.r + '|' + p.s;
+    const clave = u + '|' + p.r + '|' + p.s + '|' + p.ve;
     try { return rehaceCon(p, u, cache, clave); }
     catch (e) { if (cache) cache.delete(clave); throw e; }
   }
@@ -229,7 +233,7 @@
         const m = j && j[1] === 5 && ent.fotos.find(f => f.i === L && f.k <= j[0] && j[0] - f.k <= QUIETO_MAX - f.q);
         if (m) {
           if ((j[2] !== 0 && j[2] !== 1) || (j[2] === 1 && m.continues < 1)) throw new Error('La partida no se puede rehacer: recarga inválida.');
-          st = { r: p.r, s: p.s, u: String(u), game: null, k: j[0], q: 0, tramo: m.tramo, pasos: m.pasos };
+          st = { r: p.r, s: p.s, u: String(u), ve: p.ve, game: null, k: j[0], q: 0, tramo: m.tramo, pasos: m.pasos };
           recarga(st, JSON.parse(m.snap), j[2]);
           i = L + 1;
           ent.textos = textos.slice(0, i); ent.i = i; ent.st = st;
@@ -237,7 +241,7 @@
       }
       if (!st) { cache.delete(clave); ent = null; }
     }
-    if (!st) st = nuevo(p.r, p.s, u);
+    if (!st) st = nuevo(p.r, p.s, u, p.ve);
     if (!ent && cache) {
       ent = { textos: [], fotos: [], st, i: 0 };
       cache.set(clave, ent);
@@ -274,6 +278,6 @@
     return { ronda: st.game.round, tiempo: tiempoDe(st), perdida: !!st.game.over, ganada: !!st.game.won };
   }
 
-  PD.Prueba = { VERSION, Grabadora, rehace, categoria, reinoDe, REINOS, MODOS, QUIETO_MAX, STEP, semillaTramo };
+  PD.Prueba = { VERSION, VERSIONES, Grabadora, rehace, categoria, reinoDe, REINOS, MODOS, QUIETO_MAX, STEP, semillaTramo };
   if (typeof module === 'object' && module.exports) module.exports = PD.Prueba;
 })();

@@ -72,10 +72,10 @@ function pruebasDe(raiz, soloUid) {
 // La misma regla de pasos que prueba.js (rehace): un paso del motor por jugada pendiente,
 // QUIETO_MAX pasos como mucho entre rondas, recargas con la semilla de su tramo.
 function analiza(p) {
-  if (p.ve !== P.VERSION) throw new Error(`la prueba es de la versión ${p.ve} del motor y esta carpeta tiene la ${P.VERSION} (usa --motor con esa versión)`);
+  if (!(P.VERSIONES || [P.VERSION]).includes(p.ve)) throw new Error(`la prueba es de la versión ${p.ve} del motor y esta carpeta rehace las ${(P.VERSIONES || [P.VERSION]).join(', ')} (usa --motor con esa versión)`);
   const u = String(p.u), li = p.r;
   const quieto = g => g.over || (!g.active && g.enemies.length === 0);
-  const st = { game: new PD.Game(li, null, P.semillaTramo(p.s, u, 0)), k: 0, q: 0, tramo: 0, pasos: 0 };
+  const st = { game: new PD.Game(li, null, P.semillaTramo(p.s, u, 0), p.ve), k: 0, q: 0, tramo: 0, pasos: 0 };
   const rondas = [];
   let cur = null, acciones = [], muestreo = 0;
   const empieza = g => {
@@ -137,7 +137,7 @@ function analiza(p) {
       const snap = JSON.parse(JSON.stringify(g.snapshot()));
       snap.continues -= j[2];
       st.tramo++; st.pasos += st.k;
-      st.game = new PD.Game(li, snap, P.semillaTramo(p.s, u, st.tramo));
+      st.game = new PD.Game(li, snap, P.semillaTramo(p.s, u, st.tramo), p.ve);
       vigila(st.game);
       st.k = 0; st.q = 0;
       acciones.push(j[2] ? '⟲ reintento' : '⟲ reanuda');

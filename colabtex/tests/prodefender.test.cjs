@@ -344,13 +344,13 @@ const ponCerca=(g,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.
 
 test('segunda era: la partida de un reino nuevo se repite igual (sus mecánicas usan el azar de la partida)',()=>{
  for(const li of [5,6,7,8,9]){
-  const G=new P.Grabadora(li,'uidN',null),g=G.game;g.money=1e7;
+  const G=new P.Grabadora(li,'uidN',null),g=G.game;g.money=1e7;g.lives=1e9;   // lo que se mide es que se repita, no que se sobreviva (los jefes x20)
   const ids=PD.towersFor(li);
   ids.forEach((id,i)=>{for(let q=0;q<300;q++){const t=G.colocar(id,40+((q*137+i*71)%920),40+((q*251+i*13)%560));if(t){for(const p of [0,0,1,1,0])G.mejorar(t,p);break;}}});
   for(let r=0;r<26&&!g.over;r++){G.ronda();while(g.active&&!g.over)G.tick();}
   assert.ok(g.round>=25,PD.LEVELS[li].short+' llega al jefe de la ronda 25');
   const snap=JSON.stringify(g.snapshot());
-  const G2=new P.Grabadora(li,'uidN',null);G2.st.s=G.st.s;G2.st.game=new PD.Game(li,null,P.semillaTramo(G.st.s,'uidN',0));G2.game.money=1e7;
+  const G2=new P.Grabadora(li,'uidN',null);G2.st.s=G.st.s;G2.st.game=new PD.Game(li,null,P.semillaTramo(G.st.s,'uidN',0));G2.game.money=1e7;G2.game.lives=1e9;
   for(const j of G.j){while(G2.paso<j[0])G2.tick();const c=j[1];if(c===0)G2.colocar(PD.TOWER_ORDER[j[2]],j[3],j[4]);else if(c===1)G2.mejorar(G2.game.towers.find(x=>x.id===j[2]),j[3]);else if(c===4)G2.ronda();}
   while(G2.paso<G.paso)G2.tick();
   assert.equal(JSON.stringify(G2.game.snapshot()),snap,PD.LEVELS[li].short+': misma semilla y mismas jugadas, misma partida');
@@ -670,4 +670,41 @@ test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis 
  const n=new PD.Game(10,null,1);n.round=90;assert.equal(n.vidaTarde(),1);
  g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1);h.round=29;const f=h.spawn('robusto',0,0,1);
  assert.ok(e.maxHp>f.maxHp*9,'la vida del enemigo sube');
+});
+
+test('versión 5: los bufos de estructuras distintas se suman, los del mismo tipo no; la 4 sigue con el mejor',()=>{
+ assert.equal(P.VERSION,5);assert.deepEqual(P.VERSIONES,[4,5]);
+ const rod=PD.TOWERS.pararrayos;let pRod=-1,nRod=0;rod.paths.forEach((pa,i)=>pa.ups.forEach((u,n)=>{if(pRod<0&&/Carga Est/.test(u.name)){pRod=i;nRod=n+1;}}));
+ assert.ok(pRod>=0,'el Pararrayos tiene un bufo de velocidad');
+ const arma=ve=>{const g=new PD.Game(0,null,1,ve);g.money=1e9;
+  const t=ponCerca(g,'espinas',400,300),k=ponCerca(g,'totem',440,300),r=ponCerca(g,'pararrayos',360,300);
+  for(let i=0;i<nRod;i++)g.upgrade(r,pRod);
+  return {g,t,base:g.baseStats(t).cd};};
+ let {g,t,base}=arma(5);
+ const totem=PD.TOWERS.totem.base.buffRate,ra=g.towers.find(x=>x.type==='pararrayos').s.buffRate;
+ assert.ok(Math.abs(t.s.cd-base/(1+totem+ra))<1e-9,'v5: tótem + pararrayos se suman');
+ ponCerca(g,'totem',400,340);assert.ok(Math.abs(t.s.cd-base/(1+totem+ra))<1e-9,'v5: un segundo tótem no suma');
+ ({g,t,base}=arma(4));assert.ok(Math.abs(t.s.cd-base/(1+Math.max(totem,ra)))<1e-9,'v4: solo el mejor');
+});
+
+test('versión 5: los jefes tienen x20 de vida y van a un tercio de la velocidad (la 4 no cambia)',()=>{
+ const jefe=Object.keys(PD.ENEMIES).find(id=>PD.ENEMIES[id].boss&&!PD.ENEMIES[id].twins);
+ const mide=ve=>{const g=new PD.Game(0,null,1,ve);g.active=true;g.queue=[{t:1e9}];g.qi=0;g.hurryT=1e9;g.round=24;
+  const e=g.spawn(jefe,0,100,1,2);const d0=e.dist;for(let k=0;k<60;k++)g.update(1/60);return {hp:e.maxHp,avance:e.dist-d0};};
+ const v4=mide(4),v5=mide(5);
+ assert.ok(Math.abs(v5.hp/v4.hp-20)<1e-6,'x20 de vida');
+ assert.ok(v5.avance>0&&Math.abs(v5.avance/v4.avance-1/3)<0.02,'un tercio de la velocidad: '+(v5.avance/v4.avance));
+});
+
+const ponCercaG=(G,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.35){const t=G.colocar(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
+test('una partida empezada con la versión 4 se reanuda y se rehace con sus reglas',()=>{
+ const G=new P.Grabadora(0,'uidV',null);G.st.ve=4;G.st.game=new PD.Game(0,null,P.semillaTramo(G.st.s,'uidV',0),4);
+ const g=G.game;ponCercaG(G,'espinas',300,200);ponCercaG(G,'espinas',340,200);   // con el oro del comienzo: rehace empieza igual
+ for(let r=0;r<3;r++){G.ronda();while(g.active&&!g.over)G.tick();}
+ const run=JSON.parse(JSON.stringify(G.guardado()));assert.equal(run.pr.ve,4,'la guardada lleva la 4');
+ const H=new P.Grabadora(0,'uidV',run);assert.equal(H.game.ve,4,'al reanudar sigue con la 4');
+ H.ronda();while(H.game.active&&!H.game.over)H.tick();
+ const p=H.prueba();assert.equal(p.ve,4);
+ assert.equal(P.rehace(p,'uidV').ronda,H.game.round,'se rehace igual');
+ assert.throws(()=>P.rehace({...p,ve:3},'uidV'),/otra versión/);
 });

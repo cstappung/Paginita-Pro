@@ -60,9 +60,9 @@
       if (s && s.v === 1) {
         const d = defaultSave(); const o = Object.assign(d, s); o.settings = Object.assign(defaultSave().settings, s.settings || {});
         // Una partida guardada sin su prueba (o con la de otro motor) no se puede verificar: se descarta.
-        for (const k of Object.keys(o.runs || {})) { const r = o.runs[k]; if (!r || !r.snap || !r.pr || r.pr.ve !== PR.VERSION) delete o.runs[k]; }
+        for (const k of Object.keys(o.runs || {})) { const r = o.runs[k]; if (!r || !r.snap || !r.pr || !PR.VERSIONES.includes(r.pr.ve)) delete o.runs[k]; }
         o.pend = o.pend && typeof o.pend === 'object' ? o.pend : {};
-        for (const k of Object.keys(o.pend)) { const r = o.pend[k]; if (!r || !r.p || r.p.ve !== PR.VERSION || !(r.r > 0)) delete o.pend[k]; }
+        for (const k of Object.keys(o.pend)) { const r = o.pend[k]; if (!r || !r.p || !PR.VERSIONES.includes(r.p.ve) || !(r.r > 0)) delete o.pend[k]; }
         return o;
       }
     } catch (e) { /* sin almacenamiento disponible */ }

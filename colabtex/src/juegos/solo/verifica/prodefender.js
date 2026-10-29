@@ -33,7 +33,7 @@ export const UNA_PRUEBA = true;
 const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/;
 const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse',
   'necropolis', 'esporas', 'espejos', 'archipielago', 'noche'];
-const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-10';
+const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-11';
 const DESBLOQUEO = 50;   // levels.js: PD.UNLOCK_ROUND
 
 /* La prueba tal como se guarda (v: 2). El juego manda la de siempre (v: 1,
