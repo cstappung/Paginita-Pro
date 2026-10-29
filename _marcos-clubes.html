@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Marcos de club (vista previa)</title>
+<style>body{font:14px system-ui;margin:24px;background:#f4f6f8;color:#1b2430}h1{font-size:20px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}
+.c{background:#fff;border-radius:14px;padding:26px 14px 34px;display:flex;flex-direction:column;align-items:center;gap:30px;box-shadow:0 1px 4px #0001}
+.c b{font-size:13px}.chicos{display:flex;gap:22px;align-items:center}
+.oscuro{background:#141a24;color:#e8edf3}.oscuro .c{background:#1e2633}</style>
+<h1>Marcos de club · vista previa local</h1><p>Tamaños 112, 54, 32 y 20 px (perfil, editor, ranking, chip).</p>
+<div class="g" id="g"></div>
+<script>
+const CLUBES={realmadrid:"Real Madrid",barcelona:"Barcelona",manutd:"Manchester United",mancity:"Manchester City",chelsea:"Chelsea",liverpool:"Liverpool",tottenham:"Tottenham",arsenal:"Arsenal",betis:"Real Betis",psg:"PSG",como:"Como",inter:"Inter",roma:"Roma",napoli:"Napoli",dortmund:"Dortmund"};
+const FOTO="marca/paginita-pro-128.png";
+const av=(c,t)=>`<span class="jg-av jg-marco-club${c}" style="--c:#0d9488;--t:${t}px"><img src="${FOTO}" alt=""></span>`;
+fetch("juegos.html").then(r=>r.text()).then(h=>{
+  const st=document.createElement("style");st.textContent=[...new DOMParser().parseFromString(h,"text/html").querySelectorAll("style")].map(s=>s.textContent).join("\n");
+  document.head.prepend(st);
+  g.innerHTML=Object.entries(CLUBES).map(([k,n])=>`<div class="c">${av(k,112)}<div class="chicos">${av(k,54)}${av(k,32)}${av(k,20)}</div><b>${n}</b></div>`).join("");
+});
+</script>

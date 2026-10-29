@@ -427,7 +427,8 @@
      todo lo nuevo. */
   const ESPECIALES = [
     ["realmadrid", "mbappe-mvp", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "Real Madrid · MVP del Clásico", cinta: "MVP DEL CLÁSICO", especial: "clasico", limitada: true, peso: 3 }],
-    ["bayern", "harry-kane-balon", "Harry Kane", "DEL", 9, "ENG", { person: "bayern-harry-kane", sub: "Bayern Múnich · Balón de Oro", cinta: "BALÓN DE ORO 2026", especial: "balon", limitada: true, peso: 3 }]
+    ["bayern", "harry-kane-balon", "Harry Kane", "DEL", 9, "ENG", { person: "bayern-harry-kane", sub: "Bayern Múnich · Balón de Oro", cinta: "BALÓN DE ORO 2026", especial: "balon", limitada: true, peso: 3 }],
+    ["realmadrid", "mbappe-dictador", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "Real Madrid · Dictador", cinta: "DICTADOR", especial: "dictador", limitada: true, peso: 3 }]
   ];
   const CLUBES = {
     realmadrid: "Real Madrid", barcelona: "FC Barcelona",
@@ -450,7 +451,7 @@
       "trent": 86, "konate": 86, "cucurella": 84, "carreras": 80, "rudiger": 86,
       "mendy": 81, "dumfries": 84, "bellingham": 90, "camavinga": 83, "valverde": 89,
       "tchouameni": 84, "arda-guler": 81, "bernardo": 84, "vini-jr": 89,
-      "endrick": 77, "mbappe": 91, "mbappe-mvp": 92, "rodrygo": 85, "espi": 68, "brahim": 82,
+      "endrick": 77, "mbappe": 91, "mbappe-mvp": 92, "mbappe-dictador": 91, "rodrygo": 85, "espi": 68, "brahim": 82,
       "yan-diomande": 66
     },
     barcelona: {
@@ -575,7 +576,7 @@
       "carreras": "LI", "rudiger": "DFC", "mendy": "LI", "dumfries": "LD",
       "bellingham": "MC", "camavinga": "MC/LI", "valverde": "MC/LD", "tchouameni": "MC/DFC",
       "arda-guler": "MD/MC", "bernardo": "MC/MD", "vini-jr": "EI/DC", "endrick": "DC/ED",
-      "mbappe": "DC/EI", "mbappe-mvp": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
+      "mbappe": "DC/EI", "mbappe-mvp": "DC/EI", "mbappe-dictador": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
       "yan-diomande": "EI/ED"
     },
     barcelona: {
@@ -832,7 +833,8 @@
      siempre se agrega al final del catálogo. Con la lista vacía, todos los
      sobres ven todo. */
   // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }];
+  // Mbappé · Dictador (2026-10-29): las 813 de antes; mismo cuidado con la hora del corte.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793276830094, n: 813 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);

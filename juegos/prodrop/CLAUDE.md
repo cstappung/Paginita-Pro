@@ -142,7 +142,9 @@ other file of the site. Things that hold it together:
   and Bayern were left out because their sites block automated readers).
 - **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
-  Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the
+  Clásico, media 92, Mbappé · Dictador, media 91 like his base card, and Harry Kane ·
+  Balón de Oro, media 94). Each later batch of specials needs its own `AMPLIACIONES`
+  entry (the Dictador is the second one, `n: 813`). Row format as the
   others plus a 7th element `{ person, sub, cinta, especial, limitada, peso }`:
   `person` is the **same player's** (so the squad's no-repeat rule treats both as
   one; Kane's is `bayern-harry-kane`, the one his base card will have when the Bayern

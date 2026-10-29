@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "laboratorio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "colabtex",
+        "start"
+      ],
+      "port": 8123
+    },
+    {
+      "name": "futbol-prueba",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "/Users/jguerra/Desktop/dev/personal/Paginita-Pro/.claude/worktrees/futbol-coleccion/colabtex/server/static.js"
+      ],
+      "port": 8130,
+      "env": {
+        "PORT": "8130"
+      }
+    }
+  ]
+}

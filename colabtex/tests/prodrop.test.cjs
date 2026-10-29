@@ -14,13 +14,13 @@ const M=ctx.__M;
 const VE_TODO={mira:{at:1,por:'adm'}};
 M.fijaSerie1(VE_TODO,'mira');
 
-test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico, 155 de la Premier 163 de siete clubes de la Champions y las dos cartas especiales, una carta cada uno), con su imagen',()=>{
- assert.equal(PM.TOTAL,170+275+48+155+163+2);
- assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[217,87,41,23]);assert.equal(PM.POOL.futbol.tope,3);
- assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[217,87,41,23]);
+test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico, 155 de la Premier 163 de siete clubes de la Champions y las tres cartas especiales, una carta cada uno), con su imagen',()=>{
+ assert.equal(PM.TOTAL,170+275+48+155+163+3);
+ assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[217,87,41,24]);assert.equal(PM.POOL.futbol.tope,3);
+ assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[217,87,41,24]);
  assert.deepEqual(PM.POOL.futbol1.map(l=>l.length),[13,19,7,9],'el Clásico de antes: para rehacer sus sobres');
  // las de antes conservan su id: fútbol va después de todo
- assert.equal(PM.POR_COL.futbol.length,368);
+ assert.equal(PM.POR_COL.futbol.length,369);
  assert.ok(PM.POR_COL.futbol.every((c,i)=>c.n===445+i),'fútbol va después de todo: no mueve el id de nada');
  assert.ok(PM.POR_COL.futbol.slice(48,203).every(c=>/cards\/premier\//.test(c.img)),'los 155 de la Premier siguen con su id y su foto');
  assert.ok(PM.POR_COL.futbol.slice(203,366).every(c=>/cards\/champions\//.test(c.img)),'los de la Champions van después');
@@ -550,11 +550,11 @@ test('ampliaciones: un sobre g o h comprado antes sigue viendo solo las cartas d
  assert.equal(nuevasAntes,0,'un sobre de antes no ve las nuevas');
  assert.ok(nuevasDespues>500,'un sobre de ahora sí: '+nuevasDespues);
  assert.ok(PM.poolDe('g-N0',v.hasta-1).every(l=>l.every(c=>c.n<648)));
- assert.equal(PM.poolDe('g-N0').reduce((s,l)=>s+l.length,0),368,'sin hora: el catálogo de hoy');
+ assert.equal(PM.poolDe('g-N0').reduce((s,l)=>s+l.length,0),369,'sin hora: el catálogo de hoy');
 });
 
 test('cartas especiales por tiempo limitado: Mbappé (92) y Kane (94), legendarias, tres veces más seguido que otra legendaria',()=>{
- const [mb,kane]=PM.CARDS.slice(-2),base=PM.CARDS.find(c=>c.uid==='realmadrid-mbappe-legend'&&!c.especial);
+ const [mb,kane]=PM.CARDS.slice(813-2,813),base=PM.CARDS.find(c=>c.uid==='realmadrid-mbappe-legend'&&!c.especial);
  assert.equal(mb.name,'Mbappé');assert.equal(mb.media,base.media+1,'92: una más que el Mbappé de siempre');assert.equal(mb.tier,3);
  assert.match(mb.cinta,/MVP/);assert.equal(mb.especial,'clasico');
  assert.equal(kane.name,'Harry Kane');assert.equal(kane.media,94);assert.equal(kane.tier,3);assert.match(kane.cinta,/BAL/);assert.equal(kane.club,'bayern');assert.equal(kane.pais,'ENG');
@@ -580,6 +580,20 @@ test('cartas especiales por tiempo limitado: Mbappé (92) y Kane (94), legendari
  const arte=fs.readFileSync(path.join(__dirname,'..','src/juegos/novedades-arte.js'),'utf8');
  const medias=[...arte.matchAll(/media: (\d+)/g)].map(m=>+m[1]);
  assert.deepEqual(medias,[PM.CARDS.find(c=>c.person==='barcelona-lamine-yamal').media,mb.media,kane.media],'el banner muestra las medias de verdad');
+});
+
+test('Mbappé · Dictador: especial con la misma media que su carta normal, solo en los sobres desde su ampliación',()=>{
+ const d=PM.CARDS[813],base=PM.CARDS.find(c=>c.uid==='realmadrid-mbappe-legend'&&!c.especial);
+ assert.equal(PM.TOTAL,814);assert.equal(d.name,'Mbappé');assert.equal(d.especial,'dictador');assert.match(d.cinta,/DICTADOR/);
+ assert.equal(d.media,base.media,'la misma media que el Mbappé de siempre');assert.equal(d.tier,3);
+ assert.equal(d.person,base.person);assert.equal(d.liga,'especiales');assert.ok(d.limitada);assert.equal(d.peso,3);
+ assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',d.img)),'falta '+d.img);
+ const [a,b]=PM.AMPLIACIONES;
+ assert.equal(b.n,813);assert.ok(b.hasta>a.hasta);
+ assert.deepEqual(PM.poolDe('g-N0',b.hasta-1).map(l=>l.length),[217,87,41,23],'antes del corte: sin la nueva');
+ assert.deepEqual(PM.poolDe('h-N0',b.hasta).map(l=>l.length),[217,87,41,24]);
+ const cuenta=desde=>{let n=0;for(let i=0;i<4000;i++)if(PM.sobre('u'+(i%9),'g-Nd'+i+'abcdefg',desde+i).cartas.some(c=>c.id===813))n++;return n;};
+ assert.equal(cuenta(b.hasta-5000),0);assert.ok(cuenta(b.hasta)>0);
 });
 
 test('Premier: 155 jugadores de seis clubes con media, foto y rareza (ahora dentro del catálogo de fútbol)',()=>{

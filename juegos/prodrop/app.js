@@ -740,9 +740,9 @@ const SKIN = {
    centro], como los pinta `skin-fan`. `hub` es el acceso «Sobres de Fútbol».
    Los demás sobres sacan tres cartas buenas al azar. */
 const PORTADA = {
-  futbol: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-mvp']],
+  futbol: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
   futbolplus: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
-  hub: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-mvp']],
+  hub: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
 };
 // una carta de la portada: por jugador (`club-id`) o, si es una especial, por su archivo (`club-id-especial`)
 const cartaDePortada = (club, id) => CARDS.find(c => c.person === club + '-' + id) || CARDS.find(c => c.uid.startsWith(club + '-' + id + '-'));

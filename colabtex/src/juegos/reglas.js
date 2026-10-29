@@ -452,6 +452,29 @@ const REGLAS = {
       }
     }
   },
+  typerace: {
+    lema: "Carrera de mecanografía, como Monkeytype: de 1 a 10 corredores con el mismo texto.",
+    secciones: [
+      ["El texto", lista([
+        "Todos escriben <b>el mismo texto</b>. Quien abre la sala elige el <b>idioma</b> (español o inglés), si el español va <b>con o sin tildes</b>, y de qué está hecho: <b>palabras al azar</b> (como Monkeytype), <b>frases y refranes</b> o <b>cuentos</b> cortos.",
+        "El <b>largo</b> es de 10, 25, 50, 100 o 200 palabras, o <b>libre</b>: un texto que no se acaba, y entonces manda el reloj.",
+        "Sin tildes, «canción» se escribe «cancion»; la ñ se queda, porque es una letra."
+      ])],
+      ["Escribir", lista([
+        "Tras la cuenta atrás de 3 segundos, escribe. Cada letra bien puesta se pinta; la que no, en rojo.",
+        "El <b>espacio</b> cierra la palabra, esté bien o mal, y pasa a la siguiente. Una palabra mal escrita queda subrayada y se puede volver a ella con <b>borrar</b> (las bien escritas ya no se tocan).",
+        "La última palabra se cierra sola en cuanto queda bien: no hace falta espacio al final."
+      ])],
+      ["La pista", "Arriba corre un carril por corredor, con su foto: avanza con lo que lleva escrito y dice sus <b>ppm</b> (palabras por minuto, de cinco letras cada una, contando solo las palabras bien escritas)."],
+      ["Cómo se acaba", lista([
+        "<b>Hasta que todos terminen</b>: cada uno corre hasta el final y gana quien llegó primero.",
+        "<b>Termina el primero y se acaba</b>: en cuanto alguien termina el texto, los demás quedan donde iban.",
+        "<b>Con límite de tiempo</b> (de 15 s a 3 min): al sonar el reloj todos se detienen. Gana quien llegó a la meta antes, o si nadie llegó, quien más escribió bien (a igualdad, con menos errores)."
+      ])],
+      ["Solo", "Con un solo corredor, el anfitrión pulsa <b>Empezar</b> y corre contra el reloj: sirve para entrenar y no cuenta para la clasificación. También está la <b>práctica</b> de la portada, que no necesita cuenta y guarda tu récord en este navegador."],
+      ["Lo que no se ve", "Cada uno escribe en su navegador y manda su resultado: no hay un servidor que lo arbitre, así que es un juego entre amigos."]
+    ]
+  },
   memazo: {
     lema: "Memes con amigos: de 2 a 10 jugadores, gana quien saque más risas.",
     secciones: [
