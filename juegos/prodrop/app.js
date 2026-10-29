@@ -814,7 +814,8 @@ const Estadio = (() => {
 const FASES_ESTADIO = ['tienda', 'pack', 'opening', 'reveal', 'summary'];
 const setPhase = p => {
   phase = p; document.body.dataset.phase = p;
-  if (FASES_ESTADIO.includes(p) && esFutbolPack(coleccion)) Estadio.prende(); else Estadio.apaga();
+  // también el menú de Sobres de Fútbol (normal y Plus) va con el estadio detrás
+  if ((FASES_ESTADIO.includes(p) && esFutbolPack(coleccion)) || (p === 'elige' && menuActual === 'futbol')) Estadio.prende(); else Estadio.apaga();
 };
 const hint = txt => { $('#hint').textContent = txt; };
 
@@ -1152,16 +1153,21 @@ function abreExtras() {
 }
 
 /* ---------------- WALKOUT (fútbol) ----------------
-   La mejor carta del sobre sale por el pasillo a la cancha (walkout.js):
-   completo para legendarias, especiales y leyendas, corto para épicas;
-   lo demás se da vuelta como siempre. */
+   La mejor carta del sobre sale por el pasillo a la cancha (walkout.js)
+   si es legendaria, especial, leyenda o épica de media 86 o más. Es el
+   mismo para todas, y neutro
+   hasta la carta (solo una pista de su color, medio segundo, abajo): si
+   cambiara con la rareza, se sabría antes de tiempo. Lo demás se da
+   vuelta como siempre. */
 const valorWalkout = c => (c.leyenda || c.especial ? 4 : c.tier) * 1000 + (c.media || 0);
-const nivelWalkout = c => (!c || !M.esFutbol(c.col) ? '' : c.tier >= 3 ? 'completo' : c.tier === 2 ? 'corto' : '');
-const sonidoWalkout = n => {
+// legendarias, especiales y leyendas siempre; una épica solo con media 86 o más (ya casi legendaria)
+const MEDIA_WALKOUT_EPICA = 86;
+const nivelWalkout = c => (c && M.esFutbol(c.col) && (c.tier >= 3 || (c.tier === 2 && c.media >= MEDIA_WALKOUT_EPICA)) ? 'completo' : '');
+const sonidoWalkout = (n, tier) => {
   if (n === 'tunel') { Snd.noise({ d: 3.2, v: .06, f: 180, q: .6, type: 'lowpass' }); for (let i = 0; i < 6; i++) Snd.noise({ t: .25 + i * .42, d: .07, v: .05, f: 900, q: 1.5 }); }
   else if (n === 'salida') { Snd.noise({ d: 4.5, v: .16, f: 700, to: 1100, q: .5 }); Snd.noise({ t: .2, d: 3.8, v: .08, f: 2400, q: .8 }); Snd.tone(55, { d: 1.2, v: .3, to: 30 }); }
   else if (n === 'paso') { Snd.tone(70, { d: .5, v: .32, to: 38 }); Snd.noise({ d: .25, v: .1, f: 1400, to: 300, type: 'lowpass' }); }
-  else if (n === 'carta') { Snd.reveal(3); Snd.noise({ d: 2.6, v: .14, f: 900, q: .5 }); }
+  else if (n === 'carta') { Snd.reveal(tier); Snd.noise({ d: 2.6, v: .14, f: 900, q: .5 }); }
 };
 async function walkout(el) {
   const c = el.card, nivel = nivelWalkout(c);
@@ -1174,7 +1180,7 @@ async function walkout(el) {
     rareza: `${rareza(c).label.toUpperCase()} ${rareza(c).sym}`,
     bandera: { img: bandera(c.pais), nombre: FUT_PAIS[c.pais] || (c.leyenda ? c.sub : c.pais) },
     posicion: c.posiciones[0], club: c.club ? { img: escudo(c.club), nombre: M.CLUBES[c.club] } : null,
-    cinta: c.cinta || '', carta, sonido: sonidoWalkout,
+    cinta: c.cinta || '', carta, sonido: n => sonidoWalkout(n, c.tier),
   });
   Estadio.pausa(false);
   return true;

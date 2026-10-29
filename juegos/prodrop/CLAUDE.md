@@ -274,15 +274,20 @@ other file of the site. Things that hold it together:
 - **Football walkout** (`walkout.js`, plain; the 3D scene `walkout3d.js` is **built** from
   `colabtex/src/prodrop/walkout3d.js` by `npm run build:walkout`, part of `npm run build`, and
   imported lazily with the frame's `?v=`). In a football pack the best card of all the packs
-  (`valorWalkout`: special/legend > tier > media) goes first in `pull`, and if it is épica or better
+  (`valorWalkout`: special/legend > tier > media) goes first in `pull`, and if it is legendaria,
+  especial, leyenda or an épica with media ≥ 86 (`MEDIA_WALKOUT_EPICA`; lower épicas flip as before)
   `openPack` plays `WALKOUT.jugar` before flipping it (`reveal(el, true)` skips `REVELA.antes`):
-  `completo` (tier 3: concrete tunnel, exit to a stadium with crowd, flashes and fireworks, then flag,
-  position, crest — or ♛ for legends — and the card) or `corto` (épica: end of the tunnel, flag,
-  crest, card). Rara and común flip as before. **Only the «Saltar» button** skips (to the card, then ends): taps
+  always the same walkout (concrete tunnel, exit to a stadium with crowd and flashes, then flag,
+  position, crest — or ♛ for legends — and the card, with fireworks). **It is identical for épica,
+  legendaria, especial and leyenda and neutral (`--wn`, scene colour `NEUTRO`) until the card**, so
+  the tunnel never gives the rarity away (the owner asked: a shorter épica walkout spoiled it). The
+  only hint is `.wo-pista`: a 3 px line of the card's colour at the bottom for half a second at the
+  first step. At the card the scene is tinted (`escena.tinta`). Rara and común flip as before. **Only the «Saltar» button** skips (to the card, then ends): taps
   elsewhere and keys are swallowed, because people tap a lot while opening. After a walkout the flip
   makes no sound (`reveal(el, true)`): the walkout already played it.
-  **Stadium background** (`Estadio` in `app.js`, `crearFondo` in walkout3d.js): football packs go
-  through `tienda`, `pack`, `opening`, `reveal` and `summary` with the stadium behind (`#estadio`, a
+  **Stadium background** (`Estadio` in `app.js`, `crearFondo` in walkout3d.js): the «Sobres de Fútbol» menu
+  (`elige` with `menuActual === 'futbol'`) and football packs through `tienda`, `pack`, `opening`,
+  `reveal` and `summary` have the stadium behind (`#estadio`, a
   dark vignette on top; CSS stadium without WebGL), paused during a walkout; an épica or better
   tints its light beam and fires fireworks (`Estadio.celebra`).
   No WebGL, reduced motion or a failed import → the CSS tunnel (`.es-2d`), same steps. All

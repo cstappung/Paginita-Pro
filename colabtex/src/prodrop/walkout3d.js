@@ -295,7 +295,7 @@ export function crear(canvas, o = {}) {
     renderer.dispose();
     try { renderer.forceContextLoss(); } catch {}
   }
-  return { cuadro, tamano, fuegos: est.fuegos, fin };
+  return { cuadro, tamano, fuegos: est.fuegos, tinta: est.tinta, fin };
 }
 
 /* El fondo de los sobres de fútbol: el mismo estadio, sin pasillo, con la

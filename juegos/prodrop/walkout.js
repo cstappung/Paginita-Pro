@@ -23,6 +23,8 @@
     if (!cargando) cargando = import('./walkout3d.js' + (V ? '?v=' + V : '')).then(m => (modulo = m)).catch(() => null);
     return cargando;
   }
+  // el color del pasillo y del estadio hasta la carta: el mismo para toda rareza, para no adelantar nada
+  const NEUTRO = '#bcd4ff';
   const espera = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
 
   // los tiempos (segundos) de cada paso
@@ -52,6 +54,7 @@
     const cv = el('canvas', 'wo-cv');
     const dosD = el('div', 'wo-2d', '<div class="wo-pasillo">' + '<i></i>'.repeat(9) + '</div><div class="wo-estadio"></div>');
     const flash = el('div', 'wo-flash');
+    const pista = el('div', 'wo-pista');
     const capa = el('div', 'wo-capa');
     const paso = {
       bandera: el('div', 'wo-paso wo-bandera', `<img src="${esc(o.bandera.img)}" alt=""><b translate="no">${esc(o.bandera.nombre)}</b>`),
@@ -66,13 +69,13 @@
     const saltar = el('button', 'wo-saltar', 'Saltar ›'); saltar.type = 'button';
     Object.values(paso).forEach(p => p && capa.appendChild(p));
     capa.append(rz, cartaBox);
-    raiz.append(m ? cv : dosD, flash, capa, saltar);
+    raiz.append(m ? cv : dosD, flash, pista, capa, saltar);
     document.body.appendChild(raiz);
 
     let escena = null;
     if (m) {
       try {
-        escena = m.crear(cv, { color: o.color, color2: o.color2, tunel: g.tunel, desde: g.desde });
+        escena = m.crear(cv, { color: NEUTRO, color2: '#ffffff', tunel: g.tunel, desde: g.desde });
         const ajusta = () => escena && escena.tamano(innerWidth, innerHeight);
         ajusta(); addEventListener('resize', ajusta); raiz._ajusta = ajusta;
       } catch { escena = null; cv.replaceWith(dosD); }
@@ -84,6 +87,8 @@
       const vistos = new Set();
       const s = n => { try { o.sonido && o.sonido(n); } catch {} };
       s('tunel');
+      // la pista: al primer paso, medio segundo, una línea del color de la carta abajo
+      setTimeout(() => { if (!hecho) pista.classList.add('on'); }, 450);
       const termina = () => {
         if (hecho) return; hecho = true;
         cancelAnimationFrame(raf);
@@ -126,7 +131,7 @@
         if (!mostrada && t >= g.carta) {
           mostrada = true; raiz.classList.add('carta'); s('carta');
           flash.animate([{ opacity: 0 }, { opacity: .8, offset: .2 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
-          if (escena && !fuegos) { fuegos = true; escena.fuegos(o.nivel === 'corto' ? 4 : 12); }
+          if (escena && !fuegos) { fuegos = true; if (escena.tinta) escena.tinta(o.color); escena.fuegos(12); }
         }
         if (t >= g.fin) return termina();
         raf = requestAnimationFrame(cuadro);
