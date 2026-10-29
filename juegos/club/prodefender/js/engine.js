@@ -87,6 +87,7 @@
   // Jefes desde la versión 5 (pedido del dueño): x20 de vida y un tercio de la velocidad, para que
   // se sientan como una marcha lenta que hay que frenar entre todas las torres.
   const JEFE = { vida: 20, vel: 1 / 3 };
+  PD.JEFE = JEFE;   // el bot lo cambia para medir (--jefe vida,vel)
   // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
   // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
   const PURGA = { dur: 2.5, hp: 0.5 };
