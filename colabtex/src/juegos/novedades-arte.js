@@ -357,11 +357,13 @@ const ESTRELLAS_FUTBOL = [
   { img: "especiales/realmadrid/mbappe-mvp", nombre: "Mbappé", media: 92, cinta: "MVP DEL CLÁSICO" },
   { img: "futbol/realmadrid/bellingham", nombre: "Bellingham", media: 90, cinta: "" },
   { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" },
-  { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 90, cinta: "" },
+  { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 91, cinta: "" },
   { img: "champions/intermiami/lionel-messi", nombre: "Messi", media: 89, cinta: "" },
   { img: "champions/alnassr/cristiano-ronaldo", nombre: "C. Ronaldo", media: 84, cinta: "" },
   { img: "especiales/alnassr/cristiano-balon-all-time", nombre: "C. Ronaldo", media: 96, cinta: "BOAT" },
-  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 89, cinta: "" }
+  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 90, cinta: "" },
+  { img: "leyendas/maradona", nombre: "Maradona", media: 95, cinta: "" },
+  { img: "leyendas/ronaldinho", nombre: "Ronaldinho", media: 93, cinta: "" }
 ];
 // las especiales más una estrella al azar, barajadas: [{...carta}] de cuatro
 function manoFutbol(azar = Math.random) {

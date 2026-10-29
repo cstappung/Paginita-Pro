@@ -124,7 +124,11 @@ const subtitle = c => M.subtitulo(c);
    Balón de Oro) se ven como «Especial», aunque para el motor (sobres,
    probabilidades, re-roll) sigan siendo legendarias. */
 const ESPECIAL = { key: 'especial', label: 'Especial', sym: '✦', color: '#ffd23d' };
-const rareza = c => (c.especial ? ESPECIAL : TIERS[c.tier]);
+// las leyendas son otra categoría: también legendarias para el motor, pero salen como «Leyenda»
+const LEYENDA = { key: 'leyenda', label: 'Leyenda', sym: '♛', color: '#e8c36a' };
+const rareza = c => (c.leyenda ? LEYENDA : c.especial ? ESPECIAL : TIERS[c.tier]);
+// el lugar de una carta de fútbol entre los clubes: las leyendas (sin club) van al final
+const ixClub = (ordenClub, c) => (c.leyenda ? ordenClub.length : ordenClub.indexOf(c.club));
 // Colores dominantes de cada imagen épica/legendaria (extraídos de las imágenes)
 const PAL = {"angel-abusleme-gta":["#066cf7","#ffe871","#f7461f"],"angel-abusleme-shiny":["#42f77c","#f79963"],"christian-oberli-gta":["#67abf7","#fff27b","#f73618"],"christian-oberli-shiny":["#ff7b86","#f7dd78"],"claudia-prieto-gta":["#ff4c61","#71efff","#ff6300"],"claudia-prieto-shiny":["#f72000","#ffb90c"],"cristian-garces-gta":["#59d7ff","#f72a0f","#ffdb53"],"cristian-garces-shiny":["#64bcf7","#f774a5"],"cristian-tejos-gta":["#77d9ff","#f76203","#7183f7"],"cristian-tejos-shiny":["#f7cd00","#6fa3f7","#f7483c"],"david-watts-gta":["#74ddff","#ffdf6b","#f74134"],"david-watts-shiny":["#f77300"],"felipe-nunez-gta":["#6eb0f7","#ffde7c","#f76183"],"felipe-nunez-shiny":["#09ecf7","#f720d2","#205cf7"],"felix-rojasv2-gta":["#6ad4ff","#6a87f7","#f7d263"],"felix-rojasv2-shiny":["#9e4bf7","#f76177","#f76fde"],"javier-pereda-torres-gta":["#46daff","#5e8ef7","#ffde65"],"javier-pereda-torres-shiny":["#114bf7","#8720f7","#ff5e58"],"marilyn-cruces-gta":["#00e7ff","#ff8900","#ebf765"],"marilyn-cruces-shiny":["#00bbf7","#f72514","#6990f7"],"mario-gac-gta":["#3be0ff","#f7da5c","#f75344"],"mario-gac-shiny":["#f7695b"],"miguel-gutierrez-gta":["#ffdf72","#f75c4f"],"miguel-gutierrez-shiny":["#f70075","#3102f7","#15f700"],"pablo-irarrazaval-gta":["#64a4f7","#ffdf6a","#f72518"],"pablo-irarrazaval-shiny":["#75f700","#00c3f7","#f7cb17"],"rene-botnar-gta":["#58a4f7","#ffdb5d","#f73c2b"],"rene-botnar-shiny":["#f76c00","#f7000c"],"rodrigo-cadiz-gta":["#57e1ff","#ffde65","#f7311d"],"rodrigo-cadiz-shiny":["#00c7f7","#3e79f7","#00f78f"],"rolando-dunner-gta":["#57a5f7","#f7d157","#f76274"],"rolando-dunner-shiny":["#ff798b","#f7d44e"],"tito-arevalo-gta":["#f7425a","#ffdd60","#85d7ff"],"tito-arevalo-shiny":["#f83c44","#85ffeb"],"angel-abusleme-casino":["#f78347"],"christian-oberli-casino":["#f7875e","#f741c5"],"claudia-prieto-casino":["#f79c63"],"cristian-garces-casino":["#f79463"],"cristian-tejos-casino":["#f79863","#3780f7"],"david-watts-casino":["#f79960"],"felipe-nunez-casino":["#f77644"],"felix-rojasv2-casino":["#f79763","#f752bb"],"javier-pereda-torres-casino":["#f7915d"],"marilyn-cruces-casino":["#f78351"],"mario-gac-casino":["#f76d29"],"miguel-gutierrez-casino":["#46b5f7","#c356f7","#f78163"],"pablo-irarrazaval-casino":["#f79657"],"rene-botnar-casino":["#f79863","#5495f7"],"rodrigo-cadiz-casino":["#f79a63"],"rolando-dunner-casino":["#f79a56"],"tito-arevalo-casino":["#f78d5e"],"angel-abusleme-cyberpunk":["#4d92f7","#f78563"],"christian-oberli-cyberpunk":["#f78852","#5dd2f7"],"claudia-prieto-cyberpunk":["#f78663","#f763d2","#8a63f7"],"cristian-garces-cyberpunk":["#f79063","#7cf763"],"cristian-tejos-cyberpunk":["#f79063","#6397f7","#63f7eb"],"david-watts-cyberpunk":["#f79963"],"felipe-nunez-cyberpunk":["#f77c5f"],"felix-rojasv2-cyberpunk":["#f78d5d","#4dd1f7"],"javier-pereda-torres-cyberpunk":["#f78e5a","#6394f7"],"marilyn-cruces-cyberpunk":["#f77d63","#639bf7"],"mario-gac-cyberpunk":["#f79d5b"],"miguel-gutierrez-cyberpunk":["#f78963","#c158f7","#e7f74f"],"pablo-irarrazaval-cyberpunk":["#f79163","#63d8f7"],"rene-botnar-cyberpunk":["#f78263","#63bef7"],"rodrigo-cadiz-cyberpunk":["#f7885c","#cd5bf7"],"rolando-dunner-cyberpunk":["#637af7"],"tito-arevalo-cyberpunk":["#f77a63","#c263f7"],"angel-abusleme-starwars":["#ed6822"],"christian-oberli-starwars":["#eb7113"],"claudia-prieto-starwars":["#f0764b"],"cristian-garces-starwars":["#ef8043"],"cristian-tejos-starwars":["#f0944b"],"david-watts-starwars":["#f08f4b"],"felipe-nunez-starwars":["#eb4f13"],"felix-rojasv2-starwars":["#eb131e"],"javier-pereda-torres-starwars":["#f0884b"],"marilyn-cruces-starwars":["#1363eb"],"mario-gac-starwars":["#f09049"],"miguel-gutierrez-starwars":[],"pablo-irarrazaval-starwars":["#ed4f20"],"rene-botnar-starwars":[],"rodrigo-cadiz-starwars":[],"rolando-dunner-starwars":[],"tito-arevalo-starwars":["#ed5026","#eb1315"],"resistencia-halloween":["#f64608"],"condensador-electrolitico-halloween":["#eb2e13","#ebf04b"],"inductor-toroidal-halloween":["#eb5713"],"led-halloween":["#eb3513","#eb1329"],"transistor-bjt-halloween":["#eb3d13"],"mosfet-potencia-halloween":["#eb4413"],"timer-555-halloween":["#eb5613"],"microcontrolador-halloween":["#eb5913"],"fotoresistencia-ldr-halloween":["#eb3313","#f0a24b"],"sensor-ultrasonico-halloween":["#eb4013"],"condensador-ceramico-halloween":["#eb5113"],"potenciometro-halloween":["#eb5013"],"cristal-oscilador-halloween":["#eb131e","#f08e47","#eb1713"],"diodo-rectificador-halloween":["#eb4e13"],"mosfet-sic-to247-halloween":["#eb5a13"],"gate-driver-halloween":["#eb4813"],"amplificador-operacional-halloween":["#eb4413"],"regulador-7805-halloween":["#ed8a25","#9ceb13"],"esp32-halloween":["#eb2213","#f0b44b"],"transformador-laminado-halloween":["#ec7f1b"],"transformador-ferrita-halloween":["#edef43","#eb4e13"],"sensor-temperatura-humedad-halloween":["#ec4819"],"sensor-pir-halloween":["#f08a4b","#eb1318"],"rele-halloween":["#076ef7","#eb3713","#eb131d"],"sensor-imu-halloween":["#eb4413","#fab041"],"resistencia-dieciochero":["#eb5113","#499cf0","#eba313"],"condensador-electrolitico-dieciochero":["#eb5113"],"inductor-toroidal-dieciochero":["#eb5e13","#eb131a"],"led-dieciochero":["#eb6a13","#f30e0b"],"transistor-bjt-dieciochero":["#f0984b","#eb1314"],"mosfet-potencia-dieciochero":["#f09c4b","#eb131c"],"timer-555-dieciochero":["#f09c4b","#4b96f0","#eb1913"],"microcontrolador-dieciochero":["#f0944b","#ec2716","#eb1318"],"fotoresistencia-ldr-dieciochero":["#f0924b","#4b90f0"],"sensor-ultrasonico-dieciochero":["#eb3d13","#4b92f0"],"condensador-ceramico-dieciochero":["#f0924b"],"potenciometro-dieciochero":["#ee8139"],"cristal-oscilador-dieciochero":["#eb5a13"],"diodo-rectificador-dieciochero":["#eb6b13","#4396ef"],"mosfet-sic-to247-dieciochero":["#f09e4b","#eb1315"],"gate-driver-dieciochero":["#eb5813","#eb1317"],"amplificador-operacional-dieciochero":["#f0994b","#eb131a"],"regulador-7805-dieciochero":["#eb4b13"],"esp32-dieciochero":["#f09a4b","#eb1315"],"transformador-laminado-dieciochero":["#eb8913","#eb2913","#eb1317"],"transformador-ferrita-dieciochero":["#eb5413","#f0cf4b"],"sensor-temperatura-humedad-dieciochero":["#ed4925"],"sensor-pir-dieciochero":["#ebb013","#eb131a","#eb2513"],"rele-dieciochero":["#f0a04b","#047efa","#eb2a13"],"sensor-imu-dieciochero":["#096ef5","#f83233","#ec3f1a"],"resistencia-arcano":["#eb4c13"],"condensador-electrolitico-arcano":["#eb5d13","#1330eb"],"inductor-toroidal-arcano":["#f0874b","#4b71f0"],"led-arcano":["#eb5f13"],"transistor-bjt-arcano":["#ee7134"],"mosfet-potencia-arcano":["#eb5e13"],"timer-555-arcano":["#ec781e"],"microcontrolador-arcano":["#ef803d"],"fotoresistencia-ldr-arcano":["#f08949"],"sensor-ultrasonico-arcano":["#2865ed","#eb6a13"],"condensador-ceramico-arcano":["#ec791e"],"potenciometro-arcano":["#eb5c13"],"cristal-oscilador-arcano":[],"diodo-rectificador-arcano":["#eb4e13"],"mosfet-sic-to247-arcano":["#eb5b13"],"gate-driver-arcano":["#ec7d20","#1352eb"],"amplificador-operacional-arcano":["#eb5d13"],"regulador-7805-arcano":["#eb5813"],"esp32-arcano":["#f0994b"],"transformador-laminado-arcano":["#f0ac4a","#1351eb"],"transformador-ferrita-arcano":["#c544ef","#f04b64","#fcd53f"],"sensor-temperatura-humedad-arcano":["#f07e4b","#eb1324"],"sensor-pir-arcano":["#eb4313","#eb1319"],"rele-arcano":["#1373eb","#eb6013"],"sensor-imu-arcano":["#ed8a23","#1366eb"],"resistencia-quemado":["#eb3813"],"condensador-electrolitico-quemado":["#eb3213"],"inductor-toroidal-quemado":["#eb1f13"],"led-quemado":["#eb1913","#eb1328"],"transistor-bjt-quemado":["#eb2213"],"mosfet-potencia-quemado":["#eb1813"],"timer-555-quemado":["#eb2813"],"microcontrolador-quemado":[],"fotoresistencia-ldr-quemado":["#eb3913"],"sensor-ultrasonico-quemado":["#eb1e13"],"condensador-ceramico-quemado":["#eb4213","#eb131c"],"potenciometro-quemado":[],"cristal-oscilador-quemado":["#eb3c13"],"diodo-rectificador-quemado":["#eb1330"],"mosfet-sic-to247-quemado":[],"gate-driver-quemado":[],"amplificador-operacional-quemado":["#eb4c13"],"regulador-7805-quemado":["#eb4313"],"esp32-quemado":["#eb5913"],"transformador-laminado-quemado":["#eb4513"],"transformador-ferrita-quemado":["#eb9413","#eb4413"],"sensor-temperatura-humedad-quemado":["#f0a24b","#eb3513"],"sensor-pir-quemado":["#eb5b13"],"rele-quemado":["#1374eb","#eb131f"],"sensor-imu-quemado":["#eb1713"],"resistencia-navidad":["#f0604b","#1367eb"],"condensador-electrolitico-navidad":["#eb7313","#eb1c13"],"inductor-toroidal-navidad":["#eb6013"],"led-navidad":["#eb7613","#eb2213"],"transistor-bjt-navidad":["#f0904b","#eb1e13"],"mosfet-potencia-navidad":["#eb5213"],"timer-555-navidad":["#eb5713"],"microcontrolador-navidad":["#ec6a17"],"fotoresistencia-ldr-navidad":["#eb5a13"],"sensor-ultrasonico-navidad":["#eb5e13"],"condensador-ceramico-navidad":["#eb8213","#eb2513"],"potenciometro-navidad":["#eb7013"],"cristal-oscilador-navidad":[],"diodo-rectificador-navidad":["#eb6013"],"mosfet-sic-to247-navidad":["#138beb","#f0824b"],"gate-driver-navidad":["#eb5d13"],"amplificador-operacional-navidad":["#f0864b","#eb1314"],"regulador-7805-navidad":["#eb5513"],"esp32-navidad":["#f0964b","#eb2413"],"transformador-laminado-navidad":["#efa844","#ec2112"],"transformador-ferrita-navidad":["#f0514b","#fddc3e","#f0954b"],"sensor-temperatura-humedad-navidad":["#eb3813"],"sensor-pir-navidad":["#f07e4b"],"rele-navidad":["#067cf8","#ee8131","#eb1a13"],"sensor-imu-navidad":["#eb5813","#1375eb"]};
 const paletteOf = c => {
@@ -274,14 +278,14 @@ function frontHTML(c, lazy) {
   // fútbol: la foto entera y abajo el nombre con el tipo (Base), sin rareza
   // fútbol: la foto entera y abajo el nombre con su rareza; los efectos crecen con ella
   if (M.esFutbol(c.col)) {
-    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}${c.especial ? ' especial esp-' + c.especial : ''}" style="--accent:${accentOf(c)}">
+    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}${c.especial ? ' especial esp-' + c.especial : ''}${c.leyenda ? ' leyenda' : ''}" style="--accent:${accentOf(c)}">
       <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
       ${c.tier >= 2 ? `<div class="holo"><img src="${c.img}" alt="" draggable="false"${ld}></div><div class="glitter"></div>` : ''}
       ${c.tier >= 1 ? '<div class="sweep"></div>' : ''}<div class="glare"></div>
       <div class="fu-top"><span class="fu-pos" title="${c.posiciones.map(p => M.PUESTO[p]).join(' / ')}">${c.posiciones.join(' · ')}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
       ${c.cinta ? `<span class="fu-cinta">${c.cinta}</span>` : ''}
       ${wearHTML(c)}
-      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${rareza(c).label} ${rareza(c).sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
+      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${rareza(c).label} ${rareza(c).sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false">${c.club ? `<img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false">` : ''}</span></div>
       <i class="fu-marco"></i>
     </div>`;
   }
@@ -848,7 +852,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Nuevos: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
+  futbol: 'Nuevo: el Atlético de Madrid, el AC Milan y las medias de FC 27. Ya llegaron: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Y las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y 38 más. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -890,7 +894,7 @@ function eligeSobre(menu = 'todos') {
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
       <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i><i class="hub-liga"><img src="flags/cl.png" alt="">LIGA CHILENA</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Nuevo: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time</small>
+      <small class="ch-temas">Nuevo: el Atlético de Madrid, el AC Milan y las medias de FC 27. Antes: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Figueroa y más</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -1653,8 +1657,8 @@ function renderCollection() {
      alta: así cada equipo sale entero una sola vez. Las demás colecciones
      siguen por rareza y, dentro, por variante o temática. */
   const fut = M.esFutbol(colCol);
-  const filtros = [[-1, 'Todas', '', '#fff'], ...TIERS.map((t, i) => [i, t.label, t.sym, t.color]), ...(fut ? [[4, ESPECIAL.label, ESPECIAL.sym, ESPECIAL.color]] : [])];
-  const pasa = (c, f) => f < 0 || (fut ? (f === 4 ? !!c.especial : !c.especial && c.tier === f) : c.tier === f);
+  const filtros = [[-1, 'Todas', '', '#fff'], ...TIERS.map((t, i) => [i, t.label, t.sym, t.color]), ...(fut ? [[4, ESPECIAL.label, ESPECIAL.sym, ESPECIAL.color], [5, LEYENDA.label, LEYENDA.sym, LEYENDA.color]] : [])];
+  const pasa = (c, f) => f < 0 || (fut ? (f === 4 ? !!c.especial : f === 5 ? !!c.leyenda : !c.especial && !c.leyenda && c.tier === f) : c.tier === f);
   if (!filtros.some(([i]) => i === colFilter)) colFilter = -1;
   $('#colFilters').innerHTML = filtros.map(([i, l, s, color]) => {
       const n = todas.filter(c => pasa(c, i) && col[c.uid]).length, tot = todas.filter(c => pasa(c, i)).length;
@@ -1664,16 +1668,16 @@ function renderCollection() {
   const grid = $('#colGrid'); grid.innerHTML = '';
   const ordenClub = Object.keys(M.CLUBES);
   const lista = todas.filter(c => pasa(c, colFilter)).sort(fut
-    ? (a, b) => ordenClub.indexOf(a.club) - ordenClub.indexOf(b.club) || a.media - b.media || a.n - b.n
+    ? (a, b) => ixClub(ordenClub, a) - ixClub(ordenClub, b) || a.media - b.media || a.n - b.n
     : (a, b) => a.tier - b.tier || a.n - b.n);
-  const claveSec = c => (fut ? c.club : c.vkey);
+  const claveSec = c => (fut ? (c.leyenda ? 'leyendas' : c.club) : c.vkey);
   let seccion = '';
   lista.forEach(c => {
     if (claveSec(c) !== seccion) {
       seccion = claveSec(c);
       const de = lista.filter(x => claveSec(x) === seccion), n = de.filter(x => col[x.uid]).length;
       grid.insertAdjacentHTML('beforeend', fut
-        ? `<h3 class="col-sec club"><img src="${escudo(c.club)}" alt="">${esc(M.CLUBES[c.club])}<small>${colFilter < 0 ? '' : filtros.find(([i]) => i === colFilter)[1] + ' · '}${n}/${de.length}</small></h3>`
+        ? `<h3 class="col-sec club${c.leyenda ? ' leyendas' : ''}">${c.leyenda ? '<i class="col-corona">♛</i>' : `<img src="${escudo(c.club)}" alt="">`}${esc(c.leyenda ? 'Leyendas' : M.CLUBES[c.club])}<small>${colFilter < 0 ? '' : filtros.find(([i]) => i === colFilter)[1] + ' · '}${n}/${de.length}</small></h3>`
         : `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
     }
     if (col[c.uid]) {
@@ -1729,7 +1733,7 @@ function vistaRerollFutbol(lista) {
   const cmp = {
     media: (a, b) => b.media - a.media,
     mediaAsc: (a, b) => a.media - b.media,
-    club: (a, b) => ordenClub.indexOf(a.club) - ordenClub.indexOf(b.club) || b.media - a.media
+    club: (a, b) => ixClub(ordenClub, a) - ixClub(ordenClub, b) || b.media - a.media
   }[rr.orden] || (() => 0);
   // dentro del mismo jugador, las graduadas primero y de mayor nota
   return v.sort((x, y) => { const a = CARDS[x.id], b = CARDS[y.id]; return cmp(a, b) || a.name.localeCompare(b.name) || a.n - b.n || (y.gr - x.gr) || ((y.gr ? y.g : 0) - (x.gr ? x.g : 0)); });
@@ -1738,7 +1742,7 @@ const keyDe = cp => cp.key;
 // las rarezas que se pueden re-rollear: todas bajo la más alta de la colección (fútbol no tiene legendarias)
 const rrTiers = (co = rr.col) => [0, 1, 2].filter(i => i < M.POOL[co].tope);
 // lo que se puede meter: mis copias de esa rareza y esa colección que no están a la venta
-const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && CARDS[cp.id].col === co && !cp.venta);
+const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => M.tierEn(CARDS[cp.id], ahora()) === t && CARDS[cp.id].col === co && !cp.venta);
 /* El orden en que «Elegir automático» las toma: primero las repetidas (de
    cada carta se guarda la mejor), las sin graduar antes que las graduadas,
    y de las graduadas las de nota más baja; las exhibidas al final. */
@@ -1915,10 +1919,17 @@ $('#rlRapido').onclick = cambiaRapido;
 pintaRapido();
 /* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
    cuando de las de más arriba, que es lo que da el «casi» al pasar. */
-function cartaTira(base) {
-  const x = Math.random(), t = Math.min(M.POOL[rl.col].tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POOL[rl.col][t];
-  return l[Math.floor(Math.random() * l.length)].n;
+function cartaTira(base, sinRaras) {
+  const P = M.POOL[rl.col], x = Math.random(), t = Math.min(P.tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2));
+  let l = P[t];
+  // las especiales y las leyendas salen poco: en la tira, con los pesos del re-roll y nunca más de tres
+  if (sinRaras) { const comunes = l.filter(c => !c.especial && !c.leyenda); if (comunes.length) l = comunes; }
+  let k = Math.random() * l.reduce((s, c) => s + P.pesoRerollDe(c), 0);
+  for (const c of l) { k -= P.pesoRerollDe(c); if (k < 0) return c.n; }
+  return l[l.length - 1].n;
 }
+const esRara = id => !!(CARDS[id].especial || CARDS[id].leyenda);
+const RL_RARAS = 3;   // como mucho tres especiales o leyendas en toda la tira
 function ruleta(r, t, nueva) {
   const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
   rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t; rl.col = CARDS[r.id].col;
@@ -1928,13 +1939,15 @@ function ruleta(r, t, nueva) {
   $('#ruleta').classList.remove('fin');
   // la tira: cartas al azar desde esa rareza, sin repetir la vecina, y la que tocó en su lugar
   const ids = [];
+  let raras = 0;
   for (let i = 0; i < RL_N; i++) {
     let id;
-    do { id = cartaTira(sig); } while (i && id === ids[i - 1]);
+    do { id = cartaTira(sig, raras >= RL_RARAS); } while (i && id === ids[i - 1]);
+    if (esRara(id)) raras++;
     ids.push(id);
   }
   ids[RL_GANA] = r.id;
-  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig);
+  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig, true);
   tira.innerHTML = ids.map((id, i) => {
     const c = CARDS[id];
     return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
@@ -2122,6 +2135,12 @@ function tipFutbol() {
   const alta = w[1] + w[2] + w[3], u = plus ? P.ultima[0] + P.ultima[1] : 0;
   const quinta = plus ? [0, P.ultima[0] / u, P.ultima[1] / u] : [w[1] / alta, w[2] / alta, w[3] / alta];
   const [b0, b1, b2] = M.BANDAS, cada = t => { const k = Math.round(n[t] / E[t]); return k <= 1 ? 'casi todos los sobres' : `1 de cada ${k} sobres`; };
+  // las legendarias comunes por un lado y, por otro, las especiales y las leyendas (que pesan distinto)
+  const lComunes = P[3].filter(c => !c.especial && !c.leyenda), lRaras = P[3].filter(c => c.especial || c.leyenda), nLey = lRaras.filter(c => c.leyenda).length;
+  const deCada = c => `1 de cada <b>${fmt(Math.round(P.peso[3] / (E[3] * P.pesoDe(c))))}</b> sobres`;
+  const raras = lRaras.length
+    ? `<p>Además hay ${lRaras.length - nLey} cartas <b>especiales ✦</b>${nLey ? ` y ${nLey} <b>leyendas ♛</b> (los mejores de la historia, sin club)` : ''}: cada una sale en ${deCada(lRaras[0])}, mientras que una legendaria común sale en ${deCada(lComunes[0])}.</p>`
+    : '';
   // una Épica o mejor en el sobre: el god pack siempre la trae; si no, alguna de las cuatro primeras o la quinta
   const pD = M.DIOS / 10000, aOMas = porCarta[2] + porCarta[3], qOMas = plus ? 1 : quinta[1] + quinta[2];
   const epica = pD + (1 - pD) * (1 - (1 - aOMas) ** 4 * (1 - qOMas));
@@ -2138,11 +2157,24 @@ function tipFutbol() {
     <p>Por carta${plus ? ' (las cuatro primeras)' : ''}: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b> · <b>Legendaria ${pct(porCarta[3])}</b>.
       ${quintaTxt}</p>
     <p>${epicaTxt} El ${pct(pD)} son god packs: cinco Épicas o mejores.</p>
-    <p>Hay ${tot} jugadores (de ${new Set(M.POR_COL.futbol.map(c => c.club)).size} clubes): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario.</p>
+    <p>Hay ${tot} jugadores (de ${new Set(M.POR_COL.futbol.map(c => c.club).filter(Boolean)).size} clubes): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${lComunes.length} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${deCada(lComunes[0])}</b> si es legendario.</p>
+    ${raras}
     <p class="fu-pronto">⚽ Próximamente, más equipos y ligas en el mismo sobre.</p>`;
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Medias de FC 27, el Atlético de Madrid y el AC Milan', [
+    '<b>🔴 Atlético de Madrid</b> y <b>⚫ AC Milan</b>: sus 26 y 27 jugadores de EA SPORTS FC 27 (titulares, suplentes y la cantera), con Oblak, Julián Álvarez, Koke, Maignan, Modrić y Pulisic. También entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
+    '<b>📈 Medias de FC 27</b>: pusimos las medias de EA SPORTS FC 27 a todos los jugadores. Unas suben (Courtois 90, Yan Diomandé 84, Gerard Martín 79) y otras bajan (Trent 84). Como la rareza sale de la media, ahora es: <b>Común</b> hasta 76, <b>Rara</b> 77 a 82, <b>Épica</b> 83 a 87 y <b>Legendaria</b> 88 o más.',
+    '<b>🃏 Tus cartas</b>: las que ya tienes se quedan, solo cambian su media y su rareza. Los sobres que ya abriste no cambian.',
+    '<b>🎰 Re-roll</b>: las especiales y las leyendas salen <b>cincuenta veces menos</b> que una legendaria común (alrededor de 1 de cada 30 re-rolls trae una), y la ruleta no muestra más de tres.'
+  ]],
+  ['Octubre 2026 · Llegan las Leyendas', [
+    '<b>♛ Leyendas</b>: 43 de los mejores de la historia, retirados y sin club (solo su bandera): Pelé, Maradona, Zidane, Ronaldo R9, Cruyff, Ronaldinho, Iniesta, Maldini, Beckenbauer, Marcelo, Garrincha y más. Con su propia rareza y su propio filtro en la colección.',
+    '<b>🇨🇱 Chilenos</b>: <b>Elías Figueroa</b> (93, el Rey de Copas, que no está en el FIFA: su media es nuestra) e <b>Iván Zamorano</b> (88, el Bam Bam).',
+    '<b>🎲 Salen muy poco</b>: cada leyenda y cada carta especial sale <b>cinco veces menos</b> que una legendaria común, las dos igual de poco (antes las especiales salían el triple). Los sobres que ya abriste no cambian.',
+    'Su media es la de su carta Icon del FIFA (Hero para Zamorano). Cuentan para tu once como cualquier otra carta, y no hay dos del mismo jugador.'
+  ]],
   ['Octubre 2026 · Llegan Chile, Argentina, la MLS y Arabia', [
     '<b>🇨🇱 Colo-Colo, Universidad Católica y Universidad de Chile</b>, con sus planteles de hoy y las medias del FIFA: Vidal, Aránguiz, Zampedri, Medel y compañía.',
     '<b>🇦🇷 River Plate, Boca Juniors y Estudiantes de La Plata</b>: sus 24 mejores, con Paredes, Arambarri, Otamendi, Muslera y Merentiel. ',
@@ -2166,7 +2198,7 @@ const NOVEDADES_FUTBOL = [
     '«⚽ Mi plantilla» del perfil se quitó por ahora: su lugar lo toman los desafíos.'
   ]],
   ['Cartas especiales por tiempo limitado', [
-    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>), <b>Harry Kane · Balón de Oro</b> (media <b>94</b>) y <b>Cristiano Ronaldo · Balón de Oro All-Time</b> (media <b>96</b>): tres legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen el triple de seguido que una legendaria común. Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
+    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>), <b>Harry Kane · Balón de Oro</b> (media <b>94</b>) y <b>Cristiano Ronaldo · Balón de Oro All-Time</b> (media <b>96</b>): tres legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen <b>cinco veces menos</b> que una legendaria común (igual que las Leyendas). Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
   ]],
   ['Octubre 2026 · Más clubes de la Champions', [
     '<b>Siete clubes nuevos</b> en los sobres de fútbol: PSG, Inter, Roma, Napoli, Borussia Dortmund, Como y el Real Betis, con los jugadores de su primer equipo (cada uno con su media de EA SPORTS FC). Salen en el sobre normal y en el Plus; los sobres que ya abriste no cambian.',
@@ -2677,7 +2709,7 @@ function pintaEligeReto() {
   const ordenClub = Object.keys(M.CLUBES), nota = cp => (cp.gr ? cp.g : 0);
   const porOrden = {
     media: (a, b) => 0,
-    club: (a, b) => ordenClub.indexOf(CARDS[a.id].club) - ordenClub.indexOf(CARDS[b.id].club),
+    club: (a, b) => ixClub(ordenClub, CARDS[a.id]) - ixClub(ordenClub, CARDS[b.id]),
     nota: (a, b) => nota(b) - nota(a)
   }[rt.ordenElige] || (() => 0);
   const lista = [...grupos.values()].sort(([a], [b]) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
@@ -2810,7 +2842,7 @@ function pintaMercadoReto() {
     ${lista.length ? `<div class="rt-mk-lista">${lista.map(({ o, cp, c }) => {
       const tuya = o.u === cuenta.uid, falta = cuenta.parada || cuenta.saldo < o.p, en = i >= 0 ? RT.encaje(i, cp.id) : null, seguro = rmk.seguro === o.id;
       return `<div class="rt-mk-item">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>`)}
-        <span class="rt-mk-tx"><b>${esc(c.name)}</b><small>${esc(M.CLUBES[c.club] || '')}${en && en.nivel ? ` · incómodo, −${en.pen}` : ''}</small>
+        <span class="rt-mk-tx"><b>${esc(c.name)}</b><small>${esc(c.leyenda ? 'Leyenda' : M.CLUBES[c.club] || '')}${en && en.nivel ? ` · incómodo, −${en.pen}` : ''}</small>
           <small>${tuya ? '<b class="rt-mk-tuya">Tu oferta</b>' : `de <span translate="no">${esc(nombreDe(o.u))}</span>`}${cp.gr ? ` · nota ${cp.g}` : ' · sin graduar'}</small>
           ${tuya ? `<span class="rt-mk-precio">${MONEDA}${fmt(o.p)}</span>` : `<button class="btn mk-mini${seguro ? ' primary' : ''}" data-rmk-compra="${esc(o.id)}"${falta || rmk.comprando ? ' disabled' : ''} title="${falta ? 'No te alcanza' : ''}">${rmk.comprando === o.id ? 'Comprando…' : seguro ? `¿Seguro? Comprar por ${MONEDA}${fmt(o.p)}` : `Comprar ${MONEDA}${fmt(o.p)}`}</button>`}</span></div>`;
     }).join('')}</div>` : `<p class="mk-vacio">${todas.length ? 'Nadie vende una carta que cumpla eso: prueba quitando un filtro.' : 'Ahora nadie vende cartas de fútbol.'}</p>`}

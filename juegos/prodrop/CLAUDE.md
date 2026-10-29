@@ -162,6 +162,36 @@ other file of the site. Things that hold it together:
   face** (fut.gg `player-item` render, 512 px) on a radial gradient in the club's colours, made
   with Pillow. Positions cut to two (the test). Dorsal 0: the card no longer shows it.
   `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
+- **Leyendas** (`LEYENDAS` in the motor, photos `cards/leyendas/<id>.webp`, 43 cards, ids 1111+,
+  last `AMPLIACIONES` entry `n: 1111`): retired greats (Pelé, Maradona, Zidane, R9, Cruyff, Figueroa,
+  Zamorano…), a category of their own. **No club** (`club: null`, flag only), always tier 3 (Legendaria for
+  the motor) but shown as «Leyenda ♛» (`rareza()` in `app.js`, filter 5 in the collection, a «Leyendas» section
+  at the end, `.futbol.leyenda` frame). Medias are EA FC 26's base **Icon** card (Hero for Zamorano), untouched;
+  Figueroa isn't in the game: 93 is ours. Faces = fut.gg `player-item` renders (sepia, transparent) on a warm
+  radial background, made with Pillow; Figueroa's and Zamorano's were edited by hand (sepia + bottom fade).
+  Row: `[photo id, card name, country, media, "POS/POS"]`; `PAIS_LEYENDA` gives the country name shown on the card.
+  **Odds**: `PESO_HOY` — a plain legendary weighs 5, a special card or a legend 1 (five times less, both the same).
+  Cards carry `peso` (the old weight, specials 3) and `pesoHoy`; every pool has its own `pesoDe`: the pools of
+  packs bought before the last `AMPLIACIONES` cut-off keep the old weights so opened packs never change, only the
+  current pool (`POOL.futbol/futbolplus`, packs after the cut-off) uses `pesoHoy`. `elige` and `probabilidad` take
+  the weight from the pool. Legends don't belong to any club: they are out of the club albums and the club
+  challenges (`RT.CLUBES`), but count in open and national challenges (La Roja takes Figueroa and Zamorano).
+  The cut-off `hasta` must be set to the push time plus a few minutes when publishing.
+- **FC 27 ratings, new rarity bands and the Atlético** (Oct 2026, last `AMPLIACIONES` entry `{ n: 1154, hoy: true }`
+  and `CORTE_TIERS`): every player's media was re-read from fut.gg's FC 27 base cards (`MEDIAS27` = only
+  the 307 that changed; `MEDIAS` stays as the old table). Rarity bands are now `BANDAS = [76, 82, 87]` (común ≤ 76,
+  rara 77–82, épica 83–87, legendaria 88+); the old ones are `BANDAS_V0 = [80, 84, 87]`. **Each card keeps its old
+  rarity as `tierAntes`** (old media + old bands; the `uid` is built from it and never changes) and `mediaAntes`.
+  Pools carry `tierDe` and `bandas`: the pools of packs bought before `CORTE_TIERS` (the last cut-off) and the old
+  `f`/`e` collections still sort cards by `tierAntes`, so opened packs and old re-rolls never change; only the
+  current pool uses `tier`. Anything that validates a re-roll must use **`M.tierEn(card, at)`** (economy replay in
+  `monedas.js`, the postman in `prodrop.js`, `elegibles` in `app.js`), not `card.tier`. A club that arrives from now
+  on goes in `NUEVOS` (no history: `tierAntes = tier`). **Atlético de Madrid**: `ATLETICO` (26 male base cards of the
+  FC 27 squad, faces on a red/navy radial gradient, `cards/champions/atletico/`, crest from fut.gg, frame in
+  `juegos.html`, `perfil-tarjeta.js`); it is a club of its own (album and club challenge). The **AC Milan** (`MILAN`, 27 cards, ids 1180+, called «Milano FC» in FC 27, fut.gg club id 131681, faces on red/black) went in the same way.
+  **Re-roll odds**: `PESO_REROLL_FUTBOL` — in a re-roll a plain legendary weighs 50 and a special card or a legend 1
+  (`pesoRerollDe` of the pool; pools before `CORTE_TIERS` keep the pack weights), so about 1 in 30 re-rolls gives one.
+  The re-roll roulette (`cartaTira` in `app.js`) uses the same weights and never shows more than 3 of them.
 - **Salón banner** (`futbol()` in `colabtex/src/juegos/novedades-arte.js`): four cards in a fan,
   the three specials (those with a `cinta`) plus one random star from
   `ESTRELLAS_FUTBOL` on every paint (no Chilean-league tag any more); the test checks each `media` against the motor.

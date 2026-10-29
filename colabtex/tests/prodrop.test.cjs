@@ -14,20 +14,23 @@ const M=ctx.__M;
 const VE_TODO={mira:{at:1,por:'adm'}};
 M.fijaSerie1(VE_TODO,'mira');
 
-test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico, 155 de la Premier, 163 de siete clubes de la Champions, las dos cartas especiales, 20 del Bayern, 277 de Chile, Argentina, la MLS y Arabia y la especial de Cristiano, una carta cada uno), con su imagen',()=>{
- assert.equal(PM.TOTAL,170+275+48+155+163+2+20+61+72+72+72+1);
- assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[484,108,46,28]);assert.equal(PM.POOL.futbol.tope,3);
- assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[484,108,46,28]);
+test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico, 155 de la Premier, 163 de siete clubes de la Champions, las dos cartas especiales, 20 del Bayern, 277 de Chile, Argentina, la MLS y Arabia y la especial de Cristiano, 43 leyendas, 26 del Atlético de Madrid y 27 del AC Milan, una carta cada uno), con su imagen',()=>{
+ assert.equal(PM.TOTAL,170+275+48+155+163+2+20+61+72+72+72+1+43+26+27);
+ assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[330,237,120,75]);assert.equal(PM.POOL.futbol.tope,3);
+ assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[330,237,120,75]);
  assert.deepEqual(PM.POOL.futbol1.map(l=>l.length),[13,19,7,9],'el Clásico de antes: para rehacer sus sobres');
  // las de antes conservan su id: fútbol va después de todo
- assert.equal(PM.POR_COL.futbol.length,666);
+ assert.equal(PM.POR_COL.futbol.length,762);
  assert.ok(PM.POR_COL.futbol.every((c,i)=>c.n===445+i),'fútbol va después de todo: no mueve el id de nada');
  assert.ok(PM.POR_COL.futbol.slice(48,203).every(c=>/cards\/premier\//.test(c.img)),'los 155 de la Premier siguen con su id y su foto');
  assert.ok(PM.POR_COL.futbol.slice(203,366).every(c=>/cards\/champions\//.test(c.img)),'los de la Champions van después');
  assert.ok(PM.POR_COL.futbol.slice(366,368).every(c=>/cards\/especiales\//.test(c.img)),'después las especiales');
  assert.ok(PM.POR_COL.futbol.slice(368,388).every(c=>c.club==='bayern'&&/cards\/champions\/bayern\//.test(c.img)),'después el Bayern');
- assert.ok(PM.POR_COL.futbol.slice(388,-1).every(c=>['colocolo','ucatolica','udechile','river','boca','estudiantes','intermiami','montreal','lafc','alnassr','alhilal','alittihad'].includes(c.club)&&/cards\/champions\//.test(c.img)),'y Chile, Argentina, la MLS y Arabia después');
- assert.equal(PM.POR_COL.futbol[665].img,'cards/especiales/alnassr/cristiano-balon-all-time.webp','y la especial de Cristiano, la última de todas');
+ assert.ok(PM.POR_COL.futbol.slice(388,665).every(c=>['colocolo','ucatolica','udechile','river','boca','estudiantes','intermiami','montreal','lafc','alnassr','alhilal','alittihad'].includes(c.club)&&/cards\/champions\//.test(c.img)),'y Chile, Argentina, la MLS y Arabia después');
+ assert.equal(PM.POR_COL.futbol[665].img,'cards/especiales/alnassr/cristiano-balon-all-time.webp','y la especial de Cristiano');
+ assert.ok(PM.POR_COL.futbol.slice(666,709).every(c=>c.leyenda&&/cards\/leyendas\//.test(c.img)),'las 43 leyendas');
+ assert.ok(PM.POR_COL.futbol.slice(709,735).every(c=>c.club==='atletico'&&/cards\/champions\/atletico\//.test(c.img)),'el Atlético de Madrid');
+ assert.ok(PM.POR_COL.futbol.slice(735).every(c=>c.club==='milan'&&/cards\/champions\/milan\//.test(c.img)),'y al final de todo, el AC Milan');
  assert.equal(PM.CARDS[648].person,'betis-alvaro-valles','la primera de las nuevas es el id 648: nada se mueve');
  assert.deepEqual(PM.POOL.premier1.map(l=>l.length),[92,39,16,8]);assert.equal(PM.POOL.premier1.tope,3);
  assert.deepEqual(PM.POR_TIER.map(l=>l.length),[51,34,68,17]);
@@ -448,14 +451,15 @@ test('la Serie 01 (profes): solo la ve quien está en la lista, y nadie pierde n
 });
 
 test('fútbol: una sola colección; la rareza sale de la media del jugador',()=>{
- assert.deepEqual(PM.BANDAS,[80,84,87]);
- assert.deepEqual([60,80,81,84,85,87,88,99].map(PM.tierDeMedia),[0,0,1,1,2,2,3,3]);
+ assert.deepEqual(PM.BANDAS,[76,82,87]);assert.deepEqual(PM.BANDAS_V0,[80,84,87]);
+ assert.deepEqual([60,76,77,82,83,87,88,99].map(PM.tierDeMedia),[0,0,1,1,2,2,3,3]);
  assert.ok(PM.esFutbol('futbol')&&!PM.esFutbol('premier')&&!PM.esFutbol('comp')&&!PM.esFutbol('profes'));
  assert.deepEqual(PM.COLECCIONES.map(c=>c.key),['profes','comp','futbol'],'ya no hay Clásico y Premier aparte');
  assert.equal(PM.COL.futbol.prefijo,'g');
- for(const c of PM.POR_COL.futbol)assert.equal(c.tier,PM.tierDeMedia(c.media),c.name+' tiene la rareza de su media');
+ for(const c of PM.POR_COL.futbol){assert.equal(c.tier,c.leyenda?3:PM.tierDeMedia(c.media),c.name+' tiene la rareza de su media (las leyendas, siempre Legendaria)');if(!c.leyenda&&!c.especial&&!['atletico','milan'].includes(c.club)){const v0=m=>m<=80?0:m<=84?1:m<=87?2:3;assert.equal(c.tierAntes,v0(c.mediaAntes),c.name+': la rareza de antes sale de la media de antes')}}
  assert.equal(PM.POR_COL.futbol.find(c=>c.name==='Mbappé').tier,3,'Mbappé (91) es legendaria');
- assert.equal(PM.POR_COL.futbol.find(c=>c.name==='C. Espí').tier,0,'Espí (68) es común');
+ assert.equal(PM.POR_COL.futbol.find(c=>c.name==='C. Espí').tier,1,'Espí (77 en FC 27) es raro');
+ assert.equal(PM.POR_COL.futbol.find(c=>c.name==='Gerard Martín').tier,1,'Gerard Martín (79) es raro');assert.equal(PM.POR_COL.futbol.find(c=>c.name==='Courtois').tier,3,'Courtois (90) es legendario');
  assert.ok(PM.POR_COL.futbol.every(c=>c.col==='futbol'),'todas las cartas de futbolistas son de fútbol');
 });
 
@@ -476,7 +480,7 @@ test('fútbol: las claves de antes (f, e) siguen rehaciendo los mismos sobres, y
  // un re-roll de antes también: con la lista de su colección de entonces
  for(let i=0;i<200;i++){
   const r=PM.reroll('usrAAAA','f-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,2,Array(10).fill(6));
-  assert.ok(clasico.has(r.id));assert.equal(PM.CARDS[r.id].tier,3,'10 épicas dan una legendaria');
+  assert.ok(clasico.has(r.id));assert.equal(PM.tierEn(PM.CARDS[r.id],PM.SALTOS_DESDE+i),3,'10 épicas dan una legendaria (con la rareza de entonces)');
   assert.ok(premier.has(PM.reroll('usrAAAA','e-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,1,Array(10).fill(6)).id));
  }
  // y uno de ahora sale de todo el catálogo de fútbol
@@ -499,7 +503,7 @@ test('fútbol: el sobre normal y el Plus; probabilidades por rareza, quinta cart
  for(let i=0;i<N;i++){
   const a=PM.sobre('u'+(i%7),'g-Nk'+i+'abcdefg',1792000000000+i*7),b=PM.sobre('u'+(i%7),'h-Nk'+i+'abcdefg',1792000000000+i*7);
   for(const so of [a,b]){assert.equal(so.col,'futbol');assert.equal(new Set(so.cartas.map(x=>x.id)).size,5);}
-  const ta=a.cartas.map(x=>PM.CARDS[x.id].tier),tb=b.cartas.map(x=>PM.CARDS[x.id].tier);
+  const t0=1792000000000+i*7,ta=a.cartas.map(x=>PM.tierEn(PM.CARDS[x.id],t0)),tb=b.cartas.map(x=>PM.tierEn(PM.CARDS[x.id],t0));
   assert.ok(ta[4]>=1,'la quinta del normal es rara o mejor');
   assert.ok(tb[4]>=2,'la quinta del Plus es épica o mejor: siempre');
   assert.ok(tb.some(t=>t>=2),'todo sobre Plus trae una épica');
@@ -553,7 +557,7 @@ test('ampliaciones: un sobre g o h comprado antes sigue viendo solo las cartas d
  assert.equal(nuevasAntes,0,'un sobre de antes no ve las nuevas');
  assert.ok(nuevasDespues>500,'un sobre de ahora sí: '+nuevasDespues);
  assert.ok(PM.poolDe('g-N0',v.hasta-1).every(l=>l.every(c=>c.n<648)));
- assert.equal(PM.poolDe('g-N0').reduce((s,l)=>s+l.length,0),666,'sin hora: el catálogo de hoy');
+ assert.equal(PM.poolDe('g-N0').reduce((s,l)=>s+l.length,0),762,'sin hora: el catálogo de hoy');
  // la segunda ampliación (el Bayern): un sobre de antes de su corte ve las 813 de entonces, ni una más
  const b=PM.AMPLIACIONES[1];
  assert.equal(b.n,813);assert.ok(b.hasta>v.hasta);
@@ -615,8 +619,147 @@ test('cartas especiales por tiempo limitado: Mbappé (92), Kane (94) y Cristiano
  // las medias del banner de la página de Juegos son estas
  const arte=fs.readFileSync(path.join(__dirname,'..','src/juegos/novedades-arte.js'),'utf8');
  const cartas=[...arte.matchAll(/img: "([^"]+)", nombre: "[^"]+", media: (\d+)/g)];
- assert.equal(cartas.length,9,'las nueve estrellas del banner');
+ assert.equal(cartas.length,11,'las once estrellas del banner');
  for(const [,img,media] of cartas){const c=PM.CARDS.find(x=>x.img==='cards/'+img+'.webp');assert.ok(c,'el banner nombra '+img+', que no está');assert.equal(c.media,+media,'el banner muestra la media de verdad: '+img);}
+});
+
+
+test('ampliación de las leyendas: un sobre de antes de su corte ve las 1111 de entonces, con los pesos de entonces',()=>{
+ const ley=PM.AMPLIACIONES[4],cr=PM.AMPLIACIONES[3];
+ assert.equal(ley.n,1111);assert.ok(ley.hasta>cr.hasta);
+ const antes=PM.poolDe('g-N0',ley.hasta-1);
+ assert.equal(antes.reduce((s,l)=>s+l.length,0),666,'sin las leyendas');
+ // las especiales pesan el triple, como cuando se abrieron esos sobres
+ assert.deepEqual(antes.peso,[484,108,46,25+3*3],'pesos de entonces: la especial vale 3');
+ assert.equal(PM.poolDe('h-N0',ley.hasta-1).peso[3],34);
+ const hoy=PM.poolDe('g-N0',ley.hasta);
+ assert.equal(hoy.reduce((s,l)=>s+l.length,0),709,'con las leyendas pero todavía sin el Atlético ni la rareza nueva');
+ let nuevasAntes=0,nuevasDespues=0;
+ for(let i=0;i<3000;i++)for(const pre of ['g','h']){
+  if(PM.sobre('u'+(i%9),pre+'-Ny'+i+'abcdefg',ley.hasta-1-i).cartas.some(c=>c.id>=1111))nuevasAntes++;
+  if(PM.sobre('u'+(i%9),pre+'-Ny'+i+'abcdefg',ley.hasta+i).cartas.some(c=>c.id>=1111))nuevasDespues++;
+ }
+ assert.equal(nuevasAntes,0,'un sobre de antes no ve las leyendas');
+ assert.ok(nuevasDespues>0,'uno de después sí');
+});
+
+test('leyendas: 43 retirados, sin club, de rareza Legendaria, con la media del FIFA y su foto',()=>{
+ const ley=PM.CARDS.filter(c=>c.leyenda);
+ assert.equal(ley.length,43);assert.equal(PM.LEYENDAS.length,43);
+ assert.ok(ley.every((c,i)=>c.n===1111+i&&c.col==='futbol'&&c.liga==='leyendas'&&c.tier===3&&c.club===null&&!c.especial&&c.cinta==='LEYENDA'));
+ assert.equal(new Set(ley.map(c=>c.person)).size,43,'una sola carta por leyenda');
+ for(const c of ley){
+  assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',c.img)),'falta '+c.img);
+  assert.ok(PM.CARDS.every(x=>x===c||x.person!==c.person),c.name+' no tiene otra carta');
+ }
+ const por=n=>ley.find(c=>c.name===n);
+ assert.equal(por('Maradona').media,95);assert.equal(por('Pelé').media,95);assert.equal(por('Zidane').media,94);
+ assert.equal(por('Figueroa').media,93,'Figueroa no está en el FIFA: su media es nuestra');
+ assert.equal(por('Zamorano').media,88);assert.equal(por('Figueroa').pais,'CL');
+ assert.deepEqual(por('Ronaldinho').posiciones,['EI','MC']);assert.deepEqual(por('Maradona').posiciones,['MC']);assert.deepEqual(por('Riquelme').posiciones,['MC']);
+ assert.equal(por('Maradona').sub,'Argentina');
+ // un once se puede armar solo con leyendas: hay de cada puesto
+ const hay=p=>ley.some(c=>c.posiciones.includes(p));
+ for(const p of ['POR','LD','LI','DFC','MC','ED','EI','DC'])assert.ok(hay(p),'falta un '+p);
+ assert.ok(ley.filter(c=>c.posiciones[0]==='DFC').length>=4&&ley.filter(c=>c.posiciones[0]==='LI').length>=2);
+});
+
+test('las especiales y las leyendas salen igual de poco, cinco veces menos que una legendaria común',()=>{
+ assert.equal(PM.PESO_HOY.comun,5);assert.equal(PM.PESO_HOY.rara,1);
+ const reg=PM.POR_COL.futbol.find(c=>c.tier===3&&!c.especial&&!c.leyenda);
+ const esp=PM.CARDS.filter(c=>c.especial),ley=PM.CARDS.filter(c=>c.leyenda);
+ const pr=PM.probabilidad(reg.n,1).exacta;
+ for(const c of [...esp,...ley]){
+  assert.ok(Math.abs(PM.probabilidad(c.n,1).exacta*5-pr)<1e-12,c.name+': la quinta parte de una legendaria común');
+ }
+ assert.ok(Math.abs(PM.probabilidad(esp[0].n,1).exacta-PM.probabilidad(ley[0].n,1).exacta)<1e-15,'especial y leyenda, igual');
+ // las probabilidades de todos los jugadores siguen sumando las cinco cartas del sobre
+ const total=PM.POR_COL.futbol.reduce((s,c)=>s+PM.probabilidad(c.n,1).exacta,0);
+ assert.ok(Math.abs(total-5)<1e-9,'suman '+total);
+ // cuántas salen de verdad en sobres de hoy
+ const hasta=PM.AMPLIACIONES[4].hasta;let rar=0,leg=0,total5=0;
+ for(let i=0;i<20000;i++)for(const x of PM.sobre('u'+(i%7),'g-Nz'+i+'abcdefg',hasta+i).cartas){const c=PM.CARDS[x.id];total5++;if(c.especial||c.leyenda)rar++;else if(c.tier===3)leg++;}
+ assert.ok(rar>0&&leg>rar,'más legendarias comunes que especiales y leyendas: '+leg+' vs '+rar+' de '+total5);
+});
+
+
+test('medias de FC 27: las que cambian, la rareza de antes se conserva y un re-roll viejo se valida con la de entonces',()=>{
+ const por=id=>PM.CARDS.find(c=>c.person.endsWith('-'+id)&&!c.especial&&!c.leyenda);
+ // los ejemplos que importan: FC 27 trae otra media que FC 26
+ assert.equal(por('courtois').media,90);assert.equal(por('courtois').mediaAntes,89);
+ assert.equal(por('yan-diomande').media,84);assert.equal(por('yan-diomande').mediaAntes,66);
+ assert.equal(por('gerard-martin').media,79);assert.equal(por('gerard-martin').mediaAntes,74);
+ assert.equal(por('trent').media,84);assert.equal(por('trent').mediaAntes,86,'también bajan');
+ assert.ok(Object.values(PM.MEDIAS27).reduce((s,o)=>s+Object.keys(o).length,0)>=300);
+ // la tabla de antes no se toca: con ella y las bandas de antes salen las rarezas con que se abrieron los sobres
+ const val=por('valverde');assert.equal(val.mediaAntes,89);assert.equal(val.tierAntes,3);assert.equal(val.media,87);assert.equal(val.tier,2);
+ // el uid lleva la rareza de antes: lo que está guardado con él sigue valiendo
+ assert.equal(val.uid,'realmadrid-valverde-legend');
+ assert.ok(PM.CARDS.filter(c=>c.club&&!['atletico','milan'].includes(c.club)&&!c.especial).every(c=>c.uid.endsWith('-'+PM.TIERS[c.tierAntes].key)));
+ // antes del corte vale la de antes, y desde el corte la nueva
+ assert.equal(PM.tierEn(val,PM.CORTE_TIERS-1),3);assert.equal(PM.tierEn(val,PM.CORTE_TIERS),2);
+ const dio=por('yan-diomande');assert.equal(PM.tierEn(dio,0),0);assert.equal(PM.tierEn(dio,PM.CORTE_TIERS),2,'Diomandé: 66 común, 84 épica');
+ // los sobres de justo después del corte de las leyendas (y antes del de FC 27) salen igual que cuando se abrieron: fijados con el motor de ese momento
+ const L=PM.AMPLIACIONES[4].hasta;
+ assert.deepEqual([0,1,2].map(i=>PM.sobre('u'+i,'g-Nw'+(10+i)+'abcdefg',L+1+i*987654).cartas.map(c=>c.id)),[[1000,653,639,532,722],[528,619,1038,527,1043],[560,1011,671,522,511]]);
+ assert.deepEqual([0,1,2].map(i=>PM.sobre('u'+i,'h-Nw'+(10+i)+'abcdefg',L+1+i*987654).cartas.map(c=>c.id)),[[761,472,826,638,778],[917,499,764,765,523],[476,703,751,473,483]]);
+ assert.deepEqual([0,1,2].map(i=>{const r=PM.reroll('usrAAAA','g-Nq'+i+'abcdef',L+1+5000*i,1,Array(10).fill(6));return r.id+'/'+r.g+'/'+r.w;}),['518/7/1081321453','692/6/555201145','832/7/1784914585']);
+ // y un sobre de entonces nunca ve al Atlético ni usa la rareza nueva
+ const P=PM.poolDe('g-N0',PM.CORTE_TIERS-1);
+ assert.equal(P.reduce((s,l)=>s+l.length,0),709);assert.deepEqual(P.bandas,PM.BANDAS_V0);
+ assert.ok(P[3].every(c=>c.tierAntes===3)&&P[0].every(c=>c.tierAntes===0));
+ // desde el corte: las bandas y las rarezas nuevas, y el Atlético
+ const H=PM.poolDe('g-N0',PM.CORTE_TIERS);
+ assert.deepEqual(H.map(l=>l.length),[330,237,120,75]);assert.deepEqual(H.bandas,PM.BANDAS);
+ assert.ok(H.flat().some(c=>c.club==='atletico'));
+ let atl=0,antes=0;
+ for(let i=0;i<3000;i++){
+  if(PM.sobre('u'+(i%9),'g-Nf'+i+'abcdefg',PM.CORTE_TIERS+i).cartas.some(c=>PM.CARDS[c.id].club==='atletico'))atl++;
+  if(PM.sobre('u'+(i%9),'g-Nf'+i+'abcdefg',PM.CORTE_TIERS-1-i).cartas.some(c=>PM.CARDS[c.id].club==='atletico'))antes++;
+ }
+ assert.ok(atl>0&&antes===0,'el Atlético sale solo desde el corte: '+atl+' / '+antes);
+});
+
+test('AC Milan: 27 jugadores de FC 27, con foto, escudo, bandera y posiciones (y Modrić)',()=>{
+ const dir=path.join(__dirname,'../../juegos/prodrop');
+ const mi=PM.CARDS.filter(c=>c.club==='milan');
+ assert.equal(mi.length,27);assert.equal(PM.MILAN.length,27);assert.equal(PM.CLUBES.milan,'AC Milan');
+ assert.ok(mi.every((c,i)=>c.n===1180+i&&c.col==='futbol'&&c.liga==='champions'&&!c.especial&&!c.leyenda));
+ assert.ok(mi.every(c=>c.tier===PM.tierDeMedia(c.media)&&c.tierAntes===c.tier&&c.mediaAntes===c.media),'sin historia');
+ assert.ok(mi.every(c=>fs.existsSync(path.join(dir,c.img))),'cada uno con su foto');
+ assert.ok(fs.existsSync(path.join(dir,'escudos/milan.png')));
+ const por=n=>mi.find(c=>c.name===n);
+ assert.equal(por('L. Modrić').media,85);assert.equal(por('L. Modrić').pais,'HR');assert.equal(por('M. Maignan').media,87);assert.deepEqual(por('M. Maignan').posiciones,['POR']);
+ assert.equal(new Set(mi.map(c=>c.person)).size,27);
+});
+
+test('re-roll de fútbol: una especial o una leyenda sale cincuenta veces menos que una legendaria común (solo desde el corte)',()=>{
+ assert.equal(PM.PESO_REROLL_FUTBOL.comun,50);assert.equal(PM.PESO_REROLL_FUTBOL.rara,1);
+ const P=PM.poolDe('g-N0',PM.CORTE_TIERS),Q=PM.poolDe('g-N0',PM.CORTE_TIERS-1);
+ const reg=P[3].find(c=>!c.especial&&!c.leyenda),rara=P[3].find(c=>c.leyenda);
+ assert.equal(P.pesoRerollDe(reg),50);assert.equal(P.pesoRerollDe(rara),1);
+ assert.equal(Q.pesoRerollDe(rara),Q.pesoDe(rara),'antes del corte, el re-roll usa los pesos del sobre de entonces');
+ let raras=0,n=0;const cuales=new Set();
+ for(let i=0;i<20000;i++){const r=PM.reroll('usr'+(i%9),'g-Nrr'+i+'abcdef',PM.CORTE_TIERS+i,2,Array(10).fill(6)),c=PM.CARDS[r.id];n++;assert.equal(c.tier,3);if(c.especial||c.leyenda){raras++;cuales.add(c.name)}}
+ assert.ok(raras/n>.015&&raras/n<.05,'más o menos 1 de cada 30 re-rolls: '+(raras/n));
+ assert.ok(cuales.size>20,'y salen de todas: '+cuales.size);
+ // los de antes del corte siguen saliendo como entonces (y mucho más seguido)
+ let antes=0;for(let i=0;i<4000;i++){const c=PM.CARDS[PM.reroll('usr'+(i%9),'g-Nrr'+i+'abcdef',PM.AMPLIACIONES[4].hasta+1+i,2,Array(10).fill(6)).id];if(c.especial||c.leyenda)antes++;}
+ assert.ok(antes/4000>.15,'antes, 1 de cada 4: '+antes/4000);
+});
+
+test('Atlético de Madrid: 26 jugadores de FC 27, con foto, escudo, bandera y posiciones',()=>{
+ const dir=path.join(__dirname,'../../juegos/prodrop');
+ const atl=PM.CARDS.filter(c=>c.club==='atletico');
+ assert.equal(atl.length,26);assert.equal(PM.ATLETICO.length,26);assert.equal(PM.CLUBES.atletico,'Atlético de Madrid');
+ assert.ok(atl.every((c,i)=>c.n===1154+i&&c.col==='futbol'&&c.liga==='champions'&&!c.especial&&!c.leyenda));
+ assert.ok(atl.every(c=>c.tier===PM.tierDeMedia(c.media)&&c.tierAntes===c.tier&&c.mediaAntes===c.media),'sin historia: ya con las bandas nuevas');
+ assert.ok(atl.every(c=>fs.existsSync(path.join(dir,c.img))),'cada uno con su foto');
+ assert.ok(fs.existsSync(path.join(dir,'escudos/atletico.png')));
+ const por=n=>atl.find(c=>c.name===n);
+ assert.equal(por('J. Oblak').media,88);assert.equal(por('J. Oblak').tier,3);assert.deepEqual(por('J. Oblak').posiciones,['POR']);
+ assert.equal(por('J. Álvarez').media,86);assert.equal(por('Koke').media,81);assert.equal(por('M. Cubo').media,63);
+ assert.equal(new Set(atl.map(c=>c.person)).size,26);
 });
 
 test('Premier: 155 jugadores de seis clubes con media, foto y rareza (ahora dentro del catálogo de fútbol)',()=>{
@@ -655,11 +798,13 @@ test('fútbol: cada futbolista tiene su media (60-99) y una sola carta',()=>{
  for(const c of PM.POR_COL.futbol){
   assert.ok(Number.isInteger(c.media)&&c.media>=55&&c.media<=99,c.name+' '+c.media);
   if(c.especial)continue;      // las especiales son otra carta del mismo jugador
+  if(c.leyenda){assert.equal(por[c.person],undefined);por[c.person]=c.media;continue}
   assert.equal(por[c.person],undefined,c.name+' tiene una sola carta');por[c.person]=c.media;
  }
- assert.equal(Object.keys(por).length,663);
- assert.equal(por['bayern-harry-kane'],89,'Kane tiene su carta de siempre, aparte del Balón de Oro');
- for(const [club,id] of PM.FUTBOLISTAS.concat(PM.PREMIER,PM.CHAMPIONS,PM.ESPECIALES,PM.ESPECIALES2,PM.BAYERN,PM.CHILE,PM.ARGENTINA,PM.MLS,PM.ARABIA))assert.ok(PM.MEDIAS[club]&&PM.MEDIAS[club][id],'sin media: '+club+'/'+id);
+ assert.equal(Object.keys(por).length,759);
+ assert.equal(por['bayern-harry-kane'],90,'Kane tiene su carta de siempre, aparte del Balón de Oro');
+ for(const [club,id] of PM.FUTBOLISTAS.concat(PM.PREMIER,PM.CHAMPIONS,PM.ESPECIALES,PM.ESPECIALES2,PM.BAYERN,PM.CHILE,PM.ARGENTINA,PM.MLS,PM.ARABIA,PM.ATLETICO,PM.MILAN))assert.ok(PM.MEDIAS[club]&&PM.MEDIAS[club][id],'sin media: '+club+'/'+id);
+ for(const [id,,,media,pos] of PM.LEYENDAS){assert.ok(Number.isInteger(media)&&media>=85&&media<=99,id+' '+media);assert.ok(pos.split('/').every(x=>PM.PUESTO[x]),id+' '+pos)}
 });
 
 test('las portadas de los sobres de fútbol son jugadores que existen',()=>{
@@ -672,10 +817,10 @@ test('las portadas de los sobres de fútbol son jugadores que existen',()=>{
 
 test('cartas de fútbol: cada país tiene su bandera y cada club su escudo, como archivos de la página',()=>{
  const dir=path.join(__dirname,'../../juegos/prodrop');
- const paises=new Set([...PM.FUTBOLISTAS,...PM.PREMIER,...PM.CHAMPIONS,...PM.BAYERN,...PM.CHILE,...PM.ARGENTINA,...PM.MLS,...PM.ARABIA].map(x=>x[5]));
+ const paises=new Set([...PM.FUTBOLISTAS,...PM.PREMIER,...PM.CHAMPIONS,...PM.BAYERN,...PM.CHILE,...PM.ARGENTINA,...PM.MLS,...PM.ARABIA].concat(PM.ATLETICO,PM.MILAN).map(x=>x[5]).concat(PM.LEYENDAS.map(x=>x[2])));
  for(const cc of paises)assert.ok(fs.existsSync(path.join(dir,'flags',cc.toLowerCase()+'.png')),'falta la bandera de '+cc);
- const clubes=new Set(PM.POR_COL.futbol.map(c=>c.club));
- assert.equal(clubes.size,28);
+ const clubes=new Set(PM.POR_COL.futbol.map(c=>c.club).filter(Boolean));
+ assert.equal(clubes.size,30);
  for(const k of clubes){assert.ok(PM.CLUBES[k],k);assert.ok(fs.existsSync(path.join(dir,'escudos',k+'.png')),'falta el escudo de '+k)}
 });
 
