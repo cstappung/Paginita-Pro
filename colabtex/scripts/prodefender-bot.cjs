@@ -117,16 +117,18 @@ const MIXTA = [
 // pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
 const HEROE_TERCERA = opt('heroe', 'heroevacio');
 // --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
-if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { PD.LEVELS[li].diff = +opt('diff'); delete PD.LEVELS[li]._rounds; }
+// cambia un número del reino también en sus números de la versión 5 (levels.js `v5`, PD.nivel)
+const ajustaNivel = (k, v) => { for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { const L = PD.LEVELS[li]; L[k] = v; if (L.v5) L.v5[k] = v; delete L._rounds; delete L._v5; } };
+if (opt('diff', '')) ajustaNivel('diff', +opt('diff'));
 // --pactos a,b,c: otro orden de preferencia (p. ej. el de una persona); --precio P: otro
 // pactoPrecio del reino (levels.js), para comparar antes y después
-if (opt('precio', '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].pactoPrecio = +opt('precio');
+if (opt('precio', '') !== '') ajustaNivel('pactoPrecio', +opt('precio'));
 // --jefe vida,vel: otros jefes (engine.js JEFE, desde la versión 5)
 if (opt('jefe', '')) { const [v, s, b] = opt('jefe').split(',').map(Number); PD.JEFE.vida = v; PD.JEFE.vel = s; if (b) PD.JEFE.esbirros = b; }
 // --tarde desde,hasta,x: otra vidaTarde (levels.js); --vida X / --oro Y: otra vida y otro oro por
 // enemigo del reino (levels.js vidaX, oroX)
-if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].vidaTarde = x > 1 ? { desde, hasta, x } : null; }
-for (const [o, k] of [['vida', 'vidaX'], ['oro', 'oroX']]) if (opt(o, '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li][k] = +opt(o);
+if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); ajustaNivel('vidaTarde', x > 1 ? { desde, hasta, x } : null); }
+for (const [o, k] of [['vida', 'vidaX'], ['oro', 'oroX']]) if (opt(o, '') !== '') ajustaNivel(k, +opt(o));
 const PACTOS_PREF = opt('pactos', '') ? opt('pactos').split(',') : ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
 const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
 function eligePacto(g) {

@@ -649,26 +649,32 @@ test('cada reino pide la ronda 50 del anterior también en el verificador (y ese
  assert.equal(K.esTrampa({vivo:true,m:'Reino sin desbloquear: primero llega a la ronda 50 del reino anterior.'}),false,'no castiga');
 });
 
-test('reinos 12-15: cada pacto aceptado da más vida a los enemigos; la Necrópolis no cambia',()=>{
+test('reinos 12-15: cada pacto aceptado da más vida a los enemigos; la Necrópolis no cambia (v4 y v5)',()=>{
  assert.equal(PD.LEVELS[10].pactoPrecio,undefined,'la Necrópolis se dejó como se jugó');
- for(let li=11;li<15;li++)assert.equal(PD.LEVELS[li].pactoPrecio,0.12,PD.LEVELS[li].short);
- for(let li=11;li<15;li++)assert.ok(PD.LEVELS[li].diff>PD.LEVELS[10].diff||li===12,PD.LEVELS[li].short+' más difícil');
- const g=nuevo3(11);const v0=g.mods.vidaEnem;
- g.active=false;g.round=0;assert.ok(g.pactoPendiente());g.elegirPacto(0);const P=PD.PACTOS.find(q=>q.id===g.pactos[0].id);
- const propio=(P.m&&P.m.vidaEnem)||1;
- assert.ok(Math.abs(g.mods.vidaEnem-v0*propio*1.12)<1e-9,'+12% por el pacto');
+ for(let li=11;li<15;li++)assert.equal(PD.LEVELS[li].pactoPrecio,0.12,PD.LEVELS[li].short+' (v4)');
+ assert.deepEqual([11,12,13,14].map(li=>PD.nivel(li,5).pactoPrecio),[0.06,0.08,0.1,0.12],'v5: sube de a poco');
+ for(let li=11;li<15;li++)assert.ok(PD.nivel(li,5).diff>=PD.LEVELS[10].diff*0.9,PD.LEVELS[li].short+' no más fácil que la Necrópolis');
+ for(const ve of [4,5]){
+  const g=new PD.Game(11,null,3,ve);g.money=1e7;const v0=g.mods.vidaEnem,precio=PD.nivel(11,ve).pactoPrecio;
+  assert.ok(g.pactoPendiente());g.elegirPacto(0);const P=PD.PACTOS.find(q=>q.id===g.pactos[0].id);
+  assert.ok(Math.abs(g.mods.vidaEnem-v0*((P.m&&P.m.vidaEnem)||1)*(1+precio))<1e-9,'v'+ve+': +'+precio*100+'% por el pacto');
+ }
  const h=nuevo3(10);h.active=false;h.round=0;h.elegirPacto(0);const Q=PD.PACTOS.find(q=>q.id===h.pactos[0].id);
  assert.ok(Math.abs(h.mods.vidaEnem-((Q.m&&Q.m.vidaEnem)||1))<1e-9,'la Necrópolis sin precio');
 });
 
-test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis no)',()=>{
+test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis no); la v4 conserva sus números',()=>{
  assert.equal(PD.LEVELS[10].vidaTarde,undefined);
- assert.deepEqual([11,12,13,14].map(li=>PD.LEVELS[li].vidaTarde.x),[9,10,10,11]);
- const g=new PD.Game(12,null,1);g.round=29;assert.equal(g.vidaTarde(),1,'igual hasta la 30');
+ assert.deepEqual([11,12,13,14].map(li=>PD.LEVELS[li].vidaTarde.x),[9,10,10,11],'v4');
+ assert.deepEqual([11,12,13,14].map(li=>PD.nivel(li,5).vidaTarde.x),[2,4,6,9],'v5: escalera');
+ const g=new PD.Game(12,null,1,4);g.round=29;assert.equal(g.vidaTarde(),1,'igual hasta la 30');
  g.round=55;assert.ok(Math.abs(g.vidaTarde()-(1+9*0.5))<1e-9,'a mitad de camino');
- g.round=90;assert.equal(g.vidaTarde(),10,'x10 desde la 80');
+ g.round=90;assert.equal(g.vidaTarde(),10,'x10 desde la 80 en la v4');
+ const g5=new PD.Game(12,null,1,5);g5.round=90;assert.equal(g5.vidaTarde(),4,'x4 en la v5');
+ assert.equal(new PD.Game(12,null,1,4).L.diff,5.2);assert.equal(new PD.Game(12,null,1,5).L.diff,5.0);
+ assert.notEqual(new PD.Game(12,null,1,4).rounds,new PD.Game(12,null,1,5).rounds,'cada versión arma sus rondas');
  const n=new PD.Game(10,null,1);n.round=90;assert.equal(n.vidaTarde(),1);
- g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1);h.round=29;const f=h.spawn('robusto',0,0,1);
+ g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1,4);h.round=29;const f=h.spawn('robusto',0,0,1);
  assert.ok(e.maxHp>f.maxHp*9,'la vida del enemigo sube');
 });
 

@@ -188,9 +188,9 @@
       this.ve = ve || PD.MOTOR_VE;
       this.li = li;
       this.rs = seed === undefined ? (Math.random() * 4294967296) >>> 0 : seed >>> 0;
-      this.L = PD.LEVELS[li];
+      this.L = PD.nivel(li, this.ve);
       this.paths = this.L.paths.map(buildPath);
-      this.rounds = PD.buildRounds(li);
+      this.rounds = PD.buildRounds(li, this.L);
       this.money = this.L.cash;
       this.lives = this.L.lives;
       this.round = 0;            // rondas completadas
