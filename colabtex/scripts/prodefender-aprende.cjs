@@ -19,7 +19,8 @@
    - `guiones`: por reino, la mejor partida (la que llegó más lejos; entre las
      ganadas, la que acabó con más vidas) jugada a jugada: `[ronda, cuándo, 'p',
      tipo, x, y]` poner, `[ronda, cuándo, 'u', n.º de torre, camino]` mejorar,
-     `'v'` vender, `'m'` objetivo (el n.º de torre es el orden en que se puso;
+     `'v'` vender, `'m'` objetivo, `'g'` pinchos, `'k'` pacto, `'x'` Poder del Reino
+     (el n.º de torre es el orden en que se puso;
      cuándo es -1 entre rondas o los pasos desde que empezó la ronda: hay quien
      vende y rehace a mitad de una). El bot la sigue (`--guion N`: hasta la ronda N).
 
@@ -45,10 +46,10 @@ const CADA = 5;
 // La partida rehecha con la misma regla de pasos que prueba.js; por cada torre, su tipo,
 // el orden de sus mejoras y su modo, y al final de cada ronda las torres que había.
 function rehace(p) {
-  if (p.ve !== P.VERSION) throw new Error('otra versión del motor');
+  if (!P.VERSIONES.includes(p.ve)) throw new Error('otra versión del motor');
   const u = String(p.u), li = p.r;
   const quieto = g => g.over || (!g.active && g.enemies.length === 0);
-  let g = new PD.Game(li, null, P.semillaTramo(p.s, u, 0)), k = 0, q = 0, tramo = 0, inicio = 0;
+  let g = new PD.Game(li, null, P.semillaTramo(p.s, u, 0), p.ve), k = 0, q = 0, tramo = 0, inicio = 0;
   // cuándo: -1 entre rondas; si no, los pasos desde que empezó la ronda
   const cuando = () => (g.active ? k - inicio : -1);
   let info = new Map();   // torre → {type, seq, modo}
@@ -76,12 +77,15 @@ function rehace(p) {
     else if (c === 2) { if (!t) throw new Error('venta imposible'); guion.push([g.round + 1, cuando(), 'v', todas.indexOf(info.get(t))]); g.sell(t); }
     else if (c === 3) { if (t) { t.mode = P.MODOS[j[3]]; info.get(t).modo = t.mode; guion.push([g.round + 1, cuando(), 'm', todas.indexOf(info.get(t)), t.mode]); } }
     else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); inicio = k; }
+    else if (c === 6) { if (!g.placeSpikes(j[2], j[3])) throw new Error('pinchos imposibles'); guion.push([g.round + 1, cuando(), 'g', j[2], j[3]]); }
+    else if (c === 7) { guion.push([g.round + 1, cuando(), 'k', j[2]]); if (!g.elegirPacto(j[2])) throw new Error('pacto imposible'); }
+    else if (c === 8) { guion.push([g.round + 1, cuando(), 'x', j[2], j[3]]); if (!g.lanzarPoder(j[2], j[3])) throw new Error('poder imposible'); }
     else if (c === 5) {
       const viejas = g.towers.slice();
       const snap = JSON.parse(JSON.stringify(g.snapshot()));
       snap.continues -= j[2];
       tramo++;
-      g = new PD.Game(li, snap, P.semillaTramo(p.s, u, tramo));
+      g = new PD.Game(li, snap, P.semillaTramo(p.s, u, tramo), p.ve);
       const m = new Map();
       g.towers.forEach((t2, i) => m.set(t2, info.get(viejas[i])));
       info = m; k = 0; q = 0;
@@ -115,7 +119,7 @@ function main() {
   // la más larga de cada partida (misma persona, mismo reino, misma semilla)
   const mejor = new Map();
   for (const { p } of pruebasDe(JSON.parse(fs.readFileSync(archivo, 'utf8')))) {
-    if (!p || p.ve !== P.VERSION || !Array.isArray(p.j)) continue;   // una prueba rota (j no es una lista) no se puede rehacer
+    if (!p || !P.VERSIONES.includes(p.ve) || !Array.isArray(p.j)) continue;   // una prueba rota (j no es una lista) no se puede rehacer
     const key = p.u + '|' + p.r + '|' + p.s;
     const prev = mejor.get(key);
     if (!prev || p.j.length > prev.j.length) mejor.set(key, p);

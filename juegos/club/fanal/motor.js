@@ -5,10 +5,10 @@
      historia, cada una una oleada de polillas seguida de su jefe (ocho
      hasta el Alba, seis en la otra orilla y seis en lo alto, que termina
      en el Sol), y una función que fabrica las del sin fin a partir de la
-     21: los mismos jefes en su fase 2 (la primera vuelta), 3, 4, 5 y 6 (la
-     quinta y todas las que siguen), con una oleada entre cada dos. La travesía es una sola y
+     21: los mismos jefes en su fase 2 (la primera vuelta), 3, 4, 5, 6 (la
+     quinta) y 7 (la sexta y todas las que siguen), con una oleada entre cada dos. La travesía es una sola y
      no se acaba: después del Sol sigue sola hacia el sin fin.
-   - El RIGOR de la fase 6: cada vuelta que se pasa en ella es un grado más
+   - El RIGOR desde la fase 6: cada vuelta que se pasa en ella (y en la 7) es un grado más
      dura que la anterior (más vida, más fuego, escamas más rápidas), y no
      tiene techo: la noche termina por ganar.
    - Los AUGURIOS: cada jornada que pasas, la noche aprende algo (un poco
@@ -219,9 +219,9 @@
 
   /* El sin fin recorre los nueve actos de pelea en bloques de dos: una
      oleada y el jefe del acto, que vuelve en otra fase. La primera vuelta
-     entera es la fase 2, la segunda la 3, la tercera la 4, la cuarta la 5 y
-     de ahí en adelante, la 6. Cada vuelta en la fase 6 sube un grado de
-     rigor (ver `aplicaRigor`): sin eso, la dificultad, los augurios y la
+     entera es la fase 2, la segunda la 3, la tercera la 4, la cuarta la 5,
+     la quinta la 6 y de ahí en adelante, la 7. Cada vuelta desde la fase 6
+     sube un grado de rigor (ver `aplicaRigor`): sin eso, la dificultad, los augurios y la
      vida de los jefes tocaban techo hacia la jornada 80 y, con el arma
      llena, la travesía se volvía infinita. */
   const CICLO_SINFIN = [1, 2, 3, 6, 7, 8, 9, 10, 11];
@@ -232,12 +232,16 @@
   const OLEADA_I_SINFIN = { acto: 1, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.4, fuego: 0.95, balas: 3, apunta: 0.22, picada: 0.07, deriva: 1.5, mensajeras: 1 };
   const oleadaBase = acto => (acto === 1 ? OLEADA_I_SINFIN : JORNADAS[OLEADA_DE_ACTO[acto] - 1]);
   /* La fase de los jefes de una vuelta del sin fin (en la historia, 1). */
-  const FASE_MAX = 6;
+  const FASE_MAX = 7;
   const faseDeVuelta = vuelta => Math.min(FASE_MAX, 2 + Math.max(0, vuelta));
   /* El grado de rigor de una vuelta: 0 antes de la fase 6, 1 la primera vez
-     que se llega a ella (jornadas 93 a 110), 2 la segunda, y así. */
-  const VUELTA_FASE_MAX = FASE_MAX - 2;
-  const gradoDeVuelta = vuelta => Math.max(0, (vuelta || 0) - VUELTA_FASE_MAX + 1);
+     que se llega a ella (jornadas 93 a 110), 2 la segunda, y así. Sigue
+     contando en la fase 7: su primera vuelta (jornadas 111 a 128) ya es el
+     grado 2.
+     Fijo en 4 a propósito: atarlo a FASE_MAX corría el rigor una vuelta
+     al sumar la fase 7. */
+  const VUELTA_RIGOR = 4;
+  const gradoDeVuelta = vuelta => Math.max(0, (vuelta || 0) - VUELTA_RIGOR + 1);
 
   /* El rigor de la fase 6: lo que la noche suma en cada grado. Solo toca lo
      que la prueba no mira (el fuego, la marcha, la puntería, las picadas,
@@ -321,14 +325,14 @@
 
   /* La vida de un jefe en una jornada: crece con el nivel de la jornada
      (el arma también crece, con las mejoras) hasta el cuádruple, en el sin
-     fin con la fuerza, y en las fases 2 y 3 un poco más. Las fases 4, 5 y 6
+     fin con la fuerza, y en las fases 2 y 3 un poco más. Las fases 4 a 7
      tienen la vida de la 3 A PROPÓSITO: la vida de un jefe entra en la prueba (el
      verificador no deja que muera con menos daño), y así una partida de la
      tercera vuelta vale lo mismo con este motor que con el anterior. Lo
-     que las hace más duras son sus habilidades nuevas y, en la fase 6, la
+     que las hace más duras son sus habilidades nuevas y, desde la fase 6, la
      vida que tienen en pantalla (`vidaJefeJuego`), que el verificador no
      mira: él sigue pidiendo esta, que es menos, y nunca rechaza de más. */
-  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3, 4: 1.3, 5: 1.3, 6: 1.3 };
+  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3, 4: 1.3, 5: 1.3, 6: 1.3, 7: 1.3 };
   function vidaJefe(j) {
     const base = VIDA_JEFE[j.jefe] || 0;
     const porJornada = Math.min(4, 1 + 0.05 * Math.max(0, (j.nivel || j.n || 4) - 4));
@@ -638,7 +642,7 @@
     ACTOS, PUNTOS, PUNTOS_MENSAJERA, PUNTOS_JEFE, LLAMAS_EXTRA, LLAMAS_INICIO, LLAMAS_MAX,
     VIDA_JEFE, DISTANCIA_ALBA, CIERRE_ALBA, EMPUJE_ALBA, VENTANA_PULSO,
     JORNADAS, JORNADAS_HISTORIA, INICIO_ACTO, JORNADA_HOGUERA, OLEADA_DE_ACTO, faseDeVuelta, VIDA_FASE,
-    FASE_MAX, gradoDeVuelta, RIGOR, aplicaRigor, vidaJefeJuego,
+    FASE_MAX, VUELTA_RIGOR, gradoDeVuelta, RIGOR, aplicaRigor, vidaJefeJuego,
     dificultad, jornada, actoDe, vidaJefe, formacion, polillasDe,
     resonancia, puntosPolilla, bonusJornada, llamasGanadas, juzgaPulso, latido,
     progresoVacio, mezclaProgreso, mulberry32, hashTexto, valorMensajera, PRUEBA_PUNTO_MAX,

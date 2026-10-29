@@ -346,25 +346,37 @@ function prodrop({ serie1 = false } = {}) {
       <b class="ep-pd-leg">★ LEGENDARIA</b></div>${chispas}</div>`;
 }
 
-/* ---------- PRODROP · Fútbol: la misma mano, con tres cartas de fútbol de
-   verdad: foto, media, nombre y la cinta de las especiales (por tiempo
-   limitado). Las tres son legendarias, con su marco dorado. La media de la
-   izquierda va a la izquierda y las otras a la derecha: la carta de al
-   medio tapa un pedazo de las de los lados, y así las tres se leen. Las
-   medias son las del motor (juegos/prodrop/motor.js; un test las compara). ---------- */
-const CARTAS_FUTBOL = [
-  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 89, cinta: "" },
+/* ---------- PRODROP · Fútbol: cuatro cartas de fútbol de verdad en
+   abanico (foto, media arriba a la derecha, nombre y, en las especiales,
+   su cinta). Van siempre las tres especiales (las de `cinta`) y una
+   estrella más al azar de `ESTRELLAS_FUTBOL`, en un lugar al azar cada vez
+   que se pinta el banner. Las medias son las del motor
+   (juegos/prodrop/motor.js; un test las compara). ---------- */
+const ESTRELLAS_FUTBOL = [
+  { img: "champions/montreal/alexis-sanchez", nombre: "Alexis Sánchez", media: 75, cinta: "" },
   { img: "especiales/realmadrid/mbappe-mvp", nombre: "Mbappé", media: 92, cinta: "MVP DEL CLÁSICO" },
-  { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" }
+  { img: "futbol/realmadrid/bellingham", nombre: "Bellingham", media: 90, cinta: "" },
+  { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" },
+  { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 91, cinta: "" },
+  { img: "champions/intermiami/lionel-messi", nombre: "Messi", media: 89, cinta: "" },
+  { img: "champions/alnassr/cristiano-ronaldo", nombre: "C. Ronaldo", media: 84, cinta: "" },
+  { img: "especiales/alnassr/cristiano-balon-all-time", nombre: "C. Ronaldo", media: 96, cinta: "BOAT" },
+  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 90, cinta: "" },
+  { img: "leyendas/maradona", nombre: "Maradona", media: 95, cinta: "" },
+  { img: "leyendas/ronaldinho", nombre: "Ronaldinho", media: 93, cinta: "" }
 ];
+// las especiales más una estrella al azar, barajadas: [{...carta}] de cuatro
+function manoFutbol(azar = Math.random) {
+  const otra = ESTRELLAS_FUTBOL.filter(c => !c.cinta).sort(() => azar() - 0.5).slice(0, 1);
+  return ESTRELLAS_FUTBOL.filter(c => c.cinta).concat(otra).sort(() => azar() - 0.5);
+}
 function futbol() {
   const az = azar(31);
   let chispas = "";
   for (let i = 0; i < 12; i++) chispas += `<i class="ep-pd-chispa" style="left:${r1(az() * 100)}%;top:${r1(az() * 100)}%;animation-delay:${r1(-az() * 3)}s"></i>`;
   return `<div class="ep-pd ep-fu" aria-hidden="true"><i class="ep-pd-rayos"></i><i class="ep-pd-halo"></i>
-    <div class="ep-pd-mano">${CARTAS_FUTBOL.map((c, i) => `<span class="ep-pd-carta c${i + 1}"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">${i === 1 ? '<i class="ep-pd-holo"></i>' : ""}
-      <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em></span>`).join("")}
-      <b class="ep-pd-leg">★ LEGENDARIA</b></div>${chispas}</div>`;
+    <div class="ep-fu-mano">${manoFutbol().map((c, i) => `<div class="ep-fu-slot f${i + 1}"><span class="ep-fu-carta"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">
+      <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em></span></div>`).join("")}</div>${chispas}</div>`;
 }
 
 /* ---------- FANAL: el farol en la noche y lo que viene a su luz ---------- */

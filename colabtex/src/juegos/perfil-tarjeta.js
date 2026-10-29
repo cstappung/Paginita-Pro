@@ -34,7 +34,9 @@ export const MAX_VITRINA = 6;
 /* req: {logros: n} pide n logros; {podio: true} un puesto 1–3 en una tabla
    de al menos tres personas; {primero: true} el primer puesto en una así;
    {top: <juego>} ser el n.º 1 de alguna tabla de ese juego (de dos o más
-   personas; ver `campeones`); {tienda: true} haberlo comprado.
+   personas; ver `campeones`); {tienda: true} haberlo comprado;
+   {desafio: <club>} haber cobrado el premio 3 (las once graduadas con nota 8
+   o más) del Desafío de plantilla de ese club.
    `anim`: el marco es un dibujo animado (juegos/marcos-animados.js) que
    va encima de la foto, no solo CSS. */
 export const MARCOS = [
@@ -65,6 +67,17 @@ export const MARCOS = [
   { id: "caldero", n: "Caldero de bruja", anim: true, hw: true, req: { tienda: true } },
   { id: "parca", n: "La Parca", anim: true, hw: true, req: { tienda: true } },
   { id: "reycalabaza", n: "Rey Calabaza", anim: true, hw: true, req: { coleccion: 5 } },
+  /* Los de club: el premio del Desafío de plantilla de cada club del álbum
+     de PRODROP (juegos/prodrop/retos.js). Se gana con cualquier premio
+     cobrado de la plantilla `club-<club>` que la economía aceptó. */
+  ...[
+    ["realmadrid", "Real Madrid"], ["barcelona", "Barcelona"], ["manutd", "Manchester United"], ["mancity", "Manchester City"],
+    ["chelsea", "Chelsea"], ["liverpool", "Liverpool"], ["tottenham", "Tottenham"], ["arsenal", "Arsenal"], ["betis", "Real Betis"],
+    ["psg", "PSG"], ["como", "Como"], ["inter", "Inter"], ["roma", "Roma"], ["napoli", "Napoli"], ["dortmund", "Dortmund"], ["bayern", "Bayern Múnich"],
+    ["colocolo", "Colo-Colo"], ["ucatolica", "Universidad Católica"], ["udechile", "Universidad de Chile"],
+    ["river", "River Plate"], ["boca", "Boca Juniors"], ["estudiantes", "Estudiantes"],
+    ["intermiami", "Inter Miami"], ["montreal", "CF Montréal"], ["lafc", "LAFC"], ["alnassr", "Al Nassr"], ["alhilal", "Al Hilal"], ["alittihad", "Al Ittihad"], ["atletico", "Atlético de Madrid"], ["milan", "AC Milan"]
+  ].map(([club, n]) => ({ id: "club" + club, n, req: { desafio: club } })),
   /* Uno por juego, para quien es n.º 1 en cualquiera de sus tablas. */
   ...[
     ["tsnake", "snake", "Serpiente"], ["tminas", "minas", "Campo minado"], ["ttetris", "tetris", "Tetrominós"],
@@ -292,6 +305,8 @@ function calculaEstadisticas(uid, d) {
     /* Lo comprado en la tienda: lo que la economía aceptó (`compras`), o
        lo escrito tal cual mientras no hay economía. */
     compras: (d.compras || d.tienda || {})[uid] || {},
+    /* Los clubes cuyo Desafío de plantilla cobró (`desafios`, de la economía). */
+    desafios: (d.desafios || {})[uid] || {},
     /* El número de edición de cada cosa de Halloween que tiene (tienda.js). */
     ediciones: edicionesDe(uid, d.compras || d.tienda || {}),
     /* Sin todas las lecturas todavía, lo que se gana no se puede negar. */
@@ -316,6 +331,7 @@ export function requisito(item, est, ahora = Date.now()) {
     const p = precioDe(item.id);
     return { ok: false, falta: `${p.toLocaleString("es-CL")} monedas en la tienda`, tienda: true, precio: p };
   }
+  if (r.desafio) return est.desafios && est.desafios[r.desafio] ? { ok: true, falta: "" } : { ok: false, falta: `Cobra el premio de las once graduadas con nota 8 o más del Desafío de plantilla del ${item.n}` };
   if (r.coleccion) {
     const k = coleccionHalloween(est.compras);
     if (k >= r.coleccion) return { ok: true, falta: "" };

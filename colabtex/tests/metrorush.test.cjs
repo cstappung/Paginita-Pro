@@ -46,7 +46,7 @@ test('las reglas de Firebase aceptan las tablas, sus topes y el juego del club',
  assert.ok(cabe('club-metrorush-distancia',1000000));assert.ok(!cabe('club-metrorush-distancia',1000001));
  assert.ok(!cabe('club-metrorush-carrera',0));assert.ok(!cabe('club-metrorush-distancia',1.5));
  // Las demás tablas siguen donde estaban.
- assert.ok(cabe('club-fanal-travesia',1000000));assert.ok(!cabe('club-fanal-travesia',1000001));
+ assert.ok(cabe('club-fanal-sinfin',1000000));assert.ok(!cabe('club-fanal-sinfin',1000001));assert.ok(cabe('club-fanal-travesia',1000001));assert.ok(!cabe('club-fanal-travesia',1000000001));   // la travesía de FANAL ya no se corta en el millón
  assert.ok(!cabe('club-bbtan-rondas',100001));
  // Cada carrera es una partida del club: metrorush está en clubJugadas.
  const j=new RegExp(reglas.clubJugadas.$uid.$juego['.validate'].match(/matches\(\/(.+?)\/\)/)[1]);

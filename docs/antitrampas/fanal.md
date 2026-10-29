@@ -70,6 +70,24 @@ valiendo. Romper la Muda de la Nodriza es `V`; los vidrios de la Vidriera
 no anotan nada. `antitrampas-fanal.test.cjs` juega un robot hasta la
 jornada 112 con los jefes aguantando su vida de pantalla, y pasa.
 
+**La fase 7 y el techo de la travesía** (octubre de 2026, sin cambio de
+versión). Desde la sexta vuelta (jornada 111) `fase: 7`, con la vida de la
+fase 3 (`VIDA_FASE[7] === VIDA_FASE[3]`, en el test). Sus habilidades solo
+dejan romper escamas (el pan de oro, el halo, lo que derraman las grietas),
+que se anulan sin anotar nada; lo demás no se rompe a tiros. El rigor no se
+corrió: sigue contando desde la vuelta de la fase 6 (`VUELTA_RIGOR`). La
+travesía ya no se corta en 1 000 000 puntos: la tabla estaba llena de
+empates en el millón y un empate solo entra con menos tiempo, así que una
+travesía más larga (y por eso más lenta) nunca se guardaba. El techo es
+1 000 000 000 (`resultadoClub`, el verificador y la regla de `soloRanks`, que
+hay que **volver a publicar**); el verificador acepta además un 1 000 000
+exacto cuando la prueba pasa del millón (lo manda un juego viejo en caché, y
+es honesto). La tabla de jornadas se manda cuando mejora la fila de la nube
+(no el récord local, que podía haber subido con una partida rechazada).
+`antitrampas-fanal.test.cjs` lleva al robot a la jornada 112 (fase 7,
+4,7 millones de puntos) y pasa con los puntos enteros y con el millón viejo.
+El iframe subió a `club-72`.
+
 **Pruebas largas, empacadas (versión 5).** Todo lo que guarda una prueba
 tiene un tope de 200 000 caracteres (la regla de `soloPruebas`, el
 `PRUEBA_MAX` de `verificaClub` y el blob del progreso donde viaja la

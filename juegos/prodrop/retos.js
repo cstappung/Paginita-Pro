@@ -26,9 +26,11 @@
   "use strict";
 
   /* ---------- las plantillas ----------
-     Una por club con plantel (el Bayern hoy solo tiene la especial de Kane). */
+     Una por club con plantel (≥15 cartas). */
   const FUT = M.CARDS.filter(c => M.esFutbol(c.col));
   const CLUBES = Object.keys(M.CLUBES).filter(club => FUT.filter(c => c.club === club).length >= 15);
+  // «del Real Madrid», pero «de la Universidad Católica»
+  const delClub = club => (/^Universidad /.test(M.CLUBES[club]) ? "de la " : "del ") + M.CLUBES[club];
   const ITALIA = ["inter", "roma", "napoli", "como"];
   const PREMIER = ["manutd", "mancity", "chelsea", "liverpool", "tottenham", "arsenal"];
   const SUDAMERICA = ["AR", "BR", "UY", "CO", "EC"];
@@ -38,12 +40,15 @@
      es una condición sobre las once juntas. `bandera` es la imagen de
      flags/ que se pinta en vez del emoji (Windows dibuja las banderas
      emoji como dos letras). Solo se agregan al final: el
-     número de la semana elige el reto por su posición. Se activan solos el
+     número de la semana elige el reto por su posición. (La Roja entró
+     segunda, para la semana 43, cuando solo había pasado la 42: meter uno
+     antes de una semana ya jugada cambiaría su reto y sus premios.) Se activan solos el
      lunes; la pantalla los muestra en «Próximos retos» con su fecha. */
   const RETOS = [
     { id: "clasico", titulo: "El Clásico", icono: "⚔️", desc: "Solo Madrid y Barça, con al menos cinco de cada uno.", tope: 6,
       elegible: c => c.club === "realmadrid" || c.club === "barcelona",
       extra: cs => { const m = cs.filter(c => c.club === "realmadrid").length, b = cs.filter(c => c.club === "barcelona").length; return { ok: m >= 5 && b >= 5, txt: `Madrid ${m} · Barça ${b} (mínimo 5 de cada uno)` }; } },
+    { id: "laroja", titulo: "La Roja", icono: "🇨🇱", bandera: "cl", desc: "Once jugadores de la selección chilena.", elegible: c => c.pais === "CL" },
     { id: "bleus", titulo: "Les Bleus", icono: "🇫🇷", bandera: "fr", desc: "Once jugadores de la selección francesa.", elegible: c => c.pais === "FR" },
     { id: "lions", titulo: "Three Lions", icono: "🦁", bandera: "eng", desc: "Once jugadores de la selección inglesa.", elegible: c => c.pais === "ENG" },
     { id: "furia", titulo: "Furia Roja", icono: "🇪🇸", bandera: "es", desc: "Once jugadores de la selección española.", elegible: c => c.pais === "ES" },
@@ -82,7 +87,7 @@
     let m = /^club-([a-z]{2,15})$/.exec(s);
     if (m && CLUBES.includes(m[1])) {
       const club = m[1];
-      return { clave: s, tipo: "club", club, titulo: M.CLUBES[club], desc: `Once jugadores del ${M.CLUBES[club]}.`, elegible: c => c.club === club };
+      return { clave: s, tipo: "club", club, titulo: M.CLUBES[club], desc: `Once jugadores ${delClub(club)}.`, elegible: c => c.club === club };
     }
     m = /^reto-([a-z]{2,12})-([0-9]{1,5})$/.exec(s);
     if (m && RETO[m[1]] && retoDeSemana(+m[2]) === RETO[m[1]]) {
@@ -138,15 +143,60 @@
      primera en `k` y la segunda en `k2`. */
   const PREMIOS = [
     { n: 1, monedas: 50, sobres: ["futbol"], txt: "Plantilla completa y válida" },
-    { n: 2, monedas: 100, sobres: ["futbol", "futbol"], nota: 6, txt: "Las once graduadas con nota 6 o más" },
-    { n: 3, monedas: 250, sobres: ["futbolplus"], nota: 8, txt: "Las once graduadas con nota 8 o más" }
+    { n: 2, monedas: 300, sobres: ["futbolplus"], antes: ["futbol", "futbol"], nota: 6, txt: "Las once graduadas con nota 6 o más" },
+    { n: 3, monedas: 1000, sobres: ["futbolplus", "futbolplus"], antes: ["futbolplus"], nota: 8, txt: "Las once graduadas con nota 8 o más" }
   ];
+  /* `antes`: los sobres que daba ese premio hasta el 29-10-2026 (el 2, dos
+     normales; el 3, un Plus). Un reclamo ya escrito con esa forma sigue
+     valiendo; las reglas de ahora solo dejan escribir la nueva. */
+  const sobresValen = (pr, prefijos) => [pr.sobres, pr.antes].some(l => l && l.length === prefijos.length && l.every((t, i) => M.SOBRE[t].prefijo === prefijos[i]));
+  // el premio que da el marco de perfil de un club: el 3 (las once graduadas con nota 8 o más)
+  const PREMIO_MARCO = 3;
   // «un sobre», «dos sobres», «un sobre Plus»
-  const textoSobres = pr => (pr.sobres[0] === "futbolplus" ? "un sobre Plus" : pr.sobres.length > 1 ? pr.sobres.length === 2 ? "dos sobres" : pr.sobres.length + " sobres" : "un sobre");
+  const textoSobres = pr => { const n = pr.sobres.length, plus = pr.sobres[0] === "futbolplus"; return (n === 1 ? "un sobre" : n === 2 ? "dos sobres" : n + " sobres") + (plus ? " Plus" : ""); };
   const premioOk = (n, ev) => !!ev.valida && (!PREMIOS[n - 1].nota || ev.notaMin >= PREMIOS[n - 1].nota);
   // `club-realmadrid_2`: el reclamo del premio 2 de esa plantilla
   const claveReclamo = (clave, n) => clave + "_" + n;
   const leeReclamo = id => { const m = /^(.+)_([123])$/.exec(String(id || "")); return m ? { clave: m[1], n: +m[2] } : null; };
+
+  /* ---------- el podio de cada semana ----------
+     Cada lunes (al cerrar la semana, `finSemana`) la economía mira las
+     tablas tal como estaban en ese instante: las tablas de los clubes pagan
+     al 1.º, 2.º y 3.º (`PODIO_CLUB`, solo monedas) y la del reto que se
+     cierra paga su podio (`PODIO_RETO`, monedas y sobres; los sobres se
+     cobran con un botón, como los premios). Solo con `MIN_PODIO` personas
+     o más en la tabla: con menos no hay a quién ganarle. La mejor
+     plantilla no paga podio. */
+  const MIN_PODIO = 3;
+  const PODIO_CLUB = [300, 200, 100];
+  const PODIO_RETO = [
+    { n: 1, monedas: 1500, sobres: ["futbolplus", "futbolplus", "futbolplus"] },
+    { n: 2, monedas: 1000, sobres: ["futbolplus"] },
+    { n: 3, monedas: 500, sobres: ["futbol"] }
+  ];
+  // «tres sobres Plus», «un sobre Plus», «un sobre»
+  const textoSobresPodio = pr => (pr.sobres.length === 3 ? "tres sobres Plus" : pr.sobres[0] === "futbolplus" ? "un sobre Plus" : "un sobre");
+  // `reto-clasico-42_p1`: el reclamo de los sobres del 1.º del reto de la semana 42
+  const clavePodio = (clave, n) => clave + "_p" + n;
+  const leePodio = id => { const m = /^(reto-[a-z]{2,12}-[0-9]{1,5})_p([123])$/.exec(String(id || "")); return m ? { clave: m[1], n: +m[2] } : null; };
+  // el orden de una tabla: más puntaje primero; empate, quien la subió antes
+  const ordenaTabla = filas => filas.slice().sort((a, b) => b.puntaje - a.puntaje || a.at - b.at || (a.u < b.u ? -1 : a.u > b.u ? 1 : 0));
+
+  /* ---------- el álbum completo de un club ----------
+     Tener a la vez a cada jugador del club (una copia de su carta, con
+     cualquier nota, graduada o no) paga una vez `ALBUM`. Se cuentan
+     jugadores, no cartas: la especial de un jugador (Mbappé MVP, Kane
+     Balón de Oro) vale por su carta normal, pero no hace falta tenerla
+     (son por tiempo limitado, y el álbum quedaría imposible). El reclamo
+     guarda una copia por jugador (`c`), y la economía comprueba que eran
+     tuyas en ese momento. */
+  const ALBUM = { monedas: 2000, sobres: ["futbolplus", "futbolplus"] };
+  // los jugadores del álbum: la carta normal de cada uno (su `person` es el mismo que el de su especial)
+  const cartasAlbum = club => M.CARDS.filter(c => M.esFutbol(c.col) && c.club === club && !c.especial);
+  // la carta del álbum que cubre la carta `id` (la normal de su jugador), o null si no es de ese club
+  const huecoAlbum = (club, id) => { const c = M.CARDS[id]; return c && c.club === club ? cartasAlbum(club).find(x => x.person === c.person) || null : null; };
+  const claveAlbum = club => "album-" + club;
+  const leeAlbum = id => { const m = /^album-([a-z]{2,15})$/.exec(String(id || "")); return m && CLUBES.includes(m[1]) ? m[1] : null; };
 
   /* El mejor once que se puede armar con estas copias ({key, id, g, gr}):
      cada casilla con la que más suma entre las que juegan ahí, después
@@ -171,8 +221,11 @@
   }
 
   return {
+    delClub,
     MEJOR, CLUBES, RETOS, PRIMERA, SEMANA0, SEMANA_MS, semanaDe, inicioSemana, finSemana, retoDeSemana,
     plantilla, claveClub, claveReto, vigente, encaje, estado, puntosFicha, puntaje, evalua,
-    PREMIOS, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce
+    PREMIOS, sobresValen, PREMIO_MARCO, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce,
+    MIN_PODIO, PODIO_CLUB, PODIO_RETO, textoSobresPodio, clavePodio, leePodio, ordenaTabla,
+    ALBUM, cartasAlbum, huecoAlbum, claveAlbum, leeAlbum
   };
 });

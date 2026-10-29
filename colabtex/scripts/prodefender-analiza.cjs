@@ -72,10 +72,10 @@ function pruebasDe(raiz, soloUid) {
 // La misma regla de pasos que prueba.js (rehace): un paso del motor por jugada pendiente,
 // QUIETO_MAX pasos como mucho entre rondas, recargas con la semilla de su tramo.
 function analiza(p) {
-  if (p.ve !== P.VERSION) throw new Error(`la prueba es de la versión ${p.ve} del motor y esta carpeta tiene la ${P.VERSION} (usa --motor con esa versión)`);
+  if (!(P.VERSIONES || [P.VERSION]).includes(p.ve)) throw new Error(`la prueba es de la versión ${p.ve} del motor y esta carpeta rehace las ${(P.VERSIONES || [P.VERSION]).join(', ')} (usa --motor con esa versión)`);
   const u = String(p.u), li = p.r;
   const quieto = g => g.over || (!g.active && g.enemies.length === 0);
-  const st = { game: new PD.Game(li, null, P.semillaTramo(p.s, u, 0)), k: 0, q: 0, tramo: 0, pasos: 0 };
+  const st = { game: new PD.Game(li, null, P.semillaTramo(p.s, u, 0), p.ve), k: 0, q: 0, tramo: 0, pasos: 0 };
   const rondas = [];
   let cur = null, acciones = [], muestreo = 0;
   const empieza = g => {
@@ -126,11 +126,18 @@ function analiza(p) {
     else if (c === 2) { const t = torre(j[2]); if (!t) throw new Error('venta imposible'); acciones.push('−' + nombre(t.type)); g.sell(t); }
     else if (c === 3) { const t = torre(j[2]); if (t) t.mode = P.MODOS[j[3]]; }
     else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); empieza(g); }
+    else if (c === 6) { if (!g.placeSpikes(j[2], j[3])) throw new Error('pinchos imposibles'); acciones.push('pinchos'); }
+    else if (c === 7) {   // tercera era: el pacto elegido entre los tres que se ofrecían
+      const o = g.ofertasPacto();
+      acciones.push('📜 ' + (j[2] < 3 && o[j[2]] ? o[j[2]].name : 'sin pacto') + ' (de ' + o.map(x => x.id).join(', ') + ')');
+      if (!g.elegirPacto(j[2])) throw new Error('pacto imposible');
+    }
+    else if (c === 8) { if (!g.lanzarPoder(j[2], j[3])) throw new Error('el poder no estaba listo'); acciones.push('✨ Poder del Reino'); }
     else if (c === 5) {
       const snap = JSON.parse(JSON.stringify(g.snapshot()));
       snap.continues -= j[2];
       st.tramo++; st.pasos += st.k;
-      st.game = new PD.Game(li, snap, P.semillaTramo(p.s, u, st.tramo));
+      st.game = new PD.Game(li, snap, P.semillaTramo(p.s, u, st.tramo), p.ve);
       vigila(st.game);
       st.k = 0; st.q = 0;
       acciones.push(j[2] ? '⟲ reintento' : '⟲ reanuda');

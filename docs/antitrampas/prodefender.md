@@ -1,6 +1,9 @@
 # Antitrampas de PRO DEFENDER
 
 Quince tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)`.
+Cada reino pide la ronda 50 del anterior: la interfaz lo bloquea y el verificador lo
+comprueba con tu fila de la tabla anterior (`ctx.filaEn`, que pasa `solo/club.js`; las
+auditorías no la tienen y no lo miran). Ese rechazo («Reino sin desbloquear…») no castiga.
 Los reinos 6–10 (la «segunda era») y 11–15 (la «tercera») se abren a todos uno por día
 (`abre` en `levels.js`, día de Chile, del 22 al 31 de octubre de 2026). Antes de su día solo los
 juegan los administradores y `main.js` no manda su resultado; esa puerta es de la
@@ -68,6 +71,12 @@ segundos. En Node (tests, `scripts/auditar-club.cjs`) se usa el motor cargado en
   del trabajador y de `verifica/prodefender.js` con cualquier cambio del motor,
   los datos (`js/data/`) o las reglas de pasos**: una partida grabada con otro
   motor no se rehace igual.
+- **Varias versiones a la vez** (`VERSIONES` en `prueba.js`, hoy 4 y 5): el motor recibe la
+  versión (`new PD.Game(li, snap, semilla, ve)`) y aplica las reglas de esa versión, así que
+  una partida empezada antes de un cambio se sigue jugando, reanudando y verificando con
+  sus reglas. La 5 suma los bufos de estructuras distintas y da a los jefes x20 de vida y
+  un tercio de la velocidad. Para un cambio de reglas, mejor esto que subir `VERSION`
+  a secas: eso descarta las partidas guardadas a medias de todos.
 
 `sospecha()` (filas sin prueba): más de 100 rondas, o menos de 5 s de juego por
 ronda.

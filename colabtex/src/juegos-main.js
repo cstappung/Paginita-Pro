@@ -594,9 +594,10 @@ function alCambiarSerie1(lista, uid) {
    economía aceptó de la tienda. Perezosos y no enumerables: se calculan la
    primera vez que alguien pinta un marco, una vez por llegada. */
 function conDerivados(d) {
-  let lid = null, com = null;
+  let lid = null, com = null, des = null;
   Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
   Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  Object.defineProperty(d, "desafios", { enumerable: false, get: () => des || (des = desafiosDe(d)) });
   /* Las tablas del club que existen hoy (ranks.js): el perfil no lista
      las de versiones viejas de un juego (el Snake y el buscaminas de antes). */
   Object.defineProperty(d, "vigente", { enumerable: false, value: categoriaVigente });
@@ -614,6 +615,13 @@ function comprasDe(d) {
   if (!d.completo) return d.tienda || {};
   const out = {};
   for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.tienda && Object.keys(x.tienda).length) out[u] = x.tienda;
+  return out;
+}
+/* Los clubes cuyo Desafío de plantilla cobró cada uno (los marcos de club). */
+function desafiosDe(d) {
+  if (!d.completo) return {};
+  const out = {};
+  for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.desafios && Object.keys(x.desafios).length) out[u] = x.desafios;
   return out;
 }
 /* ---------- los tacos de Pool ----------
@@ -2924,8 +2932,8 @@ const ATAJO_RETOS = { ruta: "#cartas/retos", boton: "🏆 Desafío de plantilla"
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
     gancho: "Cartas especiales por tiempo limitado",
-    lema: "Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro, llegaron a los sobres de Fútbol como legendarias especiales, por tiempo limitado. En el mismo sobre están todos: Real Madrid, Barça, el Big Six y más clubes de la Champions, en el sobre normal y en el Plus (con una Épica asegurada).",
-    datos: () => [["2", "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
+    lema: "Los clubes más grandes de España (ahora con el Atlético de Madrid y el AC Milan), Inglaterra, Francia, Alemania e Italia, y ahora también Argentina (nuevo), Estados Unidos (nuevo) y Arabia Saudita (nuevo), con Messi, Alexis y Cristiano. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y más.",
+    datos: () => [[String(MOTOR.CARDS.filter(c => c.especial).length), "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
     gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],

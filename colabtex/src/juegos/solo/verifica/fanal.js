@@ -14,7 +14,12 @@ import FM from '../../../../../juegos/club/fanal/motor.js';
 
 export const PRUEBA = 4;
 
-const TOPE = 1000000;   // el de resultadoClub para los puntos
+/* El techo de los puntos de una travesía (el de resultadoClub y la regla
+   de soloRanks). Era 1 000 000: las travesías largas lo pasaban, la tabla
+   se llenó de empates en el millón y, como un empate solo entra con menos
+   tiempo, ninguna partida nueva se guardaba. `TOPE_VIEJO`: lo que manda un
+   juego que quedó en caché con el techo de antes; es honesto, se acepta. */
+const TOPE = 1000000000, TOPE_VIEJO = 1000000;
 
 /* `ctx.uid`, si la página lo pasa: la prueba lleva la cuenta en la que se
    jugó, y la de otra persona (copiada de soloPruebas, que se lee con
@@ -32,7 +37,7 @@ export function verifica(dato, prueba, ctx) {
   if (cat === 'club-fanal-jornadas') {
     if (dato.puntos !== r.completadas) return 'Las jornadas declaradas (' + dato.puntos + ') no son las de la partida (' + r.completadas + ').';
   } else if (cat === 'club-fanal-travesia') {
-    if (dato.puntos !== Math.min(TOPE, r.puntos)) return 'Los puntos declarados (' + dato.puntos + ') no son los de la partida (' + r.puntos + ').';
+    if (dato.puntos !== Math.min(TOPE, r.puntos) && !(dato.puntos === TOPE_VIEJO && r.puntos > TOPE_VIEJO)) return 'Los puntos declarados (' + dato.puntos + ') no son los de la partida (' + r.puntos + ').';
   } else return 'Categoría desconocida.';
   // El tiempo declarado es el de juego: la suma del de cada jornada (una
   // travesía retomada lleva en su prueba todas las anteriores).

@@ -23,9 +23,10 @@ last one). Internally the later acts are 6–11 (5 is the endless;
 `ROMANO_ACTO` shows them as V–X). After the Sol the same run turns endless
 (21+, `CICLO_SINFIN`), cycling the nine fighting acts in blocks of two
 (wave + boss), the bosses in **phase 2** on the first lap, **phase 3** on
-the second, **phase 4** on the third, **phase 5** on the fourth and **phase 6**
-from the fifth on (`fase`, `faseDeVuelta`, `VIDA_FASE`; jornadas 22–38, 40–56,
-58–74, 76–92, 94+). **There is one mode and no checkpoints**: every
+the second, **phase 4** on the third, **phase 5** on the fourth, **phase 6**
+on the fifth and **phase 7** from the sixth on (`fase`, `faseDeVuelta`,
+`FASE_MAX`, `VIDA_FASE`; boss jornadas 22–38, 40–56, 58–74, 76–92, 94–110,
+112+). **There is one mode and no checkpoints**: every
 travesía starts at jornada 1. But it can be resumed: `guardaPunto` stores
 `prog.punto` (with the proof so far, `ver`, the upgrades and `perdidas`, a
 flame lost mid-jornada that is re-applied on resuming) at the start of
@@ -74,11 +75,15 @@ first sends that one. Things that matter:
   solar wind and an eclipse during which it cannot be hit; it dies
   shrinking into a lantern, and `finalSol` tells why. Entering the
   firmamento brings 180 stars back (the moths you put out «went up»).
-- **Phase 6 has RIGOR, and it has no ceiling** (`aplicaRigor`, `RIGOR`,
-  `gradoDeVuelta` in `motor.js`). Before it, `dificultad`, the augurios,
+- **Rigor starts in phase 6 and has no ceiling** (`aplicaRigor`, `RIGOR`,
+  `gradoDeVuelta` in `motor.js`). It counts laps from the fifth
+  (`VUELTA_RIGOR = 4`, fixed on purpose: tying it to `FASE_MAX` shifted
+  every grado by a lap when phase 7 was added), so phase 7's first lap is
+  already grado 2; `gradoTexto` writes the lap *within* the phase («VII»,
+  «VII (II)»). Before it, `dificultad`, the augurios,
   `endurece` and boss life all hit their caps around jornada 80, so with a
   full weapon the endless run never ended. Now every lap spent in phase 6
-  is one `grado` harder (1 on jornadas 93–110, 2 on 111–128…): boss life
+  is one `grado` harder (1 on jornadas 93–110, 2 on 111–128, in phase 7…): boss life
   on screen +22 % per grado (`vidaJefeJuego`, unbounded), furia, escama
   speed, wave fire, balas, aim, dives and march (high caps), plus the
   phase-6 abilities bring more per grado (`masGrado` in `juego.js`) and come
@@ -88,7 +93,34 @@ first sends that one. Things that matter:
   life), which is lower than the screen life, so it never rejects an honest
   game and a run half-played with the old motor still verifies. Don't use
   `vidaJefeJuego` in `prueba.js`. The transit announces each new grado
-  (`R.RIGOR`) and the HUD/boss card write it as «VI (II)» (`gradoTexto`).
+  (`R.RIGOR`) and the HUD/boss card write the lap within the phase (`gradoTexto`).
+- **Phase 7, «la de oro»** (kintsugi: the glass broke and was mended with
+  gold). `dora` fills the dark body pixels with black lacquer shards split
+  by gold veins (random-walk cracks seeded by canvas size, so every flap
+  frame cracks the same; `porVeta` lowers the density — the Sol uses 600,
+  its face got lost), gold outline; `lienzoJefe` records the phase being
+  drawn (`faseLienzo`) so `roseton` becomes a gold-leaf `aureola` and
+  `roseta` a gold flower; `dorado` maps phase 4's cold colours to golds;
+  `solDeOro` is the Sol's own; `ESCALA_FASE[7]` ×1.55. Its sixth ability
+  per boss (`ESPECIALES7`, block «La fase 7» in `juego.js`, rotation
+  `[7, 2, 3, 4, 5, 6]`, same `cdEsp` as phase 6): Nodriza Pan de oro
+  (swaying gold-leaf escamas: `e.hoja`, `e.vaiven` in `actualizaEscamas`),
+  Faro Grieta (a marked column where you are that splits into two beams
+  moving apart; wrecks cut them), Esfinge Tres cálices (a shell game: the
+  two cups without the light pour fire on their third of the water), Casco
+  Cofre (coins in arcs to marked spots, one on you), Crisálida Costura (a
+  needle stitching shore to shore, starting far from you; stations every
+  16 px with ±8 reach, so you must cross right after a stitch), Hoguera Oro
+  fundido (drops that become spreading puddles), Luna Halo (a ring of
+  escamas with a gap that hangs, then drops at once), Siete Hermanas
+  Grietas del cielo (marked lines between sisters spill a row of escamas)
+  and Sol Fulgor (a gold wave crossing the water; only its marked shadow
+  or a wreck protects). **No proof change**: the only shootable parts are
+  escamas; `VIDA_FASE[7]` is phase 3's. `R.FASE_NUEVA[7]` is announced in
+  the transit the first time; `musica.js` (`FASE_MUSICA_MAX` 7) adds a gold
+  gong on each downbeat and a cymbal swell (`c.oro`), tempo +24 %, still
+  under `EPM_TECHO`. `__fanal.especial(7)` forces it; the Chromium check
+  jumps to 112…128 with `salta(n)`.
 - **Phases 2 to 6 have their own model and their own ability per boss.**
   `sprites.js` draws each boss six times (`nodriza(k, fase)`…,
   `COLORES_<JEFE>_F`, `ESCALA_FASE` ×1.2/×1.35/×1.4/×1.45/×1.5, hit boxes too): phase
@@ -160,8 +192,7 @@ first sends that one. Things that matter:
   lights are escamas, the rest cannot be shot; `VIDA_FASE[5]` is phase 3's
   too. And phase 6's: breaking the Muda is `V` (any boss in phase ≥ 3), a
   Vidriera pane records nothing (`golpeaFase6`), the rest cannot be shot;
-  `VIDA_FASE[6]` is phase 3's as well. `musica.js` caps the phase at 6
-  (`FASE_MUSICA_MAX`): phase 6 adds a glass bell on every eighth and the
+  `VIDA_FASE[6]` is phase 3's as well. `musica.js` gives phase 6 (`FASE_MUSICA_MAX` is now 7, see above) a glass bell on every eighth and the
   melody two octaves up, and the tempo +20 %, still under `EPM_TECHO`.
 
 - **The counter «✦ luces» is the twist made visible.** It starts at 430,
@@ -217,12 +248,22 @@ first sends that one. Things that matter:
   boat can row, so only a wreck could save you); wrecks cast shadows that
   block it. The Esfinge marks a dive's column and the only gap of its dust
   wall, which shots cannot break.
-- **Categories**: `club-fanal-travesia` (points, capped at 1 000 000) and
+- **Categories**: `club-fanal-travesia` (points, capped at 1 000 000 000 —
+  it was 1 000 000 until oct. 2026: long runs passed it (the test robot
+  has 4.7 M at jornada 112), the
+  table filled with ties at the cap, a tie only enters with a shorter time
+  and longer runs take longer, so nothing new was saved; the verifier still
+  accepts an exact 1 000 000 from a cached game when the proof is above it,
+  `TOPE_VIEJO`; coins stay capped at 1 000 000 points) and
   `club-fanal-jornadas` (the furthest jornada completed: 8 is the Alba, 14
   the Hoguera, 20 the Sol). `club-fanal-sinfin` only keeps the marks from
   before proof version 4 (shown as «Sin fin (hasta oct. 2026)»; the rules
   still accept it, so they needed no change). `jornadas` is only sent when it
-  improves, because every result counts as a club play and pays coins.
+  improves, because every result counts as a club play and pays coins —
+  improves **the cloud row** (`mejoraJornada`, from `club-tabla`; same jornada
+  with less time also counts), not the local record: a local best raised by
+  a run the cloud never stored (rejected, too big before v5) used to block
+  every later honest run below it. Guests and offline fall back to local.
   **The top is the jornadas table** (since oct. 2026): the game's own panel
   (`Club.category("club-fanal-jornadas")`, «jornada N» in `conexion.js`) and
   the first option in the Clasificación (`ranks.js`). Ties go to the shorter

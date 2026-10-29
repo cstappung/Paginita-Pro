@@ -236,3 +236,85 @@ test('la Synyster sale solo en las cajas desde CORTE_CAJAS_4; las de antes no ca
   }
   assert.ok(syn > 20, 'después del corte sí sale: ' + syn);
 });
+
+test('el escenario arde con cómo vas: ritmo de estrellas, racha y Star Power', async () => {
+  const { pathToFileURL } = require('node:url');
+  const R = await import(pathToFileURL(path.join(__dirname, '../../juegos/hero/js/rock/ritmo.js')).href);
+  // estrellas con decimales, con los umbrales del motor
+  assert.equal(R.estrellasDe(0), 0);
+  assert.equal(R.estrellasDe(0.77), 3);
+  assert.ok(Math.abs(R.estrellasDe((1.85 + 3.08) / 2) - 4.5) < 1e-9);
+  assert.equal(R.estrellasDe(9), 6);
+  const motor = (o) => ({ score: 0, baseScore: 10000, totalNotes: 200, hitCount: 100, missCount: 0, combo: 0, spActive: false, ...o });
+  assert.equal(R.fuegoDe(null), 0);
+  assert.equal(R.fuegoDe(motor({ score: 0.77 * 5000 })), 0, '3 estrellas sin racha no prenden nada');
+  // la mitad de la canción jugada: el ritmo se mide contra lo que ya pasó, no contra la canción entera
+  assert.ok(Math.abs(R.fuegoDe(motor({ score: 3.08 * 5000 })) - 0.55 * 0.8) < 1e-9, '5 estrellas de ritmo');
+  assert.equal(R.fuegoDe(motor({ score: 9 * 5000, combo: 500, spActive: true })), 1, 'tope');
+  assert.ok(Math.abs(R.fuegoDe(motor({ combo: 60 })) - 0.45 * 0.5) < 1e-9, 'la racha sola');
+  assert.equal(R.fuegoDe(motor({ score: 5 * 5000, hitCount: 5, combo: 0 })), 0, 'con menos de 12 notas no hay ritmo que medir');
+  assert.ok(R.fuegoDe(motor({ combo: 60, spActive: true })) > R.fuegoDe(motor({ combo: 60 })), 'el Star Power suma');
+});
+
+test('la música analizada: energía por banda, los golpes del bombo y la fuerza del tramo', async () => {
+  const { pathToFileURL } = require('node:url');
+  const R = await import(pathToFileURL(path.join(__dirname, '../../juegos/hero/js/rock/ritmo.js')).href);
+  // 12 s: un bombo cada medio segundo en los graves, suave los primeros 6 s y fuerte después; medios y agudos parejos
+  const sr = 8000, N = sr * 12, g = new Float32Array(N), m = new Float32Array(N), a = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const t = i / sr, ph = t % 0.5;
+    g[i] = Math.sin(2 * Math.PI * 60 * t) * Math.exp(-ph * 12) * (t >= 6 ? 1 : 0.25);
+    m[i] = 0.05 * Math.sin(2 * Math.PI * 700 * t); a[i] = 0.02 * Math.sin(2 * Math.PI * 3500 * t);
+  }
+  const M = R.analizaMusica([g, m, a], sr, 60);
+  assert.equal(M.fps, 60); assert.equal(M.n, 720);
+  for (const k of ['g', 'm', 'a', 'gg', 'gm', 'ga', 'f']) { assert.ok(M[k] instanceof Uint8Array, k); assert.equal(M[k].length, 720, k); }
+  // cada bombo fuerte es un golpe, y caen donde está el bombo (cada 30 cuadros)
+  const golpes = []; for (let i = 1; i < M.n; i++) if (M.gg[i] > 150 && M.gg[i - 1] <= 150) golpes.push(i);
+  assert.deepEqual(golpes, [360, 390, 420, 450, 480, 510, 540, 570, 600, 630, 660, 690]);
+  // los graves laten: justo después del golpe mucho más fuerte que antes del siguiente
+  assert.ok(M.g[421] > 3 * M.g[448], `${M.g[421]} vs ${M.g[448]}`);
+  // la fuerza del tramo: baja en la parte suave, alta en la fuerte
+  assert.ok(M.f[120] < 60 && M.f[600] > 200, `${M.f[120]} / ${M.f[600]}`);
+  // silencio: no se rompe (todo cero)
+  const Z = R.analizaMusica([new Float32Array(800), new Float32Array(800), new Float32Array(800)], 8000, 60);
+  assert.equal(Z.n, 6); assert.equal(Math.max(...Z.g, ...Z.gg, ...Z.f), 0);
+});
+
+test('el worker del fondo recibe cada pulso como pulso (con el segundo de la canción y el fuego)', async () => {
+  const { pathToFileURL } = require('node:url');
+  // lo mínimo del navegador para sitio/rock.js: un Worker falso que guarda lo que la página le manda
+  const enviados = [];
+  let trabajador = null;
+  class WorkerFalso {
+    constructor() { trabajador = this; }
+    postMessage(d) { enviados.push(d); if (d.t === 'lienzo') setTimeout(() => this.onmessage({ data: { t: 'listo' } }), 0); }
+    terminate() {}
+  }
+  const lienzo = () => ({ className: '', clientWidth: 800, clientHeight: 450, transferControlToOffscreen: () => ({}), remove() {} });
+  class Canvas {}
+  Canvas.prototype.transferControlToOffscreen = () => ({});
+  const G = globalThis, antes = {};
+  const falsos = {
+    location: { search: '', origin: 'http://x' }, window: { addEventListener() {}, removeEventListener() {} }, addEventListener() {}, Worker: WorkerFalso, OffscreenCanvas: class {}, HTMLCanvasElement: Canvas,
+    ResizeObserver: class { observe() {} }, devicePixelRatio: 1, innerWidth: 800, innerHeight: 450,
+    matchMedia: () => ({ matches: false }), screen: { width: 1920, height: 1080 },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    document: { createElement: lienzo, addEventListener() {}, hidden: false, documentElement: { classList: { add() {}, remove() {}, toggle() {} } } },
+  };
+  falsos.window.parent = falsos.window;
+  for (const [k, v] of Object.entries(falsos)) { antes[k] = Object.getOwnPropertyDescriptor(G, k); Object.defineProperty(G, k, { value: v, configurable: true, writable: true }); }
+  try {
+    const { cargaFondo } = await import(pathToFileURL(path.join(__dirname, '../../juegos/hero/js/sitio/rock.js')).href);
+    const rock = await cargaFondo();
+    assert.ok(trabajador, 'usó el worker');
+    rock.pulso({ beats: 12, animo: 0.2, humor: 0.1, hype: 0.3, dtJuego: 0.016, toca: [true], solo: false, confs: null, golpes: [[0, 1, 0, 0]], seg: 5.25, fuego: [0.7] });
+    const p = enviados[enviados.length - 1];
+    assert.equal(p.t, 'pulso', 'el tipo del mensaje no lo pisa ningún campo del pulso');
+    assert.equal(p.seg, 5.25); assert.deepEqual(p.fuego, [0.7]); assert.equal(p.beats, 12); assert.deepEqual(p.golpes, [[0, 1, 0, 0]]);
+    rock.musica({ fps: 60, n: 1 });
+    assert.equal(enviados[enviados.length - 1].t, 'musica');
+  } finally {
+    for (const [k, d] of Object.entries(antes)) { if (d) Object.defineProperty(G, k, d); else delete G[k]; }
+  }
+});

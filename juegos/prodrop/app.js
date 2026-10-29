@@ -105,6 +105,8 @@ const FUT_PAIS = {
   SCO: 'Escocia', WAL: 'Gales', NIR: 'Irlanda del Norte', IE: 'Irlanda', AR: 'Argentina', IT: 'Italia', CM: 'Camerún', SI: 'Eslovenia',
   GH: 'Ghana', JP: 'Japón', CZ: 'Chequia', SK: 'Eslovaquia', GR: 'Grecia', NO: 'Noruega', EC: 'Ecuador', HU: 'Hungría', UZ: 'Uzbekistán',
   SN: 'Senegal', DZ: 'Argelia', US: 'Estados Unidos', GE: 'Georgia',
+  KR: 'Corea del Sur', CA: 'Canadá', CL: 'Chile', SY: 'Siria', PY: 'Paraguay', VE: 'Venezuela',
+  BO: 'Bolivia', FI: 'Finlandia', GA: 'Gabón', GT: 'Guatemala', IQ: 'Irak', JM: 'Jamaica', ML: 'Malí', NG: 'Nigeria', SA: 'Arabia Saudita', TT: 'Trinidad y Tobago',
   AM: 'Armenia', AT: 'Austria', CH: 'Suiza', CO: 'Colombia', DO: 'República Dominicana', GN: 'Guinea', MX: 'México', RS: 'Serbia', RU: 'Rusia', XK: 'Kosovo',
 };
 // la bandera es una imagen (flags/<país>.png): el emoji no se ve como bandera en Windows, solo las dos letras
@@ -118,6 +120,15 @@ const colDe = k => M.SOBRE[k].col;
 const esFutbolPack = k => M.esFutbol(colDe(k));
 const pad = n => String(n).padStart(3, '0');
 const subtitle = c => M.subtitulo(c);
+/* La rareza que se muestra: las especiales de fútbol (Mbappé MVP, Kane
+   Balón de Oro) se ven como «Especial», aunque para el motor (sobres,
+   probabilidades, re-roll) sigan siendo legendarias. */
+const ESPECIAL = { key: 'especial', label: 'Especial', sym: '✦', color: '#ffd23d' };
+// las leyendas son otra categoría: también legendarias para el motor, pero salen como «Leyenda»
+const LEYENDA = { key: 'leyenda', label: 'Leyenda', sym: '♛', color: '#e8c36a' };
+const rareza = c => (c.leyenda ? LEYENDA : c.especial ? ESPECIAL : TIERS[c.tier]);
+// el lugar de una carta de fútbol entre los clubes: las leyendas (sin club) van al final
+const ixClub = (ordenClub, c) => (c.leyenda ? ordenClub.length : ordenClub.indexOf(c.club));
 // Colores dominantes de cada imagen épica/legendaria (extraídos de las imágenes)
 const PAL = {"angel-abusleme-gta":["#066cf7","#ffe871","#f7461f"],"angel-abusleme-shiny":["#42f77c","#f79963"],"christian-oberli-gta":["#67abf7","#fff27b","#f73618"],"christian-oberli-shiny":["#ff7b86","#f7dd78"],"claudia-prieto-gta":["#ff4c61","#71efff","#ff6300"],"claudia-prieto-shiny":["#f72000","#ffb90c"],"cristian-garces-gta":["#59d7ff","#f72a0f","#ffdb53"],"cristian-garces-shiny":["#64bcf7","#f774a5"],"cristian-tejos-gta":["#77d9ff","#f76203","#7183f7"],"cristian-tejos-shiny":["#f7cd00","#6fa3f7","#f7483c"],"david-watts-gta":["#74ddff","#ffdf6b","#f74134"],"david-watts-shiny":["#f77300"],"felipe-nunez-gta":["#6eb0f7","#ffde7c","#f76183"],"felipe-nunez-shiny":["#09ecf7","#f720d2","#205cf7"],"felix-rojasv2-gta":["#6ad4ff","#6a87f7","#f7d263"],"felix-rojasv2-shiny":["#9e4bf7","#f76177","#f76fde"],"javier-pereda-torres-gta":["#46daff","#5e8ef7","#ffde65"],"javier-pereda-torres-shiny":["#114bf7","#8720f7","#ff5e58"],"marilyn-cruces-gta":["#00e7ff","#ff8900","#ebf765"],"marilyn-cruces-shiny":["#00bbf7","#f72514","#6990f7"],"mario-gac-gta":["#3be0ff","#f7da5c","#f75344"],"mario-gac-shiny":["#f7695b"],"miguel-gutierrez-gta":["#ffdf72","#f75c4f"],"miguel-gutierrez-shiny":["#f70075","#3102f7","#15f700"],"pablo-irarrazaval-gta":["#64a4f7","#ffdf6a","#f72518"],"pablo-irarrazaval-shiny":["#75f700","#00c3f7","#f7cb17"],"rene-botnar-gta":["#58a4f7","#ffdb5d","#f73c2b"],"rene-botnar-shiny":["#f76c00","#f7000c"],"rodrigo-cadiz-gta":["#57e1ff","#ffde65","#f7311d"],"rodrigo-cadiz-shiny":["#00c7f7","#3e79f7","#00f78f"],"rolando-dunner-gta":["#57a5f7","#f7d157","#f76274"],"rolando-dunner-shiny":["#ff798b","#f7d44e"],"tito-arevalo-gta":["#f7425a","#ffdd60","#85d7ff"],"tito-arevalo-shiny":["#f83c44","#85ffeb"],"angel-abusleme-casino":["#f78347"],"christian-oberli-casino":["#f7875e","#f741c5"],"claudia-prieto-casino":["#f79c63"],"cristian-garces-casino":["#f79463"],"cristian-tejos-casino":["#f79863","#3780f7"],"david-watts-casino":["#f79960"],"felipe-nunez-casino":["#f77644"],"felix-rojasv2-casino":["#f79763","#f752bb"],"javier-pereda-torres-casino":["#f7915d"],"marilyn-cruces-casino":["#f78351"],"mario-gac-casino":["#f76d29"],"miguel-gutierrez-casino":["#46b5f7","#c356f7","#f78163"],"pablo-irarrazaval-casino":["#f79657"],"rene-botnar-casino":["#f79863","#5495f7"],"rodrigo-cadiz-casino":["#f79a63"],"rolando-dunner-casino":["#f79a56"],"tito-arevalo-casino":["#f78d5e"],"angel-abusleme-cyberpunk":["#4d92f7","#f78563"],"christian-oberli-cyberpunk":["#f78852","#5dd2f7"],"claudia-prieto-cyberpunk":["#f78663","#f763d2","#8a63f7"],"cristian-garces-cyberpunk":["#f79063","#7cf763"],"cristian-tejos-cyberpunk":["#f79063","#6397f7","#63f7eb"],"david-watts-cyberpunk":["#f79963"],"felipe-nunez-cyberpunk":["#f77c5f"],"felix-rojasv2-cyberpunk":["#f78d5d","#4dd1f7"],"javier-pereda-torres-cyberpunk":["#f78e5a","#6394f7"],"marilyn-cruces-cyberpunk":["#f77d63","#639bf7"],"mario-gac-cyberpunk":["#f79d5b"],"miguel-gutierrez-cyberpunk":["#f78963","#c158f7","#e7f74f"],"pablo-irarrazaval-cyberpunk":["#f79163","#63d8f7"],"rene-botnar-cyberpunk":["#f78263","#63bef7"],"rodrigo-cadiz-cyberpunk":["#f7885c","#cd5bf7"],"rolando-dunner-cyberpunk":["#637af7"],"tito-arevalo-cyberpunk":["#f77a63","#c263f7"],"angel-abusleme-starwars":["#ed6822"],"christian-oberli-starwars":["#eb7113"],"claudia-prieto-starwars":["#f0764b"],"cristian-garces-starwars":["#ef8043"],"cristian-tejos-starwars":["#f0944b"],"david-watts-starwars":["#f08f4b"],"felipe-nunez-starwars":["#eb4f13"],"felix-rojasv2-starwars":["#eb131e"],"javier-pereda-torres-starwars":["#f0884b"],"marilyn-cruces-starwars":["#1363eb"],"mario-gac-starwars":["#f09049"],"miguel-gutierrez-starwars":[],"pablo-irarrazaval-starwars":["#ed4f20"],"rene-botnar-starwars":[],"rodrigo-cadiz-starwars":[],"rolando-dunner-starwars":[],"tito-arevalo-starwars":["#ed5026","#eb1315"],"resistencia-halloween":["#f64608"],"condensador-electrolitico-halloween":["#eb2e13","#ebf04b"],"inductor-toroidal-halloween":["#eb5713"],"led-halloween":["#eb3513","#eb1329"],"transistor-bjt-halloween":["#eb3d13"],"mosfet-potencia-halloween":["#eb4413"],"timer-555-halloween":["#eb5613"],"microcontrolador-halloween":["#eb5913"],"fotoresistencia-ldr-halloween":["#eb3313","#f0a24b"],"sensor-ultrasonico-halloween":["#eb4013"],"condensador-ceramico-halloween":["#eb5113"],"potenciometro-halloween":["#eb5013"],"cristal-oscilador-halloween":["#eb131e","#f08e47","#eb1713"],"diodo-rectificador-halloween":["#eb4e13"],"mosfet-sic-to247-halloween":["#eb5a13"],"gate-driver-halloween":["#eb4813"],"amplificador-operacional-halloween":["#eb4413"],"regulador-7805-halloween":["#ed8a25","#9ceb13"],"esp32-halloween":["#eb2213","#f0b44b"],"transformador-laminado-halloween":["#ec7f1b"],"transformador-ferrita-halloween":["#edef43","#eb4e13"],"sensor-temperatura-humedad-halloween":["#ec4819"],"sensor-pir-halloween":["#f08a4b","#eb1318"],"rele-halloween":["#076ef7","#eb3713","#eb131d"],"sensor-imu-halloween":["#eb4413","#fab041"],"resistencia-dieciochero":["#eb5113","#499cf0","#eba313"],"condensador-electrolitico-dieciochero":["#eb5113"],"inductor-toroidal-dieciochero":["#eb5e13","#eb131a"],"led-dieciochero":["#eb6a13","#f30e0b"],"transistor-bjt-dieciochero":["#f0984b","#eb1314"],"mosfet-potencia-dieciochero":["#f09c4b","#eb131c"],"timer-555-dieciochero":["#f09c4b","#4b96f0","#eb1913"],"microcontrolador-dieciochero":["#f0944b","#ec2716","#eb1318"],"fotoresistencia-ldr-dieciochero":["#f0924b","#4b90f0"],"sensor-ultrasonico-dieciochero":["#eb3d13","#4b92f0"],"condensador-ceramico-dieciochero":["#f0924b"],"potenciometro-dieciochero":["#ee8139"],"cristal-oscilador-dieciochero":["#eb5a13"],"diodo-rectificador-dieciochero":["#eb6b13","#4396ef"],"mosfet-sic-to247-dieciochero":["#f09e4b","#eb1315"],"gate-driver-dieciochero":["#eb5813","#eb1317"],"amplificador-operacional-dieciochero":["#f0994b","#eb131a"],"regulador-7805-dieciochero":["#eb4b13"],"esp32-dieciochero":["#f09a4b","#eb1315"],"transformador-laminado-dieciochero":["#eb8913","#eb2913","#eb1317"],"transformador-ferrita-dieciochero":["#eb5413","#f0cf4b"],"sensor-temperatura-humedad-dieciochero":["#ed4925"],"sensor-pir-dieciochero":["#ebb013","#eb131a","#eb2513"],"rele-dieciochero":["#f0a04b","#047efa","#eb2a13"],"sensor-imu-dieciochero":["#096ef5","#f83233","#ec3f1a"],"resistencia-arcano":["#eb4c13"],"condensador-electrolitico-arcano":["#eb5d13","#1330eb"],"inductor-toroidal-arcano":["#f0874b","#4b71f0"],"led-arcano":["#eb5f13"],"transistor-bjt-arcano":["#ee7134"],"mosfet-potencia-arcano":["#eb5e13"],"timer-555-arcano":["#ec781e"],"microcontrolador-arcano":["#ef803d"],"fotoresistencia-ldr-arcano":["#f08949"],"sensor-ultrasonico-arcano":["#2865ed","#eb6a13"],"condensador-ceramico-arcano":["#ec791e"],"potenciometro-arcano":["#eb5c13"],"cristal-oscilador-arcano":[],"diodo-rectificador-arcano":["#eb4e13"],"mosfet-sic-to247-arcano":["#eb5b13"],"gate-driver-arcano":["#ec7d20","#1352eb"],"amplificador-operacional-arcano":["#eb5d13"],"regulador-7805-arcano":["#eb5813"],"esp32-arcano":["#f0994b"],"transformador-laminado-arcano":["#f0ac4a","#1351eb"],"transformador-ferrita-arcano":["#c544ef","#f04b64","#fcd53f"],"sensor-temperatura-humedad-arcano":["#f07e4b","#eb1324"],"sensor-pir-arcano":["#eb4313","#eb1319"],"rele-arcano":["#1373eb","#eb6013"],"sensor-imu-arcano":["#ed8a23","#1366eb"],"resistencia-quemado":["#eb3813"],"condensador-electrolitico-quemado":["#eb3213"],"inductor-toroidal-quemado":["#eb1f13"],"led-quemado":["#eb1913","#eb1328"],"transistor-bjt-quemado":["#eb2213"],"mosfet-potencia-quemado":["#eb1813"],"timer-555-quemado":["#eb2813"],"microcontrolador-quemado":[],"fotoresistencia-ldr-quemado":["#eb3913"],"sensor-ultrasonico-quemado":["#eb1e13"],"condensador-ceramico-quemado":["#eb4213","#eb131c"],"potenciometro-quemado":[],"cristal-oscilador-quemado":["#eb3c13"],"diodo-rectificador-quemado":["#eb1330"],"mosfet-sic-to247-quemado":[],"gate-driver-quemado":[],"amplificador-operacional-quemado":["#eb4c13"],"regulador-7805-quemado":["#eb4313"],"esp32-quemado":["#eb5913"],"transformador-laminado-quemado":["#eb4513"],"transformador-ferrita-quemado":["#eb9413","#eb4413"],"sensor-temperatura-humedad-quemado":["#f0a24b","#eb3513"],"sensor-pir-quemado":["#eb5b13"],"rele-quemado":["#1374eb","#eb131f"],"sensor-imu-quemado":["#eb1713"],"resistencia-navidad":["#f0604b","#1367eb"],"condensador-electrolitico-navidad":["#eb7313","#eb1c13"],"inductor-toroidal-navidad":["#eb6013"],"led-navidad":["#eb7613","#eb2213"],"transistor-bjt-navidad":["#f0904b","#eb1e13"],"mosfet-potencia-navidad":["#eb5213"],"timer-555-navidad":["#eb5713"],"microcontrolador-navidad":["#ec6a17"],"fotoresistencia-ldr-navidad":["#eb5a13"],"sensor-ultrasonico-navidad":["#eb5e13"],"condensador-ceramico-navidad":["#eb8213","#eb2513"],"potenciometro-navidad":["#eb7013"],"cristal-oscilador-navidad":[],"diodo-rectificador-navidad":["#eb6013"],"mosfet-sic-to247-navidad":["#138beb","#f0824b"],"gate-driver-navidad":["#eb5d13"],"amplificador-operacional-navidad":["#f0864b","#eb1314"],"regulador-7805-navidad":["#eb5513"],"esp32-navidad":["#f0964b","#eb2413"],"transformador-laminado-navidad":["#efa844","#ec2112"],"transformador-ferrita-navidad":["#f0514b","#fddc3e","#f0954b"],"sensor-temperatura-humedad-navidad":["#eb3813"],"sensor-pir-navidad":["#f07e4b"],"rele-navidad":["#067cf8","#ee8131","#eb1a13"],"sensor-imu-navidad":["#eb5813","#1375eb"]};
 const paletteOf = c => {
@@ -267,14 +278,14 @@ function frontHTML(c, lazy) {
   // fútbol: la foto entera y abajo el nombre con el tipo (Base), sin rareza
   // fútbol: la foto entera y abajo el nombre con su rareza; los efectos crecen con ella
   if (M.esFutbol(c.col)) {
-    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}${c.especial ? ' especial esp-' + c.especial : ''}" style="--accent:${accentOf(c)}">
+    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}${c.especial ? ' especial esp-' + c.especial : ''}${c.leyenda ? ' leyenda' : ''}" style="--accent:${accentOf(c)}">
       <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
       ${c.tier >= 2 ? `<div class="holo"><img src="${c.img}" alt="" draggable="false"${ld}></div><div class="glitter"></div>` : ''}
       ${c.tier >= 1 ? '<div class="sweep"></div>' : ''}<div class="glare"></div>
       <div class="fu-top"><span class="fu-pos" title="${c.posiciones.map(p => M.PUESTO[p]).join(' / ')}">${c.posiciones.join(' · ')}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
       ${c.cinta ? `<span class="fu-cinta">${c.cinta}</span>` : ''}
       ${wearHTML(c)}
-      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
+      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${rareza(c).label} ${rareza(c).sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false">${c.club ? `<img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false">` : ''}</span></div>
       <i class="fu-marco"></i>
     </div>`;
   }
@@ -740,9 +751,9 @@ const SKIN = {
    centro], como los pinta `skin-fan`. `hub` es el acceso «Sobres de Fútbol».
    Los demás sobres sacan tres cartas buenas al azar. */
 const PORTADA = {
-  futbol: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
+  futbol: [['colocolo', 'arturo-vidal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
   futbolplus: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
-  hub: [['barcelona', 'lamine-yamal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
+  hub: [['colocolo', 'arturo-vidal'], ['bayern', 'harry-kane-balon'], ['realmadrid', 'mbappe-dictador']],
 };
 // una carta de la portada: por jugador (`club-id`) o, si es una especial, por su archivo (`club-id-especial`)
 const cartaDePortada = (club, id) => CARDS.find(c => c.person === club + '-' + id) || CARDS.find(c => c.uid.startsWith(club + '-' + id + '-'));
@@ -841,7 +852,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico y Harry Kane · Balón de Oro. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
+  futbol: 'Nuevo: el Atlético de Madrid, el AC Milan y las medias de FC 27. Ya llegaron: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Y las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y 38 más. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -862,7 +873,7 @@ function eligeSobre(menu = 'todos') {
   document.body.classList.toggle('menu-futbol', menu === 'futbol');
   $('#chTit').textContent = menu === 'futbol' ? '⚽ Sobres de Fútbol' : 'Elige tu sobre';
   $('#chSub').textContent = menu === 'futbol'
-    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para los 🏆 desafíos de plantilla y el re-roll.'
+    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça, la Premier, el Bayern y más clubes de la Champions. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para los 🏆 desafíos de plantilla y el re-roll.'
     : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Un sobre gratis cada 6 horas.';
   $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
@@ -881,9 +892,9 @@ function eligeSobre(menu = 'todos') {
     const todas = M.POR_COL.futbol, tengo = todas.filter(c => col[c.uid]).length;
     const fan = fanDe('hub');
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
-      <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i></span>
+      <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i><i class="hub-liga"><img src="flags/cl.png" alt="">LIGA CHILENA</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Cartas especiales por tiempo limitado: Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro. Y el sobre normal y el Plus con todos los jugadores</small>
+      <small class="ch-temas">Nuevo: el Atlético de Madrid, el AC Milan y las medias de FC 27. Antes: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Figueroa y más</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -1095,7 +1106,7 @@ function showBanner(c) {
   const b = $('#banner'), t = TIERS[c.tier];
   b.className = `banner ${t.key}`;
   b.style.setProperty('--c', accentOf(c));
-  b.querySelector('.b-tier').textContent = `${t.label.toUpperCase()} ${t.sym}`;
+  b.querySelector('.b-tier').textContent = `${rareza(c).label.toUpperCase()} ${rareza(c).sym}`;
   b.querySelector('.b-name').textContent = c.name;
   const deSobre = comprados.length > 1 ? ` · sobre ${c._sobre + 1} de ${comprados.length}` : '';
   b.querySelector('.b-var').innerHTML = `${subtitle(c)} · N.º ${pad(c.num)}${deSobre}${c._new ? '<em>NUEVA</em>' : ''}`;
@@ -1288,6 +1299,7 @@ let prevTilt = null, zoomC = null, grading = false, gradeSpeed = 1;
 let sellPara = '';
 function openZoom(c) {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  sincronizaCopia(c);
   zoomC = c; sellPara = '';
   const z = $('#zoom'), box = $('#zoomCard');
   box.innerHTML = '';
@@ -1306,7 +1318,7 @@ const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M
 function zoomUI(recien) {
   const c = zoomC, t = TIERS[c.tier], mio = !!c._copy && !c._ajena;
   const venta = mio && c._copy.venta ? ofertaDe(c._copy.venta) : null;
-  $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
+  $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${rareza(c).label} ${rareza(c).sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
     (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '') +
     (venta ? `<br><span class="zi-venta">En el mercado por ${MONEDA}<b>${fmt(venta.p)}</b></span>` : '') +
     (c._ajena ? `<br><span class="zi-venta">De <b>${esc(nombreDe(c._ajena))}</b></span>` : '') +
@@ -1345,12 +1357,21 @@ function zoomUI(recien) {
   // otras copias de la misma carta
   const list = copies[c.uid] || [], base = CARDS.find(x => x.uid === c.uid), cp = $('#copies');
   cp.innerHTML = list.length > 1 && mio ? `<span>Tus copias:</span>` + list.map((x, i) =>
-    `<button data-i="${i}" class="${mismaCopia(x, c._copy) ? 'on' : ''}"${x.gr ? ` style="--gc:${gradeColor(x.g)}"` : ''}>${x.gr ? `<b>${x.g}</b>` : 'Sin graduar'}${x.venta ? ' 💰' : ''}</button>`).join('') : '';
+    `<button data-i="${i}" class="${mismaCopia(x, c._copy) ? 'on' : ''}"${x.gr ? ` style="--gc:${gradeColor(x.g)}"` : ''}>${x.gr ? `Nota <b>${x.g}</b>` : 'Sin graduar'}${enDesafios(x.key).length || enBorradores(x.key).length ? ' 🏆' : ''}${x.venta ? ' 💰' : ''}</button>`).join('') : '';
   cp.querySelectorAll('button').forEach(b => b.onclick = () => {
     const x = list[+b.dataset.i]; if (grading || mismaCopia(x, c._copy)) return;
     const pc = pull.find(p => mismaCopia(p._copy, x));
     openZoom(pc || fromCopy(base, x));
   });
+}
+/* Una carta instanciada guarda su copia de cuando se armó (las del último
+   sobre, en `pull`, viven toda la sesión): si la copia se graduó desde otra
+   vista, el zoom decía «Sin graduar» y ofrecía graduarla otra vez. Antes de
+   abrirla se toma la copia vigente de la colección. */
+function sincronizaCopia(c) {
+  if (!c || !c._copy || c._ajena) return;
+  const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy));
+  if (x && x !== c._copy) { c._copy = x; c.graded = !!x.gr; c.grade = x.g; }
 }
 // llegaron datos nuevos con el zoom abierto: la carta pudo venderse, graduarse o cambiar de dueño
 function refrescaZoom() {
@@ -1366,6 +1387,7 @@ let zoomVuelve = '';   // 'col': a dónde vuelve el zoom al cerrarse
 function cierraZoom() {
   $('#zoom').hidden = true; setTilt(null, null);
   if (zoomVuelve === 'col') { renderCollection(); $('#collection').hidden = false; $('#colGrid').scrollTop = colScroll; }
+  else if (zoomVuelve === 'retos') { $('#retos').hidden = false; renderRetos(); }
   else if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
   zoomVuelve = '';
 }
@@ -1570,7 +1592,10 @@ async function gradeCard() {
   else burst(lx, ly, { n: 22, colors: ['#8b8798', '#5d596a', gc], speed: 3, kinds: ['spark'], gravity: .45 });
 
   c.graded = true;
-  if (c._copy) c._copy.gr = 1;
+  if (c._copy) {
+    c._copy.gr = 1;
+    const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy)); if (x) x.gr = 1;
+  }
   await sleep(400);
   el.classList.remove('slabbing'); front.classList.remove('shine');
   z.classList.remove('grading'); grading = false;
@@ -1627,23 +1652,33 @@ function renderCollection() {
   }).join('');
   $('#colTabs').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { colCol = b.dataset.col; renderCollection(); $('#colGrid').scrollTop = 0; });
   $('#retosBtn3').hidden = !M.esFutbol(colCol);
-  $('#colFilters').innerHTML = [[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])]
-    .map(([i, l, s]) => {
-      const n = todas.filter(c => (i < 0 || c.tier === i) && col[c.uid]).length, tot = todas.filter(c => i < 0 || c.tier === i).length;
-      return `<button data-f="${i}" class="${i === colFilter ? 'on' : ''}" style="--c:${i < 0 ? '#fff' : TIERS[i].color}">${s ? `<i>${s}</i>` : ''}${l} ${n}/${tot}</button>`;
+  /* En fútbol la rareza «Especial» tiene su filtro (y no cuenta como
+     legendaria), y la rejilla va por club, de la media más baja a la más
+     alta: así cada equipo sale entero una sola vez. Las demás colecciones
+     siguen por rareza y, dentro, por variante o temática. */
+  const fut = M.esFutbol(colCol);
+  const filtros = [[-1, 'Todas', '', '#fff'], ...TIERS.map((t, i) => [i, t.label, t.sym, t.color]), ...(fut ? [[4, ESPECIAL.label, ESPECIAL.sym, ESPECIAL.color], [5, LEYENDA.label, LEYENDA.sym, LEYENDA.color]] : [])];
+  const pasa = (c, f) => f < 0 || (fut ? (f === 4 ? !!c.especial : f === 5 ? !!c.leyenda : !c.especial && !c.leyenda && c.tier === f) : c.tier === f);
+  if (!filtros.some(([i]) => i === colFilter)) colFilter = -1;
+  $('#colFilters').innerHTML = filtros.map(([i, l, s, color]) => {
+      const n = todas.filter(c => pasa(c, i) && col[c.uid]).length, tot = todas.filter(c => pasa(c, i)).length;
+      return `<button data-f="${i}" class="${i === colFilter ? 'on' : ''}" style="--c:${color}">${s ? `<i>${s}</i>` : ''}${l} ${n}/${tot}</button>`;
     }).join('');
   $('#colFilters').querySelectorAll('button').forEach(b => b.onclick = () => { colFilter = +b.dataset.f; renderCollection(); });
   const grid = $('#colGrid'); grid.innerHTML = '';
-  // de la peor rareza a la mejor; dentro, en el orden del catálogo (por variante o temática)
-  const lista = todas.filter(c => colFilter < 0 || c.tier === colFilter).sort((a, b) => a.tier - b.tier || a.n - b.n);
-  // las de fútbol van en secciones por rareza y, dentro, por club
-  const claveSec = c => (M.esFutbol(c.col) ? c.vkey + '/' + c.club : c.vkey);
+  const ordenClub = Object.keys(M.CLUBES);
+  const lista = todas.filter(c => pasa(c, colFilter)).sort(fut
+    ? (a, b) => ixClub(ordenClub, a) - ixClub(ordenClub, b) || a.media - b.media || a.n - b.n
+    : (a, b) => a.tier - b.tier || a.n - b.n);
+  const claveSec = c => (fut ? (c.leyenda ? 'leyendas' : c.club) : c.vkey);
   let seccion = '';
   lista.forEach(c => {
     if (claveSec(c) !== seccion) {
       seccion = claveSec(c);
       const de = lista.filter(x => claveSec(x) === seccion), n = de.filter(x => col[x.uid]).length;
-      grid.insertAdjacentHTML('beforeend', `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(M.esFutbol(c.col) ? c.sub : c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
+      grid.insertAdjacentHTML('beforeend', fut
+        ? `<h3 class="col-sec club${c.leyenda ? ' leyendas' : ''}">${c.leyenda ? '<i class="col-corona">♛</i>' : `<img src="${escudo(c.club)}" alt="">`}${esc(c.leyenda ? 'Leyendas' : M.CLUBES[c.club])}<small>${colFilter < 0 ? '' : filtros.find(([i]) => i === colFilter)[1] + ' · '}${n}/${de.length}</small></h3>`
+        : `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
     }
     if (col[c.uid]) {
       const cp = bestCopy(c.uid), inst = cp ? fromCopy(c, cp) : c;
@@ -1654,7 +1689,8 @@ function renderCollection() {
       el.addEventListener('click', () => colOpen(c));
       grid.appendChild(el);
     } else {
-      grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${TIERS[c.tier].color}"><b>${TIERS[c.tier].sym}</b>N.º ${pad(c.num)}<small>${esc(c.name)}</small></div>`);
+      const r = rareza(c);
+      grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${r.color}"><b>${r.sym}</b>${fut ? `${c.media} · ${esc(c.posiciones[0])}` : `N.º ${pad(c.num)}`}<small>${esc(c.name)}</small></div>`);
     }
   });
 }
@@ -1678,12 +1714,35 @@ $('#colBtn2').onclick = openCollection;
    están graduadas. */
 const NR = M.REROLL.n;
 const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
-const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false };
+const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false, orden: 'media', club: '', ver: 'todas' };
+/* Fútbol: la rejilla se ordena (por media, junta las copias del mismo
+   jugador) y se filtra por club y por estado; cada carta dice su media, su
+   posición y, si está graduada, su nota. «Elegir automático» no mira el
+   filtro: sigue tomando primero las repetidas. */
+const RR_ORDEN = { media: 'Media ↓', mediaAsc: 'Media ↑', club: 'Club' };
+const RR_VER = { todas: 'Todas', repetidas: 'Repetidas', sin: 'Sin graduar', graduadas: 'Graduadas' };
+function vistaRerollFutbol(lista) {
+  const cuantas = {};
+  for (const cp of lista) cuantas[CARDS[cp.id].uid] = (cuantas[CARDS[cp.id].uid] || 0) + 1;
+  const ordenClub = Object.keys(M.CLUBES);
+  const v = lista.filter(cp => {
+    const c = CARDS[cp.id];
+    if (rr.club && c.club !== rr.club) return false;
+    return rr.ver === 'repetidas' ? cuantas[c.uid] > 1 : rr.ver === 'sin' ? !cp.gr : rr.ver === 'graduadas' ? !!cp.gr : true;
+  });
+  const cmp = {
+    media: (a, b) => b.media - a.media,
+    mediaAsc: (a, b) => a.media - b.media,
+    club: (a, b) => ixClub(ordenClub, a) - ixClub(ordenClub, b) || b.media - a.media
+  }[rr.orden] || (() => 0);
+  // dentro del mismo jugador, las graduadas primero y de mayor nota
+  return v.sort((x, y) => { const a = CARDS[x.id], b = CARDS[y.id]; return cmp(a, b) || a.name.localeCompare(b.name) || a.n - b.n || (y.gr - x.gr) || ((y.gr ? y.g : 0) - (x.gr ? x.g : 0)); });
+}
 const keyDe = cp => cp.key;
 // las rarezas que se pueden re-rollear: todas bajo la más alta de la colección (fútbol no tiene legendarias)
 const rrTiers = (co = rr.col) => [0, 1, 2].filter(i => i < M.POOL[co].tope);
 // lo que se puede meter: mis copias de esa rareza y esa colección que no están a la venta
-const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && CARDS[cp.id].col === co && !cp.venta);
+const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => M.tierEn(CARDS[cp.id], ahora()) === t && CARDS[cp.id].col === co && !cp.venta);
 /* El orden en que «Elegir automático» las toma: primero las repetidas (de
    cada carta se guarda la mejor), las sin graduar antes que las graduadas,
    y de las graduadas las de nota más baja; las exhibidas al final. */
@@ -1696,11 +1755,13 @@ function ordenAuto(lista) {
   const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || enDesafios(cp.key).length || enBorradores(cp.key).length ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
   return lista.slice().sort((a, b) => peso(a) - peso(b));
 }
+// el nombre en una mini: la primera palabra, o el apellido si va con inicial («S. Rodríguez», «J. I. Díaz»)
+const nombreCorto = n => (/^\S+\.\s/.test(n) ? n.replace(/^(\S+\.\s)+/, '') : n.split(' ')[0]);
 function miniCp(cp, extra = '') {
   const c = CARDS[cp.id];
   return `<span class="mini t${c.tier}" style="--accent:${accentOf(c)}" title="${esc(c.name + ' · ' + subtitle(c) + (cp.gr ? ' · nota ' + cp.g : ' · sin graduar'))}">
     <img src="${c.img}" alt="" loading="lazy" draggable="false">${cp.gr ? `<b style="--gc:${gradeColor(cp.g)}">${cp.g}</b>` : ''}${extra}
-    <small>${esc(c.name.split(' ')[0])}</small></span>`;
+    <small>${esc(nombreCorto(c.name))}</small></span>`;
 }
 function abreReroll() {
   if (!cuenta.listo) return;
@@ -1736,6 +1797,9 @@ function renderReroll() {
   rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
   const enRetos = [...new Set(rr.sel.flatMap(enDesafios))], enBorr = [...new Set(rr.sel.flatMap(enBorradores))];
+  const fut = M.esFutbol(rr.col), vista = fut ? vistaRerollFutbol(lista) : lista;
+  const clubesRr = fut ? Object.keys(M.CLUBES).filter(k => lista.some(cp => CARDS[cp.id].club === k)) : [];
+  if (rr.club && !clubesRr.includes(rr.club)) rr.club = '';
   $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
   $('#rrCols').innerHTML = COLS.map(co => {
     const n = rrTiers(co.key).reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
@@ -1767,7 +1831,12 @@ function renderReroll() {
     </div>
     ${enBorr.length ? `<p class="rr-aviso borrador">📝 Elegiste cartas de tu borrador de ${listaY(enBorr)} (sin subir): si haces el re-roll, esas casillas quedan vacías.</p>` : ''}
     ${enRetos.length ? `<p class="rr-aviso">🏆 Elegiste cartas de tu plantilla subida en ${listaY(enRetos)}: si haces el re-roll, ${enRetos.length === 1 ? 'esa plantilla sale' : 'esas plantillas salen'} de la clasificación hasta que subas otra.</p>` : ''}
-    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (enDesafios(cp.key).length ? `<em class="rr-plant" title="En tu plantilla de ${esc(listaY(enDesafios(cp.key)))}">🏆</em>`
+    ${fut && lista.length ? `<div class="rr-filtros">
+      <label>Ordenar <select id="rrOrden">${Object.entries(RR_ORDEN).map(([k, l]) => `<option value="${k}"${rr.orden === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Club <select id="rrClub"><option value="">Todos</option>${clubesRr.map(k => `<option value="${k}"${rr.club === k ? ' selected' : ''}>${esc(M.CLUBES[k])}</option>`).join('')}</select></label>
+      <span class="rr-ver">${Object.entries(RR_VER).map(([k, l]) => `<button class="chip${rr.ver === k ? ' on' : ''}" data-rr-ver="${k}">${l}</button>`).join('')}</span>
+      <small>${vista.length} de ${lista.length}</small></div>` : ''}
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla${fut ? ' rr-fut' : ''}">${vista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (fut ? `<i class="pl-med">${CARDS[cp.id].media}</i><i class="pl-tag">${CARDS[cp.id].posiciones.join('/')}</i>` : '') + (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (enDesafios(cp.key).length ? `<em class="rr-plant" title="En tu plantilla de ${esc(listaY(enDesafios(cp.key)))}">🏆</em>`
       : enBorradores(cp.key).length ? `<em class="rr-plant" title="En tu borrador de ${esc(listaY(enBorradores(cp.key)))} (sin subir)">📝</em>` : ''))}</button>`).join('')}</div>`
       : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} de ${M.COL[rr.col].label} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
     <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
@@ -1783,6 +1852,11 @@ function renderReroll() {
     rr.seguro = false; Snd.init(); Snd.tick(); renderRerollKeep();
   };
   $('#rrBody').querySelectorAll('.tc-elige').forEach(b => b.onclick = () => toca(b.dataset.c));
+  if ($('#rrOrden')) {
+    $('#rrOrden').onchange = e => { rr.orden = e.target.value; renderReroll(); };
+    $('#rrClub').onchange = e => { rr.club = e.target.value; renderReroll(); };
+    $('#rrBody').querySelectorAll('[data-rr-ver]').forEach(b => b.onclick = () => { rr.ver = b.dataset.rrVer; renderReroll(); });
+  }
   $('#rrBody').querySelectorAll('[data-quita]').forEach(b => b.onclick = () => toca(b.dataset.quita));
   $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, NR).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
   $('#rrLimpia').onclick = () => { rr.sel = []; rr.seguro = false; renderRerollKeep(); };
@@ -1845,10 +1919,17 @@ $('#rlRapido').onclick = cambiaRapido;
 pintaRapido();
 /* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
    cuando de las de más arriba, que es lo que da el «casi» al pasar. */
-function cartaTira(base) {
-  const x = Math.random(), t = Math.min(M.POOL[rl.col].tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POOL[rl.col][t];
-  return l[Math.floor(Math.random() * l.length)].n;
+function cartaTira(base, sinRaras) {
+  const P = M.POOL[rl.col], x = Math.random(), t = Math.min(P.tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2));
+  let l = P[t];
+  // las especiales y las leyendas salen poco: en la tira, con los pesos del re-roll y nunca más de tres
+  if (sinRaras) { const comunes = l.filter(c => !c.especial && !c.leyenda); if (comunes.length) l = comunes; }
+  let k = Math.random() * l.reduce((s, c) => s + P.pesoRerollDe(c), 0);
+  for (const c of l) { k -= P.pesoRerollDe(c); if (k < 0) return c.n; }
+  return l[l.length - 1].n;
 }
+const esRara = id => !!(CARDS[id].especial || CARDS[id].leyenda);
+const RL_RARAS = 3;   // como mucho tres especiales o leyendas en toda la tira
 function ruleta(r, t, nueva) {
   const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
   rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t; rl.col = CARDS[r.id].col;
@@ -1858,13 +1939,15 @@ function ruleta(r, t, nueva) {
   $('#ruleta').classList.remove('fin');
   // la tira: cartas al azar desde esa rareza, sin repetir la vecina, y la que tocó en su lugar
   const ids = [];
+  let raras = 0;
   for (let i = 0; i < RL_N; i++) {
     let id;
-    do { id = cartaTira(sig); } while (i && id === ids[i - 1]);
+    do { id = cartaTira(sig, raras >= RL_RARAS); } while (i && id === ids[i - 1]);
+    if (esRara(id)) raras++;
     ids.push(id);
   }
   ids[RL_GANA] = r.id;
-  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig);
+  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig, true);
   tira.innerHTML = ids.map((id, i) => {
     const c = CARDS[id];
     return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
@@ -2052,6 +2135,12 @@ function tipFutbol() {
   const alta = w[1] + w[2] + w[3], u = plus ? P.ultima[0] + P.ultima[1] : 0;
   const quinta = plus ? [0, P.ultima[0] / u, P.ultima[1] / u] : [w[1] / alta, w[2] / alta, w[3] / alta];
   const [b0, b1, b2] = M.BANDAS, cada = t => { const k = Math.round(n[t] / E[t]); return k <= 1 ? 'casi todos los sobres' : `1 de cada ${k} sobres`; };
+  // las legendarias comunes por un lado y, por otro, las especiales y las leyendas (que pesan distinto)
+  const lComunes = P[3].filter(c => !c.especial && !c.leyenda), lRaras = P[3].filter(c => c.especial || c.leyenda), nLey = lRaras.filter(c => c.leyenda).length;
+  const deCada = c => `1 de cada <b>${fmt(Math.round(P.peso[3] / (E[3] * P.pesoDe(c))))}</b> sobres`;
+  const raras = lRaras.length
+    ? `<p>Además hay ${lRaras.length - nLey} cartas <b>especiales ✦</b>${nLey ? ` y ${nLey} <b>leyendas ♛</b> (los mejores de la historia, sin club)` : ''}: cada una sale en ${deCada(lRaras[0])}, mientras que una legendaria común sale en ${deCada(lComunes[0])}.</p>`
+    : '';
   // una Épica o mejor en el sobre: el god pack siempre la trae; si no, alguna de las cuatro primeras o la quinta
   const pD = M.DIOS / 10000, aOMas = porCarta[2] + porCarta[3], qOMas = plus ? 1 : quinta[1] + quinta[2];
   const epica = pD + (1 - pD) * (1 - (1 - aOMas) ** 4 * (1 - qOMas));
@@ -2068,17 +2157,48 @@ function tipFutbol() {
     <p>Por carta${plus ? ' (las cuatro primeras)' : ''}: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b> · <b>Legendaria ${pct(porCarta[3])}</b>.
       ${quintaTxt}</p>
     <p>${epicaTxt} El ${pct(pD)} son god packs: cinco Épicas o mejores.</p>
-    <p>Hay ${tot} jugadores (de ${new Set(M.POR_COL.futbol.map(c => c.club)).size} clubes): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario.</p>
+    <p>Hay ${tot} jugadores (de ${new Set(M.POR_COL.futbol.map(c => c.club).filter(Boolean)).size} clubes): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${lComunes.length} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${deCada(lComunes[0])}</b> si es legendario.</p>
+    ${raras}
     <p class="fu-pronto">⚽ Próximamente, más equipos y ligas en el mismo sobre.</p>`;
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Medias de FC 27, el Atlético de Madrid y el AC Milan', [
+    '<b>🔴 Atlético de Madrid</b> y <b>⚫ AC Milan</b>: sus 26 y 27 jugadores de EA SPORTS FC 27 (titulares, suplentes y la cantera), con Oblak, Julián Álvarez, Koke, Maignan, Modrić y Pulisic. También entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
+    '<b>📈 Medias de FC 27</b>: pusimos las medias de EA SPORTS FC 27 a todos los jugadores. Unas suben (Courtois 90, Yan Diomandé 84, Gerard Martín 79) y otras bajan (Trent 84). Como la rareza sale de la media, ahora es: <b>Común</b> hasta 76, <b>Rara</b> 77 a 82, <b>Épica</b> 83 a 87 y <b>Legendaria</b> 88 o más.',
+    '<b>🃏 Tus cartas</b>: las que ya tienes se quedan, solo cambian su media y su rareza. Los sobres que ya abriste no cambian.',
+    '<b>🎰 Re-roll</b>: las especiales y las leyendas salen <b>cincuenta veces menos</b> que una legendaria común (alrededor de 1 de cada 30 re-rolls trae una), y la ruleta no muestra más de tres.'
+  ]],
+  ['Octubre 2026 · Llegan las Leyendas', [
+    '<b>♛ Leyendas</b>: 43 de los mejores de la historia, retirados y sin club (solo su bandera): Pelé, Maradona, Zidane, Ronaldo R9, Cruyff, Ronaldinho, Iniesta, Maldini, Beckenbauer, Marcelo, Garrincha y más. Con su propia rareza y su propio filtro en la colección.',
+    '<b>🇨🇱 Chilenos</b>: <b>Elías Figueroa</b> (93, el Rey de Copas, que no está en el FIFA: su media es nuestra) e <b>Iván Zamorano</b> (88, el Bam Bam).',
+    '<b>🎲 Salen muy poco</b>: cada leyenda y cada carta especial sale <b>cinco veces menos</b> que una legendaria común, las dos igual de poco (antes las especiales salían el triple). Los sobres que ya abriste no cambian.',
+    'Su media es la de su carta Icon del FIFA (Hero para Zamorano). Cuentan para tu once como cualquier otra carta, y no hay dos del mismo jugador.'
+  ]],
+  ['Octubre 2026 · Llegan Chile, Argentina, la MLS y Arabia', [
+    '<b>🇨🇱 Colo-Colo, Universidad Católica y Universidad de Chile</b>, con sus planteles de hoy y las medias del FIFA: Vidal, Aránguiz, Zampedri, Medel y compañía.',
+    '<b>🇦🇷 River Plate, Boca Juniors y Estudiantes de La Plata</b>: sus 24 mejores, con Paredes, Arambarri, Otamendi, Muslera y Merentiel. ',
+    '<b>🇺🇸 Inter Miami, CF Montréal y LAFC</b> (Messi, Alexis Sánchez y Son) y <b>🇸🇦 Al Nassr, Al Hilal y Al Ittihad</b> (Cristiano, Rúben Neves y En-Nesyri): sus 24 mejores. Los doce clubes nuevos entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
+    '<b>🇨🇱 La Roja</b>: el reto de la semana del 2 de noviembre es una plantilla solo de jugadores chilenos.',
+    '<b>🔎 Elige la copia</b>: en el selector del desafío sale la mejor copia de cada jugador, con cuántas tienes; tócala para ver todas y elegir cuál va. «Ver» abre la carta en grande, y ahí se gradúa.'
+  ]],
+  ['Octubre 2026 · Podio semanal y premios nuevos', [
+    `<b>🏅 Podio de cada semana</b>: cada lunes, el 1.º, 2.º y 3.º de cada club ganan ${MONEDA}300, ${MONEDA}200 y ${MONEDA}100, y el podio del reto que se cierra ${MONEDA}1500 + tres sobres Plus, ${MONEDA}1000 + un Plus y ${MONEDA}500 + un sobre. Cuenta lo que tenías subido justo antes del lunes, con 3 personas o más en la tabla.`,
+    '<b>🎁 Premios</b>: las once graduadas con nota 6 o más dan ahora un sobre Plus, y con nota 8 o más, dos sobres Plus.',
+    '<b>🖼 Marco de club</b>: ahora se gana con las once graduadas con nota 8 o más.'
+  ]],
+  ['Octubre 2026 · Llega el Bayern Múnich', [
+    '<b>🔴 Bayern Múnich</b>: 20 jugadores nuevos en los sobres de fútbol, con Kane, Kimmich y Musiala legendarios. El Bayern también entra al álbum de clubes del Desafío de plantilla, con su marco de perfil.',
+    '<b>✦ Especial</b>: Mbappé MVP y Kane Balón de Oro ahora tienen su propia rareza en la colección, y cada una va con su club.',
+    '<b>📚 Colección por club</b>: cada equipo sale entero, de la media más baja a la más alta. Los filtros de rareza siguen ahí.',
+    '<b>🎓 Graduar desde el desafío</b>: toca una carta del once o del selector para graduarla ahí mismo o cambiarla. Y el re-roll de fútbol se ordena por media, con filtros por club y estado.'
+  ]],
   ['Octubre 2026 · Desafíos de plantilla', [
     '<b>🏆 Desafíos de plantilla</b>: arma un once en 4-3-3 con tus cartas para el reto de la semana o para el álbum de clubes, súbelo a su clasificación y cobra monedas y sobres. Entra desde el resumen del sobre, la tienda de Fútbol o la colección.',
     '«⚽ Mi plantilla» del perfil se quitó por ahora: su lugar lo toman los desafíos.'
   ]],
   ['Cartas especiales por tiempo limitado', [
-    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>) y <b>Harry Kane · Balón de Oro</b> (media <b>94</b>): dos legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen el triple de seguido que una legendaria común. Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
+    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>), <b>Harry Kane · Balón de Oro</b> (media <b>94</b>) y <b>Cristiano Ronaldo · Balón de Oro All-Time</b> (media <b>96</b>): tres legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen <b>cinco veces menos</b> que una legendaria común (igual que las Leyendas). Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
   ]],
   ['Octubre 2026 · Más clubes de la Champions', [
     '<b>Siete clubes nuevos</b> en los sobres de fútbol: PSG, Inter, Roma, Napoli, Borussia Dortmund, Como y el Real Betis, con los jugadores de su primer equipo (cada uno con su media de EA SPORTS FC). Salen en el sobre normal y en el Plus; los sobres que ya abriste no cambian.',
@@ -2271,7 +2391,12 @@ const jugadorDe = k => { const cp = k ? copiaPorClave(k) : null; return cp ? CAR
    las de siempre (makeCard: funda de graduada, holo, desgaste), y el
    borrador de cada plantilla se recuerda en este navegador hasta subirlo. */
 const RT = window.ProdropRetos;
-const rt = { vista: 'album', clave: '', lista: [], casilla: -1, tab: 'clasif', vuelve: false, ocupado: false };
+// `accion`: la casilla llena que muestra «graduar / cambiar»; `pick`: el jugador tocado en el selector
+const rt = { vista: 'album', clave: '', lista: [], casilla: -1, accion: -1, pick: '', tab: 'clasif', vuelve: false, ocupado: false, ordenElige: 'media',
+  pestana: 'plantillas', albumClub: '' };   // `pestana`: «Plantillas» o «Álbum completo»; `albumClub`: el club abierto en el álbum
+// cómo se ordena el selector de jugadores (se recuerda en este navegador)
+const ORDEN_ELIGE = { media: 'Media', club: 'Equipo', nota: 'Graduación' };
+try { const o = localStorage.getItem('prodrop.ordenElige'); if (ORDEN_ELIGE[o]) rt.ordenElige = o; } catch {}
 const fichaCp = cp => cp && { id: cp.id, g: cp.g, gr: !!cp.gr };
 const misFutbol = () => Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
 const borrador = clave => 'prodrop.reto.' + cuenta.uid + '.' + clave;
@@ -2320,6 +2445,9 @@ function tablaDe(clave) {
     return Object.assign({ cps, ev: RT.evalua(clave, cps.map(fichaCp)) }, f);
   }).filter(f => f.ev.valida).sort((a, b) => b.ev.puntaje - a.ev.puntaje || a.at - b.at);
 }
+// el marco de perfil de un club: se gana con el premio 3, las once graduadas con nota 8 o más (perfil-tarjeta.js)
+const marcoGanado = clave => cobrado(clave, RT.PREMIO_MARCO);
+const chipMarco = p => p.tipo === 'club' ? `<span class="rt-chip${marcoGanado(p.clave) ? ' ok' : ''}" title="Marco de perfil del ${esc(p.titulo)}: viene con el premio de las once graduadas con nota 8 o más">${marcoGanado(p.clave) ? '✓' : '○'} 🖼 Marco</span>` : '';
 // la bandera (imagen) de un reto de selección, o su emoji
 const iconoReto = (r, cls = '') => r.bandera ? `<img class="rt-icono bandera${cls}" src="flags/${r.bandera}.png" alt="">` : `<span class="rt-icono${cls}">${r.icono}</span>`;
 function fichaPlantilla(clave, extra = '') {
@@ -2328,7 +2456,7 @@ function fichaPlantilla(clave, extra = '') {
   const premios = RT.PREMIOS.map(pr => `<span class="rt-chip${cobrado(clave, pr.n) ? ' ok' : ''}" title="${pr.monedas} monedas y ${RT.textoSobres(pr)}">${cobrado(clave, pr.n) ? '✓' : '○'} ${MONEDA}${pr.monedas} + ${pr.sobres.length > 1 ? pr.sobres.length + '×' : ''}${pr.sobres[0] === 'futbolplus' ? '🃏Plus' : '🃏'}</span>`).join('');
   return `<button class="rt-ficha${p.tipo === 'reto' ? ' semana' : ''}" data-clave="${clave}">${icono}
     <b>${esc(p.titulo)}</b><small>${esc(p.desc)}</small>${extra}
-    <span class="rt-estado">${yo >= 0 ? `<span class="rt-chip oro">${fmt(t[yo].ev.puntaje)} pts · #${yo + 1} de ${t.length}</span>` : `<span class="rt-chip">${t.length ? t.length + ' en la tabla' : 'Nadie la ha subido'}</span>`}${premios}</span></button>`;
+    <span class="rt-estado">${yo >= 0 ? `<span class="rt-chip oro">${fmt(t[yo].ev.puntaje)} pts · #${yo + 1} de ${t.length}</span>` : `<span class="rt-chip">${t.length ? t.length + ' en la tabla' : 'Nadie la ha subido'}</span>`}${premios}${chipMarco(p)}</span></button>`;
 }
 function renderAlbum() {
   const n = semanaAhora(), clave = RT.claveReto(n), quedan = RT.finSemana(n) - ahora();
@@ -2336,17 +2464,141 @@ function renderAlbum() {
   $('#rtTitulo').textContent = 'Desafíos de plantilla';
   $('#rtSub').textContent = 'Arma la mejor plantilla con tus cartas, súbela a la clasificación y cobra los premios.';
   $('#rtEligeCapa').hidden = true;
-  $('#rtBody').innerHTML = `<div class="rt-acc"><button class="btn" data-rt-proximos>🔜 Próximos retos</button><button class="btn" data-rt-col>📚 Ver colección</button><button class="btn" data-rt-mercado>🏪 Mercado de fútbol</button><button class="link" data-rt-ayuda>¿Cómo se calcula el puntaje?</button></div>
-    <h3 class="rt-h">📅 Reto de la semana</h3><div class="rt-grid">${fichaPlantilla(clave, `<em class="rt-quedan">⏳ Termina en ${d ? d + ' d ' : ''}${h} h</em>`)}</div>
+  const pestanas = `<div class="mk-tabs rt-pestanas" role="tablist"><button role="tab" data-rt-pestana="plantillas" aria-selected="${rt.pestana === 'plantillas'}">🏆 Plantillas</button><button role="tab" data-rt-pestana="album" aria-selected="${rt.pestana === 'album'}">📖 Álbum completo</button></div>`;
+  const ponPestanas = () => $('#rtBody').querySelectorAll('[data-rt-pestana]').forEach(b => b.onclick = () => { rt.pestana = b.dataset.rtPestana; rt.albumClub = ''; Snd.init(); Snd.tick(); renderAlbum(); $('#rtBody').scrollTop = 0; });
+  if (rt.pestana === 'album') { $('#rtBody').innerHTML = pestanas + albumCompletoHTML(); ponPestanas(); armaAlbumCompleto(); return; }
+  const porCobrar = podioPorCobrar();
+  $('#rtBody').innerHTML = pestanas + `<div class="rt-acc"><button class="btn" data-rt-premios>🎁 Mis premios${porCobrar ? ' <i class="rt-badge">1</i>' : ''}</button><button class="btn" data-rt-proximos>🔜 Próximos retos</button><button class="btn" data-rt-col>📚 Ver colección</button><button class="btn" data-rt-mercado>🏪 Mercado de fútbol</button><button class="link" data-rt-ayuda>¿Cómo se calcula el puntaje?</button></div>
+    <h3 class="rt-h">📅 Reto de la semana</h3><div class="rt-grid">${fichaPlantilla(clave, `<em class="rt-quedan">⏳ Termina en ${d ? d + ' d ' : ''}${h} h · podio: ${MONEDA}${RT.PODIO_RETO[0].monedas} + ${RT.textoSobresPodio(RT.PODIO_RETO[0])} al 1.º</em>`)}</div>
     <h3 class="rt-h">⭐ Mejor plantilla</h3><div class="rt-grid">${fichaPlantilla(RT.MEJOR.clave, '<em class="rt-quedan">Siempre abierta · cualquier club y país</em>')}</div>
     <h3 class="rt-h">📘 Álbum de clubes</h3><div class="rt-grid">${RT.CLUBES.map(c => fichaPlantilla(RT.claveClub(c))).join('')}</div>`;
   $('#rtBody').querySelectorAll('[data-clave]').forEach(b => b.onclick = () => { Snd.init(); Snd.tick(); abreEditorReto(b.dataset.clave); });
+  ponPestanas();
+}
+/* El álbum completo: cada club con cuántas de sus cartas tienes (una de
+   cada una, cualquier nota) y, adentro, todas sus cartas como en la
+   colección: las que tienes con su foto y las que faltan con su nombre y
+   su media. Con todas (sin contar las especiales) se cobra una vez
+   `RT.ALBUM`. */
+/* Se cuentan jugadores: la especial de alguien (Mbappé MVP) cubre su carta
+   normal. `cartaDelHueco` da la carta que se muestra en ese hueco (la normal
+   si la tienes; si no, su especial). */
+const especialDe = c => CARDS.find(x => x.especial && x.person === c.person && (copies[x.uid] || []).length);
+const cartaDelHueco = c => ((copies[c.uid] || []).length ? c : especialDe(c) || null);
+const tieneCarta = c => !!cartaDelHueco(c);
+/* Los álbumes cobrados ({club: hora}): quedan como un ticket, aunque después
+   se vendan o se usen cartas en un re-roll. */
+const albumesCobrados = () => { const a = (cuenta.retos && cuenta.retos.albumes) || {}; return Array.isArray(a) ? Object.fromEntries(a.map(k => [k, 0])) : a; };
+const albumCobrado = club => club in albumesCobrados();
+const fechaAlbum = club => { const at = albumesCobrados()[club]; return at ? new Date(at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+function albumCompletoHTML() {
+  const premio = `${MONEDA}${fmt(RT.ALBUM.monedas)} + ${RT.textoSobres(RT.ALBUM)}`;
+  if (!rt.albumClub) {
+    return `<p class="rt-nota rt-album-intro">Junta <b>todas las cartas de un club</b> (una de cada una, da igual la nota o si está graduada) y cobra <b>${premio}</b>, una vez por club. Las especiales no cuentan.</p>
+      <div class="rt-grid">${RT.CLUBES.map(club => {
+        const todas = RT.cartasAlbum(club), n = todas.filter(tieneCarta).length, ok = n === todas.length, ya = albumCobrado(club);
+        // un álbum cobrado queda como ticket: completado, con su fecha, aunque hoy falten cartas
+        if (ya) return `<button class="rt-ficha rt-album-club ticket" data-album="${club}"><img class="rt-escudo" src="escudos/${club}.png" alt="">
+          <b>${esc(M.CLUBES[club])}</b><small class="rt-ticket">🎟 Completado${fechaAlbum(club) ? ' · ' + fechaAlbum(club) : ''}</small><small>Premio cobrado · hoy tienes ${n}/${todas.length}</small></button>`;
+        return `<button class="rt-ficha rt-album-club${ok ? ' completo' : ''}" data-album="${club}"><img class="rt-escudo" src="escudos/${club}.png" alt="">
+          <b>${esc(M.CLUBES[club])}</b><small>${ok ? '🎁 ¡Completo! Cobra tu premio' : `Te faltan ${todas.length - n}`}</small>
+          <span class="ch-tengo"><i style="width:${(n / todas.length * 100).toFixed(1)}%"></i></span><small>${n}/${todas.length}</small></button>`;
+      }).join('')}</div>`;
+  }
+  const club = rt.albumClub, todas = RT.cartasAlbum(club).slice().sort((a, b) => a.media - b.media || a.n - b.n);
+  const n = todas.filter(tieneCarta).length, ok = n === todas.length, ya = albumCobrado(club);
+  const accion = ya ? `<span class="rt-chip ok rt-ticket">🎟 Completado${fechaAlbum(club) ? ' el ' + fechaAlbum(club) : ''} · premio cobrado</span>`
+    : `<button class="btn primary" data-cobra-album${ok && !rt.ocupado ? '' : ' disabled'}>${ok ? `🎁 Cobrar ${premio}` : `Te faltan ${todas.length - n} para cobrar ${premio}`}</button>`;
+  return `<div class="rt-album-cab"><button class="btn mk-mini" data-album-volver>‹ Clubes</button><img class="rt-escudo chico" src="escudos/${club}.png" alt=""><b>${esc(M.CLUBES[club])}</b><small>${n}/${todas.length}</small>${accion}</div>
+    <div class="col-grid rt-album-grid">${todas.map(c => tieneCarta(c) ? `<span data-album-carta="${cartaDelHueco(c).uid}"></span>`
+      : `<div class="slot" style="--c:${TIERS[c.tier].color}"><b>${TIERS[c.tier].sym}</b>${c.media} · ${esc(c.posiciones[0])}<small>${esc(c.name)}</small></div>`).join('')}</div>`;
+}
+function armaAlbumCompleto() {
+  const b = $('#rtBody');
+  b.querySelectorAll('[data-album]').forEach(x => x.onclick = () => { rt.albumClub = x.dataset.album; Snd.init(); Snd.tick(); renderAlbum(); b.scrollTop = 0; });
+  const v = b.querySelector('[data-album-volver]'); if (v) v.onclick = () => { rt.albumClub = ''; Snd.tick(); renderAlbum(); };
+  // las que tienes, con la mejor copia y su conteo, como en la colección
+  b.querySelectorAll('[data-album-carta]').forEach(slot => {
+    const c = CARDS.find(x => x.uid === slot.dataset.albumCarta), cp = bestCopy(c.uid), inst = cp ? fromCopy(c, cp) : c;
+    const el = makeCard(inst, { back: false, lazy: true }), n = (copies[c.uid] || []).length;
+    if (n > 1) el.insertAdjacentHTML('beforeend', `<span class="count">×${n}</span>`);
+    el.addEventListener('click', () => { const i = cp ? instOf(c, cp) : c; $('#retos').hidden = true; zoomVuelve = 'retos'; openZoom(i); });
+    slot.replaceWith(el);
+  });
+  const cobra = b.querySelector('[data-cobra-album]'); if (cobra) cobra.onclick = cobraAlbum;
+}
+async function cobraAlbum() {
+  const club = rt.albumClub;
+  if (!club || rt.ocupado || albumCobrado(club)) return;
+  rt.ocupado = true; renderAlbum();
+  try {
+    const r = await Red.pide('cobraAlbum', { club });
+    cuenta.retos.albumes = Object.assign(albumesCobrados(), { [club]: r.at });
+    Snd.coin(); toast(`¡Álbum ${RT.delClub(club)} completo! +${fmt(r.monedas)} monedas y ${r.sobres}.`);
+    rt.ocupado = false; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at })));
+    return;
+  } catch (e) { toast(e.message || 'No se pudo.', true); }
+  rt.ocupado = false;
+  if (!$('#retos').hidden) renderAlbum();
+}
+/* El podio de la semana que cerró el lunes (lo calcula la economía): el
+   del reto, con sus premios y el botón para cobrar los sobres si es tuyo, y
+   los clubes donde quedaste en el podio. Cada lunes, los clubes pagan al
+   1.º, 2.º y 3.º de su tabla (`PODIO_CLUB`, con 3 personas o más). */
+const MEDALLA = ['🥇', '🥈', '🥉'];
+// los sobres de un podio del reto que todavía no cobraste
+const podioPorCobrar = () => { const m = cuenta.retos && cuenta.retos.podio && cuenta.retos.podio.mio; return m && !m.cobrado ? m : null; };
+/* «🎁 Mis premios»: lo que ganaste en los desafíos (premios de plantilla,
+   podios de cada semana, álbumes), del más nuevo al más viejo, con el total.
+   Arriba, si quedaste en el podio del reto y no has cobrado sus sobres, el
+   podio con su botón. */
+function pintaPremios() {
+  const h = (cuenta.retos && cuenta.retos.historial) || [], total = h.reduce((s, m) => s + (m.p || 0), 0);
+  const dia = ms => new Date(ms).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
+  $('#rtVerTit').textContent = '🎁 Mis premios';
+  $('#rtVerSub').innerHTML = h.length ? `Llevas <b>${MONEDA}${fmt(total)}</b> ganadas en los desafíos.` : 'Todavía no ganas nada en los desafíos: sube una plantilla y cobra sus premios.';
+  $('#rtVerCancha').innerHTML = `<div class="fu-tip">${podioPasadoHTML()}
+    ${h.length ? `<ol class="rt-historial">${h.map(m => `<li><span><b>${esc(m.d || 'Desafío de plantilla')}</b><small>${dia(m.at)}</small></span><em>+${MONEDA}${fmt(m.p)}</em></li>`).join('')}</ol>` : ''}
+    <p class="rt-nota">Cada lunes se paga el podio de la semana: en cada club, ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)}; en el reto, ${RT.PODIO_RETO.map(x => `${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')}.</p></div>`;
+  const cp = $('#rtVerCancha [data-cobra-podio]');
+  if (cp) cp.onclick = cobraPodio;
+  $('#rtVer').hidden = false;
+}
+function podioPasadoHTML() {
+  const pod = cuenta.retos && cuenta.retos.podio;
+  if (!pod || pod.semana < RT.PRIMERA || !podioPorCobrar()) return '';
+  const reto = RT.claveReto(pod.semana), p = RT.plantilla(reto), tablas = pod.tablas || {}, yo = cuenta.uid;
+  const filaReto = (tablas[reto] || []).map((u, i) => `<li class="${u === yo ? 'yo' : ''}"><i>${MEDALLA[i]}</i><span translate="no">${esc(nombreDe(u))}</span><small>${MONEDA}${RT.PODIO_RETO[i].monedas} + ${RT.textoSobresPodio(RT.PODIO_RETO[i])}</small></li>`).join('');
+  const mio = pod.mio, pr = mio && RT.PODIO_RETO[mio.n - 1];
+  const boton = mio ? (mio.cobrado ? `<p class="rt-nota">✓ Ya cobraste los sobres de tu ${mio.n}.º lugar.</p>`
+    : `<button class="btn primary" data-cobra-podio${rt.ocupado ? ' disabled' : ''}>🎁 Cobrar ${RT.textoSobresPodio(pr)} (${mio.n}.º lugar)</button>`) : '';
+  const misClubes = RT.CLUBES.map(c => [c, (tablas[RT.claveClub(c)] || []).indexOf(yo)]).filter(([, i]) => i >= 0);
+  const clubes = misClubes.length ? `<p class="rt-nota">Tus podios de club: ${misClubes.map(([c, i]) => `${MEDALLA[i]} ${esc(M.CLUBES[c])} (+${RT.PODIO_CLUB[i]})`).join(' · ')}</p>` : '';
+  if (!filaReto && !clubes) return '';
+  return `<div class="rt-podio"><h3 class="rt-h">🏅 Podio de la semana pasada${p ? ` · ${esc(p.titulo)}` : ''}</h3>
+    ${filaReto ? `<ol class="rt-podio-l">${filaReto}</ol>` : `<p class="rt-nota">El reto de la semana pasada no tuvo podio (hacen falta ${RT.MIN_PODIO} personas en la tabla).</p>`}
+    ${boton}${clubes}</div>`;
+}
+async function cobraPodio() {
+  const mio = cuenta.retos && cuenta.retos.podio && cuenta.retos.podio.mio;
+  if (!mio || mio.cobrado || rt.ocupado) return;
+  rt.ocupado = true; $('#rtVer').hidden = true; renderAlbum();
+  try {
+    const r = await Red.pide('cobraPodio', { clave: mio.clave, n: mio.n });
+    mio.cobrado = true; Snd.coin();
+    toast(`¡Podio cobrado! ${r.sobres} por tu ${r.n}.º lugar.`);
+    rt.ocupado = false; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at })));
+    return;
+  } catch (e) { toast(e.message || 'No se pudo.', true); }
+  rt.ocupado = false;
+  if (!$('#retos').hidden) renderAlbum();
 }
 const AYUDA_RETOS = `<p><b>Las cartas son las de tu colección</b>, con su media, su rareza y sus posiciones de siempre. Dos copias de la misma carta solo se diferencian en la nota.</p>
   <p><b>Cada carta vale</b> (media − castigo de posición) × estado. Estado: graduada, 0,80 + 0,02 × nota (nota 10 = ×1,00, nota 6 = ×0,92); sin graduar, ×0,80, porque su nota está oculta.</p>
   <p><b>Posición</b>: en uno de sus puestos juega entero; incómodo (otro puesto de su línea), −3 de media; más lejos no puede jugar.</p>
   <p><b>Puntaje</b> = la suma de las once × 10. Un punto de media son 10 puntos: con la misma nota, el Mbappé del Clásico (92) le gana al de siempre (91). Empate: gana quien la subió primero.</p>
-  <p><b>Premios</b>, una vez por plantilla: ${RT.PREMIOS.map(pr => `${pr.txt.toLowerCase()}, ${MONEDA}${pr.monedas} y ${RT.textoSobres(pr)}${pr.sobres[0] === 'futbolplus' ? '' : ' de Fútbol'}`).join(' · ')}. El reto semanal solo se sube y se cobra durante su semana.</p>`;
+  <p><b>Premios</b>, una vez por plantilla: ${RT.PREMIOS.map(pr => `${pr.txt.toLowerCase()}, ${MONEDA}${pr.monedas} y ${RT.textoSobres(pr)}${pr.sobres[0] === 'futbolplus' ? '' : ' de Fútbol'}`).join(' · ')}. El reto semanal solo se sube y se cobra durante su semana. En el álbum de clubes, el premio de las once graduadas con nota 8 o más trae además el <b>marco de perfil</b> de ese club.</p>
+  <p><b>Podio de la semana</b>: cada lunes se mira la tabla como estaba justo antes. En cada club, el 1.º, 2.º y 3.º ganan ${MONEDA}${RT.PODIO_CLUB.join(`, ${MONEDA}`)}; en el reto que se cierra, ${RT.PODIO_RETO.map(x => `${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(', ')}. Hacen falta ${RT.MIN_PODIO} personas en la tabla. Las monedas llegan solas; los sobres del reto se cobran en el álbum.</p>`;
 // los retos que vienen, con el día en que empiezan (se activan solos el lunes)
 function pintaProximos() {
   const n = semanaAhora(), dia = ms => new Date(ms).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -2362,11 +2614,12 @@ function pintaProximos() {
 function cierraModalReto() {
   if (!$('#rtMercado').hidden) { $('#rtMercado').hidden = true; return true; }
   if (!$('#rtVer').hidden) { $('#rtVer').hidden = true; return true; }
-  if (!$('#rtEligeCapa').hidden) { rt.casilla = -1; renderEditorReto(); return true; }
+  if (!$('#rtEligeCapa').hidden) { rt.casilla = -1; rt.pick = ''; renderEditorReto(); return true; }
+  if (rt.accion >= 0) { rt.accion = -1; renderEditorReto(); return true; }
   return false;
 }
 function abreEditorReto(clave) {
-  rt.vista = 'editor'; rt.clave = clave; rt.casilla = -1;
+  rt.vista = 'editor'; rt.clave = clave; rt.casilla = -1; rt.accion = -1; rt.pick = '';
   let guardada = null;
   try { guardada = JSON.parse(localStorage.getItem(borrador(clave)) || 'null'); } catch {}
   const mia = subidasDe(clave).find(f => f.u === cuenta.uid);
@@ -2388,12 +2641,15 @@ function renderEditorReto() {
   const premios = RT.PREMIOS.map(pr => {
     const ya = cobrado(rt.clave, pr.n), puede = !ya && abierto && RT.premioOk(pr.n, ev);
     return `<div class="rt-premio${ya ? ' cobrado' : ''}"><span>${ya ? '✓' : puede ? '🎁' : '○'} ${esc(pr.txt)}</span>
-      <b>${MONEDA}${pr.monedas} + ${RT.textoSobres(pr)}</b>
+      <b>${MONEDA}${pr.monedas} + ${RT.textoSobres(pr)}${p.tipo === 'club' && pr.n === RT.PREMIO_MARCO ? ' + 🖼 marco de perfil' : ''}</b>
       ${ya ? '<em>Cobrado</em>' : `<button class="btn mk-mini" data-cobra="${pr.n}"${puede && !rt.ocupado ? '' : ' disabled'}>Cobrar</button>`}</div>`;
-  }).join('') + '<p class="rt-nota">Cada premio se cobra una vez por plantilla, con las once cartas que tengas puestas en ese momento.</p>';
+  }).join('') + '<p class="rt-nota">Cada premio se cobra una vez por plantilla, con las once cartas que tengas puestas en ese momento.</p>'
+    + (p.tipo === 'club' ? `<p class="rt-nota">🏅 Cada lunes, el 1.º, 2.º y 3.º de esta tabla ganan ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
+    + (p.tipo === 'reto' ? `<p class="rt-nota">🏅 Al cerrar la semana, el podio de este reto gana: ${RT.PODIO_RETO.map((x, i) => `${MEDALLA[i]} ${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
+    + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el premio de las once graduadas con nota 8 o más te llevas el <b>marco ${esc(RT.delClub(p.club))}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
   $('#rtBody').innerHTML = `<div class="rt-editor">
     <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>
-      <div class="rt-acc"><button class="btn mk-mini" data-rt-auto>✨ Autocompletar con lo mejor</button><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
+      <div class="rt-acc"><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
     <div class="rt-der">
       <div class="rt-caja"><small>Puntaje</small><b class="rt-puntos">${fmt(ev.puntaje)}</b>
         <small>${mia ? `Subida: ${fmt(mia.ev.puntaje)} (${ev.puntaje - mia.ev.puntaje >= 0 ? '+' : ''}${fmt(ev.puntaje - mia.ev.puntaje)})` : 'Aún no la subes'}</small>
@@ -2403,10 +2659,21 @@ function renderEditorReto() {
       <div class="rt-caja"><div class="mk-tabs" role="tablist"><button role="tab" data-rt-tab="clasif" aria-selected="${rt.tab === 'clasif'}">🏆 Clasificación</button><button role="tab" data-rt-tab="premios" aria-selected="${rt.tab === 'premios'}">🎯 Premios</button></div>
         ${rt.tab === 'clasif' ? tabla : premios}</div>
     </div></div>`;
-  pintaCancha($('#rtCancha'), cps, i => { rt.casilla = rt.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderEditorReto(); }, rt.casilla);
+  /* Una casilla vacía abre el selector; una llena primero pregunta:
+     verla en grande o cambiarla. */
+  pintaCancha($('#rtCancha'), cps, i => {
+    Snd.init(); Snd.tick();
+    if (rt.lista[i] && rt.accion !== i && rt.casilla !== i) { rt.accion = i; rt.casilla = -1; }
+    else { rt.accion = -1; rt.casilla = rt.casilla === i ? -1 : i; }
+    renderEditorReto();
+  }, rt.casilla >= 0 ? rt.casilla : rt.accion);
+  if (rt.accion >= 0 && cps[rt.accion]) {
+    const cas = $('#rtCancha').querySelectorAll('.pl-casilla')[ordenCasillas().indexOf(rt.accion)];
+    if (cas) cas.appendChild(accionesCarta(cps[rt.accion], 'cambiar', () => { rt.casilla = rt.accion; rt.accion = -1; renderEditorReto(); }));
+  }
   const b = $('#rtBody');
-  b.querySelector('[data-rt-auto]').onclick = () => { rt.lista = RT.mejorOnce(rt.clave, misFutbol()).map(cp => (cp ? cp.key : '')); rt.casilla = -1; guardaBorrador(); Snd.flip(); renderEditorReto(); };
-  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; guardaBorrador(); renderEditorReto(); };
+  // sin «Autocompletar»: armar el once a mano es el juego (con él bastaba un toque por plantilla para saber si se podía)
+  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; rt.accion = -1; guardaBorrador(); renderEditorReto(); };
   b.querySelector('[data-rt-subir]').onclick = () => accionReto('subeReto');
   b.querySelectorAll('[data-rt-tab]').forEach(x => x.onclick = () => { rt.tab = x.dataset.rtTab; renderEditorReto(); });
   b.querySelectorAll('[data-cobra]').forEach(x => x.onclick = () => accionReto('cobraReto', +x.dataset.cobra));
@@ -2414,43 +2681,112 @@ function renderEditorReto() {
   pintaEligeReto();
 }
 /* El selector, en un modal sobre la cancha (abajo obligaba a bajar cada
-   vez): una copia por carta (la puesta o la mejor graduada), solo las que
-   cumplen la plantilla y pueden jugar en la casilla; primero las de su
-   puesto, después las incómodas, y dentro de mayor a menor media. */
+   vez): una ficha por carta, solo las que cumplen la plantilla y pueden
+   jugar en la casilla; primero las de su puesto, después las incómodas, y
+   dentro de mayor a menor media. La ficha muestra la mejor copia (la
+   graduada con mejor nota; antes mostraba la puesta y la otra, recién
+   graduada, no se podía elegir) y, si tienes varias, cuántas: al tocarla
+   salen todas para elegir cuál va. */
 function pintaEligeReto() {
   const box = $('#rtElige'), capa = $('#rtEligeCapa');
   capa.hidden = rt.casilla < 0;
   if (capa.hidden) return;
   const p = RT.plantilla(rt.clave), slot = M.FORMACION[rt.casilla], usadas = new Map();
   rt.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== rt.casilla) usadas.set(q, j); });
-  const unica = new Map();
+  const grupos = new Map();   // uid → sus copias, la mejor primero
   for (const cp of misFutbol()) {
     const c = CARDS[cp.id];
     if (!p.elegible(c) || RT.encaje(rt.casilla, cp.id).nivel > 1) continue;
-    const vista = unica.get(c.uid), puesta = rt.lista.includes(cp.key);
-    if (!vista || (puesta && !rt.lista.includes(vista.key)) || (!rt.lista.includes(vista.key) && RT.puntosFicha(fichaCp(cp)) > RT.puntosFicha(fichaCp(vista)))) unica.set(c.uid, cp);
+    if (!grupos.has(c.uid)) grupos.set(c.uid, []);
+    grupos.get(c.uid).push(cp);
   }
-  const lista = [...unica.values()].sort((a, b) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
-    || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
+  // entre dos iguales gana la que ya está en el once
+  const valor = cp => RT.puntosFicha(fichaCp(cp)) + (rt.lista.includes(cp.key) ? .001 : 0);
+  for (const l of grupos.values()) l.sort((a, b) => valor(b) - valor(a));
+  /* Dentro de cada grupo (los de su puesto, luego los incómodos): por media,
+     por equipo (cada club junto, en el orden del catálogo) o por graduación
+     (mejor nota primero; las sin graduar al final, por media). */
+  const ordenClub = Object.keys(M.CLUBES), nota = cp => (cp.gr ? cp.g : 0);
+  const porOrden = {
+    media: (a, b) => 0,
+    club: (a, b) => ixClub(ordenClub, CARDS[a.id]) - ixClub(ordenClub, CARDS[b.id]),
+    nota: (a, b) => nota(b) - nota(a)
+  }[rt.ordenElige] || (() => 0);
+  const lista = [...grupos.values()].sort(([a], [b]) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
+    || porOrden(a, b) || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
+  const aqui = rt.lista[rt.casilla];
   let grupo = -1;
   box.innerHTML = `<div class="pl-elige-head"><b>${M.PUESTO[slot.pos][0].toUpperCase() + M.PUESTO[slot.pos].slice(1)} · elige un jugador</b>
-      <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${rt.lista[rt.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
-    <div class="tc-rejilla pl-lista">${lista.length ? lista.map(cp => {
-      const c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = rt.lista[rt.casilla] === cp.key;
+      <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${aqui ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
+    <div class="pl-orden" role="group" aria-label="Ordenar">Ordenar por ${Object.entries(ORDEN_ELIGE).map(([k, l]) => `<button class="chip${rt.ordenElige === k ? ' on' : ''}" data-orden="${k}">${l}</button>`).join('')}</div>
+    <div class="tc-rejilla pl-lista">${lista.length ? lista.map(l => {
+      const cp = l[0], c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = l.some(x => x.key === aqui);
       const cab = en.nivel !== grupo ? `<h4 class="rt-grupo n${en.nivel}">${en.nivel ? `Incómodos en ${slot.pos} · −${en.pen} de media` : `De ${slot.pos}`}</h4>` : '';
       grupo = en.nivel;
-      const nota = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
-      return `${cab}<button class="tc-elige fit-${en.nivel ? 'inc' : 'ok'}" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</button>`;
+      const marca = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
+      const cuantas = l.length > 1 ? `<i class="pl-cuantas" title="Tienes ${l.length} copias">×${l.length}</i>` : '';
+      return `${cab}<div class="tc-elige pl-op fit-${en.nivel ? 'inc' : 'ok'}${rt.pick === c.uid ? ' on' : ''}" role="button" tabindex="0" data-c="${esc(c.uid)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${marca}${cuantas}`)}</div>`;
     }).join('') : `<p class="mk-vacio">No tienes jugadores que cumplan «${esc(p.titulo)}» y puedan jugar de ${slot.pos}: abre sobres de Fútbol.</p>`}</div>`;
   const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => ponReto('');
-  box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; renderEditorReto(); };
+  box.querySelector('[data-cancelar]').onclick = () => { rt.casilla = -1; rt.pick = ''; renderEditorReto(); };
+  box.querySelectorAll('[data-orden]').forEach(x => x.onclick = () => {
+    rt.ordenElige = x.dataset.orden; Snd.init(); Snd.tick();
+    try { localStorage.setItem('prodrop.ordenElige', rt.ordenElige); } catch {}
+    pintaEligeReto();
+  });
   box.querySelector('[data-rt-mk-puesto]').onclick = () => abreMercadoReto();
-  box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => ponReto(x.dataset.c));
+  box.querySelectorAll('[data-c]').forEach(x => x.onclick = () => { Snd.init(); Snd.tick(); rt.pick = rt.pick === x.dataset.c ? '' : x.dataset.c; pintaEligeReto(); });
+  const sel = rt.pick && box.querySelector(`[data-c="${CSS.escape(rt.pick)}"]`), l = sel && grupos.get(rt.pick);
+  if (!l) return;
+  // una sola copia: sus botones encima de la carta; varias: todas debajo, para elegir cuál va
+  if (l.length === 1) { sel.appendChild(accionesCarta(l[0], 'poner', () => ponReto(l[0].key))); return; }
+  sel.after(variantesHTML(l, aqui));
+  sel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+// las copias de una carta en el selector, cada una con «Poner» y «Ver»
+function variantesHTML(l, aqui) {
+  const c = CARDS[l[0].id], box = document.createElement('div');
+  box.className = 'pl-variantes';
+  box.innerHTML = `<p class="pl-var-tit">Tus ${l.length} copias de <b>${esc(c.name)}</b> · elige cuál va</p>` + l.map((x, i) => {
+    const aca = x.key === aqui, otra = !aca && rt.lista.includes(x.key);
+    return `<div class="pl-var${aca ? ' aca' : ''}">${miniCp(x)}
+      <span class="pl-var-tx"><b${x.gr ? ` style="color:${gradeColor(x.g)}"` : ''}>${x.gr ? `Nota ${x.g} · ${GRADE_WORD[x.g]}` : 'Sin graduar'}</b>
+        <small>${[i === 0 ? 'la mejor' : '', aca ? 'en esta casilla' : otra ? 'en otra casilla' : '', x.venta ? '💰 a la venta' : ''].filter(Boolean).join(' · ') || '&nbsp;'}</small></span>
+      <span class="pl-var-bt"><button class="btn mk-mini" data-var-ver="${i}">👁 Ver</button>${aca ? '<em class="pl-var-ya">✓ Puesta</em>' : `<button class="btn mk-mini primary" data-var-pon="${i}">Poner</button>`}</span></div>`;
+  }).join('');
+  box.querySelectorAll('[data-var-pon]').forEach(b => b.onclick = e => { e.stopPropagation(); ponReto(l[+b.dataset.varPon].key); });
+  box.querySelectorAll('[data-var-ver]').forEach(b => b.onclick = e => { e.stopPropagation(); verDesdeReto(l[+b.dataset.varVer]); });
+  return box;
+}
+// el orden en que pintaCancha deja las casillas en la página (de la fila de arriba a la de abajo)
+const ordenCasillas = () => [3, 2, 1, 0].flatMap(f => M.FORMACION.map((s, i) => (s.fila === f ? i : -1)).filter(i => i >= 0));
+/* Los botones sobre una carta del once o del selector: verla en grande
+   (con su nota, sus otras copias y, si no está graduada, el botón para
+   graduarla; al cerrarla se vuelve al desafío) y ponerla o cambiarla. Son
+   botones dentro de otro que se puede tocar: no dejan pasar el toque. */
+function accionesCarta(cp, que, alElegir) {
+  const box = document.createElement('div');
+  box.className = 'rt-acciones';
+  const boton = (txt, tit, fn, cls = '') => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'rt-accion ' + cls; b.innerHTML = txt; b.title = tit;
+    b.onclick = e => { e.stopPropagation(); fn(); };
+    box.appendChild(b);
+  };
+  if (cp) boton(`<b>👁</b><small>Ver</small>`, 'Ver la carta en grande (ahí puedes graduarla)', () => verDesdeReto(cp), 'ver');
+  boton(que === 'poner' ? `<b>👤＋</b><small>Poner</small>` : `<b>⇄</b><small>Cambiar</small>`, que === 'poner' ? 'Poner en la casilla' : 'Cambiar por otro jugador', alElegir, 'pon');
+  box.onclick = e => e.stopPropagation();
+  return box;
+}
+function verDesdeReto(cp) {
+  if (!cp) return;
+  Snd.init(); Snd.tick();
+  $('#retos').hidden = true; zoomVuelve = 'retos'; openZoom(instOf(CARDS[cp.id], cp));
 }
 function ponReto(k) {
   const quien = jugadorDe(k);
   if (quien) rt.lista.forEach((x, j) => { if (j !== rt.casilla && jugadorDe(x) === quien) rt.lista[j] = ''; });
-  rt.lista[rt.casilla] = k; rt.casilla = -1; guardaBorrador(); Snd.flip(); renderEditorReto();
+  rt.lista[rt.casilla] = k; rt.casilla = -1; rt.pick = ''; guardaBorrador(); Snd.flip(); renderEditorReto();
 }
 async function accionReto(accion, n) {
   if (rt.ocupado) return;
@@ -2459,8 +2795,9 @@ async function accionReto(accion, n) {
     const r = await Red.pide(accion, { clave: rt.clave, lista: rt.lista, n });
     if (accion === 'subeReto') { Snd.coin(); toast(`Plantilla subida: ${fmt(r.puntaje)} puntos.`); }
     else {
+      const p = RT.plantilla(rt.clave), marco = p && p.tipo === 'club' && n === RT.PREMIO_MARCO && !marcoGanado(rt.clave);
       Snd.coin(); cuenta.retos.cobrados.push(RT.claveReclamo(rt.clave, n));
-      toast(`¡Premio cobrado! +${r.monedas} monedas y ${r.sobres}.`);
+      toast(`¡Premio cobrado! +${r.monedas} monedas y ${r.sobres}${marco ? `, y el marco ${RT.delClub(p.club)} para tu perfil` : ''}.`);
       // los sobres del premio se abren al tiro, juntos, como unos comprados
       if (r.ks && r.ks.length) { rt.ocupado = false; rt.casilla = -1; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at }))); return; }
     }
@@ -2505,7 +2842,7 @@ function pintaMercadoReto() {
     ${lista.length ? `<div class="rt-mk-lista">${lista.map(({ o, cp, c }) => {
       const tuya = o.u === cuenta.uid, falta = cuenta.parada || cuenta.saldo < o.p, en = i >= 0 ? RT.encaje(i, cp.id) : null, seguro = rmk.seguro === o.id;
       return `<div class="rt-mk-item">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>`)}
-        <span class="rt-mk-tx"><b>${esc(c.name)}</b><small>${esc(M.CLUBES[c.club] || '')}${en && en.nivel ? ` · incómodo, −${en.pen}` : ''}</small>
+        <span class="rt-mk-tx"><b>${esc(c.name)}</b><small>${esc(c.leyenda ? 'Leyenda' : M.CLUBES[c.club] || '')}${en && en.nivel ? ` · incómodo, −${en.pen}` : ''}</small>
           <small>${tuya ? '<b class="rt-mk-tuya">Tu oferta</b>' : `de <span translate="no">${esc(nombreDe(o.u))}</span>`}${cp.gr ? ` · nota ${cp.g}` : ' · sin graduar'}</small>
           ${tuya ? `<span class="rt-mk-precio">${MONEDA}${fmt(o.p)}</span>` : `<button class="btn mk-mini${seguro ? ' primary' : ''}" data-rmk-compra="${esc(o.id)}"${falta || rmk.comprando ? ' disabled' : ''} title="${falta ? 'No te alcanza' : ''}">${rmk.comprando === o.id ? 'Comprando…' : seguro ? `¿Seguro? Comprar por ${MONEDA}${fmt(o.p)}` : `Comprar ${MONEDA}${fmt(o.p)}`}</button>`}</span></div>`;
     }).join('')}</div>` : `<p class="mk-vacio">${todas.length ? 'Nadie vende una carta que cumpla eso: prueba quitando un filtro.' : 'Ahora nadie vende cartas de fútbol.'}</p>`}
@@ -2536,6 +2873,7 @@ function renderRetos() {
 // la ayuda y «Ver colección», en el álbum y en el editor (que se repinta solo)
 $('#rtBody').addEventListener('click', e => {
   if (e.target.closest('[data-rt-proximos]')) pintaProximos();
+  if (e.target.closest('[data-rt-premios]')) pintaPremios();
   if (e.target.closest('[data-rt-mercado]')) abreMercadoReto();
   if (e.target.closest('[data-rt-ayuda]')) { $('#rtVerTit').textContent = '¿Cómo se calcula?'; $('#rtVerSub').textContent = ''; $('#rtVerCancha').innerHTML = `<div class="fu-tip">${AYUDA_RETOS}</div>`; $('#rtVer').hidden = false; }
   if (e.target.closest('[data-rt-col]')) {
@@ -2556,7 +2894,7 @@ $('#rtVolver').onclick = () => { rt.vista = 'album'; rt.casilla = -1; Snd.tick()
 $('#rtVerCerrar').onclick = () => { $('#rtVer').hidden = true; };
 $('#rtVer').addEventListener('click', e => { if (e.target.id === 'rtVer') $('#rtVer').hidden = true; });
 $('#rtMercado').addEventListener('click', e => { if (e.target.id === 'rtMercado' || e.target.closest('[data-rt-mk-cierra]')) $('#rtMercado').hidden = true; });
-$('#rtEligeCapa').addEventListener('click', e => { if (e.target.id === 'rtEligeCapa') { rt.casilla = -1; renderEditorReto(); } });
+$('#rtEligeCapa').addEventListener('click', e => { if (e.target.id === 'rtEligeCapa') { rt.casilla = -1; rt.pick = ''; renderEditorReto(); } });
 $('#retosBtn').onclick = () => abreRetos();
 $('#retosBtn2').onclick = () => abreRetos();
 $('#retosBtn3').onclick = () => { $('#collection').hidden = true; rt.vuelve = false; abreRetos(); };

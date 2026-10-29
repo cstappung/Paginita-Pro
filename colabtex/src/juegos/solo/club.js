@@ -55,7 +55,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       /* Un pendiente de antes de la verificación (sin prueba) se descarta en
          silencio: no es trampa, es una versión vieja. */
       if(v.prueba===undefined||v.prueba===null)continue;
-      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria),ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
+      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria),filaEn,ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
       if(motivo){sospecha(dato,motivo,'pendiente');continue;}
       if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba,h:v.h};
     }
@@ -161,6 +161,12 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
      (Atasco recupera sus partidas) y el verificador: la base de una prueba
      de Atasco tiene que ser la de tu fila sin prueba (verifica/atasco.js).
      Si la tabla aún no llegó por el oyente, se lee una vez. */
+  /* Tu fila en otra tabla del mismo juego (PRO DEFENDER: ¿llegaste a la ronda 50 del reino
+     anterior?). null si no tienes. */
+  async function filaEn(cat){
+    if(invitado||!fantasma)throw new Error('sin cuenta');
+    return propios[cat]!==undefined&&propios[cat]!==null?propios[cat]:((await fantasma.leerTabla(cat)).find(f=>f.uid===usuario.uid)||null);
+  }
   async function filaPropia(cat){
     if(invitado||!fantasma)throw new Error('sin cuenta');
     const fila=propios[cat]!==undefined?propios[cat]:((await fantasma.leerTabla(cat)).find(f=>f.uid===usuario.uid)||null);
@@ -223,7 +229,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
         return;
       }
       const prueba=d.prueba;
-      verificaClub(juego,dato,prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria)}).then(motivo=>{
+      verificaClub(juego,dato,prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria),filaEn}).then(motivo=>{
         if(muerto)return;
         if(motivo){
           sospecha(dato,motivo,'en vivo');
@@ -256,7 +262,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-71&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-72&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

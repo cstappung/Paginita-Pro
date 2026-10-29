@@ -5,7 +5,8 @@
 // Mensajes de la página (sitio/rock.js):
 //   {t:'lienzo', canvas, w, h, dpr}  el OffscreenCanvas (una sola vez) → carga la escena y contesta {t:'listo'}
 //   {t:'tam', w, h, dpr} · {t:'oculto', on} · {t:'monta'} · {t:'desmonta'}
-//   {t:'vivo', yo, rival, otros, alto} · {t:'pulso', beats, animo, humor, hype, dtJuego, toca, solo, confs, golpes}
+//   {t:'vivo', yo, rival, otros, alto} · {t:'pulso', beats, animo, humor, hype, dtJuego, toca, solo, confs, golpes, seg, fuego}
+//   {t:'musica', d} (la canción analizada, ritmo.js: analizaMusica)
 //   {t:'carga', quien} · {t:'poder', quien, on} · {t:'ataque', quien} · {t:'hype', kind, text, color} · {t:'fin', ganador, texto}
 // El worker contesta {t:'listo'}, {t:'error', m}, {t:'preparado'} (la canción ya puede empezar) y {t:'demasiado'}
 // (el juego no da ni con el mínimo).
@@ -45,6 +46,7 @@ function atiende(d) {
     case 'carga': rock.carga(d.quien); break;
     case 'poder': rock.poder(d.quien, d.on); break;
     case 'pulso': rock.pulso(d); break;
+    case 'musica': rock.musica(d.d); break;
     case 'ataque': rock.ataque(d.quien); break;
     case 'hype': rock.hype(d.kind, d.text, d.color); break;
     case 'fin': rock.fin(d.ganador, d.texto); break;

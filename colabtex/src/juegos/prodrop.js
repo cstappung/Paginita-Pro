@@ -72,7 +72,19 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       subidas[clave] = filas;
     }
     const mios = (d.plantillas && d.plantillas.p && d.plantillas.p[uid]) || {};
-    return { subidas, cobrados: Object.keys(mios), semana };
+    const podiosMios = (d.plantillas && d.plantillas.q && d.plantillas.q[uid]) || {};
+    /* El podio de la semana que cerró (semana − 1): clubes y reto, con
+       quién quedó 1.º, 2.º y 3.º, y los sobres del reto que me tocan. */
+    const pasada = semana - 1, pod = (e.podiosSemana || {})[pasada] || {}, podio = {};
+    for (const [clave, us] of Object.entries(pod)) podio[clave] = us.map(persona);
+    const yo = ((e.usuarios[uid] || {}).podiosReto) || {}, reto = PR.claveReto(pasada);
+    const miPodio = yo[reto] ? { clave: reto, n: yo[reto], cobrado: !!podiosMios[PR.clavePodio(reto, yo[reto])] } : null;
+    // los álbumes completos ya cobrados (por club)
+    const albumes = {};
+    for (const [id, x] of Object.entries((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})) { const club = PR.leeAlbum(id); if (club && x) albumes[club] = x.at || 0; }
+    // lo que ganó en los desafíos (premios, podios, álbumes), del más nuevo al más viejo
+    const historial = (((e.usuarios[uid] || {}).movs) || []).filter(m => m.c === "plantilla").slice(-150).reverse();
+    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio }, albumes, historial };
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -159,9 +171,9 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           if (cs.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
           const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
           if (fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
-          const tier = MOTOR.CARDS[fichas[0].id].tier;
+          const ahoraSrv = fb.ahora(), tier = MOTOR.tierEn(MOTOR.CARDS[fichas[0].id], ahoraSrv);
           if (tier >= 3) throw new Error("Las legendarias no se pueden cambiar: no hay nada por encima.");
-          if (fichas.some(f => MOTOR.CARDS[f.id].tier !== tier)) throw new Error("Las diez tienen que ser de la misma rareza.");
+          if (fichas.some(f => MOTOR.tierEn(MOTOR.CARDS[f.id], ahoraSrv) !== tier)) throw new Error("Las diez tienen que ser de la misma rareza.");
           const col = MOTOR.CARDS[fichas[0].id].col;
           if (fichas.some(f => MOTOR.CARDS[f.id].col !== col)) throw new Error("Las diez tienen que ser de la misma colección.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
@@ -207,6 +219,36 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
             const r = await fb.cobrarPlantilla(uid, id, lista, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
             responde(true, { ks: r.ks, at: r.at, n, monedas: pr.monedas, sobres: PR.textoSobres(pr) });
           }
+        } else if (x.accion === "cobraPodio") {
+          /* Los sobres de mi podio en el reto de la semana pasada: la
+             economía ya dijo en qué puesto quedé; aquí solo se escriben. */
+          const r = PR.leePodio(PR.clavePodio(String(x.clave || ""), Math.round(+x.n))), pr = r && PR.PODIO_RETO[r.n - 1];
+          const yo = ((e.usuarios[uid] || {}).podiosReto) || {};
+          if (!pr || yo[r.clave] !== r.n) throw new Error("Ese podio no es tuyo.");
+          const id = PR.clavePodio(r.clave, r.n);
+          if (((d.plantillas && d.plantillas.q && d.plantillas.q[uid]) || {})[id]) throw new Error("Esos sobres ya los cobraste.");
+          const w = await fb.cobrarPodio(uid, id, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+          responde(true, { ks: w.ks, at: w.at, n: r.n, sobres: PR.textoSobresPodio(pr) });
+        } else if (x.accion === "cobraAlbum") {
+          /* El álbum completo de un club: se elige aquí una copia tuya de
+             cada carta (la que no está a la venta, si hay) y se escribe con su sobre. */
+          const club = PR.leeAlbum(PR.claveAlbum(String(x.club || "")));
+          if (!club) throw new Error("Ese club no tiene álbum.");
+          const id = PR.claveAlbum(club);
+          if (((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})[id]) throw new Error("Ese álbum ya lo cobraste.");
+          if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
+          // una copia por jugador (la especial vale por la normal), mejor una que no esté a la venta
+          const porCarta = {};
+          for (const y of copiasDe(uid, d)) {
+            const f = fichaDe(e, y.c), h = f && PR.huecoAlbum(club, f.id);
+            if (!h) continue;
+            if (!porCarta[h.n] || (porCarta[h.n].venta && !y.venta)) porCarta[h.n] = y;
+          }
+          const faltan = PR.cartasAlbum(club).filter(cd => !porCarta[cd.n]);
+          if (faltan.length) throw new Error(`Te faltan ${faltan.length} cartas del ${MOTOR.CLUBES[club]}.`);
+          const c = PR.cartasAlbum(club).map(cd => porCarta[cd.n].c);
+          const w = await fb.cobrarAlbum(uid, id, c, PR.ALBUM.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+          responde(true, { ks: w.ks, at: w.at, monedas: PR.ALBUM.monedas, sobres: PR.textoSobres(PR.ALBUM) });
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
           if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
@@ -268,7 +310,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-59" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-82" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

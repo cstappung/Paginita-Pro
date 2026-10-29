@@ -21,6 +21,15 @@
   const KB_TORRE = e => (e.d.boss ? 140 : e.d.big ? 180 : 260);
   const KB_SUAVE = e => (e.d.boss ? 280 : e.d.big ? 360 : 520);
   PD.KB = { torre: KB_TORRE, suave: KB_SUAVE };
+  // Control de multitudes desde la versión 5 (el dueño: «que no dejen de frenar o empujar de la
+  // nada»). Antes había dos cortes en seco: el tope de empuje de cada torre (KB_TORRE) y la
+  // «ronda eterna» (90 s después del último enemigo: frenos, congelaciones y empujes a cero).
+  // Ahora el empuje de una torre rinde menos cuanto más empujó a ese enemigo (de 1 a `kbPiso`,
+  // en curva) y, pasada la ronda, todo el control baja en `rampa` s hasta `piso` (no a cero):
+  // la ronda igual termina porque los enemigos siguen avanzando. `nuevo: false` vuelve a lo de
+  // antes (el bot lo usa para comparar).
+  const CC = { nuevo: true, piso: 0.25, rampa: 60, kbPiso: 0.15 };
+  PD.CC = CC;
   // Tras una congelación, el enemigo queda 1 s sin poder volver a congelarse (solo se frena),
   // igual que el aturdimiento: varias torres de hielo ya no lo dejan quieto para siempre.
   const FREEZE_IMM = 1;
@@ -84,6 +93,14 @@
   };
   // lo que remata los huesos de un Esqueleto (y lo único que les hace algo mientras yacen)
   const REMATA = { fire: 1, explosive: 1, arcane: 1 };
+  // Jefes desde la versión 5 (pedido del dueño): x20 de vida y un tercio de la velocidad «o menos»,
+  // para que se sientan como una marcha lenta que hay que frenar entre todas las torres. Va a 1/5:
+  // con 1/3 el jefe final de la ronda 100 no lo pasaba ningún guion humano (Caldera, Pantano, Fosa);
+  // con 1/5 los tres ganan (lo mismo con 1/8).
+  // `esbirros`: cuánto más espaciadas invocan (con x20 de vida viven mucho más: a su ritmo de
+  // antes llenaban el camino de esbirros y eso, no el jefe, era lo que se escapaba).
+  const JEFE = { vida: 20, vel: 1 / 5, esbirros: 10 };
+  PD.JEFE = JEFE;   // el bot lo cambia para medir (--jefe vida,vel)
   // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
   // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
   const PURGA = { dur: 2.5, hp: 0.5 };
@@ -143,17 +160,18 @@
       this.rows = Math.ceil((H + this.off * 2) / this.cs);
       this.cells = [];
       for (let i = 0; i < this.cols * this.rows; i++) this.cells.push([]);
+      this.usadas = [];   // las celdas con algo: clear() vacía solo esas (se llama en cada paso)
     }
-    clear() { for (const c of this.cells) c.length = 0; }
-    idx(x, y) {
-      let cx = Math.floor((x + this.off) / this.cs), cy = Math.floor((y + this.off) / this.cs);
-      if (cx < 0) cx = 0; else if (cx >= this.cols) cx = this.cols - 1;
-      if (cy < 0) cy = 0; else if (cy >= this.rows) cy = this.rows - 1;
-      return [cx, cy];
+    clear() { const u = this.usadas; for (let i = 0; i < u.length; i++) this.cells[u[i]].length = 0; u.length = 0; }
+    cx(x) { const c = Math.floor((x + this.off) / this.cs); return c < 0 ? 0 : c >= this.cols ? this.cols - 1 : c; }
+    cy(y) { const c = Math.floor((y + this.off) / this.cs); return c < 0 ? 0 : c >= this.rows ? this.rows - 1 : c; }
+    add(e) {
+      const i = this.cy(e.y) * this.cols + this.cx(e.x), cell = this.cells[i];
+      if (!cell.length) this.usadas.push(i);
+      cell.push(e);
     }
-    add(e) { const [cx, cy] = this.idx(e.x, e.y); this.cells[cy * this.cols + cx].push(e); }
     query(x, y, r, fn) {
-      const [x0, y0] = this.idx(x - r, y - r), [x1, y1] = this.idx(x + r, y + r);
+      const x0 = this.cx(x - r), y0 = this.cy(y - r), x1 = this.cx(x + r), y1 = this.cy(y + r);
       for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
         const cell = this.cells[cy * this.cols + cx];
         for (let i = 0; i < cell.length; i++) if (fn(cell[i]) === true) return;
@@ -167,12 +185,15 @@
   class Game {
     // `seed`: el azar de la partida (mulberry32). Con la misma semilla y las mismas
     // acciones en los mismos pasos, la partida sale idéntica (prueba.js la rehace).
-    constructor(li, snap, seed) {
+    // `ve`: la versión del motor con que se juega (prueba.js: VERSIONES). Una partida empezada
+    // con la 4 sigue con sus reglas hasta el final; sin ella, la última.
+    constructor(li, snap, seed, ve) {
+      this.ve = ve || PD.MOTOR_VE;
       this.li = li;
       this.rs = seed === undefined ? (Math.random() * 4294967296) >>> 0 : seed >>> 0;
-      this.L = PD.LEVELS[li];
+      this.L = PD.nivel(li, this.ve);
       this.paths = this.L.paths.map(buildPath);
-      this.rounds = PD.buildRounds(li);
+      this.rounds = PD.buildRounds(li, this.L);
       this.money = this.L.cash;
       this.lives = this.L.lives;
       this.round = 0;            // rondas completadas
@@ -192,6 +213,7 @@
       this.era3 = this.L.era === 3;
       this.ley = this.era3 ? this.L.ley || null : null; this.contagioT = 0;
       this.pactos = []; this.mods = { ...MODS0 }; this.energia = 0;
+      if (this.L.vidaX || this.L.oroX) this.aplicaMods();
       this.evento = null; this.caidos = []; this.alzar = []; this.zonas = []; this.provoca = null;
       this.vendavalT = 0; this.apagonT = 0;
       if (snap) this.load(snap);
@@ -376,21 +398,31 @@
       for (const t of this.towers) t.s = this.baseStats(t);
       // apoyo: los tótems y el héroe de la Caldera (su aura de forja, radio s.aura)
       const totems = this.towers.filter(t => t.def.kind === 'support' || ((t.def.hero || t.def.kind === 'rod') && (t.s.buffDmgMult || t.s.buffRate)));
+      // Bufos (desde la versión 5): dos estructuras del mismo tipo no se suman (vale la mejor),
+      // pero las de tipos distintos sí: un Tótem con +25% y un Pararrayos con +30% dan +55%.
+      // En la 4 valía solo el mejor de todos, de cualquier tipo.
+      const suma = this.ve >= 5;
       for (const t of this.towers) {
         if (t.def.kind === 'support' || t.def.kind === 'farm') continue;
-        const b = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 };
-        let any = false;
+        const porTipo = new Map();
         for (const k of totems) {
           if (k === t || Math.hypot(k.x - t.x, k.y - t.y) > (k.s.aura || k.s.range)) continue;
-          any = true;
-          const ks = k.s;
-          b.rate = Math.max(b.rate, ks.buffRate || 0);
-          b.range = Math.max(b.range, ks.buffRange || 0);
-          b.camo = b.camo || !!ks.buffCamo;
-          b.dmg = Math.max(b.dmg, ks.buffDmg || 0);
-          b.mult = Math.max(b.mult, ks.buffDmgMult || 1);
-          b.ap = Math.max(b.ap, ks.buffArmor || 0);
-          b.pierce = Math.max(b.pierce, ks.buffPierce || 0);
+          const ks = k.s, clave = suma ? k.type : '';
+          let p = porTipo.get(clave);
+          if (!p) porTipo.set(clave, p = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 });
+          p.rate = Math.max(p.rate, ks.buffRate || 0);
+          p.range = Math.max(p.range, ks.buffRange || 0);
+          p.camo = p.camo || !!ks.buffCamo;
+          p.dmg = Math.max(p.dmg, ks.buffDmg || 0);
+          p.mult = Math.max(p.mult, ks.buffDmgMult || 1);
+          p.ap = Math.max(p.ap, ks.buffArmor || 0);
+          p.pierce = Math.max(p.pierce, ks.buffPierce || 0);
+        }
+        const any = porTipo.size > 0;
+        const b = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 };
+        for (const p of porTipo.values()) {
+          b.rate += p.rate; b.range += p.range; b.camo = b.camo || p.camo; b.dmg += p.dmg;
+          b.mult += p.mult - 1; b.ap = Math.min(1, b.ap + p.ap); b.pierce += p.pierce;
         }
         t.buffed = any;
         if (!any) continue;
@@ -506,6 +538,13 @@
         for (const k in P.m || {}) M[k] *= P.m[k];
         for (const k in P.set || {}) M[k] = k === 'ap' ? Math.max(M.ap, P.set.ap) : P.set[k];
       }
+      // reinos 12-15 (levels.js `pactoPrecio`): cada pacto aceptado da además más vida a los
+      // enemigos, y se suma. La Necrópolis se ganó juntando cinco pactos sin dejar pasar a nadie.
+      if (this.L.pactoPrecio) M.vidaEnem *= 1 + this.L.pactoPrecio * this.pactos.filter(p => p.id).length;
+      // y la vida y el oro propios del reino (levels.js `vidaX`, `oroX`): la dificultad (`diff`)
+      // pone más enemigos, que dan más oro; esto los hace más duros sin dar más
+      if (this.L.vidaX) M.vidaEnem *= this.L.vidaX;
+      if (this.L.oroX) M.oro *= this.L.oroX;
       this.mods = M;
     }
 
@@ -621,12 +660,22 @@
     }
 
     // ----------------------------- Enemigos -------------------------------
+    // Reinos 12-15 (levels.js `vidaTarde: {desde, hasta, x}`): la vida de los enemigos crece de
+    // x1 en la ronda `desde` a `x` en la `hasta`, y sigue así. El comienzo no cambia (sin oro
+    // todavía, cualquier extra rompía la apertura) y el final deja de ser un paseo: quien ganó la
+    // Necrópolis llegó a la ronda 80 con 286 000 de oro sin gastar.
+    vidaTarde() {
+      const V = this.L.vidaTarde;
+      if (!V) return 1;
+      const r = this.curRound() || 1;
+      return 1 + (V.x - 1) * Math.max(0, Math.min(1, (r - V.desde) / (V.hasta - V.desde)));
+    }
     spawn(type, path, dist, hpM, tier) {
       const d = PD.ENEMIES[type];
       const boost = PD.hpBoost(this.curRound() || 1, d.boss);
       let hp = d.hp * hpM * boost;
-      if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost;
-      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) : 1;   // pactos
+      if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost * (this.ve >= 5 ? JEFE.vida : 1);
+      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) * this.vidaTarde() : 1;   // pactos y reino
       hp *= fv;
       const shield = (d.shield || 0) * hpM * boost * fv;
       const e = {
@@ -637,7 +686,7 @@
         burrowed: false, burrowT: d.burrow ? d.burrow.every * (0.5 + this.rnd() * 0.5) : 0,
         phased: false, phaseT: d.phase ? d.phase.every * (0.3 + this.rnd() * 0.7) : 0,
         healT: d.heal ? d.heal.every : 0, sabT: d.sabotage ? d.sabotage.every * 0.7 : 0,
-        spawnT: d.spawn ? d.spawn.every : 0, tpT: d.teleport ? d.teleport.every : 0,
+        spawnT: d.spawn ? d.spawn.every * (d.boss && this.ve >= 5 ? JEFE.esbirros : 1) : 0, tpT: d.teleport ? d.teleport.every : 0,
         revived: false, enraged: false, blinked: false, haste: 1, auraSlow: 0, invulnT: 0,
         corr: 0, corrT: 0, corrAmp: 0, wetT: 0, wetElec: 1.5, wetAmp: 0, liftT: 0, goldT: 0, goldMult: 1,
         hexT: 0, hexAmp: 0, hexExec: 0, hexSpread: 0, hexDps: 0, hexArmor: 0, hexReveal: false, hexSrc: null,
@@ -722,7 +771,7 @@
     }
 
     applySlow(e, f, dur) {
-      if (e.d.slowImmune) return;
+      if (e.d.slowImmune || (e.d.boss && this.ve >= 5)) return;   // jefes (v5): no se frenan
       if (e.d.boss) f *= 0.5;
       if (f > e.slowF || e.slowT <= 0) { e.slowF = Math.max(f, e.slowT > 0 ? e.slowF : 0); e.slowT = Math.max(e.slowT, dur); }
       else if (f === e.slowF) e.slowT = Math.max(e.slowT, dur);
@@ -751,6 +800,7 @@
     }
     applyStun(e, dur) {
       if (e.stunImm > 0) return;   // inmunidad breve tras un aturdimiento (evita bloqueos eternos)
+      if (e.d.boss && this.ve >= 5) return;   // jefes (v5): no se frenan
       if (e.d.boss) dur *= 0.25;
       e.stunT = Math.max(e.stunT, dur);
       e.stunImm = e.stunT + 0.8;
@@ -1113,7 +1163,7 @@
         if (d.spawn) {
           e.spawnT -= dt;
           if (e.spawnT <= 0) {
-            e.spawnT = d.spawn.every;
+            e.spawnT = d.spawn.every * (d.boss && this.ve >= 5 ? JEFE.esbirros : 1);
             const hpM = PD.hpMult(this.L, cur);
             for (let i = 0; i < d.spawn.n; i++) this.spawn(d.spawn.type, e.path, e.dist - 20 - i * 14, hpM);
           }
@@ -1132,17 +1182,25 @@
         if (this.era3 && this.terceraEra(e, d, dt, mudo, cur, hurry)) continue;
         // movimiento
         let sp = 0;
-        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1);
-        if (hurry) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
-        else if (e.frozenT <= 0 && e.stunT <= 0) {
-          sp = vel * (1 - e.slowF) * e.haste;
-          if (e.auraSlow && !d.slowImmune) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
-          if (e.burrowed) sp *= d.burrow ? d.burrow.speed : d.hop.speed;
-          if (e.sapoT > 0) sp *= 0.5;
-          if (e.piedraT > 0 || e.burbujaT > 0) sp = 0;
-          if (e.enraged) sp *= d.enrage.mult;
-          if (e.holdT > 0) sp *= d.boss ? 0.4 : 0.05;
-          if (sp > 0 && this.blocked(e, dt)) sp = 0;
+        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1) * (d.boss && this.ve >= 5 ? JEFE.vel : 1);
+        const cc5 = this.ve >= 5 && CC.nuevo, jefe5 = d.boss && this.ve >= 5;
+        if (hurry && !cc5) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
+        else {
+          if (e.frozenT <= 0 && e.stunT <= 0) {
+            sp = vel * (1 - e.slowF) * e.haste;
+            if (e.auraSlow && !d.slowImmune && !jefe5) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
+            if (e.burrowed) sp *= d.burrow ? d.burrow.speed : d.hop.speed;
+            if (e.sapoT > 0) sp *= 0.5;
+            if (e.piedraT > 0 || e.burbujaT > 0) sp = 0;
+            if (e.enraged) sp *= d.enrage.mult;
+            if (e.holdT > 0 && !jefe5) sp *= d.boss ? 0.4 : 0.05;
+            if (sp > 0 && this.blocked(e, dt)) sp = 0;
+          }
+          // v5: pasada la ronda, el control se suelta de a poco (ccF) en vez de cortarse
+          if (cc5) {
+            const f = this.ccF();
+            if (f < 1) { sp = vel * (e.enraged ? d.enrage.mult : 1) * (1 - f) + sp * f; if (f <= 0.5 && e.engaged) this.release(e); }
+          }
         }
         e.dist += sp * dt;
         const path = this.paths[e.path];
@@ -1794,13 +1852,26 @@
     }
     // empuje hacia atrás de la torre `src` (igual que la gravedad: frena, nunca bloquea para siempre)
     push(e, amt, src) { this.retrocede(e, e.d.boss ? amt * 0.25 : amt, src); }
+    // cuánto rinde el control (frenos y empujes): 1 durante la ronda; pasada la «ronda eterna»
+    // (hurryT), en la versión 5 baja en CC.rampa s hasta CC.piso; en la 4, a cero de golpe
+    ccF() {
+      const x = this.rt - (this.hurryT || 1e9);
+      if (x <= 0) return 1;
+      if (this.ve < 5 || !CC.nuevo) return 0;
+      return Math.max(CC.piso, 1 - x / CC.rampa);
+    }
     // todo retroceso pasa por aquí: rinde menos con lo que ya empujaron otras (KB_SUAVE), gasta del
     // tope de esa torre para ese enemigo (KB_TORRE × topeX) y devuelve cuánto retrocedió
     retrocede(e, want, src, topeX) {
       if (!(want > 0)) return 0;
       const id = src ? src.id : -1, usado = (e.kb && e.kb[id]) || 0;
       const suave = KB_SUAVE(e), otras = Math.max(0, e.pulled - usado);
-      const back = Math.min(want * suave / (suave + otras), KB_TORRE(e) * (topeX || 1) - usado, e.dist);
+      let back;
+      if (this.ve >= 5 && CC.nuevo) {
+        // v5: sin tope en seco; cada torre rinde menos cuanto más empujó a este enemigo, en curva
+        const K = KB_TORRE(e) * (topeX || 1), f = CC.kbPiso + (1 - CC.kbPiso) * Math.exp(-usado / K);
+        back = Math.min(want * suave / (suave + otras) * f * this.ccF(), e.dist);
+      } else back = Math.min(want * suave / (suave + otras), KB_TORRE(e) * (topeX || 1) - usado, e.dist);
       if (!(back > 0)) return 0;
       e.dist -= back; e.pulled += back;
       (e.kb || (e.kb = {}))[id] = usado + back;
@@ -2467,7 +2538,7 @@
           this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(120,230,90,' });
           break;
         case 'tormenta':
-          if (hurry) break;
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
           for (const e of this.enemies) {
             if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > s.stormR) continue;
             const back = this.retrocede(e, s.stormPush * (e.d.boss ? 0.25 : 1), t, 1.5);
@@ -2495,12 +2566,12 @@
           break;
         }
         case 'grieta':
-          if (hurry) break;
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
           for (const e of this.enemies) {
             // una sola vez por enemigo (y sus hijos tampoco): antes cada Grieta los volvía a
             // devolver y con la recarga corta una ronda podía no terminar nunca
             if (e.dead || e.rifted) continue;
-            const back = e.dist * (e.d.boss ? s.riftBoss : s.riftBack);
+            const back = e.dist * (e.d.boss ? s.riftBoss : s.riftBack) * (this.ve >= 5 && CC.nuevo ? this.ccF() : 1);
             if (back <= 1) continue;
             e.rifted = true;
             this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: '#c07bff', r: e.d.r * 1.5 });
@@ -2536,7 +2607,7 @@
           break;
         }
         case 'maremoto':
-          if (hurry) break;
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
           for (const e of this.enemies) {
             if (e.dead) continue;
             const back = this.retrocede(e, s.wavePush * (e.d.boss ? 0.25 : 1), t, 1.5);
@@ -2605,12 +2676,22 @@
       if (this.golems.length && this.golems.some(g => g.dead)) this.golems = this.golems.filter(g => !g.dead);
       for (const k in this.abLock) if (this.abLock[k] > 0) this.abLock[k] -= dt;
       this.updateAreas(dt);
-      for (const f of this.fx) f.t += dt;
-      this.fx = this.fx.filter(f => f.t < f.T);
-      if (this.fx.length > 700) this.fx.splice(0, this.fx.length - 700);
+      // fx, enemigos y jefes se compactan sin crear arreglos en cada paso (el bot corre millones)
+      const fx = this.fx;
+      let n = 0;
+      for (let i = 0; i < fx.length; i++) { const f = fx[i]; f.t += dt; if (f.t < f.T) fx[n++] = f; }
+      fx.length = n;
+      if (fx.length > 700) fx.splice(0, fx.length - 700);
 
-      if (this.enemies.some(e => e.dead)) this.enemies = this.enemies.filter(e => !e.dead);
-      this.bosses = this.enemies.filter(e => e.d.boss);
+      const en = this.enemies, B = this.bosses;
+      let muertos = false, nb = 0, igual = true;
+      for (let i = 0; i < en.length; i++) {
+        const e = en[i];
+        if (e.dead) muertos = true;
+        else if (e.d.boss) { if (B[nb] !== e) igual = false; nb++; }
+      }
+      if (muertos) this.enemies = en.filter(e => !e.dead);
+      if (!igual || nb !== B.length) this.bosses = this.enemies.filter(e => e.d.boss);
       if (this.active && this.qi >= this.queue.length && this.enemies.length === 0) this.endRound();
     }
     updateProjectiles(dt) {
@@ -2900,5 +2981,7 @@
     }
   }
 
+  // la versión del motor de las partidas nuevas (prueba.js: VERSION)
+  PD.MOTOR_VE = 5;
   PD.Game = Game;
 })();
