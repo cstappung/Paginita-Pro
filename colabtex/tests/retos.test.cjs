@@ -283,3 +283,13 @@ test('álbum completo de un club: con una copia de cada jugador paga 2000 y dos 
   assert.equal(R.huecoAlbum('bayern', balon.n).person, 'bayern-harry-kane');
   assert.equal(R.huecoAlbum('barcelona', mvp.n), null, 'en otro club no cuenta');
 });
+
+test('las leyendas (sin club) juegan los desafíos: un once solo de leyendas es válido, y La Roja acepta a las chilenas', () => {
+  const ley = PM.CARDS.filter(c => c.leyenda).map(c => ({ key: 'x' + c.n, id: c.n, g: 10, gr: true }));
+  const once = R.mejorOnce(R.MEJOR.clave, ley);
+  assert.ok(R.evalua(R.MEJOR.clave, once).valida, 'se arma un once de leyendas en el 4-3-3');
+  assert.equal(new Set(once.map(f => PM.CARDS[f.id].person)).size, 11);
+  assert.ok(!R.CLUBES.includes(null) && !R.CLUBES.includes('leyendas'), 'las leyendas no son un club: ni álbum ni desafío de club');
+  const roja = R.RETOS.find(x => x.id === 'laroja');
+  assert.deepEqual(PM.CARDS.filter(c => c.leyenda && roja.elegible(c)).map(c => c.name).sort(), ['Figueroa', 'Zamorano']);
+});

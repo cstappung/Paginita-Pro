@@ -1353,6 +1353,13 @@ body:not(.serie1) .solo-serie1 { display: none; }
   font: 800 3.1cqw/1 "Barlow Condensed", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #3a2a00;
   background: linear-gradient(90deg, #ffe58a, #ffcc3d 60%, #e0a21a); padding: 1.1cqw 2.6cqw; border-radius: 1cqw; box-shadow: 0 .6cqw 1.6cqw #0008;
 }
+/* las leyendas: cara sepia sobre fondo cálido, marco de oro viejo que brilla y cinta oscura con letras doradas */
+.full.futbol.leyendas { background: #0e0b08; }
+.full.futbol.leyendas > img, .full.futbol.leyendas .holo img { object-fit: cover; object-position: 50% 18%; }
+.futbol.leyenda { --marco: 3.2cqw; --marco-bg: linear-gradient(135deg, #f3dfa0, #b78628 24%, #fff0b8 42%, #6e4a12 60%, #e8c36a 80%, #f6e7b4); box-shadow: 0 0 0 .6cqw #e8c36a55, 0 0 7cqw #b7862877; }
+.futbol.leyenda .fu-marco { background-size: 220% 220%; animation: espBrillo 3.8s linear infinite; }
+.futbol.leyenda .fu-cinta { background: linear-gradient(90deg, #241a07, #4a3410 60%, #241a07); color: #f3dfa0; box-shadow: 0 0 0 .3cqw #e8c36a, 0 .6cqw 1.6cqw #0008; }
+.col-sec.club .col-corona { font-size: 22px; line-height: 26px; width: 26px; text-align: center; color: #e8c36a; }
 /* la rara se nota: fondo azul hielo en las fotos recortadas y un barrido más fuerte */
 .full.futbol.rare { background: radial-gradient(circle at 50% 30%, #ffffff 0, #bfe6ff 45%, #3d8fd6 100%); }
 .futbol.rare .sweep::before { mix-blend-mode: screen; opacity: .55; width: 45%; animation-duration: 3s; }

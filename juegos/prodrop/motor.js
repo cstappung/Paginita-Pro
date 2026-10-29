@@ -436,6 +436,32 @@
   const ESPECIALES2 = [
     ["alnassr", "cristiano-balon-all-time", "C. Ronaldo", "DEL", 7, "PT", { person: "alnassr-cristiano-ronaldo", sub: "Al Nassr · Balón de Oro All-Time", cinta: "BOAT", especial: "balon", limitada: true, peso: 3 }]
   ];
+  /* ---------- las leyendas ----------
+     Una categoría aparte: jugadores retirados, de los mejores de la historia.
+     Sin club (solo la bandera de su selección) y con la media de la carta
+     Icon de EA FC 26 (Hero para Zamorano). Elías Figueroa no está en el
+     FIFA: su 93 es inventado. La foto es la cara del FIFA en sepia sobre un
+     fondo cálido (cards/leyendas/<id>.webp). Fila: [id de la foto, nombre,
+     país, media, posiciones]. Todas son de rareza Legendaria para el motor,
+     pero salen como «Leyenda» y mucho menos que una legendaria común (ver
+     `PESO_HOY`). Van al final del catálogo, con su corte en `AMPLIACIONES`. */
+  const LEYENDAS = [
+    ["maradona", "Maradona", "AR", 95, "MC"], ["pele", "Pelé", "BR", 95, "MC/DC"], ["ronaldo-r9", "Ronaldo R9", "BR", 94, "DC"],
+    ["zidane", "Zidane", "FR", 94, "MC"], ["cruyff", "Cruyff", "NL", 93, "MC/DC"], ["figueroa", "Figueroa", "CL", 93, "DFC"],
+    ["ronaldinho", "Ronaldinho", "BR", 93, "EI/MC"], ["beckenbauer", "Beckenbauer", "DE", 92, "DFC/MC"], ["charlton", "Charlton", "ENG", 92, "MC"],
+    ["garrincha", "Garrincha", "BR", 92, "ED/MD"], ["iniesta", "Iniesta", "ES", 92, "MC/EI"], ["maldini", "Maldini", "IT", 92, "DFC/LI"],
+    ["puskas", "Puskás", "HU", 92, "DC"], ["yashin", "Yashin", "RU", 92, "POR"], ["baresi", "Baresi", "IT", 91, "DFC"],
+    ["buffon", "Buffon", "IT", 91, "POR"], ["cafu", "Cafú", "BR", 91, "LD"], ["carlos-alberto", "Carlos Alberto", "BR", 91, "LD/DFC"],
+    ["eusebio", "Eusébio", "PT", 91, "DC"], ["ibrahimovic", "Ibrahimović", "SE", 91, "DC"], ["xavi", "Xavi", "ES", 91, "MC"],
+    ["casillas", "Casillas", "ES", 90, "POR"], ["best", "George Best", "NIR", 90, "ED/MC"], ["gullit", "Gullit", "NL", 90, "MC/DC"],
+    ["pirlo", "Pirlo", "IT", 90, "MC"], ["rivaldo", "Rivaldo", "BR", 90, "EI/MI"], ["roberto-carlos", "Roberto Carlos", "BR", 90, "LI"],
+    ["cannavaro", "Cannavaro", "IT", 89, "DFC"], ["drogba", "Drogba", "CI", 89, "DC"], ["etoo", "Eto'o", "CM", 89, "DC"],
+    ["figo", "Figo", "PT", 89, "ED/MD"], ["kaka", "Kaká", "BR", 89, "MC"], ["marcelo", "Marcelo", "BR", 89, "LI"],
+    ["puyol", "Puyol", "ES", 89, "DFC/LD"], ["beckham", "Beckham", "ENG", 88, "MD/MC"], ["ferdinand", "Ferdinand", "ENG", 88, "DFC"],
+    ["gerrard", "Gerrard", "ENG", 88, "MC"], ["hierro", "Hierro", "ES", 88, "DFC"], ["riquelme", "Riquelme", "AR", 88, "MC"],
+    ["rooney", "Rooney", "ENG", 88, "DC/MC"], ["zamorano", "Zamorano", "CL", 88, "DC"], ["lampard", "Lampard", "ENG", 87, "MC"],
+    ["ashley-cole", "Ashley Cole", "ENG", 86, "LI"]
+  ];
   /* ---------- el Bayern Múnich (Bundesliga) ----------
      El primer equipo de fcbayern.com (octubre 2026), con la foto en
      cards/champions/bayern/<id>.webp. Quedaron fuera los que EA FC no
@@ -1098,6 +1124,13 @@
      menos: la probabilidad de un jugador es el peso de su rareza dividido
      entre cuántos jugadores tiene (la Premier solo tiene 5 legendarias, así
      que la suya pesa menos; un test lo comprueba). */
+  /* Cuánto pesa cada carta de fútbol dentro de su rareza en los sobres de
+     hoy: una legendaria común pesa 5 y una especial o una leyenda 1, o sea
+     un quinto (salen cinco veces menos que una legendaria común, y las
+     especiales y las leyendas igual de poco). Los sobres comprados antes de
+     la ampliación de las leyendas se hicieron cuando las especiales pesaban
+     el triple de una legendaria común (`peso` 3): esos pesos no se tocan. */
+  const PESO_HOY = { comun: 5, rara: 1 };
   const PESOS_FUTBOL = {
     // el sobre de fútbol (los 203 jugadores) y el Plus: menos comunes y la quinta carta, épica o mejor
     normal: [6600, 3000, 340, 60],
@@ -1156,9 +1189,19 @@
     const posiciones = posicionesDe(club, id), pos = POS_LINEA[posiciones[0]];
     CARDS.push({
       n, uid: club + "-" + id + "-" + t.key, person: extra.person || club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
-      col, liga: carpeta, peso: extra.peso || 1, tier, club, pos, posiciones, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
+      col, liga: carpeta, peso: extra.peso || 1, pesoHoy: extra.especial ? PESO_HOY.rara : PESO_HOY.comun, tier, club, pos, posiciones, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
       sub: extra.sub || CLUBES[club], acc: t.color,
       ...(extra.especial ? { especial: extra.especial, cinta: extra.cinta, limitada: !!extra.limitada } : {})
+    });
+  };
+  // una leyenda: sin club, rareza Legendaria, categoría aparte
+  const PAIS_LEYENDA = { AR: "Argentina", BR: "Brasil", CL: "Chile", CI: "Costa de Marfil", CM: "Camerún", DE: "Alemania", ENG: "Inglaterra", ES: "España", FR: "Francia", HU: "Hungría", IT: "Italia", NIR: "Irlanda del Norte", NL: "Países Bajos", PT: "Portugal", RU: "Rusia", SE: "Suecia" };
+  const cartaLeyenda = ([id, name, pais, media, posiciones]) => {
+    const n = CARDS.length, t = TIERS[3], pos = posiciones.split("/");
+    CARDS.push({
+      n, uid: "leyendas-" + id + "-" + t.key, person: "leyendas-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
+      col: "futbol", liga: "leyendas", peso: 1, pesoHoy: PESO_HOY.rara, tier: 3, club: null, pos: POS_LINEA[pos[0]], posiciones: pos, dorsal: 0, pais, media,
+      img: "cards/leyendas/" + id + ".webp", sub: PAIS_LEYENDA[pais], acc: t.color, leyenda: true, cinta: "LEYENDA", limitada: false
     });
   };
   FUTBOLISTAS.forEach(j => cartaFutbol("futbol", "futbol", j));
@@ -1173,12 +1216,14 @@
   MLS.forEach(j => cartaFutbol("futbol", "champions", j));
   ARABIA.forEach(j => cartaFutbol("futbol", "champions", j));
   ESPECIALES2.forEach(j => cartaFutbol("futbol", "especiales", j));
+  LEYENDAS.forEach(cartaLeyenda);
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
-  const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
+  const pool = (lista, w = TIERS.map(x => x.w), ultima = null, pesoDe = c => c.peso) => {
     const t = TIERS.map((_, i) => lista.filter(c => c.tier === i));
-    t.uniforme = lista.every(c => c.peso === 1);
-    t.peso = t.map(l => l.reduce((s, c) => s + c.peso, 0));
+    t.pesoDe = pesoDe;   // los pesos que usa este pool (los de antes y los de hoy no son los mismos)
+    t.uniforme = lista.every(c => pesoDe(c) === 1);
+    t.peso = t.map(l => l.reduce((s, c) => s + pesoDe(c), 0));
     // la rareza más alta que tiene: lo que sería de una rareza que la colección no tiene sale de la más alta
     t.tope = t.reduce((m, l, i) => (l.length ? i : m), 0);
     t.w = w;
@@ -1187,9 +1232,10 @@
     Object.defineProperty(t, 'esperado', { get: () => esp || (esp = esperadoPorSobre(w, ultima)) });
     return t;
   };
+  const pesoHoy = c => c.pesoHoy || c.peso;
   const POOL = {
     legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp),
-    futbol: pool(POR_COL.futbol, PESOS_FUTBOL.normal), futbolplus: pool(POR_COL.futbol, PESOS_FUTBOL.plus, PESOS_FUTBOL.ultimaPlus),
+    futbol: pool(POR_COL.futbol, PESOS_FUTBOL.normal, null, pesoHoy), futbolplus: pool(POR_COL.futbol, PESOS_FUTBOL.plus, PESOS_FUTBOL.ultimaPlus, pesoHoy),
     // los de antes: las mismas listas y pesos de cuando se abrieron esos sobres
     futbol1: pool(CARDS.slice(BASE_FUT, BASE_PREM), PESOS_FUTBOL.v1.futbol), premier1: pool(CARDS.slice(BASE_PREM, BASE_CHAMP), PESOS_FUTBOL.v1.premier)
   };
@@ -1209,7 +1255,8 @@
   // El Bayern Múnich (20 jugadores, publicado el 2026-10-28): el corte es media hora después del push, para que ningún sobre ya comprado cambie.
   // Chile, Argentina, la MLS y Arabia (277 jugadores, publicado el 2026-10-28): el corte (28-10-2026 21:16 UTC) es media hora después del push, para que ningún sobre ya comprado cambie.
   // Cristiano · Balón de Oro All-Time (1 carta, publicado el 2026-10-29): el corte (2026-10-29 01:39 UTC) es 15 minutos después del push, para que ningún sobre ya comprado cambie.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }];
+  // Las leyendas (43 cartas, n = 1111) y los pesos nuevos de las especiales: ¡`hasta` es un PROVISORIO en el futuro (1-1-2027), así que por ahora ningún sobre las ve y el catálogo sigue como antes! Al publicar, `hasta` = la hora del push y unos minutos más (nunca antes: un sobre ya comprado cambiaría).
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1798761600000, n: 1111 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
@@ -1309,7 +1356,7 @@
 
   /* Una carta de la lista: todas iguales (como siempre fue en los profes,
      y así un sobre de antes sale idéntico) o según su `peso`. */
-  const elige = (r, l, uniforme) => (uniforme ? l[r.entero(l.length)] : l[pesado(r, l.map(c => c.peso))]);
+  const elige = (r, l, uniforme, pesoDe = c => c.peso) => (uniforme ? l[r.entero(l.length)] : l[pesado(r, l.map(pesoDe))]);
 
   /* ---------- el sobre ----------
      Cinco cartas distintas, de la peor a la mejor. La quinta (antes de
@@ -1335,7 +1382,7 @@
         libres = (P[t + d] || []).filter(c => !usadas.has(c.n));
         if (!libres.length && t - d >= 0) libres = P[t - d].filter(c => !usadas.has(c.n));
       }
-      const c = elige(r, libres, P.uniforme);
+      const c = elige(r, libres, P.uniforme, P.pesoDe);
       usadas.add(c.n);
       cartas.push({ id: c.n, g: 1 + pesado(r, GRADE_W), w: (r.u32() & 0x7fffffff) | 1 });
     }
@@ -1372,7 +1419,7 @@
     porSobre *= pg;
     // en una colección sin legendarias, las épicas se quedan también con lo que sería legendaria
     const P = POOL[c.col], esp = E.slice(c.tier, c.tier === P.tope ? TIERS.length : c.tier + 1).reduce((a, b) => a + b, 0);
-    const exacta = esp * c.peso / P.peso[c.tier] * pg;
+    const exacta = esp * P.pesoDe(c) / P.peso[c.tier] * pg;
     return { porCarta: porSobre / 5, porSobre, exacta, nota: pg };
   }
   const pDios = DIOS / 10000;
@@ -1442,7 +1489,7 @@
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
     const P = poolDe(clave, at), posibles = P[Math.min(P.tope, tier + saltoReroll(k, at, tier))];
-    const c = elige(r, posibles, P.uniforme);
+    const c = elige(r, posibles, P.uniforme, P.pesoDe);
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
     return res;
@@ -1479,7 +1526,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, LEYENDAS, PESO_HOY, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
