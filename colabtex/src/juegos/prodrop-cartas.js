@@ -15,7 +15,7 @@ export const MOTOR = PM;
 export const RAIZ = "juegos/prodrop/";
 /* El `?v=` del abridor (prodrop.js): el visor del mercado lo usa para
    compartir la caché. */
-export const PD_V = "pd-76";
+export const PD_V = "pd-77";
 export const MAX_EXHIBIDAS = 4;
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
