@@ -462,6 +462,50 @@
     ["rooney", "Rooney", "ENG", 88, "DC/MC"], ["zamorano", "Zamorano", "CL", 88, "DC"], ["lampard", "Lampard", "ENG", 87, "MC"],
     ["ashley-cole", "Ashley Cole", "ENG", 86, "LI"]
   ];
+  /* ---------- el Atlético de Madrid (LaLiga) ----------
+     Los 26 jugadores de su plantel en EA SPORTS FC 27 (los hombres con
+     carta base: titulares, suplentes y la cantera), con la media y las
+     posiciones de FC 27 (fut.gg). La foto es la cara del juego sobre los
+     colores del club (cards/champions/atletico/<id>.webp). Sin dorsal (0).
+     Va al final del catálogo (después de las leyendas) y con las medias
+     de FC 27 desde el principio: no tiene historia (`NUEVOS`). */
+  const ATLETICO = [
+    ["atletico", "jan-oblak", "J. Oblak", "POR", 0, "SI"], ["atletico", "julian-alvarez", "J. Álvarez", "DEL", 0, "AR"],
+    ["atletico", "marcos-llorente", "M. Llorente", "DEF", 0, "ES"], ["atletico", "grimaldo", "Grimaldo", "DEF", 0, "ES"],
+    ["atletico", "ademola-lookman", "A. Lookman", "DEL", 0, "NG"], ["atletico", "morten-hjulmand", "M. Hjulmand", "MED", 0, "DK"],
+    ["atletico", "pablo-barrios", "P. Barrios", "MED", 0, "ES"], ["atletico", "david-hancko", "D. Hancko", "DEF", 0, "SK"],
+    ["atletico", "alex-baena", "Á. Baena", "MED", 0, "ES"], ["atletico", "alexander-sorloth", "A. Sørloth", "DEL", 0, "NO"],
+    ["atletico", "giuliano", "Giuliano", "MED", 0, "AR"], ["atletico", "juan-musso", "J. Musso", "POR", 0, "AR"],
+    ["atletico", "cristian-romero", "C. Romero", "DEF", 0, "AR"], ["atletico", "pubill", "Pubill", "DEF", 0, "ES"],
+    ["atletico", "koke", "Koke", "MED", 0, "ES"], ["atletico", "robin-le-normand", "R. Le Normand", "DEF", 0, "ES"],
+    ["atletico", "jonathan-david", "J. David", "DEL", 0, "CA"], ["atletico", "johnny-cardoso", "J. Cardoso", "MED", 0, "US"],
+    ["atletico", "lee-kang-in", "Lee Kang-in", "DEL", 0, "KR"], ["atletico", "obed-vargas", "O. Vargas", "MED", 0, "MX"],
+    ["atletico", "rodri-mendoza", "R. Mendoza", "MED", 0, "ES"], ["atletico", "arnau-ortiz", "A. Ortiz", "MED", 0, "ES"],
+    ["atletico", "aleksa-puric", "A. Purić", "DEF", 0, "RS"], ["atletico", "salvi-esquivel", "S. Esquivel", "POR", 0, "ES"],
+    ["atletico", "miguel-cubo", "M. Cubo", "DEL", 0, "ES"], ["atletico", "dani-martinez", "D. Martínez", "DEF", 0, "ES"]
+  ];
+  /* ---------- el AC Milan (Serie A) ----------
+     Los 27 jugadores de su plantel en EA SPORTS FC 27 (en el juego se llama
+     «Milano FC»): los hombres con carta base, titulares, suplentes y la cantera,
+     con la media y las posiciones de FC 27 (fut.gg). Foto: la cara del juego sobre
+     rojo y negro (cards/champions/milan/<id>.webp). Sin dorsal (0). Va al final
+     del catálogo, después del Atlético, y sin historia (`NUEVOS`). */
+  const MILAN = [
+    ["milan", "mike-maignan", "M. Maignan", "POR", 0, "FR"], ["milan", "adrien-rabiot", "A. Rabiot", "MED", 0, "FR"],
+    ["milan", "luka-modric", "L. Modrić", "MED", 0, "HR"], ["milan", "christian-pulisic", "C. Pulisic", "DEL", 0, "US"],
+    ["milan", "mario-gila", "M. Gila", "DEF", 0, "ES"], ["milan", "fikayo-tomori", "F. Tomori", "DEF", 0, "ENG"],
+    ["milan", "alexis-saelemaekers", "A. Saelemaekers", "DEF", 0, "BE"], ["milan", "goncalo-ramos", "G. Ramos", "DEL", 0, "PT"],
+    ["milan", "matteo-gabbia", "M. Gabbia", "DEF", 0, "IT"], ["milan", "ruben-loftus-cheek", "R. Loftus-Cheek", "MED", 0, "ENG"],
+    ["milan", "diego-moreira", "D. Moreira", "DEL", 0, "BE"], ["milan", "samuel-chukwueze", "S. Chukwueze", "DEL", 0, "NG"],
+    ["milan", "strahinja-pavlovic", "S. Pavlović", "DEF", 0, "RS"], ["milan", "pervis-estupinan", "P. Estupiñán", "DEF", 0, "EC"],
+    ["milan", "ardon-jashari", "A. Jashari", "MED", 0, "CH"], ["milan", "pietro-terracciano", "P. Terracciano", "POR", 0, "IT"],
+    ["milan", "omari-hutchinson", "O. Hutchinson", "DEL", 0, "ENG"], ["milan", "koni-de-winter", "K. De Winter", "DEF", 0, "BE"],
+    ["milan", "davide-bartesaghi", "D. Bartesaghi", "DEF", 0, "IT"], ["milan", "yunus-musah", "Y. Musah", "MED", 0, "US"],
+    ["milan", "filippo-terracciano", "F. Terracciano", "DEF", 0, "IT"], ["milan", "warren-bondo", "W. Bondo", "MED", 0, "FR"],
+    ["milan", "sankhoun-diawara", "S. Diawara", "DEF", 0, "FR"], ["milan", "alphadjo-cisse", "A. Cissè", "MED", 0, "IT"],
+    ["milan", "francesco-camarda", "F. Camarda", "DEL", 0, "IT"], ["milan", "christian-comotto", "C. Comotto", "MED", 0, "IT"],
+    ["milan", "lorenzo-torriani", "L. Torriani", "POR", 0, "IT"]
+  ];
   /* ---------- el Bayern Múnich (Bundesliga) ----------
      El primer equipo de fcbayern.com (octubre 2026), con la foto en
      cards/champions/bayern/<id>.webp. Quedaron fuera los que EA FC no
@@ -662,7 +706,7 @@
     colocolo: "Colo-Colo", ucatolica: "Universidad Católica", udechile: "Universidad de Chile",
     river: "River Plate", boca: "Boca Juniors", estudiantes: "Estudiantes de La Plata",
     intermiami: "Inter Miami", montreal: "CF Montréal", lafc: "LAFC",
-    alnassr: "Al Nassr", alhilal: "Al Hilal", alittihad: "Al Ittihad"
+    alnassr: "Al Nassr", alhilal: "Al Hilal", alittihad: "Al Ittihad", atletico: "Atlético de Madrid", milan: "AC Milan"
   };
 
   /* ---------- la media de cada futbolista ----------
@@ -864,9 +908,134 @@
       "roger-fernandes": 75, "dion-lopy": 73, "muhannad-al-shanqeeti": 72, "george-ilenikhena": 72, "mahamadou-doumbia": 71, "hassan-kadish": 70,
       "marwan-al-sahafi": 69, "jan-carlo-simic": 69, "mukhtar-ali": 68, "ahmed-sharahili": 68, "saleh-al-shehri": 68, "ahmed-al-ghamdi": 66,
       "bryant-ortega": 66, "fawaz-al-sagour": 64, "faris-abdi": 64, "saad-al-mousa": 64, "hamed-al-ghamdi": 61, "stephane-keller": 61
+    },
+    atletico: {
+      "jan-oblak": 88, "julian-alvarez": 86, "marcos-llorente": 85, "grimaldo": 85, "ademola-lookman": 83,
+      "morten-hjulmand": 83, "pablo-barrios": 83, "david-hancko": 83, "alex-baena": 83, "alexander-sorloth": 83,
+      "giuliano": 82, "juan-musso": 82, "cristian-romero": 82, "pubill": 81, "koke": 81, "robin-le-normand": 81,
+      "jonathan-david": 80, "johnny-cardoso": 80, "lee-kang-in": 80, "obed-vargas": 72, "rodri-mendoza": 71,
+      "arnau-ortiz": 69, "aleksa-puric": 67, "salvi-esquivel": 64, "miguel-cubo": 63, "dani-martinez": 63
+    },
+    milan: {
+      "mike-maignan": 87, "adrien-rabiot": 85, "luka-modric": 85, "christian-pulisic": 83, "mario-gila": 81,
+      "fikayo-tomori": 80, "alexis-saelemaekers": 80, "goncalo-ramos": 80, "matteo-gabbia": 80,
+      "ruben-loftus-cheek": 79, "diego-moreira": 79, "samuel-chukwueze": 78, "strahinja-pavlovic": 78,
+      "pervis-estupinan": 78, "ardon-jashari": 76, "pietro-terracciano": 76, "omari-hutchinson": 76,
+      "koni-de-winter": 75, "davide-bartesaghi": 74, "yunus-musah": 73, "filippo-terracciano": 71, "warren-bondo": 70,
+      "sankhoun-diawara": 69, "alphadjo-cisse": 66, "francesco-camarda": 66, "christian-comotto": 65,
+      "lorenzo-torriani": 62
     }
   };
-  const mediaDe = (club, id) => MEDIAS[club][id];
+  /* Las medias de EA SPORTS FC 27 (fut.gg, cartas base, octubre 2026) de los
+     jugadores que cambiaron respecto de `MEDIAS` (las de FC 26 y anteriores,
+     con las que se abrieron los sobres de antes). Solo van los que cambian: el
+     resto sigue como estaba. Un jugador que no está en FC 27 (como los de Colo-Colo
+     y la U) o cuya carta no se pudo comprobar se queda con la de antes. */
+  const MEDIAS27 = {
+    realmadrid: {
+      "courtois": 90, "lunin": 80, "asencio": 78, "huijsen": 81, "trent": 84, "konate": 84, "cucurella": 86,
+      "carreras": 81, "rudiger": 83, "mendy": 80, "dumfries": 83, "camavinga": 81, "valverde": 87, "arda-guler": 83,
+      "endrick": 79, "rodrygo": 84, "espi": 77, "brahim": 81, "yan-diomande": 84
+    },
+    barcelona: {
+      "joan-garcia": 86, "szczesny": 81, "livakovic": 78, "cancelo": 83, "balde": 82, "cubarsi": 86, "christensen": 79,
+      "gerard-martin": 79, "kounde": 85, "eric-garcia": 85, "fermin": 85, "pedri": 90, "dani-olmo": 84, "de-jong": 86,
+      "marc-bernal": 78, "gabriel-jesus": 79, "lamine-yamal": 90, "raphinha": 88, "adeyemi": 82, "gordon": 82,
+      "bardghji": 74
+    },
+    manutd: {
+      "senne-lammens": 82, "karl-darlow": 76, "andre-onana": 78, "diogo-dalot": 78, "harry-maguire": 82,
+      "lisandro-martinez": 82, "patrick-chinazaekpere-dorgu": 78, "ayden-heaven": 75, "harry-amass": 69,
+      "mason-mount": 78, "bruno-fernandes": 89, "carlos-baleba": 80, "manuel-ugarte": 77, "kobbie-mainoo": 81,
+      "marcus-rashford": 82, "matheus-cunha": 84, "bryan-mbeumo": 84, "benjamin-sesko": 82
+    },
+    mancity: {
+      "marcus-bettinelli": 69, "geronimo-rulli": 80, "ruben-dias": 87, "marc-guehi": 85, "vitor-reis": 76,
+      "josko-gvardiol": 85, "matheus-nunes": 83, "abdukodir-khusanov": 82, "elliot-anderson": 84, "mateo-kovacic": 81,
+      "rayan-cherki": 86, "enzo-fernandez": 86, "ayyoub-bouaddi": 80, "nico-o-reilly": 83, "phil-foden": 84,
+      "iliman-ndiaye": 82, "erling-haaland": 91, "jeremy-doku": 84, "allan": 67, "antoine-semenyo": 85
+    },
+    chelsea: {
+      "teddy-sharman-lowe": 64, "mike-penders": 78, "marco-palestra": 78, "maxence-lacroix": 82, "reece-james": 84,
+      "pep-chavarria": 79, "aaron-anselmino": 72, "josh-acheampong": 75, "valentin-barco": 79, "jordan-henderson": 78,
+      "moises-caicedo": 86, "pedro-neto": 81, "joao-pedro": 83, "jamie-gittens": 77, "morgan-rogers": 84,
+      "danny-welbeck": 80, "estevao-willian": 80
+    },
+    liverpool: {
+      "alisson-becker": 87, "giorgi-mamardashvili": 83, "vitezslav-jaros": 72, "virgil-van-dijk": 88,
+      "jeremy-jacquet": 77, "milos-kerkez": 81, "conor-bradley": 79, "giovanni-leoni": 71, "kostas-tsimikas": 76,
+      "jeremie-frimpong": 81, "ronald-araujo": 80, "wataru-endo": 78, "florian-wirtz": 86, "dominik-szoboszlai": 86,
+      "alexis-mac-allister": 84, "trey-nyoni": 67, "alexander-isak": 86, "federico-chiesa": 80, "cody-gakpo": 82,
+      "hugo-ekitike": 85, "victor-munoz": 79, "bradley-barcola": 85, "rio-ngumoha": 75
+    },
+    tottenham: {
+      "antonin-kinsky": 77, "andy-robertson": 80, "tosin-adarabioyo": 77, "marcos-senesi": 82,
+      "jan-paul-van-hecke": 81, "destiny-udogie": 79, "pedro-porro": 83, "ben-davies": 74, "micky-van-de-ven": 81,
+      "xavi-simons": 81, "conor-gallagher": 78, "james-maddison": 82, "archie-gray": 77, "lucas-bergvall": 78,
+      "sandro-tonali": 85, "mateus-fernandes": 80, "wilson-odobert": 78, "rodrigo-bentancur": 79, "mathys-tel": 78,
+      "savio": 80, "dominic-solanke": 79, "mohammed-kudus": 81, "dejan-kulusevski": 81, "omar-marmoush": 82,
+      "mykhailo-mudryk": 75
+    },
+    arsenal: {
+      "david-raya": 88, "kepa-arrizabalaga": 78, "illan-meslier": 71, "william-saliba": 88, "cristhian-mosquera": 78,
+      "ben-white": 81, "piero-hincapie": 84, "gabriel-magalhaes": 89, "jurrien-timber": 84, "ezri-konsa": 84,
+      "riccardo-calafiori": 82, "martin-odegaard": 86, "eberechi-eze": 84, "martin-zubimendi": 84, "declan-rice": 88,
+      "bukayo-saka": 87, "viktor-gyokeres": 86, "christos-tzolis": 82, "kai-havertz": 81
+    },
+    betis: {
+      "alvaro-valles": 77, "diego-conde": 76, "hector-bellerin": 76, "diego-llorente": 79, "natan": 79,
+      "fran-garcia": 77, "angel-ortiz": 70, "junior-firpo": 74, "pablo-fornals": 81, "g-lo-celso": 80, "isco": 83,
+      "cucho": 79, "ez-abde": 81, "r-riquelme": 76, "troy-parrott": 78
+    },
+    psg: {
+      "achraf-hakimi": 88, "lucas-beraldo": 79, "illia-zabarnyi": 80, "khvicha-kvaratskhelia": 89, "fabian-ruiz": 86,
+      "ferran-torres": 84, "maghnes-akliouche": 81, "desire-doue": 86, "vitinha": 90, "mika-godts": 78,
+      "senny-mayulu": 79, "nuno-mendes": 89, "lucas-chevalier": 80, "warren-zaire-emery": 83, "matvey-safonov": 83,
+      "willian-pacho": 89, "joao-neves": 88
+    },
+    como: {
+      "jean-butez": 78, "robert-sanchez": 80, "trevoh-chalobah": 80, "jacobo-ramon": 76, "alex-valle": 75,
+      "ivan-smolcic": 75, "marc-oliver-kempf": 76, "mattia-liberali": 68, "luis-milla": 81, "martin-baturina": 79,
+      "lucas-da-cunha": 78, "nicolas-paz": 84, "maxence-caqueret": 78, "maximo-perrone": 78, "adrian-lahdo": 60,
+      "moise-kean": 82, "jayden-addai": 71, "jesus-rodriguez": 76, "anastasios-douvikas": 78
+    },
+    inter: {
+      "josep-martinez": 76, "ivan-provedel": 83, "manuel-akanji": 83, "benjamin-pavard": 80, "carlos-augusto": 80,
+      "yann-bisseck": 78, "federico-dimarco": 86, "alessandro-bastoni": 86, "djed-spence": 80,
+      "aleksandar-stankovic": 76, "piotr-zielinski": 82, "petar-sucic": 78, "luis-henrique": 77, "andy-diouf": 76,
+      "hakan-calhanoglu": 85, "henrikh-mkhitaryan": 81, "lautaro-martinez": 87, "ange-yoan-bonny": 78,
+      "pio-esposito": 77
+    },
+    roma: {
+      "santiago-castro": 77, "donyell-malen": 83, "matias-soule": 80, "paulo-dybala": 85, "bryan-cristante": 81,
+      "lorenzo-pellegrini": 78, "marten-de-roon": 80, "manu-kone": 81, "niccolo-pisilli": 74, "rodrigo-mora": 77,
+      "devyne-rensch": 75, "konstantinos-koulierakis": 76, "evan-ndicka": 83, "nahuel-molina": 77, "mario-hermoso": 81,
+      "gianluca-mancini": 84, "leonardo-balerdi": 79, "wesley": 80, "daniele-ghilardi": 74, "mile-svilar": 85
+    },
+    napoli: {
+      "alex-meret": 81, "vanja-milinkovic-savic": 80, "rafa-marin": 76, "mathias-olivera": 77,
+      "giovanni-di-lorenzo": 82, "leonardo-spinazzola": 80, "costantino-favasuli": 69, "billy-gilmour": 75,
+      "scott-mctominay": 86, "kevin-de-bruyne": 85, "rasmus-hjlund": 78, "lorenzo-lucca": 75, "matteo-politano": 80,
+      "antonio-vergara": 69, "alisson-santos": 74, "noa-lang": 79
+    },
+    dortmund: {
+      "gregor-kobel": 87, "alexander-meyer": 74, "waldemar-anton": 84, "nico-schlotterbeck": 87, "joane-gadou": 68,
+      "daniel-svensson": 79, "julian-ryerson": 82, "filippo-mane": 65, "jobe-bellingham": 77, "felix-nmecha": 85,
+      "carney-chukwuemeka": 78, "ethan-nwaneri": 75, "konstantinos-karetsas": 76, "marcel-sabitzer": 81,
+      "emre-can": 81, "joey-veerman": 82, "justin-lerma": 66, "giannis-konstantelias": 79, "serhou-guirassy": 85,
+      "maximilian-beier": 81, "fabio-silva": 78
+    },
+    bayern: {
+      "manuel-neuer": 81, "jonas-urbig": 79, "dayot-upamecano": 87, "minjae-kim": 83, "alphonso-davies": 82,
+      "sacha-boey": 75, "josip-stanisic": 80, "joshua-kimmich": 88, "tom-bischof": 79, "jamal-musiala": 87,
+      "konrad-laimer": 85, "lennart-karl": 77, "aleksandar-pavlovic": 83, "serge-gnabry": 83, "harry-kane": 90,
+      "luis-diaz": 88, "michael-olise": 90
+    },
+    colocolo: {
+      "matias-fernandez": 69
+    }
+  };
+  const mediaDe = (club, id) => (MEDIAS27[club] && MEDIAS27[club][id]) || MEDIAS[club][id];
 
   /* ---------- las posiciones de cada futbolista ----------
      Cada uno juega de una o dos posiciones (`"DC/EI"`: la primera es la
@@ -1092,6 +1261,24 @@
       "mahamadou-doumbia": "MC", "hassan-kadish": "LI/DFC", "marwan-al-sahafi": "EI/MD", "jan-carlo-simic": "DFC", "mukhtar-ali": "MC",
       "ahmed-sharahili": "DFC", "saleh-al-shehri": "DC", "ahmed-al-ghamdi": "MI/MD", "bryant-ortega": "MC", "fawaz-al-sagour": "LD/LI",
       "faris-abdi": "LI", "saad-al-mousa": "DFC", "hamed-al-ghamdi": "MC", "stephane-keller": "DFC"
+    },
+    atletico: {
+      "jan-oblak": "POR", "julian-alvarez": "DC/MC", "marcos-llorente": "LD/MD", "grimaldo": "LI/MI",
+      "ademola-lookman": "DC/EI", "morten-hjulmand": "MC", "pablo-barrios": "MC", "david-hancko": "DFC/LI",
+      "alex-baena": "MI/MC", "alexander-sorloth": "DC/ED", "giuliano": "MD/ED", "juan-musso": "POR",
+      "cristian-romero": "DFC", "pubill": "DFC/LD", "koke": "MC", "robin-le-normand": "DFC", "jonathan-david": "DC",
+      "johnny-cardoso": "MC", "lee-kang-in": "ED/MD", "obed-vargas": "MC/MI", "rodri-mendoza": "MC",
+      "arnau-ortiz": "MI/EI", "aleksa-puric": "DFC", "salvi-esquivel": "POR", "miguel-cubo": "DC",
+      "dani-martinez": "DFC/LI"
+    },
+    milan: {
+      "mike-maignan": "POR", "adrien-rabiot": "MC", "luka-modric": "MC", "christian-pulisic": "ED/MC",
+      "mario-gila": "DFC", "fikayo-tomori": "DFC", "alexis-saelemaekers": "LD/MD", "goncalo-ramos": "DC",
+      "matteo-gabbia": "DFC", "ruben-loftus-cheek": "MC", "diego-moreira": "ED/MD", "samuel-chukwueze": "ED/MD",
+      "strahinja-pavlovic": "DFC", "pervis-estupinan": "LI/MI", "ardon-jashari": "MC", "pietro-terracciano": "POR",
+      "omari-hutchinson": "ED/MD", "koni-de-winter": "DFC", "davide-bartesaghi": "LI/MI", "yunus-musah": "MC",
+      "filippo-terracciano": "DFC/LD", "warren-bondo": "MC", "sankhoun-diawara": "DFC/LI", "alphadjo-cisse": "MC",
+      "francesco-camarda": "DC", "christian-comotto": "MC", "lorenzo-torriani": "POR"
     }
   };
   const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
@@ -1112,10 +1299,17 @@
     if (posiciones.some(p => POS_LINEA[p] === l || CRUCES.has(p + "-" + casilla))) return { nivel: "incomodo", pen: PEN_AJUSTE.incomodo };
     return { nivel: "mal", pen: PEN_AJUSTE.mal };
   }
-  /* La rareza de una carta de fútbol sale de la media del jugador: hasta 80
-     común, 81 a 84 rara, 85 a 87 épica y 88 o más legendaria. */
-  const BANDAS = [80, 84, 87];
-  const tierDeMedia = m => (m <= BANDAS[0] ? 0 : m <= BANDAS[1] ? 1 : m <= BANDAS[2] ? 2 : 3);
+  /* La rareza de una carta de fútbol sale de la media del jugador: hasta 76
+     común, 77 a 82 rara, 83 a 87 épica y 88 o más legendaria. Así eran antes
+     (hasta 80 común, 81 a 84 rara, 85 a 87 épica): `BANDAS_V0`, con las medias de
+     `MEDIAS`, dan la rareza `tierAntes` con la que se hicieron los sobres anteriores
+     al último corte de `AMPLIACIONES`, que no se toca. */
+  const BANDAS = [76, 82, 87], BANDAS_V0 = [80, 84, 87];
+  const tierDeBandas = (b, m) => (m <= b[0] ? 0 : m <= b[1] ? 1 : m <= b[2] ? 2 : 3);
+  const tierDeMedia = m => tierDeBandas(BANDAS, m);
+  const tierDeMediaV0 = m => tierDeBandas(BANDAS_V0, m);
+  // los clubes que llegaron con las medias de FC 27 y las bandas nuevas: no tienen historia
+  const NUEVOS = new Set(["atletico", "milan"]);
   /* Las probabilidades por carta de las colecciones de fútbol, en diez
      milésimas: como cada rareza es un grupo de jugadores de distinta
      media, aquí las más altas salen un poco más que en las otras colecciones
@@ -1131,6 +1325,11 @@
      la ampliación de las leyendas se hicieron cuando las especiales pesaban
      el triple de una legendaria común (`peso` 3): esos pesos no se tocan. */
   const PESO_HOY = { comun: 5, rara: 1 };
+  /* En un re-roll (diez épicas por una legendaria) la legendaria está asegurada,
+     así que una especial o una leyenda no puede salir tan fácil como en un sobre:
+     aquí una legendaria común pesa 50 y una especial o una leyenda 1 (cincuenta veces
+     menos). Solo para los re-rolls de después del último corte de `AMPLIACIONES`. */
+  const PESO_REROLL_FUTBOL = { comun: 50, rara: 1 };
   const PESOS_FUTBOL = {
     // el sobre de fútbol (los 203 jugadores) y el Plus: menos comunes y la quinta carta, épica o mejor
     normal: [6600, 3000, 340, 60],
@@ -1185,11 +1384,13 @@
   }));
   const BASE_FUT = CARDS.length;
   const cartaFutbol = (col, carpeta, [club, id, name, , dorsal, pais, extra = {}]) => {
-    const n = CARDS.length, media = mediaDe(club, id), tier = tierDeMedia(media), t = TIERS[tier];
+    const n = CARDS.length, media = mediaDe(club, id), mediaAntes = MEDIAS[club][id], tier = tierDeMedia(media), t = TIERS[tier];
+    // la rareza de antes (con la media y las bandas de antes): el `uid` la lleva en el nombre y no cambia nunca
+    const tierAntes = extra.especial || NUEVOS.has(club) ? tier : tierDeMediaV0(mediaAntes);
     const posiciones = posicionesDe(club, id), pos = POS_LINEA[posiciones[0]];
     CARDS.push({
-      n, uid: club + "-" + id + "-" + t.key, person: extra.person || club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
-      col, liga: carpeta, peso: extra.peso || 1, pesoHoy: extra.especial ? PESO_HOY.rara : PESO_HOY.comun, tier, club, pos, posiciones, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
+      n, uid: club + "-" + id + "-" + TIERS[tierAntes].key, person: extra.person || club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
+      col, liga: carpeta, peso: extra.peso || 1, pesoHoy: extra.especial ? PESO_HOY.rara : PESO_HOY.comun, tier, tierAntes, club, pos, posiciones, dorsal, pais, media, mediaAntes, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
       sub: extra.sub || CLUBES[club], acc: t.color,
       ...(extra.especial ? { especial: extra.especial, cinta: extra.cinta, limitada: !!extra.limitada } : {})
     });
@@ -1200,7 +1401,7 @@
     const n = CARDS.length, t = TIERS[3], pos = posiciones.split("/");
     CARDS.push({
       n, uid: "leyendas-" + id + "-" + t.key, person: "leyendas-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
-      col: "futbol", liga: "leyendas", peso: 1, pesoHoy: PESO_HOY.rara, tier: 3, club: null, pos: POS_LINEA[pos[0]], posiciones: pos, dorsal: 0, pais, media,
+      col: "futbol", liga: "leyendas", peso: 1, pesoHoy: PESO_HOY.rara, tier: 3, tierAntes: 3, club: null, pos: POS_LINEA[pos[0]], posiciones: pos, dorsal: 0, pais, media, mediaAntes: media,
       img: "cards/leyendas/" + id + ".webp", sub: PAIS_LEYENDA[pais], acc: t.color, leyenda: true, cinta: "LEYENDA", limitada: false
     });
   };
@@ -1217,11 +1418,16 @@
   ARABIA.forEach(j => cartaFutbol("futbol", "champions", j));
   ESPECIALES2.forEach(j => cartaFutbol("futbol", "especiales", j));
   LEYENDAS.forEach(cartaLeyenda);
+  ATLETICO.forEach(j => cartaFutbol("futbol", "champions", j));
+  MILAN.forEach(j => cartaFutbol("futbol", "champions", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
-  const pool = (lista, w = TIERS.map(x => x.w), ultima = null, pesoDe = c => c.peso) => {
-    const t = TIERS.map((_, i) => lista.filter(c => c.tier === i));
+  const pool = (lista, w = TIERS.map(x => x.w), ultima = null, pesoDe = c => c.peso, tierDe = c => c.tier, bandas = BANDAS, pesoRerollDe = pesoDe) => {
+    const t = TIERS.map((_, i) => lista.filter(c => tierDe(c) === i));
+    t.tierDe = tierDe;   // la rareza de cada carta en este pool (la de antes o la de hoy)
+    t.bandas = bandas;
     t.pesoDe = pesoDe;   // los pesos que usa este pool (los de antes y los de hoy no son los mismos)
+    t.pesoRerollDe = pesoRerollDe;   // y los del re-roll, que en los pools de hoy son otros
     t.uniforme = lista.every(c => pesoDe(c) === 1);
     t.peso = t.map(l => l.reduce((s, c) => s + pesoDe(c), 0));
     // la rareza más alta que tiene: lo que sería de una rareza que la colección no tiene sale de la más alta
@@ -1233,11 +1439,14 @@
     return t;
   };
   const pesoHoy = c => c.pesoHoy || c.peso;
+  const pesoRerollHoy = c => (c.col !== "futbol" ? c.peso : c.especial || c.leyenda ? PESO_REROLL_FUTBOL.rara : PESO_REROLL_FUTBOL.comun);
+  // la rareza con que se hicieron los sobres de antes del corte de las medias de FC 27 (las demás colecciones no cambian)
+  const tierDeAntes = c => (c.tierAntes === undefined ? c.tier : c.tierAntes);
   const POOL = {
     legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp),
-    futbol: pool(POR_COL.futbol, PESOS_FUTBOL.normal, null, pesoHoy), futbolplus: pool(POR_COL.futbol, PESOS_FUTBOL.plus, PESOS_FUTBOL.ultimaPlus, pesoHoy),
+    futbol: pool(POR_COL.futbol, PESOS_FUTBOL.normal, null, pesoHoy, undefined, undefined, pesoRerollHoy), futbolplus: pool(POR_COL.futbol, PESOS_FUTBOL.plus, PESOS_FUTBOL.ultimaPlus, pesoHoy, undefined, undefined, pesoRerollHoy),
     // los de antes: las mismas listas y pesos de cuando se abrieron esos sobres
-    futbol1: pool(CARDS.slice(BASE_FUT, BASE_PREM), PESOS_FUTBOL.v1.futbol), premier1: pool(CARDS.slice(BASE_PREM, BASE_CHAMP), PESOS_FUTBOL.v1.premier)
+    futbol1: pool(CARDS.slice(BASE_FUT, BASE_PREM), PESOS_FUTBOL.v1.futbol, null, undefined, tierDeAntes, BANDAS_V0), premier1: pool(CARDS.slice(BASE_PREM, BASE_CHAMP), PESOS_FUTBOL.v1.premier, null, undefined, tierDeAntes, BANDAS_V0)
   };
   const POR_TIER = POOL.profes;
   /* De qué colección es un sobre o un re-roll, por su clave. Las claves
@@ -1256,13 +1465,18 @@
   // Chile, Argentina, la MLS y Arabia (277 jugadores, publicado el 2026-10-28): el corte (28-10-2026 21:16 UTC) es media hora después del push, para que ningún sobre ya comprado cambie.
   // Cristiano · Balón de Oro All-Time (1 carta, publicado el 2026-10-29): el corte (2026-10-29 01:39 UTC) es 15 minutos después del push, para que ningún sobre ya comprado cambie.
   // Las leyendas (43 cartas, n = 1111) y los pesos nuevos de las especiales (publicado el 2026-10-29): el corte (2026-10-29 03:40 UTC) es 12 minutos después del push, para que ningún sobre ya comprado cambie.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }];
+  // Las medias de FC 27, las bandas nuevas de rareza, el Atlético de Madrid y el AC Milan (n = 1154, los pesos de hoy pero todavía con la rareza de antes; publicado el 2026-10-29): el corte (2026-10-29 04:26 UTC) es 13 minutos después del push, para que ningún sobre ya comprado cambie.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }, { hasta: 1793247961952, n: 1154, hoy: true }];
+  // desde este instante las cartas valen con su rareza nueva (las medias de FC 27 y las bandas nuevas)
+  const CORTE_TIERS = AMPLIACIONES[AMPLIACIONES.length - 1].hasta;
+  // la rareza que tenía una carta a la hora `at` (un re-roll viejo se hizo con las de entonces)
+  const tierEn = (c, at) => (at < CORTE_TIERS ? tierDeAntes(c) : c.tier);
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
     if (!v) return plus ? POOL.futbolplus : POOL.futbol;
     const k = (plus ? "h" : "g") + v.n;
-    return memoPool[k] || (memoPool[k] = pool(POR_COL.futbol.filter(c => c.n < v.n), plus ? PESOS_FUTBOL.plus : PESOS_FUTBOL.normal, plus ? PESOS_FUTBOL.ultimaPlus : null));
+    return memoPool[k] || (memoPool[k] = pool(POR_COL.futbol.filter(c => c.n < v.n), plus ? PESOS_FUTBOL.plus : PESOS_FUTBOL.normal, plus ? PESOS_FUTBOL.ultimaPlus : null, v.hoy ? pesoHoy : undefined, tierDeAntes, BANDAS_V0));
   }
   // `at`: la hora del sobre o del re-roll (sin ella, el catálogo de hoy)
   const poolDe = (clave, at = Infinity) => {
@@ -1386,7 +1600,7 @@
       usadas.add(c.n);
       cartas.push({ id: c.n, g: 1 + pesado(r, GRADE_W), w: (r.u32() & 0x7fffffff) | 1 });
     }
-    cartas.sort((a, b) => CARDS[a.id].tier - CARDS[b.id].tier);   // estable: lo mejor al final
+    cartas.sort((a, b) => P.tierDe(CARDS[a.id]) - P.tierDe(CARDS[b.id]));   // estable: lo mejor al final
     const res = { dios, cartas, col: coleccionDe(clave) };
     memo.set(k, res);
     if (memo.size > 20000) memo.delete(memo.keys().next().value);
@@ -1489,7 +1703,7 @@
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
     const P = poolDe(clave, at), posibles = P[Math.min(P.tope, tier + saltoReroll(k, at, tier))];
-    const c = elige(r, posibles, P.uniforme, P.pesoDe);
+    const c = elige(r, posibles, P.uniforme, P.pesoRerollDe);
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
     return res;
@@ -1526,7 +1740,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, LEYENDAS, PESO_HOY, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
