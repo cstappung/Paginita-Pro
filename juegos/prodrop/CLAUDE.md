@@ -163,11 +163,15 @@ other file of the site. Things that hold it together:
   with Pillow. Positions cut to two (the test). Dorsal 0: the card no longer shows it.
   `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
 - **Salón banner** (`futbol()` in `colabtex/src/juegos/novedades-arte.js`): four cards in a fan,
-  Vidal always (with the «Liga Chilena · Nuevo» tag above him) plus three random stars from
-  `ESTRELLAS_FUTBOL` on every paint; the test checks each `media` against the motor.
-- **Special cards** (`ESPECIALES` in the motor, folder `cards/especiales/<club>/`): another
+  the three specials (those with a `cinta`) plus one random star from
+  `ESTRELLAS_FUTBOL` on every paint (no Chilean-league tag any more); the test checks each `media` against the motor.
+- **Special cards** (`ESPECIALES` and `ESPECIALES2` in the motor, folder `cards/especiales/<club>/`): another
   card of a player that exists for something that happened (Mbappé · MVP del
-  Clásico, media 92, and Harry Kane · Balón de Oro, media 94). Row format as the
+  Clásico, media 92; Harry Kane · Balón de Oro, media 94; Cristiano Ronaldo ·
+  Balón de Oro All-Time, media 96, club `alnassr`, person `alnassr-cristiano-ronaldo`).
+  **A new special goes in `ESPECIALES2`, never in `ESPECIALES`** (that list sits in the
+  middle of the catalogue and adding to it would shift the ids behind it); it is
+  appended after Arabia with its own `AMPLIACIONES` entry. Row format as the
   others plus a 7th element `{ person, sub, cinta, especial, limitada, peso }`:
   `person` is the **same player's** (so the squad's no-repeat rule treats both as
   one; Kane's is `bayern-harry-kane`, the one his base card will have when the Bayern
@@ -182,7 +186,7 @@ other file of the site. Things that hold it together:
   `SKIN.futbol.meta`, `TEMAS.futbol`, the hub tile text and `NOVEDADES_FUTBOL`; and in
   Juegos, the salon card `futbol` in `juegos-main.js` and its art (`futbol()` in
   `novedades-arte.js`, three real cards with media; a test compares its medias with
-  the motor's).
+  the motor's; Cristiano's ribbon is «BOAT» (Ballon d'Or All-Time) on the card and in the banner).
 - **«Especial» is a displayed rarity, not an engine tier**: the frame's
   `rareza(c)` answers `ESPECIAL` (✦, gold) for `c.especial`, on the card face,
   the banner, the zoom and the collection (its own filter chip, and the

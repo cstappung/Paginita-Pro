@@ -348,12 +348,10 @@ function prodrop({ serie1 = false } = {}) {
 
 /* ---------- PRODROP · Fútbol: cuatro cartas de fútbol de verdad en
    abanico (foto, media arriba a la derecha, nombre y, en las especiales,
-   su cinta). Vidal va siempre, con la etiqueta «Liga Chilena · Nuevo»
-   arriba: anuncia la liga chilena; las otras tres salen al azar de las
-   estrellas (`ESTRELLAS_FUTBOL`) cada vez que se pinta el banner, en un
-   lugar al azar. Las medias son las del motor (juegos/prodrop/motor.js;
-   un test las compara). ---------- */
-const VIDAL = { img: "champions/colocolo/arturo-vidal", nombre: "Arturo Vidal", media: 73, cinta: "", nuevo: "LIGA CHILENA" };
+   su cinta). Van siempre las tres especiales (las de `cinta`) y una
+   estrella más al azar de `ESTRELLAS_FUTBOL`, en un lugar al azar cada vez
+   que se pinta el banner. Las medias son las del motor
+   (juegos/prodrop/motor.js; un test las compara). ---------- */
 const ESTRELLAS_FUTBOL = [
   { img: "champions/montreal/alexis-sanchez", nombre: "Alexis Sánchez", media: 75, cinta: "" },
   { img: "especiales/realmadrid/mbappe-mvp", nombre: "Mbappé", media: 92, cinta: "MVP DEL CLÁSICO" },
@@ -361,20 +359,21 @@ const ESTRELLAS_FUTBOL = [
   { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" },
   { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 90, cinta: "" },
   { img: "champions/intermiami/lionel-messi", nombre: "Messi", media: 89, cinta: "" },
-  { img: "champions/alnassr/cristiano-ronaldo", nombre: "Cristiano Ronaldo", media: 84, cinta: "" },
+  { img: "champions/alnassr/cristiano-ronaldo", nombre: "C. Ronaldo", media: 84, cinta: "" },
+  { img: "especiales/alnassr/cristiano-balon-all-time", nombre: "C. Ronaldo", media: 96, cinta: "BOAT" },
   { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 89, cinta: "" }
 ];
-// tres estrellas al azar más Vidal, barajadas: [{...carta}] de cuatro
+// las especiales más una estrella al azar, barajadas: [{...carta}] de cuatro
 function manoFutbol(azar = Math.random) {
-  const otras = ESTRELLAS_FUTBOL.slice().sort(() => azar() - 0.5).slice(0, 3);
-  return otras.concat(VIDAL).sort(() => azar() - 0.5);
+  const otra = ESTRELLAS_FUTBOL.filter(c => !c.cinta).sort(() => azar() - 0.5).slice(0, 1);
+  return ESTRELLAS_FUTBOL.filter(c => c.cinta).concat(otra).sort(() => azar() - 0.5);
 }
 function futbol() {
   const az = azar(31);
   let chispas = "";
   for (let i = 0; i < 12; i++) chispas += `<i class="ep-pd-chispa" style="left:${r1(az() * 100)}%;top:${r1(az() * 100)}%;animation-delay:${r1(-az() * 3)}s"></i>`;
   return `<div class="ep-pd ep-fu" aria-hidden="true"><i class="ep-pd-rayos"></i><i class="ep-pd-halo"></i>
-    <div class="ep-fu-mano">${manoFutbol().map((c, i) => `<div class="ep-fu-slot f${i + 1}">${c.nuevo ? `<b class="ep-fc-nuevo"><img src="juegos/prodrop/flags/cl.png" alt="">${c.nuevo}<small>NUEVO</small></b>` : ""}<span class="ep-fu-carta"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">
+    <div class="ep-fu-mano">${manoFutbol().map((c, i) => `<div class="ep-fu-slot f${i + 1}"><span class="ep-fu-carta"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">
       <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em></span></div>`).join("")}</div>${chispas}</div>`;
 }
 
