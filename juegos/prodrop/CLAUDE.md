@@ -162,6 +162,21 @@ other file of the site. Things that hold it together:
   face** (fut.gg `player-item` render, 512 px) on a radial gradient in the club's colours, made
   with Pillow. Positions cut to two (the test). Dorsal 0: the card no longer shows it.
   `RT.delClub(club)` says «de la Universidad …» / «del Colo-Colo».
+- **Leyendas** (`LEYENDAS` in the motor, photos `cards/leyendas/<id>.webp`, 43 cards, ids 1111+,
+  last `AMPLIACIONES` entry `n: 1111`): retired greats (Pelé, Maradona, Zidane, R9, Cruyff, Figueroa,
+  Zamorano…), a category of their own. **No club** (`club: null`, flag only), always tier 3 (Legendaria for
+  the motor) but shown as «Leyenda ♛» (`rareza()` in `app.js`, filter 5 in the collection, a «Leyendas» section
+  at the end, `.futbol.leyenda` frame). Medias are EA FC 26's base **Icon** card (Hero for Zamorano), untouched;
+  Figueroa isn't in the game: 93 is ours. Faces = fut.gg `player-item` renders (sepia, transparent) on a warm
+  radial background, made with Pillow; Figueroa's and Zamorano's were edited by hand (sepia + bottom fade).
+  Row: `[photo id, card name, country, media, "POS/POS"]`; `PAIS_LEYENDA` gives the country name shown on the card.
+  **Odds**: `PESO_HOY` — a plain legendary weighs 5, a special card or a legend 1 (five times less, both the same).
+  Cards carry `peso` (the old weight, specials 3) and `pesoHoy`; every pool has its own `pesoDe`: the pools of
+  packs bought before the last `AMPLIACIONES` cut-off keep the old weights so opened packs never change, only the
+  current pool (`POOL.futbol/futbolplus`, packs after the cut-off) uses `pesoHoy`. `elige` and `probabilidad` take
+  the weight from the pool. Legends don't belong to any club: they are out of the club albums and the club
+  challenges (`RT.CLUBES`), but count in open and national challenges (La Roja takes Figueroa and Zamorano).
+  The cut-off `hasta` must be set to the push time plus a few minutes when publishing.
 - **Salón banner** (`futbol()` in `colabtex/src/juegos/novedades-arte.js`): four cards in a fan,
   the three specials (those with a `cinta`) plus one random star from
   `ESTRELLAS_FUTBOL` on every paint (no Chilean-league tag any more); the test checks each `media` against the motor.
