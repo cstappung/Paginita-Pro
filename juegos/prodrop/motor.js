@@ -1255,8 +1255,8 @@
   // El Bayern Múnich (20 jugadores, publicado el 2026-10-28): el corte es media hora después del push, para que ningún sobre ya comprado cambie.
   // Chile, Argentina, la MLS y Arabia (277 jugadores, publicado el 2026-10-28): el corte (28-10-2026 21:16 UTC) es media hora después del push, para que ningún sobre ya comprado cambie.
   // Cristiano · Balón de Oro All-Time (1 carta, publicado el 2026-10-29): el corte (2026-10-29 01:39 UTC) es 15 minutos después del push, para que ningún sobre ya comprado cambie.
-  // Las leyendas (43 cartas, n = 1111) y los pesos nuevos de las especiales: ¡`hasta` es un PROVISORIO en el futuro (1-1-2027), así que por ahora ningún sobre las ve y el catálogo sigue como antes! Al publicar, `hasta` = la hora del push y unos minutos más (nunca antes: un sobre ya comprado cambiaría).
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1798761600000, n: 1111 }];
+  // Las leyendas (43 cartas, n = 1111) y los pesos nuevos de las especiales (publicado el 2026-10-29): el corte (2026-10-29 03:40 UTC) es 12 minutos después del push, para que ningún sobre ya comprado cambie.
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
