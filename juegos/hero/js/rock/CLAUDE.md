@@ -200,7 +200,9 @@ true and the `admins` condition back in those two rules. In the frame,
   (`g m a`), onsets (`gg` kick, `gm` snare, `ga` cymbals) and section loudness
   (`f`), normalised to that song. Sent once with `rock.musica(d)` (worker:
   `{t:'musica', d}`, after `enVivo`, which clears it); each pulse sends the song
-  second `t`. `oyeMusica` takes the max onset since the previous scene frame
+  second `seg` (**not `t`**: the worker messages use `t` for their type, and a
+  pulse field named `t` overwrote it — the worker ignored every pulse and the
+  whole stage froze. The proxy now spreads the data before `t: 'pulso'`). `oyeMusica` takes the max onset since the previous scene frame
   (onsets last one 60 fps frame; the scene runs at 15–30). With it, kick and
   crash pulses come from the song instead of the choreography's drum pattern,
   and quiet stretches dim the lights. Without it (no analysis, before 0 s,

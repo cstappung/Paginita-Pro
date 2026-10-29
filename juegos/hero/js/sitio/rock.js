@@ -64,7 +64,9 @@ function fondoEnTrabajador() {
         w.postMessage({ t: 'vivo', yo, rival, otros, alto });
         return new Promise((fin) => { preparado = fin; });
       },
-      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, humor: d.humor, hype: d.hype, dtJuego: d.dtJuego || 0, toca: d.toca, solo: d.solo, confs: d.confs || null, golpes: d.golpes || null, t: d.t, fuego: d.fuego || null }); },
+      // `t` es el tipo del mensaje y va al final: un campo del pulso con ese nombre no lo puede pisar (le pasó al
+      // segundo de la canción, que se llamaba `t`: el worker no reconocía ningún pulso y la escena quedaba quieta)
+      pulso(d) { w.postMessage({ ...d, t: 'pulso' }); },
       musica(d) { w.postMessage({ t: 'musica', d }); },
       carga(quien) { w.postMessage({ t: 'carga', quien }); },
       poder(quien, on) { w.postMessage({ t: 'poder', quien, on }); },
