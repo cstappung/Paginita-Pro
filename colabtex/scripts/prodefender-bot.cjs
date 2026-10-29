@@ -122,7 +122,7 @@ if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Nu
 // pactoPrecio del reino (levels.js), para comparar antes y después
 if (opt('precio', '') !== '') for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].pactoPrecio = +opt('precio');
 // --jefe vida,vel: otros jefes (engine.js JEFE, desde la versión 5)
-if (opt('jefe', '')) { const [v, s] = opt('jefe').split(',').map(Number); PD.JEFE.vida = v; PD.JEFE.vel = s; }
+if (opt('jefe', '')) { const [v, s, b] = opt('jefe').split(',').map(Number); PD.JEFE.vida = v; PD.JEFE.vel = s; if (b) PD.JEFE.esbirros = b; }
 // --tarde desde,hasta,x: otra vidaTarde (levels.js); --vida X / --oro Y: otra vida y otro oro por
 // enemigo del reino (levels.js vidaX, oroX)
 if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) PD.LEVELS[li].vidaTarde = x > 1 ? { desde, hasta, x } : null; }

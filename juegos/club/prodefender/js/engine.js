@@ -86,7 +86,9 @@
   const REMATA = { fire: 1, explosive: 1, arcane: 1 };
   // Jefes desde la versión 5 (pedido del dueño): x20 de vida y un tercio de la velocidad, para que
   // se sientan como una marcha lenta que hay que frenar entre todas las torres.
-  const JEFE = { vida: 20, vel: 1 / 3 };
+  // `esbirros`: cuánto más espaciadas invocan (con x20 de vida viven mucho más: a su ritmo de
+  // antes llenaban el camino de esbirros y eso, no el jefe, era lo que se escapaba).
+  const JEFE = { vida: 20, vel: 1 / 3, esbirros: 10 };
   PD.JEFE = JEFE;   // el bot lo cambia para medir (--jefe vida,vel)
   // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
   // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
@@ -672,7 +674,7 @@
         burrowed: false, burrowT: d.burrow ? d.burrow.every * (0.5 + this.rnd() * 0.5) : 0,
         phased: false, phaseT: d.phase ? d.phase.every * (0.3 + this.rnd() * 0.7) : 0,
         healT: d.heal ? d.heal.every : 0, sabT: d.sabotage ? d.sabotage.every * 0.7 : 0,
-        spawnT: d.spawn ? d.spawn.every : 0, tpT: d.teleport ? d.teleport.every : 0,
+        spawnT: d.spawn ? d.spawn.every * (d.boss && this.ve >= 5 ? JEFE.esbirros : 1) : 0, tpT: d.teleport ? d.teleport.every : 0,
         revived: false, enraged: false, blinked: false, haste: 1, auraSlow: 0, invulnT: 0,
         corr: 0, corrT: 0, corrAmp: 0, wetT: 0, wetElec: 1.5, wetAmp: 0, liftT: 0, goldT: 0, goldMult: 1,
         hexT: 0, hexAmp: 0, hexExec: 0, hexSpread: 0, hexDps: 0, hexArmor: 0, hexReveal: false, hexSrc: null,
@@ -1148,7 +1150,7 @@
         if (d.spawn) {
           e.spawnT -= dt;
           if (e.spawnT <= 0) {
-            e.spawnT = d.spawn.every;
+            e.spawnT = d.spawn.every * (d.boss && this.ve >= 5 ? JEFE.esbirros : 1);
             const hpM = PD.hpMult(this.L, cur);
             for (let i = 0; i < d.spawn.n; i++) this.spawn(d.spawn.type, e.path, e.dist - 20 - i * 14, hpM);
           }
