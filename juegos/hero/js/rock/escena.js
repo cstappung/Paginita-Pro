@@ -3473,7 +3473,7 @@ const lasers = new Lasers(), celus = new Celulares(crowd);
 /* =====================================================================
    LA MÚSICA DE VERDAD — PRO HERO analiza la canción al cargarla (`rock.musica`, de ritmo.js: energía de graves,
    medios y agudos, sus golpes y la fuerza del tramo, a 60 cuadros por segundo) y en cada pulso dice en qué
-   segundo va (`t`). Con eso los focos laten con el bombo de la canción y no con el de la coreografía, los tramos
+   segundo va (`seg`). Con eso los focos laten con el bombo de la canción y no con el de la coreografía, los tramos
    suaves bajan la luz y los fuertes la suben. Sin análisis (o antes del segundo 0) se usa el bombo inventado.
    ===================================================================== */
 const MUS = { d: null, ts: 0, tsAt: 0, ult: -1, hay: false, g: 0, m: 0, a: 0, f: 0.6, gg: 0, gm: 0, ga: 0 };
@@ -4818,10 +4818,10 @@ export const rock = {
   _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null, golpes = null, t = null, fuego = null }) {
+  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null, golpes = null, seg = null, fuego = null }) {
     if (!VIVO.on) return;
     // el segundo de la canción que suena (para la música analizada) y cuánto arde cada jugador (0–1)
-    if (Number.isFinite(t)) { MUS.ts = t; MUS.tsAt = ahoraS(); }
+    if (Number.isFinite(seg)) { MUS.ts = seg; MUS.tsAt = ahoraS(); }
     if (Array.isArray(fuego)) VIVO.fuegos = fuego.slice(0, 8).map(f => clamp(+f || 0, 0, 1));
     // las notas tocadas de verdad desde el pulso anterior: [quién, carril, acorde, duración en centésimas]
     if (Array.isArray(golpes)) for (const [q, l, a, d] of golpes.slice(0, 64)) {

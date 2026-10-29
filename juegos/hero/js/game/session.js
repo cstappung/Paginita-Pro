@@ -364,7 +364,7 @@ export class GameSession {
     const golpes = this.rockGolpes?.length ? this.rockGolpes.splice(0) : null;
     // cuánto arde el escenario por cada uno: ritmo de estrellas + racha (ritmo.js, fuegoDe)
     const fuego = E.map((e) => fuegoDe(e));
-    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs, golpes, t: now, fuego });
+    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs, golpes, seg: now, fuego });
     // Star Power: cada frase completa carga la barra y manda un rayo; activarlo hace caer otro y la guitarra
     // se prende de azul mientras dure (en un mano a mano, la carga es un ataque al rival)
     // (en la batalla no: ahí las frases dan poderes y el rayo sale al lanzarlos, _lanzaBt)

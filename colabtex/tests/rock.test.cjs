@@ -280,3 +280,41 @@ test('la música analizada: energía por banda, los golpes del bombo y la fuerza
   const Z = R.analizaMusica([new Float32Array(800), new Float32Array(800), new Float32Array(800)], 8000, 60);
   assert.equal(Z.n, 6); assert.equal(Math.max(...Z.g, ...Z.gg, ...Z.f), 0);
 });
+
+test('el worker del fondo recibe cada pulso como pulso (con el segundo de la canción y el fuego)', async () => {
+  const { pathToFileURL } = require('node:url');
+  // lo mínimo del navegador para sitio/rock.js: un Worker falso que guarda lo que la página le manda
+  const enviados = [];
+  let trabajador = null;
+  class WorkerFalso {
+    constructor() { trabajador = this; }
+    postMessage(d) { enviados.push(d); if (d.t === 'lienzo') setTimeout(() => this.onmessage({ data: { t: 'listo' } }), 0); }
+    terminate() {}
+  }
+  const lienzo = () => ({ className: '', clientWidth: 800, clientHeight: 450, transferControlToOffscreen: () => ({}), remove() {} });
+  class Canvas {}
+  Canvas.prototype.transferControlToOffscreen = () => ({});
+  const G = globalThis, antes = {};
+  const falsos = {
+    location: { search: '', origin: 'http://x' }, window: { addEventListener() {}, removeEventListener() {} }, addEventListener() {}, Worker: WorkerFalso, OffscreenCanvas: class {}, HTMLCanvasElement: Canvas,
+    ResizeObserver: class { observe() {} }, devicePixelRatio: 1, innerWidth: 800, innerHeight: 450,
+    matchMedia: () => ({ matches: false }), screen: { width: 1920, height: 1080 },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    document: { createElement: lienzo, addEventListener() {}, hidden: false, documentElement: { classList: { add() {}, remove() {}, toggle() {} } } },
+  };
+  falsos.window.parent = falsos.window;
+  for (const [k, v] of Object.entries(falsos)) { antes[k] = Object.getOwnPropertyDescriptor(G, k); Object.defineProperty(G, k, { value: v, configurable: true, writable: true }); }
+  try {
+    const { cargaFondo } = await import(pathToFileURL(path.join(__dirname, '../../juegos/hero/js/sitio/rock.js')).href);
+    const rock = await cargaFondo();
+    assert.ok(trabajador, 'usó el worker');
+    rock.pulso({ beats: 12, animo: 0.2, humor: 0.1, hype: 0.3, dtJuego: 0.016, toca: [true], solo: false, confs: null, golpes: [[0, 1, 0, 0]], seg: 5.25, fuego: [0.7] });
+    const p = enviados[enviados.length - 1];
+    assert.equal(p.t, 'pulso', 'el tipo del mensaje no lo pisa ningún campo del pulso');
+    assert.equal(p.seg, 5.25); assert.deepEqual(p.fuego, [0.7]); assert.equal(p.beats, 12); assert.deepEqual(p.golpes, [[0, 1, 0, 0]]);
+    rock.musica({ fps: 60, n: 1 });
+    assert.equal(enviados[enviados.length - 1].t, 'musica');
+  } finally {
+    for (const [k, d] of Object.entries(antes)) { if (d) Object.defineProperty(G, k, d); else delete G[k]; }
+  }
+});
