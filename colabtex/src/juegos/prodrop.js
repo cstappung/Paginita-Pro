@@ -171,9 +171,9 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           if (cs.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
           const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
           if (fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
-          const tier = MOTOR.CARDS[fichas[0].id].tier;
+          const ahoraSrv = fb.ahora(), tier = MOTOR.tierEn(MOTOR.CARDS[fichas[0].id], ahoraSrv);
           if (tier >= 3) throw new Error("Las legendarias no se pueden cambiar: no hay nada por encima.");
-          if (fichas.some(f => MOTOR.CARDS[f.id].tier !== tier)) throw new Error("Las diez tienen que ser de la misma rareza.");
+          if (fichas.some(f => MOTOR.tierEn(MOTOR.CARDS[f.id], ahoraSrv) !== tier)) throw new Error("Las diez tienen que ser de la misma rareza.");
           const col = MOTOR.CARDS[fichas[0].id].col;
           if (fichas.some(f => MOTOR.CARDS[f.id].col !== col)) throw new Error("Las diez tienen que ser de la misma colección.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
@@ -310,7 +310,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-79" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-80" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

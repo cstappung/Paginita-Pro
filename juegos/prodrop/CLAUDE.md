@@ -177,6 +177,21 @@ other file of the site. Things that hold it together:
   the weight from the pool. Legends don't belong to any club: they are out of the club albums and the club
   challenges (`RT.CLUBES`), but count in open and national challenges (La Roja takes Figueroa and Zamorano).
   The cut-off `hasta` must be set to the push time plus a few minutes when publishing.
+- **FC 27 ratings, new rarity bands and the Atlético** (Oct 2026, last `AMPLIACIONES` entry `{ n: 1154, hoy: true }`
+  and `CORTE_TIERS`): every player's media was re-read from fut.gg's FC 27 base cards (`MEDIAS27` = only
+  the 307 that changed; `MEDIAS` stays as the old table). Rarity bands are now `BANDAS = [76, 82, 87]` (común ≤ 76,
+  rara 77–82, épica 83–87, legendaria 88+); the old ones are `BANDAS_V0 = [80, 84, 87]`. **Each card keeps its old
+  rarity as `tierAntes`** (old media + old bands; the `uid` is built from it and never changes) and `mediaAntes`.
+  Pools carry `tierDe` and `bandas`: the pools of packs bought before `CORTE_TIERS` (the last cut-off) and the old
+  `f`/`e` collections still sort cards by `tierAntes`, so opened packs and old re-rolls never change; only the
+  current pool uses `tier`. Anything that validates a re-roll must use **`M.tierEn(card, at)`** (economy replay in
+  `monedas.js`, the postman in `prodrop.js`, `elegibles` in `app.js`), not `card.tier`. A club that arrives from now
+  on goes in `NUEVOS` (no history: `tierAntes = tier`). **Atlético de Madrid**: `ATLETICO` (26 male base cards of the
+  FC 27 squad, faces on a red/navy radial gradient, `cards/champions/atletico/`, crest from fut.gg, frame in
+  `juegos.html`, `perfil-tarjeta.js`); it is a club of its own (album and club challenge).
+  **Re-roll odds**: `PESO_REROLL_FUTBOL` — in a re-roll a plain legendary weighs 50 and a special card or a legend 1
+  (`pesoRerollDe` of the pool; pools before `CORTE_TIERS` keep the pack weights), so about 1 in 30 re-rolls gives one.
+  The re-roll roulette (`cartaTira` in `app.js`) uses the same weights and never shows more than 3 of them.
 - **Salón banner** (`futbol()` in `colabtex/src/juegos/novedades-arte.js`): four cards in a fan,
   the three specials (those with a `cinta`) plus one random star from
   `ESTRELLAS_FUTBOL` on every paint (no Chilean-league tag any more); the test checks each `media` against the motor.

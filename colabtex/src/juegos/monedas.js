@@ -852,8 +852,9 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (!cs.every(cc => dueno[cc] === e.u && !enVenta[cc])) continue;
       const fs = cs.map(ficha);
       if (fs.some(f => !f)) continue;
-      const tier = PM.CARDS[fs[0].id].tier;
-      if (tier >= 3 || fs.some(f => PM.CARDS[f.id].tier !== tier)) continue;
+      // la rareza que tenían a la hora del re-roll (las medias de FC 27 la cambiaron después)
+      const tier = PM.tierEn(PM.CARDS[fs[0].id], e.at);
+      if (tier >= 3 || fs.some(f => PM.tierEn(PM.CARDS[f.id], e.at) !== tier)) continue;
       // y de la colección que dice su clave (antes de las colecciones, todo era de los profes)
       if (fs.some(f => PM.CARDS[f.id].col !== PM.coleccionDe(e.k))) continue;
       const res = PM.reroll(e.u, e.k, e.at, tier, fs.map(f => f.g));

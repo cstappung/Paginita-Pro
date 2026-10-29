@@ -852,7 +852,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Nuevos: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Y las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y 38 más. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
+  futbol: 'Nuevo: el Atlético de Madrid y las medias de FC 27. Ya llegaron: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Y las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y 38 más. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -894,7 +894,7 @@ function eligeSobre(menu = 'todos') {
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
       <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i><i class="hub-liga"><img src="flags/cl.png" alt="">LIGA CHILENA</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Nuevo: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Figueroa y más</small>
+      <small class="ch-temas">Nuevo: el Atlético de Madrid y las medias de FC 27. Antes: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Figueroa y más</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -1742,7 +1742,7 @@ const keyDe = cp => cp.key;
 // las rarezas que se pueden re-rollear: todas bajo la más alta de la colección (fútbol no tiene legendarias)
 const rrTiers = (co = rr.col) => [0, 1, 2].filter(i => i < M.POOL[co].tope);
 // lo que se puede meter: mis copias de esa rareza y esa colección que no están a la venta
-const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && CARDS[cp.id].col === co && !cp.venta);
+const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => M.tierEn(CARDS[cp.id], ahora()) === t && CARDS[cp.id].col === co && !cp.venta);
 /* El orden en que «Elegir automático» las toma: primero las repetidas (de
    cada carta se guarda la mejor), las sin graduar antes que las graduadas,
    y de las graduadas las de nota más baja; las exhibidas al final. */
@@ -1919,10 +1919,17 @@ $('#rlRapido').onclick = cambiaRapido;
 pintaRapido();
 /* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
    cuando de las de más arriba, que es lo que da el «casi» al pasar. */
-function cartaTira(base) {
-  const x = Math.random(), t = Math.min(M.POOL[rl.col].tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POOL[rl.col][t];
-  return l[Math.floor(Math.random() * l.length)].n;
+function cartaTira(base, sinRaras) {
+  const P = M.POOL[rl.col], x = Math.random(), t = Math.min(P.tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2));
+  let l = P[t];
+  // las especiales y las leyendas salen poco: en la tira, con los pesos del re-roll y nunca más de tres
+  if (sinRaras) { const comunes = l.filter(c => !c.especial && !c.leyenda); if (comunes.length) l = comunes; }
+  let k = Math.random() * l.reduce((s, c) => s + P.pesoRerollDe(c), 0);
+  for (const c of l) { k -= P.pesoRerollDe(c); if (k < 0) return c.n; }
+  return l[l.length - 1].n;
 }
+const esRara = id => !!(CARDS[id].especial || CARDS[id].leyenda);
+const RL_RARAS = 3;   // como mucho tres especiales o leyendas en toda la tira
 function ruleta(r, t, nueva) {
   const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
   rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t; rl.col = CARDS[r.id].col;
@@ -1932,13 +1939,15 @@ function ruleta(r, t, nueva) {
   $('#ruleta').classList.remove('fin');
   // la tira: cartas al azar desde esa rareza, sin repetir la vecina, y la que tocó en su lugar
   const ids = [];
+  let raras = 0;
   for (let i = 0; i < RL_N; i++) {
     let id;
-    do { id = cartaTira(sig); } while (i && id === ids[i - 1]);
+    do { id = cartaTira(sig, raras >= RL_RARAS); } while (i && id === ids[i - 1]);
+    if (esRara(id)) raras++;
     ids.push(id);
   }
   ids[RL_GANA] = r.id;
-  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig);
+  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig, true);
   tira.innerHTML = ids.map((id, i) => {
     const c = CARDS[id];
     return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
@@ -2154,6 +2163,12 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Medias de FC 27 y el Atlético de Madrid', [
+    '<b>🔴 Atlético de Madrid</b>: sus 26 jugadores de EA SPORTS FC 27 (titulares, suplentes y la cantera), con Oblak, Julián Álvarez, Llorente, Koke y Grimaldo. También entra al álbum de clubes del Desafío de plantilla, con su marco de perfil.',
+    '<b>📈 Medias de FC 27</b>: pusimos las medias de EA SPORTS FC 27 a todos los jugadores. Unas suben (Courtois 90, Yan Diomandé 84, Gerard Martín 79) y otras bajan (Trent 84). Como la rareza sale de la media, ahora es: <b>Común</b> hasta 76, <b>Rara</b> 77 a 82, <b>Épica</b> 83 a 87 y <b>Legendaria</b> 88 o más.',
+    '<b>🃏 Tus cartas</b>: las que ya tienes se quedan, solo cambian su media y su rareza. Los sobres que ya abriste no cambian.',
+    '<b>🎰 Re-roll</b>: las especiales y las leyendas salen <b>cincuenta veces menos</b> que una legendaria común (alrededor de 1 de cada 30 re-rolls trae una), y la ruleta no muestra más de tres.'
+  ]],
   ['Octubre 2026 · Llegan las Leyendas', [
     '<b>♛ Leyendas</b>: 43 de los mejores de la historia, retirados y sin club (solo su bandera): Pelé, Maradona, Zidane, Ronaldo R9, Cruyff, Ronaldinho, Iniesta, Maldini, Beckenbauer, Marcelo, Garrincha y más. Con su propia rareza y su propio filtro en la colección.',
     '<b>🇨🇱 Chilenos</b>: <b>Elías Figueroa</b> (93, el Rey de Copas, que no está en el FIFA: su media es nuestra) e <b>Iván Zamorano</b> (88, el Bam Bam).',
