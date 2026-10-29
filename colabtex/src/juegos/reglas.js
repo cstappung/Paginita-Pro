@@ -471,7 +471,12 @@ const REGLAS = {
         "<b>Termina el primero y se acaba</b>: en cuanto alguien termina el texto, los demás quedan donde iban.",
         "<b>Con límite de tiempo</b> (de 15 s a 3 min): al sonar el reloj todos se detienen. Gana quien llegó a la meta antes, o si nadie llegó, quien más escribió bien (a igualdad, con menos errores)."
       ])],
-      ["Solo", "Con un solo corredor, el anfitrión pulsa <b>Empezar</b> y corre contra el reloj: sirve para entrenar y no cuenta para la clasificación. También está la <b>práctica</b> de la portada, que no necesita cuenta y guarda tu récord en este navegador."],
+      ["Solo", "Con un solo corredor, el anfitrión pulsa <b>Empezar</b> y corre contra el reloj: sirve para entrenar y no cuenta para la clasificación de la sala. Para eso está la <b>práctica</b> de la portada (Type Race, en el Solo Club)."],
+      ["La clasificación (solo)", lista([
+        "En el juego individual clasifican las <b>palabras al azar en inglés</b> con 10, 25, 50, 100 o 200 palabras: hay <b>una tabla por largo</b> y la de 50 es la estándar. Las demás combinaciones se practican y guardan tu récord en este navegador, pero no entran a una tabla.",
+        "Se ordena por <b>ppm</b> (palabras por minuto) y, a igualdad, por el menor tiempo. Hace falta una <b>precisión</b> de al menos 75 %.",
+        "Cada carrera viaja con su registro, la rehace el verificador y se rechaza si no cuadra (eventos sintéticos, relojes alterados, más de ~330 ppm)."
+      ])],
       ["Lo que no se ve", "Cada uno escribe en su navegador y manda su resultado: no hay un servidor que lo arbitre, así que es un juego entre amigos."]
     ]
   },
@@ -1593,7 +1598,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

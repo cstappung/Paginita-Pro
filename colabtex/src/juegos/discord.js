@@ -149,6 +149,7 @@ const CLUBS = {
   aleteo: { nombre: "ALETEO", juego: "ALETEO", icono: "🐦", ruta: "aleteo" },
   dosmil: { nombre: "2048", juego: "2048", icono: "🟨", ruta: "dosmil" },
   trigon: { nombre: "Trigon", juego: "Trigon", icono: "🔺", ruta: "trigon" },
+  typerace: { nombre: "Type Race", juego: "Type Race", icono: "⌨️", ruta: "typerace" },
   protiles: { nombre: "PRO TILES", juego: "PRO TILES", icono: "🎹", ruta: "protiles" },
   pokelike: { nombre: "Pokelike", juego: "Pokelike", icono: "◓", ruta: "pokelike" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" },
@@ -159,8 +160,10 @@ const CLUBS = {
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|pokelike|hero|prodefender|propac)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
+  // Type Race: «en-50» es inglés con 50 palabras (los números de otras tablas significan otra cosa).
+  if (m[1] === "typerace") return { club: CLUBS.typerace, modalidad: "Inglés · " + m[2].replace(/^en-/, "") + " palabras" };
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
 
@@ -192,6 +195,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-dosmil-ficha") return `🟨 ficha ${f.puntos}`;
   if (/^club-protiles-/.test(cat)) return `🎹 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-trigon-puntos" || cat === "club-trigon-normal") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
+  if (/^club-typerace-/.test(cat)) return `⌨️ ${Number(f.puntos)} ppm`;
   if (cat === "club-pokelike-puntos") return `◓ ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-pokedex") return `📕 ${Number(f.puntos)} especies`;
   // PRO HERO: las estrellas doradas (puntos = doradas·10 000 + todas, hero.js).

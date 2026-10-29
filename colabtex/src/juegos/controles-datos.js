@@ -12,7 +12,6 @@ export const CONTROLES = {
   "bots-clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "bots-haxball": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "bots-mkw": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
-  "bots-typerace": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "bots-worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "bots-yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"},
   "boxhead": {"movil":false,"pc":true,"pide":"teclado","por":"@controles: teclado"},
@@ -60,6 +59,7 @@ export const CONTROLES = {
   "tulones": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"@controles: raton teclado"},
   "tulonesclub": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"@controles: raton teclado"},
   "typerace": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
+  "typeraceclub": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "uno": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"}

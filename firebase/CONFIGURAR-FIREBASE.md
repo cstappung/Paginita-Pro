@@ -228,6 +228,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > `soloPruebas`. Hasta volver a publicar las reglas, las partidas del modo
 > normal no entran en la clasificación.
 
+> **Type Race (octubre de 2026):** cinco categorías nuevas de `soloRanks` y
+> `soloPruebas`, `club-typerace-en-(10|25|50|100|200)` (las ppm de las palabras
+> al azar en inglés, una tabla por largo; entran en el tope común de 100 000),
+> y `typeraceclub` un juego nuevo de `clubJugadas`. Hasta volver a publicar las
+> reglas se juega igual, pero las carreras no entran en la clasificación y no
+> pagan monedas.
+
 > **PRO TILES (octubre de 2026):** nueve categorías nuevas de `soloRanks`
 > y `soloPruebas`, `club-protiles-(cristal|medianoche|calle|verano|neon|
 > latido|estrellas|despegue|mezcla)` (una por canción y la mezcla, puntos con

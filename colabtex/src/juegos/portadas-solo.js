@@ -435,6 +435,27 @@ const ARTE = {
 
   /* Pokelike: un trozo del mapa por capas (hierba, entrenador, captura)
      bajando hacia el líder, con una pokébola grande que late. */
+  /* Type Race: tres líneas de texto con lo ya escrito en claro, un error en
+     rojo y el cursor parpadeando, sobre el gris oscuro de Monkeytype. */
+  typeraceclub: u => {
+    const lineas = [
+      [["the quick brown fox", "#e8e6e1"], [" jumps over", "#6f737b"]],
+      [["a lazy dog and ", "#e8e6e1"], ["fast", "#f0616d"], [" keys", "#6f737b"]],
+      [["race to the ", "#6f737b"], ["end", "#6f737b"]]
+    ];
+    let texto = "";
+    lineas.forEach((l, i) => {
+      texto += `<text x="40" y="${120 + i * 44}" font-family="Consolas,Menlo,monospace" font-size="26" font-weight="600" xml:space="preserve">` +
+        l.map(([t, c]) => `<tspan fill="${c}">${t}</tspan>`).join("") + `</text>`;
+    });
+    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d3036"/><stop offset="1" stop-color="#1f2125"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <rect x="22" y="70" width="356" height="150" rx="10" fill="#25272c" stroke="#34373d" stroke-width="2"/>
+    ${texto}
+    <rect class="a-late" x="196" y="96" width="3" height="30" fill="#e2b714"/>
+    <text x="360" y="52" text-anchor="end" font-family="Consolas,Menlo,monospace" font-size="30" font-weight="700" fill="#e2b714">87<tspan font-size="14" fill="#6f737b"> ppm</tspan></text>`;
+  },
+
   pokelike: u => {
     const bola = (x, y, r, clase = "") => `<g class="${clase}" transform="translate(${x} ${y})">
       <circle r="${r}" fill="#f5f5f5"/><path d="M${-r} 0 A${r} ${r} 0 0 1 ${r} 0Z" fill="#e3350d"/>

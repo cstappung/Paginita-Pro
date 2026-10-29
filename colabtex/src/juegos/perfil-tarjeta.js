@@ -125,7 +125,7 @@ export const FONDOS = [
   { id: "nocheeterna", n: "Noche eterna", oscuro: true, anim: true, hw: true, req: { coleccion: 11 }, css: () => "linear-gradient(180deg, #02010d 0%, #0d0838 50%, #1c0b4a 100%)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -174,6 +174,7 @@ export function valorMarca(c, f) {
   if (c === "club-dosmil-puntos") return `${f.puntos || 0} puntos`;
   if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;
   if (c === "club-trigon-puntos" || c === "club-trigon-normal") return `${f.puntos || 0} puntos`;
+  if (/^club-typerace-en-/.test(c)) return `${f.puntos || 0} ppm`;
   if (/^club-protiles-/.test(c)) return `${f.puntos || 0} puntos`;
   if (c === "club-pokelike-puntos") return `${f.puntos || 0} puntos`;
   if (c === "club-hero-estrellas") return `${Math.floor((f.puntos || 0) / 10000)} ★ doradas`;

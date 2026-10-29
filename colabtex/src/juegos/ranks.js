@@ -34,7 +34,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, integral: { nombre: "Integrodle", color: "#2c5aa8" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }, propac: { nombre: "PRO PACMAN", color: "#ffe14d" }};
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, integral: { nombre: "Integrodle", color: "#2c5aa8" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, typeraceclub: { nombre: "Type Race", color: "#e2b714" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }, propac: { nombre: "PRO PACMAN", color: "#ffe14d" }};
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -89,6 +89,9 @@ const SOLO = {
     cat: s => `club-dosmil-${s.n}` },
   trigon: { filas: [{ k: "n", t: "Modo", ops: [["puntos", "Fácil"], ["normal", "Normal"]] }],
     cat: s => `club-trigon-${s.n}` },
+  /* Type Race: una tabla por largo, solo palabras al azar en inglés (ppm); la de 50 es la estándar. */
+  typeraceclub: { filas: [{ k: "n", t: "Palabras", ops: [["10", "10"], ["25", "25"], ["50", "50"], ["100", "100"], ["200", "200"]] }],
+    def: { n: "50" }, cat: s => `club-typerace-en-${s.n}` },
   /* PRO TILES: un top por canción y otro para la mezcla de las ocho. */
   protiles: { filas: [{ k: "n", t: "Canción", ops: [["cristal", "Cristal"], ["medianoche", "Medianoche"], ["calle", "Calle"], ["verano", "Verano"], ["neon", "Neón"], ["latido", "Latido"], ["estrellas", "Estrellas"], ["despegue", "Despegue"], ["mezcla", "Todas (mezcla)"]] }],
     cat: s => `club-protiles-${s.n}` },
