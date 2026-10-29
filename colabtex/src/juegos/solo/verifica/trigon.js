@@ -1,10 +1,12 @@
 /* Verificador antitrampas de Trigon (ver docs/antitrampas.md y
    docs/antitrampas/trigon.md).
 
-   Una tabla: `club-trigon-puntos`, puntos = el puntaje de la partida,
+   Una tabla por modo: `club-trigon-puntos` (fácil, con poderes) y
+   `club-trigon-normal` (sin poderes); puntos = el puntaje de la partida,
    tiempo = los ms jugados (sin pausas) hasta la última jugada.
 
-   El juego manda `{v: 1, s, u, j, a, w, fin}`: la semilla, la cuenta, cada
+   El juego manda `{v: 1, s, u, j, a, w, fin, m}`, con `m: 'normal'` solo en
+   el modo normal (las pruebas sin `m` son del fácil): la semilla, la cuenta, cada
    jugada como [pieza, dx, dy, origen, ms desde la anterior] (o
    [-1, casilla, 0, origen, ms] para un martillazo, que el motor solo acepta
    si había un martillo ganado) y lo jugado en los dos relojes. Aquí se vuelve a jugar con el MISMO motor
@@ -30,14 +32,16 @@ import { rachas, dosRelojes } from './patrones.js';
 
 export const PRUEBA = 1;
 
-const CAT = 'club-trigon-puntos';
+const MODO_DE = { 'club-trigon-puntos': 'facil', 'club-trigon-normal': 'normal' };
 const MAX_PUNTOS = 1000000, MAX_JUGADAS = 20000;
 const RAFAGA = 15, RAPIDO = 120, VENTANA = 50, VENTANA_MS = 10000;
 
 export function verifica(dato, prueba, ctx) {
-  if (!dato || dato.categoria !== CAT) return 'Trigon no tiene esa tabla.';
+  const modo = dato && MODO_DE[dato.categoria];
+  if (!modo) return 'Trigon no tiene esa tabla.';
   if (!prueba || typeof prueba !== 'object' || Array.isArray(prueba)) return 'La prueba de Trigon no tiene la forma esperada.';
   if (prueba.v !== 1) return 'La prueba es de otra versión de Trigon (recarga la página).';
+  if ((prueba.m === undefined ? 'facil' : prueba.m) !== modo) return 'La prueba es de otro modo de Trigon.';
   const uid = (ctx && ctx.uid) || dato.uid;
   if (typeof prueba.u !== 'string') return 'La prueba no dice de qué cuenta es.';
   if (uid && prueba.u !== uid) return 'La prueba es de una partida de otra cuenta.';
@@ -51,7 +55,7 @@ export function verifica(dato, prueba, ctx) {
   if (!Array.isArray(jugadas) || !jugadas.length || jugadas.length > MAX_JUGADAS) return 'Las jugadas de la prueba no se pueden leer.';
   if (jugadas.some(j => !Array.isArray(j) || j.length !== 5)) return 'Las jugadas de la prueba no traen origen y tiempo.';
   if (jugadas.some(j => j[3] === 'x')) return 'La partida trae jugadas que no hizo una mano (eventos sintéticos).';
-  const res = M.rehace(prueba.s, prueba.u, jugadas);
+  const res = M.rehace(prueba.s, prueba.u, jugadas, modo);
   if (res.error) return res.error;
   if (Number.isFinite(prueba.a) && res.ms > prueba.a + 1000) return 'Las jugadas suman más tiempo del que se jugó.';
   if (prueba.fin && !res.E.fin) return 'La partida dice que terminó, pero al rehacerla todavía caben piezas.';
@@ -78,7 +82,7 @@ function mano(jugadas) {
    (El puntaje por jugada no tiene techo fijo, porque la racha multiplica el
    bono, así que no hay un mínimo de tiempo creíble que exigir.) */
 export function sospecha(categoria, fila) {
-  if (categoria !== CAT || !fila) return null;
+  if (!MODO_DE[categoria] || !fila) return null;
   const p = Number(fila.puntos);
   if (!Number.isFinite(p)) return null;
   return p > MAX_PUNTOS ? `${p} puntos: más de lo que la tabla admite.` : null;

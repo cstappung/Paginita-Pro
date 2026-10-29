@@ -173,7 +173,7 @@ export function valorMarca(c, f) {
   if (c === "club-aleteo-vuelo") return `${f.puntos || 0} ${f.puntos === 1 ? "tubo" : "tubos"}`;
   if (c === "club-dosmil-puntos") return `${f.puntos || 0} puntos`;
   if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;
-  if (c === "club-trigon-puntos") return `${f.puntos || 0} puntos`;
+  if (c === "club-trigon-puntos" || c === "club-trigon-normal") return `${f.puntos || 0} puntos`;
   if (/^club-protiles-/.test(c)) return `${f.puntos || 0} puntos`;
   if (c === "club-pokelike-puntos") return `${f.puntos || 0} puntos`;
   if (c === "club-hero-estrellas") return `${Math.floor((f.puntos || 0) / 10000)} ★ doradas`;

@@ -239,8 +239,8 @@ function extraRecord(cat, f) {
   // 2048: 1 por cada 1000 puntos, y la ficha paga su exponente al cuadrado (2048 → 121).
   if (cat === "club-dosmil-puntos") return Math.floor(Math.min(f.puntos || 0, 4000000) / 1000);
   if (cat === "club-dosmil-ficha") { const e = Math.round(Math.log2(f.puntos || 1)); return e > 0 && e <= 18 ? e * e : 0; }
-  // Trigon: 1 por cada 100 puntos (sus puntajes son unas diez veces más chicos que los del 2048).
-  if (cat === "club-trigon-puntos") return Math.floor(Math.min(f.puntos || 0, 1000000) / 100);
+  // Trigon: 1 por cada 100 puntos en cada modo (sus puntajes son unas diez veces más chicos que los del 2048).
+  if (cat === "club-trigon-puntos" || cat === "club-trigon-normal") return Math.floor(Math.min(f.puntos || 0, 1000000) / 100);
   // PRO PACMAN: 1 por cada 500 puntos (un nivel limpio son unos 4 000), tope en 1 000 000.
   if (cat === "club-propac-puntos") return Math.floor(Math.min(f.puntos || 0, 1000000) / 500);
   // PRO TILES: 1 por cada 50 puntos en cada tabla (nueve: 8 canciones y la mezcla), tope en 3000.

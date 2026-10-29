@@ -31,9 +31,9 @@ export function categoriaClub(juego, categoria) {
     // 2048: el mejor puntaje y la ficha más alta.
     : juego === 'dosmil'
     ? /^club-dosmil-(puntos|ficha)$/.test(categoria)
-    // Trigon: una sola tabla, el puntaje de la partida.
+    // Trigon: el puntaje de la partida, una tabla por modo (puntos = fácil, con poderes).
     : juego === 'trigon'
-    ? categoria === 'club-trigon-puntos'
+    ? /^club-trigon-(puntos|normal)$/.test(categoria)
     // PRO TILES: un top por canción y otro para la mezcla de las ocho.
     : juego === 'protiles'
     ? /^club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)$/.test(categoria)
@@ -99,7 +99,7 @@ export function resultadoClub(juego, dato) {
   if (dato.categoria === 'club-dosmil-puntos' && dato.puntos > 4000000) return null;
   if (dato.categoria === 'club-dosmil-ficha' && (dato.puntos > 262144 || (dato.puntos & (dato.puntos - 1)) !== 0)) return null;
   /* Trigon: el puntaje, hasta 1 000 000 (la racha multiplica el bono). */
-  if (dato.categoria === 'club-trigon-puntos' && dato.puntos > 1000000) return null;
+  if (juego === 'trigon' && dato.puntos > 1000000) return null;
   /* PRO TILES: notas más bonos de las largas, con el tope de su verificador. */
   if (juego === 'protiles' && dato.puntos > 1000000) return null;
   /* Pokelike: el puntaje (la Ruta Infinita no tiene techo; el de la regla

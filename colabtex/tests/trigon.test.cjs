@@ -7,12 +7,12 @@ const V=carga('src/juegos/solo/verifica.js');
 const VT=carga('src/juegos/solo/verifica/trigon.js');
 const D=path.join(__dirname,'../../juegos/club/trigon');
 const M=require(path.join(D,'motor.js'));
-const CP='club-trigon-puntos';
+const CP='club-trigon-puntos',CN='club-trigon-normal';
 
 /* Un bot que pone la primera pieza que cabe en la primera casilla libre.
    Cada jugada tarda `lento`…`lento+rango` ms. */
-function juega(semilla,u,lento=400,rango=600,max=100000){
- const E=M.nueva(semilla,u);let a=semilla*13+5;
+function juega(semilla,u,lento=400,rango=600,max=100000,modo){
+ const E=M.nueva(semilla,u,modo);let a=semilla*13+5;
  const azar=()=>{a=(a*1103515245+12345)>>>0;return a/4294967296;};
  while(!E.fin&&E.jugadas<max){
   let hecho=false;
@@ -30,9 +30,11 @@ function juega(semilla,u,lento=400,rango=600,max=100000){
  }
  return E;
 }
-const prueba=(s,u,lento,rango,max)=>{
- const E=juega(s,u,lento,rango,max),ms=E.registro.reduce((t,j)=>t+j[4],0);
- return {E,ms,p:{v:1,s,u,j:E.registro,a:ms+20,w:ms+120,fin:E.fin}};
+const prueba=(s,u,lento,rango,max,modo)=>{
+ const E=juega(s,u,lento,rango,max,modo),ms=E.registro.reduce((t,j)=>t+j[4],0);
+ const p={v:1,s,u,j:E.registro,a:ms+20,w:ms+120,fin:E.fin};
+ if(modo==='normal')p.m='normal';
+ return {E,ms,p};
 };
 
 test('el tablero: 96 triángulos, 24 líneas de 9 a 15 y piezas conexas',()=>{
@@ -169,6 +171,33 @@ test('el verificador acepta la partida honesta y rechaza las trampas',async()=>{
  await mal(dm,{...m.p,fin:true});
 });
 
+test('modo normal: sin poderes, sin trapecio y con su propia tabla',async()=>{
+ const tr=M.FORMAS.findIndex(f=>f.id==='trapecio');
+ let lineas=0;
+ for(const s of [3,4,99]){
+  const {E,ms,p}=prueba(s,'ana',400,600,undefined,'normal');
+  assert.ok(E.fin);lineas+=E.lineas;
+  assert.ok(Object.values(E.poderes).every(n=>n===0),'no gana poderes');
+  assert.ok(E.registro.every(j=>j[0]>=0));
+  const r=M.rehace(p.s,p.u,p.j,'normal');assert.equal(r.E.puntos,E.puntos);
+  const dn={categoria:CN,uid:'ana',puntos:E.puntos,tiempo:ms};
+  assert.equal(await V.verificaClub('trigon',dn,p),null);
+  // Cada prueba vale solo en la tabla de su modo.
+  assert.notEqual(await V.verificaClub('trigon',{...dn,categoria:CP},p),null);
+  const {m,...sinModo}=p;
+  assert.notEqual(await V.verificaClub('trigon',dn,sinModo),null);
+  assert.notEqual(await V.verificaClub('trigon',{...dn,categoria:CP},sinModo),null);
+ }
+ assert.ok(lineas>0);
+ for(let s=0;s<300;s++)assert.ok(M.nueva(s,'ana','normal').mano.every(q=>q.f!==tr));
+ // Y una partida del fácil no entra en la tabla normal.
+ const f=prueba(99,'ana');
+ assert.notEqual(await V.verificaClub('trigon',{categoria:CN,uid:'ana',puntos:f.E.puntos,tiempo:f.ms},{...f.p,m:'normal'}),null);
+ // En fácil el trapecio sigue saliendo.
+ let hay=false;for(let s=0;s<300&&!hay;s++)hay=M.nueva(s,'ana').mano.some(q=>q.f===tr);
+ assert.ok(hay);
+});
+
 test('rechaza al programa que juega a ráfagas',async()=>{
  for(const s of [5,6]){
   const {E,ms,p}=prueba(s,'bot',5,40);
@@ -193,6 +222,8 @@ test('sospecha de lo imposible',()=>{
 test('resultadoClub: tabla, tope y ms enteros',()=>{
  const {resultadoClub,categoriaClub}=carga('src/juegos/solo/club-datos.js');
  assert.ok(categoriaClub('trigon',CP));
+ assert.ok(categoriaClub('trigon',CN));
+ assert.equal(resultadoClub('trigon',{categoria:CN,puntos:1000001,tiempo:5000,partida:'abc'}),null);
  assert.ok(!categoriaClub('trigon','club-trigon-lineas'));
  assert.ok(resultadoClub('trigon',{categoria:CP,puntos:1200,tiempo:61235,partida:'abc'}));
  assert.equal(resultadoClub('trigon',{categoria:CP,puntos:1200,tiempo:61234.7,partida:'abc'}),null);
@@ -207,7 +238,8 @@ test('las versiones, el juego y las reglas',()=>{
  assert.match(js,/Math\.round\(ahora - ultimaA\)/);
  assert.match(js,/Club\.result\(/);
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
- assert.equal((reglas.match(/club-trigon-puntos/g)||[]).length,3,'soloRanks, su tope y soloPruebas');
+ assert.equal((reglas.match(/club-trigon-\(puntos\|normal\)/g)||[]).length,2,'soloRanks y soloPruebas');
+ assert.match(reglas,/'club-trigon-puntos' \|\| \$categoria === 'club-trigon-normal' \|\|/,'el tope de los dos modos');
  assert.match(reglas,/\|dosmil\|trigon\|/,'clubJugadas');
  /* El tope de `puntos` en soloRanks tiene que dejar pasar lo que el
     verificador acepta (1 000 000); con el tope general de 100 000 las

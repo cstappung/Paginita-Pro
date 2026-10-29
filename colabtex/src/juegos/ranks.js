@@ -87,7 +87,7 @@ const SOLO = {
     cat: s => `club-aleteo-${s.n}` },
   dosmil: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"], ["ficha", "Ficha"]] }],
     cat: s => `club-dosmil-${s.n}` },
-  trigon: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"]] }],
+  trigon: { filas: [{ k: "n", t: "Modo", ops: [["puntos", "Fácil"], ["normal", "Normal"]] }],
     cat: s => `club-trigon-${s.n}` },
   /* PRO TILES: un top por canción y otro para la mezcla de las ocho. */
   protiles: { filas: [{ k: "n", t: "Canción", ops: [["cristal", "Cristal"], ["medianoche", "Medianoche"], ["calle", "Calle"], ["verano", "Verano"], ["neon", "Neón"], ["latido", "Latido"], ["estrellas", "Estrellas"], ["despegue", "Despegue"], ["mezcla", "Todas (mezcla)"]] }],

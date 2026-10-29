@@ -152,7 +152,7 @@ que se espera de cada uno:
 | Atasco | `club-atasco-estrellas` | los movimientos de cada nivel (motor y solver ya puros) | baja |
 | ALETEO | `club-aleteo-vuelo` | semilla + tick de cada aleteo (física determinista a 1/60 s) | baja |
 | 2048 | `club-dosmil-puntos`, `club-dosmil-ficha` | semilla + dirección y Δms de cada jugada | baja |
-| Trigon | `club-trigon-puntos` | semilla + pieza, traslación y Δms de cada jugada | baja |
+| Trigon | `club-trigon-puntos`, `club-trigon-normal` | semilla + pieza, traslación y Δms de cada jugada | baja |
 | PRO TILES | `club-protiles-<canción>`, `club-protiles-mezcla` | semilla + cuenta + tick de cada nota (y altura de cada larga) sobre pasos fijos de 4 ms | baja |
 | Pokelike | `club-pokelike-puntos`, `club-pokelike-pokedex` | semilla + cuenta + inicial + cada decisión (camino, turno, captura, orden) | media |
 | PRO HERO | `club-hero-estrellas` | cada canción: el chart + cada acción con su instante, sobre la rejilla fija del motor; la tabla: la suma del mapa de estrellas | media |

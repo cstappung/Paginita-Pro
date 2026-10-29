@@ -19,10 +19,19 @@
   const clave = k => Club && Club.storageKey ? Club.storageKey(k) : k + '.cuenta.local';
   function lee(k) { try { return JSON.parse(localStorage.getItem(clave(k)) || 'null'); } catch (_) { return null; } }
   function guarda(k, v) { try { localStorage.setItem(clave(k), JSON.stringify(v)); } catch (_) { /* sin almacenamiento */ } }
-  const prog = Object.assign({ mejor: 0, partidas: 0 }, lee('trigon.datos'));
+  /* Dos modos con su propia tabla y su propio récord local: fácil (el de
+     siempre, con poderes; conserva club-trigon-puntos y trigon.datos) y
+     normal (sin poderes y sin la tira de cinco, motor.js). */
+  const CATS = { facil: 'club-trigon-puntos', normal: 'club-trigon-normal' };
+  const DATOS = { facil: 'trigon.datos', normal: 'trigon.datos.normal' };
+  const PROG = Object.fromEntries(Object.keys(CATS).map(m => [m, Object.assign({ mejor: 0, partidas: 0 }, lee(DATOS[m]))]));
+  let dificultad = 'facil';
+  try { if (localStorage.getItem('trigon.dificultad') === 'normal') dificultad = 'normal'; } catch (_) { /* nada */ }
+  // El modo que se muestra: el de la partida en curso, o el elegido en el menú.
+  let CAT = CATS[dificultad];
 
   let E = null, terminada = false, kb = null;
-  const CAT = 'club-trigon-puntos';
+  const progDe = () => PROG[E ? E.modo : dificultad];
   const VIGENCIA = 24 * 3600 * 1000;
 
   /* ---------- Sonido ----------
@@ -427,7 +436,8 @@
 
   function pintaMarcador() {
     $('nPuntos').textContent = String(E ? E.puntos : 0);
-    $('nMejor').textContent = String(Math.max(prog.mejor, E ? E.puntos : 0));
+    $('nMejor').textContent = String(Math.max(progDe().mejor, E ? E.puntos : 0));
+    $('nModo').textContent = E && E.modo === 'normal' ? 'NORMAL' : 'FÁCIL';
     $('nLineas').textContent = String(E ? E.lineas : 0);
     pintaPoderes();
   }
@@ -749,7 +759,7 @@
   function guardaPartida() {
     if (!E || terminada || !E.jugadas) { try { localStorage.removeItem(clave('trigon.partida')); } catch (_) { /* nada */ } return; }
     const r = reloj();
-    guarda('trigon.partida', { s: E.semilla, u: E.u, j: E.registro, a: Math.round(r.a), w: Math.round(r.w), ua: Math.round(ultimaA), at: Date.now() });
+    guarda('trigon.partida', { s: E.semilla, u: E.u, m: E.modo, j: E.registro, a: Math.round(r.a), w: Math.round(r.w), ua: Math.round(ultimaA), at: Date.now() });
   }
   function retoma() {
     // La partida que dejó como invitado en esta pestaña, si acaba de iniciar
@@ -759,9 +769,10 @@
     if (previa) { try { localStorage.setItem(clave('trigon.partida'), previa); } catch (_) { /* nada */ } }
     const g = lee('trigon.partida');
     if (!g || (g.u !== CUENTA && g.u !== 'invitado') || !(Date.now() - (+g.at || 0) < VIGENCIA)) return false;
-    const r = M.rehace(g.s, g.u, g.j);
+    const r = M.rehace(g.s, g.u, g.j, g.m);
     if (r.error || r.E.fin) return false;
     E = r.E; terminada = false;
+    eligeModo(E.modo);
     reiniciaRelojes(g); arranca();
     pintaTablero(); pintaMano(true); pintaMarcador();
     return true;
@@ -803,8 +814,9 @@
     const ms = E.registro.reduce((t, j) => t + j[4], 0);
     if (ms < 1) return;
     const r = reloj();
-    Club.result({ categoria: CAT, puntos: E.puntos, tiempo: ms },
-      { v: 1, s: E.semilla, u: E.u, j: E.registro, a: Math.round(r.a), w: Math.round(r.w), fin: !!fin });
+    const prueba = { v: 1, s: E.semilla, u: E.u, j: E.registro, a: Math.round(r.a), w: Math.round(r.w), fin: !!fin };
+    if (E.modo === 'normal') prueba.m = 'normal';
+    Club.result({ categoria: CATS[E.modo], puntos: E.puntos, tiempo: ms }, prueba);
   }
 
   function termina() {
@@ -812,9 +824,10 @@
     modoPoder(null);
     para();
     reporta(true);
+    const prog = PROG[E.modo];
     const nuevo = E.puntos > prog.mejor && E.puntos > 0;
     prog.mejor = Math.max(prog.mejor, E.puntos); prog.partidas++;
-    guarda('trigon.datos', prog);
+    guarda(DATOS[E.modo], prog);
     guardaPartida();
     sonidos.fin();
     $('finPuntos').textContent = String(E.puntos);
@@ -828,8 +841,9 @@
 
   function nuevaPartida() {
     const s = new Uint32Array(1); crypto.getRandomValues(s);
-    E = M.nueva(s[0], CUENTA);
+    E = M.nueva(s[0], CUENTA, dificultad);
     terminada = false; kb = null;
+    eligeModo(E.modo);
     modoPoder(null);
     reiniciaRelojes(null); arranca();
     $('fin').hidden = true; $('menu').hidden = true;
@@ -840,20 +854,43 @@
   // Abandonar a mitad: si la partida superaba el récord, el récord queda.
   function abandona() {
     if (!E || terminada) return;
-    if (E.puntos > prog.mejor) { prog.mejor = E.puntos; guarda('trigon.datos', prog); }
+    const prog = PROG[E.modo];
+    if (E.puntos > prog.mejor) { prog.mejor = E.puntos; guarda(DATOS[E.modo], prog); }
     reporta(false);
   }
 
-  /* ---------- Menú ---------- */
+  /* ---------- Menú ----------
+     El selector de modo cambia el récord y la clasificación que se ven;
+     «Jugar» empieza en ese modo. «Volver a la partida» la sigue en el suyo. */
+  function eligeModo(m) {
+    dificultad = m === 'normal' ? 'normal' : 'facil';
+    try { localStorage.setItem('trigon.dificultad', dificultad); } catch (_) { /* nada */ }
+    for (const b of document.querySelectorAll('[data-dificultad]')) b.setAttribute('aria-pressed', String(b.dataset.dificultad === dificultad));
+    $('poderes').hidden = !!E && E.modo === 'normal';
+    $('comoPoderes').hidden = dificultad === 'normal';
+    if (CAT !== CATS[dificultad]) {
+      CAT = CATS[dificultad];
+      $('tabla').replaceChildren(); $('tablaRecord').textContent = '';
+      $('tablaEstado').textContent = embebido ? 'Cargando clasificación…' : 'Abre Trigon desde Juegos para ver la clasificación de todos.';
+      if (Club) Club.category(CAT);
+    }
+    pintaMenuDatos();
+  }
+  function pintaMenuDatos() {
+    const prog = PROG[dificultad], enCurso = E && !terminada && E.modo === dificultad ? E.puntos : 0;
+    $('menuMejor').textContent = String(Math.max(prog.mejor, enCurso));
+    $('menuPartidas').textContent = prog.partidas === 1 ? '1 partida jugada' : prog.partidas + ' partidas jugadas';
+  }
+  for (const b of document.querySelectorAll('[data-dificultad]')) b.addEventListener('click', () => eligeModo(b.dataset.dificultad));
   function abreMenu() {
     suelta_teclado();
-    $('menuMejor').textContent = String(Math.max(prog.mejor, E && !terminada ? E.puntos : 0));
-    $('menuPartidas').textContent = prog.partidas === 1 ? '1 partida jugada' : prog.partidas + ' partidas jugadas';
+    pintaMenuDatos();
     $('btnSeguirPartida').hidden = !(E && !terminada && E.jugadas > 0);
+    if (E) $('btnSeguirPartida').textContent = 'Volver a la partida (' + (E.modo === 'normal' ? 'normal' : 'fácil') + ')';
     $('fin').hidden = true; $('menu').hidden = false;
     $('btnJugar').focus({ preventScroll: true });
   }
-  function cierraMenu() { $('menu').hidden = true; }
+  function cierraMenu() { if (E) eligeModo(E.modo); $('menu').hidden = true; }
 
   $('btnMenu').addEventListener('click', () => $('menu').hidden ? abreMenu() : (E && !terminada ? cierraMenu() : null));
   $('btnJugar').addEventListener('click', () => {
@@ -971,6 +1008,7 @@
     else if (d.tipo === 'estado') $('tablaEstado').textContent = d.texto;
   });
   if (Club) Club.category(CAT);
+  eligeModo(dificultad);
   addEventListener('club-rechazo', e => {
     if (e.detail && e.detail.categoria === CAT) $('finFrase').textContent = 'Esta partida no entró en la clasificación: ' + (e.detail.motivo || '');
   });
@@ -996,7 +1034,8 @@
   window.__trigon = { estado: () => E, motor: M, sonidos, repinta: () => { pintaTablero(); pintaMano(); pintaMarcador(); } };
   if (!retoma()) {
     const s = new Uint32Array(1); crypto.getRandomValues(s);
-    E = M.nueva(s[0], CUENTA);
+    E = M.nueva(s[0], CUENTA, dificultad);
+    eligeModo(dificultad);
     pintaTablero(); pintaMano(); pintaMarcador();
     abreMenu();
   }

@@ -268,6 +268,8 @@ kbd{font:700 11px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;bor
 .modo{display:inline-flex;background:var(--hueco);border-radius:999px;padding:4px;gap:4px}
 .modo button{border:none;background:none;color:var(--tinta);font:700 14px/1 system-ui,sans-serif;padding:9px 16px;border-radius:999px;cursor:pointer;min-height:38px}
 .modo button[aria-pressed=true]{background:var(--acento);color:var(--sobre-acento)}
+.dificultad{margin:0 auto 12px;flex-wrap:wrap;justify-content:center}
+.poderes[hidden]{display:none}
 .temas-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;width:100%;max-width:560px}
 .tema{display:grid;gap:6px;justify-items:center;padding:10px 8px 8px;border-radius:14px;cursor:pointer;
   background:var(--fondo);background-image:var(--deco);background-size:cover;color:var(--tinta);border:3px solid transparent;

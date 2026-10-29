@@ -18,8 +18,16 @@ effects), `estilo.css` (shape only, no fixed colours) and `temas.css` (5
 themes × dark/light as variables on `[data-skin]`/`[data-modo]`, chosen
 with 🎨 and kept in `localStorage`). The half-played game lives **only in
 `localStorage`** (seed + moves, dropped after 24 h without a move), never
-in `users/<uid>/club`. One table, `club-trigon-puntos` (score, capped at
-1e6, time = ms played). The proof `{v, s, u, j, a, w, fin}` carries every
+in `users/<uid>/club`. **Two modes, one table each** (score, capped at
+1e6, time = ms played): *fácil* = the original game with power-ups, kept on
+`club-trigon-puntos` so old records stay; *normal* = `club-trigon-normal`,
+no power-ups and the trapecio (5-strip) never dealt — its weight goes to the
+barra, which is the same strip with one triangle less (`PESOS` in
+`motor.js`). The mode enters the seed (`u + '|normal'`), and the proof
+carries `m: 'normal'` (absent = fácil), so a proof only replays in its own
+table. Chosen in the menu (`trigon.dificultad`), local record per mode
+(`trigon.datos` / `trigon.datos.normal`); logros and coins count both.
+The proof `{v, s, u, j, a, w, fin, m?}` carries every
 move as `[piece, dx, dy, origin, Δms]`, and `solo/verifica/trigon.js`
 replays it (`docs/antitrampas/trigon.md`). Logros (score thresholds), coins
 (1 per 100 points + the per-game pay), the Discord podium, the cover and

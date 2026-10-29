@@ -22,7 +22,12 @@
      partida no termina mientras algún poder pueda destrabarla.
    - **El azar no es del navegador.** Cada tanda de tres piezas sale de su
      propio chorro mulberry32 (`mezcla(base, k)`), con la cuenta dentro de
-     la base, para que la partida se pueda rehacer. */
+     la base, para que la partida se pueda rehacer.
+   - **Dos modos.** 'facil' es el de siempre, con poderes. 'normal' no
+     regala poderes y el trapecio (la tira de cinco) llega con un triángulo
+     menos: es la tira de cuatro, así que su peso pasa a la barra (PESOS).
+     El modo entra en la semilla, así que una partida de un modo no se
+     puede rehacer en el otro. */
 (function (root) {
   'use strict';
   const LADO = 4;
@@ -131,7 +136,13 @@
     return [...vistas.values()];
   }
   FORMAS.forEach(f => { f.orient = orientaciones(f.t); });
-  const PESO_TOTAL = FORMAS.reduce((s, f) => s + f.peso, 0);
+  const MODOS = ['facil', 'normal'];
+  // Peso de cada forma por modo; en normal el trapecio no sale y la barra se lleva su peso.
+  const PESOS = {
+    facil: FORMAS.map(f => f.peso),
+    normal: FORMAS.map(f => f.id === 'trapecio' ? 0 : f.id === 'barra' ? f.peso + FORMAS.find(g => g.id === 'trapecio').peso : f.peso)
+  };
+  const PESO_TOTAL = Object.fromEntries(MODOS.map(m => [m, PESOS[m].reduce((a, b) => a + b, 0)]));
 
   const celdasDe = p => FORMAS[p.f].orient[p.o];
 
@@ -142,22 +153,22 @@
      reintentos. */
   const INTENTOS = 4;
   function reparte(E) {
-    const r = rng(mezcla(E.base, ++E.k));
+    const r = rng(mezcla(E.base, ++E.k)), pesos = PESOS[E.modo];
     for (let intento = 0; intento < INTENTOS; intento++) {
       E.mano = [];
       for (let i = 0; i < MANO; i++) {
-        let n = r() * PESO_TOTAL, f = 0;
-        while (n >= FORMAS[f].peso) { n -= FORMAS[f].peso; f++; }
+        let n = r() * PESO_TOTAL[E.modo], f = 0;
+        while (n >= pesos[f]) { n -= pesos[f]; f++; }
         E.mano.push({ f, o: Math.floor(r() * FORMAS[f].orient.length) });
       }
       if (puedeJugar(E)) return;
     }
   }
 
-  function nueva(semilla, u) {
-    const E = { semilla: semilla >>> 0, u: String(u || ''), t: new Array(CELDAS.length).fill(0), k: 0,
+  function nueva(semilla, u, modo) {
+    const E = { semilla: semilla >>> 0, u: String(u || ''), modo: modo === 'normal' ? 'normal' : 'facil', t: new Array(CELDAS.length).fill(0), k: 0,
       puntos: 0, lineas: 0, jugadas: 0, racha: 0, mejorRacha: 0, poderes: Object.fromEntries(ORDEN_PODERES.map(k => [k, 0])), fin: false, mano: [], registro: [] };
-    E.base = mezcla(E.semilla, hashTexto(E.u));
+    E.base = mezcla(E.semilla, hashTexto(E.modo === 'normal' ? E.u + '|normal' : E.u));
     reparte(E);
     return E;
   }
@@ -252,7 +263,7 @@
     E.puntos += suma; E.lineas += n; E.jugadas++;
     // Cada poder tira su dado del mismo chorro, siempre en el mismo orden (aunque ya esté lleno), para que la partida se rehaga igual.
     const ganados = [];
-    if (n) {
+    if (n && E.modo === 'facil') {
       const r = rng(mezcla(E.base ^ 0x4D41, E.jugadas));
       for (const k of ORDEN_PODERES) if (r() < PODERES[k].chance(n) && E.poderes[k] < PODERES[k].max) { E.poderes[k]++; ganados.push(k); }
     }
@@ -306,8 +317,8 @@
      `ms` es la suma de los dms: el tiempo de la partida hasta su última
      jugada. */
   const ORIGENES = 'rtkmx';
-  function rehace(semilla, u, jugadas) {
-    const E = nueva(semilla, u);
+  function rehace(semilla, u, jugadas, modo) {
+    const E = nueva(semilla, u, modo);
     if (!Array.isArray(jugadas)) return { error: 'La partida no trae jugadas.' };
     let ms = 0;
     for (const j of jugadas) {
@@ -323,7 +334,7 @@
   }
 
   const api = { LADO, H, MANO, CELDAS, LINEAS, FORMAS, vertices, plano, celdasDe, nueva, destino, cubre,
-    lineasQueCierra, cabe, puedeJugar, coloca, bonoLineas, rehace, usa, girada, alrededor, PODERES, ORDEN_PODERES };
+    lineasQueCierra, cabe, puedeJugar, coloca, bonoLineas, rehace, usa, girada, alrededor, PODERES, ORDEN_PODERES, MODOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TrigonMotor = api;
 })(this);

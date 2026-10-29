@@ -1,8 +1,9 @@
 # Antitrampas de Trigon
 
-Una tabla:
+Una tabla por modo:
 
-- `club-trigon-puntos`: `puntos` es el puntaje de la partida (1 por
+- `club-trigon-puntos` (fácil, con poderes) y `club-trigon-normal` (sin
+  poderes ni trapecio): `puntos` es el puntaje de la partida (1 por
   triángulo puesto más el bono de las líneas, multiplicado por la racha) y
   `tiempo` los ms jugados, sin pausas, hasta la última jugada. Tope
   1 000 000.
@@ -23,6 +24,8 @@ Una tabla:
   oportunidad) y `a`, `b` = casilla, pieza o punto de la red.
 - `a` / `w`: lo jugado según `performance.now` y según `Date.now`.
 - `fin`: si la partida terminó porque ninguna pieza cabía.
+- `m`: `'normal'` en el modo normal; sin `m` es el fácil. El modo entra en
+  la semilla, y el verificador rechaza una prueba en la tabla del otro modo.
 
 ## Qué comprueba `solo/verifica/trigon.js`
 

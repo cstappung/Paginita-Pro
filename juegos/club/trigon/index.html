@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610291426"></script>
+<script src="../../../i18n.js?v=202610291519"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Trigon — junta los triángulos</title>
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
   <script src="../conexion.js?v=club-20"></script>
-  <link rel="stylesheet" href="estilo.css?v=trigon-12">
+  <link rel="stylesheet" href="estilo.css?v=trigon-13">
   <link rel="stylesheet" href="temas.css?v=trigon-7">
   <script>
     /* El tema antes de pintar nada, para que no parpadee el Clásico al cargar otro. */
@@ -33,7 +33,7 @@
         </div>
 
         <div class="scorebar" role="group" aria-label="Marcador">
-          <div class="dato"><small>PUNTOS</small><strong id="nPuntos" translate="no">0</strong><b id="popSuma" class="pop-suma" translate="no" aria-hidden="true"></b></div>
+          <div class="dato"><small>PUNTOS · <span id="nModo">FÁCIL</span></small><strong id="nPuntos" translate="no">0</strong><b id="popSuma" class="pop-suma" translate="no" aria-hidden="true"></b></div>
           <div class="dato"><small>👑 MEJOR</small><strong id="nMejor" translate="no">0</strong></div>
           <div class="dato"><small>LÍNEAS</small><strong id="nLineas" translate="no">0</strong></div>
           <button type="button" id="btnMenu" class="mini" title="Menú" aria-label="Abrir el menú">☰</button>
@@ -93,6 +93,10 @@
 
           <div id="menu" class="capa menu" role="dialog" aria-modal="false" aria-labelledby="menuTitulo" hidden>
             <p id="menuTitulo" class="tit" translate="no">TRIGON</p>
+            <div class="modo dificultad" role="group" aria-label="Modo de juego">
+              <button type="button" data-dificultad="facil" aria-pressed="true">Fácil · con poderes</button>
+              <button type="button" data-dificultad="normal" aria-pressed="false">Normal · sin poderes</button>
+            </div>
             <div class="menu-botones">
               <button type="button" id="btnJugar" class="boton">▶ Jugar</button>
               <button type="button" id="btnSeguirPartida" class="boton secundario" hidden>Volver a la partida</button>
@@ -115,7 +119,9 @@
               <p>Arrastra cada una de las tres piezas de la mano hasta el hexágono. No se pueden girar: llegan ya orientadas.</p>
               <p>Completa una línea de triángulos —horizontal o en cualquiera de las dos diagonales— y se borra. Cerrar varias de una vez da más puntos, y cerrar líneas en jugadas seguidas arma una <b>racha</b> que multiplica el bono.</p>
               <p>Al usar las tres piezas llega otra mano. La partida termina cuando ninguna pieza que te queda cabe en el tablero.</p>
-              <p><b>Poderes</b>: cerrar líneas puede regalarte uno (más probable si cierras varias a la vez). Aparecen sobre el tablero:</p>
+              <p>Hay dos modos, cada uno con su clasificación: <b>Fácil</b>, con poderes, y <b>Normal</b>, sin poderes y sin la tira de cinco triángulos (llega de cuatro).</p>
+              <div id="comoPoderes">
+              <p><b>Poderes</b> (modo fácil): cerrar líneas puede regalarte uno (más probable si cierras varias a la vez). Aparecen sobre el tablero:</p>
               <ul class="lista-poderes">
                 <li data-poder="martillo"><i class="ico-poder" data-poder="martillo"></i><span><b>Martillo</b> rompe un triángulo.</span></li>
                 <li data-poder="girar"><i class="ico-poder" data-poder="girar"></i><span><b>Girar</b> gira 60° una pieza de tu mano.</span></li>
@@ -124,6 +130,7 @@
                 <li data-poder="vida"><i class="ico-poder" data-poder="vida"></i><span><b>Segunda oportunidad</b> (muy rara) borra la mitad de abajo cuando ya no cabe nada.</span></li>
               </ul>
               <p>Si ninguna pieza cabe pero algún poder puede salvarte, la partida sigue y ese poder late.</p>
+              </div>
               <p class="chico">Teclado: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> eligen pieza, flechas la mueven, <kbd>Enter</kbd> la suelta, <kbd>Esc</kbd> cancela. Poderes: <kbd>H</kbd> martillo, <kbd>G</kbd> girar, <kbd>C</kbd> cambiar, <kbd>B</kbd> bomba, <kbd>V</kbd> segunda oportunidad.</p>
             </div>
           </div>
@@ -136,7 +143,7 @@
   </div>
   <svg id="arrastre" class="arrastre" aria-hidden="true" hidden></svg>
   <script src="musica.js?v=trigon-1"></script>
-  <script src="motor.js?v=trigon-6"></script>
-  <script src="juego.js?v=trigon-15"></script>
+  <script src="motor.js?v=trigon-7"></script>
+  <script src="juego.js?v=trigon-16"></script>
 </body>
 </html>

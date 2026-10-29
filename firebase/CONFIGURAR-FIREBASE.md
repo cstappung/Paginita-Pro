@@ -223,6 +223,11 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > Hasta volver a publicar las reglas se juega igual, pero las partidas no
 > entran en la clasificación y no pagan monedas.
 
+> **Trigon modo normal (octubre de 2026):** `club-trigon-normal` (el modo
+> sin poderes, mismo tope de 1 000 000) se suma a `soloRanks` y
+> `soloPruebas`. Hasta volver a publicar las reglas, las partidas del modo
+> normal no entran en la clasificación.
+
 > **PRO TILES (octubre de 2026):** nueve categorías nuevas de `soloRanks`
 > y `soloPruebas`, `club-protiles-(cristal|medianoche|calle|verano|neon|
 > latido|estrellas|despegue|mezcla)` (una por canción y la mezcla, puntos con

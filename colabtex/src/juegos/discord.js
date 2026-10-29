@@ -191,7 +191,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-dosmil-puntos") return `🟨 ${f.puntos} puntos`;
   if (cat === "club-dosmil-ficha") return `🟨 ficha ${f.puntos}`;
   if (/^club-protiles-/.test(cat)) return `🎹 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
-  if (cat === "club-trigon-puntos") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
+  if (cat === "club-trigon-puntos" || cat === "club-trigon-normal") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-puntos") return `◓ ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-pokedex") return `📕 ${Number(f.puntos)} especies`;
   // PRO HERO: las estrellas doradas (puntos = doradas·10 000 + todas, hero.js).
