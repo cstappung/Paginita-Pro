@@ -429,6 +429,13 @@
     ["realmadrid", "mbappe-mvp", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "Real Madrid · MVP del Clásico", cinta: "MVP DEL CLÁSICO", especial: "clasico", limitada: true, peso: 3 }],
     ["bayern", "harry-kane-balon", "Harry Kane", "DEL", 9, "ENG", { person: "bayern-harry-kane", sub: "Bayern Múnich · Balón de Oro", cinta: "BALÓN DE ORO 2026", especial: "balon", limitada: true, peso: 3 }]
   ];
+  /* Las especiales que llegaron después. Cada una va al **final** del
+     catálogo (después de Arabia, nunca en `ESPECIALES`, que está en medio y
+     movería los ids de lo que viene detrás) y con su corte en
+     `AMPLIACIONES`. Misma forma de fila que `ESPECIALES`. */
+  const ESPECIALES2 = [
+    ["alnassr", "cristiano-balon-all-time", "C. Ronaldo", "DEL", 7, "PT", { person: "alnassr-cristiano-ronaldo", sub: "Al Nassr · Balón de Oro All-Time", cinta: "BALÓN DE ORO ALL TIME", especial: "balon", limitada: true, peso: 3 }]
+  ];
   /* ---------- el Bayern Múnich (Bundesliga) ----------
      El primer equipo de fcbayern.com (octubre 2026), con la foto en
      cards/champions/bayern/<id>.webp. Quedaron fuera los que EA FC no
@@ -814,6 +821,7 @@
       "igor-jesus": 65, "ryan-raposo": 63, "thomas-hasal": 60, "kenny-nielsen": 59, "cabral-carter": 58, "jude-terry": 57
     },
     alnassr: {
+      "cristiano-balon-all-time": 96,
       "cristiano-ronaldo": 84, "joao-felix": 83, "kingsley-coman": 83, "inigo-martinez": 83, "sadio-mane": 82, "mohamed-simakan": 82,
       "bento": 80, "samu-costa": 78, "angelo": 76, "abdulelah-al-amri": 73, "sultan-al-ghannam": 71, "nawaf-boushal": 71,
       "nawaf-al-aqidi": 71, "ayman-yahya": 70, "abdullah-al-khaibari": 69, "abdullah-al-hamdan": 66, "ali-al-hassan": 65, "nader-al-sharari": 65,
@@ -1038,6 +1046,7 @@
       "thomas-hasal": "POR", "kenny-nielsen": "DFC", "cabral-carter": "POR", "jude-terry": "MC"
     },
     alnassr: {
+      "cristiano-balon-all-time": "DC",
       "cristiano-ronaldo": "DC", "joao-felix": "MC/MI", "kingsley-coman": "MD/MI", "inigo-martinez": "DFC/LI", "sadio-mane": "MI/MD",
       "mohamed-simakan": "DFC/LD", "bento": "POR", "samu-costa": "MC", "angelo": "MC/MD", "abdulelah-al-amri": "DFC",
       "sultan-al-ghannam": "LD/MD", "nawaf-boushal": "LI/LD", "nawaf-al-aqidi": "POR", "ayman-yahya": "LI/MD", "abdullah-al-khaibari": "MC",
@@ -1163,6 +1172,7 @@
   ARGENTINA.forEach(j => cartaFutbol("futbol", "champions", j));
   MLS.forEach(j => cartaFutbol("futbol", "champions", j));
   ARABIA.forEach(j => cartaFutbol("futbol", "champions", j));
+  ESPECIALES2.forEach(j => cartaFutbol("futbol", "especiales", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
@@ -1198,7 +1208,8 @@
   // Siete clubes de la Champions y las dos cartas especiales (publicado el 2026-10-27): el corte es unos minutos después del push, para que ningún sobre ya comprado cambie.
   // El Bayern Múnich (20 jugadores, publicado el 2026-10-28): el corte es media hora después del push, para que ningún sobre ya comprado cambie.
   // Chile, Argentina, la MLS y Arabia (277 jugadores, publicado el 2026-10-28): el corte (28-10-2026 21:16 UTC) es media hora después del push, para que ningún sobre ya comprado cambie.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }];
+  // Cristiano · Balón de Oro All-Time (n = 1110): ¡`hasta` es un PROVISORIO en el futuro (1-1-2027), así que por ahora ningún sobre la ve! Al publicar, `hasta` = la hora del push y unos minutos más (nunca antes: un sobre ya comprado cambiaría).
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1798761600000, n: 1110 }];
   const memoPool = {};
   function poolFutbol(plus, at) {
     const v = AMPLIACIONES.find(x => at < x.hasta);
@@ -1468,7 +1479,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

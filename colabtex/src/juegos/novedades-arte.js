@@ -361,7 +361,8 @@ const ESTRELLAS_FUTBOL = [
   { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" },
   { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 90, cinta: "" },
   { img: "champions/intermiami/lionel-messi", nombre: "Messi", media: 89, cinta: "" },
-  { img: "champions/alnassr/cristiano-ronaldo", nombre: "Cristiano Ronaldo", media: 84, cinta: "" },
+  { img: "champions/alnassr/cristiano-ronaldo", nombre: "C. Ronaldo", media: 84, cinta: "" },
+  { img: "especiales/alnassr/cristiano-balon-all-time", nombre: "C. Ronaldo", media: 96, cinta: "BALÓN DE ORO" },
   { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 89, cinta: "" }
 ];
 // tres estrellas al azar más Vidal, barajadas: [{...carta}] de cuatro

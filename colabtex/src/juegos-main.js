@@ -2932,8 +2932,8 @@ const ATAJO_RETOS = { ruta: "#cartas/retos", boton: "🏆 Desafío de plantilla"
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
     gancho: "Cartas especiales por tiempo limitado",
-    lema: "Los clubes más grandes de España, Inglaterra, Francia, Alemania e Italia, y ahora la liga chilena (nuevo): Colo-Colo, la Católica y la U, con Vidal y Aránguiz. También llegan Argentina (nuevo), Estados Unidos (nuevo) y Arabia Saudita (nuevo), con Messi, Alexis y Cristiano. Y por tiempo limitado, Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro.",
-    datos: () => [["2", "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
+    lema: "Los clubes más grandes de España, Inglaterra, Francia, Alemania e Italia, y ahora la liga chilena (nuevo): Colo-Colo, la Católica y la U, con Vidal y Aránguiz. También llegan Argentina (nuevo), Estados Unidos (nuevo) y Arabia Saudita (nuevo), con Messi, Alexis y Cristiano. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time.",
+    datos: () => [[String(MOTOR.CARDS.filter(c => c.especial).length), "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
     gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],

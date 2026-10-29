@@ -848,7 +848,7 @@ let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Nuevos: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico y Harry Kane · Balón de Oro. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
+  futbol: 'Nuevos: Colo-Colo, la Católica y la U; River, Boca y Estudiantes; Inter Miami, CF Montréal y LAFC; Al Nassr, Al Hilal y Al Ittihad. Cartas especiales por tiempo limitado: Mbappé · MVP del Clásico, Harry Kane · Balón de Oro y Cristiano Ronaldo · Balón de Oro All-Time. Además, todos los jugadores de Real Madrid, Barça, el Big Six y más clubes de la Champions',
   futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
@@ -890,7 +890,7 @@ function eligeSobre(menu = 'todos') {
     return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
       <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">TIEMPO LIMITADO</i><i class="hub-liga"><img src="flags/cl.png" alt="">LIGA CHILENA</i></span>
       <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
-      <small class="ch-temas">Nuevo: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, y Harry Kane, Balón de Oro</small>
+      <small class="ch-temas">Nuevo: la liga chilena, y River, Boca, Inter Miami, Al Nassr y más. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -2166,7 +2166,7 @@ const NOVEDADES_FUTBOL = [
     '«⚽ Mi plantilla» del perfil se quitó por ahora: su lugar lo toman los desafíos.'
   ]],
   ['Cartas especiales por tiempo limitado', [
-    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>) y <b>Harry Kane · Balón de Oro</b> (media <b>94</b>): dos legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen el triple de seguido que una legendaria común. Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
+    '<b>Mbappé · MVP del Clásico</b> (media <b>92</b>), <b>Harry Kane · Balón de Oro</b> (media <b>94</b>) y <b>Cristiano Ronaldo · Balón de Oro All-Time</b> (media <b>96</b>): tres legendarias especiales, con su cinta y un marco dorado. Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, y salen el triple de seguido que una legendaria común. Las que consigas son tuyas para siempre. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once.',
   ]],
   ['Octubre 2026 · Más clubes de la Champions', [
     '<b>Siete clubes nuevos</b> en los sobres de fútbol: PSG, Inter, Roma, Napoli, Borussia Dortmund, Como y el Real Betis, con los jugadores de su primer equipo (cada uno con su media de EA SPORTS FC). Salen en el sobre normal y en el Plus; los sobres que ya abriste no cambian.',
