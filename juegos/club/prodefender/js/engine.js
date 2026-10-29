@@ -93,11 +93,13 @@
   };
   // lo que remata los huesos de un Esqueleto (y lo único que les hace algo mientras yacen)
   const REMATA = { fire: 1, explosive: 1, arcane: 1 };
-  // Jefes desde la versión 5 (pedido del dueño): x20 de vida y un tercio de la velocidad, para que
-  // se sientan como una marcha lenta que hay que frenar entre todas las torres.
+  // Jefes desde la versión 5 (pedido del dueño): x20 de vida y un tercio de la velocidad «o menos»,
+  // para que se sientan como una marcha lenta que hay que frenar entre todas las torres. Va a 1/5:
+  // con 1/3 el jefe final de la ronda 100 no lo pasaba ningún guion humano (Caldera, Pantano, Fosa);
+  // con 1/5 los tres ganan (lo mismo con 1/8).
   // `esbirros`: cuánto más espaciadas invocan (con x20 de vida viven mucho más: a su ritmo de
   // antes llenaban el camino de esbirros y eso, no el jefe, era lo que se escapaba).
-  const JEFE = { vida: 20, vel: 1 / 3, esbirros: 10 };
+  const JEFE = { vida: 20, vel: 1 / 5, esbirros: 10 };
   PD.JEFE = JEFE;   // el bot lo cambia para medir (--jefe vida,vel)
   // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
   // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
@@ -158,17 +160,18 @@
       this.rows = Math.ceil((H + this.off * 2) / this.cs);
       this.cells = [];
       for (let i = 0; i < this.cols * this.rows; i++) this.cells.push([]);
+      this.usadas = [];   // las celdas con algo: clear() vacía solo esas (se llama en cada paso)
     }
-    clear() { for (const c of this.cells) c.length = 0; }
-    idx(x, y) {
-      let cx = Math.floor((x + this.off) / this.cs), cy = Math.floor((y + this.off) / this.cs);
-      if (cx < 0) cx = 0; else if (cx >= this.cols) cx = this.cols - 1;
-      if (cy < 0) cy = 0; else if (cy >= this.rows) cy = this.rows - 1;
-      return [cx, cy];
+    clear() { const u = this.usadas; for (let i = 0; i < u.length; i++) this.cells[u[i]].length = 0; u.length = 0; }
+    cx(x) { const c = Math.floor((x + this.off) / this.cs); return c < 0 ? 0 : c >= this.cols ? this.cols - 1 : c; }
+    cy(y) { const c = Math.floor((y + this.off) / this.cs); return c < 0 ? 0 : c >= this.rows ? this.rows - 1 : c; }
+    add(e) {
+      const i = this.cy(e.y) * this.cols + this.cx(e.x), cell = this.cells[i];
+      if (!cell.length) this.usadas.push(i);
+      cell.push(e);
     }
-    add(e) { const [cx, cy] = this.idx(e.x, e.y); this.cells[cy * this.cols + cx].push(e); }
     query(x, y, r, fn) {
-      const [x0, y0] = this.idx(x - r, y - r), [x1, y1] = this.idx(x + r, y + r);
+      const x0 = this.cx(x - r), y0 = this.cy(y - r), x1 = this.cx(x + r), y1 = this.cy(y + r);
       for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
         const cell = this.cells[cy * this.cols + cx];
         for (let i = 0; i < cell.length; i++) if (fn(cell[i]) === true) return;
@@ -2673,12 +2676,22 @@
       if (this.golems.length && this.golems.some(g => g.dead)) this.golems = this.golems.filter(g => !g.dead);
       for (const k in this.abLock) if (this.abLock[k] > 0) this.abLock[k] -= dt;
       this.updateAreas(dt);
-      for (const f of this.fx) f.t += dt;
-      this.fx = this.fx.filter(f => f.t < f.T);
-      if (this.fx.length > 700) this.fx.splice(0, this.fx.length - 700);
+      // fx, enemigos y jefes se compactan sin crear arreglos en cada paso (el bot corre millones)
+      const fx = this.fx;
+      let n = 0;
+      for (let i = 0; i < fx.length; i++) { const f = fx[i]; f.t += dt; if (f.t < f.T) fx[n++] = f; }
+      fx.length = n;
+      if (fx.length > 700) fx.splice(0, fx.length - 700);
 
-      if (this.enemies.some(e => e.dead)) this.enemies = this.enemies.filter(e => !e.dead);
-      this.bosses = this.enemies.filter(e => e.d.boss);
+      const en = this.enemies, B = this.bosses;
+      let muertos = false, nb = 0, igual = true;
+      for (let i = 0; i < en.length; i++) {
+        const e = en[i];
+        if (e.dead) muertos = true;
+        else if (e.d.boss) { if (B[nb] !== e) igual = false; nb++; }
+      }
+      if (muertos) this.enemies = en.filter(e => !e.dead);
+      if (!igual || nb !== B.length) this.bosses = this.enemies.filter(e => e.d.boss);
       if (this.active && this.qi >= this.queue.length && this.enemies.length === 0) this.endRound();
     }
     updateProjectiles(dt) {

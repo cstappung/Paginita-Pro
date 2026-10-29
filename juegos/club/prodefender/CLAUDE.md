@@ -309,7 +309,9 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
   stack), but different types add up (totem +25 % rate + rod +30 % = +55 %; damage
   multipliers add their bonuses; armour pierce caps at 100 %). Version 4 took the best of
   all sources.
-- **Bosses** (`JEFE` in engine.js): x20 HP, a third of the speed, summons 10× further
+- **Bosses** (`JEFE` in engine.js): x20 HP, a fifth of the speed (the owner asked for «un
+  tercio o menos»; at 1/3 no human script beat the round-100 boss of Caldera, Pantano or
+  Fosa, at 1/5 all three win), summons 10× further
   apart (at the old pace a x20 boss filled the path with minions: that, not the boss,
   is what leaked in Caldera/Fosa round 25; slowing them changed nothing), and immune to
   slows, freezes, stuns, auras and holds (pushes still at 25 %, walls and soldiers still

@@ -693,13 +693,13 @@ test('versión 5: los bufos de estructuras distintas se suman, los del mismo tip
  ({g,t,base}=arma(4));assert.ok(Math.abs(t.s.cd-base/(1+Math.max(totem,ra)))<1e-9,'v4: solo el mejor');
 });
 
-test('versión 5: los jefes tienen x20 de vida y van a un tercio de la velocidad (la 4 no cambia)',()=>{
+test('versión 5: los jefes tienen x20 de vida y van a un quinto de la velocidad (la 4 no cambia)',()=>{
  const jefe=Object.keys(PD.ENEMIES).find(id=>PD.ENEMIES[id].boss&&!PD.ENEMIES[id].twins);
  const mide=ve=>{const g=new PD.Game(0,null,1,ve);g.active=true;g.queue=[{t:1e9}];g.qi=0;g.hurryT=1e9;g.round=24;
   const e=g.spawn(jefe,0,100,1,2);const d0=e.dist;for(let k=0;k<60;k++)g.update(1/60);return {hp:e.maxHp,avance:e.dist-d0};};
  const v4=mide(4),v5=mide(5);
  assert.ok(Math.abs(v5.hp/v4.hp-20)<1e-6,'x20 de vida');
- assert.ok(v5.avance>0&&Math.abs(v5.avance/v4.avance-1/3)<0.02,'un tercio de la velocidad: '+(v5.avance/v4.avance));
+ assert.ok(v5.avance>0&&Math.abs(v5.avance/v4.avance-1/5)<0.02,'un quinto de la velocidad: '+(v5.avance/v4.avance));
 });
 
 const ponCercaG=(G,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.35){const t=G.colocar(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
