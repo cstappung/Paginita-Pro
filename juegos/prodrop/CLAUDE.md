@@ -271,6 +271,27 @@ other file of the site. Things that hold it together:
   over). **Publish the rules right after the site is live and raise
   `juegosVersion/min`**: an old tab still carrying `plantilla` on a profile
   save would be refused, and the challenges need the new rules.
+- **Football walkout** (`walkout.js`, plain; the 3D scene `walkout3d.js` is **built** from
+  `colabtex/src/prodrop/walkout3d.js` by `npm run build:walkout`, part of `npm run build`, and
+  imported lazily with the frame's `?v=`). In a football pack the best card of all the packs
+  (`valorWalkout`: special/legend > tier > media) goes first in `pull`, and if it is épica or better
+  `openPack` plays `WALKOUT.jugar` before flipping it (`reveal(el, true)` skips `REVELA.antes`):
+  `completo` (tier 3: concrete tunnel, exit to a stadium with crowd, flashes and fireworks, then flag,
+  position, crest — or ♛ for legends — and the card) or `corto` (épica: end of the tunnel, flag,
+  crest, card). Rara and común flip as before. **Only the «Saltar» button** skips (to the card, then ends): taps
+  elsewhere and keys are swallowed, because people tap a lot while opening. After a walkout the flip
+  makes no sound (`reveal(el, true)`): the walkout already played it.
+  **Stadium background** (`Estadio` in `app.js`, `crearFondo` in walkout3d.js): football packs go
+  through `tienda`, `pack`, `opening`, `reveal` and `summary` with the stadium behind (`#estadio`, a
+  dark vignette on top; CSS stadium without WebGL), paused during a walkout; an épica or better
+  tints its light beam and fires fireworks (`Estadio.celebra`).
+  No WebGL, reduced motion or a failed import → the CSS tunnel (`.es-2d`), same steps. All
+  MeshBasic + canvas textures, no lights or models (~140 KB gzip, only on football).
+  Local test pages (**never committed**, listed in `.git/info/exclude`): `_prueba.html` has
+  «Próximo sobre de fútbol: con legendaria / especial / leyenda / épica / rara» (it tries pack keys
+  until the best card matches), and `_walkout-prueba.html?n=completo|corto&c=<uid prefix>&t=<s>`
+  plays the walkout alone on a fake clock frozen at `t`. Headless Chrome renders the stadium
+  black (SwiftShader): check it in a real browser.
 - **Reveal animations are per collection and rarity** (`revela.js`,
   `REVELA.de(card)` gives `{antes, despues}`; its particles carry their own
   `draw` and the `fxStep` loop paints them). Profes: chalk on a

@@ -779,7 +779,43 @@ let phase = 'pack', pull = [], els = [], current = 0, busy = false, tearP = 0, t
    recuerda la última para marcarla); «Cambiar sobre» vuelve a elegir. */
 let coleccion = 'profes';
 try { if (M.SOBRE[localStorage.getItem('prodrop.coleccion')]) coleccion = localStorage.getItem('prodrop.coleccion'); } catch {}
-const setPhase = p => { phase = p; document.body.dataset.phase = p; };
+/* El estadio de fondo de los sobres de fútbol: la tienda, la apertura, el
+   revelado y el resumen pasan con la cancha detrás (la escena `crearFondo`
+   de walkout3d.js; sin WebGL, un estadio en CSS). Se pausa mientras corre
+   un walkout, que tiene su propia escena, y con la pestaña oculta. */
+const Estadio = (() => {
+  const cv = $('#estadio');
+  let escena = null, cargando = null, raf = 0, on = false, pausa = false, t0 = 0;
+  const ajusta = () => escena && escena.tamano(innerWidth, innerHeight);
+  const cuadro = ahora => {
+    if (!on || !escena) { raf = 0; return; }
+    if (!pausa && !document.hidden) escena.cuadro((ahora - t0) / 1000);
+    raf = requestAnimationFrame(cuadro);
+  };
+  function prende() {
+    if (on) return;
+    on = true; document.body.classList.add('con-estadio');
+    if (!window.WALKOUT) return;
+    cargando = cargando || WALKOUT.precarga().then(m => {
+      if (!m || !m.crearFondo) return null;
+      try { escena = m.crearFondo(cv); t0 = performance.now(); ajusta(); addEventListener('resize', ajusta); } catch { escena = null; }
+      return escena;
+    });
+    cargando.then(e => {
+      document.body.classList.toggle('estadio-3d', !!e);
+      if (e && on && !raf) raf = requestAnimationFrame(cuadro);
+    });
+  }
+  function apaga() { on = false; document.body.classList.remove('con-estadio'); }
+  // una épica o mejor: el haz se tiñe de su color y hay fuegos artificiales
+  const celebra = (color, n) => { if (escena) { escena.tinta(color); escena.fuegos(n); } };
+  return { prende, apaga, celebra, pausa: v => { pausa = v; } };
+})();
+const FASES_ESTADIO = ['tienda', 'pack', 'opening', 'reveal', 'summary'];
+const setPhase = p => {
+  phase = p; document.body.dataset.phase = p;
+  if (FASES_ESTADIO.includes(p) && esFutbolPack(coleccion)) Estadio.prende(); else Estadio.apaga();
+};
 const hint = txt => { $('#hint').textContent = txt; };
 
 // los sobres comprados: su contenido sale del motor (uid, clave, hora del servidor)
@@ -961,6 +997,12 @@ function newPacks(lista, drop = true) {
   abriendo = new Set(); rehazColeccion();
   const antes = new Set(Object.keys(col)), vistas = new Set();
   pull = comprados.flatMap((x, s) => cardsOf(x.k, x.at, s, antes, vistas));
+  // fútbol, como el FUT: la mejor carta (de todos los sobres) sale primero, con su walkout
+  if (esFutbolPack(coleccion)) {
+    const i = pull.reduce((m, c, j) => (valorWalkout(c) > valorWalkout(pull[m]) ? j : m), 0);
+    if (i) pull.unshift(pull.splice(i, 1)[0]);
+    if (window.WALKOUT && nivelWalkout(pull[0])) WALKOUT.precarga();
+  }
   abriendo = new Set(comprados.map(x => x.k)); rehazColeccion();
   try { localStorage.setItem(PENDIENTE(), comprados.map(x => x.k).join(',')); } catch {}
   preload(pull);
@@ -1087,6 +1129,13 @@ async function openPack(force) {
   [caida, tapa, luz].forEach(a => a.cancel());
 
   setPhase('reveal'); setDots();
+  // fútbol: si la primera (la mejor) es épica o más, sale con su walkout y queda dada vuelta
+  if (nivelWalkout(els[0] && els[0].card)) {
+    busy = true; hint('');
+    const hizo = await walkout(els[0]);
+    busy = false;
+    if (hizo) return reveal(els[0], true);
+  }
   hint('Toca la carta para darla vuelta');
   focusTop();
   stack.focus({ preventScroll: true });
@@ -1100,6 +1149,35 @@ function abreExtras() {
     ex.animate([{ transform: desde || 'none', opacity: 1 }, { transform: `${desde} translate(${lado * 30}%, 70vh) rotate(${lado * 14}deg)`, opacity: 0 }],
       { duration: REDUCED ? 1 : 900, delay: 250, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
   }
+}
+
+/* ---------------- WALKOUT (fútbol) ----------------
+   La mejor carta del sobre sale por el pasillo a la cancha (walkout.js):
+   completo para legendarias, especiales y leyendas, corto para épicas;
+   lo demás se da vuelta como siempre. */
+const valorWalkout = c => (c.leyenda || c.especial ? 4 : c.tier) * 1000 + (c.media || 0);
+const nivelWalkout = c => (!c || !M.esFutbol(c.col) ? '' : c.tier >= 3 ? 'completo' : c.tier === 2 ? 'corto' : '');
+const sonidoWalkout = n => {
+  if (n === 'tunel') { Snd.noise({ d: 3.2, v: .06, f: 180, q: .6, type: 'lowpass' }); for (let i = 0; i < 6; i++) Snd.noise({ t: .25 + i * .42, d: .07, v: .05, f: 900, q: 1.5 }); }
+  else if (n === 'salida') { Snd.noise({ d: 4.5, v: .16, f: 700, to: 1100, q: .5 }); Snd.noise({ t: .2, d: 3.8, v: .08, f: 2400, q: .8 }); Snd.tone(55, { d: 1.2, v: .3, to: 30 }); }
+  else if (n === 'paso') { Snd.tone(70, { d: .5, v: .32, to: 38 }); Snd.noise({ d: .25, v: .1, f: 1400, to: 300, type: 'lowpass' }); }
+  else if (n === 'carta') { Snd.reveal(3); Snd.noise({ d: 2.6, v: .14, f: 900, q: .5 }); }
+};
+async function walkout(el) {
+  const c = el.card, nivel = nivelWalkout(c);
+  if (!nivel || !window.WALKOUT) return false;
+  const carta = makeCard(c, { back: false });
+  const pl = paletteOf(c);
+  Estadio.pausa(true);
+  await WALKOUT.jugar({
+    nivel, color: accentOf(c), color2: pl[1] || '#fff',
+    rareza: `${rareza(c).label.toUpperCase()} ${rareza(c).sym}`,
+    bandera: { img: bandera(c.pais), nombre: FUT_PAIS[c.pais] || (c.leyenda ? c.sub : c.pais) },
+    posicion: c.posiciones[0], club: c.club ? { img: escudo(c.club), nombre: M.CLUBES[c.club] } : null,
+    cinta: c.cinta || '', carta, sonido: sonidoWalkout,
+  });
+  Estadio.pausa(false);
+  return true;
 }
 
 /* ---------------- REVELADO ---------------- */
@@ -1153,7 +1231,7 @@ function shakeFrames(strength, n = 26) {
   return f;
 }
 
-async function reveal(el) {
+async function reveal(el, trasWalkout = false) {
   busy = true;
   const c = el.card, t = c.tier, [x, y, r] = centerOf(el), pl = t >= 2 ? paletteOf(c) : [];
   setTilt(null, null);
@@ -1163,10 +1241,10 @@ async function reveal(el) {
      su colección (revela.js): tiza o hiperespacio para los profes,
      osciloscopio, bobina de Tesla o cortocircuito para los componentes. */
   const an = window.REVELA && REVELA.de(c), k = { el, c, t, x, y, r, pl: t >= 2 ? pl : [accentOf(c), '#fff'] };
-  if (an) await an.antes(k);
+  if (an && !trasWalkout) await an.antes(k);
 
   record(c);
-  Snd.flip();
+  if (!trasWalkout) Snd.flip();
   el.querySelector('.flip').classList.remove('down');
   el.revealed = true;
   light(el);
@@ -1178,7 +1256,8 @@ async function reveal(el) {
   el.animate(pop, { duration: t >= 2 ? 800 : 500, easing: 'cubic-bezier(.2,1.3,.4,1)' });
 
   setTimeout(() => {
-    Snd.reveal(t);
+    if (!trasWalkout) Snd.reveal(t);   // el walkout ya sonó al mostrar la carta
+    if (t >= 2 && M.esFutbol(c.col)) Estadio.celebra(accentOf(c), t === 3 ? (c.especial || c.leyenda ? 10 : 6) : 3);
     if (an) an.despues(k);
     else burst(x, y, { n: 12, colors: ['#fff', '#ffe9a8'], speed: 6, kinds: ['star'], gravity: .02 });
   }, t >= 2 ? 60 : 180);
@@ -1245,7 +1324,8 @@ stack.addEventListener('pointerup', endDrag);
 stack.addEventListener('pointercancel', () => { if (drag) { drag.el.style.transition = ''; drag.el.style.transform = 'none'; drag = null; } });
 
 addEventListener('keydown', e => {
-  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta', 'retos', 'fuModal'].some(id => !$('#' + id).hidden)) {
+  // el mercado y los intercambios se fueron a Juegos: sus capas ya no existen
+  if (['zoom', 'collection', 'reroll', 'ruleta', 'retos', 'fuModal'].some(id => { const e = $('#' + id); return e && !e.hidden; })) {
     // en los desafíos, Escape cierra primero el modal de encima (selector, plantilla ajena, próximos retos)
     if (e.key === 'Escape' && !$('#retos').hidden && cierraModalReto()) return;
     if (e.key === 'Escape') closeOverlays();

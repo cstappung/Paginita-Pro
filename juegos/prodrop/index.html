@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610291235"></script>
+<script src="../../i18n.js?v=202610291356"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-83">
+<link rel="stylesheet" href="style.css?v=pd-86">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -25,7 +25,7 @@
   <filter id="wSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".5"/></filter>
   <filter id="wBlob" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency=".12" numOctaves="2" seed="8" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/></filter>
 </svg>
-<div class="bg" aria-hidden="true"><div class="bg-spot"></div><div class="bg-stars"></div></div>
+<div class="bg" aria-hidden="true"><canvas id="estadio" class="bg-estadio"></canvas><div class="bg-estadio-css"></div><div class="bg-spot"></div><div class="bg-stars"></div></div>
 <div id="aura" class="aura" aria-hidden="true"><div class="aura-rays"></div><div class="aura-core"></div></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 <div id="flash" class="flash" aria-hidden="true"></div>
@@ -197,9 +197,10 @@
   </div>
 </div>
 
-<script src="motor.js?v=pd-83"></script>
-<script src="retos.js?v=pd-83"></script>
-<script src="app.js?v=pd-83"></script>
-<script src="revela.js?v=pd-83"></script>
+<script src="motor.js?v=pd-86"></script>
+<script src="retos.js?v=pd-86"></script>
+<script src="walkout.js?v=pd-86"></script>
+<script src="app.js?v=pd-86"></script>
+<script src="revela.js?v=pd-86"></script>
 </body>
 </html>

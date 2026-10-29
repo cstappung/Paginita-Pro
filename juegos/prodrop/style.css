@@ -1692,3 +1692,110 @@ button.rt-ficha:hover { transform: translateY(-2px); border-color: #ffffff55; }
 .col-busca select { flex: 0 1 auto; max-width: 100%; }
 .col-busca select option { background: #1a1030; color: #fff; }
 .col-vacio { grid-column: 1 / -1; padding: 30px 10px; text-align: center; color: var(--muted); }
+
+/* =====================================================
+   WALKOUT DE FÚTBOL (walkout.js): la mejor carta del sobre sale por un
+   pasillo a la cancha; bandera, posición y escudo, y después la carta.
+   `.es-2d` es el respaldo sin WebGL (el pasillo en CSS).
+   ===================================================== */
+.wo { position: fixed; inset: 0; z-index: 60; background: #05060b; overflow: hidden; cursor: default; user-select: none; -webkit-user-select: none; touch-action: none; animation: woEntra .35s ease-out; }
+.wo.sale { animation: woSale .38s ease-in forwards; pointer-events: none; }
+@keyframes woEntra { from { opacity: 0; } }
+@keyframes woSale { to { opacity: 0; } }
+.wo-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.wo-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, #fff, color-mix(in srgb, var(--wc) 55%, #fff) 45%, transparent 80%); opacity: 0; pointer-events: none; }
+.wo-capa { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.wo-capa::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, transparent 35%, #000a 100%); }
+.wo-saltar {
+  position: absolute; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); z-index: 3;
+  border: 1px solid #ffffff40; background: #0008; color: #fff; border-radius: 99px; padding: 8px 16px;
+  font: 800 14px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; backdrop-filter: blur(6px);
+}
+
+/* los pasos: bandera, posición, escudo (uno a la vez, centrados) */
+.wo-paso {
+  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: #fff;
+  opacity: 0; transform: scale(1.6); filter: blur(10px); transition: opacity .32s, transform .5s cubic-bezier(.2, 1.3, .4, 1), filter .4s;
+}
+.wo-paso.on { opacity: 1; transform: none; filter: none; }
+.wo-paso b { font: 900 clamp(26px, 6vw, 44px)/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; text-shadow: 0 0 24px var(--wc), 0 4px 18px #000; }
+.wo-paso small { font: 800 clamp(13px, 2.6vw, 16px)/1 "Barlow Condensed", sans-serif; letter-spacing: .5em; color: color-mix(in srgb, var(--wc) 70%, #fff); }
+.wo-bandera img { width: clamp(150px, 34vw, 240px); aspect-ratio: 3 / 2; object-fit: cover; border-radius: 10px; box-shadow: 0 0 0 3px #fff3, 0 0 50px color-mix(in srgb, var(--wc) 70%, transparent), 0 18px 40px #000c; }
+.wo-posicion b { font-size: clamp(90px, 22vw, 160px); line-height: .85; letter-spacing: .02em; -webkit-text-stroke: 2px #fff; color: transparent; text-shadow: 0 0 40px var(--wc); }
+.wo-club img { width: clamp(130px, 30vw, 210px); aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 0 28px color-mix(in srgb, var(--wc) 80%, transparent)) drop-shadow(0 14px 22px #000c); }
+.wo-leyenda b { font-size: clamp(90px, 22vw, 150px); color: var(--wc); }
+
+/* la carta: baja girando con un estallido de luz */
+.wo-carta { position: absolute; width: min(64vw, 300px, calc((100svh - 160px) / 1.45)); opacity: 0; transform: translateY(-60vh) rotateY(540deg) scale(.6); }
+.wo-carta .card { width: 100%; }
+.wo.carta .wo-carta { animation: woCarta 1.15s cubic-bezier(.16, 1.1, .3, 1) forwards; }
+@keyframes woCarta {
+  0% { opacity: 0; transform: translateY(-60vh) rotateY(540deg) scale(.6); }
+  25% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+.wo-carta::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 260%; aspect-ratio: 1; transform: translate(-50%, -50%); z-index: -1;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--wc) 55%, transparent) 0 6deg, transparent 6deg 18deg);
+  mask: radial-gradient(circle, #000 0, transparent 62%); -webkit-mask: radial-gradient(circle, #000 0, transparent 62%);
+  animation: woRayos 9s linear infinite; opacity: .8;
+}
+@keyframes woRayos { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.wo-cinta {
+  position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%); white-space: nowrap;
+  font: 800 13px/1 "Barlow Condensed", sans-serif; letter-spacing: .2em; color: #1a1030; background: var(--wc); padding: 6px 12px; border-radius: 99px; box-shadow: 0 6px 18px #000a;
+}
+.wo-rareza {
+  position: absolute; top: max(8vh, 40px); opacity: 0; transform: translateY(-10px);
+  font: 900 clamp(18px, 4vw, 26px)/1 "Barlow Condensed", sans-serif; letter-spacing: .3em; color: var(--wc); text-shadow: 0 0 22px var(--wc), 0 2px 8px #000;
+  transition: opacity .5s .5s, transform .5s .5s;
+}
+.wo.carta .wo-rareza { opacity: 1; transform: none; }
+
+/* respaldo 2D: marcos de luz que vienen hacia la cámara, y un estadio en degradé */
+.wo-2d { position: absolute; inset: 0; perspective: 600px; overflow: hidden; background: radial-gradient(ellipse at 50% 50%, #1b1d26, #05060b 70%); }
+.wo-pasillo { position: absolute; inset: 0; transform-style: preserve-3d; }
+.wo-pasillo i {
+  position: absolute; left: 50%; top: 50%; width: 70vmin; height: 52vmin; margin: -26vmin 0 0 -35vmin;
+  border: 3px solid #fff5e0; border-bottom-color: color-mix(in srgb, var(--wc) 80%, #fff); border-radius: 4px;
+  box-shadow: 0 0 22px #fff3, inset 0 0 22px color-mix(in srgb, var(--wc) 30%, transparent);
+  animation: woMarco 1.1s linear infinite; opacity: 0;
+}
+.wo-pasillo i:nth-child(2) { animation-delay: -.12s; } .wo-pasillo i:nth-child(3) { animation-delay: -.24s; }
+.wo-pasillo i:nth-child(4) { animation-delay: -.37s; } .wo-pasillo i:nth-child(5) { animation-delay: -.49s; }
+.wo-pasillo i:nth-child(6) { animation-delay: -.61s; } .wo-pasillo i:nth-child(7) { animation-delay: -.73s; }
+.wo-pasillo i:nth-child(8) { animation-delay: -.86s; } .wo-pasillo i:nth-child(9) { animation-delay: -.98s; }
+@keyframes woMarco { 0% { transform: translateZ(-1400px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateZ(560px); opacity: 1; } }
+.wo-estadio {
+  position: absolute; inset: 0; opacity: 0; transition: opacity .6s;
+  background:
+    radial-gradient(circle at 12% 8%, #fff 0, #fff8 2%, transparent 12%),
+    radial-gradient(circle at 88% 8%, #fff 0, #fff8 2%, transparent 12%),
+    radial-gradient(ellipse at 50% 72%, color-mix(in srgb, var(--wc) 45%, transparent), transparent 45%),
+    linear-gradient(#0a0c16 0 46%, #12161f 46% 58%, #2f7a34 58% 100%);
+}
+.wo.afuera .wo-pasillo { display: none; }
+.wo.afuera .wo-estadio { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .wo-pasillo i { animation: none; opacity: .5; }
+  .wo-paso { transform: none; filter: none; }
+  .wo.carta .wo-carta { animation: none; opacity: 1; transform: none; }
+  .wo-carta::before { animation: none; }
+}
+
+/* El estadio de fondo de los sobres de fútbol (`Estadio` en app.js): la
+   escena 3D en #estadio, o un estadio en CSS si no hay WebGL; una viñeta
+   oscura encima para que las cartas se lean. */
+.bg-estadio, .bg-estadio-css { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.bg-estadio-css {
+  background:
+    radial-gradient(circle at 12% 6%, #fff 0, #fff8 2%, transparent 12%),
+    radial-gradient(circle at 88% 6%, #fff 0, #fff8 2%, transparent 12%),
+    radial-gradient(ellipse at 50% 70%, #5cc8ff33, transparent 45%),
+    linear-gradient(#0a0c16 0 40%, #1c2236 40% 56%, #2f7a34 56% 100%);
+}
+body.con-estadio.estadio-3d .bg-estadio { display: block; }
+body.con-estadio:not(.estadio-3d) .bg-estadio-css { display: block; }
+body.con-estadio .bg-spot, body.con-estadio .bg-stars { display: none; }
+body.con-estadio .bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 50% 45%, #05060b55, #05060bcc 100%); transition: background .8s; }
+body.con-estadio.dim .bg::after { background: radial-gradient(ellipse 70% 60% at 50% 45%, #05060b99, #05060bee 100%); }
