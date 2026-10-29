@@ -230,8 +230,8 @@ test('héroes: mejoras más caras y un nivel 5 de 60000 en un solo camino',()=>{
  assert.equal(g.canUpgrade(t,0),false,'las torres siguen llegando solo al 4');
 });
 
-test('retroceso con tope por torre: nadie vuelve para siempre, pero nadie se vuelve inmune',()=>{
- const g=new PD.Game(1,null,9);g.money=1e7;g.active=true;g.queue=[{t:1e9}];
+test('versión 4: retroceso con tope por torre: nadie vuelve para siempre, pero nadie se vuelve inmune',()=>{
+ const g=new PD.Game(1,null,9,4);g.money=1e7;g.active=true;g.queue=[{t:1e9}];
  const h=g.place('heroedunas',120,330);for(let q=0;q<4;q++)g.upgrade(h,1);   // Tormenta Eterna: todo el mapa, 360
  const e=g.spawn('robusto',0,900,1);e.hp=e.maxHp=1e9;
  let atras=0;for(let k=0;k<5;k++){const d0=e.dist;h.abilityCd=0;e.stunImm=0;g.useAbility(h);atras+=d0-e.dist;}
@@ -707,4 +707,23 @@ test('una partida empezada con la versión 4 se reanuda y se rehace con sus regl
  const p=H.prueba();assert.equal(p.ve,4);
  assert.equal(P.rehace(p,'uidV').ronda,H.game.round,'se rehace igual');
  assert.throws(()=>P.rehace({...p,ve:3},'uidV'),/otra versión/);
+});
+
+test('versión 5: el control se afloja de a poco y nunca se corta; los jefes no se frenan',()=>{
+ const g=new PD.Game(1,null,9,5);g.active=true;g.queue=[{t:1e9}];g.hurryT=100;
+ const a={id:-10},f=g.spawn('robusto',0,1500,1);
+ const pasos=[];for(let k=0;k<30;k++)pasos.push(g.retrocede(f,20,a));
+ assert.ok(pasos.every((p,i)=>p>0&&(i===0||p<=pasos[i-1]+1e-9)),'rinde cada vez menos, pero nunca cero');
+ assert.ok(pasos[29]>=20*PD.CC.kbPiso-1e-9,'no baja del piso');
+ assert.ok(pasos.reduce((x,y)=>x+y,0)>PD.KB.torre(f),'puede pasar del tope de antes, despacio');
+ // la ronda eterna: el control baja en rampa hasta el piso, sin saltos
+ g.rt=100;assert.equal(g.ccF(),1);g.rt=130;assert.ok(Math.abs(g.ccF()-0.5)<1e-9);g.rt=1000;assert.equal(g.ccF(),PD.CC.piso);
+ const v4=new PD.Game(1,null,9,4);v4.hurryT=100;v4.rt=101;assert.equal(v4.ccF(),0,'en la 4, de golpe');
+ // un enemigo congelado en plena rampa avanza en parte
+ g.rt=130;const c=g.spawn('robusto',0,300,1);g.applyFreeze(c,10);const d0=c.dist;g.updateEnemies(0.5);assert.ok(c.dist>d0,'congelado, igual avanza un poco');
+ // jefes: ni frenos, ni congelación, ni aturdimiento
+ const jefe=Object.keys(PD.ENEMIES).find(id=>PD.ENEMIES[id].boss&&!PD.ENEMIES[id].twins);
+ const J=g.spawn(jefe,0,200,1,2);g.applySlow(J,0.6,5);g.applyFreeze(J,5);g.applyStun(J,5);
+ assert.equal(J.slowF,0);assert.equal(J.frozenT,0);assert.equal(J.stunT,0);
+ const J4=v4.spawn(jefe,0,200,1,2);v4.applySlow(J4,0.6,5);assert.ok(J4.slowF>0,'en la 4 sí');
 });

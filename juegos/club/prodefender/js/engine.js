@@ -21,6 +21,15 @@
   const KB_TORRE = e => (e.d.boss ? 140 : e.d.big ? 180 : 260);
   const KB_SUAVE = e => (e.d.boss ? 280 : e.d.big ? 360 : 520);
   PD.KB = { torre: KB_TORRE, suave: KB_SUAVE };
+  // Control de multitudes desde la versión 5 (el dueño: «que no dejen de frenar o empujar de la
+  // nada»). Antes había dos cortes en seco: el tope de empuje de cada torre (KB_TORRE) y la
+  // «ronda eterna» (90 s después del último enemigo: frenos, congelaciones y empujes a cero).
+  // Ahora el empuje de una torre rinde menos cuanto más empujó a ese enemigo (de 1 a `kbPiso`,
+  // en curva) y, pasada la ronda, todo el control baja en `rampa` s hasta `piso` (no a cero):
+  // la ronda igual termina porque los enemigos siguen avanzando. `nuevo: false` vuelve a lo de
+  // antes (el bot lo usa para comparar).
+  const CC = { nuevo: true, piso: 0.25, rampa: 60, kbPiso: 0.15 };
+  PD.CC = CC;
   // Tras una congelación, el enemigo queda 1 s sin poder volver a congelarse (solo se frena),
   // igual que el aturdimiento: varias torres de hielo ya no lo dejan quieto para siempre.
   const FREEZE_IMM = 1;
@@ -759,7 +768,7 @@
     }
 
     applySlow(e, f, dur) {
-      if (e.d.slowImmune) return;
+      if (e.d.slowImmune || (e.d.boss && this.ve >= 5)) return;   // jefes (v5): no se frenan
       if (e.d.boss) f *= 0.5;
       if (f > e.slowF || e.slowT <= 0) { e.slowF = Math.max(f, e.slowT > 0 ? e.slowF : 0); e.slowT = Math.max(e.slowT, dur); }
       else if (f === e.slowF) e.slowT = Math.max(e.slowT, dur);
@@ -788,6 +797,7 @@
     }
     applyStun(e, dur) {
       if (e.stunImm > 0) return;   // inmunidad breve tras un aturdimiento (evita bloqueos eternos)
+      if (e.d.boss && this.ve >= 5) return;   // jefes (v5): no se frenan
       if (e.d.boss) dur *= 0.25;
       e.stunT = Math.max(e.stunT, dur);
       e.stunImm = e.stunT + 0.8;
@@ -1170,16 +1180,24 @@
         // movimiento
         let sp = 0;
         const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1) * (d.boss && this.ve >= 5 ? JEFE.vel : 1);
-        if (hurry) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
-        else if (e.frozenT <= 0 && e.stunT <= 0) {
-          sp = vel * (1 - e.slowF) * e.haste;
-          if (e.auraSlow && !d.slowImmune) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
-          if (e.burrowed) sp *= d.burrow ? d.burrow.speed : d.hop.speed;
-          if (e.sapoT > 0) sp *= 0.5;
-          if (e.piedraT > 0 || e.burbujaT > 0) sp = 0;
-          if (e.enraged) sp *= d.enrage.mult;
-          if (e.holdT > 0) sp *= d.boss ? 0.4 : 0.05;
-          if (sp > 0 && this.blocked(e, dt)) sp = 0;
+        const cc5 = this.ve >= 5 && CC.nuevo, jefe5 = d.boss && this.ve >= 5;
+        if (hurry && !cc5) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
+        else {
+          if (e.frozenT <= 0 && e.stunT <= 0) {
+            sp = vel * (1 - e.slowF) * e.haste;
+            if (e.auraSlow && !d.slowImmune && !jefe5) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
+            if (e.burrowed) sp *= d.burrow ? d.burrow.speed : d.hop.speed;
+            if (e.sapoT > 0) sp *= 0.5;
+            if (e.piedraT > 0 || e.burbujaT > 0) sp = 0;
+            if (e.enraged) sp *= d.enrage.mult;
+            if (e.holdT > 0 && !jefe5) sp *= d.boss ? 0.4 : 0.05;
+            if (sp > 0 && this.blocked(e, dt)) sp = 0;
+          }
+          // v5: pasada la ronda, el control se suelta de a poco (ccF) en vez de cortarse
+          if (cc5) {
+            const f = this.ccF();
+            if (f < 1) { sp = vel * (e.enraged ? d.enrage.mult : 1) * (1 - f) + sp * f; if (f <= 0.5 && e.engaged) this.release(e); }
+          }
         }
         e.dist += sp * dt;
         const path = this.paths[e.path];
@@ -1831,13 +1849,26 @@
     }
     // empuje hacia atrás de la torre `src` (igual que la gravedad: frena, nunca bloquea para siempre)
     push(e, amt, src) { this.retrocede(e, e.d.boss ? amt * 0.25 : amt, src); }
+    // cuánto rinde el control (frenos y empujes): 1 durante la ronda; pasada la «ronda eterna»
+    // (hurryT), en la versión 5 baja en CC.rampa s hasta CC.piso; en la 4, a cero de golpe
+    ccF() {
+      const x = this.rt - (this.hurryT || 1e9);
+      if (x <= 0) return 1;
+      if (this.ve < 5 || !CC.nuevo) return 0;
+      return Math.max(CC.piso, 1 - x / CC.rampa);
+    }
     // todo retroceso pasa por aquí: rinde menos con lo que ya empujaron otras (KB_SUAVE), gasta del
     // tope de esa torre para ese enemigo (KB_TORRE × topeX) y devuelve cuánto retrocedió
     retrocede(e, want, src, topeX) {
       if (!(want > 0)) return 0;
       const id = src ? src.id : -1, usado = (e.kb && e.kb[id]) || 0;
       const suave = KB_SUAVE(e), otras = Math.max(0, e.pulled - usado);
-      const back = Math.min(want * suave / (suave + otras), KB_TORRE(e) * (topeX || 1) - usado, e.dist);
+      let back;
+      if (this.ve >= 5 && CC.nuevo) {
+        // v5: sin tope en seco; cada torre rinde menos cuanto más empujó a este enemigo, en curva
+        const K = KB_TORRE(e) * (topeX || 1), f = CC.kbPiso + (1 - CC.kbPiso) * Math.exp(-usado / K);
+        back = Math.min(want * suave / (suave + otras) * f * this.ccF(), e.dist);
+      } else back = Math.min(want * suave / (suave + otras), KB_TORRE(e) * (topeX || 1) - usado, e.dist);
       if (!(back > 0)) return 0;
       e.dist -= back; e.pulled += back;
       (e.kb || (e.kb = {}))[id] = usado + back;
@@ -2504,7 +2535,7 @@
           this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(120,230,90,' });
           break;
         case 'tormenta':
-          if (hurry) break;
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
           for (const e of this.enemies) {
             if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > s.stormR) continue;
             const back = this.retrocede(e, s.stormPush * (e.d.boss ? 0.25 : 1), t, 1.5);
@@ -2532,12 +2563,12 @@
           break;
         }
         case 'grieta':
-          if (hurry) break;
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
           for (const e of this.enemies) {
             // una sola vez por enemigo (y sus hijos tampoco): antes cada Grieta los volvía a
             // devolver y con la recarga corta una ronda podía no terminar nunca
             if (e.dead || e.rifted) continue;
-            const back = e.dist * (e.d.boss ? s.riftBoss : s.riftBack);
+            const back = e.dist * (e.d.boss ? s.riftBoss : s.riftBack) * (this.ve >= 5 && CC.nuevo ? this.ccF() : 1);
             if (back <= 1) continue;
             e.rifted = true;
             this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: '#c07bff', r: e.d.r * 1.5 });
@@ -2573,7 +2604,7 @@
           break;
         }
         case 'maremoto':
-          if (hurry) break;
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
           for (const e of this.enemies) {
             if (e.dead) continue;
             const back = this.retrocede(e, s.wavePush * (e.d.boss ? 0.25 : 1), t, 1.5);
