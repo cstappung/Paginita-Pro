@@ -2,6 +2,9 @@
    ajustes y el récord de cada combinación quedan en este navegador
    (`localStorage`), que es lo único que hace falta para practicar.
    El reloj arranca con la primera letra, como en Monkeytype.
+   Dentro de Juegos (juegos/club/typerace/, con `Club`) las palabras al azar
+   en inglés con un largo fijo clasifican: la carrera viaja con su registro
+   y el verificador (colabtex/src/juegos/solo/verifica/typerace.js) la rehace.
    @controles: tactil teclado */
 (function () {
   "use strict";
@@ -10,8 +13,15 @@
   const lee = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
   const guarda = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
+  /* `Club` solo existe en la página de Juegos (conexion.js): la práctica suelta no clasifica. */
+  const Club = window.Club || null;
+  const CUENTA = Club ? Club.storageKey("").replace(/^\.cuenta\./, "") : "local";
+  const invitado = /[?&]invitado=1/.test(location.search);
+
   let aj = M.ajustes(lee("tr.ajustes", {}));
   let semilla = 0, s = null, muestras = [], reloj = 0, tabPulsado = 0, terminado = false;
+  // la tabla de esta combinación (o null), el registro de la carrera para rehacerla y sus relojes
+  let rank = null, tabla = "", reg = [], ult = 0, t1 = 0, w1 = 0;
 
   /* ---------- sonido ---------- */
   let son = null;
@@ -24,7 +34,14 @@
 
   const vista = V.crear($("caja"), {
     M,
-    ahora: () => performance.now(),
+    ahora: () => Math.round(performance.now()),   // enteros: el verificador rehace la carrera con los mismos ms
+    registra: (tipo, valor, t, confiable) => {
+      if (!rank) return;
+      if (!reg.length) { t1 = performance.now(); w1 = Date.now(); }
+      const e = [tipo, valor, reg.length ? Math.max(0, t - ult) : 0];
+      if (!confiable) e.push("x");
+      reg.push(e); ult = t;
+    },
     puede: () => !terminado,
     alarga: st => { if (st.pal.length - st.i < 60) { st.pal = M.palabras(aj, semilla, st.pal.length + 100); } },
     alTecla: ev => {
@@ -46,6 +63,13 @@
     }
     document.querySelector('[data-k="acentos"]').hidden = aj.idioma !== "es";
     document.querySelector('[data-k="tiempo"]').hidden = aj.largo !== 0;
+    eligeTabla();
+  }
+  /* La clasificación de esta combinación: se muestra solo cuando existe. */
+  function eligeTabla() {
+    rank = M.categoria(aj);
+    document.documentElement.classList.toggle("tr-sin-tabla", !rank);
+    if (Club && rank && rank !== tabla) { tabla = rank; Club.category(rank); }
   }
   document.querySelector(".tr-ajustes").addEventListener("click", e => {
     const b = e.target.closest("button[data-v]");
@@ -64,8 +88,11 @@
     clearInterval(reloj); reloj = 0;
     terminado = false;
     if (!mismo) semilla = (Math.random() * 4294967296) >>> 0;
-    s = M.crear(M.palabras(aj, semilla, M.inicial(aj)), aj.largo === 0);
+    eligeTabla();
+    reg = []; ult = 0;
+    s = M.crear(rank ? M.textoClasif(semilla, CUENTA, aj.largo) : M.palabras(aj, semilla, M.inicial(aj)), aj.largo === 0);
     muestras = [];
+    $("rClasif").hidden = true;
     vista.pon(s);
     vista.quieta(false);
     $("res").hidden = true;
@@ -113,11 +140,27 @@
     $("rT").textContent = (c.ms / 1000).toFixed(1) + " s";
     $("rRec").textContent = Math.max(prev, nuevo ? c.ppm : 0) || "—";
     $("rNuevo").hidden = !(nuevo && prev);
+    clasifica(c);
     grafico();
     document.querySelector(".tr-pista-solo").hidden = true;
     $("res").hidden = false;
     $("otra2").focus();
   }
+  /* La carrera a la clasificación (solo las que tienen tabla, dentro de Juegos y con cuenta). */
+  function dice(texto) { const p = $("rClasif"); p.textContent = texto; p.hidden = !texto; }
+  function clasifica(c) {
+    if (!rank) return dice("Esta combinación se practica, pero no clasifica: las tablas son de palabras en inglés con 10, 25, 50, 100 o 200 palabras.");
+    if (!Club) return dice("Esta combinación clasifica: ábrela desde Juegos, con tu cuenta, para entrar a la tabla.");
+    if (invitado) return dice("Modo invitado: inicia sesión en Juegos para que esta carrera entre en la clasificación.");
+    if (c.prec < 75) return dice("Con menos de 75 % de precisión no entra en la clasificación.");
+    const res = M.rehace(semilla, CUENTA, aj.largo, reg);
+    if (res.error || !res.c || res.c.ppm < 1 || res.c.ms < 1) return dice("Esta carrera no se pudo registrar para la clasificación.");
+    Club.result({ categoria: rank, puntos: res.c.ppm, tiempo: res.c.ms },
+      { v: 1, u: CUENTA, s: semilla, e: reg, a: Math.max(1, Math.round(performance.now() - t1)), w: Math.max(1, Date.now() - w1) });
+    dice("Enviada a la clasificación (" + res.c.ppm + " ppm).");
+  }
+  addEventListener("club-rechazo", e => { if (e.detail && e.detail.categoria === rank) dice("Esta carrera no entró en la clasificación: " + (e.detail.motivo || "")); });
+
   /* Las ppm de cada segundo, con los errores de ese segundo como puntos
      rojos abajo. */
   function grafico() {

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<script src="../../../i18n.js?v=202610292258"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+<link rel="stylesheet" href="../conexion.css?v=club-2">
+<script src="../../audio/volumen.js?v=vol-1"></script>
+<script src="../conexion.js?v=club-20"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Type Race</title>
+<script>
+  /* El tema de Juegos (jg.tema) o el del sistema, antes de pintar.
+     @controles: tactil teclado */
+  try {
+    var t = localStorage.getItem("jg.tema");
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "oscuro" : "claro";
+    document.documentElement.dataset.tema = t;
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../../typerace/estilo.css?v=typerace-2">
+</head>
+<body>
+  <div class="tr-hoja shell">
+    <header class="tr-cab">
+      <a class="tr-marca" href="../../../juegos.html" title="Volver a Juegos"><span class="tr-logo">⌨</span>type<b>race</b></a>
+      <span class="tr-cab-der">
+        <span data-volumen></span>
+        <button id="tema" class="tr-ico" type="button" title="Tema claro u oscuro">☾</button>
+      </span>
+    </header>
+
+    <nav class="tr-ajustes" aria-label="Ajustes">
+      <div class="tr-grupo" data-k="idioma">
+        <button data-v="es">español</button><button data-v="en">english</button>
+      </div>
+      <div class="tr-grupo" data-k="acentos">
+        <button data-v="1">con tildes</button><button data-v="0">sin tildes</button>
+      </div>
+      <div class="tr-grupo" data-k="texto">
+        <button data-v="palabras">palabras</button><button data-v="frases">frases</button><button data-v="cuentos">cuentos</button>
+      </div>
+      <div class="tr-grupo" data-k="largo">
+        <button data-v="10">10</button><button data-v="25">25</button><button data-v="50">50</button><button data-v="100">100</button><button data-v="200">200</button><button data-v="0" title="Libre: hasta que se acabe el tiempo">∞</button>
+      </div>
+      <div class="tr-grupo" data-k="tiempo">
+        <button data-v="15">15 s</button><button data-v="30">30 s</button><button data-v="60">60 s</button><button data-v="120">2 min</button><button data-v="180">3 min</button>
+      </div>
+    </nav>
+
+    <main class="tr-pista-solo">
+      <div class="tr-vivo" aria-live="off">
+        <span id="cuenta" class="tr-cuenta">0/50</span>
+        <span><b id="ppmVivo">0</b> ppm</span>
+        <span><b id="precVivo">100</b>%</span>
+      </div>
+      <div id="caja"></div>
+      <div class="tr-acciones">
+        <button id="otra" class="tr-btn" type="button" title="Otra (Tab + Intro)">↻ Otra</button>
+        <span class="tr-pista-txt"><kbd>tab</kbd> + <kbd>intro</kbd> para empezar otra</span>
+      </div>
+    </main>
+
+    <section id="res" class="tr-res" hidden>
+      <div class="tr-res-gran">
+        <p><small>ppm</small><b id="rPpm">0</b></p>
+        <p><small>precisión</small><b id="rPrec">0%</b></p>
+      </div>
+      <svg id="grafico" class="tr-graf" viewBox="0 0 600 140" preserveAspectRatio="none" aria-label="Palabras por minuto a lo largo de la carrera"></svg>
+      <div class="tr-res-datos">
+        <p><small>brutas</small><b id="rBrutas">0</b></p>
+        <p><small>palabras</small><b id="rPal">0</b></p>
+        <p><small>errores</small><b id="rErr">0</b></p>
+        <p><small>tiempo</small><b id="rT">0 s</b></p>
+        <p><small>récord aquí</small><b id="rRec">—</b></p>
+      </div>
+      <p id="rNuevo" class="tr-nuevo" hidden>¡Récord nuevo con estos ajustes!</p>
+      <p id="rClasif" class="tr-aviso" hidden></p>
+      <div class="tr-acciones">
+        <button id="otra2" class="tr-btn" type="button">↻ Otra</button>
+        <button id="repite" class="tr-btn" type="button">⟲ El mismo texto</button>
+      </div>
+    </section>
+
+    <footer class="tr-pie">Clasifican las palabras en inglés con 10, 25, 50, 100 o 200 palabras (la tabla de abajo es la de la combinación elegida). Para correr contra amigos, abre una sala de <b>Type Race</b> en Juegos.</footer>
+  </div>
+  <script src="../../typerace/motor.js?v=typerace-2"></script>
+  <script src="../../typerace/vista.js?v=typerace-2"></script>
+  <script src="../../typerace/juego.js?v=typerace-2"></script>
+</body>
+</html>

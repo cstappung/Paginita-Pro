@@ -309,9 +309,64 @@
     return n + Math.min(s.esc.length, objetivo(s).length);
   }
 
+  /* Lo que diga el campo, al motor. Un espacio en el medio (pegar, teclear
+     muy rápido en el celular) se reparte: lo de antes cierra la palabra y
+     lo de después empieza la siguiente. Es lo que hace la caja de tecleo
+     (vista.js) y lo que repite el verificador de la clasificación. */
+  function entrada(s, texto, ahora) {
+    const trozos = String(texto).split(" ");
+    let ev = null;
+    for (let k = 0; k < trozos.length; k++) {
+      if (k > 0) { const e = espacio(s, ahora); if (e) ev = e; if (s.fin) break; }
+      const e = escribe(s, trozos[k], ahora);
+      if (e) ev = e === "fin" || ev === "fin" ? "fin" : e === "mal" || ev === "mal" ? "mal" : e;
+      if (s.fin) break;
+    }
+    return ev;
+  }
+
+  /* ---------- la clasificación (Solo Club) ----------
+     Solo cuenta lo estándar de Monkeytype: palabras al azar en inglés y
+     con un largo fijo. Hay una tabla por largo, `club-typerace-en-<largo>`,
+     y ganan las ppm (palabras por minuto) con el menor tiempo de desempate.
+     El resto de las combinaciones se practican, pero no clasifican. */
+  const CLASIF_LARGOS = [10, 25, 50, 100, 200];
+  const categoria = aj => {
+    aj = ajustes(aj);
+    return aj.idioma === "en" && aj.texto === "palabras" && CLASIF_LARGOS.includes(aj.largo) ? "club-typerace-en-" + aj.largo : null;
+  };
+  /* El texto de una carrera que clasifica sale de la semilla y de la cuenta
+     juntas (FNV-1a), así que una prueba copiada de otra persona reparte
+     otras palabras y no se puede rehacer. */
+  function semillaDe(semilla, uid) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < 4; i++) h = Math.imul(h ^ (((Number(semilla) >>> 0) >>> (8 * i)) & 255), 16777619) >>> 0;
+    for (const c of String(uid)) h = Math.imul(h ^ (c.charCodeAt(0) & 255) ^ (c.charCodeAt(0) >>> 8), 16777619) >>> 0;
+    return h >>> 0;
+  }
+  const textoClasif = (semilla, uid, largo) =>
+    palabras({ idioma: "en", texto: "palabras", largo, final: "todos" }, semillaDe(semilla, uid), largo);
+  /* Rehace la carrera desde su registro: cada entrada es [0, lo que decía el
+     campo, ms desde la anterior] o [1, "", ms] (borrar con el campo vacío
+     para volver a una palabra mal escrita). Devuelve {s, c} (el estado y
+     las cuentas, c = null si no llegó a la meta) o {error}. */
+  function rehace(semilla, uid, largo, ev) {
+    if (!CLASIF_LARGOS.includes(largo)) return { error: "Ese largo no tiene clasificación." };
+    const s = crear(textoClasif(semilla, uid, largo), false);
+    let t = 1000;
+    for (const e of ev) {
+      if (s.fin) return { error: "Sobran pulsaciones: la carrera ya había terminado." };
+      t += e[2];
+      if (e[0] === 0) entrada(s, e[1], t);
+      else if (s.esc !== "" || retrocede(s) == null) return { error: "Hay un «borrar» que no corresponde." };
+    }
+    return { s, c: s.fin ? cuentas(s, s.tFin) : null };
+  }
+
   return {
     PALABRAS, FRASES, CUENTOS, LARGOS, TIEMPOS, TEXTOS, FINALES, IDIOMAS,
     ajustes, palabras, inicial, sinAcentos, mulberry32,
-    crear, escribe, espacio, retrocede, cuentas, objetivo
+    crear, escribe, espacio, retrocede, cuentas, objetivo,
+    entrada, CLASIF_LARGOS, categoria, semillaDe, textoClasif, rehace
   };
 });

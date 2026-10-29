@@ -163,10 +163,10 @@ export const SOLOS = [
     url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
     lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
     modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] },
-  { id: "bots-typerace", tipo: "bots", juego: "typerace", nombre: "Type Race · práctica", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
-    url: "juegos/typerace/index.html?v=typerace-1", reglas: "typerace",
-    lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés.",
-    modos: ["Palabras", "Frases", "Cuentos", "Libre con reloj"] }
+  { id: "typeraceclub", tipo: "club", nombre: "Type Race", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
+    ruta: "#solo/typerace", reglas: "typerace", popular: "club-typerace", ranking: true,
+    lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés. Las palabras en inglés clasifican.",
+    modos: ["Palabras en inglés: 10 a 200", "Frases", "Cuentos", "Libre con reloj"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -233,7 +233,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 export const COLOR_SOLO = {
   desafios: "#3ccf6e",
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", typeraceclub: "#e2b714", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC
