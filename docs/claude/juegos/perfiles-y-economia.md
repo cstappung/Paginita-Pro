@@ -300,7 +300,7 @@ logros, the balance is derived from the same four reads the profile uses
   Electrodle and Integrodle streaks 10 per day, and Integrodle's total
   points one coin per 10 (Electrodle's, one per 50: it scores ~6× more a day). PRO DEFENDER pays 20 × the kingdom number for every
   round up to each kingdom's record (`monedasProdefender`: 2000…10 000 at
-  round 100; kingdoms 6–15 pay 100 a round like Vacío) and has no per-game pay (not in `PAGO_CLUB`).
+  round 100; kingdoms 6–20 pay 100 a round like Vacío) and has no per-game pay (not in `PAGO_CLUB`).
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
   every club game that ends with a result pays `PAGO_CLUB[juego]` (15 to 25
   by how long a game lasts), up to `TOPE_CLUB_DIA` (15) per game per Chile

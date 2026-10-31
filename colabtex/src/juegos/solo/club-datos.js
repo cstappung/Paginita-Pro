@@ -53,9 +53,9 @@ export function categoriaClub(juego, categoria) {
     // PRO PACMAN: una sola tabla, el puntaje de la partida.
     : juego === 'propac'
     ? categoria === 'club-propac-puntos'
-    // PRO DEFENDER: la ronda récord de cada uno de los quince reinos.
+    // PRO DEFENDER: la ronda récord de cada uno de los veinte reinos.
     : juego === 'prodefender'
-    ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/.test(categoria)
+    ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche|jade|circo|biblioteca|estelar|tiempo)$/.test(categoria)
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|city|citypuro)$/.test(categoria)
     : juego === 'tetris'

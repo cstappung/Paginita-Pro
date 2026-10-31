@@ -559,6 +559,110 @@
       ]
     },
 
+    // ======================= CUARTA ERA (reinos 16–20) =======================
+    // Una defensa nueva por reino, como en la segunda era (levels.js: `torres`).
+    // ------------------------- Reino 16 · Templo de Jade -------------------------
+    jade: {
+      name: 'Pagoda de Jade', cost: 700, kind: 'jade', size: 17, color: '#3ac88a', targeting: true, realm: 15,
+      desc: 'Lanza dardos que MARCAN al enemigo 4 s. Si un marcado muere, ESTALLA en esquirlas de jade: daña a los de su alrededor con una parte de su vida máxima.',
+      base: { range: 140, cd: 0.9, dmg: 4, pierce: 1, projSpeed: 560, count: 1, spread: 0.16, dtype: 'phys', jadePct: 0.25, jadeR: 60, jadeDur: 4 },
+      paths: [
+        { name: 'Sello', ups: [
+          { name: 'Marca Profunda', cost: 300, desc: 'El estallido hace el 35% de la vida del marcado.', apply: s => { s.jadePct = 0.35; } },
+          { name: 'Esquirlas', cost: 800, desc: 'Estallido más grande (+25 de radio).', apply: s => { s.jadeR += 25; } },
+          { name: 'Cadena de Jade', cost: 2300, desc: 'Los alcanzados por un estallido quedan MARCADOS: estallan en cadena.', apply: s => { s.jadeChain = true; s.jadePct = 0.4; } },
+          { name: 'Furia del Dragón', cost: 8400, desc: 'Estallidos del 65% que además aturden 0.5 s.', apply: s => { s.jadePct = 0.65; s.jadeR += 15; s.jadeStun = 0.5; } }
+        ] },
+        { name: 'Dardos', ups: [
+          { name: 'Dardos Afilados', cost: 240, desc: '+3 daño y +1 perforación.', apply: s => { s.dmg += 3; s.pierce += 1; } },
+          { name: 'Tres Dardos', cost: 620, desc: '3 dardos en abanico.', apply: s => { s.count = 3; } },
+          { name: 'Ojo de Tigre', cost: 1700, desc: 'Ve CAMUFLADOS, ignora el blindaje y +6 daño.', apply: s => { s.camo = true; s.armorPierce = 1; s.dmg += 6; } },
+          { name: 'Lluvia de Jade', cost: 7600, desc: '6 dardos cada 0.45 s, +24 daño.', apply: s => { s.count = 6; s.cd = 0.45; s.dmg += 24; } }
+        ] }
+      ]
+    },
+    // ----------------------- Reino 17 · Circo de las Sombras -----------------------
+    ruleta: {
+      name: 'Ruleta del Payaso', cost: 620, kind: 'luck', size: 17, color: '#ff4a6a', targeting: true, realm: 16,
+      desc: 'Lanza naipes y cada golpe tira la RULETA: CRÍTICO x3, aturdir, una moneda de oro o el GRAN PREMIO (x10). La suerte sale de la partida.',
+      base: { range: 135, cd: 0.8, dmg: 5, pierce: 2, projSpeed: 600, count: 1, spread: 0.2, dtype: 'phys',
+        suerteCrit: 0.2, critX: 3, suerteStun: 0.12, suerteOro: 0.06, oroN: 3, suerteJack: 0.02, jackX: 10 },
+      paths: [
+        { name: 'Fortuna', ups: [
+          { name: 'Dados Cargados', cost: 280, desc: 'Crítico del 30%.', apply: s => { s.suerteCrit = 0.3; } },
+          { name: 'Trébol', cost: 700, desc: 'Más monedas: 12% de sacar oro, y más oro.', apply: s => { s.suerteOro = 0.12; s.oroN = 6; } },
+          { name: 'Gran Premio', cost: 2100, desc: 'GRAN PREMIO del 6%, x15.', apply: s => { s.suerteJack = 0.06; s.jackX = 15; } },
+          { name: 'La Casa Gana', cost: 8000, desc: 'Críticos del 45% de x5 y Gran Premio del 10%.', apply: s => { s.suerteCrit = 0.45; s.critX = 5; s.suerteJack = 0.1; } }
+        ] },
+        { name: 'Espectáculo', ups: [
+          { name: 'Baraja Rápida', cost: 220, desc: '+1 perforación y lanza un 20% más rápido.', apply: s => { s.pierce += 1; s.cd *= 0.8; } },
+          { name: 'Abanico', cost: 600, desc: '3 naipes por tirada.', apply: s => { s.count = 3; } },
+          { name: 'Naipes de Acero', cost: 1700, desc: '+12 daño, ignora la mitad del blindaje y ve CAMUFLADOS.', apply: s => { s.dmg += 12; s.armorPierce = 0.5; s.camo = true; } },
+          { name: 'Lluvia de Naipes', cost: 7400, desc: '7 naipes cada 0.4 s, +30 daño.', apply: s => { s.count = 7; s.cd = 0.4; s.dmg += 30; s.spread = 0.14; } }
+        ] }
+      ]
+    },
+    // ----------------------- Reino 18 · Biblioteca Infinita -----------------------
+    grimorio: {
+      name: 'Grimorio Viviente', cost: 680, kind: 'tome', size: 17, color: '#9a6aff', targeting: true, realm: 17,
+      desc: 'Lanza misiles ARCANOS que persiguen a su blanco. APRENDE de cada enemigo que mata: +1% de daño por cada uno (hasta +100%), y no lo olvida en toda la partida.',
+      base: { range: 150, cd: 1, dmg: 6, pierce: 1, projSpeed: 380, count: 1, spread: 0.3, dtype: 'arcane', saberX: 0.01, saberTope: 100 },
+      paths: [
+        { name: 'Saber', ups: [
+          { name: 'Lectura Veloz', cost: 300, desc: 'Aprende más rápido: +1.5% por enemigo.', apply: s => { s.saberX = 0.015; } },
+          { name: 'Biblioteca Mayor', cost: 820, desc: 'Aprende hasta 200 enemigos.', apply: s => { s.saberTope = 200; } },
+          { name: 'Erudición', cost: 2300, desc: 'Hasta 300 enemigos y ve CAMUFLADOS.', apply: s => { s.saberTope = 300; s.camo = true; } },
+          { name: 'Omnisciencia', cost: 8600, desc: '+2% por enemigo y los misiles estallan en área.', apply: s => { s.saberX = 0.02; s.splash = 40; } }
+        ] },
+        { name: 'Conjuros', ups: [
+          { name: 'Doble Misil', cost: 260, desc: '2 misiles por conjuro.', apply: s => { s.count = 2; } },
+          { name: 'Tinta Arcana', cost: 640, desc: '+8 daño.', apply: s => { s.dmg += 8; } },
+          { name: 'Enjambre de Runas', cost: 1800, desc: '4 misiles que perforan 1 más.', apply: s => { s.count = 4; s.pierce += 1; } },
+          { name: 'Lluvia de Runas', cost: 7600, desc: '7 misiles cada 0.5 s, +30 daño y x2 contra jefes.', apply: s => { s.count = 7; s.cd = 0.5; s.dmg += 30; s.bossMult = 2; } }
+        ] }
+      ]
+    },
+    // ------------------------- Reino 19 · Cinturón Estelar -------------------------
+    satelite: {
+      name: 'Satélite Orbital', cost: 760, kind: 'orbital', size: 17, color: '#8affff', targeting: true, defaultTarget: 'strong', realm: 18,
+      desc: 'Desde el espacio dispara un LÁSER que barre el suelo: alcance a todo el mapa, el haz se mueve hacia su blanco y quema a todo lo que pisa. No ve camuflados.',
+      base: { range: 9999, dps: 24, radius: 26, beamSpeed: 150, beams: 1, dtype: 'elec' },
+      paths: [
+        { name: 'Potencia', ups: [
+          { name: 'Lente Focal', cost: 320, desc: '+50% de daño.', apply: s => { s.dps *= 1.5; } },
+          { name: 'Haz Ancho', cost: 850, desc: 'Haz mucho más ancho (+14 de radio).', apply: s => { s.radius += 14; } },
+          { name: 'Plasma Solar', cost: 2500, desc: 'El haz pasa a ser FUEGO y hace el doble.', apply: s => { s.dtype = 'fire'; s.dps *= 2; } },
+          { name: 'Rayo de la Muerte', cost: 9000, desc: 'x3 de daño y x2 contra jefes.', apply: s => { s.dps *= 3; s.bossMult = 2; } }
+        ] },
+        { name: 'Órbita', ups: [
+          { name: 'Seguimiento', cost: 260, desc: 'El haz se mueve mucho más rápido.', apply: s => { s.beamSpeed = 260; } },
+          { name: 'Sensor Térmico', cost: 700, desc: 'Ve CAMUFLADOS.', apply: s => { s.camo = true; } },
+          { name: 'Doble Satélite', cost: 2000, desc: '2 haces a la vez.', apply: s => { s.beams = 2; } },
+          { name: 'Constelación', cost: 8200, desc: '4 haces a la vez y +30 daño/s.', apply: s => { s.beams = 4; s.dps += 30; } }
+        ] }
+      ]
+    },
+    // ---------------------- Reino 20 · El Corazón del Tiempo ----------------------
+    crono: {
+      name: 'Cronotorre', cost: 720, kind: 'crono', size: 17, color: '#ffcf4d', realm: 19,
+      desc: 'DETIENE EL TIEMPO en su alcance 1.5 s cada 8 s: los enemigos (no los jefes) quedan quietos, y el daño que reciben mientras tanto se les COBRA otra vez, a la mitad, al terminar.',
+      base: { range: 120, cd: 8, stopDur: 1.5, stopX: 0.5, dtype: 'arcane' },
+      paths: [
+        { name: 'Pausa', ups: [
+          { name: 'Segundo Extra', cost: 300, desc: 'La pausa dura 2 s.', apply: s => { s.stopDur = 2; } },
+          { name: 'Reloj Rápido', cost: 800, desc: 'Detiene el tiempo cada 6 s.', apply: s => { s.cd = 6; } },
+          { name: 'Gran Pausa', cost: 2200, desc: '+30 de alcance.', apply: s => { s.range += 30; } },
+          { name: 'Mundo Detenido', cost: 8400, desc: 'Pausas de 3 s cada 5 s.', apply: s => { s.stopDur = 3; s.cd = 5; } }
+        ] },
+        { name: 'Cobro', ups: [
+          { name: 'Interés', cost: 260, desc: 'Cobra el 80% del daño.', apply: s => { s.stopX = 0.8; } },
+          { name: 'Arena Afilada', cost: 700, desc: 'Cobra el 110% del daño.', apply: s => { s.stopX = 1.1; } },
+          { name: 'Factura del Tiempo', cost: 2000, desc: 'También les COBRA a los jefes (sin detenerlos).', apply: s => { s.stopBoss = true; } },
+          { name: 'Fin de los Tiempos', cost: 7800, desc: 'Cobra el 200% del daño.', apply: s => { s.stopX = 2; } }
+        ] }
+      ]
+    },
+
     // ============================ HÉROES (uno por reino) ============================
     // Solo en su reino y UNO por partida (engine.js: canPlace). Muy caros, pero con un
     // aura propia y una habilidad automática única desde el principio. A diferencia de
@@ -795,6 +899,124 @@
           { name: 'Corona Solar', cost: 60000, desc: 'NIVEL 5 (solo un camino). 7 haces de +700 daño, x3 contra jefes.', apply: s => { s.bolts = 7; s.dmg += 700; s.bossMult = 3; } }
         ] }
       ]
+    },
+
+    // ---------------- héroes de la cuarta era ----------------
+    // `era4`: se eligen entre ellos cinco en los reinos 16–20 (levels.js: heroes 'cuarta'), y
+    // no entran en la elección de la tercera era, que sigue con sus diez.
+    heroejade: {
+      name: 'Kaito, Monje del Dragón de Jade', cost: 5200, kind: 'hero', hero: true, era4: true, size: 19, color: '#3ac88a', targeting: true, realm: 15,
+      desc: 'HÉROE. Lanza estrellas de jade que perforan y MARCAN: el marcado que muere estalla. DISCIPLINA: las torres cercanas tienen un 10% más de alcance y velocidad. HABILIDAD: Vuelo del Dragón, que recorre el mapa dañando y marcando a todos.',
+      base: { atk: 'proj', range: 165, cd: 0.5, dmg: 10, pierce: 3, projSpeed: 640, count: 3, spread: 0.22, dtype: 'phys', camo: true, jadePct: 0.2, jadeR: 60, jadeDur: 4,
+        aura: 160, buffRange: 0.1, buffRate: 0.1, ability: 'dragonJade', dragonDmg: 500 },
+      paths: [
+        { name: 'Dragón', ups: [
+          { name: 'Escamas de Jade', cost: 3200, desc: 'El Dragón hace 1500.', apply: s => { s.dragonDmg = 1500; } },
+          { name: 'Vuelo Veloz', cost: 7600, desc: 'Dragón cada 22 s; aturde 0.8 s.', apply: s => { s.abCd = 22; s.dragonStun = 0.8; } },
+          { name: 'Fuego de Jade', cost: 17000, desc: 'Dragón de 5000 y x2 contra jefes.', apply: s => { s.dragonDmg = 5000; s.dragonBoss = 2; } },
+          { name: 'Emperador del Cielo', cost: 42000, desc: 'Dragón de 14000.', apply: s => { s.dragonDmg = 14000; } },
+          { name: 'Dragón Celestial', cost: 60000, desc: 'NIVEL 5 (solo un camino). Dragón de 40000, x3 contra jefes.', apply: s => { s.dragonDmg = 40000; s.dragonBoss = 3; } }
+        ] },
+        { name: 'Palma', ups: [
+          { name: 'Palma de Hierro', cost: 2600, desc: '+8 daño y +2 perforación.', apply: s => { s.dmg += 8; s.pierce += 2; } },
+          { name: 'Cinco Estrellas', cost: 6800, desc: '5 estrellas y un 20% más rápido.', apply: s => { s.count = 5; s.cd *= 0.8; } },
+          { name: 'Sello Mayor', cost: 16000, desc: 'Las marcas estallan con el 40% (+20 de radio); ignora el blindaje.', apply: s => { s.jadePct = 0.4; s.jadeR = 80; s.armorPierce = 1; } },
+          { name: 'Mil Palmas', cost: 40000, desc: '7 estrellas de +90 daño cada 0.3 s, x2 contra jefes.', apply: s => { s.count = 7; s.dmg += 90; s.cd = 0.3; s.bossMult = 2; } },
+          { name: 'Puño del Dragón', cost: 60000, desc: 'NIVEL 5 (solo un camino). +300 daño y x3 contra jefes.', apply: s => { s.dmg += 300; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroecirco: {
+      name: 'Madame Lúgubre, Maestra de Ceremonias', cost: 5400, kind: 'hero', hero: true, era4: true, size: 19, color: '#ff4a6a', targeting: true, realm: 16,
+      desc: 'HÉROE. Naipes ARCANOS que rebotan entre enemigos; ve CAMUFLADOS. Bajo su foco los enemigos reciben un 12% más de daño. HABILIDAD: El Gran Escape, que cambia de sitio a los enemigos más adelantados con los más rezagados.',
+      base: { atk: 'bolt', range: 170, cd: 0.6, dmg: 14, bounces: 3, dtype: 'arcane', camo: true,
+        ampAura: 0.12, ability: 'granEscape', escapeN: 4, escapeDmg: 400 },
+      paths: [
+        { name: 'Magia', ups: [
+          { name: 'Doble Fondo', cost: 3200, desc: 'Cambia de sitio a 6 parejas.', apply: s => { s.escapeN = 6; } },
+          { name: 'Abracadabra', cost: 7600, desc: 'Gran Escape cada 22 s; los cambiados quedan aturdidos 1 s.', apply: s => { s.abCd = 22; s.escapeStun = 1; } },
+          { name: 'Serrar en Dos', cost: 17000, desc: '10 parejas y 3000 de daño.', apply: s => { s.escapeN = 10; s.escapeDmg = 3000; } },
+          { name: 'Gran Ilusión', cost: 42000, desc: '10000 de daño a los cambiados.', apply: s => { s.escapeDmg = 10000; } },
+          { name: 'El Acto Imposible', cost: 60000, desc: 'NIVEL 5 (solo un camino). 16 parejas y 30000 de daño.', apply: s => { s.escapeN = 16; s.escapeDmg = 30000; } }
+        ] },
+        { name: 'Naipes', ups: [
+          { name: 'As de Picas', cost: 2600, desc: '+12 daño y +1 rebote.', apply: s => { s.dmg += 12; s.bounces += 1; } },
+          { name: 'Foco Principal', cost: 6800, desc: 'Un 25% más rápida; bajo su foco reciben un 20% más.', apply: s => { s.cd *= 0.75; s.ampAura = 0.2; } },
+          { name: 'Escalera Real', cost: 16000, desc: '+45 daño, ignora el blindaje y 6 rebotes.', apply: s => { s.dmg += 45; s.armorPierce = 1; s.bounces = 6; } },
+          { name: 'Póker de Ases', cost: 40000, desc: '+160 daño cada 0.3 s, x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.3; s.bossMult = 2; } },
+          { name: 'Comodín', cost: 60000, desc: 'NIVEL 5 (solo un camino). +480 daño, 10 rebotes, x3 contra jefes.', apply: s => { s.dmg += 480; s.bounces = 10; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroebiblio: {
+      name: 'Lumen, el Archivista', cost: 5600, kind: 'hero', hero: true, era4: true, size: 19, color: '#9a6aff', targeting: true, realm: 17,
+      desc: 'HÉROE. Páginas ARCANAS que atraviesan en línea; ve CAMUFLADOS. SILENCIO: los enemigos de su alcance no pueden usar sus poderes. HABILIDAD: Todo Está Escrito, durante unos segundos todas tus torres ignoran blindajes y resistencias y ven camuflados.',
+      base: { atk: 'lance', range: 180, cd: 1.2, dmg: 24, width: 10, bolts: 1, dtype: 'arcane', camo: true,
+        silencio: true, ability: 'escrito', escritoDur: 6, escritoAmp: 0 },
+      paths: [
+        { name: 'Archivo', ups: [
+          { name: 'Índice', cost: 3200, desc: 'Todo Está Escrito dura 8 s.', apply: s => { s.escritoDur = 8; } },
+          { name: 'Catálogo', cost: 7600, desc: 'Se lanza cada 24 s y +20 de alcance.', apply: s => { s.abCd = 24; s.range += 20; } },
+          { name: 'Profecía', cost: 17000, desc: 'Mientras dura, los enemigos reciben un 25% más de daño.', apply: s => { s.escritoAmp = 0.25; } },
+          { name: 'Enciclopedia', cost: 42000, desc: 'Dura 12 s.', apply: s => { s.escritoDur = 12; } },
+          { name: 'Libro de los Destinos', cost: 60000, desc: 'NIVEL 5 (solo un camino). Mientras dura, +60% de daño recibido.', apply: s => { s.escritoAmp = 0.6; } }
+        ] },
+        { name: 'Páginas', ups: [
+          { name: 'Papel Afilado', cost: 2600, desc: '+18 daño.', apply: s => { s.dmg += 18; } },
+          { name: 'Tres Páginas', cost: 6800, desc: '3 páginas y un 20% más rápido.', apply: s => { s.bolts = 3; s.cd *= 0.8; } },
+          { name: 'Pergamino Rúnico', cost: 16000, desc: '+60 daño y páginas más anchas.', apply: s => { s.dmg += 60; s.width = 16; } },
+          { name: 'Tormenta de Hojas', cost: 40000, desc: '5 páginas de +220 cada 0.8 s, x2 contra jefes.', apply: s => { s.bolts = 5; s.dmg += 220; s.cd = 0.8; s.bossMult = 2; } },
+          { name: 'Códice Infinito', cost: 60000, desc: 'NIVEL 5 (solo un camino). 7 páginas de +650, x3 contra jefes.', apply: s => { s.bolts = 7; s.dmg += 650; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroeestelar: {
+      name: 'Vega, Capitana Estelar', cost: 5800, kind: 'hero', hero: true, era4: true, size: 19, color: '#8affff', targeting: true, realm: 18,
+      desc: 'HÉROE. Granadas de plasma que estallan en área (también voladores). DISRUPTOR: los enemigos de su alcance pierden el escudo y no lo recargan. HABILIDAD: Bombardeo Orbital, daño a todo el mapa, más cuanto más adelantado va el enemigo.',
+      base: { atk: 'orb', range: 175, cd: 1.1, dmg: 16, radius: 48, dtype: 'explosive',
+        disruptor: 0.35, ability: 'orbital', orbDmg: 500 },
+      paths: [
+        { name: 'Flota', ups: [
+          { name: 'Cañones Pesados', cost: 3200, desc: 'Bombardeo de 1500.', apply: s => { s.orbDmg = 1500; } },
+          { name: 'Hiperespacio', cost: 7600, desc: 'Bombardeo cada 20 s.', apply: s => { s.abCd = 20; } },
+          { name: 'Acorazado', cost: 17000, desc: 'Bombardeo de 5000 y x2 contra jefes.', apply: s => { s.orbDmg = 5000; s.orbBoss = 2; } },
+          { name: 'Estrella de la Muerte', cost: 42000, desc: 'Bombardeo de 15000.', apply: s => { s.orbDmg = 15000; } },
+          { name: 'Armada Galáctica', cost: 60000, desc: 'NIVEL 5 (solo un camino). Bombardeo de 42000, x3 contra jefes.', apply: s => { s.orbDmg = 42000; s.orbBoss = 3; } }
+        ] },
+        { name: 'Plasma', ups: [
+          { name: 'Granada Térmica', cost: 2600, desc: '+12 daño, +10 radio y ve CAMUFLADOS.', apply: s => { s.dmg += 12; s.radius += 10; s.camo = true; } },
+          { name: 'Ráfaga Doble', cost: 6800, desc: '2 granadas y un 20% más rápida; disruptor más fuerte.', apply: s => { s.shells = 2; s.cd *= 0.8; s.disruptor = 0.7; } },
+          { name: 'Plasma Perforante', cost: 16000, desc: '+45 daño que ignora el blindaje.', apply: s => { s.dmg += 45; s.armorPierce = 1; } },
+          { name: 'Supernova', cost: 40000, desc: '3 granadas de +150 cada 0.6 s, x2 contra jefes.', apply: s => { s.shells = 3; s.dmg += 150; s.cd = 0.6; s.bossMult = 2; } },
+          { name: 'Big Crunch', cost: 60000, desc: 'NIVEL 5 (solo un camino). 4 granadas de +420, x3 contra jefes.', apply: s => { s.shells = 4; s.dmg += 420; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroetiempo: {
+      name: 'Cronos, Guardián del Tiempo', cost: 6000, kind: 'hero', hero: true, era4: true, size: 19, color: '#ffcf4d', targeting: true, defaultTarget: 'strong', realm: 19,
+      desc: 'HÉROE. Rayos ARCANOS que rebotan; ve CAMUFLADOS. Los enemigos de su alcance ENVEJECEN: reciben cada vez más daño (hasta +20%). HABILIDAD: Detener el Tiempo, todos quedan quietos y luego se les cobra el daño recibido.',
+      base: { atk: 'bolt', range: 175, cd: 0.6, dmg: 14, bounces: 2, dtype: 'arcane', camo: true,
+        edadAura: 0.05, edadTope: 0.2, ability: 'detener', detDur: 3, detX: 0.5 },
+      paths: [
+        { name: 'Reloj', ups: [
+          { name: 'Minutero', cost: 3200, desc: 'El tiempo se detiene 4 s.', apply: s => { s.detDur = 4; } },
+          { name: 'Segundero', cost: 7600, desc: 'Detener el Tiempo cada 26 s.', apply: s => { s.abCd = 26; } },
+          { name: 'Deuda Temporal', cost: 17000, desc: 'Al volver el tiempo cobra el 100% del daño.', apply: s => { s.detX = 1; } },
+          { name: 'Eternidad', cost: 42000, desc: '5 s detenidos, cada 22 s.', apply: s => { s.detDur = 5; s.abCd = 22; } },
+          { name: 'Fin de la Historia', cost: 60000, desc: 'NIVEL 5 (solo un camino). Cobra el 250% del daño.', apply: s => { s.detX = 2.5; } }
+        ] },
+        { name: 'Arena', ups: [
+          { name: 'Arena Fina', cost: 2600, desc: '+14 daño y +1 rebote.', apply: s => { s.dmg += 14; s.bounces += 1; } },
+          { name: 'Vejez', cost: 6800, desc: 'Un 25% más rápido; envejecen hasta +35%.', apply: s => { s.cd *= 0.75; s.edadTope = 0.35; s.edadAura = 0.08; } },
+          { name: 'Siglos', cost: 16000, desc: '+50 daño, ignora el blindaje y 5 rebotes.', apply: s => { s.dmg += 50; s.armorPierce = 1; s.bounces = 5; } },
+          { name: 'Milenios', cost: 40000, desc: '+180 daño cada 0.3 s, x2 contra jefes.', apply: s => { s.dmg += 180; s.cd = 0.3; s.bossMult = 2; } },
+          { name: 'Big Bang Inverso', cost: 60000, desc: 'NIVEL 5 (solo un camino). +520 daño, 9 rebotes, x3 contra jefes.', apply: s => { s.dmg += 520; s.bounces = 9; s.bossMult = 3; } }
+        ] }
+      ]
     }
   };
 
@@ -817,7 +1039,13 @@
     tempestad: { name: 'Tempestad', cd: 28, color: '#bfe0ff', desc: 'Rayos arcanos que saltan por los enemigos más fuertes y los aturden.' },
     maremoto:  { name: 'Maremoto', cd: 30, color: '#4fc8e8', desc: 'Una ola que arrastra hacia atrás a todos los enemigos y los moja.' },
     sobrecarga:{ name: 'Sobrecarga', cd: 30, color: '#ffb84d', desc: 'Las torres alrededor de Ada atacan el doble de rápido unos segundos.' },
-    amanecer:  { name: 'Amanecer', cd: 32, color: '#ffe6a0', desc: 'Daño arcano a todo el mapa, rompe escudos y revela camuflados.' }
+    amanecer:  { name: 'Amanecer', cd: 32, color: '#ffe6a0', desc: 'Daño arcano a todo el mapa, rompe escudos y revela camuflados.' },
+    // cuarta era
+    dragonJade: { name: 'Vuelo del Dragón', cd: 30, color: '#3ac88a', desc: 'Un dragón de jade recorre el mapa: daña y MARCA a todos los enemigos.' },
+    granEscape: { name: 'El Gran Escape', cd: 30, color: '#ff4a6a', desc: 'Cambia de sitio a los enemigos más adelantados con los más rezagados.' },
+    escrito:    { name: 'Todo Está Escrito', cd: 32, color: '#9a6aff', desc: 'Unos segundos en que todas las torres ignoran blindajes y resistencias y ven camuflados.' },
+    orbital:    { name: 'Bombardeo Orbital', cd: 28, color: '#8affff', desc: 'Daño a todo el mapa, más cuanto más adelantado va cada enemigo.' },
+    detener:    { name: 'Detener el Tiempo', cd: 34, color: '#ffcf4d', desc: 'Todos quedan quietos unos segundos; al volver, se les cobra parte del daño recibido.' }
   };
 
   PD.TOWER_ORDER = ['espinas', 'escarcha', 'vigia', 'voltaico', 'sembrador', 'mortero', 'dragon', 'prisma', 'colmena', 'totem', 'ancla', 'huerto',
@@ -826,19 +1054,24 @@
     'heroeprado', 'heroedunas', 'heroeglaciar', 'heroecaldera', 'heroevacio',
     // segunda era (reinos 6–10), también al final por lo mismo
     'bruja', 'pararrayos', 'burbujas', 'desintegrador', 'campanario',
-    'heroepantano', 'heroecumbres', 'heroefosa', 'heroeengranaje', 'heroeeclipse'];
+    'heroepantano', 'heroecumbres', 'heroefosa', 'heroeengranaje', 'heroeeclipse',
+    // cuarta era (reinos 16–20)
+    'jade', 'ruleta', 'grimorio', 'satelite', 'crono',
+    'heroejade', 'heroecirco', 'heroebiblio', 'heroeestelar', 'heroetiempo'];
   // Defensas disponibles en un reino: las 12 clásicas + las 2 nuevas de cada reino ya alcanzado
   // + el héroe de ESE reino (los héroes no pasan a los reinos siguientes).
   // Los reinos de la segunda era (levels.js: `torres`) venden solo su lista, cada vez más corta.
-  // En la tercera era (`heroes: 'todos'`) se elige UNO de los diez héroes (canPlace: uno por partida).
+  // En la tercera era (`heroes: 'todos'`) se elige UNO de los diez héroes (canPlace: uno por partida);
+  // en la cuarta (`heroes: 'cuarta'`), uno de sus cinco héroes nuevos (`era4`).
   PD.towersFor = li => {
     const L = PD.LEVELS && PD.LEVELS[li];
-    const heroe = id => (L && L.heroes === 'todos') || T[id].realm === li;
+    const heroe = id => L && L.heroes === 'todos' ? !T[id].era4 : L && L.heroes === 'cuarta' ? !!T[id].era4 : T[id].realm === li;
     if (L && L.torres) return PD.TOWER_ORDER.filter(id => T[id].hero ? heroe(id) : L.torres.indexOf(id) >= 0);
     return PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : (T[id].realm || 0) <= li);
   };
-  PD.heroOf = li => PD.TOWER_ORDER.find(id => T[id].hero && T[id].realm === li) || null;
-  // los héroes que se pueden poner en un reino (uno solo, o los diez para elegir)
+  // el héroe propio del reino (null en los reinos donde se elige)
+  PD.heroOf = li => (PD.LEVELS && PD.LEVELS[li] && PD.LEVELS[li].heroes) ? null : PD.TOWER_ORDER.find(id => T[id].hero && T[id].realm === li) || null;
+  // los héroes que se pueden poner en un reino (uno solo, o los diez o los cinco para elegir)
   PD.heroesOf = li => PD.towersFor(li).filter(id => T[id].hero);
   for (const id in T) T[id].id = id;
   PD.TOWERS = T;

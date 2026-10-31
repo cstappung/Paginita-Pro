@@ -124,6 +124,7 @@ const MODALIDADES = {
   prado: "Prado Esmeralda", dunas: "Dunas de Ámbar", glaciar: "Glaciar Cristal", caldera: "Caldera Volcánica", vacio: "Nexo del Vacío",
   pantano: "Pantano Sombrío", cumbres: "Cumbres Tormentosas", fosa: "Fosa Abisal", engranajes: "Ciudadela de Engranajes", eclipse: "Trono del Eclipse",
   necropolis: "Necrópolis Olvidada", esporas: "Jardín de Esporas", espejos: "Laberinto de Espejos", archipielago: "Archipiélago Celeste", noche: "La Noche Eterna",
+  jade: "Templo de Jade", circo: "Circo de las Sombras", biblioteca: "Biblioteca Infinita", estelar: "Cinturón Estelar", tiempo: "El Corazón del Tiempo",
   racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
   torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales",
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade

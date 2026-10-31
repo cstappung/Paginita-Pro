@@ -1,11 +1,11 @@
 # Antitrampas de PRO DEFENDER
 
-Quince tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)`.
+Veinte tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche|jade|circo|biblioteca|estelar|tiempo)`.
 Cada reino pide la ronda 50 del anterior: la interfaz lo bloquea y el verificador lo
 comprueba con tu fila de la tabla anterior (`ctx.filaEn`, que pasa `solo/club.js`; las
 auditorías no la tienen y no lo miran). Ese rechazo («Reino sin desbloquear…») no castiga.
-Los reinos 6–10 (la «segunda era») y 11–15 (la «tercera») se abren a todos uno por día
-(`abre` en `levels.js`, día de Chile, del 22 al 31 de octubre de 2026). Antes de su día solo los
+Los reinos 6–10 (la «segunda era»), 11–15 (la «tercera») y 16–20 (la «cuarta») se abren a todos uno por día
+(`abre` en `levels.js`, día de Chile, del 22 de octubre al 5 de noviembre de 2026). Antes de su día solo los
 juegan los administradores y `main.js` no manda su resultado; esa puerta es de la
 interfaz y del reloj del navegador, no de seguridad: quien adelante su reloj juega
 antes, pero igual tiene que jugar las rondas, y la prueba se verifica igual que las
@@ -13,7 +13,7 @@ demás (el verificador y las reglas no miran la fecha).
 `puntos` = la ronda más alta superada en una partida (1–100); `tiempo` = los ms
 de juego que llevaba esa partida al superarla (pasos del motor × 1000 / 60). Las
 monedas salen de la fila (`monedasProdefender` en `colabtex/src/juegos/monedas.js`:
-20 × el número del reino por ronda, 100 en los reinos 6–15), así que la fila es lo que hay que proteger.
+20 × el número del reino por ronda, 100 en los reinos 6–20), así que la fila es lo que hay que proteger.
 
 ## La prueba
 
