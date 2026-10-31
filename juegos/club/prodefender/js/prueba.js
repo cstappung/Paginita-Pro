@@ -37,7 +37,7 @@
   const QUIETO_MAX = 180;
   const MODOS = ['first', 'last', 'strong', 'close'];
   const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse',
-    'necropolis', 'esporas', 'espejos', 'archipielago', 'noche'];
+    'necropolis', 'esporas', 'espejos', 'archipielago', 'noche', 'jade', 'circo', 'biblioteca', 'estelar', 'tiempo'];
   const MAX_JUGADAS = 8000, MAX_PASOS = 30000000;
   // Sube con cada cambio del motor, los datos o esta regla de pasos: una prueba
   // grabada con otro motor no se rehace igual (y eso es caché, no trampa).

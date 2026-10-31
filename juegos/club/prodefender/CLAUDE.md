@@ -1,9 +1,9 @@
 # PRO DEFENDER — notes for Claude
 
 Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds (plus
-5 more that opened one per day, Oct 22–26 2026: «Second era», and 5 harder ones,
-Oct 27–31: «Third era» below), 27 towers, 10 heroes and 70+
-enemies, written by the owner as plain scripts (no build) and integrated here. Shared club rules (proof, castigo, modo celular) are in
+5 more that opened one per day, Oct 22–26 2026: «Second era», 5 harder ones,
+Oct 27–31: «Third era», and 5 more, Nov 1–5: «Fourth era», below), 32 towers,
+15 heroes and 90+ enemies, written by the owner as plain scripts (no build) and integrated here. Shared club rules (proof, castigo, modo celular) are in
 `juegos/club/CLAUDE.md`; logros/coins/ranking wiring in
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat details in
 `docs/antitrampas/prodefender.md`.
@@ -233,6 +233,84 @@ there was only them). What they add:
 - Bot: `--reino tercera` picks pacts from `PACTOS_PREF` (`--pacto rechaza`),
   casts the power on the strongest enemy and calls `--heroe` (Nyx by default).
 
+## Fourth era: kingdoms 16–20, «La Era de los Titanes» (owner's request, Oct 31 2026)
+
+Templo de Jade, Circo de las Sombras, Biblioteca Infinita, Cinturón Estelar and El
+Corazón del Tiempo (`levels.js`, `era: 4`, `abre` Nov 1–5; tables `jade`, `circo`,
+`biblioteca`, `estelar`, `tiempo` = `L.slug`, wired like the third era: `REINOS` in
+prueba.js and the verifier, `club-datos.js`, both rules regexes — **re-publish the rules**
+—, `monedas.js`, `ranks.js`, `discord.js`). The owner asked for: 5 new heroes to choose
+from in these 5 kingdoms, one new defense per map, new enemies, new events for rounds
+60–100 with more strong enemies, harder and harder, and 5 bosses with new abilities.
+
+- **Same machinery as the third era**: `this.era3 = L.era >= 3` (pacts, events, power,
+  hurry rules), plus `this.era4` for what is new. No law (`ley`): what makes each kingdom
+  different is its enemies and boss. Only v5 numbers (no `v5` key): there are no v4 runs.
+- **Determinism of kingdoms 1–15**: every new rule runs under `era4` or a new field; the
+  only shared code that changed reads fields old games never set (`e.elite`,
+  `e.paradoT`, `e.callado`, `t.saber`, `escritoT`). Checked: the same scripted 60-round
+  game in all fifteen kingdoms hashes identically on the old and new engine, so `VERSION`
+  stays 5 and only the cache tag moved (`pd-12`). `t.saber` goes in the snapshot as `sb`
+  only when non-zero, so old snapshots are byte-identical.
+- **Heroes** (`towers.js`, `era4: true`, `heroes: 'cuarta'` in the level): Kaito (jade
+  marks, buff range/rate, *Vuelo del Dragón*), Madame Lúgubre (`ampAura`, *El Gran
+  Escape* swaps the most advanced non-bosses with the least advanced, each once:
+  `e.escapado`), Lumen (`silencio`: non-bosses in range can't use powers → `mudo`;
+  *Todo Está Escrito*: `escritoT`, resistances ≥1, armour ignored, camo seen, `escritoAmp`),
+  Vega (`disruptor` drains shields; *Bombardeo Orbital* hits harder the further along),
+  Cronos (`edadAura` ages enemies: `e.edad` adds damage taken; *Detener el Tiempo*).
+  `PD.heroOf(li)` is null wherever `L.heroes` is set; `towersFor` gives the third era its
+  ten (no `era4`) and the fourth its five.
+- **Towers**: `jade` (kind `jade`: projectiles mark, `marcaJade`; a marked enemy that dies
+  queues a burst in `jadeQ`, resolved iteratively in `estallidos` — a recursive chain blew
+  the stack —, capped at `JADE_TOPE` × the round's HP scale), `ruleta` (`luck`: every hit
+  rolls `ruleta()` with `this.rnd()`: crit, stun, gold, jackpot; flat `suerte*` fields,
+  never an object in `base`, because `baseStats` copies `base` shallowly), `grimorio`
+  (`tome`: homing arcane missiles; `t.saber` counts its kills, +`saberX` damage each up to
+  `saberTope`), `satelite` (`orbital`: global beams that move at `beamSpeed` towards their
+  target and burn what they cross; pacts' rate scales its `dps`), `crono` (`crono`: stops
+  non-bosses in range; `detiene`/`cobra`: damage taken while stopped is dealt again ×`stopX`
+  when time resumes; `PARADO_IMM` 1 s after). The Cronotorre is a control tower for the bot.
+- **Enemies** (comment at the top of the fourth-era block in enemies.js; per-enemy logic in
+  `cuartaEra`, auras in `aurasCuarta`, speed in `velCuarta`, hooks in `damage`, `kill`
+  (`alCaerCuarta`) and `updateProjectiles`): esquiva and the Emperor's sky form (dodge
+  projectiles, `this.rnd()`), falange, malabares (catch projectiles), sorpresa (random
+  children), contrahechizo, clona (clones pay ¼ gold), abduce, fragmenta (explosive splits
+  once), cuerda (accelerates), pesado (adds cooldown to the tower that hit it), sinTiempo.
+  Top of the ladder from round 90: `colosoTitan` (supertank rank 4) and `nodriza` (blimp
+  rank 4).
+- **Bosses**: Long (formas: ground = +14 armour, slow; sky = fast, dodges; perla heals 20 %
+  once), Carcajada (`barajar` swaps two towers' positions — clears `spots` and recalcs —,
+  `gran` at 30 %: invulnerable + 6 clowns), El Códice (`roba`: the 2 towers near it with
+  most `dealt` attack at half speed, `t.robadoT`, and it heals; `capitulos`: every quarter
+  of its life gives every enemy a shield), Vórtex (`pozo`: zones ahead on its path that
+  double speed, `this.pozos`; `desvia`: projectiles passing near it may be deflected once,
+  `p.desv`), Aion (`rebobina`: every 12 s back to its HP of 6 s ago, `e.hist`; `paradoja`:
+  towers near it at half speed, `t.paradojaT`). Timers that could stall a round are off in
+  hurry mode.
+- **Late events** (`PD.EVENTOS` with `tarde: true`, `L.eventosTarde`): rounds ≤58 keep the
+  old cadence (8, 13, … 58); from 60 the late ones fall on rounds ending in 2, 5, 8 (not
+  boss rounds) with their own rng (`seed + 6047`): `titanes` (buildRounds adds a group of the
+  heaviest big type that fits 40 % more budget, `g.titan`), `elite` (1 in 4: ×2 HP, +5 armour,
+  unslowable, ×2 gold), `runas` (shield 40 %), `furia` (<50 % HP: ×1.5 speed), `vital`
+  (regen 1.5 %/s, not bosses, stopped by poison), `portales` (every 5 s three jump 100 ahead),
+  `terremoto` (every 9 s three towers off 2 s; rods protect). `L.grandes` (1.5) weighs big
+  types more from round 60.
+- **Powers**: `alientoJade`, `canonHumano`, `olvido` (`e.calladoT`), `agujero` (zone with
+  `retiene`), `pausa` (`detiene` with ×1).
+- **Numbers**: `diff` 5.6 / 5.8 / 6.0 / 6.2 / 6.5, `pactoPrecio` 0.12–0.14 and `vidaTarde`
+  from round 30 to **100** (not 80): x14 / 15 / 16 / 17 / 18, so from round 80 they are
+  above Noche (x9) and keep climbing. `prodefender-bot --reino cuarta --ayuda 100` (mixta)
+  cannot measure the end: after round 60 it loses whole rounds in Noche and in these five
+  alike (avance 100 %, the same lives lost with x16 or x30), so doubling `vidaTarde` changed
+  nothing. Where it does measure (rounds 11–40) it loses 1.5–3× Noche's lives. Re-tune with
+  `--estrategia humana --libro` once there are human wins (as the third era was).
+- Art: 21 new `ART` shapes (supertank/blimp got a rank 4), towers and heroes in
+  `TART`/`HERO_ART`, maps `jade`, `circo`, `biblio`, `estelar`, `tiempo` with their own rules
+  (`CUARTA` in render.js: `sueloCuarta`, `CAPAS_CUARTA`, `caminoCuarta`, `bordeCuarta`,
+  `itemCuarta`, `obstaculoCuarta`, `escenaCuarta`, `escenaOverCuarta`), state overlays in
+  `drawEstadoCuarta`, late-event overlays in `eventoEncima`.
+
 ## Knockback and crowd control
 
 Every push back along the path goes through `Game.retrocede(e, px, src)`:
@@ -395,7 +473,7 @@ a 10-round batch was tried and reverted), but:
   (`PLENO` in `solo/club.js` → `html.jg-club-pleno` in `juegos.html`), like PRO
   HERO; the game's own «← Volver a Juegos» / «← Juegos» buttons click the
   hidden `.club-volver` link that `conexion.js` adds.
-- Fifteen tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
+- Twenty tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
   of game time. `main.js` reads the tables of the open kingdoms once on open (`recorreTablas`,
   via `Club.category` + `club-tabla`) to adopt cloud records and unlock
   kingdoms (round 50 opens the next one), and sends `Club.result` for each
@@ -405,7 +483,7 @@ a 10-round batch was tried and reverted), but:
   panel) and the coins won so far.
 - **Coins** (owner's spec): each new round of a kingdom's record pays 20 × the
   kingdom number, once: 2000/4000/6000/8000/10000 for reaching round 100 of
-  kingdom 1–5, 10000 each for kingdoms 6–15 (100 a round), and beating 60 with 70 pays only the ten new rounds
+  kingdom 1–5, 10000 each for kingdoms 6–20 (100 a round), and beating 60 with 70 pays only the ten new rounds
   (`monedasProdefender` in `monedas.js`, from the row like every club record).
   **No per-game pay**: `prodefender` is not in `PAGO_CLUB`/`JUEGOS_CLUB`, and
   `alResultadoClub` in `juegos-main.js` skips `marcaJugadaClub` for it and

@@ -89,7 +89,13 @@
     floracion: { name: 'Floración Carnívora', icon: '🌺', color: '#ff7ad8', r: 95, desc: 'Brota un jardín carnívoro 8 s: envenena y frena a todo lo que pase, también a los voladores.' },
     destello:  { name: 'Destello Prismático', icon: '🔆', color: '#9ff0ff', r: 140, desc: 'Un estallido de luz: destruye ilusiones y copias, y deja a los demás revelados y más vulnerables.' },
     rayo:      { name: 'Ira del Cielo', icon: '🌩', color: '#fff27a', r: 150, desc: 'Seis rayos sobre los enemigos más fuertes del área: mucho daño y los aturden.' },
-    hoguera:   { name: 'Hoguera de Calabazas', icon: '🎃', color: '#ff7a1a', r: 100, desc: 'Un anillo de fuego 6 s que quema a todos y hace retroceder a los que entran.' }
+    hoguera:   { name: 'Hoguera de Calabazas', icon: '🎃', color: '#ff7a1a', r: 100, desc: 'Un anillo de fuego 6 s que quema a todos y hace retroceder a los que entran.' },
+    // cuarta era
+    alientoJade: { name: 'Aliento de Jade', icon: '🐉', color: '#3ac88a', r: 120, desc: 'El dragón de jade sopla sobre el área: daña y MARCA a todos (los marcados que mueren estallan en esquirlas).' },
+    canonHumano: { name: 'Bala Humana', icon: '💥', color: '#ff4a6a', r: 75, desc: '¡El hombre bala cae del cielo! Muchísimo daño explosivo en un área pequeña, x3 a los jefes, y aturde a los demás.' },
+    olvido:      { name: 'Hechizo del Olvido', icon: '📖', color: '#9a6aff', r: 130, desc: 'Los enemigos del área OLVIDAN sus poderes 8 s, pierden el escudo y reciben daño arcano.' },
+    agujero:     { name: 'Agujero Negro', icon: '🕳', color: '#8affff', r: 95, desc: 'Un agujero negro 5 s: retiene a los que no son jefes (también voladores) y los tritura.' },
+    pausa:       { name: 'Pausa Temporal', icon: '⏳', color: '#ffcf4d', r: 130, desc: 'El tiempo se detiene 4 s en el área (los jefes siguen) y al volver se les cobra todo el daño recibido.' }
   };
   // lo que remata los huesos de un Esqueleto (y lo único que les hace algo mientras yacen)
   const REMATA = { fire: 1, explosive: 1, arcane: 1 };
@@ -113,6 +119,10 @@
   // Contagio: cada cuánto salta, hasta dónde y cuánto dura lo que contagia.
   const CONTAGIO = { cada: 1.5, r: 90, dur: 3 };
   PD.LEY = { luz: LUZ, luzR: LUZ_R, contagioR: CONTAGIO.r };   // para dibujarlas
+  // Cuarta era (reinos con `era: 4`): las detenciones del tiempo (Cronotorre, Cronos, Pausa)
+  // dejan un segundo de inmunidad, como las congelaciones; un marcado de jade que estalla no
+  // hace más de JADE_TOPE veces la vida «de la ronda» (si no, un Leviatán marcado vaciaba el mapa).
+  const PARADO_IMM = 1, JADE_TOPE = 120;
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
@@ -210,12 +220,15 @@
       this.grid = new Grid();
       this.bosses = [];
       // tercera era: pactos (y sus modificadores), el Poder del Reino, el evento de la ronda
-      this.era3 = this.L.era === 3;
+      this.era3 = this.L.era >= 3;   // la cuarta era también tiene pactos, eventos y Poder del Reino
+      this.era4 = this.L.era === 4;
       this.ley = this.era3 ? this.L.ley || null : null; this.contagioT = 0;
       this.pactos = []; this.mods = { ...MODS0 }; this.energia = 0;
       if (this.L.vidaX || this.L.oroX) this.aplicaMods();
       this.evento = null; this.caidos = []; this.alzar = []; this.zonas = []; this.provoca = null;
       this.vendavalT = 0; this.apagonT = 0;
+      // cuarta era: Todo Está Escrito (Lumen), los pozos de Vórtex, el temblor del Terremoto
+      this.escritoT = 0; this.escritoAmp = 0; this.pozos = [];
       if (snap) this.load(snap);
     }
 
@@ -235,7 +248,7 @@
       const s = {
         li: this.li, round: this.round, money: this.money, lives: this.lives, continues: this.continues,
         stats: { ...this.stats },
-        towers: this.towers.map(t => ({ type: t.type, x: t.x, y: t.y, tiers: t.tiers.slice(), mode: t.mode, dealt: t.dealt, spent: t.spent })),
+        towers: this.towers.map(t => { const o = { type: t.type, x: t.x, y: t.y, tiers: t.tiers.slice(), mode: t.mode, dealt: t.dealt, spent: t.spent }; if (t.saber) o.sb = t.saber; return o; }),
         spikes: this.spikes.map(p => ({ x: p.x, y: p.y, n: p.n, dmg: p.dmg }))
       };
       if (this.era3) { s.pactos = this.pactos.map(p => ({ r: p.r, id: p.id })); s.energia = this.energia; }
@@ -249,6 +262,7 @@
       for (const st of s.towers) {
         const t = this.makeTower(st.type, st.x, st.y);
         t.tiers = st.tiers.slice(); t.mode = st.mode || t.mode; t.dealt = st.dealt || 0; t.spent = st.spent;
+        if (st.sb) t.saber = st.sb;   // lo que aprendió el Grimorio Viviente
         this.towers.push(t);
       }
       for (const p of s.spikes || []) this.spikes.push({ x: p.x, y: p.y, n: p.n, dmg: p.dmg, hit: [] });
@@ -491,7 +505,7 @@
           if (s.cd) s.cd /= M.rate;
           if (s.droneCd) s.droneCd /= M.rate;
           if (s.shardCd) s.shardCd /= M.rate;
-          if (k === 'beam' || k === 'disint') s.dps *= M.rate;
+          if (k === 'beam' || k === 'disint' || k === 'orbital') s.dps *= M.rate;
         }
         if (M.range !== 1 && s.range < 5000) s.range *= M.range;
         if (M.camo) s.camo = true;
@@ -584,10 +598,35 @@
         this.fx.push({ k: 'flashscreen', t: 0, T: 0.35, color: 'rgba(255,250,200,' });
       } else if (id === 'hoguera') {
         this.zonas.push({ x, y, r: P.r, t: 6, T: 6, dps: 30 * k, dtype: 'fire', fireFloor: 0.5, empuja: 70, look: 'hoguera', hit: [] });
+      } else if (id === 'alientoJade') {
+        for (const e of lista) {
+          this.marcaJade(e, { jadePct: 0.4, jadeR: 75, jadeDur: 6 }, null);
+          this.damage(e, 60 * k, 'phys', null, { ap: 1, bossMult: 2 });
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.5, r0: 4, r1: e.d.r + 12, color: P.color, w: 3 });
+        }
+      } else if (id === 'canonHumano') {
+        for (const e of lista) {
+          this.damage(e, 220 * k, 'explosive', null, { ap: 1, bossMult: 3 });
+          if (!e.dead && !e.d.boss) this.applyStun(e, 1.2);
+        }
+        this.fx.push({ k: 'boom', x, y, t: 0, T: 0.5, r: P.r, color: '#ff8a4a' });
+        this.fx.push({ k: 'flashscreen', t: 0, T: 0.3, color: 'rgba(255,200,160,' });
+      } else if (id === 'olvido') {
+        for (const e of lista) {
+          e.calladoT = Math.max(e.calladoT || 0, 8);
+          e.shield = 0; e.shieldT = 0;
+          this.damage(e, 70 * k, 'arcane', null, { bossMult: 2 });
+          this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: P.color, r: e.d.r * 1.3 });
+        }
+      } else if (id === 'agujero') {
+        this.zonas.push({ x, y, r: P.r, t: 5, T: 5, dps: 26 * k, dtype: 'arcane', air: true, retiene: true, look: 'agujero', hit: [] });
+      } else if (id === 'pausa') {
+        for (const e of lista) this.detiene(e, 4, 1, null, true);
+        this.fx.push({ k: 'flashscreen', t: 0, T: 0.5, color: 'rgba(255,230,160,' });
       }
       this.fx.push({ k: 'ring', x, y, t: 0, T: 0.8, r0: 10, r1: P.r, color: P.color, w: 8 });
       this.emit({ type: 'poder', id, x, y });
-      this.snd(id === 'rayo' ? 'zapBig' : id === 'hoguera' ? 'ab_inferno' : id === 'destello' ? 'ab_supernova' : 'ab_selva', x);
+      this.snd(id === 'rayo' ? 'zapBig' : id === 'hoguera' || id === 'canonHumano' ? 'ab_inferno' : id === 'destello' || id === 'olvido' ? 'ab_supernova' : id === 'agujero' ? 'ab_blackhole' : id === 'pausa' ? 'ab_absolute' : 'ab_selva', x);
       return true;
     }
 
@@ -619,6 +658,7 @@
         // el evento de la ronda: sus relojes empiezan a la mitad (el primero llega pronto)
         this.evento = R.evento ? { id: R.evento, a: 2, b: 3.5, n: 0 } : null;
         this.vendavalT = 0; this.apagonT = 0;
+        if (this.era4) { this.escritoT = 0; this.pozos = []; }
       }
       this.emit({ type: 'roundStart', round: r, special: R.special, boss: R.boss, evento: R.evento || null });
       return true;
@@ -638,6 +678,7 @@
         }
         this.evento = null; this.vendavalT = 0; this.apagonT = 0;
         this.zonas = []; this.caidos = []; this.alzar = [];
+        if (this.era4) { this.escritoT = 0; this.pozos = []; for (const t of this.towers) { t.robadoT = 0; t.paradojaT = 0; } }
       }
       let farm = 0;
       for (const t of this.towers) if (t.def.kind === 'farm') {
@@ -714,6 +755,19 @@
       if (d.pumpkins) e.calT = d.pumpkins.every * 0.5;
       if (d.charge) e.cargaCd = d.charge.every * 0.7;
       if (d.phylactery) { e.filI = 0; e.filas = []; }
+      // cuarta era (sus relojes; solo con sus campos)
+      if (d.malabares) e.malabCd = d.malabares.every * (0.4 + this.rnd() * 0.6);
+      if (d.contra) e.contraT = d.contra.every * 0.5;
+      if (d.clona) { e.clonaT = d.clona.every; e.clones = 0; }
+      if (d.abduce) e.abduceT = d.abduce.every * 0.6;
+      if (d.cuerda) e.cuerdaT = 0;
+      if (d.formas) { e.forma = 'tierra'; e.formaT = d.formas.every; }
+      if (d.barajar) e.barajaT = d.barajar.every * 0.6;
+      if (d.roba) e.robaT = d.roba.every * 0.6;
+      if (d.capitulos) e.capI = 0;
+      if (d.pozo) e.pozoT = d.pozo.every * 0.4;
+      if (d.rebobina) { e.rebT = d.rebobina.every; e.hist = []; e.histT = 0; }
+      if (d.paradoja) e.paraT = d.paradoja.every * 0.6;
       e.camo = !!d.camo && !(d.boss && tier === 1);
       if (d.boss) e.name = d.name + (tier === 1 ? ' (Joven)' : tier === 3 ? ' (Furioso)' : tier === 4 ? ' (Supremo)' : '');
       posAt(this.paths[path], e.dist, tmp);
@@ -735,7 +789,7 @@
     canSee(t, e) {
       if (e.dead || e.burrowed) return false;
       if (e.huesosT > 0 && !REMATA[t.s.dtype]) return false;   // huesos: solo los ve quien puede rematarlos
-      if ((e.camo || e.niebla || this.apagonT > 0) && !(e.sapoT > 0) && !t.s.camo && !this.revealed(e)) return false;
+      if ((e.camo || e.niebla || this.apagonT > 0) && !(e.sapoT > 0) && !t.s.camo && !this.revealed(e) && !(this.escritoT > 0)) return false;
       if (e.d.flying && t.s.noFlying) return false;
       return true;
     }
@@ -771,13 +825,13 @@
     }
 
     applySlow(e, f, dur) {
-      if (e.d.slowImmune || (e.d.boss && this.ve >= 5)) return;   // jefes (v5): no se frenan
+      if (e.d.slowImmune || (e.d.boss && this.ve >= 5) || e.elite) return;   // jefes (v5) y élites: no se frenan
       if (e.d.boss) f *= 0.5;
       if (f > e.slowF || e.slowT <= 0) { e.slowF = Math.max(f, e.slowT > 0 ? e.slowF : 0); e.slowT = Math.max(e.slowT, dur); }
       else if (f === e.slowF) e.slowT = Math.max(e.slowT, dur);
     }
     applyFreeze(e, dur) {
-      if (e.d.freezeImmune || e.d.boss || e.freezeImm > 0) { this.applySlow(e, 0.6, dur); return; }
+      if (e.d.freezeImmune || e.d.boss || e.freezeImm > 0 || e.elite) { this.applySlow(e, 0.6, dur); return; }
       e.frozenT = Math.max(e.frozenT, dur);
       e.freezeImm = e.frozenT + FREEZE_IMM;
     }
@@ -799,7 +853,7 @@
       this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.4, color: '#8ae05a', r: e.d.r });
     }
     applyStun(e, dur) {
-      if (e.stunImm > 0) return;   // inmunidad breve tras un aturdimiento (evita bloqueos eternos)
+      if (e.stunImm > 0 || e.d.sinTiempo) return;   // inmunidad breve tras un aturdimiento (evita bloqueos eternos)
       if (e.d.boss && this.ve >= 5) return;   // jefes (v5): no se frenan
       if (e.d.boss) dur *= 0.25;
       e.stunT = Math.max(e.stunT, dur);
@@ -825,6 +879,13 @@
         if (e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + amt * 0.5);
         return 0;
       }
+      if (e.contraOn && !(o && o.dot) && src && src.def) {   // Erudito: contrahechizo
+        e.contraOn = false; e.contraT = e.d.contra.every;
+        this.disableTower(src, e.d.contra.dur);
+        this.fx.push({ k: 'bolt', pts: [[e.x, e.y], [src.x, src.y]], t: 0, T: 0.35, color: '#9ab4ff', w: 3 });
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.4, r0: 4, r1: e.d.r + 14, color: '#9ab4ff', w: 3 });
+        return 0;
+      }
       let m = e.d.resist && e.d.resist[dtype] !== undefined ? e.d.resist[dtype] : 1;
       if (e.inmune && FAMILIA[dtype] === e.inmune) m *= 0.15;   // Mecatitán
       if (e.res && e.res[dtype]) m *= e.res[dtype];             // Autómata adaptado
@@ -839,6 +900,7 @@
         else if (dtype === 'elec') m *= e.wetElec;
         else if (dtype === 'ice') m *= 1.3;
       }
+      if (this.escritoT > 0 && m < 1) m = 1;   // Todo Está Escrito (Lumen): sin resistencias
       let dmg = amt * m;
       if (dmg <= 0) return 0;
       const dot = o && o.dot;
@@ -849,15 +911,22 @@
       if (e.d.shellHits && e.golpes >= e.d.shellHits) arm = 0;   // caparazón roto
       if (e.sapoT > 0) arm = 0;
       if (e.raizT > 0) arm += e.d.root.armor;   // Enredadera con raíces
+      if (e.forma === 'tierra') arm += e.d.formas.armor;   // Emperador Dragón en tierra
+      if (e.elite) arm += 5;   // Legión de Élite
       if (!dot) e.golpes++;
       const armor = Math.max(0, arm - e.corr - (e.hexT > 0 ? e.hexArmor : 0) - e.shred);
       if (armor > 0 && !dot && dtype !== 'arcane' && dtype !== 'fire' && dtype !== 'poison') {
-        const ap = Math.min(1, (o && o.ap) || 0);
+        const ap = this.escritoT > 0 ? 1 : Math.min(1, (o && o.ap) || 0);
         dmg = Math.max(dmg * 0.15, dmg - armor * (1 - ap));
       }
       // vulnerabilidades: maldición, corrosión, luz del faro y agua salada
       const amp = (e.hexT > 0 ? e.hexAmp : 0) + e.corr * e.corrAmp + e.lightAmp + (e.wetT > 0 ? e.wetAmp : 0) + (e.sapoT > 0 ? e.sapoAmp : 0) + (e.burbujaT > 0 ? e.burbujaAmp : 0);
       if (amp > 0) dmg *= 1 + amp;
+      if (this.era4) {
+        const amp4 = (e.edad || 0) + (this.escritoT > 0 ? this.escritoAmp : 0);   // Cronos y Lumen
+        if (amp4 > 0) dmg *= 1 + amp4;
+        if (e.falangeOn) dmg *= 1 - e.d.falange.f;   // Guerreros de Terracota en formación
+      }
       if (e.campo > 0) dmg *= 1 - e.campo;   // campo de fuerza del Mecatitán
       if (e.d.maxHit && !dot) dmg = Math.min(dmg, e.maxHp * e.d.maxHit);   // Prisma Viviente
       if (this.ley === 'cristal' && !dot) dmg = Math.min(dmg, Math.max(CRISTAL.minimo, e.maxHp * (e.d.boss ? CRISTAL.jefe : CRISTAL.tope)));
@@ -890,6 +959,14 @@
       }
       if (e.d.rise || this.ley === 'purga') e.ultimo = dtype;
       if (e.d.mirror && !e.desdoblado && e.hp > 0 && e.hp < e.maxHp * e.d.mirror) this.desdobla(e);
+      if (this.era4) {
+        // el tiempo detenido: lo recibido se cobra al volver (cobra)
+        if ((e.paradoT > 0 || e.cobraT > 0) && !(o && o.noAcum)) e.paradoAcum += dealt;
+        // Eco del Pasado: cada golpe le suma recarga a la torre que lo dio
+        if (e.d.pesado && src && src.def && !(o && o.dot) && src.cdT !== undefined) src.cdT = Math.min(3, src.cdT + e.d.pesado);
+        // Meteorito: lo explosivo lo parte en dos, una vez
+        if (e.d.fragmenta && dtype === 'explosive' && !e.partido && e.hp > 0) this.fragmenta(e);
+      }
       if (e.hp <= 0) this.kill(e, src);
       return dealt;
     }
@@ -910,6 +987,8 @@
       const ev = this.evento && this.evento.id;
       if (ev === 'lunaSangre') m *= 1.6; else if (ev === 'bendicion') m *= 1.25;
       if (e.dorado) m *= 8;
+      if (e.clon) m *= 0.25;
+      if (e.elite) m *= 2;
       return m;
     }
     // al caer (tercera era): carga el Poder del Reino y queda en la lista de caídos (Nigromante,
@@ -966,6 +1045,7 @@
       this.money += e.d.bounty * PD.incomeMult(cur) * (e.goldT > 0 ? e.goldMult : 1) * (this.era3 ? this.oroDe(e) : 1);
       const d = e.d;
       if (this.era3) this.alCaer(e);
+      if (this.era4) this.alCaerCuarta(e, src);
       if (e.engaged) this.release(e);
       if (e.hexT > 0 && e.hexSpread) {
         // Plaga: la maldición salta a los enemigos más cercanos
@@ -1045,6 +1125,7 @@
       // auras
       for (const e of list) { e.haste = 1; e.auraSlow = 0; e.lit = false; e.lightAmp = 0; e.lightPhase = false; e.shred = 0; e.niebla = false; e.campo = 0; }
       if (this.era3) this.aurasTercera(list);
+      if (this.era4) this.aurasCuarta(list, dt);
       // auras de los héroes: quitar blindaje (Dunas) y daño recibido (Dunas, Vacío; suma como la luz del faro)
       for (const t of this.towers) if (t.def.hero && t.disabledT <= 0 && (t.s.shredAura || t.s.ampAura || t.s.goldAura || t.s.purgeAura)) {
         const s = t.s, R = (s.goldAura || s.purgeAura) ? s.range : s.aura || s.range;
@@ -1092,7 +1173,7 @@
         if (e.burbujaImm > 0) e.burbujaImm -= dt;
         if (e.burbujaT > 0) { e.burbujaT -= dt; if (e.burbujaT <= 0) this.revienta(e); }
         if (e.piedraT > 0) { e.piedraT -= dt; e.hp = Math.min(e.maxHp, e.hp + e.maxHp * d.stone.heal * dt / d.stone.dur); }
-        const mudo = e.sapoT > 0;   // un sapo no usa sus poderes
+        const mudo = e.sapoT > 0 || e.callado || e.calladoT > 0;   // un sapo (o un silenciado) no usa sus poderes
         if (e.invulnT > 0) e.invulnT -= dt;
         if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
         if (e.frozenT > 0) e.frozenT -= dt;
@@ -1180,6 +1261,7 @@
         if (d.enrage && !e.enraged && e.hp < e.maxHp * d.enrage.below) e.enraged = true;
         if (this.segundaEra(e, d, dt, mudo, cur)) continue;
         if (this.era3 && this.terceraEra(e, d, dt, mudo, cur, hurry)) continue;
+        if (this.era4 && this.cuartaEra(e, d, dt, mudo, cur, hurry)) continue;
         // movimiento
         let sp = 0;
         const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1) * (d.boss && this.ve >= 5 ? JEFE.vel : 1);
@@ -1191,7 +1273,7 @@
             if (e.auraSlow && !d.slowImmune && !jefe5) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
             if (e.burrowed) sp *= d.burrow ? d.burrow.speed : d.hop.speed;
             if (e.sapoT > 0) sp *= 0.5;
-            if (e.piedraT > 0 || e.burbujaT > 0) sp = 0;
+            if (e.piedraT > 0 || e.burbujaT > 0 || e.paradoT > 0) sp = 0;
             if (e.enraged) sp *= d.enrage.mult;
             if (e.holdT > 0 && !jefe5) sp *= d.boss ? 0.4 : 0.05;
             if (sp > 0 && this.blocked(e, dt)) sp = 0;
@@ -1450,6 +1532,9 @@
             if (this.vendavalT > 0) rf *= 1 - this.vendavalF;
             if (this.evento && this.evento.id === 'niebla') rf *= 0.8;
           }
+          // cuarta era: el Códice les roba el saber y la Paradoja de Aion las frena (x0.5 cada una)
+          if (t.robadoT > 0) { t.robadoT -= dt; rmT *= 0.5; }
+          if (t.paradojaT > 0) { t.paradojaT -= dt; rmT *= 0.5; }
         }
         const tdt = dt * rmT;
         const r0 = s.range, ciega = t.tintaT > 0 && !SIN_TINTA[kind];
@@ -1483,6 +1568,10 @@
           case 'bubble': this.tBubble(t, s, tdt); break;
           case 'disint': this.tDisint(t, s, dt, rmT); break;
           case 'bell': this.tBell(t, s, tdt); break;
+          case 'jade': case 'luck': this.tProjectile(t, s, tdt); break;
+          case 'tome': this.tTome(t, s, tdt); break;
+          case 'orbital': this.tOrbital(t, s, dt, rmT); break;
+          case 'crono': this.tCrono(t, s, tdt); break;
         }
         if (ciega || rf !== 1) s.range = r0;
       }
@@ -1496,7 +1585,9 @@
       t.ang = base;
       const o = { ap: s.armorPierce, bossMult: s.bossMult };
       if (s.frogChance) { o.frogChance = s.frogChance; o.frogDur = s.frogDur; }
-      const common = { speed: s.projSpeed, dmg: s.dmg, pierce: s.pierce, dtype: s.dtype, life: (s.range + 60) / s.projSpeed, opt: o, kind: s.spear ? 'spear' : 'thorn', r: s.spear ? 9 : 4 };
+      if (s.jadePct) o.jade = true;                    // Pagoda de Jade y Kaito: marcan
+      if (s.suerteCrit !== undefined) o.suerte = true; // Ruleta del Payaso: cada golpe tira la ruleta
+      const common = { speed: s.projSpeed, dmg: s.dmg, pierce: s.pierce, dtype: s.dtype, life: (s.range + 60) / s.projSpeed, opt: o, kind: s.spear ? 'spear' : s.jadePct ? 'jadeDart' : o.suerte ? 'card' : 'thorn', r: s.spear ? 9 : 4 };
       if (s.poisonDps) common.poison = [s.poisonDps, s.poisonDur];
       if (s.radial) {
         t.spin += 0.37;
@@ -2410,6 +2501,60 @@
       t.cdT = s.cd;
     }
 
+    // ---- Cuarta era: Grimorio Viviente (misiles que persiguen y saben más con cada muerte) ----
+    tTome(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const e = this.pick(t, t.x, t.y, s.range, t.mode);
+      if (!e) { t.cdT = 0; return; }
+      t.ang = Math.atan2(e.y - t.y, e.x - t.x);
+      const f = 1 + Math.min(t.saber || 0, s.saberTope) * s.saberX;
+      const o = { ap: s.armorPierce, bossMult: s.bossMult };
+      for (let i = 0; i < s.count; i++) {
+        this.fireProjectile(t, t.x, t.y, t.ang + (i - (s.count - 1) / 2) * s.spread, {
+          speed: s.projSpeed, dmg: s.dmg * f, pierce: s.pierce, dtype: 'arcane', life: (s.range + 120) / s.projSpeed * 1.6,
+          opt: o, kind: 'runa', r: 5, homing: true, target: e, splash: s.splash
+        });
+      }
+      t.flash = 0.1;
+      this.snd('sniperArc', t.x);
+      t.cdT = s.cd;
+    }
+    // ---- Satélite Orbital: haces que barren el suelo hacia su blanco, en todo el mapa ----
+    tOrbital(t, s, dt, rm) {
+      if (!t.haces) t.haces = [];
+      while (t.haces.length < s.beams) t.haces.push({ x: t.x, y: t.y, e: null, on: false });
+      if (t.haces.length > s.beams) t.haces.length = s.beams;
+      const usados = [], o = { dot: true, bossMult: s.bossMult };
+      for (const h of t.haces) {
+        if (!h.e || h.e.dead || h.e.burrowed || !this.canSee(t, h.e) || usados.indexOf(h.e) >= 0) h.e = this.pick(t, h.x, h.y, s.range, t.mode, usados);
+        if (h.e) usados.push(h.e);
+        const tx = h.e ? h.e.x : t.x, ty = h.e ? h.e.y : t.y;
+        const dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy), st = s.beamSpeed * dt * (h.e ? 1 : 2.5);
+        if (d <= st) { h.x = tx; h.y = ty; } else { h.x += dx / d * st; h.y += dy / d * st; }
+        h.on = !!h.e;
+        if (!h.e) continue;
+        const dmg = s.dps * rm * dt;
+        this.grid.query(h.x, h.y, s.radius + 46, q => {
+          if (q.dead || Math.hypot(q.x - h.x, q.y - h.y) > s.radius + q.d.r * 0.5) return;
+          this.damage(q, dmg, s.dtype, t, o);
+        });
+      }
+      const h0 = t.haces[0];
+      if (h0 && h0.on) t.ang = Math.atan2(h0.y - t.y, h0.x - t.x);
+    }
+    // ---- Cronotorre: detiene el tiempo en su alcance y cobra después lo recibido ----
+    tCrono(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      if (!this.anyInRange(t, s.range)) { t.cdT = 0; return; }
+      this.inRange(t, s.range, e => this.detiene(e, s.stopDur, s.stopX, t, !!s.stopBoss));
+      this.fx.push({ k: 'ring', x: t.x, y: t.y, t: 0, T: 0.7, r0: 8, r1: s.range, color: '#ffcf4d', w: 5 });
+      this.snd('freezeBurst', t.x);
+      t.flash = 0.3;
+      t.cdT = s.cd;
+    }
+
     // ---- Héroes: cada uno ataca con su arma (s.atk) ----
     tHero(t, s, dt) {
       switch (s.atk) {
@@ -2633,6 +2778,55 @@
           }
           this.fx.push({ k: 'flashscreen', t: 0, T: 0.8, color: 'rgba(255,240,190,' });
           break;
+        // ------------------------ héroes de la cuarta era ------------------------
+        case 'dragonJade':
+          for (const e of this.enemies) {
+            if (e.dead || e.burrowed) continue;
+            this.marcaJade(e, s, t);
+            this.damage(e, s.dragonDmg, 'phys', t, { ap: 1, bossMult: s.dragonBoss || 1 });
+            if (s.dragonStun && !e.dead) this.applyStun(e, s.dragonStun);
+            this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.5, r0: 4, r1: e.d.r + 12, color: '#5affb0', w: 3 });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(90,255,170,' });
+          break;
+        case 'granEscape': {
+          if (hurry && !(this.ve >= 5 && CC.nuevo)) break;
+          const prog = e => e.dist / this.paths[e.path].len;
+          const vivos = this.enemies.filter(e => !e.dead && !e.d.boss && !e.burrowed && !e.escapado && !(e.huesosT > 0)).sort((a, b) => prog(b) - prog(a) || a.id - b.id);
+          const n = Math.min(s.escapeN, Math.floor(vivos.length / 2));
+          for (let i = 0; i < n; i++) {
+            const a = vivos[i], b = vivos[vivos.length - 1 - i];
+            if (prog(a) <= prog(b)) break;
+            const pa = a.path, da = a.dist;
+            a.path = b.path; a.dist = b.dist; b.path = pa; b.dist = da;
+            for (const q of [a, b]) {
+              q.escapado = true;
+              posAt(this.paths[q.path], q.dist, tmp); q.x = tmp.x; q.y = tmp.y; q.a = tmp.a;
+              if (q.engaged) this.release(q);
+              this.fx.push({ k: 'puff', x: q.x, y: q.y, t: 0, T: 0.6, color: '#ff9ad8', r: q.d.r * 1.4 });
+              this.damage(q, s.escapeDmg, 'arcane', t, {});
+              if (s.escapeStun && !q.dead) this.applyStun(q, s.escapeStun);
+            }
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.5, color: 'rgba(255,120,190,' });
+          break;
+        }
+        case 'escrito':
+          this.escritoT = s.escritoDur; this.escritoAmp = s.escritoAmp || 0;
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.7, color: 'rgba(170,130,255,' });
+          break;
+        case 'orbital':
+          for (const e of this.enemies) {
+            if (e.dead || e.burrowed) continue;
+            this.fx.push({ k: 'bolt', pts: [[e.x + 30, -10], [e.x, e.y]], t: 0, T: 0.4, color: '#8affff', w: 5 });
+            this.damage(e, s.orbDmg * (0.5 + e.dist / this.paths[e.path].len), 'explosive', t, { ap: 1, bossMult: s.orbBoss || 1 });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.4, color: 'rgba(150,255,255,' });
+          break;
+        case 'detener':
+          for (const e of this.enemies) this.detiene(e, s.detDur, s.detX, t, true);
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.8, color: 'rgba(255,220,120,' });
+          break;
         case 'wardrum':
           this.wardrum = 8;
           break;
@@ -2676,6 +2870,7 @@
       if (this.golems.length && this.golems.some(g => g.dead)) this.golems = this.golems.filter(g => !g.dead);
       for (const k in this.abLock) if (this.abLock[k] > 0) this.abLock[k] -= dt;
       this.updateAreas(dt);
+      if (this.jadeQ && this.jadeQ.length) this.estallidos();
       // fx, enemigos y jefes se compactan sin crear arreglos en cada paso (el bot corre millones)
       const fx = this.fx;
       let n = 0;
@@ -2696,6 +2891,8 @@
     }
     updateProjectiles(dt) {
       const out = [];
+      let desv = this.era4 && this.bosses.length ? this.bosses.filter(b => !b.dead && b.d.desvia) : null;
+      if (desv && !desv.length) desv = null;
       for (const p of this.projs) {
         if (p.homing && p.target && !p.target.dead) {
           const a = Math.atan2(p.target.y - p.y, p.target.x - p.x);
@@ -2706,6 +2903,7 @@
           p.vx = Math.cos(cur) * sp; p.vy = Math.sin(cur) * sp;
         }
         p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+        if (desv && !p.desv) this.desvia(p, desv);   // la gravedad de Vórtex
         p.ang = Math.atan2(p.vy, p.vx);
         if (p.life <= 0 || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) continue;
         let alive = true;
@@ -2716,6 +2914,12 @@
           const rr = p.r + e.d.r;
           const dx = e.x - p.x, dy = e.y - p.y;
           if (dx * dx + dy * dy > rr * rr) return;
+          if (this.era4) {
+            // Malabarista: lo atrapa; Monje y Emperador en el cielo: lo esquivan
+            if (e.malabT > 0) { this.fx.push({ k: 'puff', x: e.x, y: e.y - e.d.r, t: 0, T: 0.25, color: '#ffe08a', r: 5 }); alive = false; return true; }
+            const esq = e.forma === 'cielo' ? e.d.formas.esquiva : e.d.esquiva;
+            if (esq && this.rnd() < esq) { p.hit.push(e.id); this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.25, color: '#fff1c8', r: e.d.r * 0.8 }); return; }
+          }
           if (p.splash) {
             this.explode(p.x, p.y, p.splash, p.dmg, p.dtype, p.src, p.opt, { hitsFlying: true });
             this.fx.push({ k: 'boom', x: p.x, y: p.y, t: 0, T: 0.35, r: p.splash, color: '#ffb35c' });
@@ -2723,7 +2927,10 @@
             alive = false; return true;
           }
           p.hit.push(e.id);
-          this.damage(e, p.dmg, p.dtype, p.src, p.opt);
+          let dm = p.dmg;
+          if (p.opt.jade) this.marcaJade(e, p.src.s, p.src);
+          if (p.opt.suerte) dm = this.ruleta(e, p, dm);
+          this.damage(e, dm, p.dtype, p.src, p.opt);
           if (p.poison && !e.dead) this.applyPoison(e, p.poison[0], p.poison[1], p.src);
           if (p.opt.burbuja && !e.dead) this.atrapa(e, p.src, p.x, p.y);
           if (p.opt.frogChance && !e.dead && !e.d.big && this.rnd() < p.opt.frogChance) this.sapifica(e, p.opt.frogDur, 0.2);
@@ -2782,6 +2989,7 @@
             this.damage(e, z.dps * dt, z.dtype, null, { dot: true, fireFloor: z.fireFloor });
             if (e.dead) return;
             if (z.slow) this.applySlow(e, z.slow, 0.4);
+            if (z.retiene && !e.d.boss) e.holdT = Math.max(e.holdT, 0.15);
             if (z.empuja && z.hit.indexOf(e.id) < 0) { z.hit.push(e.id); this.retrocede(e, z.empuja * (e.d.boss ? 0.3 : 1), null); if (e.engaged) this.release(e); }
           });
         }
@@ -2809,6 +3017,7 @@
       if (this.evento && this.evento.id === 'lunaSangre') v *= 1.2;
       if (e.cargaT > 0) v *= e.d.charge.mult;
       if (e.filas && e.filas.length && !hurry) v *= 0.35;   // el Liche anda despacio mientras lo protegen
+      if (this.era4) v *= this.velCuarta(e);
       return v;
     }
     // Devuelve true si el enemigo no se mueve este paso (huesos en el suelo).
@@ -2912,9 +3121,13 @@
         c.falso = true; c.hp = c.maxHp = c.maxHp * 0.3; c.shield = c.maxShield = 0;
         if (e.mod) this.modifica(c, e.mod);
       }
+      // cuarta era: Legión de Élite y Escudos Rúnicos
+      else if (ev.id === 'elite' && ev.n % 4 === 0) { e.elite = true; e.hp *= 2; e.maxHp *= 2; }
+      else if (ev.id === 'runas') { e.maxShield = Math.max(e.maxShield, e.maxHp * 0.4); e.shield = e.maxShield; }
     }
     // relojes de la tercera era en cada paso de una ronda: eventos, los que se levantan, el vendaval
     tickTercera(dt) {
+      if (this.era4) this.tickCuarta(dt);
       if (this.vendavalT > 0) this.vendavalT -= dt;
       // Contagio: cada infectada pasa las esporas a las sanas que tiene cerca (los Pararrayos protegen)
       if (this.ley === 'contagio' && (this.contagioT -= dt) <= 0) {
@@ -2976,6 +3189,300 @@
             t.esporaT = 4;
             this.fx.push({ k: 'splash', x: t.x, y: t.y, t: 0, T: 0.8, r: 30, color: '#d85aa8' });
           }
+        }
+      }
+    }
+
+    // ================== CUARTA ERA: mecánicas y eventos ==================
+    // Todo esto corre solo con this.era4 (o con campos que solo tienen sus enemigos y torres).
+    // Marca de jade (Pagoda, Kaito, Aliento de Jade): si muere marcado, estalla.
+    marcaJade(e, s, src) {
+      if (e.dead || !s) return;
+      e.jadeT = Math.max(e.jadeT || 0, s.jadeDur || 4);
+      if (!(e.jadePct >= s.jadePct)) { e.jadePct = s.jadePct; e.jadeR = s.jadeR; e.jadeChain = !!s.jadeChain; e.jadeStun = s.jadeStun || 0; e.jadeSrc = src; }
+    }
+    // los estallidos de jade se resuelven en cola (una cadena larga no apila llamadas)
+    estallidos() {
+      let n = 0;
+      const o = { ap: 1, bossMult: 0.25 };
+      while (this.jadeQ.length && n++ < 400) {
+        const b = this.jadeQ.shift(), vict = [];
+        this.fx.push({ k: 'splash', x: b.x, y: b.y, t: 0, T: 0.5, r: b.r, color: '#5affb0' });
+        this.grid.query(b.x, b.y, b.r + 46, q => { if (!q.dead && q.id !== b.id && Math.hypot(q.x - b.x, q.y - b.y) <= b.r + q.d.r * 0.5) vict.push(q); });
+        for (const q of vict) {
+          if (q.dead) continue;
+          if (b.chain) this.marcaJade(q, { jadePct: b.pct, jadeR: b.r, jadeDur: 2, jadeChain: true, jadeStun: b.stun }, b.src);
+          this.damage(q, b.dmg, 'phys', b.src, o);
+          if (b.stun && !q.dead) this.applyStun(q, b.stun);
+        }
+      }
+      if (n) this.snd('boomSmall', 500);
+      this.jadeQ.length = 0;
+    }
+    // Ruleta del Payaso: cada golpe tira la ruleta (el azar es el de la partida)
+    ruleta(e, p, dm) {
+      const s = p.src.s, x = this.rnd();
+      let acc = s.suerteJack;
+      if (x < acc) { this.fx.push({ k: 'text', x: e.x, y: e.y - 16, t: 0, T: 1, text: '¡PREMIO!', color: '#ffd84d' }); return dm * s.jackX; }
+      if (x < (acc += s.suerteCrit)) return dm * s.critX;
+      if (x < (acc += s.suerteStun)) { if (!e.d.boss) this.applyStun(e, 0.8); return dm; }
+      if (x < (acc += s.suerteOro)) {
+        const g = s.oroN * PD.incomeMult(this.curRound() || 1);
+        this.money += g;
+        this.fx.push({ k: 'text', x: e.x, y: e.y - 14, t: 0, T: 0.8, text: '+' + Math.max(1, Math.round(g)), color: '#ffe08a' });
+      }
+      return dm;
+    }
+    // lo que pasa al caer en la cuarta era: estallidos de jade, cajas sorpresa y el saber del Grimorio
+    alCaerCuarta(e, src) {
+      const d = e.d;
+      if (e.jadeT > 0) {
+        const cur = this.curRound() || 1, tope = JADE_TOPE * PD.hpMult(this.L, cur) * PD.hpBoost(cur, false) * this.vidaTarde();
+        (this.jadeQ || (this.jadeQ = [])).push({ x: e.x, y: e.y, id: e.id, dmg: Math.min(e.maxHp * e.jadePct, tope), pct: e.jadePct, r: e.jadeR, chain: e.jadeChain, stun: e.jadeStun, src: e.jadeSrc });
+      }
+      if (d.sorpresa) {
+        const T = d.sorpresa.tipos;
+        for (let i = 0; i < d.sorpresa.n; i++) {
+          const c = this.spawn(T[Math.floor(this.rnd() * T.length)], e.path, e.dist - i * 10 + 4, e.hpM);
+          c.pulled = e.pulled; c.kb = e.kb ? { ...e.kb } : null; c.rifted = e.rifted;
+          if (e.mod) this.modifica(c, e.mod);
+        }
+        this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.5, color: '#ff9ad8', r: d.r * 1.5 });
+      }
+      if (src && src.def && src.def.kind === 'tome') src.saber = (src.saber || 0) + 1;
+    }
+    // Meteorito: se parte en dos mitades con la mitad de la vida que le queda
+    fragmenta(e) {
+      e.partido = true; e.hp *= 0.5;
+      const c = this.spawn(e.type, e.path, Math.max(0, e.dist - 14), e.hpM);
+      c.partido = true; c.hp = e.hp; c.maxHp = e.maxHp; c.shield = c.maxShield = 0;
+      c.pulled = e.pulled; c.kb = e.kb ? { ...e.kb } : null; c.rifted = e.rifted;
+      if (e.mod) this.modifica(c, e.mod);
+      this.fx.push({ k: 'boom', x: e.x, y: e.y, t: 0, T: 0.35, r: e.d.r * 1.4, color: '#ff8a3a' });
+    }
+    // detener el tiempo a un enemigo (a los jefes no: a ellos, con `conJefes`, solo se les cobra)
+    detiene(e, dur, x, src, conJefes) {
+      if (e.dead || e.d.sinTiempo) return;
+      if (e.d.boss) { if (!conJefes) return; e.cobraT = Math.max(e.cobraT || 0, dur); }
+      else { if (e.paradoImm > 0) return; e.paradoT = Math.max(e.paradoT || 0, dur); }
+      if (!e.paradoAcum) e.paradoAcum = 0;
+      e.paradoX = Math.max(e.paradoX || 0, x);
+      if (!e.paradoSrc) e.paradoSrc = src;
+    }
+    // vuelve el tiempo: se cobra lo recibido mientras estuvo detenido
+    cobra(e) {
+      const a = e.paradoAcum * (e.paradoX || 0), src = e.paradoSrc;
+      e.paradoAcum = 0; e.paradoX = 0; e.paradoSrc = null;
+      if (!e.d.boss) e.paradoImm = PARADO_IMM;
+      if (a > 0) {
+        this.fx.push({ k: 'text', x: e.x, y: e.y - 18, t: 0, T: 0.9, text: '⏳ ' + Math.round(a), color: '#ffcf4d' });
+        this.damage(e, a, 'arcane', src, { noAcum: true, noEco: true });
+      }
+    }
+    // Carcajada: cambia de sitio dos torres
+    baraja(e) {
+      const ts = this.towers.filter(t => !this.protegida(t)).sort((a, b) => a.id - b.id);
+      if (ts.length < 2) return;
+      const a = ts.splice(Math.floor(this.rnd() * ts.length), 1)[0], b = ts[Math.floor(this.rnd() * ts.length)];
+      const ax = a.x, ay = a.y;
+      a.x = b.x; a.y = b.y; b.x = ax; b.y = ay;
+      for (const t of [a, b]) { t.spots = null; t.pspots = null; this.fx.push({ k: 'puff', x: t.x, y: t.y, t: 0, T: 0.6, color: '#ff4a6a', r: 26 }); }
+      this.recalcAll();
+      this.emit({ type: 'baraja', enemy: e, a, b });
+      this.snd('teleport', e.x);
+    }
+    // la gravedad de Vórtex: la primera vez que un proyectil pasa cerca, puede salir desviado
+    desvia(p, jefes) {
+      for (const b of jefes) {
+        const D = b.d.desvia;
+        if (Math.hypot(p.x - b.x, p.y - b.y) > D.r) continue;
+        p.desv = true;
+        if (this.rnd() < D.p) {
+          const a = Math.atan2(p.vy, p.vx) + (this.rnd() < 0.5 ? -1.6 : 1.6), sp = Math.hypot(p.vx, p.vy);
+          p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp; p.homing = false;
+          this.fx.push({ k: 'puff', x: p.x, y: p.y, t: 0, T: 0.3, color: '#8affff', r: 6 });
+        }
+        return;
+      }
+    }
+    // auras: falange, el silencio de Lumen, el disruptor de Vega, la vejez de Cronos y los pozos
+    aurasCuarta(list, dt) {
+      for (const e of list) { e.callado = false; e.falangeOn = false; e.pozoF = 1; }
+      for (const e of list) {
+        const F = e.d.falange;
+        if (!F || e.dead) continue;
+        let n = 0;
+        for (const o of list) if (o !== e && !o.dead && o.d.falange && Math.abs(o.x - e.x) < F.r && Math.hypot(o.x - e.x, o.y - e.y) < F.r) n++;
+        e.falangeOn = n >= F.n;
+      }
+      for (const t of this.towers) if (t.def.hero && t.disabledT <= 0 && (t.s.silencio || t.s.disruptor || t.s.edadAura)) {
+        const s = t.s, R = s.range;
+        for (const e of list) if (!e.dead && Math.abs(e.x - t.x) < R + 30 && Math.hypot(e.x - t.x, e.y - t.y) < R + e.d.r * 0.5) {
+          if (s.silencio && !e.d.boss) e.callado = true;
+          if (s.disruptor && e.shield > 0) { e.shield = Math.max(0, e.shield - e.maxShield * s.disruptor * dt); e.shieldT = 0; }
+          if (s.edadAura) e.edad = Math.min(s.edadTope, (e.edad || 0) + s.edadAura * dt);
+        }
+      }
+      for (const p of this.pozos) for (const e of list) if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < p.r + e.d.r * 0.5) e.pozoF = Math.max(e.pozoF, p.mult);
+    }
+    // multiplicador de velocidad de la cuarta era (formas, cuerda, pozos, Furia Ancestral)
+    velCuarta(e) {
+      let v = 1;
+      if (e.forma) v *= e.forma === 'tierra' ? e.d.formas.lento : e.d.formas.rapido;
+      if (e.d.cuerda) v *= Math.min(e.d.cuerda.max, 1 + Math.floor(e.cuerdaT / e.d.cuerda.cada) * e.d.cuerda.paso);
+      if (e.pozoF > 1) v *= e.pozoF;
+      if (this.evento && this.evento.id === 'furia' && e.hp < e.maxHp * 0.5) v *= 1.5;
+      return v;
+    }
+    // las mecánicas por enemigo (relojes, umbrales de los jefes). true: dejó de existir este paso
+    cuartaEra(e, d, dt, mudo, cur, hurry) {
+      if (e.calladoT > 0) e.calladoT -= dt;
+      if (e.jadeT > 0) e.jadeT -= dt;
+      if (e.paradoImm > 0) e.paradoImm -= dt;
+      if (e.paradoT > 0 || e.cobraT > 0) {
+        if (e.paradoT > 0) e.paradoT -= dt;
+        if (e.cobraT > 0) e.cobraT -= dt;
+        if (!(e.paradoT > 0) && !(e.cobraT > 0)) { this.cobra(e); if (e.dead) return true; }
+      }
+      if (this.evento && this.evento.id === 'vital' && !d.boss && !hurry && e.poisT <= 0 && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.015 * dt);
+      if (d.malabares) {
+        if (e.malabT > 0) { e.malabT -= dt; if (e.malabT <= 0) e.malabCd = d.malabares.every; }
+        else if (!mudo && (e.malabCd -= dt) <= 0) e.malabT = d.malabares.dur;
+      }
+      if (d.contra && !e.contraOn && !mudo && (e.contraT -= dt) <= 0) {
+        e.contraOn = true;
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.4, r0: e.d.r, r1: e.d.r + 10, color: '#9ab4ff', w: 2 });
+      }
+      if (d.clona && !e.clon && e.clones < d.clona.max && !mudo && !hurry && (e.clonaT -= dt) <= 0) {
+        e.clonaT = d.clona.every; e.clones++;
+        const c = this.spawn(e.type, e.path, Math.max(0, e.dist - 14), e.hpM);
+        c.clon = true; c.hp = c.maxHp = e.maxHp * d.clona.f; c.shield = c.maxShield = 0;
+        if (e.mod) this.modifica(c, e.mod);
+        this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.5, color: '#5aff6a', r: d.r * 1.4 });
+      }
+      if (d.abduce && !mudo && !hurry && (e.abduceT -= dt) <= 0) {
+        e.abduceT = d.abduce.every;
+        let o = null;
+        for (const q of this.enemies) {
+          if (q === e || q.dead || q.d.boss || q.d.big || q.burrowed || q.huesosT > 0 || Math.hypot(q.x - e.x, q.y - e.y) > d.abduce.radius) continue;
+          if (!o || q.dist < o.dist || (q.dist === o.dist && q.id < o.id)) o = q;
+        }
+        if (o) {
+          const P = this.paths[o.path];
+          this.fx.push({ k: 'bolt', pts: [[e.x, e.y], [o.x, o.y]], t: 0, T: 0.4, color: '#5affd8', w: 3 });
+          o.dist = Math.min(P.len - 60, o.dist + d.abduce.dist);
+          posAt(P, o.dist, tmp); o.x = tmp.x; o.y = tmp.y; o.a = tmp.a;
+          if (o.engaged) this.release(o);
+          this.fx.push({ k: 'puff', x: o.x, y: o.y, t: 0, T: 0.5, color: '#5affd8', r: o.d.r * 1.4 });
+        }
+      }
+      if (d.cuerda) e.cuerdaT += dt;
+      // ---- jefes ----
+      if (d.formas && (e.formaT -= dt) <= 0) {
+        e.forma = e.forma === 'tierra' ? 'cielo' : 'tierra'; e.formaT = d.formas.every;
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.7, r0: 10, r1: d.r + 40, color: e.forma === 'cielo' ? '#bff8ff' : '#3ac88a', w: 5 });
+        this.emit({ type: 'forma', enemy: e });
+        this.snd('teleport', e.x);
+      }
+      if (d.perla && !e.perlaUsada && e.hp < e.maxHp * d.perla.at) {
+        e.perlaUsada = true; e.hp = Math.min(e.maxHp, e.hp + e.maxHp * d.perla.heal);
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 1, r0: 10, r1: 140, color: '#ffd84d', w: 6 });
+        this.emit({ type: 'perla', enemy: e });
+        this.snd('revive', e.x);
+      }
+      if (d.barajar && !hurry && (e.barajaT -= dt) <= 0) { e.barajaT = d.barajar.every; this.baraja(e); }
+      if (d.gran && !e.granUsada && e.hp < e.maxHp * d.gran.at) {
+        e.granUsada = true; e.invulnT = Math.max(e.invulnT, d.gran.dur);
+        const hpM = PD.hpMult(this.L, cur);
+        for (let i = 0; i < d.gran.n; i++) this.spawn(d.gran.type, e.path, Math.max(0, e.dist - 30 - i * 16), hpM);
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 1, r0: 10, r1: 160, color: '#ff4a6a', w: 6 });
+        this.emit({ type: 'granFuncion', enemy: e });
+        this.snd('bossSpawn', e.x);
+      }
+      if (d.roba && !hurry && (e.robaT -= dt) <= 0) {
+        e.robaT = d.roba.every;
+        const R = d.roba, ts = this.towers.filter(t => !this.protegida(t) && Math.hypot(t.x - e.x, t.y - e.y) < R.radius).sort((a, b) => b.dealt - a.dealt || a.id - b.id).slice(0, R.n);
+        for (const t of ts) {
+          t.robadoT = R.dur;
+          e.hp = Math.min(e.maxHp, e.hp + e.maxHp * R.heal);
+          this.fx.push({ k: 'bolt', pts: [[t.x, t.y], [(t.x + e.x) / 2, (t.y + e.y) / 2 - 30], [e.x, e.y]], t: 0, T: 0.5, color: '#ffd84d', w: 3 });
+        }
+        if (ts.length) this.snd('sabotage', e.x);
+      }
+      if (d.capitulos) {
+        const C = d.capitulos;
+        while (e.capI < C.at.length && e.hp < e.maxHp * C.at[e.capI]) {
+          e.capI++;
+          for (const o of this.enemies) if (!o.dead && o !== e && !o.d.boss) { o.maxShield = Math.max(o.maxShield, o.maxHp * C.escudo); o.shield = o.maxShield; o.shieldT = 0; }
+          e.shield += e.maxHp * C.propio; e.maxShield = Math.max(e.maxShield, e.shield);
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.5, color: 'rgba(255,220,120,' });
+          this.emit({ type: 'capitulo', enemy: e, n: e.capI });
+          this.snd('shield', e.x);
+        }
+      }
+      if (d.pozo && !hurry && (e.pozoT -= dt) <= 0) {
+        e.pozoT = d.pozo.every;
+        const P = this.paths[e.path];
+        posAt(P, Math.min(P.len - 40, e.dist + d.pozo.delante), tmp);
+        this.pozos.push({ x: tmp.x, y: tmp.y, r: d.pozo.r, mult: d.pozo.mult, t: d.pozo.dur, T: d.pozo.dur });
+        this.fx.push({ k: 'ring', x: tmp.x, y: tmp.y, t: 0, T: 0.8, r0: d.pozo.r * 1.6, r1: 6, color: '#8affff', w: 4 });
+        this.snd('ab_blackhole', tmp.x);
+      }
+      if (d.rebobina) {
+        const RB = d.rebobina;
+        if ((e.histT += dt) >= 0.5) { e.histT = 0; e.hist.push(e.hp); if (e.hist.length > RB.atras * 2) e.hist.shift(); }
+        if (!hurry && (e.rebT -= dt) <= 0) {
+          e.rebT = RB.every;
+          const antes = e.hist.length ? e.hist[0] : e.hp;
+          if (antes > e.hp) {
+            e.hp = Math.min(e.maxHp, antes);
+            this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 1, r0: 140, r1: 10, color: '#ffcf4d', w: 6 });
+            this.emit({ type: 'rebobina', enemy: e });
+            this.snd('revive', e.x);
+          }
+        }
+      }
+      if (d.paradoja && !hurry && (e.paraT -= dt) <= 0) {
+        e.paraT = d.paradoja.every;
+        for (const t of this.towers) if (!this.protegida(t) && Math.hypot(t.x - e.x, t.y - e.y) < d.paradoja.r) t.paradojaT = d.paradoja.dur;
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.9, r0: 10, r1: d.paradoja.r, color: '#c8a0ff', w: 5 });
+        this.snd('sabotage', e.x);
+      }
+      return false;
+    }
+    // relojes de la cuarta era en cada paso de una ronda: Todo Está Escrito, pozos y los eventos tardíos
+    tickCuarta(dt) {
+      if (this.escritoT > 0) this.escritoT -= dt;
+      if (this.pozos.length) { for (const p of this.pozos) p.t -= dt; this.pozos = this.pozos.filter(p => p.t > 0); }
+      const ev = this.evento;
+      if (!ev) return;
+      const hurry = this.rt > (this.hurryT || 1e9);
+      if (ev.id === 'portales') {
+        if ((ev.a -= dt) <= 0) {
+          ev.a = 5;
+          if (hurry) return;
+          const vivos = this.enemies.filter(e => !e.dead && !e.d.boss && !e.burrowed && !(e.huesosT > 0)).sort((a, b) => a.id - b.id);
+          for (let i = 0; i < 3 && vivos.length; i++) {
+            const o = vivos.splice(Math.floor(this.rnd() * vivos.length), 1)[0], P = this.paths[o.path];
+            this.fx.push({ k: 'puff', x: o.x, y: o.y, t: 0, T: 0.5, color: '#c87aff', r: o.d.r * 1.5 });
+            o.dist = Math.min(P.len - 60, o.dist + 100);
+            posAt(P, o.dist, tmp); o.x = tmp.x; o.y = tmp.y; o.a = tmp.a;
+            if (o.engaged) this.release(o);
+            this.fx.push({ k: 'puff', x: o.x, y: o.y, t: 0, T: 0.5, color: '#c87aff', r: o.d.r * 1.5 });
+          }
+          this.snd('teleport');
+        }
+      } else if (ev.id === 'terremoto') {
+        if ((ev.a -= dt) <= 0) {
+          ev.a = 9;
+          const ts = this.towers.filter(t => !(t.disImm > 0) && !this.protegida(t)).sort((a, b) => a.id - b.id);
+          for (let i = 0; i < 3 && ts.length; i++) {
+            const t = ts.splice(Math.floor(this.rnd() * ts.length), 1)[0];
+            this.disableTower(t, 2);
+            this.fx.push({ k: 'dust', x: t.x, y: t.y, t: 0, T: 0.6, r: 30 });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.3, color: 'rgba(160,110,60,' });
+          this.snd('golemHit');
         }
       }
     }

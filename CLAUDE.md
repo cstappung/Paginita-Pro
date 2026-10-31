@@ -113,7 +113,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Frontera Batalla | `docs/claude/juegos/frontera.md` |
 | Tulones (hot-seat) | `juegos/club/tulones/CLAUDE.md` |
 | Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
-| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda y tercera era, pactos, eventos, poder del reino) | `juegos/club/prodefender/CLAUDE.md` |
+| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda, tercera y cuarta era, pactos, eventos, eventos de titanes, poder del reino, héroes a elección) | `juegos/club/prodefender/CLAUDE.md` |
 | PRO PACMAN (pacman, laberinto, fantasmas, racha, turbo, pulso) | `juegos/club/propac/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.

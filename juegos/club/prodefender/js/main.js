@@ -40,13 +40,16 @@
   const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'g'];
   const MODES = [['first', 'Primero'], ['last', 'Último'], ['strong', 'Fuerte'], ['close', 'Cerca']];
   const ABIL_ICON = { absolute: '❄', judgement: '⚡', meteors: '☄', supernova: '✹', blackhole: '◉', treasure: '◆', wardrum: '♫', inferno: '♨',
-    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗', cienaga: '☘', tempestad: 'ϟ', maremoto: '≈', sobrecarga: '⚙', amanecer: '☀' };
+    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗', cienaga: '☘', tempestad: 'ϟ', maremoto: '≈', sobrecarga: '⚙', amanecer: '☀',
+    dragonJade: '🐉', granEscape: '🎩', escrito: '📖', orbital: '🛰', detener: '⏳' };
   const DTYPE = { phys: 'Físico', explosive: 'Explosivo', ice: 'Hielo', elec: 'Eléctrico', fire: 'Fuego', arcane: 'Arcano', poison: 'Ácido', steam: 'Vapor' };
   const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li && !PD.TOWERS[id].hero);
   // La tienda: las torres (con las teclas de HOTKEYS) y, aparte, el héroe del reino (tecla H).
   const PINCHOS = '@pinchos';   // en ui.placing: tirar pinchos en vez de colocar una torre
   const PODER = '@poder';       // en ui.placing: apuntar el Poder del Reino (tercera era)
-  const HEROE = '@heroe';       // en la tienda: elegir uno de los diez héroes (tercera era)
+  const HEROE = '@heroe';       // en la tienda: elegir héroe (los diez de la tercera era, los cinco de la cuarta)
+  // cuántos héroes se eligen en un reino, en palabras («diez», «cinco»)
+  const cuantosHeroes = li => { const n = PD.heroesOf(li).length; return n === 10 ? 'diez' : n === 5 ? 'cinco' : String(n); };
   const shopTowers = li => PD.towersFor(li).filter(id => !PD.TOWERS[id].hero);
   const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
@@ -208,8 +211,12 @@
     PD.LEVELS.forEach((L, li) => {
       const prueba = enPrueba(li);
       if (li === PUB) {
-        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era !== 3).length;
+        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && !L.era).length;
         grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día; cada uno se desbloquea llegando a la ronda ' + PD.UNLOCK_ROUND + ' del anterior: 🪙 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: 🪙 100 por ronda en cada uno'}</div>`));
+      }
+      if (L.era === 4 && PD.LEVELS[li - 1].era !== 4) {
+        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 4).length;
+        grid.appendChild(el(`<div class="lvl-sep era3 era4"><b>Cuarta Era · La Era de los Titanes</b> · <b>cinco héroes nuevos</b> para elegir, una <b>defensa nueva</b> por reino, <b>jefes</b> nunca vistos y, desde la ronda 60, <b>eventos de titanes</b> más seguidos y con más enemigos grandes. ${quedan ? 'Un reino nuevo cada día desde el 1 de noviembre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'La prueba final'} · 🪙 100 por ronda</div>`));
       }
       if (L.era === 3 && PD.LEVELS[li - 1].era !== 3) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 3).length;
@@ -229,9 +236,9 @@
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
-          ${L.era === 3 ? `<div class="lc-new">${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los diez héroes (uno por partida).">♛ Héroe a elección</span>${(N => `${N.pactoPrecio ? `<span title="Cada pacto aceptado da +${Math.round(N.pactoPrecio * 100)}% de vida a los enemigos, y se suma.">⚖ Pactos con precio</span>` : ''}${N.vidaTarde ? `<span title="Desde la ronda ${N.vidaTarde.desde} los enemigos se endurecen hasta tener x${N.vidaTarde.x} de vida en la ${N.vidaTarde.hasta}. Guardar oro no basta: hay que construir para el final.">💀 x${N.vidaTarde.x} de vida al final</span>` : ''}`)(PD.nivel(li, PD.MOTOR_VE))}<span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span></div>`
+          ${L.era >= 3 ? `<div class="lc-new">${L.era === 4 ? realmTowers(li).map(id => `<span title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].name}</span>`).join('') : ''}${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los ${cuantosHeroes(li)} héroes (uno por partida).">♛ Héroe a elección${L.era === 4 ? ' (5 nuevos)' : ''}</span>${(N => `${N.pactoPrecio ? `<span title="Cada pacto aceptado da +${Math.round(N.pactoPrecio * 100)}% de vida a los enemigos, y se suma.">⚖ Pactos con precio</span>` : ''}${N.vidaTarde ? `<span title="Desde la ronda ${N.vidaTarde.desde} los enemigos se endurecen hasta tener x${N.vidaTarde.x} de vida en la ${N.vidaTarde.hasta}. Guardar oro no basta: hay que construir para el final.">💀 x${N.vidaTarde.x} de vida al final</span>` : ''}`)(PD.nivel(li, PD.MOTOR_VE))}<span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span>${L.eventosTarde ? `<span class="ley" title="Desde la ronda 60: ${L.eventosTarde.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventosTarde.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos de titanes (R60+)</span>` : ''}</div>`
             : `<div class="lc-new">${realmTowers(li).concat(PD.heroOf(li) ? [PD.heroOf(li)] : []).map(id => `<span class="${PD.TOWERS[id].hero ? 'hero' : ''}" title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].hero ? '♛ ' : ''}${PD.TOWERS[id].name}</span>`).join('')}</div>`}
-          ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era === 3 || PD.TOWERS[id].realm < PUB)).length} de las ${L.era === 3 ? 15 : 10} de reino</div>` : ''}
+          ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era >= 3 || PD.TOWERS[id].realm < PUB)).length} de las ${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm !== undefined && PD.TOWERS[id].realm <= (L.era >= 3 ? li : PUB - 1)).length} de reino</div>` : ''}
           <div class="meta">
             <span class="stars">${'★'.repeat(L.stars)}${'☆'.repeat(5 - L.stars)}</span>
             <span>❤ ${L.lives}</span><span>🪙 ${L.cash}</span>
@@ -328,6 +335,27 @@
     if (d.taunt) b.push(['Provoca', 'b-special']);
     if (d.pumpkins) b.push(['Apaga torres', 'b-special']);
     if (d.charge) b.push(['Embiste', 'b-special']);
+    if (d.esquiva || d.formas) b.push(['Esquiva', 'b-res']);
+    if (d.falange) b.push(['Falange', 'b-armor']);
+    if (d.formas) b.push(['Cambia de forma', 'b-special']);
+    if (d.perla || d.rebobina) b.push(['Se cura', 'b-special']);
+    if (d.sorpresa) b.push(['Caja sorpresa', 'b-special']);
+    if (d.malabares) b.push(['Malabares', 'b-res']);
+    if (d.barajar) b.push(['Baraja torres', 'b-special']);
+    if (d.gran) b.push(['Gran Función', 'b-special']);
+    if (d.contra) b.push(['Contrahechizo', 'b-special']);
+    if (d.roba) b.push(['Roba el saber', 'b-special']);
+    if (d.capitulos) b.push(['Da escudos', 'b-special']);
+    if (d.clona) b.push(['Se clona', 'b-special']);
+    if (d.abduce) b.push(['Abduce', 'b-special']);
+    if (d.fragmenta) b.push(['Se parte', 'b-special']);
+    if (d.pozo) b.push(['Pozos gravitatorios', 'b-special']);
+    if (d.desvia) b.push(['Desvía proyectiles', 'b-res']);
+    if (d.cuerda) b.push(['Acelera solo', 'b-special']);
+    if (d.pesado) b.push(['Retrasa torres', 'b-special']);
+    if (d.sinTiempo) b.push(['Fuera del tiempo', 'b-res']);
+    if (d.rebobina) b.push(['Rebobina', 'b-special']);
+    if (d.paradoja) b.push(['Paradoja', 'b-special']);
     if (d.resist) for (const k in d.resist) {
       const v = d.resist[k];
       b.push([(v === 0 ? 'Inmune ' : v < 1 ? 'Resiste ' : 'Débil ') + (DTYPE[k] || k).toLowerCase(), v > 1 ? 'b-special' : 'b-res']);
@@ -339,7 +367,7 @@
     box.innerHTML = '';
     if (tab === 'caos') {
       // la tercera era: pactos, eventos y poderes de cada reino
-      const era3 = PD.LEVELS.map((L, li) => [L, li]).filter(([L]) => L.era === 3);
+      const era3 = PD.LEVELS.map((L, li) => [L, li]).filter(([L]) => L.era >= 3);
       box.appendChild(el('<div class="alm-sec">⚖ Leyes de los reinos</div>'));
       box.appendChild(el('<p class="alm-nota">Cada reino de la Tercera Era tiene su propia ley, que dura toda la partida y decide la forma de ganarlo: lo que funciona en uno no sirve en otro.</p>'));
       for (const [L] of era3) { const Y = PD.LEYES[L.ley]; if (Y) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${Y.icon}</span><div><h4>${Y.name}</h4><div class="sub">${L.name} · ${Y.meta}</div></div></div><p>${Y.desc}</p></div>`)); }
@@ -347,9 +375,10 @@
       box.appendChild(el('<p class="alm-nota">En la Tercera Era, antes de la primera ronda y cada diez rondas se ofrecen tres de estos pactos: tomas uno (o ninguno) y su ventaja y su carga duran toda la partida. No se repiten. Desde el Jardín de Esporas, además, cada pacto aceptado da +12% de vida a los enemigos (se suma): elige pocos y bien.</p>'));
       for (const P of PD.PACTOS) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${P.icon}</span><div><h4>${P.name}</h4><div class="sub" style="color:#7affb0">✔ ${P.bueno}</div><div class="sub" style="color:#ff8a8a">✘ ${P.malo}</div></div></div></div>`));
       box.appendChild(el('<div class="alm-sec">⚡ Eventos</div>'));
-      box.appendChild(el('<p class="alm-nota">Una ronda de cada cinco (la 8, la 13, … la 98) trae un evento. La vista previa lo anuncia antes, para que prepares la defensa.</p>'));
+      box.appendChild(el('<p class="alm-nota">Una ronda de cada cinco (la 8, la 13, … la 98) trae un evento. En la Cuarta Era, desde la ronda 60 llegan los <b>eventos de titanes</b> (los marcados con ★), en las rondas que acaban en 2, 5 y 8. La vista previa lo anuncia antes, para que prepares la defensa.</p>'));
       for (const id in PD.EVENTOS) {
-        const E = PD.EVENTOS[id], donde = era3.filter(([L]) => L.eventos.includes(id)).map(([L]) => L.short).join(' · ');
+        const E = PD.EVENTOS[id], donde = era3.filter(([L]) => L.eventos.includes(id) || (L.eventosTarde || []).includes(id)).map(([L]) => L.short).join(' · ');
+        if (E.tarde) { box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${E.icon}</span><div><h4>★ ${E.name}</h4><div class="sub">Desde la ronda 60 · ${donde}</div></div></div><p>${E.desc}</p></div>`)); continue; }
         box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${E.icon}</span><div><h4>${E.name}</h4><div class="sub">${donde}</div></div></div><p>${E.desc}</p></div>`));
       }
       box.appendChild(el('<div class="alm-sec">✨ Poderes del Reino</div>'));
@@ -375,7 +404,7 @@
         if (b.ability && d.hero) stats.push('Habilidad: ' + PD.ABILITIES[b.ability].name);
         if (b.pct) stats.push(Math.round(b.pct * 1000) / 10 + '% de la vida/s');
         const pronto = d.realm !== undefined && enPrueba(d.realm) ? ' <span class="badge b-camo">Próximamente</span>' : '';
-        const where = (d.hero ? `<span class="badge b-boss">♛ Héroe de ${PD.LEVELS[d.realm].name} · uno por partida</span>`
+        const where = (d.hero ? `<span class="badge b-boss">♛ ${d.era4 ? 'Héroe de la Cuarta Era (a elección en los reinos 16–20)' : 'Héroe de ' + PD.LEVELS[d.realm].name} · uno por partida</span>`
           : d.realm === undefined ? '' : `<span class="badge b-special">Nueva en ${PD.LEVELS[d.realm].name}</span>`) + pronto;
         const card = el(`<div class="alm-card">
           <div class="alm-head"><canvas width="128" height="128"></canvas><div><h4>${d.name}</h4><div class="sub"><span style="color:var(--gold);font-weight:800">${fmt(d.cost)} oro</span> · ${stats.join(' · ')}</div>${where}</div></div>
@@ -415,7 +444,14 @@
       ['Reino 13 · Laberinto de Espejos', ['reflejo', 'prismaVivo', 'ilusion'], 12],
       ['Reino 14 · Archipiélago Celeste', ['templario', 'jinete', 'pirata', 'galeon'], 13],
       ['Reino 15 · La Noche Eterna', ['calabaza', 'semilla', 'murcielago', 'espantapajaros'], 14],
-      ['Jefes de la Tercera Era', ['liche', 'reinaMicelio', 'reinaEspejos', 'tifon', 'jineteSinCabeza'], 14]
+      ['Jefes de la Tercera Era', ['liche', 'reinaMicelio', 'reinaEspejos', 'tifon', 'jineteSinCabeza'], 14],
+      ['Los más grandes · Cuarta Era (R90+)', ['colosoTitan', 'nodriza'], 15],
+      ['Reino 16 · Templo de Jade', ['monje', 'terracota', 'cometa'], 15],
+      ['Reino 17 · Circo de las Sombras', ['payaso', 'acrobata', 'malabarista'], 16],
+      ['Reino 18 · Biblioteca Infinita', ['libro', 'pagina', 'origami', 'erudito'], 17],
+      ['Reino 19 · Cinturón Estelar', ['marciano', 'ovni', 'meteorito'], 18],
+      ['Reino 20 · El Corazón del Tiempo', ['cuerda', 'ecoTiempo', 'guardianReloj'], 19],
+      ['Jefes de la Cuarta Era', ['emperadorDragon', 'reyCirco', 'codice', 'vortex', 'aion'], 19]
     ];
     for (const [title, ids, li] of sections) {
       box.appendChild(el(`<div class="alm-sec">${title}${li !== undefined && enPrueba(li) ? ' · próximamente' : ''}</div>`));
@@ -474,7 +510,8 @@
       if (game.era3) {
         const Y = PD.LEYES[game.L.ley];
         if (Y) toast(`<b>${Y.icon} ${Y.name}</b>${Y.desc}`, 'boss', null, 11000);
-        toast('<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los diez héroes (uno por partida). Arriba en la tienda o con la tecla H.', 'special', null, 8000);
+        toast(`<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los ${cuantosHeroes(li)} héroes${game.era4 ? ' de la Cuarta Era' : ''} (uno por partida). Arriba en la tienda o con la tecla H.`, 'special', null, 8000);
+        if (game.L.eventosTarde) toast(`<b>🗿 Eventos de titanes</b>Desde la ronda 60 los eventos son más duros y más seguidos: ${game.L.eventosTarde.map(id => PD.EVENTOS[id].icon + ' ' + PD.EVENTOS[id].name).join(', ')}.`, 'boss', null, 9000);
         const P = PD.PODERES[game.L.poder];
         if (P) toast(`<b>${P.icon} Poder del Reino: ${P.name}</b>${P.desc} Se carga eliminando enemigos; lánzalo con el botón de abajo a la izquierda o la tecla V.`, 'special', null, 9000);
       }
@@ -541,7 +578,7 @@
   $('#poder').addEventListener('click', apuntaPoder);
   $('#poder').addEventListener('mousemove', ev => { if (!game || !game.L.poder) return; const P = PD.PODERES[game.L.poder]; showTip(`<b>${P.icon} ${P.name}</b>${P.desc}<br><span class="tc">Energía ${Math.floor(game.energia)} / ${PD.ENERGIA_MAX} · se carga eliminando enemigos · tecla V</span>`, ev.clientX, ev.clientY); });
   $('#poder').addEventListener('mouseleave', hideTip);
-  // elegir héroe entre los diez (tercera era)
+  // elegir héroe entre los diez (tercera era) o los cinco (cuarta)
   function eligeHeroe() {
     if (!game || game.hasHero() || ui.modal) return;
     const ids = PD.heroesOf(game.li);
@@ -568,9 +605,9 @@
     const hid = PD.heroOf(game.li);
     if (!hid && PD.heroesOf(game.li).length > 1) {
       const it = el(`<div class="shop-item hero" data-id="${HEROE}"><span class="nw">♛ HÉROE</span><span class="hk">H</span><canvas width="108" height="108"></canvas><div class="nm">A elección</div><div class="ct">Elegir</div></div>`);
-      towerIcon(it.querySelector('canvas'), game.towers.find(t => t.def.hero) ? game.towers.find(t => t.def.hero).type : 'heroeeclipse', [0, 0]);
+      towerIcon(it.querySelector('canvas'), game.towers.find(t => t.def.hero) ? game.towers.find(t => t.def.hero).type : game.era4 ? 'heroetiempo' : 'heroeeclipse', [0, 0]);
       it.addEventListener('click', eligeHeroe);
-      it.addEventListener('mousemove', ev => showTip('<b>♛ Héroe a elección</b>En la Tercera Era puedes llamar a cualquiera de los diez héroes, uno por partida.<br><span class="tc">Tecla H.</span>', ev.clientX, ev.clientY));
+      it.addEventListener('mousemove', ev => showTip(`<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los ${cuantosHeroes(game.li)} héroes${game.era4 ? ' de la Cuarta Era' : ''}, uno por partida.<br><span class="tc">Tecla H.</span>`, ev.clientX, ev.clientY));
       it.addEventListener('mouseleave', hideTip);
       shop.appendChild(it);
     }
@@ -985,6 +1022,13 @@
         case 'pacto': if (ev.pacto) toast(`<b>${ev.pacto.icon} ${ev.pacto.name}</b><span style="color:#7affb0">✔ ${ev.pacto.bueno}</span><br><span style="color:#ff8a8a">✘ ${ev.pacto.malo}</span>`, 'special', null, 5000); else toast('<b>Sin pacto</b>Esta vez sigues por tu cuenta.', '', null, 2500); break;
         case 'poder': sfx('upgradeMax', ev.x); break;
         case 'filacteria': toast(`<b>¡${ev.enemy.name || ev.enemy.d.name} esconde su alma!</b>Es INVULNERABLE hasta que destruyas sus 3 Filacterias.`, 'boss', { enemy: 'filacteria' }, 5000); break;
+        // jefes de la cuarta era
+        case 'forma': toast(ev.enemy.forma === 'cielo' ? '<b>¡El Emperador alza el vuelo!</b>Forma del CIELO: va casi el doble de rápido y esquiva proyectiles.' : '<b>¡El Emperador baja a tierra!</b>Forma de TIERRA: blindaje 14, pero va lento. ¡Es el momento de los golpes pesados!', 'boss', { enemy: ev.enemy.type }, 2600); break;
+        case 'perla': toast('<b>¡Se traga su perla!</b>El Emperador Dragón se cura un 20%.', 'boss', { enemy: ev.enemy.type }, 3000); break;
+        case 'baraja': toast('<b>¡A barajar!</b>Carcajada cambió de sitio dos de tus torres.', 'boss', { enemy: ev.enemy.type }, 2600); break;
+        case 'granFuncion': toast('<b>¡La Gran Función!</b>Carcajada es invulnerable unos segundos y saltan payasos a escena.', 'boss', { enemy: ev.enemy.type }, 3500); break;
+        case 'capitulo': toast(`<b>Capítulo ${ev.n}</b>El Códice escribe: todos los enemigos ganan un escudo.`, 'boss', { enemy: ev.enemy.type }, 3000); break;
+        case 'rebobina': toast('<b>¡Aion rebobina!</b>Vuelve a la vida que tenía hace 6 segundos. Bájale mucho de golpe.', 'boss', { enemy: ev.enemy.type }, 3000); break;
         case 'vendaval': toast('<b>¡Vendaval!</b>El alcance de tus torres baja un 35% unos segundos (salvo las que protege un Pararrayos).', 'boss', null, 2600); break;
         case 'ability': {
           const A = PD.ABILITIES[ev.id];
@@ -1036,7 +1080,7 @@
           sfx('victory');
           const li = game.li;
           const hasta = n => PD.LEVELS.slice(0, n).every((L, i) => save.won[i]);
-          const all = hasta(PD.LEVELS.length) ? 'quince' : li < PUB && hasta(PUB) ? 'cinco' : '';
+          const all = hasta(PD.LEVELS.length) ? 'veinte' : li < PUB && hasta(PUB) ? 'cinco' : '';
           modal(`<div class="big-ico">🏆</div><h2>¡Victoria!</h2><p>Has completado las 100 rondas de <b>${game.L.name}</b>.<br>Eliminados: ${fmt(game.stats.kills)} · Vidas restantes: ${fmt(game.lives)}</p>${all ? `<p><b>¡Has conquistado los ${all} reinos! Eres un verdadero PRO DEFENDER.</b></p>` : ''}`, [
             ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && save.unlocked > li ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
             { label: 'Volver a los reinos', fn: () => { game = null; rec = null; ui.paused = false; show('levels'); } }

@@ -578,6 +578,180 @@
       color: '#1a1020', accent: '#ff7a1a', shape: 'horseman', boss: true, resist: { fire: 0.5 },
       pumpkins: { every: 6, n: 2, dur: 3.5 }, charge: { every: 9, dur: 1.5, mult: 2.6 }, spawn: { every: 7, type: 'calabaza', n: 2 },
       desc: 'JEFE FINAL. Lanza CALABAZAS ardientes que apagan tus torres y cada pocos segundos EMBISTE a toda velocidad.'
+    },
+
+    // ================= CUARTA ERA (reinos 16–20) =================
+    // Otra vez una mecánica por campo (engine.js: cuartaEra y los ganchos de damage, kill y
+    // los proyectiles), así que los quince reinos anteriores se juegan exactamente igual:
+    //   esquiva     esquiva esa parte de los proyectiles que le llegan
+    //   falange     junto a otros de su tipo recibe menos daño
+    //   formas      cambia entre forma de tierra (blindada, lenta) y de cielo (rápida, esquiva)
+    //   perla       a esa parte de su vida se cura una vez
+    //   sorpresa    al caer suelta enemigos al azar de una lista
+    //   malabares   a ratos atrapa los proyectiles: no le hacen nada
+    //   barajar     cambia de sitio dos de tus torres
+    //   gran        a esa parte de su vida se vuelve invulnerable un momento e invoca a muchos
+    //   contra      contrahechizo: anula el siguiente golpe y apaga la torre que lo dio
+    //   roba        le quita velocidad a las torres que más daño le hicieron y se cura
+    //   capitulos   a esas partes de su vida da escudo a todos los enemigos del mapa
+    //   clona       se clona cada tanto (los clones no se clonan)
+    //   abduce      lleva hacia adelante a un aliado que va detrás
+    //   fragmenta   lo explosivo lo parte en dos (una vez)
+    //   pozo        abre pozos gravitatorios en el camino: los enemigos los cruzan más rápido
+    //   desvia      su gravedad desvía proyectiles que pasan cerca
+    //   cuerda      corre cada vez más
+    //   pesado      cada golpe que recibe le suma recarga a la torre que lo dio
+    //   sinTiempo   no le afectan ralentizaciones, congelaciones ni aturdimientos
+    //   rebobina    vuelve a la vida que tenía unos segundos antes
+    //   paradoja    las torres cercanas atacan a la mitad de velocidad un rato
+
+    // ------------------------- REINO 16 · TEMPLO DE JADE -------------------------
+    monje: {
+      name: 'Monje Errante', hp: 46, speed: 66, bounty: 6, leak: 2, r: 11, esquiva: 0.3,
+      color: '#e8902a', accent: '#ffe08a', shape: 'monk',
+      desc: 'ESQUIVA el 30% de los proyectiles. Rayos, áreas, venenos y auras no se esquivan.'
+    },
+    terracota: {
+      name: 'Guerrero de Terracota', hp: 120, armor: 6, speed: 36, bounty: 11, leak: 4, r: 14,
+      falange: { r: 70, n: 2, f: 0.5 },
+      color: '#b8704a', accent: '#5a3a2a', shape: 'terracotta',
+      desc: 'FALANGE: con 2 o más Guerreros de Terracota a menos de 70, recibe la MITAD del daño. Rómpelos con área o sepáralos.'
+    },
+    cometa: {
+      name: 'Cometa Dragón', hp: 40, speed: 88, bounty: 6, leak: 2, r: 12, flying: true,
+      charge: { every: 6, dur: 1.2, mult: 2.4 }, resist: { fire: 1.5 },
+      color: '#e83a3a', accent: '#ffd84d', shape: 'kite',
+      desc: 'Volador. Cada 6 s se lanza en PICADA y corre más del doble. El fuego le hace un 50% más.'
+    },
+    emperadorDragon: {
+      name: 'Long, Emperador Dragón', hp: 8400, armor: 4, speed: 20, bounty: 1300, leak: 9999, r: 48,
+      color: '#2aa86a', accent: '#ffd84d', shape: 'jadedragon', boss: true,
+      formas: { every: 9, armor: 14, lento: 0.6, rapido: 1.7, esquiva: 0.4 }, perla: { at: 0.5, heal: 0.2 },
+      spawn: { every: 6, type: 'monje', n: 3 },
+      desc: 'JEFE del Templo. Cada 9 s cambia de FORMA: en TIERRA lleva blindaje 14 y va lento; en el CIELO va casi el doble de rápido y esquiva el 40% de los proyectiles. A la mitad de su vida se traga su PERLA y se cura un 20%.'
+    },
+
+    // ------------------------ REINO 17 · CIRCO DE LAS SOMBRAS ------------------------
+    payaso: {
+      name: 'Payaso Sorpresa', hp: 50, speed: 58, bounty: 6, leak: 2, r: 12,
+      sorpresa: { n: 2, tipos: ['veloz', 'robusto', 'sombra', 'escudero'] },
+      color: '#ff4a6a', accent: '#5ad1ff', shape: 'clown',
+      desc: 'Al caer abre su CAJA DE SORPRESAS: salen 2 enemigos al azar (Chispa, Tortugón, Sombra o Portaescudos).'
+    },
+    acrobata: {
+      name: 'Acróbata de la Cuerda', hp: 52, speed: 64, bounty: 7, leak: 2, r: 11, camo: true,
+      hop: { every: 3.4, dur: 0.6, speed: 4 },
+      color: '#b84aff', accent: '#ffe060', shape: 'acrobat',
+      desc: 'CAMUFLADA. Da SALTOS mortales hacia adelante: en el aire nadie la toca.'
+    },
+    malabarista: {
+      name: 'Malabarista', hp: 85, armor: 2, speed: 46, bounty: 9, leak: 3, r: 13,
+      malabares: { every: 5, dur: 1.6 },
+      color: '#ffb84a', accent: '#ff4a6a', shape: 'juggler',
+      desc: 'Cada 5 s hace MALABARES 1.6 s: atrapa los proyectiles que le llegan y no le hacen nada. Rayos, áreas y venenos sí.'
+    },
+    reyCirco: {
+      name: 'Carcajada, Rey del Circo', hp: 8800, armor: 5, shield: 1200, speed: 21, bounty: 1350, leak: 9999, r: 46,
+      color: '#3a1a4a', accent: '#ff4a6a', shape: 'ringmaster', boss: true,
+      barajar: { every: 12 }, gran: { at: 0.3, dur: 3, type: 'payaso', n: 6 },
+      spawn: { every: 7, type: 'payaso', n: 2 },
+      desc: 'JEFE del Circo. Cada 12 s BARAJA tus defensas: dos torres cambian de sitio. Al bajar del 30% da su GRAN FUNCIÓN: 3 s invulnerable y salen 6 payasos.'
+    },
+
+    // ------------------------ REINO 18 · BIBLIOTECA INFINITA ------------------------
+    pagina: {
+      name: 'Página Suelta', hp: 9, speed: 98, bounty: 1, leak: 1, r: 7, flying: true, minor: true,
+      color: '#f4ecd8', accent: '#3a2a1a', shape: 'page',
+      desc: 'Una hoja que vuela rápido. Sale de los Libros Voladores.'
+    },
+    libro: {
+      name: 'Libro Volador', hp: 36, speed: 72, bounty: 6, leak: 2, r: 12, flying: true,
+      children: [['pagina', 3]],
+      color: '#8a2a2a', accent: '#ffd84d', shape: 'book',
+      desc: 'Volador. Al caer se deshoja en 3 Páginas Sueltas, rápidas y voladoras.'
+    },
+    origami: {
+      name: 'Gólem de Origami', hp: 140, speed: 38, bounty: 12, leak: 4, r: 15,
+      resist: { phys: 0.45, explosive: 0.45, elec: 0.45, ice: 0.45, steam: 0.45, poison: 0.6, arcane: 0.7, fire: 2.2 },
+      color: '#e8e0c8', accent: '#c83a3a', shape: 'origami',
+      desc: 'De papel doblado: RESISTE casi todo… salvo el FUEGO, que le hace más del doble.'
+    },
+    erudito: {
+      name: 'Erudito Sombrío', hp: 80, speed: 48, bounty: 10, leak: 3, r: 12,
+      contra: { every: 6, dur: 2 },
+      color: '#2a2a5a', accent: '#9ab4ff', shape: 'scholar',
+      desc: 'Cada 6 s prepara un CONTRAHECHIZO: anula el siguiente golpe que recibe y APAGA 2 s la torre que lo dio (los Pararrayos protegen).'
+    },
+    codice: {
+      name: 'El Códice Prohibido', hp: 8600, armor: 4, speed: 19, bounty: 1350, leak: 9999, r: 46,
+      color: '#4a1a1a', accent: '#ffd84d', shape: 'codex', boss: true,
+      roba: { every: 9, n: 2, dur: 6, radius: 240, heal: 0.03 }, capitulos: { at: [0.75, 0.5, 0.25], escudo: 0.25, propio: 0.06 },
+      spawn: { every: 6, type: 'libro', n: 2 },
+      desc: 'JEFE de la Biblioteca. Cada 9 s ROBA EL SABER de las 2 torres cercanas que más daño hicieron (atacan a la mitad 6 s) y se cura. Cada cuarto de vida escribe un CAPÍTULO: todos los enemigos ganan escudo.'
+    },
+
+    // ------------------------- REINO 19 · CINTURÓN ESTELAR -------------------------
+    marciano: {
+      name: 'Marciano Clonador', hp: 44, speed: 60, bounty: 6, leak: 2, r: 11,
+      clona: { every: 7, max: 2, f: 0.4 },
+      color: '#5aff6a', accent: '#c83aff', shape: 'alien',
+      desc: 'Cada 7 s se CLONA (hasta 2 veces): el clon sale con el 40% de la vida y da poco oro.'
+    },
+    ovni: {
+      name: 'Platillo Abductor', hp: 62, armor: 2, speed: 68, bounty: 8, leak: 2, r: 13, flying: true,
+      abduce: { every: 6, dist: 110, radius: 150 },
+      color: '#a8b4c8', accent: '#5affd8', shape: 'ufo',
+      desc: 'Volador. Cada 6 s ABDUCE al aliado que va más atrás cerca de él y lo deja 110 más adelante.'
+    },
+    meteorito: {
+      name: 'Meteorito Vivo', hp: 150, armor: 5, speed: 34, bounty: 12, leak: 4, r: 15, fragmenta: true,
+      color: '#6a4a3a', accent: '#ff7a2a', shape: 'meteor',
+      desc: 'Blindaje 5. Lo EXPLOSIVO lo parte en dos (una vez): cada mitad sigue con la mitad de la vida que le quedaba.'
+    },
+    vortex: {
+      name: 'Vórtex, Devorador de Estrellas', hp: 8000, armor: 3, shield: 2000, speed: 22, bounty: 1400, leak: 9999, r: 48,
+      color: '#1a0a3a', accent: '#8affff', shape: 'vortex', boss: true,
+      pozo: { every: 10, dur: 6, r: 80, mult: 2, delante: 220 }, desvia: { r: 140, p: 0.5 },
+      spawn: { every: 6, type: 'marciano', n: 3 },
+      desc: 'JEFE del Cinturón. Abre POZOS GRAVITATORIOS en el camino delante de él: los enemigos los cruzan al doble de velocidad. Su GRAVEDAD desvía la mitad de los proyectiles que pasan cerca.'
+    },
+
+    // ------------------------ REINO 20 · EL CORAZÓN DEL TIEMPO ------------------------
+    cuerda: {
+      name: 'Autómata de Cuerda', hp: 70, armor: 3, speed: 40, bounty: 8, leak: 3, r: 12,
+      cuerda: { cada: 3, paso: 0.12, max: 2.4 },
+      color: '#c8a050', accent: '#5ad1ff', shape: 'windup',
+      desc: 'Se da CUERDA solo: cada 3 s corre un 12% más, hasta x2.4. Hay que acabar con él pronto.'
+    },
+    ecoTiempo: {
+      name: 'Eco del Pasado', hp: 55, speed: 62, bounty: 7, leak: 2, r: 11, pesado: 0.3,
+      color: '#8ad0ff', accent: '#ffe6a0', shape: 'echo',
+      desc: 'Cada golpe que recibe RETRASA a la torre que lo dio: 0.3 s más de recarga. Mejor pocos golpes grandes.'
+    },
+    guardianReloj: {
+      name: 'Guardián del Reloj', hp: 190, armor: 7, speed: 30, bounty: 14, leak: 4, r: 15,
+      slowImmune: true, freezeImmune: true, sinTiempo: true,
+      color: '#5a4a2a', accent: '#ffcf4d', shape: 'clockguard',
+      desc: 'Blindaje 7. Vive FUERA DEL TIEMPO: no lo frenan, no lo congelan ni lo aturden.'
+    },
+    aion: {
+      name: 'Aion, Devorador del Tiempo', hp: 9400, armor: 6, speed: 20, bounty: 1600, leak: 9999, r: 50,
+      color: '#1a1a2a', accent: '#ffcf4d', shape: 'aion', boss: true,
+      rebobina: { every: 12, atras: 6 }, paradoja: { every: 8, dur: 3, r: 210 },
+      spawn: { every: 6, type: 'cuerda', n: 2 },
+      desc: 'JEFE FINAL de la Cuarta Era. Cada 12 s REBOBINA su vida a la que tenía 6 s antes: hay que bajarle mucho de golpe. Cada 8 s abre una PARADOJA: las torres cercanas atacan a la mitad 3 s.'
+    },
+
+    // -------------- los más grandes de la cuarta era (rondas 90+) --------------
+    colosoTitan: {
+      name: 'Coloso Titánico', hp: 12000, armor: 12, speed: 13, bounty: 700, leak: 200, r: 52,
+      color: '#d8c8a0', accent: '#ff3a3a', shape: 'supertank', rank: 4, children: [['leviatan', 1], ['ciudadela', 1]], big: true, fugaHijos: 0.5,
+      desc: 'EL TANQUE DEFINITIVO. Blindaje 12. Al caer libera un Leviatán de Acero y una Ciudadela de Guerra.'
+    },
+    nodriza: {
+      name: 'Nave Nodriza', hp: 12000, armor: 6, speed: 18, bounty: 550, leak: 110, r: 45, flying: true,
+      color: '#c8c8d8', accent: '#5affff', shape: 'blimp', rank: 4, children: [['arca', 1], ['celeste', 1]], big: true, fugaHijos: 0.5,
+      desc: 'EL GLOBO DEFINITIVO. Blindaje 6. Al reventar suelta un Arca de la Tormenta y un Acorazado Celeste.'
     }
   };
 
@@ -587,6 +761,7 @@
     if (d._leak !== undefined) return d._leak;
     let v = d.leak;
     if (d.children) for (const [c, n] of d.children) v += leakTotal(c) * n * (d.fugaHijos || 1);
+    if (d.sorpresa) v += d.sorpresa.n * d.sorpresa.tipos.reduce((a, c) => a + leakTotal(c), 0) / d.sorpresa.tipos.length;
     return (d._leak = Math.min(Math.ceil(v), 9999));
   }
   function threat(id) {
@@ -630,8 +805,20 @@
     if (d.frontShield) t *= 1.5;
     if (d.drain) t *= 1.3;
     if (d.taunt) t *= 1.4;
+    // cuarta era
+    if (d.esquiva) t *= 1 + d.esquiva;
+    if (d.falange) t *= 1.45;
+    if (d.malabares) t *= 1.35;
+    if (d.contra) t *= 1.3;
+    if (d.clona) t *= 1 + d.clona.max * d.clona.f;
+    if (d.abduce) t *= 1.45;
+    if (d.fragmenta) t *= 1.3;
+    if (d.cuerda) t *= 1.5;
+    if (d.pesado) t *= 1.3;
+    if (d.sinTiempo) t *= 1.2;
     t *= Math.pow(d.speed / 55, 0.6);
     if (d.children) for (const [c, n] of d.children) t += threat(c) * n;
+    if (d.sorpresa) t += d.sorpresa.n * d.sorpresa.tipos.reduce((a, c) => a + threat(c), 0) / d.sorpresa.tipos.length;
     return (d._threat = t);
   }
   for (const id in E) { E[id].id = id; leakTotal(id); threat(id); }
