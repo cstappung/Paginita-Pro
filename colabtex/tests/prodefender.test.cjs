@@ -767,6 +767,21 @@ test('cuarta era: cinco reinos, uno por día del 1 al 5 de noviembre, con su tab
   for(const R1 of R)for(const g of R1.groups)if(g.titan)assert.ok(PD.ENEMIES[g.type].big&&R1.evento==='titanes','el grupo extra es de grandes');
  }
  assert.ok(CUARTA.some(li=>PD.buildRounds(li).some(R=>R.groups.some(g=>g.titan))),'la Marcha de los Titanes trae su grupo');
+ // las flotas: desde `flota.desde` (la 50), cada ronda sin jefe trae muchos de los grandes más altos de la escalera
+ for(const li of CUARTA){
+  const R=PD.buildRounds(li),f=r=>R[r-1].groups.find(g=>g.flota);
+  for(let r=1;r<=100;r++){const F=f(r);if(r<PD.LEVELS[li].flota.desde||R[r-1].boss)assert.ok(!F,'R'+r+' sin flota');else{assert.ok(F&&PD.ENEMIES[F.type].big&&F.n>=2,PD.LEVELS[li].short+' R'+r+' con flota');}}
+  assert.ok(PD.ENEMIES[f(99).type].rank>=3&&f(99).n>=8,PD.LEVELS[li].short+': al final, muchos de lo más alto ('+f(99).type+' x'+f(99).n+')');
+ }
+ for(let li=0;li<15;li++)assert.ok(!PD.buildRounds(li).some(R=>R.groups.some(g=>g.flota)),'los reinos de antes no tienen flotas');
+ // la flota paga ¼ del oro (y sus hijos también): si pagara entero, más flota sería más economía
+ const gf=nuevo4(19),norm=gf.spawn('arca',0,300,1),fl=gf.spawn('arca',0,300,1);fl.flota=true;
+ assert.equal(gf.oroDe(fl),gf.oroDe(norm)/4);
+ const n0=gf.enemies.length;gf.damage(fl,1e12,'arcane',null,{});const hijos=gf.enemies.slice(n0);
+ assert.ok(hijos.length&&hijos.every(h=>h.flota),'los hijos de la flota también');
+ // y entra a la ronda desde la cola
+ const gq=new PD.Game(19,null,3);gq.round=61;gq.pactos=[0,10,20,30,40,50,60].map(r=>({r,id:null}));gq.lives=1e9;gq.startRound();assert.ok(gq.queue.some(q=>q.flota));
+ for(let k=0;k<60*90&&!gq.enemies.some(e=>e.flota);k++)gq.update(1/60);assert.ok(gq.enemies.some(e=>e.flota&&e.d.big));
  // los cinco nuevos no entran en la tercera era, que sigue con sus diez
  for(let li=10;li<15;li++){assert.equal(PD.heroesOf(li).length,10);assert.ok(!PD.heroesOf(li).some(id=>PD.TOWERS[id].era4));}
  // un solo héroe por partida, de los cinco

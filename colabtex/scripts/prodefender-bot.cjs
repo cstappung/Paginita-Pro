@@ -134,11 +134,11 @@ const MIXTA = [
   ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'balista', 'colmena', 'desintegrador', 'sierra', 'voltaico', 'prisma'],
   ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'mortero', 'segador', 'vigia', 'obelisco', 'dragon', 'prisma'],
   // cuarta era (reinos 15–19): con su defensa nueva
-  ['espinas', 'espinas', 'jade', 'espinas', 'prisma', 'dragon', 'vigia', 'balista', 'jade', 'mortero', 'prisma'],
+  ['espinas', 'espinas', 'jade', 'espinas', 'prisma', 'mortero', 'vigia', 'balista', 'jade', 'obelisco', 'prisma'],
   ['espinas', 'espinas', 'ruleta', 'espinas', 'prisma', 'voltaico', 'colmena', 'vigia', 'ruleta', 'bumeran', 'prisma'],
   ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'grimorio', 'vigia', 'balista', 'desintegrador', 'grimorio', 'dragon'],
   ['espinas', 'espinas', 'satelite', 'espinas', 'prisma', 'balista', 'vigia', 'sierra', 'desintegrador', 'satelite', 'prisma'],
-  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'balista', 'vigia', 'desintegrador', 'obelisco', 'dragon', 'prisma']
+  ['espinas', 'espinas', 'prisma', 'espinas', 'balista', 'mortero', 'vigia', 'obelisco', 'campanario', 'balista', 'prisma']
 ];
 // Tercera era: el héroe que elige (se puede cambiar con --heroe), el orden en que prefiere los
 // pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
@@ -783,7 +783,7 @@ class Bot {
   juega(verRondas) {
     const filas = [];
     let g = this.game, reintentos = 3, primeraDerrota = null, foto = null;
-    const vidasPerdidas = new Array(10).fill(0);
+    const vidasPerdidas = new Array(10).fill(0), sinJefes = new Array(10).fill(0);   // sinJefes: sin las rondas de jefe (cada jefe escapado son 9999)
     while (g.round < (this.op.hasta || PD.MAX_ROUND)) {
       this.vetadas = {};
       if (this.est.humana) { this.rehaceDe(JSON.parse(JSON.stringify(g.snapshot())), g.rs, g); g = this.game; }
@@ -818,6 +818,7 @@ class Bot {
       const perdidas = Math.max(0, vidas0 - g.lives);
       if (ayuda) g.lives = vidasReal;
       vidasPerdidas[Math.min(9, Math.floor((r - 1) / 10))] += perdidas;
+      if (r % 25) sinJefes[Math.min(9, Math.floor((r - 1) / 10))] += perdidas;
       this.presion = perdidas > 0 || avance > 0.85;
       this.calibra();
       const fila = { r, oro: Math.round(g.money), vidas: g.lives, avance: Math.round(avance * 100), seg: Math.round(pasos / 60), torres: g.towers.length, invertido: Math.round(g.towers.reduce((a, t) => a + t.spent, 0)) };
@@ -840,7 +841,7 @@ class Bot {
     return {
       reino: PD.LEVELS[this.li].short, estrategia: this.nombre, semilla: this.semilla,
       ronda: G.round, gano: !!G.won && !G.over, primeraDerrota, reintentosUsados: 3 - reintentos,
-      vidasFinal: G.lives, vidasMax: PD.LEVELS[this.li].lives, vidasPerdidas,
+      vidasFinal: G.lives, vidasMax: PD.LEVELS[this.li].lives, vidasPerdidas, sinJefes,
       avanceMedio: Math.round(filas.reduce((a, f) => a + f.avance, 0) / Math.max(1, filas.length)),
       avanceTarde: tarde.length ? Math.round(tarde.reduce((a, f) => a + f.avance, 0) / tarde.length) : null,
       heroe: (G.towers.find(t => t.def.hero) || { tiers: null }).tiers,
@@ -937,7 +938,7 @@ function main() {
   const partidas = [];
   for (const li of reinos) for (const est of ests) for (const s of semillas) partidas.push([li, est, s]);
   const linea = x => `${x.reino.padEnd(8)} ${x.estrategia.padEnd(8)} s${x.semilla}  ronda ${String(x.ronda).padStart(3)}${x.gano ? ' GANA' : '     '}  1ª derrota ${x.primeraDerrota ?? '-'}  reintentos ${x.reintentosUsados}  vidas ${x.vidasFinal}/${x.vidasMax}  ` +
-    `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}  ${(x.ms / 1000).toFixed(0)} s`;
+    `perdidas/decena [${x.vidasPerdidas.join(' ')}]  sin jefes [${(x.sinJefes || []).join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}  ${(x.ms / 1000).toFixed(0)} s`;
   // --hilos N: varias partidas a la vez, cada una en su proceso (por defecto, una por núcleo;
   // con --rondas o --fugas, de a una para que no se mezclen las líneas)
   const porRonda = args.includes('--rondas') || args.includes('--fugas');

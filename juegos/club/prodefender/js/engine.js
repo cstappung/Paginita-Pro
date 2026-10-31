@@ -122,7 +122,7 @@
   // Cuarta era (reinos con `era: 4`): las detenciones del tiempo (Cronotorre, Cronos, Pausa)
   // dejan un segundo de inmunidad, como las congelaciones; un marcado de jade que estalla no
   // hace más de JADE_TOPE veces la vida «de la ronda» (si no, un Leviatán marcado vaciaba el mapa).
-  const PARADO_IMM = 1, JADE_TOPE = 120;
+  const PARADO_IMM = 1, JADE_TOPE = 40;
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
@@ -636,7 +636,8 @@
       if (!R) return null;
       const agg = {};
       for (const g of R.groups) agg[g.type] = (agg[g.type] || 0) + g.n;
-      return { list: Object.entries(agg).sort((a, b) => PD.enemyThreat(b[0]) - PD.enemyThreat(a[0])), special: R.special, boss: R.boss, evento: R.evento || null };
+      const fl = R.groups.find(g => g.flota);   // cuarta era: la flota de grandes de la ronda
+      return { list: Object.entries(agg).sort((a, b) => PD.enemyThreat(b[0]) - PD.enemyThreat(a[0])), special: R.special, boss: R.boss, evento: R.evento || null, flota: fl ? { type: fl.type, n: fl.n } : null };
     }
     startRound() {
       if (this.active || this.over || this.round >= PD.MAX_ROUND) return false;
@@ -647,7 +648,7 @@
       for (const g of R.groups) {
         for (let i = 0; i < g.n; i++) {
           let path = g.path === -1 ? (i % this.paths.length) : Math.min(g.path, this.paths.length - 1);
-          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier, hpX: g.hpX || 1, mod: g.mod });
+          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier, hpX: g.hpX || 1, mod: g.mod, flota: g.flota });
         }
       }
       q.sort((a, b) => a.t - b.t);
@@ -988,6 +989,7 @@
       if (ev === 'lunaSangre') m *= 1.6; else if (ev === 'bendicion') m *= 1.25;
       if (e.dorado) m *= 8;
       if (e.clon) m *= 0.25;
+      if (e.flota) m *= 0.25;   // la flota de la cuarta era (y sus hijos): si pagara entero, más flota sería más oro
       if (e.elite) m *= 2;
       return m;
     }
@@ -1063,6 +1065,7 @@
           ch.slowF = e.slowF * 0.5; ch.slowT = e.slowT;
           ch.pulled = e.pulled; ch.kb = e.kb ? { ...e.kb } : null; ch.rifted = e.rifted;   // el retroceso ya gastado se hereda
           if (e.mod) this.modifica(ch, e.mod);
+          if (e.flota) ch.flota = true;
           k++;
         }
       }
@@ -2850,6 +2853,7 @@
           const q = this.queue[this.qi++];
           const e = this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1) * q.hpX, q.tier);   // hpX: grupo reforzado
           if (q.mod) this.modifica(e, q.mod);
+          if (q.flota) e.flota = true;   // cuarta era: la flota paga poco oro (oroDe)
           if (this.evento) this.alAparecer(e);
         }
         if (this.era3) this.tickTercera(dt);

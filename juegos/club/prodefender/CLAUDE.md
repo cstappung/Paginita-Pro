@@ -250,7 +250,7 @@ from in these 5 kingdoms, one new defense per map, new enemies, new events for r
   only shared code that changed reads fields old games never set (`e.elite`,
   `e.paradoT`, `e.callado`, `t.saber`, `escritoT`). Checked: the same scripted 60-round
   game in all fifteen kingdoms hashes identically on the old and new engine, so `VERSION`
-  stays 5 and only the cache tag moved (`pd-12`). `t.saber` goes in the snapshot as `sb`
+  stays 5 and only the cache tag moved (`pd-12`, `pd-13` after the re-balance). `t.saber` goes in the snapshot as `sb`
   only when non-zero, so old snapshots are byte-identical.
 - **Heroes** (`towers.js`, `era4: true`, `heroes: 'cuarta'` in the level): Kaito (jade
   marks, buff range/rate, *Vuelo del Dragón*), Madame Lúgubre (`ampAura`, *El Gran
@@ -278,7 +278,8 @@ from in these 5 kingdoms, one new defense per map, new enemies, new events for r
   children), contrahechizo, clona (clones pay ¼ gold), abduce, fragmenta (explosive splits
   once), cuerda (accelerates), pesado (adds cooldown to the tower that hit it), sinTiempo.
   Top of the ladder from round 90: `colosoTitan` (supertank rank 4) and `nodriza` (blimp
-  rank 4).
+  rank 4). The Pagoda's burst cap `JADE_TOPE` is 40× the round's HP scale (at 120 its chains
+  erased whole flotas).
 - **Bosses**: Long (formas: ground = +14 armour, slow; sky = fast, dodges; perla heals 20 %
   once), Carcajada (`barajar` swaps two towers' positions — clears `spots` and recalcs —,
   `gran` at 30 %: invulnerable + 6 clowns), El Códice (`roba`: the 2 towers near it with
@@ -298,13 +299,31 @@ from in these 5 kingdoms, one new defense per map, new enemies, new events for r
   types more from round 60.
 - **Powers**: `alientoJade`, `canonHumano`, `olvido` (`e.calladoT`), `agujero` (zone with
   `retiene`), `pausa` (`detiene` with ×1).
-- **Numbers**: `diff` 5.6 / 5.8 / 6.0 / 6.2 / 6.5, `pactoPrecio` 0.12–0.14 and `vidaTarde`
-  from round 30 to **100** (not 80): x14 / 15 / 16 / 17 / 18, so from round 80 they are
-  above Noche (x9) and keep climbing. `prodefender-bot --reino cuarta --ayuda 100` (mixta)
-  cannot measure the end: after round 60 it loses whole rounds in Noche and in these five
-  alike (avance 100 %, the same lives lost with x16 or x30), so doubling `vidaTarde` changed
-  nothing. Where it does measure (rounds 11–40) it loses 1.5–3× Noche's lives. Re-tune with
-  `--estrategia humana --libro` once there are human wins (as the third era was).
+- **Flotas** (`L.flota: {desde, de, a, max}`, owner's idea: «enviar muchos de los más duros»):
+  from round 50 every non-boss round gets an extra group of the highest big type of the ladder
+  already unlocked (tanks and balloons alternating — the other side while one has no ranked type yet —, own rng `seed + 7919`), paid with `de`→`a`
+  extra parts of the round's budget, n ≤ `max`, `g.flota` → `e.flota`, inherited by children.
+  **They pay ¼ gold** (`oroDe`): paying full, more flota meant more economy and the bot lost
+  *fewer* lives. The preview shows «🛸 Flota ×n» (`roundPreview().flota`).
+- **Numbers** (Nov 1, re-balanced on the owner's request «x14 tal vez sea mucho»): `vidaTarde`
+  from round **20** to 100: Jade x11, Circo x7, Biblioteca x12, Estelar x12, Tiempo x14 (the
+  card shows it); flotas `a` 2.0 / 0.8 / 2.0 / 2.2 / 3.6. Jade and Tiempo don't sell the
+  Dragon, none sells the Desintegrador, and Tiempo doesn't sell the Mortar either.
+- **How it was measured** (the first calibration was wrong): `mixta` with `--ayuda 100` loses
+  whole rounds from 60 on in every late kingdom, so it measures nothing there. Instead give
+  every kingdom the same handicap, `--vida 0.15` (enemy HP ×0.15, bosses untouched), and read
+  `sin jefes [...]` (lives lost outside boss rounds; each escaped boss is 9999 and drowned the
+  signal), rounds 61–100, two seeds (`--semilla 1` / `2`: they differ up to 2×). References:
+  Esporas 0.3k, Archipiélago 62k, Noche 85k. Final: Jade ~45k, Circo ~61k, Biblioteca ~66k,
+  Estelar ~74k, Tiempo ~91k. What the measuring taught:
+  - `vidaTarde` barely matters while a kingdom sells the **Desintegrador** (% of max HP) or the
+    **Dragon** (fire ignores armour): with them Tiempo lost 3.7k at x16, Biblioteca and Estelar
+    29k/14k. Remove them before touching numbers.
+  - **Map shape** dominates: Tiempo's first map funnelled three paths into one 670 px exit, the
+    second crossed them all in the centre (577 sites saw all three paths within 170 px); either
+    way the bot lost nothing before round 82 even at x16. The third has two far crossings of
+    two paths each and three exits (~148 such sites): 30k → 88k at the same numbers.
+  - In rounds 31–60 Circo costs the bot ~18k (era 3: ~7–10k); the others ~1–3k.
 - Art: 21 new `ART` shapes (supertank/blimp got a rank 4), towers and heroes in
   `TART`/`HERO_ART`, maps `jade`, `circo`, `biblio`, `estelar`, `tiempo` with their own rules
   (`CUARTA` in render.js: `sueloCuarta`, `CAPAS_CUARTA`, `caminoCuarta`, `bordeCuarta`,
