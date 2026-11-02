@@ -99,7 +99,7 @@ button { font-family: inherit; }
 .badge.b-armor { background: #444b55; color: #e1e6ee; } .badge.b-boss { background: #6a1a1a; color: #ffb0b0; }
 .badge.b-shield { background: #1f3f6a; color: #9fd0ff; } .badge.b-special { background: #2c4a33; color: #b0ffc4; }
 .badge.b-res { background: #5a3a1a; color: #ffd0a0; }
-.up-table { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.up-table { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .up-col h5 { margin: 0 0 4px; font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
 .up-col.p2 h5 { color: var(--blue); }
 .up-row { font-size: 12px; padding: 4px 0; border-top: 1px solid var(--line); }
@@ -160,12 +160,17 @@ button { font-family: inherit; }
 #info { position: absolute; inset: 0; background: var(--bg2); overflow: auto; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .inf-head { display: flex; gap: 10px; align-items: center; }
 .inf-head canvas { width: 58px; height: 58px; background: var(--panel); border-radius: 12px; flex: none; }
-.inf-head h3 { margin: 0; font-family: 'Fredoka', sans-serif; font-size: 19px; line-height: 1.1; }
+.inf-head > div { min-width: 0; }
+/* un nombre de una sola palabra larga («Guardabosques») empujaba la ✕ fuera del panel angosto */
+.inf-head h3 { margin: 0; font-family: 'Fredoka', sans-serif; font-size: 19px; line-height: 1.1; hyphens: auto; overflow-wrap: anywhere; }
 .inf-head .sub { font-size: 12px; color: var(--muted); }
 .inf-close { margin-left: auto; align-self: flex-start; background: var(--panel); border: 0; color: var(--muted); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 16px; flex: none; }
-.inf-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 12.5px; background: var(--panel); border-radius: 10px; padding: 8px 10px; }
-.inf-stats div { display: flex; justify-content: space-between; gap: 6px; }
-.inf-stats span { color: var(--muted); }
+/* minmax(0, …): con 1fr a secas un valor largo ensanchaba la columna y la otra quedaba fuera del panel */
+.inf-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; font-size: 12.5px; background: var(--panel); border-radius: 10px; padding: 8px 10px; }
+.inf-stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; min-width: 0; }
+.inf-stats div.ancha { grid-column: 1 / -1; }
+.inf-stats span { color: var(--muted); flex: none; }
+.inf-stats b { min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .inf-stats b.yes { color: var(--green); } .inf-stats b.no { color: #7a82a8; }
 .targets { display: flex; gap: 4px; }
 .targets button { flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 6px 0; font-weight: 800; font-size: 12px; cursor: pointer; }

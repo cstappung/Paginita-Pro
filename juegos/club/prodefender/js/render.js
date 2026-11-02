@@ -2507,6 +2507,29 @@
     return (TSPR[key] = { c: cv, half });
   }
 
+  // Tamaño a la vista (pedido del dueño: «normaliza el tamaño de las torres»). Cada dibujo
+  // ocupaba distinto (área opaca de radio 21 el Pararrayos, 25 el Mortero; héroes de 24 a 26,
+  // y algunos sobresalían hasta 73 px), así que cada tipo se escala una vez para que su versión
+  // sin mejoras ocupe lo mismo que un círculo de VISTA_TORRE (VISTA_HEROE los héroes, que
+  // siguen destacando). Solo el dibujo: el motor sigue con def.size para el espacio entre torres.
+  const VISTA_TORRE = 22, VISTA_HEROE = 24, ESCALA_VISTA = {};
+  function escalaVista(type) {
+    let k = ESCALA_VISTA[type];
+    if (k !== undefined) return k;
+    k = 1;
+    try {
+      const n = 240, cv = document.createElement('canvas'); cv.width = cv.height = n;
+      const c = cv.getContext('2d', { willReadFrequently: true });
+      drawTower(c, type, n / 2, n / 2, -Math.PI / 4, [0, 0], { icon: true, noPips: true, time: 0, sinEscala: true });
+      const d = c.getImageData(0, 0, n, n).data;
+      let opaco = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 60) opaco++;
+      const r = Math.sqrt(opaco / Math.PI);
+      if (r > 5) k = (PD.TOWERS[type].hero ? VISTA_HEROE : VISTA_TORRE) / r;
+    } catch (e) { k = 1; }
+    return (ESCALA_VISTA[type] = k);
+  }
+
   function drawTower(ctx, type, x, y, ang, tiers, o) {
     o = o || {};
     const def = PD.TOWERS[type], art = TART[type], sz = def.size;
@@ -2515,6 +2538,7 @@
     const ga = ctx.globalAlpha;
     ctx.save();
     ctx.translate(x, y);
+    if (!o.sinEscala) { const kv = escalaVista(type); if (kv !== 1) ctx.scale(kv, kv); }
     if (!o.icon && rank >= 2) {
       // halo de poder en el suelo
       const pu = 0.5 + 0.5 * Math.sin(time * 2.4 + x * 0.013), R = sz + 10 + rank * 4;
