@@ -1240,3 +1240,17 @@ export const watchSerie1 = cb =>
   onValue(ref(db, "prodropSerie1"), s => cb(s.val() || {}), () => cb({}));
 export const habilitaSerie1 = (uid, por) => set(ref(db, `prodropSerie1/${uid}`), { at: serverTimestamp(), por });
 export const quitaSerie1 = uid => remove(ref(db, `prodropSerie1/${uid}`));
+
+/* ---------- Beta testers: quién juega lo que todavía está a prueba ----------
+   `betaTesters/<uid>` = {at, por}: la lista la escribe un administrador
+   desde su panel (pestaña «Beta testers»), igual que la de la Serie 01.
+   Cada cuenta lee solo su propia entrada (no hace falta saber quién más
+   está) y los administradores la lista entera. Lo que la lista abre son las
+   entradas del salón con `beta: true` (hoy, Pro Kingdoms). Antes de publicar
+   las reglas la lectura falla y nadie es beta tester (`cb(false)`). */
+export const watchBeta = (uid, cb) =>
+  onValue(ref(db, `betaTesters/${uid}`), s => cb(s.exists()), () => cb(false));
+export const watchBetaTesters = cb =>
+  onValue(ref(db, "betaTesters"), s => cb(s.val() || {}, null), e => cb({}, e));
+export const ponBeta = (uid, por) => set(ref(db, `betaTesters/${uid}`), { at: serverTimestamp(), por });
+export const quitaBeta = uid => remove(ref(db, `betaTesters/${uid}`));

@@ -97,6 +97,7 @@ import { tintaVisible, cssTintas, nombreHtml } from "./juegos/tintas.js";
 import { crearCasino } from "./juegos/casino.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
+import { crearProKingdoms } from "./juegos/prokingdoms.js";
 import { crearMascotasPerfil } from "./juegos/perfil-mascota.js";
 import { mejoresDropsMascotas, pedidoObjeto } from "./juegos/mascotas-datos.js";
 import { fotoDe, pideFotos } from "./juegos/visor-mascota.js";
@@ -141,7 +142,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱", typerace: "⌨" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", typeraceclub: "⌨️", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", prokingdoms: "👑", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", typeraceclub: "⌨️", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -337,6 +338,7 @@ const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
   invitado: false,      // sin sesión: se ve el salón y se juega a lo de un jugador
   admin: false,         // `admins/<uid>`: ve el escudo 🛡️ y el panel #admin (null mientras se comprueba)
+  beta: false,          // `betaTesters/<uid>`: juega lo que está a prueba (Pro Kingdoms); null mientras se comprueba
   base: null,           // lo que dice Google, sin tocar
   vista: "vestibulo",     // vestibulo | partida | ranks
   pid: "",
@@ -365,7 +367,7 @@ function ordenPopular(claves) {
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
 }
 
-let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null, offSuspension = null, offSerie1 = null;
+let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null, offSuspension = null, offSerie1 = null, offBeta = null;
 let offChat = null, chatMsgs = [], chatFirma = "";
 let jugadasVistas = -1;   // cuántas jugadas tenía el registro la última vez
 let ultimoCambio = 0;     // cuándo creció el registro por última vez (reloj local)
@@ -380,6 +382,7 @@ let paginaPerfil = null;
 let monedasVista = null, casinoVista = null;
 let prodropVista = null;
 let mascotasVista = null;
+let proKingdomsVista = null;
 let mercadoVista = null;
 let adminVista = null;
 let individual = null;
@@ -1846,6 +1849,7 @@ function leerRuta() {
   // `#cartas/retos` abre los desafíos de plantilla
   if (h === "cartas" || h === "cartas/retos") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : h.slice(7) };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
+  if (h === "prokingdoms") return { vista: "prokingdoms", pid: "" };
   // `#mercado/futbol`: PRODROP con el filtro de la colección Fútbol (lo abren los desafíos de plantilla)
   const mk = h.match(/^mercado(?:\/(prodrop|futbol|mascotas|rock))?$/);
   if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
@@ -2254,6 +2258,7 @@ function desmontaVista() {
   if (casinoVista) { casinoVista.destruir(); casinoVista = null; }
   if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
   if (mascotasVista) { mascotasVista.destruir(); mascotasVista = null; }
+  if (proKingdomsVista) { proKingdomsVista.destruir(); proKingdomsVista = null; }
   if (mercadoVista) { mercadoVista.destruir(); mercadoVista = null; }
   if (adminVista) { adminVista.destruir(); adminVista = null; }
   if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
@@ -2547,6 +2552,8 @@ function armazon() {
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
+  /* Pro Kingdoms (beta) también: su iframe trae su barra, con «← Juegos» y el volumen. */
+  document.documentElement.classList.toggle("jg-prokingdoms", state.vista === "prokingdoms" && !motivo && state.beta === true);
   h.closest("main").classList.toggle("jg-ancho", !motivo && (state.vista === "partida" || state.vista.startsWith("solo-")));
   if (motivo) { h.innerHTML = puertaHtml(motivo); return; }
   const u = state.user;
@@ -2686,6 +2693,24 @@ function armazon() {
          todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
       quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mascotasVista.montar(h);
+    return;
+  }
+  if (state.vista === "prokingdoms") {
+    /* Pro Kingdoms, solo para beta testers (`betaTesters/<uid>`, la pestaña
+       del panel de admin). Esconde el juego; no es una cerradura: la
+       página del juego es pública como todo el sitio y no escribe en la base. */
+    if (state.beta !== true) {
+      h.innerHTML = `<section class="jg-puerta" aria-labelledby="jgPuertaT">
+        <span class="jg-puerta-ico" aria-hidden="true">🧪</span>
+        <h2 id="jgPuertaT">${state.beta === null ? "Comprobando…" : "Pro Kingdoms está en beta cerrada"}</h2>
+        <p>${state.beta === null ? "Un segundo: estamos mirando si estás en la lista de beta testers." : "Por ahora solo lo juegan los beta testers. Si quieres probarlo, pídele a un administrador que te agregue a la lista."}</p>
+        <div class="jg-puerta-btns"><a class="btn2" href="#">Volver al salón</a></div>
+      </section>`;
+      return;
+    }
+    h.innerHTML = "";
+    proKingdomsVista = crearProKingdoms({ usuario: state.user, volver: () => ir("") });
+    proKingdomsVista.montar(h);
     return;
   }
   if (state.vista === "admin") {
@@ -3531,7 +3556,7 @@ function pintaVestibulo() {
      contra bots al final, que son la versión pequeña de un multijugador. */
   const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()).filter(k => k !== "mkw" || bt3Visible());   // BT3 y MKW: solo los amigos
   const celular = enCelular();
-  entradasVes = entradasSalon(JUEGOS, orden);
+  entradasVes = entradasSalon(JUEGOS, orden, { beta: state.beta === true });   // lo que está a prueba, solo a los beta testers
   /* En el celular, lo que se juega con el dedo primero (`ordenaEntradas`). */
   entradasVes.multi = ordenaEntradas(entradasVes.multi, { invitado: inv, celular });
   if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3" && e.juego !== "mkw");
@@ -4405,8 +4430,9 @@ function wire() {
       state.invitado = true;
       state.salas = []; state.mias = []; state.enCurso = []; state.tablas = {};
       soltarPartida();
-      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension, offSerie1]) { if (f) { try { f(); } catch (e) {} } }
-      offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = offSerie1 = null;
+      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension, offSerie1, offBeta]) { if (f) { try { f(); } catch (e) {} } }
+      offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = offSerie1 = offBeta = null;
+      state.beta = false;
       fijaSerie1({}, "");
       fijaVeRock(false);
       state.admin = false;
@@ -4460,6 +4486,17 @@ function wire() {
     if (offSerie1) { try { offSerie1(); } catch (e) {} }
     fijaSerie1({}, user.uid);
     offSerie1 = fb.watchSerie1(l => { if (state.user && state.user.uid === user.uid) alCambiarSerie1(l, user.uid); });
+    /* ¿Es beta tester? Su propia entrada de `betaTesters`, en vivo: un
+       admin puede ponerlo o quitarlo con la pestaña abierta. */
+    if (offBeta) { try { offBeta(); } catch (e) {} }
+    state.beta = null;
+    offBeta = fb.watchBeta(user.uid, v => {
+      if (!state.user || state.user.uid !== user.uid || state.beta === v) return;
+      state.beta = v;
+      vesFirma = "";
+      if (state.vista === "prokingdoms") vistaPintada = "";   // el cartel se cambia por el juego (o al revés)
+      if (state.vista === "vestibulo" || state.vista === "prokingdoms") render();
+    });
     /* ¿Es administrador? Una lectura por sesión. */
     state.admin = null;
     fb.esAdminJuegos(user.uid).then(a => {

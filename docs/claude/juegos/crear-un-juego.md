@@ -172,6 +172,14 @@ places.
 - Add the game's doc (`docs/claude/juegos/<id>.md`, or `juegos/<id>/CLAUDE.md`
   for an iframe game) and its row in the root docs map.
 
+## Releasing a game to beta testers only
+
+Add `beta: true` to its `SOLOS` row. `entradasSalon(..., {beta})` hides it
+from everyone outside `betaTesters/<uid>` (the admin panel's «Beta testers»
+tab), and guests never see it. Its route must still check `state.beta` itself,
+the way `#prokingdoms` does. To open it to everyone, delete `beta: true`.
+Example: `juegos/prokingdoms/CLAUDE.md`.
+
 ## Before pushing
 
 ```

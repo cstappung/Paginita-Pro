@@ -450,6 +450,17 @@ segundo y recibe la de los demás. Con seis en la sala son del orden de
 plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
 al mes; si se juega mucho conviene mirar el uso en la consola.
 
+### ⚠ Los beta testers (Pro Kingdoms) piden publicar otra vez (2026-11-02)
+
+Hay un nodo nuevo, `betaTesters/<uid>` = `{at, por}`: la lista de quién juega
+lo que todavía está a prueba (hoy, Pro Kingdoms). Solo un administrador la
+escribe, desde la pestaña **Beta testers** del panel (`#admin` en Juegos).
+Cada cuenta lee solo su propia entrada, y los administradores leen la lista
+entera. Hasta publicar las reglas, nadie es beta tester (la lectura falla) y
+el panel avisa que faltan. El arreglo es el de siempre: pega
+`firebase/database.rules.json` entero y **Publicar**. Después, agrégate tú
+también a la lista: ser administrador no te hace beta tester.
+
 ### ⚠ PRO DEFENDER guarda una sola partida por reino: pide publicar otra vez (2026-10-25)
 
 Cada ronda del récord de PRO DEFENDER es una partida nueva con la prueba entera
