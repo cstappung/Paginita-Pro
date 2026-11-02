@@ -107,7 +107,7 @@ export function crearSalon(ctx) {
       ? `<span>${esc(e.genero)}</span>${f.salas ? `<span class="jg-mn-vivo"><i aria-hidden="true"></i>${f.salas} ${f.salas === 1 ? "sala" : "salas"}</span>` : `<span>${e.grupo ? "En grupo" : "Duelo"}</span>`}`
       : `<span>${esc(e.genero)}</span><span>${e.modo === "bots" || e.ranking === false ? "Sin ranking" : e.diario ? "📅 Reto diario" : "🏆 Ranking"}</span>`;
     const clases = ["jg-mn", obra ? "obra" : "", f.nuevo ? "nuevo" : "", bloq ? "bloq" : "", f.top ? "top" : "", actual && actual.id === e.id ? "sel" : ""].filter(Boolean).join(" ");
-    const etiqueta = `${e.nombre}. ${ins.largo}.${e.movil || e.pc ? " " + dondeSeJuega(e) + "." : ""}${obra ? " Trabajando para usted." : ""}${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
+    const etiqueta = `${e.nombre}. ${ins.largo}.${e.movil || e.pc ? " " + dondeSeJuega(e) + "." : ""}${obra ? " Trabajando para usted." : ""}${e.beta ? " Beta cerrada." : ""}${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
     return `
       <article class="${clases}" data-id="${esc(e.id)}" data-modo="${e.modo}" data-movil="${e.movil ? 1 : 0}" data-grupo="${e.modo === "multi" ? (e.grupo ? "grupo" : "duelo") : ""}" style="--c:${esc(e.color)}">
         <button class="jg-mn-abre" type="button" aria-haspopup="dialog" aria-expanded="${!!(actual && actual.id === e.id)}" aria-label="${esc(etiqueta)}">
@@ -116,7 +116,7 @@ export function crearSalon(ctx) {
         </button>
         <span class="jg-mn-modo m-${e.modo}" aria-hidden="true">${ins.ico}${esc(ins.corto)}${ins.pal ? `<span class="jg-mn-pal">${ins.pal}</span>` : ""}</span>
         ${plataformas(e)}
-        ${obra ? '<span class="jg-mn-etq obra" aria-hidden="true">🚧 Trabajando para usted</span>' : f.nuevo ? '<span class="jg-mn-etq" aria-hidden="true">Nuevo</span>' : f.top ? '<span class="jg-mn-etq top" aria-hidden="true">★<span> Más jugado</span></span>' : ""}
+        ${obra ? '<span class="jg-mn-etq obra" aria-hidden="true">🚧 Trabajando para usted</span>' : e.beta ? '<span class="jg-mn-etq beta" aria-hidden="true">🧪 Beta</span>' : f.nuevo ? '<span class="jg-mn-etq" aria-hidden="true">Nuevo</span>' : f.top ? '<span class="jg-mn-etq top" aria-hidden="true">★<span> Más jugado</span></span>' : ""}
         ${bloq ? `<span class="jg-mn-candado" aria-hidden="true">${CANDADO}<b>Requiere cuenta</b></span>` : ""}
         ${e.modo !== "multi" && !bloq ? `<a class="jg-mn-ya" href="${esc(e.ruta || e.url)}" aria-label="Jugar ya a ${esc(e.nombre)}" title="Jugar ya"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5z" fill="currentColor"/></svg></a>` : ""}
       </article>`;
@@ -290,6 +290,8 @@ export function crearSalon(ctx) {
     const chips = `<span class="jg-mn-modo m-${e.modo}">${ins.ico}${esc(ins.largo)}</span>` +
       (e.genero ? `<span class="jg-hoja-chip">${esc(e.genero)}</span>` : "") +
       (ctx.esNuevo(e.id) ? '<span class="jg-hoja-chip nuevo">Nuevo</span>' : "") +
+      /* Lo que está a prueba (`beta: true`): solo lo ve quien está en la lista de beta testers. */
+      (e.beta ? '<span class="jg-hoja-chip beta">🧪 Beta cerrada</span>' : "") +
       (e.diario ? '<span class="jg-hoja-chip">📅 Reto diario</span>' : "") +
       /* En la ficha se dice también lo contrario: quien la abre desde un
          teléfono tiene que saber antes de entrar que ahí no se puede jugar. */

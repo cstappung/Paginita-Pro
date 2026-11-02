@@ -19,7 +19,7 @@ runs client-side, and persistence for the collaborative tools lives in Firebase.
 - **ColabTeX** (`colabtex.html` + `colabtex-app.js`, source in `colabtex/src/`) — Overleaf-style collaborative LaTeX editor.
 - **ColabDraw** (`colabdraw.html` + `colabdraw-app.js`, source in `colabtex/src/draw/`) — Inkscape-style collaborative SVG editor.
 - **Informes** (`informes.html` + `informes-app.js`) — the shared bug tracker.
-- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, the Casino, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage).
+- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, the Casino, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage) and Pro Kingdoms (`juegos/prokingdoms/`, beta testers only).
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the
@@ -58,6 +58,7 @@ before the first edit. Read only the docs the task needs.
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción, Pueblo (plaza, vecinos, visitas, cariños) | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
+| Pro Kingdoms (reinos, isométrico), beta testers, juegos en beta, servidor del mundo compartido | `juegos/prokingdoms/CLAUDE.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 
@@ -138,7 +139,9 @@ added to. Then the docs it names.
 ## Commands
 
 `colabtex/` is the build workspace for **both** web apps — it is the only
-folder with `node_modules`, and duplicating it just for Firebase + Yjs would
+web-side folder with `node_modules` (the other is `functions/`, the Cloud
+Function behind Pro Kingdoms online, deployed by hand with
+`firebase deploy --only functions`; see `juegos/prokingdoms/CLAUDE.md`), and duplicating it just for Firebase + Yjs would
 cost ~200 MB. Run everything from there:
 
 ```

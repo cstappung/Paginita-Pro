@@ -873,6 +873,21 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await loginAs(A);
   await allowed("el admin se la quita a B", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
   await remove(ref(db, `prodropSerie1/${ua.uid}`));
+  // Beta testers: la lista la lleva el admin; cada cuenta lee solo su entrada
+  const bt = (u, x) => set(ref(db, `betaTesters/${u}`), Object.assign({ at: serverTimestamp(), por: ua.uid }, x));
+  await denied("la beta no se firma a nombre de otro", () => bt(ub.uid, { por: ub.uid }));
+  await denied("ni lleva otra hora", () => bt(ub.uid, { at: 5 }));
+  await denied("ni campos de más", () => bt(ub.uid, { extra: 1 }));
+  await allowed("el admin hace beta tester a B", () => bt(ub.uid, {}));
+  await allowed("el admin lee la lista entera", () => get(ref(db, "betaTesters")));
+  await loginAs(B);
+  await allowed("B lee su propia entrada", () => get(ref(db, `betaTesters/${ub.uid}`)));
+  await denied("B no lee la lista entera", () => get(ref(db, "betaTesters")));
+  await denied("ni la entrada de otro", () => get(ref(db, `betaTesters/${ua.uid}`)));
+  await denied("B no se quita la beta", () => remove(ref(db, `betaTesters/${ub.uid}`)));
+  await denied("ni hace beta tester a otro", () => set(ref(db, `betaTesters/${ua.uid}`), { at: serverTimestamp(), por: ub.uid }));
+  await loginAs(A);
+  await allowed("el admin le quita la beta a B", () => remove(ref(db, `betaTesters/${ub.uid}`)));
   // Batalla de Rock: cajas y rockero, cada uno los suyos (abierto a todos)
   const caja = (u, x) => set(push(ref(db, `rock/c/${u}`)), Object.assign({ at: serverTimestamp(), p: 500, b: "f" }, x));
   await denied("una caja de rock no cuesta menos", () => caja(ua.uid, { p: 50 }));

@@ -6,7 +6,7 @@
 `juegos/admin-datos.js`, pure and shared with
 `scripts/auditar-club.cjs`; `tests/admin.test.cjs`). The 🛡️ in the header
 appears after one `esAdminJuegos` read per session. The panel is the face,
-not the key: every write is re-checked by the rules. Five tabs:
+not the key: every write is re-checked by the rules. The tabs:
 
 - **Récords**: `guardaConPodio` writes `revisiones/<cat>/<uid>` = `{p, pts,
   t, l, n, at}` whenever a club record climbs to places 1–3
@@ -45,6 +45,13 @@ not the key: every write is re-checked by the rules. Five tabs:
   someone keeps every card of theirs (`juegos/prodrop/CLAUDE.md`). The tab
   shows how many Serie 01 copies each account owns, and the admin must add
   themselves to see it too.
+- **Beta testers**: who plays what is still being tested (the `SOLOS`
+  entries with `beta: true`, today Pro Kingdoms). The node is
+  `betaTesters/<uid>` = `{at, por}`, written by admins. Each account reads only
+  its own entry (`fb.watchBeta`, live, so adding someone shows the game in
+  their open tab) and admins read the whole list (`watchBetaTesters`). It is
+  the same picker and buttons as Serie 01. Admins must add themselves too.
+  Details: `juegos/prokingdoms/CLAUDE.md`.
 - **Economía**: the economy cierre (`docs/claude/juegos/perfiles-y-economia.md`,
   «closed by periods»). *Preparar cierre* computes it up to a day ago,
   checks it (`verificaCierre`) and only then offers *Cerrar y archivar*;

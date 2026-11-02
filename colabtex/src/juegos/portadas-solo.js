@@ -45,6 +45,39 @@ const ARTE = {
     <g class="a-late" transform="translate(340 62)"><path d="M-20 -26 H20 V-6 A20 20 0 0 1 -20 -6 Z" fill="url(#c${u})"/><path d="M-20 -20 H-30 A10 10 0 0 0 -20 -2 M20 -20 H30 A10 10 0 0 1 20 -2" fill="none" stroke="#ffcf33" stroke-width="4"/>
       <rect x="-5" y="12" width="10" height="10" fill="#ffcf33"/><rect x="-15" y="22" width="30" height="7" rx="2" fill="#b8860b"/></g>`;
   },
+  /* Pro Kingdoms (beta): una isla isométrica al atardecer con el castillo,
+     dos casas, un árbol y la corona del reino. Pixel art: bordes duros. */
+  prokingdoms: u => {
+    const casa = (x, y, t) => `<g transform="translate(${x} ${y})"><path d="M-14 0 L0 7 L14 0 L14 -14 L0 -7 L-14 -14 Z" fill="#d9c08c"/><path d="M0 7 L14 0 L14 -14 L0 -7 Z" fill="#b89a64"/>
+      <path d="M-16 -13 L0 -5 L0 -23 Z" fill="${t}"/><path d="M0 -5 L16 -13 L0 -23 Z" fill="#7a2f22"/><rect x="4" y="-6" width="5" height="7" fill="#3b2615"/></g>`;
+    let estrellas = "";
+    for (const [x, y] of [[30, 26], [72, 52], [118, 18], [160, 44], [246, 22], [282, 50], [380, 30], [20, 84]]) estrellas += `<rect class="a-late" x="${x}" y="${y}" width="3" height="3" fill="#fff6d0"/>`;
+    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241736"/><stop offset=".55" stop-color="#7a3a52"/><stop offset="1" stop-color="#e8894a"/></linearGradient>
+      <linearGradient id="c${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#e8b84a"/><stop offset="1" stop-color="#9a6a18"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>${estrellas}
+    <g shape-rendering="crispEdges">
+      <path d="M30 196 L200 281 L200 300 L30 215 Z" fill="#6b4c30"/><path d="M200 281 L370 196 L370 215 L200 300 Z" fill="#4a3220"/>
+      <path d="M200 111 L370 196 L200 281 L30 196 Z" fill="#5f9a3e"/>
+      <path d="M200 131 L330 196 L200 261 L70 196 Z" fill="#6fae46"/>
+      <path d="M120 226 L200 186 L280 226" fill="none" stroke="#c9a66a" stroke-width="6"/>
+      ${casa(96, 214, "#a8382a")}${casa(300, 222, "#a8382a")}
+      <g transform="translate(276 176)"><rect x="-2" y="-4" width="4" height="10" fill="#5a3a20"/><path d="M-11 -4 L0 -24 L11 -4 Z" fill="#2f6b2a"/><path d="M-8 -14 L0 -30 L8 -14 Z" fill="#3c8a34"/></g>
+      <g transform="translate(200 196)">
+        <path d="M-34 0 L0 17 L34 0 L34 -46 L0 -29 L-34 -46 Z" fill="#c9c2b0"/><path d="M0 17 L34 0 L34 -46 L0 -29 Z" fill="#9a927e"/>
+        <path d="M-34 -46 L-34 -54 L-26 -50 L-26 -42 L-18 -38 L-18 -46 L-10 -42 L-10 -34 L0 -29 L0 -37 L-34 -54" fill="#d8d2c2"/>
+        <rect x="-46" y="-70" width="16" height="72" fill="#b8b09c"/><rect x="-46" y="-78" width="5" height="8" fill="#b8b09c"/><rect x="-35" y="-78" width="5" height="8" fill="#b8b09c"/>
+        <rect x="30" y="-70" width="16" height="72" fill="#8a826e"/><rect x="30" y="-78" width="5" height="8" fill="#8a826e"/><rect x="41" y="-78" width="5" height="8" fill="#8a826e"/>
+        <rect x="-10" y="-84" width="20" height="62" fill="#d0c8b4"/><rect x="0" y="-84" width="10" height="62" fill="#a39b86"/>
+        <rect x="-10" y="-92" width="6" height="8" fill="#d0c8b4"/><rect x="4" y="-92" width="6" height="8" fill="#a39b86"/>
+        <rect x="-4" y="-70" width="8" height="10" fill="#3b2615"/><rect x="-7" y="-8" width="14" height="18" fill="#3b2615"/><rect x="-5" y="-6" width="10" height="16" fill="#5a3a20"/>
+        <rect x="-41" y="-56" width="6" height="8" fill="#ffd36a"/><rect x="35" y="-56" width="6" height="8" fill="#e8a83a"/>
+        <rect x="-1" y="-118" width="2" height="28" fill="#3b2615"/>
+        <g transform="translate(1 -118)"><path class="a-flamea" d="M0 0 H20 L15 6 L20 12 H0 Z" fill="#e8b84a"/></g>
+      </g>
+    </g>
+    <g transform="translate(336 64)"><g class="a-late"><path d="M-26 10 L-30 -16 L-14 -2 L0 -22 L14 -2 L30 -16 L26 10 Z" fill="url(#c${u})" stroke="#5a3a10" stroke-width="2.5" stroke-linejoin="round"/>
+      <rect x="-26" y="10" width="52" height="9" rx="2" fill="#c8901e" stroke="#5a3a10" stroke-width="2.5"/><circle cx="0" cy="-22" r="3.5" fill="#e8503c"/><circle cx="-30" cy="-16" r="3" fill="#6aa8ff"/><circle cx="30" cy="-16" r="3" fill="#6aa8ff"/></g></g>`;
+  },
   snake: u => `<defs><radialGradient id="g${u}" cx=".75" cy=".3" r=".9"><stop offset="0" stop-color="#1f8a5a"/><stop offset="1" stop-color="#08201a"/></radialGradient>
     <pattern id="r${u}" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M25 0H0V25" fill="none" stroke="#fff" stroke-opacity=".07"/></pattern></defs>
     <rect width="400" height="300" fill="url(#g${u})"/><rect width="400" height="300" fill="url(#r${u})"/>

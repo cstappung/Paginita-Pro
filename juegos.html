@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610310333"></script>
+<script src="i18n.js?v=202611020504"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -3167,6 +3167,12 @@ html.jg-mascotas .head,html.jg-mascotas .bar,html.jg-mascotas .rp-fab{display:no
 html.jg-mascotas #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#fff8ee}
 .jg-mascotas-frame{display:block;width:100%;height:100%;border:0;background:#fff8ee}
 html[data-tema=oscuro].jg-mascotas #pantalla,html[data-tema=oscuro] .jg-mascotas-frame{background:#17131f}
+/* Pro Kingdoms (beta): el iframe ocupa la ventana; su barra trae «← Juegos» y el volumen. El juego es oscuro en los dos temas. */
+html.jg-prokingdoms,html.jg-prokingdoms body{overflow:hidden;height:100%}
+html.jg-prokingdoms .head,html.jg-prokingdoms .bar,html.jg-prokingdoms .rp-fab{display:none!important}
+html.jg-prokingdoms #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#16140f}
+.jg-prokingdoms-frame{display:block;width:100%;height:100%;border:0;background:#16140f}
+html[data-tema=oscuro].jg-prokingdoms #pantalla,html[data-tema=oscuro] .jg-prokingdoms-frame{background:#16140f}
 @media(max-width:1050px){.jg-partida-layout{grid-template-columns:minmax(0,1fr)}.jg-partida-layout>.jg-chat{position:static;height:300px}.jg-solo-barra nav{margin-left:0}}
 /* ---------- logros ---------- */
 .jg-lg{display:grid;gap:18px;max-width:980px;margin:0 auto}
@@ -5572,6 +5578,8 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 /* «Trabajando para usted» (SALAS_EN_OBRA): cinta de obra amarilla y negra */
 .jg-mn-etq.obra{top:84px;background:repeating-linear-gradient(-45deg,#ffd21f 0 7px,#ffbf00 7px 14px);color:#1a0a00;letter-spacing:.02em;text-transform:none;border:1px solid #1a0a00}
 .jg-mn-etq.obra:after{display:none}
+.jg-mn-etq.beta{background:#e8b84a;color:#2a1a00;letter-spacing:.03em}
+.jg-mn-etq.beta:after{display:none}
 /* En una tarjeta angosta la estrella sola: el texto pisaba la insignia de modo. */
 @container (max-width:250px){.jg-mn-etq.top>span{display:none}}
 /* Y en una de teléfono chico (dos columnas a 320 px) «2–10 jugadores» no
@@ -5631,6 +5639,7 @@ html.jg-hoja-abierta .rp-fab{display:none}
 .jg-hoja-chips{display:flex;flex-wrap:wrap;gap:6px}
 .jg-hoja-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;background:#f2eef9;color:#5c566c;font:600 11px/1.4 'IBM Plex Sans',sans-serif}
 .jg-hoja-chip.nuevo{background:#dcfce7;color:#166534}
+.jg-hoja-chip.beta{background:#fdf2d0;color:#7a4b00}
 .jg-hoja-chip.movil,.jg-hoja-chip.pc{gap:4px}
 .jg-hoja-chip.movil{background:#e0f2fe;color:#075985}
 .jg-hoja-chip.pc{background:#fef3c7;color:#854d0e}
@@ -5881,6 +5890,7 @@ html[data-tema=oscuro] .jg-hoja{background:var(--os-sup);border-color:var(--os-b
 html[data-tema=oscuro] .jg-hoja-pie{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-hoja-chip{background:var(--os-sup3);color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-chip.nuevo{background:#14351f;color:#86efac}
+html[data-tema=oscuro] .jg-hoja-chip.beta{background:#3a2a08;color:#fcd581}
 html[data-tema=oscuro] .jg-hoja-chip.movil{background:#0c2d42;color:#bae6fd}
 html[data-tema=oscuro] .jg-hoja-chip.pc{background:#3a2a0c;color:#fde68a}
 html[data-tema=oscuro] .jg-hoja-lema,html[data-tema=oscuro] .jg-hoja-cuenta p,html[data-tema=oscuro] .jg-puerta p{color:var(--os-tx2)}
@@ -6037,7 +6047,7 @@ html.jg-cg-abierto .rp-fab{display:none}
 }
 /* Pantalla completa: ni burbuja ni panel (la sala inmersiva, el Tetris
    inmersivo, el modo celular del club, PRODROP y Mascotas). */
-html:is(.jg-inm,.jg-tt-inm,.jg-club-inm,.jg-club-pleno,.jg-prodrop,.jg-mascotas) :is(.jg-cg-fab,.jg-cg,.jg-cg-fondo){display:none!important}
+html:is(.jg-inm,.jg-tt-inm,.jg-club-inm,.jg-club-pleno,.jg-prodrop,.jg-mascotas,.jg-prokingdoms) :is(.jg-cg-fab,.jg-cg,.jg-cg-fondo){display:none!important}
 @keyframes jgCgPunto{from{transform:scale(.4)}60%{transform:scale(1.2)}}
 
 /* ---- Los super chats (rieles-datos.js, `SUPER_CHAT`) ----
@@ -7043,6 +7053,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610310333"></script>
+<script src="juegos-app.js?v=202611020504"></script>
 </body>
 </html>

@@ -11,6 +11,10 @@ Read before touching `firebase/database.rules.json`, `storage.rules`, or adding 
   in [firebase/CONFIGURAR-FIREBASE.md](firebase/CONFIGURAR-FIREBASE.md). After
   editing `firebase/database.rules.json` or `storage.rules`, re-publish them
   there.
+- **The only server code is `functions/`** (Cloud Function `prokingdoms`,
+  Blaze plan). It is deployed by hand (`firebase deploy --only functions`,
+  CONFIGURAR-FIREBASE.md §5), never by a push. It writes `prokingdoms/` with
+  the Admin SDK, and the rules close that node to the web.
 - **Login in the iPhone home-screen app is a redirect, on our own domain.**
   There (`navigator.standalone`) the Google popup never returns to the app,
   so `src/firebase.js` (`conRedireccion`) uses `signInWithRedirect` with
