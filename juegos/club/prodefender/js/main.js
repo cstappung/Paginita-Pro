@@ -6,6 +6,10 @@
   const W = PD.W, H = PD.H, STEP = 1 / 60;
   const $ = s => document.querySelector(s);
   const fmt = n => Math.floor(n).toLocaleString('es-ES');
+  // Tres cifras significativas (desde 100, el entero: no se borran cifras de un daño de 1234),
+  // con coma como los miles de fmt. Sin esto se veían «29.1» junto a «106.891» y recargas como
+  // «19.599999999999998 s», que además ensanchaban el panel de la torre.
+  const n1 = v => Math.abs(v) >= 100 ? Math.round(v).toLocaleString('es-ES') : v.toLocaleString('es-ES', { maximumSignificantDigits: 3 });
   // Dentro de Juegos el guardado es de cada cuenta (conexion.js: Club.storageKey).
   const CLUB = window.Club || null;
   const SAVE_KEY = CLUB ? CLUB.storageKey('prodefender.save.v1') : 'prodefender.save.v1';
@@ -717,13 +721,12 @@
     if (k === 'support') {
       rows.push(['Velocidad', `<b>+${Math.round(s.buffRate * 100)}%</b>`]);
       rows.push(['Alcance', `<b>+${Math.round((s.buffRange || 0) * 100)}%</b>`]);
-      rows.push(['Daño', `<b>${s.buffDmgMult ? 'x' + s.buffDmgMult : '+' + (s.buffDmg || 0)}</b>`]);
+      rows.push(['Daño', `<b>${s.buffDmgMult ? 'x' + n1(s.buffDmgMult) : '+' + n1(s.buffDmg || 0)}</b>`]);
       rows.push(['Da camuflaje', yn(s.buffCamo)]);
       rows.push(['Rompe blindaje', `<b>${Math.round((s.buffArmor || 0) * 100)}%</b>`]);
       rows.push(['Área', `<b>${Math.round(s.range)}</b>`]);
       return rows;
     }
-    const n1 = v => (Math.round(v * 10) / 10).toString();
     if (k === 'hero') {
       const A = PD.ABILITIES[s.ability];
       rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
@@ -731,15 +734,15 @@
       else rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}${s.count > 1 ? ' ×' + s.count : s.bolts > 1 ? ' ×' + s.bolts : s.shells > 1 ? ' ×' + s.shells : ''}</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
       if (s.lifeRegen) rows.push(['Cura / ronda', `<b>+${s.lifeRegen} ❤</b>`]);
-      if (s.shredAura) rows.push(['Quita blindaje', `<b>${s.shredAura}</b>`]);
+      if (s.shredAura) rows.push(['Quita blindaje', `<b>${n1(s.shredAura)}</b>`]);
       if (s.ampAura) rows.push(['Daño recibido', `<b>+${Math.round(s.ampAura * 100)}%</b>`]);
       if (s.slowAura) rows.push(['Aura lenta', `<b>${Math.round(s.slowAura * 100)}%</b>`]);
-      if (s.buffDmgMult) rows.push(['Torres cercanas', `<b>x${s.buffDmgMult}${s.buffRate ? ' · +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      if (s.buffDmgMult) rows.push(['Torres cercanas', `<b>x${n1(s.buffDmgMult)}${s.buffRate ? ' · +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
       else if (s.buffRate || s.buffRange) rows.push(['Torres cercanas', `<b>+${Math.round((s.buffRange || 0) * 100)}% alcance · +${Math.round((s.buffRate || 0) * 100)}% vel.</b>`]);
       if (s.goldAura) rows.push(['Oro en su alcance', `<b>+${Math.round((s.goldAura - 1) * 100)}%</b>`]);
       if (s.heroDiscount) rows.push(['Mejoras cercanas', `<b>−${Math.round(s.heroDiscount * 100)}%</b>`]);
       if (s.purgeAura) rows.push(['Su luz', '<b class="yes">Revela y quita invulnerabilidad</b>']);
-      rows.push(['Habilidad', `<b>${A.name} · ${abCd(t)} s</b>`]);
+      rows.push(['Habilidad', `<b>${A.name} · ${n1(abCd(t))} s</b>`]);
       rows.push(['Camuflados', s.atk === 'slam' ? '<b class="yes">Área</b>' : yn(s.camo)]);
       rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
@@ -758,7 +761,7 @@
       rows.push(['Murallas', `<b>${s.maxWalls}</b>`]);
       rows.push(['Resistencia', `<b>${Math.round(s.wallHp)}</b>`]);
       rows.push(['Brota cada', `<b>${n1(s.cd)} s</b>`]);
-      rows.push(['Espinas', `<b>${s.thornDps ? s.thornDps + '/s' : 'No'}</b>`]);
+      rows.push(['Espinas', `<b>${s.thornDps ? n1(s.thornDps) + '/s' : 'No'}</b>`]);
       rows.push(['Frena jefes', yn(s.bossHold)]);
       rows.push(['Área', `<b>${Math.round(s.range)}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
@@ -789,7 +792,7 @@
       rows.push(['Saltos', `<b>${s.jumps}</b>`]);
       rows.push(['Cada', `<b>${n1(s.cd)} s</b>`]);
       rows.push(['Protege', '<b class="yes">Torres en su alcance</b>']);
-      if (s.buffRate || s.buffDmgMult) rows.push(['Protegidas', `<b>${s.buffDmgMult ? 'x' + s.buffDmgMult + ' daño' : ''}${s.buffRate ? ' +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      if (s.buffRate || s.buffDmgMult) rows.push(['Protegidas', `<b>${s.buffDmgMult ? 'x' + n1(s.buffDmgMult) + ' daño' : ''}${s.buffRate ? ' +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
       rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
@@ -798,8 +801,8 @@
     if (k === 'frog' || k === 'bubble' || k === 'bell' || k === 'disint') {
       if (k === 'disint') { rows.push(['Vida/s', `<b>${n1(s.pct * 100)}% + ${n1(s.dps)}</b>`]); rows.push(['Rayos', `<b>${s.beams}</b>`]); }
       else rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
-      if (k === 'frog') { rows.push(['Sapo', `<b>${n1(s.frogDur)} s${s.frogBig ? ' (grandes ' + s.frogBig + ' s)' : ''}</b>`]); rows.push(['Radio', `<b>${Math.round(s.radius)}</b>`]); }
-      if (k === 'bubble') { rows.push(['Atrapa', `<b>${n1(s.trapDur)} s${s.trapBig ? ' (grandes ' + s.trapBig + ' s)' : ''}</b>`]); rows.push(['Burbujas', `<b>${s.count || 1} / ${n1(s.cd)} s</b>`]); }
+      if (k === 'frog') { rows.push(['Sapo', `<b>${n1(s.frogDur)} s${s.frogBig ? ' (grandes ' + n1(s.frogBig) + ' s)' : ''}</b>`]); rows.push(['Radio', `<b>${Math.round(s.radius)}</b>`]); }
+      if (k === 'bubble') { rows.push(['Atrapa', `<b>${n1(s.trapDur)} s${s.trapBig ? ' (grandes ' + n1(s.trapBig) + ' s)' : ''}</b>`]); rows.push(['Burbujas', `<b>${s.count || 1} / ${n1(s.cd)} s</b>`]); }
       if (k === 'bell') { rows.push(['Eco', `<b>${Math.round(s.eco * 100)}% del daño</b>`]); rows.push(['Toca cada', `<b>${n1(s.cd)} s</b>`]); }
       if (k !== 'bubble' && s.cd && k !== 'bell') rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
@@ -809,6 +812,9 @@
       return rows;
     }
     if (k === 'beam') rows.push(['Daño/s', `<b>${n1(s.dps)} (x${s.rampMax})</b>`]);
+    // el Satélite no golpea: su haz quema por segundo; la Cronotorre no hace daño propio
+    else if (k === 'orbital') { rows.push(['Daño/s', `<b>${n1(s.dps)}</b>`]); rows.push(['Ancho del haz', `<b>${Math.round(s.radius)}</b>`]); }
+    else if (k === 'crono') { rows.push(['Pausa', `<b>${n1(s.stopDur)} s cada ${n1(s.cd)} s</b>`]); rows.push(['Cobra otra vez', `<b>${Math.round(s.stopX * 100)}% del daño</b>`]); }
     else if (k === 'hive') rows.push(['Daño dron', `<b>${n1(s.droneDmg)}</b>`]);
     else if (k === 'mines') rows.push(['Daño mina', `<b>${n1(s.mineDmg)}</b>`]);
     else rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
@@ -818,7 +824,7 @@
     else if (k === 'boomerang') rows.push(['Bumeranes', `<b>${s.count} / ${n1(s.cd)} s</b>`]);
     else if (k === 'rail') rows.push(['Virotes', `<b>${s.bolts} / ${n1(s.cd)} s</b>`]);
     else if (k === 'beam') rows.push(['Rayos', `<b>${s.beams}</b>`]);
-    else if (s.cd) rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
+    else if (s.cd && k !== 'crono') rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
     rows.push(['Alcance', `<b>${s.range > 5000 ? 'Global' : Math.round(s.range)}</b>`]);
     if (k === 'projectile' || k === 'boomerang' || k === 'saw') rows.push(['Perforación', `<b>${s.pierce}</b>`]);
     if (k === 'acid') rows.push(['Corrosión', `<b>${s.corr}/golpe (máx. ${s.corrMax})</b>`]);
@@ -845,6 +851,9 @@
     const owned = P.ups.slice(0, tier).map(u => u.name).join(' · ');
     return `<div class="path p${p + 1}"><div class="ph"><span>${P.name}</span><span class="pips">${pips}</span></div>${body}${owned ? `<div class="owned">${owned}</div>` : ''}</div>`;
   }
+  // Una fila cuyo texto no cabe en media columna (la habilidad, «Protege», «Torres cercanas»…)
+  // ocupa el ancho entero: en una columna empujaba a la otra fuera del panel.
+  const anchaFila = r => (r[0] + r[1].replace(/<[^>]*>/g, '')).length > 22;
   function renderInfo() {
     const box = $('#info');
     const t = ui.selected;
@@ -854,10 +863,10 @@
     const ab = t.s.ability ? PD.ABILITIES[t.s.ability] : null;
     box.innerHTML = `
       <div class="inf-head"><canvas width="116" height="116"></canvas><div><h3>${d.name}</h3><div class="sub">Nivel ${t.tiers[0]}-${t.tiers[1]} · Invertido ${fmt(t.spent)}</div></div><button class="inf-close" title="Cerrar (Esc)">✕</button></div>
-      <div class="inf-stats">${statsRows(t).map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('')}</div>
+      <div class="inf-stats">${statsRows(t).map(r => `<div${anchaFila(r) ? ' class="ancha"' : ''}><span>${r[0]}</span>${r[1]}</div>`).join('')}</div>
       ${d.targeting ? `<div class="targets">${MODES.map(m => `<button data-m="${m[0]}" class="${t.mode === m[0] ? 'on' : ''}">${m[1]}</button>`).join('')}</div>` : ''}
       ${d.hero ? `<div class="sub" style="font-size:12px;color:var(--gold)">♛ Héroe del reino: uno por partida. Puede subir sus <b>dos</b> caminos hasta el nivel 4 y <b>uno</b> de ellos al nivel 5.</div>` : ''}
-      ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${abCd(t)} s).</div>` : ''}
+      ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${n1(abCd(t))} s).</div>` : ''}
       ${t.buffed ? `<div class="sub" style="font-size:12px;color:#e07bff">♫ Potenciada por un Tótem del Eco</div>` : ''}
       <div class="paths">${pathHtml(t, 0)}${pathHtml(t, 1)}</div>
       <div class="inf-actions"><button class="btn danger" id="i-sell"><span class="sl">Vender</span> · <span class="sv"></span></button></div>`;
@@ -967,7 +976,7 @@
       for (const id in groups) {
         const A = PD.ABILITIES[id];
         const b = el(`<div class="abil" data-id="${id}" style="background:${A.color}">${ABIL_ICON[id]}<div class="cdv"></div><div class="cdt"></div><span class="cnt"></span></div>`);
-        b.addEventListener('mousemove', ev => showTip(`<b>${A.name}</b>${A.desc}<br><span class="tc">Automática · recarga ${abCd(groups[id][0])} s</span>`, ev.clientX, ev.clientY));
+        b.addEventListener('mousemove', ev => showTip(`<b>${A.name}</b>${A.desc}<br><span class="tc">Automática · recarga ${n1(abCd(groups[id][0]))} s</span>`, ev.clientX, ev.clientY));
         b.addEventListener('mouseleave', hideTip);
         box.appendChild(b);
       }

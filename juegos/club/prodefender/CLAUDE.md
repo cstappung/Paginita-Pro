@@ -538,6 +538,16 @@ a 10-round batch was tried and reverted), but:
   `rec.colocar`/`rec.pinchos`/`rec.poder`, so the proof is unchanged. Selling with a finger
   asks for a second tap; tooltips are off on touch (a tap also fires `mousemove`). The mouse
   flow is unchanged. `render.js` draws the arrows around the ghost.
+- **Tower panel** (`statsRows`/`renderInfo` in main.js): numbers go through `n1` (3 significant
+  digits below 100, the integer from 100, Spanish comma — `19,6 s`, not `19.599999999999998`),
+  rows longer than half a column span both (`anchaFila`), and the grid is `minmax(0, 1fr)`:
+  with `1fr` one long value pushed the other column out of the panel. Every kind needs its own
+  rows if it has no `s.dmg` (Satélite, Cronotorre showed «NaN»). Checked by opening the panel of
+  every tower in every tier combination, with and without support nearby, at four viewports.
+- **Tower size on screen** (`escalaVista` in render.js): each type is scaled once so its
+  unupgraded drawing covers the same opaque area (radius `VISTA_TORRE` 22, heroes
+  `VISTA_HEROE` 24); before, art ranged from 21 to 26. Drawing only: `def.size` still sets the
+  spacing between towers in the engine, so placement and proofs are unchanged.
 - **Cursor**: on the map it is a big yellow crosshair with a black outline
   (`#cv.cur-grande`, an inline SVG); the pause menu's «Cursor» select switches
   back to the system crosshair (`save.settings.cursor = 'clasico'`).
