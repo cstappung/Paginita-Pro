@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-15';
-import { Sonido } from './audio.js?v=metrorush-15';
-import './mundo-city.js?v=metrorush-15';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-15';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-16';
+import { Sonido } from './audio.js?v=metrorush-16';
+import './mundo-city.js?v=metrorush-16';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-16';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -44,7 +44,11 @@ const CLAVE_OPC = 'metrorush.opciones';
 const lee = (k, def) => { try { const t = localStorage.getItem(k); return t ? JSON.parse(t) : def; } catch (e) { return def; } };
 const escribe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento: se juega igual */ } };
 let progreso = M.limpiaProgreso(lee(CLAVE, null));            // lo que se gana y se compra (va a la cuenta)
-const opciones = Object.assign({ calidad: 'auto', estilo: 'auto', musica: 80, efectos: 90, sacudida: true, mudo: false, modo: 'clasico' }, lee(CLAVE_OPC, {}));
+const opciones = Object.assign({ calidad: 'auto', estilo: 'auto', musica: 80, efectos: 90, sacudida: true, mudo: false, modo: 'clasico', carteles: true, vioAvisoCarteles: false }, lee(CLAVE_OPC, {}));
+/* `carteles`: el letrero grande con el nombre de la estación (o del distrito
+   de City) al empezar y al salir de cada túnel. Tapa el centro de la pantalla
+   unos 3 s, así que se puede apagar en Opciones. `vioAvisoCarteles`: el aviso
+   «puedes ocultarlo en Opciones» ya salió una vez en este aparato. */
 /* El modo de juego elegido en la portada (M.MODOS: clásico, sin ayudas, sin
    monedas, City, City sin ayudas). Se recuerda en este aparato, con las
    opciones; una clave que ya no existe vuelve al clásico. */
@@ -818,7 +822,7 @@ function estaciones() {
       if (cb.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(cb.estacion.boleto)) pideBoleto(cb.estacion.boleto, o.d0 + o.largo + 260);
       if (ciudad.faltaPostal(c, progreso, cb.estacion.boleto)) pideBoleto(cb.estacion.boleto, o.d0 + o.largo + 260);   // CITY: la postal del distrito
     }
-    if (cb.hecho && c.D >= o.d0 + o.largo - 6) { banner(cb.estacion.nombre, cb.estacion.lema); c.cambio = null; }
+    if (cb.hecho && c.D >= o.d0 + o.largo - 6) { bannerEstacion(cb.estacion, true); c.cambio = null; }
   }
 }
 
@@ -1293,7 +1297,7 @@ function empezar() {
   mundo.monedasPeligro(!!c.modo.monedasMatan);                  // en «Sin monedas» las monedas se ven rojas: son un peligro
   if (Club && Club.inmersivo) Club.inmersivo(true);             // en un teléfono vertical, la carrera ocupa toda la pantalla
   sonido.tocaTema(c.estacion.musica);
-  banner(c.estacion.nombre, c.estacion.lema);
+  bannerEstacion(c.estacion, false);                            // al largar no sale el aviso de Opciones (ya hay bastante que leer)
   if (esTactil && progreso.totales.carreras < 3) aviso('Desliza el dedo: ← → carril · ↑ saltar · ↓ rodar');
   if (Club) Club.category(c.modo.categoria);                    // la clasificación del costado: la tabla de este modo
   pintaPots();
@@ -1654,19 +1658,40 @@ function pintaHud(dt) {
   else { let i = 0; for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) { const el = $('hudPoderes').children[i++]; if (el) { const total = kk === 'patineta' ? (c.patTotal || M.DURACION_PATINETA) : M.duracionPoder(kk, progreso.mejoras[kk]); el.querySelector('i').style.setProperty('--k', Math.min(1, v / total).toFixed(3)); } } }
   // el letrero grande se apaga solo
   if (c.banner > 0) { c.banner -= dt; if (c.banner <= 0) $('banner').classList.remove('ver'); }
+  // el aviso de una sola vez: recién apagado el primer letrero de estación, se dice dónde se oculta
+  if (c.avisoCarteles && c.banner <= 0) {
+    c.avisoCarteles = false;
+    opciones.vioAvisoCarteles = true; guardaOpciones();          // se guarda en este aparato: no vuelve a salir
+    aviso('¿El cartel de la estación te tapa? Puedes ocultarlo en Opciones', 5000, true);
+  }
 }
-let avisoTimer = null;
-/** Un aviso corto abajo de la pantalla. */
-function aviso(txt) {
+let avisoTimer = null, avisoFijoHasta = 0;
+/** Un aviso corto abajo de la pantalla. `ms`: cuánto se queda (por defecto
+    2,2 s). `fijo`: mientras se ve, los avisos comunes («Estrella ×4»…) no lo
+    tapan; se usa para el aviso de una sola vez, que si lo pisaba una
+    estrella no volvía a salir nunca. */
+function aviso(txt, ms = 2200, fijo = false) {
+  const ahora = performance.now();
+  if (!fijo && ahora < avisoFijoHasta) return;                   // hay un aviso que no se puede perder: este se omite
+  if (fijo) avisoFijoHasta = ahora + ms;
   const el = $('aviso');
   el.textContent = txt; el.classList.add('ver');
-  clearTimeout(avisoTimer); avisoTimer = setTimeout(() => el.classList.remove('ver'), 2200);
+  clearTimeout(avisoTimer); avisoTimer = setTimeout(() => el.classList.remove('ver'), ms);
 }
 /** El letrero grande del centro (estación nueva, récord, boleto). */
 function banner(titulo, sub) {
   ponConTildes($('bannerTitulo'), titulo); ponConTildes($('bannerSub'), sub || '');
   const b = $('banner'); b.classList.remove('ver'); void b.offsetWidth; b.classList.add('ver');
   if (c) c.banner = 3;
+}
+/** El letrero de una estación o distrito nuevo: solo si la opción «carteles»
+    está encendida. `conAviso`: la primera vez que sale al cambiar de estación
+    (nunca al largar) queda pendiente el aviso de que se puede ocultar; se
+    muestra cuando el letrero se apaga (ver `hud`), para no taparlo. */
+function bannerEstacion(e, conAviso) {
+  if (!opciones.carteles) return;                               // apagado en Opciones: ni letrero ni aviso
+  banner(e.nombre, e.lema);
+  if (conAviso && !opciones.vioAvisoCarteles && c) c.avisoCarteles = true;
 }
 
 /* ===================================================================
@@ -2038,9 +2063,10 @@ function abreRelato() {
 function abreOpciones() {
   $('optCalidad').value = opciones.calidad; $('optEstilo').value = opciones.estilo;
   $('optMusica').value = opciones.musica; $('optEfectos').value = opciones.efectos; $('optSacudida').checked = opciones.sacudida;
+  $('optCarteles').checked = opciones.carteles;
   abrePanel('capaOpciones');
 }
-for (const [id, k] of [['optCalidad', 'calidad'], ['optEstilo', 'estilo'], ['optMusica', 'musica'], ['optEfectos', 'efectos'], ['optSacudida', 'sacudida']]) {
+for (const [id, k] of [['optCalidad', 'calidad'], ['optEstilo', 'estilo'], ['optMusica', 'musica'], ['optEfectos', 'efectos'], ['optSacudida', 'sacudida'], ['optCarteles', 'carteles']]) {
   $(id).addEventListener('input', ev => {
     const el = ev.target;
     opciones[k] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value;

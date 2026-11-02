@@ -658,6 +658,14 @@ Things that matter:
   that, 24 seeds × 2 modes × 17.5 km run clean at 20, 24, 30, 60 and 144
   fps. Every crash the metre-level robot reported at low fps was the robot
   missing that window, not the track.
+- **The station banner can be turned off** (Opciones → «Cartel al cambiar
+  de estación», `opciones.carteles`, this device only): it covered the
+  centre of the screen for 3 s at every station and district. Every station
+  banner goes through `bannerEstacion`; record, ticket and ghost banners do
+  not. The first time one shows on leaving a tunnel (never at the start),
+  an aviso says it can be hidden, once per device (`vioAvisoCarteles`), right
+  after the banner fades. It is `aviso(txt, ms, fijo)`: a `fijo` aviso cannot
+  be overwritten by the common ones («Estrella ×3»), which would have lost it.
 - **Fullscreen**: ⛶ on the title screen and in the pause panel, or `F`,
   calls `requestFullscreen` on the document (webkit fallback; the button
   hides where the API is missing, i.e. iPhone). `html.mr-pc` (and
