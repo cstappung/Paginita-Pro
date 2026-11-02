@@ -11,8 +11,8 @@ touching the game itself. This file only covers how it lives inside Juegos.
 - **A `tipo: "sitio"` entry with `beta: true`** in `SOLOS`
   (`colabtex/src/juegos/salon-datos.js`), route `#prokingdoms`, full window
   like Mascotas (`html.jg-prokingdoms` in `juegos.html`). The postman is
-  `colabtex/src/juegos/prokingdoms.js` (`crearProKingdoms`). It only gets
-  `listo` and `volver` back.
+  `colabtex/src/juegos/prokingdoms.js` (`crearProKingdoms`). The frame sends
+  it `listo`, `volver` and `token` (the Firebase ID token for the server).
 - **Only beta testers see it.** `betaTesters/<uid>` = `{at, por}`, written
   from the admin panel's «Beta testers» tab (`docs/claude/juegos/admin.md`).
   The rules let only admins write it. Each account reads **only its own entry**
@@ -21,7 +21,8 @@ touching the game itself. This file only covers how it lives inside Juegos.
   Removing `beta: true` opens it to everyone. While the check is pending,
   `state.beta` is `null`: the salón hides the entry and the route shows
   «Comprobando…». It hides the game but does not lock it. The page is public
-  like the rest of the site, and in beta it writes nothing to the database.
+  like the rest of the site and writes nothing to the database, and the
+  server checks `betaTesters` itself.
 - **Guests never see it.** `libreParaInvitado` is false for every
   `beta` entry, and `MOTIVO_CUENTA.prokingdoms` is the login door.
 - **The frame** loads `i18n.js`, `mando.js` and `volumen.js` first, then
@@ -33,10 +34,11 @@ touching the game itself. This file only covers how it lives inside Juegos.
 
 ## Beta decisions (change them only on purpose)
 
-- **Local mode only.** The postman opens `index.html?local&perfil=<uid>&nombre=…`.
-  Without `?local` the game tries `POST /api/join` on GitHub Pages: one 404
-  per load before it falls back to local mode.
-- **One kingdom per account per browser.** The game suffixes its own keys
+- **Local mode unless `servidor.json` has a `url`.** In that case the postman
+  opens `index.html?local&perfil=<uid>&nombre=…`. Without `?local` the game
+  would try `POST /api/join` on GitHub Pages: one 404 per load before falling
+  back to local mode. With a URL, see the next section.
+- **Local saves: one kingdom per account per browser.** The game suffixes its own keys
   with `?perfil` (`U.key`, max 20 chars of the uid). `sitio.js` suffixes the
   two keys the game leaves bare (`pk_site_coins`, the name). Nothing syncs
   across devices yet.
@@ -49,35 +51,50 @@ touching the game itself. This file only covers how it lives inside Juegos.
   has `PK_VER`. Bump both whenever any game file changes. `stamp-version.js`
   only rewrites the `i18n.js` tag here.
 
-## The online world: where the server goes (decided 2026-11-02)
+## The online world: the Cloud Function (owner on Blaze, 2026-11-02)
 
-**Not the RTDB directly** (FIREBASE.md's option A). RTDB download is already
-the site's bottleneck: about 360 MB a day for the whole free plan, a 90 MB
-per-player cap in `consumo.js`, and the economy cierre was built to save
-download. Polling a shared world through it would eat that budget, keep the
-100-connection limit of Spark, and lose the server's anti-cheat.
+The RTDB-only option (FIREBASE.md's option A) was rejected. RTDB download is
+already the site's bottleneck (360 MB a day, the 90 MB per-player cap in
+`consumo.js`, the economy cierre). It would also lose the server's anti-cheat.
+The server is **`functions/`**, an HTTP Cloud Function `prokingdoms` in
+us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
+§5. Not deployed by a push.
 
-**Cloud Functions 2nd gen** (FIREBASE.md's option B) when the shared world
-is wanted. It needs the Blaze plan with a card. Expected cost is $0 at this
-scale, with `maxInstances: 1`, a budget alert and `SYNC_MS` raised from 4 s
-to 15 s. Differences from FIREBASE.md, because the site is on **GitHub Pages,
-not Firebase Hosting**:
-
-- there is no same-origin `/api/**` rewrite. `Net.api` needs the function's
-  absolute URL, and `server/index.js` needs CORS for `paginita-pro.cl`,
-  `www.paginita-pro.cl` and `localhost:8123`;
-- identity is the Firebase ID token (`Authorization: Bearer`, checked with
-  the Admin SDK `verifyIdToken`), never the open `pk_token`. The function
-  must also check `betaTesters/<uid>` while the beta lasts;
-- `store.js` goes to the RTDB with the Admin SDK (writes are free), with a
-  lazy tick instead of `setInterval`.
-
-A Cloudflare Worker with a Durable Object (the account already runs the BT3
-disc Worker) was considered. It needs no card, but it needs a rewrite: no
-`vm`/`eval` for `server/sim.js`, a different storage API, and the free plan's
-10 ms CPU per request is tight for world generation and the tick. It is the
-fallback if Blaze is refused.
-
-`server/`, `server.js` and `tools/cheat-test.js` stay in this folder unchanged
-(`node server.js` still serves the game locally on :8080) so that port starts
-from them. `server/data/` is git-ignored.
+- **Same `server/sim.js`.** `functions/prepara.js` (the predeploy) copies
+  `server/sim.js` and `js/{util,data,world}.js` into `functions/juego/`
+  (git-ignored). It installs `functions/store-rtdb.js` there as `store.js`.
+  `node server.js` and `tools/cheat-test.js` keep working locally. Run the
+  cheat test after touching `sim.js`.
+- **`sim.js` knobs:** `PK_TICK_PEREZOSO` removes the `setInterval`, and
+  `functions/index.js` calls `sim.tick()` before a request when 5 s have
+  passed (everything advances by elapsed time). `join({uid})` binds one
+  kingdom per Firebase uid (`byUid`). Only the function sets `uid`, after
+  `verifyIdToken`. `ONLINE_MS` is 40 s because sync is every 15 s.
+  `PK_SAVE_MAX` is 2 MB.
+- **One instance** (`maxInstances: 1`, `concurrency: 80`), because the world
+  lives in memory. Cold start: `store.carga()` downloads `prokingdoms/col` and
+  `prokingdoms/hayPartida` once. `flush()` uploads only changed docs, at most
+  every 3 s and right after a join. Saves are awaited before the response, and
+  SIGTERM flushes what is left.
+- **Docs are stored as JSON strings** (`prokingdoms/col/<col>/<id>`), because
+  the RTDB drops nulls in arrays and empty arrays/objects (`slots`, `inbox`).
+- **Who gets in:** `POST /api/join` needs `Authorization: Bearer <Firebase ID
+  token>` plus `betaTesters/<uid>` (`SOLO_BETA`). Every other route uses the
+  game token that join returns (`X-PK-Token`, or `?t=` for `sendBeacon`, which
+  sends `text/plain` to avoid a preflight). CORS only allows the site's
+  origins, and a foreign `Origin` gets 403. The database URL is explicit in
+  `initializeApp`: without it the emulator guessed another namespace.
+- **Client:** the postman reads `servidor.json` (`url`; empty means local mode)
+  and opens the frame with `?api=<url>` instead of `?local`. It answers the
+  frame's `token` requests with `auth.currentUser.getIdToken()`. In `net.js`,
+  `API` prefixes every call, sync is 15 s, cloud save is 120 s, and join waits
+  15 s for a cold start. If join fails (server down, not a beta tester), the
+  game falls back to local mode by itself.
+- **Tests:** `cd functions && npm run prueba` runs against `firebase emulators:start
+  --only auth,database,functions`. It is not idempotent: restart the emulators
+  between runs. In a cloud session, start the emulators with the
+  `HTTP(S)_PROXY` vars unset (firebase-tools 15 sent its own localhost calls
+  through the proxy) and use `firebase-admin` modular imports (v14 dropped
+  `admin.database()`).
+- Kingdom coins are still local (`sitio.js`). Moving them to the site economy
+  would be the server's job, not the browser's.

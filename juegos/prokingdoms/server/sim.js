@@ -30,7 +30,7 @@ const SLOTS = D.REALM_SLOTS.length;
 const TERR0 = Array.from(W.terrStart);
 const TSTART = new Array(SLOTS).fill(0);
 for (const v of TERR0) if (v) TSTART[v - 1]++;
-const ONLINE_MS = 20000;
+const ONLINE_MS = 40000;      // «en línea»: con sync cada 15 s (Cloud Functions), dos syncs perdidos no lo apagan
 const BOT_RATE = 500;          // recursos por hora que un reino simulado saca de las zonas comunes
 const RES = D.RES_ORDER;
 const BASE = { food: 100, wood: 100, stone: 130, ore: 140, marble: 320, gems: 1500, planks: 260, blocks: 450, ingots: 650, tools: 1600, books: 900, steel: 1800, machinery: 5000, gold: 100 };
@@ -48,11 +48,13 @@ const cleanText = (s, n) => String(s || '').replace(/[<>]/g, '').replace(/\s+/g,
 class GameError extends Error { constructor(msg, status) { super(msg); this.status = status || 400; } }
 
 // ---------- Jugadores y mundos ----------
-const tokens = new Map();
-for (const p of store.all('players')) tokens.set(p.token, p);
+const tokens = new Map(), uids = new Map();
+for (const p of store.all('players')) { tokens.set(p.token, p); if (p.uid) uids.set(p.uid, p); }
 
 const player = id => store.get('players', id);
 const byToken = t => (t ? tokens.get(t) || null : null);
+// En Cloud Functions la cuenta es el uid de Firebase (verificado antes de llamar a join): una cuenta, un reino.
+const byUid = u => (u ? uids.get(u) || null : null);
 const world = p => store.get('worlds', p.world);
 
 function newWorld() {
@@ -88,7 +90,8 @@ function humans(w, me) {
 }
 
 function join(b) {
-  let p = byToken(b.token);
+  // b.uid solo lo pone el servidor (functions/index.js, tras verificar el token de Firebase); el cliente no lo elige
+  let p = b.uid ? byUid(b.uid) : byToken(b.token);
   const name = cleanText(b.name, 20);
   if (!p) {
     const pref = Number.isInteger(b.preferSlot) && b.preferSlot >= 0 && b.preferSlot < SLOTS ? b.preferSlot : null;
@@ -100,6 +103,7 @@ function join(b) {
       world: w.id, slot, created: now(), lastSeen: now(), snap: null, buildings: [], bver: '', units: [],
       inbox: [], inSeq: 0,
     };
+    if (b.uid) { p.uid = b.uid; uids.set(b.uid, p); }
     w.slots[slot] = p.id;
     store.touch('worlds');
     store.set('players', p.id, p);
@@ -1005,7 +1009,7 @@ function ranking(p) {
 function getSave(p) { return { save: store.getSave(p.id) }; }
 function putSave(p, b) {
   const text = JSON.stringify(b.save || null);
-  if (text.length > 4e6) throw new GameError('Partida demasiado grande.', 413);
+  if (text.length > (+process.env.PK_SAVE_MAX || 4e6)) throw new GameError('Partida demasiado grande.', 413);
   store.setSave(p.id, text);
   return { ok: true };
 }
@@ -1027,9 +1031,12 @@ function tick() {
   tickGuilds();
   tickCamps();
 }
-setInterval(tick, 5000).unref();
+// Con PK_TICK_PEREZOSO (Cloud Functions) no hay reloj: una función no corre entre pedidos, así que el que
+// la llama ejecuta tick() antes de atender un pedido si pasaron 5 s. Todo lo que avanza usa el tiempo
+// transcurrido (regeneración, deriva de precios, eventos), así que un tick tarde equivale a varios.
+if (!process.env.PK_TICK_PEREZOSO) setInterval(tick, 5000).unref();
 
 module.exports = {
-  GameError, byToken, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
+  GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
   listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
 };

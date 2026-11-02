@@ -139,7 +139,9 @@ added to. Then the docs it names.
 ## Commands
 
 `colabtex/` is the build workspace for **both** web apps — it is the only
-folder with `node_modules`, and duplicating it just for Firebase + Yjs would
+web-side folder with `node_modules` (the other is `functions/`, the Cloud
+Function behind Pro Kingdoms online, deployed by hand with
+`firebase deploy --only functions`; see `juegos/prokingdoms/CLAUDE.md`), and duplicating it just for Firebase + Yjs would
 cost ~200 MB. Run everything from there:
 
 ```

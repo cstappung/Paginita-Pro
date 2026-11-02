@@ -2,9 +2,18 @@
   "database": {
     "rules": "firebase/database.rules.json"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "predeploy": ["node \"$RESOURCE_DIR/prepara.js\""],
+      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log", "prueba-emulador.js"]
+    }
+  ],
   "emulators": {
     "auth": { "port": 9099 },
     "database": { "port": 9000 },
+    "functions": { "port": 5001 },
     "ui": { "enabled": false }
   }
 }

@@ -10,19 +10,22 @@
   const S = () => PK.Game.state;
   const toast = (t, k) => PK.UI && PK.UI.toast(t, k);
   const TOKEN_KEY = U.key('pk_token');
-  const SYNC_MS = 4000, CLOUD_MS = 60000;
+  // Con servidor propio (`PK.Platform.apiBase`, la Cloud Function de Paginita Pro) cada pedido es una
+  // invocación que se paga: sync cada 15 s. La recolección se acumula entre syncs, así que no se nota.
+  const API = String((PK.Platform && PK.Platform.apiBase) || '').replace(/\/+$/, '');
+  const SYNC_MS = API ? 15000 : 4000, CLOUD_MS = API ? 120000 : 60000;
 
   let pending = {};       // recolectado en zonas comunes aún no informado
   let marketOps = [];
   let since = 0, kb = {}, lastBver = null, lastSentBuild = 0, seenIncoming = new Set(), syncing = false, tv = 0;
 
-  async function api(method, url, body, timeout) {
+  async function api(method, url, body, timeout, extra) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), timeout || 8000);
     try {
-      const res = await fetch(url, {
+      const res = await fetch(API + url, {
         method, signal: ctl.signal,
-        headers: Object.assign({ 'Content-Type': 'application/json' }, Net.me ? { 'X-PK-Token': Net.me.token } : {}),
+        headers: Object.assign({ 'Content-Type': 'application/json' }, Net.me ? { 'X-PK-Token': Net.me.token } : {}, extra || {}),
         body: body ? JSON.stringify(body) : undefined,
       });
       const data = await res.json().catch(() => ({}));
@@ -33,7 +36,8 @@
   Net.api = api;
 
   const playerName = () => {
-    const n = PK.PROFILE || PK.Platform.getPlayer().name;
+    // dentro de Paginita Pro, ?perfil es el uid: el nombre es el de la cuenta (sitio.js)
+    const n = (window.ProKingdomsPlatform && PK.Platform.getPlayer().name) || PK.PROFILE || PK.Platform.getPlayer().name;
     return n && n !== 'Tú' ? n : 'Jugador';
   };
 
@@ -41,7 +45,12 @@
   Net.connect = async function (localSave) {
     if (location.protocol === 'file:') return null;
     try {
-      const j = await api('POST', '/api/join', { token: U.store.get(TOKEN_KEY), name: playerName(), preferSlot: localSave ? (Number.isInteger(localSave.slot) ? localSave.slot : 0) : undefined }, 2500);
+      // Con la Cloud Function, la cuenta es la sesión de Firebase de la página (sitio.js la pide al padre);
+      // el arranque en frío tarda unos segundos, así que se espera más que a un servidor local.
+      const auth = API && PK.Platform.getAuthToken ? await PK.Platform.getAuthToken() : null;
+      if (API && !auth) throw new Error('sin sesión de Firebase');
+      const j = await api('POST', '/api/join', { token: U.store.get(TOKEN_KEY), name: playerName(), preferSlot: localSave ? (Number.isInteger(localSave.slot) ? localSave.slot : 0) : undefined }, API ? 15000 : 2500,
+        auth ? { Authorization: 'Bearer ' + auth } : null);
       Net.me = j.player;
       Net.world = j.world;
       U.store.set(TOKEN_KEY, j.player.token);
@@ -114,7 +123,7 @@
       for (const id in sent) pending[id] = (pending[id] || 0) + sent[id];
       marketOps = ops.concat(marketOps);
       if (e.status === 401) { U.store.del(TOKEN_KEY); toast('Tu sesión expiró. Recarga la página.', 'bad'); Net.online = false; }
-      else if (!Net.lost && Date.now() - (Net.lastOk || 0) > 15000) { Net.lost = true; toast('Sin conexión con el servidor. Reintentando…', 'warn'); }
+      else if (!Net.lost && Date.now() - (Net.lastOk || 0) > SYNC_MS * 2 + 5000) { Net.lost = true; toast('Sin conexión con el servidor. Reintentando…', 'warn'); }
     } finally { syncing = false; }
   };
 
@@ -280,7 +289,8 @@
   Net.saveCloud = function (beacon) {
     if (!Net.online) return;
     const body = JSON.stringify({ save: JSON.parse(G().serialize()) });
-    if (beacon && navigator.sendBeacon) navigator.sendBeacon('/api/save?t=' + encodeURIComponent(Net.me.token), new Blob([body], { type: 'application/json' }));
+    // text/plain: sendBeacon a otro origen (la Cloud Function) sin preflight; el servidor lo lee igual como JSON
+    if (beacon && navigator.sendBeacon) navigator.sendBeacon(API + '/api/save?t=' + encodeURIComponent(Net.me.token), new Blob([body], { type: API ? 'text/plain' : 'application/json' }));
     else api('POST', '/api/save', JSON.parse(body)).catch(() => {});
   };
   Net.deleteCloudSave = function () { return api('DELETE', '/api/save').catch(() => {}); };
