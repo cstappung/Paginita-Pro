@@ -90,8 +90,13 @@
 
   // ------------------------------- Estado --------------------------------
   let game = null, rec = null;   // rec: la Grabadora (prueba.js); game === rec.game
-  const ui = { vt: 0, placing: null, selected: null, mouse: null, speed: 1, paused: false, auto: !!save.settings.auto, autoT: -1, modal: false };
+  // tactil: el último toque fue con el dedo; fantasma: la torre elegida espera en el mapa a que se
+  // confirme (ver «Celular»); lw: unidades del mapa por píxel de pantalla (render.js engrosa la mira).
+  const ui = { vt: 0, placing: null, selected: null, mouse: null, speed: 1, paused: false, auto: !!save.settings.auto, autoT: -1, modal: false,
+    tactil: false, fantasma: false, ultimo: null, lw: 1 };
   let screen = 'menu';
+  const movil = { on: false, vert: false };   // modo celular (ver «Celular», más abajo)
+  let avisoGiro = false;
 
   // ------------------------------ Utilidades -----------------------------
   function towerIcon(canvas, type, tiers) {
@@ -122,13 +127,27 @@
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => show(b.dataset.go)));
 
   // ------------------------------- Toasts --------------------------------
+  // En el celular caben dos avisos a la vez (tapaban el mapa y la tienda): los demás esperan en
+  // `colaToast` (los más viejos se descartan), duran menos y se cierran con un toque.
+  let colaToast = [];
   function toast(html, cls, icon, dur) {
     const box = $('#toasts');
+    if (movil.on) {
+      if (box.querySelectorAll('.toast:not(.out)').length >= 2) { colaToast.push([html, cls, icon, dur]); if (colaToast.length > 4) colaToast.shift(); return; }
+      dur = Math.min(dur || 4200, 4500);
+    }
     while (box.children.length >= 4) box.firstChild.remove();
     const t = el(`<div class="toast ${cls || ''}">${icon ? '<canvas width="84" height="84"></canvas>' : ''}<div>${html}</div></div>`);
     if (icon) { const c = t.querySelector('canvas'); if (icon.enemy) enemyIcon(c, icon.enemy); else towerIcon(c, icon.tower); }
     box.appendChild(t);
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 450); }, dur || 4200);
+    let fuera = false;
+    const quita = () => {
+      if (fuera) return; fuera = true;
+      t.classList.add('out');
+      setTimeout(() => { t.remove(); if (colaToast.length && movil.on) toast(...colaToast.shift()); }, 450);
+    };
+    t.addEventListener('click', quita);
+    setTimeout(quita, dur || 4200);
   }
 
   // -------------------------------- Modal --------------------------------
@@ -150,6 +169,7 @@
   // ------------------------------- Tooltip -------------------------------
   const tip = $('#tooltip');
   function showTip(html, x, y) {
+    if (ui.tactil) return;   // un toque también manda mousemove, y el globo quedaba pegado tapando el mapa
     tip.innerHTML = html; tip.classList.remove('hidden');
     const r = tip.getBoundingClientRect();
     let tx = x - r.width - 14, ty = y - 10;
@@ -476,11 +496,13 @@
   ponCursor();
   function resize() {
     if (screen !== 'game') return;
+    acomodaMovil();
     const st = $('#stage').getBoundingClientRect();
-    const pad = 10;
+    const pad = movil.on ? 1 : 10;
     const sc = Math.max(0.1, Math.min((st.width - pad * 2) / W, (st.height - pad * 2) / H));
     const cw = Math.floor(W * sc), ch = Math.floor(H * sc);
     cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    ui.lw = W / Math.max(1, cw);
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.max(1, Math.round(cw * dpr)); cv.height = Math.max(1, Math.round(ch * dpr));
   }
@@ -495,15 +517,16 @@
     game.sounds = [];
     PD.Render.lastT = 0; ui.vt = 0;
     escuchaTabla(li);
-    ui.selected = null; ui.placing = null; ui.paused = false; ui.autoT = -1;
+    ui.selected = null; ui.placing = null; ui.fantasma = false; ui.paused = false; ui.autoT = -1;
     PD.Render.bgKey = '';
     $('#h-level').textContent = `${li + 1}. ${game.L.name}`;
-    $('#toasts').innerHTML = '';
+    $('#toasts').innerHTML = ''; colaToast = [];
     show('game');
-    buildShop(); renderInfo(); buildPreview(); updateHud(true);
+    if (movil.vert && !avisoGiro) { avisoGiro = true; toast('<b>↻ Gira el teléfono</b>En horizontal el mapa se ve mucho más grande.', 'good', null, 4000); }
+    buildShop(); renderInfo(); renderColoca(); buildPreview(); updateHud(true);
     if (enPrueba(li)) toast(`<b>Reino en pruebas</b>Se abre a todos ${cuandoAbre(li)}. Hasta entonces, solo para administradores: esta partida no guarda récords ni paga monedas.`, 'boss', null, 6500);
     if (!run) {
-      toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.`, 'good', null, 6500);
+      toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>${ui.tactil || movil.on ? 'Toca un defensor de la tienda, arrástralo en el mapa, confírmalo con ✔ y pulsa ▶.' : 'Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.'}`, 'good', null, 6500);
       for (const id of realmTowers(li)) { const d = PD.TOWERS[id]; toast(`<b>Nueva defensa: ${d.name}</b>${d.desc}`, 'special', { tower: id }, 8000); }
       const hid = PD.heroOf(li);
       if (hid) toast(`<b>♛ Héroe del reino: ${PD.TOWERS[hid].name}</b>Uno por partida y muy caro, pero único. Está arriba en la tienda (tecla H).`, 'special', { tower: hid }, 8000);
@@ -672,6 +695,11 @@
   function setPlacing(id) {
     ui.placing = id;
     if (id) { ui.selected = null; renderInfo(); }
+    // con el dedo, lo elegido aparece en el mapa como fantasma y espera ✔ (ver «Celular»)
+    ui.fantasma = !!(id && ui.tactil && game);
+    if (ui.fantasma) ui.mouse = puntoInicial(id);
+    else if (!id && ui.tactil) ui.mouse = null;
+    renderColoca();
     updateShop();
   }
 
@@ -832,7 +860,7 @@
       ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${abCd(t)} s).</div>` : ''}
       ${t.buffed ? `<div class="sub" style="font-size:12px;color:#e07bff">♫ Potenciada por un Tótem del Eco</div>` : ''}
       <div class="paths">${pathHtml(t, 0)}${pathHtml(t, 1)}</div>
-      <div class="inf-actions"><button class="btn danger" id="i-sell">Vender · <span class="sv"></span></button></div>`;
+      <div class="inf-actions"><button class="btn danger" id="i-sell"><span class="sl">Vender</span> · <span class="sv"></span></button></div>`;
     towerIcon(box.querySelector('canvas'), t.type, t.tiers);
     box.querySelector('.inf-close').addEventListener('click', () => { ui.selected = null; renderInfo(); });
     box.querySelectorAll('.targets button').forEach(b => b.addEventListener('click', () => { rec.modo(t, b.dataset.m); guardaQuieto(); renderInfo(); }));
@@ -867,9 +895,19 @@
       renderInfo();
     }
   }
-  function doSell() {
+  // Con el dedo, vender pide un segundo toque (un roce sobre el botón vendía la torre).
+  let vendeT = 0;
+  function doSell(ev) {
     const t = ui.selected;
     if (!t) return;
+    const b = $('#i-sell');
+    if (ev && ui.tactil && b && performance.now() - vendeT > 3000) {
+      vendeT = performance.now();
+      b.classList.add('seguro'); b.querySelector('.sl').textContent = '¿Seguro? Toca otra vez para vender';
+      setTimeout(() => { if (b.isConnected) { b.classList.remove('seguro'); b.querySelector('.sl').textContent = 'Vender'; } }, 3000);
+      return;
+    }
+    vendeT = 0;
     sfx('sell', t.x);
     rec.vender(t);
     guardaQuieto();
@@ -983,7 +1021,7 @@
       ${game.active ? '<p style="font-size:13px;color:var(--muted)">Si sales ahora, la partida se reanudará al inicio de esta ronda.</p>' : ''}
       <div class="vol"><label>Música <input type="range" id="v-mus" min="0" max="1" step="0.05" value="${save.settings.music}"></label>
       <label>Efectos <input type="range" id="v-sfx" min="0" max="1" step="0.05" value="${save.settings.sfx}"></label>
-      <label>Cursor <select id="v-cur"><option value="grande">Grande (mira amarilla)</option><option value="clasico">Clásico</option></select></label></div>`, [
+      <label${ui.tactil ? ' hidden' : ''}>Cursor <select id="v-cur"><option value="grande">Grande (mira amarilla)</option><option value="clasico">Clásico</option></select></label></div>`, [
       { label: 'Reanudar', cls: 'go', fn: () => { ui.paused = false; } },
       { label: 'Reiniciar reino', fn: () => modal('<h2>¿Reiniciar?</h2><p>Perderás el progreso de esta partida.</p>', [
         { label: 'Reiniciar', cls: 'danger', fn: () => { delete save.runs[game.li]; writeSave(); startGame(game.li, null); } },
@@ -1000,7 +1038,7 @@
   }
   function exitGame() {
     if (game && !game.over && !game.won) guardaPartida();
-    game = null; rec = null; ui.paused = false;
+    game = null; rec = null; ui.paused = false; ui.placing = null; ui.fantasma = false;
     show('levels');
   }
 
@@ -1115,12 +1153,44 @@
     const r = cv.getBoundingClientRect();
     return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
   }
-  cv.addEventListener('pointermove', ev => { ui.mouse = toWorld(ev); });
-  cv.addEventListener('pointerdown', ev => { ui.mouse = toWorld(ev); });
+  const limita = (v, a, b) => Math.max(a, Math.min(b, v));
+  // Con el dedo la torre fantasma no salta bajo el dedo (lo tapaba): se arrastra desde cualquier
+  // punto del mapa, y un toque corto la lleva ahí. Al soltar, si quedó donde no se puede, se
+  // acomoda al sitio libre más cercano (`acomoda`).
+  const arrastre = { id: null, x: 0, y: 0, gx: 0, gy: 0, movio: false };
+  window.addEventListener('pointerdown', ev => { ui.tactil = ev.pointerType !== 'mouse'; }, true);
+  cv.addEventListener('pointerdown', ev => {
+    if (ui.fantasma && ui.placing && ui.mouse) {
+      Object.assign(arrastre, { id: ev.pointerId, x: ev.clientX, y: ev.clientY, gx: ui.mouse.x, gy: ui.mouse.y, movio: false });
+      try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* sin captura: igual sirve */ }
+      return;
+    }
+    ui.mouse = toWorld(ev);
+  });
+  cv.addEventListener('pointermove', ev => {
+    if (ui.fantasma && ui.placing) {
+      if (arrastre.id !== ev.pointerId) return;
+      const r = cv.getBoundingClientRect(), dx = ev.clientX - arrastre.x, dy = ev.clientY - arrastre.y;
+      if (!arrastre.movio && Math.hypot(dx, dy) < 8) return;
+      arrastre.movio = true;
+      ui.mouse = { x: limita(arrastre.gx + dx / r.width * W, 0, W), y: limita(arrastre.gy + dy / r.height * H, 0, H) };
+      return;
+    }
+    ui.mouse = toWorld(ev);
+  });
+  cv.addEventListener('pointercancel', () => { arrastre.id = null; });
   cv.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') ui.mouse = null; });
   cv.addEventListener('contextmenu', ev => { ev.preventDefault(); setPlacing(null); ui.selected = null; renderInfo(); });
   cv.addEventListener('pointerup', ev => {
     if (!game || ui.modal || ev.button !== 0) return;
+    if (ui.fantasma && ui.placing) {
+      if (arrastre.id !== ev.pointerId) return;
+      arrastre.id = null;
+      if (!arrastre.movio) ui.mouse = toWorld(ev);
+      acomoda();
+      renderColoca();
+      return;
+    }
     const p = toWorld(ev);
     ui.mouse = p;
     if (ui.placing === PODER) {
@@ -1149,15 +1219,174 @@
       if (ev.pointerType !== 'mouse') ui.mouse = null;
       return;
     }
-    let hit = null;
-    for (const t of game.towers) if (Math.hypot(t.x - p.x, t.y - p.y) < t.def.size + 6) hit = t;
+    // elegir una torre: la más cercana, con más margen para el dedo
+    const extra = ev.pointerType === 'mouse' ? 6 : 6 + 14 * ui.lw;
+    let hit = null, hd = Infinity;
+    for (const t of game.towers) { const d = Math.hypot(t.x - p.x, t.y - p.y); if (d < t.def.size + extra && d < hd) { hit = t; hd = d; } }
+    if (ev.pointerType !== 'mouse') ui.mouse = null;
     ui.selected = hit; renderInfo();
   });
+
+  // ------------------------------- Celular --------------------------------
+  // Pantalla táctil chica (el lado corto ≤ 600 px, medido en esta ventana: dentro de Juegos el
+  // marco ocupa toda la ventana, ver PLENO). En vertical: HUD fino arriba, el mapa a todo el
+  // ancho, la barra de ronda (#barra-acc) y la tienda abajo. En horizontal: el mapa a toda la
+  // altura, el HUD y la tienda en una columna a la derecha, y 🔊 ❚❚ sobre la esquina del mapa.
+  // Solo se mueven nodos de la pantalla: los botones mandan lo mismo de siempre.
+  const ponEn = (n, padre, primero) => { if (n.parentNode !== padre) { if (primero) padre.prepend(n); else padre.appendChild(n); } };
+  function acomodaMovil() {
+    const on = matchMedia('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) <= 600;
+    const vert = on && innerHeight > innerWidth, R = document.documentElement;
+    R.classList.toggle('pd-movil', on); R.classList.toggle('pd-vert', vert); R.classList.toggle('pd-horiz', on && !vert);
+    movil.on = on; movil.vert = vert;
+    const hud = $('#hud'), hr = $('#hud .hud-r'), acc = $('.hud-acc'), sis = $('.hud-sis');
+    ponEn(acc, vert ? $('#barra-acc') : hr, true);
+    ponEn(sis, on && !vert ? $('#stage') : hr, false);
+    ponEn(hud, on && !vert ? $('#side') : $('#scr-game'), true);
+    $('#b-full').hidden = !(on && document.fullscreenEnabled);
+  }
+  acomodaMovil();
+  $('#b-full').addEventListener('click', () => {
+    try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch (e) { /* sin pantalla completa */ }
+  });
+  document.addEventListener('fullscreenchange', () => { $('#b-full').classList.toggle('on', !!document.fullscreenElement); requestAnimationFrame(resize); });
+
+  // ¿cerca del camino? (para que el fantasma aparezca donde la torre sirve)
+  function cercaCamino(x, y, d) {
+    for (const p of game.paths) for (const sg of p.segs) if (!sg.jump && PD.distSeg(x, y, sg.ax, sg.ay, sg.bx, sg.by) < d) return true;
+    return false;
+  }
+  // el sitio permitido más cercano a (x, y), en una rejilla de 10 (`util`: que alcance el camino)
+  function lugarLibre(id, x, y, radio, util) {
+    const def = PD.TOWERS[id], k = def.kind;
+    const alc = util && k !== 'farm' && k !== 'support' && def.base.range < 5000 ? def.base.range * 0.8 : 0;
+    let best = null, bd = radio * radio;
+    const x0 = radio === Infinity ? 0 : Math.max(0, Math.floor((x - radio) / 10)), x1 = radio === Infinity ? W / 10 : Math.min(W / 10, Math.ceil((x + radio) / 10));
+    const y0 = radio === Infinity ? 0 : Math.max(0, Math.floor((y - radio) / 10)), y1 = radio === Infinity ? H / 10 : Math.min(H / 10, Math.ceil((y + radio) / 10));
+    for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) {
+      const gx = i * 10, gy = j * 10, d = (gx - x) * (gx - x) + (gy - y) * (gy - y);
+      if (d >= bd || !game.canPlace(id, gx, gy)) continue;
+      if (alc && !cercaCamino(gx, gy, alc)) continue;
+      best = { x: gx, y: gy }; bd = d;
+    }
+    return best;
+  }
+  // el punto del camino donde caerían unos pinchos, cerca de (x, y)
+  function caminoCerca(x, y) {
+    let best = null, bd = Infinity;
+    for (let gx = 10; gx < W; gx += 20) for (let gy = 10; gy < H; gy += 20) {
+      const d = (gx - x) * (gx - x) + (gy - y) * (gy - y);
+      if (d >= bd) continue;
+      const at = game.spikeSpot(gx, gy);
+      if (at) { best = at; bd = d; }
+    }
+    return best;
+  }
+  // dónde aparece el fantasma: cerca del último sitio usado (o del centro), en un lugar que sirva;
+  // el Poder del Reino, sobre el enemigo más adelantado
+  function puntoInicial(id) {
+    const ref = ui.ultimo || { x: W / 2, y: H / 2 };
+    if (id === PODER) {
+      let e0 = null;
+      for (const e of game.enemies) if (!e.dead && e.x !== undefined && (!e0 || e.dist > e0.dist)) e0 = e;
+      return e0 ? { x: e0.x, y: e0.y } : { x: W / 2, y: H / 2 };
+    }
+    if (id === PINCHOS) return caminoCerca(ref.x, ref.y) || { x: W / 2, y: H / 2 };
+    return lugarLibre(id, ref.x, ref.y, Infinity, true) || lugarLibre(id, ref.x, ref.y, Infinity, false) || { x: ref.x, y: ref.y };
+  }
+  // al soltar: si la torre quedó donde no se puede, al sitio libre más cercano (si hay uno a mano)
+  function acomoda() {
+    const id = ui.placing, p = ui.mouse;
+    if (!id || !p || id === PODER) return;
+    if (id === PINCHOS) { if (!game.spikeSpot(p.x, p.y)) { const at = caminoCerca(p.x, p.y); if (at && Math.hypot(at.x - p.x, at.y - p.y) < 60) ui.mouse = at; } return; }
+    if (game.canPlace(id, p.x, p.y)) return;
+    const q = lugarLibre(id, p.x, p.y, 45, false);
+    if (q) ui.mouse = q;
+  }
+  // por qué no se puede (o '' si se puede)
+  function motivoNo(id, x, y) {
+    if (id === PODER) return game.poderListo() ? '' : game.active ? 'Aún se está cargando' : 'Se lanza durante una ronda';
+    if (id === PINCHOS) {
+      if (game.spikes.length >= PD.PINCHOS.max) return `Ya hay ${PD.PINCHOS.max} montones`;
+      if (game.money < game.spikeCost()) return `Te faltan ${fmt(game.spikeCost() - game.money)} de oro`;
+      return game.spikeSpot(x, y) ? '' : 'Tíralos sobre el camino';
+    }
+    const def = PD.TOWERS[id];
+    if (def.hero && game.hasHero()) return 'Ya tienes un héroe en el mapa';
+    if (game.canPlace(id, x, y)) return game.money < game.towerCost(id) ? `Te faltan ${fmt(game.towerCost(id) - game.money)} de oro` : '';
+    for (const t of game.towers) if (Math.hypot(x - t.x, y - t.y) < t.def.size + def.size + PD.TOWER_GAP) return 'Muy cerca de otra torre';
+    if (cercaCamino(x, y, PD.PATH_HALF + def.size - 3)) return 'Encima del camino';
+    return 'Aquí no se puede';
+  }
+  // El panel de confirmar (tapa la tienda mientras se coloca): qué es, cuánto cuesta, ✔ y ✕.
+  let colocaKey = '';
+  function renderColoca() {
+    const box = $('#coloca');
+    if (!ui.fantasma || !ui.placing || !game) { box.classList.add('hidden'); colocaKey = ''; return; }
+    box.classList.remove('hidden');
+    const id = ui.placing;
+    if (colocaKey !== id) {
+      colocaKey = id;
+      let nombre, sub, desc, ico, verbo;
+      if (id === PODER) { const P = PD.PODERES[game.L.poder]; nombre = P.icon + ' ' + P.name; sub = 'Poder del Reino'; desc = P.desc; verbo = 'Lanzar'; }
+      else if (id === PINCHOS) { nombre = 'Pinchos'; sub = 'Trampa · sobre el camino'; desc = `Cada enemigo de tierra que pasa encima recibe un golpe y gasta una púa (${PD.PINCHOS.puas} por montón). Duran hasta gastarse.`; verbo = 'Tirar'; ico = 'pinchos'; }
+      else { const d = PD.TOWERS[id]; nombre = (d.hero ? '♛ ' : '') + d.name; sub = d.hero ? 'Héroe · uno por partida' : (DTYPE[d.base.dtype] || 'Apoyo'); desc = d.desc; verbo = 'Colocar'; ico = id; }
+      box.innerHTML = `
+        <div class="inf-head">${ico ? '<canvas width="96" height="96"></canvas>' : ''}<div><h3>${nombre}</h3><div class="sub">${sub}</div></div></div>
+        <div class="col-acts"><button class="btn" id="col-no">✕ Cancelar</button><button class="btn go" id="col-si"><span class="cv">✔ ${verbo}</span><span class="cst"></span></button></div>
+        <div class="col-estado"></div>
+        <div class="col-tip">👆 Arrastra en el mapa para moverla, o toca donde la quieras.</div>
+        <p class="col-desc">${desc}</p>`;
+      const c = box.querySelector('canvas');
+      if (c && ico === 'pinchos') { const x = c.getContext('2d'); x.save(); x.scale(96 / 34, 96 / 34); PD.drawSpikes(x, 17, 18, 1); x.restore(); }
+      else if (c) towerIcon(c, ico, [0, 0]);
+      box.querySelector('#col-no').addEventListener('click', () => setPlacing(null));
+      box.querySelector('#col-si').addEventListener('click', confirmaColoca);
+    }
+    estadoColoca();
+  }
+  function estadoColoca() {
+    if (!ui.fantasma || !ui.placing || !game || !ui.mouse) return;
+    const id = ui.placing, box = $('#coloca'), p = ui.mouse;
+    const no = motivoNo(id, p.x, p.y);
+    const e = box.querySelector('.col-estado'), si = box.querySelector('#col-si');
+    if (!e || !si) return;
+    e.textContent = no ? '✘ ' + no : id === PODER ? '✔ Listo para lanzar' : '✔ Buen lugar';
+    e.classList.toggle('no', !!no);
+    si.disabled = !!no;
+    const c = id === PODER ? 0 : id === PINCHOS ? game.spikeCost() : game.towerCost(id);
+    si.querySelector('.cst').textContent = c ? ' · ' + fmt(c) : '';
+  }
+  function confirmaColoca() {
+    const id = ui.placing, p = ui.mouse;
+    if (!game || !id || !p || !ui.fantasma) return;
+    if (id === PODER) {
+      const ok = rec.poder(p.x, p.y);
+      sfx(ok ? 'place' : 'error', p.x);
+      if (ok) setPlacing(null);
+      return;
+    }
+    if (id === PINCHOS) {
+      const sp = rec.pinchos(p.x, p.y);
+      sfx(sp ? 'place' : 'error', p.x);
+      if (sp) { ui.ultimo = { x: p.x, y: p.y }; setPlacing(null); guardaQuieto(); }
+      return;
+    }
+    const t = rec.colocar(id, p.x, p.y);
+    if (!t) { sfx('error', p.x); estadoColoca(); return; }
+    sfx('place', p.x);
+    ui.ultimo = { x: p.x, y: p.y };
+    setPlacing(null);
+    guardaQuieto();
+    ui.selected = t; renderInfo();
+  }
+
   window.addEventListener('keydown', ev => {
     if (screen !== 'game' || !game) return;
     if (ui.modal) { if (ev.key === 'Escape' && ui.paused && !game.over) { closeModal(); ui.paused = false; } return; }
     const k = ev.key;
     if (k === ' ') { ev.preventDefault(); if (game.active) cycleSpeed(); else startRound(); return; }
+    if (k === 'Enter' && ui.fantasma) { confirmaColoca(); return; }
     if (k === 'Escape') { if (ui.placing) setPlacing(null); else if (ui.selected) { ui.selected = null; renderInfo(); } else openPause(); return; }
     if (k === 'f' || k === 'F') { cycleSpeed(); return; }
     if (k === 'p' || k === 'P') { openPause(); return; }
@@ -1210,7 +1439,7 @@
     updateAbilities();
     updatePoder();
     slowT -= dt;
-    if (slowT <= 0) { slowT = 0.2; updateShop(); refreshInfo(); if (ui.selected && game.towers.indexOf(ui.selected) < 0) { ui.selected = null; renderInfo(); } }
+    if (slowT <= 0) { slowT = 0.2; updateShop(); refreshInfo(); estadoColoca(); if (ui.selected && game.towers.indexOf(ui.selected) < 0) { ui.selected = null; renderInfo(); } }
   }
   requestAnimationFrame(loop);
 

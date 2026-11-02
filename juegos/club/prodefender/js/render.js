@@ -5403,7 +5403,7 @@
         if (g.ley === 'contagio') { ctx.setLineDash([4, 5]); for (const tw of g.towers) if (!g.protegida(tw) && Math.hypot(tw.x - ui.mouse.x, tw.y - ui.mouse.y) < PD.LEY.contagioR * 2.2) circle(ctx, tw.x, tw.y, PD.LEY.contagioR, 'rgba(216,90,168,0.06)', 'rgba(216,90,168,0.6)', 1.3); ctx.setLineDash([]); }
         if (range < 5000) {
           circle(ctx, ui.mouse.x, ui.mouse.y, range, ok ? 'rgba(255,255,255,0.12)' : 'rgba(255,60,60,0.16)');
-          ctx.setLineDash([8, 6]); circle(ctx, ui.mouse.x, ui.mouse.y, range, null, ok ? 'rgba(255,255,255,0.75)' : 'rgba(255,90,90,0.85)', 1.6); ctx.setLineDash([]);
+          ctx.setLineDash([8, 6]); circle(ctx, ui.mouse.x, ui.mouse.y, range, null, ok ? 'rgba(255,255,255,0.75)' : 'rgba(255,90,90,0.85)', Math.max(1.6, 1.4 * (ui.lw || 0))); ctx.setLineDash([]);
         }
         ctx.globalAlpha = 0.8;
         drawTower(ctx, ui.placing, ui.mouse.x, ui.mouse.y, -Math.PI / 2, [0, 0], { time: t });
@@ -5418,6 +5418,23 @@
           circle(ctx, tw.x, tw.y, R, d < R ? 'rgba(255,60,60,0.08)' : null, d < R ? '#ff6a5a' : '#ffffff', 1.2);
         }
         ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+      // con el dedo: el fantasma espera confirmación; flechas que dicen «arrástrame» (main.js: «Celular»)
+      if (ui.fantasma && ui.placing && ui.mouse) {
+        const def = PD.TOWERS[ui.placing], lw = Math.max(1, ui.lw || 1);
+        let { x, y } = ui.mouse;
+        if (ui.placing === '@pinchos') { const at = g.spikeSpot(x, y); if (at) { x = at.x; y = at.y; } }
+        const r0 = (ui.placing === '@pinchos' ? PD.PINCHOS.radio + 4 : ui.placing === '@poder' ? 18 : def.size + 4) + 6 * lw;
+        const pul = 0.5 + 0.5 * Math.sin(t * 5);
+        ctx.save(); ctx.translate(x, y);
+        circle(ctx, 0, 0, r0 + 2 * lw * pul, null, 'rgba(255,225,77,' + (0.55 + 0.35 * pul) + ')', 2 * lw);
+        ctx.fillStyle = '#ffe14d'; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1.2 * lw;
+        const ar = r0 + 7 * lw + 2 * lw * pul, s = 5 * lw;
+        for (let q = 0; q < 4; q++) {
+          ctx.save(); ctx.rotate(q * Math.PI / 2); ctx.beginPath();
+          ctx.moveTo(ar + s, 0); ctx.lineTo(ar, -s); ctx.lineTo(ar, s); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
+        }
+        ctx.restore();
       }
       let by = 12;
       for (const b of g.bosses) {

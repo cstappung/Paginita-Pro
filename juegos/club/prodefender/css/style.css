@@ -348,3 +348,167 @@ button { font-family: inherit; }
 .alm-ico { font-size: 34px; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: var(--panel2); border-radius: 12px; flex: none; }
 .alm-nota { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 14px; }
 @media (max-width: 860px) { #poder { width: 52px; height: 52px; bottom: 66px; } #poder .pw-ico { font-size: 24px; line-height: 46px; } }
+
+/* ------------------------------ Celular ------------------------------ */
+/* main.js (acomodaMovil) pone html.pd-movil en pantallas táctiles chicas, y pd-vert / pd-horiz
+   según el giro; en vertical .hud-acc baja a #barra-acc, en horizontal el #hud sube a #side y
+   .hud-sis (⛶ 🔊 ❚❚) flota sobre la esquina del mapa. */
+.hud-acc, .hud-sis { display: flex; align-items: center; gap: 10px; }
+#barra-acc { display: none; }
+#side-cuerpo { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.modal-box { max-height: calc(100dvh - 24px); overflow: auto; }
+
+/* colocar con el dedo: el panel que confirma (tapa la tienda mientras tanto) */
+#coloca { position: absolute; inset: 0; background: var(--bg2); overflow: auto; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+#coloca .inf-head canvas { width: 46px; height: 46px; }
+#coloca .inf-head h3 { font-size: 17px; }
+.col-acts { display: flex; gap: 8px; }
+.col-acts .btn { flex: 1; padding: 12px 8px; font-size: 15px; }
+.col-acts #col-si { flex: 1.6; }
+.col-acts #col-si:disabled { filter: grayscale(.9) brightness(.65); }
+.col-estado { font-weight: 800; font-size: 13px; color: var(--green); }
+.col-estado.no { color: #ff8a8a; }
+.col-tip { font-size: 12px; color: var(--muted); }
+.col-desc { margin: 0; font-size: 12.5px; line-height: 1.35; color: #c6cce8; }
+#i-sell.seguro { background: linear-gradient(180deg, #ff3b3b, #a01818); animation: pwReady 0.8s infinite; }
+
+html.pd-movil { -webkit-tap-highlight-color: transparent; }
+html.pd-movil #scr-game { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.pd-movil #scr-game button, html.pd-movil .shop-item { touch-action: manipulation; }
+html.pd-movil #stage { padding: 0; }
+html.pd-movil #cv { border-radius: 4px; box-shadow: none; }
+html.pd-movil .side-title, html.pd-movil .stat.lvl, html.pd-movil .hud-sis .pd-vol, html.pd-movil .shop-item .hk, html.pd-movil .inf-actions small, html.pd-movil .up-btn small { display: none; }
+html.pd-movil .btn:hover, html.pd-movil .shop-item:hover { filter: none; transform: none; }
+html.pd-movil .shop-item { padding: 4px 2px 5px; border-radius: 10px; }
+html.pd-movil .shop-item.sel { box-shadow: 0 0 0 2px var(--gold); }
+html.pd-movil .shop-item.hero, html.pd-movil .shop-item.pinchos { padding: 3px 8px; gap: 6px; }
+html.pd-movil .shop-item.hero canvas, html.pd-movil .shop-item.pinchos canvas { width: 32px; height: 32px; }
+html.pd-movil .shop-item.hero .nm, html.pd-movil .shop-item.pinchos .nm { font-size: 12px; min-height: 0; }
+html.pd-movil .shop-item.hero .nw { position: static; order: 3; }
+html.pd-movil #info { padding: 8px 10px 14px; gap: 8px; }
+html.pd-movil .inf-head canvas { width: 46px; height: 46px; }
+html.pd-movil .inf-close { width: 42px; height: 42px; font-size: 18px; }
+html.pd-movil .targets button { padding: 10px 0; }
+html.pd-movil .up-btn { padding: 12px 14px; }
+html.pd-movil .inf-actions .btn { padding: 12px; }
+/* avisos: chicos, a lo más dos (main.js: colaToast) y se cierran con un toque */
+html.pd-movil #toasts { top: 6px; right: 6px; gap: 5px; max-width: min(290px, 62%); pointer-events: auto; }
+html.pd-movil .toast { padding: 5px 8px; gap: 6px; font-size: 11.5px; line-height: 1.3; border-radius: 10px; border-left-width: 3px; }
+html.pd-movil .toast b { font-size: 12.5px; }
+html.pd-movil .toast canvas { width: 28px; height: 28px; }
+html.pd-movil #abilities { left: 6px; bottom: 6px; gap: 5px; }
+html.pd-movil .abil { width: 38px; height: 38px; font-size: 18px; border-radius: 10px; }
+html.pd-movil .abil .cdt { font-size: 12px; }
+html.pd-movil #poder { left: 6px; bottom: 50px; width: 46px; height: 46px; border-width: 2px; }
+html.pd-movil #poder .pw-ico { font-size: 22px; line-height: 42px; }
+html.pd-movil #poder .pw-k { display: none; }
+html.pd-movil #pactos { left: 6px; top: 6px; gap: 4px; }
+html.pd-movil #pactos .pt { width: 26px; height: 26px; font-size: 14px; border-radius: 8px; }
+html.pd-movil .modal { padding: 8px; }
+html.pd-movil .modal-box { padding: 16px 14px; border-radius: 16px; }
+html.pd-movil .modal-box h2 { font-size: 23px; }
+html.pd-movil .modal-box .big-ico { font-size: 40px; }
+html.pd-movil .modal-box p { font-size: 14px; margin: 8px 0; }
+html.pd-movil .modal-box .acts { margin-top: 10px; gap: 8px; }
+html.pd-movil .btn.pacto { padding: 8px 10px; }
+html.pd-movil .btn.pacto .pc-ico { font-size: 26px; }
+html.pd-movil .hud-c { scrollbar-width: none; overflow-x: auto; }
+html.pd-movil .hud-c::-webkit-scrollbar { display: none; }
+html.pd-movil .hud-c > * { flex: none; }
+
+/* --- vertical: HUD fino, mapa a todo el ancho, barra de ronda y tienda abajo --- */
+html.pd-vert #hud { padding: max(4px, env(safe-area-inset-top)) 6px 4px; gap: 4px 6px; flex-wrap: wrap; }
+html.pd-vert .hud-l { gap: 5px; flex: 1; min-width: 0; }
+html.pd-vert .stat { font-size: 15px; padding: 3px 9px; gap: 4px; }
+html.pd-vert .stat span { font-size: 11px; }
+html.pd-vert .ico { width: 15px; height: 15px; }
+html.pd-vert .hud-r { margin-left: 0; gap: 5px; }
+html.pd-vert .hud-sis { gap: 5px; }
+html.pd-vert .hud-sis .btn.sq { min-width: 38px; height: 34px; padding: 0 8px; font-size: 14px; }
+html.pd-vert .hud-c { order: 5; flex-basis: 100%; min-width: 0; gap: 4px; font-size: 12px; }
+html.pd-vert #game-main { flex-direction: column; }
+html.pd-vert #stage { flex: none; width: 100%; aspect-ratio: 1000 / 640; max-height: 56dvh; }
+html.pd-vert #barra-acc { display: flex; padding: 6px 8px; background: var(--bg2); border-top: 1px solid var(--line); }
+html.pd-vert #barra-acc .hud-acc { flex: 1; gap: 6px; }
+html.pd-vert #barra-acc #b-start { flex: 1; height: 46px; font-size: 17px; }
+html.pd-vert #barra-acc .btn.sq { height: 46px; min-width: 56px; }
+html.pd-vert #side { width: 100%; height: auto; flex: 1; min-height: 0; border-left: 0; border-top: 1px solid var(--line); }
+html.pd-vert #shop { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 5px; padding: 6px 8px calc(10px + env(safe-area-inset-bottom)); }
+html.pd-vert .shop-item canvas { width: 42px; height: 42px; }
+html.pd-vert .shop-item .nm { font-size: 10.5px; min-height: 24px; }
+html.pd-vert .shop-item.hero, html.pd-vert .shop-item.pinchos { grid-column: span 2; }
+html.pd-vert .shop-item.hero .nw { display: none; }
+
+/* --- horizontal: el mapa a toda la altura; HUD y tienda en la columna derecha --- */
+html.pd-horiz #scr-game { padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+html.pd-horiz #game-main { flex-direction: row; }
+html.pd-horiz #stage { flex: 1; }
+html.pd-horiz #side { width: clamp(186px, calc(100vw - 100dvh * 1.5625 - env(safe-area-inset-left) - env(safe-area-inset-right)), 290px); height: auto; border-top: 0; border-left: 1px solid var(--line); }
+html.pd-horiz #hud { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 5px; padding: max(5px, env(safe-area-inset-top)) 6px 5px; }
+html.pd-horiz .hud-l { gap: 4px; justify-content: space-between; }
+html.pd-horiz .stat { font-size: 14px; padding: 2px 7px; gap: 3px; }
+html.pd-horiz .stat span { display: none; }
+html.pd-horiz .stat small { font-size: 10px; }
+html.pd-horiz .ico { width: 13px; height: 13px; }
+html.pd-horiz .hud-r { margin: 0; order: 2; }
+html.pd-horiz .hud-acc { flex: 1; gap: 5px; }
+html.pd-horiz #b-start { flex: 1; height: 40px; padding: 0 6px; font-size: 14px; white-space: nowrap; }
+html.pd-horiz .hud-acc .btn.sq { height: 40px; min-width: 40px; padding: 0 6px; font-size: 13px; }
+html.pd-horiz .hud-c { order: 3; flex: none; min-width: 0; gap: 3px; font-size: 11px; }
+html.pd-horiz .hud-c .pv canvas { width: 20px; height: 20px; }
+html.pd-horiz #stage > .hud-sis { position: absolute; top: 5px; right: 5px; z-index: 5; gap: 5px; }
+html.pd-horiz #stage > .hud-sis .btn.sq { min-width: 36px; height: 34px; padding: 0 6px; font-size: 14px; background: rgba(20,24,44,.8); box-shadow: none; border: 1px solid rgba(255,255,255,.12); }
+html.pd-horiz #stage > .hud-sis .btn.sq.on { background: linear-gradient(180deg, #5ad1ff, #2d8fd0); }
+html.pd-horiz #toasts { top: 46px; max-width: min(280px, 48%); }
+html.pd-horiz #shop { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 4px; padding: 5px 6px calc(8px + env(safe-area-inset-bottom)); }
+html.pd-horiz .shop-item canvas { width: 34px; height: 34px; }
+html.pd-horiz .shop-item .nm { font-size: 9.5px; min-height: 22px; }
+html.pd-horiz .shop-item .ct { font-size: 12.5px; }
+html.pd-horiz .shop-item .nw { font-size: 7.5px; }
+html.pd-horiz .shop-item.hero .nw { display: none; }
+html.pd-horiz #coloca { padding: 8px; gap: 6px; }
+html.pd-horiz #coloca .inf-head canvas { width: 36px; height: 36px; }
+html.pd-horiz #coloca .inf-head h3 { font-size: 15px; }
+html.pd-horiz .col-acts { flex-direction: column-reverse; gap: 6px; }
+html.pd-horiz .col-acts .btn { padding: 10px 6px; font-size: 14px; }
+html.pd-horiz .col-tip { font-size: 11px; }
+html.pd-horiz .col-desc { font-size: 11.5px; }
+html.pd-horiz .inf-stats { grid-template-columns: 1fr; font-size: 12px; }
+html.pd-horiz .inf-head h3 { font-size: 15px; }
+html.pd-horiz .targets button { font-size: 11px; padding: 9px 0; }
+html.pd-horiz .path { padding: 6px 8px; }
+html.pd-horiz .up-next .ud { font-size: 11.5px; }
+
+/* menú y reinos en el teléfono acostado: que quepan sin cortarse */
+@media (pointer: coarse) and (max-height: 500px) and (orientation: landscape) {
+  #scr-menu { overflow: auto; justify-content: flex-start; padding: 8px 0; }
+  .menu-box { margin: auto; padding: 14px 24px 12px; gap: 8px; }
+  .logo .l1 { font-size: 22px; } .logo .l2 { font-size: 46px; }
+  .tag { margin: 0; font-size: 13px; }
+  .btn.big { font-size: 19px; padding: 10px 34px; }
+  .scr-head { padding: 6px 12px; gap: 10px; }
+  .scr-head h2 { font-size: 20px; }
+  .scr-head .hint { font-size: 12px; }
+  .pd-reinos { flex-direction: row; overflow: hidden; }
+  .pd-reinos > #level-grid { flex: 1; overflow: auto; }
+  .pd-lado { border-top: 0; border-left: 1px solid var(--line); }
+  #level-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); padding: 10px; gap: 10px; }
+  .pd-lado { width: 230px; }
+}
+/* en el celular, las mejoras primero (los datos de la torre quedaban arriba y había que bajar) */
+html.pd-movil #info > * { order: 5; }
+html.pd-movil #info > .inf-head { order: 0; }
+html.pd-movil #info > .paths { order: 1; }
+html.pd-movil #info > .inf-actions { order: 2; }
+html.pd-movil #info > .targets { order: 3; }
+html.pd-movil #info > .inf-stats { order: 6; }
+/* pactos y héroes en el teléfono acostado: sin el ícono grande y las cartas de a dos */
+html.pd-horiz .modal-box .big-ico { display: none; }
+html.pd-horiz .modal-box.pactos { max-width: 720px; }
+html.pd-horiz .modal-box.pactos p { font-size: 12.5px; margin: 4px 0; }
+html.pd-horiz .modal-box.pactos .acts { display: grid; grid-template-columns: 1fr 1fr; }
+html.pd-horiz .modal-box.pactos .acts .btn.ghost { grid-column: 1 / -1; }
+html.pd-horiz .btn.pacto .pc-txt b { font-size: 15px; }
+html.pd-horiz .btn.pacto .pc-b, html.pd-horiz .btn.pacto .pc-m { font-size: 12px; }
+html.pd-horiz .modal-box h2 { font-size: 20px; margin-bottom: 2px; }
+.vol label[hidden] { display: none; }

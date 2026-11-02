@@ -510,15 +510,34 @@ a 10-round batch was tried and reverted), but:
   digits) and podiums pay as in every club game.
 - Local save is per account: `Club.storageKey('prodefender.save.v1')`. There is no «Borrar progreso» button (the owner removed it).
 - Volume: `volumen.js` draws into the `[data-volumen]` slots (menu and HUD;
-  hidden in the HUD under 600 px), and the game keeps its own 🔊 (M) and the
+  hidden in the HUD under 600 px and in phone mode), and the game keeps its own 🔊 (M) and the
   music/effects sliders in the pause menu.
 - **Sound effects have a concurrency cap** (`A.play` in `audio.js`: `ATK_MAX`
   tower attacks, `VOCES_MAX`/`VOCES_DURO` in total, counted on `ctx.currentTime`)
   and a limiter after the compressor; the context uses `latencyHint:
   'playback'`. Without them a big map crackled and then went silent (the
-  audio thread could not keep up). `audio.js`, `main.js` and the CSS carry
-  their own tag (`pd-7a`, `main.js` `pd-7b`): they are not in the proof, so
-  they move without `VERSION`.
+  audio thread could not keep up). `audio.js`, `render.js`, `main.js` and the
+  CSS are not in the proof, so their tag can move alone (e.g. `pd-13m`)
+  without `VERSION`; the test only ties the five files the worker loads.
+- **Phone mode** (`acomodaMovil` in main.js, «Celular»; CSS `html.pd-movil` + `pd-vert`/`pd-horiz`):
+  a touch screen whose short side is ≤ 600 px (measured in the frame: it fills the window).
+  Portrait: thin HUD on top, the map full width, the round bar (`.hud-acc` moved into
+  `#barra-acc`) and the shop below. Landscape: the map at full height, `#hud` moved into
+  `#side` above `#side-cuerpo`, and `.hud-sis` (⛶ 🔊 ❚❚) floating on the map's corner. Only
+  nodes move; the buttons keep their listeners. ⛶ is fullscreen (the club iframe has
+  `allow=fullscreen`; hidden where `fullscreenEnabled` is false, i.e. iPhone). On a phone at
+  most two toasts show (`colaToast` queues the rest), shorter, closed with a tap; the tower
+  panel lists the upgrades before the stats.
+- **Placing with a finger** (`ui.tactil` = the last pointerdown was not a mouse): choosing a
+  tower, the pinchos or the power does not follow the pointer; a ghost appears on the map
+  (`ui.fantasma`, at `ui.mouse`: near the last placement or the centre, at a valid spot that
+  reaches the path; the power on the most advanced enemy). It is dragged **relative** to the
+  finger from anywhere on the map (the finger never covers it), a short tap moves it there,
+  and on release an invalid spot snaps to the nearest valid one within 45 (`acomoda`).
+  `#coloca` covers the shop with ✔/✕ and the reason it can't (`motivoNo`); ✔ calls the same
+  `rec.colocar`/`rec.pinchos`/`rec.poder`, so the proof is unchanged. Selling with a finger
+  asks for a second tap; tooltips are off on touch (a tap also fires `mousemove`). The mouse
+  flow is unchanged. `render.js` draws the arrows around the ghost.
 - **Cursor**: on the map it is a big yellow crosshair with a black outline
   (`#cv.cur-grande`, an inline SVG); the pause menu's «Cursor» select switches
   back to the system crosshair (`save.settings.cursor = 'clasico'`).
