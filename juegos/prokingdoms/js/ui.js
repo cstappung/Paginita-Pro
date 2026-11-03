@@ -27,6 +27,8 @@
   // Pantalla táctil: cambia los textos de ayuda de "clic derecho" a "toca".
   UI.isTouch = () => !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
   UI.hint = (mouse, touch) => (UI.isTouch() ? touch : mouse);
+  // «Nombre (tú)», salvo que el nombre ya sea «Tú» (el de siempre sin nombre): salía «Tú (tú)».
+  UI.yo = name => (!name || /^t[úu]$/i.test(name.trim()) ? 'Tú' : name + ' (tú)');
 
   // ---------- Avisos ----------
   let toastBox, lastToast = {};
@@ -36,12 +38,29 @@
     const now = performance.now();
     if (lastToast[text] && now - lastToast[text] < 3000) return;
     lastToast[text] = now;
-    const t = el('div', { class: 'toast ' + (kind || 'info') + (act ? ' act' : ''), title: 'Toca para cerrar' }, text);
+    const life = act ? 12000 : kind === 'epic' || kind === 'bad' ? 6500 : 4200;
+    const close = t => { clearTimeout(t._tm); t.classList.add('out'); setTimeout(() => t.remove(), 400); };
+    // Avisos repetidos se agrupan (playtest): si ya hay uno igual a la vista (los números no cuentan), se
+    // actualiza su texto, suma «×N», vuelve arriba y reinicia su tiempo, en vez de apilar otro.
+    const key = (kind || 'info') + '|' + text.replace(/\d+([.,]\d+)*/g, '#');
+    const same = [...toastBox.children].find(o => o._key === key && !o.classList.contains('out'));
+    if (same) {
+      same._n = (same._n || 1) + 1;
+      same.firstChild.textContent = text;
+      same._cnt.textContent = '×' + same._n;
+      same._cnt.style.display = '';
+      toastBox.prepend(same);
+      clearTimeout(same._tm); same._tm = setTimeout(() => close(same), life);
+      return;
+    }
+    const cnt = el('b', { class: 'toast-n', style: { display: 'none' } });
+    const t = el('div', { class: 'toast ' + (kind || 'info') + (act ? ' act' : ''), title: 'Toca para cerrar' }, el('span', null, text), cnt);
+    t._key = key; t._cnt = cnt;
     if (act) t.append(UI.btn(act.label, () => { act.fn(); t.remove(); }, { small: true, cls: 'gold' }));
-    t.addEventListener('click', () => { t.classList.add('out'); setTimeout(() => t.remove(), 250); });
+    t.addEventListener('click', () => { clearTimeout(t._tm); t.classList.add('out'); setTimeout(() => t.remove(), 250); });
     toastBox.prepend(t);
     while (toastBox.children.length > 5) toastBox.lastChild.remove();
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, act ? 12000 : kind === 'epic' || kind === 'bad' ? 6500 : 4200);
+    t._tm = setTimeout(() => close(t), life);
   };
   UI.flashTarget = function (x, y) {
     const f = el('div', { class: 'flash', style: { left: x + 'px', top: y + 'px' } });
@@ -72,6 +91,31 @@
 
   // ---------- Ventanas ----------
   let modal = null;
+  // La meta de la próxima era (tocar «Era» en la barra): requisitos, costo y cuánto falta de cada cosa.
+  UI.openEraGoal = function () {
+    UI.modal('eraGoal', 'Próxima era', body => {
+      const st = S(), g = G();
+      if (st.eraProg) {
+        body.append(el('h3', null, 'Avanzando a ' + D.eraName(st.eraProg.to)),
+          el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (st.eraProg.t / st.eraProg.total) * 100 + '%' } }), el('span', null, U.fmtTime(st.eraProg.total - st.eraProg.t))),
+          el('p', { class: 'small muted' }, 'Si te sobran recursos, paga «Horas extra» en el Centro Urbano para adelantarlo.'));
+      } else {
+        const n = st.era + 1, ch = g.eraChecks(n), cost = D.eraCost(n);
+        body.append(el('h3', null, 'Era ' + U.roman(n) + ' · ' + D.eraName(n)),
+          el('ul', { class: 'info era-goal' }, ch.map(c => el('li', { class: c.ok ? 'ok' : '' }, (c.ok ? '✓ ' : '✗ ') + c.text))),
+          el('h4', null, 'Costo'),
+          el('div', { class: 'era-cost' }, Object.keys(cost).map(r => {
+            const have = Math.floor(st.res[r] || 0), ok = have >= cost[r];
+            return el('div', { class: 'ec-row' + (ok ? ' ok' : '') }, UI.resIcon(r), el('span', null, D.RES[r].name), el('b', null, U.fmt(Math.min(have, cost[r])) + ' / ' + U.fmt(cost[r])),
+              el('div', { class: 'bar' }, el('div', { class: 'fill ' + (ok ? 'green' : 'gold'), style: { width: Math.min(100, (have / cost[r]) * 100) + '%' } })));
+          })),
+          el('p', { class: 'small muted' }, 'El avance dura ' + U.fmtTime(D.eraTime(n)) + '. Se inicia desde el Centro Urbano.'));
+      }
+      const tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
+      if (tc) body.append(UI.btn('Ir al Centro Urbano', () => { UI.closeModal(); UI.selectBuilding(tc); }, { cls: 'gold' }));
+    });
+  };
+
   UI.modal = function (key, title, render, opts) {
     UI.closeModal();
     opts = opts || {};
@@ -125,7 +169,7 @@
     bar.append(el('div', { class: 'res pop', title: 'Población' }, el('img', { class: 'ico', src: Sp.icon('pop') }), popEl));
     buildEl = el('b', null, '1/1');
     bar.append(el('button', { class: 'res builders', title: 'Maestros de Obras ocupados / total', onclick: () => UI.openWorks() }, el('img', { class: 'ico', src: Sp.icon('hammer') }), buildEl));
-    eraEl = el('div', { class: 'era' });
+    eraEl = el('div', { class: 'era', title: 'Meta de la próxima era', role: 'button', tabindex: '0', onclick: () => UI.openEraGoal() });
     coinEl = el('b', null, '0');
     netEl = el('button', { class: 'net', onclick: () => UI.openRealms() });
     bar.append(eraEl, netEl, el('div', { class: 'res coins', title: 'Monedas de la página' }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
@@ -216,8 +260,10 @@
         resEls[r].v.textContent = U.fmt(v);
         resEls[r].f.style.width = Math.min(100, (v / Math.max(1, cap)) * 100) + '%';
         resEls[r].box.classList.toggle('full', v >= cap * 0.98);
-        // los premios (misiones, cofres, botín) pueden pasar el tope a propósito para no perderse: que se entienda
-        resEls[r].box.title = D.RES[r].name + ': ' + U.fmt(v) + ' / ' + U.fmt(cap) + (v > cap ? ' — sobre el tope por premios: no se pierde, pero tus aldeanos no juntan más ni puedes comprar hasta que gastes' : '');
+        // Una sola regla para el tope: solo frena lo que juntan los aldeanos y producen los talleres. Premios, cofres,
+        // botín, compras, ventas y tratos entran enteros aunque lo pasen (antes «Comprar» se negaba y vender con el
+        // oro lleno se perdía).
+        resEls[r].box.title = D.RES[r].name + ': ' + U.fmt(v) + ' / ' + U.fmt(cap) + (v >= cap * 0.98 ? ' — bodega llena: tus aldeanos esperan hasta que gastes. Premios, compras y tratos entran igual.' : '');
         if (v >= 1) st.flags['seenRes_' + r] = true;
         resEls[r].box.style.display = !D.RES[r].special && (D.RES_START.includes(r) || st.flags['seenRes_' + r]) ? '' : 'none';
       }
@@ -226,6 +272,11 @@
       buildEl.parentNode.classList.toggle('free', G().buildersBusy() < G().builders());
       eraEl.innerHTML = '';
       eraEl.append(el('span', null, 'Era ' + U.roman(st.era)), el('small', null, D.eraName(st.era)));
+      // la meta de la próxima era a la vista (playtest): cuántos requisitos van y si ya se puede avanzar
+      if (!st.eraProg) {
+        const ch = G().eraChecks(st.era + 1), okN = ch.filter(c => c.ok).length, all = okN === ch.length && G().canAfford(D.eraCost(st.era + 1));
+        eraEl.append(el('em', { class: 'era-meta' + (all ? ' lista' : '') }, all ? '¡avanzar!' : 'meta ' + okN + '/' + ch.length));
+      }
       if (st.eraProg) eraEl.append(el('div', { class: 'mini-bar' }, el('div', { style: { width: (st.eraProg.t / st.eraProg.total) * 100 + '%' } })));
       coinEl.textContent = U.fmt(PK.Platform.getCoins());
       const net = PK.Net;
@@ -293,6 +344,7 @@
       out.push({ k: 'r' + st.research.id, icon: Sp.icon('flask'), name: t.name + ' ' + U.roman(st.research.lvl), left: (st.research.total - st.research.t) / g.researchMult(), pct: st.research.t / st.research.total, go: () => UI.openResearch() });
     }
     for (const r of (st.exp && st.exp.runs) || []) {
+      if (r.phase === 'battle') { out.unshift({ k: 'b' + r.id, raid: true, icon: Sp.icon('war'), name: '⚔ Batalla en ' + r.name, left: null, pct: 1, go: () => PK.Batalla.abrir(r.id) }); continue; }
       const go = r.phase === 'go', left = ((go ? r.arrive : r.back) - now) / 1000;
       out.push({ k: 'x' + r.id + r.phase, icon: Sp.icon('war'), name: (go ? '⚔ Hacia ' : '↩ Vuelve de ') + r.name, left, pct: 1 - left / Math.max(1, r.travel), go: () => UI.openBarracks('exp') });
     }
@@ -304,6 +356,8 @@
       if (b.owner !== 'p' || b.done) continue;
       out.push({ k: 'c' + b.id, icon: Sp.buildingIcon(b.type, 'p', 1), name: 'Obra: ' + b.def.name, left: ((1 - b.progress) * b.def.time) / g.buildMult('p'), pct: b.progress, b: null, go: () => UI.selectBuilding(b) });
     }
+    const fi = g.fiestaInfo();
+    if (fi && fi.left) out.push({ k: 'fiesta', icon: Sp.icon('coin'), name: '🎉 Fiesta (+25%)', left: fi.left, pct: 1 - fi.left / g.FIESTA.dur, go: () => { const tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc'); if (tc) UI.selectBuilding(tc); } });
     out.sort((a, b) => a.left - b.left);
     const inc = PK.Incursiones && PK.Incursiones.fila();
     if (inc) out.unshift(Object.assign(inc, { raid: true, icon: Sp.icon('war'), go: () => PK.Incursiones.ver() }));
@@ -419,6 +473,7 @@
     if (u.inside) { const b = G().buildings.find(o => o.workers.includes(u.id)); return b ? 'Trabajando en ' + b.def.name : 'Trabajando'; }
     if (!u.task) return 'Ocioso';
     const t = u.task;
+    if (u.fullWait && (t.t === 'gather' || t.t === 'farm')) return 'Esperando: bodega de ' + D.RES[t.t === 'farm' ? 'food' : t.res].name.toLowerCase() + ' llena';
     if (t.t === 'gather') return (u.phase === 'return' ? 'Llevando ' : 'Recolectando ') + D.RES[t.res].name.toLowerCase();
     if (t.t === 'farm') return u.phase === 'return' ? 'Llevando la cosecha' : 'Cultivando';
     if (t.t === 'build') { const b = G().bById.get(t.b); return 'Construyendo ' + (b ? b.def.name : ''); }
@@ -570,6 +625,11 @@
         UI.btn('+5', () => { G().train(b, 5); UI.refreshPanel(true); }, { small: true }),
         b.queue.length ? UI.btn('Quitar de la cola', () => { G().cancelTrain(b); UI.refreshPanel(true); }, { small: true }) : null,
         el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: st.auto.train, onchange: e => { st.auto.train = e.target.checked; } }), ' Entrenar sin parar')));
+      const fi = G().fiestaInfo();
+      if (fi) act.append(el('div', { class: 'ot-row fiesta-row' }, fi.left
+        ? el('span', { class: 'small good-t' }, '🎉 Fiesta en curso: +25% de recolección y talleres (' + U.fmtTime(fi.left) + ')')
+        : UI.btn(el('span', null, '🎉 Fiesta ', UI.costEl(fi.cost)), () => { G().fiesta(); UI.refreshPanel(true); },
+          { small: true, cls: 'ot', disabled: !fi.ok, title: 'Gasta lo que te sobra: +25% de recolección y de talleres durante 5 minutos. Cada fiesta del mismo día cuesta un 40% más.' })));
       act.append(el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / G().trainTime(b)) * 100 + '%' } }), el('span', null, b.queue.length ? 'En cola: ' + b.queue.length + (b.status && b.status !== 'Entrenando' ? ' · ' + b.status : '') : UI.hint('Sin cola · clic derecho para punto de reunión', 'Sin cola · toca el mapa para punto de reunión'))));
       const n = st.era + 1;
       if (st.eraProg) {
@@ -615,7 +675,7 @@
         el('div', { class: 'buf' }, UI.resIcon(ob), el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: Math.min(100, ((b.outb[ob] || 0) / cap) * 100) + '%' } }), el('span', null, 'salida ' + Math.floor(b.outb[ob] || 0) + '/' + cap)))));
       act.append(el('p', { class: 'small ' + (near || carts || belts ? 'muted' : 'warn-t') }, near ? 'Junto a ' + near.def.name + ': se abastece solo (' + PK.Logi.directRate(b) + '/s).' + (belts ? ' Además tiene ' + belts + ' cinta(s).' : '') : belts ? 'Conectado por ' + belts + ' cinta(s).' : carts ? 'Lejos de los almacenes: lo abastecen tus ' + carts + ' carretas.' : 'Lejos de los almacenes y sin carretas: no recibe insumos. Construye una Carretería o acércalo a 3 casillas de un Almacén o del Centro Urbano.'));
       const rate = (b.workers.length * G().prodMult(def.recipe, b) * 60) / r.time;
-      if (b.workers.length) act.append(el('p', { class: 'small muted' }, '≈ ' + rate.toFixed(1) + ' ' + D.RES[Object.keys(r.out)[0]].name.toLowerCase() + ' por minuto'));
+      if (b.workers.length) act.append(el('p', { class: 'small ' + (near || carts || belts ? 'muted' : 'warn-t') }, near || carts || belts ? 'Hasta aprox. ' + rate.toFixed(1) + ' ' + D.RES[ob].name.toLowerCase() + ' por minuto, si le llegan insumos' : 'Sin abastecimiento no produce nada.'));
       act.append(el('p', { class: 'small muted' }, UI.hint('Selecciona aldeanos y haz clic derecho en el edificio para asignarlos.', 'Elige aldeanos y luego toca el edificio para asignarlos.')));
       if (b.workers.length) act.append(UI.btn('Sacar trabajadores', () => { b.workers.slice().forEach(id => G().release(G().uById.get(id))); UI.refreshPanel(true); }, { small: true }));
     } else if (b.type === 'farm') {
@@ -850,6 +910,12 @@
     if (!runs.length) return;
     pane.append(el('h3', null, 'Tropas fuera (' + runs.length + ')'));
     for (const r of runs) {
+      if (r.phase === 'battle') {
+        pane.append(el('div', { class: 'run-row' }, el('span', { class: 'run-ic' }, '⚔'),
+          el('div', { class: 'dg-info' }, el('b', null, 'Peleando en ' + r.name), el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados · dirige la batalla en vivo')),
+          UI.btn('Ver batalla', () => PK.Batalla.abrir(r.id), { small: true, cls: 'gold' })));
+        continue;
+      }
       const go = r.phase === 'go', left = Math.max(0, ((go ? r.arrive : r.back) - Date.now()) / 1000), pct = U.clamp(1 - left / Math.max(1, r.travel), 0, 1);
       pane.append(el('div', { class: 'run-row' + (go ? '' : r.won ? ' won' : ' lost') },
         el('span', { class: 'run-ic' }, go ? '⚔' : r.won ? '✔' : '✘'),
@@ -945,6 +1011,7 @@
       const kinds = Object.keys(r.sent || {}).filter(k => r.sent[k] > 0);
       body.append(el('div', { class: 'report ' + (r.won ? 'won' : 'lost') },
         el('h2', null, r.name),
+        r.live ? el('p', { class: 'small good-t' }, r.retreat ? 'Te retiraste a tiempo: se salvaron más soldados.' : 'Batalla peleada en vivo: el resultado y las bajas salieron de la pelea.') : null,
         el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra aprox. ' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
         el('h3', null, 'Tu compañía'),
         el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),
@@ -1195,12 +1262,14 @@
       const box = el('div', { class: 'works scroll' });
       for (const b of list) {
         const c = g.canUpgrade(b), max = g.maxLvl(b.type);
-        box.append(el('div', { class: 'work-row' + (c.ok ? ' ok' : '') }, el('img', { src: Sp.buildingIcon(b.type, 'p', b.lvl) }),
+        const ver = () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); };
+        // toda la fila lleva al edificio (en el celular se esconde «Ver» para que la fila quepa en una línea)
+        box.append(el('div', { class: 'work-row' + (c.ok ? ' ok' : ''), onclick: e => { if (!e.target.closest('button')) ver(); } }, el('img', { src: Sp.buildingIcon(b.type, 'p', b.lvl) }),
           el('b', null, b.def.name), el('span', { class: 'lvl' }, 'Nv ' + b.lvl + '/' + max),
           b.lvl >= max ? el('span', { class: 'muted small' }, 'máximo de la era') : el('span', { class: 'wcost' }, UI.costEl(g.upCost(b)), el('span', { class: 'muted small' }, ' ' + U.fmtTime(g.upTime(b)))),
           b.lvl >= max ? null : c.ok ? UI.btn('Mejorar', () => { g.upgrade(b); PK.Auto.dequeue(b); UI.rerender(); }, { small: true, cls: 'gold' }) :
             PK.Auto.queued(b) ? el('span', { class: 'small good' }, 'en cola') : UI.btn('A la cola', () => { PK.Auto.enqueue(b); UI.rerender(); }, { small: true }),
-          UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); }, { small: true })));
+          UI.btn('Ver', ver, { small: true, cls: 'wk-ver' })));
       }
       body.append(box);
     }, { wide: true });
@@ -1227,7 +1296,7 @@
           el('span', { class: 'jr-n' }, String(n)),
           UI.btn('−', () => { A.removeJob(id); UI.rerender(); }, { small: true, disabled: !n, aria: 'Uno menos en ' + j.name }),
           UI.btn('+', () => { A.addJob(id); UI.rerender(); }, { small: true, cls: 'gold', disabled: !ok || !all, aria: 'Uno más en ' + j.name }),
-          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : A.whyText(id))));
+          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres abastecidos con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : A.whyText(id))));
       }
       body.append(rows);
       const chk = (key, label, help) => el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a[key], onchange: e => { a[key] = e.target.checked; UI.rerender(); } }), el('b', null, ' ' + label), el('span', { class: 'small muted' }, ' — ' + help));
@@ -1332,7 +1401,7 @@
     const net = PK.Net;
     UI.modal('realms', 'Reinos', body => {
       body.append(el('h3', null, net.online ? 'Tu mundo: ' + net.world.name : 'Tu mundo (modo local)'));
-      const rows = [{ me: true, name: (net.online ? net.me.name : PK.Platform.getPlayer().name) + ' (tú)', color: D.PLAYER_COLOR, era: S().era }]
+      const rows = [{ me: true, name: UI.yo(net.online ? net.me.name : PK.Platform.getPlayer().name), color: D.PLAYER_COLOR, era: S().era }]
         .concat(D.BOTS.map(b => ({ name: b.realm, color: b.color, human: b.human, online: b.online, era: b.human ? b.era : null })));
       const humansN = rows.filter(r => r.human).length, onlineN = rows.filter(r => r.human && r.online).length;
       if (net.online) body.append(el('p', { class: 'small' + (onlineN ? ' good-t' : ' muted') }, humansN ? humansN + ' jugador(es) real(es) en tu mundo · ' + onlineN + ' en línea ahora.' : 'Por ahora eres el único jugador real de este mundo: los demás reinos son simulados hasta que llegue alguien.'));
@@ -1387,10 +1456,11 @@
           UI.btn('Borrar partida', () => { if (confirm('¿Seguro? Se perderá todo tu progreso.')) G().reset(); }, { small: true, cls: 'danger' })),
         el('h3', null, 'Controles'),
         UI.isTouch() ? el('ul', { class: 'small' },
-          el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un objetivo: recolectar / trabajar / mover'),
+          el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un árbol, una mina o un edificio: recolectar / trabajar'),
+          el('li', null, 'Para soltar lo elegido: toca el suelo vacío, vuelve a tocar al aldeano o usa la ✕ del panel'),
           el('li', null, 'Construir: elige el edificio en el menú, toca dónde va y vuelve a tocar (o «Construir aquí») para confirmar'),
           el('li', null, 'Mantén pulsado y arrastra: seleccionar grupo · Doble toque en un aldeano: todos los de su tipo en pantalla'),
-          el('li', null, 'Con el Centro Urbano elegido, toca el mapa para fijar el punto de reunión'),
+          el('li', null, 'Con el Centro Urbano elegido, toca un recurso para fijar el punto de reunión'),
           el('li', null, 'Arrastra: mover cámara · Pellizca: zoom'),
           el('li', null, 'Botones Ocioso y Demoler en el menú lateral'))
         : el('ul', { class: 'small' },
@@ -1454,7 +1524,7 @@
       body.append(keys.length ? el('div', { class: 'reward big' }, keys.map(k => UI.amount(k, rep.gained[k])))
         : el('p', { class: 'muted' }, full.length ? 'No cupo nada más: el almacenamiento está lleno.' : working ? 'Tus aldeanos no lograron juntar nada: quizás se agotó lo que tenían cerca.' : 'Nadie estaba trabajando. ¡Asigna tareas antes de irte!'));
       if (full.length) body.append(el('p', { class: 'small warn-t' }, 'Lleno: ' + full.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. Mejora el Granero, el Almacén o el Centro Urbano para guardar más mientras no estás.'));
-      if (rep.depleted) body.append(el('p', { class: 'small muted' }, rep.depleted + ' recursos se agotaron en el mapa (los otros reinos también recolectan en las zonas comunes).'));
+      if (rep.depleted) body.append(el('p', { class: 'small muted' }, 'Tus aldeanos agotaron ' + rep.depleted + (rep.depleted === 1 ? ' árbol, veta o arbusto' : ' árboles, vetas o arbustos') + ' (vuelven a crecer con el tiempo).'));
       if (rep.explored > 0) body.append(el('p', { class: 'small' }, 'Tus exploradores revelaron ' + rep.explored + ' casillas del mapa.'));
       if (rep.finished && rep.finished.length) body.append(el('p', { class: 'small' }, 'Terminado: ' + rep.finished.join(', ') + '.'));
       if (rep.capped) body.append(el('p', { class: 'small muted' }, 'Las obras y estudios contaron todo el tiempo; los aldeanos, hasta 12 horas.'));
@@ -1511,8 +1581,13 @@
     body.className = 'p-body';
     const title = el('span', { class: 'p-title' }, 'Pro Kingdoms'), arrow = el('span', { class: 'p-arrow', 'aria-hidden': 'true' }, '▼');
     const head = el('button', { class: 'p-toggle', 'aria-controls': 'panel-body', 'aria-expanded': 'true', title: 'Ocultar panel' }, title, arrow);
+    // ✕: suelta lo elegido (en el celular no hay Esc ni clic derecho). Solo se ve si hay algo elegido.
+    const close = el('button', { class: 'p-close', title: 'Soltar selección', 'aria-label': 'Soltar selección', onclick: e => { e.stopPropagation(); G().sel = null; UI.refreshPanel(true); } }, '✕');
     body.replaceWith(wrap);
-    wrap.append(head, body);
+    wrap.append(el('div', { class: 'p-headrow' }, head, close), body);
+    const syncClose = () => { close.style.display = G().sel ? '' : 'none'; };
+    syncClose();
+    setInterval(syncClose, 400);
     const setOpen = open => {
       wrap.classList.toggle('collapsed', !open);
       head.setAttribute('aria-expanded', open ? 'true' : 'false');

@@ -59,6 +59,9 @@
     }
   };
 
+  // ¿Le llega algo a este taller? (junto a un almacén, con carretas o con una cinta que lo alimenta).
+  // Sin eso no recibe insumos: no se le asignan trabajadores (antes aceptaba y prometía «≈30 por minuto»).
+  L.supplied = b => !!(L.nearStore(b) || L.carts().length || S().logi.belts.some(bl => bl.b === b.id));
   // Almacén cercano: el taller se abastece y descarga solo, a un ritmo moderado.
   L.nearStore = function (b) {
     if (b._nsT === G().time) return b._ns;

@@ -191,12 +191,18 @@
   };
 
   // ---------- Resolver ----------
-  function resolve(r) {
+  // res (batalla en vivo, batalla.js): quién ganó y cuántos cayeron de cada tropa. Sin res, por la proporción de fuerzas.
+  function resolve(r, res) {
     const st = S(), tc = tactic(r), ratio = (r.power * tc.pow) / Math.max(1, r.need), sent = Object.assign({}, r.units);
-    r.won = Math.random() < Exp.chance(ratio);
-    const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss);
     r.lost = {};
-    for (const k in r.units) { const l = Math.round(r.units[k] * loss * U.rand(0.8, 1.2)); r.lost[k] = Math.min(r.units[k], l); r.units[k] -= r.lost[k]; }
+    if (res) {
+      r.won = !!res.won;
+      for (const k in r.units) { const l = Math.min(r.units[k], res.lost[k] || 0); r.lost[k] = l; r.units[k] -= l; }
+    } else {
+      r.won = Math.random() < Exp.chance(ratio);
+      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss);
+      for (const k in r.units) { const l = Math.round(r.units[k] * loss * U.rand(0.8, 1.2)); r.lost[k] = Math.min(r.units[k], l); r.units[k] -= r.lost[k]; }
+    }
     // veteranía para quienes vuelven (también se aprende perdiendo, menos)
     const xp = Math.max(4, r.need / 8) * (r.won ? 1 : 0.4) * (1 + Exp.bonus('xpBoost'));
     for (const k in r.units) if (r.units[k] > 0) st.exp.xp[k] += xp;
@@ -216,15 +222,17 @@
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy };
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat) };
     st.war.reports = st.war.reports || [];
     st.war.reports.unshift(rep);
     if (st.war.reports.length > 12) st.war.reports.length = 12;
     const to = PK.Troops ? PK.Troops.targetOf(r) : null;
-    if (to && !r.mission && PK.Troops) PK.Troops.fight(to[0], to[1], { won: r.won, units: sent, enemy: r.enemy });
-    toast(r.won ? '¡Victoria en ' + r.name + '! Tus tropas vuelven con el botín.' : 'Derrota en ' + r.name + '. Los que quedaron vuelven a casa.', r.won ? 'good' : 'bad',
+    if (to && !r.mission && PK.Troops && !res) PK.Troops.fight(to[0], to[1], { won: r.won, units: sent, enemy: r.enemy });
+    // si la estabas mirando, el cartel de la batalla ya lo dice
+    if (!(res && PK.Batalla && PK.Batalla.abierta())) toast(r.won ? '¡Victoria en ' + r.name + '! Tus tropas vuelven con el botín.' : (res && res.retreat ? 'Retirada en ' : 'Derrota en ') + r.name + '. Los que quedaron vuelven a casa.', r.won ? 'good' : 'bad',
       { label: 'Ver informe', fn: () => PK.UI.openReport(rep) });
   }
+  Exp.finishBattle = (r, res) => { if (r.phase === 'battle') resolve(r, res); };
   const lostText = l => Object.keys(l).filter(k => l[k]).map(k => l[k] + ' ' + D.ARMY[k].name.toLowerCase() + (l[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
   function arrive(r) {
     const st = S(), g = G();
@@ -277,14 +285,27 @@
     t1 = 0;
     const now = Date.now();
     for (const r of st.exp.runs.slice()) {
-      // aviso antes de llegar: para elegir táctica y mirar la pelea en el mapa
+      // aviso antes de llegar: para elegir táctica y entrar a mirar la batalla
       if (!offline && r.phase === 'go' && !r.warned && !r.mission && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
         r.warned = true;
-        const to = PK.Troops && PK.Troops.targetOf(r);
-        toast('Tus tropas llegan a ' + r.name + ' en ' + U.fmtTime((r.arrive - now) / 1000) + ' (táctica: ' + tactic(r).name.toLowerCase() + '; se cambia en el Cuartel).', 'info',
-          to ? { label: 'Ver combate', fn: () => PK.Render.centerOn(to[0], to[1]) } : { label: 'Cuartel', fn: () => PK.Social.openWar('exp') });
+        toast('Tus tropas llegan a ' + r.name + ' en ' + U.fmtTime((r.arrive - now) / 1000) + '. ¿Quieres dirigir la batalla?', 'info',
+          { label: 'Ver batalla', fn: () => { r.watch = true; } });
       }
-      if (r.phase === 'go' && now >= r.arrive) resolve(r);
+      // batalla en vivo (batalla.js). Si la partida se recargó en medio, se resuelve como antes; sin ti, se juega de una vez.
+      if (r.phase === 'battle') {
+        if (!PK.Batalla || !PK.Batalla.tiene(r.id)) resolve(r);
+        else if (offline) PK.Batalla.adelantar(r.id);
+        continue;
+      }
+      if (r.phase === 'go' && now >= r.arrive) {
+        if (!offline && !r.mission && PK.Batalla && PK.Batalla.empezar(r)) {
+          if (r.watch) PK.Batalla.abrir(r.id);
+          else toast('¡Empieza la batalla en ' + r.name + '!', 'bad', { label: 'Ver batalla', fn: () => PK.Batalla.abrir(r.id) });
+          if (PK.Sfx) PK.Sfx.play('event');
+          continue;
+        }
+        resolve(r);
+      }
       else if (r.phase === 'back' && now >= r.back) arrive(r);
     }
     // la Arena entrena a las tropas que están en casa

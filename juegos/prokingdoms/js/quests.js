@@ -322,6 +322,12 @@
       }, s === 'locked' ? '???' : q.title));
     }
     left.append(tree);
+    // El árbol de Guerra tiene 5 columnas y no cabía en la página izquierda (se cortaba a la derecha): se achica
+    // hasta caber, no menos de 0.6; si aun así no cabe, la página se desliza de lado.
+    requestAnimationFrame(() => {
+      const cs = getComputedStyle(left), room = left.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (room > 0 && width > room) tree.style.zoom = Math.max(0.6, room / width);
+    });
 
     const q = byId[selected], s = Q.status(q);
     right.append(el('div', { class: 'q-head' }, el('h2', null, s === 'locked' ? 'Misión sellada' : q.title), el('span', { class: 'q-state ' + s }, { locked: 'Bloqueada', active: 'En curso', ready: '¡Cumplida!', claimed: 'Reclamada' }[s])));

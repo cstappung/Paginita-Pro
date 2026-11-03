@@ -87,8 +87,8 @@
     const st = S(), now = Date.now(), out = [];
     if (!st) return out;
     for (const r of (st.exp && st.exp.runs) || []) {
-      const go = r.phase === 'go', ms = Math.max(1, r.travel * 1000);
-      const f = go ? 1 - (r.arrive - now) / ms : (r.back - now) / ms;
+      const go = r.phase === 'go' || r.phase === 'battle', ms = Math.max(1, r.travel * 1000);
+      const f = r.phase === 'battle' ? 1 : go ? 1 - (r.arrive - now) / ms : (r.back - now) / ms; // en batalla, en el destino
       out.push({ key: 'x' + r.id, units: r.units, to: T.targetOf(r), f: U.clamp(f, 0, 1), back: !go, name: r.name });
     }
     for (const e of (st.war && st.war.exps) || []) {
