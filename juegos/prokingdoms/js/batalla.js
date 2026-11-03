@@ -77,13 +77,20 @@
     const p = r.poi !== undefined ? PK.World.pois[r.poi] : null;
     return p && TERRENO[p.kind] ? p.kind : 'campo';
   }
+  // Qué tan adentro: 0 en el primer piso (o el campamento más cercano), 1 en el último (o el más lejano).
+  // El escenario se vuelve más espectacular con eso (escenarios.js).
+  function nivelDe(r) {
+    if (r.camp !== undefined) { const p = PK.World.pois[r.camp]; return p ? G().poiTier(p) / 6 : 0; }
+    const p = r.poi !== undefined ? PK.World.pois[r.poi] : null, d = p && D.DUNGEON[p.kind];
+    return d && r.floor ? U.clamp((r.floor - 1) / Math.max(1, d.floors - 1), 0, 1) : 0;
+  }
   B.empezar = function (r) {
     if (B.lista.some(b => b.id === r.id)) return true;
     const tipos = Object.keys(r.units).filter(k => r.units[k] > 0 && TROPA[k]);
     if (!tipos.length) return false;
     const tac = PK.Exp.TACTICS[r.tactic] || PK.Exp.TACTICS.normal;
     const b = {
-      id: r.id, nombre: r.name, lugar: lugarDe(r), t: 0, fin: null, orden: r.tactic === 'cauto' ? 'linea' : 'cargar', foco: null, vel: 1,
+      id: r.id, nombre: r.name, lugar: lugarDe(r), nivel: nivelDe(r), piso: r.floor || 0, t: 0, fin: null, orden: r.tactic === 'cauto' ? 'linea' : 'cargar', foco: null, vel: 1,
       tac, suerte: U.rand(0.8, 1.2), mios: [], suyos: [], tiros: [], efectos: [], textos: [], enviados: Object.assign({}, r.units), enemigo: r.enemy || { bandit: 1 },
     };
     // tus figuras: repartidas según la compañía (al menos una por tipo)
@@ -425,7 +432,7 @@
     const root = el('div', { id: 'batalla', role: 'dialog', 'aria-label': 'Batalla: ' + b.nombre }, top, el('div', { class: 'bt-campo' }, cv), ctl);
     document.body.append(root);
     vista = { b, root, cv, ctx: cv.getContext('2d'), top, ctl, fondo: null, key: '', fx: [], marcas: [], cortes: [], luces: [], anillos: [], rayos: [], llamas: [], shake: 0, flash: 0, fuegos: 0, final: null,
-      banner: b.t < 4 && !b.fin ? { txt: '¡A la batalla!', sub: b.nombre, t: 0, dur: 2.4 } : null };
+      banner: b.t < 4 && !b.fin ? { txt: b.nivel >= 1 && b.piso ? '¡Último piso!' : '¡A la batalla!', sub: b.nombre, t: 0, dur: 2.4 } : null };
     if (b.t < 4 && !b.fin) sfx('cuerno');
     pintarControles();
     window.addEventListener('resize', medir);
@@ -499,8 +506,9 @@
     if (W / H > A) H = W / A; else W = H * A;
     W = Math.ceil(W); H = Math.ceil(H);
     const mx = Math.round((W - fw) / 2), my = Math.round((H - fh) / 2);
-    const esc = PK.Escenarios.crear(b.lugar, { W, H, fw, fh, mx, my, parado: vista.parado, seed: Math.floor(b.id * 131) % 100000 + 7, LU, LV });
+    const esc = PK.Escenarios.crear(b.lugar, { W, H, fw, fh, mx, my, parado: vista.parado, seed: Math.floor(b.id * 131) % 100000 + 7, LU, LV, nivel: b.nivel || 0 });
     esc.mx = mx; esc.my = my;
+    esc.frente.getContext('2d').drawImage(vineta(esc), 0, 0); // la viñeta va pegada al frente: una capa menos por cuadro
     return esc;
   }
   // Dragón: pixel art de 36x26 con dos cuadros de aleteo (alas arriba y abajo), mirando a la derecha.
@@ -741,7 +749,6 @@
     ctx.setTransform(s, 0, 0, s, ox * s, oy * s);
     ctx.drawImage(esc.frente, 0, 0);
     PK.Escenarios.particulas(ctx, esc, dt);
-    ctx.drawImage(vineta(esc), 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (v.flash > 0) { ctx.fillStyle = 'rgba(255,240,210,' + Math.min(0.6, v.flash) + ')'; ctx.fillRect(0, 0, cv.width, cv.height); v.flash = Math.max(0, v.flash - dt * 1.6); }
     const W = cv.width, Hh = cv.height, base = Math.min(W, Hh);

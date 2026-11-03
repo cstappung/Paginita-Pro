@@ -260,3 +260,30 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   rays. Combat lights go to the scene's darkness pass through `esc.extra`
   (`Escenarios.luz`). All of it lives in `vista`, so with nobody watching it is
   not created and the fight is unchanged. Never put a balance number in there.
+
+## Deeper floors look deeper; moving buildings, Nov 2026
+
+- **Scenery depth** (`escenarios.js`): every place gets ground relief (`relieve`,
+  a height map lit from the top left), rock ledges off the walls (`meseta`),
+  distance haze at the top (`profundidad`, `esc.bruma`), and dark foreground
+  silhouettes in the front layer (`primerPlano`).
+- **Each floor is more spectacular than the last.** `batalla.js` passes `nivel`
+  (0 first floor … 1 last floor; for camps, `poiTier / 6`) to
+  `Escenarios.crear`. Colors drift toward the place's own tone (`HONDO`), it
+  gets darker with more lights and decor, and features unlock by depth:
+  - Cave: pulsing crystal veins, a giant geode, floating shards, light shafts.
+  - Lair: ribcages, a giant skull with glowing eyes, eyes in the dark.
+  - Crypt: green braziers, a rune circle, statues, a portal.
+  - Crater: lava pools, the fallen star, shooting stars.
+  - Nest: lava, ruined pillars, the bones of a dead dragon.
+  - Camp: watchtowers, braziers, stone walls instead of logs, more tents.
+  - The last floor's banner says «¡Último piso!».
+- **Performance:** the darkness mask is drawn at half resolution, the battle
+  vignette is baked into the front layer, and deep caves light every second
+  crystal. Set one `fillStyle` per crack or vein, never one per point.
+- **Moving buildings** (`G.moveBuilding`, `PK.Input.startMoving`, panel
+  «Mover» or key V): the same ghost as building, with `placeWhy(type, x, y,
+  ignorar)` treating the building's own tiles as free. It keeps level, upgrade
+  timer, construction, queue, workers and buffers. It costs 10% of the base
+  cost and drops the belts that reached it. The TC cannot move
+  (`G.MOVE_NO`): home regions and rescues hang on it.

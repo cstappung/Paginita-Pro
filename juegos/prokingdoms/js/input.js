@@ -161,7 +161,7 @@
   function updateGhost(sx, sy) {
     const def = D.BUILD[G().placing.type], [tx, ty] = R().screenToTile(sx, sy);
     const x = Math.floor(tx - def.w / 2 + 0.5), y = Math.floor(ty - def.h / 2 + 0.5);
-    R().ghost = { x, y, ok: G().canPlace(G().placing.type, x, y) };
+    R().ghost = { x, y, ok: G().canPlace(G().placing.type, x, y, G().placing.move) };
   }
 
   // Herramientas de logística: caminos (dos toques: inicio y fin) y cintas (edificio de origen y de destino).
@@ -212,9 +212,25 @@
   I.placeGhost = function (shift) {
     const g = G(), gh = R().ghost;
     if (!g.placing || !gh) return;
+    if (g.placing.move !== undefined) { // mudanza: un solo lugar y listo
+      const m = g.bById.get(g.placing.move);
+      if (m && g.moveBuilding(m, gh.x, gh.y)) { g.placing = null; R().ghost = null; g.sel = { type: 'building', id: m.id }; }
+      else if (g.placing) g.placing.armed = false;
+      PK.UI.refreshPanel(true);
+      return;
+    }
     const b = g.place(g.placing.type, gh.x, gh.y);
     if (b && !shift) { g.placing = null; R().ghost = null; }
     else if (b && g.placing) g.placing.armed = false;
+    PK.UI.refreshPanel(true);
+  };
+  // Mover un edificio: el mismo fantasma que al construir, con su tamaño, y sus propias casillas cuentan libres.
+  I.startMoving = function (b) {
+    const g = G();
+    if (!g.canMove(b)) { if (b && g.MOVE_NO[b.type]) PK.UI.toast(g.MOVE_NO[b.type], 'warn'); return; }
+    I.cancelTool();
+    g.placing = { type: b.type, armed: false, move: b.id };
+    R().ghost = null;
     PK.UI.refreshPanel(true);
   };
   I.startPlacing = function (type) {
@@ -347,6 +363,7 @@
 
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
+    else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido
     else if (k === 'm') PK.UI.toast(PK.Sfx.toggle() ? 'Sonido activado.' : 'Sonido silenciado.', 'info');
     else if (k === 'delete' && g.sel && g.sel.type === 'building') { const b = g.bById.get(g.sel.id); if (b) PK.UI.confirmDemolish(b); }
     if (k === ' ') e.preventDefault();

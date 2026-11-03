@@ -790,7 +790,8 @@
   // Se construye en tu territorio. Los campamentos de acopio también pueden ir en tierra de nadie y junto a
   // las zonas comunes (para recolectar lejos), pero nunca en tierra de otro reino.
   G.OUTPOST = { lumber: 1, mining: 1, mill: 1 };
-  G.placeWhy = function (type, x, y) {
+  // ignorar: el id del edificio que se está mudando (sus propias casillas cuentan como libres)
+  G.placeWhy = function (type, x, y, ignorar) {
     const def = D.BUILD[type];
     for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) {
       const tx = x + i, ty = y + j;
@@ -798,13 +799,14 @@
       const k = W.idx(tx, ty);
       if (!W.fog[k]) return 'niebla';
       if (W.terrain[k] === 4) return 'agua';
-      if (W.block[k] || W.bAt[k] >= 0 || W.belt[k] >= 0 || W.wall[k]) return 'ocupado';
+      const propio = ignorar !== undefined && W.bAt[k] === ignorar;
+      if ((W.block[k] && !(propio && W.block[k] === 2)) || (W.bAt[k] >= 0 && !propio) || W.belt[k] >= 0 || W.wall[k]) return 'ocupado';
       const o = W.ownerAt(tx, ty);
       if (o !== 'p' && !(G.OUTPOST[type] && !o)) return o ? 'ajeno' : 'libre';
     }
     return null;
   };
-  G.canPlace = (type, x, y) => !G.placeWhy(type, x, y);
+  G.canPlace = (type, x, y, ignorar) => !G.placeWhy(type, x, y, ignorar);
   // Por qué no se puede: antes en la computadora solo decía «No se puede construir ahí».
   G.placeText = why => {
     if (why === 'libre') S.flags.verTerr = 1; // desde ahora se ve el botón Territorio (ui.js, menú progresivo)
@@ -844,6 +846,42 @@
     if (!b.done) G.give(G.buildCost(b.type), 0.75 * (1 - b.progress));
     for (const u of G.units) if (u.task && u.task.b === b.id) G.release(u);
     G.removeBuilding(b);
+  };
+  // Mudar un edificio sin demolerlo: conserva nivel, mejora en curso, obra, cola, trabajadores y depósitos.
+  // Cuesta un 10% de lo que pide el edificio base, para que acomodar no sea gratis pero sí mucho más barato que
+  // demoler y volver a construir (que además perdía los niveles). Las cintas que llegaban a él se quitan (su
+  // recorrido ya no sirve). El Centro Urbano no se muda: de él salen el hogar y las regiones de los aldeanos.
+  G.MOVE_NO = { tc: 'El Centro Urbano no se puede mover: es el corazón del reino.' };
+  G.moveCost = b => { const c = {}, base = D.BUILD[b.type].cost || {}; for (const r in base) if (r !== 'coins') c[r] = Math.max(5, Math.round((base[r] * 0.1) / 5) * 5); return c; };
+  G.canMove = b => !!b && b.owner === 'p' && !b.remote && !b.static && !G.MOVE_NO[b.type];
+  G.moveBuilding = function (b, x, y) {
+    if (!G.canMove(b)) { if (b && G.MOVE_NO[b.type]) toast(G.MOVE_NO[b.type], 'warn'); return false; }
+    if (x === b.x && y === b.y) return false;
+    const why = G.placeWhy(b.type, x, y, b.id);
+    if (why) { toast(G.placeText(why), 'warn'); return false; }
+    if (!G.pay(G.moveCost(b))) { toast('Faltan recursos para la mudanza.', 'warn'); return false; }
+    if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
+    for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }
+    const ox = b.cx, oy = b.cy;
+    b.x = x; b.y = y; b._nsT = null;
+    for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) {
+      const k = W.idx(x + i, y + j);
+      W.bAt[k] = b.id;
+      if (!b.def.walkable) W.block[k] = 2;
+      if (W.road[k]) { W.road[k] = 0; W.roadVer++; }
+    }
+    for (const u of G.units) {
+      if (u.inside) continue;
+      const tx = Math.floor(u.x), ty = Math.floor(u.y);
+      if (!b.def.walkable && tx >= x && tx < x + b.w && ty >= y && ty < y + b.h) placeOutside(u, b);
+      if (u.task && u.task.b === b.id) u.path = []; // los que iban para allá rehacen el camino
+    }
+    capsDirty = true;
+    G.stat('moved', 1);
+    toast(b.def.name + ' se mudó.', 'good');
+    if (PK.Render.burst) { PK.Render.burst(ox, oy, [200, 180, 140], 14); PK.Render.burst(b.cx, b.cy, [232, 184, 74], 20); }
+    if (PK.Sfx && !G.offline) PK.Sfx.play('build');
+    return true;
   };
   G.completeBuilding = function (b) {
     if (b.done) return;
