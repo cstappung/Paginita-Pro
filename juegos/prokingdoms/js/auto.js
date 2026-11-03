@@ -51,7 +51,7 @@
       if (b.owner !== 'p' || !b.done || !b.def.recipe || b.workers.length >= g.slots(b)) continue;
       const rc = D.RECIPES[b.def.recipe];
       if (!g.reserveOk(rc.in, Object.keys(rc.out)[0]) && !PK.Logi.carts().length) continue;
-      if (!PK.Logi.nearStore(b) && !PK.Logi.carts().length && !S().logi.belts.some(bl => bl.b === b.id)) continue; // sin abastecimiento no sirve de nada
+      if (!PK.Logi.supplied(b)) continue; // sin abastecimiento no sirve de nada
       const reserved = g.units.filter(o => o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length;
       if (b.workers.length + reserved >= g.slots(b)) continue;
       return b;
@@ -189,7 +189,7 @@
   // ¿Hay dónde trabajar en eso? (para apagar los botones que no llevan a nada)
   A.jobAvailable = function (job) {
     const g = G();
-    if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b));
+    if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b) && PK.Logi.supplied(b));
     if (job === 'dig') return W.pois.some(p => p.kind === 'ruin' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d);
     if (job === 'food' && g.buildings.some(b => b.owner === 'p' && b.type === 'farm' && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
     const [hx, hy] = D.PLAYER_HOME;
@@ -220,7 +220,7 @@
     if (job === 'work') {
       let best = null, bd = 1e9;
       for (const b of g.buildings) {
-        if (b.owner !== 'p' || !b.done || !b.def.recipe) continue;
+        if (b.owner !== 'p' || !b.done || !b.def.recipe || !PK.Logi.supplied(b)) continue;
         const going = g.units.filter(o => o !== u && o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length + (used.get('b' + b.id) || 0);
         if (b.workers.length + going >= g.slots(b)) continue;
         const d = U.dist(u.x, u.y, b.cx, b.cy) - (PK.Logi.nearStore(b) ? 20 : 0);

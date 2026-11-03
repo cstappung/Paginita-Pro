@@ -225,3 +225,38 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   static background, a front layer (stalactites, roots), animated decor and a
   darkness-with-lights pass. While the battle is open the kingdom map is not
   drawn (`main.js`), which kept it near 60 fps.
+
+## Playtest 3 fixes and battle effects, Nov 2026 (playtest at 7/10)
+
+- **One storage-cap rule:** the cap only limits what villagers gather and workshops
+  make. Rewards, chests, loot, market buys, sells and trades always enter whole,
+  even over the cap. Never route a deliberate transaction through `G.addRes`
+  (selling with gold full used to eat the goods).
+- **Full storage makes gatherers wait** (`G.isFull`, `u.fullWait`, «Esperando:
+  bodega llena») instead of stripping the node and throwing the load away. The
+  offline calculation does the same, and its «agotaron» count only counts your
+  villagers' nodes (it counted the 15 simulated kingdoms too).
+- **A workshop with no supply** (`PK.Logi.supplied`: not near storage, no carts,
+  no belt) takes no workers: `G.command` refuses with a toast, and the Capataz,
+  «Talleres» and `jobAvailable` skip it.
+- **Fiesta del pueblo** (`G.fiesta`, TC panel, Era II+): 15% of the food, wood,
+  stone and gold caps (+40% per fiesta the same day) for +25% gathering and
+  workshops for 5 min, via `Date.now()` like the wishing well. It is the surplus
+  sink when there is no timer for horas extra. The server's `LIM.slack` (2.5x)
+  covers it.
+- **The era is a button:** the bar shows «meta 2/3» or «¡avanzar!», and a tap
+  opens `UI.openEraGoal` (requirements plus cost with have/need).
+- **Toasts group:** a toast whose text matches a visible one, ignoring the
+  numbers, updates it with «×N» instead of stacking. «Lleno» drops to every
+  6 min after 3 warnings.
+- Phones: the portrait panel's height is `--ph` (40vh; the menu, toasts and
+  event box sit on it). In landscape the side menu has two 40 px columns
+  (`--mw: 96px`) and a «▼ más» cue. On phones, Obras rows take one line and the
+  whole row opens the building.
+- **Battle effects** (`batalla.js`, «Efectos»): sparks, claw slashes, knockback,
+  lunges, white hit flash, dust, camera shake, arcing rocks with ground shadows,
+  aimed arrows, glowing bolts, dragon fire from the mouth, ground marks,
+  fall-over deaths, order shouts, the opening banner, fireworks and victory
+  rays. Combat lights go to the scene's darkness pass through `esc.extra`
+  (`Escenarios.luz`). All of it lives in `vista`, so with nobody watching it is
+  not created and the fight is unchanged. Never put a balance number in there.

@@ -201,7 +201,7 @@
   G.lvl = id => (S.techs[id] || 0);
   G.eraMult = () => 1 + 0.05 * (S.era - 1); // solo afecta la fuerza del ejército
   G.guildMult = () => (S.guild && S.guild.joined ? 1 + 0.03 * S.guild.stage + best('guild', 'guildBonus') : 1);
-  G.globalMult = () => G.guildMult() * (1 + best('wonder', 'allBonus')) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff : 1) * wish('harvest') * (1 + G.perkAll('gatherP'));
+  G.globalMult = () => G.guildMult() * (1 + best('wonder', 'allBonus')) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff : 1) * wish('harvest') * (1 + G.perkAll('gatherP')) * G.fiestaMult();
   const TECH_FOR = { wood: 'axes', food: 'harvest', stone: 'picks', gold: 'picks', ore: 'picks', marble: 'picks', gems: 'picks' };
   const RES_NODE = { wood: 'tree', food: 'berry', stone: 'stone', gold: 'gold', ore: 'ore', marble: 'marble', gems: 'gems' };
   const dropMult = u => 1 + 0.1 * (((u && u.dl) || 1) - 1);
@@ -223,7 +223,7 @@
   };
   G.buildMult = owner => (owner === 'p' ? (1 + 0.2 * G.lvl('architecture')) * wish('build') : 1);
   const PROD_TECH = { planks: 'saws', blocks: 'saws', books: 'saws', ingots: 'furnaces', tools: 'furnaces', steel: 'furnaces', machinery: 'furnaces' };
-  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + best('wonder', 'allBonus')) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse();
+  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + best('wonder', 'allBonus')) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult();
   G.researchMult = () => (1 + best('library', 'research') + best('observatory', 'research') + mine('university').slice(0, 2).reduce((s, b) => s + G.bst(b).research, 0) + G.perkAll('researchP')) * eclipse();
 
   // ---------- Decretos reales y dominio de la era ----------
@@ -275,11 +275,18 @@
   G.addRes = function (res, n) {
     const room = Math.max(0, G.cap(res) - (S.res[res] || 0)), add = Math.min(room, n);
     S.res[res] = (S.res[res] || 0) + add;
+    if (add < n) G.noteFull(res);
+    return add;
+  };
+  // ¿Está llena la bodega de eso? Los aldeanos esperan en vez de gastar el recurso del mapa.
+  G.isFull = res => G.cap(res) !== Infinity && (S.res[res] || 0) >= G.cap(res) - 0.5;
+  G.noteFull = function (res) {
     // un solo aviso cada 2 minutos que junta todo lo que se llenó (antes uno por recurso, y se apilaban)
-    if (add < n && PK.UI && !G.offline) {
+    if (PK.UI && !G.offline) {
       fullWarn.set.add(res);
-      if (G.time - fullWarn.t > 120) {
-        fullWarn.t = G.time;
+      // cada 2 minutos las tres primeras veces, después cada 6 (seguía siendo insistente; playtest)
+      if (G.time - fullWarn.t > (fullWarn.n >= 3 ? 360 : 120)) {
+        fullWarn.t = G.time; fullWarn.n = (fullWarn.n || 0) + 1;
         const list = [...fullWarn.set];
         fullWarn.set.clear();
         const store = list.includes('food') && list.length === 1 ? 'granary' : 'warehouse', has = G.countAll(store) > 0;
@@ -287,7 +294,6 @@
           has ? { label: 'Obras', fn: () => PK.UI.openWorks() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
       }
     }
-    return add;
   };
 
   G.canAfford = function (cost, mult) {
@@ -466,6 +472,41 @@
     G.updateTimers(0);
     return true;
   };
+  // Fiesta del pueblo (Centro Urbano, desde la Era II): otro sumidero de excedentes, para cuando no hay reloj que
+  // adelantar con horas extra (playtest: «a mitad de la Era II no hay en qué gastar»). Cuesta el 15% de las
+  // bodegas de comida, madera, piedra y oro, +40% por cada fiesta del mismo día, y da +25% de recolección y de
+  // talleres por 5 minutos. Con Date.now(), como los deseos del pozo. El servidor tolera 2,5x (LIM.slack).
+  G.FIESTA = { p: 0.25, dur: 300, res: ['food', 'wood', 'stone', 'gold'] };
+  G.fiestaMult = () => (S && S.fiesta && S.fiesta.until > Date.now() ? 1 + G.FIESTA.p : 1);
+  G.fiestaInfo = function () {
+    if (S.era < 2) return null;
+    const f = S.fiesta || {}, n = f.day === U.dayKey() ? f.n || 0 : 0, k = Math.pow(1.4, n), cost = {};
+    for (const r of G.FIESTA.res) cost[r] = Math.max(10, Math.round((G.cap(r) * 0.15 * k) / 10) * 10);
+    const left = f.until ? Math.max(0, (f.until - Date.now()) / 1000) : 0;
+    return { n, cost, left, ok: !left && G.canAfford(cost) };
+  };
+  G.fiesta = function () {
+    const o = G.fiestaInfo();
+    if (!o || o.left) return false;
+    if (!G.pay(o.cost)) { toast('Faltan recursos para la fiesta.', 'warn'); return false; }
+    S.fiesta = { until: Date.now() + G.FIESTA.dur * 1000, n: o.n + 1, day: U.dayKey() };
+    G.stat('fiestas', 1);
+    toast('¡Fiesta en el pueblo! Tu gente recolecta y produce un 25% más durante 5 minutos.', 'epic');
+    const tc = G.buildings.find(b => b.owner === 'p' && b.type === 'tc');
+    if (tc && PK.Render.burst) for (const c of [[232, 184, 74], [220, 80, 90], [90, 170, 230], [120, 200, 110]]) PK.Render.burst(tc.cx, tc.cy, c, 18);
+    if (PK.Sfx) PK.Sfx.play('era');
+    return true;
+  };
+  let fiestaFx = 0;
+  function fiestaTick(dt) {
+    if (G.fiestaMult() === 1 || G.offline || !PK.Render.burst) return;
+    if ((fiestaFx -= dt) > 0) return;
+    fiestaFx = 0.9;
+    const tc = G.buildings.find(b => b.owner === 'p' && b.type === 'tc');
+    const c = [[232, 184, 74], [220, 80, 90], [90, 170, 230], [120, 200, 110], [200, 120, 220]][Math.floor(Math.random() * 5)];
+    if (tc) PK.Render.burst(tc.cx + (Math.random() - 0.5) * 4, tc.cy + (Math.random() - 0.5) * 4, c, 8);
+  }
+
   G.finished = [];
   function finishUpgrade(b) {
     b.lvl++; b.upg = null;
@@ -671,6 +712,11 @@
         return true;
       }
       if (b.def.recipe) {
+        if (b.owner === 'p' && PK.Logi && !PK.Logi.supplied(b)) {
+          if (!silent) toast(b.def.name + ' está lejos de los almacenes y sin carretas: no le llegarían insumos. Acércalo a 3 casillas de un Almacén o del Centro Urbano, o construye una Carretería.', 'warn',
+            G.countB('cartwright') ? { label: 'Logística', fn: () => PK.UI.openLogistics() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
+          return false;
+        }
         let free = G.slots(b) - b.workers.length;
         for (const u of units) {
           if (free > 0) { G.assign(u, mark({ t: 'work', b: b.id })); free--; }
@@ -931,6 +977,7 @@
     PK.Batalla.update(dt);
     PK.Life.update(dt);
     PK.Incursiones.update(dt);
+    fiestaTick(dt);
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
     PK.Social.update(dt, false);
     regrowT += dt;
@@ -999,10 +1046,13 @@
           }
           const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res);
           // los reinos simulados recolectan a menor ritmo sin ti, para que las zonas comunes no se vacíen
-          const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3));
+          // con la bodega llena, tus aldeanos no gastan el recurso del mapa (antes lo vaciaban y se perdía)
+          const room = u.owner === 'p' ? Math.max(0, G.cap(t.res) - (S.res[t.res] || 0)) : Infinity;
+          const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
+          if (take <= 0) continue;
           n.amount -= take;
           if (online && u.owner === 'p' && W.isShared(n) && take > 0) PK.Net.harvest(n.id, take);
-          if (n.amount <= 0.5) { W.depleteNode(n); depleted++; }
+          if (n.amount <= 0.5) { W.depleteNode(n); if (u.owner === 'p') depleted++; } // solo los tuyos: contaba los de los 15 reinos simulados
           if (u.owner === 'p' && take > 0) gained(t.res, G.addRes(t.res, take), n.zone, n.kind === 'deer');
         } else if (t.t === 'farm') {
           const b = G.bById.get(t.b);

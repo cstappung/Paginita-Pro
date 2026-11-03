@@ -128,7 +128,8 @@
     const m = S().market;
     const cost = Soc.buyPrice(res, n);
     if (S().res.gold < cost) { toast('Oro insuficiente.', 'warn'); return; }
-    if (S().res[res] + n > G().cap(res)) { toast('No tienes lugar para guardarlo.', 'warn'); return; }
+    // Lo que se compra, se vende o se cambia siempre entra entero, aunque pase el tope: el tope solo frena
+    // lo que juntan los aldeanos (antes «Comprar» se negaba mientras premios y tratos sí lo pasaban).
     S().res.gold -= cost; S().res[res] += n;
     m.p[res] *= Math.pow(1.03, n / 100);
     G().stat('market_ops', 1); G().stat('gold_volume', cost);
@@ -138,7 +139,7 @@
     const m = S().market;
     if (S().res[res] < n) { toast('No tienes suficiente.', 'warn'); return; }
     const gain = Soc.sellPrice(res, n);
-    S().res[res] -= n; G().addRes('gold', gain);
+    S().res[res] -= n; S().res.gold += gain; // con el oro lleno, addRes se comía la venta
     m.p[res] *= Math.pow(0.97, n / 100);
     G().stat('market_ops', 1); G().stat('gold_volume', gain);
     if (online()) PK.Net.marketOp({ res, n, side: 'sell' });
@@ -609,7 +610,7 @@
           UI().btn('Comprar 100', () => { Soc.buy(r, 100); UI().rerender(); }, { small: true, disabled: st.res.gold < Soc.buyPrice(r, 100) }),
           UI().btn('Vender 100', () => { Soc.sell(r, 100); UI().rerender(); }, { small: true, disabled: st.res[r] < 100 })));
       }
-      body.append(el('h3', null, 'Precios (oro por 100)'), el('p', { class: 'muted small' }, 'Los precios suben cuando todos compran y bajan cuando todos venden. Mejora el Mercado para pagar menos y cobrar más (ahora compras al ' + Math.round(mkRate('buy') * 100) + '% y vendes al ' + Math.round(mkRate('sell') * 100) + '%).'), grid);
+      body.append(el('h3', null, 'Precios (oro por 100)'), el('p', { class: 'muted small' }, 'Los precios suben cuando todos compran y bajan cuando todos venden. Lo que compras o vendes entra entero aunque pase el tope de tus bodegas. Mejora el Mercado para pagar menos y cobrar más (ahora compras al ' + Math.round(mkRate('buy') * 100) + '% y vendes al ' + Math.round(mkRate('sell') * 100) + '%).'), grid);
 
       const net = online(), cache = net ? PK.Net.cache.offers : null;
       body.append(el('h3', null, net ? 'Tablón de ofertas (jugadores y mercaderes)' : 'Tablón de ofertas de otros reinos'));
@@ -677,7 +678,7 @@
     guildExtras(body);
     const cols = el('div', { class: 'two-col' });
     cols.append(el('div', null, el('h3', null, 'Aportes'), el('ol', { class: 'rank' }, g.members.map(m => el('li', { class: m.me ? 'me' : '' },
-      el('span', null, m.name + (m.me ? ' (tú)' : '') + (m.npc ? ' ·' : m.online ? ' ●' : '')), el('span', null, U.fmt(m.c))))),
+      el('span', null, m.name + (m.me && !/^t[úu]$/i.test(m.name) ? ' (tú)' : '') + (m.npc ? ' ·' : m.online ? ' ●' : '')), el('span', null, U.fmt(m.c))))),
     el('p', { class: 'muted small' }, '● en línea · · miembro simulado'), UI().btn('Dejar el gremio', () => { if (confirm('¿Dejar ' + g.name + '?')) PK.Net.leaveGuild(); }, { small: true, cls: 'danger' })));
     const chat = el('div', { class: 'chat scroll' }, g.chat.map(m => el('div', { class: m.pid === PK.Net.me.id ? 'me' : '' }, el('b', null, m.who + ': '), m.text)));
     const input = el('input', { id: 'chat-in', placeholder: 'Escribe al gremio…', maxlength: 140 });
@@ -718,7 +719,7 @@
       if (stg.zoneRes) body.append(zoneNote(stg.zoneRes));
       guildExtras(body);
       const cols = el('div', { class: 'two-col' });
-      const members = [{ name: PK.Platform.getPlayer().name + ' (tú)', c: g.my }].concat(g.members).sort((a, b) => b.c - a.c);
+      const members = [{ name: PK.UI.yo(PK.Platform.getPlayer().name), c: g.my }].concat(g.members).sort((a, b) => b.c - a.c);
       cols.append(el('div', null, el('h3', null, 'Aportes'), el('ol', { class: 'rank' }, members.map(m => el('li', null, m.name, el('span', null, U.fmt(m.c)))))));
       const chat = el('div', { class: 'chat scroll' }, g.chat.map(c => el('div', { class: c.me ? 'me' : '' }, el('b', null, c.who + ': '), c.text)));
       const input = el('input', { id: 'chat-in', placeholder: 'Escribe al gremio…', maxlength: 140 });

@@ -770,6 +770,7 @@
   q('e8', 'eco', 'Hierro en las venas', 'Recolecta 300 de hierro bruto (la Veta Roja es una zona común).', st('g_ore', 300), { gold: 100 }, ['e4', 'e5']);
   q('e9', 'eco', 'Mármol blanco', 'Recolecta 200 de mármol.', st('g_marble', 200), { gold: 200, coins: 10 }, ['e8']);
   q('e10', 'eco', 'Brillo en la roca', 'Recolecta 50 gemas.', st('g_gems', 50), { coins: 15 }, ['e9']);
+  q('e12', 'eco', 'Fiesta en el pueblo', 'Desde la Era II, el Centro Urbano organiza fiestas: gasta lo que te sobra y tu gente recolecta y produce un 25% más durante 5 minutos.', st('fiestas', 1), { coins: 5, gold: 100 }, ['e3']);
   q('e11', 'eco', 'Bien común', 'Recolecta 2.000 recursos en zonas comunes.', st('g_common', 2000), { coins: 10, food: 300 }, ['e3']);
   prev = 'e8';
   [5e3, 25e3, 1e5, 5e5, 2e6, 1e7, 5e7, 2.5e8, 1e9, 5e9].forEach((n, i) => {
@@ -778,7 +779,8 @@
   });
 
   // Industria
-  q('i1', 'ind', 'La sierra canta', 'Construye un Aserradero (Era II) y asígnale aldeanos.', B('sawmill'), { wood: 200 });
+  q('i1', 'ind', 'La sierra canta', 'Construye un Aserradero (Era II) a 3 casillas o menos de un Almacén o del Centro Urbano: así se abastece solo. Después asígnale aldeanos (Aldeanos → Talleres). Sus tablones piden la Cantería, la Fundición y la investigación.', B('sawmill'), { wood: 200 });
+  q('i1c', 'ind', 'Ruedas en el camino', 'Construye una Carretería (Era II) y arma una carreta. Las carretas llevan madera a los talleres alejados y sacan lo que producen, por ejemplo tablones de un Aserradero a otro taller. Con caminos van más rápido.', all(B('cartwright'), st('carts', 1)), { wood: 250, gold: 100 }, ['i1']);
   q('i2', 'ind', 'Tablón a tablón', 'Produce 100 tablones.', st('p_planks', 100), { gold: 100 }, ['i1']);
   q('i3', 'ind', 'Fuego y metal', 'Construye una Fundición (Era III).', B('smelter'), { ore: 200, coins: 10 }, ['i2']);
   q('i4', 'ind', 'Lingotes', 'Produce 50 lingotes de hierro.', st('p_ingots', 50), { gold: 300 }, ['i3']);

@@ -207,6 +207,9 @@
     }
     if (u.carry > 0 && u.carryRes !== t.res) { u.phase = 'return'; return; }
     if (u.carry >= cap) { u.phase = 'return'; return; }
+    // bodega llena: espera sin gastar el árbol o la veta (antes juntaba, volvía y addRes tiraba la carga)
+    if (u.owner === 'p' && g.isFull(t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(t.res); return; }
+    u.fullWait = false;
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
         const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { exclude: n.id, zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
@@ -242,6 +245,8 @@
     if (u.phase === 'return') { goDeposit(u, dt); return; }
     if (u.carry > 0 && u.carryRes !== 'food') { u.phase = 'return'; return; }
     if (u.carry >= cap) { u.phase = 'return'; return; }
+    if (u.owner === 'p' && g.isFull('food')) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull('food'); return; }
+    u.fullWait = false;
     if (!inRect(u, b)) {
       if (!pathTo(u, rectGoal(b, false))) { u.task = null; u.mode = 'idle'; }
       return;

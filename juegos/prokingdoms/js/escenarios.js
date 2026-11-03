@@ -352,15 +352,17 @@
     }
   };
   // Oscuridad con agujeros de luz (las fogatas, los cristales, las velas) y su color.
+  // esc.extra: luces de un momento que pone la batalla (fuego, explosiones, magia), en coordenadas del escenario
   E.luz = function (ctx, esc) {
-    if (!esc.oscuro && !esc.tinte) return;
+    const extra = esc.extra || [];
+    if (!esc.oscuro && !esc.tinte && !extra.length) return;
     const t = esc.t, L = esc.luz, x = L.getContext('2d');
     x.globalCompositeOperation = 'source-over';
     x.clearRect(0, 0, esc.W, esc.H);
     if (esc.oscuro) {
       x.fillStyle = 'rgba(6,6,16,' + esc.oscuro + ')'; x.fillRect(0, 0, esc.W, esc.H);
       x.globalCompositeOperation = 'destination-out';
-      for (const l of esc.luces) {
+      for (const l of extra.length ? esc.luces.concat(extra) : esc.luces) {
         const k = 1 + (l.flick ? (Math.sin(t * 17 + l.x) * 0.5 + Math.sin(t * 7.3 + l.y) * 0.5) * l.flick : 0) + (l.pulso !== undefined ? Math.sin(t * 1.5 + l.pulso) * 0.12 : 0);
         const rr = l.r * k, g = x.createRadialGradient(l.x, l.y, 0, l.x, l.y, rr);
         g.addColorStop(0, 'rgba(0,0,0,0.95)'); g.addColorStop(0.5, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -368,9 +370,14 @@
       }
       x.globalCompositeOperation = 'source-over';
     }
-    ctx.drawImage(L, 0, 0);
+    if (esc.oscuro) ctx.drawImage(L, 0, 0);
     // el color de cada luz, sumado
     ctx.globalCompositeOperation = 'lighter';
+    for (const l of extra) {
+      const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+      g.addColorStop(0, 'rgba(' + l.col.join(',') + ',0.32)'); g.addColorStop(1, 'rgba(' + l.col.join(',') + ',0)');
+      ctx.fillStyle = g; ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
+    }
     for (const l of esc.luces) {
       const k = 1 + (l.flick ? Math.sin(t * 17 + l.x) * l.flick : 0) + (l.pulso !== undefined ? Math.sin(t * 1.5 + l.pulso) * 0.2 : 0), rr = l.r * 0.8 * k;
       const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, rr), a = l.fantasma ? 0.1 : 0.16;

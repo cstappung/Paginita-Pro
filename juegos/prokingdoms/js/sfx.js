@@ -39,7 +39,7 @@
     s.connect(f); f.connect(g); g.connect(master);
     s.start(t);
   }
-  const GAP = { deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12 };
+  const GAP = { deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4 };
 
   X.play = function (name) {
     if (!X.on || !ctx || ctx.state !== 'running' || (PK.Game && PK.Game.offline)) return;
@@ -62,6 +62,13 @@
       case 'dig': noise(0, 0.09, 0.045, 500); break;
       case 'reap': noise(0, 0.08, 0.03, 5200); break;
       case 'cuerno': tone(196, 0, 0.55, 'sawtooth', 0.045, 233); tone(233, 0.6, 0.9, 'sawtooth', 0.045, 175); break; // incursión de bandidos
+      // batalla en vivo (batalla.js)
+      case 'espada': noise(0, 0.05, 0.05, 5200); tone(1400 + Math.random() * 500, 0, 0.07, 'square', 0.02, 900); break;
+      case 'boom': noise(0, 0.35, 0.09, 220); tone(110, 0, 0.3, 'sine', 0.08, 40); break;
+      case 'fuego': noise(0, 0.7, 0.07, 700); noise(0.05, 0.6, 0.05, 1600); tone(90, 0, 0.6, 'sawtooth', 0.03, 60); break;
+      case 'magia': [1319, 1568, 1976].forEach((f, i) => tone(f, i * 0.05, 0.16, 'triangle', 0.025)); break;
+      case 'victoria': [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.22, 'square', 0.045)); tone(784, 0.55, 0.2, 'square', 0.045); tone(1047, 0.72, 0.7, 'square', 0.05); noise(0.7, 0.4, 0.04, 6000); break;
+      case 'derrota': [392, 349, 311, 262].forEach((f, i) => tone(f, i * 0.22, 0.35, 'triangle', 0.05)); break;
       case 'howl': tone(300, 0, 0.5, 'sine', 0.06, 620); tone(620, 0.5, 0.9, 'sine', 0.06, 380); break;
     }
   };
