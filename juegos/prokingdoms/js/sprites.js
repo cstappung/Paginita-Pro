@@ -1801,6 +1801,11 @@
     lore: { m: ['', '.kkkkkkkkk', 'kyyyyyyyyyk', '.kyrryrryk', '.kyyyyyyyk', '.kyrryyryk', '.kyyyyyyyk', '.kyrrryryk', 'kyyyyyyyyyk', '.kkkkkkkkk'], p: { k: '#4a3418', y: '#efe2b8', r: '#7a3aa0' } },
     starIron: { m: ['.......s', '......sSs', '.......s', '...kkkkk', '..kmmMmmk', '.kmMmmmmMk', '.kmmmbmmmk', 'kmmMmmmbmmk', 'kmmmmMmmmk', '.kbmmmmmbk', '..kkkkkkk'], p: { k: '#141a28', m: '#5a6a8a', M: '#a8c0e8', b: '#2e3850', s: '#fff4b0', S: '#ffffff' } },
     scale: { m: ['', '....kkkk', '...krrrrk', '..krRRrrrk', '.krRrrrrork', '.krrrrrrrok', '.krrrrrrook', '..krrrrook', '...krrook', '....kook', '.....kk'], p: { k: '#3a0a08', r: '#c83a28', R: '#ff8a5a', o: '#8a1a14' } },
+    // Barra lateral del celular: antes tres botones tenían la misma persona y dos la misma brújula (playtest)
+    idle: { m: ['......kkkk', '.....kwwk', '....kkkk.kk', '...kssssk.', '...kssssk', '...kssssk', '....kkkk', '..kkyyyykk', '.kyyyyyyyyk', '.kyyyyyyyyk', '.kkkkkkkkkk'], p: { k: '#1c1c2a', s: '#e8c4a0', y: '#c89a3a', w: '#efe6d0' } },
+    map: { m: ['', 'kkkk.kkkk.kk', 'kggkkyykkbbk', 'kgggkyyykbbk', 'kggrkyyykbbk', 'kgrgkyrykbbk', 'kgggkyyrkbrk', 'kgggkyyykbbk', 'kggkkyykkbbk', 'kkkk.kkkk.kk'], p: { k: '#3a2410', g: '#7ab05a', y: '#e8d8a0', b: '#6aa0d8', r: '#c03028' } },
+    crown: { m: ['', '', 'k...k...k', 'kyk.kyk.kyk', 'kyykkyykkyyk', 'kyyyyyyyyyyk', 'kyyryyyyryyk', 'kyyyyyyyyyyk', 'kooooooooook', '.kkkkkkkkkk'], p: { k: '#4a3008', y: '#f0c850', o: '#c08a28', r: '#c03028' } },
+    cart: { m: ['', '', 'k........', 'kk.......', '.kbbbbbbbbk', '.kbBbbBbbbk', '.kbbbbbbbbk', '.kkkkkkkkkk', '..kgk..kgk', '..kkk..kkk'], p: { k: '#2a1a10', b: '#a07040', B: '#e8c050', g: '#a0a0aa' } },
     wall: { m: ['', 'kk.kk.kk.kk', 'kgkkgkkgkkgk', 'kggggggggggk', 'kgdggggdgggk', 'kggggdgggggk', 'kgggggggdggk', 'kgdgggggggk', 'kggggdggggk', 'kkkkkkkkkkk'], p: { k: '#2e2e30', g: '#a8a498', d: '#6a665e' } },
   });
   const ROCK_PAL = {

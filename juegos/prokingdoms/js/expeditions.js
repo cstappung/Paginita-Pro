@@ -167,7 +167,7 @@
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
     st.exp.runs.push(run);
     run.chance = Exp.chance(run.power / Math.max(1, pv.power));
-    log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra ~' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
+    log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra aprox. ' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
     const to = PK.Troops ? PK.Troops.targetOf(run) : null;
     toast('¡En marcha! ' + PK.Troops.total(units) + ' soldados salen del Cuartel hacia ' + pv.name + ' (llegan en ' + U.fmtTime(pv.travel) + ').', 'good',
       to && run.mission === null ? { label: 'Seguirlos', fn: () => { const b = G().buildings.find(o => o.owner === 'p' && o.type === 'barracks' && o.done); if (b) PK.Render.centerOn(b.cx, b.cy); else PK.Render.centerOn(to[0], to[1]); } } : null);

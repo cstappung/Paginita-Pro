@@ -44,20 +44,26 @@
   }
   A.targetFor = targetFor;
 
+  // Un taller con puesto libre y con qué trabajar (insumos y abastecimiento).
+  function openShop() {
+    const g = G();
+    for (const b of g.buildings) {
+      if (b.owner !== 'p' || !b.done || !b.def.recipe || b.workers.length >= g.slots(b)) continue;
+      const rc = D.RECIPES[b.def.recipe];
+      if (!g.reserveOk(rc.in, Object.keys(rc.out)[0]) && !PK.Logi.carts().length) continue;
+      if (!PK.Logi.nearStore(b) && !PK.Logi.carts().length && !S().logi.belts.some(bl => bl.b === b.id)) continue; // sin abastecimiento no sirve de nada
+      const reserved = g.units.filter(o => o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length;
+      if (b.workers.length + reserved >= g.slots(b)) continue;
+      return b;
+    }
+    return null;
+  }
   function assignIdle(u, st) {
     const g = G();
     // primero, puestos libres en talleres que tengan insumos
     if (st.auto.work) {
-      for (const b of g.buildings) {
-        if (b.owner !== 'p' || !b.done || !b.def.recipe || b.workers.length >= g.slots(b)) continue;
-        const rc = D.RECIPES[b.def.recipe];
-        if (!g.reserveOk(rc.in, Object.keys(rc.out)[0]) && !PK.Logi.carts().length) continue;
-        if (!PK.Logi.nearStore(b) && !PK.Logi.carts().length && !S().logi.belts.some(bl => bl.b === b.id)) continue; // sin abastecimiento no sirve de nada
-        const reserved = g.units.filter(o => o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length;
-        if (b.workers.length + reserved >= g.slots(b)) continue;
-        g.command([u], { kind: 'building', obj: b }, true);
-        return true;
-      }
+      const b = openShop();
+      if (b) { g.command([u], { kind: 'building', obj: b }, true); return true; }
     }
     const w = st.auto.w, sum = A.RES.reduce((s, r) => s + (w[r] || 0), 0);
     if (!sum) return false;
@@ -85,7 +91,7 @@
       { label: 'Aldeanos', fn: () => PK.UI.openForeman() });
   }
 
-  let t = 0;
+  let t = 0, shopT = 0;
   A.tick = function (dt) {
     const st = S(), g = G();
     if (!st || !st.auto) return;
@@ -100,6 +106,21 @@
         if (u.owner !== 'p' || u.kind !== 'v' || u.task || u.inside || u.hold || u.idleT < 3 || u.scared > 0) continue;
         if (assignIdle(u, st)) u.idleT = 0;
         if (++k > 12) break; // reparte de a poco para no buscar rutas de golpe
+      }
+    }
+    // «Ocupar los talleres» también con todos ocupados: cada 10 s pasa a un recolector que puso el Capataz (nunca uno
+    // que mandaste tú) a un taller con puesto libre. Antes solo usaba ociosos y, sin ociosos, no hacía nada (playtest).
+    if (st.auto.work && (shopT += 1) >= 10) {
+      shopT = 0;
+      const b = openShop();
+      if (b) {
+        let best = null, bd = 1e9;
+        for (const u of g.units) {
+          if (u.owner !== 'p' || u.kind !== 'v' || u.inside || u.hold || !u.task || u.task.m || u.task.t !== 'gather') continue;
+          const d = U.dist(u.x, u.y, b.cx, b.cy);
+          if (d < bd) { bd = d; best = u; }
+        }
+        if (best) g.command([best], { kind: 'building', obj: b }, true);
       }
     }
     // talleres parados (sin insumos, en reserva o con el almacén lleno): sus trabajadores salen a recolectar
@@ -125,12 +146,14 @@
       }
     }
     // cola de obras
-    while (st.upq.length && g.buildersBusy() < g.builders()) {
-      const b = g.bById.get(st.upq[0]);
-      if (!b || b.owner !== 'p' || b.upg || b.lvl >= g.maxLvl(b.type) || b.def.noUp) { st.upq.shift(); continue; }
-      if (!b.done || !g.canAfford(g.upCost(b))) break;
+    // en orden, pero saltando lo que todavía no se puede pagar: antes la primera obra impagable trababa toda la
+    // cola y los maestros quedaban libres aunque las de abajo sí alcanzaran (playtest)
+    st.upq = st.upq.filter(id => { const b = g.bById.get(id); return b && b.owner === 'p' && !b.upg && b.lvl < g.maxLvl(b.type) && !b.def.noUp; });
+    for (let i = 0; i < st.upq.length && g.buildersBusy() < g.builders();) {
+      const b = g.bById.get(st.upq[i]);
+      if (!b.done || !g.canAfford(g.upCost(b))) { i++; continue; }
       g.upgrade(b);
-      st.upq.shift();
+      st.upq.splice(i, 1);
     }
   };
 
@@ -190,7 +213,7 @@
     const w = A.why(res);
     if (!w.known) return 'no conoces dónde hay: explora';
     if (w.alive) return 'lo que conoces queda lejos o encerrado';
-    return 'se agotó lo que conoces (vuelve en ~' + U.fmtTime(w.soon) + '): explora más lejos';
+    return 'se agotó lo que conoces (vuelve en aprox. ' + U.fmtTime(w.soon) + '): explora más lejos';
   };
   function jobTarget(u, job, used) {
     const g = G();

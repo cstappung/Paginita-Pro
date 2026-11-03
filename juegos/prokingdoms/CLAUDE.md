@@ -159,7 +159,16 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Tactics** (`PK.Exp.TACTICS`: asalto, normal, cauto) change power and
   losses until arrival. A toast 20 s before arrival offers «Ver combate».
 - **One toast per batch** for finished quests, «Reclamar todo»
-  (`Quests.claimAll`) with one chest, «lleno» at most once a minute per
-  resource. Auto-train leaves one slot for the scout. Tc level 1 stores 800.
+  (`Quests.claimAll`) with one chest, («lleno»: see below).
+  Auto-train leaves one slot for the scout. Tc level 1 stores 800.
 - The 🌐 language picker only floats when the page is opened alone
   (`i18n.js` skips it inside a frame), so in Juegos it never covers the game.
+- **Toasts are prepended (newest first).** Hide extras with
+  `:nth-child(n+K)`, never `:nth-last-child`, which hid the newest. At most 3
+  on desktop and 2 on phones. «Lleno» is one toast every 2 min listing every
+  full resource. «Explorador sin alcance» shows once per range
+  (`flags.scoutDoneR`).
+- **The upgrade queue skips what it cannot pay yet** and keeps the order for
+  the rest. «Ocupar los talleres» also moves one Capataz gatherer (never a
+  `task.m` one) to a free workshop slot every 10 s.
+- **Approximate numbers say «aprox.»**: in Pixelify Sans «~79» reads as «-79».

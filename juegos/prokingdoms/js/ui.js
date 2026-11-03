@@ -150,8 +150,8 @@
     mbtn('market', 'Mercado', () => PK.Social.openMarket());
     mbtn('guild', 'Gremio', () => PK.Social.openGuild());
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T');
-    mbtn('machinery', 'Logística', () => UI.openLogistics());
-    mbtn('pop', 'Reinos', () => UI.openRealms());
+    mbtn('cart', 'Logística', () => UI.openLogistics());
+    mbtn('crown', 'Reinos', () => UI.openRealms());
     mbtn('gear', 'Opciones', () => UI.openSettings());
 
     panel = el('div', { id: 'panel' });
@@ -516,7 +516,7 @@
       return;
     }
     const act = el('div', { class: 'p-actions' });
-    act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b));
+    act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
     if (b.type === 'tc') {
       const st = S();
       act.append(el('div', { class: 'row' },
@@ -590,7 +590,7 @@
     } else if (b.type === 'observatory' && b.done) {
       const f = PK.Exp.forecast();
       act.append(el('p', { class: 'small' }, 'Mazmorras conocidas: ' + PK.Exp.sites().length + ' (busca hasta ' + G().bst(b).scan + ' casillas de tu Centro Urbano).'),
-        f ? el('p', { class: 'small' }, 'Próximos lobos en ~' + U.fmtTime(Math.max(0, f.wolves)) + ' · próximo evento en ~' + U.fmtTime(Math.max(0, f.event)) + '.') : null,
+        f ? el('p', { class: 'small' }, 'Próximos lobos en aprox. ' + U.fmtTime(Math.max(0, f.wolves)) + ' · próximo evento en aprox. ' + U.fmtTime(Math.max(0, f.event)) + '.') : null,
         UI.btn('Expediciones', () => UI.openBarracks('exp'), { small: true }));
     }
     else if (def.drop) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
@@ -631,7 +631,7 @@
       if (st.d) info.append(el('p', { class: 'small muted' }, 'Destruido.'));
       else {
         const going = S().exp.runs.some(r => r.camp === p.id);
-        info.append(el('p', { class: 'small' }, 'Fuerza ~' + D.campPower(tier) + ' (bandidos: arqueros y caballeros rinden más). Botín: '), UI.costEl(D.campLoot(tier), 1, true),
+        info.append(el('p', { class: 'small' }, 'Fuerza aprox. ' + D.campPower(tier) + ' (bandidos: arqueros y caballeros rinden más). Botín: '), UI.costEl(D.campLoot(tier), 1, true),
           going ? el('p', { class: 'small good-t' }, 'Tus tropas van en camino.') : UI.btn('Atacar', () => UI.openBarracks('exp', { camp: p.id }), { small: true, cls: 'gold' }));
       }
     } else if (D.DUNGEON[p.kind]) {
@@ -713,7 +713,7 @@
         el('div', null, el('b', null, 'Defensa del reino: '), U.fmt(PK.Social.defense()), el('span', { class: 'muted small' }, ' (torres, Centro Urbano y soldados en casa)')),
         tre.length ? el('div', { class: 'treasure' }, el('b', null, 'Tesoros: '), tre.map(r => UI.amount(r, st.res[r]))) : null,
         PK.Social.truce() ? el('div', { class: 'truce' }, 'Tregua de novato: nadie te atacará hasta que construyas un Cuartel o llegues a la Era III.') : null,
-        PK.Net.online ? PK.Net.incoming.map(r => el('div', { class: 'alert' }, '¡' + r.from + ' (jugador) ataca con fuerza ~' + r.power + ' en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '!')) : null), tabs);
+        PK.Net.online ? PK.Net.incoming.map(r => el('div', { class: 'alert' }, '¡' + r.from + ' (jugador) ataca con fuerza aprox. ' + r.power + ' en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '!')) : null), tabs);
       const pane = el('div', { class: 'bar-pane' });
       body.append(pane);
       if (!g.countB('barracks') && barTab !== 'defense' && barTab !== 'log') {
@@ -831,7 +831,7 @@
       pane.append(el('div', { class: 'raid-row dungeon' },
         el('img', { class: 'dg-ico', src: Sp.poi('camp', false).c.toDataURL() }),
         el('div', { class: 'dg-info' }, el('b', null, 'Campamento de bandidos ' + U.roman(tier + 1)),
-          el('div', { class: 'small' }, 'Fuerza ~' + D.campPower(tier) + ' · viaje ' + U.fmtTime(PK.Exp.campTravel(p)) + ' · botín: ', UI.costEl(D.campLoot(tier), 1, true))),
+          el('div', { class: 'small' }, 'Fuerza aprox. ' + D.campPower(tier) + ' · viaje ' + U.fmtTime(PK.Exp.campTravel(p)) + ' · botín: ', UI.costEl(D.campLoot(tier), 1, true))),
         going ? el('span', { class: 'muted small' }, 'Tropas en camino') : UI.btn('Preparar ataque', () => { plan = { target: { camp: p.id }, units: null }; UI.rerender(); }, { small: true, cls: 'gold' }),
         UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + 1, p.y + 1); }, { small: true })));
     }
@@ -861,7 +861,7 @@
     for (const m of list) {
       const t = D.MISSIONS.find(o => o.id === m.tpl);
       pane.append(el('div', { class: 'raid-row' }, el('div', { class: 'dg-info' }, el('b', null, t.name), el('div', { class: 'small' }, t.desc),
-        el('div', { class: 'small muted' }, enemyText(t.enemy) + ' · fuerza ~' + U.fmt(m.power) + ' · ' + U.fmtTime(m.time))), UI.costEl(m.loot, 1, true),
+        el('div', { class: 'small muted' }, enemyText(t.enemy) + ' · fuerza aprox. ' + U.fmt(m.power) + ' · ' + U.fmtTime(m.time))), UI.costEl(m.loot, 1, true),
         UI.btn('Preparar', () => { plan = { target: { mission: m.uid }, units: null }; UI.rerender(); }, { small: true, cls: 'gold' })));
     }
   }
@@ -898,7 +898,7 @@
       const kinds = Object.keys(r.sent || {}).filter(k => r.sent[k] > 0);
       body.append(el('div', { class: 'report ' + (r.won ? 'won' : 'lost') },
         el('h2', null, r.name),
-        el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra ~' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
+        el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra aprox. ' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
         el('h3', null, 'Tu compañía'),
         el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),
           (r.lost || {})[k] ? el('span', { class: 'small warn-t' }, '−' + r.lost[k] + ' bajas') : el('span', { class: 'small good-t' }, 'sin bajas')))),
@@ -980,7 +980,7 @@
       }
       if (tr.threats.length) {
         body.append(el('h3', null, 'Amenazas'));
-        for (const th of tr.threats) body.append(el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza ~' + th.power + ').'));
+        for (const th of tr.threats) body.append(el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + ').'));
       }
       const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]);
       if (realms.length) {
@@ -1011,7 +1011,7 @@
       if (owner === 'p') {
         const def = T.defenseOf(k, D.MY_SLOT);
         add(el('p', null, 'Es tuya.' + (W.isCore(k, D.MY_SLOT) ? ' Es el corazón de tu reino: nadie la puede conquistar.' : '')),
-          el('p', { class: 'small' }, 'Defensa de esta parcela: ~' + U.fmt(def) + ' (torres cercanas, tus tropas y las parcelas propias alrededor).'),
+          el('p', { class: 'small' }, 'Defensa de esta parcela: aprox. ' + U.fmt(def) + ' (torres cercanas, tus tropas y las parcelas propias alrededor).'),
           last ? el('h3', null, 'Última batalla aquí') : null, last ? UI.battleEl(last) : null);
         return;
       }
@@ -1020,7 +1020,7 @@
         rv ? el('div', { class: 'alert' }, T.revengeText(rv) + '. Te quitó esta parcela: recupérala a mitad de precio, aunque esté en tregua.') : null,
         !rv && retake > 0 ? el('p', { class: 'small good-t' }, 'Te la quitaron hace poco: recuperarla cuesta la mitad durante ' + U.fmtTime(retake) + '.') : null,
         W.isCore(k, slot) ? el('p', { class: 'small' }, 'Es el corazón de ese reino: nunca se puede conquistar.') : null,
-        el('p', { class: 'small' }, 'Defensa estimada: ~' + U.fmt(def) + '. Tu ejército en casa: ' + U.fmt(PK.Social.power(w.army)) + '.'),
+        el('p', { class: 'small' }, 'Defensa estimada: aprox. ' + U.fmt(def) + '. Tu ejército en casa: ' + U.fmt(PK.Social.power(w.army)) + '.'),
         el('div', { class: 'row' }, el('b', null, 'Costo de la campaña: '), UI.costEl(cost)),
         el('div', { class: 'row' }, el('b', null, 'Botín si ganas: '), UI.costEl(D.conquestLoot(info.era), 1, true)),
         el('p', { class: 'small warn-t' }, 'Si ganas pierdes entre el 12% y el 30% de las tropas que mandes (menos cuanto más fuerte llegues); si pierdes, entre el 70% y el 80%.'),
@@ -1139,7 +1139,7 @@
       }
       const q = st.upq.map(id => g.bById.get(id)).filter(Boolean);
       body.append(el('h3', null, 'Cola de obras (' + q.length + '/' + PK.Auto.QMAX + ')'));
-      if (!q.length) body.append(el('p', { class: 'small muted' }, 'Pon mejoras en la cola y tus maestros las empezarán solos, en orden, apenas tengan recursos. Funciona también mientras no estás.'));
+      if (!q.length) body.append(el('p', { class: 'small muted' }, 'Pon mejoras en la cola y tus maestros las empezarán solos, en orden apenas tengan recursos (si una no alcanza, siguen con la siguiente). Funciona también mientras no estás.'));
       q.forEach((b, i) => body.append(el('div', { class: 'work-row' }, el('span', { class: 'lvl' }, '#' + (i + 1)), el('img', { src: Sp.buildingIcon(b.type, 'p', b.lvl) }), el('b', null, b.def.name + ' → ' + (b.lvl + 1)),
         el('span', { class: 'wcost' }, UI.costEl(g.upCost(b))), UI.btn('Quitar', () => { PK.Auto.dequeue(b); UI.rerender(); }, { small: true }))));
       body.append(el('h3', null, 'Tus edificios'));
@@ -1187,22 +1187,22 @@
       body.append(el('h3', null, 'Capataz'),
         el('p', { class: 'small' }, 'Da trabajo a los aldeanos que se quedan sin hacer nada más de 3 segundos (también mientras no estás). Las órdenes que das tú no las cambia.'),
         chk('idle', 'Repartir aldeanos ociosos', 'los manda al recurso que más falta según tus prioridades'),
-        chk('work', 'Ocupar los talleres', 'llena primero los puestos libres de talleres que tengan insumos'),
+        chk('work', 'Ocupar los talleres', 'llena los puestos libres de talleres con insumos: con los ociosos y, si no hay, con un recolector que puso él (cada 10 s)'),
         chk('train', 'Entrenar sin parar', 'el Centro Urbano entrena aldeanos mientras haya casas y comida'),
-        el('div', { class: 'g-row' }, el('b', null, 'Reserva de los talleres: '),
+        el('div', { class: 'reserve-row' }, el('b', null, 'Reserva de los talleres: '),
           ...[0, 0.15, 0.3, 0.5].map(v => UI.btn(Math.round(v * 100) + '%', () => { a.reserve = v; UI.rerender(); }, { small: true, cls: a.reserve === v ? 'gold' : '' })),
-          el('span', { class: 'small muted' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, los trabajadores que puso el Capataz salen a recolectar')));
+          el('span', { class: 'small muted rr-help' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, los trabajadores que puso el Capataz salen a recolectar')));
       body.append(el('h3', null, 'Prioridades del Capataz'));
       const { c, n } = PK.Auto.counts();
       const sum = PK.Auto.RES.reduce((s2, r) => s2 + (a.w[r] || 0), 0) || 1;
       const prio = el('div', { class: 'guild-rows' });
       for (const r of PK.Auto.RES) {
         const v = a.w[r] || 0;
-        prio.append(el('div', { class: 'g-row' }, UI.resIcon(r), el('b', { class: 'fw-name' }, D.RES[r].name),
+        prio.append(el('div', { class: 'g-row prio-row' }, UI.resIcon(r), el('b', { class: 'fw-name' }, D.RES[r].name),
           UI.btn('−', () => { a.w[r] = Math.max(0, v - 1); UI.rerender(); }, { small: true }),
           el('span', { class: 'fw-dots' }, '●'.repeat(v) + '○'.repeat(5 - v)),
           UI.btn('+', () => { a.w[r] = Math.min(5, v + 1); UI.rerender(); }, { small: true }),
-          el('span', { class: 'small muted' }, 'objetivo ' + Math.round((v / sum) * 100) + '% · ahora ' + (c[r] || 0) + ' (' + (n ? Math.round(((c[r] || 0) / n) * 100) : 0) + '%)')));
+          el('span', { class: 'small muted pr-help' }, 'objetivo ' + Math.round((v / sum) * 100) + '% · ahora ' + (c[r] || 0) + ' (' + (n ? Math.round(((c[r] || 0) / n) * 100) : 0) + '%)')));
       }
       body.append(prio);
     }, { wide: true });
@@ -1269,7 +1269,7 @@
       found.sort((a, b) => (g.poiState(a).d ? 1 : 0) - (g.poiState(b).d ? 1 : 0) || order[a.kind] - order[b.kind]);
       for (const p of found) {
         const s2 = g.poiState(p), tier = g.poiTier(p);
-        const state = s2.d ? { chest: 'abierto', watch: 'visitada', ruin: 'excavada', camp: 'destruido', relic: 'en tu Monasterio' }[p.kind] : p.kind === 'ruin' ? 'excavada ' + Math.floor((s2.p || 0) * 100) + '%' : p.kind === 'camp' ? 'fuerza ~' + D.campPower(tier) : 'sin reclamar';
+        const state = s2.d ? { chest: 'abierto', watch: 'visitada', ruin: 'excavada', camp: 'destruido', relic: 'en tu Monasterio' }[p.kind] : p.kind === 'ruin' ? 'excavada ' + Math.floor((s2.p || 0) * 100) + '%' : p.kind === 'camp' ? 'fuerza aprox. ' + D.campPower(tier) : 'sin reclamar';
         box.append(el('div', { class: 'work-row' + (s2.d ? ' done' : '') }, el('img', { src: Sp.poi(p.kind, s2.d).c.toDataURL() }),
           el('b', null, D.POI[p.kind].name), el('span', { class: 'lvl' }, 'rango ' + U.roman(tier + 1)), el('span', { class: 'muted small' }, state),
           p.kind === 'relic' && !s2.d ? UI.btn('Al Monasterio', () => { g.claimRelic(p); UI.rerender(); }, { small: true, cls: 'gold' }) : null,
@@ -1432,7 +1432,7 @@
   function initMobile(menu) {
     // Lo que en la computadora es solo teclado (. o I: aldeano ocioso · Supr: demoler). El CSS los muestra solo en pantallas táctiles.
     const tb = (icon, label, title, fn) => el('button', { class: 'mbtn touch-only', title, 'aria-label': title, onclick: fn }, el('img', { class: 'ico', src: Sp.icon(icon), alt: '' }), el('span', null, label));
-    const idleB = tb('pop', 'Ocioso', 'Siguiente aldeano ocioso', () => PK.Input.selectNextIdle());
+    const idleB = tb('idle', 'Ocioso', 'Siguiente aldeano ocioso', () => PK.Input.selectNextIdle());
     const demoB = tb('tools', 'Demoler', 'Demoler el edificio seleccionado', () => PK.Input.demolishSelected());
     menu.prepend(idleB, demoB);
     // Si el menú se desliza y quedan botones abajo, se desvanece el borde inferior (CSS .more-below).
@@ -1442,7 +1442,7 @@
     setInterval(more, 1000);
     // Minimapa ocultable (solo en el celular): deja más mapa a la vista.
     const hud = document.getElementById('hud');
-    const mmB = tb('compass', 'Minimapa', 'Ocultar minimapa', () => {
+    const mmB = tb('map', 'Minimapa', 'Ocultar minimapa', () => {
       const off = hud.classList.toggle('mm-off');
       mmB.title = off ? 'Mostrar minimapa' : 'Ocultar minimapa';
       mmB.setAttribute('aria-label', mmB.title);

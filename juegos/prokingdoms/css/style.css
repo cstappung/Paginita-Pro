@@ -440,7 +440,7 @@ ul.info li { margin: 2px 0; }
   #hud.mm-off #menu { max-height: calc(100vh - var(--top-h, 56px) - 8px - 30vh - 22px); }
   #hud:has(#panel.collapsed) #menu { max-height: calc(100vh - var(--top-h, 56px) - 108px - 80px); }
   #hud.mm-off:has(#panel.collapsed) #menu { max-height: calc(100vh - var(--top-h, 56px) - 8px - 80px); }
-  #toasts > .toast:not(:nth-last-child(-n+2)) { display: none; }
+  #toasts > .toast:nth-child(n+3) { display: none; } /* el más nuevo va primero (prepend) */
 }
 
 /* ---- celular acostado: barra fina, menú en columna a la derecha, panel a la izquierda a todo lo alto ---- */
@@ -476,8 +476,9 @@ ul.info li { margin: 2px 0; }
   #qstrip { left: calc(var(--pw) + var(--sl) + 12px); top: calc(var(--top-h, 32px) + 8px); width: min(200px, calc(100vw - var(--pw) - 210px)); max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
   #qstrip::-webkit-scrollbar { display: none; }
   /* avisos: abajo y como mucho 2 a la vez, para que no suban hasta la tira ni el minimapa */
-  #toasts { max-height: 30vh; overflow: hidden; }
-  #toasts > .toast:not(:nth-last-child(-n+2)) { display: none; }
+  #toasts { max-height: 46vh; overflow: hidden; }
+  #toasts .toast { font-size: 13px; padding: 4px 8px; line-height: 1.2; }
+  #toasts > .toast:nth-child(n+3) { display: none; } /* el más nuevo va primero (prepend) */
 
   /* avisos y evento: abajo, en el hueco entre el panel y el menú */
   #toasts { top: auto; bottom: calc(8px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); width: auto; transform: none; flex-direction: column-reverse; }
@@ -723,3 +724,9 @@ ul.info li { margin: 2px 0; }
 /* «Reclamar todo» al principio de las pestañas del Libro (en el celular se deslizan: al final no se veía) */
 .book-tabs .book-all { flex: none; align-self: center; white-space: nowrap; }
 .tactics { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+/* Aldeanos: la fila de reserva y las prioridades tenían más hijos que columnas (la ayuda caía en la de 28 px) */
+.reserve-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.reserve-row .rr-help { flex: 1 1 100%; }
+.prio-row .pr-help { grid-column: 2 / -1; margin-top: -4px; }
+/* computadora: como mucho 3 avisos a la vez (los más nuevos) */
+#toasts > .toast:nth-child(n+4) { display: none; }

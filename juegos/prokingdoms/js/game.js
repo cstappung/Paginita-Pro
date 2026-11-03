@@ -274,12 +274,17 @@
   G.addRes = function (res, n) {
     const room = Math.max(0, G.cap(res) - (S.res[res] || 0)), add = Math.min(room, n);
     S.res[res] = (S.res[res] || 0) + add;
-    // como mucho una vez por minuto por recurso: antes salía cada pocos segundos y tapaba el mapa
-    if (add < n && PK.UI && !G.offline && G.time - (fullWarn[res] || -1e9) > 60) {
-      fullWarn[res] = G.time;
-      const store = res === 'food' ? 'granary' : 'warehouse', has = G.countAll(store) > 0;
-      toast('Almacenamiento lleno de ' + D.RES[res].name.toLowerCase() + ': ' + (has ? 'mejora tu ' + D.BUILD[store].name + ' o el Centro Urbano, o construye otro.' : 'construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
-        has ? { label: 'Obras', fn: () => PK.UI.openWorks() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
+    // un solo aviso cada 2 minutos que junta todo lo que se llenó (antes uno por recurso, y se apilaban)
+    if (add < n && PK.UI && !G.offline) {
+      fullWarn.set.add(res);
+      if (G.time - fullWarn.t > 120) {
+        fullWarn.t = G.time;
+        const list = [...fullWarn.set];
+        fullWarn.set.clear();
+        const store = list.includes('food') && list.length === 1 ? 'granary' : 'warehouse', has = G.countAll(store) > 0;
+        toast('Almacenamiento lleno: ' + list.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. ' + (has ? 'Mejora el Granero, el Almacén o el Centro Urbano.' : 'Construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
+          has ? { label: 'Obras', fn: () => PK.UI.openWorks() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
+      }
     }
     return add;
   };
@@ -295,7 +300,7 @@
     for (const r in cost) if (r !== 'coins') S.res[r] -= Math.ceil(cost[r] * mult);
     return true;
   };
-  const fullWarn = {};
+  const fullWarn = { t: -1e9, set: new Set() };
   // Recompensas (misiones, cofres, botín): pueden superar la capacidad.
   G.give = function (cost, mult) {
     mult = mult || 1;
@@ -489,7 +494,7 @@
       toast('Atalaya en ruinas: desde lo alto se ve gran parte del mapa.', 'epic');
       G.revealAt(p.x + 0.5, p.y + 0.5, D.POI.watch.reveal);
     } else if (p.kind === 'ruin') toast('Descubriste ' + name + '. Envía aldeanos a excavar.', 'quest');
-    else if (p.kind === 'camp') toast('¡Un campamento de bandidos! Fuerza ~' + D.campPower(tier) + '.', 'bad', G.countB('barracks') ? { label: 'Atacar', fn: () => PK.UI.openBarracks('exp', { camp: p.id }) } : null);
+    else if (p.kind === 'camp') toast('¡Un campamento de bandidos! Fuerza aprox. ' + D.campPower(tier) + '.', 'bad', G.countB('barracks') ? { label: 'Atacar', fn: () => PK.UI.openBarracks('exp', { camp: p.id }) } : null);
     else if (p.kind === 'relic') toast('¡Una reliquia! Llévala a un Monasterio para que dé oro sin parar.', 'epic');
     else if (D.POI[p.kind].dungeon) PK.Exp.found(p);
   }
@@ -516,6 +521,10 @@
   G.exploreDone = function (u) {
     if (u.doneMsg) return;
     u.doneMsg = true;
+    // una vez por alcance, no en cada carga (u.doneMsg no se guarda): el aviso volvía cada vez que abrías el juego
+    const range = G.exploreRange();
+    if (S.flags.scoutDoneR === range) return;
+    S.flags.scoutDoneR = range;
     toast('Tu explorador ya recorrió todo su alcance. Mejora el Puesto de Exploradores para llegar más lejos.', 'info');
   };
   G.trainScout = function (b) {
