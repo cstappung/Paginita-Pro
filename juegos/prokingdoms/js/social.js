@@ -38,6 +38,7 @@
   Soc.init = function (st) {
     for (const k in D.MARKET_BASE) if (st.market && !st.market.p[k]) st.market.p[k] = D.MARKET_BASE[k];
     if (!st.market) st.market = { p: Object.assign({}, D.MARKET_BASE), t: 0, offers: [], mine: [], offerT: 5, oid: 1, mineT: 0 };
+    if (st.market) st.market.offers = st.market.offers.filter(validOffer); // partidas con ofertas «por 0» guardadas
     if (!st.guild) st.guild = { joined: false, stage: 0, prog: {}, my: 0, members: D.GUILD_MEMBERS.map(n => ({ name: n, c: 0 })), chat: [], t: 0, chatT: 30 };
     st.guild.helps = st.guild.helps || [];
     st.guild.needs = st.guild.needs || [];   // tablón "Necesito…" (sin servidor)
@@ -60,7 +61,11 @@
   };
 
   // ---------- Mercado ----------
-  const value = (res, n) => (S().market.p[res] || D.MARKET_BASE[res]) * n / 100;
+  // El oro es la moneda: 100 oro valen 100 (no está en MARKET_BASE, que también usa el gremio). Sin esto,
+  // las ofertas con oro daban NaN: «200 oro por 0 madera», y aceptarla dejaba el recurso en NaN.
+  const price = r => (r === 'gold' ? 100 : S().market.p[r] || D.MARKET_BASE[r] || 100);
+  const value = (res, n) => price(res) * n / 100;
+  const validOffer = o => o && D.RES[o.give] && D.RES[o.want] && o.give !== o.want && o.gn > 0 && o.wn > 0;
 
   function marketTick(dt) {
     const m = S().market;
@@ -113,9 +118,9 @@
     let want = U.pick(pool);
     while (want === give) want = U.pick(pool);
     const scale = 200 * Math.pow(1.6, S().era - 1);
-    const gn = Math.max(10, Math.round((scale * 100) / (m.p[give] || 100) / 10) * 10);
+    const gn = Math.max(10, Math.round((scale * 100) / price(give) / 10) * 10);
     const fair = U.rand(0.8, 1.2);
-    const wn = Math.max(10, Math.round((value(give, gn) * fair * 100) / (m.p[want] || 100) / 10) * 10);
+    const wn = Math.max(10, Math.round((value(give, gn) * fair * 100) / price(want) / 10) * 10);
     return { id: m.oid++, by: bot.name, bot: bot.id, give, gn, want, wn, ttl: 900 + Math.random() * 1500 };
   }
 
@@ -141,6 +146,7 @@
   Soc.accept = function (id) {
     const m = S().market, o = m.offers.find(x => x.id === id);
     if (!o) return;
+    if (!validOffer(o)) { m.offers.splice(m.offers.indexOf(o), 1); toast('Esa oferta ya no es válida.', 'warn'); return; }
     if ((S().res[o.want] || 0) < o.wn) { toast('No tienes lo que pide.', 'warn'); return; }
     S().res[o.want] -= o.wn; S().res[o.give] += o.gn;
     m.offers.splice(m.offers.indexOf(o), 1);

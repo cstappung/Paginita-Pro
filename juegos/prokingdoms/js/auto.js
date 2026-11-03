@@ -70,6 +70,21 @@
     return false;
   }
 
+  // Si varios aldeanos llevan rato ociosos es porque se agotó lo que conoces: antes no lo decía nada y la aldea
+  // quedaba parada en el Centro Urbano. Avisa (como mucho cada 3 minutos) qué falta y qué hacer.
+  let hintT = -1e9;
+  function idleHint(g) {
+    if (g.offline || !PK.UI) return;
+    const idle = g.units.filter(u => u.owner === 'p' && u.kind === 'v' && !u.task && !u.inside && !u.hold && u.idleT > 20).length;
+    if (idle < 3 || performance.now() - hintT < 180000) return;
+    hintT = performance.now();
+    const w = S().auto.w, miss = A.RES.filter(r => w[r] > 0 && !A.jobAvailable(r));
+    if (!miss.length) return;
+    const names = miss.map(r => D.RES[r].name.toLowerCase()).join(', ');
+    PK.UI.toast(idle + ' aldeanos sin trabajo: no queda ' + names + ' a su alcance. Explora más lejos (un explorador del Puesto), pon granjas o espera a que rebrote.', 'warn',
+      { label: 'Aldeanos', fn: () => PK.UI.openForeman() });
+  }
+
   let t = 0;
   A.tick = function (dt) {
     const st = S(), g = G();
@@ -79,6 +94,7 @@
     if (t < 1) return;
     t = 0;
     if (st.auto.idle) {
+      idleHint(g);
       let k = 0;
       for (const u of g.units) {
         if (u.owner !== 'p' || u.kind !== 'v' || u.task || u.inside || u.hold || u.idleT < 3 || u.scared > 0) continue;
@@ -103,7 +119,9 @@
       for (const b of g.buildings) {
         if (b.owner !== 'p' || b.type !== 'tc' || !b.done || b.queue.length >= 2) continue;
         const queued = g.buildings.reduce((s, o) => s + (o.owner === 'p' ? o.queue.length : 0), 0);
-        if (g.pop() + queued < g.popCap() && st.res.food >= D.VILLAGER.cost.food + 30) g.train(b, 1);
+        // deja un lugar libre para el explorador que permite el Puesto: si no, «entrenar sin parar» se comía toda la población
+        const room = g.scoutCount() < g.scoutMax() ? 1 : 0;
+        if (g.pop() + queued + room < g.popCap() && st.res.food >= D.VILLAGER.cost.food + 30) g.train(b, 1);
       }
     }
     // cola de obras
@@ -153,6 +171,26 @@
     if (job === 'food' && g.buildings.some(b => b.owner === 'p' && b.type === 'farm' && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
     const [hx, hy] = D.PLAYER_HOME;
     return !!g.bestNode(job, hx, hy, 'p', { r: 40, max: 100 });
+  };
+  // Por qué no hay de un recurso: ¿nunca lo viste o se agotó todo lo que conoces? (y cuándo vuelve lo primero).
+  A.why = function (res) {
+    const now = Date.now();
+    let known = 0, soon = Infinity;
+    for (const n of W.nodes) {
+      if (n.temp || D.NODES[n.kind].res !== res || !W.fog[n.y * W.W + n.x] || !W.canUse(n, 'p')) continue;
+      known++;
+      if (!n.dead) return { known, alive: true };
+      const def = D.NODES[n.kind];
+      const left = def.regen ? 3600 / (def.regen * (W.isShared(n) ? 1 : 0.6) * n.max) : def.regrow - (now - n.t) / 1000;
+      soon = Math.min(soon, Math.max(60, left));
+    }
+    return { known, alive: false, soon };
+  };
+  A.whyText = function (res) {
+    const w = A.why(res);
+    if (!w.known) return 'no conoces dónde hay: explora';
+    if (w.alive) return 'lo que conoces queda lejos o encerrado';
+    return 'se agotó lo que conoces (vuelve en ~' + U.fmtTime(w.soon) + '): explora más lejos';
   };
   function jobTarget(u, job, used) {
     const g = G();

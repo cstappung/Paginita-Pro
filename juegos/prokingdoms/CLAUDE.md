@@ -139,3 +139,27 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   Centro Urbano (`W.regionAt`) means enclosed, so they jump back to it. Never
   rescue by distance or by path failures alone: a villager in its home region
   is never trapped, only waiting.
+
+## Playtest fixes, Nov 2026
+
+- **Gold has no `MARKET_BASE` entry** (that table also feeds the guild's
+  needs). `social.js` prices it at 100 through `price()`. Without it, gold
+  offers came out as «200 oro por 0» and accepting one set a resource to NaN.
+  Saved offers that are not valid are dropped at load.
+- **`U.dayKey` does not zero-pad** («2026-11-2»). Parse it with `parseDay`,
+  never `new Date(key + 'T00:00:00')`, which gave «faltan NaNs».
+- **`Element.append(null)` writes «null».** Pass `''` for an optional child
+  (`U.el` skips nulls, but bare `append` does not).
+- **The panel hides when empty** (`#hud.p-none`): with «Ocultar ayuda»
+  (`flags.helpOff`) and nothing selected, the map is free.
+- **Portrait phones under 600 px wrap the top bar into two rows.** In one
+  scrolling row, population, era and coins sat off screen.
+- **Why villagers are idle:** `PK.Auto.whyText` (never seen, depleted with
+  regrow ETA, or out of reach), and `idleHint` warns at most every 3 min.
+- **Tactics** (`PK.Exp.TACTICS`: asalto, normal, cauto) change power and
+  losses until arrival. A toast 20 s before arrival offers «Ver combate».
+- **One toast per batch** for finished quests, «Reclamar todo»
+  (`Quests.claimAll`) with one chest, «lleno» at most once a minute per
+  resource. Auto-train leaves one slot for the scout. Tc level 1 stores 800.
+- The 🌐 language picker only floats when the page is opened alone
+  (`i18n.js` skips it inside a frame), so in Juegos it never covers the game.

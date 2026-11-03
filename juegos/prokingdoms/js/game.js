@@ -274,7 +274,13 @@
   G.addRes = function (res, n) {
     const room = Math.max(0, G.cap(res) - (S.res[res] || 0)), add = Math.min(room, n);
     S.res[res] = (S.res[res] || 0) + add;
-    if (add < n && PK.UI && !G.offline) toast('Almacenamiento lleno de ' + D.RES[res].name.toLowerCase() + ': mejora tu ' + (res === 'food' ? 'Granero' : 'Almacén') + ' o el Centro Urbano.', 'warn');
+    // como mucho una vez por minuto por recurso: antes salía cada pocos segundos y tapaba el mapa
+    if (add < n && PK.UI && !G.offline && G.time - (fullWarn[res] || -1e9) > 60) {
+      fullWarn[res] = G.time;
+      const store = res === 'food' ? 'granary' : 'warehouse', has = G.countAll(store) > 0;
+      toast('Almacenamiento lleno de ' + D.RES[res].name.toLowerCase() + ': ' + (has ? 'mejora tu ' + D.BUILD[store].name + ' o el Centro Urbano, o construye otro.' : 'construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
+        has ? { label: 'Obras', fn: () => PK.UI.openWorks() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
+    }
     return add;
   };
 
@@ -289,6 +295,7 @@
     for (const r in cost) if (r !== 'coins') S.res[r] -= Math.ceil(cost[r] * mult);
     return true;
   };
+  const fullWarn = {};
   // Recompensas (misiones, cofres, botín): pueden superar la capacidad.
   G.give = function (cost, mult) {
     mult = mult || 1;
@@ -705,19 +712,30 @@
       const tx = x + i, ty = y + j;
       if (!W.inb(tx, ty)) return 'fuera';
       const k = W.idx(tx, ty);
-      if (W.block[k] || W.bAt[k] >= 0 || W.terrain[k] === 4 || !W.fog[k] || W.belt[k] >= 0 || W.wall[k]) return 'ocupado';
+      if (!W.fog[k]) return 'niebla';
+      if (W.terrain[k] === 4) return 'agua';
+      if (W.block[k] || W.bAt[k] >= 0 || W.belt[k] >= 0 || W.wall[k]) return 'ocupado';
       const o = W.ownerAt(tx, ty);
       if (o !== 'p' && !(G.OUTPOST[type] && !o)) return o ? 'ajeno' : 'libre';
     }
     return null;
   };
   G.canPlace = (type, x, y) => !G.placeWhy(type, x, y);
+  // Por qué no se puede: antes en la computadora solo decía «No se puede construir ahí».
+  G.placeText = why => ({
+    libre: 'Esa tierra no es tuya: reclama la parcela en Territorio (solo los campamentos van en tierra de nadie).',
+    ajeno: 'Esa tierra pertenece a otro reino.',
+    niebla: 'Esa zona sigue en la niebla: explórala primero.',
+    agua: 'No se puede construir sobre el agua.',
+    ocupado: 'Ahí hay algo (árboles, rocas, un edificio, una cinta o una muralla): busca un lugar despejado.',
+    fuera: 'Eso queda fuera del mapa.',
+  })[why] || 'No se puede construir ahí.';
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }
     if (!G.isUnlocked(type)) { toast('Necesitas la Era ' + U.roman(D.BUILD[type].era) + '.', 'warn'); return null; }
     if (G.countAll(type) >= G.maxCount(type)) { toast('Ya tienes el máximo de ' + D.BUILD[type].name + ' para tu era.', 'warn'); return null; }
     const why = G.placeWhy(type, x, y);
-    if (why) { toast(why === 'libre' ? 'Esa tierra no es tuya: reclama la parcela en Territorio (solo los campamentos van en tierra de nadie).' : why === 'ajeno' ? 'Esa tierra pertenece a otro reino.' : 'No se puede construir ahí.', 'warn'); return null; }
+    if (why) { toast(G.placeText(why), 'warn'); return null; }
     const cost = G.buildCost(type);
     if (!G.pay(cost)) { toast('Recursos insuficientes.', 'warn'); return null; }
     const b = G.addBuilding(type, 'p', x, y, false);
@@ -763,7 +781,12 @@
       if (b.type === 'cartwright') { PK.Logi.updateCartwright(b, dt); continue; }
       if (b.def.trains) {
         if (!b.queue.length) { b.status = ''; continue; }
-        if (G.pop() >= G.popCap()) { b.status = 'Población máxima: construye o mejora casas'; continue; }
+        if (G.pop() >= G.popCap()) {
+          // avisa al trabarse (antes el explorador quedaba en cola en silencio, con una línea chica en el panel)
+          if (b.status !== 'Población máxima: construye o mejora casas' && !G.offline) toast(b.def.name + ': ' + (b.queue[0] === 'scout' ? 'el explorador' : 'el aldeano') + ' espera porque llegaste a la población máxima. Construye o mejora casas.', 'warn', { label: 'Construir', fn: () => PK.UI.openBuild() });
+          b.status = 'Población máxima: construye o mejora casas';
+          continue;
+        }
         b.status = 'Entrenando';
         b.qt += dt;
         const tt = G.trainTime(b);

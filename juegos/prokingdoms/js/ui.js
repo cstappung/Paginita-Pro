@@ -185,7 +185,8 @@
         resEls[r].v.textContent = U.fmt(v);
         resEls[r].f.style.width = Math.min(100, (v / Math.max(1, cap)) * 100) + '%';
         resEls[r].box.classList.toggle('full', v >= cap * 0.98);
-        resEls[r].box.title = D.RES[r].name + ': ' + U.fmt(v) + ' / ' + U.fmt(cap);
+        // los premios (misiones, cofres, botín) pueden pasar el tope a propósito para no perderse: que se entienda
+        resEls[r].box.title = D.RES[r].name + ': ' + U.fmt(v) + ' / ' + U.fmt(cap) + (v > cap ? ' — sobre el tope por premios: no se pierde, pero tus aldeanos no juntan más ni puedes comprar hasta que gastes' : '');
         if (v >= 1) st.flags['seenRes_' + r] = true;
         resEls[r].box.style.display = !D.RES[r].special && (D.RES_START.includes(r) || st.flags['seenRes_' + r]) ? '' : 'none';
       }
@@ -227,7 +228,7 @@
       evEl.innerHTML = '';
       evEl.classList.toggle('min', evMin);
       const time = el('span', { class: 'ev-t' }), fill = el('div');
-      const act = lab ? UI.btn(lab, () => { PK.Life.eventAction(); evKey = ''; }, { small: true, cls: 'gold' }) : null;
+      const act = lab ? UI.btn(lab, () => { PK.Life.eventAction(); evKey = ''; }, { small: true, cls: 'gold' }) : ''; // append(null) escribe «null»
       if (evMin) evEl.append(el('button', { class: 'ev-open', title: 'Ver el evento', onclick: () => { evMin = false; evAt = performance.now(); } }, '★ ', el('b', null, ev.name), ' ', time), act);
       else evEl.append(el('div', { class: 'ev-main' }, el('b', null, ev.name), el('span', null, ev.desc)), el('div', { class: 'mini-bar' }, fill), time, act,
         el('button', { class: 'ev-x', title: 'Achicar el aviso', 'aria-label': 'Achicar el aviso', onclick: () => { evMin = true; } }, '✕'));
@@ -315,6 +316,9 @@
     panel.innerHTML = '';
     fillPanel(g, sel);
     if (snap) restoreScroll(panel, snap); else panel.scrollTop = 0; // otra cosa elegida: desde arriba
+    // sin nada que mostrar (ayuda oculta y nada elegido) el panel desaparece y deja el mapa libre
+    const hud = document.getElementById('hud');
+    if (hud) hud.classList.toggle('p-none', !panel.childNodes.length);
   };
   function fillPanel(g, sel) {
     if (PK.Def.tool) {
@@ -347,7 +351,7 @@
       // los botones van primero: en el celular el panel es bajo y quedaban fuera de la vista
       panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(g.placing.type) }), el('div', null, el('h3', null, 'Construir: ' + def.name),
         el('p', { class: 'small' }, UI.hint('Clic para colocarlo en tu tierra explorada · Mayús para poner varios · Clic derecho o Esc para cancelar',
-          armed ? (gh.ok ? 'Así quedaría. Toca «Construir aquí» o el mismo lugar otra vez. Para moverlo, toca otro lugar.' : 'Ahí no se puede (tiene que ser tu tierra, explorada y libre). Toca otro lugar.') : 'Toca dónde va: primero verás cómo queda.')),
+          armed ? (gh.ok ? 'Así quedaría. Toca «Construir aquí» o el mismo lugar otra vez. Para moverlo, toca otro lugar.' : (G().placeText(G().placeWhy(g.placing.type, gh.x, gh.y)) + ' Toca otro lugar.')) : 'Toca dónde va: primero verás cómo queda.')),
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Construir aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null,
           UI.btn('Otro edificio', () => UI.openBuild(), { small: true }), UI.btn('Cancelar', cancel, { small: true })),
         UI.costEl(G().buildCost(g.placing.type)),
@@ -355,13 +359,15 @@
       return;
     }
     if (!sel) {
+      if (S().flags.helpOff) return; // la ocultaste: el panel solo aparece al elegir algo
       panel.append(el('div', { class: 'p-help' },
         el('h3', null, 'Pro Kingdoms'),
         el('p', null, 'Toca ', el('b', null, 'Construir'), ' para levantar edificios: se construyen solos. Tus aldeanos solo recolectan y trabajan: usa ', el('b', null, 'Aldeanos'), ' para repartirlos, o elige alguno y dile qué hacer.'),
         el('p', { class: 'small muted' }, UI.hint('Clic o arrastra para elegir aldeanos; clic derecho sobre un árbol, una mina o un taller para mandarlos.',
           'Toca un aldeano para elegirlo (mantén pulsado y arrastra para varios; doble toque: todos los de su tipo) y después toca un árbol, una mina o un taller.')),
         el('p', { class: 'small muted' }, 'Lo oscuro es niebla: un Puesto de Exploradores la descubre. Cada edificio se mejora por separado con tus Maestros de Obras.'),
-        el('div', { class: 'row' }, UI.btn('Construir', () => UI.openBuild(), { small: true, cls: 'gold' }), UI.btn('Aldeanos', () => UI.openForeman(), { small: true }))));
+        el('div', { class: 'row' }, UI.btn('Construir', () => UI.openBuild(), { small: true, cls: 'gold' }), UI.btn('Aldeanos', () => UI.openForeman(), { small: true }),
+          UI.btn('Ocultar ayuda', () => { S().flags.helpOff = true; UI.refreshPanel(true); UI.toast('Listo. La ayuda vuelve desde Opciones.', 'info'); }, { small: true, title: 'El panel solo aparecerá al elegir algo' }))));
       return;
     }
     if (sel.type === 'units') return unitsPanel(g.selUnits());
@@ -802,7 +808,11 @@
         el('span', { class: 'run-ic' }, go ? '⚔' : r.won ? '✔' : '✘'),
         el('div', { class: 'dg-info' }, el('b', null, (go ? 'Marchan hacia ' : r.won ? 'Vuelven con el botín de ' : 'Vuelven de ') + r.name),
           el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (go ? 'gold' : r.won ? 'green' : 'red'), style: { width: pct * 100 + '%' } }), el('span', null, (go ? 'llegan en ' : 'en casa en ') + U.fmtTime(left))),
-          el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados' + (go && r.chance ? ' · probabilidad ' + Math.round(r.chance * 100) + '%' : ''))),
+          el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados' + (go && r.chance ? ' · probabilidad ' + Math.round(r.chance * 100) + '%' : '')),
+          go ? el('div', { class: 'tactics', role: 'group', 'aria-label': 'Táctica' }, Object.keys(PK.Exp.TACTICS).map(k => {
+            const tc = PK.Exp.TACTICS[k], on = (r.tactic || 'normal') === k;
+            return UI.btn(tc.name, () => { PK.Exp.setTactic(r.id, k); UI.rerender(); }, { small: true, cls: on ? 'gold' : '', title: tc.desc, aria: 'Táctica ' + tc.name + ': ' + tc.desc });
+          })) : null),
         r.mission ? null : UI.btn('Ver', () => { UI.closeModal(); const pos = PK.Troops.where('x' + r.id); if (pos) PK.Render.centerOn(pos[0], pos[1]); }, { small: true })));
     }
   }
@@ -1170,7 +1180,7 @@
           el('span', { class: 'jr-n' }, String(n)),
           UI.btn('−', () => { A.removeJob(id); UI.rerender(); }, { small: true, disabled: !n, aria: 'Uno menos en ' + j.name }),
           UI.btn('+', () => { A.addJob(id); UI.rerender(); }, { small: true, cls: 'gold', disabled: !ok || !all, aria: 'Uno más en ' + j.name }),
-          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : 'no conoces dónde hay')));
+          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : A.whyText(id))));
       }
       body.append(rows);
       const chk = (key, label, help) => el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a[key], onchange: e => { a[key] = e.target.checked; UI.rerender(); } }), el('b', null, ' ' + label), el('span', { class: 'small muted' }, ' — ' + help));
@@ -1322,6 +1332,8 @@
         el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.evMin, onchange: e => { S().flags.evMin = e.target.checked; } }),
           el('b', null, ' Eventos achicados'), el('span', { class: 'small muted' }, ' — los eventos del mapa (ciervo dorado, estrellas, mercader…) aparecen como una pastilla chica arriba, sin el cartel grande. Igual se pueden abrir tocándolos.')),
         el('p', { class: 'small muted' }, 'Los avisos que aparecen y se van solos se cierran antes tocándolos.'),
+        el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !S().flags.helpOff, onchange: e => { S().flags.helpOff = !e.target.checked; UI.refreshPanel(true); } }),
+          el('b', null, ' Ayuda en el panel'), el('span', { class: 'small muted' }, ' — con nada elegido, el panel de abajo muestra cómo se juega. Sin ella, el panel solo aparece al elegir algo y el mapa queda libre.')),
         el('h3', null, 'Partida'),
         el('p', { class: 'small muted' }, 'El juego se guarda solo cada 20 segundos y al cerrar. Tus aldeanos siguen trabajando hasta 12 horas sin ti.'),
         el('div', { class: 'row' }, UI.btn('Guardar ahora', () => { G().save(); UI.toast('Partida guardada.', 'good'); }, { small: true }),
@@ -1388,7 +1400,12 @@
     UI.modal('offline', 'Mientras no estabas…', body => {
       body.append(el('p', null, 'Pasaron ' + U.fmtTime(rep.sec) + '. Tus aldeanos siguieron trabajando:'));
       const keys = Object.keys(rep.gained).filter(k => rep.gained[k] > 0);
-      body.append(keys.length ? el('div', { class: 'reward big' }, keys.map(k => UI.amount(k, rep.gained[k]))) : el('p', { class: 'muted' }, 'Nadie estaba trabajando. ¡Asigna tareas antes de irte!'));
+      // Por qué no se ganó (o se ganó poco): antes culpaba siempre al jugador, aunque la causa fuera el almacén lleno.
+      const full = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'].filter(r => G().cap(r) !== Infinity && (S().res[r] || 0) >= G().cap(r) - 1);
+      const working = G().units.some(u => u.owner === 'p' && u.kind === 'v' && (u.task || u.inside));
+      body.append(keys.length ? el('div', { class: 'reward big' }, keys.map(k => UI.amount(k, rep.gained[k])))
+        : el('p', { class: 'muted' }, full.length ? 'No cupo nada más: el almacenamiento está lleno.' : working ? 'Tus aldeanos no lograron juntar nada: quizás se agotó lo que tenían cerca.' : 'Nadie estaba trabajando. ¡Asigna tareas antes de irte!'));
+      if (full.length) body.append(el('p', { class: 'small warn-t' }, 'Lleno: ' + full.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. Mejora el Granero, el Almacén o el Centro Urbano para guardar más mientras no estás.'));
       if (rep.depleted) body.append(el('p', { class: 'small muted' }, rep.depleted + ' recursos se agotaron en el mapa (los otros reinos también recolectan en las zonas comunes).'));
       if (rep.explored > 0) body.append(el('p', { class: 'small' }, 'Tus exploradores revelaron ' + rep.explored + ' casillas del mapa.'));
       if (rep.finished && rep.finished.length) body.append(el('p', { class: 'small' }, 'Terminado: ' + rep.finished.join(', ') + '.'));
@@ -1418,6 +1435,11 @@
     const idleB = tb('pop', 'Ocioso', 'Siguiente aldeano ocioso', () => PK.Input.selectNextIdle());
     const demoB = tb('tools', 'Demoler', 'Demoler el edificio seleccionado', () => PK.Input.demolishSelected());
     menu.prepend(idleB, demoB);
+    // Si el menú se desliza y quedan botones abajo, se desvanece el borde inferior (CSS .more-below).
+    const more = () => menu.classList.toggle('more-below', menu.scrollHeight - menu.scrollTop - menu.clientHeight > 6);
+    menu.addEventListener('scroll', more, { passive: true });
+    window.addEventListener('resize', more);
+    setInterval(more, 1000);
     // Minimapa ocultable (solo en el celular): deja más mapa a la vista.
     const hud = document.getElementById('hud');
     const mmB = tb('compass', 'Minimapa', 'Ocultar minimapa', () => {

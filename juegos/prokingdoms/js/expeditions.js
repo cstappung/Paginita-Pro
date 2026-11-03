@@ -175,11 +175,26 @@
     return true;
   };
 
+  // ---------- Tácticas ----------
+  // Una decisión mientras marchan (playtest: el combate era solo esperar una barra). Se cambia hasta que llegan.
+  Exp.TACTICS = {
+    asalto: { name: 'Asalto', desc: '+15% de fuerza, más bajas', pow: 1.15, loss: 1.35 },
+    normal: { name: 'Normal', desc: 'sin cambios', pow: 1, loss: 1 },
+    cauto: { name: 'Cauteloso', desc: '−10% de fuerza, muchas menos bajas', pow: 0.9, loss: 0.6 },
+  };
+  const tactic = r => Exp.TACTICS[r.tactic] || Exp.TACTICS.normal;
+  Exp.setTactic = function (id, k) {
+    const r = S().exp.runs.find(o => o.id === id);
+    if (!r || r.phase !== 'go' || !Exp.TACTICS[k]) return;
+    r.tactic = k;
+    r.chance = Exp.chance((r.power * tactic(r).pow) / Math.max(1, r.need));
+  };
+
   // ---------- Resolver ----------
   function resolve(r) {
-    const st = S(), ratio = r.power / Math.max(1, r.need), sent = Object.assign({}, r.units);
+    const st = S(), tc = tactic(r), ratio = (r.power * tc.pow) / Math.max(1, r.need), sent = Object.assign({}, r.units);
     r.won = Math.random() < Exp.chance(ratio);
-    const loss = (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal);
+    const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss);
     r.lost = {};
     for (const k in r.units) { const l = Math.round(r.units[k] * loss * U.rand(0.8, 1.2)); r.lost[k] = Math.min(r.units[k], l); r.units[k] -= r.lost[k]; }
     // veteranía para quienes vuelven (también se aprende perdiendo, menos)
@@ -262,6 +277,13 @@
     t1 = 0;
     const now = Date.now();
     for (const r of st.exp.runs.slice()) {
+      // aviso antes de llegar: para elegir táctica y mirar la pelea en el mapa
+      if (!offline && r.phase === 'go' && !r.warned && !r.mission && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
+        r.warned = true;
+        const to = PK.Troops && PK.Troops.targetOf(r);
+        toast('Tus tropas llegan a ' + r.name + ' en ' + U.fmtTime((r.arrive - now) / 1000) + ' (táctica: ' + tactic(r).name.toLowerCase() + '; se cambia en el Cuartel).', 'info',
+          to ? { label: 'Ver combate', fn: () => PK.Render.centerOn(to[0], to[1]) } : { label: 'Cuartel', fn: () => PK.Social.openWar('exp') });
+      }
       if (r.phase === 'go' && now >= r.arrive) resolve(r);
       else if (r.phase === 'back' && now >= r.back) arrive(r);
     }

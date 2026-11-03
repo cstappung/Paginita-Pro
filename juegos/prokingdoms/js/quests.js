@@ -48,17 +48,21 @@
   };
 
   let notified = {}, streakNote = null;
+  let checked = false; // la primera revisión (al cargar) no celebra lo que ya estaba listo
   Q.check = function () {
     if (streakNote) { PK.UI.toast(streakNote, 'epic'); streakNote = null; }
     almostCheck();
+    // Una sola notificación por tanda: al cargar la partida salían cinco avisos de golpe, uno por misión lista.
+    const fresh = [];
     for (const q of D.QUESTS) {
       if (S().quests[q.id] === 'claimed') continue;
-      if (Q.status(q) === 'ready' && !notified[q.id]) {
-        notified[q.id] = true;
-        PK.UI.toast('Misión cumplida: ' + q.title + '. Reclama tu recompensa en el libro.', 'quest');
-        if (PK.Sfx) PK.Sfx.play('quest');
-      }
+      if (Q.status(q) === 'ready' && !notified[q.id]) { notified[q.id] = true; fresh.push(q); }
     }
+    const open = { label: 'Libro', fn: () => Q.openBook() };
+    if (fresh.length === 1 && checked) PK.UI.toast('Misión cumplida: ' + fresh[0].title + '. Reclama tu recompensa en el libro.', 'quest', open);
+    else if (fresh.length) PK.UI.toast(checked ? fresh.length + ' misiones cumplidas: reclama sus recompensas en el libro.' : 'Tienes ' + fresh.length + (fresh.length === 1 ? ' misión lista' : ' misiones listas') + ' para reclamar en el libro.', 'quest', open);
+    if (fresh.length && checked && PK.Sfx) PK.Sfx.play('quest');
+    checked = true;
     Q.ensureDaily();
   };
   const weeklyReady = () => { const w = S().weekly; return w ? w.list.filter(it => !it.claimed && dailyProg(it)[0] >= it.n).length : 0; };
@@ -73,9 +77,9 @@
     n += weeklyReady() + (dailyBonusReady() ? 1 : 0);
     return n;
   };
-  Q.claim = function (id) {
+  Q.claim = function (id, silent) {
     const q = byId[id];
-    if (Q.status(q) !== 'ready') return;
+    if (Q.status(q) !== 'ready') return null;
     S().quests[id] = 'claimed';
     G().give(q.reward);
     if (q.perk) {
@@ -88,7 +92,8 @@
       PK.UI.toast('Desbloqueaste: ' + D.BUILD[q.unlock].name + '. Ya aparece en el menú de obras.', 'epic');
     }
     G().stat('quests_done', 1);
-    PK.UI.toast('Recompensa obtenida: ' + q.title, 'good');
+    if (!silent) PK.UI.toast('Recompensa obtenida: ' + q.title, 'good');
+    return q.reward;
   };
 
   // ---------- Diarias ----------
@@ -155,15 +160,47 @@
     Q.almostSent();
     PK.UI.toast(t, 'quest');
   }
-  Q.weekLeft = () => { const d = new Date(weekKey() + 'T00:00:00'); d.setDate(d.getDate() + 7); return Math.max(0, (d - Date.now()) / 1000); };
+  Q.weekLeft = () => { const d = parseDay(weekKey()); d.setDate(d.getDate() + 7); return Math.max(0, (d - Date.now()) / 1000); }; // parseDay: dayKey no rellena con ceros y 'T00:00:00' daba NaN
   function dailyProg(it) { return [Math.floor((S().stats[it.k] || 0) - it.base), it.n]; }
   const dailyReward = () => { const e = S().era; return { food: 150 * e, wood: 150 * e, gold: 50 * e, coins: 3 + e }; };
-  Q.claimDaily = function (i) {
+  Q.claimDaily = function (i, silent) {
     const it = S().daily.list[i];
-    if (!it || it.claimed || dailyProg(it)[0] < it.n) return;
+    if (!it || it.claimed || dailyProg(it)[0] < it.n) return null;
     it.claimed = true;
-    G().give(dailyReward());
-    PK.UI.toast('Misión diaria completada.', 'good');
+    const r = dailyReward();
+    G().give(r);
+    if (!silent) PK.UI.toast('Misión diaria completada.', 'good');
+    return r;
+  };
+  // «Reclamar todo»: misiones del libro, diarias, el premio de las tres diarias y las semanales, con un solo
+  // cofre que muestra la suma. Antes había que entrar pestaña por pestaña y nodo por nodo. El cofre de racha
+  // queda aparte: tiene su propio ritual diario.
+  Q.claimableCount = function () {
+    const st = S();
+    let n = D.QUESTS.filter(q => Q.status(q) === 'ready').length;
+    if (st.daily) n += st.daily.list.filter(it => !it.claimed && dailyProg(it)[0] >= it.n).length;
+    return n + weeklyReady() + (dailyBonusReady() ? 1 : 0);
+  };
+  Q.claimAll = function () {
+    const st = S(), sum = {};
+    let n = 0;
+    const add = r => { if (!r) return; n++; for (const k in r) sum[k] = (sum[k] || 0) + r[k]; };
+    // en tandas: reclamar una misión puede dejar lista la siguiente de la rama
+    for (let pass = 0; pass < 6; pass++) {
+      const ready = D.QUESTS.filter(q => Q.status(q) === 'ready');
+      if (!ready.length) break;
+      for (const q of ready) add(Q.claim(q.id, true));
+    }
+    if (st.daily) st.daily.list.forEach((it, i) => add(Q.claimDaily(i, true)));
+    if (dailyBonusReady()) { st.daily.bonus = true; const r = D.dailyBonus(st.era); G().give(r); add(r); }
+    if (st.weekly) st.weekly.list.forEach(it => {
+      if (it.claimed || dailyProg(it)[0] < it.n) return;
+      it.claimed = true;
+      const r = D.weeklyReward(st.era);
+      G().give(r); G().stat('weeklies', 1); add(r);
+    });
+    if (n) PK.UI.chestReveal({ title: n === 1 ? 'Recompensa reclamada' : n + ' recompensas reclamadas', sub: 'Todo lo que tenías listo en el libro', reward: sum, tier: n >= 5 ? 2 : 1 });
+    return n;
   };
   Q.claimDailyBonus = function () {
     if (!dailyBonusReady()) return;
@@ -236,6 +273,8 @@
         el('img', { class: 'ico', src: PK.Sprites.icon(b.icon) }), b.name, ready ? el('span', { class: 'dot' }) : null));
     }
     const left = el('div', { class: 'page left scroll' }), right = el('div', { class: 'page right' });
+    const nAll = Q.claimableCount();
+    if (nAll > 1) tabs.prepend(PK.UI.btn('Reclamar todo (' + nAll + ')', () => { Q.claimAll(); PK.UI.rerender(); }, { small: true, cls: 'gold book-all' }));
     book.append(tabs, el('div', { class: 'pages' }, left, right));
     body.append(book);
 

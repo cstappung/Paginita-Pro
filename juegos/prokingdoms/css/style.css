@@ -696,3 +696,30 @@ ul.info li { margin: 2px 0; }
 @media (max-width: 900px) and (orientation: portrait) {
   #hud:has(#event:not(.min):not([style*="none"])) #toasts { bottom: calc(30vh + 150px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---- Playtest, nov. 2026 ---- */
+/* Panel vacío (ayuda oculta y nada elegido): desaparece y el mapa queda libre. */
+#hud.p-none #panel { display: none; }
+@media (max-width: 900px) and (orientation: portrait) {
+  #hud.p-none #toasts { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #hud.p-none #menu { max-height: calc(100vh - var(--top-h, 56px) - 108px - 22px); }
+  #hud.p-none.mm-off #menu { max-height: calc(100vh - var(--top-h, 56px) - 8px - 22px); }
+}
+/* Celular vertical angosto: la barra de recursos en dos filas. En una sola fila (deslizable) quedaban fuera
+   de la pantalla población, maestros, era y monedas, y nadie se daba cuenta de que se podía deslizar. */
+@media (max-width: 600px) and (orientation: portrait) {
+  #topbar { flex-wrap: wrap; overflow: visible; touch-action: auto; gap: 2px 8px; justify-content: flex-start; }
+  #topbar .res { font-size: 13px; gap: 3px; min-width: 0; }
+  #topbar .res .ico { width: 16px; height: 16px; }
+  #topbar .res .capbar { left: 19px; }
+  #topbar .res.builders { min-height: 30px; min-width: 0; }
+  #topbar .era { flex-direction: row; gap: 6px; min-width: 0; padding: 0 6px; }
+  #topbar .era small { display: none; }
+  #topbar .era .mini-bar { width: 36px; margin: 0; }
+  #topbar .net { padding: 0 8px; font-size: 13px; }
+}
+/* Menú lateral con scroll (celular acostado o pantallas bajas): una sombra abajo avisa que hay más botones. */
+#menu.more-below { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
+/* «Reclamar todo» al principio de las pestañas del Libro (en el celular se deslizan: al final no se veía) */
+.book-tabs .book-all { flex: none; align-self: center; white-space: nowrap; }
+.tactics { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }

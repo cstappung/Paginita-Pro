@@ -132,7 +132,8 @@
   const campStats = L => ({ gather: 0.1 * (L - 1), carry: L - 1 });
   // Efecto de cada edificio según su nivel.
   D.BSTATS = {
-    tc: L => ({ pop: 5 + 3 * (L - 1), cap: capR(600 * Math.pow(1.55, L - 1)), train: 0.12 * (L - 1), defense: 25 + 20 * (L - 1), sight: 9 + L }),
+    // cap 800 (era 600): en la Era I se pasaba más tiempo con el almacén lleno que juntando (playtest)
+    tc: L => ({ pop: 5 + 3 * (L - 1), cap: capR(800 * Math.pow(1.55, L - 1)), train: 0.12 * (L - 1), defense: 25 + 20 * (L - 1), sight: 9 + L }),
     house: L => ({ pop: 5 + 2 * (L - 1) }),
     lumber: campStats, mining: campStats, mill: campStats,
     farm: L => ({ farm: 0.12 * (L - 1) }),
@@ -157,7 +158,7 @@
     pop: ['Población', v => '+' + v], cap: ['Capacidad (todo)', v => U.fmt(v)], capFood: ['Capacidad de comida', v => U.fmt(v)], capGoods: ['Capacidad de bienes', v => U.fmt(v)],
     train: ['Velocidad de entrenamiento', pct], defense: ['Defensa', v => String(v)], sight: ['Visión', v => v + ' casillas'],
     gather: ['Ritmo de quien descarga aquí', pct], carry: ['Carga extra', v => '+' + v], farm: ['Rendimiento', pct],
-    builders: ['Maestros de Obras', v => '+' + v], scouts: ['Exploradores', v => String(v)], range: ['Alcance de exploración', v => v + ' casillas'], scoutSpeed: ['Velocidad de exploradores', pct],
+    builders: ['Maestros de Obras', v => '+' + v], scouts: ['Exploradores (máx.)', v => String(v)], range: ['Alcance de exploración', v => v + ' casillas'], scoutSpeed: ['Velocidad de exploradores', pct],
     buy: ['Precio de compra', v => Math.round(v * 100) + '%'], sell: ['Precio de venta', v => Math.round(v * 100) + '%'],
     prod: ['Producción', pct], slots: ['Puestos de trabajo', v => String(v)],
     techMax: ['Nivel máx. de tecnologías', v => String(v)], research: ['Velocidad de investigación', pct], armyTrain: ['Velocidad de entrenamiento', pct],
@@ -697,7 +698,7 @@
 
   // Crónica (rama principal, hace de tutorial)
   q('m1', 'main', 'El primer fuego', 'Entrena aldeanos en el Centro Urbano hasta tener 5. Selecciona el Centro Urbano y pulsa "Aldeano".', { t: 'villagers', n: 5 }, { food: 100 });
-  q('m2', 'main', 'Techo para todos', 'Construye 2 casas: selecciona un aldeano y elige Casa en el menú de construcción.', B('house', 2), { wood: 80 }, ['m1']);
+  q('m2', 'main', 'Techo para todos', 'Construye 2 casas: pulsa Construir (tecla C), elige Casa y ubícala. Se levantan solas, sin aldeanos.', B('house', 2), { wood: 80 }, ['m1']);
   q('m3', 'main', 'Mejorar es crecer', 'Mejora el Centro Urbano a nivel 2. Selecciónalo y pulsa "Mejorar": lo hace tu Maestro de Obras.', LV('tc', 2), { stone: 80, gold: 40 }, ['m2']);
   q('m4', 'main', 'Ojos en la niebla', 'Construye un Puesto de Exploradores y entrena un explorador. Él solo irá revelando el mapa.', all(B('scout'), st('scouts_trained', 1)), { food: 150, coins: 5 }, ['m3']);
   q('m5', 'main', 'Puntos de acopio', 'Construye un Campamento Maderero y uno Minero cerca de los recursos para acortar los viajes.', all(B('lumber'), B('mining')), { wood: 150 }, ['m4']);
@@ -899,7 +900,8 @@
   D.WEEKLY = [
     { id: 'w_gather', k: 'g_total', base: 15000, text: n => 'Recolecta ' + U.fmt(n) + ' recursos en total' },
     { id: 'w_upg', k: 'upgrades', base: 12, flat: true, text: n => 'Completa ' + n + ' mejoras de edificios' },
-    { id: 'w_vill', k: 'villagers_trained', base: 20, flat: true, text: n => 'Entrena ' + n + ' aldeanos' },
+    // 20 se cumplía en los primeros minutos de una partida nueva (playtest): una semanal tiene que durar días
+    { id: 'w_vill', k: 'villagers_trained', base: 40, flat: true, text: n => 'Entrena ' + n + ' aldeanos' },
     { id: 'w_explore', k: 'explored', base: 900, flat: true, needB: 'scout', text: n => 'Revela ' + n + ' casillas del mapa' },
     { id: 'w_common', k: 'g_common', base: 3000, text: n => 'Recolecta ' + U.fmt(n) + ' en zonas comunes' },
     { id: 'w_market', k: 'market_ops', base: 15, flat: true, era: 2, needB: 'market', text: n => 'Haz ' + n + ' operaciones en el mercado' },
