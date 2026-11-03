@@ -393,7 +393,7 @@
   UI.refreshPanel = function (force) {
     const g = G(), sel = g.sel;
     let key = sel ? sel.type + ':' + (sel.ids ? sel.ids.join(',') : sel.id) : 'none';
-    if (g.placing) { const gh = PK.Render.ghost; key = 'placing:' + g.placing.type + (g.placing.armed && gh ? ':' + gh.x + ',' + gh.y + (gh.ok ? '+' : '-') : ''); }
+    if (g.placing) { const gh = PK.Render.ghost; key = 'placing:' + (g.placing.move !== undefined ? 'mv' + g.placing.move + ':' : '') + g.placing.type + (g.placing.armed && gh ? ':' + gh.x + ',' + gh.y + (gh.ok ? '+' : '-') : ''); }
     if (PK.Logi.tool) key = 'tool:' + PK.Logi.tool + (PK.Logi.beltFrom || '');
     if (PK.Def.tool) key = 'def:' + PK.Def.tool + (PK.Def.start ? PK.Def.start.join(',') : '') + S().def.walls.length + S().def.gates.length;
     if (PK.Terr.mode) key = 'terr';
@@ -431,6 +431,18 @@
         el('p', { class: 'small' }, 'Toca una parcela para verla. Borde blanco: la puedes reclamar. Borde rojo: la puedes intentar conquistar.'),
         el('p', { class: 'small muted' }, 'Tus parcelas: ' + PK.Terr.count() + ' de ' + PK.Terr.max() + ' posibles en tu era.'),
         el('div', { class: 'row' }, UI.btn('Salir del mapa', () => PK.Terr.toggle(false), { small: true }), UI.btn('Resumen', () => UI.openTerritory(), { small: true }))));
+      return;
+    }
+    if (g.placing && g.placing.move !== undefined) { // mudando un edificio
+      const def = D.BUILD[g.placing.type], gh = PK.Render.ghost, armed = g.placing.armed && gh, m = g.bById.get(g.placing.move);
+      const cancel = () => { g.placing = null; PK.Render.ghost = null; UI.refreshPanel(true); };
+      if (!m) { cancel(); return; }
+      panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(m.type, 'p', m.lvl) }), el('div', null, el('h3', null, 'Mover: ' + def.name + ' · Nv ' + m.lvl),
+        el('p', { class: 'small' }, UI.hint('Clic en el lugar nuevo · Clic derecho o Esc para cancelar',
+          armed ? (gh.ok ? 'Así quedaría. Toca «Mover aquí» o el mismo lugar otra vez.' : (G().placeText(G().placeWhy(m.type, gh.x, gh.y, m.id)) + ' Toca otro lugar.')) : 'Toca el lugar nuevo: primero verás cómo queda.')),
+        el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Mover aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null, UI.btn('Cancelar', cancel, { small: true })),
+        el('div', { class: 'row' }, el('span', { class: 'small' }, 'Mudanza: '), UI.costEl(G().moveCost(m))),
+        el('p', { class: 'small muted' }, 'Conserva el nivel, la mejora en curso, la cola y los trabajadores. Las cintas que llegaban a él se quitan.'))));
       return;
     }
     if (g.placing) {
@@ -702,7 +714,9 @@
     }
     else if (def.drop) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
     if (b.type === 'granary' || b.type === 'warehouse') act.append(el('p', { class: 'small muted' }, 'Capacidad total: comida ' + U.fmt(G().cap('food')) + ' · bienes ' + U.fmt(G().cap('wood')) + '.'));
-    if (b.type !== 'tc') act.append(el('div', { class: 'row end' }, UI.btn('Demoler', () => UI.confirmDemolish(b), { small: true, cls: 'danger' })));
+    if (b.type !== 'tc') act.append(el('div', { class: 'row end' },
+      G().canMove(b) ? UI.btn(el('span', null, 'Mover ', UI.costEl(G().moveCost(b))), () => PK.Input.startMoving(b), { small: true, title: 'Llévalo a otro lugar sin perder su nivel (tecla V)' }) : '',
+      UI.btn('Demoler', () => UI.confirmDemolish(b), { small: true, cls: 'danger' })));
     panel.append(act);
   }
 
@@ -1468,7 +1482,7 @@
           el('li', null, 'Clic derecho: recolectar / trabajar / mover'),
           el('li', null, 'Con el Centro Urbano seleccionado, clic derecho fija el punto de reunión'),
           el('li', null, 'WASD / flechas / botón central: mover cámara · Rueda: zoom'),
-          el('li', null, 'C: construir · H: Centro Urbano · . o I: aldeano ocioso · Z: zonas · B: libro · Supr: demoler')));
+          el('li', null, 'C: construir · H: Centro Urbano · . o I: aldeano ocioso · Z: zonas · B: libro · V: mover el edificio elegido · Supr: demoler')));
       if (PK.dev) {
         body.append(el('h3', null, 'Modo desarrollo'), el('div', { class: 'row' },
           [1, 5, 20].map(s => UI.btn('x' + s, () => { G().timeScale = s; UI.toast('Velocidad x' + s, 'info'); }, { small: true })),
