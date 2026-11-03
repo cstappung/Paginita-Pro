@@ -196,3 +196,25 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **The minimap frames the explored area** (`R.mmView`, eased) instead of the
   whole world. `minimapToTile` and the camera box go through that view.
 - **Phones start at zoom 1** (smaller side under 560 px).
+
+## Live battles and touch deselect, Nov 2026
+
+- **Camp and dungeon runs are fought live** (`js/batalla.js`, `PK.Batalla`)
+  when they arrive while you play: `r.phase = 'battle'`, simulated in
+  `G.update` whether or not anyone watches, and drawn on its own full-screen
+  map («Ver batalla», `#batalla`). Its result and losses go through
+  `Exp.finishBattle(r, res)` → `resolve(r, res)`. Missions, the offline
+  calculation (`B.adelantar`, played to the end at once) and a reload mid-fight
+  (no battle in memory → old formula) keep working without it. Nothing of it is
+  saved or sent to the server.
+- **Balance rule:** each figure's hp and damage come from `Exp.powerVs`, and our
+  hp also gets `vsFactor`, so the planner's «fuerza contra» is what fights
+  (strength ∝ power² on both sides). Measured with `B.adelantar` over many
+  fights: bandits ~50% at 1:1 and ~100% at 1.3:1; the dragon needs «dispersar».
+- **Orders matter on purpose:** `linea` (spears ×1.35 against fast enemies and
+  the dragon), `dispersar` (fire and catapult splash hit fewer), focus on an
+  enemy type, retreat (fewer losses). Below 20% life the army retreats by
+  itself. `B.CONSEJO` tells the player which order fits each enemy.
+- **Touch deselect:** tapping empty ground releases the selection (it used to
+  send villagers walking there), as does tapping the only selected villager
+  again or the panel's ✕. The TC rally point is set by tapping a resource.

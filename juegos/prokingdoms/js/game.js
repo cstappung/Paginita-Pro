@@ -928,6 +928,7 @@
     PK.Logi.update(dt);
     PK.Terr.update(dt, false);
     PK.Exp.update(dt, false);
+    PK.Batalla.update(dt);
     PK.Life.update(dt);
     PK.Incursiones.update(dt);
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);

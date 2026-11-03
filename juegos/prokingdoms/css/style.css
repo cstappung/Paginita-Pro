@@ -750,3 +750,32 @@ ul.info li { margin: 2px 0; }
   #panel .p-headrow .p-close { display: flex !important; align-items: center; justify-content: center; flex: none; width: 48px; background: none; border: none; border-left: 2px solid var(--edge); color: var(--parch); font-family: var(--font); font-size: 20px; cursor: pointer; text-shadow: 1px 1px 0 #000; }
   #panel .p-headrow .p-close[style*="none"] { display: none !important; }
 }
+/* ---- Batalla en vivo (batalla.js): otro mapa, a pantalla completa ---- */
+#batalla { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: #120c08; color: var(--parch); font-family: var(--font); padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+#batalla .bt-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px; border-bottom: 2px solid var(--edge); background: rgba(40, 26, 14, 0.95); }
+#batalla .bt-nombre { color: var(--gold); font-size: 17px; text-shadow: 1px 1px 0 #000; }
+#batalla .bt-bars { display: flex; flex: 1 1 260px; gap: 8px; min-width: 0; }
+#batalla .bt-bar { position: relative; flex: 1; height: 20px; background: rgba(0, 0, 0, 0.5); border: 2px solid #000; min-width: 0; }
+#batalla .bt-bar i { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.25s; }
+#batalla .bt-bar.mio i { background: #3a78d8; }
+#batalla .bt-bar.suyo i { background: #c03a2a; }
+#batalla .bt-bar span { position: relative; display: block; padding: 0 6px; font-size: 13px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 0 #000; }
+#batalla .bt-t { font-size: 15px; min-width: 52px; text-align: right; }
+#batalla .bt-campo { position: relative; flex: 1; min-height: 0; }
+#batalla .bt-cv { position: absolute; inset: 0; image-rendering: pixelated; touch-action: none; }
+#batalla .bt-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px; border-top: 2px solid var(--edge); background: rgba(40, 26, 14, 0.95); }
+#batalla .bt-ord { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+#batalla .bt-tip { flex: 1 1 240px; margin: 0; color: var(--parch2); }
+#batalla .bt-fin { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; width: 100%; }
+#batalla .bt-fin b { font-size: 18px; }
+#batalla .bt-fin.gano b { color: #ffe27a; }
+#batalla .bt-fin.perdio b { color: #ff8a70; }
+@media (max-width: 600px) {
+  #batalla .bt-top, #batalla .bt-ctl { padding: 6px 8px; }
+  #batalla .bt-nombre { font-size: 15px; flex: 1 1 100%; }
+  #batalla .bt-tip { flex-basis: 100%; font-size: 12px; line-height: 1.25; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  #batalla .bt-top, #batalla .bt-ctl { padding: 4px 8px; }
+  #batalla .bt-tip { display: none; }
+}

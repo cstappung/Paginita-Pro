@@ -293,6 +293,7 @@
       out.push({ k: 'r' + st.research.id, icon: Sp.icon('flask'), name: t.name + ' ' + U.roman(st.research.lvl), left: (st.research.total - st.research.t) / g.researchMult(), pct: st.research.t / st.research.total, go: () => UI.openResearch() });
     }
     for (const r of (st.exp && st.exp.runs) || []) {
+      if (r.phase === 'battle') { out.unshift({ k: 'b' + r.id, raid: true, icon: Sp.icon('war'), name: '⚔ Batalla en ' + r.name, left: null, pct: 1, go: () => PK.Batalla.abrir(r.id) }); continue; }
       const go = r.phase === 'go', left = ((go ? r.arrive : r.back) - now) / 1000;
       out.push({ k: 'x' + r.id + r.phase, icon: Sp.icon('war'), name: (go ? '⚔ Hacia ' : '↩ Vuelve de ') + r.name, left, pct: 1 - left / Math.max(1, r.travel), go: () => UI.openBarracks('exp') });
     }
@@ -850,6 +851,12 @@
     if (!runs.length) return;
     pane.append(el('h3', null, 'Tropas fuera (' + runs.length + ')'));
     for (const r of runs) {
+      if (r.phase === 'battle') {
+        pane.append(el('div', { class: 'run-row' }, el('span', { class: 'run-ic' }, '⚔'),
+          el('div', { class: 'dg-info' }, el('b', null, 'Peleando en ' + r.name), el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados · dirige la batalla en vivo')),
+          UI.btn('Ver batalla', () => PK.Batalla.abrir(r.id), { small: true, cls: 'gold' })));
+        continue;
+      }
       const go = r.phase === 'go', left = Math.max(0, ((go ? r.arrive : r.back) - Date.now()) / 1000), pct = U.clamp(1 - left / Math.max(1, r.travel), 0, 1);
       pane.append(el('div', { class: 'run-row' + (go ? '' : r.won ? ' won' : ' lost') },
         el('span', { class: 'run-ic' }, go ? '⚔' : r.won ? '✔' : '✘'),
@@ -945,6 +952,7 @@
       const kinds = Object.keys(r.sent || {}).filter(k => r.sent[k] > 0);
       body.append(el('div', { class: 'report ' + (r.won ? 'won' : 'lost') },
         el('h2', null, r.name),
+        r.live ? el('p', { class: 'small good-t' }, r.retreat ? 'Te retiraste a tiempo: se salvaron más soldados.' : 'Batalla peleada en vivo: el resultado y las bajas salieron de la pelea.') : null,
         el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra aprox. ' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
         el('h3', null, 'Tu compañía'),
         el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),
