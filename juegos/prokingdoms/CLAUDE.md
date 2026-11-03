@@ -6,6 +6,10 @@ is: `CONTEXTO.md` (how it is built, the platform bridge, the server protocol)
 and `FIREBASE.md` (the cost study) are the author's notes. Read them before
 touching the game itself. This file only covers how it lives inside Juegos.
 
+**Mega update plan (Nov 2026):** `PLAN-MEGA-ACTUALIZACION.md` lists the bug
+fixes (Fase 0) and the phased content update. Read it before working on any
+of its phases. Its section 1 lists the rules every phase must keep.
+
 ## How it is wired
 
 - **A `tipo: "sitio"` entry with `beta: true`** in `SOLOS`
