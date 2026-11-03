@@ -15,6 +15,8 @@
   R.init = function (canvas) {
     R.cv = canvas;
     R.ctx = canvas.getContext('2d');
+    // en el celular arranca más lejos: con zoom 2 en 390 px se veían 12 casillas de ancho (playtest)
+    if (Math.min(window.innerWidth, window.innerHeight) < 560) R.cam.z = 1;
     R.resize();
     window.addEventListener('resize', () => R.resize());
   };
@@ -355,6 +357,7 @@
     }
     // soldados: guarnición del Cuartel, columnas en marcha y peleas (troops.js)
     if (PK.Troops) PK.Troops.collect(list, dt, vis);
+    if (PK.Incursiones) PK.Incursiones.collect(list, dt, vis); // bandidos y tropas que salen a pelear
 
     // capa plana: granjas y marcas de selección
     for (const [a, ax, ay] of aprons) ctx.drawImage(a.c, ax, ay);
@@ -538,6 +541,7 @@
       ctx.globalAlpha = 1;
     }
     if (PK.Troops) PK.Troops.drawTexts(ctx, s, ox, oy, R.dpr, dt);
+    if (PK.Incursiones) PK.Incursiones.dibujarPantalla(ctx, s, ox, oy, R.dpr);
     // nivel de tus edificios
     if (R.showZones && R.cam.z >= 2) {
       ctx.font = 10 * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
@@ -804,7 +808,20 @@
 
   // ---------- Minimapa ----------
   // Muestra el territorio de cada reino con su color. Se recalcula cada pocos segundos.
-  let mmBase = null, mmT = 99, mmFog = -1, mmTerr = -1;
+  // Encuadra lo explorado (más un margen), no el mundo entero: al empezar, el mundo completo era un rectángulo
+  // negro con un manchón diminuto. El encuadre crece suave a medida que exploras. mmView está en píxeles de mmBase.
+  let mmBase = null, mmT = 99, mmFog = -1, mmTerr = -1, mmBox = null;
+  R.mmView = null;
+  function mmTarget(w, h, aspect) {
+    if (!mmBox) return { x: 0, y: 0, w, h };
+    const m = 14;
+    let x0 = mmBox[0] - m, x1 = mmBox[2] + m, y0 = mmBox[1] - m / 2, y1 = mmBox[3] + m / 2;
+    let vw = Math.max(72, x1 - x0), vh = Math.max(vw / aspect, y1 - y0);
+    vw = Math.max(vw, vh * aspect);
+    if (vw >= w || vh >= h) return { x: 0, y: 0, w, h };
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    return { x: U.clamp(cx - vw / 2, 0, w - vw), y: U.clamp(cy - vh / 2, 0, h - vh), w: vw, h: vh };
+  }
   R.drawMinimap = function (mc, dt) {
     const ctx = mc.getContext('2d'), w = W.W + W.H, h = (W.W + W.H) / 2;
     mmT += dt;
@@ -813,6 +830,7 @@
       mmT = 0;
       mmBase = mmBase || Sp.mk(w, h);
       const bctx = mmBase.getContext('2d'), im = bctx.createImageData(w, h), d = im.data;
+      const box = [1e9, 1e9, -1e9, -1e9];
       for (let my = 0; my < h; my++) for (let mx = 0; mx < w; mx++) {
         const a = mx - W.H, b = my * 2, tx = Math.floor((a + b) / 2), ty = Math.floor((b - a) / 2);
         if (!W.inb(tx, ty)) continue;
@@ -823,38 +841,46 @@
         const o = W.terr[W.parcel(tx, ty)];
         if (o) { const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color; col = [col[0] * 0.6 + c2[0] * 0.4, col[1] * 0.6 + c2[1] * 0.4, col[2] * 0.6 + c2[2] * 0.4]; }
         if (!W.fog[k]) col = [22, 19, 14];
+        else { if (mx < box[0]) box[0] = mx; if (my < box[1]) box[1] = my; if (mx > box[2]) box[2] = mx; if (my > box[3]) box[3] = my; }
         const i = (my * w + mx) * 4;
         d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
       }
       bctx.putImageData(im, 0, 0);
+      mmBox = box[2] >= box[0] ? box : null;
     }
-    const sx = mc.width / w, sy = mc.height / h;
+    const tg = mmTarget(w, h, mc.width / mc.height);
+    let v = R.mmView;
+    if (!v) v = R.mmView = Object.assign({}, tg);
+    else { const k = Math.min(1, dt * 3); for (const p of ['x', 'y', 'w', 'h']) v[p] += (tg[p] - v[p]) * k; }
+    const sx = mc.width / v.w, sy = mc.height / v.h, zk = U.clamp(sx / (mc.width / w), 1, 3);
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, mc.width, mc.height);
-    ctx.drawImage(mmBase, 0, 0, mc.width, mc.height);
-    const toMM = (x, y) => [(x - y + W.H) * sx, ((x + y) / 2) * sy];
+    ctx.fillStyle = '#16130e';
+    ctx.fillRect(0, 0, mc.width, mc.height);
+    ctx.drawImage(mmBase, v.x, v.y, v.w, v.h, 0, 0, mc.width, mc.height);
+    const toMM = (x, y) => [(x - y + W.H - v.x) * sx, ((x + y) / 2 - v.y) * sy];
     for (const b of G().buildings) {
       if (b.owner !== 'p' && !seen(b.cx, b.cy)) continue;
       const [x, y] = toMM(b.cx, b.cy);
       ctx.fillStyle = 'rgb(' + Sp.ownerColor(b.owner).join(',') + ')';
-      const s = b.w >= 3 ? 3 : 2;
+      const s = Math.round((b.w >= 3 ? 3 : 2) * zk);
       ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
     }
     for (const u of G().units) {
       if (u.inside || (u.owner !== 'p' && !seen(u.x, u.y))) continue;
       const [x, y] = toMM(u.x, u.y);
       ctx.fillStyle = u.owner === 'p' ? '#cfe0ff' : 'rgb(' + Sp.ownerColor(u.owner).map(c => Math.min(255, c + 60)).join(',') + ')';
-      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
     }
+    if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
     // vista de la cámara
     const s = R.scale(), vw = R.cv.width / s, vh = R.cv.height / s;
-    const ax = (R.cam.x - vw / 2) / 16 * sx, ay = (R.cam.y - vh / 2) / 16 * sy;
+    const ax = ((R.cam.x - vw / 2) / 16 - v.x) * sx, ay = ((R.cam.y - vh / 2) / 16 - v.y) * sy;
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(ax) + 0.5, Math.round(ay) + 0.5, Math.round((vw / 16) * sx), Math.round((vh / 16) * sy));
   };
   R.minimapToTile = function (mc, mx, my) {
-    const w = W.W + W.H, h = (W.W + W.H) / 2;
-    const a = (mx / mc.clientWidth) * w - W.H, b = (my / mc.clientHeight) * h * 2;
+    const w = W.W + W.H, h = (W.W + W.H) / 2, v = R.mmView || { x: 0, y: 0, w, h };
+    const a = v.x + (mx / mc.clientWidth) * v.w - W.H, b = (v.y + (my / mc.clientHeight) * v.h) * 2;
     return [(a + b) / 2, (b - a) / 2];
   };
 })();

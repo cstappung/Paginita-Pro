@@ -25,6 +25,7 @@
     return out;
   }
   T.pickTypes = pickTypes;
+  T.soldierItem = (...a) => soldierItem(...a); // también lo usan los defensores de incursiones.js
   T.total = units => Object.keys(units || {}).reduce((s, k) => s + (units[k] || 0), 0);
 
   // De dónde salen: el Cuartel más cercano al destino (o el Centro Urbano), por su frente.
@@ -150,6 +151,7 @@
   function garrison(items) {
     const g = G(), st = S(), army = st && st.war && st.war.army;
     if (!army) return;
+    if (PK.Incursiones && PK.Incursiones.defensores.length) return; // salieron a pelear contra los bandidos
     const bars = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'barracks');
     if (!bars.length) return;
     const types = pickTypes(army, 12 * bars.length), now = performance.now() / 1000;

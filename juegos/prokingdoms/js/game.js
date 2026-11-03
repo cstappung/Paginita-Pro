@@ -47,6 +47,7 @@
     PK.Logi.init(S);
     PK.Def.init(S);
     PK.Exp.init(S);
+    PK.Incursiones.init(S);
     PK.Auto.init(S);
     PK.Life.reset();
     PK.Quests.init(S);
@@ -437,6 +438,34 @@
     toast('¡Empujón! Tus obreros apuraron el paso y terminaron la mejora de ' + b.def.name + '.', 'good');
     G.updateTimers(0);
   };
+  // Horas extra: lo que sobra en las bodegas (comida, madera y piedra) se paga en jornales para adelantar el
+  // avance de era o una mejora larga. Cada pago en el mismo reloj cuesta un 30% más y hay un tope por reloj
+  // (la era: 8 x 10%; una mejora: 4 x 12,5%). Es el sumidero de excedentes que pedía el playtest: desde la
+  // Era II las bodegas se llenaban y la espera de la Era III no tenía nada que hacer. El costo sale de la
+  // capacidad (12% de cada bodega), así acompaña a las eras sin tabla aparte. t.ot cuenta los pagos.
+  G.OT_RES = ['food', 'wood', 'stone'];
+  G.otInfo = function (kind, b) {
+    const t = kind === 'era' ? S.eraProg : b && b.owner === 'p' ? b.upg : null;
+    if (!t || (kind !== 'era' && t.total < 120)) return null;
+    const max = kind === 'era' ? 8 : 4, n = t.ot || 0, left = t.total - t.t;
+    const skip = Math.min(left, t.total * (kind === 'era' ? 0.1 : 0.125)), k = Math.pow(1.3, n), cost = {};
+    for (const r of G.OT_RES) cost[r] = Math.max(10, Math.round((G.cap(r) * 0.12 * k) / 10) * 10);
+    const avail = n < max && left > 30;
+    return { n, max, skip, cost, avail, ok: avail && G.canAfford(cost) };
+  };
+  G.overtime = function (kind, b) {
+    const o = G.otInfo(kind, b);
+    if (!o || !o.avail) return false;
+    if (!G.pay(o.cost)) { toast('Faltan recursos para pagar las horas extra.', 'warn'); return false; }
+    const t = kind === 'era' ? S.eraProg : b.upg, at = kind === 'era' ? G.buildings.find(o2 => o2.owner === 'p' && o2.type === 'tc') : b;
+    t.ot = o.n + 1; t.t += o.skip;
+    G.stat('overtime', 1);
+    toast('¡Horas extra! ' + (kind === 'era' ? 'El avance a la Era ' + U.roman(S.eraProg.to) : 'La mejora de ' + b.def.name) + ' se adelanta ' + U.fmtTime(o.skip) + '.', 'good');
+    if (at && PK.Render.burst) PK.Render.burst(at.cx, at.cy, [232, 184, 74], 30);
+    if (PK.Sfx) PK.Sfx.play('build');
+    G.updateTimers(0);
+    return true;
+  };
   G.finished = [];
   function finishUpgrade(b) {
     b.lvl++; b.upg = null;
@@ -731,14 +760,18 @@
   };
   G.canPlace = (type, x, y) => !G.placeWhy(type, x, y);
   // Por qué no se puede: antes en la computadora solo decía «No se puede construir ahí».
-  G.placeText = why => ({
+  G.placeText = why => {
+    if (why === 'libre') S.flags.verTerr = 1; // desde ahora se ve el botón Territorio (ui.js, menú progresivo)
+    return G.PLACE_TEXT[why] || 'No se puede construir ahí.';
+  };
+  G.PLACE_TEXT = {
     libre: 'Esa tierra no es tuya: reclama la parcela en Territorio (solo los campamentos van en tierra de nadie).',
     ajeno: 'Esa tierra pertenece a otro reino.',
     niebla: 'Esa zona sigue en la niebla: explórala primero.',
     agua: 'No se puede construir sobre el agua.',
     ocupado: 'Ahí hay algo (árboles, rocas, un edificio, una cinta o una muralla): busca un lugar despejado.',
     fuera: 'Eso queda fuera del mapa.',
-  })[why] || 'No se puede construir ahí.';
+  };
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }
     if (!G.isUnlocked(type)) { toast('Necesitas la Era ' + U.roman(D.BUILD[type].era) + '.', 'warn'); return null; }
@@ -824,7 +857,7 @@
     if (!G.eraChecks(n).every(c => c.ok)) { toast('Aún no cumples los requisitos de la siguiente era.', 'warn'); return false; }
     if (!G.pay(D.eraCost(n))) { toast('Recursos insuficientes para avanzar de era.', 'warn'); return false; }
     S.eraProg = { to: n, t: 0, total: D.eraTime(n) };
-    toast('Tu pueblo comienza el avance a ' + D.eraName(n) + '.', 'good');
+    toast('Tu pueblo comienza el avance a ' + D.eraName(n) + '.' + (n >= 3 ? ' Si te sobran recursos, paga «Horas extra» en el Centro Urbano para adelantarlo.' : ''), 'good');
     return true;
   };
 
@@ -896,6 +929,7 @@
     PK.Terr.update(dt, false);
     PK.Exp.update(dt, false);
     PK.Life.update(dt);
+    PK.Incursiones.update(dt);
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
     PK.Social.update(dt, false);
     regrowT += dt;

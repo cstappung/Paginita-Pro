@@ -82,14 +82,16 @@
     }
   }
 
-  function scare(u) {
+  function scare(u, who) {
     if (u.carry) { u.carry = 0; u.carryRes = null; }
     const tc = G().buildings.find(b => b.owner === 'p' && b.type === 'tc' && b.done);
     u.scared = 5;
     if (tc) u.path = W.findPath(Math.floor(u.x), Math.floor(u.y), { x0: tc.x, y0: tc.y, x1: tc.x + tc.w - 1, y1: tc.y + tc.h - 1, adj: true }, 4000).path;
-    if (!L.warned || G().time - L.warned > 20) { L.warned = G().time; toast('¡Los lobos asustan a tus aldeanos! Huyen al Centro Urbano.', 'bad'); }
+    if (!L.warned || G().time - L.warned > 20) { L.warned = G().time; toast('¡' + (who || 'Los lobos') + ' asustan a tus aldeanos! Huyen al Centro Urbano.', 'bad'); }
     sfx('hit');
   }
+
+  L.scare = scare; // también asustan los bandidos (incursiones.js)
 
   function hurt(w, dmg, arrow) {
     if (w.hp <= 0) return;
@@ -124,7 +126,8 @@
     }
     for (const a of L.arrows.slice()) {
       a.t += dt;
-      if (a.t >= a.dur) { L.arrows.splice(L.arrows.indexOf(a), 1); if (L.wolves.includes(a.w)) hurt(a.w, a.dmg, true); }
+      // fn: flechas de otros (incursiones.js: torres contra bandidos y arqueros que salen a defender)
+      if (a.t >= a.dur) { L.arrows.splice(L.arrows.indexOf(a), 1); if (a.fn) a.fn(a); else if (L.wolves.includes(a.w)) hurt(a.w, a.dmg, true); }
     }
   }
 

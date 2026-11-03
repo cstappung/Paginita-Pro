@@ -172,3 +172,27 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   the rest. «Ocupar los talleres» also moves one Capataz gatherer (never a
   `task.m` one) to a free workshop slot every 10 s.
 - **Approximate numbers say «aprox.»**: in Pixelify Sans «~79» reads as «-79».
+
+## Fun pass, Nov 2026 (playtests at 6/10)
+
+- **Bandit raids** (`js/incursiones.js`, `PK.Incursiones`) from Era II, live play
+  only like the wolves: never offline, in `?timelapse` or on the server. Only
+  the clock to the next one is saved (`state.inc`, defaults for old saves).
+  Camp + horn + `aviso` countdown, then a march on the nearest storage. TC and
+  towers shoot them through `Life.arrows` (`a.fn` callback); home troops sally
+  (drawn figures, damage from `Social.power`, garrison hidden meanwhile).
+  Looting takes up to 12% of food/wood/stone/gold, capped per era, and killing
+  a carrier returns its share. A win counts `raids_won` and `defenses_won`
+  (quests w5, w11, w12). Walls that cut the path turn it into a siege.
+- **Horas extra** (`G.otInfo`/`G.overtime`): pay 12% of each storage cap in
+  food, wood and stone to skip 10% of an era advance (max 8) or 12.5% of an
+  upgrade of 2 min or more (max 4), +30% per payment on the same timer
+  (`t.ot`). It is the surplus sink. Keep it priced off caps, not a table.
+- **Progressive menu** (`MENU_VER` in `ui.js`): Explorar, Investigar, Mercado,
+  Gremio, Territorio, Logística and Reinos show up when they make sense and
+  stay (`flags.menu_<id>`). Cuartel is always there (walls from Era I). What
+  appears mid-session glows (`.nuevo`); on load nothing is announced.
+  Territorio also appears after a «tierra libre» placement (`flags.verTerr`).
+- **The minimap frames the explored area** (`R.mmView`, eased) instead of the
+  whole world. `minimapToTile` and the camera box go through that view.
+- **Phones start at zoom 1** (smaller side under 560 px).

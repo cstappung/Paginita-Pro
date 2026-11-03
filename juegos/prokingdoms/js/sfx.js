@@ -61,6 +61,7 @@
       case 'hammer': tone(420, 0, 0.05, 'square', 0.028, 260); noise(0, 0.03, 0.03, 1800); break;
       case 'dig': noise(0, 0.09, 0.045, 500); break;
       case 'reap': noise(0, 0.08, 0.03, 5200); break;
+      case 'cuerno': tone(196, 0, 0.55, 'sawtooth', 0.045, 233); tone(233, 0.6, 0.9, 'sawtooth', 0.045, 175); break; // incursión de bandidos
       case 'howl': tone(300, 0, 0.5, 'sine', 0.06, 620); tone(620, 0.5, 0.9, 'sine', 0.06, 380); break;
     }
   };

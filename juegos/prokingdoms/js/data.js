@@ -828,6 +828,8 @@
   q('w7', 'war', 'Primera empalizada', 'Levanta 20 casillas de muralla (Cuartel → Defensa).', st('walls_built', 20), { wood: 300 });
   q('w8', 'war', 'Recinto cerrado', 'Encierra 4 parcelas con murallas, edificios o agua. Deja una puerta para tu gente.', { t: 'walled', n: 4 }, { coins: 15, stone: 400 }, ['w7']);
   q('w9', 'war', 'Muros de piedra', 'Mejora tus murallas a Muro de piedra.', { t: 'wallTier', n: 2 }, { coins: 10, gold: 300 }, ['w8']);
+  q('w11', 'war', 'Guardia del pueblo', 'Rechaza una incursión de bandidos. Desde la Era II llegan cada tanto: el cuerno avisa, y tus Torres, tu Centro Urbano y las tropas del Cuartel los frenan.', st('raids_won', 1), { gold: 200, coins: 10 });
+  q('w12', 'war', 'Azote de forajidos', 'Rechaza 5 incursiones de bandidos.', st('raids_won', 5), { coins: 20, gold: 600 }, ['w11']);
   q('w10', 'war', 'A la aventura', 'Gana una expedición en una mazmorra o un encargo del tablón.', st('exp_won', 1), { gold: 200, coins: 10 }, ['w2']);
   prev = 'w10';
   [5, 15, 40, 100, 250, 600].forEach((n, i) => {

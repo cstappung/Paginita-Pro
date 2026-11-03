@@ -134,9 +134,10 @@
     if (window.ResizeObserver) new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', Math.max(0, bar.offsetTop - 6) + bar.offsetHeight + 'px')).observe(bar);
 
     const menu = el('div', { id: 'menu' });
-    const mbtn = (icon, label, fn, key) => {
-      const b = el('button', { class: 'mbtn', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: fn }, el('img', { class: 'ico', src: icon.startsWith('data:') ? icon : Sp.icon(icon), alt: '' }), el('span', null, label));
+    const mbtn = (icon, label, fn, key, id) => {
+      const b = el('button', { class: 'mbtn', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: () => { b.classList.remove('nuevo'); fn(); } }, el('img', { class: 'ico', src: icon.startsWith('data:') ? icon : Sp.icon(icon), alt: '' }), el('span', null, label));
       menu.append(b);
+      if (id) menuIds[id] = b;
       return b;
     };
     const bb = mbtn('book', 'Misiones', () => PK.Quests.openBook(), 'B');
@@ -145,13 +146,13 @@
     mbtn('hammer', 'Obras', () => UI.openWorks());
     mbtn('pop', 'Aldeanos', () => UI.openForeman());
     mbtn('war', 'Cuartel', () => PK.Social.openWar());
-    mbtn('compass', 'Explorar', () => UI.openExplore());
-    mbtn('flask', 'Investigar', () => UI.openResearch());
-    mbtn('market', 'Mercado', () => PK.Social.openMarket());
-    mbtn('guild', 'Gremio', () => PK.Social.openGuild());
-    mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T');
-    mbtn('cart', 'Logística', () => UI.openLogistics());
-    mbtn('crown', 'Reinos', () => UI.openRealms());
+    mbtn('compass', 'Explorar', () => UI.openExplore(), null, 'explore');
+    mbtn('flask', 'Investigar', () => UI.openResearch(), null, 'research');
+    mbtn('market', 'Mercado', () => PK.Social.openMarket(), null, 'market');
+    mbtn('guild', 'Gremio', () => PK.Social.openGuild(), null, 'guild');
+    mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
+    mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
+    mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
     mbtn('gear', 'Opciones', () => UI.openSettings());
 
     panel = el('div', { id: 'panel' });
@@ -172,6 +173,36 @@
     window.addEventListener('pk:coins', () => { coinEl.textContent = U.fmt(PK.Platform.getCoins()); });
     UI.refreshPanel(true);
   };
+
+  // ---------- Menú progresivo ----------
+  // Cada botón aparece cuando tiene sentido (playtest: 14 botones desde el minuto 1, varios vacíos o bloqueados
+  // abrumaban). Una vez visto queda para siempre (flags.menu_<id>). Lo que aparece durante la partida brilla
+  // hasta que lo tocas; al cargar, lo que ya correspondía se muestra sin anuncio (también en partidas viejas).
+  // Cuartel siempre está: sus murallas (Defensa) sirven desde la Era I y una misión lo nombra.
+  const menuIds = {};
+  const MENU_VER = {
+    explore: (g, st) => g.countAll('scout') > 0 || st.era >= 2,
+    research: (g, st) => st.era >= 2 || g.countAll('library') > 0,
+    market: (g, st) => st.era >= 2 || g.countAll('market') > 0,
+    guild: (g, st) => g.countAll('guild') > 0 || (st.guild && st.guild.joined) || (PK.Net.online && st.era >= 2),
+    terr: (g, st) => st.era >= 2 || !!st.flags.verTerr,
+    logi: (g, st) => g.countAll('cartwright') > 0 || g.buildings.some(b => b.owner === 'p' && b.def.recipe) || !!(st.logi && st.logi.roads.length),
+    realms: (g, st) => !!PK.Net.online || D.BOTS.some(b => st.flags['seen_' + b.slot]),
+  };
+  let menuFirst = true;
+  function updateMenu() {
+    const g = G(), st = S(), nuevos = [];
+    for (const id in menuIds) {
+      const b = menuIds[id], ok = !!st.flags['menu_' + id] || MENU_VER[id](g, st);
+      if (ok && !st.flags['menu_' + id]) {
+        st.flags['menu_' + id] = 1;
+        if (!menuFirst) { b.classList.add('nuevo'); nuevos.push(b.getAttribute('aria-label')); }
+      }
+      b.style.display = ok ? '' : 'none';
+    }
+    menuFirst = false;
+    if (nuevos.length) UI.toast('Nuevo en el menú: ' + (nuevos.length > 1 ? nuevos.slice(0, -1).join(', ') + ' y ' + nuevos[nuevos.length - 1] : nuevos[0]) + '.', 'quest');
+  }
 
   let tHud = 0, tPanel = 0, tModal = 0, lastPanelKey = '';
   UI.update = function (dt) {
@@ -202,6 +233,7 @@
       netEl.textContent = net.online ? (net.lost ? '● Reconectando…' : '● ' + net.world.name) : '○ Modo local';
       netEl.title = net.online ? 'Conectado como ' + net.me.name + ' · ' + net.ping + ' ms' : 'Sin servidor: los demás reinos son simulados';
       updateEvent();
+      updateMenu();
       const n = PK.Quests.readyCount();
       bookDot.textContent = n || '';
       bookDot.style.display = n ? '' : 'none';
@@ -273,6 +305,8 @@
       out.push({ k: 'c' + b.id, icon: Sp.buildingIcon(b.type, 'p', 1), name: 'Obra: ' + b.def.name, left: ((1 - b.progress) * b.def.time) / g.buildMult('p'), pct: b.progress, b: null, go: () => UI.selectBuilding(b) });
     }
     out.sort((a, b) => a.left - b.left);
+    const inc = PK.Incursiones && PK.Incursiones.fila();
+    if (inc) out.unshift(Object.assign(inc, { raid: true, icon: Sp.icon('war'), go: () => PK.Incursiones.ver() }));
     // maestros sin trabajo: un recordatorio para que no queden parados
     const free = g.builders() - g.buildersBusy();
     if (free > 0 && g.buildings.some(b => b.owner === 'p' && b.done && !b.def.noUp && !b.upg && b.lvl < g.maxLvl(b.type))) out.push({ k: 'free' + free, idle: true, icon: Sp.icon('hammer'), name: free === 1 ? '1 maestro libre' : free + ' maestros libres', go: () => UI.openWorks() });
@@ -285,7 +319,7 @@
       qsEl.innerHTML = '';
       qsRows = shown.map(it => {
         const time = el('span', { class: 'qs-t' }), fill = el('i', { class: 'qs-fill' });
-        const row = el('div', { class: 'qs-item' + (it.idle ? ' idle' : ''), title: it.name, onclick: () => it.go() },
+        const row = el('div', { class: 'qs-item' + (it.idle ? ' idle' : '') + (it.raid ? ' raid' : ''), title: it.name, onclick: () => it.go() },
           el('img', { src: it.icon }), el('span', { class: 'qs-n' }, it.name), time, it.idle ? null : el('b', { class: 'qs-bar' }, fill));
         if (it.b && G().canNudge(it.b)) row.append(UI.btn('Empujón', () => { G().nudge(it.b); UI.refreshPanel(true); }, { small: true, cls: 'gold', title: 'Le queda menos de un minuto: termínala gratis' }));
         qsEl.append(row);
@@ -295,7 +329,7 @@
     }
     shown.forEach((it, i) => {
       if (it.idle) return;
-      qsRows[i].time.textContent = U.fmtTime(it.left);
+      qsRows[i].time.textContent = it.left === null ? '' : U.fmtTime(it.left); // la marcha de los bandidos no tiene reloj
       qsRows[i].fill.style.width = U.clamp(it.pct * 100, 0, 100) + '%';
     });
     qsEl.style.display = items.length ? '' : 'none';
@@ -480,6 +514,17 @@
       return el('div', { class: 'st' + (changed ? ' up' : '') }, el('span', null, label), el('b', null, fmt(a[k]) + (changed ? ' → ' + fmt(b[k]) : '')));
     }));
   };
+  // Horas extra (G.overtime): pagar con lo que sobra para adelantar el reloj. Sin nada que ofrecer, ''.
+  function overtimeRow(kind, b) {
+    const o = G().otInfo(kind, b);
+    if (!o) return '';
+    if (!o.avail) return o.n >= o.max ? el('p', { class: 'small muted' }, 'Horas extra: ya pagaste todas las de este reloj (' + o.max + ').') : '';
+    return el('div', { class: 'ot-row' },
+      UI.btn(el('span', null, 'Horas extra −' + U.fmtTime(o.skip) + ' ', UI.costEl(o.cost)), () => { G().overtime(kind, b); UI.refreshPanel(true); },
+        { small: true, cls: 'ot', disabled: !o.ok, title: 'Paga jornales con lo que te sobra para adelantar ' + (kind === 'era' ? 'el avance de era' : 'la mejora') + '. Cada vez cuesta un 30% más.' }),
+      el('span', { class: 'small muted' }, ' ' + o.n + '/' + o.max));
+  }
+
   function upgradeBox(b) {
     const g = G(), box = el('div', { class: 'up-box' });
     if (b.def.noUp) return null;
@@ -490,7 +535,8 @@
         el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (b.upg.t / b.upg.total) * 100 + '%' } }), el('span', null, U.fmtTime(left))),
         el('div', { class: 'row' }, g.canNudge(b) ? UI.btn('Empujón gratis', () => { g.nudge(b); UI.refreshPanel(true); }, { small: true, cls: 'gold', title: 'Le queda menos de un minuto: termínala ya, sin costo' })
           : UI.btn(el('span', null, 'Terminar ya ', UI.amount('coins', coins)), () => { g.speedUp(b); UI.refreshPanel(true); }, { small: true, cls: 'gold', disabled: PK.Platform.getCoins() < coins }),
-          UI.btn('Cancelar', () => { g.cancelUpgrade(b); UI.refreshPanel(true); }, { small: true })));
+          UI.btn('Cancelar', () => { g.cancelUpgrade(b); UI.refreshPanel(true); }, { small: true })),
+        overtimeRow('upg', b));
       return box;
     }
     if (b.lvl >= max) { box.append(el('p', { class: 'small muted' }, 'Nivel ' + b.lvl + ' de ' + max + ': es el máximo en la Era ' + U.roman(g.state.era) + '. Cada era permite 2 niveles más.')); return box; }
@@ -528,7 +574,8 @@
       const n = st.era + 1;
       if (st.eraProg) {
         act.append(el('div', { class: 'era-box' }, el('b', null, 'Avanzando a ' + D.eraName(st.eraProg.to)),
-          el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (st.eraProg.t / st.eraProg.total) * 100 + '%' } }), el('span', null, U.fmtTime(st.eraProg.total - st.eraProg.t)))));
+          el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (st.eraProg.t / st.eraProg.total) * 100 + '%' } }), el('span', null, U.fmtTime(st.eraProg.total - st.eraProg.t))),
+          overtimeRow('era', null)));
       } else {
         const checks = G().eraChecks(n), ok = checks.every(c => c.ok) && G().canAfford(D.eraCost(n));
         act.append(el('div', { class: 'era-box' },
@@ -1359,6 +1406,7 @@
           UI.btn('Terminar obras', () => { for (const b of G().buildings) if (b.upg) b.upg.t = b.upg.total; if (S().research) S().research.t = S().research.total; if (S().eraProg) S().eraProg.t = S().eraProg.total; G().updateTimers(0); }, { small: true }),
           UI.btn('Revelar mapa', () => { G().revealAt(W.W / 2, W.H / 2, W.W); }, { small: true }),
           UI.btn('Lobos', () => PK.Life.debug.spawnPack(), { small: true }),
+          UI.btn('Bandidos', () => { if (PK.Incursiones.activa()) PK.Incursiones.debug.atacar(); else PK.Incursiones.debug.ya(); }, { small: true }),
           UI.btn('Evento', () => PK.Life.debug.startEvent(), { small: true }),
           UI.btn('Simular 3h offline', () => { const rep = G().simulateOffline(3 * 3600); UI.closeModal(); UI.offlineReport(rep); }, { small: true })));
       }
