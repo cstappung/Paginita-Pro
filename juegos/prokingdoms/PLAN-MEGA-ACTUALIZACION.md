@@ -5,6 +5,12 @@
 - **Base:** una partida de prueba de ~1,5 h (Eras I a VI) y la lectura del código de `js/`, `server/` y `functions/`.
 - **Para qué sirve:** es la guía para implementar la actualización por partes. Cada fase es una entrega aparte (un PR, una versión `pk-N`). Para pedirla basta con decir «implementa la Fase 0 del plan de Pro Kingdoms».
 
+> **Decisiones del dueño (3 de noviembre de 2026).** Mandan sobre cualquier otra parte de este plan:
+> 1. **Se pueden reiniciar los mundos y las partidas** cuando haga falta. Los beta testers saben que pueden perder su reino. No hace falta escribir migraciones ni código de compatibilidad con partidas viejas.
+> 2. **Todo se implementa en línea de una vez.** El servidor (Cloud Function) es quien decide en todo lo que toca a otros jugadores. No hay que hacer primero una versión local simulada y después la en línea.
+> 3. **Las monedas del reino siguen separadas** de las monedas de Juegos (`monedas.js`).
+> 4. **Prestigio («Nueva Dinastía», V10): pendiente.** No se implementa hasta que el dueño lo decida (ver sección 13).
+
 ---
 
 ## Índice
@@ -76,18 +82,23 @@ En total son unas **40 a 55 sesiones** de trabajo de Claude Code, repartidas en 
 
 Hay que leerlas antes de cada fase. Salen del código y de `juegos/prokingdoms/CLAUDE.md`.
 
-1. **No subir `D.SAVE_V`.** `G.loadSave` (`js/game.js:1175`) descarta cualquier partida cuya versión no sea `D.SAVE_V`. Subirla **borraría el reino de todos los beta testers**.
-   - Todo lo nuevo entra con valores por defecto en `G.init`, como ya se hace con `S.ret`, `S.perks` o `S.decrees`: `S.heroes = S.heroes || []`.
-   - Si algún día hace falta una migración, `loadSave` tiene que aceptar la v3 y convertirla. Nunca devolver `null`.
-2. **No mover el mundo compartido.** `D.SEED`, `D.MAPV`, los `amount` de `D.NODES`, `D.ZONES` y el orden de generación de `world.js` también los usa el servidor (`server/sim.js` carga `util.js`, `data.js` y `world.js`).
-   - Cambiar `D.MAPV` reinicia los recursos compartidos del servidor.
-3. **Los lugares nuevos del mapa van al final y con su propio generador.** Los identificadores de los puntos de interés son su posición en `W.pois`, y las partidas guardan `S.pois` por ese número. Hay que hacerlo como las mazmorras: `drng = U.rng(seed + 9091)` después de todo lo demás (`world.js`, «con su propio generador y al final»).
-   - Insertar uno en medio corre todos los números y **corrompe los descubrimientos de cada partida**.
-4. **Todo bono nuevo tiene que caber en el antitrampas del servidor.** Esto vale para recolección, fuerza del ejército, defensa y producción.
+1. **Reiniciar está permitido, pero con orden** (decisión 1 del dueño).
+   - Subir `D.SAVE_V` es la forma de reiniciar las partidas. `G.loadSave` (`js/game.js:1175`) descarta la partida local de otra versión, y `main.js` hace lo mismo con la partida en la nube (`net.cloud.v`). Todos empiezan de cero.
+   - Para borrar también los mundos del servidor se usa el reinicio por versión de P1 (Fase 0).
+   - **Juntar los cambios que rompen:** cuantos menos reinicios, mejor. La sección 11 marca qué entregas reinician y propone agrupar todos los cambios de mapa en una sola.
+   - Avisar en el juego: al entrar después de un reinicio, un cartel «El mundo se reinició con la actualización …».
+   - Lo nuevo puede seguir entrando con valores por defecto en `G.init` (como `S.ret` o `S.perks`) cuando eso evita un reinicio. Donde este plan habla de «compatibilidad con partidas viejas», es **opcional**.
+2. **El mundo compartido se puede cambiar, pero cliente y servidor van juntos.** `D.SEED`, `D.MAPV`, los `amount` de `D.NODES`, `D.ZONES` y `world.js` los usa también el servidor (`server/sim.js` carga `util.js`, `data.js` y `world.js`).
+   - Si cambia el mapa, hay que subir `D.MAPV`. El servidor ya reinicia solo los recursos compartidos y los edificios de cada mundo (`sim.js`, líneas 68 a 74).
+   - **GitHub Pages publica al hacer merge, pero la Cloud Function se despliega a mano.** Si se desfasan, cliente y servidor ven mapas distintos. Por eso existe la versión de protocolo de P1: el servidor rechaza a un cliente de otra versión con un mensaje claro.
+3. **Los lugares nuevos del mapa:** los identificadores de los puntos de interés son su posición en `W.pois`, y las partidas guardan `S.pois` por ese número.
+   - En una entrega **con** reinicio (`D.SAVE_V` y `D.MAPV` nuevos), se pueden ubicar libremente.
+   - En una entrega **sin** reinicio, van al final y con su propio generador, como las mazmorras (`drng = U.rng(seed + 9091)` en `world.js`). Insertar uno en medio sin reiniciar corre todos los números y corrompe los descubrimientos.
+4. **Todo bono nuevo tiene que caber en el antitrampas del servidor**, en la misma entrega (decisión 2: todo en línea). Esto vale para recolección, fuerza del ejército, defensa y producción.
    - En `server/sim.js` están `LIM.slack` (2,5), `kindRate`, `armyMultMax` y `defMax`.
    - Si un bono nuevo (héroes, equipo, ánimo, estaciones, decoraciones) puede pasar ese margen, hay que actualizar `sim.js`.
    - Después hay que correr `node tools/cheat-test.js` y `cd functions && npm run prueba`, y avisar al dueño que **el despliegue es manual** (`firebase deploy --only functions`).
-5. **Las monedas del reino no son las monedas de Juegos** (`sitio.js`). La tienda cosmética de la Fase 3 usa monedas del reino. Conectarlas a `monedas.js` necesita al servidor (ver Decisiones).
+5. **Las monedas del reino siguen separadas de las monedas de Juegos** (decisión 3 del dueño). Nada de este plan llama a `monedas.js`. La tienda cosmética de la Fase 3 usa monedas del reino.
 6. **Caché.** En cada entrega hay que:
    - subir el `?v=pk-N` de **todos** los scripts de `index.html` y del CSS;
    - subir `PK_VER` en `colabtex/src/juegos/prokingdoms.js`;
@@ -161,7 +172,7 @@ Se hace primero y sola, porque dos de estos bugs dejan el pueblo parado. Tamaño
 - **Arreglo:**
   - En `gained()`, contar también por tipo: `G.stat('z_' + z.type, n)`, es decir `z_tree`.
   - La misión pasa a pedir `z_tree` con este texto: «Recolecta 300 de madera en un bosque común (una zona compartida con tus vecinos; primero tienes que descubrirla)».
-  - En `Quests.init`, completar `S.stats.z_tree` sumando los `z_<id>` de las zonas de bosque, para que no pierda progreso quien ya taló ahí.
+  - (Opcional si la entrega reinicia) En `Quests.init`, completar `S.stats.z_tree` sumando los `z_<id>` de las zonas de bosque, para que no pierda progreso quien ya taló ahí.
   - Cambiar la frase del chat «El Bosque Ancestral rebrota lento…» (`data.js:521`) por un bosque que exista.
 - **Prueba:** la prueba automática T3 recorre todas las misiones y falla si alguna pide una estadística que nadie registra. Con esa prueba, este bug se habría visto antes de publicar.
 
@@ -203,6 +214,20 @@ Se hace primero y sola, porque dos de estos bugs dejan el pueblo parado. Tamaño
   ```css
   .modal-body input[type=checkbox], .modal-body input[type=radio] { width: auto; padding: 0; }
   ```
+
+### P1. Herramientas para reiniciar y para desplegar sin desfase
+
+No son bugs, pero hacen falta antes de cualquier cambio que rompa (decisiones 1 y 2 del dueño).
+
+- **Reinicio por versión del mundo.** Una constante nueva `D.MUNDO_VER` en `js/data.js`.
+  - En `functions/store-rtdb.js`, `carga()` lee `prokingdoms/mundoVer`. Si no coincide, borra `prokingdoms/col`, `prokingdoms/partidas` y `prokingdoms/hayPartida`, y escribe la versión nueva. Lo mismo en `server/store.js` (servidor local, carpeta `server/data/`).
+  - Así, reiniciar es: subir `D.MUNDO_VER` (y `D.SAVE_V`) y desplegar. Sin tocar la consola de Firebase.
+  - Hay que borrar **antes** de que la instancia nueva acepte pedidos, y no tocar `prokingdoms/sospechas`.
+- **Versión de protocolo.** Una constante `D.PROTO` que el cliente manda en `POST /api/join`.
+  - Si no coincide con la del servidor, `join` responde un error propio («El servidor se está actualizando»).
+  - El cliente muestra ese mensaje en la pantalla de carga con un botón «Jugar sin conexión», en vez de entrar a un mundo con otro mapa.
+- **Cartel de reinicio.** Si hay datos de una partida vieja (otra `v`) en `localStorage`, mostrar una vez: «El mundo se reinició con la actualización …» con un resumen de novedades.
+- **Prueba:** con los emuladores, subir `D.MUNDO_VER` y comprobar que el mundo queda vacío. Con un cliente de otro `D.PROTO`, comprobar el mensaje.
 
 ### Cierre de la Fase 0
 
@@ -353,11 +378,11 @@ Hoy cada piso es «botón → esperar → batalla». La propuesta es convertir c
 3. **Jefes cada 5 pisos**, uno por tipo de mazmorra, con mecánicas reales en `js/batalla.js` (Anexo A2). Son el momento «épico» que hoy falta.
 4. **Modificadores semanales («afijos»).** Cada lunes, 2 afijos para todas las mazmorras; la clave es la semana (`weekKey` de quests). Ejemplos en el Anexo A3. Suben la dificultad y el botín.
 5. Los **recursos especiales** siguen saliendo como hoy, para que las Leyendas sigan funcionando. A eso se suman equipo y trofeos de jefe (sección nueva del Álbum: «Trofeos»).
-6. **Compatibilidad:** `site.best` sigue contando el piso máximo. Las partidas viejas siguen desde ahí y la incursión empieza en el bloque de 5 pisos que les toca.
+6. `site.best` sigue contando el piso máximo, y la incursión empieza en el bloque de 5 pisos que toca. (La compatibilidad con partidas viejas es opcional: ver regla 1.)
 
 ### H4. Mazmorras, enemigos y tropas nuevas (`pk-21`)
 
-Van como **capa nueva al final de `world.js`** (regla 3).
+Cambian el mapa, así que conviene ubicarlas en la **misma entrega que los lugares legendarios (H6)**, con un solo reinicio (regla 3 y sección 11).
 
 | Mazmorra | Era | Enemigo nuevo | Recurso especial | Estructura de Leyenda que desbloquea |
 |---|---|---|---|---|
@@ -417,7 +442,7 @@ Usan sprites que ya existen. Por ejemplo, el **balde** (`S.bucket`) sirve para e
 
 - Un jugador de la Era II tiene **al menos una decisión con consecuencias cada 10 minutos**: un encuentro, un evento con opciones, un camino de incursión o un talento.
 - Los jefes se pueden ganar con la compañía y las órdenes correctas, y se pierden ignorando la mecánica. Se mide con `B.adelantar` en 200 peleas por jefe.
-- Las partidas `pk-10` cargan sin perder nada y los POI viejos conservan su id.
+- Si la entrega no reinicia, las partidas anteriores cargan sin perder nada. Si reinicia, se subieron `D.SAVE_V`, `D.MAPV` y `D.MUNDO_VER`, y aparece el cartel de reinicio.
 
 ---
 
@@ -481,7 +506,7 @@ Tamaño: **L-XL (6-8 sesiones)**, `pk-19` y `pk-20`.
   - **Jardines Eternos**: recolección y ánimo;
   - **Gran Catedral**: investigación y reliquias.
 - Cada una tiene un sprite propio **más grande (5×5)**, con **etapas visibles** de construcción cada 5 niveles: andamios, cúpula, estatua, brillos.
-- La de hoy (4×4) sigue funcionando. Quien ya la tiene puede «transformarla» gratis en una de las cuatro, conservando su nivel.
+- La Maravilla de hoy (4×4) se reemplaza por estas cuatro. Sin reinicio, quien ya la tenga puede «transformarla» gratis en una de las cuatro, conservando su nivel.
 
 ### V7. Misiones con más sabor y desafíos
 
@@ -503,7 +528,10 @@ Tamaño: **L-XL (6-8 sesiones)**, `pk-19` y `pk-20`.
 - Con un barquito animado.
 - Abre una alternativa a las granjas y hace que los lagos sirvan para algo.
 
-### V10. Prestigio «Nueva Dinastía» (opcional, al final)
+### V10. Prestigio «Nueva Dinastía» (pendiente de decisión del dueño: no implementar todavía)
+
+**Qué es:** el reino se vuelve a fundar desde cero a cambio de bonos permanentes, que hacen la siguiente partida más rápida. Es el «ascender» de los juegos idle (Cookie Clicker, AdVenture Capitalist, Clicker Heroes). Es voluntario: nadie está obligado.
+
 
 - Desde la Era X se puede **fundar una nueva dinastía**: el reino vuelve a la Era I y se conservan los héroes, los cosméticos, el Álbum y la Crónica.
 - Se ganan **puntos de Legado** según la era y la Maravilla, que se gastan en un árbol permanente: +recolección, eras más rápidas, un héroe extra.
@@ -553,7 +581,7 @@ Tamaño: **L (4-5 sesiones)**, `pk-21`, junto con H4.
 
 ### C6. Rivales con ejércitos visibles
 
-- Desde la Era IV, los reinos simulados mandan **partidas de saqueo** que se ven marchar por el mapa, con aviso previo.
+- Desde la Era IV, los reinos que maneja el servidor (los bots de `sim.js`, que ya tienen ataques) mandan **partidas de saqueo** que se ven marchar por el mapa, con aviso previo. El servidor decide el ataque y el resultado, y el cliente lo dibuja.
 - Opciones: **pagar tributo**, **pelear** o **pedir ayuda a un aliado** (S1).
 - Los reinos con personalidad «Conquistador» lo hacen más seguido.
 
@@ -570,7 +598,11 @@ Tamaño: **L (4-5 sesiones)**, `pk-21`, junto con H4.
 
 ## 7. Fase 5: Mundo vivo y social
 
-Tamaño: **L-XL (6-8 sesiones)**, `pk-22` y siguientes. Todo se hace **primero en modo local** (simulado) y después en línea, con trabajo en el servidor.
+Tamaño: **L-XL (6-8 sesiones)**, `pk-22` y siguientes. Todo se hace **directamente en línea** (decisión 2 del dueño):
+
+- El servidor (`server/sim.js` y `server/index.js`, desplegados como Cloud Function) guarda el estado y valida cada acción, con límites diarios en `LIM`.
+- Los reinos que no son de jugadores ya los simula el servidor (los «bots» de cada mundo en `sim.js`), así que su diplomacia y sus ejércitos también corren allí.
+- Si el servidor no responde y el juego cae en modo local, estas funciones muestran «Requiere conexión» en vez de simularse en el navegador.
 
 ### S1. Diplomacia con los reinos
 
@@ -583,7 +615,7 @@ Tamaño: **L-XL (6-8 sesiones)**, `pk-22` y siguientes. Todo se hace **primero e
   - declarar rivalidad.
 - **Eventos diplomáticos:** bodas reales, embajadas, ultimátum, pedidos de ayuda.
 - La ventana Reinos pasa a ser una **ficha por reino** con escudo, personalidad, relación y acciones, en vez de una lista.
-- **En línea**, entre jugadores reales: rutas nuevas en `server/index.js` y `sim.js` (`diplo/propose`, `diplo/accept`), con límites diarios en `LIM`. Las reglas de conquista de `D.canConquer` respetan los pactos.
+- **Rutas nuevas** en `server/index.js` y `sim.js` (`diplo/propose`, `diplo/accept`, `diplo/gift`), con límites diarios en `LIM`. El servidor responde por los bots según su personalidad. Las reglas de conquista de `D.canConquer` respetan los pactos.
 
 ### S2. Rutas comerciales
 
@@ -594,8 +626,8 @@ Tamaño: **L-XL (6-8 sesiones)**, `pk-22` y siguientes. Todo se hace **primero e
 
 - «El Leviatán del Lago Grande» (u otro distinto cada semana) tiene **vida compartida**. Cada miembro manda expediciones y su daño suma.
 - Premios por tramos de daño total y por aporte personal.
-- En local, los miembros simulados (`D.GUILD_MEMBERS`) aportan.
-- En línea, una ruta `guilds/boss` en `sim.js`. El daño de cada envío se valida con la fuerza que el servidor ya conoce del jugador (`armyMultMax`).
+- Una ruta `guilds/boss` en `sim.js`. El daño de cada envío se valida con la fuerza que el servidor ya conoce del jugador (`armyMultMax`).
+- Si el gremio tiene pocos miembros reales, el servidor suma aportes de miembros simulados, como hoy hace el ayudante `D.GUILD_APPRENTICE`.
 
 ### S4. Visitar reinos
 
@@ -605,13 +637,14 @@ Tamaño: **L-XL (6-8 sesiones)**, `pk-22` y siguientes. Todo se hace **primero e
 ### S5. Rankings y torneos
 
 - **Categorías:** era, nivel de la Maravilla, piso más profundo, defensas ganadas y mayor jefe de gremio derrotado.
+- La foto que manda cada sync suma esos datos, y el servidor los acota como ya hace con la era (no puede subir más rápido de lo posible).
 - **Títulos semanales**, por ejemplo «Señor de las Profundidades».
 
 ### S6. Costos del servidor
 
 - Mantener el sync cada 15 s y meter lo nuevo **dentro del mismo pedido**.
 - Hay que medir el tamaño medio de la foto antes y después. La meta es no subir más del 20%.
-- Revisar `FIREBASE.md` con los números nuevos antes de activar S1 a S4 en línea.
+- Revisar `FIREBASE.md` con los números nuevos antes de publicar S1 a S4.
 
 ---
 
@@ -763,26 +796,28 @@ Se mide con el piloto (T1), jugando sin trucos. Las cifras de «hoy» salen de l
 
 ## 11. Orden de trabajo y versiones
 
-| # | Entrega | Contenido | Depende de | Tamaño |
-|---|---|---|---|---|
-| 1 | `pk-11` | **Fase 0**: bugs B1 a B8 y prueba T3 inicial | — | S-M |
-| 2 | `pk-12` | Partir `ui.js` (T5) y piloto (T1, T2) | 1 | M |
-| 3 | `pk-13` | **Fase 1**: A1, A2, A5, A6, A7 | 1, 2 | L |
-| 4 | `pk-14` | Salón del Consejo y consejeros (A3), exploración dirigida (A4) | 3 | M-L |
-| 5 | `pk-15` | **Héroes** (H1) y héroes en batalla (C2) | 2 | XL |
-| 6 | `pk-16` | **Mazmorras 2.0** con jefes y afijos (H3), escala visual de batalla (C3) | 5 | XL |
-| 7 | `pk-17` | Viajes, encuentros, eventos con opciones y mapas del tesoro (H2, H7, H8) | 5 | L |
-| 8 | `pk-18` | **Campaña** y lugares legendarios (H5, H6) | 5, 7 | L |
-| 9 | `pk-19` | Árbol 2.0, cartas de era y estaciones (V1, V2, V3) | 1 | L |
-| 10 | `pk-20` | Ánimo, decoraciones, cercanía, Maravillas 2.0, muelle, desafíos y tienda (V4 a V9) | 9 | L |
-| 11 | `pk-21` | **Combate 2.0** (C1, C4 a C8) y mazmorras, enemigos y tropas nuevos (H4) | 6 | L-XL |
-| 12 | `pk-22` y más | **Mundo vivo** (S1 a S5), primero local y después en línea con el servidor | 5, 11 | XL |
-| — | (en paralelo) | **Fase 6**: menú agrupado, tutorial, celular, música y accesibilidad | 2 | M-L |
-| — | (al final, opcional) | Prestigio «Nueva Dinastía» (V10) | 9, 10 | M |
+| # | Entrega | Contenido | Depende de | Tamaño | ¿Reinicia? |
+|---|---|---|---|---|---|
+| 1 | `pk-11` | **Fase 0**: bugs B1 a B8, herramientas de reinicio y protocolo (P1) y prueba T3 inicial | — | M | No (deja listo P1) |
+| 2 | `pk-12` | Partir `ui.js` (T5) y piloto (T1, T2) | 1 | M | No |
+| 3 | `pk-13` | **Fase 1**: A1, A2, A5, A6, A7 | 1, 2 | L | No |
+| 4 | `pk-14` | Salón del Consejo y consejeros (A3), exploración dirigida (A4) | 3 | M-L | No |
+| 5 | `pk-15` | **Héroes** (H1) y héroes en batalla (C2) | 2 | XL | Opcional |
+| 6 | `pk-16` | **Mazmorras 2.0** con jefes y afijos (H3), escala visual de batalla (C3) | 5 | XL | Opcional |
+| 7 | `pk-17` | Viajes, encuentros, eventos con opciones y mapas del tesoro (H2, H7, H8) | 5 | L | No |
+| 8 | `pk-18` | **Campaña**, lugares legendarios y **todo el mapa nuevo** de una vez: lugares de H6, mazmorras de H4 y lugares únicos de la campaña (H5) | 5, 7 | L-XL | **Sí: el reinicio grande** |
+| 9 | `pk-19` | Árbol 2.0, cartas de era y estaciones (V1, V2, V3) | 1 | L | No |
+| 10 | `pk-20` | Ánimo, decoraciones, cercanía, Maravillas 2.0, muelle, desafíos y tienda (V4 a V9) | 9 | L | Opcional |
+| 11 | `pk-21` | **Combate 2.0** (C1, C4 a C8), enemigos y tropas de H4 (las mazmorras ya están en el mapa desde `pk-18`) | 6, 8 | L-XL | No |
+| 12 | `pk-22` y más | **Mundo vivo** (S1 a S5), directo en línea con el servidor | 5, 11 | XL | Opcional |
+| — | (en paralelo) | **Fase 6**: menú agrupado, tutorial, celular, música y accesibilidad | 2 | M-L | No |
+| — | (pendiente de decisión) | Prestigio «Nueva Dinastía» (V10) | 9, 10 | M | — |
 
 Notas:
 
 - Los números `pk-N` son orientativos. Lo obligatorio es subir la versión en cada entrega (regla 6).
+- «Opcional» en la última columna quiere decir que se puede reiniciar si simplifica el trabajo, aprovechando la decisión 1 del dueño. Si dos entregas seguidas iban a reiniciar, conviene juntarlas en un solo reinicio.
+- **Toda entrega que toque el servidor termina con el despliegue manual de la función** (`firebase deploy --only functions`) justo al hacer merge, para que cliente y servidor no se desfasen (regla 2).
 - Las entregas 5 a 8 son la «mega actualización» propiamente dicha. Si hay que recortar, el orden de valor es **Héroes → Mazmorras 2.0 → Campaña → Viajes**.
 - La Fase 0 no espera a nada: es la siguiente sesión.
 
@@ -790,7 +825,7 @@ Notas:
 
 ## 12. Lista de control de cada entrega
 
-- [ ] Una partida guardada en la versión anterior carga sin perder nada: recursos, edificios, POI descubiertos, misiones y héroes.
+- [ ] **Sin reinicio:** una partida guardada en la versión anterior carga sin perder nada. **Con reinicio:** se subieron `D.SAVE_V`, `D.MAPV` (si cambió el mapa) y `D.MUNDO_VER`, el mundo del servidor queda vacío en los emuladores y aparece el cartel de reinicio.
 - [ ] Una partida nueva llega a la Era II sin errores en la consola.
 - [ ] El informe «Mientras no estabas» después de 12 h simuladas (`?dev` → «Simular 3h offline», cuatro veces) da números razonables.
 - [ ] `node tools/cheat-test.js` pasa si se tocó algo que el servidor ve.
@@ -800,19 +835,28 @@ Notas:
 - [ ] Subido `?v=pk-N` en `index.html` y `PK_VER` en `colabtex/src/juegos/prokingdoms.js`, y corrido `npm run build`.
 - [ ] Anotadas en `juegos/prokingdoms/CLAUDE.md` las decisiones nuevas, en pocas líneas.
 - [ ] El piloto (T1) corre y anota los tiempos de era. Comparar con la entrega anterior.
-- [ ] Si se tocó el servidor: aviso al dueño de que debe desplegar a mano.
+- [ ] Si se tocó el servidor: `D.PROTO` subido si cambió algo que ven los dos lados, y aviso al dueño de que debe desplegar la función a mano justo al hacer merge.
 
 ---
 
 ## 13. Decisiones que debe tomar el dueño
 
-1. **Monedas del reino.** ¿Siguen solo dentro del juego (como hoy) o se conectan a la economía de Juegos? Conectarlas exige que el servidor las valide, más un `ganadoDe` y reglas nuevas (ver `perfiles-y-economia.md`). Recomendación: **seguir aparte** durante esta actualización.
-2. **Prestigio (V10).** ¿Sí o no? Es muy de juegos «idle», pero hace que la era baje y afecta el ranking. Recomendación: **dejarlo para el final** y decidir con datos.
-3. **Consumo de comida en invierno (V3).** ¿Bonos suaves o consumo real? Recomendación: **bonos suaves**, para no castigar al que se va 12 horas.
-4. **Local primero o en línea primero** para la diplomacia y el jefe de gremio. Recomendación: **local primero**, porque se prueba sin costo de servidor.
-5. **Tope de héroes:** 6 por reino. ¿Más con la tienda? Recomendación: **no** vender héroes, solo cosméticos.
-6. **Nombre de la actualización:** «Héroes y Fronteras» es una propuesta.
-7. **Fin de la beta cerrada:** ¿se abre a todos con esta actualización (quitar `beta: true` en `SOLOS`)? Recomendación: después de la entrega 8, cuando el juego tenga héroes, mazmorras 2.0 y campaña.
+**Ya decididas (3 de noviembre de 2026):**
+
+- **Reinicios:** permitidos cuando hagan falta (regla 1).
+- **Monedas del reino:** siguen separadas de las de Juegos.
+- **En línea:** todo se implementa en línea de una vez, sin una versión local previa.
+
+**Pendientes:**
+
+1. **Prestigio «Nueva Dinastía» (V10).** ¿Sí o no?
+   - *A favor:* da una meta cuando las eras ya tardan días, y deja probar otras elecciones (cartas, Maravilla, árbol) en una partida nueva.
+   - *En contra:* a algunos jugadores no les gusta empezar de cero. En línea, la era baja, lo que mueve el ranking y el emparejamiento de conquistas (`D.canConquer` usa era y poder) y obliga a revisar el antitrampas de la era (`vera`, `LIM.eraGap`).
+   - Recomendación: **decidir cuando los primeros jugadores lleguen a la Era X**. Hasta entonces no se implementa.
+2. **Consumo de comida en invierno (V3).** ¿Bonos suaves o consumo real? Recomendación: **bonos suaves**, para no castigar al que se va 12 horas.
+3. **Tope de héroes:** 6 por reino. ¿Más con la tienda? Recomendación: **no** vender héroes, solo cosméticos.
+4. **Nombre de la actualización:** «Héroes y Fronteras» es una propuesta.
+5. **Fin de la beta cerrada:** ¿se abre a todos con esta actualización (quitar `beta: true` en `SOLOS`)? Recomendación: después de la entrega 8, que trae el reinicio grande, para que todos empiecen juntos en el mundo nuevo.
 
 ---
 
