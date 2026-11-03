@@ -387,10 +387,82 @@
     if (walkable(Math.floor(u.x), Math.floor(u.y + dy + Math.sign(dy) * 0.2))) u.y += dy;
   }
 
+  // ---------- Rescate de aldeanos atrapados ----------
+  // Un aldeano puede quedar sobre una casilla que se bloqueó después (una muralla trazada encima, un árbol que
+  // volvió a crecer, el recurso de un evento, un tocón que el servidor revivió) o encerrado en un hueco sin
+  // salida (murallas sin puerta, edificios, árboles). Desde ahí A* no encuentra nada y se quedaba quieto para
+  // siempre. Cada segundo se revisa: si está sobre algo bloqueado, sale a la casilla libre más cercana; si
+  // lleva un rato sin moverse fuera de la región de su Centro Urbano, vuelve a ella. Fuera de esa región solo
+  // se puede estar encerrado: todo lo que se conecta con el Centro Urbano es la misma región.
+  const homeCache = new Map();
+  function homeRegions(owner) {
+    const t = G().time, c = homeCache.get(owner);
+    if (c && t >= c.t && t - c.t < 1) return c.set;
+    const set = new Set(), small = new Set();
+    for (const b of G().buildings) {
+      if (b.owner !== owner || b.type !== 'tc') continue;
+      for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) {
+        if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) continue;
+        const l = W.regionAt(x, y);
+        if (l) (W.regionSize(l) >= 30 ? set : small).add(l);
+      }
+    }
+    const out = set.size ? set : small;
+    homeCache.set(owner, { t, set: out });
+    return out;
+  }
+  // Casilla libre más cercana; con home, solo las de esas regiones (o con castigo si soft).
+  function escapeTile(u, home, soft) {
+    const cx = Math.floor(u.x), cy = Math.floor(u.y);
+    let best = null, bd = 1e9;
+    for (let r = 1; r <= 48; r++) {
+      if (best && r > bd + 1) break;
+      for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== r || !W.passable(x, y)) continue;
+        const l = W.regionAt(x, y), inHome = !home.size || home.has(l);
+        if (!inHome && !soft) continue;
+        if (!inHome && W.regionSize(l) < 30) continue; // tampoco a otro hueco chico
+        const d = Math.hypot(x + 0.5 - u.x, y + 0.5 - u.y) + (inHome ? 0 : 4);
+        if (d < bd) { bd = d; best = [x, y]; }
+      }
+    }
+    if (best) return best;
+    const tc = G().buildings.find(b => b.owner === u.owner && b.type === 'tc');
+    return tc ? W.freeAround(tc.x, tc.y, tc.x + tc.w - 1, tc.y + tc.h - 1, tc.x + tc.w, tc.y + tc.h) : null;
+  }
+  function rescue(u, home, soft) {
+    const p = escapeTile(u, home, soft);
+    if (!p) return;
+    const far = Math.hypot(p[0] + 0.5 - u.x, p[1] + 0.5 - u.y) > 3;
+    if (far && u.owner === 'p' && PK.Render.burst) PK.Render.burst(u.x, u.y, null, 8);
+    u.x = p[0] + 0.5; u.y = p[1] + 0.5;
+    if (far && u.owner === 'p' && PK.Render.burst) PK.Render.burst(u.x, u.y, null, 8);
+    u.path = []; u.fails = 0; u.wait = 0; u.hugId = null; u.pchk = -1;
+    u.stX = u.x; u.stY = u.y; u.stS = 0;
+    if (u.task && u.task.t === 'move') u.task = null;
+  }
+  function unstick(u, dt) {
+    u.stT = (u.stT || 0) + dt;
+    if (u.stT < 1) return;
+    const el = u.stT;
+    u.stT = 0;
+    if (!walkable(Math.floor(u.x), Math.floor(u.y))) { rescue(u, homeRegions(u.owner), true); return; }
+    if (u.kind === 'cart') return; // las carretas tienen su propia lógica de caminos
+    if (u.stX === undefined || Math.abs(u.x - u.stX) + Math.abs(u.y - u.stY) > 0.6 || u.mode === 'work') {
+      u.stX = u.x; u.stY = u.y; u.stS = 0; return;
+    }
+    u.stS += el;
+    if (u.stS < (u.fails > 3 ? 2 : 6)) return;
+    u.stS = 0;
+    const home = homeRegions(u.owner), l = W.regionAt(Math.floor(u.x), Math.floor(u.y));
+    if (home.size && !home.has(l)) rescue(u, home, false);
+  }
+
   function update(u, dt) {
     u.anim += dt;
     if (u.remote) { remoteStep(u, dt); return; }
     if (u.inside) return;
+    unstick(u, dt);
     if (u.scared > 0) { // huye de los lobos hacia el Centro Urbano
       u.scared -= dt;
       if (u.scared <= 0) { u.path = []; u.fails = 0; return; } // pasó el susto: vuelve a lo suyo sin terminar la huida

@@ -132,3 +132,10 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Map events** have a banner that shrinks to a pill (✕, after 15 s, or always
   with Opciones → «Eventos achicados», `flags.evMin`). Toasts close on tap.
   Chests open with `UI.chestReveal`.
+- **Trapped villagers get rescued** (`unstick` in `entities.js`, every second).
+  On a tile that became blocked (a wall drawn over them, a tree regrown or
+  revived by the server, an event node), they step to the nearest free tile.
+  Standing still for 6 s (2 s after failed paths) outside the region of their
+  Centro Urbano (`W.regionAt`) means enclosed, so they jump back to it. Never
+  rescue by distance or by path failures alone: a villager in its home region
+  is never trapped, only waiting.

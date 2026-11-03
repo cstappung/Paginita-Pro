@@ -135,6 +135,7 @@
       const x = Math.floor(hx + (Math.random() - 0.5) * 24), y = Math.floor(hy + (Math.random() - 0.5) * 24);
       if (!W.explored(x, y) || !W.passable(x, y) || (W.zoneAt[W.idx(x, y)] >= 0 && W.zones[W.zoneAt[W.idx(x, y)]].common)) continue;
       if (G().buildings.some(b => b.owner === 'p' && U.dist(b.cx, b.cy, x, y) < 3)) continue;
+      if (G().units.some(u => !u.inside && Math.floor(u.x) === x && Math.floor(u.y) === y)) continue; // no encima de un aldeano
       const n = { id: W.nodes.length, kind, x, y, amount, max: amount, zone: -1, v: Math.floor(Math.random() * 4), dead: false, t: 0, temp: true };
       W.nodes.push(n); W.nodeAt[W.idx(x, y)] = n.id; W.block[W.idx(x, y)] = 1; W.bucket(n);
       return n;
