@@ -401,6 +401,7 @@
     if (PK.Terr.mode) drawTerritory(ctx, vx0, vy0, vw, vh);
 
     // barras de progreso y marcas
+    const puertas = g.encierro && g.encierro.puertas.length ? new Set(g.encierro.puertas) : null;
     for (const it of list) {
       if (it.k === 'building') {
         const b = it.o;
@@ -420,7 +421,14 @@
           const inFill = Math.min(...Object.keys(r.in).map(k => ((b.inb && b.inb[k]) || 0) / cap));
           bar(ctx, cx - 12, cy + 5, 11, inFill, '#7ad070');
           bar(ctx, cx + 1, cy + 5, 11, ((b.outb && b.outb[out]) || 0) / cap, '#f0b040');
-          if (b.status === 'Faltan insumos' || b.status === 'Depósito de salida lleno') { ctx.fillStyle = '#ff5040'; ctx.fillRect(Math.round(cx) - 1, cy - 8, 2, 5); ctx.fillRect(Math.round(cx) - 1, cy - 2, 2, 1); }
+          if (b.status === 'Faltan insumos' || b.status === 'En reserva' || b.status === 'Depósito de salida lleno') { ctx.fillStyle = '#ff5040'; ctx.fillRect(Math.round(cx) - 1, cy - 8, 2, 5); ctx.fillRect(Math.round(cx) - 1, cy - 2, 2, 1); }
+        }
+        // Centro Urbano encerrado (G.checkEncierro): una flecha roja sobre los edificios que, movidos o demolidos,
+        // abren el patio. Va sobre el techo porque un contorno en el suelo lo tapaba el propio edificio.
+        if (puertas && puertas.has(b.id)) {
+          const ax = Math.round(it.x + it.spr.c.width / 2), ay = Math.round(it.y + techo(it.spr) - 3 + 2 * Math.sin(performance.now() / 180));
+          ctx.fillStyle = '#2a0a06'; ctx.fillRect(ax - 6, ay - 7, 13, 4); for (let k = 0; k < 5; k++) ctx.fillRect(ax - 5 + k, ay - 3 + k, 11 - 2 * k, 1);
+          ctx.fillStyle = '#ff4a3a'; ctx.fillRect(ax - 5, ay - 6, 11, 2); for (let k = 0; k < 4; k++) ctx.fillRect(ax - 4 + k, ay - 4 + k, 9 - 2 * k, 1);
         }
         if (b.owner === 'p' && b.done && !b.def.noUp) labels.push([it.x + it.spr.c.width / 2, it.y + it.spr.c.height - 2, b.lvl, !!b.upg]);
       } else if (it.k === 'wolf' && it.o.hp < it.o.max) {
@@ -671,6 +679,17 @@
     }
   }
 
+  // Primera fila con dibujo de un sprite (el lienzo tiene aire arriba): se calcula una vez por sprite.
+  function techo(spr) {
+    if (spr._techo === undefined) {
+      spr._techo = spr.pad || 0;
+      try {
+        const c = spr.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        fila: for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 40) { spr._techo = y; break fila; }
+      } catch (e) { /* lienzo sin acceso: queda pad */ }
+    }
+    return spr._techo;
+  }
   function drawBuilding(ctx, it) {
     const b = it.o, spr = it.spr;
     if (b.done) {

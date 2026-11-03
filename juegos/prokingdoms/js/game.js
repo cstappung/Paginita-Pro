@@ -29,7 +29,7 @@
 
   G.init = function (save) {
     W.generate(D.SEED);
-    G.units = []; G.buildings = []; G.uById.clear(); G.bById.clear();
+    G.units = []; G.buildings = []; G.uById.clear(); G.bById.clear(); G.encierro = null;
     S = G.state = save || G.newState();
     S.slot = D.MY_SLOT;
     S.inboxAck = S.inboxAck || 0;
@@ -64,6 +64,7 @@
       if (!b.def.walkable) W.block[k] = 2;
     }
     if (owner === 'p') capsDirty = true;
+    G.blockVer++;
     return b;
   };
   G.removeBuilding = function (b) {
@@ -77,6 +78,7 @@
     G.buildings.splice(G.buildings.indexOf(b), 1);
     G.bById.delete(b.id);
     if (b.owner === 'p') capsDirty = true;
+    G.blockVer++;
     if (G.sel && G.sel.type === 'building' && G.sel.id === b.id) G.sel = null;
   };
   // Edificio de otro jugador: no pisa lo que ya existe y empuja fuera a quien esté parado encima.
@@ -168,7 +170,7 @@
     for (const p of W.pois) { const st = S.pois[p.id]; if (st && st.d && p.kind === 'camp') W.poiFree(p); }
     for (const o of save.buildings || []) {
       const b = G.addBuilding(o.type, 'p', o.x, o.y, o.done, o.id, false, o.lvl);
-      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {} });
+      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva });
       if (b.done) W.reveal(b.cx, b.cy, G.sight(b));
     }
     for (const o of save.units || []) G.addUnit(o);
@@ -321,7 +323,8 @@
     G.stat('g_' + res, n); G.stat('g_total', n);
     if (hunt) G.stat('hunt', n);
     const z = zone >= 0 ? W.zones[zone] : null;
-    if (z && z.common) { G.stat('z_' + z.id, n); G.stat('g_common', n); }
+    // por zona y también por tipo (z_tree): la misión «Al bosque común» pedía z_forest, que nadie registraba
+    if (z && z.common) { G.stat('z_' + z.id, n); if (z.type) G.stat('z_' + z.type, n); G.stat('g_common', n); }
   }
 
   G.deposit = function (u, b) {
@@ -629,12 +632,26 @@
   };
   // Los talleres no gastan un insumo por debajo de la reserva que fija el Capataz (parte de la bodega),
   // así no dejan al reino sin madera ni piedra para construir. Si lo que fabrican escasea, la reserva baja.
-  G.reserveOk = function (cost, out) {
+  // Con «Producir igual» (b.sinReserva) ese taller la ignora.
+  G.reserveOk = function (cost, out, b) {
+    if (b && b.sinReserva) return true;
     let rv = S.auto ? S.auto.reserve || 0 : 0;
     if (out && S.res[out] < 0.05 * G.cap(out)) rv /= 3;
     for (const k in cost) if (S.res[k] - cost[k] < rv * G.cap(k)) return false;
     return true;
   };
+  // ¿El taller está parado por la reserva? El primer insumo que retiene ({res, have, keep}) o null. Antes solo
+  // decía «Sin trabajadores» y la Fundición quedaba vacía con 1.650 de hierro (B4 del plan).
+  G.reservaDe = function (b) {
+    if (!b || !b.def.recipe || b.sinReserva) return null;
+    const rc = D.RECIPES[b.def.recipe], out = Object.keys(rc.out)[0];
+    let rv = S.auto ? S.auto.reserve || 0 : 0;
+    if (!rv) return null;
+    if (S.res[out] < 0.05 * G.cap(out)) rv /= 3;
+    for (const k in rc.in) { const keep = rv * G.cap(k); if (S.res[k] - rc.in[k] < keep) return { res: k, have: S.res[k], keep }; }
+    return null;
+  };
+  G.reservaText = r => 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
   G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')); // por minuto
 
   // ---------- Órdenes ----------
@@ -751,7 +768,8 @@
 
   G.spawnUnit = function (b, kind) {
     const tx = b.rally && b.rally.kind === 'tile' ? b.rally.x : b.x + b.w + 1, ty = b.rally && b.rally.kind === 'tile' ? b.rally.y : b.y + b.h + 1;
-    const p = W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, tx, ty, occupied);
+    // con el Centro Urbano encerrado, «sale por la puerta de atrás»: nace en la casilla libre más cercana de afuera
+    const p = (b.owner === 'p' && G.encierro && W.nearestInRegion(b.cx, b.cy, G.encierro.out, 48)) || W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, tx, ty, occupied);
     const u = G.addUnit({ owner: b.owner, x: p[0] + 0.5, y: p[1] + 0.5, kind });
     if (b.owner !== 'p' || kind === 'cart') return u;
     if (kind === 'scout') { u.task = { t: 'explore' }; G.stat('scouts_trained', 1); return u; }
@@ -804,8 +822,81 @@
       const o = W.ownerAt(tx, ty);
       if (o !== 'p' && !(G.OUTPOST[type] && !o)) return o ? 'ajeno' : 'libre';
     }
+    if (G.encierra(type, x, y, ignorar)) return 'encierra';
     return null;
   };
+  // ¿Ese edificio encerraría al Centro Urbano? (B2 del plan: un patio cerrado por casas dejó 93 de 154 aldeanos
+  // parados). Compara cuánto se camina desde el borde de los Centros Urbanos antes y después: si se pierde
+  // algo más que el propio edificio y un hueco chico, y lo que queda es poco, lo cierra. Un pueblo que ya
+  // estaba cerrado (murallas sin puerta) no se traba: solo cuenta lo que este edificio corta. Se recuerda
+  // 150 ms por lugar porque el fantasma lo pregunta en cada movimiento del puntero.
+  G.blockVer = 0;
+  let encBefore = null, encMemo = new Map();
+  G.encierra = function (type, x, y, ignorar) {
+    const def = D.BUILD[type];
+    if (!def || def.walkable) return false;
+    const tcs = G.buildings.filter(b => b.owner === 'p' && b.type === 'tc' && b.id !== ignorar);
+    if (!tcs.length) return false;
+    const now = Date.now(), key = type + ',' + x + ',' + y + ',' + ignorar;
+    const m = encMemo.get(key);
+    if (m && m.v === G.blockVer && now - m.t < 150) return m.r;
+    if (encMemo.size > 200) encMemo.clear();
+    const rects = tcs.map(b => [b.x, b.y, b.w, b.h]);
+    if (!encBefore || encBefore.v !== G.blockVer || now - encBefore.t > 2000) encBefore = { v: G.blockVer, t: now, n: W.reachCount(rects) };
+    const tapa = [], libre = [];
+    for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) tapa.push(W.idx(x + i, y + j));
+    const mv = ignorar !== undefined && G.bById.get(ignorar);
+    if (mv) for (let j = 0; j < mv.h; j++) for (let i = 0; i < mv.w; i++) libre.push(W.idx(mv.x + i, mv.y + j));
+    const antes = encBefore.n + libre.length, tope = Math.min(antes - tapa.length - 30, Math.max(600, antes * 0.5));
+    const r = tope > 0 && W.reachCount(rects, tapa, libre, tope) < tope;
+    encMemo.set(key, { v: G.blockVer, t: now, r });
+    return r;
+  };
+  // Si igual quedó encerrado (una partida de antes, árboles que rebrotaron, murallas), se detecta cada 5 s:
+  // las regiones que tocan el Centro Urbano son chicas, no queda ningún recurso a su alcance y afuera hay
+  // tierra grande. G.encierro = { out: la región de afuera, puertas: los edificios que tocan el patio y el
+  // exterior a la vez (mover o demoler uno de ellos abre el paso) }. Con eso los aldeanos nuevos nacen afuera
+  // (spawnUnit), el rescate los saca hacia afuera (entities.js) y el aviso de ociosos no dice «explora».
+  G.encierro = null;
+  let encAvisoT = -1e9;
+  G.checkEncierro = function () {
+    const prev = G.encierro;
+    G.encierro = encierroAhora();
+    S.flags.encerrado = G.encierro ? 1 : 0;
+    if (G.offline || !PK.UI) return;
+    if (G.encierro && (!prev || Date.now() - encAvisoT > 180000)) {
+      encAvisoT = Date.now();
+      const n = G.encierro.puertas.length;
+      toast('Tu Centro Urbano quedó encerrado por edificios. ' + (n ? 'Mueve o demuele uno de los marcados en rojo.' : 'Abre una puerta en la muralla o despeja el paso.'), 'warn',
+        n ? { label: 'Ver edificios', fn: G.verPuertas } : null);
+    } else if (!G.encierro && prev) toast('Tu Centro Urbano volvió a tener salida.', 'good');
+  };
+  G.verPuertas = function () {
+    const b = G.encierro && G.bById.get(G.encierro.puertas[0]);
+    if (!b) return;
+    G.sel = { type: 'building', id: b.id };
+    PK.Render.centerOn(b.cx, b.cy);
+    if (PK.UI) PK.UI.refreshPanel(true);
+  };
+  function encierroAhora() {
+    const tcs = G.buildings.filter(b => b.owner === 'p' && b.type === 'tc');
+    if (!tcs.length) return null;
+    // las casillas que tocan el edificio por un lado (no las esquinas: se camina en 4 direcciones, como las regiones)
+    const ring = (b, fn) => { for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) if (((x < b.x || x >= b.x + b.w) !== (y < b.y || y >= b.y + b.h)) && W.inb(x, y)) fn(W.regionAt(x, y)); };
+    const casa = new Set();
+    for (const b of tcs) ring(b, l => { if (l) casa.add(l); });
+    const big = W.biggestRegion();
+    if (casa.has(big.l) || big.n < 600 || [...casa].some(l => W.regionSize(l) >= 600)) return null;
+    if (casa.size) for (const n of W.nodes) if (!n.dead && W.fog[W.idx(n.x, n.y)] && W.canUse(n, 'p') && W.reachable(n, casa)) return null; // todavía hay qué recolectar adentro
+    const puertas = [];
+    for (const b of G.buildings) {
+      if (b.owner !== 'p' || b.type === 'tc' || b.def.walkable) continue;
+      let adentro = false, afuera = false;
+      ring(b, l => { if (casa.has(l)) adentro = true; else if (l === big.l) afuera = true; });
+      if (adentro && afuera) puertas.push(b.id);
+    }
+    return { out: big.l, puertas };
+  }
   G.canPlace = (type, x, y, ignorar) => !G.placeWhy(type, x, y, ignorar);
   // Por qué no se puede: antes en la computadora solo decía «No se puede construir ahí».
   G.placeText = why => {
@@ -819,6 +910,7 @@
     agua: 'No se puede construir sobre el agua.',
     ocupado: 'Ahí hay algo (árboles, rocas, un edificio, una cinta o una muralla): busca un lugar despejado.',
     fuera: 'Eso queda fuera del mapa.',
+    encierra: 'Así encerrarías a tu pueblo: deja al menos una casilla de paso.',
   };
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }
@@ -863,7 +955,7 @@
     if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }
     const ox = b.cx, oy = b.cy;
-    b.x = x; b.y = y; b._nsT = null;
+    b.x = x; b.y = y; b._nsT = null; G.blockVer++;
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) {
       const k = W.idx(x + i, y + j);
       W.bAt[k] = b.id;
@@ -1019,7 +1111,7 @@
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
     PK.Social.update(dt, false);
     regrowT += dt;
-    if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); }
+    if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); }
     questT += dt;
     if (questT > 1) { questT = 0; PK.Quests.check(); }
   };
@@ -1172,7 +1264,11 @@
   G.loadSave = function () {
     const s = U.store.get(SAVE_KEY);
     if (!s) return null;
-    try { const o = JSON.parse(s); return o && o.v === D.SAVE_V ? o : null; } catch (e) { return null; }
+    try {
+      const o = JSON.parse(s);
+      if (o && o.v !== D.SAVE_V) G.reinicioDe = o.v; // para el cartel «El mundo se reinició…» (main.js)
+      return o && o.v === D.SAVE_V ? o : null;
+    } catch (e) { return null; }
   };
   G.reset = async function () {
     G.noSave = true;

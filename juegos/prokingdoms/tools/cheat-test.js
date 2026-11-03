@@ -10,6 +10,8 @@ const path = require('path');
 const PORT = 8000 + Math.floor(Math.random() * 900);
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'pk-cheat-'));
 const URL = 'http://127.0.0.1:' + PORT;
+// join pide la versión de protocolo del cliente (D.PROTO en js/data.js)
+const PROTO = +/D\.PROTO = (\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8'))[1];
 let failed = 0;
 
 function check(ok, what, detail) {
@@ -17,6 +19,7 @@ function check(ok, what, detail) {
   if (!ok) failed++;
 }
 async function api(method, route, body, token) {
+  if (route === '/api/join' && body && !('proto' in body)) body = Object.assign({ proto: PROTO }, body);
   const res = await fetch(URL + route, {
     method, headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { 'X-PK-Token': token } : {}),
     body: body ? JSON.stringify(body) : undefined,

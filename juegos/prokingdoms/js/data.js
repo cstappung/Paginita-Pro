@@ -8,6 +8,17 @@
   D.SEED = 20261027;          // misma semilla para todos: el mundo compartido es idéntico
   D.MAPV = 3;                 // versión del mapa: si cambia, el servidor reinicia los recursos compartidos
   D.SAVE_V = 3;
+  // Reiniciar el mundo del servidor: al subir MUNDO_VER, el servidor (server/sim.js al cargar) borra jugadores,
+  // mundos, gremios, ofertas y partidas guardadas, y anota la versión nueva. Se sube junto con SAVE_V (que
+  // descarta las partidas locales) y se despliega la función a mano.
+  D.MUNDO_VER = 1;
+  // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
+  // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
+  // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
+  D.PROTO = 1;
+  // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
+  // cada entrega que reinicie.
+  D.NOVEDADES = { ver: 'pk-11', items: ['Arreglos: aldeanos que quedaban «asustados» para siempre, Centros Urbanos encerrados por casas, la misión «Al bosque común» y los talleres en reserva.'] };
   D.OFFLINE_CAP = 12 * 3600;  // los aldeanos trabajan hasta 12h sin ti (las obras y estudios no tienen tope)
 
   D.RES = {
@@ -518,7 +529,7 @@
     '¿Alguien tiene piedra de sobra? La Cantera Gris está casi vacía.',
     'Acabo de aportar madera al proyecto. ¡Vamos que se puede!',
     'Cuidado con Brunilda, anda saqueando caravanas.',
-    'El Bosque Ancestral rebrota lento, no talen todo de una vez.',
+    'El ' + ((D.ZONES.find(z => z.type === 'tree') || {}).name || 'bosque común') + ' rebrota lento, no talen todo de una vez.',
     'Vendo tablones baratos en el mercado.',
     'Mi explorador encontró unas ruinas al norte. ¡Tenían libros!',
     'Mis aldeanos trabajaron toda la noche, ¡qué alegría volver!',
@@ -762,7 +773,7 @@
   // Economía
   q('e1', 'eco', 'Leñadores', 'Recolecta 300 de madera.', st('g_wood', 300), { food: 60 });
   q('e2', 'eco', 'Recolectores', 'Recolecta 300 de comida.', st('g_food', 300), { wood: 60 });
-  q('e3', 'eco', 'Al bosque común', 'Recolecta 300 de madera en el Bosque Ancestral, la gran zona común del centro del mapa (primero tienes que descubrirla).', st('z_forest', 300), { wood: 150, coins: 5 }, ['e1']);
+  q('e3', 'eco', 'Al bosque común', 'Recolecta 300 de madera en un bosque común (una zona compartida con tus vecinos; primero tienes que descubrirla).', st('z_tree', 300), { wood: 150, coins: 5 }, ['e1']);
   q('e4', 'eco', 'Fiebre del oro', 'Recolecta 200 de oro.', st('g_gold', 200), { food: 150 }, ['e1']);
   q('e5', 'eco', 'Picapedreros', 'Recolecta 300 de piedra.', st('g_stone', 300), { wood: 150 }, ['e1']);
   q('e6', 'eco', 'Cazadores', 'Caza 300 de comida (los ciervos rinden mucho, pero tardan en volver).', st('hunt', 300), { wood: 150 }, ['e2']);

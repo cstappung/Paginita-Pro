@@ -15,6 +15,11 @@
     st.weekly = st.weekly || null;
     st.streak.best = st.streak.best || 0;
     st.streak.shieldWk = st.streak.shieldWk || null; // semana en que se gastó el escudo
+    // z_tree existe desde pk-11: quien ya taló en un bosque común no pierde lo hecho
+    if (st.stats.z_tree === undefined) {
+      const n = PK.World.zones.reduce((s, z) => s + (z.common && z.type === 'tree' ? st.stats['z_' + z.id] || 0 : 0), 0);
+      if (n) st.stats.z_tree = n;
+    }
     Q.ensureDaily();
   };
 

@@ -39,18 +39,27 @@
       if (away > 60) report = PK.Game.simulateOffline(away);
     }
     document.getElementById('loading').remove();
+    // una partida (local o en la nube) de otra SAVE_V: el mundo se reinició con la actualización
+    const viejo = !save && (PK.Game.reinicioDe !== undefined || (net && net.cloud && net.cloud.v !== PK.D.SAVE_V));
+    if (viejo && PK.UI.reinicio) PK.UI.reinicio();
     if (report) PK.UI.offlineReport(report);
     else if (!save) PK.UI.toast((net ? 'Bienvenido a ' + PK.Net.world.name + '. ' : 'Bienvenido a tu reino. ') + 'Todo lo demás está en la niebla: abre el Libro de Misiones (B) para empezar.', 'epic');
     if (TIMELAPSE) {
-      // el time-lapse maneja su propio reloj: no corre el bucle normal ni se guarda nada
+      // el time-lapse maneja su propio reloj: no corre el bucle normal ni se guarda nada. tools/timelapse.js no
+      // vino con el juego (B6 del plan): si no carga, se avisa y se juega normal, sin guardar, en vez de quedarse
+      // con la pantalla quieta
       PK.Game.noSave = true;
       const sc = document.createElement('script');
       sc.src = 'tools/timelapse.js';
+      sc.onerror = () => { PK.UI.toast('Herramienta de time-lapse no incluida: el reino corre normal y no se guarda.', 'warn'); loop(); };
       document.body.appendChild(sc);
       return;
     }
     PK.Net.start();
+    loop();
+  }
 
+  function loop() {
     let last = performance.now(), lastWall = Date.now();
     function frame(now) {
       const wall = Date.now(), gap = (wall - lastWall) / 1000;
@@ -71,7 +80,7 @@
     }
     requestAnimationFrame(frame);
 
-    setInterval(() => PK.Game.save(), 20000);
+    setInterval(() => { if (!PK.Game.noSave) PK.Game.save(); }, 20000);
     const saveNow = () => { if (!PK.Game.noSave) { PK.Game.save(); PK.Net.saveCloud(true); } };
     window.addEventListener('beforeunload', saveNow);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });

@@ -24,6 +24,14 @@
     b.addEventListener('click', e => { e.stopPropagation(); if (!b.disabled) fn(e); });
     return b;
   };
+  // Taller parado por la reserva de la bodega: por qué y un botón «Producir igual» (b.sinReserva) solo para él.
+  UI.reservaRow = function (b) {
+    const r = G().reservaDe(b);
+    if (!r && !b.sinReserva) return '';
+    return el('div', { class: 'row' },
+      el('span', { class: 'small ' + (r ? 'warn-t' : 'muted') }, r ? G().reservaText(r) + '. ' : 'Este taller ignora la reserva de la bodega. '),
+      UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { b.sinReserva = !b.sinReserva; UI.refreshPanel(true); }, { small: true, cls: b.sinReserva ? '' : 'gold' }));
+  };
   // Pantalla táctil: cambia los textos de ayuda de "clic derecho" a "toca".
   UI.isTouch = () => !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
   UI.hint = (mouse, touch) => (UI.isTouch() ? touch : mouse);
@@ -680,6 +688,7 @@
       const inp = Object.keys(r.in).map(k => UI.amount(k, r.in[k])), out = Object.keys(r.out).map(k => UI.amount(k, r.out[k]));
       act.append(el('div', { class: 'recipe' }, inp, ' → ', out, el('span', { class: 'small muted' }, ' · ' + r.time + 's por trabajador')));
       act.append(el('p', null, 'Trabajadores: ' + b.workers.length + '/' + G().slots(b) + ' · ' + (b.status || '')));
+      act.append(UI.reservaRow(b));
       // depósitos y abastecimiento
       const near = PK.Logi.nearStore(b), belts = S().logi.belts.filter(x => x.a === b.id || x.b === b.id).length, carts = PK.Logi.carts().length;
       act.append(el('div', { class: 'bufs' },
@@ -1184,7 +1193,8 @@
         for (const b of shops) {
           const r = D.RECIPES[b.def.recipe], cap = L.bufCap(b), out = Object.keys(r.out)[0];
           body.append(el('div', { class: 'work-row' }, el('img', { class: 'ico', src: Sp.buildingIcon(b.type) }), el('b', null, b.def.name + ' ' + b.lvl),
-            el('span', { class: 'small muted' }, ' ' + (b.status || '') + ' · entrada ' + Object.keys(r.in).map(k => Math.floor(b.inb[k] || 0)).join('/') + ' · salida ' + Math.floor(b.outb[out] || 0) + '/' + cap + (L.nearStore(b) ? ' · junto a almacén' : '')),
+            el('span', { class: 'small muted' }, ' ' + (b.status === 'En reserva' && G().reservaDe(b) ? G().reservaText(G().reservaDe(b)) : b.status || '') + ' · entrada ' + Object.keys(r.in).map(k => Math.floor(b.inb[k] || 0)).join('/') + ' · salida ' + Math.floor(b.outb[out] || 0) + '/' + cap + (L.nearStore(b) ? ' · junto a almacén' : '')),
+            G().reservaDe(b) || b.sinReserva ? UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { b.sinReserva = !b.sinReserva; UI.rerender(); }, { small: true, cls: b.sinReserva ? '' : 'gold' }) : '',
             UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); }, { small: true })));
         }
       }
@@ -1329,9 +1339,9 @@
       for (const r of PK.Auto.RES) {
         const v = a.w[r] || 0;
         prio.append(el('div', { class: 'g-row prio-row' }, UI.resIcon(r), el('b', { class: 'fw-name' }, D.RES[r].name),
-          UI.btn('−', () => { a.w[r] = Math.max(0, v - 1); UI.rerender(); }, { small: true }),
+          UI.btn('−', () => { a.w[r] = Math.max(0, v - 1); PK.Auto.rebalance(10); UI.rerender(); }, { small: true }),
           el('span', { class: 'fw-dots' }, '●'.repeat(v) + '○'.repeat(5 - v)),
-          UI.btn('+', () => { a.w[r] = Math.min(5, v + 1); UI.rerender(); }, { small: true }),
+          UI.btn('+', () => { a.w[r] = Math.min(5, v + 1); PK.Auto.rebalance(10); UI.rerender(); }, { small: true }),
           el('span', { class: 'small muted pr-help' }, 'objetivo ' + Math.round((v / sum) * 100) + '% · ahora ' + (c[r] || 0) + ' (' + (n ? Math.round(((c[r] || 0) / n) * 100) : 0) + '%)')));
       }
       body.append(prio);
@@ -1527,6 +1537,15 @@
     setTimeout(() => { try { done.focus({ preventScroll: true }); } catch (e) { /* nada */ } }, (OPEN + 0.5 + keys.length * STEP) * 1000);
   };
 
+  // Al entrar después de un reinicio (D.SAVE_V nuevo): una vez, porque la partida nueva se guarda con la versión nueva.
+  UI.reinicio = function () {
+    const N = D.NOVEDADES || { ver: '', items: [] };
+    UI.modal('reinicio', 'Un mundo nuevo', body => {
+      body.append(el('p', null, 'El mundo se reinició con la actualización ' + N.ver + '. Tu reino empieza de cero, igual que el de todos.'),
+        N.items.length ? el('ul', { class: 'info' }, N.items.map(t => el('li', null, t))) : '',
+        el('div', { class: 'row' }, UI.btn('¡A construir!', () => UI.closeModal(), { cls: 'gold' })));
+    });
+  };
   UI.offlineReport = function (rep) {
     if (!rep) return;
     UI.modal('offline', 'Mientras no estabas…', body => {

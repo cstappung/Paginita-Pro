@@ -101,6 +101,7 @@
     }
     if (G().placing) updateGhost(e.clientX, e.clientY);
     toolGhost(e.clientX, e.clientY);
+    I.mouse.on = e.target === r.cv; // para recalcular el cartel en I.update
     if (e.target === r.cv) {
       const it = r.pick(e.clientX, e.clientY);
       r.hover = it && it.k !== 'tile' ? it : null;
@@ -377,5 +378,17 @@
     if (I.keys.arrowup || I.keys.w) dy -= sp;
     if (I.keys.arrowdown || I.keys.s) dy += sp;
     if (dx || dy) { r.cam.x += dx; r.cam.y += dy; r.clampCam(); }
+    // El cartel del puntero solo se calculaba al mover el mouse: después de mover la cámara (WASD, rueda,
+    // arrastre, centerOn) o de que subiera de nivel lo de abajo, seguía diciendo «Centro Urbano · Nv 2» con el
+    // Centro ya en Nv 10. Se recalcula al mover la cámara y cada 250 ms.
+    hovT += dt;
+    const cm = r.cam.x + ',' + r.cam.y + ',' + r.cam.z;
+    if (I.mouse.on && I.mouse.in && (cm !== hovCam || hovT >= 0.25)) {
+      hovT = 0; hovCam = cm;
+      const it = r.pick(I.mouse.x, I.mouse.y);
+      r.hover = it && it.k !== 'tile' ? it : null;
+      PK.UI.hoverInfo(r.hover, I.mouse.x, I.mouse.y);
+    }
   };
+  let hovT = 0, hovCam = '';
 })();

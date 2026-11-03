@@ -287,3 +287,43 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   timer, construction, queue, workers and buffers. It costs 10% of the base
   cost and drops the belts that reached it. The TC cannot move
   (`G.MOVE_NO`): home regions and rescues hang on it.
+
+## The mega update plan, Phase 0 (`pk-11`, Nov 2026)
+
+`PLAN-MEGA-ACTUALIZACION.md` (this folder) is the owner's plan, phase by phase
+(«implementa la Fase N del plan»). Its rules section applies to every phase.
+
+- **`scared` goes negative after a fright.** Test `u.scared > 0`, never
+  `!u.scared`: a leftover −0.03 locked 132 of 159 villagers out of «+» (B1).
+- **No building may close the TC's yard** (`G.encierra`, reason `'encierra'` in
+  `placeWhy`, also for moves). It compares how many tiles you can walk to from
+  the TC's sides before and after (`W.reachCount`, 4-way like the regions and
+  A*, which never cuts corners). A town that was already closed (walls without a
+  gate) is not blocked. If a yard still ends up closed, `G.checkEncierro` (every
+  5 s) sets `G.encierro`: red arrows on the buildings that open it, new
+  villagers spawn outside, `unstick` rescues outward, the idle hint stops
+  saying «explora» (B2).
+- **Common-zone stats also count by type** (`z_tree`). Quest `e3` asked for
+  `z_forest`, which nobody wrote (B3).
+- **Workshops held by the reserve say so** (`G.reservaDe`, status «En
+  reserva»), and `b.sinReserva` («Producir igual», saved) skips it for one
+  workshop. New games start at 15% (B4).
+- **Changing a Capataz priority rebalances** up to 10 of its villagers
+  (`PK.Auto.rebalance`), never a `task.m` order (B5). The hover tip refreshes
+  every 250 ms and on camera moves (B7).
+- **World resets** (P1): bump `D.MUNDO_VER` (and `D.SAVE_V`) and deploy the
+  function. `sim.js` compares it on load with the stored one (`mundo.json`
+  locally, `prokingdoms/mundoVer` in the RTDB) and calls `store.reinicia()`,
+  which wipes everything but the suspicion log. No stored version just writes
+  it. A save of another `SAVE_V` shows the «Un mundo nuevo» card once
+  (`D.NOVEDADES`: update it in every delivery that resets).
+- **`D.PROTO`** goes in `POST /api/join`. Another one gets 426, and the loading
+  screen offers «Jugar sin conexión». Bump it whenever both sides must agree
+  (map, routes, limits), since Pages publishes on merge and the function is
+  deployed by hand.
+- **Tests:** `colabtex/tests/prokingdoms.test.cjs` (in `test:juegos`) checks
+  the data tables, B1, B2 and the reset. Its POI fingerprint
+  (`tests/fixtures/prokingdoms-pois.json`) must change only with a deliberate
+  reset (new `D.MAPV`). Regenerate it with the snippet at the top of that
+  file. The «two good troops per enemy» check is a `todo` until Phase 4: beasts
+  only have the Lancero.

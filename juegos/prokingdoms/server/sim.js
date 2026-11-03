@@ -47,6 +47,15 @@ const cleanText = (s, n) => String(s || '').replace(/[<>]/g, '').replace(/\s+/g,
 
 class GameError extends Error { constructor(msg, status) { super(msg); this.status = status || 400; } }
 
+// ---------- Reinicio por versión del mundo (D.MUNDO_VER) ----------
+// Antes de leer a nadie: si la versión guardada es otra, se borra todo menos las sospechas. Sin versión
+// guardada (el primer arranque con esto) solo se anota, sin borrar.
+if (store.mundoVer) {
+  const v = store.mundoVer();
+  if (v === null || v === undefined) store.setMundoVer(D.MUNDO_VER);
+  else if (v !== D.MUNDO_VER) { store.reinicia(D.MUNDO_VER); console.log('Mundo reiniciado: versión', v, '→', D.MUNDO_VER); }
+}
+
 // ---------- Jugadores y mundos ----------
 const tokens = new Map(), uids = new Map();
 for (const p of store.all('players')) { tokens.set(p.token, p); if (p.uid) uids.set(p.uid, p); }
@@ -90,6 +99,8 @@ function humans(w, me) {
 }
 
 function join(b) {
+  // un cliente de otra versión vería otro mapa: mejor un mensaje claro (el juego ofrece jugar sin conexión)
+  if (b.proto !== D.PROTO) throw new GameError('El servidor se está actualizando. Recarga la página en unos minutos.', 426);
   // b.uid solo lo pone el servidor (functions/index.js, tras verificar el token de Firebase); el cliente no lo elige
   let p = b.uid ? byUid(b.uid) : byToken(b.token);
   const name = cleanText(b.name, 20);

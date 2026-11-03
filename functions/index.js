@@ -40,7 +40,8 @@ let sim = null, listo = null;
    jugadores al cargarse y genera el mapa por semilla). Si la lectura falla, el próximo pedido
    lo vuelve a intentar. */
 function arranca() {
-  if (!listo) listo = store.carga().then(() => { sim = require('./juego/server/sim.js'); }).catch(e => { listo = null; throw e; });
+  // sim.js puede reiniciar el mundo al cargarse (D.MUNDO_VER): ese borrado termina antes del primer pedido
+  if (!listo) listo = store.carga().then(() => { sim = require('./juego/server/sim.js'); return store.pendientes(); }).catch(e => { listo = null; throw e; });
   return listo;
 }
 

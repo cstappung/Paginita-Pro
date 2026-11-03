@@ -58,6 +58,7 @@
       st.def.walls.push(k);
     }
     G().stat('walls_built', tiles.length);
+    G().blockVer++;
     if (PK.Sfx) PK.Sfx.play('build');
     Def.recount();
     return tiles.length;
@@ -70,7 +71,7 @@
     if (!G().pay(D.WALL.gate)) { toast('Faltan recursos para la puerta.', 'warn'); return false; }
     if (W.wall[k] === WALL) st.def.walls.splice(st.def.walls.indexOf(k), 1);
     else clearSpot(k);
-    W.wall[k] = GATE; W.block[k] = 0;
+    W.wall[k] = GATE; W.block[k] = 0; G().blockVer++;
     st.def.gates.push(k);
     // se despeja el paso a ambos lados (árboles y arbustos frente a la puerta)
     let shut = 0;
@@ -97,6 +98,7 @@
     list.splice(list.indexOf(k), 1);
     W.wall[k] = 0;
     if (W.block[k] === BLOCK) W.block[k] = 0;
+    G().blockVer++;
     Def.recount();
   };
   // Mejorar todas juntas al siguiente material.

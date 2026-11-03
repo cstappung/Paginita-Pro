@@ -354,6 +354,56 @@
   // Región de una casilla (0 si está bloqueada) y su tamaño: para saber si un aldeano quedó encerrado.
   W.regionAt = (x, y) => (W.inb(x, y) ? regions()[W.idx(x, y)] : 0);
   W.regionSize = l => (l ? regSize[l] || 0 : 0);
+  // Casilla libre de la región l más cercana a un punto (por anillos, hasta maxR), o null.
+  W.nearestInRegion = function (px, py, l, maxR) {
+    const reg = regions(), cx = Math.floor(px), cy = Math.floor(py);
+    for (let r = 0; r <= maxR; r++) {
+      let best = null, bd = 1e9;
+      for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== r || !W.inb(x, y) || reg[W.idx(x, y)] !== l) continue;
+        const d = Math.hypot(x + 0.5 - px, y + 0.5 - py);
+        if (d < bd) { bd = d; best = [x, y]; }
+      }
+      if (best) return best;
+    }
+    return null;
+  };
+  // La región más grande del mapa (la tierra firme por donde se camina): {l, n}.
+  W.biggestRegion = function () {
+    regions();
+    let l = 0, n = 0;
+    for (let i = 1; i < regSize.length; i++) if (regSize[i] > n) { n = regSize[i]; l = i; }
+    return { l, n };
+  };
+  // Cuántas casillas libres se alcanzan caminando desde el borde de unos rectángulos ([x, y, w, h], los
+  // Centros Urbanos). Las casillas de `tapa` cuentan como bloqueadas y las de `libre` como libres (índices):
+  // así se prueba un edificio antes de ponerlo o mudarlo. Se detiene al llegar a `tope`. Sirve para no
+  // encerrar al pueblo (G.placeWhy, 'encierra'): un patio cerrado por casas dejaba a los aldeanos sin salida.
+  let rcMark = null, rcStack = null, rcGen = 0;
+  W.reachCount = function (rects, tapa, libre, tope) {
+    const w = W.W, N = w * W.H;
+    if (!rcMark) { rcMark = new Int32Array(N); rcStack = new Int32Array(N); }
+    if (++rcGen > 2e9) { rcMark.fill(0); rcGen = 1; }
+    const g = rcGen, T = new Set(tapa || []), L = new Set(libre || []);
+    const free = k => !T.has(k) && (W.block[k] === 0 || L.has(k));
+    let sp = 0, n = 0;
+    const push = k => { if (rcMark[k] !== g && free(k)) { rcMark[k] = g; rcStack[sp++] = k; } };
+    for (const [x0, y0, rw, rh] of rects) // las casillas que lo tocan por un lado (las esquinas no: se camina en 4 direcciones)
+      for (let y = y0 - 1; y <= y0 + rh; y++) for (let x = x0 - 1; x <= x0 + rw; x++) {
+        if ((x < x0 || x >= x0 + rw) === (y < y0 || y >= y0 + rh)) continue;
+        if (W.inb(x, y)) push(W.idx(x, y));
+      }
+    tope = tope || N;
+    while (sp && n < tope) {
+      const k = rcStack[--sp], x = k % w, y = (k / w) | 0;
+      n++;
+      if (x > 0) push(k - 1);
+      if (x < w - 1) push(k + 1);
+      if (y > 0) push(k - w);
+      if (y < W.H - 1) push(k + w);
+    }
+    return n;
+  };
   W.reachable = function (n, regs) {
     if (!regs.size) return true; // no se sabe desde dónde: que lo resuelva la ruta
     const reg = regions();

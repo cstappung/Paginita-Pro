@@ -154,6 +154,8 @@ ul.sub li.ok::marker { content: '✔ '; }
 .modal-body ul.sub li.ok { color: #3a7a24; }
 .modal-body .amt.bad { color: #c03a20; }
 .modal-body input, .modal-body select { font-family: var(--font); font-size: 15px; padding: 3px 6px; background: #f6ebcf; border: 2px solid #6b4c30; color: var(--ink); width: 90px; user-select: text; }
+/* las casillas no heredan los 90 px: en la ventana del Capataz quedaban lejos de su texto */
+.modal-body input[type=checkbox], .modal-body input[type=radio] { width: auto; padding: 0; }
 .modal-body select { width: auto; }
 .modal-body ul { padding-left: 20px; }
 
@@ -237,6 +239,8 @@ ul.sub li.ok::marker { content: '✔ '; }
 .ld-box { text-align: center; }
 .ld-title { font-size: 48px; color: var(--gold); font-weight: 700; text-shadow: 3px 3px 0 #000; letter-spacing: 2px; }
 .ld-sub { margin-top: 8px; color: var(--parch2); animation: pulse 1s infinite alternate; }
+.ld-sub.ld-quieto { animation: none; max-width: 420px; margin: 8px auto 0; padding: 0 16px; }
+.ld-btns { margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 @keyframes pulse { to { opacity: 0.4; } }
 
 /* Pantallas pequeñas */

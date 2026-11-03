@@ -6,8 +6,13 @@
    Comprueba: CORS, que join exige sesión de Firebase y estar en betaTesters, que la cuenta es el
    uid (un reino por cuenta), sync, guardar y leer la partida (también como sendBeacon, text/plain),
    que lo guardado en la RTDB vuelve igual en un arranque en frío (arreglos con null, listas vacías)
-   y que nadie de la web puede leer prokingdoms/. No es idempotente: reinicia el emulador entre corridas. */
+   y que nadie de la web puede leer prokingdoms/, la versión del mundo y el rechazo de un cliente de otro
+   protocolo (426). No es idempotente: reinicia el emulador entre corridas. */
 'use strict';
+const fs = require('fs'), path = require('path');
+// las versiones de juegos/prokingdoms/js/data.js (las mismas que copia prepara.js)
+const DATOS = fs.readFileSync(path.join(__dirname, '..', 'juegos', 'prokingdoms', 'js', 'data.js'), 'utf8');
+const PROTO = +/D\.PROTO = (\d+)/.exec(DATOS)[1], MUNDO_VER = +/D\.MUNDO_VER = (\d+)/.exec(DATOS)[1];
 const PROYECTO = 'mi-pagina-pro', NS = 'mi-pagina-pro-default-rtdb';
 const FN = `http://127.0.0.1:5001/${PROYECTO}/us-central1/prokingdoms`;
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
@@ -25,6 +30,7 @@ const dbPut = (ruta, v) => fetch(`${DB}/${ruta}.json?ns=${NS}`, { method: 'PUT',
 const dbGet = async (ruta, admin = true) => { const r = await fetch(`${DB}/${ruta}.json?ns=${NS}`, { headers: admin ? { Authorization: 'Bearer owner' } : {} }); return { status: r.status, v: await r.json() }; };
 async function api(metodo, ruta, { cuerpo, token, bearer, origen = SITIO, tipo = 'application/json' } = {}) {
   const h = { 'Content-Type': tipo };
+  if (ruta === '/api/join' && cuerpo && typeof cuerpo === 'object' && !('proto' in cuerpo)) cuerpo = Object.assign({ proto: PROTO }, cuerpo);
   if (origen) h.Origin = origen;
   if (token) h['X-PK-Token'] = token;
   if (bearer) h.Authorization = 'Bearer ' + bearer;
@@ -55,6 +61,9 @@ async function main() {
   const yo = ja.d.player || {};
   const ja2 = await api('POST', '/api/join', { cuerpo: { name: 'Ana' }, bearer: A.tok });
   ok(ja2.d.player && ja2.d.player.id === yo.id && ja2.d.player.token === yo.token, 'otra vez (otro aparato): el mismo reino');
+  const viejo = await api('POST', '/api/join', { cuerpo: { name: 'Ana', proto: PROTO - 1 }, bearer: A.tok });
+  ok(viejo.status === 426 && /actualizando/.test(viejo.d.error || ''), 'un cliente de otro protocolo: 426 con mensaje', viejo.status + ' ' + viejo.d.error);
+  ok((await dbGet('prokingdoms/mundoVer')).v === MUNDO_VER, 'la versión del mundo quedó anotada', MUNDO_VER);
   ok((await api('POST', '/api/sync', { cuerpo: {}, token: 'inventado' })).status === 401, 'sync con un token del juego inventado: 401');
 
   console.log('\nJugar');

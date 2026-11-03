@@ -42,7 +42,7 @@
     get cx() { return this.x + this.w / 2; }
     get cy() { return this.y + this.h / 2; }
     toJSON() {
-      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb };
+      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined };
     }
   }
   PK.Unit = Unit;
@@ -402,6 +402,9 @@
   const homeCache = new Map();
   function homeRegions(owner) {
     const t = G().time, c = homeCache.get(owner);
+    // Centro Urbano encerrado por edificios (G.checkEncierro): el hogar pasa a ser la tierra de afuera, así el
+    // rescate saca a los del patio en vez de devolverlos adentro
+    if (owner === 'p' && G().encierro) return new Set([G().encierro.out]);
     if (c && t >= c.t && t - c.t < 1) return c.set;
     const set = new Set(), small = new Set();
     for (const b of G().buildings) {
@@ -470,7 +473,7 @@
     unstick(u, dt);
     if (u.scared > 0) { // huye de los lobos hacia el Centro Urbano
       u.scared -= dt;
-      if (u.scared <= 0) { u.path = []; u.fails = 0; return; } // pasó el susto: vuelve a lo suyo sin terminar la huida
+      if (u.scared <= 0) { u.scared = 0; u.path = []; u.fails = 0; return; } // pasó el susto: vuelve a lo suyo sin terminar la huida
       if (u.path.length) step(u, dt); else u.mode = 'idle';
       return;
     }

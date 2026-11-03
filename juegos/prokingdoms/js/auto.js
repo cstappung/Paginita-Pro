@@ -11,7 +11,7 @@
   A.RES = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'];
   A.QMAX = 6;
   A.init = function (st) {
-    st.auto = Object.assign({ idle: true, work: true, train: false, reserve: 0.3, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
+    st.auto = Object.assign({ idle: true, work: true, train: false, reserve: 0.15, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
     st.upq = (st.upq || []).filter(id => G().bById.get(id));
   };
 
@@ -50,7 +50,7 @@
     for (const b of g.buildings) {
       if (b.owner !== 'p' || !b.done || !b.def.recipe || b.workers.length >= g.slots(b)) continue;
       const rc = D.RECIPES[b.def.recipe];
-      if (!g.reserveOk(rc.in, Object.keys(rc.out)[0]) && !PK.Logi.carts().length) continue;
+      if (!g.reserveOk(rc.in, Object.keys(rc.out)[0], b) && !PK.Logi.carts().length) continue;
       if (!PK.Logi.supplied(b)) continue; // sin abastecimiento no sirve de nada
       const reserved = g.units.filter(o => o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length;
       if (b.workers.length + reserved >= g.slots(b)) continue;
@@ -84,6 +84,11 @@
     const idle = g.units.filter(u => u.owner === 'p' && u.kind === 'v' && !u.task && !u.inside && !u.hold && u.idleT > 20).length;
     if (idle < 3 || performance.now() - hintT < 180000) return;
     hintT = performance.now();
+    if (g.encierro) { // explorar no sirve de nada: el problema es el patio cerrado (G.checkEncierro)
+      PK.UI.toast(idle + ' aldeanos sin trabajo: tu Centro Urbano quedó encerrado por edificios. Mueve o demuele uno de los marcados en rojo.', 'warn',
+        g.encierro.puertas.length ? { label: 'Ver edificios', fn: g.verPuertas } : null);
+      return;
+    }
     const w = S().auto.w, miss = A.RES.filter(r => w[r] > 0 && !A.jobAvailable(r));
     if (!miss.length) return;
     const names = miss.map(r => D.RES[r].name.toLowerCase()).join(', ');
@@ -260,7 +265,7 @@
   };
   // +1 en un trabajo: primero un ocioso; si no hay, el que esté en el trabajo con más gente.
   A.addJob = function (job) {
-    const vs = A.villagers().filter(u => !u.scared), c = A.jobCounts();
+    const vs = A.villagers().filter(u => !(u.scared > 0)), c = A.jobCounts(); // un susto negativo ya pasó
     let u = vs.find(o => A.jobOf(o) === 'idle');
     if (!u) {
       const from = Object.keys(c).filter(k => k !== job && k !== 'idle' && k !== 'other' && c[k] > 0).sort((a, b) => c[b] - c[a])[0];
@@ -268,6 +273,34 @@
     }
     if (!u) { PK.UI.toast('No tienes aldeanos libres: entrena más en el Centro Urbano.', 'warn'); return false; }
     return A.setJob([u], job) > 0;
+  };
+  // Reequilibrar al cambiar una prioridad (B5 del plan): el Capataz solo repartía ociosos, así que con todos
+  // ocupados subir «Piedra» no movía a nadie (137 en madera, 0 en piedra). Mueve hasta `max` aldeanos que puso
+  // él (nunca una orden tuya, task.m) desde lo que está sobre su objetivo (o con la bodega llena) hacia lo que
+  // está más abajo. Devuelve cuántos movió.
+  A.rebalance = function (max) {
+    const st = S(), g = G(), w = st.auto.w, sum = A.RES.reduce((s, r) => s + (w[r] || 0), 0);
+    if (!sum) return 0;
+    const { c, n } = A.counts(), meta = r => ((w[r] || 0) / sum) * n;
+    const ok = {}; // ¿hay dónde trabajar en eso? (se pregunta una vez por recurso)
+    let moved = 0;
+    for (let k = 0; k < (max || 10); k++) {
+      const sobra = r => (g.isFull(r) ? c[r] || 0 : (c[r] || 0) - meta(r));
+      const to = A.RES.filter(r => w[r] > 0 && !g.isFull(r) && (c[r] || 0) + 1 <= meta(r) + 0.5 && (ok[r] !== undefined ? ok[r] : (ok[r] = A.jobAvailable(r))))
+        .sort((a, b) => (meta(b) - (c[b] || 0)) - (meta(a) - (c[a] || 0)))[0];
+      if (!to) break;
+      const froms = A.RES.filter(r => r !== to && sobra(r) >= 1).sort((a, b) => sobra(b) - sobra(a));
+      let u = null;
+      for (const from of froms) {
+        u = A.villagers().filter(o => o.task && !o.task.m && !o.inside && A.jobOf(o) === from).sort((a, b) => (a.carry || 0) - (b.carry || 0))[0];
+        if (u) { c[from]--; break; }
+      }
+      if (!u) break;
+      const t = targetFor(u, to);
+      if (!t || !g.command([u], t, true)) { ok[to] = false; c[A.jobOf(u)] = (c[A.jobOf(u)] || 0) + 1; continue; }
+      c[to] = (c[to] || 0) + 1; moved++;
+    }
+    return moved;
   };
   // −1: uno de ese trabajo queda ocioso a propósito (el Capataz no lo reparte hasta que le des otra cosa).
   A.removeJob = function (job) {

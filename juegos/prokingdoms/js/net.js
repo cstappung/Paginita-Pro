@@ -49,7 +49,7 @@
       // el arranque en frío tarda unos segundos, así que se espera más que a un servidor local.
       const auth = API && PK.Platform.getAuthToken ? await PK.Platform.getAuthToken() : null;
       if (API && !auth) throw new Error('sin sesión de Firebase');
-      const j = await api('POST', '/api/join', { token: U.store.get(TOKEN_KEY), name: playerName(), preferSlot: localSave ? (Number.isInteger(localSave.slot) ? localSave.slot : 0) : undefined }, API ? 15000 : 2500,
+      const j = await api('POST', '/api/join', { proto: D.PROTO, token: U.store.get(TOKEN_KEY), name: playerName(), preferSlot: localSave ? (Number.isInteger(localSave.slot) ? localSave.slot : 0) : undefined }, API ? 15000 : 2500,
         auth ? { Authorization: 'Bearer ' + auth } : null);
       Net.me = j.player;
       Net.world = j.world;
@@ -64,9 +64,23 @@
       return { slot: j.world.slot, humans: j.world.humans, cloud };
     } catch (e) {
       console.info('Pro Kingdoms: sin servidor, modo local.', e.message);
+      if (e.status === 426) await versionDistinta(e.message);
       return null;
     }
   };
+  // El servidor es de otra versión (D.PROTO): entrar vería otro mapa. Se avisa en la pantalla de carga y se
+  // espera a que elija jugar sin conexión (o recargar).
+  function versionDistinta(msg) {
+    const box = document.querySelector('#loading .ld-box');
+    if (!box) return Promise.resolve();
+    const sub = box.querySelector('.ld-sub');
+    if (sub) { sub.textContent = msg; sub.classList.add('ld-quieto'); }
+    return new Promise(res => {
+      box.append(U.el('div', { class: 'ld-btns' },
+        U.el('button', { class: 'btn gold', onclick: () => res() }, 'Jugar sin conexión'),
+        U.el('button', { class: 'btn', onclick: () => location.reload() }, 'Recargar')));
+    });
+  }
 
   Net.harvest = function (id, n) { pending[id] = (pending[id] || 0) + n; };
   Net.marketOp = function (op) { if (Net.online) marketOps.push(op); };

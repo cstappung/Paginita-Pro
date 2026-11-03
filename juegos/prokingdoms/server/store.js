@@ -55,8 +55,21 @@ function log(entry) {
   fs.appendFile(path.join(DATA, 'sospechas.log'), JSON.stringify(entry) + '\n', e => { if (e) console.error('No se pudo registrar', e.message); });
 }
 
+// Versión del mundo (D.MUNDO_VER; la compara sim.js al cargar) en data/mundo.json. reinicia() borra las
+// colecciones y las partidas, pero no sospechas.log.
+const MUNDO = path.join(DATA, 'mundo.json');
+function mundoVer() { try { return JSON.parse(fs.readFileSync(MUNDO, 'utf8')).v; } catch (e) { return null; } }
+function setMundoVer(v) { writeAtomic(MUNDO, JSON.stringify({ v })); }
+function reinicia(v) {
+  for (const f of fs.readdirSync(DATA)) if (f.endsWith('.json') && f !== 'mundo.json') fs.unlinkSync(path.join(DATA, f));
+  for (const f of fs.readdirSync(SAVES)) fs.unlinkSync(path.join(SAVES, f));
+  for (const k in cols) delete cols[k];
+  dirty.clear();
+  setMundoVer(v);
+}
+
 setInterval(flush, 5000).unref();
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { flush(); process.exit(0); });
 process.on('exit', flush);
 
-module.exports = { col, get, set, del, all, touch, flush, getSave, setSave, delSave, log };
+module.exports = { col, get, set, del, all, touch, flush, getSave, setSave, delSave, log, mundoVer, setMundoVer, reinicia };
