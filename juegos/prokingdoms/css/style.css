@@ -740,3 +740,13 @@ ul.info li { margin: 2px 0; }
 .ot-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .ot-row .btn.ot { background: linear-gradient(180deg, #8a6a34, #5a4020); color: var(--parch); }
 .ot-row .btn.ot .cost { margin-left: 2px; }
+/* ✕ para soltar la selección en la cabecera del panel (solo donde el panel tiene cabecera: celular) */
+.p-headrow { display: contents; }
+.p-headrow .p-close { display: none !important; }
+@media (max-width: 900px) {
+  #panel .p-headrow { display: flex; flex: none; align-items: stretch; border-bottom: 2px solid var(--edge); }
+  #panel.collapsed .p-headrow { border-bottom: none; }
+  #panel .p-headrow .p-toggle { flex: 1; min-width: 0; border-bottom: none; }
+  #panel .p-headrow .p-close { display: flex !important; align-items: center; justify-content: center; flex: none; width: 48px; background: none; border: none; border-left: 2px solid var(--edge); color: var(--parch); font-family: var(--font); font-size: 20px; cursor: pointer; text-shadow: 1px 1px 0 #000; }
+  #panel .p-headrow .p-close[style*="none"] { display: none !important; }
+}

@@ -149,8 +149,12 @@
     if (prev && now - prev.t < 350 && Math.hypot(x - prev.x, y - prev.y) < 28 && it && it.k === 'unit' && it.o.owner === 'p') {
       lastTap = null; selectKindOnScreen(it.o.kind); return;
     }
+    // Con el dedo no hay Esc ni clic derecho: tocar el suelo vacío suelta lo elegido (antes, con aldeanos elegidos,
+    // los mandaba a caminar ahí y no había forma de deseleccionarlos). Tocar otra vez al único aldeano elegido, también.
+    if (g.sel && (!it || it.k === 'tile')) { g.sel = null; PK.UI.refreshPanel(true); return; }
+    if (it && it.k === 'unit' && it.o.owner === 'p' && g.sel && g.sel.type === 'units' && g.sel.ids.length === 1 && g.sel.ids[0] === it.o.id) { g.sel = null; PK.UI.refreshPanel(true); return; }
     if (g.selUnits().length && it && !(it.k === 'unit' && it.o.owner === 'p')) { rightClick(x, y); return; }
-    if (g.sel && g.sel.type === 'building' && it && it.k !== 'unit' && g.bById.get(g.sel.id) && g.bById.get(g.sel.id).type === 'tc' && it.k !== 'building') { rightClick(x, y); return; }
+    if (g.sel && g.sel.type === 'building' && it && it.k === 'node' && g.bById.get(g.sel.id) && g.bById.get(g.sel.id).type === 'tc') { rightClick(x, y); return; }
     leftClick(x, y, false);
   }
 

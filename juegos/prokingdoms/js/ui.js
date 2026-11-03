@@ -1387,10 +1387,11 @@
           UI.btn('Borrar partida', () => { if (confirm('¿Seguro? Se perderá todo tu progreso.')) G().reset(); }, { small: true, cls: 'danger' })),
         el('h3', null, 'Controles'),
         UI.isTouch() ? el('ul', { class: 'small' },
-          el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un objetivo: recolectar / trabajar / mover'),
+          el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un árbol, una mina o un edificio: recolectar / trabajar'),
+          el('li', null, 'Para soltar lo elegido: toca el suelo vacío, vuelve a tocar al aldeano o usa la ✕ del panel'),
           el('li', null, 'Construir: elige el edificio en el menú, toca dónde va y vuelve a tocar (o «Construir aquí») para confirmar'),
           el('li', null, 'Mantén pulsado y arrastra: seleccionar grupo · Doble toque en un aldeano: todos los de su tipo en pantalla'),
-          el('li', null, 'Con el Centro Urbano elegido, toca el mapa para fijar el punto de reunión'),
+          el('li', null, 'Con el Centro Urbano elegido, toca un recurso para fijar el punto de reunión'),
           el('li', null, 'Arrastra: mover cámara · Pellizca: zoom'),
           el('li', null, 'Botones Ocioso y Demoler en el menú lateral'))
         : el('ul', { class: 'small' },
@@ -1511,8 +1512,13 @@
     body.className = 'p-body';
     const title = el('span', { class: 'p-title' }, 'Pro Kingdoms'), arrow = el('span', { class: 'p-arrow', 'aria-hidden': 'true' }, '▼');
     const head = el('button', { class: 'p-toggle', 'aria-controls': 'panel-body', 'aria-expanded': 'true', title: 'Ocultar panel' }, title, arrow);
+    // ✕: suelta lo elegido (en el celular no hay Esc ni clic derecho). Solo se ve si hay algo elegido.
+    const close = el('button', { class: 'p-close', title: 'Soltar selección', 'aria-label': 'Soltar selección', onclick: e => { e.stopPropagation(); G().sel = null; UI.refreshPanel(true); } }, '✕');
     body.replaceWith(wrap);
-    wrap.append(head, body);
+    wrap.append(el('div', { class: 'p-headrow' }, head, close), body);
+    const syncClose = () => { close.style.display = G().sel ? '' : 'none'; };
+    syncClose();
+    setInterval(syncClose, 400);
     const setOpen = open => {
       wrap.classList.toggle('collapsed', !open);
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
