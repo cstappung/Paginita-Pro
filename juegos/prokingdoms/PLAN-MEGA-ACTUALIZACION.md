@@ -9,7 +9,8 @@
 > 1. **Se pueden reiniciar los mundos y las partidas** cuando haga falta. Los beta testers saben que pueden perder su reino. No hace falta escribir migraciones ni código de compatibilidad con partidas viejas.
 > 2. **Todo se implementa en línea de una vez.** El servidor (Cloud Function) es quien decide en todo lo que toca a otros jugadores. No hay que hacer primero una versión local simulada y después la en línea.
 > 3. **Las monedas del reino siguen separadas** de las monedas de Juegos (`monedas.js`).
-> 4. **Prestigio («Nueva Dinastía», V10): pendiente.** No se implementa hasta que el dueño lo decida (ver sección 13).
+> 4. **No habrá «Nueva Dinastía»** (volver a empezar a cambio de bonos). En su lugar, quien termine la primera fase por completo abre **un Nuevo Mundo con otra temática**, como la segunda isla de Clash of Clans (Fase 9).
+> 5. **Habrá un pase de batalla semanal** que se compra con **monedas de la página** y da recursos y cosas especiales, como aspectos de héroe (Fase 8). Es la única conexión con las monedas de Juegos y va en un solo sentido: el juego nunca da monedas de la página.
 
 ---
 
@@ -25,11 +26,13 @@
 7. [Fase 5: Mundo vivo y social](#7-fase-5-mundo-vivo-y-social)
 8. [Fase 6: Interfaz, celular y sonido](#8-fase-6-interfaz-celular-y-sonido)
 9. [Fase 7: Técnica, pruebas y balance](#9-fase-7-técnica-pruebas-y-balance)
-10. [Ritmo objetivo](#10-ritmo-objetivo)
-11. [Orden de trabajo y versiones](#11-orden-de-trabajo-y-versiones)
-12. [Lista de control de cada entrega](#12-lista-de-control-de-cada-entrega)
-13. [Decisiones que debe tomar el dueño](#13-decisiones-que-debe-tomar-el-dueño)
-14. [Anexos: tablas de contenido nuevo](#14-anexos-tablas-de-contenido-nuevo)
+10. [Fase 8: El Pase del Reino semanal](#10-fase-8-el-pase-del-reino-semanal)
+11. [Fase 9: El Nuevo Mundo, «Las Islas del Cielo»](#11-fase-9-el-nuevo-mundo-las-islas-del-cielo)
+12. [Ritmo objetivo](#12-ritmo-objetivo)
+13. [Orden de trabajo y versiones](#13-orden-de-trabajo-y-versiones)
+14. [Lista de control de cada entrega](#14-lista-de-control-de-cada-entrega)
+15. [Decisiones que debe tomar el dueño](#15-decisiones-que-debe-tomar-el-dueño)
+16. [Anexos: tablas de contenido nuevo](#16-anexos-tablas-de-contenido-nuevo)
 
 ---
 
@@ -40,19 +43,19 @@
 | Aspecto | Nota hoy | Meta | Fase que lo mueve |
 |---|---|---|---|
 | **Automatización** | 6 | 8,5 | 0, 1 |
-| **Entretención** | 6 | 8 | 2, 3, 4 |
-| **Aventura** | 5 | 8,5 | 2 |
-| Gráficos y ambientación | 8 | 9 | 3, 6 |
+| **Entretención** | 6 | 8,5 | 2, 3, 4, 8, 9 |
+| **Aventura** | 5 | 9 | 2, 9 |
+| Gráficos y ambientación | 8 | 9 | 3, 6, 9 |
 | Economía y estrategia | 7 | 8 | 1, 3 |
-| Progresión y ritmo | 6 | 8 | 1, 3, 7 |
+| Progresión y ritmo | 6 | 8 | 1, 3, 7, 8 |
 | Combate | 6 | 8 | 2, 4 |
 | Cantidad de contenido | 8 | 9 | 2, 3 |
-| Variedad | 5 | 8 | 2, 3, 4 |
+| Variedad | 5 | 8,5 | 2, 3, 4, 9 |
 | Interfaz y claridad | 6 | 8 | 0, 1, 6 |
 | Social y multijugador | 4 | 7 | 5 |
 | Celular | 6 | 8 | 6 |
 | Estabilidad técnica | 8 | 9 | 0, 7 |
-| **Promedio** | **6,2** | **~8,3** | |
+| **Promedio** | **6,2** | **~8,4** | |
 
 ### El diagnóstico en tres frases
 
@@ -71,10 +74,12 @@
 - **Combate 2.0**: formación previa, enemigos con roles, asedios por oleadas y torres con ramas.
 - **Mundo vivo**: diplomacia con los reinos, rutas comerciales, jefe semanal del gremio y visitas a otros reinos.
 - **Interfaz**: menú agrupado, panel «¿Qué hago ahora?», tutorial guiado, barra inferior en el celular y música procedural.
+- **Pase del Reino semanal**: 25 niveles con una pista gratis y una pista dorada que se compra con monedas de la página. Da recursos, equipo y aspectos de héroe, tropa y edificio.
+- **El Nuevo Mundo, «Las Islas del Cielo»**: para quien termine la Crónica, una segunda base de islas flotantes con su propia economía, flota de dirigibles, eras y competencia semanal, como la segunda isla de Clash of Clans.
 
 ### Tamaño
 
-En total son unas **40 a 55 sesiones** de trabajo de Claude Code, repartidas en **12 entregas** (de `pk-11` a `pk-22`), más la Fase 6, que se puede hacer en paralelo. La Fase 0 cabe en una sesión y conviene hacerla primero, sola.
+En total son unas **60 a 80 sesiones** de trabajo de Claude Code, repartidas en **17 entregas** (de `pk-11` a `pk-27`), más la Fase 6, que se puede hacer en paralelo. La Fase 0 cabe en una sesión y conviene hacerla primero, sola.
 
 ---
 
@@ -85,7 +90,7 @@ Hay que leerlas antes de cada fase. Salen del código y de `juegos/prokingdoms/C
 1. **Reiniciar está permitido, pero con orden** (decisión 1 del dueño).
    - Subir `D.SAVE_V` es la forma de reiniciar las partidas. `G.loadSave` (`js/game.js:1175`) descarta la partida local de otra versión, y `main.js` hace lo mismo con la partida en la nube (`net.cloud.v`). Todos empiezan de cero.
    - Para borrar también los mundos del servidor se usa el reinicio por versión de P1 (Fase 0).
-   - **Juntar los cambios que rompen:** cuantos menos reinicios, mejor. La sección 11 marca qué entregas reinician y propone agrupar todos los cambios de mapa en una sola.
+   - **Juntar los cambios que rompen:** cuantos menos reinicios, mejor. La sección 13 marca qué entregas reinician y propone agrupar todos los cambios de mapa en una sola.
    - Avisar en el juego: al entrar después de un reinicio, un cartel «El mundo se reinició con la actualización …».
    - Lo nuevo puede seguir entrando con valores por defecto en `G.init` (como `S.ret` o `S.perks`) cuando eso evita un reinicio. Donde este plan habla de «compatibilidad con partidas viejas», es **opcional**.
 2. **El mundo compartido se puede cambiar, pero cliente y servidor van juntos.** `D.SEED`, `D.MAPV`, los `amount` de `D.NODES`, `D.ZONES` y `world.js` los usa también el servidor (`server/sim.js` carga `util.js`, `data.js` y `world.js`).
@@ -98,7 +103,9 @@ Hay que leerlas antes de cada fase. Salen del código y de `juegos/prokingdoms/C
    - En `server/sim.js` están `LIM.slack` (2,5), `kindRate`, `armyMultMax` y `defMax`.
    - Si un bono nuevo (héroes, equipo, ánimo, estaciones, decoraciones) puede pasar ese margen, hay que actualizar `sim.js`.
    - Después hay que correr `node tools/cheat-test.js` y `cd functions && npm run prueba`, y avisar al dueño que **el despliegue es manual** (`firebase deploy --only functions`).
-5. **Las monedas del reino siguen separadas de las monedas de Juegos** (decisión 3 del dueño). Nada de este plan llama a `monedas.js`. La tienda cosmética de la Fase 3 usa monedas del reino.
+5. **Las monedas del reino siguen separadas de las monedas de Juegos** (decisión 3 del dueño). La tienda cosmética de la Fase 3 usa monedas del reino.
+   - **Única excepción:** el Pase semanal se compra con monedas de la página (decisión 5), siguiendo el mismo modelo que la tienda de perfiles (Fase 8).
+   - Va en un solo sentido: el juego nunca da monedas de la página.
 6. **Caché.** En cada entrega hay que:
    - subir el `?v=pk-N` de **todos** los scripts de `index.html` y del CSS;
    - subir `PK_VER` en `colabtex/src/juegos/prokingdoms.js`;
@@ -382,7 +389,7 @@ Hoy cada piso es «botón → esperar → batalla». La propuesta es convertir c
 
 ### H4. Mazmorras, enemigos y tropas nuevas (`pk-21`)
 
-Cambian el mapa, así que conviene ubicarlas en la **misma entrega que los lugares legendarios (H6)**, con un solo reinicio (regla 3 y sección 11).
+Cambian el mapa, así que conviene ubicarlas en la **misma entrega que los lugares legendarios (H6)**, con un solo reinicio (regla 3 y sección 13).
 
 | Mazmorra | Era | Enemigo nuevo | Recurso especial | Estructura de Leyenda que desbloquea |
 |---|---|---|---|---|
@@ -528,14 +535,9 @@ Tamaño: **L-XL (6-8 sesiones)**, `pk-19` y `pk-20`.
 - Con un barquito animado.
 - Abre una alternativa a las granjas y hace que los lagos sirvan para algo.
 
-### V10. Prestigio «Nueva Dinastía» (pendiente de decisión del dueño: no implementar todavía)
+### V10. Prestigio «Nueva Dinastía»: descartado
 
-**Qué es:** el reino se vuelve a fundar desde cero a cambio de bonos permanentes, que hacen la siguiente partida más rápida. Es el «ascender» de los juegos idle (Cookie Clicker, AdVenture Capitalist, Clicker Heroes). Es voluntario: nadie está obligado.
-
-
-- Desde la Era X se puede **fundar una nueva dinastía**: el reino vuelve a la Era I y se conservan los héroes, los cosméticos, el Álbum y la Crónica.
-- Se ganan **puntos de Legado** según la era y la Maravilla, que se gastan en un árbol permanente: +recolección, eras más rápidas, un héroe extra.
-- **Servidor:** la era baja. Hay que confirmar que `sim.js` acepta una era menor y que `vera` no bloquea volver a subir (`LIM.eraGap`). Se activa solo con el visto bueno del dueño.
+El dueño lo descartó el 3 de noviembre de 2026. La meta para quien llega al final la da el **Nuevo Mundo** (Fase 9).
 
 ### Criterios de aceptación de la Fase 3
 
@@ -722,7 +724,7 @@ Es un trabajo continuo. Cada fase deja estas piezas al día.
   - investiga, recluta y manda expediciones con probabilidad ≥ 80%;
   - reclama misiones.
 - Anota en consola y en `window.pkPiloto.log` el **tiempo hasta cada era**, los aldeanos ociosos, los recursos llenos y las batallas ganadas y perdidas.
-- Sirve para **medir el balance antes y después de cada cambio** (tabla de la sección 10) y para encontrar trabas como B2 y B5. Una versión de prueba de este piloto encontró los dos.
+- Sirve para **medir el balance antes y después de cada cambio** (tabla de la sección 12) y para encontrar trabas como B2 y B5. Una versión de prueba de este piloto encontró los dos.
 
 ### T2. Time-lapse
 
@@ -741,6 +743,8 @@ Hay que agregarla a `test:juegos` en `colabtex/package.json`. Carga `js/util.js`
 - **POI estables:** los ids de `W.pois` de los tipos de hoy no cambian. Se guarda una huella (tipo, x, y de los primeros 300) y se compara.
 - **B2:** en un mapa sintético, `placeWhy` rechaza el edificio que encierra al Centro Urbano.
 - **B1:** `addJob` funciona con aldeanos que tienen `scared` negativo.
+- **Pase (Fase 8):** cada premio existe (todo aspecto tiene su dibujo y todo recurso es válido), y el precio de la regla `pkPase` coincide con `PRECIO_PASE`.
+- **Nuevo Mundo (Fase 9):** las tablas del cielo (`js/datos-cielo.js`) pasan las mismas comprobaciones que las de la tierra.
 
 ### T4. Rendimiento
 
@@ -775,7 +779,225 @@ Siempre:
 
 ---
 
-## 10. Ritmo objetivo
+## 10. Fase 8: El Pase del Reino semanal
+
+Un pase de batalla de una semana, como el pase de oro de Clash of Clans. Se compra con **monedas de la página** y da recursos y cosas especiales, entre ellas aspectos de héroe (decisión 5 del dueño). Tamaño: **M-L (3-4 sesiones)**, `pk-21`.
+
+Toca tres lugares: el juego, el servidor de Pro Kingdoms (Cloud Function) y la economía de Juegos (reglas, `monedas.js` y el cierre). Antes de empezar hay que leer `docs/claude/juegos/perfiles-y-economia.md` y `docs/claude/firebase.md`.
+
+### PA1. Cómo funciona para el jugador
+
+- **Duración:** de lunes 00:00 a domingo 23:59, hora de Chile. Es la misma semana que ya usan las misiones semanales (`weekKey` en `js/quests.js`).
+- **25 niveles**, de 100 puntos de pase (PP) cada uno. Hay **dos pistas**:
+  - **Pista gratis**, para todos: recursos, esencia y algún cofre.
+  - **Pista dorada**, que se compra con monedas de la página: recursos más grandes, recursos especiales, equipo, **aspectos de héroe, de tropa y de edificio**, decoraciones, marcos de retrato y efectos de habilidad. Además da ventajas toda la semana (PA3).
+- **Después del nivel 25**, un «Cofre del pase» cada 300 PP, hasta 5. Así el que juega mucho sigue teniendo premio.
+- **Comprar a mitad de semana** entrega de una vez los premios dorados de los niveles ya alcanzados, como en Clash of Clans.
+- **Al terminar la semana**, los premios ganados y no reclamados se entregan solos.
+- El tema de cada semana cambia los aspectos (8 temas que rotan, Anexo A11).
+
+### PA2. Cómo se ganan puntos
+
+- **Retos del pase:** 3 diarios (40 a 80 PP) y 6 semanales (150 a 300 PP). Salen del mismo motor que las diarias, las semanales y los desafíos de V7. Ejemplos:
+  - «Gana 3 combates en mazmorras»;
+  - «Derrota a un jefe»;
+  - «Recolecta 20.000 recursos en zonas comunes»;
+  - «Usa 5 veces la habilidad de un héroe»;
+  - «Defiende una incursión sin perder recursos».
+- **Actividad normal**, con tope diario: 5 PP por mejora de edificio, 10 PP por expedición ganada, 2 PP por aldeano entrenado.
+- Jugando normal se llega al nivel 25 en **5 o 6 días**.
+- **La pista dorada no da más puntos ni vende niveles.** Lo que se paga son mejores premios, no saltarse el juego. Así nadie puede comprar progreso con monedas.
+
+### PA3. Ventajas de la pista dorada (toda la semana)
+
+- −15% de tiempo en las mejoras de edificios;
+- −15% de tiempo de investigación;
+- +1 espacio en la cola de obras y en la de investigación;
+- heridas de héroe un 30% más cortas;
+- reclamar las diarias de forma automática.
+
+**No da fuerza de ejército ni más recolección.** Lo que toca a otros jugadores (conquista, ranking, mercado) queda igual para quien paga y para quien no. Además, así el pase no choca con el antitrampas del servidor (regla 4).
+
+### PA4. Cómo se compra (lo más delicado)
+
+El juego vive en un marco sin Firebase (`sitio.js`). Las monedas de la página solo las puede gastar la página padre. La compra sigue **el mismo modelo que la tienda de perfiles** (`tienda/<uid>/<item>`):
+
+1. **El juego pide comprar.** El marco manda al padre `postMessage({ t: 'pkPase', semana })`, y `sitio.js` agrega ese mensaje a los que ya manda (`listo`, `volver`, `token`).
+2. **La página confirma con su propia ventana.** El cartero (`colabtex/src/juegos/prokingdoms.js`) muestra una confirmación propia del sitio, con el saldo real (`monedasDe(...).saldo`) y el precio.
+   - Así el marco no puede fingir una compra ni gastar sin que el jugador lo vea.
+   - Si el saldo no alcanza, el botón queda apagado.
+   - Son dos pasos, como en la tienda de Halloween.
+3. **Se escribe el registro de compra, una sola vez.** Va en `pkPase/<uid>/<semana>` = `{ at: now, p: PRECIO_PASE, s: semana }`. `semana` es el número de semanas desde un lunes fijo, en hora de Chile. La regla nueva en `firebase/database.rules.json` exige:
+   - `auth.uid === $uid`, `!data.exists()` y `newData.child('at').val() === now`;
+   - `newData.child('p').val() === PRECIO_PASE`;
+   - que `s` sea igual a la clave (`newData.child('s').val() + '' === $semana`);
+   - que `s` sea **la semana actual**, comparando con `now` como hace `diario` con `dia`, con la misma ventana de 25 horas para cubrir UTC−3 y UTC−4. Las reglas pueden hacer cuentas con números pero no con el nombre de una clave, por eso `s` va dentro del registro. No se puede comprar una semana pasada ni futura.
+   - Lectura: el dueño y los admins. Ningún otro campo.
+4. **La economía de Juegos lo descuenta** como cualquier gasto:
+   - `recorreEconomia` (`colabtex/src/juegos/monedas.js`) lee el nodo nuevo y agrega un evento de gasto, como el `t: "c"` de la tienda, con la categoría «Pro Kingdoms» en `paga(…, cat)`, para que aparezca en la pestaña Monedas (`monedas-vista.js`).
+   - Si el saldo no alcanzaba, pasa lo mismo que con la tienda: la compra no cuenta y la cuenta se frena.
+   - `fb-juegos.js`: `watchLogros` lee `pkPase` y `NODOS_MONEDAS` sube en 1.
+   - `cierre.js`: el nodo es chico y se escribe una sola vez, así que queda vivo como `tienda` y no va al archivo.
+   - El precio vive en un módulo puro nuevo (`colabtex/src/juegos/pase-pk.js`) que leen el cartero, `monedas.js` y las pruebas.
+5. **El servidor de Pro Kingdoms se entera.**
+   - El padre avisa al marco (`pkPaseOk`) y el juego llama `POST /api/pase/refresh`.
+   - La Cloud Function lee `pkPase/<uid>/<semana>` con el Admin SDK, que puede leerlo aunque la regla no deje a otros, y marca la pista dorada en el jugador del servidor.
+   - El servidor también lo revisa en cada `join`, por si el aviso se perdió.
+6. **Un solo sentido.** El juego nunca da monedas de la página (decisión 3).
+
+**Pruebas y despliegue:**
+
+- `tests/monedas.test.cjs`: la categoría nueva suma bien y cuadra con `gastadas`.
+- `tests/cierre.test.cjs`: el cierre conserva `pkPase`.
+- `colabtex/test-rules.mjs`: la regla (precio, semana, una sola escritura, otro uid rechazado).
+- Una prueba que lea la regla y compare el precio con `PRECIO_PASE`, como hace `tienda.test.cjs` con la tienda.
+- **Re-publicar las reglas a mano** en la consola de Firebase (no se despliegan con push), y desplegar la función.
+
+### PA5. Servidor: puntos, niveles y premios
+
+- **Estado por jugador** en `sim.js`: `pase: { sem, pp, ppHoy, dorado, cobrados: { gratis: [], dorado: [] }, retos }`.
+- **Los puntos los decide el servidor.**
+  - Usa lo que ve del jugador (la foto de cada sync, ya acotada) y las acciones que pasan por él: expediciones, jefes y retos en línea.
+  - Cada reto tiene un tope de PP por día, y el total diario también (`LIM.pasePPDia`, por ejemplo 450). Así un tramposo como mucho completa el pase, que igual tiene un techo natural.
+- **Reclamar:** `POST /api/pase/claim { nivel, pista }`. El servidor entrega el premio por el **buzón** que ya existe (`inbox`). Los recursos entran como premio conocido, no como recolección sospechosa.
+- **Cambio de semana:** el servidor cierra el pase anterior, entrega lo pendiente y arranca el nuevo con el tema que toca.
+
+### PA6. Aspectos (skins)
+
+- Son solo visuales y se describen con datos: `D.ASPECTOS = { id: { tipo: 'heroe' | 'tropa' | 'edificio' | 'efecto', clase, paleta, casco, capa, arma, aura, semana } }`.
+- Se dibujan por código como todo el arte: el retrato (`Sp.retrato`), la figura en batalla (`S.troop`) y el edificio (una variante de `BDRAW`, con caché aparte en `BCACHE`).
+- **Dónde se guardan:** los que tiene cada jugador los guarda el servidor (los dio el pase) y se copian a `S.aspectos`.
+- Cada héroe elige su aspecto en su ficha, y cada edificio en su panel.
+- **Exclusividad:** los aspectos de una semana no vuelven durante un año (decisión pendiente, sección 15).
+
+### PA7. Interfaz
+
+- Botón **«Pase»** en la barra superior, junto a la era, con el nivel (por ejemplo «12/25») y un brillo dorado si se compró.
+- Ventana con:
+  - las dos pistas en horizontal, con desplazamiento;
+  - los retos del día y de la semana;
+  - la cuenta regresiva;
+  - una vista previa animada del aspecto de héroe de la semana;
+  - el botón **«Desbloquear pista dorada (2.500 🪙)»**.
+- En el celular, las pistas van en vertical.
+
+### Criterios de aceptación de la Fase 8
+
+- Con saldo suficiente, comprar activa la pista dorada en menos de 5 s, y la pestaña Monedas muestra el gasto en «Pro Kingdoms».
+- Sin saldo, el botón está apagado. Si alguien escribe el nodo desde la consola, la regla o la economía lo frenan.
+- Comprar el miércoles entrega los premios dorados de los niveles ya alcanzados.
+- Las pruebas de monedas, cierre y reglas pasan. Las reglas se re-publicaron.
+
+---
+
+## 11. Fase 9: El Nuevo Mundo, «Las Islas del Cielo»
+
+Reemplaza a la «Nueva Dinastía» (decisión 4 del dueño). La inspiración es la segunda isla de Clash of Clans (la Base del Constructor): **una segunda base con otra temática, otra economía, otros edificios y otra forma de jugar**, a la que se viaja en barco. Aquí se viaja en dirigible. Tamaño: **XXL (15-20 sesiones)**, en 4 entregas (`pk-24` a `pk-27`).
+
+### N1. Quién entra: terminar la primera fase por completo
+
+- **Terminar la primera fase** quiere decir completar la Crónica: los 10 capítulos de la campaña (H5), que terminan en la Era XI con la derrota de Ignivor y la coronación.
+- **La Nave del Cielo es una meta que se ve desde temprano:**
+  - En el capítulo 6 (Era VII) aparecen junto al reino los restos de un dirigible gigante.
+  - Los capítulos 6 a 10 piden piezas para repararlo, con recursos especiales y trofeos de jefe (Anexo A4).
+  - Así el Nuevo Mundo es algo que se persigue durante semanas, no una sorpresa al final.
+- **Un adelanto para los que aún no llegan:** la ventana de la Nave muestra imágenes del mundo del otro lado y lo que falta para repararla.
+- Si la campaña (`pk-18`) sale antes que el Nuevo Mundo (`pk-24`), la Nave queda reparada pero dice «El viaje llega con la próxima gran actualización».
+
+### N2. El tema: Islas del Cielo
+
+- Islas flotantes sobre un mar de nubes, unidas por puentes colgantes.
+- Hay dirigibles, cristales de éter, piratas del cielo, grifos y tormentas.
+- Se eligió porque es **lo más distinto posible de la tierra medieval** (otro suelo, otra luz, otra música). También encaja con lo que el jugador domina al final: con acero y maquinaria se construyen dirigibles.
+- **Alternativas** para el dueño (sección 15):
+  - Archipiélago de Bruma: mar, barcos y piratas;
+  - Tierras Heladas: hielo, vikingos y mamuts;
+  - Desierto de Ámbar: oasis, ruinas solares y escorpiones gigantes.
+
+### N3. Qué cambia en la forma de jugar
+
+No es «lo mismo con otros colores». Cinco mecánicas propias:
+
+1. **Espacio limitado y expansión por islas.**
+   - El reino empieza en una isla chica. Se crece **anclando islas nuevas** con puentes colgantes, en vez de reclamar parcelas.
+   - Cada isla tiene un rasgo: Isla de los Vientos (+molinos), Isla Volcánica (+fundición), Isla de los Grifos (nidos), Isla de Cristal (+éter).
+   - Elegir qué islas unir es la decisión clave.
+2. **Exploración en dirigible.**
+   - El mar de nubes se recorre en dirigible, no a pie.
+   - Las **corrientes de viento** cambian con la hora del reloj real (de forma predecible) y hacen que una ruta sea rápida o lenta. Planificar el viaje importa.
+   - Las tormentas cierran zonas por un rato.
+3. **Flota en vez de ejército de a pie.**
+   - Arqueros del viento, jinetes de grifo, cañoneros de éter y dirigibles de guerra.
+   - Las batallas son aéreas, en un escenario nuevo de nubes (`escenarios.js`, tema «cielo»). **La altura importa:** los que vuelan alto disparan más lejos y los de abajo se cubren en las nubes.
+4. **Energía de éter.**
+   - Los edificios grandes necesitan éter de los cristales, que llega por una red de **conductos**.
+   - Es un acertijo de logística nuevo y reemplaza a las carretas.
+5. **Un modo competitivo propio: la Copa del Cielo.**
+   - Carreras semanales de dirigibles: la ruta, el viento y las mejoras de la nave deciden.
+   - Duelos de flotas sin tener que estar conectados a la vez, que resuelve el servidor.
+   - Liga con ascensos y premios, como las batallas versus de la segunda isla de Clash of Clans.
+
+### N4. Contenido
+
+Las tablas están en el Anexo A12:
+
+- 5 recursos base y 3 elaborados;
+- unos 20 edificios;
+- 5 enemigos, 5 tropas y 3 jefes;
+- **6 eras propias**: «Eras del Cielo I a VI», con su propia rama de la Crónica y misiones.
+
+### N5. Puentes entre los dos mundos
+
+Para que ninguno de los dos quede abandonado:
+
+- **Los héroes viajan.** Cada héroe está en un mundo a la vez, y el viaje en la Nave tarda un rato. Hay una clase nueva que solo se recluta en el cielo: la **Aeronauta**, que dirige la flota y descubre corrientes.
+- **Comercio entre mundos:** la Nave lleva cargas en los dos sentidos.
+  - El cielo necesita acero y maquinaria de la tierra para empezar.
+  - La tierra necesita éter y plumas para sus mejoras más altas (Maravilla nivel 20 o más, Coloso, Gran Archivo).
+- **Un edificio del cielo ayuda a la tierra**, como el O.T.T.O. de Clash of Clans: el **Taller del Gran Inventor** da +1 Maestro de Obras en la tierra.
+- El **Pase semanal** (Fase 8) y el **Álbum** cubren los dos mundos.
+
+### N6. Arquitectura (lo más delicado)
+
+- **Un mundo vivo a la vez.** El que no se está mirando avanza con el cálculo sin conexión (`G.simulateOffline`) cuando el jugador vuelve, como la otra base de Clash of Clans. Así el motor nunca simula dos mapas al mismo tiempo.
+- **Estado:**
+  - `S.mundos = { tierra: {…}, cielo: {…} }` y `S.mundoActivo`.
+  - Viajar guarda el mundo actual, regenera `W` con el tema del otro y restaura sus unidades y edificios (`G.init` con un parámetro de mundo).
+  - Esta entrega sube `D.SAVE_V`, lo que está permitido (regla 1).
+- **Mundo generado por tema:**
+  - `W.generate(seed, tema)` con `D.TEMAS = { tierra, cielo }`: suelos, tipos de nodo, lugares y bordes.
+  - El «agua» de la tierra es en el cielo **el vacío**: no se camina ni se construye, y debajo se ven nubes con paralaje.
+  - Las tablas del cielo (recursos, edificios, eras, misiones) van en un archivo nuevo, `js/datos-cielo.js`, para no inflar `data.js`.
+- **Arte:** es la parte más grande del trabajo.
+  - `BDRAW` nuevos para unos 20 edificios.
+  - Suelo de isla con bordes que caen al vacío, y nubes debajo del mapa.
+  - Dirigibles y grifos animados.
+  - Escenario de batalla «cielo» y música propia (U5).
+- **Servidor:**
+  - Mundos del cielo aparte en `sim.js` (`tema: 'cielo'`, de 8 a 16 casillas), con sus islas compartidas y su propio `D.MAPV`.
+  - Antitrampas propio: los recursos que el servidor vigila (`TRACKED`) y las tasas de `kindRate` del cielo.
+  - Rutas de la Copa del Cielo y del comercio entre mundos, con límites diarios en `LIM`.
+- **Preparar desde antes.** Al partir `ui.js` (T5, `pk-12`) y al cambiar `world.js` para el mapa nuevo (`pk-18`), dejar `W.generate` listo para recibir un tema y las ventanas listas para un segundo juego de tablas. Así no hay que rehacerlo después.
+
+### N7. Entregas
+
+| Entrega | Contenido |
+|---|---|
+| `pk-24` | Motor de dos mundos, la Nave y el viaje, todavía sin contenido del cielo (una isla de prueba) |
+| `pk-25` | Islas, recursos, edificios, eras del cielo y su arte |
+| `pk-26` | Flota, batallas aéreas, enemigos y jefes del cielo |
+| `pk-27` | Copa del Cielo y puentes entre mundos (héroes que viajan, comercio, Taller del Gran Inventor) |
+
+### Criterios de aceptación de la Fase 9
+
+- Un jugador con la Crónica completa repara la Nave, viaja al cielo y vuelve sin perder nada de ningún mundo.
+- Al volver a la tierra después de 3 horas en el cielo, el informe «Mientras no estabas» muestra lo que pasó en la tierra.
+- El cielo **se ve y se juega distinto**: capturas lado a lado de los dos mundos a la misma hora de juego.
+- El servidor acepta los dos mundos y el cheat-test pasa en ambos.
+
+---
+
+## 12. Ritmo objetivo
 
 Se mide con el piloto (T1), jugando sin trucos. Las cifras de «hoy» salen de la prueba del 3 de noviembre y de `D.eraTime` y `D.eraReq`.
 
@@ -789,12 +1011,14 @@ Se mide con el piloto (T1), jugando sin trucos. Las cifras de «hoy» salen de l
 | Era V | varias horas (estimado según `data.js`) | 4-6 h | |
 | Era VI y Maravilla | ~1 día (estimado) | 1-2 días | Elegir Maravilla (V6). |
 | Era VII en adelante | días | días | Cartas de era, decretos, jefes de gremio. |
+| Pase semanal | (no existe) | nivel 25 en 5-6 días de juego normal | Retos diarios y semanales (Fase 8). |
+| Nuevo Mundo | (no existe) | al terminar la Crónica (semanas) | La Nave del Cielo se ve desde la Era VII (Fase 9). |
 
 **Regla de oro:** en cualquier era, siempre tiene que haber **algo que decidir en los próximos 10 minutos**: un encuentro, un camino de incursión, un evento con opciones, un talento, una carta o un tratado.
 
 ---
 
-## 11. Orden de trabajo y versiones
+## 13. Orden de trabajo y versiones
 
 | # | Entrega | Contenido | Depende de | Tamaño | ¿Reinicia? |
 |---|---|---|---|---|---|
@@ -808,10 +1032,14 @@ Se mide con el piloto (T1), jugando sin trucos. Las cifras de «hoy» salen de l
 | 8 | `pk-18` | **Campaña**, lugares legendarios y **todo el mapa nuevo** de una vez: lugares de H6, mazmorras de H4 y lugares únicos de la campaña (H5) | 5, 7 | L-XL | **Sí: el reinicio grande** |
 | 9 | `pk-19` | Árbol 2.0, cartas de era y estaciones (V1, V2, V3) | 1 | L | No |
 | 10 | `pk-20` | Ánimo, decoraciones, cercanía, Maravillas 2.0, muelle, desafíos y tienda (V4 a V9) | 9 | L | Opcional |
-| 11 | `pk-21` | **Combate 2.0** (C1, C4 a C8), enemigos y tropas de H4 (las mazmorras ya están en el mapa desde `pk-18`) | 6, 8 | L-XL | No |
-| 12 | `pk-22` y más | **Mundo vivo** (S1 a S5), directo en línea con el servidor | 5, 11 | XL | Opcional |
+| 11 | `pk-21` | **Pase del Reino semanal** (Fase 8): servidor, compra con monedas de la página (reglas, economía, cierre) y aspectos | 5, 10 | M-L | No |
+| 12 | `pk-22` | **Combate 2.0** (C1, C4 a C8), enemigos y tropas de H4 (las mazmorras ya están en el mapa desde `pk-18`) | 6, 8 | L-XL | No |
+| 13 | `pk-23` | **Mundo vivo** (S1 a S5), directo en línea con el servidor | 5, 12 | XL | Opcional |
+| 14 | `pk-24` | **Nuevo Mundo (a)**: motor de dos mundos, la Nave y el viaje | 8, 12 | L | **Sí** (sube `D.SAVE_V`) |
+| 15 | `pk-25` | **Nuevo Mundo (b)**: islas, recursos, edificios, eras y arte del cielo | 14 | XL | Opcional |
+| 16 | `pk-26` | **Nuevo Mundo (c)**: flota, batallas aéreas, enemigos y jefes del cielo | 15 | L | No |
+| 17 | `pk-27` | **Nuevo Mundo (d)**: Copa del Cielo y puentes entre mundos | 16, 13 | L | No |
 | — | (en paralelo) | **Fase 6**: menú agrupado, tutorial, celular, música y accesibilidad | 2 | M-L | No |
-| — | (pendiente de decisión) | Prestigio «Nueva Dinastía» (V10) | 9, 10 | M | — |
 
 Notas:
 
@@ -819,11 +1047,12 @@ Notas:
 - «Opcional» en la última columna quiere decir que se puede reiniciar si simplifica el trabajo, aprovechando la decisión 1 del dueño. Si dos entregas seguidas iban a reiniciar, conviene juntarlas en un solo reinicio.
 - **Toda entrega que toque el servidor termina con el despliegue manual de la función** (`firebase deploy --only functions`) justo al hacer merge, para que cliente y servidor no se desfasen (regla 2).
 - Las entregas 5 a 8 son la «mega actualización» propiamente dicha. Si hay que recortar, el orden de valor es **Héroes → Mazmorras 2.0 → Campaña → Viajes**.
+- El Pase (entrega 11) puede adelantarse apenas existan los héroes (`pk-15`) si se quiere empezar a cobrarlo antes. En ese caso, los aspectos de tropa y de edificio van primero, y los retos usan las diarias y semanales que ya existen hasta que lleguen los desafíos de V7.
 - La Fase 0 no espera a nada: es la siguiente sesión.
 
 ---
 
-## 12. Lista de control de cada entrega
+## 14. Lista de control de cada entrega
 
 - [ ] **Sin reinicio:** una partida guardada en la versión anterior carga sin perder nada. **Con reinicio:** se subieron `D.SAVE_V`, `D.MAPV` (si cambió el mapa) y `D.MUNDO_VER`, el mundo del servidor queda vacío en los emuladores y aparece el cartel de reinicio.
 - [ ] Una partida nueva llega a la Era II sin errores en la consola.
@@ -836,31 +1065,36 @@ Notas:
 - [ ] Anotadas en `juegos/prokingdoms/CLAUDE.md` las decisiones nuevas, en pocas líneas.
 - [ ] El piloto (T1) corre y anota los tiempos de era. Comparar con la entrega anterior.
 - [ ] Si se tocó el servidor: `D.PROTO` subido si cambió algo que ven los dos lados, y aviso al dueño de que debe desplegar la función a mano justo al hacer merge.
+- [ ] Si se tocó el pase o la economía de Juegos: `monedas.test.cjs`, `cierre.test.cjs` y `test-rules.mjs` pasan, y aviso al dueño de que debe **re-publicar las reglas** en la consola de Firebase (no se despliegan con push).
 
 ---
 
-## 13. Decisiones que debe tomar el dueño
+## 15. Decisiones que debe tomar el dueño
 
 **Ya decididas (3 de noviembre de 2026):**
 
 - **Reinicios:** permitidos cuando hagan falta (regla 1).
 - **Monedas del reino:** siguen separadas de las de Juegos.
 - **En línea:** todo se implementa en línea de una vez, sin una versión local previa.
+- **Sin «Nueva Dinastía»:** en su lugar, el Nuevo Mundo para quien termine la primera fase (Fase 9).
+- **Pase semanal** con monedas de la página (Fase 8).
 
 **Pendientes:**
 
-1. **Prestigio «Nueva Dinastía» (V10).** ¿Sí o no?
-   - *A favor:* da una meta cuando las eras ya tardan días, y deja probar otras elecciones (cartas, Maravilla, árbol) en una partida nueva.
-   - *En contra:* a algunos jugadores no les gusta empezar de cero. En línea, la era baja, lo que mueve el ranking y el emparejamiento de conquistas (`D.canConquer` usa era y poder) y obliga a revisar el antitrampas de la era (`vera`, `LIM.eraGap`).
-   - Recomendación: **decidir cuando los primeros jugadores lleguen a la Era X**. Hasta entonces no se implementa.
-2. **Consumo de comida en invierno (V3).** ¿Bonos suaves o consumo real? Recomendación: **bonos suaves**, para no castigar al que se va 12 horas.
-3. **Tope de héroes:** 6 por reino. ¿Más con la tienda? Recomendación: **no** vender héroes, solo cosméticos.
-4. **Nombre de la actualización:** «Héroes y Fronteras» es una propuesta.
-5. **Fin de la beta cerrada:** ¿se abre a todos con esta actualización (quitar `beta: true` en `SOLOS`)? Recomendación: después de la entrega 8, que trae el reinicio grande, para que todos empiecen juntos en el mundo nuevo.
+1. **Precio del pase.** Recomendación: **2.500 🪙** por semana.
+   - Es la mitad de un marco de la tienda de perfiles (5.000).
+   - Con la recompensa diaria (de 250 a 1.000 por día) se paga en 3 o 4 días sin jugar nada más.
+   - Se ajusta en un solo lugar (`pase-pk.js`) más la regla.
+2. **¿Vuelven los aspectos de semanas pasadas?** Recomendación: **no durante un año**. Después pueden volver en la Tienda del reino (monedas del reino), para que haber tenido el pase siga valiendo algo.
+3. **Tema del Nuevo Mundo.** Recomendación: **Islas del Cielo**. Las alternativas están en N2.
+4. **Consumo de comida en invierno (V3).** ¿Bonos suaves o consumo real? Recomendación: **bonos suaves**, para no castigar al que se va 12 horas.
+5. **Tope de héroes:** 6 por reino. ¿Más con la tienda? Recomendación: **no** vender héroes, solo cosméticos.
+6. **Nombre de la actualización:** «Héroes y Fronteras» es una propuesta.
+7. **Fin de la beta cerrada:** ¿se abre a todos con esta actualización (quitar `beta: true` en `SOLOS`)? Recomendación: después de la entrega 8, que trae el reinicio grande, para que todos empiecen juntos en el mundo nuevo.
 
 ---
 
-## 14. Anexos: tablas de contenido nuevo
+## 16. Anexos: tablas de contenido nuevo
 
 Son valores iniciales para implementar y después ajustar con el piloto.
 
@@ -912,11 +1146,11 @@ Son valores iniciales para implementar y después ajustar con el piloto.
 3. **Era IV, «La reina Brunilda».** La vecina reclama tu frontera. Se resuelve por diplomacia (regalos y un tratado) o por la fuerza (defender un asedio). La elección cambia la relación con ella para siempre (S1).
 4. **Era V, «La estrella caída».** La Orden del Cráter recoge hierro estelar a escondidas. Hay que investigar el Cráter y vencer al **Heraldo Estelar**.
 5. **Era VI, «La Maravilla».** Hay que elegir y levantar la Maravilla (V6) mientras la Orden intenta sabotearla con eventos de incendio y robo.
-6. **Era VII, «El despertar».** Temblores en las montañas. Hay que encontrar el **Cementerio de Dragones** (un lugar legendario) y vencer a una cría.
-7. **Era VIII, «Las aguas oscuras».** Se abre el **Templo Hundido** y hay que derrotar a **La Voz del Abismo**.
-8. **Era IX, «La alianza».** Hay que reunir a 3 reinos en una alianza (S1) para el asalto final.
-9. **Era X, «Ignivor».** Asalto al **Nido** en la última fase: jefe a 3 fases con todos los héroes.
-10. **Era XI, «La leyenda».** Un epílogo: coronación, una Maravilla dorada cosmética y el título «Leyenda del Reino». De aquí parte el prestigio (V10), si existe.
+6. **Era VII, «El despertar».** Temblores en las montañas. Hay que encontrar el **Cementerio de Dragones** (un lugar legendario) y vencer a una cría. Junto al reino caen **los restos de la Nave del Cielo**, un dirigible gigante: el Forastero cuenta que viene de «las islas sobre las nubes». Primera pieza: el casco (Fase 9).
+7. **Era VIII, «Las aguas oscuras».** Se abre el **Templo Hundido** y hay que derrotar a **La Voz del Abismo**. Segunda pieza de la Nave: el timón, que estaba en el templo.
+8. **Era IX, «La alianza».** Hay que reunir a 3 reinos en una alianza (S1) para el asalto final. Tercera pieza: las velas de seda, un regalo de los aliados.
+9. **Era X, «Ignivor».** Asalto al **Nido** en la última fase: jefe a 3 fases con todos los héroes. Cuarta pieza: el corazón de fuego de Ignivor, que será el motor de la Nave.
+10. **Era XI, «La leyenda».** Un epílogo: coronación, una Maravilla dorada cosmética y el título «Leyenda del Reino». Al final, **la Nave del Cielo despega** y se abre el Nuevo Mundo (Fase 9).
 
 ### A5. Encuentros en el camino (muestra de 12 de 30)
 
@@ -1025,6 +1259,77 @@ Son valores iniciales para implementar y después ajustar con el piloto.
 ### A10. Decoraciones
 
 Farol (+1 de ánimo, radio 3), Banca, Pozo, Árbol frutal (+comida chica), Estatua del fundador, Fuente (+2 de ánimo, radio 5), Jardín de flores, Plaza adoquinada (bonus de casas), Estandarte del reino, Arco de triunfo (solo por logros), Escenario del juglar, Columna conmemorativa (por jefe vencido), Glorieta, Estanque con peces, Hoguera de fiesta.
+
+### A11. Pase del Reino: una semana de ejemplo
+
+Los recursos escalan con la era del jugador, como `scale` del servidor (×1,6 por era). «R» es un paquete de comida, madera, piedra y oro de la era.
+
+| Nivel | Pista gratis | Pista dorada |
+|---|---|---|
+| 1 | R ×1 | Estandarte de la semana |
+| 2 | Esencia 20 | R ×3 |
+| 3 | R ×1 | 10 recursos especiales a elección |
+| 4 | Cofre chico | Marco de retrato de héroe |
+| 5 | **Cofre del pase** | **Aspecto de edificio de la semana** y R ×3 |
+| 6 a 9 | R, esencia, gemas o pociones (se alternan) | R ×3, esencia ×2, equipo raro, curar todas las heridas |
+| 10 | Equipo raro | **Aspecto de tropa de la semana** |
+| 11 a 14 | Como 6 a 9 | Como 6 a 9, más gemas |
+| 15 | **Cofre del pase** | **Equipo épico** y decoración de la semana |
+| 16 a 19 | Como 6 a 9 | Como 6 a 9, con esencia ×3 |
+| 20 | Gemas 30 | **Efecto de habilidad** (color y partículas) para el héroe de la semana |
+| 21 a 24 | Como 6 a 9 | Como 6 a 9, con recursos especiales |
+| 25 | **Cofre grande** | **Aspecto de héroe exclusivo de la semana** y equipo épico |
+| Más de 25 | — | Cofre del pase cada 300 PP, hasta 5 |
+
+**Temas semanales** (8 que rotan; el primero de cada tema puede salir en una fecha especial):
+
+| Semana | Aspecto de héroe (nivel 25) | Aspecto de edificio (nivel 5) | Aspecto de tropa (nivel 10) | Decoración (nivel 15) |
+|---|---|---|---|---|
+| Del Dragón | Paladín «Escama de Ignivor» | Taberna «Guarida del Dragón» | Lanceros de escamas | Estatua de dragón |
+| Piratas del Cielo (adelanto del Nuevo Mundo) | Guardabosques «Capitana del Viento» | Muelle con velas | Arqueros con sombrero de pirata | Ancla dorada |
+| De Invierno | Clériga «Dama de la Escarcha» | Centro Urbano nevado | Milicia con capas de piel | Muñeco de nieve |
+| De los No-muertos | Hechicero «Nigromante» | Taberna embrujada | Caballeros espectrales | Calabazas y lápidas |
+| Del Torneo | Juglar «Heraldo del Torneo» | Cuartel con gradas | Caballeros de justa | Estandartes de justa |
+| Arcana | Hechicero «Archimago Estelar» | Biblioteca con cúpula de estrellas | Clérigos de túnica estelar | Orbe flotante |
+| De la Cosecha | Ingeniera «Maestra de los Molinos» | Molino gigante | Milicia de granjeros | Espantapájaros |
+| Del Gremio | Paladín «Guardián del Roble» | Salón del Gremio dorado | Lanceros del Roble | Árbol del Roble |
+
+### A12. Islas del Cielo: contenido
+
+**Recursos:**
+
+| Base | Para qué | Elaborado | Receta |
+|---|---|---|---|
+| Frutos del sol | Comida | Seda de nube | Plumas + frutos (Telar) |
+| Madera de nube | Construcción, dirigibles | Engranajes celestes | Piedra flotante + éter (Fundición celeste) |
+| Piedra flotante | Islas, puentes, defensas | Núcleos de éter | Éter + engranajes (Destilería) |
+| Éter | Energía de edificios (conductos) | | |
+| Plumas de grifo | Velas, jinetes de grifo | | |
+
+**Edificios (unos 20):**
+
+- **Centro:** Ciudadela del Cielo (hace de Centro Urbano).
+- **Población:** Casa colgante.
+- **Acopio y recolección:** Molino de viento (acopio), Huerto solar (comida), Aserradero de nubes, Cantera flotante, Recolector de éter.
+- **Talleres:** Telar de seda, Fundición celeste, Destilería de éter.
+- **Ejército:** Nido de grifos, Astillero de dirigibles, Academia del viento (arqueros y aeronautas).
+- **Defensa:** Torre de rayos, Cañón de éter, Red de nubes (trampa).
+- **Expansión y logística:** Ancla de isla, Puente colgante, Conducto de éter.
+- **Especiales:** Faro de corrientes (exploración y viento), Observatorio de tormentas, Taller del Gran Inventor (+1 Maestro de Obras en la tierra) y Santuario del Viento (la Maravilla del cielo).
+
+**Eras del Cielo:** I Atalaya · II Puerto · III Flota · IV Ciudad Flotante · V Reino del Viento · VI Trono de las Nubes.
+
+**Enemigos y jefes:**
+
+| Enemigo | Cómo pelea | Qué conviene |
+|---|---|---|
+| Piratas del cielo | Abordan desde dirigibles; los tiradores disparan desde arriba | Jinetes de grifo y cañoneros |
+| Elementales de tormenta | Rayos en cadena entre grupos juntos | Dispersarse; arqueros del viento |
+| Grifos salvajes | Rápidos, van por los tiradores | Mantener la línea; ballestas de la flota |
+| Autómatas de éter | Duros; explotan al morir | Cañoneros a distancia |
+| **Jefes:** Capitana Garra Negra (pirata, Era II), El Ojo de la Tormenta (Era IV), El Leviatán de las Nubes (Era VI) | Fases y mecánicas como los de A2 | |
+
+**Tropas:** Arquero del viento, Jinete de grifo, Cañonero de éter, Dirigible de guerra (unidad grande que lleva tropas) y la heroína **Aeronauta**.
 
 ---
 
