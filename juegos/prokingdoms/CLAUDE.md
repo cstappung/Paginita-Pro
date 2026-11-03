@@ -218,3 +218,10 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Touch deselect:** tapping empty ground releases the selection (it used to
   send villagers walking there), as does tapping the only selected villager
   again or the panel's ✕. The TC rally point is set by tapping a resource.
+- **Battle scenery** lives in `js/escenarios.js` (`PK.Escenarios`): one
+  procedural pixel-art scene per place (camp at dusk, crystal cave, lair,
+  crypt, crater, dragon nest). It covers the whole screen (`escenario()` in
+  `batalla.js` stretches the field plus a margin to the screen shape), with a
+  static background, a front layer (stalactites, roots), animated decor and a
+  darkness-with-lights pass. While the battle is open the kingdom map is not
+  drawn (`main.js`), which kept it near 60 fps.

@@ -65,7 +65,7 @@
       const steps = PK.Game.timeScale;
       for (let i = 0; i < steps; i++) PK.Game.update(dt);
       PK.Input.update(dt);
-      PK.Render.draw(dt);
+      if (!(PK.Batalla && PK.Batalla.abierta())) PK.Render.draw(dt); // con la batalla a pantalla completa, el mapa no se ve
       PK.UI.update(dt);
       requestAnimationFrame(frame);
     }

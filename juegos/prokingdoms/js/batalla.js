@@ -369,41 +369,53 @@
   }
 
   // ---------- Dibujo ----------
-  function fondo() {
-    const v = vista, b = v.b, t = TERRENO[b.lugar], [w, h] = v.parado ? [LV * TILE, LU * TILE] : [LU * TILE, LV * TILE];
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const x = c.getContext('2d'), rnd = U.rng(b.id * 97 + 13);
-    for (let j = 0; j < h; j += 2) for (let i = 0; i < w; i += 2) {
-      const k = (U.noise(i / 22, j / 22, b.id) - 0.5) * t.tono * 2 + (rnd() - 0.5) * t.tono * 0.6;
-      x.fillStyle = 'rgb(' + t.suelo.map(q => Math.round(U.clamp(q + k, 0, 255))).join(',') + ')';
-      x.fillRect(i, j, 2, 2);
-    }
-    // adornos del lugar, lejos del centro de la pelea
-    for (let n = 0; n < 16; n++) {
-      const u = rnd() < 0.5 ? 1 + rnd() * 3 : LU - 1 - rnd() * 3.5, vv = rnd() < 0.5 ? 0.5 + rnd() * 1.6 : LV - 0.5 - rnd() * 1.6;
-      const [px, py] = v.parado ? [vv * TILE, (LU - u) * TILE] : [u * TILE, vv * TILE];
-      adorno(x, t.deco, Math.round(px), Math.round(py), rnd);
-    }
-    return c;
+  // Tamaño del escenario: el campo más un margen, estirado a la forma de la pantalla (sin franjas negras).
+  function escenario(b, cv) {
+    const fw = (vista.parado ? LV : LU) * TILE, fh = (vista.parado ? LU : LV) * TILE, A = cv.width / cv.height, pad = 30;
+    let W = fw + pad * 2, H = fh + pad * 2;
+    if (W / H > A) H = W / A; else W = H * A;
+    W = Math.ceil(W); H = Math.ceil(H);
+    const mx = Math.round((W - fw) / 2), my = Math.round((H - fh) / 2);
+    const esc = PK.Escenarios.crear(b.lugar, { W, H, fw, fh, mx, my, parado: vista.parado, seed: Math.floor(b.id * 131) % 100000 + 7, LU, LV });
+    esc.mx = mx; esc.my = my;
+    return esc;
   }
-  function adorno(x, deco, px, py, rnd) {
-    const r = (cx, cy, w, h, col) => { x.fillStyle = col; x.fillRect(px + cx, py + cy, w, h); };
-    if (deco === 'carpa') { r(-7, -8, 14, 8, '#7a3a20'); r(-5, -11, 10, 3, '#9a4a28'); r(-1, -8, 2, 8, '#2a1608'); }
-    else if (deco === 'cristal') { r(-2, -9, 3, 9, '#8ae0f0'); r(1, -6, 3, 6, '#3a9ac0'); r(-1, -9, 1, 3, '#e8fbff'); }
-    else if (deco === 'hueso') { r(-4, -1, 8, 2, '#e6dcc0'); r(-5, -2, 2, 4, '#e6dcc0'); r(3, -2, 2, 4, '#e6dcc0'); }
-    else if (deco === 'lapida') { r(-3, -8, 6, 8, '#6a6a70'); r(-2, -9, 4, 1, '#6a6a70'); r(-1, -6, 2, 4, '#3a3a40'); }
-    else if (deco === 'estrella') { r(-3, -3, 6, 4, '#2a1e1a'); r(-1, -2, 2, 2, rnd() < 0.5 ? '#ffb060' : '#a8c0e8'); }
-    else if (deco === 'oro') { r(-5, -2, 10, 3, '#e8b83a'); r(-3, -4, 6, 2, '#ffd84a'); r(-1, -5, 2, 1, '#fff0a0'); }
-    else { r(-1, -4, 1, 4, '#4a7a2a'); r(1, -3, 1, 3, '#5a8a32'); r(-3, -2, 1, 2, '#4a7a2a'); }
-  }
-  // Dragón: dibujado una vez por cuadro de aleteo (24x16 px)
+  // Dragón: pixel art de 36x26 con dos cuadros de aleteo (alas arriba y abajo), mirando a la derecha.
   const dragonSpr = [0, 1].map(fr => {
-    const c = document.createElement('canvas'); c.width = 26; c.height = 18;
+    const c = document.createElement('canvas'); c.width = 36; c.height = 26;
     const x = c.getContext('2d'), r = (a, b2, w, h, col) => { x.fillStyle = col; x.fillRect(a, b2, w, h); };
-    r(6, 8, 13, 5, '#a8281c'); r(17, 5, 5, 5, '#a8281c'); r(21, 6, 3, 2, '#c83a28'); r(22, 5, 1, 1, '#ffe27a');
-    r(2, 10, 5, 2, '#a8281c'); r(0, 11, 3, 1, '#7a1a14'); r(8, 13, 2, 3, '#7a1a14'); r(15, 13, 2, 3, '#7a1a14');
-    if (fr) { r(8, 2, 7, 6, '#d84a2a'); r(9, 0, 4, 2, '#d84a2a'); } else { r(8, 6, 8, 3, '#d84a2a'); r(6, 8, 4, 2, '#d84a2a'); }
-    r(7, 12, 12, 1, '#f0a050');
+    // triángulo relleno por filas (para las alas)
+    const tri = (ax, ay, bx, by, cx, cy, col) => {
+      const y0 = Math.min(ay, by, cy), y1 = Math.max(ay, by, cy);
+      for (let y = y0; y <= y1; y++) {
+        const xs = [];
+        for (const [p1, p2] of [[[ax, ay], [bx, by]], [[bx, by], [cx, cy]], [[cx, cy], [ax, ay]]]) {
+          if ((y >= Math.min(p1[1], p2[1])) && (y <= Math.max(p1[1], p2[1])) && p1[1] !== p2[1]) xs.push(p1[0] + ((y - p1[1]) * (p2[0] - p1[0])) / (p2[1] - p1[1]));
+        }
+        if (xs.length >= 2) r(Math.round(Math.min(...xs)), y, Math.max(1, Math.round(Math.max(...xs) - Math.min(...xs))), 1, col);
+      }
+    };
+    const ROJO = '#a8281c', CLARO = '#d0402a', OSC = '#6a140e', VIENTRE = '#f0a050', ALA = '#c8402a', ALA2 = '#e8703a', HUESO = '#e8dcc0';
+    // ala de atrás (más oscura)
+    if (fr) tri(13, 12, 9, 1, 19, 3, OSC); else tri(13, 12, 7, 20, 17, 18, OSC);
+    // cola con púas
+    for (let k = 0; k < 10; k++) { r(10 - k, 15 + Math.floor(k / 3), 2, 2, k % 2 ? ROJO : OSC); if (k % 3 === 0) r(10 - k, 14 + Math.floor(k / 3), 1, 1, HUESO); }
+    r(0, 18, 2, 2, OSC);
+    // cuerpo
+    for (let y = 0; y < 8; y++) { const w = [10, 14, 16, 17, 17, 16, 14, 10][y], x0 = 17 - w / 2; r(x0, 10 + y, w, 1, y < 2 ? CLARO : ROJO); }
+    r(11, 16, 13, 2, VIENTRE); for (let k = 12; k < 24; k += 2) r(k, 16, 1, 2, '#c87a38');
+    for (let k = 10; k < 24; k += 3) r(k, 10, 1, 1, HUESO); // púas del lomo
+    // patas con garras
+    r(12, 18, 3, 4, OSC); r(11, 22, 4, 1, HUESO); r(21, 18, 3, 4, OSC); r(21, 22, 4, 1, HUESO);
+    // cuello y cabeza
+    for (let k = 0; k < 6; k++) r(23 + k, 11 - k, 3, 3, k % 2 ? ROJO : CLARO);
+    r(28, 3, 6, 4, ROJO); r(32, 5, 4, 2, ROJO); r(29, 7, 6, 1, VIENTRE);  // cabeza, hocico y mandíbula
+    r(28, 3, 6, 1, CLARO); r(30, 4, 1, 1, '#ffe27a'); r(30, 4, 1, 1, '#ffe27a'); r(35, 5, 1, 1, '#2a0806'); // ojo y nariz
+    r(28, 1, 1, 2, HUESO); r(30, 0, 1, 3, HUESO);                           // cuernos
+    r(33, 7, 1, 1, '#fff'); r(35, 7, 1, 1, '#fff');                         // colmillos
+    // ala de adelante
+    if (fr) { tri(17, 11, 13, 0, 25, 2, ALA); tri(17, 11, 18, 2, 24, 3, ALA2); r(17, 1, 1, 10, OSC); r(13, 0, 12, 1, OSC); }
+    else { tri(17, 12, 11, 22, 23, 20, ALA); tri(17, 12, 14, 20, 21, 19, ALA2); r(11, 21, 12, 1, OSC); }
     return c;
   });
   const PALIDO = [176, 176, 164], BANDIDO = [70, 44, 40];
@@ -424,14 +436,16 @@
     // la barra de arriba y los controles cambian de alto (al llenarse, al terminar): el lienzo se vuelve a medir
     const box = cv.parentElement.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     if (Math.abs(box.width * dpr - cv.width) > 2 || Math.abs(box.height * dpr - cv.height) > 2) medir();
-    if (!v.fondo) v.fondo = fondo();
-    const fw = v.fondo.width, fh = v.fondo.height, s = Math.min(cv.width / fw, cv.height / fh), ox = (cv.width - fw * s) / 2, oy = (cv.height - fh * s) / 2;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const suelo = TERRENO[b.lugar].suelo.map(q => Math.round(q * 0.55)); // los bordes, con el suelo oscurecido
-    ctx.fillStyle = 'rgb(' + suelo.join(',') + ')'; ctx.fillRect(0, 0, cv.width, cv.height);
+    // el escenario (escenarios.js) cubre toda la pantalla; el campo de la pelea queda en el medio, en (mx, my)
+    if (!v.fondo) v.fondo = escenario(b, cv);
+    const esc = v.fondo, s = cv.width / esc.W, now = performance.now(), dt = Math.min(0.1, (now - (v.last || now)) / 1000);
+    v.last = now;
     ctx.imageSmoothingEnabled = false;
-    ctx.setTransform(s, 0, 0, s, ox, oy);
-    ctx.drawImage(v.fondo, 0, 0);
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    ctx.drawImage(esc.c, 0, 0);
+    PK.Escenarios.animar(ctx, esc, dt);
+    PK.Escenarios.luz(ctx, esc);
+    ctx.setTransform(s, 0, 0, s, esc.mx * s, esc.my * s);
     // efectos de suelo
     for (const e of b.efectos) {
       const [px, py] = aPx(e.u, e.v), k = e.t / e.dur;
@@ -454,8 +468,8 @@
       ctx.fillStyle = f.lado === 'p' ? 'rgba(80,140,255,0.55)' : 'rgba(255,80,60,0.5)'; ctx.fillRect(Math.round(px - 4), Math.round(py + 1), 8, 1);
       if (f.st.spr === 'dragon') {
         const d = dragonSpr[Math.floor(f.anim * 4) % 2];
-        ctx.save(); ctx.translate(Math.round(px), Math.round(py)); if (!f.flip) ctx.scale(-1, 1);
-        ctx.drawImage(d, -26, -36, 52, 36); ctx.restore();
+        ctx.save(); ctx.translate(Math.round(px), Math.round(py)); if (f.flip) ctx.scale(-1, 1); // el dibujo mira a la derecha
+        ctx.drawImage(d, -40, -56, 72, 52); ctx.restore(); // el dragón, bien grande
       } else {
         const spr = sprite(f, frame);
         if (spr) {
@@ -469,7 +483,7 @@
       ctx.globalAlpha = 1;
       // vida y cuántos son
       if (!f.muerto) {
-        const k = U.clamp(f.hp / f.max, 0, 1), top = f.st.spr === 'dragon' ? 40 : 24;
+        const k = U.clamp(f.hp / f.max, 0, 1), top = f.st.spr === 'dragon' ? 58 : 24;
         ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(Math.round(px - 7), Math.round(py - top), 14, 3);
         ctx.fillStyle = f.lado === 'p' ? '#5ab0ff' : '#e05040'; ctx.fillRect(Math.round(px - 6), Math.round(py - top + 1), Math.round(12 * k), 1);
         if (f.lado === 'p' && f.rep > 1) { ctx.font = '7px "PK Num", "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText('x' + f.rep, Math.round(px) + 1, Math.round(py - top - 1) + 1); ctx.fillStyle = '#cfe4ff'; ctx.fillText('x' + f.rep, Math.round(px), Math.round(py - top - 1)); }
@@ -485,6 +499,10 @@
     ctx.font = 'bold 8px "PK Num", "Pixelify Sans", monospace'; ctx.textAlign = 'center';
     for (const x of b.textos) { const [px, py] = aPx(x.u, x.v); ctx.globalAlpha = 1 - x.t / 1.2; ctx.fillStyle = '#000'; ctx.fillText(x.txt, Math.round(px) + 1, Math.round(py - 26 - x.t * 10) + 1); ctx.fillStyle = x.col; ctx.fillText(x.txt, Math.round(px), Math.round(py - 26 - x.t * 10)); }
     ctx.globalAlpha = 1;
+    // lo que va adelante de las figuras: estalactitas, raíces, y las partículas (brasas, gotas, niebla)
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    ctx.drawImage(esc.frente, 0, 0);
+    PK.Escenarios.particulas(ctx, esc, dt);
     if (b.fin) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, cv.width, cv.height);
