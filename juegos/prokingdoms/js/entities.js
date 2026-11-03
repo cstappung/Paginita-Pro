@@ -18,11 +18,12 @@
     this.ox = ((o.id * 37) % 9 - 4) * 0.05; this.oy = ((o.id * 53) % 9 - 4) * 0.05; // pequeño desvío para no apilarse
     this.back = false; this.scared = 0;
       this.dl = o.dl || 1;             // nivel del último punto de acopio donde descargó
+      this.hold = !!o.hold;            // lo dejaste sin trabajo a propósito: el Capataz no lo toca
       this.path = []; this.acc = 0; this.anim = Math.random() * 10; this.flip = false;
       this.mode = 'idle'; this.fails = 0; this.wait = 0; this.fx = 0;
     }
     toJSON() {
-      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job };
+      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined };
     }
   }
 
@@ -194,7 +195,9 @@
     if (u.phase === 'return') { goDeposit(u, dt); return; }
     let n = W.nodes[t.node];
     if (!n || n.dead) {
-      const nn = W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
+      // se agotó: busca otro del mismo tipo (cerca de él y de su acopio, sin amontonarse); cada vez más lejos
+      // antes de rendirse, para que siga con la tarea que le diste
+      const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
       if (nn) { t.node = nn.id; n = nn; }
       else {
         if (u.carry) { u.phase = 'return'; return; }
@@ -206,7 +209,7 @@
     if (u.carry >= cap) { u.phase = 'return'; return; }
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
-        const nn = W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
+        const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { exclude: n.id, zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
         if (nn && nn.id !== n.id) { t.node = nn.id; u.fails = 0; } else { u.task = null; u.mode = 'idle'; }
       }
       return;
@@ -256,26 +259,9 @@
     if (u.carry >= cap) u.phase = 'return';
   }
 
-  function doBuild(u, dt) {
-    const g = G(), b = g.bById.get(u.task.b);
-    if (!b) { u.task = null; return; }
-    if (b.done) { autoTask(u, b); return; }
-    if (!nearRect(u, b.x, b.y, b.x + b.w - 1, b.y + b.h - 1) && !(b.def.walkable && inRect(u, b))) {
-      if (!pathTo(u, rectGoal(b, !b.def.walkable))) { u.task = null; u.mode = 'idle'; }
-      return;
-    }
-    if (b.def.walkable && inRect(u, b)) u.aim = null;
-    else {
-      const [ax, ay] = rectPoint(u, b.x, b.y, b.x + b.w, b.y + b.h);
-      if (closeIn(u, ax, ay, dt, 'b' + b.id)) return;
-      setAim(u, ax, ay, AIM.build);
-    }
-    face(u, b.cx, b.cy);
-    u.mode = 'work';
-    b.progress += (dt / b.def.time) * g.buildMult(u.owner);
-    if (b.progress >= 1) g.completeBuilding(b);
-  }
-
+  // Partidas viejas: las obras ahora se levantan solas (game.js, updateBuildings). Quien estaba construyendo
+  // queda libre y el Capataz le da trabajo.
+  function doBuildOld(u) { u.task = null; u.mode = 'idle'; }
   function doWork(u, dt) {
     const g = G(), b = g.bById.get(u.task.b);
     if (!b || !b.done) { u.task = null; return; }
@@ -347,8 +333,6 @@
         if (f) { g.assign(u, { t: 'farm', b: f.id }); return; }
       }
     }
-    const other = g.buildings.find(o => o.owner === u.owner && !o.done && U.dist(o.cx, o.cy, u.x, u.y) < 12);
-    if (other) { g.assign(u, { t: 'build', b: other.id }); return; }
     u.task = null; u.mode = 'idle';
   }
 
@@ -365,6 +349,8 @@
   }
 
   // Choques suaves: los aldeanos se empujan entre sí. Quien trabaja pesa más, así los que caminan lo rodean.
+  // Dos que caminan se cruzan sin empujarse (como en los clásicos): empujarse en los caminos angostos los
+  // trababa y los sacaba de su ruta.
   const cells = new Map();
   const mass = u => (u.mode === 'work' ? 4 : u.mode === 'idle' ? 2 : 1);
   function separate(list, dt) {
@@ -384,10 +370,12 @@
         if (!c) continue;
         for (const o of c) {
           if (o.id <= u.id) continue;
+          if (u.mode === 'walk' && o.mode === 'walk') continue;
           let dx = o.x - u.x, dy = o.y - u.y, d = Math.hypot(dx, dy);
-          if (d >= R) continue;
+          const r = u.mode === 'work' && o.mode === 'work' ? R : R * 0.8;
+          if (d >= r) continue;
           if (d < 1e-4) { const a = (u.id * 2.39 + o.id) % 6.283; dx = Math.cos(a); dy = Math.sin(a); d = 1; } else { dx /= d; dy /= d; }
-          const push = (R - Math.min(d, R)) * k, mu = mass(u), mo = mass(o), t = mu + mo;
+          const push = (r - Math.min(d, r)) * k, mu = mass(u), mo = mass(o), t = mu + mo;
           nudge(u, -dx * push * (mo / t), -dy * push * (mo / t));
           nudge(o, dx * push * (mu / t), dy * push * (mu / t));
         }
@@ -405,6 +393,7 @@
     if (u.inside) return;
     if (u.scared > 0) { // huye de los lobos hacia el Centro Urbano
       u.scared -= dt;
+      if (u.scared <= 0) { u.path = []; u.fails = 0; return; } // pasó el susto: vuelve a lo suyo sin terminar la huida
       if (u.path.length) step(u, dt); else u.mode = 'idle';
       return;
     }
@@ -416,7 +405,7 @@
       case 'move': u.task = u.task.then ? { t: u.task.then } : null; u.mode = 'idle'; break;
       case 'gather': doGather(u, dt); break;
       case 'farm': doFarm(u, dt); break;
-      case 'build': doBuild(u, dt); break;
+      case 'build': doBuildOld(u); break;
       case 'work': doWork(u, dt); break;
       case 'deposit': doDeposit(u, dt); break;
       case 'explore': doExplore(u, dt); break;

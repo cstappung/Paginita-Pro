@@ -32,9 +32,13 @@
 
   // Recursos del mapa. regrow: segundos hasta rebrotar; regen: fracción del máximo que vuelve por hora.
   D.NODES = {
-    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.42, regrow: 4 * 3600 },
-    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.36, regrow: 3 * 3600 },
-    deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.62, regrow: 6 * 3600, hunt: true },
+    // Balance (beta, nov. 2026): la madera costaba mucho más que la comida. Todo pide madera (casas, campamentos,
+    // granjas, tablones, fundición, eras) y cada árbol se agota rápido, mientras la caza rendía 1,5 veces la tala.
+    // Por eso la tala es más rápida, los árboles rebrotan antes y la caza rinde un poco menos. Los montos (amount)
+    // no se tocan: el servidor del mundo compartido los usa para las zonas comunes.
+    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 2.5 * 3600 },
+    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600 },
+    deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.5, regrow: 6 * 3600, hunt: true },
     stone: { name: 'Mina de piedra', res: 'stone', amount: 350, rate: 0.36, regen: 0.05 },
     gold: { name: 'Mina de oro', res: 'gold', amount: 400, rate: 0.38, regen: 0.04 },
     ore: { name: 'Veta de hierro', res: 'ore', amount: 400, rate: 0.33, regen: 0.04 },
@@ -47,7 +51,7 @@
   D.SIGHT = { scout: 5 };
 
   // ---------- Edificios ----------
-  // cost/time: construcción inicial (la hacen los aldeanos). up: costo base de las mejoras (si no, cost).
+  // cost/time: construcción inicial (se levanta sola, ver game.js updateBuildings). up: costo base de las mejoras (si no, cost).
   // upT: factor del tiempo de mejora. max: cuántos puedes tener (número o función de la era).
   // drop: recursos que acepta como punto de acopio. recipe: producción con trabajadores dentro.
   const ALLRAW = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'];
@@ -57,7 +61,7 @@
     lumber: { name: 'Campamento Maderero', w: 2, h: 2, cost: { wood: 80 }, time: 20, era: 1, drop: ['wood'], upT: 0.7, desc: 'Acopio de madera. Quien descarga aquí trabaja más rápido según su nivel.' },
     mining: { name: 'Campamento Minero', w: 2, h: 2, cost: { wood: 80 }, time: 20, era: 1, drop: ['stone', 'gold', 'ore', 'marble', 'gems'], upT: 0.7, desc: 'Acopio de piedra, oro, hierro, mármol y gemas.' },
     mill: { name: 'Molino', w: 2, h: 2, cost: { wood: 80 }, time: 20, era: 1, drop: ['food'], upT: 0.7, desc: 'Acopio de comida (bayas, caza y granjas).' },
-    farm: { name: 'Granja', w: 3, h: 3, cost: { wood: 60 }, time: 15, era: 1, walkable: true, flat: true, upT: 0.6, desc: 'Comida inagotable, más lenta que las bayas. Un granjero por granja.' },
+    farm: { name: 'Granja', w: 3, h: 3, cost: { wood: 50 }, time: 15, era: 1, walkable: true, flat: true, upT: 0.6, desc: 'Comida inagotable, más lenta que las bayas. Un granjero por granja.' },
     granary: { name: 'Granero', w: 2, h: 2, cost: { wood: 120, stone: 30 }, time: 25, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánta comida puedes guardar.' },
     warehouse: { name: 'Almacén', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 30, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánto puedes guardar de todo lo demás.' },
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
@@ -834,7 +838,7 @@
   const ql = (id, title, desc, req, reward, pre, unlock) => { q(id, 'legend', title, desc, req, reward, pre); if (unlock) Q[Q.length - 1].unlock = unlock; };
   ql('l1', 'El forastero de la capa', 'Un viajero llega con historias de cuevas que brillan y guaridas de fieras. Construye un Cuartel para que tus soldados lo escuchen.', B('barracks'), { gold: 150 }, [], 'tavern');
   ql('l2', 'Una jarra para el viajero', 'Construye la Taberna. Desde ahí llegan los rumores y los encargos.', B('tavern'), { crystal: 5, gold: 200 }, ['l1']);
-  ql('l3', 'Bajo tierra', 'Gana tu primera expedición en una mazmorra (Cuartel → Expediciones).', st('exp_won', 1), { hide: 5, coins: 10 }, ['l2']);
+  ql('l3', 'Bajo tierra', 'Gana tu primera expedición en una mazmorra (Cuartel → Atacar).', st('exp_won', 1), { hide: 5, coins: 10 }, ['l2']);
   ql('l4', 'Ecos en la piedra', 'Descubre 3 mazmorras explorando el mapa.', st('dungeons_found', 3), { gold: 300 }, ['l2']);
   ql('l5', 'Un deseo de cristal', 'Junta 30 cristales de cueva.', st('sp_crystal', 30), { coins: 15 }, ['l3'], 'wishwell');
   ql('l6', 'Monedas al agua', 'Construye la Fuente de los Deseos y pide tu primer deseo.', all(B('wishwell'), st('wishes', 1)), { crystal: 10 }, ['l5']);

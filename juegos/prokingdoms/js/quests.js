@@ -168,16 +168,18 @@
   Q.claimDailyBonus = function () {
     if (!dailyBonusReady()) return;
     S().daily.bonus = true;
-    G().give(D.dailyBonus(S().era));
-    PK.UI.toast('¡Las 3 diarias completas! Premio extra.', 'epic');
+    const r = D.dailyBonus(S().era);
+    G().give(r);
+    PK.UI.chestReveal({ title: '¡Las tres diarias!', sub: 'Premio extra del día', reward: r, tier: 1 });
   };
   Q.claimWeekly = function (i) {
     const it = S().weekly.list[i];
     if (!it || it.claimed || dailyProg(it)[0] < it.n) return;
     it.claimed = true;
-    G().give(D.weeklyReward(S().era));
+    const r = D.weeklyReward(S().era);
+    G().give(r);
     G().stat('weeklies', 1);
-    PK.UI.toast('¡Misión semanal completada!', 'epic');
+    PK.UI.chestReveal({ title: '¡Misión semanal completada!', reward: r, tier: 1 });
   };
   Q.chestReward = function () {
     // la racha cuenta sin tope; el cofre base crece hasta el día 7 y los hitos suman premios aparte
@@ -195,8 +197,7 @@
     const c = Q.chestReward();
     Object.assign(st.streak, { last: U.dayKey(), n: c.streak, best: Math.max(st.streak.best || 0, c.streak) });
     G().give(c.reward);
-    PK.UI.toast(c.milestone ? '¡' + c.milestone.name + '! Racha de ' + c.streak + ' días.' : 'Cofre diario abierto (racha de ' + c.streak + ' días).', 'epic');
-    if (c.milestone && PK.Sfx) PK.Sfx.play('level');
+    PK.UI.chestReveal({ title: c.milestone ? c.milestone.name : 'Cofre diario', sub: 'Racha de ' + c.streak + (c.streak === 1 ? ' día' : ' días') + (c.streak < 7 ? ' · crece hasta el día 7' : ''), reward: c.reward, tier: c.milestone ? 2 : c.streak >= 7 ? 1 : 0 });
   };
 
   // ---------- Interfaz del libro ----------
@@ -231,7 +232,7 @@
     const tabs = el('div', { class: 'book-tabs' });
     for (const b of D.BRANCHES.concat([{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'album', name: 'Álbum', icon: 'gems' }])) {
       const ready = b.id === 'album' ? false : b.id === 'daily' ? (st.streak.last !== U.dayKey() || Q.repairable() || st.daily.list.some(it => !it.claimed && dailyProg(it)[0] >= it.n) || weeklyReady() > 0 || dailyBonusReady()) : D.QUESTS.some(q => q.branch === b.id && Q.status(q) === 'ready');
-      tabs.append(el('button', { class: 'book-tab' + (tab === b.id ? ' on' : ''), onclick: () => { tab = b.id; selected = null; PK.UI.rerender(); } },
+      tabs.append(el('button', { class: 'book-tab' + (tab === b.id ? ' on' : ''), onclick: () => { tab = b.id; selected = null; PK.UI.rerender(true); } },
         el('img', { class: 'ico', src: PK.Sprites.icon(b.icon) }), b.name, ready ? el('span', { class: 'dot' }) : null));
     }
     const left = el('div', { class: 'page left scroll' }), right = el('div', { class: 'page right' });
@@ -338,7 +339,7 @@
     const c = Q.chestReward(), opened = st.streak.last === U.dayKey(), cur = opened ? st.streak.n : c.streak - 1;
     right.append(el('h2', null, 'Cofre diario'),
       el('img', { class: 'chest-img', src: PK.Sprites.icon('chest') }),
-      el('p', null, opened ? 'Ya abriste el cofre de hoy (racha de ' + st.streak.n + ' días). Vuelve mañana para mantenerla.' : 'Hoy es tu día ' + c.streak + ' de racha. El cofre crece hasta el día 7 y hay premios especiales en los días 3, 7, 14 y 30.'),
+      el('p', null, opened ? 'Ya abriste el cofre de hoy (racha de ' + st.streak.n + (st.streak.n === 1 ? ' día' : ' días') + '). Vuelve mañana para mantenerla.' : 'Hoy es tu día ' + c.streak + ' de racha. El cofre crece hasta el día 7 y hay premios especiales en los días 3, 7, 14 y 30.'),
       streakGuard(),
       opened ? null : rewardEl(c.reward),
       opened ? null : PK.UI.btn(c.milestone ? 'Abrir ' + c.milestone.name : Q.repairable() ? 'Abrir y empezar de nuevo' : 'Abrir cofre', () => { Q.claimChest(); PK.UI.rerender(); }, { cls: Q.repairable() ? '' : 'gold' }),

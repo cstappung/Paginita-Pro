@@ -36,8 +36,9 @@
     const now = performance.now();
     if (lastToast[text] && now - lastToast[text] < 3000) return;
     lastToast[text] = now;
-    const t = el('div', { class: 'toast ' + (kind || 'info') + (act ? ' act' : '') }, text);
+    const t = el('div', { class: 'toast ' + (kind || 'info') + (act ? ' act' : ''), title: 'Toca para cerrar' }, text);
     if (act) t.append(UI.btn(act.label, () => { act.fn(); t.remove(); }, { small: true, cls: 'gold' }));
+    t.addEventListener('click', () => { t.classList.add('out'); setTimeout(() => t.remove(), 250); });
     toastBox.prepend(t);
     while (toastBox.children.length > 5) toastBox.lastChild.remove();
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, act ? 12000 : kind === 'epic' || kind === 'bad' ? 6500 : 4200);
@@ -47,6 +48,27 @@
     document.body.append(f);
     setTimeout(() => f.remove(), 450);
   };
+
+  // ---------- Scroll y toques ----------
+  // Las ventanas se redibujan cada segundo y el panel cada medio segundo (se recrea todo). Antes se perdía el
+  // desplazamiento de lo que no tuviera la clase .scroll (la página derecha del Libro, listas, el panel): uno
+  // bajaba y «se subía solo». Ahora se guarda el de cada elemento, por su posición en el árbol, y se repone.
+  function snapScroll(root) {
+    const out = [], all = [root, ...root.querySelectorAll('*')];
+    all.forEach((e, i) => { if (e.scrollTop || e.scrollLeft) out.push([i, e.scrollTop, e.scrollLeft, e.className]); });
+    return out;
+  }
+  function restoreScroll(root, snap) {
+    if (!snap || !snap.length) return;
+    const all = [root, ...root.querySelectorAll('*')];
+    for (const [i, t, l, c] of snap) if (all[i] && all[i].className === c) { all[i].scrollTop = t; all[i].scrollLeft = l; }
+  }
+  // Mientras el dedo (o la rueda) está moviendo algo, no se redibuja solo: el redibujo cortaba el deslizamiento.
+  let modalTouch = 0, panelTouch = 0;
+  const recent = t => performance.now() - t < 1500;
+  function watchTouch(node, set) {
+    for (const ev of ['pointerdown', 'pointermove', 'wheel', 'touchmove', 'scroll']) node.addEventListener(ev, e => { if (ev !== 'pointermove' || e.buttons) set(); }, { capture: true, passive: true });
+  }
 
   // ---------- Ventanas ----------
   let modal = null;
@@ -58,6 +80,7 @@
     const box = el('div', { class: 'modal' + (opts.wide ? ' wide' : '') + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'modal-title', tabindex: '-1' },
       el('div', { class: 'modal-head' }, el('span', { id: 'modal-title' }, title), el('button', { class: 'x', 'aria-label': 'Cerrar', title: 'Cerrar', onclick: () => UI.closeModal() }, '✕')), body);
     const back = el('div', { class: 'modal-back', onpointerdown: e => { if (e.target === back) UI.closeModal(); } }, box);
+    watchTouch(back, () => { modalTouch = performance.now(); });
     document.body.append(back);
     modal = { key, render, body, back, prevFocus };
     UI.rerender();
@@ -71,17 +94,16 @@
     if (pf && pf.focus && document.contains(pf) && pf !== document.body) try { pf.focus({ preventScroll: true }); } catch (err) { /* nada */ }
     return true;
   };
-  UI.rerender = function () {
+  // fresh: al cambiar de pestaña no se repone el desplazamiento (es otra página).
+  UI.rerender = function (fresh) {
     if (!modal) return;
-    const keep = {}, scrolls = [];
+    const keep = {};
     modal.body.querySelectorAll('input[id],select[id]').forEach(i => { keep[i.id] = i.value; });
-    modal.body.querySelectorAll('.scroll').forEach(s => scrolls.push(s.scrollTop));
-    const top = modal.body.scrollTop;
+    const snap = fresh === true ? null : snapScroll(modal.body);
     modal.body.innerHTML = '';
     modal.render(modal.body);
     for (const id in keep) { const i = document.getElementById(id); if (i) i.value = keep[id]; }
-    modal.body.querySelectorAll('.scroll').forEach((s, i) => { if (scrolls[i] !== undefined) s.scrollTop = scrolls[i]; });
-    modal.body.scrollTop = top;
+    if (snap) restoreScroll(modal.body, snap); else modal.body.scrollTop = 0;
   };
   function modalBusy() {
     const a = document.activeElement;
@@ -113,19 +135,20 @@
 
     const menu = el('div', { id: 'menu' });
     const mbtn = (icon, label, fn, key) => {
-      const b = el('button', { class: 'mbtn', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: fn }, el('img', { class: 'ico', src: Sp.icon(icon), alt: '' }), el('span', null, label));
+      const b = el('button', { class: 'mbtn', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: fn }, el('img', { class: 'ico', src: icon.startsWith('data:') ? icon : Sp.icon(icon), alt: '' }), el('span', null, label));
       menu.append(b);
       return b;
     };
     const bb = mbtn('book', 'Misiones', () => PK.Quests.openBook(), 'B');
     bookDot = el('span', { class: 'badge' }); bb.append(bookDot);
+    mbtn(Sp.buildingIcon('house'), 'Construir', () => UI.openBuild(), 'C');
     mbtn('hammer', 'Obras', () => UI.openWorks());
-    mbtn('pop', 'Capataz', () => UI.openForeman());
+    mbtn('pop', 'Aldeanos', () => UI.openForeman());
+    mbtn('war', 'Cuartel', () => PK.Social.openWar());
     mbtn('compass', 'Explorar', () => UI.openExplore());
     mbtn('flask', 'Investigar', () => UI.openResearch());
     mbtn('market', 'Mercado', () => PK.Social.openMarket());
     mbtn('guild', 'Gremio', () => PK.Social.openGuild());
-    mbtn('war', 'Conflicto', () => PK.Social.openWar());
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T');
     mbtn('machinery', 'Logística', () => UI.openLogistics());
     mbtn('pop', 'Reinos', () => UI.openRealms());
@@ -144,6 +167,7 @@
     evEl = el('div', { id: 'event' });
     qsEl = el('div', { id: 'qstrip' });
     hud.append(bar, menu, panel, mmWrap, qsEl, toastBox, tip, evEl);
+    watchTouch(panel, () => { panelTouch = performance.now(); });
     initMobile(menu);
     window.addEventListener('pk:coins', () => { coinEl.textContent = U.fmt(PK.Platform.getCoins()); });
     UI.refreshPanel(true);
@@ -176,22 +200,42 @@
       netEl.className = 'net ' + (net.online ? (net.lost ? 'lost' : 'on') : 'off');
       netEl.textContent = net.online ? (net.lost ? '● Reconectando…' : '● ' + net.world.name) : '○ Modo local';
       netEl.title = net.online ? 'Conectado como ' + net.me.name + ' · ' + net.ping + ' ms' : 'Sin servidor: los demás reinos son simulados';
-      const ev = PK.Life.event;
-      evEl.style.display = ev ? '' : 'none';
-      if (ev) {
-        evEl.innerHTML = '';
-        const lab = PK.Life.eventLabel();
-        evEl.append(el('b', null, ev.name), el('span', null, ev.desc), el('div', { class: 'mini-bar' }, el('div', { style: { width: (ev.t / ev.total) * 100 + '%' } })),
-          lab ? UI.btn(lab, () => PK.Life.eventAction(), { small: true, cls: 'gold' }) : null);
-      }
+      updateEvent();
       const n = PK.Quests.readyCount();
       bookDot.textContent = n || '';
       bookDot.style.display = n ? '' : 'none';
       updateQueueStrip();
     }
     if (tPanel > 0.5) { tPanel = 0; UI.refreshPanel(false); }
-    if (tModal > 1) { tModal = 0; if (modal && !modalBusy()) UI.rerender(); }
+    if (tModal > 1) { tModal = 0; if (modal && !modalBusy() && !recent(modalTouch)) UI.rerender(); }
   };
+
+  // ---------- Aviso de evento (ciervo dorado, estrella, mercader…) ----------
+  // Se puede achicar con ✕ a una pastilla (nombre, tiempo y su botón); a los 15 s se achica solo, y en Opciones
+  // se elige que aparezcan ya achicados. Solo se rearma al cambiar de estado: rearmarlo 4 veces por segundo
+  // se comía los toques en sus botones.
+  let evRef = null, evMin = false, evAt = 0, evKey = '', evParts = null;
+  function updateEvent() {
+    const ev = PK.Life.event;
+    evEl.style.display = ev ? '' : 'none';
+    if (!ev) { evRef = null; evKey = ''; return; }
+    if (ev !== evRef) { evRef = ev; evMin = !!S().flags.evMin; evAt = performance.now(); }
+    if (!evMin && performance.now() - evAt > 15000) evMin = true;
+    const lab = PK.Life.eventLabel(), key = ev.id + '|' + evMin + '|' + lab + '|' + ev.desc;
+    if (key !== evKey) {
+      evKey = key;
+      evEl.innerHTML = '';
+      evEl.classList.toggle('min', evMin);
+      const time = el('span', { class: 'ev-t' }), fill = el('div');
+      const act = lab ? UI.btn(lab, () => { PK.Life.eventAction(); evKey = ''; }, { small: true, cls: 'gold' }) : null;
+      if (evMin) evEl.append(el('button', { class: 'ev-open', title: 'Ver el evento', onclick: () => { evMin = false; evAt = performance.now(); } }, '★ ', el('b', null, ev.name), ' ', time), act);
+      else evEl.append(el('div', { class: 'ev-main' }, el('b', null, ev.name), el('span', null, ev.desc)), el('div', { class: 'mini-bar' }, fill), time, act,
+        el('button', { class: 'ev-x', title: 'Achicar el aviso', 'aria-label': 'Achicar el aviso', onclick: () => { evMin = true; } }, '✕'));
+      evParts = { time, fill };
+    }
+    evParts.time.textContent = U.fmtTime(ev.t);
+    evParts.fill.style.width = U.clamp((ev.t / ev.total) * 100, 0, 100) + '%';
+  }
 
   // ---------- Tira de cola: obras, era, investigación y expediciones en curso ----------
   let qsEl, qsKey = '', qsRows = [];
@@ -216,8 +260,16 @@
       out.push({ k: 'r' + st.research.id, icon: Sp.icon('flask'), name: t.name + ' ' + U.roman(st.research.lvl), left: (st.research.total - st.research.t) / g.researchMult(), pct: st.research.t / st.research.total, go: () => UI.openResearch() });
     }
     for (const r of (st.exp && st.exp.runs) || []) {
-      const end = r.phase === 'go' ? r.arrive + r.travel * 1000 : r.back, left = (end - now) / 1000;
-      out.push({ k: 'x' + r.id + r.phase, icon: Sp.icon('war'), name: (r.phase === 'go' ? 'Hacia ' : 'Vuelve de ') + r.name, left, pct: 1 - left / Math.max(1, r.travel * 2), go: () => UI.openBarracks('exp') });
+      const go = r.phase === 'go', left = ((go ? r.arrive : r.back) - now) / 1000;
+      out.push({ k: 'x' + r.id + r.phase, icon: Sp.icon('war'), name: (go ? '⚔ Hacia ' : '↩ Vuelve de ') + r.name, left, pct: 1 - left / Math.max(1, r.travel), go: () => UI.openBarracks('exp') });
+    }
+    if (st.war.q.length) {
+      const sp = PK.Social.trainSpeed(), k = st.war.q[0], left = sp ? (D.ARMY[k].time - st.war.qt) / sp : 0;
+      out.push({ k: 'army' + st.war.q.length, icon: Sp.troopIcon(k), name: D.ARMY[k].name + (st.war.q.length > 1 ? ' (+' + (st.war.q.length - 1) + ')' : ''), left, pct: st.war.qt / D.ARMY[k].time, go: () => UI.openBarracks('troops') });
+    }
+    for (const b of g.buildings) {
+      if (b.owner !== 'p' || b.done) continue;
+      out.push({ k: 'c' + b.id, icon: Sp.buildingIcon(b.type, 'p', 1), name: 'Obra: ' + b.def.name, left: ((1 - b.progress) * b.def.time) / g.buildMult('p'), pct: b.progress, b: null, go: () => UI.selectBuilding(b) });
     }
     out.sort((a, b) => a.left - b.left);
     // maestros sin trabajo: un recordatorio para que no queden parados
@@ -252,13 +304,19 @@
   UI.refreshPanel = function (force) {
     const g = G(), sel = g.sel;
     let key = sel ? sel.type + ':' + (sel.ids ? sel.ids.join(',') : sel.id) : 'none';
-    if (g.placing) key = 'placing:' + g.placing.type;
+    if (g.placing) { const gh = PK.Render.ghost; key = 'placing:' + g.placing.type + (g.placing.armed && gh ? ':' + gh.x + ',' + gh.y + (gh.ok ? '+' : '-') : ''); }
     if (PK.Logi.tool) key = 'tool:' + PK.Logi.tool + (PK.Logi.beltFrom || '');
     if (PK.Def.tool) key = 'def:' + PK.Def.tool + (PK.Def.start ? PK.Def.start.join(',') : '') + S().def.walls.length + S().def.gates.length;
     if (PK.Terr.mode) key = 'terr';
     if (!force && key === lastPanelKey && sel && sel.type === 'units' && !g.placing) { updateUnitsLive(); return; }
+    if (!force && recent(panelTouch)) return; // lo están deslizando o tocando: se actualiza después
+    const snap = key === lastPanelKey ? snapScroll(panel) : null;
     lastPanelKey = key;
     panel.innerHTML = '';
+    fillPanel(g, sel);
+    if (snap) restoreScroll(panel, snap); else panel.scrollTop = 0; // otra cosa elegida: desde arriba
+  };
+  function fillPanel(g, sel) {
     if (PK.Def.tool) {
       const gate = PK.Def.tool === 'gate';
       panel.append(el('div', { class: 'p-help' }, el('h3', null, gate ? 'Poner puerta' : 'Trazar muralla (' + PK.Def.tier().name.toLowerCase() + ')'),
@@ -284,17 +342,26 @@
       return;
     }
     if (g.placing) {
-      const def = D.BUILD[g.placing.type];
-      panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(g.placing.type) }), el('div', null, el('h3', null, 'Construir: ' + def.name), el('p', { class: 'small' }, UI.hint('Clic para colocar (solo en terreno explorado) · Mayús para varios · Clic derecho o Esc para cancelar', 'Toca dónde colocarlo (solo en terreno explorado).')), UI.costEl(G().buildCost(g.placing.type)),
-        UI.isTouch() ? el('div', { class: 'row' }, UI.btn('Cancelar', () => { g.placing = null; PK.Render.ghost = null; UI.refreshPanel(true); }, { small: true })) : null)));
+      const def = D.BUILD[g.placing.type], gh = PK.Render.ghost, armed = g.placing.armed && gh;
+      const cancel = () => { g.placing = null; PK.Render.ghost = null; UI.refreshPanel(true); };
+      // los botones van primero: en el celular el panel es bajo y quedaban fuera de la vista
+      panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(g.placing.type) }), el('div', null, el('h3', null, 'Construir: ' + def.name),
+        el('p', { class: 'small' }, UI.hint('Clic para colocarlo en tu tierra explorada · Mayús para poner varios · Clic derecho o Esc para cancelar',
+          armed ? (gh.ok ? 'Así quedaría. Toca «Construir aquí» o el mismo lugar otra vez. Para moverlo, toca otro lugar.' : 'Ahí no se puede (tiene que ser tu tierra, explorada y libre). Toca otro lugar.') : 'Toca dónde va: primero verás cómo queda.')),
+        el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Construir aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null,
+          UI.btn('Otro edificio', () => UI.openBuild(), { small: true }), UI.btn('Cancelar', cancel, { small: true })),
+        UI.costEl(G().buildCost(g.placing.type)),
+        el('p', { class: 'small muted' }, def.desc + ' Se construye solo en ' + U.fmtTime(def.time / g.buildMult('p')) + ': no ocupa aldeanos.'))));
       return;
     }
     if (!sel) {
       panel.append(el('div', { class: 'p-help' },
         el('h3', null, 'Pro Kingdoms'),
-        el('p', null, UI.hint('Clic o arrastra para seleccionar aldeanos. Clic derecho sobre un árbol, mina, bayas o edificio para darles una orden.',
-          'Toca un aldeano para elegirlo; mantén pulsado y arrastra para elegir varios (doble toque: todos los de su tipo). Luego toca un árbol, una mina, bayas o un edificio para darles una orden.')),
-        el('p', { class: 'small muted' }, 'Lo oscuro es niebla: construye un Puesto de Exploradores para descubrir el mapa. Cada edificio se mejora por separado con tus Maestros de Obras.')));
+        el('p', null, 'Toca ', el('b', null, 'Construir'), ' para levantar edificios: se construyen solos. Tus aldeanos solo recolectan y trabajan: usa ', el('b', null, 'Aldeanos'), ' para repartirlos, o elige alguno y dile qué hacer.'),
+        el('p', { class: 'small muted' }, UI.hint('Clic o arrastra para elegir aldeanos; clic derecho sobre un árbol, una mina o un taller para mandarlos.',
+          'Toca un aldeano para elegirlo (mantén pulsado y arrastra para varios; doble toque: todos los de su tipo) y después toca un árbol, una mina o un taller.')),
+        el('p', { class: 'small muted' }, 'Lo oscuro es niebla: un Puesto de Exploradores la descubre. Cada edificio se mejora por separado con tus Maestros de Obras.'),
+        el('div', { class: 'row' }, UI.btn('Construir', () => UI.openBuild(), { small: true, cls: 'gold' }), UI.btn('Aldeanos', () => UI.openForeman(), { small: true }))));
       return;
     }
     if (sel.type === 'units') return unitsPanel(g.selUnits());
@@ -384,19 +451,17 @@
         el('div', { class: 'row' }, UI.btn('Detener', () => { us.forEach(x => G().release(x)); UI.refreshPanel(true); }, { small: true }),
           UI.btn('Siguiente ocioso', () => { const n = G().nextIdle(u.id); if (n) { G().sel = { type: 'units', ids: [n.id] }; PK.Render.centerOn(n.x, n.y); UI.refreshPanel(true); } }, { small: true })))));
     updateUnitsLive();
-    const grid = el('div', { class: 'build-grid' });
-    for (const type of D.BUILD_ORDER) {
-      const def = D.BUILD[type], locked = !G().isUnlocked(type), have = G().countAll(type), max = G().maxCount(type), full = have >= max;
-      const b = el('button', { class: 'bbtn' + (locked ? ' locked' : full ? ' full' : ''), onclick: () => {
-        if (locked) { UI.toast(G().legendLocked(type) ? def.name + ' se desbloquea con una misión de la rama Leyendas del Libro.' : def.name + ' requiere la Era ' + U.roman(def.era) + '.', 'warn'); return; }
-        if (full) { UI.toast('Ya tienes el máximo de ' + def.name + (D.BUILD[type].max === undefined || typeof D.BUILD[type].max === 'number' ? '.' : ' para tu era.'), 'warn'); return; }
-        G().placing = { type, builders: us }; UI.refreshPanel(true);
-      } }, el('img', { src: Sp.buildingIcon(type) }), locked ? el('span', { class: 'lock' }, G().legendLocked(type) ? '★' : U.roman(def.era)) : max < 99 ? el('span', { class: 'cnt' }, have + '/' + max) : null);
-      b.addEventListener('pointerenter', e => UI.showTip(e.currentTarget, el('div', null, el('b', null, def.name), el('p', null, def.desc), UI.costEl(G().buildCost(type)), el('div', { class: 'small muted' }, 'Construcción: ' + def.time + 's' + (locked ? ' · Era ' + U.roman(def.era) : '') + (max < 99 ? ' · Tienes ' + have + ' de ' + max : '')))));
-      b.addEventListener('pointerleave', () => UI.hideTip());
-      grid.append(b);
+    // ¿Qué hacen? Un toque y se reparten solos por los recursos cercanos de ese tipo (sin amontonarse).
+    const A = PK.Auto, jobs = el('div', { class: 'job-grid' }), cur = us.length === 1 ? A.jobOf(us[0]) : null;
+    for (const id in A.JOBS) {
+      const j = A.JOBS[id];
+      if ((id === 'ore' || id === 'marble' || id === 'gems') && !S().flags['seenRes_' + id] && S().era < 2) continue;
+      if (id === 'dig' && !A.jobAvailable('dig')) continue;
+      jobs.append(UI.btn(el('span', null, el('img', { class: 'ico', src: Sp.icon(j.icon), alt: '' }), j.name), () => { if (A.setJob(us, id)) UI.toast(us.length === 1 ? 'Aldeano: ' + j.name.toLowerCase() + '.' : us.length + ' aldeanos: ' + j.name.toLowerCase() + '.', 'good'); UI.refreshPanel(true); },
+        { small: true, cls: cur === id ? 'gold' : '', title: j.hint ? j.name + ': ' + j.hint : j.name }));
     }
-    panel.append(grid);
+    panel.append(el('p', { class: 'small p-sub' }, el('b', null, '¿Qué hacen? '), el('span', { class: 'muted' }, 'Toca un trabajo y van al recurso más conveniente, cerca de su punto de acopio.')), jobs,
+      el('div', { class: 'row' }, UI.btn('Construir…', () => UI.openBuild(), { small: true }), UI.btn('Todos los aldeanos', () => UI.openForeman(), { small: true })));
   }
 
   // Efecto actual → siguiente nivel.
@@ -439,8 +504,8 @@
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(b.type, b.owner, b.lvl) }), head));
     if (!own) return;
     if (!b.done) {
-      head.append(el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: b.progress * 100 + '%' } }), el('span', null, 'En construcción ' + Math.floor(b.progress * 100) + '%')));
-      head.append(el('p', { class: 'small muted' }, UI.hint('Selecciona aldeanos y haz clic derecho aquí para que ayuden.', 'Elige aldeanos y toca esta obra para que ayuden.')));
+      head.append(el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: b.progress * 100 + '%' } }), el('span', null, 'En construcción ' + Math.floor(b.progress * 100) + '% · ' + U.fmtTime(((1 - b.progress) * def.time) / G().buildMult('p')))));
+      head.append(el('p', { class: 'small muted' }, 'Se levanta sola: tus aldeanos siguen con su trabajo. Arquitectura (Investigar) la acelera.'));
       head.append(el('div', { class: 'row' }, UI.btn('Cancelar obra', () => UI.confirmDemolish(b), { small: true })));
       return;
     }
@@ -506,7 +571,8 @@
     } else if (b.type === 'library') act.append(UI.btn('Abrir investigación', () => UI.openResearch()));
     else if (b.type === 'market') act.append(UI.btn('Abrir mercado', () => PK.Social.openMarket()));
     else if (b.type === 'guild') act.append(UI.btn('Abrir gremio', () => PK.Social.openGuild()));
-    else if (b.type === 'barracks' || b.type === 'tower') act.append(UI.btn('Abrir cuartel', () => PK.Social.openWar()), UI.btn('Expediciones', () => UI.openBarracks('exp'), { small: true }), UI.btn('Territorio', () => UI.openTerritory(), { small: true }));
+    else if (b.type === 'barracks') barracksQuick(act);
+    else if (b.type === 'tower') act.append(el('p', { class: 'small' }, 'Dispara a los lobos cercanos y suma a la defensa del reino (' + U.fmt(PK.Social.defense()) + ').'), UI.btn('Cuartel', () => PK.Social.openWar('troops')), UI.btn('Murallas', () => UI.openBarracks('defense'), { small: true }));
     else if (b.type === 'tavern') act.append(el('p', { class: 'small' }, 'Encargos en el tablón: ' + PK.Exp.board().length + '.'), UI.btn('Ver encargos', () => UI.openBarracks('missions'), { cls: 'gold' }));
     else if (b.type === 'arena') act.append(el('p', { class: 'small' }, 'Tus tropas en casa ganan ' + G().bst(b).armyXp + ' de experiencia por hora.'), UI.btn('Ver tropas', () => UI.openBarracks('troops'), { small: true }));
     else if (b.type === 'wishwell' && b.done) {
@@ -557,7 +623,11 @@
       else info.append(UI.btn('Llevar al Monasterio', () => { G().claimRelic(p); UI.refreshPanel(true); }, { small: true, cls: 'gold' }));
     } else if (p.kind === 'camp') {
       if (st.d) info.append(el('p', { class: 'small muted' }, 'Destruido.'));
-      else info.append(el('p', { class: 'small' }, 'Fuerza ~' + D.campPower(tier) + '. Botín: '), UI.costEl(D.campLoot(tier), 1, true), UI.btn('Atacar desde el Cuartel', () => PK.Social.openWar(), { small: true }));
+      else {
+        const going = S().exp.runs.some(r => r.camp === p.id);
+        info.append(el('p', { class: 'small' }, 'Fuerza ~' + D.campPower(tier) + ' (bandidos: arqueros y caballeros rinden más). Botín: '), UI.costEl(D.campLoot(tier), 1, true),
+          going ? el('p', { class: 'small good-t' }, 'Tus tropas van en camino.') : UI.btn('Atacar', () => UI.openBarracks('exp', { camp: p.id }), { small: true, cls: 'gold' }));
+      }
     } else if (D.DUNGEON[p.kind]) {
       const d = D.DUNGEON[p.kind], site = PK.Exp.site(p.id), rest = site.rest - Date.now();
       info.firstChild.textContent = d.name;
@@ -581,30 +651,71 @@
     });
   };
 
-  // ---------- Cuartel: tropas, expediciones, encargos, defensa y crónica ----------
-  let barTab = 'troops', plan = null; // plan = { target: { poi, floor } | { mission }, units }
+  // ---------- Cuartel: tropas, ataques, encargos, defensa y crónica ----------
+  // Revisión de nov. 2026 (beta): el botón «Atacar desde el Cuartel» de un campamento abría la pestaña de tropas
+  // sin nada preparado, los ataques a campamentos eran un reloj invisible y las tropas no se veían en ninguna
+  // parte. Ahora todo ataque (campamento, mazmorra o encargo) pasa por el mismo planificador, las tropas forman
+  // frente al Cuartel y marchan por el mapa (troops.js), y cada batalla deja un informe.
+  let barTab = 'troops', plan = null; // plan = { target: { poi, floor } | { mission } | { camp }, units }
   const enemyText = e => Object.keys(e).map(k => D.ENEMY[k].name + (Object.keys(e).length > 1 ? ' ' + Math.round(e[k] * 100) + '%' : '')).join(' · ');
   const bestVs = e => Object.keys(D.ARMY).sort((a, b) => PK.Exp.vsFactor(b, e) * D.ARMY[b].power - PK.Exp.vsFactor(a, e) * D.ARMY[a].power).filter(k => PK.Exp.vsFactor(k, e) > 1).map(k => D.ARMY[k].name).slice(0, 2).join(' y ');
+  const troopImg = (k, cls) => el('img', { class: cls || 'tr-ico', src: Sp.troopIcon(k), alt: '', title: D.ARMY[k].name });
+  const sumUnits = u => Object.keys(u || {}).reduce((s2, k) => s2 + (u[k] || 0), 0);
+
+  // Lo que está fuera: expediciones, ataques y campañas.
+  function awayUnits() {
+    const st = S(), out = {};
+    const add = u => { for (const k in u) out[k] = (out[k] || 0) + (u[k] || 0); };
+    for (const r of st.exp.runs) add(r.units);
+    for (const e of st.war.exps) add(e.units);
+    for (const c of (st.terr && st.terr.camps) || []) add(c.units);
+    return out;
+  }
+  // Resumen del ejército: en casa, fuera y la cola de entrenamiento (con la barra del que está saliendo).
+  function armySummary() {
+    const st = S(), w = st.war, away = awayUnits(), home = sumUnits(w.army), out = sumUnits(away);
+    const box = el('div', { class: 'army-sum' });
+    box.append(el('div', { class: 'as-head' }, el('b', null, home ? home + ' soldado' + (home > 1 ? 's' : '') + ' en casa' : 'Sin soldados en casa'),
+      el('span', { class: 'small' }, ' · fuerza ' + U.fmt(PK.Social.power(w.army)) + (out ? ' · ' + out + ' fuera' : ''))));
+    const kinds = Object.keys(D.ARMY).filter(k => w.army[k] || away[k]);
+    if (kinds.length) box.append(el('div', { class: 'as-chips' }, kinds.map(k => el('span', { class: 'as-chip', title: D.ARMY[k].name + ': ' + w.army[k] + ' en casa' + (away[k] ? ', ' + away[k] + ' fuera' : '') },
+      troopImg(k), el('b', null, String(w.army[k])), away[k] ? el('small', null, '+' + away[k] + ' fuera') : null))));
+    else box.append(el('p', { class: 'small muted' }, 'Entrena tropas aquí abajo: salen del Cuartel y forman frente a él, en el mapa.'));
+    if (w.q.length) {
+      const k = w.q[0], sp = PK.Social.trainSpeed(), left = sp ? (D.ARMY[k].time - w.qt) / sp : 0, rest = w.q.slice(1);
+      box.append(el('div', { class: 'as-queue' }, troopImg(k),
+        el('div', { class: 'bar' }, el('div', { class: 'fill red', style: { width: U.clamp((w.qt / D.ARMY[k].time) * 100, 0, 100) + '%' } }), el('span', null, 'Entrenando ' + D.ARMY[k].name.toLowerCase() + ' · ' + U.fmtTime(left))),
+        rest.length ? el('span', { class: 'as-next' }, rest.slice(0, 8).map(k2 => troopImg(k2, 'tr-mini')), rest.length > 8 ? el('small', null, '+' + (rest.length - 8)) : null) : null,
+        UI.btn('Quitar último', () => { PK.Social.cancelArmy(); UI.rerender(); UI.refreshPanel(true); }, { small: true, title: 'Saca de la cola la última tropa y te devuelve lo que costó' })));
+    }
+    return box;
+  }
 
   UI.openBarracks = function (tab, target) {
     if (tab) barTab = tab;
     if (target) plan = { target, units: null };
     UI.modal('war', 'Cuartel', body => {
-      const st = S(), w = st.war, g = G();
+      const st = S(), g = G();
       const tabs = el('div', { class: 'book-tabs bar-tabs' });
-      for (const [id, name, icon] of [['troops', 'Tropas', 'war'], ['exp', 'Expediciones', 'crystal'], ['missions', 'Encargos', 'scroll'], ['defense', 'Defensa', 'wall'], ['log', 'Crónica', 'book']]) {
-        tabs.append(el('button', { class: 'book-tab' + (barTab === id ? ' on' : ''), onclick: () => { barTab = id; if (id !== 'exp' && id !== 'missions') plan = null; UI.rerender(); } }, el('img', { class: 'ico', src: Sp.icon(icon) }), name));
+      const camps = W.pois.filter(p => p.kind === 'camp' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d).length;
+      for (const [id, name, icon] of [['troops', 'Tropas', 'war'], ['exp', 'Atacar', 'crystal'], ['missions', 'Encargos', 'scroll'], ['defense', 'Defensa', 'wall'], ['log', 'Crónica', 'book']]) {
+        const dot = id === 'exp' && camps && g.countB('barracks') && sumUnits(st.war.army);
+        tabs.append(el('button', { class: 'book-tab' + (barTab === id ? ' on' : ''), onclick: () => { barTab = id; if (id !== 'exp' && id !== 'missions') plan = null; UI.rerender(true); } }, el('img', { class: 'ico', src: Sp.icon(icon) }), name, dot ? el('span', { class: 'dot' }) : null));
       }
       const tre = D.SPECIAL.filter(r => st.res[r] > 0);
       body.append(el('div', { class: 'war-top' },
-        el('div', null, el('b', null, 'Defensa del reino: '), U.fmt(PK.Social.defense()), el('span', { class: 'muted small' }, ' · ejército en casa ' + U.fmt(PK.Social.power(w.army)))),
+        el('div', null, el('b', null, 'Defensa del reino: '), U.fmt(PK.Social.defense()), el('span', { class: 'muted small' }, ' (torres, Centro Urbano y soldados en casa)')),
         tre.length ? el('div', { class: 'treasure' }, el('b', null, 'Tesoros: '), tre.map(r => UI.amount(r, st.res[r]))) : null,
         PK.Social.truce() ? el('div', { class: 'truce' }, 'Tregua de novato: nadie te atacará hasta que construyas un Cuartel o llegues a la Era III.') : null,
         PK.Net.online ? PK.Net.incoming.map(r => el('div', { class: 'alert' }, '¡' + r.from + ' (jugador) ataca con fuerza ~' + r.power + ' en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '!')) : null), tabs);
       const pane = el('div', { class: 'bar-pane' });
       body.append(pane);
       if (!g.countB('barracks') && barTab !== 'defense' && barTab !== 'log') {
-        pane.append(el('p', { class: 'muted' }, 'Construye un Cuartel (Era II) para entrenar tropas y mandar expediciones. Las murallas (pestaña Defensa) se pueden levantar desde la Era I.'));
+        const can = g.isUnlocked('barracks'), building = g.countAll('barracks') > 0;
+        pane.append(el('div', { class: 'empty-box' }, el('img', { src: Sp.buildingIcon('barracks'), alt: '' }),
+          el('div', null, el('b', null, building ? 'Tu Cuartel está en obra.' : 'Todavía no tienes Cuartel.'),
+            el('p', { class: 'small' }, building ? 'Cuando esté listo podrás entrenar tropas y atacar campamentos, mazmorras y encargos.' : can ? 'Constrúyelo para entrenar tropas y atacar campamentos de bandidos, mazmorras y encargos. Ojo: termina tu tregua de novato.' : 'Se desbloquea en la Era II. Las murallas (pestaña Defensa) sí se pueden levantar desde ya.'),
+            can && !building ? UI.btn('Construir un Cuartel', () => { UI.closeModal(); PK.Input.startPlacing('barracks'); }, { cls: 'gold' }) : null)));
         return;
       }
       ({ troops: troopsTab, exp: expTab, missions: missionsTab, defense: defenseTab, log: logTab })[barTab](pane);
@@ -612,27 +723,32 @@
   };
 
   function troopsTab(pane) {
-    const st = S(), w = st.war, bl = PK.Social.barracksLvl();
+    const st = S(), w = st.war, bl = PK.Social.barracksLvl(), sp = PK.Social.trainSpeed() || 1;
+    pane.append(armySummary());
     const grid = el('div', { class: 'army-grid' });
     for (const k in D.ARMY) {
       const a = D.ARMY[k], locked = st.era < a.era || bl < a.lvl, xp = st.exp.xp[k], r = D.rankOf(xp);
-      const nx = D.rankXp(r + 1), cur = D.rankXp(r);
+      const nx = D.rankXp(r + 1), cur = D.rankXp(r), why = locked ? null : PK.Social.trainWhy(k);
+      const vs = Object.keys(a.vs).map(e => D.ENEMY[e].name.toLowerCase() + ' x' + String(a.vs[e]).replace('.', ',')).join(' · ');
       grid.append(el('div', { class: 'army-card' + (locked ? ' locked' : '') },
-        el('b', null, a.name), el('div', { class: 'small' }, a.role),
-        el('div', { class: 'small muted' }, 'Fuerza ' + a.power + ' · ' + a.time + 's' + (a.heal ? ' · sanador' : '')), UI.costEl(a.cost),
-        el('div', null, 'En casa: ' + w.army[k]),
+        el('div', { class: 'ac-top' }, troopImg(k, 'ac-img'),
+          el('div', { class: 'ac-info' }, el('b', null, a.name), el('div', { class: 'small' }, 'Fuerza ' + a.power + ' · ' + U.fmtTime(a.time / sp) + (a.heal ? ' · sana' : '')),
+            el('div', { class: 'small muted' }, vs ? 'Fuerte contra: ' + vs : 'Sin especialidad: sirve contra todo')),
+          el('span', { class: 'ac-n', title: 'En casa' }, String(w.army[k]))),
+        UI.costEl(a.cost),
         el('div', { class: 'bar thin' }, el('div', { class: 'fill gold', style: { width: (r >= D.RANKS.length - 1 ? 100 : ((xp - cur) / (nx - cur)) * 100) + '%' } }), el('span', null, D.RANKS[r] + (r ? ' (+' + r * 4 + '%)' : ''))),
-        locked ? el('div', { class: 'muted small' }, st.era < a.era ? 'Era ' + U.roman(a.era) : 'Cuartel nivel ' + a.lvl) : el('div', null,
-          UI.btn('+1', () => { PK.Social.trainArmy(k, 1); UI.rerender(); }, { small: true }),
-          UI.btn('+5', () => { PK.Social.trainArmy(k, 5); UI.rerender(); }, { small: true }))));
+        locked ? el('div', { class: 'muted small' }, 'Se desbloquea con ' + (st.era < a.era ? 'la Era ' + U.roman(a.era) : 'el Cuartel en nivel ' + a.lvl) + '.')
+          : el('div', { class: 'row ac-btns' }, [1, 5, 10].map(n => UI.btn('+' + n, () => { PK.Social.trainArmy(k, n); UI.rerender(); UI.refreshPanel(true); }, { small: true, cls: n === 1 ? 'gold' : '', disabled: !!why, title: why || 'Entrenar ' + n }))),
+        why && !locked ? el('div', { class: 'small warn-t' }, why) : null));
     }
-    pane.append(grid);
-    if (w.q.length) pane.append(el('p', { class: 'small' }, 'En cola: ' + w.q.length + ' · siguiente en ' + U.fmtTime(D.ARMY[w.q[0]].time - w.qt)));
-    pane.append(el('h3', null, 'Contra qué sirve cada tropa'), el('div', { class: 'enemy-guide' }, Object.keys(D.ENEMY).map(e => {
+    pane.append(el('h3', null, 'Entrenar'), grid);
+    const nextLock = Object.keys(D.ARMY).filter(k => st.era >= D.ARMY[k].era && bl < D.ARMY[k].lvl).map(k => D.ARMY[k].name + ' (nivel ' + D.ARMY[k].lvl + ')');
+    if (nextLock.length) pane.append(el('p', { class: 'small muted' }, 'Mejora el Cuartel para desbloquear: ' + nextLock.join(', ') + '. Cada nivel también entrena más rápido.'));
+    const guide = el('details', { class: 'enemy-det' }, el('summary', null, 'Contra qué sirve cada tropa'), el('div', { class: 'enemy-guide' }, Object.keys(D.ENEMY).map(e => {
       const en = {}; en[e] = 1;
       return el('div', { class: 'eg' }, el('b', null, D.ENEMY[e].name), el('span', { class: 'small' }, D.ENEMY[e].desc), el('span', { class: 'small muted' }, 'Mejor: ' + (bestVs(en) || 'cualquiera')));
     })));
-    pane.append(el('p', { class: 'small muted' }, 'Cada tipo de tropa gana experiencia en las expediciones (y sola en la Arena de Entrenamiento): +4% de fuerza por rango, también al defender.'));
+    pane.append(guide, el('p', { class: 'small muted' }, 'Cada tipo de tropa gana experiencia en las batallas (y sola en la Arena de Entrenamiento): +4% de fuerza por rango, también al defender.'));
   }
 
   // Planificador: elegir tropas, ver la fuerza contra ese enemigo, la probabilidad y el botín.
@@ -641,44 +757,74 @@
     if (!pv) { plan = null; return; }
     const w = S().war;
     if (!plan.units) plan.units = PK.Exp.recommend(pv.enemy, pv.power);
-    const est = el('div', { class: 'plan-est' });
+    const est = el('div', { class: 'plan-est' }), go = el('span');
+    const why = PK.Exp.canSend(plan.target);
     const refresh = () => {
-      const p = PK.Exp.powerVs(plan.units, pv.enemy), ch = PK.Exp.chance(p / Math.max(1, pv.power)), heal = PK.Exp.heal(plan.units);
+      const p = PK.Exp.powerVs(plan.units, pv.enemy), ch = PK.Exp.chance(p / Math.max(1, pv.power)), heal = PK.Exp.heal(plan.units), n = sumUnits(plan.units);
       est.innerHTML = '';
-      est.append(el('div', null, el('b', null, 'Tu fuerza contra ' + enemyText(pv.enemy).toLowerCase() + ': '), U.fmt(p) + ' contra ' + U.fmt(pv.power)),
+      est.append(el('div', null, el('b', null, 'Tu fuerza: '), U.fmt(p) + ' contra ' + U.fmt(pv.power) + ' (' + n + ' soldado' + (n === 1 ? '' : 's') + ')'),
         el('div', { class: 'bar' }, el('div', { class: 'fill ' + (ch >= 0.75 ? 'green' : ch >= 0.45 ? 'gold' : 'red'), style: { width: ch * 100 + '%' } }), el('span', null, 'Probabilidad de victoria: ' + Math.round(ch * 100) + '%')),
         el('div', { class: 'small muted' }, heal ? 'Los clérigos reducen las bajas un ' + Math.round(heal * 100) + '%.' : 'Sin clérigos: las bajas serán completas.'));
+      go.innerHTML = '';
+      go.append(UI.btn('¡En marcha! (' + n + ')', () => { if (PK.Exp.send(plan.target, Object.assign({}, plan.units))) { plan = null; UI.closeModal(); } }, { cls: 'gold', disabled: !!why || !n }));
     };
-    const inputs = el('div', { class: 'raid-in' }, Object.keys(D.ARMY).filter(k => w.army[k] > 0).map(k => el('label', null, D.ARMY[k].name + ' ',
-      el('input', { type: 'number', min: 0, max: w.army[k], value: plan.units[k] || 0, oninput: e => { plan.units[k] = U.clamp(Math.floor(+e.target.value || 0), 0, w.army[k]); refresh(); } }), el('span', { class: 'muted small' }, '/' + w.army[k]))));
-    const why = PK.Exp.canSend(plan.target);
+    const kinds = Object.keys(D.ARMY).filter(k => w.army[k] > 0);
+    const rows = el('div', { class: 'pick-rows' }, kinds.map(k => {
+      const inp = el('input', { id: 'pl-' + k, type: 'number', min: 0, max: w.army[k], value: plan.units[k] || 0, inputmode: 'numeric' });
+      const set = v => { plan.units[k] = U.clamp(Math.floor(+v || 0), 0, w.army[k]); inp.value = plan.units[k]; refresh(); };
+      inp.addEventListener('input', () => set(inp.value));
+      inp.addEventListener('keydown', e => e.stopPropagation());
+      const f = PK.Exp.vsFactor(k, pv.enemy);
+      return el('div', { class: 'pick-row' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small ' + (f > 1 ? 'good-t' : f < 1 ? 'warn-t' : 'muted') }, f !== 1 ? 'x' + (Math.round(f * 100) / 100).toString().replace('.', ',') : ''),
+        UI.btn('−', () => set((plan.units[k] || 0) - 1), { small: true, aria: 'Uno menos' }), inp, UI.btn('+', () => set((plan.units[k] || 0) + 1), { small: true, aria: 'Uno más' }),
+        el('span', { class: 'small muted' }, '/' + w.army[k]));
+    }));
     pane.append(el('div', { class: 'planner' },
-      el('div', { class: 'row' }, el('h3', null, pv.name), UI.btn('Cerrar', () => { plan = null; UI.rerender(); }, { small: true })),
+      el('div', { class: 'row pl-head' }, el('h3', null, pv.name), UI.btn('Cerrar', () => { plan = null; UI.rerender(); }, { small: true })),
       el('div', { class: 'small' }, 'Enemigos: ' + enemyText(pv.enemy) + '. Conviene: ' + (bestVs(pv.enemy) || 'cualquier tropa') + '. Viaje: ' + U.fmtTime(pv.travel) + ' de ida y otro tanto de vuelta.'),
-      Object.keys(w.army).some(k => w.army[k] > 0) ? inputs : el('p', { class: 'warn-t' }, 'No tienes tropas en casa.'),
-      est,
+      kinds.length ? rows : el('div', { class: 'empty-box small' }, el('div', null, el('b', null, 'No tienes soldados en casa.'), el('p', { class: 'small' }, 'Entrénalos en la pestaña Tropas: tardan unos segundos y quedan formados frente al Cuartel.'),
+        UI.btn('Entrenar tropas', () => { barTab = 'troops'; UI.rerender(true); }, { small: true, cls: 'gold' }))),
+      kinds.length ? est : null,
       el('div', { class: 'row' }, el('b', null, 'Botín si ganas: '), UI.costEl(pv.loot, 1, true)),
       why ? el('p', { class: 'small warn-t' }, why) : null,
-      el('div', { class: 'row' },
-        UI.btn('Compañía recomendada', () => { plan.units = PK.Exp.recommend(pv.enemy, pv.power); UI.rerender(); }, { small: true }),
-        UI.btn('¡En marcha!', () => { if (PK.Exp.send(plan.target, Object.assign({}, plan.units))) { plan = null; UI.rerender(); } }, { cls: 'gold', disabled: !!why }))));
+      kinds.length ? el('div', { class: 'row' }, UI.btn('Compañía recomendada', () => { plan.units = PK.Exp.recommend(pv.enemy, pv.power); UI.rerender(); }, { small: true }),
+        UI.btn('Todos', () => { plan.units = Object.assign({}, w.army); UI.rerender(); }, { small: true }), go) : null));
     refresh();
   }
 
   function runsList(pane) {
     const runs = S().exp.runs;
     if (!runs.length) return;
-    pane.append(el('h3', null, 'En camino'));
+    pane.append(el('h3', null, 'Tropas fuera (' + runs.length + ')'));
     for (const r of runs) {
-      const t = ((r.phase === 'go' ? r.arrive : r.back) - Date.now()) / 1000;
-      pane.append(el('div', { class: 'exp' }, (r.phase === 'go' ? '⚔ Hacia ' : (r.won ? '✔ Vuelven de ' : '✘ Vuelven de ')) + r.name + ' · ' + U.fmtTime(Math.max(0, t))));
+      const go = r.phase === 'go', left = Math.max(0, ((go ? r.arrive : r.back) - Date.now()) / 1000), pct = U.clamp(1 - left / Math.max(1, r.travel), 0, 1);
+      pane.append(el('div', { class: 'run-row' + (go ? '' : r.won ? ' won' : ' lost') },
+        el('span', { class: 'run-ic' }, go ? '⚔' : r.won ? '✔' : '✘'),
+        el('div', { class: 'dg-info' }, el('b', null, (go ? 'Marchan hacia ' : r.won ? 'Vuelven con el botín de ' : 'Vuelven de ') + r.name),
+          el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (go ? 'gold' : r.won ? 'green' : 'red'), style: { width: pct * 100 + '%' } }), el('span', null, (go ? 'llegan en ' : 'en casa en ') + U.fmtTime(left))),
+          el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados' + (go && r.chance ? ' · probabilidad ' + Math.round(r.chance * 100) + '%' : ''))),
+        r.mission ? null : UI.btn('Ver', () => { UI.closeModal(); const pos = PK.Troops.where('x' + r.id); if (pos) PK.Render.centerOn(pos[0], pos[1]); }, { small: true })));
     }
   }
 
   function expTab(pane) {
-    const st = S();
-    if (plan && plan.target.poi !== undefined) planner(pane);
+    const st = S(), g = G();
+    if (plan && (plan.target.poi !== undefined || plan.target.camp !== undefined)) planner(pane);
     runsList(pane);
+    // campamentos de bandidos (botín común, sin pisos)
+    const camps = W.pois.filter(p => p.kind === 'camp' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d)
+      .sort((a, b) => g.poiTier(a) - g.poiTier(b));
+    pane.append(el('h3', null, 'Campamentos de bandidos (' + camps.length + ')'));
+    if (!camps.length) pane.append(el('p', { class: 'muted small' }, 'Tus exploradores todavía no encontraron campamentos. Están en la niebla: cuando aparezca uno, lo verás aquí y en el mapa (humo negro).'));
+    for (const p of camps) {
+      const tier = g.poiTier(p), going = st.exp.runs.some(r => r.camp === p.id) || st.war.exps.some(e => e.camp === p.id);
+      pane.append(el('div', { class: 'raid-row dungeon' },
+        el('img', { class: 'dg-ico', src: Sp.poi('camp', false).c.toDataURL() }),
+        el('div', { class: 'dg-info' }, el('b', null, 'Campamento de bandidos ' + U.roman(tier + 1)),
+          el('div', { class: 'small' }, 'Fuerza ~' + D.campPower(tier) + ' · viaje ' + U.fmtTime(PK.Exp.campTravel(p)) + ' · botín: ', UI.costEl(D.campLoot(tier), 1, true))),
+        going ? el('span', { class: 'muted small' }, 'Tropas en camino') : UI.btn('Preparar ataque', () => { plan = { target: { camp: p.id }, units: null }; UI.rerender(); }, { small: true, cls: 'gold' }),
+        UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + 1, p.y + 1); }, { small: true })));
+    }
     const sites = PK.Exp.sites();
     pane.append(el('h3', null, 'Mazmorras descubiertas (' + sites.length + ')'));
     if (!sites.length) pane.append(el('p', { class: 'muted small' }, 'Tus exploradores todavía no encontraron mazmorras. Están escondidas en la niebla: cuevas de cristal y guaridas cerca, catacumbas, cráteres y nidos de dragón más lejos. El Observatorio las marca en el mapa.'));
@@ -694,24 +840,13 @@
           el('span', { class: 'row' }, site.best ? floorBtn(site.best) : null, site.best < d.floors ? floorBtn(next) : null),
         UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + 1, p.y + 1); }, { small: true })));
     }
-    // campamentos de bandidos (botín común, sin pisos)
-    const w = st.war, camps = W.pois.filter(p => p.kind === 'camp' && G().poiState(p) && G().poiState(p).f && !G().poiState(p).d);
-    if (camps.length) {
-      pane.append(el('h3', null, 'Campamentos de bandidos'));
-      for (const p of camps) {
-        const tier = G().poiTier(p), going = w.exps.some(e => e.camp === p.id);
-        pane.append(el('div', { class: 'raid-row' }, el('b', null, 'Campamento ' + U.roman(tier + 1)), el('span', { class: 'small muted' }, ' fuerza ~' + D.campPower(tier) + ' · botín: '), UI.costEl(D.campLoot(tier), 1, true),
-          going ? el('span', { class: 'muted small' }, 'Tropas en camino') : UI.btn('Atacar con todo', () => { PK.Social.attackCamp(p.id, Object.assign({}, w.army)); UI.rerender(); }, { small: true }),
-          UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + 1, p.y + 1); }, { small: true })));
-      }
-    }
   }
 
   function missionsTab(pane) {
     if (plan && plan.target.mission) planner(pane);
     runsList(pane);
     const list = PK.Exp.board();
-    pane.append(el('h3', null, 'Tablón de encargos'), el('p', { class: 'small muted' }, 'Se renueva en ' + U.fmtTime(PK.Exp.boardLeft() / 1000) + '. La Taberna suma encargos.'));
+    pane.append(el('h3', null, 'Tablón de encargos'), el('p', { class: 'small muted' }, 'Se renueva en ' + U.fmtTime(PK.Exp.boardLeft() / 1000) + '. La Taberna suma encargos. No están en el mapa: tus tropas salen del reino y vuelven.'));
     if (!list.length) pane.append(el('p', { class: 'muted small' }, 'No quedan encargos por ahora.'));
     for (const m of list) {
       const t = D.MISSIONS.find(o => o.id === m.tpl);
@@ -739,8 +874,44 @@
   }
 
   function logTab(pane) {
-    const w = S().war;
-    pane.append(el('div', { class: 'log scroll' }, w.log.length ? w.log.map(l => el('div', { class: l.kind }, l.text)) : el('div', { class: 'muted' }, 'Todavía no pasó nada digno de contarse.')));
+    const w = S().war, reps = w.reports || [];
+    pane.append(el('h3', null, 'Informes de batalla'));
+    if (!reps.length) pane.append(el('p', { class: 'muted small' }, 'Cuando tus tropas peleen, aquí quedará el informe: quiénes fueron, las bajas y el botín.'));
+    for (const r of reps) pane.append(el('button', { class: 'rep-row ' + (r.won ? 'won' : 'lost'), onclick: () => UI.openReport(r) },
+      el('b', null, (r.won ? '✔ Victoria · ' : '✘ Derrota · ') + r.name), el('span', { class: 'small muted' }, sumUnits(r.sent) + ' soldados · hace ' + U.fmtTime(Math.max(1, (Date.now() - r.at) / 1000)))));
+    pane.append(el('h3', null, 'Crónica'), el('div', { class: 'log scroll' }, w.log.length ? w.log.map(l => el('div', { class: l.kind }, l.text)) : el('div', { class: 'muted' }, 'Todavía no pasó nada digno de contarse.')));
+  }
+
+  // Informe de una batalla: tu compañía, las bajas de cada tropa, la probabilidad que tenías y el botín.
+  UI.openReport = function (r) {
+    UI.modal('report', r.won ? '¡Victoria!' : 'Derrota', body => {
+      const kinds = Object.keys(r.sent || {}).filter(k => r.sent[k] > 0);
+      body.append(el('div', { class: 'report ' + (r.won ? 'won' : 'lost') },
+        el('h2', null, r.name),
+        el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra ~' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
+        el('h3', null, 'Tu compañía'),
+        el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),
+          (r.lost || {})[k] ? el('span', { class: 'small warn-t' }, '−' + r.lost[k] + ' bajas') : el('span', { class: 'small good-t' }, 'sin bajas')))),
+        r.loot ? el('h3', null, 'Botín (llega con las tropas)') : null, r.loot ? UI.costEl(r.loot, 1, true) : null,
+        r.won ? null : el('p', { class: 'small' }, 'Arma la compañía con las tropas que mejor rinden contra ' + (r.enemy ? enemyText(r.enemy).toLowerCase() : 'ese enemigo') + ' (' + (r.enemy ? bestVs(r.enemy) || 'cualquiera' : 'cualquiera') + ') o lleva más soldados, y vuelve a intentarlo.'),
+        el('div', { class: 'row' }, UI.btn('Ir al Cuartel', () => UI.openBarracks('exp'), { small: true, cls: 'gold' }), UI.btn('Cerrar', () => UI.closeModal(), { small: true }))));
+    });
+  };
+
+  // Panel del Cuartel elegido en el mapa: el ejército y entrenar sin abrir la ventana.
+  function barracksQuick(act) {
+    const st = S(), bl = PK.Social.barracksLvl();
+    act.append(armySummary());
+    const row = el('div', { class: 'row tq' });
+    for (const k in D.ARMY) {
+      const a = D.ARMY[k];
+      if (st.era < a.era || bl < a.lvl) continue;
+      const why = PK.Social.trainWhy(k);
+      row.append(UI.btn(el('span', null, troopImg(k, 'tr-mini'), '+1 ' + a.name), () => { PK.Social.trainArmy(k, 1); UI.refreshPanel(true); }, { small: true, disabled: !!why, title: why || 'Entrenar un ' + a.name.toLowerCase() }));
+    }
+    act.append(el('p', { class: 'small p-sub' }, el('b', null, 'Entrenar')), row,
+      el('div', { class: 'row' }, UI.btn('Abrir Cuartel', () => UI.openBarracks('troops'), { cls: 'gold' }), UI.btn('Atacar', () => UI.openBarracks('exp'), { small: true }),
+        UI.btn('Encargos', () => UI.openBarracks('missions'), { small: true }), UI.btn('Territorio', () => UI.openTerritory(), { small: true })));
   }
 
   // ---------- Territorio ----------
@@ -978,31 +1149,94 @@
     }, { wide: true });
   };
 
-  // ---------- Capataz: automatización de los aldeanos ----------
+  // ---------- Aldeanos: trabajos y Capataz ----------
+  // Los aldeanos ya no construyen (las obras se levantan solas): solo se elige qué hacen. Arriba, cuántos hay en
+  // cada trabajo con − y +; abajo, el Capataz, que reparte a los que quedan ociosos según tus prioridades.
   UI.openForeman = function () {
-    UI.modal('foreman', 'Capataz', body => {
-      const st = S(), a = st.auto, { c, n } = PK.Auto.counts();
+    UI.modal('foreman', 'Aldeanos', body => {
+      const st = S(), a = st.auto, A = PK.Auto, jc = A.jobCounts(), all = A.villagers().length;
+      const held = A.villagers().filter(u => !u.task && !u.inside && u.hold).length;
+      body.append(el('div', { class: 'war-top' },
+        el('div', null, el('b', null, all + ' aldeanos'), el('span', { class: 'small' }, ' · ' + (jc.idle || 0) + ' ociosos' + (held ? ' (' + held + ' quietos a propósito)' : '') + ' · población ' + G().pop() + '/' + G().popCap())),
+        el('div', { class: 'row' }, (jc.idle || 0) ? UI.btn('Repartir ociosos ahora', () => { A.freeIdle(); UI.rerender(); }, { small: true, cls: 'gold', title: 'El Capataz les da trabajo según tus prioridades' }) : null,
+          UI.btn('Entrenar en el Centro Urbano', () => { const tc = G().buildings.find(b => b.owner === 'p' && b.type === 'tc' && b.done); if (tc) { UI.closeModal(); UI.selectBuilding(tc); } }, { small: true }))));
+      body.append(el('h3', null, 'Trabajos'), el('p', { class: 'small muted' }, '+ suma un ocioso (o uno del trabajo con más gente) y lo manda al lugar más conveniente. − deja uno quieto, sin trabajo, hasta que le des otra cosa.'));
+      const rows = el('div', { class: 'job-rows' });
+      for (const id in A.JOBS) {
+        const j = A.JOBS[id], n = jc[id] || 0;
+        if ((id === 'ore' || id === 'marble' || id === 'gems') && !n && !st.flags['seenRes_' + id] && st.era < 2) continue;
+        const ok = n > 0 || A.jobAvailable(id);
+        rows.append(el('div', { class: 'job-row' + (ok ? '' : ' off') }, el('img', { class: 'ico', src: Sp.icon(j.icon), alt: '' }), el('b', null, j.name),
+          el('span', { class: 'jr-n' }, String(n)),
+          UI.btn('−', () => { A.removeJob(id); UI.rerender(); }, { small: true, disabled: !n, aria: 'Uno menos en ' + j.name }),
+          UI.btn('+', () => { A.addJob(id); UI.rerender(); }, { small: true, cls: 'gold', disabled: !ok || !all, aria: 'Uno más en ' + j.name }),
+          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : 'no conoces dónde hay')));
+      }
+      body.append(rows);
       const chk = (key, label, help) => el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a[key], onchange: e => { a[key] = e.target.checked; UI.rerender(); } }), el('b', null, ' ' + label), el('span', { class: 'small muted' }, ' — ' + help));
-      body.append(el('p', { class: 'small' }, 'El Capataz da trabajo a los aldeanos que se quedan sin hacer nada más de 3 segundos. Tú decides las prioridades; también funciona mientras no estás.'),
+      body.append(el('h3', null, 'Capataz'),
+        el('p', { class: 'small' }, 'Da trabajo a los aldeanos que se quedan sin hacer nada más de 3 segundos (también mientras no estás). Las órdenes que das tú no las cambia.'),
         chk('idle', 'Repartir aldeanos ociosos', 'los manda al recurso que más falta según tus prioridades'),
         chk('work', 'Ocupar los talleres', 'llena primero los puestos libres de talleres que tengan insumos'),
         chk('train', 'Entrenar sin parar', 'el Centro Urbano entrena aldeanos mientras haya casas y comida'),
         el('div', { class: 'g-row' }, el('b', null, 'Reserva de los talleres: '),
           ...[0, 0.15, 0.3, 0.5].map(v => UI.btn(Math.round(v * 100) + '%', () => { a.reserve = v; UI.rerender(); }, { small: true, cls: a.reserve === v ? 'gold' : '' })),
-          el('span', { class: 'small muted' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, sus trabajadores salen a recolectar')));
-      body.append(el('h3', null, 'Prioridades'));
+          el('span', { class: 'small muted' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, los trabajadores que puso el Capataz salen a recolectar')));
+      body.append(el('h3', null, 'Prioridades del Capataz'));
+      const { c, n } = PK.Auto.counts();
       const sum = PK.Auto.RES.reduce((s2, r) => s2 + (a.w[r] || 0), 0) || 1;
-      const rows = el('div', { class: 'guild-rows' });
+      const prio = el('div', { class: 'guild-rows' });
       for (const r of PK.Auto.RES) {
         const v = a.w[r] || 0;
-        rows.append(el('div', { class: 'g-row' }, UI.resIcon(r), el('b', { class: 'fw-name' }, D.RES[r].name),
+        prio.append(el('div', { class: 'g-row' }, UI.resIcon(r), el('b', { class: 'fw-name' }, D.RES[r].name),
           UI.btn('−', () => { a.w[r] = Math.max(0, v - 1); UI.rerender(); }, { small: true }),
           el('span', { class: 'fw-dots' }, '●'.repeat(v) + '○'.repeat(5 - v)),
           UI.btn('+', () => { a.w[r] = Math.min(5, v + 1); UI.rerender(); }, { small: true }),
           el('span', { class: 'small muted' }, 'objetivo ' + Math.round((v / sum) * 100) + '% · ahora ' + (c[r] || 0) + ' (' + (n ? Math.round(((c[r] || 0) / n) * 100) : 0) + '%)')));
       }
-      body.append(rows, el('p', { class: 'small muted' }, 'Los aldeanos que ya trabajan no se mueven: el Capataz solo reparte a los que quedan libres (por ejemplo, cuando se agota un recurso o acaban de nacer).'));
-    });
+      body.append(prio);
+    }, { wide: true });
+  };
+
+  // ---------- Construir ----------
+  // Menú propio (antes la grilla salía solo al elegir aldeanos, que además tenían que ir a levantar la obra).
+  const BUILD_CATS = [
+    ['Casas y bodegas', ['house', 'granary', 'warehouse', 'builder', 'tc']],
+    ['Recolección', ['lumber', 'mining', 'mill', 'farm', 'scout']],
+    ['Talleres', ['sawmill', 'masonry', 'smelter', 'forge', 'scriptorium', 'steelworks', 'workshop', 'cartwright']],
+    ['Reino', ['market', 'library', 'university', 'monastery', 'guild', 'wonder']],
+    ['Ejército y defensa', ['barracks', 'tower']],
+  ];
+  UI.openBuild = function () {
+    UI.modal('build', 'Construir', body => {
+      const g = G(), st = S(), seen = new Set();
+      body.append(el('p', { class: 'small muted' }, 'Elige un edificio y ' + UI.hint('haz clic donde va', 'toca dónde va') + ' en tu tierra. Se levanta solo: tus aldeanos siguen con lo suyo. Arquitectura (Investigar) acelera las obras.'));
+      const cats = BUILD_CATS.concat([['Leyendas', D.LEGEND_B]]);
+      const rest = D.BUILD_ORDER.filter(t => !cats.some(c => c[1].includes(t)));
+      if (rest.length) cats[3][1] = cats[3][1].concat(rest);
+      for (const [name, types] of cats) {
+        const grid = el('div', { class: 'bmenu' });
+        for (const type of types) {
+          if (!D.BUILD[type] || seen.has(type)) continue;
+          seen.add(type);
+          const def = D.BUILD[type], legend = g.legendLocked(type), eraLock = def.era > st.era, have = g.countAll(type), max = g.maxCount(type), full = have >= max;
+          if (legend && name === 'Leyendas' && def.era > st.era + 2) continue; // las muy lejanas no se muestran todavía
+          const cost = g.buildCost(type), afford = g.canAfford(cost), locked = legend || eraLock;
+          const why = legend ? 'Se desbloquea con una misión de la rama Leyendas del Libro.' : eraLock ? 'Requiere la Era ' + U.roman(def.era) + '.' : full ? 'Ya tienes el máximo' + (typeof def.max === 'function' ? ' para tu era' : '') + ' (' + have + '/' + max + ').' : !afford ? 'Te faltan recursos.' : '';
+          grid.append(el('button', { class: 'bcard' + (locked ? ' locked' : full ? ' full' : !afford ? ' poor' : ''), title: def.desc, onclick: () => {
+            if (locked || full) { UI.toast(why, 'warn'); return; }
+            UI.closeModal();
+            PK.Input.startPlacing(type);
+            UI.toast(UI.hint('Haz clic donde va ' + def.name + '.', 'Toca dónde va ' + def.name + ': primero verás cómo queda.'), 'info');
+          } }, el('img', { class: 'bc-img', src: Sp.buildingIcon(type), alt: '' }),
+            el('div', { class: 'bc-txt' }, el('b', null, def.name), el('span', { class: 'small bc-desc' }, def.desc),
+              locked ? el('span', { class: 'small muted' }, legend ? '★ Leyendas' : 'Era ' + U.roman(def.era)) : el('span', { class: 'bc-cost' }, UI.costEl(cost), el('span', { class: 'small muted' }, ' · ' + U.fmtTime(def.time / g.buildMult('p')))),
+              why && !locked ? el('span', { class: 'small warn-t' }, why) : null),
+            max < 99 ? el('span', { class: 'bc-n' }, have + '/' + max) : have ? el('span', { class: 'bc-n' }, String(have)) : null));
+        }
+        if (grid.children.length) body.append(el('h3', null, name), grid);
+      }
+    }, { wide: true });
   };
 
   // ---------- Exploración ----------
@@ -1085,23 +1319,27 @@
         el('div', { class: 'row' }, PK.Notify.enabled()
           ? UI.btn('Desactivar avisos', () => { PK.Notify.enable(false); UI.rerender(); }, { small: true })
           : UI.btn('Activar avisos', () => PK.Notify.enable(true).then(() => UI.rerender()), { small: true, cls: 'gold' })),
+        el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.evMin, onchange: e => { S().flags.evMin = e.target.checked; } }),
+          el('b', null, ' Eventos achicados'), el('span', { class: 'small muted' }, ' — los eventos del mapa (ciervo dorado, estrellas, mercader…) aparecen como una pastilla chica arriba, sin el cartel grande. Igual se pueden abrir tocándolos.')),
+        el('p', { class: 'small muted' }, 'Los avisos que aparecen y se van solos se cierran antes tocándolos.'),
         el('h3', null, 'Partida'),
         el('p', { class: 'small muted' }, 'El juego se guarda solo cada 20 segundos y al cerrar. Tus aldeanos siguen trabajando hasta 12 horas sin ti.'),
         el('div', { class: 'row' }, UI.btn('Guardar ahora', () => { G().save(); UI.toast('Partida guardada.', 'good'); }, { small: true }),
           UI.btn('Borrar partida', () => { if (confirm('¿Seguro? Se perderá todo tu progreso.')) G().reset(); }, { small: true, cls: 'danger' })),
         el('h3', null, 'Controles'),
         UI.isTouch() ? el('ul', { class: 'small' },
-          el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un objetivo: recolectar / construir / trabajar / mover'),
+          el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un objetivo: recolectar / trabajar / mover'),
+          el('li', null, 'Construir: elige el edificio en el menú, toca dónde va y vuelve a tocar (o «Construir aquí») para confirmar'),
           el('li', null, 'Mantén pulsado y arrastra: seleccionar grupo · Doble toque en un aldeano: todos los de su tipo en pantalla'),
           el('li', null, 'Con el Centro Urbano elegido, toca el mapa para fijar el punto de reunión'),
           el('li', null, 'Arrastra: mover cámara · Pellizca: zoom'),
           el('li', null, 'Botones Ocioso y Demoler en el menú lateral'))
         : el('ul', { class: 'small' },
           el('li', null, 'Clic: seleccionar · Arrastrar: seleccionar grupo · Mayús: añadir'),
-          el('li', null, 'Clic derecho: recolectar / construir / trabajar / mover'),
+          el('li', null, 'Clic derecho: recolectar / trabajar / mover'),
           el('li', null, 'Con el Centro Urbano seleccionado, clic derecho fija el punto de reunión'),
           el('li', null, 'WASD / flechas / botón central: mover cámara · Rueda: zoom'),
-          el('li', null, 'H: Centro Urbano · . o I: aldeano ocioso · Z: zonas · B: libro · Supr: demoler')));
+          el('li', null, 'C: construir · H: Centro Urbano · . o I: aldeano ocioso · Z: zonas · B: libro · Supr: demoler')));
       if (PK.dev) {
         body.append(el('h3', null, 'Modo desarrollo'), el('div', { class: 'row' },
           [1, 5, 20].map(s => UI.btn('x' + s, () => { G().timeScale = s; UI.toast('Velocidad x' + s, 'info'); }, { small: true })),
@@ -1113,6 +1351,36 @@
           UI.btn('Simular 3h offline', () => { const rep = G().simulateOffline(3 * 3600); UI.closeModal(); UI.offlineReport(rep); }, { small: true })));
       }
     });
+  };
+
+  // ---------- Cofre: animación al abrirlo ----------
+  // Antes el cofre diario solo dejaba un aviso y no se entendía qué había salido. Ahora tiembla, se abre con un
+  // destello y los premios saltan uno por uno. o = { title, sub, reward, tier (0 normal, 1 bueno, 2 especial) }.
+  UI.chestReveal = function (o) {
+    const old = document.querySelector('.cr-back');
+    if (old) old.remove();
+    const sfx = n => PK.Sfx && PK.Sfx.play(n);
+    const keys = Object.keys(o.reward || {}).filter(k => o.reward[k] > 0);
+    const OPEN = 1.05, STEP = 0.24;
+    const chest = el('img', { class: 'cr-chest', src: Sp.icon('chest'), alt: '' });
+    const items = el('div', { class: 'cr-items' }, keys.map((k, i) => el('div', { class: 'cr-item', style: { animationDelay: OPEN + 0.25 + i * STEP + 's' } },
+      el('img', { class: 'ico', src: Sp.icon(k === 'coins' ? 'coin' : k), alt: '' }), el('b', null, '+' + U.fmt(o.reward[k])), el('small', null, k === 'coins' ? 'monedas' : D.RES[k].name))));
+    const done = el('button', { class: 'btn gold cr-ok', style: { animationDelay: OPEN + 0.45 + keys.length * STEP + 's' } }, '¡Genial!');
+    const conf = el('div', { class: 'cr-conf', 'aria-hidden': 'true' }, Array.from({ length: 22 }, (_, i) => el('i', { style: { left: (4 + ((i * 37) % 92)) + '%', animationDelay: OPEN + (i % 7) * 0.08 + 's', background: ['#ffd84a', '#e8b83a', '#fffbe0', '#6fbf5a', '#6aa8ff', '#d8503c'][i % 6] } })));
+    const box = el('div', { class: 'cr-box tier' + (o.tier || 0) }, el('div', { class: 'cr-title' }, o.title), o.sub ? el('div', { class: 'cr-sub' }, o.sub) : null,
+      el('div', { class: 'cr-stage' }, el('div', { class: 'cr-rays' }), el('div', { class: 'cr-glow' }), chest), items, done);
+    const back = el('div', { class: 'cr-back', role: 'dialog', 'aria-modal': 'true', 'aria-label': o.title }, conf, box);
+    let shut = false;
+    const close = () => { if (shut) return; shut = true; back.classList.add('out'); setTimeout(() => back.remove(), 260); };
+    done.addEventListener('click', close);
+    back.addEventListener('pointerdown', e => { if (e.target === back && back.classList.contains('open')) close(); });
+    back.addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === 'Enter') { e.stopPropagation(); close(); } });
+    document.body.append(back);
+    sfx('hammer');
+    setTimeout(() => sfx('hammer'), 350); setTimeout(() => sfx('hammer'), 700);
+    setTimeout(() => { if (shut) return; chest.src = Sp.icon('chestOpen'); back.classList.add('open'); sfx('level'); }, OPEN * 1000);
+    keys.forEach((k, i) => setTimeout(() => { if (!shut) sfx('coin'); }, (OPEN + 0.25 + i * STEP) * 1000));
+    setTimeout(() => { try { done.focus({ preventScroll: true }); } catch (e) { /* nada */ } }, (OPEN + 0.5 + keys.length * STEP) * 1000);
   };
 
   UI.offlineReport = function (rep) {
@@ -1133,7 +1401,7 @@
       else if (Q.repairable()) body.append(el('p', { class: 'small warn-t' }, 'Tu racha de ' + sk.n + ' días se cortó. Puedes repararla hoy en el Libro (pestaña Diarias).'));
       const w = rep.welcome;
       if (w) {
-        const open = () => { if (S().ret.welcome === w) G().openWelcome(); UI.rerender(); };
+        const open = () => { if (S().ret.welcome === w) { G().openWelcome(); UI.chestReveal({ title: w.name, sub: 'Por el tiempo que estuviste fuera', reward: w.reward, tier: w.tier }); } UI.rerender(); };
         body.append(w.opened
           ? el('div', { class: 'welcome-chest opened tier' + w.tier + (Date.now() - w.opened < 800 ? ' pop' : '') },el('img', { src: Sp.icon('chest') }), el('div', null, el('b', null, w.name + ' abierto'), el('div', { class: 'reward' }, Object.keys(w.reward).map(k => UI.amount(k, w.reward[k])))))
           : el('button', { class: 'welcome-chest closed', onclick: open }, el('img', { src: Sp.icon('chest') }),
@@ -1210,6 +1478,7 @@
     if (h.k === 'node') { const z = W.zoneOf(h.o); text = D.NODES[h.o.kind].name + ' · ' + (h.o.dead ? 'agotado' : U.fmt(h.o.amount)) + (z ? ' · ' + z.name : ''); }
     else if (h.k === 'building') text = h.o.def.name + (h.o.def.noUp ? '' : ' · Nv ' + h.o.lvl) + (h.o.upg ? ' (mejorando)' : '') + (h.o.owner !== 'p' ? ' · ' + D.BOTS.find(b => b.id === h.o.owner).name : '');
     else if (h.k === 'poi') { const st = G().poiState(h.o); text = D.POI[h.o.kind].name + (st && st.d ? ' · ya aprovechado' : ''); }
+    else if (h.k === 'troop') text = h.o.march ? 'Tus tropas marchan hacia ' + (h.o.march.back ? 'casa' : h.o.march.name) : 'Tus soldados · ' + UI.hint('clic', 'toca') + ' para abrir el Cuartel';
     else if (h.k === 'unit') text = h.o.owner === 'p' ? (h.o.kind === 'scout' ? 'Explorador · ' : 'Aldeano · ') + taskText(h.o) : 'Aldeano de ' + D.BOTS.find(b => b.id === h.o.owner).name;
     hoverKey = text;
     tip.textContent = text;

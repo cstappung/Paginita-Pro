@@ -353,6 +353,8 @@
       list.push({ d: u.x + u.y, k: 'unit', o: u, spr, x: px - spr.ax, y: py - spr.ay, px, py, sel: selUnits && selUnits.has(u.id) });
       if (u.mode === 'work' && u.swF === 2 && prevF !== 2 && spr.hit) impact(u, px + spr.hit[0], py + spr.hit[1]);
     }
+    // soldados: guarnición del Cuartel, columnas en marcha y peleas (troops.js)
+    if (PK.Troops) PK.Troops.collect(list, dt, vis);
 
     // capa plana: granjas y marcas de selección
     for (const [a, ax, ay] of aprons) ctx.drawImage(a.c, ax, ay);
@@ -381,6 +383,7 @@
         if (soft) ctx.imageSmoothingEnabled = false;
       }
       else ctx.drawImage(it.spr.c, it.x, it.y);
+      if (it.after) it.after(ctx);
     }
 
     // niebla de lo no explorado
@@ -401,6 +404,7 @@
         if (!b.done) bar(ctx, it.x + it.spr.c.width / 2 - 14, it.y + it.spr.oy - 10, 28, b.progress, '#e8c050');
         else if (b.upg) bar(ctx, it.x + it.spr.c.width / 2 - 14, it.y + (it.spr.pad || 0) + 2, 28, b.upg.t / b.upg.total, '#f0a040');
         else if (b.owner === 'p' && b.def.trains && b.queue.length) bar(ctx, it.x + it.spr.c.width / 2 - 14, it.y + (it.spr.pad || 0) + 4, 28, b.qt / g.trainTime(b), '#7ac0ff');
+        else if (b.owner === 'p' && b.type === 'barracks' && g.state.war.q.length && PK.Social.trainSpeed()) bar(ctx, it.x + it.spr.c.width / 2 - 14, it.y + (it.spr.pad || 0) + 4, 28, g.state.war.qt / D.ARMY[g.state.war.q[0]].time, '#e05040');
         else if (b.owner === 'p' && b.type === 'cartwright' && b.queue.length) bar(ctx, it.x + it.spr.c.width / 2 - 14, it.y + (it.spr.pad || 0) + 4, 28, b.qt / D.CART.time, '#7ac0ff');
         if (b.owner === 'p' && b.def.recipe && b.done) {
           const cx = it.x + it.spr.c.width / 2, cy = it.y + (it.spr.pad || 0) + 8, n = g.slots(b);
@@ -477,7 +481,7 @@
     // nombres de las zonas
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (R.showZones) {
-      ctx.font = (R.cam.z >= 2 ? 14 : 12) * R.dpr + 'px "Pixelify Sans", monospace';
+      ctx.font = (R.cam.z >= 2 ? 14 : 12) * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
       ctx.textAlign = 'center';
       for (const z of W.zones) {
         if (!seen(z.cx, z.cy)) continue;
@@ -492,17 +496,17 @@
         ctx.fillText(label, sx, sy);
         if (z.common) {
           const st = W.zoneStats(W.zones.indexOf(z));
-          ctx.font = 11 * R.dpr + 'px "Pixelify Sans", monospace';
+          ctx.font = 11 * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
           ctx.fillStyle = 'rgba(255,240,200,0.8)';
           ctx.fillText('zona común · ' + Math.round((st.amt / Math.max(1, st.max)) * 100) + '%', sx, sy + 14 * R.dpr);
-          ctx.font = (R.cam.z >= 2 ? 14 : 12) * R.dpr + 'px "Pixelify Sans", monospace';
+          ctx.font = (R.cam.z >= 2 ? 14 : 12) * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
         }
       }
     }
     // globos de la plaza del mundo sobre el Centro Urbano de quien habló
     if (PK.Social && PK.Social.worldChat) {
       const now = Date.now();
-      ctx.font = 11 * R.dpr + 'px "Pixelify Sans", monospace';
+      ctx.font = 11 * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
       ctx.textAlign = 'center';
       for (const m of PK.Social.worldChat()) {
         if (now - m.at > 8000 || m.slot === undefined || m.slot === null) continue;
@@ -520,7 +524,7 @@
       }
     }
     // números que suben al descargar recursos
-    ctx.font = 11 * R.dpr + 'px "Pixelify Sans", monospace';
+    ctx.font = 11 * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
     ctx.textAlign = 'left';
     for (let i = R.floats.length - 1; i >= 0; i--) {
       const f = R.floats[i];
@@ -533,9 +537,10 @@
       ctx.fillStyle = '#fff2c0'; ctx.fillText(f.text, sx, sy);
       ctx.globalAlpha = 1;
     }
+    if (PK.Troops) PK.Troops.drawTexts(ctx, s, ox, oy, R.dpr, dt);
     // nivel de tus edificios
     if (R.showZones && R.cam.z >= 2) {
-      ctx.font = 10 * R.dpr + 'px "Pixelify Sans", monospace';
+      ctx.font = 10 * R.dpr + 'px "PK Num", "Pixelify Sans", monospace';
       ctx.textAlign = 'center';
       for (const [wx, wy, lvl, up] of labels) {
         const sx = wx * s + ox, sy = wy * s + oy;
@@ -779,7 +784,8 @@
       const lx = wx - it.x, ly = wy - it.y;
       const w = it.spr.k ? it.spr.w : it.spr.c.width, h = it.spr.k ? it.spr.h : it.spr.c.height;
       if (lx < 0 || ly < 0 || lx >= w || ly >= h) continue;
-      if (it.k === 'wolf') continue;
+      if (it.k === 'wolf' || (it.k === 'troop' && it.o.enemy)) continue;
+      if (it.k === 'troop') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
       if (it.k === 'unit') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
       if (it.k === 'node' && it.o.dead && it.o.kind === 'tree') continue;
       if (Sp.hit(it.spr, lx, ly)) return it;

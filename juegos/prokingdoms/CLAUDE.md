@@ -98,3 +98,37 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   `admin.database()`).
 - Kingdom coins are still local (`sitio.js`). Moving them to the site economy
   would be the server's job, not the browser's.
+
+## Beta review, Nov 2026 (decisions; change them only on purpose)
+
+- **Buildings build themselves.** `G.updateBuildings` advances `progress` of
+  unfinished player buildings (`def.time / buildMult`). Villagers no longer build:
+  the `build` task only survives in old saves and clears itself. Placing comes
+  from the **Construir** menu (`UI.openBuild`, key C), not from the villager
+  panel. On touch, the first tap shows the ghost and a second tap on it (or
+  «Construir aquí») builds it (`PK.Input.placeGhost`).
+- **Villagers get jobs.** `PK.Auto.JOBS`, `setJob`, `addJob` and `removeJob`
+  (the «Aldeanos» window, which also holds the Capataz). A player order sets
+  `task.m`, and the Capataz never undoes it (stalled workshops only release
+  the workers it placed). `u.hold` is «idle on purpose». `G.bestNode` picks
+  nodes by distance to the villager and to its drop point plus a crowding
+  penalty (`G.nodeRoom`), and widens the search before giving up. Two walking
+  villagers don't push each other (`separate`).
+- **Troops are drawn, not simulated** (`js/troops.js`). The garrison stands in
+  front of the barracks, and columns march along an A* route by the time
+  fraction of each run. The fight plays at arrival. Nothing of it is saved or
+  sent to the server. Bandit camps go through the expedition planner
+  (`PK.Exp` target `{ camp }`). `war.exps` camp entries are legacy. Each battle
+  leaves a report in `war.reports` (`UI.openReport`).
+- **Digits use Jersey 10** (`css/numeros.woff2`, OFL, 0-9 only via
+  `unicode-range`, `size-adjust: 125%`), because in Pixelify Sans the 2, 5 and
+  8 look alike. The canvas uses the same stack (`"PK Num", "Pixelify Sans"`).
+- **Balance:** only rates, regrow times and costs changed in `data.js`. Node
+  `amount`s are untouched because the server uses them for the shared zones.
+- **Redraws keep scroll.** `UI.rerender` and `refreshPanel` rebuild everything,
+  so they snapshot and restore every element's scroll, and they skip the timed
+  redraw while the user is touching or scrolling (`watchTouch`). Pass
+  `rerender(true)` when switching tabs. On phones, modals are full screen.
+- **Map events** have a banner that shrinks to a pill (✕, after 15 s, or always
+  with Opciones → «Eventos achicados», `flags.evMin`). Toasts close on tap.
+  Chests open with `UI.chestReveal`.

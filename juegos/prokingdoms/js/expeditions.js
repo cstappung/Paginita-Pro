@@ -7,13 +7,14 @@
   const Exp = (PK.Exp = {});
   const G = () => PK.Game;
   const S = () => PK.Game.state;
-  const toast = (t, k) => PK.UI && !G().offline && PK.UI.toast(t, k);
+  const toast = (t, k, act) => PK.UI && !G().offline && PK.UI.toast(t, k, act);
   const log = (t, k) => PK.Social.log(t, k);
   const BOARD_MS = 4 * 3600e3;
 
   Exp.init = function (st) {
     st.exp = st.exp || { runs: [], board: { at: 0, list: [] }, sites: {}, xp: {}, wish: { day: '', offer: [], buff: null }, rid: 1 };
     for (const k in D.ARMY) st.exp.xp[k] = st.exp.xp[k] || 0;
+    st.war.reports = st.war.reports || []; // informes de batalla (los últimos 12) para la Crónica del Cuartel
   };
 
   // ---------- Efectos de las estructuras ----------
@@ -117,7 +118,14 @@
 
   // ---------- Enviar ----------
   // target: { poi, floor } (mazmorra) o { mission: uid } (encargo).
+  Exp.campTravel = p => Math.round((30 + U.dist(p.x, p.y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) * 1.5) * (1 - Exp.bonus('expSpeed')));
   Exp.preview = function (target) {
+    if (target.camp !== undefined) {
+      const p = W.pois[target.camp];
+      if (!p) return null;
+      const tier = G().poiTier(p);
+      return { name: 'Campamento de bandidos ' + U.roman(tier + 1), enemy: { bandit: 1 }, power: D.campPower(tier), loot: D.campLoot(tier), travel: Exp.campTravel(p) };
+    }
     if (target.mission) {
       const m = S().exp.board.list.find(o => o.uid === target.mission);
       if (!m) return null;
@@ -130,6 +138,12 @@
   Exp.canSend = function (target) {
     const st = S();
     if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
+    if (target.camp !== undefined) {
+      const p = W.pois[target.camp], ps = p && G().poiState(p);
+      if (!ps || !ps.f) return 'Todavía no descubres ese campamento.';
+      if (ps.d) return 'Ese campamento ya fue destruido.';
+      if (st.exp.runs.some(r => r.camp === target.camp) || st.war.exps.some(e => e.camp === target.camp)) return 'Ya hay tropas en camino a ese campamento.';
+    }
     if (target.poi !== undefined) {
       const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
       if (st.era < d.era) return 'Requiere la Era ' + U.roman(d.era) + '.';
@@ -149,17 +163,21 @@
     const pv = Exp.preview(target);
     if (!pv) return false;
     for (const k in units) army[k] -= units[k];
-    const run = { id: st.exp.rid++, poi: target.poi, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
+    const run = { id: st.exp.rid++, poi: target.poi, camp: target.camp, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
     st.exp.runs.push(run);
+    run.chance = Exp.chance(run.power / Math.max(1, pv.power));
     log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra ~' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
-    toast('La expedición parte hacia ' + pv.name + '.', 'good');
+    const to = PK.Troops ? PK.Troops.targetOf(run) : null;
+    toast('¡En marcha! ' + PK.Troops.total(units) + ' soldados salen del Cuartel hacia ' + pv.name + ' (llegan en ' + U.fmtTime(pv.travel) + ').', 'good',
+      to && run.mission === null ? { label: 'Seguirlos', fn: () => { const b = G().buildings.find(o => o.owner === 'p' && o.type === 'barracks' && o.done); if (b) PK.Render.centerOn(b.cx, b.cy); else PK.Render.centerOn(to[0], to[1]); } } : null);
+    if (PK.Sfx) PK.Sfx.play('event');
     return true;
   };
 
   // ---------- Resolver ----------
   function resolve(r) {
-    const st = S(), ratio = r.power / Math.max(1, r.need);
+    const st = S(), ratio = r.power / Math.max(1, r.need), sent = Object.assign({}, r.units);
     r.won = Math.random() < Exp.chance(ratio);
     const loss = (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal);
     r.lost = {};
@@ -176,10 +194,21 @@
         st.stats.floor_max = Math.max(st.stats.floor_max || 0, r.floor);
       }
     }
+    if (r.camp !== undefined && r.won) {
+      const p = W.pois[r.camp], ps = p && G().poiState(p);
+      if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
+    }
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    toast(r.won ? '¡Victoria en ' + r.name + '!' : 'La expedición a ' + r.name + ' fracasó.', r.won ? 'good' : 'bad');
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy };
+    st.war.reports = st.war.reports || [];
+    st.war.reports.unshift(rep);
+    if (st.war.reports.length > 12) st.war.reports.length = 12;
+    const to = PK.Troops ? PK.Troops.targetOf(r) : null;
+    if (to && !r.mission && PK.Troops) PK.Troops.fight(to[0], to[1], { won: r.won, units: sent, enemy: r.enemy });
+    toast(r.won ? '¡Victoria en ' + r.name + '! Tus tropas vuelven con el botín.' : 'Derrota en ' + r.name + '. Los que quedaron vuelven a casa.', r.won ? 'good' : 'bad',
+      { label: 'Ver informe', fn: () => PK.UI.openReport(rep) });
   }
   const lostText = l => Object.keys(l).filter(k => l[k]).map(k => l[k] + ' ' + D.ARMY[k].name.toLowerCase() + (l[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
   function arrive(r) {
@@ -190,7 +219,9 @@
       for (const k of D.SPECIAL) if (r.loot[k]) g.stat('sp_' + k, r.loot[k]);
       g.stat('exp_won', 1);
       log('Botín de ' + r.name + ': ' + Object.keys(r.loot).map(k => U.fmt(r.loot[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ') + '.', 'good');
-    }
+      toast('Tus tropas volvieron de ' + r.name + ' con el botín: ' + Object.keys(r.loot).map(k => '+' + U.fmt(r.loot[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ') + '.', 'epic');
+      if (PK.Sfx) PK.Sfx.play('coin');
+    } else if (PK.Troops.total(r.units)) toast('Los sobrevivientes de ' + r.name + ' volvieron al Cuartel.', 'info');
     st.exp.runs.splice(st.exp.runs.indexOf(r), 1);
   }
 

@@ -494,30 +494,45 @@
   Soc.barracksLvl = () => G().buildings.reduce((m, b) => (b.owner === 'p' && b.done && b.type === 'barracks' ? Math.max(m, b.lvl) : m), 0);
   Soc.truce = () => !G().countB('barracks') && S().era < 3;
 
+  Soc.Q_MAX = 20;
+  // Velocidad de la cola: cada Cuartel entrena a la vez (1 + su bono por nivel).
+  Soc.trainSpeed = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + G().bst(b).armyTrain : 0), 0);
+  // Por qué no se puede entrenar esa tropa ahora (o null).
+  Soc.trainWhy = function (type) {
+    const def = D.ARMY[type], w = S().war;
+    if (S().era < def.era) return 'Requiere la Era ' + U.roman(def.era) + '.';
+    if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
+    if (Soc.barracksLvl() < def.lvl) return def.name + ' requiere un Cuartel de nivel ' + def.lvl + '.';
+    if (G().pop() >= G().popCap()) return 'Población máxima: construye o mejora casas.';
+    if (w.q.length >= Soc.Q_MAX) return 'La cola del Cuartel está llena.';
+    if (!G().canAfford(def.cost)) return 'Recursos insuficientes.';
+    return null;
+  };
   Soc.trainArmy = function (type, n) {
     const def = D.ARMY[type], w = S().war;
-    if (S().era < def.era) { toast('Requiere la Era ' + U.roman(def.era) + '.', 'warn'); return; }
-    if (!G().countB('barracks')) { toast('Necesitas un Cuartel.', 'warn'); return; }
-    if (Soc.barracksLvl() < def.lvl) { toast(def.name + ' requiere un Cuartel de nivel ' + def.lvl + '.', 'warn'); return; }
+    let done = 0;
     for (let i = 0; i < n; i++) {
-      if (G().pop() >= G().popCap()) { toast('Población máxima.', 'warn'); break; }
-      if (w.q.length >= 20) { toast('Cola del cuartel llena.', 'warn'); break; }
-      if (!G().pay(def.cost)) { toast('Recursos insuficientes.', 'warn'); break; }
+      const why = Soc.trainWhy(type);
+      if (why) { toast(why, 'warn'); break; }
+      G().pay(def.cost);
       w.q.push(type);
+      done++;
     }
+    if (done && PK.Sfx) PK.Sfx.play('build');
+    return done;
   };
-  // Campamentos de bandidos descubiertos explorando: se atacan con tropas.
+  // Saca de la cola la última tropa pedida y devuelve lo que costó.
+  Soc.cancelArmy = function () {
+    const w = S().war;
+    if (!w.q.length) return;
+    const k = w.q.pop();
+    G().give(D.ARMY[k].cost);
+    if (!w.q.length) w.qt = 0;
+  };
+  // Campamentos de bandidos descubiertos explorando: ahora van por el mismo planificador que las mazmorras
+  // (expeditions.js, objetivo { camp }), con fuerza, probabilidad, bajas e informe. Esto queda por compatibilidad.
   Soc.attackCamp = function (poiId, units) {
-    const w = S().war, p = PK.World.pois[poiId], st = p && G().poiState(p);
-    if (!st || !st.f || st.d) return;
-    if (w.exps.some(e => e.camp === poiId)) { toast('Ya hay tropas en camino a ese campamento.', 'warn'); return; }
-    const total = Object.keys(units).reduce((s, k) => s + units[k], 0);
-    if (!total) { toast('Elige tropas para el ataque.', 'warn'); return; }
-    for (const k in units) if (units[k] > w.army[k]) return;
-    for (const k in units) w.army[k] -= units[k];
-    const travel = 30 + U.dist(D.PLAYER_HOME[0], D.PLAYER_HOME[1], p.x, p.y) * 1.5;
-    w.exps.push({ camp: poiId, units: Object.assign({}, units), t: 0, travel, phase: 'go', loot: null, won: false });
-    toast('Tus tropas marchan contra los bandidos.', 'good');
+    return PK.Exp.send({ camp: poiId }, Object.assign({}, units));
   };
 
   Soc.log = log;
@@ -530,13 +545,15 @@
   function warTick(dt, offline) {
     const w = S().war, g = G();
     if (w.q.length && g.countB('barracks')) {
-      w.qt += dt * g.buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + g.bst(b).armyTrain : 0), 0);
-      let guard = 0;
+      w.qt += dt * Soc.trainSpeed();
+      let guard = 0, got = null;
       while (w.q.length && w.qt >= D.ARMY[w.q[0]].time && guard++ < 1000) {
         w.qt -= D.ARMY[w.q[0]].time;
-        w.army[w.q.shift()]++;
+        got = w.q.shift();
+        w.army[got]++;
         g.stat('trained_army', 1);
       }
+      if (got && !offline && !w.q.length) toast('El Cuartel terminó de entrenar: ' + D.ARMY[got].name.toLowerCase() + ' y los demás ya forman frente al Cuartel.', 'good');
       if (!w.q.length) w.qt = 0;
     }
     for (const e of w.exps.slice()) {

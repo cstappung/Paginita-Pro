@@ -271,7 +271,8 @@
     for (let k = 0; k < 5; k++) {
       const id = U.pick(ids), def = EVENTS[id], e = { id, name: def.name, desc: def.desc, t: def.dur, total: def.dur };
       if (def.start(e) === false) continue;
-      toast('Evento: ' + e.name + ' — ' + e.desc + '.', 'epic');
+      // los que duran ya tienen su cartel (ui.js, que se puede achicar): el aviso extra tapaba la pantalla dos veces
+      if (!def.dur) toast('Evento: ' + e.name + ' — ' + e.desc + '.', 'epic');
       sfx('event');
       G().stat('events', 1);
       L.event = def.dur ? e : null;

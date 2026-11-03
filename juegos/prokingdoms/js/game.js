@@ -5,7 +5,7 @@
   const PK = window.PK, U = PK.U, D = PK.D, W = PK.World;
   const G = (PK.Game = {});
   const SAVE_KEY = U.key('prokingdoms_save_v2');
-  const toast = (t, k) => PK.UI && PK.UI.toast(t, k);
+  const toast = (t, k, act) => PK.UI && PK.UI.toast(t, k, act);
 
   G.units = []; G.buildings = [];
   G.uById = new Map(); G.bById = new Map();
@@ -315,6 +315,45 @@
     void b;
   };
 
+  // ---------- Elegir recurso ----------
+  // Cuántos aldeanos tuyos tienen asignado cada árbol, mina o arbusto.
+  G.gatherers = function () {
+    const m = new Map();
+    for (const u of G.units) if (u.owner === 'p' && u.task && u.task.t === 'gather') m.set(u.task.node, (m.get(u.task.node) || 0) + 1);
+    return m;
+  };
+  // Cuántos caben cómodos en cada recurso antes de estorbarse (una mina es grande; un árbol, no).
+  G.nodeRoom = n => (n.kind === 'tree' || n.kind === 'berry' || n.kind === 'deer' ? 2 : 4);
+  // El mejor recurso de ese tipo para alguien parado en (x, y): cerca de él, cerca de su punto de acopio y sin
+  // amontonarse con otros aldeanos (antes iban todos al mismo árbol y se chocaban). Busca primero cerca y,
+  // si no hay nada, cada vez más lejos: así un aldeano sigue con su tarea cuando se agota lo de al lado.
+  // opts: { zone, exclude, used (Map extra de asignaciones), r (primer radio), max (radio máximo) }.
+  G.bestNode = function (res, x, y, owner, opts) {
+    opts = opts || {};
+    const crowd = opts.crowd || G.gatherers(), used = opts.used, drop = G.findDrop(owner, res, x, y);
+    let regs = null, best = null;
+    for (const R of [opts.r || 16, 34, opts.max || 70]) {
+      let bs = 1e9;
+      const c0x = Math.max(0, Math.floor((x - R) / W.CH)), c1x = Math.min(W.CW - 1, Math.floor((x + R) / W.CH));
+      const c0y = Math.max(0, Math.floor((y - R) / W.CH)), c1y = Math.min(W.CW - 1, Math.floor((y + R) / W.CH));
+      for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) for (const n of W.chunkNodes[cy * W.CW + cx]) {
+        if (n.dead || D.NODES[n.kind].res !== res || n.id === opts.exclude) continue;
+        const d = U.dist(x, y, n.x + 0.5, n.y + 0.5);
+        if (d > R) continue;
+        if (owner === 'p' && !W.fog[n.y * W.W + n.x]) continue;
+        if (opts.zone && (n.zone < 0 || W.zones[n.zone].id !== opts.zone)) continue;
+        if (!W.canUse(n, owner)) continue;
+        const c = (crowd.get(n.id) || 0) + ((used && used.get(n.id)) || 0), room = G.nodeRoom(n);
+        const sc = d + (drop ? 0.7 * U.dist(n.x + 0.5, n.y + 0.5, drop.cx, drop.cy) : 0) + (c >= room ? 8 * (c - room + 1) : c * 1.5) + (n.amount < 15 ? 4 : 0);
+        if (sc >= bs) continue;
+        if (!W.reachable(n, regs || (regs = W.regionsAt(x, y)))) continue;
+        bs = sc; best = n;
+      }
+      if (best || R >= (opts.max || 70)) break;
+    }
+    return best;
+  };
+
   G.findDrop = function (owner, res, x, y) {
     let bst = null, bd = 1e9;
     for (const b of G.buildings) {
@@ -443,7 +482,7 @@
       toast('Atalaya en ruinas: desde lo alto se ve gran parte del mapa.', 'epic');
       G.revealAt(p.x + 0.5, p.y + 0.5, D.POI.watch.reveal);
     } else if (p.kind === 'ruin') toast('Descubriste ' + name + '. Envía aldeanos a excavar.', 'quest');
-    else if (p.kind === 'camp') toast('¡Un campamento de bandidos! Fuerza ~' + D.campPower(tier) + '. Atácalo desde el Cuartel.', 'bad');
+    else if (p.kind === 'camp') toast('¡Un campamento de bandidos! Fuerza ~' + D.campPower(tier) + '.', 'bad', G.countB('barracks') ? { label: 'Atacar', fn: () => PK.UI.openBarracks('exp', { camp: p.id }) } : null);
     else if (p.kind === 'relic') toast('¡Una reliquia! Llévala a un Monasterio para que dé oro sin parar.', 'epic');
     else if (D.POI[p.kind].dungeon) PK.Exp.found(p);
   }
@@ -530,6 +569,7 @@
   }
   G.assign = function (u, task) {
     const keepCarry = u.carry;
+    u.hold = false;
     if (u.task !== task) G.release(u);
     u.carry = keepCarry;
     u.task = task; u.phase = 'go'; u.path = []; u.fails = 0;
@@ -539,6 +579,10 @@
   G.command = function (units, target, silent) {
     units = units.filter(u => u.owner === 'p' && u.kind !== 'cart'); // las carretas se manejan solas
     if (!units.length) return false;
+    // una orden tuya (no del Capataz) queda marcada: el Capataz no la cambia y el aldeano la sigue aunque se
+    // agote lo de al lado
+    if (!silent) for (const u of units) u.hold = false;
+    const mark = t => { if (!silent && t) t.m = 1; return t; };
     const scouts = units.filter(u => u.kind === 'scout');
     if (scouts.length) {
       const tx = target.kind === 'tile' ? target.x : target.obj.x, ty = target.kind === 'tile' ? target.y : target.obj.y;
@@ -548,7 +592,7 @@
     }
     if (target.kind === 'poi') {
       const p = target.obj, st = G.poiState(p);
-      if (p.kind === 'ruin' && st && !st.d) { for (const u of units) G.assign(u, { t: 'dig', poi: p.id }); return true; }
+      if (p.kind === 'ruin' && st && !st.d) { for (const u of units) G.assign(u, mark({ t: 'dig', poi: p.id })); return true; }
       if (p.kind === 'relic' && st && !st.d) { G.claimRelic(p); return true; }
       return G.command(units, { kind: 'tile', x: p.x + p.w, y: p.y + p.h }, silent);
     }
@@ -556,19 +600,27 @@
       const n = target.obj;
       if (!W.canUse(n, 'p')) { if (!silent) toast('Ese recurso pertenece a ' + W.zoneOf(n).name + '.', 'warn'); return false; }
       if (n.dead) return G.command(units, { kind: 'tile', x: n.x, y: n.y }, silent);
-      for (const u of units) G.assign(u, { t: 'gather', node: n.id, res: W.nodeRes(n) });
+      // el primero va justo ahí; si ya hay gente de sobra, los demás se reparten por los vecinos del mismo tipo
+      const res = W.nodeRes(n), crowd = G.gatherers(), used = new Map();
+      for (const u of units) if (u.task && u.task.t === 'gather') crowd.set(u.task.node, Math.max(0, (crowd.get(u.task.node) || 0) - 1));
+      for (const u of units) {
+        let tgt = n;
+        if ((crowd.get(n.id) || 0) + (used.get(n.id) || 0) >= G.nodeRoom(n)) tgt = G.bestNode(res, n.x + 0.5, n.y + 0.5, 'p', { crowd, used, r: 7, max: 12 }) || n;
+        used.set(tgt.id, (used.get(tgt.id) || 0) + 1);
+        G.assign(u, mark({ t: 'gather', node: tgt.id, res }));
+      }
       return true;
     }
     if (target.kind === 'building') {
       const b = target.obj;
       if (b.owner !== 'p') return G.command(units, { kind: 'tile', x: b.x + b.w, y: b.y + b.h }, silent);
-      if (!b.done) { for (const u of units) G.assign(u, { t: 'build', b: b.id }); return true; }
+      if (!b.done) return G.command(units, { kind: 'tile', x: b.x + b.w, y: b.y + b.h }, silent); // las obras se levantan solas
       if (b.type === 'farm') {
         const farms = [b].concat(G.buildings.filter(o => o.owner === 'p' && o.type === 'farm' && o.done && o !== b).sort((a, c) => U.dist(a.cx, a.cy, b.cx, b.cy) - U.dist(c.cx, c.cy, b.cx, b.cy)));
         let fi = 0;
         for (const u of units) {
           while (fi < farms.length && farms[fi].farmer !== null && farms[fi].farmer !== u.id && G.uById.get(farms[fi].farmer)) fi++;
-          if (fi < farms.length) { G.assign(u, { t: 'farm', b: farms[fi].id }); fi++; }
+          if (fi < farms.length) { G.assign(u, mark({ t: 'farm', b: farms[fi].id })); fi++; }
           else G.assign(u, { t: 'move' }), moveUnit(u, b.x + b.w, b.y + b.h);
         }
         return true;
@@ -576,7 +628,7 @@
       if (b.def.recipe) {
         let free = G.slots(b) - b.workers.length;
         for (const u of units) {
-          if (free > 0) { G.assign(u, { t: 'work', b: b.id }); free--; }
+          if (free > 0) { G.assign(u, mark({ t: 'work', b: b.id })); free--; }
           else { G.assign(u, { t: 'move' }); moveUnit(u, b.x + b.w, b.y + b.h); }
         }
         if (free < 0 && !silent) toast('No caben más trabajadores.', 'warn');
@@ -675,7 +727,9 @@
       const tx = Math.floor(u.x), ty = Math.floor(u.y);
       if (!b.def.walkable && tx >= x && tx < x + b.w && ty >= y && ty < y + b.h) placeOutside(u, b);
     }
-    for (const u of builders || []) if (u.kind === 'v') G.assign(u, { t: 'build', b: b.id });
+    void builders; // las obras se levantan solas (updateBuildings): los aldeanos ya no construyen
+    toast('Obra iniciada: ' + b.def.name + ' estará lista en ' + U.fmtTime(b.def.time / G.buildMult('p')) + '.', 'info');
+    if (PK.Sfx && !G.offline) PK.Sfx.play('build');
     return b;
   };
   G.demolish = function (b) {
@@ -700,6 +754,11 @@
   // ---------- Producción y colas ----------
   G.updateBuildings = function (dt) {
     for (const b of G.buildings) {
+      if (b.owner === 'p' && !b.done) { // obra en curso: avanza sola, a la velocidad de Arquitectura y los deseos
+        b.progress += (dt / b.def.time) * G.buildMult('p');
+        if (b.progress >= 1) G.completeBuilding(b);
+        continue;
+      }
       if (b.owner !== 'p' || !b.done) continue;
       if (b.type === 'cartwright') { PK.Logi.updateCartwright(b, dt); continue; }
       if (b.def.trains) {
@@ -865,7 +924,7 @@
         if (t.t === 'gather') {
           let n = W.nodes[t.node];
           if (!n || n.dead) {
-            n = W.nearestNode(t.res, u.x, u.y, 14, u.owner, { zone: t.zone });
+            n = u.owner === 'p' ? G.bestNode(t.res, u.x, u.y, 'p', { zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { zone: t.zone });
             if (!n) { u.task = null; continue; }
             t.node = n.id;
             const p = W.freeAround(n.x, n.y, n.x, n.y, u.x, u.y);
@@ -883,11 +942,8 @@
           if (!b) { u.task = null; continue; }
           const eff = tripRate(u, G.farmRate(u.owner, b, u), b.cx, b.cy, 'food');
           if (u.owner === 'p') gained('food', G.addRes('food', eff * dt), -1);
-        } else if (t.t === 'build') {
-          const b = G.bById.get(t.b);
-          if (!b) { u.task = null; continue; }
-          if (!b.done) { b.progress += (dt / b.def.time) * G.buildMult(u.owner); if (b.progress >= 1) G.completeBuilding(b); }
-          if (b.done) PK.Units.autoTask(u, b);
+        } else if (t.t === 'build') { // partidas viejas: las obras ya se levantan solas
+          u.task = null;
         } else if (t.t === 'dig') {
           const p = W.pois[t.poi], st = p && G.poiState(p);
           if (!st || st.d) { u.task = null; continue; }

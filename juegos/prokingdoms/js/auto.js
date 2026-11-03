@@ -11,7 +11,7 @@
   A.RES = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'];
   A.QMAX = 6;
   A.init = function (st) {
-    st.auto = Object.assign({ idle: true, work: true, train: false, reserve: 0.3, w: { food: 4, wood: 4, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
+    st.auto = Object.assign({ idle: true, work: true, train: false, reserve: 0.3, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
     st.upq = (st.upq || []).filter(id => G().bById.get(id));
   };
 
@@ -27,8 +27,8 @@
     return { c, n };
   };
 
-  // Recurso más cercano al punto de acopio que corresponde (así los viajes son cortos).
-  function targetFor(u, res) {
+  // Recurso para ese aldeano: cerca de él y de su punto de acopio, sin amontonarse (G.bestNode).
+  function targetFor(u, res, used) {
     const g = G();
     if (res === 'food') {
       let best = null, bd = 1e9;
@@ -39,11 +39,10 @@
       }
       if (best) return { kind: 'building', obj: best };
     }
-    const drop = g.findDrop('p', res, u.x, u.y);
-    // cerca del punto de acopio; si ya se agotó todo alrededor, lo que haya aunque quede lejos
-    const n = (drop && W.nearestNode(res, drop.cx, drop.cy, 40, 'p')) || W.nearestNode(res, u.x, u.y, 100, 'p');
+    const n = g.bestNode(res, u.x, u.y, 'p', { used, max: 100 });
     return n ? { kind: 'node', obj: n } : null;
   }
+  A.targetFor = targetFor;
 
   function assignIdle(u, st) {
     const g = G();
@@ -82,7 +81,7 @@
     if (st.auto.idle) {
       let k = 0;
       for (const u of g.units) {
-        if (u.owner !== 'p' || u.kind !== 'v' || u.task || u.inside || u.idleT < 3 || u.scared > 0) continue;
+        if (u.owner !== 'p' || u.kind !== 'v' || u.task || u.inside || u.hold || u.idleT < 3 || u.scared > 0) continue;
         if (assignIdle(u, st)) u.idleT = 0;
         if (++k > 12) break; // reparte de a poco para no buscar rutas de golpe
       }
@@ -96,7 +95,8 @@
         b.stallT = b.status === 'Produciendo' || coming ? 0 : (b.stallT || 0) + 1;
         if (b.stallT < 20) continue;
         b.stallT = 0;
-        for (const id of b.workers.slice()) { const u = g.uById.get(id); if (u) { g.release(u); u.task = null; u.mode = 'idle'; } }
+        // los que pusiste tú se quedan: una orden tuya no la deshace el Capataz
+        for (const id of b.workers.slice()) { const u = g.uById.get(id); if (u && !(u.task && u.task.m)) { g.release(u); u.task = null; u.mode = 'idle'; } }
       }
     }
     if (st.auto.train) {
@@ -114,6 +114,112 @@
       g.upgrade(b);
       st.upq.shift();
     }
+  };
+
+  // ---------- Trabajos ----------
+  // Lo que elige el jugador para sus aldeanos, desde el panel (aldeanos elegidos) o desde la ventana Aldeanos.
+  // Una orden así queda marcada (task.m): el Capataz no la cambia.
+  A.JOBS = {
+    food: { name: 'Comida', icon: 'food', hint: 'granjas libres, bayas o caza' },
+    wood: { name: 'Madera', icon: 'wood' },
+    stone: { name: 'Piedra', icon: 'stone' },
+    gold: { name: 'Oro', icon: 'gold' },
+    ore: { name: 'Hierro', icon: 'ore' },
+    marble: { name: 'Mármol', icon: 'marble' },
+    gems: { name: 'Gemas', icon: 'gems' },
+    work: { name: 'Talleres', icon: 'tools', hint: 'puestos libres de los talleres' },
+    dig: { name: 'Excavar', icon: 'scroll', hint: 'ruinas descubiertas' },
+  };
+  A.jobOf = function (u) {
+    const t = u.task;
+    if (!t) return u.inside ? 'work' : 'idle';
+    if (t.t === 'gather') return t.res;
+    if (t.t === 'farm') return 'food';
+    if (t.t === 'work') return 'work';
+    if (t.t === 'dig') return 'dig';
+    return 'other';
+  };
+  A.villagers = () => G().units.filter(u => u.owner === 'p' && u.kind === 'v');
+  A.jobCounts = function () {
+    const c = { idle: 0 };
+    for (const u of A.villagers()) { const j = A.jobOf(u); c[j] = (c[j] || 0) + 1; }
+    return c;
+  };
+  // ¿Hay dónde trabajar en eso? (para apagar los botones que no llevan a nada)
+  A.jobAvailable = function (job) {
+    const g = G();
+    if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b));
+    if (job === 'dig') return W.pois.some(p => p.kind === 'ruin' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d);
+    if (job === 'food' && g.buildings.some(b => b.owner === 'p' && b.type === 'farm' && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
+    const [hx, hy] = D.PLAYER_HOME;
+    return !!g.bestNode(job, hx, hy, 'p', { r: 40, max: 100 });
+  };
+  function jobTarget(u, job, used) {
+    const g = G();
+    if (job === 'work') {
+      let best = null, bd = 1e9;
+      for (const b of g.buildings) {
+        if (b.owner !== 'p' || !b.done || !b.def.recipe) continue;
+        const going = g.units.filter(o => o !== u && o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length + (used.get('b' + b.id) || 0);
+        if (b.workers.length + going >= g.slots(b)) continue;
+        const d = U.dist(u.x, u.y, b.cx, b.cy) - (PK.Logi.nearStore(b) ? 20 : 0);
+        if (d < bd) { bd = d; best = b; }
+      }
+      if (best) used.set('b' + best.id, (used.get('b' + best.id) || 0) + 1);
+      return best ? { kind: 'building', obj: best } : null;
+    }
+    if (job === 'dig') {
+      let best = null, bd = 1e9;
+      for (const p of W.pois) {
+        const ps = g.poiState(p);
+        if (p.kind !== 'ruin' || !ps || !ps.f || ps.d) continue;
+        const d = U.dist(u.x, u.y, p.x, p.y);
+        if (d < bd) { bd = d; best = p; }
+      }
+      return best ? { kind: 'poi', obj: best } : null;
+    }
+    const t = targetFor(u, job, used);
+    if (t && t.kind === 'node') used.set(t.obj.id, (used.get(t.obj.id) || 0) + 1);
+    if (t && t.kind === 'building') used.set('f' + t.obj.id, 1);
+    return t;
+  }
+  // Pone a esos aldeanos en ese trabajo. Devuelve cuántos.
+  A.setJob = function (units, job) {
+    const used = new Map(), g = G();
+    let n = 0;
+    for (const u of units) {
+      if (u.kind !== 'v' || u.owner !== 'p') continue;
+      if (A.jobOf(u) === job && u.task) { n++; continue; }
+      const t = jobTarget(u, job, used);
+      if (!t) break;
+      if (g.command([u], t, false)) n++;
+    }
+    if (!n) PK.UI.toast(job === 'work' ? 'No hay puestos libres en los talleres.' : job === 'dig' ? 'No hay ruinas descubiertas por excavar.' : 'No conoces ' + A.JOBS[job].name.toLowerCase() + ' a la que puedan llegar. Explora o reclama más tierra.', 'warn');
+    return n;
+  };
+  // +1 en un trabajo: primero un ocioso; si no hay, el que esté en el trabajo con más gente.
+  A.addJob = function (job) {
+    const vs = A.villagers().filter(u => !u.scared), c = A.jobCounts();
+    let u = vs.find(o => A.jobOf(o) === 'idle');
+    if (!u) {
+      const from = Object.keys(c).filter(k => k !== job && k !== 'idle' && k !== 'other' && c[k] > 0).sort((a, b) => c[b] - c[a])[0];
+      u = from && vs.filter(o => A.jobOf(o) === from).sort((a, b) => (a.carry || 0) - (b.carry || 0))[0];
+    }
+    if (!u) { PK.UI.toast('No tienes aldeanos libres: entrena más en el Centro Urbano.', 'warn'); return false; }
+    return A.setJob([u], job) > 0;
+  };
+  // −1: uno de ese trabajo queda ocioso a propósito (el Capataz no lo reparte hasta que le des otra cosa).
+  A.removeJob = function (job) {
+    const u = A.villagers().filter(o => A.jobOf(o) === job).sort((a, b) => (a.carry || 0) - (b.carry || 0))[0];
+    if (!u) return false;
+    G().release(u);
+    u.mode = 'idle'; u.hold = true;
+    return true;
+  };
+  A.freeIdle = function () { // los ociosos «a propósito» vuelven a quedar en manos del Capataz
+    let n = 0;
+    for (const u of A.villagers()) if (!u.task && !u.inside) { u.hold = false; u.idleT = 3; n++; }
+    return n;
   };
 
   A.queued = b => S().upq.includes(b.id);
