@@ -98,3 +98,101 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   `admin.database()`).
 - Kingdom coins are still local (`sitio.js`). Moving them to the site economy
   would be the server's job, not the browser's.
+
+## Beta review, Nov 2026 (decisions; change them only on purpose)
+
+- **Buildings build themselves.** `G.updateBuildings` advances `progress` of
+  unfinished player buildings (`def.time / buildMult`). Villagers no longer build:
+  the `build` task only survives in old saves and clears itself. Placing comes
+  from the **Construir** menu (`UI.openBuild`, key C), not from the villager
+  panel. On touch, the first tap shows the ghost and a second tap on it (or
+  «Construir aquí») builds it (`PK.Input.placeGhost`).
+- **Villagers get jobs.** `PK.Auto.JOBS`, `setJob`, `addJob` and `removeJob`
+  (the «Aldeanos» window, which also holds the Capataz). A player order sets
+  `task.m`, and the Capataz never undoes it (stalled workshops only release
+  the workers it placed). `u.hold` is «idle on purpose». `G.bestNode` picks
+  nodes by distance to the villager and to its drop point plus a crowding
+  penalty (`G.nodeRoom`), and widens the search before giving up. Two walking
+  villagers don't push each other (`separate`).
+- **Troops are drawn, not simulated** (`js/troops.js`). The garrison stands in
+  front of the barracks, and columns march along an A* route by the time
+  fraction of each run. The fight plays at arrival. Nothing of it is saved or
+  sent to the server. Bandit camps go through the expedition planner
+  (`PK.Exp` target `{ camp }`). `war.exps` camp entries are legacy. Each battle
+  leaves a report in `war.reports` (`UI.openReport`).
+- **Digits use Jersey 10** (`css/numeros.woff2`, OFL, 0-9 only via
+  `unicode-range`, `size-adjust: 125%`), because in Pixelify Sans the 2, 5 and
+  8 look alike. The canvas uses the same stack (`"PK Num", "Pixelify Sans"`).
+- **Balance:** only rates, regrow times and costs changed in `data.js`. Node
+  `amount`s are untouched because the server uses them for the shared zones.
+- **Redraws keep scroll.** `UI.rerender` and `refreshPanel` rebuild everything,
+  so they snapshot and restore every element's scroll, and they skip the timed
+  redraw while the user is touching or scrolling (`watchTouch`). Pass
+  `rerender(true)` when switching tabs. On phones, modals are full screen.
+- **Map events** have a banner that shrinks to a pill (✕, after 15 s, or always
+  with Opciones → «Eventos achicados», `flags.evMin`). Toasts close on tap.
+  Chests open with `UI.chestReveal`.
+- **Trapped villagers get rescued** (`unstick` in `entities.js`, every second).
+  On a tile that became blocked (a wall drawn over them, a tree regrown or
+  revived by the server, an event node), they step to the nearest free tile.
+  Standing still for 6 s (2 s after failed paths) outside the region of their
+  Centro Urbano (`W.regionAt`) means enclosed, so they jump back to it. Never
+  rescue by distance or by path failures alone: a villager in its home region
+  is never trapped, only waiting.
+
+## Playtest fixes, Nov 2026
+
+- **Gold has no `MARKET_BASE` entry** (that table also feeds the guild's
+  needs). `social.js` prices it at 100 through `price()`. Without it, gold
+  offers came out as «200 oro por 0» and accepting one set a resource to NaN.
+  Saved offers that are not valid are dropped at load.
+- **`U.dayKey` does not zero-pad** («2026-11-2»). Parse it with `parseDay`,
+  never `new Date(key + 'T00:00:00')`, which gave «faltan NaNs».
+- **`Element.append(null)` writes «null».** Pass `''` for an optional child
+  (`U.el` skips nulls, but bare `append` does not).
+- **The panel hides when empty** (`#hud.p-none`): with «Ocultar ayuda»
+  (`flags.helpOff`) and nothing selected, the map is free.
+- **Portrait phones under 600 px wrap the top bar into two rows.** In one
+  scrolling row, population, era and coins sat off screen.
+- **Why villagers are idle:** `PK.Auto.whyText` (never seen, depleted with
+  regrow ETA, or out of reach), and `idleHint` warns at most every 3 min.
+- **Tactics** (`PK.Exp.TACTICS`: asalto, normal, cauto) change power and
+  losses until arrival. A toast 20 s before arrival offers «Ver combate».
+- **One toast per batch** for finished quests, «Reclamar todo»
+  (`Quests.claimAll`) with one chest, («lleno»: see below).
+  Auto-train leaves one slot for the scout. Tc level 1 stores 800.
+- The 🌐 language picker only floats when the page is opened alone
+  (`i18n.js` skips it inside a frame), so in Juegos it never covers the game.
+- **Toasts are prepended (newest first).** Hide extras with
+  `:nth-child(n+K)`, never `:nth-last-child`, which hid the newest. At most 3
+  on desktop and 2 on phones. «Lleno» is one toast every 2 min listing every
+  full resource. «Explorador sin alcance» shows once per range
+  (`flags.scoutDoneR`).
+- **The upgrade queue skips what it cannot pay yet** and keeps the order for
+  the rest. «Ocupar los talleres» also moves one Capataz gatherer (never a
+  `task.m` one) to a free workshop slot every 10 s.
+- **Approximate numbers say «aprox.»**: in Pixelify Sans «~79» reads as «-79».
+
+## Fun pass, Nov 2026 (playtests at 6/10)
+
+- **Bandit raids** (`js/incursiones.js`, `PK.Incursiones`) from Era II, live play
+  only like the wolves: never offline, in `?timelapse` or on the server. Only
+  the clock to the next one is saved (`state.inc`, defaults for old saves).
+  Camp + horn + `aviso` countdown, then a march on the nearest storage. TC and
+  towers shoot them through `Life.arrows` (`a.fn` callback); home troops sally
+  (drawn figures, damage from `Social.power`, garrison hidden meanwhile).
+  Looting takes up to 12% of food/wood/stone/gold, capped per era, and killing
+  a carrier returns its share. A win counts `raids_won` and `defenses_won`
+  (quests w5, w11, w12). Walls that cut the path turn it into a siege.
+- **Horas extra** (`G.otInfo`/`G.overtime`): pay 12% of each storage cap in
+  food, wood and stone to skip 10% of an era advance (max 8) or 12.5% of an
+  upgrade of 2 min or more (max 4), +30% per payment on the same timer
+  (`t.ot`). It is the surplus sink. Keep it priced off caps, not a table.
+- **Progressive menu** (`MENU_VER` in `ui.js`): Explorar, Investigar, Mercado,
+  Gremio, Territorio, Logística and Reinos show up when they make sense and
+  stay (`flags.menu_<id>`). Cuartel is always there (walls from Era I). What
+  appears mid-session glows (`.nuevo`); on load nothing is announced.
+  Territorio also appears after a «tierra libre» placement (`flags.verTerr`).
+- **The minimap frames the explored area** (`R.mmView`, eased) instead of the
+  whole world. `minimapToTile` and the camera box go through that view.
+- **Phones start at zoom 1** (smaller side under 560 px).

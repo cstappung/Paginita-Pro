@@ -351,6 +351,9 @@
       }
     return out;
   };
+  // Región de una casilla (0 si está bloqueada) y su tamaño: para saber si un aldeano quedó encerrado.
+  W.regionAt = (x, y) => (W.inb(x, y) ? regions()[W.idx(x, y)] : 0);
+  W.regionSize = l => (l ? regSize[l] || 0 : 0);
   W.reachable = function (n, regs) {
     if (!regs.size) return true; // no se sabe desde dónde: que lo resuelva la ruta
     const reg = regions();

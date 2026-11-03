@@ -32,9 +32,13 @@
 
   // Recursos del mapa. regrow: segundos hasta rebrotar; regen: fracción del máximo que vuelve por hora.
   D.NODES = {
-    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.42, regrow: 4 * 3600 },
-    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.36, regrow: 3 * 3600 },
-    deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.62, regrow: 6 * 3600, hunt: true },
+    // Balance (beta, nov. 2026): la madera costaba mucho más que la comida. Todo pide madera (casas, campamentos,
+    // granjas, tablones, fundición, eras) y cada árbol se agota rápido, mientras la caza rendía 1,5 veces la tala.
+    // Por eso la tala es más rápida, los árboles rebrotan antes y la caza rinde un poco menos. Los montos (amount)
+    // no se tocan: el servidor del mundo compartido los usa para las zonas comunes.
+    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 2.5 * 3600 },
+    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600 },
+    deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.5, regrow: 6 * 3600, hunt: true },
     stone: { name: 'Mina de piedra', res: 'stone', amount: 350, rate: 0.36, regen: 0.05 },
     gold: { name: 'Mina de oro', res: 'gold', amount: 400, rate: 0.38, regen: 0.04 },
     ore: { name: 'Veta de hierro', res: 'ore', amount: 400, rate: 0.33, regen: 0.04 },
@@ -47,7 +51,7 @@
   D.SIGHT = { scout: 5 };
 
   // ---------- Edificios ----------
-  // cost/time: construcción inicial (la hacen los aldeanos). up: costo base de las mejoras (si no, cost).
+  // cost/time: construcción inicial (se levanta sola, ver game.js updateBuildings). up: costo base de las mejoras (si no, cost).
   // upT: factor del tiempo de mejora. max: cuántos puedes tener (número o función de la era).
   // drop: recursos que acepta como punto de acopio. recipe: producción con trabajadores dentro.
   const ALLRAW = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'];
@@ -57,7 +61,7 @@
     lumber: { name: 'Campamento Maderero', w: 2, h: 2, cost: { wood: 80 }, time: 20, era: 1, drop: ['wood'], upT: 0.7, desc: 'Acopio de madera. Quien descarga aquí trabaja más rápido según su nivel.' },
     mining: { name: 'Campamento Minero', w: 2, h: 2, cost: { wood: 80 }, time: 20, era: 1, drop: ['stone', 'gold', 'ore', 'marble', 'gems'], upT: 0.7, desc: 'Acopio de piedra, oro, hierro, mármol y gemas.' },
     mill: { name: 'Molino', w: 2, h: 2, cost: { wood: 80 }, time: 20, era: 1, drop: ['food'], upT: 0.7, desc: 'Acopio de comida (bayas, caza y granjas).' },
-    farm: { name: 'Granja', w: 3, h: 3, cost: { wood: 60 }, time: 15, era: 1, walkable: true, flat: true, upT: 0.6, desc: 'Comida inagotable, más lenta que las bayas. Un granjero por granja.' },
+    farm: { name: 'Granja', w: 3, h: 3, cost: { wood: 50 }, time: 15, era: 1, walkable: true, flat: true, upT: 0.6, desc: 'Comida inagotable, más lenta que las bayas. Un granjero por granja.' },
     granary: { name: 'Granero', w: 2, h: 2, cost: { wood: 120, stone: 30 }, time: 25, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánta comida puedes guardar.' },
     warehouse: { name: 'Almacén', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 30, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánto puedes guardar de todo lo demás.' },
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
@@ -128,7 +132,8 @@
   const campStats = L => ({ gather: 0.1 * (L - 1), carry: L - 1 });
   // Efecto de cada edificio según su nivel.
   D.BSTATS = {
-    tc: L => ({ pop: 5 + 3 * (L - 1), cap: capR(600 * Math.pow(1.55, L - 1)), train: 0.12 * (L - 1), defense: 25 + 20 * (L - 1), sight: 9 + L }),
+    // cap 800 (era 600): en la Era I se pasaba más tiempo con el almacén lleno que juntando (playtest)
+    tc: L => ({ pop: 5 + 3 * (L - 1), cap: capR(800 * Math.pow(1.55, L - 1)), train: 0.12 * (L - 1), defense: 25 + 20 * (L - 1), sight: 9 + L }),
     house: L => ({ pop: 5 + 2 * (L - 1) }),
     lumber: campStats, mining: campStats, mill: campStats,
     farm: L => ({ farm: 0.12 * (L - 1) }),
@@ -153,7 +158,7 @@
     pop: ['Población', v => '+' + v], cap: ['Capacidad (todo)', v => U.fmt(v)], capFood: ['Capacidad de comida', v => U.fmt(v)], capGoods: ['Capacidad de bienes', v => U.fmt(v)],
     train: ['Velocidad de entrenamiento', pct], defense: ['Defensa', v => String(v)], sight: ['Visión', v => v + ' casillas'],
     gather: ['Ritmo de quien descarga aquí', pct], carry: ['Carga extra', v => '+' + v], farm: ['Rendimiento', pct],
-    builders: ['Maestros de Obras', v => '+' + v], scouts: ['Exploradores', v => String(v)], range: ['Alcance de exploración', v => v + ' casillas'], scoutSpeed: ['Velocidad de exploradores', pct],
+    builders: ['Maestros de Obras', v => '+' + v], scouts: ['Exploradores (máx.)', v => String(v)], range: ['Alcance de exploración', v => v + ' casillas'], scoutSpeed: ['Velocidad de exploradores', pct],
     buy: ['Precio de compra', v => Math.round(v * 100) + '%'], sell: ['Precio de venta', v => Math.round(v * 100) + '%'],
     prod: ['Producción', pct], slots: ['Puestos de trabajo', v => String(v)],
     techMax: ['Nivel máx. de tecnologías', v => String(v)], research: ['Velocidad de investigación', pct], armyTrain: ['Velocidad de entrenamiento', pct],
@@ -693,7 +698,7 @@
 
   // Crónica (rama principal, hace de tutorial)
   q('m1', 'main', 'El primer fuego', 'Entrena aldeanos en el Centro Urbano hasta tener 5. Selecciona el Centro Urbano y pulsa "Aldeano".', { t: 'villagers', n: 5 }, { food: 100 });
-  q('m2', 'main', 'Techo para todos', 'Construye 2 casas: selecciona un aldeano y elige Casa en el menú de construcción.', B('house', 2), { wood: 80 }, ['m1']);
+  q('m2', 'main', 'Techo para todos', 'Construye 2 casas: pulsa Construir (tecla C), elige Casa y ubícala. Se levantan solas, sin aldeanos.', B('house', 2), { wood: 80 }, ['m1']);
   q('m3', 'main', 'Mejorar es crecer', 'Mejora el Centro Urbano a nivel 2. Selecciónalo y pulsa "Mejorar": lo hace tu Maestro de Obras.', LV('tc', 2), { stone: 80, gold: 40 }, ['m2']);
   q('m4', 'main', 'Ojos en la niebla', 'Construye un Puesto de Exploradores y entrena un explorador. Él solo irá revelando el mapa.', all(B('scout'), st('scouts_trained', 1)), { food: 150, coins: 5 }, ['m3']);
   q('m5', 'main', 'Puntos de acopio', 'Construye un Campamento Maderero y uno Minero cerca de los recursos para acortar los viajes.', all(B('lumber'), B('mining')), { wood: 150 }, ['m4']);
@@ -823,6 +828,8 @@
   q('w7', 'war', 'Primera empalizada', 'Levanta 20 casillas de muralla (Cuartel → Defensa).', st('walls_built', 20), { wood: 300 });
   q('w8', 'war', 'Recinto cerrado', 'Encierra 4 parcelas con murallas, edificios o agua. Deja una puerta para tu gente.', { t: 'walled', n: 4 }, { coins: 15, stone: 400 }, ['w7']);
   q('w9', 'war', 'Muros de piedra', 'Mejora tus murallas a Muro de piedra.', { t: 'wallTier', n: 2 }, { coins: 10, gold: 300 }, ['w8']);
+  q('w11', 'war', 'Guardia del pueblo', 'Rechaza una incursión de bandidos. Desde la Era II llegan cada tanto: el cuerno avisa, y tus Torres, tu Centro Urbano y las tropas del Cuartel los frenan.', st('raids_won', 1), { gold: 200, coins: 10 });
+  q('w12', 'war', 'Azote de forajidos', 'Rechaza 5 incursiones de bandidos.', st('raids_won', 5), { coins: 20, gold: 600 }, ['w11']);
   q('w10', 'war', 'A la aventura', 'Gana una expedición en una mazmorra o un encargo del tablón.', st('exp_won', 1), { gold: 200, coins: 10 }, ['w2']);
   prev = 'w10';
   [5, 15, 40, 100, 250, 600].forEach((n, i) => {
@@ -834,7 +841,7 @@
   const ql = (id, title, desc, req, reward, pre, unlock) => { q(id, 'legend', title, desc, req, reward, pre); if (unlock) Q[Q.length - 1].unlock = unlock; };
   ql('l1', 'El forastero de la capa', 'Un viajero llega con historias de cuevas que brillan y guaridas de fieras. Construye un Cuartel para que tus soldados lo escuchen.', B('barracks'), { gold: 150 }, [], 'tavern');
   ql('l2', 'Una jarra para el viajero', 'Construye la Taberna. Desde ahí llegan los rumores y los encargos.', B('tavern'), { crystal: 5, gold: 200 }, ['l1']);
-  ql('l3', 'Bajo tierra', 'Gana tu primera expedición en una mazmorra (Cuartel → Expediciones).', st('exp_won', 1), { hide: 5, coins: 10 }, ['l2']);
+  ql('l3', 'Bajo tierra', 'Gana tu primera expedición en una mazmorra (Cuartel → Atacar).', st('exp_won', 1), { hide: 5, coins: 10 }, ['l2']);
   ql('l4', 'Ecos en la piedra', 'Descubre 3 mazmorras explorando el mapa.', st('dungeons_found', 3), { gold: 300 }, ['l2']);
   ql('l5', 'Un deseo de cristal', 'Junta 30 cristales de cueva.', st('sp_crystal', 30), { coins: 15 }, ['l3'], 'wishwell');
   ql('l6', 'Monedas al agua', 'Construye la Fuente de los Deseos y pide tu primer deseo.', all(B('wishwell'), st('wishes', 1)), { crystal: 10 }, ['l5']);
@@ -895,7 +902,8 @@
   D.WEEKLY = [
     { id: 'w_gather', k: 'g_total', base: 15000, text: n => 'Recolecta ' + U.fmt(n) + ' recursos en total' },
     { id: 'w_upg', k: 'upgrades', base: 12, flat: true, text: n => 'Completa ' + n + ' mejoras de edificios' },
-    { id: 'w_vill', k: 'villagers_trained', base: 20, flat: true, text: n => 'Entrena ' + n + ' aldeanos' },
+    // 20 se cumplía en los primeros minutos de una partida nueva (playtest): una semanal tiene que durar días
+    { id: 'w_vill', k: 'villagers_trained', base: 40, flat: true, text: n => 'Entrena ' + n + ' aldeanos' },
     { id: 'w_explore', k: 'explored', base: 900, flat: true, needB: 'scout', text: n => 'Revela ' + n + ' casillas del mapa' },
     { id: 'w_common', k: 'g_common', base: 3000, text: n => 'Recolecta ' + U.fmt(n) + ' en zonas comunes' },
     { id: 'w_market', k: 'market_ops', base: 15, flat: true, era: 2, needB: 'market', text: n => 'Haz ' + n + ' operaciones en el mercado' },

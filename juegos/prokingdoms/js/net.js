@@ -244,7 +244,7 @@
         case 'under_attack': {
           seenIncoming.add(it.cid);
           const left = (it.arrive - Date.now()) / 1000;
-          const text = '¡' + it.from + ' (jugador) marcha contra una parcela de tu frontera con una fuerza de ~' + U.fmt(it.power) + '!' + (left > 0 ? ' Llega en ' + U.fmtTime(left) + '.' : '');
+          const text = '¡' + it.from + ' (jugador) marcha contra una parcela de tu frontera con una fuerza de aprox. ' + U.fmt(it.power) + '!' + (left > 0 ? ' Llega en ' + U.fmtTime(left) + '.' : '');
           PK.Social.log(text, 'bad');
           g.logNews(text, 'bad');
           if (left > 0) { toast(text + ' Refuerza tus torres o trae tropas a casa.', 'bad'); PK.Notify.now('¡Te atacan!', text); }
@@ -278,10 +278,10 @@
     for (const r of list) {
       if (seenIncoming.has(r.id)) continue;
       seenIncoming.add(r.id);
-      const text = '¡' + r.from + ' marcha contra tu frontera con una fuerza de ~' + r.power + '! Llega en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '.';
+      const text = '¡' + r.from + ' marcha contra tu frontera con una fuerza de aprox. ' + r.power + '! Llega en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '.';
       toast(text, 'bad');
       PK.Notify.now('¡Te atacan!', text);
-      PK.Social.log(r.from + ' (jugador) viene a atacarte con una fuerza de ~' + r.power + '.', 'bad');
+      PK.Social.log(r.from + ' (jugador) viene a atacarte con una fuerza de aprox. ' + r.power + '.', 'bad');
     }
   }
 

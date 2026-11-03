@@ -82,14 +82,16 @@
     }
   }
 
-  function scare(u) {
+  function scare(u, who) {
     if (u.carry) { u.carry = 0; u.carryRes = null; }
     const tc = G().buildings.find(b => b.owner === 'p' && b.type === 'tc' && b.done);
     u.scared = 5;
     if (tc) u.path = W.findPath(Math.floor(u.x), Math.floor(u.y), { x0: tc.x, y0: tc.y, x1: tc.x + tc.w - 1, y1: tc.y + tc.h - 1, adj: true }, 4000).path;
-    if (!L.warned || G().time - L.warned > 20) { L.warned = G().time; toast('¡Los lobos asustan a tus aldeanos! Huyen al Centro Urbano.', 'bad'); }
+    if (!L.warned || G().time - L.warned > 20) { L.warned = G().time; toast('¡' + (who || 'Los lobos') + ' asustan a tus aldeanos! Huyen al Centro Urbano.', 'bad'); }
     sfx('hit');
   }
+
+  L.scare = scare; // también asustan los bandidos (incursiones.js)
 
   function hurt(w, dmg, arrow) {
     if (w.hp <= 0) return;
@@ -124,7 +126,8 @@
     }
     for (const a of L.arrows.slice()) {
       a.t += dt;
-      if (a.t >= a.dur) { L.arrows.splice(L.arrows.indexOf(a), 1); if (L.wolves.includes(a.w)) hurt(a.w, a.dmg, true); }
+      // fn: flechas de otros (incursiones.js: torres contra bandidos y arqueros que salen a defender)
+      if (a.t >= a.dur) { L.arrows.splice(L.arrows.indexOf(a), 1); if (a.fn) a.fn(a); else if (L.wolves.includes(a.w)) hurt(a.w, a.dmg, true); }
     }
   }
 
@@ -135,6 +138,7 @@
       const x = Math.floor(hx + (Math.random() - 0.5) * 24), y = Math.floor(hy + (Math.random() - 0.5) * 24);
       if (!W.explored(x, y) || !W.passable(x, y) || (W.zoneAt[W.idx(x, y)] >= 0 && W.zones[W.zoneAt[W.idx(x, y)]].common)) continue;
       if (G().buildings.some(b => b.owner === 'p' && U.dist(b.cx, b.cy, x, y) < 3)) continue;
+      if (G().units.some(u => !u.inside && Math.floor(u.x) === x && Math.floor(u.y) === y)) continue; // no encima de un aldeano
       const n = { id: W.nodes.length, kind, x, y, amount, max: amount, zone: -1, v: Math.floor(Math.random() * 4), dead: false, t: 0, temp: true };
       W.nodes.push(n); W.nodeAt[W.idx(x, y)] = n.id; W.block[W.idx(x, y)] = 1; W.bucket(n);
       return n;
@@ -271,7 +275,8 @@
     for (let k = 0; k < 5; k++) {
       const id = U.pick(ids), def = EVENTS[id], e = { id, name: def.name, desc: def.desc, t: def.dur, total: def.dur };
       if (def.start(e) === false) continue;
-      toast('Evento: ' + e.name + ' — ' + e.desc + '.', 'epic');
+      // los que duran ya tienen su cartel (ui.js, que se puede achicar): el aviso extra tapaba la pantalla dos veces
+      if (!def.dur) toast('Evento: ' + e.name + ' — ' + e.desc + '.', 'epic');
       sfx('event');
       G().stat('events', 1);
       L.event = def.dur ? e : null;

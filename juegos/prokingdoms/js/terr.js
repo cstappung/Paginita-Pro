@@ -331,7 +331,7 @@
       if (!th.warned && now >= th.at - 120e3 && !offline) {
         th.warned = true;
         toast('¡' + T.realmOf(th.slot).name + ' marcha contra tu frontera! Llega en 2 minutos.', 'bad');
-        PK.Social.log(T.realmOf(th.slot).realm + ' viene contra tu frontera con una fuerza de ~' + th.power + '.', 'bad');
+        PK.Social.log(T.realmOf(th.slot).realm + ' viene contra tu frontera con una fuerza de aprox. ' + th.power + '.', 'bad');
       }
       if (now >= th.at) { st.terr.threats.splice(st.terr.threats.indexOf(th), 1); if (st.terr.shield < now) resolveThreat(th); }
     }

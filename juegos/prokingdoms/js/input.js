@@ -142,7 +142,7 @@
 
   function tap(x, y) {
     const g = G();
-    if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode) { leftClick(x, y, false); return; }
+    if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode) { leftClick(x, y, false, true); return; }
     const it = R().pick(x, y);
     const now = performance.now(), prev = lastTap;
     lastTap = { x, y, t: now };
@@ -204,7 +204,24 @@
     }
   }
 
-  function leftClick(sx, sy, shift) {
+  // Construir en el lugar del fantasma (con el dedo se confirma con un segundo toque o con «Construir aquí»).
+  I.placeGhost = function (shift) {
+    const g = G(), gh = R().ghost;
+    if (!g.placing || !gh) return;
+    const b = g.place(g.placing.type, gh.x, gh.y);
+    if (b && !shift) { g.placing = null; R().ghost = null; }
+    else if (b && g.placing) g.placing.armed = false;
+    PK.UI.refreshPanel(true);
+  };
+  I.startPlacing = function (type) {
+    const g = G();
+    I.cancelTool();
+    g.placing = { type, armed: false };
+    R().ghost = null;
+    PK.UI.refreshPanel(true);
+  };
+
+  function leftClick(sx, sy, shift, touch) {
     const g = G();
     if (PK.Logi.tool) { toolClick(sx, sy); return; }
     if (PK.Def.tool) { const [tx, ty] = R().screenToTile(sx, sy); PK.Def.click(Math.floor(tx), Math.floor(ty)); PK.UI.refreshPanel(true); return; }
@@ -214,15 +231,18 @@
       return;
     }
     if (g.placing) {
-      updateGhost(sx, sy);
-      const gh = R().ghost;
-      const b = g.place(g.placing.type, gh.x, gh.y, g.placing.builders);
-      if (b && !(shift || g.placing.type === 'farm' && shift)) { g.placing = null; R().ghost = null; }
-      PK.UI.refreshPanel(true);
+      // con el dedo, el primer toque muestra dónde quedaría; el segundo sobre el mismo lugar lo construye
+      if (touch) {
+        const gh = R().ghost, def = D.BUILD[g.placing.type], [tx, ty] = R().screenToTile(sx, sy);
+        const onGhost = g.placing.armed && gh && tx >= gh.x - 0.5 && tx < gh.x + def.w + 0.5 && ty >= gh.y - 0.5 && ty < gh.y + def.h + 0.5;
+        if (!onGhost) { updateGhost(sx, sy); g.placing.armed = true; PK.UI.refreshPanel(true); return; }
+      } else updateGhost(sx, sy);
+      I.placeGhost(shift);
       return;
     }
     const it = R().pick(sx, sy);
     if (!it || it.k === 'tile') { if (!shift) g.sel = null; PK.UI.refreshPanel(true); return; }
+    if (it.k === 'troop') { PK.UI.openBarracks(it.o.march || it.o.fight ? 'exp' : 'troops'); return; }
     if (it.k === 'unit') {
       if (it.o.owner === 'p') {
         if (shift && g.sel && g.sel.type === 'units') { const s = new Set(g.sel.ids); s.has(it.o.id) ? s.delete(it.o.id) : s.add(it.o.id); g.sel = { type: 'units', ids: [...s] }; }
@@ -322,6 +342,7 @@
     else if (k === 't') PK.Terr.toggle();
 
     else if (k === 'b') PK.Quests.openBook();
+    else if (k === 'c') PK.UI.openBuild();
     else if (k === 'm') PK.UI.toast(PK.Sfx.toggle() ? 'Sonido activado.' : 'Sonido silenciado.', 'info');
     else if (k === 'delete' && g.sel && g.sel.type === 'building') { const b = g.bById.get(g.sel.id); if (b) PK.UI.confirmDemolish(b); }
     if (k === ' ') e.preventDefault();

@@ -38,6 +38,7 @@
   Soc.init = function (st) {
     for (const k in D.MARKET_BASE) if (st.market && !st.market.p[k]) st.market.p[k] = D.MARKET_BASE[k];
     if (!st.market) st.market = { p: Object.assign({}, D.MARKET_BASE), t: 0, offers: [], mine: [], offerT: 5, oid: 1, mineT: 0 };
+    if (st.market) st.market.offers = st.market.offers.filter(validOffer); // partidas con ofertas «por 0» guardadas
     if (!st.guild) st.guild = { joined: false, stage: 0, prog: {}, my: 0, members: D.GUILD_MEMBERS.map(n => ({ name: n, c: 0 })), chat: [], t: 0, chatT: 30 };
     st.guild.helps = st.guild.helps || [];
     st.guild.needs = st.guild.needs || [];   // tablón "Necesito…" (sin servidor)
@@ -60,7 +61,11 @@
   };
 
   // ---------- Mercado ----------
-  const value = (res, n) => (S().market.p[res] || D.MARKET_BASE[res]) * n / 100;
+  // El oro es la moneda: 100 oro valen 100 (no está en MARKET_BASE, que también usa el gremio). Sin esto,
+  // las ofertas con oro daban NaN: «200 oro por 0 madera», y aceptarla dejaba el recurso en NaN.
+  const price = r => (r === 'gold' ? 100 : S().market.p[r] || D.MARKET_BASE[r] || 100);
+  const value = (res, n) => price(res) * n / 100;
+  const validOffer = o => o && D.RES[o.give] && D.RES[o.want] && o.give !== o.want && o.gn > 0 && o.wn > 0;
 
   function marketTick(dt) {
     const m = S().market;
@@ -113,9 +118,9 @@
     let want = U.pick(pool);
     while (want === give) want = U.pick(pool);
     const scale = 200 * Math.pow(1.6, S().era - 1);
-    const gn = Math.max(10, Math.round((scale * 100) / (m.p[give] || 100) / 10) * 10);
+    const gn = Math.max(10, Math.round((scale * 100) / price(give) / 10) * 10);
     const fair = U.rand(0.8, 1.2);
-    const wn = Math.max(10, Math.round((value(give, gn) * fair * 100) / (m.p[want] || 100) / 10) * 10);
+    const wn = Math.max(10, Math.round((value(give, gn) * fair * 100) / price(want) / 10) * 10);
     return { id: m.oid++, by: bot.name, bot: bot.id, give, gn, want, wn, ttl: 900 + Math.random() * 1500 };
   }
 
@@ -141,6 +146,7 @@
   Soc.accept = function (id) {
     const m = S().market, o = m.offers.find(x => x.id === id);
     if (!o) return;
+    if (!validOffer(o)) { m.offers.splice(m.offers.indexOf(o), 1); toast('Esa oferta ya no es válida.', 'warn'); return; }
     if ((S().res[o.want] || 0) < o.wn) { toast('No tienes lo que pide.', 'warn'); return; }
     S().res[o.want] -= o.wn; S().res[o.give] += o.gn;
     m.offers.splice(m.offers.indexOf(o), 1);
@@ -494,30 +500,45 @@
   Soc.barracksLvl = () => G().buildings.reduce((m, b) => (b.owner === 'p' && b.done && b.type === 'barracks' ? Math.max(m, b.lvl) : m), 0);
   Soc.truce = () => !G().countB('barracks') && S().era < 3;
 
+  Soc.Q_MAX = 20;
+  // Velocidad de la cola: cada Cuartel entrena a la vez (1 + su bono por nivel).
+  Soc.trainSpeed = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + G().bst(b).armyTrain : 0), 0);
+  // Por qué no se puede entrenar esa tropa ahora (o null).
+  Soc.trainWhy = function (type) {
+    const def = D.ARMY[type], w = S().war;
+    if (S().era < def.era) return 'Requiere la Era ' + U.roman(def.era) + '.';
+    if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
+    if (Soc.barracksLvl() < def.lvl) return def.name + ' requiere un Cuartel de nivel ' + def.lvl + '.';
+    if (G().pop() >= G().popCap()) return 'Población máxima: construye o mejora casas.';
+    if (w.q.length >= Soc.Q_MAX) return 'La cola del Cuartel está llena.';
+    if (!G().canAfford(def.cost)) return 'Recursos insuficientes.';
+    return null;
+  };
   Soc.trainArmy = function (type, n) {
     const def = D.ARMY[type], w = S().war;
-    if (S().era < def.era) { toast('Requiere la Era ' + U.roman(def.era) + '.', 'warn'); return; }
-    if (!G().countB('barracks')) { toast('Necesitas un Cuartel.', 'warn'); return; }
-    if (Soc.barracksLvl() < def.lvl) { toast(def.name + ' requiere un Cuartel de nivel ' + def.lvl + '.', 'warn'); return; }
+    let done = 0;
     for (let i = 0; i < n; i++) {
-      if (G().pop() >= G().popCap()) { toast('Población máxima.', 'warn'); break; }
-      if (w.q.length >= 20) { toast('Cola del cuartel llena.', 'warn'); break; }
-      if (!G().pay(def.cost)) { toast('Recursos insuficientes.', 'warn'); break; }
+      const why = Soc.trainWhy(type);
+      if (why) { toast(why, 'warn'); break; }
+      G().pay(def.cost);
       w.q.push(type);
+      done++;
     }
+    if (done && PK.Sfx) PK.Sfx.play('build');
+    return done;
   };
-  // Campamentos de bandidos descubiertos explorando: se atacan con tropas.
+  // Saca de la cola la última tropa pedida y devuelve lo que costó.
+  Soc.cancelArmy = function () {
+    const w = S().war;
+    if (!w.q.length) return;
+    const k = w.q.pop();
+    G().give(D.ARMY[k].cost);
+    if (!w.q.length) w.qt = 0;
+  };
+  // Campamentos de bandidos descubiertos explorando: ahora van por el mismo planificador que las mazmorras
+  // (expeditions.js, objetivo { camp }), con fuerza, probabilidad, bajas e informe. Esto queda por compatibilidad.
   Soc.attackCamp = function (poiId, units) {
-    const w = S().war, p = PK.World.pois[poiId], st = p && G().poiState(p);
-    if (!st || !st.f || st.d) return;
-    if (w.exps.some(e => e.camp === poiId)) { toast('Ya hay tropas en camino a ese campamento.', 'warn'); return; }
-    const total = Object.keys(units).reduce((s, k) => s + units[k], 0);
-    if (!total) { toast('Elige tropas para el ataque.', 'warn'); return; }
-    for (const k in units) if (units[k] > w.army[k]) return;
-    for (const k in units) w.army[k] -= units[k];
-    const travel = 30 + U.dist(D.PLAYER_HOME[0], D.PLAYER_HOME[1], p.x, p.y) * 1.5;
-    w.exps.push({ camp: poiId, units: Object.assign({}, units), t: 0, travel, phase: 'go', loot: null, won: false });
-    toast('Tus tropas marchan contra los bandidos.', 'good');
+    return PK.Exp.send({ camp: poiId }, Object.assign({}, units));
   };
 
   Soc.log = log;
@@ -530,13 +551,15 @@
   function warTick(dt, offline) {
     const w = S().war, g = G();
     if (w.q.length && g.countB('barracks')) {
-      w.qt += dt * g.buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + g.bst(b).armyTrain : 0), 0);
-      let guard = 0;
+      w.qt += dt * Soc.trainSpeed();
+      let guard = 0, got = null;
       while (w.q.length && w.qt >= D.ARMY[w.q[0]].time && guard++ < 1000) {
         w.qt -= D.ARMY[w.q[0]].time;
-        w.army[w.q.shift()]++;
+        got = w.q.shift();
+        w.army[got]++;
         g.stat('trained_army', 1);
       }
+      if (got && !offline && !w.q.length) toast('El Cuartel terminó de entrenar: ' + D.ARMY[got].name.toLowerCase() + ' y los demás ya forman frente al Cuartel.', 'good');
       if (!w.q.length) w.qt = 0;
     }
     for (const e of w.exps.slice()) {

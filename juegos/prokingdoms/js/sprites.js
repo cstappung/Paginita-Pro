@@ -1384,20 +1384,23 @@
   const VLIGHT = norm3(0.4, -0.62, 0.68);
   // frame: caminando 0..5; trabajando 0..3 (preparar, medio, impacto, rebote).
   // aim: punto de contacto [dx, dy] en píxeles respecto de los pies, mirando a la derecha.
-  const HEAD = { axe: 1.0, pick: 1.6, hammer: 1.0, sickle: 1.1, knife: 0.5 }; // del extremo del mango al filo que golpea
-  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim) {
-    const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '');
+  const HEAD = { axe: 1.0, pick: 1.6, hammer: 1.0, sickle: 1.1, knife: 0.5, sword: 0.3, spear: 0.3 }; // del extremo del mango al filo que golpea
+  // troop: el mismo cuerpo vestido de soldado (militia, spear, archer, knight, cleric o catapult, la dotación).
+  // Cambian la túnica, el casco o la capucha y el arma que lleva en la mano de adelante (al pelear, la herramienta).
+  const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204] };
+  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop) {
+    const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '');
     if (VC[key]) return VC[key];
     if (++vcN > 3000) { for (const k in VC) delete VC[k]; vcN = 0; }
     const PW = VW * VR, PH = VH * VR, pb = new PB(PW, PH);
-    const female = (hair * 3 + skin) % 2 === 1, hat = scout ? 0 : (hair + skin * 2) % 4;
+    const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric';
     const walk = mode === 'walk', ph = walk ? (frame % 6) / 6 * Math.PI * 2 : 0;
     // al recoger a mano se agacha: baja la cadera y adelanta las rodillas
     const crouch = mode === 'work' && tool === 'hand' ? 4 : 0;
     const sv = walk ? Math.sin(ph) : 0, lift = walk ? Math.abs(Math.cos(ph)) : 0, yo = -lift * 0.35 + crouch;
     const working = mode === 'work' && tool;
     // materiales
-    const tcol = scout ? [86, 108, 56] : col;
+    const tcol = troop ? TROOP_TUNIC[troop] || col : scout ? [86, 108, 56] : col;
     const SK = vRamp(SKIN[skin]), HR = vRamp(HAIR[hair]), BRD = vRamp(sc(HAIR[hair], 0.85));
     const TU = vRamp(tcol), TU2 = vRamp(sc(tcol, 0.78)), LIN = vRamp([212, 196, 160]), LIN2 = vRamp([176, 160, 126]);
     const PA = vRamp([104, 80, 54]), WRAP = vRamp([150, 128, 92]), BO = vRamp([78, 54, 36]), BE = vRamp([92, 58, 30]);
@@ -1500,7 +1503,7 @@
     if (!female) { // pecho: dos volúmenes que sobresalen hacia la luz, con la línea del esternón
       E(hx + 0.95, shY + 1.35, 1.25, 1.05, 3.08, torsoM); E(hx - 0.35, shY + 1.4, 1.15, 1.0, 3.07, torsoM);
     }
-    if (female) K(hx, waist, 17.6, 1.7, 2.7, 3.2, (px, py) => (py > 17.0 ? LIN2 : py > 16.4 ? TU2 : Math.floor(px * 2.5) % 3 === 0 && py > waist + 1.5 ? TU2 : TU));
+    if (female || robe) K(hx, waist, 17.6, 1.7, 2.7, 3.2, (px, py) => (py > 17.0 ? LIN2 : py > 16.4 ? TU2 : Math.floor(px * 2.5) % 3 === 0 && py > waist + 1.5 ? TU2 : TU));
     else K(hx, waist, 13.6 + yo, 1.75, 2.3, 3.2, (px, py) => (py > 13.1 + yo ? LIN2 : Math.floor(px * 2.5) % 3 === 0 && py > waist + 0.8 ? TU2 : TU)); // faldón
     if (!back) E(hx - 1.5, beltY + 0.75, 0.55, 0.7, 3.4, BE); // bolsita
     Cp(hx + 0.1, 5.4 + yo, hx + 0.1, 6.4 + yo, female ? 0.58 : 0.72, 3.5, SK);  // cuello
@@ -1524,6 +1527,13 @@
       E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
       Cp(12.4, 1.2, 12.4, 18.4, 0.32, 6.5, WO); E(12.4, 0.9, 0.5, 0.5, 6.6, WO);
     }
+    if (troop) {
+      const helm = troop === 'knight' || troop === 'spear' ? ME : troop === 'militia' || troop === 'catapult' ? WRAP : null;
+      if (helm) E(hx - 0.05, hy - 0.5, 1.6, 1.35, 4.65, helm, (px, py) => py < hy - 0.2 || (troop === 'knight' && (back || px < hx + 0.35) && py < hy + 1.3));
+      if (troop === 'knight') E(hx - 0.35, hy - 1.95, 0.5, 0.8, 4.7, vRamp(col)); // penacho del color del reino
+      if (troop === 'archer' || robe) E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, robe ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'knight' && !back) E(hx - 1.15, 10.1 + yo, 1.45, 2.0, 3.6, (px, py) => (Math.abs(px - (hx - 1.15)) < 0.3 || Math.abs(py - (10.1 + yo)) < 0.3 ? ST : vRamp(col))); // escudo
+    }
     // brazo de adelante: herramienta, canasta o balanceo
     if (working && tip) {
       const ul = Math.hypot(tip[0] - hand[0], tip[1] - hand[1]) || 1, u = [(tip[0] - hand[0]) / ul, (tip[1] - hand[1]) / ul];
@@ -1535,6 +1545,8 @@
       else if (tool === 'pick') { seg(at(0, -1.0), at(0, 1.0), 0.32); seg(at(0, 1.0), at(-0.55, 1.8), 0.25); seg(at(0, -1.0), at(-0.55, -1.8), 0.25); }
       else if (tool === 'hammer') seg(at(0, -0.75), at(0, 0.75), 0.55);
       else if (tool === 'knife') seg(at(0, 0), at(-0.3, 0.55), 0.3);
+      else if (tool === 'sword') seg(at(0.4, 0), at(-2.8, 0), 0.32);
+      else if (tool === 'spear') seg(at(-0.4, 0), at(1.2, 0), 0.38);
       else { let q = at(0, 0); for (let i = 1; i <= 5; i++) { const a = i / 5 * Math.PI, n = at(-Math.sin(a) * 0.9, 0.9 - Math.cos(a) * 0.9); seg(q, n, 0.24); q = n; } }
       const e = elbow(10.0, shY + 0.2, hand[0], hand[1]);
       arm(10.0, 1, zA, hand[0], hand[1], e[0], e[1]);
@@ -1547,6 +1559,19 @@
       arm(9.9, 1, 5, 10.5, 10.3 + yo, 10.4, 8.9 + yo);
       E(11.2, 11.5 + yo, 1.6, 1.0, 6, (px, py) => (Math.floor(px * 2 + py * 2) % 3 ? BASK : BASK2), (px, py) => py > 10.8 + yo);
       E(10.5, 10.6 + yo, 0.5, 0.5, 5.9, RED); E(11.4, 10.4 + yo, 0.5, 0.5, 5.9, RED); E(12.0, 10.8 + yo, 0.46, 0.46, 5.9, GRN);
+    } else if (troop) { // la mano de adelante sostiene el arma, quieta aunque camine
+      const hX = 10.7, hY = 10.4 + yo;
+      arm(9.9, 1, 5, hX, hY, 10.3, 8.9 + yo);
+      const z = 6.5;
+      if (troop === 'spear') { Cp(11.3, 0.9 + yo, 11.3, 18.0, 0.3, z, WO); E(11.3, 0.6 + yo, 0.5, 1.0, z + 0.1, ME); }
+      else if (troop === 'knight') { Cp(11.2, 10.0 + yo, 12.6, 3.6 + yo, 0.32, z, ME); Cp(10.3, 9.2 + yo, 12.0, 9.8 + yo, 0.24, z + 0.05, ST); }
+      else if (troop === 'archer') {
+        let q = [11.6, 4.6 + yo];
+        for (let i = 1; i <= 6; i++) { const a = (i / 6) * Math.PI, n = [11.6 + Math.sin(a) * 1.6, 4.6 + yo + (1 - Math.cos(a)) * 5.6]; Cp(q[0], q[1], n[0], n[1], 0.3, z, WO); q = n; }
+        Cp(11.6, 4.6 + yo, 11.6, 15.8 + yo, 0.12, z - 0.1, LIN);
+      } else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.4 + yo, 0.65, 0.65, z + 0.1, ST); }
+      else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, troop === 'catapult' ? 0.8 : 0.65, 0.7, z + 0.05, troop === 'catapult' ? ME : WO); } // garrote o martillo
+      E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, SK);
     } else arm(9.9, 1, 5, 10.1 - sw * 1.0, 11.6 + yo, 10.2 - sw * 0.45, 9.3 + yo);
 
     // ---- render por píxel (al doble de resolución, con tramado entre tonos) ----
@@ -1760,6 +1785,7 @@
     guild: { m: ['k', 'kkkkkkkkkk', 'kppppppppk', 'kppyyyyppk', 'kppyppyppk', 'kppyyyyppk', 'kppppppppk', 'kpppkkpppk', 'kppk..kppk', 'kpk....kpk', 'kk......kk', 'k'], p: { k: '#1c0e24', p: '#7a3aa6', y: '#e8c050' } },
     war: { m: ['w.........w', '.w.......w', '..w.....w', '...w...w', '....w.w', '.....w', '....w.w', '..bw...wb', '..b.....b', '.b.......b', 'b.........b'], p: { w: '#e0e4ec', b: '#8a5a30' } },
     gear: { m: ['....kk', '..k.kk.k', '.kkkggkkk', '..kgddgk', 'kkgd..dgkk', 'kkgd..dgkk', '..kgddgk', '.kkkggkkk', '..k.kk.k', '....kk'], p: { k: '#2a2a30', g: '#a0a0aa', d: '#6a6a72' } },
+    chestOpen: { m: ['..kkkkkkkk', '.kbbbbbbbbk', '.kyyyyyyyyk', '.kkkkkkkkkk', 'kgwggggwgggk', 'kyyyyyyyyyyk', 'kbbbbyybbbbk', 'kbbbbkkbbbbk', 'kbbbbbbbbbbk', 'kyyyyyyyyyyk', 'kbbbbbbbbbbk', '.kkkkkkkkkk'], p: { k: '#2a1608', b: '#8a5228', y: '#e8b83a', g: '#ffd84a', w: '#fffbe0' } },
     chest: { m: ['', '..kkkkkkkk', '.kbbbbbbbbk', 'kbbbbbbbbbbk', 'kyyyyyyyyyyk', 'kbbbbyybbbbk', 'kbbbbkkbbbbk', 'kbbbbbbbbbbk', 'kyyyyyyyyyyk', 'kbbbbbbbbbbk', '.kkkkkkkkkk'], p: { k: '#2a1608', b: '#8a5228', y: '#e8b83a' } },
     gems: { m: ['', '...kkkkk', '..kwbbbbk', '.kwbbbbbdk', 'kkkkkkkkkkk', '.kbbbbbbdk', '..kbbbbdk', '...kbbdk', '....kdk', '.....k'], p: { k: '#1a2a4a', w: '#d0f4ff', b: '#4aa8e8', d: '#2a6aa8' } },
     books: { m: ['', '.kkkkkkkkk', '.krrrrrrrk', '.krRRRRRrk', '.kkkkkkkkk', 'kbbbbbbbbbk', 'kbBBBBBBBbk', 'kkkkkkkkkkk', '.kggggggggk', '.kgGGGGGGgk', '.kkkkkkkkkk'], p: { k: '#1c120a', r: '#a03028', R: '#e8c050', b: '#2a5a9a', B: '#e8e0c8', g: '#3a7a3a', G: '#e8c050' } },
@@ -1775,6 +1801,11 @@
     lore: { m: ['', '.kkkkkkkkk', 'kyyyyyyyyyk', '.kyrryrryk', '.kyyyyyyyk', '.kyrryyryk', '.kyyyyyyyk', '.kyrrryryk', 'kyyyyyyyyyk', '.kkkkkkkkk'], p: { k: '#4a3418', y: '#efe2b8', r: '#7a3aa0' } },
     starIron: { m: ['.......s', '......sSs', '.......s', '...kkkkk', '..kmmMmmk', '.kmMmmmmMk', '.kmmmbmmmk', 'kmmMmmmbmmk', 'kmmmmMmmmk', '.kbmmmmmbk', '..kkkkkkk'], p: { k: '#141a28', m: '#5a6a8a', M: '#a8c0e8', b: '#2e3850', s: '#fff4b0', S: '#ffffff' } },
     scale: { m: ['', '....kkkk', '...krrrrk', '..krRRrrrk', '.krRrrrrork', '.krrrrrrrok', '.krrrrrrook', '..krrrrook', '...krrook', '....kook', '.....kk'], p: { k: '#3a0a08', r: '#c83a28', R: '#ff8a5a', o: '#8a1a14' } },
+    // Barra lateral del celular: antes tres botones tenían la misma persona y dos la misma brújula (playtest)
+    idle: { m: ['......kkkk', '.....kwwk', '....kkkk.kk', '...kssssk.', '...kssssk', '...kssssk', '....kkkk', '..kkyyyykk', '.kyyyyyyyyk', '.kyyyyyyyyk', '.kkkkkkkkkk'], p: { k: '#1c1c2a', s: '#e8c4a0', y: '#c89a3a', w: '#efe6d0' } },
+    map: { m: ['', 'kkkk.kkkk.kk', 'kggkkyykkbbk', 'kgggkyyykbbk', 'kggrkyyykbbk', 'kgrgkyrykbbk', 'kgggkyyrkbrk', 'kgggkyyykbbk', 'kggkkyykkbbk', 'kkkk.kkkk.kk'], p: { k: '#3a2410', g: '#7ab05a', y: '#e8d8a0', b: '#6aa0d8', r: '#c03028' } },
+    crown: { m: ['', '', 'k...k...k', 'kyk.kyk.kyk', 'kyykkyykkyyk', 'kyyyyyyyyyyk', 'kyyryyyyryyk', 'kyyyyyyyyyyk', 'kooooooooook', '.kkkkkkkkkk'], p: { k: '#4a3008', y: '#f0c850', o: '#c08a28', r: '#c03028' } },
+    cart: { m: ['', '', 'k........', 'kk.......', '.kbbbbbbbbk', '.kbBbbBbbbk', '.kbbbbbbbbk', '.kkkkkkkkkk', '..kgk..kgk', '..kkk..kkk'], p: { k: '#2a1a10', b: '#a07040', B: '#e8c050', g: '#a0a0aa' } },
     wall: { m: ['', 'kk.kk.kk.kk', 'kgkkgkkgkkgk', 'kggggggggggk', 'kgdggggdgggk', 'kggggdgggggk', 'kgggggggdggk', 'kgdgggggggk', 'kggggdggggk', 'kkkkkkkkkkk'], p: { k: '#2e2e30', g: '#a8a498', d: '#6a665e' } },
   });
   const ROCK_PAL = {
@@ -1792,6 +1823,20 @@
     const c = mk(12, 12), ctx = c.getContext('2d');
     def.m.forEach((row, y) => { for (let x = 0; x < row.length && x < 12; x++) { const col = def.p[row[x]]; if (col) { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); } } });
     return (ICONS[name] = c.toDataURL());
+  };
+
+  // Soldados: el aldeano vestido de tropa (ver S.villager). Retratos para la interfaz del Cuartel, ampliados x2.
+  const TROOP_LOOK = { militia: [0, 0], spear: [1, 1], archer: [2, 0], knight: [1, 2], cleric: [3, 1], catapult: [1, 0] };
+  S.troop = function (type, col, mode, frame, flip, back, tool, id) {
+    const lk = TROOP_LOOK[type] || [0, 0], v = id === undefined ? 0 : id % 3;
+    return S.villager(col, (lk[0] + v) % 4, (lk[1] + v) % 3, mode, frame, null, flip, tool || null, false, back, null, type);
+  };
+  S.troopIcon = function (type) {
+    const key = 'troop_' + type;
+    if (ICONS[key]) return ICONS[key];
+    const spr = S.troop(type, PK.D.PLAYER_COLOR, 'idle', 0, false, false), c = mk(spr.c.width, spr.c.height), ctx = c.getContext('2d');
+    ctx.drawImage(spr.c, 0, 0);
+    return (ICONS[key] = c.toDataURL());
   };
 
   S.buildingIcon = function (type, owner, lvl) {
