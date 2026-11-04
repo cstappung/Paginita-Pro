@@ -152,7 +152,7 @@
   H.xpPara = n => 40 + 12 * n;
   H.talentosPendientes = h => Math.max(0, Math.min(8, Math.floor(h.nivel / 5)) - h.talentos.length);
   H.darXp = function (h, n) {
-    h.xp += Math.round(n * (1 + H.efecto(h, 'xp')));
+    h.xp += Math.round(n * (1 + H.efecto(h, 'xp') + (G().bono ? G().bono('heroXp') : 0)));
     let subio = 0;
     while (h.nivel < H.tope() && h.xp >= H.xpPara(h.nivel)) { h.xp -= H.xpPara(h.nivel); h.nivel++; subio++; }
     if (h.nivel >= H.tope()) h.xp = Math.min(h.xp, H.xpPara(h.nivel) - 1);
@@ -178,8 +178,9 @@
     const st = S(), day = U.dayKey(), rng = U.rng(U.strHash('heroes:' + day + ':' + (st.created || 0)));
     // solo del día y de la partida: reclutar a uno no cambia a los otros dos
     const out = [], usadas = new Set();
-    for (let i = 0; i < 3; i++) {
-      // tres clases distintas
+    const nc = 3 + Math.min(2, G().bono ? G().bono('taberna') : 0); // Patronazgo (cartas de era)
+    for (let i = 0; i < nc; i++) {
+      // clases distintas
       let clase = U.pick(H.ORDEN, rng);
       while (usadas.has(clase)) clase = U.pick(H.ORDEN, rng);
       usadas.add(clase);

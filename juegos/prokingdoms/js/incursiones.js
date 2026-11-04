@@ -349,7 +349,7 @@
   function disparos(dt) {
     const bd = Inc.banda;
     if (!bd || bd.fase === 'aviso') return;
-    const g = G(), muros = 1 + 0.2 * g.lvl('walls'), blancos = vivos().filter(b => !b.fuera);
+    const g = G(), muros = (1 + 0.2 * g.lvl('walls')) * Math.max(0.5, 1 + (g.bono ? g.bono('raidDef') : 0)), blancos = vivos().filter(b => !b.fuera);
     if (!blancos.length) return;
     for (const b of g.buildings) {
       if (b.owner !== 'p' || !b.done || (b.type !== 'tower' && b.type !== 'tc')) continue;

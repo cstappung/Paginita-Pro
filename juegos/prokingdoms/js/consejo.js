@@ -20,6 +20,7 @@
   ];
   const POR = Object.fromEntries(C.LISTA.map(c => [c.id, c]));
   C.COLA_MAX = 5;
+  C.colaMax = () => C.COLA_MAX + (G().bono ? G().bono('cola') : 0); // Archivo real (árbol 2.0)
   // Tesorero: el servidor deja mover hasta 20 × scale(era) de oro por día con los mercaderes (LIM.marketDay) y
   // 2 × scale por sync (cada 15 s en línea). El Tesorero usa menos, para que al jugador le quede margen.
   C.MERCADO_DIA = 12;
@@ -65,12 +66,20 @@
     mayordomo(st, cs) {
       const g = G();
       // la cola de investigación: descarta lo que ya no se puede y empieza lo primero cuando alcanza
-      cs.cola = cs.cola.filter(id => D.TECHS[id] && g.lvl(id) < g.techMax());
+      // también nodos del árbol 2.0 ('n:<id>'): salen de la cola cuando ya están hechos o su par los bloqueó
+      const V = PK.Vida, nodo = id => V && V.esNodo(id);
+      cs.cola = cs.cola.filter(id => (nodo(id) ? D.ARBOL[id.slice(2)] && !['hecho', 'curso', 'bloq'].includes(V.estado(id.slice(2))) : D.TECHS[id] && g.lvl(id) < g.techMax()));
       if (!st.research && cs.cola.length && g.countB('library')) {
-        const id = cs.cola[0], t = D.TECHS[id];
-        if (!(t.era && st.era < t.era) && g.canAfford(g.techCost(id, g.lvl(id))) && g.startResearch(id)) {
-          cs.cola.shift();
-          anota('mayordomo', 'Empezó a investigar ' + t.name + ' ' + U.roman(g.lvl(id) + 1) + '.');
+        const id = cs.cola[0];
+        if (nodo(id)) {
+          const n = id.slice(2);
+          if (V.estado(n) === 'ok' && g.canAfford(V.costoNodo(n)) && V.investigar(n)) { cs.cola.shift(); anota('mayordomo', 'Empezó a investigar ' + D.ARBOL[n].name + ' (árbol).'); }
+        } else {
+          const t = D.TECHS[id];
+          if (!(t.era && st.era < t.era) && g.canAfford(g.techCost(id, g.lvl(id))) && g.startResearch(id)) {
+            cs.cola.shift();
+            anota('mayordomo', 'Empezó a investigar ' + t.name + ' ' + U.roman(g.lvl(id) + 1) + '.');
+          }
         }
       }
       if (cs.reclamar && PK.Quests.claimableCount()) {
@@ -193,16 +202,17 @@
   C.HACE = HACE;
 
   // ---------- Cola del Mayordomo ----------
+  const colaNombre = id => (PK.Vida && PK.Vida.esNodo(id) ? PK.Vida.nombre(id) : D.TECHS[id].name);
   C.encolar = function (id) {
     const cs = S().consejo;
-    if (cs.cola.length >= C.COLA_MAX) { PK.UI.toast('La cola del Mayordomo admite ' + C.COLA_MAX + ' investigaciones.', 'warn'); return false; }
+    if (cs.cola.length >= C.colaMax()) { PK.UI.toast('La cola del Mayordomo admite ' + C.colaMax() + ' investigaciones.', 'warn'); return false; }
     cs.cola.push(id);
     return true;
   };
   C.colaEl = function () {
     const cs = S().consejo;
-    return el('div', { class: 'era-box' }, el('b', null, 'Cola del Mayordomo (' + cs.cola.length + '/' + C.COLA_MAX + ')'),
-      cs.cola.length ? el('ol', { class: 'info' }, cs.cola.map((id, i) => el('li', null, D.TECHS[id].name + ' ', PK.UI.btn('✕', () => { cs.cola.splice(i, 1); PK.UI.rerender(); }, { small: true, aria: 'Quitar ' + D.TECHS[id].name })))) :
+    return el('div', { class: 'era-box' }, el('b', null, 'Cola del Mayordomo (' + cs.cola.length + '/' + C.colaMax() + ')'),
+      cs.cola.length ? el('ol', { class: 'info' }, cs.cola.map((id, i) => el('li', null, colaNombre(id) + ' ', PK.UI.btn('✕', () => { cs.cola.splice(i, 1); PK.UI.rerender(); }, { small: true, aria: 'Quitar ' + colaNombre(id) })))) :
         el('p', { class: 'small muted' }, 'Vacía: toca «+ cola» en una tecnología. El Mayordomo la empieza cuando termine la anterior y alcancen los recursos.'));
   };
 
@@ -238,7 +248,7 @@
         if (tiene) {
           if (c.id === 'mayordomo') box.append(el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: cs.reclamar, onchange: e => { cs.reclamar = e.target.checked; } }), ' Reclamar misiones, diarias y semanales'),
             el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: cs.avanzar, onchange: e => { cs.avanzar = e.target.checked; } }), ' Empezar el avance de era cuando alcance'),
-            el('p', { class: 'small muted' }, 'Cola de investigación: ' + (cs.cola.length ? cs.cola.map(id => D.TECHS[id].name).join(', ') : 'vacía') + ' (se arma en Investigar).'));
+            el('p', { class: 'small muted' }, 'Cola de investigación: ' + (cs.cola.length ? cs.cola.map(colaNombre).join(', ') : 'vacía') + ' (se arma en Investigar).'));
           if (c.id === 'mariscal') box.append(
             el('div', { class: 'row small' }, 'Guarnición: ', btn('−', () => { cs.guarnicion = Math.max(0, cs.guarnicion - 5); UI.rerender(); }, { small: true }), el('b', null, String(cs.guarnicion)), btn('+', () => { cs.guarnicion += 5; UI.rerender(); }, { small: true }), ' tropas'),
             el('div', { class: 'row small' }, 'Sale si gana con: ', opt(cs.prob, [0.7, 0.8, 0.85, 0.9, 0.95], v => Math.round(v * 100) + '%', v => { cs.prob = v; })),

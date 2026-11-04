@@ -184,7 +184,7 @@
     // «¿Qué me frena?» (A6, js/asesor.js): junto a la era, con cuántas cosas importantes hay
     asEl = el('span', { class: 'badge' });
     const asBtn = el('button', { class: 'res asesor', title: '¿Qué me frena?', 'aria-label': '¿Qué me frena?', onclick: () => PK.Asesor.open() }, '?', asEl);
-    bar.append(eraEl, asBtn, netEl, el('div', { class: 'res coins', title: 'Monedas de la página' }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
+    bar.append(eraEl, UI.estacionEl ? UI.estacionEl() : '', asBtn, netEl, el('div', { class: 'res coins', title: 'Monedas de la página' }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
     // en pantallas chicas la barra ocupa varias filas según la era: el minimapa y el menú se acomodan debajo
     // (incluye el margen del notch arriba: --top-h + 6 px es siempre el borde inferior de la barra)
     if (window.ResizeObserver) new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', Math.max(0, bar.offsetTop - 6) + bar.offsetHeight + 'px')).observe(bar);
@@ -305,6 +305,7 @@
       bookDot.textContent = n || '';
       bookDot.style.display = n ? '' : 'none';
       updateQueueStrip();
+      if (UI.revisarCartas) UI.revisarCartas();
       const na = PK.Asesor.cuenta(0.25);
       asEl.textContent = na || '';
       asEl.style.display = na ? '' : 'none';
@@ -361,8 +362,7 @@
       out.push({ k: 'era', icon: Sp.icon('scroll'), name: 'Era ' + U.roman(st.eraProg.to), left: st.eraProg.total - st.eraProg.t, pct: st.eraProg.t / st.eraProg.total, go: () => tc && UI.selectBuilding(tc) });
     }
     if (st.research) {
-      const t = D.TECHS[st.research.id];
-      out.push({ k: 'r' + st.research.id, icon: Sp.icon('flask'), name: t.name + ' ' + U.roman(st.research.lvl), left: (st.research.total - st.research.t) / g.researchMult(), pct: st.research.t / st.research.total, go: () => UI.openResearch() });
+      out.push({ k: 'r' + st.research.id, icon: Sp.icon('flask'), name: g.researchName(st.research), left: (st.research.total - st.research.t) / g.researchMult(), pct: st.research.t / st.research.total, go: () => UI.openResearch() });
     }
     for (const r of (st.exp && st.exp.runs) || []) {
       if (r.phase === 'battle') { out.unshift({ k: 'b' + r.id, raid: true, icon: Sp.icon('war'), name: '⚔ Batalla en ' + r.name, left: null, pct: 1, go: () => PK.Batalla.abrir(r.id) }); continue; }

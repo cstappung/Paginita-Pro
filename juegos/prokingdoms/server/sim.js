@@ -145,6 +145,7 @@ const LIM = {
   firstEra: 4,        // era máxima que se acepta en la primera foto de una cuenta
   eraGap: 0.1,        // fracción de D.eraTime(n) que debe pasar como mínimo entre dos subidas de era
   slack: 2.5,         // margen sobre la mejor tasa posible (deseos, eventos, reliquias, maravilla…)
+  vida: 1.6,          // árbol 2.0, cartas de era y estación juntos (Fase 3): el cliente los topa en D.VIDA_TOPE
   startBudget: 120,   // segundos de recolección que trae una cuenta nueva
   maxKeys: 300,       // recursos distintos por sync
   resSlack: 0.2,      // margen fijo por foto (en múltiplos de scale(era)) para premios del cliente
@@ -168,7 +169,7 @@ const guildStageOf = p => { const g = guildOf(p); return g ? g.stage : 0; };
 // máximo, gremio real y un margen para todo lo demás.
 function kindRate(kind, era, stage) {
   const L = techMax(era), tech = kind === 'deer' ? 1 + 0.2 * L : 1 + 0.15 * L;
-  return D.NODES[kind].rate * tech * (1 + 0.1 * (L - 1)) * (1 + 0.03 * stage + 0.02 * L) * LIM.slack;
+  return D.NODES[kind].rate * tech * (1 + 0.1 * (L - 1)) * (1 + 0.03 * stage + 0.02 * L) * LIM.slack * LIM.vida;
 }
 const RES_KINDS = {};
 for (const k in D.NODES) (RES_KINDS[D.NODES[k].res] = RES_KINDS[D.NODES[k].res] || []).push(k);

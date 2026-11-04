@@ -97,6 +97,8 @@
           : UI.btn('Activar avisos', () => PK.Notify.enable(true).then(() => UI.rerender()), { small: true, cls: 'gold' })),
         el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.evMin, onchange: e => { S().flags.evMin = e.target.checked; } }),
           el('b', null, ' Eventos achicados'), el('span', { class: 'small muted' }, ' — los eventos del mapa (ciervo dorado, estrellas, mercader…) aparecen como una pastilla chica arriba, sin el cartel grande. Igual se pueden abrir tocándolos.')),
+        el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.sinNoche, onchange: e => { S().flags.sinNoche = e.target.checked; } }),
+          el('b', null, ' Sin noche'), el('span', { class: 'small muted' }, ' — de noche (según la hora de tu equipo) el mapa se oscurece y se encienden las ventanas. Con esto queda siempre de día.')),
         el('p', { class: 'small muted' }, 'Los avisos que aparecen y se van solos se cierran antes tocándolos.'),
         el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !S().flags.helpOff, onchange: e => { S().flags.helpOff = !e.target.checked; UI.refreshPanel(true); } }),
           el('b', null, ' Ayuda en el panel'), el('span', { class: 'small muted' }, ' — con nada elegido, el panel de abajo muestra cómo se juega. Sin ella, el panel solo aparece al elegir algo y el mapa queda libre.')),

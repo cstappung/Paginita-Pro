@@ -526,11 +526,56 @@
       end(e) { for (const n of e.nodes) if (!n.dead) removeTemp(n); },
       action: { label: 'Ver', run(e) { const n = e.nodes.find(o => !o.dead); if (n) PK.Render.centerOn(n.x, n.y); return false; } },
     },
+    // Eventos de temporada (Fase 3, V3): uno por estación, solo mientras dura (Vida.estacion sale del reloj real).
+    feria: {
+      era: 2, name: 'Feria de primavera', dur: 120, cond: () => est() === 0,
+      start(e) { e.cost = { food: oro(150) }; e.desc = 'Los pueblos vecinos traen sus flores y semillas'; },
+      opciones: [
+        { label: 'Montar puestos', run(e) { if (!pagar(e.cost, 'los puestos')) return false; L.ponerMod('farm', 1.4, 300, e); const r = { gold: oro(90) }; G().give(r); toast('¡Feria! +' + recl(r) + ' y granjas +40% por 5 minutos.', 'epic'); sfx('coin'); return true; } },
+        { label: 'Solo mirar', run() { return true; } },
+      ],
+      defecto: 1,
+    },
+    torneo: {
+      era: 3, name: 'Torneo de verano', dur: 120, cond: () => est() === 1,
+      start(e) { e.desc = 'Caballeros de todo el reino se miden en la plaza'; },
+      opciones: [
+        { label: 'Inscribir a un héroe', run() {
+          const h = PK.Heroes && PK.Heroes.lista().find(o => o.estado === 'libre');
+          if (!h) { toast('Necesitas un héroe libre.', 'warn'); return false; }
+          // el resultado sale del día y del héroe: recargar no lo cambia
+          const gana = U.rng(U.strHash('torneo:' + U.dayKey() + ':' + h.id))() < 0.35 + 0.015 * h.nivel;
+          PK.Heroes.darXp(h, 30 + 6 * S().era);
+          const r = gana ? { gold: oro(220), gems: 4 * S().era } : { gold: oro(40) };
+          G().give(r); toast(h.nombre + (gana ? ' ganó el torneo: +' : ' perdió con honor: +') + recl(r) + ' y experiencia.', gana ? 'epic' : 'good'); return true;
+        } },
+        { label: 'Mirar desde las gradas', run() { L.ponerMod('gather', 1.1, 180); toast('El pueblo vuelve contento: +10% de recolección por 3 minutos.', 'good'); return true; } },
+      ],
+      defecto: 1,
+    },
+    cosechaOtono: {
+      era: 2, name: 'Cosecha de otoño', desc: 'Los frutales están cargados: +60% de bayas y granjas', dur: 150, cond: () => est() === 2,
+      start(e) { L.ponerMod('farm', 1.6, 150, e); },
+      end(e) { L.quitarMods(e); },
+    },
+    inviernoFest: {
+      era: 2, name: 'Festival de invierno', dur: 120, cond: () => est() === 3,
+      start(e) { e.cost = { wood: oro(160) }; e.desc = 'Hogueras, villancicos y vino caliente'; },
+      opciones: [
+        { label: 'Encender las hogueras', run(e) { if (!pagar(e.cost, 'las hogueras')) return false; L.ponerMod('speed', 1.15, 300, e); L.ponerMod('craft', 1.15, 300, e); toast('¡Festival! Aldeanos +15% más rápidos y talleres +15% por 5 minutos.', 'epic'); return true; } },
+        { label: 'Quedarse en casa', run() { return true; } },
+      ],
+      defecto: 1,
+    },
   });
+  const est = () => (PK.Vida ? PK.Vida.estacion() : -1);
   function startEvent() {
     const ids = Object.keys(EVENTS).filter(id => (EVENTS[id].era || 0) <= S().era && (!EVENTS[id].cond || EVENTS[id].cond()));
     for (let k = 0; k < 5; k++) {
-      const id = U.pick(ids), def = EVENTS[id], e = { id, name: def.name, desc: def.desc, t: def.dur, total: def.dur };
+      let id = U.pick(ids);
+      // Mercaderes amigos / Diplomacia (Fase 3): el mercader errante pasa el doble
+      if (id !== 'merchant' && ids.includes('merchant') && G().bono && G().bono('mercader') && Math.random() < 1 / ids.length) id = 'merchant';
+      const def = EVENTS[id], e = { id, name: def.name, desc: def.desc, t: def.dur, total: def.dur };
       if (def.start && def.start(e) === false) continue;
       // los que duran ya tienen su cartel (ui.js, que se puede achicar): el aviso extra tapaba la pantalla dos veces
       if (!def.dur) toast('Evento: ' + e.name + ' — ' + e.desc + '.', 'epic');

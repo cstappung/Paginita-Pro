@@ -101,7 +101,8 @@
 
   // ---------- Carretas ----------
   L.cartMax = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).carts : 0), 0);
-  L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost'))));
+  const beltK = () => 1 + (G().bono ? G().bono('belt') : 0); // Cintas reforzadas (árbol 2.0)
+  L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost') + (G().bono ? G().bono('cartCap') : 0))));
   L.cartSpeed = () => G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartSpeed : 0), 0) + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost'));
   L.carts = () => G().units.filter(u => u.owner === 'p' && u.kind === 'cart');
   L.trainCart = function (b) {
@@ -378,7 +379,7 @@
       }
     }
     // cargar
-    bl.acc = Math.min(1, bl.acc + dt * D.BELT.rate);
+    bl.acc = Math.min(1, bl.acc + dt * D.BELT.rate * beltK());
     const res = beltRes(bl, a, b);
     if (!res || bl.acc < 1 || (bl.items.length && bl.items[0].p < 0.34)) return;
     if (L.isShop(b) && L.need(b, res) - bl.items.length < 1) return;
@@ -400,7 +401,7 @@
     for (const bl of st.logi.belts) {
       const a = g.bById.get(bl.a), b = g.bById.get(bl.b);
       if (!a || !b) continue;
-      let n = D.BELT.rate * dt;
+      let n = D.BELT.rate * beltK() * dt;
       const res = beltRes(bl, a, b);
       if (!res) continue;
       if (L.isShop(b)) n = Math.min(n, L.need(b, res));

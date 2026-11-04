@@ -66,9 +66,11 @@
   }
 
   function loop() {
-    let last = performance.now(), lastWall = Date.now();
+    // el piloto adelanta Date.now() a la velocidad del juego (tools/piloto.js); el hueco de pestaña se mide con el reloj real
+    const reloj = () => (PK.relojReal ? PK.relojReal() : Date.now());
+    let last = performance.now(), lastWall = reloj();
     function frame(now) {
-      const wall = Date.now(), gap = (wall - lastWall) / 1000;
+      const wall = reloj(), gap = (wall - lastWall) / 1000;
       lastWall = wall;
       if (gap > 3) {
         const rep = PK.Game.simulateOffline(gap, gap < 300);

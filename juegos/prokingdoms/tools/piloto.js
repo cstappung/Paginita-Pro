@@ -1,7 +1,7 @@
 // Piloto automático de pruebas (T1 del plan de la mega actualización). Juega como un jugador razonable para
 // medir el balance antes y después de un cambio, y para encontrar trabas como las del playtest (pueblo
 // encerrado, aldeanos parados). Se carga con ?dev&piloto (velocidad ×10; ?piloto=20 para otra) y con
-// ?timelapse (×40, sin guardar). No es parte del juego: main.js lo pide solo con esos parámetros.
+// ?timelapse (×40). Nunca guarda: adelanta el reloj (ver start). No es parte del juego: main.js lo pide solo con esos parámetros.
 //
 // Anota en la consola y en window.pkPiloto: el minuto de juego en que llegó a cada era, qué parte de los
 // aldeanos estuvo ociosa (promedio), los héroes reclutados, cuántas veces se llenaron las bodegas y las batallas ganadas y perdidas.
@@ -79,8 +79,13 @@
     }
   }
   function investigar() {
-    const g = G(), st = S();
+    const g = G(), st = S(), V = PK.Vida;
     if (st.research || !g.countB('library')) return;
+    // primero el árbol 2.0 (Fase 3): el nodo más barato que se pueda; de un par enfrentado, el primero que aparezca
+    if (V) {
+      const ns = Object.keys(D.ARBOL).filter(id => !V.porQueNo(id)).sort((a, b) => D.ARBOL[a].era - D.ARBOL[b].era);
+      if (ns[0] && V.investigar(ns[0])) { anota('Árbol: ' + D.ARBOL[ns[0]].name + '.'); return; }
+    }
     const ids = Object.keys(D.TECHS).filter(id => g.lvl(id) < g.techMax() && !(D.TECHS[id].era && st.era < D.TECHS[id].era) && g.canAfford(g.techCost(id, g.lvl(id))));
     ids.sort((a, b) => Object.values(g.techCost(a, g.lvl(a))).reduce((s, v) => s + v, 0) - Object.values(g.techCost(b, g.lvl(b))).reduce((s, v) => s + v, 0));
     if (ids[0]) g.startResearch(ids[0]);
@@ -118,6 +123,25 @@
       for (const rn in H.RANURAS) { const it = S().heroes.inv.filter(o => o.t === rn && !H.equipadoPor(o)).sort((a, b) => b.r - a.r)[0], cur = S().heroes.inv.find(o => o.id === h.equipo[rn]); if (it && (!cur || it.r > cur.r)) H.equipar(h, it.id); }
     }
   }
+  // Cartas de era (Fase 3): la primera de la mano. Exploradores: los que permita el Puesto (sin ellos no ve más
+  // que el 1% del mapa del principio y, agotado eso, el pueblo se queda ocioso). Mercado: compra madera y piedra
+  // cuando se acaban y sobra oro, como haría un jugador.
+  function cartas() {
+    const V = PK.Vida, e = V && V.pendiente();
+    if (!e) return;
+    const id = V.mano(e)[0];
+    if (V.elegirCarta(e, id)) anota('Carta de la Era ' + U.roman(e) + ': ' + D.CARTAS[id].name + '.');
+    if (PK.UI.modalKey() === 'cartas') PK.UI.closeModal();
+  }
+  function exploradores() {
+    const g = G(), post = g.buildings.find(b => b.owner === 'p' && b.done && b.type === 'scout');
+    if (post && !post.queue.length && g.scoutCount() < g.scoutMax() && g.canAfford(D.SCOUT.cost)) g.trainScout(post);
+  }
+  function mercado() {
+    const g = G(), st = S();
+    if (!g.countB('market')) return;
+    for (const r of ['wood', 'stone']) if (st.res[r] < 150 && st.res.gold > 1500 && PK.Social.buyPrice(r, 300) < st.res.gold - 1000) PK.Social.buy(r, 300);
+  }
   function medir() {
     const g = G(), st = S();
     if (st.campana) for (const c in st.campana.hechos) if (!P.caps[c]) { P.caps[c] = Math.round((g.time - P.t0) / 6) / 10; anota('Cerró el capítulo ' + U.roman(+c) + '.'); }
@@ -145,6 +169,9 @@
       if (g.decreePending()) g.chooseDecree('harvest');
       PK.Quests.claimAll(true);
       if (!st.eraProg && g.eraChecks(st.era + 1).every(c => c.ok) && g.canAfford(D.eraCost(st.era + 1))) g.startEra();
+      cartas();
+      exploradores();
+      mercado();
       construir();
       mejorar();
       investigar();
@@ -162,7 +189,17 @@
     P.eraVista = st.era;
     Object.assign(st.auto, { idle: true, work: true, train: true, rebal: true });
     PK.Auto.setPlan('meta');
-    if (o.timelapse) G().noSave = true;
+    // El reloj del juego corre a la velocidad del piloto. Rebrotes, regeneración de minas, heridas, fiestas, estaciones
+    // y todo lo que va por Date.now() iban a velocidad real: a ×40 el pueblo talaba 40 veces más rápido de lo que el
+    // bosque rebrotaba y en 2 horas de juego se quedaba sin nada (el «83% ociosos» de pk-17, igual en pk-16). Por eso la
+    // partida del piloto no se guarda: quedaría con fechas en el futuro.
+    if (!PK.relojReal) {
+      const real = Date.now.bind(Date);
+      let lr = real(), virt = lr;
+      PK.relojReal = real;
+      Date.now = () => { const r = real(); virt += (r - lr) * G().timeScale; lr = r; return Math.floor(virt); };
+    }
+    G().noSave = true;
     anota('Piloto en marcha a ×' + G().timeScale + '.');
     setInterval(paso, 400);
   };

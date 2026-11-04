@@ -520,6 +520,46 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   map slot; attacked as target `{ cap: n }` with `r.jefe` from the chapter.
   Choices have no timer (wait for the player), so offline decides nothing.
   Scenes only open live and when no modal or battle is open.
-- **Open issue:** the autopilot (`?piloto=40`, 300 s) reached Era II at 9.6
-  min and then stayed there with 83% idle villagers. Not yet compared with
-  `pk-16`; check before the next delivery.
+- The «83% idle» autopilot run after `pk-17` was not caused by `pk-17`: `pk-16`
+  stalled the same way. See the next section.
+
+## Life in the kingdom, part 1 (`pk-18`, V1, V2, V3) and the autopilot stall
+
+- **The autopilot stall had two causes, both outside the game's balance.**
+  Regrowth, mine regen, wounds, fiestas and seasons go by `Date.now()`, so at
+  ×40 the town cut 40 times faster than the forest regrew. Now `piloto.js`
+  makes `Date.now()` run at `timeScale` (main.js measures the tab gap with
+  `PK.relojReal`), and the pilot never saves (its dates would be in the
+  future). The pilot also never trained a scout: it saw 1.2% of the map. Now
+  «Entrenar sin parar» (`auto.train`) trains a scout at the Puesto when one is
+  missing and the range is not done, and the pilot does too. After the fix:
+  Era II 9.3 min, III 29.9, IV 108, idle 0–5% (was 50–83%).
+- **Everything Phase 3 gives goes through `G.bono(k)` = `PK.Vida.bono`**
+  (`js/vida.js`): tree + cards + season, cached, invalidated on a pick and on a
+  season change. Keys are listed at the top of `js/datos-vida.js` (tables live
+  there because the server does not load them). Perk keys (`craftP`,
+  `researchP`, `expSpeed`, `xpBoost`…) enter through `G.perk`; **`gatherP`
+  does not**: gathering goes through `Vida.recoleccion`, clamped to
+  `D.VIDA_TOPE` (1.6), which is `LIM.vida` in `sim.js`'s `kindRate`. The test
+  compares both. A new key needs a reader: the test fails on unused keys.
+- **V1, tree 2.0:** `D.ARBOL` (32 nodes, 4 branches, one opposed pair `ex` per
+  era II–IX). Nodes use the same research slot as the Fundamentos:
+  `S.research.id = 'n:<id>'` (`G.researchName` for labels; the Mayordomo's
+  queue takes them too). Picking one of a pair sets `S.arbolBloq[other] = era +
+  1`. `lib` = era − 1 is the Library level it needs. Research window has two
+  tabs (`UI.openResearch('arbol' | 'fund')`).
+- **V2, era cards:** `D.CARTAS` (31). One per era from II (`S.cartas.tomadas`
+  `[{era, id}]`); the hand is 3 cards seeded by `created` + era, so reloading
+  never rerolls. Eras VII and X keep the decrees as the «royal» cards. Choices
+  wait for the player (no default: no resources flow until picked). Card
+  window `UI.openCartas`, also from the Álbum and opened by itself at a new
+  era (`UI.revisarCartas`). PvE-only card effects (`pve_*`, `dragon`) go in
+  `Exp.powerVs`, never `Social.power` (rule 4).
+- **V3, seasons:** `floor(Date.now() / 6 h) % 4`, the same live, offline and
+  on the server. Soft bonuses only (no winter food upkeep). The ground chunk
+  is repainted with a season tint (`Sp.temporada`, `R.nuevaEstacion` clears the
+  chunk cache once per change); snow, leaves or petals fall in screen space.
+  Night follows the player's clock (20:00–6:00, with dusk): a dark layer over
+  the fog and lit windows. Opciones → «Sin noche» (`flags.sinNoche`). Four
+  season events in `life.js` (`feria`, `torneo`, `cosechaOtono`,
+  `inviernoFest`) with `cond` on the season.

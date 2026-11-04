@@ -93,7 +93,8 @@
     const g = G();
     // los caminos aceleran a todos; las carretas fuera del camino van lentas
     const road = W.road[W.idx(Math.floor(u.x), Math.floor(u.y))] === 1;
-    const terrain = u.kind === 'cart' ? (road ? D.ROAD.cart : D.CART.offRoad) : road ? D.ROAD.walk : 1;
+    const rk = road && u.owner === 'p' && PK.Game.bono ? PK.Game.bono('road') : 0; // Caminos empedrados, Caravaneros
+    const terrain = u.kind === 'cart' ? (road ? 1 + (D.ROAD.cart - 1) * (1 + rk) : D.CART.offRoad) : road ? 1 + (D.ROAD.walk - 1) * (1 + rk) : 1;
     let move = g.speed(u.owner, u) * terrain * dt * (u.scared > 0 ? 1.4 : 1);
     while (move > 0 && u.path.length) {
       if (u.pchk !== u.path.length) {

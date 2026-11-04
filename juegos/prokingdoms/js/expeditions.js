@@ -44,8 +44,10 @@
   // heroe: id de un héroe que va con la compañía (js/heroes.js): multiplica la fuerza contra ese enemigo.
   Exp.powerVs = function (units, enemy, heroe) {
     let p = 0;
-    for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy);
-    return p * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy) * (PK.Leyendas && S().leyendas ? 1 + PK.Leyendas.contra(enemy) : 1);
+    const vb = G().bono || (() => 0), drag = enemy && enemy.dragon ? (vb('dragon') * enemy.dragon) / Math.max(1, Object.values(enemy).reduce((s, v) => s + v, 0)) : 0;
+    // árbol y cartas (Fase 3): fuerza contra monstruos por tropa, solo aquí (PvE). Social.power no la cuenta (regla 4).
+    for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy) * (1 + vb('pve_all') + vb('pve_' + k));
+    return p * (1 + drag) * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy) * (PK.Leyendas && S().leyendas ? 1 + PK.Leyendas.contra(enemy) : 1);
   };
   Exp.heroMult = (id, enemy) => (id && PK.Heroes ? PK.Heroes.mult(PK.Heroes.de(id), enemy) : 1);
   Exp.heal = units => Math.min(0.45, Object.keys(units).reduce((s, k) => s + (units[k] || 0) * (D.ARMY[k].heal || 0), 0));
@@ -140,13 +142,15 @@
       const m = S().exp.board.list.find(o => o.uid === target.mission);
       if (!m) return null;
       const tpl = D.MISSIONS.find(o => o.id === m.tpl);
-      return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: m.loot, travel: Math.round((m.time / 2) * Exp.velViaje()) };
+      return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: misLoot(m.loot), travel: Math.round((m.time / 2) * Exp.velViaje()) };
     }
     const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
     // Mazmorras 2.0: una incursión por un bloque de 5 pisos (incursion.js); la fuerza es la del primer piso
     if (PK.Inc) { const fin = PK.Inc.finDe(p.kind, target.floor); return { name: d.name + ' · pisos ' + target.floor + '–' + fin, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: PK.Inc.botinBloque(p.kind, target.floor), travel: Exp.travel(p), incursion: true, fin }; }
     return { name: d.name + ' · piso ' + target.floor, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: D.dungeonLoot(p.kind, target.floor, target.floor > site.best), travel: Exp.travel(p) };
   };
+  // Diplomacia (árbol 2.0): +20% de premio en los encargos (sin tocar las monedas)
+  const misLoot = l => { const k = G().bono ? G().bono('misiones') : 0; if (!k) return l; const o = {}; for (const r in l) o[r] = r === 'coins' ? l[r] : Math.round(l[r] * (1 + k)); return o; };
   Exp.canSend = function (target) {
     const st = S();
     if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
@@ -225,7 +229,7 @@
       for (const k in r.units) { const l = Math.min(r.units[k], res.lost[k] || 0); r.lost[k] = l; r.units[k] -= l; }
     } else {
       r.won = Math.random() < Exp.chance(ratio);
-      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss * (1 - heroBajas(r)));
+      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss * (1 - heroBajas(r)) * (1 - Math.min(0.4, G().bono ? G().bono('bajas') : 0)));
       for (const k in r.units) { const l = Math.round(r.units[k] * loss * U.rand(0.8, 1.2)); r.lost[k] = Math.min(r.units[k], l); r.units[k] -= r.lost[k]; }
     }
     // veteranía para quienes vuelven (también se aprende perdiendo, menos)

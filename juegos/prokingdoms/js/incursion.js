@@ -96,7 +96,7 @@
     if (!G().offline) toast('Piso ' + inc.piso + ' de ' + D.DUNGEON[p.kind].name + ': ' + (inc.opciones[0] === 'jefe' ? '¡el jefe, ' + I.JEFES[p.kind].name + '!' : 'elige el camino.'), inc.opciones[0] === 'jefe' ? 'bad' : 'info', { label: 'Elegir', fn: () => I.open(r.id) });
   };
   function opcionesDe(r, piso) {
-    const rng = U.rng(r.id * 131 + piso * 7 + 3), n = rng() < 0.45 ? 3 : 2, peso = Object.assign({}, PESO), out = [];
+    const rng = U.rng(r.id * 131 + piso * 7 + 3), n = Math.min(4, (rng() < 0.45 ? 3 : 2) + (G().bono ? G().bono('salas') : 0)), peso = Object.assign({}, PESO), out = [];
     if (I.tiene(r, 'sinluna')) peso.elite *= 2;
     while (out.length < n) {
       const libres = Object.keys(peso).filter(k => !out.includes(k)), tot = libres.reduce((s, k) => s + peso[k], 0);
@@ -206,7 +206,7 @@
   I.tras = function (r) {
     const inc = r.inc, p = W().pois[r.poi];
     // pociones del Herbolario (H4): tras una sala ganada salvan a parte de los caídos de esa pelea
-    const poc = r.won ? G().best('herbolario', 'pociones') : 0;
+    const poc = r.won ? Math.min(0.9, G().best('herbolario', 'pociones') * (1 + (G().bono ? G().bono('pociones') : 0))) : 0;
     if (poc) { let n = 0; for (const t in r.lost || {}) { const v = Math.floor(r.lost[t] * poc); r.lost[t] -= v; r.units[t] += v; n += v; } if (n) inc.log.push('Pociones: ' + n + ' caídos vuelven a pelear.'); }
     for (const t in r.lost || {}) inc.perdidos[t] = (inc.perdidos[t] || 0) + r.lost[t];
     if (!r.won) { terminar(r, false); return false; }

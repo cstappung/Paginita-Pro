@@ -157,15 +157,25 @@
 
   // ---------- Investigación ----------
 
-  UI.openResearch = function () {
+  // Dos pestañas: el Árbol del reino (V1 de la Fase 3, js/ui/vida.js) y los Fundamentos (las 15 técnicas por niveles).
+  let resTab = 'arbol';
+  UI.openResearch = function (tab) {
+    if (tab) resTab = tab;
     UI.modal('research', 'Investigación', body => {
       const st = S();
       if (!G().countB('library')) { body.append(el('p', { class: 'muted' }, 'Construye una Biblioteca (Era II) para investigar. Las investigaciones siguen avanzando aunque cierres el juego.')); return; }
+      if (UI.arbolEl) {
+        const tabs = el('div', { class: 'book-tabs bar-tabs' });
+        for (const [id, name, icon] of [['arbol', 'Árbol del reino', 'flask'], ['fund', 'Fundamentos', 'book']])
+          tabs.append(el('button', { class: 'book-tab' + (resTab === id ? ' on' : ''), onclick: () => { resTab = id; UI.rerender(true); } }, el('img', { class: 'ico', src: PK.Sprites.icon(icon), alt: '' }), name));
+        body.append(tabs);
+      }
       if (st.research) {
-        const t = D.TECHS[st.research.id];
-        body.append(el('div', { class: 'era-box' }, el('b', null, 'Investigando: ' + t.name + ' ' + U.roman(st.research.lvl)),
+        body.append(el('div', { class: 'era-box' }, el('b', null, 'Investigando: ' + G().researchName(st.research)),
           el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (st.research.t / st.research.total) * 100 + '%' } }), el('span', null, U.fmtTime((st.research.total - st.research.t) / G().researchMult())))));
       }
+      if (PK.Consejo && PK.Consejo.tiene('mayordomo')) body.append(PK.Consejo.colaEl());
+      if (UI.arbolEl && resTab === 'arbol') { body.append(UI.arbolEl()); return; }
       body.append(el('p', { class: 'small muted' }, 'Nivel máximo: ' + G().techMax() + ' (el nivel de tu Biblioteca). Cada nivel cuesta más y tarda más: avanza un poco cada día. Velocidad: +' + Math.round((G().researchMult() - 1) * 100) + '%.'));
       const grid = el('div', { class: 'tech-grid' });
       for (const id in D.TECHS) {
@@ -180,7 +190,6 @@
               UI.btn('Investigar Nv ' + (lvl + 1), () => { G().startResearch(id); UI.rerender(); }, { small: true, disabled: !!st.research || !G().canAfford(cost) }),
               PK.Consejo && PK.Consejo.tiene('mayordomo') ? UI.btn('+ cola', () => { PK.Consejo.encolar(id); UI.rerender(); }, { small: true, title: 'El Mayordomo la empieza cuando termine lo que hay y alcancen los recursos' }) : '')));
       }
-      if (PK.Consejo && PK.Consejo.tiene('mayordomo')) body.prepend(PK.Consejo.colaEl());
       body.append(grid);
     }, { wide: true });
   };

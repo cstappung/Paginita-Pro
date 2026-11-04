@@ -66,6 +66,78 @@
     g.used = frameNo;
     return g;
   }
+  // Estaciones (Fase 3, V3): el suelo se repinta con el tinte de la estación (sprites.js) una vez por cambio.
+  R.nuevaEstacion = function () {
+    const e = PK.Vida ? PK.Vida.estacion() : 1;
+    if (Sp.temporada === e) return;
+    Sp.temporada = e;
+    ground.clear();
+  };
+  // Clima de la estación y noche. Las partículas viven en coordenadas de pantalla (no del mundo): 50 copos u hojas
+  // que caen y dan la vuelta. Nada de esto cambia números del juego.
+  const clima = [];
+  let glowC = null;
+  function brillo() {
+    if (glowC) return glowC;
+    glowC = document.createElement('canvas'); glowC.width = glowC.height = 32;
+    const c = glowC.getContext('2d'), gr = c.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(255,200,110,0.55)'); gr.addColorStop(1, 'rgba(255,170,60,0)');
+    c.fillStyle = gr; c.fillRect(0, 0, 32, 32);
+    return glowC;
+  }
+  const LUZ = { house: 1, tc: 3, tavern: 2, market: 1, library: 2, monastery: 2, consejo: 2, barracks: 1, guild: 2, university: 2, scriptorium: 1 };
+  function dibujarClima(ctx, dt, vis, g) {
+    const V = PK.Vida, cv = R.cv, dpr = R.dpr;
+    if (!V || !g.state) return;
+    if (Sp.temporada !== V.estacion()) R.nuevaEstacion();
+    const noche = V.noche();
+    if (noche > 0) {
+      // la oscuridad tapa el mundo y las ventanas de tus edificios se encienden (en coordenadas del mundo)
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = 'rgba(12,18,48,' + (0.42 * noche).toFixed(3) + ')';
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.restore();
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = noche;
+      const gl = brillo(), t = performance.now() / 1000;
+      ctx.fillStyle = 'rgba(255,214,120,0.9)';
+      for (const b of g.buildings) {
+        if (b.owner !== 'p' || !b.done || !LUZ[b.type]) continue;
+        const [x, y] = R.iso(b.x + b.w / 2, b.y + b.h / 2);
+        if (!vis(x - 30, y - 50, 60, 60)) continue;
+        const n = LUZ[b.type], hh = b.h * 6 + 6;
+        for (let i = 0; i < n; i++) {
+          const wx = x + (i - (n - 1) / 2) * 7, wy = y - hh, fl = 0.8 + 0.2 * Math.sin(t * 3 + U.hash(b.x, b.y, 4) * 20 + i);
+          ctx.globalAlpha = noche * fl;
+          ctx.drawImage(gl, wx - 9, wy - 9, 18, 18);
+          ctx.fillRect(Math.round(wx - 1), Math.round(wy - 1), 2, 2);
+        }
+      }
+      ctx.restore();
+    }
+    // copos (invierno), hojas (otoño) y pétalos (primavera)
+    const e = Sp.temporada, n = e === 1 ? 0 : MOBILE ? 26 : 50;
+    if (!n || (g.state.flags && g.state.flags.sinClima)) { clima.length = 0; return; }
+    const W0 = cv.width / dpr, H0 = cv.height / dpr;
+    while (clima.length < n) clima.push({ x: Math.random() * W0, y: Math.random() * H0, v: 0.5 + Math.random(), f: Math.random() * 6 });
+    clima.length = n;
+    const col = e === 3 ? 'rgba(245,248,255,0.85)' : e === 2 ? 'rgba(206,110,40,0.9)' : 'rgba(244,170,200,0.9)';
+    const sp = e === 3 ? 22 : 30;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = col;
+    for (const p of clima) {
+      p.f += dt * 2;
+      p.y += dt * sp * p.v; p.x += dt * (e === 3 ? 6 : 14) * Math.sin(p.f);
+      if (p.y > H0 + 4) { p.y = -4; p.x = Math.random() * W0; }
+      if (p.x < -4) p.x = W0 + 3; else if (p.x > W0 + 4) p.x = -3;
+      const z = e === 3 ? (p.v > 1.1 ? 2 : 1) : 2;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), z, e === 3 ? z : 1);
+    }
+    ctx.restore();
+  }
   // ¿Hay algo explorado en el trozo? Si no, se tapa con niebla y ni se pinta.
   function chunkSeen(ci) {
     if (!W.chunkSeen || W.chunkSeenVer !== W.fogVer) {
@@ -408,6 +480,8 @@
       if (fw > 0 && fh > 0) ctx.drawImage(fogC, fx0, fy0, fw, fh, fx0 * 4, fy0 * 4, fw * 4, fh * 4);
       ctx.imageSmoothingEnabled = false;
     }
+    // noche y clima de la estación (Fase 3), sobre la niebla para que de noche también se vea oscuro
+    if (!PK.Terr.mode) dibujarClima(ctx, dt, vis, g);
     // en el mapa de territorio las parcelas se ven encima de la niebla (tus tierras siempre)
     if (PK.Terr.mode) drawTerritory(ctx, vx0, vy0, vw, vh);
 

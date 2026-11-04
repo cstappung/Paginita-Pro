@@ -110,7 +110,9 @@
   }
   Soc.tradePool = tradePool;
   // Mejores precios con un Mercado de más nivel.
-  const mkRate = k => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'market').reduce((m, b) => (k === 'buy' ? Math.min(m, G().bst(b).buy) : Math.max(m, G().bst(b).sell)), k === 'buy' ? 1.1 : 0.65);
+  const mkRate0 = k => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'market').reduce((m, b) => (k === 'buy' ? Math.min(m, G().bst(b).buy) : Math.max(m, G().bst(b).sell)), k === 'buy' ? 1.1 : 0.65);
+  // árbol y cartas (Moneda acuñada, Puertas abiertas): nunca se vende más caro de lo que se compra
+  const mkRate = k => { const v = !G().bono ? 0 : k === 'buy' ? G().bono('buy') : G().bono('sell'); return k === 'buy' ? Math.max(0.8, mkRate0('buy') - v) : Math.min(0.97, mkRate0('sell') + v); };
   Soc.buyPrice = (r, n) => Math.ceil((S().market.p[r] * mkRate('buy') * n) / 100);
   Soc.sellPrice = (r, n) => Math.floor((S().market.p[r] * mkRate('sell') * n) / 100);
   function botOffer() {

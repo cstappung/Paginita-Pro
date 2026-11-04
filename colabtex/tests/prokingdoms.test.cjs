@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js']);
+const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -395,4 +395,72 @@ test('H5: la campaña', () => {
     C.ganar(2); C.elegir(2, 0);
     assert.equal(G.state.heroes.lista.length, 1, 'el Rey Bandido se une');
   } finally { G.state = viejo; G.stat = stat0; }
+});
+
+// ---------- Fase 3 (pk-18): árbol 2.0, cartas de era y estaciones ----------
+test('árbol 2.0: 32 nodos, un par enfrentado por era de la II a la IX, y cartas de sobra', () => {
+  const ids = Object.keys(D.ARBOL);
+  assert.ok(ids.length >= 32, ids.length + ' nodos');
+  for (const id of ids) {
+    const n = D.ARBOL[id];
+    assert.ok(D.RAMAS[n.rama] && n.name && n.desc && n.ef && Object.keys(n.ef).length, id);
+    if (n.ex) assert.equal(D.ARBOL[n.ex].ex, id, id + ': su par lo nombra a él');
+    if (n.ex) assert.equal(D.ARBOL[n.ex].era, n.era, id + ': el par es de la misma era');
+  }
+  for (let e = 2; e <= 9; e++) assert.equal(ids.filter(id => D.ARBOL[id].ex && D.ARBOL[id].era === e).length, 2, 'Era ' + e + ': un par');
+  assert.ok(Object.keys(D.CARTAS).length >= 30, 'mazo de 30');
+  assert.equal(D.ESTACIONES.length, 4);
+});
+test('cada efecto del árbol, las cartas y las estaciones tiene dónde usarse', () => {
+  const fuente = FUENTES.filter(([f]) => f !== 'datos-vida.js').map(([, s]) => s).join('\n');
+  const PERKS = ['gatherP', 'craftP', 'researchP', 'upgradeP', 'expSpeed', 'xpBoost'];
+  const usada = k => {
+    if (PERKS.includes(k)) return new RegExp("perk(All)?\\('" + k + "'\\)").test(fuente) || fuente.includes("'" + k + "'");
+    const m = /^(g|c|pve|slots)_/.exec(k);
+    if (m) return fuente.includes("'" + m[1] + "_' +");
+    return new RegExp("\\b(bono|vb|b)\\('" + k + "'\\)").test(fuente);
+  };
+  const todas = [].concat(...Object.values(D.ARBOL).map(n => Object.keys(n.ef)), ...Object.values(D.CARTAS).map(c => Object.keys(c.ef || {})), ...D.ESTACIONES.map(e => Object.keys(e.ef)));
+  const malas = [...new Set(todas)].filter(k => !usada(k));
+  assert.deepEqual(malas, [], 'efectos que nadie lee');
+  for (const c of Object.values(D.CARTAS)) if (c.al) assert.ok(PK.Vida.CARTA_AL[c.al], c.name + ': ' + c.al);
+});
+test('el tope de recolección de la Fase 3 es el mismo que el margen del servidor', () => {
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
+  const lim = +/vida: ([\d.]+),/.exec(sim)[1];
+  assert.equal(lim, D.VIDA_TOPE, 'LIM.vida = D.VIDA_TOPE');
+  assert.match(sim, /LIM\.slack \* LIM\.vida/, 'kindRate lo usa');
+  // con todo a favor (todas las cartas y nodos juntos, y la mejor estación) no pasa del tope
+  const viejo = G.state;
+  G.state = { era: 12, arbol: {}, arbolBloq: {}, cartas: { tomadas: Object.keys(D.CARTAS).map((id, i) => ({ id, era: i + 2 })) }, flags: {} };
+  for (const id in D.ARBOL) G.state.arbol[id] = 1;
+  try {
+    PK.Vida.init(G.state);
+    for (const r of ['food', 'wood', 'stone', 'gold', 'ore']) for (const k of [undefined, 'deer', 'berry', 'farm']) assert.ok(PK.Vida.recoleccion(r, k) <= D.VIDA_TOPE + 1e-9, r + '/' + k);
+  } finally { G.state = viejo; }
+});
+test('las estaciones salen del reloj real y las cartas de una semilla fija', () => {
+  const h6 = D.ESTACION_H * 3600 * 1000;
+  assert.equal(PK.Vida.estacion(0), 0);
+  assert.equal(PK.Vida.estacion(h6 + 1), 1);
+  assert.equal(PK.Vida.estacion(4 * h6 + 5), 0, 'da la vuelta');
+  const viejo = G.state;
+  G.state = { era: 3, created: 12345, arbol: {}, arbolBloq: {}, cartas: { tomadas: [] }, flags: {}, stats: {} };
+  PK.UI = PK.UI || { toast: () => {} };
+  const stat0 = G.stat, inv0 = G.invalidateCaps;
+  G.stat = () => {}; G.invalidateCaps = () => {};
+  try {
+    PK.Vida.init(G.state);
+    const m = PK.Vida.mano(2);
+    assert.equal(m.length, 3);
+    assert.deepEqual([...PK.Vida.mano(2)], [...m], 'recargar no cambia la mano');
+    assert.equal(PK.Vida.pendiente(), 2);
+    assert.ok(PK.Vida.elegirCarta(2, m[1]));
+    assert.ok(!PK.Vida.elegirCarta(2, m[0]), 'una sola por era');
+    assert.equal(PK.Vida.pendiente(), 3);
+    assert.ok(!PK.Vida.mano(3).includes(m[1]), 'una carta tomada no vuelve a salir');
+    G.state.era = 7;
+    PK.Vida.elegirCarta(3, PK.Vida.mano(3)[0]); PK.Vida.elegirCarta(4, PK.Vida.mano(4)[0]); PK.Vida.elegirCarta(5, PK.Vida.mano(5)[0]); PK.Vida.elegirCarta(6, PK.Vida.mano(6)[0]);
+    assert.equal(PK.Vida.pendiente(), 0, 'la Era VII es de decreto, no de carta');
+  } finally { G.state = viejo; G.stat = stat0; G.invalidateCaps = inv0; }
 });

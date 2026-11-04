@@ -459,6 +459,12 @@
       right.append(el('h3', null, 'Maravillas del mundo (' + Object.keys(ly).length + '/' + D.LEYENDAS.length + ')'),
         el('div', { class: 'al-grid' }, D.LEYENDAS.map((o, i) => { const s0 = slot('crown', o.name, ly[i], ly[i] ? o.bono : null, true); if (ly[i] && PK.Leyendas) { s0.style.cursor = 'pointer'; s0.onclick = () => PK.Leyendas.pagina(i); } return s0; })));
     }
+    // cartas de era (Fase 3): las que elegiste, más los decretos reales
+    if (D.CARTAS && st.cartas) {
+      const tom = new Set(st.cartas.tomadas.map(c => c.id)), ids = Object.keys(D.CARTAS);
+      left.append(el('h3', null, 'Cartas de era (' + tom.size + '/' + ids.length + ')'),
+        el('div', { class: 'al-grid' }, ids.map(id => slot('scroll', D.CARTAS[id].name, tom.has(id), tom.has(id) ? D.CARTAS[id].desc : null)).concat(Object.keys(D.DECREES).map(id => slot('crown', D.DECREES[id].name, st.decrees.includes(id), 'carta real', true)))));
+    }
     const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]).length;
     right.append(el('h3', null, 'Reinos encontrados (' + realms + '/' + D.BOTS.length + ')'),
       el('div', { class: 'al-grid' }, D.BOTS.map(b => slot('pop', b.realm, st.flags['seen_' + b.slot]))));

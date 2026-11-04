@@ -227,6 +227,10 @@
         const room = g.scoutCount() < g.scoutMax() ? 1 : 0;
         if (g.pop() + queued + room < g.popCap() && st.res.food >= D.VILLAGER.cost.food + 30) g.train(b, 1);
       }
+      // …y ese lugar se usa: si falta un explorador y todavía queda mapa a su alcance, el Puesto entrena uno. Sin esto el
+      // pueblo podía quedarse con lo que vio al empezar (1% del mapa) y, agotado eso, con todos ociosos (piloto de pk-17).
+      const post = g.buildings.find(b => b.owner === 'p' && b.done && b.type === 'scout');
+      if (post && !post.queue.length && g.scoutCount() < g.scoutMax() && st.flags.scoutDoneR !== g.exploreRange() && g.pop() < g.popCap() && g.canAfford(D.SCOUT.cost)) g.trainScout(post);
     }
     // cola de obras
     // en orden, pero saltando lo que todavía no se puede pagar: antes la primera obra impagable trababa toda la

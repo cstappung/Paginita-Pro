@@ -901,3 +901,31 @@ ul.info li { margin: 2px 0; }
 .esc-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 10px; }
 .esc-op { border: 2px solid #6b4c30; background: rgba(255,255,255,0.2); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 520px) { .esc { flex-direction: column; align-items: center; } }
+
+/* ---------- Fase 3 (pk-18): árbol 2.0, cartas de era, estación ---------- */
+.arbol-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+.arbol-col { display: flex; flex-direction: column; gap: 6px; border-top: 3px solid var(--rama, #8a6a44); padding-top: 4px; min-width: 0; }
+.arbol-col h4 { margin: 0; display: flex; align-items: center; gap: 4px; color: var(--rama); }
+.arbol-col h4 small { opacity: 0.8; }
+.arbol-par { display: flex; flex-direction: column; gap: 2px; border: 1px dashed var(--rama, #8a6a44); padding: 3px; }
+.arbol-o { text-align: center; font-weight: 700; color: var(--rama); line-height: 1; }
+.tech.nodo.hecho { border-color: #7fb35a; background: rgba(90, 150, 60, 0.18); }
+.tech.nodo.curso { border-color: #e2c25a; }
+.tech.nodo.bloq, .tech.nodo.era, .tech.nodo.lib { opacity: 0.6; }
+.tech.nodo .ok { color: #3f7a2a; margin: 0; font-weight: 600; }
+.tech.nodo .lvl { white-space: nowrap; }
+.cartas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 6px 0; }
+.carta { border: 2px solid #8a6a44; background: linear-gradient(180deg, rgba(232, 190, 110, 0.35), rgba(120, 80, 30, 0.16)); padding: 10px 8px; display: flex; flex-direction: column; gap: 4px; min-height: 120px; }
+.carta b { font-size: 1.05em; }
+.carta p { flex: 1; margin: 0; }
+.carta small { color: #7a5a30; }
+.carta.contra { border-color: #a0553a; }
+.carta.real { border-color: #c8a030; box-shadow: inset 0 0 0 2px #e8b84a88; }
+.cartas.chicas .carta { min-height: 0; padding: 6px; }
+.res.estacion { font-size: 15px; padding: 0 6px; min-width: 30px; justify-content: center; }
+@media (max-width: 700px) {
+  .arbol-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .arbol-cols { grid-template-columns: 1fr; }
+}

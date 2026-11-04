@@ -1973,6 +1973,22 @@
 
   // El terreno se pinta por trozos de 16x16 casillas, solo los que están a la vista (y se guardan unos
   // cuantos en memoria). Un mapa de 256x256 entero sería una imagen de 8192x4096: demasiado para un celular.
+  // Estación del suelo (Fase 3, V3): 0 primavera, 1 verano, 2 otoño, 3 invierno. render.js la fija y vacía su caché
+  // de trozos al cambiar (R.nuevaEstacion), así que cada estación se pinta una sola vez por trozo.
+  S.temporada = 1;
+  const TEMP = [
+    { tinte: [96, 156, 52], k: 0.12, flores: 0.992 },  // primavera: más verde y con flores
+    { tinte: [150, 146, 64], k: 0.12, flores: 0.9994 }, // verano: un poco seco
+    { tinte: [168, 112, 44], k: 0.38, flores: 2 },      // otoño: ocre y hojas
+    { tinte: [226, 232, 240], k: 0.62, flores: 2 },     // invierno: nieve en manchones
+  ];
+  function estacion(col, mx, h) {
+    const t = TEMP[S.temporada] || TEMP[1];
+    let k = t.k;
+    if (S.temporada === 3) k *= U.clamp(0.55 + (mx - 0.4) * 1.6, 0.25, 1); // nieve despareja
+    if (S.temporada === 2 && h > 0.97) return [196, 96, 40];              // hoja caída
+    return mix(col, t.tinte, k);
+  }
   S.renderGroundChunk = function (W, chx, chy) {
     const CH = W.CH, x0 = chx * CH, y0 = chy * CH, Wd = W.W, Ht = W.H, seed = W.seed;
     const gx0 = (x0 - y0 - CH) * 16 + Ht * 16, gy0 = (x0 + y0) * 8, cw = CH * 32, ch = CH * 16 + 2;
@@ -2022,10 +2038,12 @@
             col = mix(GR2, GR1, U.clamp((mx - 0.35) * 2.4, 0, 1));
             if (mx > 0.62) col = mix(col, GR3, (mx - 0.62) * 2);
             if (h > 0.985) col = sc(col, 1.2); else if (h < 0.012) col = sc(col, 0.78);
-            if (h > 0.9994) col = U.hash(px, py, 9) > 0.5 ? [232, 222, 120] : [226, 226, 236];
+            col = estacion(col, mx, h);
+            if (h > (TEMP[S.temporada] || TEMP[1]).flores) col = U.hash(px, py, 9) > 0.5 ? [232, 222, 120] : S.temporada === 0 ? [228, 128, 170] : [226, 226, 236];
           } else if (T === 1) {
             col = mix(FF1, FF2, mx);
             if (h > 0.93) col = [84, 66, 40]; else if (h < 0.05) col = sc(col, 0.8);
+            if (S.temporada >= 2) col = estacion(col, mx, h);
           } else if (T === 2) {
             col = mix(DI2, DI1, mx);
             if (h > 0.97) col = sc(col, 1.18); else if (h < 0.03) col = sc(col, 0.75);
