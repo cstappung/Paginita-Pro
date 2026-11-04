@@ -1,4 +1,4 @@
-// Exploración, Reinos, Opciones, cofres, el cartel de reinicio y el informe «Mientras no estabas».
+// Exploración, Opciones, cofres, el cartel de reinicio y el informe «Mientras no estabas».
 // Salió de js/ui.js al partirlo por ventanas (T5 del plan): los mismos atajos que allá. Va después de ui.js.
 (function () {
   'use strict';
@@ -46,41 +46,7 @@
     }, { wide: true });
   };
 
-  // ---------- Reinos y ranking ----------
-  UI.openRealms = function () {
-    const net = PK.Net;
-    UI.modal('realms', 'Reinos', body => {
-      body.append(el('h3', null, net.online ? 'Tu mundo: ' + net.world.name : 'Tu mundo (modo local)'));
-      const rows = [{ me: true, name: UI.yo(net.online ? net.me.name : PK.Platform.getPlayer().name), color: D.PLAYER_COLOR, era: S().era }]
-        .concat(D.BOTS.map(b => ({ name: b.realm, color: b.color, human: b.human, online: b.online, era: b.human ? b.era : null })));
-      const humansN = rows.filter(r => r.human).length, onlineN = rows.filter(r => r.human && r.online).length;
-      if (net.online) body.append(el('p', { class: 'small' + (onlineN ? ' good-t' : ' muted') }, humansN ? humansN + ' jugador(es) real(es) en tu mundo · ' + onlineN + ' en línea ahora.' : 'Por ahora eres el único jugador real de este mundo: los demás reinos son simulados hasta que llegue alguien.'));
-      rows.sort((a, b) => (b.me ? 2 : 0) + (b.human ? 1 : 0) + (b.online ? 1 : 0) - ((a.me ? 2 : 0) + (a.human ? 1 : 0) + (a.online ? 1 : 0)));
-      body.append(el('div', { class: 'offers' }, rows.map(r => el('div', { class: 'offer' + (r.human ? ' human' : '') },
-        el('span', { class: 'swatch', style: { background: 'rgb(' + r.color.join(',') + ')' } }), el('b', null, r.name),
-        r.me ? null : el('span', { class: 'tag' }, r.human ? (r.online ? 'jugador ● en línea' : 'jugador') : 'simulado'),
-        r.era ? el('span', { class: 'muted small' }, ' · Era ' + U.roman(r.era)) : null))));
-      // plaza del mundo: chat corto entre reinos, que además aparece como globo sobre el reino que habla
-      const chat = el('div', { class: 'chat scroll' }, PK.Social.worldChat().map(m => el('div', { class: m.me ? 'me' : '' }, el('b', null, m.who + ': '), m.text)));
-      const input = el('input', { id: 'wchat-in', placeholder: 'Escribe a todo el mundo…', maxlength: 100 });
-      const send = t => { PK.Social.sayWorld(t); input.value = ''; setTimeout(() => UI.rerender(), 300); };
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') send(input.value); e.stopPropagation(); });
-      body.append(el('h3', null, 'Plaza del mundo'), chat, el('div', { class: 'chat-in' }, input, UI.btn('Enviar', () => send(input.value), { small: true })),
-        el('div', { class: 'row quick-say' }, D.QUICK_SAY.map(t => UI.btn(t, () => send(t), { small: true }))));
-      setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 0);
-      if (!net.online) {
-        body.append(el('p', { class: 'muted' }, (PK.Platform.name === 'paginita-pro-beta' ? 'Beta cerrada: por ahora los demás reinos son simulados y tu partida se guarda en este navegador. El mundo compartido con otras personas llega más adelante.' : 'No hay servidor: los demás reinos son simulados. Ejecuta "node server.js" y abre el juego desde http://localhost:8080 para jugar con otras personas.')));
-        return;
-      }
-      body.append(el('p', { class: 'muted small' }, 'Cada mundo tiene 16 reinos. Las casillas libres las ocupan reinos simulados hasta que llegue un jugador.'));
-      body.append(el('h3', null, 'Ranking del servidor'));
-      const rk = net.cache.ranking;
-      if (!rk) body.append(el('p', { class: 'muted' }, 'Cargando…'));
-      else body.append(el('ol', { class: 'rank' }, rk.map(r => el('li', { class: r.me ? 'me' : '' },
-        el('span', null, r.name + (r.online ? ' ●' : '') + ' · ' + r.world), el('span', null, 'Era ' + U.roman(r.era) + ' · ' + U.fmt(r.total))))));
-    });
-    if (net.online) net.refreshRanking();
-  };
+  // La ventana Reinos (con la diplomacia de la Fase 5) está en js/ui/reinos.js.
 
   // ---------- Opciones ----------
   UI.openSettings = function () {

@@ -17,6 +17,10 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const routes = {
   'POST /api/pase/claim': (p, b) => sim.paseClaim(p, b),
   'POST /api/saqueo': (p, b) => sim.saqueo(p, b),
+  'POST /api/diplo/propose': (p, b) => sim.diploPropose(p, b),
+  'POST /api/diplo/accept': (p, b) => sim.diploAccept(p, b),
+  'POST /api/diplo/gift': (p, b) => sim.diploGift(p, b),
+  'POST /api/diplo/evento': (p, b) => sim.diploEvento(p, b),
   'POST /api/pase/refresh': p => sim.paseActivar(p, !!process.env.PK_PASE_LIBRE),
   'GET /api/status': () => sim.status(),
   'POST /api/join': (p, b) => sim.join(b),

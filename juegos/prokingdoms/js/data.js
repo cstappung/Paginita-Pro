@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 5;
+  D.PROTO = 6;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -351,7 +351,7 @@
       if (i === mySlot) return;
       const h = humans && humans[i];
       D.BOTS.push({
-        id: 'b' + i, slot: i, home: s.home, color: s.color, zones: s.bot.zones, strength: s.bot.strength,
+        id: 'b' + i, slot: i, home: s.home, color: s.color, zones: s.bot.zones, strength: s.bot.strength, pers: h ? null : s.bot.pers,
         human: !!h, pid: h ? h.id : null, name: h ? h.name : s.bot.name, realm: h ? 'Reino de ' + h.name : s.bot.realm,
       });
     });
@@ -359,6 +359,69 @@
   D.ownerOfSlot = i => (i === D.MY_SLOT ? 'p' : 'b' + i);
   D.slotOfOwner = o => (o === 'p' ? D.MY_SLOT : o && o[0] === 'b' ? +o.slice(1) : -1);
   D.setupRealms(0, null);
+
+  // ---------- Diplomacia (Fase 5, S1, pk-23) ----------
+  // Cada reino simulado tiene una personalidad, sembrada por casilla con su propio generador (no toca `wrng`, así el
+  // mapa no cambia): cuatro de cada una por mundo. La relación (−100 a +100), los pactos y los eventos los decide
+  // server/sim.js; estas tablas las leen los dos lados. Sin servidor, la diplomacia dice «Requiere conexión».
+  D.PERSONALIDADES = {
+    comerciante: { name: 'Comerciante', desc: 'Le gustan los regalos y los tratados. Casi nunca saquea.', base: 15, regalo: 1.3, saq: 1.8, peso: 0.5, deriva: 1,
+      umbral: { comercio: 5, noAgresion: 25, alianza: 55, paz: -60 } },
+    conquistador: { name: 'Conquistador', desc: 'Saquea seguido y exige tributo. Solo pacta con quien se gana su respeto.', base: -15, regalo: 0.8, saq: 0.6, peso: 3, deriva: 1.5,
+      umbral: { comercio: 30, noAgresion: 45, alianza: 75, paz: -30 } },
+    sabio: { name: 'Sabio', desc: 'Paciente: su relación se mueve despacio y aprecia los libros y las gemas.', base: 5, regalo: 1, gustos: ['books', 'gems'], saq: 1.2, peso: 1, deriva: 0.5,
+      umbral: { comercio: 15, noAgresion: 20, alianza: 50, paz: -60 } },
+    ermitano: { name: 'Ermitaño', desc: 'Quiere que lo dejen en paz: rara vez saquea y casi nunca se alía.', base: 0, regalo: 0.6, saq: 2.5, peso: 0.3, deriva: 0.7,
+      umbral: { comercio: 35, noAgresion: 10, alianza: 85, paz: -70 } },
+  };
+  D.PERS_ORDEN = ['comerciante', 'conquistador', 'sabio', 'ermitano'];
+  {
+    const r = U.rng(D.SEED + 4243), lista = D.REALM_SLOTS.map((s, i) => D.PERS_ORDEN[i % 4]);
+    for (let i = lista.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [lista[i], lista[j]] = [lista[j], lista[i]]; }
+    D.REALM_SLOTS.forEach((s, i) => { s.bot.pers = lista[i]; });
+    D.setupRealms(0, null);
+  }
+  D.DIPLO = {
+    era: 2,                  // la diplomacia se abre en la Era II
+    regaloRes: ['food', 'wood', 'stone', 'gold', 'books', 'gems'],
+    regalosDia: 3,           // regalos por día a un mismo reino
+    regaloMax: 12,           // lo más que sube la relación un regalo
+    maxAliados: 3,
+    rompe: 20,               // un pacto se rompe solo si la relación cae este tanto bajo su umbral
+    tratado: { buy: 0.9 },   // un tratado de comercio (con quien sea) abarata un 10% las compras del Mercado
+    rival: { saq: 0.5, peso: 3, premio: 1.5, conquista: 0.75 }, // un rival saquea más, pero rechazarlo paga más y conquistarlo cuesta menos
+    accionesDia: 30,         // propuestas, regalos y respuestas por día (servidor)
+    ayuda: { base: 0.12, fuerza: 0.12, boda: 1.5, favor: 2 }, // lo que suma cada aliado a tu defensa contra un saqueo
+  };
+  D.PACTOS = {
+    comercio: { name: 'Tratado de comercio', desc: 'Compras un 10% más barato en el Mercado mientras dure.' },
+    noAgresion: { name: 'Pacto de no agresión', desc: 'No te saquea y ninguno puede conquistar las parcelas del otro.' },
+    alianza: { name: 'Alianza', desc: 'Incluye la no agresión. Te ayuda contra los saqueos y a veces te manda tropas.' },
+    rival: { name: 'Rivalidad', desc: 'Rompe los pactos. Te saquea más, pero rechazarlo paga más y conquistar sus parcelas cuesta menos.' },
+  };
+  D.diploEscala = era => 300 * Math.pow(1.6, era - 1);
+  // Cuánto sube la relación un regalo de `valor` (en oro, al precio del Mercado).
+  D.regaloRel = function (valor, era, pers, res) {
+    const P = D.PERSONALIDADES[pers] || D.PERSONALIDADES.sabio, gusto = P.gustos && P.gustos.includes(res) ? 1.5 : 1;
+    return U.clamp(Math.round((10 * valor / D.diploEscala(era)) * P.regalo * gusto * 10) / 10, 0, D.DIPLO.regaloMax);
+  };
+  D.relNombre = r => (r <= -60 ? 'Hostil' : r <= -20 ? 'Frío' : r < 20 ? 'Neutral' : r < 60 ? 'Amistoso' : 'Leal');
+  // ¿Acepta un reino simulado este pacto? e = { rel, pacto, tratado }. Devuelve null o el motivo.
+  D.diploAcepta = function (pers, e, pacto, aliados) {
+    const P = D.PERSONALIDADES[pers], u = P && P.umbral[pacto];
+    if (!P) return 'Ese reino no responde.';
+    if (pacto === 'rival' || pacto === 'romper') return null;
+    if (pacto === 'paz') return e.pacto !== 'rival' ? 'No están en rivalidad.' : e.rel < u ? 'Todavía no quiere la paz (relación ' + Math.round(e.rel) + ', pide ' + u + ').' : null;
+    if (e.pacto === 'rival') return 'Primero hagan las paces.';
+    if (pacto === 'comercio' && e.tratado) return 'Ya tienen un tratado de comercio.';
+    if (pacto === 'noAgresion' && (e.pacto === 'noAgresion' || e.pacto === 'alianza')) return 'Ya tienen un pacto de no agresión.';
+    if (pacto === 'alianza' && e.pacto === 'alianza') return 'Ya son aliados.';
+    if (pacto === 'alianza' && aliados >= D.DIPLO.maxAliados) return 'Ya tienes ' + D.DIPLO.maxAliados + ' aliados.';
+    if (e.rel < u) return P.name + ': pide una relación de ' + u + ' (tienes ' + Math.round(e.rel) + ').';
+    return null;
+  };
+  // Ultimátum de un Conquistador: lo que pide para no mandar una partida enseguida.
+  D.ultimatumPide = era => ({ gold: Math.round(250 * Math.pow(1.8, era - 1) * 0.3) });
 
   // ---------- Territorio ----------
   // Cada reino parte con las parcelas alrededor de su hogar. Las parcelas libres vecinas se reclaman pagando;
@@ -445,8 +508,9 @@
   // Poder de un reino para el emparejamiento: los muy avanzados no pueden atacar a los que recién empiezan.
   D.realmScore = (era, levels, pop) => era * 100 + levels * 2 + pop;
   // revenge: quien te quitó una parcela no se esconde detrás de su tregua ni de la diferencia de poder.
-  D.canConquer = function (a, b, revenge) { // a, b: { era, score, newbie, shield }
+  D.canConquer = function (a, b, revenge) { // a, b: { era, score, newbie, shield, pacto }
     if (a.era < D.TERR.minEra) return 'Conquistar requiere la Era ' + U.roman(D.TERR.minEra) + '.';
+    if (b.pacto === 'noAgresion' || b.pacto === 'alianza') return 'Tienes ' + (b.pacto === 'alianza' ? 'una alianza' : 'un pacto de no agresión') + ' con ese reino.';
     if (revenge) return null;
     if (b.newbie) return 'Ese reino está en tregua de novato.';
     if (b.shield) return 'Ese reino rechazó o sufrió un ataque hace poco y está en tregua.';

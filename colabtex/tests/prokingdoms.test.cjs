@@ -519,3 +519,26 @@ test('Pase del Reino: premios de los 30 niveles en las dos pistas y retos con qu
   const dias = (D.PASE.niveles * D.PASE.pp - retos) / (diarios + 160);
   assert.ok(dias > 7 && dias < 12, dias.toFixed(1) + ' días');
 });
+test('Diplomacia (S1): personalidades sembradas, umbrales en orden y los pactos frenan la conquista', () => {
+  const cuenta = {};
+  for (const s of D.REALM_SLOTS) cuenta[s.bot.pers] = (cuenta[s.bot.pers] || 0) + 1;
+  for (const k of D.PERS_ORDEN) assert.equal(cuenta[k], 4, k + ': cuatro por mundo');
+  // otra carga del mismo código da la misma personalidad por casilla (servidor y navegador coinciden)
+  const otra = carga(['util.js', 'data.js', 'pase.js', 'world.js']);
+  assert.equal(JSON.stringify(otra.D.REALM_SLOTS.map(s => s.bot.pers)), JSON.stringify(D.REALM_SLOTS.map(s => s.bot.pers)));
+  for (const k of D.PERS_ORDEN) {
+    const P = D.PERSONALIDADES[k];
+    assert.ok(P.umbral.alianza > P.umbral.comercio && P.umbral.alianza > P.umbral.noAgresion, k + ': la alianza es lo más difícil');
+    assert.ok(P.saq > 0 && P.peso > 0 && P.regalo > 0, k);
+  }
+  assert.ok(D.PERSONALIDADES.conquistador.saq < 1 && D.PERSONALIDADES.conquistador.peso > 1, 'el Conquistador saquea más seguido');
+  const e = { rel: 0, pacto: null, tratado: false };
+  assert.ok(D.diploAcepta('conquistador', e, 'alianza', 0), 'con relación 0 el Conquistador no se alía');
+  assert.equal(D.diploAcepta('comerciante', Object.assign({}, e, { rel: 60 }), 'alianza', 0), null);
+  assert.ok(D.diploAcepta('comerciante', Object.assign({}, e, { rel: 99 }), 'alianza', D.DIPLO.maxAliados), 'tope de aliados');
+  assert.ok(D.regaloRel(1e9, 5, 'comerciante', 'gold') <= D.DIPLO.regaloMax, 'un regalo enorme no pasa el tope');
+  assert.ok(D.regaloRel(500, 3, 'sabio', 'books') > D.regaloRel(500, 3, 'sabio', 'food'), 'al Sabio le gustan los libros');
+  const yo = { era: 5, score: 600 }, el = { era: 5, score: 600, newbie: false, shield: false };
+  assert.equal(D.canConquer(yo, el, false), null);
+  assert.ok(D.canConquer(yo, Object.assign({}, el, { pacto: 'alianza' }), true), 'una alianza impide conquistar, aun con revancha');
+});

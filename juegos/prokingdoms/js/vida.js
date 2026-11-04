@@ -71,7 +71,7 @@
 
   // ---------- V3. Estaciones ----------
   const DUR = () => D.ESTACION_H * 3600 * 1000;
-  V.estacion = (t) => Math.floor((t || Date.now()) / DUR()) % 4;
+  V.estacion = (t) => Math.floor((t == null ? Date.now() : t) / DUR()) % 4; // t = 0 es un instante válido: nunca `t || Date.now()`
   V.estacionDe = (t) => D.ESTACIONES[V.estacion(t)];
   V.estacionFalta = () => (DUR() - (Date.now() % DUR())) / 1000; // segundos hasta la próxima
   // De noche (hora real del jugador): entre las 20 y las 6. Opciones → «Sin noche» la apaga (flags.sinNoche).

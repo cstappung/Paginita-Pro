@@ -995,3 +995,34 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .sq-op { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 8px; }
 .sq-op > div { border: 1px solid var(--line, #5a4a34); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .tw-ramas .row { flex-wrap: wrap; gap: 4px; }
+/* S1 (pk-23): fichas de la ventana Reinos */
+.fichas { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.ficha { border: 2px solid #8a6a44; background: rgba(120, 80, 30, 0.1); padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.ficha.alianza { border-color: #3a7a24; background: rgba(60, 140, 40, 0.12); }
+.ficha.noAgresion { border-color: #3462c4; }
+.ficha.rival { border-color: #a03a24; background: rgba(170, 40, 30, 0.1); }
+.ficha.yo { border-style: dashed; }
+.ficha-h { display: flex; gap: 8px; align-items: center; }
+.ficha-h > div { min-width: 0; }
+.ficha p { margin: 0; }
+.escudo { image-rendering: pixelated; vertical-align: middle; flex: 0 0 auto; }
+.pers { font-weight: 700; }
+.pers.comerciante { color: #8a6a10; } .pers.conquistador { color: #a03a24; } .pers.sabio { color: #3462c4; } .pers.ermitano { color: #3a6a3a; }
+.dp-rel { display: flex; align-items: center; gap: 6px; }
+.rel-bar { position: relative; flex: 1; height: 8px; background: rgba(0, 0, 0, 0.15); border: 1px solid #6b4c30; }
+.rel-bar i { position: absolute; top: 0; bottom: 0; background: #b8862a; }
+.rel-bar.bien i { background: #4a9a34; } .rel-bar.mal i { background: #c04a30; }
+.rel-bar b { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #3a2414; }
+.dp-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.dp-chips:empty { display: none; }
+.dp-chip { font-size: 12px; padding: 0 5px; border: 1px solid #6b4c30; background: rgba(0, 0, 0, 0.06); }
+.dp-chip.alianza { background: #4a9a34; color: #fff; border-color: #2a5a1a; }
+.dp-chip.noAgresion { background: #3462c4; color: #fff; border-color: #1c2a5a; }
+.dp-chip.rival { background: #c04a30; color: #fff; border-color: #6a1a10; }
+.dp-chip.comercio { background: #e8b84a; color: #3a2414; }
+.dp-acc, .dp-reg { display: flex; gap: 4px; flex-wrap: wrap; }
+.dp-reg .btn .ico { width: 18px; height: 18px; }
+.dp-ev { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; margin: 6px 0; border: 2px solid #c8a030; background: rgba(232, 184, 74, 0.18); }
+.dp-ev.ultimatum { border-color: #a03a24; background: rgba(200, 60, 40, 0.14); }
+.dp-ev .row { flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+@media (max-width: 600px) { .fichas { grid-template-columns: 1fr; } }

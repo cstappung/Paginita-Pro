@@ -21,7 +21,7 @@ sim.tickSaqueos();
 ok(p.saqueo && !p.saqueo.fin && p.inbox.some(i => i.type === 'saqueo'), 'después llega una partida, con aviso en el buzón', p.saqueo && p.saqueo.from + ' fuerza ' + p.saqueo.power);
 let err = null;
 try { sim.saqueo(p, { id: p.saqueo.id, accion: 'ayuda' }); } catch (e) { err = e.message; }
-ok(err && /gremio/.test(err), 'sin gremio no se pide ayuda', err);
+ok(err && /aliado/.test(err), 'sin aliados no se pide ayuda', err);
 try { sim.saqueo(p, { id: 'otra', accion: 'pelear' }); err = null; } catch (e) { err = e.message; }
 ok(!!err, 'no se elige por una partida que no es la tuya', err);
 sim.saqueo(p, { id: p.saqueo.id, accion: 'pelear' });

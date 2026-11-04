@@ -1,6 +1,7 @@
-// Partidas de saqueo de los reinos simulados (Fase 4, C6, pk-22). Las decide server/sim.js (tickSaqueos): aquí
-// solo se dibuja la columna que marcha desde ese reino hasta tu Centro Urbano, se ofrecen las tres opciones y se
-// aplica lo que llega por el buzón (net.js: «saqueo» y «saqueo_fin»). Sin servidor (modo local) no hay saqueos.
+// Partidas de saqueo de los reinos simulados (Fase 4, C6, pk-22; aliados en pk-23). Las decide server/sim.js
+// (tickSaqueos): aquí solo se dibuja la columna que marcha desde ese reino hasta tu Centro Urbano (y las de tus
+// aliados si les pediste ayuda), se ofrecen las tres opciones y se aplica lo que llega por el buzón (net.js:
+// «saqueo» y «saqueo_fin»). Sin servidor (modo local) no hay saqueos.
 (function () {
   'use strict';
   const PK = window.PK, U = PK.U, D = PK.D, Sp = PK.Sprites;
@@ -41,7 +42,7 @@
       if (PK.Social.log) PK.Social.log(it.text, 'info');
       return;
     }
-    const det = ' (tu defensa ' + U.fmt(it.def) + (it.ayuda ? ', con tu gremio' : '') + ' contra ' + U.fmt(it.atk) + ')';
+    const det = ' (tu defensa ' + U.fmt(it.def) + (it.ayuda ? ', con ' + (it.aliados && it.aliados.length ? it.aliados.join(' y ') : 'tus aliados') : '') + ' contra ' + U.fmt(it.atk) + ')';
     if (it.res === 'gano') {
       g.give(it.premio || {});
       g.stat('defenses_won', 1); g.stat('saqueos_rechazados', 1);
@@ -53,7 +54,7 @@
       for (const k of ['food', 'wood', 'stone', 'gold']) { const n = Math.floor(Math.min((st.res[k] || 0) * (it.pct || 0.08), it.tope || 1e9)); if (n > 0) { robo[k] = n; st.res[k] -= n; } }
       if (PK.Vida && PK.Vida.animoEv) PK.Vida.animoEv(-10, 1800, 'Nos saquearon');
       const txt = it.text + det + ' Se llevaron ' + (Object.keys(robo).map(k => U.fmt(robo[k]) + ' de ' + D.RES[k].name.toLowerCase()).join(', ') || 'casi nada') + '.';
-      toast(txt + ' Sube tus torres o pide ayuda a tu gremio la próxima vez.', 'bad');
+      toast(txt + ' Sube tus torres o busca aliados en Reinos para la próxima vez.', 'bad');
       if (PK.Social.log) PK.Social.log(txt, 'bad');
     }
     g.logNews(it.text, it.res === 'gano' ? 'good' : 'bad');
@@ -68,7 +69,7 @@
       Sq.info = r.saqueo || null;
       if (r.inbox && PK.Net.applyInbox) PK.Net.applyInbox(r.inbox);
       if (accion === 'pelear') toast('Tus torres y tus soldados los esperan.', 'info');
-      if (accion === 'ayuda') toast('Tu gremio manda refuerzos: +30% a tu defensa contra esta partida.', 'good');
+      if (accion === 'ayuda') toast('Tus aliados mandan refuerzos: suman a tu defensa contra esta partida.', 'good');
     } catch (e) { toast((e && e.message) || 'No se pudo hablar con el servidor.', 'warn'); }
     if (PK.UI.closeModal) PK.UI.closeModal();
   };
@@ -78,13 +79,14 @@
     PK.UI.modal('saqueo', 'Partida de saqueo', body => {
       const st = S(), def = PK.Social.defense(), t = D.saqTributo(st.era), alcanza = G().canAfford(t);
       body.append(el('div', { class: 'sq' },
-        el('p', null, el('b', { translate: 'no' }, q.from), q.conq ? ' (conquistador: ataca seguido)' : '', ' marcha contra tu pueblo con una fuerza de aprox. ', el('b', null, U.fmt(q.power)), '. Llega en ' + U.fmtTime(quedan()) + '.'),
+        el('p', null, PK.Diplo ? PK.Diplo.escudo(q.slot, 28) : '', ' ', el('b', { translate: 'no' }, q.from), q.rival ? ' (tu rival: rechazarlo paga más)' : q.pers === 'conquistador' ? ' (Conquistador: saquea seguido)' : '', ' marcha contra tu pueblo con una fuerza de aprox. ', el('b', null, U.fmt(q.power)), '. Llega en ' + U.fmtTime(quedan()) + '.'),
         el('p', { class: 'small' }, 'Tu defensa: ' + U.fmt(def) + ' (torres, Centro Urbano, murallas y soldados en casa). Si no eliges, se pelea.'),
-        q.eleccion && q.eleccion !== 'tributo' ? el('p', { class: 'small good-t' }, q.eleccion === 'ayuda' ? 'Tu gremio ya viene en camino.' : 'Elegiste pelear.') : null,
+        q.eleccion && q.eleccion !== 'tributo' ? el('p', { class: 'small good-t' }, q.eleccion === 'ayuda' ? 'Tus aliados ya vienen en camino.' : 'Elegiste pelear.') : '',
         el('div', { class: 'sq-op' },
           el('div', null, el('b', null, 'Pagar tributo'), el('p', { class: 'small' }, 'Se vuelven sin pelear.'), PK.UI.costEl(t), PK.UI.btn('Pagar', () => Sq.elegir('tributo'), { small: true, disabled: !alcanza, title: alcanza ? '' : 'No te alcanza' })),
           el('div', null, el('b', null, 'Pelear'), el('p', { class: 'small' }, 'Si ganas, botín y gemas; si pierdes, se llevan hasta un 8% de tus bodegas.'), PK.UI.btn('Pelear', () => Sq.elegir('pelear'), { small: true, cls: 'gold' })),
-          el('div', null, el('b', null, 'Pedir ayuda'), el('p', { class: 'small' }, q.ayuda ? 'Tu gremio suma un 30% a tu defensa.' : 'Necesitas estar en un gremio.'), PK.UI.btn('Pedir ayuda', () => Sq.elegir('ayuda'), { small: true, disabled: !q.ayuda })))));
+          el('div', null, el('b', null, 'Pedir ayuda'), el('p', { class: 'small' }, q.ayuda ? el('span', { translate: 'no' }, (q.aliados || []).map(a => a.name).join(', ')) : 'Necesitas un aliado: fírmalo en Reinos.', q.ayuda ? ' suman a tu defensa según su fuerza (les debes un favor).' : ''),
+            PK.UI.btn('Pedir ayuda', () => Sq.elegir('ayuda'), { small: true, disabled: !q.ayuda || q.eleccion === 'ayuda' })))));
     });
   };
   // fila para la tira de cola (ui.js)
@@ -96,19 +98,25 @@
   };
 
   // ---------- Dibujo: la columna con el color de ese reino ----------
-  Sq.dibujar = function (ctx, R) {
-    const q = Sq.info, b = tc();
-    if (!q || !b) return;
-    const tot = Math.max(1, q.arrive - q.at), f = U.clamp((ahora() - q.at) / tot, 0, 1), [hx, hy] = home(q.slot);
-    const col = (D.REALM_SLOTS[q.slot] || {}).color || [150, 40, 40], dx = b.cx - hx, dy = b.cy - hy, L = Math.hypot(dx, dy) || 1;
+  // una columna de 6 figuras del color de un reino, de (hx, hy) hacia el Centro Urbano, en la fracción f del camino
+  function columna(ctx, R, slot, f, b, tipos) {
+    const [hx, hy] = home(slot), col = (D.REALM_SLOTS[slot] || {}).color || [150, 40, 40], dx = b.cx - hx, dy = b.cy - hy, L = Math.hypot(dx, dy) || 1;
     const now = performance.now() / 1000, flip = dx - dy < 0, back = dx + dy < 0;
     for (let i = 0; i < 6; i++) {
       const k = Math.max(0, f - i * (0.7 / L)), x = hx + dx * k + (i % 2 ? 0.25 : -0.25) * (dy / L), y = hy + dy * k - (i % 2 ? 0.25 : -0.25) * (dx / L);
       if (!PK.World.explored(Math.floor(x), Math.floor(y))) continue;
-      const spr = Sp.troop(i % 3 === 0 ? 'knight' : i % 3 === 1 ? 'spear' : 'archer', col, 'walk', Math.floor(now * 9 + i) % 6, flip, back, null, i), [px, py] = R.iso(x, y);
+      const spr = Sp.troop(tipos[i % 3], col, 'walk', Math.floor(now * 9 + i) % 6, flip, back, null, i), [px, py] = R.iso(x, y);
       ctx.drawImage(spr.c, Math.round(px - spr.ax), Math.round(py - spr.ay), spr.k ? spr.w : spr.c.width, spr.k ? spr.h : spr.c.height);
       if (!i) { ctx.fillStyle = '#2a1a10'; ctx.fillRect(Math.round(px + 4), Math.round(py - 30), 1, 20); ctx.fillStyle = 'rgb(' + col.join(',') + ')'; ctx.fillRect(Math.round(px + 5), Math.round(py - 30), 7, 5); }
     }
+  }
+  Sq.dibujar = function (ctx, R) {
+    const q = Sq.info, b = tc();
+    if (!q || !b) return;
+    const tot = Math.max(1, q.arrive - q.at), f = U.clamp((ahora() - q.at) / tot, 0, 1);
+    columna(ctx, R, q.slot, f, b, ['knight', 'spear', 'archer']);
+    // los aliados llegan un poco antes que los saqueadores
+    if (q.eleccion === 'ayuda') for (const a of q.aliados || []) columna(ctx, R, a.slot, Math.min(1, f * 1.15), b, ['spear', 'archer', 'spear']);
   };
   Sq.minimapa = function (ctx, toMM) {
     const q = Sq.info, b = tc();

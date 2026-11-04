@@ -709,10 +709,42 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   truce, every 2.5–5 h (×0.6 for «conquistador» realms, strength ≥ 1.1). 3
   min warning, a column in the realm's colour on the map and minimap. Choices
   through `POST /api/saqueo`: tributo (resolves at once; the client pays when
-  `saqueo_fin` arrives), pelear (default), ayuda (needs a guild, +30%
-  defense; a placeholder until S1 diplomacy). The server compares the last
+  `saqueo_fin` arrives), pelear (default), ayuda (allies since `pk-23`; it was
+  the guild's +30% until then). The server compares the last
   snapshot's defense with the power; a win arrives as a prize through the
   inbox, a loss as `pct` + `tope` the client takes from its stores.
   `D.saqTope`/`D.saqTributo` live in `data.js` (both sides). Local mode: none.
   Test: `node tools/saqueo-test.js` (in-process, moves the clock).
 - `D.PROTO` 5: deploy the function with this delivery.
+
+## Diplomacia (`pk-23`, Phase 5: S1, allies in raids, personalities)
+
+- **Personality per slot** (`D.PERSONALIDADES`, `D.REALM_SLOTS[i].bot.pers`): four of each per world,
+  shuffled with its own `U.rng(D.SEED + 4243)`, never `wrng` (that would move the map). It replaces
+  pk-22's «conquistador = strength ≥ 1.1». `D.BOTS[i].pers` is null for a human slot.
+- **The server decides everything** (`diploDe`, `diploPropose`, `diploAccept`, `diploGift`, `diploEvento`,
+  `tickDiplo` in `sim.js`; routes `/api/diplo/{propose,accept,gift,evento}`). `p.diplo.s[slot]` = `{con,
+  rel, pacto, tratado, boda, reg, trop}`; `con` is `'bot'` or the occupant's pid, and an entry restarts when
+  the occupant changes. Bot relations drift toward the personality's base (`deriva`, 2 points a day) and a
+  pact breaks by itself `D.DIPLO.rompe` below its threshold (a boda keeps the alliance). With a human there is
+  no number: proposals go through the inbox and `prop`, rivalry and «romper» are one-sided.
+- **The sync carries `diplo` only when `p.diplo.v` changed** (client sends `dv`). Bump `d.v` on every change,
+  including a rounded drift. Local mode has no diplomacy: the cards say «requiere conexión».
+- **Pacts:** treaty = −10% on market buys (`buyRate` in `social.js`, never below sell + 10% and never above
+  the old price: buy at 0.8 and sell at 0.97 is already close to free money). Non-aggression and alliance: no
+  raids from that realm and no conquest either way (`D.canConquer` gets `pacto`, beats revenge; `conquerBot`
+  checks it and costs −15 relation). Rival: raids more (`D.DIPLO.rival`), a won raid pays ×1.5, conquering
+  it costs ×0.75.
+- **Raids (C6) now:** the attacker comes from the 5 nearest unpacted bot realms, weighted by `peso`
+  (Conquistador 3), rivalry and relation; the next wait is the base × the lowest `saq` among them. With a pact
+  with every neighbour nobody comes. «Pedir ayuda» needs an ally: each bot ally adds `0.12 + 0.12 × strength`
+  (×1.5 with a boda, −2 relation as a favour), each human ally up to +30% from its own defense (and gets 20 ×
+  era gold). Allies march as columns to your TC (`saqueos.js`). Tribute +5 (comerciante +8); a won raid −5,
+  except the Conquistador, who respects it (+3).
+- **Events** (one at a time, every 3–6 h online, from Era II): embassy (gift), request for help (6 h; sending
+  it counts double), ultimatum (Conquistador under 10, Era IV+, 20 min: refusing sends its raid at once via
+  `p.saqDe`), royal wedding (ally at 80+), troops from an ally (once a day, into `st.war.army`).
+- **UI:** `js/diplomacia.js` (`PK.Diplo`, crests drawn by code, 14×16) and `js/ui/reinos.js` (cards; it
+  replaced `openRealms` in `ui/libro.js`). Gifts come in three sizes of `D.diploEscala(era)`; three per realm a
+  day. Test: `node tools/diplo-test.js` (in-process, like the raid test).
+- `D.PROTO` 6: deploy the function with this delivery.

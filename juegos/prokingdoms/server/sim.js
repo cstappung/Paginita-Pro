@@ -12,7 +12,7 @@ const store = require('./store');
 const ROOT = path.join(__dirname, '..');
 const ctx = vm.createContext({ window: {}, console });
 for (const f of ['js/util.js', 'js/data.js', 'js/pase.js', 'js/world.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
-const PK = ctx.window.PK, D = PK.D, W = PK.World;
+const PK = ctx.window.PK, D = PK.D, W = PK.World, U = PK.U;
 D.setupRealms(-1, null);
 W.generate(D.SEED);
 
@@ -401,7 +401,9 @@ function sync(p, b) {
     });
   });
   ensureTerr(w);
-  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
+  // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
+  const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
+  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -928,6 +930,9 @@ function conquerBot(p, b) {
   if (W.isCore(k, slot)) throw new GameError('Es el corazón de ese reino.');
   if (!touches(w, k, p.slot)) throw new GameError('Esa parcela no toca tu territorio.');
   if (!p.snap || p.snap.era < D.TERR.minEra) throw new GameError('Conquistar requiere la Era III.');
+  const pa = pactoCon(p, slot);
+  if (pa === 'noAgresion' || pa === 'alianza') throw new GameError('Tienes un pacto con ese reino.');
+  relSuma(p, slot, -15); // le quitaste tierra: se ofende (puede romper un tratado)
   w.terr[k] = p.slot + 1; w.tv++;
   store.touch('worlds');
   return { ok: true, tv: w.tv };
@@ -950,7 +955,7 @@ function conquer(p, b) {
   if (W.isCore(k, slot)) throw new GameError('Es el corazón de ese reino: nunca se puede conquistar.');
   if (!touches(w, k, p.slot)) throw new GameError('Solo puedes atacar parcelas que toquen tu territorio.');
   const revenge = revengeOf(p, k, tpid);
-  const why = D.canConquer({ era: p.snap ? p.snap.era : 1, score: p.snap ? p.snap.score : 0 }, terrInfo(tgt, w, slot), revenge);
+  const why = D.canConquer({ era: p.snap ? p.snap.era : 1, score: p.snap ? p.snap.score : 0 }, Object.assign(terrInfo(tgt, w, slot), { pacto: pactoCon(p, slot) }), revenge);
   if (why) throw new GameError(why);
   if (store.all('camps').some(c => c.k === k && c.world === w.id)) throw new GameError('Ya hay una campaña contra esa parcela.');
   const { units, total, power } = checkArmy(p, b.units, b.power);
@@ -1040,18 +1045,281 @@ function status() {
   return { ok: true, players: ps.length, online: ps.filter(p => t - p.lastSeen < ONLINE_MS).length, worlds: store.all('worlds').length };
 }
 
-// ---------- Partidas de saqueo de los reinos simulados (Fase 4, C6, pk-22) ----------
+// ---------- Diplomacia (Fase 5, S1, pk-23) ----------
+// Cada jugador guarda su relación con los otros 15 reinos de su mundo (p.diplo.s[casilla]). Con un reino simulado
+// hay relación (−100 a +100, que deriva hacia la base de su personalidad), tratado de comercio y un pacto
+// (no agresión, alianza o rivalidad); el servidor responde por él según su personalidad (D.diploAcepta). Con un
+// jugador real no hay número: las propuestas le llegan por el buzón y él las acepta. Si en una casilla cambia
+// quién la ocupa (llegó un jugador o se fue), esa entrada vuelve a empezar.
+const PERS = D.PERSONALIDADES, DP = D.DIPLO;
+const persDe = slot => (D.REALM_SLOTS[slot] && D.REALM_SLOTS[slot].bot.pers) || 'sabio';
+const realmName = (p, slot) => { const w = world(p), o = w && w.slots[slot] && player(w.slots[slot]); return o ? 'Reino de ' + o.name : D.REALM_SLOTS[slot].bot.realm; };
+function diploDe(p) {
+  const w = world(p), t = now();
+  const d = p.diplo || (p.diplo = { v: 1, at: t, s: {}, prop: [], ev: null, evNext: 0 });
+  const dias = clamp((t - (d.at || t)) / 864e5, 0, 3);
+  d.at = t;
+  let cambio = false;
+  for (let slot = 0; slot < SLOTS; slot++) {
+    if (slot === p.slot) continue;
+    const con = (w && w.slots[slot]) || 'bot';
+    let e = d.s[slot];
+    if (!e || e.con !== con) {
+      e = d.s[slot] = { con, rel: con === 'bot' ? PERS[persDe(slot)].base : 0, pacto: null, tratado: false, boda: false, reg: { d: '', n: 0 }, trop: 0 };
+      cambio = true;
+      continue;
+    }
+    if (con !== 'bot' || dias <= 0) continue;
+    const P = PERS[persDe(slot)], base = e.boda ? Math.max(P.base, 60) : e.pacto === 'rival' ? Math.min(P.base, -40) : P.base, paso = 2 * P.deriva * dias, antes = Math.round(e.rel);
+    e.rel += clamp(base - e.rel, -paso, paso);
+    if (Math.round(e.rel) !== antes) cambio = true;
+    if (rompeSiCae(p, slot, e)) cambio = true;
+  }
+  d.prop = (d.prop || []).filter(o => t - o.at < 864e5);
+  if (cambio) { d.v++; store.touch('players'); }
+  return d;
+}
+// Un reino simulado rompe el pacto (o el tratado) si la relación cae muy bajo lo que pidió para firmarlo.
+function rompeSiCae(p, slot, e) {
+  const u = PERS[persDe(slot)].umbral, nombre = D.REALM_SLOTS[slot].bot.realm;
+  let roto = null;
+  if (e.pacto === 'alianza' && !e.boda && e.rel < u.alianza - DP.rompe) { e.pacto = e.rel >= u.noAgresion - DP.rompe ? 'noAgresion' : null; roto = 'la alianza'; }
+  else if (e.pacto === 'noAgresion' && e.rel < u.noAgresion - DP.rompe) { e.pacto = null; roto = 'el pacto de no agresión'; }
+  else if (e.tratado && e.rel < u.comercio - DP.rompe) { e.tratado = false; roto = 'el tratado de comercio'; }
+  if (roto) push(p, { type: 'diplo', text: nombre + ' rompió ' + roto + ': la relación se enfrió demasiado.' });
+  return !!roto;
+}
+const aliadosDe = p => { const d = diploDe(p); return Object.keys(d.s).map(Number).filter(k => d.s[k].pacto === 'alianza'); };
+function diploAccion(p) {
+  const day = today(p);
+  day.diplo = (day.diplo || 0) + 1;
+  if (day.diplo > DP.accionesDia) throw new GameError('Ya hiciste mucha diplomacia hoy. Vuelve mañana.');
+}
+function diploInfo(p) {
+  const d = diploDe(p), s = {}, t = now(), dia = diaUTC();
+  for (const k in d.s) {
+    const e = d.s[k];
+    s[k] = { rel: e.con === 'bot' ? Math.round(e.rel) : null, pacto: e.pacto, tratado: !!e.tratado, boda: !!e.boda, reg: e.reg.d === dia ? e.reg.n : 0, h: e.con !== 'bot' };
+  }
+  return { v: d.v, s, prop: d.prop.map(o => ({ id: o.id, slot: o.slot, from: o.from, pacto: o.pacto })), ev: d.ev && d.ev.hasta > t ? d.ev : null };
+}
+const diploResp = (p, extra) => Object.assign({ diplo: diploInfo(p), inbox: p.inbox }, extra || {});
+function entrada(p, b) {
+  const slot = Math.floor(+b.slot), d = diploDe(p), e = d.s[slot];
+  if (!e) throw new GameError('Ese reino no existe.');
+  if (vEra(p) < DP.era) throw new GameError('La diplomacia se abre en la Era ' + U.roman(DP.era) + '.');
+  return { slot, d, e };
+}
+function aplicaPacto(e, pacto) {
+  const bot = e.con === 'bot';
+  if (pacto === 'comercio') e.tratado = true;
+  else if (pacto === 'noAgresion' || pacto === 'alianza') e.pacto = pacto;
+  else if (pacto === 'rival') { e.pacto = 'rival'; e.tratado = false; e.boda = false; if (bot) e.rel = Math.max(-100, Math.min(e.rel - 40, -30)); }
+  else if (pacto === 'paz') { e.pacto = null; if (bot) e.rel = Math.min(100, e.rel + 10); }
+  else if (pacto === 'romper') {
+    if (bot) e.rel = Math.max(-100, e.rel - (e.pacto === 'alianza' ? 30 : e.pacto === 'noAgresion' ? 20 : 10));
+    if (e.pacto === 'alianza' || e.pacto === 'noAgresion') { e.pacto = null; e.boda = false; } else e.tratado = false;
+  }
+}
+const PACTO_TXT = { comercio: 'un tratado de comercio', noAgresion: 'un pacto de no agresión', alianza: 'una alianza', paz: 'hacer las paces' };
+function diploPropose(p, b) {
+  const { slot, d, e } = entrada(p, b), pacto = b.pacto;
+  if (!['comercio', 'noAgresion', 'alianza', 'rival', 'paz', 'romper'].includes(pacto)) throw new GameError('Esa propuesta no existe.');
+  if (pacto === 'romper' && !e.pacto && !e.tratado) throw new GameError('No tienes nada firmado con ese reino.');
+  const nAli = aliadosDe(p).length;
+  if (e.con === 'bot') {
+    const pers = persDe(slot), why = D.diploAcepta(pers, e, pacto, nAli), nombre = D.REALM_SLOTS[slot].bot.realm;
+    diploAccion(p);
+    if (why) return diploResp(p, { ok: false, motivo: why });
+    aplicaPacto(e, pacto);
+    d.v++; store.touch('players');
+    const txt = pacto === 'rival' ? 'Declaraste la rivalidad a ' + nombre + '.' : pacto === 'romper' ? 'Rompiste con ' + nombre + '.' : pacto === 'paz' ? nombre + ' aceptó la paz.' : nombre + ' aceptó ' + PACTO_TXT[pacto] + '.';
+    return diploResp(p, { ok: true, txt });
+  }
+  // con un jugador real: la rivalidad y romper son de una parte; lo demás es una propuesta que él acepta
+  const o = player(e.con);
+  if (!o) throw new GameError('Ese jugador ya no está en tu mundo.');
+  const oe = diploDe(o).s[p.slot];
+  if (pacto === 'rival' || pacto === 'romper') {
+    diploAccion(p);
+    aplicaPacto(e, pacto); if (oe) aplicaPacto(oe, pacto);
+    d.v++; o.diplo.v++;
+    push(o, { type: 'diplo', text: pacto === 'rival' ? p.name + ' te declaró la rivalidad.' : p.name + ' rompió lo que tenían firmado.' });
+    return diploResp(p, { ok: true, txt: pacto === 'rival' ? 'Declaraste la rivalidad a ' + o.name + '.' : 'Rompiste con ' + o.name + '.' });
+  }
+  const why = D.diploAcepta('sabio', Object.assign({}, e, { rel: 100 }), pacto, nAli);
+  if (why) throw new GameError(why);
+  if (o.diplo.prop.some(x => x.fromId === p.id && x.pacto === pacto)) throw new GameError('Ya le propusiste eso: espera su respuesta.');
+  diploAccion(p);
+  o.diplo.prop.push({ id: rid('d'), fromId: p.id, from: p.name, slot: p.slot, pacto, at: now() });
+  if (o.diplo.prop.length > 10) o.diplo.prop.shift();
+  o.diplo.v++;
+  push(o, { type: 'diplo', text: p.name + ' te propone ' + PACTO_TXT[pacto] + '. Respóndele en Reinos.' });
+  store.touch('players');
+  return diploResp(p, { ok: true, txt: 'Le propusiste ' + PACTO_TXT[pacto] + ' a ' + o.name + '.' });
+}
+function diploAccept(p, b) {
+  const d = diploDe(p), x = d.prop.find(o => o.id === b.id);
+  if (!x) throw new GameError('Esa propuesta ya no está.');
+  d.prop.splice(d.prop.indexOf(x), 1); d.v++;
+  const q = player(x.fromId), w = world(p);
+  if (!q || w.slots[x.slot] !== q.id) { store.touch('players'); return diploResp(p, { ok: false, motivo: 'Ese jugador ya no está en tu mundo.' }); }
+  if (!b.si) { push(q, { type: 'diplo', text: p.name + ' rechazó ' + PACTO_TXT[x.pacto] + '.' }); store.touch('players'); return diploResp(p, { ok: true, txt: 'Rechazaste la propuesta.' }); }
+  const e = d.s[x.slot], qe = diploDe(q).s[p.slot];
+  const why = D.diploAcepta('sabio', Object.assign({}, e, { rel: 100 }), x.pacto, aliadosDe(p).length) || D.diploAcepta('sabio', Object.assign({}, qe, { rel: 100 }), x.pacto, aliadosDe(q).length);
+  if (why) throw new GameError(why);
+  diploAccion(p);
+  aplicaPacto(e, x.pacto); aplicaPacto(qe, x.pacto);
+  q.diplo.v++;
+  push(q, { type: 'diplo', text: p.name + ' aceptó ' + PACTO_TXT[x.pacto] + '.' });
+  store.touch('players');
+  return diploResp(p, { ok: true, txt: 'Aceptaste ' + PACTO_TXT[x.pacto] + ' con ' + q.name + '.' });
+}
+// Regalo: a un reino simulado le sube la relación (se va de tu economía); a un jugador real le llega el recurso,
+// con los mismos topes diarios de valor que el tablón del gremio.
+function diploGift(p, b) {
+  const { slot, d, e } = entrada(p, b), res = b.res, era = vEra(p), dia = diaUTC();
+  if (!DP.regaloRes.includes(res)) throw new GameError('Ese recurso no se regala.');
+  const asked = Math.floor(+b.n || 0);
+  if (!(asked > 0)) throw new GameError('Elige cuánto regalar.');
+  if (e.reg.d !== dia) e.reg = { d: dia, n: 0 };
+  if (e.reg.n >= DP.regalosDia) throw new GameError('Ya le mandaste ' + DP.regalosDia + ' regalos hoy.');
+  if (asked > stockOf(p, res) + 1) suspect(p, 'regalo', { res, pedido: asked, stock: Math.round(stockOf(p, res)) });
+  let n = Math.min(asked, Math.floor(stockOf(p, res)));
+  const o = e.con !== 'bot' ? player(e.con) : null, price = market().p[res] || BASE[res];
+  if (o) n = Math.min(n, Math.floor((giftLeft(p, 'giftOut') * 100) / price), Math.floor((giftLeft(o, 'giftIn') * 100) / price));
+  if (n <= 0) throw new GameError(o ? 'Ya mandaste (o recibió) mucho por hoy.' : 'No tienes de eso en tu bodega.');
+  diploAccion(p);
+  e.reg.n++;
+  spend(p, res, n);
+  let gana = 0, extra = '';
+  if (o) {
+    const day = today(p), od = today(o), v = value(res, n);
+    day.giftOut = (day.giftOut || 0) + v; od.giftIn = (od.giftIn || 0) + v;
+    push(o, { type: 'res', res: { [res]: n }, text: p.name + ' te regaló ' + n + ' de ' + D.RES[res].name.toLowerCase() + '.' });
+  } else {
+    gana = D.regaloRel(value(res, n), era, persDe(slot), res);
+    const ev = d.ev;
+    if (ev && ev.tipo === 'pedido' && ev.slot === slot && ev.res === res && n >= ev.n && ev.hasta > now()) { gana = Math.min(2 * DP.regaloMax, gana * 2 + 5); d.ev = null; extra = ' Era justo lo que te pidió: vale el doble.'; }
+    e.rel = clamp(e.rel + gana, -100, 100);
+  }
+  d.v++; store.touch('players');
+  return diploResp(p, { accepted: n, gana: Math.round(gana * 10) / 10, txt: extra });
+}
+// Respuesta a un evento diplomático (ultimátum o pedido de ayuda). Lo que se paga lo descuenta el cliente con `paga`.
+function diploEvento(p, b) {
+  const d = diploDe(p), ev = d.ev, t = now();
+  if (!ev || ev.id !== b.id || ev.hasta <= t) throw new GameError('Ese asunto ya pasó.');
+  const e = d.s[ev.slot], nombre = D.REALM_SLOTS[ev.slot].bot.realm, pide = ev.tipo === 'ultimatum' ? ev.pide : { [ev.res]: ev.n };
+  d.ev = null; d.v++;
+  if (b.acc !== 'pagar') { venceEvento(p, ev, e, nombre); store.touch('players'); return diploResp(p, { ok: true }); }
+  for (const r in pide) if (pide[r] > stockOf(p, r) + 1) { d.ev = ev; throw new GameError('No te alcanza.'); }
+  diploAccion(p);
+  for (const r in pide) spend(p, r, pide[r]);
+  if (ev.tipo === 'ultimatum') { e.rel = clamp(e.rel + 10, -100, 100); p.saqNext = Math.max(p.saqNext || 0, t + 3 * 3600e3); if (p.saqDe === ev.slot) p.saqDe = null; }
+  else e.rel = clamp(e.rel + 12, -100, 100);
+  store.touch('players');
+  return diploResp(p, { ok: true, paga: pide, txt: ev.tipo === 'ultimatum' ? nombre + ' aceptó tu pago y se queda tranquilo por un tiempo.' : nombre + ' agradece tu ayuda.' });
+}
+// Rechazar (o dejar vencer) un evento.
+function venceEvento(p, ev, e, nombre) {
+  if (ev.tipo === 'ultimatum') {
+    e.rel = clamp(e.rel - 5, -100, 100);
+    p.saqDe = ev.slot; p.saqNext = now(); // manda su partida enseguida (con el aviso de siempre)
+    push(p, { type: 'diplo', text: nombre + ' no recibió su tributo: su partida de saqueo ya sale hacia tu pueblo.' });
+  } else { e.rel = clamp(e.rel - 2, -100, 100); push(p, { type: 'diplo', text: nombre + ' se quedó esperando tu ayuda.' }); }
+}
+function nuevoEvento(p, d, t) {
+  const era = vEra(p), bots = Object.keys(d.s).map(Number).filter(k => d.s[k].con === 'bot'), opc = [];
+  const saqEnCurso = p.saqueo && !p.saqueo.fin;
+  const ult = bots.filter(k => persDe(k) === 'conquistador' && d.s[k].rel < 10 && (!d.s[k].pacto || d.s[k].pacto === 'rival'));
+  if (ult.length && era >= SAQ.era && !saqEnCurso && !p.snap.truce) opc.push(['ultimatum', pick(ult), 2]);
+  const amigos = bots.filter(k => d.s[k].rel >= 20);
+  if (amigos.length) opc.push(['embajada', pick(amigos), 2]);
+  const piden = bots.filter(k => d.s[k].rel >= 25 || d.s[k].pacto === 'alianza');
+  if (piden.length) opc.push(['pedido', pick(piden), 2]);
+  const boda = bots.filter(k => d.s[k].pacto === 'alianza' && d.s[k].rel >= 80 && !d.s[k].boda);
+  if (boda.length) opc.push(['boda', boda[0], 3]);
+  const ali = bots.filter(k => d.s[k].pacto === 'alianza' && t - (d.s[k].trop || 0) > 864e5);
+  if (ali.length) opc.push(['tropas', pick(ali), 2]);
+  if (!opc.length) return;
+  let r = Math.random() * opc.reduce((s, o) => s + o[2], 0), elegido = opc[0];
+  for (const o of opc) { r -= o[2]; if (r <= 0) { elegido = o; break; } }
+  const [tipo, slot] = elegido, e = d.s[slot], nombre = D.REALM_SLOTS[slot].bot.realm, esc = D.diploEscala(era);
+  if (tipo === 'embajada') {
+    e.rel = clamp(e.rel + 2, -100, 100);
+    push(p, { type: 'diplo', res: { gold: Math.round(esc * 0.25), food: Math.round(esc * 0.4) }, text: 'Embajada de ' + nombre + ': te traen regalos en señal de amistad.' });
+  } else if (tipo === 'pedido') {
+    const pool = ['food', 'wood', 'stone', 'gold'].concat(era >= 3 ? ['books'] : []), res = pick(pool), n = D.needAmount(res, era);
+    d.ev = { id: rid('e'), tipo, slot, res, n, hasta: t + 6 * 3600e3 };
+    push(p, { type: 'diplo', ev: true, text: nombre + ' te pide ayuda: necesita ' + n + ' de ' + D.RES[res].name.toLowerCase() + '. Mandárselo vale el doble.' });
+  } else if (tipo === 'ultimatum') {
+    d.ev = { id: rid('e'), tipo, slot, pide: D.ultimatumPide(era), hasta: t + 20 * 60e3 };
+    push(p, { type: 'diplo', ev: true, urgente: true, text: 'Ultimátum de ' + nombre + ': paga ' + d.ev.pide.gold + ' de oro en 20 minutos o manda una partida de saqueo.' });
+  } else if (tipo === 'boda') {
+    e.boda = true; e.rel = Math.max(e.rel, 85);
+    push(p, { type: 'diplo', res: { gems: 3 * era, gold: Math.round(esc * 0.5) }, text: '¡Boda real con ' + nombre + '! La alianza queda sellada para siempre y los invitados dejan regalos.' });
+  } else if (tipo === 'tropas') {
+    e.trop = t;
+    push(p, { type: 'diplo', tropas: { spear: 2 + era, archer: 1 + Math.ceil(era / 2) }, text: nombre + ', tu aliado, te manda soldados para tu guarnición.' });
+  }
+  d.v++;
+}
+function tickDiplo() {
+  const t = now();
+  for (const p of store.all('players')) {
+    if (!p.snap || t - p.lastSeen > ONLINE_MS || vEra(p) < DP.era) continue;
+    const d = diploDe(p);
+    if (d.ev && d.ev.hasta <= t) { const ev = d.ev; d.ev = null; d.v++; venceEvento(p, ev, d.s[ev.slot], D.REALM_SLOTS[ev.slot].bot.realm); }
+    if (!d.evNext) { d.evNext = t + rand(0.5, 1.5) * 3600e3; store.touch('players'); continue; }
+    if (t < d.evNext || d.ev) continue;
+    d.evNext = t + rand(3, 6) * 3600e3;
+    nuevoEvento(p, d, t);
+    store.touch('players');
+  }
+}
+// Cambio de relación por algo que pasó en el mundo (saqueos, conquistas).
+function relSuma(p, slot, n) { const d = diploDe(p), e = d.s[slot]; if (!e || e.con !== 'bot') return; e.rel = clamp(e.rel + n, -100, 100); rompeSiCae(p, slot, e); d.v++; store.touch('players'); }
+const pactoCon = (p, slot) => { const e = diploDe(p).s[slot]; return e ? e.pacto : null; };
+
+// ---------- Partidas de saqueo de los reinos simulados (Fase 4, C6, pk-22; con diplomacia en pk-23) ----------
 // Desde la Era IV, cada tanto un reino que maneja el servidor manda una partida contra un jugador conectado (que la
-// ve marchar, con aviso). El jugador elige: pagar tributo, pelear (por defecto) o pedir ayuda a su gremio, que suma
-// a su defensa. El servidor decide el resultado con la defensa de la última foto (la misma que usa la conquista).
-// Los recursos viven en el cliente: el tributo lo paga él y una derrota le llega por el buzón como un porcentaje que
-// descuenta; una victoria le llega como premio por el buzón (y entra en lo que su foto puede crecer).
-const SAQ = { era: 4, aviso: 180, entre: [2.5, 5], conq: 0.6 };
+// ve marchar, con aviso). Quién la manda sale de los 5 reinos simulados más cercanos sin pacto de no agresión ni
+// alianza, pesados por personalidad (el Conquistador manda más), rivalidad y relación; y el tiempo hasta la próxima
+// lo acorta el vecino más agresivo. El jugador elige: pagar tributo, pelear (por defecto) o pedir ayuda a sus
+// aliados, que suman a su defensa. El servidor decide el resultado con la defensa de la última foto (la misma que usa
+// la conquista). Los recursos viven en el cliente: el tributo lo paga él y una derrota le llega por el buzón como un
+// porcentaje que descuenta; una victoria le llega como premio por el buzón (y entra en lo que su foto puede crecer).
+const SAQ = { era: 4, aviso: 180, entre: [2.5, 5] };
 const saqTope = D.saqTope;
-const conquistador = str => str >= 1.1;   // los reinos más fuertes (strength de D.REALM_SLOTS) atacan más seguido
+function saqCandidatos(p, w) {
+  const d = diploDe(p), [hx, hy] = D.REALM_SLOTS[p.slot].home, out = [];
+  w.slots.forEach((pid, slot) => {
+    if (pid || slot === p.slot) return;
+    const e = d.s[slot];
+    if (e && (e.pacto === 'noAgresion' || e.pacto === 'alianza')) return;
+    const h = D.REALM_SLOTS[slot].home;
+    out.push({ slot, e, dist: Math.hypot(h[0] - hx, h[1] - hy) });
+  });
+  return out.sort((a, b) => a.dist - b.dist);
+}
+const saqPeso = c => PERS[persDe(c.slot)].peso * (c.e && c.e.pacto === 'rival' ? DP.rival.peso : 1) * (c.e && c.e.rel < -20 ? 1.5 : c.e && c.e.rel >= 30 ? 0.5 : 1);
+const saqRitmo = c => PERS[persDe(c.slot)].saq * (c.e && c.e.pacto === 'rival' ? DP.rival.saq : 1);
+// Los aliados que ayudarían ahora: reinos simulados con alianza y jugadores reales aliados (como mucho 3).
+function aliadosAyuda(p) {
+  const d = diploDe(p), out = [];
+  for (const slot of aliadosDe(p).slice(0, DP.maxAliados)) {
+    const e = d.s[slot];
+    if (e.con === 'bot') out.push({ slot, name: D.REALM_SLOTS[slot].bot.realm, bot: true, boda: !!e.boda });
+    else { const o = player(e.con); if (o) out.push({ slot, name: 'Reino de ' + o.name, pid: o.id }); }
+  }
+  return out;
+}
 function saqueoInfo(p) {
   const q = p.saqueo;
-  return q && !q.fin ? { id: q.id, from: q.from, slot: q.slot, power: q.power, arrive: q.arrive, at: q.at, eleccion: q.eleccion || null, tributo: q.tributo, ayuda: !!guildOf(p), conq: q.conq } : null;
+  if (!q || q.fin) return null;
+  const al = aliadosAyuda(p);
+  return { id: q.id, from: q.from, slot: q.slot, power: q.power, arrive: q.arrive, at: q.at, eleccion: q.eleccion || null, tributo: q.tributo, ayuda: al.length, aliados: al.map(a => ({ slot: a.slot, name: a.name })), pers: q.pers, rival: !!q.rival };
 }
 function tickSaqueos() {
   const t = now();
@@ -1065,15 +1333,21 @@ function tickSaqueos() {
     if (t < p.saqNext) continue;
     const w = store.get('worlds', p.world);
     if (!w) continue;
-    // el reino simulado más cercano
-    const [hx, hy] = D.REALM_SLOTS[p.slot].home;
-    let best = -1, bd = 1e9;
-    w.slots.forEach((pid, slot) => { if (pid || slot === p.slot) return; const h = D.REALM_SLOTS[slot].home, d = Math.hypot(h[0] - hx, h[1] - hy); if (d < bd) { bd = d; best = slot; } });
-    if (best < 0) { p.saqNext = t + 6 * 3600e3; continue; }
-    const bot = D.REALM_SLOTS[best].bot, str = bot.strength, conq = conquistador(str);
+    const todos = saqCandidatos(p, w), cands = todos.slice(0, 5);
+    // en paz con todos los vecinos: nadie viene (y se vuelve a mirar en unas horas)
+    if (!cands.length) { p.saqNext = t + 6 * 3600e3; p.saqDe = null; store.touch('players'); continue; }
+    // el que dio un ultimátum (si sigue sin pacto) o uno al azar, pesado por personalidad
+    let c = todos.find(o => o.slot === p.saqDe) || null;
+    if (!c) {
+      let r = Math.random() * cands.reduce((a, o) => a + saqPeso(o), 0);
+      c = cands[cands.length - 1];
+      for (const o of cands) { r -= saqPeso(o); if (r <= 0) { c = o; break; } }
+    }
+    p.saqDe = null;
+    const best = c.slot, bot = D.REALM_SLOTS[best].bot, str = bot.strength, pers = persDe(best), rival = !!(c.e && c.e.pacto === 'rival');
     const power = Math.round(Math.max(60 * s.era * s.era, (s.defense || 0) * rand(0.75, 1.2)) * str);
-    p.saqueo = { id: rid('s'), slot: best, from: bot.realm, power, at: t, arrive: t + SAQ.aviso * 1000, tributo: D.saqTributo(s.era), conq };
-    p.saqNext = t + rand(SAQ.entre[0], SAQ.entre[1]) * 3600e3 * (conq ? SAQ.conq : 1);
+    p.saqueo = { id: rid('s'), slot: best, from: bot.realm, power, at: t, arrive: t + SAQ.aviso * 1000, tributo: D.saqTributo(s.era), pers, rival };
+    p.saqNext = t + rand(SAQ.entre[0], SAQ.entre[1]) * 3600e3 * Math.min(...cands.map(saqRitmo));
     push(p, { type: 'saqueo', sid: p.saqueo.id, from: bot.realm, power, arrive: p.saqueo.arrive, text: '¡' + bot.realm + ' manda una partida de saqueo contra tu pueblo!' });
     store.touch('players');
   }
@@ -1083,22 +1357,42 @@ function saqueo(p, b) {
   if (!q || q.fin || (b.id && b.id !== q.id)) throw new GameError('No hay ninguna partida en camino.');
   if (now() >= q.arrive) throw new GameError('Ya llegaron.');
   if (!['tributo', 'pelear', 'ayuda'].includes(acc)) throw new GameError('Esa opción no existe.');
-  if (acc === 'ayuda' && !guildOf(p)) throw new GameError('Necesitas un gremio para pedir ayuda.');
+  if (acc === 'ayuda' && !aliadosAyuda(p).length) throw new GameError('Necesitas un aliado para pedir ayuda (Reinos → Alianza).');
   if (q.eleccion === 'tributo') throw new GameError('Ya pagaste el tributo.');
   q.eleccion = acc;
   // el tributo resuelve en el acto: se vuelven a casa (el cliente lo descuenta de sus bodegas)
-  if (acc === 'tributo') { q.fin = true; push(p, { type: 'saqueo_fin', sid: q.id, res: 'tributo', from: q.from, text: q.from + ' aceptó tu tributo y su partida vuelve a casa.' }); }
+  if (acc === 'tributo') {
+    q.fin = true;
+    relSuma(p, q.slot, q.pers === 'comerciante' ? 8 : 5);
+    push(p, { type: 'saqueo_fin', sid: q.id, res: 'tributo', from: q.from, text: q.from + ' aceptó tu tributo y su partida vuelve a casa.' });
+  }
   store.touch('players');
   return { saqueo: saqueoInfo(p), inbox: p.inbox };
 }
 function resolverSaqueo(p, q) {
   q.fin = true;
   const s = p.snap || {}, era = s.era || SAQ.era, tope = saqTope(era);
-  const ayuda = q.eleccion === 'ayuda' && guildOf(p) ? 1.3 : 1;
-  const def = Math.max(1, (s.defense || 0) * ayuda) * rand(0.85, 1.15), atk = q.power * rand(0.85, 1.15), gano = def >= atk;
-  const base = { sid: q.id, from: q.from, atk: Math.round(atk), def: Math.round(def), ayuda: ayuda > 1 };
-  if (gano) push(p, Object.assign(base, { type: 'saqueo_fin', res: 'gano', premio: { gold: Math.round(tope * 0.35), gems: era }, text: '¡Rechazaste la partida de saqueo de ' + q.from + '!' }));
-  else push(p, Object.assign(base, { type: 'saqueo_fin', res: 'perdio', pct: 0.08, tope, text: 'La partida de ' + q.from + ' saqueó tus bodegas.' }));
+  // los aliados suman a la defensa: cada reino simulado según su fuerza (más si hubo boda), cada jugador según la suya
+  let mult = 1;
+  const ayudaron = [];
+  if (q.eleccion === 'ayuda') for (const a of aliadosAyuda(p)) {
+    let ap = 0;
+    if (a.bot) { ap = (DP.ayuda.base + DP.ayuda.fuerza * D.REALM_SLOTS[a.slot].bot.strength) * (a.boda ? DP.ayuda.boda : 1); relSuma(p, a.slot, -DP.ayuda.favor); }
+    else {
+      const o = player(a.pid);
+      ap = o && o.snap ? Math.min(0.3, ((o.snap.defense || 0) * 0.25) / Math.max(1, s.defense || 1)) : 0;
+      if (ap > 0.01) push(o, { type: 'diplo', res: { gold: 20 * era }, text: 'Tus soldados ayudaron a ' + p.name + ' contra la partida de ' + q.from + '.' });
+    }
+    if (ap > 0.01) { mult += ap; ayudaron.push(a.name); }
+  }
+  const def = Math.max(1, (s.defense || 0) * mult) * rand(0.85, 1.15), atk = q.power * rand(0.85, 1.15), gano = def >= atk;
+  const base = { sid: q.id, from: q.from, atk: Math.round(atk), def: Math.round(def), ayuda: ayudaron.length > 0, aliados: ayudaron, rival: !!q.rival };
+  // el Conquistador respeta a quien lo rechaza; los demás se ofenden
+  relSuma(p, q.slot, gano ? (q.pers === 'conquistador' ? 3 : -5) : q.pers === 'conquistador' ? -3 : 0);
+  if (gano) {
+    const k = q.rival ? DP.rival.premio : 1;
+    push(p, Object.assign(base, { type: 'saqueo_fin', res: 'gano', premio: { gold: Math.round(tope * 0.35 * k), gems: Math.round(era * k) }, text: '¡Rechazaste la partida de saqueo de ' + q.from + '!' }));
+  } else push(p, Object.assign(base, { type: 'saqueo_fin', res: 'perdio', pct: 0.08, tope, text: 'La partida de ' + q.from + ' saqueó tus bodegas.' }));
   store.touch('players');
 }
 function tick() {
@@ -1107,6 +1401,7 @@ function tick() {
   tickGuilds();
   tickCamps();
   tickSaqueos();
+  tickDiplo();
 }
 // ---------- Pase del Reino (Fase 8) ----------
 // Los puntos los decide el servidor: el cliente informa sus estadísticas acumuladas (D.PASE_STATS) y aquí se suman
@@ -1200,4 +1495,5 @@ module.exports = {
   GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
   listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
   paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos,
+  diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
 };
