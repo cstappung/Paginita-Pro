@@ -423,6 +423,43 @@
   // Ultimátum de un Conquistador: lo que pide para no mandar una partida enseguida.
   D.ultimatumPide = era => ({ gold: Math.round(250 * Math.pow(1.8, era - 1) * 0.3) });
 
+  // ---------- Mundo vivo (Fase 5, S2 a S5, pk-24) ----------
+  // Semana UTC que empieza el lunes (el 1-1-1970 fue jueves): jefe del gremio y títulos semanales.
+  D.semana = t => Math.floor(((t === undefined ? Date.now() : t) / 864e5 + 3) / 7);
+  // S2. Caravanas: van de tu Centro Urbano a un reino con tratado de comercio, venden y vuelven con oro. Las decide
+  // el servidor (salida, llegada, asalto); el cliente solo las dibuja con la carreta.
+  D.CARAVANA = { era: 2, max: 2, dia: 6, riesgo: 0.08, riesgoDist: 1 / 600, escolta: 0.35, faro: 0.5, asalto: 0.6, socio: 0.25 };
+  D.caravanaOro = (era, dist) => Math.round(D.diploEscala(era) * 0.35 * (1 + dist / 80));
+  D.caravanaIda = dist => Math.round(60 + dist * 3);        // segundos de ida (y otros tantos de vuelta)
+  D.caravanaEscolta = era => ({ food: Math.round(D.diploEscala(era) * 0.12), gold: Math.round(D.diploEscala(era) * 0.08) });
+  D.caravanaRiesgo = (dist, escolta, faro) => Math.min(0.6, (D.CARAVANA.riesgo + dist * D.CARAVANA.riesgoDist) * (escolta ? D.CARAVANA.escolta : 1) * (faro ? D.CARAVANA.faro : 1));
+  D.distReinos = (a, b) => { const x = D.REALM_SLOTS[a].home, y = D.REALM_SLOTS[b].home; return Math.hypot(x[0] - y[0], x[1] - y[1]); };
+  // S3. Jefe semanal del gremio: uno distinto cada semana, con vida compartida. Cada miembro lo ataca hasta 3 veces
+  // al día con su ejército (el servidor valida la fuerza como en la conquista); los miembros simulados también pegan.
+  D.JEFES_GREMIO = [
+    { id: 'leviatan', name: 'El Leviatán del Lago Grande', desc: 'Una serpiente de agua que hunde barcas y puentes.' },
+    { id: 'coloso', name: 'El Coloso de Ceniza', desc: 'Un gigante de piedra caliente que baja del volcán.' },
+    { id: 'hidra', name: 'La Hidra del Pantano', desc: 'Cada cabeza que cae vuelve a crecer… casi siempre.' },
+    { id: 'liche', name: 'El Rey Liche', desc: 'Un rey muerto con un ejército que no se cansa.' },
+    { id: 'grifo', name: 'La Reina Grifo', desc: 'Caza caravanas desde las cumbres.' },
+  ];
+  D.jefeGremioDe = sem => D.JEFES_GREMIO[((sem % D.JEFES_GREMIO.length) + D.JEFES_GREMIO.length) % D.JEFES_GREMIO.length];
+  D.JEFE_GREMIO = { ataquesDia: 3, golpe: 3, bajas: 0.1, npc: 0.4, tramos: [0.25, 0.5, 0.75, 1] };
+  D.jefeGremioVida = (era, miembros) => Math.round(3000 * Math.pow(1.7, Math.max(1, era) - 1) * (2 + miembros));
+  // Premio de cada tramo (al llegar a ese % de daño total), para cada miembro que pegó esa semana.
+  D.jefeGremioPremio = (tramo, era) => ({ gold: Math.round(D.diploEscala(era) * 0.3 * tramo), gems: era * tramo, coins: 5 * tramo });
+  // S4. Visitas: una vista de solo lectura del reino de otro jugador. Un «me gusta» y un regalo por día y por reino.
+  D.visitaRegalo = era => ({ gold: Math.round(D.diploEscala(era) * 0.15) });
+  // S5. Rankings: categorías y el título semanal del primero de cada una.
+  D.RANKINGS = {
+    era: { name: 'Era', titulo: 'Monarca de la Semana' },
+    maravilla: { name: 'Maravilla', titulo: 'Gran Arquitecto' },
+    piso: { name: 'Piso más profundo', titulo: 'Señor de las Profundidades' },
+    defensas: { name: 'Defensas ganadas', titulo: 'Muralla Viva' },
+    jefes: { name: 'Jefes de gremio', titulo: 'Cazador de Leviatanes' },
+    visitas: { name: 'Más visitados', titulo: 'Reino más Querido' },
+  };
+
   // ---------- Territorio ----------
   // Cada reino parte con las parcelas alrededor de su hogar. Las parcelas libres vecinas se reclaman pagando;
   // las de otro reino solo se toman por la fuerza. Conquistar es caro pero vale la pena: la campaña se paga

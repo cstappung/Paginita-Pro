@@ -681,6 +681,7 @@
     body.append(rows);
     if (g.zoneRes) body.append(zoneNote(g.zoneRes));
     guildExtras(body);
+    if (g.jefe && PK.Mundo) body.append(PK.Mundo.jefeEl(g.jefe)); // S3 (pk-24)
     const cols = el('div', { class: 'two-col' });
     cols.append(el('div', null, el('h3', null, 'Aportes'), el('ol', { class: 'rank' }, g.members.map(m => el('li', { class: m.me ? 'me' : '' },
       el('span', null, m.name + (m.me && !/^t[úu]$/i.test(m.name) ? ' (tú)' : '') + (m.npc ? ' ·' : m.online ? ' ●' : '')), el('span', null, U.fmt(m.c))))),

@@ -615,6 +615,7 @@
     }
     if (PK.Asedios) PK.Asedios.dibujar(ctx, R); // trampas (C5)
     if (PK.Saqueos) PK.Saqueos.dibujar(ctx, R); // partidas de saqueo (C6)
+    if (PK.Mundo) PK.Mundo.dibujar(ctx, R); // caravanas (S2)
     // partículas
     for (let i = R.particles.length - 1; i >= 0; i--) {
       const p = R.particles[i];
@@ -1036,6 +1037,7 @@
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
     if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
+    if (PK.Mundo) PK.Mundo.minimapa(ctx, toMM); // S2
     if (PK.Campana && G().state && G().state.campana) { // el lugar del capítulo en curso: un punto rojo y dorado que late
       const n = PK.Campana.actual(), l = n && PK.Campana.lugar(n);
       if (l) { const [x, y] = toMM(l.x + 0.5, l.y + 0.5), s = Math.max(2, Math.round(zk * 2)), on = Math.floor(performance.now() / 350) % 2; ctx.fillStyle = on ? '#ffd040' : '#c02020'; ctx.fillRect(Math.round(x) - s, Math.round(y) - s, s * 2, s * 2); }

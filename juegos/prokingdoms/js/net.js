@@ -95,7 +95,7 @@
       era: st.era, pop: g.pop(), defense: PK.Social.defense(), truce: PK.Social.truce(),
       res: { food: st.res.food, wood: st.res.wood, stone: st.res.stone, gold: st.res.gold }, total: st.stats.g_total || 0,
       army: PK.Social.power(st.war.army), walls: g.lvl('walls'), score: PK.Terr.myInfo().score,
-      walled: PK.Def.walledList(), wallMult: PK.Def.parcelMult(-1, true), terrMult: 1 + g.best('dragontower', 'terrDef'),
+      walled: PK.Def.walledList(), wallMult: PK.Def.parcelMult(-1, true), terrMult: 1 + g.best('dragontower', 'terrDef'), rk: PK.Mundo ? PK.Mundo.rkFoto() : undefined,
       units: g.units.filter(u => u.owner === 'p' && !u.inside).slice(0, 250).map(u => [
         Math.round(u.x * 10), Math.round(u.y * 10), u.mode === 'walk' ? 1 : u.mode === 'work' ? 2 : 0,
         u.task ? Math.max(0, TASKS.indexOf(u.task.t)) : 0, u.task && u.task.res ? RAW.indexOf(u.task.res) : -1,
@@ -120,6 +120,7 @@
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
+      if (PK.Mundo) PK.Mundo.desdeSync(r); // S2-S5 (pk-24): caravanas y título
       Net.ping = Math.round(performance.now() - t0);
       Net.lastOk = Date.now();
       if (Net.lost) { Net.lost = false; toast('Conexión recuperada.', 'good'); }
@@ -242,6 +243,7 @@
         case 'saqueo': if (PK.Saqueos) PK.Saqueos.aviso(it); break;
         case 'saqueo_fin': if (PK.Saqueos) PK.Saqueos.fin(it); break;
         case 'diplo': if (PK.Diplo) PK.Diplo.recibir(it); break;
+        case 'caravana': case 'jefe_gremio': case 'visita': case 'titulo': if (PK.Mundo) PK.Mundo.recibir(it); break;
         case 'offer_filled':
           g.give(it.res); g.stat('offers_filled', 1); g.stat('gold_volume', it.value || 0);
           toast(it.text, 'good');
@@ -400,5 +402,5 @@
   Net.claim = k => api('POST', '/api/claim', { k }).then(r => { tv = 0; return r; });
   Net.conquer = (k, units, power) => api('POST', '/api/conquer', { k, units, power });
   Net.conquerBot = k => api('POST', '/api/conquer-bot', { k }).then(r => { tv = 0; return r; });
-  Net.refreshRanking = () => api('GET', '/api/ranking').then(r => { Net.cache.ranking = r; done(); }).catch(() => {});
+  Net.refreshRanking = () => (PK.Mundo ? PK.Mundo.refrescar() : api('GET', '/api/ranking').then(r => { Net.cache.ranking = r; done(); }).catch(() => {}));
 })();

@@ -381,6 +381,7 @@ function sync(p, b) {
   }
   if (b.ack) p.inbox = p.inbox.filter(i => i.id > b.ack);
   if (b.pase && typeof b.pase === 'object') paseStats(p, b.pase);
+  if (b.snap && b.snap.rk) checkRk(p, b.snap.rk);
   w.chat = w.chat || [];
   const wsince = +b.wsince || 0;
   store.touch('players'); store.touch('worlds');
@@ -403,7 +404,7 @@ function sync(p, b) {
   ensureTerr(w);
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
-  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
+  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -611,7 +612,7 @@ function guildDetail(g, p) {
   const needs = liveNeeds(g).map(h => ({ id: h.id, name: h.name, res: h.res, n: h.n, got: h.got, mine: h.pid === p.id, ttl: Math.max(0, (h.at + D.GUILD_NEED.ttl * 1000 - t) / 1000) }));
   return {
     id: g.id, name: g.name, npc: g.npc, stage: g.stage, stageName: st.name, cost: st.cost, zoneRes: st.zoneRes, prog: g.prog, members, chat: g.chat.slice(-40),
-    ev: { name: ev.name, res: ev.res, goal: ev.goal, prog: ev.prog, ends: ev.ends, done: ev.done, my: ev.contrib[p.id] || 0, top }, helps, needs,
+    ev: { name: ev.name, res: ev.res, goal: ev.goal, prog: ev.prog, ends: ev.ends, done: ev.done, my: ev.contrib[p.id] || 0, top }, helps, needs, jefe: jefeInfo(g, p),
   };
 }
 function listGuilds(p) {
@@ -1019,12 +1020,12 @@ function tickCamps() {
 }
 
 // ---------- Ranking, partidas y estado ----------
-function ranking(p) {
-  const t = now();
-  return store.all('players').map(o => ({
-    name: o.name, era: o.snap ? o.snap.era : 1, pop: o.snap ? o.snap.pop : 0, total: o.snap ? Math.floor(o.snap.total) : 0,
+function ranking(p, b) {
+  const t = now(), cat = D.RANKINGS[b && b.cat] ? b.cat : 'era';
+  return store.all('players').filter(o => cat === 'era' || rkValor(o, cat) > 0).map(o => ({
+    id: o.id, name: o.name, era: o.snap ? o.snap.era : 1, pop: o.snap ? o.snap.pop : 0, total: o.snap ? Math.floor(o.snap.total) : 0, v: rkValor(o, cat), titulo: tituloDe(o),
     world: (store.get('worlds', o.world) || {}).name, online: t - o.lastSeen < ONLINE_MS, me: o.id === p.id,
-  })).sort((a, b) => b.era - a.era || b.total - a.total).slice(0, 50);
+  })).sort((a, b) => (cat === 'era' ? b.era - a.era || b.total - a.total : b.v - a.v)).slice(0, 50);
 }
 function getSave(p) { return { save: store.getSave(p.id) }; }
 function putSave(p, b) {
@@ -1282,6 +1283,199 @@ function tickDiplo() {
 function relSuma(p, slot, n) { const d = diploDe(p), e = d.s[slot]; if (!e || e.con !== 'bot') return; e.rel = clamp(e.rel + n, -100, 100); rompeSiCae(p, slot, e); d.v++; store.touch('players'); }
 const pactoCon = (p, slot) => { const e = diploDe(p).s[slot]; return e ? e.pacto : null; };
 
+// ---------- Caravanas (Fase 5, S2, pk-24) ----------
+// Van de tu Centro Urbano a un reino con tratado de comercio y vuelven con oro (por el buzón). El riesgo de bandidos
+// crece con la distancia y baja con escolta (que se paga al salir) o con el Faro Abisal (de la foto de edificios).
+const CV = D.CARAVANA;
+const tieneFaro = p => (p.buildings || []).some(b => b[0] === 'faro' && b[3]);
+const caravanasInfo = p => (p.caravanas || []).map(c => ({ id: c.id, slot: c.slot, sale: c.sale, llega: c.llega, vuelve: c.vuelve, escolta: c.escolta, oro: c.oro, riesgo: c.riesgo }));
+function caravana(p, b) {
+  const slot = Math.floor(+b.slot), era = vEra(p), t = now(), d = diploDe(p), e = d.s[slot];
+  if (era < CV.era) throw new GameError('Las caravanas salen desde la Era ' + U.roman(CV.era) + '.');
+  if (!e) throw new GameError('Ese reino no existe.');
+  if (!e.tratado) throw new GameError('Necesitas un tratado de comercio con ese reino.');
+  p.caravanas = (p.caravanas || []).filter(c => c.vuelve > t);
+  if (p.caravanas.length >= CV.max) throw new GameError('Ya tienes ' + CV.max + ' caravanas en camino.');
+  const day = today(p);
+  if ((day.caravanas || 0) >= CV.dia) throw new GameError('Ya mandaste ' + CV.dia + ' caravanas hoy.');
+  const escolta = !!b.escolta, paga = escolta ? D.caravanaEscolta(era) : null;
+  if (paga) for (const r in paga) if (paga[r] > stockOf(p, r) + 1) throw new GameError('No te alcanza para la escolta.');
+  if (paga) for (const r in paga) spend(p, r, paga[r]);
+  day.caravanas = (day.caravanas || 0) + 1;
+  const dist = D.distReinos(p.slot, slot), ida = D.caravanaIda(dist) * 1000;
+  const c = { id: rid('v'), slot, sale: t, llega: t + ida, vuelve: t + 2 * ida, escolta, oro: D.caravanaOro(era, dist), riesgo: D.caravanaRiesgo(dist, escolta, tieneFaro(p)) };
+  p.caravanas.push(c);
+  store.touch('players');
+  return { caravanas: caravanasInfo(p), paga };
+}
+function tickCaravanas() {
+  const t = now();
+  for (const p of store.all('players')) {
+    if (!p.caravanas || !p.caravanas.length) continue;
+    for (const c of p.caravanas.slice()) {
+      if (t < c.vuelve) continue;
+      p.caravanas.splice(p.caravanas.indexOf(c), 1);
+      const nombre = realmName(p, c.slot), asalto = Math.random() < c.riesgo, oro = Math.round(c.oro * (asalto ? 1 - CV.asalto : 1));
+      push(p, { type: 'caravana', res: { gold: oro }, asalto, slot: c.slot, text: asalto ? 'Unos bandidos asaltaron tu caravana de vuelta de ' + nombre + ': salvaste ' + oro + ' de oro.' : 'Volvió tu caravana de ' + nombre + ' con ' + oro + ' de oro.' });
+      // con un jugador real, el socio también gana algo
+      const w = world(p), o = w && w.slots[c.slot] && player(w.slots[c.slot]);
+      if (o && !asalto) push(o, { type: 'res', res: { gold: Math.round(c.oro * CV.socio) }, text: 'La caravana de ' + p.name + ' comerció en tu reino: +' + Math.round(c.oro * CV.socio) + ' de oro.' });
+      store.touch('players');
+    }
+  }
+}
+
+// ---------- Jefe semanal del gremio (Fase 5, S3, pk-24) ----------
+// g.jefe = { sem, id, max, hp, dano: {pid|npc:nombre: n}, tramo }. La vida sale de la era media de los miembros
+// reales y de cuántos son. Cada ataque gasta la fuerza que valida checkArmy (como una campaña) y vuelve con bajas.
+const JG = D.JEFE_GREMIO;
+function jefeDe(g) {
+  const sem = D.semana(now());
+  if (!g.jefe || g.jefe.sem !== sem) {
+    if (g.jefe && g.jefe.hp > 0) chatPush(g, 'Gremio', D.jefeGremioDe(g.jefe.sem).name + ' se retiró con ' + Math.round((g.jefe.hp / g.jefe.max) * 100) + '% de vida.');
+    const reales = g.members.map(player).filter(Boolean), era = reales.length ? Math.round(reales.reduce((s, o) => s + vEra(o), 0) / reales.length) : 2;
+    const J = D.jefeGremioDe(sem), max = D.jefeGremioVida(era, reales.length + (g.npc ? NPC_MEMBERS.length * 0.5 : 0));
+    g.jefe = { sem, id: J.id, max, hp: max, dano: {}, tramo: 0, era, at: now() };
+    chatPush(g, 'Gremio', '¡' + J.name + ' apareció! Ataquen con sus ejércitos: el daño de todos suma.');
+    store.touch('guilds');
+  }
+  return g.jefe;
+}
+function jefeDano(g, quien, n) {
+  const j = jefeDe(g);
+  if (j.hp <= 0) return 0;
+  const hecho = Math.min(j.hp, Math.max(0, Math.round(n)));
+  j.hp -= hecho;
+  j.dano[quien] = (j.dano[quien] || 0) + hecho;
+  // premios por tramo de daño total, para cada miembro real que pegó esta semana
+  while (j.tramo < JG.tramos.length && (j.max - j.hp) / j.max >= JG.tramos[j.tramo] - 1e-9) {
+    j.tramo++;
+    const J = D.jefeGremioDe(j.sem), top = D.eventTopKey(j.dano);
+    chatPush(g, 'Gremio', j.tramo === JG.tramos.length ? '¡' + J.name + ' cayó! Gracias a todos.' : J.name + ' perdió el ' + Math.round(JG.tramos[j.tramo - 1] * 100) + '% de su vida.');
+    for (const pid of Object.keys(j.dano)) {
+      if (pid.startsWith('npc:')) continue;
+      const o = player(pid);
+      if (!o) continue;
+      const pr = D.jefeGremioPremio(j.tramo, vEra(o));
+      if (j.tramo === JG.tramos.length) { o.jefes = (o.jefes || 0) + 1; if (pid === top) { pr.gems += 2 * vEra(o); pr.coins += 10; } }
+      push(o, { type: 'jefe_gremio', res: { gold: pr.gold, gems: pr.gems }, coins: pr.coins, text: J.name + ': tramo ' + j.tramo + ' de ' + JG.tramos.length + (j.tramo === JG.tramos.length && pid === top ? ' (y el extra por más daño)' : '') + '.' });
+    }
+  }
+  store.touch('guilds');
+  return hecho;
+}
+function jefeInfo(g, p) {
+  const j = jefeDe(g), J = D.jefeGremioDe(j.sem), names = {};
+  for (const pid of g.members) { const o = player(pid); if (o) names[pid] = o.name; }
+  const top = Object.keys(j.dano).map(k => ({ name: k.startsWith('npc:') ? k.slice(4) : names[k] || '—', n: j.dano[k], me: k === p.id })).sort((a, b) => b.n - a.n).slice(0, 6);
+  return { id: J.id, name: J.name, desc: J.desc, max: j.max, hp: j.hp, tramo: j.tramo, mio: j.dano[p.id] || 0, top, hoy: today(p).jefe || 0, fin: (j.sem + 1) * 7 * 864e5 - 3 * 864e5 };
+}
+function guildBoss(p, b) {
+  const g = guildOf(p);
+  if (!g) throw new GameError('No perteneces a ningún gremio.');
+  const j = jefeDe(g), day = today(p);
+  if (j.hp <= 0) throw new GameError('El jefe de esta semana ya cayó. El lunes llega otro.');
+  if ((day.jefe || 0) >= JG.ataquesDia) throw new GameError('Ya atacaste ' + JG.ataquesDia + ' veces hoy.');
+  const { total, power } = checkArmy(p, b.units, b.power);
+  if (!total) throw new GameError('Elige tropas para atacar.');
+  day.jefe = (day.jefe || 0) + 1;
+  const hecho = jefeDano(g, p.id, power * JG.golpe * rand(0.9, 1.1));
+  chatPush(g, 'Gremio', p.name + ' le hizo ' + hecho + ' de daño a ' + D.jefeGremioDe(j.sem).name + '.');
+  store.touch('players');
+  return { dano: hecho, bajas: JG.bajas, guilds: listGuilds(p) };
+}
+// los miembros simulados pegan poco a poco: entre todos, cerca del 40% de la vida en la semana
+function tickJefes() {
+  const t = now();
+  for (const g of store.all('guilds')) {
+    if (!g.members.length) continue;
+    const j = jefeDe(g), mins = Math.min((t - (j.npcAt || j.at || t)) / 60000, 12 * 60);
+    if (mins < 5 || j.hp <= 0) continue;
+    j.npcAt = t;
+    const npc = g.npc ? NPC_MEMBERS : [D.GUILD_APPRENTICE];
+    jefeDano(g, 'npc:' + pick(npc), (j.max * JG.npc * mins) / (7 * 24 * 60) * rand(0.5, 1.5) * (g.npc ? 1 : 0.4));
+  }
+}
+
+// ---------- Visitas (Fase 5, S4, pk-24) ----------
+// Vista de solo lectura del reino de otro jugador (sus edificios de la última foto), con un «me gusta» y un regalo
+// por día y por reino. Cada visitante cuenta una vez por día.
+function otroJugador(p, b) {
+  const o = player(String(b.id || ''));
+  if (!o || o.id === p.id) throw new GameError('Ese reino no existe.');
+  return o;
+}
+function visita(p, b) {
+  const o = otroJugador(p, b), dia = diaUTC();
+  o.vis = o.vis || { n: 0, likes: 0, de: {} };
+  if (o.vis.de[p.id] !== dia) { o.vis.n++; o.vis.de[p.id] = dia; for (const k in o.vis.de) if (o.vis.de[k] !== dia) delete o.vis.de[k]; store.touch('players'); }
+  const yo = (p.visHoy && p.visHoy.d === dia ? p.visHoy : (p.visHoy = { d: dia, like: {}, reg: {} }));
+  const s = o.snap || {};
+  return { id: o.id, name: o.name, slot: o.slot, world: (world(o) || {}).name, era: s.era || 1, pop: s.pop || 0, score: s.score || 0, buildings: o.buildings || [], visitas: o.vis.n, likes: o.vis.likes, titulo: tituloDe(o),
+    yaLike: !!yo.like[o.id], yaRegalo: !!yo.reg[o.id] };
+}
+function visitaLike(p, b) {
+  const o = otroJugador(p, b), dia = diaUTC();
+  p.visHoy = p.visHoy && p.visHoy.d === dia ? p.visHoy : { d: dia, like: {}, reg: {} };
+  if (p.visHoy.like[o.id]) throw new GameError('Ya le diste «me gusta» hoy.');
+  p.visHoy.like[o.id] = 1;
+  o.vis = o.vis || { n: 0, likes: 0, de: {} }; o.vis.likes++;
+  push(o, { type: 'visita', text: p.name + ' visitó tu reino y le dio «me gusta».' });
+  store.touch('players');
+  return visita(p, b);
+}
+function visitaRegalo(p, b) {
+  const o = otroJugador(p, b), dia = diaUTC(), pr = D.visitaRegalo(vEra(p));
+  p.visHoy = p.visHoy && p.visHoy.d === dia ? p.visHoy : { d: dia, like: {}, reg: {} };
+  if (p.visHoy.reg[o.id]) throw new GameError('Ya le dejaste un regalo hoy.');
+  const v = value('gold', pr.gold);
+  if (pr.gold > stockOf(p, 'gold') + 1) throw new GameError('No te alcanza.');
+  if (giftLeft(p, 'giftOut') < v || giftLeft(o, 'giftIn') < v) throw new GameError('Ya se mandó mucho por hoy.');
+  p.visHoy.reg[o.id] = 1;
+  spend(p, 'gold', pr.gold);
+  today(p).giftOut = (today(p).giftOut || 0) + v; today(o).giftIn = (today(o).giftIn || 0) + v;
+  push(o, { type: 'res', res: pr, text: p.name + ' visitó tu reino y te dejó ' + pr.gold + ' de oro.' });
+  store.touch('players');
+  return Object.assign(visita(p, b), { paga: pr });
+}
+
+// ---------- Rankings y títulos semanales (Fase 5, S5, pk-24) ----------
+// La foto trae `rk` (nivel de la Maravilla, piso más profundo, defensas ganadas). El servidor los acota como a la era:
+// no pueden subir más rápido de lo posible. Los jefes de gremio y las visitas los cuenta él mismo.
+const RK_MAX = { wonder: 3, floor: 5, def: 3 }; // cuánto puede subir cada uno entre dos fotos
+function checkRk(p, raw) {
+  if (!raw || typeof raw !== 'object') return;
+  const prev = p.rk || { wonder: 0, floor: 0, def: 0 }, era = vEra(p), out = {}, odd = {};
+  const techo = { wonder: 200, floor: 15, def: 1e6 };
+  for (const k in RK_MAX) {
+    const v = clamp(Math.floor(+raw[k] || 0), 0, techo[k]);
+    // una partida nueva baja los números: se acepta (como el pase)
+    out[k] = v < prev[k] ? v : Math.min(v, prev[k] + RK_MAX[k]);
+    if (v > out[k]) odd[k] = v;
+  }
+  if (Object.keys(odd).length) suspect(p, 'ranking', odd);
+  p.rk = out;
+}
+const rkValor = (o, cat) => {
+  const rk = o.rk || {};
+  return cat === 'era' ? (o.snap ? o.snap.era * 1e7 + Math.min(9e6, Math.floor(o.snap.total / 100)) : 0) : cat === 'maravilla' ? rk.wonder || 0 : cat === 'piso' ? rk.floor || 0 : cat === 'defensas' ? rk.def || 0 : cat === 'jefes' ? o.jefes || 0 : cat === 'visitas' ? (o.vis ? o.vis.n + 3 * o.vis.likes : 0) : 0;
+};
+function tituloDe(o) { const t = o.titulo; return t && t.sem >= D.semana(now()) - 1 ? D.RANKINGS[t.cat].titulo : null; }
+function tickTitulos() {
+  const sem = D.semana(now()), meta = store.get('meta', 'rk') || store.set('meta', 'rk', { sem });
+  if (meta.sem === sem) return;
+  meta.sem = sem;
+  const recientes = store.all('players').filter(o => now() - o.lastSeen < 7 * 864e5);
+  for (const cat in D.RANKINGS) {
+    // un título por jugador y semana: si el primero ya tiene uno, va al siguiente
+    const top = recientes.filter(o => !(o.titulo && o.titulo.sem === sem)).sort((a, b) => rkValor(b, cat) - rkValor(a, cat))[0];
+    if (!top || rkValor(top, cat) <= 0) continue;
+    top.titulo = { sem, cat };
+    push(top, { type: 'titulo', text: '¡Título de la semana: «' + D.RANKINGS[cat].titulo + '»! Fuiste el primero del servidor en ' + D.RANKINGS[cat].name.toLowerCase() + '.' });
+  }
+  store.touch('meta'); store.touch('players');
+}
+
 // ---------- Partidas de saqueo de los reinos simulados (Fase 4, C6, pk-22; con diplomacia en pk-23) ----------
 // Desde la Era IV, cada tanto un reino que maneja el servidor manda una partida contra un jugador conectado (que la
 // ve marchar, con aviso). Quién la manda sale de los 5 reinos simulados más cercanos sin pacto de no agresión ni
@@ -1402,6 +1596,9 @@ function tick() {
   tickCamps();
   tickSaqueos();
   tickDiplo();
+  tickCaravanas();
+  tickJefes();
+  tickTitulos();
 }
 // ---------- Pase del Reino (Fase 8) ----------
 // Los puntos los decide el servidor: el cliente informa sus estadísticas acumuladas (D.PASE_STATS) y aquí se suman
@@ -1496,4 +1693,5 @@ module.exports = {
   listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
   paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos,
   diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
+  caravana, tickCaravanas, guildBoss, tickJefes, visita, visitaLike, visitaRegalo, tickTitulos,
 };

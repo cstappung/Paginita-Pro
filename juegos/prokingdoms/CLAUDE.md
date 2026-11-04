@@ -748,3 +748,28 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   replaced `openRealms` in `ui/libro.js`). Gifts come in three sizes of `D.diploEscala(era)`; three per realm a
   day. Test: `node tools/diplo-test.js` (in-process, like the raid test).
 - `D.PROTO` 6: deploy the function with this delivery.
+
+## Living world (`pk-24`, Phase 5: S2 to S6) — Phase 5 done
+
+- **S2 caravans** (`caravana`, `tickCaravanas` in `sim.js`; `POST /api/caravana`): only to a realm with a
+  trade treaty, max 2 at a time and 6 a day. Gold `D.caravanaOro(era, distance)`, one-way time
+  `D.caravanaIda`. Risk `D.caravanaRiesgo` grows with distance (far routes pay more and are risky), ×0.35 with
+  an escort (paid on departure, the client pays `paga`) and ×0.5 with a finished Faro Abisal in the building
+  snapshot. The server rolls it at return and sends the gold by inbox (`caravana`); a human partner gets 25%.
+  The client only draws the cart (`Sp.cart`) and escort along TC → partner home → TC (`js/mundo.js`).
+- **S3 weekly guild boss** (`g.jefe`, `D.JEFES_GREMIO` by `D.semana`, Monday UTC): HP from the real members'
+  average era and count. `POST /api/guilds/boss` sends the army at home, validated by `checkArmy` like a
+  conquest (a made-up power does nothing), 3 a day, 10% losses applied by the client. Damage tiers 25/50/75/100%
+  pay every member who hit (`jefe_gremio`, with kingdom coins); the top hitter gets an extra and every hitter
+  counts a kill (`p.jefes`). Simulated members hit ~40% of the HP over the week (`tickJefes`).
+- **S4 visits** (`POST /api/visita`, `/like`, `/regalo`): a read-only view drawn with the map's own sprites
+  from the last building snapshot. One like and one gift (`D.visitaRegalo`, inside the tablón's daily gift
+  caps) per target per day; each visitor counts once a day.
+- **S5 rankings** (`POST /api/ranking {cat}`, `D.RANKINGS`): the snapshot sends `rk` (`Mundo.rkFoto`: wonder
+  level, deepest floor, defenses won); `checkRk` lets each rise at most 3/5/3 per sync and logs bigger jumps.
+  Boss kills and visits are counted by the server. Every Monday (`tickTitulos`, marker in collection `meta`)
+  the top of each category gets a weekly title, one title per player (the next one gets it otherwise).
+- **S6:** the steady sync only grew by `rk` (~40 bytes up) and, when present, `caravanas` (~150 bytes) and
+  `titulo`; `diplo` (~1.2 KB) only travels when its version changes. A first sync is ~23 KB, as before.
+- Test: `node tools/mundo-test.js`. Routes are in both `server/index.js` and `functions/index.js`; no
+  `D.PROTO` bump beyond pk-23's 6 (deploy the function with this delivery too).

@@ -1026,3 +1026,12 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .dp-ev.ultimatum { border-color: #a03a24; background: rgba(200, 60, 40, 0.14); }
 .dp-ev .row { flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 @media (max-width: 600px) { .fichas { grid-template-columns: 1fr; } }
+/* S2-S5 (pk-24): jefe del gremio, visitas y rankings */
+.jefe-g { margin: 8px 0; padding: 6px 8px; border: 2px solid #a03a24; background: rgba(170, 40, 30, 0.08); }
+.jefe-g h3 { margin-top: 0; }
+.jefe-bar { height: 18px; }
+.jefe-tramos { display: flex; gap: 4px; margin: 4px 0; }
+.visita-box { overflow: auto; max-height: 60vh; background: #3a5a24; border: 2px solid var(--edge); text-align: center; }
+.visita-c { image-rendering: pixelated; max-width: 100%; height: auto; display: inline-block; }
+.rk-tabs { flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.rank li .btn { margin-left: 6px; }

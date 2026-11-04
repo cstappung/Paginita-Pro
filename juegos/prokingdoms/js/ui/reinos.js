@@ -86,6 +86,8 @@
       e && e.rel !== null && e.rel !== undefined ? el('div', { class: 'dp-rel' }, relBar(e.rel), el('span', { class: 'small' }, D.relNombre(e.rel) + ' (' + (e.rel > 0 ? '+' : '') + e.rel + ')')) : '',
       chips,
       conectado && S().era >= D.DIPLO.era ? acciones(b) : el('p', { class: 'small muted' }, conectado ? '' : 'Diplomacia: requiere conexión.'),
+      conectado && e && e.tratado && PK.Mundo ? PK.Mundo.caravanaEl(b.slot) : '', // S2 (pk-24)
+      conectado && b.human && b.pid && PK.Mundo ? el('div', { class: 'dp-acc' }, UI.btn('Visitar', () => PK.Mundo.visitar(b.pid), { small: true })) : '', // S4
       abierto === b.slot && conectado ? regalos(b) : '');
     return card;
   }
@@ -98,6 +100,7 @@
       if (net.online) body.append(el('p', { class: 'small' + (enLinea ? ' good-t' : ' muted') }, humanos.length ? humanos.length + ' jugador(es) real(es) en tu mundo · ' + enLinea + ' en línea ahora.' : 'Por ahora eres el único jugador real de este mundo: los demás reinos son simulados hasta que llegue alguien.'));
       if (Dp().activa()) {
         asuntos(body);
+        if (PK.Mundo) body.append(PK.Mundo.caravanasEl());
         const ali = Dp().aliados().length;
         body.append(el('p', { class: 'small' }, 'Aliados: ' + ali + '/' + D.DIPLO.maxAliados + (Dp().tratado() ? ' · Con un tratado de comercio compras un 10% más barato en el Mercado.' : ' · Un tratado de comercio abarata un 10% las compras del Mercado.') + ' Los reinos con pacto no te saquean.'));
       } else if (!net.online) body.append(el('p', { class: 'small muted' }, 'La diplomacia (regalos, tratados, pactos, alianzas y rivalidades) requiere conexión: la decide el servidor.'));
@@ -120,11 +123,7 @@
         return;
       }
       body.append(el('p', { class: 'muted small' }, 'Cada mundo tiene 16 reinos. Las casillas libres las ocupan reinos simulados hasta que llegue un jugador.'));
-      body.append(el('h3', null, 'Ranking del servidor'));
-      const rk = net.cache.ranking;
-      if (!rk) body.append(el('p', { class: 'muted' }, 'Cargando…'));
-      else body.append(el('ol', { class: 'rank' }, rk.map(r => el('li', { class: r.me ? 'me' : '' },
-        el('span', { translate: 'no' }, r.name + (r.online ? ' ●' : '') + ' · ' + r.world), el('span', null, 'Era ' + U.roman(r.era) + ' · ' + U.fmt(r.total))))));
+      body.append(PK.Mundo.rankingEl()); // S5 (pk-24): categorías, títulos y «Visitar»
     }, { wide: true });
     if (net.online) net.refreshRanking();
   };
