@@ -169,6 +169,14 @@
     if (!runs.length) return;
     pane.append(el('h3', null, 'Tropas fuera (' + runs.length + ')'));
     for (const r of runs) {
+      // encuentro en el camino (aventura.js): esperando que decidas
+      if (r.enc && PK.Aventura) {
+        const c = PK.Aventura.ENCUENTROS.find(e => e.id === r.enc.id);
+        pane.append(el('div', { class: 'run-row' }, el('span', { class: 'run-ic' }, '?'),
+          el('div', { class: 'dg-info' }, el('b', null, 'En el camino a ' + r.name + ': ' + (c ? c.name : 'un encuentro')), el('div', { class: 'small muted' }, 'Decide (' + U.fmtTime(Math.max(0, (r.enc.hasta - Date.now()) / 1000)) + ') o irán por lo seguro.')),
+          UI.btn('Decidir', () => PK.Aventura.open(r.id), { small: true, cls: 'gold' })));
+        continue;
+      }
       // incursión (incursion.js): eligiendo sala o entrando a una
       if (r.inc && (r.phase === 'sala' || r.phase === 'fin' || (r.phase === 'go' && r.inc.llego))) {
         pane.append(el('div', { class: 'run-row' }, el('span', { class: 'run-ic' }, '☠'),
@@ -284,6 +292,7 @@
         el('h2', null, r.name),
         r.live ? el('p', { class: 'small good-t' }, r.retreat ? 'Te retiraste a tiempo: se salvaron más soldados.' : 'Batalla peleada en vivo: el resultado y las bajas salieron de la pelea.') : null,
         el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra aprox. ' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
+        r.enc && r.enc.length ? el('ul', { class: 'info small' }, r.enc.map(t => el('li', null, t))) : null,
         r.heroe ? el('p', { class: 'small' }, 'Héroe: ', el('b', { translate: 'no' }, r.heroe), r.won ? '' : ' (vuelve herido)', r.hab ? ' · usó su habilidad ' + (r.hab === 1 ? 'una vez' : r.hab + ' veces') : '') : null,
         el('h3', null, 'Tu compañía'),
         el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),

@@ -243,7 +243,7 @@
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), hab: r.habUsos };
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), hab: r.habUsos, enc: r.encLog };
     st.war.reports = st.war.reports || [];
     st.war.reports.unshift(rep);
     if (st.war.reports.length > 12) st.war.reports.length = 12;
@@ -265,6 +265,7 @@
     for (const k in r.units) st.war.army[k] += r.units[k];
     if (r.heroe && PK.Heroes) PK.Heroes.volver(r);
     if (r.inc && PK.Inc) PK.Inc.volver(r);
+    if (PK.Aventura) PK.Aventura.volver(r);
     // una incursión perdida vuelve con la mitad de lo juntado (incursion.js)
     const mitad = !r.won && r.inc && Object.keys(r.loot || {}).some(k => r.loot[k] > 0);
     if (r.won || mitad) {
@@ -332,6 +333,8 @@
         else if (offline) PK.Batalla.adelantar(r.id);
         continue;
       }
+      // encuentros en el camino (aventura.js, H2): solo con héroe y de ida
+      if (r.phase === 'go' && PK.Aventura) PK.Aventura.update(r, offline);
       if (r.phase === 'go' && now >= r.arrive && r.inc && !r.inc.llego) { r.inc.llego = true; PK.Inc.llegar(r); if (r.watch && !offline) PK.Inc.open(r.id); continue; }
       if (r.phase === 'go' && now >= r.arrive) {
         if (!offline && !r.mission && PK.Batalla && PK.Batalla.empezar(r)) {

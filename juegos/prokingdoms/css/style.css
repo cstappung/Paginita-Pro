@@ -880,3 +880,12 @@ ul.info li { margin: 2px 0; }
 .inc-sala.jefe { border-color: #a02818; background: rgba(200,60,40,0.15); }
 .inc-sala.elite { border-color: #8a4ac0; }
 .inc-sala.tesoro { border-color: #c89a3a; }
+
+/* Aventura (js/aventura.js, H2 y H7) y eventos con opciones (life.js, H8) */
+.enc-cab { display: flex; gap: 10px; align-items: flex-start; }
+.enc-cab h3 { margin-top: 0; }
+.enc-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 8px; }
+.enc-op { border: 2px solid #6b4c30; background: rgba(255,255,255,0.2); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.enc-op.cauta { border-color: #5a8a3a; }
+#event .ev-ops { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+#event .ev-ops .def { outline: 1px dashed currentColor; outline-offset: 2px; } /* la que va sola si no eliges */

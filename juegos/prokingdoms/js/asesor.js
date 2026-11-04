@@ -46,6 +46,16 @@
       }
       return null;
     },
+    // un encuentro en el camino (aventura.js) espera tu decisión
+    () => {
+      const r = PK.Aventura && S().exp.runs.find(o => o.enc);
+      return r && { id: 'encuentro', prioridad: 61, texto: 'Tus tropas se cruzaron con algo en el camino: decide qué hacer.', acciones: [{ label: 'Decidir', fn: cerrarY(() => PK.Aventura.open(r.id)) }] };
+    },
+    // mapas del tesoro sin buscar
+    () => {
+      const ms = (S().mapas || []).filter(m => !m.heroe);
+      return ms.length > 0 && { id: 'mapas', prioridad: 32, texto: (ms.length === 1 ? 'Tienes un mapa del tesoro' : 'Tienes ' + ms.length + ' mapas del tesoro') + ' sin buscar.', acciones: [{ label: 'Ver mapas', fn: cerrarY(() => PK.Aventura.openMapas()) }] };
+    },
     // una incursión espera que elijas la sala (si no, el capitán elige solo)
     () => {
       const r = PK.Inc && S().exp.runs.find(o => o.phase === 'sala');

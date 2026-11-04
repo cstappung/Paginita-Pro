@@ -90,7 +90,7 @@
       const adentro = r.phase === 'battle' || r.phase === 'sala' || r.phase === 'fin'; // en el destino (incursión: entre salas)
       const go = r.phase === 'go' || adentro, ms = Math.max(1, r.travel * 1000);
       const f = adentro ? 1 : go ? 1 - (r.arrive - now) / ms : (r.back - now) / ms; // en batalla, en el destino
-      out.push({ key: 'x' + r.id, units: r.units, to: T.targetOf(r), f: U.clamp(f, 0, 1), back: !go, name: r.name });
+      out.push({ key: 'x' + r.id, units: r.units, to: T.targetOf(r), f: U.clamp(f, 0, 1), back: !go, name: r.name, heroe: r.heroe });
     }
     for (const e of (st.war && st.war.exps) || []) {
       if (e.camp === undefined) continue;
@@ -182,6 +182,13 @@
         if (!i) banner(it, f.flip);
         items.push(it);
       });
+      // el héroe va adelante de la columna, con su estrella (H2)
+      const h = m.heroe && PK.Heroes ? PK.Heroes.de(m.heroe) : null;
+      if (h) {
+        const c = PK.Heroes.CLASES[h.clase], [x, y, dx, dy] = along(r, d0 + dir * 0.7), f = faceOf(dx * dir, dy * dir), [px, py] = PK.Render.iso(x, y);
+        const spr = Sp.villager(c.col, 1, 1, 'walk', Math.floor(now * 9) % 6, null, f.flip, null, false, f.back, null, c.look);
+        items.push({ d: x + y, k: 'troop', o: { march: m, heroe: h.id }, spr, x: px - spr.ax, y: py - spr.ay, px, py, after: ctx => { ctx.fillStyle = '#ffd860'; ctx.font = 'bold 7px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillText('★', Math.round(px), Math.round(py - 26)); } });
+      }
     }
   }
 

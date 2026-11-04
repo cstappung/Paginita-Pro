@@ -863,6 +863,9 @@
   ql('lh2', 'Forjado en batalla', 'Sube a un héroe al nivel 10 y elígele un talento.', st('hero_lvl', 10), { coins: 20, lore: 3 }, ['lh1']);
   ql('lh3', 'Botín de leyenda', 'Encuentra 5 objetos de equipo en expediciones con un héroe.', st('items_found', 5), { coins: 15, hide: 10 }, ['lh1']);
   ql('lh4', 'La mesa redonda', 'Ten 4 héroes en tu reino (la Taberna en nivel 6).', st('heroes_hired', 4), { coins: 30, crystal: 20 }, ['lh2']);
+  // Aventura (H2, H7): encuentros en el camino de las expediciones con héroe y mapas del tesoro.
+  ql('la1', 'Caminos peligrosos', 'Resuelve 3 encuentros en el camino (salen en las expediciones con un héroe).', st('encounters', 3), { gold: 300, coins: 10 }, ['lh1']);
+  ql('la2', 'La X marca el lugar', 'Desentierra un tesoro de un mapa (salen de las ruinas, de los encuentros y del Mercader de mapas).', st('treasures', 1), { gems: 10, coins: 15 }, ['la1']);
   // Mazmorras 2.0 (H3): incursiones de 5 pisos con un jefe al final.
   ql('lj1', 'El guardián del piso', 'Vence al jefe de una mazmorra: el último piso de una incursión (Cuartel → Atacar).', st('bosses_killed', 1), { coins: 25, crystal: 15 }, ['l3']);
   ql('lj2', 'Sala de trofeos', 'Vence a 5 jefes de mazmorra.', st('bosses_killed', 5), { coins: 40, lore: 10 }, ['lj1']);

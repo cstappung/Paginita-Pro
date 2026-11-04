@@ -456,3 +456,40 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - Trophies (`S.trofeos`) in the Álbum, quests lj1–lj2, an Asesor rule for a
   waiting room, and the Mariscal repeats the last fully cleared block.
 
+
+## Encounters, treasure maps and events with choices (`pk-16`, H2, H7, H8)
+
+- **Road encounters** (`js/aventura.js`, `PK.Aventura`): an expedition with a
+  hero and more than 60 s of travel meets one card halfway (two, at 35% and
+  70%, if the trip is 240 s or more; `A.puntos`). Without a hero, nothing:
+  the hero is what makes the trip a story. The card is picked by
+  `U.rng(r.id, encounter number)`, and so is the luck of each option, so live
+  and offline give the same result (rule 8). Without the player (offline,
+  60 s without choosing, or arriving first) the **`cauta`** option is taken;
+  every card has exactly one (the test checks it). If the safe one costs what
+  you cannot pay, `elegir` falls back to the least risky free option.
+- Effects (`ef`) are kept on the run (`encBotin`, `encTropa`, `encObjetos`,
+  `encLog`) and paid out in `arrive` through `A.volver(r)`. `fuerza`
+  multiplies `r.power` of that trip (or adds to `r.inc.bend` in an
+  incursion): PvE only, never `Social.power` (rule 4).
+- **The hero is visible on the map**: marches carry `heroe`, and `troops.js`
+  draws the hero with a ★ at the head of the column.
+- **Treasure maps** (`st.mapas`): from ruins (35%, seeded and flagged per
+  ruin so reloading does not reroll), from some cards and from the «Mercader
+  de mapas» event. Each marks a tile with a red X on the map and a blinking X
+  on the minimap. `W.fog[i]` truthy means explored: a map that came out in
+  the fog gets `oculto`, and when the scout uncovers that tile (the button
+  plants a flag there) it is dug up by itself. A hero can go instead (state
+  `'explora'`, travel time like an expedition). The chest always brings a
+  rare-or-better item.
+- **Events with choices** (`life.js`): an event can have `opciones` (buttons;
+  `run(e)` returns true when it ends the event), `defecto` (applied by
+  `endEvent` if nobody chose; without it nothing happens, as in the fire,
+  which just burns on), `cond()` (whether it may start now) and `tick(e, dt)`.
+  20 new events, among them the fire (villagers carry buckets: `u.balde`,
+  drawn in `render.js`), locusts, the comet, the earthquake, the spy. Their
+  timed effects go through `L.ponerMod(k, v, t, de)` / `L.mod(k)`, read by
+  `game.js` (`lm(k)`) for gathering, farms, speed, crafting, research and
+  costs (`conMod`). `L.reset` clears mods and fire.
+- Quests la1–la2, Asesor rules «encuentro» and «mapas», a «Mapas del tesoro»
+  button in the Explore window.

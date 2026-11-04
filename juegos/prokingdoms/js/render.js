@@ -352,7 +352,7 @@
       const [px, py] = R.iso(u.x, u.y);
       if (!vis(px - 14, py - 20, 28, 24)) continue;
       const prevF = u.mode === 'work' ? u.swF : -1, spr = unitSprite(u);
-      list.push({ d: u.x + u.y, k: 'unit', o: u, spr, x: px - spr.ax, y: py - spr.ay, px, py, sel: selUnits && selUnits.has(u.id) });
+      list.push({ d: u.x + u.y, k: 'unit', o: u, spr, x: px - spr.ax, y: py - spr.ay, px, py, sel: selUnits && selUnits.has(u.id), after: u.balde ? c => c.drawImage(Sp.bucket(), Math.round(px + (u.flip ? -7 : 2)), Math.round(py - 9)) : null }); // el balde del incendio (life.js)
       if (u.mode === 'work' && u.swF === 2 && prevF !== 2 && spr.hit) impact(u, px + spr.hit[0], py + spr.hit[1]);
     }
     // soldados: guarnición del Cuartel, columnas en marcha y peleas (troops.js)
@@ -454,6 +454,12 @@
     if (R.wallGhost) for (const [x, y] of R.wallGhost) diamondFill(ctx, x, y, PK.Def.tool === 'gate' ? 'rgba(232,184,74,0.6)' : 'rgba(210,210,220,0.55)');
     if (R.beltGhost) for (const [x, y] of R.beltGhost) diamondFill(ctx, x, y, 'rgba(140,200,255,0.45)');
 
+    // mapas del tesoro (H7): una X roja en el suelo, también sobre la niebla
+    for (const m of (g.state && g.state.mapas) || []) {
+      const [px, py] = R.iso(m.x + 0.5, m.y + 0.5), x = Math.round(px), y = Math.round(py), k = 0.7 + 0.3 * Math.sin(performance.now() / 300);
+      ctx.fillStyle = 'rgba(200,30,20,' + k + ')';
+      for (let i = -4; i <= 4; i++) { ctx.fillRect(x + i * 2, y + i, 2, 1); ctx.fillRect(x - i * 2, y + i, 2, 1); }
+    }
     // banderas de exploración (A4): un mástil con el color del reino, también sobre la niebla
     for (const f of g.banderas()) {
       const [px, py] = R.iso(f[0] + 0.5, f[1] + 0.5), x = Math.round(px), y = Math.round(py), ond = Math.round(Math.sin(performance.now() / 260 + f[0]));
@@ -900,6 +906,11 @@
       ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
+    for (const m of (G().state && G().state.mapas) || []) { // mapas del tesoro: una X que late
+      const [x, y] = toMM(m.x + 0.5, m.y + 0.5), s = Math.max(1, Math.round(zk)), on = Math.floor(performance.now() / 400) % 2;
+      ctx.fillStyle = on ? '#ff4030' : '#ffd040';
+      for (let i = -2; i <= 2; i++) { ctx.fillRect(Math.round(x) + i * s, Math.round(y) + i * s, s, s); ctx.fillRect(Math.round(x) - i * s, Math.round(y) + i * s, s, s); }
+    }
     for (const f of G().banderas()) { // banderas de exploración
       const [x, y] = toMM(f[0] + 0.5, f[1] + 0.5), s = Math.max(1, Math.round(zk));
       ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(x), Math.round(y) - 5 * s, s, 5 * s);

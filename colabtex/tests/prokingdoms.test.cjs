@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js']);
+const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -285,4 +285,32 @@ test('H3: incursiones, jefes y afijos', () => {
   for (const k in D.DUNGEON) { assert.ok(I.esJefe(k, 5) && I.esJefe(k, D.DUNGEON[k].floors)); assert.ok(!I.esJefe(k, 4)); }
   for (const k in I.SALAS) assert.ok(I.SALAS[k].name && I.SALAS[k].desc, k);
   assert.ok(I.BOTIN_SALA > 0 && I.BOTIN_SALA < 1, 'una incursión trae varios pisos: cada sala da una parte');
+});
+
+test('H2/H7/H8: encuentros en el camino, mapas del tesoro y eventos con decisiones', () => {
+  const A = PK.Aventura, ev = PK.Life.EVENTS;
+  // eventos con opciones: botones con texto y acción, y una opción por defecto válida (regla 8 del plan)
+  for (const id in ev) {
+    const e = ev[id];
+    assert.ok(e.name, id);
+    if (!e.opciones) continue;
+    assert.ok(e.opciones.length >= 1, id);
+    for (const o of e.opciones) assert.ok(o.label && typeof o.run === 'function', id);
+    // sin defecto, al acabarse el tiempo no pasa nada (el incendio sigue su curso); con él, debe existir
+    if (e.defecto !== undefined) assert.ok(Number.isInteger(e.defecto) && e.defecto >= 0 && e.defecto < e.opciones.length, id + ': defecto');
+  }
+  assert.ok(Object.keys(ev).length >= 30, 'los 10 de antes y los 20 nuevos');
+  // encuentros: ids únicos y exactamente una opción cauta (la que se toma sola sin jugador)
+  const ids = new Set(A.ENCUENTROS.map(c => c.id));
+  assert.equal(ids.size, A.ENCUENTROS.length, 'ids repetidos');
+  for (const c of A.ENCUENTROS) {
+    assert.ok(c.name && c.desc && c.ops.length >= 2, c.id);
+    assert.equal(c.ops.filter(o => o.cauta).length, 1, c.id + ': una sola opción cauta');
+    for (const o of c.ops) { assert.ok(o.label && o.ef && o.txt, c.id); if (o.ef.riesgo) assert.ok(o.ef.riesgo > 0 && o.ef.riesgo < 1, c.id); }
+  }
+  // cuántos encuentros toca por salida: ninguno sin héroe o en viajes cortos
+  assert.deepEqual([...A.puntos({ travel: 300 })], []);
+  assert.deepEqual([...A.puntos({ travel: 30, heroe: 1 })], []);
+  assert.deepEqual([...A.puntos({ travel: 120, heroe: 1 })], [0.5]);
+  assert.deepEqual([...A.puntos({ travel: 400, heroe: 1 })], [0.35, 0.7]);
 });

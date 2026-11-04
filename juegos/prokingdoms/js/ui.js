@@ -324,13 +324,15 @@
     if (!ev) { evRef = null; evKey = ''; return; }
     if (ev !== evRef) { evRef = ev; evMin = !!S().flags.evMin; evAt = performance.now(); }
     if (!evMin && performance.now() - evAt > 15000) evMin = true;
-    const lab = PK.Life.eventLabel(), key = ev.id + '|' + evMin + '|' + lab + '|' + ev.desc;
+    const lab = PK.Life.eventLabel(), ops = PK.Life.eventOptions ? PK.Life.eventOptions() : [], key = ev.id + '|' + evMin + '|' + lab + '|' + ev.desc + '|' + ops.map(o => o.label).join(',');
     if (key !== evKey) {
       evKey = key;
       evEl.innerHTML = '';
       evEl.classList.toggle('min', evMin);
       const time = el('span', { class: 'ev-t' }), fill = el('div');
-      const act = lab ? UI.btn(lab, () => { PK.Life.eventAction(); evKey = ''; }, { small: true, cls: 'gold' }) : ''; // append(null) escribe «null»
+      // eventos con opciones (H8): un botón por opción; la que se aplica sola al acabarse el tiempo lleva un «·»
+      const act = ops.length ? el('span', { class: 'ev-ops' }, ops.map(o => UI.btn(o.label, () => { PK.Life.eventChoose(o.i); evKey = ''; }, { small: true, cls: (o.i === 0 ? 'gold' : '') + (o.defecto ? ' def' : ''), title: o.defecto ? 'Si no eliges, pasa esto' : '' })))
+        : lab ? UI.btn(lab, () => { PK.Life.eventAction(); evKey = ''; }, { small: true, cls: 'gold' }) : ''; // append(null) escribe «null»
       if (evMin) evEl.append(el('button', { class: 'ev-open', title: 'Ver el evento', onclick: () => { evMin = false; evAt = performance.now(); } }, '★ ', el('b', null, ev.name), ' ', time), act);
       else evEl.append(el('div', { class: 'ev-main' }, el('b', null, ev.name), el('span', null, ev.desc)), el('div', { class: 'mini-bar' }, fill), time, act,
         el('button', { class: 'ev-x', title: 'Achicar el aviso', 'aria-label': 'Achicar el aviso', onclick: () => { evMin = true; } }, '✕'));

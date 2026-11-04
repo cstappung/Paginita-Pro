@@ -27,6 +27,7 @@
           el('div', { class: 'row' }, UI.btn('Poner bandera', () => { UI.closeModal(); PK.Input.startFlag(); }, { small: true, cls: 'gold', disabled: fl.length >= g.BANDERAS_MAX }),
             fl.map((f, i) => el('span', { class: 'tag' }, '⚑ ' + (i + 1) + ' ', UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(f[0], f[1]); }, { small: true }), UI.btn('✕', () => { fl.splice(i, 1); UI.rerender(); }, { small: true, aria: 'Quitar la bandera ' + (i + 1) })))));
       }
+      if (PK.Aventura && (st.mapas || []).length) body.append(el('h3', null, 'Mapas del tesoro (' + st.mapas.length + ')'), el('div', { class: 'row' }, UI.btn('Ver los mapas', () => PK.Aventura.openMapas(), { small: true, cls: 'gold' }), el('span', { class: 'small muted' }, 'La X roja del minimapa marca dónde cavar.')));
       const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]);
       if (realms.length) body.append(el('p', { class: 'small' }, 'Reinos encontrados: ' + realms.map(b => b.realm).join(', ') + '.'));
       const box = el('div', { class: 'works scroll' });

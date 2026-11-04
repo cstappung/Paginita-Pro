@@ -410,7 +410,7 @@
   // ---------- Ventana ----------
   let tab = 'heroes', sel = null;
   const pct = v => Math.round(v * 100) + '%';
-  const estadoTxt = h => (h.estado === 'expedicion' ? 'En expedición' : h.estado === 'herido' ? 'Herido · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : gobernado(h) ? 'Gobierna ' + gobernado(h).def.name : 'En casa');
+  const estadoTxt = h => (h.estado === 'explora' ? 'Busca un tesoro · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'expedicion' ? 'En expedición' : h.estado === 'herido' ? 'Herido · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : gobernado(h) ? 'Gobierna ' + gobernado(h).def.name : 'En casa');
   H.open = function (t, id) {
     const UI = PK.UI;
     if (t) tab = t;
