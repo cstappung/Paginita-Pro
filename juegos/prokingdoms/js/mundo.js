@@ -77,7 +77,7 @@
   }
   Mn.dibujar = function (ctx, R) {
     const b = tc();
-    if (!b || !Mn.caravanas.length) return;
+    if (!b || !Mn.caravanas.length || (PK.Game.enMar && PK.Game.enMar())) return; // las caravanas son de la tierra
     const fr = Math.floor(performance.now() / 120) % 4;
     for (const c of Mn.caravanas) {
       const p = donde(c, b), sx = p.ida ? p.dx : -p.dx, sy = p.ida ? p.dy : -p.dy, flip = sx - sy < 0;
@@ -96,7 +96,7 @@
   };
   Mn.minimapa = function (ctx, toMM) {
     const b = tc();
-    if (!b) return;
+    if (!b || (PK.Game.enMar && PK.Game.enMar())) return;
     for (const c of Mn.caravanas) { const p = donde(c, b), [x, y] = toMM(p.x, p.y); ctx.fillStyle = '#f0c850'; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); }
   };
 

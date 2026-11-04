@@ -297,6 +297,7 @@
     const it = R().pick(sx, sy);
     if (!it || it.k === 'tile') { if (!shift) g.sel = null; PK.UI.refreshPanel(true); return; }
     if (it.k === 'troop') { PK.UI.openBarracks(it.o.march || it.o.fight ? 'exp' : 'troops'); return; }
+    if (it.k === 'galeon') { PK.Mar.abrir(); return; } // Fase 9
     if (it.k === 'unit') {
       if (it.o.owner === 'p') {
         if (shift && g.sel && g.sel.type === 'units') { const s = new Set(g.sel.ids); s.has(it.o.id) ? s.delete(it.o.id) : s.add(it.o.id); g.sel = { type: 'units', ids: [...s] }; }

@@ -96,7 +96,8 @@
           UI.btn('Lobos', () => PK.Life.debug.spawnPack(), { small: true }),
           UI.btn('Bandidos', () => { if (PK.Incursiones.activa()) PK.Incursiones.debug.atacar(); else PK.Incursiones.debug.ya(); }, { small: true }),
           UI.btn('Evento', () => PK.Life.debug.startEvent(), { small: true }),
-          UI.btn('Simular 3h offline', () => { const rep = G().simulateOffline(3 * 3600); UI.closeModal(); UI.offlineReport(rep); }, { small: true })));
+          UI.btn('Simular 3h offline', () => { const rep = G().simulateOffline(3 * 3600); UI.closeModal(); UI.offlineReport(rep); }, { small: true }),
+          UI.btn('Galeón listo (prueba)', () => { S().flags.galeonDev = 1; UI.closeModal(); if (PK.Mar) { PK.Mar.iniciar(null); PK.Mar.abrir(); } }, { small: true })));
       }
     });
   };

@@ -11,9 +11,11 @@
   W.inb = (x, y) => x >= 0 && y >= 0 && x < W.W && y < W.H;
   W.idx = (x, y) => y * W.W + x;
 
-  W.generate = function (seed) {
+  // tema: 'tierra' (el reino de siempre) o 'mar' (el Archipiélago de Bruma, Fase 9). Un mundo vivo a la vez.
+  W.generate = function (seed, tema) {
     const w = W.W, h = W.H, N = w * h;
     W.seed = seed;
+    W.tema = tema === 'mar' ? 'mar' : 'tierra';
     W.terrain = new Uint8Array(N);
     W.block = new Uint8Array(N);      // 0 libre, 1 recurso, 2 edificio, 4 agua
     W.nodeAt = new Int32Array(N).fill(-1);
@@ -31,6 +33,7 @@
     W.zones = [];
     W.pois = [];
     const rng = U.rng(seed);
+    if (W.tema === 'mar') return generarMar(seed);
 
     // Siempre en orden de casilla, para que todos generen exactamente los mismos recursos (mismos ids).
     W.realms = D.REALM_SLOTS.map((s, i) => {
@@ -239,6 +242,63 @@
     W.buildBuckets();
     W.initTerritory();
   };
+  // ---------- El Archipiélago de Bruma (Fase 9, pk-25: la isla de prueba) ----------
+  // Casi todo es agua. Tu isla queda en el mismo lugar que tu hogar de la tierra (así la cámara, el Centro Urbano y
+  // la niebla funcionan igual), con playa, palmeras, rocas y arbustos; alrededor, unos islotes. Sin otros reinos,
+  // zonas comunes ni lugares: eso llega con las islas y colonias de la siguiente entrega.
+  function generarMar(seed) {
+    const w = W.W, h = W.H, rng = U.rng(seed + 777), [hx, hy] = D.PLAYER_HOME;
+    W.realms = [{ id: 'p', slot: D.MY_SLOT, home: [hx, hy], name: 'Tu isla' }];
+    W.zones.push({ id: 'home_' + D.MY_SLOT, name: 'Tu isla', common: false, owner: 'p', cx: hx, cy: hy, r: 13 });
+    for (let i = 0; i < w * h; i++) { W.terrain[i] = T_WATER; W.block[i] = 4; }
+    const islas = [{ x: hx, y: hy, r: 15, k: 'casa' }];
+    for (let t = 0, n = 0; n < 4 && t < 400; t++) {
+      const a = rng() * Math.PI * 2, d = 26 + rng() * 22, x = Math.round(hx + Math.cos(a) * d), y = Math.round(hy + Math.sin(a) * d), r = 5 + rng() * 4;
+      if (x < r + 4 || y < r + 4 || x > w - r - 4 || y > h - r - 4 || islas.some(o => U.dist(o.x, o.y, x, y) < o.r + r + 6)) continue;
+      islas.push({ x, y, r, k: ['roca', 'palmas', 'arbustos', 'palmas'][n++] });
+    }
+    W.islas = islas;
+    for (const I of islas) {
+      const R = Math.ceil(I.r * 1.4) + 2;
+      for (let y = Math.max(0, I.y - R); y <= Math.min(h - 1, I.y + R); y++) for (let x = Math.max(0, I.x - R); x <= Math.min(w - 1, I.x + R); x++) {
+        const d = U.dist(x, y, I.x, I.y) / I.r + (U.fbm(x * 0.18, y * 0.18, seed + 31, 3) - 0.5) * 0.55;
+        if (d < 1) { const i = W.idx(x, y); W.terrain[i] = d > 0.78 ? T_SAND : T_GRASS; W.block[i] = 0; }
+      }
+    }
+    W.waterDist = new Float32Array(w * h);
+    computeWaterDist();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = W.idx(x, y);
+      if (W.terrain[i] === T_WATER) continue;
+      const dHome = U.dist(x + 0.5, y + 0.5, hx, hy);
+      if (dHome < 7) W.reserved[i] = 1;
+      if (dHome < 4.2) W.terrain[i] = T_DIRT;
+    }
+    W.zoneAt.fill(-1);
+    const zi = 0;
+    for (let y = hy - 16; y <= hy + 16; y++) for (let x = hx - 16; x <= hx + 16; x++) if (W.inb(x, y) && W.terrain[W.idx(x, y)] !== T_WATER && U.dist(x, y, hx, hy) <= 14) W.zoneAt[W.idx(x, y)] = zi;
+    const pon = (kind, x, y, sp) => { const n = addNode(kind, x, y, W.zoneAt[W.idx(x, y)], rng); if (n && sp) n.sp = sp; return n; };
+    for (const I of islas) {
+      for (let y = Math.floor(I.y - I.r - 2); y <= I.y + I.r + 2; y++) for (let x = Math.floor(I.x - I.r - 2); x <= I.x + I.r + 2; x++) {
+        if (!W.inb(x, y)) continue;
+        const i = W.idx(x, y);
+        if (W.terrain[i] === T_WATER || W.reserved[i]) continue;
+        const arena = W.terrain[i] === T_SAND, f = U.fbm(x * 0.2, y * 0.2, seed + 57, 3);
+        if (I.k === 'casa') {
+          const dx = x - I.x, dy = y - I.y;
+          if (arena && rng() < 0.18) pon('tree', x, y, 'palm');
+          else if (!arena && f > 0.55 && rng() < 0.55) pon('tree', x, y, 'palm');
+          else if (!arena && dx > 4 && dy < -2 && rng() < 0.35) pon('berry', x, y);
+          else if (!arena && dx < -5 && dy > 2 && rng() < 0.45) pon('stone', x, y);
+        } else if (I.k === 'roca') { if (rng() < (arena ? 0.15 : 0.6)) pon(rng() < 0.75 ? 'stone' : 'gold', x, y); }
+        else if (I.k === 'arbustos') { if (rng() < 0.4) pon('berry', x, y); }
+        else if (rng() < (arena ? 0.2 : 0.5)) pon('tree', x, y, 'palm');
+      }
+    }
+    W.buildBuckets();
+    W.initTerritory();
+  }
+
   // Reino cuyo hogar está a menos de d casillas (o null).
   W.realmNear = function (x, y, d) {
     for (const r of W.realms) if (Math.abs(x - r.home[0]) < d && Math.abs(y - r.home[1]) < d && U.dist(x, y, r.home[0], r.home[1]) < d) return r;

@@ -211,6 +211,7 @@
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
     mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
+    mbtn('ancla', 'Galeón', () => PK.Mar.abrir(), null, 'galeon'); // Fase 9
     mbtn('gear', 'Opciones', () => UI.openSettings());
 
     panel = el('div', { id: 'panel' });
@@ -249,6 +250,7 @@
     logi: (g, st) => g.countAll('cartwright') > 0 || g.buildings.some(b => b.owner === 'p' && b.def.recipe) || !!(st.logi && st.logi.roads.length),
     realms: (g, st) => !!PK.Net.online || D.BOTS.some(b => st.flags['seen_' + b.slot]),
     heroes: (g, st) => g.countAll('tavern') > 0 || !!(st.heroes && st.heroes.lista.length),
+    galeon: () => !!(PK.Mar && PK.Mar.visible()),
   };
   let menuFirst = true;
   function updateMenu() {

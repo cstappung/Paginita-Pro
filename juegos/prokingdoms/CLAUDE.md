@@ -773,3 +773,32 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   `titulo`; `diplo` (~1.2 KB) only travels when its version changes. A first sync is ~23 KB, as before.
 - Test: `node tools/mundo-test.js`. Routes are in both `server/index.js` and `functions/index.js`; no
   `D.PROTO` bump beyond pk-23's 6 (deploy the function with this delivery too).
+
+## The New World, part 1 (`pk-25`, Phase 9 N7 «a»: two-world engine, the Galeón, the crossing)
+
+- **One live world at a time.** The save is the active world's state; the other one waits inside it as
+  `S.otro`, and `S.tema` says which is which (`'tierra'` or `'mar'`). `js/mar.js` (`PK.Mar.viajar`)
+  serializes, swaps the two states, carries what belongs to the player and not to the map (`COMPARTIDO`:
+  `inboxAck`, `slot`), saves locally, uploads to the cloud (`Net.saveCloudObj`, awaited) and **reloads the page**
+  («Navegando hacia…»). Every system then starts clean on its own map; never try to swap worlds in place.
+- The world you leave advances when you come back with the usual offline calculation (`main.js` measures from
+  that world's `lastSeen`), so «Mientras no estabas» tells what happened on land. **`S.at`** is when the save
+  was written; `main.js` picks local vs cloud by `at` (falling back to `lastSeen`), because with two worlds
+  `lastSeen` is per world.
+- **`W.generate(seed, tema)`**: `'mar'` builds an all-water map with your island on your land home (so the
+  camera, TC and fog code work unchanged), sand, palms (`n.sp = 'palm'`, `makePalm` in `sprites.js`), and four
+  islets (`W.islas`); one realm (yours), no zones, POIs or other kingdoms. The land map is untouched (tested).
+  A first visit has no buildings, so `G.init` runs `setupPlayer` (TC + 3 villagers, `D.TEMAS.mar.inicio`).
+- **At sea** (`G.enMar()`): no bots, and `Terr`, `Life`, `Incursiones`, `Leyendas`, `Campana`, `Vida.tick` and
+  quests don't run (the Libro says the archipelago's branch comes later). The sync sends `mundo: 'mar'` with no
+  snapshot, harvest or pase stats; the server marks `p.mar`, sends no land nodes/players/terr, and raids and
+  diplomatic events skip that player (the land kingdom is «offline»). `D.PROTO` 7.
+- **The Galeón** (`S.galeon` lives in the existing `campana.galeon` list: chapters 6–9 give casco, timón,
+  velas, brújula; chapter 10 completes the Crónica). It shows from chapter 6 (era VII), stranded and broken on
+  the shore of the lake nearest your home (`Mar.lugar`), drawn by code (`Sp.galeon`, wrecked or repaired by
+  piece) as a `k: 'galeon'` render item you can tap; at sea it is anchored by your island. Menu button
+  «Galeón» (`MENU_VER.galeon`), window with a painted preview of the archipelago. `?dev` → Opciones → «Galeón
+  listo (prueba)» sets `flags.galeonDev` to sail without the Crónica.
+- Not yet (N7 «b» to «d»): the archipelago's own resources, buildings, eras, tides and colonies; ships and
+  naval battles; the Regata, naval duels and the bridges between worlds (heroes travelling, trade, Maestro de
+  Ribera). The sea world uses the land's tables meanwhile.

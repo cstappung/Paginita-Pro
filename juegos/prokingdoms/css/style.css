@@ -1035,3 +1035,13 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .visita-c { image-rendering: pixelated; max-width: 100%; height: auto; display: inline-block; }
 .rk-tabs { flex-wrap: wrap; gap: 4px; margin: 4px 0; }
 .rank li .btn { margin-left: 6px; }
+/* Fase 9 (pk-25): el Galeón y el archipiélago */
+#mar-cartel { position: fixed; left: 8px; bottom: 214px; display: flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; background: rgba(20, 50, 74, 0.92); border: 2px solid #0c2232; color: #e8f4fa; font-size: 14px; z-index: 6; white-space: nowrap; }
+#mar-cartel .btn .ico { width: 16px; height: 16px; }
+.mar-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mar-adelanto { image-rendering: pixelated; width: 320px; max-width: 100%; height: auto; border: 2px solid var(--edge); }
+.mar-top p { flex: 1; min-width: 200px; }
+.mar-piezas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.mar-pieza { border: 2px dashed #8a6a44; padding: 4px 8px; display: flex; flex-direction: column; }
+.mar-pieza.ok { border-style: solid; border-color: #3a7a24; background: rgba(60, 140, 40, 0.12); }
+@media (max-width: 600px) { #mar-cartel { bottom: calc(var(--ph, 40vh) + 6px); font-size: 12px; max-width: calc(100% - 120px); } #mar-cartel .small { display: none; } }

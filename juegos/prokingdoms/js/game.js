@@ -27,8 +27,10 @@
     };
   };
 
+  // Fase 9: la partida dice en qué mundo está (S.tema). El otro espera guardado en S.otro (js/mar.js).
+  G.enMar = () => W.tema === 'mar';
   G.init = function (save) {
-    W.generate(D.SEED);
+    W.generate(D.SEED, save && save.tema);
     G.units = []; G.buildings = []; G.uById.clear(); G.bById.clear(); G.encierro = null;
     S = G.state = save || G.newState();
     S.slot = D.MY_SLOT;
@@ -41,8 +43,10 @@
     S.ret = Object.assign({ welcome: null, helpLog: [], news: [], almostDay: null }, S.ret);
     for (const r of D.RES_ORDER) S.res[r] = S.res[r] || 0;
     PK.Social.init(S);
-    setupBots();
-    if (save) restore(save); else setupPlayer();
+    if (!G.enMar()) setupBots(); // en el archipiélago no hay reinos vecinos (todavía)
+    if (save) restore(save);
+    // un mundo recién descubierto (el primer viaje al archipiélago) llega sin edificios: se arma como una partida nueva
+    if (!save || !G.buildings.some(b => b.owner === 'p')) setupPlayer();
     PK.Terr.init(S);
     PK.Logi.init(S);
     PK.Def.init(S);
@@ -1240,23 +1244,24 @@
     G.updateTimers(dt);
     PK.Auto.tick(dt);
     PK.Logi.update(dt);
-    PK.Terr.update(dt, false);
+    const tierra = !G.enMar(); // en el archipiélago (Fase 9) no corren los sistemas de la tierra
+    if (tierra) PK.Terr.update(dt, false);
     PK.Exp.update(dt, false);
     if (PK.Heroes) PK.Heroes.update(dt);
     if (PK.Aventura) PK.Aventura.tick(dt);
-      if (PK.Leyendas) PK.Leyendas.tick(dt);
-      if (PK.Campana) PK.Campana.tick(dt);
+    if (tierra && PK.Leyendas) PK.Leyendas.tick(dt);
+    if (tierra && PK.Campana) PK.Campana.tick(dt);
     PK.Batalla.update(dt);
-    PK.Life.update(dt);
-    PK.Incursiones.update(dt);
+    if (tierra) PK.Life.update(dt);
+    if (tierra) PK.Incursiones.update(dt);
     fiestaTick(dt);
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
     frutales(dt);
     PK.Social.update(dt, false);
     regrowT += dt;
-    if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); if (PK.Vida) PK.Vida.tick(); }
+    if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); if (tierra && PK.Vida) PK.Vida.tick(); }
     questT += dt;
-    if (questT > 1) { questT = 0; PK.Quests.check(); }
+    if (questT > 1 && tierra) { questT = 0; PK.Quests.check(); }
   };
   // Árboles frutales (V5): un poco de comida sin aldeanos, en vivo y sin conexión
   let frutT = 0, frutN = 0;
@@ -1405,6 +1410,7 @@
   // ---------- Guardado ----------
   G.serialize = function () {
     S.lastSeen = Date.now();
+    S.at = S.lastSeen; // cuándo se guardó (main.js elige entre la local y la nube por esto: lastSeen es del mundo)
     S.units = G.units.filter(u => u.owner === 'p').map(u => u.toJSON());
     S.buildings = G.buildings.filter(b => b.owner === 'p').map(b => b.toJSON());
     S.nodes = W.saveNodes();
@@ -1415,6 +1421,7 @@
 
   };
   G.save = function () { U.store.set(SAVE_KEY, G.serialize()); };
+  G.guardarObjeto = o => U.store.set(SAVE_KEY, JSON.stringify(o)); // la travesía (js/mar.js) guarda los dos mundos ya cambiados
   G.loadSave = function () {
     const s = U.store.get(SAVE_KEY);
     if (!s) return null;

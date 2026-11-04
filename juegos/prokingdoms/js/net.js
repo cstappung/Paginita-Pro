@@ -116,7 +116,11 @@
       // Pase del Reino: las estadísticas que el servidor convierte en puntos (D.PASE_STATS, js/pase.js)
       const pase = {};
       for (const k of PK.D.PASE_STATS || []) pase[k] = Math.floor(S().stats[k] || 0);
-      const r = await api('POST', '/api/sync', { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+      // Fase 9: en el archipiélago el servidor sigue viendo la última foto de tu reino de la tierra (que en ese momento
+      // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
+      const mar = PK.Game.enMar && PK.Game.enMar();
+      const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
+        : { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
@@ -124,11 +128,13 @@
       Net.ping = Math.round(performance.now() - t0);
       Net.lastOk = Date.now();
       if (Net.lost) { Net.lost = false; toast('Conexión recuperada.', 'good'); }
-      since = r.ver;
-      applyNodes(r.nodes);
-      if (r.terr) applyTerr(r.terr);
-      tv = r.tv || 0;
-      applyPlayers(r.players || []);
+      if (!mar) {
+        since = r.ver;
+        applyNodes(r.nodes);
+        if (r.terr) applyTerr(r.terr);
+        tv = r.tv || 0;
+        applyPlayers(r.players || []);
+      }
       if (r.prices) Object.assign(S().market.p, r.prices);
       applyGuild(r.guild);
       applyInbox(r.inbox || []);
@@ -320,6 +326,8 @@
     if (beacon && navigator.sendBeacon) navigator.sendBeacon(API + '/api/save?t=' + encodeURIComponent(Net.me.token), new Blob([body], { type: API ? 'text/plain' : 'application/json' }));
     else api('POST', '/api/save', JSON.parse(body)).catch(() => {});
   };
+  // la travesía (js/mar.js) sube la partida con los dos mundos ya cambiados antes de recargar
+  Net.saveCloudObj = o => api('POST', '/api/save', { save: o }, 15000).catch(() => {});
   Net.deleteCloudSave = function () { return api('DELETE', '/api/save').catch(() => {}); };
 
   Net.start = function () {

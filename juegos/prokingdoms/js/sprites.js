@@ -1609,6 +1609,35 @@
     return withMask({ c: pb.canvas(), ax: cx, ay: base - 1 });
   }
 
+  // Palmera del Archipiélago (Fase 9): tronco curvo con anillos, hojas que caen en arco y cocos.
+  function makePalm(seed) {
+    const r = U.rng(seed), w = 30, h = 40, pb = new PB(w, h), base = 37, lean = (r() - 0.5) * 7;
+    ellipseShadow(pb, 15 + 3, base - 1, 8, 2, 70);
+    const top = 9 + Math.floor(r() * 3);
+    let tx = 15, ty = top;
+    for (let y = base; y >= top; y--) {
+      const t = (base - y) / (base - top), x = Math.round(15 + lean * t * t);
+      const anillo = (y % 3) === 0;
+      pb.set(x - 1, y, anillo ? [96, 66, 40] : [150, 108, 64]);
+      pb.set(x, y, anillo ? [80, 54, 32] : [124, 86, 50]);
+      pb.set(x + 1, y, [92, 62, 36]);
+      if (y === top) { tx = x; ty = y; }
+    }
+    const verde = [[54, 120, 44], [76, 150, 54], [104, 176, 66], [40, 92, 36]];
+    const hojas = 6 + Math.floor(r() * 2);
+    for (let k = 0; k < hojas; k++) {
+      const a = (k / hojas) * Math.PI * 2 + r() * 0.4, L = 9 + r() * 4, ca = Math.cos(a), sa = Math.sin(a) * 0.55;
+      for (let s2 = 0; s2 <= L; s2 += 0.5) {
+        const f = s2 / L, x = tx + ca * s2, y = ty + sa * s2 + f * f * 6 - 1;
+        const c = verde[(f < 0.3 ? 2 : f < 0.7 ? 1 : 0) + (sa > 0.2 && f > 0.5 ? 1 : 0)] || verde[3];
+        pb.set(Math.round(x), Math.round(y), c);
+        if (f > 0.15 && f < 0.85) { pb.set(Math.round(x), Math.round(y) + 1, verde[3]); if (s2 % 2 < 0.5) pb.set(Math.round(x - sa), Math.round(y + ca * 0.6) + 1, verde[0]); }
+      }
+    }
+    for (const [dx, dy] of [[-1, 1], [1, 1], [0, 2]]) { pb.set(tx + dx, ty + dy, [110, 72, 36]); pb.set(tx + dx, ty + dy - 1 + 1, [138, 96, 50]); }
+    return withMask({ c: pb.canvas(), ax: 15, ay: base - 1 });
+  }
+
   function makeStump() {
     const pb = new PB(10, 8);
     ellipseShadow(pb, 6, 5, 4, 1, 60);
@@ -1977,6 +2006,58 @@
   const SPOKES = [[[4, 1], [4, 2], [4, 3], [4, 5], [4, 6], [4, 7], [1, 4], [2, 4], [3, 4], [5, 4], [6, 4], [7, 4]],
     [[2, 2], [3, 3], [5, 5], [6, 6], [6, 2], [5, 3], [3, 5], [2, 6]]];
   const LEGS = [[1, -1, -1, 1], [0, 0, 0, 0], [-1, 1, 1, -1], [0, 0, 0, 0]];
+  // El Galeón del Alba (Fase 9): encallado y roto en la orilla del lago, o reparado, con velas y banderas.
+  const GALC = {};
+  S.galeon = function (listo, piezas) {
+    const key = (listo ? 'L' : 'R') + (piezas || []).join(',');
+    if (GALC[key]) return GALC[key];
+    const w = 84, h = 76, pb = new PB(w, h), tiene = id => listo || (piezas || []).includes(id);
+    const madera = [[86, 54, 30], [112, 74, 42], [140, 96, 56], [60, 38, 22]], oro = [214, 168, 72], vela = [236, 226, 200], velaS = [196, 184, 156], rojo = [176, 52, 40];
+    const incl = listo ? 0 : 0.11; // encallado: escorado
+    const Y = (x, y) => y + (x - 42) * incl;
+    ellipseShadow(pb, 44, 66, 34, 5, 90);
+    // casco: proa a la izquierda, castillo de popa a la derecha
+    for (let x = 6; x <= 76; x++) {
+      const t = (x - 6) / 70, quilla = 62 - Math.sin(t * Math.PI) * 4, borda = x > 60 ? 38 : x < 16 ? 44 - (16 - x) * 0.6 : 46;
+      for (let y = Math.floor(borda); y <= quilla; y++) {
+        const roto = !tiene('casco') && ((x > 28 && x < 36 && y > 50 && y < 57) || (x > 50 && x < 55 && y > 47 && y < 52));
+        const yy = Math.round(Y(x, y));
+        if (roto) { pb.set(x, yy, [24, 16, 10]); continue; }
+        const banda = (y - Math.floor(borda)) % 4 === 0, c = y > quilla - 2 ? madera[3] : banda ? madera[0] : x % 9 === 0 ? madera[0] : madera[y < 50 ? 2 : 1];
+        pb.set(x, yy, c);
+      }
+      pb.set(x, Math.round(Y(x, (x > 60 ? 38 : x < 16 ? 44 - (16 - x) * 0.6 : 46) - 1)), oro);
+    }
+    // portas de los cañones y ventanas de popa
+    for (let x = 22; x < 58; x += 7) for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++) pb.set(x + dx, Math.round(Y(x, 51 + dy)), [30, 20, 12]);
+    for (let x = 64; x < 74; x += 3) { pb.set(x, Math.round(Y(x, 42)), [250, 210, 110]); pb.set(x, Math.round(Y(x, 43)), [250, 210, 110]); }
+    // bauprés
+    for (let k = 0; k < 10; k++) pb.set(6 - k * 0.6, Math.round(Y(6, 44 - k * 0.7)), madera[0]);
+    // mástiles
+    const mastil = (mx, alto, rotoM) => {
+      const top = 46 - alto;
+      for (let y = 46; y >= top; y--) { const xx = rotoM ? mx + (46 - y) * 0.35 : mx; pb.set(xx, Math.round(Y(mx, y)), madera[3]); pb.set(xx + 1, Math.round(Y(mx, y)), madera[1]); }
+      return top;
+    };
+    const masts = [[26, 34], [44, 40], [62, 30]];
+    masts.forEach(([mx, alto], i) => {
+      const conVelas = tiene('velas'), rotoM = !tiene('timon') && i === 1;
+      const top = mastil(mx, rotoM ? 16 : alto, rotoM);
+      if (!conVelas) { if (!listo && i === 0) for (let k = 0; k < 6; k++) pb.set(mx - 3 + k, Math.round(Y(mx, top + 6 + k)), velaS); return; }
+      for (const [ya, hh, ww] of [[top + 3, 10, 9], [top + 15, 11, 11]]) {
+        for (let y = ya; y < ya + hh; y++) {
+          const inflado = Math.sin(((y - ya) / hh) * Math.PI) * 2;
+          for (let x = mx - ww - inflado; x <= mx + ww + inflado; x++) pb.set(x, Math.round(Y(mx, y)), (x + y) % 7 === 0 ? velaS : vela);
+        }
+        if (i === 1) for (let y = ya + 2; y < ya + hh - 2; y++) { pb.set(mx, Math.round(Y(mx, y)), rojo); pb.set(mx + 1, Math.round(Y(mx, y)), rojo); }
+      }
+      if (listo) for (let k = 0; k < 7; k++) { pb.set(mx + 1 + k, Math.round(Y(mx, top + (k % 2))), i === 1 ? oro : rojo); pb.set(mx + 1 + k, Math.round(Y(mx, top + 1 + (k % 2))), i === 1 ? oro : rojo); }
+    });
+    // brújula: un brillo azul en el castillo de popa
+    if (tiene('brujula')) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 0], [2, 1]]) pb.set(68 + dx, Math.round(Y(68, 35 + dy)), [120, 200, 255]);
+    return (GALC[key] = withMask({ c: pb.canvas(), ax: 44, ay: 64 }));
+  };
+
   S.cart = function (col, carry, flip, frame, moving) {
     const f = moving ? frame % 4 : 1, key = col.join(',') + (carry || '') + (flip ? 1 : 0) + f;
     if (CC[key]) return CC[key];
@@ -2117,6 +2198,7 @@
     steel: { m: ['', '', '..kkkkkkkk', '.kwwwwwwwwk', 'kwLwwwwwwgk', 'kggggggggdk', 'kkkkkkkkkk', '..kkkkkkkk', '.kwwwwwwwwk', 'kggggggggdk', 'kkkkkkkkkk'], p: { k: '#1a1e26', w: '#b8c8d8', L: '#ffffff', g: '#7a8a9a', d: '#4a5664' } },
     machinery: { m: ['....kk', '..k.kk.k', '.kkkggkkk', '..kgyygk', 'kkgy..ygkk', 'kkgy..ygkk', '..kgyygk', '.kkkggkkk', '..k.kk.k', '....kk'], p: { k: '#2a1e10', g: '#c08a3a', y: '#e8c050' } },
     hammer: { m: ['', '.kkkkkk', 'kggggggk', 'kgggggdk', '.kkbbkk', '...kbk', '....kbk', '.....kbk', '......kbk', '.......kk'], p: { k: '#1c1c22', g: '#a8a8b2', d: '#6a6a72', b: '#8a5a30' } },
+    ancla: { m: ['....kkk', '...ksssk', '...ks.sk', '....ksk', '..kkksskkk', '....ksk', '....ksk', 'kk..ksk..kk', 'ksk.ksk.ksk', '.kskksskksk', '..kssssssk', '...kkkkkk'], p: { k: '#1d2a3a', s: '#8aa4bc' } },
     compass: { m: ['...kkkkk', '..kwwrwwk', '.kwwwrwwwk', 'kwwwrrrwwwk', 'kwwkrrrkwwk', 'kwwwbbbwwwk', 'kwwwwbwwwwk', '.kwwwbwwwk', '..kwwwwwk', '...kkkkk'], p: { k: '#3a2410', w: '#efe6d0', r: '#c03028', b: '#2a4a8a' } },
     scroll: { m: ['', '.kkkkkkkkk', 'kyLLLLLLLyk', '.kLkkkkkLk', '.kLLLLLLLk', '.kLkkkkLLk', '.kLLLLLLLk', '.kLkkkkkLk', 'kyLLLLLLLyk', '.kkkkkkkkk'], p: { k: '#4a3010', y: '#a07040', L: '#efe0b8' } },
   };
@@ -2365,7 +2447,8 @@
   S.NODE_MM = { tree: [30, 58, 26], berry: [150, 60, 90], deer: [170, 120, 70], stone: [170, 168, 160], gold: [240, 200, 70], ore: [180, 90, 60], marble: [240, 240, 232], gems: [90, 170, 230] };
 
   S.init = function () {
-    S.trees = { oak: [], pine: [], aut: [] };
+    S.trees = { oak: [], pine: [], aut: [], palm: [] };
+    for (let i = 0; i < 4; i++) S.trees.palm.push(makePalm(400 + i));
     for (let i = 0; i < 6; i++) { S.trees.oak.push(makeOak(100 + i)); S.trees.pine.push(makePine(200 + i)); }
     for (let i = 0; i < 2; i++) S.trees.aut.push(makeOak(300 + i, AUT));
     S.stump = makeStump();

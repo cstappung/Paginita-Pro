@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 6;
+  D.PROTO = 7;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -450,6 +450,20 @@
   D.jefeGremioPremio = (tramo, era) => ({ gold: Math.round(D.diploEscala(era) * 0.3 * tramo), gems: era * tramo, coins: 5 * tramo });
   // S4. Visitas: una vista de solo lectura del reino de otro jugador. Un «me gusta» y un regalo por día y por reino.
   D.visitaRegalo = era => ({ gold: Math.round(D.diploEscala(era) * 0.15) });
+  // ---------- El Nuevo Mundo (Fase 9, pk-25: motor de dos mundos, el Galeón y la travesía) ----------
+  // Las piezas del Galeón del Alba las dan los capítulos 6 a 9 de la Crónica (D.CAPITULOS[n].galeon); con las cuatro
+  // y la Crónica completa (capítulo 10) se puede zarpar. Mientras tanto, la ventana muestra lo que falta.
+  D.GALEON = {
+    aparece: 6, ultimo: 10,
+    piezas: [
+      { id: 'casco', name: 'Casco', cap: 6 }, { id: 'timon', name: 'Timón', cap: 7 },
+      { id: 'velas', name: 'Velas', cap: 8 }, { id: 'brujula', name: 'Brújula de la bruma', cap: 9 },
+    ],
+  };
+  D.TEMAS = {
+    tierra: { name: 'El Reino', mundo: 'Tu reino' },
+    mar: { name: 'Archipiélago de Bruma', mundo: 'Archipiélago de Bruma', inicio: { food: 300, wood: 300, stone: 150, gold: 120 } },
+  };
   // S5. Rankings: categorías y el título semanal del primero de cada una.
   D.RANKINGS = {
     era: { name: 'Era', titulo: 'Monarca de la Semana' },

@@ -362,6 +362,9 @@ function sync(p, b) {
   ensureTerr(w);
   p.lastSeen = t;
   if (b.name) p.name = cleanText(b.name, 20) || p.name;
+  // Fase 9: en el archipiélago no llega foto ni recolección; el reino de la tierra queda como «sin conexión»
+  p.mar = b.mundo === 'mar';
+  if (p.mar) { b.harvest = null; b.market = null; b.snap = null; b.pase = null; }
   if (b.harvest && typeof b.harvest === 'object') {
     const ok = checkHarvest(p, b.harvest, w, t);
     for (const id in ok) {
@@ -387,10 +390,10 @@ function sync(p, b) {
   store.touch('players'); store.touch('worlds');
 
   const since = +b.since || 0, nodes = {};
-  for (const id in w.nodes) if (!since || (w.nv[id] || 0) > since) nodes[id] = w.nodes[id];
+  if (!p.mar) for (const id in w.nodes) if (!since || (w.nv[id] || 0) > since) nodes[id] = w.nodes[id]; // en el mar no hace falta la tierra
   const kb = b.kb || {}, players = [];
   w.slots.forEach((pid, slot) => {
-    if (!pid || pid === p.id) return;
+    if (!pid || pid === p.id || p.mar) return;
     const o = player(pid);
     if (!o) return;
     const online = t - o.lastSeen < ONLINE_MS;
@@ -404,7 +407,7 @@ function sync(p, b) {
   ensureTerr(w);
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
-  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
+  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -1269,7 +1272,7 @@ function nuevoEvento(p, d, t) {
 function tickDiplo() {
   const t = now();
   for (const p of store.all('players')) {
-    if (!p.snap || t - p.lastSeen > ONLINE_MS || vEra(p) < DP.era) continue;
+    if (!p.snap || t - p.lastSeen > ONLINE_MS || vEra(p) < DP.era || p.mar) continue;
     const d = diploDe(p);
     if (d.ev && d.ev.hasta <= t) { const ev = d.ev; d.ev = null; d.v++; venceEvento(p, ev, d.s[ev.slot], D.REALM_SLOTS[ev.slot].bot.realm); }
     if (!d.evNext) { d.evNext = t + rand(0.5, 1.5) * 3600e3; store.touch('players'); continue; }
@@ -1522,7 +1525,7 @@ function tickSaqueos() {
     if (q && !q.fin && t >= q.arrive) { resolverSaqueo(p, q); continue; }
     if (q && !q.fin) continue;
     const s = p.snap;
-    if (!s || s.era < SAQ.era || t - p.lastSeen > ONLINE_MS || s.truce) continue;
+    if (!s || s.era < SAQ.era || t - p.lastSeen > ONLINE_MS || s.truce || p.mar) continue; // en el mar, su tierra está sin nadie
     if (!p.saqNext) { p.saqNext = t + rand(0.5, 1.5) * 3600e3; store.touch('players'); continue; }
     if (t < p.saqNext) continue;
     const w = store.get('worlds', p.world);

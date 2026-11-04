@@ -407,6 +407,9 @@
       if (st && !st.d && p.kind === 'relic' && Math.random() < dt * 3) R.particles.push({ x: px + (Math.random() - 0.5) * 6, y: py - 12, vx: 0, vy: -8, life: 0, max: 1.2, s: 1, rgb: [255, 230, 120] });
       if (p.kind === 'camp' && !(st && st.d) && smokeT > 0.35) R.particles.push({ x: x + spr.c.width / 2, y: y + spr.oy + 10, vx: 2, vy: -7, life: 0, max: 2, s: 1, c: 90 });
     }
+    // el Galeón del Alba (Fase 9): encallado en la orilla del lago, o fondeado frente a tu isla
+    const gal = PK.Mar && PK.Mar.item(R, seen);
+    if (gal && vis(gal.x, gal.y, gal.spr.c.width, gal.spr.c.height)) list.push(gal);
     // el lugar del capítulo en curso de la campaña (H5): el dibujo de su terreno, con estandarte
     const cn = PK.Campana && g.state && g.state.campana ? PK.Campana.actual() : 0, cl = cn && PK.Campana.lugar(cn);
     if (cl && seen(cl.x, cl.y)) {
@@ -1038,6 +1041,7 @@
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
     if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
     if (PK.Mundo) PK.Mundo.minimapa(ctx, toMM); // S2
+    if (PK.Mar) PK.Mar.minimapa(ctx, toMM); // Fase 9: el Galeón
     if (PK.Campana && G().state && G().state.campana) { // el lugar del capítulo en curso: un punto rojo y dorado que late
       const n = PK.Campana.actual(), l = n && PK.Campana.lugar(n);
       if (l) { const [x, y] = toMM(l.x + 0.5, l.y + 0.5), s = Math.max(2, Math.round(zk * 2)), on = Math.floor(performance.now() / 350) % 2; ctx.fillStyle = on ? '#ffd040' : '#c02020'; ctx.fillRect(Math.round(x) - s, Math.round(y) - s, s * 2, s * 2); }

@@ -542,3 +542,24 @@ test('Diplomacia (S1): personalidades sembradas, umbrales en orden y los pactos 
   assert.equal(D.canConquer(yo, el, false), null);
   assert.ok(D.canConquer(yo, Object.assign({}, el, { pacto: 'alianza' }), true), 'una alianza impide conquistar, aun con revancha');
 });
+test('Fase 9: el mapa del archipiélago es casi todo agua, con tu isla en tu hogar, y la tierra no cambia', () => {
+  const huella = JSON.stringify(W.pois.slice(0, 50).map(p => [p.kind, p.x, p.y]));
+  W.generate(D.SEED, 'mar');
+  try {
+    assert.equal(W.tema, 'mar');
+    let agua = 0;
+    for (let i = 0; i < W.terrain.length; i++) if (W.terrain[i] === 4) agua++;
+    assert.ok(agua / W.terrain.length > 0.85, 'casi todo agua: ' + Math.round((agua / W.terrain.length) * 100) + '%');
+    const [hx, hy] = D.PLAYER_HOME;
+    assert.notEqual(W.terrain[W.idx(hx, hy)], 4, 'tu hogar es tierra firme');
+    assert.equal(W.realms.length, 1, 'sin otros reinos');
+    assert.equal(W.pois.length, 0, 'sin lugares todavía');
+    assert.ok(W.nodes.filter(n => n.sp === 'palm').length > 50, 'palmeras');
+    assert.ok(W.nodes.some(n => n.kind === 'stone') && W.nodes.some(n => n.kind === 'berry'), 'rocas y arbustos');
+    assert.ok(W.islas.length >= 3, W.islas.length + ' islas');
+  } finally { W.generate(D.SEED); }
+  assert.equal(W.tema, 'tierra');
+  assert.equal(JSON.stringify(W.pois.slice(0, 50).map(p => [p.kind, p.x, p.y])), huella, 'volver a la tierra da el mismo mapa');
+  // las cuatro piezas del Galeón las da la Crónica, cada una en su capítulo
+  for (const p of D.GALEON.piezas) assert.equal(D.CAPITULOS[p.cap - 1].galeon, p.id, p.id);
+});

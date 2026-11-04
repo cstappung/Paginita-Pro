@@ -472,6 +472,11 @@
   }
 
   Q.openBook = function (t) {
+    // Fase 9: el archipiélago tendrá su propia rama de la Crónica; mientras tanto, el libro es el de la tierra
+    if (PK.Game.enMar && PK.Game.enMar()) {
+      PK.UI.modal('book', 'Libro de Misiones', body => body.append(U.el('p', null, 'Las misiones del ' + D.TEMAS.mar.name + ' (su rama de la Crónica, sus eras y sus desafíos) llegan con las islas y las colonias. Tu Libro de la tierra te espera al volver.')));
+      return;
+    }
     if (t) tab = t;
     PK.UI.modal('book', 'Libro de Misiones', renderBook, { cls: 'book-modal', wide: true });
   };
