@@ -991,3 +991,7 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .rep-dano .rd-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .rep-dano .rd-n { min-width: 96px; font-size: 13px; }
 .rep-dano .bar { flex: 1; }
+/* C6 (pk-22): partida de saqueo */
+.sq-op { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 8px; }
+.sq-op > div { border: 1px solid var(--line, #5a4a34); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.tw-ramas .row { flex-wrap: wrap; gap: 4px; }

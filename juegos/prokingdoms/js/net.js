@@ -118,6 +118,7 @@
       for (const k of PK.D.PASE_STATS || []) pase[k] = Math.floor(S().stats[k] || 0);
       const r = await api('POST', '/api/sync', { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince, pase });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
+      if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       Net.ping = Math.round(performance.now() - t0);
       Net.lastOk = Date.now();
       if (Net.lost) { Net.lost = false; toast('Conexión recuperada.', 'good'); }
@@ -237,6 +238,8 @@
       switch (it.type) {
         case 'res': g.give(it.res); toast(it.text, 'info'); break;
         case 'pase': if (PK.Pase) PK.Pase.recibir(it); break;
+        case 'saqueo': if (PK.Saqueos) PK.Saqueos.aviso(it); break;
+        case 'saqueo_fin': if (PK.Saqueos) PK.Saqueos.fin(it); break;
         case 'offer_filled':
           g.give(it.res); g.stat('offers_filled', 1); g.stat('gold_volume', it.value || 0);
           toast(it.text, 'good');

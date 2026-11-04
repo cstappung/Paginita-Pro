@@ -20,6 +20,7 @@
   const COLOR = [70, 44, 40];     // el mismo pardo de los bandidos de troops.js
   const HERRAMIENTA = { militia: 'hammer', spear: 'spear', knight: 'sword', cleric: 'hammer' };
   const RES_BOTIN = ['food', 'wood', 'stone', 'gold'];
+  const OLA = [0.7, 0.85, 1.1], ENTRE_OLAS = 30; // fuerza de cada oleada de un asedio (C5)
   let nid = 1;
 
   Inc.init = function (st) {
@@ -75,22 +76,45 @@
   function empezar() {
     const st = S(), g = G(), o = buscarOrigen();
     if (!o) return false;
-    const era = st.era, n = st.inc.n, fuerza = Inc.fuerza(era, n);
+    // C5 (pk-22): desde la Era III, una de cada tres es un asedio de 3 oleadas con 30 s entre una y otra
+    const era = st.era, n = st.inc.n, olas = era >= 3 && n % 3 === 2 ? 3 : 1, fuerza = Math.round(Inc.fuerza(era, n) * (olas > 1 ? OLA[0] : 1));
     const cuantos = U.clamp(3 + Math.floor((era - 1) / 2) + Math.floor(n / 3), 3, 8), hp = Math.round((fuerza * 3) / cuantos);
-    const bandidos = [];
-    for (let i = 0; i < cuantos; i++) {
-      const ang = (i / cuantos) * Math.PI * 2;
-      bandidos.push({ id: nid++, x: o.x + 0.5 + Math.cos(ang) * 0.9, y: o.y + 0.5 + Math.sin(ang) * 0.9, hp, max: hp, path: [], anim: Math.random(), flip: i % 2 === 1, back: false, i, hair: i % 4, saco: 0, espera: i * 0.55, eng: null, fuera: false });
-    }
-    const aviso = n < 2 ? 75 : 50;
-    Inc.banda = { fase: 'aviso', t: 0, aviso, ox: o.x + 0.5, oy: o.y + 0.5, dest: o.dest.id, path: o.path, muro: o.muro, fuerza, bandidos, n0: cuantos, botin: {}, escaparon: 0, recuperado: {}, dano: 0, pool: 0, pool0: 0, salida: false, lado: rumbo(o.x - o.hx, o.y - o.hy), total: 0 };
+    const bandidos = banda(o.x + 0.5, o.y + 0.5, cuantos, hp);
+    const aviso = n < 2 ? 75 : olas > 1 ? 60 : 50;
+    Inc.banda = { fase: 'aviso', t: 0, aviso, ox: o.x + 0.5, oy: o.y + 0.5, dest: o.dest.id, path: o.path, muro: o.muro, fuerza, bandidos, n0: cuantos, botin: {}, escaparon: 0, recuperado: {}, dano: 0, pool: 0, pool0: 0, salida: false, lado: rumbo(o.x - o.hx, o.y - o.hy), total: 0, ola: 1, olas };
     st.inc.n++;
     const def = PK.Social.defense();
-    toast('¡Bandidos ' + Inc.banda.lado + '! Una banda de ' + cuantos + ' (fuerza aprox. ' + U.fmt(fuerza) + ') acampa a la vista y atacará en ' + U.fmtTime(aviso) + '. Tu defensa: ' + U.fmt(def) + '.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
+    if (olas > 1) toast('¡Asedio ' + Inc.banda.lado + '! Llegan ' + olas + ' oleadas de bandidos, la primera de ' + cuantos + ' (fuerza aprox. ' + U.fmt(fuerza) + '), en ' + U.fmtTime(aviso) + '. Los aldeanos se refugiarán en el Centro Urbano. Tu defensa: ' + U.fmt(def) + '.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
+    else toast('¡Bandidos ' + Inc.banda.lado + '! Una banda de ' + cuantos + ' (fuerza aprox. ' + U.fmt(fuerza) + ') acampa a la vista y atacará en ' + U.fmtTime(aviso) + '. Tu defensa: ' + U.fmt(def) + '.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
     Inc.banda.explicar = n === 0; // la primera vez, cómo se defiende (en otro aviso: uno solo no cabía en el celular)
     sfx('cuerno');
     g.stat('raids', 1);
     return true;
+  }
+
+  function banda(x, y, cuantos, hp) {
+    const out = [];
+    for (let i = 0; i < cuantos; i++) {
+      const ang = (i / cuantos) * Math.PI * 2;
+      out.push({ id: nid++, x: x + Math.cos(ang) * 0.9, y: y + Math.sin(ang) * 0.9, hp, max: hp, path: [], anim: Math.random(), flip: i % 2 === 1, back: false, i, hair: i % 4, saco: 0, espera: i * 0.55, eng: null, fuera: false });
+    }
+    return out;
+  }
+  // C5: la oleada siguiente de un asedio acampa donde la primera y ataca 30 s después
+  function siguienteOla() {
+    const bd = Inc.banda, st = S(), era = st.era;
+    bd.ola++;
+    const fuerza = Math.round(Inc.fuerza(era, st.inc.n - 1) * OLA[bd.ola - 1]);
+    const cuantos = U.clamp(3 + Math.floor((era - 1) / 2) + Math.floor((st.inc.n - 1) / 3) + bd.ola - 1, 3, 9), hp = Math.round((fuerza * 3) / cuantos);
+    bd.bandidos = bd.bandidos.concat(banda(bd.ox, bd.oy, cuantos, hp));
+    bd.fuerza = fuerza; bd.n0 = cuantos; bd.fase = 'aviso'; bd.t = 0; bd.aviso = ENTRE_OLAS; bd.total = 0; bd.botin = {}; bd.recuperado = {}; bd.salida = false;
+    toast('¡Oleada ' + bd.ola + ' de ' + bd.olas + '! ' + cuantos + ' bandidos más (fuerza aprox. ' + U.fmt(fuerza) + ') atacan en ' + ENTRE_OLAS + ' s.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
+    sfx('cuerno');
+  }
+  // en un asedio, los aldeanos corren al Centro Urbano
+  function refugio() {
+    const g = G();
+    if (PK.Life.scare) for (const u of g.units) if (u.owner === 'p' && u.kind === 'v' && !u.inside && !(u.scared > 0)) PK.Life.scare(u, 'El asedio');
   }
 
   // ---------- Bucle ----------
@@ -130,27 +154,33 @@
       if (bd.t >= bd.aviso) {
         bd.fase = 'marcha'; bd.t = 0;
         for (const b of bd.bandidos) b.path = bd.path.slice();
-        toast('¡Los bandidos ' + bd.lado + ' marchan sobre tu pueblo!', 'bad', { label: 'Ver', fn: () => Inc.ver() });
+        toast(bd.olas > 1 ? '¡Oleada ' + bd.ola + ' de ' + bd.olas + ': marchan sobre tu pueblo!' : '¡Los bandidos ' + bd.lado + ' marchan sobre tu pueblo!', 'bad', { label: 'Ver', fn: () => Inc.ver() });
         sfx('cuerno');
+        if (bd.olas > 1) refugio();
         salir();
       }
       return;
     }
     for (const b of bd.bandidos) {
       if (b.hp <= 0 || b.fuera) continue;
+      if (b.lento > 0) b.lento -= dt;
       // trabados con un soldado: pelean y no avanzan
       const rival = Inc.defensores.find(d => d.cuerpo && U.dist(d.x, d.y, b.x, b.y) < 0.95);
       b.eng = rival || null;
       if (rival) { mirar(b, rival.x, rival.y); if (bd.pool > 0) bd.dano += (bd.fuerza / bd.n0) * 0.15 * dt; continue; }
       if (b.espera > 0) { b.espera -= dt; continue; }
       if (bd.fase === 'marcha' || (bd.fase !== 'huida' && b.path.length)) {
-        if (paso(b, 1.35, dt) && !b.llego) {
+        const tr = PK.Asedios && PK.Asedios.pisar(b); // trampas (C5)
+        if (tr && tr.lento) b.lento = tr.lento;
+        if (tr && tr.dano) herir(b, b.max * tr.dano);
+        if (b.hp <= 0) continue;
+        if (paso(b, 1.35 * (b.lento > 0 ? 0.5 : 1), dt) && !b.llego) {
           b.llego = true;
           if (bd.fase === 'marcha') { bd.fase = bd.muro ? 'asedio' : 'saqueo'; bd.t = 0; if (!bd.muro) toast('¡Los bandidos están saqueando tus bodegas!', 'bad', { label: 'Ver', fn: () => Inc.ver() }); }
         }
         if (b.llego && dest) mirar(b, dest.cx, dest.cy);
       } else if (bd.fase === 'huida') {
-        if (paso(b, 1.7, dt)) escapa(b);
+        if (paso(b, 1.7 * (b.lento > 0 ? 0.5 : 1), dt)) escapa(b);
       }
       // los aldeanos que se cruzan con ellos salen corriendo al Centro Urbano
       if (PK.Life.scare) for (const u of g.units) if (u.owner === 'p' && u.kind === 'v' && !u.inside && !(u.scared > 0) && U.dist(u.x, u.y, b.x, b.y) < 1.2) PK.Life.scare(u, 'Los bandidos');
@@ -163,8 +193,8 @@
     if (bd.fase === 'saqueo' && bd.t >= SAQUEO) robar(dest);
     if (bd.fase === 'asedio' && bd.t >= ASEDIO) huir('Tus murallas les cerraron el paso: los bandidos se cansaron de golpear y se van.');
     if (bd.fase === 'marcha' && bd.t > 150) huir(null); // se perdieron por el camino
-    if (!vivos().some(b => !b.fuera)) terminar();
-    else if (bd.total > 420) { for (const b of vivos()) if (!b.fuera) escapa(b); terminar(); }
+    if (!vivos().some(b => !b.fuera)) { if (bd.ola < bd.olas) siguienteOla(); else terminar(); }
+    else if (bd.total > 420) { for (const b of vivos()) if (!b.fuera) escapa(b); if (bd.ola < bd.olas) siguienteOla(); else terminar(); }
   }
 
   // Se llevan hasta un 12% de cada recurso (menos si llegaron pocos), con un tope según la era.
@@ -228,8 +258,9 @@
     const muertos = bd.bandidos.filter(b => b.hp <= 0).length, x = bd.ox, y = bd.oy;
     const bajas = perdidas(bd);
     const robo = Object.keys(bd.botin).filter(r => bd.botin[r] - (bd.recuperado[r] || 0) > 0).map(r => U.fmt(bd.botin[r] - (bd.recuperado[r] || 0)) + ' de ' + D.RES[r].name.toLowerCase());
-    if (muertos >= bd.n0) {
+    if (muertos >= bd.bandidos.length) {
       const p = Inc.premio(st.era);
+      if (bd.olas > 1) { for (const k in p) p[k] *= 2; g.stat('asedios_ganados', 1); } // C5: el asedio paga doble
       g.give(p);
       st.inc.ganadas++;
       g.stat('raids_won', 1); g.stat('defenses_won', 1);
@@ -359,13 +390,19 @@
       if (b.owner !== 'p' || !b.done || (b.type !== 'tower' && b.type !== 'tc')) continue;
       b.cdInc = (b.cdInc || 0) - dt;
       if (b.cdInc > 0) continue;
-      const range = b.type === 'tower' ? 6 + 0.6 * b.lvl : 7.5;
-      let best = null, bdist = range;
+      const base = (b.type === 'tower' ? 5 + 2.5 * (b.lvl - 1) : 4 + 1.5 * (b.lvl - 1)) * muros;
+      // C5: la rama de la torre (asedios.js) cambia el ritmo, el daño, el alcance, el área y el freno
+      const tr = b.type === 'tower' && PK.Asedios ? PK.Asedios.tiro(b, base) : { cd: 1.4, dmg: base, alcance: 7.5 };
+      let best = null, bdist = tr.alcance;
       for (const o of blancos) { const k = U.dist(b.cx, b.cy, o.x, o.y); if (k < bdist) { bdist = k; best = o; } }
       if (!best) continue;
-      b.cdInc = b.type === 'tower' ? 1.0 : 1.4;
-      const dmg = (b.type === 'tower' ? 5 + 2.5 * (b.lvl - 1) : 4 + 1.5 * (b.lvl - 1)) * muros;
-      PK.Life.arrows.push({ x0: b.cx, y0: b.cy, z0: b.type === 'tower' ? 36 : 30, w: best, t: 0, dur: Math.max(0.15, bdist / 12), dmg, fn: a => herir(a.w, a.dmg) });
+      b.cdInc = tr.cd;
+      const dmg = tr.dmg;
+      PK.Life.arrows.push({ x0: b.cx, y0: b.cy, z0: b.type === 'tower' ? 36 : 30, w: best, t: 0, dur: Math.max(0.15, bdist / (tr.rama === 'balista' ? 18 : 12)), dmg, col: tr.col, fn: a => {
+        if (tr.area) { for (const o of vivos()) if (!o.fuera && U.dist(o.x, o.y, a.w.x, a.w.y) < tr.area) herir(o, a.dmg); if (PK.Render.burst) PK.Render.burst(a.w.x, a.w.y, [255, 160, 60], 14); }
+        else herir(a.w, a.dmg);
+        if (tr.lento && a.w.hp > 0) a.w.lento = Math.max(a.w.lento || 0, tr.lento);
+      } });
       sfx('arrow');
     }
   }
@@ -473,7 +510,7 @@
     const bd = Inc.banda;
     if (!bd) return null;
     const v = vivos().filter(b => !b.fuera).length;
-    if (bd.fase === 'aviso') return { k: 'inc-aviso', name: 'Bandidos ' + bd.lado, left: bd.aviso - bd.t, pct: bd.t / bd.aviso };
+    if (bd.fase === 'aviso') return { k: 'inc-aviso' + bd.ola, name: bd.olas > 1 ? 'Asedio: oleada ' + bd.ola + ' de ' + bd.olas : 'Bandidos ' + bd.lado, left: bd.aviso - bd.t, pct: bd.t / bd.aviso };
     if (bd.fase === 'marcha') return { k: 'inc-marcha' + v, name: 'Bandidos en camino (' + v + ')', left: null, pct: 1 - v / bd.n0 };
     if (bd.fase === 'saqueo') return { k: 'inc-saqueo', name: '¡Saqueando tus bodegas!', left: SAQUEO - bd.t, pct: bd.t / SAQUEO };
     if (bd.fase === 'asedio') return { k: 'inc-asedio', name: 'Golpean tus murallas', left: ASEDIO - bd.t, pct: bd.t / ASEDIO };

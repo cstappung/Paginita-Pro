@@ -385,6 +385,8 @@
     out.sort((a, b) => a.left - b.left);
     const inc = PK.Incursiones && PK.Incursiones.fila();
     if (inc) out.unshift(Object.assign(inc, { raid: true, icon: Sp.icon('war'), go: () => PK.Incursiones.ver() }));
+    const sq = PK.Saqueos && PK.Saqueos.fila(); // C6: partida de saqueo de un reino del servidor
+    if (sq) out.unshift(Object.assign(sq, { icon: Sp.icon('war') }));
     // maestros sin trabajo: un recordatorio para que no queden parados
     const free = g.builders() - g.buildersBusy();
     if (free > 0 && g.buildings.some(b => b.owner === 'p' && b.done && !b.def.noUp && !b.upg && b.lvl < g.maxLvl(b.type))) out.push({ k: 'free' + free, idle: true, icon: Sp.icon('hammer'), name: free === 1 ? '1 maestro libre' : free + ' maestros libres', go: () => UI.openWorks() });
@@ -739,7 +741,7 @@
     else if (b.type === 'market') act.append(UI.btn('Abrir mercado', () => PK.Social.openMarket()));
     else if (b.type === 'guild') act.append(UI.btn('Abrir gremio', () => PK.Social.openGuild()));
     else if (b.type === 'barracks') UI.barracksQuick(act);
-    else if (b.type === 'tower') act.append(el('p', { class: 'small' }, 'Dispara a los lobos cercanos y suma a la defensa del reino (' + U.fmt(PK.Social.defense()) + ').'), UI.btn('Cuartel', () => PK.Social.openWar('troops')), UI.btn('Murallas', () => UI.openBarracks('defense'), { small: true }));
+    else if (b.type === 'tower') act.append(el('p', { class: 'small' }, 'Dispara a los lobos cercanos y suma a la defensa del reino (' + U.fmt(PK.Social.defense()) + ').'), PK.Asedios ? PK.Asedios.panelTorre(b) : '', UI.btn('Cuartel', () => PK.Social.openWar('troops')), UI.btn('Murallas y trampas', () => UI.openBarracks('defense'), { small: true }));
     else if (b.type === 'tavern') act.append(el('p', { class: 'small' }, 'Encargos en el tablón: ' + PK.Exp.board().length + '.'), UI.btn('Ver encargos', () => UI.openBarracks('missions'), { cls: 'gold' }));
     else if (b.type === 'arena') act.append(el('p', { class: 'small' }, 'Tus tropas en casa ganan ' + G().bst(b).armyXp + ' de experiencia por hora.'), UI.btn('Ver tropas', () => UI.openBarracks('troops'), { small: true }));
     else if (b.type === 'wishwell' && b.done) {

@@ -16,6 +16,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 // En el servidor local no hay RTDB: con PK_PASE_LIBRE=1 (pruebas) la pista dorada se activa sin compra.
 const routes = {
   'POST /api/pase/claim': (p, b) => sim.paseClaim(p, b),
+  'POST /api/saqueo': (p, b) => sim.saqueo(p, b),
   'POST /api/pase/refresh': p => sim.paseActivar(p, !!process.env.PK_PASE_LIBRE),
   'GET /api/status': () => sim.status(),
   'POST /api/join': (p, b) => sim.join(b),

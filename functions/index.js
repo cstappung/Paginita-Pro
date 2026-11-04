@@ -70,6 +70,7 @@ const RUTAS = {
   'POST /api/guilds/need/send': (p, b) => sim.sendNeed(p, b),
   'POST /api/claim': (p, b) => sim.claim(p, b),
   'POST /api/pase/claim': (p, b) => sim.paseClaim(p, b),
+  'POST /api/saqueo': (p, b) => sim.saqueo(p, b),
   'POST /api/conquer': (p, b) => sim.conquer(p, b),
   'POST /api/conquer-bot': (p, b) => sim.conquerBot(p, b),
   'GET /api/ranking': p => sim.ranking(p),

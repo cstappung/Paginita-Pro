@@ -316,6 +316,7 @@
         el('li', null, 'Bloquean el paso a todos. Las puertas dejan pasar a tus aldeanos y carretas, pero no a los lobos.'),
         el('li', null, 'Una parcela rodeada por murallas (también valen edificios y agua) queda amurallada: su defensa se multiplica según el material (x1,3 empalizada, x1,6 piedra, x2 sillares, x2,6 bastión). Los aldeanos de adentro están a salvo de los lobos.'),
         el('li', null, 'Al mejorar, todas las murallas cambian de material juntas. Desarmar devuelve la mitad.')));
+    if (PK.Asedios) pane.append(PK.Asedios.panelTrampas()); // C5 (pk-22)
   }
 
   function logTab(pane) {

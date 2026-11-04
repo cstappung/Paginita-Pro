@@ -685,3 +685,34 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Left for part 2 (`pk-22`):** C1 terrain (`esc.obstaculos`), C5 sieges by
   waves, tower branches and traps, C6 server raid parties (bots of `sim.js`,
   tribute / fight / ally).
+
+## Combate 2.0, part 2 (`pk-22`, Phase 4: C1 terrain, C5, C6) — Phase 4 done
+
+- **C1 terrain** (`OBST` in `batalla.js`, `b.obst`, seeded by run id): rocks
+  (no one walks through them; a target right behind one takes ×0.6 from
+  shots), a river crossable only by the middle bridge (`rumboRio` walks to
+  it first; swamp and temple) and a hill (ranged on it +1.5 range). Drawn
+  by `dibujarTerreno`. Measured: bandits 80–82% as before, cave 78%. The
+  bridge funnels the enemy into splash, so mages and riders win more there.
+- **C5, sieges:** from Era III one raid in three (`st.inc.n % 3 === 2`) is 3
+  waves (`OLA` power 0.7/0.85/1.1, 30 s apart, `siguienteOla`). Villagers run
+  to the TC (`refugio`), and a won siege pays double. Live only, like raids.
+  **Tower branches** (`js/asedios.js`, `b.rama`, saved in the building's
+  `toJSON` in `entities.js` and read back in `game.js`) at level 5 from Era III:
+  arquera, balista, aceite (area), mística (slow). Only against raids:
+  `Social.defense` does not change, so `sim.js` needs no limit. **Traps**
+  (`S.trampas`, max 16, one tile in your territory, `PK.Asedios.herramienta`
+  handled in `input.js` like the flag tool): spikes hurt 35% of a bandit's
+  life (3 uses), tar slows 4 s (5 uses).
+- **C6, raid parties from the server's realms** (`tickSaqueos` in `sim.js`,
+  client `js/saqueos.js`): from Era IV, only for an online player out of
+  truce, every 2.5–5 h (×0.6 for «conquistador» realms, strength ≥ 1.1). 3
+  min warning, a column in the realm's colour on the map and minimap. Choices
+  through `POST /api/saqueo`: tributo (resolves at once; the client pays when
+  `saqueo_fin` arrives), pelear (default), ayuda (needs a guild, +30%
+  defense; a placeholder until S1 diplomacy). The server compares the last
+  snapshot's defense with the power; a win arrives as a prize through the
+  inbox, a loss as `pct` + `tope` the client takes from its stores.
+  `D.saqTope`/`D.saqTributo` live in `data.js` (both sides). Local mode: none.
+  Test: `node tools/saqueo-test.js` (in-process, moves the clock).
+- `D.PROTO` 5: deploy the function with this delivery.

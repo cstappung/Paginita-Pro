@@ -611,8 +611,10 @@
       const t = Math.min(1, a.t / a.dur), [x0, y0] = R.iso(a.x0, a.y0), [x1, y1] = R.iso(a.w.x, a.w.y);
       const x = x0 + (x1 - x0) * t, y = y0 - a.z0 + (y1 - 6 - (y0 - a.z0)) * t - Math.sin(t * Math.PI) * 14;
       const t2 = Math.max(0, t - 0.08), xb = x0 + (x1 - x0) * t2, yb = y0 - a.z0 + (y1 - 6 - (y0 - a.z0)) * t2 - Math.sin(t2 * Math.PI) * 14;
-      pxLine(ctx, xb, yb, x, y, '#3a2a1a'); ctx.fillStyle = '#e8e4dc'; ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      pxLine(ctx, xb, yb, x, y, a.col ? '#2a1a10' : '#3a2a1a'); ctx.fillStyle = a.col || '#e8e4dc'; ctx.fillRect(Math.round(x), Math.round(y), a.col ? 2 : 1, a.col ? 2 : 1);
     }
+    if (PK.Asedios) PK.Asedios.dibujar(ctx, R); // trampas (C5)
+    if (PK.Saqueos) PK.Saqueos.dibujar(ctx, R); // partidas de saqueo (C6)
     // partículas
     for (let i = R.particles.length - 1; i >= 0; i--) {
       const p = R.particles[i];
@@ -1033,6 +1035,7 @@
       ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
+    if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
     if (PK.Campana && G().state && G().state.campana) { // el lugar del capítulo en curso: un punto rojo y dorado que late
       const n = PK.Campana.actual(), l = n && PK.Campana.lugar(n);
       if (l) { const [x, y] = toMM(l.x + 0.5, l.y + 0.5), s = Math.max(2, Math.round(zk * 2)), on = Math.floor(performance.now() / 350) % 2; ctx.fillStyle = on ? '#ffd040' : '#c02020'; ctx.fillRect(Math.round(x) - s, Math.round(y) - s, s * 2, s * 2); }

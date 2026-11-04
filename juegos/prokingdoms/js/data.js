@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 4;
+  D.PROTO = 5;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -594,6 +594,10 @@
     mage: { name: 'Mago de batalla', role: 'Daño en área desde lejos. x2 contra abisales y x1,4 contra gólems.', cost: { food: 60, gold: 160, books: 3 }, time: 45, power: 34, era: 6, lvl: 8, vs: { abyss: 2, golem: 1.4 } },
     catapult: { name: 'Catapulta', role: 'x2 contra gólems y x1,8 contra gigantes; la mitad contra bestias.', cost: { wood: 200, gold: 120, machinery: 2 }, time: 60, power: 60, era: 5, lvl: 7, vs: { golem: 2, beast: 0.5, giant: 1.8 } },
   };
+  // Partidas de saqueo de los reinos simulados (C6, pk-22; las decide server/sim.js): tope por recurso de una
+  // derrota y el tributo que las hace volver.
+  D.saqTope = era => Math.round(250 * Math.pow(1.8, era - 1));
+  D.saqTributo = era => { const t = D.saqTope(era); return { food: Math.round(t * 0.4), gold: Math.round(t * 0.3) }; };
   // Veteranía: cada tipo de tropa junta experiencia en las expediciones (y en la Arena). +4% de fuerza por rango.
   D.RANKS = ['Recluta', 'Soldado', 'Curtido', 'Veterano', 'Sargento', 'Élite', 'Campeón', 'Héroe', 'Leyenda', 'Mito', 'Inmortal'];
   D.rankOf = xp => Math.min(D.RANKS.length - 1, Math.floor(Math.log2(1 + (xp || 0) / 40)));

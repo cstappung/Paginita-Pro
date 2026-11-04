@@ -401,7 +401,7 @@ function sync(p, b) {
     });
   });
   ensureTerr(w);
-  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
+  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -1040,11 +1040,73 @@ function status() {
   return { ok: true, players: ps.length, online: ps.filter(p => t - p.lastSeen < ONLINE_MS).length, worlds: store.all('worlds').length };
 }
 
+// ---------- Partidas de saqueo de los reinos simulados (Fase 4, C6, pk-22) ----------
+// Desde la Era IV, cada tanto un reino que maneja el servidor manda una partida contra un jugador conectado (que la
+// ve marchar, con aviso). El jugador elige: pagar tributo, pelear (por defecto) o pedir ayuda a su gremio, que suma
+// a su defensa. El servidor decide el resultado con la defensa de la última foto (la misma que usa la conquista).
+// Los recursos viven en el cliente: el tributo lo paga él y una derrota le llega por el buzón como un porcentaje que
+// descuenta; una victoria le llega como premio por el buzón (y entra en lo que su foto puede crecer).
+const SAQ = { era: 4, aviso: 180, entre: [2.5, 5], conq: 0.6 };
+const saqTope = D.saqTope;
+const conquistador = str => str >= 1.1;   // los reinos más fuertes (strength de D.REALM_SLOTS) atacan más seguido
+function saqueoInfo(p) {
+  const q = p.saqueo;
+  return q && !q.fin ? { id: q.id, from: q.from, slot: q.slot, power: q.power, arrive: q.arrive, at: q.at, eleccion: q.eleccion || null, tributo: q.tributo, ayuda: !!guildOf(p), conq: q.conq } : null;
+}
+function tickSaqueos() {
+  const t = now();
+  for (const p of store.all('players')) {
+    const q = p.saqueo;
+    if (q && !q.fin && t >= q.arrive) { resolverSaqueo(p, q); continue; }
+    if (q && !q.fin) continue;
+    const s = p.snap;
+    if (!s || s.era < SAQ.era || t - p.lastSeen > ONLINE_MS || s.truce) continue;
+    if (!p.saqNext) { p.saqNext = t + rand(0.5, 1.5) * 3600e3; store.touch('players'); continue; }
+    if (t < p.saqNext) continue;
+    const w = store.get('worlds', p.world);
+    if (!w) continue;
+    // el reino simulado más cercano
+    const [hx, hy] = D.REALM_SLOTS[p.slot].home;
+    let best = -1, bd = 1e9;
+    w.slots.forEach((pid, slot) => { if (pid || slot === p.slot) return; const h = D.REALM_SLOTS[slot].home, d = Math.hypot(h[0] - hx, h[1] - hy); if (d < bd) { bd = d; best = slot; } });
+    if (best < 0) { p.saqNext = t + 6 * 3600e3; continue; }
+    const bot = D.REALM_SLOTS[best].bot, str = bot.strength, conq = conquistador(str);
+    const power = Math.round(Math.max(60 * s.era * s.era, (s.defense || 0) * rand(0.75, 1.2)) * str);
+    p.saqueo = { id: rid('s'), slot: best, from: bot.realm, power, at: t, arrive: t + SAQ.aviso * 1000, tributo: D.saqTributo(s.era), conq };
+    p.saqNext = t + rand(SAQ.entre[0], SAQ.entre[1]) * 3600e3 * (conq ? SAQ.conq : 1);
+    push(p, { type: 'saqueo', sid: p.saqueo.id, from: bot.realm, power, arrive: p.saqueo.arrive, text: '¡' + bot.realm + ' manda una partida de saqueo contra tu pueblo!' });
+    store.touch('players');
+  }
+}
+function saqueo(p, b) {
+  const q = p.saqueo, acc = b && b.accion;
+  if (!q || q.fin || (b.id && b.id !== q.id)) throw new GameError('No hay ninguna partida en camino.');
+  if (now() >= q.arrive) throw new GameError('Ya llegaron.');
+  if (!['tributo', 'pelear', 'ayuda'].includes(acc)) throw new GameError('Esa opción no existe.');
+  if (acc === 'ayuda' && !guildOf(p)) throw new GameError('Necesitas un gremio para pedir ayuda.');
+  if (q.eleccion === 'tributo') throw new GameError('Ya pagaste el tributo.');
+  q.eleccion = acc;
+  // el tributo resuelve en el acto: se vuelven a casa (el cliente lo descuenta de sus bodegas)
+  if (acc === 'tributo') { q.fin = true; push(p, { type: 'saqueo_fin', sid: q.id, res: 'tributo', from: q.from, text: q.from + ' aceptó tu tributo y su partida vuelve a casa.' }); }
+  store.touch('players');
+  return { saqueo: saqueoInfo(p), inbox: p.inbox };
+}
+function resolverSaqueo(p, q) {
+  q.fin = true;
+  const s = p.snap || {}, era = s.era || SAQ.era, tope = saqTope(era);
+  const ayuda = q.eleccion === 'ayuda' && guildOf(p) ? 1.3 : 1;
+  const def = Math.max(1, (s.defense || 0) * ayuda) * rand(0.85, 1.15), atk = q.power * rand(0.85, 1.15), gano = def >= atk;
+  const base = { sid: q.id, from: q.from, atk: Math.round(atk), def: Math.round(def), ayuda: ayuda > 1 };
+  if (gano) push(p, Object.assign(base, { type: 'saqueo_fin', res: 'gano', premio: { gold: Math.round(tope * 0.35), gems: era }, text: '¡Rechazaste la partida de saqueo de ' + q.from + '!' }));
+  else push(p, Object.assign(base, { type: 'saqueo_fin', res: 'perdio', pct: 0.08, tope, text: 'La partida de ' + q.from + ' saqueó tus bodegas.' }));
+  store.touch('players');
+}
 function tick() {
   for (const w of store.all('worlds')) tickWorld(w);
   tickMarket();
   tickGuilds();
   tickCamps();
+  tickSaqueos();
 }
 // ---------- Pase del Reino (Fase 8) ----------
 // Los puntos los decide el servidor: el cliente informa sus estadísticas acumuladas (D.PASE_STATS) y aquí se suman
@@ -1137,5 +1199,5 @@ if (!process.env.PK_TICK_PEREZOSO) setInterval(tick, 5000).unref();
 module.exports = {
   GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
   listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
-  paseInfo, paseClaim, paseActivar, pasePeriodo,
+  paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos,
 };

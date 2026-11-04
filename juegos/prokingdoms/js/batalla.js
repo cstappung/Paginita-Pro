@@ -113,6 +113,54 @@
     campo: { suelo: [86, 126, 58], tono: 16, deco: 'pasto' },
   };
 
+  // C1 (pk-22): terreno del lugar. rocas: tapan a los tiradores de las flechas que vienen del otro lado y no se
+  // pueden atravesar; puente: un río que solo se cruza por el medio; loma: los tiradores encima tiran +1,5 más lejos.
+  const OBST = { camp: ['rocas', 'loma'], cave: ['rocas'], lair: ['rocas'], crypt: ['rocas'], crater: ['loma', 'rocas'], nest: ['loma'], swamp: ['puente'], giants: ['rocas'], temple: ['puente'], campo: ['loma'] };
+  B.OBST_TXT = { rocas: 'Rocas: cubren de las flechas a quien esté detrás.', puente: 'Un río: solo se cruza por el puente del medio.', loma: 'Una loma: tus tiradores encima disparan más lejos.' };
+  function terreno(b, r) {
+    const rng = U.rng(5113 + (r.id || 0) * 17), tipos = OBST[b.lugar] || [], o = { rocas: [], rio: null, loma: null, tipos };
+    for (const t of tipos) {
+      if (t === 'rocas') for (let i = 0; i < 3; i++) o.rocas.push({ u: 11 + rng() * 8, v: 2 + rng() * (LV - 4), r: 0.7 + rng() * 0.4, s: Math.floor(rng() * 1e6) });
+      if (t === 'puente') o.rio = { u0: 14, u1: 16, v0: LV / 2 - 1.6, v1: LV / 2 + 1.6 };
+      if (t === 'loma') o.loma = { u: 3.2, v: rng() < 0.5 ? LV * 0.28 : LV * 0.72, r: 2.4 };
+    }
+    return o;
+  }
+  // ¿la piedra tapa al blanco del tirador? (la roca está entre los dos y pegada al blanco)
+  function cubierto(b, de, o) {
+    const ob = b.obst;
+    if (!ob || !ob.rocas.length) return false;
+    for (const k of ob.rocas) {
+      if (Math.hypot(o.u - k.u, o.v - k.v) > k.r + 1.3) continue;
+      const du = o.u - de.u, dv = o.v - de.v, L2 = du * du + dv * dv || 1, t = U.clamp(((k.u - de.u) * du + (k.v - de.v) * dv) / L2, 0, 1);
+      if (t > 0.05 && t < 1 && Math.hypot(de.u + du * t - k.u, de.v + dv * t - k.v) < k.r) return true;
+    }
+    return false;
+  }
+  const enLoma = (b, f) => !!(b.obst && b.obst.loma && Math.hypot(f.u - b.obst.loma.u, f.v - b.obst.loma.v) < b.obst.loma.r);
+  // nadie atraviesa una roca, y el río solo se cruza por el puente
+  function obstaculos(b, list) {
+    const ob = b.obst;
+    if (!ob) return;
+    for (const f of list) {
+      for (const k of ob.rocas) { const du = f.u - k.u, dv = f.v - k.v, d = Math.hypot(du, dv) || 0.01; if (d < k.r + 0.25) { f.u = k.u + (du / d) * (k.r + 0.25); f.v = k.v + (dv / d) * (k.r + 0.25); } }
+      const rio = ob.rio;
+      if (rio && f.u > rio.u0 && f.u < rio.u1 && (f.v < rio.v0 || f.v > rio.v1)) {
+        // empuja hacia el borde más cercano del río, o hacia el puente si ya está casi en él
+        const aOrilla = Math.min(f.u - rio.u0, rio.u1 - f.u), aPuente = f.v < rio.v0 ? rio.v0 - f.v : f.v - rio.v1;
+        if (aPuente < aOrilla + 0.4) f.v = U.clamp(f.v, rio.v0, rio.v1); else f.u = f.u - rio.u0 < rio.u1 - f.u ? rio.u0 : rio.u1;
+      }
+    }
+  }
+  // al caminar hacia alguien al otro lado del río, primero hacia el puente
+  function rumboRio(b, f, o) {
+    const rio = b.obst && b.obst.rio;
+    if (!rio) return o;
+    const cruza = (f.u < rio.u0 && o.u > rio.u0) || (f.u > rio.u1 && o.u < rio.u1);
+    if (!cruza || (f.v >= rio.v0 && f.v <= rio.v1 && Math.abs(f.u - (rio.u0 + rio.u1) / 2) < 2.5)) return o;
+    return { u: f.u < rio.u0 ? rio.u0 - 0.3 : rio.u1 + 0.3, v: U.clamp(f.v, rio.v0 + 0.4, rio.v1 - 0.4) };
+  }
+
   // ---------- Armar la batalla ----------
   const porUnidad = k => PK.Exp.powerVs({ [k]: 1 }, {}); // fuerza de un soldado con veteranía, era y bonos
   function lugarDe(r) {
@@ -188,6 +236,7 @@
     }
     acomodar(b.mios); acomodar(b.suyos.filter(f => !f.esJefe));
     ponerRoles(b, r);
+    b.obst = terreno(b, r);
     // afijos de la semana (incursion.js)
     b.af = r.inc ? r.inc.afijos.slice() : [];
     if (b.af.includes('doble')) for (const f of b.suyos) f.max = f.hp = f.hp * 1.3;
@@ -274,6 +323,7 @@
     if (b.peligros.length) peligros(b, dt);
     separar(mios, b.orden === 'dispersar' ? 1.35 : 0.7, dt);
     separar(suyos, 0.7, dt);
+    obstaculos(b, mios); obstaculos(b, suyos);
     tiros(b, dt);
     for (const e of b.efectos.slice()) { e.t += dt; if (e.t > e.dur) b.efectos.splice(b.efectos.indexOf(e), 1); }
     for (const x of b.textos.slice()) { x.t += dt; if (x.t > 1.2) b.textos.splice(b.textos.indexOf(x), 1); }
@@ -311,14 +361,15 @@
     if (f.encantado > 0) { f.modo = 'idle'; return; } // la Voz del Abismo (H4)
     if (!f.objetivo || f.objetivo.muerto || Math.random() < dt * 0.6) f.objetivo = elegir(b, f, rivales);
     const o = f.objetivo;
-    const d = cerca(f, o), alcance = st.alcance * (f.lado === 'p' && st.dispara && b.af.includes('niebla') ? 0.6 : 1);
+    const d = cerca(f, o), alcance = st.alcance * (f.lado === 'p' && st.dispara && b.af.includes('niebla') ? 0.6 : 1) + (st.dispara && enLoma(b, f) ? 1.5 : 0);
     f.flip = o.u < f.u;
     // mantener la línea: tus cuerpo a cuerpo no salen de su fila hasta que el enemigo se acerca
     const quieto = f.lado === 'p' && b.orden === 'linea' && !st.dispara && d > 2.6 && f.u >= f.u0 - 0.5;
     if (d > alcance) {
       if (quieto || f.atado > 0) { f.modo = 'idle'; return; }
+      const ir = rumboRio(b, f, o), di = Math.hypot(ir.u - f.u, ir.v - f.v) || 0.01;
       const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * (f.lado === 'p' && b.cancion > 0 ? 1.25 : 1) * (b.af.includes('helado') ? 0.8 : 1) * (f.lento > 0 ? 0.55 : 1) * dt;
-      f.u += ((o.u - f.u) / d) * sp; f.v += ((o.v - f.v) / d) * sp;
+      f.u += ((ir.u - f.u) / di) * sp; f.v += ((ir.v - f.v) / di) * sp;
       f.modo = 'walk';
       return;
     }
@@ -406,7 +457,7 @@
         // el virote no se pierde: si su blanco ya cayó, sigue hasta el enemigo más cercano (los tiros lentos y pesados
         // se desperdiciaban todos en el mismo cuerpo)
         if (p.tipo === 'virote' && p.o.muerto) { const rv = (p.de.lado === 'p' ? b.suyos : b.mios).filter(o => !o.muerto && cerca(o, p.o) < 2.5).sort((a, c) => cerca(a, p.o) - cerca(c, p.o))[0]; if (rv) p.o = rv; }
-        herir(b, p.o, p.dmg * (p.de && p.de.lado === 'p' && (p.tipo === 'flecha' || p.tipo === 'virote') ? escudo(b, p.o, p.de) : 1), p.de);
+        herir(b, p.o, p.dmg * (p.de && p.de.lado === 'p' && (p.tipo === 'flecha' || p.tipo === 'virote') ? escudo(b, p.o, p.de) : 1) * (p.de && cubierto(b, p.de, p.o) ? 0.6 : 1), p.de);
         // brujas (H4): la maldición frena; con clérigos dura la mitad
         if (p.de && p.de.st.maldice && p.o.lado === 'p') p.o.lento = Math.max(p.o.lento || 0, hayClerigo(b, b.mios.filter(f => !f.muerto)) ? 1.2 : 2.5);
       }
@@ -918,7 +969,8 @@
       [...new Set(conRol.map(f => f.rol))].map(id => btn(el('span', null, el('i', { class: 'bt-rol', style: { background: B.ROLES[id].col } }), (id === 'elite' ? 'A la ' : 'Al ') + B.ROLES[id].nombre), () => { B.enfocar(b.id, 'rol:' + id); pintarControles(); }, { small: true, cls: b.foco === 'rol:' + id ? 'gold' : '', title: nombreDe(conRol.find(f => f.rol === id)) + ': ' + B.ROLES[id].desc }))) : '';
     const jf = b.jefeF && Object.keys(JEFE).find(k => JEFE[k] === b.jefeF.st);
     const consejo = el('p', { class: 'small bt-tip' }, jf ? B.CONSEJO_JEFE[jf] : kinds.map(k => B.CONSEJO[k] || D.ENEMY[k].desc).join(' '),
-      conRol.length ? ' ' + [...new Set(conRol.map(f => f.rol))].map(id => B.CONSEJO_ROL[id]).join(' ') : '');
+      conRol.length ? ' ' + [...new Set(conRol.map(f => f.rol))].map(id => B.CONSEJO_ROL[id]).join(' ') : '',
+      b.obst && b.obst.tipos.length ? ' ' + b.obst.tipos.map(t => B.OBST_TXT[t]).join(' ') : '');
     // el héroe: su retrato, la habilidad con la recarga a la vista (un toque) y «sola» para que la use él
     let heroeRow = '';
     v.habBtn = null;
@@ -1077,6 +1129,36 @@
     if (a.spr === 'dragon') return null;
     return Sp.villager(a.spr === 'esqueleto' ? PALIDO : BANDIDO, 1, a.spr === 'esqueleto' ? 0 : 2, modo, frame % 4, null, f.flip, modo === 'work' ? 'knife' : null);
   }
+  // C1: el terreno, dibujado sobre el suelo y debajo de las figuras
+  function dibujarTerreno(ctx, ob, now) {
+    if (ob.loma) {
+      const [x, y] = aPx(ob.loma.u, ob.loma.v), R = ob.loma.r * TILE;
+      ctx.fillStyle = 'rgba(255,240,190,0.10)'; ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.62, 0, 0, 6.3); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,190,0.08)'; ctx.beginPath(); ctx.ellipse(x - 2, y - 3, R * 0.7, R * 0.42, 0, 0, 6.3); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(x + 3, y + R * 0.45, R * 0.9, R * 0.2, 0, 0, 6.3); ctx.fill();
+    }
+    if (ob.rio) {
+      const rio = ob.rio, caja = (u0, v0, u1, v1) => { const [a, c] = aPx(u0, v0), [e, f] = aPx(u1, v1); return [Math.min(a, e), Math.min(c, f), Math.abs(e - a), Math.abs(f - c)]; };
+      for (const [v0, v1] of [[0, rio.v0], [rio.v1, LV]]) {
+        const [x, y, w, h] = caja(rio.u0, v0, rio.u1, v1);
+        ctx.fillStyle = '#2a5a78'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'rgba(160,210,240,0.35)';
+        for (let i = 0; i < 8; i++) { const k = ((now / 900 + i * 0.37) % 1); ctx.fillRect(Math.round(x + (w > h ? k * w : (i % 3) * w / 3 + 2)), Math.round(y + (w > h ? (i % 3) * h / 3 + 2 : k * h)), 4, 1); }
+      }
+      const [x, y, w, h] = caja(rio.u0 - 0.2, rio.v0, rio.u1 + 0.2, rio.v1);
+      ctx.fillStyle = '#7a5a36'; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#5a3e22'; if (w > h) for (let i = 0; i < w; i += 4) ctx.fillRect(x + i, y, 1, h); else for (let i = 0; i < h; i += 4) ctx.fillRect(x, y + i, w, 1);
+    }
+    for (const k of ob.rocas) {
+      const [x, y] = aPx(k.u, k.v), R = k.r * TILE, rr = U.rng(k.s);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, R, R * 0.45, 0, 0, 6.3); ctx.fill();
+      for (let i = 0; i < 5; i++) {
+        const dx = (rr() - 0.5) * R, dy = (rr() - 0.7) * R * 0.6, w = R * (0.6 + rr() * 0.5), h = R * (0.5 + rr() * 0.4);
+        ctx.fillStyle = i % 2 ? '#6e6a62' : '#837e74'; ctx.fillRect(Math.round(x + dx - w / 2), Math.round(y + dy - h), Math.round(w), Math.round(h));
+        ctx.fillStyle = '#a19b8e'; ctx.fillRect(Math.round(x + dx - w / 2), Math.round(y + dy - h), Math.round(w), 2);
+      }
+    }
+  }
   // marcas que quedan en el suelo: cráteres, quemaduras, huesos, rocas, caídos
   function dibujarMarca(ctx, m) {
     const a = m.t < 10 ? 1 : Math.max(0, 1 - (m.t - 10) / 4), x = Math.round(m.x), y = Math.round(m.y), r = m.rot;
@@ -1135,6 +1217,7 @@
     T(esc.mx + ox, esc.my + oy);
     // suelo: marcas y aros de impacto
     for (const m of v.marcas) { m.t += dt; dibujarMarca(ctx, m); }
+    if (b.obst) dibujarTerreno(ctx, b.obst, now);
     if (v.marcas.length && v.marcas[0].t > 14) v.marcas = v.marcas.filter(m => m.t < 14);
     // círculos de los jefes: se llenan hasta que estallan (meteoros, cristales)
     for (const p of b.peligros || []) {

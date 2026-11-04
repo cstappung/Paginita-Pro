@@ -143,7 +143,7 @@
 
   function tap(x, y) {
     const g = G();
-    if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode || I.flagTool) { leftClick(x, y, false, true); return; }
+    if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode || I.flagTool || (PK.Asedios && PK.Asedios.herramienta)) { leftClick(x, y, false, true); return; }
     const it = R().pick(x, y);
     const now = performance.now(), prev = lastTap;
     lastTap = { x, y, t: now };
@@ -195,6 +195,7 @@
   I.cancelTool = function () {
     const L = PK.Logi;
     I.flagTool = false;
+    if (PK.Asedios) PK.Asedios.cancelar();
     L.tool = null; L.beltFrom = null; I.roadStart = null;
     PK.Def.cancel();
     R().roadGhost = null; R().beltGhost = null;
@@ -275,6 +276,7 @@
   function leftClick(sx, sy, shift, touch) {
     const g = G();
     if (I.flagTool) { const [tx, ty] = R().screenToTile(sx, sy); I.flagAt(tx, ty); return; }
+    if (PK.Asedios && PK.Asedios.herramienta) { const [tx, ty] = R().screenToTile(sx, sy); PK.Asedios.click(tx, ty); return; } // trampas (C5)
     if (PK.Logi.tool) { toolClick(sx, sy); return; }
     if (PK.Def.tool) { const [tx, ty] = R().screenToTile(sx, sy); PK.Def.click(Math.floor(tx), Math.floor(ty)); PK.UI.refreshPanel(true); return; }
     if (PK.Terr.mode) {
@@ -311,7 +313,7 @@
 
   function rightClick(sx, sy) {
     const g = G();
-    if (PK.Logi.tool || PK.Def.tool || I.flagTool) { I.cancelTool(); return; }
+    if (PK.Logi.tool || PK.Def.tool || I.flagTool || (PK.Asedios && PK.Asedios.herramienta)) { I.cancelTool(); return; }
     if (PK.Terr.mode) { PK.Terr.toggle(false); return; }
     if (g.placing) { g.placing = null; R().ghost = null; PK.UI.refreshPanel(true); return; }
     const it = R().pick(sx, sy);
@@ -382,7 +384,7 @@
     I.keys[k] = true;
     if (k === 'escape') {
       if (PK.UI.closeModal()) return;
-      if (PK.Logi.tool || PK.Def.tool || I.flagTool) { I.cancelTool(); return; }
+      if (PK.Logi.tool || PK.Def.tool || I.flagTool || (PK.Asedios && PK.Asedios.herramienta)) { I.cancelTool(); return; }
       if (PK.Terr.mode) { PK.Terr.toggle(false); return; }
       if (g.placing) { g.placing = null; R().ghost = null; } else g.sel = null;
       PK.UI.refreshPanel(true);
