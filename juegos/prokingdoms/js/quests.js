@@ -33,6 +33,7 @@
       case 'level': return [G().levelCount(req.lvl, req.b, req.recipe), req.n];
       case 'explored': return [PK.World.fogCount, req.n];
       case 'flag': return [st.flags[req.k] ? 1 : 0, 1];
+      case 'cap': return [st.campana && st.campana.hechos && st.campana.hechos[req.n] ? 1 : 0, 1];
       case 'walled': return [PK.Def.walledCount(), req.n];
       case 'wallTier': return [st.def.tier, req.n];
       case 'all': {
@@ -350,14 +351,16 @@
     right.append(el('h3', null, 'Recompensa'), rewardEl(q.reward));
     if (q.perk) right.append(el('p', { class: 'small good-t' }, 'Mejora permanente: ' + D.perkText(q.perk) + '.'));
     if (q.unlock) right.append(el('div', { class: 'unlock' }, el('img', { src: PK.Sprites.buildingIcon(q.unlock) }), el('div', null, el('b', null, 'Desbloquea: ' + D.BUILD[q.unlock].name), el('p', { class: 'small' }, D.BUILD[q.unlock].desc))));
+    if (q.cap && s !== 'locked' && PK.Campana) right.append(PK.Campana.caja(q.cap));
     if (s === 'ready') right.append(PK.UI.btn('Reclamar recompensa', () => { Q.claim(q.id); PK.UI.rerender(); }, { cls: 'gold' }));
   }
 
   function reqText(r) {
     if (r.t === 'build') return D.BUILD[r.b].name + (r.n > 1 ? ' x' + r.n : '');
     if (r.t === 'level') return (r.b ? D.BUILD[r.b].name : 'Edificios') + ' en nivel ' + r.lvl + '+';
-    if (r.t === 'stat') { const m = { p_blocks: 'Sillares producidos', p_tools: 'Herramientas producidas', p_books: 'Libros producidos', p_steel: 'Acero producido', p_machinery: 'Maquinaria producida', scouts_trained: 'Exploradores entrenados', dungeons_found: 'Mazmorras descubiertas', wishes: 'Deseos pedidos' }; return m[r.k] || r.k; }
+    if (r.t === 'stat') { const m = { p_blocks: 'Sillares producidos', p_tools: 'Herramientas producidas', p_books: 'Libros producidos', p_steel: 'Acero producido', p_machinery: 'Maquinaria producida', scouts_trained: 'Exploradores entrenados', dungeons_found: 'Mazmorras descubiertas', wishes: 'Deseos pedidos', legends: 'Lugares legendarios investigados', camps_cleared: 'Campamentos destruidos', heroes_hired: 'Héroes reclutados', floor_crater: 'Piso del Cráter Estelar', floor_temple: 'Piso del Templo Hundido', floor_nest: 'Piso del Nido del Dragón', trades_accepted: 'Tratos con otros reinos', guild_helps: 'Ayudas al gremio', walls_built: 'Tramos de muralla' }; return m[r.k] || r.k; }
     if (r.t === 'era') return 'Era ' + U.roman(r.n);
+    if (r.t === 'flag' && r.k === 'ley_dragones') return 'Cementerio de Dragones investigado';
     return '';
   }
 
@@ -421,7 +424,7 @@
   }
 
   // ---------- Álbum de colección ----------
-  const POI_ICON = { chest: 'chest', ruin: 'scroll', camp: 'war', relic: 'gold', watch: 'compass', cave: 'crystal', lair: 'hide', crypt: 'lore', crater: 'starIron', nest: 'scale' };
+  const POI_ICON = { chest: 'chest', ruin: 'scroll', camp: 'war', relic: 'gold', watch: 'compass', cave: 'crystal', lair: 'hide', crypt: 'lore', crater: 'starIron', nest: 'scale', swamp: 'herbs', giants: 'titanBone', temple: 'pearls', legend: 'crown' };
   // known: el nombre se ve aunque la casilla siga vacía
   function slot(icon, name, got, sub, known) {
     return el('div', { class: 'al-slot' + (got ? ' got' : ''), title: got || known ? name : '???' },
@@ -449,6 +452,12 @@
       const tr = st.trofeos || {}, kinds = Object.keys(PK.Inc.JEFES);
       right.append(el('h3', null, 'Trofeos (' + kinds.filter(k => tr[k]).length + '/' + kinds.length + ')'),
         el('div', { class: 'al-grid' }, kinds.map(k => slot(POI_ICON[k] || 'scale', PK.Inc.JEFES[k].name, tr[k], tr[k] ? 'x' + tr[k] : null, true))));
+    }
+    // maravillas del mundo (lugares legendarios, H6)
+    if (D.LEYENDAS) {
+      const ly = st.leyendas || {};
+      right.append(el('h3', null, 'Maravillas del mundo (' + Object.keys(ly).length + '/' + D.LEYENDAS.length + ')'),
+        el('div', { class: 'al-grid' }, D.LEYENDAS.map((o, i) => { const s0 = slot('crown', o.name, ly[i], ly[i] ? o.bono : null, true); if (ly[i] && PK.Leyendas) { s0.style.cursor = 'pointer'; s0.onclick = () => PK.Leyendas.pagina(i); } return s0; })));
     }
     const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]).length;
     right.append(el('h3', null, 'Reinos encontrados (' + realms + '/' + D.BOTS.length + ')'),

@@ -889,3 +889,15 @@ ul.info li { margin: 2px 0; }
 .enc-op.cauta { border-color: #5a8a3a; }
 #event .ev-ops { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 #event .ev-ops .def { outline: 1px dashed currentColor; outline-offset: 2px; } /* la que va sola si no eliges */
+
+/* Lugares legendarios (H6, leyendas.js) y escenas de la campaña (H5, campana.js) */
+.ley-pag { max-width: 520px; }
+.ley-hist { font-style: italic; line-height: 1.5; border-left: 3px solid #c89a40; padding-left: 10px; }
+.esc { display: flex; gap: 12px; align-items: flex-start; }
+.esc .esc-ret { flex: 0 0 auto; }
+.esc .esc-txt { flex: 1; }
+.esc .esc-quien { font-weight: bold; color: #7a3a10; margin-bottom: 4px; }
+.esc .esc-linea { line-height: 1.5; margin: 0 0 6px; }
+.esc-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 10px; }
+.esc-op { border: 2px solid #6b4c30; background: rgba(255,255,255,0.2); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 520px) { .esc { flex-direction: column; align-items: center; } }

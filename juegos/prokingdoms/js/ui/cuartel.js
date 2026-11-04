@@ -207,8 +207,17 @@
 
   function expTab(pane) {
     const st = S(), g = G();
-    if (plan && (plan.target.poi !== undefined || plan.target.camp !== undefined)) planner(pane);
+    if (plan && (plan.target.poi !== undefined || plan.target.camp !== undefined || plan.target.cap)) planner(pane);
     runsList(pane);
+    // el lugar del capítulo en curso de la campaña (H5)
+    const C = PK.Campana, cn = C && st.campana ? C.actual() : 0, cc = cn && C.cap(cn);
+    if (cc && cc.lugar && C.lugar(cn)) {
+      const going = st.exp.runs.some(r => r.cap === cn);
+      pane.append(el('h3', null, 'La Crónica del Reino · Capítulo ' + U.roman(cn)),
+        el('div', { class: 'raid-row dungeon' }, el('img', { class: 'dg-ico', src: C.retrato ? (C.retrato(D.ESCENAS[cc.ini].quien).src || '') : '' }),
+          el('div', { class: 'dg-info' }, el('b', null, cc.lugar.name), el('div', { class: 'small' }, UI.enemyText(cc.lugar.enemy) + ' · fuerza aprox. ' + U.fmt(C.fuerza(cn)) + ' · jefe: ' + PK.Batalla.JEFE[cc.lugar.jefe].nombre)),
+          going ? el('span', { class: 'small good-t' }, 'En camino') : UI.btn('Preparar', () => { plan = { target: { cap: cn }, units: null }; UI.rerender(); }, { small: true, cls: 'gold' })));
+    }
     // campamentos de bandidos (botín común, sin pisos)
     const camps = W.pois.filter(p => p.kind === 'camp' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d)
       .sort((a, b) => g.poiTier(a) - g.poiTier(b));

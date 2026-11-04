@@ -306,6 +306,17 @@
       if (st && !st.d && p.kind === 'relic' && Math.random() < dt * 3) R.particles.push({ x: px + (Math.random() - 0.5) * 6, y: py - 12, vx: 0, vy: -8, life: 0, max: 1.2, s: 1, rgb: [255, 230, 120] });
       if (p.kind === 'camp' && !(st && st.d) && smokeT > 0.35) R.particles.push({ x: x + spr.c.width / 2, y: y + spr.oy + 10, vx: 2, vy: -7, life: 0, max: 2, s: 1, c: 90 });
     }
+    // el lugar del capítulo en curso de la campaña (H5): el dibujo de su terreno, con estandarte
+    const cn = PK.Campana && g.state && g.state.campana ? PK.Campana.actual() : 0, cl = cn && PK.Campana.lugar(cn);
+    if (cl && seen(cl.x, cl.y)) {
+      const c0 = D.CAPITULOS[cn - 1], kind = { crater: 'crater', nest: 'nest', temple: 'temple', giants: 'giants' }[c0.lugar.terreno] || 'camp', spr = Sp.poi(kind, false);
+      const [px, py] = R.iso(cl.x - 1, cl.y - 1);
+      list.push({ d: cl.x + cl.y + 1, k: 'cap', o: { n: cn }, spr, x: Math.round(px - spr.ox), y: Math.round(py - spr.oy), after: ctx2 => {
+        const [bx, by] = R.iso(cl.x + 0.5, cl.y + 0.5), x = Math.round(bx), y = Math.round(by) - 34, ond = Math.round(Math.sin(performance.now() / 240));
+        ctx2.fillStyle = '#2a1a0e'; ctx2.fillRect(x, y, 2, 26);
+        ctx2.fillStyle = '#b02020'; ctx2.fillRect(x + 2, y, 12, 8 + ond); ctx2.fillStyle = '#ffd040'; ctx2.fillRect(x + 6, y + 2, 4, 4);
+      } });
+    }
     // lobos
     for (const w of PK.Life.wolves) {
       if (!seen(w.x, w.y)) continue;
@@ -871,7 +882,7 @@
         const k = W.idx(tx, ty), nid = W.nodeAt[k];
         let col = Sp.TERRAIN_MM[W.terrain[k]];
         if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind];
-        if (W.poiAt[k] >= 0) col = [210, 180, 120];
+        if (W.poiAt[k] >= 0) col = W.pois[W.poiAt[k]].kind === 'legend' ? [255, 220, 90] : [210, 180, 120];
         const o = W.terr[W.parcel(tx, ty)];
         if (o) { const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color; col = [col[0] * 0.6 + c2[0] * 0.4, col[1] * 0.6 + c2[1] * 0.4, col[2] * 0.6 + c2[2] * 0.4]; }
         if (!W.fog[k]) col = [22, 19, 14];
@@ -906,6 +917,10 @@
       ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
+    if (PK.Campana && G().state && G().state.campana) { // el lugar del capítulo en curso: un punto rojo y dorado que late
+      const n = PK.Campana.actual(), l = n && PK.Campana.lugar(n);
+      if (l) { const [x, y] = toMM(l.x + 0.5, l.y + 0.5), s = Math.max(2, Math.round(zk * 2)), on = Math.floor(performance.now() / 350) % 2; ctx.fillStyle = on ? '#ffd040' : '#c02020'; ctx.fillRect(Math.round(x) - s, Math.round(y) - s, s * 2, s * 2); }
+    }
     for (const m of (G().state && G().state.mapas) || []) { // mapas del tesoro: una X que late
       const [x, y] = toMM(m.x + 0.5, m.y + 0.5), s = Math.max(1, Math.round(zk)), on = Math.floor(performance.now() / 400) % 2;
       ctx.fillStyle = on ? '#ff4030' : '#ffd040';

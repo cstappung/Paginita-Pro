@@ -11,7 +11,7 @@
   const PK = window.PK, D = PK.D, U = PK.U, W = PK.World;
   const G = () => PK.Game;
   const S = () => PK.Game.state;
-  const P = (PK.Piloto = { log: [], eras: {}, ociosos: 0, llenos: 0, ganadas: 0, perdidas: 0, obras: 0, mejoras: 0, t0: 0 });
+  const P = (PK.Piloto = { log: [], eras: {}, ociosos: 0, llenos: 0, ganadas: 0, perdidas: 0, obras: 0, mejoras: 0, t0: 0, caps: {} });
   window.pkPiloto = P;
 
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
@@ -90,6 +90,22 @@
     const st = S();
     if (!G().countB('barracks')) return;
     PK.Consejo.HACE.mariscal(st, Object.assign({}, st.consejo, { prob: 0.8, guarnicion: 8 * st.era, defensa: 0.2 }));
+    campana();
+  }
+  // Campaña (H5): ataca el lugar del capítulo con 80% de probabilidad, elige siempre la primera opción y cierra
+  // las escenas (en vivo se abren solas y taparían todo).
+  function campana() {
+    const C = PK.Campana, st = S(), E = PK.Exp;
+    if (!C || !st.campana) return;
+    const k = PK.UI.modalKey();
+    if (k === 'escena') PK.UI.closeModal();
+    if (k === 'antes') { const n = C.actual(); if (n) C.antes(n, 1); PK.UI.closeModal(); }
+    if (st.campana.pend) { const n = st.campana.pend; if (C.elegir(n, 0)) anota('Capítulo ' + U.roman(n) + ': eligió «' + C.cap(n).eleccion.ops[0].label + '».'); if (PK.UI.modalKey() === 'eleccion') PK.UI.closeModal(); }
+    const n = C.actual(), tg = { cap: n };
+    if (!n || !C.lugar(n) || E.canSend(tg)) return;
+    const pv = E.preview(tg), units = E.recommend(pv.enemy, pv.power), h = PK.Heroes ? PK.Heroes.mejorPara(pv.enemy) : null;
+    if (E.chance(E.powerVs(units, pv.enemy, h && h.id) / Math.max(1, pv.power)) < 0.8) return;
+    if (E.send(tg, units, h && h.id)) anota('Capítulo ' + U.roman(n) + ': atacó ' + pv.name + '.');
   }
   // Héroes: recluta al que pueda pagar, elige siempre el primer talento, lo pone a gobernar y le pone lo mejor.
   function heroes() {
@@ -104,6 +120,7 @@
   }
   function medir() {
     const g = G(), st = S();
+    if (st.campana) for (const c in st.campana.hechos) if (!P.caps[c]) { P.caps[c] = Math.round((g.time - P.t0) / 6) / 10; anota('Cerró el capítulo ' + U.roman(+c) + '.'); }
     if (st.era > (P.eraVista || 1)) {
       for (let e = (P.eraVista || 1) + 1; e <= st.era; e++) { P.eras[e] = Math.round((g.time - P.t0) / 6) / 10; anota('Llegó a la Era ' + U.roman(e) + '.'); }
       P.eraVista = st.era;
@@ -136,7 +153,7 @@
       if (st.ret.welcome) g.openWelcome(true);
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js']);
+const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -313,4 +313,86 @@ test('H2/H7/H8: encuentros en el camino, mapas del tesoro y eventos con decision
   assert.deepEqual([...A.puntos({ travel: 30, heroe: 1 })], []);
   assert.deepEqual([...A.puntos({ travel: 120, heroe: 1 })], [0.5]);
   assert.deepEqual([...A.puntos({ travel: 400, heroe: 1 })], [0.35, 0.7]);
+});
+
+test('H4: mazmorras, enemigos y estructuras nuevas', () => {
+  W.generate(D.SEED); // B2 aplanó el terreno: el mapa de verdad otra vez
+  for (const k of ['swamp', 'giants', 'temple']) {
+    const d = D.DUNGEON[k];
+    assert.ok(d && D.POI[k] && D.RES[d.loot].special && D.SPECIAL.includes(d.loot), k);
+    for (const e in d.enemy) assert.ok(D.ENEMY[e], k + ' pelea contra ' + e);
+    assert.ok(W.pois.filter(p => p.kind === k).length >= 5, k + ' está en el mapa');
+  }
+  // el Templo Hundido, siempre junto a un lago
+  for (const p of W.pois.filter(o => o.kind === 'temple')) {
+    let agua = false;
+    for (let j = -3; j <= p.h + 3 && !agua; j++) for (let i = -3; i <= p.w + 3; i++) if (W.inb(p.x + i, p.y + j) && W.terrain[W.idx(p.x + i, p.y + j)] === 4) { agua = true; break; }
+    assert.ok(agua, 'templo en ' + p.x + ',' + p.y);
+  }
+  // cada enemigo nuevo tiene al menos dos respuestas buenas entre las tropas
+  for (const e of ['arcane', 'giant', 'abyss']) assert.ok(Object.values(D.ARMY).filter(a => (a.vs[e] || 1) >= 1.4).length >= 2, e);
+  // figuras en la batalla para los enemigos nuevos (batalla.js no carga sin document: se lee el código)
+  const bat = JS('batalla.js');
+  for (const e of ['arcane', 'giant', 'abyss']) assert.match(bat, new RegExp('\\n    ' + e + ': \\['), 'ENEMIGOS.' + e);
+  for (const t of ['herbolario', 'titanforge', 'faro']) {
+    assert.ok(D.LEGEND_B.includes(t) && D.BSTATS[t] && D.BUILD[t].lock === t, t);
+    assert.ok(D.QUESTS.some(q => q.unlock === t), t + ' se desbloquea con una misión');
+    assert.match(JS('sprites.js'), new RegExp('\\n    ' + t + '\\(p'), t + ' tiene dibujo');
+  }
+});
+
+test('H6: lugares legendarios', () => {
+  const Ly = PK.Leyendas, viejo = G.state;
+  assert.equal(D.LEYENDAS.length, 12);
+  const lp = W.pois.filter(p => p.kind === 'legend');
+  for (let i = 0; i < 12; i++) assert.equal(lp.filter(p => p.ley === i).length, 3, D.LEYENDAS[i].name + ': 3 copias');
+  for (const L of D.LEYENDAS) assert.ok(L.name && L.bono && L.historia, L.id);
+  G.state = { era: 4, stats: {}, flags: {}, leyendas: {}, created: 1, perks: {}, decrees: [] };
+  try {
+    assert.equal(Ly.recurso('food'), 0);
+    G.state.leyendas = { 0: 1, 5: 1, 6: 1, 2: 1, 8: 1 }; // cascada, mina, estatua, círculo, campo
+    assert.equal(Ly.recurso('food'), 0.05);
+    assert.equal(Ly.recurso('gold'), 0.1, 'mina y estatua');
+    assert.equal(Ly.perk('researchP'), 0.05);
+    assert.equal(Ly.perk('xpBoost'), 0.1);
+    assert.match(JS('game.js'), /PK\.Leyendas\.perk\(k\)/, 'G.perk los suma');
+    assert.ok(Ly.contra({ dragon: 1 }) === 0);
+    G.state.leyendas[3] = 1;
+    assert.ok(Math.abs(Ly.contra({ dragon: 1 }) - 0.1) < 1e-9 && Ly.contra({ beast: 1 }) === 0, 'solo contra dragones (PvE)');
+  } finally { G.state = viejo; }
+});
+
+test('H5: la campaña', () => {
+  const C = PK.Campana, viejo = G.state;
+  assert.equal(D.CAPITULOS.length, 10);
+  D.CAPITULOS.forEach((c, i) => {
+    const n = i + 1;
+    assert.ok(D.ESCENAS[c.ini] && D.ESCENAS[c.fin], n + ': escenas');
+    for (const id of [c.ini, c.fin]) assert.ok(D.PERSONAJES[D.ESCENAS[id].quien], id + ': quién habla');
+    assert.ok(D.QUESTS.find(q => q.id === 'c' + n + '_fin' && q.cap === n && q.req.t === 'cap'), n + ': misión final');
+    assert.ok(i === 0 || c.era > D.CAPITULOS[i - 1].era, 'un capítulo por era');
+    if (c.lugar) {
+      for (const e in c.lugar.enemy) assert.ok(D.ENEMY[e], n + ': ' + e);
+      assert.match(JS('batalla.js'), new RegExp('\\n    ' + c.lugar.jefe + ': \\{ id:'), n + ': jefe ' + c.lugar.jefe);
+    }
+    if (c.eleccion) for (const op of c.eleccion.ops) assert.ok(op.label && op.txt && (op.res || op.perk || op.militia || op.heroe), n + ': ' + op.label);
+  });
+  // abrir y cerrar capítulos
+  G.state = { era: 2, stats: {}, flags: {}, campana: null, created: 1, heroes: { lista: [], nid: 1 }, war: { army: { militia: 0 } }, res: {}, perks: {} };
+  PK.UI = { toast: () => {} };
+  const stat0 = G.stat;
+  G.stat = (k, n) => { G.state.stats[k] = (G.state.stats[k] || 0) + n; };
+  try {
+    C.init(G.state);
+    assert.equal(C.actual(), 1);
+    G.state.era = 6;
+    assert.equal(C.actual(), 1, 'sin cerrar el I no se abre el II');
+    C.ganar(1);
+    assert.equal(G.state.campana.pend, 1);
+    assert.ok(C.elegir(1, 0) && !C.elegir(1, 1), 'se elige una sola vez');
+    assert.equal(G.state.war.army.militia, 10);
+    assert.equal(C.actual(), 2);
+    C.ganar(2); C.elegir(2, 0);
+    assert.equal(G.state.heroes.lista.length, 1, 'el Rey Bandido se une');
+  } finally { G.state = viejo; G.stat = stat0; }
 });

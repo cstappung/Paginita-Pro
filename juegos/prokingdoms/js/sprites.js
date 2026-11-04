@@ -550,6 +550,45 @@
       p.line(p.P(0.7, 1.0, 64), p.P(0.2, 1.6, 58), Rd); p.line(p.P(0.7, 1.05, 63), p.P(0.25, 1.65, 57), R);
       p.flag(0.25, 1.75, 66, col, 12);
     },
+    // H4 (pk-17)
+    herbolario(p, col) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.9, 0.3);
+      const b = { x: 0.2, y: 0.2, w: 1.2, h: 1.1 };
+      p.box(b.x, b.y, b.w, b.h, 0, 14, 'plaster');
+      p.timber(b, 'L', 0, 14, 3); p.timber(b, 'R', 0, 14, 3);
+      p.door(b, 'L', 0.6, 0.35, 8, 0); p.win(b, 'R', 0.55, 7, 0.3, 4);
+      p.roof(b.x, b.y, b.w, b.h, 14, 10, 'thatch', 0.1, 0.15, 'x');
+      // huerto de hierbas y un caldero
+      for (let i = 0; i < 3; i++) { p.box(0.2 + i * 0.4, 1.55, 0.3, 0.3, 0, 2, 'soil', 'soil', '#3a7a3a'); const h = p.P(0.35 + i * 0.4, 1.7, 3); p.px(h[0], h[1] - 1, ['#9ae070', '#e070c0', '#70c0e0'][i]); }
+      p.box(1.55, 0.6, 0.35, 0.35, 0, 5, '#2a2a30', '#1a1a20', '#4ac070');
+      const c = p.P(1.72, 0.78, 6); p.px(c[0], c[1] - 2, '#9aff9a'); p.px(c[0] - 1, c[1] - 4, '#c8ffc8');
+      p.flag(1.4, 0.2, 14, col, 8);
+    },
+    titanforge(p, col, m) {
+      p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
+      const b = { x: 0.3, y: 0.3, w: 1.8, h: 1.8 };
+      p.box(b.x, b.y, b.w, b.h, 2, 22, 'rock', 'rock', 'rock');
+      p.quad(b, 'L', 0.5, 1.3, 2, 14, '#1a1010'); p.quad(b, 'L', 0.65, 1.15, 2, 8, '#ff8a2a');
+      p.roof(b.x, b.y, b.w, b.h, 22, 8, 'slate', 0.3, 0.2, 'y');
+      p.box(1.6, 0.4, 0.4, 0.4, 22, 42, 'rock', 'rock', '#2a2020'); m.smoke.push(p.P(1.8, 0.6, 42));
+      // el yunque de hueso de titán
+      p.box(2.25, 1.6, 0.6, 0.35, 0, 5, '#d8d0b8', '#a8a088', '#f2ead4');
+      p.box(2.15, 1.55, 0.8, 0.45, 5, 9, '#e8e0cc', '#b8b098', '#fffaea');
+      const k = p.P(2.55, 1.75, 10); p.px(k[0], k[1], '#ffd060'); p.px(k[0] + 2, k[1] - 1, '#ffd060');
+      p.flag(2.85, 2.7, 0, col, 20);
+    },
+    faro(p, col) {
+      p.box(0, 0, 2, 2, 0, 4, 'stone', 'stone', 'paving');
+      const t = { x: 0.5, y: 0.5, w: 1.0, h: 1.0 };
+      p.box(t.x, t.y, t.w, t.h, 4, 62, 'marbleS');
+      for (const z of [18, 34, 50]) p.box(t.x - 0.02, t.y - 0.02, t.w + 0.04, t.h + 0.04, z, z + 3, '#2a6a8a', '#1a4a6a', '#3a8aaa');
+      p.door(t, 'L', 0.5, 0.35, 8, 4);
+      p.box(0.4, 0.4, 1.2, 1.2, 62, 64, 'marbleS', 'marbleS', 'paving');
+      p.box(0.6, 0.6, 0.8, 0.8, 64, 72, '#c8fffa', '#7ae8e0', '#e8fffd');
+      p.roof(0.55, 0.55, 0.9, 0.9, 72, 8, 'verdigris', 0.02, 0.02, 'x');
+      const l = p.P(1.0, 1.0, 68); for (const [dx, dy] of [[0, 0], [-3, 1], [3, -1], [0, -2]]) p.px(l[0] + dx, l[1] + dy, '#ffffff');
+      p.flag(0.2, 1.8, 4, col, 10);
+    },
     library(p, col, m, tier) {
       p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
       const b = { x: 0.3, y: 0.3, w: 2.4, h: 2.4 };
@@ -916,6 +955,57 @@
       for (const [x, y] of [[0.6, 2.7], [1.2, 2.8], [2.6, 1.7]]) { const o = p.P(x, y, 0); p.line([o[0] - 3, o[1]], [o[0] + 3, o[1] - 1], '#e8e0cc'); }
       p.line(p.P(0.6, 0.5, 46), p.P(0.4, 0.3, 54), '#5a5a5a'); p.line(p.P(0.7, 0.5, 46), p.P(0.6, 0.2, 56), '#6a6a6a');
     },
+    // H4 (pk-17)
+    swamp(p) {
+      p.fill([p.P(0, 0, 0), p.P(3, 0, 0), p.P(3, 3, 0), p.P(0, 3, 0)], '#3a4a2a', 1, 0);
+      p.fill([p.P(0.3, 1.4, 0), p.P(1.6, 1.3, 0), p.P(1.8, 2.7, 0), p.P(0.4, 2.8, 0)], '#2a4a3a', 1, 0);
+      p.fill([p.P(0.5, 1.6, 0), p.P(1.4, 1.5, 0), p.P(1.5, 2.4, 0), p.P(0.6, 2.5, 0)], '#3a6a4a', 1, 0);
+      // choza de la bruja sobre patas
+      for (const [x, y] of [[1.6, 0.5], [2.5, 0.5], [1.6, 1.3], [2.5, 1.3]]) p.box(x, y, 0.12, 0.12, 0, 8, 'darkwood', 'darkwood', 'darkwood');
+      const b = { x: 1.5, y: 0.4, w: 1.2, h: 1.0 };
+      p.box(b.x, b.y, b.w, b.h, 8, 18, 'darkwood');
+      p.win(b, 'L', 0.5, 12, 0.25, 4);
+      p.roof(b.x, b.y, b.w, b.h, 18, 10, '#4a5a2a', 0.1, 0.1, 'x');
+      const w = p.wp(b, 'L', 0.5, 13); p.px(w[0], w[1], '#9aff7a'); p.px(w[0] + 1, w[1], '#9aff7a');
+      // árbol muerto y fuegos fatuos
+      p.line(p.P(0.4, 0.5, 0), p.P(0.4, 0.5, 22), '#3a2a18'); p.line(p.P(0.4, 0.5, 16), p.P(0.1, 0.4, 22), '#3a2a18'); p.line(p.P(0.4, 0.5, 19), p.P(0.7, 0.3, 26), '#3a2a18');
+      for (const [x, y, z] of [[1.0, 2.0, 6], [2.4, 2.4, 8], [0.8, 1.0, 10]]) { const f = p.P(x, y, z); p.px(f[0], f[1], '#9affb8'); p.px(f[0], f[1] + 1, '#5aff8a'); p.px(f[0] + 1, f[1] + 1, '#5aff8a'); }
+    },
+    giants(p) {
+      p.fill([p.P(0, 0, 0), p.P(3, 0, 0), p.P(3, 3, 0), p.P(0, 3, 0)], 'soil', 0.85, 0.3);
+      // muralla de bloques enormes con una puerta altísima
+      p.box(0.1, 0.1, 2.8, 0.8, 0, 30, 'rock', 'rock', 'rock');
+      p.box(0.1, 0.1, 0.8, 2.8, 0, 26, 'rock', 'rock', 'rock');
+      p.quad({ x: 0.1, y: 0.1, w: 2.8, h: 0.8 }, 'L', 1.1, 1.9, 0, 22, '#141010');
+      for (const x of [0.1, 0.8, 1.5, 2.2]) p.box(x, 0.05, 0.5, 0.5, 30, 36, 'rock', 'rock', 'rock');
+      // el mazo de un gigante tirado y un hueso enorme
+      p.box(1.6, 2.0, 1.1, 0.25, 0, 4, '#5a3a20', '#3a2410', '#7a5030');
+      p.box(2.5, 1.85, 0.45, 0.55, 0, 9, '#8a8a92', '#5a5a62', '#b0b0b8');
+      const h = p.P(1.2, 2.6, 0); p.line([h[0] - 8, h[1]], [h[0] + 8, h[1] - 3], '#e8e0cc'); p.line([h[0] - 8, h[1] + 1], [h[0] + 8, h[1] - 2], '#c8c0a8');
+      p.px(h[0] - 9, h[1] - 1, '#f2ead4'); p.px(h[0] + 9, h[1] - 4, '#f2ead4');
+    },
+    temple(p) {
+      p.fill([p.P(0, 0, 0), p.P(3, 0, 0), p.P(3, 3, 0), p.P(0, 3, 0)], '#2a5a7a', 1, 0);
+      p.fill([p.P(0.2, 0.2, 0), p.P(2.8, 0.2, 0), p.P(2.8, 2.8, 0), p.P(0.2, 2.8, 0)], '#3a7a9a', 1, 0);
+      // templo a medio hundir: escalinata, columnas rotas y un frontón ladeado
+      p.box(0.5, 0.5, 2.0, 1.6, 0, 4, 'marbleS', 'marbleS', 'paving');
+      for (const [x, y, h] of [[0.6, 0.6, 22], [1.3, 0.6, 18], [2.0, 0.6, 24], [0.6, 1.6, 14], [2.0, 1.6, 10]]) p.box(x, y, 0.3, 0.3, 4, h, 'marbleS', 'marbleS', 'marbleS');
+      p.box(0.55, 0.55, 1.8, 0.4, 24, 28, 'marbleS', 'marbleS', 'verdigris');
+      const g = p.P(1.3, 1.3, 6); p.px(g[0], g[1], '#5ae8e0'); p.px(g[0] + 1, g[1] - 1, '#c8fffa');
+      for (const [x, y] of [[0.3, 2.5], [2.6, 2.4], [2.6, 0.3]]) { const o = p.P(x, y, 0); p.px(o[0], o[1], '#c8f0ff'); p.px(o[0] + 2, o[1], '#c8f0ff'); }
+    },
+    // Lugar legendario (H6): un arco de piedras viejas con una luz dorada; investigado, la luz se apaga
+    legend(p, s) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], '#5a6a4a', 1, 0);
+      p.fill([p.P(0.4, 0.4, 0), p.P(1.6, 0.4, 0), p.P(1.6, 1.6, 0), p.P(0.4, 1.6, 0)], 'paving', 0.9, 0);
+      for (const [x, y, h] of [[0.15, 0.15, 26], [1.55, 0.15, 22], [0.15, 1.55, 20], [1.6, 1.6, 12]]) p.box(x, y, 0.3, 0.3, 0, h, 'rock', 'rock', 'rock');
+      p.box(0.1, 0.1, 1.8, 0.35, 26, 30, 'rock', 'rock', 'rock');
+      const c = p.P(1, 1, 10), col = s ? '#a8a090' : '#ffe070';
+      p.ctx.fillStyle = s ? 'rgba(200,190,160,0.3)' : 'rgba(255,220,110,0.35)'; p.ctx.fillRect(c[0] - 5, c[1] - 6, 11, 11);
+      p.ctx.fillStyle = col; p.ctx.fillRect(c[0] - 2, c[1] - 3, 5, 5);
+      p.ctx.fillStyle = s ? '#d0c8b0' : '#fff8d0'; p.ctx.fillRect(c[0] - 1, c[1] - 2, 2, 2);
+      if (!s) for (const [dx, dy] of [[-8, -10], [9, -6], [-5, 6], [7, 8], [0, -14]]) p.px(c[0] + dx, c[1] + dy, '#fff0a0');
+    },
     chest(p, s) {
       p.box(0.25, 0.3, 0.5, 0.35, 0, 5, 'darkwood', 'darkwood', s ? '#2a1a0e' : 'plank');
       p.line(p.P(0.25, 0.65, 3), p.P(0.75, 0.65, 3), '#e8b83a');
@@ -959,9 +1049,9 @@
       p.box(0.7, 0.75, 0.3, 0.25, 0, 3, 'rock', 'rock', 'rock');
     },
   };
-  const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60 };
+  const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60, swamp: 36, giants: 44, temple: 36, legend: 40 };
 
-  const BTOP = { tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84 };
+  const BTOP = { tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84 };
   // Tramos de nivel: 1-3, 4-6, 7-9, 10-12, 13-15, 16-19 y 20+ (cada era sube 2 niveles el tope).
   S.tier = lvl => (lvl >= 20 ? 6 : lvl >= 16 ? 5 : lvl >= 13 ? 4 : lvl >= 10 ? 3 : lvl >= 7 ? 2 : lvl >= 4 ? 1 : 0);
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).
@@ -1818,6 +1908,9 @@
     hide: { m: ['', '.kk......kk', '.kbk....kbk', '..kbbbbbbk', '.kbbBbbBbbk', '.kbBbbbbBbk', '..kbbbbbbk', '..kbBbbBbk', '.kbbbbbbbbk', '.kbk....kbk', '.kk......kk'], p: { k: '#2a1a10', b: '#b0804e', B: '#7a5432' } },
     lore: { m: ['', '.kkkkkkkkk', 'kyyyyyyyyyk', '.kyrryrryk', '.kyyyyyyyk', '.kyrryyryk', '.kyyyyyyyk', '.kyrrryryk', 'kyyyyyyyyyk', '.kkkkkkkkk'], p: { k: '#4a3418', y: '#efe2b8', r: '#7a3aa0' } },
     starIron: { m: ['.......s', '......sSs', '.......s', '...kkkkk', '..kmmMmmk', '.kmMmmmmMk', '.kmmmbmmmk', 'kmmMmmmbmmk', 'kmmmmMmmmk', '.kbmmmmmbk', '..kkkkkkk'], p: { k: '#141a28', m: '#5a6a8a', M: '#a8c0e8', b: '#2e3850', s: '#fff4b0', S: '#ffffff' } },
+    herbs: { m: ['', '.....g', '....gGg', '..g.gGg.g', '.gGggGggGg', '..gGgGgGg', '...ggGgg', '....kGk', '....kbk', '...kbbbk', '...kkkkk'], p: { k: '#1a2a10', g: '#3aa84a', G: '#8ae07a', b: '#8a5a30' } },
+    titanBone: { m: ['', '.kk.....kk', 'kwwk...kwwk', 'kwwwkkkkwwk', '.kwwwwwwwk', '..kwwwwwk', '.kwwwwwwwk', 'kwwwkkkkwwk', 'kwwk...kwwk', '.kk.....kk'], p: { k: '#4a4030', w: '#efe6cc' } },
+    pearls: { m: ['', '...kkk', '..kwLwk', '..kwwwk', '...kkk.kkk', '.kkk.kwLwk', 'kwLwkkwwwk', 'kwwwk.kkk', '.kkk.kkk', '....kwLwk', '....kkkk'], p: { k: '#1a3a4a', w: '#a8e8f0', L: '#ffffff' } },
     scale: { m: ['', '....kkkk', '...krrrrk', '..krRRrrrk', '.krRrrrrork', '.krrrrrrrok', '.krrrrrrook', '..krrrrook', '...krrook', '....kook', '.....kk'], p: { k: '#3a0a08', r: '#c83a28', R: '#ff8a5a', o: '#8a1a14' } },
     // Barra lateral del celular: antes tres botones tenían la misma persona y dos la misma brújula (playtest)
     idle: { m: ['......kkkk', '.....kwwk', '....kkkk.kk', '...kssssk.', '...kssssk', '...kssssk', '....kkkk', '..kkyyyykk', '.kyyyyyyyyk', '.kyyyyyyyyk', '.kkkkkkkkkk'], p: { k: '#1c1c2a', s: '#e8c4a0', y: '#c89a3a', w: '#efe6d0' } },

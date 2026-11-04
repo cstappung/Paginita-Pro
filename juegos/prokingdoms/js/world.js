@@ -216,6 +216,26 @@
     dungeon('crypt', 26, 20);
     dungeon('crater', 14, 30);
     dungeon('nest', 6, 36);
+    // H4 (pk-17): el Templo Hundido solo junto a un lago (agua a 3 casillas o menos)
+    const junto = (x, y, kind) => { const d = D.POI[kind]; for (let j = -3; j <= d.h + 3; j++) for (let i = -3; i <= d.w + 3; i++) if (W.inb(x + i, y + j) && W.terrain[W.idx(x + i, y + j)] === T_WATER) return true; return false; };
+    dungeon('swamp', 22, 18);
+    dungeon('giants', 10, 30);
+    for (let k = 0, tries = 0; k < 9 && tries < 9 * 400; tries++) {
+      const x = 4 + Math.floor(drng() * (w - 8)), y = 4 + Math.floor(drng() * (h - 8));
+      if (farFromHomes(x, y, 24) && junto(x, y, 'temple') && placeDungeon('temple', x, y)) k++;
+    }
+    // Lugares legendarios (H6, pk-17): cada uno 3 veces, lejos de las otras copias, con su propio generador.
+    const lrng = U.rng(seed + 5531), LD = D.POI.legend;
+    for (let copia = 0; copia < 3; copia++) D.LEYENDAS.forEach((L, i) => {
+      for (let t = 0; t < 600; t++) {
+        const x = 4 + Math.floor(lrng() * (w - 8)), y = 4 + Math.floor(lrng() * (h - 8));
+        if (!farFromHomes(x, y, 16) || (L.agua && !junto(x, y, 'legend'))) continue;
+        if (W.pois.some(o => o.kind === 'legend' && o.ley === i && U.dist(o.x, o.y, x, y) < 60)) continue;
+        if (!placeDungeon('legend', x, y)) continue;
+        W.pois[W.pois.length - 1].ley = i;
+        break;
+      }
+    });
     W.buildBuckets();
     W.initTerritory();
   };
@@ -566,7 +586,7 @@
           n.amount = Math.min(n.max, n.amount + n.max * def.regen * mult * hoursPassed);
           if (n.dead && n.amount >= 1) n.dead = false;
         }
-      } else if (n.dead && now - n.t >= def.regrow * 1000) {
+      } else if (n.dead && now - n.t >= def.regrow * 1000 * (n.kind === 'tree' && PK.Leyendas ? PK.Leyendas.rebrote() : 1)) {
         const i = W.idx(n.x, n.y);
         if (W.block[i] || W.bAt[i] >= 0 || occupied(n.x, n.y)) continue;
         n.dead = false; n.amount = n.max; W.block[i] = 1;

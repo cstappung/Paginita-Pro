@@ -79,6 +79,7 @@
     const id = r.poi !== undefined && r.poi !== null ? r.poi : r.camp;
     if (id !== undefined && id !== null && W.pois[id]) { const p = W.pois[id]; return [p.x + p.w / 2, p.y + p.h / 2]; }
     if (r.k !== undefined && PK.Terr) return PK.Terr.center(r.k);
+    if (r.cap && PK.Campana && PK.Campana.lugar(r.cap)) { const l = PK.Campana.lugar(r.cap); return [l.x + 0.5, l.y + 0.5]; }
     return missionSpot(r.id || 1);
   };
 

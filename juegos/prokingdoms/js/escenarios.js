@@ -336,16 +336,19 @@
       esc.oscuro = 0.32 + n * 0.08; esc.tinte = [255, 140 - n * 40, 80, 0.1 + n * 0.04]; // atardecer, más rojo lejos
       esc.part.push({ tipo: 'brasas', n: 18 + Math.round(n * 20) });
       esc.bruma = [255, 170, 110];
-    } else if (lugar === 'cave' || lugar === 'lair' || lugar === 'crypt' || lugar === 'nest' || lugar === 'crater') {
+    } else if (lugar === 'cave' || lugar === 'lair' || lugar === 'crypt' || lugar === 'nest' || lugar === 'crater' || lugar === 'swamp' || lugar === 'giants' || lugar === 'temple') {
       const P = {
         cave: { suelo: [52, 58, 76], tono: 14, muro: [80, 86, 112], gros: 12, oscuro: 0.6 },
         lair: { suelo: [72, 58, 40], tono: 16, muro: [64, 50, 36], gros: 12, oscuro: 0.55 },
         crypt: { suelo: [78, 80, 86], tono: 8, muro: [62, 62, 70], gros: 8, oscuro: 0.58 },
         nest: { suelo: [84, 56, 42], tono: 18, muro: [62, 38, 32], gros: 14, oscuro: 0.42 },
         crater: { suelo: [46, 36, 34], tono: 14, muro: [70, 50, 44], gros: 6, oscuro: 0.45 },
+        swamp: { suelo: [52, 66, 44], tono: 14, muro: [46, 58, 40], gros: 8, oscuro: 0.48 },
+        giants: { suelo: [96, 90, 80], tono: 12, muro: [118, 110, 98], gros: 14, oscuro: 0.3 },
+        temple: { suelo: [56, 74, 82], tono: 10, muro: [60, 78, 88], gros: 10, oscuro: 0.52 },
       }[lugar];
       // al bajar, los colores se van hacia el tono propio del lugar y se oscurece (las luces resaltan más)
-      const HONDO = { cave: [60, 52, 150], lair: [92, 34, 26], crypt: [44, 84, 72], nest: [100, 30, 20], crater: [64, 40, 96] }[lugar];
+      const HONDO = { cave: [60, 52, 150], lair: [92, 34, 26], crypt: [44, 84, 72], nest: [100, 30, 20], crater: [64, 40, 96], swamp: [40, 90, 40], giants: [90, 80, 70], temple: [30, 80, 110] }[lugar];
       P.muro = mix(P.muro, HONDO, n * 0.45); P.suelo = mix(P.suelo, HONDO.map(q => q * 0.7), n * 0.3); P.oscuro += n * 0.12;
       if (lugar === 'crypt') { // baldosas con juntas, grietas y musgo
         suelo(x, W, H, P.suelo, P.tono, seed);
@@ -374,8 +377,8 @@
       // salientes de roca que bajan de los muros a la orilla del campo (no en la crypta: es de baldosas)
       if (lugar !== 'crypt') for (let i = 0; i < 3 + Math.round(n * 6); i++) { const [px, py] = at(1 + rnd() * (LU - 2), rnd() < 0.5 ? -0.1 : LV + 0.1); pone(py, () => meseta(p, px, py, 24 + rnd() * 24 + n * 12, 7 + rnd() * 7 + n * 5, P.muro, rnd)); }
       primerPlano(xf, W, H, rect, rnd, lugar === 'cave' ? 'puntas' : lugar === 'lair' ? 'mixto' : 'rocas',
-        { cave: [130, 220, 255], lair: [255, 200, 140], crypt: [140, 255, 190], nest: [255, 120, 50], crater: [160, 170, 255] }[lugar], 6 + Math.round(n * 7));
-      esc.bruma = { cave: [90, 120, 200], lair: [140, 100, 60], crypt: [90, 140, 120], nest: [200, 80, 40], crater: [110, 80, 160] }[lugar];
+        { cave: [130, 220, 255], lair: [255, 200, 140], crypt: [140, 255, 190], nest: [255, 120, 50], crater: [160, 170, 255], swamp: [150, 255, 120], giants: [230, 210, 170], temple: [110, 240, 230] }[lugar], 6 + Math.round(n * 7));
+      esc.bruma = { cave: [90, 120, 200], lair: [140, 100, 60], crypt: [90, 140, 120], nest: [200, 80, 40], crater: [110, 80, 160], swamp: [90, 140, 80], giants: [170, 160, 140], temple: [60, 120, 150] }[lugar];
 
       if (lugar === 'cave') {
         const COL = [[110, 230, 250], [200, 120, 250], [120, 250, 200]];
@@ -437,6 +440,31 @@
         { const [px, py] = at(LU - 3, LV / 2); esc.luces.push({ x: px, y: py, r: 130, col: [255, 120, 50], flick: 0.06 }); }
         esc.part.push({ tipo: 'brasas', n: 30 + Math.round(n * 30) });
         esc.tinte = [255, 90, 40, 0.08 + n * 0.05];
+      } else if (lugar === 'swamp') { // H4: agua verde, árboles muertos, fuegos fatuos y una choza al fondo
+        for (let i = 0; i < 5 + Math.round(n * 4); i++) { const [px, py] = at(2 + rnd() * (LU - 4), 1 + rnd() * (LV - 2)), w = 20 + rnd() * 24; pone(py - 10, () => poza(p, px, py, w, [70, 130, 60])); }
+        for (let i = 0; i < 12; i++) { const [px, py] = orilla(); pone(py, () => pino(p, px, py, rnd, 0.9 + rnd() * 0.3)); }
+        for (let i = 0; i < 6 + Math.round(n * 6); i++) { const [px, py] = at(rnd() * LU, rnd() * LV); esc.luces.push({ x: px, y: py - 8, r: 34, col: [110, 255, 130], flick: 0, pulso: rnd() * 6, fantasma: true }); }
+        { const [px, py] = at(LU - 1.2, LV / 2); pone(py, () => { p.sombra(px, py, 30, 6, 0.4); for (const dx of [-8, 6]) p.r(px + dx, py - 12, 2, 12, '#3a2a18'); p.r(px - 12, py - 24, 24, 12, '#5a4428'); p.r(px - 14, py - 30, 28, 6, '#3a5a2a'); p.r(px - 2, py - 20, 4, 6, '#9aff7a'); }); esc.luces.push({ x: px, y: py - 18, r: 60, col: [130, 255, 110], flick: 0.2 }); }
+        for (let i = 0; i < 4 + Math.round(n * 6); i++) { const yy = rnd() < 0.5 ? rnd() * (my - 6) : my + fh + 6 + rnd() * Math.max(2, H - my - fh - 12); esc.anim.push({ tipo: 'ojos', x: rnd() * W, y: yy, sep: 4, col: [200, 255, 90] }); }
+        esc.part.push({ tipo: 'niebla', n: 10 + Math.round(n * 8) }, { tipo: 'motas', n: 18, col: [150, 255, 130] });
+        esc.tinte = [80, 160, 70, 0.08 + n * 0.05];
+      } else if (lugar === 'giants') { // H4: murallas enormes, huesos de titán y armas del tamaño de un árbol
+        for (let i = 0; i < 4; i++) { const [px, py] = at(3 + i * ((LU - 6) / 3), i % 2 ? -0.1 : LV + 0.1); pone(py, () => pilarRoto(p, px, py, 40 + rnd() * 24, [130, 122, 108])); }
+        for (let i = 0; i < 1 + Math.round(n * 2); i++) { const [px, py] = orilla(); pone(py, () => costillar(p, px, py, 1.4 + n * 0.6)); }
+        { const [px, py] = at(LU - 0.9, LV / 2); pone(py, () => calavera(p, px, py, 1.6 + n * 0.6)); }
+        for (let i = 0; i < 12; i++) { const [px, py] = orilla(); pone(py, () => roca(p, px, py, 18 + rnd() * 16, 10 + rnd() * 10, P.muro, rnd)); }
+        for (let i = 0; i < 3; i++) { const [px, py] = fondoEnemigo(5); pone(py, () => { p.sombra(px, py, 24, 5, 0.4); p.r(px - 2, py - 34, 4, 34, '#5a3a20'); p.r(px - 8, py - 40, 16, 8, '#8a8a92'); p.r(px - 8, py - 40, 16, 1, '#b0b0b8'); }); }
+        esc.part.push({ tipo: 'motas', n: 26, col: [230, 210, 170] });
+        esc.tinte = [200, 180, 140, 0.05 + n * 0.04];
+      } else if (lugar === 'temple') { // H4: columnas bajo el agua, luz que baja del lago y un portal que canta
+        for (let k = 0; k < 5; k++) for (const v of [-0.15, LV + 0.15]) { const [px, py] = at(3 + k * ((LU - 6) / 4), v); pone(py, () => columna(p, px, py, 38 + Math.round(rnd() * 10))); }
+        for (let i = 0; i < 6; i++) { const [px, py] = at(2 + rnd() * (LU - 4), 1 + rnd() * (LV - 2)); charco(p, px, py, 18 + rnd() * 16); }
+        for (let i = 0; i < 4; i++) esc.anim.push({ tipo: 'rayo', x: mx + fw * (0.15 + i * 0.25 + rnd() * 0.05), w: 24 + rnd() * 16, col: [110, 220, 240] });
+        for (let i = 0; i < 6; i++) { const [px, py] = at(rnd() * LU, rnd() * LV); esc.luces.push({ x: px, y: py, r: 40, col: [90, 230, 220], flick: 0, pulso: rnd() * 6, fantasma: true }); }
+        if (n >= 0.4) for (let k = 0; k < 3; k++) { const [px, py] = at(4 + k * ((LU - 8) / 2), k % 2 ? 0.1 : LV - 0.1); pone(py, () => estatua(p, px, py)); }
+        if (n >= 0.6) { const [px, py] = at(LU - 0.9, LV / 2); esc.anim.push({ tipo: 'portal', x: px, y: py - 18 }); esc.luces.push({ x: px, y: py - 18, r: 90, col: [90, 230, 220], flick: 0, pulso: 0 }); }
+        esc.part.push({ tipo: 'orbes', n: 8 }, { tipo: 'motas', n: 20, col: [140, 240, 240] });
+        esc.tinte = [60, 160, 200, 0.1 + n * 0.05];
       } else if (lugar === 'crater') {
         for (let i = 0; i < 10; i++) { const [px, py] = orilla(); pone(py, () => roca(p, px, py, 14 + rnd() * 14, 8 + rnd() * 8, P.muro, rnd)); }
         for (let i = 0; i < 9; i++) { const [px, py] = at(LU * 0.4 + rnd() * LU * 0.55, 1 + rnd() * (LV - 2)); pone(py, () => cristales(p, px, py, [150, 180, 240], rnd, 2 + Math.floor(rnd() * 2))); esc.luces.push({ x: px, y: py - 6, r: 32, col: [150, 190, 255], flick: 0, pulso: rnd() * 6 }); }

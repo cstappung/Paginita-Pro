@@ -303,6 +303,7 @@
     } else if (it.k === 'building') g.sel = { type: 'building', id: it.o.id };
     else if (it.k === 'node') g.sel = { type: 'node', id: it.o.id };
     else if (it.k === 'poi') g.sel = { type: 'poi', id: it.o.id };
+    else if (it.k === 'cap') { PK.Campana.openLugar(it.o.n); return; }
     else if (it.k === 'belt') g.sel = { type: 'belt', id: W.belt[W.idx(it.x, it.y)] };
     else if (it.k === 'wall') g.sel = { type: 'wall', id: it.o.k };
     PK.UI.refreshPanel(true);

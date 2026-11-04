@@ -36,6 +36,9 @@
     lair: { name: 'Matriarca Colmillo', mec: 'Aúlla cada 20 s y llama a tres lobos que van por tus tiradores.', como: 'Lanceros, «Cargar» y «Al jefe»: mientras viva, llama más lobos.' },
     crypt: { name: 'El Liche Sin Nombre', mec: 'Levanta a sus esqueletos caídos mientras no tengas clérigos vivos.', como: 'Lleva clérigos (o a la Clériga) y protégelos.' },
     crater: { name: 'Heraldo Estelar', mec: 'Marca círculos en el suelo y 3 s después caen meteoros.', como: '«Dispersarse» al ver las marcas.' },
+    swamp: { name: 'Morgana del Pantano', mec: 'Maldice a tus tropas (las frena) y llama fuegos fatuos cada 15 s.', como: 'Caballeros y clérigos, «Cargar» y «Al jefe»: con clérigos vivos la maldición dura la mitad.' },
+    giants: { name: 'Ymrok, Rey de los Gigantes', mec: 'Levanta el mazo y golpea el suelo: un círculo grande que aplasta a los que estén juntos.', como: '«Dispersarse» al ver el círculo; catapultas y arqueros de lejos.' },
+    temple: { name: 'La Voz del Abismo', mec: 'Su canto encanta a tus tropas cuerpo a cuerpo (se quedan quietas) y sus tentáculos agarran.', como: 'Clérigos para romper el canto y «Cargar»: ir directo a ella («Al jefe») cuesta caro.' },
     nest: { name: 'Ignivor el Antiguo', mec: 'Vuela a ratos: en el aire solo le pegan arqueros y lanceros en línea. En el suelo, fuego en cono.', como: 'Arqueros y lanceros, «Mantener línea» cuando vuela y «Dispersarse» contra el fuego.' },
   };
   // Afijos semanales (Anexo A3). dureza: cuánto más difícil es en el cálculo por proporción (en vivo pesa la mecánica).
@@ -202,6 +205,9 @@
   // Lo llama resolve() (expeditions.js) después de cada pelea de la incursión. true: sigue adentro.
   I.tras = function (r) {
     const inc = r.inc, p = W().pois[r.poi];
+    // pociones del Herbolario (H4): tras una sala ganada salvan a parte de los caídos de esa pelea
+    const poc = r.won ? G().best('herbolario', 'pociones') : 0;
+    if (poc) { let n = 0; for (const t in r.lost || {}) { const v = Math.floor(r.lost[t] * poc); r.lost[t] -= v; r.units[t] += v; n += v; } if (n) inc.log.push('Pociones: ' + n + ' caídos vuelven a pelear.'); }
     for (const t in r.lost || {}) inc.perdidos[t] = (inc.perdidos[t] || 0) + r.lost[t];
     if (!r.won) { terminar(r, false); return false; }
     const pl = inc.pelea || { botinK: 1 }, first = inc.piso > PK.Exp.site(p.id).best;

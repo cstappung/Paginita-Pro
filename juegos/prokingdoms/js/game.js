@@ -52,6 +52,8 @@
     PK.Consejo.init(S);
     if (PK.Heroes) PK.Heroes.init(S);
     if (PK.Aventura) PK.Aventura.init(S);
+    if (PK.Leyendas) PK.Leyendas.init(S);
+    if (PK.Campana) PK.Campana.init(S);
     PK.Life.reset();
     PK.Quests.init(S);
   };
@@ -186,7 +188,7 @@
 
   // ---------- Niveles y efectos de los edificios ----------
   G.bst = b => (D.BSTATS[b.type] ? D.BSTATS[b.type](b.lvl) : {});
-  G.sight = b => G.bst(b).sight || b.def.sight;
+  G.sight = b => (G.bst(b).sight || b.def.sight) + (b.type === 'tower' && b.owner === 'p' && PK.Leyendas && S.leyendas ? PK.Leyendas.visionTorre() : 0);
   G.maxLvl = type => D.maxLevel(type, S.era);
   G.slots = b => G.bst(b).slots || b.def.slots || 0;
   const mine = type => G.buildings.filter(b => b.owner === 'p' && b.done && (!type || b.type === type));
@@ -197,11 +199,14 @@
   const hp = (k, b) => (PK.Heroes && S && S.heroes ? PK.Heroes.pasiva(k, b) : 0);
   // modificadores pasajeros de los eventos (life.js, H8): cosecha, langostas, cometa, fiebre, gremio…
   const lm = k => (PK.Life && PK.Life.mod ? PK.Life.mod(k) : 1);
+  // lugares legendarios (leyendas.js, H6): +5% de un recurso
+  const ley = res => (PK.Leyendas && S && S.leyendas ? PK.Leyendas.recurso(res) : 0);
   const conMod = cost => { const m = lm('cost'); if (m === 1) return cost; const o = {}; for (const r in cost) o[r] = Math.ceil(cost[r] * m); return o; };
   // Mejoras permanentes: decretos y rangos de misiones (G.perk); perkAll suma además las estructuras de Leyendas.
   G.perk = k => {
     let s = (S.perks && S.perks[k]) || 0;
     for (const id of S.decrees || []) s += (D.DECREES[id] && D.DECREES[id].perk[k]) || 0;
+    if (PK.Leyendas && S.leyendas) s += PK.Leyendas.perk(k);
     return s;
   };
   G.perkAll = k => G.perk(k) + D.LEGEND_B.reduce((s, t) => s + best(t, k), 0);
@@ -219,11 +224,11 @@
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
     if (owner !== 'p') return base;
     const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
-    return base * tech * dropMult(u) * G.globalMult();
+    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res));
   };
   G.farmRate = function (owner, b, u) {
     if (owner !== 'p') return D.FARM_RATE;
-    return D.FARM_RATE * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm');
+    return D.FARM_RATE * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food'));
   };
   G.carryCap = (owner, u) => (owner === 'p' ? 10 + 3 * G.lvl('carts') + (((u && u.dl) || 1) - 1) : 10);
   G.speed = function (owner, u) {
@@ -492,7 +497,8 @@
   G.fiestaInfo = function () {
     if (S.era < 2) return null;
     const f = S.fiesta || {}, n = f.day === U.dayKey() ? f.n || 0 : 0, k = Math.pow(1.4, n), cost = {};
-    for (const r of G.FIESTA.res) cost[r] = Math.max(10, Math.round((G.cap(r) * 0.15 * k) / 10) * 10);
+    const kl = PK.Leyendas && S.leyendas ? PK.Leyendas.fiestaK() : 1; // Colmena Gigante (H6)
+    for (const r of G.FIESTA.res) cost[r] = Math.max(10, Math.round((G.cap(r) * 0.15 * k * kl) / 10) * 10);
     const left = f.until ? Math.max(0, (f.until - Date.now()) / 1000) : 0;
     return { n, cost, left, ok: !left && G.canAfford(cost) };
   };
@@ -578,6 +584,7 @@
     else if (p.kind === 'camp') toast('¡Un campamento de bandidos! Fuerza aprox. ' + D.campPower(tier) + '.', 'bad', G.countB('barracks') ? { label: 'Atacar', fn: () => PK.UI.openBarracks('exp', { camp: p.id }) } : null);
     else if (p.kind === 'relic') toast('¡Una reliquia! Llévala a un Monasterio para que dé oro sin parar.', 'epic');
     else if (D.POI[p.kind].dungeon) PK.Exp.found(p);
+    else if (p.kind === 'legend') { G.stat('legends_found', 1); toast('¡Un lugar legendario: ' + D.LEYENDAS[p.ley].name + '! Manda a un héroe a investigarlo: ' + D.LEYENDAS[p.ley].bono + '.', 'epic', { label: 'Ver', fn: () => { PK.Render.centerOn(p.x + 1, p.y + 1); G.sel = { type: 'poi', id: p.id }; PK.UI.refreshPanel(true); } }); }
   }
 
   // ---------- Banderas de exploración (A4 del plan) ----------
@@ -1165,6 +1172,8 @@
     PK.Exp.update(dt, false);
     if (PK.Heroes) PK.Heroes.update(dt);
     if (PK.Aventura) PK.Aventura.tick(dt);
+      if (PK.Leyendas) PK.Leyendas.tick(dt);
+      if (PK.Campana) PK.Campana.tick(dt);
     PK.Batalla.update(dt);
     PK.Life.update(dt);
     PK.Incursiones.update(dt);
@@ -1266,6 +1275,8 @@
       PK.Exp.update(dt, true);
       if (PK.Heroes) PK.Heroes.update(dt);
       if (PK.Aventura) PK.Aventura.tick(dt);
+      if (PK.Leyendas) PK.Leyendas.tick(dt);
+      if (PK.Campana) PK.Campana.tick(dt);
       if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
       PK.Social.update(dt, true);
     }

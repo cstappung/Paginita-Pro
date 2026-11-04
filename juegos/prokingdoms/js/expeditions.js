@@ -24,6 +24,8 @@
     return b && b.k === k && b.until > Date.now() ? 1 + b.p : 1;
   };
   Exp.unitMult = type => 1 + 0.04 * D.rankOf(S().exp.xp[type]);
+  // Taberna, Faro Abisal y decretos: hasta −60% del viaje (sin tope, todo junto llegaba a −85%)
+  Exp.velViaje = () => 1 - Math.min(0.6, Exp.bonus('expSpeed'));
   Exp.armyMult = () => (1 + Exp.bonus('armyPower')) * Exp.wishMult('army');
   // Los lobos no se acercan a la Casa de Fieras.
   Exp.warded = function (x, y) {
@@ -43,7 +45,7 @@
   Exp.powerVs = function (units, enemy, heroe) {
     let p = 0;
     for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy);
-    return p * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy);
+    return p * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy) * (PK.Leyendas && S().leyendas ? 1 + PK.Leyendas.contra(enemy) : 1);
   };
   Exp.heroMult = (id, enemy) => (id && PK.Heroes ? PK.Heroes.mult(PK.Heroes.de(id), enemy) : 1);
   Exp.heal = units => Math.min(0.45, Object.keys(units).reduce((s, k) => s + (units[k] || 0) * (D.ARMY[k].heal || 0), 0));
@@ -79,7 +81,7 @@
   Exp.site = id => S().exp.sites[id] || (S().exp.sites[id] = { best: 0, rest: 0 });
   Exp.travel = function (p) {
     const [hx, hy] = D.PLAYER_HOME;
-    return Math.round((60 + U.dist(p.x, p.y, hx, hy) * 2) * (1 - Exp.bonus('expSpeed')));
+    return Math.round((60 + U.dist(p.x, p.y, hx, hy) * 2) * Exp.velViaje());
   };
   // El Observatorio marca en el mapa las mazmorras dentro de su radio, aunque estén en la niebla.
   function scan() {
@@ -120,8 +122,14 @@
 
   // ---------- Enviar ----------
   // target: { poi, floor } (mazmorra) o { mission: uid } (encargo).
-  Exp.campTravel = p => Math.round((30 + U.dist(p.x, p.y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) * 1.5) * (1 - Exp.bonus('expSpeed')));
+  Exp.campTravel = p => Math.round((30 + U.dist(p.x, p.y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) * 1.5) * Exp.velViaje());
   Exp.preview = function (target) {
+    // el lugar de un capítulo de la campaña (campana.js, H5)
+    if (target.cap) {
+      const C = PK.Campana, c = C && C.cap(target.cap), l = c && C.lugar(target.cap);
+      if (!l || !c.lugar) return null;
+      return { name: c.lugar.name, enemy: c.lugar.enemy, power: C.fuerza(target.cap), loot: C.botin(target.cap), travel: Exp.campTravel(l) };
+    }
     if (target.camp !== undefined) {
       const p = W.pois[target.camp];
       if (!p) return null;
@@ -132,7 +140,7 @@
       const m = S().exp.board.list.find(o => o.uid === target.mission);
       if (!m) return null;
       const tpl = D.MISSIONS.find(o => o.id === m.tpl);
-      return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: m.loot, travel: Math.round((m.time / 2) * (1 - Exp.bonus('expSpeed'))) };
+      return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: m.loot, travel: Math.round((m.time / 2) * Exp.velViaje()) };
     }
     const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
     // Mazmorras 2.0: una incursión por un bloque de 5 pisos (incursion.js); la fuerza es la del primer piso
@@ -142,6 +150,11 @@
   Exp.canSend = function (target) {
     const st = S();
     if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
+    if (target.cap) {
+      const C = PK.Campana;
+      if (!C || !C.abierto(target.cap) || !C.lugar(target.cap)) return 'Ese capítulo no está abierto.';
+      if (st.exp.runs.some(r => r.cap === target.cap)) return 'Ya hay tropas en camino.';
+    }
     if (target.camp !== undefined) {
       const p = W.pois[target.camp], ps = p && G().poiState(p);
       if (!ps || !ps.f) return 'Todavía no descubres ese campamento.';
@@ -171,10 +184,11 @@
     if (!pv) return false;
     if (heroe) pv.travel = Math.round(pv.travel * PK.Heroes.viaje(heroe));
     for (const k in units) army[k] -= units[k];
-    const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
+    const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, cap: target.cap, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
     st.exp.runs.push(run);
     if (run.poi !== undefined && PK.Inc) PK.Inc.preparar(run, W.pois[run.poi]);
+    if (run.cap) run.jefe = D.CAPITULOS[run.cap - 1].lugar.jefe; // con su jefe (batalla.js)
     if (heroe) PK.Heroes.salir(heroe, run);
     run.chance = Exp.chance(run.power / Math.max(1, pv.power));
     log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra aprox. ' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
@@ -226,16 +240,17 @@
   function cerrar(r, res, ratio) {
     const st = S(), sent = r.inc ? r.inc.enviados : Object.assign({}, r.units);
     if (!r.inc) for (const k in r.lost || {}) sent[k] = (sent[k] || 0) + r.lost[k];
-    if (r.poi !== undefined && r.inc) Exp.site(r.poi).rest = Date.now() + D.DUNGEON[W.pois[r.poi].kind].rest * 1000;
+    if (r.poi !== undefined && r.inc) Exp.site(r.poi).rest = Date.now() + D.DUNGEON[W.pois[r.poi].kind].rest * 1000 * reposo();
     if (r.poi !== undefined && !r.inc) {
       const p = W.pois[r.poi], site = Exp.site(p.id);
-      site.rest = Date.now() + D.DUNGEON[p.kind].rest * 1000;
+      site.rest = Date.now() + D.DUNGEON[p.kind].rest * 1000 * reposo();
       if (r.won && r.floor > site.best) {
         site.best = r.floor;
         st.stats['floor_' + p.kind] = Math.max(st.stats['floor_' + p.kind] || 0, r.floor);
         st.stats.floor_max = Math.max(st.stats.floor_max || 0, r.floor);
       }
     }
+    if (r.cap && r.won && PK.Campana) PK.Campana.ganar(r.cap);
     if (r.camp !== undefined && r.won) {
       const p = W.pois[r.camp], ps = p && G().poiState(p);
       if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
@@ -255,6 +270,7 @@
   }
   Exp.finishBattle = (r, res) => { if (r.phase === 'battle') resolve(r, res); };
   Exp.cerrar = r => cerrar(r, null, 0);
+  const reposo = () => (PK.Leyendas && S().leyendas ? PK.Leyendas.reposo() : 1); // Puerta de las Estrellas (H6)
   const lostText = l => Object.keys(l).filter(k => l[k]).map(k => l[k] + ' ' + D.ARMY[k].name.toLowerCase() + (l[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
   // Menos bajas con el héroe (armadura, rasgo Prudente, talentos). Valiente puede subirlas.
   const heroBajas = r => (r.heroe && PK.Heroes ? U.clamp(PK.Heroes.efecto(PK.Heroes.de(r.heroe), 'bajas'), -0.2, 0.5) : 0);
@@ -285,15 +301,18 @@
   // Tres bendiciones al día (las mismas todo el día); se elige una.
   Exp.wishOffer = function () {
     const w = S().exp.wish, day = U.dayKey();
-    if (w.day === day) return [];
-    const pool = D.WISHES.map(o => o.k), rng = U.rng(U.strHash(day + ':' + S().created)), out = [];
+    // Pozo de los Deseos Antiguo (H6): un deseo más cada 3 días, con otras tres bendiciones
+    const extra = w.day === day && w.extra !== day && PK.Leyendas && S().leyendas && PK.Leyendas.deseoExtra();
+    if (w.day === day && !extra) return [];
+    const pool = D.WISHES.map(o => o.k), rng = U.rng(U.strHash(day + (extra ? ':x:' : ':') + S().created)), out = [];
     while (out.length < 3) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
     return out;
   };
   Exp.makeWish = function (k) {
     const w = S().exp.wish, b = G().buildings.find(o => o.owner === 'p' && o.done && o.type === 'wishwell');
-    if (!b || w.day === U.dayKey() || !Exp.wishOffer().includes(k)) return;
+    if (!b || !Exp.wishOffer().includes(k)) return;
     const s = G().bst(b), def = D.WISHES.find(o => o.k === k);
+    if (w.day === U.dayKey()) w.extra = U.dayKey();
     w.day = U.dayKey();
     G().stat('wishes', 1);
     if (def.instant) {

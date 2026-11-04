@@ -794,7 +794,8 @@
         el('p', { class: 'small muted' }, 'Pisos limpiados: ' + site.best + ' de ' + d.floors + (rest > 0 ? ' · se repone en ' + U.fmtTime(rest / 1000) : '') + '. Da ' + D.RES[d.loot].name.toLowerCase() + '.'),
         S().era < d.era ? el('p', { class: 'small warn-t' }, 'Hace falta la Era ' + U.roman(d.era) + '.') :
           UI.btn('Preparar expedición al piso ' + Math.min(d.floors, site.best + 1), () => UI.openBarracks('exp', { poi: p.id, floor: Math.min(d.floors, site.best + 1) }), { small: true, cls: 'gold' }));
-    } else info.append(el('p', { class: 'small muted' }, st.d ? 'Ya lo aprovechaste.' : ''));
+    } else if (p.kind === 'legend' && PK.Leyendas) PK.Leyendas.panel(p, info);
+    else info.append(el('p', { class: 'small muted' }, st.d ? 'Ya lo aprovechaste.' : ''));
   }
 
   function otherUnitPanel(u) {
@@ -886,7 +887,8 @@
     let text = '';
     if (h.k === 'node') { const z = W.zoneOf(h.o); text = D.NODES[h.o.kind].name + ' · ' + (h.o.dead ? 'agotado' : U.fmt(h.o.amount)) + (z ? ' · ' + z.name : ''); }
     else if (h.k === 'building') text = h.o.def.name + (h.o.def.noUp ? '' : ' · Nv ' + h.o.lvl) + (h.o.upg ? ' (mejorando)' : '') + (h.o.owner !== 'p' ? ' · ' + D.BOTS.find(b => b.id === h.o.owner).name : '');
-    else if (h.k === 'poi') { const st = G().poiState(h.o); text = D.POI[h.o.kind].name + (st && st.d ? ' · ya aprovechado' : ''); }
+    else if (h.k === 'poi') { const st = G().poiState(h.o); text = (h.o.kind === 'legend' ? D.LEYENDAS[h.o.ley].name + (st && st.d ? ' · investigado' : ' · lugar legendario') : D.POI[h.o.kind].name + (st && st.d ? ' · ya aprovechado' : '')); }
+    else if (h.k === 'cap') { const c = D.CAPITULOS[h.o.n - 1]; text = c.lugar.name + ' · Capítulo ' + U.roman(h.o.n) + ' de la Crónica'; }
     else if (h.k === 'troop') text = h.o.march ? 'Tus tropas marchan hacia ' + (h.o.march.back ? 'casa' : h.o.march.name) : 'Tus soldados · ' + UI.hint('clic', 'toca') + ' para abrir el Cuartel';
     else if (h.k === 'unit') text = h.o.owner === 'p' ? (h.o.kind === 'scout' ? 'Explorador · ' : 'Aldeano · ') + taskText(h.o) : 'Aldeano de ' + D.BOTS.find(b => b.id === h.o.owner).name;
     hoverKey = text;

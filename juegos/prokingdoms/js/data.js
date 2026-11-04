@@ -6,19 +6,26 @@
   const D = (PK.D = {});
 
   D.SEED = 20261027;          // misma semilla para todos: el mundo compartido es idéntico
-  D.MAPV = 3;                 // versión del mapa: si cambia, el servidor reinicia los recursos compartidos
-  D.SAVE_V = 3;
+  D.MAPV = 4;                 // versión del mapa: si cambia, el servidor reinicia los recursos compartidos
+  D.SAVE_V = 4;
   // Reiniciar el mundo del servidor: al subir MUNDO_VER, el servidor (server/sim.js al cargar) borra jugadores,
   // mundos, gremios, ofertas y partidas guardadas, y anota la versión nueva. Se sube junto con SAVE_V (que
   // descarta las partidas locales) y se despliega la función a mano.
-  D.MUNDO_VER = 1;
+  D.MUNDO_VER = 2;
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 1;
+  D.PROTO = 2;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
-  D.NOVEDADES = { ver: 'pk-11', items: ['Arreglos: aldeanos que quedaban «asustados» para siempre, Centros Urbanos encerrados por casas, la misión «Al bosque común» y los talleres en reserva.'] };
+  D.NOVEDADES = { ver: 'pk-17', items: [
+    'Héroes: recluta en la Taberna, súbelos de nivel, equípalos y llévalos a la batalla.',
+    'Mazmorras 2.0: incursiones de 5 pisos con salas a elegir, jefes y afijos semanales.',
+    'La Crónica del Reino: una campaña con un capítulo por era, escenas, batallas únicas y decisiones.',
+    'Tres mazmorras nuevas (Pantano de las Brujas, Fortaleza de los Gigantes y Templo Hundido) con sus enemigos y estructuras de Leyenda.',
+    '12 lugares legendarios que se investigan con un héroe, mapas del tesoro, encuentros en el camino y eventos con decisiones.',
+    'El Salón del Consejo, el Asesor y un Capataz más listo.',
+  ] };
   D.OFFLINE_CAP = 12 * 3600;  // los aldeanos trabajan hasta 12h sin ti (las obras y estudios no tienen tope)
 
   D.RES = {
@@ -545,13 +552,17 @@
   // ---------- Recursos especiales ----------
   // Solo salen de las mazmorras (cuevas, guaridas, catacumbas, cráteres y nidos) y de los encargos del
   // Cuartel. No se venden ni ocupan bodega: se gastan en las estructuras de las Leyendas.
-  D.SPECIAL = ['crystal', 'hide', 'lore', 'starIron', 'scale'];
+  D.SPECIAL = ['crystal', 'hide', 'lore', 'starIron', 'scale', 'herbs', 'titanBone', 'pearls'];
   Object.assign(D.RES, {
     crystal: { name: 'Cristal de cueva', special: true },
     hide: { name: 'Pieles raras', special: true },
     lore: { name: 'Pergaminos arcanos', special: true },
     starIron: { name: 'Hierro estelar', special: true },
     scale: { name: 'Escamas de dragón', special: true },
+    // H4 (pk-17): de las mazmorras nuevas
+    herbs: { name: 'Hierbas raras', special: true },
+    titanBone: { name: 'Hueso de titán', special: true },
+    pearls: { name: 'Perlas abisales', special: true },
   });
   D.RES_ORDER.push(...D.SPECIAL);
 
@@ -564,15 +575,20 @@
     undead: { name: 'No-muertos', desc: 'Esqueletos y espectros. Los clérigos los deshacen.' },
     golem: { name: 'Gólems', desc: 'Piedra y cristal vivos. Las flechas rebotan: hace falta catapulta o caballería.' },
     dragon: { name: 'Dragón', desc: 'Vuela y escupe fuego. Arqueros y lanceros, y clérigos para sobrevivir.' },
+    // H4 (pk-17). Las tropas nuevas del plan (Jinete, Ballestero, Monje, Mago) llegan con el Combate 2.0;
+    // mientras, cada uno tiene dos respuestas entre las tropas de hoy.
+    arcane: { name: 'Arcanos', desc: 'Brujas que maldicen (tus tropas se frenan) y fuegos fatuos. Caballeros y clérigos los deshacen.' },
+    giant: { name: 'Gigantes', desc: 'Lentos y con mucha vida; su golpe alcanza a varios. Catapultas y arqueros de lejos, y dispérsate.' },
+    abyss: { name: 'Abisales', desc: 'Tentáculos que agarran y sirenas que cantan. Arqueros y clérigos.' },
   };
   // vs: multiplicador contra cada tipo de enemigo. heal: cuánto reduce las bajas cada unidad (clérigos).
   D.ARMY = {
     militia: { name: 'Miliciano', role: 'Barato y sin especialidad.', cost: { food: 40, gold: 15 }, time: 15, power: 5, era: 2, lvl: 1, vs: {} },
     spear: { name: 'Lancero', role: 'x2 contra bestias y x1,5 contra dragones.', cost: { food: 50, wood: 30, gold: 15 }, time: 18, power: 6, era: 2, lvl: 2, vs: { beast: 2, dragon: 1.5 } },
-    archer: { name: 'Arquero', role: 'x1,6 contra bandidos y x1,5 contra dragones; la mitad contra gólems.', cost: { wood: 30, gold: 30 }, time: 18, power: 6, era: 2, lvl: 3, vs: { bandit: 1.6, dragon: 1.5, golem: 0.5 } },
-    knight: { name: 'Caballero', role: 'x1,5 contra bandidos, x1,4 contra gólems y x1,3 contra no-muertos.', cost: { food: 60, gold: 60, ingots: 2 }, time: 30, power: 16, era: 3, lvl: 4, vs: { bandit: 1.5, golem: 1.4, undead: 1.3 } },
-    cleric: { name: 'Clérigo', role: 'x3 contra no-muertos. Cada clérigo reduce las bajas un 3% (máx. 45%).', cost: { food: 40, gold: 50, books: 1 }, time: 25, power: 4, era: 3, lvl: 5, vs: { undead: 3 }, heal: 0.03 },
-    catapult: { name: 'Catapulta', role: 'x2 contra gólems; la mitad contra bestias.', cost: { wood: 200, gold: 120, machinery: 2 }, time: 60, power: 60, era: 5, lvl: 7, vs: { golem: 2, beast: 0.5 } },
+    archer: { name: 'Arquero', role: 'x1,6 contra bandidos, x1,5 contra dragones y abisales, x1,4 contra gigantes; la mitad contra gólems.', cost: { wood: 30, gold: 30 }, time: 18, power: 6, era: 2, lvl: 3, vs: { bandit: 1.6, dragon: 1.5, golem: 0.5, giant: 1.4, abyss: 1.5 } },
+    knight: { name: 'Caballero', role: 'x1,5 contra bandidos y arcanos, x1,4 contra gólems y x1,3 contra no-muertos.', cost: { food: 60, gold: 60, ingots: 2 }, time: 30, power: 16, era: 3, lvl: 4, vs: { bandit: 1.5, golem: 1.4, undead: 1.3, arcane: 1.5 } },
+    cleric: { name: 'Clérigo', role: 'x3 contra no-muertos, x1,6 contra arcanos y x1,5 contra abisales. Cada clérigo reduce las bajas un 3% (máx. 45%).', cost: { food: 40, gold: 50, books: 1 }, time: 25, power: 4, era: 3, lvl: 5, vs: { undead: 3, arcane: 1.6, abyss: 1.5 }, heal: 0.03 },
+    catapult: { name: 'Catapulta', role: 'x2 contra gólems y x1,8 contra gigantes; la mitad contra bestias.', cost: { wood: 200, gold: 120, machinery: 2 }, time: 60, power: 60, era: 5, lvl: 7, vs: { golem: 2, beast: 0.5, giant: 1.8 } },
   };
   // Veteranía: cada tipo de tropa junta experiencia en las expediciones (y en la Arena). +4% de fuerza por rango.
   D.RANKS = ['Recluta', 'Soldado', 'Curtido', 'Veterano', 'Sargento', 'Élite', 'Campeón', 'Héroe', 'Leyenda', 'Mito', 'Inmortal'];
@@ -588,6 +604,10 @@
     crypt: { name: 'Catacumbas', enemy: { undead: 0.8, bandit: 0.2 }, loot: 'lore', extra: { books: 3 }, era: 3, base: 160, floors: 15, rest: 60 * 60, desc: 'Criptas olvidadas con pergaminos arcanos. Los muertos no descansan.' },
     crater: { name: 'Cráter Estelar', enemy: { golem: 0.5, bandit: 0.5 }, loot: 'starIron', extra: { ingots: 8 }, era: 4, base: 420, floors: 15, rest: 90 * 60, desc: 'Aquí cayó una estrella. Su hierro atrae ladrones y despierta a la piedra.' },
     nest: { name: 'Nido del Dragón', enemy: { dragon: 1 }, loot: 'scale', extra: { gold: 400 }, era: 5, base: 1400, floors: 10, rest: 3 * 3600, desc: 'Montañas de oro y un dragón que no comparte. Escamas para la Torre del Dragón.' },
+    // H4 (pk-17)
+    swamp: { name: 'Pantano de las Brujas', enemy: { arcane: 0.75, beast: 0.25 }, loot: 'herbs', extra: { food: 400 }, era: 3, base: 240, floors: 15, rest: 60 * 60, desc: 'Niebla verde, luces que flotan y una choza sobre patas. Hierbas raras para el Herbolario.' },
+    giants: { name: 'Fortaleza de los Gigantes', enemy: { giant: 0.8, golem: 0.2 }, loot: 'titanBone', extra: { stone: 900 }, era: 6, base: 2600, floors: 15, rest: 2 * 3600, desc: 'Murallas que hizo alguien diez veces más alto. Hueso de titán para la Forja de Titanes.' },
+    temple: { name: 'Templo Hundido', enemy: { abyss: 0.8, undead: 0.2 }, loot: 'pearls', extra: { gems: 10 }, era: 8, base: 7000, floors: 15, rest: 3 * 3600, desc: 'Un templo a medias bajo el lago. Algo canta allá abajo. Perlas abisales para el Faro.' },
   };
   D.dungeonPower = (kind, floor) => Math.round(D.DUNGEON[kind].base * Math.pow(1.38, floor - 1));
   D.dungeonLoot = function (kind, floor, first) {
@@ -652,7 +672,13 @@
     archive: { name: 'Gran Archivo', w: 3, h: 3, cost: { blocks: 3000, books: 1200, marble: 900, lore: 60 }, time: 1200, era: 10, max: 1, lock: 'archive', desc: 'Toda la memoria del reino: investigación y mejoras de edificios más rápidas.' },
     colossus: { name: 'Coloso del Reino', w: 2, h: 2, cost: { steel: 1500, machinery: 400, starIron: 80, scale: 60 }, time: 1800, era: 12, max: 1, lock: 'colossus', desc: 'Una estatua gigante con la antorcha del reino: más fuerza del ejército y más producción.' },
   });
-  D.LEGEND_B = ['tavern', 'wishwell', 'arena', 'beasthouse', 'observatory', 'sanctum', 'runeforge', 'dragontower', 'gardens', 'archive', 'colossus'];
+  // H4 (pk-17): una por mazmorra nueva
+  Object.assign(D.BUILD, {
+    herbolario: { name: 'Herbolario', w: 2, h: 2, cost: { wood: 900, planks: 200, herbs: 30 }, time: 180, era: 3, max: 1, lock: 'herbolario', desc: 'Ungüentos y pociones: los héroes se curan antes y cada incursión lleva pociones que salvan a parte de los caídos.' },
+    titanforge: { name: 'Forja de Titanes', w: 3, h: 3, cost: { blocks: 1200, steel: 300, titanBone: 30 }, time: 900, era: 6, max: 1, lock: 'titanforge', desc: 'Un yunque de hueso de titán: al mejorar el equipo de un héroe, a veces sube de rareza. Más fuerza del ejército.' },
+    faro: { name: 'Faro Abisal', w: 2, h: 2, cost: { blocks: 2500, marble: 800, pearls: 30 }, time: 1200, era: 8, max: 1, lock: 'faro', desc: 'Una luz que ve por encima de la niebla: visión enorme, expediciones más rápidas y carretas más seguras.' },
+  });
+  D.LEGEND_B = ['tavern', 'wishwell', 'arena', 'beasthouse', 'observatory', 'sanctum', 'runeforge', 'dragontower', 'herbolario', 'titanforge', 'faro', 'gardens', 'archive', 'colossus'];
   D.BUILD_ORDER.splice(D.BUILD_ORDER.indexOf('wonder'), 0, ...D.LEGEND_B);
   for (const k of D.LEGEND_B) { const b = D.BUILD[k]; b.sight = b.w >= 3 ? 5 : 4; b.upT = 1.2; }
   Object.assign(D.BSTATS, {
@@ -667,6 +693,9 @@
     sanctum: L => ({ shrineProd: 0.05 * L }),
     runeforge: L => ({ armyPower: 0.05 * L, xpBoost: 0.1 * L }),
     dragontower: L => ({ terrDef: 0.1 * L, sight: 16 + L }),
+    herbolario: L => ({ heridaP: Math.min(0.5, 0.3 + 0.02 * (L - 1)), pociones: Math.min(0.4, 0.1 + 0.02 * (L - 1)) }),
+    titanforge: L => ({ armyPower: 0.03 * L, rareza: Math.min(0.5, 0.15 + 0.03 * (L - 1)) }),
+    faro: L => ({ sight: 22 + L, expSpeed: Math.min(0.3, 0.05 + 0.01 * L), cartBoost: 0.04 * L }),
   });
   Object.assign(D.STAT_LABELS, {
     missions: ['Encargos extra en el tablón', v => '+' + v], expSpeed: ['Velocidad de expediciones', pct],
@@ -676,6 +705,7 @@
     cartBoost: ['Velocidad y carga de carretas', pct], wolfWard: ['Radio sin lobos', v => v + ' casillas'],
     scan: ['Radio de búsqueda de mazmorras', v => v + ' casillas'], shrineProd: ['Producción de talleres', pct],
     xpBoost: ['Experiencia extra', pct], terrDef: ['Defensa de tus parcelas', pct],
+    heridaP: ['Héroes heridos: menos descanso', pct], pociones: ['Caídos que salvan las pociones (incursiones)', pct], rareza: ['Mejora que sube de rareza', pct],
   });
 
   // Mazmorras como puntos de interés del mapa (se ubican aparte, sin mover nada de lo que ya existía).
@@ -685,7 +715,90 @@
     crypt: { name: D.DUNGEON.crypt.name, w: 2, h: 2, dungeon: true, desc: D.DUNGEON.crypt.desc },
     crater: { name: D.DUNGEON.crater.name, w: 3, h: 3, dungeon: true, desc: D.DUNGEON.crater.desc },
     nest: { name: D.DUNGEON.nest.name, w: 3, h: 3, dungeon: true, desc: D.DUNGEON.nest.desc },
+    swamp: { name: D.DUNGEON.swamp.name, w: 3, h: 3, dungeon: true, desc: D.DUNGEON.swamp.desc },
+    giants: { name: D.DUNGEON.giants.name, w: 3, h: 3, dungeon: true, desc: D.DUNGEON.giants.desc },
+    temple: { name: D.DUNGEON.temple.name, w: 3, h: 3, dungeon: true, desc: D.DUNGEON.temple.desc },
   });
+
+  // ---------- Lugares legendarios (H6, pk-17) ----------
+  // Maravillas naturales del mapa. Cada una está 3 veces en el mundo compartido (así todos tienen alguna cerca) y
+  // se ubica en world.js. Se descubren explorando y se activan mandando a un héroe a investigarlas (leyendas.js):
+  // un bono pequeño para siempre (no se suma dos veces la misma), una página de historia y una casilla en el Álbum.
+  D.POI.legend = { name: 'Lugar legendario', w: 2, h: 2, desc: 'Una maravilla del mundo. Manda a un héroe a investigarla.' };
+  D.LEYENDAS = [
+    { id: 'cascada', name: 'Cascada del Alba', bono: '+5% de comida', agua: true, historia: 'Dicen que el primer rey se bañó aquí antes de la coronación, y que desde entonces el agua sale tibia al amanecer. Los campesinos riegan con ella y juran que el trigo crece más rápido.' },
+    { id: 'arbol', name: 'Árbol Madre', bono: '+5% de madera; los árboles rebrotan un 10% antes', historia: 'Un tronco que no abrazan diez hombres. Los leñadores le dejan pan en las raíces antes de entrar al bosque, y el bosque, agradecido, vuelve a crecer.' },
+    { id: 'circulo', name: 'Círculo de Piedras', bono: '+5% de investigación', historia: 'Doce piedras en ronda, más viejas que cualquier reino. En la noche más larga del año, la sombra de la del centro apunta a una estrella que nadie ha sabido nombrar.' },
+    { id: 'dragones', name: 'Cementerio de Dragones', bono: '+10% de fuerza contra dragones', historia: 'Costillas como arcos de catedral. Aquí vinieron a morir los dragones viejos, y aquí aprendieron los cazadores dónde no tienen escamas.' },
+    { id: 'faro', name: 'Faro Abandonado', bono: '+3 de visión de tus torres', agua: true, historia: 'Nadie recuerda qué barcos guiaba. La lámpara está rota, pero desde arriba se ve hasta donde termina el lago, y a veces más allá.' },
+    { id: 'mina', name: 'Mina de los Enanos', bono: '+5% de minería', historia: 'Túneles bajitos y perfectos, con escaleras talladas para pies chicos. Los enanos se fueron, pero dejaron marcas en la roca que muestran dónde está la veta.' },
+    { id: 'estatua', name: 'Estatua del Rey Olvidado', bono: '+5% de oro', historia: 'Un rey de piedra con la cara gastada por la lluvia. Su nombre está borrado; su tesoro, no del todo. El pueblo dice que trae suerte a los comerciantes.' },
+    { id: 'pozo', name: 'Pozo de los Deseos Antiguo', bono: 'un deseo extra cada 3 días (Fuente de los Deseos)', historia: 'Más hondo que cualquier cuerda. Si tiras una moneda no se oye el fondo, pero a veces, días después, se oye una risa.' },
+    { id: 'campo', name: 'Campo de Batalla Antiguo', bono: '+10% de experiencia de tus tropas', historia: 'Puntas de flecha oxidadas, cascos sin dueño. Los veteranos traen a los reclutas aquí para que entiendan, en silencio, lo que es una batalla.' },
+    { id: 'biblioteca', name: 'Biblioteca Hundida', bono: '+10 libros por día', historia: 'Un edificio tragado por la tierra hasta el segundo piso. Los libros de arriba se secaron; los de abajo cuentan historias que el agua todavía no termina de borrar.' },
+    { id: 'colmena', name: 'Colmena Gigante', bono: 'las fiestas del pueblo cuestan un 20% menos', historia: 'Abejas del tamaño de un pulgar y miel que no se acaba. Con ella se endulza cualquier fiesta: el pueblo ya no necesita vaciar las bodegas para celebrar.' },
+    { id: 'puerta', name: 'Puerta de las Estrellas', bono: 'las mazmorras se reponen un 15% antes', historia: 'Un arco de piedra negra en medio de la nada. De noche, entre sus columnas se ven estrellas que no están en el cielo.' },
+  ];
+
+  // ---------- Campaña: «La Crónica del Reino» (H5, pk-17; guion en el Anexo A4 del plan) ----------
+  // Un capítulo por era, de la II a la XI. Cada uno: una escena al empezar (D.ESCENAS, con retratos dibujados como
+  // los de los héroes), sus misiones en la rama Crónica, un lugar único en el mapa con una batalla y su jefe, y
+  // una elección al ganarla que cambia el premio. La lógica está en campana.js.
+  D.PERSONAJES = {
+    forastero: { name: 'El Forastero de la Capa', clase: 'hechicero', semilla: 4242 },
+    valdes: { name: 'Tuerto Valdés', clase: 'guarda', semilla: 66 },
+    rey: { name: 'El Rey Bandido', clase: 'juglar', semilla: 1313 },
+    brunilda: { name: 'La reina Brunilda', clase: 'paladin', semilla: 777, mujer: true },
+    ceniza: { name: 'Hermana Ceniza, de la Orden del Cráter', clase: 'ingeniera', semilla: 909, mujer: true },
+    capitana: { name: 'La capitana del Galeón', clase: 'guarda', semilla: 5150, mujer: true },
+  };
+  D.ESCENAS = {
+    c1a: { quien: 'forastero', lineas: ['Buenas noches, señor del pueblo. Vengo del norte y traigo malas noticias.', 'Algo se mueve más allá de las montañas: los bandidos se juntan y las bestias bajan de los cerros.', 'Si quieres resistir, vas a necesitar héroes. Y una taberna donde encontrarlos.'] },
+    c1b: { quien: 'valdes', lineas: ['Está bien, está bien… me rindo. Pero no fui yo quien juntó a las bandas.', 'Hay un tipo que se hace llamar Rey. Tiene una fortaleza al otro lado del bosque.'] },
+    c2a: { quien: 'forastero', lineas: ['El Rey Bandido unió a los campamentos bajo una sola bandera.', 'Toma tres de sus campamentos y su fortaleza quedará sola. Entonces será tu turno.'] },
+    c2b: { quien: 'rey', lineas: ['Bien peleado. Nadie había llegado hasta mi trono.', 'Ahora decide: ¿una canción para tu corte, o mi cabeza y todo mi oro?'] },
+    c3a: { quien: 'brunilda', lineas: ['Soy Brunilda, reina de las tierras del este. Tu frontera pisa la mía.', 'Puedo ser tu aliada o tu peor vecina. Elige bien cómo me respondes.'] },
+    c3b: { quien: 'brunilda', lineas: ['Que así sea. Las crónicas de los dos reinos recordarán este día.'] },
+    c4a: { quien: 'ceniza', lineas: ['El hierro que cayó del cielo es sagrado. La Orden lo cuida desde hace siglos.', 'No te metas en el Cráter… o el Heraldo te enseñará por qué.'] },
+    c4b: { quien: 'forastero', lineas: ['El Heraldo cayó. La Orden no te lo va a perdonar fácilmente.', 'Pero ahora sabemos qué buscaban: estrellas. Y algo que duerme en el Nido.'] },
+    c5a: { quien: 'forastero', lineas: ['Un reino de verdad deja algo que dure más que sus reyes.', 'Levanta una Maravilla. Y vigila: la Orden no quiere que la termines.'] },
+    c5b: { quien: 'ceniza', lineas: ['Tu Maravilla sigue en pie. Quizás nos equivocamos contigo.'] },
+    c6a: { quien: 'forastero', lineas: ['¿Sentiste el temblor? Las montañas se están despertando.', 'Busca el Cementerio de Dragones: ahí aprendieron los antiguos dónde golpear.', 'Y otra cosa… en la orilla del lago grande encalló un barco que nadie ha visto antes.'] },
+    c6b: { quien: 'capitana', lineas: ['Este es el Galeón del Alba. Venimos de las islas más allá de la bruma.', 'El casco está roto. Si nos ayudas a repararlo, algún día te llevaremos allá.'] },
+    c7a: { quien: 'capitana', lineas: ['El timón del Galeón se hundió con el templo del lago.', 'Allá abajo canta algo. No escuches la canción.'] },
+    c7b: { quien: 'capitana', lineas: ['¡El timón! Con esto, el Galeón vuelve a tener rumbo.'] },
+    c8a: { quien: 'brunilda', lineas: ['Ignivor despertó. Ningún reino puede contra él a solas.', 'Junta aliados: tratos, regalos, promesas. Los vamos a necesitar a todos.'] },
+    c8b: { quien: 'capitana', lineas: ['Tus aliados mandaron velas nuevas para el Galeón. Ya casi está listo.'] },
+    c9a: { quien: 'forastero', lineas: ['Ha llegado la hora. Ignivor el Antiguo espera en su cumbre.', 'Lleva a todos tus héroes. Y si cae, guarda una de sus escamas: la vamos a necesitar.'] },
+    c9b: { quien: 'forastero', lineas: ['Con su escama se forja una brújula que atraviesa la bruma.', 'Tu reino ya no tiene miedo. Solo le falta una corona.'] },
+    c10a: { quien: 'forastero', lineas: ['Todos los caminos del reino llevan hoy a tu Centro Urbano.', 'Cuando termines lo que empezaste, el pueblo te va a coronar.'] },
+    c10b: { quien: 'capitana', lineas: ['¡Larga vida a la Leyenda del Reino!', 'El Galeón del Alba está listo. Cuando quieras, zarpamos hacia las islas.'] },
+  };
+  // lugar: el sitio único del capítulo (aparece cerca de tu reino al empezar el capítulo). k: fuerza relativa a la
+  // de la era (D.capPower). jefe: tabla JEFE de batalla.js. eleccion: al ganar; antes: se elige al aparecer el lugar
+  // (el capítulo III se puede cerrar pagando, sin pelear).
+  D.capPower = (era, k) => Math.round(90 * Math.pow(1.85, era - 2) * (k || 1));
+  D.CAPITULOS = [
+    { era: 2, titulo: 'El forastero de la capa', ini: 'c1a', fin: 'c1b', lugar: { name: 'Guarida de Tuerto Valdés', enemy: { bandit: 1 }, k: 1, jefe: 'valdes', terreno: 'camp' }, premio: { gold: 300, coins: 15 },
+      eleccion: { txt: 'La banda de Valdés se rindió.', ops: [{ label: 'Reclutarlos', txt: '+10 milicianos', militia: 10 }, { label: 'Repartir su botín', txt: 'oro para el pueblo', res: { gold: 400, food: 300 } }] } },
+    { era: 3, titulo: 'El Rey Bandido', ini: 'c2a', fin: 'c2b', lugar: { name: 'Fortaleza Bandida', enemy: { bandit: 1 }, k: 1.2, jefe: 'reybandido', terreno: 'camp' }, premio: { gold: 800, coins: 25 },
+      eleccion: { txt: 'El Rey Bandido está de rodillas.', ops: [{ label: 'Perdonarlo', txt: 'se une como héroe Juglar', heroe: 'rey' }, { label: 'Quedarte con su tesoro', txt: 'oro y gemas', res: { gold: 2500, gems: 30 } }] } },
+    { era: 4, titulo: 'La reina Brunilda', ini: 'c3a', fin: 'c3b', lugar: { name: 'Campamento de Brunilda', enemy: { bandit: 0.6, golem: 0.4 }, k: 1.2, jefe: 'brunilda', terreno: 'campo' }, premio: { gold: 1500, coins: 30 },
+      antes: { txt: 'Brunilda acampa en tu frontera. ¿Tratado o batalla?', ops: [{ label: 'Firmar un tratado', txt: 'pagas tributo y quedan en paz para siempre', costo: { gold: 3000, gems: 40 }, cierra: true, rel: 'paz' }, { label: 'Defender la frontera', txt: 'una batalla contra su guardia', rel: 'guerra' }] } },
+    { era: 5, titulo: 'La estrella caída', ini: 'c4a', fin: 'c4b', lugar: { name: 'Santuario de la Orden', enemy: { golem: 0.6, bandit: 0.4 }, k: 1.2, jefe: 'crater', terreno: 'crater' }, premio: { starIron: 20, coins: 35 },
+      eleccion: { txt: 'El hierro estelar del santuario es tuyo.', ops: [{ label: 'Devolverlo a la Orden', txt: 'te enseñan su saber', res: { lore: 25, books: 300 } }, { label: 'Quedártelo', txt: 'más hierro estelar', res: { starIron: 30 } }] } },
+    { era: 6, titulo: 'La Maravilla', ini: 'c5a', fin: 'c5b', lugar: { name: 'Taller de los saboteadores', enemy: { bandit: 0.5, arcane: 0.5 }, k: 1.2, jefe: 'swamp', terreno: 'campo' }, premio: { gold: 6000, coins: 40 },
+      eleccion: { txt: 'Atrapaste a los saboteadores de la Orden.', ops: [{ label: 'Darles trabajo', txt: 'ayudan en tu Maravilla: +3% de producción para siempre', perk: { craftP: 0.03 } }, { label: 'Expulsarlos', txt: 'confiscas sus herramientas', res: { tools: 400, machinery: 60 } }] } },
+    { era: 7, titulo: 'El despertar', ini: 'c6a', fin: 'c6b', lugar: { name: 'Paso de las Cenizas', enemy: { dragon: 1 }, k: 1.1, jefe: 'cria', terreno: 'nest' }, premio: { scale: 20, coins: 45 }, galeon: 'casco',
+      eleccion: { txt: 'La cría de dragón está vencida.', ops: [{ label: 'Dejarla ir', txt: '+3% de fuerza del ejército para siempre', perk: { armyPower: 0.03 } }, { label: 'Llevarte sus escamas', txt: 'escamas de dragón', res: { scale: 40 } }] } },
+    { era: 8, titulo: 'Las aguas oscuras', ini: 'c7a', fin: 'c7b', lugar: { name: 'Santuario del Timón', enemy: { abyss: 0.8, undead: 0.2 }, k: 1.1, jefe: 'temple', terreno: 'temple' }, premio: { pearls: 20, coins: 50 }, galeon: 'timon',
+      eleccion: { txt: 'Bajo el timón brillan perlas.', ops: [{ label: 'Para el Galeón', txt: 'adornan su mascarón: +5% de velocidad de expediciones', perk: { expSpeed: 0.05 } }, { label: 'Para tus bodegas', txt: 'perlas abisales y gemas', res: { pearls: 30, gems: 80 } }] } },
+    { era: 9, titulo: 'La alianza', ini: 'c8a', fin: 'c8b', lugar: { name: 'Bastión de la Orden', enemy: { arcane: 0.5, giant: 0.5 }, k: 1.2, jefe: 'giants', terreno: 'giants' }, premio: { gold: 40000, coins: 55 }, galeon: 'velas',
+      eleccion: { txt: 'Tus aliados esperan un gesto.', ops: [{ label: 'Un banquete', txt: '+3% de recolección para siempre', perk: { gatherP: 0.03 } }, { label: 'Un tratado de armas', txt: 'acero y maquinaria', res: { steel: 1500, machinery: 300 } }] } },
+    { era: 10, titulo: 'Ignivor', ini: 'c9a', fin: 'c9b', lugar: { name: 'La Cumbre de Ignivor', enemy: { dragon: 1 }, k: 1.15, jefe: 'nest', terreno: 'nest' }, premio: { scale: 60, coins: 80 }, galeon: 'brujula',
+      eleccion: { txt: 'Ignivor cayó. Su tesoro brilla en la cumbre.', ops: [{ label: 'Forjar la brújula', txt: '+5% de fuerza del ejército para siempre', perk: { armyPower: 0.05 } }, { label: 'El tesoro del dragón', txt: 'oro y escamas', res: { gold: 120000, scale: 60 } }] } },
+    { era: 11, titulo: 'La leyenda', ini: 'c10a', fin: 'c10b', lugar: null, premio: { gems: 500, coins: 150 } },
+  ];
 
   // ---------- Libro de misiones ----------
   D.BRANCHES = [
@@ -854,6 +967,29 @@
     prev = 'wt' + i;
   });
 
+  // Campaña «La Crónica del Reino» (H5): un capítulo por era. { t: 'cap', n }: el capítulo n está cerrado (campana.js).
+  const CAPQ = [
+    [['c1_1', 'Una taberna para el viajero', 'El Forastero de la Capa necesita un lugar donde contar su historia. Construye la Taberna.', B('tavern')], ['c1_2', 'Primer héroe', 'Recluta a un héroe en la Taberna.', st('heroes_hired', 1)]],
+    [['c2_1', 'Rompe sus alianzas', 'Destruye 3 campamentos de bandidos.', st('camps_cleared', 3)]],
+    [['c3_1', 'Muros para la frontera', 'Brunilda mira tus murallas: levanta 20 tramos de muralla.', st('walls_built', 20)]],
+    [['c4_1', 'Bajo el Cráter', 'Llega al piso 5 de un Cráter Estelar y vence al Heraldo.', st('floor_crater', 5)]],
+    [['c5_1', 'Una obra para la historia', 'Construye la Maravilla.', B('wonder')]],
+    [['c6_1', 'Huesos de dragón', 'Investiga un Cementerio de Dragones (un lugar legendario) con un héroe.', { t: 'flag', k: 'ley_dragones' }]],
+    [['c7_1', 'Lo que guarda el lago', 'Llega al piso 5 de un Templo Hundido.', st('floor_temple', 5)]],
+    [['c8_1', 'Tratos de amistad', 'Cierra 3 tratos con otros reinos en el Mercado.', st('trades_accepted', 3)], ['c8_2', 'Manos amigas', 'Ayuda 3 veces a tu gremio.', st('guild_helps', 3)]],
+    [['c9_1', 'El camino al Nido', 'Llega al piso 5 de un Nido del Dragón.', st('floor_nest', 5)]],
+    [['c10_1', 'Las maravillas del reino', 'Investiga 6 lugares legendarios distintos.', st('legends', 6)]],
+  ];
+  let capPrev = 'm8';
+  D.CAPITULOS.forEach((c, i) => {
+    const n = i + 1;
+    CAPQ[i].forEach(([id, title, desc, req], j) => { q(id, 'main', 'Cap. ' + U.roman(n) + ' · ' + title, desc, j === 0 ? all({ t: 'era', n: c.era }, req) : req, { gold: Math.round(200 * Math.pow(1.7, c.era - 2)), coins: 5 + 2 * n }, [capPrev]); capPrev = id; });
+    const fin = c.lugar ? 'Vence en ' + c.lugar.name + ' (Cuartel → Atacar, o tócalo en el mapa).' : 'Cumple lo que pide el capítulo y el pueblo te corona.';
+    q('c' + n + '_fin', 'main', 'Cap. ' + U.roman(n) + ' · ' + c.titulo, fin, { t: 'cap', n }, Object.assign({}, c.premio), [capPrev]);
+    Q[Q.length - 1].cap = n;
+    capPrev = 'c' + n + '_fin';
+  });
+
   // Leyendas: cadenas secundarias que desbloquean estructuras únicas.
   const ql = (id, title, desc, req, reward, pre, unlock) => { q(id, 'legend', title, desc, req, reward, pre); if (unlock) Q[Q.length - 1].unlock = unlock; };
   ql('l1', 'El forastero de la capa', 'Un viajero llega con historias de cuevas que brillan y guaridas de fieras. Construye un Cuartel para que tus soldados lo escuchen.', B('barracks'), { gold: 150 }, [], 'tavern');
@@ -885,6 +1021,17 @@
   ql('l16', 'Runas en el yunque', 'Construye la Fragua Rúnica.', B('runeforge'), { starIron: 5, lore: 10 }, ['l15']);
   ql('l17', 'Despertar al dragón', 'Llega al piso 3 de un Nido del Dragón (Era V).', st('floor_nest', 3), { coins: 30 }, ['l16', 'l10'], 'dragontower');
   ql('l18', 'Jinete de dragón', 'Construye la Torre del Dragón.', B('dragontower'), { coins: 50, scale: 5 }, ['l17']);
+  // H4 (pk-17): las tres mazmorras nuevas
+  ql('lp1', 'Luces en el pantano', 'Llega al piso 5 de un Pantano de las Brujas (Era III) y vence a su bruja.', st('floor_swamp', 5), { herbs: 10, coins: 20 }, ['l3'], 'herbolario');
+  ql('lp2', 'Manos verdes', 'Construye el Herbolario.', B('herbolario'), { coins: 25, herbs: 10 }, ['lp1']);
+  ql('lg1', 'Pisadas de gigante', 'Llega al piso 5 de una Fortaleza de los Gigantes (Era VI).', st('floor_giants', 5), { titanBone: 10, coins: 30 }, ['lp1'], 'titanforge');
+  ql('lg2', 'El yunque de hueso', 'Construye la Forja de Titanes.', B('titanforge'), { coins: 50, titanBone: 10 }, ['lg1']);
+  ql('lt1', 'Lo que canta bajo el lago', 'Llega al piso 5 de un Templo Hundido (Era VIII).', st('floor_temple', 5), { pearls: 10, coins: 40 }, ['lg1'], 'faro');
+  ql('lt2', 'Una luz sobre la niebla', 'Levanta el Faro Abisal.', B('faro'), { coins: 70, pearls: 10 }, ['lt1']);
+  // H6 (pk-17): lugares legendarios
+  ql('lw1', 'Maravillas del mundo', 'Descubre un lugar legendario explorando y manda a un héroe a investigarlo.', st('legends', 1), { gems: 15, coins: 15 }, ['lh1']);
+  ql('lw2', 'Cronista de maravillas', 'Investiga 6 lugares legendarios distintos.', st('legends', 6), { coins: 40, lore: 10 }, ['lw1']);
+  ql('lw3', 'Las doce maravillas', 'Investiga las 12 maravillas del mundo.', st('legends', 12), { coins: 100, gems: 60 }, ['lw2']);
   prev = 'l14';
   [3, 6, 9, 12].forEach((n, i) => {
     ql('lf' + i, 'Espeleólogo ' + U.roman(i + 1), 'Llega al piso ' + n + ' de cualquier mazmorra.', st('floor_max', n), { coins: 15 * (i + 1), crystal: 10 * (i + 1) }, [prev]);

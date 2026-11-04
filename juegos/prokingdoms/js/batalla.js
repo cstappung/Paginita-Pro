@@ -47,6 +47,17 @@
     ],
     golem: [{ id: 'golem', nombre: 'Gólem', peso: 1, hp: 2.6, dps: 1, alcance: 1.1, vel: 0.8, spr: 'golem' }],
     dragon: [{ id: 'dragon', nombre: 'Dragón', peso: 1, hp: 1, dps: 0.55, alcance: 5, vel: 1.2, fuego: 1.7, jefe: true, spr: 'dragon' }],
+    // H4 (pk-17). maldice: su tiro frena al que toca; aplasta: el golpe alcanza a los que estén cerca; agarra: el
+    // que recibe el golpe no puede moverse un rato.
+    arcane: [
+      { id: 'bruja', nombre: 'Bruja', peso: 0.7, hp: 0.8, dps: 1, alcance: 4.5, vel: 1.2, dispara: 'sombra', maldice: true, spr: 'bruja' },
+      { id: 'fatuo', nombre: 'Fuego fatuo', peso: 1, hp: 0.6, dps: 0.95, alcance: 0.9, vel: 2.6, flanco: true, spr: 'fatuo' },
+    ],
+    giant: [{ id: 'gigante', nombre: 'Gigante', peso: 1, hp: 3, dps: 1.05, alcance: 1.5, vel: 0.7, aplasta: 1.5, spr: 'gigante', escala: 1.8 }],
+    abyss: [
+      { id: 'tentaculo', nombre: 'Tentáculo', peso: 1, hp: 1.3, dps: 0.9, alcance: 1.3, vel: 1, agarra: true, spr: 'tentaculo' },
+      { id: 'sirena', nombre: 'Sirena', peso: 0.6, hp: 0.75, dps: 1, alcance: 5, vel: 1.3, dispara: 'luz', spr: 'sirena' },
+    ],
   };
   B.ORDENES = {
     cargar: { nombre: 'Cargar', desc: 'todos al ataque' },
@@ -60,6 +71,9 @@
     undead: 'No-muertos: lentos y duros. Los clérigos los deshacen; mantén a tus tiradores atrás.',
     golem: 'Gólems: las flechas rebotan. Mantén la línea y que peguen catapultas y caballeros.',
     dragon: 'Dragón: su fuego quema a todos los que estén juntos. ¡Dispérsate!',
+    arcane: 'Arcanos: las brujas maldicen y frenan a los tuyos. Carga con caballeros; los clérigos acortan la maldición.',
+    giant: 'Gigantes: lentos, pero su golpe alcanza a varios. Dispérsate y que peguen las catapultas y los arqueros.',
+    abyss: 'Abisales: los tentáculos agarran a los de adelante. Arqueros atrás y clérigos.',
   };
   const TERRENO = {
     camp: { suelo: [118, 96, 62], tono: 18, deco: 'carpa' },
@@ -68,6 +82,9 @@
     crypt: { suelo: [82, 84, 88], tono: 12, deco: 'lapida' },
     crater: { suelo: [64, 48, 44], tono: 18, deco: 'estrella' },
     nest: { suelo: [96, 70, 48], tono: 18, deco: 'oro' },
+    swamp: { suelo: [60, 76, 50], tono: 16, deco: 'pasto' },
+    giants: { suelo: [104, 96, 84], tono: 14, deco: 'hueso' },
+    temple: { suelo: [62, 84, 92], tono: 12, deco: 'lapida' },
     campo: { suelo: [86, 126, 58], tono: 16, deco: 'pasto' },
   };
 
@@ -75,12 +92,14 @@
   const porUnidad = k => PK.Exp.powerVs({ [k]: 1 }, {}); // fuerza de un soldado con veteranía, era y bonos
   function lugarDe(r) {
     if (r.camp !== undefined) return 'camp';
+    if (r.cap) { const c = D.CAPITULOS[r.cap - 1]; return (c && c.lugar && c.lugar.terreno) || 'campo'; }
     const p = r.poi !== undefined ? PK.World.pois[r.poi] : null;
     return p && TERRENO[p.kind] ? p.kind : 'campo';
   }
   // Qué tan adentro: 0 en el primer piso (o el campamento más cercano), 1 en el último (o el más lejano).
   // El escenario se vuelve más espectacular con eso (escenarios.js).
   function nivelDe(r) {
+    if (r.cap) return 0.6;
     if (r.camp !== undefined) { const p = PK.World.pois[r.camp]; return p ? G().poiTier(p) / 6 : 0; }
     const p = r.poi !== undefined ? PK.World.pois[r.poi] : null, d = p && D.DUNGEON[p.kind];
     return d && r.floor ? U.clamp((r.floor - 1) / Math.max(1, d.floors - 1), 0, 1) : 0;
@@ -178,10 +197,11 @@
   function paso(b, dt) {
     b.t += dt;
     const mios = b.mios.filter(f => !f.muerto), suyos = b.suyos.filter(f => !f.muerto);
-    for (const f of b.mios.concat(b.suyos)) { f.anim += dt; f.golpe = Math.max(0, f.golpe - dt); if (f.muerto) f.muerto += dt; }
+    for (const f of b.mios.concat(b.suyos)) { f.anim += dt; f.golpe = Math.max(0, f.golpe - dt); if (f.muerto) f.muerto += dt; if (f.lento > 0) f.lento -= dt; if (f.atado > 0) f.atado -= dt; if (f.encantado > 0) f.encantado -= dt; }
     for (const f of mios) actuar(b, f, suyos, mios, dt);
     for (const f of suyos) actuar(b, f, mios, suyos, dt);
     if (b.heroe) heroePaso(b, mios, suyos, dt);
+    if (b.arenga > 0) b.arenga -= dt;
     if (b.jefeF) jefePaso(b, mios, suyos, dt);
     if (b.peligros.length) peligros(b, dt);
     separar(mios, b.orden === 'dispersar' ? 1.35 : 0.7, dt);
@@ -218,6 +238,7 @@
       if (her) { her.hp = Math.min(her.max, her.hp + f.pow * HPK * st.cura * dt * 0.1); if (Math.random() < dt * 2) { b.efectos.push({ tipo: 'cura', u: her.u, v: her.v, t: 0, dur: 0.6 }); fxCura(b, f, her); } }
     }
     if (!rivales.length) { f.modo = 'idle'; return; }
+    if (f.encantado > 0) { f.modo = 'idle'; return; } // la Voz del Abismo (H4)
     if (!f.objetivo || f.objetivo.muerto || Math.random() < dt * 0.6) f.objetivo = elegir(b, f, rivales);
     const o = f.objetivo;
     const d = cerca(f, o), alcance = st.alcance * (f.lado === 'p' && st.dispara && b.af.includes('niebla') ? 0.6 : 1);
@@ -225,8 +246,8 @@
     // mantener la línea: tus cuerpo a cuerpo no salen de su fila hasta que el enemigo se acerca
     const quieto = f.lado === 'p' && b.orden === 'linea' && !st.dispara && d > 2.6 && f.u >= f.u0 - 0.5;
     if (d > alcance) {
-      if (quieto) { f.modo = 'idle'; return; }
-      const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * (f.lado === 'p' && b.cancion > 0 ? 1.25 : 1) * (b.af.includes('helado') ? 0.8 : 1) * dt;
+      if (quieto || f.atado > 0) { f.modo = 'idle'; return; }
+      const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * (f.lado === 'p' && b.cancion > 0 ? 1.25 : 1) * (b.af.includes('helado') ? 0.8 : 1) * (f.lento > 0 ? 0.55 : 1) * dt;
       f.u += ((o.u - f.u) / d) * sp; f.v += ((o.v - f.v) / d) * sp;
       f.modo = 'walk';
       return;
@@ -248,7 +269,14 @@
     } else if (st.dispara) {
       b.tiros.push({ tipo: st.dispara, u0: f.u, v0: f.v, u: f.u, v: f.v, o, dmg, t: 0, dur: Math.max(0.2, d / (st.dispara === 'piedra' ? 7 : 12)), area: st.area, de: f });
       if (st.dispara === 'flecha' && Math.random() < 0.4) sfx('arrow');
-    } else { herir(b, o, dmg, f); fxGolpe(b, o, f, dmg > o.max * 0.15); if (Math.random() < 0.3) sfx(Math.random() < 0.5 ? 'espada' : 'hit'); }
+    } else if (st.aplasta) { // gigantes: el golpe alcanza a los que estén cerca del objetivo («Dispersarse» los separa)
+      herir(b, o, dmg, f); fxGolpe(b, o, f, true);
+      for (const r of rivales) { if (r === o) continue; const k = cerca(r, o); if (k < st.aplasta) herir(b, r, dmg * 0.5 * (1 - k / (st.aplasta * 1.4)) * (b.orden === 'dispersar' ? 0.6 : 1), f); }
+      const v = fxDe(b); if (v) sacudir(v, 2);
+    } else {
+      herir(b, o, dmg, f); fxGolpe(b, o, f, dmg > o.max * 0.15); if (Math.random() < 0.3) sfx(Math.random() < 0.5 ? 'espada' : 'hit');
+      if (st.agarra && o.lado === 'p') o.atado = 1.6;
+    }
   }
   // Multiplicadores: tropa contra tipo de enemigo (D.ARMY.vs), táctica, la línea de lanceros, los lobos con los de atrás.
   function mult(b, f, o) {
@@ -259,12 +287,14 @@
       if (b.cancion > 0) m *= 1.25;
       // Ignivor en el aire: solo le llegan las flechas y los lanceros en línea
       if (o.esJefe && b.vuela && !(f.st.dispara === 'flecha' || (f.tipo === 'spear' && b.orden === 'linea'))) m *= 0.15;
+      if (o.esJefe && b.escudo) m *= 0.15; // el escudo de Brunilda
       return m;
     }
     let m = b.tac.loss >= 1 ? 1 + (b.tac.loss - 1) * 0.3 : 1 - (1 - b.tac.loss) * 0.4; // asalto expone más; cauteloso, menos
     if (f.st.flanco && o.st.dispara) m *= 1.25;
     if (b.muro > 0) m *= 0.5;
     if (b.af.includes('furia')) m *= 1.2;
+    if (b.arenga > 0) m *= b.orden === 'linea' ? 1.05 : 1.35;
     return m;
   }
   function herir(b, o, dmg, de) {
@@ -298,7 +328,11 @@
         for (const r of rivales) { if (r.muerto) continue; const d = cerca(r, p.o); if (d < p.area) herir(b, r, p.dmg * (1 - d / (p.area * 1.5)), p.de); }
         b.efectos.push({ tipo: 'polvo', u: p.o.u, v: p.o.v, t: 0, dur: 0.6 });
         sfx('boom');
-      } else herir(b, p.o, p.dmg, p.de);
+      } else {
+        herir(b, p.o, p.dmg, p.de);
+        // brujas (H4): la maldición frena; con clérigos dura la mitad
+        if (p.de && p.de.st.maldice && p.o.lado === 'p') p.o.lento = Math.max(p.o.lento || 0, hayClerigo(b, b.mios.filter(f => !f.muerto)) ? 1.2 : 2.5);
+      }
       fxImpacto(b, p);
     }
   }
@@ -321,6 +355,14 @@
     crypt: { id: 'liche', nombre: 'El Liche Sin Nombre', kind: 'undead', hp: 1.3, dps: 0.85, alcance: 5, vel: 0.9, dispara: 'sombra', spr: 'liche', escala: 1.6, jefe: true },
     crater: { id: 'heraldo', nombre: 'Heraldo Estelar', kind: 'golem', hp: 1.7, dps: 0.8, alcance: 4.5, vel: 0.8, dispara: 'luz', spr: 'golem', escala: 1.8, jefe: true, tinte: [255, 190, 90] },
     nest: { id: 'ignivor', nombre: 'Ignivor el Antiguo', kind: 'dragon', hp: 1.25, dps: 0.6, alcance: 5, vel: 1.2, fuego: 1.9, spr: 'dragon', escala: 1.3, jefe: true },
+    swamp: { id: 'morgana', nombre: 'Morgana del Pantano', kind: 'arcane', hp: 1.2, dps: 0.85, alcance: 4.5, vel: 1, dispara: 'sombra', maldice: true, spr: 'bruja', escala: 1.7, jefe: true },
+    giants: { id: 'ymrok', nombre: 'Ymrok, Rey de los Gigantes', kind: 'giant', hp: 1.5, dps: 0.7, alcance: 1.7, vel: 0.6, aplasta: 1.3, spr: 'gigante', escala: 2.6, jefe: true },
+    // jefes de la campaña (H5, campana.js): no son de una mazmorra
+    valdes: { id: 'valdes', nombre: 'Tuerto Valdés', kind: 'bandit', hp: 1.1, dps: 0.9, alcance: 1, vel: 1.6, spr: 'bandido', escala: 1.5, jefe: true },
+    reybandido: { id: 'reybandido', nombre: 'El Rey Bandido', kind: 'bandit', hp: 1.2, dps: 0.85, alcance: 1, vel: 1.5, spr: 'rey', escala: 1.7, jefe: true },
+    brunilda: { id: 'brunilda', nombre: 'La reina Brunilda', kind: 'bandit', hp: 1.3, dps: 0.85, alcance: 1.1, vel: 1.3, spr: 'reina', escala: 1.7, jefe: true },
+    cria: { id: 'cria', nombre: 'Cría de dragón', kind: 'dragon', hp: 1.1, dps: 0.6, alcance: 4.5, vel: 1.3, fuego: 1.5, spr: 'dragon', escala: 0.85, jefe: true },
+    temple: { id: 'voz', nombre: 'La Voz del Abismo', kind: 'abyss', hp: 0.85, dps: 0.6, alcance: 5, vel: 0.9, dispara: 'luz', spr: 'sirena', escala: 1.9, jefe: true },
   };
   B.JEFE = JEFE;
   B.CONSEJO_JEFE = {
@@ -329,6 +371,13 @@
     crypt: 'El Liche levanta a sus muertos si no quedan clérigos: llévalos y cuídalos.',
     crater: 'Heraldo Estelar: cuando marque el suelo, «Dispersarse» antes de que caigan los meteoros.',
     nest: 'Ignivor: en el aire solo le pegan arqueros y lanceros en línea. «Dispersarse» contra su fuego.',
+    swamp: 'Morgana maldice a todos cada 10 s y llama fuegos fatuos: «Cargar», «Al jefe» y clérigos para acortar la maldición.',
+    giants: 'Ymrok: cuando levante el mazo, «Dispersarse». Catapultas y arqueros le pegan sin acercarse.',
+    valdes: 'Tuerto Valdés silba y llegan más bandidos cada 16 s: «Al jefe» con caballeros para callarlo pronto.',
+    reybandido: 'El Rey Bandido arenga a los suyos (pegan más fuerte unos segundos): «Mantener línea» mientras grita y «Al jefe» después.',
+    brunilda: 'Brunilda alza el escudo y casi no le entra nada: mientras lo tenga, pega a su guardia; cuando lo baje, «Al jefe».',
+    cria: 'La cría escupe fuego como su madre: «Dispersarse», y arqueros y lanceros.',
+    temple: 'La Voz del Abismo encanta a tus soldados de cuerpo a cuerpo: lleva clérigos y «Cargar» contra su escolta; ir directo a ella cuesta caro.',
   };
   const hayClerigo = (b, mios) => mios.some(f => f.tipo === 'cleric') || !!(b.heroe && b.heroe.clase === 'clerigo');
   function jefePaso(b, mios, suyos, dt) {
@@ -368,6 +417,45 @@
         for (const o of mios.slice().sort(() => Math.random() - 0.5).slice(0, 3)) b.peligros.push({ u: o.u, v: o.v, r: 1.4, t: 3, dur: 3, dmg: J.pow * DPSK * 1.5, tipo: 'meteoro' });
         grito(b, '¡El cielo se abre!');
       }
+    } else if (id === 'valdes' && !J.muerto) {
+      if (t.c <= 0) { // silba: llegan tres bandidos más
+        t.c = 16;
+        for (let i = 0; i < 3; i++) { const w = figura('e', 'forajido', ENEMIGOS.bandit[0], J.pow * 0.07, 0, LU - 1, 0, 'bandit'); w.v = U.clamp(J.v + (i - 1) * 2, 1, LV - 1); b.suyos.push(w); }
+        grito(b, '¡Valdés llama a su banda!'); fxJefe(b, 'aullido', J);
+      }
+    } else if (id === 'reybandido' && !J.muerto) {
+      if (t.c <= 0) { t.c = 12; b.arenga = 5; grito(b, '¡El Rey arenga a los suyos!'); fxJefe(b, 'aullido', J); }
+    } else if (id === 'brunilda' && !J.muerto) {
+      if (t.c <= 0) { b.escudo = !b.escudo; t.c = b.escudo ? 5 : 9; grito(b, b.escudo ? '¡Brunilda alza el escudo!' : 'Brunilda baja el escudo.'); }
+    } else if (id === 'morgana' && !J.muerto) {
+      if (t.a <= 0) { // maldición a todos: más corta si hay clérigos
+        t.a = 10;
+        const d = hayClerigo(b, mios) ? 2 : 4;
+        for (const f of mios) f.lento = Math.max(f.lento || 0, d);
+        grito(b, '¡Morgana los maldice!'); fxJefe(b, 'maldicion', J);
+      }
+      if (t.c <= 0) { // fuegos fatuos que van por los de atrás
+        t.c = 15;
+        for (let i = 0; i < 3; i++) { const w = figura('e', 'fatuo', ENEMIGOS.arcane[1], J.pow * 0.05, 0, J.u + 0.8, 0, 'arcane'); w.v = U.clamp(J.v + (i - 1) * 2, 1, LV - 1); b.suyos.push(w); }
+      }
+    } else if (id === 'ymrok' && !J.muerto) {
+      if (t.c <= 0) { // levanta el mazo: 2 s después aplasta un círculo grande donde están los tuyos
+        t.c = 8;
+        const o = mios.slice().sort((a, c) => cerca(a, J) - cerca(c, J))[0];
+        b.peligros.push({ u: o.u, v: o.v, r: 2.3, t: 2, dur: 2, dmg: J.pow * DPSK * 1.6, tipo: 'mazo' });
+        grito(b, '¡Ymrok levanta el mazo!');
+      }
+    } else if (id === 'voz' && !J.muerto) {
+      if (t.c <= 0) { // canto: tus soldados de cuerpo a cuerpo se quedan quietos (con clérigos, casi nada)
+        t.c = 13;
+        const cl = hayClerigo(b, mios);
+        for (const f of mios.filter(o => !o.st.dispara).sort(() => Math.random() - 0.5).slice(0, cl ? 2 : 5)) f.encantado = cl ? 0.6 : 4.5;
+        grito(b, '¡Canta la Voz del Abismo!'); fxJefe(b, 'canto', J);
+      }
+      if (t.a <= 0) { // tentáculos que salen junto a tus tiradores
+        t.a = 12;
+        for (const o of mios.filter(f => f.st.dispara).slice(0, 2)) { const w = figura('e', 'tentaculo', ENEMIGOS.abyss[0], J.pow * 0.045, 0, o.u + 1, 0, 'abyss'); w.v = o.v; b.suyos.push(w); }
+      }
     } else if (id === 'ignivor' && !J.muerto) {
       // 9 s en el aire cada 22 s
       if (t.c <= 0) { b.vuela = !b.vuela; t.c = b.vuela ? 9 : 13; grito(b, b.vuela ? '¡Ignivor alza el vuelo!' : '¡Ignivor baja a tierra!'); }
@@ -394,6 +482,14 @@
       sacudir(v, 6); v.flash = Math.max(v.flash, 0.15); sfx('boom');
       for (let i = 0; i < 30; i++) { const a = rnd(Math.PI, Math.PI * 2), sp = rnd(60, 180); part(v, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 300, life: rnd(0.4, 0.9), size: rnd(1, 3) | 0, col: Math.random() < 0.5 ? [255, 200, 90] : [255, 120, 50], add: true }); }
       luzTemp(v, x, y, 80, [255, 170, 80], 0.6); marca(v, x, y, 'quemado');
+    } else if (tipo === 'mazo') {
+      sacudir(v, 9); v.flash = Math.max(v.flash, 0.1); sfx('boom');
+      for (let i = 0; i < 26; i++) { const a = rnd(Math.PI, Math.PI * 2), sp = rnd(50, 150); part(v, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 300, life: rnd(0.4, 0.9), size: rnd(2, 4) | 0, col: Math.random() < 0.6 ? [120, 104, 86] : [170, 160, 140] }); }
+      marca(v, x, y, 'rocas');
+    } else if (tipo === 'maldicion' || tipo === 'canto') {
+      const col = tipo === 'canto' ? [90, 230, 220] : [150, 255, 110];
+      for (let k = 0; k < 3; k++) v.anillos.push({ x, y: y - 10, t: -k * 0.2, dur: 1, col, r: 50 + k * 16 });
+      luzTemp(v, x, y - 10, 70, col, 0.6); sfx('cuerno');
     } else if (tipo === 'aullido') {
       for (let k = 0; k < 3; k++) v.anillos.push({ x, y: y - 10, t: -k * 0.15, dur: 0.8, col: [255, 120, 100], r: 30 + k * 10 });
       sacudir(v, 3); sfx('cuerno');
@@ -538,7 +634,7 @@
   }
   B.habilidad = function (id) { const b = B.de(id); if (b && b.heroe && !b.fin) b.heroe.pedir = true; };
   B.autoHab = function (id, on) { const b = B.de(id); if (b && b.heroe) b.heroe.auto = !!on; };
-  const A_POR = { jefe: 'el jefe', beast: 'las bestias', bandit: 'los bandidos', undead: 'los no-muertos', golem: 'los gólems', dragon: 'el dragón' };
+  const A_POR = { jefe: 'el jefe', beast: 'las bestias', bandit: 'los bandidos', undead: 'los no-muertos', golem: 'los gólems', dragon: 'el dragón', arcane: 'las brujas', giant: 'los gigantes', abyss: 'los abisales' };
 
   // ---------- Efectos (solo dibujo) ----------
   // Lo que se ve de cada golpe, disparo y caída: chispas, zarpazos, polvo, lascas de roca, llamas, marcas en el
@@ -828,6 +924,27 @@
   let GOLEM = null, GOLEM_F = null, OSO = null;
   const golemDe = fuego => (fuego ? (GOLEM_F = GOLEM_F || spr2([0, 1].map(fr => mkGolem(fr, '#ffb040', '#fff0a0')), 10, 22)) : (GOLEM = GOLEM || spr2([0, 1].map(fr => mkGolem(fr, '#7af0ff', '#c8fbff')), 10, 22)));
   const osoDe = () => (OSO = OSO || spr2([0, 1].map(mkOso), 13, 16));
+  // H4: fuego fatuo (una llama verde que flota) y tentáculo (sale del suelo y se mece)
+  function mkFatuo(fr) {
+    const c = document.createElement('canvas'); c.width = 10; c.height = 14;
+    const x = c.getContext('2d'), r = (a, b2, w, h, col) => { x.fillStyle = col; x.fillRect(a, b2, w, h); };
+    const o = fr ? 1 : 0;
+    r(3, 5 + o, 4, 5, '#5aff8a'); r(2, 7 + o, 6, 3, '#5aff8a'); r(4, 2 + o, 2, 3, '#9affb8'); r(4, 6 + o, 2, 3, '#e8fff0'); r(3 + o, 1 + o, 1, 2, '#9affb8');
+    r(3, 11, 1, 1, '#3aa860'); r(6, 12, 1, 1, '#3aa860');
+    return c;
+  }
+  function mkTentaculo(fr) {
+    const c = document.createElement('canvas'); c.width = 14; c.height = 22;
+    const x = c.getContext('2d'), r = (a, b2, w, h, col) => { x.fillStyle = col; x.fillRect(a, b2, w, h); };
+    const T = '#3a7a8a', T2 = '#24525e', V = '#c86aa8';
+    r(2, 19, 10, 3, '#1a2a30');
+    const pts = fr ? [[5, 17], [6, 14], [7, 11], [8, 8], [8, 5], [7, 3], [5, 2]] : [[5, 17], [5, 14], [5, 11], [6, 8], [7, 5], [9, 3], [11, 3]];
+    pts.forEach(([a, b2], i) => { const w = Math.max(2, 5 - Math.floor(i / 2)); r(a - 1, b2, w, 3, T); r(a - 1, b2, 1, 3, T2); if (i % 2) r(a + w - 2, b2 + 1, 1, 1, V); });
+    return c;
+  }
+  let FATUO = null, TENT = null;
+  const fatuoDe = () => (FATUO = FATUO || spr2([0, 1].map(mkFatuo), 5, 14));
+  const tentDe = () => (TENT = TENT || spr2([0, 1].map(mkTentaculo), 7, 22));
   const PALIDO = [176, 176, 164], BANDIDO = [70, 44, 40];
   function sprite(f, frame) {
     const a = f.st, modo = f.modo;
@@ -837,6 +954,13 @@
     if (a.spr === 'oso') return osoDe()[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'walk' ? 5 : 1)) % 2];
     if (a.spr === 'golem') return golemDe(!!a.tinte)[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'idle' ? 1 : 3)) % 2];
     if (a.spr === 'liche') return Sp.villager([96, 50, 140], 3, 0, modo === 'walk' ? 'walk' : 'idle', frame % 4, null, f.flip, null);
+    if (a.spr === 'rey') return Sp.villager([150, 110, 30], 2, 1, modo, frame % 4, null, f.flip, modo === 'work' ? 'sword' : null);
+    if (a.spr === 'reina') return Sp.villager([150, 40, 60], 0, 1, modo, frame % 4, null, f.flip, modo === 'work' ? 'sword' : null, false, false, null, 'knight');
+    if (a.spr === 'bruja') return Sp.villager([48, 70, 40], 3, 0, modo === 'walk' ? 'walk' : 'idle', frame % 4, null, f.flip, null);
+    if (a.spr === 'fatuo') return fatuoDe()[f.flip ? 1 : 0][Math.floor(f.anim * 4) % 2];
+    if (a.spr === 'gigante') return Sp.villager([104, 84, 60], 2, 2, modo, frame % 4, null, f.flip, modo === 'work' ? 'hammer' : null);
+    if (a.spr === 'tentaculo') return tentDe()[f.flip ? 1 : 0][Math.floor(f.anim * 2) % 2];
+    if (a.spr === 'sirena') return Sp.villager([40, 130, 140], 1, 0, modo === 'walk' ? 'walk' : 'idle', frame % 4, null, f.flip, null);
     // los enemigos nunca usan el dibujo de tus tropas (se confundían los arqueros): ropa de bandido o de hueso
     if (a.spr === 'tirador') return Sp.villager(BANDIDO, 2, 1, modo, frame % 4, null, f.flip, modo === 'work' ? 'hammer' : null);
     if (a.spr === 'espectro') return Sp.villager(PALIDO, 3, 0, modo === 'walk' ? 'walk' : 'idle', frame % 4, null, f.flip, null);
@@ -904,7 +1028,7 @@
     if (v.marcas.length && v.marcas[0].t > 14) v.marcas = v.marcas.filter(m => m.t < 14);
     // círculos de los jefes: se llenan hasta que estallan (meteoros, cristales)
     for (const p of b.peligros || []) {
-      const [px, py] = aPx(p.u, p.v), k = 1 - p.t / p.dur, R = p.r * TILE, col = p.tipo === 'cristal' ? '122,240,255' : '255,90,40', pul = 0.5 + 0.5 * Math.sin(now / 90);
+      const [px, py] = aPx(p.u, p.v), k = 1 - p.t / p.dur, R = p.r * TILE, col = p.tipo === 'cristal' ? '122,240,255' : p.tipo === 'mazo' ? '230,190,120' : '255,90,40', pul = 0.5 + 0.5 * Math.sin(now / 90);
       ctx.fillStyle = 'rgba(' + col + ',' + (0.12 + 0.25 * k) + ')'; ctx.beginPath(); ctx.ellipse(px, py, R * k, R * k * 0.5, 0, 0, 6.3); ctx.fill();
       ctx.strokeStyle = 'rgba(' + col + ',' + (0.5 + 0.4 * pul) + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(px, py, R, R * 0.5, 0, 0, 6.3); ctx.stroke();
     }
@@ -963,6 +1087,9 @@
           // ojos que brillan: los del gólem (en su dibujo, en x 9 y 12, y 4) y un halo verde para el Liche
           if (spr0 === 'golem' && !m) { const k = 0.6 + 0.4 * Math.sin(f.anim * 3), ex = f.flip ? 20 - 13 : 9; ctx.fillStyle = (f.st.tinte ? 'rgba(255,200,90,' : 'rgba(122,240,255,') + k + ')'; ctx.fillRect(Math.round(x0 + ex * big), Math.round(y0 + 4 * big), Math.ceil(big), Math.ceil(big)); ctx.fillRect(Math.round(x0 + (ex + 3) * big), Math.round(y0 + 4 * big), Math.ceil(big), Math.ceil(big)); }
           if (spr0 === 'liche' && !m) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(120,255,140,' + (0.12 + 0.08 * Math.sin(f.anim * 4)) + ')'; ctx.fillRect(x0 - 2, y0 - 2, w + 4, h + 2); ctx.globalCompositeOperation = 'source-over'; }
+          if ((spr0 === 'fatuo' || spr0 === 'bruja' || spr0 === 'sirena') && !m) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = spr0 === 'sirena' ? 'rgba(90,230,220,0.14)' : 'rgba(110,255,140,' + (spr0 === 'fatuo' ? 0.3 : 0.12) + ')'; ctx.fillRect(x0 - 2, y0 - 2, w + 4, h + 2); ctx.globalCompositeOperation = 'source-over'; }
+          // maldecidos, agarrados o encantados: una marca sobre la cabeza
+          if (!m && (f.lento > 0 || f.atado > 0 || f.encantado > 0)) { ctx.fillStyle = f.encantado > 0 ? '#5ae8e0' : f.atado > 0 ? '#c86aa8' : '#7aff70'; ctx.fillRect(-1, y0 - 4, 3, 2); }
           if (spr0 === 'espectro' && !m) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(150,90,230,0.18)'; ctx.fillRect(-6, -18, 12, 18); ctx.globalCompositeOperation = 'source-over'; }
         }
       }

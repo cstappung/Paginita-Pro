@@ -493,3 +493,33 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   costs (`conMod`). `L.reset` clears mods and fire.
 - Quests la1–la2, Asesor rules «encuentro» and «mapas», a «Mapas del tesoro»
   button in the Explore window.
+
+## Campaign, legendary places, new dungeons (`pk-17`, H4, H5, H6) — the big reset
+
+- **Reset:** `D.SAVE_V` 4, `D.MAPV` 4, `D.MUNDO_VER` 2, `D.PROTO` 2, new
+  `D.NOVEDADES`, POI fixture regenerated. The Cloud Function must be
+  redeployed by hand (`firebase deploy --only functions`) right at merge.
+- **H4:** Pantano de las Brujas, Fortaleza de los Gigantes, Templo Hundido
+  (only next to water), placed after the old dungeons with the same `drng`.
+  Enemies `arcane` (curse: `f.lento`), `giant` (`aplasta`: area melee),
+  `abyss` (`agarra`: `f.atado`; the boss charms: `f.encantado`). The plan's
+  new troops come with Combate 2.0; meanwhile each enemy has two answers
+  among today's troops. Legend buildings Herbolario (wound time, potions in
+  incursions), Forja de Titanes (seeded rarity up on item upgrade), Faro
+  Abisal. Bosses measured (`jefes3.js`): Morgana 100% with clerics / 0%
+  without; Ymrok 88% dispersing / 4% charging; the Voz 80% charging with
+  clerics, worse with «Al jefe» (the hint says so).
+- **H6:** `D.LEYENDAS` (12) placed in `world.js` (server sees the same map),
+  3 copies each, POI kind `legend` with `p.ley`. `js/leyendas.js`: a hero
+  investigates (state `investiga`); bonus per legend index, never twice;
+  hooks in `gatherRate`/`farmRate`, `G.perk`, `powerVs` (dragons, PvE only),
+  tower sight, fiesta cost, dungeon rest, wishwell extra wish, tree regrow.
+- **H5:** `D.CAPITULOS`/`D.ESCENAS`/`D.PERSONAJES`, quests `c<N>_…` in the
+  Crónica, req `{ t: 'cap', n }`. `js/campana.js`: the chapter site is
+  per player (`S.campana.lugares`, seeded), not a world POI, so it needs no
+  map slot; attacked as target `{ cap: n }` with `r.jefe` from the chapter.
+  Choices have no timer (wait for the player), so offline decides nothing.
+  Scenes only open live and when no modal or battle is open.
+- **Open issue:** the autopilot (`?piloto=40`, 300 s) reached Era II at 9.6
+  min and then stayed there with 83% idle villagers. Not yet compared with
+  `pk-16`; check before the next delivery.

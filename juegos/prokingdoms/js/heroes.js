@@ -22,13 +22,13 @@
     paladin: { name: 'Paladín', rol: 'Primera línea', col: [214, 178, 70], look: 'knight', gob: ['barracks'], pas: { armyTrain: 0.15 }, pasTxt: 'Cuartel: +15% velocidad de entrenamiento',
       hab: { id: 'muro', name: 'Muro de escudos', desc: '−50% de daño recibido por 8 s', cd: 30, dur: 8 }, vs: ['undead', 'bandit'], sp: 'hide' },
     guarda: { name: 'Guardabosques', rol: 'Tirador', col: [86, 150, 70], look: 'archer', gob: ['scout'], pas: { range: 0.2, hunt: 0.2 }, pasTxt: 'Puesto de Exploradores: +20% alcance y +20% caza',
-      hab: { id: 'lluvia', name: 'Lluvia de flechas', desc: 'daño en un área llena de enemigos', cd: 25 }, vs: ['beast', 'dragon'], sp: 'hide' },
+      hab: { id: 'lluvia', name: 'Lluvia de flechas', desc: 'daño en un área llena de enemigos', cd: 25 }, vs: ['beast', 'dragon', 'giant'], sp: 'hide' },
     clerigo: { name: 'Clériga', rol: 'Apoyo', col: [236, 228, 200], look: 'cleric', gob: ['monastery'], pas: { relicGold: 0.2, heridas: 0.3 }, pasTxt: 'Monasterio: +20% oro de reliquias y −30% tiempo de heridas',
-      hab: { id: 'plegaria', name: 'Plegaria', desc: 'cura un 30% de vida a todos', cd: 40 }, vs: ['undead'], sp: 'lore', mujer: true },
+      hab: { id: 'plegaria', name: 'Plegaria', desc: 'cura un 30% de vida a todos', cd: 40 }, vs: ['undead', 'arcane'], sp: 'lore', mujer: true },
     ingeniera: { name: 'Ingeniera', rol: 'Asedio', col: [200, 120, 50], look: 'militia', gob: '*', pas: { upTime: 0.1 }, pasTxt: 'El edificio que gobierna: −10% tiempo de mejora',
       hab: { id: 'bombarda', name: 'Bombarda', desc: 'gran daño a un objetivo, x3 contra gólems', cd: 35 }, vs: ['golem'], sp: 'crystal', mujer: true },
     hechicero: { name: 'Hechicero', rol: 'Daño mágico', col: [130, 80, 200], look: 'cleric', gob: ['library', 'university'], pas: { research: 0.1 }, pasTxt: 'Biblioteca o Universidad: +10% investigación',
-      hab: { id: 'rayo', name: 'Rayo encadenado', desc: 'salta entre 5 enemigos', cd: 30 }, vs: ['golem', 'dragon'], sp: 'lore' },
+      hab: { id: 'rayo', name: 'Rayo encadenado', desc: 'salta entre 5 enemigos', cd: 30 }, vs: ['golem', 'dragon', 'abyss'], sp: 'lore' },
     juglar: { name: 'Juglar', rol: 'Moral', col: [200, 60, 80], look: 'militia', gob: ['tavern', 'tc'], pas: { fiesta: 0.1, missions: 1 }, pasTxt: 'Taberna o Centro Urbano: fiestas +10% y +1 encargo en el tablón',
       hab: { id: 'cancion', name: 'Canción de guerra', desc: '+25% velocidad y daño por 10 s', cd: 45, dur: 10 }, vs: [], sp: 'crystal' },
   };
@@ -302,7 +302,7 @@
   };
   H.heridaSeg = function (h) {
     const mon = G().best('monastery', 'relics'); // nivel del Monasterio
-    const k = (1 - Math.min(0.5, 0.05 * mon)) * (1 - Math.min(0.6, H.pasiva('heridas'))) * (1 - H.efecto(h, 'herida'));
+    const k = (1 - Math.min(0.5, 0.05 * mon)) * (1 - Math.min(0.6, H.pasiva('heridas'))) * (1 - H.efecto(h, 'herida')) * (1 - G().best('herbolario', 'heridaP'));
     return Math.round((1800 + 5400 * (h.semilla % 97) / 96) * k);
   };
   // El mejor héroe libre contra ese enemigo (lo usan el planificador, el Mariscal y el piloto).
@@ -329,6 +329,9 @@
     if (!it || (it.m || 0) >= 5 || e.esencia < H.costoMejora(it)) return false;
     e.esencia -= H.costoMejora(it);
     it.m = (it.m || 0) + 1;
+    // Forja de Titanes (H4): a veces sube de rareza (con semilla: recargar no cambia el resultado)
+    const ft = G().best('titanforge', 'rareza');
+    if (ft && it.r < H.RAREZAS.length - 1 && U.rng(it.s + it.m * 977)() < ft) { it.r++; toast('¡La Forja de Titanes la volvió ' + H.RAREZAS[it.r].name + '!', 'epic'); }
     recalc(it);
     return true;
   };
@@ -410,7 +413,7 @@
   // ---------- Ventana ----------
   let tab = 'heroes', sel = null;
   const pct = v => Math.round(v * 100) + '%';
-  const estadoTxt = h => (h.estado === 'explora' ? 'Busca un tesoro · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'expedicion' ? 'En expedición' : h.estado === 'herido' ? 'Herido · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : gobernado(h) ? 'Gobierna ' + gobernado(h).def.name : 'En casa');
+  const estadoTxt = h => (h.estado === 'investiga' ? 'Investiga un lugar legendario · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'explora' ? 'Busca un tesoro · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'expedicion' ? 'En expedición' : h.estado === 'herido' ? 'Herido · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : gobernado(h) ? 'Gobierna ' + gobernado(h).def.name : 'En casa');
   H.open = function (t, id) {
     const UI = PK.UI;
     if (t) tab = t;
