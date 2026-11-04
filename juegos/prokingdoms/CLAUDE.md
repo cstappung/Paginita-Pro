@@ -418,3 +418,41 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   The Mariscal takes the best free hero (`cs.heroes`). The Asesor has three
   hero rules. Quests lh1–lh4 in Leyendas.
 
+## Mazmorras 2.0 (`pk-15`, H3 and C3)
+
+- **Every dungeon visit is an incursion** of a 5-floor block (1–5, 6–10,
+  11–15; `js/incursion.js`, `PK.Inc`). It rides on the expedition: `r.inc`
+  holds the floor, the room options, the loot so far, blessings and losses.
+  A room with a fight sets `r.need` and goes back to phase `'go'` with
+  arrival in 2.5 s, so the live battle, the ratio formula and offline all
+  stay the same code. New phases: `'sala'` (waiting for a choice) and
+  `'fin'` (ended between rooms, i.e. retreat). `troops.js`, the timer strip
+  and the Cuartel treat both as «at the dungeon».
+- **Without the player** (offline, or 2 minutes without choosing) the room is
+  `I.porDefecto`: heal if needed, then the safe ones, never the merchant.
+- **Loot:** each room gives `I.BOTIN_SALA` (35%) of a floor's loot, because a
+  trip now brings five floors before the dungeon rests. Without it the cave
+  gave 337 crystals per trip instead of about 90. Coins only on a first
+  clear, never multiplied. A lost incursion keeps half (`arrive` gives it).
+- **Bosses** (`JEFE` in `batalla.js`, Annex A2) on the last floor of every
+  block take 55% of the room's power. Measured with 60 fights per boss at
+  1.2× power and no veterancy (it skews the numbers: `jefes.js` in the
+  session): right orders ≈ the same fight without a boss, wrong ones far
+  lower (cave 22/0, lair 55/32, crypt 77/0, crater 68/2, nest 92/40). Keep a
+  boss's `hp × dps` close to a normal enemy of its kind: the Matriarca at
+  2.2 × 1.1 was unbeatable.
+- **Focus** got «Al jefe». Melee only gets −3 of distance for the focus
+  (ranged −8): with −8 the spears held the line staring at a far boss while
+  wolves bit them.
+- **«Mantener línea» against beasts depends on how soldiers split into
+  figures** (17% or 77% with the same power); «Cargar» is steady at ~70%.
+  That is the old engine, left for Phase 4. The hints say what works.
+- **Weekly affixes** (`I.AFIJOS`, 2 a week from `weekKey`): mechanics live in
+  the battle (`b.af`), and `I.dureza` makes the ratio formula harder to match.
+- **C3:** the camera zooms to the figures (1–1.6×, `v.cam`; every layer is
+  drawn through `T()`), new golem and bear sprites (`mkGolem`, `mkOso`), a big
+  boss bar, clearer damage numbers, tactical pause (space; closing the view
+  unpauses, or it would freeze offscreen) and ×4.
+- Trophies (`S.trofeos`) in the Álbum, quests lj1–lj2, an Asesor rule for a
+  waiting room, and the Mariscal repeats the last fully cleared block.
+

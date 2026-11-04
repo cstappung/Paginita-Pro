@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js']);
+const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -269,4 +269,20 @@ test('H1: héroes, equipo y talentos', () => {
     assert.equal(G.state.stats.hero_lvl, 11);
     assert.equal(H.crearObjeto(1, 0).m, 0);
   } finally { G.state = viejo; }
+});
+
+test('H3: incursiones, jefes y afijos', () => {
+  const I = PK.Inc;
+  // un jefe por cada tipo de mazmorra, aquí y en la batalla (batalla.js no carga sin document: se lee el código)
+  assert.deepEqual(Object.keys(I.JEFES).sort(), Object.keys(D.DUNGEON).sort());
+  const bat = JS('batalla.js'), tabla = /const JEFE = \{([\s\S]*?)\n  \};/.exec(bat)[1];
+  for (const k in D.DUNGEON) { assert.match(tabla, new RegExp('\\b' + k + ': \\{'), 'JEFE.' + k); assert.match(bat, new RegExp('    ' + k + ": '"), 'CONSEJO_JEFE.' + k); }
+  assert.equal(Object.keys(I.AFIJOS).length, 8);
+  for (const id in I.AFIJOS) assert.ok(I.AFIJOS[id].dureza >= 1 && I.AFIJOS[id].botin >= 1, id);
+  const a = [...I.afijos()];
+  assert.equal(a.length, 2); assert.notEqual(a[0], a[1]); assert.deepEqual([...I.afijos()], a, 'los mismos toda la semana');
+  // el último piso de cada bloque (y el último de la mazmorra) es un jefe
+  for (const k in D.DUNGEON) { assert.ok(I.esJefe(k, 5) && I.esJefe(k, D.DUNGEON[k].floors)); assert.ok(!I.esJefe(k, 4)); }
+  for (const k in I.SALAS) assert.ok(I.SALAS[k].name && I.SALAS[k].desc, k);
+  assert.ok(I.BOTIN_SALA > 0 && I.BOTIN_SALA < 1, 'una incursión trae varios pisos: cada sala da una parte');
 });

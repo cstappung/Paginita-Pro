@@ -867,3 +867,16 @@ ul.info li { margin: 2px 0; }
 #batalla .bt-heroe { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 #batalla .bt-heroe .h-ret { width: 30px; height: 30px; }
 @media (max-width: 600px) { .h-ret.grande { width: 56px; height: 56px; } .h-slot > .small:first-child { width: auto; } }
+
+/* Mazmorras 2.0 (js/incursion.js, H3) */
+.inc-pisos { display: flex; gap: 4px; margin: 4px 0 8px; flex-wrap: wrap; }
+.inc-p { min-width: 26px; text-align: center; padding: 2px 4px; border: 2px solid #6b4c30; background: rgba(255,255,255,0.15); }
+.inc-p.ok { background: rgba(90,160,70,0.45); }
+.inc-p.aqui { border-color: #e8b84a; background: rgba(255,230,150,0.5); font-weight: bold; }
+.inc-p.jefe { color: #8a1a10; }
+.inc-salas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 8px 0; }
+.inc-sala { border: 2px solid #6b4c30; background: rgba(255,255,255,0.2); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.inc-sala .ico { width: 24px; height: 24px; image-rendering: pixelated; }
+.inc-sala.jefe { border-color: #a02818; background: rgba(200,60,40,0.15); }
+.inc-sala.elite { border-color: #8a4ac0; }
+.inc-sala.tesoro { border-color: #c89a3a; }

@@ -110,7 +110,8 @@
       }
       // una salida por pasada: pisos ya limpiados que se repusieron, después encargos del tablón
       const objetivos = [];
-      for (const p of Exp.sites()) { const site = Exp.site(p.id); if (site.best >= 1) objetivos.push({ poi: p.id, floor: site.best }); }
+      // mazmorras: repite el último bloque de 5 pisos que ya limpió entero (incursion.js)
+      for (const p of Exp.sites()) { const site = Exp.site(p.id), B5 = PK.Inc ? PK.Inc.BLOQUE : 1; if (site.best >= B5) objetivos.push({ poi: p.id, floor: PK.Inc ? Math.floor(site.best / B5 - 1) * B5 + 1 : site.best }); }
       for (const m of Exp.board()) objetivos.push({ mission: m.uid });
       const minimo = Math.ceil(cs.defensa * (enCasa() + fuera));
       for (const tg of objetivos) {

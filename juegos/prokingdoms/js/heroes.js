@@ -257,12 +257,12 @@
   H.resultado = function (r) {
     const h = H.de(r.heroe);
     if (!h) return;
-    const xp = (20 + 10 * Math.log2(1 + (r.need || 50) / 50)) * (r.won ? 1 : 0.4);
+    const xp = (20 + 10 * Math.log2(1 + (r.need || 50) / 50)) * (r.won ? 1 : 0.4) * (r.inc && PK.Inc && PK.Inc.tiene(r, 'plaga') ? 1.3 : 1);
     H.darXp(h, xp);
     r.heroeGano = !!r.won;
     if (r.won) {
       const p = r.poi !== undefined ? 0.35 + 0.02 * (r.floor || 1) : r.camp !== undefined ? 0.2 : 0.25;
-      if (Math.random() < p + 0.05 * H.efecto(h, 'suerte')) r.objeto = H.crearObjeto(nivelBotin(r), H.efecto(h, 'suerte'));
+      if (Math.random() < p + 0.05 * H.efecto(h, 'suerte')) { const o = H.crearObjeto(nivelBotin(r), H.efecto(h, 'suerte')); if (r.inc) r.inc.items.push(o); else r.objeto = o; }
     }
   };
   function nivelBotin(r) {

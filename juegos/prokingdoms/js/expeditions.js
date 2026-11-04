@@ -135,6 +135,8 @@
       return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: m.loot, travel: Math.round((m.time / 2) * (1 - Exp.bonus('expSpeed'))) };
     }
     const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
+    // Mazmorras 2.0: una incursión por un bloque de 5 pisos (incursion.js); la fuerza es la del primer piso
+    if (PK.Inc) { const fin = PK.Inc.finDe(p.kind, target.floor); return { name: d.name + ' · pisos ' + target.floor + '–' + fin, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: PK.Inc.botinBloque(p.kind, target.floor), travel: Exp.travel(p), incursion: true, fin }; }
     return { name: d.name + ' · piso ' + target.floor, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: D.dungeonLoot(p.kind, target.floor, target.floor > site.best), travel: Exp.travel(p) };
   };
   Exp.canSend = function (target) {
@@ -150,6 +152,7 @@
       const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
       if (st.era < d.era) return 'Requiere la Era ' + U.roman(d.era) + '.';
       if (target.floor > site.best + 1) return 'Primero limpia el piso ' + (site.best + 1) + '.';
+      if (PK.Inc && (target.floor - 1) % PK.Inc.BLOQUE) return 'Las incursiones empiezan en los pisos 1, 6, 11…';
       if (target.floor > d.floors) return 'Esa mazmorra no tiene más pisos.';
       if (site.rest > Date.now()) return 'La mazmorra se está reponiendo: ' + U.fmtTime((site.rest - Date.now()) / 1000) + '.';
       if (st.exp.runs.some(r => r.poi === p.id)) return 'Ya hay una expedición en esa mazmorra.';
@@ -171,6 +174,7 @@
     const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
     st.exp.runs.push(run);
+    if (run.poi !== undefined && PK.Inc) PK.Inc.preparar(run, W.pois[run.poi]);
     if (heroe) PK.Heroes.salir(heroe, run);
     run.chance = Exp.chance(run.power / Math.max(1, pv.power));
     log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra aprox. ' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
@@ -199,7 +203,8 @@
   // ---------- Resolver ----------
   // res (batalla en vivo, batalla.js): quién ganó y cuántos cayeron de cada tropa. Sin res, por la proporción de fuerzas.
   function resolve(r, res) {
-    const st = S(), tc = tactic(r), ratio = (r.power * tc.pow) / Math.max(1, r.need), sent = Object.assign({}, r.units);
+    // en una incursión (incursion.js) los afijos de la semana hacen más dura la cuenta por proporción
+    const st = S(), tc = tactic(r), ratio = (r.power * tc.pow) / Math.max(1, r.need * (r.inc ? PK.Inc.dureza(r) : 1));
     r.lost = {};
     if (res) {
       r.won = !!res.won;
@@ -212,7 +217,17 @@
     // veteranía para quienes vuelven (también se aprende perdiendo, menos)
     const xp = Math.max(4, r.need / 8) * (r.won ? 1 : 0.4) * (1 + Exp.bonus('xpBoost'));
     for (const k in r.units) if (r.units[k] > 0) st.exp.xp[k] += xp;
-    if (r.poi !== undefined) {
+    if (r.heroe && PK.Heroes) PK.Heroes.resultado(r);
+    // incursión: si ganó y quedan pisos, sigue adentro (a elegir la próxima sala)
+    if (r.inc && PK.Inc.tras(r)) return;
+    cerrar(r, res, ratio);
+  }
+  // Fin de una expedición (o de una incursión entera): informe, aviso y de vuelta a casa.
+  function cerrar(r, res, ratio) {
+    const st = S(), sent = r.inc ? r.inc.enviados : Object.assign({}, r.units);
+    if (!r.inc) for (const k in r.lost || {}) sent[k] = (sent[k] || 0) + r.lost[k];
+    if (r.poi !== undefined && r.inc) Exp.site(r.poi).rest = Date.now() + D.DUNGEON[W.pois[r.poi].kind].rest * 1000;
+    if (r.poi !== undefined && !r.inc) {
       const p = W.pois[r.poi], site = Exp.site(p.id);
       site.rest = Date.now() + D.DUNGEON[p.kind].rest * 1000;
       if (r.won && r.floor > site.best) {
@@ -225,11 +240,10 @@
       const p = W.pois[r.camp], ps = p && G().poiState(p);
       if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
     }
-    if (r.heroe && PK.Heroes) PK.Heroes.resultado(r);
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), hab: r.habUsos };
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), hab: r.habUsos };
     st.war.reports = st.war.reports || [];
     st.war.reports.unshift(rep);
     if (st.war.reports.length > 12) st.war.reports.length = 12;
@@ -240,6 +254,7 @@
       { label: 'Ver informe', fn: () => PK.UI.openReport(rep) });
   }
   Exp.finishBattle = (r, res) => { if (r.phase === 'battle') resolve(r, res); };
+  Exp.cerrar = r => cerrar(r, null, 0);
   const lostText = l => Object.keys(l).filter(k => l[k]).map(k => l[k] + ' ' + D.ARMY[k].name.toLowerCase() + (l[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
   // Menos bajas con el héroe (armadura, rasgo Prudente, talentos). Valiente puede subirlas.
   const heroBajas = r => (r.heroe && PK.Heroes ? U.clamp(PK.Heroes.efecto(PK.Heroes.de(r.heroe), 'bajas'), -0.2, 0.5) : 0);
@@ -249,12 +264,15 @@
     const st = S(), g = G();
     for (const k in r.units) st.war.army[k] += r.units[k];
     if (r.heroe && PK.Heroes) PK.Heroes.volver(r);
-    if (r.won) {
+    if (r.inc && PK.Inc) PK.Inc.volver(r);
+    // una incursión perdida vuelve con la mitad de lo juntado (incursion.js)
+    const mitad = !r.won && r.inc && Object.keys(r.loot || {}).some(k => r.loot[k] > 0);
+    if (r.won || mitad) {
       const h = r.heroe && PK.Heroes ? PK.Heroes.de(r.heroe) : null, bot = h ? PK.Heroes.efecto(h, 'botin') : 0;
       if (bot) for (const k in r.loot) if (k !== 'coins') r.loot[k] = Math.round(r.loot[k] * (1 + bot));
       g.give(r.loot);
       for (const k of D.SPECIAL) if (r.loot[k]) g.stat('sp_' + k, r.loot[k]);
-      g.stat('exp_won', 1);
+      if (r.won) g.stat('exp_won', 1);
       log('Botín de ' + r.name + ': ' + Object.keys(r.loot).map(k => U.fmt(r.loot[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ') + '.', 'good');
       toast('Tus tropas volvieron de ' + r.name + ' con el botín: ' + Object.keys(r.loot).map(k => '+' + U.fmt(r.loot[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ') + '.', 'epic');
       if (PK.Sfx) PK.Sfx.play('coin');
@@ -306,11 +324,15 @@
           { label: 'Ver batalla', fn: () => { r.watch = true; } });
       }
       // batalla en vivo (batalla.js). Si la partida se recargó en medio, se resuelve como antes; sin ti, se juega de una vez.
+      // incursión: eligiendo sala, o terminada entre salas (retirada)
+      if (r.phase === 'sala') { PK.Inc.update(r, offline); continue; }
+      if (r.phase === 'fin') { cerrar(r, null, 0); continue; }
       if (r.phase === 'battle') {
         if (!PK.Batalla || !PK.Batalla.tiene(r.id)) resolve(r);
         else if (offline) PK.Batalla.adelantar(r.id);
         continue;
       }
+      if (r.phase === 'go' && now >= r.arrive && r.inc && !r.inc.llego) { r.inc.llego = true; PK.Inc.llegar(r); if (r.watch && !offline) PK.Inc.open(r.id); continue; }
       if (r.phase === 'go' && now >= r.arrive) {
         if (!offline && !r.mission && PK.Batalla && PK.Batalla.empezar(r)) {
           if (r.watch) PK.Batalla.abrir(r.id);

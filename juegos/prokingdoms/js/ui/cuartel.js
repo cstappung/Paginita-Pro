@@ -169,6 +169,14 @@
     if (!runs.length) return;
     pane.append(el('h3', null, 'Tropas fuera (' + runs.length + ')'));
     for (const r of runs) {
+      // incursión (incursion.js): eligiendo sala o entrando a una
+      if (r.inc && (r.phase === 'sala' || r.phase === 'fin' || (r.phase === 'go' && r.inc.llego))) {
+        pane.append(el('div', { class: 'run-row' }, el('span', { class: 'run-ic' }, '☠'),
+          el('div', { class: 'dg-info' }, el('b', null, 'Incursión: ' + D.DUNGEON[W.pois[r.poi].kind].name + ' · piso ' + r.inc.piso + ' de ' + r.inc.fin),
+            el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados · ' + (r.phase === 'sala' ? 'elige el camino (' + U.fmtTime(Math.max(0, (r.inc.hasta - Date.now()) / 1000)) + ')' : 'entrando a la sala'))),
+          UI.btn(r.phase === 'sala' ? 'Elegir sala' : 'Ver', () => PK.Inc.open(r.id), { small: true, cls: 'gold' })));
+        continue;
+      }
       if (r.phase === 'battle') {
         pane.append(el('div', { class: 'run-row' }, el('span', { class: 'run-ic' }, '⚔'),
           el('div', { class: 'dg-info' }, el('b', null, 'Peleando en ' + r.name), el('div', { class: 'small muted' }, sumUnits(r.units) + ' soldados · dirige la batalla en vivo')),
@@ -209,17 +217,21 @@
     }
     const sites = PK.Exp.sites();
     pane.append(el('h3', null, 'Mazmorras descubiertas (' + sites.length + ')'));
+    if (PK.Inc && sites.length) pane.append(el('p', { class: 'small' }, 'Cada visita es una incursión de 5 pisos: eliges la sala de cada piso y el último es un jefe. Afijos de esta semana: ', PK.Inc.afijos().map((a, i) => el('span', { title: PK.Inc.AFIJOS[a].desc + (PK.Inc.AFIJOS[a].premio ? '; ' + PK.Inc.AFIJOS[a].premio : '') }, (i ? ' y ' : '') + PK.Inc.AFIJOS[a].name + ' (' + PK.Inc.AFIJOS[a].desc + (PK.Inc.AFIJOS[a].premio ? ', ' + PK.Inc.AFIJOS[a].premio : '') + ')')), '.'));
     if (!sites.length) pane.append(el('p', { class: 'muted small' }, 'Tus exploradores todavía no encontraron mazmorras. Están escondidas en la niebla: cuevas de cristal y guaridas cerca, catacumbas, cráteres y nidos de dragón más lejos. El Observatorio las marca en el mapa.'));
     for (const p of sites) {
       const d = D.DUNGEON[p.kind], site = PK.Exp.site(p.id), rest = site.rest - Date.now(), next = Math.min(d.floors, site.best + 1);
       const going = st.exp.runs.some(r => r.poi === p.id), locked = st.era < d.era;
       const floorBtn = f => UI.btn((f > site.best ? 'Piso ' : 'Repetir piso ') + f, () => { plan = { target: { poi: p.id, floor: f }, units: null }; UI.rerender(); }, { small: true, cls: f > site.best ? 'gold' : '' });
+      // Mazmorras 2.0: incursiones por bloques de 5 pisos (el último bloque es el más nuevo)
+      const bloques = PK.Inc ? PK.Inc.bloques(p) : null;
+      const bloqueBtn = k => UI.btn((k.limpio ? 'Repetir ' : 'Pisos ') + k.desde + '–' + k.hasta, () => { plan = { target: { poi: p.id, floor: k.desde }, units: null }; UI.rerender(); }, { small: true, cls: k.limpio ? '' : 'gold', title: 'Incursión de ' + (k.hasta - k.desde + 1) + ' pisos con jefe al final' });
       pane.append(el('div', { class: 'raid-row dungeon' + (locked ? ' locked' : '') },
         el('img', { class: 'dg-ico', src: Sp.poi(p.kind, false).c.toDataURL() }),
         el('div', { class: 'dg-info' }, el('b', null, d.name), el('div', { class: 'small' }, enemyText(d.enemy) + ' · da ' + D.RES[d.loot].name.toLowerCase()),
           el('div', { class: 'small muted' }, 'Pisos ' + site.best + '/' + d.floors + ' · viaje ' + U.fmtTime(PK.Exp.travel(p)) + (rest > 0 ? ' · se repone en ' + U.fmtTime(rest / 1000) : ''))),
         locked ? el('span', { class: 'muted small' }, 'Era ' + U.roman(d.era)) : going ? el('span', { class: 'muted small' }, 'Expedición en curso') :
-          el('span', { class: 'row' }, site.best ? floorBtn(site.best) : null, site.best < d.floors ? floorBtn(next) : null),
+          bloques ? el('span', { class: 'row' }, bloques.slice(-2).map(bloqueBtn)) : el('span', { class: 'row' }, site.best ? floorBtn(site.best) : null, site.best < d.floors ? floorBtn(next) : null),
         UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + 1, p.y + 1); }, { small: true })));
     }
   }

@@ -46,6 +46,11 @@
       }
       return null;
     },
+    // una incursión espera que elijas la sala (si no, el capitán elige solo)
+    () => {
+      const r = PK.Inc && S().exp.runs.find(o => o.phase === 'sala');
+      return r && { id: 'sala', prioridad: 62, texto: 'Tus tropas esperan en el piso ' + r.inc.piso + ': elige el camino.', acciones: [{ label: 'Elegir sala', fn: cerrarY(() => PK.Inc.open(r.id)) }] };
+    },
     // aldeanos sin nada que hacer
     () => {
       const vs = PK.Auto.villagers().filter(u => !u.task && !u.inside && !u.hold && (u.idleT || 0) > 10);

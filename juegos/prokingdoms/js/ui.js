@@ -364,6 +364,8 @@
     }
     for (const r of (st.exp && st.exp.runs) || []) {
       if (r.phase === 'battle') { out.unshift({ k: 'b' + r.id, raid: true, icon: Sp.icon('war'), name: '⚔ Batalla en ' + r.name, left: null, pct: 1, go: () => PK.Batalla.abrir(r.id) }); continue; }
+      // incursión entre salas (incursion.js): sin reloj de viaje
+      if (r.inc && (r.phase === 'sala' || r.phase === 'fin' || (r.phase === 'go' && r.inc.llego))) { out.unshift({ k: 's' + r.id + r.phase, raid: r.phase === 'sala', icon: Sp.icon('scale'), name: '☠ ' + (r.phase === 'sala' ? 'Elige sala: piso ' : 'Piso ') + r.inc.piso + ' de ' + r.inc.fin, left: r.phase === 'sala' ? Math.max(0, (r.inc.hasta - now) / 1000) : null, pct: (r.inc.piso - r.inc.desde) / Math.max(1, r.inc.fin - r.inc.desde + 1), go: () => PK.Inc.open(r.id) }); continue; }
       const go = r.phase === 'go', left = ((go ? r.arrive : r.back) - now) / 1000;
       out.push({ k: 'x' + r.id + r.phase, icon: Sp.icon('war'), name: (go ? '⚔ Hacia ' : '↩ Vuelve de ') + r.name, left, pct: 1 - left / Math.max(1, r.travel), go: () => UI.openBarracks('exp') });
     }

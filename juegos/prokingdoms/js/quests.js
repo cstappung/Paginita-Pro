@@ -444,6 +444,12 @@
       el('div', { class: 'al-grid' }, relics.map((p, i) => { const ps = st.pois[p.id]; return slot('gold', 'Reliquia ' + U.roman(i + 1), ps && ps.f, ps && ps.d ? 'en el Monasterio' : null); })));
     right.append(el('h3', null, 'Puntos de interés vistos'),
       el('div', { class: 'al-grid' }, Object.keys(D.POI).filter(k => total[k]).map(k => slot(POI_ICON[k] || 'compass', D.POI[k].name, seen[k], (seen[k] || 0) + ' de ' + total[k], true))));
+    // trofeos de los jefes de mazmorra (Mazmorras 2.0, incursion.js)
+    if (PK.Inc) {
+      const tr = st.trofeos || {}, kinds = Object.keys(PK.Inc.JEFES);
+      right.append(el('h3', null, 'Trofeos (' + kinds.filter(k => tr[k]).length + '/' + kinds.length + ')'),
+        el('div', { class: 'al-grid' }, kinds.map(k => slot(POI_ICON[k] || 'scale', PK.Inc.JEFES[k].name, tr[k], tr[k] ? 'x' + tr[k] : null, true))));
+    }
     const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]).length;
     right.append(el('h3', null, 'Reinos encontrados (' + realms + '/' + D.BOTS.length + ')'),
       el('div', { class: 'al-grid' }, D.BOTS.map(b => slot('pop', b.realm, st.flags['seen_' + b.slot]))));
