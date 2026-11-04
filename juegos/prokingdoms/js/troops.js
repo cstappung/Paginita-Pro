@@ -118,7 +118,7 @@
   const faceOf = (dx, dy) => ({ flip: dx - dy < 0, back: dx + dy < 0 });
   function soldierItem(type, x, y, mode, frame, flip, back, tool, id, extra) {
     const [px, py] = PK.Render.iso(x, y);
-    const spr = type === 'catapult' ? Sp.cart(D.PLAYER_COLOR, 'stone', flip, frame % 4, mode === 'walk') : Sp.troop(type, D.PLAYER_COLOR, mode, frame, flip, back, tool, id);
+    const spr = type === 'catapult' ? Sp.cart(D.PLAYER_COLOR, 'stone', flip, frame % 4, mode === 'walk') : Sp.troop(type, Sp.colorDeTropa ? Sp.colorDeTropa(type) : D.PLAYER_COLOR, mode, frame, flip, back, tool, id);
     return Object.assign({ d: x + y, k: 'troop', o: extra || {}, spr, x: px - spr.ax, y: py - spr.ay, px, py }, {});
   }
   function banner(it, flip) {

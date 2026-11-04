@@ -532,6 +532,7 @@ const fotoBreve = f => { const s = fotoSana(f, false); return s.length <= 400 ? 
    junta las escuchas del mismo nodo, así que la pestaña de logros no lo
    baja dos veces. */
 let datosP = null, offDatosP = null;
+const nadaPk = () => {};
 const oyentesP = new Set();
 function datosPerfil(cb) {
   oyentesP.add(cb);
@@ -2709,7 +2710,12 @@ function armazon() {
       return;
     }
     h.innerHTML = "";
-    proKingdomsVista = crearProKingdoms({ usuario: state.user, volver: () => ir("") });
+    const yoPk = state.user.uid;
+    datosPerfil(nadaPk); // el saldo para el Pase del Reino (la misma escucha de toda la sesión)
+    proKingdomsVista = crearProKingdoms({ usuario: state.user, volver: () => ir(""),
+      saldo: () => datosP && datosP.completo ? monedasDe(yoPk, datosP).saldo : null,
+      yaTiene: n => !!(datosP && datosP.pkPase && datosP.pkPase[yoPk] && datosP.pkPase[yoPk][n]),
+      comprarPase: (n, p) => fb.comprarPase(yoPk, n, p) });
     proKingdomsVista.montar(h);
     return;
   }

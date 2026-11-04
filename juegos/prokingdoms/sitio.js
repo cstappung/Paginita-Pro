@@ -22,7 +22,7 @@
    - El nombre que ven los reinos vecinos simulados es el de la cuenta
      (`?nombre=`).
 
-   Nunca toca Firebase. Al padre le dice `listo` y `volver`, y le pide `token`. */
+   Nunca toca Firebase. Al padre le dice `listo` y `volver`, y le pide `token` y `pkPase` (comprar el pase). */
 (function () {
   'use strict';
   const q = new URLSearchParams(location.search);
@@ -50,10 +50,26 @@
     });
   }
 
+  /* Pase del Reino (Fase 8): el juego pide comprar y la página de Juegos lo confirma con su propia ventana y
+     su saldo real, escribe la compra (pkPase/<uid>/<período>) y contesta. El marco nunca gasta monedas de la
+     página: solo pide. Resuelve true si se compró, false si no (cancelado, sin saldo, sin página). */
+  let pedidoPase = 0;
+  function comprarPase(periodo) {
+    if (!enMarco0) return Promise.resolve(false);
+    const id = ++pedidoPase;
+    return new Promise(res => {
+      const fin = ok => { window.removeEventListener('message', oye); res(!!ok); };
+      const oye = e => { const x = e.data; if (e.source === window.parent && e.origin === location.origin && x && x.canal === 'prokingdoms-parent' && x.tipo === 'pkPaseOk' && x.id === id) fin(x.ok); };
+      window.addEventListener('message', oye);
+      window.parent.postMessage({ canal: 'prokingdoms-child', tipo: 'pkPase', id, periodo }, location.origin);
+    });
+  }
+
   window.ProKingdomsPlatform = {
     name: 'paginita-pro-beta',
     apiBase,
     getAuthToken: apiBase ? getAuthToken : undefined,
+    comprarPase: apiBase ? comprarPase : undefined,
     getPlayer() { return { id: perfil || 'local', name: nombre }; },
     getCoins() { return Math.max(0, Math.floor(+(lee(K_MONEDAS) || 0)) || 0); },
     addCoins(n, reason) {

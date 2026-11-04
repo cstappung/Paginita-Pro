@@ -113,7 +113,11 @@
     pending = {}; marketOps = [];
     const t0 = performance.now();
     try {
-      const r = await api('POST', '/api/sync', { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince });
+      // Pase del Reino: las estadísticas que el servidor convierte en puntos (D.PASE_STATS, js/pase.js)
+      const pase = {};
+      for (const k of PK.D.PASE_STATS || []) pase[k] = Math.floor(S().stats[k] || 0);
+      const r = await api('POST', '/api/sync', { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince, pase });
+      if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       Net.ping = Math.round(performance.now() - t0);
       Net.lastOk = Date.now();
       if (Net.lost) { Net.lost = false; toast('Conexión recuperada.', 'good'); }
@@ -224,6 +228,7 @@
     if (sum) S().flags.guildJoined = true;
   }
 
+  Net.applyInbox = items => applyInbox(items);
   function applyInbox(items) {
     const st = S(), g = G();
     for (const it of items) {
@@ -231,6 +236,7 @@
       st.inboxAck = it.id;
       switch (it.type) {
         case 'res': g.give(it.res); toast(it.text, 'info'); break;
+        case 'pase': if (PK.Pase) PK.Pase.recibir(it); break;
         case 'offer_filled':
           g.give(it.res); g.stat('offers_filled', 1); g.stat('gold_volume', it.value || 0);
           toast(it.text, 'good');

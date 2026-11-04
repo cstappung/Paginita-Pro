@@ -949,3 +949,32 @@ ul.info li { margin: 2px 0; }
 .tienda .ok { color: #3f7a2a; font-weight: 600; }
 .h-ret { box-shadow: 0 0 0 2px var(--marco, transparent); }
 button.res.animo, button.res.estacion { background: rgba(0, 0, 0, 0.25); border: 2px solid var(--edge); color: var(--parch2, #f2e6c8); font-family: var(--font); cursor: pointer; height: 26px; }
+
+/* ---------- Pase del Reino (pk-20) ---------- */
+button.res.pase-btn { background: rgba(0, 0, 0, 0.25); border: 2px solid var(--edge); color: var(--parch2, #f2e6c8); font-family: var(--font); cursor: pointer; height: 26px; font-size: 14px; padding: 0 6px; white-space: nowrap; }
+button.res.pase-btn.dorado { border-color: #e8b84a; color: #ffe27a; box-shadow: 0 0 6px #e8b84a88; }
+button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
+@keyframes pkBrillo { 50% { box-shadow: 0 0 10px #ffe27a; } }
+.pase-top { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; border: 2px solid #8a6a44; padding: 8px; background: rgba(120, 80, 30, 0.1); }
+.pase-top > div { flex: 1; min-width: 220px; }
+.pase-top.dorado { border-color: #c8a030; box-shadow: inset 0 0 0 2px #e8b84a88; }
+.pase-oro { font-weight: 700; color: #a07818; }
+.pase-pistas { display: flex; gap: 4px; overflow-x: auto; padding: 6px 0 10px; margin: 8px 0; }
+.pase-n { flex: 0 0 104px; display: flex; flex-direction: column; gap: 3px; text-align: center; opacity: 0.7; }
+.pase-n.ok { opacity: 1; }
+.pase-n > b { background: #5a3c22; color: #f2e6c8; border-radius: 3px; }
+.pase-n.ok > b { background: #a07818; }
+.pase-c { min-height: 64px; border: 2px solid #8a6a44; padding: 3px; display: flex; flex-direction: column; gap: 2px; align-items: center; justify-content: center; background: rgba(120, 80, 30, 0.1); }
+.pase-c.d { border-color: #c8a030; background: rgba(232, 184, 74, 0.18); }
+.pase-c.d.cerrada { filter: grayscale(0.6); }
+.pase-c.listo { box-shadow: 0 0 0 2px #e8b84a; }
+.pase-c.hecho { opacity: 0.55; }
+.pase-c.vacia { border-style: dashed; opacity: 0.4; }
+.pase-retos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.asp-chip { border: 2px solid; padding: 2px 6px; font-size: 13px; background: rgba(0, 0, 0, 0.06); }
+@media (max-width: 600px) {
+  .pase-pistas { flex-direction: column; overflow-x: visible; }
+  .pase-n { flex: 0 0 auto; flex-direction: row; text-align: left; }
+  .pase-n > b { flex: 0 0 34px; display: flex; align-items: center; justify-content: center; }
+  .pase-c { flex: 1; min-height: 40px; }
+}

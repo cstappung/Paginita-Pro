@@ -106,6 +106,20 @@ async function main() {
     const gift = nid ? await api('POST', '/api/guilds/need/send', { id: nid.id, n: 1e9 }, cheat.token) : { status: 0, data: {} };
     check(gift.status === 200 && gift.data.accepted <= Math.min(nid.n, 300), 'mandar mil millones de comida: solo sale lo que pide el pedido y hay en su almacén', gift.data.accepted !== undefined ? gift.data.accepted + ' de ' + nid.n + ' pedidos' : gift.data.error);
 
+    console.log('\nPase del Reino');
+    let pz = (await api('POST', '/api/sync', { since: 0, pase: {} }, cheat.token)).data.pase;
+    for (let i = 1; i <= 8; i++) pz = (await api('POST', '/api/sync', { since: 0, pase: { upgrades: i * 1e6, exp_won: i * 1e6, aldeanos: i * 1e6, bosses_killed: i * 1e6, g_total: i * 1e9 } }, cheat.token)).data.pase;
+    check(pz && pz.ppHoy <= pz.tope && pz.pp <= pz.tope, 'la tramposa informa millones de mejoras y jefes: el pase suma como mucho el tope del día', pz && pz.pp + ' PP (tope ' + pz.tope + ')');
+    r = await api('POST', '/api/pase/claim', { nivel: 30, pista: 'g' }, cheat.token);
+    check(r.status === 400, 'no se reclama un nivel no alcanzado', r.data.error);
+    r = await api('POST', '/api/pase/claim', { nivel: 1, pista: 'd' }, cheat.token);
+    check(r.status === 400, 'ni la pista dorada sin comprarla', r.data.error);
+    r = await api('POST', '/api/pase/refresh', {}, cheat.token);
+    check(r.status === 200 && !r.data.pase.dorado, 'pedir la pista dorada sin compra no la da', r.data.pase && r.data.pase.dorado);
+    r = await api('POST', '/api/pase/claim', { nivel: 1, pista: 'g' }, cheat.token);
+    const r2 = await api('POST', '/api/pase/claim', { nivel: 1, pista: 'g' }, cheat.token);
+    check(r.status === 200 && r2.status === 400, 'un premio se reclama una sola vez', r2.data.error);
+
     console.log('\nLímite de pedidos');
     const burst = await Promise.all(Array.from({ length: 60 }, () => api('POST', '/api/sync', {}, cheat.token)));
     const n429 = burst.filter(x => x.status === 429).length;

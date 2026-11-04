@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -482,4 +482,40 @@ test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen su
     G.state = { animo: { v: 0, ev: [] } }; assert.ok(Math.abs(PK.Vida.animoMult() - 0.9) < 1e-9);
     G.state = { animo: { v: 100, ev: [] } }; assert.ok(Math.abs(PK.Vida.animoMult() - 1.15) < 1e-9);
   } finally { G.state = viejo; }
+});
+
+// ---------- Fase 8 (pk-20): el Pase del Reino ----------
+test('Pase del Reino: cada tema del calendario tiene sus aspectos, y el actual y el siguiente tienen tema', () => {
+  const hj = JS('heroes.js');
+  for (const [id, T] of Object.entries(D.PASE_TEMAS)) {
+    assert.ok(T.name && T.col.length === 3, id);
+    assert.ok(PK.Heroes.CLASES[T.heroe.clase], id + ': clase del héroe');
+    assert.ok(hj.includes("A === '" + T.heroe.acc + "'"), id + ': el accesorio ' + T.heroe.acc + ' se dibuja en heroes.js');
+    assert.ok(D.BUILD[T.edificio.b] && T.edificio.techo, id + ': aspecto de edificio');
+    assert.ok(D.ARMY[T.tropa.t] && T.tropa.col, id + ': aspecto de tropa');
+    assert.ok(D.BUILD[T.deco.b], id + ': decoración');
+    assert.ok(T.barco.name && T.efecto.name, id + ': barco y efecto');
+  }
+  assert.equal(D.CALENDARIO_PASE.length, 26, '26 quincenas al año');
+  for (const t of D.CALENDARIO_PASE) if (t) assert.ok(D.PASE_TEMAS[t], t);
+  const n = D.paseDe(Date.now());
+  assert.ok(D.paseTema(n), 'el pase actual (' + n + ') no tiene tema: agrega uno a D.CALENDARIO_PASE');
+  assert.ok(D.paseTema(n + 1), 'el pase siguiente (' + (n + 1) + ') no tiene tema: agrega uno a D.CALENDARIO_PASE');
+});
+test('Pase del Reino: premios de los 30 niveles en las dos pistas y retos con quien registre su estadística', () => {
+  assert.equal(D.PASE.precio, 2500);
+  for (let n = 1; n <= 35; n++) for (const pista of n <= 30 ? ['g', 'd'] : ['d']) {
+    const pr = D.pasePremio(n, pista, 4, 'dragon');
+    assert.ok(pr.txt, n + pista);
+    if (pr.aspecto) assert.ok(D.aspecto(pr.aspecto), pr.aspecto);
+  }
+  for (const k of ['heroe', 'edificio', 'tropa', 'deco', 'efecto', 'marco', 'estandarte', 'heroe2']) assert.ok([...Array(30).keys()].some(i => D.pasePremio(i + 1, 'd', 3, 'dragon').aspecto === 'dragon:' + k), 'la pista dorada da ' + k);
+  for (const k of D.PASE_STATS) assert.ok(k.startsWith('g_') || new RegExp("stat\\('" + k + "'").test(TODO), 'nadie registra ' + k);
+  assert.equal(D.paseDiarios(0, '2026-11-04').length, 3);
+  assert.equal(D.paseRetos(0).length, 10);
+  assert.deepEqual(D.paseRetos(5).map(r => r.id), D.paseRetos(5).map(r => r.id), 'con semilla fija');
+  // jugando normal se llega al 30 en 9 o 10 días: retos del pase + 3 diarios + actividad, contra 4.500 PP
+  const retos = D.PASE_RETOS.reduce((a, r) => a + r.pp, 0) / D.PASE_RETOS.length * 10, diarios = D.PASE_DIARIOS.reduce((a, r) => a + r.pp, 0) / D.PASE_DIARIOS.length * 3;
+  const dias = (D.PASE.niveles * D.PASE.pp - retos) / (diarios + 160);
+  assert.ok(dias > 7 && dias < 12, dias.toFixed(1) + ' días');
 });

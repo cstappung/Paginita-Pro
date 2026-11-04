@@ -157,6 +157,7 @@
       line(P(x + w, y + h, z0), P(x + w, y + h, z1), 'rgba(0,0,0,0.18)');
     }
     function roof(x, y, w, h, zb, ht, mat, frac, ov, axis) {
+      if (techoAsp) mat = techoAsp; // el techo de un aspecto del Pase del Reino
       if (tier >= 5 && (mat === 'plank' || mat === 'darkwood')) mat = tier >= 6 ? 'verdigris' : 'glaze'; // techos de madera, rehechos
       const x0 = x - ov, y0 = y - ov, x1 = x + w + ov, y1 = y + h + ov;
       let r0, r1;
@@ -1287,11 +1288,24 @@
     }
     return withMask({ c, ox, oy, smoke: meta.smoke, hub: meta.hub, tier: tier || 0 });
   }
+  // Aspectos del Pase del Reino (js/ui/pase.js): solo para tus edificios. {col, techo, id}: el color de banderas
+  // y estandartes y el material de los techos. La caché los separa por id.
+  const ASP_B = {}, ASP_T = {};
+  S.aspectoEdificio = function (type, a) {
+    const antes = ASP_B[type] ? ASP_B[type].id : null;
+    if (a) ASP_B[type] = a; else delete ASP_B[type];
+    if (antes !== (a ? a.id : null)) for (const k in BCACHE) if (k.startsWith(type + '|p|')) delete BCACHE[k];
+  };
+  S.colorTropa = function (type, col) { if (col) ASP_T[type] = col; else delete ASP_T[type]; };
+  S.colorDeTropa = type => ASP_T[type] || D.PLAYER_COLOR;
+  let techoAsp = null;
   S.building = function (type, owner, lvl) {
-    const tier = S.tier(lvl || 1), key = type + '|' + owner + '|' + bkey(type, lvl);
+    const tier = S.tier(lvl || 1), asp = owner === 'p' ? ASP_B[type] : null, key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (BCACHE[key]) return BCACHE[key];
-    const def = D.BUILD[type], col = S.ownerColor(owner);
+    const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
+    techoAsp = asp ? asp.techo : null;
     const spr = isoSprite(def.w, def.h, S.btop(type, lvl), def.flat, (p, meta) => BDRAW[type](p, col, meta, tier, lvl || 1), tier, col);
+    techoAsp = null;
     spr.pad = S.btop(type, lvl) - (BTOP[type] || 40); // alto extra arriba (las barras se dibujan donde antes)
     return (BCACHE[key] = spr);
   };

@@ -606,3 +606,44 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   `G.MUELLE_RATE × G.aguaMuelle(b)` (water tiles within 3, cached on `b._agua`,
   cleared on move). The boat is drawn in `render.js` (`botes`) on the nearest
   water tile. Tree node `redes` (+30%).
+
+## The Pase del Reino (`pk-20`, Phase 8)
+
+- **The only link with Juegos coins, one way only.** The page buys, the game
+  never pays out. The game frame asks through `ProKingdomsPlatform.comprarPase`
+  (postMessage `pkPase`). The postman (`prokingdoms.js`, `confirmaPase`) shows
+  its own two-step dialog with the balance and writes
+  `pkPase/<uid>/<period>` (`fb.comprarPase`, write-once rule with price and
+  period). Then the frame calls `POST /api/pase/refresh`, and the function
+  reads that node with the Admin SDK before opening the gold track. `join`
+  checks it too, in case the message got lost. The economy side (event `pk`,
+  category `pkPase`) is in `docs/claude/juegos/perfiles-y-economia.md`.
+- **Period arithmetic in three places:** `colabtex/src/juegos/pase-pk.js`
+  (page and economy), the rule, and `js/pase.js` (game and server, which do
+  not load the page's modules). Two weeks from Monday 2-11-2026 at 03:00 UTC.
+  `tests/monedas.test.cjs` checks that all three agree.
+- **The server decides the PP** (`sim.js`: `paseStats`, `paseClaim`,
+  `paseActivar`). Each sync sends the stats in `D.PASE_STATS` (`b.pase`). The
+  server adds the differences, with a cap per source (`D.PASE_ACT`) and per
+  day (`LIM.pasePPDia` 700). A jump over `LIM.paseSalto` in one sync is
+  clipped and logged as suspicion. Stats that go down mean a new save: the
+  count restarts from there and the jump earns nothing. Rewards arrive through
+  the inbox (type `'pase'` → `PK.Pase.recibir`). Locally,
+  `PK_PASE_LIBRE=1` lets refresh open the gold track without a purchase.
+- **Offline and in local mode the pass window says «Requiere conexión»**:
+  nothing about it is computed in the browser.
+- **Themes and aspects** (`D.PASE_TEMAS`, `D.CALENDARIO_PASE`, 26 slots,
+  `período % 26`): each theme comes back in the same fortnight each year. 8
+  are filled and the rest are `null` (the tracks give no aspect). Aspects are
+  visual only: building (`Sp.aspectoEdificio`, part of the sprite key), troop
+  colour (`Sp.colorDeTropa`), banner, decoration and hero (palette, accessory
+  and frame in `H.retrato`). A repeat turns into 25 gems + 40 essence.
+- **The gold track's bonuses** (in `Vida.bono`: +17.6% upgrade speed and
+  research, +1 queue slot; heroes heal ×0.7) stay inside what `LIM.slack`
+  already covers. Never add a gathering bonus here: it would go past
+  `LIM.vida`.
+- **After merging:** re-publish `firebase/database.rules.json` (new node
+  `pkPase`) and deploy the function (`firebase deploy --only functions`).
+  Tests: `test-rules.mjs` («Pase del Reino»), `functions/prueba-emulador.js`
+  (refresh with and without a purchase), `tools/cheat-test.js` (daily cap,
+  jumps).

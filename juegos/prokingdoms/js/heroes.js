@@ -303,7 +303,7 @@
   };
   H.heridaSeg = function (h) {
     const mon = G().best('monastery', 'relics'); // nivel del Monasterio
-    const k = (1 - Math.min(0.5, 0.05 * mon)) * (1 - Math.min(0.6, H.pasiva('heridas'))) * (1 - H.efecto(h, 'herida')) * (1 - G().best('herbolario', 'heridaP'));
+    const k = (1 - Math.min(0.5, 0.05 * mon)) * (1 - Math.min(0.6, H.pasiva('heridas'))) * (1 - H.efecto(h, 'herida')) * (1 - G().best('herbolario', 'heridaP')) * (PK.Pase && PK.Pase.dorado() ? 0.7 : 1); // pista dorada del Pase: heridas 30% más cortas
     return Math.round((1800 + 5400 * (h.semilla % 97) / 96) * k);
   };
   // El mejor héroe libre contra ese enemigo (lo usan el planificador, el Mariscal y el piloto).
@@ -367,12 +367,15 @@
   const PIELES = [[244, 208, 172], [226, 180, 140], [196, 146, 104], [150, 100, 66], [110, 72, 48]];
   const PELOS = [[40, 28, 20], [96, 60, 30], [180, 120, 50], [220, 190, 110], [150, 50, 30], [70, 70, 76], [230, 230, 230]];
   H.retrato = function (h) {
-    const key = h.clase + ':' + h.semilla + ':' + (h.mujer ? 1 : 0);
+    // un aspecto del Pase del Reino (js/pase.js) cambia el color y lo que lleva en la cabeza
+    const asp = h.aspecto && D.aspecto ? D.aspecto(h.aspecto) : null, ao = asp && asp.o && asp.o.clase === h.clase ? asp : null;
+    const key = h.clase + ':' + h.semilla + ':' + (h.mujer ? 1 : 0) + (ao ? ':' + h.aspecto : '');
     if (RET[key]) return RET[key];
     if (typeof document === 'undefined') return '';
     const N = 24, c = document.createElement('canvas');
     c.width = N; c.height = N;
-    const x = c.getContext('2d'), rng = U.rng(h.semilla), cl = H.CLASES[h.clase];
+    const x = c.getContext('2d'), rng = U.rng(h.semilla), cl0 = H.CLASES[h.clase];
+    const cl = ao ? Object.assign({}, cl0, { col: ao.tipo === 'heroe2' ? ao.o.col.map(v => 255 - v * 0.6) : ao.o.col }) : cl0;
     const css = (a, f) => 'rgb(' + a.map(v => U.clamp(Math.round(v * (f || 1)), 0, 255)).join(',') + ')';
     const r = (a, b, w, hh, col) => { x.fillStyle = col; x.fillRect(a, b, w, hh); };
     const piel = PIELES[Math.floor(rng() * PIELES.length)], pelo = PELOS[Math.floor(rng() * PELOS.length)];
@@ -405,6 +408,20 @@
     else if (h.clase === 'ingeniera') { r(7, 6, 10, 2, '#6a4424'); r(8, 6, 3, 2, '#9ad8e8'); r(13, 6, 3, 2, '#9ad8e8'); r(8, 6, 1, 1, '#fff'); r(13, 6, 1, 1, '#fff'); }
     else if (h.clase === 'hechicero') { for (let i = 0; i < 6; i++) r(9 + Math.floor(i / 2), 6 - i, 6 - i, 1, css(cl.col, 0.8)); r(6, 5, 12, 2, css(cl.col, 0.7)); r(11, 3, 1, 1, '#ffe27a'); if (!h.mujer) { r(8, 13, 8, 4, '#e8e8e8'); r(9, 17, 6, 2, '#e0e0e0'); } }
     else if (h.clase === 'juglar') { r(7, 4, 10, 3, css(cl.col)); r(6, 6, 12, 1, css(cl.col, 0.8)); r(16, 1, 1, 4, '#f0f0f0'); r(17, 0, 1, 3, '#f0f0f0'); r(15, 2, 1, 2, '#e8c050'); }
+    // el accesorio del aspecto, encima de lo de la clase
+    if (ao) {
+      const A = ao.o.acc, oro = '#f0c850';
+      if (A === 'cuernos') { r(6, 1, 2, 4, '#e8dcc0'); r(16, 1, 2, 4, '#e8dcc0'); r(5, 0, 1, 2, '#e8dcc0'); r(18, 0, 1, 2, '#e8dcc0'); }
+      else if (A === 'tricornio') { r(5, 3, 14, 3, '#2a2420'); r(8, 1, 8, 2, '#2a2420'); r(5, 5, 14, 1, oro); r(11, 2, 2, 1, '#e8e8e8'); }
+      else if (A === 'tiara') { r(8, 4, 8, 1, '#dff4ff'); r(9, 2, 1, 2, '#bfe6ff'); r(12, 1, 1, 3, '#ffffff'); r(15, 2, 1, 2, '#bfe6ff'); }
+      else if (A === 'capucha') { r(5, 3, 14, 5, css(cl.col, 0.6)); r(4, 6, 3, 12, css(cl.col, 0.55)); r(17, 6, 3, 12, css(cl.col, 0.55)); r(10, 9, 1, 1, '#7aff8a'); r(14, 9, 1, 1, '#7aff8a'); }
+      else if (A === 'sombrero') { r(6, 3, 12, 3, css(cl.col)); r(4, 5, 16, 1, css(cl.col, 0.8)); r(14, 0, 4, 3, '#f0f0f0'); }
+      else if (A === 'estrellas') { for (const [a, b] of [[4, 2], [19, 3], [2, 9], [21, 11], [12, 0]]) { r(a, b, 1, 1, '#fff6c0'); r(a - 1, b, 3, 1, 'rgba(255,246,192,0.5)'); } }
+      else if (A === 'paja') { r(5, 4, 14, 2, '#e8c870'); r(8, 2, 8, 2, '#d8b860'); r(8, 3, 8, 1, '#a05030'); }
+      else if (A === 'hojas') { for (let i = 0; i < 6; i++) r(6 + i * 2, 3 + (i % 2), 2, 2, i % 2 ? '#5a9a40' : '#78b450'); }
+      x.strokeStyle = oro; x.lineWidth = 1; x.strokeRect(0.5, 0.5, N - 1, N - 1);
+      return (RET[key] = c.toDataURL());
+    }
     // marco
     x.strokeStyle = css(cl.col, 0.4); x.lineWidth = 1; x.strokeRect(0.5, 0.5, N - 1, N - 1);
     return (RET[key] = c.toDataURL());
@@ -448,6 +465,10 @@
       el('div', null, el('div', { class: 'row' }, el('b', { class: 'h-nombre', translate: 'no' }, h.nombre), UI.btn('✎', () => { const n = window.prompt('Nuevo nombre:', h.nombre); if (n) { H.renombrar(h, n); UI.rerender(); } }, { small: true, title: 'Cambiar el nombre' })),
         el('div', { class: 'small' }, c.name + ' (' + c.rol.toLowerCase() + ') · ' + R.name + ': ' + R.desc),
         el('div', { class: 'small ' + (h.estado === 'herido' ? 'warn-t' : 'muted') }, estadoTxt(h)), xpBar)));
+    // aspectos del Pase del Reino que sirven para su clase
+    const asps = PK.Pase ? PK.Pase.aspectosDe('heroe').filter(id => { const a = D.aspecto(id); return a && a.o && a.o.clase === h.clase; }) : [];
+    if (asps.length) box.append(el('div', { class: 'row wrap' }, el('span', { class: 'small' }, 'Aspecto: '), UI.btn('Normal', () => { h.aspecto = null; UI.rerender(); }, { small: true, cls: h.aspecto ? '' : 'gold' }),
+      asps.map(id => { const a = D.aspecto(id); return UI.btn(a.o.name + (a.tipo === 'heroe2' ? ' (variante)' : ''), () => { h.aspecto = id; UI.rerender(); }, { small: true, cls: h.aspecto === id ? 'gold' : '' }); })));
     // contra quién rinde y cuánto suma
     const ej = {}; for (const e of c.vs) ej[e] = 1;
     box.append(el('p', { class: 'small' }, el('b', null, 'En expedición: '), '+' + pct(H.mult(h, c.vs.length ? ej : { bandit: 1 }) - 1) + ' de fuerza' + (c.vs.length ? ' contra ' + c.vs.map(e => D.ENEMY[e].name.toLowerCase()).join(' y ') : '') + ', +' + pct(H.mult(h, { _: 1 }) - 1) + ' contra el resto (tope +' + pct(H.TOPE_FUERZA) + ').'),

@@ -11,7 +11,7 @@ const store = require('./store');
 // mismos recursos (mismos ids) sin duplicar nada.
 const ROOT = path.join(__dirname, '..');
 const ctx = vm.createContext({ window: {}, console });
-for (const f of ['js/util.js', 'js/data.js', 'js/world.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+for (const f of ['js/util.js', 'js/data.js', 'js/pase.js', 'js/world.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 const PK = ctx.window.PK, D = PK.D, W = PK.World;
 D.setupRealms(-1, null);
 W.generate(D.SEED);
@@ -157,6 +157,8 @@ const LIM = {
   contribDay: 6,      // aporte diario al gremio por recurso (en múltiplos de scale)
   helpsDay: 40, helpsPair: 8, helpedDay: 40, asksDay: 30,
   defendedDay: 10,    // premios de defensa por día
+  pasePPDia: D.PASE.diaMax, // Pase del Reino: puntos por día como mucho (un tramposo como mucho completa el pase)
+  paseSalto: 60,      // cuánto puede subir una estadística del pase entre dos syncs (más es un número inventado)
 };
 const TRACKED = ['food', 'wood', 'stone', 'gold']; // los recursos que el servidor ve en la foto
 const scale = era => 1000 * Math.pow(1.6, era - 1);
@@ -378,6 +380,7 @@ function sync(p, b) {
     p.units = Array.isArray(b.snap.units) ? b.snap.units.slice(0, 250) : [];
   }
   if (b.ack) p.inbox = p.inbox.filter(i => i.id > b.ack);
+  if (b.pase && typeof b.pase === 'object') paseStats(p, b.pase);
   w.chat = w.chat || [];
   const wsince = +b.wsince || 0;
   store.touch('players'); store.touch('worlds');
@@ -398,7 +401,7 @@ function sync(p, b) {
     });
   });
   ensureTerr(w);
-  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, incoming: incomingFor(p), guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
+  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -1043,6 +1046,89 @@ function tick() {
   tickGuilds();
   tickCamps();
 }
+// ---------- Pase del Reino (Fase 8) ----------
+// Los puntos los decide el servidor: el cliente informa sus estadísticas acumuladas (D.PASE_STATS) y aquí se suman
+// las diferencias, con tope por fuente (D.PASE_ACT), por día (LIM.pasePPDia) y por sync (LIM.paseSalto, salvo las
+// que cuentan recursos). La pista dorada solo la marca paseActivar, después de que functions/index.js leyera
+// `pkPase/<uid>/<período>` en la RTDB (la compra la escribe la página de Juegos). Los premios van por el buzón.
+const diaUTC = () => new Date().toISOString().slice(0, 10);
+const cleanStats = o => { const out = {}; for (const k of D.PASE_STATS) { const v = Math.floor(+((o || {})[k]) || 0); out[k] = v > 0 ? Math.min(v, 1e9) : 0; } return out; };
+function paseDe(p) {
+  const n = D.paseDe(now());
+  if (!p.pase || p.pase.n !== n) {
+    if (p.pase) cierraPase(p);
+    p.pase = { n, pp: 0, dorado: false, cg: {}, cd: {}, dia: '', ppHoy: 0, act: {}, rd: {}, rp: {}, vis: p.pase ? p.pase.vis : null, base: p.pase ? p.pase.vis : null, baseDia: null };
+    store.touch('players');
+  }
+  return p.pase;
+}
+function paseSuma(q, n) { const m = Math.max(0, Math.min(n, LIM.pasePPDia - q.ppHoy)); q.pp += m; q.ppHoy += m; return m; }
+function paseStats(p, raw) {
+  const q = paseDe(p), cur = cleanStats(raw), dia = diaUTC();
+  if (!q.vis) { q.vis = cur; q.base = q.base || cur; }
+  if (q.dia !== dia) { q.dia = dia; q.ppHoy = 0; q.act = {}; q.rd = {}; q.baseDia = q.vis; }
+  // una partida nueva (estadísticas que bajan): se cuenta desde ahora, sin premiar el salto
+  if (D.PASE_STATS.some(k => cur[k] < (q.vis[k] || 0))) { q.vis = cur; q.base = cur; q.baseDia = cur; return; }
+  let raro = 0;
+  for (const k of D.PASE_STATS) {
+    const d = cur[k] - (q.vis[k] || 0);
+    if (k !== 'g_total' && d > LIM.paseSalto) { raro++; cur[k] = (q.vis[k] || 0) + LIM.paseSalto; }
+  }
+  if (raro) suspect(p, 'pase', { saltos: raro });
+  for (const k in D.PASE_ACT) {
+    const [pp, tope] = D.PASE_ACT[k], d = cur[k] - (q.vis[k] || 0);
+    if (d <= 0) continue;
+    const gan = Math.min(d * pp, tope - (q.act[k] || 0));
+    if (gan > 0) q.act[k] = (q.act[k] || 0) + paseSuma(q, gan);
+  }
+  const bd = q.baseDia || q.vis;
+  for (const r of D.paseDiarios(q.n, dia)) if (!q.rd[r.id] && cur[r.k] - (bd[r.k] || 0) >= r.n) { q.rd[r.id] = 1; paseSuma(q, r.pp); }
+  for (const r of D.paseRetos(q.n)) if (!q.rp[r.id] && cur[r.k] - (q.base[r.k] || 0) >= r.n) { q.rp[r.id] = 1; paseSuma(q, r.pp); }
+  q.vis = cur;
+  store.touch('players');
+}
+function paseEntrega(p, q, nivel, pista) {
+  const pr = D.pasePremio(nivel, pista, vEra(p), D.paseTemaId(q.n));
+  (pista === 'd' ? q.cd : q.cg)[nivel] = 1;
+  push(p, { type: 'pase', text: 'Pase del Reino, nivel ' + (nivel > D.PASE.niveles ? '30+' : nivel) + (pista === 'd' ? ' (dorado)' : '') + ': ' + pr.txt + '.', res: pr.res, pase: pr, nivel, pista });
+}
+function alcanzado(q, nivel) { return nivel <= D.PASE.niveles ? D.paseNivel(q.pp) >= nivel : D.paseExtras(q.pp) >= nivel - D.PASE.niveles; }
+// Al cambiar de período, lo ganado y no reclamado se entrega solo
+function cierraPase(p) {
+  const q = p.pase;
+  for (let n = 1; n <= D.PASE.niveles + D.PASE.extraMax; n++) {
+    if (n <= D.PASE.niveles && alcanzado(q, n) && !q.cg[n]) paseEntrega(p, q, n, 'g');
+    if (q.dorado && alcanzado(q, n) && !q.cd[n]) paseEntrega(p, q, n, 'd');
+  }
+}
+function paseInfo(p) {
+  const q = paseDe(p), tid = D.paseTemaId(q.n), v = q.vis || {}, bd = q.baseDia || v, base = q.base || v;
+  return { n: q.n, tema: tid, pp: q.pp, nivel: D.paseNivel(q.pp), extras: D.paseExtras(q.pp), dorado: q.dorado, cg: q.cg, cd: q.cd, ppHoy: q.ppHoy, tope: LIM.pasePPDia, fin: D.paseInicio(q.n + 1),
+    diarios: D.paseDiarios(q.n, q.dia || diaUTC()).map(r => ({ id: r.id, txt: r.txt, pp: r.pp, n: r.n, v: Math.max(0, (v[r.k] || 0) - (bd[r.k] || 0)), ok: !!q.rd[r.id] })),
+    retos: D.paseRetos(q.n).map(r => ({ id: r.id, txt: r.txt, pp: r.pp, n: r.n, v: Math.max(0, (v[r.k] || 0) - (base[r.k] || 0)), ok: !!q.rp[r.id] })) };
+}
+function paseClaim(p, b) {
+  const q = paseDe(p), nivel = Math.floor(+b.nivel), pista = b.pista === 'd' ? 'd' : 'g';
+  if (!(nivel >= 1 && nivel <= D.PASE.niveles + (pista === 'd' ? D.PASE.extraMax : 0))) throw new GameError('Ese nivel no existe.');
+  if (!alcanzado(q, nivel)) throw new GameError('Todavía no llegas a ese nivel.');
+  if (pista === 'd' && !q.dorado) throw new GameError('Ese premio es de la pista dorada.');
+  if ((pista === 'd' ? q.cd : q.cg)[nivel]) throw new GameError('Ya reclamaste ese premio.');
+  paseEntrega(p, q, nivel, pista);
+  return { pase: paseInfo(p), inbox: p.inbox };
+}
+// comprado: lo que functions/index.js leyó en la RTDB (o PK_PASE_LIBRE en el servidor local de pruebas). Comprar a
+// mitad del pase entrega de una vez los premios dorados de los niveles ya alcanzados.
+function paseActivar(p, comprado) {
+  const q = paseDe(p);
+  if (comprado && !q.dorado) {
+    q.dorado = true;
+    for (let n = 1; n <= D.PASE.niveles + D.PASE.extraMax; n++) if (alcanzado(q, n) && !q.cd[n]) paseEntrega(p, q, n, 'd');
+    store.touch('players');
+  }
+  return { pase: paseInfo(p), inbox: p.inbox };
+}
+const pasePeriodo = () => D.paseDe(now());
+
 // Con PK_TICK_PEREZOSO (Cloud Functions) no hay reloj: una función no corre entre pedidos, así que el que
 // la llama ejecuta tick() antes de atender un pedido si pasaron 5 s. Todo lo que avanza usa el tiempo
 // transcurrido (regeneración, deriva de precios, eventos), así que un tick tarde equivale a varios.
@@ -1051,4 +1137,5 @@ if (!process.env.PK_TICK_PEREZOSO) setInterval(tick, 5000).unref();
 module.exports = {
   GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
   listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
+  paseInfo, paseClaim, paseActivar, pasePeriodo,
 };

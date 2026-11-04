@@ -23,6 +23,7 @@
     st.tienda = Object.assign({ tengo: {} }, st.tienda);
     cache = null;
     aplicarTienda();
+    if (PK.Pase && PK.Pase.aplicar) PK.Pase.aplicar();
   };
 
   // ---------- Bonos ----------
@@ -38,6 +39,8 @@
     if (m && m.done && D.MARAV && D.MARAV[m.type]) add(D.MARAV[m.type].ef(m.lvl));
     // la tienda: el Escribano del Mayordomo
     if (st.tienda && st.tienda.tengo.cola) add({ cola: 1 });
+    // la pista dorada del Pase del Reino (PA3): solo tiempo y comodidad, nada de fuerza ni recolección
+    if (PK.Pase && PK.Pase.dorado()) add({ upSpeed: 0.176, researchP: 0.176, cola: 1 });
     return o;
   }
   V.bono = function (k) {

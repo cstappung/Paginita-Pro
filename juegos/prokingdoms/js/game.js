@@ -1139,7 +1139,7 @@
         b.status = 'Entrenando';
         b.qt += dt;
         const tt = G.trainTime(b);
-        while (b.qt >= tt && b.queue.length && G.pop() < G.popCap()) { b.qt -= tt; G.spawnUnit(b, b.queue.shift() === 'scout' ? 'scout' : 'v'); }
+        while (b.qt >= tt && b.queue.length && G.pop() < G.popCap()) { b.qt -= tt; const k = b.queue.shift() === 'scout' ? 'scout' : 'v'; G.spawnUnit(b, k); if (k === 'v' && b.owner === 'p') G.stat('aldeanos', 1); }
         if (!b.queue.length) b.qt = 0;
       } else if (b.def.recipe) {
         PK.Logi.produce(b, dt);

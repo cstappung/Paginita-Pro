@@ -6,7 +6,7 @@
    Comprueba: CORS, que join exige sesión de Firebase y estar en betaTesters, que la cuenta es el
    uid (un reino por cuenta), sync, guardar y leer la partida (también como sendBeacon, text/plain),
    que lo guardado en la RTDB vuelve igual en un arranque en frío (arreglos con null, listas vacías)
-   y que nadie de la web puede leer prokingdoms/, la versión del mundo y el rechazo de un cliente de otro
+   y que nadie de la web puede leer prokingdoms/, la versión del mundo, el Pase del Reino (pkPase → refresh) y el rechazo de un cliente de otro
    protocolo (426). No es idempotente: reinicia el emulador entre corridas. */
 'use strict';
 const fs = require('fs'), path = require('path');
@@ -73,6 +73,18 @@ async function main() {
   ok(of.status === 200, 'el mercado contesta', of.status);
   const rk = await api('GET', '/api/ranking', { token: yo.token });
   ok(rk.status === 200 && Array.isArray(rk.d) && rk.d.some(r => r.me && r.name === 'Ana'), 'Ana sale en el ranking');
+
+  console.log('\nPase del Reino');
+  const r0 = await api('POST', '/api/pase/refresh', { cuerpo: {}, token: yo.token });
+  ok(r0.status === 200 && r0.d.pase && r0.d.pase.dorado === false, 'sin compra en pkPase la pista dorada sigue cerrada', r0.status + ' ' + JSON.stringify(r0.d.pase || r0.d).slice(0, 80));
+  const n = r0.d.pase ? r0.d.pase.n : 0;
+  await dbPut(`pkPase/${A.uid}/${n}`, { at: Date.now(), p: 100, s: n });
+  ok((await api('POST', '/api/pase/refresh', { cuerpo: {}, token: yo.token })).d.pase.dorado === false, 'una compra con otro precio no abre nada');
+  await dbPut(`pkPase/${A.uid}/${n}`, { at: Date.now(), p: 2500, s: n });
+  const r1 = await api('POST', '/api/pase/refresh', { cuerpo: {}, token: yo.token });
+  ok(r1.status === 200 && r1.d.pase && r1.d.pase.dorado === true, 'con la compra escrita, refresh abre la pista dorada', r1.status);
+  const cl = await api('POST', '/api/pase/claim', { cuerpo: { nivel: 30, pista: 'g' }, token: yo.token });
+  ok(cl.status === 400 || cl.status === 409 || (cl.d && cl.d.error), 'no se reclama un nivel que no se alcanzó', cl.status + ' ' + (cl.d && cl.d.error));
 
   console.log('\nPartida en la nube');
   const partida = { v: 99, slot: yo.slot || 0, lastSeen: Date.now(), cosas: [null, 1, []], vacio: {} };

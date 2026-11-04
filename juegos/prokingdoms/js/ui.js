@@ -185,7 +185,7 @@
     // «¿Qué me frena?» (A6, js/asesor.js): junto a la era, con cuántas cosas importantes hay
     asEl = el('span', { class: 'badge' });
     const asBtn = el('button', { class: 'res asesor', title: '¿Qué me frena?', 'aria-label': '¿Qué me frena?', onclick: () => PK.Asesor.open() }, '?', asEl);
-    bar.append(eraEl, UI.estacionEl ? UI.estacionEl() : '', asBtn, netEl, el('button', { class: 'res coins', title: 'Monedas del reino: abre la tienda', onclick: () => UI.openTienda && UI.openTienda() }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
+    bar.append(eraEl, PK.Pase ? PK.Pase.barEl() : '', UI.estacionEl ? UI.estacionEl() : '', asBtn, netEl, el('button', { class: 'res coins', title: 'Monedas del reino: abre la tienda', onclick: () => UI.openTienda && UI.openTienda() }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
     // en pantallas chicas la barra ocupa varias filas según la era: el minimapa y el menú se acomodan debajo
     // (incluye el margen del notch arriba: --top-h + 6 px es siempre el borde inferior de la barra)
     if (window.ResizeObserver) new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', Math.max(0, bar.offsetTop - 6) + bar.offsetHeight + 'px')).observe(bar);

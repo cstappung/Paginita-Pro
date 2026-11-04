@@ -480,6 +480,20 @@ event `sc`, category `superChat`; `superChats` in the replay lists the
 paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
 whole (`NODOS_MONEDAS` is 17 with `economiaCierre`, below).
 
+**Pro Kingdoms' Pase del Reino** (`pkPase/<uid>/<period>` = `{at: now, p:
+2500, s}`, event `pk`, category `pkPase`; `pkPase` in the replay maps each
+period to its purchase time): the only link between the kingdom and Juegos
+coins, one way only (the game never pays coins out). The period arithmetic is
+in `juegos/pase-pk.js` and repeated in the rule (two weeks from 2-11-2026
+03:00 UTC, one hour of margin each side for the winter offset) and in
+`juegos/prokingdoms/js/pase.js`; `tests/monedas.test.cjs` compares them.
+The replay skips a purchase whose `s` is not its key or that is out of its
+period, so a write that slipped past an older rule charges nothing. The
+read rule is `auth != null`, not owner + admins as the plan asked: every tab
+replays everyone's spends. The game's server reads it with the Admin SDK
+before opening the gold track (`juegos/prokingdoms/CLAUDE.md`). `NODOS_MONEDAS`
+is 19.
+
 ## The economy is closed by periods (`juegos/cierre.js`, `cierre-datos.js`)
 
 Every tab downloaded the whole spending history to replay it: in October

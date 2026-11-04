@@ -543,6 +543,7 @@
     return false;
   }
   function lanzar(b, h, mios, suyos) {
+    if (PK.Game.stat) PK.Game.stat('habilidades', 1); // retos del Pase del Reino
     const id = h.hab.id, base = mios.reduce((s, o) => s + o.dps, 0) * h.pot, blancos = [];
     if (id === 'muro') b.muro = (h.hab.dur || 8) * (0.5 + 0.5 * h.pot);
     else if (id === 'cancion') b.cancion = (h.hab.dur || 10) * (0.5 + 0.5 * h.pot);

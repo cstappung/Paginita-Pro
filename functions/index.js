@@ -69,6 +69,7 @@ const RUTAS = {
   'POST /api/guilds/need': (p, b) => sim.askNeed(p, b),
   'POST /api/guilds/need/send': (p, b) => sim.sendNeed(p, b),
   'POST /api/claim': (p, b) => sim.claim(p, b),
+  'POST /api/pase/claim': (p, b) => sim.paseClaim(p, b),
   'POST /api/conquer': (p, b) => sim.conquer(p, b),
   'POST /api/conquer-bot': (p, b) => sim.conquerBot(p, b),
   'GET /api/ranking': p => sim.ranking(p),
@@ -149,7 +150,7 @@ async function atiende(req, res) {
   if (origen && !ORIGENES.has(origen)) return envia(403, { error: 'Origen no permitido.' });
 
   const ruta = req.method + ' ' + req.path.replace(/\/+$/, '');
-  if (ruta !== 'GET /api/save' && !RUTAS[ruta]) return envia(404, { error: 'Ruta desconocida.' });
+  if (ruta !== 'GET /api/save' && ruta !== 'POST /api/pase/refresh' && !RUTAS[ruta]) return envia(404, { error: 'Ruta desconocida.' });
   try {
     await arranca();
     const t = Date.now();
@@ -165,6 +166,9 @@ async function atiende(req, res) {
       if (SOLO_BETA && !(await esBeta(uid))) return envia(403, { error: 'Pro Kingdoms en línea es solo para beta testers.' });
       if (!sim.byUid(uid) && !deja('join', ip)) return envia(429, { error: 'Se crearon demasiadas cuentas desde tu red. Prueba más tarde.' });
       const r = sim.join(Object.assign({}, b, { uid, token: undefined }));
+      // el pase comprado se revisa también al entrar, por si el aviso de la página se perdió
+      const pj = sim.byUid(uid), n = sim.pasePeriodo();
+      if (pj && !(pj.pase && pj.pase.n === n && pj.pase.dorado)) { const x = (await getDatabase().ref('pkPase/' + uid + '/' + n).get()).val(); if (x && x.p === 2500 && x.s === n) sim.paseActivar(pj, true); }
       await guarda(true);                          // un jugador nuevo no puede perderse en un arranque en frío
       return envia(200, r);
     }
@@ -175,6 +179,14 @@ async function atiende(req, res) {
     if (req.method !== 'GET' && !deja('token', p.token)) { sim.suspect(p, 'pedidos', { limite: 'token' }); return envia(429, { error: 'Demasiados pedidos; espera un momento.' }); }
 
     if (ruta === 'GET /api/save') return envia(200, { save: await store.leeSave(p.id) });
+    // Pase del Reino: la compra la escribió la página de Juegos en pkPase/<uid>/<período> (regla de escritura
+    // única con el precio y el período); aquí se lee con el Admin SDK y recién entonces se marca la pista dorada.
+    if (ruta === 'POST /api/pase/refresh') {
+      const n = sim.pasePeriodo(), x = p.uid ? (await getDatabase().ref('pkPase/' + p.uid + '/' + n).get()).val() : null;
+      const r = sim.paseActivar(p, !!(x && x.p === 2500 && x.s === n));
+      await guarda(false);
+      return envia(200, r);
+    }
     const r = RUTAS[ruta](p, b);
     if (ruta.endsWith(' /api/save')) await store.pendientes();   // la partida queda escrita antes de contestar
     await guarda(false);

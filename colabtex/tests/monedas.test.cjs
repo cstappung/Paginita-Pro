@@ -4,8 +4,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
-vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasFanal,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido,ultimosPodios}',ctx);
+vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/pase-pk.js')+'\n'+sin('src/juegos/monedas.js')+
+ ';globalThis.__M={PRECIO_PASE,periodoPase,inicioPase,JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasFanal,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido,ultimosPodios}',ctx);
 const M=ctx.__M;
 
 test('cada logro tiene su nivel, y cada juego de sala su peso',()=>{
@@ -189,4 +189,31 @@ test('el detalle: lo gastado por categoría, los movimientos y lo ganado por jue
  assert.equal(r.gastadas,Object.values(r.gasto).reduce((a,b)=>a+b,0),'lo gastado por categoría suma lo gastado');
  assert.deepEqual(r.movs.map(x=>x.c).join(),'sobre,tienda');
  assert.equal(M.monedasDe('a',sinTienda).movs.length,1);
+});
+
+test('el Pase del Reino de Pro Kingdoms se cobra una vez por período, en «pkPase»',()=>{
+ const n=3,at=M.inicioPase(n)+86400000;
+ const base={ranks:{},solo:{},logros:{},diario:{},clubJugadas:{},ajustes:{a:{x:{n:10000}}}};
+ const d=Object.assign({},base,{pkPase:{a:{[n]:{at,p:M.PRECIO_PASE,s:n},[n+1]:{at,p:M.PRECIO_PASE,s:n+1},[n+2]:{at:M.inicioPase(n+2)+5,p:100,s:n+2}}}});
+ const m=M.monedasDe('a',d);
+ assert.equal(m.gasto.pkPase,M.PRECIO_PASE,'solo vale el del período en que se escribió y a su precio');
+ assert.equal(m.cuenta.pkPase,1);
+ assert.equal(m.gastadas,Object.values(m.gasto).reduce((a,b)=>a+b,0),'cuadra con lo gastado');
+ const pobre=M.monedasDe('a',Object.assign({},d,{ajustes:{}}));
+ assert.equal(pobre.gasto.pkPase,undefined,'sin saldo no vale');
+ assert.equal(M.periodoPase(M.inicioPase(5)),5);assert.equal(M.periodoPase(M.inicioPase(5)-1),4);
+});
+test('el juego cuenta los períodos del pase igual que Juegos',()=>{
+ const pase=fs.readFileSync(path.join(__dirname,'..','..','juegos','prokingdoms','js','pase.js'),'utf8');
+ const w={},c=vm.createContext({window:w});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'..','..','juegos','prokingdoms','js','util.js'),'utf8'),c);
+ vm.runInContext('window.PK.D={};',c);
+ vm.runInContext(pase,c);
+ const P=w.PK.D.PASE;
+ for(const t of [M.inicioPase(0),M.inicioPase(7)-1,Date.now()])assert.equal(w.PK.D.paseDe(t),M.periodoPase(t));
+ assert.equal(P.precio,M.PRECIO_PASE);
+ const reglas=fs.readFileSync(path.join(__dirname,'..','..','firebase','database.rules.json'),'utf8');
+ const r=/"pkPase":[\s\S]*?"\.validate": "([^"]+)"/.exec(reglas)[1];
+ assert.ok(r.includes("newData.child('p').val() === "+M.PRECIO_PASE),'la regla cobra el mismo precio');
+ assert.ok(r.includes(String(M.inicioPase(0))),'y cuenta desde el mismo lunes');
 });
