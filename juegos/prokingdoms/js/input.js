@@ -23,6 +23,10 @@
     if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode) return;
     d.box = true;
     I.box = { x0: d.x, y0: d.y, x1: d.x, y1: d.y };
+    // U4 (Fase 6): mantener pulsado sobre un edificio tuyo y soltar sin arrastrar lo mejora (o lo pone en la cola).
+    // Si arrastras, sigue siendo la selección en grupo de siempre.
+    const it = R().pick(d.x, d.y);
+    if (it && it.k === 'building' && it.o.owner === 'p' && it.o.done && !it.o.def.noUp) d.edif = it.o;
     try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) { /* sin vibración */ }
   }
 
@@ -126,6 +130,7 @@
       if (down && down.box) {
         const b = I.box;
         if (b && Math.abs(b.x1 - b.x0) > 10 && Math.abs(b.y1 - b.y0) > 10) boxSelect(b, false);
+        else if (down.edif && (!b || Math.hypot(b.x1 - b.x0, b.y1 - b.y0) < 14)) mejoraRapida(down.edif);
         I.box = null; down = null;
         return;
       }
@@ -139,6 +144,16 @@
     down = null;
     if (e.target !== R().cv) return;
     leftClick(e.clientX, e.clientY, e.shiftKey);
+  }
+
+  function mejoraRapida(b) {
+    const g = G(), c = g.canUpgrade(b);
+    g.sel = { type: 'building', id: b.id };
+    if (c.ok) { g.upgrade(b); PK.Auto.dequeue(b); PK.UI.toast('Mejorando ' + b.def.name + ' a nivel ' + (b.lvl + 1) + '.', 'good'); }
+    else if (b.upg || c.max) PK.UI.toast(c.why, 'info');
+    else if (!PK.Auto.queued(b)) PK.Auto.enqueue(b);
+    else PK.UI.toast(b.def.name + ' ya está en la cola de obras.', 'info');
+    PK.UI.refreshPanel(true);
   }
 
   function tap(x, y) {

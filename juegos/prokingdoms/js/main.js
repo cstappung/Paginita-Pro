@@ -32,6 +32,7 @@
     PK.UI.init();
     PK.Input.init(document.getElementById('game'));
     if (PK.Mar) PK.Mar.iniciar(viaje);
+    if (PK.Musica) PK.Musica.iniciar();
     const tc = PK.Game.buildings.find(b => b.owner === 'p' && b.type === 'tc');
     if (tc) PK.Render.centerOn(tc.cx + 2, tc.cy - 2);
 

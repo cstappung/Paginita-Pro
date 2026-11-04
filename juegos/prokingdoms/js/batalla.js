@@ -794,7 +794,7 @@
   const FX_MAX = 900;
   const fxDe = b => (vista && vista.b === b ? vista : null);
   function part(v, p) { if (v.fx.length < FX_MAX) v.fx.push(Object.assign({ t: 0, vx: 0, vy: 0, g: 0, life: 0.6, size: 2, crece: 0, a: 1, add: false, drag: 0 }, p)); }
-  function sacudir(v, k) { v.shake = Math.min(9, Math.max(v.shake, k)); }
+  function sacudir(v, k) { if (PK.menosMov) return; v.shake = Math.min(9, Math.max(v.shake, k)); } // U6: «menos movimiento»
   function luzTemp(v, x, y, r, col, dur) { v.luces.push({ x, y, r, col, t: 0, dur }); }
   function marca(v, x, y, tipo) { v.marcas.push({ x, y, tipo, t: 0, rot: Math.random() * 6.3 }); if (v.marcas.length > 70) v.marcas.shift(); }
   function grito(b, txt) { const v = fxDe(b); if (v) v.banner = { txt, t: 0, dur: 1.3, chico: true }; }
@@ -907,6 +907,7 @@
   // ---------- Vista: otro mapa, a pantalla completa ----------
   let vista = null;
   B.abierta = () => !!vista;
+  B.vistaActual = () => (vista ? vista.b : null); // la música mira si hay jefe
   B.abrir = function (id) {
     const b = B.de(id);
     if (!b) { PK.UI.toast('Esa batalla ya terminó.', 'info'); return; }

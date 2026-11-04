@@ -119,7 +119,7 @@
     }
     // copos (invierno), hojas (otoño) y pétalos (primavera)
     const e = Sp.temporada, n = e === 1 ? 0 : MOBILE ? 26 : 50;
-    if (!n || (g.state.flags && g.state.flags.sinClima)) { clima.length = 0; return; }
+    if (!n || PK.menosMov || (g.state.flags && g.state.flags.sinClima)) { clima.length = 0; return; }
     const W0 = cv.width / dpr, H0 = cv.height / dpr;
     while (clima.length < n) clima.push({ x: Math.random() * W0, y: Math.random() * H0, v: 0.5 + Math.random(), f: Math.random() * 6 });
     clima.length = n;

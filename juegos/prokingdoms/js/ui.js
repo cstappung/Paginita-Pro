@@ -194,25 +194,37 @@
     const mbtn = (icon, label, fn, key, id) => {
       const b = el('button', { class: 'mbtn', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: () => { b.classList.remove('nuevo'); fn(); } }, el('img', { class: 'ico', src: icon.startsWith('data:') ? icon : Sp.icon(icon), alt: '' }), el('span', null, label));
       menu.append(b);
-      if (id) menuIds[id] = b;
+      if (id) { b.dataset.mid = id; if (MENU_VER[id]) menuIds[id] = b; }
       return b;
     };
-    const bb = mbtn('book', 'Misiones', () => PK.Quests.openBook(), 'B');
+    // U1 (Fase 6, pk-26): los botones son los de siempre (con su id para el menú progresivo) y después se agrupan
+    // en cinco submenús (agrupar). Las teclas rápidas no pasan por aquí: siguen igual.
+    const bb = mbtn('book', 'Misiones', () => PK.Quests.openBook('main'), 'B', 'book');
     bookDot = el('span', { class: 'badge' }); bb.append(bookDot);
-    mbtn(Sp.buildingIcon('house'), 'Construir', () => UI.openBuild(), 'C');
-    mbtn('hammer', 'Obras', () => UI.openWorks());
-    mbtn('pop', 'Aldeanos', () => UI.openForeman());
-    mbtn('war', 'Cuartel', () => PK.Social.openWar());
-    mbtn('hero', 'Héroes', () => PK.Heroes.open(), null, 'heroes');
+    mbtn('chest', 'Diarias', () => PK.Quests.openBook('daily'), null, 'diarias');
+    mbtn('crown', 'Desafíos', () => PK.Quests.openBook('desafios'), null, 'desafios');
+    mbtn('gems', 'Álbum', () => PK.Quests.openBook('album'), null, 'album');
+    mbtn(Sp.buildingIcon('house'), 'Construir', () => UI.openBuild(), 'C', 'build');
+    mbtn('hammer', 'Obras', () => UI.openWorks(), null, 'works');
+    mbtn('pop', 'Aldeanos', () => UI.openForeman(), null, 'foreman');
+    mbtn('war', 'Cuartel', () => PK.Social.openWar('troops'), null, 'war');
+    mbtn('crystal', 'Atacar', () => PK.Social.openWar('exp'), null, 'atacar');
+    mbtn('wall', 'Defensa', () => PK.Social.openWar('defense'), null, 'defensa');
+    mbtn('scroll', 'Batallas', () => PK.Social.openWar('log'), null, 'batallas');
+    mbtn('hero', 'Héroes', () => PK.Heroes.open('heroes'), null, 'heroes');
+    mbtn('coin', 'Taberna', () => PK.Heroes.open('taberna'), null, 'taberna');
+    mbtn('tools', 'Equipo', () => PK.Heroes.open('inv'), null, 'equipo');
     mbtn('compass', 'Explorar', () => UI.openExplore(), null, 'explore');
     mbtn('flask', 'Investigar', () => UI.openResearch(), null, 'research');
     mbtn('market', 'Mercado', () => PK.Social.openMarket(), null, 'market');
     mbtn('guild', 'Gremio', () => PK.Social.openGuild(), null, 'guild');
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
     mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
+    mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
     mbtn('ancla', 'Galeón', () => PK.Mar.abrir(), null, 'galeon'); // Fase 9
-    mbtn('gear', 'Opciones', () => UI.openSettings());
+    mbtn('gear', 'Opciones', () => UI.openSettings(), null, 'settings');
+    agrupar(menu);
 
     panel = el('div', { id: 'panel' });
     mm = el('canvas', { id: 'minimap', width: 384, height: 192 });
@@ -231,8 +243,31 @@
     hud.append(bar, menu, panel, mmWrap, qsEl, toastBox, tip, evEl);
     watchTouch(panel, () => { panelTouch = performance.now(); });
     initMobile(menu);
+    UI.aplicarAcceso();
     window.addEventListener('pk:coins', () => { coinEl.textContent = U.fmt(PK.Platform.getCoins()); });
     UI.refreshPanel(true);
+  };
+
+  // ---------- U6 (Fase 6): accesibilidad ----------
+  // Por equipo, no por partida (U.store): texto más grande (zoom de ventanas, panel, avisos y submenú), colores para
+  // daltonismo (verde/rojo pasan a azul/naranja) y menos movimiento (sin animaciones CSS, sin sacudidas de cámara en
+  // batalla ni copos y hojas). «Menos movimiento» arranca encendido si el sistema lo pide (prefers-reduced-motion).
+  UI.acceso = function () {
+    const mm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const mov = U.store.get('pk_menosmov');
+    return { texto: +U.store.get('pk_texto') || 0, dalto: U.store.get('pk_dalto') === '1', menosMov: mov === null || mov === undefined || mov === '' ? !!mm : mov === '1' };
+  };
+  UI.aplicarAcceso = function () {
+    const a = UI.acceso(), h = document.documentElement;
+    h.classList.toggle('texto-1', a.texto === 1);
+    h.classList.toggle('texto-2', a.texto === 2);
+    h.classList.toggle('daltonico', a.dalto);
+    h.classList.toggle('menos-mov', a.menosMov);
+    PK.menosMov = a.menosMov;
+  };
+  UI.setAcceso = function (k, v) {
+    U.store.set({ texto: 'pk_texto', dalto: 'pk_dalto', menosMov: 'pk_menosmov' }[k], k === 'texto' ? String(v) : v ? '1' : '0');
+    UI.aplicarAcceso();
   };
 
   // ---------- Menú progresivo ----------
@@ -251,7 +286,91 @@
     realms: (g, st) => !!PK.Net.online || D.BOTS.some(b => st.flags['seen_' + b.slot]),
     heroes: (g, st) => g.countAll('tavern') > 0 || !!(st.heroes && st.heroes.lista.length),
     galeon: () => !!(PK.Mar && PK.Mar.visible()),
+    // U1: lo que antes eran pestañas dentro de una ventana aparece cuando aparece su ventana
+    diarias: (g, st) => st.era >= 2 || !!st.flags.menu_explore,
+    desafios: (g, st) => st.era >= 2,
+    album: (g, st) => st.era >= 2,
+    atacar: g => g.countAll('barracks') > 0,
+    defensa: () => true,
+    batallas: g => g.countAll('barracks') > 0,
+    taberna: g => g.countAll('tavern') > 0,
+    equipo: (g, st) => !!(st.heroes && st.heroes.lista.length),
+    consejo: g => g.countAll('consejo') > 0,
   };
+  // ---------- U1 (Fase 6): menú agrupado ----------
+  // Cinco grupos con submenú, más Opciones. Un grupo se ve si se ve alguno de sus botones, y brilla si alguno es nuevo.
+  const GRUPOS = [
+    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon'] },
+    { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
+    { id: 'guerra', label: 'Guerra', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
+    { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms'] },
+    { id: 'libro', label: 'Libro', icon: 'book', items: ['book', 'diarias', 'desafios', 'album'] },
+  ];
+  const grupos = [];
+  let subPop = null, subAbierto = null;
+  function agrupar(menu) {
+    const todos = {};
+    for (const b of [...menu.children]) { if (b.dataset.mid) todos[b.dataset.mid] = b; b.remove(); }
+    subPop = el('div', { id: 'submenu', role: 'menu' });
+    subPop.addEventListener('click', e => { if (e.target.closest('.mbtn')) setTimeout(cerrarGrupo, 0); });
+    for (const g of GRUPOS) {
+      const box = el('div', { class: 'sub-items' });
+      for (const id of g.items) if (todos[id]) box.append(todos[id]);
+      const dot = el('span', { class: 'badge g-dot' });
+      const gb = el('button', { class: 'mbtn grupo', 'data-g': g.id, title: g.label, 'aria-label': g.label, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: e => { e.stopPropagation(); abrirGrupo(g.id); } },
+        el('img', { class: 'ico', src: Sp.icon(g.icon), alt: '' }), el('span', null, g.label), dot);
+      menu.append(gb);
+      grupos.push({ g, gb, box, dot });
+    }
+    menu.append(todos.settings);
+    document.getElementById('hud').append(subPop);
+    window.addEventListener('pointerdown', e => { if (subAbierto && !subPop.contains(e.target) && !e.target.closest('.mbtn.grupo')) cerrarGrupo(); });
+    window.addEventListener('keydown', e => { if (e.key === 'Escape' && subAbierto) cerrarGrupo(); });
+    window.addEventListener('resize', () => { if (subAbierto) ubicarSub(); });
+  }
+  function ubicarSub() {
+    const x = grupos.find(o => o.g.id === subAbierto);
+    if (!x) return;
+    const r = x.gb.getBoundingClientRect(), m = x.gb.parentNode.getBoundingClientRect(), barra = m.width > m.height * 2;
+    subPop.style.left = subPop.style.right = subPop.style.top = subPop.style.bottom = '';
+    if (barra) { // celular vertical: barra de abajo, el submenú sube desde el botón
+      subPop.style.bottom = window.innerHeight - r.top + 6 + 'px';
+      subPop.style.left = Math.max(6, Math.min(window.innerWidth - subPop.offsetWidth - 6, r.left + r.width / 2 - subPop.offsetWidth / 2)) + 'px';
+    } else {
+      subPop.style.right = window.innerWidth - r.left + 6 + 'px';
+      subPop.style.top = Math.max(6, Math.min(window.innerHeight - subPop.offsetHeight - 6, r.top)) + 'px';
+    }
+  }
+  function abrirGrupo(id) {
+    if (subAbierto === id) { cerrarGrupo(); return; }
+    cerrarGrupo();
+    const x = grupos.find(o => o.g.id === id);
+    subAbierto = id;
+    subPop.append(el('div', { class: 'sub-tit' }, x.g.label), x.box);
+    subPop.classList.add('on');
+    x.gb.classList.add('on'); x.gb.setAttribute('aria-expanded', 'true');
+    ubicarSub();
+    const first = x.box.querySelector('.mbtn:not([style*="none"])');
+    if (first && !UI.isTouch()) first.focus({ preventScroll: true });
+  }
+  function cerrarGrupo() {
+    if (!subAbierto) return;
+    const x = grupos.find(o => o.g.id === subAbierto);
+    subAbierto = null;
+    subPop.classList.remove('on');
+    subPop.innerHTML = '';
+    if (x) { x.gb.classList.remove('on'); x.gb.setAttribute('aria-expanded', 'false'); }
+  }
+  UI.cerrarGrupo = cerrarGrupo;
+  function updateGrupos() {
+    for (const x of grupos) {
+      const vis = [...x.box.children].filter(b => b.style.display !== 'none');
+      x.gb.style.display = vis.length ? '' : 'none';
+      x.gb.classList.toggle('nuevo', vis.some(b => b.classList.contains('nuevo')));
+      const badge = vis.some(b => { const d = b.querySelector('.badge'); return d && d.textContent && d.style.display !== 'none'; });
+      x.dot.textContent = badge ? '!' : '';
+    }
+  }
   let menuFirst = true;
   function updateMenu() {
     const g = G(), st = S(), nuevos = [];
@@ -264,6 +383,7 @@
       b.style.display = ok ? '' : 'none';
     }
     menuFirst = false;
+    updateGrupos();
     if (nuevos.length) UI.toast('Nuevo en el menú: ' + (nuevos.length > 1 ? nuevos.slice(0, -1).join(', ') + ' y ' + nuevos[nuevos.length - 1] : nuevos[0]) + '.', 'quest');
   }
 
@@ -418,6 +538,66 @@
   }
 
   // ---------- Panel de selección ----------
+  // ---------- U2 y U3 (Fase 6): «¿Qué hago ahora?» y los primeros pasos ----------
+  // Sin nada elegido, el panel dice la próxima misión de la Crónica (con su barra) y lo más importante del Asesor.
+  // Mientras no reclamaste m4 es el tutorial guiado: «Muéstrame» lleva al lugar de cada paso, y se puede saltar
+  // (flags.tuto = 'saltado'; al terminarlo, 'fin').
+  const GUIA = {
+    m1: { txt: 'Elige el Centro Urbano y toca «Aldeano».', fn: () => elegirTc() },
+    m2: { txt: 'Abre Reino → Construir y elige Casa.', fn: () => { UI.openBuild(); }, grupo: 'reino' },
+    m3: { txt: 'Elige el Centro Urbano y toca «Mejorar».', fn: () => elegirTc() },
+    m4: { txt: 'Construye un Puesto de Exploradores y entrena un explorador en él.', fn: () => {
+      const b = G().buildings.find(o => o.owner === 'p' && o.type === 'scout' && o.done);
+      if (b) { G().sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); } else UI.openBuild();
+    }, grupo: 'reino' },
+  };
+  const TUTO = ['m1', 'm2', 'm3', 'm4'];
+  function elegirTc() {
+    const b = G().buildings.find(o => o.owner === 'p' && o.type === 'tc');
+    if (!b) return;
+    G().sel = { type: 'building', id: b.id };
+    PK.Render.centerOn(b.cx, b.cy);
+    UI.refreshPanel(true);
+  }
+  let tutoVisto = false, asCache = null, asT = 0;
+  UI.tutoActivo = () => { const st = S(); return !st.flags.tuto && st.quests.m4 !== 'claimed' && !(G().enMar && G().enMar()); };
+  function asesorTop() {
+    const now = performance.now();
+    if (!asCache || now - asT > 2000) { asCache = PK.Asesor.problemas(); asT = now; }
+    return asCache;
+  }
+  function queHago() {
+    const st = S(), Q = PK.Quests, enMar = G().enMar && G().enMar();
+    const tuto = UI.tutoActivo();
+    if (tuto) tutoVisto = true;
+    else if (!st.flags.tuto && st.quests.m4 === 'claimed') { st.flags.tuto = 'fin'; if (tutoVisto) UI.toast('¡Terminaste los primeros pasos! Desde ahora este panel te dice la próxima misión y qué te frena.', 'epic'); }
+    for (const x of grupos) x.gb.classList.toggle('guia', false);
+    const box = el('div', { class: 'p-help que-hago' }, el('h3', null, '¿Qué hago ahora?'));
+    const q = enMar ? null : Q.siguiente();
+    if (tuto && q) box.append(el('p', { class: 'small qh-paso' }, 'Primeros pasos · ' + (TUTO.indexOf(q.id) + 1) + ' de ' + TUTO.length));
+    if (q) {
+      const [a, b] = Q.progress(q.req), listo = Q.status(q) === 'ready', guia = GUIA[q.id];
+      if (tuto && guia && guia.grupo && !listo) { const x = grupos.find(o => o.g.id === guia.grupo); if (x) x.gb.classList.add('guia'); }
+      box.append(el('div', { class: 'qh-mision' + (listo ? ' lista' : '') },
+        el('div', { class: 'qh-tit' }, el('img', { class: 'ico', src: Sp.icon('book'), alt: '' }), el('b', null, q.title), listo ? el('em', null, '¡cumplida!') : ''),
+        el('p', { class: 'small' }, tuto && guia ? guia.txt : q.desc),
+        listo ? '' : el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: Math.min(100, (a / Math.max(1, b)) * 100) + '%' } }), el('span', null, U.fmt(Math.min(a, b)) + ' / ' + U.fmt(b))),
+        el('div', { class: 'row' },
+          listo ? UI.btn('Reclamar', () => { Q.claim(q.id); UI.refreshPanel(true); }, { small: true, cls: 'gold' }) : guia && tuto ? UI.btn('Muéstrame', guia.fn, { small: true, cls: 'gold' }) : '',
+          UI.btn('Ver en el libro', () => Q.openBook('main', q.id), { small: true }))));
+    } else if (enMar) box.append(el('p', { class: 'small' }, 'Estás en el ' + D.TEMAS.mar.name + '. Sus misiones llegan con las islas; mientras, recolecta y vuelve en el Galeón cuando quieras.'));
+    // lo que dice el Asesor (sin repetir «reclamar» cuando la misión ya muestra su botón)
+    const ps = tuto ? [] : asesorTop().filter(p => p.prioridad >= 30 && !(q && p.id === 'reclamar' && Q.status(q) === 'ready')).slice(0, 2);
+    for (const p of ps) box.append(el('div', { class: 'asesor-row' + (p.prioridad >= 70 ? ' grave' : '') }, el('span', { class: 'small' }, p.texto),
+      el('span', { class: 'row' }, p.acciones.map(ac => UI.btn(ac.label, () => { ac.fn(); asCache = null; UI.refreshPanel(true); }, { small: true })))));
+    if (!q && !ps.length && !enMar) box.append(el('p', { class: 'small muted' }, 'Nada te frena ahora: tu reino marcha bien.'));
+    if (tuto) box.append(el('p', { class: 'small muted' }, UI.hint('Clic o arrastra para elegir aldeanos; clic derecho sobre un árbol, una mina o un taller para mandarlos.',
+      'Toca un aldeano para elegirlo (mantén pulsado y arrastra para varios) y después toca un árbol, una mina o un taller.')));
+    box.append(el('div', { class: 'row' },
+      tuto ? UI.btn('Saltar tutorial', () => { st.flags.tuto = 'saltado'; UI.refreshPanel(true); UI.toast('Listo. Las misiones siguen en el Libro, y este panel te dice la próxima.', 'info'); }, { small: true })
+        : UI.btn('Ocultar ayuda', () => { st.flags.helpOff = true; UI.refreshPanel(true); UI.toast('Listo. La ayuda vuelve desde Opciones.', 'info'); }, { small: true, title: 'El panel solo aparecerá al elegir algo' })));
+    panel.append(box);
+  }
   UI.refreshPanel = function (force) {
     const g = G(), sel = g.sel;
     let key = sel ? sel.type + ':' + (sel.ids ? sel.ids.join(',') : sel.id) : 'none';
@@ -428,6 +608,8 @@
     if (!force && key === lastPanelKey && sel && sel.type === 'units' && !g.placing) { updateUnitsLive(); return; }
     if (!force && recent(panelTouch)) return; // lo están deslizando o tocando: se actualiza después
     const snap = key === lastPanelKey ? snapScroll(panel) : null;
+    // U4: en el celular, pasado el tutorial, el panel sin nada elegido queda plegado (su cabecera dice «¿Qué hago ahora?»)
+    if (key === 'none' && key !== lastPanelKey && UI.plegarPanel && !UI.tutoActivo()) UI.plegarPanel();
     lastPanelKey = key;
     panel.innerHTML = '';
     fillPanel(g, sel);
@@ -492,14 +674,7 @@
     }
     if (!sel) {
       if (S().flags.helpOff) return; // la ocultaste: el panel solo aparece al elegir algo
-      panel.append(el('div', { class: 'p-help' },
-        el('h3', null, 'Pro Kingdoms'),
-        el('p', null, 'Toca ', el('b', null, 'Construir'), ' para levantar edificios: se construyen solos. Tus aldeanos solo recolectan y trabajan: usa ', el('b', null, 'Aldeanos'), ' para repartirlos, o elige alguno y dile qué hacer.'),
-        el('p', { class: 'small muted' }, UI.hint('Clic o arrastra para elegir aldeanos; clic derecho sobre un árbol, una mina o un taller para mandarlos.',
-          'Toca un aldeano para elegirlo (mantén pulsado y arrastra para varios; doble toque: todos los de su tipo) y después toca un árbol, una mina o un taller.')),
-        el('p', { class: 'small muted' }, 'Lo oscuro es niebla: un Puesto de Exploradores la descubre. Cada edificio se mejora por separado con tus Maestros de Obras.'),
-        el('div', { class: 'row' }, UI.btn('Construir', () => UI.openBuild(), { small: true, cls: 'gold' }), UI.btn('Aldeanos', () => UI.openForeman(), { small: true }),
-          UI.btn('Ocultar ayuda', () => { S().flags.helpOff = true; UI.refreshPanel(true); UI.toast('Listo. La ayuda vuelve desde Opciones.', 'info'); }, { small: true, title: 'El panel solo aparecerá al elegir algo' }))));
+      queHago();
       return;
     }
     if (sel.type === 'units') return unitsPanel(g.selUnits());
@@ -829,9 +1004,14 @@
   function initMobile(menu) {
     // Lo que en la computadora es solo teclado (. o I: aldeano ocioso · Supr: demoler). El CSS los muestra solo en pantallas táctiles.
     const tb = (icon, label, title, fn) => el('button', { class: 'mbtn touch-only', title, 'aria-label': title, onclick: fn }, el('img', { class: 'ico', src: Sp.icon(icon), alt: '' }), el('span', null, label));
+    // U4 (Fase 6): van en su propia columna (#acciones), fuera del menú agrupado: en el celular vertical el menú
+    // es la barra de abajo y no caben. «Ocioso» es grande y dice cuántos hay.
     const idleB = tb('idle', 'Ocioso', 'Siguiente aldeano ocioso', () => PK.Input.selectNextIdle());
+    idleB.classList.add('ocioso');
+    const idleN = el('span', { class: 'badge' }); idleB.append(idleN);
     const demoB = tb('tools', 'Demoler', 'Demoler el edificio seleccionado', () => PK.Input.demolishSelected());
-    menu.prepend(idleB, demoB);
+    const acc = el('div', { id: 'acciones' }, idleB, demoB);
+    menu.after(acc);
     // Si el menú se desliza y quedan botones abajo, se desvanece el borde inferior (CSS .more-below).
     const more = () => menu.classList.toggle('more-below', menu.scrollHeight - menu.scrollTop - menu.clientHeight > 6);
     menu.addEventListener('scroll', more, { passive: true });
@@ -846,11 +1026,14 @@
       mmB.setAttribute('aria-pressed', off ? 'false' : 'true');
     });
     mmB.setAttribute('aria-pressed', 'true');
-    menu.append(mmB);
+    acc.append(mmB);
     setInterval(() => {
       const ok = !!(PK.Input.demolishTarget && PK.Input.demolishTarget());
       demoB.classList.toggle('off', !ok);
       demoB.setAttribute('aria-disabled', ok ? 'false' : 'true');
+      const n = G().units.filter(u => u.owner === 'p' && !u.task && !u.inside && u.kind === 'v').length;
+      idleN.textContent = n || ''; idleN.style.display = n ? '' : 'none';
+      idleB.classList.toggle('off', !n);
     }, 400);
 
     // Panel de selección plegable: en el celular tiene una cabecera con flecha (en la computadora no se ve).
@@ -874,6 +1057,7 @@
       arrow.textContent = open ? '▼' : '▲';
     };
     head.addEventListener('click', () => setOpen(wrap.classList.contains('collapsed')));
+    if (window.matchMedia('(max-width: 900px)').matches) UI.plegarPanel = () => setOpen(false);
     let lastTitle = '';
     new MutationObserver(() => {
       const h = body.querySelector('h3'), t = h ? h.textContent : 'Pro Kingdoms';

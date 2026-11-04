@@ -471,13 +471,20 @@
       el('div', { class: 'al-grid' }, D.BOTS.map(b => slot('pop', b.realm, st.flags['seen_' + b.slot]))));
   }
 
-  Q.openBook = function (t) {
+  Q.openBook = function (t, id) {
     // Fase 9: el archipiélago tendrá su propia rama de la Crónica; mientras tanto, el libro es el de la tierra
     if (PK.Game.enMar && PK.Game.enMar()) {
       PK.UI.modal('book', 'Libro de Misiones', body => body.append(U.el('p', null, 'Las misiones del ' + D.TEMAS.mar.name + ' (su rama de la Crónica, sus eras y sus desafíos) llegan con las islas y las colonias. Tu Libro de la tierra te espera al volver.')));
       return;
     }
     if (t) tab = t;
+    if (t && id) selected = id;
     PK.UI.modal('book', 'Libro de Misiones', renderBook, { cls: 'book-modal', wide: true });
   };
+  // U2 (Fase 6): la próxima misión de la Crónica (la lista para reclamar primero, si no la que está en curso)
+  Q.siguiente = function () {
+    const main = D.QUESTS.filter(q => q.branch === 'main');
+    return main.find(q => Q.status(q) === 'ready') || main.find(q => Q.status(q) === 'active') || null;
+  };
+  Q.reqText = reqText;
 })();

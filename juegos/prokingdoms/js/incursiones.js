@@ -464,8 +464,9 @@
     libreT = now;
     const top = document.getElementById('topbar'), menu = document.getElementById('menu'), W0 = window.innerWidth;
     const t = top ? top.getBoundingClientRect().bottom : 0, m = menu ? menu.getBoundingClientRect() : null;
-    const der = m && m.width && m.left > W0 / 2 ? W0 - m.left : 0;
-    libre = [t + 40, der + 34, 70, 34];
+    const barra = m && m.width > m.height * 2; // U4: en el celular vertical el menú es la barra de abajo
+    const der = m && m.width && !barra && m.left > W0 / 2 ? W0 - m.left : 0;
+    libre = [t + 40, der + 34, barra ? Math.max(70, window.innerHeight - m.top + 16) : 70, 34];
     return libre;
   }
   // Flecha roja en el borde de la pantalla cuando la banda no se ve, con el tiempo que falta.

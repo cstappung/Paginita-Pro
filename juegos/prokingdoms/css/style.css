@@ -29,7 +29,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #16140f; fon
 button { font-family: var(--font); }
 
 /* Marco de madera pixelado */
-.frame, #topbar, #panel, #menu .mbtn, #mmwrap, .modal {
+.frame, #topbar, #panel, #menu .mbtn, #acciones .mbtn, #submenu, #submenu .mbtn, #mmwrap, .modal {
   background: linear-gradient(180deg, var(--wood2), var(--wood));
   border: 3px solid var(--edge);
   box-shadow: inset 0 0 0 2px var(--wood3), inset 0 -3px 0 2px rgba(0, 0, 0, 0.35), 0 4px 0 rgba(0, 0, 0, 0.45);
@@ -404,7 +404,7 @@ ul.info li { margin: 2px 0; }
   .res.builders { min-height: 44px; min-width: 52px; }
 }
 @media (pointer: coarse) {
-  #menu .touch-only { display: flex !important; }
+  #menu .touch-only, #acciones .touch-only { display: flex !important; }
   .mm-legend { display: none !important; }
 }
 
@@ -430,7 +430,7 @@ ul.info li { margin: 2px 0; }
 @media (max-width: 900px) {
   /* notch arriba (con viewport-fit=cover); --top-h ya lo incluye */
   #topbar { top: calc(6px + env(safe-area-inset-top, 0px)); left: calc(6px + env(safe-area-inset-left, 0px)); right: calc(6px + env(safe-area-inset-right, 0px)); }
-  #panel { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+  #panel { bottom: calc(6px + var(--sab)); }
   #hud.mm-off #mmwrap { display: none; }
   #hud.mm-off #menu { top: calc(var(--top-h, 56px) + 8px); }
   .qs-item .btn.small { padding: 1px 8px; font-size: 13px; }
@@ -439,8 +439,8 @@ ul.info li { margin: 2px 0; }
 @media (max-width: 900px) and (orientation: portrait) {
   /* más alto que antes (playtest: con ~200 px casi todo pedía deslizar) */
   :root { --ph: 40vh; }
-  #toasts { top: auto; bottom: calc(var(--ph) + 14px + env(safe-area-inset-bottom, 0px)); left: calc(6px + env(safe-area-inset-left, 0px)); right: 104px; width: auto; transform: none; align-items: stretch; flex-direction: column-reverse; max-height: 30vh; overflow: hidden; }
-  #hud:has(#panel.collapsed) #toasts { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  #toasts { top: auto; bottom: calc(var(--ph) + 14px + var(--sab)); left: calc(6px + env(safe-area-inset-left, 0px)); right: 104px; width: auto; transform: none; align-items: stretch; flex-direction: column-reverse; max-height: 30vh; overflow: hidden; }
+  #hud:has(#panel.collapsed) #toasts { bottom: calc(66px + var(--sab)); }
   /* el menú termina antes del panel; en pantallas bajas se desliza */
   #menu { max-height: calc(100vh - var(--top-h, 56px) - 108px - var(--ph) - 22px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; }
   #menu::-webkit-scrollbar { display: none; }
@@ -546,11 +546,11 @@ ul.info li { margin: 2px 0; }
 @media (pointer: coarse), (max-width: 900px) { #event .ev-x, #event .ev-open { min-height: 40px; min-width: 40px; } }
 @media (max-width: 900px) and (orientation: portrait) {
   /* abajo, sobre el panel (arriba no hay lugar entre la tira de cola y el minimapa); los avisos suben un poco */
-  #event { top: auto; transform: none; left: calc(6px + env(safe-area-inset-left, 0px)); right: 104px; max-width: none; bottom: calc(var(--ph) + 14px + env(safe-area-inset-bottom, 0px)); padding: 4px 8px; font-size: 14px; }
+  #event { top: auto; transform: none; left: calc(6px + env(safe-area-inset-left, 0px)); right: 104px; max-width: none; bottom: calc(var(--ph) + 14px + var(--sab)); padding: 4px 8px; font-size: 14px; }
   #event.min { right: auto; }
-  #hud:has(#panel.collapsed) #event { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
-  #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(var(--ph) + 66px + env(safe-area-inset-bottom, 0px)); }
-  #hud:has(#panel.collapsed):has(#event:not([style*="none"])) #toasts { bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+  #hud:has(#panel.collapsed) #event { bottom: calc(66px + var(--sab)); }
+  #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(var(--ph) + 66px + var(--sab)); }
+  #hud:has(#panel.collapsed):has(#event:not([style*="none"])) #toasts { bottom: calc(118px + var(--sab)); }
 }
 
 /* ventanas a pantalla completa en el celular (antes no llegaban arriba y se sentían chicas) */
@@ -707,14 +707,14 @@ ul.info li { margin: 2px 0; }
   .book-tab { flex: none; white-space: nowrap; }
 }
 @media (max-width: 900px) and (orientation: portrait) {
-  #hud:has(#event:not(.min):not([style*="none"])) #toasts { bottom: calc(var(--ph) + 150px + env(safe-area-inset-bottom, 0px)); }
+  #hud:has(#event:not(.min):not([style*="none"])) #toasts { bottom: calc(var(--ph) + 150px + var(--sab)); }
 }
 
 /* ---- Playtest, nov. 2026 ---- */
 /* Panel vacío (ayuda oculta y nada elegido): desaparece y el mapa queda libre. */
 #hud.p-none #panel { display: none; }
 @media (max-width: 900px) and (orientation: portrait) {
-  #hud.p-none #toasts { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #hud.p-none #toasts { bottom: calc(14px + var(--sab)); }
   #hud.p-none #menu { max-height: calc(100vh - var(--top-h, 56px) - 108px - 22px); }
   #hud.p-none.mm-off #menu { max-height: calc(100vh - var(--top-h, 56px) - 8px - 22px); }
 }
@@ -1044,4 +1044,83 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .mar-piezas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .mar-pieza { border: 2px dashed #8a6a44; padding: 4px 8px; display: flex; flex-direction: column; }
 .mar-pieza.ok { border-style: solid; border-color: #3a7a24; background: rgba(60, 140, 40, 0.12); }
-@media (max-width: 600px) { #mar-cartel { bottom: calc(var(--ph, 40vh) + 6px); font-size: 12px; max-width: calc(100% - 120px); } #mar-cartel .small { display: none; } }
+@media (max-width: 600px) { #mar-cartel { bottom: calc(var(--ph, 40vh) + 6px + var(--sab, 0px)); font-size: 12px; max-width: calc(100% - 120px); } #mar-cartel .small { display: none; } }
+
+/* ---- U1 y U4 (Fase 6, pk-26): menú agrupado en cinco submenús; en el celular vertical, barra de abajo ---- */
+/* --sab: lo que ocupa abajo lo que no es el panel (la barra del menú en el celular vertical, el notch siempre) */
+:root { --sab: env(safe-area-inset-bottom, 0px); }
+#submenu { display: none; position: absolute; z-index: 30; flex-direction: column; gap: 4px; padding: 6px; min-width: 176px; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; }
+#submenu.on { display: flex; }
+#submenu .sub-tit { color: var(--gold); font-weight: 700; font-size: 14px; padding: 0 4px 3px; border-bottom: 2px solid var(--edge); text-shadow: 1px 1px 0 #000; }
+#submenu .sub-items { display: flex; flex-direction: column; gap: 4px; }
+#submenu .mbtn { width: 100%; min-width: 0; justify-content: flex-start; padding: 5px 12px 5px 6px; }
+#submenu .mbtn > span:not(.badge) { display: inline; }
+#submenu .mbtn.nuevo { animation: glow 0.7s infinite alternate; border-color: var(--gold2); }
+#menu .mbtn.grupo.on { border-color: var(--gold2); filter: brightness(1.25); }
+.g-dot:empty { display: none !important; }
+#acciones { position: absolute; right: 6px; bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+#acciones:empty { display: none; }
+#acciones .mbtn.ocioso .badge { background: var(--gold2); color: #2a1a08; }
+@media (max-width: 900px) {
+  #acciones { bottom: auto; top: calc(var(--top-h, 56px) + 268px); }
+}
+@media (max-width: 900px) and (orientation: portrait) {
+  :root { --sab: calc(env(safe-area-inset-bottom, 0px) + 62px); }
+  #menu { display: flex; flex-direction: row; gap: 4px; left: calc(6px + env(safe-area-inset-left, 0px)); right: calc(6px + env(safe-area-inset-right, 0px)); top: auto !important; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); max-height: none !important; overflow: visible; padding: 0; }
+  #menu.more-below { -webkit-mask-image: none; mask-image: none; }
+  #menu.more-below::after { display: none; }
+  #menu .mbtn { flex: 1 1 0; min-width: 0; height: 54px; min-height: 54px; flex-direction: column; justify-content: center; gap: 1px; padding: 2px; }
+  #menu .mbtn .ico { width: 24px; height: 24px; }
+  #menu .mbtn > span:not(.badge) { display: block; font-size: 11px; line-height: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  #menu .mbtn .badge { top: -4px; right: 2px; }
+  #submenu { min-width: 190px; max-height: calc(100vh - var(--top-h, 56px) - 90px); }
+  #submenu .mbtn { min-height: 44px; }
+  /* las acciones táctiles donde estaba el menú: a la derecha, bajo el minimapa */
+  #acciones { right: calc(6px + env(safe-area-inset-right, 0px)); top: calc(var(--top-h, 56px) + 108px); bottom: auto; }
+  #hud.mm-off #acciones { top: calc(var(--top-h, 56px) + 8px); }
+  #acciones .mbtn.ocioso { min-width: 60px; min-height: 60px; flex-direction: column; gap: 1px; }
+  #acciones .mbtn.ocioso > span:not(.badge) { display: block; font-size: 11px; line-height: 12px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  /* una columna de seis botones, y al lado la de las acciones táctiles */
+  :root { --mw: 100px; }
+  #menu { display: flex; flex-direction: column; padding: 0; overflow: visible; }
+  #menu .mbtn { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  #menu.more-below { -webkit-mask-image: none; mask-image: none; }
+  #menu.more-below::after { display: none; }
+  #acciones { right: calc(52px + var(--sr)); top: calc(var(--top-h, 32px) + 8px); bottom: auto; gap: 4px; }
+  #acciones .mbtn { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 2px; }
+  #submenu { max-height: calc(100vh - 16px); }
+  #submenu .mbtn { min-height: 38px; padding: 3px 10px 3px 6px; font-size: 14px; }
+}
+/* U2 (Fase 6): «¿Qué hago ahora?» */
+.que-hago .qh-paso { margin: 0 0 4px; color: var(--gold2); font-weight: 700; }
+.que-hago .qh-mision { padding: 6px 8px; margin: 4px 0 6px; background: rgba(120, 80, 30, 0.14); border-left: 4px solid var(--gold2); }
+.que-hago .qh-mision.lista { border-left-color: #8bd06a; background: rgba(80, 140, 50, 0.16); }
+.que-hago .qh-tit { display: flex; align-items: center; gap: 6px; }
+.que-hago .qh-tit .ico { width: 20px; height: 20px; }
+.que-hago .qh-tit em { color: #8bd06a; font-style: normal; font-weight: 700; }
+.que-hago .qh-mision p { margin: 3px 0; }
+.que-hago .asesor-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; padding: 4px 6px; margin: 3px 0; border-left: 4px solid #8a6a44; }
+.que-hago .asesor-row.grave { border-left-color: var(--bad); }
+/* U3: el botón del menú que lleva al paso del tutorial */
+#menu .mbtn.grupo.guia { animation: glow 0.7s infinite alternate; border-color: var(--gold2); outline: 2px solid var(--gold2); outline-offset: 1px; }
+/* U6 (Fase 6): accesibilidad, por equipo (Opciones → Accesibilidad) */
+html.texto-1 .modal, html.texto-1 #panel > :not(.p-headrow), html.texto-1 #toasts, html.texto-1 #submenu, html.texto-1 #event { zoom: 1.12; }
+html.texto-2 .modal, html.texto-2 #panel > :not(.p-headrow), html.texto-2 #toasts, html.texto-2 #submenu, html.texto-2 #event { zoom: 1.25; }
+html.daltonico { --good: #4a9ae8; --bad: #e8902a; }
+html.daltonico .bar .fill, html.daltonico .bar .fill.green { background: linear-gradient(180deg, #8ac0ff, #3a6ab0); }
+html.daltonico .que-hago .qh-mision.lista { border-left-color: #4a9ae8; }
+html.daltonico .que-hago .qh-tit em { color: #8ac0ff; }
+html.daltonico .res.full { outline-style: dashed; }
+html.menos-mov *, html.menos-mov *::before, html.menos-mov *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+.deslizador { align-items: center; gap: 6px 10px; }
+.deslizador input[type=range] { flex: 1 1 140px; max-width: 260px; accent-color: var(--gold); }
+.deslizador output { min-width: 42px; }
+.deslizador .small { flex: 1 1 100%; }
+/* U7 (Fase 6): pulido. La batalla entra con un fundido y un leve acercamiento; un recurso lleno resalta en la barra. */
+#batalla { animation: bt-entra 0.45s ease-out; }
+@keyframes bt-entra { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+.res.full { background: rgba(216, 80, 60, 0.28); outline: 2px solid #ff9a6a; outline-offset: -1px; border-radius: 3px; }
+.res.full b { color: #ffd0b0; text-shadow: 1px 1px 0 #000; }
+html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: #ffc070; }

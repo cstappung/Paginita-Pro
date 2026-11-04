@@ -49,6 +49,13 @@
   // La ventana Reinos (con la diplomacia de la Fase 5) está en js/ui/reinos.js.
 
   // ---------- Opciones ----------
+  // un deslizador 0–100 con su número (Opciones → Sonido)
+  function deslizador(nombre, valor, fn, ayuda) {
+    const out = el('output', null, valor + '%');
+    const inp = el('input', { type: 'range', min: 0, max: 100, step: 5, value: valor, 'aria-label': nombre });
+    inp.addEventListener('input', () => { out.textContent = inp.value + '%'; fn(+inp.value); });
+    return el('div', { class: 'row deslizador' }, el('b', null, nombre + ': '), inp, out, ayuda ? el('span', { class: 'small muted' }, ayuda) : '');
+  }
   UI.openSettings = function () {
     UI.modal('settings', 'Opciones', body => {
       const nameIn = el('input', { id: 'pname', value: PK.Platform.getPlayer().name, maxlength: 20 });
@@ -56,6 +63,15 @@
       body.append(el('h3', null, 'Jugador'), el('div', { class: 'row' }, nameIn, UI.btn('Guardar nombre', () => { U.store.set('pk_player_name', nameIn.value.trim() || 'Tú'); UI.toast('Nombre guardado.', 'good'); }, { small: true })),
         el('h3', null, 'Sonido'),
         el('div', { class: 'row' }, UI.btn(PK.Sfx.on ? 'Silenciar (M)' : 'Activar sonido (M)', () => { PK.Sfx.toggle(); UI.rerender(); }, { small: true })),
+        PK.Musica ? deslizador('Música', PK.Musica.vol(), v => PK.Musica.setVol(v), 'Cambia con la era, de noche y en batalla. M la calla junto con los efectos.') : '',
+        PK.Musica ? deslizador('Ambiente', PK.Musica.volAmb(), v => PK.Musica.setVolAmb(v), 'Pájaros, grillos, viento, olas y martillos de las obras.') : '',
+        el('h3', null, 'Accesibilidad'),
+        (() => { const a = UI.acceso(); return el('div', null,
+          el('div', { class: 'row' }, el('b', null, 'Texto: '), [['Normal', 0], ['Grande', 1], ['Muy grande', 2]].map(([n, v]) => UI.btn(n, () => { UI.setAcceso('texto', v); UI.rerender(); }, { small: true, cls: a.texto === v ? 'gold' : '' }))),
+          el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a.dalto, onchange: e => UI.setAcceso('dalto', e.target.checked) }),
+            el('b', null, ' Colores para daltonismo'), el('span', { class: 'small muted' }, ' — lo bueno en azul y lo malo en naranja, en vez de verde y rojo.')),
+          el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a.menosMov, onchange: e => UI.setAcceso('menosMov', e.target.checked) }),
+            el('b', null, ' Menos movimiento'), el('span', { class: 'small muted' }, ' — sin brillos que parpadean, sin sacudidas en las batallas y sin copos ni hojas cayendo.'))); })(),
         el('h3', null, 'Avisos'),
         el('p', { class: 'small muted' }, 'Te avisamos cuando termine una mejora, una investigación, una era o una expedición, y cuando el cofre diario esté listo, aunque el juego esté en otra pestaña.'),
         el('div', { class: 'row' }, PK.Notify.enabled()
@@ -80,7 +96,8 @@
           el('li', null, 'Mantén pulsado y arrastra: seleccionar grupo · Doble toque en un aldeano: todos los de su tipo en pantalla'),
           el('li', null, 'Con el Centro Urbano elegido, toca un recurso para fijar el punto de reunión'),
           el('li', null, 'Arrastra: mover cámara · Pellizca: zoom'),
-          el('li', null, 'Botones Ocioso y Demoler en el menú lateral'))
+          el('li', null, 'Mantén pulsado un edificio tuyo y suelta sin arrastrar: lo mejora (o lo pone en la cola de obras)'),
+          el('li', null, 'Botones Ocioso, Demoler y Minimapa a la derecha; el menú está abajo (o a la derecha con el celular acostado)'))
         : el('ul', { class: 'small' },
           el('li', null, 'Clic: seleccionar · Arrastrar: seleccionar grupo · Mayús: añadir'),
           el('li', null, 'Clic derecho: recolectar / trabajar / mover'),

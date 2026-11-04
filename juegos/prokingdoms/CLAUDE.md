@@ -802,3 +802,38 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - Not yet (N7 «b» to «d»): the archipelago's own resources, buildings, eras, tides and colonies; ships and
   naval battles; the Regata, naval duels and the bridges between worlds (heroes travelling, trade, Maestro de
   Ribera). The sea world uses the land's tables meanwhile.
+
+## Interface, phone and sound (`pk-26`, Phase 6: U1 to U7)
+
+- **U1, grouped menu** (`GRUPOS`, `agrupar` in `ui.js`): the old buttons are still built by `mbtn(icon, label,
+  fn, key, id)` and keep their `MENU_VER` rule, then `agrupar` moves them into five groups (Reino, Héroes,
+  Guerra, Mundo, Libro) plus Opciones. A group shows when any of its buttons shows, glows when one is new and gets
+  a «!» when one has a badge (`updateGrupos`, called from `updateMenu`). Tabs that lived inside a window
+  (Diarias, Desafíos, Álbum, Atacar, Defensa, Batallas, Taberna, Equipo, Consejo) are now entries of their own.
+  The popover is `#submenu`; `UI.cerrarGrupo` closes it. Keyboard shortcuts don't go through the menu.
+- **U4, phones:** in portrait the menu is a bottom bar (`#menu` as a row). Everything that sat on the bottom
+  edge uses **`--sab`** (safe area + the bar's 62 px) instead of `env(safe-area-inset-bottom)`; use it for any new
+  bottom-anchored element. Ocioso (big, with the idle count), Demoler and Minimapa live in **`#acciones`**, not
+  in the menu: right side under the minimap in portrait, a second column next to the menu in landscape (`--mw`
+  100 px). `incursiones.js`' arrow area reads the bar's height. **Long-press on your own building and release
+  without dragging upgrades it** or queues it (`mejoraRapida` in `input.js`); dragging is still box select. After
+  `m4`, the empty-selection panel starts folded on phones (`UI.plegarPanel`).
+- **U2 and U3** (`queHago` in `ui.js`): with nothing selected the panel is «¿Qué hago ahora?»: the next Crónica
+  quest (`PK.Quests.siguiente`, ready first) with its bar and «Reclamar» or «Ver en el libro», plus the top two
+  Asesor rules (cached 2 s; the panel redraws every 0.5 s). Until `m4` is claimed it is the guided tutorial:
+  step N of 4, a «Muéstrame» per step (`GUIA`: selects the TC or opens Construir) and the menu group to touch
+  glows (`.guia`). «Saltar tutorial» sets `flags.tuto = 'saltado'`; finishing sets `'fin'`.
+- **U5, music** (`js/musica.js`, `PK.Musica`): procedural, through `sfx.js`' master (`Sfx.ac()` never creates
+  the context: the first touch does), so M and the shared Juegos volume reach it. One mode per era group
+  (rústico, medieval, reino, imperio), the Archipiélago's own, a night variant (slower, lower, sparser) and a battle
+  theme (live battle view or bandits past the warning) that adds cymbals and tempo while a boss lives
+  (`Batalla.vistaActual`). Phrases are seeded motifs over a 4-chord progression. Ambience: birds, crickets at
+  night, wind in winter, waves at sea, hammers while something is being built. It picks by game state, not by
+  what is on screen. Volumes `pk_musica` and `pk_ambiente` (0–100) in Opciones. Silent while the tab is hidden
+  and during the offline calculation.
+- **U6, accessibility** (per device, `UI.acceso`/`UI.setAcceso`): text size (zoom 1.12/1.25 on windows, panel,
+  toasts, submenu and event), colorblind colors (`html.daltonico`: good blue, bad orange; icons do not change
+  shape and realm colors have no pattern yet), reduce motion (`PK.menosMov`: no CSS animations, no battle shake,
+  no falling leaves or snow; on by default when the system asks for it).
+- **U7:** the battle view fades in, and a full resource gets a red frame in the top bar. The rest of U7 (wonders,
+  golem, bear, portraits) was already done in earlier deliveries.
