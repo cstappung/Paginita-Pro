@@ -357,3 +357,20 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Barrio:** Shift (or «Modo barrio» for touch) snaps the next houses to the
   first one's grid with 1-tile streets and paves the street below and right
   when there is stone (`calles` in `input.js`).
+
+## Split UI and the test autopilot (`pk-13`)
+
+- **`js/ui.js` is split** (T5): the core stays there; the Cuartel and battle
+  reports go to `js/ui/cuartel.js`, the kingdom windows (Obras, Territorio,
+  Logística, Reinos…) to `js/ui/reino.js`, Aldeanos and the Capataz to
+  `js/ui/aldeanos.js`, the Libro de Misiones to `js/ui/libro.js`. Each one
+  adds functions to `PK.UI` and loads right after `ui.js` in `index.html`.
+  The core calls `UI.barracksQuick`, `UI.enemyText` and `UI.bestVs`, so
+  those must stay on `UI`. A new window gets its own file there.
+- **The autopilot** (`tools/piloto.js`, T1) loads only with `?dev&piloto[=N]`
+  (speed ×N, default 10) or `?timelapse` (×40, no save; T2, replaces the lost
+  `tools/timelapse.js`). It builds a plan per era, keeps the builders busy,
+  researches the cheapest tech, uses the Mariscal's logic at 80%, and claims
+  quests, all under `UI.mute`. `pkPiloto.resumen()` gives minutes per era,
+  villagers idle over 60 s, full-storage events and battles. Run it before
+  and after any balance change and compare. Never let the game depend on it.

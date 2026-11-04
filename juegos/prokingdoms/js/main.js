@@ -45,18 +45,24 @@
     if (report) PK.UI.offlineReport(report);
     else if (!save) PK.UI.toast((net ? 'Bienvenido a ' + PK.Net.world.name + '. ' : 'Bienvenido a tu reino. ') + 'Todo lo demás está en la niebla: abre el Libro de Misiones (B) para empezar.', 'epic');
     if (TIMELAPSE) {
-      // el time-lapse maneja su propio reloj: no corre el bucle normal ni se guarda nada. tools/timelapse.js no
-      // vino con el juego (B6 del plan): si no carga, se avisa y se juega normal, sin guardar, en vez de quedarse
-      // con la pantalla quieta
+      // el time-lapse es el piloto automático (tools/piloto.js, T2 del plan) a ×40, sin guardar nada. El viejo
+      // tools/timelapse.js no vino con el juego (B6). Si el piloto no carga, se avisa y se juega normal.
       PK.Game.noSave = true;
-      const sc = document.createElement('script');
-      sc.src = 'tools/timelapse.js';
-      sc.onerror = () => { PK.UI.toast('Herramienta de time-lapse no incluida: el reino corre normal y no se guarda.', 'warn'); loop(); };
-      document.body.appendChild(sc);
+      piloto({ escala: 40, timelapse: true });
       return;
     }
     PK.Net.start();
     loop();
+    // ?dev&piloto[=N]: el piloto de pruebas juega solo a ×N (10 si no se dice)
+    const pm = PK.dev && /[?&]piloto(?:=(\d+))?/.exec(location.search);
+    if (pm) piloto({ escala: +pm[1] || 10 }, true);
+  }
+  function piloto(o, yaCorre) {
+    const sc = document.createElement('script');
+    sc.src = 'tools/piloto.js';
+    sc.onload = () => { PK.Piloto.start(o); if (!yaCorre) loop(); };
+    sc.onerror = () => { PK.UI.toast('El piloto de pruebas (tools/piloto.js) no está incluido.', 'warn'); if (!yaCorre) loop(); };
+    document.body.appendChild(sc);
   }
 
   function loop() {

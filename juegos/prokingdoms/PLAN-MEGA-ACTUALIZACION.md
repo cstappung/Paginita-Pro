@@ -3,7 +3,7 @@
 - **Fecha:** 3 de noviembre de 2026.
 - **Versión evaluada:** `pk-10`, en modo local.
 - **Base:** una partida de prueba de ~1,5 h (Eras I a VI) y la lectura del código de `js/`, `server/` y `functions/`.
-- **Avance:** Fase 0 hecha en `pk-11` (B1 a B8, P1 y la prueba T3). Fase 1 hecha en `pk-12` (A1 a A7). Las notas de lo que se decidió al implementarla están en `juegos/prokingdoms/CLAUDE.md`, «Fase 0 del plan».
+- **Avance:** Fase 0 hecha en `pk-11` (B1 a B8, P1 y la prueba T3). Fase 1 hecha en `pk-12` (A1 a A7). T5, T1 y T2 (partir `ui.js`, piloto y time-lapse) en `pk-13`. Desde aquí los números de entrega van uno corrido respecto de la tabla de la sección 13. Las notas de lo que se decidió al implementarla están en `juegos/prokingdoms/CLAUDE.md`, «Fase 0 del plan».
 - **Para qué sirve:** es la guía para implementar la actualización por partes. Cada fase es una entrega aparte (un PR, una versión `pk-N`). Para pedirla basta con decir «implementa la Fase 0 del plan de Pro Kingdoms».
 
 > **Decisiones del dueño (3 de noviembre de 2026).** Mandan sobre cualquier otra parte de este plan:

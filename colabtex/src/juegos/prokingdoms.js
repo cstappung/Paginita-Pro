@@ -17,7 +17,7 @@ import { auth } from "../firebase.js";
 
 /* El ?v= de la página del juego: súbelo junto con los `?v=pk-N` de
    juegos/prokingdoms/index.html cada vez que cambie un archivo del juego. */
-export const PK_VER = "pk-12";
+export const PK_VER = "pk-13";
 
 /* La URL del servidor, leída una vez por pestaña y sin caché (cambiarla no
    pide compilar). Solo https, o localhost con el emulador de Functions. */
