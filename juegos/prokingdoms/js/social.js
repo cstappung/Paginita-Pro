@@ -504,7 +504,7 @@
 
   Soc.Q_MAX = 20;
   // Velocidad de la cola: cada Cuartel entrena a la vez (1 + su bono por nivel).
-  Soc.trainSpeed = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + G().bst(b).armyTrain : 0), 0);
+  Soc.trainSpeed = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + G().bst(b).armyTrain : 0), 0) * (PK.Heroes && S().heroes ? 1 + PK.Heroes.pasiva('armyTrain') : 1);
   // Por qué no se puede entrenar esa tropa ahora (o null).
   Soc.trainWhy = function (type) {
     const def = D.ARMY[type], w = S().war;

@@ -374,3 +374,47 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   quests, all under `UI.mute`. `pkPiloto.resumen()` gives minutes per era,
   villagers idle over 60 s, full-storage events and battles. Run it before
   and after any balance change and compare. Never let the game depend on it.
+- **The autopilot places workshops next to storage** (`lugarTaller`, within
+  `D.NEAR_STORE` of the TC or a warehouse). Elsewhere they get no supply and
+  no workers, and it stalled in Era II for lack of planks. «ociosos» is the
+  average share of idle villagers, not a count: at ×40 one villager crossed
+  «60 s idle» many times a minute.
+
+## Heroes (`pk-14`, H1 and C2)
+
+- **`js/heroes.js`, `PK.Heroes`, saved in `S.heroes`** (`lista`, `inv`,
+  `esencia`, `tab`, `nid`; defaults in `H.init`, so old saves load). Six
+  classes (`H.CLASES`, Annex A1), seven traits, 8 talent tiers × 2 (the
+  effect table `H.TALENTOS` is shared, the names are per class). Level cap
+  5 + 3 × era (max 40), XP per expedition `20 + 10·log2(1 + need/50)`.
+- **The Taberna opens with the Cuartel** (`G.legendLocked`), not with quest
+  l1. Three candidates a day, seeded by day + `created` only: hiring one must
+  not reshuffle the other two (it did when the list looked at your heroes).
+  Max heroes 1 + Taberna level / 2, up to 6. The first one costs only gold.
+- **Expedition power:** `Exp.powerVs(units, enemy, heroe)` × `H.mult`, capped
+  at +60% (`H.TOPE_FUERZA`, tested with level 40 and three legendary +5
+  items). **Only PvE:** `Social.power` (defense, territory attacks, the
+  server's snapshot) never counts heroes, so `sim.js` did not change.
+- **Live battle (C2):** the troops get only 60% of the hero bonus
+  (`HERO_TROPAS` in `batalla.js`), and the ability adds the rest. It fires by
+  itself (rule in `conviene`) unless «sola» is off. Measured with
+  `B.adelantar`, 80 fights each at 1:1: with a hero ≈ without one (±noise),
+  so live and the ratio formula still agree (rule 8). With 100% to the troops
+  plus the ability it was +30 points. The hero figure is not a target and
+  not in `vida()`. Losses get the hero's `bajas`. Golem fights at 1:1 lose
+  with or without a hero: that is Phase 4's problem.
+- **Governing:** a hero at home and healthy applies its class passive to the
+  building it governs (`H.pasiva(k, b)`). It is hooked into `trainSpeed`,
+  `exploreRange`, deer gathering, `relicGold`, `upTime`, `researchMult`,
+  `fiestaMult`, the mission board and `prodMult` (item `prod`). Away or
+  injured, the passive pauses; the assignment stays.
+- **Never dead:** a lost run brings the hero back injured for 30 min to 2 h
+  real (shorter with the Monasterio, the Clériga, Robusto, armor).
+- **Items** are `{id, t, r, s, m}`. Stats come from the seed
+  (`H.itemStats`, cached in a non-enumerable `_st`, rebuilt on upgrade).
+  Inventory max 60: a full one melts the worst item. Essence from melting
+  upgrades items up to +5. Drops only on wins with a hero.
+- Portraits are drawn by code (`H.retrato`, 24 px, cached by class + seed).
+  The Mariscal takes the best free hero (`cs.heroes`). The Asesor has three
+  hero rules. Quests lh1–lh4 in Leyendas.
+

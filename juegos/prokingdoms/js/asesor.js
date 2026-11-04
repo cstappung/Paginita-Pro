@@ -87,6 +87,20 @@
       if (!g.countB('library') || st.research || Object.keys(D.TECHS).every(id => g.lvl(id) >= g.techMax())) return null;
       return { id: 'investigar', prioridad: 30, texto: 'La Biblioteca no está investigando nada.', acciones: [{ label: 'Investigar', fn: cerrarY(() => PK.UI.openResearch()) }] };
     },
+    // héroes (H1): talento por elegir, candidatos que puedes pagar, héroes en casa sin gobernar nada
+    () => {
+      const H = PK.Heroes, h = H && H.lista().find(x => H.talentosPendientes(x));
+      return h && { id: 'talento', prioridad: 42, texto: h.nombre + ' puede elegir un talento.', acciones: [{ label: 'Elegir', fn: cerrarY(() => H.open('heroes', h.id)) }] };
+    },
+    () => {
+      const H = PK.Heroes;
+      if (!H || !H.taberna() || H.lista().length >= H.max() || !H.candidatos().some(c => !H.porQueNo(c))) return null;
+      return { id: 'taberna', prioridad: 38, texto: H.lista().length ? 'Hay un héroe que puedes reclutar en la Taberna.' : '¡Tu primer héroe te espera en la Taberna!', acciones: [{ label: 'Ver candidatos', fn: cerrarY(() => H.open('taberna')) }] };
+    },
+    () => {
+      const H = PK.Heroes, h = H && H.libres().find(x => x.gobierna == null && G().buildings.some(b => H.puedeGobernar(x, b) && !H.gobernanteDe(b)));
+      return h && { id: 'gobernar', prioridad: 28, texto: h.nombre + ' está en casa sin gobernar nada (' + H.CLASES[h.clase].pasTxt + ').', acciones: [{ label: 'Asignar', fn: cerrarY(() => H.open('heroes', h.id)) }] };
+    },
     // recompensas sin reclamar
     () => {
       const n = PK.Quests.claimableCount();

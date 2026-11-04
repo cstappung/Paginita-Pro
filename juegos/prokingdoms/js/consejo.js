@@ -119,8 +119,10 @@
         if (!pv) continue;
         const units = Exp.recommend(pv.enemy, pv.power), n = Object.values(units).reduce((a, b) => a + b, 0);
         if (!n || enCasa() - n < minimo) continue;
-        if (Exp.chance(Exp.powerVs(units, pv.enemy) / Math.max(1, pv.power)) < cs.prob) continue;
-        if (Exp.send(tg, units)) { anota('mariscal', 'Mandó ' + n + ' soldados a ' + pv.name + '.'); break; }
+        // lleva al mejor héroe libre contra ese enemigo (salvo que lo apagues en el Consejo)
+        const h = cs.heroes !== false && PK.Heroes ? PK.Heroes.mejorPara(pv.enemy) : null;
+        if (Exp.chance(Exp.powerVs(units, pv.enemy, h && h.id) / Math.max(1, pv.power)) < cs.prob) continue;
+        if (Exp.send(tg, units, h && h.id)) { anota('mariscal', 'Mandó ' + n + ' soldados a ' + pv.name + (h ? ' con ' + h.nombre : '') + '.'); break; }
       }
     },
     tesorero(st, cs) {
@@ -239,7 +241,8 @@
           if (c.id === 'mariscal') box.append(
             el('div', { class: 'row small' }, 'Guarnición: ', btn('−', () => { cs.guarnicion = Math.max(0, cs.guarnicion - 5); UI.rerender(); }, { small: true }), el('b', null, String(cs.guarnicion)), btn('+', () => { cs.guarnicion += 5; UI.rerender(); }, { small: true }), ' tropas'),
             el('div', { class: 'row small' }, 'Sale si gana con: ', opt(cs.prob, [0.7, 0.8, 0.85, 0.9, 0.95], v => Math.round(v * 100) + '%', v => { cs.prob = v; })),
-            el('div', { class: 'row small' }, 'Deja en casa: ', opt(cs.defensa, [0, 0.2, 0.3, 0.5], v => Math.round(v * 100) + '%', v => { cs.defensa = v; })));
+            el('div', { class: 'row small' }, 'Deja en casa: ', opt(cs.defensa, [0, 0.2, 0.3, 0.5], v => Math.round(v * 100) + '%', v => { cs.defensa = v; })),
+            el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: cs.heroes !== false, onchange: e => { cs.heroes = e.target.checked; } }), ' Llevar al mejor héroe libre'));
           if (c.id === 'tesorero') box.append(
             el('div', { class: 'row small' }, 'Vende sobre: ', opt(cs.vender, [0.8, 0.9, 0.95], v => Math.round(v * 100) + '%', v => { cs.vender = v; })),
             el('div', { class: 'row small' }, 'Reserva de oro: ', opt(cs.oroReserva, [0.1, 0.2, 0.4], v => Math.round(v * 100) + '%', v => { cs.oroReserva = v; })),

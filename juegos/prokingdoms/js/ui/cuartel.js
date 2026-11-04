@@ -113,16 +113,19 @@
     if (!pv) { plan = null; return; }
     const w = S().war;
     if (!plan.units) plan.units = PK.Exp.recommend(pv.enemy, pv.power);
+    const HH = PK.Heroes;
+    if (plan.heroe === undefined) { const m = HH && HH.mejorPara(pv.enemy); plan.heroe = m ? m.id : null; }
+    if (plan.heroe && !(HH.de(plan.heroe) && HH.de(plan.heroe).estado === 'libre')) plan.heroe = null;
     const est = el('div', { class: 'plan-est' }), go = el('span');
     const why = PK.Exp.canSend(plan.target);
     const refresh = () => {
-      const p = PK.Exp.powerVs(plan.units, pv.enemy), ch = PK.Exp.chance(p / Math.max(1, pv.power)), heal = PK.Exp.heal(plan.units), n = sumUnits(plan.units);
+      const p = PK.Exp.powerVs(plan.units, pv.enemy, plan.heroe), ch = PK.Exp.chance(p / Math.max(1, pv.power)), heal = PK.Exp.heal(plan.units), n = sumUnits(plan.units);
       est.innerHTML = '';
       est.append(el('div', null, el('b', null, 'Tu fuerza: '), U.fmt(p) + ' contra ' + U.fmt(pv.power) + ' (' + n + ' soldado' + (n === 1 ? '' : 's') + ')'),
         el('div', { class: 'bar' }, el('div', { class: 'fill ' + (ch >= 0.75 ? 'green' : ch >= 0.45 ? 'gold' : 'red'), style: { width: ch * 100 + '%' } }), el('span', null, 'Probabilidad de victoria: ' + Math.round(ch * 100) + '%')),
         el('div', { class: 'small muted' }, heal ? 'Los clérigos reducen las bajas un ' + Math.round(heal * 100) + '%.' : 'Sin clérigos: las bajas serán completas.'));
       go.innerHTML = '';
-      go.append(UI.btn('¡En marcha! (' + n + ')', () => { if (PK.Exp.send(plan.target, Object.assign({}, plan.units))) { plan = null; UI.closeModal(); } }, { cls: 'gold', disabled: !!why || !n }));
+      go.append(UI.btn('¡En marcha! (' + n + ')', () => { if (PK.Exp.send(plan.target, Object.assign({}, plan.units), plan.heroe)) { plan = null; UI.closeModal(); } }, { cls: 'gold', disabled: !!why || !n }));
     };
     const kinds = Object.keys(D.ARMY).filter(k => w.army[k] > 0);
     const rows = el('div', { class: 'pick-rows' }, kinds.map(k => {
@@ -140,6 +143,7 @@
       el('div', { class: 'small' }, 'Enemigos: ' + enemyText(pv.enemy) + '. Conviene: ' + (bestVs(pv.enemy) || 'cualquier tropa') + '. Viaje: ' + U.fmtTime(pv.travel) + ' de ida y otro tanto de vuelta.'),
       kinds.length ? rows : el('div', { class: 'empty-box small' }, el('div', null, el('b', null, 'No tienes soldados en casa.'), el('p', { class: 'small' }, 'Entrénalos en la pestaña Tropas: tardan unos segundos y quedan formados frente al Cuartel.'),
         UI.btn('Entrenar tropas', () => { barTab = 'troops'; UI.rerender(true); }, { small: true, cls: 'gold' }))),
+      kinds.length ? heroePick(pv) : null,
       kinds.length ? est : null,
       el('div', { class: 'row' }, el('b', null, 'Botín si ganas: '), UI.costEl(pv.loot, 1, true)),
       why ? el('p', { class: 'small warn-t' }, why) : null,
@@ -147,6 +151,18 @@
         UI.btn('Todos', () => { plan.units = Object.assign({}, w.army); UI.rerender(); }, { small: true }), go) : null));
     refresh();
   }
+
+  // Qué héroe va con la compañía (H1): los libres, con cuánto suben la fuerza contra este enemigo.
+  function heroePick(pv) {
+    const HH = PK.Heroes, todos = HH ? HH.lista() : [];
+    if (!todos.length) return '';
+    const libres = HH.libres();
+    return el('div', { class: 'pl-heroe' }, el('b', null, 'Héroe: '),
+      UI.btn('Ninguno', () => { plan.heroe = null; UI.rerender(); }, { small: true, cls: plan.heroe ? '' : 'gold' }),
+      libres.map(h => UI.btn('', () => { plan.heroe = h.id; UI.rerender(); }, { small: true, cls: plan.heroe === h.id ? 'gold' : '', title: H_txt(h, pv) })).map((b, i) => { b.append(HH.retratoEl(libres[i]), el('span', { translate: 'no' }, libres[i].nombre), el('small', null, ' +' + Math.round((HH.mult(libres[i], pv.enemy) - 1) * 100) + '%')); return b; }),
+      libres.length < todos.length ? el('span', { class: 'small muted' }, (todos.length - libres.length) + ' fuera o herido' + (todos.length - libres.length > 1 ? 's' : '')) : '');
+  }
+  const H_txt = (h, pv) => PK.Heroes.CLASES[h.clase].name + ' nivel ' + h.nivel + ': +' + Math.round((PK.Heroes.mult(h, pv.enemy) - 1) * 100) + '% de fuerza contra estos enemigos';
 
   function runsList(pane) {
     const runs = S().exp.runs;
@@ -256,6 +272,7 @@
         el('h2', null, r.name),
         r.live ? el('p', { class: 'small good-t' }, r.retreat ? 'Te retiraste a tiempo: se salvaron más soldados.' : 'Batalla peleada en vivo: el resultado y las bajas salieron de la pelea.') : null,
         el('p', null, 'Tu fuerza ' + U.fmt(r.power) + ' contra aprox. ' + U.fmt(r.need) + (r.enemy ? ' (' + enemyText(r.enemy).toLowerCase() + ')' : '') + '. Probabilidad: ' + Math.round((r.chance || 0) * 100) + '%.'),
+        r.heroe ? el('p', { class: 'small' }, 'Héroe: ', el('b', { translate: 'no' }, r.heroe), r.won ? '' : ' (vuelve herido)', r.hab ? ' · usó su habilidad ' + (r.hab === 1 ? 'una vez' : r.hab + ' veces') : '') : null,
         el('h3', null, 'Tu compañía'),
         el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),
           (r.lost || {})[k] ? el('span', { class: 'small warn-t' }, '−' + r.lost[k] + ' bajas') : el('span', { class: 'small good-t' }, 'sin bajas')))),

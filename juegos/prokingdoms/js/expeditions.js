@@ -39,11 +39,13 @@
     for (const e in enemy) { f += enemy[e] * (vs[e] || 1); tot += enemy[e]; }
     return tot ? f / tot : 1;
   };
-  Exp.powerVs = function (units, enemy) {
+  // heroe: id de un héroe que va con la compañía (js/heroes.js): multiplica la fuerza contra ese enemigo.
+  Exp.powerVs = function (units, enemy, heroe) {
     let p = 0;
     for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy);
-    return p * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult();
+    return p * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy);
   };
+  Exp.heroMult = (id, enemy) => (id && PK.Heroes ? PK.Heroes.mult(PK.Heroes.de(id), enemy) : 1);
   Exp.heal = units => Math.min(0.45, Object.keys(units).reduce((s, k) => s + (units[k] || 0) * (D.ARMY[k].heal || 0), 0));
   // Probabilidad de victoria según la proporción de fuerzas: 1:1 es 50%, 1,5:1 ya es casi seguro.
   Exp.chance = ratio => U.clamp(0.5 + (ratio - 1) * 0.9, 0.03, 0.97);
@@ -94,7 +96,7 @@
 
   // ---------- Encargos ----------
   Exp.board = function () {
-    const st = S(), b = st.exp.board, n = 3 + Exp.bonus('missions');
+    const st = S(), b = st.exp.board, n = 3 + Exp.bonus('missions') + (PK.Heroes && st.heroes ? Math.floor(PK.Heroes.pasiva('missions')) : 0);
     if (Date.now() - b.at > BOARD_MS || !b.at) {
       b.at = Date.now();
       const pool = D.MISSIONS.filter(m => st.era >= m.era), rng = U.rng(Math.floor(Date.now() / BOARD_MS) * 7 + st.created % 997);
@@ -154,18 +156,22 @@
     }
     return null;
   };
-  Exp.send = function (target, units) {
+  Exp.send = function (target, units, heroeId) {
     const why = Exp.canSend(target), st = S(), army = st.war.army;
     if (why) { toast(why, 'warn'); return false; }
+    const heroe = heroeId && PK.Heroes ? PK.Heroes.de(heroeId) : null;
+    if (heroeId && (!heroe || heroe.estado !== 'libre')) { toast('Ese héroe no está disponible.', 'warn'); return false; }
     let total = 0;
     for (const k in units) { units[k] = Math.max(0, Math.floor(units[k] || 0)); if (units[k] > army[k]) { toast('No tienes tantas tropas.', 'warn'); return false; } total += units[k]; }
     if (!total) { toast('Elige tropas para la expedición.', 'warn'); return false; }
     const pv = Exp.preview(target);
     if (!pv) return false;
+    if (heroe) pv.travel = Math.round(pv.travel * PK.Heroes.viaje(heroe));
     for (const k in units) army[k] -= units[k];
-    const run = { id: st.exp.rid++, poi: target.poi, camp: target.camp, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
+    const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
     st.exp.runs.push(run);
+    if (heroe) PK.Heroes.salir(heroe, run);
     run.chance = Exp.chance(run.power / Math.max(1, pv.power));
     log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra aprox. ' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
     const to = PK.Troops ? PK.Troops.targetOf(run) : null;
@@ -200,7 +206,7 @@
       for (const k in r.units) { const l = Math.min(r.units[k], res.lost[k] || 0); r.lost[k] = l; r.units[k] -= l; }
     } else {
       r.won = Math.random() < Exp.chance(ratio);
-      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss);
+      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss * (1 - heroBajas(r)));
       for (const k in r.units) { const l = Math.round(r.units[k] * loss * U.rand(0.8, 1.2)); r.lost[k] = Math.min(r.units[k], l); r.units[k] -= r.lost[k]; }
     }
     // veteranía para quienes vuelven (también se aprende perdiendo, menos)
@@ -219,10 +225,11 @@
       const p = W.pois[r.camp], ps = p && G().poiState(p);
       if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
     }
+    if (r.heroe && PK.Heroes) PK.Heroes.resultado(r);
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat) };
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), hab: r.habUsos };
     st.war.reports = st.war.reports || [];
     st.war.reports.unshift(rep);
     if (st.war.reports.length > 12) st.war.reports.length = 12;
@@ -234,10 +241,17 @@
   }
   Exp.finishBattle = (r, res) => { if (r.phase === 'battle') resolve(r, res); };
   const lostText = l => Object.keys(l).filter(k => l[k]).map(k => l[k] + ' ' + D.ARMY[k].name.toLowerCase() + (l[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
+  // Menos bajas con el héroe (armadura, rasgo Prudente, talentos). Valiente puede subirlas.
+  const heroBajas = r => (r.heroe && PK.Heroes ? U.clamp(PK.Heroes.efecto(PK.Heroes.de(r.heroe), 'bajas'), -0.2, 0.5) : 0);
+  Exp.heroBajas = heroBajas;
+  const heroName = r => { const h = r.heroe && PK.Heroes ? PK.Heroes.de(r.heroe) : null; return h ? h.nombre : undefined; };
   function arrive(r) {
     const st = S(), g = G();
     for (const k in r.units) st.war.army[k] += r.units[k];
+    if (r.heroe && PK.Heroes) PK.Heroes.volver(r);
     if (r.won) {
+      const h = r.heroe && PK.Heroes ? PK.Heroes.de(r.heroe) : null, bot = h ? PK.Heroes.efecto(h, 'botin') : 0;
+      if (bot) for (const k in r.loot) if (k !== 'coins') r.loot[k] = Math.round(r.loot[k] * (1 + bot));
       g.give(r.loot);
       for (const k of D.SPECIAL) if (r.loot[k]) g.stat('sp_' + k, r.loot[k]);
       g.stat('exp_won', 1);

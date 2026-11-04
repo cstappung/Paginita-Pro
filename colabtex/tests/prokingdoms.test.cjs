@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js']);
+const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -231,4 +231,42 @@ test('A3: el Salón del Consejo y sus seis consejeros', () => {
 test('A6: las reglas del Asesor tienen texto y botones', () => {
   assert.ok(PK.Asesor.REGLAS.length >= 8);
   assert.match(JS('asesor.js'), /prioridad: 100/);
+});
+
+test('H1: héroes, equipo y talentos', () => {
+  const H = PK.Heroes, viejo = G.state;
+  PK.UI = { toast: () => {} };
+  G.state = { era: 12, stats: {}, created: 1 };
+  H.init(G.state);
+  try {
+    assert.deepEqual([...H.ORDEN].sort(), Object.keys(H.CLASES).sort());
+    for (const id of H.ORDEN) {
+      const c = H.CLASES[id];
+      assert.equal(H.TAL_NOMBRES[id].length, 16, id + ': 8 escalones x 2 nombres');
+      assert.ok(c.hab.cd > 0 && c.hab.name && c.pasTxt, id);
+      assert.ok(D.SPECIAL.includes(c.sp), id + ' se recluta con un recurso especial');
+      for (const e of c.vs) assert.ok(D.ENEMY[e], id + ' rinde contra ' + e);
+    }
+    assert.equal(H.TALENTOS.length, 8);
+    // el equipo sale de la semilla: el mismo objeto da lo mismo, y la mejora lo sube
+    const it = { id: 1, t: 'arma', r: 3, s: 12345, m: 0 }, a = { ...H.itemStats(it) };
+    assert.deepEqual({ ...H.itemStats({ id: 2, t: 'arma', r: 3, s: 12345, m: 0 }) }, a);
+    assert.ok(Object.keys(a).length >= 3);
+    // tope: héroe de nivel 40 con lo mejor que puede tener → nunca más de +60% (plan H1)
+    const h = { id: 1, clase: 'paladin', nombre: 'Prueba', semilla: 7, rasgo: 'valiente', nivel: 40, xp: 0, talentos: [0, 0, 0, 0, 0, 0, 0, 0], equipo: {}, estado: 'libre', gobierna: null };
+    G.state.heroes.lista.push(h);
+    for (const [i, t] of [[10, 'arma'], [11, 'armadura'], [12, 'talisman']]) { G.state.heroes.inv.push({ id: i, t, r: 3, s: 999 + i, m: 5 }); h.equipo[t] = i; }
+    for (const e of Object.keys(D.ENEMY)) assert.ok(H.mult(h, { [e]: 1 }) <= 1 + H.TOPE_FUERZA + 1e-9, e);
+    assert.ok(H.mult(h, { undead: 1 }) > H.mult({ ...h, nivel: 1, talentos: [], equipo: {} }, { undead: 1 }));
+    assert.ok(H.efecto(h, 'bajas') <= 0.5 && H.efecto(h, 'cd') <= 0.4);
+    // niveles: el tope es 5 + 3 x era (hasta 40); cada 5 niveles, un talento
+    G.state.era = 2;
+    const n = { ...h, nivel: 1, xp: 0, talentos: [], equipo: {} };
+    H.darXp(n, 1e6);
+    assert.equal(n.nivel, 11);
+    assert.equal(H.talentosPendientes(n), 2);
+    assert.ok(H.elegirTalento(n, 1) && H.elegirTalento(n, 0) && !H.elegirTalento(n, 0));
+    assert.equal(G.state.stats.hero_lvl, 11);
+    assert.equal(H.crearObjeto(1, 0).m, 0);
+  } finally { G.state = viejo; }
 });

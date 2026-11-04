@@ -202,6 +202,7 @@
     mbtn('hammer', 'Obras', () => UI.openWorks());
     mbtn('pop', 'Aldeanos', () => UI.openForeman());
     mbtn('war', 'Cuartel', () => PK.Social.openWar());
+    mbtn('hero', 'Héroes', () => PK.Heroes.open(), null, 'heroes');
     mbtn('compass', 'Explorar', () => UI.openExplore(), null, 'explore');
     mbtn('flask', 'Investigar', () => UI.openResearch(), null, 'research');
     mbtn('market', 'Mercado', () => PK.Social.openMarket(), null, 'market');
@@ -246,6 +247,7 @@
     terr: (g, st) => st.era >= 2 || !!st.flags.verTerr,
     logi: (g, st) => g.countAll('cartwright') > 0 || g.buildings.some(b => b.owner === 'p' && b.def.recipe) || !!(st.logi && st.logi.roads.length),
     realms: (g, st) => !!PK.Net.online || D.BOTS.some(b => st.flags['seen_' + b.slot]),
+    heroes: (g, st) => g.countAll('tavern') > 0 || !!(st.heroes && st.heroes.lista.length),
   };
   let menuFirst = true;
   function updateMenu() {
@@ -652,6 +654,8 @@
     }
     const act = el('div', { class: 'p-actions' });
     act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
+    if (b.type === 'tavern' && PK.Heroes) act.append(el('div', { class: 'row' }, UI.btn('Candidatos del día', () => PK.Heroes.open('taberna'), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Héroes: ' + PK.Heroes.lista().length + '/' + PK.Heroes.max())));
+    if (PK.Heroes && b.done) { const gh = PK.Heroes.gobernanteDe(b); if (gh) act.append(el('p', { class: 'small' }, '★ Lo gobierna ', el('b', { translate: 'no' }, gh.nombre), ': ' + PK.Heroes.CLASES[gh.clase].pasTxt.split(': ').pop() + (gh.estado === 'libre' ? '.' : ' (ahora no: ' + (gh.estado === 'herido' ? 'herido' : 'de expedición') + ').'))); }
     if (b.type === 'consejo' && PK.Consejo) act.append(el('div', { class: 'row' }, UI.btn('Abrir el Consejo', () => PK.Consejo.open(), { cls: 'gold' }), el('span', { class: 'small muted' }, PK.Consejo.resumen())));
     if (b.type === 'tc') {
       const st = S();

@@ -20,6 +20,7 @@
   const HPK = 10, DPSK = 0.33;     // vida y daño por punto de fuerza: a fuerzas iguales, unos 30-40 s de pelea
   const LIMITE = 150;              // si nadie cae del todo, gana el que conserve más vida
   const MAX_MIOS = 18, COL_MIOS = D.PLAYER_COLOR;
+  const HERO_TROPAS = 0.6;
 
   // Cómo pelea cada tropa tuya (la fuerza y los multiplicadores contra cada enemigo vienen de D.ARMY).
   const TROPA = {
@@ -89,6 +90,10 @@
     const tipos = Object.keys(r.units).filter(k => r.units[k] > 0 && TROPA[k]);
     if (!tipos.length) return false;
     const tac = PK.Exp.TACTICS[r.tactic] || PK.Exp.TACTICS.normal;
+    // El héroe sube la fuerza de la compañía (Exp.heroMult, lo que dice el planificador). En la batalla en vivo las
+    // tropas reciben solo una parte (HERO_TROPAS) y el resto lo pone su habilidad, que se usa sola si nadie mira:
+    // así el resultado medio en vivo se parece al del cálculo por proporción (regla 8). Medido con B.adelantar.
+    const hm = 1 + (PK.Exp.heroMult(r.heroe, r.enemy || { bandit: 1 }) - 1) * HERO_TROPAS;
     const b = {
       id: r.id, nombre: r.name, lugar: lugarDe(r), nivel: nivelDe(r), piso: r.floor || 0, t: 0, fin: null, orden: r.tactic === 'cauto' ? 'linea' : 'cargar', foco: null, vel: 1,
       tac, suerte: U.rand(0.8, 1.2), mios: [], suyos: [], tiros: [], efectos: [], textos: [], enviados: Object.assign({}, r.units), enemigo: r.enemy || { bandit: 1 },
@@ -106,7 +111,7 @@
         if (!rep) continue;
         // la vida también sale de cuánto rinde esa tropa contra este enemigo: así la «fuerza contra» del planificador
         // (Exp.powerVs) es la que pelea (vida x daño crecen igual que la fuerza al cuadrado de los dos lados)
-        const pow = rep * porUnidad(k), f = figura('p', k, st, pow, rep, st.fila + (Math.random() - 0.5) * 0.6, 0);
+        const pow = rep * porUnidad(k) * hm, f = figura('p', k, st, pow, rep, st.fila + (Math.random() - 0.5) * 0.6, 0);
         f.max = f.hp = f.hp * PK.Exp.vsFactor(k, b.enemigo);
         b.mios.push(f);
       }
@@ -123,6 +128,7 @@
     }
     acomodar(b.mios); acomodar(b.suyos);
     b.fuerza0 = [vida(b.mios), vida(b.suyos)];
+    if (r.heroe && PK.Heroes) armarHeroe(b, PK.Heroes.de(r.heroe));
     B.lista.push(b);
     r.phase = 'battle';
     r.battleAt = Date.now();
@@ -162,6 +168,7 @@
     for (const f of b.mios.concat(b.suyos)) { f.anim += dt; f.golpe = Math.max(0, f.golpe - dt); if (f.muerto) f.muerto += dt; }
     for (const f of mios) actuar(b, f, suyos, mios, dt);
     for (const f of suyos) actuar(b, f, mios, suyos, dt);
+    if (b.heroe) heroePaso(b, mios, suyos, dt);
     separar(mios, b.orden === 'dispersar' ? 1.35 : 0.7, dt);
     separar(suyos, 0.7, dt);
     tiros(b, dt);
@@ -203,7 +210,7 @@
     const quieto = f.lado === 'p' && b.orden === 'linea' && !st.dispara && d > 2.6 && f.u >= f.u0 - 0.5;
     if (d > alcance) {
       if (quieto) { f.modo = 'idle'; return; }
-      const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * dt;
+      const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * (f.lado === 'p' && b.cancion > 0 ? 1.25 : 1) * dt;
       f.u += ((o.u - f.u) / d) * sp; f.v += ((o.v - f.v) / d) * sp;
       f.modo = 'walk';
       return;
@@ -233,10 +240,12 @@
       let m = (D.ARMY[f.tipo].vs || {})[o.kind] || 1;
       m *= b.tac.pow;
       if (b.orden === 'linea' && f.st.linea && (o.st.vel >= 2 || o.st.jefe)) m *= f.st.linea;
+      if (b.cancion > 0) m *= 1.25;
       return m;
     }
     let m = b.tac.loss >= 1 ? 1 + (b.tac.loss - 1) * 0.3 : 1 - (1 - b.tac.loss) * 0.4; // asalto expone más; cauteloso, menos
     if (f.st.flanco && o.st.dispara) m *= 1.25;
+    if (b.muro > 0) m *= 0.5;
     return m;
   }
   function herir(b, o, dmg, de) {
@@ -279,12 +288,110 @@
     for (const f of list) { f.u = U.clamp(f.u, 0.5, LU - 0.5); f.v = U.clamp(f.v, 0.6, LV - 0.4); }
   }
 
+  // ---------- El héroe (C2 del plan) ----------
+  // Va detrás de la primera línea, no recibe golpes y no cuenta en la vida de la compañía: su fuerza ya está en
+  // la de las tropas (Exp.heroMult). Lo que agrega es su habilidad, con recarga. Si nadie la pide, se usa sola
+  // con una regla simple, así que la batalla da lo mismo mirándola o no (B.adelantar).
+  function armarHeroe(b, h) {
+    if (!h) return;
+    const c = PK.Heroes.CLASES[h.clase], H = PK.Heroes;
+    b.heroeId = h.id;
+    b.heroe = { id: h.id, nombre: h.nombre, clase: h.clase, hab: c.hab, cd: 4, cdMax: c.hab.cd * (1 - H.efecto(h, 'cd')), pot: 1 + H.efecto(h, 'pot'), auto: true, pedir: false, usos: 0,
+      fig: { lado: 'p', tipo: 'heroe', st: { spr: 'heroe', hp: 1 }, look: c.look, col: c.col, pow: 0, rep: 1, hp: 1, max: 1, dps: 0, u: 1.5, v: LV / 2, u0: 1.5, cd: 0, anim: 0, flip: false, modo: 'idle', muerto: 0, golpe: 0, objetivo: null } };
+    b.muro = 0; b.cancion = 0;
+  }
+  function heroePaso(b, mios, suyos, dt) {
+    const h = b.heroe, f = h.fig;
+    h.cd = Math.max(0, h.cd - dt); b.muro = Math.max(0, b.muro - dt); b.cancion = Math.max(0, b.cancion - dt);
+    f.anim += dt;
+    // se para un par de pasos detrás del más adelantado de los suyos
+    let front = null;
+    for (const o of mios) if (!front || o.u > front.u) front = o;
+    const tu = front ? U.clamp(front.u - 2.2, 0.8, LU - 3) : f.u, tv = front ? U.clamp(front.v, 1, LV - 1) : f.v, d = Math.hypot(tu - f.u, tv - f.v);
+    if (d > 0.4) { const sp = Math.min(d, 1.8 * dt); f.u += ((tu - f.u) / d) * sp; f.v += ((tv - f.v) / d) * sp; f.modo = 'walk'; } else f.modo = f.lanza > 0 ? 'work' : 'idle';
+    f.lanza = Math.max(0, (f.lanza || 0) - dt);
+    if (h.cd > 0 || !suyos.length || !mios.length) { h.pedir = false; return; }
+    if (h.pedir || (h.auto && conviene(b, h, mios, suyos))) lanzar(b, h, mios, suyos);
+    h.pedir = false;
+  }
+  // el grupo de enemigos más apretado (para la lluvia de flechas)
+  function racimo(suyos, r) {
+    let mejor = null, n = 0;
+    for (const o of suyos) { const k = suyos.filter(x => cerca(x, o) < r).length; if (k > n) { n = k; mejor = o; } }
+    return [mejor, n];
+  }
+  function conviene(b, h, mios, suyos) {
+    const id = h.hab.id;
+    if (id === 'muro') return suyos.filter(o => mios.some(m => cerca(m, o) < 1.6)).length >= 3 || vida(mios) < b.fuerza0[0] * 0.7;
+    if (id === 'lluvia') return racimo(suyos, 3.2)[1] >= Math.min(3, suyos.length) || b.t > 12;
+    if (id === 'plegaria') { const mx = mios.reduce((s, o) => s + o.max, 0); return mx && 1 - vida(mios) / mx >= 0.3; }
+    if (id === 'bombarda') return suyos.some(o => cerca(o, h.fig) < 10);
+    if (id === 'rayo') return suyos.length >= 3 || b.t > 10;
+    if (id === 'cancion') return suyos.some(o => mios.some(m => cerca(m, o) < 2));
+    return false;
+  }
+  function lanzar(b, h, mios, suyos) {
+    const id = h.hab.id, base = mios.reduce((s, o) => s + o.dps, 0) * h.pot, blancos = [];
+    if (id === 'muro') b.muro = (h.hab.dur || 8) * (0.5 + 0.5 * h.pot);
+    else if (id === 'cancion') b.cancion = (h.hab.dur || 10) * (0.5 + 0.5 * h.pot);
+    else if (id === 'plegaria') for (const a of mios) { a.hp = Math.min(a.max, a.hp + a.max * 0.3 * h.pot); blancos.push(a); }
+    else if (id === 'lluvia') {
+      const [c] = racimo(suyos, 3.2);
+      if (c) { blancos.push(c); for (const o of suyos) { const d = cerca(o, c); if (d < 3.2) herir(b, o, base * 1.6 * (1 - d / 5), null); } }
+    } else if (id === 'bombarda') {
+      const o = suyos.reduce((m, x) => (x.hp > m.hp ? x : m), suyos[0]);
+      blancos.push(o); herir(b, o, base * 4 * (o.kind === 'golem' || o.kind === 'giant' ? 3 : 1), null);
+    } else if (id === 'rayo') {
+      let o = suyos.reduce((m, x) => (cerca(x, h.fig) < cerca(m, h.fig) ? x : m), suyos[0]);
+      const tocados = new Set();
+      for (let i = 0; i < 5 && o; i++) {
+        tocados.add(o); blancos.push(o); herir(b, o, base * 1.3 * Math.pow(0.85, i), null);
+        let sig = null;
+        for (const x of suyos) if (!tocados.has(x) && !x.muerto && (!sig || cerca(x, o) < cerca(sig, o))) sig = x;
+        o = sig;
+      }
+    }
+    h.cd = h.cdMax;
+    h.usos++;
+    h.fig.lanza = 0.5;
+    fxHab(b, h, blancos, mios);
+  }
+  function fxHab(b, h, blancos, mios) {
+    const v = fxDe(b); if (!v) return;
+    v.banner = { txt: h.hab.name + '!', sub: h.nombre, t: 0, dur: 1.4, chico: true };
+    const [hx, hy] = aPx(h.fig.u, h.fig.v), id = h.hab.id;
+    luzTemp(v, hx, hy - 12, 50, [255, 230, 140], 0.5);
+    sfx('magia');
+    if (id === 'muro' || id === 'cancion') for (const a of mios) {
+      const [x, y] = aPx(a.u, a.v);
+      v.anillos.push({ x, y: y - 6, t: 0, dur: 0.7, col: id === 'muro' ? [120, 180, 255] : [255, 210, 90], r: 14 });
+      for (let i = 0; i < 4; i++) part(v, { x: x + rnd(-6, 6), y: y - rnd(6, 16), vy: rnd(-30, -10), life: rnd(0.6, 1), size: 2, col: id === 'muro' ? [150, 200, 255] : [255, 220, 110], add: true });
+    } else if (id === 'plegaria') for (const a of blancos) {
+      const [x, y] = aPx(a.u, a.v);
+      for (let i = 0; i < 6; i++) part(v, { x: x + rnd(-6, 6), y: y - rnd(2, 14), vy: rnd(-30, -12), life: rnd(0.7, 1.1), size: 1, col: [150, 255, 170], add: true, cruz: Math.random() < 0.5 });
+      v.anillos.push({ x, y, t: 0, dur: 0.6, col: [140, 255, 170], r: 12 });
+    } else if (id === 'lluvia' && blancos[0]) {
+      const [x, y] = aPx(blancos[0].u, blancos[0].v);
+      for (let i = 0; i < 40; i++) part(v, { x: x + rnd(-36, 36), y: y - rnd(40, 90), vx: rnd(-10, 10), vy: rnd(160, 240), life: rnd(0.25, 0.45), size: 1, col: [232, 220, 192], linea: true });
+      v.anillos.push({ x, y, t: 0, dur: 0.6, col: [255, 230, 170], r: 40, suelo: true });
+      sacudir(v, 2); sfx('arrow');
+    } else if (id === 'bombarda' && blancos[0]) {
+      const [x, y] = aPx(blancos[0].u, blancos[0].v);
+      sacudir(v, 7); v.flash = Math.max(v.flash, 0.2); sfx('boom');
+      for (let i = 0; i < 30; i++) { const a = rnd(0, 6.3), sp = rnd(50, 170); part(v, { x, y: y - 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, g: 200, drag: 1, life: rnd(0.4, 0.9), size: rnd(1, 3) | 0, col: Math.random() < 0.5 ? [255, 200, 80] : [255, 120, 40], add: true }); }
+      luzTemp(v, x, y - 8, 90, [255, 170, 80], 0.6); marca(v, x, y, 'quemado');
+    } else if (id === 'rayo') {
+      let [px, py] = [hx, hy - 16];
+      for (const o of blancos) { const [x, y] = aPx(o.u, o.v); v.rayos.push({ x0: px, y0: py, x1: x, y1: y - 10, t: 0, dur: 0.45, col: [190, 160, 255] }); luzTemp(v, x, y - 10, 36, [170, 130, 255], 0.4); px = x; py = y - 10; }
+    }
+  }
+
   // ---------- Final ----------
   // Bajas: las figuras que cayeron (todos sus soldados) y parte de los heridos. Retirarse salva a los que quedan.
   function bajas(b, retirada) {
-    const lost = {};
+    const lost = {}, hb = b.heroeId ? 1 - PK.Exp.heroBajas({ heroe: b.heroeId }) : 1;
     for (const f of b.mios) {
-      let n = f.muerto ? f.rep : Math.round(f.rep * (1 - f.hp / f.max) * (retirada ? 0.2 : 0.3));
+      let n = Math.round((f.muerto ? f.rep : f.rep * (1 - f.hp / f.max) * (retirada ? 0.2 : 0.3)) * hb);
       n = Math.min(f.rep, n);
       if (n) lost[f.tipo] = (lost[f.tipo] || 0) + n;
     }
@@ -297,6 +404,7 @@
     sfx(gano ? 'victoria' : 'derrota');
     fxFinal(b);
     const r = S().exp.runs.find(o => o.id === b.id);
+    if (r && b.heroe) r.habUsos = b.heroe.usos;
     if (r) PK.Exp.finishBattle(r, { won: gano, lost: b.fin.lost, live: true, retreat: !!retirada });
     if (vista && vista.b === b) pintarControles();
     // si nadie la mira, se borra enseguida; si la están mirando, queda el cartel hasta que la cierren
@@ -306,6 +414,8 @@
   const GRITOS = { cargar: '¡A la carga!', linea: '¡Mantengan la línea!', dispersar: '¡Dispérsense!' };
   B.ordenar = function (id, orden) { const b = B.de(id); if (b && B.ORDENES[orden]) { if (b.orden !== orden) grito(b, GRITOS[orden]); b.orden = orden; } };
   B.enfocar = function (id, kind) { const b = B.de(id); if (b) { b.foco = b.foco === kind ? null : kind; if (b.foco) grito(b, '¡A por ' + (A_POR[kind] || 'ellos') + '!'); } };
+  B.habilidad = function (id) { const b = B.de(id); if (b && b.heroe && !b.fin) b.heroe.pedir = true; };
+  B.autoHab = function (id, on) { const b = B.de(id); if (b && b.heroe) b.heroe.auto = !!on; };
   const A_POR = { beast: 'las bestias', bandit: 'los bandidos', undead: 'los no-muertos', golem: 'los gólems', dragon: 'el dragón' };
 
   // ---------- Efectos (solo dibujo) ----------
@@ -478,13 +588,27 @@
     const foco = kinds.length > 1 ? el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Atacar primero' }, el('span', { class: 'small' }, 'Atacar primero: '),
       kinds.map(k => btn(D.ENEMY[k].name, () => { B.enfocar(b.id, k); pintarControles(); }, { small: true, cls: b.foco === k ? 'gold' : '', title: D.ENEMY[k].desc }))) : '';
     const consejo = el('p', { class: 'small bt-tip' }, kinds.map(k => B.CONSEJO[k] || D.ENEMY[k].desc).join(' '));
-    v.ctl.append(ord, foco, consejo,
+    // el héroe: su retrato, la habilidad con la recarga a la vista (un toque) y «sola» para que la use él
+    let heroeRow = '';
+    v.habBtn = null;
+    if (b.heroe && PK.Heroes) {
+      const hh = PK.Heroes.de(b.heroe.id), hb = b.heroe;
+      v.habBtn = btn(hb.hab.name, () => { B.habilidad(b.id); }, { small: true, cls: 'gold', title: hb.hab.desc });
+      heroeRow = el('div', { class: 'bt-heroe' }, hh ? PK.Heroes.retratoEl(hh) : '', el('b', { translate: 'no' }, hb.nombre), v.habBtn,
+        el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: hb.auto, onchange: e => B.autoHab(b.id, e.target.checked) }), ' sola'));
+      v.habKey = '';
+    }
+    v.ctl.append(heroeRow, ord, foco, consejo,
       el('div', { class: 'row' }, btn('x' + (b.vel === 1 ? 2 : 1), () => { b.vel = b.vel === 1 ? 2 : 1; pintarControles(); }, { small: true, title: 'Velocidad de la batalla' }),
         btn('Retirada', () => { B.retirada(b.id); }, { small: true, cls: 'danger', title: 'Pierdes la pelea, pero se salvan más soldados' }),
         btn('Volver al reino', () => B.cerrar(), { small: true, title: 'La batalla sigue aunque no la mires' })));
   }
   function pintarArriba() {
     const v = vista, b = v.b, vm = vida(b.mios), vs = vida(b.suyos);
+    if (v.habBtn && b.heroe) { // la recarga de la habilidad, sin rehacer los controles
+      const cd = Math.ceil(b.heroe.cd), k = cd + '|' + !!b.fin;
+      if (k !== v.habKey) { v.habKey = k; v.habBtn.textContent = b.heroe.hab.name + (cd > 0 ? ' · ' + cd + ' s' : ''); v.habBtn.disabled = cd > 0 || !!b.fin; }
+    }
     const key = Math.round(vm) + '|' + Math.round(vs) + '|' + Math.floor(b.t) + '|' + !!b.fin;
     if (key === v.key) return;
     v.key = key;
@@ -552,6 +676,7 @@
   const PALIDO = [176, 176, 164], BANDIDO = [70, 44, 40];
   function sprite(f, frame) {
     const a = f.st, modo = f.modo;
+    if (f.tipo === 'heroe') return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
     if (f.lado === 'p') return f.tipo === 'catapult' ? Sp.cart(COL_MIOS, 'stone', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
     if (a.spr === 'lobo' || a.spr === 'oso') return Sp.wolf[f.flip ? 1 : 0][frame % 2];
     if (a.spr === 'golem') return Sp.rocks.stone[2][0];
@@ -613,7 +738,7 @@
     // con la pelea terminada la simulación ya no corre: los que venían cayendo terminan de caer aquí
     if (b.fin) for (const f of b.mios.concat(b.suyos)) { if (f.muerto) f.muerto += dt; f.anim += dt; f.golpe = Math.max(0, f.golpe - dt); }
     // figuras, de atrás hacia adelante
-    const todos = b.mios.concat(b.suyos).filter(f => !f.muerto || f.muerto < (f.st.spr === 'golem' ? 0.3 : f.st.spr === 'espectro' ? 0.6 : 1.6));
+    const todos = b.mios.concat(b.suyos, b.heroe ? [b.heroe.fig] : []).filter(f => !f.muerto || f.muerto < (f.st.spr === 'golem' ? 0.3 : f.st.spr === 'espectro' ? 0.6 : 1.6));
     todos.sort((a, c) => aPx(a.u, a.v)[1] - aPx(c.u, c.v)[1]);
     for (const f of todos) {
       let [px, py] = aPx(f.u, f.v);
@@ -652,7 +777,7 @@
       } else {
         const spr = sprite(f, frame);
         if (spr) {
-          const big = spr0 === 'oso' ? 1.5 : spr0 === 'golem' ? 1.2 : 1;
+          const big = spr0 === 'oso' ? 1.5 : spr0 === 'golem' ? 1.2 : spr0 === 'heroe' ? 1.25 : 1;
           const w = (spr.k ? spr.w : spr.c.width) * big, h = (spr.k ? spr.h : spr.c.height) * big, x0 = Math.round(-spr.ax * big), y0 = Math.round(-spr.ay * big);
           ctx.drawImage(spr.c, x0, y0, w, h);
           // destello blanco del golpe recibido
@@ -664,8 +789,12 @@
       ctx.restore();
       ctx.globalAlpha = 1;
       // vida y cuántos son
-      if (!m) {
+      if (!m && spr0 === 'heroe') { // el héroe: una estrella y su nombre en vez de barra de vida
+        const nm = b.heroe.nombre;
+        ctx.font = 'bold 7px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText('★ ' + nm, Math.round(px) + 1, Math.round(py - 30) + 1); ctx.fillStyle = '#ffd860'; ctx.fillText('★ ' + nm, Math.round(px), Math.round(py - 30));
+      } else if (!m) {
         const k = U.clamp(f.hp / f.max, 0, 1), top = spr0 === 'dragon' ? 62 : 24;
+        if (f.lado === 'p' && (b.muro > 0 || b.cancion > 0)) { ctx.fillStyle = b.muro > 0 ? '#7ab8ff' : '#ffd060'; ctx.fillRect(Math.round(px - 10), Math.round(py - top - 1), 3, 4); }
         ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(Math.round(px - 7), Math.round(py - top), 14, 3);
         ctx.fillStyle = k < 0.3 ? '#ff7040' : f.lado === 'p' ? '#5ab0ff' : '#e05040'; ctx.fillRect(Math.round(px - 6), Math.round(py - top + 1), Math.round(12 * k), 1);
         if (f.lado === 'p' && f.rep > 1) { ctx.font = '7px "PK Num", "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText('x' + f.rep, Math.round(px) + 1, Math.round(py - top - 1) + 1); ctx.fillStyle = '#cfe4ff'; ctx.fillText('x' + f.rep, Math.round(px), Math.round(py - top - 1)); }

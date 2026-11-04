@@ -50,6 +50,7 @@
     PK.Incursiones.init(S);
     PK.Auto.init(S);
     PK.Consejo.init(S);
+    if (PK.Heroes) PK.Heroes.init(S);
     PK.Life.reset();
     PK.Quests.init(S);
   };
@@ -191,6 +192,8 @@
   const best = (type, key) => mine(type).reduce((m, b) => Math.max(m, G.bst(b)[key] || 0), 0);
   G.best = best;
   const wish = k => (PK.Exp ? PK.Exp.wishMult(k) : 1);
+  // pasivas de los héroes que gobiernan un edificio (js/heroes.js)
+  const hp = (k, b) => (PK.Heroes && S && S.heroes ? PK.Heroes.pasiva(k, b) : 0);
   // Mejoras permanentes: decretos y rangos de misiones (G.perk); perkAll suma además las estructuras de Leyendas.
   G.perk = k => {
     let s = (S.perks && S.perks[k]) || 0;
@@ -211,7 +214,7 @@
   G.gatherRate = function (owner, res, u, kind) {
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
     if (owner !== 'p') return base;
-    const tech = nk === 'deer' ? 1 + 0.2 * G.lvl('hunting') : 1 + 0.15 * G.lvl(TECH_FOR[res]);
+    const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
     return base * tech * dropMult(u) * G.globalMult();
   };
   G.farmRate = function (owner, b, u) {
@@ -226,8 +229,8 @@
   };
   G.buildMult = owner => (owner === 'p' ? (1 + 0.2 * G.lvl('architecture')) * wish('build') : 1);
   const PROD_TECH = { planks: 'saws', blocks: 'saws', books: 'saws', ingots: 'furnaces', tools: 'furnaces', steel: 'furnaces', machinery: 'furnaces' };
-  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + best('wonder', 'allBonus')) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult();
-  G.researchMult = () => (1 + best('library', 'research') + best('observatory', 'research') + mine('university').slice(0, 2).reduce((s, b) => s + G.bst(b).research, 0) + G.perkAll('researchP')) * eclipse();
+  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + best('wonder', 'allBonus')) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult() * (b && PK.Heroes ? 1 + PK.Heroes.prodEn(b) : 1);
+  G.researchMult = () => (1 + best('library', 'research') + best('observatory', 'research') + mine('university').slice(0, 2).reduce((s, b) => s + G.bst(b).research, 0) + G.perkAll('researchP') + hp('research')) * eclipse();
 
   // ---------- Decretos reales y dominio de la era ----------
   G.decreePending = () => D.DECREE_ERAS.filter(e => S.era >= e).length > S.decrees.length;
@@ -405,7 +408,7 @@
   G.builders = () => 1 + G.countB('builder');
   G.buildersBusy = () => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.upg ? 1 : 0), 0);
   G.upCost = b => D.upCost(b.type, b.lvl);
-  G.upTime = b => D.upTime(b.type, b.lvl) * Math.max(0.5, 1 - 0.05 * G.lvl('engineering')) * (1 - Math.min(0.4, G.perkAll('upgradeP')));
+  G.upTime = b => D.upTime(b.type, b.lvl) * Math.max(0.5, 1 - 0.05 * G.lvl('engineering')) * (1 - Math.min(0.4, G.perkAll('upgradeP'))) * (1 - Math.min(0.3, hp('upTime', b)));
   G.canUpgrade = function (b) {
     if (b.def.noUp) return { ok: false, why: 'Este edificio no tiene mejoras.' };
     if (!b.done) return { ok: false, why: 'Primero termina de construirlo.' };
@@ -481,7 +484,7 @@
   // bodegas de comida, madera, piedra y oro, +40% por cada fiesta del mismo día, y da +25% de recolección y de
   // talleres por 5 minutos. Con Date.now(), como los deseos del pozo. El servidor tolera 2,5x (LIM.slack).
   G.FIESTA = { p: 0.25, dur: 300, res: ['food', 'wood', 'stone', 'gold'] };
-  G.fiestaMult = () => (S && S.fiesta && S.fiesta.until > Date.now() ? 1 + G.FIESTA.p : 1);
+  G.fiestaMult = () => (S && S.fiesta && S.fiesta.until > Date.now() ? 1 + G.FIESTA.p * (1 + hp('fiesta')) : 1);
   G.fiestaInfo = function () {
     if (S.era < 2) return null;
     const f = S.fiesta || {}, n = f.day === U.dayKey() ? f.n || 0 : 0, k = Math.pow(1.4, n), cost = {};
@@ -528,7 +531,7 @@
   }
 
   // ---------- Exploración ----------
-  G.exploreRange = () => { const r = best('scout', 'range'); return r ? r + 4 * G.lvl('cartography') : 0; };
+  G.exploreRange = () => { const r = best('scout', 'range'); return r ? Math.round((r + 4 * G.lvl('cartography')) * (1 + hp('range'))) : 0; };
   G.scoutSight = () => D.SIGHT.scout + (G.lvl('cartography') >= 3 ? 1 : 0);
   G.scoutMax = () => best('scout', 'scouts');
   G.poiState = p => S.pois[p.id] || null;
@@ -702,7 +705,7 @@
     return null;
   };
   G.reservaText = r => 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
-  G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')); // por minuto
+  G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')) * (1 + hp('relicGold')); // por minuto
 
   // ---------- Órdenes ----------
   G.release = function (u) {
@@ -853,7 +856,8 @@
 
   // ---------- Construcción ----------
   G.isUnlocked = type => D.BUILD[type].era <= S.era && !G.legendLocked(type);
-  G.legendLocked = type => !!D.BUILD[type].lock && !S.flags['unlock_' + D.BUILD[type].lock];
+  // la Taberna (héroes) se abre con el Cuartel, sin esperar a reclamar la misión l1 (H1 del plan)
+  G.legendLocked = type => !!D.BUILD[type].lock && !S.flags['unlock_' + D.BUILD[type].lock] && !(type === 'tavern' && G.countAll('barracks'));
   G.buildCost = type => D.buildCost(type, G.countAll(type));
   // Se construye en tu territorio. Los campamentos de acopio también pueden ir en tierra de nadie y junto a
   // las zonas comunes (para recolectar lejos), pero nunca en tierra de otro reino.
@@ -1154,6 +1158,7 @@
     PK.Logi.update(dt);
     PK.Terr.update(dt, false);
     PK.Exp.update(dt, false);
+    if (PK.Heroes) PK.Heroes.update(dt);
     PK.Batalla.update(dt);
     PK.Life.update(dt);
     PK.Incursiones.update(dt);
@@ -1253,6 +1258,7 @@
       PK.Logi.offline(dt);
       PK.Terr.update(dt, true);
       PK.Exp.update(dt, true);
+      if (PK.Heroes) PK.Heroes.update(dt);
       if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
       PK.Social.update(dt, true);
     }

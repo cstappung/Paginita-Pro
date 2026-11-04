@@ -3,8 +3,8 @@
 // encerrado, aldeanos parados). Se carga con ?dev&piloto (velocidad ×10; ?piloto=20 para otra) y con
 // ?timelapse (×40, sin guardar). No es parte del juego: main.js lo pide solo con esos parámetros.
 //
-// Anota en la consola y en window.pkPiloto: el minuto de juego en que llegó a cada era, cuántas veces hubo
-// aldeanos ociosos más de 60 s seguidos, cuántas veces se llenaron las bodegas y las batallas ganadas y perdidas.
+// Anota en la consola y en window.pkPiloto: el minuto de juego en que llegó a cada era, qué parte de los
+// aldeanos estuvo ociosa (promedio), los héroes reclutados, cuántas veces se llenaron las bodegas y las batallas ganadas y perdidas.
 // pkPiloto.resumen() devuelve la tabla para comparar con la entrega anterior.
 (function () {
   'use strict';
@@ -17,7 +17,7 @@
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
   const PLAN = {
     1: [['house', 2], ['lumber', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
-    2: [['sawmill', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2]],
+    2: [['sawmill', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2]],
     3: [['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2]],
     4: [['university', 1], ['steelworks', 1], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
@@ -42,6 +42,17 @@
     }
     return null;
   }
+  // Talleres: pegados (D.NEAR_STORE) a un Almacén o al Centro Urbano, o no se abastecen y nadie trabaja ahí.
+  function lugarTaller(type) {
+    const g = G(), def = D.BUILD[type], N = D.NEAR_STORE;
+    for (const o of g.buildings.filter(b => b.owner === 'p' && b.done && (b.type === 'tc' || b.type === 'warehouse'))) {
+      for (let y = o.y - N - def.h; y <= o.y + o.h + N; y++) for (let x = o.x - N - def.w; x <= o.x + o.w + N; x++) {
+        const dx = Math.max(o.x - (x + def.w), 0, x - (o.x + o.w)), dy = Math.max(o.y - (y + def.h), 0, y - (o.y + o.h));
+        if (Math.max(dx, dy) <= N && Math.max(dx, dy) >= 1 && g.canPlace(type, x, y)) return [x, y];
+      }
+    }
+    return null;
+  }
   function construir() {
     const g = G(), st = S(), tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
     if (!tc) return false;
@@ -50,7 +61,7 @@
       let cx = tc.cx, cy = tc.cy;
       if (RECURSO[type] && RECURSO[type] !== 'food') { const nd = W.nearestNode(RECURSO[type], tc.cx, tc.cy, 40, 'p'); if (nd) { const p = PK.Auto.lugarJunto(type, nd); if (p && g.place(type, p[0], p[1])) { P.obras++; return true; } cx = nd.x; cy = nd.y; } }
       if (type === 'farm') { const m = g.buildings.find(b => b.owner === 'p' && b.type === 'mill'); if (m) { cx = m.cx; cy = m.cy; } }
-      const p = lugar(type, cx, cy);
+      const p = D.BUILD[type].recipe ? lugarTaller(type) || lugar(type, cx, cy) : lugar(type, cx, cy);
       if (p && g.place(type, p[0], p[1])) { P.obras++; return true; }
     }
     return false;
@@ -80,14 +91,27 @@
     if (!G().countB('barracks')) return;
     PK.Consejo.HACE.mariscal(st, Object.assign({}, st.consejo, { prob: 0.8, guarnicion: 8 * st.era, defensa: 0.2 }));
   }
+  // Héroes: recluta al que pueda pagar, elige siempre el primer talento, lo pone a gobernar y le pone lo mejor.
+  function heroes() {
+    const H = PK.Heroes;
+    if (!H || !H.taberna()) return;
+    for (const c of H.candidatos()) if (!H.porQueNo(c) && H.contratar(c.i)) { anota('Reclutó a un ' + H.CLASES[c.clase].name + '.'); P.heroes = (P.heroes || 0) + 1; break; }
+    for (const h of H.lista()) {
+      while (H.talentosPendientes(h)) H.elegirTalento(h, 0);
+      if (h.gobierna == null) { const b = G().buildings.find(o => H.puedeGobernar(h, o) && !H.gobernanteDe(o)); if (b) H.gobernar(h, b); }
+      for (const rn in H.RANURAS) { const it = S().heroes.inv.filter(o => o.t === rn && !H.equipadoPor(o)).sort((a, b) => b.r - a.r)[0], cur = S().heroes.inv.find(o => o.id === h.equipo[rn]); if (it && (!cur || it.r > cur.r)) H.equipar(h, it.id); }
+    }
+  }
   function medir() {
     const g = G(), st = S();
     if (st.era > (P.eraVista || 1)) {
       for (let e = (P.eraVista || 1) + 1; e <= st.era; e++) { P.eras[e] = Math.round((g.time - P.t0) / 6) / 10; anota('Llegó a la Era ' + U.roman(e) + '.'); }
       P.eraVista = st.era;
     }
-    for (const u of g.units) if (u.owner === 'p' && u.kind === 'v' && !u.task && !u.inside && (u.idleT || 0) > 60 && !u._pilotoOcioso) { u._pilotoOcioso = true; P.ociosos++; }
-    for (const u of g.units) if (u._pilotoOcioso && (u.task || u.inside)) u._pilotoOcioso = false;
+    // ociosos: qué parte de los aldeanos está sin hacer nada, en promedio (a ×40 un mismo aldeano entraba y salía
+    // del «más de 60 s» muchas veces por minuto y la cuenta se inflaba)
+    const vs = g.units.filter(u => u.owner === 'p' && u.kind === 'v');
+    if (vs.length) { P._oc = (P._oc || 0) + vs.filter(u => !u.task && !u.inside && (u.idleT || 0) > 10).length / vs.length; P._ocN = (P._ocN || 0) + 1; }
     const llenos = ['food', 'wood', 'stone', 'gold'].filter(r => st.res[r] >= g.cap(r) - 1).length;
     if (llenos && !P._lleno) P.llenos++;
     P._lleno = llenos > 0;
@@ -107,11 +131,12 @@
       construir();
       mejorar();
       investigar();
+      heroes();
       guerra();
       if (st.ret.welcome) g.openWelcome(true);
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), ociosos60s: P.ociosos, bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

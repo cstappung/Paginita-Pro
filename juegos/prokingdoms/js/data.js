@@ -858,6 +858,11 @@
   const ql = (id, title, desc, req, reward, pre, unlock) => { q(id, 'legend', title, desc, req, reward, pre); if (unlock) Q[Q.length - 1].unlock = unlock; };
   ql('l1', 'El forastero de la capa', 'Un viajero llega con historias de cuevas que brillan y guaridas de fieras. Construye un Cuartel para que tus soldados lo escuchen.', B('barracks'), { gold: 150 }, [], 'tavern');
   ql('l2', 'Una jarra para el viajero', 'Construye la Taberna. Desde ahí llegan los rumores y los encargos.', B('tavern'), { crystal: 5, gold: 200 }, ['l1']);
+  // Héroes (H1 del plan): la Taberna recibe tres candidatos por día.
+  ql('lh1', 'Un héroe en la taberna', 'Recluta a tu primer héroe en la Taberna (menú Héroes). Llévalo de expedición: sube la fuerza de la compañía y usa su habilidad en la batalla.', st('heroes_hired', 1), { gold: 200, crystal: 5 }, ['l2']);
+  ql('lh2', 'Forjado en batalla', 'Sube a un héroe al nivel 10 y elígele un talento.', st('hero_lvl', 10), { coins: 20, lore: 3 }, ['lh1']);
+  ql('lh3', 'Botín de leyenda', 'Encuentra 5 objetos de equipo en expediciones con un héroe.', st('items_found', 5), { coins: 15, hide: 10 }, ['lh1']);
+  ql('lh4', 'La mesa redonda', 'Ten 4 héroes en tu reino (la Taberna en nivel 6).', st('heroes_hired', 4), { coins: 30, crystal: 20 }, ['lh2']);
   ql('l3', 'Bajo tierra', 'Gana tu primera expedición en una mazmorra (Cuartel → Atacar).', st('exp_won', 1), { hide: 5, coins: 10 }, ['l2']);
   ql('l4', 'Ecos en la piedra', 'Descubre 3 mazmorras explorando el mapa.', st('dungeons_found', 3), { gold: 300 }, ['l2']);
   ql('l5', 'Un deseo de cristal', 'Junta 30 cristales de cueva.', st('sp_crystal', 30), { coins: 15 }, ['l3'], 'wishwell');

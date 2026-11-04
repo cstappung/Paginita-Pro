@@ -1825,6 +1825,8 @@
     crown: { m: ['', '', 'k...k...k', 'kyk.kyk.kyk', 'kyykkyykkyyk', 'kyyyyyyyyyyk', 'kyyryyyyryyk', 'kyyyyyyyyyyk', 'kooooooooook', '.kkkkkkkkkk'], p: { k: '#4a3008', y: '#f0c850', o: '#c08a28', r: '#c03028' } },
     cart: { m: ['', '', 'k........', 'kk.......', '.kbbbbbbbbk', '.kbBbbBbbbk', '.kbbbbbbbbk', '.kkkkkkkkkk', '..kgk..kgk', '..kkk..kkk'], p: { k: '#2a1a10', b: '#a07040', B: '#e8c050', g: '#a0a0aa' } },
     wall: { m: ['', 'kk.kk.kk.kk', 'kgkkgkkgkkgk', 'kggggggggggk', 'kgdggggdgggk', 'kggggdgggggk', 'kgggggggdggk', 'kgdgggggggk', 'kggggdggggk', 'kkkkkkkkkkk'], p: { k: '#2e2e30', g: '#a8a498', d: '#6a665e' } },
+    // Héroes (H1): un yelmo con penacho
+    hero: { m: ['.....rr', '....rrr', '...kkkkk', '..kgggggk', '.kgLgggggk', '.kgLgggggk', '.kggkkkggk', '.kgk.y.kgk', '.kgk...kgk', '.kggkykggk', '..kkkkkkk'], p: { k: '#1c1c24', g: '#b4bac8', L: '#f0f4ff', r: '#c83028', y: '#f0c850' } },
   });
   const ROCK_PAL = {
     stone: { k: '#2e2e30', w: '#d0ccc2', g: '#9a968c', d: '#66625c' },
