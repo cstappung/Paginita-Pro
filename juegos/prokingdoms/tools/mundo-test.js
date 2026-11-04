@@ -38,9 +38,9 @@ const vueltas = p.inbox.filter(i => i.type === 'caravana');
 ok(vueltas.length === 2 && vueltas.every(i => i.res.gold > 0) && !p.caravanas.length, 'al volver, el oro llega por el buzón', vueltas.map(i => i.res.gold + (i.asalto ? ' (asaltada)' : '')).join(', '));
 // riesgo: con muchas caravanas lejanas sin escolta, alguna es asaltada; nunca más del tope
 let asaltos = 0, n = 0;
-for (let i = 0; i < 200; i++) { p.caravanas = []; p.day = null; p.diplo.s[slots[14]].tratado = true; p.diplo.s[slots[14]].rel = 80; sim.caravana(p, { slot: slots[14] }); corre += 3 * 3600e3; sim.tickCaravanas(); n++; if (p.inbox[p.inbox.length - 1].asalto) asaltos++; }
+for (let i = 0; i < 400; i++) { p.caravanas = []; p.day = null; p.diplo.s[slots[14]].tratado = true; p.diplo.s[slots[14]].rel = 80; sim.caravana(p, { slot: slots[14] }); corre += 3 * 3600e3; sim.tickCaravanas(); n++; if (p.inbox.filter(x => x.type === 'caravana').pop().asalto) asaltos++; }
 const esp = D.caravanaRiesgo(D.distReinos(p.slot, slots[14]), false, false);
-ok(Math.abs(asaltos / n - esp) < 0.1, 'los asaltos siguen el riesgo de la ruta', Math.round((asaltos / n) * 100) + '% contra ' + Math.round(esp * 100) + '% esperado');
+ok(Math.abs(asaltos / n - esp) < 4 * Math.sqrt((esp * (1 - esp)) / n), 'los asaltos siguen el riesgo de la ruta (4 desviaciones)', Math.round((asaltos / n) * 100) + '% contra ' + Math.round(esp * 100) + '% esperado');
 
 // S3. Jefe semanal del gremio
 const g = sim.createGuild(p, { name: 'Prueba' });
