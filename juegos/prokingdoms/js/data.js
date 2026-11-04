@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 3;
+  D.PROTO = 4;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -570,16 +570,15 @@
   // Cada mazmorra tiene su tipo de enemigo y cada tropa rinde distinto contra cada uno: armar la
   // compañía correcta importa más que mandar muchas tropas.
   D.ENEMY = {
-    beast: { name: 'Bestias', desc: 'Lobos gigantes, osos y jabalíes. Los lanceros los frenan.' },
-    bandit: { name: 'Bandidos', desc: 'Forajidos armados. Arqueros y caballeros los dispersan.' },
-    undead: { name: 'No-muertos', desc: 'Esqueletos y espectros. Los clérigos los deshacen.' },
-    golem: { name: 'Gólems', desc: 'Piedra y cristal vivos. Las flechas rebotan: hace falta catapulta o caballería.' },
+    beast: { name: 'Bestias', desc: 'Lobos gigantes, osos y jabalíes. Los lanceros los frenan y los ballesteros los tumban.' },
+    bandit: { name: 'Bandidos', desc: 'Forajidos armados. Arqueros, caballeros y jinetes los dispersan.' },
+    undead: { name: 'No-muertos', desc: 'Esqueletos y espectros. Los clérigos y los monjes los deshacen.' },
+    golem: { name: 'Gólems', desc: 'Piedra y cristal vivos. Las flechas rebotan: hace falta catapulta, caballería, virotes o magia.' },
     dragon: { name: 'Dragón', desc: 'Vuela y escupe fuego. Arqueros y lanceros, y clérigos para sobrevivir.' },
-    // H4 (pk-17). Las tropas nuevas del plan (Jinete, Ballestero, Monje, Mago) llegan con el Combate 2.0;
-    // mientras, cada uno tiene dos respuestas entre las tropas de hoy.
-    arcane: { name: 'Arcanos', desc: 'Brujas que maldicen (tus tropas se frenan) y fuegos fatuos. Caballeros y clérigos los deshacen.' },
-    giant: { name: 'Gigantes', desc: 'Lentos y con mucha vida; su golpe alcanza a varios. Catapultas y arqueros de lejos, y dispérsate.' },
-    abyss: { name: 'Abisales', desc: 'Tentáculos que agarran y sirenas que cantan. Arqueros y clérigos.' },
+    // H4 (pk-17); las tropas que les responden mejor llegaron en pk-21 (Jinete, Ballestero, Monje, Mago).
+    arcane: { name: 'Arcanos', desc: 'Brujas que maldicen (tus tropas se frenan) y fuegos fatuos. Jinetes, monjes, caballeros y clérigos los deshacen.' },
+    giant: { name: 'Gigantes', desc: 'Lentos y con mucha vida; su golpe alcanza a varios. Ballesteros y catapultas de lejos, y dispérsate.' },
+    abyss: { name: 'Abisales', desc: 'Tentáculos que agarran y sirenas que cantan. Magos de batalla, arqueros y clérigos.' },
   };
   // vs: multiplicador contra cada tipo de enemigo. heal: cuánto reduce las bajas cada unidad (clérigos).
   D.ARMY = {
@@ -588,6 +587,11 @@
     archer: { name: 'Arquero', role: 'x1,6 contra bandidos, x1,5 contra dragones y abisales, x1,4 contra gigantes; la mitad contra gólems.', cost: { wood: 30, gold: 30 }, time: 18, power: 6, era: 2, lvl: 3, vs: { bandit: 1.6, dragon: 1.5, golem: 0.5, giant: 1.4, abyss: 1.5 } },
     knight: { name: 'Caballero', role: 'x1,5 contra bandidos y arcanos, x1,4 contra gólems y x1,3 contra no-muertos.', cost: { food: 60, gold: 60, ingots: 2 }, time: 30, power: 16, era: 3, lvl: 4, vs: { bandit: 1.5, golem: 1.4, undead: 1.3, arcane: 1.5 } },
     cleric: { name: 'Clérigo', role: 'x3 contra no-muertos, x1,6 contra arcanos y x1,5 contra abisales. Cada clérigo reduce las bajas un 3% (máx. 45%).', cost: { food: 40, gold: 50, books: 1 }, time: 25, power: 4, era: 3, lvl: 5, vs: { undead: 3, arcane: 1.6, abyss: 1.5 }, heal: 0.03 },
+    // Fase 4 (pk-21): las tropas que el plan dejó para Combate 2.0 (H4). Cada enemigo tiene al menos dos respuestas.
+    rider: { name: 'Jinete', role: 'Rápido y flanquea: va por los tiradores. x1,5 contra arcanos, x1,3 contra bandidos.', cost: { food: 90, gold: 50, ingots: 1 }, time: 28, power: 14, era: 3, lvl: 5, vs: { arcane: 1.5, bandit: 1.3 } },
+    crossbow: { name: 'Ballestero', role: 'Tirador pesado y lento. x2 contra gigantes, x1,4 contra bestias y x1,3 contra gólems.', cost: { wood: 70, gold: 55, ingots: 1 }, time: 30, power: 12, era: 4, lvl: 6, vs: { giant: 2, beast: 1.4, golem: 1.3 } },
+    monk: { name: 'Monje guerrero', role: 'Pelea de cerca y cura un poco a los de al lado. x1,5 contra arcanos y no-muertos; reduce las bajas un 1,5% cada uno.', cost: { food: 70, gold: 45, books: 1 }, time: 26, power: 10, era: 5, lvl: 7, vs: { arcane: 1.5, undead: 1.5 }, heal: 0.015 },
+    mage: { name: 'Mago de batalla', role: 'Daño en área desde lejos. x2 contra abisales y x1,4 contra gólems.', cost: { food: 60, gold: 160, books: 3 }, time: 45, power: 34, era: 6, lvl: 8, vs: { abyss: 2, golem: 1.4 } },
     catapult: { name: 'Catapulta', role: 'x2 contra gólems y x1,8 contra gigantes; la mitad contra bestias.', cost: { wood: 200, gold: 120, machinery: 2 }, time: 60, power: 60, era: 5, lvl: 7, vs: { golem: 2, beast: 0.5, giant: 1.8 } },
   };
   // Veteranía: cada tipo de tropa junta experiencia en las expediciones (y en la Arena). +4% de fuerza por rango.

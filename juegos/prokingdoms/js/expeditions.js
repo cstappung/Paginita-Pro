@@ -176,7 +176,8 @@
     }
     return null;
   };
-  Exp.send = function (target, units, heroeId) {
+  // form (C1, pk-21): { filas: { tipo: 'f' | 'm' | 'a' }, flanco: 'i' | 'c' | 'd' } para la batalla en vivo.
+  Exp.send = function (target, units, heroeId, form) {
     const why = Exp.canSend(target), st = S(), army = st.war.army;
     if (why) { toast(why, 'warn'); return false; }
     const heroe = heroeId && PK.Heroes ? PK.Heroes.de(heroeId) : null;
@@ -190,6 +191,8 @@
     for (const k in units) army[k] -= units[k];
     const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, cap: target.cap, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
+    else run.target = { poi: target.poi, floor: target.floor, camp: target.camp, cap: target.cap }; // para «Repetir» (C7)
+    if (form) { run.form = form; st.formaciones = st.formaciones || {}; st.formaciones.ult = form; }
     st.exp.runs.push(run);
     if (run.poi !== undefined && PK.Inc) PK.Inc.preparar(run, W.pois[run.poi]);
     if (run.cap) run.jefe = D.CAPITULOS[run.cap - 1].lugar.jefe; // con su jefe (batalla.js)
@@ -226,6 +229,7 @@
     r.lost = {};
     if (res) {
       r.won = !!res.won;
+      if (res.dano) { r.dano = r.dano || {}; for (const k in res.dano) r.dano[k] = (r.dano[k] || 0) + res.dano[k]; } // C7, suma las salas de una incursión
       for (const k in r.units) { const l = Math.min(r.units[k], res.lost[k] || 0); r.lost[k] = l; r.units[k] -= l; }
     } else {
       r.won = Math.random() < Exp.chance(ratio);
@@ -265,7 +269,7 @@
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), hab: r.habUsos, enc: r.encLog };
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), heroeId: r.heroe, hab: r.habUsos, enc: r.encLog, dano: r.dano, target: r.target, form: r.form };
     st.war.reports = st.war.reports || [];
     st.war.reports.unshift(rep);
     if (st.war.reports.length > 12) st.war.reports.length = 12;

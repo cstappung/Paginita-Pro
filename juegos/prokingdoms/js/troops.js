@@ -9,7 +9,7 @@
   const G = () => PK.Game;
   const S = () => PK.Game.state;
   // herramienta con la que pelea cada tropa (los arqueros y los clérigos pelean quietos, con su arma)
-  const FIGHT_TOOL = { militia: 'hammer', spear: 'spear', knight: 'sword', catapult: 'hammer' };
+  const FIGHT_TOOL = { militia: 'hammer', spear: 'spear', knight: 'sword', catapult: 'hammer', rider: 'spear', monk: 'hammer' };
 
   // n figuras repartidas según la composición de la compañía (al menos una de cada tipo presente).
   function pickTypes(units, n) {
@@ -132,6 +132,19 @@
     };
   }
 
+  // C8 (pk-21): estandarte de veteranía. El primer soldado de cada tipo en la guarnición lleva uno con el color del
+  // tramo de su rango (bronce, plata, oro, púrpura) y una muesca por cada dos rangos (D.RANKS).
+  const TRAMO = r => (r >= 9 ? '#b070ff' : r >= 6 ? '#ffd040' : r >= 3 ? '#d8dce8' : '#c87a3a');
+  function estandarte(it, rango, flip) {
+    it.after = ctx => {
+      const x = Math.round(it.px + (flip ? -5 : 4)), y = Math.round(it.py), w = 5, n = Math.min(5, Math.ceil(rango / 2));
+      ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x, y - 28, 1, 18);
+      ctx.fillStyle = TRAMO(rango); ctx.fillRect(flip ? x - w : x + 1, y - 28, w, 4 + n);
+      ctx.fillStyle = '#2a1a10'; for (let i = 0; i < n; i++) ctx.fillRect(flip ? x - w + 2 : x + 3, y - 27 + i, 1, 1);
+    };
+  }
+  T.TRAMO = TRAMO;
+
   // ---------- Guarnición ----------
   // Los soldados en casa forman frente al Cuartel; los de cuerpo a cuerpo practican de a pares.
   const slotCache = new Map();
@@ -156,7 +169,7 @@
     if (PK.Incursiones && PK.Incursiones.defensores.length) return; // salieron a pelear contra los bandidos
     const bars = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'barracks');
     if (!bars.length) return;
-    const types = pickTypes(army, 12 * bars.length), now = performance.now() / 1000;
+    const types = pickTypes(army, 12 * bars.length), now = performance.now() / 1000, xp = (st.exp && st.exp.xp) || {}, visto = {};
     let i = 0;
     for (const b of bars) {
       const slots = slotsOf(b);
@@ -164,7 +177,9 @@
         const type = types[i], [x, y] = slots[j], ph = (now + i * 0.9) % 7, melee = !!FIGHT_TOOL[type] && type !== 'catapult';
         const drill = melee && ph < 3; // de a pares: uno mira a la derecha y el otro a la izquierda
         const flip = j % 2 === 1, frame = drill ? Math.floor((now * 1.3 + j * 0.37) * 4) % 4 : 0;
-        items.push(soldierItem(type, x, y, drill ? 'work' : 'idle', frame, flip, false, drill ? FIGHT_TOOL[type] : null, i, { home: true }));
+        const it = soldierItem(type, x, y, drill ? 'work' : 'idle', frame, flip, false, drill ? FIGHT_TOOL[type] : null, i, { home: true }), rg = D.rankOf(xp[type] || 0);
+        if (!visto[type] && rg > 0) { visto[type] = 1; estandarte(it, rg, flip); }
+        items.push(it);
       }
     }
   }

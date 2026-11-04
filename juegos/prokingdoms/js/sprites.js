@@ -1706,13 +1706,13 @@
   const HEAD = { axe: 1.0, pick: 1.6, hammer: 1.0, sickle: 1.1, knife: 0.5, sword: 0.3, spear: 0.3 }; // del extremo del mango al filo que golpea
   // troop: el mismo cuerpo vestido de soldado (militia, spear, archer, knight, cleric o catapult, la dotación).
   // Cambian la túnica, el casco o la capucha y el arma que lleva en la mano de adelante (al pelear, la herramienta).
-  const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204] };
+  const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [104, 96, 72], monk: [134, 96, 58], mage: [72, 58, 150] };
   S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop) {
     const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '');
     if (VC[key]) return VC[key];
     if (++vcN > 3000) { for (const k in VC) delete VC[k]; vcN = 0; }
     const PW = VW * VR, PH = VH * VR, pb = new PB(PW, PH);
-    const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric';
+    const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage';
     const walk = mode === 'walk', ph = walk ? (frame % 6) / 6 * Math.PI * 2 : 0;
     // al recoger a mano se agacha: baja la cadera y adelanta las rodillas
     const crouch = mode === 'work' && tool === 'hand' ? 4 : 0;
@@ -1847,10 +1847,12 @@
       Cp(12.4, 1.2, 12.4, 18.4, 0.32, 6.5, WO); E(12.4, 0.9, 0.5, 0.5, 6.6, WO);
     }
     if (troop) {
-      const helm = troop === 'knight' || troop === 'spear' ? ME : troop === 'militia' || troop === 'catapult' ? WRAP : null;
+      const helm = troop === 'knight' || troop === 'spear' || troop === 'rider' || troop === 'crossbow' ? ME : troop === 'militia' || troop === 'catapult' ? WRAP : null;
       if (helm) E(hx - 0.05, hy - 0.5, 1.6, 1.35, 4.65, helm, (px, py) => py < hy - 0.2 || (troop === 'knight' && (back || px < hx + 0.35) && py < hy + 1.3));
-      if (troop === 'knight') E(hx - 0.35, hy - 1.95, 0.5, 0.8, 4.7, vRamp(col)); // penacho del color del reino
-      if (troop === 'archer' || robe) E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, robe ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'knight' || troop === 'rider') E(hx - 0.35, hy - 1.95, 0.5, troop === 'rider' ? 1.2 : 0.8, 4.7, vRamp(col)); // penacho del color del reino
+      if (troop === 'crossbow') E(hx - 0.05, hy - 0.9, 2.3, 0.4, 4.7, ME); // ala del capacete
+      if (troop === 'archer' || robe) E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, troop === 'monk' ? vRamp([96, 66, 40]) : troop === 'mage' ? vRamp([50, 40, 110]) : robe ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'mage') { E(hx - 0.2, hy - 1.7, 0.9, 1.3, 4.7, vRamp([50, 40, 110])); E(hx - 0.5, hy - 2.7, 0.4, 0.5, 4.75, vRamp([50, 40, 110])); } // sombrero en punta
       if (troop === 'knight' && !back) E(hx - 1.15, 10.1 + yo, 1.45, 2.0, 3.6, (px, py) => (Math.abs(px - (hx - 1.15)) < 0.3 || Math.abs(py - (10.1 + yo)) < 0.3 ? ST : vRamp(col))); // escudo
     }
     // brazo de adelante: herramienta, canasta o balanceo
@@ -1888,7 +1890,11 @@
         let q = [11.6, 4.6 + yo];
         for (let i = 1; i <= 6; i++) { const a = (i / 6) * Math.PI, n = [11.6 + Math.sin(a) * 1.6, 4.6 + yo + (1 - Math.cos(a)) * 5.6]; Cp(q[0], q[1], n[0], n[1], 0.3, z, WO); q = n; }
         Cp(11.6, 4.6 + yo, 11.6, 15.8 + yo, 0.12, z - 0.1, LIN);
-      } else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.4 + yo, 0.65, 0.65, z + 0.1, ST); }
+      } else if (troop === 'rider') { Cp(10.6, 13.0 + yo, 13.4, 1.0 + yo, 0.3, z, WO); E(13.5, 0.7 + yo, 0.45, 0.9, z + 0.1, ME); } // la lanza, alta
+      else if (troop === 'crossbow') { Cp(10.2, 10.4 + yo, 13.6, 9.6 + yo, 0.34, z, WO); Cp(13.2, 7.6 + yo, 13.4, 11.6 + yo, 0.26, z + 0.05, ME); } // ballesta
+      else if (troop === 'monk') { Cp(11.4, 2.6 + yo, 11.4, 18.2, 0.34, z, WO); } // bastón
+      else if (troop === 'mage') { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.3, z, BO); E(11.6, 1.3 + yo, 0.8, 0.8, z + 0.1, vRamp([170, 130, 255])); } // vara con su piedra
+      else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.4 + yo, 0.65, 0.65, z + 0.1, ST); }
       else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, troop === 'catapult' ? 0.8 : 0.65, 0.7, z + 0.05, troop === 'catapult' ? ME : WO); } // garrote o martillo
       E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, SK);
     } else arm(9.9, 1, 5, 10.1 - sw * 1.0, 11.6 + yo, 10.2 - sw * 0.45, 9.3 + yo);
@@ -2150,11 +2156,34 @@
   };
 
   // Soldados: el aldeano vestido de tropa (ver S.villager). Retratos para la interfaz del Cuartel, ampliados x2.
-  const TROOP_LOOK = { militia: [0, 0], spear: [1, 1], archer: [2, 0], knight: [1, 2], cleric: [3, 1], catapult: [1, 0] };
+  const TROOP_LOOK = { militia: [0, 0], spear: [1, 1], archer: [2, 0], knight: [1, 2], cleric: [3, 1], catapult: [1, 0], rider: [2, 2], crossbow: [0, 1], monk: [1, 0], mage: [3, 2] };
   S.troop = function (type, col, mode, frame, flip, back, tool, id) {
     const lk = TROOP_LOOK[type] || [0, 0], v = id === undefined ? 0 : id % 3;
-    return S.villager(col, (lk[0] + v) % 4, (lk[1] + v) % 3, mode, frame, null, flip, tool || null, false, back, null, type);
+    const p = S.villager(col, (lk[0] + v) % 4, (lk[1] + v) % 3, mode, frame, null, flip, tool || null, false, back, null, type);
+    return type === 'rider' ? montado(p, col, mode, frame, flip) : p;
   };
+  // El jinete: el soldado sentado sobre un caballo (el caballo tapa sus piernas). Pixel art a la misma resolución
+  // doble que el aldeano; el caballo mira a la derecha y se espeja con flip.
+  const MC = {};
+  function montado(p, col, mode, frame, flip) {
+    const key = col.join(',') + mode + frame + (flip ? 1 : 0) + p.c.width;
+    if (MC[key]) return MC[key];
+    const W = 30, H = 28, K = 2, c = mk(W * K, H * K), x = c.getContext('2d');
+    x.imageSmoothingEnabled = false;
+    const ox = 6, oy = 2; // dónde va el jinete (en píxeles del aldeano)
+    x.drawImage(p.c, (flip ? W - p.w - ox : ox) * K, oy * K + (mode === 'walk' && frame % 3 === 1 ? -K : 0));
+    const hc = x, r = (a, b, w, h, cl) => { hc.fillStyle = cl; hc.fillRect((flip ? W - a - w : a) * K, b * K, w * K, h * K); };
+    const C = '#7a5232', C2 = '#5a3a22', C3 = '#94683e', M = '#2e2018', MA = 'rgb(' + col.join(',') + ')';
+    const g = mode === 'walk' ? frame % 6 : 0, l = [0, 1, 2, 1, 0, -1][g];
+    // patas (se mueven al caminar), cuerpo, manta del color del reino, cuello y cabeza
+    r(7 + l, 20, 2, 7, C2); r(10 - l, 20, 2, 7, C); r(19 + l, 20, 2, 7, C2); r(22 - l, 20, 2, 7, C);
+    r(7 + l, 27, 2, 1, M); r(10 - l, 27, 2, 1, M); r(19 + l, 27, 2, 1, M); r(22 - l, 27, 2, 1, M);
+    r(6, 14, 19, 7, C); r(6, 14, 19, 2, C3); r(7, 20, 17, 1, C2);
+    r(11, 13, 8, 6, MA); r(11, 18, 8, 1, '#00000040');
+    r(23, 8, 4, 8, C); r(23, 8, 1, 7, M); r(25, 6, 5, 4, C); r(27, 9, 3, 2, C3); r(28, 7, 1, 1, M); r(24, 5, 1, 2, C2);
+    r(3, 15, 3, 2, M); r(2, 16, 2, 5, M); // cola
+    return (MC[key] = { c, ax: flip ? W - 15 : 15, ay: 27, k: K, w: W, h: H });
+  }
   S.troopIcon = function (type) {
     const key = 'troop_' + type;
     if (ICONS[key]) return ICONS[key];

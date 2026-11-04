@@ -103,7 +103,7 @@ test('toda tropa tiene su figura en la batalla (TROPA)', () => {
 });
 
 // Hoy las bestias solo tienen al Lancero; la Fase 4 del plan suma tropas (Jinete, Ballestero…) y lo arregla.
-test('todo enemigo tiene al menos 2 tropas con ventaja', { todo: 'las bestias solo tienen al Lancero (Fase 4)' }, () => {
+test('todo enemigo tiene al menos 2 tropas con ventaja', () => {
   for (const e of Object.keys(D.ENEMY)) {
     const buenas = Object.keys(D.ARMY).filter(a => (D.ARMY[a].vs[e] || 1) > 1);
     assert.ok(buenas.length >= 2, e + ': ' + buenas.join(', '));

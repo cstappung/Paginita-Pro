@@ -47,9 +47,9 @@
     return box;
   }
 
-  UI.openBarracks = function (tab, target) {
+  UI.openBarracks = function (tab, target, extra) {
     if (tab) barTab = tab;
-    if (target) plan = { target, units: null };
+    if (target) plan = Object.assign({ target, units: null }, extra || {});
     UI.modal('war', 'Cuartel', body => {
       const st = S(), g = G();
       const tabs = el('div', { class: 'book-tabs bar-tabs' });
@@ -125,7 +125,7 @@
         el('div', { class: 'bar' }, el('div', { class: 'fill ' + (ch >= 0.75 ? 'green' : ch >= 0.45 ? 'gold' : 'red'), style: { width: ch * 100 + '%' } }), el('span', null, 'Probabilidad de victoria: ' + Math.round(ch * 100) + '%')),
         el('div', { class: 'small muted' }, heal ? 'Los clérigos reducen las bajas un ' + Math.round(heal * 100) + '%.' : 'Sin clérigos: las bajas serán completas.'));
       go.innerHTML = '';
-      go.append(UI.btn('¡En marcha! (' + n + ')', () => { if (PK.Exp.send(plan.target, Object.assign({}, plan.units), plan.heroe)) { plan = null; UI.closeModal(); } }, { cls: 'gold', disabled: !!why || !n }));
+      go.append(UI.btn('¡En marcha! (' + n + ')', () => { if (PK.Exp.send(plan.target, Object.assign({}, plan.units), plan.heroe, formLimpia(plan))) { plan = null; UI.closeModal(); } }, { cls: 'gold', disabled: !!why || !n }));
     };
     const kinds = Object.keys(D.ARMY).filter(k => w.army[k] > 0);
     const rows = el('div', { class: 'pick-rows' }, kinds.map(k => {
@@ -144,12 +144,46 @@
       kinds.length ? rows : el('div', { class: 'empty-box small' }, el('div', null, el('b', null, 'No tienes soldados en casa.'), el('p', { class: 'small' }, 'Entrénalos en la pestaña Tropas: tardan unos segundos y quedan formados frente al Cuartel.'),
         UI.btn('Entrenar tropas', () => { barTab = 'troops'; UI.rerender(true); }, { small: true, cls: 'gold' }))),
       kinds.length ? heroePick(pv) : null,
+      kinds.length ? formacionEl() : null,
       kinds.length ? est : null,
       el('div', { class: 'row' }, el('b', null, 'Botín si ganas: '), UI.costEl(pv.loot, 1, true)),
       why ? el('p', { class: 'small warn-t' }, why) : null,
       kinds.length ? el('div', { class: 'row' }, UI.btn('Compañía recomendada', () => { plan.units = PK.Exp.recommend(pv.enemy, pv.power); UI.rerender(); }, { small: true }),
         UI.btn('Todos', () => { plan.units = Object.assign({}, w.army); UI.rerender(); }, { small: true }), go) : null));
     refresh();
+  }
+
+  // C1 (pk-21): la formación. Cada tropa va al frente, al medio o atrás, y el héroe a un flanco. Se recuerda la
+  // última usada (S.formaciones.ult) y se pueden guardar hasta 3 con nombre.
+  const formLimpia = pl => {
+    const f = pl.form || {}, filas = {};
+    for (const k in pl.units) if (pl.units[k] > 0 && f.filas && f.filas[k] && f.filas[k] !== PK.Batalla.filaPorDefecto(k)) filas[k] = f.filas[k];
+    return { filas, flanco: f.flanco || 'c' };
+  };
+  function formacionEl() {
+    const st = S(), B = PK.Batalla, fs = (st.formaciones = st.formaciones || {});
+    if (!plan.form) plan.form = JSON.parse(JSON.stringify(fs.ult || { filas: {}, flanco: 'c' }));
+    const f = plan.form, kinds = Object.keys(plan.units).filter(k => plan.units[k] > 0);
+    if (!kinds.length) return '';
+    f.filas = f.filas || {};
+    const chip = (on, txt, fn, title) => UI.btn(txt, () => { fn(); UI.rerender(); }, { small: true, cls: on ? 'gold' : '', title });
+    const filas = kinds.map(k => {
+      const cur = f.filas[k] || B.filaPorDefecto(k);
+      return el('div', { class: 'fm-row' }, troopImg(k, 'tr-mini'), el('span', { class: 'fm-n' }, D.ARMY[k].name),
+        el('span', { class: 'fm-ch', role: 'group', 'aria-label': 'Fila de ' + D.ARMY[k].name }, Object.keys(B.FILAS).map(x => chip(cur === x, B.FILAS[x] + (x === B.filaPorDefecto(k) ? ' ·' : ''), () => { f.filas[k] = x; }, x === B.filaPorDefecto(k) ? 'Su fila de siempre' : ''))));
+    });
+    const flanco = plan.heroe ? el('div', { class: 'fm-row' }, el('span', { class: 'fm-n' }, 'Flanco del héroe'),
+      el('span', { class: 'fm-ch' }, [['i', 'Izquierda'], ['c', 'Centro'], ['d', 'Derecha']].map(([x, t]) => chip((f.flanco || 'c') === x, t, () => { f.flanco = x; })))) : '';
+    fs.lista = fs.lista || [];
+    const guardadas = el('div', { class: 'row fm-sv' }, fs.lista.map((g, i) => el('span', { class: 'fm-g' }, UI.btn(g.n, () => { plan.form = JSON.parse(JSON.stringify(g.f)); UI.rerender(); }, { small: true, title: 'Usar esta formación' }),
+      UI.btn('×', () => { fs.lista.splice(i, 1); UI.rerender(); }, { small: true, aria: 'Borrar ' + g.n }))),
+      fs.lista.length < 3 ? UI.btn('Guardar formación', () => { fs.lista.push({ n: 'Formación ' + (fs.lista.length + 1), f: formLimpia(plan) }); UI.rerender(); }, { small: true }) : '',
+      UI.btn('Filas de siempre', () => { plan.form = { filas: {}, flanco: 'c' }; UI.rerender(); }, { small: true }));
+    const det = el('details', { class: 'fm' }, el('summary', null, el('b', null, 'Formación'), el('span', { class: 'small muted' }, ' · solo cuenta en la batalla en vivo')),
+      el('p', { class: 'small muted' }, 'Al frente reciben el primer choque; atrás, los tiradores pegan sin que los alcancen. «·» marca la fila de siempre.'), filas, flanco, guardadas);
+    det.open = !!plan.fmOpen; // (no va en las props: U.el toma «open» por un evento «en»)
+    det.addEventListener('toggle', () => { plan.fmOpen = det.open; });
+    return det;
   }
 
   // Qué héroe va con la compañía (H1): los libres, con cuánto suben la fuerza contra este enemigo.
@@ -293,6 +327,33 @@
     pane.append(el('h3', null, 'Crónica'), el('div', { class: 'log scroll' }, w.log.length ? w.log.map(l => el('div', { class: l.kind }, l.text)) : el('div', { class: 'muted' }, 'Todavía no pasó nada digno de contarse.')));
   }
 
+  // C7 (pk-21): cuánto daño hizo cada tropa en la batalla en vivo, y el grupo más valioso
+  function danoEl(r) {
+    const d = r.dano || {}, ks = Object.keys(d).filter(k => d[k] > 0 && (D.ARMY[k] || k === 'heroe')).sort((a, c) => d[c] - d[a]);
+    if (!ks.length) return null;
+    const tot = ks.reduce((t, k) => t + d[k], 0), top = d[ks[0]], nom = k => (k === 'heroe' ? r.heroe || 'Héroe' : D.ARMY[k].name);
+    return el('div', { class: 'rep-dano' }, el('h3', null, 'Daño por tropa'),
+      el('p', { class: 'small' }, 'El grupo más valioso: ', el('b', ks[0] === 'heroe' ? { translate: 'no' } : null, nom(ks[0])), ' (' + Math.round((top / tot) * 100) + '% del daño).'),
+      ks.map(k => el('div', { class: 'rd-row' }, k === 'heroe' ? el('span', { class: 'tr-mini' }, '★') : troopImg(k, 'tr-mini'), el('span', { class: 'rd-n' }, nom(k)),
+        el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (k === ks[0] ? 'gold' : 'green'), style: { width: Math.max(3, (d[k] / top) * 100) + '%' } }), el('span', null, U.fmt(Math.round(d[k])))))));
+  }
+  // una frase de B.CONSEJO para el enemigo que más pesaba
+  function consejoEl(r) {
+    if (!r.enemy || !PK.Batalla) return null;
+    const k = Object.keys(r.enemy).sort((a, c) => r.enemy[c] - r.enemy[a])[0], t = PK.Batalla.CONSEJO[k];
+    return t ? el('p', { class: 'small bt-tip' }, '💡 ' + t) : null;
+  }
+  // «Repetir con la misma compañía»: abre el planificador con el mismo destino, las mismas tropas (las que haya en
+  // casa), el mismo héroe si está libre y la misma formación
+  function repetirBtn(r) {
+    if (!r.target || !PK.Exp.preview(r.target)) return null;
+    const army = S().war.army, units = {};
+    let n = 0;
+    for (const k in r.sent || {}) { units[k] = Math.min(r.sent[k], army[k] || 0); n += units[k]; }
+    return UI.btn('Repetir con la misma compañía', () => { UI.closeModal(); UI.openBarracks('exp', r.target, { units, heroe: r.heroeId, form: r.form ? JSON.parse(JSON.stringify(r.form)) : undefined }); },
+      { small: true, cls: 'gold', disabled: !n, title: n ? '' : 'No tienes esas tropas en casa' });
+  }
+
   // Informe de una batalla: tu compañía, las bajas de cada tropa, la probabilidad que tenías y el botín.
   UI.openReport = function (r) {
     UI.modal('report', r.won ? '¡Victoria!' : 'Derrota', body => {
@@ -306,9 +367,11 @@
         el('h3', null, 'Tu compañía'),
         el('div', { class: 'rep-units' }, kinds.map(k => el('div', { class: 'rep-u' }, troopImg(k), el('b', null, D.ARMY[k].name), el('span', { class: 'small' }, r.sent[k] + ' fueron'),
           (r.lost || {})[k] ? el('span', { class: 'small warn-t' }, '−' + r.lost[k] + ' bajas') : el('span', { class: 'small good-t' }, 'sin bajas')))),
+        danoEl(r),
         r.loot ? el('h3', null, 'Botín (llega con las tropas)') : null, r.loot ? UI.costEl(r.loot, 1, true) : null,
         r.won ? null : el('p', { class: 'small' }, 'Arma la compañía con las tropas que mejor rinden contra ' + (r.enemy ? enemyText(r.enemy).toLowerCase() : 'ese enemigo') + ' (' + (r.enemy ? bestVs(r.enemy) || 'cualquiera' : 'cualquiera') + ') o lleva más soldados, y vuelve a intentarlo.'),
-        el('div', { class: 'row' }, UI.btn('Ir al Cuartel', () => UI.openBarracks('exp'), { small: true, cls: 'gold' }), UI.btn('Cerrar', () => UI.closeModal(), { small: true }))));
+        consejoEl(r),
+        el('div', { class: 'row' }, repetirBtn(r), UI.btn('Ir al Cuartel', () => UI.openBarracks('exp'), { small: true, cls: r.target ? '' : 'gold' }), UI.btn('Cerrar', () => UI.closeModal(), { small: true }))));
     });
   };
 

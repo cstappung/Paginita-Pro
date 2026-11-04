@@ -647,3 +647,41 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   Tests: `test-rules.mjs` («Pase del Reino»), `functions/prueba-emulador.js`
   (refresh with and without a purchase), `tools/cheat-test.js` (daily cap,
   jumps).
+
+## Combate 2.0, part 1 (`pk-21`, Phase 4: H4 troops, C1, C4, C7, C8)
+
+- **Four new troops** in `D.ARMY` (`rider` Jinete III/5, `crossbow` Ballestero
+  IV/6, `monk` Monje guerrero V/7, `mage` Mago de batalla VI/8: era/Cuartel
+  level). `D.PROTO` 4: the server drops unit types it does not know. Every
+  enemy now has 2+ troops with `vs > 1` (the T3 test is on). The Jinete is a
+  horse plus the soldier (`montado` in `sprites.js`, its own cache `MC`); it
+  flanks like the wolves (`TROPA.flanco`).
+- **Big enemies were unbeatable live at 1:1** (gólem 2.6, oso 2.4, gigante
+  3.2 of hp×dps): `figura` caps a common enemy at `TOPE_EN` (1.6). Bosses keep
+  their measured numbers. Measured with `B.adelantar` (60 fights each, 1:1):
+  knights+spears vs the cave 0→66%, mages vs golems 74%, crossbows vs giants
+  42% (66% dispersing). Catapults vs giants is now 100%: splash on big clumps.
+- **Crossbows:** a heavy bolt every 1.6 s (`cd`), ×1.6 against enemies with
+  `st.hp >= 2` (`pesado`, live only like the spears' line), and a bolt whose
+  target already fell goes to the nearest enemy. Without that, all of them
+  fired at one body and lost 0% vs 73%.
+- **C4, enemy roles** (`B.ROLES`: chamán, escudero, jefe de banda, invocador,
+  élite with a name): `B.cuantosRoles(need)` gives 0–3, seeded by run id.
+  Whatever a role adds (`extra`) comes off every enemy's life, so the total
+  stays the planner's (measured: 62% without roles, 60% with, average of 4
+  cases). The escudero only stops `flecha`/`virote` from the front. Focus
+  `'rol:<id>'` (buttons with the role's colour), `B.CONSEJO_ROL`.
+- **C1, formation:** `r.form = {filas: {tipo: 'f'|'m'|'a'}, flanco}` from the
+  planner (`formacionEl` in `ui/cuartel.js`), `S.formaciones` = `{ult,
+  lista}` (3 saved). The default row is the old `TROPA.fila`, so not touching
+  it fights the same. The hero follows the front of his flank. Do not pass
+  `open` in `U.el` props: it reads «on…» as an event.
+- **C7, report:** `b.dano` per troop (in `herir`, real damage / HPK) goes
+  through `finishBattle` → `r.dano` (summed over incursion rooms) → the report:
+  most valuable group, bars, a `B.CONSEJO` line and «Repetir con la misma
+  compañía» (`rep.target`, `rep.form`, `rep.heroeId`; not for missions).
+- **C8:** gold pips under the bar in battle (one per two ranks) and a rank
+  pennant on the first garrison soldier of each type (`troops.js`, `TRAMO`).
+- **Left for part 2 (`pk-22`):** C1 terrain (`esc.obstaculos`), C5 sieges by
+  waves, tower branches and traps, C6 server raid parties (bots of `sim.js`,
+  tribute / fight / ally).

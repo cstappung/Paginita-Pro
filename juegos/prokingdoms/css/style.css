@@ -978,3 +978,16 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
   .pase-n > b { flex: 0 0 34px; display: flex; align-items: center; justify-content: center; }
   .pase-c { flex: 1; min-height: 40px; }
 }
+/* C4 (pk-21): el rombo del rol en los botones de «Atacar primero» */
+#batalla .bt-rol { display: inline-block; width: 7px; height: 7px; transform: rotate(45deg); margin: 0 5px 1px 1px; outline: 1px solid #000; }
+/* C1 (pk-21): formación en el planificador */
+.fm { margin: 6px 0; padding: 4px 8px; border: 1px solid var(--line, #5a4a34); border-radius: 6px; }
+.fm summary { cursor: pointer; padding: 2px 0; }
+.fm-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 3px 0; }
+.fm-n { min-width: 96px; font-size: 13px; }
+.fm-ch { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+.fm-g { display: inline-flex; gap: 1px; }
+/* C7 (pk-21): daño por tropa en el informe */
+.rep-dano .rd-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.rep-dano .rd-n { min-width: 96px; font-size: 13px; }
+.rep-dano .bar { flex: 1; }
