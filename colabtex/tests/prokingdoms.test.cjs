@@ -475,7 +475,7 @@ test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen su
   for (const d of D.DESAFIOS) assert.ok(['tick', 'batalla', 'era', 'fiesta', 'incursion', 'carta'].includes(d.on) && typeof d.ok === 'function', d.id);
   // las estadísticas que piden los Retos del Rey las registra alguien
   for (const r of D.RETOS) assert.ok(r.k.startsWith('g_') || new RegExp("stat\\('" + r.k + "'").test(TODO), r.id + ' pide ' + r.k);
-  for (const it of D.TIENDA) assert.ok(['color', 'marco', 'fuegos', 'cola'].includes(it.t) && it.precio > 0, it.id);
+  for (const it of D.TIENDA) assert.ok(['color', 'marco', 'fuegos', 'cola'].includes(it.t) && (it.premio ? !it.precio : it.precio > 0), it.id); // los premios de escalera (V7) no tienen precio
   // el ánimo topado: en 0 resta 10%, en 100 suma 15%
   const viejo = G.state;
   try {
@@ -562,4 +562,31 @@ test('Fase 9: el mapa del archipiélago es casi todo agua, con tu isla en tu hog
   assert.equal(JSON.stringify(W.pois.slice(0, 50).map(p => [p.kind, p.x, p.y])), huella, 'volver a la tierra da el mismo mapa');
   // las cuatro piezas del Galeón las da la Crónica, cada una en su capítulo
   for (const p of D.GALEON.piezas) assert.equal(D.CAPITULOS[p.cap - 1].galeon, p.id, p.id);
+});
+
+test('V7: escaleras de hasta 4 rangos, sin perder premios ni mejoras de los peldaños absorbidos', () => {
+  const ids = new Set(D.QUESTS.map(q => q.id));
+  const esc = Object.keys(D.ESCALERAS);
+  assert.ok(esc.length >= 10, 'escaleras: ' + esc.length);
+  let perks = 0;
+  for (const k of esc) {
+    const vis = D.QUESTS.filter(q => q.rango && q.rango.esc === k);
+    assert.ok(vis.length >= 1 && vis.length <= 4, k + ': ' + vis.length + ' rangos visibles');
+    assert.deepEqual(vis.map(q => q.id), D.ESCALERAS[k].ids.slice());
+    vis.forEach((q, i) => {
+      assert.equal(q.rango.k, i);
+      if (i) assert.equal(q.pre[0], vis[i - 1].id, k + ': cada rango pide el anterior visible');
+      for (const a of q.absorbe || []) assert.ok(!ids.has(a.id), a.id + ' quedó dos veces');
+      perks += (q.perk ? 1 : 0) + (q.absorbe || []).filter(a => a.perk).length;
+    });
+    // el último rango sigue siendo el más difícil de antes (no se recorta la meta final)
+    const n = D.QUESTS.filter(q => q.rango && q.rango.esc === k).length + vis.reduce((s, q) => s + (q.absorbe || []).length, 0);
+    assert.equal(vis[vis.length - 1].id, k + (n - 1));
+    for (const t of [D.ESCALERAS[k].ids[1] && 'esc_' + k + '_c', vis.length >= 3 && 'esc_' + k + '_m'].filter(Boolean)) assert.ok(D.TIENDA.some(o => o.id === t && o.premio === k), t);
+  }
+  assert.equal(perks, 10, 'las 10 mejoras permanentes de las escaleras siguen en algún rango');
+  // Constructor Incansable: 8 peldaños de antes, 4 visibles, y las monedas suman lo mismo (10 + 20 + … + 80)
+  const bt = D.QUESTS.filter(q => q.rango && q.rango.esc === 'bt');
+  assert.equal(bt.reduce((s, q) => s + q.reward.coins + (q.absorbe || []).reduce((t, a) => t + a.reward.coins, 0), 0), 360);
+  assert.ok(D.TIENDA.filter(o => o.premio).every(o => !o.precio), 'los premios de escalera no se venden');
 });

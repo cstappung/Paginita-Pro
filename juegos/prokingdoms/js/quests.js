@@ -86,12 +86,30 @@
   Q.claim = function (id, silent) {
     const q = byId[id];
     if (Q.status(q) !== 'ready') return null;
+    const total = Q.premioTotal(q); // V7: con los peldaños absorbidos (se calcula antes de marcarlos)
     S().quests[id] = 'claimed';
     G().give(q.reward);
-    if (q.perk) {
+    const mejora = perk => {
       const p = (S().perks = S().perks || {});
-      for (const k in q.perk) p[k] = (p[k] || 0) + q.perk[k];
-      PK.UI.toast('Mejora permanente: ' + D.perkText(q.perk) + '.', 'epic');
+      for (const k in perk) p[k] = (p[k] || 0) + perk[k];
+      PK.UI.toast('Mejora permanente: ' + D.perkText(perk) + '.', 'epic');
+    };
+    if (q.perk) mejora(q.perk);
+    // V7: los peldaños que este rango absorbió se pagan ahora, si esta partida no los había reclamado antes
+    for (const a of q.absorbe || []) {
+      if (S().quests[a.id] === 'claimed') continue;
+      S().quests[a.id] = 'claimed';
+      G().give(a.reward);
+      if (a.perk) mejora(a.perk);
+    }
+    // V7: el rango da su título (Desafíos → Título del reino) y el II y el último, un cosmético
+    if (q.rango) {
+      const st = S();
+      for (const tid of D.premiosRango(q)) if (st.tienda && !st.tienda.tengo[tid]) {
+        st.tienda.tengo[tid] = 1;
+        const it = D.TIENDA && D.TIENDA.find(o => o.id === tid);
+        if (it) PK.UI.toast('Ganaste ' + (it.t === 'color' ? 'el estandarte' : 'el marco de retrato') + ' «' + D.ESCALERAS[q.rango.esc].nombre + '». Úsalo desde la tienda del reino.', 'epic', { label: 'Ver', fn: () => PK.UI.openTienda() });
+      }
     }
     if (q.unlock) {
       S().flags['unlock_' + q.unlock] = true;
@@ -99,7 +117,7 @@
     }
     G().stat('quests_done', 1);
     if (!silent) PK.UI.toast('Recompensa obtenida: ' + q.title, 'good');
-    return q.reward;
+    return total;
   };
 
   // ---------- Diarias ----------
@@ -349,7 +367,8 @@
         right.append(el('ul', { class: 'sub' }, q.req.of.map(r => { const [x, y] = progress(r); return el('li', { class: x >= y ? 'ok' : '' }, reqText(r) + ' (' + U.fmt(Math.min(x, y)) + '/' + U.fmt(y) + ')'); })));
       }
     }
-    right.append(el('h3', null, 'Recompensa'), rewardEl(q.reward));
+    right.append(el('h3', null, 'Recompensa'), rewardEl(Q.premioTotal(q)));
+    if (q.rango) right.append(el('p', { class: 'small muted' }, 'Rango ' + U.roman(q.rango.k + 1) + ' de ' + q.rango.de + '. Te da el título «' + q.title + '»' + (D.premiosRango(q).length ? ' y ' + D.premiosRango(q).map(t => (t.endsWith('_c') ? 'su estandarte' : 'su marco de retrato')).join(' y ') : '') + '.'));
     if (q.perk) right.append(el('p', { class: 'small good-t' }, 'Mejora permanente: ' + D.perkText(q.perk) + '.'));
     if (q.unlock) right.append(el('div', { class: 'unlock' }, el('img', { src: PK.Sprites.buildingIcon(q.unlock) }), el('div', null, el('b', null, 'Desbloquea: ' + D.BUILD[q.unlock].name), el('p', { class: 'small' }, D.BUILD[q.unlock].desc))));
     if (q.cap && s !== 'locked' && PK.Campana) right.append(PK.Campana.caja(q.cap));
@@ -487,4 +506,11 @@
     return main.find(q => Q.status(q) === 'ready') || main.find(q => Q.status(q) === 'active') || null;
   };
   Q.reqText = reqText;
+  // V7: lo que paga un rango, contando los peldaños que absorbió y esta partida no había reclamado
+  Q.premioTotal = function (q) {
+    if (!q.absorbe) return q.reward;
+    const r = Object.assign({}, q.reward);
+    for (const a of q.absorbe) if (S().quests[a.id] !== 'claimed') for (const k in a.reward) r[k] = (r[k] || 0) + a.reward[k];
+    return r;
+  };
 })();

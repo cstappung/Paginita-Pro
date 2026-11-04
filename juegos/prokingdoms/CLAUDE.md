@@ -595,8 +595,7 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   (shown in the TC panel). **King's challenges** (`D.RETOS`, 3 a week by
   `weekKey` + `created`, `S.retos`) count stat deltas from the week's start;
   all three open a royal chest with a rare item. They live in the book's
-  «Desafíos» tab. Ladders were not shortened (deferred: it would renumber
-  quest ids).
+  «Desafíos» tab. Ladders were shortened later, in `pk-27` (below).
 - **V8, shop** (`D.TIENDA`, kingdom coins via `Platform.spendCoins`, never
   `monedas.js`): banner colour (`Sp.colorPropio`, clears the player's sprite
   cache), hero portrait frame (`--marco` on `.h-ret`), fireworks at a new era
@@ -837,3 +836,20 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   no falling leaves or snow; on by default when the system asks for it).
 - **U7:** the battle view fades in, and a full resource gets a red frame in the top bar. The rest of U7 (wonders,
   golem, bear, portraits) was already done in earlier deliveries.
+
+## Shorter mission ladders (`pk-27`, the rest of V7)
+
+- **`escalera(pref, …)` in `data.js`** builds every ladder (`bt`, `bl`, `xt`, `xc`, `xr`, `et`, `it`, `tt`,
+  `gt`, `wt`, `lf`) with at most 4 visible ranks: indices `round(j·(L−1)/3)`, so the first and the hardest step
+  stay. **Quest ids never change** (that is why this was deferred in `pk-19`): a hidden step leaves `D.QUESTS`
+  and goes into `absorbe` of the next visible rank, with its reward and its perk (`PERKS` looks there too).
+  `Q.claim` pays absorbed steps this save had not claimed yet and marks them claimed, so an old save half way
+  up a ladder neither loses nor double-collects anything. `Q.premioTotal(q)` is what the book shows and what
+  `claim` returns (the «Reclamar todo» chest sums it).
+- **Each rank is a title** (`q.rango = {esc, k, de}`; `flags.titulo = 'q:<id>'`, read by `Vida.titulo`; the
+  highest claimed rank of each ladder shows in Desafíos → «Título del reino»). **Rank II gives the ladder's
+  banner colour and the last rank its portrait frame** (`D.premiosRango`; `D.ESCALERAS[k].col`). They are
+  `D.TIENDA` entries with `premio` and no price: the shop lists them in their own section and `comprar` refuses
+  them. `Vida.init` grants them silently to saves that already had those ranks.
+- Test: «V7: escaleras…» in `prokingdoms.test.cjs` (≤ 4 ranks, the 10 perks still somewhere, Constructor
+  Incansable's coins still add up to 360).

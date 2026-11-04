@@ -239,6 +239,13 @@
     { id: 'cola', t: 'cola', name: 'Escribano del Mayordomo', desc: '+1 lugar en la cola de investigación.', precio: 200 },
   ];
 
+  // V7: premios de las escaleras de misiones (sin precio: se ganan con el rango, ver D.premiosRango en data.js)
+  for (const k in D.ESCALERAS || {}) {
+    const e = D.ESCALERAS[k], claro = e.col.map(v => Math.min(255, Math.round(v * 1.35 + 30)));
+    D.TIENDA.push({ id: 'esc_' + k + '_c', t: 'color', name: 'Estandarte: ' + e.nombre, col: e.col, premio: k });
+    D.TIENDA.push({ id: 'esc_' + k + '_m', t: 'marco', name: 'Marco: ' + e.nombre, css: 'rgb(' + claro.join(',') + ')', premio: k });
+  }
+
   // Tope del multiplicador de recolección que pueden sumar árbol, cartas y estación juntos (Vida.recoleccion). El
   // servidor tiene el mismo número como LIM.vida (server/sim.js): la prueba de prokingdoms.test.cjs los compara.
   D.VIDA_TOPE = 1.6;

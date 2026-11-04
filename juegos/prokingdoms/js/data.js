@@ -985,6 +985,31 @@
   const st = (k, n) => ({ t: 'stat', k, n });
   let prev;
 
+  // V7: escaleras de hasta 4 rangos visibles (antes llegaban a 10 peldaños casi iguales). Los ids no cambian: los
+  // peldaños intermedios salen de la lista, pero lo que daban (recursos y mejora permanente) se paga al reclamar el
+  // rango visible que los absorbe, salvo que esa partida ya los hubiera reclamado (quests.js, Q.claim). Así ninguna
+  // partida guardada pierde ni cobra dos veces. Cada rango da su título; el II y el IV, un cosmético (D.ESCALERAS).
+  D.ESCALERAS = {};
+  const visibles = L => (L <= 4 ? [...Array(L).keys()] : [0, 1, 2, 3].map(j => Math.round((j * (L - 1)) / 3)));
+  function escalera(pref, branch, nombre, ns, desc, req, premio, inicio) {
+    const vis = visibles(ns.length);
+    let pre = inicio, absorbe = [];
+    D.ESCALERAS[pref] = { nombre, ids: [] };
+    ns.forEach((n, i) => {
+      const id = pref + i;
+      if (!vis.includes(i)) { absorbe.push({ id, reward: premio(n, i) }); return; }
+      const k = vis.indexOf(i);
+      q(id, branch, nombre + ' ' + U.roman(k + 1), desc(n), req(n), premio(n, i), [pre]);
+      const qq = Q[Q.length - 1];
+      qq.rango = { esc: pref, k, de: vis.length };
+      if (absorbe.length) qq.absorbe = absorbe;
+      absorbe = [];
+      pre = id;
+      D.ESCALERAS[pref].ids.push(id);
+    });
+    return pre;
+  }
+
   // Crónica (rama principal, hace de tutorial)
   q('m1', 'main', 'El primer fuego', 'Entrena aldeanos en el Centro Urbano hasta tener 5. Selecciona el Centro Urbano y pulsa "Aldeano".', { t: 'villagers', n: 5 }, { food: 100 });
   q('m2', 'main', 'Techo para todos', 'Construye 2 casas: pulsa Construir (tecla C), elige Casa y ubícala. Se levantan solas, sin aldeanos.', B('house', 2), { wood: 80 }, ['m1']);
@@ -1014,16 +1039,8 @@
   q('b9', 'build', 'El primer consejero', 'Construye un Salón del Consejo (Era II): su Mayordomo investiga en cola y reclama tus misiones.', B('consejo'), { gold: 200, books: 10, coins: 10 }, ['b3']);
   q('b10', 'build', 'Un consejo completo', 'Sube el Salón del Consejo a nivel 9: con el Gobernador, los seis consejeros trabajan para ti.', LV('consejo', 9), { coins: 40, gems: 30 }, ['b9']);
   q('b8', 'build', 'Cuadrilla completa', 'Ten las 4 Casas del Maestro de Obras (5 maestros).', B('builder', 4), { coins: 30 }, ['b6']);
-  prev = 'b7';
-  [10, 30, 75, 180, 400, 900, 2000, 4500].forEach((n, i) => {
-    q('bt' + i, 'build', 'Constructor Incansable ' + U.roman(i + 1), 'Completa ' + n + ' mejoras de edificios.', st('upgrades', n), { coins: 10 * (i + 1), stone: Math.round(400 * Math.pow(2.2, i)) }, [prev]);
-    prev = 'bt' + i;
-  });
-  prev = 'b7';
-  [9, 11, 13, 15, 18, 21, 25].forEach((n, i) => {
-    q('bl' + i, 'build', 'Altura ' + U.roman(i + 1), 'Sube un edificio a nivel ' + n + '.', LA(n, 1), { coins: 15 * (i + 1), gold: Math.round(500 * Math.pow(2.3, i)) }, [prev]);
-    prev = 'bl' + i;
-  });
+  escalera('bt', 'build', 'Constructor Incansable', [10, 30, 75, 180, 400, 900, 2000, 4500], n => 'Completa ' + U.fmt(n) + ' mejoras de edificios.', n => st('upgrades', n), (n, i) => ({ coins: 10 * (i + 1), stone: Math.round(400 * Math.pow(2.2, i)) }), 'b7');
+  escalera('bl', 'build', 'Altura', [9, 11, 13, 15, 18, 21, 25], n => 'Sube un edificio a nivel ' + n + '.', n => LA(n, 1), (n, i) => ({ coins: 15 * (i + 1), gold: Math.round(500 * Math.pow(2.3, i)) }), 'b7');
 
   // Exploración
   q('x1', 'explore', 'Más allá del humo', 'Revela 900 casillas del mapa con tu explorador.', { t: 'explored', n: 900 }, { food: 150, gold: 50 });
@@ -1034,21 +1051,9 @@
   q('x6', 'explore', 'Limpiar el camino', 'Derrota un campamento de bandidos con tus tropas.', st('camps_cleared', 1), { coins: 15, gold: 200 }, ['x5']);
   q('x7', 'explore', 'Reliquia sagrada', 'Lleva una reliquia a tu Monasterio.', st('relics', 1), { coins: 20 }, ['x4']);
   q('x8', 'explore', 'Cartógrafo', 'Revela 4.000 casillas del mapa.', { t: 'explored', n: 4000 }, { coins: 20, books: 20 }, ['x6', 'x7']);
-  prev = 'x8';
-  [6000, 8000, 10000, 12000, 14000, 16000].forEach((n, i) => {
-    q('xt' + i, 'explore', 'Atlas ' + U.roman(i + 1), 'Revela ' + U.fmt(n) + ' casillas del mapa.', { t: 'explored', n }, { coins: 15 * (i + 1), gems: 10 * (i + 1) }, [prev]);
-    prev = 'xt' + i;
-  });
-  prev = 'x6';
-  [3, 6, 10, 16, 24].forEach((n, i) => {
-    q('xc' + i, 'explore', 'Azote de Bandidos ' + U.roman(i + 1), 'Derrota ' + n + ' campamentos de bandidos.', st('camps_cleared', n), { coins: 20 * (i + 1), gold: Math.round(400 * Math.pow(2, i)) }, [prev]);
-    prev = 'xc' + i;
-  });
-  prev = 'x7';
-  [3, 5, 8].forEach((n, i) => {
-    q('xr' + i, 'explore', 'Custodio ' + U.roman(i + 1), 'Guarda ' + n + ' reliquias en tu Monasterio.', st('relics', n), { coins: 25 * (i + 1) }, [prev]);
-    prev = 'xr' + i;
-  });
+  escalera('xt', 'explore', 'Atlas', [6000, 8000, 10000, 12000, 14000, 16000], n => 'Revela ' + U.fmt(n) + ' casillas del mapa.', n => ({ t: 'explored', n }), (n, i) => ({ coins: 15 * (i + 1), gems: 10 * (i + 1) }), 'x8');
+  escalera('xc', 'explore', 'Azote de Bandidos', [3, 6, 10, 16, 24], n => 'Derrota ' + n + ' campamentos de bandidos.', n => st('camps_cleared', n), (n, i) => ({ coins: 20 * (i + 1), gold: Math.round(400 * Math.pow(2, i)) }), 'x6');
+  escalera('xr', 'explore', 'Custodio', [3, 5, 8], n => 'Guarda ' + n + ' reliquias en tu Monasterio.', n => st('relics', n), (n, i) => ({ coins: 25 * (i + 1) }), 'x7');
 
   // Economía
   q('e1', 'eco', 'Leñadores', 'Recolecta 300 de madera.', st('g_wood', 300), { food: 60 });
@@ -1063,11 +1068,7 @@
   q('e10', 'eco', 'Brillo en la roca', 'Recolecta 50 gemas.', st('g_gems', 50), { coins: 15 }, ['e9']);
   q('e12', 'eco', 'Fiesta en el pueblo', 'Desde la Era II, el Centro Urbano organiza fiestas: gasta lo que te sobra y tu gente recolecta y produce un 25% más durante 5 minutos.', st('fiestas', 1), { coins: 5, gold: 100 }, ['e3']);
   q('e11', 'eco', 'Bien común', 'Recolecta 2.000 recursos en zonas comunes.', st('g_common', 2000), { coins: 10, food: 300 }, ['e3']);
-  prev = 'e8';
-  [5e3, 25e3, 1e5, 5e5, 2e6, 1e7, 5e7, 2.5e8, 1e9, 5e9].forEach((n, i) => {
-    q('et' + i, 'eco', 'Gran Recolector ' + U.roman(i + 1), 'Recolecta ' + U.fmt(n) + ' recursos en total.', st('g_total', n), { coins: 10 * (i + 1), gold: Math.round(n * 0.03) }, [prev]);
-    prev = 'et' + i;
-  });
+  escalera('et', 'eco', 'Gran Recolector', [5e3, 25e3, 1e5, 5e5, 2e6, 1e7, 5e7, 2.5e8, 1e9, 5e9], n => 'Recolecta ' + U.fmt(n) + ' recursos en total.', n => st('g_total', n), (n, i) => ({ coins: 10 * (i + 1), gold: Math.round(n * 0.03) }), 'e8');
 
   // Industria
   q('i1', 'ind', 'La sierra canta', 'Construye un Aserradero (Era II) a 3 casillas o menos de un Almacén o del Centro Urbano: así se abastece solo. Después asígnale aldeanos (Aldeanos → Talleres). Sus tablones piden la Cantería, la Fundición y la investigación.', B('sawmill'), { wood: 200 });
@@ -1081,11 +1082,7 @@
   q('i8', 'ind', 'Acero templado', 'Construye una Acería (Era IV) y produce 30 de acero.', all(B('steelworks'), st('p_steel', 30)), { coins: 20, ingots: 100 }, ['i6']);
   q('i9', 'ind', 'Engranajes', 'Construye un Taller de Ingeniería (Era V) y produce 10 de maquinaria.', all(B('workshop'), st('p_machinery', 10)), { coins: 30, steel: 50 }, ['i8']);
   q('i10', 'ind', 'Talleres de primera', 'Ten 3 edificios de producción en nivel 5 o más.', { t: 'level', lvl: 5, n: 3, recipe: true }, { coins: 20, tools: 50 }, ['i6']);
-  prev = 'i9';
-  [1e3, 1e4, 1e5, 1e6, 1e7, 1e8].forEach((n, i) => {
-    q('it' + i, 'ind', 'Maestro Artesano ' + U.roman(i + 1), 'Produce ' + U.fmt(n) + ' bienes elaborados.', st('p_total', n), { coins: 15 * (i + 1), tools: Math.round(n * 0.02) }, [prev]);
-    prev = 'it' + i;
-  });
+  escalera('it', 'ind', 'Maestro Artesano', [1e3, 1e4, 1e5, 1e6, 1e7, 1e8], n => 'Produce ' + U.fmt(n) + ' bienes elaborados.', n => st('p_total', n), (n, i) => ({ coins: 15 * (i + 1), tools: Math.round(n * 0.02) }), 'i9');
 
   // Comercio
   q('t1', 'trade', 'Plaza de mercado', 'Construye un Mercado (Era II).', B('market'), { gold: 100 });
@@ -1094,22 +1091,14 @@
   q('t4', 'trade', 'Tu propia oferta', 'Publica una oferta en el tablón y espera a que otro reino la acepte.', st('offers_filled', 1), { gold: 150 }, ['t2']);
   q('t5', 'trade', 'Regateo', 'Sube el Mercado a nivel 4: mejores precios.', LV('market', 4), { gold: 300 }, ['t2']);
   q('t6', 'trade', 'Mercader', 'Mueve 5.000 de oro en el comercio.', st('gold_volume', 5000), { coins: 15 }, ['t3', 't4']);
-  prev = 't6';
-  [25e3, 1e5, 5e5, 2e6, 1e7, 5e7].forEach((n, i) => {
-    q('tt' + i, 'trade', 'Magnate ' + U.roman(i + 1), 'Mueve ' + U.fmt(n) + ' de oro en el comercio.', st('gold_volume', n), { coins: 15 * (i + 1), gold: Math.round(n * 0.05) }, [prev]);
-    prev = 'tt' + i;
-  });
+  escalera('tt', 'trade', 'Magnate', [25e3, 1e5, 5e5, 2e6, 1e7, 5e7], n => 'Mueve ' + U.fmt(n) + ' de oro en el comercio.', n => st('gold_volume', n), (n, i) => ({ coins: 15 * (i + 1), gold: Math.round(n * 0.05) }), 't6');
 
   // Gremio
   q('g1', 'guild', 'Salón del Gremio', 'Construye el Salón del Gremio (Era II).', B('guild'), { stone: 150 });
   q('g2', 'guild', 'Juramento', 'Únete a un gremio.', { t: 'flag', k: 'guildJoined' }, { gold: 100, coins: 10 }, ['g1']);
   q('g3', 'guild', 'Primer aporte', 'Aporta 500 recursos al proyecto del gremio.', st('contrib', 500), { food: 300 }, ['g2']);
   q('g4', 'guild', 'Obra común', 'Completa una etapa del proyecto del gremio junto a tus compañeros.', st('guild_stages', 1), { coins: 25 }, ['g3']);
-  prev = 'g4';
-  [5e3, 25e3, 1e5, 5e5, 2e6, 1e7].forEach((n, i) => {
-    q('gt' + i, 'guild', 'Pilar del Gremio ' + U.roman(i + 1), 'Aporta ' + U.fmt(n) + ' recursos al gremio.', st('contrib', n), { coins: 20 * (i + 1) }, [prev]);
-    prev = 'gt' + i;
-  });
+  escalera('gt', 'guild', 'Pilar del Gremio', [5e3, 25e3, 1e5, 5e5, 2e6, 1e7], n => 'Aporta ' + U.fmt(n) + ' recursos al gremio.', n => st('contrib', n), (n, i) => ({ coins: 20 * (i + 1) }), 'g4');
 
   // Guerra
   q('w1', 'war', 'A las armas', 'Construye un Cuartel (Era II). Ojo: termina tu tregua de novato.', B('barracks'), { food: 150 });
@@ -1124,11 +1113,7 @@
   q('w11', 'war', 'Guardia del pueblo', 'Rechaza una incursión de bandidos. Desde la Era II llegan cada tanto: el cuerno avisa, y tus Torres, tu Centro Urbano y las tropas del Cuartel los frenan.', st('raids_won', 1), { gold: 200, coins: 10 });
   q('w12', 'war', 'Azote de forajidos', 'Rechaza 5 incursiones de bandidos.', st('raids_won', 5), { coins: 20, gold: 600 }, ['w11']);
   q('w10', 'war', 'A la aventura', 'Gana una expedición en una mazmorra o un encargo del tablón.', st('exp_won', 1), { gold: 200, coins: 10 }, ['w2']);
-  prev = 'w10';
-  [5, 15, 40, 100, 250, 600].forEach((n, i) => {
-    q('wt' + i, 'war', 'Señor de la Guerra ' + U.roman(i + 1), 'Gana ' + n + ' expediciones o encargos.', st('exp_won', n), { coins: 20 * (i + 1), gold: 300 * Math.pow(2, i) }, [prev]);
-    prev = 'wt' + i;
-  });
+  escalera('wt', 'war', 'Señor de la Guerra', [5, 15, 40, 100, 250, 600], n => 'Gana ' + n + ' expediciones o encargos.', n => st('exp_won', n), (n, i) => ({ coins: 20 * (i + 1), gold: 300 * Math.pow(2, i) }), 'w10');
 
   // Campaña «La Crónica del Reino» (H5): un capítulo por era. { t: 'cap', n }: el capítulo n está cerrado (campana.js).
   const CAPQ = [
@@ -1195,11 +1180,7 @@
   ql('lw1', 'Maravillas del mundo', 'Descubre un lugar legendario explorando y manda a un héroe a investigarlo.', st('legends', 1), { gems: 15, coins: 15 }, ['lh1']);
   ql('lw2', 'Cronista de maravillas', 'Investiga 6 lugares legendarios distintos.', st('legends', 6), { coins: 40, lore: 10 }, ['lw1']);
   ql('lw3', 'Las doce maravillas', 'Investiga las 12 maravillas del mundo.', st('legends', 12), { coins: 100, gems: 60 }, ['lw2']);
-  prev = 'l14';
-  [3, 6, 9, 12].forEach((n, i) => {
-    ql('lf' + i, 'Espeleólogo ' + U.roman(i + 1), 'Llega al piso ' + n + ' de cualquier mazmorra.', st('floor_max', n), { coins: 15 * (i + 1), crystal: 10 * (i + 1) }, [prev]);
-    prev = 'lf' + i;
-  });
+  escalera('lf', 'legend', 'Espeleólogo', [3, 6, 9, 12], n => 'Llega al piso ' + n + ' de cualquier mazmorra.', n => st('floor_max', n), (n, i) => ({ coins: 15 * (i + 1), crystal: 10 * (i + 1) }), 'l14');
 
   ql('l19', 'Semillas de Oriente', 'Un mercader trae semillas que solo crecen en lo alto. Llega a la Era VIII.', { t: 'era', n: 8 }, { gems: 40, coins: 30 }, ['l18'], 'gardens');
   ql('l20', 'Un jardín en el cielo', 'Construye los Jardines Colgantes.', B('gardens'), { coins: 60, crystal: 40 }, ['l19']);
@@ -1208,12 +1189,28 @@
   ql('l23', 'El gigante dormido', 'Llega a la Era XII y al piso 12 de cualquier mazmorra.', all({ t: 'era', n: 12 }, st('floor_max', 12)), { coins: 60 }, ['l22'], 'colossus');
   ql('l24', 'La antorcha del reino', 'Levanta el Coloso del Reino.', B('colossus'), { coins: 120, scale: 20 }, ['l23']);
 
+  // V7: el color de cada escalera. El rango II da su estandarte (color del reino) y el último, su marco de retrato
+  // (datos-vida.js los suma a D.TIENDA como premios, sin precio).
+  const ESC_COL = { bt: [150, 96, 52], bl: [120, 132, 150], xt: [52, 120, 140], xc: [140, 60, 40], xr: [210, 200, 160], et: [96, 140, 56], it: [80, 80, 96], tt: [200, 160, 60], gt: [70, 90, 160], wt: [150, 36, 36], lf: [96, 60, 140] };
+  for (const k in D.ESCALERAS) D.ESCALERAS[k].col = ESC_COL[k] || [150, 150, 150];
+  D.premiosRango = q => {
+    if (!q.rango) return [];
+    const { esc, k, de } = q.rango, out = [];
+    if (k === 1) out.push('esc_' + esc + '_c');
+    if (k === de - 1 && de >= 3) out.push('esc_' + esc + '_m');
+    return out;
+  };
+
   // Algunos rangos dan una mejora permanente además de recursos: un hito de mecánica, no solo un número.
   const PERKS = {
     bt2: { upgradeP: 0.03 }, bt5: { upgradeP: 0.04 }, bl2: { craftP: 0.04 }, bl4: { researchP: 0.05 },
     et2: { gatherP: 0.03 }, et5: { gatherP: 0.05 }, wt2: { armyPower: 0.04 }, wt4: { armyPower: 0.06 }, xt2: { expSpeed: 0.05 }, xt4: { expSpeed: 0.05 },
   };
-  for (const id in PERKS) { const qq = Q.find(o => o.id === id); if (qq) qq.perk = PERKS[id]; }
+  for (const id in PERKS) {
+    const qq = Q.find(o => o.id === id);
+    if (qq) { qq.perk = PERKS[id]; continue; }
+    for (const o of Q) for (const a of o.absorbe || []) if (a.id === id) a.perk = PERKS[id]; // un peldaño absorbido (V7)
+  }
 
   // Misiones diarias (3 al día, escaladas por era)
   D.DAILY = [

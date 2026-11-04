@@ -132,7 +132,10 @@
     // títulos
     const t = st.flags.titulo;
     left.append(el('h3', null, 'Título del reino'), el('p', { class: 'small muted' }, 'Cada desafío cumplido te da su título. El que elijas se ve en el panel de tu Centro Urbano.'),
-      el('div', { class: 'row wrap' }, D.DESAFIOS.filter(d => st.desafios[d.id]).map(d => UI.btn(d.name, () => { st.flags.titulo = t === d.id ? null : d.id; UI.rerender(); }, { small: true, cls: t === d.id ? 'gold' : '' }))));
+      el('div', { class: 'row wrap' }, D.DESAFIOS.filter(d => st.desafios[d.id]).map(d => UI.btn(d.name, () => { st.flags.titulo = t === d.id ? null : d.id; UI.rerender(); }, { small: true, cls: t === d.id ? 'gold' : '' })),
+        // V7: el rango más alto de cada escalera de misiones también es un título
+        Object.keys(D.ESCALERAS).map(k => { const id = D.ESCALERAS[k].ids.filter(x => st.quests[x] === 'claimed').pop(); if (!id) return ''; const q = D.QUESTS.find(o => o.id === id), v = 'q:' + id;
+          return UI.btn(q.title, () => { st.flags.titulo = t === v ? null : v; UI.rerender(); }, { small: true, cls: t === v ? 'gold' : '' }); })));
     right.append(el('h2', null, 'Desafíos (' + n + '/' + D.DESAFIOS.length + ')'), el('p', { class: 'small muted' }, 'Se cumplen una vez y para siempre. Con 10 se desbloquea el Arco de triunfo.'));
     right.append(el('div', { class: 'desafios' }, D.DESAFIOS.map(d => el('div', { class: 'desafio' + (st.desafios[d.id] ? ' done' : '') }, el('b', null, (st.desafios[d.id] ? '✓ ' : '') + d.name), el('span', { class: 'small' }, d.desc)))));
   };
@@ -143,14 +146,17 @@
     UI.modal('tienda', 'Tienda del reino', body => {
       const st = S(), m = PK.Platform.getCoins();
       body.append(el('p', null, 'Tienes ', el('b', null, U.fmt(m) + ' monedas del reino'), '. Aquí solo hay cosas que se ven y comodidades: nada que cambie el balance. Las monedas del reino salen de misiones, cofres y la Maravilla, y no son las de Juegos.'));
-      const grupos = { color: 'Color del reino (banderas y estandartes)', marco: 'Marco para los retratos de héroe', fuegos: 'Al llegar a una era', cola: 'Comodidades' };
+      const grupos = { color: 'Color del reino (banderas y estandartes)', marco: 'Marco para los retratos de héroe', fuegos: 'Al llegar a una era', cola: 'Comodidades', premio: 'Premios de las escaleras de misiones' };
       for (const g in grupos) {
         body.append(el('h3', null, grupos[g]));
-        body.append(el('div', { class: 'tienda' }, D.TIENDA.filter(it => it.t === g).map(it => {
+        // V7: los premios no se compran: se ganan con el rango II (estandarte) y el último (marco) de cada escalera
+        if (g === 'premio') body.append(el('p', { class: 'small muted' }, 'Se ganan con el rango II y el último de cada escalera del Libro de Misiones.'));
+        body.append(el('div', { class: 'tienda' }, D.TIENDA.filter(it => (g === 'premio' ? !!it.premio : it.t === g && !it.premio)).map(it => {
           const tengo = st.tienda.tengo[it.id], uso = st.tienda[it.t] === it.id;
           const muestra = it.col ? el('span', { class: 'muestra', style: { background: 'rgb(' + it.col.join(',') + ')' } }) : it.css ? el('span', { class: 'muestra marco', style: { borderColor: it.css } }) : '';
           return el('div', { class: 'item' + (uso ? ' uso' : '') }, muestra, el('b', null, it.name), it.desc ? el('span', { class: 'small' }, it.desc) : '',
             tengo ? (it.t === 'cola' ? el('span', { class: 'small ok' }, '✓ Tuyo') : UI.btn(uso ? 'Quitar' : 'Usar', () => { V().usar(it.id); UI.rerender(); }, { small: true, cls: uso ? '' : 'gold' }))
+              : it.premio ? el('span', { class: 'small muted' }, it.t === 'color' ? 'Rango II' : 'Último rango')
               : UI.btn(it.precio + ' monedas', () => { V().comprar(it.id); UI.rerender(); }, { small: true, disabled: m < it.precio }));
         })));
       }

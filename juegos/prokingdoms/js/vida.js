@@ -21,6 +21,8 @@
     st.desafios = st.desafios || {};
     st.retos = st.retos || null;
     st.tienda = Object.assign({ tengo: {} }, st.tienda);
+    // V7: partidas que ya tenían rangos de escalera reclamados reciben sus cosméticos (sin aviso)
+    if (st.quests) for (const q of D.QUESTS) if (q.rango && st.quests[q.id] === 'claimed') for (const tid of D.premiosRango(q)) st.tienda.tengo[tid] = 1;
     cache = null;
     aplicarTienda();
     if (PK.Pase && PK.Pase.aplicar) PK.Pase.aplicar();
@@ -290,7 +292,11 @@
     if (PK.Sfx) PK.Sfx.play('level');
   }
   V.cumplidos = () => Object.keys((S() && S().desafios) || {}).length;
-  V.titulo = () => { const st = S(), t = st && st.flags.titulo; return t && st.desafios[t] ? D.DESAFIOS.find(d => d.id === t).name : null; };
+  V.titulo = () => {
+    const st = S(), t = st && st.flags.titulo;
+    if (t && t.indexOf('q:') === 0) { const q = D.QUESTS.find(o => o.id === t.slice(2)); return q && st.quests[q.id] === 'claimed' ? q.title : null; } // V7: rango de escalera
+    return t && st.desafios[t] ? D.DESAFIOS.find(d => d.id === t).name : null;
+  };
 
   // Retos del Rey: 3 por semana (se renuevan el lunes), con semilla de la semana y la partida
   const semana = () => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return U.dayKey(d); };
@@ -337,7 +343,7 @@
   // ---------- V8. Tienda del reino ----------
   V.comprar = function (id) {
     const st = S(), it = D.TIENDA.find(o => o.id === id);
-    if (!it || st.tienda.tengo[id]) return false;
+    if (!it || it.premio || st.tienda.tengo[id]) return false; // V7: los premios de escalera no se venden
     if (!PK.Platform.spendCoins(it.precio, 'tienda del reino')) { toast('Te faltan monedas del reino (' + it.precio + ').', 'warn'); return false; }
     st.tienda.tengo[id] = 1;
     if (it.t !== 'cola') V.usar(id);
