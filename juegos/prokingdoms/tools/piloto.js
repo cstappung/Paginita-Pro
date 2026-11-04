@@ -17,13 +17,15 @@
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
   const PLAN = {
     1: [['house', 2], ['lumber', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
-    2: [['sawmill', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2]],
-    3: [['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2]],
+    2: [['sawmill', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
+    3: [['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2]],
     4: [['university', 1], ['steelworks', 1], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
-    6: [['wonder', 1], ['house', 19]],
+    6: [['m_jardines', 1], ['house', 19]],
   };
   const RECURSO = { lumber: 'wood', mining: 'stone', mill: 'food' };
+  // las decoraciones van junto a las casas (dan ánimo a las que tienen a su alcance); el muelle, a la orilla
+  const JUNTO_CASAS = new Set(D.DECOS || []);
 
   function anota(t) {
     const m = Math.round((G().time - P.t0) / 6) / 10;
@@ -35,10 +37,12 @@
   function lugar(type, cx, cy, rMax) {
     const g = G(), def = D.BUILD[type];
     for (let r = 2; r <= (rMax || 28); r++) for (let y = Math.round(cy) - r; y <= Math.round(cy) + r; y++) for (let x = Math.round(cx) - r; x <= Math.round(cx) + r; x++) {
-      if (Math.max(Math.abs(x - Math.round(cx)), Math.abs(y - Math.round(cy))) !== r || !g.canPlace(type, x, y)) continue;
+      if (Math.max(Math.abs(x - Math.round(cx)), Math.abs(y - Math.round(cy))) !== r) continue;
+      // lo barato primero: canPlace llama a G.encierra (un relleno de hasta 3.000 casillas) y con las decoraciones
+      // el piloto probaba miles de lugares por vuelta y colgaba la página
       let pegado = false;
       for (let j = -1; j <= def.h && !pegado; j++) for (let i = -1; i <= def.w; i++) { if (W.inb(x + i, y + j) && W.bAt[W.idx(x + i, y + j)] >= 0) { pegado = true; break; } }
-      if (!pegado) return [x, y];
+      if (!pegado && g.canPlace(type, x, y)) return [x, y];
     }
     return null;
   }
@@ -53,6 +57,13 @@
     }
     return null;
   }
+  // Un lugar en la orilla, en tu tierra, lo más cerca posible del Centro Urbano
+  function orilla(tc) {
+    const g = G();
+    for (let r = 3; r <= 30; r++) for (let y = Math.round(tc.cy) - r; y <= Math.round(tc.cy) + r; y++) for (let x = Math.round(tc.cx) - r; x <= Math.round(tc.cx) + r; x++)
+      if (Math.max(Math.abs(x - Math.round(tc.cx)), Math.abs(y - Math.round(tc.cy))) === r && g.canPlace('muelle', x, y)) return [x, y];
+    return null;
+  }
   function construir() {
     const g = G(), st = S(), tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
     if (!tc) return false;
@@ -61,6 +72,8 @@
       let cx = tc.cx, cy = tc.cy;
       if (RECURSO[type] && RECURSO[type] !== 'food') { const nd = W.nearestNode(RECURSO[type], tc.cx, tc.cy, 40, 'p'); if (nd) { const p = PK.Auto.lugarJunto(type, nd); if (p && g.place(type, p[0], p[1])) { P.obras++; return true; } cx = nd.x; cy = nd.y; } }
       if (type === 'farm') { const m = g.buildings.find(b => b.owner === 'p' && b.type === 'mill'); if (m) { cx = m.cx; cy = m.cy; } }
+      if (JUNTO_CASAS.has(type)) { const hs = g.buildings.filter(b => b.owner === 'p' && b.type === 'house'); const h = hs[(g.countAll(type) * 3) % Math.max(1, hs.length)]; if (h) { cx = h.cx; cy = h.cy; } }
+      if (type === 'muelle') { const p = orilla(tc); if (p && g.place(type, p[0], p[1])) { P.obras++; return true; } continue; }
       const p = D.BUILD[type].recipe ? lugarTaller(type) || lugar(type, cx, cy) : lugar(type, cx, cy);
       if (p && g.place(type, p[0], p[1])) { P.obras++; return true; }
     }

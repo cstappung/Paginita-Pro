@@ -33,7 +33,7 @@
     if (res === 'food') {
       let best = null, bd = 1e9;
       for (const b of g.buildings) {
-        if (b.owner !== 'p' || b.type !== 'farm' || !b.done || (b.farmer !== null && g.uById.get(b.farmer))) continue;
+        if (b.owner !== 'p' || !g.esGranja(b) || !b.done || (b.farmer !== null && g.uById.get(b.farmer))) continue;
         const d = U.dist(u.x, u.y, b.cx, b.cy);
         if (d < bd) { bd = d; best = b; }
       }
@@ -278,7 +278,7 @@
     const g = G();
     if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b) && PK.Logi.supplied(b));
     if (job === 'dig') return W.pois.some(p => p.kind === 'ruin' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d);
-    if (job === 'food' && g.buildings.some(b => b.owner === 'p' && b.type === 'farm' && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
+    if (job === 'food' && g.buildings.some(b => b.owner === 'p' && g.esGranja(b) && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
     const [hx, hy] = D.PLAYER_HOME;
     return !!g.bestNode(job, hx, hy, 'p', { r: 40, max: 100 });
   };

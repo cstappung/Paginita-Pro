@@ -135,7 +135,7 @@
     // lo que juntan los aldeanos (antes «Comprar» se negaba mientras premios y tratos sí lo pasaban).
     S().res.gold -= cost; S().res[res] += n;
     m.p[res] *= Math.pow(1.03, n / 100);
-    G().stat('market_ops', 1); G().stat('gold_volume', cost);
+    G().stat('market_ops', 1); G().stat('gold_volume', cost); G().stat('compras', 1);
     if (online()) PK.Net.marketOp({ res, n, side: 'buy' });
   };
   Soc.sell = function (res, n) {

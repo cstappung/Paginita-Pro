@@ -84,7 +84,7 @@ test('todo edificio tiene dibujo, estadísticas y lugar en el orden de construcc
   for (const t of Object.keys(D.BUILD)) {
     assert.ok(new RegExp('\\b' + t + '\\s*[:(]').test(bloque), t + ' no tiene BDRAW en sprites.js');
     if (!D.BUILD[t].noUp) assert.equal(typeof D.BSTATS[t], 'function', t + ' se mejora pero no tiene D.BSTATS');
-    assert.ok(D.BUILD_ORDER.includes(t), t + ' no está en D.BUILD_ORDER');
+    if (!D.BUILD[t].retirada) assert.ok(D.BUILD_ORDER.includes(t), t + ' no está en D.BUILD_ORDER');
   }
 });
 
@@ -447,8 +447,8 @@ test('las estaciones salen del reloj real y las cartas de una semilla fija', () 
   const viejo = G.state;
   G.state = { era: 3, created: 12345, arbol: {}, arbolBloq: {}, cartas: { tomadas: [] }, flags: {}, stats: {} };
   PK.UI = PK.UI || { toast: () => {} };
-  const stat0 = G.stat, inv0 = G.invalidateCaps;
-  G.stat = () => {}; G.invalidateCaps = () => {};
+  const stat0 = G.stat, inv0 = G.invalidateCaps, give0 = G.give;
+  G.stat = () => {}; G.invalidateCaps = () => {}; G.give = () => {};
   try {
     PK.Vida.init(G.state);
     const m = PK.Vida.mano(2);
@@ -462,5 +462,24 @@ test('las estaciones salen del reloj real y las cartas de una semilla fija', () 
     G.state.era = 7;
     PK.Vida.elegirCarta(3, PK.Vida.mano(3)[0]); PK.Vida.elegirCarta(4, PK.Vida.mano(4)[0]); PK.Vida.elegirCarta(5, PK.Vida.mano(5)[0]); PK.Vida.elegirCarta(6, PK.Vida.mano(6)[0]);
     assert.equal(PK.Vida.pendiente(), 0, 'la Era VII es de decreto, no de carta');
-  } finally { G.state = viejo; G.stat = stat0; G.invalidateCaps = inv0; }
+  } finally { G.state = viejo; G.stat = stat0; G.invalidateCaps = inv0; G.give = give0; }
+});
+test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen sus piezas', () => {
+  for (const c of D.CERCANIA) { assert.ok(D.BUILD[c.a], c.a); for (const b of c.b) assert.ok(D.BUILD[b], b); assert.ok(c.r > 0 && c.ef > 0 && c.txt, c.a); }
+  assert.equal(D.DECOS.length, 15, '15 decoraciones');
+  for (const t of D.DECOS) assert.ok(D.BUILD[t].deco.animo > 0 && D.BUILD[t].deco.r > 0, t);
+  assert.deepEqual([...D.MARAVILLAS].sort(), Object.keys(D.MARAV).sort(), 'cada Maravilla tiene sus efectos');
+  for (const t of D.MARAVILLAS) { assert.equal(D.BUILD[t].w, 5); assert.equal(D.MARAV[t].fase.length, 7, t + ': 7 etapas'); assert.ok(Object.keys(D.MARAV[t].ef(40)).length); }
+  assert.ok(D.DESAFIOS.length >= 40, D.DESAFIOS.length + ' desafíos');
+  assert.equal(new Set(D.DESAFIOS.map(d => d.id)).size, D.DESAFIOS.length, 'ids únicos');
+  for (const d of D.DESAFIOS) assert.ok(['tick', 'batalla', 'era', 'fiesta', 'incursion', 'carta'].includes(d.on) && typeof d.ok === 'function', d.id);
+  // las estadísticas que piden los Retos del Rey las registra alguien
+  for (const r of D.RETOS) assert.ok(r.k.startsWith('g_') || new RegExp("stat\\('" + r.k + "'").test(TODO), r.id + ' pide ' + r.k);
+  for (const it of D.TIENDA) assert.ok(['color', 'marco', 'fuegos', 'cola'].includes(it.t) && it.precio > 0, it.id);
+  // el ánimo topado: en 0 resta 10%, en 100 suma 15%
+  const viejo = G.state;
+  try {
+    G.state = { animo: { v: 0, ev: [] } }; assert.ok(Math.abs(PK.Vida.animoMult() - 0.9) < 1e-9);
+    G.state = { animo: { v: 100, ev: [] } }; assert.ok(Math.abs(PK.Vida.animoMult() - 1.15) < 1e-9);
+  } finally { G.state = viejo; }
 });

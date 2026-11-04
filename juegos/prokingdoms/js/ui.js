@@ -176,6 +176,7 @@
     }
     popEl = el('b', null, '0/0');
     bar.append(el('div', { class: 'res pop', title: 'Población' }, el('img', { class: 'ico', src: Sp.icon('pop') }), popEl));
+    if (UI.animoEl) bar.append(UI.animoEl());
     buildEl = el('b', null, '1/1');
     bar.append(el('button', { class: 'res builders', title: 'Maestros de Obras ocupados / total', onclick: () => UI.openWorks() }, el('img', { class: 'ico', src: Sp.icon('hammer') }), buildEl));
     eraEl = el('div', { class: 'era', title: 'Meta de la próxima era', role: 'button', tabindex: '0', onclick: () => UI.openEraGoal() });
@@ -184,7 +185,7 @@
     // «¿Qué me frena?» (A6, js/asesor.js): junto a la era, con cuántas cosas importantes hay
     asEl = el('span', { class: 'badge' });
     const asBtn = el('button', { class: 'res asesor', title: '¿Qué me frena?', 'aria-label': '¿Qué me frena?', onclick: () => PK.Asesor.open() }, '?', asEl);
-    bar.append(eraEl, UI.estacionEl ? UI.estacionEl() : '', asBtn, netEl, el('div', { class: 'res coins', title: 'Monedas de la página' }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
+    bar.append(eraEl, UI.estacionEl ? UI.estacionEl() : '', asBtn, netEl, el('button', { class: 'res coins', title: 'Monedas del reino: abre la tienda', onclick: () => UI.openTienda && UI.openTienda() }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
     // en pantallas chicas la barra ocupa varias filas según la era: el minimapa y el menú se acomodan debajo
     // (incluye el margen del notch arriba: --top-h + 6 px es siempre el borde inferior de la barra)
     if (window.ResizeObserver) new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', Math.max(0, bar.offsetTop - 6) + bar.offsetHeight + 'px')).observe(bar);
@@ -660,6 +661,8 @@
     act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
     if (b.type === 'tavern' && PK.Heroes) act.append(el('div', { class: 'row' }, UI.btn('Candidatos del día', () => PK.Heroes.open('taberna'), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Héroes: ' + PK.Heroes.lista().length + '/' + PK.Heroes.max())));
     if (PK.Heroes && b.done) { const gh = PK.Heroes.gobernanteDe(b); if (gh) act.append(el('p', { class: 'small' }, '★ Lo gobierna ', el('b', { translate: 'no' }, gh.nombre), ': ' + PK.Heroes.CLASES[gh.clase].pasTxt.split(': ').pop() + (gh.estado === 'libre' ? '.' : ' (ahora no: ' + (gh.estado === 'herido' ? 'herido' : 'de expedición') + ').'))); }
+    // bonos por cercanía (V5): qué vecino le suma
+    if (b.done && b.owner === 'p' && G().cercaDe) for (const c of G().cercaDe(b)) act.append(el('p', { class: 'small cerca-ok' }, '✚ Junto a ' + c.o.def.name + ': ' + c.c.txt + '.'));
     if (b.type === 'consejo' && PK.Consejo) act.append(el('div', { class: 'row' }, UI.btn('Abrir el Consejo', () => PK.Consejo.open(), { cls: 'gold' }), el('span', { class: 'small muted' }, PK.Consejo.resumen())));
     if (b.type === 'tc') {
       const st = S();
@@ -668,6 +671,9 @@
         UI.btn('+5', () => { G().train(b, 5); UI.refreshPanel(true); }, { small: true }),
         b.queue.length ? UI.btn('Quitar de la cola', () => { G().cancelTrain(b); UI.refreshPanel(true); }, { small: true }) : null,
         el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: st.auto.train, onchange: e => { st.auto.train = e.target.checked; } }), ' Entrenar sin parar')));
+      // cartas de era y título (Fase 3)
+      if (PK.Vida && st.cartas) act.append(el('div', { class: 'row wrap' }, PK.Vida.titulo() ? el('span', { class: 'small' }, '★ ' + PK.Vida.titulo()) : '',
+        UI.btn('Cartas (' + st.cartas.tomadas.length + ')' + (PK.Vida.pendiente() ? ' ¡nueva!' : ''), () => UI.openCartas(), { small: true, cls: PK.Vida.pendiente() ? 'gold' : '' }), UI.btn('Ánimo ' + PK.Vida.animo(), () => UI.openAnimo(), { small: true })));
       const fi = G().fiestaInfo();
       if (fi) act.append(el('div', { class: 'ot-row fiesta-row' }, fi.left
         ? el('span', { class: 'small good-t' }, '🎉 Fiesta en curso: +25% de recolección y talleres (' + U.fmtTime(fi.left) + ')')
@@ -722,10 +728,14 @@
       if (b.workers.length) act.append(el('p', { class: 'small ' + (near || carts || belts ? 'muted' : 'warn-t') }, near || carts || belts ? 'Hasta aprox. ' + rate.toFixed(1) + ' ' + D.RES[ob].name.toLowerCase() + ' por minuto, si le llegan insumos' : 'Sin abastecimiento no produce nada.'));
       act.append(el('p', { class: 'small muted' }, UI.hint('Selecciona aldeanos y haz clic derecho en el edificio para asignarlos.', 'Elige aldeanos y luego toca el edificio para asignarlos.')));
       if (b.workers.length) act.append(UI.btn('Sacar trabajadores', () => { b.workers.slice().forEach(id => G().release(G().uById.get(id))); UI.refreshPanel(true); }, { small: true }));
-    } else if (b.type === 'farm') {
-      const f = b.farmer !== null && G().uById.get(b.farmer);
-      act.append(el('p', null, f ? 'Granjero trabajando.' : UI.hint('Sin granjero. Selecciona un aldeano y haz clic derecho aquí.', 'Sin granjero. Elige un aldeano y luego toca esta granja.')));
-    } else if (b.type === 'library') act.append(UI.btn('Abrir investigación', () => UI.openResearch()));
+    } else if (b.type === 'farm' || b.type === 'muelle') {
+      const f = b.farmer !== null && G().uById.get(b.farmer), pes = b.type === 'muelle';
+      act.append(el('p', null, f ? (pes ? 'Pescador trabajando.' : 'Granjero trabajando.') : UI.hint((pes ? 'Sin pescador.' : 'Sin granjero.') + ' Selecciona un aldeano y haz clic derecho aquí.', (pes ? 'Sin pescador.' : 'Sin granjero.') + ' Elige un aldeano y luego toca ' + (pes ? 'este muelle.' : 'esta granja.'))));
+      if (pes) act.append(el('p', { class: 'small muted' }, 'Agua alrededor: ' + Math.round(G().aguaMuelle(b) * 100) + '% del rinde (más lago cerca, más pesca). Unos ' + (G().farmRate('p', b) * 60).toFixed(1) + ' de comida por minuto.'));
+    } else if (b.def.deco) act.append(el('p', { class: 'small' }, '+' + b.def.deco.animo + ' de ánimo a las casas a ' + b.def.deco.r + ' casillas o menos.' + (b.def.deco.fiesta ? ' +' + b.def.deco.fiesta + ' más durante una fiesta.' : '')), UI.btn('Ver ánimo', () => UI.openAnimo && UI.openAnimo(), { small: true }));
+    else if (b.type === 'wonder' && b.done && UI.maravillaEl) act.append(UI.maravillaEl(b));
+    else if (b.def.marav && b.done && UI.maravillaInfo) act.append(UI.maravillaInfo(b));
+    else if (b.type === 'library') act.append(UI.btn('Abrir investigación', () => UI.openResearch()));
     else if (b.type === 'market') act.append(UI.btn('Abrir mercado', () => PK.Social.openMarket()));
     else if (b.type === 'guild') act.append(UI.btn('Abrir gremio', () => PK.Social.openGuild()));
     else if (b.type === 'barracks') UI.barracksQuick(act);

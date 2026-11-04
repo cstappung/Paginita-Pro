@@ -325,7 +325,7 @@
   function autoTask(u, b) {
     const g = G();
     const def = b.def;
-    if (b.type === 'farm') { if (b.farmer === null || b.farmer === u.id) { g.assign(u, { t: 'farm', b: b.id }); return; } }
+    if (g.esGranja(b)) { if (b.farmer === null || b.farmer === u.id) { g.assign(u, { t: 'farm', b: b.id }); return; } }
     if (def.recipe && b.workers.length < g.slots(b)) { g.assign(u, { t: 'work', b: b.id }); return; }
     if (def.drop && b.type !== 'tc') {
       let best = null, bd = 9;

@@ -563,3 +563,46 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   the fog and lit windows. Opciones → «Sin noche» (`flags.sinNoche`). Four
   season events in `life.js` (`feria`, `torneo`, `cosechaOtono`,
   `inviernoFest`) with `cond` on the season.
+
+## Life in the kingdom, part 2 (`pk-19`, V4 to V9)
+
+- **New building types live in `data.js`** (not `datos-vida.js`): the server's
+  `cleanBuildings` drops types it does not know. So `D.PROTO` went to 3 and the
+  function must be redeployed with this delivery.
+- **V4, mood** (`S.animo = {v, ev, feliz}`, `Vida.calcAnimo` every 10 s live):
+  50 is neutral, 0 is −10% and 100 is +15% to gathering (inside the
+  `Vida.recoleccion` clamp, so `LIM.vida` still covers it) and to workshops.
+  Offline uses the last value. `Vida.animoPartes` is the breakdown the window
+  shows (decorations near houses capped at +25, Taberna, fiesta, variety,
+  governing Juglar, Jardines, timed memories from raids, empty pantry, houses
+  far from a drop point). Over 80: «Día feliz» at most every 2 h.
+- **V5, decorations** (`D.DECOS`, 15, `def.deco = {animo, r}`, no levels). The
+  Columna needs one boss trophy each and the Arco 10 challenges
+  (`G.logroFalta`). **Proximity** (`D.CERCANIA`): one bonus per rule, read by
+  `G.cerca(b)` (cached on `G.blockVer`, which now also bumps when a building
+  finishes) in `farmRate`, `prodMult` and `popCap` (house next to a plaza or
+  fountain: +1). The ghost draws green lines to the neighbours that count.
+- **V6, Wonders 2.0:** four 5×5 types in `D.MARAVILLAS`, one per kingdom
+  (`G.maxCount` returns 0 once any `D.WONDERS` exists). They reuse
+  `BSTATS.wonder` (prestige, +3% to everything, coins per level) plus
+  `D.MARAV[type].ef(lvl)` through `Vida.bono`. The old 4×4 `wonder` is
+  `retirada`: not buildable; its panel transforms it for free, keeping level
+  (`Vida.transformar`, needs 5×5 free around it). A stage is drawn every 5
+  levels (`fase`).
+- **V7, challenges** (`D.DESAFIOS`, 40, `S.desafios`): `on` is `'tick'` or an
+  event fired with `Vida.evento` (`batalla` from `Exp.resolve`, `era`,
+  `fiesta`, `incursion`, `carta`). Each gives gems, kingdom coins and a title
+  (shown in the TC panel). **King's challenges** (`D.RETOS`, 3 a week by
+  `weekKey` + `created`, `S.retos`) count stat deltas from the week's start;
+  all three open a royal chest with a rare item. They live in the book's
+  «Desafíos» tab. Ladders were not shortened (deferred: it would renumber
+  quest ids).
+- **V8, shop** (`D.TIENDA`, kingdom coins via `Platform.spendCoins`, never
+  `monedas.js`): banner colour (`Sp.colorPropio`, clears the player's sprite
+  cache), hero portrait frame (`--marco` on `.h-ret`), fireworks at a new era
+  and +1 Mayordomo queue slot. Opened from the coins in the top bar.
+- **V9, fishing dock** (`muelle`): a farm on the shore (`G.esGranja`; one
+  fisher, `doFarm`), must touch water (`placeWhy` → `'sinAgua'`). Rate
+  `G.MUELLE_RATE × G.aguaMuelle(b)` (water tiles within 3, cached on `b._agua`,
+  cleared on move). The boat is drawn in `render.js` (`botes`) on the nearest
+  water tile. Tree node `redes` (+30%).

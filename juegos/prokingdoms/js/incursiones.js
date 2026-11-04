@@ -233,6 +233,9 @@
       g.give(p);
       st.inc.ganadas++;
       g.stat('raids_won', 1); g.stat('defenses_won', 1);
+      if (!robo.length) g.stat('defensa_limpia', 1);
+      if (PK.Vida && PK.Vida.evento) PK.Vida.evento('incursion', { won: true, robo: robo.length });
+      if (PK.Vida && PK.Vida.animoEv) PK.Vida.animoEv(8, 1800, 'Rechazaron a los bandidos');
       const txt = Object.keys(p).map(k => '+' + U.fmt(p[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ');
       toast('¡Rechazaste la incursión! Botín de los bandidos: ' + txt + '.' + (bajas ? ' Bajas: ' + bajas + '.' : ''), 'epic');
       if (PK.Troops) PK.Troops.texts.push({ x, y, t: 0, text: '¡Pueblo a salvo!', col: '#ffe27a' });
@@ -244,6 +247,7 @@
     } else {
       st.inc.perdidas++;
       g.stat('raids_lost', 1);
+      if (PK.Vida && PK.Vida.animoEv && robo.length) PK.Vida.animoEv(-15, 1800, 'Los bandidos saquearon el pueblo');
       const msg = robo.length ? 'Los bandidos escaparon con ' + robo.join(', ') + '.' : 'Los bandidos se fueron sin llevarse nada.';
       toast(msg + (muertos ? ' Cayeron ' + muertos + ' de ' + bd.n0 + '.' : '') + ' Sube tus Torres y entrena tropas en el Cuartel para la próxima.' + (bajas ? ' Bajas: ' + bajas + '.' : ''), robo.length ? 'warn' : 'info');
       if (PK.Social.log) PK.Social.log(msg, robo.length ? 'bad' : 'info');

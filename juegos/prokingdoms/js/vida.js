@@ -17,7 +17,12 @@
     st.arbol = st.arbol || {};
     st.arbolBloq = st.arbolBloq || {};
     st.cartas = Object.assign({ tomadas: [] }, st.cartas);
+    st.animo = Object.assign({ v: D.ANIMO.base, ev: [], feliz: 0 }, st.animo);
+    st.desafios = st.desafios || {};
+    st.retos = st.retos || null;
+    st.tienda = Object.assign({ tengo: {} }, st.tienda);
     cache = null;
+    aplicarTienda();
   };
 
   // ---------- Bonos ----------
@@ -28,6 +33,11 @@
     for (const id in st.arbol || {}) if (D.ARBOL[id]) add(D.ARBOL[id].ef);
     for (const c of (st.cartas && st.cartas.tomadas) || []) if (D.CARTAS[c.id]) add(D.CARTAS[c.id].ef);
     add(V.estacionDe().ef);
+    // la Maravilla elegida (V6), según su nivel
+    const m = G().maravilla && G().maravilla();
+    if (m && m.done && D.MARAV && D.MARAV[m.type]) add(D.MARAV[m.type].ef(m.lvl));
+    // la tienda: el Escribano del Mayordomo
+    if (st.tienda && st.tienda.tengo.cola) add({ cola: 1 });
     return o;
   }
   V.bono = function (k) {
@@ -50,6 +60,7 @@
     if (kind === 'deer') s += b('hunt');
     if (kind === 'berry') s += b('berry');
     if (kind === 'farm') s += b('farm');
+    s += V.animoMult() - 1; // el ánimo del pueblo (V4) también va dentro del tope
     return U.clamp(1 + s, 0.5, D.VIDA_TOPE);
   };
   // Lo que suma por G.perk (como los decretos). gatherP queda fuera: va topado en recoleccion.
@@ -71,10 +82,12 @@
     if (h < 6.5) return 6.5 - h;
     return 0;
   };
-  let estVista = null;
+  let estVista = null, tickN = 0;
   V.tick = function () {
     const st = S();
     if (!st || G().offline) return;
+    // cada 10 s (el juego llama cada 5): ánimo y desafíos que se miran en el estado
+    if (++tickN % 2 === 0) { V.calcAnimo(); V.revisar('tick'); V.revisarRetos(); }
     const e = V.estacion();
     if (estVista === null) { estVista = e; return; }
     if (e !== estVista) {
@@ -168,6 +181,7 @@
     if (c.al && V.CARTA_AL[c.al]) V.CARTA_AL[c.al]();
     V.invalidar();
     G().stat('cartas', 1);
+    V.evento('carta');
     toast('Carta de la Era ' + U.roman(era) + ': ' + c.name + '. ' + c.desc, 'epic');
     if (PK.Sfx) PK.Sfx.play('level');
     return true;
@@ -185,5 +199,169 @@
       const ps = W.pois.filter(p => D.DUNGEON[p.kind] && !(g.poiState(p) && g.poiState(p).f)).sort((a, b) => U.dist(a.x, a.y, hx, hy) - U.dist(b.x, b.y, hx, hy)).slice(0, 2);
       for (const p of ps) g.revealAt(p.x + 1, p.y + 1, 4);
     },
+  };
+
+  // ---------- V4. Ánimo del pueblo ----------
+  const casas = () => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'house');
+  const juglar = () => !!(PK.Heroes && S().heroes && PK.Heroes.lista().some(h => h.clase === 'juglar' && h.gobierna != null && h.estado === 'libre'));
+  // Lo que suma y resta, para la ventana del ánimo: [{txt, v}]
+  V.animoPartes = function () {
+    const g = G(), st = S(), out = [], cs = casas(), rd = g.rectDist, now = Date.now(), A = D.ANIMO;
+    let deco = 0;
+    for (const b of g.buildings) {
+      if (b.owner !== 'p' || !b.done || !b.def.deco) continue;
+      const d = b.def.deco, n = cs.filter(c => rd(b.x, b.y, b.w, b.h, c.x, c.y, c.w, c.h) <= d.r).length;
+      if (!n) continue;
+      deco += (d.animo + (d.fiesta && g.fiestaMult() > 1 ? d.fiesta : 0) + (b.type === 'escenario' && juglar() ? 3 : 0)) * Math.min(1, n / 2);
+    }
+    if (deco) out.push({ txt: 'Decoraciones cerca de las casas', v: Math.min(A.decoTope, Math.round(deco)) });
+    const tab = g.buildings.find(b => b.owner === 'p' && b.done && b.type === 'tavern');
+    if (tab) out.push({ txt: 'Taberna (nivel ' + tab.lvl + ')', v: Math.min(10, 2 * tab.lvl) });
+    if (g.fiestaMult() > 1) out.push({ txt: 'Fiesta en el pueblo', v: 10 });
+    const tipos = new Set(g.buildings.filter(b => b.owner === 'p' && b.done && !b.def.deco).map(b => b.type)).size;
+    if (tipos >= 6) out.push({ txt: 'Variedad de edificios (' + tipos + ' tipos)', v: Math.min(8, Math.floor((tipos - 3) / 3)) });
+    if (juglar()) out.push({ txt: 'Un Juglar gobierna', v: 5 });
+    if (V.bono('animo')) out.push({ txt: 'Jardines Eternos', v: Math.round(V.bono('animo')) });
+    for (const e of st.animo.ev) if (e.hasta > now) out.push({ txt: e.txt, v: e.v });
+    if (st.era >= 2 && st.res.food < g.cap('food') * 0.05) out.push({ txt: 'La despensa está vacía', v: -10 });
+    const lejos = cs.filter(c => !g.buildings.some(o => o.owner === 'p' && o.done && o.def.drop && rd(c.x, c.y, c.w, c.h, o.x, o.y, o.w, o.h) <= 14)).length;
+    if (lejos) out.push({ txt: lejos + (lejos === 1 ? ' casa lejos' : ' casas lejos') + ' de un punto de acopio', v: -Math.min(10, lejos) });
+    return out;
+  };
+  V.calcAnimo = function () {
+    const st = S(), now = Date.now(), A = D.ANIMO;
+    st.animo.ev = st.animo.ev.filter(e => e.hasta > now);
+    const v = U.clamp(Math.round(A.base + V.animoPartes().reduce((a, p) => a + p.v, 0)), 0, 100);
+    st.animo.v = v;
+    // Día feliz: pasado de 80, como mucho cada 2 horas (solo en vivo, como los eventos)
+    if (v >= A.feliz && now - (st.animo.feliz || 0) > A.felizCada && PK.Life && PK.Life.ponerMod) {
+      st.animo.feliz = now;
+      PK.Life.ponerMod('gather', 1.1, 180);
+      G().stat('dias_felices', 1);
+      toast('¡Día feliz! El pueblo canta mientras trabaja: +10% de recolección por 3 minutos.', 'epic');
+    }
+    return v;
+  };
+  // Un recuerdo que sube o baja el ánimo por un rato (incursiones, eventos)
+  V.animoEv = function (v, seg, txt) { const st = S(); if (!st || !st.animo) return; st.animo.ev.push({ v, hasta: Date.now() + seg * 1000, txt }); };
+  V.animo = () => (S() && S().animo ? S().animo.v : D.ANIMO.base);
+  V.animoMult = function () {
+    const v = V.animo(), A = D.ANIMO;
+    return v < 50 ? 1 - (A.malo * (50 - v)) / 50 : 1 + (A.bueno * (v - 50)) / 50;
+  };
+
+  // ---------- V6. Maravillas 2.0 ----------
+  // La Maravilla vieja (4×4) se transforma gratis en una de las cuatro, conservando nivel. Necesita lugar de 5×5.
+  V.transformar = function (b, tipo) {
+    const g = G();
+    if (!b || b.type !== 'wonder' || !D.MARAV[tipo]) return false;
+    const why = g.placeWhy(tipo, b.x, b.y, b.id);
+    if (why) { toast('La ' + D.BUILD[tipo].name + ' mide 5×5 y no cabe donde está la Maravilla (' + g.placeText(why) + ') Muévela a un lugar con más espacio.', 'warn'); return false; }
+    const { x, y, lvl, upg, id } = b;
+    g.removeBuilding(b);
+    const n = g.addBuilding(tipo, 'p', x, y, true, id, false, lvl);
+    n.upg = upg;
+    V.invalidar();
+    toast('Tu Maravilla ahora es la ' + D.BUILD[tipo].name + '.', 'epic');
+    return n;
+  };
+  V.fase = b => Math.min(6, Math.floor((b.lvl || 1) / 5));
+
+  // ---------- V7. Desafíos ----------
+  V.evento = function (tipo, e) { if (S() && S().desafios) V.revisar(tipo, e || {}); };
+  V.revisar = function (tipo, e) {
+    const st = S();
+    for (const d of D.DESAFIOS) {
+      if (d.on !== tipo || st.desafios[d.id]) continue;
+      let ok = false;
+      try { ok = d.ok(st, e || {}); } catch (err) { ok = false; }
+      if (ok) cumplir(d);
+    }
+  };
+  function cumplir(d) {
+    const st = S(), r = { gems: 4 + st.era, coins: 8 };
+    st.desafios[d.id] = Date.now();
+    G().stat('desafios', 1);
+    G().give(r);
+    toast('Desafío cumplido: «' + d.name + '». +' + r.gems + ' gemas y +' + r.coins + ' monedas. Ya puedes usar su título.', 'epic', { label: 'Ver', fn: () => PK.UI.openDesafios && PK.UI.openDesafios() });
+    if (PK.Sfx) PK.Sfx.play('level');
+  }
+  V.cumplidos = () => Object.keys((S() && S().desafios) || {}).length;
+  V.titulo = () => { const st = S(), t = st && st.flags.titulo; return t && st.desafios[t] ? D.DESAFIOS.find(d => d.id === t).name : null; };
+
+  // Retos del Rey: 3 por semana (se renuevan el lunes), con semilla de la semana y la partida
+  const semana = () => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return U.dayKey(d); };
+  V.retos = function () {
+    const st = S(), wk = semana();
+    if (!st.retos || st.retos.sem !== wk) {
+      const rng = U.rng(U.strHash('retos:' + wk + ':' + (st.created || 0))), pool = D.RETOS.slice(), ids = [];
+      while (ids.length < 3 && pool.length) ids.push(pool.splice(Math.floor(rng() * pool.length), 1)[0].id);
+      const base = {};
+      for (const id of ids) { const r = D.RETOS.find(o => o.id === id); base[id] = st.stats[r.k] || 0; }
+      st.retos = { sem: wk, ids, base, era: st.era, hechos: {}, cofre: false };
+    }
+    return st.retos;
+  };
+  V.retoMeta = (r, era) => (r.esc ? Math.round((r.n * Math.max(1, era - 1)) / 100) * 100 : r.n);
+  V.retoProg = function (id) {
+    const st = S(), rs = V.retos(), r = D.RETOS.find(o => o.id === id);
+    return { r, n: Math.max(0, (st.stats[r.k] || 0) - (rs.base[id] || 0)), meta: V.retoMeta(r, rs.era) };
+  };
+  V.revisarRetos = function () {
+    const st = S();
+    if (!st || st.era < 2) return;
+    const rs = V.retos();
+    for (const id of rs.ids) {
+      if (rs.hechos[id]) continue;
+      const p = V.retoProg(id);
+      if (p.n < p.meta) continue;
+      rs.hechos[id] = 1;
+      const r = { gold: 300 * st.era, gems: 3 + st.era, coins: 10 };
+      G().give(r);
+      toast('Reto del Rey cumplido: ' + p.r.name + '. +' + U.fmt(r.gold) + ' de oro, +' + r.gems + ' gemas y +' + r.coins + ' monedas.', 'epic');
+    }
+    if (!rs.cofre && rs.ids.every(id => rs.hechos[id])) {
+      rs.cofre = true;
+      const r = { gems: 10 * st.era, coins: 30 };
+      G().give(r);
+      let obj = '';
+      if (PK.Heroes && S().heroes) { const it = PK.Heroes.crearObjeto(0.6 + st.era / 20, 1); PK.Heroes.guardarObjeto ? PK.Heroes.guardarObjeto(it) : S().heroes.inv.push(it); obj = ' y un objeto raro para tus héroes'; }
+      toast('¡Cofre real! Cumpliste los 3 Retos del Rey de la semana: +' + r.gems + ' gemas, +' + r.coins + ' monedas' + obj + '.', 'epic');
+      if (PK.Sfx) PK.Sfx.play('era');
+    }
+  };
+
+  // ---------- V8. Tienda del reino ----------
+  V.comprar = function (id) {
+    const st = S(), it = D.TIENDA.find(o => o.id === id);
+    if (!it || st.tienda.tengo[id]) return false;
+    if (!PK.Platform.spendCoins(it.precio, 'tienda del reino')) { toast('Te faltan monedas del reino (' + it.precio + ').', 'warn'); return false; }
+    st.tienda.tengo[id] = 1;
+    if (it.t !== 'cola') V.usar(id);
+    else V.invalidar();
+    toast('Compraste ' + it.name + '.', 'good');
+    return true;
+  };
+  V.usar = function (id) {
+    const st = S(), it = D.TIENDA.find(o => o.id === id);
+    if (!it || (id && !st.tienda.tengo[id])) return false;
+    st.tienda[it.t] = st.tienda[it.t] === id ? null : id; // tocar lo que ya se usa lo saca
+    aplicarTienda();
+    return true;
+  };
+  function aplicarTienda() {
+    const st = S(), t = st && st.tienda;
+    if (!t) return;
+    const c = t.color && D.TIENDA.find(o => o.id === t.color);
+    if (PK.Sprites && PK.Sprites.colorPropio !== undefined) PK.Sprites.colorPropio(c ? c.col : null);
+    const m = t.marco && D.TIENDA.find(o => o.id === t.marco);
+    if (typeof document !== 'undefined' && document.documentElement) document.documentElement.style.setProperty('--marco', m ? m.css : 'transparent');
+  }
+  // Fuegos artificiales al llegar a una era (si los compraste)
+  V.fuegos = function () {
+    const st = S(), f = st.tienda && st.tienda.fuegos, tc = G().buildings.find(b => b.owner === 'p' && b.type === 'tc');
+    if (!f || !tc || !PK.Render || !PK.Render.burst) return;
+    const cols = f === 'f_dorados' ? [[255, 220, 110], [255, 190, 60], [255, 245, 200]] : [[232, 184, 74], [220, 80, 90], [90, 170, 230], [120, 200, 110], [200, 120, 220]];
+    for (let k = 0; k < 14; k++) setTimeout(() => PK.Render.burst(tc.cx + (Math.random() - 0.5) * 10, tc.cy + (Math.random() - 0.5) * 10, cols[k % cols.length], 34), k * 220);
   };
 })();

@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 2;
+  D.PROTO = 3;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -707,6 +707,46 @@
     xpBoost: ['Experiencia extra', pct], terrDef: ['Defensa de tus parcelas', pct],
     heridaP: ['Héroes heridos: menos descanso', pct], pociones: ['Caídos que salvan las pociones (incursiones)', pct], rareza: ['Mejora que sube de rareza', pct],
   });
+
+  // ---------- Fase 3, segunda parte (pk-19): muelle, decoraciones y Maravillas 2.0 ----------
+  // Van aquí (y no en datos-vida.js) porque el servidor descarta de la foto los tipos de edificio que no conoce.
+  // Muelle (V9): una granja en el agua. Un pescador, rinde según el agua que lo rodea (G.aguaMuelle) y no crea nodos.
+  // Decoraciones (V5): no suben de nivel; dan ánimo a las casas a menos de `r` casillas (vida.js). Las Maravillas
+  // (V6) son 4 y se elige una: el grupo D.MARAVILLAS comparte el tope de 1 (G.maravilla). La «wonder» de 4×4 queda
+  // para las partidas que ya la tenían, sin construirse más: en su panel se transforma gratis en una de las 4.
+  Object.assign(D.BUILD, {
+    muelle: { name: 'Muelle de pesca', w: 2, h: 2, cost: { wood: 140, stone: 30 }, time: 30, era: 2, walkable: true, upT: 0.6, max: e => 1 + e, desc: 'Va pegado al agua. Un pescador saca comida según cuánta agua lo rodea, sin agotar nada.' },
+    farol: { name: 'Farol', w: 1, h: 1, cost: { wood: 40, stone: 20 }, time: 8, era: 1, deco: { animo: 1, r: 3 }, max: e => 4 + 2 * e, desc: 'Ilumina la calle: +1 de ánimo a las casas cercanas.' },
+    banca: { name: 'Banca', w: 1, h: 1, cost: { wood: 30 }, time: 6, era: 1, deco: { animo: 1, r: 3 }, max: e => 3 + 2 * e, desc: 'Para sentarse a mirar el pueblo: +1 de ánimo cerca.' },
+    pozo: { name: 'Pozo', w: 1, h: 1, cost: { stone: 80, wood: 20 }, time: 12, era: 1, deco: { animo: 2, r: 4 }, max: e => 1 + e, desc: 'Agua fresca para el barrio: +2 de ánimo cerca.' },
+    frutal: { name: 'Árbol frutal', w: 1, h: 1, cost: { wood: 40, food: 40 }, time: 10, era: 1, deco: { animo: 1, r: 3, comida: 0.04 }, max: e => 2 + 2 * e, desc: 'Sombra y fruta: +1 de ánimo cerca y un poco de comida sin aldeanos.' },
+    estandarte: { name: 'Estandarte del reino', w: 1, h: 1, cost: { wood: 60, gold: 80 }, time: 10, era: 2, deco: { animo: 2, r: 4 }, max: e => 1 + e, desc: 'Los colores del reino: +2 de ánimo cerca.' },
+    hoguera: { name: 'Hoguera de fiesta', w: 1, h: 1, cost: { wood: 120 }, time: 10, era: 2, deco: { animo: 2, r: 4, fiesta: 4 }, max: e => 1 + Math.floor(e / 2), desc: '+2 de ánimo cerca, y +4 más mientras hay fiesta.' },
+    fuente: { name: 'Fuente', w: 2, h: 2, cost: { stone: 200, gold: 60 }, time: 20, era: 2, deco: { animo: 2, r: 5 }, max: e => 1 + Math.floor(e / 2), desc: '+2 de ánimo cerca. Una casa a su lado vive con una persona más.' },
+    jardin: { name: 'Jardín de flores', w: 2, h: 2, cost: { wood: 60, food: 60 }, time: 15, era: 2, walkable: true, flat: true, deco: { animo: 2, r: 4 }, max: e => 1 + e, desc: '+2 de ánimo cerca.' },
+    plaza: { name: 'Plaza adoquinada', w: 2, h: 2, cost: { stone: 250 }, time: 20, era: 2, walkable: true, flat: true, deco: { animo: 1, r: 5 }, max: e => 1 + Math.floor(e / 2), desc: '+1 de ánimo cerca. Las casas a su lado viven con una persona más.' },
+    estanque: { name: 'Estanque con peces', w: 2, h: 2, cost: { stone: 120, food: 40 }, time: 20, era: 2, deco: { animo: 2, r: 4 }, max: e => 1 + Math.floor(e / 3), desc: '+2 de ánimo cerca.' },
+    estatua: { name: 'Estatua del fundador', w: 1, h: 1, cost: { stone: 300, gold: 150 }, time: 25, era: 3, deco: { animo: 3, r: 5 }, max: 2, desc: 'El primero de tu linaje, en piedra: +3 de ánimo cerca.' },
+    glorieta: { name: 'Glorieta', w: 2, h: 2, cost: { wood: 200, planks: 40 }, time: 25, era: 3, deco: { animo: 2, r: 4 }, max: e => Math.floor(e / 2), desc: 'Música los domingos: +2 de ánimo cerca.' },
+    escenario: { name: 'Escenario del juglar', w: 2, h: 2, cost: { wood: 300, gold: 200, planks: 60 }, time: 30, era: 3, deco: { animo: 3, r: 5 }, max: 1, desc: '+3 de ánimo cerca, y +3 más si un Juglar gobierna la Taberna o el Centro Urbano.' },
+    columna: { name: 'Columna conmemorativa', w: 1, h: 1, cost: { stone: 400, marble: 50 }, time: 30, era: 3, deco: { animo: 3, r: 5 }, max: 3, logro: 'columna', desc: 'Recuerda a un jefe vencido: +3 de ánimo cerca. Pide un trofeo de jefe por cada una.' },
+    arco: { name: 'Arco de triunfo', w: 2, h: 2, cost: { stone: 800, marble: 200, gold: 500 }, time: 60, era: 4, walkable: true, deco: { animo: 5, r: 6 }, max: 1, logro: 'arco', desc: 'Solo por logros (10 desafíos cumplidos): +5 de ánimo cerca.' },
+    m_faro: { name: 'Gran Faro', w: 5, h: 5, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, marav: true, desc: 'Comercio y visión: ve muy lejos, vende más caro en el Mercado. Cada nivel da prestigio, +3% a todo y monedas.' },
+    m_coloso: { name: 'Coloso de Bronce', w: 5, h: 5, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, marav: true, desc: 'Ejército: más fuerza contra monstruos y torres que pegan más fuerte a los bandidos. Cada nivel da prestigio, +3% a todo y monedas.' },
+    m_jardines: { name: 'Jardines Eternos', w: 5, h: 5, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, marav: true, desc: 'Recolección y ánimo. Cada nivel da prestigio, +3% a todo y monedas.' },
+    m_catedral: { name: 'Gran Catedral', w: 5, h: 5, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, marav: true, desc: 'Investigación y reliquias. Cada nivel da prestigio, +3% a todo y monedas.' },
+  });
+  D.DECOS = Object.keys(D.BUILD).filter(k => D.BUILD[k].deco);
+  D.MARAVILLAS = ['m_faro', 'm_coloso', 'm_jardines', 'm_catedral'];
+  D.WONDERS = ['wonder'].concat(D.MARAVILLAS); // todo lo que cuenta como «la Maravilla» (bono a todo, monedas, misión)
+  for (const k of D.DECOS) Object.assign(D.BUILD[k], { noUp: true, sight: 3 });
+  D.BUILD.wonder.retirada = true; // ya no se construye: se transforma (G.transformarMaravilla)
+  D.BUILD_ORDER.splice(D.BUILD_ORDER.indexOf('wonder'), 1, ...D.MARAVILLAS);
+  D.BUILD_ORDER.splice(D.BUILD_ORDER.indexOf('sawmill'), 0, 'muelle');
+  D.BUILD_ORDER.push(...D.DECOS);
+  for (const k of ['muelle'].concat(D.MARAVILLAS)) D.BUILD[k].sight = 5;
+  D.BSTATS.muelle = L => ({ farm: 0.12 * (L - 1) });
+  for (const k of D.MARAVILLAS) D.BSTATS[k] = D.BSTATS.wonder;
 
   // Mazmorras como puntos de interés del mapa (se ubican aparte, sin mover nada de lo que ya existía).
   Object.assign(D.POI, {

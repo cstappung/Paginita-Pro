@@ -236,6 +236,9 @@
     const xp = Math.max(4, r.need / 8) * (r.won ? 1 : 0.4) * (1 + Exp.bonus('xpBoost'));
     for (const k in r.units) if (r.units[k] > 0) st.exp.xp[k] += xp;
     if (r.heroe && PK.Heroes) PK.Heroes.resultado(r);
+    // desafíos (Fase 3, V7): cada pelea, con quiénes fueron y cómo salió
+    if (r.won) { if (r.inc) G().stat('floors', 1); if (r.mission) G().stat('missions_done', 1); }
+    if (PK.Vida && PK.Vida.evento) { const u = Object.assign({}, r.units); for (const k in r.lost) u[k] = (u[k] || 0) + r.lost[k]; PK.Vida.evento('batalla', { won: r.won, units: u, lost: r.lost, chance: Exp.chance(ratio), heroe: r.heroe, poi: r.poi, piso: r.inc ? r.inc.piso : r.floor || 0 }); }
     // incursión: si ganó y quedan pisos, sigue adentro (a elegir la próxima sala)
     if (r.inc && PK.Inc.tras(r)) return;
     cerrar(r, res, ratio);

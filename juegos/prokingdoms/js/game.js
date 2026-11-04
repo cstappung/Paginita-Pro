@@ -217,12 +217,18 @@
   };
   G.perkAll = k => G.perk(k) + D.LEGEND_B.reduce((s, t) => s + best(t, k), 0);
   const eclipse = () => (PK.Life && PK.Life.eclipse ? 1.5 : 1);
+  // la Maravilla, cualquiera de las cinco (la vieja de 4×4 y las 4 de la Fase 3): +3% a todo por nivel
+  const maravBonus = () => D.WONDERS.reduce((m, t) => Math.max(m, best(t, 'allBonus')), 0);
+  G.maravilla = () => G.buildings.find(b => b.owner === 'p' && D.WONDERS.includes(b.type)) || null;
+  // distancia en casillas entre dos rectángulos (0 si se tocan)
+  const rectDist = (ax, ay, aw, ah, bx, by, bw, bh) => Math.max(Math.max(bx - (ax + aw), ax - (bx + bw), 0), Math.max(by - (ay + ah), ay - (by + bh), 0));
+  G.rectDist = rectDist;
 
   // ---------- Recursos y multiplicadores ----------
   G.lvl = id => (S.techs[id] || 0);
   G.eraMult = () => 1 + 0.05 * (S.era - 1); // solo afecta la fuerza del ejército
   G.guildMult = () => (S.guild && S.guild.joined ? 1 + 0.03 * S.guild.stage + best('guild', 'guildBonus') : 1);
-  G.globalMult = () => G.guildMult() * (1 + best('wonder', 'allBonus')) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff * lm('gather') : 1) * wish('harvest') * (1 + G.perkAll('gatherP')) * G.fiestaMult();
+  G.globalMult = () => G.guildMult() * (1 + maravBonus()) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff * lm('gather') : 1) * wish('harvest') * (1 + G.perkAll('gatherP')) * G.fiestaMult();
   const TECH_FOR = { wood: 'axes', food: 'harvest', stone: 'picks', gold: 'picks', ore: 'picks', marble: 'picks', gems: 'picks' };
   const RES_NODE = { wood: 'tree', food: 'berry', stone: 'stone', gold: 'gold', ore: 'ore', marble: 'marble', gems: 'gems' };
   const dropMult = u => 1 + 0.1 * (((u && u.dl) || 1) - 1);
@@ -232,9 +238,39 @@
     const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
     return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk);
   };
+  // Muelle de pesca (V9): rinde según el agua que lo rodea; la Cosecha eficiente no le suma, Pesca con redes sí.
+  G.MUELLE_RATE = 0.3;
+  G.aguaMuelle = function (b) {
+    if (b._agua !== undefined) return b._agua;
+    let n = 0;
+    for (let y = b.y - 3; y < b.y + b.h + 3; y++) for (let x = b.x - 3; x < b.x + b.w + 3; x++) if (W.inb(x, y) && W.terrain[W.idx(x, y)] === 4) n++;
+    return (b._agua = U.clamp(n / 24, 0.25, 1.3));
+  };
+  G.esGranja = b => !!b && (b.type === 'farm' || b.type === 'muelle');
   G.farmRate = function (owner, b, u) {
     if (owner !== 'p') return D.FARM_RATE;
-    return D.FARM_RATE * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm');
+    if (b && b.type === 'muelle') return G.MUELLE_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * (1 + vb('muelle')) * (1 + G.cerca(b)) * dropMult(u) * G.globalMult() * (1 + ley('food')) * vr('food');
+    return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm');
+  };
+  // Bonos por cercanía (V5, D.CERCANIA en datos-vida.js): un edificio rinde más con un vecino de cierto tipo. Se
+  // recalcula cuando cambia algo del mapa (G.blockVer sube al construir, terminar, mover o demoler).
+  G.cerca = function (b) {
+    if (!b || b.owner !== 'p' || !D.CERCANIA) return 0;
+    if (b._cv === G.blockVer && b._cerca !== undefined) return b._cerca;
+    let s = 0;
+    for (const c of G.cercaDe(b)) s += c.ef;
+    b._cv = G.blockVer;
+    return (b._cerca = s);
+  };
+  // [{ c: regla, o: vecino, ef }] de las reglas que cumple (una por regla), para el panel y las líneas del fantasma
+  G.cercaDe = function (b, x, y, type) {
+    const out = [], t = type || b.type, bx = x === undefined ? b.x : x, by = y === undefined ? b.y : y, def = D.BUILD[t];
+    for (const c of D.CERCANIA || []) {
+      if (c.a !== t) continue;
+      const o = G.buildings.find(o2 => o2 !== b && o2.owner === 'p' && o2.done && c.b.includes(o2.type) && rectDist(bx, by, def.w, def.h, o2.x, o2.y, o2.w, o2.h) <= c.r);
+      if (o) out.push({ c, o, ef: c.ef });
+    }
+    return out;
   };
   G.carryCap = (owner, u) => (owner === 'p' ? 10 + 3 * G.lvl('carts') + (((u && u.dl) || 1) - 1) : 10);
   G.speed = function (owner, u) {
@@ -244,7 +280,7 @@
   };
   G.buildMult = owner => (owner === 'p' ? (1 + 0.2 * G.lvl('architecture')) * wish('build') * (1 + vb('build')) : 1);
   const PROD_TECH = { planks: 'saws', blocks: 'saws', books: 'saws', ingots: 'furnaces', tools: 'furnaces', steel: 'furnaces', machinery: 'furnaces' };
-  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + best('wonder', 'allBonus')) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult() * (b && PK.Heroes ? 1 + PK.Heroes.prodEn(b) : 1) * lm('craft') * Math.max(0.5, 1 + vb('c_' + recipe) + (recipe === 'planks' && b && vb('aguaPlanks') && G.junAgua(b) ? vb('aguaPlanks') : 0));
+  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + maravBonus()) * (1 + (b ? G.cerca(b) : 0)) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult() * (b && PK.Heroes ? 1 + PK.Heroes.prodEn(b) : 1) * lm('craft') * (PK.Vida && S && S.animo ? PK.Vida.animoMult() : 1) * Math.max(0.5, 1 + vb('c_' + recipe) + (recipe === 'planks' && b && vb('aguaPlanks') && G.junAgua(b) ? vb('aguaPlanks') : 0));
   // ¿El edificio está a 4 casillas o menos del agua? (Molino de agua del árbol)
   G.junAgua = b => { const wd = W.waterDist; if (!wd) return false; for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) if (W.inb(b.x + i, b.y + j) && wd[W.idx(b.x + i, b.y + j)] <= 4) return true; return false; };
   G.researchMult = () => (1 + best('library', 'research') + best('observatory', 'research') + mine('university').slice(0, 2).reduce((s, b) => s + G.bst(b).research, 0) + G.perkAll('researchP') + hp('research')) * eclipse() * lm('research');
@@ -409,7 +445,9 @@
 
   G.countB = (type, owner) => G.buildings.reduce((s, b) => s + (b.owner === (owner || 'p') && b.type === type && b.done ? 1 : 0), 0);
   G.countAll = type => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.type === type ? 1 : 0), 0);
-  G.maxCount = function (type) { const m = D.BUILD[type].max; return m === undefined ? Infinity : typeof m === 'function' ? m(S.era) : m; };
+  G.maxCount = function (type) {
+    if (D.BUILD[type].marav && D.WONDERS.some(t => t !== type && G.countAll(t))) return 0; // una sola Maravilla
+    const m = D.BUILD[type].max; return m === undefined ? Infinity : typeof m === 'function' ? m(S.era) : m; };
   G.levelCount = (lvl, type, recipe) => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.lvl >= lvl && (!type || b.type === type) && (!recipe || b.def.recipe) ? 1 : 0), 0);
   G.villagers = () => G.units.filter(u => u.owner === 'p' && u.kind === 'v');
   G.villagerCount = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind === 'v' ? 1 : 0), 0);
@@ -417,7 +455,7 @@
   G.pop = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind !== 'cart' ? 1 : 0), 0) + PK.Social.armyPop();
   G.popCap = function () {
     let c = 0;
-    for (const b of mine()) c += G.bst(b).pop || 0;
+    for (const b of mine()) c += (G.bst(b).pop || 0) + (b.type === 'house' ? G.cerca(b) : 0); // casa junto a una plaza o fuente: +1
     return Math.min(c, D.maxPop(S.era));
   };
 
@@ -516,6 +554,7 @@
     if (!G.pay(o.cost)) { toast('Faltan recursos para la fiesta.', 'warn'); return false; }
     S.fiesta = { until: Date.now() + G.FIESTA.dur * 1000, n: o.n + 1, day: U.dayKey() };
     G.stat('fiestas', 1);
+    if (PK.Vida && PK.Vida.evento) PK.Vida.evento('fiesta', {});
     toast('¡Fiesta en el pueblo! Tu gente recolecta y produce un 25% más durante 5 minutos.', 'epic');
     const tc = G.buildings.find(b => b.owner === 'p' && b.type === 'tc');
     if (tc && PK.Render.burst) for (const c of [[232, 184, 74], [220, 80, 90], [90, 170, 230], [120, 200, 110]]) PK.Render.burst(tc.cx, tc.cy, c, 18);
@@ -545,7 +584,8 @@
       if (PK.Sfx) PK.Sfx.play('level');
     }
     PK.Platform.reportStat('upgrades', S.stats.upgrades);
-    if (b.type === 'wonder') PK.Platform.addCoins(10 * b.lvl, 'wonder');
+    if (D.WONDERS.includes(b.type)) PK.Platform.addCoins(10 * b.lvl, 'wonder');
+    if (PK.Vida) PK.Vida.invalidar();
   }
 
   // ---------- Exploración ----------
@@ -791,8 +831,8 @@
       const b = target.obj;
       if (b.owner !== 'p') return G.command(units, { kind: 'tile', x: b.x + b.w, y: b.y + b.h }, silent);
       if (!b.done) return G.command(units, { kind: 'tile', x: b.x + b.w, y: b.y + b.h }, silent); // las obras se levantan solas
-      if (b.type === 'farm') {
-        const farms = [b].concat(G.buildings.filter(o => o.owner === 'p' && o.type === 'farm' && o.done && o !== b).sort((a, c) => U.dist(a.cx, a.cy, b.cx, b.cy) - U.dist(c.cx, c.cy, b.cx, b.cy)));
+      if (G.esGranja(b)) {
+        const farms = [b].concat(G.buildings.filter(o => o.owner === 'p' && o.type === b.type && o.done && o !== b).sort((a, c) => U.dist(a.cx, a.cy, b.cx, b.cy) - U.dist(c.cx, c.cy, b.cx, b.cy)));
         let fi = 0;
         for (const u of units) {
           while (fi < farms.length && farms[fi].farmer !== null && farms[fi].farmer !== u.id && G.uById.get(farms[fi].farmer)) fi++;
@@ -875,7 +915,14 @@
   G.trainTime = b => (b.type === 'scout' ? D.SCOUT.time : D.VILLAGER.time / (1 + (G.bst(b).train || 0)) / U.clamp(1 + vb('train'), 0.8, 1.6));
 
   // ---------- Construcción ----------
-  G.isUnlocked = type => D.BUILD[type].era <= S.era && !G.legendLocked(type);
+  G.isUnlocked = type => D.BUILD[type].era <= S.era && !G.legendLocked(type) && !D.BUILD[type].retirada && !G.logroFalta(type);
+  // decoraciones que se ganan (V5): la Columna pide un trofeo de jefe por cada una; el Arco, 10 desafíos (V7)
+  G.logroFalta = function (type) {
+    const l = D.BUILD[type].logro;
+    if (l === 'columna') return Object.values(S.trofeos || {}).reduce((a, n) => a + n, 0) > G.countAll('columna') ? null : 'Vence a un jefe de mazmorra por cada columna.';
+    if (l === 'arco') return (S.stats.desafios || 0) >= 10 ? null : 'Cumple 10 desafíos (Libro de Misiones).';
+    return null;
+  };
   // la Taberna (héroes) se abre con el Cuartel, sin esperar a reclamar la misión l1 (H1 del plan)
   G.legendLocked = type => !!D.BUILD[type].lock && !S.flags['unlock_' + D.BUILD[type].lock] && !(type === 'tavern' && G.countAll('barracks'));
   G.buildCost = type => conMod(D.buildCost(type, G.countAll(type)));
@@ -896,8 +943,13 @@
       const o = W.ownerAt(tx, ty);
       if (o !== 'p' && !(G.OUTPOST[type] && !o)) return o ? 'ajeno' : 'libre';
     }
+    if (type === 'muelle' && !G.tocaAgua(x, y, def)) return 'sinAgua';
     if (G.encierra(type, x, y, ignorar)) return 'encierra';
     return null;
+  };
+  G.tocaAgua = function (x, y, def) {
+    for (let j = -1; j <= def.h; j++) for (let i = -1; i <= def.w; i++) if ((i < 0 || j < 0 || i >= def.w || j >= def.h) && W.inb(x + i, y + j) && W.terrain[W.idx(x + i, y + j)] === 4) return true;
+    return false;
   };
   // ¿Ese edificio encerraría al Centro Urbano? (B2 del plan: un patio cerrado por casas dejó 93 de 154 aldeanos
   // parados). Compara cuánto se camina desde el borde de los Centros Urbanos antes y después: si se pierde
@@ -985,9 +1037,11 @@
     ocupado: 'Ahí hay algo (árboles, rocas, un edificio, una cinta o una muralla): busca un lugar despejado.',
     fuera: 'Eso queda fuera del mapa.',
     encierra: 'Así encerrarías a tu pueblo: deja al menos una casilla de paso.',
+    sinAgua: 'El muelle va pegado al agua: ponlo en la orilla de un lago o río.',
   };
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }
+    if (G.logroFalta(type)) { toast(G.logroFalta(type), 'warn'); return null; }
     if (!G.isUnlocked(type)) { toast('Necesitas la Era ' + U.roman(D.BUILD[type].era) + '.', 'warn'); return null; }
     if (G.countAll(type) >= G.maxCount(type)) { toast('Ya tienes el máximo de ' + D.BUILD[type].name + ' para tu era.', 'warn'); return null; }
     const why = G.placeWhy(type, x, y);
@@ -1029,7 +1083,7 @@
     if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }
     const ox = b.cx, oy = b.cy;
-    b.x = x; b.y = y; b._nsT = null; G.blockVer++;
+    b.x = x; b.y = y; b._nsT = null; b._agua = undefined; G.blockVer++;
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) {
       const k = W.idx(x + i, y + j);
       W.bAt[k] = b.id;
@@ -1057,7 +1111,10 @@
       toast(b.def.name + ' terminado.', 'good');
       if (!G.offline && PK.Sfx) PK.Sfx.play('build');
       G.stat('built_total', 1);
+      if (b.def.deco) G.stat('decos', 1);
       G.revealAt(b.cx, b.cy, G.sight(b));
+      G.blockVer++; // los bonos por cercanía se recalculan
+      if (PK.Vida) PK.Vida.invalidar();
     }
   };
 
@@ -1144,6 +1201,8 @@
       S.eraProg.t += dt;
       if (S.eraProg.t >= S.eraProg.total) {
         S.era = S.eraProg.to; S.eraProg = null;
+        if (PK.Vida && PK.Vida.evento) PK.Vida.evento('era', { era: S.era, aldeanos: G.villagerCount() });
+        if (!G.offline && PK.Vida && PK.Vida.fuegos) PK.Vida.fuegos();
         G.finished.push('Era ' + U.roman(S.era));
         toast('¡Has alcanzado la Era ' + U.roman(S.era) + ': ' + D.eraName(S.era) + '! Tus edificios pueden subir 2 niveles más.', 'epic');
         if (!G.offline) { const tc = G.buildings.find(b => b.owner === 'p' && b.type === 'tc'); if (tc && PK.Render.burst) for (let k = 0; k < 4; k++) PK.Render.burst(tc.cx + (Math.random() - 0.5) * 6, tc.cy + (Math.random() - 0.5) * 6, null, 50); if (PK.Sfx) PK.Sfx.play('era'); }
@@ -1192,12 +1251,19 @@
     PK.Incursiones.update(dt);
     fiestaTick(dt);
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
+    frutales(dt);
     PK.Social.update(dt, false);
     regrowT += dt;
     if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); if (PK.Vida) PK.Vida.tick(); }
     questT += dt;
     if (questT > 1) { questT = 0; PK.Quests.check(); }
   };
+  // Árboles frutales (V5): un poco de comida sin aldeanos, en vivo y sin conexión
+  let frutT = 0, frutN = 0;
+  function frutales(dt) {
+    if ((frutT -= dt) <= 0) { frutT = 5; frutN = mine('frutal').length; }
+    if (frutN) G.addRes('food', frutN * D.BUILD.frutal.deco.comida * dt * G.globalMult());
+  }
   function occupied(x, y) {
     for (const u of G.units) if (!u.inside && Math.floor(u.x) === x && Math.floor(u.y) === y) return true;
     return false;
@@ -1291,6 +1357,7 @@
       if (PK.Leyendas) PK.Leyendas.tick(dt);
       if (PK.Campana) PK.Campana.tick(dt);
       if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
+      frutales(dt);
       PK.Social.update(dt, true);
     }
     // obras, estudios y eras siguen su reloj completo aunque hayan pasado más de 12 h

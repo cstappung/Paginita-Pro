@@ -74,6 +74,8 @@
     granbiblioteca: { rama: 'sab', era: 8, name: 'Gran biblioteca', desc: '+10% de investigación.', ef: { researchP: 0.1 } },
     diplomacia: { rama: 'sab', era: 9, ex: 'archivo', name: 'Diplomacia', desc: 'Encargos del tablón con +20% de premio y el mercader errante pasa el doble.', ef: { misiones: 0.2, mercader: 1 } },
   };
+  // pk-19: el muelle (V9) llegó, y con él su nodo
+  D.ARBOL.redes = { rama: 'eco', era: 3, name: 'Pesca con redes', desc: 'Los muelles de pesca rinden +30%.', ef: { muelle: 0.3 } };
   for (const id in D.ARBOL) D.ARBOL[id].lib = Math.max(1, D.ARBOL[id].era - 1);
 
   // ---------- V2. Cartas de era ----------
@@ -123,6 +125,118 @@
     { id: 'verano', name: 'Verano', icon: '☀️', desc: '+10% de recolección.', ef: { gatherP: 0.1 } },
     { id: 'otono', name: 'Otoño', icon: '🍂', desc: '+20% caza y madera.', ef: { hunt: 0.2, g_wood: 0.2 } },
     { id: 'invierno', name: 'Invierno', icon: '❄️', desc: '−20% granjas, +20% minería: se trabaja bajo techo.', ef: { farm: -0.2, g_mine: 0.2 } },
+  ];
+
+  // ---------- V4. Ánimo del pueblo (pk-19) ----------
+  // De 0 a 100 (Vida.animo, cada 10 s). En 50 no cambia nada; en 0 resta 10% y en 100 suma 15% a la recolección
+  // (dentro del tope D.VIDA_TOPE) y a los talleres. Pasar de 80 trae un «Día feliz» como mucho cada 2 horas.
+  D.ANIMO = { base: 50, malo: 0.1, bueno: 0.15, feliz: 80, felizCada: 2 * 3600 * 1000, decoTope: 25 };
+
+  // ---------- V5. Bonos por cercanía ----------
+  // a: el edificio que gana, b: el vecino (alguno de la lista) a r casillas o menos, ef: cuánto (fracción, o +1 de
+  // población para las casas). Una vez por regla, aunque haya varios vecinos. Se leen en G.cerca (game.js).
+  D.CERCANIA = [
+    { a: 'farm', b: ['mill'], r: 3, ef: 0.1, txt: '+10% de comida' },
+    { a: 'muelle', b: ['mill'], r: 4, ef: 0.1, txt: '+10% de pesca' },
+    { a: 'sawmill', b: ['lumber'], r: 3, ef: 0.1, txt: '+10% de tablones' },
+    { a: 'smelter', b: ['mining'], r: 3, ef: 0.1, txt: '+10% de lingotes' },
+    { a: 'forge', b: ['smelter'], r: 2, ef: 0.15, txt: '+15% de herramientas (los lingotes pasan directo)' },
+    { a: 'scriptorium', b: ['library', 'monastery'], r: 3, ef: 0.1, txt: '+10% de libros' },
+    { a: 'masonry', b: ['mining'], r: 3, ef: 0.1, txt: '+10% de sillares' },
+    { a: 'house', b: ['plaza', 'fuente'], r: 1, ef: 1, txt: '+1 de población' },
+  ];
+
+  // ---------- V6. Maravillas 2.0 ----------
+  // Lo que da cada una además del +3% a todo por nivel (BSTATS.wonder): ef(nivel) entra por Vida.bono. `fase` son los
+  // nombres de lo que se ve crecer cada 5 niveles (sprites.js dibuja las etapas).
+  D.MARAV = {
+    m_faro: { ef: L => ({ sell: Math.min(0.1, 0.01 * L), vision: Math.min(8, Math.floor(L / 2)), range: Math.min(20, L) }), txt: L => '+' + Math.min(10, L) + '% de venta en el Mercado, torres +' + Math.min(8, Math.floor(L / 2)) + ' de visión y +' + Math.min(20, L) + ' casillas de exploración', fase: ['la base', 'la torre', 'la linterna', 'el espejo de bronce', 'la galería', 'la llama eterna', 'el halo'] },
+    m_coloso: { ef: L => ({ pve_all: Math.min(0.4, 0.02 * L), raidDef: Math.min(0.5, 0.03 * L) }), txt: L => '+' + Math.min(40, 2 * L) + '% de fuerza contra monstruos y +' + Math.min(50, 3 * L) + '% de daño de las torres a los bandidos', fase: ['el pedestal', 'las piernas', 'el torso', 'la cabeza', 'la lanza', 'la antorcha', 'el halo'] },
+    m_jardines: { ef: L => ({ gatherP: Math.min(0.15, 0.01 * L), animo: Math.min(20, L) }), txt: L => '+' + Math.min(15, L) + '% de recolección y +' + Math.min(20, L) + ' de ánimo', fase: ['la terraza', 'el segundo piso', 'las cascadas', 'el tercer piso', 'los árboles', 'las flores eternas', 'el halo'] },
+    m_catedral: { ef: L => ({ researchP: Math.min(0.5, 0.03 * L), relic: Math.min(0.5, 0.04 * L) }), txt: L => '+' + Math.min(50, 3 * L) + '% de investigación y +' + Math.min(50, 4 * L) + '% de oro de las reliquias', fase: ['los cimientos', 'la nave', 'el rosetón', 'las torres', 'la cúpula', 'las campanas', 'el halo'] },
+  };
+
+  // ---------- V7. Desafíos y Retos del Rey ----------
+  // Un desafío se cumple una vez y para siempre. `on`: cuándo se revisa ('tick' cada 10 s con el estado, o un evento de
+  // Vida.evento: 'batalla', 'era', 'fiesta', 'incursion', 'carta'). `ok(st, ev)` dice si se cumplió. Premio: monedas del
+  // reino y gemas; el título de cada uno se puede lucir (Álbum). Los Retos del Rey son 3 por semana de RETOS (`n` veces
+  // en la semana), renuevan el lunes (weekKey) y dan un cofre real.
+  const sumT = o => Object.values(o || {}).reduce((a, n) => a + (n || 0), 0);
+  const soloTipo = (u, k) => sumT(u) > 0 && sumT(u) === (u[k] || 0);
+  const ndecos = st => (st.stats.decos || 0);
+  D.DESAFIOS = [
+    { id: 'arqueros', name: 'Lluvia de flechas', desc: 'Gana un combate usando solo arqueros.', on: 'batalla', ok: (st, e) => e.won && soloTipo(e.units, 'archer') },
+    { id: 'lanceros', name: 'Bosque de lanzas', desc: 'Gana un combate usando solo lanceros.', on: 'batalla', ok: (st, e) => e.won && soloTipo(e.units, 'spear') },
+    { id: 'milicia', name: 'Gente de a pie', desc: 'Gana un combate usando solo milicianos.', on: 'batalla', ok: (st, e) => e.won && soloTipo(e.units, 'militia') },
+    { id: 'caballeros', name: 'Carga de caballería', desc: 'Gana un combate usando solo caballeros.', on: 'batalla', ok: (st, e) => e.won && soloTipo(e.units, 'knight') },
+    { id: 'poquitos', name: 'Pocos pero buenos', desc: 'Gana un combate con 5 soldados o menos.', on: 'batalla', ok: (st, e) => e.won && sumT(e.units) <= 5 },
+    { id: 'sinbajas', name: 'Ni un rasguño', desc: 'Gana un combate de mazmorra sin bajas.', on: 'batalla', ok: (st, e) => e.won && e.poi !== undefined && !sumT(e.lost) },
+    { id: 'contra', name: 'Contra todo pronóstico', desc: 'Gana un combate con menos de 50% de probabilidad.', on: 'batalla', ok: (st, e) => e.won && e.chance < 0.5 },
+    { id: 'sinheroe', name: 'Sin capa ni espada', desc: 'Limpia un piso 5 o más sin héroe.', on: 'batalla', ok: (st, e) => e.won && !e.heroe && e.piso >= 5 },
+    { id: 'jefe1', name: 'Cazador de jefes', desc: 'Vence a un jefe de mazmorra.', on: 'tick', ok: st => sumT(st.trofeos) >= 1 },
+    { id: 'jefe5', name: 'Sala de trofeos', desc: 'Vence a 5 jefes de mazmorra.', on: 'tick', ok: st => sumT(st.trofeos) >= 5 },
+    { id: 'jefes', name: 'Ninguno se escapa', desc: 'Vence a 4 jefes distintos.', on: 'tick', ok: st => Object.keys(st.trofeos || {}).filter(k => st.trofeos[k]).length >= 4 },
+    { id: 'era3chico', name: 'Pueblo chico, infierno grande', desc: 'Llega a la Era III con menos de 40 aldeanos.', on: 'era', ok: (st, e) => e.era === 3 && e.aldeanos < 40 },
+    { id: 'era4chico', name: 'Pocos y bien organizados', desc: 'Llega a la Era IV con menos de 70 aldeanos.', on: 'era', ok: (st, e) => e.era === 4 && e.aldeanos < 70 },
+    { id: 'era5sinmercado', name: 'Autosuficiente', desc: 'Llega a la Era V sin haber comprado nunca en el Mercado.', on: 'era', ok: (st, e) => e.era === 5 && !st.stats.compras },
+    { id: 'fiestas3', name: 'Fiesta sin fin', desc: 'Haz 3 fiestas del pueblo en un mismo día.', on: 'fiesta', ok: st => (st.fiesta && st.fiesta.day === PK.U.dayKey() ? st.fiesta.n : 0) >= 3 },
+    { id: 'defensas3', name: 'Muralla humana', desc: 'Defiende 3 incursiones de bandidos sin que te roben nada.', on: 'incursion', ok: st => (st.stats.defensa_limpia || 0) >= 3 },
+    { id: 'defensa1', name: 'Ni un grano', desc: 'Defiende una incursión sin que te roben nada.', on: 'incursion', ok: st => (st.stats.defensa_limpia || 0) >= 1 },
+    { id: 'animo90', name: 'El pueblo más feliz', desc: 'Llega a 90 de ánimo.', on: 'tick', ok: st => st.animo && st.animo.v >= 90 },
+    { id: 'animo70', name: 'Buen humor', desc: 'Llega a 70 de ánimo.', on: 'tick', ok: st => st.animo && st.animo.v >= 70 },
+    { id: 'decos5', name: 'Urbanista', desc: 'Construye 5 decoraciones.', on: 'tick', ok: st => ndecos(st) >= 5 },
+    { id: 'decos15', name: 'Paisajista', desc: 'Construye 15 decoraciones.', on: 'tick', ok: st => ndecos(st) >= 15 },
+    { id: 'decos_tipos', name: 'De todo un poco', desc: 'Ten 8 tipos de decoración distintos.', on: 'tick', ok: () => D.DECOS.filter(t => PK.Game.countB(t)).length >= 8 },
+    { id: 'cercania', name: 'Buenos vecinos', desc: 'Ten 6 edificios con bono por cercanía.', on: 'tick', ok: () => PK.Game.buildings.filter(b => b.owner === 'p' && b.type !== 'house' && PK.Game.cerca(b) > 0).length >= 6 },
+    { id: 'muelles', name: 'Puerto pesquero', desc: 'Ten 3 muelles de pesca con pescador.', on: 'tick', ok: () => PK.Game.buildings.filter(b => b.owner === 'p' && b.type === 'muelle' && b.farmer !== null).length >= 3 },
+    { id: 'cartas5', name: 'Buena mano', desc: 'Elige 5 cartas de era.', on: 'carta', ok: st => st.cartas.tomadas.length >= 5 },
+    { id: 'arbolrama', name: 'Especialista', desc: 'Investiga todos los nodos de una rama del árbol.', on: 'tick', ok: () => Object.keys(D.RAMAS).some(r => PK.Vida.contar(r) === Object.keys(D.ARBOL).filter(id => D.ARBOL[id].rama === r).length) },
+    { id: 'arbol10', name: 'Sabio del reino', desc: 'Investiga 10 nodos del árbol.', on: 'tick', ok: () => PK.Vida.contar() >= 10 },
+    { id: 'estaciones', name: 'Un año entero', desc: 'Juega las 4 estaciones.', on: 'tick', ok: st => (st.stats.estaciones || 0) >= 4 },
+    { id: 'invierno', name: 'Invierno largo', desc: 'Llena el granero en invierno.', on: 'tick', ok: st => PK.Vida.estacion() === 3 && st.res.food >= PK.Game.cap('food') - 1 },
+    { id: 'heroes3', name: 'La compañía', desc: 'Ten 3 héroes.', on: 'tick', ok: st => st.heroes && st.heroes.lista.length >= 3 },
+    { id: 'heroe20', name: 'Leyenda viva', desc: 'Sube un héroe a nivel 20.', on: 'tick', ok: st => (st.stats.hero_lvl || 0) >= 20 },
+    { id: 'legendario', name: 'Tesoro de reyes', desc: 'Consigue un objeto legendario.', on: 'tick', ok: st => st.heroes && st.heroes.inv.some(o => o.r >= 3) },
+    { id: 'mapas3', name: 'La X marca el lugar', desc: 'Desentierra 3 mapas del tesoro.', on: 'tick', ok: st => (st.stats.treasures || 0) >= 3 },
+    { id: 'leyendas3', name: 'Peregrino', desc: 'Investiga 3 lugares legendarios.', on: 'tick', ok: st => (st.stats.legends || 0) >= 3 },
+    { id: 'maravilla', name: 'Para la historia', desc: 'Termina una Maravilla.', on: 'tick', ok: () => !!(PK.Game.maravilla() && PK.Game.maravilla().done) },
+    { id: 'maravilla10', name: 'Obra de siglos', desc: 'Sube tu Maravilla a nivel 10.', on: 'tick', ok: () => !!(PK.Game.maravilla() && PK.Game.maravilla().lvl >= 10) },
+    { id: 'eventos10', name: 'Pasa de todo', desc: 'Vive 10 eventos del mapa.', on: 'tick', ok: st => (st.stats.events || 0) >= 10 },
+    { id: 'lleno0', name: 'Nada se pierde', desc: 'Ten 150 aldeanos y ninguno ocioso.', on: 'tick', ok: () => { const vs = PK.Game.villagers(); return vs.length >= 150 && !vs.some(u => !u.task && !u.inside); } },
+    { id: 'capitulo3', name: 'Cronista', desc: 'Cierra el capítulo III de la Crónica.', on: 'tick', ok: st => !!(st.campana && st.campana.hechos && st.campana.hechos[3]) },
+    { id: 'diez_mil', name: 'Graneros de oro', desc: 'Junta 10.000 de oro a la vez.', on: 'tick', ok: st => st.res.gold >= 10000 },
+  ];
+  D.RETOS = [
+    { id: 'r_batallas', name: 'Campaña de la semana', desc: 'Gana 8 combates', k: 'exp_won', n: 8 },
+    { id: 'r_mejoras', name: 'Obras del rey', desc: 'Completa 25 mejoras', k: 'upgrades', n: 25 },
+    { id: 'r_fiestas', name: 'El pueblo festeja', desc: 'Haz 4 fiestas', k: 'fiestas', n: 4 },
+    { id: 'r_eventos', name: 'Atento al reino', desc: 'Vive 6 eventos del mapa', k: 'events', n: 6 },
+    { id: 'r_madera', name: 'Leña para el invierno', desc: 'Junta 20.000 de madera', k: 'g_wood', n: 20000, esc: true },
+    { id: 'r_comida', name: 'Despensa real', desc: 'Junta 25.000 de comida', k: 'g_food', n: 25000, esc: true },
+    { id: 'r_piedra', name: 'Canteras del rey', desc: 'Junta 12.000 de piedra', k: 'g_stone', n: 12000, esc: true },
+    { id: 'r_pisos', name: 'Bajo tierra', desc: 'Limpia 10 pisos de mazmorra', k: 'floors', n: 10 },
+    { id: 'r_decos', name: 'Embellecer el reino', desc: 'Construye 4 decoraciones', k: 'decos', n: 4 },
+    { id: 'r_nodos', name: 'La biblioteca del rey', desc: 'Investiga 2 nodos del árbol', k: 'nodos', n: 2 },
+    { id: 'r_incursiones', name: 'Defensores', desc: 'Rechaza 2 incursiones', k: 'raids_won', n: 2 },
+    { id: 'r_encargos', name: 'Mercenarios', desc: 'Cumple 5 encargos del tablón', k: 'missions_done', n: 5 },
+  ];
+
+  // ---------- V8. Tienda del reino (monedas del reino, nunca las de Juegos) ----------
+  // Solo se ve y la comodidad no rompe el balance. `t`: color (de banderas y estandartes), marco (de los retratos de
+  // héroe), fuegos (al llegar a una era), cola (+1 en la cola del Mayordomo, una vez).
+  D.TIENDA = [
+    { id: 'c_carmesi', t: 'color', name: 'Carmesí', col: [176, 40, 48], precio: 60 },
+    { id: 'c_esmeralda', t: 'color', name: 'Esmeralda', col: [40, 140, 80], precio: 60 },
+    { id: 'c_real', t: 'color', name: 'Azul real', col: [44, 72, 176], precio: 60 },
+    { id: 'c_purpura', t: 'color', name: 'Púrpura', col: [118, 52, 150], precio: 80 },
+    { id: 'c_oro', t: 'color', name: 'Oro viejo', col: [196, 150, 48], precio: 120 },
+    { id: 'c_noche', t: 'color', name: 'Noche', col: [36, 36, 52], precio: 120 },
+    { id: 'm_bronce', t: 'marco', name: 'Marco de bronce', css: '#a8743c', precio: 40 },
+    { id: 'm_plata', t: 'marco', name: 'Marco de plata', css: '#c8ccd6', precio: 80 },
+    { id: 'm_oro', t: 'marco', name: 'Marco de oro', css: '#e8b84a', precio: 150 },
+    { id: 'f_clasicos', t: 'fuegos', name: 'Fuegos artificiales', precio: 50 },
+    { id: 'f_dorados', t: 'fuegos', name: 'Fuegos dorados', precio: 120 },
+    { id: 'cola', t: 'cola', name: 'Escribano del Mayordomo', desc: '+1 lugar en la cola de investigación.', precio: 200 },
   ];
 
   // Tope del multiplicador de recolección que pueden sumar árbol, cartas y estación juntos (Vida.recoleccion). El

@@ -138,6 +138,34 @@
     }
     ctx.restore();
   }
+  // El bote de cada muelle de pesca (V9): en el agua más cercana, meciéndose, y con el pescador si hay uno.
+  function botes(ctx, vis, g) {
+    const t = performance.now() / 1000;
+    for (const b of g.buildings) {
+      if (b.type !== 'muelle' || !b.done) continue;
+      if (b._bote === undefined) {
+        b._bote = null;
+        let bd = 1e9;
+        for (let y = b.y - 3; y < b.y + b.h + 3; y++) for (let x = b.x - 3; x < b.x + b.w + 3; x++) {
+          if (!W.inb(x, y) || W.terrain[W.idx(x, y)] !== 4) continue;
+          const d = U.dist(x + 0.5, y + 0.5, b.cx, b.cy);
+          if (d < bd) { bd = d; b._bote = [x + 0.5, y + 0.5]; }
+        }
+      }
+      if (!b._bote) continue;
+      const [px, py] = R.iso(b._bote[0], b._bote[1]), x = Math.round(px), y = Math.round(py + Math.sin(t * 1.6 + b.id) * 1.2);
+      if (!vis(x - 10, y - 14, 20, 20)) continue;
+      ctx.fillStyle = 'rgba(20,40,70,0.35)'; ctx.fillRect(x - 7, y + 2, 14, 2);
+      ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 6, y - 1, 12, 3); ctx.fillRect(x - 7, y - 2, 2, 2); ctx.fillRect(x + 5, y - 2, 2, 2);
+      ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 5, y - 2, 10, 1);
+      if (b.farmer !== null && g.uById.get(b.farmer)) {
+        ctx.fillStyle = '#3a5a9a'; ctx.fillRect(x - 1, y - 6, 3, 4);
+        ctx.fillStyle = '#e8c8a0'; ctx.fillRect(x - 1, y - 8, 3, 2);
+        ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 2, y - 6); ctx.lineTo(x + 8, y - 11); ctx.stroke();
+        ctx.fillStyle = 'rgba(230,240,255,0.7)'; ctx.fillRect(x + 8, y - 11 + Math.round(Math.sin(t * 2) * 1), 1, 9);
+      }
+    }
+  }
   // ¿Hay algo explorado en el trozo? Si no, se tapa con niebla y ni se pinta.
   function chunkSeen(ci) {
     if (!W.chunkSeen || W.chunkSeenVer !== W.fogVer) {
@@ -334,6 +362,7 @@
     // caminos y cintas (planos, sobre el suelo)
     drawRoads(ctx, chunks);
     drawBelts(ctx, vis);
+    botes(ctx, vis, g);
     // bordes de zonas comunes
     if (R.showZones) {
       ctx.strokeStyle = 'rgba(255,226,120,0.8)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -534,6 +563,19 @@
       ctx.globalAlpha = ok ? 0.75 : 0.45;
       ctx.drawImage(spr.c, Math.round(px - spr.ox), Math.round(py - spr.oy));
       ctx.globalAlpha = 1;
+      // bonos por cercanía (V5): líneas verdes hacia los vecinos que suman
+      if (ok && g.cercaDe) {
+        const [gx, gy] = R.iso(x + def.w / 2, y + def.h / 2);
+        ctx.strokeStyle = 'rgba(110,240,120,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+        for (const c of g.cercaDe(null, x, y, g.placing.type)) { const [ox2, oy2] = R.iso(c.o.cx, c.o.cy); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(ox2, oy2); ctx.stroke(); }
+        // y al revés: lo que este edificio le suma a los que ya están (una casa nueva no, una plaza junto a casas sí)
+        for (const o of g.buildings) {
+          if (o.owner !== 'p' || !o.done) continue;
+          const r = D.CERCANIA && D.CERCANIA.find(c => c.a === o.type && c.b.includes(g.placing.type));
+          if (r && g.rectDist(x, y, def.w, def.h, o.x, o.y, o.w, o.h) <= r.r) { const [ox2, oy2] = R.iso(o.cx, o.cy); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(ox2, oy2); ctx.stroke(); }
+        }
+        ctx.setLineDash([]); ctx.lineWidth = 1;
+      }
     }
     if (R.roadGhost) for (const [x, y] of R.roadGhost) diamondFill(ctx, x, y, 'rgba(230,200,120,0.45)');
     if (R.wallGhost) for (const [x, y] of R.wallGhost) diamondFill(ctx, x, y, PK.Def.tool === 'gate' ? 'rgba(232,184,74,0.6)' : 'rgba(210,210,220,0.55)');

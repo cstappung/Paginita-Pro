@@ -72,10 +72,12 @@
   // Menú propio (antes la grilla salía solo al elegir aldeanos, que además tenían que ir a levantar la obra).
   const BUILD_CATS = [
     ['Casas y bodegas', ['house', 'granary', 'warehouse', 'builder', 'tc']],
-    ['Recolección', ['lumber', 'mining', 'mill', 'farm', 'scout']],
+    ['Recolección', ['lumber', 'mining', 'mill', 'farm', 'muelle', 'scout']],
     ['Talleres', ['sawmill', 'masonry', 'smelter', 'forge', 'scriptorium', 'steelworks', 'workshop', 'cartwright']],
-    ['Reino', ['market', 'library', 'consejo', 'university', 'monastery', 'guild', 'wonder']],
+    ['Reino', ['market', 'library', 'consejo', 'university', 'monastery', 'guild']],
     ['Ejército y defensa', ['barracks', 'tower']],
+    ['Maravilla (elige una)', D.MARAVILLAS || []],
+    ['Decoraciones (ánimo)', D.DECOS || []],
   ];
   UI.openBuild = function () {
     UI.modal('build', 'Construir', body => {
@@ -87,12 +89,13 @@
       for (const [name, types] of cats) {
         const grid = el('div', { class: 'bmenu' });
         for (const type of types) {
-          if (!D.BUILD[type] || seen.has(type)) continue;
+          if (!D.BUILD[type] || seen.has(type) || D.BUILD[type].retirada) continue;
           seen.add(type);
           const def = D.BUILD[type], legend = g.legendLocked(type), eraLock = def.era > st.era, have = g.countAll(type), max = g.maxCount(type), full = have >= max;
           if (legend && name === 'Leyendas' && def.era > st.era + 2) continue; // las muy lejanas no se muestran todavía
-          const cost = g.buildCost(type), afford = g.canAfford(cost), locked = legend || eraLock;
-          const why = legend ? 'Se desbloquea con una misión de la rama Leyendas del Libro.' : eraLock ? 'Requiere la Era ' + U.roman(def.era) + '.' : full ? 'Ya tienes el máximo' + (typeof def.max === 'function' ? ' para tu era' : '') + ' (' + have + '/' + max + ').' : !afford ? 'Te faltan recursos.' : '';
+          const cost = g.buildCost(type), afford = g.canAfford(cost), logro = g.logroFalta(type), locked = legend || eraLock || !!logro;
+          const otra = def.marav && full && g.maravilla() && g.maravilla().type !== type;
+          const why = legend ? 'Se desbloquea con una misión de la rama Leyendas del Libro.' : eraLock ? 'Requiere la Era ' + U.roman(def.era) + '.' : logro ? logro : otra ? 'Ya elegiste la ' + g.maravilla().def.name + ': solo hay una Maravilla por reino.' : full ? 'Ya tienes el máximo' + (typeof def.max === 'function' ? ' para tu era' : '') + ' (' + have + '/' + max + ').' : !afford ? 'Te faltan recursos.' : '';
           grid.append(el('button', { class: 'bcard' + (locked ? ' locked' : full ? ' full' : !afford ? ' poor' : ''), title: def.desc, onclick: () => {
             if (locked || full) { UI.toast(why, 'warn'); return; }
             UI.closeModal();
@@ -100,7 +103,7 @@
             UI.toast(UI.hint('Haz clic donde va ' + def.name + '.', 'Toca dónde va ' + def.name + ': primero verás cómo queda.'), 'info');
           } }, el('img', { class: 'bc-img', src: Sp.buildingIcon(type), alt: '' }),
             el('div', { class: 'bc-txt' }, el('b', null, def.name), el('span', { class: 'small bc-desc' }, def.desc),
-              locked ? el('span', { class: 'small muted' }, legend ? '★ Leyendas' : 'Era ' + U.roman(def.era)) : el('span', { class: 'bc-cost' }, UI.costEl(cost), el('span', { class: 'small muted' }, ' · ' + U.fmtTime(def.time / g.buildMult('p')))),
+              locked ? el('span', { class: 'small muted' }, legend ? '★ Leyendas' : logro ? '★ ' + logro : 'Era ' + U.roman(def.era)) : el('span', { class: 'bc-cost' }, UI.costEl(cost), el('span', { class: 'small muted' }, ' · ' + U.fmtTime(def.time / g.buildMult('p')))),
               why && !locked ? el('span', { class: 'small warn-t' }, why) : null),
             max < 99 ? el('span', { class: 'bc-n' }, have + '/' + max) : have ? el('span', { class: 'bc-n' }, String(have)) : null));
         }

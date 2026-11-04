@@ -274,8 +274,8 @@
     const st = S();
     const book = el('div', { class: 'book' });
     const tabs = el('div', { class: 'book-tabs' });
-    for (const b of D.BRANCHES.concat([{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'album', name: 'Álbum', icon: 'gems' }])) {
-      const ready = b.id === 'album' ? false : b.id === 'daily' ? (st.streak.last !== U.dayKey() || Q.repairable() || st.daily.list.some(it => !it.claimed && dailyProg(it)[0] >= it.n) || weeklyReady() > 0 || dailyBonusReady()) : D.QUESTS.some(q => q.branch === b.id && Q.status(q) === 'ready');
+    for (const b of D.BRANCHES.concat([{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'desafios', name: 'Desafíos', icon: 'crown' }, { id: 'album', name: 'Álbum', icon: 'gems' }])) {
+      const ready = b.id === 'album' || b.id === 'desafios' ? false : b.id === 'daily' ? (st.streak.last !== U.dayKey() || Q.repairable() || st.daily.list.some(it => !it.claimed && dailyProg(it)[0] >= it.n) || weeklyReady() > 0 || dailyBonusReady()) : D.QUESTS.some(q => q.branch === b.id && Q.status(q) === 'ready');
       tabs.append(el('button', { class: 'book-tab' + (tab === b.id ? ' on' : ''), onclick: () => { tab = b.id; selected = null; PK.UI.rerender(true); } },
         el('img', { class: 'ico', src: PK.Sprites.icon(b.icon) }), b.name, ready ? el('span', { class: 'dot' }) : null));
     }
@@ -287,6 +287,7 @@
 
     if (tab === 'daily') { renderDaily(left, right); return; }
     if (tab === 'album') { renderAlbum(left, right); return; }
+    if (tab === 'desafios' && PK.UI.renderDesafios) { PK.UI.renderDesafios(left, right); return; }
     const br = D.BRANCHES.find(b => b.id === tab);
     left.append(el('h2', null, br.name), el('p', { class: 'muted small' }, br.desc));
     const { rows } = layout(tab);

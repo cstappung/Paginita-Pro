@@ -83,6 +83,80 @@
     setInterval(pintar, 5000);
     return b;
   };
+  // ---------- V4. Ánimo (barra de arriba y ventana) ----------
+  UI.animoEl = function () {
+    const b = el('button', { class: 'res animo', onclick: () => UI.openAnimo() });
+    const pintar = () => {
+      const v = V().animo(), m = V().animoMult();
+      b.textContent = (v >= 70 ? '😊 ' : v >= 40 ? '🙂 ' : '😟 ') + v;
+      b.classList.toggle('bajo', v < 40); b.classList.toggle('alto', v >= 80);
+      b.title = 'Ánimo del pueblo: ' + v + '/100 (' + (m >= 1 ? '+' : '') + Math.round((m - 1) * 100) + '% de recolección y talleres)';
+    };
+    pintar();
+    setInterval(pintar, 2000);
+    return b;
+  };
+  UI.openAnimo = function () {
+    UI.modal('animo', 'Ánimo del pueblo', body => {
+      const v = V().animo(), m = V().animoMult();
+      body.append(el('div', { class: 'era-box' }, el('b', null, 'Ánimo ' + v + ' de 100'), el('div', { class: 'bar' }, el('div', { class: 'fill ' + (v >= 50 ? 'green' : 'gold'), style: { width: v + '%' } }), el('span', null, (m >= 1 ? '+' : '') + Math.round((m - 1) * 100) + '% de recolección y talleres'))));
+      const partes = V().animoPartes();
+      body.append(el('h3', null, 'Qué lo mueve'), el('ul', { class: 'info' }, el('li', null, 'Base: 50'), partes.map(p => el('li', { class: p.v < 0 ? 'warn-t' : '' }, p.txt + ': ' + (p.v > 0 ? '+' : '') + p.v))));
+      body.append(el('p', { class: 'small muted' }, 'En 50 no cambia nada. En 0 tu gente rinde 10% menos y en 100, 15% más. Pasado 80, de vez en cuando hay un «Día feliz». Sube con decoraciones junto a las casas, la Taberna, las fiestas, la variedad de edificios y un Juglar que gobierne. Baja si te saquean, si la despensa se vacía o si hay casas lejos de un punto de acopio.'),
+        UI.btn('Construir decoraciones', () => { UI.closeModal(); UI.openBuild(); }, { small: true }));
+    });
+  };
+
+  // ---------- V6. La Maravilla vieja: elegir en qué se transforma ----------
+  UI.maravillaEl = function (b) {
+    const box = el('div', { class: 'era-box' }, el('b', null, 'Maravillas 2.0'), el('p', { class: 'small' }, 'Tu Maravilla puede transformarse gratis, conservando el nivel, en una de las cuatro nuevas (5×5): elige qué quieres que haga por tu reino.'));
+    for (const t of D.MARAVILLAS) box.append(el('div', { class: 'work-row' }, el('span', null, el('b', null, D.BUILD[t].name), el('span', { class: 'small muted' }, ' — ' + D.MARAV[t].txt(b.lvl))), UI.btn('Elegir', () => { const n = V().transformar(b, t); if (n) UI.selectBuilding(n); }, { small: true })));
+    return box;
+  };
+  UI.maravillaInfo = function (b) {
+    const M = D.MARAV[b.type], f = V().fase(b);
+    return el('div', { class: 'era-box' }, el('b', null, 'Etapa ' + (f + 1) + ' de 7: ' + M.fase[f]), el('p', { class: 'small' }, 'Da ' + M.txt(b.lvl) + '.'), f < 6 ? el('p', { class: 'small muted' }, 'En el nivel ' + (f + 1) * 5 + ' se suma ' + M.fase[f + 1] + '.') : '');
+  };
+
+  // ---------- V7. Desafíos, Retos del Rey y títulos (pestaña del Libro de Misiones) ----------
+  UI.renderDesafios = function (left, right) {
+    const st = S(), n = V().cumplidos();
+    left.append(el('h2', null, 'Retos del Rey'), el('p', { class: 'small muted' }, 'Tres por semana. Se renuevan el lunes. Cumplir los tres abre un cofre real.'));
+    const rs = V().retos();
+    for (const id of rs.ids) {
+      const p = V().retoProg(id), ok = rs.hechos[id];
+      left.append(el('div', { class: 'quest' + (ok ? ' done' : '') }, el('b', null, (ok ? '✓ ' : '') + p.r.name), el('p', { class: 'small' }, p.r.desc.replace(/\d[\d.]*/, U.fmt(p.meta)) + '.'),
+        el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: Math.min(100, (p.n / p.meta) * 100) + '%' } }), el('span', null, U.fmt(Math.min(p.n, p.meta)) + ' / ' + U.fmt(p.meta)))));
+    }
+    left.append(el('p', { class: 'small' + (rs.cofre ? '' : ' muted') }, rs.cofre ? '✓ Cofre real abierto esta semana.' : 'Cofre real: ' + rs.ids.filter(id => rs.hechos[id]).length + ' de 3.'));
+    // títulos
+    const t = st.flags.titulo;
+    left.append(el('h3', null, 'Título del reino'), el('p', { class: 'small muted' }, 'Cada desafío cumplido te da su título. El que elijas se ve en el panel de tu Centro Urbano.'),
+      el('div', { class: 'row wrap' }, D.DESAFIOS.filter(d => st.desafios[d.id]).map(d => UI.btn(d.name, () => { st.flags.titulo = t === d.id ? null : d.id; UI.rerender(); }, { small: true, cls: t === d.id ? 'gold' : '' }))));
+    right.append(el('h2', null, 'Desafíos (' + n + '/' + D.DESAFIOS.length + ')'), el('p', { class: 'small muted' }, 'Se cumplen una vez y para siempre. Con 10 se desbloquea el Arco de triunfo.'));
+    right.append(el('div', { class: 'desafios' }, D.DESAFIOS.map(d => el('div', { class: 'desafio' + (st.desafios[d.id] ? ' done' : '') }, el('b', null, (st.desafios[d.id] ? '✓ ' : '') + d.name), el('span', { class: 'small' }, d.desc)))));
+  };
+  UI.openDesafios = () => PK.Quests.openBook('desafios');
+
+  // ---------- V8. Tienda del reino ----------
+  UI.openTienda = function () {
+    UI.modal('tienda', 'Tienda del reino', body => {
+      const st = S(), m = PK.Platform.getCoins();
+      body.append(el('p', null, 'Tienes ', el('b', null, U.fmt(m) + ' monedas del reino'), '. Aquí solo hay cosas que se ven y comodidades: nada que cambie el balance. Las monedas del reino salen de misiones, cofres y la Maravilla, y no son las de Juegos.'));
+      const grupos = { color: 'Color del reino (banderas y estandartes)', marco: 'Marco para los retratos de héroe', fuegos: 'Al llegar a una era', cola: 'Comodidades' };
+      for (const g in grupos) {
+        body.append(el('h3', null, grupos[g]));
+        body.append(el('div', { class: 'tienda' }, D.TIENDA.filter(it => it.t === g).map(it => {
+          const tengo = st.tienda.tengo[it.id], uso = st.tienda[it.t] === it.id;
+          const muestra = it.col ? el('span', { class: 'muestra', style: { background: 'rgb(' + it.col.join(',') + ')' } }) : it.css ? el('span', { class: 'muestra marco', style: { borderColor: it.css } }) : '';
+          return el('div', { class: 'item' + (uso ? ' uso' : '') }, muestra, el('b', null, it.name), it.desc ? el('span', { class: 'small' }, it.desc) : '',
+            tengo ? (it.t === 'cola' ? el('span', { class: 'small ok' }, '✓ Tuyo') : UI.btn(uso ? 'Quitar' : 'Usar', () => { V().usar(it.id); UI.rerender(); }, { small: true, cls: uso ? '' : 'gold' }))
+              : UI.btn(it.precio + ' monedas', () => { V().comprar(it.id); UI.rerender(); }, { small: true, disabled: m < it.precio }));
+        })));
+      }
+    }, { wide: true });
+  };
+
   UI.openEstacion = function () {
     UI.modal('estacion', 'Estaciones', body => {
       const e = V().estacion();
