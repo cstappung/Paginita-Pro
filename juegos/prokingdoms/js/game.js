@@ -49,6 +49,7 @@
     PK.Exp.init(S);
     PK.Incursiones.init(S);
     PK.Auto.init(S);
+    PK.Consejo.init(S);
     PK.Life.reset();
     PK.Quests.init(S);
   };
@@ -572,10 +573,59 @@
     else if (D.POI[p.kind].dungeon) PK.Exp.found(p);
   }
 
+  // ---------- Banderas de exploración (A4 del plan) ----------
+  // Hasta 3 banderas en la niebla: el explorador dirigido va hacia ellas antes que a la niebla más cercana.
+  // Dirigido hay uno; el Puesto en nivel 5 o Cartografía III suman un segundo. Cuando la casilla de la bandera
+  // se descubre, la bandera se quita sola.
+  G.BANDERAS_MAX = 3;
+  G.banderas = () => S.banderas || (S.banderas = []);
+  G.dirigidos = () => (mine('scout').some(b => b.lvl >= 5) || G.lvl('cartography') >= 3 ? 2 : 1);
+  G.ponerBandera = function (x, y) {
+    const fl = G.banderas(), [hx, hy] = D.PLAYER_HOME;
+    const i = fl.findIndex(f => U.dist(f[0], f[1], x, y) < 3);
+    if (i >= 0) { fl.splice(i, 1); toast('Bandera quitada.', 'info'); return 'quitada'; }
+    if (!W.inb(x, y)) return null;
+    if (W.fog[W.idx(x, y)]) { toast('Esa zona ya está descubierta: pon la bandera en la niebla.', 'warn'); return null; }
+    const R = G.exploreRange();
+    if (!R) { toast('Necesitas un Puesto de Exploradores.', 'warn'); return null; }
+    if (U.dist(x, y, hx, hy) > R + 2) { toast('Queda fuera del alcance de tus exploradores (' + R + ' casillas): mejora el Puesto de Exploradores.', 'warn'); return null; }
+    if (fl.length >= G.BANDERAS_MAX) { toast('Ya tienes ' + G.BANDERAS_MAX + ' banderas: toca una para quitarla.', 'warn'); return null; }
+    fl.push([x, y]);
+    for (const u of G.units) if (u.owner === 'p' && u.kind === 'scout' && u.task && u.task.t === 'explore') { u.path = []; u.exT = undefined; } // que lo tomen ya
+    toast('Bandera puesta: tu explorador irá hacia allá.', 'good');
+    return 'puesta';
+  };
+  // La bandera que sigue ese explorador (o null). Quita las que ya se descubrieron.
+  function banderaDe(u) {
+    const fl = G.banderas();
+    for (let i = fl.length - 1; i >= 0; i--) if (W.fog[W.idx(fl[i][0], fl[i][1])]) { fl.splice(i, 1); if (!G.offline) toast('Tu explorador llegó a la bandera.', 'good'); }
+    if (!fl.length) return null;
+    const sc = G.units.filter(o => o.owner === 'p' && o.kind === 'scout').sort((a, b) => a.id - b.id), i = sc.indexOf(u);
+    return i >= 0 && i < G.dirigidos() ? fl[i % fl.length] : null;
+  }
+  // Borde de la niebla más cercano a la bandera (por anillos desde ella) y, entre esos, el más cercano al explorador.
+  function haciaBandera(u, f, R, frontier) {
+    const [hx, hy] = D.PLAYER_HOME, skip = u.skip;
+    for (let r = 0; r <= 90; r++) {
+      let pick = null, bs = 1e9;
+      for (let y = f[1] - r; y <= f[1] + r; y++) for (let x = f[0] - r; x <= f[0] + r; x++) {
+        if (Math.max(Math.abs(x - f[0]), Math.abs(y - f[1])) !== r || !W.inb(x, y)) continue;
+        const i = y * W.W + x;
+        if (W.fog[i] || (skip && skip.has(i)) || U.dist(x, y, hx, hy) > R || !frontier(x, y)) continue;
+        const sc = U.dist(x, y, u.x, u.y) + (W.passable(x, y) ? 0 : 3);
+        if (sc < bs) { bs = sc; pick = [x, y]; }
+      }
+      if (pick) return pick;
+    }
+    return null;
+  }
+
   // Exploradores: el borde de la niebla más cercano, dentro del alcance del Puesto de Exploradores.
   G.exploreTarget = function (u) {
     const [hx, hy] = D.PLAYER_HOME, R = G.exploreRange();
     if (!R) return null;
+    const fb = banderaDe(u);
+    if (fb) { const t = haciaBandera(u, fb, R, (x, y) => W.explored(x + 1, y) || W.explored(x - 1, y) || W.explored(x, y + 1) || W.explored(x, y - 1)); if (t) return t; }
     const ux = Math.floor(u.x), uy = Math.floor(u.y), skip = u.skip;
     const frontier = (x, y) => W.explored(x + 1, y) || W.explored(x - 1, y) || W.explored(x, y + 1) || W.explored(x, y - 1);
     for (let r = 1; r <= 60; r++) {
@@ -1217,7 +1267,7 @@
     // ayudas del gremio que llegaron mientras no estabas (las del buzón se aplican justo antes de este cálculo)
     const from = Date.now() - secFull * 1000 - 120000, helps = S.ret.helpLog.filter(h => h.at >= from), news = S.ret.news.filter(h => h.at >= from);
     const welcome = secFull >= D.WELCOME_MIN ? G.newWelcome(secFull) : null;
-    return { sec: secFull, capped: secFull > sec, gained: got, depleted, eraUp: S.era > startEra, finished: G.finished.slice(), explored: W.fogCount - fogBefore, helps: helps.length, helpsWhat: helps.length ? helps[helps.length - 1].what : null, news, welcome };
+    return { sec: secFull, capped: secFull > sec, gained: got, depleted, eraUp: S.era > startEra, finished: G.finished.slice(), explored: W.fogCount - fogBefore, helps: helps.length, helpsWhat: helps.length ? helps[helps.length - 1].what : null, news, welcome, consejo: PK.Consejo.informe(from) };
   };
 
   // ---------- Cofre de bienvenida ----------

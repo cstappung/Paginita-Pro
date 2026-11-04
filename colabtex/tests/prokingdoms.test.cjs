@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js']);
+const PK = carga(['util.js', 'data.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -199,4 +199,36 @@ test('P1: versiones de protocolo y del mundo', () => {
   assert.ok(Number.isInteger(D.MUNDO_VER) && D.MUNDO_VER > 0);
   assert.match(JS('net.js'), /proto: D\.PROTO/, 'el cliente manda su versión en join');
   assert.match(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /b\.proto !== D\.PROTO/);
+});
+
+// ---------- Fase 1: automatización ----------
+
+test('A2: los planes y la receta inversa (productos → materia prima)', () => {
+  const A = PK.Auto;
+  for (const id in A.PLANES) if (A.PLANES[id].w) for (const r of A.RES) assert.ok(A.PLANES[id].w[r] >= 0 && A.PLANES[id].w[r] <= 5, id + ' ' + r);
+  assert.deepEqual({ ...A.crudo({ ingots: 2 }, {}) }, { ore: 4, wood: 2 });
+  assert.deepEqual({ ...A.crudo({ tools: 1 }, {}) }, { wood: 3, ore: 2 });
+  assert.deepEqual({ ...A.crudo({ stone: 5, gold: 1 }, {}) }, { stone: 5, gold: 1 });
+});
+
+test('A3: el Salón del Consejo y sus seis consejeros', () => {
+  const C = PK.Consejo, b = D.BUILD.consejo;
+  assert.equal(b.era, 2); assert.equal(b.max, 1);
+  assert.deepEqual([...C.LISTA.map(c => c.lvl)], [1, 2, 3, 5, 7, 9]);
+  for (const c of C.LISTA) {
+    assert.equal(typeof C.HACE[c.id], 'function', c.id);
+    // cada consejero se puede tener en alguna era (el nivel máximo crece 2 por era)
+    assert.ok([...Array(12)].some((_, e) => D.maxLevel('consejo', e + 1) >= c.lvl), c.id);
+  }
+  assert.equal(D.BSTATS.consejo(9).consejeros, 6);
+  assert.equal(D.BSTATS.consejo(4).consejeros, 3);
+  assert.ok(D.QUESTS.some(q => q.req.t === 'build' && q.req.b === 'consejo'));
+  // el Tesorero se queda bajo el límite diario del mercado del servidor
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), dia = +/marketDay: (\d+)/.exec(sim)[1];
+  assert.ok(C.MERCADO_DIA < dia, 'Tesorero ' + C.MERCADO_DIA + ' contra el servidor ' + dia);
+});
+
+test('A6: las reglas del Asesor tienen texto y botones', () => {
+  assert.ok(PK.Asesor.REGLAS.length >= 8);
+  assert.match(JS('asesor.js'), /prioridad: 100/);
 });

@@ -327,3 +327,33 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   reset (new `D.MAPV`). Regenerate it with the snippet at the top of that
   file. The «two good troops per enemy» check is a `todo` until Phase 4: beasts
   only have the Lancero.
+
+## Phase 1, automation (`pk-12`)
+
+- **Capataz:** «Reequilibrar» (`auto.rebal`, on) moves up to 3 of its villagers
+  every 20 s, only past 8% of the population. Plans (`PK.Auto.PLANES`,
+  `auto.plan`); «Meta de era» turns what the next era and the upgrade queue
+  lack into raw resources (`A.crudo`) every minute. Touching + or − returns to
+  «A mano». `A.tick` timers count seconds (`el`), not calls: offline calls
+  bring 60 s each.
+- **Salón del Consejo** (`consejo`, Era II, one; `js/consejo.js`): one
+  counselor per level 1/2/3/5/7/9, each with its own on/off and cadence, run
+  from `A.tick` (offline too) inside `UI.mute`, so they never toast. What they
+  do goes to `consejo.log` and the «Mientras no estabas» report
+  (`Consejo.informe`). The Tesorero stays under the server's daily market
+  cap (`C.MERCADO_DIA` < `LIM.marketDay`, tested). The Mayordomo also starts
+  the era advance when it can (acceptance: 12 h away still advances).
+- **Exploration flags** (`S.banderas`, max 3, `G.ponerBandera`,
+  `PK.Input.startFlag`, map or minimap): the first scout (two with the Puesto
+  at level 5 or Cartografía III) heads to the frontier tile nearest its flag.
+  A flag goes away once its tile is revealed. Out of range is refused.
+- **Outposts:** every 30 s live, a weighted resource with no node within 20
+  tiles of its drop points offers a camp next to the nearest one
+  (`A.lejos`, `A.lugarJunto`, `A.proponerCampo` leaves the ghost armed).
+  Walking share per resource (`A.eficiencia`) shows in Aldeanos.
+- **Asesor** (`js/asesor.js`, «?» in the top bar): ordered rules returning
+  `{prioridad, texto, acciones}`. The top one also shows in the report.
+  Phase 6 (U2) reuses it.
+- **Barrio:** Shift (or «Modo barrio» for touch) snaps the next houses to the
+  first one's grid with 1-tile streets and paves the street below and right
+  when there is stone (`calles` in `input.js`).

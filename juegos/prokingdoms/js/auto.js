@@ -11,7 +11,7 @@
   A.RES = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'];
   A.QMAX = 6;
   A.init = function (st) {
-    st.auto = Object.assign({ idle: true, work: true, train: false, reserve: 0.15, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
+    st.auto = Object.assign({ idle: true, work: true, train: false, rebal: true, plan: 'mano', reserve: 0.15, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
     st.upq = (st.upq || []).filter(id => G().bById.get(id));
   };
 
@@ -96,14 +96,88 @@
       { label: 'Aldeanos', fn: () => PK.UI.openForeman() });
   }
 
-  let t = 0, shopT = 0;
+  // ---------- Puestos avanzados guiados y eficiencia (A5 del plan) ----------
+  // Campamento que sirve de acopio para cada recurso del mapa.
+  A.CAMPO = { wood: 'lumber', stone: 'mining', gold: 'mining', ore: 'mining', marble: 'mining', gems: 'mining', food: 'mill' };
+  // Lugar libre donde ese campamento se puede construir, lo más cerca posible de un recurso (o null).
+  A.lugarJunto = function (tipo, n) {
+    const g = G(), def = D.BUILD[tipo];
+    for (let r = 1; r <= 8; r++) for (let y = n.y - r - def.h + 1; y <= n.y + r; y++) for (let x = n.x - r - def.w + 1; x <= n.x + r; x++) {
+      if (Math.max(Math.abs(x + def.w / 2 - n.x - 0.5), Math.abs(y + def.h / 2 - n.y - 0.5)) > r + def.w / 2) continue;
+      if (g.canPlace(tipo, x, y)) return [x, y];
+    }
+    return null;
+  };
+  // Deja el fantasma del campamento ya ubicado y lleva la cámara allí: solo falta confirmar.
+  A.proponerCampo = function (tipo, x, y) {
+    PK.Input.startPlacing(tipo);
+    PK.Render.ghost = { x, y, ok: G().canPlace(tipo, x, y) };
+    G().placing.armed = true;
+    PK.Render.centerOn(x + 1, y + 1);
+    PK.UI.refreshPanel(true);
+  };
+  // ¿Se acabó ese recurso cerca de los puntos de acopio? Devuelve el más cercano lejos (hasta 70 casillas).
+  A.lejos = function (res) {
+    const g = G(), drops = g.buildings.filter(b => b.owner === 'p' && b.done && b.def.drop && b.def.drop.includes(res));
+    if (!drops.length || drops.some(b => W.nearestNode(res, b.cx, b.cy, 20, 'p'))) return null;
+    const tc = drops.find(b => b.type === 'tc') || drops[0], n = W.nearestNode(res, tc.cx, tc.cy, 70, 'p');
+    if (!n) return null;
+    const d = Math.min(...drops.map(b => U.dist(b.cx, b.cy, n.x, n.y)));
+    return { n, d: Math.round(d) };
+  };
+  const NOMBRE_NODO = { wood: 'un bosque', stone: 'una cantera', gold: 'una mina de oro', ore: 'una veta de hierro', marble: 'una cantera de mármol', gems: 'una veta de gemas' };
+  const avisoLejos = {};
+  function revisarLejos(g, st) {
+    for (const res of ['wood', 'stone', 'gold', 'ore', 'marble', 'gems']) {
+      if (!(st.auto.w[res] > 0) || (avisoLejos[res] && performance.now() - avisoLejos[res] < 600000)) continue;
+      const lj = A.lejos(res), tipo = A.CAMPO[res];
+      if (!lj || !g.isUnlocked(tipo) || g.countAll(tipo) >= g.maxCount(tipo)) continue;
+      const p = A.lugarJunto(tipo, lj.n);
+      if (!p) continue;
+      avisoLejos[res] = performance.now();
+      PK.UI.toast('Se acabó ' + D.RES[res].name.toLowerCase() + ' cerca. Hay ' + NOMBRE_NODO[res] + ' a ' + lj.d + ' casillas: ¿construir un ' + D.BUILD[tipo].name + ' allí?', 'warn',
+        { label: 'Construir allí', fn: () => A.proponerCampo(tipo, p[0], p[1]) });
+      return; // de a uno
+    }
+  }
+  // Eficiencia: cuánto del tiempo los recolectores de cada recurso caminan en vez de recolectar (se mide en vivo,
+  // una muestra por segundo con memoria de unos minutos). Más de la mitad caminando: falta un acopio más cerca.
+  const efi = {};
+  function medir(g) {
+    for (const r in efi) { efi[r].walk *= 0.985; efi[r].work *= 0.985; }
+    for (const u of g.units) {
+      if (u.owner !== 'p' || u.kind !== 'v' || !u.task || u.task.t !== 'gather' || u.inside) continue;
+      const e = efi[u.task.res] || (efi[u.task.res] = { walk: 0, work: 0 });
+      if (u.mode === 'work') e.work++; else if (u.path && u.path.length) e.walk++;
+    }
+  }
+  A.eficiencia = function (res) {
+    const e = efi[res];
+    return e && e.walk + e.work >= 15 ? e.walk / (e.walk + e.work) : null;
+  };
+  // Para el aviso de eficiencia: el recurso donde más trabajan, y un lugar para su campamento.
+  A.acopioCerca = function (res) {
+    const g = G(), cnt = new Map();
+    for (const u of g.units) if (u.owner === 'p' && u.task && u.task.t === 'gather' && u.task.res === res && W.nodes[u.task.node]) cnt.set(u.task.node, (cnt.get(u.task.node) || 0) + 1);
+    const top = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0], tipo = A.CAMPO[res];
+    if (!top || !tipo) return null;
+    const p = A.lugarJunto(tipo, W.nodes[top[0]]);
+    return p ? { tipo, x: p[0], y: p[1] } : null;
+  };
+
+  // los consejeros del Salón del Consejo (js/consejo.js) corren en la misma pasada, también sin conexión
+  A.consejo = el => { if (PK.Consejo) PK.Consejo.tick(el); };
+  let t = 0, shopT = 0, rebalT = 0, metaT = 0, lejosT = 0;
   A.tick = function (dt) {
     const st = S(), g = G();
     if (!st || !st.auto) return;
     for (const u of g.units) if (u.owner === 'p' && u.kind === 'v') u.idleT = !u.task && !u.inside ? (u.idleT || 0) + dt : 0;
     t += dt;
     if (t < 1) return;
+    const el = t; // segundos desde la última pasada (sin conexión llegan de a 60)
     t = 0;
+    A.consejo(el);
+    if (!g.offline) { medir(g); if ((lejosT += el) >= 30) { lejosT = 0; revisarLejos(g, st); } }
     if (st.auto.idle) {
       idleHint(g);
       let k = 0;
@@ -113,6 +187,10 @@
         if (++k > 12) break; // reparte de a poco para no buscar rutas de golpe
       }
     }
+    // A1: cada 20 s mueve hasta 3 aldeanos del Capataz al trabajo más lejos de su objetivo, solo si la diferencia
+    // pasa del 8% de la población (para que no vayan y vengan). Corre también en el cálculo sin conexión.
+    if (st.auto.plan === 'meta' && (metaT += el) >= 60) { metaT = 0; Object.assign(st.auto.w, A.metaWeights()); }
+    if (st.auto.rebal && (rebalT += el) >= 20) { rebalT = 0; A.rebalance(3, 0.08 * A.villagers().length); }
     // «Ocupar los talleres» también con todos ocupados: cada 10 s pasa a un recolector que puso el Capataz (nunca uno
     // que mandaste tú) a un taller con puesto libre. Antes solo usaba ociosos y, sin ociosos, no hacía nada (playtest).
     if (st.auto.work && (shopT += 1) >= 10) {
@@ -278,18 +356,20 @@
   // ocupados subir «Piedra» no movía a nadie (137 en madera, 0 en piedra). Mueve hasta `max` aldeanos que puso
   // él (nunca una orden tuya, task.m) desde lo que está sobre su objetivo (o con la bodega llena) hacia lo que
   // está más abajo. Devuelve cuántos movió.
-  A.rebalance = function (max) {
+  // umbral: solo mueve si lo que falta (y lo que sobra) pasa de esa cantidad de aldeanos; el reequilibrio
+  // continuo (A1) usa el 8% de la población, para que no vayan y vengan.
+  A.rebalance = function (max, umbral) {
     const st = S(), g = G(), w = st.auto.w, sum = A.RES.reduce((s, r) => s + (w[r] || 0), 0);
     if (!sum) return 0;
-    const { c, n } = A.counts(), meta = r => ((w[r] || 0) / sum) * n;
+    const { c, n } = A.counts(), meta = r => ((w[r] || 0) / sum) * n, gap = Math.max(0.5, umbral || 0);
     const ok = {}; // ¿hay dónde trabajar en eso? (se pregunta una vez por recurso)
     let moved = 0;
     for (let k = 0; k < (max || 10); k++) {
       const sobra = r => (g.isFull(r) ? c[r] || 0 : (c[r] || 0) - meta(r));
-      const to = A.RES.filter(r => w[r] > 0 && !g.isFull(r) && (c[r] || 0) + 1 <= meta(r) + 0.5 && (ok[r] !== undefined ? ok[r] : (ok[r] = A.jobAvailable(r))))
+      const to = A.RES.filter(r => w[r] > 0 && !g.isFull(r) && meta(r) - (c[r] || 0) >= gap && (ok[r] !== undefined ? ok[r] : (ok[r] = A.jobAvailable(r))))
         .sort((a, b) => (meta(b) - (c[b] || 0)) - (meta(a) - (c[a] || 0)))[0];
       if (!to) break;
-      const froms = A.RES.filter(r => r !== to && sobra(r) >= 1).sort((a, b) => sobra(b) - sobra(a));
+      const froms = A.RES.filter(r => r !== to && sobra(r) >= Math.max(1, gap)).sort((a, b) => sobra(b) - sobra(a));
       let u = null;
       for (const from of froms) {
         u = A.villagers().filter(o => o.task && !o.task.m && !o.inside && A.jobOf(o) === from).sort((a, b) => (a.carry || 0) - (b.carry || 0))[0];
@@ -301,6 +381,54 @@
       c[to] = (c[to] || 0) + 1; moved++;
     }
     return moved;
+  };
+  // ---------- Planes de prioridades (A2) ----------
+  // Listos para elegir; «A mano» es lo de siempre (tocar + o − vuelve a «A mano»). «Meta de era» mira cuánto
+  // falta para la próxima era y para la cola de obras, pasado a recursos del mapa, y se recalcula cada minuto.
+  A.PLANES = {
+    mano: { name: 'A mano', help: 'tú eliges cada prioridad' },
+    equilibrado: { name: 'Equilibrado', help: 'un poco de todo', w: { food: 4, wood: 4, stone: 3, gold: 3, ore: 1, marble: 1, gems: 1 } },
+    obras: { name: 'Construcción', help: 'madera y piedra', w: { food: 2, wood: 5, stone: 5, gold: 1, ore: 0, marble: 0, gems: 0 } },
+    industria: { name: 'Industria', help: 'hierro, mármol y talleres', w: { food: 2, wood: 3, stone: 2, gold: 1, ore: 5, marble: 4, gems: 1 } },
+    guerra: { name: 'Guerra', help: 'comida y oro para tropas', w: { food: 5, wood: 2, stone: 1, gold: 5, ore: 2, marble: 0, gems: 0 } },
+    tesoro: { name: 'Tesoro', help: 'oro y gemas', w: { food: 2, wood: 2, stone: 1, gold: 5, ore: 0, marble: 1, gems: 5 } },
+    meta: { name: 'Meta de era', help: 'lo que falta para la próxima era y la cola de obras' },
+  };
+  // Cuánto de cada recurso del mapa hace falta para un costo (los productos se pasan a lo que piden sus recetas).
+  function crudo(cost, out, k) {
+    for (const r in cost) {
+      const n = cost[r] * (k || 1);
+      if (D.RECIPES[r]) { const rc = D.RECIPES[r]; for (const i in rc.in) crudo({ [i]: rc.in[i] }, out, n / rc.out[r]); }
+      else if (A.RES.includes(r)) out[r] = (out[r] || 0) + n;
+    }
+    return out;
+  }
+  A.crudo = crudo;
+  A.metaWeights = function () {
+    // lo que falta de cada cosa del costo, pasado a materia prima; lo que sobra en bodega (más allá de lo que el
+    // costo pide directo) cubre parte de lo que piden las recetas
+    const st = S(), g = G(), cost = {};
+    const suma = c => { for (const r in c) cost[r] = (cost[r] || 0) + c[r]; };
+    if (!st.eraProg) suma(D.eraCost(st.era + 1));
+    for (const id of st.upq) { const b = g.bById.get(id); if (b) suma(g.upCost(b)); }
+    const falta0 = {};
+    for (const r in cost) falta0[r] = Math.max(0, cost[r] - (st.res[r] || 0));
+    const crudoFalta = crudo(falta0, {}), falta = {};
+    for (const r of A.RES) falta[r] = Math.max(0, (crudoFalta[r] || 0) - Math.max(0, (st.res[r] || 0) - (cost[r] || 0)));
+    const top = Math.max(...A.RES.map(r => falta[r]));
+    if (!top) return Object.assign({}, A.PLANES.equilibrado.w);
+    const w = {};
+    for (const r of A.RES) w[r] = falta[r] ? Math.max(1, Math.round((5 * falta[r]) / top)) : 0;
+    if (!w.food) w.food = 1; // siempre algo de comida: entrenar y las tropas la piden
+    return w;
+  };
+  A.setPlan = function (id) {
+    const a = S().auto, p = A.PLANES[id];
+    if (!p) return;
+    a.plan = id;
+    if (p.w) Object.assign(a.w, p.w);
+    if (id === 'meta') Object.assign(a.w, A.metaWeights());
+    A.rebalance(10);
   };
   // −1: uno de ese trabajo queda ocioso a propósito (el Capataz no lo reparte hasta que le des otra cosa).
   A.removeJob = function (job) {

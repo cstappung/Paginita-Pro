@@ -186,7 +186,8 @@
     if (st.daily) n += st.daily.list.filter(it => !it.claimed && dailyProg(it)[0] >= it.n).length;
     return n + weeklyReady() + (dailyBonusReady() ? 1 : 0);
   };
-  Q.claimAll = function () {
+  // quiet: sin el cofre en pantalla (lo usa el Mayordomo del Consejo, también sin conexión).
+  Q.claimAll = function (quiet) {
     const st = S(), sum = {};
     let n = 0;
     const add = r => { if (!r) return; n++; for (const k in r) sum[k] = (sum[k] || 0) + r[k]; };
@@ -204,7 +205,7 @@
       const r = D.weeklyReward(st.era);
       G().give(r); G().stat('weeklies', 1); add(r);
     });
-    if (n) PK.UI.chestReveal({ title: n === 1 ? 'Recompensa reclamada' : n + ' recompensas reclamadas', sub: 'Todo lo que tenías listo en el libro', reward: sum, tier: n >= 5 ? 2 : 1 });
+    if (n && !quiet) PK.UI.chestReveal({ title: n === 1 ? 'Recompensa reclamada' : n + ' recompensas reclamadas', sub: 'Todo lo que tenías listo en el libro', reward: sum, tier: n >= 5 ? 2 : 1 });
     return n;
   };
   Q.claimDailyBonus = function () {

@@ -820,3 +820,15 @@ ul.info li { margin: 2px 0; }
 /* Fiesta del pueblo y avisos agrupados */
 .fiesta-row { margin: 2px 0; }
 .toast .toast-n { margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--gold2); color: #1c120a; font-size: 12px; text-shadow: none; }
+/* Salón del Consejo (js/consejo.js) */
+.consejero { border: 2px solid #6b4c30; background: rgba(255,255,255,0.18); padding: 6px 8px; margin: 6px 0; }
+.consejero.off { opacity: 0.55; }
+.consejero .cj-h { display: flex; align-items: center; gap: 8px; }
+.consejero .cj-h .chk { margin-left: auto; }
+.consejero .cj-log { margin: 4px 0 0; }
+.plan-row { margin-bottom: 4px; }
+/* Asesor «¿Qué me frena?» (js/asesor.js) */
+#topbar .asesor { position: relative; font: inherit; font-weight: 700; font-size: 16px; color: var(--gold); background: rgba(0, 0, 0, 0.3); border: 2px solid var(--edge); min-width: 30px; min-height: 30px; justify-content: center; cursor: pointer; }
+#topbar .asesor .badge { position: absolute; top: -4px; right: -6px; }
+.asesor-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-left: 4px solid #c89a3a; background: rgba(255,255,255,0.2); padding: 6px 8px; margin: 6px 0; }
+.asesor-row.grave { border-left-color: #c0392b; }

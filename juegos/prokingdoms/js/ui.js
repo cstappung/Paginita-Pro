@@ -41,8 +41,9 @@
   // ---------- Avisos ----------
   let toastBox, lastToast = {};
   // act (opcional): { label, fn } agrega un botón al aviso, que dura más para dar tiempo a tocarlo.
+  // UI.mute: los consejeros (js/consejo.js) actúan sin llenar la pantalla de avisos; lo suyo va al informe.
   UI.toast = function (text, kind, act) {
-    if (!toastBox) return;
+    if (!toastBox || UI.mute) return;
     const now = performance.now();
     if (lastToast[text] && now - lastToast[text] < 3000) return;
     lastToast[text] = now;
@@ -163,7 +164,7 @@
   }
 
   // ---------- HUD ----------
-  let resEls = {}, popEl, eraEl, coinEl, netEl, panel, bookDot, mm, tip, buildEl, evEl;
+  let resEls = {}, popEl, eraEl, coinEl, netEl, panel, bookDot, mm, tip, buildEl, evEl, asEl;
   UI.init = function () {
     const hud = document.getElementById('hud');
     toastBox = el('div', { id: 'toasts' });
@@ -180,7 +181,10 @@
     eraEl = el('div', { class: 'era', title: 'Meta de la próxima era', role: 'button', tabindex: '0', onclick: () => UI.openEraGoal() });
     coinEl = el('b', null, '0');
     netEl = el('button', { class: 'net', onclick: () => UI.openRealms() });
-    bar.append(eraEl, netEl, el('div', { class: 'res coins', title: 'Monedas de la página' }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
+    // «¿Qué me frena?» (A6, js/asesor.js): junto a la era, con cuántas cosas importantes hay
+    asEl = el('span', { class: 'badge' });
+    const asBtn = el('button', { class: 'res asesor', title: '¿Qué me frena?', 'aria-label': '¿Qué me frena?', onclick: () => PK.Asesor.open() }, '?', asEl);
+    bar.append(eraEl, asBtn, netEl, el('div', { class: 'res coins', title: 'Monedas de la página' }, el('img', { class: 'ico', src: Sp.icon('coin') }), coinEl));
     // en pantallas chicas la barra ocupa varias filas según la era: el minimapa y el menú se acomodan debajo
     // (incluye el margen del notch arriba: --top-h + 6 px es siempre el borde inferior de la barra)
     if (window.ResizeObserver) new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', Math.max(0, bar.offsetTop - 6) + bar.offsetHeight + 'px')).observe(bar);
@@ -212,7 +216,9 @@
     const mmWrap = el('div', { id: 'mmwrap' }, mm, el('div', { class: 'mm-legend' }, 'Z: zonas · H: centro · . : ocioso'));
     let mmDrag = false;
     const mmGo = e => { const r = mm.getBoundingClientRect(); const [tx, ty] = PK.Render.minimapToTile(mm, e.clientX - r.left, e.clientY - r.top); PK.Render.centerOn(tx, ty); };
-    mm.addEventListener('pointerdown', e => { mmDrag = true; mmGo(e); e.stopPropagation(); });
+    // con «Poner bandera» activa, tocar el minimapa la pone ahí (A4)
+    const mmFlag = e => { const r = mm.getBoundingClientRect(); const [tx, ty] = PK.Render.minimapToTile(mm, e.clientX - r.left, e.clientY - r.top); PK.Input.flagAt(tx, ty); };
+    mm.addEventListener('pointerdown', e => { e.stopPropagation(); if (PK.Input.flagTool) { mmFlag(e); return; } mmDrag = true; mmGo(e); });
     window.addEventListener('pointermove', e => { if (mmDrag) mmGo(e); });
     window.addEventListener('pointerup', () => { mmDrag = false; });
 
@@ -297,6 +303,9 @@
       bookDot.textContent = n || '';
       bookDot.style.display = n ? '' : 'none';
       updateQueueStrip();
+      const na = PK.Asesor.cuenta(0.25);
+      asEl.textContent = na || '';
+      asEl.style.display = na ? '' : 'none';
     }
     if (tPanel > 0.5) { tPanel = 0; UI.refreshPanel(false); }
     if (tModal > 1) { tModal = 0; if (modal && !modalBusy() && !recent(modalTouch)) UI.rerender(); }
@@ -463,6 +472,10 @@
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Construir aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null,
           UI.btn('Otro edificio', () => UI.openBuild(), { small: true }), UI.btn('Cancelar', cancel, { small: true })),
         UI.costEl(G().buildCost(g.placing.type)),
+        g.placing.type === 'house' ? el('div', { class: 'row small' },
+          el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.barrio, onchange: e => { S().flags.barrio = e.target.checked ? 1 : 0; if (!e.target.checked) g.placing.barrio = null; } }), ' Modo barrio'),
+          el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !S().flags.barrioSinCaminos, onchange: e => { S().flags.barrioSinCaminos = e.target.checked ? 0 : 1; } }), ' con caminos'),
+          el('span', { class: 'muted' }, UI.hint('(o Mayús): ', '') + 'casas en cuadrícula con calles de 1 casilla')) : '',
         el('p', { class: 'small muted' }, def.desc + ' Se construye solo en ' + U.fmtTime(def.time / g.buildMult('p')) + ': no ocupa aldeanos.'))));
       return;
     }
@@ -549,6 +562,7 @@
       el('div', null, el('h3', null, us.length === 1 ? 'Explorador' : us.length + ' exploradores'), liveEl,
         el('p', { class: 'small muted' }, 'Explora solo hasta ' + G().exploreRange() + ' casillas de tu Centro Urbano. ' + UI.hint('Clic derecho', 'Toca el mapa') + ' para enviarlo a un lugar; después sigue explorando.'),
         el('div', { class: 'row' }, UI.btn('Explorar', () => { us.forEach(x => { G().assign(x, { t: 'explore' }); x.doneMsg = false; x.skip = null; }); UI.refreshPanel(true); }, { small: true }),
+          UI.btn('⚑ Bandera', () => PK.Input.startFlag(), { small: true, title: 'Marca un lugar en la niebla: va hacia allá antes que a lo más cercano' }),
           UI.btn('Detener', () => { us.forEach(x => G().release(x)); UI.refreshPanel(true); }, { small: true })))));
     updateUnitsLive();
   }
@@ -638,6 +652,7 @@
     }
     const act = el('div', { class: 'p-actions' });
     act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
+    if (b.type === 'consejo' && PK.Consejo) act.append(el('div', { class: 'row' }, UI.btn('Abrir el Consejo', () => PK.Consejo.open(), { cls: 'gold' }), el('span', { class: 'small muted' }, PK.Consejo.resumen())));
     if (b.type === 'tc') {
       const st = S();
       act.append(el('div', { class: 'row' },
@@ -1231,8 +1246,10 @@
           el('p', { class: 'small' }, t.desc),
           eraLock ? el('p', { class: 'small muted' }, 'Requiere Era ' + U.roman(t.era)) : lvl >= G().techMax() ? el('p', { class: 'small muted' }, 'Mejora la Biblioteca para el nivel ' + (lvl + 1)) :
             el('div', null, UI.costEl(cost), el('div', { class: 'small muted' }, U.fmtTime(G().techTime(lvl) / G().researchMult())),
-              UI.btn('Investigar Nv ' + (lvl + 1), () => { G().startResearch(id); UI.rerender(); }, { small: true, disabled: !!st.research || !G().canAfford(cost) }))));
+              UI.btn('Investigar Nv ' + (lvl + 1), () => { G().startResearch(id); UI.rerender(); }, { small: true, disabled: !!st.research || !G().canAfford(cost) }),
+              PK.Consejo && PK.Consejo.tiene('mayordomo') ? UI.btn('+ cola', () => { PK.Consejo.encolar(id); UI.rerender(); }, { small: true, title: 'El Mayordomo la empieza cuando termine lo que hay y alcancen los recursos' }) : '')));
       }
+      if (PK.Consejo && PK.Consejo.tiene('mayordomo')) body.prepend(PK.Consejo.colaEl());
       body.append(grid);
     }, { wide: true });
   };
@@ -1302,6 +1319,14 @@
   // ---------- Aldeanos: trabajos y Capataz ----------
   // Los aldeanos ya no construyen (las obras se levantan solas): solo se elige qué hacen. Arriba, cuántos hay en
   // cada trabajo con − y +; abajo, el Capataz, que reparte a los que quedan ociosos según tus prioridades.
+  // A5: cuánto caminan los recolectores de ese recurso; si es más de la mitad, un botón deja el campamento ubicado.
+  function eficiencia(res) {
+    const A = PK.Auto, ef = A.eficiencia(res);
+    if (ef === null) return '';
+    const mal = ef > 0.5;
+    return el('span', { class: 'small ' + (mal ? 'warn-t' : 'muted') }, ' · caminan ' + Math.round(ef * 100) + '% del tiempo' + (mal ? ': pon un punto de acopio más cerca ' : ''),
+      mal && A.CAMPO[res] ? UI.btn('Ubicar ' + D.BUILD[A.CAMPO[res]].name, () => { const p = A.acopioCerca(res); if (!p) { UI.toast('No encuentro lugar libre junto a donde trabajan.', 'warn'); return; } UI.closeModal(); A.proponerCampo(p.tipo, p.x, p.y); }, { small: true }) : '');
+  }
   UI.openForeman = function () {
     UI.modal('foreman', 'Aldeanos', body => {
       const st = S(), a = st.auto, A = PK.Auto, jc = A.jobCounts(), all = A.villagers().length;
@@ -1320,7 +1345,8 @@
           el('span', { class: 'jr-n' }, String(n)),
           UI.btn('−', () => { A.removeJob(id); UI.rerender(); }, { small: true, disabled: !n, aria: 'Uno menos en ' + j.name }),
           UI.btn('+', () => { A.addJob(id); UI.rerender(); }, { small: true, cls: 'gold', disabled: !ok || !all, aria: 'Uno más en ' + j.name }),
-          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres abastecidos con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : A.whyText(id))));
+          el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres abastecidos con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : A.whyText(id)),
+          eficiencia(id)));
       }
       body.append(rows);
       const chk = (key, label, help) => el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a[key], onchange: e => { a[key] = e.target.checked; UI.rerender(); } }), el('b', null, ' ' + label), el('span', { class: 'small muted' }, ' — ' + help));
@@ -1329,19 +1355,22 @@
         chk('idle', 'Repartir aldeanos ociosos', 'los manda al recurso que más falta según tus prioridades'),
         chk('work', 'Ocupar los talleres', 'llena los puestos libres de talleres con insumos: con los ociosos y, si no hay, con un recolector que puso él (cada 10 s)'),
         chk('train', 'Entrenar sin parar', 'el Centro Urbano entrena aldeanos mientras haya casas y comida'),
+        chk('rebal', 'Reequilibrar', 'cada 20 s pasa hasta 3 de sus aldeanos al recurso más lejos de su objetivo (nunca a los que mandaste tú)'),
         el('div', { class: 'reserve-row' }, el('b', null, 'Reserva de los talleres: '),
           ...[0, 0.15, 0.3, 0.5].map(v => UI.btn(Math.round(v * 100) + '%', () => { a.reserve = v; UI.rerender(); }, { small: true, cls: a.reserve === v ? 'gold' : '' })),
           el('span', { class: 'small muted rr-help' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, los trabajadores que puso el Capataz salen a recolectar')));
-      body.append(el('h3', null, 'Prioridades del Capataz'));
+      body.append(el('h3', null, 'Prioridades del Capataz'),
+        el('div', { class: 'row plan-row' }, Object.keys(A.PLANES).map(id => UI.btn(A.PLANES[id].name, () => { A.setPlan(id); UI.rerender(); }, { small: true, cls: (a.plan || 'mano') === id ? 'gold' : '', title: A.PLANES[id].help }))),
+        el('p', { class: 'small muted' }, 'Plan: ' + A.PLANES[a.plan || 'mano'].name + ' — ' + A.PLANES[a.plan || 'mano'].help + (a.plan === 'meta' ? ' (se recalcula cada minuto)' : '') + '.'));
       const { c, n } = PK.Auto.counts();
       const sum = PK.Auto.RES.reduce((s2, r) => s2 + (a.w[r] || 0), 0) || 1;
       const prio = el('div', { class: 'guild-rows' });
       for (const r of PK.Auto.RES) {
         const v = a.w[r] || 0;
         prio.append(el('div', { class: 'g-row prio-row' }, UI.resIcon(r), el('b', { class: 'fw-name' }, D.RES[r].name),
-          UI.btn('−', () => { a.w[r] = Math.max(0, v - 1); PK.Auto.rebalance(10); UI.rerender(); }, { small: true }),
+          UI.btn('−', () => { a.w[r] = Math.max(0, v - 1); a.plan = 'mano'; PK.Auto.rebalance(10); UI.rerender(); }, { small: true }),
           el('span', { class: 'fw-dots' }, '●'.repeat(v) + '○'.repeat(5 - v)),
-          UI.btn('+', () => { a.w[r] = Math.min(5, v + 1); PK.Auto.rebalance(10); UI.rerender(); }, { small: true }),
+          UI.btn('+', () => { a.w[r] = Math.min(5, v + 1); a.plan = 'mano'; PK.Auto.rebalance(10); UI.rerender(); }, { small: true }),
           el('span', { class: 'small muted pr-help' }, 'objetivo ' + Math.round((v / sum) * 100) + '% · ahora ' + (c[r] || 0) + ' (' + (n ? Math.round(((c[r] || 0) / n) * 100) : 0) + '%)')));
       }
       body.append(prio);
@@ -1354,7 +1383,7 @@
     ['Casas y bodegas', ['house', 'granary', 'warehouse', 'builder', 'tc']],
     ['Recolección', ['lumber', 'mining', 'mill', 'farm', 'scout']],
     ['Talleres', ['sawmill', 'masonry', 'smelter', 'forge', 'scriptorium', 'steelworks', 'workshop', 'cartwright']],
-    ['Reino', ['market', 'library', 'university', 'monastery', 'guild', 'wonder']],
+    ['Reino', ['market', 'library', 'consejo', 'university', 'monastery', 'guild', 'wonder']],
     ['Ejército y defensa', ['barracks', 'tower']],
   ];
   UI.openBuild = function () {
@@ -1402,6 +1431,13 @@
       const counts = {};
       for (const p of W.pois) { const c = counts[p.kind] || (counts[p.kind] = [0, 0]); c[1]++; if (g.poiState(p) && g.poiState(p).f) c[0]++; }
       body.append(el('h3', null, 'Descubrimientos'), el('div', { class: 'poi-sum' }, Object.keys(D.POI).map(k => el('span', { class: 'tag' }, D.POI[k].name + ': ' + (counts[k] ? counts[k][0] + '/' + counts[k][1] : '0')))));
+      if (lodge) {
+        const fl = g.banderas();
+        body.append(el('h3', null, 'Banderas de exploración'),
+          el('p', { class: 'small muted' }, 'Marca hasta ' + g.BANDERAS_MAX + ' lugares en la niebla: ' + (g.dirigidos() > 1 ? 'tus 2 primeros exploradores van' : 'tu primer explorador va') + ' hacia ellos antes que a la niebla más cercana. ' + (g.dirigidos() > 1 ? '' : 'El Puesto en nivel 5 o Cartografía III suman un segundo explorador dirigido.')),
+          el('div', { class: 'row' }, UI.btn('Poner bandera', () => { UI.closeModal(); PK.Input.startFlag(); }, { small: true, cls: 'gold', disabled: fl.length >= g.BANDERAS_MAX }),
+            fl.map((f, i) => el('span', { class: 'tag' }, '⚑ ' + (i + 1) + ' ', UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(f[0], f[1]); }, { small: true }), UI.btn('✕', () => { fl.splice(i, 1); UI.rerender(); }, { small: true, aria: 'Quitar la bandera ' + (i + 1) })))));
+      }
       const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]);
       if (realms.length) body.append(el('p', { class: 'small' }, 'Reinos encontrados: ' + realms.map(b => b.realm).join(', ') + '.'));
       const box = el('div', { class: 'works scroll' });
@@ -1563,6 +1599,10 @@
       if (rep.capped) body.append(el('p', { class: 'small muted' }, 'Las obras y estudios contaron todo el tiempo; los aldeanos, hasta 12 horas.'));
       if (rep.eraUp) body.append(el('p', { class: 'good' }, '¡Tu pueblo avanzó de era mientras dormías!'));
       if (rep.helps) body.append(el('p', { class: 'small good-t' }, 'Tu pedido' + (rep.helpsWhat ? ' (' + rep.helpsWhat + ')' : '') + ' recibió ' + rep.helps + (rep.helps === 1 ? ' ayuda' : ' ayudas') + ' del gremio.'));
+      const traba = PK.Asesor.problemas()[0]; // lo primero que conviene arreglar al volver
+      if (traba) body.append(el('div', { class: 'asesor-row' + (traba.prioridad >= 70 ? ' grave' : '') }, el('span', null, el('b', null, 'Ojo: '), traba.texto),
+        el('span', { class: 'row' }, traba.acciones.slice(0, 2).map(a => UI.btn(a.label, () => { a.fn(); UI.refreshPanel(true); if (UI.modalKey() === 'offline') UI.rerender(); }, { small: true, cls: 'gold' })))));
+      if (rep.consejo && rep.consejo.length) body.append(el('h3', null, 'Lo que hizo tu Consejo'), el('div', { class: 'log' }, rep.consejo.map(c => el('div', null, el('b', null, c.name + ': '), c.items.slice(0, 4).join(' ') + (c.items.length > 4 ? ' Y ' + (c.items.length - 4) + ' cosas más.' : '')))));
       if (rep.news && rep.news.length) body.append(el('h3', null, 'Novedades'), el('div', { class: 'log' }, rep.news.slice(-8).map(n => el('div', { class: n.kind }, n.text))));
       const sk = S().streak, Q = PK.Quests;
       if (sk.shielded === U.dayKey()) body.append(el('p', { class: 'small' }, 'Faltaste un día, pero tu escudo de racha la salvó: tus ' + sk.n + ' días siguen en pie.'));

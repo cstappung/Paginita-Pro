@@ -83,6 +83,7 @@
     sawmill: { name: 'Aserradero', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 40, era: 2, recipe: 'planks', slots: 3, desc: 'Convierte madera en tablones.' },
     library: { name: 'Biblioteca', w: 3, h: 3, cost: { wood: 150, stone: 100 }, time: 50, era: 2, max: 1, desc: 'Permite investigar. Su nivel es el nivel máximo de las tecnologías.' },
     barracks: { name: 'Cuartel', w: 3, h: 3, cost: { wood: 175 }, time: 40, era: 2, max: 2, desc: 'Entrena tropas. Cada nivel desbloquea tropas y entrena más rápido. Termina tu tregua de novato.' },
+    consejo: { name: 'Salón del Consejo', w: 3, h: 3, cost: { wood: 300, stone: 200, gold: 120 }, time: 60, era: 2, max: 1, desc: 'Cada nivel suma un consejero que maneja solo una parte del reino (investigación, exploración, ejército, comercio, obras y fiestas). Se encienden y apagan uno por uno.' },
     guild: { name: 'Salón del Gremio', w: 3, h: 3, cost: { wood: 200, stone: 150, gold: 50 }, time: 60, era: 2, max: 1, desc: 'Únete a un gremio. Cada nivel da recolección extra mientras seas miembro.' },
     masonry: { name: 'Cantería', w: 2, h: 2, cost: { wood: 150, planks: 40 }, time: 40, era: 3, recipe: 'blocks', slots: 2, desc: 'Talla piedra en sillares.' },
     smelter: { name: 'Fundición', w: 3, h: 3, cost: { stone: 250, planks: 80 }, time: 60, era: 3, recipe: 'ingots', slots: 3, desc: 'Funde hierro bruto con madera en lingotes.' },
@@ -94,7 +95,7 @@
     workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -161,6 +162,7 @@
     university: L => ({ research: 0.2 * L }),
     barracks: L => ({ armyTrain: 0.15 * (L - 1) }),
     guild: L => ({ guildBonus: 0.02 * L }),
+    consejo: L => ({ consejeros: [1, 2, 3, 5, 7, 9].filter(n => n <= L).length }),
     monastery: L => ({ relics: L, relicGold: 1.5 * (1 + 0.2 * (L - 1)) }),
     wonder: L => ({ prestige: L, allBonus: 0.03 * L }),
   };
@@ -173,7 +175,7 @@
     buy: ['Precio de compra', v => Math.round(v * 100) + '%'], sell: ['Precio de venta', v => Math.round(v * 100) + '%'],
     prod: ['Producción', pct], slots: ['Puestos de trabajo', v => String(v)],
     techMax: ['Nivel máx. de tecnologías', v => String(v)], research: ['Velocidad de investigación', pct], armyTrain: ['Velocidad de entrenamiento', pct],
-    guildBonus: ['Recolección (en gremio)', pct], relics: ['Reliquias', v => String(v)], relicGold: ['Oro por reliquia/min', v => v.toFixed(1)],
+    consejeros: ['Consejeros', v => v + ' de 6'], guildBonus: ['Recolección (en gremio)', pct], relics: ['Reliquias', v => String(v)], relicGold: ['Oro por reliquia/min', v => v.toFixed(1)],
     prestige: ['Prestigio', v => String(v)], allBonus: ['Bono a todo', pct],
     carts: ['Carretas', v => String(v)], cartCap: ['Carga por carreta', v => String(v)], cartSpeed: ['Velocidad de carretas', pct],
   };
@@ -733,6 +735,8 @@
   q('b5', 'build', 'Pueblo sólido', 'Ten 5 edificios en nivel 3 o más.', LA(3, 5), { gold: 150, coins: 10 }, ['b2', 'b4']);
   q('b6', 'build', 'Cuadrilla', 'Ten 3 Casas del Maestro de Obras (4 maestros).', B('builder', 3), { coins: 15 }, ['b3']);
   q('b7', 'build', 'Obra maestra', 'Sube cualquier edificio a nivel 7.', LA(7, 1), { coins: 20, tools: 30 }, ['b5']);
+  q('b9', 'build', 'El primer consejero', 'Construye un Salón del Consejo (Era II): su Mayordomo investiga en cola y reclama tus misiones.', B('consejo'), { gold: 200, books: 10, coins: 10 }, ['b3']);
+  q('b10', 'build', 'Un consejo completo', 'Sube el Salón del Consejo a nivel 9: con el Gobernador, los seis consejeros trabajan para ti.', LV('consejo', 9), { coins: 40, gems: 30 }, ['b9']);
   q('b8', 'build', 'Cuadrilla completa', 'Ten las 4 Casas del Maestro de Obras (5 maestros).', B('builder', 4), { coins: 30 }, ['b6']);
   prev = 'b7';
   [10, 30, 75, 180, 400, 900, 2000, 4500].forEach((n, i) => {

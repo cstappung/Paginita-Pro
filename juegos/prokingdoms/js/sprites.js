@@ -597,6 +597,24 @@
         p.flag(0.5, 0.5, 54, col, 7);
       } else p.flag(0.5, 0.5, 35, col, 14);
     },
+    // Salón del Consejo: sala con entramado, estandartes del reino y una linterna con su bandera sobre el tejado.
+    consejo(p, col, m, tier) {
+      p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
+      const b = { x: 0.3, y: 0.3, w: 2.4, h: 2.4 };
+      p.box(b.x, b.y, b.w, b.h, 2, 9, 'stone');
+      p.box(b.x, b.y, b.w, b.h, 9, 19, 'plaster');
+      p.timber(b, 'L', 9, 19, 5); p.timber(b, 'R', 9, 19, 5);
+      p.door(b, 'L', 1.2, 0.55, 10, 2);
+      p.win(b, 'R', 0.6, 11, 0.3, 6); p.win(b, 'R', 1.8, 11, 0.3, 6);
+      p.quad(b, 'L', 0.3, 0.55, 4, 17, col); p.quad(b, 'L', 1.85, 2.1, 4, 17, col);
+      p.quad(b, 'L', 0.38, 0.47, 12, 15, [232, 192, 80]); p.quad(b, 'L', 1.93, 2.02, 12, 15, [232, 192, 80]);
+      p.roof(b.x, b.y, b.w, b.h, 19, 13, tier >= 4 ? 'glaze' : 'slate', 0.3, 0.25, 'x');
+      const l = { x: 1.15, y: 1.15, w: 0.7, h: 0.7 };
+      p.box(l.x, l.y, l.w, l.h, 27, 35, 'plaster');
+      p.win(l, 'L', 0.35, 29, 0.22, 5); p.win(l, 'R', 0.35, 29, 0.22, 5);
+      p.roof(l.x, l.y, l.w, l.h, 35, 10, tier >= 3 ? 'gilt' : 'tile', 0.01, 0.1, 'x');
+      p.flag(1.5, 1.5, 45, col, 10);
+    },
     guild(p) {
       p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
       const b = { x: 0.25, y: 0.25, w: 2.5, h: 2.5 };

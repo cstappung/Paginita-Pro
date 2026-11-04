@@ -454,6 +454,14 @@
     if (R.wallGhost) for (const [x, y] of R.wallGhost) diamondFill(ctx, x, y, PK.Def.tool === 'gate' ? 'rgba(232,184,74,0.6)' : 'rgba(210,210,220,0.55)');
     if (R.beltGhost) for (const [x, y] of R.beltGhost) diamondFill(ctx, x, y, 'rgba(140,200,255,0.45)');
 
+    // banderas de exploración (A4): un mástil con el color del reino, también sobre la niebla
+    for (const f of g.banderas()) {
+      const [px, py] = R.iso(f[0] + 0.5, f[1] + 0.5), x = Math.round(px), y = Math.round(py), ond = Math.round(Math.sin(performance.now() / 260 + f[0]));
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x - 3, y - 1, 7, 2);
+      ctx.fillStyle = '#2a1a0e'; ctx.fillRect(x, y - 20, 1, 20);
+      ctx.fillStyle = 'rgb(' + D.PLAYER_COLOR.join(',') + ')'; ctx.fillRect(x + 1, y - 20, 8, 5 + ond); ctx.fillRect(x + 1, y - 15 + ond, 5, 1);
+      ctx.fillStyle = '#f2ead6'; ctx.fillRect(x + 3, y - 18, 2, 2);
+    }
     // punto de reunión
     if (sel && sel.type === 'building') {
       const b = g.bById.get(sel.id);
@@ -835,6 +843,7 @@
     if (!mmBox) return { x: 0, y: 0, w, h };
     const m = 14;
     let x0 = mmBox[0] - m, x1 = mmBox[2] + m, y0 = mmBox[1] - m / 2, y1 = mmBox[3] + m / 2;
+    for (const f of G().banderas()) { const fx = f[0] - f[1] + W.H, fy = (f[0] + f[1]) / 2; x0 = Math.min(x0, fx - 6); x1 = Math.max(x1, fx + 6); y0 = Math.min(y0, fy - 6); y1 = Math.max(y1, fy + 3); } // que se vean las banderas
     let vw = Math.max(72, x1 - x0), vh = Math.max(vw / aspect, y1 - y0);
     vw = Math.max(vw, vh * aspect);
     if (vw >= w || vh >= h) return { x: 0, y: 0, w, h };
@@ -891,6 +900,11 @@
       ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
+    for (const f of G().banderas()) { // banderas de exploración
+      const [x, y] = toMM(f[0] + 0.5, f[1] + 0.5), s = Math.max(1, Math.round(zk));
+      ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(x), Math.round(y) - 5 * s, s, 5 * s);
+      ctx.fillStyle = 'rgb(' + D.PLAYER_COLOR.join(',') + ')'; ctx.fillRect(Math.round(x) + s, Math.round(y) - 5 * s, 3 * s, 2 * s);
+    }
     // vista de la cámara
     const s = R.scale(), vw = R.cv.width / s, vh = R.cv.height / s;
     const ax = ((R.cam.x - vw / 2) / 16 - v.x) * sx, ay = ((R.cam.y - vh / 2) / 16 - v.y) * sy;

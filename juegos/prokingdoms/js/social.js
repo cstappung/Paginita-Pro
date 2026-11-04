@@ -108,6 +108,7 @@
     if (era >= 6) pool.push('machinery');
     return pool;
   }
+  Soc.tradePool = tradePool;
   // Mejores precios con un Mercado de más nivel.
   const mkRate = k => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'market').reduce((m, b) => (k === 'buy' ? Math.min(m, G().bst(b).buy) : Math.max(m, G().bst(b).sell)), k === 'buy' ? 1.1 : 0.65);
   Soc.buyPrice = (r, n) => Math.ceil((S().market.p[r] * mkRate('buy') * n) / 100);
