@@ -109,3 +109,11 @@ Es lo mismo que B, porque las Functions de 2.ª generación corren sobre Cloud R
 3. **La Opción A solo conviene si no hay forma de usar tarjeta.** Es más trabajo, deja menos protección contra trampas y queda atada al tope de 100 conexiones de Spark.
 
 **Servir los archivos del juego**: el cliente pesa unos 200 KB con gzip. Hosting de Spark (360 MB/día) aguanta unas 1.800 cargas por día. Si tu página ya está en otro hosting o CDN, sírvelo desde ahí.
+
+## Mundo vivo (Fase 5, `pk-23` y `pk-24`): lo que agrega al sync
+
+Medido en el mismo proceso con `server/sim.js`: el primer sync (con todos los recursos compartidos) pesa unos
+23 KB, igual que antes. En los siguientes solo se suman `rk` en la subida (unos 40 bytes) y, cuando existen,
+`caravanas` (unos 150 bytes) y `titulo`. La diplomacia (unos 1,2 KB) viaja solo cuando cambia su versión
+(`dv`). El sync sigue cada 15 s: lo nuevo no agrega pedidos, salvo las acciones sueltas (regalos, pactos,
+caravanas, ataques al jefe, visitas), que tienen tope diario.

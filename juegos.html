@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202611051641"></script>
+<script src="i18n.js?v=202611052228"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -197,6 +197,13 @@ try { var t = localStorage.getItem("jg.tema");
      algo que se pone delante de la partida y se quita. Lo propio de
      aquí es el cuerpo en dos columnas y la rejilla de colores. */
   .jg-modal-capa{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:18px;background:#0f172899;backdrop-filter:blur(2px);animation:jgVela .2s ease-out}
+  /* Pase del Reino de Pro Kingdoms: la confirmación de la página (juegos/prokingdoms.js) */
+  .jg-pkp{background:var(--jg-card,#fff);color:var(--jg-ink,#1e2433);border-radius:14px;max-width:440px;width:100%;padding:20px 22px;box-shadow:0 20px 60px #0006;border:3px solid #e8b84a}
+  .jg-pkp h2{margin:0 0 8px;font-size:1.2rem}
+  .jg-pkp-precio{font-size:1.05rem}
+  .jg-pkp-ya{color:#b45309;font-weight:600}
+  .jg-pkp-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+  .jg-pkp-nota{font-size:.85rem;opacity:.75;margin:10px 0 0}
   .jg-modal{position:relative;width:460px;max-width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:24px 22px 20px;border-radius:14px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 18px 50px #0f172840;animation:jgEntra .35s ease-out;text-align:left}
   .jg-modal-t{font-size:19px;font-weight:700;color:#1f2933}
   .jg-modal-s{font-size:12px;color:#5a6772;line-height:1.55;margin:6px 0 0}
@@ -6455,6 +6462,7 @@ html[data-tema=oscuro] .jg-ped-baile.leg{background:linear-gradient(90deg,#3a301
 html[data-tema=oscuro] .jg-tira-m{background:linear-gradient(120deg,#2a1406,#5c2c0e 55%,#7a3d14);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-dropm-f{background-color:#3a2a1c}
 html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
+html[data-tema=oscuro] .jg-pkp{background:#1e2433;color:#e8ecf4}
 
 /* Casino (casino.js y casino-*.js): siempre de
    noche, felpa verde oscura y oro, igual en los dos temas; por eso no
@@ -7053,6 +7061,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202611051641"></script>
+<script src="juegos-app.js?v=202611052228"></script>
 </body>
 </html>

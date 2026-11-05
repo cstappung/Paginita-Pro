@@ -72,6 +72,9 @@
       case 'howl': tone(300, 0, 0.5, 'sine', 0.06, 620); tone(620, 0.5, 0.9, 'sine', 0.06, 380); break;
     }
   };
+  // para la música (musica.js): el mismo contexto y la misma salida, así M y el volumen la alcanzan
+  X.ac = () => (ctx ? ac() : null); // sin crearlo: lo crea el primer toque del jugador
+  X.salida = () => master;
   X.toggle = function () {
     X.on = !X.on;
     U.store.set('pk_sound', X.on ? '1' : '0');

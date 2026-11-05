@@ -12,6 +12,6 @@ const DESTINO = path.join(__dirname, 'juego');
 fs.rmSync(DESTINO, { recursive: true, force: true });
 fs.mkdirSync(path.join(DESTINO, 'js'), { recursive: true });
 fs.mkdirSync(path.join(DESTINO, 'server'), { recursive: true });
-for (const f of ['js/util.js', 'js/data.js', 'js/world.js', 'server/sim.js']) fs.copyFileSync(path.join(JUEGO, f), path.join(DESTINO, f));
+for (const f of ['js/util.js', 'js/data.js', 'js/pase.js', 'js/world.js', 'server/sim.js']) fs.copyFileSync(path.join(JUEGO, f), path.join(DESTINO, f));
 fs.copyFileSync(path.join(__dirname, 'store-rtdb.js'), path.join(DESTINO, 'server', 'store.js'));
 console.log('prepara: juego copiado a functions/juego/');

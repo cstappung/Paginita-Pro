@@ -353,6 +353,26 @@ console.log("— Tienda del perfil —");
   await loginAs(A);
 }
 
+console.log("— Pro Kingdoms: Pase del Reino —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const { periodoPase, PRECIO_PASE } = await import("./src/juegos/pase-pk.js");
+  const ua = await loginAs(A), n = periodoPase(Date.now());
+  const compra = (uid, k, p, s) => set(ref(db, `pkPase/${uid}/${k}`), { at: serverTimestamp(), p, s });
+  await denied("el pase no se paga menos", () => compra(ua.uid, n, 100, n));
+  await denied("ni se compra uno pasado", () => compra(ua.uid, n - 1, PRECIO_PASE, n - 1));
+  await denied("ni uno futuro", () => compra(ua.uid, n + 1, PRECIO_PASE, n + 1));
+  await denied("ni con otro período adentro", () => compra(ua.uid, n, PRECIO_PASE, n + 1));
+  await denied("ni se elige la hora", () => set(ref(db, `pkPase/${ua.uid}/${n}`), { at: 1700000000000, p: PRECIO_PASE, s: n }));
+  await allowed("A compra el pase de este período", () => compra(ua.uid, n, PRECIO_PASE, n));
+  await denied("una sola vez", () => compra(ua.uid, n, PRECIO_PASE, n));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `pkPase/${ua.uid}/${n}`)));
+  const ub = await loginAs(B);
+  await denied("B no compra a nombre de A", () => compra(ua.uid, n, PRECIO_PASE, n));
+  ok("B ve la compra de A (la economía la repite en todas las pestañas)", (await get(ref(db, `pkPase/${ua.uid}/${n}/p`))).val() === PRECIO_PASE);
+  await loginAs(A);
+}
+
 console.log("— PRODROP: sobres y graduaciones —");
 {
   const { serverTimestamp, push } = await import("firebase/database");

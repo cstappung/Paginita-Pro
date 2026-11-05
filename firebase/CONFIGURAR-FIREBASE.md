@@ -578,6 +578,17 @@ partidas del club, podios, rachas, repeticiones ni el chat general (la misma
 condición que `vetados`, con la hora de fin). Hasta publicar, el panel avisa
 de que faltan las reglas y los jugadores no notan nada.
 
+### ⚠ El Pase del Reino de Pro Kingdoms pide publicar otra vez (2026-11-04)
+
+- `pkPase/<uid>/<período>` — `{at, p, s}`, la compra del Pase del Reino
+  (2.500 monedas). Lo lee cualquiera con sesión (el saldo de monedas lo suma),
+  lo escribe su dueño **una vez**, con la hora del servidor, el precio exacto y
+  el período de esa hora (`s` igual a la clave); no se reescribe ni se borra.
+- Con esta entrega hay que desplegar también la función (`firebase deploy
+  --only functions`, §5): es la que lee `pkPase` para abrir la pista dorada.
+
+Sin publicar, la compra falla con `PERMISSION_DENIED` y nadie paga nada.
+
 ### ⚠ Los super chats del chat general piden publicar otra vez
 
 - `superChat/<uid>/<id del mensaje>` — `{at, p}`, el cobro de un super chat

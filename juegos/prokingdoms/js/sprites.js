@@ -29,6 +29,11 @@
     canvas() { const cv = mk(this.w, this.h); cv.getContext('2d').putImageData(new ImageData(this.d, this.w, this.h), 0, 0); return cv; }
   }
 
+  // Fase 9 (pk-28): sprites-mar.js dibuja el archipiélago con las mismas herramientas
+  S.PB = PB; S.ramp = ramp; S.LIGHT = LIGHT; S.mix = mix;
+  S.withMask = spr => withMask(spr);
+  S.sombra = (pb, cx, cy, rx, ry, a) => ellipseShadow(pb, cx, cy, rx, ry, a);
+  S.BDRAW_MAR = {}; S.BTOP_MAR = {};
   function withMask(spr) {
     const c = spr.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     const m = new Uint8Array(c.width * c.height);
@@ -53,6 +58,9 @@
     thatch: [178, 142, 76], tile: [166, 76, 50], slate: [92, 100, 116], paving: [158, 150, 134], soil: [112, 80, 50],
     logend: [196, 158, 104], canvasR: [176, 48, 40], canvasB: [48, 84, 160], rock: [120, 116, 110], rust: [138, 72, 46],
     marbleS: [222, 218, 206], gilt: [214, 170, 64], glaze: [62, 92, 168], verdigris: [78, 152, 132],
+    // techos de los temas del Pase del Reino (pk-33)
+    jade: [72, 150, 112], obsidiana: [52, 46, 64], coral: [212, 112, 96], rosa: [206, 128, 164], cobre: [186, 108, 58],
+    hielo: [176, 212, 236], purpura: [112, 62, 142], arena: [212, 182, 126], canvasV: [52, 132, 84], canvasA: [214, 168, 48],
   };
   const TEX = {};
   S.tex = function (mat, light) {
@@ -86,7 +94,7 @@
           if (h > 0.92) f += 0.12;
           break;
         }
-        case 'tile': case 'slate': case 'glaze': case 'verdigris': {
+        case 'tile': case 'slate': case 'glaze': case 'verdigris': case 'jade': case 'obsidiana': case 'coral': case 'rosa': case 'cobre': case 'hielo': case 'purpura': {
           const rh = mat === 'slate' ? 3 : 4, row = Math.floor(y / rh), off = (row & 1) * 2;
           f = 0.94 + U.hash(Math.floor((x + off) / 4), row, 6) * 0.12;
           if (y % rh === rh - 1) f -= 0.28; else if ((x + off) % 4 === 0) f -= 0.1;
@@ -100,7 +108,8 @@
           if (r > 3.3) { col = MAT.bark; f = 0.8; }
           break;
         }
-        case 'canvasR': case 'canvasB': if (Math.floor(x / 3) % 2) col = [228, 218, 196]; f = 0.95 + h * 0.06; break;
+        case 'canvasR': case 'canvasB': case 'canvasV': case 'canvasA': if (Math.floor(x / 3) % 2) col = [228, 218, 196]; f = 0.95 + h * 0.06; break;
+        case 'arena': f = 0.9 + U.noise(x * 0.5, y * 0.25, 3) * 0.12 + h * 0.06; if (y % 4 === 3) f -= 0.12; break; // adobe
         default: f = 0.95 + h * 0.1;
       }
       pb.set(x, y, sc(col, f * light));
@@ -157,6 +166,7 @@
       line(P(x + w, y + h, z0), P(x + w, y + h, z1), 'rgba(0,0,0,0.18)');
     }
     function roof(x, y, w, h, zb, ht, mat, frac, ov, axis) {
+      if (techoAsp) mat = techoAsp; // el techo de un aspecto del Pase del Reino
       if (tier >= 5 && (mat === 'plank' || mat === 'darkwood')) mat = tier >= 6 ? 'verdigris' : 'glaze'; // techos de madera, rehechos
       const x0 = x - ov, y0 = y - ov, x1 = x + w + ov, y1 = y + h + ov;
       let r0, r1;
@@ -550,6 +560,45 @@
       p.line(p.P(0.7, 1.0, 64), p.P(0.2, 1.6, 58), Rd); p.line(p.P(0.7, 1.05, 63), p.P(0.25, 1.65, 57), R);
       p.flag(0.25, 1.75, 66, col, 12);
     },
+    // H4 (pk-17)
+    herbolario(p, col) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.9, 0.3);
+      const b = { x: 0.2, y: 0.2, w: 1.2, h: 1.1 };
+      p.box(b.x, b.y, b.w, b.h, 0, 14, 'plaster');
+      p.timber(b, 'L', 0, 14, 3); p.timber(b, 'R', 0, 14, 3);
+      p.door(b, 'L', 0.6, 0.35, 8, 0); p.win(b, 'R', 0.55, 7, 0.3, 4);
+      p.roof(b.x, b.y, b.w, b.h, 14, 10, 'thatch', 0.1, 0.15, 'x');
+      // huerto de hierbas y un caldero
+      for (let i = 0; i < 3; i++) { p.box(0.2 + i * 0.4, 1.55, 0.3, 0.3, 0, 2, 'soil', 'soil', '#3a7a3a'); const h = p.P(0.35 + i * 0.4, 1.7, 3); p.px(h[0], h[1] - 1, ['#9ae070', '#e070c0', '#70c0e0'][i]); }
+      p.box(1.55, 0.6, 0.35, 0.35, 0, 5, '#2a2a30', '#1a1a20', '#4ac070');
+      const c = p.P(1.72, 0.78, 6); p.px(c[0], c[1] - 2, '#9aff9a'); p.px(c[0] - 1, c[1] - 4, '#c8ffc8');
+      p.flag(1.4, 0.2, 14, col, 8);
+    },
+    titanforge(p, col, m) {
+      p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
+      const b = { x: 0.3, y: 0.3, w: 1.8, h: 1.8 };
+      p.box(b.x, b.y, b.w, b.h, 2, 22, 'rock', 'rock', 'rock');
+      p.quad(b, 'L', 0.5, 1.3, 2, 14, '#1a1010'); p.quad(b, 'L', 0.65, 1.15, 2, 8, '#ff8a2a');
+      p.roof(b.x, b.y, b.w, b.h, 22, 8, 'slate', 0.3, 0.2, 'y');
+      p.box(1.6, 0.4, 0.4, 0.4, 22, 42, 'rock', 'rock', '#2a2020'); m.smoke.push(p.P(1.8, 0.6, 42));
+      // el yunque de hueso de titán
+      p.box(2.25, 1.6, 0.6, 0.35, 0, 5, '#d8d0b8', '#a8a088', '#f2ead4');
+      p.box(2.15, 1.55, 0.8, 0.45, 5, 9, '#e8e0cc', '#b8b098', '#fffaea');
+      const k = p.P(2.55, 1.75, 10); p.px(k[0], k[1], '#ffd060'); p.px(k[0] + 2, k[1] - 1, '#ffd060');
+      p.flag(2.85, 2.7, 0, col, 20);
+    },
+    faro(p, col) {
+      p.box(0, 0, 2, 2, 0, 4, 'stone', 'stone', 'paving');
+      const t = { x: 0.5, y: 0.5, w: 1.0, h: 1.0 };
+      p.box(t.x, t.y, t.w, t.h, 4, 62, 'marbleS');
+      for (const z of [18, 34, 50]) p.box(t.x - 0.02, t.y - 0.02, t.w + 0.04, t.h + 0.04, z, z + 3, '#2a6a8a', '#1a4a6a', '#3a8aaa');
+      p.door(t, 'L', 0.5, 0.35, 8, 4);
+      p.box(0.4, 0.4, 1.2, 1.2, 62, 64, 'marbleS', 'marbleS', 'paving');
+      p.box(0.6, 0.6, 0.8, 0.8, 64, 72, '#c8fffa', '#7ae8e0', '#e8fffd');
+      p.roof(0.55, 0.55, 0.9, 0.9, 72, 8, 'verdigris', 0.02, 0.02, 'x');
+      const l = p.P(1.0, 1.0, 68); for (const [dx, dy] of [[0, 0], [-3, 1], [3, -1], [0, -2]]) p.px(l[0] + dx, l[1] + dy, '#ffffff');
+      p.flag(0.2, 1.8, 4, col, 10);
+    },
     library(p, col, m, tier) {
       p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
       const b = { x: 0.3, y: 0.3, w: 2.4, h: 2.4 };
@@ -596,6 +645,24 @@
         p.roof(0.15, 0.15, 0.7, 0.7, 39, 15, tier >= 6 ? 'verdigris' : tier >= 5 ? 'glaze' : tier >= 4 ? 'gilt' : 'slate', 0.01, 0.06, 'x');
         p.flag(0.5, 0.5, 54, col, 7);
       } else p.flag(0.5, 0.5, 35, col, 14);
+    },
+    // Salón del Consejo: sala con entramado, estandartes del reino y una linterna con su bandera sobre el tejado.
+    consejo(p, col, m, tier) {
+      p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
+      const b = { x: 0.3, y: 0.3, w: 2.4, h: 2.4 };
+      p.box(b.x, b.y, b.w, b.h, 2, 9, 'stone');
+      p.box(b.x, b.y, b.w, b.h, 9, 19, 'plaster');
+      p.timber(b, 'L', 9, 19, 5); p.timber(b, 'R', 9, 19, 5);
+      p.door(b, 'L', 1.2, 0.55, 10, 2);
+      p.win(b, 'R', 0.6, 11, 0.3, 6); p.win(b, 'R', 1.8, 11, 0.3, 6);
+      p.quad(b, 'L', 0.3, 0.55, 4, 17, col); p.quad(b, 'L', 1.85, 2.1, 4, 17, col);
+      p.quad(b, 'L', 0.38, 0.47, 12, 15, [232, 192, 80]); p.quad(b, 'L', 1.93, 2.02, 12, 15, [232, 192, 80]);
+      p.roof(b.x, b.y, b.w, b.h, 19, 13, tier >= 4 ? 'glaze' : 'slate', 0.3, 0.25, 'x');
+      const l = { x: 1.15, y: 1.15, w: 0.7, h: 0.7 };
+      p.box(l.x, l.y, l.w, l.h, 27, 35, 'plaster');
+      p.win(l, 'L', 0.35, 29, 0.22, 5); p.win(l, 'R', 0.35, 29, 0.22, 5);
+      p.roof(l.x, l.y, l.w, l.h, 35, 10, tier >= 3 ? 'gilt' : 'tile', 0.01, 0.1, 'x');
+      p.flag(1.5, 1.5, 45, col, 10);
     },
     guild(p) {
       p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
@@ -828,6 +895,196 @@
       if (ph >= 6) { const t = p.P(2.0, 2.0, fz + 18); for (const [dx, dy] of [[0, -4], [-3, -2], [3, -2], [-4, 1], [4, 1], [0, -7]]) p.px(t[0] + dx, t[1] + dy, GLINT); }
       p.flag(2.0, 2.0, fz, col, 14);
     },
+    // ---------- Fase 3 (pk-19): muelle, decoraciones y las cuatro Maravillas ----------
+    // Muelle de pesca: tablado sobre pilotes, una caseta con techo de paja, redes y un secadero de pescado. El bote
+    // se dibuja aparte (render.js), sobre el agua más cercana, y se mece.
+    muelle(p, col) {
+      p.box(0, 0, 2, 2, 0, 3, 'plank', 'darkwood', 'plank');
+      for (const [x, y] of [[0, 1.85], [0.9, 1.85], [1.85, 1.85], [1.85, 0.9], [1.85, 0]]) p.box(x, y, 0.15, 0.15, 0, 5, 'darkwood');
+      const b = { x: 0.1, y: 0.1, w: 1.0, h: 0.9 };
+      p.box(b.x, b.y, b.w, b.h, 3, 13, 'plank');
+      p.door(b, 'L', 0.5, 0.32, 7, 3);
+      p.roof(b.x, b.y, b.w, b.h, 13, 8, 'thatch', 0.4, 0.1, 'x');
+      // secadero con pescados
+      p.box(1.3, 0.3, 0.08, 0.08, 3, 13, 'darkwood'); p.box(1.3, 1.2, 0.08, 0.08, 3, 13, 'darkwood');
+      const a = p.P(1.34, 0.34, 12), c = p.P(1.34, 1.24, 12);
+      p.line(a, c, '#5a3c22');
+      for (let i = 1; i < 5; i++) { const t = i / 5, x = a[0] + (c[0] - a[0]) * t, y = a[1] + (c[1] - a[1]) * t; p.px(x, y + 1, '#b8c4cc'); p.px(x, y + 2, '#98a4b0'); p.px(x, y + 3, '#d0dae0'); }
+      // red recogida y barril
+      const r = p.P(0.5, 1.6, 3);
+      for (let i = -3; i <= 3; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2 === 0) p.px(r[0] + i, r[1] - j, '#d8c8a0');
+      p.box(1.45, 1.45, 0.3, 0.3, 3, 9, [120, 82, 48], [90, 60, 34], [150, 110, 70]);
+      p.flag(0.15, 0.15, 21, col, 9);
+    },
+    farol(p) {
+      p.box(0.44, 0.44, 0.12, 0.12, 0, 15, 'darkwood');
+      p.box(0.36, 0.36, 0.28, 0.28, 15, 20, [40, 32, 26], [30, 24, 20], [60, 48, 36]);
+      const l = p.P(0.5, 0.64, 17); p.px(l[0], l[1], '#ffe28a'); p.px(l[0] + 1, l[1], '#ffd060'); p.px(l[0], l[1] + 1, '#ffc040');
+      const t = p.P(0.5, 0.5, 22); p.px(t[0], t[1], '#2a2018'); p.px(t[0], t[1] - 1, '#2a2018');
+    },
+    banca(p) {
+      for (const [x, y] of [[0.2, 0.35], [0.75, 0.35], [0.2, 0.6], [0.75, 0.6]]) p.box(x, y, 0.06, 0.06, 0, 3, 'darkwood');
+      p.box(0.18, 0.33, 0.66, 0.34, 3, 4, 'plank', 'darkwood', 'plank');
+      p.box(0.18, 0.33, 0.66, 0.06, 4, 8, 'plank', 'darkwood', 'plank');
+    },
+    pozo(p) {
+      p.box(0.18, 0.18, 0.64, 0.64, 0, 6, 'stone', 'stone', [52, 96, 140]);
+      p.box(0.18, 0.46, 0.06, 0.06, 6, 15, 'darkwood'); p.box(0.76, 0.46, 0.06, 0.06, 6, 15, 'darkwood');
+      p.roof(0.12, 0.3, 0.76, 0.4, 15, 5, 'tile', 0.01, 0.06, 'x');
+      const b = p.P(0.5, 0.5, 9); p.px(b[0], b[1], '#8a5a30'); p.px(b[0], b[1] + 1, '#6a4020');
+    },
+    frutal(p) {
+      p.box(0.44, 0.44, 0.12, 0.12, 0, 8, 'bark');
+      const c = p.P(0.5, 0.5, 14), L = ['#3e7a30', '#5a9a40', '#78b450'];
+      for (let y = -6; y <= 5; y++) for (let x = -7; x <= 7; x++) if (x * x / 49 + y * y / 36 <= 1) p.px(c[0] + x, c[1] + y, L[(U.hash(x, y, 3) * 3) | 0]);
+      for (const [x, y] of [[-4, -1], [2, -3], [4, 2], [-1, 3], [-3, -4], [1, 0]]) { p.px(c[0] + x, c[1] + y, '#d8402c'); p.px(c[0] + x + 1, c[1] + y, '#f06a4a'); }
+    },
+    estandarte(p, col) {
+      p.box(0.35, 0.35, 0.3, 0.3, 0, 3, 'stone', 'stone', 'paving');
+      p.flag(0.5, 0.5, 3, col, 26);
+    },
+    hoguera(p) {
+      for (const [x, y, w, h] of [[0.2, 0.42, 0.6, 0.16], [0.42, 0.2, 0.16, 0.6]]) p.box(x, y, w, h, 0, 3, 'bark', 'logend', 'bark');
+      const c = p.P(0.5, 0.5, 3);
+      for (const [x, y, k] of [[0, 0, '#c84a1c'], [-1, 0, '#e8701e'], [1, 0, '#e8701e'], [-2, 1, '#c84a1c'], [2, 1, '#c84a1c'], [0, -1, '#f0a030'], [-1, -2, '#f0a030'], [1, -2, '#ffd060'], [0, -3, '#ffd060'], [0, -4, '#fff0a0'], [-1, -5, '#ffd060']]) p.px(c[0] + x, c[1] + y, k);
+    },
+    fuente(p) {
+      p.box(0.15, 0.15, 1.7, 1.7, 0, 5, 'stone', 'stone', [70, 130, 180]);
+      p.box(0.85, 0.85, 0.3, 0.3, 5, 14, 'marbleS');
+      p.box(0.7, 0.7, 0.6, 0.6, 14, 16, 'marbleS', 'marbleS', [90, 150, 200]);
+      const t = p.P(1.0, 1.0, 18);
+      for (const [x, y, c] of [[0, 0, '#bfe0ff'], [0, -1, '#e8f6ff'], [-1, -2, '#bfe0ff'], [1, -2, '#bfe0ff'], [-2, 0, '#7ab8ec'], [2, 0, '#7ab8ec'], [-3, 2, '#7ab8ec'], [3, 2, '#7ab8ec']]) p.px(t[0] + x, t[1] + y, c);
+      for (let i = 0; i < 8; i++) { const w = p.P(0.3 + U.hash(i, 1, 4) * 1.4, 0.3 + U.hash(i, 2, 4) * 1.4, 5); p.px(w[0], w[1], '#d4ecff'); }
+    },
+    jardin(p) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], [84, 138, 54], 1, 0);
+      p.fill([p.P(0.85, 0, 0), p.P(1.15, 0, 0), p.P(1.15, 2, 0), p.P(0.85, 2, 0)], [186, 164, 120], 1, 0);
+      const F = ['#e86a8a', '#f0d050', '#e8e8f0', '#b070d8', '#f09040'];
+      for (let i = 0; i < 70; i++) { const u = U.hash(i, 7, 1) * 2, v = U.hash(i, 8, 1) * 2; if (Math.abs(u - 1) < 0.18) continue; const q = p.P(u, v, 0); p.px(q[0], q[1], F[i % F.length]); p.px(q[0], q[1] + 1, '#3e7a30'); }
+    },
+    plaza(p) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], [172, 162, 144], 1, 0);
+      for (let i = 1; i < 6; i++) { p.line(p.P(i / 3, 0, 0), p.P(i / 3, 2, 0), 'rgba(90,80,70,0.45)'); p.line(p.P(0, i / 3, 0), p.P(2, i / 3, 0), 'rgba(90,80,70,0.45)'); }
+      const c = p.P(1, 1, 0);
+      for (let a = 0; a < 16; a++) { const t = (a / 16) * Math.PI * 2; p.px(c[0] + Math.cos(t) * 8, c[1] + Math.sin(t) * 4, '#8a7a64'); }
+    },
+    estanque(p) {
+      p.box(0.15, 0.15, 1.7, 1.7, 0, 3, 'stone', 'stone', [52, 110, 150]);
+      for (const [u, v] of [[0.5, 0.7], [1.3, 1.2], [0.9, 1.5]]) { const f = p.P(u, v, 3); p.px(f[0], f[1], '#f08a30'); p.px(f[0] + 1, f[1], '#f0a050'); }
+      for (const [u, v] of [[1.4, 0.5], [0.4, 1.4]]) { const l = p.P(u, v, 3); for (const [x, y] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) p.px(l[0] + x, l[1] + y, '#4a9a40'); p.px(l[0], l[1], '#f0a0c0'); }
+      p.box(1.55, 0.2, 0.25, 0.25, 3, 6, 'rock', 'rock', 'rock');
+    },
+    estatua(p) {
+      p.box(0.2, 0.2, 0.6, 0.6, 0, 6, 'stone', 'stone', 'paving');
+      p.box(0.38, 0.38, 0.24, 0.24, 6, 20, 'marbleS');
+      p.box(0.34, 0.34, 0.32, 0.32, 18, 22, 'marbleS', 'marbleS', 'marbleS');
+      const h = p.P(0.5, 0.5, 25); for (const [x, y] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) p.px(h[0] + x, h[1] + y, '#ece6d6');
+      const sw = p.P(0.62, 0.5, 26); p.line(sw, [sw[0] + 3, sw[1] - 8], '#c8ccd6');
+    },
+    glorieta(p, col) {
+      p.box(0.1, 0.1, 1.8, 1.8, 0, 3, 'plank', 'darkwood', 'plank');
+      for (const [x, y] of [[0.15, 0.15], [1.7, 0.15], [0.15, 1.7], [1.7, 1.7]]) p.box(x, y, 0.14, 0.14, 3, 16, 'plaster');
+      p.box(0.1, 0.1, 1.8, 1.8, 16, 18, 'plaster', 'plaster', 'plaster');
+      p.roof(0.1, 0.1, 1.8, 1.8, 18, 12, 'tile', 0.01, 0.12, 'x');
+      p.flag(1.0, 1.0, 30, col, 7);
+    },
+    escenario(p, col) {
+      p.box(0, 0, 2, 2, 0, 6, 'plank', 'darkwood', 'plank');
+      p.box(0.05, 0.05, 1.9, 0.25, 6, 26, 'plank');
+      const b = { x: 0.05, y: 0.05, w: 1.9, h: 0.25 };
+      p.quad(b, 'L', 0.1, 0.6, 6, 24, rgb(col)); p.quad(b, 'L', 1.3, 1.8, 6, 24, rgb(col));
+      p.quad(b, 'L', 0.6, 1.3, 20, 24, rgb(sc(col, 0.8)));
+      p.roof(0, 0, 2, 0.4, 26, 8, 'canvasR', 0.01, 0.1, 'x');
+      for (const [x, y] of [[0.1, 1.8], [1.8, 1.8]]) p.box(x, y, 0.1, 0.1, 6, 18, 'darkwood');
+      const lu = p.P(1, 1, 6); p.px(lu[0], lu[1], '#ffe28a'); p.px(lu[0] - 6, lu[1] + 3, '#ffe28a'); p.px(lu[0] + 6, lu[1] + 3, '#ffe28a');
+    },
+    columna(p) {
+      p.box(0.15, 0.15, 0.7, 0.7, 0, 5, 'stone', 'stone', 'paving');
+      p.box(0.32, 0.32, 0.36, 0.36, 5, 34, 'marbleS');
+      for (let z = 9; z < 34; z += 6) { const a = p.P(0.32, 0.68, z), b2 = p.P(0.68, 0.68, z); p.line(a, b2, 'rgba(120,110,90,0.4)'); }
+      p.box(0.26, 0.26, 0.48, 0.48, 34, 37, 'gilt', 'gilt', 'gilt');
+      const t = p.P(0.5, 0.5, 40); for (const [x, y, c] of [[0, 0, GOLD], [0, -1, GOLD], [-1, -1, GOLD2], [1, -1, GOLD2], [0, -2, GLINT], [0, -3, GOLD]]) p.px(t[0] + x, t[1] + y, c);
+    },
+    arco(p, col) {
+      p.box(0.05, 0.6, 0.5, 0.8, 0, 26, 'marbleS'); p.box(1.45, 0.6, 0.5, 0.8, 0, 26, 'marbleS');
+      p.box(0.0, 0.55, 2.0, 0.9, 26, 34, 'marbleS', 'marbleS', 'marbleS');
+      p.box(0.0, 0.55, 2.0, 0.9, 34, 36, 'gilt', 'gilt', 'gilt');
+      const b = { x: 0.0, y: 0.55, w: 2.0, h: 0.9 };
+      p.quad(b, 'L', 0.7, 1.3, 28, 32, rgb(col));
+      p.flag(1.0, 1.0, 36, col, 10);
+    },
+    // Las cuatro Maravillas (V6): 5×5, una etapa visible cada 5 niveles (fase 0 a 6, como la vieja).
+    m_faro(p, col, m, tier, lvl) {
+      const ph = Math.min(6, Math.floor((lvl || 1) / 5));
+      p.box(-0.1, -0.1, 5.2, 5.2, 0, 4, 'stone', 'stone', 'paving');
+      p.box(0.5, 0.5, 4, 4, 4, 8, 'stone', 'stone', 'paving');
+      for (const [x, y] of [[0.3, 4.1], [4.1, 0.3]]) { p.box(x, y, 0.5, 0.5, 4, 12, 'stone'); const f = p.P(x + 0.25, y + 0.25, 13); p.px(f[0], f[1], '#ffd060'); }
+      p.box(1.2, 1.2, 2.6, 2.6, 8, 34, 'stone');
+      const b = { x: 1.2, y: 1.2, w: 2.6, h: 2.6 };
+      p.door(b, 'L', 1.3, 0.5, 10, 8);
+      for (const z of [18, 26]) { p.win(b, 'L', 0.6, z, 0.25, 5); p.win(b, 'R', 1.3, z, 0.25, 5); }
+      let top = 34;
+      if (ph >= 1) { p.box(1.6, 1.6, 1.8, 1.8, 34, 58, 'plaster'); p.win({ x: 1.6, y: 1.6, w: 1.8, h: 1.8 }, 'L', 0.9, 44, 0.25, 6); top = 58; }
+      if (ph >= 4) for (const z of [34, top]) p.box(1.45, 1.45, 2.1, 2.1, z, z + 2, 'gilt', 'gilt', 'paving'); // galerías
+      if (ph >= 2) { p.box(1.9, 1.9, 1.2, 1.2, top, top + 16, 'marbleS'); top += 16; }
+      // la linterna
+      p.box(2.0, 2.0, 1.0, 1.0, top, top + 10, [40, 34, 30], [30, 26, 22], [60, 52, 44]);
+      const L = p.P(2.5, 3.0, top + 5);
+      for (let i = -3; i <= 3; i++) for (let j = -3; j <= 2; j++) p.px(L[0] + i, L[1] + j, Math.abs(i) + Math.abs(j) < 3 ? '#fff4c0' : '#ffd060');
+      if (ph >= 3) { const g = p.P(2.0, 2.5, top + 5); for (let j = -3; j <= 2; j++) { p.px(g[0], g[1] + j, GOLD); p.px(g[0] - 1, g[1] + j, GOLD2); } } // espejo
+      p.roof(1.95, 1.95, 1.1, 1.1, top + 10, 12, ph >= 5 ? 'gilt' : 'slate', 0.01, 0.08, 'x');
+      if (ph >= 5) { const f = p.P(2.5, 2.5, top + 24); for (const [x, y, c] of [[0, 0, '#e8701e'], [0, -1, '#f0a030'], [-1, -1, '#e8701e'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [0, -3, '#fff0a0']]) p.px(f[0] + x, f[1] + y, c); }
+      if (ph >= 6) { const t = p.P(2.5, 2.5, top + 30); for (const [dx, dy] of [[0, -4], [-4, -1], [4, -1], [-3, 3], [3, 3], [0, -7]]) p.px(t[0] + dx, t[1] + dy, GLINT); }
+      p.flag(1.3, 1.3, 34, col, 12);
+    },
+    m_coloso(p, col, m, tier, lvl) {
+      const ph = Math.min(6, Math.floor((lvl || 1) / 5)), BR = [176, 118, 62], BR2 = [124, 82, 44];
+      p.box(-0.1, -0.1, 5.2, 5.2, 0, 4, 'stone', 'stone', 'paving');
+      p.box(1.0, 1.0, 3, 3, 4, 18, 'marbleS', 'marbleS', 'marbleS');
+      p.box(0.95, 0.95, 3.1, 3.1, 18, 21, 'gilt', 'gilt', 'marbleS');
+      p.quad({ x: 1, y: 1, w: 3, h: 3 }, 'L', 1.1, 1.9, 8, 14, rgb(col));
+      if (ph === 0) { for (const [x, y] of [[1.4, 2.1], [2.5, 2.1]]) p.box(x, y, 0.6, 0.6, 21, 34, 'plank', 'darkwood'); p.box(1.3, 2.0, 2.0, 0.8, 34, 36, 'plank', 'darkwood', 'plank'); }
+      if (ph >= 1) { p.box(1.9, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); p.box(2.6, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); }
+      if (ph >= 2) { p.box(1.8, 2.05, 1.35, 0.7, 44, 52, BR2, BR2, BR); p.box(1.75, 2.0, 1.45, 0.8, 52, 72, BR, BR2, BR); p.box(1.6, 2.05, 1.75, 0.7, 68, 75, BR, BR2, BR); }
+      if (ph >= 3) { p.box(2.25, 2.15, 0.5, 0.45, 75, 87, BR, BR2, BR); p.box(2.2, 2.1, 0.6, 0.55, 87, 90, 'gilt', 'gilt', 'gilt'); }
+      if (ph >= 4) { p.box(1.4, 2.25, 0.25, 0.25, 50, 72, BR, BR2, BR); const a = p.P(1.52, 2.37, 104), b = p.P(1.52, 2.37, 40); p.line(a, b, '#8a5a30'); p.px(a[0], a[1] - 1, '#c8ccd6'); p.px(a[0], a[1] - 2, '#e0e4ec'); }
+      if (ph >= 5) { p.box(3.3, 2.25, 0.25, 0.25, 64, 98, BR, BR2, BR); const t = p.P(3.42, 2.37, 100); for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [0, -3, '#fff0a0'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c); }
+      if (ph >= 6) { const t = p.P(2.5, 2.4, 96); for (let a = 0; a < 24; a++) { const k = (a / 24) * Math.PI * 2; p.px(t[0] + Math.cos(k) * 9, t[1] + Math.sin(k) * 4, a % 2 ? GOLD : GLINT); } }
+      p.flag(0.4, 0.4, 4, col, 16);
+    },
+    m_jardines(p, col, m, tier, lvl) {
+      const ph = Math.min(6, Math.floor((lvl || 1) / 5)), G1 = [96, 154, 62], LEAF = ['#3e7a30', '#5a9a40', '#78b450'];
+      p.box(-0.1, -0.1, 5.2, 5.2, 0, 4, 'stone', 'stone', 'paving');
+      const pisos = [[0.3, 4.4, 4, 12], [0.9, 3.2, 12, 20], [1.5, 2.0, 20, 28], [2.0, 1.0, 28, 36]].slice(0, 1 + Math.min(3, Math.ceil(ph / 1.5)));
+      for (const [o, s, z0, z1] of pisos) {
+        p.box(o, o, s, s, z0, z1, 'stone', 'stone', G1);
+        for (let i = 0; i < 14; i++) {
+          const u = (s * (i + 0.5)) / 14, len = 2 + Math.floor(U.hash(i, z0, 5) * 5);
+          for (const side of ['L', 'R']) { const a = side === 'L' ? p.P(o + u, o + s, z1) : p.P(o + s, o + s - u, z1); for (let k = 0; k < len; k++) p.px(a[0], a[1] + k, ph >= 5 && k === len - 1 && U.hash(i, k, z0) > 0.4 ? '#f0d050' : k === len - 1 && U.hash(i, k + 3, z0) > 0.55 ? '#e86a8a' : LEAF[k % 2]); }
+        }
+        if (ph >= 4) for (const [dx, dy] of [[0.3, 0.3], [s - 0.45, 0.3], [0.3, s - 0.45]]) { const c = p.P(o + dx, o + dy, z1); p.px(c[0], c[1] - 1, '#5a3c22'); for (const [x, y, k] of [[-1, -3, 0], [0, -3, 1], [1, -3, 0], [-2, -4, 0], [-1, -4, 2], [0, -4, 1], [1, -4, 1], [2, -4, 0], [0, -5, 2]]) p.px(c[0] + x, c[1] + y, LEAF[k]); }
+      }
+      if (ph >= 2) { const a = p.P(2.5, 4.7, 4), top = pisos[pisos.length - 1][3]; for (let z = 4; z < top; z++) { const c = p.P(2.5, 2.5 + (2.2 * (top - z)) / top, z); p.px(c[0], c[1], z % 3 ? '#7ab8ec' : '#bfe0ff'); p.px(c[0] + 1, c[1], '#5a9ad8'); } void a; } // cascada
+      const t = pisos[pisos.length - 1], f = p.P(t[0] + t[1] / 2, t[0] + t[1] / 2, t[3]);
+      for (const [x, y, c] of [[-2, 0, '#9a9488'], [-1, 0, '#5a9ad8'], [0, 0, '#7ab8ec'], [1, 0, '#5a9ad8'], [2, 0, '#9a9488'], [0, -1, '#bfe0ff'], [0, -2, '#7ab8ec']]) p.px(f[0] + x, f[1] + y, c);
+      if (ph >= 6) for (const [dx, dy] of [[0, -6], [-5, -3], [5, -3], [-3, 2], [3, 2]]) p.px(f[0] + dx, f[1] + dy, GLINT);
+      p.flag(4.4, 0.4, 4, col, 14);
+    },
+    m_catedral(p, col, m, tier, lvl) {
+      const ph = Math.min(6, Math.floor((lvl || 1) / 5));
+      p.box(-0.1, -0.1, 5.2, 5.2, 0, 4, 'stone', 'stone', 'paving');
+      const nave = { x: 0.6, y: 1.4, w: 3.8, h: 2.2 };
+      p.box(nave.x, nave.y, nave.w, nave.h, 4, ph >= 1 ? 30 : 16, 'stone');
+      if (ph >= 1) { for (let i = 0; i < 5; i++) p.win(nave, 'L', 0.5 + i * 0.7, 14, 0.24, 10); p.door(nave, 'R', 1.1, 0.5, 14, 4); }
+      if (ph >= 2) { const r = p.P(4.4, 2.5, 22); for (let a = 0; a < 16; a++) { const t = (a / 16) * Math.PI * 2; p.px(r[0] + Math.cos(t) * 3, r[1] + Math.sin(t) * 3, a % 2 ? '#c84a6a' : '#5a8ad8'); } p.px(r[0], r[1], GOLD); }
+      if (ph >= 1) p.roof(nave.x, nave.y, nave.w, nave.h, 30, 16, 'slate', 0.7, 0.12, 'x');
+      if (ph >= 3) for (const [x, y] of [[0.4, 0.4], [3.6, 0.4]]) { p.box(x, y, 1.0, 1.0, 4, 56, 'stone'); p.win({ x, y, w: 1, h: 1 }, 'L', 0.5, 40, 0.22, 8); p.roof(x, y, 1.0, 1.0, 56, 18, ph >= 6 ? 'gilt' : 'slate', 0.01, 0.08, 'x'); }
+      if (ph >= 4) { p.box(2.0, 2.0, 1.0, 1.0, 46, 54, 'marbleS'); p.roof(1.9, 1.9, 1.2, 1.2, 54, 16, 'gilt', 0.01, 0.1, 'x'); }
+      if (ph >= 5) for (const x of [0.9, 4.1]) { const c = p.P(x, 0.9, 46); p.px(c[0], c[1], GOLD); p.px(c[0] + 1, c[1], GOLD2); p.px(c[0], c[1] + 1, GOLD2); }
+      if (ph === 0) for (const [x, y] of [[0.8, 1.6], [3.6, 1.6], [0.8, 3.2], [3.6, 3.2]]) p.box(x, y, 0.15, 0.15, 4, 26, 'plank', 'darkwood'); // andamios
+      if (ph >= 6) { const t = p.P(2.5, 2.5, 76); for (const [dx, dy] of [[0, -4], [-3, -2], [3, -2], [-4, 1], [4, 1]]) p.px(t[0] + dx, t[1] + dy, GLINT); }
+      p.flag(0.9, 0.9, ph >= 3 ? 74 : 16, col, 12);
+    },
   };
   // Puntos de interés de la exploración (s: 0 sin tocar, 1 resuelto).
   const PDRAW = {
@@ -898,6 +1155,57 @@
       for (const [x, y] of [[0.6, 2.7], [1.2, 2.8], [2.6, 1.7]]) { const o = p.P(x, y, 0); p.line([o[0] - 3, o[1]], [o[0] + 3, o[1] - 1], '#e8e0cc'); }
       p.line(p.P(0.6, 0.5, 46), p.P(0.4, 0.3, 54), '#5a5a5a'); p.line(p.P(0.7, 0.5, 46), p.P(0.6, 0.2, 56), '#6a6a6a');
     },
+    // H4 (pk-17)
+    swamp(p) {
+      p.fill([p.P(0, 0, 0), p.P(3, 0, 0), p.P(3, 3, 0), p.P(0, 3, 0)], '#3a4a2a', 1, 0);
+      p.fill([p.P(0.3, 1.4, 0), p.P(1.6, 1.3, 0), p.P(1.8, 2.7, 0), p.P(0.4, 2.8, 0)], '#2a4a3a', 1, 0);
+      p.fill([p.P(0.5, 1.6, 0), p.P(1.4, 1.5, 0), p.P(1.5, 2.4, 0), p.P(0.6, 2.5, 0)], '#3a6a4a', 1, 0);
+      // choza de la bruja sobre patas
+      for (const [x, y] of [[1.6, 0.5], [2.5, 0.5], [1.6, 1.3], [2.5, 1.3]]) p.box(x, y, 0.12, 0.12, 0, 8, 'darkwood', 'darkwood', 'darkwood');
+      const b = { x: 1.5, y: 0.4, w: 1.2, h: 1.0 };
+      p.box(b.x, b.y, b.w, b.h, 8, 18, 'darkwood');
+      p.win(b, 'L', 0.5, 12, 0.25, 4);
+      p.roof(b.x, b.y, b.w, b.h, 18, 10, '#4a5a2a', 0.1, 0.1, 'x');
+      const w = p.wp(b, 'L', 0.5, 13); p.px(w[0], w[1], '#9aff7a'); p.px(w[0] + 1, w[1], '#9aff7a');
+      // árbol muerto y fuegos fatuos
+      p.line(p.P(0.4, 0.5, 0), p.P(0.4, 0.5, 22), '#3a2a18'); p.line(p.P(0.4, 0.5, 16), p.P(0.1, 0.4, 22), '#3a2a18'); p.line(p.P(0.4, 0.5, 19), p.P(0.7, 0.3, 26), '#3a2a18');
+      for (const [x, y, z] of [[1.0, 2.0, 6], [2.4, 2.4, 8], [0.8, 1.0, 10]]) { const f = p.P(x, y, z); p.px(f[0], f[1], '#9affb8'); p.px(f[0], f[1] + 1, '#5aff8a'); p.px(f[0] + 1, f[1] + 1, '#5aff8a'); }
+    },
+    giants(p) {
+      p.fill([p.P(0, 0, 0), p.P(3, 0, 0), p.P(3, 3, 0), p.P(0, 3, 0)], 'soil', 0.85, 0.3);
+      // muralla de bloques enormes con una puerta altísima
+      p.box(0.1, 0.1, 2.8, 0.8, 0, 30, 'rock', 'rock', 'rock');
+      p.box(0.1, 0.1, 0.8, 2.8, 0, 26, 'rock', 'rock', 'rock');
+      p.quad({ x: 0.1, y: 0.1, w: 2.8, h: 0.8 }, 'L', 1.1, 1.9, 0, 22, '#141010');
+      for (const x of [0.1, 0.8, 1.5, 2.2]) p.box(x, 0.05, 0.5, 0.5, 30, 36, 'rock', 'rock', 'rock');
+      // el mazo de un gigante tirado y un hueso enorme
+      p.box(1.6, 2.0, 1.1, 0.25, 0, 4, '#5a3a20', '#3a2410', '#7a5030');
+      p.box(2.5, 1.85, 0.45, 0.55, 0, 9, '#8a8a92', '#5a5a62', '#b0b0b8');
+      const h = p.P(1.2, 2.6, 0); p.line([h[0] - 8, h[1]], [h[0] + 8, h[1] - 3], '#e8e0cc'); p.line([h[0] - 8, h[1] + 1], [h[0] + 8, h[1] - 2], '#c8c0a8');
+      p.px(h[0] - 9, h[1] - 1, '#f2ead4'); p.px(h[0] + 9, h[1] - 4, '#f2ead4');
+    },
+    temple(p) {
+      p.fill([p.P(0, 0, 0), p.P(3, 0, 0), p.P(3, 3, 0), p.P(0, 3, 0)], '#2a5a7a', 1, 0);
+      p.fill([p.P(0.2, 0.2, 0), p.P(2.8, 0.2, 0), p.P(2.8, 2.8, 0), p.P(0.2, 2.8, 0)], '#3a7a9a', 1, 0);
+      // templo a medio hundir: escalinata, columnas rotas y un frontón ladeado
+      p.box(0.5, 0.5, 2.0, 1.6, 0, 4, 'marbleS', 'marbleS', 'paving');
+      for (const [x, y, h] of [[0.6, 0.6, 22], [1.3, 0.6, 18], [2.0, 0.6, 24], [0.6, 1.6, 14], [2.0, 1.6, 10]]) p.box(x, y, 0.3, 0.3, 4, h, 'marbleS', 'marbleS', 'marbleS');
+      p.box(0.55, 0.55, 1.8, 0.4, 24, 28, 'marbleS', 'marbleS', 'verdigris');
+      const g = p.P(1.3, 1.3, 6); p.px(g[0], g[1], '#5ae8e0'); p.px(g[0] + 1, g[1] - 1, '#c8fffa');
+      for (const [x, y] of [[0.3, 2.5], [2.6, 2.4], [2.6, 0.3]]) { const o = p.P(x, y, 0); p.px(o[0], o[1], '#c8f0ff'); p.px(o[0] + 2, o[1], '#c8f0ff'); }
+    },
+    // Lugar legendario (H6): un arco de piedras viejas con una luz dorada; investigado, la luz se apaga
+    legend(p, s) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], '#5a6a4a', 1, 0);
+      p.fill([p.P(0.4, 0.4, 0), p.P(1.6, 0.4, 0), p.P(1.6, 1.6, 0), p.P(0.4, 1.6, 0)], 'paving', 0.9, 0);
+      for (const [x, y, h] of [[0.15, 0.15, 26], [1.55, 0.15, 22], [0.15, 1.55, 20], [1.6, 1.6, 12]]) p.box(x, y, 0.3, 0.3, 0, h, 'rock', 'rock', 'rock');
+      p.box(0.1, 0.1, 1.8, 0.35, 26, 30, 'rock', 'rock', 'rock');
+      const c = p.P(1, 1, 10), col = s ? '#a8a090' : '#ffe070';
+      p.ctx.fillStyle = s ? 'rgba(200,190,160,0.3)' : 'rgba(255,220,110,0.35)'; p.ctx.fillRect(c[0] - 5, c[1] - 6, 11, 11);
+      p.ctx.fillStyle = col; p.ctx.fillRect(c[0] - 2, c[1] - 3, 5, 5);
+      p.ctx.fillStyle = s ? '#d0c8b0' : '#fff8d0'; p.ctx.fillRect(c[0] - 1, c[1] - 2, 2, 2);
+      if (!s) for (const [dx, dy] of [[-8, -10], [9, -6], [-5, 6], [7, 8], [0, -14]]) p.px(c[0] + dx, c[1] + dy, '#fff0a0');
+    },
     chest(p, s) {
       p.box(0.25, 0.3, 0.5, 0.35, 0, 5, 'darkwood', 'darkwood', s ? '#2a1a0e' : 'plank');
       p.line(p.P(0.25, 0.65, 3), p.P(0.75, 0.65, 3), '#e8b83a');
@@ -941,24 +1249,63 @@
       p.box(0.7, 0.75, 0.3, 0.25, 0, 3, 'rock', 'rock', 'rock');
     },
   };
-  const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60 };
+  const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60, swamp: 36, giants: 44, temple: 36, legend: 40 };
 
-  const BTOP = { tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84 };
+  const BTOP = { tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
   // Tramos de nivel: 1-3, 4-6, 7-9, 10-12, 13-15, 16-19 y 20+ (cada era sube 2 niveles el tope).
   S.tier = lvl => (lvl >= 20 ? 6 : lvl >= 16 ? 5 : lvl >= 13 ? 4 : lvl >= 10 ? 3 : lvl >= 7 ? 2 : lvl >= 4 ? 1 : 0);
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).
   const TALL = { library: 10, tower: 12, wonder: 0 };
   const wonderPhase = lvl => Math.min(6, Math.floor((lvl || 1) / 5));
+  const btopBase = type => (D.temaActivo === 'mar' && S.BTOP_MAR[type]) || BTOP[type] || 40;
   S.btop = (type, lvl) => {
     const t = S.tier(lvl || 1);
-    return (BTOP[type] || 40) + (t >= 3 ? 7 + (TALL[type] || 0) : t >= 2 ? 5 : 0) +(type === 'wonder' ? wonderPhase(lvl) * 4 + (wonderPhase(lvl) >= 3 ? 14 : 0) : 0);
+    return btopBase(type) + (t >= 3 ? 7 + (TALL[type] || 0) : t >= 2 ? 5 : 0) +(type === 'wonder' || (D.WONDERS && D.WONDERS.includes(type)) ? wonderPhase(lvl) * 4 + (wonderPhase(lvl) >= 3 ? 14 : 0) : 0);
   };
-  const bkey = (type, lvl) => S.tier(lvl || 1) + (type === 'wonder' ? '.' + wonderPhase(lvl) : '');
+  const bkey = (type, lvl) => S.tier(lvl || 1) + (type === 'wonder' || (D.WONDERS && D.WONDERS.includes(type)) ? '.' + wonderPhase(lvl) : '');
 
+  // Color comprado en la tienda del reino (V8): solo cambia cómo ves tus banderas y estandartes.
+  let colorTienda = null;
+  S.colorPropio = function (col) {
+    if (String(col) === String(colorTienda)) return;
+    colorTienda = col;
+    for (const k in BCACHE) if (k.includes('|p|')) delete BCACHE[k];
+  };
   S.ownerColor = function (owner) {
-    if (owner === 'p') return D.PLAYER_COLOR;
+    if (owner === 'p') return colorTienda || D.PLAYER_COLOR;
     const b = D.BOTS.find(x => x.id === owner);
     return b ? b.color : [150, 150, 150];
+  };
+
+  // Daltonismo (resto de U6): además del color, cada reino lleva un patrón (rayas, puntos, cuadros…) en el
+  // territorio del mapa y del minimapa, en sus bordes y en su escudo; el tuyo va liso. Solo con el modo activo.
+  S.daltonico = () => document.documentElement.classList.contains('daltonico');
+  S.patronDe = slot => (slot === undefined || slot === null || slot < 0 || slot === D.MY_SLOT ? -1 : slot % 6);
+  S.patronSlotDe = function (owner) { // el patrón de un dueño ('p', id de bot o de jugador)
+    const m = /^b(\d+)$/.exec(owner || ''); // D.ownerOfSlot: la casilla i es 'b' + i (la tuya, 'p')
+    return m ? S.patronDe(+m[1]) : -1;
+  };
+  S.enPatron = function (p, x, y) {
+    if (p === 0) return (x + y) % 4 === 0;                 // diagonal
+    if (p === 1) return x % 3 === 0 && y % 3 === 0;        // puntos
+    if (p === 2) return y % 3 === 0;                       // rayas horizontales
+    if (p === 3) return x % 3 === 0;                       // rayas verticales
+    if (p === 4) return ((x >> 1) + (y >> 1)) % 2 === 0;   // cuadros
+    if (p === 5) return (((x - y) % 4) + 4) % 4 === 0;     // la otra diagonal
+    return false;
+  };
+  S.GUIONES = [[10, 4], [2, 3], [10, 3, 2, 3], [5, 5], [16, 4], [2, 2, 7, 2]];
+  const TRAMAS = {};
+  S.trama = function (ctx, p, rgb, a) { // relleno con el patrón del reino (para el modo territorio)
+    const key = p + ':' + rgb.join(',') + ':' + a;
+    if (!TRAMAS[key]) {
+      const c = mk(36, 36), x = c.getContext('2d'); // 12 × 12 celdas de 3 px: a zoom 1 se sigue leyendo
+      x.fillStyle = 'rgba(' + rgb.join(',') + ',' + a * 0.4 + ')'; x.fillRect(0, 0, 36, 36);
+      x.fillStyle = 'rgba(' + rgb.join(',') + ',' + Math.min(1, a * 2.6) + ')';
+      for (let y = 0; y < 12; y++) for (let i = 0; i < 12; i++) if (S.enPatron(p, i, y)) x.fillRect(i * 3, y * 3, 3, 3);
+      TRAMAS[key] = c;
+    }
+    return ctx.createPattern(TRAMAS[key], 'repeat');
   };
 
   const BCACHE = {};
@@ -982,12 +1329,26 @@
     }
     return withMask({ c, ox, oy, smoke: meta.smoke, hub: meta.hub, tier: tier || 0 });
   }
+  // Aspectos del Pase del Reino (js/ui/pase.js): solo para tus edificios. {col, techo, id}: el color de banderas
+  // y estandartes y el material de los techos. La caché los separa por id.
+  const ASP_B = {}, ASP_T = {};
+  S.aspectoEdificio = function (type, a) {
+    const antes = ASP_B[type] ? ASP_B[type].id : null;
+    if (a) ASP_B[type] = a; else delete ASP_B[type];
+    if (antes !== (a ? a.id : null)) for (const k in BCACHE) if (k.startsWith(type + '|p|')) delete BCACHE[k];
+  };
+  S.colorTropa = function (type, col) { if (col) ASP_T[type] = col; else delete ASP_T[type]; };
+  S.colorDeTropa = type => ASP_T[type] || D.PLAYER_COLOR;
+  let techoAsp = null;
   S.building = function (type, owner, lvl) {
-    const tier = S.tier(lvl || 1), key = type + '|' + owner + '|' + bkey(type, lvl);
+    const tier = S.tier(lvl || 1), asp = owner === 'p' ? ASP_B[type] : null, key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (BCACHE[key]) return BCACHE[key];
-    const def = D.BUILD[type], col = S.ownerColor(owner);
-    const spr = isoSprite(def.w, def.h, S.btop(type, lvl), def.flat, (p, meta) => BDRAW[type](p, col, meta, tier, lvl || 1), tier, col);
-    spr.pad = S.btop(type, lvl) - (BTOP[type] || 40); // alto extra arriba (las barras se dibujan donde antes)
+    const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
+    techoAsp = asp ? asp.techo : null;
+    const draw = (D.temaActivo === 'mar' && S.BDRAW_MAR[type]) || BDRAW[type]; // en el mar, su propio dibujo (sprites-mar.js)
+    const spr = isoSprite(def.w, def.h, S.btop(type, lvl), def.flat, (p, meta) => draw(p, col, meta, tier, lvl || 1), tier, col);
+    techoAsp = null;
+    spr.pad = S.btop(type, lvl) - btopBase(type); // alto extra arriba (las barras se dibujan donde antes)
     return (BCACHE[key] = spr);
   };
 
@@ -1290,6 +1651,35 @@
     return withMask({ c: pb.canvas(), ax: cx, ay: base - 1 });
   }
 
+  // Palmera del Archipiélago (Fase 9): tronco curvo con anillos, hojas que caen en arco y cocos.
+  function makePalm(seed) {
+    const r = U.rng(seed), w = 30, h = 40, pb = new PB(w, h), base = 37, lean = (r() - 0.5) * 7;
+    ellipseShadow(pb, 15 + 3, base - 1, 8, 2, 70);
+    const top = 9 + Math.floor(r() * 3);
+    let tx = 15, ty = top;
+    for (let y = base; y >= top; y--) {
+      const t = (base - y) / (base - top), x = Math.round(15 + lean * t * t);
+      const anillo = (y % 3) === 0;
+      pb.set(x - 1, y, anillo ? [96, 66, 40] : [150, 108, 64]);
+      pb.set(x, y, anillo ? [80, 54, 32] : [124, 86, 50]);
+      pb.set(x + 1, y, [92, 62, 36]);
+      if (y === top) { tx = x; ty = y; }
+    }
+    const verde = [[54, 120, 44], [76, 150, 54], [104, 176, 66], [40, 92, 36]];
+    const hojas = 6 + Math.floor(r() * 2);
+    for (let k = 0; k < hojas; k++) {
+      const a = (k / hojas) * Math.PI * 2 + r() * 0.4, L = 9 + r() * 4, ca = Math.cos(a), sa = Math.sin(a) * 0.55;
+      for (let s2 = 0; s2 <= L; s2 += 0.5) {
+        const f = s2 / L, x = tx + ca * s2, y = ty + sa * s2 + f * f * 6 - 1;
+        const c = verde[(f < 0.3 ? 2 : f < 0.7 ? 1 : 0) + (sa > 0.2 && f > 0.5 ? 1 : 0)] || verde[3];
+        pb.set(Math.round(x), Math.round(y), c);
+        if (f > 0.15 && f < 0.85) { pb.set(Math.round(x), Math.round(y) + 1, verde[3]); if (s2 % 2 < 0.5) pb.set(Math.round(x - sa), Math.round(y + ca * 0.6) + 1, verde[0]); }
+      }
+    }
+    for (const [dx, dy] of [[-1, 1], [1, 1], [0, 2]]) { pb.set(tx + dx, ty + dy, [110, 72, 36]); pb.set(tx + dx, ty + dy - 1 + 1, [138, 96, 50]); }
+    return withMask({ c: pb.canvas(), ax: 15, ay: base - 1 });
+  }
+
   function makeStump() {
     const pb = new PB(10, 8);
     ellipseShadow(pb, 6, 5, 4, 1, 60);
@@ -1366,8 +1756,10 @@
   const SKIN = [[232, 188, 148], [200, 150, 108], [142, 96, 64]];
   const CARRY = { wood: [124, 86, 52], food: [190, 58, 62], stone: [150, 148, 140], gold: [236, 196, 70], ore: [164, 86, 56], marble: [232, 230, 222], gems: [80, 170, 230], planks: [196, 156, 100], blocks: [200, 196, 184], ingots: [190, 194, 204], tools: [150, 150, 160], books: [150, 50, 40], steel: [170, 186, 200], machinery: [200, 140, 60] };
   S.CARRY = CARRY;
-  const VW = 22, VH = 22, VR = 2, VC = {}, RAMPS = {}; // 4 de ancho extra a la derecha para el alcance de la herramienta
-  let vcN = 0;
+  const VW = 22, VH = 22, VR = 2, VC = new Map(), RAMPS = {}; // 4 de ancho extra a la derecha para el alcance de la herramienta
+  // T4: el caché olvida los menos usados (Map en orden de uso), nunca todo de una vez. Vaciarlo entero al pasar de
+  // 3000 hacía que con 300 aldeanos trabajando se rehicieran cientos de figuras por segundo (20 fps en un PC).
+  const VC_MAX = 2400, VC_SUELTA = 400;
   // Rampa de 6 tonos con más contraste: sombras hacia el violeta, luces hacia el cálido.
   function vRamp(c) {
     const k = c.join(',');
@@ -1387,13 +1779,17 @@
   const HEAD = { axe: 1.0, pick: 1.6, hammer: 1.0, sickle: 1.1, knife: 0.5, sword: 0.3, spear: 0.3 }; // del extremo del mango al filo que golpea
   // troop: el mismo cuerpo vestido de soldado (militia, spear, archer, knight, cleric o catapult, la dotación).
   // Cambian la túnica, el casco o la capucha y el arma que lleva en la mano de adelante (al pelear, la herramienta).
-  const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204] };
-  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop) {
+  const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [104, 96, 72], monk: [134, 96, 58], mage: [72, 58, 150] };
+  S.vNuevas = 0; // figuras hechas (render.js las cuenta para su presupuesto por cuadro)
+  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop, soloCache) {
     const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '');
-    if (VC[key]) return VC[key];
-    if (++vcN > 3000) { for (const k in VC) delete VC[k]; vcN = 0; }
+    const ya = VC.get(key);
+    if (ya) { VC.delete(key); VC.set(key, ya); return ya; }
+    if (soloCache) return null; // sin presupuesto este cuadro: quien llama usa la de antes
+    S.vNuevas++;
+    if (VC.size >= VC_MAX) { let n = VC_SUELTA; for (const k of VC.keys()) { VC.delete(k); if (--n <= 0) break; } }
     const PW = VW * VR, PH = VH * VR, pb = new PB(PW, PH);
-    const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric';
+    const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage';
     const walk = mode === 'walk', ph = walk ? (frame % 6) / 6 * Math.PI * 2 : 0;
     // al recoger a mano se agacha: baja la cadera y adelanta las rodillas
     const crouch = mode === 'work' && tool === 'hand' ? 4 : 0;
@@ -1528,10 +1924,12 @@
       Cp(12.4, 1.2, 12.4, 18.4, 0.32, 6.5, WO); E(12.4, 0.9, 0.5, 0.5, 6.6, WO);
     }
     if (troop) {
-      const helm = troop === 'knight' || troop === 'spear' ? ME : troop === 'militia' || troop === 'catapult' ? WRAP : null;
+      const helm = troop === 'knight' || troop === 'spear' || troop === 'rider' || troop === 'crossbow' ? ME : troop === 'militia' || troop === 'catapult' ? WRAP : null;
       if (helm) E(hx - 0.05, hy - 0.5, 1.6, 1.35, 4.65, helm, (px, py) => py < hy - 0.2 || (troop === 'knight' && (back || px < hx + 0.35) && py < hy + 1.3));
-      if (troop === 'knight') E(hx - 0.35, hy - 1.95, 0.5, 0.8, 4.7, vRamp(col)); // penacho del color del reino
-      if (troop === 'archer' || robe) E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, robe ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'knight' || troop === 'rider') E(hx - 0.35, hy - 1.95, 0.5, troop === 'rider' ? 1.2 : 0.8, 4.7, vRamp(col)); // penacho del color del reino
+      if (troop === 'crossbow') E(hx - 0.05, hy - 0.9, 2.3, 0.4, 4.7, ME); // ala del capacete
+      if (troop === 'archer' || robe) E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, troop === 'monk' ? vRamp([96, 66, 40]) : troop === 'mage' ? vRamp([50, 40, 110]) : robe ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'mage') { E(hx - 0.2, hy - 1.7, 0.9, 1.3, 4.7, vRamp([50, 40, 110])); E(hx - 0.5, hy - 2.7, 0.4, 0.5, 4.75, vRamp([50, 40, 110])); } // sombrero en punta
       if (troop === 'knight' && !back) E(hx - 1.15, 10.1 + yo, 1.45, 2.0, 3.6, (px, py) => (Math.abs(px - (hx - 1.15)) < 0.3 || Math.abs(py - (10.1 + yo)) < 0.3 ? ST : vRamp(col))); // escudo
     }
     // brazo de adelante: herramienta, canasta o balanceo
@@ -1569,7 +1967,11 @@
         let q = [11.6, 4.6 + yo];
         for (let i = 1; i <= 6; i++) { const a = (i / 6) * Math.PI, n = [11.6 + Math.sin(a) * 1.6, 4.6 + yo + (1 - Math.cos(a)) * 5.6]; Cp(q[0], q[1], n[0], n[1], 0.3, z, WO); q = n; }
         Cp(11.6, 4.6 + yo, 11.6, 15.8 + yo, 0.12, z - 0.1, LIN);
-      } else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.4 + yo, 0.65, 0.65, z + 0.1, ST); }
+      } else if (troop === 'rider') { Cp(10.6, 13.0 + yo, 13.4, 1.0 + yo, 0.3, z, WO); E(13.5, 0.7 + yo, 0.45, 0.9, z + 0.1, ME); } // la lanza, alta
+      else if (troop === 'crossbow') { Cp(10.2, 10.4 + yo, 13.6, 9.6 + yo, 0.34, z, WO); Cp(13.2, 7.6 + yo, 13.4, 11.6 + yo, 0.26, z + 0.05, ME); } // ballesta
+      else if (troop === 'monk') { Cp(11.4, 2.6 + yo, 11.4, 18.2, 0.34, z, WO); } // bastón
+      else if (troop === 'mage') { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.3, z, BO); E(11.6, 1.3 + yo, 0.8, 0.8, z + 0.1, vRamp([170, 130, 255])); } // vara con su piedra
+      else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.4 + yo, 0.65, 0.65, z + 0.1, ST); }
       else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, troop === 'catapult' ? 0.8 : 0.65, 0.7, z + 0.05, troop === 'catapult' ? ME : WO); } // garrote o martillo
       E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, SK);
     } else arm(9.9, 1, 5, 10.1 - sw * 1.0, 11.6 + yo, 10.2 - sw * 0.45, 9.3 + yo);
@@ -1641,7 +2043,9 @@
       if (d2 <= 1 && d[(y * PW + x) * 4 + 3] === 0) pb.set(x, y, [10, 18, 6], d2 > 0.6 ? 45 : 75);
     }
     // hit: dónde toca la herramienta, en píxeles del mundo respecto del ancla (para los efectos del golpe)
-    return (VC[key] = withMask({ c: pb.canvas(), ax: flip ? VW - 8 : 8, ay: 19, k: VR, w: VW, h: VH, hit: hit && [(hit[0] - 8) * (flip ? -1 : 1), hit[1] - 19] }));
+    const hecho = withMask({ c: pb.canvas(), ax: flip ? VW - 8 : 8, ay: 19, k: VR, w: VW, h: VH, hit: hit && [(hit[0] - 8) * (flip ? -1 : 1), hit[1] - 19] });
+    VC.set(key, hecho);
+    return hecho;
   };
 
   // Carreta tirada por un burro: lleva la carga a la vista, con el color del recurso.
@@ -1652,6 +2056,58 @@
   const SPOKES = [[[4, 1], [4, 2], [4, 3], [4, 5], [4, 6], [4, 7], [1, 4], [2, 4], [3, 4], [5, 4], [6, 4], [7, 4]],
     [[2, 2], [3, 3], [5, 5], [6, 6], [6, 2], [5, 3], [3, 5], [2, 6]]];
   const LEGS = [[1, -1, -1, 1], [0, 0, 0, 0], [-1, 1, 1, -1], [0, 0, 0, 0]];
+  // El Galeón del Alba (Fase 9): encallado y roto en la orilla del lago, o reparado, con velas y banderas.
+  const GALC = {};
+  S.galeon = function (listo, piezas) {
+    const key = (listo ? 'L' : 'R') + (piezas || []).join(',');
+    if (GALC[key]) return GALC[key];
+    const w = 84, h = 76, pb = new PB(w, h), tiene = id => listo || (piezas || []).includes(id);
+    const madera = [[86, 54, 30], [112, 74, 42], [140, 96, 56], [60, 38, 22]], oro = [214, 168, 72], vela = [236, 226, 200], velaS = [196, 184, 156], rojo = [176, 52, 40];
+    const incl = listo ? 0 : 0.11; // encallado: escorado
+    const Y = (x, y) => y + (x - 42) * incl;
+    ellipseShadow(pb, 44, 66, 34, 5, 90);
+    // casco: proa a la izquierda, castillo de popa a la derecha
+    for (let x = 6; x <= 76; x++) {
+      const t = (x - 6) / 70, quilla = 62 - Math.sin(t * Math.PI) * 4, borda = x > 60 ? 38 : x < 16 ? 44 - (16 - x) * 0.6 : 46;
+      for (let y = Math.floor(borda); y <= quilla; y++) {
+        const roto = !tiene('casco') && ((x > 28 && x < 36 && y > 50 && y < 57) || (x > 50 && x < 55 && y > 47 && y < 52));
+        const yy = Math.round(Y(x, y));
+        if (roto) { pb.set(x, yy, [24, 16, 10]); continue; }
+        const banda = (y - Math.floor(borda)) % 4 === 0, c = y > quilla - 2 ? madera[3] : banda ? madera[0] : x % 9 === 0 ? madera[0] : madera[y < 50 ? 2 : 1];
+        pb.set(x, yy, c);
+      }
+      pb.set(x, Math.round(Y(x, (x > 60 ? 38 : x < 16 ? 44 - (16 - x) * 0.6 : 46) - 1)), oro);
+    }
+    // portas de los cañones y ventanas de popa
+    for (let x = 22; x < 58; x += 7) for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++) pb.set(x + dx, Math.round(Y(x, 51 + dy)), [30, 20, 12]);
+    for (let x = 64; x < 74; x += 3) { pb.set(x, Math.round(Y(x, 42)), [250, 210, 110]); pb.set(x, Math.round(Y(x, 43)), [250, 210, 110]); }
+    // bauprés
+    for (let k = 0; k < 10; k++) pb.set(6 - k * 0.6, Math.round(Y(6, 44 - k * 0.7)), madera[0]);
+    // mástiles
+    const mastil = (mx, alto, rotoM) => {
+      const top = 46 - alto;
+      for (let y = 46; y >= top; y--) { const xx = rotoM ? mx + (46 - y) * 0.35 : mx; pb.set(xx, Math.round(Y(mx, y)), madera[3]); pb.set(xx + 1, Math.round(Y(mx, y)), madera[1]); }
+      return top;
+    };
+    const masts = [[26, 34], [44, 40], [62, 30]];
+    masts.forEach(([mx, alto], i) => {
+      const conVelas = tiene('velas'), rotoM = !tiene('timon') && i === 1;
+      const top = mastil(mx, rotoM ? 16 : alto, rotoM);
+      if (!conVelas) { if (!listo && i === 0) for (let k = 0; k < 6; k++) pb.set(mx - 3 + k, Math.round(Y(mx, top + 6 + k)), velaS); return; }
+      for (const [ya, hh, ww] of [[top + 3, 10, 9], [top + 15, 11, 11]]) {
+        for (let y = ya; y < ya + hh; y++) {
+          const inflado = Math.sin(((y - ya) / hh) * Math.PI) * 2;
+          for (let x = mx - ww - inflado; x <= mx + ww + inflado; x++) pb.set(x, Math.round(Y(mx, y)), (x + y) % 7 === 0 ? velaS : vela);
+        }
+        if (i === 1) for (let y = ya + 2; y < ya + hh - 2; y++) { pb.set(mx, Math.round(Y(mx, y)), rojo); pb.set(mx + 1, Math.round(Y(mx, y)), rojo); }
+      }
+      if (listo) for (let k = 0; k < 7; k++) { pb.set(mx + 1 + k, Math.round(Y(mx, top + (k % 2))), i === 1 ? oro : rojo); pb.set(mx + 1 + k, Math.round(Y(mx, top + 1 + (k % 2))), i === 1 ? oro : rojo); }
+    });
+    // brújula: un brillo azul en el castillo de popa
+    if (tiene('brujula')) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 0], [2, 1]]) pb.set(68 + dx, Math.round(Y(68, 35 + dy)), [120, 200, 255]);
+    return (GALC[key] = withMask({ c: pb.canvas(), ax: 44, ay: 64 }));
+  };
+
   S.cart = function (col, carry, flip, frame, moving) {
     const f = moving ? frame % 4 : 1, key = col.join(',') + (carry || '') + (flip ? 1 : 0) + f;
     if (CC[key]) return CC[key];
@@ -1792,6 +2248,7 @@
     steel: { m: ['', '', '..kkkkkkkk', '.kwwwwwwwwk', 'kwLwwwwwwgk', 'kggggggggdk', 'kkkkkkkkkk', '..kkkkkkkk', '.kwwwwwwwwk', 'kggggggggdk', 'kkkkkkkkkk'], p: { k: '#1a1e26', w: '#b8c8d8', L: '#ffffff', g: '#7a8a9a', d: '#4a5664' } },
     machinery: { m: ['....kk', '..k.kk.k', '.kkkggkkk', '..kgyygk', 'kkgy..ygkk', 'kkgy..ygkk', '..kgyygk', '.kkkggkkk', '..k.kk.k', '....kk'], p: { k: '#2a1e10', g: '#c08a3a', y: '#e8c050' } },
     hammer: { m: ['', '.kkkkkk', 'kggggggk', 'kgggggdk', '.kkbbkk', '...kbk', '....kbk', '.....kbk', '......kbk', '.......kk'], p: { k: '#1c1c22', g: '#a8a8b2', d: '#6a6a72', b: '#8a5a30' } },
+    ancla: { m: ['....kkk', '...ksssk', '...ks.sk', '....ksk', '..kkksskkk', '....ksk', '....ksk', 'kk..ksk..kk', 'ksk.ksk.ksk', '.kskksskksk', '..kssssssk', '...kkkkkk'], p: { k: '#1d2a3a', s: '#8aa4bc' } },
     compass: { m: ['...kkkkk', '..kwwrwwk', '.kwwwrwwwk', 'kwwwrrrwwwk', 'kwwkrrrkwwk', 'kwwwbbbwwwk', 'kwwwwbwwwwk', '.kwwwbwwwk', '..kwwwwwk', '...kkkkk'], p: { k: '#3a2410', w: '#efe6d0', r: '#c03028', b: '#2a4a8a' } },
     scroll: { m: ['', '.kkkkkkkkk', 'kyLLLLLLLyk', '.kLkkkkkLk', '.kLLLLLLLk', '.kLkkkkLLk', '.kLLLLLLLk', '.kLkkkkkLk', 'kyLLLLLLLyk', '.kkkkkkkkk'], p: { k: '#4a3010', y: '#a07040', L: '#efe0b8' } },
   };
@@ -1800,6 +2257,9 @@
     hide: { m: ['', '.kk......kk', '.kbk....kbk', '..kbbbbbbk', '.kbbBbbBbbk', '.kbBbbbbBbk', '..kbbbbbbk', '..kbBbbBbk', '.kbbbbbbbbk', '.kbk....kbk', '.kk......kk'], p: { k: '#2a1a10', b: '#b0804e', B: '#7a5432' } },
     lore: { m: ['', '.kkkkkkkkk', 'kyyyyyyyyyk', '.kyrryrryk', '.kyyyyyyyk', '.kyrryyryk', '.kyyyyyyyk', '.kyrrryryk', 'kyyyyyyyyyk', '.kkkkkkkkk'], p: { k: '#4a3418', y: '#efe2b8', r: '#7a3aa0' } },
     starIron: { m: ['.......s', '......sSs', '.......s', '...kkkkk', '..kmmMmmk', '.kmMmmmmMk', '.kmmmbmmmk', 'kmmMmmmbmmk', 'kmmmmMmmmk', '.kbmmmmmbk', '..kkkkkkk'], p: { k: '#141a28', m: '#5a6a8a', M: '#a8c0e8', b: '#2e3850', s: '#fff4b0', S: '#ffffff' } },
+    herbs: { m: ['', '.....g', '....gGg', '..g.gGg.g', '.gGggGggGg', '..gGgGgGg', '...ggGgg', '....kGk', '....kbk', '...kbbbk', '...kkkkk'], p: { k: '#1a2a10', g: '#3aa84a', G: '#8ae07a', b: '#8a5a30' } },
+    titanBone: { m: ['', '.kk.....kk', 'kwwk...kwwk', 'kwwwkkkkwwk', '.kwwwwwwwk', '..kwwwwwk', '.kwwwwwwwk', 'kwwwkkkkwwk', 'kwwk...kwwk', '.kk.....kk'], p: { k: '#4a4030', w: '#efe6cc' } },
+    pearls: { m: ['', '...kkk', '..kwLwk', '..kwwwk', '...kkk.kkk', '.kkk.kwLwk', 'kwLwkkwwwk', 'kwwwk.kkk', '.kkk.kkk', '....kwLwk', '....kkkk'], p: { k: '#1a3a4a', w: '#a8e8f0', L: '#ffffff' } },
     scale: { m: ['', '....kkkk', '...krrrrk', '..krRRrrrk', '.krRrrrrork', '.krrrrrrrok', '.krrrrrrook', '..krrrrook', '...krrook', '....kook', '.....kk'], p: { k: '#3a0a08', r: '#c83a28', R: '#ff8a5a', o: '#8a1a14' } },
     // Barra lateral del celular: antes tres botones tenían la misma persona y dos la misma brújula (playtest)
     idle: { m: ['......kkkk', '.....kwwk', '....kkkk.kk', '...kssssk.', '...kssssk', '...kssssk', '....kkkk', '..kkyyyykk', '.kyyyyyyyyk', '.kyyyyyyyyk', '.kkkkkkkkkk'], p: { k: '#1c1c2a', s: '#e8c4a0', y: '#c89a3a', w: '#efe6d0' } },
@@ -1807,6 +2267,8 @@
     crown: { m: ['', '', 'k...k...k', 'kyk.kyk.kyk', 'kyykkyykkyyk', 'kyyyyyyyyyyk', 'kyyryyyyryyk', 'kyyyyyyyyyyk', 'kooooooooook', '.kkkkkkkkkk'], p: { k: '#4a3008', y: '#f0c850', o: '#c08a28', r: '#c03028' } },
     cart: { m: ['', '', 'k........', 'kk.......', '.kbbbbbbbbk', '.kbBbbBbbbk', '.kbbbbbbbbk', '.kkkkkkkkkk', '..kgk..kgk', '..kkk..kkk'], p: { k: '#2a1a10', b: '#a07040', B: '#e8c050', g: '#a0a0aa' } },
     wall: { m: ['', 'kk.kk.kk.kk', 'kgkkgkkgkkgk', 'kggggggggggk', 'kgdggggdgggk', 'kggggdgggggk', 'kgggggggdggk', 'kgdgggggggk', 'kggggdggggk', 'kkkkkkkkkkk'], p: { k: '#2e2e30', g: '#a8a498', d: '#6a665e' } },
+    // Héroes (H1): un yelmo con penacho
+    hero: { m: ['.....rr', '....rrr', '...kkkkk', '..kgggggk', '.kgLgggggk', '.kgLgggggk', '.kggkkkggk', '.kgk.y.kgk', '.kgk...kgk', '.kggkykggk', '..kkkkkkk'], p: { k: '#1c1c24', g: '#b4bac8', L: '#f0f4ff', r: '#c83028', y: '#f0c850' } },
   });
   const ROCK_PAL = {
     stone: { k: '#2e2e30', w: '#d0ccc2', g: '#9a968c', d: '#66625c' },
@@ -1815,7 +2277,9 @@
     marble: { k: '#5a5850', w: '#ffffff', g: '#e2e0d8', d: '#b0aea4' },
   };
   const ICONS = {};
+  S.ICON_MAPS = ICON_MAPS;
   S.icon = function (name) {
+    if (D.temaActivo === 'mar' && ICON_MAPS[name + '_mar']) name += '_mar'; // en el mar, el pescado, la teca y el coral
     if (ICONS[name]) return ICONS[name];
     let def = ICON_MAPS[name];
     if (ROCK_PAL[name]) def = { m: ICON_MAPS.rock.m, p: ROCK_PAL[name] };
@@ -1826,11 +2290,34 @@
   };
 
   // Soldados: el aldeano vestido de tropa (ver S.villager). Retratos para la interfaz del Cuartel, ampliados x2.
-  const TROOP_LOOK = { militia: [0, 0], spear: [1, 1], archer: [2, 0], knight: [1, 2], cleric: [3, 1], catapult: [1, 0] };
+  const TROOP_LOOK = { militia: [0, 0], spear: [1, 1], archer: [2, 0], knight: [1, 2], cleric: [3, 1], catapult: [1, 0], rider: [2, 2], crossbow: [0, 1], monk: [1, 0], mage: [3, 2] };
   S.troop = function (type, col, mode, frame, flip, back, tool, id) {
     const lk = TROOP_LOOK[type] || [0, 0], v = id === undefined ? 0 : id % 3;
-    return S.villager(col, (lk[0] + v) % 4, (lk[1] + v) % 3, mode, frame, null, flip, tool || null, false, back, null, type);
+    const p = S.villager(col, (lk[0] + v) % 4, (lk[1] + v) % 3, mode, frame, null, flip, tool || null, false, back, null, type);
+    return type === 'rider' ? montado(p, col, mode, frame, flip) : p;
   };
+  // El jinete: el soldado sentado sobre un caballo (el caballo tapa sus piernas). Pixel art a la misma resolución
+  // doble que el aldeano; el caballo mira a la derecha y se espeja con flip.
+  const MC = {};
+  function montado(p, col, mode, frame, flip) {
+    const key = col.join(',') + mode + frame + (flip ? 1 : 0) + p.c.width;
+    if (MC[key]) return MC[key];
+    const W = 30, H = 28, K = 2, c = mk(W * K, H * K), x = c.getContext('2d');
+    x.imageSmoothingEnabled = false;
+    const ox = 6, oy = 2; // dónde va el jinete (en píxeles del aldeano)
+    x.drawImage(p.c, (flip ? W - p.w - ox : ox) * K, oy * K + (mode === 'walk' && frame % 3 === 1 ? -K : 0));
+    const hc = x, r = (a, b, w, h, cl) => { hc.fillStyle = cl; hc.fillRect((flip ? W - a - w : a) * K, b * K, w * K, h * K); };
+    const C = '#7a5232', C2 = '#5a3a22', C3 = '#94683e', M = '#2e2018', MA = 'rgb(' + col.join(',') + ')';
+    const g = mode === 'walk' ? frame % 6 : 0, l = [0, 1, 2, 1, 0, -1][g];
+    // patas (se mueven al caminar), cuerpo, manta del color del reino, cuello y cabeza
+    r(7 + l, 20, 2, 7, C2); r(10 - l, 20, 2, 7, C); r(19 + l, 20, 2, 7, C2); r(22 - l, 20, 2, 7, C);
+    r(7 + l, 27, 2, 1, M); r(10 - l, 27, 2, 1, M); r(19 + l, 27, 2, 1, M); r(22 - l, 27, 2, 1, M);
+    r(6, 14, 19, 7, C); r(6, 14, 19, 2, C3); r(7, 20, 17, 1, C2);
+    r(11, 13, 8, 6, MA); r(11, 18, 8, 1, '#00000040');
+    r(23, 8, 4, 8, C); r(23, 8, 1, 7, M); r(25, 6, 5, 4, C); r(27, 9, 3, 2, C3); r(28, 7, 1, 1, M); r(24, 5, 1, 2, C2);
+    r(3, 15, 3, 2, M); r(2, 16, 2, 5, M); // cola
+    return (MC[key] = { c, ax: flip ? W - 15 : 15, ay: 27, k: K, w: W, h: H });
+  }
   S.troopIcon = function (type) {
     const key = 'troop_' + type;
     if (ICONS[key]) return ICONS[key];
@@ -1860,6 +2347,22 @@
 
   // El terreno se pinta por trozos de 16x16 casillas, solo los que están a la vista (y se guardan unos
   // cuantos en memoria). Un mapa de 256x256 entero sería una imagen de 8192x4096: demasiado para un celular.
+  // Estación del suelo (Fase 3, V3): 0 primavera, 1 verano, 2 otoño, 3 invierno. render.js la fija y vacía su caché
+  // de trozos al cambiar (R.nuevaEstacion), así que cada estación se pinta una sola vez por trozo.
+  S.temporada = 1;
+  const TEMP = [
+    { tinte: [96, 156, 52], k: 0.12, flores: 0.992 },  // primavera: más verde y con flores
+    { tinte: [150, 146, 64], k: 0.12, flores: 0.9994 }, // verano: un poco seco
+    { tinte: [168, 112, 44], k: 0.38, flores: 2 },      // otoño: ocre y hojas
+    { tinte: [226, 232, 240], k: 0.62, flores: 2 },     // invierno: nieve en manchones
+  ];
+  function estacion(col, mx, h) {
+    const t = TEMP[S.temporada] || TEMP[1];
+    let k = t.k;
+    if (S.temporada === 3) k *= U.clamp(0.55 + (mx - 0.4) * 1.6, 0.25, 1); // nieve despareja
+    if (S.temporada === 2 && h > 0.97) return [196, 96, 40];              // hoja caída
+    return mix(col, t.tinte, k);
+  }
   S.renderGroundChunk = function (W, chx, chy) {
     const CH = W.CH, x0 = chx * CH, y0 = chy * CH, Wd = W.W, Ht = W.H, seed = W.seed;
     const gx0 = (x0 - y0 - CH) * 16 + Ht * 16, gy0 = (x0 + y0) * 8, cw = CH * 32, ch = CH * 16 + 2;
@@ -1909,10 +2412,12 @@
             col = mix(GR2, GR1, U.clamp((mx - 0.35) * 2.4, 0, 1));
             if (mx > 0.62) col = mix(col, GR3, (mx - 0.62) * 2);
             if (h > 0.985) col = sc(col, 1.2); else if (h < 0.012) col = sc(col, 0.78);
-            if (h > 0.9994) col = U.hash(px, py, 9) > 0.5 ? [232, 222, 120] : [226, 226, 236];
+            col = estacion(col, mx, h);
+            if (h > (TEMP[S.temporada] || TEMP[1]).flores) col = U.hash(px, py, 9) > 0.5 ? [232, 222, 120] : S.temporada === 0 ? [228, 128, 170] : [226, 226, 236];
           } else if (T === 1) {
             col = mix(FF1, FF2, mx);
             if (h > 0.93) col = [84, 66, 40]; else if (h < 0.05) col = sc(col, 0.8);
+            if (S.temporada >= 2) col = estacion(col, mx, h);
           } else if (T === 2) {
             col = mix(DI2, DI1, mx);
             if (h > 0.97) col = sc(col, 1.18); else if (h < 0.03) col = sc(col, 0.75);
@@ -1994,7 +2499,8 @@
   S.NODE_MM = { tree: [30, 58, 26], berry: [150, 60, 90], deer: [170, 120, 70], stone: [170, 168, 160], gold: [240, 200, 70], ore: [180, 90, 60], marble: [240, 240, 232], gems: [90, 170, 230] };
 
   S.init = function () {
-    S.trees = { oak: [], pine: [], aut: [] };
+    S.trees = { oak: [], pine: [], aut: [], palm: [] };
+    for (let i = 0; i < 4; i++) S.trees.palm.push(makePalm(400 + i));
     for (let i = 0; i < 6; i++) { S.trees.oak.push(makeOak(100 + i)); S.trees.pine.push(makePine(200 + i)); }
     for (let i = 0; i < 2; i++) S.trees.aut.push(makeOak(300 + i, AUT));
     S.stump = makeStump();
@@ -2005,5 +2511,6 @@
     S.deer = [makeDeer(61, false), makeDeer(62, true), makeDeer(63, false), makeDeer(64, true)];
     S.deerGold = [makeDeer(65, false, true), makeDeer(66, true, true)];
     S.wolf = [[makeWolf(0, false), makeWolf(1, false)], [makeWolf(0, true), makeWolf(1, true)]];
+    if (S.initMar) S.initMar();
   };
 })();

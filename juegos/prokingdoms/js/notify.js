@@ -39,7 +39,7 @@
     if (!st) return out;
     for (const b of g.buildings) if (b.owner === 'p' && b.upg) out.push({ in: b.upg.total - b.upg.t, title: b.def.name + ' nivel ' + (b.lvl + 1), body: 'Terminó la mejora. Un Maestro de Obras quedó libre.' });
     if (st.eraProg) out.push({ in: st.eraProg.total - st.eraProg.t, title: '¡Era ' + U.roman(st.eraProg.to) + '!', body: 'Tu pueblo avanzó de era: hay edificios y mejoras nuevas.' });
-    if (st.research) out.push({ in: (st.research.total - st.research.t) / g.researchMult(), title: D.TECHS[st.research.id].name + ' ' + U.roman(st.research.lvl), body: 'La investigación terminó.' });
+    if (st.research) out.push({ in: (st.research.total - st.research.t) / g.researchMult(), title: g.researchName(st.research), body: 'La investigación terminó.' });
     for (const r of (st.exp && st.exp.runs) || []) out.push({ in: ((r.phase === 'go' ? r.arrive + r.travel * 1000 : r.back) - Date.now()) / 1000, title: 'Tus tropas volvieron', body: 'La expedición regresó con su botín.' });
     // campañas: las tuyas llegan a la parcela y los ataques de otros jugadores llegan a tu frontera
     for (const c of (st.terr && st.terr.camps) || []) if (c.phase === 'go') out.push({ in: (c.arrive - Date.now()) / 1000, title: 'Tus tropas llegan a la parcela', body: 'La batalla se resuelve ahora: entra a ver el resumen.' });

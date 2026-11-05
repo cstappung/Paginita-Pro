@@ -57,6 +57,7 @@ import PR from "../../../juegos/prodrop/retos.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { cajaRock, reembolsoRock, repetidaRock, claveRock, PRECIO_CAJA } from "./rock-datos.js";
 import { TIENDA, precioDe, aLaVenta } from "./tienda.js";
+import { compraValida } from "./pase-pk.js";
 import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
@@ -668,6 +669,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries(d.tienda || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "c", at: x.at, u, k, p: num(x.p) });
+  /* El Pase del Reino de Pro Kingdoms: `pkPase/<uid>/<período>` = {at, p, s} (pase-pk.js). */
+  for (const [u, l] of Object.entries(d.pkPase || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pk", at: x.at, u, k, p: num(x.p), s: x.s });
   /* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. */
   for (const [u, l] of Object.entries(d.cofres || {}))
     for (const [k, x] of Object.entries(l || {}))
@@ -709,7 +714,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, desafios: {}, tacos: {}, cofres: [],
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, pkPase: {}, desafios: {}, tacos: {}, cofres: [],
     intentos: 0, adopciones: 0, comida: 0, comidas: {}, piezas: 0, piezasUsadas: 0, piezasDia: 0, piezasHoy: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
@@ -953,6 +958,12 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
          y lo de edición limitada solo mientras se vendía. */
       if (!TIENDA[e.k] || e.p !== precioDe(e.k) || !aLaVenta(e.k, e.at) || U(e.u).tienda[e.k]) continue;
       if (paga(e.u, e.p, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
+    } else if (e.t === "pk") {
+      /* Un Pase del Reino: una vez por período, a su precio y escrito dentro de ese período (lo mismo que la
+         regla). Si no alcanzaba, no vale y la cuenta se frena, como en la tienda. */
+      const s = +e.k;
+      if (String(e.s) !== e.k || !compraValida(s, e.at, e.p) || (U(e.u).pkPase || {})[e.k]) continue;
+      if (paga(e.u, e.p, "pkPase", e.k)) (U(e.u).pkPase = U(e.u).pkPase || {})[e.k] = e.at;
     } else if (e.t === "sc") {
       /* Un super chat: al precio de un nivel. El que no se pudo pagar no
          vale, y el chat lo pinta como un mensaje normal. */
@@ -1085,7 +1096,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.pkPase, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   /* Y quien solo sale en el cierre (todo lo suyo ya está archivado). */
   if (d.cierre) for (const u of Object.keys(economia(d).usuarios)) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)

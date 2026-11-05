@@ -66,6 +66,106 @@
     g.used = frameNo;
     return g;
   }
+  // Estaciones (Fase 3, V3): el suelo se repinta con el tinte de la estación (sprites.js) una vez por cambio.
+  R.nuevaEstacion = function () {
+    const e = PK.Vida ? PK.Vida.estacion() : 1;
+    if (Sp.temporada === e) return;
+    Sp.temporada = e;
+    ground.clear();
+  };
+  // Clima de la estación y noche. Las partículas viven en coordenadas de pantalla (no del mundo): 50 copos u hojas
+  // que caen y dan la vuelta. Nada de esto cambia números del juego.
+  const clima = [];
+  let glowC = null;
+  function brillo() {
+    if (glowC) return glowC;
+    glowC = document.createElement('canvas'); glowC.width = glowC.height = 32;
+    const c = glowC.getContext('2d'), gr = c.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(255,200,110,0.55)'); gr.addColorStop(1, 'rgba(255,170,60,0)');
+    c.fillStyle = gr; c.fillRect(0, 0, 32, 32);
+    return glowC;
+  }
+  const LUZ = { house: 1, tc: 3, tavern: 2, market: 1, library: 2, monastery: 2, consejo: 2, barracks: 1, guild: 2, university: 2, scriptorium: 1 };
+  function dibujarClima(ctx, dt, vis, g) {
+    const V = PK.Vida, cv = R.cv, dpr = R.dpr;
+    if (!V || !g.state) return;
+    if (Sp.temporada !== V.estacion()) R.nuevaEstacion();
+    const noche = V.noche();
+    if (noche > 0) {
+      // la oscuridad tapa el mundo y las ventanas de tus edificios se encienden (en coordenadas del mundo)
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = 'rgba(12,18,48,' + (0.42 * noche).toFixed(3) + ')';
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.restore();
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = noche;
+      const gl = brillo(), t = performance.now() / 1000;
+      ctx.fillStyle = 'rgba(255,214,120,0.9)';
+      for (const b of g.buildings) {
+        if (b.owner !== 'p' || !b.done || !LUZ[b.type]) continue;
+        const [x, y] = R.iso(b.x + b.w / 2, b.y + b.h / 2);
+        if (!vis(x - 30, y - 50, 60, 60)) continue;
+        const n = LUZ[b.type], hh = b.h * 6 + 6;
+        for (let i = 0; i < n; i++) {
+          const wx = x + (i - (n - 1) / 2) * 7, wy = y - hh, fl = 0.8 + 0.2 * Math.sin(t * 3 + U.hash(b.x, b.y, 4) * 20 + i);
+          ctx.globalAlpha = noche * fl;
+          ctx.drawImage(gl, wx - 9, wy - 9, 18, 18);
+          ctx.fillRect(Math.round(wx - 1), Math.round(wy - 1), 2, 2);
+        }
+      }
+      ctx.restore();
+    }
+    // copos (invierno), hojas (otoño) y pétalos (primavera)
+    const e = Sp.temporada, n = e === 1 ? 0 : MOBILE ? 26 : 50;
+    if (!n || PK.menosMov || (g.state.flags && g.state.flags.sinClima)) { clima.length = 0; return; }
+    const W0 = cv.width / dpr, H0 = cv.height / dpr;
+    while (clima.length < n) clima.push({ x: Math.random() * W0, y: Math.random() * H0, v: 0.5 + Math.random(), f: Math.random() * 6 });
+    clima.length = n;
+    const col = e === 3 ? 'rgba(245,248,255,0.85)' : e === 2 ? 'rgba(206,110,40,0.9)' : 'rgba(244,170,200,0.9)';
+    const sp = e === 3 ? 22 : 30;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = col;
+    for (const p of clima) {
+      p.f += dt * 2;
+      p.y += dt * sp * p.v; p.x += dt * (e === 3 ? 6 : 14) * Math.sin(p.f);
+      if (p.y > H0 + 4) { p.y = -4; p.x = Math.random() * W0; }
+      if (p.x < -4) p.x = W0 + 3; else if (p.x > W0 + 4) p.x = -3;
+      const z = e === 3 ? (p.v > 1.1 ? 2 : 1) : 2;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), z, e === 3 ? z : 1);
+    }
+    ctx.restore();
+  }
+  // El bote de cada muelle de pesca (V9): en el agua más cercana, meciéndose, y con el pescador si hay uno.
+  function botes(ctx, vis, g) {
+    const t = performance.now() / 1000;
+    for (const b of g.buildings) {
+      if (b.type !== 'muelle' || !b.done) continue;
+      if (b._bote === undefined) {
+        b._bote = null;
+        let bd = 1e9;
+        for (let y = b.y - 3; y < b.y + b.h + 3; y++) for (let x = b.x - 3; x < b.x + b.w + 3; x++) {
+          if (!W.inb(x, y) || W.terrain[W.idx(x, y)] !== 4) continue;
+          const d = U.dist(x + 0.5, y + 0.5, b.cx, b.cy);
+          if (d < bd) { bd = d; b._bote = [x + 0.5, y + 0.5]; }
+        }
+      }
+      if (!b._bote) continue;
+      const [px, py] = R.iso(b._bote[0], b._bote[1]), x = Math.round(px), y = Math.round(py + Math.sin(t * 1.6 + b.id) * 1.2);
+      if (!vis(x - 10, y - 14, 20, 20)) continue;
+      ctx.fillStyle = 'rgba(20,40,70,0.35)'; ctx.fillRect(x - 7, y + 2, 14, 2);
+      ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 6, y - 1, 12, 3); ctx.fillRect(x - 7, y - 2, 2, 2); ctx.fillRect(x + 5, y - 2, 2, 2);
+      ctx.fillStyle = '#8a5a30'; ctx.fillRect(x - 5, y - 2, 10, 1);
+      if (b.farmer !== null && g.uById.get(b.farmer)) {
+        ctx.fillStyle = '#3a5a9a'; ctx.fillRect(x - 1, y - 6, 3, 4);
+        ctx.fillStyle = '#e8c8a0'; ctx.fillRect(x - 1, y - 8, 3, 2);
+        ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 2, y - 6); ctx.lineTo(x + 8, y - 11); ctx.stroke();
+        ctx.fillStyle = 'rgba(230,240,255,0.7)'; ctx.fillRect(x + 8, y - 11 + Math.round(Math.sin(t * 2) * 1), 1, 9);
+      }
+    }
+  }
   // ¿Hay algo explorado en el trozo? Si no, se tapa con niebla y ni se pinta.
   function chunkSeen(ci) {
     if (!W.chunkSeen || W.chunkSeenVer !== W.fogVer) {
@@ -138,6 +238,7 @@
 
   function nodeSprite(n) {
     if (n.gone) return null;
+    if (D.NODES[n.kind] && D.NODES[n.kind].mar && Sp.nodoMar) return Sp.nodoMar(n, G().mareaBaja()); // Fase 9 (pk-28)
     if (n.kind === 'deer') return n.dead ? null : n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
     if (n.kind === 'tree') return n.dead ? Sp.stump : Sp.trees[n.sp][n.v % Sp.trees[n.sp].length];
     if (n.kind === 'berry') return n.dead || n.amount < n.max * 0.15 ? Sp.bushBare : Sp.bush[n.v % 3];
@@ -155,21 +256,37 @@
     else if (mode === 'work') {
       const t = u.task && u.task.t, n = t === 'gather' && W.nodes[u.task.node];
       tool = t === 'dig' ? 'pick' : t === 'build' ? 'hammer' : t === 'farm' ? 'sickle' : !n ? 'pick'
-        : n.kind === 'tree' ? 'axe' : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : 'pick';
+        : n.kind === 'tree' ? 'axe' : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
       const ph = (u.anim * SWING[tool] + u.id * 0.37) % 1;
       frame = tool === 'hand' ? Math.floor(ph * 4) : ph < 0.4 ? 0 : ph < 0.52 ? 1 : ph < 0.8 ? 2 : 3;
-      if (u.aim) { // punto de contacto en pantalla: el borde del objetivo que da al aldeano, a la altura del golpe
+      // punto de contacto en pantalla: el borde del objetivo que da al aldeano, a la altura del golpe. T4: lejos no se
+      // nota (y multiplicaba las figuras), y cerca se recalcula solo si se movió 0,3 casillas o cambió de objetivo:
+      // los empujones entre vecinos que trabajan juntos hacían una figura nueva por cuadro.
+      const fa = u._aimF;
+      if (u.aim && R.cam.z >= 1.5 && fa && fa.a === u.aim && Math.abs(fa.x - u.x) + Math.abs(fa.y - u.y) < 0.3) aim = fa.v;
+      else if (u.aim && R.cam.z >= 1.5) {
         const a = u.aim, [ux, uy] = R.iso(u.x, u.y), [tx, ty] = R.iso(a.x, a.y);
         let dx = tx - ux, dy = ty - uy;
         const d = Math.hypot(dx, dy) || 1;
         dx -= (dx / d) * a.r; dy -= (dy / d) * a.r * 0.5;
         dy = Math.max(dy - a.h1, Math.min(dy - a.h0, -a.w));
-        aim = [Math.round(Math.abs(dx)), Math.round(dy)];
+        aim = [Math.round(Math.abs(dx) / 2) * 2, Math.round(dy / 2) * 2]; // de a 2 px: menos figuras distintas
+        u._aimF = { a: u.aim, x: u.x, y: u.y, v: aim };
       }
     }
     u.swTool = tool; u.swF = frame;
-    return Sp.villager(col, u.hair, u.skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim);
+    // T4: lejos (zoom < 1,5) todos usan una de dos caras (hombre o mujer): con el pelo y la piel de cada uno, las
+    // combinaciones no cabían en el caché. Y cada cuadro se hacen pocas figuras nuevas (vPres); el que se queda sin
+    // la suya muestra la de antes, nunca más de 3 cuadros seguidos (8 en el celular, donde cada figura cuesta más).
+    const lejos = R.cam.z < 1.5, hair = lejos ? (u.id % 2) : u.hair, skin = lejos ? 0 : u.skin;
+    const espera = vPres <= 0 && u._spr && (u._hambre || 0) < (MOBILE ? 8 : 3), n0 = Sp.vNuevas;
+    const spr = Sp.villager(col, hair, skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim, undefined, espera);
+    if (!spr) { u._hambre = (u._hambre || 0) + 1; return u._spr; }
+    if (Sp.vNuevas !== n0) vPres--;
+    u._hambre = 0; u._spr = spr;
+    return spr;
   }
+  let vPres = 0;
 
   // Efecto del golpe, en el cuadro exacto en que la herramienta toca: astillas y hojas, esquirlas y chispas,
   // tierra, paja o polvo según lo que se golpea, más la sacudida del objetivo y su sonido.
@@ -213,9 +330,59 @@
   }
 
   let sparkT = 0, smokeT = 0, firstFrame = true;
+  // ---------- Fase 9 (pk-28): marea y bruma ----------
+  // Con la bajamar, las casillas de agua pegadas a la costa se ven como bancos de arena (más la primera fila que la
+  // segunda); con la pleamar, agua llena. La espuma va y viene en la primera fila, al ritmo de las olas.
+  function costaMarea(ctx, chunks, tsec) {
+    const m = D.marea(), seco = 1 - m;
+    for (const c of chunks) {
+      if (!c.onScreen || !chunkSeen(c.ci)) continue;
+      const L = W.costa.get(c.ci);
+      if (!L) continue;
+      for (const [x, y, d] of L) {
+        if (!seen(x, y)) continue;
+        const a = d === 1 ? Math.max(0, seco - 0.25) * 0.95 : Math.max(0, seco - 0.55) * 0.9;
+        const p = [R.iso(x, y), R.iso(x + 1, y), R.iso(x + 1, y + 1), R.iso(x, y + 1)];
+        if (a > 0.02) {
+          ctx.fillStyle = 'rgba(214,196,140,' + a.toFixed(2) + ')';
+          ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(p[i][0], p[i][1]); ctx.closePath(); ctx.fill();
+        }
+        if (d === 1) {
+          const hsh = U.hash(x, y, 5), ph = (tsec * 0.45 + hsh * 3) % 1.6;
+          if (ph < 0.8) {
+            ctx.fillStyle = 'rgba(245,250,255,' + (0.55 * (1 - ph / 0.8)).toFixed(2) + ')';
+            const [px, py] = R.iso(x + 0.5, y + 0.5);
+            ctx.fillRect(Math.round(px - 5 + hsh * 4), Math.round(py - 1 + ph * 2), 6, 1);
+          }
+        }
+      }
+    }
+  }
+  // Bancos de bruma: manchas grandes que derivan despacio (dan la vuelta al mapa) y se abren cerca de un faro.
+  const BRUMA = [];
+  for (let i = 0; i < 9; i++) BRUMA.push({ x: (i * 97) % 256, y: (i * 61 + 40) % 256, r: 9 + (i % 4) * 3, vx: 0.18 + (i % 3) * 0.07, vy: 0.05 * ((i % 2) * 2 - 1) });
+  let faros = [], farosT = 0;
+  function bruma(ctx, vx0, vy0, vw, vh, g) {
+    if ((farosT -= 1) <= 0) { farosT = 60; faros = g.buildings.filter(b => b.owner === 'p' && b.done && (b.type === 'faromar' || b.type === 'granfaro' || b.type === 'tc')).map(b => [b.cx, b.cy, b.type === 'tc' ? 12 : g.bst(b).sight || 20]); }
+    const t = Date.now() / 1000;
+    for (const B of BRUMA) {
+      const x = (((B.x + B.vx * t) % 256) + 256) % 256, y = (((B.y + B.vy * t) % 256) + 256) % 256;
+      let a = 0.42;
+      for (const [fx, fy, r] of faros) { const d = Math.hypot(fx - x, fy - y); if (d < r + B.r) a *= U.clamp((d - r * 0.6) / (B.r + r * 0.4), 0, 1); }
+      if (a < 0.03) continue;
+      const [px, py] = R.iso(x, y), rr = B.r * 16;
+      if (px + rr < vx0 || px - rr > vx0 + vw || py + rr < vy0 || py - rr > vy0 + vh) continue;
+      const gr = ctx.createRadialGradient(px, py, rr * 0.15, px, py, rr);
+      gr.addColorStop(0, 'rgba(226,234,240,' + a.toFixed(2) + ')'); gr.addColorStop(1, 'rgba(226,234,240,0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.ellipse(px, py, rr, rr * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   R.draw = function (dt) {
     const ctx = R.ctx, cv = R.cv, s = R.scale(), g = G();
     frameNo++;
+    vPres = MOBILE ? 2 : 10; // figuras de aldeano nuevas por cuadro (T4)
     sparkT += dt; smokeT += dt;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#16140f';
@@ -259,9 +426,12 @@
         ctx.fillRect(Math.round(px - 4 + hsh * 8), Math.round(py - 2 + U.hash(x, y, 2) * 4), w, 1);
       }
     }
+    // Fase 9 (pk-28): la marea en la costa del archipiélago (bancos de arena con la bajamar y espuma)
+    if (W.costa && g.enMar()) costaMarea(ctx, chunks, tsec);
     // caminos y cintas (planos, sobre el suelo)
     drawRoads(ctx, chunks);
     drawBelts(ctx, vis);
+    botes(ctx, vis, g);
     // bordes de zonas comunes
     if (R.showZones) {
       ctx.strokeStyle = 'rgba(255,226,120,0.8)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -305,6 +475,22 @@
       list.push({ d: p.x + p.y + (p.w + p.h) / 2, k: 'poi', o: p, spr, x, y });
       if (st && !st.d && p.kind === 'relic' && Math.random() < dt * 3) R.particles.push({ x: px + (Math.random() - 0.5) * 6, y: py - 12, vx: 0, vy: -8, life: 0, max: 1.2, s: 1, rgb: [255, 230, 120] });
       if (p.kind === 'camp' && !(st && st.d) && smokeT > 0.35) R.particles.push({ x: x + spr.c.width / 2, y: y + spr.oy + 10, vx: 2, vy: -7, life: 0, max: 2, s: 1, c: 90 });
+    }
+    // el Galeón del Alba (Fase 9): encallado en la orilla del lago, o fondeado frente a tu isla
+    const gal = PK.Mar && PK.Mar.item(R, seen);
+    if (gal && vis(gal.x, gal.y, gal.spr.c.width, gal.spr.c.height)) list.push(gal);
+    if (PK.Arch && g.enMar()) for (const it of PK.Arch.items(R, seen)) if (vis(it.x, it.y, it.spr.c.width, it.spr.c.height)) list.push(it); // barcos de colonos
+    if (PK.Armada && g.enMar()) for (const it of PK.Armada.items(R, seen)) if (vis(it.x, it.y, it.spr.c.width, it.spr.c.height)) list.push(it); // la flota (pk-29)
+    // el lugar del capítulo en curso de la campaña (H5): el dibujo de su terreno, con estandarte
+    const cn = PK.Campana && g.state && g.state.campana ? PK.Campana.actual() : 0, cl = cn && PK.Campana.lugar(cn);
+    if (cl && seen(cl.x, cl.y)) {
+      const c0 = D.CAPITULOS[cn - 1], kind = { crater: 'crater', nest: 'nest', temple: 'temple', giants: 'giants' }[c0.lugar.terreno] || 'camp', spr = Sp.poi(kind, false);
+      const [px, py] = R.iso(cl.x - 1, cl.y - 1);
+      list.push({ d: cl.x + cl.y + 1, k: 'cap', o: { n: cn }, spr, x: Math.round(px - spr.ox), y: Math.round(py - spr.oy), after: ctx2 => {
+        const [bx, by] = R.iso(cl.x + 0.5, cl.y + 0.5), x = Math.round(bx), y = Math.round(by) - 34, ond = Math.round(Math.sin(performance.now() / 240));
+        ctx2.fillStyle = '#2a1a0e'; ctx2.fillRect(x, y, 2, 26);
+        ctx2.fillStyle = '#b02020'; ctx2.fillRect(x + 2, y, 12, 8 + ond); ctx2.fillStyle = '#ffd040'; ctx2.fillRect(x + 6, y + 2, 4, 4);
+      } });
     }
     // lobos
     for (const w of PK.Life.wolves) {
@@ -352,7 +538,7 @@
       const [px, py] = R.iso(u.x, u.y);
       if (!vis(px - 14, py - 20, 28, 24)) continue;
       const prevF = u.mode === 'work' ? u.swF : -1, spr = unitSprite(u);
-      list.push({ d: u.x + u.y, k: 'unit', o: u, spr, x: px - spr.ax, y: py - spr.ay, px, py, sel: selUnits && selUnits.has(u.id) });
+      list.push({ d: u.x + u.y, k: 'unit', o: u, spr, x: px - spr.ax, y: py - spr.ay, px, py, sel: selUnits && selUnits.has(u.id), after: u.balde ? c => c.drawImage(Sp.bucket(), Math.round(px + (u.flip ? -7 : 2)), Math.round(py - 9)) : null }); // el balde del incendio (life.js)
       if (u.mode === 'work' && u.swF === 2 && prevF !== 2 && spr.hit) impact(u, px + spr.hit[0], py + spr.hit[1]);
     }
     // soldados: guarnición del Cuartel, columnas en marcha y peleas (troops.js)
@@ -389,6 +575,7 @@
       if (it.after) it.after(ctx);
     }
 
+    if (g.enMar()) bruma(ctx, vx0, vy0, vw, vh, g); // los bancos de bruma del archipiélago, que los faros despejan
     // niebla de lo no explorado
     if (fogC) {
       ctx.imageSmoothingEnabled = true;
@@ -397,10 +584,13 @@
       if (fw > 0 && fh > 0) ctx.drawImage(fogC, fx0, fy0, fw, fh, fx0 * 4, fy0 * 4, fw * 4, fh * 4);
       ctx.imageSmoothingEnabled = false;
     }
+    // noche y clima de la estación (Fase 3), sobre la niebla para que de noche también se vea oscuro
+    if (!PK.Terr.mode) dibujarClima(ctx, dt, vis, g);
     // en el mapa de territorio las parcelas se ven encima de la niebla (tus tierras siempre)
     if (PK.Terr.mode) drawTerritory(ctx, vx0, vy0, vw, vh);
 
     // barras de progreso y marcas
+    const puertas = g.encierro && g.encierro.puertas.length ? new Set(g.encierro.puertas) : null;
     for (const it of list) {
       if (it.k === 'building') {
         const b = it.o;
@@ -420,7 +610,14 @@
           const inFill = Math.min(...Object.keys(r.in).map(k => ((b.inb && b.inb[k]) || 0) / cap));
           bar(ctx, cx - 12, cy + 5, 11, inFill, '#7ad070');
           bar(ctx, cx + 1, cy + 5, 11, ((b.outb && b.outb[out]) || 0) / cap, '#f0b040');
-          if (b.status === 'Faltan insumos' || b.status === 'Depósito de salida lleno') { ctx.fillStyle = '#ff5040'; ctx.fillRect(Math.round(cx) - 1, cy - 8, 2, 5); ctx.fillRect(Math.round(cx) - 1, cy - 2, 2, 1); }
+          if (b.status === 'Faltan insumos' || b.status === 'En reserva' || b.status === 'Depósito de salida lleno') { ctx.fillStyle = '#ff5040'; ctx.fillRect(Math.round(cx) - 1, cy - 8, 2, 5); ctx.fillRect(Math.round(cx) - 1, cy - 2, 2, 1); }
+        }
+        // Centro Urbano encerrado (G.checkEncierro): una flecha roja sobre los edificios que, movidos o demolidos,
+        // abren el patio. Va sobre el techo porque un contorno en el suelo lo tapaba el propio edificio.
+        if (puertas && puertas.has(b.id)) {
+          const ax = Math.round(it.x + it.spr.c.width / 2), ay = Math.round(it.y + techo(it.spr) - 3 + 2 * Math.sin(performance.now() / 180));
+          ctx.fillStyle = '#2a0a06'; ctx.fillRect(ax - 6, ay - 7, 13, 4); for (let k = 0; k < 5; k++) ctx.fillRect(ax - 5 + k, ay - 3 + k, 11 - 2 * k, 1);
+          ctx.fillStyle = '#ff4a3a'; ctx.fillRect(ax - 5, ay - 6, 11, 2); for (let k = 0; k < 4; k++) ctx.fillRect(ax - 4 + k, ay - 4 + k, 9 - 2 * k, 1);
         }
         if (b.owner === 'p' && b.done && !b.def.noUp) labels.push([it.x + it.spr.c.width / 2, it.y + it.spr.c.height - 2, b.lvl, !!b.upg]);
       } else if (it.k === 'wolf' && it.o.hp < it.o.max) {
@@ -441,11 +638,38 @@
       ctx.globalAlpha = ok ? 0.75 : 0.45;
       ctx.drawImage(spr.c, Math.round(px - spr.ox), Math.round(py - spr.oy));
       ctx.globalAlpha = 1;
+      // bonos por cercanía (V5): líneas verdes hacia los vecinos que suman
+      if (ok && g.cercaDe) {
+        const [gx, gy] = R.iso(x + def.w / 2, y + def.h / 2);
+        ctx.strokeStyle = 'rgba(110,240,120,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+        for (const c of g.cercaDe(null, x, y, g.placing.type)) { const [ox2, oy2] = R.iso(c.o.cx, c.o.cy); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(ox2, oy2); ctx.stroke(); }
+        // y al revés: lo que este edificio le suma a los que ya están (una casa nueva no, una plaza junto a casas sí)
+        for (const o of g.buildings) {
+          if (o.owner !== 'p' || !o.done) continue;
+          const r = D.CERCANIA && D.CERCANIA.find(c => c.a === o.type && c.b.includes(g.placing.type));
+          if (r && g.rectDist(x, y, def.w, def.h, o.x, o.y, o.w, o.h) <= r.r) { const [ox2, oy2] = R.iso(o.cx, o.cy); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(ox2, oy2); ctx.stroke(); }
+        }
+        ctx.setLineDash([]); ctx.lineWidth = 1;
+      }
     }
     if (R.roadGhost) for (const [x, y] of R.roadGhost) diamondFill(ctx, x, y, 'rgba(230,200,120,0.45)');
     if (R.wallGhost) for (const [x, y] of R.wallGhost) diamondFill(ctx, x, y, PK.Def.tool === 'gate' ? 'rgba(232,184,74,0.6)' : 'rgba(210,210,220,0.55)');
     if (R.beltGhost) for (const [x, y] of R.beltGhost) diamondFill(ctx, x, y, 'rgba(140,200,255,0.45)');
 
+    // mapas del tesoro (H7): una X roja en el suelo, también sobre la niebla
+    for (const m of (g.state && g.state.mapas) || []) {
+      const [px, py] = R.iso(m.x + 0.5, m.y + 0.5), x = Math.round(px), y = Math.round(py), k = 0.7 + 0.3 * Math.sin(performance.now() / 300);
+      ctx.fillStyle = 'rgba(200,30,20,' + k + ')';
+      for (let i = -4; i <= 4; i++) { ctx.fillRect(x + i * 2, y + i, 2, 1); ctx.fillRect(x - i * 2, y + i, 2, 1); }
+    }
+    // banderas de exploración (A4): un mástil con el color del reino, también sobre la niebla
+    for (const f of g.banderas()) {
+      const [px, py] = R.iso(f[0] + 0.5, f[1] + 0.5), x = Math.round(px), y = Math.round(py), ond = Math.round(Math.sin(performance.now() / 260 + f[0]));
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x - 3, y - 1, 7, 2);
+      ctx.fillStyle = '#2a1a0e'; ctx.fillRect(x, y - 20, 1, 20);
+      ctx.fillStyle = 'rgb(' + D.PLAYER_COLOR.join(',') + ')'; ctx.fillRect(x + 1, y - 20, 8, 5 + ond); ctx.fillRect(x + 1, y - 15 + ond, 5, 1);
+      ctx.fillStyle = '#f2ead6'; ctx.fillRect(x + 3, y - 18, 2, 2);
+    }
     // punto de reunión
     if (sel && sel.type === 'building') {
       const b = g.bById.get(sel.id);
@@ -462,8 +686,11 @@
       const t = Math.min(1, a.t / a.dur), [x0, y0] = R.iso(a.x0, a.y0), [x1, y1] = R.iso(a.w.x, a.w.y);
       const x = x0 + (x1 - x0) * t, y = y0 - a.z0 + (y1 - 6 - (y0 - a.z0)) * t - Math.sin(t * Math.PI) * 14;
       const t2 = Math.max(0, t - 0.08), xb = x0 + (x1 - x0) * t2, yb = y0 - a.z0 + (y1 - 6 - (y0 - a.z0)) * t2 - Math.sin(t2 * Math.PI) * 14;
-      pxLine(ctx, xb, yb, x, y, '#3a2a1a'); ctx.fillStyle = '#e8e4dc'; ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      pxLine(ctx, xb, yb, x, y, a.col ? '#2a1a10' : '#3a2a1a'); ctx.fillStyle = a.col || '#e8e4dc'; ctx.fillRect(Math.round(x), Math.round(y), a.col ? 2 : 1, a.col ? 2 : 1);
     }
+    if (PK.Asedios) PK.Asedios.dibujar(ctx, R); // trampas (C5)
+    if (PK.Saqueos) PK.Saqueos.dibujar(ctx, R); // partidas de saqueo (C6)
+    if (PK.Mundo) PK.Mundo.dibujar(ctx, R); // caravanas (S2)
     // partículas
     for (let i = R.particles.length - 1; i >= 0; i--) {
       const p = R.particles[i];
@@ -621,7 +848,7 @@
   // que puedes reclamar (blanco) o atacar (rojo).
   function drawTerritory(ctx, vx0, vy0, vw, vh) {
     if (!W.terr) return;
-    const P = W.PW, PS = D.PARCEL, T = PK.Terr, mode = T && T.mode;
+    const P = W.PW, PS = D.PARCEL, T = PK.Terr, mode = T && T.mode, dal = Sp.daltonico();
     const corners = [R.tileAt(vx0, vy0), R.tileAt(vx0 + vw, vy0), R.tileAt(vx0, vy0 + vh), R.tileAt(vx0 + vw, vy0 + vh)];
     const px0 = Math.max(0, Math.floor(Math.min(...corners.map(c => c[0])) / PS) - 1), px1 = Math.min(P - 1, Math.floor(Math.max(...corners.map(c => c[0])) / PS) + 1);
     const py0 = Math.max(0, Math.floor(Math.min(...corners.map(c => c[1])) / PS) - 1), py1 = Math.min(P - 1, Math.floor(Math.max(...corners.map(c => c[1])) / PS) + 1);
@@ -635,7 +862,7 @@
       if (!(mode && o === 'p') && !seen(x0 + PS / 2, y0 + PS / 2) && !seen(x0, y0) && !seen(x0 + PS - 1, y0 + PS - 1)) continue;
       if (mode) {
         // cuadrícula de parcelas + relleno del color del dueño
-        if (o) { ctx.fillStyle = 'rgba(' + colOf(o).join(',') + ',0.3)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.fill(); }
+        if (o) { const pt = dal ? Sp.patronSlotDe(o) : -1; ctx.fillStyle = pt >= 0 ? Sp.trama(ctx, pt, colOf(o), 0.3) : 'rgba(' + colOf(o).join(',') + ',0.3)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.fill(); }
         else if (W.terrCommon[k]) { ctx.fillStyle = 'rgba(255,220,120,0.14)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.fill(); }
         ctx.strokeStyle = 'rgba(0,0,0,0.22)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.stroke();
         const claim = T.canClaim(k) === null, atk = o && o !== 'p' && T.touchesMine(k) && !W.isCore(k, W.terr[k] - 1);
@@ -649,6 +876,8 @@
       // borde hacia afuera, un poco hacia adentro para que dos reinos vecinos se vean los dos
       const c = colOf(o), inset = 0.18;
       ctx.strokeStyle = 'rgba(' + c.join(',') + ',' + (mode ? 0.95 : 0.7) + ')';
+      const pg = dal ? Sp.patronSlotDe(o) : -1;
+      if (pg >= 0) ctx.setLineDash(Sp.GUIONES[pg]); // daltonismo: cada reino con su guion, el tuyo continuo
       ctx.beginPath();
       const diff = n => n < 0 || W.terr[n] !== W.terr[k];
       if (py === 0 || diff(k - P)) { const a = R.iso(x0, y0 + inset), b = R.iso(x0 + PS, y0 + inset); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
@@ -656,6 +885,7 @@
       if (py === P - 1 || diff(k + P)) { const a = R.iso(x0, y0 + PS - inset), b = R.iso(x0 + PS, y0 + PS - inset); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
       if (px === 0 || diff(k - 1)) { const a = R.iso(x0 + inset, y0), b = R.iso(x0 + inset, y0 + PS); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
       ctx.stroke();
+      if (pg >= 0) ctx.setLineDash([]);
     }
     if (mode && T.sel !== null && T.sel !== undefined) {
       const x0 = (T.sel % P) * PS, y0 = Math.floor(T.sel / P) * PS;
@@ -671,6 +901,17 @@
     }
   }
 
+  // Primera fila con dibujo de un sprite (el lienzo tiene aire arriba): se calcula una vez por sprite.
+  function techo(spr) {
+    if (spr._techo === undefined) {
+      spr._techo = spr.pad || 0;
+      try {
+        const c = spr.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        fila: for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 40) { spr._techo = y; break fila; }
+      } catch (e) { /* lienzo sin acceso: queda pad */ }
+    }
+    return spr._techo;
+  }
   function drawBuilding(ctx, it) {
     const b = it.o, spr = it.spr;
     if (b.done) {
@@ -810,12 +1051,13 @@
   // Muestra el territorio de cada reino con su color. Se recalcula cada pocos segundos.
   // Encuadra lo explorado (más un margen), no el mundo entero: al empezar, el mundo completo era un rectángulo
   // negro con un manchón diminuto. El encuadre crece suave a medida que exploras. mmView está en píxeles de mmBase.
-  let mmBase = null, mmT = 99, mmFog = -1, mmTerr = -1, mmBox = null;
+  let mmBase = null, mmT = 99, mmFog = -1, mmTerr = -1, mmBox = null, mmDal = false;
   R.mmView = null;
   function mmTarget(w, h, aspect) {
     if (!mmBox) return { x: 0, y: 0, w, h };
     const m = 14;
     let x0 = mmBox[0] - m, x1 = mmBox[2] + m, y0 = mmBox[1] - m / 2, y1 = mmBox[3] + m / 2;
+    for (const f of G().banderas()) { const fx = f[0] - f[1] + W.H, fy = (f[0] + f[1]) / 2; x0 = Math.min(x0, fx - 6); x1 = Math.max(x1, fx + 6); y0 = Math.min(y0, fy - 6); y1 = Math.max(y1, fy + 3); } // que se vean las banderas
     let vw = Math.max(72, x1 - x0), vh = Math.max(vw / aspect, y1 - y0);
     vw = Math.max(vw, vh * aspect);
     if (vw >= w || vh >= h) return { x: 0, y: 0, w, h };
@@ -825,8 +1067,9 @@
   R.drawMinimap = function (mc, dt) {
     const ctx = mc.getContext('2d'), w = W.W + W.H, h = (W.W + W.H) / 2;
     mmT += dt;
-    if (!mmBase || mmT > 4 || ((mmFog !== W.fogVer || mmTerr !== W.terrVer) && mmT > 0.7)) {
-      mmFog = W.fogVer; mmTerr = W.terrVer;
+    const dal = Sp.daltonico();
+    if (!mmBase || mmT > 4 || mmDal !== dal || ((mmFog !== W.fogVer || mmTerr !== W.terrVer) && mmT > 0.7)) {
+      mmFog = W.fogVer; mmTerr = W.terrVer; mmDal = dal;
       mmT = 0;
       mmBase = mmBase || Sp.mk(w, h);
       const bctx = mmBase.getContext('2d'), im = bctx.createImageData(w, h), d = im.data;
@@ -836,10 +1079,13 @@
         if (!W.inb(tx, ty)) continue;
         const k = W.idx(tx, ty), nid = W.nodeAt[k];
         let col = Sp.TERRAIN_MM[W.terrain[k]];
-        if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind];
-        if (W.poiAt[k] >= 0) col = [210, 180, 120];
+        if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind] || (Sp.NODE_MM_MAR && Sp.NODE_MM_MAR[W.nodes[nid].kind]) || col;
+        if (W.poiAt[k] >= 0) col = W.pois[W.poiAt[k]].kind === 'legend' ? [255, 220, 90] : [210, 180, 120];
         const o = W.terr[W.parcel(tx, ty)];
-        if (o) { const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color; col = [col[0] * 0.6 + c2[0] * 0.4, col[1] * 0.6 + c2[1] * 0.4, col[2] * 0.6 + c2[2] * 0.4]; }
+        if (o) {
+          const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color, pt = dal ? Sp.patronDe(o - 1) : -1, f = pt >= 0 && Sp.enPatron(pt, mx, my) ? 0.85 : 0.4; // daltonismo: el patrón del reino
+          col = [col[0] * (1 - f) + c2[0] * f, col[1] * (1 - f) + c2[1] * f, col[2] * (1 - f) + c2[2] * f];
+        }
         if (!W.fog[k]) col = [22, 19, 14];
         else { if (mx < box[0]) box[0] = mx; if (my < box[1]) box[1] = my; if (mx > box[2]) box[2] = mx; if (my > box[3]) box[3] = my; }
         const i = (my * w + mx) * 4;
@@ -863,7 +1109,8 @@
       const [x, y] = toMM(b.cx, b.cy);
       ctx.fillStyle = 'rgb(' + Sp.ownerColor(b.owner).join(',') + ')';
       const s = Math.round((b.w >= 3 ? 3 : 2) * zk);
-      ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
+      if (dal && b.owner !== 'p') { const c = Math.max(1, Math.round(s / 3)), r = Math.round(s / 2) + 1; ctx.fillRect(Math.round(x - r), Math.round(y - c / 2), r * 2, c); ctx.fillRect(Math.round(x - c / 2), Math.round(y - r), c, r * 2); } // ajenos: una cruz, los tuyos: un cuadrado
+      else ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
     }
     for (const u of G().units) {
       if (u.inside || (u.owner !== 'p' && !seen(u.x, u.y))) continue;
@@ -872,6 +1119,23 @@
       ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
+    if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
+    if (PK.Mundo) PK.Mundo.minimapa(ctx, toMM); // S2
+    if (PK.Mar) PK.Mar.minimapa(ctx, toMM); // Fase 9: el Galeón
+    if (PK.Campana && G().state && G().state.campana) { // el lugar del capítulo en curso: un punto rojo y dorado que late
+      const n = PK.Campana.actual(), l = n && PK.Campana.lugar(n);
+      if (l) { const [x, y] = toMM(l.x + 0.5, l.y + 0.5), s = Math.max(2, Math.round(zk * 2)), on = Math.floor(performance.now() / 350) % 2; ctx.fillStyle = on ? '#ffd040' : '#c02020'; ctx.fillRect(Math.round(x) - s, Math.round(y) - s, s * 2, s * 2); }
+    }
+    for (const m of (G().state && G().state.mapas) || []) { // mapas del tesoro: una X que late
+      const [x, y] = toMM(m.x + 0.5, m.y + 0.5), s = Math.max(1, Math.round(zk)), on = Math.floor(performance.now() / 400) % 2;
+      ctx.fillStyle = on ? '#ff4030' : '#ffd040';
+      for (let i = -2; i <= 2; i++) { ctx.fillRect(Math.round(x) + i * s, Math.round(y) + i * s, s, s); ctx.fillRect(Math.round(x) - i * s, Math.round(y) + i * s, s, s); }
+    }
+    for (const f of G().banderas()) { // banderas de exploración
+      const [x, y] = toMM(f[0] + 0.5, f[1] + 0.5), s = Math.max(1, Math.round(zk));
+      ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(x), Math.round(y) - 5 * s, s, 5 * s);
+      ctx.fillStyle = 'rgb(' + D.PLAYER_COLOR.join(',') + ')'; ctx.fillRect(Math.round(x) + s, Math.round(y) - 5 * s, 3 * s, 2 * s);
+    }
     // vista de la cámara
     const s = R.scale(), vw = R.cv.width / s, vh = R.cv.height / s;
     const ax = ((R.cam.x - vw / 2) / 16 - v.x) * sx, ay = ((R.cam.y - vh / 2) / 16 - v.y) * sy;

@@ -342,9 +342,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    de antes de su hora ya no está en `casino`, `cartas` ni `mercado`, así que
    sin él las cuentas saldrían mal. Si no existe (o las reglas aún no dejan
    leerlo), `cierre` queda en null y se rehace todo como siempre. */
-const NODOS_MONEDAS = 18, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+const NODOS_MONEDAS = 19, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cierre: null }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, pkPase: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cierre: null }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -387,7 +387,7 @@ export function watchLogros(cb, yo = () => "") {
     llegados.add(k); avisa();
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("pkPase", "pkPase"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
     oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("plantillas", "plantillas"), oye("economiaCierre", "cierre"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
@@ -451,6 +451,11 @@ export async function comprarTienda(uid, item, p) {
 /* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. La regla
    exige `at === now` y el precio; el saldo y el premio los decide
    `economia()` con `abreCofre`. Devuelve la hora que puso el servidor. */
+/* El Pase del Reino de Pro Kingdoms (juegos/pase-pk.js): una vez por período, con el precio y el período dentro
+   del registro, porque la regla no puede hacer cuentas con el nombre de la clave. */
+export async function comprarPase(uid, periodo, p) {
+  await set(ref(db, `pkPase/${uid}/${periodo}`), { at: serverTimestamp(), p, s: periodo });
+}
 export async function comprarCofre(uid, clave, p) {
   const r = ref(db, `cofres/${uid}/${clave}`);
   await set(r, { at: serverTimestamp(), p });

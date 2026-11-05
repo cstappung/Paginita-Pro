@@ -827,6 +827,19 @@
         }
       }
     },
+    "pkPase": {
+      ".read": "auth != null",
+      "$uid": {
+        "$periodo": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['at', 'p', 's']) && newData.child('at').val() === now && newData.child('p').val() === 2500 && newData.child('s').val() + '' === $periodo && now >= 1793588400000 + newData.child('s').val() * 1209600000 - 3600000 && now < 1793588400000 + (newData.child('s').val() + 1) * 1209600000 + 3600000",
+          "at": { ".validate": "newData.isNumber()" },
+          "p": { ".validate": "newData.isNumber()" },
+          "s": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "rock": {
       ".read": "auth != null",
       "c": {

@@ -44,7 +44,8 @@
     ensure(b);
     const g = G(), r = L.recipe(b), out = L.output(b), cap = L.bufCap(b), n = b.workers.length;
     if (L.nearStore(b)) L.direct(b, dt);
-    if (!n) { b.status = 'Sin trabajadores'; return; }
+    const enReserva = () => g.reservaDe(b) && Object.keys(r.in).some(k => (b.inb[k] || 0) < r.in[k]);
+    if (!n) { b.status = enReserva() ? 'En reserva' : 'Sin trabajadores'; return; }
     b.prodAcc += (dt * n * g.prodMult(b.def.recipe, b)) / r.time;
     b.status = 'Produciendo';
     let guard = 0;
@@ -52,7 +53,7 @@
       if ((b.outb[out] || 0) + r.out[out] > cap) { b.status = 'Depósito de salida lleno'; b.prodAcc = Math.min(b.prodAcc, 1); break; }
       let ok = true;
       for (const k in r.in) if ((b.inb[k] || 0) < r.in[k]) { ok = false; break; }
-      if (!ok) { b.status = 'Faltan insumos'; b.prodAcc = Math.min(b.prodAcc, 1); break; }
+      if (!ok) { b.status = enReserva() ? 'En reserva' : 'Faltan insumos'; b.prodAcc = Math.min(b.prodAcc, 1); break; }
       b.prodAcc -= 1;
       for (const k in r.in) b.inb[k] -= r.in[k];
       for (const k in r.out) { b.outb[k] = (b.outb[k] || 0) + r.out[k]; g.stat('p_' + k, r.out[k]); g.stat('p_total', r.out[k]); }
@@ -81,7 +82,7 @@
     for (const k in r.in) {
       const want = Math.min(L.need(b, k), budget);
       if (want <= 0) continue;
-      const avail = Math.max(0, st.res[k] - reserveOf(k, out));
+      const avail = Math.max(0, st.res[k] - reserveOf(k, out, b));
       const n = Math.min(want, avail);
       if (n > 0) { st.res[k] -= n; b.inb[k] = (b.inb[k] || 0) + n; budget -= n; }
     }
@@ -89,8 +90,13 @@
     if (have > 0) { const n = Math.min(have, L.directRate(b) * dt, Math.max(0, g.cap(out) - st.res[out])); b.outb[out] -= n; st.res[out] += n; }
   };
   // Reserva que fija el Capataz: los talleres no vacían la bodega de lo que hace falta para construir.
-  function reserveOf(res, out) {
+  // Un taller con «Producir igual» (b.sinReserva) no respeta la reserva.
+  function reserveOf(res, out, b) {
     const st = S(), g = G();
+    if (b && b.sinReserva) return 0;
+    const rm = b && PK.Game.reservaDe(b); // la meta de era guarda el insumo entero (G.reservaDe)
+    if (rm && rm.meta && rm.res === res) return Infinity;
+    if (out && g.metaPide(out)) return 0; // la meta pide lo que hace este taller
     let rv = st.auto ? st.auto.reserve || 0 : 0;
     if (out && st.res[out] < 0.05 * g.cap(out)) rv /= 3;
     return rv * g.cap(res);
@@ -98,8 +104,9 @@
 
   // ---------- Carretas ----------
   L.cartMax = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).carts : 0), 0);
-  L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + G().best('beasthouse', 'cartBoost')));
-  L.cartSpeed = () => G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartSpeed : 0), 0) + G().best('beasthouse', 'cartBoost');
+  const beltK = () => 1 + (G().bono ? G().bono('belt') : 0); // Cintas reforzadas (árbol 2.0)
+  L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost') + (G().bono ? G().bono('cartCap') : 0))));
+  L.cartSpeed = () => G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartSpeed : 0), 0) + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost'));
   L.carts = () => G().units.filter(u => u.owner === 'p' && u.kind === 'cart');
   L.trainCart = function (b) {
     if (L.carts().length + (b.queue ? b.queue.length : 0) >= L.cartMax()) { toast('Mejora la Carretería para tener más carretas.', 'warn'); return; }
@@ -156,7 +163,7 @@
         for (const o of shops) { if (o !== b && L.output(o) === k && (o.outb[k] || 0) - outbound(o, k) >= Math.min(cap, missing) * 0.5) { src = o; break; } }
         let avail;
         if (src) avail = (src.outb[k] || 0) - outbound(src, k);
-        else { src = nearestStore(b.cx, b.cy, k); avail = st.res[k] - reserveOf(k, out); }
+        else { src = nearestStore(b.cx, b.cy, k); avail = st.res[k] - reserveOf(k, out, b); }
         if (!src || avail < 1) continue;
         const n = Math.floor(Math.min(cap, missing, avail));
         if (n < 1) continue;
@@ -353,7 +360,7 @@
     if (L.isShop(b)) {
       const r = L.recipe(b);
       let best = null, bn = 0;
-      for (const k in r.in) { const n = L.need(b, k); if (n > bn && L.storeAccepts(a, k) && S().res[k] > reserveOf(k, L.output(b))) { bn = n; best = k; } }
+      for (const k in r.in) { const n = L.need(b, k); if (n > bn && L.storeAccepts(a, k) && S().res[k] > reserveOf(k, L.output(b), b)) { bn = n; best = k; } }
       return best;
     }
     return null;
@@ -375,13 +382,13 @@
       }
     }
     // cargar
-    bl.acc = Math.min(1, bl.acc + dt * D.BELT.rate);
+    bl.acc = Math.min(1, bl.acc + dt * D.BELT.rate * beltK());
     const res = beltRes(bl, a, b);
     if (!res || bl.acc < 1 || (bl.items.length && bl.items[0].p < 0.34)) return;
     if (L.isShop(b) && L.need(b, res) - bl.items.length < 1) return;
     let ok = false;
     if (L.isShop(a)) { ensure(a); if ((a.outb[res] || 0) >= 1) { a.outb[res] -= 1; ok = true; } }
-    else if (S().res[res] - 1 >= (L.isShop(b) ? reserveOf(res, L.output(b)) : 0)) { S().res[res] -= 1; ok = true; }
+    else if (S().res[res] - 1 >= (L.isShop(b) ? reserveOf(res, L.output(b), b) : 0)) { S().res[res] -= 1; ok = true; }
     if (ok) { bl.acc = 0; bl.items.unshift({ p: 0, r: res }); }
   }
 
@@ -397,7 +404,7 @@
     for (const bl of st.logi.belts) {
       const a = g.bById.get(bl.a), b = g.bById.get(bl.b);
       if (!a || !b) continue;
-      let n = D.BELT.rate * dt;
+      let n = D.BELT.rate * beltK() * dt;
       const res = beltRes(bl, a, b);
       if (!res) continue;
       if (L.isShop(b)) n = Math.min(n, L.need(b, res));
@@ -411,7 +418,7 @@
       if (budget <= 0) break;
       const r = L.recipe(b), out = L.output(b);
       for (const k in r.in) {
-        const n = Math.min(L.need(b, k), budget, Math.max(0, st.res[k] - reserveOf(k, out)));
+        const n = Math.min(L.need(b, k), budget, Math.max(0, st.res[k] - reserveOf(k, out, b)));
         if (n > 0) { st.res[k] -= n; ensure(b); b.inb[k] = (b.inb[k] || 0) + n; budget -= n; }
       }
       const have = (b.outb && b.outb[out]) || 0, n = Math.min(have, budget, Math.max(0, g.cap(out) - st.res[out]));

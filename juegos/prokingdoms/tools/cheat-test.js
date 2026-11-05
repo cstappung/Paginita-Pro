@@ -10,6 +10,8 @@ const path = require('path');
 const PORT = 8000 + Math.floor(Math.random() * 900);
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'pk-cheat-'));
 const URL = 'http://127.0.0.1:' + PORT;
+// join pide la versión de protocolo del cliente (D.PROTO en js/data.js)
+const PROTO = +/D\.PROTO = (\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8'))[1];
 let failed = 0;
 
 function check(ok, what, detail) {
@@ -17,6 +19,7 @@ function check(ok, what, detail) {
   if (!ok) failed++;
 }
 async function api(method, route, body, token) {
+  if (route === '/api/join' && body && !('proto' in body)) body = Object.assign({ proto: PROTO }, body);
   const res = await fetch(URL + route, {
     method, headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { 'X-PK-Token': token } : {}),
     body: body ? JSON.stringify(body) : undefined,
@@ -103,6 +106,46 @@ async function main() {
     const gift = nid ? await api('POST', '/api/guilds/need/send', { id: nid.id, n: 1e9 }, cheat.token) : { status: 0, data: {} };
     check(gift.status === 200 && gift.data.accepted <= Math.min(nid.n, 300), 'mandar mil millones de comida: solo sale lo que pide el pedido y hay en su almacén', gift.data.accepted !== undefined ? gift.data.accepted + ' de ' + nid.n + ' pedidos' : gift.data.error);
 
+    console.log('\nPase del Reino');
+    let pz = (await api('POST', '/api/sync', { since: 0, pase: {} }, cheat.token)).data.pase;
+    for (let i = 1; i <= 8; i++) pz = (await api('POST', '/api/sync', { since: 0, pase: { upgrades: i * 1e6, exp_won: i * 1e6, aldeanos: i * 1e6, bosses_killed: i * 1e6, g_total: i * 1e9 } }, cheat.token)).data.pase;
+    check(pz && pz.ppHoy <= pz.tope && pz.pp <= pz.tope, 'la tramposa informa millones de mejoras y jefes: el pase suma como mucho el tope del día', pz && pz.pp + ' PP (tope ' + pz.tope + ')');
+    r = await api('POST', '/api/pase/claim', { nivel: 30, pista: 'g' }, cheat.token);
+    check(r.status === 400, 'no se reclama un nivel no alcanzado', r.data.error);
+    r = await api('POST', '/api/pase/claim', { nivel: 1, pista: 'd' }, cheat.token);
+    check(r.status === 400, 'ni la pista dorada sin comprarla', r.data.error);
+    r = await api('POST', '/api/pase/refresh', {}, cheat.token);
+    check(r.status === 200 && !r.data.pase.dorado, 'pedir la pista dorada sin compra no la da', r.data.pase && r.data.pase.dorado);
+    r = await api('POST', '/api/pase/claim', { nivel: 1, pista: 'g' }, cheat.token);
+    const r2 = await api('POST', '/api/pase/claim', { nivel: 1, pista: 'g' }, cheat.token);
+    check(r.status === 200 && r2.status === 400, 'un premio se reclama una sola vez', r2.data.error);
+
+    console.log('\nEl archipiélago (Fase 9)');
+    // una cuenta en el mar: el servidor no ve su mapa, así que todo lo de la tierra que mande se ignora
+    const mar = (await api('POST', '/api/join', { name: 'Marina' })).data.player;
+    await api('POST', '/api/sync', { since: 0, snap: snap() }, mar.token);
+    const antes = sum((await api('POST', '/api/sync', { since: 0 }, honest.token)).data.nodes);
+    const todo = {};
+    for (const k of ids) todo[k] = 1e6;
+    let m = await api('POST', '/api/sync', { since: 0, mundo: 'mar', harvest: todo, snap: snap({ era: 9, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }), pase: { upgrades: 1e6, exp_won: 1e6 }, market: [{ t: 'buy', r: 'wood', n: 1e6 }] }, mar.token);
+    check(m.status === 200 && !Object.keys(m.data.nodes).length && !m.data.players.length && m.data.terr === undefined, 'en el mar el sync no trae la tierra (recursos, reinos ni territorio)', m.status);
+    const despues = sum((await api('POST', '/api/sync', { since: 0 }, honest.token)).data.nodes);
+    check(Math.abs(despues - antes) < 1, 'lo que «recolecta» en el mar no toca los recursos comunes de la tierra', Math.round(antes) + ' → ' + Math.round(despues));
+    const visto = (await api('POST', '/api/sync', { since: 0 }, honest.token)).data.players.find(o => o.id === mar.id);
+    check(visto && visto.era === 1, 'la foto mandada desde el mar no cambia su reino de la tierra (era 9 inventada)', visto && visto.era);
+    m = await api('POST', '/api/pase/refresh', {}, mar.token);
+    check(m.status === 200 && m.data.pase && m.data.pase.pp === 0, 'ni el pase suma puntos con estadísticas mandadas desde el mar', m.data.pase && m.data.pase.pp);
+    m = await api('POST', '/api/regata', { ruta: 'altamar', barco: { casco: 10, velas: 10, timon: 10 } }, mar.token);
+    check(m.status === 200 && m.data.barcoUsado.velas === 1, 'recién llegada, su primera regata no corre con el barco al máximo', m.data.barcoUsado && JSON.stringify(m.data.barcoUsado));
+    m = await api('POST', '/api/flota', { units: { galeon: 120 } }, mar.token);
+    check(m.status === 400, 'ni anota 120 galeones como flota de duelo', m.data.error);
+    m = await api('POST', '/api/flota', { units: { balandra: 10 } }, mar.token);
+    const rival = (await api('POST', '/api/duelos', {}, honest.token)).data;
+    check(m.status === 200 && rival.rivales.some(o => o.id === mar.id), 'una flota posible sí se anota y otros la ven', m.data.flota && m.data.flota.poder);
+    m = await api('POST', '/api/sync', { since: 0, snap: snap({ era: 9, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }) }, mar.token);
+    const vuelta = (await api('POST', '/api/sync', { since: 0 }, honest.token)).data.players.find(o => o.id === mar.id);
+    check(m.status === 200 && Object.keys(m.data.nodes).length > 0 && vuelta.era < 9, 'de vuelta en la tierra recibe el mapa, y la foto inflada se sigue frenando', 'era ' + (vuelta && vuelta.era));
+
     console.log('\nLímite de pedidos');
     const burst = await Promise.all(Array.from({ length: 60 }, () => api('POST', '/api/sync', {}, cheat.token)));
     const n429 = burst.filter(x => x.status === 429).length;
@@ -128,7 +171,7 @@ async function main() {
     await wait(300);
     const log = fs.existsSync(path.join(DATA, 'sospechas.log')) ? fs.readFileSync(path.join(DATA, 'sospechas.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
     const kinds = [...new Set(log.map(e => e.kind))];
-    check(['recoleccion', 'foto', 'oferta', 'mercado', 'tablon', 'pedidos'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
+    check(['recoleccion', 'foto', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
     check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro');
   } finally {
     srv.kill();

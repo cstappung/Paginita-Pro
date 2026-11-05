@@ -74,9 +74,10 @@
   T.realmInfo = function (slot) {
     const bot = T.realmOf(slot), st = S();
     if (!bot) return null;
-    if (bot.human) return { era: bot.era || 1, score: bot.score || 0, newbie: !!bot.newbie, shield: !!bot.tshield, human: true, name: bot.name, realm: bot.realm };
+    const pacto = PK.Diplo ? PK.Diplo.pacto(slot) : null; // S1: los pactos impiden conquistar
+    if (bot.human) return { era: bot.era || 1, score: bot.score || 0, newbie: !!bot.newbie, shield: !!bot.tshield, human: true, name: bot.name, realm: bot.realm, pacto };
     const era = T.botEra(bot);
-    return { era, score: D.realmScore(era, 18 * era * bot.strength, 20 + 12 * era), newbie: false, shield: (st.terr.botShield[slot] || 0) > Date.now(), human: false, name: bot.name, realm: bot.realm };
+    return { era, score: D.realmScore(era, 18 * era * bot.strength, 20 + 12 * era), newbie: false, shield: (st.terr.botShield[slot] || 0) > Date.now(), human: false, name: bot.name, realm: bot.realm, pacto };
   };
   T.myInfo = function () {
     const g = G(), lv = g.buildings.reduce((s, b) => s + (b.owner === 'p' && b.done ? b.lvl : 0), 0);
@@ -155,6 +156,7 @@
   T.campaignCost = function (k) {
     const c = D.conquestCost(S().era, T.recent());
     if (T.retakeLeft(k) > 0) for (const r in c) c[r] = Math.round(c[r] / 2);
+    if (PK.Diplo && PK.Diplo.pacto(W.terr[k] - 1) === 'rival') for (const r in c) c[r] = Math.round(c[r] * D.DIPLO.rival.conquista); // S1: contra un rival, más barato
     return c;
   };
   T.attack = function (k, units) {

@@ -7,7 +7,7 @@
   const G = () => PK.Game;
   const S = () => PK.Game.state;
   const byId = {};
-  for (const q of D.QUESTS) byId[q.id] = q;
+  for (const q of D.QUESTS.concat(D.QUESTS_MAR || [])) byId[q.id] = q; // la Crónica del Mar también (pk-28)
   Q.byId = byId;
 
   Q.init = function (st) {
@@ -15,6 +15,11 @@
     st.weekly = st.weekly || null;
     st.streak.best = st.streak.best || 0;
     st.streak.shieldWk = st.streak.shieldWk || null; // semana en que se gastó el escudo
+    // z_tree existe desde pk-11: quien ya taló en un bosque común no pierde lo hecho
+    if (st.stats.z_tree === undefined) {
+      const n = PK.World.zones.reduce((s, z) => s + (z.common && z.type === 'tree' ? st.stats['z_' + z.id] || 0 : 0), 0);
+      if (n) st.stats.z_tree = n;
+    }
     Q.ensureDaily();
   };
 
@@ -28,6 +33,7 @@
       case 'level': return [G().levelCount(req.lvl, req.b, req.recipe), req.n];
       case 'explored': return [PK.World.fogCount, req.n];
       case 'flag': return [st.flags[req.k] ? 1 : 0, 1];
+      case 'cap': return [st.campana && st.campana.hechos && st.campana.hechos[req.n] ? 1 : 0, 1];
       case 'walled': return [PK.Def.walledCount(), req.n];
       case 'wallTier': return [st.def.tier, req.n];
       case 'all': {
@@ -80,12 +86,30 @@
   Q.claim = function (id, silent) {
     const q = byId[id];
     if (Q.status(q) !== 'ready') return null;
+    const total = Q.premioTotal(q); // V7: con los peldaños absorbidos (se calcula antes de marcarlos)
     S().quests[id] = 'claimed';
     G().give(q.reward);
-    if (q.perk) {
+    const mejora = perk => {
       const p = (S().perks = S().perks || {});
-      for (const k in q.perk) p[k] = (p[k] || 0) + q.perk[k];
-      PK.UI.toast('Mejora permanente: ' + D.perkText(q.perk) + '.', 'epic');
+      for (const k in perk) p[k] = (p[k] || 0) + perk[k];
+      PK.UI.toast('Mejora permanente: ' + D.perkText(perk) + '.', 'epic');
+    };
+    if (q.perk) mejora(q.perk);
+    // V7: los peldaños que este rango absorbió se pagan ahora, si esta partida no los había reclamado antes
+    for (const a of q.absorbe || []) {
+      if (S().quests[a.id] === 'claimed') continue;
+      S().quests[a.id] = 'claimed';
+      G().give(a.reward);
+      if (a.perk) mejora(a.perk);
+    }
+    // V7: el rango da su título (Desafíos → Título del reino) y el II y el último, un cosmético
+    if (q.rango) {
+      const st = S();
+      for (const tid of D.premiosRango(q)) if (st.tienda && !st.tienda.tengo[tid]) {
+        st.tienda.tengo[tid] = 1;
+        const it = D.TIENDA && D.TIENDA.find(o => o.id === tid);
+        if (it) PK.UI.toast('Ganaste ' + (it.t === 'color' ? 'el estandarte' : 'el marco de retrato') + ' «' + D.ESCALERAS[q.rango.esc].nombre + '». Úsalo desde la tienda del reino.', 'epic', { label: 'Ver', fn: () => PK.UI.openTienda() });
+      }
     }
     if (q.unlock) {
       S().flags['unlock_' + q.unlock] = true;
@@ -93,7 +117,7 @@
     }
     G().stat('quests_done', 1);
     if (!silent) PK.UI.toast('Recompensa obtenida: ' + q.title, 'good');
-    return q.reward;
+    return total;
   };
 
   // ---------- Diarias ----------
@@ -181,7 +205,8 @@
     if (st.daily) n += st.daily.list.filter(it => !it.claimed && dailyProg(it)[0] >= it.n).length;
     return n + weeklyReady() + (dailyBonusReady() ? 1 : 0);
   };
-  Q.claimAll = function () {
+  // quiet: sin el cofre en pantalla (lo usa el Mayordomo del Consejo, también sin conexión).
+  Q.claimAll = function (quiet) {
     const st = S(), sum = {};
     let n = 0;
     const add = r => { if (!r) return; n++; for (const k in r) sum[k] = (sum[k] || 0) + r[k]; };
@@ -199,7 +224,7 @@
       const r = D.weeklyReward(st.era);
       G().give(r); G().stat('weeklies', 1); add(r);
     });
-    if (n) PK.UI.chestReveal({ title: n === 1 ? 'Recompensa reclamada' : n + ' recompensas reclamadas', sub: 'Todo lo que tenías listo en el libro', reward: sum, tier: n >= 5 ? 2 : 1 });
+    if (n && !quiet) PK.UI.chestReveal({ title: n === 1 ? 'Recompensa reclamada' : n + ' recompensas reclamadas', sub: 'Todo lo que tenías listo en el libro', reward: sum, tier: n >= 5 ? 2 : 1 });
     return n;
   };
   Q.claimDailyBonus = function () {
@@ -267,8 +292,9 @@
     const st = S();
     const book = el('div', { class: 'book' });
     const tabs = el('div', { class: 'book-tabs' });
-    for (const b of D.BRANCHES.concat([{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'album', name: 'Álbum', icon: 'gems' }])) {
-      const ready = b.id === 'album' ? false : b.id === 'daily' ? (st.streak.last !== U.dayKey() || Q.repairable() || st.daily.list.some(it => !it.claimed && dailyProg(it)[0] >= it.n) || weeklyReady() > 0 || dailyBonusReady()) : D.QUESTS.some(q => q.branch === b.id && Q.status(q) === 'ready');
+    const extra = PK.Game.enMar && PK.Game.enMar() ? [{ id: 'daily', name: 'Diarias', icon: 'chest' }] : [{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'desafios', name: 'Desafíos', icon: 'crown' }, { id: 'album', name: 'Álbum', icon: 'gems' }];
+    for (const b of D.BRANCHES.concat(extra)) {
+      const ready = b.id === 'album' || b.id === 'desafios' ? false : b.id === 'daily' ? (st.streak.last !== U.dayKey() || Q.repairable() || st.daily.list.some(it => !it.claimed && dailyProg(it)[0] >= it.n) || weeklyReady() > 0 || dailyBonusReady()) : D.QUESTS.some(q => q.branch === b.id && Q.status(q) === 'ready');
       tabs.append(el('button', { class: 'book-tab' + (tab === b.id ? ' on' : ''), onclick: () => { tab = b.id; selected = null; PK.UI.rerender(true); } },
         el('img', { class: 'ico', src: PK.Sprites.icon(b.icon) }), b.name, ready ? el('span', { class: 'dot' }) : null));
     }
@@ -280,6 +306,7 @@
 
     if (tab === 'daily') { renderDaily(left, right); return; }
     if (tab === 'album') { renderAlbum(left, right); return; }
+    if (tab === 'desafios' && PK.UI.renderDesafios) { PK.UI.renderDesafios(left, right); return; }
     const br = D.BRANCHES.find(b => b.id === tab);
     left.append(el('h2', null, br.name), el('p', { class: 'muted small' }, br.desc));
     const { rows } = layout(tab);
@@ -341,17 +368,20 @@
         right.append(el('ul', { class: 'sub' }, q.req.of.map(r => { const [x, y] = progress(r); return el('li', { class: x >= y ? 'ok' : '' }, reqText(r) + ' (' + U.fmt(Math.min(x, y)) + '/' + U.fmt(y) + ')'); })));
       }
     }
-    right.append(el('h3', null, 'Recompensa'), rewardEl(q.reward));
+    right.append(el('h3', null, 'Recompensa'), rewardEl(Q.premioTotal(q)));
+    if (q.rango) right.append(el('p', { class: 'small muted' }, 'Rango ' + U.roman(q.rango.k + 1) + ' de ' + q.rango.de + '. Te da el título «' + q.title + '»' + (D.premiosRango(q).length ? ' y ' + D.premiosRango(q).map(t => (t.endsWith('_c') ? 'su estandarte' : 'su marco de retrato')).join(' y ') : '') + '.'));
     if (q.perk) right.append(el('p', { class: 'small good-t' }, 'Mejora permanente: ' + D.perkText(q.perk) + '.'));
     if (q.unlock) right.append(el('div', { class: 'unlock' }, el('img', { src: PK.Sprites.buildingIcon(q.unlock) }), el('div', null, el('b', null, 'Desbloquea: ' + D.BUILD[q.unlock].name), el('p', { class: 'small' }, D.BUILD[q.unlock].desc))));
+    if (q.cap && s !== 'locked' && PK.Campana) right.append(PK.Campana.caja(q.cap));
     if (s === 'ready') right.append(PK.UI.btn('Reclamar recompensa', () => { Q.claim(q.id); PK.UI.rerender(); }, { cls: 'gold' }));
   }
 
   function reqText(r) {
     if (r.t === 'build') return D.BUILD[r.b].name + (r.n > 1 ? ' x' + r.n : '');
     if (r.t === 'level') return (r.b ? D.BUILD[r.b].name : 'Edificios') + ' en nivel ' + r.lvl + '+';
-    if (r.t === 'stat') { const m = { p_blocks: 'Sillares producidos', p_tools: 'Herramientas producidas', p_books: 'Libros producidos', p_steel: 'Acero producido', p_machinery: 'Maquinaria producida', scouts_trained: 'Exploradores entrenados', dungeons_found: 'Mazmorras descubiertas', wishes: 'Deseos pedidos' }; return m[r.k] || r.k; }
+    if (r.t === 'stat') { const m = { p_blocks: 'Sillares producidos', p_tools: 'Herramientas producidas', p_books: 'Libros producidos', p_steel: 'Acero producido', p_machinery: 'Maquinaria producida', scouts_trained: 'Exploradores entrenados', dungeons_found: 'Mazmorras descubiertas', wishes: 'Deseos pedidos', legends: 'Lugares legendarios investigados', camps_cleared: 'Campamentos destruidos', heroes_hired: 'Héroes reclutados', floor_crater: 'Piso del Cráter Estelar', floor_temple: 'Piso del Templo Hundido', floor_nest: 'Piso del Nido del Dragón', trades_accepted: 'Tratos con otros reinos', guild_helps: 'Ayudas al gremio', walls_built: 'Tramos de muralla' }; return m[r.k] || r.k; }
     if (r.t === 'era') return 'Era ' + U.roman(r.n);
+    if (r.t === 'flag' && r.k === 'ley_dragones') return 'Cementerio de Dragones investigado';
     return '';
   }
 
@@ -415,7 +445,7 @@
   }
 
   // ---------- Álbum de colección ----------
-  const POI_ICON = { chest: 'chest', ruin: 'scroll', camp: 'war', relic: 'gold', watch: 'compass', cave: 'crystal', lair: 'hide', crypt: 'lore', crater: 'starIron', nest: 'scale' };
+  const POI_ICON = { chest: 'chest', ruin: 'scroll', camp: 'war', relic: 'gold', watch: 'compass', cave: 'crystal', lair: 'hide', crypt: 'lore', crater: 'starIron', nest: 'scale', swamp: 'herbs', giants: 'titanBone', temple: 'pearls', legend: 'crown' };
   // known: el nombre se ve aunque la casilla siga vacía
   function slot(icon, name, got, sub, known) {
     return el('div', { class: 'al-slot' + (got ? ' got' : ''), title: got || known ? name : '???' },
@@ -438,13 +468,50 @@
       el('div', { class: 'al-grid' }, relics.map((p, i) => { const ps = st.pois[p.id]; return slot('gold', 'Reliquia ' + U.roman(i + 1), ps && ps.f, ps && ps.d ? 'en el Monasterio' : null); })));
     right.append(el('h3', null, 'Puntos de interés vistos'),
       el('div', { class: 'al-grid' }, Object.keys(D.POI).filter(k => total[k]).map(k => slot(POI_ICON[k] || 'compass', D.POI[k].name, seen[k], (seen[k] || 0) + ' de ' + total[k], true))));
+    // trofeos de los jefes de mazmorra (Mazmorras 2.0, incursion.js)
+    if (PK.Inc) {
+      const tr = st.trofeos || {}, kinds = Object.keys(PK.Inc.JEFES);
+      right.append(el('h3', null, 'Trofeos (' + kinds.filter(k => tr[k]).length + '/' + kinds.length + ')'),
+        el('div', { class: 'al-grid' }, kinds.map(k => slot(POI_ICON[k] || 'scale', PK.Inc.JEFES[k].name, tr[k], tr[k] ? 'x' + tr[k] : null, true))));
+    }
+    // maravillas del mundo (lugares legendarios, H6)
+    if (D.LEYENDAS) {
+      const ly = st.leyendas || {};
+      right.append(el('h3', null, 'Maravillas del mundo (' + Object.keys(ly).length + '/' + D.LEYENDAS.length + ')'),
+        el('div', { class: 'al-grid' }, D.LEYENDAS.map((o, i) => { const s0 = slot('crown', o.name, ly[i], ly[i] ? o.bono : null, true); if (ly[i] && PK.Leyendas) { s0.style.cursor = 'pointer'; s0.onclick = () => PK.Leyendas.pagina(i); } return s0; })));
+    }
+    // cartas de era (Fase 3): las que elegiste, más los decretos reales
+    if (D.CARTAS && st.cartas) {
+      const tom = new Set(st.cartas.tomadas.map(c => c.id)), ids = Object.keys(D.CARTAS);
+      left.append(el('h3', null, 'Cartas de era (' + tom.size + '/' + ids.length + ')'),
+        el('div', { class: 'al-grid' }, ids.map(id => slot('scroll', D.CARTAS[id].name, tom.has(id), tom.has(id) ? D.CARTAS[id].desc : null)).concat(Object.keys(D.DECREES).map(id => slot('crown', D.DECREES[id].name, st.decrees.includes(id), 'carta real', true)))));
+    }
     const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]).length;
     right.append(el('h3', null, 'Reinos encontrados (' + realms + '/' + D.BOTS.length + ')'),
       el('div', { class: 'al-grid' }, D.BOTS.map(b => slot('pop', b.realm, st.flags['seen_' + b.slot]))));
   }
 
-  Q.openBook = function (t) {
+  Q.openBook = function (t, id) {
+    // Fase 9: el archipiélago tendrá su propia rama de la Crónica; mientras tanto, el libro es el de la tierra
     if (t) tab = t;
+    if (t && id) selected = id;
+    // en el mar (pk-28) no están el Álbum ni los Desafíos, y la rama principal es la Crónica del Mar
+    const enMar = PK.Game.enMar && PK.Game.enMar();
+    if (tab === 'main' && D.BRANCHES[0].id !== 'main') tab = D.BRANCHES[0].id;
+    if (enMar && (tab === 'album' || tab === 'desafios')) tab = D.BRANCHES[0].id;
     PK.UI.modal('book', 'Libro de Misiones', renderBook, { cls: 'book-modal', wide: true });
+  };
+  // U2 (Fase 6): la próxima misión de la Crónica (la lista para reclamar primero, si no la que está en curso)
+  Q.siguiente = function () {
+    const main = D.QUESTS.filter(q => q.branch === D.BRANCHES[0].id); // 'main', o 'mar' en el archipiélago
+    return main.find(q => Q.status(q) === 'ready') || main.find(q => Q.status(q) === 'active') || null;
+  };
+  Q.reqText = reqText;
+  // V7: lo que paga un rango, contando los peldaños que absorbió y esta partida no había reclamado
+  Q.premioTotal = function (q) {
+    if (!q.absorbe) return q.reward;
+    const r = Object.assign({}, q.reward);
+    for (const a of q.absorbe) if (S().quests[a.id] !== 'claimed') for (const k in a.reward) r[k] = (r[k] || 0) + a.reward[k];
+    return r;
   };
 })();

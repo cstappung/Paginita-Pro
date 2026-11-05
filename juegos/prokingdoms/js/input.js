@@ -23,6 +23,10 @@
     if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode) return;
     d.box = true;
     I.box = { x0: d.x, y0: d.y, x1: d.x, y1: d.y };
+    // U4 (Fase 6): mantener pulsado sobre un edificio tuyo y soltar sin arrastrar lo mejora (o lo pone en la cola).
+    // Si arrastras, sigue siendo la selección en grupo de siempre.
+    const it = R().pick(d.x, d.y);
+    if (it && it.k === 'building' && it.o.owner === 'p' && it.o.done && !it.o.def.noUp) d.edif = it.o;
     try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) { /* sin vibración */ }
   }
 
@@ -101,6 +105,7 @@
     }
     if (G().placing) updateGhost(e.clientX, e.clientY);
     toolGhost(e.clientX, e.clientY);
+    I.mouse.on = e.target === r.cv; // para recalcular el cartel en I.update
     if (e.target === r.cv) {
       const it = r.pick(e.clientX, e.clientY);
       r.hover = it && it.k !== 'tile' ? it : null;
@@ -125,6 +130,7 @@
       if (down && down.box) {
         const b = I.box;
         if (b && Math.abs(b.x1 - b.x0) > 10 && Math.abs(b.y1 - b.y0) > 10) boxSelect(b, false);
+        else if (down.edif && (!b || Math.hypot(b.x1 - b.x0, b.y1 - b.y0) < 14)) mejoraRapida(down.edif);
         I.box = null; down = null;
         return;
       }
@@ -140,9 +146,19 @@
     leftClick(e.clientX, e.clientY, e.shiftKey);
   }
 
+  function mejoraRapida(b) {
+    const g = G(), c = g.canUpgrade(b);
+    g.sel = { type: 'building', id: b.id };
+    if (c.ok) { g.upgrade(b); PK.Auto.dequeue(b); PK.UI.toast('Mejorando ' + b.def.name + ' a nivel ' + (b.lvl + 1) + '.', 'good'); }
+    else if (b.upg || c.max) PK.UI.toast(c.why, 'info');
+    else if (!PK.Auto.queued(b)) PK.Auto.enqueue(b);
+    else PK.UI.toast(b.def.name + ' ya está en la cola de obras.', 'info');
+    PK.UI.refreshPanel(true);
+  }
+
   function tap(x, y) {
     const g = G();
-    if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode) { leftClick(x, y, false, true); return; }
+    if (g.placing || PK.Logi.tool || PK.Def.tool || PK.Terr.mode || I.flagTool || (PK.Asedios && PK.Asedios.herramienta)) { leftClick(x, y, false, true); return; }
     const it = R().pick(x, y);
     const now = performance.now(), prev = lastTap;
     lastTap = { x, y, t: now };
@@ -159,8 +175,10 @@
   }
 
   function updateGhost(sx, sy) {
-    const def = D.BUILD[G().placing.type], [tx, ty] = R().screenToTile(sx, sy);
-    const x = Math.floor(tx - def.w / 2 + 0.5), y = Math.floor(ty - def.h / 2 + 0.5);
+    const def = D.BUILD[G().placing.type], [tx, ty] = R().screenToTile(sx, sy), br = G().placing.barrio;
+    let x = Math.floor(tx - def.w / 2 + 0.5), y = Math.floor(ty - def.h / 2 + 0.5);
+    // barrio (A7): las casas siguientes se acomodan en la cuadrícula de la primera, con calles de 1 casilla
+    if (br) { const px = def.w + 1, py = def.h + 1; x = br.x + Math.round((x - br.x) / px) * px; y = br.y + Math.round((y - br.y) / py) * py; }
     R().ghost = { x, y, ok: G().canPlace(G().placing.type, x, y, G().placing.move) };
   }
 
@@ -177,8 +195,22 @@
       if (a && it && it.k === 'building' && it.o.owner === 'p' && it.o !== a) r.beltGhost = L.beltPlan(a, it.o);
     }
   }
+  // Herramienta «Poner bandera» (A4): el próximo toque en el mapa o el minimapa pone (o quita) una bandera.
+  I.flagTool = false;
+  I.startFlag = function () {
+    I.cancelTool();
+    I.flagTool = true;
+    PK.UI.toast('Toca la niebla en el mapa o en el minimapa para poner la bandera (' + PK.UI.hint('clic derecho o Esc', 'toca la bandera del panel') + ' para cancelar). Tocar una bandera la quita.', 'info');
+  };
+  I.flagAt = function (tx, ty) {
+    I.flagTool = false;
+    G().ponerBandera(Math.floor(tx), Math.floor(ty));
+    PK.UI.refreshPanel(true);
+  };
   I.cancelTool = function () {
     const L = PK.Logi;
+    I.flagTool = false;
+    if (PK.Asedios) PK.Asedios.cancelar();
     L.tool = null; L.beltFrom = null; I.roadStart = null;
     PK.Def.cancel();
     R().roadGhost = null; R().beltGhost = null;
@@ -219,11 +251,26 @@
       PK.UI.refreshPanel(true);
       return;
     }
-    const b = g.place(g.placing.type, gh.x, gh.y);
-    if (b && !shift) { g.placing = null; R().ghost = null; }
+    const b = g.place(g.placing.type, gh.x, gh.y), barrio = g.placing.type === 'house' && (shift || !!g.state.flags.barrio);
+    if (b && barrio) calles(g, b);
+    if (b && !shift && !barrio) { g.placing = null; R().ghost = null; }
     else if (b && g.placing) g.placing.armed = false;
     PK.UI.refreshPanel(true);
   };
+  // Barrio (A7 del plan): Mayús (o «Modo barrio» en el panel) pone casas en cuadrícula, dejando calles de una
+  // casilla, y traza el camino de la calle de abajo y de la derecha si alcanza la piedra. Junto con el bloqueo
+  // del encierro (G.encierra), evita el patio cerrado del playtest.
+  function calles(g, b) {
+    if (!g.placing.barrio) g.placing.barrio = { x: b.x, y: b.y };
+    if (g.state.flags.barrioSinCaminos) return;
+    const tiles = [];
+    for (let i = 0; i <= b.w; i++) tiles.push([b.x + i, b.y + b.h]);
+    for (let j = 0; j < b.h; j++) tiles.push([b.x + b.w, b.y + j]);
+    const ok = tiles.filter(([x, y]) => W.inb(x, y) && !W.road[W.idx(x, y)] && W.passable(x, y) && W.bAt[W.idx(x, y)] < 0 && W.ownerAt(x, y) === 'p');
+    const cost = {};
+    for (const r in D.ROAD.cost) cost[r] = D.ROAD.cost[r] * ok.length;
+    if (ok.length && g.canAfford(cost)) PK.Logi.buildRoad(ok);
+  }
   // Mover un edificio: el mismo fantasma que al construir, con su tamaño, y sus propias casillas cuentan libres.
   I.startMoving = function (b) {
     const g = G();
@@ -243,6 +290,8 @@
 
   function leftClick(sx, sy, shift, touch) {
     const g = G();
+    if (I.flagTool) { const [tx, ty] = R().screenToTile(sx, sy); I.flagAt(tx, ty); return; }
+    if (PK.Asedios && PK.Asedios.herramienta) { const [tx, ty] = R().screenToTile(sx, sy); PK.Asedios.click(tx, ty); return; } // trampas (C5)
     if (PK.Logi.tool) { toolClick(sx, sy); return; }
     if (PK.Def.tool) { const [tx, ty] = R().screenToTile(sx, sy); PK.Def.click(Math.floor(tx), Math.floor(ty)); PK.UI.refreshPanel(true); return; }
     if (PK.Terr.mode) {
@@ -263,6 +312,7 @@
     const it = R().pick(sx, sy);
     if (!it || it.k === 'tile') { if (!shift) g.sel = null; PK.UI.refreshPanel(true); return; }
     if (it.k === 'troop') { PK.UI.openBarracks(it.o.march || it.o.fight ? 'exp' : 'troops'); return; }
+    if (it.k === 'galeon') { PK.Mar.abrir(); return; } // Fase 9
     if (it.k === 'unit') {
       if (it.o.owner === 'p') {
         if (shift && g.sel && g.sel.type === 'units') { const s = new Set(g.sel.ids); s.has(it.o.id) ? s.delete(it.o.id) : s.add(it.o.id); g.sel = { type: 'units', ids: [...s] }; }
@@ -271,6 +321,7 @@
     } else if (it.k === 'building') g.sel = { type: 'building', id: it.o.id };
     else if (it.k === 'node') g.sel = { type: 'node', id: it.o.id };
     else if (it.k === 'poi') g.sel = { type: 'poi', id: it.o.id };
+    else if (it.k === 'cap') { PK.Campana.openLugar(it.o.n); return; }
     else if (it.k === 'belt') g.sel = { type: 'belt', id: W.belt[W.idx(it.x, it.y)] };
     else if (it.k === 'wall') g.sel = { type: 'wall', id: it.o.k };
     PK.UI.refreshPanel(true);
@@ -278,7 +329,7 @@
 
   function rightClick(sx, sy) {
     const g = G();
-    if (PK.Logi.tool || PK.Def.tool) { I.cancelTool(); return; }
+    if (PK.Logi.tool || PK.Def.tool || I.flagTool || (PK.Asedios && PK.Asedios.herramienta)) { I.cancelTool(); return; }
     if (PK.Terr.mode) { PK.Terr.toggle(false); return; }
     if (g.placing) { g.placing = null; R().ghost = null; PK.UI.refreshPanel(true); return; }
     const it = R().pick(sx, sy);
@@ -349,7 +400,7 @@
     I.keys[k] = true;
     if (k === 'escape') {
       if (PK.UI.closeModal()) return;
-      if (PK.Logi.tool || PK.Def.tool) { I.cancelTool(); return; }
+      if (PK.Logi.tool || PK.Def.tool || I.flagTool || (PK.Asedios && PK.Asedios.herramienta)) { I.cancelTool(); return; }
       if (PK.Terr.mode) { PK.Terr.toggle(false); return; }
       if (g.placing) { g.placing = null; R().ghost = null; } else g.sel = null;
       PK.UI.refreshPanel(true);
@@ -377,5 +428,17 @@
     if (I.keys.arrowup || I.keys.w) dy -= sp;
     if (I.keys.arrowdown || I.keys.s) dy += sp;
     if (dx || dy) { r.cam.x += dx; r.cam.y += dy; r.clampCam(); }
+    // El cartel del puntero solo se calculaba al mover el mouse: después de mover la cámara (WASD, rueda,
+    // arrastre, centerOn) o de que subiera de nivel lo de abajo, seguía diciendo «Centro Urbano · Nv 2» con el
+    // Centro ya en Nv 10. Se recalcula al mover la cámara y cada 250 ms.
+    hovT += dt;
+    const cm = r.cam.x + ',' + r.cam.y + ',' + r.cam.z;
+    if (I.mouse.on && I.mouse.in && (cm !== hovCam || hovT >= 0.25)) {
+      hovT = 0; hovCam = cm;
+      const it = r.pick(I.mouse.x, I.mouse.y);
+      r.hover = it && it.k !== 'tile' ? it : null;
+      PK.UI.hoverInfo(r.hover, I.mouse.x, I.mouse.y);
+    }
   };
+  let hovT = 0, hovCam = '';
 })();

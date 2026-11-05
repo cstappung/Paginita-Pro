@@ -49,7 +49,7 @@
       // el arranque en frío tarda unos segundos, así que se espera más que a un servidor local.
       const auth = API && PK.Platform.getAuthToken ? await PK.Platform.getAuthToken() : null;
       if (API && !auth) throw new Error('sin sesión de Firebase');
-      const j = await api('POST', '/api/join', { token: U.store.get(TOKEN_KEY), name: playerName(), preferSlot: localSave ? (Number.isInteger(localSave.slot) ? localSave.slot : 0) : undefined }, API ? 15000 : 2500,
+      const j = await api('POST', '/api/join', { proto: D.PROTO, token: U.store.get(TOKEN_KEY), name: playerName(), preferSlot: localSave ? (Number.isInteger(localSave.slot) ? localSave.slot : 0) : undefined }, API ? 15000 : 2500,
         auth ? { Authorization: 'Bearer ' + auth } : null);
       Net.me = j.player;
       Net.world = j.world;
@@ -64,9 +64,23 @@
       return { slot: j.world.slot, humans: j.world.humans, cloud };
     } catch (e) {
       console.info('Pro Kingdoms: sin servidor, modo local.', e.message);
+      if (e.status === 426) await versionDistinta(e.message);
       return null;
     }
   };
+  // El servidor es de otra versión (D.PROTO): entrar vería otro mapa. Se avisa en la pantalla de carga y se
+  // espera a que elija jugar sin conexión (o recargar).
+  function versionDistinta(msg) {
+    const box = document.querySelector('#loading .ld-box');
+    if (!box) return Promise.resolve();
+    const sub = box.querySelector('.ld-sub');
+    if (sub) { sub.textContent = msg; sub.classList.add('ld-quieto'); }
+    return new Promise(res => {
+      box.append(U.el('div', { class: 'ld-btns' },
+        U.el('button', { class: 'btn gold', onclick: () => res() }, 'Jugar sin conexión'),
+        U.el('button', { class: 'btn', onclick: () => location.reload() }, 'Recargar')));
+    });
+  }
 
   Net.harvest = function (id, n) { pending[id] = (pending[id] || 0) + n; };
   Net.marketOp = function (op) { if (Net.online) marketOps.push(op); };
@@ -81,7 +95,7 @@
       era: st.era, pop: g.pop(), defense: PK.Social.defense(), truce: PK.Social.truce(),
       res: { food: st.res.food, wood: st.res.wood, stone: st.res.stone, gold: st.res.gold }, total: st.stats.g_total || 0,
       army: PK.Social.power(st.war.army), walls: g.lvl('walls'), score: PK.Terr.myInfo().score,
-      walled: PK.Def.walledList(), wallMult: PK.Def.parcelMult(-1, true), terrMult: 1 + g.best('dragontower', 'terrDef'),
+      walled: PK.Def.walledList(), wallMult: PK.Def.parcelMult(-1, true), terrMult: 1 + g.best('dragontower', 'terrDef'), rk: PK.Mundo ? PK.Mundo.rkFoto() : undefined,
       units: g.units.filter(u => u.owner === 'p' && !u.inside).slice(0, 250).map(u => [
         Math.round(u.x * 10), Math.round(u.y * 10), u.mode === 'walk' ? 1 : u.mode === 'work' ? 2 : 0,
         u.task ? Math.max(0, TASKS.indexOf(u.task.t)) : 0, u.task && u.task.res ? RAW.indexOf(u.task.res) : -1,
@@ -99,15 +113,28 @@
     pending = {}; marketOps = [];
     const t0 = performance.now();
     try {
-      const r = await api('POST', '/api/sync', { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince });
+      // Pase del Reino: las estadísticas que el servidor convierte en puntos (D.PASE_STATS, js/pase.js)
+      const pase = {};
+      for (const k of PK.D.PASE_STATS || []) pase[k] = Math.floor(S().stats[k] || 0);
+      // Fase 9: en el archipiélago el servidor sigue viendo la última foto de tu reino de la tierra (que en ese momento
+      // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
+      const mar = PK.Game.enMar && PK.Game.enMar();
+      const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
+        : { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+      if (r.pase && PK.Pase) PK.Pase.info = r.pase;
+      if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
+      if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
+      if (PK.Mundo) PK.Mundo.desdeSync(r); // S2-S5 (pk-24): caravanas y título
       Net.ping = Math.round(performance.now() - t0);
       Net.lastOk = Date.now();
       if (Net.lost) { Net.lost = false; toast('Conexión recuperada.', 'good'); }
-      since = r.ver;
-      applyNodes(r.nodes);
-      if (r.terr) applyTerr(r.terr);
-      tv = r.tv || 0;
-      applyPlayers(r.players || []);
+      if (!mar) {
+        since = r.ver;
+        applyNodes(r.nodes);
+        if (r.terr) applyTerr(r.terr);
+        tv = r.tv || 0;
+        applyPlayers(r.players || []);
+      }
       if (r.prices) Object.assign(S().market.p, r.prices);
       applyGuild(r.guild);
       applyInbox(r.inbox || []);
@@ -210,6 +237,7 @@
     if (sum) S().flags.guildJoined = true;
   }
 
+  Net.applyInbox = items => applyInbox(items);
   function applyInbox(items) {
     const st = S(), g = G();
     for (const it of items) {
@@ -217,6 +245,11 @@
       st.inboxAck = it.id;
       switch (it.type) {
         case 'res': g.give(it.res); toast(it.text, 'info'); break;
+        case 'pase': if (PK.Pase) PK.Pase.recibir(it); break;
+        case 'saqueo': if (PK.Saqueos) PK.Saqueos.aviso(it); break;
+        case 'saqueo_fin': if (PK.Saqueos) PK.Saqueos.fin(it); break;
+        case 'diplo': if (PK.Diplo) PK.Diplo.recibir(it); break;
+        case 'caravana': case 'jefe_gremio': case 'visita': case 'titulo': if (PK.Mundo) PK.Mundo.recibir(it); break;
         case 'offer_filled':
           g.give(it.res); g.stat('offers_filled', 1); g.stat('gold_volume', it.value || 0);
           toast(it.text, 'good');
@@ -293,6 +326,8 @@
     if (beacon && navigator.sendBeacon) navigator.sendBeacon(API + '/api/save?t=' + encodeURIComponent(Net.me.token), new Blob([body], { type: API ? 'text/plain' : 'application/json' }));
     else api('POST', '/api/save', JSON.parse(body)).catch(() => {});
   };
+  // la travesía (js/mar.js) sube la partida con los dos mundos ya cambiados antes de recargar
+  Net.saveCloudObj = o => api('POST', '/api/save', { save: o }, 15000).catch(() => {});
   Net.deleteCloudSave = function () { return api('DELETE', '/api/save').catch(() => {}); };
 
   Net.start = function () {
@@ -375,5 +410,5 @@
   Net.claim = k => api('POST', '/api/claim', { k }).then(r => { tv = 0; return r; });
   Net.conquer = (k, units, power) => api('POST', '/api/conquer', { k, units, power });
   Net.conquerBot = k => api('POST', '/api/conquer-bot', { k }).then(r => { tv = 0; return r; });
-  Net.refreshRanking = () => api('GET', '/api/ranking').then(r => { Net.cache.ranking = r; done(); }).catch(() => {});
+  Net.refreshRanking = () => (PK.Mundo ? PK.Mundo.refrescar() : api('GET', '/api/ranking').then(r => { Net.cache.ranking = r; done(); }).catch(() => {}));
 })();

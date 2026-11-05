@@ -13,7 +13,26 @@ const PORT = +process.env.PORT || 8080;
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.json': 'application/json', '.md': 'text/plain; charset=utf-8' };
 
 // Rutas de la API: 'MÉTODO /ruta' -> (jugador, cuerpo) => respuesta
+// En el servidor local no hay RTDB: con PK_PASE_LIBRE=1 (pruebas) la pista dorada se activa sin compra.
 const routes = {
+  'POST /api/pase/claim': (p, b) => sim.paseClaim(p, b),
+  'POST /api/saqueo': (p, b) => sim.saqueo(p, b),
+  'POST /api/diplo/propose': (p, b) => sim.diploPropose(p, b),
+  'POST /api/diplo/accept': (p, b) => sim.diploAccept(p, b),
+  'POST /api/diplo/gift': (p, b) => sim.diploGift(p, b),
+  'POST /api/diplo/evento': (p, b) => sim.diploEvento(p, b),
+  'POST /api/caravana': (p, b) => sim.caravana(p, b),
+  'POST /api/guilds/boss': (p, b) => sim.guildBoss(p, b),
+  'POST /api/visita': (p, b) => sim.visita(p, b),
+  'POST /api/visita/like': (p, b) => sim.visitaLike(p, b),
+  'POST /api/visita/regalo': (p, b) => sim.visitaRegalo(p, b),
+  'POST /api/ranking': (p, b) => sim.ranking(p, b),
+  'POST /api/regata': (p, b) => sim.regata(p, b),           // Fase 9 «d» (pk-30)
+  'POST /api/regata/info': p => sim.regataInfo(p),
+  'POST /api/flota': (p, b) => sim.flotaMar(p, b),
+  'POST /api/duelos': p => sim.duelosInfo(p),
+  'POST /api/duelo': (p, b) => sim.duelo(p, b),
+  'POST /api/pase/refresh': p => sim.paseActivar(p, !!process.env.PK_PASE_LIBRE),
   'GET /api/status': () => sim.status(),
   'POST /api/join': (p, b) => sim.join(b),
   'POST /api/sync': (p, b) => sim.sync(p, b),

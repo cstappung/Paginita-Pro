@@ -287,3 +287,738 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   timer, construction, queue, workers and buffers. It costs 10% of the base
   cost and drops the belts that reached it. The TC cannot move
   (`G.MOVE_NO`): home regions and rescues hang on it.
+
+## The mega update plan, Phase 0 (`pk-11`, Nov 2026)
+
+`PLAN-MEGA-ACTUALIZACION.md` (this folder) is the owner's plan, phase by phase
+(«implementa la Fase N del plan»). Its rules section applies to every phase.
+
+- **`scared` goes negative after a fright.** Test `u.scared > 0`, never
+  `!u.scared`: a leftover −0.03 locked 132 of 159 villagers out of «+» (B1).
+- **No building may close the TC's yard** (`G.encierra`, reason `'encierra'` in
+  `placeWhy`, also for moves). It compares how many tiles you can walk to from
+  the TC's sides before and after (`W.reachCount`, 4-way like the regions and
+  A*, which never cuts corners). A town that was already closed (walls without a
+  gate) is not blocked. If a yard still ends up closed, `G.checkEncierro` (every
+  5 s) sets `G.encierro`: red arrows on the buildings that open it, new
+  villagers spawn outside, `unstick` rescues outward, the idle hint stops
+  saying «explora» (B2).
+- **Common-zone stats also count by type** (`z_tree`). Quest `e3` asked for
+  `z_forest`, which nobody wrote (B3).
+- **Workshops held by the reserve say so** (`G.reservaDe`, status «En
+  reserva»), and `b.sinReserva` («Producir igual», saved) skips it for one
+  workshop. New games start at 15% (B4).
+- **Changing a Capataz priority rebalances** up to 10 of its villagers
+  (`PK.Auto.rebalance`), never a `task.m` order (B5). The hover tip refreshes
+  every 250 ms and on camera moves (B7).
+- **World resets** (P1): bump `D.MUNDO_VER` (and `D.SAVE_V`) and deploy the
+  function. `sim.js` compares it on load with the stored one (`mundo.json`
+  locally, `prokingdoms/mundoVer` in the RTDB) and calls `store.reinicia()`,
+  which wipes everything but the suspicion log. No stored version just writes
+  it. A save of another `SAVE_V` shows the «Un mundo nuevo» card once
+  (`D.NOVEDADES`: update it in every delivery that resets).
+- **`D.PROTO`** goes in `POST /api/join`. Another one gets 426, and the loading
+  screen offers «Jugar sin conexión». Bump it whenever both sides must agree
+  (map, routes, limits), since Pages publishes on merge and the function is
+  deployed by hand.
+- **Tests:** `colabtex/tests/prokingdoms.test.cjs` (in `test:juegos`) checks
+  the data tables, B1, B2 and the reset. Its POI fingerprint
+  (`tests/fixtures/prokingdoms-pois.json`) must change only with a deliberate
+  reset (new `D.MAPV`). Regenerate it with the snippet at the top of that
+  file. The «two good troops per enemy» check is a `todo` until Phase 4: beasts
+  only have the Lancero.
+
+## Phase 1, automation (`pk-12`)
+
+- **Capataz:** «Reequilibrar» (`auto.rebal`, on) moves up to 3 of its villagers
+  every 20 s, only past 8% of the population. Plans (`PK.Auto.PLANES`,
+  `auto.plan`); «Meta de era» turns what the next era and the upgrade queue
+  lack into raw resources (`A.crudo`) every minute. Touching + or − returns to
+  «A mano». `A.tick` timers count seconds (`el`), not calls: offline calls
+  bring 60 s each.
+- **Salón del Consejo** (`consejo`, Era II, one; `js/consejo.js`): one
+  counselor per level 1/2/3/5/7/9, each with its own on/off and cadence, run
+  from `A.tick` (offline too) inside `UI.mute`, so they never toast. What they
+  do goes to `consejo.log` and the «Mientras no estabas» report
+  (`Consejo.informe`). The Tesorero stays under the server's daily market
+  cap (`C.MERCADO_DIA` < `LIM.marketDay`, tested). The Mayordomo also starts
+  the era advance when it can (acceptance: 12 h away still advances).
+- **Exploration flags** (`S.banderas`, max 3, `G.ponerBandera`,
+  `PK.Input.startFlag`, map or minimap): the first scout (two with the Puesto
+  at level 5 or Cartografía III) heads to the frontier tile nearest its flag.
+  A flag goes away once its tile is revealed. Out of range is refused.
+- **Outposts:** every 30 s live, a weighted resource with no node within 20
+  tiles of its drop points offers a camp next to the nearest one
+  (`A.lejos`, `A.lugarJunto`, `A.proponerCampo` leaves the ghost armed).
+  Walking share per resource (`A.eficiencia`) shows in Aldeanos.
+- **Asesor** (`js/asesor.js`, «?» in the top bar): ordered rules returning
+  `{prioridad, texto, acciones}`. The top one also shows in the report.
+  Phase 6 (U2) reuses it.
+- **Barrio:** Shift (or «Modo barrio» for touch) snaps the next houses to the
+  first one's grid with 1-tile streets and paves the street below and right
+  when there is stone (`calles` in `input.js`).
+
+## Split UI and the test autopilot (`pk-13`)
+
+- **`js/ui.js` is split** (T5): the core stays there; the Cuartel and battle
+  reports go to `js/ui/cuartel.js`, the kingdom windows (Obras, Territorio,
+  Logística, Reinos…) to `js/ui/reino.js`, Aldeanos and the Capataz to
+  `js/ui/aldeanos.js`, the Libro de Misiones to `js/ui/libro.js`. Each one
+  adds functions to `PK.UI` and loads right after `ui.js` in `index.html`.
+  The core calls `UI.barracksQuick`, `UI.enemyText` and `UI.bestVs`, so
+  those must stay on `UI`. A new window gets its own file there.
+- **The autopilot** (`tools/piloto.js`, T1) loads only with `?dev&piloto[=N]`
+  (speed ×N, default 10) or `?timelapse` (×40, no save; T2, replaces the lost
+  `tools/timelapse.js`). It builds a plan per era, keeps the builders busy,
+  researches the cheapest tech, uses the Mariscal's logic at 80%, and claims
+  quests, all under `UI.mute`. `pkPiloto.resumen()` gives minutes per era,
+  villagers idle over 60 s, full-storage events and battles. Run it before
+  and after any balance change and compare. Never let the game depend on it.
+- **The autopilot places workshops next to storage** (`lugarTaller`, within
+  `D.NEAR_STORE` of the TC or a warehouse). Elsewhere they get no supply and
+  no workers, and it stalled in Era II for lack of planks. «ociosos» is the
+  average share of idle villagers, not a count: at ×40 one villager crossed
+  «60 s idle» many times a minute.
+
+## Heroes (`pk-14`, H1 and C2)
+
+- **`js/heroes.js`, `PK.Heroes`, saved in `S.heroes`** (`lista`, `inv`,
+  `esencia`, `tab`, `nid`; defaults in `H.init`, so old saves load). Six
+  classes (`H.CLASES`, Annex A1), seven traits, 8 talent tiers × 2 (the
+  effect table `H.TALENTOS` is shared, the names are per class). Level cap
+  5 + 3 × era (max 40), XP per expedition `20 + 10·log2(1 + need/50)`.
+- **The Taberna opens with the Cuartel** (`G.legendLocked`), not with quest
+  l1. Three candidates a day, seeded by day + `created` only: hiring one must
+  not reshuffle the other two (it did when the list looked at your heroes).
+  Max heroes 1 + Taberna level / 2, up to 6. The first one costs only gold.
+- **Expedition power:** `Exp.powerVs(units, enemy, heroe)` × `H.mult`, capped
+  at +60% (`H.TOPE_FUERZA`, tested with level 40 and three legendary +5
+  items). **Only PvE:** `Social.power` (defense, territory attacks, the
+  server's snapshot) never counts heroes, so `sim.js` did not change.
+- **Live battle (C2):** the troops get only 60% of the hero bonus
+  (`HERO_TROPAS` in `batalla.js`), and the ability adds the rest. It fires by
+  itself (rule in `conviene`) unless «sola» is off. Measured with
+  `B.adelantar`, 80 fights each at 1:1: with a hero ≈ without one (±noise),
+  so live and the ratio formula still agree (rule 8). With 100% to the troops
+  plus the ability it was +30 points. The hero figure is not a target and
+  not in `vida()`. Losses get the hero's `bajas`. Golem fights at 1:1 lose
+  with or without a hero: that is Phase 4's problem.
+- **Governing:** a hero at home and healthy applies its class passive to the
+  building it governs (`H.pasiva(k, b)`). It is hooked into `trainSpeed`,
+  `exploreRange`, deer gathering, `relicGold`, `upTime`, `researchMult`,
+  `fiestaMult`, the mission board and `prodMult` (item `prod`). Away or
+  injured, the passive pauses; the assignment stays.
+- **Never dead:** a lost run brings the hero back injured for 30 min to 2 h
+  real (shorter with the Monasterio, the Clériga, Robusto, armor).
+- **Items** are `{id, t, r, s, m}`. Stats come from the seed
+  (`H.itemStats`, cached in a non-enumerable `_st`, rebuilt on upgrade).
+  Inventory max 60: a full one melts the worst item. Essence from melting
+  upgrades items up to +5. Drops only on wins with a hero.
+- Portraits are drawn by code (`H.retrato`, 24 px, cached by class + seed).
+  The Mariscal takes the best free hero (`cs.heroes`). The Asesor has three
+  hero rules. Quests lh1–lh4 in Leyendas.
+
+## Mazmorras 2.0 (`pk-15`, H3 and C3)
+
+- **Every dungeon visit is an incursion** of a 5-floor block (1–5, 6–10,
+  11–15; `js/incursion.js`, `PK.Inc`). It rides on the expedition: `r.inc`
+  holds the floor, the room options, the loot so far, blessings and losses.
+  A room with a fight sets `r.need` and goes back to phase `'go'` with
+  arrival in 2.5 s, so the live battle, the ratio formula and offline all
+  stay the same code. New phases: `'sala'` (waiting for a choice) and
+  `'fin'` (ended between rooms, i.e. retreat). `troops.js`, the timer strip
+  and the Cuartel treat both as «at the dungeon».
+- **Without the player** (offline, or 2 minutes without choosing) the room is
+  `I.porDefecto`: heal if needed, then the safe ones, never the merchant.
+- **Loot:** each room gives `I.BOTIN_SALA` (35%) of a floor's loot, because a
+  trip now brings five floors before the dungeon rests. Without it the cave
+  gave 337 crystals per trip instead of about 90. Coins only on a first
+  clear, never multiplied. A lost incursion keeps half (`arrive` gives it).
+- **Bosses** (`JEFE` in `batalla.js`, Annex A2) on the last floor of every
+  block take 55% of the room's power. Measured with 60 fights per boss at
+  1.2× power and no veterancy (it skews the numbers: `jefes.js` in the
+  session): right orders ≈ the same fight without a boss, wrong ones far
+  lower (cave 22/0, lair 55/32, crypt 77/0, crater 68/2, nest 92/40). Keep a
+  boss's `hp × dps` close to a normal enemy of its kind: the Matriarca at
+  2.2 × 1.1 was unbeatable.
+- **Focus** got «Al jefe». Melee only gets −3 of distance for the focus
+  (ranged −8): with −8 the spears held the line staring at a far boss while
+  wolves bit them.
+- **«Mantener línea» against beasts depends on how soldiers split into
+  figures** (17% or 77% with the same power); «Cargar» is steady at ~70%.
+  That is the old engine, left for Phase 4. The hints say what works.
+- **Weekly affixes** (`I.AFIJOS`, 2 a week from `weekKey`): mechanics live in
+  the battle (`b.af`), and `I.dureza` makes the ratio formula harder to match.
+- **C3:** the camera zooms to the figures (1–1.6×, `v.cam`; every layer is
+  drawn through `T()`), new golem and bear sprites (`mkGolem`, `mkOso`), a big
+  boss bar, clearer damage numbers, tactical pause (space; closing the view
+  unpauses, or it would freeze offscreen) and ×4.
+- Trophies (`S.trofeos`) in the Álbum, quests lj1–lj2, an Asesor rule for a
+  waiting room, and the Mariscal repeats the last fully cleared block.
+
+
+## Encounters, treasure maps and events with choices (`pk-16`, H2, H7, H8)
+
+- **Road encounters** (`js/aventura.js`, `PK.Aventura`): an expedition with a
+  hero and more than 60 s of travel meets one card halfway (two, at 35% and
+  70%, if the trip is 240 s or more; `A.puntos`). Without a hero, nothing:
+  the hero is what makes the trip a story. The card is picked by
+  `U.rng(r.id, encounter number)`, and so is the luck of each option, so live
+  and offline give the same result (rule 8). Without the player (offline,
+  60 s without choosing, or arriving first) the **`cauta`** option is taken;
+  every card has exactly one (the test checks it). If the safe one costs what
+  you cannot pay, `elegir` falls back to the least risky free option.
+- Effects (`ef`) are kept on the run (`encBotin`, `encTropa`, `encObjetos`,
+  `encLog`) and paid out in `arrive` through `A.volver(r)`. `fuerza`
+  multiplies `r.power` of that trip (or adds to `r.inc.bend` in an
+  incursion): PvE only, never `Social.power` (rule 4).
+- **The hero is visible on the map**: marches carry `heroe`, and `troops.js`
+  draws the hero with a ★ at the head of the column.
+- **Treasure maps** (`st.mapas`): from ruins (35%, seeded and flagged per
+  ruin so reloading does not reroll), from some cards and from the «Mercader
+  de mapas» event. Each marks a tile with a red X on the map and a blinking X
+  on the minimap. `W.fog[i]` truthy means explored: a map that came out in
+  the fog gets `oculto`, and when the scout uncovers that tile (the button
+  plants a flag there) it is dug up by itself. A hero can go instead (state
+  `'explora'`, travel time like an expedition). The chest always brings a
+  rare-or-better item.
+- **Events with choices** (`life.js`): an event can have `opciones` (buttons;
+  `run(e)` returns true when it ends the event), `defecto` (applied by
+  `endEvent` if nobody chose; without it nothing happens, as in the fire,
+  which just burns on), `cond()` (whether it may start now) and `tick(e, dt)`.
+  20 new events, among them the fire (villagers carry buckets: `u.balde`,
+  drawn in `render.js`), locusts, the comet, the earthquake, the spy. Their
+  timed effects go through `L.ponerMod(k, v, t, de)` / `L.mod(k)`, read by
+  `game.js` (`lm(k)`) for gathering, farms, speed, crafting, research and
+  costs (`conMod`). `L.reset` clears mods and fire.
+- Quests la1–la2, Asesor rules «encuentro» and «mapas», a «Mapas del tesoro»
+  button in the Explore window.
+
+## Campaign, legendary places, new dungeons (`pk-17`, H4, H5, H6) — the big reset
+
+- **Reset:** `D.SAVE_V` 4, `D.MAPV` 4, `D.MUNDO_VER` 2, `D.PROTO` 2, new
+  `D.NOVEDADES`, POI fixture regenerated. The Cloud Function must be
+  redeployed by hand (`firebase deploy --only functions`) right at merge.
+- **H4:** Pantano de las Brujas, Fortaleza de los Gigantes, Templo Hundido
+  (only next to water), placed after the old dungeons with the same `drng`.
+  Enemies `arcane` (curse: `f.lento`), `giant` (`aplasta`: area melee),
+  `abyss` (`agarra`: `f.atado`; the boss charms: `f.encantado`). The plan's
+  new troops come with Combate 2.0; meanwhile each enemy has two answers
+  among today's troops. Legend buildings Herbolario (wound time, potions in
+  incursions), Forja de Titanes (seeded rarity up on item upgrade), Faro
+  Abisal. Bosses measured (`jefes3.js`): Morgana 100% with clerics / 0%
+  without; Ymrok 88% dispersing / 4% charging; the Voz 80% charging with
+  clerics, worse with «Al jefe» (the hint says so).
+- **H6:** `D.LEYENDAS` (12) placed in `world.js` (server sees the same map),
+  3 copies each, POI kind `legend` with `p.ley`. `js/leyendas.js`: a hero
+  investigates (state `investiga`); bonus per legend index, never twice;
+  hooks in `gatherRate`/`farmRate`, `G.perk`, `powerVs` (dragons, PvE only),
+  tower sight, fiesta cost, dungeon rest, wishwell extra wish, tree regrow.
+- **H5:** `D.CAPITULOS`/`D.ESCENAS`/`D.PERSONAJES`, quests `c<N>_…` in the
+  Crónica, req `{ t: 'cap', n }`. `js/campana.js`: the chapter site is
+  per player (`S.campana.lugares`, seeded), not a world POI, so it needs no
+  map slot; attacked as target `{ cap: n }` with `r.jefe` from the chapter.
+  Choices have no timer (wait for the player), so offline decides nothing.
+  Scenes only open live and when no modal or battle is open.
+- The «83% idle» autopilot run after `pk-17` was not caused by `pk-17`: `pk-16`
+  stalled the same way. See the next section.
+
+## Life in the kingdom, part 1 (`pk-18`, V1, V2, V3) and the autopilot stall
+
+- **The autopilot stall had two causes, both outside the game's balance.**
+  Regrowth, mine regen, wounds, fiestas and seasons go by `Date.now()`, so at
+  ×40 the town cut 40 times faster than the forest regrew. Now `piloto.js`
+  makes `Date.now()` run at `timeScale` (main.js measures the tab gap with
+  `PK.relojReal`), and the pilot never saves (its dates would be in the
+  future). The pilot also never trained a scout: it saw 1.2% of the map. Now
+  «Entrenar sin parar» (`auto.train`) trains a scout at the Puesto when one is
+  missing and the range is not done, and the pilot does too. After the fix:
+  Era II 9.3 min, III 29.9, IV 108, idle 0–5% (was 50–83%).
+- **Everything Phase 3 gives goes through `G.bono(k)` = `PK.Vida.bono`**
+  (`js/vida.js`): tree + cards + season, cached, invalidated on a pick and on a
+  season change. Keys are listed at the top of `js/datos-vida.js` (tables live
+  there because the server does not load them). Perk keys (`craftP`,
+  `researchP`, `expSpeed`, `xpBoost`…) enter through `G.perk`; **`gatherP`
+  does not**: gathering goes through `Vida.recoleccion`, clamped to
+  `D.VIDA_TOPE` (1.6), which is `LIM.vida` in `sim.js`'s `kindRate`. The test
+  compares both. A new key needs a reader: the test fails on unused keys.
+- **V1, tree 2.0:** `D.ARBOL` (32 nodes, 4 branches, one opposed pair `ex` per
+  era II–IX). Nodes use the same research slot as the Fundamentos:
+  `S.research.id = 'n:<id>'` (`G.researchName` for labels; the Mayordomo's
+  queue takes them too). Picking one of a pair sets `S.arbolBloq[other] = era +
+  1`. `lib` = era − 1 is the Library level it needs. Research window has two
+  tabs (`UI.openResearch('arbol' | 'fund')`).
+- **V2, era cards:** `D.CARTAS` (31). One per era from II (`S.cartas.tomadas`
+  `[{era, id}]`); the hand is 3 cards seeded by `created` + era, so reloading
+  never rerolls. Eras VII and X keep the decrees as the «royal» cards. Choices
+  wait for the player (no default: no resources flow until picked). Card
+  window `UI.openCartas`, also from the Álbum and opened by itself at a new
+  era (`UI.revisarCartas`). PvE-only card effects (`pve_*`, `dragon`) go in
+  `Exp.powerVs`, never `Social.power` (rule 4).
+- **V3, seasons:** `floor(Date.now() / 6 h) % 4`, the same live, offline and
+  on the server. Soft bonuses only (no winter food upkeep). The ground chunk
+  is repainted with a season tint (`Sp.temporada`, `R.nuevaEstacion` clears the
+  chunk cache once per change); snow, leaves or petals fall in screen space.
+  Night follows the player's clock (20:00–6:00, with dusk): a dark layer over
+  the fog and lit windows. Opciones → «Sin noche» (`flags.sinNoche`). Four
+  season events in `life.js` (`feria`, `torneo`, `cosechaOtono`,
+  `inviernoFest`) with `cond` on the season.
+
+## Life in the kingdom, part 2 (`pk-19`, V4 to V9)
+
+- **New building types live in `data.js`** (not `datos-vida.js`): the server's
+  `cleanBuildings` drops types it does not know. So `D.PROTO` went to 3 and the
+  function must be redeployed with this delivery.
+- **V4, mood** (`S.animo = {v, ev, feliz}`, `Vida.calcAnimo` every 10 s live):
+  50 is neutral, 0 is −10% and 100 is +15% to gathering (inside the
+  `Vida.recoleccion` clamp, so `LIM.vida` still covers it) and to workshops.
+  Offline uses the last value. `Vida.animoPartes` is the breakdown the window
+  shows (decorations near houses capped at +25, Taberna, fiesta, variety,
+  governing Juglar, Jardines, timed memories from raids, empty pantry, houses
+  far from a drop point). Over 80: «Día feliz» at most every 2 h.
+- **V5, decorations** (`D.DECOS`, 15, `def.deco = {animo, r}`, no levels). The
+  Columna needs one boss trophy each and the Arco 10 challenges
+  (`G.logroFalta`). **Proximity** (`D.CERCANIA`): one bonus per rule, read by
+  `G.cerca(b)` (cached on `G.blockVer`, which now also bumps when a building
+  finishes) in `farmRate`, `prodMult` and `popCap` (house next to a plaza or
+  fountain: +1). The ghost draws green lines to the neighbours that count.
+- **V6, Wonders 2.0:** four 5×5 types in `D.MARAVILLAS`, one per kingdom
+  (`G.maxCount` returns 0 once any `D.WONDERS` exists). They reuse
+  `BSTATS.wonder` (prestige, +3% to everything, coins per level) plus
+  `D.MARAV[type].ef(lvl)` through `Vida.bono`. The old 4×4 `wonder` is
+  `retirada`: not buildable; its panel transforms it for free, keeping level
+  (`Vida.transformar`, needs 5×5 free around it). A stage is drawn every 5
+  levels (`fase`).
+- **V7, challenges** (`D.DESAFIOS`, 40, `S.desafios`): `on` is `'tick'` or an
+  event fired with `Vida.evento` (`batalla` from `Exp.resolve`, `era`,
+  `fiesta`, `incursion`, `carta`). Each gives gems, kingdom coins and a title
+  (shown in the TC panel). **King's challenges** (`D.RETOS`, 3 a week by
+  `weekKey` + `created`, `S.retos`) count stat deltas from the week's start;
+  all three open a royal chest with a rare item. They live in the book's
+  «Desafíos» tab. Ladders were shortened later, in `pk-27` (below).
+- **V8, shop** (`D.TIENDA`, kingdom coins via `Platform.spendCoins`, never
+  `monedas.js`): banner colour (`Sp.colorPropio`, clears the player's sprite
+  cache), hero portrait frame (`--marco` on `.h-ret`), fireworks at a new era
+  and +1 Mayordomo queue slot. Opened from the coins in the top bar.
+- **V9, fishing dock** (`muelle`): a farm on the shore (`G.esGranja`; one
+  fisher, `doFarm`), must touch water (`placeWhy` → `'sinAgua'`). Rate
+  `G.MUELLE_RATE × G.aguaMuelle(b)` (water tiles within 3, cached on `b._agua`,
+  cleared on move). The boat is drawn in `render.js` (`botes`) on the nearest
+  water tile. Tree node `redes` (+30%).
+
+## The Pase del Reino (`pk-20`, Phase 8)
+
+- **The only link with Juegos coins, one way only.** The page buys, the game
+  never pays out. The game frame asks through `ProKingdomsPlatform.comprarPase`
+  (postMessage `pkPase`). The postman (`prokingdoms.js`, `confirmaPase`) shows
+  its own two-step dialog with the balance and writes
+  `pkPase/<uid>/<period>` (`fb.comprarPase`, write-once rule with price and
+  period). Then the frame calls `POST /api/pase/refresh`, and the function
+  reads that node with the Admin SDK before opening the gold track. `join`
+  checks it too, in case the message got lost. The economy side (event `pk`,
+  category `pkPase`) is in `docs/claude/juegos/perfiles-y-economia.md`.
+- **Period arithmetic in three places:** `colabtex/src/juegos/pase-pk.js`
+  (page and economy), the rule, and `js/pase.js` (game and server, which do
+  not load the page's modules). Two weeks from Monday 2-11-2026 at 03:00 UTC.
+  `tests/monedas.test.cjs` checks that all three agree.
+- **The server decides the PP** (`sim.js`: `paseStats`, `paseClaim`,
+  `paseActivar`). Each sync sends the stats in `D.PASE_STATS` (`b.pase`). The
+  server adds the differences, with a cap per source (`D.PASE_ACT`) and per
+  day (`LIM.pasePPDia` 700). A jump over `LIM.paseSalto` in one sync is
+  clipped and logged as suspicion. Stats that go down mean a new save: the
+  count restarts from there and the jump earns nothing. Rewards arrive through
+  the inbox (type `'pase'` → `PK.Pase.recibir`). Locally,
+  `PK_PASE_LIBRE=1` lets refresh open the gold track without a purchase.
+- **Offline and in local mode the pass window says «Requiere conexión»**:
+  nothing about it is computed in the browser.
+- **Themes and aspects** (`D.PASE_TEMAS`, `D.CALENDARIO_PASE`, 26 slots,
+  `período % 26`): each theme comes back in the same fortnight each year. All
+  26 are filled since `pk-33`, ordered by Chile's seasons (carnival in late
+  February, autumn in March, Imperial over 18 September, spring after it).
+  New accessories go in `H.retrato` (the test greps `A === '<acc>'`) and new
+  roof materials in `MAT` plus a texture case in `S.tex` (unknown ones fall
+  to the flat default). Aspects are
+  visual only: building (`Sp.aspectoEdificio`, part of the sprite key), troop
+  colour (`Sp.colorDeTropa`), banner, decoration and hero (palette, accessory
+  and frame in `H.retrato`). A repeat turns into 25 gems + 40 essence.
+- **The gold track's bonuses** (in `Vida.bono`: +17.6% upgrade speed and
+  research, +1 queue slot; heroes heal ×0.7) stay inside what `LIM.slack`
+  already covers. Never add a gathering bonus here: it would go past
+  `LIM.vida`.
+- **After merging:** re-publish `firebase/database.rules.json` (new node
+  `pkPase`) and deploy the function (`firebase deploy --only functions`).
+  Tests: `test-rules.mjs` («Pase del Reino»), `functions/prueba-emulador.js`
+  (refresh with and without a purchase), `tools/cheat-test.js` (daily cap,
+  jumps).
+
+## Combate 2.0, part 1 (`pk-21`, Phase 4: H4 troops, C1, C4, C7, C8)
+
+- **Four new troops** in `D.ARMY` (`rider` Jinete III/5, `crossbow` Ballestero
+  IV/6, `monk` Monje guerrero V/7, `mage` Mago de batalla VI/8: era/Cuartel
+  level). `D.PROTO` 4: the server drops unit types it does not know. Every
+  enemy now has 2+ troops with `vs > 1` (the T3 test is on). The Jinete is a
+  horse plus the soldier (`montado` in `sprites.js`, its own cache `MC`); it
+  flanks like the wolves (`TROPA.flanco`).
+- **Big enemies were unbeatable live at 1:1** (gólem 2.6, oso 2.4, gigante
+  3.2 of hp×dps): `figura` caps a common enemy at `TOPE_EN` (1.6). Bosses keep
+  their measured numbers. Measured with `B.adelantar` (60 fights each, 1:1):
+  knights+spears vs the cave 0→66%, mages vs golems 74%, crossbows vs giants
+  42% (66% dispersing). Catapults vs giants is now 100%: splash on big clumps.
+- **Crossbows:** a heavy bolt every 1.6 s (`cd`), ×1.6 against enemies with
+  `st.hp >= 2` (`pesado`, live only like the spears' line), and a bolt whose
+  target already fell goes to the nearest enemy. Without that, all of them
+  fired at one body and lost 0% vs 73%.
+- **C4, enemy roles** (`B.ROLES`: chamán, escudero, jefe de banda, invocador,
+  élite with a name): `B.cuantosRoles(need)` gives 0–3, seeded by run id.
+  Whatever a role adds (`extra`) comes off every enemy's life, so the total
+  stays the planner's (measured: 62% without roles, 60% with, average of 4
+  cases). The escudero only stops `flecha`/`virote` from the front. Focus
+  `'rol:<id>'` (buttons with the role's colour), `B.CONSEJO_ROL`.
+- **C1, formation:** `r.form = {filas: {tipo: 'f'|'m'|'a'}, flanco}` from the
+  planner (`formacionEl` in `ui/cuartel.js`), `S.formaciones` = `{ult,
+  lista}` (3 saved). The default row is the old `TROPA.fila`, so not touching
+  it fights the same. The hero follows the front of his flank. Do not pass
+  `open` in `U.el` props: it reads «on…» as an event.
+- **C7, report:** `b.dano` per troop (in `herir`, real damage / HPK) goes
+  through `finishBattle` → `r.dano` (summed over incursion rooms) → the report:
+  most valuable group, bars, a `B.CONSEJO` line and «Repetir con la misma
+  compañía» (`rep.target`, `rep.form`, `rep.heroeId`; not for missions).
+- **C8:** gold pips under the bar in battle (one per two ranks) and a rank
+  pennant on the first garrison soldier of each type (`troops.js`, `TRAMO`).
+- **Left for part 2 (`pk-22`):** C1 terrain (`esc.obstaculos`), C5 sieges by
+  waves, tower branches and traps, C6 server raid parties (bots of `sim.js`,
+  tribute / fight / ally).
+
+## Combate 2.0, part 2 (`pk-22`, Phase 4: C1 terrain, C5, C6) — Phase 4 done
+
+- **C1 terrain** (`OBST` in `batalla.js`, `b.obst`, seeded by run id): rocks
+  (no one walks through them; a target right behind one takes ×0.6 from
+  shots), a river crossable only by the middle bridge (`rumboRio` walks to
+  it first; swamp and temple) and a hill (ranged on it +1.5 range). Drawn
+  by `dibujarTerreno`. Measured: bandits 80–82% as before, cave 78%. The
+  bridge funnels the enemy into splash, so mages and riders win more there.
+- **C5, sieges:** from Era III one raid in three (`st.inc.n % 3 === 2`) is 3
+  waves (`OLA` power 0.7/0.85/1.1, 30 s apart, `siguienteOla`). Villagers run
+  to the TC (`refugio`), and a won siege pays double. Live only, like raids.
+  **Tower branches** (`js/asedios.js`, `b.rama`, saved in the building's
+  `toJSON` in `entities.js` and read back in `game.js`) at level 5 from Era III:
+  arquera, balista, aceite (area), mística (slow). Only against raids:
+  `Social.defense` does not change, so `sim.js` needs no limit. **Traps**
+  (`S.trampas`, max 16, one tile in your territory, `PK.Asedios.herramienta`
+  handled in `input.js` like the flag tool): spikes hurt 35% of a bandit's
+  life (3 uses), tar slows 4 s (5 uses).
+- **C6, raid parties from the server's realms** (`tickSaqueos` in `sim.js`,
+  client `js/saqueos.js`): from Era IV, only for an online player out of
+  truce, every 2.5–5 h (×0.6 for «conquistador» realms, strength ≥ 1.1). 3
+  min warning, a column in the realm's colour on the map and minimap. Choices
+  through `POST /api/saqueo`: tributo (resolves at once; the client pays when
+  `saqueo_fin` arrives), pelear (default), ayuda (allies since `pk-23`; it was
+  the guild's +30% until then). The server compares the last
+  snapshot's defense with the power; a win arrives as a prize through the
+  inbox, a loss as `pct` + `tope` the client takes from its stores.
+  `D.saqTope`/`D.saqTributo` live in `data.js` (both sides). Local mode: none.
+  Test: `node tools/saqueo-test.js` (in-process, moves the clock).
+- `D.PROTO` 5: deploy the function with this delivery.
+
+## Diplomacia (`pk-23`, Phase 5: S1, allies in raids, personalities)
+
+- **Personality per slot** (`D.PERSONALIDADES`, `D.REALM_SLOTS[i].bot.pers`): four of each per world,
+  shuffled with its own `U.rng(D.SEED + 4243)`, never `wrng` (that would move the map). It replaces
+  pk-22's «conquistador = strength ≥ 1.1». `D.BOTS[i].pers` is null for a human slot.
+- **The server decides everything** (`diploDe`, `diploPropose`, `diploAccept`, `diploGift`, `diploEvento`,
+  `tickDiplo` in `sim.js`; routes `/api/diplo/{propose,accept,gift,evento}`). `p.diplo.s[slot]` = `{con,
+  rel, pacto, tratado, boda, reg, trop}`; `con` is `'bot'` or the occupant's pid, and an entry restarts when
+  the occupant changes. Bot relations drift toward the personality's base (`deriva`, 2 points a day) and a
+  pact breaks by itself `D.DIPLO.rompe` below its threshold (a boda keeps the alliance). With a human there is
+  no number: proposals go through the inbox and `prop`, rivalry and «romper» are one-sided.
+- **The sync carries `diplo` only when `p.diplo.v` changed** (client sends `dv`). Bump `d.v` on every change,
+  including a rounded drift. Local mode has no diplomacy: the cards say «requiere conexión».
+- **Pacts:** treaty = −10% on market buys (`buyRate` in `social.js`, never below sell + 10% and never above
+  the old price: buy at 0.8 and sell at 0.97 is already close to free money). Non-aggression and alliance: no
+  raids from that realm and no conquest either way (`D.canConquer` gets `pacto`, beats revenge; `conquerBot`
+  checks it and costs −15 relation). Rival: raids more (`D.DIPLO.rival`), a won raid pays ×1.5, conquering
+  it costs ×0.75.
+- **Raids (C6) now:** the attacker comes from the 5 nearest unpacted bot realms, weighted by `peso`
+  (Conquistador 3), rivalry and relation; the next wait is the base × the lowest `saq` among them. With a pact
+  with every neighbour nobody comes. «Pedir ayuda» needs an ally: each bot ally adds `0.12 + 0.12 × strength`
+  (×1.5 with a boda, −2 relation as a favour), each human ally up to +30% from its own defense (and gets 20 ×
+  era gold). Allies march as columns to your TC (`saqueos.js`). Tribute +5 (comerciante +8); a won raid −5,
+  except the Conquistador, who respects it (+3).
+- **Events** (one at a time, every 3–6 h online, from Era II): embassy (gift), request for help (6 h; sending
+  it counts double), ultimatum (Conquistador under 10, Era IV+, 20 min: refusing sends its raid at once via
+  `p.saqDe`), royal wedding (ally at 80+), troops from an ally (once a day, into `st.war.army`).
+- **UI:** `js/diplomacia.js` (`PK.Diplo`, crests drawn by code, 14×16) and `js/ui/reinos.js` (cards; it
+  replaced `openRealms` in `ui/libro.js`). Gifts come in three sizes of `D.diploEscala(era)`; three per realm a
+  day. Test: `node tools/diplo-test.js` (in-process, like the raid test).
+- `D.PROTO` 6: deploy the function with this delivery.
+
+## Living world (`pk-24`, Phase 5: S2 to S6) — Phase 5 done
+
+- **S2 caravans** (`caravana`, `tickCaravanas` in `sim.js`; `POST /api/caravana`): only to a realm with a
+  trade treaty, max 2 at a time and 6 a day. Gold `D.caravanaOro(era, distance)`, one-way time
+  `D.caravanaIda`. Risk `D.caravanaRiesgo` grows with distance (far routes pay more and are risky), ×0.35 with
+  an escort (paid on departure, the client pays `paga`) and ×0.5 with a finished Faro Abisal in the building
+  snapshot. The server rolls it at return and sends the gold by inbox (`caravana`); a human partner gets 25%.
+  The client only draws the cart (`Sp.cart`) and escort along TC → partner home → TC (`js/mundo.js`).
+- **S3 weekly guild boss** (`g.jefe`, `D.JEFES_GREMIO` by `D.semana`, Monday UTC): HP from the real members'
+  average era and count. `POST /api/guilds/boss` sends the army at home, validated by `checkArmy` like a
+  conquest (a made-up power does nothing), 3 a day, 10% losses applied by the client. Damage tiers 25/50/75/100%
+  pay every member who hit (`jefe_gremio`, with kingdom coins); the top hitter gets an extra and every hitter
+  counts a kill (`p.jefes`). Simulated members hit ~40% of the HP over the week (`tickJefes`).
+- **S4 visits** (`POST /api/visita`, `/like`, `/regalo`): a read-only view drawn with the map's own sprites
+  from the last building snapshot. One like and one gift (`D.visitaRegalo`, inside the tablón's daily gift
+  caps) per target per day; each visitor counts once a day.
+- **S5 rankings** (`POST /api/ranking {cat}`, `D.RANKINGS`): the snapshot sends `rk` (`Mundo.rkFoto`: wonder
+  level, deepest floor, defenses won); `checkRk` lets each rise at most 3/5/3 per sync and logs bigger jumps.
+  Boss kills and visits are counted by the server. Every Monday (`tickTitulos`, marker in collection `meta`)
+  the top of each category gets a weekly title, one title per player (the next one gets it otherwise).
+- **S6:** the steady sync only grew by `rk` (~40 bytes up) and, when present, `caravanas` (~150 bytes) and
+  `titulo`; `diplo` (~1.2 KB) only travels when its version changes. A first sync is ~23 KB, as before.
+- Test: `node tools/mundo-test.js`. Routes are in both `server/index.js` and `functions/index.js`; no
+  `D.PROTO` bump beyond pk-23's 6 (deploy the function with this delivery too).
+
+## The New World, part 1 (`pk-25`, Phase 9 N7 «a»: two-world engine, the Galeón, the crossing)
+
+- **One live world at a time.** The save is the active world's state; the other one waits inside it as
+  `S.otro`, and `S.tema` says which is which (`'tierra'` or `'mar'`). `js/mar.js` (`PK.Mar.viajar`)
+  serializes, swaps the two states, carries what belongs to the player and not to the map (`COMPARTIDO`:
+  `inboxAck`, `slot`), saves locally, uploads to the cloud (`Net.saveCloudObj`, awaited) and **reloads the page**
+  («Navegando hacia…»). Every system then starts clean on its own map; never try to swap worlds in place.
+- The world you leave advances when you come back with the usual offline calculation (`main.js` measures from
+  that world's `lastSeen`), so «Mientras no estabas» tells what happened on land. **`S.at`** is when the save
+  was written; `main.js` picks local vs cloud by `at` (falling back to `lastSeen`), because with two worlds
+  `lastSeen` is per world.
+- **`W.generate(seed, tema)`**: `'mar'` builds an all-water map with your island on your land home (so the
+  camera, TC and fog code work unchanged), sand, palms (`n.sp = 'palm'`, `makePalm` in `sprites.js`), and four
+  islets (`W.islas`); one realm (yours), no zones, POIs or other kingdoms. The land map is untouched (tested).
+  A first visit has no buildings, so `G.init` runs `setupPlayer` (TC + 3 villagers, `D.TEMAS.mar.inicio`).
+- **At sea** (`G.enMar()`): no bots, and `Terr`, `Life`, `Incursiones`, `Leyendas`, `Campana`, `Vida.tick` and
+  quests don't run (the Libro says the archipelago's branch comes later). The sync sends `mundo: 'mar'` with no
+  snapshot, harvest or pase stats; the server marks `p.mar`, sends no land nodes/players/terr, and raids and
+  diplomatic events skip that player (the land kingdom is «offline»). `D.PROTO` 7.
+- **The Galeón** (`S.galeon` lives in the existing `campana.galeon` list: chapters 6–9 give casco, timón,
+  velas, brújula; chapter 10 completes the Crónica). It shows from chapter 6 (era VII), stranded and broken on
+  the shore of the lake nearest your home (`Mar.lugar`), drawn by code (`Sp.galeon`, wrecked or repaired by
+  piece) as a `k: 'galeon'` render item you can tap; at sea it is anchored by your island. Menu button
+  «Galeón» (`MENU_VER.galeon`), window with a painted preview of the archipelago. `?dev` → Opciones → «Galeón
+  listo (prueba)» sets `flags.galeonDev` to sail without the Crónica.
+- Not yet (N7 «b» to «d»): the archipelago's own resources, buildings, eras, tides and colonies; ships and
+  naval battles; the Regata, naval duels and the bridges between worlds (heroes travelling, trade, Maestro de
+  Ribera). The sea world uses the land's tables meanwhile.
+
+## Interface, phone and sound (`pk-26`, Phase 6: U1 to U7)
+
+- **U1, grouped menu** (`GRUPOS`, `agrupar` in `ui.js`): the old buttons are still built by `mbtn(icon, label,
+  fn, key, id)` and keep their `MENU_VER` rule, then `agrupar` moves them into five groups (Reino, Héroes,
+  Guerra, Mundo, Libro) plus Opciones. A group shows when any of its buttons shows, glows when one is new and gets
+  a «!» when one has a badge (`updateGrupos`, called from `updateMenu`). Tabs that lived inside a window
+  (Diarias, Desafíos, Álbum, Atacar, Defensa, Batallas, Taberna, Equipo, Consejo) are now entries of their own.
+  The popover is `#submenu`; `UI.cerrarGrupo` closes it. Keyboard shortcuts don't go through the menu.
+- **U4, phones:** in portrait the menu is a bottom bar (`#menu` as a row). Everything that sat on the bottom
+  edge uses **`--sab`** (safe area + the bar's 62 px) instead of `env(safe-area-inset-bottom)`; use it for any new
+  bottom-anchored element. Ocioso (big, with the idle count), Demoler and Minimapa live in **`#acciones`**, not
+  in the menu: right side under the minimap in portrait, a second column next to the menu in landscape (`--mw`
+  100 px). `incursiones.js`' arrow area reads the bar's height. **Long-press on your own building and release
+  without dragging upgrades it** or queues it (`mejoraRapida` in `input.js`); dragging is still box select. After
+  `m4`, the empty-selection panel starts folded on phones (`UI.plegarPanel`).
+- **U2 and U3** (`queHago` in `ui.js`): with nothing selected the panel is «¿Qué hago ahora?»: the next Crónica
+  quest (`PK.Quests.siguiente`, ready first) with its bar and «Reclamar» or «Ver en el libro», plus the top two
+  Asesor rules (cached 2 s; the panel redraws every 0.5 s). Until `m4` is claimed it is the guided tutorial:
+  step N of 4, a «Muéstrame» per step (`GUIA`: selects the TC or opens Construir) and the menu group to touch
+  glows (`.guia`). «Saltar tutorial» sets `flags.tuto = 'saltado'`; finishing sets `'fin'`.
+- **U5, music** (`js/musica.js`, `PK.Musica`): procedural, through `sfx.js`' master (`Sfx.ac()` never creates
+  the context: the first touch does), so M and the shared Juegos volume reach it. One mode per era group
+  (rústico, medieval, reino, imperio), the Archipiélago's own, a night variant (slower, lower, sparser) and a battle
+  theme (live battle view or bandits past the warning) that adds cymbals and tempo while a boss lives
+  (`Batalla.vistaActual`). Phrases are seeded motifs over a 4-chord progression. Ambience: birds, crickets at
+  night, wind in winter, waves at sea, hammers while something is being built. Since `pk-31` it follows what is
+  on screen (see «Phase 6 leftovers» below). Volumes `pk_musica` and `pk_ambiente` (0–100) in Opciones. Silent while the tab is hidden
+  and during the offline calculation.
+- **U6, accessibility** (per device, `UI.acceso`/`UI.setAcceso`): text size (zoom 1.12/1.25 on windows, panel,
+  toasts, submenu and event), colorblind colors (`html.daltonico`: good blue, bad orange; shapes and realm
+  patterns since `pk-31`, below), reduce motion (`PK.menosMov`: no CSS animations, no battle shake,
+  no falling leaves or snow; on by default when the system asks for it).
+- **U7:** the battle view fades in, and a full resource gets a red frame in the top bar. The rest of U7 (wonders,
+  golem, bear, portraits) was already done in earlier deliveries.
+
+## Shorter mission ladders (`pk-27`, the rest of V7)
+
+- **`escalera(pref, …)` in `data.js`** builds every ladder (`bt`, `bl`, `xt`, `xc`, `xr`, `et`, `it`, `tt`,
+  `gt`, `wt`, `lf`) with at most 4 visible ranks: indices `round(j·(L−1)/3)`, so the first and the hardest step
+  stay. **Quest ids never change** (that is why this was deferred in `pk-19`): a hidden step leaves `D.QUESTS`
+  and goes into `absorbe` of the next visible rank, with its reward and its perk (`PERKS` looks there too).
+  `Q.claim` pays absorbed steps this save had not claimed yet and marks them claimed, so an old save half way
+  up a ladder neither loses nor double-collects anything. `Q.premioTotal(q)` is what the book shows and what
+  `claim` returns (the «Reclamar todo» chest sums it).
+- **Each rank is a title** (`q.rango = {esc, k, de}`; `flags.titulo = 'q:<id>'`, read by `Vida.titulo`; the
+  highest claimed rank of each ladder shows in Desafíos → «Título del reino»). **Rank II gives the ladder's
+  banner colour and the last rank its portrait frame** (`D.premiosRango`; `D.ESCALERAS[k].col`). They are
+  `D.TIENDA` entries with `premio` and no price: the shop lists them in their own section and `comprar` refuses
+  them. `Vida.init` grants them silently to saves that already had those ranks.
+- Test: «V7: escaleras…» in `prokingdoms.test.cjs` (≤ 4 ranks, the 10 perks still somewhere, Constructor
+  Incansable's coins still add up to 360).
+
+## The New World, part 2 (`pk-28`, Phase 9 N7 «b»: the archipelago's economy)
+
+- **The sea is a theme applied once at startup**: `G.init` calls `D.aplicarTema('mar')` (`js/datos-mar.js`)
+  *before* `W.generate`, which mutates the tables in place: resource and building names (`D.MAR.nombres`,
+  `D.MAR.edificios` re-skin land types: Fortaleza del Puerto, Lonja, Aserradero de teca…), `BUILD_ORDER =
+  D.MAR.construir`, eras (`ERAS_MAR`, 6 eras, `eraReqMar` makes VII impossible), `eraCost/eraTime/upCost`,
+  `QUESTS = QUESTS_MAR` (the Crónica del Mar), `BRANCHES`, daily/weekly, `WONDERS = ['granfaro']`. On land it is
+  never called and nothing changes; since travel reloads the page, never «un-apply» it. Tests that need it
+  load a separate `carga()` context.
+- **Food, wood and stone are reused** (Pescado, Teca, Coral) so the villager/farm/storage code runs untouched;
+  the new ones (`fibra`, `salitre`, `especias`, `lona`, `tablazon`, `polvora`) carry `mar: true`.
+  `D.resDelMundo(r)` hides land-only resources in the top bar at sea and sea ones on land. The build window
+  uses its own sections at sea (`BUILD_CATS_MAR` in `ui/aldeanos.js`). Era cards (V2) don't trigger at sea.
+- **Tide**: `D.marea(t)` is a sine on the real clock (4 h cycle); `G.ahora()` returns `G.tSim` during the
+  offline calculation so live and offline agree. Reefs (`arrecife`) are only workable at low tide (the
+  villager waits, `u.mareaWait`); the fishing hut yields more at high tide; the sand overlay and foam on the
+  shore follow it (`render.js` `costaMarea`, shore tiles precomputed in `W.costa`). Chip in the top bar.
+- **Islands**: `W.islas[0]` is home, then one islet per trait (palmas, coral, volcán, naufragios, especias)
+  by distance. `PK.Arch.islaDe(x, y)`. **Colonies** (`js/archipielago.js`, `S.colonias`): the Embarcadero
+  sends 3 colonists by ship (cost and trip time grow with distance and count); on arrival the island is
+  revealed, becomes your territory (reapplied on each load from `S.colonias`, never stored in the map) and gets
+  a colony drop building. **Villagers never cross water**: `findDrop`, `Auto.targetFor`, shops and the
+  rebalancer filter by island, otherwise colonists walked to the home island's farm.
+- Salinas are a farm with `farmRes: 'salitre'` (`G.granjaRes(b)`); anything counting farms as food must use it.
+  The Comercio buys and sells sea goods for gold (`D.COMERCIO_MAR`). Bruma banks drift over the sea and thin
+  out near lighthouses.
+- The server never sees the sea map (no snapshot at sea), so none of this changes `D.PROTO`.
+
+## The New World, part 3 (`pk-29`, Phase 9 N7 «c»: the navy and naval battles)
+
+- **At sea `D.ARMY`, `D.ENEMY` and `D.MISSIONS` are the sea's** (`ARMY_MAR`, `ENEMY_MAR`, `MISSIONS_MAR` in
+  `datos-mar.js`, swapped by `aplicarTema`), so the Cuartel code, the planner and the battle run unchanged.
+  The land never sees them. `barracks` is re-skinned as the **Dársena de guerra** (`agua: true`); menu «Flota»,
+  group «Armada». `Armada.init` drops land troop keys left in a sea save (pre-`pk-29` the sea used land
+  tables) — `Soc.power` would crash on them. Troops with `req` (infantería, arponeros) need the Escuela.
+- **`js/armada.js`** fills `batalla.js` through hooks: `B.TROPA`, `B.ENEMIGOS`, `B.JEFE`, `B.CONSEJO*`
+  (exposed tables), `B.ext.sprite` (ships, boats, crabs, sharks… drawn by code, cached per frame/flip),
+  `B.ext.alArmar` (wind, storm damage, shore batteries, boss setup), `B.ext.jefePaso[id]`, and `B.H` (the
+  internal helpers a boss needs). Generic mechanics live in `batalla.js`: `st.barco` (wake instead of dust,
+  ships sink instead of falling), `st.explota` (brulote), `st.frena` (harpoon), `st.caparazon`/`st.rompe`,
+  `st.hunde`/`st.chico`, `st.fija` (batteries), `b.jefeMult` (a boss that takes less), and **wind**
+  (`b.viento` ±1, seeded by run id: the windward ships ×1.15 speed, ×1.1 damage; even on average).
+- **A brulote that explodes leaves the life count** (`b.fuerza0[0] -= f.max`): before that, exploding counted
+  as losing and fired the automatic retreat. Its blast is 1.5× its power (what it would deal living the
+  whole fight). **`bala` and `arpon` retarget like the crossbow bolt** when their target already fell.
+- **At sea everything is fought in the `'mar'` scenery** (`escenarios.js`: water, islets, debris, gulls;
+  storm, fog and rain with depth) and **sea missions are live too** (on land missions stay formula-only).
+  `r.nivel` sets the scene's depth. On the map the fleet is drawn by `Armada.items` (ships leaving the
+  Dársena, ships moored by it); `Troops.collect` draws nothing at sea.
+- **Bosses** (`D.JEFES_MAR`, target `{ jefeMar }` in `Exp.preview/canSend/send/cerrar`): Malvarosa (II,
+  boarders at your shooters, broadside circles), el Lamento (IV, in and out of the fog: only infantry and
+  brulotes hit it fully; a lighthouse shortens it), the Kraken (VI, 4 tentacles taken from its life; while one
+  lives the body takes ×0.2; one regrows every 15 s). First win pays `loot`, later ones `rep`, then `descanso`.
+- **Storms** (`D.tormenta`, real clock, ~7% of the time, 40 min): a fleet that sails in one takes ×1.4 travel
+  and arrives at ×0.9. **Pirate raids** (live only, like land raids; `st.asalto` keeps the clock): from Era II
+  with a Dársena or Batería, every 25–40 min, 45 s warning; your fleet at home plus shore batteries
+  (`r.baterias`, fixed figures that are not troops: `bajas` skips them) fight; the Cadena lowers their power.
+  Lost: 12% of food, wood, gold and spices, capped by `D.asaltoTope`.
+- **Measured with `B.update` to the end** (40 fights each, 1:1 / 1.3:1): pirates vs fragatas+infantería
+  50/100, crabs vs arponeros 25/93 (balandras 0/5: the shell), sharks/serpents vs galeón+arponeros 85/100,
+  ghosts vs brulotes+infantería 55/100, Malvarosa 17/83, el Lamento 33/100 with infantry+frigates (10/53 with
+  brulotes), Kraken 63/100. Crabs started at 2.2 hp like a land giant and specialists won 5%: at sea they are a
+  normal enemy whose trick is only the shell.
+- Fixed on the way: chained rings (`anillos` with negative `t`, Morgana's curse) threw on `ellipse`.
+
+## The New World, part 4 (`pk-30`, Phase 9 N7 «d»: the Regata and the bridges) — Phase 9 done
+
+- **`D.PROTO` 8, new routes:** `POST /api/regata`, `/api/regata/info`, `/api/flota`, `/api/duelos`, `/api/duelo`
+  (in both `server/index.js` and `functions/index.js`). Deploy the function with this delivery. Test:
+  `node tools/regata-test.js` (in-process, moves the clock, like the raid test).
+- **Anything the server computes lives in `data.js`**, since its vm loads only util, data, pase and world:
+  `D.REGATA`, `D.vientoMar` (90-minute cycle, out of phase with the tide), `D.regataTiempo`, `D.DUELO`,
+  `D.dueloPoder`/`D.dueloVentaja`, and `D.tormenta` (moved there from `datos-mar.js`).
+- **Regata** (`js/regata.js`, `PK.Regata`, menu «Regata», sea only via `NO_TIERRA`): the client pays for the ship
+  parts (casco, velas, timón, 0–10), the server decides the time from the parts, the route (arrecifes, canal,
+  altamar), the tide, the wind, the storm and ±3% luck. Each part can rise at most `1 + floor(h × subeHora)`
+  levels since the last race (the first race counts from `p.marDesde`, set by the first sync with `mundo: 'mar'`;
+  before that a new account raced at 10/10/10): a lie only earns a ship you could have had, and it is logged
+  (`suspect`). Three a day. Weekly leagues (Bronce, Plata, Oro, Bruma): every Monday `tickRegata` promotes the top 30% and relegates
+  the bottom 30% of each league and pays kingdom coins by inbox (`type: 'res'`). It reads each player's league
+  from a snapshot (`ligaDe`), or a player promoted from Bronce got promoted again in Plata. The ranking
+  category `regata` sorts by best time (`1e5 / t`).
+- **Naval duels:** `POST /api/flota` saves a duel fleet (≤ 120 ships). The server cannot see the sea, so its
+  check is growth: power may reach `max(prev, 300) × 1.5 + 400 per hour` since the last save (the first fleet counts
+  from `p.marDesde`, so a new account cannot list 120 galleons). Duels never cost
+  ships, only trophies (5 a day; chance `0.5 + 0.9 × (ratio − 1)` clamped to 5–95%, rock-paper-scissors bonus
+  ≤ ×1.15). Both players get an inbox line. Ship powers in `D.DUELO.poder` must match `D.ARMY_MAR` (tested).
+- **Bridges between worlds** (`js/mar.js`): the Galeón carries cargo (`D.CARGA`, 400 units: tools, steel,
+  machinery, ingots and books to the sea; spices, gunpowder, planks and canvas to land) and up to
+  `D.HEROES_ABORDO` (2) heroes. Heroes and their items get **new ids** in the other world (`a.nid++`), because
+  ids are per world, and arrive `travesia` for `D.TRAVESIA_HEROE` (10 min). The top bar shows a resource of the
+  other world when you hold ≥ 1 of it.
+- **The Corsaria** (`H.CLASES.corsaria`, `mar: true`, not in `H.ORDEN`): hired in the Flota tab with gold and
+  spices, only one across both worlds. «Leer las corrientes» turns the battle's wind in your favor and gives
+  infantry ×1.4 for 12 s, then restores the wind. Like every hero, it starts each battle with a 4 s cooldown.
+- **Astillero del Maestro de Ribera** (`maestro`, sea era III, one): once built, `G.maestroMar()` gives the land
+  +1 builder (`G.builders`). **Wonder levels from 20 on land cost spices and gunpowder** (`G.upCost` wraps
+  `conMar`), but only once the Galeón can sail, so a kingdom that never reached the sea is not locked.
+- Quests `reg1`–`reg4` in the Crónica del Mar (races, ship upgrades, duels won, the Maestro).
+- **Tests of both worlds:** `tools/cheat-test.js` has an «archipiélago» block (a sea sync ignores harvest, snapshot,
+  market and pass stats and sends no land; first race and first fleet are capped), and `functions/prueba-emulador.js`
+  runs the Regata and a duel against the real function. Its beta check is cached a minute per uid, so the test uses a
+  fresh account for the second captain.
+
+## Phase 6 leftovers (`pk-31`): ambience from the screen, colorblind shapes and patterns — Phase 6 done
+
+- **The ambience plays what the camera shows** (`musica.js`, `mirar`, every 1.5 s): a 16 × 10 grid of screen
+  points over explored tiles (water, shore, forest and tree nodes, grass), plus the buildings and villagers on
+  screen (works and upgrades → hammers, staffed forge/smelter/steelworks/workshop → anvil, sawmill/masonry/
+  cartwright → saw, houses, market, TC, tavern, guild → people, other realms' villagers chopping or mining →
+  axe or pick; yours already sound on every hit through `impact` in `render.js`).
+  `fuentes` turns that into weighted sources, one sound at a time, more often when more is going on. Each sound
+  goes through a `StereoPanner` placed by where its source sits on screen, and the zoom makes it louder
+  (`cerca`). Night (crickets), winter (wind) and the sea (waves, gulls) still decide what nature sounds like.
+  Read-only: it never touches the game. `PK.Musica.escena()` / `fuentes()` are for tests.
+- **Colorblind mode adds shapes and patterns** (only with `html.daltonico`): every realm but yours gets one of
+  six patterns (`Sp.patronDe(slot)` = `slot % 6`, `Sp.enPatron`) in the minimap's territory (the base is rebuilt
+  when the mode changes), in the territory-mode fill (`Sp.trama`, 3 px cells so it still reads at zoom 1), as a
+  dash per realm on the map borders (`Sp.GUIONES`) and on the field of its crest (`Diplo.escudo`, cached per
+  pattern). Other realms' buildings on the minimap are crosses, yours are squares. In the UI: ✗ after a cost you
+  cannot pay, ✓/✗ on era cost rows, ✓ and ! on good and bad toasts, double or dashed left borders where only a
+  green or red border used to tell.
+
+## Performance with 300 villagers (`pk-32`, Phase 7 T4)
+
+- **Measure with `node tools/rendimiento.js [pc|cel] [villagers] [cpu slowdown] [url]`** (Playwright, against
+  `npm start`): N of *your* villagers working around your TC, at zoom 1 and 2. `cel` sets a phone user agent, or
+  `MOBILE` is false and the phone settings never run. A Chromium without GPU paints the canvas in software, and
+  that is most of the frame there: compare against a run with few villagers, not against 60 fps.
+- **The villager sprite cache was thrashing.** Its key had each villager's exact aim (where the tool lands) plus
+  its own hair and skin, and past 3000 sprites the whole cache was wiped. Now: no aim below zoom 1.5, aim in 2 px
+  steps and recomputed only after moving 0.3 tiles or changing target (`u._aimF`; neighbours working the same
+  node jostle every frame), two canonical looks (man and woman) below zoom 1.5, the cache forgets the least
+  recently used 400 at 2400 (`VC` is a `Map`), and at most 10 new villager sprites per frame (2 on phones). A
+  villager without budget shows its previous sprite (`u._spr`), never more than 3 frames in a row (8 on phones).
+- **`mine(type)` in `game.js` is cached** until `G.blockVer`, the building count or the array changes: each
+  villager's gather rate walked every building several times per frame. Never mutate what it returns.
+- Measured, 300 villagers working: PC zoom 1 draw 29.7 → 5 ms, sim 4.6 → 1.7 ms, 22 → 56 fps; zoom 2 33 → 53 fps.
+  Phone (CPU ×4, DPR 1.5) zoom 1 draw 112 → 13 ms, sim 17 → 9 ms; zoom 2 draw 68 → 31 ms.
+
+## Pace check and the fixes it found (`pk-34`, §12 of the plan)
+
+Measured with the autopilot at ×40 (`?timelapse`), one run, game minutes: Era II 12 (other runs 9–10), III 33,
+first hero 12, first boss 88, IV 121, **V 344** (target 4–6 h; before these fixes it never got there in 15 h).
+Each fix below came from a stall in that run; keep them in mind before touching the economy.
+
+- **Stone regen 0.05 → 0.25** (`D.NODES.stone`, shared with the server's common zones). The 26 mines within 45
+  tiles gave ~400 stone an hour; Era V asked ~9,500. Era costs use `1800·k` stone (was 2500) and `D.eraTime` from
+  Era V is 1 h ×1.8 per era (was 2 h ×1.6). The server only uses `eraTime` for its minimum gap, so shorter is safe.
+- **«Meta de era» now steers workshops too** (`G.metaNecesita`, `G.reservaDe`, `G.metaPide`, `reserveOf` in
+  `logistics.js`). A workshop whose output covers the goal (×1.25 and 20% of the cap) holds an input the goal still
+  lacks («En reserva para la meta de era»); the Canterías had turned 15,000 stone into 5,000 blocks while the era
+  waited for stone. And a workshop whose output the goal lacks ignores the normal reserve: the goal saw enough ore for
+  9 missing ingots, nobody gathered ore, and the 5% reserve kept the smelter from using it. The hold of an output
+  the era cost does not list waits until every era goal is met (upgrades still need planks before that).
+- **When the era cost does not fit in storage** the era window marks those rows and says which storage to upgrade,
+  and the Asesor has a rule for it (`eracap`). Era V asks 19,600 food; a normal Granero holds ~10,000.
+- **A dungeon block's preview is its boss room** (`Exp.preview`: `dungeonPower(fin) × SALAS.jefe.need`). With floor
+  1's power the planner said 99% and the army fell to the boss on floor 5 every time.
+- **The autopilot** (`tools/piloto.js`) now: pushes the buildings closest to an unmet «N buildings at level L»
+  goal, saves for the era once its goals are met (still upgrading storage if the cost does not fit), sells full
+  storage the era does not need, keeps a garrison of 14 per era, attempts the next 5-floor block of a dungeon at 80%
+  before the Mariscal sends the army on missions, and builds the Taberna right after the Aserradero. Its `paso()`
+  swallows exceptions (`console.error('piloto', …)`): a typo there silently stops everything after it.

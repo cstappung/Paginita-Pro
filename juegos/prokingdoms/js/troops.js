@@ -9,7 +9,7 @@
   const G = () => PK.Game;
   const S = () => PK.Game.state;
   // herramienta con la que pelea cada tropa (los arqueros y los clérigos pelean quietos, con su arma)
-  const FIGHT_TOOL = { militia: 'hammer', spear: 'spear', knight: 'sword', catapult: 'hammer' };
+  const FIGHT_TOOL = { militia: 'hammer', spear: 'spear', knight: 'sword', catapult: 'hammer', rider: 'spear', monk: 'hammer' };
 
   // n figuras repartidas según la composición de la compañía (al menos una de cada tipo presente).
   function pickTypes(units, n) {
@@ -79,6 +79,7 @@
     const id = r.poi !== undefined && r.poi !== null ? r.poi : r.camp;
     if (id !== undefined && id !== null && W.pois[id]) { const p = W.pois[id]; return [p.x + p.w / 2, p.y + p.h / 2]; }
     if (r.k !== undefined && PK.Terr) return PK.Terr.center(r.k);
+    if (r.cap && PK.Campana && PK.Campana.lugar(r.cap)) { const l = PK.Campana.lugar(r.cap); return [l.x + 0.5, l.y + 0.5]; }
     return missionSpot(r.id || 1);
   };
 
@@ -87,9 +88,10 @@
     const st = S(), now = Date.now(), out = [];
     if (!st) return out;
     for (const r of (st.exp && st.exp.runs) || []) {
-      const go = r.phase === 'go' || r.phase === 'battle', ms = Math.max(1, r.travel * 1000);
-      const f = r.phase === 'battle' ? 1 : go ? 1 - (r.arrive - now) / ms : (r.back - now) / ms; // en batalla, en el destino
-      out.push({ key: 'x' + r.id, units: r.units, to: T.targetOf(r), f: U.clamp(f, 0, 1), back: !go, name: r.name });
+      const adentro = r.phase === 'battle' || r.phase === 'sala' || r.phase === 'fin'; // en el destino (incursión: entre salas)
+      const go = r.phase === 'go' || adentro, ms = Math.max(1, r.travel * 1000);
+      const f = adentro ? 1 : go ? 1 - (r.arrive - now) / ms : (r.back - now) / ms; // en batalla, en el destino
+      out.push({ key: 'x' + r.id, units: r.units, to: T.targetOf(r), f: U.clamp(f, 0, 1), back: !go, name: r.name, heroe: r.heroe });
     }
     for (const e of (st.war && st.war.exps) || []) {
       if (e.camp === undefined) continue;
@@ -116,7 +118,7 @@
   const faceOf = (dx, dy) => ({ flip: dx - dy < 0, back: dx + dy < 0 });
   function soldierItem(type, x, y, mode, frame, flip, back, tool, id, extra) {
     const [px, py] = PK.Render.iso(x, y);
-    const spr = type === 'catapult' ? Sp.cart(D.PLAYER_COLOR, 'stone', flip, frame % 4, mode === 'walk') : Sp.troop(type, D.PLAYER_COLOR, mode, frame, flip, back, tool, id);
+    const spr = type === 'catapult' ? Sp.cart(D.PLAYER_COLOR, 'stone', flip, frame % 4, mode === 'walk') : Sp.troop(type, Sp.colorDeTropa ? Sp.colorDeTropa(type) : D.PLAYER_COLOR, mode, frame, flip, back, tool, id);
     return Object.assign({ d: x + y, k: 'troop', o: extra || {}, spr, x: px - spr.ax, y: py - spr.ay, px, py }, {});
   }
   function banner(it, flip) {
@@ -129,6 +131,19 @@
       ctx.fillStyle = '#e8b83a'; ctx.fillRect(flip ? x - w : x + 1, y - 26 + wave, w, 1);
     };
   }
+
+  // C8 (pk-21): estandarte de veteranía. El primer soldado de cada tipo en la guarnición lleva uno con el color del
+  // tramo de su rango (bronce, plata, oro, púrpura) y una muesca por cada dos rangos (D.RANKS).
+  const TRAMO = r => (r >= 9 ? '#b070ff' : r >= 6 ? '#ffd040' : r >= 3 ? '#d8dce8' : '#c87a3a');
+  function estandarte(it, rango, flip) {
+    it.after = ctx => {
+      const x = Math.round(it.px + (flip ? -5 : 4)), y = Math.round(it.py), w = 5, n = Math.min(5, Math.ceil(rango / 2));
+      ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x, y - 28, 1, 18);
+      ctx.fillStyle = TRAMO(rango); ctx.fillRect(flip ? x - w : x + 1, y - 28, w, 4 + n);
+      ctx.fillStyle = '#2a1a10'; for (let i = 0; i < n; i++) ctx.fillRect(flip ? x - w + 2 : x + 3, y - 27 + i, 1, 1);
+    };
+  }
+  T.TRAMO = TRAMO;
 
   // ---------- Guarnición ----------
   // Los soldados en casa forman frente al Cuartel; los de cuerpo a cuerpo practican de a pares.
@@ -154,7 +169,7 @@
     if (PK.Incursiones && PK.Incursiones.defensores.length) return; // salieron a pelear contra los bandidos
     const bars = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'barracks');
     if (!bars.length) return;
-    const types = pickTypes(army, 12 * bars.length), now = performance.now() / 1000;
+    const types = pickTypes(army, 12 * bars.length), now = performance.now() / 1000, xp = (st.exp && st.exp.xp) || {}, visto = {};
     let i = 0;
     for (const b of bars) {
       const slots = slotsOf(b);
@@ -162,7 +177,9 @@
         const type = types[i], [x, y] = slots[j], ph = (now + i * 0.9) % 7, melee = !!FIGHT_TOOL[type] && type !== 'catapult';
         const drill = melee && ph < 3; // de a pares: uno mira a la derecha y el otro a la izquierda
         const flip = j % 2 === 1, frame = drill ? Math.floor((now * 1.3 + j * 0.37) * 4) % 4 : 0;
-        items.push(soldierItem(type, x, y, drill ? 'work' : 'idle', frame, flip, false, drill ? FIGHT_TOOL[type] : null, i, { home: true }));
+        const it = soldierItem(type, x, y, drill ? 'work' : 'idle', frame, flip, false, drill ? FIGHT_TOOL[type] : null, i, { home: true }), rg = D.rankOf(xp[type] || 0);
+        if (!visto[type] && rg > 0) { visto[type] = 1; estandarte(it, rg, flip); }
+        items.push(it);
       }
     }
   }
@@ -181,6 +198,13 @@
         if (!i) banner(it, f.flip);
         items.push(it);
       });
+      // el héroe va adelante de la columna, con su estrella (H2)
+      const h = m.heroe && PK.Heroes ? PK.Heroes.de(m.heroe) : null;
+      if (h) {
+        const c = PK.Heroes.CLASES[h.clase], [x, y, dx, dy] = along(r, d0 + dir * 0.7), f = faceOf(dx * dir, dy * dir), [px, py] = PK.Render.iso(x, y);
+        const spr = Sp.villager(c.col, 1, 1, 'walk', Math.floor(now * 9) % 6, null, f.flip, null, false, f.back, null, c.look);
+        items.push({ d: x + y, k: 'troop', o: { march: m, heroe: h.id }, spr, x: px - spr.ax, y: py - spr.ay, px, py, after: ctx => { ctx.fillStyle = '#ffd860'; ctx.font = 'bold 7px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillText('★', Math.round(px), Math.round(py - 26)); } });
+      }
     }
   }
 
@@ -234,7 +258,7 @@
 
   // Lo que dibuja render.js junto con aldeanos y edificios (ordenado por profundidad).
   T.collect = function (list, dt, vis) {
-    if (!S()) return;
+    if (!S() || D.temaActivo === 'mar') return; // en el mar la flota la dibuja armada.js (barcos, no soldados)
     const items = [];
     garrison(items);
     marches(items);

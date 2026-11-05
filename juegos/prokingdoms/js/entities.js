@@ -42,7 +42,7 @@
     get cx() { return this.x + this.w / 2; }
     get cy() { return this.y + this.h / 2; }
     toJSON() {
-      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb };
+      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined };
     }
   }
   PK.Unit = Unit;
@@ -93,7 +93,8 @@
     const g = G();
     // los caminos aceleran a todos; las carretas fuera del camino van lentas
     const road = W.road[W.idx(Math.floor(u.x), Math.floor(u.y))] === 1;
-    const terrain = u.kind === 'cart' ? (road ? D.ROAD.cart : D.CART.offRoad) : road ? D.ROAD.walk : 1;
+    const rk = road && u.owner === 'p' && PK.Game.bono ? PK.Game.bono('road') : 0; // Caminos empedrados, Caravaneros
+    const terrain = u.kind === 'cart' ? (road ? 1 + (D.ROAD.cart - 1) * (1 + rk) : D.CART.offRoad) : road ? 1 + (D.ROAD.walk - 1) * (1 + rk) : 1;
     let move = g.speed(u.owner, u) * terrain * dt * (u.scared > 0 ? 1.4 : 1);
     while (move > 0 && u.path.length) {
       if (u.pchk !== u.path.length) {
@@ -210,6 +211,9 @@
     // bodega llena: espera sin gastar el árbol o la veta (antes juntaba, volvía y addRes tiraba la carga)
     if (u.owner === 'p' && g.isFull(t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(t.res); return; }
     u.fullWait = false;
+    // Fase 9: el arrecife solo se trabaja con la marea baja; con la alta se espera al lado (u.mareaWait)
+    const bajo = D.NODES[n.kind].marea && !g.mareaBaja();
+    if (!bajo) u.mareaWait = false;
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
         const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { exclude: n.id, zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
@@ -219,6 +223,7 @@
     }
     if (hug(u, n.x + 0.5, n.y + 0.5, dt, 'n' + n.id, n.kind === 'berry' ? 0.75 : 1)) return; // a los arbustos, más cerca
     face(u, n.x + 0.5, n.y + 0.5);
+    if (bajo) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.mareaWait = true; return; }
     setAim(u, n.x + 0.5, n.y + 0.5, AIM[n.kind] || AIM.rock);
     u.mode = 'work';
     u.acc += g.gatherRate(u.owner, t.res, u, n.kind) * dt;
@@ -243,9 +248,10 @@
     }
     b.farmer = u.id;
     if (u.phase === 'return') { goDeposit(u, dt); return; }
-    if (u.carry > 0 && u.carryRes !== 'food') { u.phase = 'return'; return; }
+    const fr = g.granjaRes(b); // las Salinas (pk-28) dan salitre en vez de comida
+    if (u.carry > 0 && u.carryRes !== fr) { u.phase = 'return'; return; }
     if (u.carry >= cap) { u.phase = 'return'; return; }
-    if (u.owner === 'p' && g.isFull('food')) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull('food'); return; }
+    if (u.owner === 'p' && g.isFull(fr)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(fr); return; }
     u.fullWait = false;
     if (!inRect(u, b)) {
       if (!pathTo(u, rectGoal(b, false))) { u.task = null; u.mode = 'idle'; }
@@ -260,7 +266,7 @@
       u.path = [[tx, ty]];
     }
     u.acc += g.farmRate(u.owner, b, u) * dt;
-    while (u.acc >= 1 && u.carry < cap) { u.acc -= 1; u.carry++; u.carryRes = 'food'; u.carryZone = -1; }
+    while (u.acc >= 1 && u.carry < cap) { u.acc -= 1; u.carry++; u.carryRes = fr; u.carryZone = -1; }
     if (u.carry >= cap) u.phase = 'return';
   }
 
@@ -324,7 +330,7 @@
   function autoTask(u, b) {
     const g = G();
     const def = b.def;
-    if (b.type === 'farm') { if (b.farmer === null || b.farmer === u.id) { g.assign(u, { t: 'farm', b: b.id }); return; } }
+    if (g.esGranja(b)) { if (b.farmer === null || b.farmer === u.id) { g.assign(u, { t: 'farm', b: b.id }); return; } }
     if (def.recipe && b.workers.length < g.slots(b)) { g.assign(u, { t: 'work', b: b.id }); return; }
     if (def.drop && b.type !== 'tc') {
       let best = null, bd = 9;
@@ -402,6 +408,9 @@
   const homeCache = new Map();
   function homeRegions(owner) {
     const t = G().time, c = homeCache.get(owner);
+    // Centro Urbano encerrado por edificios (G.checkEncierro): el hogar pasa a ser la tierra de afuera, así el
+    // rescate saca a los del patio en vez de devolverlos adentro
+    if (owner === 'p' && G().encierro) return new Set([G().encierro.out]);
     if (c && t >= c.t && t - c.t < 1) return c.set;
     const set = new Set(), small = new Set();
     for (const b of G().buildings) {
@@ -470,7 +479,7 @@
     unstick(u, dt);
     if (u.scared > 0) { // huye de los lobos hacia el Centro Urbano
       u.scared -= dt;
-      if (u.scared <= 0) { u.path = []; u.fails = 0; return; } // pasó el susto: vuelve a lo suyo sin terminar la huida
+      if (u.scared <= 0) { u.scared = 0; u.path = []; u.fails = 0; return; } // pasó el susto: vuelve a lo suyo sin terminar la huida
       if (u.path.length) step(u, dt); else u.mode = 'idle';
       return;
     }

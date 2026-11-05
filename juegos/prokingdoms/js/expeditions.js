@@ -24,6 +24,8 @@
     return b && b.k === k && b.until > Date.now() ? 1 + b.p : 1;
   };
   Exp.unitMult = type => 1 + 0.04 * D.rankOf(S().exp.xp[type]);
+  // Taberna, Faro Abisal y decretos: hasta −60% del viaje (sin tope, todo junto llegaba a −85%)
+  Exp.velViaje = () => 1 - Math.min(0.6, Exp.bonus('expSpeed'));
   Exp.armyMult = () => (1 + Exp.bonus('armyPower')) * Exp.wishMult('army');
   // Los lobos no se acercan a la Casa de Fieras.
   Exp.warded = function (x, y) {
@@ -39,11 +41,15 @@
     for (const e in enemy) { f += enemy[e] * (vs[e] || 1); tot += enemy[e]; }
     return tot ? f / tot : 1;
   };
-  Exp.powerVs = function (units, enemy) {
+  // heroe: id de un héroe que va con la compañía (js/heroes.js): multiplica la fuerza contra ese enemigo.
+  Exp.powerVs = function (units, enemy, heroe) {
     let p = 0;
-    for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy);
-    return p * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult();
+    const vb = G().bono || (() => 0), drag = enemy && enemy.dragon ? (vb('dragon') * enemy.dragon) / Math.max(1, Object.values(enemy).reduce((s, v) => s + v, 0)) : 0;
+    // árbol y cartas (Fase 3): fuerza contra monstruos por tropa, solo aquí (PvE). Social.power no la cuenta (regla 4).
+    for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy) * (1 + vb('pve_all') + vb('pve_' + k));
+    return p * (1 + drag) * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy) * (PK.Leyendas && S().leyendas ? 1 + PK.Leyendas.contra(enemy) : 1);
   };
+  Exp.heroMult = (id, enemy) => (id && PK.Heroes ? PK.Heroes.mult(PK.Heroes.de(id), enemy) : 1);
   Exp.heal = units => Math.min(0.45, Object.keys(units).reduce((s, k) => s + (units[k] || 0) * (D.ARMY[k].heal || 0), 0));
   // Probabilidad de victoria según la proporción de fuerzas: 1:1 es 50%, 1,5:1 ya es casi seguro.
   Exp.chance = ratio => U.clamp(0.5 + (ratio - 1) * 0.9, 0.03, 0.97);
@@ -77,7 +83,7 @@
   Exp.site = id => S().exp.sites[id] || (S().exp.sites[id] = { best: 0, rest: 0 });
   Exp.travel = function (p) {
     const [hx, hy] = D.PLAYER_HOME;
-    return Math.round((60 + U.dist(p.x, p.y, hx, hy) * 2) * (1 - Exp.bonus('expSpeed')));
+    return Math.round((60 + U.dist(p.x, p.y, hx, hy) * 2) * Exp.velViaje());
   };
   // El Observatorio marca en el mapa las mazmorras dentro de su radio, aunque estén en la niebla.
   function scan() {
@@ -94,7 +100,7 @@
 
   // ---------- Encargos ----------
   Exp.board = function () {
-    const st = S(), b = st.exp.board, n = 3 + Exp.bonus('missions');
+    const st = S(), b = st.exp.board, n = 3 + Exp.bonus('missions') + (PK.Heroes && st.heroes ? Math.floor(PK.Heroes.pasiva('missions')) : 0);
     if (Date.now() - b.at > BOARD_MS || !b.at) {
       b.at = Date.now();
       const pool = D.MISSIONS.filter(m => st.era >= m.era), rng = U.rng(Math.floor(Date.now() / BOARD_MS) * 7 + st.created % 997);
@@ -118,8 +124,21 @@
 
   // ---------- Enviar ----------
   // target: { poi, floor } (mazmorra) o { mission: uid } (encargo).
-  Exp.campTravel = p => Math.round((30 + U.dist(p.x, p.y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) * 1.5) * (1 - Exp.bonus('expSpeed')));
+  Exp.campTravel = p => Math.round((30 + U.dist(p.x, p.y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) * 1.5) * Exp.velViaje());
   Exp.preview = function (target) {
+    // un jefe del mar (pk-29, armada.js): la primera victoria paga «loot», las siguientes «rep»
+    if (target.jefeMar) {
+      const J = D.JEFES_MAR && D.JEFES_MAR[target.jefeMar];
+      if (!J) return null;
+      const ya = ((S().jefesMar || {})[target.jefeMar] || {}).n;
+      return { name: J.name, enemy: J.enemy, power: J.power, loot: Object.assign({}, ya ? J.rep : J.loot), travel: Math.round(J.travel * Exp.velViaje()), jefe: target.jefeMar };
+    }
+    // el lugar de un capítulo de la campaña (campana.js, H5)
+    if (target.cap) {
+      const C = PK.Campana, c = C && C.cap(target.cap), l = c && C.lugar(target.cap);
+      if (!l || !c.lugar) return null;
+      return { name: c.lugar.name, enemy: c.lugar.enemy, power: C.fuerza(target.cap), loot: C.botin(target.cap), travel: Exp.campTravel(l) };
+    }
     if (target.camp !== undefined) {
       const p = W.pois[target.camp];
       if (!p) return null;
@@ -130,14 +149,30 @@
       const m = S().exp.board.list.find(o => o.uid === target.mission);
       if (!m) return null;
       const tpl = D.MISSIONS.find(o => o.id === m.tpl);
-      return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: m.loot, travel: Math.round((m.time / 2) * (1 - Exp.bonus('expSpeed'))) };
+      return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: misLoot(m.loot), travel: Math.round((m.time / 2) * Exp.velViaje()) };
     }
     const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
+    // Mazmorras 2.0: una incursión por un bloque de 5 pisos (incursion.js). La fuerza es la de la sala del jefe del último
+    // piso (la más dura): con la del primero, el planificador decía 99% y el ejército caía en el jefe (prueba de ritmo)
+    if (PK.Inc) { const fin = PK.Inc.finDe(p.kind, target.floor); return { name: d.name + ' · pisos ' + target.floor + '–' + fin, enemy: d.enemy, power: Math.round(D.dungeonPower(p.kind, fin) * PK.Inc.SALAS.jefe.need), loot: PK.Inc.botinBloque(p.kind, target.floor), travel: Exp.travel(p), incursion: true, fin }; }
     return { name: d.name + ' · piso ' + target.floor, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: D.dungeonLoot(p.kind, target.floor, target.floor > site.best), travel: Exp.travel(p) };
   };
+  // Diplomacia (árbol 2.0): +20% de premio en los encargos (sin tocar las monedas)
+  const misLoot = l => { const k = G().bono ? G().bono('misiones') : 0; if (!k) return l; const o = {}; for (const r in l) o[r] = r === 'coins' ? l[r] : Math.round(l[r] * (1 + k)); return o; };
   Exp.canSend = function (target) {
     const st = S();
-    if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
+    if (!G().countB('barracks')) return 'Necesitas ' + (D.temaActivo === 'mar' ? 'una ' : 'un ') + D.BUILD.barracks.name + '.';
+    if (target.jefeMar) {
+      const J = D.JEFES_MAR[target.jefeMar], j = (st.jefesMar || {})[target.jefeMar] || {};
+      if (st.era < J.era) return 'Requiere la Era ' + U.roman(J.era) + '.';
+      if (j.vuelve > Date.now()) return J.name + ' vuelve en ' + U.fmtTime((j.vuelve - Date.now()) / 1000) + '.';
+      if (st.exp.runs.some(r => r.jefeMar === target.jefeMar)) return 'Tu flota ya va hacia ' + J.name + '.';
+    }
+    if (target.cap) {
+      const C = PK.Campana;
+      if (!C || !C.abierto(target.cap) || !C.lugar(target.cap)) return 'Ese capítulo no está abierto.';
+      if (st.exp.runs.some(r => r.cap === target.cap)) return 'Ya hay tropas en camino.';
+    }
     if (target.camp !== undefined) {
       const p = W.pois[target.camp], ps = p && G().poiState(p);
       if (!ps || !ps.f) return 'Todavía no descubres ese campamento.';
@@ -148,24 +183,40 @@
       const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
       if (st.era < d.era) return 'Requiere la Era ' + U.roman(d.era) + '.';
       if (target.floor > site.best + 1) return 'Primero limpia el piso ' + (site.best + 1) + '.';
+      if (PK.Inc && (target.floor - 1) % PK.Inc.BLOQUE) return 'Las incursiones empiezan en los pisos 1, 6, 11…';
       if (target.floor > d.floors) return 'Esa mazmorra no tiene más pisos.';
       if (site.rest > Date.now()) return 'La mazmorra se está reponiendo: ' + U.fmtTime((site.rest - Date.now()) / 1000) + '.';
       if (st.exp.runs.some(r => r.poi === p.id)) return 'Ya hay una expedición en esa mazmorra.';
     }
     return null;
   };
-  Exp.send = function (target, units) {
+  // form (C1, pk-21): { filas: { tipo: 'f' | 'm' | 'a' }, flanco: 'i' | 'c' | 'd' } para la batalla en vivo.
+  Exp.send = function (target, units, heroeId, form) {
     const why = Exp.canSend(target), st = S(), army = st.war.army;
     if (why) { toast(why, 'warn'); return false; }
+    const heroe = heroeId && PK.Heroes ? PK.Heroes.de(heroeId) : null;
+    if (heroeId && (!heroe || heroe.estado !== 'libre')) { toast('Ese héroe no está disponible.', 'warn'); return false; }
     let total = 0;
     for (const k in units) { units[k] = Math.max(0, Math.floor(units[k] || 0)); if (units[k] > army[k]) { toast('No tienes tantas tropas.', 'warn'); return false; } total += units[k]; }
     if (!total) { toast('Elige tropas para la expedición.', 'warn'); return false; }
     const pv = Exp.preview(target);
     if (!pv) return false;
+    if (heroe) pv.travel = Math.round(pv.travel * PK.Heroes.viaje(heroe));
     for (const k in units) army[k] -= units[k];
-    const run = { id: st.exp.rid++, poi: target.poi, camp: target.camp, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
+    // el mar (pk-29): con tormenta la flota tarda más y llega con las velas rotas (D.tormenta, del reloj real)
+    const temp = D.temaActivo === 'mar' && D.tormenta && D.tormenta();
+    if (temp) pv.travel = Math.round(pv.travel * D.TORMENTA.viaje);
+    const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, cap: target.cap, floor: target.floor, jefeMar: target.jefeMar, tormenta: temp ? 1 : undefined, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
+    else run.target = { poi: target.poi, floor: target.floor, camp: target.camp, cap: target.cap, jefeMar: target.jefeMar }; // para «Repetir» (C7)
+    if (temp) run.power = Math.round(run.power * D.TORMENTA.fuerza);
+    if (target.jefeMar) { run.jefe = target.jefeMar; run.nivel = D.JEFES_MAR[target.jefeMar].nivel; }
+    else if (D.temaActivo === 'mar') run.nivel = U.clamp(0.1 + 0.08 * (st.era - 2), 0, 0.45);
+    if (form) { run.form = form; st.formaciones = st.formaciones || {}; st.formaciones.ult = form; }
     st.exp.runs.push(run);
+    if (run.poi !== undefined && PK.Inc) PK.Inc.preparar(run, W.pois[run.poi]);
+    if (run.cap) run.jefe = D.CAPITULOS[run.cap - 1].lugar.jefe; // con su jefe (batalla.js)
+    if (heroe) PK.Heroes.salir(heroe, run);
     run.chance = Exp.chance(run.power / Math.max(1, pv.power));
     log('Expedición a ' + pv.name + ': fuerza ' + U.fmt(run.power) + ' contra aprox. ' + U.fmt(pv.power) + '. Llegan en ' + U.fmtTime(pv.travel) + '.', 'info');
     const to = PK.Troops ? PK.Troops.targetOf(run) : null;
@@ -193,28 +244,50 @@
   // ---------- Resolver ----------
   // res (batalla en vivo, batalla.js): quién ganó y cuántos cayeron de cada tropa. Sin res, por la proporción de fuerzas.
   function resolve(r, res) {
-    const st = S(), tc = tactic(r), ratio = (r.power * tc.pow) / Math.max(1, r.need), sent = Object.assign({}, r.units);
+    // en una incursión (incursion.js) los afijos de la semana hacen más dura la cuenta por proporción
+    const st = S(), tc = tactic(r), ratio = (r.power * tc.pow) / Math.max(1, r.need * (r.inc ? PK.Inc.dureza(r) : 1));
     r.lost = {};
     if (res) {
       r.won = !!res.won;
+      if (res.dano) { r.dano = r.dano || {}; for (const k in res.dano) r.dano[k] = (r.dano[k] || 0) + res.dano[k]; } // C7, suma las salas de una incursión
       for (const k in r.units) { const l = Math.min(r.units[k], res.lost[k] || 0); r.lost[k] = l; r.units[k] -= l; }
     } else {
       r.won = Math.random() < Exp.chance(ratio);
-      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss);
+      const loss = Math.min(0.95, (r.won ? U.clamp(0.32 / ratio, 0.03, 0.4) : 0.55 + Math.random() * 0.2) * (1 - r.heal) * tc.loss * (1 - heroBajas(r)) * (1 - Math.min(0.4, G().bono ? G().bono('bajas') : 0)));
       for (const k in r.units) { const l = Math.round(r.units[k] * loss * U.rand(0.8, 1.2)); r.lost[k] = Math.min(r.units[k], l); r.units[k] -= r.lost[k]; }
     }
     // veteranía para quienes vuelven (también se aprende perdiendo, menos)
     const xp = Math.max(4, r.need / 8) * (r.won ? 1 : 0.4) * (1 + Exp.bonus('xpBoost'));
     for (const k in r.units) if (r.units[k] > 0) st.exp.xp[k] += xp;
-    if (r.poi !== undefined) {
+    if (r.heroe && PK.Heroes) PK.Heroes.resultado(r);
+    // desafíos (Fase 3, V7): cada pelea, con quiénes fueron y cómo salió
+    if (r.won) { if (r.inc) G().stat('floors', 1); if (r.mission) G().stat('missions_done', 1); }
+    if (PK.Vida && PK.Vida.evento) { const u = Object.assign({}, r.units); for (const k in r.lost) u[k] = (u[k] || 0) + r.lost[k]; PK.Vida.evento('batalla', { won: r.won, units: u, lost: r.lost, chance: Exp.chance(ratio), heroe: r.heroe, poi: r.poi, piso: r.inc ? r.inc.piso : r.floor || 0 }); }
+    // incursión: si ganó y quedan pisos, sigue adentro (a elegir la próxima sala)
+    if (r.inc && PK.Inc.tras(r)) return;
+    cerrar(r, res, ratio);
+  }
+  // Fin de una expedición (o de una incursión entera): informe, aviso y de vuelta a casa.
+  function cerrar(r, res, ratio) {
+    const st = S(), sent = r.inc ? r.inc.enviados : Object.assign({}, r.units);
+    if (!r.inc) for (const k in r.lost || {}) sent[k] = (sent[k] || 0) + r.lost[k];
+    if (r.poi !== undefined && r.inc) Exp.site(r.poi).rest = Date.now() + D.DUNGEON[W.pois[r.poi].kind].rest * 1000 * reposo();
+    if (r.poi !== undefined && !r.inc) {
       const p = W.pois[r.poi], site = Exp.site(p.id);
-      site.rest = Date.now() + D.DUNGEON[p.kind].rest * 1000;
+      site.rest = Date.now() + D.DUNGEON[p.kind].rest * 1000 * reposo();
       if (r.won && r.floor > site.best) {
         site.best = r.floor;
         st.stats['floor_' + p.kind] = Math.max(st.stats['floor_' + p.kind] || 0, r.floor);
         st.stats.floor_max = Math.max(st.stats.floor_max || 0, r.floor);
       }
     }
+    if (r.cap && r.won && PK.Campana) PK.Campana.ganar(r.cap);
+    if (r.jefeMar && r.won) { // pk-29: el jefe del mar se va a descansar y vuelve más tarde
+      const J = D.JEFES_MAR[r.jefeMar], jm = (st.jefesMar = st.jefesMar || {}), j = (jm[r.jefeMar] = jm[r.jefeMar] || { n: 0 });
+      j.n++; j.vuelve = Date.now() + J.descanso * 1000;
+      G().stat('jefe_' + r.jefeMar, 1);
+    }
+    if (r.asalto && PK.Armada) PK.Armada.finAsalto(r);
     if (r.camp !== undefined && r.won) {
       const p = W.pois[r.camp], ps = p && G().poiState(p);
       if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
@@ -222,7 +295,7 @@
     r.phase = 'back';
     r.back = Date.now() + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
-    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio), sent, lost: r.lost, loot: r.won ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat) };
+    const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), heroeId: r.heroe, hab: r.habUsos, enc: r.encLog, dano: r.dano, target: r.target, form: r.form };
     st.war.reports = st.war.reports || [];
     st.war.reports.unshift(rep);
     if (st.war.reports.length > 12) st.war.reports.length = 12;
@@ -233,14 +306,27 @@
       { label: 'Ver informe', fn: () => PK.UI.openReport(rep) });
   }
   Exp.finishBattle = (r, res) => { if (r.phase === 'battle') resolve(r, res); };
+  Exp.cerrar = r => cerrar(r, null, 0);
+  const reposo = () => (PK.Leyendas && S().leyendas ? PK.Leyendas.reposo() : 1); // Puerta de las Estrellas (H6)
   const lostText = l => Object.keys(l).filter(k => l[k]).map(k => l[k] + ' ' + D.ARMY[k].name.toLowerCase() + (l[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
+  // Menos bajas con el héroe (armadura, rasgo Prudente, talentos). Valiente puede subirlas.
+  const heroBajas = r => (r.heroe && PK.Heroes ? U.clamp(PK.Heroes.efecto(PK.Heroes.de(r.heroe), 'bajas'), -0.2, 0.5) : 0);
+  Exp.heroBajas = heroBajas;
+  const heroName = r => { const h = r.heroe && PK.Heroes ? PK.Heroes.de(r.heroe) : null; return h ? h.nombre : undefined; };
   function arrive(r) {
     const st = S(), g = G();
     for (const k in r.units) st.war.army[k] += r.units[k];
-    if (r.won) {
+    if (r.heroe && PK.Heroes) PK.Heroes.volver(r);
+    if (r.inc && PK.Inc) PK.Inc.volver(r);
+    if (PK.Aventura) PK.Aventura.volver(r);
+    // una incursión perdida vuelve con la mitad de lo juntado (incursion.js)
+    const mitad = !r.won && r.inc && Object.keys(r.loot || {}).some(k => r.loot[k] > 0);
+    if (r.won || mitad) {
+      const h = r.heroe && PK.Heroes ? PK.Heroes.de(r.heroe) : null, bot = h ? PK.Heroes.efecto(h, 'botin') : 0;
+      if (bot) for (const k in r.loot) if (k !== 'coins') r.loot[k] = Math.round(r.loot[k] * (1 + bot));
       g.give(r.loot);
       for (const k of D.SPECIAL) if (r.loot[k]) g.stat('sp_' + k, r.loot[k]);
-      g.stat('exp_won', 1);
+      if (r.won) g.stat('exp_won', 1);
       log('Botín de ' + r.name + ': ' + Object.keys(r.loot).map(k => U.fmt(r.loot[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ') + '.', 'good');
       toast('Tus tropas volvieron de ' + r.name + ' con el botín: ' + Object.keys(r.loot).map(k => '+' + U.fmt(r.loot[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', ') + '.', 'epic');
       if (PK.Sfx) PK.Sfx.play('coin');
@@ -252,15 +338,18 @@
   // Tres bendiciones al día (las mismas todo el día); se elige una.
   Exp.wishOffer = function () {
     const w = S().exp.wish, day = U.dayKey();
-    if (w.day === day) return [];
-    const pool = D.WISHES.map(o => o.k), rng = U.rng(U.strHash(day + ':' + S().created)), out = [];
+    // Pozo de los Deseos Antiguo (H6): un deseo más cada 3 días, con otras tres bendiciones
+    const extra = w.day === day && w.extra !== day && PK.Leyendas && S().leyendas && PK.Leyendas.deseoExtra();
+    if (w.day === day && !extra) return [];
+    const pool = D.WISHES.map(o => o.k), rng = U.rng(U.strHash(day + (extra ? ':x:' : ':') + S().created)), out = [];
     while (out.length < 3) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
     return out;
   };
   Exp.makeWish = function (k) {
     const w = S().exp.wish, b = G().buildings.find(o => o.owner === 'p' && o.done && o.type === 'wishwell');
-    if (!b || w.day === U.dayKey() || !Exp.wishOffer().includes(k)) return;
+    if (!b || !Exp.wishOffer().includes(k)) return;
     const s = G().bst(b), def = D.WISHES.find(o => o.k === k);
+    if (w.day === U.dayKey()) w.extra = U.dayKey();
     w.day = U.dayKey();
     G().stat('wishes', 1);
     if (def.instant) {
@@ -286,19 +375,25 @@
     const now = Date.now();
     for (const r of st.exp.runs.slice()) {
       // aviso antes de llegar: para elegir táctica y entrar a mirar la batalla
-      if (!offline && r.phase === 'go' && !r.warned && !r.mission && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
+      if (!offline && r.phase === 'go' && !r.warned && (!r.mission || D.temaActivo === 'mar') && !r.asalto && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
         r.warned = true;
         toast('Tus tropas llegan a ' + r.name + ' en ' + U.fmtTime((r.arrive - now) / 1000) + '. ¿Quieres dirigir la batalla?', 'info',
           { label: 'Ver batalla', fn: () => { r.watch = true; } });
       }
       // batalla en vivo (batalla.js). Si la partida se recargó en medio, se resuelve como antes; sin ti, se juega de una vez.
+      // incursión: eligiendo sala, o terminada entre salas (retirada)
+      if (r.phase === 'sala') { PK.Inc.update(r, offline); continue; }
+      if (r.phase === 'fin') { cerrar(r, null, 0); continue; }
       if (r.phase === 'battle') {
         if (!PK.Batalla || !PK.Batalla.tiene(r.id)) resolve(r);
         else if (offline) PK.Batalla.adelantar(r.id);
         continue;
       }
+      // encuentros en el camino (aventura.js, H2): solo con héroe y de ida
+      if (r.phase === 'go' && PK.Aventura) PK.Aventura.update(r, offline);
+      if (r.phase === 'go' && now >= r.arrive && r.inc && !r.inc.llego) { r.inc.llego = true; PK.Inc.llegar(r); if (r.watch && !offline) PK.Inc.open(r.id); continue; }
       if (r.phase === 'go' && now >= r.arrive) {
-        if (!offline && !r.mission && PK.Batalla && PK.Batalla.empezar(r)) {
+        if (!offline && (!r.mission || D.temaActivo === 'mar') && PK.Batalla && PK.Batalla.empezar(r)) { // en el mar los encargos también se pelean en vivo
           if (r.watch) PK.Batalla.abrir(r.id);
           else toast('¡Empieza la batalla en ' + r.name + '!', 'bad', { label: 'Ver batalla', fn: () => PK.Batalla.abrir(r.id) });
           if (PK.Sfx) PK.Sfx.play('event');

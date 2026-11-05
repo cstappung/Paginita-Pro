@@ -13,8 +13,12 @@
    - Nadie de la web lee ni escribe `prokingdoms/` (reglas: `.read`/`.write` false). El Admin SDK
      se salta las reglas.
 
+   - **Versión del mundo** (`prokingdoms/mundoVer`, se baja con el resto): sim.js la compara con
+     `D.MUNDO_VER` al cargarse y, si es otra, llama a `reinicia()`, que borra col, partidas y
+     hayPartida (no sospechas). functions/index.js espera esa escritura antes de atender a nadie.
+
    Nodos: prokingdoms/col/<colección>/<id>, prokingdoms/partidas/<pid>,
-   prokingdoms/hayPartida/<pid>, prokingdoms/sospechas/<push>. */
+   prokingdoms/hayPartida/<pid>, prokingdoms/sospechas/<push>, prokingdoms/mundoVer. */
 'use strict';
 const { getDatabase } = require('firebase-admin/database');
 
@@ -28,10 +32,12 @@ const cols = {};       // colección -> { id: documento }
 const escritos = {};   // colección -> { clave: texto JSON que hay en la base }
 const dirty = new Set();
 let hayPartida = {};   // clave -> true
+let mundo = null;      // versión del mundo guardada (null: nunca se anotó)
 const cola = [];       // escrituras sueltas en curso (partidas, sospechas)
 
 async function carga() {
-  const [c, idx] = await Promise.all([db().ref(RAIZ + '/col').get(), db().ref(RAIZ + '/hayPartida').get()]);
+  const [c, idx, mv] = await Promise.all([db().ref(RAIZ + '/col').get(), db().ref(RAIZ + '/hayPartida').get(), db().ref(RAIZ + '/mundoVer').get()]);
+  mundo = mv.exists() ? mv.val() : null;
   const v = c.val() || {};
   for (const name in v) {
     cols[name] = {}; escritos[name] = {};
@@ -105,7 +111,18 @@ function log(entry) {
   console.warn('[sospecha]', JSON.stringify(entry));
   encola(db().ref(`${RAIZ}/sospechas`).push(JSON.parse(JSON.stringify(entry))));   // sin undefined: la RTDB los rechaza
 }
+/* Versión del mundo y reinicio (ver arriba). Borra en memoria y en la base, en una sola escritura. */
+const mundoVer = () => mundo;
+function setMundoVer(v) { mundo = v; encola(db().ref(RAIZ + '/mundoVer').set(v)); }
+function reinicia(v) {
+  for (const k in cols) delete cols[k];
+  for (const k in escritos) delete escritos[k];
+  dirty.clear();
+  hayPartida = {};
+  mundo = v;
+  encola(db().ref(RAIZ).update({ col: null, partidas: null, hayPartida: null, mundoVer: v }));
+}
 /* Espera las escrituras sueltas en curso (antes de contestar un guardado). */
 const pendientes = () => Promise.all(cola.splice(0));
 
-module.exports = { col, get, set, del, all, touch, flush, getSave, setSave, delSave, log, carga, leeSave, pendientes, sucio };
+module.exports = { col, get, set, del, all, touch, flush, getSave, setSave, delSave, log, carga, leeSave, pendientes, sucio, mundoVer, setMundoVer, reinicia };

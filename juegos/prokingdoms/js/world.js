@@ -11,9 +11,11 @@
   W.inb = (x, y) => x >= 0 && y >= 0 && x < W.W && y < W.H;
   W.idx = (x, y) => y * W.W + x;
 
-  W.generate = function (seed) {
+  // tema: 'tierra' (el reino de siempre) o 'mar' (el Archipiélago de Bruma, Fase 9). Un mundo vivo a la vez.
+  W.generate = function (seed, tema) {
     const w = W.W, h = W.H, N = w * h;
     W.seed = seed;
+    W.tema = tema === 'mar' ? 'mar' : 'tierra';
     W.terrain = new Uint8Array(N);
     W.block = new Uint8Array(N);      // 0 libre, 1 recurso, 2 edificio, 4 agua
     W.nodeAt = new Int32Array(N).fill(-1);
@@ -31,6 +33,7 @@
     W.zones = [];
     W.pois = [];
     const rng = U.rng(seed);
+    if (W.tema === 'mar') return generarMar(seed);
 
     // Siempre en orden de casilla, para que todos generen exactamente los mismos recursos (mismos ids).
     W.realms = D.REALM_SLOTS.map((s, i) => {
@@ -216,9 +219,111 @@
     dungeon('crypt', 26, 20);
     dungeon('crater', 14, 30);
     dungeon('nest', 6, 36);
+    // H4 (pk-17): el Templo Hundido solo junto a un lago (agua a 3 casillas o menos)
+    const junto = (x, y, kind) => { const d = D.POI[kind]; for (let j = -3; j <= d.h + 3; j++) for (let i = -3; i <= d.w + 3; i++) if (W.inb(x + i, y + j) && W.terrain[W.idx(x + i, y + j)] === T_WATER) return true; return false; };
+    dungeon('swamp', 22, 18);
+    dungeon('giants', 10, 30);
+    for (let k = 0, tries = 0; k < 9 && tries < 9 * 400; tries++) {
+      const x = 4 + Math.floor(drng() * (w - 8)), y = 4 + Math.floor(drng() * (h - 8));
+      if (farFromHomes(x, y, 24) && junto(x, y, 'temple') && placeDungeon('temple', x, y)) k++;
+    }
+    // Lugares legendarios (H6, pk-17): cada uno 3 veces, lejos de las otras copias, con su propio generador.
+    const lrng = U.rng(seed + 5531), LD = D.POI.legend;
+    for (let copia = 0; copia < 3; copia++) D.LEYENDAS.forEach((L, i) => {
+      for (let t = 0; t < 600; t++) {
+        const x = 4 + Math.floor(lrng() * (w - 8)), y = 4 + Math.floor(lrng() * (h - 8));
+        if (!farFromHomes(x, y, 16) || (L.agua && !junto(x, y, 'legend'))) continue;
+        if (W.pois.some(o => o.kind === 'legend' && o.ley === i && U.dist(o.x, o.y, x, y) < 60)) continue;
+        if (!placeDungeon('legend', x, y)) continue;
+        W.pois[W.pois.length - 1].ley = i;
+        break;
+      }
+    });
     W.buildBuckets();
     W.initTerritory();
   };
+  // ---------- El Archipiélago de Bruma (Fase 9, pk-25: la isla de prueba) ----------
+  // Casi todo es agua. Tu isla queda en el mismo lugar que tu hogar de la tierra (así la cámara, el Centro Urbano y
+  // la niebla funcionan igual), con playa, palmeras, rocas y arbustos; alrededor, unos islotes. Sin otros reinos,
+  // zonas comunes ni lugares: eso llega con las islas y colonias de la siguiente entrega.
+  function generarMar(seed) {
+    const w = W.W, h = W.H, rng = U.rng(seed + 777), [hx, hy] = D.PLAYER_HOME;
+    W.realms = [{ id: 'p', slot: D.MY_SLOT, home: [hx, hy], name: 'Tu isla' }];
+    W.zones.push({ id: 'home_' + D.MY_SLOT, name: 'Tu isla', common: false, owner: 'p', cx: hx, cy: hy, r: 13 });
+    for (let i = 0; i < w * h; i++) { W.terrain[i] = T_WATER; W.block[i] = 4; }
+    // la isla de casa y cinco islas con rasgo (pk-28): la más cercana es la de las palmeras y la más lejana, la de
+    // las especias (rara y disputada). Las distancias crecen con el orden para que fundar colonias sea un camino.
+    const islas = [{ x: hx, y: hy, r: 15, k: 'casa' }];
+    const orden = (D.ISLAS_ORDEN || ['palmas', 'coral', 'volcan', 'naufragios', 'especias']).slice();
+    for (let t = 0, n = 0; n < orden.length && t < 2000; t++) {
+      const a = rng() * Math.PI * 2, d = 28 + n * 9 + rng() * 10, x = Math.round(hx + Math.cos(a) * d), y = Math.round(hy + Math.sin(a) * d), r = 6 + rng() * 3;
+      if (x < r + 4 || y < r + 4 || x > w - r - 4 || y > h - r - 4 || islas.some(o => U.dist(o.x, o.y, x, y) < o.r + r + 7)) continue;
+      islas.push({ x, y, r, k: orden[n++] });
+    }
+    W.islas = islas;
+    for (const I of islas) {
+      const R = Math.ceil(I.r * 1.4) + 2;
+      for (let y = Math.max(0, I.y - R); y <= Math.min(h - 1, I.y + R); y++) for (let x = Math.max(0, I.x - R); x <= Math.min(w - 1, I.x + R); x++) {
+        const d = U.dist(x, y, I.x, I.y) / I.r + (U.fbm(x * 0.18, y * 0.18, seed + 31, 3) - 0.5) * 0.55;
+        if (d < 1) { const i = W.idx(x, y); W.terrain[i] = d > 0.78 ? T_SAND : T_GRASS; W.block[i] = 0; }
+      }
+    }
+    W.waterDist = new Float32Array(w * h);
+    computeWaterDist();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = W.idx(x, y);
+      if (W.terrain[i] === T_WATER) continue;
+      const dHome = U.dist(x + 0.5, y + 0.5, hx, hy);
+      if (dHome < 7) W.reserved[i] = 1;
+      if (dHome < 4.2) W.terrain[i] = T_DIRT;
+    }
+    W.zoneAt.fill(-1);
+    const zi = 0;
+    for (let y = hy - 16; y <= hy + 16; y++) for (let x = hx - 16; x <= hx + 16; x++) if (W.inb(x, y) && W.terrain[W.idx(x, y)] !== T_WATER && U.dist(x, y, hx, hy) <= 14) W.zoneAt[W.idx(x, y)] = zi;
+    const pon = (kind, x, y, sp) => { const n = addNode(kind, x, y, W.zoneAt[W.idx(x, y)], rng); if (n && sp) n.sp = sp; return n; };
+    const orilla = (x, y) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => W.inb(x + dx, y + dy) && W.terrain[W.idx(x + dx, y + dy)] === T_WATER);
+    const hayNodos = D.NODES.palma; // sin datos-mar.js (el servidor nunca arma el mar) no hay nodos propios
+    for (const I of islas) {
+      for (let y = Math.floor(I.y - I.r - 2); y <= I.y + I.r + 2; y++) for (let x = Math.floor(I.x - I.r - 2); x <= I.x + I.r + 2; x++) {
+        if (!W.inb(x, y)) continue;
+        const i = W.idx(x, y);
+        if (W.terrain[i] === T_WATER || W.reserved[i]) continue;
+        const arena = W.terrain[i] === T_SAND, costa = orilla(x, y), f = U.fbm(x * 0.2, y * 0.2, seed + 57, 3), r = rng();
+        if (!hayNodos) { if (r < (arena ? 0.2 : 0.5)) pon('tree', x, y, 'palm'); continue; }
+        if (I.k === 'casa') {
+          const dx = x - I.x, dy = y - I.y;
+          if (costa && dx > 3 && r < 0.45) pon('arrecife', x, y);
+          else if (costa && dy > 3 && r < 0.35) pon('almeja', x, y);
+          else if (costa && dx < -6 && dy < -3 && r < 0.12) pon('naufragio', x, y);
+          else if (arena && r < 0.16) pon('palma', x, y);
+          else if (!arena && f > 0.55 && r < 0.6) pon('tree', x, y, 'teca');
+          else if (!arena && dx < -4 && dy > 2 && r < 0.3) pon('palma', x, y);
+        } else if (I.k === 'palmas') { if (r < (arena ? 0.3 : 0.55)) pon(r < 0.42 ? 'palma' : 'tree', x, y, r < 0.42 ? null : 'teca'); }
+        else if (I.k === 'coral') { if (costa && r < 0.7) pon('arrecife', x, y); else if (arena && r < 0.25) pon('almeja', x, y); else if (!arena && r < 0.2) pon('palma', x, y); }
+        else if (I.k === 'volcan') { if (!arena && r < 0.45) pon(r < 0.3 ? 'salitral' : 'gold', x, y); else if (arena && r < 0.1) pon('salitral', x, y); }
+        else if (I.k === 'naufragios') { if (costa && r < 0.3) pon('naufragio', x, y); else if (r < 0.25) pon('palma', x, y); }
+        else if (I.k === 'especias') { if (!arena && r < 0.4) pon(r < 0.25 ? 'especia' : 'tree', x, y, r < 0.25 ? null : 'teca'); else if (arena && r < 0.12) pon('especia', x, y); }
+      }
+    }
+    // Costa: casillas de agua a 1 o 2 de la tierra, por trozo (render.js pinta ahí la marea y la espuma)
+    W.costa = new Map();
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = W.idx(x, y);
+      if (W.terrain[i] !== T_WATER) continue;
+      let d = 9;
+      for (let yy = -2; yy <= 2 && d > 1; yy++) for (let xx = -2; xx <= 2; xx++) {
+        if (!W.inb(x + xx, y + yy) || W.terrain[W.idx(x + xx, y + yy)] === T_WATER) continue;
+        d = Math.min(d, Math.max(Math.abs(xx), Math.abs(yy)));
+      }
+      if (d > 2) continue;
+      const c = Math.floor(y / W.CH) * W.CW + Math.floor(x / W.CH);
+      if (!W.costa.has(c)) W.costa.set(c, []);
+      W.costa.get(c).push([x, y, d]);
+    }
+    W.buildBuckets();
+    W.initTerritory();
+  }
+
   // Reino cuyo hogar está a menos de d casillas (o null).
   W.realmNear = function (x, y, d) {
     for (const r of W.realms) if (Math.abs(x - r.home[0]) < d && Math.abs(y - r.home[1]) < d && U.dist(x, y, r.home[0], r.home[1]) < d) return r;
@@ -354,6 +459,56 @@
   // Región de una casilla (0 si está bloqueada) y su tamaño: para saber si un aldeano quedó encerrado.
   W.regionAt = (x, y) => (W.inb(x, y) ? regions()[W.idx(x, y)] : 0);
   W.regionSize = l => (l ? regSize[l] || 0 : 0);
+  // Casilla libre de la región l más cercana a un punto (por anillos, hasta maxR), o null.
+  W.nearestInRegion = function (px, py, l, maxR) {
+    const reg = regions(), cx = Math.floor(px), cy = Math.floor(py);
+    for (let r = 0; r <= maxR; r++) {
+      let best = null, bd = 1e9;
+      for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== r || !W.inb(x, y) || reg[W.idx(x, y)] !== l) continue;
+        const d = Math.hypot(x + 0.5 - px, y + 0.5 - py);
+        if (d < bd) { bd = d; best = [x, y]; }
+      }
+      if (best) return best;
+    }
+    return null;
+  };
+  // La región más grande del mapa (la tierra firme por donde se camina): {l, n}.
+  W.biggestRegion = function () {
+    regions();
+    let l = 0, n = 0;
+    for (let i = 1; i < regSize.length; i++) if (regSize[i] > n) { n = regSize[i]; l = i; }
+    return { l, n };
+  };
+  // Cuántas casillas libres se alcanzan caminando desde el borde de unos rectángulos ([x, y, w, h], los
+  // Centros Urbanos). Las casillas de `tapa` cuentan como bloqueadas y las de `libre` como libres (índices):
+  // así se prueba un edificio antes de ponerlo o mudarlo. Se detiene al llegar a `tope`. Sirve para no
+  // encerrar al pueblo (G.placeWhy, 'encierra'): un patio cerrado por casas dejaba a los aldeanos sin salida.
+  let rcMark = null, rcStack = null, rcGen = 0;
+  W.reachCount = function (rects, tapa, libre, tope) {
+    const w = W.W, N = w * W.H;
+    if (!rcMark) { rcMark = new Int32Array(N); rcStack = new Int32Array(N); }
+    if (++rcGen > 2e9) { rcMark.fill(0); rcGen = 1; }
+    const g = rcGen, T = new Set(tapa || []), L = new Set(libre || []);
+    const free = k => !T.has(k) && (W.block[k] === 0 || L.has(k));
+    let sp = 0, n = 0;
+    const push = k => { if (rcMark[k] !== g && free(k)) { rcMark[k] = g; rcStack[sp++] = k; } };
+    for (const [x0, y0, rw, rh] of rects) // las casillas que lo tocan por un lado (las esquinas no: se camina en 4 direcciones)
+      for (let y = y0 - 1; y <= y0 + rh; y++) for (let x = x0 - 1; x <= x0 + rw; x++) {
+        if ((x < x0 || x >= x0 + rw) === (y < y0 || y >= y0 + rh)) continue;
+        if (W.inb(x, y)) push(W.idx(x, y));
+      }
+    tope = tope || N;
+    while (sp && n < tope) {
+      const k = rcStack[--sp], x = k % w, y = (k / w) | 0;
+      n++;
+      if (x > 0) push(k - 1);
+      if (x < w - 1) push(k + 1);
+      if (y > 0) push(k - w);
+      if (y < W.H - 1) push(k + w);
+    }
+    return n;
+  };
   W.reachable = function (n, regs) {
     if (!regs.size) return true; // no se sabe desde dónde: que lo resuelva la ruta
     const reg = regions();
@@ -502,7 +657,7 @@
     }
   };
 
-  W.soft = n => n.kind === 'tree' || n.kind === 'berry' || n.kind === 'deer'; // al agotarse dejan pasar
+  W.soft = n => n.kind === 'tree' || n.kind === 'berry' || n.kind === 'deer' || !!(D.NODES[n.kind] && D.NODES[n.kind].soft); // al agotarse dejan pasar
   W.isShared = n => n.zone >= 0 && W.zones[n.zone].common;
   W.serverNodes = false; // en línea, el servidor manda sobre los recursos de las zonas comunes
 
@@ -516,7 +671,7 @@
           n.amount = Math.min(n.max, n.amount + n.max * def.regen * mult * hoursPassed);
           if (n.dead && n.amount >= 1) n.dead = false;
         }
-      } else if (n.dead && now - n.t >= def.regrow * 1000) {
+      } else if (n.dead && now - n.t >= def.regrow * 1000 * (n.kind === 'tree' && PK.Leyendas ? PK.Leyendas.rebrote() : 1)) {
         const i = W.idx(n.x, n.y);
         if (W.block[i] || W.bAt[i] >= 0 || occupied(n.x, n.y)) continue;
         n.dead = false; n.amount = n.max; W.block[i] = 1;

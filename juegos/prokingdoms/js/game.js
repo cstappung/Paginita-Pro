@@ -27,9 +27,12 @@
     };
   };
 
+  // Fase 9: la partida dice en qué mundo está (S.tema). El otro espera guardado en S.otro (js/mar.js).
+  G.enMar = () => W.tema === 'mar';
   G.init = function (save) {
-    W.generate(D.SEED);
-    G.units = []; G.buildings = []; G.uById.clear(); G.bById.clear();
+    if (D.aplicarTema) D.aplicarTema(save && save.tema); // Fase 9 (pk-28): las tablas del mar, antes del mapa
+    W.generate(D.SEED, save && save.tema);
+    G.units = []; G.buildings = []; G.uById.clear(); G.bById.clear(); G.encierro = null;
     S = G.state = save || G.newState();
     S.slot = D.MY_SLOT;
     S.inboxAck = S.inboxAck || 0;
@@ -41,16 +44,26 @@
     S.ret = Object.assign({ welcome: null, helpLog: [], news: [], almostDay: null }, S.ret);
     for (const r of D.RES_ORDER) S.res[r] = S.res[r] || 0;
     PK.Social.init(S);
-    setupBots();
-    if (save) restore(save); else setupPlayer();
+    if (!G.enMar()) setupBots(); // en el archipiélago no hay reinos vecinos (todavía)
+    if (save) restore(save);
+    // un mundo recién descubierto (el primer viaje al archipiélago) llega sin edificios: se arma como una partida nueva
+    if (!save || !G.buildings.some(b => b.owner === 'p')) setupPlayer();
     PK.Terr.init(S);
     PK.Logi.init(S);
     PK.Def.init(S);
     PK.Exp.init(S);
     PK.Incursiones.init(S);
     PK.Auto.init(S);
+    PK.Consejo.init(S);
+    if (PK.Heroes) PK.Heroes.init(S);
+    if (PK.Aventura) PK.Aventura.init(S);
+    if (PK.Leyendas) PK.Leyendas.init(S);
+    if (PK.Campana) PK.Campana.init(S);
+    if (PK.Vida) PK.Vida.init(S);
     PK.Life.reset();
     PK.Quests.init(S);
+    if (PK.Arch) PK.Arch.init(S); // colonias, comercio y marea del archipiélago
+    if (PK.Armada) PK.Armada.init(S); // la armada del archipiélago (pk-29): asaltos, jefes del mar
   };
 
   // ---------- Registro de entidades ----------
@@ -64,6 +77,7 @@
       if (!b.def.walkable) W.block[k] = 2;
     }
     if (owner === 'p') capsDirty = true;
+    G.blockVer++;
     return b;
   };
   G.removeBuilding = function (b) {
@@ -77,6 +91,7 @@
     G.buildings.splice(G.buildings.indexOf(b), 1);
     G.bById.delete(b.id);
     if (b.owner === 'p') capsDirty = true;
+    G.blockVer++;
     if (G.sel && G.sel.type === 'building' && G.sel.id === b.id) G.sel = null;
   };
   // Edificio de otro jugador: no pisa lo que ya existe y empuja fuera a quien esté parado encima.
@@ -168,7 +183,7 @@
     for (const p of W.pois) { const st = S.pois[p.id]; if (st && st.d && p.kind === 'camp') W.poiFree(p); }
     for (const o of save.buildings || []) {
       const b = G.addBuilding(o.type, 'p', o.x, o.y, o.done, o.id, false, o.lvl);
-      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {} });
+      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined });
       if (b.done) W.reveal(b.cx, b.cy, G.sight(b));
     }
     for (const o of save.units || []) G.addUnit(o);
@@ -181,50 +196,119 @@
 
   // ---------- Niveles y efectos de los edificios ----------
   G.bst = b => (D.BSTATS[b.type] ? D.BSTATS[b.type](b.lvl) : {});
-  G.sight = b => G.bst(b).sight || b.def.sight;
-  G.maxLvl = type => D.maxLevel(type, S.era);
-  G.slots = b => G.bst(b).slots || b.def.slots || 0;
-  const mine = type => G.buildings.filter(b => b.owner === 'p' && b.done && (!type || b.type === type));
+  G.sight = b => (G.bst(b).sight || b.def.sight) + (b.type === 'tower' && b.owner === 'p' ? (PK.Leyendas && S.leyendas ? PK.Leyendas.visionTorre() : 0) + (PK.Vida && S.arbol ? PK.Vida.bono('vision') : 0) : 0);
+  G.maxLvl = type => D.maxLevel(type, S.era) + (type === 'farm' && PK.Vida && S.arbol ? PK.Vida.bono('farmLvl') : 0);
+  G.slots = b => (G.bst(b).slots || b.def.slots || 0) + (b.owner === 'p' && PK.Vida && S && S.arbol ? PK.Vida.bono('slots_' + b.type) : 0);
+  // T4: guardada hasta que cambie la lista (blockVer sube al poner, terminar o demoler uno tuyo). Sin esto, el ritmo de
+  // recolección de cada aldeano recorría todos los edificios varias veces por cuadro. Nadie debe modificar lo que da.
+  const mineC = new Map();
+  let mineK = '', mineArr = null;
+  const mine = type => {
+    const k = G.blockVer + ':' + G.buildings.length;
+    if (k !== mineK || mineArr !== G.buildings) { mineC.clear(); mineK = k; mineArr = G.buildings; }
+    let l = mineC.get(type || '');
+    if (!l) { l = G.buildings.filter(b => b.owner === 'p' && b.done && (!type || b.type === type)); mineC.set(type || '', l); }
+    return l;
+  };
   const best = (type, key) => mine(type).reduce((m, b) => Math.max(m, G.bst(b)[key] || 0), 0);
   G.best = best;
   const wish = k => (PK.Exp ? PK.Exp.wishMult(k) : 1);
+  // pasivas de los héroes que gobiernan un edificio (js/heroes.js)
+  const hp = (k, b) => (PK.Heroes && S && S.heroes ? PK.Heroes.pasiva(k, b) : 0);
+  // modificadores pasajeros de los eventos (life.js, H8): cosecha, langostas, cometa, fiebre, gremio…
+  const lm = k => (PK.Life && PK.Life.mod ? PK.Life.mod(k) : 1);
+  // lugares legendarios (leyendas.js, H6): +5% de un recurso
+  const ley = res => (PK.Leyendas && S && S.leyendas ? PK.Leyendas.recurso(res) : 0);
+  // Fase 3 (js/vida.js): árbol 2.0, cartas de era y estación
+  const vb = k => (PK.Vida && S ? PK.Vida.bono(k) : 0);
+  const vr = (res, kind) => (PK.Vida && S ? PK.Vida.recoleccion(res, kind) : 1);
+  G.bono = vb;
+  const conMod = cost => { const m = lm('cost') * (1 + vb('cost')); if (m === 1) return cost; const o = {}; for (const r in cost) o[r] = Math.ceil(cost[r] * m); return o; };
   // Mejoras permanentes: decretos y rangos de misiones (G.perk); perkAll suma además las estructuras de Leyendas.
   G.perk = k => {
     let s = (S.perks && S.perks[k]) || 0;
     for (const id of S.decrees || []) s += (D.DECREES[id] && D.DECREES[id].perk[k]) || 0;
+    if (PK.Leyendas && S.leyendas) s += PK.Leyendas.perk(k);
+    if (PK.Vida) s += PK.Vida.perk(k);
     return s;
   };
   G.perkAll = k => G.perk(k) + D.LEGEND_B.reduce((s, t) => s + best(t, k), 0);
   const eclipse = () => (PK.Life && PK.Life.eclipse ? 1.5 : 1);
+  // la Maravilla, cualquiera de las cinco (la vieja de 4×4 y las 4 de la Fase 3): +3% a todo por nivel
+  const maravBonus = () => D.WONDERS.reduce((m, t) => Math.max(m, best(t, 'allBonus')), 0);
+  G.maravilla = () => G.buildings.find(b => b.owner === 'p' && D.WONDERS.includes(b.type)) || null;
+  // distancia en casillas entre dos rectángulos (0 si se tocan)
+  const rectDist = (ax, ay, aw, ah, bx, by, bw, bh) => Math.max(Math.max(bx - (ax + aw), ax - (bx + bw), 0), Math.max(by - (ay + ah), ay - (by + bh), 0));
+  G.rectDist = rectDist;
 
   // ---------- Recursos y multiplicadores ----------
   G.lvl = id => (S.techs[id] || 0);
   G.eraMult = () => 1 + 0.05 * (S.era - 1); // solo afecta la fuerza del ejército
   G.guildMult = () => (S.guild && S.guild.joined ? 1 + 0.03 * S.guild.stage + best('guild', 'guildBonus') : 1);
-  G.globalMult = () => G.guildMult() * (1 + best('wonder', 'allBonus')) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff : 1) * wish('harvest') * (1 + G.perkAll('gatherP')) * G.fiestaMult();
+  G.globalMult = () => G.guildMult() * (1 + maravBonus()) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff * lm('gather') : 1) * wish('harvest') * (1 + G.perkAll('gatherP')) * G.fiestaMult();
   const TECH_FOR = { wood: 'axes', food: 'harvest', stone: 'picks', gold: 'picks', ore: 'picks', marble: 'picks', gems: 'picks' };
-  const RES_NODE = { wood: 'tree', food: 'berry', stone: 'stone', gold: 'gold', ore: 'ore', marble: 'marble', gems: 'gems' };
+  const RES_NODE = { wood: 'tree', food: 'berry', stone: 'stone', gold: 'gold', ore: 'ore', marble: 'marble', gems: 'gems', fibra: 'palma', salitre: 'salitral', especias: 'especia' };
+  // Fase 9: el reloj de la marea. En el cálculo sin conexión es la hora simulada (G.tSim), así da lo mismo que en vivo.
+  G.ahora = () => (G.offline && G.tSim ? G.tSim : Date.now());
+  G.mareaBaja = () => D.mareaBaja(G.ahora());
   const dropMult = u => 1 + 0.1 * (((u && u.dl) || 1) - 1);
   G.gatherRate = function (owner, res, u, kind) {
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
     if (owner !== 'p') return base;
-    const tech = nk === 'deer' ? 1 + 0.2 * G.lvl('hunting') : 1 + 0.15 * G.lvl(TECH_FOR[res]);
-    return base * tech * dropMult(u) * G.globalMult();
+    const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
+    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk);
   };
+  // Muelle de pesca (V9): rinde según el agua que lo rodea; la Cosecha eficiente no le suma, Pesca con redes sí.
+  G.MUELLE_RATE = 0.3;
+  G.aguaMuelle = function (b) {
+    if (b._agua !== undefined) return b._agua;
+    let n = 0;
+    for (let y = b.y - 3; y < b.y + b.h + 3; y++) for (let x = b.x - 3; x < b.x + b.w + 3; x++) if (W.inb(x, y) && W.terrain[W.idx(x, y)] === 4) n++;
+    return (b._agua = U.clamp(n / 24, 0.25, 1.3));
+  };
+  G.esGranja = b => !!b && (b.type === 'farm' || b.type === 'muelle' || !!b.def.farmRes);
+  G.granjaRes = b => (b && b.def.farmRes) || 'food'; // las Salinas del mar (pk-28) dan salitre
+  G.SALINAS_RATE = 0.16;
+  // en el mar la pesca sigue a la marea: 0,75 con bajamar y 1,25 con pleamar
+  const mareaPesca = () => (G.enMar() ? 0.75 + 0.5 * D.marea(G.ahora()) : 1);
   G.farmRate = function (owner, b, u) {
     if (owner !== 'p') return D.FARM_RATE;
-    return D.FARM_RATE * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult();
+    if (b && b.def.farmRes) return G.SALINAS_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * dropMult(u) * G.globalMult();
+    if (b && b.type === 'muelle') return mareaPesca() * G.MUELLE_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * (1 + vb('muelle')) * (1 + G.cerca(b)) * dropMult(u) * G.globalMult() * (1 + ley('food')) * vr('food');
+    return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm');
+  };
+  // Bonos por cercanía (V5, D.CERCANIA en datos-vida.js): un edificio rinde más con un vecino de cierto tipo. Se
+  // recalcula cuando cambia algo del mapa (G.blockVer sube al construir, terminar, mover o demoler).
+  G.cerca = function (b) {
+    if (!b || b.owner !== 'p' || !D.CERCANIA) return 0;
+    if (b._cv === G.blockVer && b._cerca !== undefined) return b._cerca;
+    let s = 0;
+    for (const c of G.cercaDe(b)) s += c.ef;
+    b._cv = G.blockVer;
+    return (b._cerca = s);
+  };
+  // [{ c: regla, o: vecino, ef }] de las reglas que cumple (una por regla), para el panel y las líneas del fantasma
+  G.cercaDe = function (b, x, y, type) {
+    const out = [], t = type || b.type, bx = x === undefined ? b.x : x, by = y === undefined ? b.y : y, def = D.BUILD[t];
+    for (const c of D.CERCANIA || []) {
+      if (c.a !== t) continue;
+      const o = G.buildings.find(o2 => o2 !== b && o2.owner === 'p' && o2.done && c.b.includes(o2.type) && rectDist(bx, by, def.w, def.h, o2.x, o2.y, o2.w, o2.h) <= c.r);
+      if (o) out.push({ c, o, ef: c.ef });
+    }
+    return out;
   };
   G.carryCap = (owner, u) => (owner === 'p' ? 10 + 3 * G.lvl('carts') + (((u && u.dl) || 1) - 1) : 10);
   G.speed = function (owner, u) {
     if (u && u.kind === 'scout') return 2.3 * (1 + best('scout', 'scoutSpeed') + 0.1 * G.lvl('cartography'));
     if (u && u.kind === 'cart') return D.CART.speed * (1 + PK.Logi.cartSpeed());
-    return owner === 'p' ? 1.3 * (1 + 0.08 * G.lvl('boots')) : 1.2;
+    return owner === 'p' ? 1.3 * (1 + 0.08 * G.lvl('boots')) * lm('speed') : 1.2;
   };
-  G.buildMult = owner => (owner === 'p' ? (1 + 0.2 * G.lvl('architecture')) * wish('build') : 1);
+  G.buildMult = owner => (owner === 'p' ? (1 + 0.2 * G.lvl('architecture')) * wish('build') * (1 + vb('build')) : 1);
   const PROD_TECH = { planks: 'saws', blocks: 'saws', books: 'saws', ingots: 'furnaces', tools: 'furnaces', steel: 'furnaces', machinery: 'furnaces' };
-  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + best('wonder', 'allBonus')) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult();
-  G.researchMult = () => (1 + best('library', 'research') + best('observatory', 'research') + mine('university').slice(0, 2).reduce((s, b) => s + G.bst(b).research, 0) + G.perkAll('researchP')) * eclipse();
+  G.prodMult = (recipe, b) => (1 + 0.2 * G.lvl(PROD_TECH[recipe])) * (1 + (b ? G.bst(b).prod || 0 : 0)) * (1 + maravBonus()) * (1 + (b ? G.cerca(b) : 0)) * (1 + best('sanctum', 'shrineProd')) * wish('craft') * (1 + G.perkAll('craftP')) * eclipse() * G.fiestaMult() * (b && PK.Heroes ? 1 + PK.Heroes.prodEn(b) : 1) * lm('craft') * (PK.Vida && S && S.animo ? PK.Vida.animoMult() : 1) * Math.max(0.5, 1 + vb('c_' + recipe) + (recipe === 'planks' && b && vb('aguaPlanks') && G.junAgua(b) ? vb('aguaPlanks') : 0));
+  // ¿El edificio está a 4 casillas o menos del agua? (Molino de agua del árbol)
+  G.junAgua = b => { const wd = W.waterDist; if (!wd) return false; for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) if (W.inb(b.x + i, b.y + j) && wd[W.idx(b.x + i, b.y + j)] <= 4) return true; return false; };
+  G.researchMult = () => (1 + best('library', 'research') + best('observatory', 'research') + mine('university').slice(0, 2).reduce((s, b) => s + G.bst(b).research, 0) + G.perkAll('researchP') + hp('research')) * eclipse() * lm('research');
 
   // ---------- Decretos reales y dominio de la era ----------
   G.decreePending = () => D.DECREE_ERAS.filter(e => S.era >= e).length > S.decrees.length;
@@ -261,8 +345,8 @@
   function computeCaps() {
     let all = 0, food = 0, goods = 0;
     for (const b of mine()) { const s = G.bst(b); all += s.cap || 0; food += s.capFood || 0; goods += s.capGoods || 0; }
-    const k = 1 + 0.08 * G.lvl('storage');
-    caps = { food: Math.floor((all + food) * k), goods: Math.floor((all + goods) * k) };
+    const k = (1 + 0.08 * G.lvl('storage')) * (1 + vb('capAll'));
+    caps = { food: Math.floor((all + food) * k * (1 + vb('capFood'))), goods: Math.floor((all + goods) * k) };
     capsDirty = false;
   }
   G.cap = function (res) {
@@ -321,7 +405,8 @@
     G.stat('g_' + res, n); G.stat('g_total', n);
     if (hunt) G.stat('hunt', n);
     const z = zone >= 0 ? W.zones[zone] : null;
-    if (z && z.common) { G.stat('z_' + z.id, n); G.stat('g_common', n); }
+    // por zona y también por tipo (z_tree): la misión «Al bosque común» pedía z_forest, que nadie registraba
+    if (z && z.common) { G.stat('z_' + z.id, n); if (z.type) G.stat('z_' + z.type, n); G.stat('g_common', n); }
   }
 
   G.deposit = function (u, b) {
@@ -375,8 +460,10 @@
 
   G.findDrop = function (owner, res, x, y) {
     let bst = null, bd = 1e9;
+    const isla = G.enMar() && PK.Arch ? PK.Arch.islaDe(x, y) : -1; // en el mar, solo los acopios de la misma isla
     for (const b of G.buildings) {
       if (b.owner !== owner || !b.done || !b.def.drop || !b.def.drop.includes(res)) continue;
+      if (isla >= 0 && PK.Arch.islaDe(b.cx, b.cy) !== isla) continue;
       const d = U.dist(x, y, b.cx, b.cy) - b.w / 2;
       if (d < bd) { bd = d; bst = b; }
     }
@@ -385,7 +472,9 @@
 
   G.countB = (type, owner) => G.buildings.reduce((s, b) => s + (b.owner === (owner || 'p') && b.type === type && b.done ? 1 : 0), 0);
   G.countAll = type => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.type === type ? 1 : 0), 0);
-  G.maxCount = function (type) { const m = D.BUILD[type].max; return m === undefined ? Infinity : typeof m === 'function' ? m(S.era) : m; };
+  G.maxCount = function (type) {
+    if (D.BUILD[type].marav && D.WONDERS.some(t => t !== type && G.countAll(t))) return 0; // una sola Maravilla
+    const m = D.BUILD[type].max; return m === undefined ? Infinity : typeof m === 'function' ? m(S.era) : m; };
   G.levelCount = (lvl, type, recipe) => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.lvl >= lvl && (!type || b.type === type) && (!recipe || b.def.recipe) ? 1 : 0), 0);
   G.villagers = () => G.units.filter(u => u.owner === 'p' && u.kind === 'v');
   G.villagerCount = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind === 'v' ? 1 : 0), 0);
@@ -393,15 +482,24 @@
   G.pop = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind !== 'cart' ? 1 : 0), 0) + PK.Social.armyPop();
   G.popCap = function () {
     let c = 0;
-    for (const b of mine()) c += G.bst(b).pop || 0;
+    for (const b of mine()) c += (G.bst(b).pop || 0) + (b.type === 'house' ? G.cerca(b) : 0); // casa junto a una plaza o fuente: +1
     return Math.min(c, D.maxPop(S.era));
   };
 
   // ---------- Maestros de obras y mejoras ----------
-  G.builders = () => 1 + G.countB('builder');
+  G.builders = () => 1 + G.countB('builder') + G.maestroMar();
+  // el Astillero del Maestro de Ribera del archipiélago (pk-30) da un maestro más en la tierra
+  G.maestroMar = () => (!G.enMar() && S.otro && (S.otro.buildings || []).some(b => b.type === 'maestro' && b.done) ? 1 : 0);
   G.buildersBusy = () => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.upg ? 1 : 0), 0);
-  G.upCost = b => D.upCost(b.type, b.lvl);
-  G.upTime = b => D.upTime(b.type, b.lvl) * Math.max(0.5, 1 - 0.05 * G.lvl('engineering')) * (1 - Math.min(0.4, G.perkAll('upgradeP')));
+  G.upCost = b => conMod(conMar(b, D.upCost(b.type, b.lvl)));
+  // pk-30: en la tierra, la Maravilla desde el nivel 20 pide especias y pólvora del archipiélago (cuando ya se puede
+  // zarpar: antes de reparar el Galeón no se pide lo que no se puede conseguir)
+  function conMar(b, c) {
+    if (G.enMar() || b.lvl < 20 || !D.WONDERS.includes(b.type) || !(PK.Mar && (PK.Mar.listo() || S.otro))) return c;
+    const k = Math.pow(1.25, b.lvl - 20);
+    return Object.assign({}, c, { especias: Math.round(20 * k / 5) * 5, polvora: Math.round(15 * k / 5) * 5 });
+  }
+  G.upTime = b => D.upTime(b.type, b.lvl) * Math.max(0.5, 1 - 0.05 * G.lvl('engineering')) * (1 - Math.min(0.4, G.perkAll('upgradeP'))) * (1 - Math.min(0.3, hp('upTime', b))) / U.clamp(1 + vb('upSpeed'), 0.8, 1.5);
   G.canUpgrade = function (b) {
     if (b.def.noUp) return { ok: false, why: 'Este edificio no tiene mejoras.' };
     if (!b.done) return { ok: false, why: 'Primero termina de construirlo.' };
@@ -477,11 +575,12 @@
   // bodegas de comida, madera, piedra y oro, +40% por cada fiesta del mismo día, y da +25% de recolección y de
   // talleres por 5 minutos. Con Date.now(), como los deseos del pozo. El servidor tolera 2,5x (LIM.slack).
   G.FIESTA = { p: 0.25, dur: 300, res: ['food', 'wood', 'stone', 'gold'] };
-  G.fiestaMult = () => (S && S.fiesta && S.fiesta.until > Date.now() ? 1 + G.FIESTA.p : 1);
+  G.fiestaMult = () => (S && S.fiesta && S.fiesta.until > Date.now() ? 1 + G.FIESTA.p * (1 + hp('fiesta')) : 1);
   G.fiestaInfo = function () {
     if (S.era < 2) return null;
     const f = S.fiesta || {}, n = f.day === U.dayKey() ? f.n || 0 : 0, k = Math.pow(1.4, n), cost = {};
-    for (const r of G.FIESTA.res) cost[r] = Math.max(10, Math.round((G.cap(r) * 0.15 * k) / 10) * 10);
+    const kl = (PK.Leyendas && S.leyendas ? PK.Leyendas.fiestaK() : 1) * (1 - Math.min(0.5, vb('fiesta'))); // Colmena Gigante (H6), cartas
+    for (const r of G.FIESTA.res) cost[r] = Math.max(10, Math.round((G.cap(r) * 0.15 * k * kl) / 10) * 10);
     const left = f.until ? Math.max(0, (f.until - Date.now()) / 1000) : 0;
     return { n, cost, left, ok: !left && G.canAfford(cost) };
   };
@@ -491,6 +590,7 @@
     if (!G.pay(o.cost)) { toast('Faltan recursos para la fiesta.', 'warn'); return false; }
     S.fiesta = { until: Date.now() + G.FIESTA.dur * 1000, n: o.n + 1, day: U.dayKey() };
     G.stat('fiestas', 1);
+    if (PK.Vida && PK.Vida.evento) PK.Vida.evento('fiesta', {});
     toast('¡Fiesta en el pueblo! Tu gente recolecta y produce un 25% más durante 5 minutos.', 'epic');
     const tc = G.buildings.find(b => b.owner === 'p' && b.type === 'tc');
     if (tc && PK.Render.burst) for (const c of [[232, 184, 74], [220, 80, 90], [90, 170, 230], [120, 200, 110]]) PK.Render.burst(tc.cx, tc.cy, c, 18);
@@ -520,11 +620,12 @@
       if (PK.Sfx) PK.Sfx.play('level');
     }
     PK.Platform.reportStat('upgrades', S.stats.upgrades);
-    if (b.type === 'wonder') PK.Platform.addCoins(10 * b.lvl, 'wonder');
+    if (D.WONDERS.includes(b.type)) PK.Platform.addCoins(10 * b.lvl, 'wonder');
+    if (PK.Vida) PK.Vida.invalidar();
   }
 
   // ---------- Exploración ----------
-  G.exploreRange = () => { const r = best('scout', 'range'); return r ? r + 4 * G.lvl('cartography') : 0; };
+  G.exploreRange = () => { const r = best('scout', 'range'); return r ? Math.round((r + 4 * G.lvl('cartography') + vb('range')) * (1 + hp('range'))) : 0; };
   G.scoutSight = () => D.SIGHT.scout + (G.lvl('cartography') >= 3 ? 1 : 0);
   G.scoutMax = () => best('scout', 'scouts');
   G.poiState = p => S.pois[p.id] || null;
@@ -567,12 +668,62 @@
     else if (p.kind === 'camp') toast('¡Un campamento de bandidos! Fuerza aprox. ' + D.campPower(tier) + '.', 'bad', G.countB('barracks') ? { label: 'Atacar', fn: () => PK.UI.openBarracks('exp', { camp: p.id }) } : null);
     else if (p.kind === 'relic') toast('¡Una reliquia! Llévala a un Monasterio para que dé oro sin parar.', 'epic');
     else if (D.POI[p.kind].dungeon) PK.Exp.found(p);
+    else if (p.kind === 'legend') { G.stat('legends_found', 1); toast('¡Un lugar legendario: ' + D.LEYENDAS[p.ley].name + '! Manda a un héroe a investigarlo: ' + D.LEYENDAS[p.ley].bono + '.', 'epic', { label: 'Ver', fn: () => { PK.Render.centerOn(p.x + 1, p.y + 1); G.sel = { type: 'poi', id: p.id }; PK.UI.refreshPanel(true); } }); }
+  }
+
+  // ---------- Banderas de exploración (A4 del plan) ----------
+  // Hasta 3 banderas en la niebla: el explorador dirigido va hacia ellas antes que a la niebla más cercana.
+  // Dirigido hay uno; el Puesto en nivel 5 o Cartografía III suman un segundo. Cuando la casilla de la bandera
+  // se descubre, la bandera se quita sola.
+  G.BANDERAS_MAX = 3;
+  G.banderas = () => S.banderas || (S.banderas = []);
+  G.dirigidos = () => Math.min(3, (mine('scout').some(b => b.lvl >= 5) || G.lvl('cartography') >= 3 ? 2 : 1) + vb('dirigido'));
+  G.ponerBandera = function (x, y) {
+    const fl = G.banderas(), [hx, hy] = D.PLAYER_HOME;
+    const i = fl.findIndex(f => U.dist(f[0], f[1], x, y) < 3);
+    if (i >= 0) { fl.splice(i, 1); toast('Bandera quitada.', 'info'); return 'quitada'; }
+    if (!W.inb(x, y)) return null;
+    if (W.fog[W.idx(x, y)]) { toast('Esa zona ya está descubierta: pon la bandera en la niebla.', 'warn'); return null; }
+    const R = G.exploreRange();
+    if (!R) { toast('Necesitas un Puesto de Exploradores.', 'warn'); return null; }
+    if (U.dist(x, y, hx, hy) > R + 2) { toast('Queda fuera del alcance de tus exploradores (' + R + ' casillas): mejora el Puesto de Exploradores.', 'warn'); return null; }
+    if (fl.length >= G.BANDERAS_MAX) { toast('Ya tienes ' + G.BANDERAS_MAX + ' banderas: toca una para quitarla.', 'warn'); return null; }
+    fl.push([x, y]);
+    for (const u of G.units) if (u.owner === 'p' && u.kind === 'scout' && u.task && u.task.t === 'explore') { u.path = []; u.exT = undefined; } // que lo tomen ya
+    toast('Bandera puesta: tu explorador irá hacia allá.', 'good');
+    return 'puesta';
+  };
+  // La bandera que sigue ese explorador (o null). Quita las que ya se descubrieron.
+  function banderaDe(u) {
+    const fl = G.banderas();
+    for (let i = fl.length - 1; i >= 0; i--) if (W.fog[W.idx(fl[i][0], fl[i][1])]) { fl.splice(i, 1); if (!G.offline) toast('Tu explorador llegó a la bandera.', 'good'); }
+    if (!fl.length) return null;
+    const sc = G.units.filter(o => o.owner === 'p' && o.kind === 'scout').sort((a, b) => a.id - b.id), i = sc.indexOf(u);
+    return i >= 0 && i < G.dirigidos() ? fl[i % fl.length] : null;
+  }
+  // Borde de la niebla más cercano a la bandera (por anillos desde ella) y, entre esos, el más cercano al explorador.
+  function haciaBandera(u, f, R, frontier) {
+    const [hx, hy] = D.PLAYER_HOME, skip = u.skip;
+    for (let r = 0; r <= 90; r++) {
+      let pick = null, bs = 1e9;
+      for (let y = f[1] - r; y <= f[1] + r; y++) for (let x = f[0] - r; x <= f[0] + r; x++) {
+        if (Math.max(Math.abs(x - f[0]), Math.abs(y - f[1])) !== r || !W.inb(x, y)) continue;
+        const i = y * W.W + x;
+        if (W.fog[i] || (skip && skip.has(i)) || U.dist(x, y, hx, hy) > R || !frontier(x, y)) continue;
+        const sc = U.dist(x, y, u.x, u.y) + (W.passable(x, y) ? 0 : 3);
+        if (sc < bs) { bs = sc; pick = [x, y]; }
+      }
+      if (pick) return pick;
+    }
+    return null;
   }
 
   // Exploradores: el borde de la niebla más cercano, dentro del alcance del Puesto de Exploradores.
   G.exploreTarget = function (u) {
     const [hx, hy] = D.PLAYER_HOME, R = G.exploreRange();
     if (!R) return null;
+    const fb = banderaDe(u);
+    if (fb) { const t = haciaBandera(u, fb, R, (x, y) => W.explored(x + 1, y) || W.explored(x - 1, y) || W.explored(x, y + 1) || W.explored(x, y - 1)); if (t) return t; }
     const ux = Math.floor(u.x), uy = Math.floor(u.y), skip = u.skip;
     const frontier = (x, y) => W.explored(x + 1, y) || W.explored(x - 1, y) || W.explored(x, y + 1) || W.explored(x, y - 1);
     for (let r = 1; r <= 60; r++) {
@@ -613,6 +764,7 @@
       const r = D.ruinReward(tier);
       G.give(r); G.stat('ruins_done', 1);
       if (tier >= 2) G.revealAt(p.x + 1, p.y + 1, 8); // un mapa antiguo entre los escombros
+      if (PK.Aventura) PK.Aventura.mapaDeRuina(p); // y a veces, un mapa del tesoro (H7)
       toast('¡Excavación terminada! ' + Object.keys(r).map(k => '+' + U.fmt(r[k]) + ' ' + (k === 'coins' ? 'monedas' : D.RES[k].name.toLowerCase())).join(', '), 'epic');
     }
   };
@@ -629,13 +781,53 @@
   };
   // Los talleres no gastan un insumo por debajo de la reserva que fija el Capataz (parte de la bodega),
   // así no dejan al reino sin madera ni piedra para construir. Si lo que fabrican escasea, la reserva baja.
-  G.reserveOk = function (cost, out) {
+  // Con «Producir igual» (b.sinReserva) ese taller la ignora.
+  G.reserveOk = function (cost, out, b) {
+    if (b && b.sinReserva) return true;
+    if (b) { const rm = G.reservaDe(b); if (rm && rm.meta) return false; }
+    if (G.metaPide(out)) return true;
     let rv = S.auto ? S.auto.reserve || 0 : 0;
     if (out && S.res[out] < 0.05 * G.cap(out)) rv /= 3;
     for (const k in cost) if (S.res[k] - cost[k] < rv * G.cap(k)) return false;
     return true;
   };
-  G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')); // por minuto
+  // ¿El taller está parado por la reserva? El primer insumo que retiene ({res, have, keep}) o null. Antes solo
+  // decía «Sin trabajadores» y la Fundición quedaba vacía con 1.650 de hierro (B4 del plan).
+  // Lo que pide la meta (avance de era + cola de mejoras), guardado un segundo: lo mira cada taller en cada cuadro.
+  // metaJunta: las metas de la próxima era ya están y solo falta pagarla (recién ahí los talleres guardan insumos;
+  // antes, las mejoras que piden las metas necesitan tablones y sillares).
+  let metaC = null, metaT = -1, metaJunta = false;
+  G.metaNecesita = function () {
+    if (metaC && Math.abs(G.time - metaT) < 1) return metaC;
+    const c = {}, suma = x => { for (const r in x) c[r] = (c[r] || 0) + x[r]; };
+    if (!S.eraProg) suma(D.eraCost(S.era + 1));
+    for (const id of S.upq || []) { const b = G.bById.get(id); if (b) suma(G.upCost(b)); }
+    metaJunta = !S.eraProg && G.eraChecks(S.era + 1).every(x => x.ok);
+    metaT = G.time;
+    return (metaC = c);
+  };
+  // Con «Meta de era», un taller cuyo producto le falta a la meta no respeta la reserva. Si no, se trababa: la meta veía
+  // hierro de sobra para los 9 lingotes que faltaban (nadie juntaba hierro) y la reserva no dejaba usarlo (prueba de ritmo).
+  G.metaPide = out => !!(S.auto && S.auto.plan === 'meta' && (G.metaNecesita()[out] || 0) > (S.res[out] || 0));
+  G.reservaDe = function (b) {
+    if (!b || !b.def.recipe || b.sinReserva) return null;
+    const rc = D.RECIPES[b.def.recipe], out = Object.keys(rc.out)[0];
+    // Con el plan «Meta de era»: si lo que hace el taller ya alcanza para la meta (y para un 20% de la bodega, que las
+    // mejoras también lo piden) y lo que gasta es algo que la meta pide y falta, se guarda. Sin esto las Canterías convertían en sillares la piedra de la Era V (el piloto juntó
+    // 5.000 sillares cuando pedía 840 y nunca llegó a las 7.000 de piedra).
+    if (S.auto && S.auto.plan === 'meta') {
+      const nec = G.metaNecesita();
+      if ((S.res[out] || 0) >= Math.max((nec[out] || 0) * 1.25, 0.2 * G.cap(out)) && (metaJunta || nec[out])) for (const k in rc.in) if (nec[k] && (S.res[k] || 0) < nec[k]) return { res: k, have: S.res[k], keep: nec[k], meta: true };
+    }
+    if (G.metaPide(out)) return null; // la meta pide lo que hace: la reserva no lo frena (ver G.metaPide)
+    let rv = S.auto ? S.auto.reserve || 0 : 0;
+    if (!rv) return null;
+    if (S.res[out] < 0.05 * G.cap(out)) rv /= 3;
+    for (const k in rc.in) { const keep = rv * G.cap(k); if (S.res[k] - rc.in[k] < keep) return { res: k, have: S.res[k], keep }; }
+    return null;
+  };
+  G.reservaText = r => r.meta ? 'En reserva para la meta de era: guarda ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + ' de ' + U.fmt(Math.ceil(r.keep)) + ')' : 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
+  G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')) * (1 + hp('relicGold')) * (1 + vb('relic')); // por minuto
 
   // ---------- Órdenes ----------
   G.release = function (u) {
@@ -701,8 +893,8 @@
       const b = target.obj;
       if (b.owner !== 'p') return G.command(units, { kind: 'tile', x: b.x + b.w, y: b.y + b.h }, silent);
       if (!b.done) return G.command(units, { kind: 'tile', x: b.x + b.w, y: b.y + b.h }, silent); // las obras se levantan solas
-      if (b.type === 'farm') {
-        const farms = [b].concat(G.buildings.filter(o => o.owner === 'p' && o.type === 'farm' && o.done && o !== b).sort((a, c) => U.dist(a.cx, a.cy, b.cx, b.cy) - U.dist(c.cx, c.cy, b.cx, b.cy)));
+      if (G.esGranja(b)) {
+        const farms = [b].concat(G.buildings.filter(o => o.owner === 'p' && o.type === b.type && o.done && o !== b).sort((a, c) => U.dist(a.cx, a.cy, b.cx, b.cy) - U.dist(c.cx, c.cy, b.cx, b.cy)));
         let fi = 0;
         for (const u of units) {
           while (fi < farms.length && farms[fi].farmer !== null && farms[fi].farmer !== u.id && G.uById.get(farms[fi].farmer)) fi++;
@@ -751,7 +943,8 @@
 
   G.spawnUnit = function (b, kind) {
     const tx = b.rally && b.rally.kind === 'tile' ? b.rally.x : b.x + b.w + 1, ty = b.rally && b.rally.kind === 'tile' ? b.rally.y : b.y + b.h + 1;
-    const p = W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, tx, ty, occupied);
+    // con el Centro Urbano encerrado, «sale por la puerta de atrás»: nace en la casilla libre más cercana de afuera
+    const p = (b.owner === 'p' && G.encierro && W.nearestInRegion(b.cx, b.cy, G.encierro.out, 48)) || W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, tx, ty, occupied);
     const u = G.addUnit({ owner: b.owner, x: p[0] + 0.5, y: p[1] + 0.5, kind });
     if (b.owner !== 'p' || kind === 'cart') return u;
     if (kind === 'scout') { u.task = { t: 'explore' }; G.stat('scouts_trained', 1); return u; }
@@ -781,12 +974,20 @@
     G.give(k === 'scout' ? D.SCOUT.cost : D.VILLAGER.cost);
     if (!b.queue.length) b.qt = 0;
   };
-  G.trainTime = b => (b.type === 'scout' ? D.SCOUT.time : D.VILLAGER.time / (1 + (G.bst(b).train || 0)));
+  G.trainTime = b => (b.type === 'scout' ? D.SCOUT.time : D.VILLAGER.time / (1 + (G.bst(b).train || 0)) / U.clamp(1 + vb('train'), 0.8, 1.6));
 
   // ---------- Construcción ----------
-  G.isUnlocked = type => D.BUILD[type].era <= S.era && !G.legendLocked(type);
-  G.legendLocked = type => !!D.BUILD[type].lock && !S.flags['unlock_' + D.BUILD[type].lock];
-  G.buildCost = type => D.buildCost(type, G.countAll(type));
+  G.isUnlocked = type => D.BUILD[type].era <= S.era && !G.legendLocked(type) && !D.BUILD[type].retirada && !G.logroFalta(type);
+  // decoraciones que se ganan (V5): la Columna pide un trofeo de jefe por cada una; el Arco, 10 desafíos (V7)
+  G.logroFalta = function (type) {
+    const l = D.BUILD[type].logro;
+    if (l === 'columna') return Object.values(S.trofeos || {}).reduce((a, n) => a + n, 0) > G.countAll('columna') ? null : 'Vence a un jefe de mazmorra por cada columna.';
+    if (l === 'arco') return (S.stats.desafios || 0) >= 10 ? null : 'Cumple 10 desafíos (Libro de Misiones).';
+    return null;
+  };
+  // la Taberna (héroes) se abre con el Cuartel, sin esperar a reclamar la misión l1 (H1 del plan)
+  G.legendLocked = type => !!D.BUILD[type].lock && !S.flags['unlock_' + D.BUILD[type].lock] && !(type === 'tavern' && G.countAll('barracks'));
+  G.buildCost = type => conMod(D.buildCost(type, G.countAll(type)));
   // Se construye en tu territorio. Los campamentos de acopio también pueden ir en tierra de nadie y junto a
   // las zonas comunes (para recolectar lejos), pero nunca en tierra de otro reino.
   G.OUTPOST = { lumber: 1, mining: 1, mill: 1 };
@@ -804,8 +1005,86 @@
       const o = W.ownerAt(tx, ty);
       if (o !== 'p' && !(G.OUTPOST[type] && !o)) return o ? 'ajeno' : 'libre';
     }
+    if ((type === 'muelle' || def.agua) && !G.tocaAgua(x, y, def)) return 'sinAgua';
+    if (G.encierra(type, x, y, ignorar)) return 'encierra';
     return null;
   };
+  G.tocaAgua = function (x, y, def) {
+    for (let j = -1; j <= def.h; j++) for (let i = -1; i <= def.w; i++) if ((i < 0 || j < 0 || i >= def.w || j >= def.h) && W.inb(x + i, y + j) && W.terrain[W.idx(x + i, y + j)] === 4) return true;
+    return false;
+  };
+  // ¿Ese edificio encerraría al Centro Urbano? (B2 del plan: un patio cerrado por casas dejó 93 de 154 aldeanos
+  // parados). Compara cuánto se camina desde el borde de los Centros Urbanos antes y después: si se pierde
+  // algo más que el propio edificio y un hueco chico, y lo que queda es poco, lo cierra. Un pueblo que ya
+  // estaba cerrado (murallas sin puerta) no se traba: solo cuenta lo que este edificio corta. Se recuerda
+  // 150 ms por lugar porque el fantasma lo pregunta en cada movimiento del puntero.
+  G.blockVer = 0;
+  let encBefore = null, encMemo = new Map();
+  G.encierra = function (type, x, y, ignorar) {
+    const def = D.BUILD[type];
+    if (!def || def.walkable) return false;
+    const tcs = G.buildings.filter(b => b.owner === 'p' && b.type === 'tc' && b.id !== ignorar);
+    if (!tcs.length) return false;
+    const now = Date.now(), key = type + ',' + x + ',' + y + ',' + ignorar;
+    const m = encMemo.get(key);
+    if (m && m.v === G.blockVer && now - m.t < 150) return m.r;
+    if (encMemo.size > 200) encMemo.clear();
+    const rects = tcs.map(b => [b.x, b.y, b.w, b.h]);
+    if (!encBefore || encBefore.v !== G.blockVer || now - encBefore.t > 2000) encBefore = { v: G.blockVer, t: now, n: W.reachCount(rects) };
+    const tapa = [], libre = [];
+    for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) tapa.push(W.idx(x + i, y + j));
+    const mv = ignorar !== undefined && G.bById.get(ignorar);
+    if (mv) for (let j = 0; j < mv.h; j++) for (let i = 0; i < mv.w; i++) libre.push(W.idx(mv.x + i, mv.y + j));
+    const antes = encBefore.n + libre.length, tope = Math.min(antes - tapa.length - 30, Math.max(600, antes * 0.5));
+    const r = tope > 0 && W.reachCount(rects, tapa, libre, tope) < tope;
+    encMemo.set(key, { v: G.blockVer, t: now, r });
+    return r;
+  };
+  // Si igual quedó encerrado (una partida de antes, árboles que rebrotaron, murallas), se detecta cada 5 s:
+  // las regiones que tocan el Centro Urbano son chicas, no queda ningún recurso a su alcance y afuera hay
+  // tierra grande. G.encierro = { out: la región de afuera, puertas: los edificios que tocan el patio y el
+  // exterior a la vez (mover o demoler uno de ellos abre el paso) }. Con eso los aldeanos nuevos nacen afuera
+  // (spawnUnit), el rescate los saca hacia afuera (entities.js) y el aviso de ociosos no dice «explora».
+  G.encierro = null;
+  let encAvisoT = -1e9;
+  G.checkEncierro = function () {
+    const prev = G.encierro;
+    G.encierro = encierroAhora();
+    S.flags.encerrado = G.encierro ? 1 : 0;
+    if (G.offline || !PK.UI) return;
+    if (G.encierro && (!prev || Date.now() - encAvisoT > 180000)) {
+      encAvisoT = Date.now();
+      const n = G.encierro.puertas.length;
+      toast('Tu Centro Urbano quedó encerrado por edificios. ' + (n ? 'Mueve o demuele uno de los marcados en rojo.' : 'Abre una puerta en la muralla o despeja el paso.'), 'warn',
+        n ? { label: 'Ver edificios', fn: G.verPuertas } : null);
+    } else if (!G.encierro && prev) toast('Tu Centro Urbano volvió a tener salida.', 'good');
+  };
+  G.verPuertas = function () {
+    const b = G.encierro && G.bById.get(G.encierro.puertas[0]);
+    if (!b) return;
+    G.sel = { type: 'building', id: b.id };
+    PK.Render.centerOn(b.cx, b.cy);
+    if (PK.UI) PK.UI.refreshPanel(true);
+  };
+  function encierroAhora() {
+    const tcs = G.buildings.filter(b => b.owner === 'p' && b.type === 'tc');
+    if (!tcs.length) return null;
+    // las casillas que tocan el edificio por un lado (no las esquinas: se camina en 4 direcciones, como las regiones)
+    const ring = (b, fn) => { for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) if (((x < b.x || x >= b.x + b.w) !== (y < b.y || y >= b.y + b.h)) && W.inb(x, y)) fn(W.regionAt(x, y)); };
+    const casa = new Set();
+    for (const b of tcs) ring(b, l => { if (l) casa.add(l); });
+    const big = W.biggestRegion();
+    if (casa.has(big.l) || big.n < 600 || [...casa].some(l => W.regionSize(l) >= 600)) return null;
+    if (casa.size) for (const n of W.nodes) if (!n.dead && W.fog[W.idx(n.x, n.y)] && W.canUse(n, 'p') && W.reachable(n, casa)) return null; // todavía hay qué recolectar adentro
+    const puertas = [];
+    for (const b of G.buildings) {
+      if (b.owner !== 'p' || b.type === 'tc' || b.def.walkable) continue;
+      let adentro = false, afuera = false;
+      ring(b, l => { if (casa.has(l)) adentro = true; else if (l === big.l) afuera = true; });
+      if (adentro && afuera) puertas.push(b.id);
+    }
+    return { out: big.l, puertas };
+  }
   G.canPlace = (type, x, y, ignorar) => !G.placeWhy(type, x, y, ignorar);
   // Por qué no se puede: antes en la computadora solo decía «No se puede construir ahí».
   G.placeText = why => {
@@ -819,9 +1098,12 @@
     agua: 'No se puede construir sobre el agua.',
     ocupado: 'Ahí hay algo (árboles, rocas, un edificio, una cinta o una muralla): busca un lugar despejado.',
     fuera: 'Eso queda fuera del mapa.',
+    encierra: 'Así encerrarías a tu pueblo: deja al menos una casilla de paso.',
+    sinAgua: 'El muelle va pegado al agua: ponlo en la orilla de un lago o río.',
   };
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }
+    if (G.logroFalta(type)) { toast(G.logroFalta(type), 'warn'); return null; }
     if (!G.isUnlocked(type)) { toast('Necesitas la Era ' + U.roman(D.BUILD[type].era) + '.', 'warn'); return null; }
     if (G.countAll(type) >= G.maxCount(type)) { toast('Ya tienes el máximo de ' + D.BUILD[type].name + ' para tu era.', 'warn'); return null; }
     const why = G.placeWhy(type, x, y);
@@ -863,7 +1145,7 @@
     if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }
     const ox = b.cx, oy = b.cy;
-    b.x = x; b.y = y; b._nsT = null;
+    b.x = x; b.y = y; b._nsT = null; b._agua = undefined; G.blockVer++;
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) {
       const k = W.idx(x + i, y + j);
       W.bAt[k] = b.id;
@@ -891,7 +1173,10 @@
       toast(b.def.name + ' terminado.', 'good');
       if (!G.offline && PK.Sfx) PK.Sfx.play('build');
       G.stat('built_total', 1);
+      if (b.def.deco) G.stat('decos', 1);
       G.revealAt(b.cx, b.cy, G.sight(b));
+      G.blockVer++; // los bonos por cercanía se recalculan
+      if (PK.Vida) PK.Vida.invalidar();
     }
   };
 
@@ -916,7 +1201,7 @@
         b.status = 'Entrenando';
         b.qt += dt;
         const tt = G.trainTime(b);
-        while (b.qt >= tt && b.queue.length && G.pop() < G.popCap()) { b.qt -= tt; G.spawnUnit(b, b.queue.shift() === 'scout' ? 'scout' : 'v'); }
+        while (b.qt >= tt && b.queue.length && G.pop() < G.popCap()) { b.qt -= tt; const k = b.queue.shift() === 'scout' ? 'scout' : 'v'; G.spawnUnit(b, k); if (k === 'v' && b.owner === 'p') G.stat('aldeanos', 1); }
         if (!b.queue.length) b.qt = 0;
       } else if (b.def.recipe) {
         PK.Logi.produce(b, dt);
@@ -958,7 +1243,10 @@
     return c;
   };
   G.techTime = lvl => Math.min(45 * Math.pow(1.85, lvl), 5 * 86400);
+  // Nombre de lo que se investiga: una técnica de D.TECHS (con su nivel) o un nodo del árbol 2.0 ('n:<id>')
+  G.researchName = r => (PK.Vida && PK.Vida.esNodo(r.id) ? PK.Vida.nombre(r.id) : D.TECHS[r.id].name + ' ' + U.roman(r.lvl));
   G.startResearch = function (id) {
+    if (PK.Vida && PK.Vida.esNodo(id)) return PK.Vida.investigar(id.slice(2));
     if (S.research) { toast('Ya hay una investigación en curso.', 'warn'); return false; }
     if (!G.countB('library')) { toast('Necesitas una Biblioteca.', 'warn'); return false; }
     const lvl = G.lvl(id), t = D.TECHS[id];
@@ -975,16 +1263,20 @@
       S.eraProg.t += dt;
       if (S.eraProg.t >= S.eraProg.total) {
         S.era = S.eraProg.to; S.eraProg = null;
+        if (PK.Vida && PK.Vida.evento) PK.Vida.evento('era', { era: S.era, aldeanos: G.villagerCount() });
+        if (!G.offline && PK.Vida && PK.Vida.fuegos) PK.Vida.fuegos();
         G.finished.push('Era ' + U.roman(S.era));
         toast('¡Has alcanzado la Era ' + U.roman(S.era) + ': ' + D.eraName(S.era) + '! Tus edificios pueden subir 2 niveles más.', 'epic');
         if (!G.offline) { const tc = G.buildings.find(b => b.owner === 'p' && b.type === 'tc'); if (tc && PK.Render.burst) for (let k = 0; k < 4; k++) PK.Render.burst(tc.cx + (Math.random() - 0.5) * 6, tc.cy + (Math.random() - 0.5) * 6, null, 50); if (PK.Sfx) PK.Sfx.play('era'); }
         PK.Platform.reportStat('era', S.era);
         if (G.decreePending() && !G.offline) setTimeout(() => PK.UI.openDecree(), 2500); // ¡a elegir decreto!
+        else if (PK.UI.revisarCartas && !G.offline) setTimeout(() => PK.UI.revisarCartas(), 2500); // carta de era (Fase 3)
       }
     }
     if (S.research) {
       S.research.t += dt * G.researchMult();
-      if (S.research.t >= S.research.total) {
+      if (S.research.t >= S.research.total && PK.Vida && PK.Vida.esNodo(S.research.id)) { PK.Vida.terminarNodo(S.research.id); S.research = null; }
+      else if (S.research.t >= S.research.total) {
         S.techs[S.research.id] = S.research.lvl;
         G.finished.push(D.TECHS[S.research.id].name + ' ' + U.roman(S.research.lvl));
         toast(D.TECHS[S.research.id].name + ' ' + U.roman(S.research.lvl) + ' investigado.', 'good');
@@ -1010,19 +1302,33 @@
     G.updateTimers(dt);
     PK.Auto.tick(dt);
     PK.Logi.update(dt);
-    PK.Terr.update(dt, false);
+    const tierra = !G.enMar(); // en el archipiélago (Fase 9) no corren los sistemas de la tierra
+    if (tierra) PK.Terr.update(dt, false);
     PK.Exp.update(dt, false);
+    if (PK.Heroes) PK.Heroes.update(dt);
+    if (PK.Aventura) PK.Aventura.tick(dt);
+    if (tierra && PK.Leyendas) PK.Leyendas.tick(dt);
+    if (tierra && PK.Campana) PK.Campana.tick(dt);
     PK.Batalla.update(dt);
-    PK.Life.update(dt);
-    PK.Incursiones.update(dt);
+    if (tierra) PK.Life.update(dt);
+    if (tierra) PK.Incursiones.update(dt);
     fiestaTick(dt);
     if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
+    frutales(dt);
     PK.Social.update(dt, false);
     regrowT += dt;
-    if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); }
+    if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); if (tierra && PK.Vida) PK.Vida.tick(); }
     questT += dt;
-    if (questT > 1) { questT = 0; PK.Quests.check(); }
+    if (questT > 1) { questT = 0; PK.Quests.check(); } // en el mar, con la Crónica del Mar (pk-28)
+    if (!tierra && PK.Arch) PK.Arch.tick(dt);
+    if (!tierra && PK.Armada) PK.Armada.tick(dt);
   };
+  // Árboles frutales (V5): un poco de comida sin aldeanos, en vivo y sin conexión
+  let frutT = 0, frutN = 0;
+  function frutales(dt) {
+    if ((frutT -= dt) <= 0) { frutT = 5; frutN = mine('frutal').length; }
+    if (frutN) G.addRes('food', frutN * D.BUILD.frutal.deco.comida * dt * G.globalMult());
+  }
   function occupied(x, y) {
     for (const u of G.units) if (!u.inside && Math.floor(u.x) === x && Math.floor(u.y) === y) return true;
     return false;
@@ -1064,9 +1370,10 @@
     G.finished = [];
     const before = Object.assign({}, S.res), fogBefore = W.fogCount;
     const steps = U.clamp(Math.ceil(sec / 60), 1, 240), dt = sec / steps;
-    const startEra = S.era;
+    const startEra = S.era, t0 = Date.now() - sec * 1000;
     let depleted = 0;
     for (let s = 0; s < steps; s++) {
+      G.tSim = t0 + (s + 0.5) * dt * 1000; // la marea (y lo que dependa de la hora) va con el reloj simulado
       const online = PK.Net && PK.Net.online;
       for (const u of G.units) {
         if (!u.task || u.inside || u.remote) continue;
@@ -1082,6 +1389,7 @@
             const p = W.freeAround(n.x, n.y, n.x, n.y, u.x, u.y);
             u.x = p[0] + 0.5; u.y = p[1] + 0.5; u.path = [];
           }
+          if (D.NODES[n.kind].marea && !D.mareaBaja(G.tSim)) continue; // el arrecife está bajo el agua
           const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res);
           // los reinos simulados recolectan a menor ritmo sin ti, para que las zonas comunes no se vacíen
           // con la bodega llena, tus aldeanos no gastan el recurso del mapa (antes lo vaciaban y se perdía)
@@ -1095,8 +1403,8 @@
         } else if (t.t === 'farm') {
           const b = G.bById.get(t.b);
           if (!b) { u.task = null; continue; }
-          const eff = tripRate(u, G.farmRate(u.owner, b, u), b.cx, b.cy, 'food');
-          if (u.owner === 'p') gained('food', G.addRes('food', eff * dt), -1);
+          const fr = G.granjaRes(b), eff = tripRate(u, G.farmRate(u.owner, b, u), b.cx, b.cy, fr);
+          if (u.owner === 'p') gained(fr, G.addRes(fr, eff * dt), -1);
         } else if (t.t === 'build') { // partidas viejas: las obras ya se levantan solas
           u.task = null;
         } else if (t.t === 'dig') {
@@ -1111,21 +1419,26 @@
       PK.Logi.offline(dt);
       PK.Terr.update(dt, true);
       PK.Exp.update(dt, true);
+      if (PK.Heroes) PK.Heroes.update(dt);
+      if (PK.Aventura) PK.Aventura.tick(dt);
+      if (PK.Leyendas) PK.Leyendas.tick(dt);
+      if (PK.Campana) PK.Campana.tick(dt);
       if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
+      frutales(dt);
       PK.Social.update(dt, true);
     }
     // obras, estudios y eras siguen su reloj completo aunque hayan pasado más de 12 h
     if (secFull > sec) G.updateTimers(secFull - sec);
     for (const r of D.RES_ORDER) S.res[r] = Math.floor(S.res[r] * 100) / 100;
     regrowNow();
-    G.offline = false;
+    G.offline = false; G.tSim = 0;
     if (quiet) return null;
     const got = {};
     for (const r of D.RES_ORDER) { const d = Math.floor(S.res[r] - before[r]); if (d) got[r] = d; }
     // ayudas del gremio que llegaron mientras no estabas (las del buzón se aplican justo antes de este cálculo)
     const from = Date.now() - secFull * 1000 - 120000, helps = S.ret.helpLog.filter(h => h.at >= from), news = S.ret.news.filter(h => h.at >= from);
     const welcome = secFull >= D.WELCOME_MIN ? G.newWelcome(secFull) : null;
-    return { sec: secFull, capped: secFull > sec, gained: got, depleted, eraUp: S.era > startEra, finished: G.finished.slice(), explored: W.fogCount - fogBefore, helps: helps.length, helpsWhat: helps.length ? helps[helps.length - 1].what : null, news, welcome };
+    return { sec: secFull, capped: secFull > sec, gained: got, depleted, eraUp: S.era > startEra, finished: G.finished.slice(), explored: W.fogCount - fogBefore, helps: helps.length, helpsWhat: helps.length ? helps[helps.length - 1].what : null, news, welcome, consejo: PK.Consejo.informe(from) };
   };
 
   // ---------- Cofre de bienvenida ----------
@@ -1159,6 +1472,7 @@
   // ---------- Guardado ----------
   G.serialize = function () {
     S.lastSeen = Date.now();
+    S.at = S.lastSeen; // cuándo se guardó (main.js elige entre la local y la nube por esto: lastSeen es del mundo)
     S.units = G.units.filter(u => u.owner === 'p').map(u => u.toJSON());
     S.buildings = G.buildings.filter(b => b.owner === 'p').map(b => b.toJSON());
     S.nodes = W.saveNodes();
@@ -1169,10 +1483,15 @@
 
   };
   G.save = function () { U.store.set(SAVE_KEY, G.serialize()); };
+  G.guardarObjeto = o => U.store.set(SAVE_KEY, JSON.stringify(o)); // la travesía (js/mar.js) guarda los dos mundos ya cambiados
   G.loadSave = function () {
     const s = U.store.get(SAVE_KEY);
     if (!s) return null;
-    try { const o = JSON.parse(s); return o && o.v === D.SAVE_V ? o : null; } catch (e) { return null; }
+    try {
+      const o = JSON.parse(s);
+      if (o && o.v !== D.SAVE_V) G.reinicioDe = o.v; // para el cartel «El mundo se reinició…» (main.js)
+      return o && o.v === D.SAVE_V ? o : null;
+    } catch (e) { return null; }
   };
   G.reset = async function () {
     G.noSave = true;

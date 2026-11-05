@@ -108,9 +108,14 @@
     if (era >= 6) pool.push('machinery');
     return pool;
   }
+  Soc.tradePool = tradePool;
   // Mejores precios con un Mercado de más nivel.
-  const mkRate = k => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'market').reduce((m, b) => (k === 'buy' ? Math.min(m, G().bst(b).buy) : Math.max(m, G().bst(b).sell)), k === 'buy' ? 1.1 : 0.65);
-  Soc.buyPrice = (r, n) => Math.ceil((S().market.p[r] * mkRate('buy') * n) / 100);
+  const mkRate0 = k => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'market').reduce((m, b) => (k === 'buy' ? Math.min(m, G().bst(b).buy) : Math.max(m, G().bst(b).sell)), k === 'buy' ? 1.1 : 0.65);
+  // árbol y cartas (Moneda acuñada, Puertas abiertas): nunca se vende más caro de lo que se compra
+  const mkRate = k => { const v = !G().bono ? 0 : k === 'buy' ? G().bono('buy') : G().bono('sell'); return k === 'buy' ? Math.max(0.8, mkRate0('buy') - v) : Math.min(0.97, mkRate0('sell') + v); };
+  // S1 (pk-23): un tratado de comercio abarata la compra, sin bajar nunca de la venta + 10% (no hay compra-venta gratis)
+  const buyRate = () => { const b = mkRate('buy'); return PK.Diplo && PK.Diplo.tratado() ? Math.min(b, Math.max(mkRate('sell') + 0.1, b * D.DIPLO.tratado.buy)) : b; };
+  Soc.buyPrice = (r, n) => Math.ceil((S().market.p[r] * buyRate() * n) / 100);
   Soc.sellPrice = (r, n) => Math.floor((S().market.p[r] * mkRate('sell') * n) / 100);
   function botOffer() {
     const m = S().market, pool = tradePool(), bot = U.pick(D.BOTS);
@@ -132,7 +137,7 @@
     // lo que juntan los aldeanos (antes «Comprar» se negaba mientras premios y tratos sí lo pasaban).
     S().res.gold -= cost; S().res[res] += n;
     m.p[res] *= Math.pow(1.03, n / 100);
-    G().stat('market_ops', 1); G().stat('gold_volume', cost);
+    G().stat('market_ops', 1); G().stat('gold_volume', cost); G().stat('compras', 1);
     if (online()) PK.Net.marketOp({ res, n, side: 'buy' });
   };
   Soc.sell = function (res, n) {
@@ -495,7 +500,7 @@
   // Defensa: cada Torre y el Centro Urbano aportan según su nivel; las tropas en casa suman su fuerza.
   Soc.defense = function () {
     let d = 0;
-    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc')) d += G().bst(b).defense || 0;
+    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'bateria')) d += G().bst(b).defense || 0;
     return Math.round(d * (1 + 0.2 * G().lvl('walls')) + Soc.power(S().war.army));
   };
   Soc.barracksLvl = () => G().buildings.reduce((m, b) => (b.owner === 'p' && b.done && b.type === 'barracks' ? Math.max(m, b.lvl) : m), 0);
@@ -503,13 +508,14 @@
 
   Soc.Q_MAX = 20;
   // Velocidad de la cola: cada Cuartel entrena a la vez (1 + su bono por nivel).
-  Soc.trainSpeed = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + G().bst(b).armyTrain : 0), 0);
+  Soc.trainSpeed = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'barracks' ? 1 + G().bst(b).armyTrain : 0), 0) * (PK.Heroes && S().heroes ? 1 + PK.Heroes.pasiva('armyTrain') : 1);
   // Por qué no se puede entrenar esa tropa ahora (o null).
   Soc.trainWhy = function (type) {
     const def = D.ARMY[type], w = S().war;
     if (S().era < def.era) return 'Requiere la Era ' + U.roman(def.era) + '.';
-    if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
-    if (Soc.barracksLvl() < def.lvl) return def.name + ' requiere un Cuartel de nivel ' + def.lvl + '.';
+    if (!G().countB('barracks')) return 'Necesitas ' + (D.temaActivo === 'mar' ? 'una ' : 'un ') + D.BUILD.barracks.name + '.';
+    if (Soc.barracksLvl() < def.lvl) return def.name + ' requiere ' + (D.temaActivo === 'mar' ? 'una ' : 'un ') + D.BUILD.barracks.name + ' de nivel ' + def.lvl + '.';
+    if (def.req && !G().countB(def.req)) return def.name + ': necesitas la ' + D.BUILD[def.req].name + '.'; // la armada (pk-29)
     if (G().pop() >= G().popCap()) return 'Población máxima: construye o mejora casas.';
     if (w.q.length >= Soc.Q_MAX) return 'La cola del Cuartel está llena.';
     if (!G().canAfford(def.cost)) return 'Recursos insuficientes.';
@@ -560,7 +566,7 @@
         w.army[got]++;
         g.stat('trained_army', 1);
       }
-      if (got && !offline && !w.q.length) toast('El Cuartel terminó de entrenar: ' + D.ARMY[got].name.toLowerCase() + ' y los demás ya forman frente al Cuartel.', 'good');
+      if (got && !offline && !w.q.length) toast(D.temaActivo === 'mar' ? 'La Dársena de guerra terminó: ' + D.ARMY[got].name.toLowerCase() + ' y los demás esperan en el puerto.' : 'El Cuartel terminó de entrenar: ' + D.ARMY[got].name.toLowerCase() + ' y los demás ya forman frente al Cuartel.', 'good');
       if (!w.q.length) w.qt = 0;
     }
     for (const e of w.exps.slice()) {
@@ -676,6 +682,7 @@
     body.append(rows);
     if (g.zoneRes) body.append(zoneNote(g.zoneRes));
     guildExtras(body);
+    if (g.jefe && PK.Mundo) body.append(PK.Mundo.jefeEl(g.jefe)); // S3 (pk-24)
     const cols = el('div', { class: 'two-col' });
     cols.append(el('div', null, el('h3', null, 'Aportes'), el('ol', { class: 'rank' }, g.members.map(m => el('li', { class: m.me ? 'me' : '' },
       el('span', null, m.name + (m.me && !/^t[úu]$/i.test(m.name) ? ' (tú)' : '') + (m.npc ? ' ·' : m.online ? ' ●' : '')), el('span', null, U.fmt(m.c))))),
