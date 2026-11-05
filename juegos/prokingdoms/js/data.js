@@ -464,6 +464,23 @@
     tierra: { name: 'El Reino', mundo: 'Tu reino' },
     mar: { name: 'Archipiélago de Bruma', mundo: 'Archipiélago de Bruma', inicio: { food: 300, wood: 300, stone: 150, gold: 120 } },
   };
+  // Fase 9 (pk-28): la marea del archipiélago sale del reloj real, así da lo mismo en vivo, sin conexión y en el
+  // servidor. Un ciclo cada 4 h: 1 es pleamar, 0 es bajamar. Con la marea baja se trabajan los arrecifes; con la
+  // alta, la pesca rinde más. Va aquí (y no en datos-mar.js) porque el servidor también la usa.
+  D.MAREA_MS = 4 * 3600e3;
+  D.marea = function (t) {
+    const P = D.MAREA_MS, f = ((((t == null ? Date.now() : t) % P) + P) % P) / P;
+    return 0.5 + 0.5 * Math.sin(2 * Math.PI * f);
+  };
+  D.MAREA_BAJA = 0.38;
+  D.mareaBaja = t => D.marea(t) < D.MAREA_BAJA;
+  // segundos hasta que la marea cruce el umbral de bajamar (para la barra): se busca de minuto en minuto
+  D.mareaCambia = function (t) {
+    t = t == null ? Date.now() : t;
+    const b = D.mareaBaja(t);
+    for (let s = 60; s <= D.MAREA_MS / 1000; s += 60) if (D.mareaBaja(t + s * 1000) !== b) return s;
+    return D.MAREA_MS / 1000;
+  };
   // S5. Rankings: categorías y el título semanal del primero de cada una.
   D.RANKINGS = {
     era: { name: 'Era', titulo: 'Monarca de la Semana' },

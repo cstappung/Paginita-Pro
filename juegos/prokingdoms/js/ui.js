@@ -194,7 +194,7 @@
     const mbtn = (icon, label, fn, key, id) => {
       const b = el('button', { class: 'mbtn', title: label + (key ? ' (' + key + ')' : ''), 'aria-label': label, onclick: () => { b.classList.remove('nuevo'); fn(); } }, el('img', { class: 'ico', src: icon.startsWith('data:') ? icon : Sp.icon(icon), alt: '' }), el('span', null, label));
       menu.append(b);
-      if (id) { b.dataset.mid = id; if (MENU_VER[id]) menuIds[id] = b; }
+      if (id) { b.dataset.mid = id; allIds[id] = b; if (MENU_VER[id]) menuIds[id] = b; }
       return b;
     };
     // U1 (Fase 6, pk-26): los botones son los de siempre (con su id para el menú progresivo) y después se agrupan
@@ -275,7 +275,9 @@
   // abrumaban). Una vez visto queda para siempre (flags.menu_<id>). Lo que aparece durante la partida brilla
   // hasta que lo tocas; al cargar, lo que ya correspondía se muestra sin anuncio (también en partidas viejas).
   // Cuartel siempre está: sus murallas (Defensa) sirven desde la Era I y una misión lo nombra.
-  const menuIds = {};
+  const menuIds = {}, allIds = {};
+  // En el archipiélago (pk-28) no hay investigación, gremio, territorio, mercado, ejército ni héroes (todavía)
+  const NO_MAR = ['explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'heroes', 'taberna', 'equipo', 'consejo', 'war', 'atacar', 'defensa', 'batallas', 'desafios', 'album'];
   const MENU_VER = {
     explore: (g, st) => g.countAll('scout') > 0 || st.era >= 2,
     research: (g, st) => st.era >= 2 || g.countAll('library') > 0,
@@ -374,7 +376,9 @@
   let menuFirst = true;
   function updateMenu() {
     const g = G(), st = S(), nuevos = [];
+    const mar = g.enMar && g.enMar();
     for (const id in menuIds) {
+      if (mar && NO_MAR.includes(id)) { menuIds[id].style.display = 'none'; continue; }
       const b = menuIds[id], ok = !!st.flags['menu_' + id] || MENU_VER[id](g, st);
       if (ok && !st.flags['menu_' + id]) {
         st.flags['menu_' + id] = 1;
@@ -383,6 +387,7 @@
       b.style.display = ok ? '' : 'none';
     }
     menuFirst = false;
+    if (mar) for (const id of NO_MAR) if (allIds[id]) allIds[id].style.display = 'none';
     updateGrupos();
     if (nuevos.length) UI.toast('Nuevo en el menú: ' + (nuevos.length > 1 ? nuevos.slice(0, -1).join(', ') + ' y ' + nuevos[nuevos.length - 1] : nuevos[0]) + '.', 'quest');
   }
@@ -404,7 +409,7 @@
         // oro lleno se perdía).
         resEls[r].box.title = D.RES[r].name + ': ' + U.fmt(v) + ' / ' + U.fmt(cap) + (v >= cap * 0.98 ? ' — bodega llena: tus aldeanos esperan hasta que gastes. Premios, compras y tratos entran igual.' : '');
         if (v >= 1) st.flags['seenRes_' + r] = true;
-        resEls[r].box.style.display = !D.RES[r].special && (D.RES_START.includes(r) || st.flags['seenRes_' + r]) ? '' : 'none';
+        resEls[r].box.style.display = !D.RES[r].special && (!D.resDelMundo || D.resDelMundo(r)) && (D.RES_START.includes(r) || st.flags['seenRes_' + r]) ? '' : 'none';
       }
       popEl.textContent = G().pop() + '/' + G().popCap();
       buildEl.textContent = G().buildersBusy() + '/' + G().builders();
@@ -573,7 +578,7 @@
     else if (!st.flags.tuto && st.quests.m4 === 'claimed') { st.flags.tuto = 'fin'; if (tutoVisto) UI.toast('¡Terminaste los primeros pasos! Desde ahora este panel te dice la próxima misión y qué te frena.', 'epic'); }
     for (const x of grupos) x.gb.classList.toggle('guia', false);
     const box = el('div', { class: 'p-help que-hago' }, el('h3', null, '¿Qué hago ahora?'));
-    const q = enMar ? null : Q.siguiente();
+    const q = Q.siguiente(); // en el mar, la Crónica del Mar (pk-28)
     if (tuto && q) box.append(el('p', { class: 'small qh-paso' }, 'Primeros pasos · ' + (TUTO.indexOf(q.id) + 1) + ' de ' + TUTO.length));
     if (q) {
       const [a, b] = Q.progress(q.req), listo = Q.status(q) === 'ready', guia = GUIA[q.id];
@@ -585,7 +590,7 @@
         el('div', { class: 'row' },
           listo ? UI.btn('Reclamar', () => { Q.claim(q.id); UI.refreshPanel(true); }, { small: true, cls: 'gold' }) : guia && tuto ? UI.btn('Muéstrame', guia.fn, { small: true, cls: 'gold' }) : '',
           UI.btn('Ver en el libro', () => Q.openBook('main', q.id), { small: true }))));
-    } else if (enMar) box.append(el('p', { class: 'small' }, 'Estás en el ' + D.TEMAS.mar.name + '. Sus misiones llegan con las islas; mientras, recolecta y vuelve en el Galeón cuando quieras.'));
+    } else if (enMar) box.append(el('p', { class: 'small' }, 'Terminaste la Crónica del Mar. La armada y la Regata llegan en las próximas entregas.'));
     // lo que dice el Asesor (sin repetir «reclamar» cuando la misión ya muestra su botón)
     const ps = tuto ? [] : asesorTop().filter(p => p.prioridad >= 30 && !(q && p.id === 'reclamar' && Q.status(q) === 'ready')).slice(0, 2);
     for (const p of ps) box.append(el('div', { class: 'asesor-row' + (p.prioridad >= 70 ? ' grave' : '') }, el('span', { class: 'small' }, p.texto),
@@ -838,6 +843,9 @@
     }
     const act = el('div', { class: 'p-actions' });
     act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
+    // Fase 9 (pk-28): las ventanas del archipiélago
+    if (b.type === 'embarcadero' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Fundar colonias', () => PK.Arch.abrirEmbarcadero(), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Colonias: ' + PK.Arch.coloniasHechas() + '/' + PK.Arch.maxColonias())));
+    if (b.type === 'comercio' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Comerciar', () => PK.Arch.abrirComercio(), { cls: 'gold' })));
     if (b.type === 'tavern' && PK.Heroes) act.append(el('div', { class: 'row' }, UI.btn('Candidatos del día', () => PK.Heroes.open('taberna'), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Héroes: ' + PK.Heroes.lista().length + '/' + PK.Heroes.max())));
     if (PK.Heroes && b.done) { const gh = PK.Heroes.gobernanteDe(b); if (gh) act.append(el('p', { class: 'small' }, '★ Lo gobierna ', el('b', { translate: 'no' }, gh.nombre), ': ' + PK.Heroes.CLASES[gh.clase].pasTxt.split(': ').pop() + (gh.estado === 'libre' ? '.' : ' (ahora no: ' + (gh.estado === 'herido' ? 'herido' : 'de expedición') + ').'))); }
     // bonos por cercanía (V5): qué vecino le suma

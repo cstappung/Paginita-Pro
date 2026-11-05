@@ -238,6 +238,7 @@
 
   function nodeSprite(n) {
     if (n.gone) return null;
+    if (D.NODES[n.kind] && D.NODES[n.kind].mar && Sp.nodoMar) return Sp.nodoMar(n, G().mareaBaja()); // Fase 9 (pk-28)
     if (n.kind === 'deer') return n.dead ? null : n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
     if (n.kind === 'tree') return n.dead ? Sp.stump : Sp.trees[n.sp][n.v % Sp.trees[n.sp].length];
     if (n.kind === 'berry') return n.dead || n.amount < n.max * 0.15 ? Sp.bushBare : Sp.bush[n.v % 3];
@@ -255,7 +256,7 @@
     else if (mode === 'work') {
       const t = u.task && u.task.t, n = t === 'gather' && W.nodes[u.task.node];
       tool = t === 'dig' ? 'pick' : t === 'build' ? 'hammer' : t === 'farm' ? 'sickle' : !n ? 'pick'
-        : n.kind === 'tree' ? 'axe' : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : 'pick';
+        : n.kind === 'tree' ? 'axe' : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
       const ph = (u.anim * SWING[tool] + u.id * 0.37) % 1;
       frame = tool === 'hand' ? Math.floor(ph * 4) : ph < 0.4 ? 0 : ph < 0.52 ? 1 : ph < 0.8 ? 2 : 3;
       if (u.aim) { // punto de contacto en pantalla: el borde del objetivo que da al aldeano, a la altura del golpe
@@ -313,6 +314,55 @@
   }
 
   let sparkT = 0, smokeT = 0, firstFrame = true;
+  // ---------- Fase 9 (pk-28): marea y bruma ----------
+  // Con la bajamar, las casillas de agua pegadas a la costa se ven como bancos de arena (más la primera fila que la
+  // segunda); con la pleamar, agua llena. La espuma va y viene en la primera fila, al ritmo de las olas.
+  function costaMarea(ctx, chunks, tsec) {
+    const m = D.marea(), seco = 1 - m;
+    for (const c of chunks) {
+      if (!c.onScreen || !chunkSeen(c.ci)) continue;
+      const L = W.costa.get(c.ci);
+      if (!L) continue;
+      for (const [x, y, d] of L) {
+        if (!seen(x, y)) continue;
+        const a = d === 1 ? Math.max(0, seco - 0.25) * 0.95 : Math.max(0, seco - 0.55) * 0.9;
+        const p = [R.iso(x, y), R.iso(x + 1, y), R.iso(x + 1, y + 1), R.iso(x, y + 1)];
+        if (a > 0.02) {
+          ctx.fillStyle = 'rgba(214,196,140,' + a.toFixed(2) + ')';
+          ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(p[i][0], p[i][1]); ctx.closePath(); ctx.fill();
+        }
+        if (d === 1) {
+          const hsh = U.hash(x, y, 5), ph = (tsec * 0.45 + hsh * 3) % 1.6;
+          if (ph < 0.8) {
+            ctx.fillStyle = 'rgba(245,250,255,' + (0.55 * (1 - ph / 0.8)).toFixed(2) + ')';
+            const [px, py] = R.iso(x + 0.5, y + 0.5);
+            ctx.fillRect(Math.round(px - 5 + hsh * 4), Math.round(py - 1 + ph * 2), 6, 1);
+          }
+        }
+      }
+    }
+  }
+  // Bancos de bruma: manchas grandes que derivan despacio (dan la vuelta al mapa) y se abren cerca de un faro.
+  const BRUMA = [];
+  for (let i = 0; i < 9; i++) BRUMA.push({ x: (i * 97) % 256, y: (i * 61 + 40) % 256, r: 9 + (i % 4) * 3, vx: 0.18 + (i % 3) * 0.07, vy: 0.05 * ((i % 2) * 2 - 1) });
+  let faros = [], farosT = 0;
+  function bruma(ctx, vx0, vy0, vw, vh, g) {
+    if ((farosT -= 1) <= 0) { farosT = 60; faros = g.buildings.filter(b => b.owner === 'p' && b.done && (b.type === 'faromar' || b.type === 'granfaro' || b.type === 'tc')).map(b => [b.cx, b.cy, b.type === 'tc' ? 12 : g.bst(b).sight || 20]); }
+    const t = Date.now() / 1000;
+    for (const B of BRUMA) {
+      const x = (((B.x + B.vx * t) % 256) + 256) % 256, y = (((B.y + B.vy * t) % 256) + 256) % 256;
+      let a = 0.42;
+      for (const [fx, fy, r] of faros) { const d = Math.hypot(fx - x, fy - y); if (d < r + B.r) a *= U.clamp((d - r * 0.6) / (B.r + r * 0.4), 0, 1); }
+      if (a < 0.03) continue;
+      const [px, py] = R.iso(x, y), rr = B.r * 16;
+      if (px + rr < vx0 || px - rr > vx0 + vw || py + rr < vy0 || py - rr > vy0 + vh) continue;
+      const gr = ctx.createRadialGradient(px, py, rr * 0.15, px, py, rr);
+      gr.addColorStop(0, 'rgba(226,234,240,' + a.toFixed(2) + ')'); gr.addColorStop(1, 'rgba(226,234,240,0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.ellipse(px, py, rr, rr * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   R.draw = function (dt) {
     const ctx = R.ctx, cv = R.cv, s = R.scale(), g = G();
     frameNo++;
@@ -359,6 +409,8 @@
         ctx.fillRect(Math.round(px - 4 + hsh * 8), Math.round(py - 2 + U.hash(x, y, 2) * 4), w, 1);
       }
     }
+    // Fase 9 (pk-28): la marea en la costa del archipiélago (bancos de arena con la bajamar y espuma)
+    if (W.costa && g.enMar()) costaMarea(ctx, chunks, tsec);
     // caminos y cintas (planos, sobre el suelo)
     drawRoads(ctx, chunks);
     drawBelts(ctx, vis);
@@ -410,6 +462,7 @@
     // el Galeón del Alba (Fase 9): encallado en la orilla del lago, o fondeado frente a tu isla
     const gal = PK.Mar && PK.Mar.item(R, seen);
     if (gal && vis(gal.x, gal.y, gal.spr.c.width, gal.spr.c.height)) list.push(gal);
+    if (PK.Arch && g.enMar()) for (const it of PK.Arch.items(R, seen)) if (vis(it.x, it.y, it.spr.c.width, it.spr.c.height)) list.push(it); // barcos de colonos
     // el lugar del capítulo en curso de la campaña (H5): el dibujo de su terreno, con estandarte
     const cn = PK.Campana && g.state && g.state.campana ? PK.Campana.actual() : 0, cl = cn && PK.Campana.lugar(cn);
     if (cl && seen(cl.x, cl.y)) {
@@ -504,6 +557,7 @@
       if (it.after) it.after(ctx);
     }
 
+    if (g.enMar()) bruma(ctx, vx0, vy0, vw, vh, g); // los bancos de bruma del archipiélago, que los faros despejan
     // niebla de lo no explorado
     if (fogC) {
       ctx.imageSmoothingEnabled = true;
@@ -1003,7 +1057,7 @@
         if (!W.inb(tx, ty)) continue;
         const k = W.idx(tx, ty), nid = W.nodeAt[k];
         let col = Sp.TERRAIN_MM[W.terrain[k]];
-        if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind];
+        if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind] || (Sp.NODE_MM_MAR && Sp.NODE_MM_MAR[W.nodes[nid].kind]) || col;
         if (W.poiAt[k] >= 0) col = W.pois[W.poiAt[k]].kind === 'legend' ? [255, 220, 90] : [210, 180, 120];
         const o = W.terr[W.parcel(tx, ty)];
         if (o) { const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color; col = [col[0] * 0.6 + c2[0] * 0.4, col[1] * 0.6 + c2[1] * 0.4, col[2] * 0.6 + c2[2] * 0.4]; }

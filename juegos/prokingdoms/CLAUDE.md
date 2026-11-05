@@ -853,3 +853,31 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   them. `Vida.init` grants them silently to saves that already had those ranks.
 - Test: «V7: escaleras…» in `prokingdoms.test.cjs` (≤ 4 ranks, the 10 perks still somewhere, Constructor
   Incansable's coins still add up to 360).
+
+## The New World, part 2 (`pk-28`, Phase 9 N7 «b»: the archipelago's economy)
+
+- **The sea is a theme applied once at startup**: `G.init` calls `D.aplicarTema('mar')` (`js/datos-mar.js`)
+  *before* `W.generate`, which mutates the tables in place: resource and building names (`D.MAR.nombres`,
+  `D.MAR.edificios` re-skin land types: Fortaleza del Puerto, Lonja, Aserradero de teca…), `BUILD_ORDER =
+  D.MAR.construir`, eras (`ERAS_MAR`, 6 eras, `eraReqMar` makes VII impossible), `eraCost/eraTime/upCost`,
+  `QUESTS = QUESTS_MAR` (the Crónica del Mar), `BRANCHES`, daily/weekly, `WONDERS = ['granfaro']`. On land it is
+  never called and nothing changes; since travel reloads the page, never «un-apply» it. Tests that need it
+  load a separate `carga()` context.
+- **Food, wood and stone are reused** (Pescado, Teca, Coral) so the villager/farm/storage code runs untouched;
+  the new ones (`fibra`, `salitre`, `especias`, `lona`, `tablazon`, `polvora`) carry `mar: true`.
+  `D.resDelMundo(r)` hides land-only resources in the top bar at sea and sea ones on land. The build window
+  uses its own sections at sea (`BUILD_CATS_MAR` in `ui/aldeanos.js`). Era cards (V2) don't trigger at sea.
+- **Tide**: `D.marea(t)` is a sine on the real clock (4 h cycle); `G.ahora()` returns `G.tSim` during the
+  offline calculation so live and offline agree. Reefs (`arrecife`) are only workable at low tide (the
+  villager waits, `u.mareaWait`); the fishing hut yields more at high tide; the sand overlay and foam on the
+  shore follow it (`render.js` `costaMarea`, shore tiles precomputed in `W.costa`). Chip in the top bar.
+- **Islands**: `W.islas[0]` is home, then one islet per trait (palmas, coral, volcán, naufragios, especias)
+  by distance. `PK.Arch.islaDe(x, y)`. **Colonies** (`js/archipielago.js`, `S.colonias`): the Embarcadero
+  sends 3 colonists by ship (cost and trip time grow with distance and count); on arrival the island is
+  revealed, becomes your territory (reapplied on each load from `S.colonias`, never stored in the map) and gets
+  a colony drop building. **Villagers never cross water**: `findDrop`, `Auto.targetFor`, shops and the
+  rebalancer filter by island, otherwise colonists walked to the home island's farm.
+- Salinas are a farm with `farmRes: 'salitre'` (`G.granjaRes(b)`); anything counting farms as food must use it.
+  The Comercio buys and sells sea goods for gold (`D.COMERCIO_MAR`). Bruma banks drift over the sea and thin
+  out near lighthouses.
+- The server never sees the sea map (no snapshot at sea), so none of this changes `D.PROTO`.

@@ -94,11 +94,11 @@
       if (!st.flags.marRevelado) { st.flags.marRevelado = 1; G().revealAt(hx, hy, 26); }
       G().revealAt(l.x, l.y, 4);
       const hud = document.getElementById('hud');
-      if (hud && !document.getElementById('mar-cartel')) hud.append(el('div', { id: 'mar-cartel' }, el('b', null, D.TEMAS.mar.name), el('span', { class: 'small' }, ' · isla de prueba'),
+      if (hud && !document.getElementById('mar-cartel')) hud.append(el('div', { id: 'mar-cartel' }, el('b', null, D.TEMAS.mar.name), el('span', { class: 'small', id: 'mar-cartel-era' }, ' · ' + D.eraName(st.era)),
         el('button', { class: 'btn small gold', onclick: () => Mar.abrir() }, el('img', { class: 'ico', src: Sp.icon('ancla'), alt: '' }), ' Galeón')));
       if (viaje && !st.flags.marVisto) {
         st.flags.marVisto = 1;
-        toast('Llegaste al ' + D.TEMAS.mar.name + '. Esta isla es la primera parada: las colonias, las mareas y la armada llegan en las próximas entregas. El Galeón te espera para volver.', 'epic');
+        toast('Llegaste al ' + D.TEMAS.mar.name + '. Aquí se pesca, se cortan teca y palmas, el coral sale con la marea baja y las otras islas se colonizan desde el Embarcadero. La Crónica del Mar te guía; el Galeón te espera para volver.', 'epic');
       } else if (viaje) toast('De vuelta en tu isla del ' + D.TEMAS.mar.name + '.', 'info');
       return;
     }

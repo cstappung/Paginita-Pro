@@ -21,7 +21,7 @@
     let n = 0;
     for (const u of G().units) {
       if (u.owner !== 'p' || u.kind !== 'v' || !u.task) continue;
-      const r = u.task.t === 'gather' ? u.task.res : u.task.t === 'farm' ? 'food' : null;
+      const r = u.task.t === 'gather' ? u.task.res : u.task.t === 'farm' ? G().granjaRes(G().bById.get(u.task.b)) : null;
       if (r) { c[r] = (c[r] || 0) + 1; n++; }
     }
     return { c, n };
@@ -30,10 +30,13 @@
   // Recurso para ese aldeano: cerca de él y de su punto de acopio, sin amontonarse (G.bestNode).
   function targetFor(u, res, used) {
     const g = G();
-    if (res === 'food') {
+    // granjas, muelles y (en el mar) salinas: cada una da lo suyo, y solo las de la isla del aldeano (pk-28)
+    const isla = otraIsla(u);
+    {
       let best = null, bd = 1e9;
       for (const b of g.buildings) {
-        if (b.owner !== 'p' || !g.esGranja(b) || !b.done || (b.farmer !== null && g.uById.get(b.farmer))) continue;
+        if (b.owner !== 'p' || !g.esGranja(b) || g.granjaRes(b) !== res || !b.done || (b.farmer !== null && g.uById.get(b.farmer))) continue;
+        if (isla(b.cx, b.cy)) continue;
         const d = U.dist(u.x, u.y, b.cx, b.cy);
         if (d < bd) { bd = d; best = b; }
       }
@@ -44,11 +47,18 @@
   }
   A.targetFor = targetFor;
 
+  // En el mar, ¿ese punto está en otra isla que la del aldeano? (en la tierra, nunca)
+  function otraIsla(u) {
+    if (!G().enMar() || !PK.Arch || !u) return () => false;
+    const i = PK.Arch.islaDe(u.x, u.y);
+    return (x, y) => PK.Arch.islaDe(x, y) !== i;
+  }
   // Un taller con puesto libre y con qué trabajar (insumos y abastecimiento).
-  function openShop() {
-    const g = G();
+  function openShop(u) {
+    const g = G(), isla = otraIsla(u);
     for (const b of g.buildings) {
       if (b.owner !== 'p' || !b.done || !b.def.recipe || b.workers.length >= g.slots(b)) continue;
+      if (isla(b.cx, b.cy)) continue;
       const rc = D.RECIPES[b.def.recipe];
       if (!g.reserveOk(rc.in, Object.keys(rc.out)[0], b) && !PK.Logi.carts().length) continue;
       if (!PK.Logi.supplied(b)) continue; // sin abastecimiento no sirve de nada
@@ -62,7 +72,7 @@
     const g = G();
     // primero, puestos libres en talleres que tengan insumos
     if (st.auto.work) {
-      const b = openShop();
+      const b = openShop(u);
       if (b) { g.command([u], { kind: 'building', obj: b }, true); return true; }
     }
     const w = st.auto.w, sum = A.RES.reduce((s, r) => s + (w[r] || 0), 0);
@@ -200,6 +210,7 @@
         let best = null, bd = 1e9;
         for (const u of g.units) {
           if (u.owner !== 'p' || u.kind !== 'v' || u.inside || u.hold || !u.task || u.task.m || u.task.t !== 'gather') continue;
+          if (g.enMar() && PK.Arch && PK.Arch.islaDe(u.x, u.y) !== PK.Arch.islaDe(b.cx, b.cy)) continue; // otra isla
           const d = U.dist(u.x, u.y, b.cx, b.cy);
           if (d < bd) { bd = d; best = u; }
         }
@@ -262,7 +273,7 @@
     const t = u.task;
     if (!t) return u.inside ? 'work' : 'idle';
     if (t.t === 'gather') return t.res;
-    if (t.t === 'farm') return 'food';
+    if (t.t === 'farm') return G().granjaRes(G().bById.get(t.b)); // las Salinas del mar dan salitre
     if (t.t === 'work') return 'work';
     if (t.t === 'dig') return 'dig';
     return 'other';
@@ -278,7 +289,7 @@
     const g = G();
     if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b) && PK.Logi.supplied(b));
     if (job === 'dig') return W.pois.some(p => p.kind === 'ruin' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d);
-    if (job === 'food' && g.buildings.some(b => b.owner === 'p' && g.esGranja(b) && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
+    if (g.buildings.some(b => b.owner === 'p' && g.esGranja(b) && g.granjaRes(b) === job && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
     const [hx, hy] = D.PLAYER_HOME;
     return !!g.bestNode(job, hx, hy, 'p', { r: 40, max: 100 });
   };

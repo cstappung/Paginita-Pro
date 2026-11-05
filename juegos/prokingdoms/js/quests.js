@@ -7,7 +7,7 @@
   const G = () => PK.Game;
   const S = () => PK.Game.state;
   const byId = {};
-  for (const q of D.QUESTS) byId[q.id] = q;
+  for (const q of D.QUESTS.concat(D.QUESTS_MAR || [])) byId[q.id] = q; // la Crónica del Mar también (pk-28)
   Q.byId = byId;
 
   Q.init = function (st) {
@@ -292,7 +292,8 @@
     const st = S();
     const book = el('div', { class: 'book' });
     const tabs = el('div', { class: 'book-tabs' });
-    for (const b of D.BRANCHES.concat([{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'desafios', name: 'Desafíos', icon: 'crown' }, { id: 'album', name: 'Álbum', icon: 'gems' }])) {
+    const extra = PK.Game.enMar && PK.Game.enMar() ? [{ id: 'daily', name: 'Diarias', icon: 'chest' }] : [{ id: 'daily', name: 'Diarias', icon: 'chest' }, { id: 'desafios', name: 'Desafíos', icon: 'crown' }, { id: 'album', name: 'Álbum', icon: 'gems' }];
+    for (const b of D.BRANCHES.concat(extra)) {
       const ready = b.id === 'album' || b.id === 'desafios' ? false : b.id === 'daily' ? (st.streak.last !== U.dayKey() || Q.repairable() || st.daily.list.some(it => !it.claimed && dailyProg(it)[0] >= it.n) || weeklyReady() > 0 || dailyBonusReady()) : D.QUESTS.some(q => q.branch === b.id && Q.status(q) === 'ready');
       tabs.append(el('button', { class: 'book-tab' + (tab === b.id ? ' on' : ''), onclick: () => { tab = b.id; selected = null; PK.UI.rerender(true); } },
         el('img', { class: 'ico', src: PK.Sprites.icon(b.icon) }), b.name, ready ? el('span', { class: 'dot' }) : null));
@@ -492,17 +493,17 @@
 
   Q.openBook = function (t, id) {
     // Fase 9: el archipiélago tendrá su propia rama de la Crónica; mientras tanto, el libro es el de la tierra
-    if (PK.Game.enMar && PK.Game.enMar()) {
-      PK.UI.modal('book', 'Libro de Misiones', body => body.append(U.el('p', null, 'Las misiones del ' + D.TEMAS.mar.name + ' (su rama de la Crónica, sus eras y sus desafíos) llegan con las islas y las colonias. Tu Libro de la tierra te espera al volver.')));
-      return;
-    }
     if (t) tab = t;
     if (t && id) selected = id;
+    // en el mar (pk-28) no están el Álbum ni los Desafíos, y la rama principal es la Crónica del Mar
+    const enMar = PK.Game.enMar && PK.Game.enMar();
+    if (tab === 'main' && D.BRANCHES[0].id !== 'main') tab = D.BRANCHES[0].id;
+    if (enMar && (tab === 'album' || tab === 'desafios')) tab = D.BRANCHES[0].id;
     PK.UI.modal('book', 'Libro de Misiones', renderBook, { cls: 'book-modal', wide: true });
   };
   // U2 (Fase 6): la próxima misión de la Crónica (la lista para reclamar primero, si no la que está en curso)
   Q.siguiente = function () {
-    const main = D.QUESTS.filter(q => q.branch === 'main');
+    const main = D.QUESTS.filter(q => q.branch === D.BRANCHES[0].id); // 'main', o 'mar' en el archipiélago
     return main.find(q => Q.status(q) === 'ready') || main.find(q => Q.status(q) === 'active') || null;
   };
   Q.reqText = reqText;

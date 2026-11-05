@@ -251,11 +251,14 @@
     W.realms = [{ id: 'p', slot: D.MY_SLOT, home: [hx, hy], name: 'Tu isla' }];
     W.zones.push({ id: 'home_' + D.MY_SLOT, name: 'Tu isla', common: false, owner: 'p', cx: hx, cy: hy, r: 13 });
     for (let i = 0; i < w * h; i++) { W.terrain[i] = T_WATER; W.block[i] = 4; }
+    // la isla de casa y cinco islas con rasgo (pk-28): la más cercana es la de las palmeras y la más lejana, la de
+    // las especias (rara y disputada). Las distancias crecen con el orden para que fundar colonias sea un camino.
     const islas = [{ x: hx, y: hy, r: 15, k: 'casa' }];
-    for (let t = 0, n = 0; n < 4 && t < 400; t++) {
-      const a = rng() * Math.PI * 2, d = 26 + rng() * 22, x = Math.round(hx + Math.cos(a) * d), y = Math.round(hy + Math.sin(a) * d), r = 5 + rng() * 4;
-      if (x < r + 4 || y < r + 4 || x > w - r - 4 || y > h - r - 4 || islas.some(o => U.dist(o.x, o.y, x, y) < o.r + r + 6)) continue;
-      islas.push({ x, y, r, k: ['roca', 'palmas', 'arbustos', 'palmas'][n++] });
+    const orden = (D.ISLAS_ORDEN || ['palmas', 'coral', 'volcan', 'naufragios', 'especias']).slice();
+    for (let t = 0, n = 0; n < orden.length && t < 2000; t++) {
+      const a = rng() * Math.PI * 2, d = 28 + n * 9 + rng() * 10, x = Math.round(hx + Math.cos(a) * d), y = Math.round(hy + Math.sin(a) * d), r = 6 + rng() * 3;
+      if (x < r + 4 || y < r + 4 || x > w - r - 4 || y > h - r - 4 || islas.some(o => U.dist(o.x, o.y, x, y) < o.r + r + 7)) continue;
+      islas.push({ x, y, r, k: orden[n++] });
     }
     W.islas = islas;
     for (const I of islas) {
@@ -278,22 +281,44 @@
     const zi = 0;
     for (let y = hy - 16; y <= hy + 16; y++) for (let x = hx - 16; x <= hx + 16; x++) if (W.inb(x, y) && W.terrain[W.idx(x, y)] !== T_WATER && U.dist(x, y, hx, hy) <= 14) W.zoneAt[W.idx(x, y)] = zi;
     const pon = (kind, x, y, sp) => { const n = addNode(kind, x, y, W.zoneAt[W.idx(x, y)], rng); if (n && sp) n.sp = sp; return n; };
+    const orilla = (x, y) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => W.inb(x + dx, y + dy) && W.terrain[W.idx(x + dx, y + dy)] === T_WATER);
+    const hayNodos = D.NODES.palma; // sin datos-mar.js (el servidor nunca arma el mar) no hay nodos propios
     for (const I of islas) {
       for (let y = Math.floor(I.y - I.r - 2); y <= I.y + I.r + 2; y++) for (let x = Math.floor(I.x - I.r - 2); x <= I.x + I.r + 2; x++) {
         if (!W.inb(x, y)) continue;
         const i = W.idx(x, y);
         if (W.terrain[i] === T_WATER || W.reserved[i]) continue;
-        const arena = W.terrain[i] === T_SAND, f = U.fbm(x * 0.2, y * 0.2, seed + 57, 3);
+        const arena = W.terrain[i] === T_SAND, costa = orilla(x, y), f = U.fbm(x * 0.2, y * 0.2, seed + 57, 3), r = rng();
+        if (!hayNodos) { if (r < (arena ? 0.2 : 0.5)) pon('tree', x, y, 'palm'); continue; }
         if (I.k === 'casa') {
           const dx = x - I.x, dy = y - I.y;
-          if (arena && rng() < 0.18) pon('tree', x, y, 'palm');
-          else if (!arena && f > 0.55 && rng() < 0.55) pon('tree', x, y, 'palm');
-          else if (!arena && dx > 4 && dy < -2 && rng() < 0.35) pon('berry', x, y);
-          else if (!arena && dx < -5 && dy > 2 && rng() < 0.45) pon('stone', x, y);
-        } else if (I.k === 'roca') { if (rng() < (arena ? 0.15 : 0.6)) pon(rng() < 0.75 ? 'stone' : 'gold', x, y); }
-        else if (I.k === 'arbustos') { if (rng() < 0.4) pon('berry', x, y); }
-        else if (rng() < (arena ? 0.2 : 0.5)) pon('tree', x, y, 'palm');
+          if (costa && dx > 3 && r < 0.45) pon('arrecife', x, y);
+          else if (costa && dy > 3 && r < 0.35) pon('almeja', x, y);
+          else if (costa && dx < -6 && dy < -3 && r < 0.12) pon('naufragio', x, y);
+          else if (arena && r < 0.16) pon('palma', x, y);
+          else if (!arena && f > 0.55 && r < 0.6) pon('tree', x, y, 'teca');
+          else if (!arena && dx < -4 && dy > 2 && r < 0.3) pon('palma', x, y);
+        } else if (I.k === 'palmas') { if (r < (arena ? 0.3 : 0.55)) pon(r < 0.42 ? 'palma' : 'tree', x, y, r < 0.42 ? null : 'teca'); }
+        else if (I.k === 'coral') { if (costa && r < 0.7) pon('arrecife', x, y); else if (arena && r < 0.25) pon('almeja', x, y); else if (!arena && r < 0.2) pon('palma', x, y); }
+        else if (I.k === 'volcan') { if (!arena && r < 0.45) pon(r < 0.3 ? 'salitral' : 'gold', x, y); else if (arena && r < 0.1) pon('salitral', x, y); }
+        else if (I.k === 'naufragios') { if (costa && r < 0.3) pon('naufragio', x, y); else if (r < 0.25) pon('palma', x, y); }
+        else if (I.k === 'especias') { if (!arena && r < 0.4) pon(r < 0.25 ? 'especia' : 'tree', x, y, r < 0.25 ? null : 'teca'); else if (arena && r < 0.12) pon('especia', x, y); }
       }
+    }
+    // Costa: casillas de agua a 1 o 2 de la tierra, por trozo (render.js pinta ahí la marea y la espuma)
+    W.costa = new Map();
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = W.idx(x, y);
+      if (W.terrain[i] !== T_WATER) continue;
+      let d = 9;
+      for (let yy = -2; yy <= 2 && d > 1; yy++) for (let xx = -2; xx <= 2; xx++) {
+        if (!W.inb(x + xx, y + yy) || W.terrain[W.idx(x + xx, y + yy)] === T_WATER) continue;
+        d = Math.min(d, Math.max(Math.abs(xx), Math.abs(yy)));
+      }
+      if (d > 2) continue;
+      const c = Math.floor(y / W.CH) * W.CW + Math.floor(x / W.CH);
+      if (!W.costa.has(c)) W.costa.set(c, []);
+      W.costa.get(c).push([x, y, d]);
     }
     W.buildBuckets();
     W.initTerritory();
@@ -632,7 +657,7 @@
     }
   };
 
-  W.soft = n => n.kind === 'tree' || n.kind === 'berry' || n.kind === 'deer'; // al agotarse dejan pasar
+  W.soft = n => n.kind === 'tree' || n.kind === 'berry' || n.kind === 'deer' || !!(D.NODES[n.kind] && D.NODES[n.kind].soft); // al agotarse dejan pasar
   W.isShared = n => n.zone >= 0 && W.zones[n.zone].common;
   W.serverNodes = false; // en línea, el servidor manda sobre los recursos de las zonas comunes
 

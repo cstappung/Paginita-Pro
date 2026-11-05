@@ -39,7 +39,7 @@
       const g = G(), st = S(), A = PK.Auto;
       if (st.eraProg) return null;
       const cost = D.eraCost(st.era + 1), c = A.jobCounts();
-      for (const r of ['stone', 'wood', 'food', 'gold', 'ore', 'marble', 'gems']) {
+      for (const r of ['stone', 'wood', 'food', 'gold', 'ore', 'marble', 'gems', 'fibra', 'salitre', 'especias']) {
         if (!cost[r] || (st.res[r] || 0) >= cost[r] || c[r] || !A.jobAvailable(r)) continue;
         return { id: 'meta_' + r, prioridad: 65, texto: '0 aldeanos en ' + nombre(r) + ' y la meta de era pide ' + U.fmt(cost[r]) + '.',
           acciones: [{ label: 'Mandar 10', fn: () => { for (let i = 0; i < 10; i++) if (!A.addJob(r)) break; } }] };
@@ -69,7 +69,7 @@
     // bodegas llenas: vender o hacer una fiesta
     () => {
       const g = G(), st = S(), mercado = g.countB('market');
-      const llenas = ['gold', 'food', 'wood', 'stone', 'ore'].filter(r => isFinite(g.cap(r)) && st.res[r] >= g.cap(r) * 0.98);
+      const llenas = ['gold', 'food', 'wood', 'stone', 'ore', 'fibra', 'salitre'].filter(r => D.RES[r] && isFinite(g.cap(r)) && st.res[r] >= g.cap(r) * 0.98);
       if (!llenas.length) return null;
       const r = llenas[0], acc = [], fi = g.fiestaInfo();
       if (r !== 'gold' && mercado) acc.push({ label: 'Vender 1.000', fn: () => { PK.Social.sell(r, Math.min(1000, Math.floor(st.res[r]))); } });

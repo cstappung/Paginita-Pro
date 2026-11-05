@@ -29,6 +29,11 @@
     canvas() { const cv = mk(this.w, this.h); cv.getContext('2d').putImageData(new ImageData(this.d, this.w, this.h), 0, 0); return cv; }
   }
 
+  // Fase 9 (pk-28): sprites-mar.js dibuja el archipiélago con las mismas herramientas
+  S.PB = PB; S.ramp = ramp; S.LIGHT = LIGHT; S.mix = mix;
+  S.withMask = spr => withMask(spr);
+  S.sombra = (pb, cx, cy, rx, ry, a) => ellipseShadow(pb, cx, cy, rx, ry, a);
+  S.BDRAW_MAR = {}; S.BTOP_MAR = {};
   function withMask(spr) {
     const c = spr.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     const m = new Uint8Array(c.width * c.height);
@@ -1248,9 +1253,10 @@
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).
   const TALL = { library: 10, tower: 12, wonder: 0 };
   const wonderPhase = lvl => Math.min(6, Math.floor((lvl || 1) / 5));
+  const btopBase = type => (D.temaActivo === 'mar' && S.BTOP_MAR[type]) || BTOP[type] || 40;
   S.btop = (type, lvl) => {
     const t = S.tier(lvl || 1);
-    return (BTOP[type] || 40) + (t >= 3 ? 7 + (TALL[type] || 0) : t >= 2 ? 5 : 0) +(type === 'wonder' || (D.WONDERS && D.WONDERS.includes(type)) ? wonderPhase(lvl) * 4 + (wonderPhase(lvl) >= 3 ? 14 : 0) : 0);
+    return btopBase(type) + (t >= 3 ? 7 + (TALL[type] || 0) : t >= 2 ? 5 : 0) +(type === 'wonder' || (D.WONDERS && D.WONDERS.includes(type)) ? wonderPhase(lvl) * 4 + (wonderPhase(lvl) >= 3 ? 14 : 0) : 0);
   };
   const bkey = (type, lvl) => S.tier(lvl || 1) + (type === 'wonder' || (D.WONDERS && D.WONDERS.includes(type)) ? '.' + wonderPhase(lvl) : '');
 
@@ -1304,9 +1310,10 @@
     if (BCACHE[key]) return BCACHE[key];
     const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
     techoAsp = asp ? asp.techo : null;
-    const spr = isoSprite(def.w, def.h, S.btop(type, lvl), def.flat, (p, meta) => BDRAW[type](p, col, meta, tier, lvl || 1), tier, col);
+    const draw = (D.temaActivo === 'mar' && S.BDRAW_MAR[type]) || BDRAW[type]; // en el mar, su propio dibujo (sprites-mar.js)
+    const spr = isoSprite(def.w, def.h, S.btop(type, lvl), def.flat, (p, meta) => draw(p, col, meta, tier, lvl || 1), tier, col);
     techoAsp = null;
-    spr.pad = S.btop(type, lvl) - (BTOP[type] || 40); // alto extra arriba (las barras se dibujan donde antes)
+    spr.pad = S.btop(type, lvl) - btopBase(type); // alto extra arriba (las barras se dibujan donde antes)
     return (BCACHE[key] = spr);
   };
 
@@ -2227,7 +2234,9 @@
     marble: { k: '#5a5850', w: '#ffffff', g: '#e2e0d8', d: '#b0aea4' },
   };
   const ICONS = {};
+  S.ICON_MAPS = ICON_MAPS;
   S.icon = function (name) {
+    if (D.temaActivo === 'mar' && ICON_MAPS[name + '_mar']) name += '_mar'; // en el mar, el pescado, la teca y el coral
     if (ICONS[name]) return ICONS[name];
     let def = ICON_MAPS[name];
     if (ROCK_PAL[name]) def = { m: ICON_MAPS.rock.m, p: ROCK_PAL[name] };
@@ -2459,5 +2468,6 @@
     S.deer = [makeDeer(61, false), makeDeer(62, true), makeDeer(63, false), makeDeer(64, true)];
     S.deerGold = [makeDeer(65, false, true), makeDeer(66, true, true)];
     S.wolf = [[makeWolf(0, false), makeWolf(1, false)], [makeWolf(0, true), makeWolf(1, true)]];
+    if (S.initMar) S.initMar();
   };
 })();

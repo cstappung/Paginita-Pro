@@ -69,7 +69,7 @@
   let avisada = 0;
   UI.revisarCartas = function () {
     const e = V() && S() && S().cartas ? V().pendiente() : 0;
-    if (!e || avisada === e || G().offline) return;
+    if (!e || avisada === e || G().offline || D.temaActivo === 'mar') return; // en el mar no hay cartas de era (pk-28)
     avisada = e;
     if (!UI.modalKey() && !(PK.Batalla && PK.Batalla.abierta())) UI.openCartas();
     else UI.toast('Tienes una carta de era para elegir.', 'epic', { label: 'Ver', fn: () => UI.openCartas() });

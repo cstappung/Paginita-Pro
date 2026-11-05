@@ -211,6 +211,9 @@
     // bodega llena: espera sin gastar el árbol o la veta (antes juntaba, volvía y addRes tiraba la carga)
     if (u.owner === 'p' && g.isFull(t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(t.res); return; }
     u.fullWait = false;
+    // Fase 9: el arrecife solo se trabaja con la marea baja; con la alta se espera al lado (u.mareaWait)
+    const bajo = D.NODES[n.kind].marea && !g.mareaBaja();
+    if (!bajo) u.mareaWait = false;
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
         const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { exclude: n.id, zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
@@ -220,6 +223,7 @@
     }
     if (hug(u, n.x + 0.5, n.y + 0.5, dt, 'n' + n.id, n.kind === 'berry' ? 0.75 : 1)) return; // a los arbustos, más cerca
     face(u, n.x + 0.5, n.y + 0.5);
+    if (bajo) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.mareaWait = true; return; }
     setAim(u, n.x + 0.5, n.y + 0.5, AIM[n.kind] || AIM.rock);
     u.mode = 'work';
     u.acc += g.gatherRate(u.owner, t.res, u, n.kind) * dt;
@@ -244,9 +248,10 @@
     }
     b.farmer = u.id;
     if (u.phase === 'return') { goDeposit(u, dt); return; }
-    if (u.carry > 0 && u.carryRes !== 'food') { u.phase = 'return'; return; }
+    const fr = g.granjaRes(b); // las Salinas (pk-28) dan salitre en vez de comida
+    if (u.carry > 0 && u.carryRes !== fr) { u.phase = 'return'; return; }
     if (u.carry >= cap) { u.phase = 'return'; return; }
-    if (u.owner === 'p' && g.isFull('food')) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull('food'); return; }
+    if (u.owner === 'p' && g.isFull(fr)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(fr); return; }
     u.fullWait = false;
     if (!inRect(u, b)) {
       if (!pathTo(u, rectGoal(b, false))) { u.task = null; u.mode = 'idle'; }
@@ -261,7 +266,7 @@
       u.path = [[tx, ty]];
     }
     u.acc += g.farmRate(u.owner, b, u) * dt;
-    while (u.acc >= 1 && u.carry < cap) { u.acc -= 1; u.carry++; u.carryRes = 'food'; u.carryZone = -1; }
+    while (u.acc >= 1 && u.carry < cap) { u.acc -= 1; u.carry++; u.carryRes = fr; u.carryZone = -1; }
     if (u.carry >= cap) u.phase = 'return';
   }
 

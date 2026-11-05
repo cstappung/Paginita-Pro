@@ -1124,3 +1124,22 @@ html.menos-mov *, html.menos-mov *::before, html.menos-mov *::after { animation:
 .res.full { background: rgba(216, 80, 60, 0.28); outline: 2px solid #ff9a6a; outline-offset: -1px; border-radius: 3px; }
 .res.full b { color: #ffd0b0; text-shadow: 1px 1px 0 #000; }
 html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: #ffc070; }
+/* ---- Fase 9, entrega «b» (pk-28): el archipiélago ---- */
+.marea { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 0 8px; min-height: 36px; background: rgba(14, 42, 58, 0.55); border: 2px solid #0c2232; color: #e8f4fa; font-family: var(--font); font-size: 13px; line-height: 1.05; cursor: pointer; position: relative; }
+.marea small { font-size: 11px; color: #a8d4ea; }
+.marea .ola { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--m, 0.5) * 100%); background: linear-gradient(180deg, rgba(90, 170, 210, 0.35), rgba(40, 100, 150, 0.35)); pointer-events: none; }
+.marea > span:not(.ola), .marea small { position: relative; }
+.marea.baja { border-color: #c8a050; }
+.marea-curva { display: block; width: 100%; max-width: 360px; image-rendering: pixelated; border: 2px solid var(--edge); }
+.islas-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.isla-fila { display: grid; grid-template-columns: 28px 1fr auto auto auto; align-items: center; gap: 4px 8px; padding: 6px 8px; background: rgba(40, 100, 150, 0.12); border-left: 4px solid #5aa0c8; }
+.isla-fila.tuya { border-left-color: var(--good); background: rgba(80, 140, 50, 0.14); }
+.isla-fila .isla-por { grid-column: 2 / -1; }
+.comercio-mar { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.cm-fila { display: grid; grid-template-columns: 28px minmax(90px, 1fr) minmax(70px, auto) auto auto; align-items: center; gap: 6px; padding: 3px 6px; background: rgba(120, 80, 30, 0.1); }
+@media (max-width: 600px) {
+  .isla-fila { grid-template-columns: 28px 1fr; }
+  .isla-fila > .btn, .isla-fila > span:not(.small) { grid-column: 2; justify-self: start; }
+  .cm-fila { grid-template-columns: 28px 1fr; }
+  .cm-fila > .btn, .cm-fila > .small { grid-column: 2; justify-self: start; }
+}

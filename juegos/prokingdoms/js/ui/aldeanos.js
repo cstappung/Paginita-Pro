@@ -79,13 +79,22 @@
     ['Maravilla (elige una)', D.MARAVILLAS || []],
     ['Decoraciones (ánimo)', D.DECOS || []],
   ];
+  const BUILD_CATS_MAR = [
+    ['Casas y bodegas', ['house', 'granary', 'warehouse', 'builder', 'tc']],
+    ['Recolección', ['lumber', 'mining', 'mill', 'muelle', 'salinas']],
+    ['Talleres', ['velas', 'astillero', 'polvorin']],
+    ['Puerto', ['embarcadero', 'comercio', 'faromar', 'tower']],
+    ['Maravilla', ['granfaro']],
+  ];
   UI.openBuild = function () {
     UI.modal('build', 'Construir', body => {
       const g = G(), st = S(), seen = new Set();
       body.append(el('p', { class: 'small muted' }, 'Elige un edificio y ' + UI.hint('haz clic donde va', 'toca dónde va') + ' en tu tierra. Se levanta solo: tus aldeanos siguen con lo suyo. Arquitectura (Investigar) acelera las obras.'));
-      const cats = BUILD_CATS.concat([['Leyendas', D.LEGEND_B]]);
+      // En el mar (pk-28) la lista es otra: solo D.MAR.construir, en sus propias secciones
+      const cats = D.temaActivo === 'mar' ? BUILD_CATS_MAR.map(c => [c[0], c[1].filter(t => D.BUILD_ORDER.includes(t))]) : BUILD_CATS.concat([['Leyendas', D.LEGEND_B]]);
       const rest = D.BUILD_ORDER.filter(t => !cats.some(c => c[1].includes(t)));
       if (rest.length) cats[3][1] = cats[3][1].concat(rest);
+      if (D.temaActivo === 'mar') body.firstChild.textContent = 'Elige un edificio y ' + UI.hint('haz clic', 'toca') + ' en la isla donde va. Para levantar en otra isla primero funda allí una colonia (Embarcadero).';
       for (const [name, types] of cats) {
         const grid = el('div', { class: 'bmenu' });
         for (const type of types) {

@@ -30,6 +30,7 @@
   // Fase 9: la partida dice en qué mundo está (S.tema). El otro espera guardado en S.otro (js/mar.js).
   G.enMar = () => W.tema === 'mar';
   G.init = function (save) {
+    if (D.aplicarTema) D.aplicarTema(save && save.tema); // Fase 9 (pk-28): las tablas del mar, antes del mapa
     W.generate(D.SEED, save && save.tema);
     G.units = []; G.buildings = []; G.uById.clear(); G.bById.clear(); G.encierro = null;
     S = G.state = save || G.newState();
@@ -61,6 +62,7 @@
     if (PK.Vida) PK.Vida.init(S);
     PK.Life.reset();
     PK.Quests.init(S);
+    if (PK.Arch) PK.Arch.init(S); // colonias, comercio y marea del archipiélago
   };
 
   // ---------- Registro de entidades ----------
@@ -234,7 +236,10 @@
   G.guildMult = () => (S.guild && S.guild.joined ? 1 + 0.03 * S.guild.stage + best('guild', 'guildBonus') : 1);
   G.globalMult = () => G.guildMult() * (1 + maravBonus()) * (1 + 0.01 * S.relics) * (PK.Life ? PK.Life.buff * lm('gather') : 1) * wish('harvest') * (1 + G.perkAll('gatherP')) * G.fiestaMult();
   const TECH_FOR = { wood: 'axes', food: 'harvest', stone: 'picks', gold: 'picks', ore: 'picks', marble: 'picks', gems: 'picks' };
-  const RES_NODE = { wood: 'tree', food: 'berry', stone: 'stone', gold: 'gold', ore: 'ore', marble: 'marble', gems: 'gems' };
+  const RES_NODE = { wood: 'tree', food: 'berry', stone: 'stone', gold: 'gold', ore: 'ore', marble: 'marble', gems: 'gems', fibra: 'palma', salitre: 'salitral', especias: 'especia' };
+  // Fase 9: el reloj de la marea. En el cálculo sin conexión es la hora simulada (G.tSim), así da lo mismo que en vivo.
+  G.ahora = () => (G.offline && G.tSim ? G.tSim : Date.now());
+  G.mareaBaja = () => D.mareaBaja(G.ahora());
   const dropMult = u => 1 + 0.1 * (((u && u.dl) || 1) - 1);
   G.gatherRate = function (owner, res, u, kind) {
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
@@ -250,10 +255,15 @@
     for (let y = b.y - 3; y < b.y + b.h + 3; y++) for (let x = b.x - 3; x < b.x + b.w + 3; x++) if (W.inb(x, y) && W.terrain[W.idx(x, y)] === 4) n++;
     return (b._agua = U.clamp(n / 24, 0.25, 1.3));
   };
-  G.esGranja = b => !!b && (b.type === 'farm' || b.type === 'muelle');
+  G.esGranja = b => !!b && (b.type === 'farm' || b.type === 'muelle' || !!b.def.farmRes);
+  G.granjaRes = b => (b && b.def.farmRes) || 'food'; // las Salinas del mar (pk-28) dan salitre
+  G.SALINAS_RATE = 0.16;
+  // en el mar la pesca sigue a la marea: 0,75 con bajamar y 1,25 con pleamar
+  const mareaPesca = () => (G.enMar() ? 0.75 + 0.5 * D.marea(G.ahora()) : 1);
   G.farmRate = function (owner, b, u) {
     if (owner !== 'p') return D.FARM_RATE;
-    if (b && b.type === 'muelle') return G.MUELLE_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * (1 + vb('muelle')) * (1 + G.cerca(b)) * dropMult(u) * G.globalMult() * (1 + ley('food')) * vr('food');
+    if (b && b.def.farmRes) return G.SALINAS_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * dropMult(u) * G.globalMult();
+    if (b && b.type === 'muelle') return mareaPesca() * G.MUELLE_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * (1 + vb('muelle')) * (1 + G.cerca(b)) * dropMult(u) * G.globalMult() * (1 + ley('food')) * vr('food');
     return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm');
   };
   // Bonos por cercanía (V5, D.CERCANIA en datos-vida.js): un edificio rinde más con un vecino de cierto tipo. Se
@@ -439,8 +449,10 @@
 
   G.findDrop = function (owner, res, x, y) {
     let bst = null, bd = 1e9;
+    const isla = G.enMar() && PK.Arch ? PK.Arch.islaDe(x, y) : -1; // en el mar, solo los acopios de la misma isla
     for (const b of G.buildings) {
       if (b.owner !== owner || !b.done || !b.def.drop || !b.def.drop.includes(res)) continue;
+      if (isla >= 0 && PK.Arch.islaDe(b.cx, b.cy) !== isla) continue;
       const d = U.dist(x, y, b.cx, b.cy) - b.w / 2;
       if (d < bd) { bd = d; bst = b; }
     }
@@ -947,7 +959,7 @@
       const o = W.ownerAt(tx, ty);
       if (o !== 'p' && !(G.OUTPOST[type] && !o)) return o ? 'ajeno' : 'libre';
     }
-    if (type === 'muelle' && !G.tocaAgua(x, y, def)) return 'sinAgua';
+    if ((type === 'muelle' || def.agua) && !G.tocaAgua(x, y, def)) return 'sinAgua';
     if (G.encierra(type, x, y, ignorar)) return 'encierra';
     return null;
   };
@@ -1261,7 +1273,8 @@
     regrowT += dt;
     if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); if (tierra && PK.Vida) PK.Vida.tick(); }
     questT += dt;
-    if (questT > 1 && tierra) { questT = 0; PK.Quests.check(); }
+    if (questT > 1) { questT = 0; PK.Quests.check(); } // en el mar, con la Crónica del Mar (pk-28)
+    if (!tierra && PK.Arch) PK.Arch.tick(dt);
   };
   // Árboles frutales (V5): un poco de comida sin aldeanos, en vivo y sin conexión
   let frutT = 0, frutN = 0;
@@ -1310,9 +1323,10 @@
     G.finished = [];
     const before = Object.assign({}, S.res), fogBefore = W.fogCount;
     const steps = U.clamp(Math.ceil(sec / 60), 1, 240), dt = sec / steps;
-    const startEra = S.era;
+    const startEra = S.era, t0 = Date.now() - sec * 1000;
     let depleted = 0;
     for (let s = 0; s < steps; s++) {
+      G.tSim = t0 + (s + 0.5) * dt * 1000; // la marea (y lo que dependa de la hora) va con el reloj simulado
       const online = PK.Net && PK.Net.online;
       for (const u of G.units) {
         if (!u.task || u.inside || u.remote) continue;
@@ -1328,6 +1342,7 @@
             const p = W.freeAround(n.x, n.y, n.x, n.y, u.x, u.y);
             u.x = p[0] + 0.5; u.y = p[1] + 0.5; u.path = [];
           }
+          if (D.NODES[n.kind].marea && !D.mareaBaja(G.tSim)) continue; // el arrecife está bajo el agua
           const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res);
           // los reinos simulados recolectan a menor ritmo sin ti, para que las zonas comunes no se vacíen
           // con la bodega llena, tus aldeanos no gastan el recurso del mapa (antes lo vaciaban y se perdía)
@@ -1341,8 +1356,8 @@
         } else if (t.t === 'farm') {
           const b = G.bById.get(t.b);
           if (!b) { u.task = null; continue; }
-          const eff = tripRate(u, G.farmRate(u.owner, b, u), b.cx, b.cy, 'food');
-          if (u.owner === 'p') gained('food', G.addRes('food', eff * dt), -1);
+          const fr = G.granjaRes(b), eff = tripRate(u, G.farmRate(u.owner, b, u), b.cx, b.cy, fr);
+          if (u.owner === 'p') gained(fr, G.addRes(fr, eff * dt), -1);
         } else if (t.t === 'build') { // partidas viejas: las obras ya se levantan solas
           u.task = null;
         } else if (t.t === 'dig') {
@@ -1369,7 +1384,7 @@
     if (secFull > sec) G.updateTimers(secFull - sec);
     for (const r of D.RES_ORDER) S.res[r] = Math.floor(S.res[r] * 100) / 100;
     regrowNow();
-    G.offline = false;
+    G.offline = false; G.tSim = 0;
     if (quiet) return null;
     const got = {};
     for (const r of D.RES_ORDER) { const d = Math.floor(S.res[r] - before[r]); if (d) got[r] = d; }

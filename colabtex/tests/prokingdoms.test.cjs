@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -80,12 +80,21 @@ test('los prerrequisitos existen y no forman ciclos', () => {
 });
 
 test('todo edificio tiene dibujo, estadísticas y lugar en el orden de construcción', () => {
-  const sp = JS('sprites.js'), i = sp.indexOf('const BDRAW = {'), bloque = sp.slice(i, sp.indexOf('\n  };', i));
+  const sp = JS('sprites.js'), i = sp.indexOf('const BDRAW = {'), bloque = sp.slice(i, sp.indexOf('\n  };', i)), mar = JS('sprites-mar.js');
   for (const t of Object.keys(D.BUILD)) {
-    assert.ok(new RegExp('\\b' + t + '\\s*[:(]').test(bloque), t + ' no tiene BDRAW en sprites.js');
     if (!D.BUILD[t].noUp) assert.equal(typeof D.BSTATS[t], 'function', t + ' se mejora pero no tiene D.BSTATS');
+    // los del archipiélago (pk-28) se dibujan en sprites-mar.js y se construyen desde la lista del mar
+    if (D.BUILD[t].mar) {
+      assert.ok(mar.includes('BD.' + t + ' = function'), t + ' no tiene dibujo en sprites-mar.js');
+      if (t !== 'colonia') assert.ok(D.MAR.construir.includes(t), t + ' no está en D.MAR.construir');
+      continue;
+    }
+    assert.ok(new RegExp('\\b' + t + '\\s*[:(]').test(bloque), t + ' no tiene BDRAW en sprites.js');
     if (!D.BUILD[t].retirada) assert.ok(D.BUILD_ORDER.includes(t), t + ' no está en D.BUILD_ORDER');
   }
+  // lo que se construye en el mar y es de la tierra se dibuja distinto allá
+  for (const t of D.MAR.construir) assert.ok(D.BUILD[t], t + ' no existe');
+  for (const t in D.MAR.edificios) assert.ok(mar.includes('BD.' + t + ' = function'), t + ' no tiene su dibujo del mar');
 });
 
 test('todo recurso especial cuesta algo', () => {
@@ -554,9 +563,18 @@ test('Fase 9: el mapa del archipiélago es casi todo agua, con tu isla en tu hog
     assert.notEqual(W.terrain[W.idx(hx, hy)], 4, 'tu hogar es tierra firme');
     assert.equal(W.realms.length, 1, 'sin otros reinos');
     assert.equal(W.pois.length, 0, 'sin lugares todavía');
-    assert.ok(W.nodes.filter(n => n.sp === 'palm').length > 50, 'palmeras');
-    assert.ok(W.nodes.some(n => n.kind === 'stone') && W.nodes.some(n => n.kind === 'berry'), 'rocas y arbustos');
-    assert.ok(W.islas.length >= 3, W.islas.length + ' islas');
+    // pk-28: cinco islas con su rasgo y sus recursos; las especias solo en la suya
+    assert.equal(W.islas.length, 6, W.islas.length + ' islas');
+    assert.deepEqual(W.islas.slice(1).map(I => I.k).sort(), D.ISLAS_ORDEN.slice().sort());
+    const cuantos = k => W.nodes.filter(n => n.kind === k).length;
+    for (const k of ['palma', 'arrecife', 'almeja', 'salitral', 'especia', 'naufragio']) assert.ok(cuantos(k) > 3, k + ': ' + cuantos(k));
+    assert.ok(W.nodes.filter(n => n.sp === 'teca').length > 20, 'teca');
+    const esp = W.islas.find(I => I.k === 'especias');
+    assert.ok(W.nodes.filter(n => n.kind === 'especia').every(n => Math.hypot(n.x - esp.x, n.y - esp.y) < esp.r * 1.6), 'especias solo en su isla');
+    // los arrecifes están en la orilla (con la bajamar se trabajan desde la arena)
+    assert.ok(W.nodes.filter(n => n.kind === 'arrecife').every(n => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => W.terrain[W.idx(n.x + a, n.y + b)] === 4)), 'arrecifes en la orilla');
+    assert.ok(W.costa && W.costa.size > 10, 'la costa para la marea');
+    for (let i = 1; i < W.islas.length; i++) assert.ok(Math.hypot(W.islas[i].x - hx, W.islas[i].y - hy) > 25, 'las islas están lejos de casa');
   } finally { W.generate(D.SEED); }
   assert.equal(W.tema, 'tierra');
   assert.equal(JSON.stringify(W.pois.slice(0, 50).map(p => [p.kind, p.x, p.y])), huella, 'volver a la tierra da el mismo mapa');
@@ -589,4 +607,51 @@ test('V7: escaleras de hasta 4 rangos, sin perder premios ni mejoras de los peld
   const bt = D.QUESTS.filter(q => q.rango && q.rango.esc === 'bt');
   assert.equal(bt.reduce((s, q) => s + q.reward.coins + (q.absorbe || []).reduce((t, a) => t + a.reward.coins, 0), 0), 360);
   assert.ok(D.TIENDA.filter(o => o.premio).every(o => !o.precio), 'los premios de escalera no se venden');
+});
+
+test('Fase 9 «b»: tablas del archipiélago, marea del reloj y el tema del mar aplicado', () => {
+  // la marea: entre 0 y 1, con un ciclo de D.MAREA_MS, y la bajamar existe un rato en cada ciclo
+  const t0 = Date.UTC(2026, 10, 5, 12);
+  let bajas = 0;
+  for (let k = 0; k < 240; k++) { const m = D.marea(t0 + (k / 240) * D.MAREA_MS); assert.ok(m >= 0 && m <= 1); if (m < D.MAREA_BAJA) bajas++; }
+  assert.ok(bajas > 40 && bajas < 120, 'bajamar ' + bajas + ' de 240');
+  assert.equal(D.marea(t0), D.marea(t0 + D.MAREA_MS), 'ciclo exacto');
+  assert.equal(D.marea(0), 0.5);
+  const s = D.mareaCambia(t0);
+  assert.ok(s > 0 && s <= D.MAREA_MS / 1000 && D.mareaBaja(t0) !== D.mareaBaja(t0 + (s + 1) * 1000), 'cuándo cambia');
+  // recursos y recetas del mar
+  for (const r of D.RES_MAR) assert.ok(D.RES[r] && D.RES[r].mar && D.RES_ORDER.includes(r), r);
+  for (const k in D.RECIPES) for (const r in Object.assign({}, D.RECIPES[k].in, D.RECIPES[k].out)) assert.ok(D.RES[r], k + ' usa ' + r);
+  for (const k of ['palma', 'arrecife', 'almeja', 'salitral', 'especia', 'naufragio']) assert.ok(D.RES[D.NODES[k].res], k);
+  // en la tierra nada cambió: el tema solo se aplica en el mar
+  assert.equal(D.RES.food.name, 'Comida');
+  assert.ok(!D.BUILD_ORDER.includes('salinas') && D.QUESTS.every(q => q.branch !== 'mar'));
+  // otro contexto, ya en el mar (como la página después de zarpar)
+  const PM = carga(['util.js', 'data.js', 'datos-vida.js', 'datos-mar.js', 'world.js']), DM = PM.D;
+  assert.ok(DM.aplicarTema('mar'));
+  assert.ok(!DM.aplicarTema('mar'), 'una sola vez');
+  assert.equal(DM.RES.food.name, 'Pescado');
+  assert.equal(DM.BUILD.tc.name, 'Fortaleza del Puerto');
+  assert.equal(DM.eraName(1), 'Caleta');
+  assert.equal(DM.eraName(6), 'Señor de los Mares');
+  for (let n = 2; n <= 6; n++) {
+    for (const r in DM.eraCost(n)) assert.ok(DM.RES[r] && (!DM.RES[r].special), 'era ' + n + ' pide ' + r);
+    for (const q of DM.eraReq(n)) for (const t of q.any || []) assert.ok(DM.BUILD[t], 'era ' + n + ' pide ' + t);
+  }
+  assert.ok(DM.eraReq(7)[0].pop > 1e6, 'no hay Era VII en el mar');
+  // las mejoras del mar no piden nada de la tierra
+  for (const t of DM.MAR.construir) for (let L = 1; L <= 15; L++) for (const r in DM.upCost(t, L)) assert.ok(!['planks', 'blocks', 'ingots', 'tools', 'books', 'marble', 'steel', 'machinery', 'gems'].includes(r), t + ' ' + L + ' pide ' + r);
+  // la Crónica del Mar: ids únicos, cadena sin huecos, y cada estadística que pide alguien la escribe
+  const ids = new Set(DM.QUESTS.map(q => q.id));
+  assert.equal(ids.size, DM.QUESTS.length);
+  for (const q of DM.QUESTS) { assert.equal(q.branch, 'mar'); for (const p of q.pre) assert.ok(ids.has(p)); }
+  const fuentes = FUENTES.map(([, x]) => x).join('\n'), stats = new Set();
+  const mira = r => { if (r.t === 'stat') stats.add(r.k); for (const o of r.of || []) mira(o); };
+  for (const q of DM.QUESTS) mira(q.req);
+  for (const d of DM.DAILY.concat(DM.WEEKLY)) stats.add(d.k);
+  for (const k of stats) {
+    const ok = /^g_/.test(k) || /^p_/.test(k) || fuentes.includes("'" + k + "'");
+    assert.ok(ok, 'nadie escribe la estadística ' + k);
+  }
+  for (const q of DM.QUESTS) for (const r in q.reward) assert.ok(r === 'coins' || DM.RES[r], q.id + ' paga ' + r);
 });
