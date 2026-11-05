@@ -258,7 +258,7 @@
 
   // Lo que dibuja render.js junto con aldeanos y edificios (ordenado por profundidad).
   T.collect = function (list, dt, vis) {
-    if (!S()) return;
+    if (!S() || D.temaActivo === 'mar') return; // en el mar la flota la dibuja armada.js (barcos, no soldados)
     const items = [];
     garrison(items);
     marches(items);

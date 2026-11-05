@@ -463,6 +463,7 @@
     const gal = PK.Mar && PK.Mar.item(R, seen);
     if (gal && vis(gal.x, gal.y, gal.spr.c.width, gal.spr.c.height)) list.push(gal);
     if (PK.Arch && g.enMar()) for (const it of PK.Arch.items(R, seen)) if (vis(it.x, it.y, it.spr.c.width, it.spr.c.height)) list.push(it); // barcos de colonos
+    if (PK.Armada && g.enMar()) for (const it of PK.Armada.items(R, seen)) if (vis(it.x, it.y, it.spr.c.width, it.spr.c.height)) list.push(it); // la flota (pk-29)
     // el lugar del capítulo en curso de la campaña (H5): el dibujo de su terreno, con estandarte
     const cn = PK.Campana && g.state && g.state.campana ? PK.Campana.actual() : 0, cl = cn && PK.Campana.lugar(cn);
     if (cl && seen(cl.x, cl.y)) {

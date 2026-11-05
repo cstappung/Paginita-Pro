@@ -500,7 +500,7 @@
   // Defensa: cada Torre y el Centro Urbano aportan según su nivel; las tropas en casa suman su fuerza.
   Soc.defense = function () {
     let d = 0;
-    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc')) d += G().bst(b).defense || 0;
+    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'bateria')) d += G().bst(b).defense || 0;
     return Math.round(d * (1 + 0.2 * G().lvl('walls')) + Soc.power(S().war.army));
   };
   Soc.barracksLvl = () => G().buildings.reduce((m, b) => (b.owner === 'p' && b.done && b.type === 'barracks' ? Math.max(m, b.lvl) : m), 0);
@@ -513,8 +513,9 @@
   Soc.trainWhy = function (type) {
     const def = D.ARMY[type], w = S().war;
     if (S().era < def.era) return 'Requiere la Era ' + U.roman(def.era) + '.';
-    if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
-    if (Soc.barracksLvl() < def.lvl) return def.name + ' requiere un Cuartel de nivel ' + def.lvl + '.';
+    if (!G().countB('barracks')) return 'Necesitas ' + (D.temaActivo === 'mar' ? 'una ' : 'un ') + D.BUILD.barracks.name + '.';
+    if (Soc.barracksLvl() < def.lvl) return def.name + ' requiere ' + (D.temaActivo === 'mar' ? 'una ' : 'un ') + D.BUILD.barracks.name + ' de nivel ' + def.lvl + '.';
+    if (def.req && !G().countB(def.req)) return def.name + ': necesitas la ' + D.BUILD[def.req].name + '.'; // la armada (pk-29)
     if (G().pop() >= G().popCap()) return 'Población máxima: construye o mejora casas.';
     if (w.q.length >= Soc.Q_MAX) return 'La cola del Cuartel está llena.';
     if (!G().canAfford(def.cost)) return 'Recursos insuficientes.';
@@ -565,7 +566,7 @@
         w.army[got]++;
         g.stat('trained_army', 1);
       }
-      if (got && !offline && !w.q.length) toast('El Cuartel terminó de entrenar: ' + D.ARMY[got].name.toLowerCase() + ' y los demás ya forman frente al Cuartel.', 'good');
+      if (got && !offline && !w.q.length) toast(D.temaActivo === 'mar' ? 'La Dársena de guerra terminó: ' + D.ARMY[got].name.toLowerCase() + ' y los demás esperan en el puerto.' : 'El Cuartel terminó de entrenar: ' + D.ARMY[got].name.toLowerCase() + ' y los demás ya forman frente al Cuartel.', 'good');
       if (!w.q.length) w.qt = 0;
     }
     for (const e of w.exps.slice()) {

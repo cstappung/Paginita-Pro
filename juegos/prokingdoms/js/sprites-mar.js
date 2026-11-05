@@ -323,6 +323,49 @@
     p.roof(1.2, 1.2, 1.6, 1.6, 23 + alto, 12, fase >= 3 ? 'gilt' : 'verdigris', 0.02, 0.02, 'x');
     for (let i = 0; i < 4; i++) p.flag(0.3 + (i % 2) * 3.4, 0.3 + Math.floor(i / 2) * 3.4, 8, col, 12);
   };
+  // ---------- La armada (pk-29) ----------
+  Object.assign(Sp.BTOP_MAR, { barracks: 64, escuela: 42, bateria: 22, cadena: 30 });
+  BD.barracks = function (p, col) { // Dársena de guerra: dique de piedra, galpón y una fragata en grada
+    suelo(p, 3, 3, SAND2);
+    p.box(0.1, 0.1, 2.8, 2.8, 0, 2, 'stone', 'stone', 'paving');
+    const g = { x: 0.2, y: 0.2, w: 1.2, h: 1.3 };
+    p.box(g.x, g.y, g.w, g.h, 2, 14, 'plank');
+    p.roof(g.x, g.y, g.w, g.h, 14, 10, 'thatch', 0.3, 0.3, 'x');
+    p.door(g, 'L', 0.6, 0.5, 9);
+    p.box(1.6, 0.5, 1.2, 2.2, 2, 8, TECA, '#7a4224', '#b06a3a'); // el casco
+    p.box(1.65, 0.55, 1.1, 2.1, 8, 9, 'plank', 'darkwood', 'plank');
+    for (const [y, h] of [[1.0, 34], [2.0, 30]]) { p.post(2.2, y, h); p.fill([p.P(2.25, y - 0.45, h - 2), p.P(2.25, y + 0.45, h - 2), p.P(2.25, y + 0.4, 12), p.P(2.25, y - 0.4, 12)], LONA, 1, 0); }
+    for (let i = 0; i < 3; i++) p.box(1.55, 0.8 + i * 0.6, 0.12, 0.12, 5, 6, '#22222a', '#14141a', '#3a3a44'); // cañones
+    p.flag(2.27, 1.0, 34, col, 9);
+  };
+  BD.escuela = function (p, col) { // Escuela de navegantes: casa con una rosa de los vientos y un ancla
+    suelo(p, 2, 2);
+    const b = { x: 0.25, y: 0.25, w: 1.5, h: 1.3 };
+    p.box(b.x, b.y, b.w, b.h, 0, 13, 'plaster');
+    p.roof(b.x, b.y, b.w, b.h, 13, 10, 'tile', 0.5, 0.2, 'x');
+    p.door(b, 'L', 0.75, 0.45, 8); p.win(b, 'L', 0.3, 6, 0.25, 4); p.win(b, 'L', 1.2, 6, 0.25, 4);
+    p.box(0.3, 1.7, 0.25, 0.25, 0, 8, '#3a3a44', '#2a2a32', '#5a5a64'); // el ancla
+    p.line(p.P(0.2, 1.8, 6), p.P(0.65, 1.8, 6), '#3a3a44');
+    p.flag(1.7, 1.7, 0, col, 14);
+  };
+  BD.bateria = function (p, col) { // Batería costera: parapeto de piedra con dos cañones
+    suelo(p, 2, 2, SAND2);
+    p.box(0.1, 0.1, 1.8, 1.8, 0, 3, 'stone', 'stone', 'paving');
+    for (const [x, y, w, h] of [[0.1, 0.1, 1.8, 0.3], [0.1, 0.1, 0.3, 1.8]]) p.box(x, y, w, h, 3, 8, 'stone', 'stone', 'paving');
+    for (const y of [0.6, 1.3]) { p.box(0.6, y, 0.7, 0.25, 3, 5, '#5a3a20', '#3a2410', '#7a5030'); p.box(0.3, y + 0.05, 0.7, 0.15, 5, 7, '#22222a', '#14141a', '#3a3a44'); }
+    p.box(1.4, 1.4, 0.3, 0.3, 3, 5, '#1c1c22', '#101014', '#3a3a44'); // balas
+    p.flag(1.8, 1.8, 3, col, 10);
+  };
+  BD.cadena = function (p, col) { // Cadena de puerto: torreón con un torno y la cadena que entra al agua
+    suelo(p, 2, 2, SAND2);
+    const t = { x: 0.3, y: 0.3, w: 1.0, h: 1.0 };
+    p.box(t.x, t.y, t.w, t.h, 0, 18, 'stone', 'stone', 'paving');
+    p.box(t.x - 0.05, t.y - 0.05, t.w + 0.1, t.h + 0.1, 18, 20, 'stone', 'stone', 'paving');
+    p.door(t, 'L', 0.5, 0.35, 7);
+    p.box(1.4, 0.5, 0.4, 0.6, 0, 6, 'darkwood', 'darkwood', 'plank'); // torno
+    for (let i = 0; i < 6; i++) p.box(1.5 + i * 0.08, 1.15 + i * 0.13, 0.1, 0.1, 3 - i * 0.5, 4 - i * 0.5, '#4a4a54', '#2a2a32', '#6a6a74');
+    p.flag(0.4, 0.4, 20, col, 10);
+  };
   BD.colonia = function (p, col) { // Muelle de la colonia: tarima, una choza y la bandera
     suelo(p, 2, 2);
     p.box(0.1, 1.3, 1.8, 0.6, 0, 3, 'plank', 'darkwood', 'plank');

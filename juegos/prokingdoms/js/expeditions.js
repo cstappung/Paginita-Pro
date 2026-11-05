@@ -126,6 +126,13 @@
   // target: { poi, floor } (mazmorra) o { mission: uid } (encargo).
   Exp.campTravel = p => Math.round((30 + U.dist(p.x, p.y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) * 1.5) * Exp.velViaje());
   Exp.preview = function (target) {
+    // un jefe del mar (pk-29, armada.js): la primera victoria paga «loot», las siguientes «rep»
+    if (target.jefeMar) {
+      const J = D.JEFES_MAR && D.JEFES_MAR[target.jefeMar];
+      if (!J) return null;
+      const ya = ((S().jefesMar || {})[target.jefeMar] || {}).n;
+      return { name: J.name, enemy: J.enemy, power: J.power, loot: Object.assign({}, ya ? J.rep : J.loot), travel: Math.round(J.travel * Exp.velViaje()), jefe: target.jefeMar };
+    }
     // el lugar de un capítulo de la campaña (campana.js, H5)
     if (target.cap) {
       const C = PK.Campana, c = C && C.cap(target.cap), l = c && C.lugar(target.cap);
@@ -153,7 +160,13 @@
   const misLoot = l => { const k = G().bono ? G().bono('misiones') : 0; if (!k) return l; const o = {}; for (const r in l) o[r] = r === 'coins' ? l[r] : Math.round(l[r] * (1 + k)); return o; };
   Exp.canSend = function (target) {
     const st = S();
-    if (!G().countB('barracks')) return 'Necesitas un Cuartel.';
+    if (!G().countB('barracks')) return 'Necesitas ' + (D.temaActivo === 'mar' ? 'una ' : 'un ') + D.BUILD.barracks.name + '.';
+    if (target.jefeMar) {
+      const J = D.JEFES_MAR[target.jefeMar], j = (st.jefesMar || {})[target.jefeMar] || {};
+      if (st.era < J.era) return 'Requiere la Era ' + U.roman(J.era) + '.';
+      if (j.vuelve > Date.now()) return J.name + ' vuelve en ' + U.fmtTime((j.vuelve - Date.now()) / 1000) + '.';
+      if (st.exp.runs.some(r => r.jefeMar === target.jefeMar)) return 'Tu flota ya va hacia ' + J.name + '.';
+    }
     if (target.cap) {
       const C = PK.Campana;
       if (!C || !C.abierto(target.cap) || !C.lugar(target.cap)) return 'Ese capítulo no está abierto.';
@@ -189,9 +202,15 @@
     if (!pv) return false;
     if (heroe) pv.travel = Math.round(pv.travel * PK.Heroes.viaje(heroe));
     for (const k in units) army[k] -= units[k];
-    const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, cap: target.cap, floor: target.floor, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
+    // el mar (pk-29): con tormenta la flota tarda más y llega con las velas rotas (D.tormenta, del reloj real)
+    const temp = D.temaActivo === 'mar' && D.tormenta && D.tormenta();
+    if (temp) pv.travel = Math.round(pv.travel * D.TORMENTA.viaje);
+    const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, cap: target.cap, floor: target.floor, jefeMar: target.jefeMar, tormenta: temp ? 1 : undefined, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
     if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
-    else run.target = { poi: target.poi, floor: target.floor, camp: target.camp, cap: target.cap }; // para «Repetir» (C7)
+    else run.target = { poi: target.poi, floor: target.floor, camp: target.camp, cap: target.cap, jefeMar: target.jefeMar }; // para «Repetir» (C7)
+    if (temp) run.power = Math.round(run.power * D.TORMENTA.fuerza);
+    if (target.jefeMar) { run.jefe = target.jefeMar; run.nivel = D.JEFES_MAR[target.jefeMar].nivel; }
+    else if (D.temaActivo === 'mar') run.nivel = U.clamp(0.1 + 0.08 * (st.era - 2), 0, 0.45);
     if (form) { run.form = form; st.formaciones = st.formaciones || {}; st.formaciones.ult = form; }
     st.exp.runs.push(run);
     if (run.poi !== undefined && PK.Inc) PK.Inc.preparar(run, W.pois[run.poi]);
@@ -262,6 +281,12 @@
       }
     }
     if (r.cap && r.won && PK.Campana) PK.Campana.ganar(r.cap);
+    if (r.jefeMar && r.won) { // pk-29: el jefe del mar se va a descansar y vuelve más tarde
+      const J = D.JEFES_MAR[r.jefeMar], jm = (st.jefesMar = st.jefesMar || {}), j = (jm[r.jefeMar] = jm[r.jefeMar] || { n: 0 });
+      j.n++; j.vuelve = Date.now() + J.descanso * 1000;
+      G().stat('jefe_' + r.jefeMar, 1);
+    }
+    if (r.asalto && PK.Armada) PK.Armada.finAsalto(r);
     if (r.camp !== undefined && r.won) {
       const p = W.pois[r.camp], ps = p && G().poiState(p);
       if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
@@ -349,7 +374,7 @@
     const now = Date.now();
     for (const r of st.exp.runs.slice()) {
       // aviso antes de llegar: para elegir táctica y entrar a mirar la batalla
-      if (!offline && r.phase === 'go' && !r.warned && !r.mission && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
+      if (!offline && r.phase === 'go' && !r.warned && (!r.mission || D.temaActivo === 'mar') && !r.asalto && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
         r.warned = true;
         toast('Tus tropas llegan a ' + r.name + ' en ' + U.fmtTime((r.arrive - now) / 1000) + '. ¿Quieres dirigir la batalla?', 'info',
           { label: 'Ver batalla', fn: () => { r.watch = true; } });
@@ -367,7 +392,7 @@
       if (r.phase === 'go' && PK.Aventura) PK.Aventura.update(r, offline);
       if (r.phase === 'go' && now >= r.arrive && r.inc && !r.inc.llego) { r.inc.llego = true; PK.Inc.llegar(r); if (r.watch && !offline) PK.Inc.open(r.id); continue; }
       if (r.phase === 'go' && now >= r.arrive) {
-        if (!offline && !r.mission && PK.Batalla && PK.Batalla.empezar(r)) {
+        if (!offline && (!r.mission || D.temaActivo === 'mar') && PK.Batalla && PK.Batalla.empezar(r)) { // en el mar los encargos también se pelean en vivo
           if (r.watch) PK.Batalla.abrir(r.id);
           else toast('¡Empieza la batalla en ' + r.name + '!', 'bad', { label: 'Ver batalla', fn: () => PK.Batalla.abrir(r.id) });
           if (PK.Sfx) PK.Sfx.play('event');

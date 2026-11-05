@@ -115,6 +115,11 @@
 
   // C1 (pk-22): terreno del lugar. rocas: tapan a los tiradores de las flechas que vienen del otro lado y no se
   // pueden atravesar; puente: un río que solo se cruza por el medio; loma: los tiradores encima tiran +1,5 más lejos.
+  // Fase 9 «c» (pk-29, armada.js): las tablas quedan a la vista para que el mar agregue sus barcos, enemigos y
+  // jefes, y estos ganchos dejan que dibuje sus figuras, arme las baterías y mueva a sus jefes.
+  B.TROPA = TROPA; B.ENEMIGOS = ENEMIGOS; B.TERRENO = TERRENO;
+  B.ext = { sprite: null, alArmar: null, jefePaso: {} };
+  TERRENO.mar = { suelo: [40, 92, 130], tono: 10, deco: 'olas' };
   const OBST = { camp: ['rocas', 'loma'], cave: ['rocas'], lair: ['rocas'], crypt: ['rocas'], crater: ['loma', 'rocas'], nest: ['loma'], swamp: ['puente'], giants: ['rocas'], temple: ['puente'], campo: ['loma'] };
   B.OBST_TXT = { rocas: 'Rocas: cubren de las flechas a quien esté detrás.', puente: 'Un río: solo se cruza por el puente del medio.', loma: 'Una loma: tus tiradores encima disparan más lejos.' };
   function terreno(b, r) {
@@ -164,6 +169,7 @@
   // ---------- Armar la batalla ----------
   const porUnidad = k => PK.Exp.powerVs({ [k]: 1 }, {}); // fuerza de un soldado con veteranía, era y bonos
   function lugarDe(r) {
+    if (D.temaActivo === 'mar') return 'mar'; // en el archipiélago todo se pelea en el agua (pk-29)
     if (r.camp !== undefined) return 'camp';
     if (r.cap) { const c = D.CAPITULOS[r.cap - 1]; return (c && c.lugar && c.lugar.terreno) || 'campo'; }
     const p = r.poi !== undefined ? PK.World.pois[r.poi] : null;
@@ -172,6 +178,7 @@
   // Qué tan adentro: 0 en el primer piso (o el campamento más cercano), 1 en el último (o el más lejano).
   // El escenario se vuelve más espectacular con eso (escenarios.js).
   function nivelDe(r) {
+    if (r.nivel !== undefined) return r.nivel; // los del mar lo traen puesto (armada.js)
     if (r.cap) return 0.6;
     if (r.camp !== undefined) { const p = PK.World.pois[r.camp]; return p ? G().poiTier(p) / 6 : 0; }
     const p = r.poi !== undefined ? PK.World.pois[r.poi] : null, d = p && D.DUNGEON[p.kind];
@@ -186,7 +193,7 @@
   B.empezar = function (r) {
     if (B.lista.some(b => b.id === r.id)) return true;
     const tipos = Object.keys(r.units).filter(k => r.units[k] > 0 && TROPA[k]);
-    if (!tipos.length) return false;
+    if (!tipos.length && !(r.baterias > 0)) return false; // un asalto pirata se puede pelear solo con las baterías
     const tac = PK.Exp.TACTICS[r.tactic] || PK.Exp.TACTICS.normal;
     // El héroe sube la fuerza de la compañía (Exp.heroMult, lo que dice el planificador). En la batalla en vivo las
     // tropas reciben solo una parte (HERO_TROPAS) y el resto lo pone su habilidad, que se usa sola si nadie mira:
@@ -199,7 +206,7 @@
     };
     const xp = (S().exp && S().exp.xp) || {};
     // tus figuras: repartidas según la compañía (al menos una por tipo)
-    const total = tipos.reduce((s, k) => s + r.units[k], 0), nFig = Math.min(MAX_MIOS, total);
+    const total = Math.max(1, tipos.reduce((s, k) => s + r.units[k], 0)), nFig = Math.min(MAX_MIOS, total);
     let quedan = nFig;
     const figuras = {};
     for (const k of tipos) { figuras[k] = 1; quedan--; }
@@ -242,6 +249,7 @@
     if (b.af.includes('doble')) for (const f of b.suyos) f.max = f.hp = f.hp * 1.3;
     if (b.af.includes('sinluna')) b.nivel = Math.min(1, b.nivel + 0.35);
     b.peligros = [];
+    if (B.ext.alArmar) B.ext.alArmar(b, r);
     b.fuerza0 = [vida(b.mios), vida(b.suyos)];
     if (r.heroe && PK.Heroes) armarHeroe(b, PK.Heroes.de(r.heroe));
     B.lista.push(b);
@@ -366,15 +374,15 @@
     // mantener la línea: tus cuerpo a cuerpo no salen de su fila hasta que el enemigo se acerca
     const quieto = f.lado === 'p' && b.orden === 'linea' && !st.dispara && d > 2.6 && f.u >= f.u0 - 0.5;
     if (d > alcance) {
-      if (quieto || f.atado > 0) { f.modo = 'idle'; return; }
+      if (quieto || f.atado > 0 || st.fija) { f.modo = 'idle'; return; }
       const ir = rumboRio(b, f, o), di = Math.hypot(ir.u - f.u, ir.v - f.v) || 0.01;
-      const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * (f.lado === 'p' && b.cancion > 0 ? 1.25 : 1) * (b.af.includes('helado') ? 0.8 : 1) * (f.lento > 0 ? 0.55 : 1) * dt;
+      const sp = st.vel * (f.lado === 'p' && b.orden === 'cargar' ? 1.1 : 1) * (f.lado === 'p' && b.cancion > 0 ? 1.25 : 1) * (b.af.includes('helado') ? 0.8 : 1) * (f.lento > 0 ? 0.55 : 1) * aFavor(b, f, 1.15, 0.92) * dt;
       f.u += ((ir.u - f.u) / di) * sp; f.v += ((ir.v - f.v) / di) * sp;
       f.modo = 'walk';
       return;
     }
     // los tiradores retroceden si se les vienen encima (salvo con «cargar»)
-    if (st.dispara && d < 1.3 && !(f.lado === 'p' && b.orden === 'cargar')) {
+    if (st.dispara && !st.fija && d < 1.3 && !(f.lado === 'p' && b.orden === 'cargar')) {
       const sp = st.vel * 0.8 * dt, hacia = f.lado === 'p' ? -1 : 1;
       f.u = U.clamp(f.u + hacia * sp, 0.5, LU - 0.5); f.modo = 'walk';
     } else f.modo = 'work';
@@ -388,8 +396,16 @@
       for (const r of rivales) { const k = cerca(r, o); if (k < st.fuego) herir(b, r, dmg * (k < 0.3 ? 1 : 0.4) * (1 - k / (st.fuego * 1.6)) * (b.orden === 'dispersar' ? 0.7 : 1), f); }
       sfx('hit');
     } else if (st.dispara) {
-      b.tiros.push({ tipo: st.dispara, u0: f.u, v0: f.v, u: f.u, v: f.v, o, dmg, t: 0, dur: Math.max(0.2, d / (st.dispara === 'piedra' ? 7 : st.dispara === 'virote' ? 16 : 12)), area: st.area, de: f });
-      if ((st.dispara === 'flecha' || st.dispara === 'virote') && Math.random() < 0.4) sfx('arrow');
+      b.tiros.push({ tipo: st.dispara, u0: f.u, v0: f.v, u: f.u, v: f.v, o, dmg, t: 0, dur: Math.max(0.2, d / (st.dispara === 'piedra' ? 7 : st.dispara === 'virote' || st.dispara === 'arpon' ? 16 : st.dispara === 'bala' ? 10 : 12)), area: st.area, de: f });
+      if ((st.dispara === 'flecha' || st.dispara === 'virote' || st.dispara === 'arpon') && Math.random() < 0.4) sfx('arrow');
+      if (st.dispara === 'bala') { if (Math.random() < 0.5) sfx('boom'); fxCanon(b, f, o); }
+    } else if (st.explota) { // brulote (pk-29): se mete entre ellos y estalla; se pierde con la explosión
+      // daña lo que habría hecho viviendo la pelea entera; su vida sale de la cuenta (si no, estallar contaba como
+      // perder y los brulotes disparaban la retirada sola de los suyos)
+      for (const r of rivales) { const k = cerca(r, o); if (k < st.explota) herir(b, r, f.pow * HPK * 1.5 * mult(b, f, r) * (1 - k / (st.explota * 1.6)), f); }
+      if (f.lado === 'p') b.fuerza0[0] = Math.max(1, b.fuerza0[0] - f.max);
+      f.hp = 0; f.muerto = 0.001; f.caida = 1; f.objetivo = null; f.estallo = true;
+      fxJefe(b, 'meteoro', f); grito(b, '¡Brulote!');
     } else if (st.aplasta) { // gigantes: el golpe alcanza a los que estén cerca del objetivo («Dispersarse» los separa)
       herir(b, o, dmg, f); fxGolpe(b, o, f, true);
       for (const r of rivales) { if (r === o) continue; const k = cerca(r, o); if (k < st.aplasta) herir(b, r, dmg * 0.5 * (1 - k / (st.aplasta * 1.4)) * (b.orden === 'dispersar' ? 0.6 : 1), f); }
@@ -402,7 +418,10 @@
   // Multiplicadores: tropa contra tipo de enemigo (D.ARMY.vs), táctica, la línea de lanceros, los lobos con los de atrás.
   function mult(b, f, o) {
     if (f.lado === 'p') {
-      let m = (D.ARMY[f.tipo].vs || {})[o.kind] || 1;
+      let m = ((D.ARMY[f.tipo] && D.ARMY[f.tipo].vs) || {})[o.kind] || 1;
+      m *= aFavor(b, f, 1.1, 0.95);
+      if (o.st.caparazon && f.st.dispara && !f.st.rompe) m *= 0.6; // cangrejos: las balas chicas rebotan
+      if (o.esJefe && b.jefeMult) m *= b.jefeMult(f, o);
       m *= b.tac.pow;
       if (b.orden === 'linea' && f.st.linea && (o.st.vel >= 2 || o.st.jefe)) m *= f.st.linea;
       if (f.st.pesado && o.st.hp >= 2) m *= f.st.pesado; // el virote pesado contra los grandes (gólems, osos, gigantes)
@@ -414,15 +433,19 @@
     }
     let m = b.tac.loss >= 1 ? 1 + (b.tac.loss - 1) * 0.3 : 1 - (1 - b.tac.loss) * 0.4; // asalto expone más; cauteloso, menos
     if (f.st.flanco && o.st.dispara) m *= 1.25;
+    if (f.st.hunde && o.st.chico) m *= f.st.hunde; // tiburones contra las balandras
+    m *= aFavor(b, f, 1.1, 0.95);
     if (b.auras && b.auras.some(j => cerca(j, f) < 3)) m *= B.ROLES.jefebanda.aura; // C4: jefe de banda
     if (b.muro > 0) m *= 0.5;
     if (b.af.includes('furia')) m *= 1.2;
     if (b.arenga > 0) m *= b.orden === 'linea' ? 1.05 : 1.35;
     return m;
   }
+  // el viento (pk-29): los barcos del lado que lo tiene a favor navegan y disparan mejor
+  function aFavor(b, f, si, no) { return b.viento && f.st.barco ? (b.viento * (f.lado === 'p' ? 1 : -1) > 0 ? si : no) : 1; }
   function herir(b, o, dmg, de) {
     if (o.muerto || dmg <= 0) return;
-    if (de && de.lado === 'p' && o.lado === 'e') b.dano[de.tipo] = (b.dano[de.tipo] || 0) + Math.min(dmg, Math.max(0, o.hp)) / HPK; // C7: para el informe
+    if (de && de.lado === 'p' && o.lado === 'e' && D.ARMY[de.tipo]) b.dano[de.tipo] = (b.dano[de.tipo] || 0) + Math.min(dmg, Math.max(0, o.hp)) / HPK; // C7: para el informe
     o.hp -= dmg; o.golpe = 0.18;
     // retroceso al recibir el golpe (solo se dibuja): se aleja de quien pegó
     if (de) { const d = cerca(o, de) || 1; o.kb = 0.2; o.kbU = (o.u - de.u) / d; o.kbV = (o.v - de.v) / d; }
@@ -456,9 +479,10 @@
       } else {
         // el virote no se pierde: si su blanco ya cayó, sigue hasta el enemigo más cercano (los tiros lentos y pesados
         // se desperdiciaban todos en el mismo cuerpo)
-        if (p.tipo === 'virote' && p.o.muerto) { const rv = (p.de.lado === 'p' ? b.suyos : b.mios).filter(o => !o.muerto && cerca(o, p.o) < 2.5).sort((a, c) => cerca(a, p.o) - cerca(c, p.o))[0]; if (rv) p.o = rv; }
+        if ((p.tipo === 'virote' || p.tipo === 'arpon' || p.tipo === 'bala') && p.o.muerto) { const rv = (p.de.lado === 'p' ? b.suyos : b.mios).filter(o => !o.muerto && cerca(o, p.o) < 2.5).sort((a, c) => cerca(a, p.o) - cerca(c, p.o))[0]; if (rv) p.o = rv; }
         herir(b, p.o, p.dmg * (p.de && p.de.lado === 'p' && (p.tipo === 'flecha' || p.tipo === 'virote') ? escudo(b, p.o, p.de) : 1) * (p.de && cubierto(b, p.de, p.o) ? 0.6 : 1), p.de);
         // brujas (H4): la maldición frena; con clérigos dura la mitad
+        if (p.de && p.de.st.frena && !p.o.muerto) p.o.lento = Math.max(p.o.lento || 0, p.de.st.frena); // el arpón (pk-29)
         if (p.de && p.de.st.maldice && p.o.lado === 'p') p.o.lento = Math.max(p.o.lento || 0, hayClerigo(b, b.mios.filter(f => !f.muerto)) ? 1.2 : 2.5);
       }
       fxImpacto(b, p);
@@ -488,7 +512,8 @@
       const a = list[i], c = list[j], dx = c.u - a.u, dy = c.v - a.v, d = Math.hypot(dx, dy) || 0.01;
       if (d >= r) continue;
       const push = ((r - d) / 2) * Math.min(1, dt * 8);
-      a.u -= (dx / d) * push; a.v -= (dy / d) * push; c.u += (dx / d) * push; c.v += (dy / d) * push;
+      if (!a.st.fija) { a.u -= (dx / d) * push; a.v -= (dy / d) * push; }
+      if (!c.st.fija) { c.u += (dx / d) * push; c.v += (dy / d) * push; }
     }
     for (const f of list) { f.u = U.clamp(f.u, 0.5, LU - 0.5); f.v = U.clamp(f.v, 0.6, LV - 0.4); }
   }
@@ -512,6 +537,8 @@
     temple: { id: 'voz', nombre: 'La Voz del Abismo', kind: 'abyss', hp: 0.85, dps: 0.6, alcance: 5, vel: 0.9, dispara: 'luz', spr: 'sirena', escala: 1.9, jefe: true },
   };
   B.JEFE = JEFE;
+  // lo que necesitan los jefes del mar (armada.js) para moverse como los de aquí
+  B.H = { figura: (...a) => figura(...a), herir: (...a) => herir(...a), grito: (...a) => grito(...a), fxJefe: (...a) => fxJefe(...a), cerca, LU, LV, HPK, DPSK };
   B.CONSEJO_JEFE = {
     cave: 'Corazón de Cristal: «Al jefe» con caballeros y catapultas, y «Dispersarse» antes de que se parta (a media vida).',
     lair: 'Matriarca Colmillo: llama lobos cada 20 s mientras viva. «Cargar» y «Al jefe» para callarla rápido.',
@@ -531,6 +558,7 @@
     const J = b.jefeF, t = b.jefeT, id = J.st.id;
     if (!mios.length) return;
     t.a -= dt; t.b -= dt; t.c -= dt;
+    if (B.ext.jefePaso[id]) { B.ext.jefePaso[id](b, J, t, mios, suyos, dt); return; }
     if (id === 'corazon') {
       // con media vida se parte en tres gólems
       if (!J.muerto && !b.partido && J.hp < J.max * 0.5) {
@@ -754,6 +782,7 @@
   function bajas(b, retirada) {
     const lost = {}, hb = b.heroeId ? 1 - PK.Exp.heroBajas({ heroe: b.heroeId }) : 1;
     for (const f of b.mios) {
+      if (!D.ARMY[f.tipo]) continue; // las baterías del asalto pirata no son tropas
       let n = Math.round((f.muerto ? f.rep : f.rep * (1 - f.hp / f.max) * (retirada ? 0.2 : 0.3)) * hb);
       n = Math.min(f.rep, n);
       if (n) lost[f.tipo] = (lost[f.tipo] || 0) + n;
@@ -811,6 +840,14 @@
     if (spr === 'golem') for (let i = 0; i < 6; i++) part(v, { x, y: y - 8, vx: rnd(-60, 60), vy: rnd(-90, -30), g: 300, life: rnd(0.4, 0.7), size: 2, col: [130, 126, 120] });
     if (o.st.spr === 'golem') for (let i = 0; i < 4; i++) part(v, { x, y: y - 10, vx: rnd(-50, 50), vy: rnd(-80, -20), g: 300, life: rnd(0.4, 0.7), size: 2, col: Math.random() < 0.5 ? [110, 106, 100] : [122, 240, 255], add: Math.random() < 0.3 });
   }
+  // el fogonazo de una andanada (pk-29): humo blanco al costado del barco que dispara
+  function fxCanon(b, f, o) {
+    const v = fxDe(b); if (!v) return;
+    const [x, y] = aPx(f.u, f.v), [tx] = aPx(o.u, o.v), lado = tx > x ? 1 : -1;
+    for (let i = 0; i < 6; i++) part(v, { x: x + lado * rnd(4, 9), y: y - rnd(6, 11), vx: lado * rnd(10, 30), vy: rnd(-10, 2), drag: 1.5, life: rnd(0.7, 1.2), size: 2, crece: 7, a: 0.5, col: [236, 236, 240] });
+    part(v, { x: x + lado * 6, y: y - 9, life: 0.1, size: 3, col: [255, 220, 120], add: true });
+    luzTemp(v, x + lado * 6, y - 9, 22, [255, 200, 110], 0.12);
+  }
   function fxFuego(b, f, o) {
     const v = fxDe(b); if (!v) return;
     v.llamas.push({ f, u: o.u, v: o.v, t: 0, dur: 0.75 });
@@ -849,6 +886,11 @@
     } else if (p.tipo === 'sombra') {
       for (let i = 0; i < 10; i++) { const a = rnd(0, 6.3), sp = rnd(20, 70); part(v, { x, y: y - 10, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, drag: 2, life: rnd(0.4, 0.8), size: 2, col: Math.random() < 0.5 ? [150, 90, 220] : [60, 20, 90], add: Math.random() < 0.5 }); }
       luzTemp(v, x, y - 8, 30, [170, 90, 255], 0.4);
+    } else if (p.tipo === 'bala') { // astillas del casco y un chorro de agua
+      sacudir(v, 1.5);
+      for (let i = 0; i < 8; i++) part(v, { x, y: y - 8, vx: rnd(-60, 60), vy: rnd(-90, -30), g: 300, life: rnd(0.3, 0.6), size: 1, col: Math.random() < 0.5 ? [140, 100, 60] : [220, 236, 250] });
+      for (let i = 0; i < 6; i++) part(v, { x: x + rnd(-4, 4), y: y - 2, vx: rnd(-14, 14), vy: rnd(-50, -20), g: 160, life: rnd(0.4, 0.7), size: 2, col: [210, 232, 250], a: 0.8 });
+      luzTemp(v, x, y - 6, 26, [255, 190, 110], 0.2);
     } else { // flecha: astillas
       for (let i = 0; i < 3; i++) part(v, { x, y: y - 10, vx: rnd(-40, 40), vy: rnd(-60, -10), g: 260, life: 0.3, size: 1, col: [232, 220, 192] });
     }
@@ -971,7 +1013,8 @@
     const jf = b.jefeF && Object.keys(JEFE).find(k => JEFE[k] === b.jefeF.st);
     const consejo = el('p', { class: 'small bt-tip' }, jf ? B.CONSEJO_JEFE[jf] : kinds.map(k => B.CONSEJO[k] || D.ENEMY[k].desc).join(' '),
       conRol.length ? ' ' + [...new Set(conRol.map(f => f.rol))].map(id => B.CONSEJO_ROL[id]).join(' ') : '',
-      b.obst && b.obst.tipos.length ? ' ' + b.obst.tipos.map(t => B.OBST_TXT[t]).join(' ') : '');
+      b.obst && b.obst.tipos.length ? ' ' + b.obst.tipos.map(t => B.OBST_TXT[t]).join(' ') : '',
+      b.viento ? el('b', { class: b.viento > 0 ? 'good-t' : 'warn-t' }, ' ' + (b.viento > 0 ? '⛵ Viento a favor: tus barcos navegan y disparan mejor.' : '⛵ Viento en contra: los suyos navegan y disparan mejor.')) : '');
     // el héroe: su retrato, la habilidad con la recarga a la vista (un toque) y «sola» para que la use él
     let heroeRow = '';
     v.habBtn = null;
@@ -1111,6 +1154,7 @@
   const PALIDO = [176, 176, 164], BANDIDO = [70, 44, 40];
   function sprite(f, frame) {
     const a = f.st, modo = f.modo;
+    if (B.ext.sprite && (a.barco || a.mar)) { const s2 = B.ext.sprite(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe') return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
     if (f.lado === 'p') return f.tipo === 'catapult' ? Sp.cart(COL_MIOS, 'stone', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
     if (a.spr === 'lobo') return Sp.wolf[f.flip ? 1 : 0][frame % 2];
@@ -1246,21 +1290,27 @@
       }
       if (f.kb > 0) { f.kb = Math.max(0, f.kb - dt); const [kx, ky] = vecPx(f.kbU, f.kbV), k = (f.kb / 0.2) * 3; px += kx * k; py += ky * k; }
       // polvo de los pies al correr
-      if (f.modo === 'walk' && !f.muerto && (f._p = (f._p || 0) - dt) < 0) { f._p = rnd(0.16, 0.3); part(v, { x: px + rnd(-3, 3), y: py, vx: rnd(-8, 8), vy: rnd(-8, -2), drag: 3, life: rnd(0.4, 0.6), size: 2, crece: 4, a: 0.3, col: [196, 178, 140] }); }
+      const agua = f.st.barco || f.st.mar;
+      if (f.modo === 'walk' && !f.muerto && (f._p = (f._p || 0) - dt) < 0) { f._p = rnd(0.16, 0.3); part(v, agua ? { x: px + (f.flip ? 6 : -6) + rnd(-2, 2), y: py, vx: (f.flip ? 14 : -14) + rnd(-6, 6), vy: rnd(-3, 3), drag: 2, life: rnd(0.5, 0.9), size: 2, crece: 3, a: 0.55, col: [226, 240, 250] } : { x: px + rnd(-3, 3), y: py, vx: rnd(-8, 8), vy: rnd(-8, -2), drag: 3, life: rnd(0.4, 0.6), size: 2, crece: 4, a: 0.3, col: [196, 178, 140] }); }
       const m = f.muerto, spr0 = f.st.spr;
       let alpha = m ? (m < 0.9 ? 1 : Math.max(0, 1 - (m - 0.9) / 0.7)) : spr0 === 'espectro' ? 0.75 : 1;
       if (m && spr0 === 'espectro') { alpha = Math.max(0, 0.75 - m / 0.6 * 0.75); py -= m * 20; }
       if (m && spr0 === 'golem') alpha = Math.max(0, 1 - m / 0.3);
       ctx.globalAlpha = alpha;
       // sombra y aro de bando
-      if (!m) {
+      if (!m && agua) { // en el agua: espuma alrededor del casco en vez de sombra
+        const wv = Math.sin(f.anim * 3) * 0.5, ww = Math.round(12 * (f.st.escala || 1));
+        ctx.fillStyle = 'rgba(230,245,255,' + (0.35 + 0.15 * wv) + ')'; ctx.fillRect(Math.round(px - ww), Math.round(py - 1), ww * 2, 2);
+        ctx.fillStyle = f.lado === 'p' ? 'rgba(80,140,255,0.6)' : 'rgba(255,80,60,0.55)'; ctx.fillRect(Math.round(px - 4), Math.round(py + 2), 8, 1);
+      } else if (!m) {
         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(Math.round(px - 5), Math.round(py - 1), 10, 3); ctx.fillRect(Math.round(px - 3), Math.round(py - 2), 6, 5);
         ctx.fillStyle = f.lado === 'p' ? 'rgba(80,140,255,0.6)' : 'rgba(255,80,60,0.55)'; ctx.fillRect(Math.round(px - 4), Math.round(py + 1), 8, 1);
       }
       ctx.save();
       ctx.translate(Math.round(px), Math.round(py));
       // al caer se tumban de costado (el dragón se hunde)
-      if (m && spr0 !== 'dragon' && spr0 !== 'espectro' && spr0 !== 'golem') ctx.rotate(f.caida * Math.min(1, m / 0.28) * Math.PI / 2 * 0.9);
+      if (m && agua) { ctx.translate(0, Math.min(1, m / 1.4) * 12); ctx.rotate((f.caida || 1) * Math.min(1, m / 1.4) * 0.35); } // los barcos se hunden escorando
+      else if (m && spr0 !== 'dragon' && spr0 !== 'espectro' && spr0 !== 'golem') ctx.rotate(f.caida * Math.min(1, m / 0.28) * Math.PI / 2 * 0.9);
       if (m && spr0 === 'dragon') ctx.translate(0, Math.min(1, m / 1.2) * 14);
       if (spr0 === 'dragon') {
         const d = dragonSpr[Math.floor(f.anim * (m ? 1 : 4)) % 2];
@@ -1312,7 +1362,7 @@
     }
     // tiros: flechas que apuntan a donde van, rocas con sombra y arco, bolas de luz y de sombra con estela
     for (const p of b.tiros) {
-      const k = Math.min(1, p.t / p.dur), H = p.tipo === 'piedra' ? 26 : p.tipo === 'flecha' ? 7 : p.tipo === 'virote' ? 3 : p.tipo === 'arcano' ? 10 : 3;
+      const k = Math.min(1, p.t / p.dur), H = p.tipo === 'piedra' ? 26 : p.tipo === 'bala' ? 9 : p.tipo === 'flecha' ? 7 : p.tipo === 'virote' ? 3 : p.tipo === 'arcano' ? 10 : 3;
       const [px, py] = aPx(p.u, p.v), [x0, y0] = aPx(p.u0, p.v0), [x1, y1] = aPx(p.o.u, p.o.v);
       const arc = Math.sin(k * Math.PI) * H, y = py - 10 - arc;
       const vx = (x1 - x0), vy = (y1 - y0) - Math.cos(k * Math.PI) * Math.PI * H, a = Math.atan2(vy, vx);
@@ -1321,6 +1371,15 @@
         ctx.save(); ctx.translate(Math.round(px), Math.round(y)); ctx.rotate(p.t * 9);
         ctx.fillStyle = '#6e685c'; ctx.fillRect(-2, -2, 4, 4); ctx.fillStyle = '#9a9284'; ctx.fillRect(-2, -2, 2, 2); ctx.restore();
         if (Math.random() < 0.5) part(v, { x: px, y, vx: rnd(-6, 6), vy: rnd(-4, 4), drag: 2, life: 0.35, size: 1, crece: 2, a: 0.35, col: [170, 160, 140] });
+      } else if (p.tipo === 'bala') { // bala de cañón: negra, con una estela de humo
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(Math.round(px - 1), Math.round(py - 1), 3, 1);
+        ctx.fillStyle = '#1c1c22'; ctx.fillRect(Math.round(px) - 1, Math.round(y) - 1, 3, 3); ctx.fillStyle = '#6a6a74'; ctx.fillRect(Math.round(px) - 1, Math.round(y) - 1, 1, 1);
+        if (Math.random() < 0.6) part(v, { x: px, y, vx: rnd(-5, 5), vy: rnd(-5, 2), drag: 2, life: 0.4, size: 1, crece: 3, a: 0.35, col: [200, 200, 205] });
+      } else if (p.tipo === 'arpon') { // largo, con la cuerda detrás
+        const cx = Math.cos(a), sy = Math.sin(a), [qx, qy] = aPx(p.u0, p.v0);
+        ctx.strokeStyle = 'rgba(210,190,140,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(qx, qy - 10); ctx.lineTo(px - cx * 7, y - sy * 7); ctx.stroke();
+        ctx.strokeStyle = '#7a5a34'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px - cx * 8, y - sy * 8); ctx.lineTo(px, y); ctx.stroke(); ctx.lineWidth = 1;
+        ctx.fillStyle = '#e0e4ea'; ctx.fillRect(Math.round(px + cx * 1) - 1, Math.round(y + sy * 1) - 1, 3, 2);
       } else if (p.tipo === 'virote') { // corto, grueso y casi recto
         const cx = Math.cos(a), sy = Math.sin(a);
         ctx.strokeStyle = '#8a6a40'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px - cx * 5, y - sy * 5); ctx.lineTo(px, y); ctx.stroke(); ctx.lineWidth = 1;
@@ -1374,6 +1433,7 @@
     // aros (impactos y curas)
     for (const r of v.anillos.slice()) {
       r.t += dt; if (r.t > r.dur) { v.anillos.splice(v.anillos.indexOf(r), 1); continue; }
+      if (r.t < 0) continue; // los aros en cadena (maldición, canto) empiezan con t negativo: todavía no salen
       const k = r.t / r.dur; ctx.strokeStyle = 'rgba(' + r.col + ',' + 0.7 * (1 - k) + ')'; ctx.lineWidth = r.suelo ? 2 : 1;
       ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r * k + 2, (r.r * k + 2) * (r.suelo ? 0.45 : 1), 0, 0, 6.3); ctx.stroke();
     }

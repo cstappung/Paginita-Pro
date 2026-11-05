@@ -63,6 +63,7 @@
     PK.Life.reset();
     PK.Quests.init(S);
     if (PK.Arch) PK.Arch.init(S); // colonias, comercio y marea del archipiélago
+    if (PK.Armada) PK.Armada.init(S); // la armada del archipiélago (pk-29): asaltos, jefes del mar
   };
 
   // ---------- Registro de entidades ----------
@@ -1275,6 +1276,7 @@
     questT += dt;
     if (questT > 1) { questT = 0; PK.Quests.check(); } // en el mar, con la Crónica del Mar (pk-28)
     if (!tierra && PK.Arch) PK.Arch.tick(dt);
+    if (!tierra && PK.Armada) PK.Armada.tick(dt);
   };
   // Árboles frutales (V5): un poco de comida sin aldeanos, en vivo y sin conexión
   let frutT = 0, frutN = 0;

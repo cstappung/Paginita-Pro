@@ -655,3 +655,62 @@ test('Fase 9 «b»: tablas del archipiélago, marea del reloj y el tema del mar 
   }
   for (const q of DM.QUESTS) for (const r in q.reward) assert.ok(r === 'coins' || DM.RES[r], q.id + ' paga ' + r);
 });
+
+test('Fase 9 «c»: la armada, los enemigos y jefes del mar, las tormentas y los asaltos', () => {
+  // en la tierra no hay barcos ni enemigos del mar
+  for (const k in D.ARMY) assert.ok(!D.ARMY[k].mar, 'barco en la tierra: ' + k);
+  for (const k in D.ENEMY_MAR) assert.ok(!D.ENEMY[k], 'enemigo del mar en la tierra: ' + k);
+  const PM = carga(['util.js', 'data.js', 'datos-vida.js', 'datos-mar.js', 'world.js']), DM = PM.D;
+  DM.aplicarTema('mar');
+  assert.equal(DM.ARMY, DM.ARMY_MAR);
+  assert.equal(DM.ENEMY, DM.ENEMY_MAR);
+  assert.equal(DM.MISSIONS, DM.MISSIONS_MAR);
+  assert.equal(DM.BUILD.barracks.name, 'Dársena de guerra');
+  assert.ok(DM.BUILD.barracks.agua);
+  for (const t of ['barracks', 'escuela', 'bateria', 'cadena']) assert.ok(DM.MAR.construir.includes(t), t);
+  // cada enemigo del mar tiene dos respuestas o más (como la T3 de la tierra)
+  for (const e in DM.ENEMY_MAR) {
+    const n = Object.keys(DM.ARMY_MAR).filter(k => (DM.ARMY_MAR[k].vs[e] || 1) > 1).length;
+    assert.ok(n >= 2, e + ' tiene ' + n + ' respuestas');
+  }
+  const TIERRA = ['planks', 'blocks', 'ingots', 'tools', 'books', 'marble', 'steel', 'machinery', 'gems', 'ore'];
+  for (const k in DM.ARMY_MAR) {
+    const a = DM.ARMY_MAR[k];
+    for (const r in a.cost) assert.ok(DM.RES[r] && !TIERRA.includes(r), k + ' cuesta ' + r);
+    for (const e in a.vs) assert.ok(DM.ENEMY_MAR[e], k + ' contra ' + e);
+    if (a.req) assert.ok(DM.BUILD[a.req] && DM.MAR.construir.includes(a.req), k + ' pide ' + a.req);
+    assert.ok(a.era >= 2 && a.era <= 6, k);
+  }
+  for (const m of DM.MISSIONS_MAR) {
+    for (const e in m.enemy) assert.ok(DM.ENEMY_MAR[e], m.id + ': ' + e);
+    assert.ok(DM.RES[m.sp], m.id + ' da ' + m.sp);
+    for (const r in m.loot) assert.ok(DM.RES[r], m.id + ' paga ' + r);
+  }
+  for (const id in DM.JEFES_MAR) {
+    const J = DM.JEFES_MAR[id];
+    for (const e in J.enemy) assert.ok(DM.ENEMY_MAR[e], id);
+    for (const r in Object.assign({}, J.loot, J.rep)) assert.ok(r === 'coins' || DM.RES[r], id + ' paga ' + r);
+  }
+  // armada.js: cómo pelea cada barco y cada enemigo, los jefes y sus dibujos (no carga sin document: se lee el código)
+  const ar = JS('armada.js');
+  for (const k in DM.ARMY_MAR) assert.match(ar, new RegExp('\\n    ' + k + ': \\{ hp:'), 'TROPA.' + k);
+  for (const e in DM.ENEMY_MAR) assert.match(ar, new RegExp('\\n    ' + e + ': \\['), 'ENEMIGOS.' + e);
+  for (const id in DM.JEFES_MAR) { assert.match(ar, new RegExp('\\n    ' + id + ": \\{ id: '" + id + "'"), 'JEFE.' + id); assert.match(ar, new RegExp('B\\.ext\\.jefePaso\\.' + id + ' = '), 'mecánica de ' + id); }
+  const sprs = new Set([...ar.matchAll(/spr: '(\w+)'/g)].map(m => m[1]).concat(Object.keys(DM.ARMY_MAR)));
+  const modelos = ar.slice(ar.indexOf('const MODELOS = {'), ar.indexOf('\n  };', ar.indexOf('const MODELOS = {')));
+  for (const s of sprs) assert.ok(new RegExp('\\b' + s + '\\b').test(modelos), 'sin dibujo: ' + s);
+  // las estadísticas de la Crónica de la armada las escribe alguien
+  assert.match(JS('expeditions.js'), /stat\('jefe_' \+ r\.jefeMar, 1\)/);
+  assert.match(ar, /stat\('asaltos_ganados', 1\)/);
+  // tormentas: del reloj, iguales para todos; un 5–12% del tiempo, de a 40 minutos
+  const t0 = Date.UTC(2026, 10, 1);
+  let con = 0;
+  const N = 30 * 24 * 12; // cada 5 minutos durante 30 días
+  for (let i = 0; i < N; i++) { const t = t0 + i * 300e3, a = DM.tormenta(t); if (a) { con++; assert.ok(a.hasta > t && a.hasta - t <= 40 * 60e3); } }
+  assert.ok(con / N > 0.04 && con / N < 0.13, 'tormenta ' + (con / N));
+  assert.deepEqual(DM.tormenta(t0 + 12345678), PM.D.tormenta(t0 + 12345678));
+  // asaltos: más fuertes con la era y con cada asalto (hasta 8), premio y tope del robo crecen
+  assert.ok(DM.asaltoFuerza(3, 0) > DM.asaltoFuerza(2, 0) && DM.asaltoFuerza(2, 8) === DM.asaltoFuerza(2, 20));
+  assert.ok(DM.asaltoTope(4) > DM.asaltoTope(2) && DM.asaltoPremio(4).gold > DM.asaltoPremio(2).gold);
+  assert.ok(DM.BSTATS.cadena(1).cadena < 1 && DM.BSTATS.cadena(20).cadena >= 0.55);
+});

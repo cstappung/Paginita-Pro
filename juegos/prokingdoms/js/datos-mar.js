@@ -138,9 +138,76 @@
       warehouse: { name: 'Bodega del puerto', desc: 'Aumenta cuánto puedes guardar de todo lo demás.' },
       builder: { name: 'Casa del Carpintero de Ribera', desc: '+1 carpintero: podrás mejorar un edificio más a la vez.' },
       tower: { name: 'Torre de vigía de la costa', desc: 'Vigila la costa y ve lejos sobre el agua.' },
+      barracks: { name: 'Dársena de guerra', agua: true, max: 2, desc: 'Arma tu flota: balandras, fragatas, brulotes y galeones. Cada nivel desbloquea barcos y arma más rápido. Va pegada al agua.' },
     },
-    construir: ['house', 'mill', 'muelle', 'lumber', 'mining', 'salinas', 'granary', 'warehouse', 'builder', 'tower', 'faromar', 'velas', 'embarcadero', 'astillero', 'polvorin', 'comercio', 'granfaro'],
+    construir: ['house', 'mill', 'muelle', 'lumber', 'mining', 'salinas', 'granary', 'warehouse', 'builder', 'tower', 'faromar', 'velas', 'embarcadero', 'astillero', 'polvorin', 'comercio', 'granfaro', 'barracks', 'escuela', 'bateria', 'cadena'],
   };
+
+
+  // ---------- Armada (pk-29, Fase 9 «c») ----------
+  // En el mar, D.ARMY y D.ENEMY son estos (aplicarTema): la tierra nunca los ve. Cada enemigo tiene dos o más
+  // respuestas con vs > 1 (como en la tierra, la prueba T3). `req`: edificio que hace falta para entrenarla.
+  // `chico`: los tiburones le pegan más (hunden balandras). Cómo pelea cada uno en la batalla: armada.js.
+  D.ARMY_MAR = {
+    balandra: { name: 'Balandra', role: 'Rápida y barata: explora y flanquea. x1,3 contra piratas; los tiburones la hunden.', cost: { wood: 70, fibra: 20, gold: 20 }, time: 18, power: 6, era: 2, lvl: 1, vs: { pirata: 1.3, marino: 0.7 }, mar: true, chico: true },
+    infanteria: { name: 'Infantería de marina', role: 'Aborda en botes. x1,5 contra piratas y x1,4 contra el barco fantasma.', cost: { food: 60, gold: 30, fibra: 10 }, time: 16, power: 6, era: 2, lvl: 2, req: 'escuela', vs: { pirata: 1.5, fantasma: 1.4 }, mar: true, chico: true },
+    arponero: { name: 'Arponeros', role: 'Arpón contra monstruos: frena lo que toca. x2 contra cangrejos y x1,8 contra tiburones y serpientes.', cost: { food: 50, wood: 40, gold: 35, salitre: 6 }, time: 22, power: 8, era: 3, lvl: 2, req: 'escuela', vs: { cangrejo: 2, marino: 1.8 }, mar: true, chico: true },
+    fragata: { name: 'Fragata', role: 'Andanadas de cañones a los costados. x1,6 contra piratas y x1,4 contra cangrejos.', cost: { tablazon: 8, lona: 10, polvora: 3, gold: 60 }, time: 32, power: 18, era: 3, lvl: 3, vs: { pirata: 1.6, cangrejo: 1.4 }, mar: true },
+    brulote: { name: 'Brulote', role: 'Barco incendiario: se mete entre ellos y estalla (se pierde). x1,8 contra el barco fantasma, x1,3 contra piratas.', cost: { wood: 120, polvora: 8, gold: 30 }, time: 26, power: 16, era: 3, lvl: 4, vs: { fantasma: 1.8, pirata: 1.3 }, mar: true },
+    galeon: { name: 'Galeón de guerra', role: 'Casco grueso y muchos cañones. x1,8 contra tiburones y serpientes, x1,2 contra cangrejos y el barco fantasma.', cost: { tablazon: 18, lona: 14, polvora: 8, gold: 160 }, time: 55, power: 45, era: 4, lvl: 6, vs: { marino: 1.8, cangrejo: 1.2, fantasma: 1.2 }, mar: true },
+  };
+  D.ENEMY_MAR = {
+    pirata: { name: 'Piratas de la Bruma', desc: 'Balandros rápidos que abordan; los tiradores disparan desde la cofa. Fragatas e infantería de marina.' },
+    cangrejo: { name: 'Cangrejos gigantes', desc: 'Caparazón duro: las balas chicas rebotan. Arponeros y cañones de fragata.' },
+    marino: { name: 'Tiburones y serpientes', desc: 'Rápidos, hunden balandras. Galeones de casco grueso y arponeros; no mandes barcos chicos solos.' },
+    fantasma: { name: 'Barco fantasma', desc: 'Atraviesa la bruma y sus ahogados abordan. Brulotes que lo incendian e infantería de marina.' },
+  };
+  // Encargos del tablón de la Dársena (el mismo motor que los de la tierra: Exp.board).
+  D.MISSIONS_MAR = [
+    { id: 'convoy', name: 'Escoltar un convoy de especias', enemy: { pirata: 1 }, base: 50, time: 20 * 60, era: 2, loot: { gold: 250 }, sp: 'especias', spN: 4, desc: 'Un mercader de canela no quiere perder otra carga.' },
+    { id: 'cangrejos', name: 'Cangrejos en el arrecife', enemy: { cangrejo: 1 }, base: 60, time: 15 * 60, era: 2, loot: { stone: 400 }, sp: 'salitre', spN: 20, desc: 'Con la marea baja salen del agua y no dejan trabajar a nadie.' },
+    { id: 'banco', name: 'Tiburones en el banco de pesca', enemy: { marino: 1 }, base: 80, time: 25 * 60, era: 2, loot: { food: 500 }, sp: 'fibra', spN: 40, desc: 'Las redes vuelven rotas y los pescadores no quieren salir.' },
+    { id: 'contrabando', name: 'Contrabandistas de pólvora', enemy: { pirata: 0.7, cangrejo: 0.3 }, base: 110, time: 25 * 60, era: 3, loot: { gold: 300 }, sp: 'polvora', spN: 6, desc: 'Esconden barriles en una cueva del arrecife.' },
+    { id: 'serpiente', name: 'La serpiente del estrecho', enemy: { marino: 1 }, base: 150, time: 30 * 60, era: 3, loot: { wood: 600 }, sp: 'tablazon', spN: 10, desc: 'Algo largo y verde se enrosca en los cascos que cruzan.' },
+    { id: 'farol', name: 'El farol de los ahogados', enemy: { fantasma: 1 }, base: 140, time: 25 * 60, era: 3, loot: { gold: 350 }, sp: 'lona', spN: 12, desc: 'De noche se ve una luz verde donde no hay ningún barco.' },
+    { id: 'pecio', name: 'Saqueadores del pecio', enemy: { pirata: 0.5, fantasma: 0.5 }, base: 300, time: 45 * 60, era: 4, loot: { gold: 900 }, sp: 'especias', spN: 10, desc: 'Piratas y muertos se pelean el mismo naufragio.' },
+    { id: 'crias', name: 'Las crías del abismo', enemy: { marino: 0.6, cangrejo: 0.4 }, base: 800, time: 60 * 60, era: 5, loot: { gold: 1500 }, sp: 'polvora', spN: 20, desc: 'Del fondo suben cosas que nadie había visto.' },
+  ];
+  // Jefes del mar: uno por era par. Se pelean desde la Dársena (pestaña Atacar). La primera victoria paga mucho;
+  // después se pueden repetir cuando vuelven (descanso) por menos.
+  D.JEFES_MAR = {
+    malvarosa: { name: 'La Reina Pirata Malvarosa', era: 2, enemy: { pirata: 1 }, power: 240, travel: 4 * 60, descanso: 12 * 3600, nivel: 0.5, loot: { gold: 1200, especias: 30, coins: 25 }, rep: { gold: 400, especias: 8, coins: 5 }, desc: 'Su galera de velas rosadas manda en las rutas de especias. Sus abordadores van por tus cañones.' },
+    lamento: { name: 'El Lamento', era: 4, enemy: { fantasma: 1 }, power: 1400, travel: 8 * 60, descanso: 18 * 3600, nivel: 0.8, loot: { gold: 4000, polvora: 150, especias: 60, coins: 50 }, rep: { gold: 1200, especias: 15, coins: 10 }, desc: 'Un barco fantasma que entra y sale de la bruma. Mientras está adentro casi nada le entra.' },
+    kraken: { name: 'El Kraken de la Bruma', era: 6, enemy: { marino: 1 }, power: 7000, travel: 12 * 60, descanso: 24 * 3600, nivel: 1, loot: { gold: 15000, especias: 200, tablazon: 400, coins: 120 }, rep: { gold: 4000, especias: 40, coins: 20 }, desc: 'Agarra los barcos con sus tentáculos. Hay que cortarlos uno por uno antes de que el cuerpo sienta algo.' },
+  };
+  // Tormentas: salen del reloj real (las mismas para todos y en vivo y sin conexión). Una de cada tres ventanas de
+  // 3 horas tiene una de 40 minutos. Una flota que zarpa con tormenta tarda más y llega con las velas rotas.
+  D.TORMENTA_MS = 3 * 3600e3;
+  D.tormenta = function (t) {
+    t = t == null ? Date.now() : t;
+    const w = Math.floor(t / D.TORMENTA_MS), h = U.strHash('tormenta' + w) % 1000;
+    if (h % 3) return null;
+    const ini = w * D.TORMENTA_MS + ((h * 7919) % 100) / 100 * (D.TORMENTA_MS - 40 * 60e3);
+    return t >= ini && t < ini + 40 * 60e3 ? { hasta: ini + 40 * 60e3 } : null;
+  };
+  D.TORMENTA = { viaje: 1.4, fuerza: 0.9 };
+  // Asaltos piratas (solo mientras juegas, como las incursiones de la tierra): desde la Era II si ya tienes
+  // Dársena o Batería. La Cadena de puerto los achica.
+  D.asaltoFuerza = (era, n) => Math.round((40 + 45 * (era - 1)) * (0.8 + 0.1 * Math.min(n, 8)));
+  D.asaltoPremio = era => ({ gold: Math.round(120 * Math.pow(1.7, era - 1) / 10) * 10, especias: 3 * era, coins: 2 + era });
+  D.asaltoTope = era => Math.round(300 * Math.pow(1.8, era - 1));
+  Object.assign(D.BUILD, {
+    escuela: { name: 'Escuela de navegantes', w: 2, h: 2, cost: { wood: 200, stone: 120, gold: 80 }, time: 50, era: 2, max: 1, mar: true, desc: 'Forma infantería de marina y arponeros. Cada nivel les da veteranía mientras esperan en el puerto.' },
+    bateria: { name: 'Batería costera', w: 2, h: 2, cost: { stone: 300, tablazon: 20, polvora: 15 }, time: 50, era: 3, max: e => 1 + e, agua: true, mar: true, desc: 'Cañones en la costa: disparan a los piratas que asaltan tu puerto.' },
+    cadena: { name: 'Cadena de puerto', w: 2, h: 2, cost: { stone: 500, tablazon: 60, polvora: 20 }, time: 80, era: 4, max: 1, agua: true, mar: true, desc: 'Cierra la bahía: los asaltos piratas llegan con menos barcos.' },
+  });
+  Object.assign(D.BSTATS, {
+    escuela: L => ({ armyXp: 4 * L }),
+    bateria: L => ({ defense: Math.round(45 * (1 + 0.4 * (L - 1))), sight: 6 }),
+    cadena: L => ({ cadena: Math.max(0.55, 0.8 - 0.025 * (L - 1)) }),
+  });
+  D.STAT_LABELS.cadena = ['Asaltos piratas', v => '×' + v.toFixed(2).replace('.', ',')];
+  for (const k of ['escuela', 'bateria', 'cadena']) D.BUILD[k].sight = D.BUILD[k].sight || 4;
 
   // ---------- Crónica del Mar ----------
   const B = (b, n) => ({ t: 'build', b, n: n || 1 }), LV = (b, lvl) => ({ t: 'level', b, lvl, n: 1 }), LA = (lvl, n) => ({ t: 'level', lvl, n });
@@ -169,6 +236,18 @@
   q('mar19', 'Tres colonias', 'Funda tres colonias.', st('colonias', 3), { especias: 60, coins: 40 });
   q('mar20', 'El Gran Faro', 'Levanta el Gran Faro de la Bruma.', B('granfaro'), { coins: 100 });
   q('mar21', 'Señor de los Mares', 'Avanza a la Era VI: Señor de los Mares.', era(6), { coins: 150, especias: 200 });
+  // la armada: su propia cadena dentro de la Crónica, desde la Era II
+  prev = 'mar7';
+  const qa = (id, title, desc, req, reward) => q(id, title, desc, req, reward);
+  qa('arm1', 'La Dársena de guerra', 'Construye una Dársena de guerra pegada al agua.', B('barracks'), { wood: 300, lona: 20, coins: 10 });
+  qa('arm2', 'Velas al viento', 'Arma 5 barcos o soldados en la Dársena.', st('trained_army', 5), { gold: 200, fibra: 100 });
+  qa('arm3', 'Primer encargo', 'Cumple un encargo del tablón de la Dársena.', st('missions_done', 1), { gold: 300, coins: 10 });
+  qa('arm4', 'Escuela de navegantes', 'Levanta la Escuela de navegantes: infantería de marina y arponeros.', B('escuela'), { food: 400, coins: 10 });
+  qa('arm5', 'La Reina Pirata', 'Derrota a la Reina Pirata Malvarosa.', st('jefe_malvarosa', 1), { especias: 30, coins: 30 });
+  qa('arm6', 'Cañones en la costa', 'Levanta una Batería costera.', B('bateria'), { polvora: 30, coins: 10 });
+  qa('arm7', 'Puerto seguro', 'Rechaza un asalto pirata.', st('asaltos_ganados', 1), { gold: 800, coins: 20 });
+  qa('arm8', 'El Lamento', 'Hunde al Lamento, el barco fantasma.', st('jefe_lamento', 1), { tablazon: 150, coins: 50 });
+  qa('arm9', 'El Kraken de la Bruma', 'Derrota al Kraken de la Bruma.', st('jefe_kraken', 1), { coins: 150, especias: 150 });
   D.BRANCH_MAR = { id: 'mar', name: 'Crónica del Mar', icon: 'ancla', desc: 'La historia de tu isla: pesca, colonias, especias y el Gran Faro.' };
 
   const DAILY_MAR = [
@@ -213,6 +292,9 @@
     D.dailyBonus = e => ({ gold: 100 * e, fibra: 40 * e, coins: 6 + 2 * e });
     D.weeklyReward = e => ({ food: 800 * e, wood: 800 * e, stone: 400 * e, gold: 350 * e, fibra: 200 * e, coins: 20 + 5 * e });
     D.VILLAGER = Object.assign({}, D.VILLAGER, { name: 'Colono' });
+    D.ARMY = D.ARMY_MAR;
+    D.ENEMY = D.ENEMY_MAR;
+    D.MISSIONS = D.MISSIONS_MAR;
     return true;
   };
 })();

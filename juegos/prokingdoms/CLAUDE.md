@@ -881,3 +881,40 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   The Comercio buys and sells sea goods for gold (`D.COMERCIO_MAR`). Bruma banks drift over the sea and thin
   out near lighthouses.
 - The server never sees the sea map (no snapshot at sea), so none of this changes `D.PROTO`.
+
+## The New World, part 3 (`pk-29`, Phase 9 N7 «c»: the navy and naval battles)
+
+- **At sea `D.ARMY`, `D.ENEMY` and `D.MISSIONS` are the sea's** (`ARMY_MAR`, `ENEMY_MAR`, `MISSIONS_MAR` in
+  `datos-mar.js`, swapped by `aplicarTema`), so the Cuartel code, the planner and the battle run unchanged.
+  The land never sees them. `barracks` is re-skinned as the **Dársena de guerra** (`agua: true`); menu «Flota»,
+  group «Armada». `Armada.init` drops land troop keys left in a sea save (pre-`pk-29` the sea used land
+  tables) — `Soc.power` would crash on them. Troops with `req` (infantería, arponeros) need the Escuela.
+- **`js/armada.js`** fills `batalla.js` through hooks: `B.TROPA`, `B.ENEMIGOS`, `B.JEFE`, `B.CONSEJO*`
+  (exposed tables), `B.ext.sprite` (ships, boats, crabs, sharks… drawn by code, cached per frame/flip),
+  `B.ext.alArmar` (wind, storm damage, shore batteries, boss setup), `B.ext.jefePaso[id]`, and `B.H` (the
+  internal helpers a boss needs). Generic mechanics live in `batalla.js`: `st.barco` (wake instead of dust,
+  ships sink instead of falling), `st.explota` (brulote), `st.frena` (harpoon), `st.caparazon`/`st.rompe`,
+  `st.hunde`/`st.chico`, `st.fija` (batteries), `b.jefeMult` (a boss that takes less), and **wind**
+  (`b.viento` ±1, seeded by run id: the windward ships ×1.15 speed, ×1.1 damage; even on average).
+- **A brulote that explodes leaves the life count** (`b.fuerza0[0] -= f.max`): before that, exploding counted
+  as losing and fired the automatic retreat. Its blast is 1.5× its power (what it would deal living the
+  whole fight). **`bala` and `arpon` retarget like the crossbow bolt** when their target already fell.
+- **At sea everything is fought in the `'mar'` scenery** (`escenarios.js`: water, islets, debris, gulls;
+  storm, fog and rain with depth) and **sea missions are live too** (on land missions stay formula-only).
+  `r.nivel` sets the scene's depth. On the map the fleet is drawn by `Armada.items` (ships leaving the
+  Dársena, ships moored by it); `Troops.collect` draws nothing at sea.
+- **Bosses** (`D.JEFES_MAR`, target `{ jefeMar }` in `Exp.preview/canSend/send/cerrar`): Malvarosa (II,
+  boarders at your shooters, broadside circles), el Lamento (IV, in and out of the fog: only infantry and
+  brulotes hit it fully; a lighthouse shortens it), the Kraken (VI, 4 tentacles taken from its life; while one
+  lives the body takes ×0.2; one regrows every 15 s). First win pays `loot`, later ones `rep`, then `descanso`.
+- **Storms** (`D.tormenta`, real clock, ~7% of the time, 40 min): a fleet that sails in one takes ×1.4 travel
+  and arrives at ×0.9. **Pirate raids** (live only, like land raids; `st.asalto` keeps the clock): from Era II
+  with a Dársena or Batería, every 25–40 min, 45 s warning; your fleet at home plus shore batteries
+  (`r.baterias`, fixed figures that are not troops: `bajas` skips them) fight; the Cadena lowers their power.
+  Lost: 12% of food, wood, gold and spices, capped by `D.asaltoTope`.
+- **Measured with `B.update` to the end** (40 fights each, 1:1 / 1.3:1): pirates vs fragatas+infantería
+  50/100, crabs vs arponeros 25/93 (balandras 0/5: the shell), sharks/serpents vs galeón+arponeros 85/100,
+  ghosts vs brulotes+infantería 55/100, Malvarosa 17/83, el Lamento 33/100 with infantry+frigates (10/53 with
+  brulotes), Kraken 63/100. Crabs started at 2.2 hp like a land giant and specialists won 5%: at sea they are a
+  normal enemy whose trick is only the shell.
+- Fixed on the way: chained rings (`anillos` with negative `t`, Morgana's curse) threw on `ellipse`.

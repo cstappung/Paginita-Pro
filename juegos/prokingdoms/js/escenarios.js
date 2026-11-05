@@ -475,6 +475,36 @@
         if (n >= 0.75) esc.part.push({ tipo: 'estrellas', n: 3 });
         esc.tinte = n >= 0.6 ? [120, 100, 255, 0.05 + n * 0.04] : null;
       }
+    } else if (lugar === 'mar') { // pk-29: mar abierto. Olas, islotes y rocas en las orillas; más lejos, tormenta y bruma
+      const azul = mix([40, 104, 146], [28, 52, 80], n), claro = mix([70, 150, 190], [56, 90, 120], n);
+      for (let j = 0; j < H; j += 2) for (let i = 0; i < W; i += 2) {
+        const k = U.noise(i / 40, j / 22, seed) * 0.6 + U.noise(i / 9, j / 5, seed + 4) * 0.4;
+        x.fillStyle = rgb(mix(azul, claro, U.clamp(k * 1.3 - 0.35, 0, 1))); x.fillRect(i, j, 2, 2);
+      }
+      // crestas de las olas, quietas (las que se mueven van en animar)
+      for (let i = 0; i < 260; i++) { const px = rnd() * W, py = rnd() * H, w = 3 + Math.floor(rnd() * 6); p.r(px, py, w, 1, 'rgba(220,240,255,' + (0.16 + rnd() * 0.22).toFixed(2) + ')'); p.r(px + 1, py + 1, w - 2, 1, 'rgba(10,30,50,0.18)'); }
+      // islotes y rocas fuera del campo (o en las orillas)
+      const islote = (cx, cy, w, h, palma) => {
+        p.sombra(cx, cy + 2, w + 10, 6, 0.2);
+        for (let r = 0; r < 4; r++) p.r(cx - w / 2 - 4 + r, cy - 1 + r, w + 8 - r * 2, 1, 'rgba(230,245,255,' + (0.5 - r * 0.1) + ')');
+        for (let r = 0; r < h; r++) { const half = Math.round((w / 2) * Math.sqrt(1 - Math.pow(1 - (r + 1) / h, 2))); p.r(cx - half, cy - h + r, half * 2, 1, r < 2 ? '#e8d8a0' : r < h - 2 ? '#d4bf84' : '#b89a60'); }
+        if (palma) { p.r(cx - 1, cy - h - 12, 2, 12, '#7a5a34'); for (const [dx, dy] of [[-7, 0], [6, 0], [-5, -3], [4, -3], [0, -4]]) p.r(cx + dx - 2, cy - h - 13 + dy, 6, 2, '#3a8a3a'); }
+      };
+      const roquedal = (cx, cy, w) => { for (let r = 0; r < 3; r++) p.r(cx - w / 2 - 3, cy + r - 1, w + 6, 1, 'rgba(230,245,255,0.35)'); roca(p, cx, cy, w, Math.round(w * 0.6), [84, 84, 92], rnd); };
+      for (let i = 0; i < 4 + Math.round(n * 3); i++) { const [px, py] = orilla(); pone(py, () => (rnd() < 0.5 ? roquedal(px, py, 10 + rnd() * 12) : islote(px, py, 22 + rnd() * 20, 6 + rnd() * 4, rnd() < 0.6))); }
+      for (let i = 0; i < 8; i++) { const px = rnd() * W, py = rnd() * H; if (px > mx - 20 && px < mx + fw + 20 && py > my - 20 && py < my + fh + 20) continue; pone(py, () => islote(px, py, 30 + rnd() * 40, 8 + rnd() * 6, true)); }
+      // restos flotando: barriles, tablas y un mástil roto
+      for (let i = 0; i < 5 + Math.round(n * 5); i++) { const [px, py] = at(2 + rnd() * (LU - 4), 0.5 + rnd() * (LV - 1)); const t = rnd(); pone(py, () => { if (t < 0.4) { p.r(px - 3, py - 4, 6, 5, '#7a4a24'); p.r(px - 3, py - 3, 6, 1, '#3a3a40'); } else if (t < 0.8) { p.r(px - 6, py - 1, 12, 2, '#8a6232'); p.r(px - 6, py - 1, 12, 1, '#a8804a'); } else { p.r(px - 10, py - 2, 20, 2, '#6a4424'); p.r(px + 6, py - 4, 6, 3, '#d8d0b8'); } p.r(px - 6, py + 1, 12, 1, 'rgba(230,245,255,0.4)'); }); }
+      for (let i = 0; i < 26; i++) esc.anim.push({ tipo: 'ola', x: rnd() * W, y: rnd() * H, w: 4 + Math.floor(rnd() * 6), f: rnd() * 6 });
+      for (let i = 0; i < 10; i++) esc.anim.push({ tipo: 'destello', x: rnd() * W, y: rnd() * H });
+      for (let i = 0; i < 3; i++) esc.anim.push({ tipo: 'gaviota', x: rnd() * W, y: rnd() * H * 0.5, f: rnd() * 6, v: 14 + rnd() * 10 });
+      // tu lado: una boya con el color de tu reino; el de ellos, una bandera negra
+      { const [px, py] = fondoMio(2); pone(py, () => { p.r(px - 3, py - 6, 6, 6, '#c8c0a8'); p.r(px - 1, py - 22, 2, 16, '#3a2412'); p.r(px - 4, py, 8, 1, 'rgba(230,245,255,0.5)'); }); esc.anim.push({ tipo: 'bandera', x: px + 1, y: py - 22, col: rgb(PK.D.PLAYER_COLOR) }); }
+      { const [px, py] = fondoEnemigo(2); pone(py, () => { p.r(px - 3, py - 6, 6, 6, '#5a5a62'); p.r(px - 1, py - 22, 2, 16, '#2a1a10'); p.r(px - 4, py, 8, 1, 'rgba(230,245,255,0.5)'); }); esc.anim.push({ tipo: 'bandera', x: px + 1, y: py - 22, col: '#1a1a1e' }); }
+      if (n >= 0.55) { esc.part.push({ tipo: 'niebla', n: 8 + Math.round(n * 10) }); esc.anim.push({ tipo: 'relampago', f: rnd() * 5 }); }
+      if (n >= 0.85) esc.part.push({ tipo: 'gotas', n: 50 });
+      esc.oscuro = 0.06 + n * 0.32; esc.tinte = n >= 0.55 ? [70, 110, 150, 0.08 + n * 0.06] : [255, 230, 180, 0.04];
+      esc.bruma = [170, 200, 220];
     } else { // campo abierto (encargos y lo que no tenga escenario propio)
       suelo(x, W, H, [86, 126, 58], 16, seed);
       for (let i = 0; i < 120; i++) { const [px, py] = [rnd() * W, rnd() * H]; p.r(px, py, 1, 1, ['#e8e060', '#f0f0f0', '#d070a0'][Math.floor(rnd() * 3)]); }
@@ -556,6 +586,16 @@
         const h = Math.max(4, Math.round(a.w * 0.3));
         for (let i = 0; i < 6; i++) { const ph = t * 0.8 + i * 1.3, gx = a.x + Math.sin(ph + i) * a.w * 0.32, gy = a.y + Math.cos(ph * 0.7 + i) * h * 0.25; r(gx - 2, gy, 5, 1, 'rgba(255,230,120,' + (0.5 + 0.3 * Math.sin(ph * 3)).toFixed(2) + ')'); }
         const b = (t * 1.3 + a.x) % 2.2; if (b < 0.4) { const bx = a.x + Math.sin(a.x + Math.floor(t * 1.3)) * a.w * 0.3; r(bx - 1, a.y - b * 6, 3, 2, 'rgba(255,200,90,' + (1 - b / 0.4).toFixed(2) + ')'); }
+      } else if (a.tipo === 'ola') { // pk-29: una cresta que va y viene
+        const k = Math.sin(t * 1.6 + a.f), ox = Math.round(Math.sin(t * 0.7 + a.f) * 3);
+        if (k > 0) { r(a.x + ox, a.y, a.w, 1, 'rgba(235,248,255,' + (0.5 * k).toFixed(2) + ')'); r(a.x + ox + 1, a.y - 1, a.w - 2, 1, 'rgba(255,255,255,' + (0.3 * k).toFixed(2) + ')'); }
+      } else if (a.tipo === 'gaviota') {
+        a.x += a.v * dt; if (a.x > esc.W + 10) a.x = -10;
+        const ala = Math.sin(t * 8 + a.f) > 0 ? -1 : 1, gy = a.y + Math.sin(t + a.f) * 4;
+        r(a.x - 3, gy + ala, 3, 1, '#f0f0f0'); r(a.x, gy, 1, 1, '#f0f0f0'); r(a.x + 1, gy + ala, 3, 1, '#f0f0f0');
+      } else if (a.tipo === 'relampago') { // de vez en cuando, un destello en el cielo
+        const c = (t + a.f) % 7;
+        if (c < 0.12 || (c > 0.22 && c < 0.28)) { ctx.fillStyle = 'rgba(220,235,255,0.22)'; ctx.fillRect(0, 0, esc.W, esc.H); }
       } else if (a.tipo === 'rayo') {
         const g = ctx.createLinearGradient(a.x, 0, a.x + 60, esc.H), rc = (a.col || [255, 240, 190]).join(',');
         g.addColorStop(0, 'rgba(' + rc + ',0.22)'); g.addColorStop(1, 'rgba(' + rc + ',0)');

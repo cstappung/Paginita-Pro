@@ -50,30 +50,39 @@
   UI.openBarracks = function (tab, target, extra) {
     if (tab) barTab = tab;
     if (target) plan = Object.assign({ target, units: null }, extra || {});
-    UI.modal('war', 'Cuartel', body => {
+    const mar = D.temaActivo === 'mar'; // en el archipiélago (pk-29) es la Dársena de guerra, con la flota
+    UI.modal('war', D.BUILD.barracks.name, body => {
       const st = S(), g = G();
       const tabs = el('div', { class: 'book-tabs bar-tabs' });
       const camps = W.pois.filter(p => p.kind === 'camp' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d).length;
-      for (const [id, name, icon] of [['troops', 'Tropas', 'war'], ['exp', 'Atacar', 'crystal'], ['missions', 'Encargos', 'scroll'], ['defense', 'Defensa', 'wall'], ['log', 'Crónica', 'book']]) {
+      for (const [id, name, icon] of [['troops', mar ? 'Flota' : 'Tropas', 'war'], ['exp', 'Atacar', 'crystal'], ['missions', 'Encargos', 'scroll'], ['defense', 'Defensa', 'wall'], ['log', 'Crónica', 'book']]) {
         const dot = id === 'exp' && camps && g.countB('barracks') && sumUnits(st.war.army);
         tabs.append(el('button', { class: 'book-tab' + (barTab === id ? ' on' : ''), onclick: () => { barTab = id; if (id !== 'exp' && id !== 'missions') plan = null; UI.rerender(true); } }, el('img', { class: 'ico', src: Sp.icon(icon) }), name, dot ? el('span', { class: 'dot' }) : null));
       }
-      const tre = D.SPECIAL.filter(r => st.res[r] > 0);
+      const tre = mar ? [] : D.SPECIAL.filter(r => st.res[r] > 0); // los tesoros son de la tierra
       body.append(el('div', { class: 'war-top' },
         el('div', null, el('b', null, 'Defensa del reino: '), U.fmt(PK.Social.defense()), el('span', { class: 'muted small' }, ' (torres, Centro Urbano y soldados en casa)')),
         tre.length ? el('div', { class: 'treasure' }, el('b', null, 'Tesoros: '), tre.map(r => UI.amount(r, st.res[r]))) : null,
-        PK.Social.truce() ? el('div', { class: 'truce' }, 'Tregua de novato: nadie te atacará hasta que construyas un Cuartel o llegues a la Era III.') : null,
-        PK.Net.online ? PK.Net.incoming.map(r => el('div', { class: 'alert' }, '¡' + r.from + ' (jugador) ataca con fuerza aprox. ' + r.power + ' en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '!')) : null), tabs);
+        !mar && PK.Social.truce() ? el('div', { class: 'truce' }, 'Tregua de novato: nadie te atacará hasta que construyas un Cuartel o llegues a la Era III.') : null,
+        PK.Net.online && !mar ? PK.Net.incoming.map(r => el('div', { class: 'alert' }, '¡' + r.from + ' (jugador) ataca con fuerza aprox. ' + r.power + ' en ' + U.fmtTime((r.arrive - Date.now()) / 1000) + '!')) : null), tabs);
       const pane = el('div', { class: 'bar-pane' });
       body.append(pane);
       if (!g.countB('barracks') && barTab !== 'defense' && barTab !== 'log') {
         const can = g.isUnlocked('barracks'), building = g.countAll('barracks') > 0;
+        if (mar) {
+          pane.append(el('div', { class: 'empty-box' }, el('img', { src: Sp.buildingIcon('barracks'), alt: '' }),
+            el('div', null, el('b', null, building ? 'Tu Dársena de guerra está en obra.' : 'Todavía no tienes Dársena de guerra.'),
+              el('p', { class: 'small' }, building ? 'Cuando esté lista podrás armar tu flota y salir a los encargos y contra los jefes del mar.' : can ? 'Constrúyela pegada al agua para armar balandras, fragatas y galeones, y salir contra piratas, cangrejos, serpientes y barcos fantasma.' : 'Se desbloquea en la Era II del archipiélago (Puerto).'),
+              can && !building ? UI.btn('Construir la Dársena', () => { UI.closeModal(); PK.Input.startPlacing('barracks'); }, { cls: 'gold' }) : null)));
+          return;
+        }
         pane.append(el('div', { class: 'empty-box' }, el('img', { src: Sp.buildingIcon('barracks'), alt: '' }),
           el('div', null, el('b', null, building ? 'Tu Cuartel está en obra.' : 'Todavía no tienes Cuartel.'),
             el('p', { class: 'small' }, building ? 'Cuando esté listo podrás entrenar tropas y atacar campamentos, mazmorras y encargos.' : can ? 'Constrúyelo para entrenar tropas y atacar campamentos de bandidos, mazmorras y encargos. Ojo: termina tu tregua de novato.' : 'Se desbloquea en la Era II. Las murallas (pestaña Defensa) sí se pueden levantar desde ya.'),
             can && !building ? UI.btn('Construir un Cuartel', () => { UI.closeModal(); PK.Input.startPlacing('barracks'); }, { cls: 'gold' }) : null)));
         return;
       }
+      if (mar && barTab === 'defense' && PK.Armada) { pane.append(PK.Armada.defensaEl()); return; }
       ({ troops: troopsTab, exp: expTab, missions: missionsTab, defense: defenseTab, log: logTab })[barTab](pane);
     }, { wide: true });
   };
@@ -93,13 +102,13 @@
           el('span', { class: 'ac-n', title: 'En casa' }, String(w.army[k]))),
         UI.costEl(a.cost),
         el('div', { class: 'bar thin' }, el('div', { class: 'fill gold', style: { width: (r >= D.RANKS.length - 1 ? 100 : ((xp - cur) / (nx - cur)) * 100) + '%' } }), el('span', null, D.RANKS[r] + (r ? ' (+' + r * 4 + '%)' : ''))),
-        locked ? el('div', { class: 'muted small' }, 'Se desbloquea con ' + (st.era < a.era ? 'la Era ' + U.roman(a.era) : 'el Cuartel en nivel ' + a.lvl) + '.')
+        locked ? el('div', { class: 'muted small' }, 'Se desbloquea con ' + (st.era < a.era ? 'la Era ' + U.roman(a.era) : (D.temaActivo === 'mar' ? 'la ' : 'el ') + D.BUILD.barracks.name + ' en nivel ' + a.lvl) + '.')
           : el('div', { class: 'row ac-btns' }, [1, 5, 10].map(n => UI.btn('+' + n, () => { PK.Social.trainArmy(k, n); UI.rerender(); UI.refreshPanel(true); }, { small: true, cls: n === 1 ? 'gold' : '', disabled: !!why, title: why || 'Entrenar ' + n }))),
         why && !locked ? el('div', { class: 'small warn-t' }, why) : null));
     }
     pane.append(el('h3', null, 'Entrenar'), grid);
     const nextLock = Object.keys(D.ARMY).filter(k => st.era >= D.ARMY[k].era && bl < D.ARMY[k].lvl).map(k => D.ARMY[k].name + ' (nivel ' + D.ARMY[k].lvl + ')');
-    if (nextLock.length) pane.append(el('p', { class: 'small muted' }, 'Mejora el Cuartel para desbloquear: ' + nextLock.join(', ') + '. Cada nivel también entrena más rápido.'));
+    if (nextLock.length) pane.append(el('p', { class: 'small muted' }, 'Mejora ' + (D.temaActivo === 'mar' ? 'la ' : 'el ') + D.BUILD.barracks.name + ' para desbloquear: ' + nextLock.join(', ') + '. Cada nivel también entrena más rápido.'));
     const guide = el('details', { class: 'enemy-det' }, el('summary', null, 'Contra qué sirve cada tropa'), el('div', { class: 'enemy-guide' }, Object.keys(D.ENEMY).map(e => {
       const en = {}; en[e] = 1;
       return el('div', { class: 'eg' }, el('b', null, D.ENEMY[e].name), el('span', { class: 'small' }, D.ENEMY[e].desc), el('span', { class: 'small muted' }, 'Mejor: ' + (bestVs(en) || 'cualquiera')));
@@ -148,6 +157,7 @@
       kinds.length ? est : null,
       el('div', { class: 'row' }, el('b', null, 'Botín si ganas: '), UI.costEl(pv.loot, 1, true)),
       why ? el('p', { class: 'small warn-t' }, why) : null,
+      D.temaActivo === 'mar' && D.tormenta && D.tormenta() ? el('p', { class: 'small warn-t' }, '⛈ Hay tormenta: si zarpas ahora, la flota tarda un 40% más y llega con −10% de fuerza.') : null,
       kinds.length ? el('div', { class: 'row' }, UI.btn('Compañía recomendada', () => { plan.units = PK.Exp.recommend(pv.enemy, pv.power); UI.rerender(); }, { small: true }),
         UI.btn('Todos', () => { plan.units = Object.assign({}, w.army); UI.rerender(); }, { small: true }), go) : null));
     refresh();
@@ -241,8 +251,13 @@
 
   function expTab(pane) {
     const st = S(), g = G();
-    if (plan && (plan.target.poi !== undefined || plan.target.camp !== undefined || plan.target.cap)) planner(pane);
+    if (plan && (plan.target.poi !== undefined || plan.target.camp !== undefined || plan.target.cap || plan.target.jefeMar)) planner(pane);
     runsList(pane);
+    if (D.temaActivo === 'mar' && PK.Armada) { // el mar no tiene campamentos ni mazmorras: sus jefes y los encargos
+      pane.append(PK.Armada.jefesEl(target => { plan = { target, units: null }; UI.rerender(); }),
+        el('p', { class: 'small muted' }, 'Los encargos del tablón (piratas, cangrejos, tiburones, barcos fantasma) están en la pestaña Encargos.'));
+      return;
+    }
     // el lugar del capítulo en curso de la campaña (H5)
     const C = PK.Campana, cn = C && st.campana ? C.actual() : 0, cc = cn && C.cap(cn);
     if (cc && cc.lugar && C.lugar(cn)) {

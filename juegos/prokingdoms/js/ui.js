@@ -207,7 +207,7 @@
     mbtn(Sp.buildingIcon('house'), 'Construir', () => UI.openBuild(), 'C', 'build');
     mbtn('hammer', 'Obras', () => UI.openWorks(), null, 'works');
     mbtn('pop', 'Aldeanos', () => UI.openForeman(), null, 'foreman');
-    mbtn('war', 'Cuartel', () => PK.Social.openWar('troops'), null, 'war');
+    mbtn('war', D.temaActivo === 'mar' ? 'Flota' : 'Cuartel', () => PK.Social.openWar('troops'), null, 'war');
     mbtn('crystal', 'Atacar', () => PK.Social.openWar('exp'), null, 'atacar');
     mbtn('wall', 'Defensa', () => PK.Social.openWar('defense'), null, 'defensa');
     mbtn('scroll', 'Batallas', () => PK.Social.openWar('log'), null, 'batallas');
@@ -277,7 +277,7 @@
   // Cuartel siempre está: sus murallas (Defensa) sirven desde la Era I y una misión lo nombra.
   const menuIds = {}, allIds = {};
   // En el archipiélago (pk-28) no hay investigación, gremio, territorio, mercado, ejército ni héroes (todavía)
-  const NO_MAR = ['explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'heroes', 'taberna', 'equipo', 'consejo', 'war', 'atacar', 'defensa', 'batallas', 'desafios', 'album'];
+  const NO_MAR = ['explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'heroes', 'taberna', 'equipo', 'consejo', 'defensa', 'desafios', 'album']; // la armada (pk-29) sí está en el mar
   const MENU_VER = {
     explore: (g, st) => g.countAll('scout') > 0 || st.era >= 2,
     research: (g, st) => st.era >= 2 || g.countAll('library') > 0,
@@ -304,7 +304,7 @@
   const GRUPOS = [
     { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
-    { id: 'guerra', label: 'Guerra', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
+    { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
     { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms'] },
     { id: 'libro', label: 'Libro', icon: 'book', items: ['book', 'diarias', 'desafios', 'album'] },
   ];
@@ -319,6 +319,7 @@
       const box = el('div', { class: 'sub-items' });
       for (const id of g.items) if (todos[id]) box.append(todos[id]);
       const dot = el('span', { class: 'badge g-dot' });
+      if (g.labelMar && D.temaActivo === 'mar') g.label = g.labelMar;
       const gb = el('button', { class: 'mbtn grupo', 'data-g': g.id, title: g.label, 'aria-label': g.label, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: e => { e.stopPropagation(); abrirGrupo(g.id); } },
         el('img', { class: 'ico', src: Sp.icon(g.icon), alt: '' }), el('span', null, g.label), dot);
       menu.append(gb);
