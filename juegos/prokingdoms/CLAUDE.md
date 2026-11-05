@@ -827,12 +827,12 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   (rústico, medieval, reino, imperio), the Archipiélago's own, a night variant (slower, lower, sparser) and a battle
   theme (live battle view or bandits past the warning) that adds cymbals and tempo while a boss lives
   (`Batalla.vistaActual`). Phrases are seeded motifs over a 4-chord progression. Ambience: birds, crickets at
-  night, wind in winter, waves at sea, hammers while something is being built. It picks by game state, not by
-  what is on screen. Volumes `pk_musica` and `pk_ambiente` (0–100) in Opciones. Silent while the tab is hidden
+  night, wind in winter, waves at sea, hammers while something is being built. Since `pk-31` it follows what is
+  on screen (see «Phase 6 leftovers» below). Volumes `pk_musica` and `pk_ambiente` (0–100) in Opciones. Silent while the tab is hidden
   and during the offline calculation.
 - **U6, accessibility** (per device, `UI.acceso`/`UI.setAcceso`): text size (zoom 1.12/1.25 on windows, panel,
-  toasts, submenu and event), colorblind colors (`html.daltonico`: good blue, bad orange; icons do not change
-  shape and realm colors have no pattern yet), reduce motion (`PK.menosMov`: no CSS animations, no battle shake,
+  toasts, submenu and event), colorblind colors (`html.daltonico`: good blue, bad orange; shapes and realm
+  patterns since `pk-31`, below), reduce motion (`PK.menosMov`: no CSS animations, no battle shake,
   no falling leaves or snow; on by default when the system asks for it).
 - **U7:** the battle view fades in, and a full resource gets a red frame in the top bar. The rest of U7 (wonders,
   golem, bear, portraits) was already done in earlier deliveries.
@@ -951,3 +951,21 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   +1 builder (`G.builders`). **Wonder levels from 20 on land cost spices and gunpowder** (`G.upCost` wraps
   `conMar`), but only once the Galeón can sail, so a kingdom that never reached the sea is not locked.
 - Quests `reg1`–`reg4` in the Crónica del Mar (races, ship upgrades, duels won, the Maestro).
+
+## Phase 6 leftovers (`pk-31`): ambience from the screen, colorblind shapes and patterns — Phase 6 done
+
+- **The ambience plays what the camera shows** (`musica.js`, `mirar`, every 1.5 s): a 16 × 10 grid of screen
+  points over explored tiles (water, shore, forest and tree nodes, grass), plus the buildings and villagers on
+  screen (works and upgrades → hammers, staffed forge/smelter/steelworks/workshop → anvil, sawmill/masonry/
+  cartwright → saw, houses, market, TC, tavern, guild → people, villagers chopping or mining → axe or pick).
+  `fuentes` turns that into weighted sources, one sound at a time, more often when more is going on. Each sound
+  goes through a `StereoPanner` placed by where its source sits on screen, and the zoom makes it louder
+  (`cerca`). Night (crickets), winter (wind) and the sea (waves, gulls) still decide what nature sounds like.
+  Read-only: it never touches the game. `PK.Musica.escena()` / `fuentes()` are for tests.
+- **Colorblind mode adds shapes and patterns** (only with `html.daltonico`): every realm but yours gets one of
+  six patterns (`Sp.patronDe(slot)` = `slot % 6`, `Sp.enPatron`) in the minimap's territory (the base is rebuilt
+  when the mode changes), in the territory-mode fill (`Sp.trama`, 3 px cells so it still reads at zoom 1), as a
+  dash per realm on the map borders (`Sp.GUIONES`) and on the field of its crest (`Diplo.escudo`, cached per
+  pattern). Other realms' buildings on the minimap are crosses, yours are squares. In the UI: ✗ after a cost you
+  cannot pay, ✓/✗ on era cost rows, ✓ and ! on good and bad toasts, double or dashed left borders where only a
+  green or red border used to tell.

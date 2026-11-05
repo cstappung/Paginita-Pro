@@ -1273,6 +1273,37 @@
     return b ? b.color : [150, 150, 150];
   };
 
+  // Daltonismo (resto de U6): además del color, cada reino lleva un patrón (rayas, puntos, cuadros…) en el
+  // territorio del mapa y del minimapa, en sus bordes y en su escudo; el tuyo va liso. Solo con el modo activo.
+  S.daltonico = () => document.documentElement.classList.contains('daltonico');
+  S.patronDe = slot => (slot === undefined || slot === null || slot < 0 || slot === D.MY_SLOT ? -1 : slot % 6);
+  S.patronSlotDe = function (owner) { // el patrón de un dueño ('p', id de bot o de jugador)
+    const m = /^b(\d+)$/.exec(owner || ''); // D.ownerOfSlot: la casilla i es 'b' + i (la tuya, 'p')
+    return m ? S.patronDe(+m[1]) : -1;
+  };
+  S.enPatron = function (p, x, y) {
+    if (p === 0) return (x + y) % 4 === 0;                 // diagonal
+    if (p === 1) return x % 3 === 0 && y % 3 === 0;        // puntos
+    if (p === 2) return y % 3 === 0;                       // rayas horizontales
+    if (p === 3) return x % 3 === 0;                       // rayas verticales
+    if (p === 4) return ((x >> 1) + (y >> 1)) % 2 === 0;   // cuadros
+    if (p === 5) return (((x - y) % 4) + 4) % 4 === 0;     // la otra diagonal
+    return false;
+  };
+  S.GUIONES = [[10, 4], [2, 3], [10, 3, 2, 3], [5, 5], [16, 4], [2, 2, 7, 2]];
+  const TRAMAS = {};
+  S.trama = function (ctx, p, rgb, a) { // relleno con el patrón del reino (para el modo territorio)
+    const key = p + ':' + rgb.join(',') + ':' + a;
+    if (!TRAMAS[key]) {
+      const c = mk(36, 36), x = c.getContext('2d'); // 12 × 12 celdas de 3 px: a zoom 1 se sigue leyendo
+      x.fillStyle = 'rgba(' + rgb.join(',') + ',' + a * 0.4 + ')'; x.fillRect(0, 0, 36, 36);
+      x.fillStyle = 'rgba(' + rgb.join(',') + ',' + Math.min(1, a * 2.6) + ')';
+      for (let y = 0; y < 12; y++) for (let i = 0; i < 12; i++) if (S.enPatron(p, i, y)) x.fillRect(i * 3, y * 3, 3, 3);
+      TRAMAS[key] = c;
+    }
+    return ctx.createPattern(TRAMAS[key], 'repeat');
+  };
+
   const BCACHE = {};
   function isoSprite(w, h, top, flat, draw, tier, deco) {
     const MX = 10, cw = (w + h) * 16 + MX * 2, ch = (w + h) * 8 + top + 6;

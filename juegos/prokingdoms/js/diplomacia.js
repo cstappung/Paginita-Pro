@@ -99,7 +99,7 @@
   };
   const cache = {};
   Dp.escudo = function (slot, alto) {
-    const pers = Dp.pers(slot) || 'humano', col = (D.REALM_SLOTS[slot] || {}).color || [120, 120, 120], key = slot + ':' + pers;
+    const pers = Dp.pers(slot) || 'humano', col = (D.REALM_SLOTS[slot] || {}).color || [120, 120, 120], pt = PK.Sprites.daltonico() ? PK.Sprites.patronDe(slot) : -1, key = slot + ':' + pers + ':' + pt;
     if (!cache[key]) {
       const c = document.createElement('canvas');
       c.width = 14; c.height = 16;
@@ -110,6 +110,10 @@
         if (a > b) continue;
         x.fillStyle = '#1d120a'; x.fillRect(a, y, b - a + 1, 1);
         if (y > 0 && y < 15 && b - a >= 2) { x.fillStyle = y < 4 ? rgb(1.25) : rgb(1); x.fillRect(a + 1, y, b - a - 1, 1); }
+      }
+      if (pt >= 0) { // daltonismo: el campo lleva el patrón del reino (el mismo del mapa)
+        x.fillStyle = rgb(0.62);
+        for (let y = 5; y < 15; y++) { const i = ancho(y); for (let k = i + 1; k < 13 - i; k++) if (PK.Sprites.enPatron(pt, k, y)) x.fillRect(k, y, 1, 1); }
       }
       x.fillStyle = rgb(0.75); x.fillRect(1, 4, 12, 1); // la franja bajo el jefe del escudo
       const m = CARGA[pers], top = pers === 'humano' ? 6 : 5, left = 4;

@@ -7,6 +7,7 @@
 // fuertes. Cada grupo de eras tiene su modo, su tempo y sus timbres; de noche todo baja de tempo y de octava y
 // hay menos notas. En batalla (la vista de batalla o bandidos atacando) suena un tema rápido con tambores, y con
 // un jefe en el campo se le suman platillos y sube el tempo. En el Archipiélago suena su propio modo.
+// El ambiente, en cambio, sale de lo que se ve en pantalla (ver «ambiente» más abajo).
 (function () {
   'use strict';
   const PK = window.PK, U = PK.U;
@@ -174,35 +175,123 @@
   }
 
   // ---------- ambiente ----------
-  // Pájaros de día, grillos de noche, viento en invierno, olas en el mar y martillos lejanos si hay obras.
+  // Suena lo que se ve (resto de la Fase 6): cada 1,5 s `mirar` recorre la pantalla (una grilla de 16 × 10 puntos
+  // sobre el mapa explorado, más los edificios y aldeanos a la vista) y arma las fuentes con su peso y su lugar en
+  // la pantalla. Cada sonido sale por un paneo según de qué lado está (olas a la izquierda si el agua está a la
+  // izquierda) y más fuerte con el zoom cerca. La estación, la noche y el mar siguen mandando sobre los pájaros, los
+  // grillos y el viento. Nada de esto toca el juego: solo lee.
+  const TALA = { tree: 'hacha', palm: 'hacha' }, PICO = { stone: 'pico', gold: 'pico', ore: 'pico', marble: 'pico', gems: 'pico', arrecife: 'pico' };
+  const YUNQUE = { forge: 1, smelter: 1, steelworks: 1, workshop: 1 }, SIERRA = { sawmill: 1, masonry: 1, cartwright: 1 }, GENTE = { house: 1, market: 1, tc: 1, tavern: 1, guild: 1 };
+  let escena = null, tMira = 0;
+  function mirar() {
+    const R = PK.Render, G = PK.Game, W = PK.World;
+    if (!R || !R.cv || !W || !W.terrain || !W.fog) return null;
+    const w = R.cv.width / R.dpr, h = R.cv.height / R.dpr, s = {};
+    const suma = (k, x, p) => { const f = s[k] || (s[k] = { n: 0, x: 0 }); f.n += p || 1; f.x += (x / w) * (p || 1); };
+    let vistos = 0;
+    for (let j = 0; j < 10; j++) for (let i = 0; i < 16; i++) {
+      const sx = ((i + 0.5) / 16) * w, sy = ((j + 0.5) / 10) * h, t = R.screenToTile(sx, sy), tx = Math.floor(t[0]), ty = Math.floor(t[1]);
+      if (!W.inb(tx, ty)) continue;
+      const k = W.idx(tx, ty);
+      if (!W.fog[k]) continue;
+      vistos++;
+      const ter = W.terrain[k], nid = W.nodeAt[k], n = nid >= 0 ? W.nodes[nid] : null;
+      if (ter === 4) suma('agua', sx); else if (ter === 3) suma('costa', sx);
+      if (n && !n.dead && (n.kind === 'tree' || n.kind === 'palm')) suma('bosque', sx);
+      else if (ter === 1) suma('bosque', sx, 0.5);
+      else if (ter === 0) suma('pasto', sx);
+    }
+    const enPantalla = (tx, ty) => { const p = R.iso(tx, ty), q = R.worldToScreen(p[0], p[1]); return q[0] > -40 && q[0] < w + 40 && q[1] > -40 && q[1] < h + 40 ? q : null; };
+    for (const b of G.buildings || []) {
+      const q = enPantalla(b.x + b.w / 2, b.y + b.h / 2);
+      if (!q) continue;
+      if (!b.done || b.upg) suma('obra', q[0]);
+      else if (b.workers && b.workers.length && YUNQUE[b.type]) suma('yunque', q[0], b.workers.length);
+      else if (b.workers && b.workers.length && SIERRA[b.type]) suma('sierra', q[0], b.workers.length);
+      if (b.done && GENTE[b.type]) suma('gente', q[0], b.type === 'house' ? 1 : 3);
+    }
+    for (const u of G.units || []) {
+      if (u.inside || u.mode !== 'work' || !u.task || u.task.t !== 'gather') continue;
+      const n = W.nodes[u.task.node], tipo = n && (TALA[n.kind] || PICO[n.kind]);
+      if (!tipo) continue;
+      const q = enPantalla(u.x, u.y);
+      if (q) suma(tipo, q[0]);
+    }
+    for (const k in s) s[k].x = s[k].x / s[k].n; // de 0 (izquierda) a 1 (derecha)
+    s.vistos = vistos;
+    s.cerca = Math.max(0.55, Math.min(1.5, (R.cam.z || 2) / 2)); // el zoom acerca
+    return s;
+  }
+  // un canal con paneo para un sonido: se desarma solo cuando termina
+  function canal(x, dur) {
+    const g = ctx.createGain();
+    if (ctx.createStereoPanner) {
+      const p = ctx.createStereoPanner(); p.pan.value = Math.max(-0.8, Math.min(0.8, ((x === undefined ? 0.5 : x) - 0.5) * 1.6));
+      g.connect(p); p.connect(amb);
+      setTimeout(() => { try { p.disconnect(); g.disconnect(); } catch (e) { /* ya estaba */ } }, (dur + 0.5) * 1000);
+    } else g.connect(amb);
+    return g;
+  }
+  // qué suena ahora: cada fuente con su peso (cuánto hay a la vista), una por vez, al azar según el peso
+  function fuentes(s, est, enMar) {
+    const f = [], fr = k => (s[k] ? s[k].n : 0), V = Math.max(1, s.vistos);
+    const agua = fr('agua') / V, costa = fr('costa') / V, bosque = fr('bosque') / V, pasto = fr('pasto') / V;
+    if (agua > 0.03 || enMar) f.push(['olas', 0.4 + agua * 2.2 + costa * 3, s.agua ? s.agua.x : 0.5, 0.5 + Math.min(1, agua * 1.5 + costa * 2) * 0.6]);
+    if ((agua > 0.15 || enMar) && !noche) f.push(['gaviota', 0.25 + agua * 0.6, s.agua ? s.agua.x : 0.5, 0.8]);
+    if (noche) f.push(['grillo', 0.3 + pasto * 2 + bosque, s.pasto ? s.pasto.x : 0.5, 1]);
+    else if (est !== 3) f.push(['pajaro', 0.15 + bosque * 3 + pasto * 0.5, s.bosque ? s.bosque.x : 0.5, 0.7 + Math.min(1, bosque * 2) * 0.5]);
+    f.push(['viento', est === 3 ? 1.6 : 0.12 + (s.vistos < 40 ? 0.6 : 0), 0.5, est === 3 ? 1 : 0.7]);
+    const cosas = [['obra', 1.2], ['hacha', 0.5], ['pico', 0.5], ['yunque', 0.6], ['sierra', 0.5], ['gente', 0.12]];
+    for (const [k, p] of cosas) if (s[k]) f.push([k, Math.min(2.2, p * s[k].n), s[k].x, Math.min(1.3, 0.6 + 0.1 * s[k].n)]);
+    return f;
+  }
   function ambiente(ahora) {
     if (volAmb <= 0 || modo === 'batalla' || ahora < tAmb) return;
-    const G = PK.Game, enMar = G.enMar && G.enMar(), est = PK.Vida && PK.Vida.estacion ? PK.Vida.estacion() : 0;
-    const v = 0.5, r = Math.random();
-    tAmb = ahora + 2.5 + Math.random() * 5;
-    if (enMar || r < 0.18) { ruido(ahora, 3.2, v * 0.05, 420, 'lowpass', amb, 1.4); if (enMar) return; }
-    if (noche) { grillo(ahora); return; }
-    if (est === 3 && r < 0.6) { ruido(ahora, 4, v * 0.06, 520, 'bandpass', amb, 1.8); return; }
-    const obras = G.buildings && G.buildings.some(b => b.owner === 'p' && (!b.done || b.upg));
-    if (obras && r < 0.45) { for (let i = 0; i < 3; i++) { ruido(ahora + i * 0.42, 0.05, v * 0.05, 1500, 'bandpass', amb); nota(80, ahora + i * 0.42, 0.06, 'triangle', v * 0.03, 0.003, amb); } return; }
-    pajaro(ahora, v);
+    const G = PK.Game, enMar = !!(G.enMar && G.enMar()), est = PK.Vida && PK.Vida.estacion ? PK.Vida.estacion() : 0;
+    if (!escena || ahora > tMira) { escena = mirar() || { vistos: 0, cerca: 1 }; tMira = ahora + 1.5; }
+    const f = fuentes(escena, enMar ? 0 : est, enMar);
+    const tot = f.reduce((a, x) => a + x[1], 0);
+    let r = Math.random() * tot, e = f[0];
+    for (const x of f) { if ((r -= x[1]) <= 0) { e = x; break; } }
+    // con mucho a la vista los sonidos vienen más seguido
+    tAmb = ahora + Math.max(1.1, 4.5 - tot * 0.6) + Math.random() * 2.5;
+    if (e) sonar(e[0], ahora, e[2], 0.5 * e[3] * escena.cerca);
   }
-  function grillo(t) {
+  function sonar(k, t, x, v) {
+    if (k === 'olas') { const d = canal(x, 3.6); ruido(t, 3.2, v * 0.06, 420, 'lowpass', d, 1.4); return; }
+    if (k === 'viento') { const d = canal(x, 4.4); ruido(t, 4, v * 0.06, 520, 'bandpass', d, 1.8); return; }
+    if (k === 'grillo') { grillo(t, canal(x, 0.6)); return; }
+    if (k === 'pajaro') { pajaro(t, v, canal(x, 1)); return; }
+    if (k === 'gaviota') { const d = canal(x, 1.2); for (let i = 0; i < 2; i++) barrido(t + i * 0.32, 1500, 950, 0.24, 'triangle', v * 0.03, d); return; }
+    if (k === 'obra') { const d = canal(x, 1.6); for (let i = 0; i < 3; i++) { ruido(t + i * 0.42, 0.05, v * 0.05, 1500, 'bandpass', d); nota(80, t + i * 0.42, 0.06, 'triangle', v * 0.03, 0.003, d); } return; }
+    if (k === 'hacha') { const d = canal(x, 1.4); for (let i = 0; i < 2; i++) { ruido(t + i * 0.6, 0.07, v * 0.06, 850, 'bandpass', d); nota(43, t + i * 0.6, 0.1, 'triangle', v * 0.05, 0.002, d); } return; }
+    if (k === 'pico') { const d = canal(x, 1.2); for (let i = 0; i < 3; i++) { nota(98 + (i % 2) * 2, t + i * 0.36, 0.09, 'triangle', v * 0.018, 0.001, d); ruido(t + i * 0.36, 0.03, v * 0.03, 3200, 'highpass', d); } return; }
+    if (k === 'yunque') { const d = canal(x, 1.6); for (let i = 0; i < 2; i++) { nota(93, t + i * 0.5, 0.55, 'sine', v * 0.022, 0.001, d); nota(100, t + i * 0.5, 0.3, 'sine', v * 0.01, 0.001, d); } return; }
+    if (k === 'sierra') { const d = canal(x, 1.4); for (let i = 0; i < 4; i++) ruido(t + i * 0.26, 0.22, v * 0.03, i % 2 ? 2400 : 1800, 'bandpass', d, 0.06); return; }
+    if (k === 'gente') { const d = canal(x, 1.8); const n = 3 + Math.floor(Math.random() * 3); for (let i = 0; i < n; i++) ruido(t + i * (0.18 + Math.random() * 0.2), 0.16 + Math.random() * 0.14, v * 0.025, 350 + Math.random() * 600, 'bandpass', d, 0.04); }
+  }
+  function barrido(t, f0, f1, dur, onda, v, destino) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = onda; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(destino || amb); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function grillo(t, destino) {
     for (let i = 0; i < 3; i++) {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = 'sine'; o.frequency.value = 4300;
       const ti = t + i * 0.085;
       g.gain.setValueAtTime(0.0001, ti); g.gain.exponentialRampToValueAtTime(0.012, ti + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, ti + 0.05);
-      o.connect(g); g.connect(amb); o.start(ti); o.stop(ti + 0.08);
+      o.connect(g); g.connect(destino || amb); o.start(ti); o.stop(ti + 0.08);
     }
   }
-  function pajaro(t, v) {
+  function pajaro(t, v, destino) {
     const n = 2 + Math.floor(Math.random() * 3), f0 = 2400 + Math.random() * 1400;
     for (let i = 0; i < n; i++) {
       const o = ctx.createOscillator(), g = ctx.createGain(), ti = t + i * (0.11 + Math.random() * 0.05);
       o.type = 'sine'; o.frequency.setValueAtTime(f0, ti); o.frequency.exponentialRampToValueAtTime(f0 * (1.25 + Math.random() * 0.3), ti + 0.07);
       g.gain.setValueAtTime(0.0001, ti); g.gain.exponentialRampToValueAtTime(v * 0.035, ti + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, ti + 0.09);
-      o.connect(g); g.connect(amb); o.start(ti); o.stop(ti + 0.12);
+      o.connect(g); g.connect(destino || amb); o.start(ti); o.stop(ti + 0.12);
     }
   }
 
@@ -218,5 +307,7 @@
     if (amb) amb.gain.setTargetAtTime(volAmb / 100 * 0.6, ctx.currentTime, 0.1);
   };
   M.estado = () => ({ modo, noche, jefe, paso, sonando: !!(ctx && suena()) });
+  M.escena = () => mirar(); // lo que el ambiente ve en pantalla (para probar)
+  M.fuentes = () => { const s = mirar(); return s ? fuentes(s, PK.Vida && PK.Vida.estacion ? PK.Vida.estacion() : 0, !!(PK.Game.enMar && PK.Game.enMar())) : []; };
   M.iniciar = function () { if (!timer) timer = setInterval(tick, 100); };
 })();

@@ -831,7 +831,7 @@
   // que puedes reclamar (blanco) o atacar (rojo).
   function drawTerritory(ctx, vx0, vy0, vw, vh) {
     if (!W.terr) return;
-    const P = W.PW, PS = D.PARCEL, T = PK.Terr, mode = T && T.mode;
+    const P = W.PW, PS = D.PARCEL, T = PK.Terr, mode = T && T.mode, dal = Sp.daltonico();
     const corners = [R.tileAt(vx0, vy0), R.tileAt(vx0 + vw, vy0), R.tileAt(vx0, vy0 + vh), R.tileAt(vx0 + vw, vy0 + vh)];
     const px0 = Math.max(0, Math.floor(Math.min(...corners.map(c => c[0])) / PS) - 1), px1 = Math.min(P - 1, Math.floor(Math.max(...corners.map(c => c[0])) / PS) + 1);
     const py0 = Math.max(0, Math.floor(Math.min(...corners.map(c => c[1])) / PS) - 1), py1 = Math.min(P - 1, Math.floor(Math.max(...corners.map(c => c[1])) / PS) + 1);
@@ -845,7 +845,7 @@
       if (!(mode && o === 'p') && !seen(x0 + PS / 2, y0 + PS / 2) && !seen(x0, y0) && !seen(x0 + PS - 1, y0 + PS - 1)) continue;
       if (mode) {
         // cuadrícula de parcelas + relleno del color del dueño
-        if (o) { ctx.fillStyle = 'rgba(' + colOf(o).join(',') + ',0.3)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.fill(); }
+        if (o) { const pt = dal ? Sp.patronSlotDe(o) : -1; ctx.fillStyle = pt >= 0 ? Sp.trama(ctx, pt, colOf(o), 0.3) : 'rgba(' + colOf(o).join(',') + ',0.3)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.fill(); }
         else if (W.terrCommon[k]) { ctx.fillStyle = 'rgba(255,220,120,0.14)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.fill(); }
         ctx.strokeStyle = 'rgba(0,0,0,0.22)'; poly(quad(x0, y0, x0 + PS, y0 + PS)); ctx.stroke();
         const claim = T.canClaim(k) === null, atk = o && o !== 'p' && T.touchesMine(k) && !W.isCore(k, W.terr[k] - 1);
@@ -859,6 +859,8 @@
       // borde hacia afuera, un poco hacia adentro para que dos reinos vecinos se vean los dos
       const c = colOf(o), inset = 0.18;
       ctx.strokeStyle = 'rgba(' + c.join(',') + ',' + (mode ? 0.95 : 0.7) + ')';
+      const pg = dal ? Sp.patronSlotDe(o) : -1;
+      if (pg >= 0) ctx.setLineDash(Sp.GUIONES[pg]); // daltonismo: cada reino con su guion, el tuyo continuo
       ctx.beginPath();
       const diff = n => n < 0 || W.terr[n] !== W.terr[k];
       if (py === 0 || diff(k - P)) { const a = R.iso(x0, y0 + inset), b = R.iso(x0 + PS, y0 + inset); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
@@ -866,6 +868,7 @@
       if (py === P - 1 || diff(k + P)) { const a = R.iso(x0, y0 + PS - inset), b = R.iso(x0 + PS, y0 + PS - inset); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
       if (px === 0 || diff(k - 1)) { const a = R.iso(x0 + inset, y0), b = R.iso(x0 + inset, y0 + PS); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
       ctx.stroke();
+      if (pg >= 0) ctx.setLineDash([]);
     }
     if (mode && T.sel !== null && T.sel !== undefined) {
       const x0 = (T.sel % P) * PS, y0 = Math.floor(T.sel / P) * PS;
@@ -1031,7 +1034,7 @@
   // Muestra el territorio de cada reino con su color. Se recalcula cada pocos segundos.
   // Encuadra lo explorado (más un margen), no el mundo entero: al empezar, el mundo completo era un rectángulo
   // negro con un manchón diminuto. El encuadre crece suave a medida que exploras. mmView está en píxeles de mmBase.
-  let mmBase = null, mmT = 99, mmFog = -1, mmTerr = -1, mmBox = null;
+  let mmBase = null, mmT = 99, mmFog = -1, mmTerr = -1, mmBox = null, mmDal = false;
   R.mmView = null;
   function mmTarget(w, h, aspect) {
     if (!mmBox) return { x: 0, y: 0, w, h };
@@ -1047,8 +1050,9 @@
   R.drawMinimap = function (mc, dt) {
     const ctx = mc.getContext('2d'), w = W.W + W.H, h = (W.W + W.H) / 2;
     mmT += dt;
-    if (!mmBase || mmT > 4 || ((mmFog !== W.fogVer || mmTerr !== W.terrVer) && mmT > 0.7)) {
-      mmFog = W.fogVer; mmTerr = W.terrVer;
+    const dal = Sp.daltonico();
+    if (!mmBase || mmT > 4 || mmDal !== dal || ((mmFog !== W.fogVer || mmTerr !== W.terrVer) && mmT > 0.7)) {
+      mmFog = W.fogVer; mmTerr = W.terrVer; mmDal = dal;
       mmT = 0;
       mmBase = mmBase || Sp.mk(w, h);
       const bctx = mmBase.getContext('2d'), im = bctx.createImageData(w, h), d = im.data;
@@ -1061,7 +1065,10 @@
         if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind] || (Sp.NODE_MM_MAR && Sp.NODE_MM_MAR[W.nodes[nid].kind]) || col;
         if (W.poiAt[k] >= 0) col = W.pois[W.poiAt[k]].kind === 'legend' ? [255, 220, 90] : [210, 180, 120];
         const o = W.terr[W.parcel(tx, ty)];
-        if (o) { const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color; col = [col[0] * 0.6 + c2[0] * 0.4, col[1] * 0.6 + c2[1] * 0.4, col[2] * 0.6 + c2[2] * 0.4]; }
+        if (o) {
+          const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color, pt = dal ? Sp.patronDe(o - 1) : -1, f = pt >= 0 && Sp.enPatron(pt, mx, my) ? 0.85 : 0.4; // daltonismo: el patrón del reino
+          col = [col[0] * (1 - f) + c2[0] * f, col[1] * (1 - f) + c2[1] * f, col[2] * (1 - f) + c2[2] * f];
+        }
         if (!W.fog[k]) col = [22, 19, 14];
         else { if (mx < box[0]) box[0] = mx; if (my < box[1]) box[1] = my; if (mx > box[2]) box[2] = mx; if (my > box[3]) box[3] = my; }
         const i = (my * w + mx) * 4;
@@ -1085,7 +1092,8 @@
       const [x, y] = toMM(b.cx, b.cy);
       ctx.fillStyle = 'rgb(' + Sp.ownerColor(b.owner).join(',') + ')';
       const s = Math.round((b.w >= 3 ? 3 : 2) * zk);
-      ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
+      if (dal && b.owner !== 'p') { const c = Math.max(1, Math.round(s / 3)), r = Math.round(s / 2) + 1; ctx.fillRect(Math.round(x - r), Math.round(y - c / 2), r * 2, c); ctx.fillRect(Math.round(x - c / 2), Math.round(y - r), c, r * 2); } // ajenos: una cruz, los tuyos: un cuadrado
+      else ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
     }
     for (const u of G().units) {
       if (u.inside || (u.owner !== 'p' && !seen(u.x, u.y))) continue;

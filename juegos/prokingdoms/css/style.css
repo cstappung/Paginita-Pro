@@ -1113,6 +1113,15 @@ html.daltonico .bar .fill, html.daltonico .bar .fill.green { background: linear-
 html.daltonico .que-hago .qh-mision.lista { border-left-color: #4a9ae8; }
 html.daltonico .que-hago .qh-tit em { color: #8ac0ff; }
 html.daltonico .res.full { outline-style: dashed; }
+/* daltonismo: además del color, una forma (✓ lo que alcanza o está bien, ✗ lo que falta, ! lo que va mal) */
+html.daltonico .amt.bad::after { content: '✗'; margin-left: 1px; font-size: 0.85em; }
+html.daltonico .ec-row.ok b::after { content: ' ✓'; }
+html.daltonico .ec-row:not(.ok) b::after { content: ' ✗'; color: var(--bad); }
+html.daltonico .toast.good > span:first-child::before { content: '✓ '; color: var(--good); }
+html.daltonico .toast.bad > span:first-child::before { content: '! '; color: var(--bad); font-weight: bold; }
+html.daltonico .work-row.ok, html.daltonico .isla-fila.tuya, html.daltonico .que-hago .qh-mision.lista { border-left-style: double; border-left-width: 6px; }
+html.daltonico .que-hago .asesor-row.grave { border-left-style: dashed; }
+html.daltonico .stats .st.up b::before { content: '▲'; font-size: 0.75em; margin-right: 1px; }
 html.menos-mov *, html.menos-mov *::before, html.menos-mov *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 .deslizador { align-items: center; gap: 6px 10px; }
 .deslizador input[type=range] { flex: 1 1 140px; max-width: 260px; accent-color: var(--gold); }
