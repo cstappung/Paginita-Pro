@@ -58,6 +58,9 @@
     thatch: [178, 142, 76], tile: [166, 76, 50], slate: [92, 100, 116], paving: [158, 150, 134], soil: [112, 80, 50],
     logend: [196, 158, 104], canvasR: [176, 48, 40], canvasB: [48, 84, 160], rock: [120, 116, 110], rust: [138, 72, 46],
     marbleS: [222, 218, 206], gilt: [214, 170, 64], glaze: [62, 92, 168], verdigris: [78, 152, 132],
+    // techos de los temas del Pase del Reino (pk-33)
+    jade: [72, 150, 112], obsidiana: [52, 46, 64], coral: [212, 112, 96], rosa: [206, 128, 164], cobre: [186, 108, 58],
+    hielo: [176, 212, 236], purpura: [112, 62, 142], arena: [212, 182, 126], canvasV: [52, 132, 84], canvasA: [214, 168, 48],
   };
   const TEX = {};
   S.tex = function (mat, light) {
@@ -91,7 +94,7 @@
           if (h > 0.92) f += 0.12;
           break;
         }
-        case 'tile': case 'slate': case 'glaze': case 'verdigris': {
+        case 'tile': case 'slate': case 'glaze': case 'verdigris': case 'jade': case 'obsidiana': case 'coral': case 'rosa': case 'cobre': case 'hielo': case 'purpura': {
           const rh = mat === 'slate' ? 3 : 4, row = Math.floor(y / rh), off = (row & 1) * 2;
           f = 0.94 + U.hash(Math.floor((x + off) / 4), row, 6) * 0.12;
           if (y % rh === rh - 1) f -= 0.28; else if ((x + off) % 4 === 0) f -= 0.1;
@@ -105,7 +108,8 @@
           if (r > 3.3) { col = MAT.bark; f = 0.8; }
           break;
         }
-        case 'canvasR': case 'canvasB': if (Math.floor(x / 3) % 2) col = [228, 218, 196]; f = 0.95 + h * 0.06; break;
+        case 'canvasR': case 'canvasB': case 'canvasV': case 'canvasA': if (Math.floor(x / 3) % 2) col = [228, 218, 196]; f = 0.95 + h * 0.06; break;
+        case 'arena': f = 0.9 + U.noise(x * 0.5, y * 0.25, 3) * 0.12 + h * 0.06; if (y % 4 === 3) f -= 0.12; break; // adobe
         default: f = 0.95 + h * 0.1;
       }
       pb.set(x, y, sc(col, f * light));

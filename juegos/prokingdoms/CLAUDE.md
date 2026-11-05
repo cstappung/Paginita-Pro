@@ -632,8 +632,12 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Offline and in local mode the pass window says «Requiere conexión»**:
   nothing about it is computed in the browser.
 - **Themes and aspects** (`D.PASE_TEMAS`, `D.CALENDARIO_PASE`, 26 slots,
-  `período % 26`): each theme comes back in the same fortnight each year. 8
-  are filled and the rest are `null` (the tracks give no aspect). Aspects are
+  `período % 26`): each theme comes back in the same fortnight each year. All
+  26 are filled since `pk-33`, ordered by Chile's seasons (carnival in late
+  February, autumn in March, Imperial over 18 September, spring after it).
+  New accessories go in `H.retrato` (the test greps `A === '<acc>'`) and new
+  roof materials in `MAT` plus a texture case in `S.tex` (unknown ones fall
+  to the flat default). Aspects are
   visual only: building (`Sp.aspectoEdificio`, part of the sprite key), troop
   colour (`Sp.colorDeTropa`), banner, decoration and hero (palette, accessory
   and frame in `H.retrato`). A repeat turns into 25 gems + 40 essence.

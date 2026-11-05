@@ -447,6 +447,25 @@
       else if (A === 'estrellas') { for (const [a, b] of [[4, 2], [19, 3], [2, 9], [21, 11], [12, 0]]) { r(a, b, 1, 1, '#fff6c0'); r(a - 1, b, 3, 1, 'rgba(255,246,192,0.5)'); } }
       else if (A === 'paja') { r(5, 4, 14, 2, '#e8c870'); r(8, 2, 8, 2, '#d8b860'); r(8, 3, 8, 1, '#a05030'); }
       else if (A === 'hojas') { for (let i = 0; i < 6; i++) r(6 + i * 2, 3 + (i % 2), 2, 2, i % 2 ? '#5a9a40' : '#78b450'); }
+      // los de los temas nuevos (pk-33)
+      else if (A === 'flores') { for (const [a, b, c] of [[6, 4, '#ffb0d0'], [9, 3, '#fff0f6'], [12, 3, '#ff80b0'], [15, 4, '#ffd0e4'], [17, 6, '#ff9cc4']]) { r(a, b, 2, 2, c); r(a, b, 1, 1, '#ffe27a'); } }
+      else if (A === 'conchas') { r(6, 4, 12, 1, '#e8f4f0'); for (const a of [7, 11, 15]) { r(a, 2, 2, 2, '#f0b8a8'); r(a, 2, 1, 1, '#fff0e8'); } }
+      else if (A === 'diadema_sol') { r(7, 4, 10, 1, oro); for (const [a, b, h2] of [[8, 2, 2], [10, 1, 3], [12, 0, 4], [14, 1, 3], [16, 2, 2]]) r(a, b, 1, h2, '#ffd040'); }
+      else if (A === 'luna') { r(15, 0, 3, 1, '#e8ecff'); r(17, 1, 2, 3, '#e8ecff'); r(15, 4, 3, 1, '#e8ecff'); r(16, 1, 1, 1, '#b8c0e8'); r(7, 4, 8, 1, '#c8d0f0'); }
+      else if (A === 'llamas') { for (const [a, h2] of [[7, 3], [9, 5], [11, 4], [13, 6], [15, 3], [17, 4]]) { r(a, 6 - h2, 2, h2, '#ff7a30'); r(a, 6 - Math.ceil(h2 / 2), 1, Math.ceil(h2 / 2), '#ffd040'); } }
+      else if (A === 'cuernos_ciervo') { r(6, 1, 1, 5, '#8a6440'); r(4, 2, 2, 1, '#8a6440'); r(5, 0, 1, 2, '#8a6440'); r(17, 1, 1, 5, '#8a6440'); r(18, 2, 2, 1, '#8a6440'); r(18, 0, 1, 2, '#8a6440'); }
+      else if (A === 'turbante') { r(6, 3, 12, 4, '#f0e4c8'); r(6, 4, 12, 1, '#d8c8a0'); r(11, 4, 2, 2, '#c03040'); r(11, 3, 2, 1, '#ffe27a'); }
+      else if (A === 'yelmo_alado') { r(7, 3, 10, 4, '#a8b0bc'); r(7, 6, 10, 1, '#7a8290'); r(3, 2, 4, 2, '#f4f0e4'); r(4, 1, 2, 1, '#f4f0e4'); r(17, 2, 4, 2, '#f4f0e4'); r(18, 1, 2, 1, '#f4f0e4'); }
+      else if (A === 'antifaz') { r(7, 9, 10, 3, css(cl.col)); r(9, 10, 2, 1, '#1a1410'); r(13, 10, 2, 1, '#1a1410'); r(17, 7, 3, 1, '#ffe27a'); r(19, 5, 1, 3, '#ff60e0'); }
+      else if (A === 'cristales') { for (const [a, h2] of [[8, 3], [11, 5], [14, 3]]) { r(a, 5 - h2, 2, h2, '#bfe6ff'); r(a, 5 - h2, 1, h2, '#ffffff'); } r(7, 5, 10, 1, '#88c8f0'); }
+      else if (A === 'corona') { r(7, 3, 10, 2, oro); for (const a of [7, 10, 13, 16]) r(a, 1, 1, 2, oro); r(11, 3, 2, 1, '#c03040'); r(8, 3, 1, 1, '#4080ff'); r(15, 3, 1, 1, '#40c060'); }
+      else if (A === 'kasa') { r(4, 4, 16, 2, '#d8b870'); r(7, 2, 10, 2, '#c8a860'); r(10, 1, 4, 1, '#b89850'); r(4, 5, 16, 1, '#8a6a30'); }
+      else if (A === 'rayos') { for (const [a, b] of [[5, 1], [18, 2]]) { r(a, b, 2, 1, '#fff6a0'); r(a + 1, b + 1, 1, 2, '#fff6a0'); r(a, b + 3, 2, 1, '#fff6a0'); } r(7, 4, 10, 1, '#6a7aa8'); }
+      else if (A === 'plumas') { r(6, 4, 12, 2, css(cl.col, 0.8)); r(15, 0, 1, 4, '#40c0a0'); r(16, 1, 1, 4, '#f0c040'); r(17, 0, 1, 3, '#e05050'); }
+      else if (A === 'tentaculos') { r(5, 3, 14, 3, '#1e4050'); for (const a of [4, 7, 16, 19]) r(a, 5, 1, 6, '#2a6a78'); r(10, 2, 1, 1, '#7aff8a'); r(13, 2, 1, 1, '#7aff8a'); }
+      else if (A === 'bufanda') { r(6, 4, 12, 3, css(cl.col)); r(6, 18, 12, 2, '#c05030'); r(15, 18, 2, 5, '#c05030'); r(6, 18, 12, 1, '#e08050'); }
+      else if (A === 'casco_piedra') { r(6, 2, 12, 5, '#8a8478'); r(6, 2, 12, 1, '#a8a294'); r(8, 4, 1, 1, '#6a645a'); r(14, 3, 2, 1, '#6a645a'); r(11, 6, 2, 5, '#7a746a'); }
+      else if (A === 'gorro') { r(7, 3, 10, 3, '#c83040'); r(13, 1, 4, 2, '#c83040'); r(17, 2, 2, 2, '#ffffff'); r(6, 5, 12, 2, '#f4f0ec'); }
       x.strokeStyle = oro; x.lineWidth = 1; x.strokeRect(0.5, 0.5, N - 1, N - 1);
       return (RET[key] = c.toDataURL());
     }
