@@ -107,6 +107,7 @@
         why && !locked ? el('div', { class: 'small warn-t' }, why) : null));
     }
     pane.append(el('h3', null, 'Entrenar'), grid);
+    if (D.temaActivo === 'mar' && PK.Armada) pane.append(PK.Armada.corsariaEl()); // pk-30
     const nextLock = Object.keys(D.ARMY).filter(k => st.era >= D.ARMY[k].era && bl < D.ARMY[k].lvl).map(k => D.ARMY[k].name + ' (nivel ' + D.ARMY[k].lvl + ')');
     if (nextLock.length) pane.append(el('p', { class: 'small muted' }, 'Mejora ' + (D.temaActivo === 'mar' ? 'la ' : 'el ') + D.BUILD.barracks.name + ' para desbloquear: ' + nextLock.join(', ') + '. Cada nivel también entrena más rápido.'));
     const guide = el('details', { class: 'enemy-det' }, el('summary', null, 'Contra qué sirve cada tropa'), el('div', { class: 'enemy-guide' }, Object.keys(D.ENEMY).map(e => {

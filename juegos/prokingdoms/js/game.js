@@ -477,9 +477,18 @@
   };
 
   // ---------- Maestros de obras y mejoras ----------
-  G.builders = () => 1 + G.countB('builder');
+  G.builders = () => 1 + G.countB('builder') + G.maestroMar();
+  // el Astillero del Maestro de Ribera del archipiélago (pk-30) da un maestro más en la tierra
+  G.maestroMar = () => (!G.enMar() && S.otro && (S.otro.buildings || []).some(b => b.type === 'maestro' && b.done) ? 1 : 0);
   G.buildersBusy = () => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.upg ? 1 : 0), 0);
-  G.upCost = b => conMod(D.upCost(b.type, b.lvl));
+  G.upCost = b => conMod(conMar(b, D.upCost(b.type, b.lvl)));
+  // pk-30: en la tierra, la Maravilla desde el nivel 20 pide especias y pólvora del archipiélago (cuando ya se puede
+  // zarpar: antes de reparar el Galeón no se pide lo que no se puede conseguir)
+  function conMar(b, c) {
+    if (G.enMar() || b.lvl < 20 || !D.WONDERS.includes(b.type) || !(PK.Mar && (PK.Mar.listo() || S.otro))) return c;
+    const k = Math.pow(1.25, b.lvl - 20);
+    return Object.assign({}, c, { especias: Math.round(20 * k / 5) * 5, polvora: Math.round(15 * k / 5) * 5 });
+  }
   G.upTime = b => D.upTime(b.type, b.lvl) * Math.max(0.5, 1 - 0.05 * G.lvl('engineering')) * (1 - Math.min(0.4, G.perkAll('upgradeP'))) * (1 - Math.min(0.3, hp('upTime', b))) / U.clamp(1 + vb('upSpeed'), 0.8, 1.5);
   G.canUpgrade = function (b) {
     if (b.def.noUp) return { ok: false, why: 'Este edificio no tiene mejoras.' };

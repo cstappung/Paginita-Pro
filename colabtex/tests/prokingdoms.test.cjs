@@ -248,7 +248,9 @@ test('H1: héroes, equipo y talentos', () => {
   G.state = { era: 12, stats: {}, created: 1 };
   H.init(G.state);
   try {
-    assert.deepEqual([...H.ORDEN].sort(), Object.keys(H.CLASES).sort());
+    // la Corsaria (pk-30) es del mar: no sale en la Taberna
+    assert.deepEqual([...H.ORDEN].sort(), Object.keys(H.CLASES).filter(k => !H.CLASES[k].mar).sort());
+    assert.ok(H.CLASES.corsaria && H.CLASES.corsaria.mar && !H.ORDEN.includes('corsaria'));
     for (const id of H.ORDEN) {
       const c = H.CLASES[id];
       assert.equal(H.TAL_NOMBRES[id].length, 16, id + ': 8 escalones x 2 nombres');
@@ -640,7 +642,8 @@ test('Fase 9 «b»: tablas del archipiélago, marea del reloj y el tema del mar 
   }
   assert.ok(DM.eraReq(7)[0].pop > 1e6, 'no hay Era VII en el mar');
   // las mejoras del mar no piden nada de la tierra
-  for (const t of DM.MAR.construir) for (let L = 1; L <= 15; L++) for (const r in DM.upCost(t, L)) assert.ok(!['planks', 'blocks', 'ingots', 'tools', 'books', 'marble', 'steel', 'machinery', 'gems'].includes(r), t + ' ' + L + ' pide ' + r);
+  // (el Astillero del Maestro de Ribera, pk-30, pide herramientas y maquinaria traídas en el Galeón)
+  for (const t of DM.MAR.construir) for (let L = 1; L <= 15; L++) for (const r in DM.upCost(t, L)) assert.ok(DM.CARGA.desde.tierra.includes(r) || !['planks', 'blocks', 'ingots', 'tools', 'books', 'marble', 'steel', 'machinery', 'gems'].includes(r), t + ' ' + L + ' pide ' + r);
   // la Crónica del Mar: ids únicos, cadena sin huecos, y cada estadística que pide alguien la escribe
   const ids = new Set(DM.QUESTS.map(q => q.id));
   assert.equal(ids.size, DM.QUESTS.length);
@@ -676,7 +679,7 @@ test('Fase 9 «c»: la armada, los enemigos y jefes del mar, las tormentas y los
   const TIERRA = ['planks', 'blocks', 'ingots', 'tools', 'books', 'marble', 'steel', 'machinery', 'gems', 'ore'];
   for (const k in DM.ARMY_MAR) {
     const a = DM.ARMY_MAR[k];
-    for (const r in a.cost) assert.ok(DM.RES[r] && !TIERRA.includes(r), k + ' cuesta ' + r);
+    for (const r in a.cost) assert.ok(DM.RES[r] && (!TIERRA.includes(r) || DM.CARGA.desde.tierra.includes(r)), k + ' cuesta ' + r); // lo de la tierra, solo si viaja en el Galeón
     for (const e in a.vs) assert.ok(DM.ENEMY_MAR[e], k + ' contra ' + e);
     if (a.req) assert.ok(DM.BUILD[a.req] && DM.MAR.construir.includes(a.req), k + ' pide ' + a.req);
     assert.ok(a.era >= 2 && a.era <= 6, k);
@@ -713,4 +716,41 @@ test('Fase 9 «c»: la armada, los enemigos y jefes del mar, las tormentas y los
   assert.ok(DM.asaltoFuerza(3, 0) > DM.asaltoFuerza(2, 0) && DM.asaltoFuerza(2, 8) === DM.asaltoFuerza(2, 20));
   assert.ok(DM.asaltoTope(4) > DM.asaltoTope(2) && DM.asaltoPremio(4).gold > DM.asaltoPremio(2).gold);
   assert.ok(DM.BSTATS.cadena(1).cadena < 1 && DM.BSTATS.cadena(20).cadena >= 0.55);
+});
+
+test('Fase 9 «d»: la Regata, los duelos y los puentes entre mundos', () => {
+  // la regata: rutas, partes y un tiempo que mejora con el barco y depende del mar del momento
+  const t0 = Date.UTC(2026, 10, 5, 10);
+  for (const ruta in D.REGATA.rutas) {
+    const lento = D.regataTiempo({}, ruta, t0, 1), rapido = D.regataTiempo({ casco: 10, velas: 10, timon: 10 }, ruta, t0, 1);
+    assert.ok(lento > 30 && lento < 200 && rapido < lento, ruta + ' ' + lento + ' → ' + rapido);
+    assert.equal(D.regataTiempo({ velas: 99 }, ruta, t0, 1), D.regataTiempo({ velas: 10 }, ruta, t0, 1), 'el nivel tiene tope');
+  }
+  // ninguna ruta es la mejor siempre: cambia con la marea y el viento
+  const mejores = new Set();
+  for (let k = 0; k < 96; k++) { const t = t0 + k * 900e3, ts = Object.keys(D.REGATA.rutas).map(r => [r, D.regataTiempo({ velas: 4, timon: 4, casco: 4 }, r, t, 1)]).sort((a, b) => a[1] - b[1]); mejores.add(ts[0][0]); }
+  assert.ok(mejores.size >= 2, 'la mejor ruta cambia con la hora: ' + [...mejores].join(', '));
+  for (let k = 0; k < 50; k++) { const v = D.vientoMar(t0 + k * 7e5); assert.ok(v >= 0 && v <= 1); }
+  // duelos: el poder por barco es el de la armada, y la ventaja es chica (como mucho ×1,15)
+  const PM = carga(['util.js', 'data.js', 'datos-vida.js', 'datos-mar.js', 'world.js']), DM = PM.D;
+  for (const k in DM.ARMY_MAR) assert.equal(D.DUELO.poder[k], DM.ARMY_MAR[k].power, 'poder de duelo de ' + k);
+  assert.equal(Object.keys(D.DUELO.poder).length, Object.keys(DM.ARMY_MAR).length);
+  const v = D.dueloVentaja({ brulote: 10 }, { galeon: 4 });
+  assert.ok(v > 1 && v <= 1.15 + 1e-9 && D.dueloVentaja({ galeon: 4 }, { brulote: 10 }) === 1, 'brulotes a galeones ' + v);
+  // la bodega del Galeón y el Astillero del Maestro
+  for (const w in DM.CARGA.desde) for (const r of DM.CARGA.desde[w]) assert.ok(DM.RES[r], r);
+  assert.ok(DM.CARGA.desde.mar.every(r => DM.RES[r].mar), 'del mar sale lo del mar');
+  assert.ok(DM.CARGA.desde.tierra.every(r => !DM.RES[r].mar), 'de la tierra, lo de la tierra');
+  assert.ok(DM.BUILD.maestro && DM.MAR.construir.includes('maestro'));
+  for (const r in DM.BUILD.maestro.cost) assert.ok(DM.RES[r].mar || ['wood', 'stone', 'food', 'gold'].includes(r) || DM.CARGA.desde.tierra.includes(r), 'maestro pide ' + r);
+  assert.match(JS('game.js'), /G\.maestroMar = \(\) =>/);
+  assert.match(JS('game.js'), /especias: Math\.round\(20 \* k/);
+  // mar.js mueve la carga y los héroes al viajar, con su equipo
+  const mar = JS('mar.js');
+  assert.match(mar, /const carga = moverCarga\(actual, otro\), heroes = moverHeroes\(actual, otro\);/);
+  assert.match(mar, /it\.id = a\.nid\+\+/);
+  // el servidor y la Cloud Function tienen las mismas rutas nuevas
+  const srv = fs.readFileSync(path.join(PKDIR, 'server', 'index.js'), 'utf8'), fn = fs.readFileSync(path.join(PKDIR, '..', '..', 'functions', 'index.js'), 'utf8');
+  for (const r of ['/api/regata', '/api/regata/info', '/api/flota', '/api/duelos', '/api/duelo']) { assert.ok(srv.includes("'POST " + r + "'"), 'server ' + r); assert.ok(fn.includes("'POST " + r + "'"), 'functions ' + r); }
+  assert.ok(D.RANKINGS.regata);
 });

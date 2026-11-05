@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 7;
+  D.PROTO = 8;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -473,6 +473,15 @@
     return 0.5 + 0.5 * Math.sin(2 * Math.PI * f);
   };
   D.MAREA_BAJA = 0.38;
+  // Tormentas del archipiélago (pk-29): una de cada tres ventanas de 3 horas tiene una de 40 minutos.
+  D.TORMENTA_MS = 3 * 3600e3;
+  D.tormenta = function (t) {
+    t = t == null ? Date.now() : t;
+    const w = Math.floor(t / D.TORMENTA_MS), h = U.strHash('tormenta' + w) % 1000;
+    if (h % 3) return null;
+    const ini = w * D.TORMENTA_MS + ((h * 7919) % 100) / 100 * (D.TORMENTA_MS - 40 * 60e3);
+    return t >= ini && t < ini + 40 * 60e3 ? { hasta: ini + 40 * 60e3 } : null;
+  };
   D.mareaBaja = t => D.marea(t) < D.MAREA_BAJA;
   // segundos hasta que la marea cruce el umbral de bajamar (para la barra): se busca de minuto en minuto
   D.mareaCambia = function (t) {
@@ -489,6 +498,59 @@
     defensas: { name: 'Defensas ganadas', titulo: 'Muralla Viva' },
     jefes: { name: 'Jefes de gremio', titulo: 'Cazador de Leviatanes' },
     visitas: { name: 'Más visitados', titulo: 'Reino más Querido' },
+    regata: { name: 'Regata', titulo: 'Almirante de la Bruma' }, // pk-30: el mejor tiempo de la semana
+  };
+
+  // ---------- La Regata de la Bruma y los duelos navales (Fase 9 «d», pk-30) ----------
+  // Los decide el servidor (sim.js) con estas mismas tablas: el tiempo sale del barco, la ruta y el mar de ese
+  // momento (la marea y el viento salen del reloj real). El barco se mejora en el cliente, pero el servidor solo deja
+  // subir cada parte de a poco (`subeHora`), así que mentir no da más que un barco que se pudo tener.
+  D.REGATA = {
+    porDia: 3, maxNivel: 10, subeHora: 2,
+    partes: {
+      casco: { name: 'Casco', desc: 'aguanta la tormenta y el roce del arrecife' },
+      velas: { name: 'Velas', desc: 'más rápido, y mucho más con viento' },
+      timon: { name: 'Timón', desc: 'esquiva los arrecifes con marea baja' },
+    },
+    rutas: {
+      arrecifes: { name: 'Entre los arrecifes', largo: 62, desc: 'La más corta. Con marea baja hay que esquivar el coral.' },
+      canal: { name: 'El canal', largo: 76, desc: 'Pareja: la marea y el viento casi no cambian nada.' },
+      altamar: { name: 'Mar abierto', largo: 92, desc: 'La más larga, pero con buen viento es la más rápida.' },
+    },
+    ligas: ['Bronce', 'Plata', 'Oro', 'Bruma'],
+    sube: 0.3, baja: 0.3, // qué parte de la liga asciende y desciende cada lunes
+  };
+  // el viento del archipiélago: de 0 a 1, un ciclo de 90 minutos desfasado de la marea
+  D.VIENTO_MS = 5400e3;
+  D.vientoMar = function (t) { const P = D.VIENTO_MS, f = ((((t == null ? Date.now() : t) % P) + P) % P) / P; return 0.5 + 0.5 * Math.sin(2 * Math.PI * f + 1.3); };
+  // Segundos que tarda un barco en la ruta, con el mar del momento t. suerte: 0,97 a 1,03 (la pone el servidor).
+  D.regataTiempo = function (barco, ruta, t, suerte) {
+    const R = D.REGATA.rutas[ruta] || D.REGATA.rutas.canal, M = D.REGATA.maxNivel;
+    const nv = k => Math.max(0, Math.min(M, Math.floor(+(barco && barco[k]) || 0)));
+    const casco = nv('casco'), velas = nv('velas'), timon = nv('timon'), viento = D.vientoMar(t), baja = D.mareaBaja(t);
+    let seg = R.largo / (1 + 0.05 * velas + 0.02 * casco + 0.02 * timon);
+    if (ruta === 'arrecifes' && baja) seg += 22 * (1 - 0.08 * timon);          // esquivar el coral
+    if (ruta === 'arrecifes' && !baja) seg *= 0.96;                              // con agua de sobra, se pasa por encima
+    if (ruta === 'altamar') seg *= 1.22 - 0.42 * viento * (1 + 0.04 * velas);    // el viento manda
+    if (ruta === 'canal') seg *= 1.02 - 0.06 * viento;
+    if (D.tormenta(t)) seg *= 1.2 - 0.015 * casco;                               // la tormenta
+    return Math.round(seg * (suerte || 1) * 10) / 10;
+  };
+  // Duelos navales: tu «flota de duelo» (lo que tenías en casa al anotarla) contra la de otro jugador. Ninguno
+  // pierde barcos: se juegan trofeos. El poder por barco es el de D.ARMY_MAR (lo comprueba una prueba).
+  D.DUELO = {
+    porDia: 5, maxBarcos: 120, inicial: 100, gana: 30, pierde: 20,
+    poder: { balandra: 6, infanteria: 6, arponero: 8, fragata: 18, brulote: 16, galeon: 45 },
+    // qué gana a qué (×1,15 a quien tenga más de lo que le gana al otro): brulotes a galeones, galeones a
+    // balandras, fragatas a botes (infantería y arponeros), balandras a brulotes
+    ventaja: { brulote: ['galeon'], galeon: ['balandra'], fragata: ['infanteria', 'arponero'], balandra: ['brulote'] },
+  };
+  D.dueloPoder = function (units) { let p = 0; for (const k in units || {}) if (D.DUELO.poder[k]) p += Math.max(0, Math.floor(units[k] || 0)) * D.DUELO.poder[k]; return p; };
+  D.dueloVentaja = function (a, b) {
+    const pa = D.dueloPoder(a) || 1, pb = D.dueloPoder(b) || 1, part = (u, k, p) => ((u[k] || 0) * D.DUELO.poder[k]) / p;
+    let v = 0;
+    for (const k in D.DUELO.ventaja) for (const o of D.DUELO.ventaja[k]) v += part(a, k, pa) * part(b, o, pb);
+    return 1 + 0.6 * Math.min(0.25, v); // como mucho ×1,15
   };
 
   // ---------- Territorio ----------

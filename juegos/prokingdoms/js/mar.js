@@ -87,6 +87,12 @@
   // pone el cartel con el botón para volver.
   Mar.iniciar = function (viaje) {
     const st = S();
+    const ll = st.flags.llegada;
+    if (ll) { // lo que trajo el Galeón (pk-30)
+      delete st.flags.llegada;
+      const txt = Object.keys(ll.carga || {}).map(r => '+' + U.fmt(ll.carga[r]) + ' ' + D.RES[r].name.toLowerCase());
+      setTimeout(() => toast('El Galeón descargó' + (txt.length ? ': ' + txt.join(', ') : '') + (ll.heroes && ll.heroes.length ? (txt.length ? '. ' : ' a ') + ll.heroes.join(' y ') + (ll.heroes.length > 1 ? ' bajan' : ' baja') + ' en ' + U.fmtTime(D.TRAVESIA_HEROE) + '.' : '.'), 'epic'), 1500);
+    }
     if (Mar.enMar()) {
       document.body.classList.add('en-mar');
       // el agua alrededor de tu isla y el Galeón fondeado se ven desde el primer día
@@ -142,12 +148,78 @@
         const ok = piezas.includes(p.id);
         return el('div', { class: 'mar-pieza' + (ok ? ' ok' : '') }, el('b', null, (ok ? '✓ ' : '') + p.name), el('span', { class: 'small muted' }, ok ? 'reparado' : 'capítulo ' + p.cap + ' de la Crónica'));
       }), el('div', { class: 'mar-pieza' + (Mar.cronica() ? ' ok' : '') }, el('b', null, (Mar.cronica() ? '✓ ' : '') + 'La Crónica completa'), el('span', { class: 'small muted' }, 'capítulo ' + D.GALEON.ultimo))));
+      if (enMar || listo || S().flags.galeonDev) body.append(bodegaEl(), abordoEl());
       if (enMar) body.append(el('div', { class: 'row' }, PK.UI.btn('Volver al reino', () => Mar.viajar('tierra'), { cls: 'gold' })));
       else if (listo || S().flags.galeonDev) body.append(el('div', { class: 'row' }, PK.UI.btn(S().otro ? 'Zarpar a tu isla' : 'Zarpar al ' + D.TEMAS.mar.name, () => Mar.viajar('mar'), { cls: 'gold' }),
         !listo ? el('span', { class: 'small muted' }, ' (modo de prueba)') : ''));
       else body.append(el('p', { class: 'muted' }, 'Faltan ' + (D.GALEON.piezas.filter(p => !piezas.includes(p.id)).length + (Mar.cronica() ? 0 : 1)) + ' de 5. La travesía se abre al terminar la Crónica.'));
     }, { wide: true });
   };
+
+  // ---------- La bodega y los héroes a bordo (pk-30) ----------
+  // Lo que se elige aquí viaja en el próximo zarpe: se descuenta de este mundo y aparece en el otro al llegar.
+  Mar.carga = {};
+  Mar.abordo = [];
+  const capLibre = () => D.CARGA.cap - Object.values(Mar.carga).reduce((s, v) => s + (v || 0), 0);
+  function bodegaEl() {
+    const st = S(), desde = D.CARGA.desde[Mar.tema()], box = el('div', { class: 'mar-bodega' });
+    for (const r of Object.keys(Mar.carga)) if (!desde.includes(r)) delete Mar.carga[r];
+    box.append(el('h3', null, 'Bodega del Galeón'), el('p', { class: 'small' }, Mar.enMar()
+      ? 'Lleva a tu reino lo que solo da el archipiélago: la Maravilla pide especias y pólvora desde el nivel 20.'
+      : 'Lleva al archipiélago lo que allá no se fabrica: acero para los galeones de guerra, herramientas y maquinaria para el Astillero del Maestro de Ribera.'),
+    el('div', { class: 'small muted' }, 'Entran ' + D.CARGA.cap + ' unidades por viaje; quedan ' + capLibre() + '.'));
+    for (const r of desde) {
+      const tiene = Math.floor(st.res[r] || 0), v = Mar.carga[r] || 0;
+      const pon = n => { Mar.carga[r] = U.clamp(n, 0, Math.min(tiene, v + capLibre())); PK.UI.rerender(); };
+      box.append(el('div', { class: 'carga-fila' }, PK.UI.resIcon(r), el('b', null, D.RES[r].name), el('span', { class: 'small muted' }, 'tienes ' + U.fmt(tiene)),
+        PK.UI.btn('−10', () => pon(v - 10), { small: true, disabled: !v }), el('b', { class: 'cm-n' }, String(v)), PK.UI.btn('+10', () => pon(v + 10), { small: true, disabled: v >= tiene || !capLibre() }),
+        PK.UI.btn('Todo', () => pon(tiene), { small: true, disabled: v >= tiene || !capLibre() })));
+    }
+    return box;
+  }
+  function abordoEl() {
+    const H = PK.Heroes, box = el('div', { class: 'mar-bodega' });
+    const libres = H ? H.lista().filter(h => h.estado === 'libre') : [];
+    Mar.abordo = Mar.abordo.filter(id => libres.some(h => h.id === id));
+    box.append(el('h3', null, 'Héroes a bordo'), el('p', { class: 'small' }, 'Hasta ' + D.HEROES_ABORDO + ' héroes libres viajan contigo, con su equipo. Al llegar tardan ' + U.fmtTime(D.TRAVESIA_HEROE) + ' en bajar del Galeón. Cada héroe está en un solo mundo a la vez.'));
+    if (!libres.length) { box.append(el('p', { class: 'small muted' }, 'No hay héroes libres en este mundo.')); return box; }
+    box.append(el('div', { class: 'row' }, libres.map(h => {
+      const on = Mar.abordo.includes(h.id);
+      return PK.UI.btn((on ? '✓ ' : '') + h.nombre + ' (' + H.CLASES[h.clase].name + ')', () => {
+        if (on) Mar.abordo = Mar.abordo.filter(x => x !== h.id); else if (Mar.abordo.length < D.HEROES_ABORDO) Mar.abordo.push(h.id); else toast('Caben ' + D.HEROES_ABORDO + ' héroes por viaje.', 'warn');
+        PK.UI.rerender();
+      }, { small: true, cls: on ? 'gold' : '' });
+    })));
+    return box;
+  }
+  function moverCarga(actual, otro) {
+    const desde = D.CARGA.desde[actual.tema] || [], out = {};
+    let tot = 0;
+    for (const r in Mar.carga) {
+      if (!desde.includes(r)) continue;
+      const n = Math.min(Math.floor(Mar.carga[r] || 0), Math.floor(actual.res[r] || 0), D.CARGA.cap - tot);
+      if (n <= 0) continue;
+      actual.res[r] -= n; otro.res[r] = (otro.res[r] || 0) + n; out[r] = n; tot += n;
+    }
+    return out;
+  }
+  function moverHeroes(actual, otro) {
+    const de = actual.heroes, out = [];
+    if (!de || !Mar.abordo.length) return out;
+    const a = (otro.heroes = otro.heroes || {});
+    a.lista = a.lista || []; a.inv = a.inv || []; a.esencia = a.esencia || 0; a.tab = a.tab || { dia: '', tomados: [] }; a.nid = a.nid || 1;
+    for (const id of Mar.abordo.slice(0, D.HEROES_ABORDO)) {
+      const i = de.lista.findIndex(h => h.id === id && h.estado === 'libre');
+      if (i < 0 || a.lista.length >= PK.Heroes.MAX) continue;
+      const h = de.lista.splice(i, 1)[0], equipo = {};
+      // su equipo viaja con él; los ids se rehacen en el otro mundo (cada uno numera los suyos)
+      for (const ran in h.equipo || {}) { const j = de.inv.findIndex(it => it.id === h.equipo[ran]); if (j >= 0) { const it = de.inv.splice(j, 1)[0]; it.id = a.nid++; a.inv.push(it); equipo[ran] = it.id; } }
+      Object.assign(h, { id: a.nid++, equipo, gobierna: null, run: null, estado: 'travesia', hasta: Date.now() + D.TRAVESIA_HEROE * 1000 });
+      a.lista.push(h);
+      out.push(h.nombre);
+    }
+    return out;
+  }
 
   // ---------- La travesía ----------
   Mar.viajar = async function (destino) {
@@ -161,6 +233,10 @@
     actual.tema = Mar.tema();
     if (!otro) otro = nuevoMundo(destino);
     for (const k of COMPARTIDO) otro[k] = actual[k];
+    // pk-30: la bodega y los héroes a bordo
+    const carga = moverCarga(actual, otro), heroes = moverHeroes(actual, otro);
+    if (Object.keys(carga).length || heroes.length) { otro.flags = otro.flags || {}; otro.flags.llegada = { carga, heroes }; }
+    Mar.carga = {}; Mar.abordo = [];
     otro.tema = destino;
     otro.otro = actual;
     otro.at = Date.now();

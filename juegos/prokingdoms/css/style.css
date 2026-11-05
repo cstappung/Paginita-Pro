@@ -1143,3 +1143,17 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
   .cm-fila { grid-template-columns: 28px 1fr; }
   .cm-fila > .btn, .cm-fila > .small { grid-column: 2; justify-self: start; }
 }
+
+/* ---------- La Regata de la Bruma y los duelos navales (pk-30) ---------- */
+.rg-top { margin: 6px 0; padding: 6px 8px; background: rgba(40, 90, 130, 0.12); border-radius: 4px; }
+.rg-mar { margin: 4px 0 8px; }
+.rg-partes, .rg-rutas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.rg-parte, .rg-ruta { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid rgba(90, 60, 30, 0.35); border-radius: 4px; background: rgba(255, 255, 255, 0.25); }
+.rg-carrera { width: 100%; max-width: 480px; image-rendering: pixelated; border-radius: 4px; display: block; margin: 6px 0; }
+.rg-ultima { margin-top: 10px; }
+.mar-bodega { margin-top: 10px; }
+.mar-bodega .cm-n { min-width: 36px; text-align: center; }
+.carga-fila { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 3px 0; border-bottom: 1px solid rgba(90, 60, 30, 0.15); }
+.carga-fila > b:first-of-type { min-width: 120px; }
+.carga-fila > .small { min-width: 80px; }
+@media (max-width: 600px) { .rg-partes, .rg-rutas { grid-template-columns: 1fr; } }

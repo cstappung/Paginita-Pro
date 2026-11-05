@@ -140,7 +140,7 @@
       tower: { name: 'Torre de vigía de la costa', desc: 'Vigila la costa y ve lejos sobre el agua.' },
       barracks: { name: 'Dársena de guerra', agua: true, max: 2, desc: 'Arma tu flota: balandras, fragatas, brulotes y galeones. Cada nivel desbloquea barcos y arma más rápido. Va pegada al agua.' },
     },
-    construir: ['house', 'mill', 'muelle', 'lumber', 'mining', 'salinas', 'granary', 'warehouse', 'builder', 'tower', 'faromar', 'velas', 'embarcadero', 'astillero', 'polvorin', 'comercio', 'granfaro', 'barracks', 'escuela', 'bateria', 'cadena'],
+    construir: ['house', 'mill', 'muelle', 'lumber', 'mining', 'salinas', 'granary', 'warehouse', 'builder', 'tower', 'faromar', 'velas', 'embarcadero', 'astillero', 'polvorin', 'comercio', 'granfaro', 'barracks', 'escuela', 'bateria', 'cadena', 'maestro'],
   };
 
 
@@ -154,7 +154,7 @@
     arponero: { name: 'Arponeros', role: 'Arpón contra monstruos: frena lo que toca. x2 contra cangrejos y x1,8 contra tiburones y serpientes.', cost: { food: 50, wood: 40, gold: 35, salitre: 6 }, time: 22, power: 8, era: 3, lvl: 2, req: 'escuela', vs: { cangrejo: 2, marino: 1.8 }, mar: true, chico: true },
     fragata: { name: 'Fragata', role: 'Andanadas de cañones a los costados. x1,6 contra piratas y x1,4 contra cangrejos.', cost: { tablazon: 8, lona: 10, polvora: 3, gold: 60 }, time: 32, power: 18, era: 3, lvl: 3, vs: { pirata: 1.6, cangrejo: 1.4 }, mar: true },
     brulote: { name: 'Brulote', role: 'Barco incendiario: se mete entre ellos y estalla (se pierde). x1,8 contra el barco fantasma, x1,3 contra piratas.', cost: { wood: 120, polvora: 8, gold: 30 }, time: 26, power: 16, era: 3, lvl: 4, vs: { fantasma: 1.8, pirata: 1.3 }, mar: true },
-    galeon: { name: 'Galeón de guerra', role: 'Casco grueso y muchos cañones. x1,8 contra tiburones y serpientes, x1,2 contra cangrejos y el barco fantasma.', cost: { tablazon: 18, lona: 14, polvora: 8, gold: 160 }, time: 55, power: 45, era: 4, lvl: 6, vs: { marino: 1.8, cangrejo: 1.2, fantasma: 1.2 }, mar: true },
+    galeon: { name: 'Galeón de guerra', role: 'Casco grueso y muchos cañones. x1,8 contra tiburones y serpientes, x1,2 contra cangrejos y el barco fantasma. Lleva acero de la tierra.', cost: { tablazon: 18, lona: 14, polvora: 8, gold: 160, steel: 2 }, time: 55, power: 45, era: 4, lvl: 6, vs: { marino: 1.8, cangrejo: 1.2, fantasma: 1.2 }, mar: true },
   };
   D.ENEMY_MAR = {
     pirata: { name: 'Piratas de la Bruma', desc: 'Balandros rápidos que abordan; los tiradores disparan desde la cofa. Fragatas e infantería de marina.' },
@@ -182,14 +182,7 @@
   };
   // Tormentas: salen del reloj real (las mismas para todos y en vivo y sin conexión). Una de cada tres ventanas de
   // 3 horas tiene una de 40 minutos. Una flota que zarpa con tormenta tarda más y llega con las velas rotas.
-  D.TORMENTA_MS = 3 * 3600e3;
-  D.tormenta = function (t) {
-    t = t == null ? Date.now() : t;
-    const w = Math.floor(t / D.TORMENTA_MS), h = U.strHash('tormenta' + w) % 1000;
-    if (h % 3) return null;
-    const ini = w * D.TORMENTA_MS + ((h * 7919) % 100) / 100 * (D.TORMENTA_MS - 40 * 60e3);
-    return t >= ini && t < ini + 40 * 60e3 ? { hasta: ini + 40 * 60e3 } : null;
-  };
+  // (D.tormenta está en data.js: el servidor la usa en la Regata)
   D.TORMENTA = { viaje: 1.4, fuerza: 0.9 };
   // Asaltos piratas (solo mientras juegas, como las incursiones de la tierra): desde la Era II si ya tienes
   // Dársena o Batería. La Cadena de puerto los achica.
@@ -208,6 +201,20 @@
   });
   D.STAT_LABELS.cadena = ['Asaltos piratas', v => '×' + v.toFixed(2).replace('.', ',')];
   for (const k of ['escuela', 'bateria', 'cadena']) D.BUILD[k].sight = D.BUILD[k].sight || 4;
+
+  // ---------- Puentes entre los dos mundos (pk-30, Fase 9 «d») ----------
+  // La bodega del Galeón: qué se puede llevar desde cada mundo y cuánto entra por viaje. El archipiélago necesita
+  // acero, herramientas y maquinaria de la tierra (el Galeón de guerra, el Astillero del Maestro); la tierra, especias
+  // y pólvora para su Maravilla desde el nivel 20 (game.js, G.upCost).
+  D.CARGA = { cap: 400, desde: { tierra: ['tools', 'steel', 'machinery', 'ingots', 'books'], mar: ['especias', 'polvora', 'tablazon', 'lona'] } };
+  D.HEROES_ABORDO = 2;
+  D.TRAVESIA_HEROE = 10 * 60; // segundos que tarda en bajar del Galeón
+  Object.assign(D.BUILD, {
+    maestro: { name: 'Astillero del Maestro de Ribera', w: 3, h: 3, cost: { tablazon: 300, lona: 150, especias: 40, tools: 40, machinery: 8 }, time: 300, era: 3, max: 1, agua: true, mar: true, desc: 'Un maestro carpintero de ribera que también sabe de obras en tierra: +1 Maestro de Obras en tu reino de la tierra.' },
+  });
+  D.BSTATS.maestro = () => ({ maestroTierra: 1 });
+  D.STAT_LABELS.maestroTierra = ['Maestros en la tierra', v => '+' + v];
+  D.BUILD.maestro.sight = 5;
 
   // ---------- Crónica del Mar ----------
   const B = (b, n) => ({ t: 'build', b, n: n || 1 }), LV = (b, lvl) => ({ t: 'level', b, lvl, n: 1 }), LA = (lvl, n) => ({ t: 'level', lvl, n });
@@ -248,6 +255,12 @@
   qa('arm7', 'Puerto seguro', 'Rechaza un asalto pirata.', st('asaltos_ganados', 1), { gold: 800, coins: 20 });
   qa('arm8', 'El Lamento', 'Hunde al Lamento, el barco fantasma.', st('jefe_lamento', 1), { tablazon: 150, coins: 50 });
   qa('arm9', 'El Kraken de la Bruma', 'Derrota al Kraken de la Bruma.', st('jefe_kraken', 1), { coins: 150, especias: 150 });
+  // la Regata, los duelos y el puente con la tierra (pk-30): otra cadena corta, también desde la Era II
+  prev = 'mar7';
+  q('reg1', 'La primera regata', 'Corre la Regata de la Bruma (menú Mundo → Regata).', st('regatas', 1), { lona: 40, coins: 10 });
+  q('reg2', 'Velas nuevas', 'Mejora 5 veces tu barco de regata.', st('regata_mejoras', 5), { fibra: 300, coins: 10 });
+  q('reg3', 'Duelo naval', 'Gana un duelo naval contra la flota de otro jugador.', st('duelos_ganados', 1), { gold: 800, coins: 20 });
+  q('reg4', 'Un maestro para la tierra', 'Levanta el Astillero del Maestro de Ribera: +1 Maestro de Obras en tu reino.', B('maestro'), { especias: 40, coins: 40 });
   D.BRANCH_MAR = { id: 'mar', name: 'Crónica del Mar', icon: 'ancla', desc: 'La historia de tu isla: pesca, colonias, especias y el Gran Faro.' };
 
   const DAILY_MAR = [

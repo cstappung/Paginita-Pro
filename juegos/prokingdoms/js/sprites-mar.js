@@ -366,6 +366,22 @@
     for (let i = 0; i < 6; i++) p.box(1.5 + i * 0.08, 1.15 + i * 0.13, 0.1, 0.1, 3 - i * 0.5, 4 - i * 0.5, '#4a4a54', '#2a2a32', '#6a6a74');
     p.flag(0.4, 0.4, 20, col, 10);
   };
+  // ---------- Puentes entre mundos (pk-30) ----------
+  Sp.BTOP_MAR.maestro = 70;
+  BD.maestro = function (p, col) { // Astillero del Maestro de Ribera: grada techada, un galeón a medio armar y la casa del maestro
+    suelo(p, 3, 3, SAND2);
+    p.box(0.1, 0.1, 2.8, 2.8, 0, 2, 'stone', 'stone', 'paving');
+    for (let i = 0; i < 4; i++) p.post(1.2 + (i % 2) * 1.5, 0.3 + Math.floor(i / 2) * 2.3, 30);
+    p.roof(1.2, 0.3, 1.6, 2.4, 30, 8, 'tile', 0.2, 0.2, 'y');
+    p.box(1.45, 0.6, 1.0, 1.9, 2, 8, TECA, '#7a4224', '#b06a3a');
+    for (let i = 0; i < 5; i++) p.line(p.P(1.5, 0.75 + i * 0.4, 8), p.P(1.95, 0.75 + i * 0.4, 18), '#8a4a24');
+    const c = { x: 0.2, y: 0.4, w: 0.85, h: 1.0 };
+    p.box(c.x, c.y, c.w, c.h, 2, 14, 'plaster');
+    p.roof(c.x, c.y, c.w, c.h, 14, 9, 'tile', 0.4, 0.15, 'x');
+    p.door(c, 'L', 0.42, 0.35, 8);
+    p.box(0.3, 1.8, 0.6, 0.35, 2, 4, '#8a6a3a', '#6a4a22', '#a8804a'); // tablones
+    p.flag(0.25, 2.6, 2, col, 16);
+  };
   BD.colonia = function (p, col) { // Muelle de la colonia: tarima, una choza y la bandera
     suelo(p, 2, 2);
     p.box(0.1, 1.3, 1.8, 0.6, 0, 3, 'plank', 'darkwood', 'plank');

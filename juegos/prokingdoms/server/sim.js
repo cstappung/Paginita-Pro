@@ -1461,7 +1461,7 @@ function checkRk(p, raw) {
 }
 const rkValor = (o, cat) => {
   const rk = o.rk || {};
-  return cat === 'era' ? (o.snap ? o.snap.era * 1e7 + Math.min(9e6, Math.floor(o.snap.total / 100)) : 0) : cat === 'maravilla' ? rk.wonder || 0 : cat === 'piso' ? rk.floor || 0 : cat === 'defensas' ? rk.def || 0 : cat === 'jefes' ? o.jefes || 0 : cat === 'visitas' ? (o.vis ? o.vis.n + 3 * o.vis.likes : 0) : 0;
+  return cat === 'era' ? (o.snap ? o.snap.era * 1e7 + Math.min(9e6, Math.floor(o.snap.total / 100)) : 0) : cat === 'maravilla' ? rk.wonder || 0 : cat === 'piso' ? rk.floor || 0 : cat === 'defensas' ? rk.def || 0 : cat === 'jefes' ? o.jefes || 0 : cat === 'visitas' ? (o.vis ? o.vis.n + 3 * o.vis.likes : 0) : cat === 'regata' ? regataValor(o) : 0;
 };
 function tituloDe(o) { const t = o.titulo; return t && t.sem >= D.semana(now()) - 1 ? D.RANKINGS[t.cat].titulo : null; }
 function tickTitulos() {
@@ -1592,6 +1592,117 @@ function resolverSaqueo(p, q) {
   } else push(p, Object.assign(base, { type: 'saqueo_fin', res: 'perdio', pct: 0.08, tope, text: 'La partida de ' + q.from + ' saqueó tus bodegas.' }));
   store.touch('players');
 }
+
+// ---------- La Regata de la Bruma y los duelos navales (Fase 9 «d», pk-30) ----------
+// El mar no manda foto (los recursos del archipiélago viven en el cliente), así que el servidor no puede comprobar
+// cuánto se gastó en el barco o en la flota. Lo que sí controla: cada parte del barco sube de a poco
+// (D.REGATA.subeHora), el tiempo lo calcula él (D.regataTiempo, con su reloj y su suerte), 3 regatas por día, la
+// flota de duelo crece a un ritmo posible y 5 duelos por día. Lo peor que logra un tramposo es el barco y la flota
+// que pudo haber tenido.
+const RG = D.REGATA;
+const regataValor = o => (o.reg && o.reg.sem === D.semana(now()) && o.reg.mejor ? Math.round(1e5 / o.reg.mejor) : 0);
+function regData(p) {
+  const sem = D.semana(now()), r = (p.reg = p.reg || { liga: 0, barco: { casco: 0, velas: 0, timon: 0 }, at: 0 });
+  if (r.sem !== sem) { r.semAnt = r.sem === sem - 1 ? { mejor: r.mejor || 0, n: r.n || 0 } : null; r.sem = sem; r.mejor = 0; r.n = 0; }
+  if (r.dia !== diaUTC()) { r.dia = diaUTC(); r.hoy = 0; }
+  return r;
+}
+function regataInfo(p) {
+  const r = regData(p), sem = r.sem, liga = r.liga || 0;
+  const rivales = store.all('players').filter(o => o.reg && o.reg.sem === sem && o.reg.mejor && (o.reg.liga || 0) === liga).sort((a, b) => a.reg.mejor - b.reg.mejor);
+  return { liga, ligaName: RG.ligas[liga], mejor: r.mejor || 0, n: r.n || 0, hoy: r.hoy || 0, porDia: RG.porDia, barco: r.barco,
+    tabla: rivales.slice(0, 20).map((o, i) => ({ pos: i + 1, id: o.id, name: o.name, mejor: o.reg.mejor, me: o.id === p.id })), puesto: rivales.findIndex(o => o.id === p.id) + 1, de: rivales.length };
+}
+function regata(p, b) {
+  const r = regData(p), t = now(), ruta = String((b && b.ruta) || '');
+  if (!RG.rutas[ruta]) throw new GameError('Esa ruta no existe.');
+  if (r.hoy >= RG.porDia) throw new GameError('Ya corriste ' + RG.porDia + ' regatas hoy. Mañana hay más.');
+  // el barco: cada parte puede subir 1 + subeHora por hora desde la última regata (y nunca más del máximo)
+  const horas = r.at ? (t - r.at) / 3600e3 : 1e9, pedido = (b && b.barco) || {}, barco = {}, raro = {};
+  for (const k in RG.partes) {
+    const v = clamp(Math.floor(+pedido[k] || 0), 0, RG.maxNivel), tope = Math.min(RG.maxNivel, (r.barco[k] || 0) + 1 + Math.floor(horas * RG.subeHora));
+    barco[k] = Math.min(v, tope);
+    if (v > tope) raro[k] = v;
+  }
+  if (Object.keys(raro).length) suspect(p, 'regata', raro);
+  const tiempo = D.regataTiempo(barco, ruta, t, rand(0.97, 1.03));
+  r.barco = barco; r.at = t; r.hoy++; r.n = (r.n || 0) + 1;
+  const record = !r.mejor || tiempo < r.mejor;
+  if (record) r.mejor = tiempo;
+  store.touch('players');
+  return Object.assign(regataInfo(p), { tiempo, record, ruta, barcoUsado: barco, marea: D.marea(t), viento: D.vientoMar(t), tormenta: !!D.tormenta(t) });
+}
+// Cada lunes: en cada liga, los mejores ascienden y los peores descienden; todos los que corrieron reciben premio.
+function tickRegata() {
+  const sem = D.semana(now()), meta = store.get('meta', 'regata') || store.set('meta', 'regata', { sem });
+  if (meta.sem === sem) return;
+  meta.sem = sem;
+  const corrieron = store.all('players').filter(o => o.reg && o.reg.sem === sem - 1 && o.reg.mejor);
+  const ligaDe = new Map(corrieron.map(o => [o, o.reg.liga || 0])); // la de antes: ascender no hace correr de nuevo en la de arriba
+  for (let liga = 0; liga < RG.ligas.length; liga++) {
+    const l = corrieron.filter(o => ligaDe.get(o) === liga).sort((a, b) => a.reg.mejor - b.reg.mejor), n = l.length;
+    if (!n) continue;
+    const suben = n >= 2 ? Math.max(1, Math.floor(n * RG.sube)) : n, bajan = n >= 3 ? Math.floor(n * RG.baja) : 0;
+    l.forEach((o, i) => {
+      const nueva = i < suben ? Math.min(RG.ligas.length - 1, liga + 1) : i >= n - bajan ? Math.max(0, liga - 1) : liga;
+      const coins = 5 + 5 * liga + (i === 0 ? 10 : i < 3 ? 5 : 0);
+      o.reg.liga = nueva;
+      push(o, { type: 'res', res: { coins }, text: 'Regata de la Bruma: terminaste ' + (i + 1) + '.º de ' + n + ' en la liga ' + RG.ligas[liga] + ' (+' + coins + ' monedas).' + (nueva > liga ? ' ¡Asciendes a ' + RG.ligas[nueva] + '!' : nueva < liga ? ' Bajas a ' + RG.ligas[nueva] + '.' : '') });
+    });
+  }
+  store.touch('meta'); store.touch('players');
+}
+// Duelos: la flota de duelo se anota con lo que hay en casa (POST /api/flota) y no se pierde al pelear.
+const DU = D.DUELO;
+function duData(p) {
+  const d = (p.duelo = p.duelo || { trofeos: DU.inicial, gan: 0, per: 0, hist: [] });
+  if (d.dia !== diaUTC()) { d.dia = diaUTC(); d.hoy = 0; }
+  return d;
+}
+function flotaMar(p, b) {
+  const d = duData(p), t = now(), units = {};
+  let n = 0;
+  for (const k in DU.poder) { const v = clamp(Math.floor(+((b && b.units) || {})[k] || 0), 0, 1e6); units[k] = v; n += v; }
+  if (n > DU.maxBarcos) throw new GameError('Una flota de duelo lleva como mucho ' + DU.maxBarcos + ' barcos.');
+  if (!n) throw new GameError('Elige al menos un barco.');
+  // a un ritmo posible: el poder puede crecer un 50% más 400 por hora desde la última vez
+  const poder = D.dueloPoder(units), prev = d.flota ? d.flota.poder : 0, horas = d.flota ? (t - d.flota.at) / 3600e3 : 1e9;
+  const tope = prev ? Math.max(prev, 300) * 1.5 + 400 * horas : 1e9;
+  if (poder > tope) { suspect(p, 'flota', { poder, tope: Math.round(tope) }); throw new GameError('Tu flota creció demasiado rápido; espera un rato.'); }
+  d.flota = { units, poder, at: t };
+  store.touch('players');
+  return duelosInfo(p);
+}
+function duelosInfo(p) {
+  const d = duData(p), yo = d.trofeos;
+  const rivales = store.all('players').filter(o => o.id !== p.id && o.duelo && o.duelo.flota)
+    .sort((a, b) => Math.abs(a.duelo.trofeos - yo) - Math.abs(b.duelo.trofeos - yo)).slice(0, 8)
+    .map(o => ({ id: o.id, name: o.name, trofeos: o.duelo.trofeos, poder: Math.round(o.duelo.flota.poder / 10) * 10 }));
+  return { trofeos: yo, gan: d.gan, per: d.per, hoy: d.hoy, porDia: DU.porDia, flota: d.flota || null, rivales, hist: d.hist.slice(0, 8) };
+}
+function duelo(p, b) {
+  const d = duData(p), o = player(b && b.id);
+  if (!d.flota) throw new GameError('Primero anota tu flota de duelo.');
+  if (!o || o.id === p.id || !o.duelo || !o.duelo.flota) throw new GameError('Ese rival no tiene flota de duelo.');
+  if (d.hoy >= DU.porDia) throw new GameError('Ya hiciste ' + DU.porDia + ' duelos hoy.');
+  const od = duData(o), a = d.flota, c = od.flota;
+  const ratio = (a.poder * D.dueloVentaja(a.units, c.units)) / Math.max(1, c.poder * D.dueloVentaja(c.units, a.units));
+  const chance = clamp(0.5 + (ratio - 1) * 0.9, 0.05, 0.95), gano = Math.random() < chance;
+  // más trofeos por ganarle a alguien de más arriba
+  const dif = clamp((od.trofeos - d.trofeos) / 400, -0.5, 0.5), gan = Math.round(DU.gana * (1 + dif)), per = Math.round(DU.pierde * (1 - dif * 0.5));
+  d.hoy++;
+  if (gano) { d.trofeos += gan; d.gan++; od.trofeos = Math.max(0, od.trofeos - Math.round(per * 0.5)); }
+  else { d.trofeos = Math.max(0, d.trofeos - per); d.per++; od.trofeos += Math.round(gan * 0.5); }
+  const linea = { at: now(), rival: o.name, gano, trofeos: gano ? gan : -per, chance: Math.round(chance * 100) };
+  d.hist.unshift(linea); d.hist.length = Math.min(d.hist.length, 20);
+  od.hist = od.hist || [];
+  od.hist.unshift({ at: now(), rival: p.name, gano: !gano, trofeos: gano ? -Math.round(per * 0.5) : Math.round(gan * 0.5), defensa: true }); od.hist.length = Math.min(od.hist.length, 20);
+  push(o, { type: 'res', res: gano ? {} : { coins: 1 }, text: 'Duelo naval: la flota de ' + p.name + ' ' + (gano ? 'le ganó a la tuya.' : 'atacó la tuya y perdió (+1 moneda).') });
+  if (gano) push(p, { type: 'res', res: { coins: 2 }, text: 'Duelo naval ganado contra ' + o.name + ': +' + gan + ' trofeos y 2 monedas.' });
+  store.touch('players');
+  return Object.assign(duelosInfo(p), { resultado: linea });
+}
+
 function tick() {
   for (const w of store.all('worlds')) tickWorld(w);
   tickMarket();
@@ -1602,6 +1713,7 @@ function tick() {
   tickCaravanas();
   tickJefes();
   tickTitulos();
+  tickRegata();
 }
 // ---------- Pase del Reino (Fase 8) ----------
 // Los puntos los decide el servidor: el cliente informa sus estadísticas acumuladas (D.PASE_STATS) y aquí se suman
@@ -1697,4 +1809,5 @@ module.exports = {
   paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos,
   diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
   caravana, tickCaravanas, guildBoss, tickJefes, visita, visitaLike, visitaRegalo, tickTitulos,
+  regata, regataInfo: p => regataInfo(p), tickRegata, flotaMar, duelosInfo: p => duelosInfo(p), duelo,
 };

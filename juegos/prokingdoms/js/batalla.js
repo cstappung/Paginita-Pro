@@ -426,6 +426,7 @@
       if (b.orden === 'linea' && f.st.linea && (o.st.vel >= 2 || o.st.jefe)) m *= f.st.linea;
       if (f.st.pesado && o.st.hp >= 2) m *= f.st.pesado; // el virote pesado contra los grandes (gólems, osos, gigantes)
       if (b.cancion > 0) m *= 1.25;
+      if (b.corrientes > 0 && f.tipo === 'infanteria') m *= 1.4; // la Corsaria: los abordajes
       // Ignivor en el aire: solo le llegan las flechas y los lanceros en línea
       if (o.esJefe && b.vuela && !(f.st.dispara === 'flecha' || f.st.dispara === 'virote' || (f.tipo === 'spear' && b.orden === 'linea'))) m *= 0.15;
       if (o.esJefe && b.escudo) m *= 0.15; // el escudo de Brunilda
@@ -690,6 +691,7 @@
   function heroePaso(b, mios, suyos, dt) {
     const h = b.heroe, f = h.fig;
     h.cd = Math.max(0, h.cd - dt); b.muro = Math.max(0, b.muro - dt); b.cancion = Math.max(0, b.cancion - dt);
+    if (b.corrientes > 0 && (b.corrientes -= dt) <= 0 && b.vientoAntes !== undefined) { b.viento = b.vientoAntes; b.vientoAntes = undefined; if (vista && vista.b === b) pintarControles(); } // vuelve el viento de antes
     f.anim += dt;
     // se para un par de pasos detrás del más adelantado de los suyos
     // C1: el flanco elegido (izquierda, centro o derecha): sigue al más adelantado de esa franja
@@ -718,6 +720,7 @@
     if (id === 'bombarda') return suyos.some(o => cerca(o, h.fig) < 10);
     if (id === 'rayo') return suyos.length >= 3 || b.t > 10;
     if (id === 'cancion') return suyos.some(o => mios.some(m => cerca(m, o) < 2));
+    if (id === 'corrientes') return b.viento < 0 || suyos.some(o => mios.some(m => cerca(m, o) < 2.5));
     return false;
   }
   function lanzar(b, h, mios, suyos) {
@@ -725,6 +728,7 @@
     const id = h.hab.id, base = mios.reduce((s, o) => s + o.dps, 0) * h.pot, blancos = [];
     if (id === 'muro') b.muro = (h.hab.dur || 8) * (0.5 + 0.5 * h.pot);
     else if (id === 'cancion') b.cancion = (h.hab.dur || 10) * (0.5 + 0.5 * h.pot);
+    else if (id === 'corrientes') { b.corrientes = (h.hab.dur || 12) * (0.5 + 0.5 * h.pot); b.vientoAntes = b.vientoAntes === undefined ? b.viento : b.vientoAntes; b.viento = b.viento ? 1 : 0; grito(b, '¡Viento a favor!'); if (vista && vista.b === b) pintarControles(); } // la Corsaria (pk-30)
     else if (id === 'plegaria') for (const a of mios) { a.hp = Math.min(a.max, a.hp + a.max * 0.3 * h.pot); blancos.push(a); }
     else if (id === 'lluvia') {
       const [c] = racimo(suyos, 3.2);
@@ -1155,6 +1159,7 @@
   function sprite(f, frame) {
     const a = f.st, modo = f.modo;
     if (B.ext.sprite && (a.barco || a.mar)) { const s2 = B.ext.sprite(f, frame); if (s2) return s2; }
+    if (f.tipo === 'heroe' && D.temaActivo === 'mar' && B.ext.heroe) { const s2 = B.ext.heroe(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe') return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
     if (f.lado === 'p') return f.tipo === 'catapult' ? Sp.cart(COL_MIOS, 'stone', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
     if (a.spr === 'lobo') return Sp.wolf[f.flip ? 1 : 0][frame % 2];

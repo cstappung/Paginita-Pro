@@ -918,3 +918,36 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   brulotes), Kraken 63/100. Crabs started at 2.2 hp like a land giant and specialists won 5%: at sea they are a
   normal enemy whose trick is only the shell.
 - Fixed on the way: chained rings (`anillos` with negative `t`, Morgana's curse) threw on `ellipse`.
+
+## The New World, part 4 (`pk-30`, Phase 9 N7 «d»: the Regata and the bridges) — Phase 9 done
+
+- **`D.PROTO` 8, new routes:** `POST /api/regata`, `/api/regata/info`, `/api/flota`, `/api/duelos`, `/api/duelo`
+  (in both `server/index.js` and `functions/index.js`). Deploy the function with this delivery. Test:
+  `node tools/regata-test.js` (in-process, moves the clock, like the raid test).
+- **Anything the server computes lives in `data.js`**, since its vm loads only util, data, pase and world:
+  `D.REGATA`, `D.vientoMar` (90-minute cycle, out of phase with the tide), `D.regataTiempo`, `D.DUELO`,
+  `D.dueloPoder`/`D.dueloVentaja`, and `D.tormenta` (moved there from `datos-mar.js`).
+- **Regata** (`js/regata.js`, `PK.Regata`, menu «Regata», sea only via `NO_TIERRA`): the client pays for the ship
+  parts (casco, velas, timón, 0–10), the server decides the time from the parts, the route (arrecifes, canal,
+  altamar), the tide, the wind, the storm and ±3% luck. Each part can rise at most `1 + floor(h × subeHora)`
+  levels since the last race: a lie only earns a ship you could have had, and it is logged (`suspect`). Three a
+  day. Weekly leagues (Bronce, Plata, Oro, Bruma): every Monday `tickRegata` promotes the top 30% and relegates
+  the bottom 30% of each league and pays kingdom coins by inbox (`type: 'res'`). It reads each player's league
+  from a snapshot (`ligaDe`), or a player promoted from Bronce got promoted again in Plata. The ranking
+  category `regata` sorts by best time (`1e5 / t`).
+- **Naval duels:** `POST /api/flota` saves a duel fleet (≤ 120 ships). The server cannot see the sea, so its
+  check is growth: power may reach `max(prev, 300) × 1.5 + 400 per hour` since the last save. Duels never cost
+  ships, only trophies (5 a day; chance `0.5 + 0.9 × (ratio − 1)` clamped to 5–95%, rock-paper-scissors bonus
+  ≤ ×1.15). Both players get an inbox line. Ship powers in `D.DUELO.poder` must match `D.ARMY_MAR` (tested).
+- **Bridges between worlds** (`js/mar.js`): the Galeón carries cargo (`D.CARGA`, 400 units: tools, steel,
+  machinery, ingots and books to the sea; spices, gunpowder, planks and canvas to land) and up to
+  `D.HEROES_ABORDO` (2) heroes. Heroes and their items get **new ids** in the other world (`a.nid++`), because
+  ids are per world, and arrive `travesia` for `D.TRAVESIA_HEROE` (10 min). The top bar shows a resource of the
+  other world when you hold ≥ 1 of it.
+- **The Corsaria** (`H.CLASES.corsaria`, `mar: true`, not in `H.ORDEN`): hired in the Flota tab with gold and
+  spices, only one across both worlds. «Leer las corrientes» turns the battle's wind in your favor and gives
+  infantry ×1.4 for 12 s, then restores the wind. Like every hero, it starts each battle with a 4 s cooldown.
+- **Astillero del Maestro de Ribera** (`maestro`, sea era III, one): once built, `G.maestroMar()` gives the land
+  +1 builder (`G.builders`). **Wonder levels from 20 on land cost spices and gunpowder** (`G.upCost` wraps
+  `conMar`), but only once the Galeón can sail, so a kingdom that never reached the sea is not locked.
+- Quests `reg1`–`reg4` in the Crónica del Mar (races, ship upgrades, duels won, the Maestro).

@@ -188,7 +188,7 @@
   Mn.rankingEl = function () {
     const cat = Mn.rkCat, lista = Mn.rk[cat];
     const tabs = el('div', { class: 'row rk-tabs' }, Object.keys(D.RANKINGS).map(k => UI().btn(D.RANKINGS[k].name, () => Mn.refrescar(k), { small: true, cls: k === cat ? 'gold' : '' })));
-    const fmt = r => (cat === 'era' ? 'Era ' + U.roman(r.era) + ' · ' + U.fmt(r.total) : cat === 'maravilla' ? 'nivel ' + r.v : cat === 'piso' ? 'piso ' + r.v : U.fmt(r.v));
+    const fmt = r => (cat === 'era' ? 'Era ' + U.roman(r.era) + ' · ' + U.fmt(r.total) : cat === 'maravilla' ? 'nivel ' + r.v : cat === 'piso' ? 'piso ' + r.v : cat === 'regata' ? (1e5 / r.v).toFixed(1).replace('.', ',') + ' s' : U.fmt(r.v));
     return el('div', null, el('h3', null, 'Ranking del servidor'), Mn.titulo ? el('p', { class: 'small good-t' }, 'Tu título esta semana: «' + Mn.titulo + '».') : '',
       el('p', { class: 'small muted' }, 'Cada lunes, el primero de cada categoría se lleva un título por una semana: ' + Object.values(D.RANKINGS).map(o => o.titulo).join(', ') + '.'),
       tabs,

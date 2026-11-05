@@ -223,6 +223,7 @@
     mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
     mbtn('ancla', 'Galeón', () => PK.Mar.abrir(), null, 'galeon'); // Fase 9
+    mbtn('crown', 'Regata', () => PK.Regata && PK.Regata.abrir(), null, 'regata'); // pk-30, solo en el mar
     mbtn('gear', 'Opciones', () => UI.openSettings(), null, 'settings');
     agrupar(menu);
 
@@ -277,7 +278,8 @@
   // Cuartel siempre está: sus murallas (Defensa) sirven desde la Era I y una misión lo nombra.
   const menuIds = {}, allIds = {};
   // En el archipiélago (pk-28) no hay investigación, gremio, territorio, mercado, ejército ni héroes (todavía)
-  const NO_MAR = ['explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'heroes', 'taberna', 'equipo', 'consejo', 'defensa', 'desafios', 'album']; // la armada (pk-29) sí está en el mar
+  const NO_MAR = ['explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'taberna', 'consejo', 'defensa', 'desafios', 'album']; // los héroes viajan (pk-30)
+  const NO_TIERRA = ['regata']; // lo que solo existe en el archipiélago // la armada (pk-29) sí está en el mar
   const MENU_VER = {
     explore: (g, st) => g.countAll('scout') > 0 || st.era >= 2,
     research: (g, st) => st.era >= 2 || g.countAll('library') > 0,
@@ -288,6 +290,7 @@
     realms: (g, st) => !!PK.Net.online || D.BOTS.some(b => st.flags['seen_' + b.slot]),
     heroes: (g, st) => g.countAll('tavern') > 0 || !!(st.heroes && st.heroes.lista.length),
     galeon: () => !!(PK.Mar && PK.Mar.visible()),
+    regata: (g, st) => D.temaActivo === 'mar' && st.era >= 2,
     // U1: lo que antes eran pestañas dentro de una ventana aparece cuando aparece su ventana
     diarias: (g, st) => st.era >= 2 || !!st.flags.menu_explore,
     desafios: (g, st) => st.era >= 2,
@@ -305,7 +308,7 @@
     { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
     { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
-    { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms'] },
+    { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms', 'regata'] },
     { id: 'libro', label: 'Libro', icon: 'book', items: ['book', 'diarias', 'desafios', 'album'] },
   ];
   const grupos = [];
@@ -379,7 +382,7 @@
     const g = G(), st = S(), nuevos = [];
     const mar = g.enMar && g.enMar();
     for (const id in menuIds) {
-      if (mar && NO_MAR.includes(id)) { menuIds[id].style.display = 'none'; continue; }
+      if ((mar && NO_MAR.includes(id)) || (!mar && NO_TIERRA.includes(id))) { menuIds[id].style.display = 'none'; continue; }
       const b = menuIds[id], ok = !!st.flags['menu_' + id] || MENU_VER[id](g, st);
       if (ok && !st.flags['menu_' + id]) {
         st.flags['menu_' + id] = 1;
@@ -389,6 +392,7 @@
     }
     menuFirst = false;
     if (mar) for (const id of NO_MAR) if (allIds[id]) allIds[id].style.display = 'none';
+    if (!mar) for (const id of NO_TIERRA) if (allIds[id]) allIds[id].style.display = 'none';
     updateGrupos();
     if (nuevos.length) UI.toast('Nuevo en el menú: ' + (nuevos.length > 1 ? nuevos.slice(0, -1).join(', ') + ' y ' + nuevos[nuevos.length - 1] : nuevos[0]) + '.', 'quest');
   }
@@ -410,7 +414,7 @@
         // oro lleno se perdía).
         resEls[r].box.title = D.RES[r].name + ': ' + U.fmt(v) + ' / ' + U.fmt(cap) + (v >= cap * 0.98 ? ' — bodega llena: tus aldeanos esperan hasta que gastes. Premios, compras y tratos entran igual.' : '');
         if (v >= 1) st.flags['seenRes_' + r] = true;
-        resEls[r].box.style.display = !D.RES[r].special && (!D.resDelMundo || D.resDelMundo(r)) && (D.RES_START.includes(r) || st.flags['seenRes_' + r]) ? '' : 'none';
+        resEls[r].box.style.display = !D.RES[r].special && (!D.resDelMundo || D.resDelMundo(r) || st.res[r] >= 1) && (D.RES_START.includes(r) || st.flags['seenRes_' + r]) ? '' : 'none';
       }
       popEl.textContent = G().pop() + '/' + G().popCap();
       buildEl.textContent = G().buildersBusy() + '/' + G().builders();

@@ -32,6 +32,11 @@
     juglar: { name: 'Juglar', rol: 'Moral', col: [200, 60, 80], look: 'militia', gob: ['tavern', 'tc'], pas: { fiesta: 0.1, missions: 1 }, pasTxt: 'Taberna o Centro Urbano: fiestas +10% y +1 encargo en el tablón',
       hab: { id: 'cancion', name: 'Canción de guerra', desc: '+25% velocidad y daño por 10 s', cd: 45, dur: 10 }, vs: [], sp: 'crystal' },
   };
+  // La Corsaria (Fase 9 «d», pk-30): solo se recluta en el archipiélago (Dársena de guerra, con la Escuela de
+  // navegantes) y nunca sale en la Taberna. Dirige la armada: su habilidad pone el viento a favor y hace pegar más a
+  // los abordajes (batalla.js, 'corrientes'). Una sola entre los dos mundos.
+  H.CLASES.corsaria = { name: 'Corsaria', rol: 'Almirante', col: [60, 120, 170], look: 'archer', gob: ['barracks'], pas: { armyTrain: 0.15 }, pasTxt: 'Dársena de guerra: +15% velocidad de armado',
+    hab: { id: 'corrientes', name: 'Leer las corrientes', desc: 'el viento sopla a favor y los abordajes pegan +40% por 12 s', cd: 35, dur: 12 }, vs: ['pirata', 'fantasma'], sp: 'especias', mujer: true, mar: true };
   H.ORDEN = ['paladin', 'guarda', 'clerigo', 'ingeniera', 'hechicero', 'juglar'];
   // Efectos (fracciones): fuerza, vs (extra contra su especialidad), bajas (menos bajas), herida (heridas más cortas),
   // xp, botin, viaje (viajes más cortos), pot (potencia de la habilidad), cd (recarga más corta), pasiva, prod
@@ -216,6 +221,28 @@
     if (PK.Sfx) PK.Sfx.play('level');
     return h;
   };
+  // ---------- La Corsaria (pk-30) ----------
+  const otraLista = () => { const o = S().otro; return (o && o.heroes && o.heroes.lista) || []; };
+  H.hayCorsaria = () => H.lista().concat(otraLista()).some(h => h.clase === 'corsaria');
+  H.costoCorsaria = () => ({ gold: 2500, especias: 40 });
+  H.porQueNoCorsaria = function () {
+    if (D.temaActivo !== 'mar') return 'La Corsaria solo se recluta en el archipiélago.';
+    if (H.hayCorsaria()) return 'Ya navega contigo.';
+    if (!G().countB('escuela')) return 'Necesitas la Escuela de navegantes.';
+    if (H.lista().length >= H.MAX) return 'Tienes el máximo de héroes en la isla (' + H.MAX + ').';
+    if (!G().canAfford(H.costoCorsaria())) return 'Te falta para pagarle.';
+    return null;
+  };
+  H.nombreCorsaria = () => U.pick(['Isabela la Roja', 'Marina Tormenta', 'Leonor de Ribera', 'Catalina Brisa', 'Inés del Faro'], U.rng(U.strHash('corsaria:' + (S().created || 0))));
+  H.contratarCorsaria = function () {
+    if (H.porQueNoCorsaria()) return null;
+    G().pay(H.costoCorsaria());
+    const h = { id: est().nid++, clase: 'corsaria', nombre: H.nombreCorsaria(), mujer: true, semilla: U.strHash('corsaria:' + (S().created || 0)), rasgo: 'valiente', nivel: 3, xp: 0, talentos: [], equipo: {}, estado: 'libre', hasta: 0, gobierna: null };
+    est().lista.push(h);
+    G().stat('heroes_hired', 1);
+    toast(h.nombre + ', la Corsaria, sube a tu flota. Llévala en las batallas del mar: lee las corrientes.', 'epic');
+    return h;
+  };
   H.renombrar = function (h, nombre) {
     nombre = String(nombre || '').replace(/[<>]/g, '').trim().slice(0, 18);
     if (nombre) h.nombre = nombre;
@@ -356,6 +383,7 @@
     const now = Date.now();
     for (const h of H.lista()) {
       if (h.estado === 'herido' && now >= h.hasta) { h.estado = 'libre'; toast(h.nombre + ' ya se recuperó.', 'good'); }
+      if (h.estado === 'travesia' && now >= h.hasta) { h.estado = 'libre'; toast(h.nombre + ' bajó del Galeón: ya está lista para lo que mandes.', 'good'); } // pk-30
       // la expedición que lo llevaba ya no existe (partida vieja, algo raro): vuelve a casa
       if (h.estado === 'expedicion' && !S().exp.runs.some(r => r.id === h.run)) { h.estado = 'libre'; h.run = null; }
       if (h.gobierna !== null && h.gobierna !== undefined && !G().bById.get(h.gobierna)) h.gobierna = null;
@@ -431,7 +459,7 @@
   // ---------- Ventana ----------
   let tab = 'heroes', sel = null;
   const pct = v => Math.round(v * 100) + '%';
-  const estadoTxt = h => (h.estado === 'investiga' ? 'Investiga un lugar legendario · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'explora' ? 'Busca un tesoro · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'expedicion' ? 'En expedición' : h.estado === 'herido' ? 'Herido · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : gobernado(h) ? 'Gobierna ' + gobernado(h).def.name : 'En casa');
+  const estadoTxt = h => (h.estado === 'investiga' ? 'Investiga un lugar legendario · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'explora' ? 'Busca un tesoro · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'expedicion' ? 'En expedición' : h.estado === 'herido' ? 'Herido · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : h.estado === 'travesia' ? 'Bajando del Galeón · ' + U.fmtTime(Math.max(0, (h.hasta - Date.now()) / 1000)) : gobernado(h) ? 'Gobierna ' + gobernado(h).def.name : 'En casa');
   H.open = function (t, id) {
     const UI = PK.UI;
     if (t) tab = t;
@@ -447,6 +475,11 @@
   function heroesTab(body, UI) {
     const lista = H.lista();
     if (!lista.length) {
+      if (D.temaActivo === 'mar') { // en el archipiélago no hay Taberna: llegan en el Galeón o es la Corsaria
+        body.append(el('div', { class: 'empty-box' }, el('div', null, el('b', null, 'Todavía no hay héroes en tu isla.'),
+          el('p', { class: 'small' }, 'Tráelos de tu reino en el Galeón (hasta dos por viaje), o contrata a la Corsaria en la Dársena de guerra cuando tengas la Escuela de navegantes.'))));
+        return;
+      }
       body.append(el('div', { class: 'empty-box' }, el('div', null, el('b', null, 'Todavía no tienes héroes.'),
         el('p', { class: 'small' }, H.taberna() ? 'En la Taberna hay tres candidatos cada día.' : 'Construye la Taberna (Era II, con un Cuartel): cada día llegan tres candidatos.'),
         H.taberna() ? UI.btn('Ir a la Taberna', () => { tab = 'taberna'; UI.rerender(true); }, { cls: 'gold' }) : G().isUnlocked('tavern') && !G().countAll('tavern') ? UI.btn('Construir la Taberna', () => { UI.closeModal(); PK.Input.startPlacing('tavern'); }, { cls: 'gold' }) : '')));

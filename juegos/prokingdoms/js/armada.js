@@ -268,6 +268,23 @@
     const b = B.vistaActual(), niebla = st.id === 'lamento' && b && b.bruma;
     return Ar.dibujo(tipo, f.flip, fr, niebla);
   };
+  // el héroe en el mar (pk-30): de pie en un bote, con el dibujo de siempre
+  const BOTES = new WeakMap();
+  B.ext.heroe = function (f, frame) {
+    const v = Sp.villager(f.col, 1, 1, f.modo === 'walk' ? 'idle' : f.modo, frame, null, f.flip, f.modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
+    if (!v) return null;
+    if (BOTES.has(v)) return BOTES.get(v);
+    const k = v.k || 1, vw = v.k ? v.w : v.c.width, vh = v.k ? v.h : v.c.height, Wd = Math.max(22, vw + 6), Hd = vh + 3;
+    const c = mk(Wd * k, Hd * k), x = c.getContext('2d'), r = (a, b2, w, h, col) => { x.fillStyle = col; x.fillRect(a * k, b2 * k, w * k, h * k); };
+    x.imageSmoothingEnabled = false;
+    x.drawImage(v.c, Math.round((Wd / 2 - v.ax) * k), 0, vw * k, vh * k);
+    const cx = Wd / 2, y0 = vh - 3;
+    for (let j = 0; j < 4; j++) r(cx - 10 + j, y0 + j, 20 - j * 2, 1, j === 0 ? '#c09060' : j === 3 ? '#5a3a1e' : '#8a5a32');
+    r(cx - 9, y0 + 1, 18, 1, 'rgb(' + f.col.join(',') + ')');
+    const out = { c, ax: Math.round(cx), ay: vh, k, w: Wd, h: Hd };
+    BOTES.set(v, out);
+    return out;
+  };
   // íconos de la Dársena y el planificador
   const _troopIcon = Sp.troopIcon;
   Sp.troopIcon = function (type) {
@@ -430,6 +447,17 @@
     const d = Ar.dibujo(id, false, 0), c = mk(48, 48), x = c.getContext('2d'), s = Math.min(44 / d.c.width, 44 / d.c.height);
     x.imageSmoothingEnabled = false; x.drawImage(d.c, Math.round((48 - d.c.width * s) / 2), Math.round((48 - d.c.height * s) / 2), d.c.width * s, d.c.height * s);
     return (cache[k] = c.toDataURL());
+  };
+  // La Corsaria (pk-30): se contrata aquí, en la pestaña Flota de la Dársena.
+  Ar.corsariaEl = function () {
+    const H = PK.Heroes;
+    if (!H || H.hayCorsaria()) return '';
+    const why = H.porQueNoCorsaria();
+    return el('div', { class: 'raid-row dungeon' }, el('div', { class: 'dg-info' }, el('b', null, 'La Corsaria: ' + H.nombreCorsaria()),
+      el('div', { class: 'small' }, 'Una heroína que solo se recluta en el archipiélago. Dirige la flota: «Leer las corrientes» pone el viento a favor y hace pegar +40% a los abordajes. Gobierna la Dársena (+15% de armado). Puede viajar a la tierra en el Galeón.'),
+      el('div', { class: 'small muted' }, 'Cuesta: ', PK.UI.costEl(H.costoCorsaria()))),
+      PK.UI.btn('Contratar', () => { if (H.contratarCorsaria()) PK.UI.rerender(); }, { small: true, cls: 'gold', disabled: !!why, title: why || '' }),
+      why ? el('span', { class: 'small warn-t' }, why) : '');
   };
   // Pestaña «Defensa» en el mar: los asaltos piratas, las baterías y la cadena.
   Ar.defensaEl = function () {
