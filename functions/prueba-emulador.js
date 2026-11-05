@@ -6,7 +6,7 @@
    Comprueba: CORS, que join exige sesión de Firebase y estar en betaTesters, que la cuenta es el
    uid (un reino por cuenta), sync, guardar y leer la partida (también como sendBeacon, text/plain),
    que lo guardado en la RTDB vuelve igual en un arranque en frío (arreglos con null, listas vacías)
-   y que nadie de la web puede leer prokingdoms/, la versión del mundo, el Pase del Reino (pkPase → refresh) y el rechazo de un cliente de otro
+   y que nadie de la web puede leer prokingdoms/, la versión del mundo, el Pase del Reino (pkPase → refresh), la Regata y los duelos navales, y el rechazo de un cliente de otro
    protocolo (426). No es idempotente: reinicia el emulador entre corridas. */
 'use strict';
 const fs = require('fs'), path = require('path');
@@ -85,6 +85,31 @@ async function main() {
   ok(r1.status === 200 && r1.d.pase && r1.d.pase.dorado === true, 'con la compra escrita, refresh abre la pista dorada', r1.status);
   const cl = await api('POST', '/api/pase/claim', { cuerpo: { nivel: 30, pista: 'g' }, token: yo.token });
   ok(cl.status === 400 || cl.status === 409 || (cl.d && cl.d.error), 'no se reclama un nivel que no se alcanzó', cl.status + ' ' + (cl.d && cl.d.error));
+
+  console.log('\nEl archipiélago: Regata y duelos (pk-30)');
+  const sm = await api('POST', '/api/sync', { cuerpo: { since: 0, mundo: 'mar' }, token: yo.token });
+  ok(sm.status === 200 && !Object.keys(sm.d.nodes || {}).length, 'un sync desde el mar no trae la tierra', sm.status);
+  const ri = await api('POST', '/api/regata/info', { cuerpo: {}, token: yo.token });
+  ok(ri.status === 200 && ri.d.ligaName === 'Bronce' && ri.d.hoy === 0, 'regata/info: liga Bronce, ninguna corrida hoy', ri.status + ' ' + ri.d.ligaName);
+  const rg = await api('POST', '/api/regata', { cuerpo: { ruta: 'canal', barco: { casco: 10, velas: 10, timon: 10 } }, token: yo.token });
+  ok(rg.status === 200 && rg.d.tiempo > 0 && rg.d.barcoUsado.velas === 1 && rg.d.puesto === 1, 'la regata da un tiempo y frena el barco inventado', rg.status + ' ' + rg.d.tiempo + ' s ' + JSON.stringify(rg.d.barcoUsado));
+  ok((await api('POST', '/api/regata', { cuerpo: { ruta: 'atajo' }, token: yo.token })).status === 400, 'una ruta inventada: 400');
+  const C = await cuenta('cata@prueba.cl'); // Beto no: el «no es beta» de arriba queda recordado un minuto
+  await dbPut(`betaTesters/${C.uid}`, { at: Date.now(), por: A.uid });
+  const jb = await api('POST', '/api/join', { cuerpo: { name: 'Beto' }, bearer: C.tok });
+  ok(jb.status === 200, 'entra una segunda capitana', jb.status);
+  const beto = jb.d.player || {};
+  await api('POST', '/api/sync', { cuerpo: { since: 0, mundo: 'mar' }, token: beto.token });
+  ok((await api('POST', '/api/flota', { cuerpo: { units: { galeon: 120 } }, token: beto.token })).status === 400, '120 galeones de golpe: 400');
+  const fb = await api('POST', '/api/flota', { cuerpo: { units: { balandra: 5 } }, token: beto.token });
+  const fa = await api('POST', '/api/flota', { cuerpo: { units: { fragata: 10, infanteria: 20 } }, token: yo.token });
+  ok(fb.status === 200 && fa.status === 200 && fa.d.flota.poder === 300, 'se anotan dos flotas de duelo', fb.status + ' / ' + fa.status);
+  const du = await api('POST', '/api/duelos', { cuerpo: {}, token: yo.token });
+  ok(du.status === 200 && du.d.rivales.some(o => o.id === beto.id), 'Ana ve a Beto entre sus rivales', du.status);
+  const d1 = await api('POST', '/api/duelo', { cuerpo: { id: beto.id }, token: yo.token });
+  ok(d1.status === 200 && d1.d.resultado && typeof d1.d.resultado.gano === 'boolean' && d1.d.hoy === 1, 'un duelo se resuelve en el servidor', d1.status + ' ' + JSON.stringify(d1.d.resultado || d1.d).slice(0, 90));
+  const sb = await api('POST', '/api/sync', { cuerpo: { since: 0, mundo: 'mar' }, token: beto.token });
+  ok((sb.d.inbox || []).some(i => /Duelo naval/.test(i.text)), 'Beto se entera por el buzón');
 
   console.log('\nPartida en la nube');
   const partida = { v: 99, slot: yo.slot || 0, lastSeen: Date.now(), cosas: [null, 1, []], vacio: {} };

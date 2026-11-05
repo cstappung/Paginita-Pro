@@ -930,13 +930,15 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **Regata** (`js/regata.js`, `PK.Regata`, menu «Regata», sea only via `NO_TIERRA`): the client pays for the ship
   parts (casco, velas, timón, 0–10), the server decides the time from the parts, the route (arrecifes, canal,
   altamar), the tide, the wind, the storm and ±3% luck. Each part can rise at most `1 + floor(h × subeHora)`
-  levels since the last race: a lie only earns a ship you could have had, and it is logged (`suspect`). Three a
-  day. Weekly leagues (Bronce, Plata, Oro, Bruma): every Monday `tickRegata` promotes the top 30% and relegates
+  levels since the last race (the first race counts from `p.marDesde`, set by the first sync with `mundo: 'mar'`;
+  before that a new account raced at 10/10/10): a lie only earns a ship you could have had, and it is logged
+  (`suspect`). Three a day. Weekly leagues (Bronce, Plata, Oro, Bruma): every Monday `tickRegata` promotes the top 30% and relegates
   the bottom 30% of each league and pays kingdom coins by inbox (`type: 'res'`). It reads each player's league
   from a snapshot (`ligaDe`), or a player promoted from Bronce got promoted again in Plata. The ranking
   category `regata` sorts by best time (`1e5 / t`).
 - **Naval duels:** `POST /api/flota` saves a duel fleet (≤ 120 ships). The server cannot see the sea, so its
-  check is growth: power may reach `max(prev, 300) × 1.5 + 400 per hour` since the last save. Duels never cost
+  check is growth: power may reach `max(prev, 300) × 1.5 + 400 per hour` since the last save (the first fleet counts
+  from `p.marDesde`, so a new account cannot list 120 galleons). Duels never cost
   ships, only trophies (5 a day; chance `0.5 + 0.9 × (ratio − 1)` clamped to 5–95%, rock-paper-scissors bonus
   ≤ ×1.15). Both players get an inbox line. Ship powers in `D.DUELO.poder` must match `D.ARMY_MAR` (tested).
 - **Bridges between worlds** (`js/mar.js`): the Galeón carries cargo (`D.CARGA`, 400 units: tools, steel,
@@ -951,6 +953,10 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   +1 builder (`G.builders`). **Wonder levels from 20 on land cost spices and gunpowder** (`G.upCost` wraps
   `conMar`), but only once the Galeón can sail, so a kingdom that never reached the sea is not locked.
 - Quests `reg1`–`reg4` in the Crónica del Mar (races, ship upgrades, duels won, the Maestro).
+- **Tests of both worlds:** `tools/cheat-test.js` has an «archipiélago» block (a sea sync ignores harvest, snapshot,
+  market and pass stats and sends no land; first race and first fleet are capped), and `functions/prueba-emulador.js`
+  runs the Regata and a duel against the real function. Its beta check is cached a minute per uid, so the test uses a
+  fresh account for the second captain.
 
 ## Phase 6 leftovers (`pk-31`): ambience from the screen, colorblind shapes and patterns — Phase 6 done
 

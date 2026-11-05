@@ -364,6 +364,7 @@ function sync(p, b) {
   if (b.name) p.name = cleanText(b.name, 20) || p.name;
   // Fase 9: en el archipiélago no llega foto ni recolección; el reino de la tierra queda como «sin conexión»
   p.mar = b.mundo === 'mar';
+  if (p.mar && !p.marDesde) p.marDesde = t; // desde cuándo navega: tope del primer barco de regata y de la primera flota de duelo
   if (p.mar) { b.harvest = null; b.market = null; b.snap = null; b.pase = null; }
   if (b.harvest && typeof b.harvest === 'object') {
     const ok = checkHarvest(p, b.harvest, w, t);
@@ -1618,7 +1619,8 @@ function regata(p, b) {
   if (!RG.rutas[ruta]) throw new GameError('Esa ruta no existe.');
   if (r.hoy >= RG.porDia) throw new GameError('Ya corriste ' + RG.porDia + ' regatas hoy. Mañana hay más.');
   // el barco: cada parte puede subir 1 + subeHora por hora desde la última regata (y nunca más del máximo)
-  const horas = r.at ? (t - r.at) / 3600e3 : 1e9, pedido = (b && b.barco) || {}, barco = {}, raro = {};
+  // la primera vez cuenta desde que llegó al mar (sin eso, una cuenta nueva corría con el barco al máximo)
+  const desde = r.at || p.marDesde || t, horas = (t - desde) / 3600e3, pedido = (b && b.barco) || {}, barco = {}, raro = {};
   for (const k in RG.partes) {
     const v = clamp(Math.floor(+pedido[k] || 0), 0, RG.maxNivel), tope = Math.min(RG.maxNivel, (r.barco[k] || 0) + 1 + Math.floor(horas * RG.subeHora));
     barco[k] = Math.min(v, tope);
@@ -1666,8 +1668,9 @@ function flotaMar(p, b) {
   if (n > DU.maxBarcos) throw new GameError('Una flota de duelo lleva como mucho ' + DU.maxBarcos + ' barcos.');
   if (!n) throw new GameError('Elige al menos un barco.');
   // a un ritmo posible: el poder puede crecer un 50% más 400 por hora desde la última vez
-  const poder = D.dueloPoder(units), prev = d.flota ? d.flota.poder : 0, horas = d.flota ? (t - d.flota.at) / 3600e3 : 1e9;
-  const tope = prev ? Math.max(prev, 300) * 1.5 + 400 * horas : 1e9;
+  // la primera flota cuenta desde que llegó al mar (sin eso, una cuenta nueva anotaba 120 galeones)
+  const poder = D.dueloPoder(units), prev = d.flota ? d.flota.poder : 0, horas = (t - (d.flota ? d.flota.at : p.marDesde || t)) / 3600e3;
+  const tope = Math.max(prev, 300) * 1.5 + 400 * horas;
   if (poder > tope) { suspect(p, 'flota', { poder, tope: Math.round(tope) }); throw new GameError('Tu flota creció demasiado rápido; espera un rato.'); }
   d.flota = { units, poder, at: t };
   store.touch('players');

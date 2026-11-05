@@ -56,5 +56,15 @@ for (let i = 0; i < 5; i++) { const x = sim.duelo(a, { id: b.id }); if (x.result
 ok(ganadas >= 3, 'una flota mucho más fuerte gana casi siempre', ganadas + ' de 5');
 ok(/5 duelos/.test(falla(() => sim.duelo(a, { id: b.id })) || ''), 'cinco duelos por día');
 ok(b.inbox.some(i => /Duelo naval/.test(i.text)) && b.duelo.hist.length === 5, 'el rival se entera por el buzón y en su historial');
+// la primera vez también tiene tope: cuenta desde que llegó al mar
+const e = nuevo('Eva');
+sim.sync(e, { mundo: 'mar' });
+r = sim.regata(e, { ruta: 'canal', barco: { casco: 10, velas: 10, timon: 10 } });
+ok(r.barcoUsado.casco === 1 && r.barcoUsado.velas === 1, 'una cuenta recién llegada al mar no corre su primera regata con el barco al máximo', JSON.stringify(r.barcoUsado));
+const e3 = falla(() => sim.flotaMar(e, { units: { galeon: 100 } }));
+ok(e3 && /rápido/.test(e3), 'ni anota 100 galeones como primera flota', e3);
+corre += 6 * 3600e3;
+const f = nuevo('Fede'); f.marDesde = Date.now() - 6 * 3600e3; // seis horas navegando
+ok(!falla(() => sim.flotaMar(f, { units: { galeon: 40, fragata: 20 } })), 'con horas en el mar, una primera flota grande pasa', sim.duelosInfo(f).flota.poder);
 console.log(fallas ? '\n' + fallas + ' fallas.' : '\nTodo en orden.');
 process.exit(fallas ? 1 : 0);
