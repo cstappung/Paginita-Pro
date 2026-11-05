@@ -957,7 +957,8 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 - **The ambience plays what the camera shows** (`musica.js`, `mirar`, every 1.5 s): a 16 × 10 grid of screen
   points over explored tiles (water, shore, forest and tree nodes, grass), plus the buildings and villagers on
   screen (works and upgrades → hammers, staffed forge/smelter/steelworks/workshop → anvil, sawmill/masonry/
-  cartwright → saw, houses, market, TC, tavern, guild → people, villagers chopping or mining → axe or pick).
+  cartwright → saw, houses, market, TC, tavern, guild → people, other realms' villagers chopping or mining →
+  axe or pick; yours already sound on every hit through `impact` in `render.js`).
   `fuentes` turns that into weighted sources, one sound at a time, more often when more is going on. Each sound
   goes through a `StereoPanner` placed by where its source sits on screen, and the zoom makes it louder
   (`cerca`). Night (crickets), winter (wind) and the sea (waves, gulls) still decide what nature sounds like.
@@ -969,3 +970,20 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   pattern). Other realms' buildings on the minimap are crosses, yours are squares. In the UI: ✗ after a cost you
   cannot pay, ✓/✗ on era cost rows, ✓ and ! on good and bad toasts, double or dashed left borders where only a
   green or red border used to tell.
+
+## Performance with 300 villagers (`pk-32`, Phase 7 T4)
+
+- **Measure with `node tools/rendimiento.js [pc|cel] [villagers] [cpu slowdown] [url]`** (Playwright, against
+  `npm start`): N of *your* villagers working around your TC, at zoom 1 and 2. `cel` sets a phone user agent, or
+  `MOBILE` is false and the phone settings never run. A Chromium without GPU paints the canvas in software, and
+  that is most of the frame there: compare against a run with few villagers, not against 60 fps.
+- **The villager sprite cache was thrashing.** Its key had each villager's exact aim (where the tool lands) plus
+  its own hair and skin, and past 3000 sprites the whole cache was wiped. Now: no aim below zoom 1.5, aim in 2 px
+  steps and recomputed only after moving 0.3 tiles or changing target (`u._aimF`; neighbours working the same
+  node jostle every frame), two canonical looks (man and woman) below zoom 1.5, the cache forgets the least
+  recently used 400 at 2400 (`VC` is a `Map`), and at most 10 new villager sprites per frame (2 on phones). A
+  villager without budget shows its previous sprite (`u._spr`), never more than 3 frames in a row (8 on phones).
+- **`mine(type)` in `game.js` is cached** until `G.blockVer`, the building count or the array changes: each
+  villager's gather rate walked every building several times per frame. Never mutate what it returns.
+- Measured, 300 villagers working: PC zoom 1 draw 29.7 → 5 ms, sim 4.6 → 1.7 ms, 22 → 56 fps; zoom 2 33 → 53 fps.
+  Phone (CPU ×4, DPR 1.5) zoom 1 draw 112 → 13 ms, sim 17 → 9 ms; zoom 2 draw 68 → 31 ms.

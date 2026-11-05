@@ -211,7 +211,8 @@
       if (b.done && GENTE[b.type]) suma('gente', q[0], b.type === 'house' ? 1 : 3);
     }
     for (const u of G.units || []) {
-      if (u.inside || u.mode !== 'work' || !u.task || u.task.t !== 'gather') continue;
+      // los tuyos ya suenan en cada golpe (impact en render.js); aquí, los de los otros reinos
+      if (u.owner === 'p' || u.inside || u.mode !== 'work' || !u.task || u.task.t !== 'gather') continue;
       const n = W.nodes[u.task.node], tipo = n && (TALA[n.kind] || PICO[n.kind]);
       if (!tipo) continue;
       const q = enPantalla(u.x, u.y);

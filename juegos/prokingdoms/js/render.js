@@ -259,18 +259,34 @@
         : n.kind === 'tree' ? 'axe' : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
       const ph = (u.anim * SWING[tool] + u.id * 0.37) % 1;
       frame = tool === 'hand' ? Math.floor(ph * 4) : ph < 0.4 ? 0 : ph < 0.52 ? 1 : ph < 0.8 ? 2 : 3;
-      if (u.aim) { // punto de contacto en pantalla: el borde del objetivo que da al aldeano, a la altura del golpe
+      // punto de contacto en pantalla: el borde del objetivo que da al aldeano, a la altura del golpe. T4: lejos no se
+      // nota (y multiplicaba las figuras), y cerca se recalcula solo si se movió 0,3 casillas o cambió de objetivo:
+      // los empujones entre vecinos que trabajan juntos hacían una figura nueva por cuadro.
+      const fa = u._aimF;
+      if (u.aim && R.cam.z >= 1.5 && fa && fa.a === u.aim && Math.abs(fa.x - u.x) + Math.abs(fa.y - u.y) < 0.3) aim = fa.v;
+      else if (u.aim && R.cam.z >= 1.5) {
         const a = u.aim, [ux, uy] = R.iso(u.x, u.y), [tx, ty] = R.iso(a.x, a.y);
         let dx = tx - ux, dy = ty - uy;
         const d = Math.hypot(dx, dy) || 1;
         dx -= (dx / d) * a.r; dy -= (dy / d) * a.r * 0.5;
         dy = Math.max(dy - a.h1, Math.min(dy - a.h0, -a.w));
-        aim = [Math.round(Math.abs(dx)), Math.round(dy)];
+        aim = [Math.round(Math.abs(dx) / 2) * 2, Math.round(dy / 2) * 2]; // de a 2 px: menos figuras distintas
+        u._aimF = { a: u.aim, x: u.x, y: u.y, v: aim };
       }
     }
     u.swTool = tool; u.swF = frame;
-    return Sp.villager(col, u.hair, u.skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim);
+    // T4: lejos (zoom < 1,5) todos usan una de dos caras (hombre o mujer): con el pelo y la piel de cada uno, las
+    // combinaciones no cabían en el caché. Y cada cuadro se hacen pocas figuras nuevas (vPres); el que se queda sin
+    // la suya muestra la de antes, nunca más de 3 cuadros seguidos (8 en el celular, donde cada figura cuesta más).
+    const lejos = R.cam.z < 1.5, hair = lejos ? (u.id % 2) : u.hair, skin = lejos ? 0 : u.skin;
+    const espera = vPres <= 0 && u._spr && (u._hambre || 0) < (MOBILE ? 8 : 3), n0 = Sp.vNuevas;
+    const spr = Sp.villager(col, hair, skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim, undefined, espera);
+    if (!spr) { u._hambre = (u._hambre || 0) + 1; return u._spr; }
+    if (Sp.vNuevas !== n0) vPres--;
+    u._hambre = 0; u._spr = spr;
+    return spr;
   }
+  let vPres = 0;
 
   // Efecto del golpe, en el cuadro exacto en que la herramienta toca: astillas y hojas, esquirlas y chispas,
   // tierra, paja o polvo según lo que se golpea, más la sacudida del objetivo y su sonido.
@@ -366,6 +382,7 @@
   R.draw = function (dt) {
     const ctx = R.ctx, cv = R.cv, s = R.scale(), g = G();
     frameNo++;
+    vPres = MOBILE ? 2 : 10; // figuras de aldeano nuevas por cuadro (T4)
     sparkT += dt; smokeT += dt;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#16140f';

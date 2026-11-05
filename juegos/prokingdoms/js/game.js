@@ -199,7 +199,17 @@
   G.sight = b => (G.bst(b).sight || b.def.sight) + (b.type === 'tower' && b.owner === 'p' ? (PK.Leyendas && S.leyendas ? PK.Leyendas.visionTorre() : 0) + (PK.Vida && S.arbol ? PK.Vida.bono('vision') : 0) : 0);
   G.maxLvl = type => D.maxLevel(type, S.era) + (type === 'farm' && PK.Vida && S.arbol ? PK.Vida.bono('farmLvl') : 0);
   G.slots = b => (G.bst(b).slots || b.def.slots || 0) + (b.owner === 'p' && PK.Vida && S && S.arbol ? PK.Vida.bono('slots_' + b.type) : 0);
-  const mine = type => G.buildings.filter(b => b.owner === 'p' && b.done && (!type || b.type === type));
+  // T4: guardada hasta que cambie la lista (blockVer sube al poner, terminar o demoler uno tuyo). Sin esto, el ritmo de
+  // recolección de cada aldeano recorría todos los edificios varias veces por cuadro. Nadie debe modificar lo que da.
+  const mineC = new Map();
+  let mineK = '', mineArr = null;
+  const mine = type => {
+    const k = G.blockVer + ':' + G.buildings.length;
+    if (k !== mineK || mineArr !== G.buildings) { mineC.clear(); mineK = k; mineArr = G.buildings; }
+    let l = mineC.get(type || '');
+    if (!l) { l = G.buildings.filter(b => b.owner === 'p' && b.done && (!type || b.type === type)); mineC.set(type || '', l); }
+    return l;
+  };
   const best = (type, key) => mine(type).reduce((m, b) => Math.max(m, G.bst(b)[key] || 0), 0);
   G.best = best;
   const wish = k => (PK.Exp ? PK.Exp.wishMult(k) : 1);

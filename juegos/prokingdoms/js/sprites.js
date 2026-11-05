@@ -1752,8 +1752,10 @@
   const SKIN = [[232, 188, 148], [200, 150, 108], [142, 96, 64]];
   const CARRY = { wood: [124, 86, 52], food: [190, 58, 62], stone: [150, 148, 140], gold: [236, 196, 70], ore: [164, 86, 56], marble: [232, 230, 222], gems: [80, 170, 230], planks: [196, 156, 100], blocks: [200, 196, 184], ingots: [190, 194, 204], tools: [150, 150, 160], books: [150, 50, 40], steel: [170, 186, 200], machinery: [200, 140, 60] };
   S.CARRY = CARRY;
-  const VW = 22, VH = 22, VR = 2, VC = {}, RAMPS = {}; // 4 de ancho extra a la derecha para el alcance de la herramienta
-  let vcN = 0;
+  const VW = 22, VH = 22, VR = 2, VC = new Map(), RAMPS = {}; // 4 de ancho extra a la derecha para el alcance de la herramienta
+  // T4: el caché olvida los menos usados (Map en orden de uso), nunca todo de una vez. Vaciarlo entero al pasar de
+  // 3000 hacía que con 300 aldeanos trabajando se rehicieran cientos de figuras por segundo (20 fps en un PC).
+  const VC_MAX = 2400, VC_SUELTA = 400;
   // Rampa de 6 tonos con más contraste: sombras hacia el violeta, luces hacia el cálido.
   function vRamp(c) {
     const k = c.join(',');
@@ -1774,10 +1776,14 @@
   // troop: el mismo cuerpo vestido de soldado (militia, spear, archer, knight, cleric o catapult, la dotación).
   // Cambian la túnica, el casco o la capucha y el arma que lleva en la mano de adelante (al pelear, la herramienta).
   const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [104, 96, 72], monk: [134, 96, 58], mage: [72, 58, 150] };
-  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop) {
+  S.vNuevas = 0; // figuras hechas (render.js las cuenta para su presupuesto por cuadro)
+  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop, soloCache) {
     const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '');
-    if (VC[key]) return VC[key];
-    if (++vcN > 3000) { for (const k in VC) delete VC[k]; vcN = 0; }
+    const ya = VC.get(key);
+    if (ya) { VC.delete(key); VC.set(key, ya); return ya; }
+    if (soloCache) return null; // sin presupuesto este cuadro: quien llama usa la de antes
+    S.vNuevas++;
+    if (VC.size >= VC_MAX) { let n = VC_SUELTA; for (const k of VC.keys()) { VC.delete(k); if (--n <= 0) break; } }
     const PW = VW * VR, PH = VH * VR, pb = new PB(PW, PH);
     const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage';
     const walk = mode === 'walk', ph = walk ? (frame % 6) / 6 * Math.PI * 2 : 0;
@@ -2033,7 +2039,9 @@
       if (d2 <= 1 && d[(y * PW + x) * 4 + 3] === 0) pb.set(x, y, [10, 18, 6], d2 > 0.6 ? 45 : 75);
     }
     // hit: dónde toca la herramienta, en píxeles del mundo respecto del ancla (para los efectos del golpe)
-    return (VC[key] = withMask({ c: pb.canvas(), ax: flip ? VW - 8 : 8, ay: 19, k: VR, w: VW, h: VH, hit: hit && [(hit[0] - 8) * (flip ? -1 : 1), hit[1] - 19] }));
+    const hecho = withMask({ c: pb.canvas(), ax: flip ? VW - 8 : 8, ay: 19, k: VR, w: VW, h: VH, hit: hit && [(hit[0] - 8) * (flip ? -1 : 1), hit[1] - 19] });
+    VC.set(key, hecho);
+    return hecho;
   };
 
   // Carreta tirada por un burro: lleva la carga a la vista, con el color del recurso.
