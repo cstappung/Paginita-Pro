@@ -817,6 +817,8 @@ ul.info li { margin: 2px 0; }
 .ec-row { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 2px 6px; }
 .ec-row .bar { grid-column: 1 / -1; height: 6px; }
 .ec-row.ok b { color: var(--good); }
+.ec-nocabe { color: #e8a050; }
+.ec-row.nocabe .bar { outline: 1px dashed #e8a050; }
 /* Fiesta del pueblo y avisos agrupados */
 .fiesta-row { margin: 2px 0; }
 .toast .toast-n { margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--gold2); color: #1c120a; font-size: 12px; text-shadow: none; }

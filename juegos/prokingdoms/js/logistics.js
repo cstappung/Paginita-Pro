@@ -94,6 +94,9 @@
   function reserveOf(res, out, b) {
     const st = S(), g = G();
     if (b && b.sinReserva) return 0;
+    const rm = b && PK.Game.reservaDe(b); // la meta de era guarda el insumo entero (G.reservaDe)
+    if (rm && rm.meta && rm.res === res) return Infinity;
+    if (out && g.metaPide(out)) return 0; // la meta pide lo que hace este taller
     let rv = st.auto ? st.auto.reserve || 0 : 0;
     if (out && st.res[out] < 0.05 * g.cap(out)) rv /= 3;
     return rv * g.cap(res);

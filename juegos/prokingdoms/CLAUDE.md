@@ -997,3 +997,28 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
   villager's gather rate walked every building several times per frame. Never mutate what it returns.
 - Measured, 300 villagers working: PC zoom 1 draw 29.7 → 5 ms, sim 4.6 → 1.7 ms, 22 → 56 fps; zoom 2 33 → 53 fps.
   Phone (CPU ×4, DPR 1.5) zoom 1 draw 112 → 13 ms, sim 17 → 9 ms; zoom 2 draw 68 → 31 ms.
+
+## Pace check and the fixes it found (`pk-34`, §12 of the plan)
+
+Measured with the autopilot at ×40 (`?timelapse`), one run, game minutes: Era II 12 (other runs 9–10), III 33,
+first hero 12, first boss 88, IV 121, **V 344** (target 4–6 h; before these fixes it never got there in 15 h).
+Each fix below came from a stall in that run; keep them in mind before touching the economy.
+
+- **Stone regen 0.05 → 0.25** (`D.NODES.stone`, shared with the server's common zones). The 26 mines within 45
+  tiles gave ~400 stone an hour; Era V asked ~9,500. Era costs use `1800·k` stone (was 2500) and `D.eraTime` from
+  Era V is 1 h ×1.8 per era (was 2 h ×1.6). The server only uses `eraTime` for its minimum gap, so shorter is safe.
+- **«Meta de era» now steers workshops too** (`G.metaNecesita`, `G.reservaDe`, `G.metaPide`, `reserveOf` in
+  `logistics.js`). A workshop whose output covers the goal (×1.25 and 20% of the cap) holds an input the goal still
+  lacks («En reserva para la meta de era»); the Canterías had turned 15,000 stone into 5,000 blocks while the era
+  waited for stone. And a workshop whose output the goal lacks ignores the normal reserve: the goal saw enough ore for
+  9 missing ingots, nobody gathered ore, and the 5% reserve kept the smelter from using it. The hold of an output
+  the era cost does not list waits until every era goal is met (upgrades still need planks before that).
+- **When the era cost does not fit in storage** the era window marks those rows and says which storage to upgrade,
+  and the Asesor has a rule for it (`eracap`). Era V asks 19,600 food; a normal Granero holds ~10,000.
+- **A dungeon block's preview is its boss room** (`Exp.preview`: `dungeonPower(fin) × SALAS.jefe.need`). With floor
+  1's power the planner said 99% and the army fell to the boss on floor 5 every time.
+- **The autopilot** (`tools/piloto.js`) now: pushes the buildings closest to an unmet «N buildings at level L»
+  goal, saves for the era once its goals are met (still upgrading storage if the cost does not fit), sells full
+  storage the era does not need, keeps a garrison of 14 per era, attempts the next 5-floor block of a dungeon at 80%
+  before the Mariscal sends the army on missions, and builds the Taberna right after the Aserradero. Its `paso()`
+  swallows exceptions (`console.error('piloto', …)`): a typo there silently stops everything after it.

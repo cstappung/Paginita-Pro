@@ -152,8 +152,9 @@
       return { name: tpl.name, enemy: tpl.enemy, power: m.power, loot: misLoot(m.loot), travel: Math.round((m.time / 2) * Exp.velViaje()) };
     }
     const p = W.pois[target.poi], d = D.DUNGEON[p.kind], site = Exp.site(p.id);
-    // Mazmorras 2.0: una incursión por un bloque de 5 pisos (incursion.js); la fuerza es la del primer piso
-    if (PK.Inc) { const fin = PK.Inc.finDe(p.kind, target.floor); return { name: d.name + ' · pisos ' + target.floor + '–' + fin, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: PK.Inc.botinBloque(p.kind, target.floor), travel: Exp.travel(p), incursion: true, fin }; }
+    // Mazmorras 2.0: una incursión por un bloque de 5 pisos (incursion.js). La fuerza es la de la sala del jefe del último
+    // piso (la más dura): con la del primero, el planificador decía 99% y el ejército caía en el jefe (prueba de ritmo)
+    if (PK.Inc) { const fin = PK.Inc.finDe(p.kind, target.floor); return { name: d.name + ' · pisos ' + target.floor + '–' + fin, enemy: d.enemy, power: Math.round(D.dungeonPower(p.kind, fin) * PK.Inc.SALAS.jefe.need), loot: PK.Inc.botinBloque(p.kind, target.floor), travel: Exp.travel(p), incursion: true, fin }; }
     return { name: d.name + ' · piso ' + target.floor, enemy: d.enemy, power: D.dungeonPower(p.kind, target.floor), loot: D.dungeonLoot(p.kind, target.floor, target.floor > site.best), travel: Exp.travel(p) };
   };
   // Diplomacia (árbol 2.0): +20% de premio en los encargos (sin tocar las monedas)

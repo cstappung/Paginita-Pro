@@ -57,7 +57,9 @@
     tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 2.5 * 3600 },
     berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600 },
     deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.5, regrow: 6 * 3600, hunt: true },
-    stone: { name: 'Mina de piedra', res: 'stone', amount: 350, rate: 0.36, regen: 0.05 },
+    // regen 0,25 (era 0,05): la Era V pide unas 9.500 de piedra (con los sillares) y las minas de alrededor daban ~400 por
+    // hora; el piloto quedó más de 14 h en la Era IV esperando piedra (prueba de ritmo después de pk-33)
+    stone: { name: 'Mina de piedra', res: 'stone', amount: 350, rate: 0.36, regen: 0.25 },
     gold: { name: 'Mina de oro', res: 'gold', amount: 400, rate: 0.38, regen: 0.04 },
     ore: { name: 'Veta de hierro', res: 'ore', amount: 400, rate: 0.33, regen: 0.04 },
     marble: { name: 'Cantera de mármol', res: 'marble', amount: 500, rate: 0.22, regen: 0.03 },
@@ -197,12 +199,14 @@
     if (n === 3) return { food: 1500, wood: 1000, gold: 300, planks: 150 };
     if (n === 4) return { food: 5000, wood: 3500, stone: 1500, gold: 1000, ingots: 200, books: 40 };
     const k = Math.pow(2.8, n - 4), r = v => Math.round(v / 10) * 10;
-    const c = { food: r(7000 * k), wood: r(4500 * k), stone: r(2500 * k), gold: r(1600 * k), blocks: r(300 * k), ingots: r(250 * k), books: r(60 * k), marble: r(150 * k) };
+    // piedra 1.800·k (era 2.500·k): la Era V llegaba a las 10,5 h en la prueba de ritmo (meta del plan: 4 a 6 h)
+    const c = { food: r(7000 * k), wood: r(4500 * k), stone: r(1800 * k), gold: r(1600 * k), blocks: r(300 * k), ingots: r(250 * k), books: r(60 * k), marble: r(150 * k) };
     if (n >= 6) { c.steel = r(40 * k / 2.8); c.gems = r(20 * k / 2.8); }
     if (n >= 7) c.machinery = r(15 * k / 7.84);
     return c;
   };
-  D.eraTime = n => (n === 2 ? 120 : n === 3 ? 900 : n === 4 ? 3600 : Math.min(7200 * Math.pow(1.6, n - 5), 3 * 86400));
+  // desde la V: 1 h y ×1,8 por era (era 2 h y ×1,6): V 1 h, VI 1,8 h, VII 3,2 h… (prueba de ritmo después de pk-33)
+  D.eraTime = n => (n === 2 ? 120 : n === 3 ? 900 : n === 4 ? 3600 : Math.min(3600 * Math.pow(1.8, n - 5), 3 * 86400));
   D.eraReq = function (n) {
     if (n === 2) return [{ b: 'tc', lvl: 2, text: 'Centro Urbano nivel 2' }, { any: ['lumber', 'mining', 'mill'], n: 2, text: '2 de: Campamento Maderero, Campamento Minero, Molino' }, { any: ['scout'], n: 1, text: 'Puesto de Exploradores' }];
     if (n === 3) return [{ any: ['sawmill'], n: 1, text: 'Un Aserradero' }, { any: ['market', 'library'], n: 1, text: 'Un Mercado o una Biblioteca' }, { lvlAny: 3, n: 4, text: '4 edificios en nivel 3 o más' }];

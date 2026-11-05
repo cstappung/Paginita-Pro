@@ -784,6 +784,8 @@
   // Con «Producir igual» (b.sinReserva) ese taller la ignora.
   G.reserveOk = function (cost, out, b) {
     if (b && b.sinReserva) return true;
+    if (b) { const rm = G.reservaDe(b); if (rm && rm.meta) return false; }
+    if (G.metaPide(out)) return true;
     let rv = S.auto ? S.auto.reserve || 0 : 0;
     if (out && S.res[out] < 0.05 * G.cap(out)) rv /= 3;
     for (const k in cost) if (S.res[k] - cost[k] < rv * G.cap(k)) return false;
@@ -791,16 +793,40 @@
   };
   // ¿El taller está parado por la reserva? El primer insumo que retiene ({res, have, keep}) o null. Antes solo
   // decía «Sin trabajadores» y la Fundición quedaba vacía con 1.650 de hierro (B4 del plan).
+  // Lo que pide la meta (avance de era + cola de mejoras), guardado un segundo: lo mira cada taller en cada cuadro.
+  // metaJunta: las metas de la próxima era ya están y solo falta pagarla (recién ahí los talleres guardan insumos;
+  // antes, las mejoras que piden las metas necesitan tablones y sillares).
+  let metaC = null, metaT = -1, metaJunta = false;
+  G.metaNecesita = function () {
+    if (metaC && Math.abs(G.time - metaT) < 1) return metaC;
+    const c = {}, suma = x => { for (const r in x) c[r] = (c[r] || 0) + x[r]; };
+    if (!S.eraProg) suma(D.eraCost(S.era + 1));
+    for (const id of S.upq || []) { const b = G.bById.get(id); if (b) suma(G.upCost(b)); }
+    metaJunta = !S.eraProg && G.eraChecks(S.era + 1).every(x => x.ok);
+    metaT = G.time;
+    return (metaC = c);
+  };
+  // Con «Meta de era», un taller cuyo producto le falta a la meta no respeta la reserva. Si no, se trababa: la meta veía
+  // hierro de sobra para los 9 lingotes que faltaban (nadie juntaba hierro) y la reserva no dejaba usarlo (prueba de ritmo).
+  G.metaPide = out => !!(S.auto && S.auto.plan === 'meta' && (G.metaNecesita()[out] || 0) > (S.res[out] || 0));
   G.reservaDe = function (b) {
     if (!b || !b.def.recipe || b.sinReserva) return null;
     const rc = D.RECIPES[b.def.recipe], out = Object.keys(rc.out)[0];
+    // Con el plan «Meta de era»: si lo que hace el taller ya alcanza para la meta (y para un 20% de la bodega, que las
+    // mejoras también lo piden) y lo que gasta es algo que la meta pide y falta, se guarda. Sin esto las Canterías convertían en sillares la piedra de la Era V (el piloto juntó
+    // 5.000 sillares cuando pedía 840 y nunca llegó a las 7.000 de piedra).
+    if (S.auto && S.auto.plan === 'meta') {
+      const nec = G.metaNecesita();
+      if ((S.res[out] || 0) >= Math.max((nec[out] || 0) * 1.25, 0.2 * G.cap(out)) && (metaJunta || nec[out])) for (const k in rc.in) if (nec[k] && (S.res[k] || 0) < nec[k]) return { res: k, have: S.res[k], keep: nec[k], meta: true };
+    }
+    if (G.metaPide(out)) return null; // la meta pide lo que hace: la reserva no lo frena (ver G.metaPide)
     let rv = S.auto ? S.auto.reserve || 0 : 0;
     if (!rv) return null;
     if (S.res[out] < 0.05 * G.cap(out)) rv /= 3;
     for (const k in rc.in) { const keep = rv * G.cap(k); if (S.res[k] - rc.in[k] < keep) return { res: k, have: S.res[k], keep }; }
     return null;
   };
-  G.reservaText = r => 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
+  G.reservaText = r => r.meta ? 'En reserva para la meta de era: guarda ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + ' de ' + U.fmt(Math.ceil(r.keep)) + ')' : 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
   G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')) * (1 + hp('relicGold')) * (1 + vb('relic')); // por minuto
 
   // ---------- Órdenes ----------

@@ -17,9 +17,9 @@
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
   const PLAN = {
     1: [['house', 2], ['lumber', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
-    2: [['sawmill', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
-    3: [['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2]],
-    4: [['university', 1], ['steelworks', 1], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8]],
+    2: [['sawmill', 1], ['barracks', 1], ['tavern', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
+    3: [['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
+    4: [['university', 1], ['steelworks', 1], ['masonry', 3], ['mining', 4], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8], ['smelter', 2]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
     6: [['m_jardines', 1], ['house', 19]],
   };
@@ -82,11 +82,22 @@
   // Mantiene ocupados a los maestros de obras: la mejora más barata que se puede pagar (el Centro Urbano primero).
   function mejorar() {
     const g = G();
+    // con las metas de la era cumplidas, junta para el avance: mejorar se comía la piedra de la Era V una y otra vez
+    // (salvo las bodegas, si el costo de la era no cabe en ellas: sin eso el ahorro se trababa para siempre)
+    const sig = S().era + 1, costo = D.eraCost(sig);
+    const noCabe = Object.keys(costo).filter(r => isFinite(g.cap(r)) && costo[r] > g.cap(r));
+    const juntar = !S().eraProg && g.eraChecks(sig).every(c => c.ok) && !g.canAfford(costo);
+    if (juntar && !noCabe.length) return;
+    const bodega = new Set(noCabe.length ? ['tc', ...(noCabe.includes('food') ? ['granary'] : []), ...(noCabe.some(r => r !== 'food') ? ['warehouse'] : [])] : []);
     while (g.buildersBusy() < g.builders()) {
-      const ok = g.buildings.filter(b => b.owner === 'p' && g.canUpgrade(b).ok);
+      const ok = g.buildings.filter(b => b.owner === 'p' && g.canUpgrade(b).ok && (!juntar || bodega.has(b.type)));
       if (!ok.length) return;
       const suma = b => Object.values(g.upCost(b)).reduce((s, v) => s + v, 0) * (b.type === 'tc' ? 0.3 : 1);
-      ok.sort((a, b) => suma(a) - suma(b));
+      // si la próxima era pide «N edificios en nivel L», primero los que ya están más cerca de L (como haría alguien
+      // que mira la meta); si no, la más barata. Repartir las mejoras dejó al piloto 11 h en la Era IV sin ninguno en 7.
+      const n = S().era + 1, chk = g.eraChecks(n), meta = D.eraReq(n).find((r, i) => r.lvlAny && !chk[i].ok);
+      const L = meta ? meta.lvlAny : 0;
+      ok.sort((a, b) => (L ? (b.lvl < L) - (a.lvl < L) || (a.lvl < L && b.lvl < L ? b.lvl - a.lvl : 0) : 0) || suma(a) - suma(b));
       if (!g.upgrade(ok[0])) return;
       P.mejoras++;
     }
@@ -107,8 +118,27 @@
   function guerra() {
     const st = S();
     if (!G().countB('barracks')) return;
-    PK.Consejo.HACE.mariscal(st, Object.assign({}, st.consejo, { prob: 0.8, guarnicion: 8 * st.era, defensa: 0.2 }));
+    mazmorras(); // antes que el Mariscal: si no, el ejército siempre estaba afuera en encargos y nunca iba por un jefe
+    PK.Consejo.HACE.mariscal(st, Object.assign({}, st.consejo, { prob: 0.8, guarnicion: 14 * st.era, defensa: 0.2 }));
     campana();
+  }
+  // Primeras visitas a las mazmorras (el Mariscal solo repite bloques limpios): el próximo bloque de 5 pisos de la
+  // que tenga mejor probabilidad, si llega al 80%. Sin esto el piloto nunca vio un jefe y no se podía medir el ritmo.
+  function mazmorras() {
+    const E = PK.Exp, B5 = PK.Inc ? PK.Inc.BLOQUE : 5;
+    if ((S().exp.runs || []).some(r => r.target && r.target.poi !== undefined)) return; // una a la vez
+    let mejor = null;
+    for (const p of E.sites()) {
+      const site = E.site(p.id), tg = { poi: p.id, floor: Math.floor((site.best || 0) / B5) * B5 + 1 };
+      if (D.DUNGEON[p.kind] && tg.floor > D.DUNGEON[p.kind].floors) continue;
+      if (E.canSend(tg)) continue;
+      const fin = E.preview(tg); // la fuerza del bloque ya es la de su jefe (Exp.preview)
+      if (!fin) continue;
+      const units = E.recommend(fin.enemy, fin.power), h = PK.Heroes ? PK.Heroes.mejorPara(fin.enemy) : null;
+      const ch = E.chance(E.powerVs(units, fin.enemy, h && h.id) / Math.max(1, fin.power));
+      if (ch >= 0.8 && (!mejor || ch > mejor.ch)) mejor = { tg, units, h, ch, name: fin.name };
+    }
+    if (mejor && E.send(mejor.tg, mejor.units, mejor.h && mejor.h.id)) anota('Mazmorra: entró a ' + mejor.name + '.');
   }
   // Campaña (H5): ataca el lugar del capítulo con 80% de probabilidad, elige siempre la primera opción y cierra
   // las escenas (en vivo se abren solas y taparían todo).
@@ -154,6 +184,12 @@
     const g = G(), st = S();
     if (!g.countB('market')) return;
     for (const r of ['wood', 'stone']) if (st.res[r] < 150 && st.res.gold > 1500 && PK.Social.buyPrice(r, 300) < st.res.gold - 1000) PK.Social.buy(r, 300);
+    // lo que está lleno y la próxima era no pide (o ya tiene de sobra), se vende: lo que sugiere el Asesor
+    const costo = st.eraProg ? {} : D.eraCost(st.era + 1);
+    for (const r of ['food', 'wood', 'stone', 'marble', 'planks', 'blocks', 'books']) {
+      if (!D.RES[r] || st.res[r] < g.cap(r) * 0.95 || st.res[r] - 1000 < (costo[r] || 0) * 1.1) continue;
+      if (PK.Social.sell(r, 1000)) { P.ventas = (P.ventas || 0) + 1; break; }
+    }
   }
   function medir() {
     const g = G(), st = S();

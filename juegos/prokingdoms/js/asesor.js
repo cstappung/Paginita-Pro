@@ -13,6 +13,16 @@
   const cerrarY = fn => () => { PK.UI.closeModal(); fn(); };
 
   const REGLAS = [
+    // la próxima era pide más de lo que cabe en las bodegas: no se junta nunca sin agrandarlas antes (prueba de ritmo:
+    // la Era V pide 19.600 de comida y un Granero común guarda 10.000; la barra quedaba quieta sin decir por qué)
+    () => {
+      const g = G(), st = S();
+      if (st.eraProg) return null;
+      const n = st.era + 1, cost = D.eraCost(n), r = Object.keys(cost).find(k => D.RES[k] && isFinite(g.cap(k)) && cost[k] > g.cap(k));
+      if (!r) return null;
+      const alm = r === 'food' ? 'granary' : 'warehouse';
+      return { id: 'eracap', prioridad: 72, texto: 'La Era ' + U.roman(n) + ' pide ' + U.fmt(cost[r]) + ' de ' + nombre(r) + ' y tus bodegas guardan ' + U.fmt(g.cap(r)) + ': mejora ' + (D.BUILD[alm] ? 'el ' + D.BUILD[alm].name + ' o ' : '') + 'el Centro Urbano.', acciones: [{ label: 'Obras', fn: cerrarY(() => PK.UI.openWorks()) }] };
+    },
     // el patio del Centro Urbano cerrado por edificios (B2): lo más grave, nadie sale a trabajar
     () => {
       const e = G().encierro;
@@ -28,10 +38,10 @@
     },
     // talleres parados por la reserva (B4)
     () => {
-      const g = G(), b = g.buildings.find(o => o.owner === 'p' && o.done && o.def.recipe && g.reservaDe(o) && PK.Logi.supplied(o));
+      const g = G(), b = g.buildings.find(o => o.owner === 'p' && o.done && o.def.recipe && g.reservaDe(o) && !g.reservaDe(o).meta && PK.Logi.supplied(o)); // la de la meta de era es a propósito
       if (!b) return null;
       const r = g.reservaDe(b), st = S(), menos = [0.5, 0.3, 0.15, 0].find(v => v < st.auto.reserve);
-      return { id: 'reserva', prioridad: 70, texto: 'La ' + b.def.name + ' está parada: falta ' + nombre(r.res) + ' (reserva ' + Math.round(st.auto.reserve * 100) + '%).',
+      return { id: 'reserva', prioridad: 70, texto: 'Taller parado: ' + b.def.name + ', falta ' + nombre(r.res) + ' (reserva ' + Math.round(st.auto.reserve * 100) + '%).',
         acciones: [{ label: 'Producir igual', fn: () => { b.sinReserva = true; } }].concat(menos !== undefined ? [{ label: 'Bajar reserva a ' + Math.round(menos * 100) + '%', fn: () => { st.auto.reserve = menos; } }] : []) };
     },
     // la meta de era pide un recurso del mapa que nadie junta

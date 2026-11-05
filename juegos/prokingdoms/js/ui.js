@@ -109,15 +109,17 @@
           el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (st.eraProg.t / st.eraProg.total) * 100 + '%' } }), el('span', null, U.fmtTime(st.eraProg.total - st.eraProg.t))),
           el('p', { class: 'small muted' }, 'Si te sobran recursos, paga «Horas extra» en el Centro Urbano para adelantarlo.'));
       } else {
-        const n = st.era + 1, ch = g.eraChecks(n), cost = D.eraCost(n);
+        const n = st.era + 1, ch = g.eraChecks(n), cost = D.eraCost(n), noCabe = Object.keys(cost).filter(r => (st.res[r] || 0) < cost[r] && isFinite(g.cap(r)) && g.cap(r) < cost[r]);
         body.append(el('h3', null, 'Era ' + U.roman(n) + ' · ' + D.eraName(n)),
           el('ul', { class: 'info era-goal' }, ch.map(c => el('li', { class: c.ok ? 'ok' : '' }, (c.ok ? '✓ ' : '✗ ') + c.text))),
           el('h4', null, 'Costo'),
           el('div', { class: 'era-cost' }, Object.keys(cost).map(r => {
             const have = Math.floor(st.res[r] || 0), ok = have >= cost[r];
-            return el('div', { class: 'ec-row' + (ok ? ' ok' : '') }, UI.resIcon(r), el('span', null, D.RES[r].name), el('b', null, U.fmt(Math.min(have, cost[r])) + ' / ' + U.fmt(cost[r])),
+            return el('div', { class: 'ec-row' + (ok ? ' ok' : '') + (noCabe.includes(r) ? ' nocabe' : '') }, UI.resIcon(r), el('span', null, D.RES[r].name + (noCabe.includes(r) ? ' ⚠' : '')), el('b', null, U.fmt(Math.min(have, cost[r])) + ' / ' + U.fmt(cost[r])),
               el('div', { class: 'bar' }, el('div', { class: 'fill ' + (ok ? 'green' : 'gold'), style: { width: Math.min(100, (have / cost[r]) * 100) + '%' } })));
           })),
+          // lo que no cabe: la bodega guarda menos de lo que pide la era, y la barra se quedaba quieta sin decir por qué
+          noCabe.length ? el('p', { class: 'small ec-nocabe' }, '⚠ No te cabe: ' + noCabe.map(r => D.RES[r].name.toLowerCase()).join(', ') + ' (tus bodegas guardan ' + U.fmt(g.cap(noCabe[0])) + '). Mejora ' + (noCabe.includes('food') ? 'el Granero, ' : '') + (noCabe.some(r => r !== 'food') ? 'el Almacén, ' : '') + 'o el Centro Urbano.') : '',
           el('p', { class: 'small muted' }, 'El avance dura ' + U.fmtTime(D.eraTime(n)) + '. Se inicia desde el Centro Urbano.'));
       }
       const tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
