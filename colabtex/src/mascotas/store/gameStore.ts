@@ -8,6 +8,7 @@ import { moveDecor, placeDecor, removeDecor, rotateDecor } from '../game/decor'
 import { aEstado, claveEstado, desdeEstado, type Adopcion, type Estado } from '../game/estado'
 import type { ActionId, Pet, SlotId, SpeciesId } from '../game/types'
 import { CARINO_ANIMO, conCarino, nuevosCarinos, type Carino } from '../game/pueblo'
+import { FOOD_COST, FOOD_FILL, FOODS, foodStock, type FoodId } from '../game/comidas'
 import MM from '../../../../juegos/mascotas/motor.js'
 import { pide } from './red'
 
@@ -23,6 +24,17 @@ const GUARDA_MS = 4000
 /** Aviso que devuelve `act` cuando no queda comida (la UI ofrece comprar). */
 export const SIN_COMIDA = 'SIN_COMIDA'
 
+/** Las piezas de regalo (de jugar): las que quedan por canjear, las de hoy y los topes. */
+export interface Piezas {
+  tengo: number
+  hoy: number
+  /** Cuántas valen por día. */
+  tope: number
+  /** Cuántas hacen un regalo. */
+  cada: number
+}
+const SIN_PIEZAS: Piezas = { tengo: 0, hoy: 0, tope: MM.PIEZAS_DIA, cada: MM.PIEZAS_REGALO }
+
 export interface Datos {
   uid: string
   saldo: number
@@ -31,6 +43,9 @@ export interface Datos {
   mascotas: (Omit<Adopcion, 'semilla'> & { estado: Partial<Estado> | null })[]
   objetos: { c: string; kind: Item['kind']; id: string; tint: number; leg: boolean; venta: string }[]
   comida: number
+  /** Las comidas que llenan más (raciones que quedan). */
+  comidas?: Partial<Record<FoodId, number>>
+  piezas?: Piezas
   fondos: string[]
   adopciones: number
   /** `oscuras`: las mascotas con la luz apagada. `luz: false` es el formato viejo (una luz para todas). */
@@ -48,8 +63,9 @@ interface GameState {
   pets: Pet[]
   /** Inventario: lo inicial más lo que salió de regalos (o se compró en el mercado). */
   items: Item[]
-  /** Raciones de comida que quedan. */
-  comida: number
+  /** Raciones que quedan de cada comida (la común y las que llenan más). */
+  comidas: Record<FoodId, number>
+  piezas: Piezas
   /** Fondos comprados (la pradera es gratis). */
   fondos: string[]
   /** Adopciones válidas de la cuenta (la primera es gratis). */
@@ -79,10 +95,12 @@ interface GameState {
   setBackground: (id: string) => void
   /** Compra un fondo. Devuelve null si se pudo, o el motivo. */
   buyBackground: (id: string) => Promise<string | null>
-  /** Abre un regalo: devuelve lo que salió, o el motivo si no se pudo. */
-  openGift: () => Promise<{ item: Item; legendary: boolean } | string>
-  /** Compra raciones de comida. Devuelve null si se pudo, o el motivo. */
-  buyFood: (n: number) => Promise<string | null>
+  /** Abre un regalo (pagado, o canjeando piezas): devuelve lo que salió, o el motivo si no se pudo. */
+  openGift: (conPiezas?: boolean) => Promise<{ item: Item; legendary: boolean } | string>
+  /** Terminó un juego con una mascota: el cartero decide si se soltó una pieza. */
+  ganaPieza: () => Promise<{ gano: boolean; tope?: boolean } | null>
+  /** Compra raciones de una comida. Devuelve null si se pudo, o el motivo. */
+  buyFood: (n: number, food?: FoodId) => Promise<string | null>
   /** Compra la poción eterna para una mascota y se la da. Devuelve null si se pudo, o el motivo. */
   givePotion: (id: string) => Promise<string | null>
   /** Pone o saca un baile de la barra. Devuelve el que salió para hacerle lugar (si salió alguno). */
@@ -93,8 +111,8 @@ interface GameState {
   rename: (id: string, name: string) => void
   /** Se despide de una mascota (sale de la cuenta y libera su cupo). */
   release: (id: string) => Promise<string | null>
-  /** Aplica una acción de cuidado. Devuelve null si se pudo, o el motivo si no. */
-  act: (id: string, action: ActionId) => string | null
+  /** Aplica una acción de cuidado (al alimentar, con qué comida). Devuelve null si se pudo, o el motivo si no. */
+  act: (id: string, action: ActionId, food?: FoodId) => string | null
   /** Pone (un objeto del inventario, por uid) o quita (null) un accesorio. */
   equip: (id: string, slot: SlotId, uid: string | null) => void
   placeDecor: (id: string, uid: string) => void
@@ -175,7 +193,7 @@ let carinosPendientes: { lista: Carino[]; visto: number | null; ahora: number } 
 let carinoAplicado = 0
 
 /** Raciones gastadas que el cartero todavía no confirma (para no mostrar comida de más). */
-let comiendo = 0
+const comiendo: Record<FoodId, number> = { comida: 0, premium: 0, gourmet: 0 }
 /** El nombre de una mascota que se está adoptando (llega antes que su estado). */
 let nombrePendiente = ''
 
@@ -189,7 +207,8 @@ export const useGame = create<GameState>()((set, get) => ({
   falta: 0,
   pets: [],
   items: starterItems(),
-  comida: 0,
+  comidas: foodStock(0),
+  piezas: SIN_PIEZAS,
   fondos: [],
   adopciones: 0,
   fps: Math.min(FPS_MAX, Math.max(FPS_MIN, Number(leeLocal('mascotas.fps', String(FPS_DEFAULT))) || FPS_DEFAULT)),
@@ -235,7 +254,8 @@ export const useGame = create<GameState>()((set, get) => ({
       falta: d.falta,
       pets,
       items,
-      comida: Math.max(0, d.comida - comiendo),
+      comidas: Object.fromEntries(Object.entries(foodStock(d.comida, d.comidas)).map(([k, v]) => [k, Math.max(0, v - comiendo[k as FoodId])])) as Record<FoodId, number>,
+      piezas: d.piezas ?? SIN_PIEZAS,
       fondos,
       adopciones: d.adopciones,
       danceBar: barra.length || d.prefs.barra ? barra : defaultDanceBar(items),
@@ -312,23 +332,38 @@ export const useGame = create<GameState>()((set, get) => ({
       return motivo(e)
     }
   },
-  openGift: async () => {
-    if (get().saldo < MM.PRECIO.regalo) return `Te faltan ${MM.PRECIO.regalo - get().saldo} monedas`
+  openGift: async (conPiezas) => {
+    const pz = get().piezas
+    if (conPiezas && pz.tengo < pz.cada) return `Te faltan ${pz.cada - pz.tengo} ${pz.cada - pz.tengo === 1 ? 'pieza' : 'piezas'}`
+    if (!conPiezas && get().saldo < MM.PRECIO.regalo) return `Te faltan ${MM.PRECIO.regalo - get().saldo} monedas`
     try {
-      const r = await pide<{ c: string; kind: Item['kind']; id: string; tint: number; leg: boolean }>('regalo')
+      const r = await pide<{ c: string; kind: Item['kind']; id: string; tint: number; leg: boolean }>(conPiezas ? 'regaloPiezas' : 'regalo')
       const item: Item = { uid: r.c, kind: r.kind, id: r.id, tint: r.tint, ...(r.leg ? { leg: true } : {}) }
-      set((s) => ({ items: s.items.some((i) => i.uid === item.uid) ? s.items : [...s.items, item] }))
+      set((s) => ({
+        items: s.items.some((i) => i.uid === item.uid) ? s.items : [...s.items, item],
+        piezas: conPiezas ? { ...s.piezas, tengo: Math.max(0, s.piezas.tengo - s.piezas.cada) } : s.piezas,
+      }))
       return { item, legendary: r.leg }
     } catch (e) {
       return motivo(e)
     }
   },
-  buyFood: async (n) => {
-    const p = MM.PRECIO.comida * n
+  ganaPieza: async () => {
+    try {
+      const r = await pide<{ gano: boolean; tope?: boolean; piezas?: Piezas }>('pieza')
+      if (r.piezas) set({ piezas: r.piezas })
+      return { gano: !!r.gano, tope: !!r.tope }
+    } catch (e) {
+      console.warn('[mascotas] pieza', e)
+      return null
+    }
+  },
+  buyFood: async (n, food = 'comida') => {
+    const p = FOOD_COST[food] * n
     if (get().saldo < p) return `Te faltan ${p - get().saldo} monedas`
     try {
-      await pide('comida', { n })
-      set((s) => ({ comida: s.comida + n }))
+      await pide('comida', { n, t: food })
+      set((s) => ({ comidas: { ...s.comidas, [food]: s.comidas[food] + n } }))
       play('buy')
       return null
     } catch (e) {
@@ -398,23 +433,27 @@ export const useGame = create<GameState>()((set, get) => ({
     }
   },
 
-  act: (id, action) => {
+  act: (id, action, food = 'comida') => {
     const pet = get().pets.find((p) => p.id === id)
     if (!pet) return 'No existe esa mascota'
     if (pet.venta) return 'Está a la venta: retírala del mercado para cuidarla'
-    if (action === 'feed' && get().comida < 1) return SIN_COMIDA
+    const comida = FOODS.includes(food) ? food : 'comida'
+    if (action === 'feed' && get().comidas[comida] < 1) return SIN_COMIDA
     // Primero se pone al día el tiempo, para que la acción actúe sobre los stats reales.
     const dark = get().oscuras.includes(id)
     const fresh = tick(pet, Date.now(), dark)
-    const result = applyAction(fresh, action, dark)
+    const result = applyAction(fresh, action, dark, action === 'feed' ? FOOD_FILL[comida] : undefined)
     if (!result.ok) return result.reason ?? 'No se pudo'
-    set((s) => ({ pets: s.pets.map((p) => (p.id === id ? result.pet : p)), comida: action === 'feed' ? s.comida - 1 : s.comida }))
+    set((s) => ({
+      pets: s.pets.map((p) => (p.id === id ? result.pet : p)),
+      comidas: action === 'feed' ? { ...s.comidas, [comida]: s.comidas[comida] - 1 } : s.comidas,
+    }))
     guarda(id)
     if (action === 'feed') {
-      comiendo++
-      pide('comer', { n: 1 })
+      comiendo[comida]++
+      pide('comer', { n: 1, t: comida === 'comida' ? '' : comida })
         .catch((e) => console.warn('[mascotas] no se anotó la ración', e))
-        .finally(() => void (comiendo = Math.max(0, comiendo - 1)))
+        .finally(() => void (comiendo[comida] = Math.max(0, comiendo[comida] - 1)))
     }
     return null
   },

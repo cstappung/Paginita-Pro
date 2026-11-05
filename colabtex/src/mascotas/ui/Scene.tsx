@@ -16,6 +16,7 @@ import { getPet, setLure } from '../pets/handle'
 import { ROOM, clampSpot } from '../game/decor'
 import { night } from '../scene/decor'
 import { DecorLayer, type DecorRegistry } from './DecorLayer'
+import { JUEGO, lejosDe, type JuegoId } from '../game/juegos'
 
 /** Última acción hecha sobre una mascota: se convierte en su animación de reacción. */
 export type Reaction = { petId: string; action: ActionId; dance?: string; refused?: boolean; key: number; until: number; cue?: CueId }
@@ -527,6 +528,209 @@ function Laser({ target, yank }: { target: { current: THREE.Vector3 }; yank: { c
   )
 }
 
+let moleTex: THREE.CanvasTexture | null = null
+/** Topo asomado de su montoncito de tierra (anclado abajo: crece hacia arriba al asomarse). */
+function moleTexture() {
+  if (moleTex) return moleTex
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  g.lineWidth = 5
+  g.strokeStyle = '#3a2416'
+  g.lineJoin = 'round'
+  // Cuerpo y cabeza.
+  g.beginPath()
+  g.moveTo(30, 104)
+  g.bezierCurveTo(26, 40, 102, 40, 98, 104)
+  g.closePath()
+  g.fillStyle = '#8a5a3c'
+  g.fill()
+  g.stroke()
+  // Panza clara.
+  g.beginPath()
+  g.ellipse(64, 92, 20, 16, 0, Math.PI, 0)
+  g.fillStyle = '#c9946a'
+  g.fill()
+  // Ojitos cerrados de gusto y nariz rosada.
+  g.lineWidth = 4
+  for (const ex of [50, 78]) {
+    g.beginPath()
+    g.arc(ex, 62, 5, Math.PI * 1.1, Math.PI * 1.9)
+    g.stroke()
+  }
+  g.beginPath()
+  g.ellipse(64, 72, 9, 7, 0, 0, Math.PI * 2)
+  g.fillStyle = '#ff8fb1'
+  g.fill()
+  g.stroke()
+  // Bigotes.
+  g.lineWidth = 2.5
+  for (const s of [-1, 1]) {
+    for (const dy of [-3, 3]) {
+      g.beginPath()
+      g.moveTo(64 + s * 12, 74 + dy)
+      g.lineTo(64 + s * 30, 70 + dy * 2)
+      g.stroke()
+    }
+  }
+  // Manitos rosadas sobre la tierra.
+  g.lineWidth = 4
+  for (const hx of [44, 84]) {
+    g.beginPath()
+    g.ellipse(hx, 100, 10, 7, 0, 0, Math.PI * 2)
+    g.fillStyle = '#ffb3c7'
+    g.fill()
+    g.stroke()
+  }
+  // Montoncito de tierra.
+  g.beginPath()
+  g.moveTo(8, 124)
+  g.quadraticCurveTo(22, 98, 46, 106)
+  g.quadraticCurveTo(64, 96, 82, 106)
+  g.quadraticCurveTo(106, 98, 120, 124)
+  g.closePath()
+  g.fillStyle = '#6b4226'
+  g.fill()
+  g.lineWidth = 5
+  g.stroke()
+  g.fillStyle = '#4a2c18'
+  for (const [x, y] of [[30, 116], [58, 112], [90, 115], [74, 120]]) {
+    g.beginPath()
+    g.arc(x, y, 3, 0, Math.PI * 2)
+    g.fill()
+  }
+  moleTex = new THREE.CanvasTexture(c)
+  moleTex.colorSpace = THREE.SRGBColorSpace
+  return moleTex
+}
+
+/** Un topo puesto en el pasto: dónde, cuándo asomó y (si lo atraparon) cuándo se escondió. */
+export type Topo = { id: number; x: number; z: number; t0: number; fuera: number }
+
+/** Los topos: asoman con un saltito, se mecen esperando y se esconden al atraparlos. */
+function Topos({ lista }: { lista: { current: Topo[] } }) {
+  const group = useRef<THREE.Group>(null)
+  const sprites = useRef(new Map<number, THREE.Sprite>())
+  const mat = useMemo(() => new THREE.SpriteMaterial({ map: moleTexture(), transparent: true, depthWrite: false }), [])
+  useEffect(() => () => mat.dispose(), [mat])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const g = group.current
+    if (!g) return
+    const vivos = new Set<number>()
+    for (const m of lista.current) {
+      if (m.t0 < 0) m.t0 = t
+      if (m.fuera === -1) m.fuera = t
+      vivos.add(m.id)
+      let s = sprites.current.get(m.id)
+      if (!s) {
+        s = new THREE.Sprite(mat)
+        s.center.set(0.5, 0.05)
+        s.renderOrder = 6
+        s.raycast = () => {}
+        sprites.current.set(m.id, s)
+        g.add(s)
+      }
+      const u = t - m.t0
+      // Asoma rápido con un rebote y después respira; al atraparlo se hunde.
+      let k = u < 0.25 ? u / 0.25 : 1 + 0.12 * Math.sin(Math.min(1, (u - 0.25) / 0.2) * Math.PI) * Math.max(0, 1 - (u - 0.25) / 0.4)
+      if (m.fuera > 0) k *= Math.max(0, 1 - (t - m.fuera) / 0.35)
+      const bob = m.fuera > 0 ? 0 : 0.04 * Math.sin(t * 4 + m.id)
+      s.position.set(m.x, 0.01, m.z)
+      s.scale.set(0.3 * (1 + bob * 0.5), 0.3 * Math.max(0.001, k) * (1 + bob), 1)
+      s.visible = k > 0.01
+    }
+    for (const [id, s] of sprites.current) {
+      if (vivos.has(id)) continue
+      g.remove(s)
+      sprites.current.delete(id)
+    }
+  })
+  return <group ref={group} />
+}
+
+let ballTex: THREE.CanvasTexture | null = null
+/** Pelota de playa de gajos, con su trazo de tinta. */
+function ballTexture() {
+  if (ballTex) return ballTex
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const colores = ['#ff6b6b', '#fff', '#4fb3ec', '#fff', '#ffd23f', '#fff']
+  for (let i = 0; i < 6; i++) {
+    g.beginPath()
+    g.moveTo(64, 64)
+    g.arc(64, 64, 54, (i * Math.PI) / 3 - Math.PI / 2, ((i + 1) * Math.PI) / 3 - Math.PI / 2)
+    g.closePath()
+    g.fillStyle = colores[i]
+    g.fill()
+  }
+  g.beginPath()
+  g.arc(64, 64, 12, 0, Math.PI * 2)
+  g.fillStyle = '#fff'
+  g.fill()
+  g.lineWidth = 6
+  g.strokeStyle = '#3a2416'
+  g.beginPath()
+  g.arc(64, 64, 54, 0, Math.PI * 2)
+  g.stroke()
+  g.fillStyle = 'rgba(255,255,255,0.75)'
+  g.beginPath()
+  g.ellipse(46, 40, 12, 7, -0.6, 0, Math.PI * 2)
+  g.fill()
+  ballTex = new THREE.CanvasTexture(c)
+  ballTex.colorSpace = THREE.SRGBColorSpace
+  return ballTex
+}
+
+/** Un lanzamiento: desde dónde, hasta dónde, cuándo salió y si ya la tomó la mascota. */
+export type Tiro = { from: THREE.Vector3; to: THREE.Vector3; t0: number; tomada: number }
+const VUELO = 0.55
+
+/** La pelota: vuela en arco hasta donde se tocó, da unos botes y desaparece cuando la atrapan. */
+function Pelota({ tiro }: { tiro: { current: Tiro | null } }) {
+  const sprite = useRef<THREE.Sprite>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const s = sprite.current
+    const b = tiro.current
+    if (!s) return
+    if (!b) return void (s.visible = false)
+    if (b.t0 < 0) b.t0 = t
+    if (b.tomada === -1) b.tomada = t
+    const u = t - b.t0
+    const r = 0.075
+    let x: number, y: number, z: number
+    if (u < VUELO) {
+      const f = u / VUELO
+      x = THREE.MathUtils.lerp(b.from.x, b.to.x, f)
+      z = THREE.MathUtils.lerp(b.from.z, b.to.z, f)
+      y = THREE.MathUtils.lerp(b.from.y, r, f) + Math.sin(f * Math.PI) * 0.7
+    } else {
+      // Botes que se apagan.
+      const v = u - VUELO
+      x = b.to.x
+      z = b.to.z
+      y = r + Math.abs(Math.sin(v * 9)) * 0.12 * Math.exp(-v * 3.2)
+    }
+    const fuera = b.tomada > 0 ? Math.max(0, 1 - (t - b.tomada) / 0.25) : 1
+    s.visible = fuera > 0.01
+    s.position.set(x, y, z)
+    s.scale.setScalar(r * 2 * fuera)
+    s.material.rotation = -u * 6
+  })
+  return (
+    <sprite ref={sprite} renderOrder={6} raycast={() => {}} visible={false}>
+      <spriteMaterial map={ballTexture()} transparent depthWrite={false} />
+    </sprite>
+  )
+}
+
+/** Cuántos topos puede haber esperando a la vez. */
+const MAX_TOPOS = 3
+/** Distancia mínima entre un juguete nuevo y la última atrapada (si no, no salta). */
+const LEJOS = 0.36
+
 export function Scene(props: {
   pets: Pet[]
   selected: Pet | null
@@ -540,6 +744,8 @@ export function Scene(props: {
   /** La frotaron con la esponja (distancia recorrida sobre ella, en unidades de la escena). */
   onScrub?: (d: number) => void
   onCatch?: () => void
+  /** El juego de «Jugar» que salió (ver game/juegos.ts). */
+  juego?: JuegoId
   /** Acomodando los muebles: se pueden tocar y arrastrar. */
   decorating?: boolean
   decorSel?: string | null
@@ -573,14 +779,67 @@ export function Scene(props: {
   const menu = useRef<HTMLDivElement>(null)
   const menuFor = decorating ? (props.decorSel ?? null) : null
   const yank = useRef(-9)
+  const juego: JuegoId = props.juego ?? (selected?.species === 'cat' ? 'laser' : 'gusano')
+  const tocando = JUEGO[juego].tocando
+  const topos = useRef<Topo[]>([])
+  const tiro = useRef<Tiro | null>(null)
+  const ultima = useRef<{ x: number; z: number } | null>(null)
+  const topoId = useRef(0)
+  const aterriza = useRef(0)
 
-  // Gusanito: aparece a un lado para que lo vea; al guardarlo, lo deja de perseguir.
+  // El juguete: el gusanito y el láser aparecen a un lado para que los vea; los topos y la pelota
+  // esperan a que se toque el pasto. Al guardarlo, lo deja de perseguir.
   useEffect(() => {
     if (tool !== 'play' || !id) return
-    lure.current.set(0.5, 0, 0.42)
-    setLure(id, lure.current)
-    return () => setLure(id, null)
-  }, [tool, id])
+    topos.current = []
+    tiro.current = null
+    ultima.current = null
+    if (!tocando) {
+      lure.current.set(0.5, 0, 0.42)
+      setLure(id, lure.current)
+    } else setLure(id, null)
+    return () => {
+      window.clearTimeout(aterriza.current)
+      setLure(id, null)
+    }
+  }, [tool, id, tocando])
+
+  /** Persigue el primer topo que sigue asomado (o nada). */
+  const siguienteTopo = () => {
+    if (!id) return
+    const m = topos.current.find((x) => x.fuera === 0)
+    if (m) {
+      lure.current.set(m.x, 0, m.z)
+      setLure(id, lure.current)
+    } else setLure(id, null)
+  }
+
+  /** Pone un topo o lanza la pelota donde se tocó. */
+  const ponJuguete = (x: number, y: number) => {
+    if (!id) return
+    const f = floorAt(x, y)
+    const lejos = [ultima.current, ...(juego === 'topos' ? topos.current.filter((m) => m.fuera === 0) : [])].filter(Boolean) as { x: number; z: number }[]
+    let p = { x: f.x, z: f.z }
+    for (let i = 0; i < 2; i++) for (const q of lejos) p = lejosDe(p.x, p.z, q, LEJOS, AREA)
+    if (juego === 'topos') {
+      if (topos.current.filter((m) => m.fuera === 0).length >= MAX_TOPOS) return play('error')
+      topos.current = [...topos.current, { id: ++topoId.current, x: p.x, z: p.z, t0: -1, fuera: 0 }]
+      play('pop')
+      if (topos.current.filter((m) => m.fuera === 0).length === 1) siguienteTopo()
+      return
+    }
+    // La pelota sale desde abajo, del lado de quien la lanza, y la persigue cuando cae.
+    const to = new THREE.Vector3(p.x, 0, p.z)
+    const from = aim(x, wrap.current!.getBoundingClientRect().height - 10).intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.5), new THREE.Vector3()) ?? new THREE.Vector3(0, 0.5, 1.2)
+    tiro.current = { from, to, t0: -1, tomada: 0 }
+    play('toss')
+    setLure(id, null)
+    window.clearTimeout(aterriza.current)
+    aterriza.current = window.setTimeout(() => {
+      lure.current.copy(to)
+      setLure(id, lure.current)
+    }, VUELO * 900)
+  }
 
   /** Rayo desde la cámara por un punto de la pantalla (px relativos al cuadro). */
   const aim = (x: number, y: number) => {
@@ -684,6 +943,7 @@ export function Scene(props: {
         capture(e)
         scrubAt(x, y)
       } else if (tool === 'play' && id) {
+        if (tocando) return ponJuguete(x, y)
         lure.current.copy(floorAt(x, y))
         setLure(id, lure.current)
         capture(e)
@@ -711,7 +971,7 @@ export function Scene(props: {
       const [x, y] = local(e)
       moveCursor(x, y)
       // Con mouse el gusanito sigue al puntero aunque no se apriete; con el dedo, mientras lo arrastra.
-      if (tool === 'play' && id && (e.pointerType === 'mouse' || e.buttons)) {
+      if (tool === 'play' && id && !tocando && (e.pointerType === 'mouse' || e.buttons)) {
         lure.current.copy(floorAt(x, y))
         setLure(id, lure.current)
       }
@@ -761,15 +1021,29 @@ export function Scene(props: {
   }
 
   const onCatch = () => {
-    play(selected?.species === 'cat' ? 'pop' : 'squeak')
+    play(juego === 'laser' ? 'pop' : juego === 'pelota' ? 'boing' : 'squeak')
     yank.current = -1
+    ultima.current = { x: lure.current.x, z: lure.current.z }
+    if (juego === 'topos') {
+      // El topo atrapado se esconde y la mascota va por el siguiente.
+      const m = topos.current.find((x) => x.fuera === 0)
+      if (m) {
+        m.fuera = -1
+        ultima.current = { x: m.x, z: m.z }
+        window.setTimeout(() => (topos.current = topos.current.filter((x) => x !== m)), 700)
+      }
+      siguienteTopo()
+    } else if (juego === 'pelota') {
+      if (tiro.current) tiro.current.tomada = -1
+      if (id) setLure(id, null)
+    }
     props.onCatch?.()
   }
 
   return (
     <div
       ref={wrap}
-      className={`scene${selected && !tool ? ' rotatable' : ''}${tool ? ` tool tool-${tool}` : ''}${decorating ? ' decorating' : ''}`}
+      className={`scene${selected && !tool ? ' rotatable' : ''}${tool ? ` tool tool-${tool}` : ''}${tool === 'play' ? ` juego-${juego}` : ''}${decorating ? ' decorating' : ''}`}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -784,7 +1058,10 @@ export function Scene(props: {
         <CameraRig count={selected ? 1 : props.pets.length} focus={!!selected} view={view} />
         <Lighting sky={bg.sky} ground={bg.ground} on={lightsOn} />
         <Slots pets={props.pets} selected={selected} reaction={props.reaction} onPick={props.onPick} yaw={yaw} tool={tool} cleaned={props.cleaned ?? 0} onCatch={onCatch} />
-        {tool === 'play' && (selected?.species === 'cat' ? <Laser target={lure} yank={yank} /> : <Lure target={lure} yank={yank} />)}
+        {tool === 'play' && juego === 'laser' && <Laser target={lure} yank={yank} />}
+        {tool === 'play' && juego === 'gusano' && <Lure target={lure} yank={yank} />}
+        {tool === 'play' && juego === 'topos' && <Topos lista={topos} />}
+        {tool === 'play' && juego === 'pelota' && <Pelota tiro={tiro} />}
         {selected && <DecorLayer items={selected.decor ?? []} selected={decorating ? (props.decorSel ?? null) : null} registry={decor.current} />}
         {menuFor && <FollowMenu el={menu} registry={decor.current} id={menuFor} />}
       </Canvas>

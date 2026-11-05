@@ -3,7 +3,9 @@ import { AVAILABLE_SPECIES, getSpecies, getStage } from '../data/species'
 import { BACKGROUNDS, danceSeconds, getDance } from '../data/accessories'
 import { play } from '../audio/sound'
 import { getDecor } from '../data/decor'
-import { DANCE_BAR, FOOD_PRICE, POTION_PRICE, type Item } from '../game/inventory'
+import { DANCE_BAR, POTION_PRICE, type Item } from '../game/inventory'
+import { FOODS, foodInfo, type FoodId } from '../game/comidas'
+import { JUEGO, sorteaJuego, type JuegoId } from '../game/juegos'
 import { chickColors, eggColors, henColors } from '../pets/rig/plumage'
 import { furColors } from '../pets/rig/fur'
 import { SellDialog, type SellTarget } from './Sell'
@@ -14,7 +16,7 @@ import { isOwned, priceOf } from '../game/shop'
 import { ACTIONS } from '../game/actions'
 import { FPS_MAX, FPS_MIN } from '../game/config'
 import { hoursToWake, hoursToWakeable, mood, neediest } from '../game/rules'
-import type { ActionId, Pet, StatId } from '../game/types'
+import type { ActionId, Pet, SpeciesId, StatId } from '../game/types'
 import type { CueId } from '../pets/anim/cues'
 import { SIN_COMIDA, useGame, useLuz } from '../store/gameStore'
 import { avisa, enJuegos } from '../store/red'
@@ -41,7 +43,7 @@ const NEED_TEXT: Record<StatId, string> = {
 /** Cómo se ve cada cuidado: color, ícono, qué se hace y qué stat mejora. */
 const CARE: Partial<Record<ActionId, { tone: string; icon: string; hint: string; stat?: StatId }>> = {
   feed: { tone: 'wheat', icon: '🌾', hint: 'Lánzale granos', stat: 'hunger' },
-  play: { tone: 'berry', icon: '🐛', hint: 'Juega con el gusanito', stat: 'happiness' },
+  play: { tone: 'berry', icon: '🎲', hint: 'Un juego al azar', stat: 'happiness' },
   clean: { tone: 'sky', icon: '🧽', hint: 'Pásale la esponja', stat: 'hygiene' },
   sleep: { tone: 'night', icon: '🛏️', hint: 'A la camita', stat: 'energy' },
   wake: { tone: 'sun', icon: '☀️', hint: '¡Buen día!' },
@@ -53,7 +55,7 @@ const TOOL_OF: Partial<Record<ActionId, Tool>> = { feed: 'feed', clean: 'clean',
 
 /** Cuánto hay que frotar (unidades de la escena) para dejarla limpia, según el tamaño. */
 const SCRUB_NEED: Record<string, number> = { egg: 3.4, baby: 4.2, adult: 5.4 }
-/** Veces que tiene que atrapar el gusanito para que cuente como jugar. */
+/** Veces que tiene que atrapar el juguete (gusanito, láser, topo, pelota) para que cuente como jugar. */
 const CATCHES = 3
 
 const NAMES = ['Pío', 'Coco', 'Lola', 'Pepa', 'Rulo', 'Mota', 'Canela', 'Chispa']
@@ -150,32 +152,58 @@ function Volumen() {
   return <span className="vol-slot" ref={ref} />
 }
 
-/** Sin comida no se puede alimentar: se compran raciones (una ración = un puñado). */
-function FoodDialog({ onClose, say }: { onClose: () => void; say: (m: string) => void }) {
+/**
+ * La despensa: se compran raciones de cada comida (una ración = un puñado). Sirven para todas las
+ * mascotas; las mejores suben más la barra de comida y cuestan un poco más por punto.
+ */
+function FoodDialog({ onClose, say, species, onPick }: { onClose: () => void; say: (m: string) => void; species?: SpeciesId; onPick?: (f: FoodId) => void }) {
   const saldo = useGame((s) => s.saldo)
-  const comida = useGame((s) => s.comida)
+  const comidas = useGame((s) => s.comidas)
   const [busy, setBusy] = useState(false)
-  const compra = async (n: number) => {
+  const compra = async (n: number, f: FoodId) => {
     setBusy(true)
-    const err = await useGame.getState().buyFood(n)
+    const err = await useGame.getState().buyFood(n, f)
     setBusy(false)
     if (err) return play('error'), say(err)
-    say(`🌾 Compraste ${n} ${n === 1 ? 'ración' : 'raciones'} de comida`)
+    const i = foodInfo(f, species)
+    say(`${i.icon} Compraste ${n} ${n === 1 ? 'ración' : 'raciones'} de ${i.name.toLowerCase()}`)
+    onPick?.(f)
     onClose()
   }
+  const total = FOODS.reduce((a, f) => a + comidas[f], 0)
   return (
     <div className="modal" role="dialog" aria-label="Comprar comida" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="confirm food-dialog">
         <p>
-          🌾 {comida ? `Te quedan ${comida} ${comida === 1 ? 'ración' : 'raciones'}.` : 'No te queda comida.'} Cada ración es un puñado y cuesta 💰 {FOOD_PRICE}. Sirve para
-          todas tus mascotas.
+          {total ? 'Tu despensa.' : 'No te queda comida.'} Cada ración es un puñado y sirve para todas tus mascotas. Las mejores llenan más la barra de
+          comida.
         </p>
-        <div className="confirm-buttons food-buttons">
-          {[1, 5, 10, 25].map((n) => (
-            <button key={n} className="primary" disabled={busy || saldo < n * FOOD_PRICE} onClick={() => void compra(n)}>
-              ×{n} · 💰 {n * FOOD_PRICE}
-            </button>
-          ))}
+        <div className="food-rows">
+          {FOODS.map((f) => {
+            const i = foodInfo(f, species)
+            return (
+              <div key={f} className={`food-row food-${f}`}>
+                <span className="food-icon" aria-hidden>
+                  {i.icon}
+                </span>
+                <span className="food-text">
+                  <strong>
+                    {i.name} <span className="food-tag">{i.clase}</span>
+                  </strong>
+                  <small>
+                    +{i.fill} de comida · 💰 {i.cost} c/u · tienes {comidas[f]}
+                  </small>
+                </span>
+                <span className="food-buy">
+                  {[1, 5, 10].map((n) => (
+                    <button key={n} className="pill-btn" disabled={busy || saldo < n * i.cost} onClick={() => void compra(n, f)}>
+                      ×{n} · 💰 {n * i.cost}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            )
+          })}
         </div>
         <div className="confirm-buttons">
           <button className="pill-btn" onClick={onClose}>
@@ -588,22 +616,55 @@ function petColor(p: Pet) {
 }
 
 /** Cartel sobre la escena mientras se usa una herramienta: qué hacer, cómo va y para terminar. */
-function ToolBanner(props: { tool: Tool; pet: Pet; cleaned: number; caught: number; handfuls: number; onDone: () => void }) {
-  const { tool, pet, cleaned, caught, handfuls, onDone } = props
-  const comida = useGame((s) => s.comida)
+function ToolBanner(props: {
+  tool: Tool
+  pet: Pet
+  cleaned: number
+  caught: number
+  handfuls: number
+  juego: JuegoId
+  food: FoodId
+  onFood: (f: FoodId) => void
+  onBuy: () => void
+  onDone: () => void
+}) {
+  const { tool, pet, cleaned, caught, handfuls, juego, food, onDone } = props
+  const comidas = useGame((s) => s.comidas)
+  const f = foodInfo(food, pet.species)
+  const j = JUEGO[juego]
   return (
-    <div className={`tool-banner tool-${tool}`} role="status">
+    <div className={`tool-banner tool-${tool}${tool === 'play' ? ` juego-${juego}` : ''}`} role="status">
       <span className="tool-icon" aria-hidden>
-        {tool === 'feed' ? (careOf(pet, 'feed')?.icon ?? '🌾') : tool === 'clean' ? '🧽' : (getSpecies(pet.species).toy?.icon ?? '🐛')}
+        {tool === 'feed' ? f.icon : tool === 'clean' ? '🧽' : j.icon}
       </span>
       <div className="tool-text">
         {tool === 'feed' && (
           <>
-            <strong>Toca el suelo para lanzarle {getSpecies(pet.species).food}</strong>
+            <strong>Toca el suelo para lanzarle {f.name.toLowerCase()}</strong>
             <small>
-              {handfuls ? `${handfuls} ${handfuls === 1 ? 'puñado' : 'puñados'} · ¡a comer!` : `${pet.name} está atento…`} · quedan {comida}{' '}
-              {comida === 1 ? 'ración' : 'raciones'}
+              {handfuls ? `${handfuls} ${handfuls === 1 ? 'puñado' : 'puñados'} · ¡a comer!` : `${pet.name} está atento…`} · +{f.fill} por puñado
             </small>
+            <span className="food-pick" role="radiogroup" aria-label="Qué comida lanzar">
+              {FOODS.map((id) => {
+                const i = foodInfo(id, pet.species)
+                return (
+                  <button
+                    key={id}
+                    role="radio"
+                    aria-checked={food === id}
+                    className={`food-chip${food === id ? ' on' : ''}${comidas[id] ? '' : ' empty'}`}
+                    title={`${i.name} (${i.clase}): +${i.fill} · quedan ${comidas[id]}`}
+                    onClick={() => props.onFood(id)}
+                  >
+                    <span aria-hidden>{i.icon}</span>
+                    <b>{comidas[id]}</b>
+                  </button>
+                )
+              })}
+              <button className="food-chip more" title="Comprar comida" aria-label="Comprar comida" onClick={props.onBuy}>
+                ＋
+              </button>
+            </span>
           </>
         )}
         {tool === 'clean' && (
@@ -616,12 +677,12 @@ function ToolBanner(props: { tool: Tool; pet: Pet; cleaned: number; caught: numb
         )}
         {tool === 'play' && (
           <>
-            <strong>Mueve {getSpecies(pet.species).toy?.name ?? 'el gusanito'}… ¡que lo atrape!</strong>
+            <strong>{j.titulo}</strong>
             <span className="tool-dots" aria-label={`${caught} de ${CATCHES}`}>
               {Array.from({ length: CATCHES }, (_, i) => (
                 <span key={i} className={i < caught ? 'on' : ''} />
               ))}
-              <small>{caught === 0 ? 'Déjalo quieto cerca para que salte' : 'Muévelo a otro lado'}</small>
+              <small>{caught === 0 ? j.antes : j.despues}</small>
             </span>
           </>
         )}
@@ -637,7 +698,9 @@ export function App() {
   const listo = useGame((s) => s.listo)
   const pets = useGame((s) => s.pets)
   const coins = useGame((s) => s.saldo)
-  const comida = useGame((s) => s.comida)
+  const comidas = useGame((s) => s.comidas)
+  const piezas = useGame((s) => s.piezas)
+  const comida = FOODS.reduce((a, f) => a + comidas[f], 0)
   const adopt = useGame((s) => s.adopt)
   const act = useGame((s) => s.act)
   const tickAll = useGame((s) => s.tickAll)
@@ -668,6 +731,12 @@ export function App() {
   const [handfuls, setHandfuls] = useState(0)
   const scrubbed = useRef(0)
   const caughtRef = useRef(0)
+  // Qué juego salió esta vez (al azar, distinto del anterior de esa mascota) y qué comida se lanza.
+  const [juego, setJuego] = useState<JuegoId>('gusano')
+  const ultimoJuego = useRef(new Map<string, JuegoId>())
+  const [racion, setRacion] = useState<FoodId>('comida')
+  // La pieza de regalo que se soltó (para la animación).
+  const [pieza, setPieza] = useState(0)
 
   // Acomodando muebles (botón ✋ en la escena) y cuál está elegido.
   const [editing, setEditing] = useState(false)
@@ -744,11 +813,11 @@ export function App() {
    * Hace un cuidado. `cue` cambia la reacción (p. ej. el final del baño tras la esponja) y
    * `react: false` la omite (los granos lanzados ya la hacen caminar a comer). Devuelve si se pudo.
    */
-  const perform = (action: ActionId, o: { dance?: string; cue?: CueId; react?: boolean } = {}) => {
+  const perform = (action: ActionId, o: { dance?: string; cue?: CueId; react?: boolean; food?: FoodId } = {}) => {
     const pet = useGame.getState().pets.find((p) => p.id === selectedId)
     if (!pet) return false
     const before = pet.stage
-    const error = act(pet.id, action)
+    const error = act(pet.id, action, o.food)
     if (error === SIN_COMIDA) {
       play('error')
       setTool(null)
@@ -784,13 +853,20 @@ export function App() {
     const t = TOOL_OF[action]
     if (!t || !selected) return onAction(action)
     if (tool === t) return setTool(null)
-    // Sin comida, antes de sacar el saco se ofrece comprar.
-    if (action === 'feed' && useGame.getState().comida < 1 && !ACTIONS.feed.blocked(selected.stats)) return play('error'), setFood(true)
+    // Sin comida, antes de sacar el saco se ofrece comprar; si no queda de la elegida, se pasa a una que haya.
+    const stock = useGame.getState().comidas
+    if (action === 'feed' && FOODS.every((f) => stock[f] < 1) && !ACTIONS.feed.blocked(selected.stats)) return play('error'), setFood(true)
+    if (action === 'feed' && stock[racion] < 1) setRacion(FOODS.find((f) => stock[f] > 0) ?? 'comida')
     tickAll()
     const fresh = useGame.getState().pets.find((p) => p.id === selected.id)
     // Si no hace falta (no tiene hambre, ya está limpia…), se niega como siempre.
     if (!fresh || ACTIONS[action].blocked(fresh.stats)) return onAction(action)
     play('tap')
+    if (t === 'play') {
+      const j = sorteaJuego(ultimoJuego.current.get(selected.id))
+      ultimoJuego.current.set(selected.id, j)
+      setJuego(j)
+    }
     scrubbed.current = 0
     caughtRef.current = 0
     setCleaned(0)
@@ -802,7 +878,7 @@ export function App() {
   const onThrow = () => {
     const pet = selected
     if (!pet) return null
-    const ok = perform('feed', { react: false })
+    const ok = perform('feed', { react: false, food: racion })
     if (!ok) {
       setTool(null)
       return false
@@ -835,10 +911,28 @@ export function App() {
     caughtRef.current++
     setCaught(caughtRef.current)
     if (caughtRef.current >= CATCHES) {
-      // Deja que termine de sacudir el gusanito y celebra.
+      // Deja que termine de sacudir el juguete y celebra; al terminar puede soltarse una pieza.
+      const fin = JUEGO[juego].fin
+      const name = selected?.name ?? ''
       window.setTimeout(() => {
         setTool(null)
-        if (perform('play')) say('¡Lo atrapó tres veces! 🎉')
+        if (!perform('play')) return
+        say(fin)
+        void useGame
+          .getState()
+          .ganaPieza()
+          .then((r) => {
+            if (!r?.gano) return
+            const pz = useGame.getState().piezas
+            play('grow')
+            setPieza(Date.now())
+            say(
+              pz.tengo >= pz.cada
+                ? `🧩 ¡${name} encontró una pieza! Ya juntaste ${pz.cada}: canjea un regalo gratis en 🎁`
+                : `🧩 ¡${name} encontró una pieza de regalo! (${pz.tengo} de ${pz.cada})`,
+              4500,
+            )
+          })
       }, 1100)
     }
   }
@@ -927,8 +1021,14 @@ export function App() {
           <button className="icon-btn" aria-label="Pueblo" title="Pueblo: pasea con tu mascota y visita a los vecinos" onClick={() => (play('tap'), setPueblo(true))}>
             🏘️
           </button>
-          <button className="icon-btn" aria-label="Regalos" title="Regalos y pociones" onClick={() => setGifts(true)}>
+          <button
+            className={`icon-btn gift-btn${piezas.tengo >= piezas.cada ? ' lista' : ''}`}
+            aria-label={`Regalos (${piezas.tengo} piezas)`}
+            title={piezas.tengo >= piezas.cada ? '¡Tienes piezas para un regalo gratis!' : `Regalos y pociones · piezas: ${piezas.tengo} de ${piezas.cada}`}
+            onClick={() => setGifts(true)}
+          >
             🎁
+            {piezas.tengo > 0 && <span className="gift-badge">🧩{piezas.tengo}</span>}
           </button>
           <button className="icon-btn" aria-label="Mercado" title="Mercado: comprar y vender mascotas y objetos" onClick={() => avisa('mercado')}>
             🏪
@@ -992,7 +1092,7 @@ export function App() {
       )}
 
       {gifts && <GiftShop onClose={() => setGifts(false)} say={say} pet={selected} onPotion={onPotion} />}
-      {food && <FoodDialog onClose={() => setFood(false)} say={say} />}
+      {food && <FoodDialog onClose={() => setFood(false)} say={say} species={selected?.species} onPick={setRacion} />}
       {ask && <ConfirmDialog ask={ask} onClose={() => setAsk(null)} />}
       {selling && <SellDialog target={selling} onClose={() => setSelling(null)} say={say} />}
 
@@ -1007,6 +1107,7 @@ export function App() {
           onThrow={onThrow}
           onScrub={onScrub}
           onCatch={onCatch}
+          juego={juego}
           decorating={decorating}
           decorSel={decorSel}
           onDecorSel={setDecorSel}
@@ -1024,7 +1125,27 @@ export function App() {
           </button>
         )}
         {activeTool && selected && (
-          <ToolBanner tool={activeTool} pet={selected} cleaned={cleaned} caught={caught} handfuls={handfuls} onDone={() => setTool(null)} />
+          <ToolBanner
+            tool={activeTool}
+            pet={selected}
+            cleaned={cleaned}
+            caught={caught}
+            handfuls={handfuls}
+            juego={juego}
+            food={racion}
+            onFood={(f) => {
+              play('tap')
+              if (useGame.getState().comidas[f] < 1) return setRacion(f), setFood(true)
+              setRacion(f)
+            }}
+            onBuy={() => setFood(true)}
+            onDone={() => setTool(null)}
+          />
+        )}
+        {pieza > 0 && (
+          <span key={pieza} className="pieza-pop" aria-hidden onAnimationEnd={() => setPieza(0)}>
+            🧩
+          </span>
         )}
         {toast && (
           <div key={toast} className="toast" role="status">
