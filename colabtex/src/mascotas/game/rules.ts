@@ -145,9 +145,10 @@ export interface ActionResult {
 
 /**
  * Hace un cuidado. Con la luz apagada (`dark`) solo se la puede acostar: para todo lo demás
- * (incluido despertarla) hay que prender la luz primero.
+ * (incluido despertarla) hay que prender la luz primero. `fill` cambia cuánto sube la comida al
+ * alimentarla (las comidas premium llenan más que la común; ver game/comidas.ts).
  */
-export function applyAction(pet: Pet, action: ActionId, dark = false): ActionResult {
+export function applyAction(pet: Pet, action: ActionId, dark = false, fill?: number): ActionResult {
   const stage = getStage(pet.species, pet.stage)
   const allowed = action === 'wake' ? stage.actions.includes('sleep') : stage.actions.includes(action)
   if (!allowed) return { pet, ok: false, reason: 'No puede hacer eso ahora' }
@@ -160,7 +161,8 @@ export function applyAction(pet: Pet, action: ActionId, dark = false): ActionRes
 
   const premio = !def.sinPremio?.(pet.stats)
   const stats: Stats = { ...pet.stats }
-  for (const [k, delta] of Object.entries(def.effects) as [StatId, number][]) stats[k] = clamp(stats[k] + delta)
+  const effects = action === 'feed' && fill != null ? { ...def.effects, hunger: fill } : def.effects
+  for (const [k, delta] of Object.entries(effects) as [StatId, number][]) stats[k] = clamp(stats[k] + delta)
 
   if (action === 'sleep') return { pet: { ...pet, stats, asleep: true, rest: 0 }, ok: true }
   if (action === 'wake') {

@@ -574,9 +574,10 @@
         "$uid": {
           "$k": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
-            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === 500",
+            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && (newData.child('p').val() === 500 || (newData.child('p').val() === 0 && newData.child('z').val() === 5))",
             "at": { ".validate": "newData.isNumber()" },
             "p": { ".validate": "newData.isNumber()" },
+            "z": { ".validate": "newData.val() === 5" },
             "$otro": { ".validate": false }
           }
         }
@@ -585,14 +586,30 @@
         "$uid": {
           "$k": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
-            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'k', 'p']) && newData.child('at').val() === now && ((newData.child('k').val() === 'comida' && newData.child('n').isNumber() && newData.child('p').val() === 20 * newData.child('n').val()) || (newData.child('k').val() === 'pocion' && newData.child('m').exists() && newData.child('p').val() === 1000) || (newData.child('k').val() === 'adios' && newData.child('m').exists() && newData.child('p').val() === 0) || (newData.child('k').val() === 'fondo-sunset' && newData.child('p').val() === 10) || (newData.child('k').val() === 'fondo-night' && newData.child('p').val() === 15) || (newData.child('k').val() === 'fondo-beach' && newData.child('p').val() === 20) || (newData.child('k').val() === 'fondo-snow' && newData.child('p').val() === 25))",
+            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'k', 'p']) && newData.child('at').val() === now && ((newData.child('k').val() === 'comida' && newData.child('n').isNumber() && newData.child('p').val() === 20 * newData.child('n').val()) || (newData.child('k').val() === 'comida-premium' && newData.child('n').isNumber() && newData.child('p').val() === 40 * newData.child('n').val()) || (newData.child('k').val() === 'comida-gourmet' && newData.child('n').isNumber() && newData.child('p').val() === 70 * newData.child('n').val()) || (newData.child('k').val() === 'pocion' && newData.child('m').exists() && newData.child('p').val() === 1000) || (newData.child('k').val() === 'adios' && newData.child('m').exists() && newData.child('p').val() === 0) || (newData.child('k').val() === 'fondo-sunset' && newData.child('p').val() === 10) || (newData.child('k').val() === 'fondo-night' && newData.child('p').val() === 15) || (newData.child('k').val() === 'fondo-beach' && newData.child('p').val() === 20) || (newData.child('k').val() === 'fondo-snow' && newData.child('p').val() === 25))",
             "at": { ".validate": "newData.isNumber()" },
-            "k": { ".validate": "newData.isString() && newData.val().matches(/^(comida|pocion|adios|fondo-(sunset|night|beach|snow))$/)" },
+            "k": { ".validate": "newData.isString() && newData.val().matches(/^(comida|comida-premium|comida-gourmet|pocion|adios|fondo-(sunset|night|beach|snow))$/)" },
             "p": { ".validate": "newData.isNumber()" },
             "n": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 50" },
             "m": { ".validate": "newData.isString() && newData.val().matches(/^ma:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/)" },
             "$otro": { ".validate": false }
           }
+        }
+      },
+      "p": {
+        "$uid": {
+          "$k": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at']) && newData.child('at').val() === now && newData.parent().parent().parent().child('pu').child($uid).val() === now",
+            "at": { ".validate": "newData.isNumber()" },
+            "$otro": { ".validate": false }
+          }
+        }
+      },
+      "pu": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && newData.exists()",
+          ".validate": "newData.isNumber() && newData.val() === now && (!data.exists() || data.val() <= now - 300000)"
         }
       }
     },

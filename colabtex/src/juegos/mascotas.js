@@ -22,7 +22,7 @@
    antes de mandarlo al juego: una mascota que no es de quien pasea, o ropa
    que no es suya, no se dibuja. */
 import { ambientar } from "./sonido.js";
-import { monedasDe, economia, mascotasDe, objetosDe, leeCopia, claveMascota, claveObjeto } from "./monedas.js";
+import { monedasDe, economia, mascotasDe, objetosDe, leeCopia, claveMascota, claveObjeto, diaChile } from "./monedas.js";
 import MM from "../../../juegos/mascotas/motor.js";
 
 const MAX_PRECIO = 100000;
@@ -30,6 +30,11 @@ const MAX_PRECIO = 100000;
 const claveEstado = c => String(c).replace(/^ma:/, "");
 const RE_ESTADO = /^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/;
 const RE_MASCOTA = /^ma:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/;
+/* Los juegos seguidos sin pieza (la suerte de la próxima crece con ellos):
+   solo de este navegador, porque la pieza la decide el cliente igual. */
+const FALLOS = "mascotas.sinPieza";
+const leeFallos = () => { try { return +localStorage.getItem(FALLOS) || 0; } catch (e) { return 0; } };
+const ponFallos = n => { try { localStorage.setItem(FALLOS, String(n)); } catch (e) { /* sin almacenamiento */ } };
 /* RTDB devuelve las listas como arreglo o como objeto de índices. */
 const lista = v => Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v) : undefined;
 
@@ -212,17 +217,30 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
     const mias = mascotasDe(uid, d);
     for (const x of mias) if (!estados[claveEstado(x.c)] && x.antes.length) hereda(x);
     const comprada = mio.comida || 0, usadas = Number.isFinite(prefs.usadas) ? prefs.usadas : 0;
+    /* Las comidas que llenan más: compradas (economía) menos comidas (`usadasT`). */
+    const comidas = {};
+    for (const tipo of Object.keys(MM.PRECIO.comidas)) {
+      const u = prefs.usadasT && Number.isFinite(prefs.usadasT[tipo]) ? prefs.usadasT[tipo] : 0;
+      comidas[tipo] = Math.max(0, ((mio.comidas || {})[tipo] || 0) - u);
+    }
     manda({ tipo: "datos", datos: {
       uid, saldo: m.saldo, parada: m.parada, falta: m.falta,
       mascotas: mias.map(x => ({ c: x.c, o: x.o, k: x.k, at: x.at, e: x.e, frozen: x.frozen, venta: x.venta, estado: estados[claveEstado(x.c)] || null })),
       objetos: objetosDe(uid, d).map(x => ({ c: x.c, kind: x.kind, id: x.id, tint: x.tint, leg: x.leg, venta: x.venta })),
       comida: Math.max(0, comprada - usadas),
+      comidas,
+      piezas: piezasDe(mio),
       fondos: Object.keys(mio.fondos || {}),
       adopciones: mio.intentos || 0,
       prefs: { luz: prefs.luz, oscuras: lista(prefs.oscuras), fondo: prefs.fondo, barra: lista(prefs.barra) }
     } });
   }
   const mandaTema = () => manda({ tipo: "tema", tema: temaSitio() });
+  /* Las piezas de regalo: las que quedan por canjear y las de hoy (hay tope por día). */
+  function piezasDe(mio) {
+    const hoy = (mio.piezasDia === diaChile(fb.ahora()) ? mio.piezasHoy : 0) || 0;
+    return { tengo: Math.max(0, (mio.piezas || 0) - (mio.piezasUsadas || 0)), hoy, tope: MM.PIEZAS_DIA, cada: MM.PIEZAS_REGALO };
+  }
 
   function pagable(p, que) {
     const m = cuenta();
@@ -264,11 +282,34 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
           const g = await esperaEco(z => z.regalos[c]);
           if (!g) throw new Error("Otra pestaña gastó tus monedas a la vez: este regalo no vale hasta que ganes las que faltan.");
           responde(true, Object.assign({ c }, g.item));
+        } else if (x.accion === "regaloPiezas") {
+          /* Un regalo gratis por cinco piezas: la economía las descuenta. */
+          if (piezasDe(u).tengo < MM.PIEZAS_REGALO) throw new Error(`Junta ${MM.PIEZAS_REGALO} piezas para canjear un regalo.`);
+          const r = await fb.abrirRegaloMascota(uid, true);
+          const c = claveObjeto(uid, r.k);
+          const g = await esperaEco(z => z.regalos[c]);
+          if (!g) throw new Error("Otra pestaña canjeó esas piezas a la vez.");
+          responde(true, Object.assign({ c }, g.item));
+        } else if (x.accion === "pieza") {
+          /* Terminó un juego con su mascota: ¿se suelta una pieza? Con tope
+             por día y un respiro entre dos (lo mismo que miran la economía y
+             la regla), y la suerte crece con cada juego sin pieza. */
+          const pz = piezasDe(u), pu = ((d.mascotas || {}).pu || {})[uid];
+          if (pz.hoy >= pz.tope) return responde(true, { gano: false, tope: true, piezas: pz });
+          if (Number.isFinite(pu) && fb.ahora() - pu < MM.PIEZA_RESPIRO) return responde(true, { gano: false, piezas: pz });
+          const fallos = leeFallos();
+          if (Math.random() >= MM.probPieza(fallos)) { ponFallos(fallos + 1); return responde(true, { gano: false, piezas: pz }); }
+          await fb.ganaPiezaMascota(uid);
+          ponFallos(0);
+          const antes = pz.tengo, z = await esperaEco(y => (piezasDe(y.usuarios[uid] || {}).tengo > antes ? y : null));
+          responde(true, { gano: !!z, piezas: piezasDe((z || eco()).usuarios[uid] || {}) });
         } else if (x.accion === "comida") {
-          const n = Math.round(+x.n);
+          const n = Math.round(+x.n), tipo = String(x.t || "comida");
           if (!(n >= 1 && n <= MM.MAX_RACIONES)) throw new Error(`Se compran de 1 a ${MM.MAX_RACIONES} raciones.`);
-          pagable(MM.PRECIO.comida * n, n === 1 ? "Una ración" : `${n} raciones`);
-          await fb.compraMascotas(uid, { k: "comida", p: MM.PRECIO.comida * n, n });
+          const k = tipo === "comida" ? "comida" : "comida-" + tipo, p = MM.precioCompra(k, n);
+          if (!p) throw new Error("Esa comida no existe.");
+          pagable(p, n === 1 ? "Una ración" : `${n} raciones`);
+          await fb.compraMascotas(uid, { k, p, n });
           responde(true, null);
         } else if (x.accion === "pocion") {
           if (!tengoMascota(x.m)) throw new Error("Esa mascota no es tuya.");
@@ -315,7 +356,8 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
           });
           responde(true, null);
         } else if (x.accion === "comer") {
-          await fb.usaComidaMascota(uid, 1);
+          const tipo = x.t && MM.PRECIO.comidas[x.t] ? String(x.t) : "";
+          await fb.usaComidaMascota(uid, 1, tipo);
           responde(true, null);
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p), q = leeCopia(x.c);
@@ -448,7 +490,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
       frame.title = "Mascotas — cría tu mascota en 3D";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/mascotas/index.html?v=mc-8";
+      frame.src = "juegos/mascotas/index.html?v=mc-9";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       vigilaTema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });

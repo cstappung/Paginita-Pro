@@ -17,9 +17,10 @@
 
 **Money.** The game pays no coins. The minigame and the `coins` of the care actions are gone. Coins enter only through market sales. The writes, all one-shot and never deleted, are replayed by `economia()`:
 - `mascotas/a/<uid>/<k>` = `{at, e, p}`: an adoption. The account's first one is free (the rule checks that `mascotas/a/<uid>` did not exist before; the replay counts `intentos` the same way), the rest cost 1000. Over the cap of 6 owned pets it simply does not happen.
-- `mascotas/r/<uid>/<k>` = `{at, p: 500}`: a gift. Its content is derived from the write.
+- `mascotas/r/<uid>/<k>` = `{at, p: 500}`: a gift. Its content is derived from the write. `{at, p: 0, z: 5}` is a gift paid with five pieces (below): the replay gives it only if the account has 5 unused pieces, and charges nothing.
+- `mascotas/p/<uid>/<k>` = `{at}`: a gift piece, written in one `update` with `mascotas/pu/<uid>` = the same `now`. The rule demands `pu` be ≥ 5 min old (`PIEZA_RESPIRO`) and never deleted. The piece is client-claimed, so the replay counts at most `PIEZAS_DIA` (3) per Chile day; `piezas`/`piezasUsadas`/`piezasDia`/`piezasHoy` live in the per-account state, so a cierre keeps them.
 - `mascotas/c/<uid>/<k>` = `{at, k, p, n?, m?}`, with `k` one of:
-  - `comida` (20 × `n`);
+  - `comida` (20 × `n`), `comida-premium` (40 × `n`) and `comida-gourmet` (70 × `n`), counted apart (`comida`, `comidas[tipo]`). `MM.LLENA` says how much each fills the bar (35/60/100): the better ones cost a bit more per point;
   - `pocion` for pet `m` (1000; it freezes that pet for good and travels with it);
   - `fondo-<id>` (10–25, once per account);
   - `adios` (free: the pet leaves the account and frees its slot).
@@ -32,7 +33,11 @@
 - A pet bought or received has no state in the new account. The postman copies the latest previous owner's state (from `historial`), without `w`/`d`, which belonged to the seller.
 - **Honest limit:** stage and growth are client-claimed, like club marks. A console can grow its own pet; it cannot mint items, coins or potions. The rule only lets the stage move forward.
 
-**Preferences** go to `users/<uid>/mascotas`: `oscuras` (the pets with their light off), background, dance bar, and `usadas`, the rations eaten (a transaction +1 per handful). Food stock = rations bought (replay) − `usadas`. FPS and mute stay in `localStorage`.
+**Preferences** go to `users/<uid>/mascotas`: `oscuras` (the pets with their light off), background, dance bar, and `usadas`, the common rations eaten (a transaction +1 per handful; `usadasT/<tipo>` for premium/gourmet). Food stock = rations bought (replay) − eaten, per food. The feeding banner picks which food to throw; `applyAction(…, fill)` takes how much it fills (`game/comidas.ts`).
+
+**Jugar is a random game** (`game/juegos.ts`, never the same twice in a row per pet): `gusano` and `laser` follow the pointer, `topos` (tap the grass, up to 3 moles waiting) and `pelota` (tap to throw) are placed by tapping. All are "catch it three times" on the animator's `hunt`/`pounce`; a toy placed by tap is pushed ≥ 0.36 from the last catch (`lejosDe`), or the pet would never pounce again (`ch.armed`). After a finished game the frame asks the postman `pieza`: the chance is `probPieza(misses)` (25 %, +12.5 % per game without one, misses in `localStorage`), skipped if the daily cap or the respite would refuse it. Five pieces are swapped in 🎁 for a free gift (`regaloPiezas`).
+
+**Dark theme trap:** the `html[data-tema='oscuro'] :is(…)` list counts as `.tabs button.on` (0,3,2), so a light rule below it like `.tool-dots > span.on` or `.potion-row .pill-btn` loses. The «semáforo» of the game and the potion price were unreadable for that reason. Exclude the state (`:not(.on)`) or add a class to beat it. FPS and mute stay in `localStorage`.
 
 **The light is per pet** (`oscuras`, `useLuz(id)`): turning it off for one must not darken the others, and the corral is always lit. The old single `luz: false` is read once as «all dark»; the postman now always writes `luz: true` so it never applies again.
 
@@ -56,4 +61,4 @@
 
 **Theme.** The postman forwards `data-tema`. `app.css` has an `html[data-tema='oscuro']` block: neutral surfaces go dark and the ink goes light, while coloured buttons keep dark ink on their pastel.
 
-Tests: `colabtex/tests/mascotas.test.cjs` compiles `src/mascotas/**/*.test.ts` with esbuild against a fake `vitest` (describe/it/expect over `node:test`). It also tests the motor and the Mascotas part of `economia()`. The rules (plaza and cariños too) are covered in `test-rules.mjs`.
+Tests: `colabtex/tests/mascotas.test.cjs` compiles `src/mascotas/**/*.test.ts` with esbuild against a fake `vitest` (describe/it/expect over `node:test`). It also tests the motor and the Mascotas part of `economia()`. The rules (plaza, cariños, pieces and foods too) are covered in `test-rules.mjs`. **The pieces and the new foods need the rules re-published** in the console; until then the frame says so when you buy or swap.

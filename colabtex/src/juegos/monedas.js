@@ -588,7 +588,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   /* El cierre de cada semana (`ps`) va antes que todo lo de ese instante:
      las tablas se miran como estaban justo antes del lunes. El reclamo de
      los sobres de un podio (`pq`) va, como el de un premio, antes que sus sobres. */
-  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mp: 2.15, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p), pl: typeof x.pl === "string" ? x.pl : "" });
@@ -634,13 +634,17 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "r", at: x.at, u, k, c: comoLista(x.c).map(String) });
   /* Mascotas: `mascotas/a` adopciones {at, e, p}, `mascotas/r` regalos
-     {at, p} y `mascotas/c` compras {at, k, p, n?, m?}. */
+     {at, p, z?}, `mascotas/c` compras {at, k, p, n?, m?} y `mascotas/p`
+     piezas de regalo {at} (de jugar con la mascota). */
   for (const [u, l] of Object.entries(ms.a || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "ma", at: x.at, u, k, e: String(x.e || ""), p: num(x.p) });
   for (const [u, l] of Object.entries(ms.r || {}))
     for (const [k, x] of Object.entries(l || {}))
-      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mr", at: x.at, u, k, p: num(x.p) });
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mr", at: x.at, u, k, p: num(x.p), z: num(x.z) });
+  for (const [u, l] of Object.entries(ms.p || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mp", at: x.at, u, k });
   for (const [u, l] of Object.entries(ms.c || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mc", at: x.at, u, k, q: String(x.k || ""), p: num(x.p), n: x.n, m: typeof x.m === "string" ? x.m : "" });
@@ -706,7 +710,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, desafios: {}, tacos: {}, cofres: [],
-    intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
+    intentos: 0, adopciones: 0, comida: 0, comidas: {}, piezas: 0, piezasUsadas: 0, piezasDia: 0, piezasHoy: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
     const x = U(u);
@@ -879,9 +883,21 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       x.adopciones++;
       mascotas[cc] = { u: e.u, k: e.k, at: e.at, e: e.e };
       dueno[cc] = e.u; tiene[e.u] = (tiene[e.u] || 0) + 1;
+    } else if (e.t === "mp") {
+      /* Una pieza de regalo (de jugar con la mascota): la escribe el
+         cliente, así que valen a lo más `PIEZAS_DIA` por día de Chile. */
+      const x = U(e.u), dia = diaChile(e.at);
+      if (x.piezasDia !== dia) { x.piezasDia = dia; x.piezasHoy = 0; }
+      if (x.piezasHoy >= MM.PIEZAS_DIA) continue;
+      x.piezasHoy++; x.piezas = (x.piezas || 0) + 1;
     } else if (e.t === "mr") {
-      /* Un regalo: lo que trae sale del motor, no de lo escrito. */
-      if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p, "regalo")) continue;
+      /* Un regalo: lo que trae sale del motor, no de lo escrito. Se paga
+         con monedas o, gratis (p: 0, z: 5), con cinco piezas juntadas. */
+      if (e.p === 0 && e.z === MM.PIEZAS_REGALO) {
+        const x = U(e.u);
+        if ((x.piezas || 0) - (x.piezasUsadas || 0) < MM.PIEZAS_REGALO) continue;
+        x.piezasUsadas = (x.piezasUsadas || 0) + MM.PIEZAS_REGALO;
+      } else if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p, "regalo")) continue;
       const cc = claveObjeto(e.u, e.k);
       regalos[cc] = { u: e.u, k: e.k, at: e.at, item: MM.regalo(e.u, e.k, e.at) };
       dueno[cc] = e.u;
@@ -892,6 +908,8 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       const x = U(e.u), n = Number.isInteger(e.n) ? e.n : 0, precio = MM.precioCompra(e.q, n);
       if (precio === null || e.p !== precio) continue;
       if (e.q === "comida") { if (paga(e.u, precio, "comida", String(n))) x.comida += n; continue; }
+      const tipo = /^comida-([a-z]+)$/.exec(e.q);
+      if (tipo) { if (paga(e.u, precio, "comida", tipo[1] + " " + n)) { x.comidas = x.comidas || {}; x.comidas[tipo[1]] = (x.comidas[tipo[1]] || 0) + n; } continue; }
       const fondo = /^fondo-([a-z]+)$/.exec(e.q);
       if (fondo) { if (!x.fondos[fondo[1]] && paga(e.u, precio, "fondoMascota", fondo[1])) x.fondos[fondo[1]] = e.at; continue; }
       if (!esMascota(e.m) || dueno[e.m] !== e.u || enVenta[e.m]) continue;

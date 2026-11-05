@@ -2,9 +2,8 @@ import type { SpeciesDef } from './types'
 
 // Gato: llega en una caja (con el gatito asomado). Mimos y limpieza la abren y sale el gatito;
 // con cuidados crece a gato. Mismas etapas, cuidados y espacios de ropa que la gallina; juega
-// con un puntero láser.
+// a lo mismo que ella (el láser, el gusanito, los topos, la pelota).
 const FEED = { icon: '🐟', hint: 'Lánzale croquetas' }
-const PLAY = { icon: '🔴', hint: 'Juega con el láser' }
 
 export const cat: SpeciesDef = {
   id: 'cat',
@@ -38,7 +37,7 @@ export const cat: SpeciesDef = {
       slots: ['hat', 'boots'],
       stats: ['hunger', 'happiness', 'energy', 'hygiene'],
       actions: ['feed', 'play', 'sleep', 'clean'],
-      care: { feed: FEED, play: PLAY },
+      care: { feed: FEED },
       growthToNext: 30,
     },
     {
@@ -50,7 +49,7 @@ export const cat: SpeciesDef = {
       slots: ['hat', 'outfit', 'shoes'],
       stats: ['hunger', 'happiness', 'energy', 'hygiene'],
       actions: ['feed', 'play', 'sleep', 'clean', 'dance'],
-      care: { feed: FEED, play: PLAY },
+      care: { feed: FEED },
     },
   ],
 }

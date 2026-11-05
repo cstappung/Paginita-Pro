@@ -441,9 +441,12 @@ events keep their order):
 - `mascotas/a` adoptions: the first one *written* by an account is free
   (`intentos`, the same thing the rule can see), the rest cost 1000, and
   none happens with 6 pets owned now.
-- `mascotas/r` gifts: 500, content from `MascotasMotor.regalo`.
+- `mascotas/r` gifts: 500, content from `MascotasMotor.regalo`; or free with
+  `p: 0, z: 5` if the account has five unused pieces.
+- `mascotas/p` gift pieces (event `mp`, `ORDEN` 2.15): at most
+  `PIEZAS_DIA` per Chile day count; the count lives in the account state.
 - `mascotas/c` purchases:
-  - food, 20 a ration;
+  - food, 20 a ration (premium 40, gourmet 70, counted in `comidas`);
   - potion, 1000, only for an own pet that is not listed and not frozen
     yet;
   - a background, once;
