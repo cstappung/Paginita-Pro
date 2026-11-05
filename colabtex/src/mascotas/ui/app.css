@@ -64,6 +64,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .scene.tool-clean { cursor: none; }
 .scene.tool-play { cursor: grab; }
 .scene.tool-play:active { cursor: grabbing; }
+.scene.tool-play:is(.juego-topos, .juego-pelota) { cursor: pointer; }
 .rotate-hint { position: absolute; top: 10px; left: 12px; font-size: 0.75rem; font-weight: 800; color: var(--ink); background: rgba(255, 250, 241, 0.75); padding: 3px 9px; border-radius: 999px; pointer-events: none; }
 
 /* Cartel de la herramienta en uso. */
@@ -73,6 +74,9 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .tool-feed .tool-icon { background: #ffe08a; }
 .tool-clean .tool-icon { background: #bfe9ff; }
 .tool-play .tool-icon { background: #ffd0e3; }
+.tool-play.juego-laser .tool-icon { background: #ffc9c9; }
+.tool-play.juego-topos .tool-icon { background: #e7d3bf; }
+.tool-play.juego-pelota .tool-icon { background: #cdeeff; }
 .tool-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .tool-text strong { font-size: 0.92rem; line-height: 1.15; }
 .tool-text small { color: var(--muted); font-weight: 700; font-size: 0.76rem; }
@@ -80,10 +84,26 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .tool-progress span { display: block; height: 100%; background: repeating-linear-gradient(-45deg, #4fb3ec 0 8px, #7cc8f3 8px 16px); transition: width 0.15s; }
 .tool-dots { display: flex; align-items: center; gap: 5px; }
 .tool-dots > span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; transition: background 0.2s, transform 0.2s; }
-.tool-dots > span.on { background: #f472a8; transform: scale(1.15); }
+.tool-dots > span.on { background: #f472a8; transform: scale(1.2); box-shadow: 0 0 0 3px rgba(244, 114, 168, 0.35); }
 .tool-dots small { margin-left: 4px; }
 .tool-done { flex: none; border: 2px solid var(--ink); border-radius: 12px; background: var(--good); color: #fff; font-weight: 900; padding: 8px 12px; box-shadow: var(--drop-sm); }
 .tool-done:active { transform: translateY(2px); box-shadow: none; }
+/* Qué comida se lanza (con cuántas quedan) y el ＋ para comprar. */
+.food-pick { display: flex; flex-wrap: wrap; gap: 5px; }
+.food-chip { display: inline-flex; align-items: center; gap: 3px; border: 2px solid #3a2416; border-radius: 999px; background: #fff7e6; color: #3a2416; padding: 1px 8px; font-size: 0.85rem; box-shadow: 0 2px 0 #3a2416; transition: transform 0.1s, box-shadow 0.1s; }
+.food-chip b { font-size: 0.75rem; }
+.food-chip.on { background: #ffd36b; transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(58, 36, 22, 0.2); }
+.food-chip.empty { opacity: 0.55; }
+.food-chip.more { font-weight: 900; background: #e2f5d8; }
+
+/* La pieza de regalo que se suelta al terminar un juego: salta y vuela hacia el 🎁. */
+.pieza-pop { position: absolute; left: 50%; top: 45%; z-index: 3; font-size: 3rem; pointer-events: none; filter: drop-shadow(0 3px 0 rgba(58, 36, 22, 0.35)); animation: pieza-pop 1.7s cubic-bezier(0.3, 1.2, 0.5, 1) forwards; }
+@keyframes pieza-pop {
+  0% { transform: translate(-50%, 30px) scale(0.2) rotate(-30deg); opacity: 0; }
+  25% { transform: translate(-50%, -30px) scale(1.25) rotate(10deg); opacity: 1; }
+  55% { transform: translate(-50%, -20px) scale(1) rotate(-6deg); opacity: 1; }
+  100% { transform: translate(40vw, -60vh) scale(0.3) rotate(30deg); opacity: 0; }
+}
 
 /* Saco de granos: de ahí salen los puñados. */
 .seed-sack { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); pointer-events: none; transform-origin: 50% 100%; animation: sack-bob 1.6s ease-in-out infinite; filter: drop-shadow(0 3px 0 rgba(58, 36, 22, 0.25)); }
@@ -304,6 +324,44 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .potion-icon { font-size: 1.6rem; }
 .potion-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .potion-text small { font-size: 0.72rem; font-weight: 700; color: #5d4a7a; }
+/* El precio de la poción: dorado, con tinta oscura (en los dos temas). */
+.potion-row .potion-price { flex: none; background: #fff4cf; color: #3a2416; border-color: #3a2416; box-shadow: 0 2px 0 #3a2416; font-weight: 900; }
+.potion-row .potion-price:hover { background: #ffe7a3; }
+
+/* ——— Piezas de regalo (de jugar con la mascota) ——— */
+.piezas-row { display: flex; align-items: center; gap: 10px; border: 2px solid #3a2416; border-radius: 14px; padding: 8px 10px; background: linear-gradient(180deg, #e3f7ff, #c9ecff); color: #3a2416; box-shadow: var(--drop-sm); }
+.piezas-row.lista { background: linear-gradient(180deg, #fff4cf, #ffe08a); animation: piezas-brilla 1.6s ease-in-out infinite; }
+@keyframes piezas-brilla { 50% { box-shadow: 0 2px 0 #3a2416, 0 0 14px rgba(255, 200, 60, 0.75); } }
+.piezas-icon { font-size: 1.6rem; }
+.piezas-text { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 3px; }
+.piezas-text small { font-size: 0.72rem; font-weight: 700; color: #3f5a6b; }
+.piezas-slots { display: flex; align-items: center; gap: 4px; }
+.piezas-slots i { width: 18px; height: 18px; border-radius: 5px; border: 2px dashed #6b8a9c; background: rgba(255, 255, 255, 0.6); }
+.piezas-slots i.on { border: 2px solid #3a2416; background: #ffd36b; box-shadow: inset 0 -3px 0 rgba(185, 122, 0, 0.45); }
+.piezas-slots i.on::before { content: '🧩'; display: block; font-size: 0.7rem; line-height: 14px; text-align: center; font-style: normal; }
+.piezas-slots b { font-size: 0.75rem; }
+.piezas-btn { flex: none; background: #fff; color: #3a2416; border-color: #3a2416; box-shadow: 0 2px 0 #3a2416; font-weight: 900; }
+.piezas-btn:disabled { opacity: 0.6; cursor: default; }
+.piezas-row.lista .piezas-btn { background: #7fd36b; }
+/* El 🎁 de arriba cuenta las piezas y brilla cuando alcanzan para un regalo. */
+.gift-btn { position: relative; }
+.gift-badge { position: absolute; right: -8px; bottom: -6px; font-size: 0.62rem; font-weight: 900; line-height: 1; padding: 2px 4px; border-radius: 999px; background: #fff4cf; color: #3a2416; border: 1.5px solid #3a2416; white-space: nowrap; }
+.gift-btn.lista { animation: piezas-brilla 1.6s ease-in-out infinite; }
+.gift-btn.lista .gift-badge { background: #7fd36b; }
+
+/* ——— La despensa: las comidas y sus precios ——— */
+.food-rows { display: flex; flex-direction: column; gap: 8px; }
+.food-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 2px solid #3a2416; border-radius: 14px; padding: 8px 10px; color: #3a2416; background: #fff7e6; box-shadow: 0 2px 0 #3a2416; }
+.food-row.food-premium { background: linear-gradient(180deg, #fff6d0, #ffe7a0); }
+.food-row.food-gourmet { background: linear-gradient(180deg, #ffe9f2, #ffd0e3); }
+.food-icon { font-size: 1.6rem; }
+.food-text { display: flex; flex-direction: column; flex: 1; min-width: 150px; }
+.food-text small { font-size: 0.74rem; font-weight: 700; color: #6b4a33; }
+.food-tag { font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 999px; background: rgba(58, 36, 22, 0.1); vertical-align: middle; }
+.food-buy { display: flex; gap: 5px; flex-wrap: wrap; }
+.food-buy .pill-btn { background: #fff; color: #3a2416; border-color: #3a2416; box-shadow: 0 2px 0 #3a2416; padding: 4px 10px; font-size: 0.8rem; }
+.food-buy .pill-btn:disabled { opacity: 0.5; cursor: default; }
+
 .potion-btn { margin-left: auto; border: 2px solid var(--ink); border-radius: 999px; background: #efe2ff; padding: 0 7px; font-size: 0.8rem; line-height: 1.5; box-shadow: var(--drop-sm); }
 .stat-grow .stat-name { display: flex; align-items: center; gap: 4px; }
 .stat-grow.frozen { align-items: center; background: linear-gradient(90deg, #f1e6ff, transparent); border-radius: 10px; }
@@ -378,7 +436,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
 
 @media (prefers-reduced-motion: reduce) {
-  .chip.legendary::after, .seed-sack, .stat.low .fill, .stat.low .stat-icon, .care-alert, .gift-tap, .gift-rays, .inv-cell.legendary::after, .thumb-wait { animation: none !important; }
+  .chip.legendary::after, .seed-sack, .stat.low .fill, .stat.low .stat-icon, .care-alert, .gift-tap, .gift-rays, .inv-cell.legendary::after, .thumb-wait, .piezas-row.lista, .gift-btn.lista { animation: none !important; }
 }
 
 /* ——— Mover muebles (botón en la escena) ——— */
@@ -453,16 +511,21 @@ html[data-tema='oscuro'] {
 html[data-tema='oscuro'] body {
   background-image: radial-gradient(rgba(255, 179, 71, 0.07) 2px, transparent 2.5px), radial-gradient(rgba(255, 138, 61, 0.05) 2px, transparent 2.5px);
 }
-html[data-tema='oscuro'] :is(.icon-btn:hover, .pill-btn, .tabs button.on, .pet-card, .chip, .inv-cell, .dance-slot, .adopt-form input, .sell-price input, .stat-icon, .pet-card-icon, .tool-dots > span) {
+html[data-tema='oscuro'] :is(.icon-btn:hover, .pill-btn, .tabs button.on, .pet-card, .chip, .inv-cell, .dance-slot, .adopt-form input, .sell-price input, .stat-icon, .pet-card-icon, .tool-dots > span:not(.on)) {
   background: var(--card);
 }
+/* Botones de color dentro de filas pastel: conservan su fondo claro y la tinta oscura. Llevan
+   `.pill-btn` de más para ganarle a la regla de arriba (su :is cuenta como `.tabs button.on`). */
+html[data-tema='oscuro'] .potion-row .potion-price.pill-btn { background: #fff4cf; }
+html[data-tema='oscuro'] :is(.piezas-row .piezas-btn, .food-buy .pill-btn).pill-btn { background: #fff; }
+html[data-tema='oscuro'] .piezas-row.lista .piezas-btn.pill-btn { background: #7fd36b; }
 html[data-tema='oscuro'] :is(.pill-btn:hover, .chip:hover, .inv-cell:hover, .dance-slot:hover) { background: #372e47; }
 html[data-tema='oscuro'] :is(.icon-btn:active, .icon-btn.on) { background: #4a3a22; }
 html[data-tema='oscuro'] :is(.bar, .tabs) { background: #1b1624; }
 html[data-tema='oscuro'] .stage-tag { background: #4a3a22; }
 html[data-tema='oscuro'] .modal { background: rgba(5, 3, 9, 0.7); }
 html[data-tema='oscuro'] .toast { background: #f2e6d6; color: #2a1d12; }
-html[data-tema='oscuro'] :is(.care, .tool-banner, .coins, .edit-btn, .gift-name, .gift-kind, .dance-slot.legendary, .chip.legendary) { color: #3a2416; }
+html[data-tema='oscuro'] :is(.care, .coins, .edit-btn, .gift-name, .gift-kind, .dance-slot.legendary, .chip.legendary) { color: #3a2416; }
 html[data-tema='oscuro'] :is(.care, .tool-banner, .coins, .edit-btn) { border-color: #07050b; }
 html[data-tema='oscuro'] .stage-wrap { border-color: #07050b; }
 html[data-tema='oscuro'] :is(.rotate-hint, .potion-row, .potion-row small) { color: #3a2416; }

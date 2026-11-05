@@ -18,7 +18,7 @@
      vista apaga la anterior, y cerrarla se la devuelve. Va a 12 fps, se pausa fuera de pantalla o con la
      pestaña oculta, y se libera al cerrarla. Con movimiento reducido la
      dibuja quieta el propio visor. */
-const VERSION = "mc-8";
+const VERSION = "mc-9";
 const RUTA = "juegos/mascotas/visor.html?v=" + VERSION;
 const CANAL_PADRE = "visor-parent", CANAL_HIJO = "visor-child";
 const ESPERA_CIERRE = 20000;

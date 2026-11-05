@@ -56,9 +56,25 @@
     pocion: 1000,
     comida: 20,          // por ración: un puñado, una acción de alimentar
     adopcion: 1000,      // la primera de cada cuenta es gratis
-    fondos: { sunset: 10, night: 15, beach: 20, snow: 25 }
+    fondos: { sunset: 10, night: 15, beach: 20, snow: 25 },
+    /* Las comidas que llenan más (`comida-<tipo>`), por ración. Proporcionales
+       a lo que suben la barra (la común: 35 puntos por 20) y un poco más
+       caras: 60 puntos por 40 y la barra entera (100) por 70. */
+    comidas: { premium: 40, gourmet: 70 }
   };
+  /* Lo que sube la barra de comida cada ración (la común y las de `PRECIO.comidas`). */
+  const LLENA = { comida: 35, premium: 60, gourmet: 100 };
   const MAX_MASCOTAS = 6, MAX_RACIONES = 50;
+
+  /* ---------- las piezas de regalo ----------
+     Al terminar un juego con la mascota puede soltarse una pieza; cinco se
+     canjean por un regalo gratis (`mascotas/r` con p: 0, z: 5). La pieza es
+     del cliente (como las marcas del club): lo que la acota es la economía,
+     que cuenta a lo más `PIEZAS_DIA` por día de Chile, y la regla, que
+     pide `PIEZA_RESPIRO` entre dos. La suerte crece con cada juego sin
+     pieza (`probPieza`): ni rachas eternas en blanco ni una por juego. */
+  const PIEZAS_REGALO = 5, PIEZAS_DIA = 3, PIEZA_RESPIRO = 300000;
+  const probPieza = fallos => Math.min(1, 0.25 + 0.125 * Math.max(0, Math.floor(+fallos) || 0));
   const ESPECIES = ["chicken", "cat"];
   /* 6 % de legendarios, en diez milésimas. */
   const LEGENDARIO = 600;
@@ -66,6 +82,8 @@
   /* Lo que cuesta una compra de `mascotas/c` según su `k` (null: no existe). */
   function precioCompra(k, n) {
     if (k === "comida") return Number.isInteger(n) && n >= 1 && n <= MAX_RACIONES ? PRECIO.comida * n : null;
+    const c = /^comida-([a-z]+)$/.exec(String(k || ""));
+    if (c) return PRECIO.comidas[c[1]] && Number.isInteger(n) && n >= 1 && n <= MAX_RACIONES ? PRECIO.comidas[c[1]] * n : null;
     if (k === "pocion") return PRECIO.pocion;
     if (k === "adios") return 0;
     const f = /^fondo-([a-z]+)$/.exec(String(k || ""));
@@ -153,7 +171,7 @@
   const semillaGenes = (uid, clave, at) => sha256("mascota-genes:" + uid + "|" + clave + "|" + at).slice(0, 4);
 
   return {
-    POOL, COMUNES, LEGENDARIOS, INICIALES, BAILES_INICIALES, PRECIO, MAX_MASCOTAS, MAX_RACIONES, ESPECIES, LEGENDARIO,
-    precioCompra, sha256, generador, regalo, semillaGenes
+    POOL, COMUNES, LEGENDARIOS, INICIALES, BAILES_INICIALES, PRECIO, LLENA, MAX_MASCOTAS, MAX_RACIONES, ESPECIES, LEGENDARIO,
+    PIEZAS_REGALO, PIEZAS_DIA, PIEZA_RESPIRO, probPieza, precioCompra, sha256, generador, regalo, semillaGenes
   };
 });

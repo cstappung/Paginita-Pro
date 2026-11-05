@@ -22,12 +22,13 @@ export function GiftShop({ onClose, say, pet, onPotion }: { onClose: () => void;
   const [paying, setPaying] = useState(false)
   const skip = useRef(0)
 
-  const open = async () => {
+  const piezas = useGame((s) => s.piezas)
+  const open = async (conPiezas = false) => {
     if (phase === 'opening' || phase === 'popped') return void (skip.current = 1)
     if (paying) return
     setPaying(true)
     play('tap')
-    const r = await useGame.getState().openGift()
+    const r = await useGame.getState().openGift(conPiezas)
     setPaying(false)
     if (typeof r === 'string') {
       play('error')
@@ -57,7 +58,7 @@ export function GiftShop({ onClose, say, pet, onPotion }: { onClose: () => void;
         >
           <span className="gift-rays" aria-hidden />
           <GiftReveal opening={opening} species={dancer?.species} look={dancer?.look ?? dancer?.coat} skip={skip} onPop={() => setPhase('popped')} onShown={() => setPhase('shown')} />
-          {phase === 'idle' && <span className="gift-tap">{paying ? 'Pagando…' : 'Toca la caja para abrirla'}</span>}
+          {phase === 'idle' && <span className="gift-tap">{paying ? 'Abriendo…' : 'Toca la caja para abrirla'}</span>}
           {got && def && (
             <div className="gift-result">
               {got.legendary && <b className="gift-legend">★ Legendario</b>}
@@ -93,6 +94,31 @@ export function GiftShop({ onClose, say, pet, onPotion }: { onClose: () => void;
         <p className="hint">
           Trae ropa, calzado, sombreros, cosas para la casa o bailes, en colores al azar. Legendario: {Math.round(LEGENDARY_CHANCE * 100)} %. Tienes {coins.toLocaleString('es-CL')} monedas.
         </p>
+        <div className={`piezas-row${piezas.tengo >= piezas.cada ? ' lista' : ''}`}>
+          <span className="piezas-icon" aria-hidden>
+            🧩
+          </span>
+          <span className="piezas-text">
+            <strong>Piezas de regalo</strong>
+            <small>
+              Al jugar con tu mascota a veces se suelta una pieza (hasta {piezas.tope} por día; hoy {Math.min(piezas.hoy, piezas.tope)}). Con {piezas.cada}, un regalo
+              gratis.
+            </small>
+            <span className="piezas-slots" aria-label={`${piezas.tengo} de ${piezas.cada} piezas`}>
+              {Array.from({ length: piezas.cada }, (_, i) => (
+                <i key={i} className={i < piezas.tengo ? 'on' : ''} />
+              ))}
+              {piezas.tengo > piezas.cada && <b>+{piezas.tengo - piezas.cada}</b>}
+            </span>
+          </span>
+          <button
+            className="pill-btn piezas-btn"
+            onClick={() => void open(true)}
+            disabled={piezas.tengo < piezas.cada || paying || phase === 'opening' || phase === 'popped'}
+          >
+            {piezas.tengo >= piezas.cada ? '🎁 Canjear gratis' : `${piezas.tengo}/${piezas.cada}`}
+          </button>
+        </div>
         <div className="potion-row">
           <span className="potion-icon" aria-hidden>
             🧪
@@ -105,8 +131,8 @@ export function GiftShop({ onClose, say, pet, onPotion }: { onClose: () => void;
             </small>
           </span>
           {pet && !pet.frozen && (
-            <button className="pill-btn" onClick={onPotion}>
-              💰 {POTION_PRICE}
+            <button className="pill-btn potion-price" onClick={onPotion}>
+              💰 {POTION_PRICE.toLocaleString('es-CL')}
             </button>
           )}
         </div>

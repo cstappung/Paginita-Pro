@@ -590,7 +590,10 @@ export async function cobrarPlantilla(uid, id, c, pres) {
    regla), `mascotas/r/<uid>/<k>` = {at, p: 500} (un regalo, cuyo contenido
    sale del motor con `at`) y `mascotas/c/<uid>/<k>` = {at, k, p, n?, m?}
    (comida, poción, fondo o despedirse). Quién tiene qué y si alcanzaba el
-   dinero lo decide `economia()`. */
+   dinero lo decide `economia()`. Un regalo canjeado con piezas es
+   {at, p: 0, z: 5}; una pieza, `mascotas/p/<uid>/<k>` = {at}, se escribe
+   junto con `mascotas/pu/<uid>` = la misma hora (la regla pide un respiro
+   entre dos piezas mirando ese valor). */
 async function escribeYLee(r, valor) {
   await set(r, valor);
   const x = (await get(r)).val();
@@ -598,8 +601,13 @@ async function escribeYLee(r, valor) {
 }
 export const adoptarMascota = (uid, e, p) =>
   escribeYLee(push(ref(db, `mascotas/a/${uid}`)), { at: serverTimestamp(), e, p });
-export const abrirRegaloMascota = uid =>
-  escribeYLee(push(ref(db, `mascotas/r/${uid}`)), { at: serverTimestamp(), p: 500 });
+export const abrirRegaloMascota = (uid, conPiezas) =>
+  escribeYLee(push(ref(db, `mascotas/r/${uid}`)), conPiezas ? { at: serverTimestamp(), p: 0, z: 5 } : { at: serverTimestamp(), p: 500 });
+export async function ganaPiezaMascota(uid) {
+  const k = push(ref(db, `mascotas/p/${uid}`)).key;
+  await update(ref(db), { [`mascotas/p/${uid}/${k}`]: { at: serverTimestamp() }, [`mascotas/pu/${uid}`]: serverTimestamp() });
+  return k;
+}
 export const compraMascotas = (uid, c) =>
   escribeYLee(push(ref(db, `mascotas/c/${uid}`)), Object.assign({ at: serverTimestamp(), k: c.k, p: c.p },
     Number.isInteger(c.n) ? { n: c.n } : {}, c.m ? { m: c.m } : {}));
@@ -622,8 +630,9 @@ export const borraEstadoMascota = (uid, k) => remove(ref(db, `mascotasEstado/${u
 export const watchPrefsMascotas = (uid, cb) =>
   onValue(ref(db, `${U}/${uid}/mascotas`), s => cb(s.val() || {}, null), err => cb({}, err));
 export const guardaPrefsMascotas = (uid, p) => update(ref(db, `${U}/${uid}/mascotas`), p);
-export const usaComidaMascota = (uid, n = 1) =>
-  runTransaction(ref(db, `${U}/${uid}/mascotas/usadas`), v => (Number.isFinite(v) ? v : 0) + n);
+/* Las raciones comidas: `usadas` las comunes y `usadasT/<tipo>` las que llenan más. */
+export const usaComidaMascota = (uid, n = 1, tipo = "") =>
+  runTransaction(ref(db, `${U}/${uid}/mascotas/${tipo ? "usadasT/" + tipo : "usadas"}`), v => (Number.isFinite(v) ? v : 0) + n);
 /* El Pueblo de Mascotas. La plaza: `mascotasPlaza/<uid>` = {m, x, z, at,
    em?, ea?, b?, t?, ta?} es quién pasea, adónde va y su último gesto. Se
    reescribe al caminar (con respiro) y cada tanto para seguir «fresco», y
