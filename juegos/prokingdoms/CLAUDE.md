@@ -1026,8 +1026,9 @@ Each fix below came from a stall in that run; keep them in mind before touching 
 ## Upgrades in series (`pk-35`, after the mega update)
 
 - **Aldeanos → Capataz → «Mejoras en serie»** and a «Capataz, tus N» row in the building panel (`UI.serieCtl`,
-  shared). Only types you own `A.SERIE_MIN` (3) or more of, done, upgradable and not `noCap` (wonders) or the TC
-  (`A.serieOk`, `A.serieTipos`). `st.auto.serie[type]` is the target level; `A.SERIE_ERA` (99) means «always the
+  shared). Only the whitelist `A.SERIE_TIPOS` (house, farm, lumber, mining, mill, muelle, salinas; the same keys
+  are the sea's re-skins) and only when you own `A.SERIE_MIN` (3) or more (`A.serieOk`, `A.serieTipos`). The owner
+  chose it: workshops, storage, towers and single buildings stay out on purpose, because upgrading them is a decision. `st.auto.serie[type]` is the target level; `A.SERIE_ERA` (99) means «always the
   era max» (`A.serieNivel` clamps to `G.maxLvl`). It is the early-game answer to clicking 12 houses one by one; the
   Consejo's Maestro mayor (level 7) only arrives much later.
 - **`A.serieTick`** runs at the end of `A.tick` (offline too): never while `st.upq` has anything (your queue goes

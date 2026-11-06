@@ -31,8 +31,8 @@
   function serieEl() {
     const A = PK.Auto, g = PK.Game, tipos = A.serieTipos();
     const box = el('div', null, el('h3', null, 'Mejoras en serie'),
-      el('p', { class: 'small' }, 'Para los edificios de los que tienes ' + A.SERIE_MIN + ' o más (casas, granjas…): elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. Lo que pongas en la cola de obras va antes, deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
-    if (!tipos.length) { box.append(el('p', { class: 'small muted' }, 'Todavía no tienes ' + A.SERIE_MIN + ' edificios del mismo tipo.')); return box; }
+      el('p', { class: 'small' }, 'Para casas, granjas, campamentos, molinos y muelles de los que tienes ' + A.SERIE_MIN + ' o más: elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. Lo que pongas en la cola de obras va antes, deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
+    if (!tipos.length) { box.append(el('p', { class: 'small muted' }, 'Todavía no tienes ' + A.SERIE_MIN + ' de un mismo tipo (casas, granjas, campamentos, molinos o muelles).')); return box; }
     const rows = el('div', { class: 'guild-rows' });
     for (const x of tipos) {
       const meta = A.serieNivel(x.type), faltan = meta ? g.buildings.filter(b => b.owner === 'p' && b.done && b.type === x.type && b.lvl < meta).length : 0;

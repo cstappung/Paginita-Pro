@@ -258,14 +258,17 @@
   };
 
   // ---------- Mejoras en serie ----------
-  // Subir 12 casas una por una cansa. Para los tipos de los que tienes A.SERIE_MIN o más, eliges un nivel
+  // Subir 12 casas una por una cansa. Para los tipos de A.SERIE_TIPOS de los que tienes A.SERIE_MIN o más, eliges un nivel
   // (st.auto.serie[tipo]; A.SERIE_ERA = siempre el máximo de la era) y el Capataz los va subiendo, del más bajo al
   // más alto. Tu cola de obras va primero (con algo en ella no empieza nada), deja un maestro libre si tienes más
   // de uno, y con «Meta de era» no gasta lo que la era pide. Corre también sin conexión, como el resto de A.tick.
   A.SERIE_MIN = 3;
   A.SERIE_ERA = 99;
   const enSerie = (b, obj) => b.owner === 'p' && !!obj[b.type];
-  A.serieOk = type => { const d = D.BUILD[type]; return !!d && !d.noUp && !d.noCap && type !== 'tc'; };
+  // Solo lo repetitivo: vivienda y recolección (en el mar, los mismos tipos con otro nombre, más las Salinas).
+  // Talleres, bodegas, torres y edificios únicos quedan fuera a propósito: subirlos es una decisión, no un trámite.
+  A.SERIE_TIPOS = ['house', 'farm', 'lumber', 'mining', 'mill', 'muelle', 'salinas'];
+  A.serieOk = type => A.SERIE_TIPOS.includes(type) && !!D.BUILD[type] && !D.BUILD[type].noUp;
   // Los tipos que califican, con cuántos hay y el rango de niveles: [{type, n, min, max}], los más numerosos primero.
   A.serieTipos = function () {
     const por = {};
