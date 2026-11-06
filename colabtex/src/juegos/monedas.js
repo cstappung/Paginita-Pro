@@ -615,10 +615,11 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries(pd.q || {}))
     for (const [id, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "pq", at: x.at, u, k: id, sobres: [x.k, x.k2, x.k3].filter(k => typeof k === "string" && k) });
-  /* El álbum completo de un club: `plantillas/a/<uid>/album-<club>` = {at, c: [una copia por jugador], k, k2}. */
+  /* El álbum completo de un club: `plantillas/a/<uid>/album-<club>` = {at, c: [una copia por jugador], k, k2, k3?},
+     y los con nota (`album6-<club>`, `album10-<club>`) = {at, c}, sin sobres. */
   for (const [u, l] of Object.entries(pd.a || {}))
     for (const [id, x] of Object.entries(l || {}))
-      if (x && Number.isFinite(x.at)) ev.push({ t: "pa", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k, x.k2].filter(k => typeof k === "string" && k) });
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pa", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k, x.k2, x.k3].filter(k => typeof k === "string" && k) });
   for (const [u, l] of Object.entries(c.g || {}))
     for (const [k, porI] of Object.entries(l || {}))
       for (const [i, x] of Object.entries(porI || {}))
@@ -795,16 +796,22 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
     } else if (e.t === "pa") {
       /* El álbum completo: una copia tuya de cada carta del club, en ese
-         instante, y una sola vez por club. Paga sus monedas y deja pasar su sobre. */
-      const club = conRetos && PR.leeAlbum(e.k), x = U(e.u);
-      if (!club || x.parada || (x.albumes && x.albumes[club]) || reclamos[e.u + "~" + e.k]) continue;
-      const faltan = new Set(PR.cartasAlbum(club).map(cd => cd.n));
-      for (const cc of new Set(e.c)) { const f = dueno[cc] === e.u && ficha(cc), h = f && PR.huecoAlbum(club, f.id); if (h) faltan.delete(h.n); }
-      if (faltan.size || e.sobres.length !== PR.ALBUM.sobres.length || new Set(e.sobres).size !== e.sobres.length || e.sobres.some((k, i) => k[0] !== PM.SOBRE[PR.ALBUM.sobres[i]].prefijo)) continue;
+         instante, y una sola vez por club. Paga sus monedas y deja pasar sus
+         sobres. Los con nota piden además que cada copia esté graduada con
+         esa nota o más (con lo graduado hasta ahí) y no traen sobres. */
+      const a = conRetos && PR.leeAlbumNota(e.k), pr = a && PR.premioAlbum(a.nota), x = U(e.u);
+      if (!pr || x.parada || (!a.nota && x.albumes && x.albumes[a.club]) || reclamos[e.u + "~" + e.k]) continue;
+      const club = a.club, faltan = new Set(PR.cartasAlbum(club).map(cd => cd.n));
+      for (const cc of new Set(e.c)) {
+        const f = dueno[cc] === e.u && ficha(cc), h = f && PR.sirveAlbum({ g: f.g, gr: !!graduada[cc] }, a.nota) && PR.huecoAlbum(club, f.id);
+        if (h) faltan.delete(h.n);
+      }
+      if (faltan.size || new Set(e.sobres).size !== e.sobres.length) continue;
+      if (a.nota ? e.sobres.length : !PR.sobresValen(pr, e.sobres.map(k => k[0]))) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
-      (x.albumes || (x.albumes = {}))[club] = e.at;
-      x.premios += PR.ALBUM.monedas;
-      anota(e.u, "plantilla", PR.ALBUM.monedas, `Álbum completo · ${PM.CLUBES[club]}${textoSobresDe(e.sobres)}`);
+      if (!a.nota) (x.albumes || (x.albumes = {}))[club] = e.at;
+      x.premios += pr.monedas;
+      anota(e.u, "plantilla", pr.monedas, a.nota ? `Álbum con nota ${a.nota}${a.nota < 10 ? " o más" : ""} · ${PM.CLUBES[club]}` : `Álbum completo · ${PM.CLUBES[club]}${textoSobresDe(e.sobres)}`);
     } else if (e.t === "pl") {
       /* Un premio vale si la plantilla está vigente (un reto, solo en su
          semana), las once son de quien reclama en ese momento y, con lo

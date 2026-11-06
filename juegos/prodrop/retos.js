@@ -153,7 +153,7 @@
   // el premio que da el marco de perfil de un club: el 3 (las once graduadas con nota 8 o más)
   const PREMIO_MARCO = 3;
   // «un sobre», «dos sobres», «un sobre Plus»
-  const textoSobres = pr => { const n = pr.sobres.length, plus = pr.sobres[0] === "futbolplus"; return (n === 1 ? "un sobre" : n === 2 ? "dos sobres" : n + " sobres") + (plus ? " Plus" : ""); };
+  const textoSobres = pr => { const n = pr.sobres.length, plus = pr.sobres[0] === "futbolplus"; return (n === 1 ? "un sobre" : n === 2 ? "dos sobres" : n === 3 ? "tres sobres" : n + " sobres") + (plus ? " Plus" : ""); };
   const premioOk = (n, ev) => !!ev.valida && (!PREMIOS[n - 1].nota || ev.notaMin >= PREMIOS[n - 1].nota);
   // `club-realmadrid_2`: el reclamo del premio 2 de esa plantilla
   const claveReclamo = (clave, n) => clave + "_" + n;
@@ -164,10 +164,12 @@
      tablas tal como estaban en ese instante: las tablas de los clubes pagan
      al 1.º, 2.º y 3.º (`PODIO_CLUB`, solo monedas) y la del reto que se
      cierra paga su podio (`PODIO_RETO`, monedas y sobres; los sobres se
-     cobran con un botón, como los premios). Solo con `MIN_PODIO` personas
-     o más en la tabla: con menos no hay a quién ganarle. La mejor
+     cobran con un botón, como los premios). Basta `MIN_PODIO` persona en
+     la tabla: con una o dos se pagan solo los puestos que hay (hasta el
+     4-11-2026 hacían falta tres, y nadie entendía por qué no ganaba; como
+     todo lo derivado, vale también para las semanas ya cerradas). La mejor
      plantilla no paga podio. */
-  const MIN_PODIO = 3;
+  const MIN_PODIO = 1;
   const PODIO_CLUB = [300, 200, 100];
   const PODIO_RETO = [
     { n: 1, monedas: 1500, sobres: ["futbolplus", "futbolplus", "futbolplus"] },
@@ -189,14 +191,30 @@
      Balón de Oro) vale por su carta normal, pero no hace falta tenerla
      (son por tiempo limitado, y el álbum quedaría imposible). El reclamo
      guarda una copia por jugador (`c`), y la economía comprueba que eran
-     tuyas en ese momento. */
-  const ALBUM = { monedas: 2000, sobres: ["futbolplus", "futbolplus"] };
+     tuyas en ese momento. Hasta el 4-11-2026 daba dos sobres Plus (`antes`):
+     esos reclamos siguen valiendo, como los de `PREMIOS`. */
+  const ALBUM = { monedas: 2000, sobres: ["futbolplus", "futbolplus", "futbolplus"], antes: ["futbolplus", "futbolplus"] };
+  /* Los álbumes con nota: el mismo álbum, pero cada jugador con una copia
+     graduada de nota `nota` o más. Solo monedas (sin sobres), una vez por
+     club y nivel, aparte del álbum normal. Con nota 10 es lo más difícil
+     del juego, y paga como tal. Las monedas viven solo aquí. */
+  const ALBUM_NOTA = [
+    { nota: 6, monedas: 5000, sobres: [] },
+    { nota: 10, monedas: 25000, sobres: [] }
+  ];
   // los jugadores del álbum: la carta normal de cada uno (su `person` es el mismo que el de su especial)
   const cartasAlbum = club => M.CARDS.filter(c => M.esFutbol(c.col) && c.club === club && !c.especial);
   // la carta del álbum que cubre la carta `id` (la normal de su jugador), o null si no es de ese club
   const huecoAlbum = (club, id) => { const c = M.CARDS[id]; return c && c.club === club ? cartasAlbum(club).find(x => x.person === c.person) || null : null; };
-  const claveAlbum = club => "album-" + club;
-  const leeAlbum = id => { const m = /^album-([a-z]{2,15})$/.exec(String(id || "")); return m && CLUBES.includes(m[1]) ? m[1] : null; };
+  // `album-roma` (el álbum normal), `album6-roma`, `album10-roma` (los con nota)
+  const claveAlbum = (club, nota) => "album" + (nota || "") + "-" + club;
+  const leeAlbumNota = id => { const m = /^album(6|10)?-([a-z]{2,15})$/.exec(String(id || "")); return m && CLUBES.includes(m[2]) ? { club: m[2], nota: m[1] ? +m[1] : 0 } : null; };
+  // solo el álbum normal: el club, o null
+  const leeAlbum = id => { const a = leeAlbumNota(id); return a && !a.nota ? a.club : null; };
+  // lo que paga cada álbum: el normal (`nota` 0) o el de esa nota
+  const premioAlbum = nota => (nota ? ALBUM_NOTA.find(x => x.nota === nota) || null : ALBUM);
+  // si la ficha {g, gr} sirve para el álbum de esa nota (el normal acepta cualquiera)
+  const sirveAlbum = (f, nota) => !nota || (!!f.gr && f.g >= nota);
 
   /* El mejor once que se puede armar con estas copias ({key, id, g, gr}):
      cada casilla con la que más suma entre las que juegan ahí, después
@@ -226,6 +244,6 @@
     plantilla, claveClub, claveReto, vigente, encaje, estado, puntosFicha, puntaje, evalua,
     PREMIOS, sobresValen, PREMIO_MARCO, textoSobres, premioOk, claveReclamo, leeReclamo, mejorOnce,
     MIN_PODIO, PODIO_CLUB, PODIO_RETO, textoSobresPodio, clavePodio, leePodio, ordenaTabla,
-    ALBUM, cartasAlbum, huecoAlbum, claveAlbum, leeAlbum
+    ALBUM, ALBUM_NOTA, cartasAlbum, huecoAlbum, claveAlbum, leeAlbum, leeAlbumNota, premioAlbum, sirveAlbum
   };
 });

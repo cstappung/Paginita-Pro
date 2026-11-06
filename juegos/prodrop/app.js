@@ -2319,7 +2319,7 @@ const NOVEDADES_FUTBOL = [
     '<b>🔎 Elige la copia</b>: en el selector del desafío sale la mejor copia de cada jugador, con cuántas tienes; tócala para ver todas y elegir cuál va. «Ver» abre la carta en grande, y ahí se gradúa.'
   ]],
   ['Octubre 2026 · Podio semanal y premios nuevos', [
-    `<b>🏅 Podio de cada semana</b>: cada lunes, el 1.º, 2.º y 3.º de cada club ganan ${MONEDA}300, ${MONEDA}200 y ${MONEDA}100, y el podio del reto que se cierra ${MONEDA}1500 + tres sobres Plus, ${MONEDA}1000 + un Plus y ${MONEDA}500 + un sobre. Cuenta lo que tenías subido justo antes del lunes, con 3 personas o más en la tabla.`,
+    `<b>🏅 Podio de cada semana</b>: cada lunes, el 1.º, 2.º y 3.º de cada club ganan ${MONEDA}300, ${MONEDA}200 y ${MONEDA}100, y el podio del reto que se cierra ${MONEDA}1500 + tres sobres Plus, ${MONEDA}1000 + un Plus y ${MONEDA}500 + un sobre. Cuenta lo que tenías subido justo antes del lunes, aunque estés solo en la tabla.`,
     '<b>🎁 Premios</b>: las once graduadas con nota 6 o más dan ahora un sobre Plus, y con nota 8 o más, dos sobres Plus.',
     '<b>🖼 Marco de club</b>: ahora se gana con las once graduadas con nota 8 o más.'
   ]],
@@ -2627,15 +2627,21 @@ const tieneCarta = c => !!cartaDelHueco(c);
 const albumesCobrados = () => { const a = (cuenta.retos && cuenta.retos.albumes) || {}; return Array.isArray(a) ? Object.fromEntries(a.map(k => [k, 0])) : a; };
 const albumCobrado = club => club in albumesCobrados();
 const fechaAlbum = club => { const at = albumesCobrados()[club]; return at ? new Date(at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+/* Los álbumes con nota (`RT.ALBUM_NOTA`): cada jugador del club con una
+   copia graduada de esa nota o más (la especial cuenta por su jugador). */
+const tieneNota = (c, nota) => CARDS.some(x => x.person === c.person && x.club === c.club && (x === c || x.especial) && (copies[x.uid] || []).some(cp => RT.sirveAlbum(cp, nota)));
+const albumNotaCobrado = (club, nota) => nota in ((((cuenta.retos && cuenta.retos.albumesNota) || {})[club]) || {});
+const textoNota = nota => `nota ${nota}${nota < 10 ? ' o más' : ''}`;
 function albumCompletoHTML() {
   const premio = `${MONEDA}${fmt(RT.ALBUM.monedas)} + ${RT.textoSobres(RT.ALBUM)}`;
   if (!rt.albumClub) {
-    return `<p class="rt-nota rt-album-intro">Junta <b>todas las cartas de un club</b> (una de cada una, da igual la nota o si está graduada) y cobra <b>${premio}</b>, una vez por club. Las especiales no cuentan.</p>
+    const notas = RT.ALBUM_NOTA.map(t => `<b>${MONEDA}${fmt(t.monedas)}</b> con todas graduadas con ${textoNota(t.nota)}`).join(' y ');
+    return `<p class="rt-nota rt-album-intro">Junta <b>todas las cartas de un club</b> (una de cada una, da igual la nota o si está graduada) y cobra <b>${premio}</b>, una vez por club. Las especiales no cuentan. Y para los más dedicados, el mismo álbum paga además ${notas}.</p>
       <div class="rt-grid">${RT.CLUBES.map(club => {
         const todas = RT.cartasAlbum(club), n = todas.filter(tieneCarta).length, ok = n === todas.length, ya = albumCobrado(club);
         // un álbum cobrado queda como ticket: completado, con su fecha, aunque hoy falten cartas
         if (ya) return `<button class="rt-ficha rt-album-club ticket" data-album="${club}"><img class="rt-escudo" src="escudos/${club}.png" alt="">
-          <b>${esc(M.CLUBES[club])}</b><small class="rt-ticket">🎟 Completado${fechaAlbum(club) ? ' · ' + fechaAlbum(club) : ''}</small><small>Premio cobrado · hoy tienes ${n}/${todas.length}</small></button>`;
+          <b>${esc(M.CLUBES[club])}</b><small class="rt-ticket">🎟 Completado${fechaAlbum(club) ? ' · ' + fechaAlbum(club) : ''}</small><small>Premio cobrado · hoy tienes ${n}/${todas.length}</small>${notasCobradas(club)}</button>`;
         return `<button class="rt-ficha rt-album-club${ok ? ' completo' : ''}" data-album="${club}"><img class="rt-escudo" src="escudos/${club}.png" alt="">
           <b>${esc(M.CLUBES[club])}</b><small>${ok ? '🎁 ¡Completo! Cobra tu premio' : `Te faltan ${todas.length - n}`}</small>
           <span class="ch-tengo"><i style="width:${(n / todas.length * 100).toFixed(1)}%"></i></span><small>${n}/${todas.length}</small></button>`;
@@ -2645,7 +2651,14 @@ function albumCompletoHTML() {
   const n = todas.filter(tieneCarta).length, ok = n === todas.length, ya = albumCobrado(club);
   const accion = ya ? `<span class="rt-chip ok rt-ticket">🎟 Completado${fechaAlbum(club) ? ' el ' + fechaAlbum(club) : ''} · premio cobrado</span>`
     : `<button class="btn primary" data-cobra-album${ok && !rt.ocupado ? '' : ' disabled'}>${ok ? `🎁 Cobrar ${premio}` : `Te faltan ${todas.length - n} para cobrar ${premio}`}</button>`;
+  // los álbumes con nota: cuántos jugadores tienes graduados con esa nota, y su botón
+  const notas = RT.ALBUM_NOTA.map(t => {
+    const k = todas.filter(c => tieneNota(c, t.nota)).length, listo = k === todas.length;
+    if (albumNotaCobrado(club, t.nota)) return `<span class="rt-chip ok rt-ticket">🎟 Todas con ${textoNota(t.nota)} · cobrado</span>`;
+    return `<button class="btn${listo ? ' primary' : ''}" data-cobra-album="${t.nota}"${listo && !rt.ocupado ? '' : ' disabled'}>${listo ? `🎁 Cobrar ${MONEDA}${fmt(t.monedas)} (todas con ${textoNota(t.nota)})` : `⭐ Todas graduadas con ${textoNota(t.nota)}: ${k}/${todas.length} · ${MONEDA}${fmt(t.monedas)}`}</button>`;
+  }).join('');
   return `<div class="rt-album-cab"><button class="btn mk-mini" data-album-volver>‹ Clubes</button><img class="rt-escudo chico" src="escudos/${club}.png" alt=""><b>${esc(M.CLUBES[club])}</b><small>${n}/${todas.length}</small>${accion}</div>
+    <div class="rt-album-notas">${notas}</div>
     <div class="col-grid rt-album-grid">${todas.map(c => tieneCarta(c) ? `<span data-album-carta="${cartaDelHueco(c).uid}"></span>`
       : `<div class="slot" style="--c:${TIERS[c.tier].color}"><b>${TIERS[c.tier].sym}</b>${c.media} · ${esc(c.posiciones[0])}<small>${esc(c.name)}</small></div>`).join('')}</div>`;
 }
@@ -2661,14 +2674,24 @@ function armaAlbumCompleto() {
     el.addEventListener('click', () => { const i = cp ? instOf(c, cp) : c; $('#retos').hidden = true; zoomVuelve = 'retos'; openZoom(i); });
     slot.replaceWith(el);
   });
-  const cobra = b.querySelector('[data-cobra-album]'); if (cobra) cobra.onclick = cobraAlbum;
+  b.querySelectorAll('[data-cobra-album]').forEach(x => x.onclick = () => cobraAlbum(+x.dataset.cobraAlbum || 0));
 }
-async function cobraAlbum() {
+// los álbumes con nota ya cobrados de un club, en su ficha de la lista
+const notasCobradas = club => { const l = RT.ALBUM_NOTA.filter(t => albumNotaCobrado(club, t.nota)); return l.length ? `<small>⭐ ${l.map(t => textoNota(t.nota)).join(' · ')} ✓</small>` : ''; };
+async function cobraAlbum(nota = 0) {
   const club = rt.albumClub;
-  if (!club || rt.ocupado || albumCobrado(club)) return;
+  if (!club || rt.ocupado || (nota ? albumNotaCobrado(club, nota) : albumCobrado(club))) return;
   rt.ocupado = true; renderAlbum();
   try {
-    const r = await Red.pide('cobraAlbum', { club });
+    const r = await Red.pide('cobraAlbum', { club, nota });
+    if (nota) {
+      // sin sobres: solo monedas, y se queda en el álbum
+      const an = cuenta.retos.albumesNota || (cuenta.retos.albumesNota = {});
+      (an[club] || (an[club] = {}))[nota] = r.at;
+      Snd.coin(); toast(`¡Álbum ${RT.delClub(club)} con todas en ${textoNota(nota)}! +${fmt(r.monedas)} monedas.`);
+      rt.ocupado = false; renderAlbum();
+      return;
+    }
     cuenta.retos.albumes = Object.assign(albumesCobrados(), { [club]: r.at });
     Snd.coin(); toast(`¡Álbum ${RT.delClub(club)} completo! +${fmt(r.monedas)} monedas y ${r.sobres}.`);
     rt.ocupado = false; closeOverlays(); newPacks(r.ks.map(k => ({ k, at: r.at })));
@@ -2680,7 +2703,7 @@ async function cobraAlbum() {
 /* El podio de la semana que cerró el lunes (lo calcula la economía): el
    del reto, con sus premios y el botón para cobrar los sobres si es tuyo, y
    los clubes donde quedaste en el podio. Cada lunes, los clubes pagan al
-   1.º, 2.º y 3.º de su tabla (`PODIO_CLUB`, con 3 personas o más). */
+   1.º, 2.º y 3.º de su tabla (`PODIO_CLUB`; con una o dos personas, solo los puestos que hay). */
 const MEDALLA = ['🥇', '🥈', '🥉'];
 // los sobres de un podio del reto que todavía no cobraste
 const podioPorCobrar = () => { const m = cuenta.retos && cuenta.retos.podio && cuenta.retos.podio.mio; return m && !m.cobrado ? m : null; };
@@ -2712,7 +2735,7 @@ function podioPasadoHTML() {
   const clubes = misClubes.length ? `<p class="rt-nota">Tus podios de club: ${misClubes.map(([c, i]) => `${MEDALLA[i]} ${esc(M.CLUBES[c])} (+${RT.PODIO_CLUB[i]})`).join(' · ')}</p>` : '';
   if (!filaReto && !clubes) return '';
   return `<div class="rt-podio"><h3 class="rt-h">🏅 Podio de la semana pasada${p ? ` · ${esc(p.titulo)}` : ''}</h3>
-    ${filaReto ? `<ol class="rt-podio-l">${filaReto}</ol>` : `<p class="rt-nota">El reto de la semana pasada no tuvo podio (hacen falta ${RT.MIN_PODIO} personas en la tabla).</p>`}
+    ${filaReto ? `<ol class="rt-podio-l">${filaReto}</ol>` : `<p class="rt-nota">El reto de la semana pasada no tuvo podio (nadie subió una plantilla).</p>`}
     ${boton}${clubes}</div>`;
 }
 async function cobraPodio() {
@@ -2734,7 +2757,7 @@ const AYUDA_RETOS = `<p><b>Las cartas son las de tu colección</b>, con su media
   <p><b>Posición</b>: en uno de sus puestos juega entero; incómodo (otro puesto de su línea), −3 de media; más lejos no puede jugar.</p>
   <p><b>Puntaje</b> = la suma de las once × 10. Un punto de media son 10 puntos: con la misma nota, el Mbappé del Clásico (92) le gana al de siempre (91). Empate: gana quien la subió primero.</p>
   <p><b>Premios</b>, una vez por plantilla: ${RT.PREMIOS.map(pr => `${pr.txt.toLowerCase()}, ${MONEDA}${pr.monedas} y ${RT.textoSobres(pr)}${pr.sobres[0] === 'futbolplus' ? '' : ' de Fútbol'}`).join(' · ')}. El reto semanal solo se sube y se cobra durante su semana. En el álbum de clubes, el premio de las once graduadas con nota 8 o más trae además el <b>marco de perfil</b> de ese club.</p>
-  <p><b>Podio de la semana</b>: cada lunes se mira la tabla como estaba justo antes. En cada club, el 1.º, 2.º y 3.º ganan ${MONEDA}${RT.PODIO_CLUB.join(`, ${MONEDA}`)}; en el reto que se cierra, ${RT.PODIO_RETO.map(x => `${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(', ')}. Hacen falta ${RT.MIN_PODIO} personas en la tabla. Las monedas llegan solas; los sobres del reto se cobran en el álbum.</p>`;
+  <p><b>Podio de la semana</b>: cada lunes se mira la tabla como estaba justo antes. En cada club, el 1.º, 2.º y 3.º ganan ${MONEDA}${RT.PODIO_CLUB.join(`, ${MONEDA}`)}; en el reto que se cierra, ${RT.PODIO_RETO.map(x => `${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(', ')}. Aunque estés solo en la tabla, el 1.º cobra (con dos, el 1.º y el 2.º). Las monedas llegan solas; los sobres del reto se cobran en el álbum.</p>`;
 // los retos que vienen, con el día en que empiezan (se activan solos el lunes)
 function pintaProximos() {
   const n = semanaAhora(), dia = ms => new Date(ms).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -2780,8 +2803,8 @@ function renderEditorReto() {
       <b>${MONEDA}${pr.monedas} + ${RT.textoSobres(pr)}${p.tipo === 'club' && pr.n === RT.PREMIO_MARCO ? ' + 🖼 marco de perfil' : ''}</b>
       ${ya ? '<em>Cobrado</em>' : `<button class="btn mk-mini" data-cobra="${pr.n}"${puede && !rt.ocupado ? '' : ' disabled'}>Cobrar</button>`}</div>`;
   }).join('') + '<p class="rt-nota">Cada premio se cobra una vez por plantilla, con las once cartas que tengas puestas en ese momento.</p>'
-    + (p.tipo === 'club' ? `<p class="rt-nota">🏅 Cada lunes, el 1.º, 2.º y 3.º de esta tabla ganan ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
-    + (p.tipo === 'reto' ? `<p class="rt-nota">🏅 Al cerrar la semana, el podio de este reto gana: ${RT.PODIO_RETO.map((x, i) => `${MEDALLA[i]} ${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')} (con ${RT.MIN_PODIO} personas o más).</p>` : '')
+    + (p.tipo === 'club' ? `<p class="rt-nota">🏅 Cada lunes, el 1.º, 2.º y 3.º de esta tabla ganan ${MONEDA}${RT.PODIO_CLUB.join(` · ${MONEDA}`)} (aunque estés solo en la tabla).</p>` : '')
+    + (p.tipo === 'reto' ? `<p class="rt-nota">🏅 Al cerrar la semana, el podio de este reto gana: ${RT.PODIO_RETO.map((x, i) => `${MEDALLA[i]} ${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')} (aunque estés solo en la tabla).</p>` : '')
     + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el premio de las once graduadas con nota 8 o más te llevas el <b>marco ${esc(RT.delClub(p.club))}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
   $('#rtBody').innerHTML = `<div class="rt-editor">
     <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>

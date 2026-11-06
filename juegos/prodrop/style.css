@@ -1631,6 +1631,7 @@ button.rt-ficha:hover { transform: translateY(-2px); border-color: #ffffff55; }
 .rt-album-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 2px 0 12px; }
 .rt-album-cab b { font: 900 20px/1.1 Rubik, sans-serif; }
 .rt-album-cab small { color: var(--muted); font-weight: 700; margin-right: auto; }
+.rt-album-notas { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 12px; }
 .rt-album-grid { padding-bottom: 12px; overflow: visible; flex: none; }
 .rt-album-club.ticket { background: repeating-linear-gradient(135deg, #ffd76a14 0 10px, transparent 10px 20px), #1a1530; box-shadow: inset 0 0 0 2px #ffd76a88; border-style: dashed; }
 .rt-ticket { color: #ffd76a !important; font-weight: 900; letter-spacing: .02em; }

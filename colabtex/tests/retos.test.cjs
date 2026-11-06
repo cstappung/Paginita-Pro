@@ -225,13 +225,26 @@ test('podio semanal de un club: el lunes paga 300, 200 y 100 con lo subido justo
   assert.deepEqual([p1, p2, p3].map(u => e.usuarios[u].premios), [300, 200, 100]);
   // antes del lunes no paga nada
   assert.ok(conAhora(FIN - 1, () => TRES.every(u => (economia(datosPodio(CLUB, { [A]: antes, [B]: antes + 1, [C3]: antes + 2 })).usuarios[u] || {}).premios === 0)));
-  // lo subido después del lunes no cuenta para esa semana: con dos en la tabla no hay podio
+  // lo subido después del lunes no cuenta para esa semana: con dos en la tabla, solo 1.º y 2.º
   const d2 = datosPodio(CLUB, { [A]: antes, [B]: antes + 1, [C3]: FIN + 5 });
-  assert.equal(conAhora(FIN + H, () => economia(d2)).podiosSemana[SEM][CLUB], undefined);
+  const dos = [A, B].sort((x, y) => ARM[y].pts.club - ARM[x].pts.club);
+  const e2 = conAhora(FIN + H, () => economia(d2));
+  assert.deepEqual(e2.podiosSemana[SEM][CLUB], dos);
+  assert.deepEqual(dos.map(u => e2.usuarios[u].premios), [300, 200]);
+  assert.equal((e2.usuarios[C3] || {}).premios || 0, 0);
   // el lunes siguiente sí cuenta (y se paga otra vez)
   const e3 = conAhora(R.finSemana(SEM + 1) + H, () => economia(Object.assign({}, d2)));   // otro objeto: economia() guarda el resultado por objeto
   assert.deepEqual(e3.podiosSemana[SEM + 1][CLUB], [p1, p2, p3]);
-  assert.equal(e3.usuarios[p1].premios, 300 + (p1 === C3 ? 0 : 300));
+  assert.equal(e3.usuarios[p1].premios, 300 + (dos[0] === p1 ? 300 : dos[1] === p1 ? 200 : 0));
+});
+
+test('podio con una sola persona en la tabla: el 1.º cobra igual', () => {
+  const d = datosPodio(CLUB, { [A]: FIN - H }), e = conAhora(FIN + H, () => economia(d));
+  assert.deepEqual(e.podiosSemana[SEM][CLUB], [A]);
+  assert.equal(e.usuarios[A].premios, 300);
+  const dr = datosPodio(RETO, { [B]: FIN - H }), er = conAhora(FIN + H, () => economia(dr));
+  assert.equal(er.usuarios[B].premios, 1500);
+  assert.equal(er.usuarios[B].podiosReto[RETO], 1, 'y puede cobrar los sobres del 1.º');
 });
 
 test('podio del reto: 1500, 1000 y 500, y los sobres se cobran una vez, según el puesto', () => {
@@ -262,7 +275,7 @@ test('álbum completo de un club: con una copia de cada jugador paga 2000 y dos 
   assert.equal(faltan.size, 0, 'se juntó la Roma entera');
   const c = R.cartasAlbum('roma').map(cd => porId[cd.n]), cuando = at + H, id = R.claveAlbum('roma');
   const con = (lista, ks = ['hAlbum00001', 'hAlbum00009'], u = E) => {
-    const d = { ajustes: { [E]: { x: { n: 1e6 } } }, cartas: { s: { [E]: Object.assign({}, s) } }, plantillas: { a: { [u]: { [id]: Object.assign({ at: cuando, c: lista, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) } } } };
+    const d = { ajustes: { [E]: { x: { n: 1e6 } } }, cartas: { s: { [E]: Object.assign({}, s) } }, plantillas: { a: { [u]: { [id]: Object.assign({ at: cuando, c: lista, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}, ks[2] ? { k3: ks[2] } : {}) } } } };
     if (u !== E) d.cartas.s[u] = {};
     ks.forEach(k => { d.cartas.s[u][k] = { at: cuando, p: 0, pl: id }; });
     return d;
@@ -271,6 +284,11 @@ test('álbum completo de un club: con una copia de cada jugador paga 2000 y dos 
   assert.equal(monedasDe(E, d).premios, 2000);
   assert.equal(e.usuarios[E].albumes.roma, cuando);
   assert.ok(e.sobres[E + '~hAlbum00001'] && e.sobres[E + '~hAlbum00009'], 'sus dos sobres Plus existen');
+  // desde el 4-11-2026 son tres Plus; los reclamos de dos (de antes) siguen valiendo
+  const e3 = economia(con(c, ['hAlbum00011', 'hAlbum00012', 'hAlbum00013']));
+  assert.equal(e3.usuarios[E].premios, 2000);
+  assert.ok(['hAlbum00011', 'hAlbum00012', 'hAlbum00013'].every(k => e3.sobres[E + '~' + k]), 'sus tres sobres Plus existen');
+  assert.equal(monedasDe(E, con(c, ['hAlbum00014', 'hAlbum00015', 'gAlbum00016'])).premios, 0, 'con un normal entre los tres no');
   assert.equal(monedasDe(E, con(c, ['hAlbum00008'])).premios, 0, 'con un solo Plus no');
   assert.equal(monedasDe(E, con(c.slice(1))).premios, 0, 'faltando una carta no paga');
   assert.equal(monedasDe(E, con(c, ['hAlbum00002', 'gAlbum00002'])).premios, 0, 'con un sobre normal no');
@@ -282,6 +300,32 @@ test('álbum completo de un club: con una copia de cada jugador paga 2000 y dos 
   assert.equal(R.huecoAlbum('realmadrid', mvp.n).uid, PM.CARDS.find(cd => cd.person === mvp.person && !cd.especial).uid);
   assert.equal(R.huecoAlbum('bayern', balon.n).person, 'bayern-harry-kane');
   assert.equal(R.huecoAlbum('barcelona', mvp.n), null, 'en otro club no cuenta');
+});
+
+test('álbum con nota: cada jugador graduado con 6 o más paga 5000, con 10 paga 25000, sin sobres y una vez', () => {
+  const E = 'cuentaGGG7', s = {}, grad = {}, mejor = {};
+  const club = 'roma', jugadores = R.cartasAlbum(club);
+  // se junta la Roma y se gradúa, de cada jugador, la copia de mejor nota
+  for (let n = 0; n < 40000 && jugadores.some(cd => !mejor[cd.n] || mejor[cd.n].g < 10); n++) {
+    const k = 'g' + String(n).padStart(9, '0'), at = T0 + n * 60000;
+    s[k] = { at, p: 80 };
+    PM.sobre(E, k, at).cartas.forEach((cd, i) => { const h = R.huecoAlbum(club, cd.id); if (h && (!mejor[h.n] || cd.g > mejor[h.n].g)) mejor[h.n] = { g: cd.g, k, i, c: `${E}~${k}.${i}` }; });
+  }
+  const fin = T0 + 40000 * 60000, cuando = fin + 2 * H, g = {};
+  // graduar cada una (cartas/g/<uid>/<sobre>/<i>), después del último sobre y antes del reclamo
+  jugadores.forEach((cd, j) => { const m = mejor[cd.n]; (g[m.k] || (g[m.k] = {}))[m.i] = { at: fin + j * 1000, p: 100 }; grad[cd.n] = m; });
+  const c = jugadores.map(cd => grad[cd.n].c), min = Math.min(...jugadores.map(cd => grad[cd.n].g));
+  assert.equal(min, 10, 'se juntó la Roma entera con nota 10');
+  const con = (id, lista, extra = {}, gs = g) => ({ ajustes: { [E]: { x: { n: 1e7 } } }, cartas: { s: { [E]: s }, g: { [E]: gs } }, plantillas: { a: { [E]: { [id]: Object.assign({ at: cuando, c: lista }, extra) } } } });
+  assert.equal(R.leeAlbum('album6-roma'), null, 'no es el álbum normal');
+  assert.deepEqual(R.leeAlbumNota('album10-roma'), { club: 'roma', nota: 10 });
+  assert.equal(monedasDe(E, con(R.claveAlbum(club, 6), c)).premios, 5000);
+  assert.equal(monedasDe(E, con(R.claveAlbum(club, 10), c)).premios, min === 10 ? 25000 : 0, 'el de 10 pide todas con 10');
+  assert.equal(monedasDe(E, con(R.claveAlbum(club, 6), c.slice(1))).premios, 0, 'faltando uno no paga');
+  assert.equal(monedasDe(E, con(R.claveAlbum(club, 6), c, { k: 'hAlbum00020' })).premios, 0, 'no trae sobres');
+  assert.equal(monedasDe(E, con('album7-roma', c)).premios, 0, 'solo las notas que existen');
+  // sin graduar no cuenta, aunque la carta tenga la nota
+  assert.equal(monedasDe(E, con(R.claveAlbum(club, 6), c, {}, {})).premios, 0, 'tienen que estar graduadas');
 });
 
 test('las leyendas (sin club) juegan los desafíos: un once solo de leyendas es válido, y La Roja acepta a las chilenas', () => {

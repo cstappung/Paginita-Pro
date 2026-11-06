@@ -439,10 +439,17 @@ console.log("— PRODROP: desafíos de plantilla —");
   // el álbum completo de un club (fb.cobrarAlbum): la lista de copias y su sobre Plus
   const album = (id, pres, c = once.concat(once.slice(0, 4))) => {
     const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${ua.uid}`)).key);
-    const w = { [`plantillas/a/${ua.uid}/${id}`]: Object.assign({ at: serverTimestamp(), c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) };
+    const w = { [`plantillas/a/${ua.uid}/${id}`]: Object.assign({ at: serverTimestamp(), c }, ks[0] ? { k: ks[0] } : {}, ks[1] ? { k2: ks[1] } : {}, ks[2] ? { k3: ks[2] } : {}) };
     ks.forEach(k => { w[`cartas/s/${ua.uid}/${k}`] = { at: serverTimestamp(), p: 0, pl: id }; });
     return update(ref(db), w);
   };
+  await allowed("desde el 4-11-2026, el álbum trae tres sobres Plus", () => album("album-chelsea", ["h", "h", "h"]));
+  await denied("el tercero tampoco puede ser normal", () => album("album-napoli", ["h", "h", "g"]));
+  await allowed("el álbum con nota 6 va sin sobres", () => album("album6-roma", []));
+  await allowed("y el de nota 10 también", () => album("album10-roma", []));
+  await denied("el álbum con nota no trae sobres", () => album("album6-chelsea", ["h"]));
+  await denied("ni otra nota", () => album("album7-roma", []));
+  await denied("el álbum normal no va sin sobres", () => album("album-milan", []));
   await denied("el álbum no trae un sobre normal", () => album("album-roma", ["h", "g"]));
   await denied("ni un solo Plus", () => album("album-roma", ["h"]));
   await denied("ni una lista corta", () => album("album-roma", ["h", "h"], once.slice(0, 5)));

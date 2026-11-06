@@ -79,12 +79,17 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
     for (const [clave, us] of Object.entries(pod)) podio[clave] = us.map(persona);
     const yo = ((e.usuarios[uid] || {}).podiosReto) || {}, reto = PR.claveReto(pasada);
     const miPodio = yo[reto] ? { clave: reto, n: yo[reto], cobrado: !!podiosMios[PR.clavePodio(reto, yo[reto])] } : null;
-    // los álbumes completos ya cobrados (por club)
-    const albumes = {};
-    for (const [id, x] of Object.entries((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})) { const club = PR.leeAlbum(id); if (club && x) albumes[club] = x.at || 0; }
+    // los álbumes completos ya cobrados (por club) y los con nota ({club: {6: hora, 10: hora}})
+    const albumes = {}, albumesNota = {};
+    for (const [id, x] of Object.entries((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})) {
+      const a = PR.leeAlbumNota(id);
+      if (!a || !x) continue;
+      if (a.nota) (albumesNota[a.club] || (albumesNota[a.club] = {}))[a.nota] = x.at || 0;
+      else albumes[a.club] = x.at || 0;
+    }
     // lo que ganó en los desafíos (premios, podios, álbumes), del más nuevo al más viejo
     const historial = (((e.usuarios[uid] || {}).movs) || []).filter(m => m.c === "plantilla").slice(-150).reverse();
-    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio }, albumes, historial };
+    return { subidas, cobrados: Object.keys(mios), semana, podio: { semana: pasada, tablas: podio, mio: miPodio }, albumes, albumesNota, historial };
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -230,25 +235,27 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           const w = await fb.cobrarPodio(uid, id, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
           responde(true, { ks: w.ks, at: w.at, n: r.n, sobres: PR.textoSobresPodio(pr) });
         } else if (x.accion === "cobraAlbum") {
-          /* El álbum completo de un club: se elige aquí una copia tuya de
-             cada carta (la que no está a la venta, si hay) y se escribe con su sobre. */
-          const club = PR.leeAlbum(PR.claveAlbum(String(x.club || "")));
-          if (!club) throw new Error("Ese club no tiene álbum.");
-          const id = PR.claveAlbum(club);
+          /* El álbum completo de un club (o uno con nota, `x.nota` 6 o 10):
+             se elige aquí una copia tuya de cada carta (la que no está a la
+             venta, si hay; en los con nota, graduada con esa nota o más) y
+             se escribe con sus sobres (los con nota no traen). */
+          const a = PR.leeAlbumNota(PR.claveAlbum(String(x.club || ""), Math.round(+x.nota) || 0)), pr = a && PR.premioAlbum(a.nota);
+          if (!pr) throw new Error("Ese club no tiene álbum.");
+          const club = a.club, id = PR.claveAlbum(club, a.nota);
           if (((d.plantillas && d.plantillas.a && d.plantillas.a[uid]) || {})[id]) throw new Error("Ese álbum ya lo cobraste.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
           // una copia por jugador (la especial vale por la normal), mejor una que no esté a la venta
           const porCarta = {};
           for (const y of copiasDe(uid, d)) {
-            const f = fichaDe(e, y.c), h = f && PR.huecoAlbum(club, f.id);
+            const f = fichaDe(e, y.c), h = f && PR.sirveAlbum(f, a.nota) && PR.huecoAlbum(club, f.id);
             if (!h) continue;
             if (!porCarta[h.n] || (porCarta[h.n].venta && !y.venta)) porCarta[h.n] = y;
           }
           const faltan = PR.cartasAlbum(club).filter(cd => !porCarta[cd.n]);
-          if (faltan.length) throw new Error(`Te faltan ${faltan.length} cartas del ${MOTOR.CLUBES[club]}.`);
+          if (faltan.length) throw new Error(a.nota ? `Te faltan ${faltan.length} jugadores del ${MOTOR.CLUBES[club]} con nota ${a.nota}${a.nota < 10 ? " o más" : ""} (graduados).` : `Te faltan ${faltan.length} cartas del ${MOTOR.CLUBES[club]}.`);
           const c = PR.cartasAlbum(club).map(cd => porCarta[cd.n].c);
-          const w = await fb.cobrarAlbum(uid, id, c, PR.ALBUM.sobres.map(t => MOTOR.SOBRE[t].prefijo));
-          responde(true, { ks: w.ks, at: w.at, monedas: PR.ALBUM.monedas, sobres: PR.textoSobres(PR.ALBUM) });
+          const w = await fb.cobrarAlbum(uid, id, c, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+          responde(true, { ks: w.ks, at: w.at, nota: a.nota, monedas: pr.monedas, sobres: pr.sobres.length ? PR.textoSobres(pr) : "" });
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
           if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
