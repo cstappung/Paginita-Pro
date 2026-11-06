@@ -309,7 +309,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|pokelike|hero|prodefender|propac)-/.exec(cat);
     if (m) {
       n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
       n[cat] = Object.keys(filas || {}).length;
@@ -342,9 +342,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    de antes de su hora ya no está en `casino`, `cartas` ni `mercado`, así que
    sin él las cuentas saldrían mal. Si no existe (o las reglas aún no dejan
    leerlo), `cierre` queda en null y se rehace todo como siempre. */
-const NODOS_MONEDAS = 18, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+const NODOS_MONEDAS = 19, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cierre: null }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, pkPase: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cierre: null }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -387,7 +387,7 @@ export function watchLogros(cb, yo = () => "") {
     llegados.add(k); avisa();
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("pkPase", "pkPase"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
     oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("plantillas", "plantillas"), oye("economiaCierre", "cierre"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
@@ -451,6 +451,11 @@ export async function comprarTienda(uid, item, p) {
 /* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. La regla
    exige `at === now` y el precio; el saldo y el premio los decide
    `economia()` con `abreCofre`. Devuelve la hora que puso el servidor. */
+/* El Pase del Reino de Pro Kingdoms (juegos/pase-pk.js): una vez por período, con el precio y el período dentro
+   del registro, porque la regla no puede hacer cuentas con el nombre de la clave. */
+export async function comprarPase(uid, periodo, p) {
+  await set(ref(db, `pkPase/${uid}/${periodo}`), { at: serverTimestamp(), p, s: periodo });
+}
 export async function comprarCofre(uid, clave, p) {
   const r = ref(db, `cofres/${uid}/${clave}`);
   await set(r, { at: serverTimestamp(), p });
@@ -586,7 +591,10 @@ export async function cobrarPlantilla(uid, id, c, pres) {
    regla), `mascotas/r/<uid>/<k>` = {at, p: 500} (un regalo, cuyo contenido
    sale del motor con `at`) y `mascotas/c/<uid>/<k>` = {at, k, p, n?, m?}
    (comida, poción, fondo o despedirse). Quién tiene qué y si alcanzaba el
-   dinero lo decide `economia()`. */
+   dinero lo decide `economia()`. Un regalo canjeado con piezas es
+   {at, p: 0, z: 5}; una pieza, `mascotas/p/<uid>/<k>` = {at}, se escribe
+   junto con `mascotas/pu/<uid>` = la misma hora (la regla pide un respiro
+   entre dos piezas mirando ese valor). */
 async function escribeYLee(r, valor) {
   await set(r, valor);
   const x = (await get(r)).val();
@@ -594,8 +602,13 @@ async function escribeYLee(r, valor) {
 }
 export const adoptarMascota = (uid, e, p) =>
   escribeYLee(push(ref(db, `mascotas/a/${uid}`)), { at: serverTimestamp(), e, p });
-export const abrirRegaloMascota = uid =>
-  escribeYLee(push(ref(db, `mascotas/r/${uid}`)), { at: serverTimestamp(), p: 500 });
+export const abrirRegaloMascota = (uid, conPiezas) =>
+  escribeYLee(push(ref(db, `mascotas/r/${uid}`)), conPiezas ? { at: serverTimestamp(), p: 0, z: 5 } : { at: serverTimestamp(), p: 500 });
+export async function ganaPiezaMascota(uid) {
+  const k = push(ref(db, `mascotas/p/${uid}`)).key;
+  await update(ref(db), { [`mascotas/p/${uid}/${k}`]: { at: serverTimestamp() }, [`mascotas/pu/${uid}`]: serverTimestamp() });
+  return k;
+}
 export const compraMascotas = (uid, c) =>
   escribeYLee(push(ref(db, `mascotas/c/${uid}`)), Object.assign({ at: serverTimestamp(), k: c.k, p: c.p },
     Number.isInteger(c.n) ? { n: c.n } : {}, c.m ? { m: c.m } : {}));
@@ -618,8 +631,9 @@ export const borraEstadoMascota = (uid, k) => remove(ref(db, `mascotasEstado/${u
 export const watchPrefsMascotas = (uid, cb) =>
   onValue(ref(db, `${U}/${uid}/mascotas`), s => cb(s.val() || {}, null), err => cb({}, err));
 export const guardaPrefsMascotas = (uid, p) => update(ref(db, `${U}/${uid}/mascotas`), p);
-export const usaComidaMascota = (uid, n = 1) =>
-  runTransaction(ref(db, `${U}/${uid}/mascotas/usadas`), v => (Number.isFinite(v) ? v : 0) + n);
+/* Las raciones comidas: `usadas` las comunes y `usadasT/<tipo>` las que llenan más. */
+export const usaComidaMascota = (uid, n = 1, tipo = "") =>
+  runTransaction(ref(db, `${U}/${uid}/mascotas/${tipo ? "usadasT/" + tipo : "usadas"}`), v => (Number.isFinite(v) ? v : 0) + n);
 /* El Pueblo de Mascotas. La plaza: `mascotasPlaza/<uid>` = {m, x, z, at,
    em?, ea?, b?, t?, ta?} es quién pasea, adónde va y su último gesto. Se
    reescribe al caminar (con respiro) y cada tanto para seguir «fresco», y
@@ -1241,3 +1255,17 @@ export const watchSerie1 = cb =>
   onValue(ref(db, "prodropSerie1"), s => cb(s.val() || {}), () => cb({}));
 export const habilitaSerie1 = (uid, por) => set(ref(db, `prodropSerie1/${uid}`), { at: serverTimestamp(), por });
 export const quitaSerie1 = uid => remove(ref(db, `prodropSerie1/${uid}`));
+
+/* ---------- Beta testers: quién juega lo que todavía está a prueba ----------
+   `betaTesters/<uid>` = {at, por}: la lista la escribe un administrador
+   desde su panel (pestaña «Beta testers»), igual que la de la Serie 01.
+   Cada cuenta lee solo su propia entrada (no hace falta saber quién más
+   está) y los administradores la lista entera. Lo que la lista abre son las
+   entradas del salón con `beta: true` (hoy, Pro Kingdoms). Antes de publicar
+   las reglas la lectura falla y nadie es beta tester (`cb(false)`). */
+export const watchBeta = (uid, cb) =>
+  onValue(ref(db, `betaTesters/${uid}`), s => cb(s.exists()), () => cb(false));
+export const watchBetaTesters = cb =>
+  onValue(ref(db, "betaTesters"), s => cb(s.val() || {}, null), e => cb({}, e));
+export const ponBeta = (uid, por) => set(ref(db, `betaTesters/${uid}`), { at: serverTimestamp(), por });
+export const quitaBeta = uid => remove(ref(db, `betaTesters/${uid}`));

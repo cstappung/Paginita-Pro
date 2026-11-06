@@ -20,7 +20,7 @@ export const MONEDA = '<svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="t
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 const PARTES = [
   ["partidas", "🎮", "Partidas", `${TARIFA.partida} por partida de sala, por el peso del juego`],
   ["victorias", "🏆", "Victorias", `${TARIFA.victoria} por victoria y ${TARIFA.empate} por empate, por el peso`],
@@ -79,7 +79,7 @@ function movimientosHtml(movs) {
   const texto = f => ({
     sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
-    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], superChat: ["💬", "Super chat en el chat general"], plantilla: ["🏆", `Premio de desafío de plantilla${f.d ? ` · ${f.d}` : ""}`], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
+    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], superChat: ["💬", "Super chat en el chat general"], pkPase: ["👑", "Pro Kingdoms · Pase del Reino"], plantilla: ["🏆", `Premio de desafío de plantilla${f.d ? ` · ${f.d}` : ""}`], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
     venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `${HALLOWEEN[f.d] ? "Tienda de Halloween" : "Tienda del perfil"} · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${((TIENDA[f.d] === "marco" ? marcoDe(f.d) : fondoDe(f.d)) || {}).n || f.d}»`]
   }[f.c] || ["🪙", f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -117,6 +117,7 @@ function detalleHtml(yo) {
     { i: "🎱", t: "Pool · cofres de tacos", n: g.cofre || 0, s: veces("cofre", "cofre", "cofres") },
     { i: "🎸", t: "Batalla de Rock · cajas", n: g.cajaRock || 0, s: veces("cajaRock", "caja", "cajas") },
     { i: "💬", t: "Super chats", n: g.superChat || 0, s: veces("superChat", "mensaje", "mensajes") },
+    { i: "👑", t: "Pro Kingdoms · Pase del Reino", ir: "#prokingdoms", n: g.pkPase || 0, s: veces("pkPase", "pase", "pases") },
     { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
   ].sort((a, b) => b.n - a.n);
   const casino = Object.entries(cas.porJuego || {}).filter(([, z]) => z.rondas || z.apostado)

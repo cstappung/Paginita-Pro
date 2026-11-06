@@ -57,6 +57,7 @@ import PR from "../../../juegos/prodrop/retos.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { cajaRock, reembolsoRock, repetidaRock, claveRock, PRECIO_CAJA } from "./rock-datos.js";
 import { TIENDA, precioDe, aLaVenta } from "./tienda.js";
+import { compraValida } from "./pase-pk.js";
 import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
@@ -120,6 +121,9 @@ export const NIVEL = {
   /* Trigon, en el orden de LOGROS.trigon: p100 p250 p500 p1k p1.5k p2.5k
      p4k p6k p10k p20k. */
   trigon: "1122233344",
+  /* Type Race, en el orden de LOGROS.typeraceclub: p30 p45 p60 p80 p100 p120
+     p150 p180 p220 p260. */
+  typeraceclub: "1122233344",
   /* PRO PACMAN, en el orden de LOGROS.propac: p1k p5k p10k p25k p50k p100k
      p200k · t3 t6 t10. */
   propac: "1122334123",
@@ -148,7 +152,7 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, integral: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, aleteo: 30, dosmil: 30, trigon: 30, protiles: 20, pokelike: 40, metrorush: 40, propac: 30 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, integral: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, aleteo: 30, dosmil: 30, trigon: 30, typeraceclub: 30, protiles: 20, pokelike: 40, metrorush: 40, propac: 30 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
    (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). Lo que
    paga cada ronda deja de crecer en la 450 (112 por ronda desde ahí) y
@@ -203,12 +207,12 @@ export function monedasHero(puntos) {
 }
 /* PRO DEFENDER: cada ronda del récord de un reino paga 20 × el número del
    reino (el Prado, 20; el Vacío, 100), así que llegar a la 100 son 2000,
-   4000, 6000, 8000 y 10 000; los diez de la segunda y la tercera era pagan
-   como el Vacío, 100 por ronda (10 000 cada uno). Sale del récord, así que una
+   4000, 6000, 8000 y 10 000; los quince de la segunda, la tercera y la cuarta
+   era pagan como el Vacío, 100 por ronda (10 000 cada uno). Sale del récord, así que una
    partida que no lo supera no paga nada, y la que lo supera paga solo las
    rondas nuevas. */
 export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio", "pantano", "cumbres", "fosa", "engranajes", "eclipse",
-  "necropolis", "esporas", "espejos", "archipielago", "noche"];
+  "necropolis", "esporas", "espejos", "archipielago", "noche", "jade", "circo", "biblioteca", "estelar", "tiempo"];
 export function monedasProdefender(cat, rondas) {
   const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || "")), r = m ? PRODEFENDER_REINOS.indexOf(m[1]) : -1;
   if (r < 0) return 0;
@@ -241,6 +245,8 @@ function extraRecord(cat, f) {
   if (cat === "club-dosmil-ficha") { const e = Math.round(Math.log2(f.puntos || 1)); return e > 0 && e <= 18 ? e * e : 0; }
   // Trigon: 1 por cada 100 puntos en cada modo (sus puntajes son unas diez veces más chicos que los del 2048).
   if (cat === "club-trigon-puntos" || cat === "club-trigon-normal") return Math.floor(Math.min(f.puntos || 0, 1000000) / 100);
+  // Type Race: 1 moneda por cada 10 ppm de cada tabla (120 ppm son 12), tope en 330.
+  if (/^club-typerace-en-/.test(cat)) return Math.floor(Math.min(f.puntos || 0, 330) / 10);
   // PRO PACMAN: 1 por cada 500 puntos (un nivel limpio son unos 4 000), tope en 1 000 000.
   if (cat === "club-propac-puntos") return Math.floor(Math.min(f.puntos || 0, 1000000) / 500);
   // PRO TILES: 1 por cada 50 puntos en cada tabla (nueve: 8 canciones y la mezcla), tope en 3000.
@@ -292,10 +298,10 @@ export function registraDia(prev, dia) {
    sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
    BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
    ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
-export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, integral: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, protiles: 15, pokelike: 25, metrorush: 20, hero: 50, propac: 15 };
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, integral: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, typeraceclub: 10, protiles: 15, pokelike: 25, metrorush: 20, hero: 50, propac: 15 };
 export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
 export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "integral", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "protiles", "pokelike", "metrorush", "hero", "propac"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "integral", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "typeraceclub", "protiles", "pokelike", "metrorush", "hero", "propac"];
 export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;
@@ -583,7 +589,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   /* El cierre de cada semana (`ps`) va antes que todo lo de ese instante:
      las tablas se miran como estaban justo antes del lunes. El reclamo de
      los sobres de un podio (`pq`) va, como el de un premio, antes que sus sobres. */
-  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mp: 2.15, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p), pl: typeof x.pl === "string" ? x.pl : "" });
@@ -630,13 +636,17 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "r", at: x.at, u, k, c: comoLista(x.c).map(String) });
   /* Mascotas: `mascotas/a` adopciones {at, e, p}, `mascotas/r` regalos
-     {at, p} y `mascotas/c` compras {at, k, p, n?, m?}. */
+     {at, p, z?}, `mascotas/c` compras {at, k, p, n?, m?} y `mascotas/p`
+     piezas de regalo {at} (de jugar con la mascota). */
   for (const [u, l] of Object.entries(ms.a || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "ma", at: x.at, u, k, e: String(x.e || ""), p: num(x.p) });
   for (const [u, l] of Object.entries(ms.r || {}))
     for (const [k, x] of Object.entries(l || {}))
-      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mr", at: x.at, u, k, p: num(x.p) });
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mr", at: x.at, u, k, p: num(x.p), z: num(x.z) });
+  for (const [u, l] of Object.entries(ms.p || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mp", at: x.at, u, k });
   for (const [u, l] of Object.entries(ms.c || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mc", at: x.at, u, k, q: String(x.k || ""), p: num(x.p), n: x.n, m: typeof x.m === "string" ? x.m : "" });
@@ -660,6 +670,10 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries(d.tienda || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "c", at: x.at, u, k, p: num(x.p) });
+  /* El Pase del Reino de Pro Kingdoms: `pkPase/<uid>/<período>` = {at, p, s} (pase-pk.js). */
+  for (const [u, l] of Object.entries(d.pkPase || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pk", at: x.at, u, k, p: num(x.p), s: x.s });
   /* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. */
   for (const [u, l] of Object.entries(d.cofres || {}))
     for (const [k, x] of Object.entries(l || {}))
@@ -701,8 +715,8 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, desafios: {}, tacos: {}, cofres: [],
-    intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, pkPase: {}, desafios: {}, tacos: {}, cofres: [],
+    intentos: 0, adopciones: 0, comida: 0, comidas: {}, piezas: 0, piezasUsadas: 0, piezasDia: 0, piezasHoy: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
     const x = U(u);
@@ -881,9 +895,21 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       x.adopciones++;
       mascotas[cc] = { u: e.u, k: e.k, at: e.at, e: e.e };
       dueno[cc] = e.u; tiene[e.u] = (tiene[e.u] || 0) + 1;
+    } else if (e.t === "mp") {
+      /* Una pieza de regalo (de jugar con la mascota): la escribe el
+         cliente, así que valen a lo más `PIEZAS_DIA` por día de Chile. */
+      const x = U(e.u), dia = diaChile(e.at);
+      if (x.piezasDia !== dia) { x.piezasDia = dia; x.piezasHoy = 0; }
+      if (x.piezasHoy >= MM.PIEZAS_DIA) continue;
+      x.piezasHoy++; x.piezas = (x.piezas || 0) + 1;
     } else if (e.t === "mr") {
-      /* Un regalo: lo que trae sale del motor, no de lo escrito. */
-      if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p, "regalo")) continue;
+      /* Un regalo: lo que trae sale del motor, no de lo escrito. Se paga
+         con monedas o, gratis (p: 0, z: 5), con cinco piezas juntadas. */
+      if (e.p === 0 && e.z === MM.PIEZAS_REGALO) {
+        const x = U(e.u);
+        if ((x.piezas || 0) - (x.piezasUsadas || 0) < MM.PIEZAS_REGALO) continue;
+        x.piezasUsadas = (x.piezasUsadas || 0) + MM.PIEZAS_REGALO;
+      } else if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p, "regalo")) continue;
       const cc = claveObjeto(e.u, e.k);
       regalos[cc] = { u: e.u, k: e.k, at: e.at, item: MM.regalo(e.u, e.k, e.at) };
       dueno[cc] = e.u;
@@ -894,6 +920,8 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       const x = U(e.u), n = Number.isInteger(e.n) ? e.n : 0, precio = MM.precioCompra(e.q, n);
       if (precio === null || e.p !== precio) continue;
       if (e.q === "comida") { if (paga(e.u, precio, "comida", String(n))) x.comida += n; continue; }
+      const tipo = /^comida-([a-z]+)$/.exec(e.q);
+      if (tipo) { if (paga(e.u, precio, "comida", tipo[1] + " " + n)) { x.comidas = x.comidas || {}; x.comidas[tipo[1]] = (x.comidas[tipo[1]] || 0) + n; } continue; }
       const fondo = /^fondo-([a-z]+)$/.exec(e.q);
       if (fondo) { if (!x.fondos[fondo[1]] && paga(e.u, precio, "fondoMascota", fondo[1])) x.fondos[fondo[1]] = e.at; continue; }
       if (!esMascota(e.m) || dueno[e.m] !== e.u || enVenta[e.m]) continue;
@@ -937,6 +965,12 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
          y lo de edición limitada solo mientras se vendía. */
       if (!TIENDA[e.k] || e.p !== precioDe(e.k) || !aLaVenta(e.k, e.at) || U(e.u).tienda[e.k]) continue;
       if (paga(e.u, e.p, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
+    } else if (e.t === "pk") {
+      /* Un Pase del Reino: una vez por período, a su precio y escrito dentro de ese período (lo mismo que la
+         regla). Si no alcanzaba, no vale y la cuenta se frena, como en la tienda. */
+      const s = +e.k;
+      if (String(e.s) !== e.k || !compraValida(s, e.at, e.p) || (U(e.u).pkPase || {})[e.k]) continue;
+      if (paga(e.u, e.p, "pkPase", e.k)) (U(e.u).pkPase = U(e.u).pkPase || {})[e.k] = e.at;
     } else if (e.t === "sc") {
       /* Un super chat: al precio de un nivel. El que no se pudo pagar no
          vale, y el chat lo pinta como un mensaje normal. */
@@ -1069,7 +1103,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.pkPase, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   /* Y quien solo sale en el cierre (todo lo suyo ya está archivado). */
   if (d.cierre) for (const u of Object.keys(economia(d).usuarios)) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)

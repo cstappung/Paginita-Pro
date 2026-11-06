@@ -55,6 +55,14 @@ kbd{background:var(--panel);border:1px solid var(--borde);border-radius:4px;padd
 .tr-graf text{fill:var(--tenue);font-size:11px}
 .tr-nuevo{color:var(--acento);font-weight:600;margin:0}
 .tr-res .tr-nuevo[hidden]{display:none}
+.tr-aviso{color:var(--tenue);font-size:13px;margin:0;text-align:center}
+.tr-aviso[hidden]{display:none}
+/* La tabla de la página de Juegos (la arma conexion.js): solo existe donde hay clasificación. */
+.tr-sin-tabla .club-ranking{display:none}
+.tr-hoja .club-ranking{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:14px 18px;margin:0;font:13px/1.5 "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--tinta)}
+.tr-hoja .club-ranking h2{font-size:14px;margin:0 0 6px;color:var(--acento)}
+.tr-hoja .club-ranking ol{margin:0;padding-left:22px}
+.tr-hoja .club-ranking button{background:none;border:1px solid var(--borde);border-radius:8px;padding:3px 10px;cursor:pointer;color:var(--tenue)}
 .tr-pie{margin-top:auto;color:var(--tenue);font-size:12px;text-align:center}
 @media (max-width:600px){
   .tr-grupo+.tr-grupo{border-left:0;padding-left:0}

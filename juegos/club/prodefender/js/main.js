@@ -6,6 +6,10 @@
   const W = PD.W, H = PD.H, STEP = 1 / 60;
   const $ = s => document.querySelector(s);
   const fmt = n => Math.floor(n).toLocaleString('es-ES');
+  // Tres cifras significativas (desde 100, el entero: no se borran cifras de un daño de 1234),
+  // con coma como los miles de fmt. Sin esto se veían «29.1» junto a «106.891» y recargas como
+  // «19.599999999999998 s», que además ensanchaban el panel de la torre.
+  const n1 = v => Math.abs(v) >= 100 ? Math.round(v).toLocaleString('es-ES') : v.toLocaleString('es-ES', { maximumSignificantDigits: 3 });
   // Dentro de Juegos el guardado es de cada cuenta (conexion.js: Club.storageKey).
   const CLUB = window.Club || null;
   const SAVE_KEY = CLUB ? CLUB.storageKey('prodefender.save.v1') : 'prodefender.save.v1';
@@ -40,13 +44,16 @@
   const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'g'];
   const MODES = [['first', 'Primero'], ['last', 'Último'], ['strong', 'Fuerte'], ['close', 'Cerca']];
   const ABIL_ICON = { absolute: '❄', judgement: '⚡', meteors: '☄', supernova: '✹', blackhole: '◉', treasure: '◆', wardrum: '♫', inferno: '♨',
-    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗', cienaga: '☘', tempestad: 'ϟ', maremoto: '≈', sobrecarga: '⚙', amanecer: '☀' };
+    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗', cienaga: '☘', tempestad: 'ϟ', maremoto: '≈', sobrecarga: '⚙', amanecer: '☀',
+    dragonJade: '🐉', granEscape: '🎩', escrito: '📖', orbital: '🛰', detener: '⏳' };
   const DTYPE = { phys: 'Físico', explosive: 'Explosivo', ice: 'Hielo', elec: 'Eléctrico', fire: 'Fuego', arcane: 'Arcano', poison: 'Ácido', steam: 'Vapor' };
   const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li && !PD.TOWERS[id].hero);
   // La tienda: las torres (con las teclas de HOTKEYS) y, aparte, el héroe del reino (tecla H).
   const PINCHOS = '@pinchos';   // en ui.placing: tirar pinchos en vez de colocar una torre
   const PODER = '@poder';       // en ui.placing: apuntar el Poder del Reino (tercera era)
-  const HEROE = '@heroe';       // en la tienda: elegir uno de los diez héroes (tercera era)
+  const HEROE = '@heroe';       // en la tienda: elegir héroe (los diez de la tercera era, los cinco de la cuarta)
+  // cuántos héroes se eligen en un reino, en palabras («diez», «cinco»)
+  const cuantosHeroes = li => { const n = PD.heroesOf(li).length; return n === 10 ? 'diez' : n === 5 ? 'cinco' : String(n); };
   const shopTowers = li => PD.towersFor(li).filter(id => !PD.TOWERS[id].hero);
   const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
@@ -87,8 +94,13 @@
 
   // ------------------------------- Estado --------------------------------
   let game = null, rec = null;   // rec: la Grabadora (prueba.js); game === rec.game
-  const ui = { vt: 0, placing: null, selected: null, mouse: null, speed: 1, paused: false, auto: !!save.settings.auto, autoT: -1, modal: false };
+  // tactil: el último toque fue con el dedo; fantasma: la torre elegida espera en el mapa a que se
+  // confirme (ver «Celular»); lw: unidades del mapa por píxel de pantalla (render.js engrosa la mira).
+  const ui = { vt: 0, placing: null, selected: null, mouse: null, speed: 1, paused: false, auto: !!save.settings.auto, autoT: -1, modal: false,
+    tactil: false, fantasma: false, ultimo: null, lw: 1 };
   let screen = 'menu';
+  const movil = { on: false, vert: false };   // modo celular (ver «Celular», más abajo)
+  let avisoGiro = false;
 
   // ------------------------------ Utilidades -----------------------------
   function towerIcon(canvas, type, tiers) {
@@ -119,13 +131,27 @@
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => show(b.dataset.go)));
 
   // ------------------------------- Toasts --------------------------------
+  // En el celular caben dos avisos a la vez (tapaban el mapa y la tienda): los demás esperan en
+  // `colaToast` (los más viejos se descartan), duran menos y se cierran con un toque.
+  let colaToast = [];
   function toast(html, cls, icon, dur) {
     const box = $('#toasts');
+    if (movil.on) {
+      if (box.querySelectorAll('.toast:not(.out)').length >= 2) { colaToast.push([html, cls, icon, dur]); if (colaToast.length > 4) colaToast.shift(); return; }
+      dur = Math.min(dur || 4200, 4500);
+    }
     while (box.children.length >= 4) box.firstChild.remove();
     const t = el(`<div class="toast ${cls || ''}">${icon ? '<canvas width="84" height="84"></canvas>' : ''}<div>${html}</div></div>`);
     if (icon) { const c = t.querySelector('canvas'); if (icon.enemy) enemyIcon(c, icon.enemy); else towerIcon(c, icon.tower); }
     box.appendChild(t);
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 450); }, dur || 4200);
+    let fuera = false;
+    const quita = () => {
+      if (fuera) return; fuera = true;
+      t.classList.add('out');
+      setTimeout(() => { t.remove(); if (colaToast.length && movil.on) toast(...colaToast.shift()); }, 450);
+    };
+    t.addEventListener('click', quita);
+    setTimeout(quita, dur || 4200);
   }
 
   // -------------------------------- Modal --------------------------------
@@ -147,6 +173,7 @@
   // ------------------------------- Tooltip -------------------------------
   const tip = $('#tooltip');
   function showTip(html, x, y) {
+    if (ui.tactil) return;   // un toque también manda mousemove, y el globo quedaba pegado tapando el mapa
     tip.innerHTML = html; tip.classList.remove('hidden');
     const r = tip.getBoundingClientRect();
     let tx = x - r.width - 14, ty = y - 10;
@@ -208,8 +235,12 @@
     PD.LEVELS.forEach((L, li) => {
       const prueba = enPrueba(li);
       if (li === PUB) {
-        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era !== 3).length;
+        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && !L.era).length;
         grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día; cada uno se desbloquea llegando a la ronda ' + PD.UNLOCK_ROUND + ' del anterior: 🪙 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: 🪙 100 por ronda en cada uno'}</div>`));
+      }
+      if (L.era === 4 && PD.LEVELS[li - 1].era !== 4) {
+        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 4).length;
+        grid.appendChild(el(`<div class="lvl-sep era3 era4"><b>Cuarta Era · La Era de los Titanes</b> · <b>cinco héroes nuevos</b> para elegir, una <b>defensa nueva</b> por reino, <b>jefes</b> nunca vistos y, desde la ronda 60, <b>eventos de titanes</b> más seguidos y con más enemigos grandes. ${quedan ? 'Un reino nuevo cada día desde el 1 de noviembre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'La prueba final'} · 🪙 100 por ronda</div>`));
       }
       if (L.era === 3 && PD.LEVELS[li - 1].era !== 3) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 3).length;
@@ -229,9 +260,9 @@
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
-          ${L.era === 3 ? `<div class="lc-new">${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los diez héroes (uno por partida).">♛ Héroe a elección</span>${(N => `${N.pactoPrecio ? `<span title="Cada pacto aceptado da +${Math.round(N.pactoPrecio * 100)}% de vida a los enemigos, y se suma.">⚖ Pactos con precio</span>` : ''}${N.vidaTarde ? `<span title="Desde la ronda ${N.vidaTarde.desde} los enemigos se endurecen hasta tener x${N.vidaTarde.x} de vida en la ${N.vidaTarde.hasta}. Guardar oro no basta: hay que construir para el final.">💀 x${N.vidaTarde.x} de vida al final</span>` : ''}`)(PD.nivel(li, PD.MOTOR_VE))}<span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span></div>`
+          ${L.era >= 3 ? `<div class="lc-new">${L.era === 4 ? realmTowers(li).map(id => `<span title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].name}</span>`).join('') : ''}${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los ${cuantosHeroes(li)} héroes (uno por partida).">♛ Héroe a elección${L.era === 4 ? ' (5 nuevos)' : ''}</span>${(N => `${N.pactoPrecio ? `<span title="Cada pacto aceptado da +${Math.round(N.pactoPrecio * 100)}% de vida a los enemigos, y se suma.">⚖ Pactos con precio</span>` : ''}${N.vidaTarde ? `<span title="Desde la ronda ${N.vidaTarde.desde} los enemigos se endurecen hasta tener x${N.vidaTarde.x} de vida en la ${N.vidaTarde.hasta}. Guardar oro no basta: hay que construir para el final.">💀 x${N.vidaTarde.x} de vida al final</span>` : ''}`)(PD.nivel(li, PD.MOTOR_VE))}<span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span>${L.eventosTarde ? `<span class="ley" title="Desde la ronda 60: ${L.eventosTarde.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventosTarde.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos de titanes (R60+)</span>` : ''}${L.flota ? `<span class="ley" title="Desde la ronda ${L.flota.desde}, cada ronda que no es de jefe trae una FLOTA de los grandes más altos de la escalera, cada vez más grande (hasta ${L.flota.max}). Pagan un cuarto del oro.">🛸 Flotas de grandes (R${L.flota.desde}+)</span>` : ''}</div>`
             : `<div class="lc-new">${realmTowers(li).concat(PD.heroOf(li) ? [PD.heroOf(li)] : []).map(id => `<span class="${PD.TOWERS[id].hero ? 'hero' : ''}" title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].hero ? '♛ ' : ''}${PD.TOWERS[id].name}</span>`).join('')}</div>`}
-          ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era === 3 || PD.TOWERS[id].realm < PUB)).length} de las ${L.era === 3 ? 15 : 10} de reino</div>` : ''}
+          ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era >= 3 || PD.TOWERS[id].realm < PUB)).length} de las ${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm !== undefined && PD.TOWERS[id].realm <= (L.era >= 3 ? li : PUB - 1)).length} de reino</div>` : ''}
           <div class="meta">
             <span class="stars">${'★'.repeat(L.stars)}${'☆'.repeat(5 - L.stars)}</span>
             <span>❤ ${L.lives}</span><span>🪙 ${L.cash}</span>
@@ -328,6 +359,27 @@
     if (d.taunt) b.push(['Provoca', 'b-special']);
     if (d.pumpkins) b.push(['Apaga torres', 'b-special']);
     if (d.charge) b.push(['Embiste', 'b-special']);
+    if (d.esquiva || d.formas) b.push(['Esquiva', 'b-res']);
+    if (d.falange) b.push(['Falange', 'b-armor']);
+    if (d.formas) b.push(['Cambia de forma', 'b-special']);
+    if (d.perla || d.rebobina) b.push(['Se cura', 'b-special']);
+    if (d.sorpresa) b.push(['Caja sorpresa', 'b-special']);
+    if (d.malabares) b.push(['Malabares', 'b-res']);
+    if (d.barajar) b.push(['Baraja torres', 'b-special']);
+    if (d.gran) b.push(['Gran Función', 'b-special']);
+    if (d.contra) b.push(['Contrahechizo', 'b-special']);
+    if (d.roba) b.push(['Roba el saber', 'b-special']);
+    if (d.capitulos) b.push(['Da escudos', 'b-special']);
+    if (d.clona) b.push(['Se clona', 'b-special']);
+    if (d.abduce) b.push(['Abduce', 'b-special']);
+    if (d.fragmenta) b.push(['Se parte', 'b-special']);
+    if (d.pozo) b.push(['Pozos gravitatorios', 'b-special']);
+    if (d.desvia) b.push(['Desvía proyectiles', 'b-res']);
+    if (d.cuerda) b.push(['Acelera solo', 'b-special']);
+    if (d.pesado) b.push(['Retrasa torres', 'b-special']);
+    if (d.sinTiempo) b.push(['Fuera del tiempo', 'b-res']);
+    if (d.rebobina) b.push(['Rebobina', 'b-special']);
+    if (d.paradoja) b.push(['Paradoja', 'b-special']);
     if (d.resist) for (const k in d.resist) {
       const v = d.resist[k];
       b.push([(v === 0 ? 'Inmune ' : v < 1 ? 'Resiste ' : 'Débil ') + (DTYPE[k] || k).toLowerCase(), v > 1 ? 'b-special' : 'b-res']);
@@ -339,7 +391,7 @@
     box.innerHTML = '';
     if (tab === 'caos') {
       // la tercera era: pactos, eventos y poderes de cada reino
-      const era3 = PD.LEVELS.map((L, li) => [L, li]).filter(([L]) => L.era === 3);
+      const era3 = PD.LEVELS.map((L, li) => [L, li]).filter(([L]) => L.era >= 3);
       box.appendChild(el('<div class="alm-sec">⚖ Leyes de los reinos</div>'));
       box.appendChild(el('<p class="alm-nota">Cada reino de la Tercera Era tiene su propia ley, que dura toda la partida y decide la forma de ganarlo: lo que funciona en uno no sirve en otro.</p>'));
       for (const [L] of era3) { const Y = PD.LEYES[L.ley]; if (Y) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${Y.icon}</span><div><h4>${Y.name}</h4><div class="sub">${L.name} · ${Y.meta}</div></div></div><p>${Y.desc}</p></div>`)); }
@@ -347,9 +399,10 @@
       box.appendChild(el('<p class="alm-nota">En la Tercera Era, antes de la primera ronda y cada diez rondas se ofrecen tres de estos pactos: tomas uno (o ninguno) y su ventaja y su carga duran toda la partida. No se repiten. Desde el Jardín de Esporas, además, cada pacto aceptado da +12% de vida a los enemigos (se suma): elige pocos y bien.</p>'));
       for (const P of PD.PACTOS) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${P.icon}</span><div><h4>${P.name}</h4><div class="sub" style="color:#7affb0">✔ ${P.bueno}</div><div class="sub" style="color:#ff8a8a">✘ ${P.malo}</div></div></div></div>`));
       box.appendChild(el('<div class="alm-sec">⚡ Eventos</div>'));
-      box.appendChild(el('<p class="alm-nota">Una ronda de cada cinco (la 8, la 13, … la 98) trae un evento. La vista previa lo anuncia antes, para que prepares la defensa.</p>'));
+      box.appendChild(el('<p class="alm-nota">Una ronda de cada cinco (la 8, la 13, … la 98) trae un evento. En la Cuarta Era, desde la ronda 60 llegan los <b>eventos de titanes</b> (los marcados con ★), en las rondas que acaban en 2, 5 y 8. La vista previa lo anuncia antes, para que prepares la defensa.</p>'));
       for (const id in PD.EVENTOS) {
-        const E = PD.EVENTOS[id], donde = era3.filter(([L]) => L.eventos.includes(id)).map(([L]) => L.short).join(' · ');
+        const E = PD.EVENTOS[id], donde = era3.filter(([L]) => L.eventos.includes(id) || (L.eventosTarde || []).includes(id)).map(([L]) => L.short).join(' · ');
+        if (E.tarde) { box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${E.icon}</span><div><h4>★ ${E.name}</h4><div class="sub">Desde la ronda 60 · ${donde}</div></div></div><p>${E.desc}</p></div>`)); continue; }
         box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${E.icon}</span><div><h4>${E.name}</h4><div class="sub">${donde}</div></div></div><p>${E.desc}</p></div>`));
       }
       box.appendChild(el('<div class="alm-sec">✨ Poderes del Reino</div>'));
@@ -375,7 +428,7 @@
         if (b.ability && d.hero) stats.push('Habilidad: ' + PD.ABILITIES[b.ability].name);
         if (b.pct) stats.push(Math.round(b.pct * 1000) / 10 + '% de la vida/s');
         const pronto = d.realm !== undefined && enPrueba(d.realm) ? ' <span class="badge b-camo">Próximamente</span>' : '';
-        const where = (d.hero ? `<span class="badge b-boss">♛ Héroe de ${PD.LEVELS[d.realm].name} · uno por partida</span>`
+        const where = (d.hero ? `<span class="badge b-boss">♛ ${d.era4 ? 'Héroe de la Cuarta Era (a elección en los reinos 16–20)' : 'Héroe de ' + PD.LEVELS[d.realm].name} · uno por partida</span>`
           : d.realm === undefined ? '' : `<span class="badge b-special">Nueva en ${PD.LEVELS[d.realm].name}</span>`) + pronto;
         const card = el(`<div class="alm-card">
           <div class="alm-head"><canvas width="128" height="128"></canvas><div><h4>${d.name}</h4><div class="sub"><span style="color:var(--gold);font-weight:800">${fmt(d.cost)} oro</span> · ${stats.join(' · ')}</div>${where}</div></div>
@@ -415,7 +468,14 @@
       ['Reino 13 · Laberinto de Espejos', ['reflejo', 'prismaVivo', 'ilusion'], 12],
       ['Reino 14 · Archipiélago Celeste', ['templario', 'jinete', 'pirata', 'galeon'], 13],
       ['Reino 15 · La Noche Eterna', ['calabaza', 'semilla', 'murcielago', 'espantapajaros'], 14],
-      ['Jefes de la Tercera Era', ['liche', 'reinaMicelio', 'reinaEspejos', 'tifon', 'jineteSinCabeza'], 14]
+      ['Jefes de la Tercera Era', ['liche', 'reinaMicelio', 'reinaEspejos', 'tifon', 'jineteSinCabeza'], 14],
+      ['Los más grandes · Cuarta Era (R90+)', ['colosoTitan', 'nodriza'], 15],
+      ['Reino 16 · Templo de Jade', ['monje', 'terracota', 'cometa'], 15],
+      ['Reino 17 · Circo de las Sombras', ['payaso', 'acrobata', 'malabarista'], 16],
+      ['Reino 18 · Biblioteca Infinita', ['libro', 'pagina', 'origami', 'erudito'], 17],
+      ['Reino 19 · Cinturón Estelar', ['marciano', 'ovni', 'meteorito'], 18],
+      ['Reino 20 · El Corazón del Tiempo', ['cuerda', 'ecoTiempo', 'guardianReloj'], 19],
+      ['Jefes de la Cuarta Era', ['emperadorDragon', 'reyCirco', 'codice', 'vortex', 'aion'], 19]
     ];
     for (const [title, ids, li] of sections) {
       box.appendChild(el(`<div class="alm-sec">${title}${li !== undefined && enPrueba(li) ? ' · próximamente' : ''}</div>`));
@@ -440,11 +500,13 @@
   ponCursor();
   function resize() {
     if (screen !== 'game') return;
+    acomodaMovil();
     const st = $('#stage').getBoundingClientRect();
-    const pad = 10;
+    const pad = movil.on ? 1 : 10;
     const sc = Math.max(0.1, Math.min((st.width - pad * 2) / W, (st.height - pad * 2) / H));
     const cw = Math.floor(W * sc), ch = Math.floor(H * sc);
     cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    ui.lw = W / Math.max(1, cw);
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.max(1, Math.round(cw * dpr)); cv.height = Math.max(1, Math.round(ch * dpr));
   }
@@ -459,22 +521,24 @@
     game.sounds = [];
     PD.Render.lastT = 0; ui.vt = 0;
     escuchaTabla(li);
-    ui.selected = null; ui.placing = null; ui.paused = false; ui.autoT = -1;
+    ui.selected = null; ui.placing = null; ui.fantasma = false; ui.paused = false; ui.autoT = -1;
     PD.Render.bgKey = '';
     $('#h-level').textContent = `${li + 1}. ${game.L.name}`;
-    $('#toasts').innerHTML = '';
+    $('#toasts').innerHTML = ''; colaToast = [];
     show('game');
-    buildShop(); renderInfo(); buildPreview(); updateHud(true);
+    if (movil.vert && !avisoGiro) { avisoGiro = true; toast('<b>↻ Gira el teléfono</b>En horizontal el mapa se ve mucho más grande.', 'good', null, 4000); }
+    buildShop(); renderInfo(); renderColoca(); buildPreview(); updateHud(true);
     if (enPrueba(li)) toast(`<b>Reino en pruebas</b>Se abre a todos ${cuandoAbre(li)}. Hasta entonces, solo para administradores: esta partida no guarda récords ni paga monedas.`, 'boss', null, 6500);
     if (!run) {
-      toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.`, 'good', null, 6500);
+      toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>${ui.tactil || movil.on ? 'Toca un defensor de la tienda, arrástralo en el mapa, confírmalo con ✔ y pulsa ▶.' : 'Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.'}`, 'good', null, 6500);
       for (const id of realmTowers(li)) { const d = PD.TOWERS[id]; toast(`<b>Nueva defensa: ${d.name}</b>${d.desc}`, 'special', { tower: id }, 8000); }
       const hid = PD.heroOf(li);
       if (hid) toast(`<b>♛ Héroe del reino: ${PD.TOWERS[hid].name}</b>Uno por partida y muy caro, pero único. Está arriba en la tienda (tecla H).`, 'special', { tower: hid }, 8000);
       if (game.era3) {
         const Y = PD.LEYES[game.L.ley];
         if (Y) toast(`<b>${Y.icon} ${Y.name}</b>${Y.desc}`, 'boss', null, 11000);
-        toast('<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los diez héroes (uno por partida). Arriba en la tienda o con la tecla H.', 'special', null, 8000);
+        toast(`<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los ${cuantosHeroes(li)} héroes${game.era4 ? ' de la Cuarta Era' : ''} (uno por partida). Arriba en la tienda o con la tecla H.`, 'special', null, 8000);
+        if (game.L.eventosTarde) toast(`<b>🗿 Eventos de titanes</b>Desde la ronda 60 los eventos son más duros y más seguidos: ${game.L.eventosTarde.map(id => PD.EVENTOS[id].icon + ' ' + PD.EVENTOS[id].name).join(', ')}.`, 'boss', null, 9000);
         const P = PD.PODERES[game.L.poder];
         if (P) toast(`<b>${P.icon} Poder del Reino: ${P.name}</b>${P.desc} Se carga eliminando enemigos; lánzalo con el botón de abajo a la izquierda o la tecla V.`, 'special', null, 9000);
       }
@@ -541,7 +605,7 @@
   $('#poder').addEventListener('click', apuntaPoder);
   $('#poder').addEventListener('mousemove', ev => { if (!game || !game.L.poder) return; const P = PD.PODERES[game.L.poder]; showTip(`<b>${P.icon} ${P.name}</b>${P.desc}<br><span class="tc">Energía ${Math.floor(game.energia)} / ${PD.ENERGIA_MAX} · se carga eliminando enemigos · tecla V</span>`, ev.clientX, ev.clientY); });
   $('#poder').addEventListener('mouseleave', hideTip);
-  // elegir héroe entre los diez (tercera era)
+  // elegir héroe entre los diez (tercera era) o los cinco (cuarta)
   function eligeHeroe() {
     if (!game || game.hasHero() || ui.modal) return;
     const ids = PD.heroesOf(game.li);
@@ -568,9 +632,9 @@
     const hid = PD.heroOf(game.li);
     if (!hid && PD.heroesOf(game.li).length > 1) {
       const it = el(`<div class="shop-item hero" data-id="${HEROE}"><span class="nw">♛ HÉROE</span><span class="hk">H</span><canvas width="108" height="108"></canvas><div class="nm">A elección</div><div class="ct">Elegir</div></div>`);
-      towerIcon(it.querySelector('canvas'), game.towers.find(t => t.def.hero) ? game.towers.find(t => t.def.hero).type : 'heroeeclipse', [0, 0]);
+      towerIcon(it.querySelector('canvas'), game.towers.find(t => t.def.hero) ? game.towers.find(t => t.def.hero).type : game.era4 ? 'heroetiempo' : 'heroeeclipse', [0, 0]);
       it.addEventListener('click', eligeHeroe);
-      it.addEventListener('mousemove', ev => showTip('<b>♛ Héroe a elección</b>En la Tercera Era puedes llamar a cualquiera de los diez héroes, uno por partida.<br><span class="tc">Tecla H.</span>', ev.clientX, ev.clientY));
+      it.addEventListener('mousemove', ev => showTip(`<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los ${cuantosHeroes(game.li)} héroes${game.era4 ? ' de la Cuarta Era' : ''}, uno por partida.<br><span class="tc">Tecla H.</span>`, ev.clientX, ev.clientY));
       it.addEventListener('mouseleave', hideTip);
       shop.appendChild(it);
     }
@@ -635,6 +699,11 @@
   function setPlacing(id) {
     ui.placing = id;
     if (id) { ui.selected = null; renderInfo(); }
+    // con el dedo, lo elegido aparece en el mapa como fantasma y espera ✔ (ver «Celular»)
+    ui.fantasma = !!(id && ui.tactil && game);
+    if (ui.fantasma) ui.mouse = puntoInicial(id);
+    else if (!id && ui.tactil) ui.mouse = null;
+    renderColoca();
     updateShop();
   }
 
@@ -652,13 +721,12 @@
     if (k === 'support') {
       rows.push(['Velocidad', `<b>+${Math.round(s.buffRate * 100)}%</b>`]);
       rows.push(['Alcance', `<b>+${Math.round((s.buffRange || 0) * 100)}%</b>`]);
-      rows.push(['Daño', `<b>${s.buffDmgMult ? 'x' + s.buffDmgMult : '+' + (s.buffDmg || 0)}</b>`]);
+      rows.push(['Daño', `<b>${s.buffDmgMult ? 'x' + n1(s.buffDmgMult) : '+' + n1(s.buffDmg || 0)}</b>`]);
       rows.push(['Da camuflaje', yn(s.buffCamo)]);
       rows.push(['Rompe blindaje', `<b>${Math.round((s.buffArmor || 0) * 100)}%</b>`]);
       rows.push(['Área', `<b>${Math.round(s.range)}</b>`]);
       return rows;
     }
-    const n1 = v => (Math.round(v * 10) / 10).toString();
     if (k === 'hero') {
       const A = PD.ABILITIES[s.ability];
       rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
@@ -666,15 +734,15 @@
       else rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}${s.count > 1 ? ' ×' + s.count : s.bolts > 1 ? ' ×' + s.bolts : s.shells > 1 ? ' ×' + s.shells : ''}</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
       if (s.lifeRegen) rows.push(['Cura / ronda', `<b>+${s.lifeRegen} ❤</b>`]);
-      if (s.shredAura) rows.push(['Quita blindaje', `<b>${s.shredAura}</b>`]);
+      if (s.shredAura) rows.push(['Quita blindaje', `<b>${n1(s.shredAura)}</b>`]);
       if (s.ampAura) rows.push(['Daño recibido', `<b>+${Math.round(s.ampAura * 100)}%</b>`]);
       if (s.slowAura) rows.push(['Aura lenta', `<b>${Math.round(s.slowAura * 100)}%</b>`]);
-      if (s.buffDmgMult) rows.push(['Torres cercanas', `<b>x${s.buffDmgMult}${s.buffRate ? ' · +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      if (s.buffDmgMult) rows.push(['Torres cercanas', `<b>x${n1(s.buffDmgMult)}${s.buffRate ? ' · +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
       else if (s.buffRate || s.buffRange) rows.push(['Torres cercanas', `<b>+${Math.round((s.buffRange || 0) * 100)}% alcance · +${Math.round((s.buffRate || 0) * 100)}% vel.</b>`]);
       if (s.goldAura) rows.push(['Oro en su alcance', `<b>+${Math.round((s.goldAura - 1) * 100)}%</b>`]);
       if (s.heroDiscount) rows.push(['Mejoras cercanas', `<b>−${Math.round(s.heroDiscount * 100)}%</b>`]);
       if (s.purgeAura) rows.push(['Su luz', '<b class="yes">Revela y quita invulnerabilidad</b>']);
-      rows.push(['Habilidad', `<b>${A.name} · ${abCd(t)} s</b>`]);
+      rows.push(['Habilidad', `<b>${A.name} · ${n1(abCd(t))} s</b>`]);
       rows.push(['Camuflados', s.atk === 'slam' ? '<b class="yes">Área</b>' : yn(s.camo)]);
       rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
@@ -693,7 +761,7 @@
       rows.push(['Murallas', `<b>${s.maxWalls}</b>`]);
       rows.push(['Resistencia', `<b>${Math.round(s.wallHp)}</b>`]);
       rows.push(['Brota cada', `<b>${n1(s.cd)} s</b>`]);
-      rows.push(['Espinas', `<b>${s.thornDps ? s.thornDps + '/s' : 'No'}</b>`]);
+      rows.push(['Espinas', `<b>${s.thornDps ? n1(s.thornDps) + '/s' : 'No'}</b>`]);
       rows.push(['Frena jefes', yn(s.bossHold)]);
       rows.push(['Área', `<b>${Math.round(s.range)}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
@@ -724,7 +792,7 @@
       rows.push(['Saltos', `<b>${s.jumps}</b>`]);
       rows.push(['Cada', `<b>${n1(s.cd)} s</b>`]);
       rows.push(['Protege', '<b class="yes">Torres en su alcance</b>']);
-      if (s.buffRate || s.buffDmgMult) rows.push(['Protegidas', `<b>${s.buffDmgMult ? 'x' + s.buffDmgMult + ' daño' : ''}${s.buffRate ? ' +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      if (s.buffRate || s.buffDmgMult) rows.push(['Protegidas', `<b>${s.buffDmgMult ? 'x' + n1(s.buffDmgMult) + ' daño' : ''}${s.buffRate ? ' +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
       rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
@@ -733,8 +801,8 @@
     if (k === 'frog' || k === 'bubble' || k === 'bell' || k === 'disint') {
       if (k === 'disint') { rows.push(['Vida/s', `<b>${n1(s.pct * 100)}% + ${n1(s.dps)}</b>`]); rows.push(['Rayos', `<b>${s.beams}</b>`]); }
       else rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
-      if (k === 'frog') { rows.push(['Sapo', `<b>${n1(s.frogDur)} s${s.frogBig ? ' (grandes ' + s.frogBig + ' s)' : ''}</b>`]); rows.push(['Radio', `<b>${Math.round(s.radius)}</b>`]); }
-      if (k === 'bubble') { rows.push(['Atrapa', `<b>${n1(s.trapDur)} s${s.trapBig ? ' (grandes ' + s.trapBig + ' s)' : ''}</b>`]); rows.push(['Burbujas', `<b>${s.count || 1} / ${n1(s.cd)} s</b>`]); }
+      if (k === 'frog') { rows.push(['Sapo', `<b>${n1(s.frogDur)} s${s.frogBig ? ' (grandes ' + n1(s.frogBig) + ' s)' : ''}</b>`]); rows.push(['Radio', `<b>${Math.round(s.radius)}</b>`]); }
+      if (k === 'bubble') { rows.push(['Atrapa', `<b>${n1(s.trapDur)} s${s.trapBig ? ' (grandes ' + n1(s.trapBig) + ' s)' : ''}</b>`]); rows.push(['Burbujas', `<b>${s.count || 1} / ${n1(s.cd)} s</b>`]); }
       if (k === 'bell') { rows.push(['Eco', `<b>${Math.round(s.eco * 100)}% del daño</b>`]); rows.push(['Toca cada', `<b>${n1(s.cd)} s</b>`]); }
       if (k !== 'bubble' && s.cd && k !== 'bell') rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
@@ -744,6 +812,9 @@
       return rows;
     }
     if (k === 'beam') rows.push(['Daño/s', `<b>${n1(s.dps)} (x${s.rampMax})</b>`]);
+    // el Satélite no golpea: su haz quema por segundo; la Cronotorre no hace daño propio
+    else if (k === 'orbital') { rows.push(['Daño/s', `<b>${n1(s.dps)}</b>`]); rows.push(['Ancho del haz', `<b>${Math.round(s.radius)}</b>`]); }
+    else if (k === 'crono') { rows.push(['Pausa', `<b>${n1(s.stopDur)} s cada ${n1(s.cd)} s</b>`]); rows.push(['Cobra otra vez', `<b>${Math.round(s.stopX * 100)}% del daño</b>`]); }
     else if (k === 'hive') rows.push(['Daño dron', `<b>${n1(s.droneDmg)}</b>`]);
     else if (k === 'mines') rows.push(['Daño mina', `<b>${n1(s.mineDmg)}</b>`]);
     else rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
@@ -753,7 +824,7 @@
     else if (k === 'boomerang') rows.push(['Bumeranes', `<b>${s.count} / ${n1(s.cd)} s</b>`]);
     else if (k === 'rail') rows.push(['Virotes', `<b>${s.bolts} / ${n1(s.cd)} s</b>`]);
     else if (k === 'beam') rows.push(['Rayos', `<b>${s.beams}</b>`]);
-    else if (s.cd) rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
+    else if (s.cd && k !== 'crono') rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
     rows.push(['Alcance', `<b>${s.range > 5000 ? 'Global' : Math.round(s.range)}</b>`]);
     if (k === 'projectile' || k === 'boomerang' || k === 'saw') rows.push(['Perforación', `<b>${s.pierce}</b>`]);
     if (k === 'acid') rows.push(['Corrosión', `<b>${s.corr}/golpe (máx. ${s.corrMax})</b>`]);
@@ -780,6 +851,9 @@
     const owned = P.ups.slice(0, tier).map(u => u.name).join(' · ');
     return `<div class="path p${p + 1}"><div class="ph"><span>${P.name}</span><span class="pips">${pips}</span></div>${body}${owned ? `<div class="owned">${owned}</div>` : ''}</div>`;
   }
+  // Una fila cuyo texto no cabe en media columna (la habilidad, «Protege», «Torres cercanas»…)
+  // ocupa el ancho entero: en una columna empujaba a la otra fuera del panel.
+  const anchaFila = r => (r[0] + r[1].replace(/<[^>]*>/g, '')).length > 22;
   function renderInfo() {
     const box = $('#info');
     const t = ui.selected;
@@ -789,13 +863,13 @@
     const ab = t.s.ability ? PD.ABILITIES[t.s.ability] : null;
     box.innerHTML = `
       <div class="inf-head"><canvas width="116" height="116"></canvas><div><h3>${d.name}</h3><div class="sub">Nivel ${t.tiers[0]}-${t.tiers[1]} · Invertido ${fmt(t.spent)}</div></div><button class="inf-close" title="Cerrar (Esc)">✕</button></div>
-      <div class="inf-stats">${statsRows(t).map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('')}</div>
+      <div class="inf-stats">${statsRows(t).map(r => `<div${anchaFila(r) ? ' class="ancha"' : ''}><span>${r[0]}</span>${r[1]}</div>`).join('')}</div>
       ${d.targeting ? `<div class="targets">${MODES.map(m => `<button data-m="${m[0]}" class="${t.mode === m[0] ? 'on' : ''}">${m[1]}</button>`).join('')}</div>` : ''}
       ${d.hero ? `<div class="sub" style="font-size:12px;color:var(--gold)">♛ Héroe del reino: uno por partida. Puede subir sus <b>dos</b> caminos hasta el nivel 4 y <b>uno</b> de ellos al nivel 5.</div>` : ''}
-      ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${abCd(t)} s).</div>` : ''}
+      ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${n1(abCd(t))} s).</div>` : ''}
       ${t.buffed ? `<div class="sub" style="font-size:12px;color:#e07bff">♫ Potenciada por un Tótem del Eco</div>` : ''}
       <div class="paths">${pathHtml(t, 0)}${pathHtml(t, 1)}</div>
-      <div class="inf-actions"><button class="btn danger" id="i-sell">Vender · <span class="sv"></span></button></div>`;
+      <div class="inf-actions"><button class="btn danger" id="i-sell"><span class="sl">Vender</span> · <span class="sv"></span></button></div>`;
     towerIcon(box.querySelector('canvas'), t.type, t.tiers);
     box.querySelector('.inf-close').addEventListener('click', () => { ui.selected = null; renderInfo(); });
     box.querySelectorAll('.targets button').forEach(b => b.addEventListener('click', () => { rec.modo(t, b.dataset.m); guardaQuieto(); renderInfo(); }));
@@ -830,9 +904,19 @@
       renderInfo();
     }
   }
-  function doSell() {
+  // Con el dedo, vender pide un segundo toque (un roce sobre el botón vendía la torre).
+  let vendeT = 0;
+  function doSell(ev) {
     const t = ui.selected;
     if (!t) return;
+    const b = $('#i-sell');
+    if (ev && ui.tactil && b && performance.now() - vendeT > 3000) {
+      vendeT = performance.now();
+      b.classList.add('seguro'); b.querySelector('.sl').textContent = '¿Seguro? Toca otra vez para vender';
+      setTimeout(() => { if (b.isConnected) { b.classList.remove('seguro'); b.querySelector('.sl').textContent = 'Vender'; } }, 3000);
+      return;
+    }
+    vendeT = 0;
     sfx('sell', t.x);
     rec.vender(t);
     guardaQuieto();
@@ -869,6 +953,7 @@
     if (pv.boss) box.appendChild(el(`<span class="bs">☠ JEFE</span>`));
     if (pv.special) box.appendChild(el(`<span class="sp">★ ${pv.special.name}</span>`));
     if (pv.evento) { const E = PD.EVENTOS[pv.evento]; box.appendChild(el(`<span class="ev" title="${E.desc}">${E.icon} ${E.name}</span>`)); }
+    if (pv.flota) box.appendChild(el(`<span class="bs" title="Una flota de ${pv.flota.n} ${PD.ENEMIES[pv.flota.type].name}: pagan un cuarto del oro.">🛸 Flota ×${pv.flota.n}</span>`));
     if (game.pactoPendiente()) box.appendChild(el('<span class="ev">📜 Pacto</span>'));
     for (const [id, n] of pv.list.slice(0, 7)) {
       const chip = el(`<span class="pv" title="${PD.ENEMIES[id].name}"><canvas width="48" height="48"></canvas>×${n}</span>`);
@@ -891,7 +976,7 @@
       for (const id in groups) {
         const A = PD.ABILITIES[id];
         const b = el(`<div class="abil" data-id="${id}" style="background:${A.color}">${ABIL_ICON[id]}<div class="cdv"></div><div class="cdt"></div><span class="cnt"></span></div>`);
-        b.addEventListener('mousemove', ev => showTip(`<b>${A.name}</b>${A.desc}<br><span class="tc">Automática · recarga ${abCd(groups[id][0])} s</span>`, ev.clientX, ev.clientY));
+        b.addEventListener('mousemove', ev => showTip(`<b>${A.name}</b>${A.desc}<br><span class="tc">Automática · recarga ${n1(abCd(groups[id][0]))} s</span>`, ev.clientX, ev.clientY));
         b.addEventListener('mouseleave', hideTip);
         box.appendChild(b);
       }
@@ -945,7 +1030,7 @@
       ${game.active ? '<p style="font-size:13px;color:var(--muted)">Si sales ahora, la partida se reanudará al inicio de esta ronda.</p>' : ''}
       <div class="vol"><label>Música <input type="range" id="v-mus" min="0" max="1" step="0.05" value="${save.settings.music}"></label>
       <label>Efectos <input type="range" id="v-sfx" min="0" max="1" step="0.05" value="${save.settings.sfx}"></label>
-      <label>Cursor <select id="v-cur"><option value="grande">Grande (mira amarilla)</option><option value="clasico">Clásico</option></select></label></div>`, [
+      <label${ui.tactil ? ' hidden' : ''}>Cursor <select id="v-cur"><option value="grande">Grande (mira amarilla)</option><option value="clasico">Clásico</option></select></label></div>`, [
       { label: 'Reanudar', cls: 'go', fn: () => { ui.paused = false; } },
       { label: 'Reiniciar reino', fn: () => modal('<h2>¿Reiniciar?</h2><p>Perderás el progreso de esta partida.</p>', [
         { label: 'Reiniciar', cls: 'danger', fn: () => { delete save.runs[game.li]; writeSave(); startGame(game.li, null); } },
@@ -962,7 +1047,7 @@
   }
   function exitGame() {
     if (game && !game.over && !game.won) guardaPartida();
-    game = null; rec = null; ui.paused = false;
+    game = null; rec = null; ui.paused = false; ui.placing = null; ui.fantasma = false;
     show('levels');
   }
 
@@ -985,6 +1070,13 @@
         case 'pacto': if (ev.pacto) toast(`<b>${ev.pacto.icon} ${ev.pacto.name}</b><span style="color:#7affb0">✔ ${ev.pacto.bueno}</span><br><span style="color:#ff8a8a">✘ ${ev.pacto.malo}</span>`, 'special', null, 5000); else toast('<b>Sin pacto</b>Esta vez sigues por tu cuenta.', '', null, 2500); break;
         case 'poder': sfx('upgradeMax', ev.x); break;
         case 'filacteria': toast(`<b>¡${ev.enemy.name || ev.enemy.d.name} esconde su alma!</b>Es INVULNERABLE hasta que destruyas sus 3 Filacterias.`, 'boss', { enemy: 'filacteria' }, 5000); break;
+        // jefes de la cuarta era
+        case 'forma': toast(ev.enemy.forma === 'cielo' ? '<b>¡El Emperador alza el vuelo!</b>Forma del CIELO: va casi el doble de rápido y esquiva proyectiles.' : '<b>¡El Emperador baja a tierra!</b>Forma de TIERRA: blindaje 14, pero va lento. ¡Es el momento de los golpes pesados!', 'boss', { enemy: ev.enemy.type }, 2600); break;
+        case 'perla': toast('<b>¡Se traga su perla!</b>El Emperador Dragón se cura un 20%.', 'boss', { enemy: ev.enemy.type }, 3000); break;
+        case 'baraja': toast('<b>¡A barajar!</b>Carcajada cambió de sitio dos de tus torres.', 'boss', { enemy: ev.enemy.type }, 2600); break;
+        case 'granFuncion': toast('<b>¡La Gran Función!</b>Carcajada es invulnerable unos segundos y saltan payasos a escena.', 'boss', { enemy: ev.enemy.type }, 3500); break;
+        case 'capitulo': toast(`<b>Capítulo ${ev.n}</b>El Códice escribe: todos los enemigos ganan un escudo.`, 'boss', { enemy: ev.enemy.type }, 3000); break;
+        case 'rebobina': toast('<b>¡Aion rebobina!</b>Vuelve a la vida que tenía hace 6 segundos. Bájale mucho de golpe.', 'boss', { enemy: ev.enemy.type }, 3000); break;
         case 'vendaval': toast('<b>¡Vendaval!</b>El alcance de tus torres baja un 35% unos segundos (salvo las que protege un Pararrayos).', 'boss', null, 2600); break;
         case 'ability': {
           const A = PD.ABILITIES[ev.id];
@@ -1036,7 +1128,7 @@
           sfx('victory');
           const li = game.li;
           const hasta = n => PD.LEVELS.slice(0, n).every((L, i) => save.won[i]);
-          const all = hasta(PD.LEVELS.length) ? 'quince' : li < PUB && hasta(PUB) ? 'cinco' : '';
+          const all = hasta(PD.LEVELS.length) ? 'veinte' : li < PUB && hasta(PUB) ? 'cinco' : '';
           modal(`<div class="big-ico">🏆</div><h2>¡Victoria!</h2><p>Has completado las 100 rondas de <b>${game.L.name}</b>.<br>Eliminados: ${fmt(game.stats.kills)} · Vidas restantes: ${fmt(game.lives)}</p>${all ? `<p><b>¡Has conquistado los ${all} reinos! Eres un verdadero PRO DEFENDER.</b></p>` : ''}`, [
             ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && save.unlocked > li ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
             { label: 'Volver a los reinos', fn: () => { game = null; rec = null; ui.paused = false; show('levels'); } }
@@ -1070,12 +1162,44 @@
     const r = cv.getBoundingClientRect();
     return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
   }
-  cv.addEventListener('pointermove', ev => { ui.mouse = toWorld(ev); });
-  cv.addEventListener('pointerdown', ev => { ui.mouse = toWorld(ev); });
+  const limita = (v, a, b) => Math.max(a, Math.min(b, v));
+  // Con el dedo la torre fantasma no salta bajo el dedo (lo tapaba): se arrastra desde cualquier
+  // punto del mapa, y un toque corto la lleva ahí. Al soltar, si quedó donde no se puede, se
+  // acomoda al sitio libre más cercano (`acomoda`).
+  const arrastre = { id: null, x: 0, y: 0, gx: 0, gy: 0, movio: false };
+  window.addEventListener('pointerdown', ev => { ui.tactil = ev.pointerType !== 'mouse'; }, true);
+  cv.addEventListener('pointerdown', ev => {
+    if (ui.fantasma && ui.placing && ui.mouse) {
+      Object.assign(arrastre, { id: ev.pointerId, x: ev.clientX, y: ev.clientY, gx: ui.mouse.x, gy: ui.mouse.y, movio: false });
+      try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* sin captura: igual sirve */ }
+      return;
+    }
+    ui.mouse = toWorld(ev);
+  });
+  cv.addEventListener('pointermove', ev => {
+    if (ui.fantasma && ui.placing) {
+      if (arrastre.id !== ev.pointerId) return;
+      const r = cv.getBoundingClientRect(), dx = ev.clientX - arrastre.x, dy = ev.clientY - arrastre.y;
+      if (!arrastre.movio && Math.hypot(dx, dy) < 8) return;
+      arrastre.movio = true;
+      ui.mouse = { x: limita(arrastre.gx + dx / r.width * W, 0, W), y: limita(arrastre.gy + dy / r.height * H, 0, H) };
+      return;
+    }
+    ui.mouse = toWorld(ev);
+  });
+  cv.addEventListener('pointercancel', () => { arrastre.id = null; });
   cv.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') ui.mouse = null; });
   cv.addEventListener('contextmenu', ev => { ev.preventDefault(); setPlacing(null); ui.selected = null; renderInfo(); });
   cv.addEventListener('pointerup', ev => {
     if (!game || ui.modal || ev.button !== 0) return;
+    if (ui.fantasma && ui.placing) {
+      if (arrastre.id !== ev.pointerId) return;
+      arrastre.id = null;
+      if (!arrastre.movio) ui.mouse = toWorld(ev);
+      acomoda();
+      renderColoca();
+      return;
+    }
     const p = toWorld(ev);
     ui.mouse = p;
     if (ui.placing === PODER) {
@@ -1104,15 +1228,174 @@
       if (ev.pointerType !== 'mouse') ui.mouse = null;
       return;
     }
-    let hit = null;
-    for (const t of game.towers) if (Math.hypot(t.x - p.x, t.y - p.y) < t.def.size + 6) hit = t;
+    // elegir una torre: la más cercana, con más margen para el dedo
+    const extra = ev.pointerType === 'mouse' ? 6 : 6 + 14 * ui.lw;
+    let hit = null, hd = Infinity;
+    for (const t of game.towers) { const d = Math.hypot(t.x - p.x, t.y - p.y); if (d < t.def.size + extra && d < hd) { hit = t; hd = d; } }
+    if (ev.pointerType !== 'mouse') ui.mouse = null;
     ui.selected = hit; renderInfo();
   });
+
+  // ------------------------------- Celular --------------------------------
+  // Pantalla táctil chica (el lado corto ≤ 600 px, medido en esta ventana: dentro de Juegos el
+  // marco ocupa toda la ventana, ver PLENO). En vertical: HUD fino arriba, el mapa a todo el
+  // ancho, la barra de ronda (#barra-acc) y la tienda abajo. En horizontal: el mapa a toda la
+  // altura, el HUD y la tienda en una columna a la derecha, y 🔊 ❚❚ sobre la esquina del mapa.
+  // Solo se mueven nodos de la pantalla: los botones mandan lo mismo de siempre.
+  const ponEn = (n, padre, primero) => { if (n.parentNode !== padre) { if (primero) padre.prepend(n); else padre.appendChild(n); } };
+  function acomodaMovil() {
+    const on = matchMedia('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) <= 600;
+    const vert = on && innerHeight > innerWidth, R = document.documentElement;
+    R.classList.toggle('pd-movil', on); R.classList.toggle('pd-vert', vert); R.classList.toggle('pd-horiz', on && !vert);
+    movil.on = on; movil.vert = vert;
+    const hud = $('#hud'), hr = $('#hud .hud-r'), acc = $('.hud-acc'), sis = $('.hud-sis');
+    ponEn(acc, vert ? $('#barra-acc') : hr, true);
+    ponEn(sis, on && !vert ? $('#stage') : hr, false);
+    ponEn(hud, on && !vert ? $('#side') : $('#scr-game'), true);
+    $('#b-full').hidden = !(on && document.fullscreenEnabled);
+  }
+  acomodaMovil();
+  $('#b-full').addEventListener('click', () => {
+    try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch (e) { /* sin pantalla completa */ }
+  });
+  document.addEventListener('fullscreenchange', () => { $('#b-full').classList.toggle('on', !!document.fullscreenElement); requestAnimationFrame(resize); });
+
+  // ¿cerca del camino? (para que el fantasma aparezca donde la torre sirve)
+  function cercaCamino(x, y, d) {
+    for (const p of game.paths) for (const sg of p.segs) if (!sg.jump && PD.distSeg(x, y, sg.ax, sg.ay, sg.bx, sg.by) < d) return true;
+    return false;
+  }
+  // el sitio permitido más cercano a (x, y), en una rejilla de 10 (`util`: que alcance el camino)
+  function lugarLibre(id, x, y, radio, util) {
+    const def = PD.TOWERS[id], k = def.kind;
+    const alc = util && k !== 'farm' && k !== 'support' && def.base.range < 5000 ? def.base.range * 0.8 : 0;
+    let best = null, bd = radio * radio;
+    const x0 = radio === Infinity ? 0 : Math.max(0, Math.floor((x - radio) / 10)), x1 = radio === Infinity ? W / 10 : Math.min(W / 10, Math.ceil((x + radio) / 10));
+    const y0 = radio === Infinity ? 0 : Math.max(0, Math.floor((y - radio) / 10)), y1 = radio === Infinity ? H / 10 : Math.min(H / 10, Math.ceil((y + radio) / 10));
+    for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) {
+      const gx = i * 10, gy = j * 10, d = (gx - x) * (gx - x) + (gy - y) * (gy - y);
+      if (d >= bd || !game.canPlace(id, gx, gy)) continue;
+      if (alc && !cercaCamino(gx, gy, alc)) continue;
+      best = { x: gx, y: gy }; bd = d;
+    }
+    return best;
+  }
+  // el punto del camino donde caerían unos pinchos, cerca de (x, y)
+  function caminoCerca(x, y) {
+    let best = null, bd = Infinity;
+    for (let gx = 10; gx < W; gx += 20) for (let gy = 10; gy < H; gy += 20) {
+      const d = (gx - x) * (gx - x) + (gy - y) * (gy - y);
+      if (d >= bd) continue;
+      const at = game.spikeSpot(gx, gy);
+      if (at) { best = at; bd = d; }
+    }
+    return best;
+  }
+  // dónde aparece el fantasma: cerca del último sitio usado (o del centro), en un lugar que sirva;
+  // el Poder del Reino, sobre el enemigo más adelantado
+  function puntoInicial(id) {
+    const ref = ui.ultimo || { x: W / 2, y: H / 2 };
+    if (id === PODER) {
+      let e0 = null;
+      for (const e of game.enemies) if (!e.dead && e.x !== undefined && (!e0 || e.dist > e0.dist)) e0 = e;
+      return e0 ? { x: e0.x, y: e0.y } : { x: W / 2, y: H / 2 };
+    }
+    if (id === PINCHOS) return caminoCerca(ref.x, ref.y) || { x: W / 2, y: H / 2 };
+    return lugarLibre(id, ref.x, ref.y, Infinity, true) || lugarLibre(id, ref.x, ref.y, Infinity, false) || { x: ref.x, y: ref.y };
+  }
+  // al soltar: si la torre quedó donde no se puede, al sitio libre más cercano (si hay uno a mano)
+  function acomoda() {
+    const id = ui.placing, p = ui.mouse;
+    if (!id || !p || id === PODER) return;
+    if (id === PINCHOS) { if (!game.spikeSpot(p.x, p.y)) { const at = caminoCerca(p.x, p.y); if (at && Math.hypot(at.x - p.x, at.y - p.y) < 60) ui.mouse = at; } return; }
+    if (game.canPlace(id, p.x, p.y)) return;
+    const q = lugarLibre(id, p.x, p.y, 45, false);
+    if (q) ui.mouse = q;
+  }
+  // por qué no se puede (o '' si se puede)
+  function motivoNo(id, x, y) {
+    if (id === PODER) return game.poderListo() ? '' : game.active ? 'Aún se está cargando' : 'Se lanza durante una ronda';
+    if (id === PINCHOS) {
+      if (game.spikes.length >= PD.PINCHOS.max) return `Ya hay ${PD.PINCHOS.max} montones`;
+      if (game.money < game.spikeCost()) return `Te faltan ${fmt(game.spikeCost() - game.money)} de oro`;
+      return game.spikeSpot(x, y) ? '' : 'Tíralos sobre el camino';
+    }
+    const def = PD.TOWERS[id];
+    if (def.hero && game.hasHero()) return 'Ya tienes un héroe en el mapa';
+    if (game.canPlace(id, x, y)) return game.money < game.towerCost(id) ? `Te faltan ${fmt(game.towerCost(id) - game.money)} de oro` : '';
+    for (const t of game.towers) if (Math.hypot(x - t.x, y - t.y) < t.def.size + def.size + PD.TOWER_GAP) return 'Muy cerca de otra torre';
+    if (cercaCamino(x, y, PD.PATH_HALF + def.size - 3)) return 'Encima del camino';
+    return 'Aquí no se puede';
+  }
+  // El panel de confirmar (tapa la tienda mientras se coloca): qué es, cuánto cuesta, ✔ y ✕.
+  let colocaKey = '';
+  function renderColoca() {
+    const box = $('#coloca');
+    if (!ui.fantasma || !ui.placing || !game) { box.classList.add('hidden'); colocaKey = ''; return; }
+    box.classList.remove('hidden');
+    const id = ui.placing;
+    if (colocaKey !== id) {
+      colocaKey = id;
+      let nombre, sub, desc, ico, verbo;
+      if (id === PODER) { const P = PD.PODERES[game.L.poder]; nombre = P.icon + ' ' + P.name; sub = 'Poder del Reino'; desc = P.desc; verbo = 'Lanzar'; }
+      else if (id === PINCHOS) { nombre = 'Pinchos'; sub = 'Trampa · sobre el camino'; desc = `Cada enemigo de tierra que pasa encima recibe un golpe y gasta una púa (${PD.PINCHOS.puas} por montón). Duran hasta gastarse.`; verbo = 'Tirar'; ico = 'pinchos'; }
+      else { const d = PD.TOWERS[id]; nombre = (d.hero ? '♛ ' : '') + d.name; sub = d.hero ? 'Héroe · uno por partida' : (DTYPE[d.base.dtype] || 'Apoyo'); desc = d.desc; verbo = 'Colocar'; ico = id; }
+      box.innerHTML = `
+        <div class="inf-head">${ico ? '<canvas width="96" height="96"></canvas>' : ''}<div><h3>${nombre}</h3><div class="sub">${sub}</div></div></div>
+        <div class="col-acts"><button class="btn" id="col-no">✕ Cancelar</button><button class="btn go" id="col-si"><span class="cv">✔ ${verbo}</span><span class="cst"></span></button></div>
+        <div class="col-estado"></div>
+        <div class="col-tip">👆 Arrastra en el mapa para moverla, o toca donde la quieras.</div>
+        <p class="col-desc">${desc}</p>`;
+      const c = box.querySelector('canvas');
+      if (c && ico === 'pinchos') { const x = c.getContext('2d'); x.save(); x.scale(96 / 34, 96 / 34); PD.drawSpikes(x, 17, 18, 1); x.restore(); }
+      else if (c) towerIcon(c, ico, [0, 0]);
+      box.querySelector('#col-no').addEventListener('click', () => setPlacing(null));
+      box.querySelector('#col-si').addEventListener('click', confirmaColoca);
+    }
+    estadoColoca();
+  }
+  function estadoColoca() {
+    if (!ui.fantasma || !ui.placing || !game || !ui.mouse) return;
+    const id = ui.placing, box = $('#coloca'), p = ui.mouse;
+    const no = motivoNo(id, p.x, p.y);
+    const e = box.querySelector('.col-estado'), si = box.querySelector('#col-si');
+    if (!e || !si) return;
+    e.textContent = no ? '✘ ' + no : id === PODER ? '✔ Listo para lanzar' : '✔ Buen lugar';
+    e.classList.toggle('no', !!no);
+    si.disabled = !!no;
+    const c = id === PODER ? 0 : id === PINCHOS ? game.spikeCost() : game.towerCost(id);
+    si.querySelector('.cst').textContent = c ? ' · ' + fmt(c) : '';
+  }
+  function confirmaColoca() {
+    const id = ui.placing, p = ui.mouse;
+    if (!game || !id || !p || !ui.fantasma) return;
+    if (id === PODER) {
+      const ok = rec.poder(p.x, p.y);
+      sfx(ok ? 'place' : 'error', p.x);
+      if (ok) setPlacing(null);
+      return;
+    }
+    if (id === PINCHOS) {
+      const sp = rec.pinchos(p.x, p.y);
+      sfx(sp ? 'place' : 'error', p.x);
+      if (sp) { ui.ultimo = { x: p.x, y: p.y }; setPlacing(null); guardaQuieto(); }
+      return;
+    }
+    const t = rec.colocar(id, p.x, p.y);
+    if (!t) { sfx('error', p.x); estadoColoca(); return; }
+    sfx('place', p.x);
+    ui.ultimo = { x: p.x, y: p.y };
+    setPlacing(null);
+    guardaQuieto();
+    ui.selected = t; renderInfo();
+  }
+
   window.addEventListener('keydown', ev => {
     if (screen !== 'game' || !game) return;
     if (ui.modal) { if (ev.key === 'Escape' && ui.paused && !game.over) { closeModal(); ui.paused = false; } return; }
     const k = ev.key;
     if (k === ' ') { ev.preventDefault(); if (game.active) cycleSpeed(); else startRound(); return; }
+    if (k === 'Enter' && ui.fantasma) { confirmaColoca(); return; }
     if (k === 'Escape') { if (ui.placing) setPlacing(null); else if (ui.selected) { ui.selected = null; renderInfo(); } else openPause(); return; }
     if (k === 'f' || k === 'F') { cycleSpeed(); return; }
     if (k === 'p' || k === 'P') { openPause(); return; }
@@ -1165,7 +1448,7 @@
     updateAbilities();
     updatePoder();
     slowT -= dt;
-    if (slowT <= 0) { slowT = 0.2; updateShop(); refreshInfo(); if (ui.selected && game.towers.indexOf(ui.selected) < 0) { ui.selected = null; renderInfo(); } }
+    if (slowT <= 0) { slowT = 0.2; updateShop(); refreshInfo(); estadoColoca(); if (ui.selected && game.towers.indexOf(ui.selected) < 0) { ui.selected = null; renderInfo(); } }
   }
   requestAnimationFrame(loop);
 

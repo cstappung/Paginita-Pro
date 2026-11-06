@@ -60,7 +60,8 @@
   }
 
   /* `op`: {M (el motor, si no está en global), alTecla(ev), puede() →
-     bool (si se acepta tecleo ahora), ahora() → ms, aviso (texto del velo
+     bool (si se acepta tecleo ahora), ahora() → ms, registra(tipo, valor, t,
+     confiable) (la clasificación guarda cada entrada para rehacer la carrera), aviso (texto del velo
      sin foco)}. */
   function crear(host, op) {
     op = op || {};
@@ -142,18 +143,12 @@
     /* Lo que diga el campo, al motor. Un espacio en el medio (pegar,
        teclear muy rápido en el celular) se reparte: lo de antes cierra la
        palabra y lo de después empieza la siguiente. */
-    function alEntrar() {
+    function alEntrar(evento) {
       if (!s) return;
       if (!puede() || s.fin) { campo.value = s.esc; return; }
       const t = ahora(), desde = s.i;
-      const trozos = campo.value.split(" ");
-      let ev = null;
-      for (let k = 0; k < trozos.length; k++) {
-        if (k > 0) { const e = M.espacio(s, t); if (e) ev = e; if (s.fin) break; }
-        const e = M.escribe(s, trozos[k], t);
-        if (e) ev = e === "fin" || ev === "fin" ? "fin" : e === "mal" || ev === "mal" ? "mal" : e;
-        if (s.fin) break;
-      }
+      if (op.registra) op.registra(0, campo.value, t, !evento || evento.isTrusted !== false);
+      const ev = M.entrada(s, campo.value, t);
       if (s.libre && op.alarga) op.alarga(s);
       campo.value = s.esc;
       refresca(desde);
@@ -163,7 +158,11 @@
       if (!s) return;
       if (e.key === "Backspace" && campo.value === "" && puede()) {
         const v = M.retrocede(s);
-        if (v != null) { e.preventDefault(); campo.value = v; refresca(); if (op.alTecla) op.alTecla("atras", s); }
+        if (v != null) {
+          e.preventDefault(); campo.value = v; refresca();
+          if (op.registra) op.registra(1, "", ahora(), e.isTrusted !== false);
+          if (op.alTecla) op.alTecla("atras", s);
+        }
       }
       if (e.key === "Tab" && op.alTab) { e.preventDefault(); op.alTab(e); }
       if (e.key === "Enter" && op.alEnter) { e.preventDefault(); op.alEnter(e); }

@@ -34,6 +34,9 @@ export function categoriaClub(juego, categoria) {
     // Trigon: el puntaje de la partida, una tabla por modo (puntos = fácil, con poderes).
     : juego === 'trigon'
     ? /^club-trigon-(puntos|normal)$/.test(categoria)
+    // Type Race: las ppm de las palabras al azar en inglés, una tabla por largo.
+    : juego === 'typerace'
+    ? /^club-typerace-en-(10|25|50|100|200)$/.test(categoria)
     // PRO TILES: un top por canción y otro para la mezcla de las ocho.
     : juego === 'protiles'
     ? /^club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)$/.test(categoria)
@@ -50,9 +53,9 @@ export function categoriaClub(juego, categoria) {
     // PRO PACMAN: una sola tabla, el puntaje de la partida.
     : juego === 'propac'
     ? categoria === 'club-propac-puntos'
-    // PRO DEFENDER: la ronda récord de cada uno de los quince reinos.
+    // PRO DEFENDER: la ronda récord de cada uno de los veinte reinos.
     : juego === 'prodefender'
-    ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/.test(categoria)
+    ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche|jade|circo|biblioteca|estelar|tiempo)$/.test(categoria)
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|city|citypuro)$/.test(categoria)
     : juego === 'tetris'
@@ -100,6 +103,8 @@ export function resultadoClub(juego, dato) {
   if (dato.categoria === 'club-dosmil-ficha' && (dato.puntos > 262144 || (dato.puntos & (dato.puntos - 1)) !== 0)) return null;
   /* Trigon: el puntaje, hasta 1 000 000 (la racha multiplica el bono). */
   if (juego === 'trigon' && dato.puntos > 1000000) return null;
+  /* Type Race: las ppm, hasta las 330 que cree su verificador. */
+  if (juego === 'typerace' && dato.puntos > 330) return null;
   /* PRO TILES: notas más bonos de las largas, con el tope de su verificador. */
   if (juego === 'protiles' && dato.puntos > 1000000) return null;
   /* Pokelike: el puntaje (la Ruta Infinita no tiene techo; el de la regla

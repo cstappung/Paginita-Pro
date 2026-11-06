@@ -523,6 +523,21 @@ const SOLO = {
     { id: "p10k", n: "Diez mil triángulos", d: "Haz 10 000 puntos en una partida.", i: "💎", m: "Puntos", s: d => cat(/^club-trigon-(puntos|normal)$/)(d) && d.puntos >= 10000 },
     { id: "p20k", n: "Maestro del hexágono", d: "Haz 20 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/^club-trigon-(puntos|normal)$/)(d) && d.puntos >= 20000 }
   ],
+  /* Type Race. Todos salen de las ppm de una carrera clasificada, en cualquiera
+     de las cinco tablas (club-typerace-en-<palabras>): 40 ppm es teclear con
+     calma, 100 es muy bueno y por encima de 200 casi nadie pasa. */
+  typeraceclub: [
+    { id: "p30", n: "Dos dedos", d: "Llega a 30 ppm en una carrera de Type Race.", i: "⌨️", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 30 },
+    { id: "p45", n: "Agarrando ritmo", d: "Llega a 45 ppm en una carrera de Type Race.", i: "🐢", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 45 },
+    { id: "p60", n: "Mecanógrafo", d: "Llega a 60 ppm en una carrera de Type Race.", i: "📝", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 60 },
+    { id: "p80", n: "Ritmo de oficina", d: "Llega a 80 ppm en una carrera de Type Race.", i: "🖥️", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 80 },
+    { id: "p100", n: "Cien por minuto", d: "Llega a 100 ppm en una carrera de Type Race.", i: "💯", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 100 },
+    { id: "p120", n: "Pianista", d: "Llega a 120 ppm en una carrera de Type Race.", i: "🎹", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 120 },
+    { id: "p150", n: "Relámpago", d: "Llega a 150 ppm en una carrera de Type Race.", i: "⚡", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 150 },
+    { id: "p180", n: "Teclas calientes", d: "Llega a 180 ppm en una carrera de Type Race.", i: "🔥", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 180 },
+    { id: "p220", n: "Fuera de serie", d: "Llega a 220 ppm en una carrera de Type Race.", i: "🚀", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 220 },
+    { id: "p260", n: "¿Eres humano?", d: "Llega a 260 ppm en una carrera de Type Race.", i: "🤖", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 260 }
+  ],
   /* PRO PACMAN. Todos salen de club-propac-puntos (el récord): siete por
      puntaje y tres por lo que aguantó esa partida (tiempo de juego). Un
      nivel limpio da unos 4 000; los fantasmas y la racha, el resto. */
@@ -635,7 +650,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", typeraceclub: "club-typerace-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

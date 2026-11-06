@@ -228,6 +228,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > `soloPruebas`. Hasta volver a publicar las reglas, las partidas del modo
 > normal no entran en la clasificación.
 
+> **Type Race (octubre de 2026):** cinco categorías nuevas de `soloRanks` y
+> `soloPruebas`, `club-typerace-en-(10|25|50|100|200)` (las ppm de las palabras
+> al azar en inglés, una tabla por largo; entran en el tope común de 100 000),
+> y `typeraceclub` un juego nuevo de `clubJugadas`. Hasta volver a publicar las
+> reglas se juega igual, pero las carreras no entran en la clasificación y no
+> pagan monedas.
+
 > **PRO TILES (octubre de 2026):** nueve categorías nuevas de `soloRanks`
 > y `soloPruebas`, `club-protiles-(cristal|medianoche|calle|verano|neon|
 > latido|estrellas|despegue|mezcla)` (una por canción y la mezcla, puntos con
@@ -443,6 +450,17 @@ segundo y recibe la de los demás. Con seis en la sala son del orden de
 plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
 al mes; si se juega mucho conviene mirar el uso en la consola.
 
+### ⚠ Los beta testers (Pro Kingdoms) piden publicar otra vez (2026-11-02)
+
+Hay un nodo nuevo, `betaTesters/<uid>` = `{at, por}`: la lista de quién juega
+lo que todavía está a prueba (hoy, Pro Kingdoms). Solo un administrador la
+escribe, desde la pestaña **Beta testers** del panel (`#admin` en Juegos).
+Cada cuenta lee solo su propia entrada, y los administradores leen la lista
+entera. Hasta publicar las reglas, nadie es beta tester (la lectura falla) y
+el panel avisa que faltan. El arreglo es el de siempre: pega
+`firebase/database.rules.json` entero y **Publicar**. Después, agrégate tú
+también a la lista: ser administrador no te hace beta tester.
+
 ### ⚠ PRO DEFENDER guarda una sola partida por reino: pide publicar otra vez (2026-10-25)
 
 Cada ronda del récord de PRO DEFENDER es una partida nueva con la prueba entera
@@ -559,6 +577,17 @@ Además, una cuenta **suspendida** ya no puede escribir récords,
 partidas del club, podios, rachas, repeticiones ni el chat general (la misma
 condición que `vetados`, con la hora de fin). Hasta publicar, el panel avisa
 de que faltan las reglas y los jugadores no notan nada.
+
+### ⚠ El Pase del Reino de Pro Kingdoms pide publicar otra vez (2026-11-04)
+
+- `pkPase/<uid>/<período>` — `{at, p, s}`, la compra del Pase del Reino
+  (2.500 monedas). Lo lee cualquiera con sesión (el saldo de monedas lo suma),
+  lo escribe su dueño **una vez**, con la hora del servidor, el precio exacto y
+  el período de esa hora (`s` igual a la clave); no se reescribe ni se borra.
+- Con esta entrega hay que desplegar también la función (`firebase deploy
+  --only functions`, §5): es la que lee `pkPase` para abrir la pista dorada.
+
+Sin publicar, la compra falla con `PERMISSION_DENIED` y nadie paga nada.
 
 ### ⚠ Los super chats del chat general piden publicar otra vez
 
@@ -1012,3 +1041,89 @@ Avisos:
 - El repo pesa ~220 MB por el motor LaTeX (`vendor/busytex/`). El archivo
   más grande (99.7 MiB) queda justo bajo el límite de 100 MiB de GitHub.
 - GitHub Pages en cuentas gratuitas requiere que el repo sea **público**.
+
+## 5. Servidor de Pro Kingdoms (Cloud Functions)
+
+El mundo compartido de Pro Kingdoms (otros jugadores en tu mundo, mercado entre
+personas, gremios, chat, conquista y ranking) lo atiende una Cloud Function,
+`prokingdoms`, que está en la carpeta `functions/`. Usa el mismo servidor del
+juego (`juegos/prokingdoms/server/sim.js`) y guarda su estado en la RTDB
+(`prokingdoms/`, que nadie de la web puede leer). Pide el plan **Blaze**.
+**No se publica con un push**: se sube con la CLI de Firebase desde tu PC.
+Mientras `juegos/prokingdoms/servidor.json` tenga la `url` vacía, el juego
+sigue en modo local, como hasta ahora.
+
+Una vez:
+
+1. Instala la CLI de Firebase (necesitas Node 22 o más nuevo) e inicia sesión
+   con la cuenta dueña del proyecto:
+
+   ```
+   npm install -g firebase-tools
+   firebase login
+   ```
+
+2. En la carpeta del repo, actualizada (`git pull`), instala lo que usa la
+   función:
+
+   ```
+   cd functions
+   npm install
+   cd ..
+   ```
+
+3. Publica las reglas de la base (sección 1). Traen `betaTesters` y el nodo
+   cerrado `prokingdoms`. Lo de siempre: pega `firebase/database.rules.json`
+   en la consola y pulsa **Publicar**.
+
+4. Sube la función:
+
+   ```
+   firebase deploy --only functions --project mi-pagina-pro
+   ```
+
+   - La primera vez activa sola varias APIs de Google Cloud (Cloud Functions,
+     Cloud Build, Artifact Registry, Cloud Run, Eventarc) y tarda unos
+     minutos. Si pregunta algo, contesta que sí.
+   - Si pregunta cuántos días guardar las imágenes de contenedor, contesta
+     **1**: así no se acumulan y no cobran almacenamiento.
+   - Antes de subir, copia sola a `functions/juego/` lo que necesita del juego
+     (`prepara.js`, el predeploy de `firebase.json`).
+   - Al terminar muestra la dirección: `Function URL (prokingdoms(us-central1)):
+     https://prokingdoms-….a.run.app`. **Cópiala.** También responde en
+     `https://us-central1-mi-pagina-pro.cloudfunctions.net/prokingdoms`.
+
+5. Pon un tope de aviso de gasto: Google Cloud → Facturación → **Presupuestos y
+   alertas** → un presupuesto de 5 USD con aviso por correo (sección 0, punto
+   5). La función ya trae sus propios frenos: una sola instancia
+   (`maxInstances: 1`), un límite de pedidos por IP y por jugador, y el juego
+   sincroniza cada 15 s.
+
+6. Pega la dirección en `juegos/prokingdoms/servidor.json` (`"url": "https://…"`)
+   y publica el sitio. Desde ese momento, los beta testers que abren Pro
+   Kingdoms entran al mundo compartido: arriba ven «● Mundo 1» en vez de
+   «○ Modo local». Si el servidor no contesta o la cuenta no es beta tester,
+   el juego entra solo en modo local.
+
+Cada vez que cambie `functions/` o el servidor del juego
+(`juegos/prokingdoms/server/sim.js`, `js/data.js` o `js/world.js`), repite el
+paso 4.
+
+Para ver qué pasa: `firebase functions:log --only prokingdoms`. Lo sospechoso
+(recolección o recursos imposibles, ráfagas de pedidos) queda en ese registro
+y en `prokingdoms/sospechas` en la base. Para reiniciar el mundo de cero,
+borra el nodo `prokingdoms` en la consola y vuelve a subir la función (el
+paso 4 apaga la instancia vieja, que tenía el mundo en memoria).
+
+**Costo esperado**: $0 a esta escala. La capa gratis de Cloud Run (2 millones
+de pedidos y 180.000 vCPU-segundos al mes) alcanza para miles de horas de
+juego al mes; cada jugador conectado hace unos 240 pedidos por hora. Lo que
+la función lee de la base (el estado del mundo al arrancar en frío, la
+partida al entrar) cuenta como descarga de la RTDB. Escribir no se cobra.
+
+Probarla sin tocar la base real, con los emuladores:
+
+```
+firebase emulators:start --only auth,database,functions --project mi-pagina-pro
+cd functions && npm run prueba
+```

@@ -153,6 +153,7 @@ que se espera de cada uno:
 | ALETEO | `club-aleteo-vuelo` | semilla + tick de cada aleteo (física determinista a 1/60 s) | baja |
 | 2048 | `club-dosmil-puntos`, `club-dosmil-ficha` | semilla + dirección y Δms de cada jugada | baja |
 | Trigon | `club-trigon-puntos`, `club-trigon-normal` | semilla + pieza, traslación y Δms de cada jugada | baja |
+| Type Race | `club-typerace-en-<10\|25\|50\|100\|200>` | semilla + cuenta + cada entrada del campo de texto con su Δms | baja |
 | PRO TILES | `club-protiles-<canción>`, `club-protiles-mezcla` | semilla + cuenta + tick de cada nota (y altura de cada larga) sobre pasos fijos de 4 ms | baja |
 | Pokelike | `club-pokelike-puntos`, `club-pokelike-pokedex` | semilla + cuenta + inicial + cada decisión (camino, turno, captura, orden) | media |
 | PRO HERO | `club-hero-estrellas` | cada canción: el chart + cada acción con su instante, sobre la rejilla fija del motor; la tabla: la suma del mapa de estrellas | media |

@@ -22,7 +22,12 @@ test('cada juego de un jugador tiene adónde ir, manual y fecha',()=>{
   assert.ok(Number.isFinite(S.diasDesde(s.alta,Date.now())),s.id+' sin alta legible');
   /* Una pantalla de Juegos (`sitio`, los desafíos de plantilla) no tiene
      manual: su ayuda está dentro, y lleva a una ruta que leerRuta conoce. */
-  if(s.tipo==='sitio'){assert.ok(!s.reglas);assert.match(s.ruta,/^#cartas\/retos$/);assert.ok(S.COLOR_SOLO[s.id],s.id+' sin color');continue;}
+  if(s.tipo==='sitio'){
+   assert.ok(!s.reglas);assert.match(s.ruta,/^#(cartas\/retos|prokingdoms)$/);assert.ok(S.COLOR_SOLO[s.id],s.id+' sin color');
+   assert.ok(main.includes('h === "'+s.ruta.slice(1)+'"')||main.includes('h === "cartas" || h === "'+s.ruta.slice(1)+'"'),s.id+': leerRuta no conoce '+s.ruta);
+   assert.ok(fs.existsSync('../'+s.codigo),s.id+': no existe '+s.codigo);
+   continue;
+  }
   assert.match(reglas,new RegExp('^  "?'+s.reglas+'"?: \\{','m'),s.id+': el manual «'+s.reglas+'» no existe');
   if(s.tipo==='club'){
    /* La ruta tiene que ser una que `leerRuta` reconozca, o el clic
@@ -36,6 +41,20 @@ test('cada juego de un jugador tiene adónde ir, manual y fecha',()=>{
    assert.ok(fs.existsSync('../'+s.url.split('?')[0]),s.id+': no existe '+s.url);
   }
  }
+});
+
+/* Lo que está a prueba (`beta: true`, hoy Pro Kingdoms) solo entra en el
+   salón de un beta tester, y nunca es del invitado: ni siquiera lo ve. */
+test('lo que está en beta solo lo ven los beta testers',()=>{
+ const betas=S.SOLOS.filter(s=>s.beta).map(s=>s.id);
+ assert.deepEqual([...betas],['prokingdoms']);
+ const sin=S.entradasSalon(J).solos.map(e=>e.id),con=S.entradasSalon(J,undefined,{beta:true}).solos.map(e=>e.id);
+ for(const id of betas){assert.ok(!sin.includes(id),id+' se ve sin ser beta tester');assert.ok(con.includes(id),id+' no se ve siendo beta tester');}
+ assert.equal(con.length,sin.length+betas.length);
+ for(const id of betas)assert.equal(S.bloqueado(S.entradasSalon(J,undefined,{beta:true}).solos.find(e=>e.id===id),true),true,id+': el invitado no lo abre');
+ assert.ok(S.MOTIVO_CUENTA.prokingdoms.t&&S.MOTIVO_CUENTA.prokingdoms.d,'la puerta del invitado en #prokingdoms');
+ assert.match(main,/entradasSalon\(JUEGOS, orden, \{ beta: state\.beta === true \}\)/,'el salón filtra por la lista de beta testers');
+ assert.match(main,/fb\.watchBeta\(user\.uid/,'cada sesión escucha su propia entrada de betaTesters');
 });
 
 /* La ficha se busca por `data-id` en las dos listas, primero en la de un

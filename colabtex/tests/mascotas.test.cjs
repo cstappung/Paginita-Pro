@@ -238,8 +238,86 @@ test('la economía de antes (solo cartas) no cambia', () => {
   assert.equal(monedasDe('ana00001', fresco(d)).saldo, 500 - 80 + 100);
 });
 
+/* ---------- las piezas de regalo y las comidas que llenan más ---------- */
+const pieza = (d, u, at) => { const k = clave(); ((d.mascotas.p = d.mascotas.p || {})[u] = d.mascotas.p[u] || {})[k] = { at }; return k; };
+const regalaConPiezas = (d, u, at) => { const k = clave(); (d.mascotas.r[u] = d.mascotas.r[u] || {})[k] = { at, p: 0, z: 5 }; return { c: 'ob:' + u + '~' + k, k }; };
+const DIA = 86400000;
+
+test('piezas: a lo más PIEZAS_DIA por día de Chile, y cinco dan un regalo gratis', () => {
+  const d = base({ ana00001: 0 });
+  // Mediodía en Chile: las cuatro del mismo día; la cuarta no cuenta.
+  const t0 = Date.UTC(2026, 10, 3, 15);
+  for (let i = 0; i < 4; i++) pieza(d, 'ana00001', t0 + i * 600000);
+  let u = economia(fresco(d)).usuarios.ana00001;
+  assert.equal(MM.PIEZAS_DIA, 3);
+  assert.equal(u.piezas, 3, 'el tope del día');
+  const antes = regalaConPiezas(d, 'ana00001', t0 + DIA);          // con 3 no alcanza: no ocurre
+  pieza(d, 'ana00001', t0 + DIA + 1000);
+  pieza(d, 'ana00001', t0 + DIA + 2000);
+  const r = regalaConPiezas(d, 'ana00001', t0 + DIA + 3000);
+  const otro = regalaConPiezas(d, 'ana00001', t0 + DIA + 4000);    // ya gastó las cinco
+  const e = economia(fresco(d));
+  u = e.usuarios.ana00001;
+  assert.equal(e.dueno[antes.c], undefined);
+  assert.equal(e.dueno[r.c], 'ana00001');
+  assert.deepEqual({ ...e.regalos[r.c].item }, { ...MM.regalo('ana00001', r.k, t0 + DIA + 3000) });
+  assert.equal(e.dueno[otro.c], undefined);
+  assert.equal(u.piezas - u.piezasUsadas, 0);
+  const m = monedasDe('ana00001', fresco(d));
+  assert.equal(m.gastadas, 0, 'el regalo con piezas no cobra');
+  assert.equal(m.parada, false, 'ni para la cuenta');
+});
+
+test('un regalo con p: 0 sin z no es gratis: no existe', () => {
+  const d = base({ ana00001: 1000 });
+  for (let i = 0; i < 3; i++) pieza(d, 'ana00001', T + i * DIA);
+  for (let i = 0; i < 2; i++) pieza(d, 'ana00001', T + 3 * DIA + i);
+  const r = regala(d, 'ana00001', T + 5 * DIA, 0);
+  assert.equal(economia(fresco(d)).dueno[r.c], undefined);
+  assert.equal(monedasDe('ana00001', fresco(d)).saldo, 1000);
+});
+
+test('las piezas sobreviven a un cierre de la economía', () => {
+  const C = compila(`export { hacerCierre, sinRutas } from './juegos/cierre.js';`, { loader: { '.js': 'js' } });
+  const d = base({ ana00001: 0 });
+  d.cofres = {}; d.referidos = {}; d.superChat = {}; d.casino = {}; d.rock = {}; d.plantillas = {};
+  for (let i = 0; i < 3; i++) pieza(d, 'ana00001', T + i * DIA);
+  const c = C.hacerCierre(d, T + 3 * DIA);
+  const despues = Object.assign(C.sinRutas(d, c.archivar), { cierre: c.nodo });
+  for (let i = 0; i < 2; i++) pieza(despues, 'ana00001', T + 4 * DIA + i);
+  const r = regalaConPiezas(despues, 'ana00001', T + 4 * DIA + 10);
+  assert.equal(economia(fresco(despues)).dueno[r.c], 'ana00001');
+});
+
+test('las comidas premium y gourmet: su precio por ración y por separado de la común', () => {
+  const d = base({ ana00001: 5000 });
+  compra(d, 'ana00001', T + 1, { k: 'comida-premium', p: 120, n: 3 });
+  compra(d, 'ana00001', T + 2, { k: 'comida-gourmet', p: 140, n: 2 });
+  compra(d, 'ana00001', T + 3, { k: 'comida-premium', p: 20, n: 1 });   // mal precio: no existe
+  compra(d, 'ana00001', T + 4, { k: 'comida-caviar', p: 10, n: 1 });    // no existe
+  compra(d, 'ana00001', T + 5, { k: 'comida', p: 40, n: 2 });
+  const u = economia(fresco(d)).usuarios.ana00001;
+  assert.deepEqual({ ...u.comidas }, { premium: 3, gourmet: 2 });
+  assert.equal(u.comida, 2);
+  assert.equal(monedasDe('ana00001', fresco(d)).gastadas, 120 + 140 + 40);
+  // Más caras por punto de barra que la común, y redondas.
+  const porPunto = (p, k) => p / MM.LLENA[k];
+  assert.ok(porPunto(MM.PRECIO.comidas.premium, 'premium') > porPunto(MM.PRECIO.comida, 'comida'));
+  assert.ok(porPunto(MM.PRECIO.comidas.gourmet, 'gourmet') > porPunto(MM.PRECIO.comida, 'comida'));
+  for (const p of Object.values(MM.PRECIO.comidas)) assert.equal(p % 10, 0);
+});
+
+test('la suerte de las piezas crece con cada juego sin pieza', () => {
+  assert.equal(MM.probPieza(0), 0.25);
+  assert.ok(MM.probPieza(3) > MM.probPieza(1));
+  assert.equal(MM.probPieza(6), 1, 'a la séptima, segura');
+});
+
 test('las reglas tienen los precios del motor', () => {
   const r = fs.readFileSync(path.join(__dirname, '..', '..', 'firebase', 'database.rules.json'), 'utf8');
+  for (const [id, p] of Object.entries(MM.PRECIO.comidas)) assert.ok(r.includes(`'comida-${id}' && newData.child('n').isNumber() && newData.child('p').val() === ${p} * newData.child('n').val()`), 'comida ' + id);
+  assert.ok(r.includes("newData.child('p').val() === 0 && newData.child('z').val() === " + MM.PIEZAS_REGALO), 'regalo con piezas');
+  assert.ok(r.includes('data.val() <= now - ' + MM.PIEZA_RESPIRO), 'respiro entre piezas');
   assert.ok(r.includes("newData.child('p').val() === 500"), 'regalo');
   assert.ok(r.includes("newData.child('p').val() === 1000)"), 'poción');
   assert.ok(r.includes("20 * newData.child('n').val()"), 'comida');

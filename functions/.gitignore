@@ -1,0 +1,3 @@
+node_modules/
+# copia del juego que hace prepara.js antes de cada deploy (la fuente es juegos/prokingdoms/)
+juego/

@@ -135,7 +135,7 @@ test('el juego manda su récord en cada ronda y reenvía al abrir lo que no conf
 });
 
 test('las monedas: 20 × reino por ronda del récord, hasta 2000…10000, y solo la diferencia',()=>{
- assert.deepEqual(['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse','necropolis','esporas','espejos','archipielago','noche'].map(r=>M.monedasProdefender('club-prodefender-'+r,100)),[2000,4000,6000,8000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000]);
+ assert.deepEqual(['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse','necropolis','esporas','espejos','archipielago','noche','jade','circo','biblioteca','estelar','tiempo'].map(r=>M.monedasProdefender('club-prodefender-'+r,100)),[2000,4000,6000,8000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000]);
  assert.equal(M.monedasProdefender('club-prodefender-noche',42),4200,'la tercera era también paga 100 por ronda');
  assert.equal(M.monedasProdefender('club-prodefender-fosa',37),3700,'la segunda era paga 100 por ronda, como el Vacío');
  assert.equal(M.monedasProdefender('club-prodefender-prado',60),1200);
@@ -150,15 +150,15 @@ test('las monedas: 20 × reino por ronda del récord, hasta 2000…10000, y solo
 });
 
 test('categorías, topes y reglas de Firebase',()=>{
- for(const r of ['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse','necropolis','esporas','espejos','archipielago','noche'])assert.ok(C.categoriaClub('prodefender','club-prodefender-'+r),r);
+ for(const r of ['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse','necropolis','esporas','espejos','archipielago','noche','jade','circo','biblioteca','estelar','tiempo'])assert.ok(C.categoriaClub('prodefender','club-prodefender-'+r),r);
  assert.equal(C.categoriaClub('prodefender','club-prodefender-otro'),false);
  const ok={categoria:'club-prodefender-prado',puntos:100,tiempo:5,partida:'a-b'};
  assert.ok(C.resultadoClub('prodefender',ok));
  assert.equal(C.resultadoClub('prodefender',{...ok,puntos:101}),null);
  assert.equal(V.juegoDeCategoria('club-prodefender-vacio'),'prodefender');
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
- assert.equal((reglas.match(/club-prodefender-\(prado\|dunas\|glaciar\|caldera\|vacio\|pantano\|cumbres\|fosa\|engranajes\|eclipse\|necropolis\|esporas\|espejos\|archipielago\|noche\)/g)||[]).length,2,'soloRanks y soloPruebas');
- assert.deepEqual(P.REINOS,['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse','necropolis','esporas','espejos','archipielago','noche'],'prueba.js conoce los quince reinos');
+ assert.equal((reglas.match(/club-prodefender-\(prado\|dunas\|glaciar\|caldera\|vacio\|pantano\|cumbres\|fosa\|engranajes\|eclipse\|necropolis\|esporas\|espejos\|archipielago\|noche\|jade\|circo\|biblioteca\|estelar\|tiempo\)/g)||[]).length,2,'soloRanks y soloPruebas');
+ assert.deepEqual(P.REINOS,['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse','necropolis','esporas','espejos','archipielago','noche','jade','circo','biblioteca','estelar','tiempo'],'prueba.js conoce los veinte reinos');
  assert.match(reglas,/beginsWith\('club-prodefender-'\) \|\| newData\.val\(\) <= 100/);
  // El juego carga el mismo motor que el verificador, con el mismo ?v=.
  const html=fs.readFileSync(path.join(D,'../index.html'),'utf8'),trab=fs.readFileSync(D+'verificador.js','utf8'),verif=fs.readFileSync('src/juegos/solo/verifica/prodefender.js','utf8');
@@ -301,7 +301,7 @@ test('rondas altas: llegan los grandes (supertanques y superglobos) que se abren
    misma VERSION). */
 test('segunda era: un reino por día desde el 22 de octubre de 2026, con su tabla, su defensa, su héroe y menos defensas',async()=>{
  assert.equal(PD.PUBLIC_LEVELS,5);
- assert.equal(PD.LEVELS.length,15);
+ assert.equal(PD.LEVELS.length,20);
  assert.deepEqual(PD.LEVELS.slice(5,10).map(L=>L.abre),['2026-10-22','2026-10-23','2026-10-24','2026-10-25','2026-10-26']);
  assert.match(PD.diaChile(),/^\d{4}-\d{2}-\d{2}$/);
  for(let li=0;li<5;li++)assert.ok(PD.abierto(li,'2000-01-01'),'los cinco de siempre están siempre abiertos');
@@ -732,4 +732,188 @@ test('versión 5: el control se afloja de a poco y nunca se corta; los jefes no 
  const J=g.spawn(jefe,0,200,1,2);g.applySlow(J,0.6,5);g.applyFreeze(J,5);g.applyStun(J,5);
  assert.equal(J.slowF,0);assert.equal(J.frozenT,0);assert.equal(J.stunT,0);
  const J4=v4.spawn(jefe,0,200,1,2);v4.applySlow(J4,0.6,5);assert.ok(J4.slowF>0,'en la 4 sí');
+});
+
+/* Cuarta era (reinos 16–20): un reino por día del 1 al 5 de noviembre, con cinco héroes
+   nuevos para elegir, una defensa nueva por reino, jefes nuevos y eventos de titanes desde
+   la ronda 60. Todo depende de era: 4 o de campos nuevos, así que los quince reinos
+   anteriores se juegan igual (comprobado con la misma partida guionizada en el motor viejo
+   y el nuevo). */
+const nuevo4=(li,seed)=>{const g=new PD.Game(li,null,seed||4);g.money=1e7;g.active=true;g.queue=[{t:1e9}];g.qi=0;g.hurryT=1e9;g.rt=0;return g;};
+const CUARTA=[15,16,17,18,19],HEROES4=['heroejade','heroecirco','heroebiblio','heroeestelar','heroetiempo'];
+
+test('cuarta era: cinco reinos, uno por día del 1 al 5 de noviembre, con su tabla, su defensa y cinco héroes nuevos',()=>{
+ assert.deepEqual(CUARTA.map(li=>PD.LEVELS[li].abre),['2026-11-01','2026-11-02','2026-11-03','2026-11-04','2026-11-05']);
+ assert.deepEqual(CUARTA.map(li=>PD.abierto(li,'2026-10-31')),[false,false,false,false,false]);
+ assert.deepEqual(CUARTA.map(li=>PD.abierto(li,'2026-11-03')),[true,true,true,false,false]);
+ assert.deepEqual(CUARTA.map(li=>P.categoria(li)),['club-prodefender-jade','club-prodefender-circo','club-prodefender-biblioteca','club-prodefender-estelar','club-prodefender-tiempo']);
+ for(const li of CUARTA){
+  const L=PD.LEVELS[li],ids=PD.towersFor(li);
+  assert.equal(L.era,4);assert.ok(L.diff>=PD.nivel(14,5).diff,L.short+' no es más fácil que la Noche');
+  assert.deepEqual(PD.heroesOf(li),HEROES4,'los cinco héroes nuevos, y solo ellos');
+  assert.equal(PD.heroOf(li),null,'no hay héroe fijo: se elige');
+  assert.equal(ids.filter(id=>!PD.TOWERS[id].hero&&PD.TOWERS[id].realm===li).length,1,L.short+': su defensa nueva');
+  assert.ok(PD.ENEMIES[L.boss].boss&&PD.PODERES[L.poder],'jefe y poder');
+  for(const [id] of L.pool)assert.ok(PD.ENEMIES[id],id);
+  for(const id of L.torres)assert.ok(PD.TOWERS[id],id);
+  for(const id of [...L.eventos,...L.eventosTarde])assert.ok(PD.EVENTOS[id],id);
+  assert.ok(L.eventosTarde.every(id=>PD.EVENTOS[id].tarde),'los tardíos son de los nuevos');
+  assert.equal(P.reinoDe(P.categoria(li)),li);assert.ok(C.categoriaClub('prodefender',P.categoria(li)));
+  // eventos: hasta la 58 cada cinco rondas, desde la 60 en las que acaban en 2, 5 y 8
+  const R=PD.buildRounds(li),ev=R.map((x,i)=>x.evento?i+1:0).filter(Boolean);
+  assert.deepEqual(ev.filter(r=>r<60),[8,13,18,23,28,33,38,43,48,53,58]);
+  assert.deepEqual(ev.filter(r=>r>=60),[62,65,68,72,78,82,85,88,92,95,98]);
+  for(const r of ev.filter(r=>r>=60))assert.ok(PD.EVENTOS[R[r-1].evento].tarde,'R'+r+' trae un evento de titanes');
+  for(const R1 of R)for(const g of R1.groups)if(g.titan)assert.ok(PD.ENEMIES[g.type].big&&R1.evento==='titanes','el grupo extra es de grandes');
+ }
+ assert.ok(CUARTA.some(li=>PD.buildRounds(li).some(R=>R.groups.some(g=>g.titan))),'la Marcha de los Titanes trae su grupo');
+ // las flotas: desde `flota.desde` (la 50), cada ronda sin jefe trae muchos de los grandes más altos de la escalera
+ for(const li of CUARTA){
+  const R=PD.buildRounds(li),f=r=>R[r-1].groups.find(g=>g.flota);
+  for(let r=1;r<=100;r++){const F=f(r);if(r<PD.LEVELS[li].flota.desde||R[r-1].boss)assert.ok(!F,'R'+r+' sin flota');else{assert.ok(F&&PD.ENEMIES[F.type].big&&F.n>=2,PD.LEVELS[li].short+' R'+r+' con flota');}}
+  assert.ok(PD.ENEMIES[f(99).type].rank>=3&&f(99).n>=8,PD.LEVELS[li].short+': al final, muchos de lo más alto ('+f(99).type+' x'+f(99).n+')');
+ }
+ for(let li=0;li<15;li++)assert.ok(!PD.buildRounds(li).some(R=>R.groups.some(g=>g.flota)),'los reinos de antes no tienen flotas');
+ // la flota paga ¼ del oro (y sus hijos también): si pagara entero, más flota sería más economía
+ const gf=nuevo4(19),norm=gf.spawn('arca',0,300,1),fl=gf.spawn('arca',0,300,1);fl.flota=true;
+ assert.equal(gf.oroDe(fl),gf.oroDe(norm)/4);
+ const n0=gf.enemies.length;gf.damage(fl,1e12,'arcane',null,{});const hijos=gf.enemies.slice(n0);
+ assert.ok(hijos.length&&hijos.every(h=>h.flota),'los hijos de la flota también');
+ // y entra a la ronda desde la cola
+ const gq=new PD.Game(19,null,3);gq.round=61;gq.pactos=[0,10,20,30,40,50,60].map(r=>({r,id:null}));gq.lives=1e9;gq.startRound();assert.ok(gq.queue.some(q=>q.flota));
+ for(let k=0;k<60*90&&!gq.enemies.some(e=>e.flota);k++)gq.update(1/60);assert.ok(gq.enemies.some(e=>e.flota&&e.d.big));
+ // los cinco nuevos no entran en la tercera era, que sigue con sus diez
+ for(let li=10;li<15;li++){assert.equal(PD.heroesOf(li).length,10);assert.ok(!PD.heroesOf(li).some(id=>PD.TOWERS[id].era4));}
+ // un solo héroe por partida, de los cinco
+ const g=nuevo4(15);assert.ok(ponCerca(g,'heroejade',300,400));assert.equal(ponCerca(g,'heroetiempo',700,400),null);
+ assert.equal(ponCerca(nuevo4(15),'heroeprado',300,400)&&PD.towersFor(15).includes('heroeprado'),false,'los de antes no se venden aquí');
+ for(const id of HEROES4){const d=PD.TOWERS[id];assert.ok(PD.ABILITIES[d.base.ability],id);assert.equal(d.paths[0].ups.length,5);assert.equal(d.paths[1].ups.length,5);}
+});
+
+test('cuarta era: las mecánicas de los atacantes nuevos',()=>{
+ let g=nuevo4(15);
+ // Terracota: en formación recibe la mitad
+ const solo=g.spawn('terracota',0,200,1);solo.hp=solo.maxHp=1e6;g.updateEnemies(1/60);
+ const d1=g.damage(solo,100,'arcane',null,{});
+ for(const k of [0,1,2])g.spawn('terracota',0,600+k*20,1).hp=1e6;
+ const tf=g.enemies.filter(e=>e.type==='terracota'&&e.dist>=600);for(const e of tf)e.maxHp=1e6;g.updateEnemies(1/60);
+ assert.ok(tf[1].falangeOn,'en falange');assert.ok(Math.abs(g.damage(tf[1],100,'arcane',null,{})-d1/2)<1e-6,'la mitad');
+ // Monje: esquiva parte de los proyectiles (con el azar de la partida)
+ g=nuevo4(15);const t=ponCerca(g,'espinas',400,200);let esq=0;
+ for(let k=0;k<200;k++){const m=g.spawn('monje',0,300,1);m.hp=m.maxHp=1e6;g.grid.clear();g.grid.add(m);g.projs=[];g.fireProjectile(t,m.x,m.y,0,{dmg:1,speed:1,life:1});g.updateProjectiles(1/60);if(m.hp===m.maxHp)esq++;m.dead=true;}
+ assert.ok(esq>30&&esq<90,'esquiva cerca del 30% ('+esq+'/200)');
+ // Malabarista: con malabares atrapa el proyectil
+ g=nuevo4(16);const t2=ponCerca(g,'espinas',400,200),mb=g.spawn('malabarista',0,300,1);mb.malabT=1;g.grid.clear();g.grid.add(mb);
+ g.fireProjectile(t2,mb.x,mb.y,0,{dmg:50,speed:1,life:1});g.updateProjectiles(1/60);assert.equal(mb.hp,mb.maxHp);assert.equal(g.projs.length,0,'atrapado');
+ // Payaso: al caer salen dos enemigos de su caja
+ const n0=g.enemies.length,py=g.spawn('payaso',0,300,1);g.damage(py,1e9,'arcane',null,{});assert.equal(g.enemies.length,n0+3);
+ // Erudito: el contrahechizo anula un golpe y apaga la torre
+ g=nuevo4(17);const t3=ponCerca(g,'espinas',400,200),er=g.spawn('erudito',0,300,1);er.contraOn=true;
+ assert.equal(g.damage(er,50,'phys',t3,{}),0);assert.ok(t3.disabledT>0,'apagada');assert.ok(g.damage(er,50,'phys',t3,{})>0,'el siguiente sí entra');
+ // Meteorito: lo explosivo lo parte en dos, una vez
+ g=nuevo4(18);const me=g.spawn('meteorito',0,300,1);me.hp=me.maxHp=1000;const n1=g.enemies.length;
+ g.damage(me,100,'explosive',null,{ap:1});assert.equal(g.enemies.length,n1+1);const otro=g.enemies[g.enemies.length-1];
+ assert.ok(Math.abs(me.hp-otro.hp)<1e-6&&me.partido&&otro.partido);g.damage(me,10,'explosive',null,{ap:1});assert.equal(g.enemies.length,n1+1,'una sola vez');
+ // Marciano: se clona (los clones no) y dan poco oro
+ const ma=g.spawn('marciano',0,300,1);ma.clonaT=0.01;g.update(1/60);g.update(1/60);
+ const cl=g.enemies.find(e=>e.clon);assert.ok(cl,'clon');assert.ok(g.oroDe(cl)<g.oroDe(ma));
+ // Platillo: lleva hacia adelante al de atrás
+ const ov=g.spawn('ovni',0,500,1),atras=g.spawn('brote',0,430,1);ov.abduceT=0.01;const da=atras.dist;g.update(1/60);g.update(1/60);assert.ok(atras.dist>da+90,'abducido');
+ // Autómata de cuerda: cada vez más rápido
+ g=nuevo4(19);const cu=g.spawn('cuerda',0,100,1);cu.cuerdaT=0;const v0=g.velCuarta(cu);cu.cuerdaT=30;assert.ok(g.velCuarta(cu)>v0*2);
+ // Eco del Pasado: le suma recarga a la torre
+ const t4=ponCerca(g,'espinas',400,200),ec=g.spawn('ecoTiempo',0,300,1);t4.cdT=0;g.damage(ec,1,'phys',t4,{});assert.ok(Math.abs(t4.cdT-0.3)<1e-9);
+ // Guardián del Reloj: fuera del tiempo
+ const gu=g.spawn('guardianReloj',0,300,1);g.applyStun(gu,3);g.applySlow(gu,0.5,3);g.applyFreeze(gu,3);g.detiene(gu,3,1,null,true);
+ assert.equal(gu.stunT,0);assert.equal(gu.slowF,0);assert.equal(gu.frozenT,0);assert.ok(!(gu.paradoT>0));
+});
+
+test('cuarta era: los cinco jefes nuevos',()=>{
+ // Emperador Dragón: cambia de forma (blindaje y velocidad) y se traga su perla una vez
+ let g=nuevo4(15);const em=g.spawn('emperadorDragon',0,300,1,2);
+ assert.equal(em.forma,'tierra');const vt=g.velCuarta(em),dt=g.damage(em,100,'phys',null,{});em.formaT=0.01;g.update(1/60);
+ assert.equal(em.forma,'cielo');assert.ok(g.velCuarta(em)>vt*2);assert.ok(g.damage(em,100,'phys',null,{})>dt,'sin blindaje entra más');
+ em.hp=em.maxHp*0.4;g.update(1/60);assert.ok(em.perlaUsada&&em.hp>em.maxHp*0.55);em.hp=em.maxHp*0.4;g.update(1/60);assert.ok(em.hp<em.maxHp*0.45,'una sola vez');
+ // Carcajada: baraja dos torres y da su Gran Función
+ g=nuevo4(16);const a=ponCerca(g,'espinas',200,200),b=ponCerca(g,'prisma',800,450),pa=[a.x,a.y],pb=[b.x,b.y];
+ const rc=g.spawn('reyCirco',0,300,1,2);rc.barajaT=0.01;g.update(1/60);g.update(1/60);
+ assert.deepEqual([a.x,a.y],pb);assert.deepEqual([b.x,b.y],pa);
+ const n=g.enemies.length;rc.shield=0;rc.hp=rc.maxHp*0.2;g.update(1/60);assert.ok(rc.invulnT>2&&g.enemies.length>=n+6,'invulnerable y con payasos');
+ // El Códice: roba el saber de las torres que más daño hicieron y escribe capítulos
+ g=nuevo4(17);const t1=ponCerca(g,'espinas',300,200);t1.dealt=500;const co=g.spawn('codice',0,200,1,2);co.x=t1.x;co.y=t1.y+60;co.hp=co.maxHp*0.9;co.robaT=0.01;
+ const hp0=co.hp;g.cuartaEra(co,co.d,1/60,false,1,false);assert.ok(t1.robadoT>0&&co.hp>hp0);
+ const mi=g.spawn('brote',0,400,1);co.hp=co.maxHp*0.7;g.cuartaEra(co,co.d,1/60,false,1,false);assert.ok(mi.shield>0&&mi.maxShield>=mi.maxHp*0.25,'capítulo: escudo para todos');
+ // Vórtex: pozos que aceleran y desvía proyectiles
+ g=nuevo4(18);const vx=g.spawn('vortex',0,300,1,2);vx.pozoT=0.01;g.update(1/60);g.update(1/60);assert.equal(g.pozos.length,1);
+ const p0=g.pozos[0],pi=g.spawn('brote',0,0,1);pi.x=p0.x;pi.y=p0.y;g.aurasCuarta(g.enemies,1/60);assert.equal(pi.pozoF,2);
+ let desv=0;const tv=ponCerca(g,'espinas',600,300);for(let k=0;k<100;k++){g.projs=[];g.fireProjectile(tv,vx.x-30,vx.y,0,{dmg:1,speed:600,life:1});const p=g.projs[0],v=p.vy;g.updateProjectiles(1/60);if(Math.abs(p.vy-v)>1)desv++;}
+ assert.ok(desv>25&&desv<75,'desvía cerca de la mitad ('+desv+')');
+ // Aion: rebobina su vida y su Paradoja frena las torres cercanas
+ g=nuevo4(19);const ai=g.spawn('aion',0,300,1,2);const tt=ponCerca(g,'espinas',ai.x,ai.y-70);
+ for(let k=0;k<60*7;k++){ai.dist=300;g.cuartaEra(ai,ai.d,1/60,false,1,false);}
+ ai.hp=ai.maxHp*0.3;ai.rebT=0.01;g.cuartaEra(ai,ai.d,1/60,false,1,false);assert.ok(ai.hp>ai.maxHp*0.9,'vuelve a la vida de hace 6 s');
+ ai.paraT=0.01;g.cuartaEra(ai,ai.d,1/60,false,1,false);assert.ok(tt.paradojaT>0,'paradoja');
+});
+
+test('cuarta era: las defensas nuevas',()=>{
+ // Pagoda de Jade: marca, y el marcado que muere estalla sobre los de al lado
+ let g=nuevo4(15);const pj=ponCerca(g,'jade',400,200),e1=g.spawn('robusto',0,300,1),e2=g.spawn('robusto',0,310,1);
+ e2.hp=e2.maxHp=1e6;g.marcaJade(e1,pj.s,pj);g.grid.clear();g.grid.add(e1);g.grid.add(e2);g.damage(e1,1e6,'arcane',null,{});
+ assert.ok(g.jadeQ.length===1);g.estallidos();assert.ok(e2.hp<e2.maxHp,'el estallido daña al vecino');
+ // Ruleta: con la misma semilla tira lo mismo, y a veces critica
+ const tira=()=>{const h=nuevo4(16,77),r=ponCerca(h,'ruleta',400,200),e=h.spawn('robusto',0,300,1);let s=0,c=0;for(let k=0;k<300;k++){const d=h.ruleta(e,{src:r},10);s+=d;if(d>10)c++;}return [s,c];};
+ const [s1,c1]=tira();assert.deepEqual(tira(),[s1,c1]);assert.ok(c1>40,'hay críticos');
+ // Grimorio: aprende de cada muerte y no lo olvida (va en la foto)
+ g=nuevo4(17);const gr=ponCerca(g,'grimorio',400,200);for(let k=0;k<5;k++)g.damage(g.spawn('brote',0,300,1),1e6,'arcane',gr,{});
+ assert.equal(gr.saber,5);const foto=g.snapshot();assert.equal(foto.towers.find(t=>t.type==='grimorio').sb,5);
+ assert.equal(new PD.Game(17,JSON.parse(JSON.stringify(foto)),1).towers.find(t=>t.type==='grimorio').saber,5);
+ assert.ok(!('sb' in new PD.Game(0,null,1).snapshot().towers),'las fotos de antes no cambian');
+ // Satélite: alcanza a cualquiera del mapa y lo quema
+ g=nuevo4(18);const sa=ponCerca(g,'satelite',100,600),lej=g.spawn('robusto',0,1500,1);lej.hp=lej.maxHp=1e6;
+ for(let k=0;k<60*12;k++){lej.dist=1500;g.grid.clear();g.grid.add(lej);g.updateTowers(1/60);}assert.ok(lej.hp<lej.maxHp,'el haz llegó');
+ // Cronotorre: detiene (no a los jefes) y cobra al volver
+ g=nuevo4(19);const cr=ponCerca(g,'crono',300,200),en=g.spawn('robusto',0,0,1);en.hp=en.maxHp=1e6;
+ const cerca=g.enemies.filter(e=>e===en);en.x=cr.x+40;en.y=cr.y;g.tCrono(cr,cr.s,0.1);assert.ok(en.paradoT>0);
+ g.damage(en,1000,'arcane',null,{});const antes=en.hp;en.paradoT=0.001;g.cuartaEra(en,en.d,1/60,false,1,false);assert.ok(Math.abs((antes-en.hp)-500)<1e-6,'cobra la mitad de lo recibido');
+ const bo=g.spawn('aion',0,0,1,2);bo.x=cr.x+40;bo.y=cr.y;cr.cdT=0;g.tCrono(cr,cr.s,0.1);assert.ok(!(bo.paradoT>0),'al jefe no lo detiene');
+});
+
+test('cuarta era: habilidades de los héroes y eventos de titanes',()=>{
+ let g=nuevo4(15);const hk=ponCerca(g,'heroejade',400,300);g.spawn('robusto',0,300,1);g.spawn('robusto',1,200,1);
+ g.useAbility(hk);assert.ok(g.enemies.every(e=>e.jadeT>0),'el Dragón marca a todos');
+ g=nuevo4(16);const hm=ponCerca(g,'heroecirco',400,300),dl=g.spawn('robusto',0,1500,1),tr=g.spawn('robusto',0,100,1);dl.hp=dl.maxHp=tr.hp=tr.maxHp=1e7;
+ g.useAbility(hm);assert.equal(Math.round(dl.dist),100);assert.equal(Math.round(tr.dist),1500);
+ g=nuevo4(17);const hb=ponCerca(g,'heroebiblio',400,300),bl=g.spawn('blindado',0,300,1);bl.hp=bl.maxHp=1e6;const d0=g.damage(bl,20,'phys',null,{});
+ g.useAbility(hb);assert.ok(g.escritoT>0);assert.ok(g.damage(bl,20,'phys',null,{})>d0,'ignora el blindaje');
+ g=nuevo4(18);const hv=ponCerca(g,'heroeestelar',400,300),ad=g.spawn('robusto',0,1500,1),at=g.spawn('robusto',0,100,1);ad.hp=ad.maxHp=at.hp=at.maxHp=1e7;
+ g.useAbility(hv);assert.ok(ad.maxHp-ad.hp>at.maxHp-at.hp,'al más adelantado, más');
+ g=nuevo4(19);const hc=ponCerca(g,'heroetiempo',400,300),q=g.spawn('robusto',0,300,1);q.hp=q.maxHp=1e6;g.useAbility(hc);assert.ok(q.paradoT>0);
+ // eventos
+ g=nuevo4(19);g.evento={id:'elite',a:2,b:3,n:0};const es=[];for(let k=0;k<8;k++){const e=g.spawn('robusto',0,100,1);g.alAparecer(e);es.push(e);}
+ assert.equal(es.filter(e=>e.elite).length,2);const el=es.find(e=>e.elite);g.applySlow(el,0.5,3);assert.equal(el.slowF,0,'la élite no se frena');
+ g.evento={id:'runas',a:2,b:3,n:0};const ru=g.spawn('robusto',0,100,1);g.alAparecer(ru);assert.ok(Math.abs(ru.shield-ru.maxHp*0.4)<1e-9);
+ g.evento={id:'furia',a:2,b:3,n:0};const fu=g.spawn('robusto',0,100,1);const vf=g.velCuarta(fu);fu.hp=fu.maxHp*0.3;assert.ok(Math.abs(g.velCuarta(fu)-vf*1.5)<1e-9);
+ g.evento={id:'vital',a:2,b:3,n:0};const vi=g.spawn('robusto',0,100,1);vi.hp=vi.maxHp*0.5;g.cuartaEra(vi,vi.d,1,false,1,false);assert.ok(vi.hp>vi.maxHp*0.51);
+ g.evento={id:'portales',a:0.01,b:3,n:0};const po=g.spawn('robusto',0,400,1);g.enemies=[po];g.tickCuarta(1/60);assert.ok(po.dist>=499);
+ g.evento={id:'terremoto',a:0.01,b:3,n:0};const tq=ponCerca(g,'espinas',300,300);g.tickCuarta(1/60);assert.ok(tq.disabledT>0);
+});
+
+test('cuarta era: la partida se rehace igual con pactos, poderes, eventos y recargas',()=>{
+ for(const li of CUARTA){
+  let a=31+li;const azar=()=>{a=(a*1103515245+12345)>>>0;return a/4294967296;};
+  let G=new P.Grabadora(li,'uidC4',null);const ids=PD.towersFor(li).filter(id=>!PD.TOWERS[id].hero),nueva=ids.find(id=>PD.TOWERS[id].realm===li);
+  const vistas=[];
+  for(let r=0;r<14&&!G.game.over;r++){
+   const g=G.game;
+   if(g.pactoPendiente())assert.ok(G.pacto(Math.floor(azar()*4)));
+   for(let k=0;k<8;k++){const ty=k%4===1?nueva:ids[Math.floor(azar()*ids.length)];if(g.money>=g.towerCost(ty))for(let q=0;q<80;q++)if(G.colocar(ty,30+azar()*940,30+azar()*580))break;const t=g.towers[Math.floor(azar()*g.towers.length)];if(t&&azar()<0.5)G.mejorar(t,azar()<0.5?0:1);}
+   if(r===5)G=new P.Grabadora(li,'uidC4',JSON.parse(JSON.stringify(G.guardado())));
+   G.ronda();
+   while(G.game.active&&!G.game.over){G.tick();if(G.game.poderListo()&&G.game.enemies.length){const e=G.game.enemies[0];G.poder(e.x,e.y);}}
+   if(!G.game.over)vistas.push({r:G.game.round,t:G.tiempo(),p:JSON.parse(JSON.stringify(G.prueba()))});
+  }
+  assert.ok(vistas.length>1,PD.LEVELS[li].short+' jugó varias rondas');
+  const cache=new Map();
+  for(const v of vistas){const x=P.rehace(v.p,'uidC4',cache);assert.equal(x.ronda,v.r);assert.equal(x.tiempo,v.t);}
+ }
 });

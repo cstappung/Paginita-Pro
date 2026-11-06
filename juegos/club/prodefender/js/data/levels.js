@@ -288,6 +288,123 @@
         ['sombra', 9, 1], ['martir', 11, 0.8], ['bruma', 13, 0.8], ['blindado', 14, 1], ['divisor', 15, 1], ['seta', 17, 0.7], ['templario', 19, 0.7],
         ['reflejo', 21, 0.7], ['gargola', 23, 0.6], ['portador', 25, 0.8], ['galeon', 28, 0.8], ['zepelin', 30, 0.8], ['titan', 46, 0.7],
         ['fortaleza', 54, 0.8], ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7], ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
+    },
+
+    // ======================= CUARTA ERA: reinos 16–20 ========================
+    // «La Era de los Titanes». Como la tercera (pactos, eventos, Poder del Reino, `abre`, cada
+    // reino pide la ronda 50 del anterior) y además (era: 4):
+    //  - `heroes: 'cuarta'`: se elige uno de los CINCO héroes nuevos (towers.js: era4).
+    //  - `torres`: lo de siempre (una defensa nueva por reino, menos clásicas).
+    //  - Sin ley: lo propio de cada reino son sus atacantes y su jefe.
+    //  - `eventosTarde`: desde la ronda 60, los eventos son los de PD.EVENTOS con `tarde` (más
+    //    duros, con más enemigos fuertes) y llegan más seguido (buildRounds).
+    //  - `grandes`: desde la 60 pesan más los grandes al armar las rondas.
+    //  - `flota`: desde la 50, FLOTAS de los grandes más altos de la escalera que pagan ¼ del oro
+    //    (buildRounds, abajo). Es lo que más endurece el final (pedido del dueño: muchos de los
+    //    más duros, no solo más vida); `vidaTarde` sube de x1 en la 20 hasta x7–x15 en la 100.
+    //  - Ninguno vende el Desintegrador, y Jade y Tiempo tampoco el Dragón: el % de vida y el
+    //    fuego que ignora blindaje anulaban la vida y las flotas (el bot no perdía nada).
+    //  Medido con prodefender-bot --ayuda 100 --vida 0.15 (ver CLAUDE.md, «Fourth era»).
+    //  Solo hay números de la versión 5 (se estrenan con ella), así que no llevan `v5`.
+    {
+      name: 'Templo de Jade', short: 'Jade', slug: 'jade', abre: '2026-11-01', era: 4, musica: 0,
+      subtitle: 'Escalinatas entre bambúes, monjes que esquivan y un dragón que despierta.',
+      diff: 5.6, pactoPrecio: 0.12, vidaTarde: { desde: 20, hasta: 100, x: 11 }, grandes: 1.5, flota: { desde: 50, de: 0.15, a: 2.0, max: 28 }, lives: 70, cash: 1150, seed: 16193, stars: 5,
+      theme: { bg1: '#2a6a4a', bg2: '#1e5a3e', path: '#c8b088', pathEdge: '#5a3a1a', deco: 'jade', accent: '#ffd84d' },
+      paths: [
+        [[-30, 100], [300, 100], [300, 260], [160, 260], [160, 500], [460, 500], [460, 320], [700, 320], [700, 120], [880, 120], [880, 420], [1030, 420]],
+        [[560, 670], [560, 560], [820, 560], [820, 420], [880, 420], [1030, 420]]
+      ],
+      obstacles: [{ x: 580, y: 200, r: 40, kind: 'pagoda' }, { x: 300, y: 395, r: 44, kind: 'estanque' }, { x: 945, y: 260, r: 28, kind: 'bambu' }, { x: 80, y: 580, r: 30, kind: 'bambu' }, { x: 690, y: 460, r: 30, kind: 'estanque' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'prisma', 'totem', 'balista', 'faro', 'obelisco', 'bruja', 'pararrayos', 'jade'],
+      heroes: 'cuarta', eventos: ['bendicion', 'niebla', 'viento', 'frenesi'], eventosTarde: ['titanes', 'elite', 'furia', 'terremoto'], poder: 'alientoJade',
+      boss: 'emperadorDragon',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['monje', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['terracota', 8, 1.3],
+        ['sombra', 9, 1], ['cometa', 11, 1.3], ['blindado', 12, 1], ['divisor', 14, 1], ['chaman', 16, 0.8], ['templario', 18, 0.7], ['espejismo', 20, 0.7],
+        ['gargola', 22, 0.6], ['portador', 24, 0.8], ['reparador', 26, 0.7], ['zepelin', 28, 0.8], ['titan', 44, 0.7], ['fortaleza', 52, 0.8],
+        ['dirigible', 56, 0.8], ['colosoVacio', 62, 0.7], ['ciudadela', 68, 0.8], ['celeste', 72, 0.8], ['leviatan', 82, 0.9], ['arca', 84, 0.9],
+        ['colosoTitan', 92, 0.9], ['nodriza', 94, 0.9]]
+    },
+    {
+      name: 'Circo de las Sombras', short: 'Circo', slug: 'circo', abre: '2026-11-02', era: 4, musica: 3,
+      subtitle: 'Bajo la carpa todo es un truco: cajas que sorprenden, malabares y un rey que baraja tus torres.',
+      diff: 5.8, pactoPrecio: 0.12, vidaTarde: { desde: 20, hasta: 100, x: 7 }, grandes: 1.5, flota: { desde: 50, de: 0.15, a: 0.8, max: 20 }, lives: 70, cash: 1200, seed: 17203, stars: 5,
+      theme: { bg1: '#2a1430', bg2: '#1c0c22', path: '#a8402a', pathEdge: '#2a0a10', deco: 'circo', accent: '#ff4a6a' },
+      paths: [
+        [[-30, 320], [200, 320], [200, 120], [500, 120], [500, 320], [800, 320], [800, 560], [1030, 560]],
+        [[500, -30], [500, 120], [500, 320], [800, 320], [800, 560], [1030, 560]],
+        [[-30, 560], [340, 560], [340, 440], [650, 200, 1], [650, 320], [800, 320], [800, 560], [1030, 560]]
+      ],
+      obstacles: [{ x: 350, y: 235, r: 46, kind: 'carpa' }, { x: 650, y: 470, r: 40, kind: 'carpa' }, { x: 935, y: 400, r: 30, kind: 'jaula' }, { x: 95, y: 440, r: 28, kind: 'jaula' }, { x: 930, y: 150, r: 36, kind: 'carpa' }],
+      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'colmena', 'totem', 'bumeran', 'acido', 'faro', 'burbujas', 'campanario', 'ruleta'],
+      heroes: 'cuarta', eventos: ['espejismo', 'oro', 'lunaSangre', 'apagon'], eventosTarde: ['elite', 'portales', 'vital', 'titanes'], poder: 'canonHumano',
+      boss: 'reyCirco',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['payaso', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['acrobata', 8, 1.3],
+        ['sombra', 9, 1], ['malabarista', 11, 1.3], ['blindado', 12, 1], ['divisor', 14, 1], ['espantapajaros', 16, 0.7], ['reflejo', 18, 0.7], ['murcielago', 20, 0.7],
+        ['bruma', 22, 0.6], ['portador', 24, 0.8], ['martir', 26, 0.7], ['zepelin', 28, 0.8], ['titan', 44, 0.7], ['fortaleza', 52, 0.8],
+        ['dirigible', 56, 0.8], ['colosoVacio', 62, 0.7], ['ciudadela', 68, 0.8], ['celeste', 72, 0.8], ['leviatan', 82, 0.9], ['arca', 84, 0.9],
+        ['colosoTitan', 92, 0.9], ['nodriza', 94, 0.9]]
+    },
+    {
+      name: 'Biblioteca Infinita', short: 'Biblioteca', slug: 'biblioteca', abre: '2026-11-03', era: 4, musica: 2,
+      subtitle: 'Pasillos de estantes sin fin. Los libros vuelan y el saber se defiende solo.',
+      diff: 6.0, pactoPrecio: 0.13, vidaTarde: { desde: 20, hasta: 100, x: 12 }, grandes: 1.5, flota: { desde: 50, de: 0.15, a: 2.0, max: 28 }, lives: 65, cash: 1200, seed: 18211, stars: 5,
+      theme: { bg1: '#3a2a1e', bg2: '#2a1e14', path: '#7a2a2a', pathEdge: '#1e0e08', deco: 'biblio', accent: '#ffd84d' },
+      paths: [
+        [[-30, 80], [700, 80], [700, 250], [140, 250], [140, 420], [560, 420], [560, 580], [1030, 580]],
+        [[1030, 160], [860, 160], [860, 420], [560, 420], [560, 580], [1030, 580]]
+      ],
+      obstacles: [{ x: 420, y: 165, r: 40, kind: 'estante' }, { x: 330, y: 335, r: 38, kind: 'globoTerra' }, { x: 760, y: 340, r: 34, kind: 'estante' }, { x: 300, y: 525, r: 34, kind: 'estante' }, { x: 960, y: 300, r: 28, kind: 'globoTerra' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'dragon', 'prisma', 'totem', 'huerto', 'balista', 'obelisco', 'segador', 'grimorio'],
+      heroes: 'cuarta', eventos: ['apagon', 'niebla', 'esporas', 'bendicion'], eventosTarde: ['runas', 'vital', 'elite', 'furia'], poder: 'olvido',
+      boss: 'codice',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['libro', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['origami', 8, 1.3],
+        ['sombra', 9, 1], ['erudito', 11, 1.3], ['blindado', 12, 1], ['divisor', 14, 1], ['alma', 16, 0.7], ['prismaVivo', 18, 0.7], ['purificador', 20, 0.6],
+        ['nigromante', 22, 0.6], ['portador', 24, 0.8], ['fractal', 26, 0.7], ['zepelin', 28, 0.8], ['titan', 44, 0.7], ['fortaleza', 52, 0.8],
+        ['dirigible', 56, 0.8], ['colosoVacio', 62, 0.7], ['ciudadela', 68, 0.8], ['celeste', 72, 0.8], ['leviatan', 82, 0.9], ['arca', 84, 0.9],
+        ['colosoTitan', 92, 0.9], ['nodriza', 94, 0.9]]
+    },
+    {
+      name: 'Cinturón Estelar', short: 'Estelar', slug: 'estelar', abre: '2026-11-04', era: 4, musica: 4,
+      subtitle: 'Asteroides, agujeros de gusano y un devorador de estrellas que tuerce la gravedad.',
+      diff: 6.2, pactoPrecio: 0.13, vidaTarde: { desde: 20, hasta: 100, x: 12 }, grandes: 1.5, flota: { desde: 50, de: 0.15, a: 2.2, max: 28 }, lives: 65, cash: 1250, seed: 19219, stars: 5,
+      theme: { bg1: '#0a0a1e', bg2: '#060614', path: '#3a3a5a', pathEdge: '#8affff', deco: 'estelar', accent: '#8affff' },
+      paths: [
+        [[-30, 140], [260, 140], [260, 460], [480, 460], [700, 140, 1], [900, 140], [900, 520], [1030, 520]],
+        [[-30, 560], [160, 560], [160, 330], [600, 300, 1], [600, 520], [900, 520], [1030, 520]]
+      ],
+      obstacles: [{ x: 420, y: 280, r: 50, kind: 'planeta' }, { x: 790, y: 330, r: 44, kind: 'planeta' }, { x: 75, y: 400, r: 30, kind: 'asteroide' }, { x: 560, y: 110, r: 30, kind: 'asteroide' }, { x: 965, y: 280, r: 26, kind: 'asteroide' }],
+      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'totem', 'balista', 'sierra', 'geiser', 'pararrayos', 'satelite'],
+      heroes: 'cuarta', eventos: ['meteoros', 'tormenta', 'viento', 'frenesi'], eventosTarde: ['portales', 'titanes', 'runas', 'terremoto'], poder: 'agujero',
+      boss: 'vortex',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['alado', 3, 1], ['robusto', 4, 1], ['marciano', 5, 1.3], ['escudero', 7, 1], ['ovni', 8, 1.3],
+        ['sombra', 9, 1], ['meteorito', 11, 1.3], ['blindado', 12, 1], ['divisor', 14, 1], ['magnetita', 16, 0.7], ['jinete', 18, 0.7], ['espectro', 20, 0.7],
+        ['automata', 22, 0.6], ['portador', 24, 0.8], ['galeon', 26, 0.8], ['zepelin', 28, 0.8], ['titan', 44, 0.7], ['fortaleza', 52, 0.8],
+        ['dirigible', 56, 0.8], ['colosoVacio', 62, 0.7], ['ciudadela', 68, 0.8], ['celeste', 72, 0.8], ['leviatan', 82, 0.9], ['arca', 84, 0.9],
+        ['colosoTitan', 92, 0.9], ['nodriza', 94, 0.9]]
+    },
+    {
+      name: 'El Corazón del Tiempo', short: 'Tiempo', slug: 'tiempo', abre: '2026-11-05', era: 4, musica: 1,
+      subtitle: 'Tres caminos que se cruzan y tres salidas. El último enemigo no muere: vuelve atrás.',
+      diff: 6.5, pactoPrecio: 0.14, vidaTarde: { desde: 20, hasta: 100, x: 14 }, grandes: 1.5, flota: { desde: 50, de: 0.2, a: 3.6, max: 44 }, lives: 60, cash: 1300, seed: 20231, stars: 5,
+      theme: { bg1: '#2a2030', bg2: '#1a1420', path: '#8a7a5a', pathEdge: '#ffcf4d', deco: 'tiempo', accent: '#ffcf4d' },
+      // Tres caminos con tres salidas y dos cruces lejanos (cada uno de solo dos caminos): con
+      // una salida compartida, y después con los cruces juntos en el centro, unas pocas torres
+      // cubrían los tres caminos y el bot no perdía nada hasta la ronda 82, con x16 de vida.
+      paths: [
+        [[-30, 120], [340, 120], [340, 300], [700, 300], [700, 120], [1030, 120]],
+        [[200, 670], [200, 420], [560, 420], [560, 560], [1030, 560]],
+        [[860, -30], [860, 200], [960, 200], [960, 440], [780, 440], [780, 670]]
+      ],
+      obstacles: [{ x: 520, y: 210, r: 48, kind: 'relojSol' }, { x: 110, y: 300, r: 34, kind: 'arenaReloj' }, { x: 650, y: 490, r: 30, kind: 'arenaReloj' }, { x: 410, y: 600, r: 26, kind: 'engranajeT' }, { x: 960, y: 625, r: 24, kind: 'engranajeT' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'prisma', 'totem', 'faro', 'balista', 'obelisco', 'campanario', 'crono'],
+      heroes: 'cuarta', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], eventosTarde: ['titanes', 'elite', 'runas', 'vital', 'furia', 'portales', 'terremoto'], poder: 'pausa',
+      boss: 'aion',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['cuerda', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['ecoTiempo', 8, 1.3],
+        ['sombra', 9, 1], ['guardianReloj', 11, 1.3], ['blindado', 12, 1], ['divisor', 14, 1], ['monje', 16, 0.6], ['payaso', 17, 0.6], ['erudito', 18, 0.6],
+        ['marciano', 19, 0.6], ['terracota', 21, 0.6], ['malabarista', 22, 0.6], ['portador', 24, 0.8], ['meteorito', 26, 0.6], ['zepelin', 28, 0.8], ['titan', 44, 0.7],
+        ['fortaleza', 52, 0.8], ['dirigible', 56, 0.8], ['colosoVacio', 62, 0.7], ['ciudadela', 68, 0.8], ['celeste', 72, 0.8], ['leviatan', 82, 0.9], ['arca', 84, 0.9],
+        ['colosoTitan', 90, 0.9], ['nodriza', 92, 0.9]]
     }
   ];
   // Los reinos de siempre, que se abren uno tras otro con la ronda 50 (los de `abre`
@@ -330,7 +447,15 @@
     oro:        { name: 'Fiebre del Oro', icon: '✨', desc: 'Uno de cada seis enemigos es DORADO: el triple de vida y ocho veces su oro.' },
     viento:     { name: 'Viento a Favor', icon: '🍃', desc: 'Buena suerte: todas las torres atacan un 20% más rápido.' },
     tormenta:   { name: 'Tormenta Eléctrica', icon: '⛈', desc: 'Cada 2 s un rayo cae sobre un enemigo… y cada 7 s otro apaga una torre sin pararrayos.' },
-    meteoros:   { name: 'Lluvia de Estrellas', icon: '☄', desc: 'Caen estrellas sobre el camino: dañan a los enemigos y apagan 2 s las torres de al lado.' }
+    meteoros:   { name: 'Lluvia de Estrellas', icon: '☄', desc: 'Caen estrellas sobre el camino: dañan a los enemigos y apagan 2 s las torres de al lado.' },
+    // cuarta era, desde la ronda 60 (levels.js `eventosTarde`): más duros y más seguidos
+    titanes:    { name: 'Marcha de los Titanes', icon: '🗿', tarde: true, desc: 'Llega un grupo EXTRA de los enemigos más grandes que tenga el reino.' },
+    elite:      { name: 'Legión de Élite', icon: '⚔', tarde: true, desc: 'Uno de cada cuatro enemigos es de ÉLITE: el doble de vida, +5 de blindaje y no se deja frenar. Da el doble de oro.' },
+    runas:      { name: 'Escudos Rúnicos', icon: '🛡', tarde: true, desc: 'Todos los enemigos llegan con un ESCUDO del 40% de su vida, que se recarga si dejan de recibir daño.' },
+    furia:      { name: 'Furia Ancestral', icon: '😤', tarde: true, desc: 'Los enemigos que bajan de la mitad de su vida se ENFURECEN: corren un 50% más.' },
+    vital:      { name: 'Marea Vital', icon: '💚', tarde: true, desc: 'Los enemigos se REGENERAN un 1.5% de su vida por segundo (el veneno lo corta). Los jefes no.' },
+    portales:   { name: 'Grietas del Caos', icon: '🌀', tarde: true, desc: 'Cada 5 s se abren grietas: tres enemigos al azar SALTAN 100 hacia adelante.' },
+    terremoto:  { name: 'Terremoto', icon: '🌋', tarde: true, desc: 'Cada 9 s tiembla la tierra: tres torres al azar quedan apagadas 2 s (los Pararrayos protegen).' }
   };
 
   // ---------------------- Curvas de dificultad -------------------------
@@ -488,7 +613,8 @@
               if (n > maxN) fit *= Math.pow(maxN / n, 2);
             }
             const fresh = r - p[1] < 8 ? 1.6 : 1;
-            const grande = d.big && r >= 45 ? 1 + (r - 45) / 12 : 1;   // los grandes, cada vez más frecuentes
+            let grande = d.big && r >= 45 ? 1 + (r - 45) / 12 : 1;   // los grandes, cada vez más frecuentes
+            if (L.grandes && d.big && r >= 60) grande *= L.grandes;   // cuarta era: más todavía desde la 60
             const repeat = used[p[0]] && !(special && special.mono) ? 0.25 : 1;   // variedad dentro de la ronda
             cands.push({ id: p[0], w: p[2] * fit * fresh * repeat * grande });
           }
@@ -532,10 +658,13 @@
     }
     // Tercera era: un evento cada cinco rondas (la 8, la 13, … la 98), nunca en las de
     // jefe ni dos iguales seguidos, con su propio azar (el resto sale igual que siempre).
+    // Cuarta era (`eventosTarde`): hasta la 58 igual; desde la 60, los eventos tardíos en las
+    // rondas que acaban en 2, 5 y 8 (la 62, 65, 68, 72, … 98), con otro azar.
     if (L.eventos) {
       const er = mulberry32(L.seed + 4243);
       let antes = null;
       for (let r = 8; r <= PD.MAX_ROUND; r += 5) {
+        if (L.eventosTarde && r >= 60) break;
         const R = rounds[r - 1];
         if (R.boss) continue;
         let ev = L.eventos[Math.floor(er() * L.eventos.length)];
@@ -543,6 +672,54 @@
         R.evento = antes = ev;
         // Frenesí: los grupos salen más juntos (y más seguidos dentro de cada uno)
         if (ev === 'frenesi') for (const g of R.groups) { g.interval *= 0.6; g.start *= 0.7; }
+      }
+    }
+    if (L.eventosTarde) {
+      const er = mulberry32(L.seed + 6047), T = L.eventosTarde;
+      let antes = null;
+      for (let r = 60; r <= PD.MAX_ROUND; r++) {
+        const R = rounds[r - 1];
+        if (R.boss || [2, 5, 8].indexOf(r % 10) < 0) continue;
+        let ev = T[Math.floor(er() * T.length)];
+        if (ev === antes) ev = T[(T.indexOf(ev) + 1) % T.length];
+        R.evento = antes = ev;
+        // Marcha de los Titanes: un grupo más, de los más grandes que ya salen (un 40% más de
+        // presupuesto, en pocos y enormes), al final de la ronda
+        if (ev === 'titanes') {
+          const extra = PD.budget(L, r) * 0.4, hpM = PD.hpMult(L, r);
+          const big = L.pool.filter(p => p[1] <= r && PD.ENEMIES[p[0]].big).map(p => p[0])
+            .filter(id => extra / (PD.enemyThreat(id) * hpM) >= 2)
+            .sort((a, b) => PD.enemyThreat(b) - PD.enemyThreat(a));
+          if (big.length) {
+            const id = big[0], n = Math.max(2, Math.min(8, Math.round(extra / (PD.enemyThreat(id) * hpM))));
+            const last = R.groups.filter(g => !g.bossTier).reduce((m, g) => Math.max(m, g.start + g.n * g.interval), 0);
+            R.groups.push({ type: id, n, interval: 2.2, start: last + 2, path: -1, hpX: 1, titan: true });
+          }
+        }
+      }
+    }
+    // Cuarta era (`flota: {desde, de, a, max}`): desde la ronda `desde`, cada ronda que no es de
+    // jefe trae además una FLOTA de los grandes más altos de la escalera que ya salen (tanques y
+    // globos, alternando), pagada con un extra de presupuesto que crece de `de` a `a` (partes del
+    // presupuesto de la ronda) hasta la 100. Pedido del dueño: que el final se endurezca mandando
+    // muchos de los más duros, no solo con más vida para todos.
+    if (L.flota) {
+      const F = L.flota, er = mulberry32(L.seed + 7919);
+      for (let r = F.desde; r <= PD.MAX_ROUND; r++) {
+        const R = rounds[r - 1];
+        if (R.boss) continue;
+        const k = (r - F.desde) / (PD.MAX_ROUND - F.desde);
+        const extra = PD.budget(L, r) * (F.de + (F.a - F.de) * k), hpM = PD.hpMult(L, r);
+        const globo = er() < 0.5;
+        const escalera = vuela => L.pool.filter(p => p[1] <= r && PD.ENEMIES[p[0]].big && PD.ENEMIES[p[0]].rank !== undefined && !!PD.ENEMIES[p[0]].flying === vuela)
+          .map(p => p[0]).sort((a, b) => PD.enemyThreat(b) - PD.enemyThreat(a));
+        let altos = escalera(globo);
+        if (!altos.length) altos = escalera(!globo);   // aún no sale ese lado de la escalera
+        const id = altos.find(x => extra / (PD.enemyThreat(x) * hpM) >= 2) || altos[altos.length - 1];
+        if (!id) continue;
+        const n = Math.max(2, Math.min(F.max, Math.round(extra / (PD.enemyThreat(id) * hpM))));
+        const last = R.groups.filter(g => !g.bossTier).reduce((m, g) => Math.max(m, g.start + g.n * g.interval), 0);
+        R.groups.push({ type: id, n, interval: 1.4, start: Math.max(2, last * 0.5), path: -1, hpX: 1, flota: true });
       }
     }
     L._rounds = rounds;

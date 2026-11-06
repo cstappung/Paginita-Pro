@@ -2,7 +2,7 @@
    El panel de administración (`#admin`), solo para quien está en
    `admins/<uid>` (eso se escribe a mano en la consola de Firebase).
 
-   Cinco pestañas:
+   Las pestañas:
    - **Récords**: cada récord del club que sube al podio (1.º a 3.º) de su
      tabla deja una revisión (`revisiones/<cat>/<uid>`). Aquí se abre, se
      baja su prueba, se pasa por el verificador y —en Tetris, Snake, sortEm
@@ -23,6 +23,9 @@
    - **Serie 01**: quién ve la colección de los profes de PRODROP
      (`prodropSerie1`). Es solo de vista: quitar a alguien no le toca
      ninguna carta, solo deja de verlas hasta que se le vuelva a poner.
+   - **Beta testers**: quién juega lo que todavía está a prueba
+     (`betaTesters`; las entradas del salón con `beta: true`, hoy Pro
+     Kingdoms). Se pone y se quita igual que la Serie 01.
    - **Economía**: el cierre de la economía (cierre.js). Calcula el
      estado hasta ayer, comprueba que con él salen las mismas cuentas y
      pasa lo viejo de `casino`, `cartas` y `mercado` al archivo, para que
@@ -69,6 +72,7 @@ export function crearAdmin(ctx) {
   const pruebas = new Map();             // "cat|uid|partida" → {prueba, at, bytes, motivo} ya bajadas en esta visita
   let offDatos = null, offAdm = null, offSerie1 = null, aviso = "";
   let serie1 = {};                       // prodropSerie1: {uid: {at, por}}
+  let betas = {}, errBetas = null, offBetas = null;   // betaTesters: {uid: {at, por}}
   /* La pestaña Economía: el cierre preparado ({c, dif, ms}), el avance de
      la escritura ({hechas, total}) y el recálculo desde el archivo
      ({cargando} o {full, difs, ms}). */
@@ -81,6 +85,7 @@ export function crearAdmin(ctx) {
     offDatos = ctx.datos(d => { datos = d; pinta(); });
     offAdm = fb.watchAdmin((d, err) => { adm = d; errAdm = err; pinta(); });
     offSerie1 = fb.watchSerie1(l => { serie1 = l; pinta(); });
+    offBetas = fb.watchBetaTesters((l, err) => { betas = l; errBetas = err; pinta(); });
     offVer = fb.watchVersionMinima(v => { verMin = v; pinta(); });
     host.addEventListener("click", alClic);
     host.addEventListener("submit", alEnviar);
@@ -92,6 +97,7 @@ export function crearAdmin(ctx) {
     if (offDatos) offDatos();
     if (offAdm) offAdm();
     if (offSerie1) offSerie1();
+    if (offBetas) offBetas();
     if (offVer) offVer();
     cierraPlayer();
     if (host) { host.removeEventListener("click", alClic); host.removeEventListener("submit", alEnviar); host.removeEventListener("input", alEscribir); host.innerHTML = ""; }
@@ -117,11 +123,11 @@ export function crearAdmin(ctx) {
       ${sinReglas ? `<p class="jg-adm-aviso">Faltan publicar las reglas nuevas en la consola de Firebase (revisiones, suspensiones, auditados, ajustesMonedas). Hasta entonces el panel no puede leer ni escribir.</p>` : ""}
       ${aviso ? `<p class="jg-adm-aviso" role="status">${esc(aviso)}</p>` : ""}
       <nav class="jg-adm-tabs" role="tablist">
-        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"], ["economia", "Economía"]]
+        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"], ["beta", `Beta testers${Object.keys(betas).length ? ` <b>${Object.keys(betas).length}</b>` : ""}`], ["economia", "Economía"]]
           .map(([k, t]) => `<button type="button" role="tab" class="btn2${pestaña === k ? " on" : ""}" data-tab="${k}" aria-selected="${pestaña === k}">${t}</button>`).join("")}
       </nav>
       ${detalle ? detalleHtml() : ""}
-      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : pestaña === "economia" ? economiaHtml() : suspensionesHtml()}</div>
+      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : pestaña === "beta" ? betaHtml() : pestaña === "economia" ? economiaHtml() : suspensionesHtml()}</div>
     </section>`;
     if (pl) { const sitio = host.querySelector(".jg-adm-player-sitio"); if (sitio) sitio.replaceWith(pl); else cierraPlayer(); }
     for (const [id, v] of Object.entries(escrito)) { const i = host.querySelector("#" + id); if (i && id !== "admBusca") i.value = v; }
@@ -348,6 +354,7 @@ export function crearAdmin(ctx) {
     // quien solo sale en el cierre de la economía (lo suyo ya está archivado)
     if (datos && datos.completo && datos.cierre) for (const u of Object.keys(economia(datos).usuarios)) s.add(u);
     for (const u of Object.keys(serie1)) s.add(u);
+    for (const u of Object.keys(betas)) s.add(u);
     return [...s];
   }
   function buscadorHtml(ph) {
@@ -533,6 +540,26 @@ export function crearAdmin(ctx) {
         : `<p class="jg-nada">Nadie la ve todavía.</p>`);
   }
 
+  /* ---------- beta testers ----------
+     Quién juega lo que todavía está a prueba: las entradas del salón con
+     `beta: true` (hoy, Pro Kingdoms). Para el resto no aparecen en el
+     salón ni en el buscador, y su ruta muestra un cartel. */
+  function betaHtml() {
+    const l = Object.entries(betas).sort((a, b) => nombre(a[0]).localeCompare(nombre(b[0])));
+    const ficha = cuenta ? `<div class="jg-adm-caja">
+        <p><b translate="no">${esc(nombre(cuenta))}</b> ${betas[cuenta] ? "es beta tester" : "<b>no</b> es beta tester"}.</p>
+        <p class="jg-adm-btns">${betas[cuenta] ? `<button type="button" class="btn2 jg-adm-rojo" data-quitabeta="${esc(cuenta)}">Quitarle la beta</button>`
+          : `<button type="button" class="btn" data-ponbeta="${esc(cuenta)}">Hacerla beta tester</button>`}</p>
+      </div>` : "";
+    return (errBetas && permiso(errBetas) ? `<p class="jg-adm-aviso">Falta publicar las reglas nuevas (<code>betaTesters</code>) en la consola de Firebase: hasta entonces nadie es beta tester y esta lista no se puede leer ni escribir.</p>` : "") +
+      `<p class="jg-adm-nota">Los beta testers juegan lo que todavía está a prueba: hoy, <b>Pro Kingdoms</b>. Para el resto no aparece en el salón ni en el buscador, y quien llega por el enlace ve un cartel. Tú también tienes que estar en la lista para jugarlo.</p>` +
+      buscadorHtml("Busca una cuenta para hacerla beta tester o quitársela") + ficha +
+      `<h3>Beta testers (${l.length})</h3>` + (l.length ? `<ul class="jg-adm-lista">${l.map(([u, v]) => `<li><div><b translate="no">${esc(nombre(u))}</b>
+          <small>desde ${fecha(v && v.at)}${v && v.por ? " · por " + esc(nombre(v.por)) : ""}</small></div>
+          <span class="jg-adm-btns"><button type="button" class="btn2" data-quitabeta="${esc(u)}">Quitar</button></span></li>`).join("")}</ul>`
+        : `<p class="jg-nada">Todavía no hay beta testers.</p>`);
+  }
+
   /* ---------- los eventos ---------- */
   const partes = s => String(s || "").split("|");
   async function alClic(e) {
@@ -585,6 +612,19 @@ export function crearAdmin(ctx) {
       const u = ds.quitas1;
       if (!confirm(`¿Dejar de mostrarle la Serie 01 a ${nombre(u)}? No pierde ninguna carta: solo deja de verlas.`)) return;
       try { await fb.quitaSerie1(u); aviso = `${nombre(u)} ya no ve la Serie 01 (sus cartas siguen siendo suyas).`; }
+      catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
+      pinta(); return;
+    }
+    if (ds.ponbeta) {
+      const u = ds.ponbeta;
+      try { await fb.ponBeta(u, yo); aviso = `${nombre(u)} ya es beta tester.`; }
+      catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
+      pinta(); return;
+    }
+    if (ds.quitabeta) {
+      const u = ds.quitabeta;
+      if (!confirm(`¿Quitarle la beta a ${nombre(u)}? Deja de ver los juegos a prueba (su partida queda en su navegador por si vuelve).`)) return;
+      try { await fb.quitaBeta(u); aviso = `${nombre(u)} ya no es beta tester.`; }
       catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
       pinta(); return;
     }

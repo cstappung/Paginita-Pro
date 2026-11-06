@@ -47,6 +47,15 @@ export const SOLOS = [
     lema: "Arma un once en 4-3-3 con tus cartas de fútbol de PRODROP para el reto de la semana, la mejor plantilla o el álbum de clubes, súbelo a su clasificación y gana monedas y sobres.",
     nota: "Un reto nuevo cada lunes y una plantilla por club. Cada plantilla tiene su clasificación y tres premios, de 50 monedas y un sobre a 250 y un sobre Plus.",
     modos: ["Reto de la semana", "Mejor plantilla", "Álbum de clubes", "Premios: monedas y sobres"] },
+  /* `beta: true`: solo para los beta testers (`betaTesters/<uid>`, la
+     pestaña «Beta testers» del panel de admin). Para el resto no sale en el
+     salón ni en el buscador (`entradasSalon(..., {beta})`), y su ruta
+     muestra un cartel. Para abrirlo a todos, se borra `beta: true`. */
+  { id: "prokingdoms", tipo: "sitio", beta: true, nombre: "Pro Kingdoms", genero: "Reinos", icono: "👑", alta: "2026-11-02",
+    ruta: "#prokingdoms", codigo: "juegos/prokingdoms",
+    lema: "Funda un reino en pixel art: tus aldeanos recolectan y construyen solos, tú decides qué levantar, qué investigar y cuándo pasar de era. Sigue creciendo mientras no estás.",
+    nota: "Beta cerrada: los demás reinos, el mercado y el gremio son simulados, y tu partida se guarda en este navegador. Las monedas del reino no son las de Juegos.",
+    modos: ["Construcción y eras", "Misiones y racha diaria", "Mercado y gremio (simulados)", "Avance mientras no juegas"] },
   { id: "minas", tipo: "club", nombre: "Mina Club", genero: "Estrategia", icono: "✦", alta: "2026-09-20",
     ruta: "#solo/minas", reglas: "minas", popular: "club-minas", ranking: true,
     lema: "Buscaminas en tres dificultades, con variante táctica y música que crece contigo.",
@@ -163,10 +172,10 @@ export const SOLOS = [
     url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
     lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
     modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] },
-  { id: "bots-typerace", tipo: "bots", juego: "typerace", nombre: "Type Race · práctica", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
-    url: "juegos/typerace/index.html?v=typerace-1", reglas: "typerace",
-    lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés.",
-    modos: ["Palabras", "Frases", "Cuentos", "Libre con reloj"] }
+  { id: "typeraceclub", tipo: "club", nombre: "Type Race", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
+    ruta: "#solo/typerace", reglas: "typerace", popular: "club-typerace", ranking: true,
+    lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés. Las palabras en inglés clasifican.",
+    modos: ["Palabras en inglés: 10 a 200", "Frases", "Cuentos", "Libre con reloj"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -213,7 +222,7 @@ export const cupoTexto = j => (j.minimo || 2) === j.cupo ? String(j.cupo) : `${j
    distingue la miniatura: "solo" (juego del club), "bots" (práctica de un
    multijugador) o "multi" (sala en línea). `orden` es la lista de claves
    multijugador ya ordenada por popularidad (la decide `juegos-main.js`). */
-export function entradasSalon(juegos, orden = Object.keys(juegos)) {
+export function entradasSalon(juegos, orden = Object.keys(juegos), { beta = false } = {}) {
   const multi = orden.filter(k => juegos[k]).map(k => {
     const j = juegos[k];
     return {
@@ -222,7 +231,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
       practica: practicaDe(k) ? practicaDe(k).id : "", movil: enMovil(k), pc: enPc(k), pide: pideEnVez(k)
     };
   });
-  const solos = SOLOS.map(s => Object.assign({}, s, {
+  const solos = SOLOS.filter(s => beta || !s.beta).map(s => Object.assign({}, s, {
     modo: s.tipo === "bots" ? "bots" : "solo", movil: enMovil(s.id), pc: enPc(s.id), pide: pideEnVez(s.id),
     color: s.juego && juegos[s.juego] ? juegos[s.juego].color : COLOR_SOLO[s.id] || "#f6bc64"
   }));
@@ -231,9 +240,9 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
-  desafios: "#3ccf6e",
+  desafios: "#3ccf6e", prokingdoms: "#e8b84a",
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", typeraceclub: "#e2b714", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC
@@ -273,7 +282,8 @@ export const DESTACADOS_INVITADO = ["bbtan", "aleteo", "fanal", "trigon"];
    cuenta, por decisión de la dueña) y Tenkaichi 3 (el disco es privado).
    Todo lo demás de un jugador se juega sin cuenta y sin guardar nada. */
 export const CON_CUENTA_SOLO = ["heroclub", "bots-bt3", "desafios"];
-export const libreParaInvitado = id => SOLOS.some(s => s.id === id) && !CON_CUENTA_SOLO.includes(id);
+/* Lo que está a prueba (`beta: true`) nunca es del invitado: ni siquiera lo ve. */
+export const libreParaInvitado = id => SOLOS.some(s => s.id === id && !s.beta) && !CON_CUENTA_SOLO.includes(id);
 /* Lo mismo para una ruta `#solo/<juego>` (la del Tetris es `tetris`, la
    de PRO HERO `hero`): se busca la entrada que la lleva. */
 export const rutaLibre = juego => {
@@ -350,6 +360,7 @@ export const MOTIVO_CUENTA = {
   mercado: { t: "El mercado es entre cuentas", d: "Aquí se compran, se venden y se intercambian cartas de PRODROP, mascotas y sus cosas, con las monedas que ganas jugando. Inicia sesión para entrar." },
   mascotas: { t: "Mascotas necesita una cuenta", d: "Tus mascotas, su ropa y sus muebles viven en tu cuenta, y se pagan con las monedas que ganas jugando. Inicia sesión y adopta la primera: es gratis." },
   casino: { t: "El casino juega con tus monedas", d: "Las apuestas se pagan con las monedas que ganas jugando y los premios vuelven a tu cuenta. Inicia sesión para subirte al avión o hacer saltar al pingüino." },
+  prokingdoms: { t: "Pro Kingdoms está en beta cerrada", d: "Por ahora solo lo juegan los beta testers, y la lista va por cuenta. Inicia sesión: si estás en ella, entras a tu reino." },
   perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
 };
 

@@ -300,7 +300,7 @@ logros, the balance is derived from the same four reads the profile uses
   Electrodle and Integrodle streaks 10 per day, and Integrodle's total
   points one coin per 10 (Electrodle's, one per 50: it scores ~6× more a day). PRO DEFENDER pays 20 × the kingdom number for every
   round up to each kingdom's record (`monedasProdefender`: 2000…10 000 at
-  round 100; kingdoms 6–15 pay 100 a round like Vacío) and has no per-game pay (not in `PAGO_CLUB`).
+  round 100; kingdoms 6–20 pay 100 a round like Vacío) and has no per-game pay (not in `PAGO_CLUB`).
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
   every club game that ends with a result pays `PAGO_CLUB[juego]` (15 to 25
   by how long a game lasts), up to `TOPE_CLUB_DIA` (15) per game per Chile
@@ -441,9 +441,12 @@ events keep their order):
 - `mascotas/a` adoptions: the first one *written* by an account is free
   (`intentos`, the same thing the rule can see), the rest cost 1000, and
   none happens with 6 pets owned now.
-- `mascotas/r` gifts: 500, content from `MascotasMotor.regalo`.
+- `mascotas/r` gifts: 500, content from `MascotasMotor.regalo`; or free with
+  `p: 0, z: 5` if the account has five unused pieces.
+- `mascotas/p` gift pieces (event `mp`, `ORDEN` 2.15): at most
+  `PIEZAS_DIA` per Chile day count; the count lives in the account state.
 - `mascotas/c` purchases:
-  - food, 20 a ration;
+  - food, 20 a ration (premium 40, gourmet 70, counted in `comidas`);
   - potion, 1000, only for an own pet that is not listed and not frozen
     yet;
   - a background, once;
@@ -479,6 +482,20 @@ must index by account, never scan a whole-site map.
 event `sc`, category `superChat`; `superChats` in the replay lists the
 paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
 whole (`NODOS_MONEDAS` is 17 with `economiaCierre`, below).
+
+**Pro Kingdoms' Pase del Reino** (`pkPase/<uid>/<period>` = `{at: now, p:
+2500, s}`, event `pk`, category `pkPase`; `pkPase` in the replay maps each
+period to its purchase time): the only link between the kingdom and Juegos
+coins, one way only (the game never pays coins out). The period arithmetic is
+in `juegos/pase-pk.js` and repeated in the rule (two weeks from 2-11-2026
+03:00 UTC, one hour of margin each side for the winter offset) and in
+`juegos/prokingdoms/js/pase.js`; `tests/monedas.test.cjs` compares them.
+The replay skips a purchase whose `s` is not its key or that is out of its
+period, so a write that slipped past an older rule charges nothing. The
+read rule is `auth != null`, not owner + admins as the plan asked: every tab
+replays everyone's spends. The game's server reads it with the Admin SDK
+before opening the gold track (`juegos/prokingdoms/CLAUDE.md`). `NODOS_MONEDAS`
+is 19.
 
 ## The economy is closed by periods (`juegos/cierre.js`, `cierre-datos.js`)
 

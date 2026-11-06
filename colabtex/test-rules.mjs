@@ -353,6 +353,26 @@ console.log("— Tienda del perfil —");
   await loginAs(A);
 }
 
+console.log("— Pro Kingdoms: Pase del Reino —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const { periodoPase, PRECIO_PASE } = await import("./src/juegos/pase-pk.js");
+  const ua = await loginAs(A), n = periodoPase(Date.now());
+  const compra = (uid, k, p, s) => set(ref(db, `pkPase/${uid}/${k}`), { at: serverTimestamp(), p, s });
+  await denied("el pase no se paga menos", () => compra(ua.uid, n, 100, n));
+  await denied("ni se compra uno pasado", () => compra(ua.uid, n - 1, PRECIO_PASE, n - 1));
+  await denied("ni uno futuro", () => compra(ua.uid, n + 1, PRECIO_PASE, n + 1));
+  await denied("ni con otro período adentro", () => compra(ua.uid, n, PRECIO_PASE, n + 1));
+  await denied("ni se elige la hora", () => set(ref(db, `pkPase/${ua.uid}/${n}`), { at: 1700000000000, p: PRECIO_PASE, s: n }));
+  await allowed("A compra el pase de este período", () => compra(ua.uid, n, PRECIO_PASE, n));
+  await denied("una sola vez", () => compra(ua.uid, n, PRECIO_PASE, n));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `pkPase/${ua.uid}/${n}`)));
+  const ub = await loginAs(B);
+  await denied("B no compra a nombre de A", () => compra(ua.uid, n, PRECIO_PASE, n));
+  ok("B ve la compra de A (la economía la repite en todas las pestañas)", (await get(ref(db, `pkPase/${ua.uid}/${n}/p`))).val() === PRECIO_PASE);
+  await loginAs(A);
+}
+
 console.log("— PRODROP: sobres y graduaciones —");
 {
   const { serverTimestamp, push } = await import("firebase/database");
@@ -550,6 +570,22 @@ console.log("— Mascotas: adopciones, regalos, compras y estado —");
   await denied("ni uno que no existe", () => compra(ua.uid, { k: "fondo-espacio", p: 0 }));
   await allowed("despedirse es gratis", () => compra(ua.uid, { k: "adios", p: 0, m: m1 }));
   await denied("ni se cuela un campo", () => compra(ua.uid, { k: "comida", n: 1, p: 20, gratis: true }));
+  await allowed("comida premium: 40 por ración", () => compra(ua.uid, { k: "comida-premium", n: 3, p: 120 }));
+  await allowed("comida gourmet: 70 por ración", () => compra(ua.uid, { k: "comida-gourmet", n: 2, p: 140 }));
+  await denied("premium al precio de la común, no", () => compra(ua.uid, { k: "comida-premium", n: 3, p: 60 }));
+  await denied("ni una comida inventada", () => compra(ua.uid, { k: "comida-caviar", n: 1, p: 1 }));
+  /* Las piezas de regalo: {at} junto con `pu` = la misma hora, y un respiro de 5 min entre dos. */
+  const pieza = uid => { const k = push(ref(db, `mascotas/p/${uid}`)).key; return update(ref(db), { [`mascotas/p/${uid}/${k}`]: { at: serverTimestamp() }, [`mascotas/pu/${uid}`]: serverTimestamp() }); };
+  await remove(ref(db, `mascotas/pu/${ua.uid}`)).catch(() => {});
+  await denied("una pieza sola (sin pu), no", () => set(push(ref(db, `mascotas/p/${ua.uid}`)), { at: serverTimestamp() }));
+  await allowed("A gana una pieza (con pu)", () => pieza(ua.uid));
+  await denied("otra al tiro, no (respiro)", () => pieza(ua.uid));
+  await denied("ni se borra el pu para saltarse el respiro", () => remove(ref(db, `mascotas/pu/${ua.uid}`)));
+  await denied("ni se pone pu en el pasado", () => set(ref(db, `mascotas/pu/${ua.uid}`), 1700000000000));
+  await denied("ni la pieza elige la hora", () => update(ref(db), { [`mascotas/p/${ua.uid}/-Npieza00001`]: { at: 1700000000000 }, [`mascotas/pu/${ua.uid}`]: serverTimestamp() }));
+  await allowed("un regalo canjeado con piezas: p 0 y z 5", () => set(push(ref(db, `mascotas/r/${ua.uid}`)), { at: serverTimestamp(), p: 0, z: 5 }));
+  await denied("un regalo gratis sin z, no", () => set(push(ref(db, `mascotas/r/${ua.uid}`)), { at: serverTimestamp(), p: 0 }));
+  await denied("ni con otra cantidad de piezas", () => set(push(ref(db, `mascotas/r/${ua.uid}`)), { at: serverTimestamp(), p: 0, z: 1 }));
   const est = { v: 1, n: "Pío", e: "baby", g: 3.5, s: { hunger: 80, happiness: 70, energy: 60, hygiene: 90 }, ls: Date.now(), w: { hat: "start-hat-beanie" } };
   const ke = `${ua.uid}~${k1}`;
   await allowed("A guarda el estado de su mascota", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), est));
@@ -564,6 +600,7 @@ console.log("— Mascotas: adopciones, regalos, compras y estado —");
   await denied("ni la colección entera", () => get(ref(db, "mascotasEstado")));
   await denied("B no escribe el estado de A", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), est));
   await denied("B no adopta a nombre de A", () => adopta(ua.uid, "chicken", 1000));
+  await denied("ni gana piezas a nombre de A", () => update(ref(db), { [`mascotas/p/${ua.uid}/-Npieza00002`]: { at: serverTimestamp() }, [`mascotas/pu/${ua.uid}`]: serverTimestamp() }));
   ok("B lee las adopciones (la economía las necesita)", !!(await get(ref(db, `mascotas/a/${ua.uid}`))).val());
   const o = push(ref(db, "mercado/o"));
   await denied("una copia con prefijo y número de carta no vale", () => set(o, { u: ub.uid, c: `ob:${ub.uid}~-Nabcdefgh.3`, p: 10, at: serverTimestamp() }));
@@ -880,6 +917,21 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await loginAs(A);
   await allowed("el admin se la quita a B", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
   await remove(ref(db, `prodropSerie1/${ua.uid}`));
+  // Beta testers: la lista la lleva el admin; cada cuenta lee solo su entrada
+  const bt = (u, x) => set(ref(db, `betaTesters/${u}`), Object.assign({ at: serverTimestamp(), por: ua.uid }, x));
+  await denied("la beta no se firma a nombre de otro", () => bt(ub.uid, { por: ub.uid }));
+  await denied("ni lleva otra hora", () => bt(ub.uid, { at: 5 }));
+  await denied("ni campos de más", () => bt(ub.uid, { extra: 1 }));
+  await allowed("el admin hace beta tester a B", () => bt(ub.uid, {}));
+  await allowed("el admin lee la lista entera", () => get(ref(db, "betaTesters")));
+  await loginAs(B);
+  await allowed("B lee su propia entrada", () => get(ref(db, `betaTesters/${ub.uid}`)));
+  await denied("B no lee la lista entera", () => get(ref(db, "betaTesters")));
+  await denied("ni la entrada de otro", () => get(ref(db, `betaTesters/${ua.uid}`)));
+  await denied("B no se quita la beta", () => remove(ref(db, `betaTesters/${ub.uid}`)));
+  await denied("ni hace beta tester a otro", () => set(ref(db, `betaTesters/${ua.uid}`), { at: serverTimestamp(), por: ub.uid }));
+  await loginAs(A);
+  await allowed("el admin le quita la beta a B", () => remove(ref(db, `betaTesters/${ub.uid}`)));
   // Batalla de Rock: cajas y rockero, cada uno los suyos (abierto a todos)
   const caja = (u, x) => set(push(ref(db, `rock/c/${u}`)), Object.assign({ at: serverTimestamp(), p: 500, b: "f" }, x));
   await denied("una caja de rock no cuesta menos", () => caja(ua.uid, { p: 50 }));
