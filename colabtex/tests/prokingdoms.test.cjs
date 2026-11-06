@@ -754,3 +754,51 @@ test('Fase 9 «d»: la Regata, los duelos y los puentes entre mundos', () => {
   for (const r of ['/api/regata', '/api/regata/info', '/api/flota', '/api/duelos', '/api/duelo']) { assert.ok(srv.includes("'POST " + r + "'"), 'server ' + r); assert.ok(fn.includes("'POST " + r + "'"), 'functions ' + r); }
   assert.ok(D.RANKINGS.regata);
 });
+
+test('Mejoras en serie: el Capataz sube los tipos numerosos, deja tu cola primero y un maestro libre', () => {
+  const A = PK.Auto, guarda = {}, cambia = o => { for (const k in o) { guarda[k] = G[k]; G[k] = o[k]; } };
+  const casa = (id, lvl, extra) => Object.assign({ id, owner: 'p', type: 'house', done: true, lvl, upg: null, def: D.BUILD.house }, extra);
+  const bs = [casa(1, 1), casa(2, 3), casa(3, 2), casa(4, 1, { owner: 'b1' }),
+    { id: 9, owner: 'p', type: 'farm', done: true, lvl: 1, upg: null, def: D.BUILD.farm },
+    { id: 10, owner: 'p', type: 'farm', done: true, lvl: 1, upg: null, def: D.BUILD.farm }];
+  const st = { auto: { serie: {}, plan: 'mano' }, upq: [], res: { food: 1e6, wood: 1e6, stone: 1e6, gold: 1e6 } };
+  let maestros = 2, plata = true;
+  const ocupados = () => bs.filter(b => b.upg).length;
+  PK.UI = PK.UI || {};
+  cambia({ state: st, buildings: bs, maxLvl: () => 5, builders: () => maestros, buildersBusy: ocupados, upCost: () => ({ wood: 10 }),
+    canAfford: () => plata, metaNecesita: () => ({ wood: 1e6 }), upgrade: b => { b.upg = { t: 0, total: 9 }; return true; } });
+  try {
+    const tipos = A.serieTipos();
+    assert.equal(JSON.stringify(tipos.map(x => [x.type, x.n, x.min, x.max])), JSON.stringify([['house', 3, 1, 3]]), 'solo lo tuyo, y solo con 3 o más');
+    A.serieTick(G, st);
+    assert.equal(ocupados(), 0, 'sin nivel elegido no hace nada');
+    A.setSerie('house', 3);
+    A.setSerie('farm', 5);
+    st.upq = [2];
+    A.serieTick(G, st);
+    assert.equal(ocupados(), 0, 'con algo en tu cola, tu cola va primero');
+    st.upq = [];
+    A.serieTick(G, st);
+    assert.deepEqual(bs.filter(b => b.upg).map(b => b.id), [1], 'el más bajo primero, y con 2 maestros deja 1 libre');
+    assert.ok(!bs[4].upg && !bs[5].upg, 'la granja no califica: solo hay 2');
+    maestros = 1; bs[0].upg = null;
+    A.serieTick(G, st);
+    assert.deepEqual(bs.filter(b => b.upg).map(b => b.id), [1], 'con un solo maestro lo usa');
+    bs[0].upg = null; bs[0].lvl = 3; bs[2].lvl = 3; maestros = 3;
+    A.serieTick(G, st);
+    assert.equal(ocupados(), 0, 'todas en el nivel elegido');
+    A.setSerie('house', A.SERIE_ERA);
+    assert.equal(A.serieNivel('house'), 5, '«máx. de la era» sigue el tope de la era');
+    st.auto.plan = 'meta';
+    A.serieTick(G, st);
+    assert.equal(ocupados(), 0, 'con «Meta de era» no gasta lo que la era guarda');
+    st.auto.plan = 'mano'; plata = false;
+    A.serieTick(G, st);
+    assert.equal(ocupados(), 0, 'sin recursos espera');
+    plata = true;
+    A.serieTick(G, st);
+    assert.equal(ocupados(), 2, 'con 3 maestros usa 2');
+    A.setSerie('house', 0);
+    assert.equal(st.auto.serie.house, undefined, 'apagar la borra');
+  } finally { for (const k in guarda) G[k] = guarda[k]; }
+});

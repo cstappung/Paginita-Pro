@@ -18,6 +18,34 @@
     return el('span', { class: 'small ' + (mal ? 'warn-t' : 'muted') }, ' · caminan ' + Math.round(ef * 100) + '% del tiempo' + (mal ? ': pon un punto de acopio más cerca ' : ''),
       mal && A.CAMPO[res] ? UI.btn('Ubicar ' + D.BUILD[A.CAMPO[res]].name, () => { const p = A.acopioCerca(res); if (!p) { UI.toast('No encuentro lugar libre junto a donde trabajan.', 'warn'); return; } UI.closeModal(); A.proponerCampo(p.tipo, p.x, p.y); }, { small: true }) : '');
   }
+  // Mejoras en serie (PK.Auto.serieTick): − nivel + para un tipo. 0 = apagado; A.SERIE_ERA = siempre el máximo de la era.
+  UI.serieCtl = function (type, refresca) {
+    const A = PK.Auto, g = PK.Game, max = g.maxLvl(type), v = g.state.auto.serie[type] || 0;
+    const pon = n => { A.setSerie(type, n); refresca(); };
+    const txt = !v ? 'apagado' : v >= A.SERIE_ERA ? 'máx. de la era (' + max + ')' : 'hasta nivel ' + Math.min(v, max);
+    return el('span', { class: 'serie-ctl' },
+      UI.btn('−', () => pon(v >= A.SERIE_ERA ? max : v - 1 <= 1 ? 0 : v - 1), { small: true, disabled: !v, title: 'Bajar el nivel de la serie' }),
+      el('b', { class: v ? 'good' : 'muted' }, ' ' + txt + ' '),
+      UI.btn('+', () => { const x = A.serieTipos().find(t => t.type === type); pon(!v ? Math.min(max, Math.max(2, (x ? x.min : 1) + 1)) : v >= max ? A.SERIE_ERA : v + 1); }, { small: true, disabled: v >= A.SERIE_ERA, title: 'Subir el nivel de la serie' }));
+  };
+  function serieEl() {
+    const A = PK.Auto, g = PK.Game, tipos = A.serieTipos();
+    const box = el('div', null, el('h3', null, 'Mejoras en serie'),
+      el('p', { class: 'small' }, 'Para los edificios de los que tienes ' + A.SERIE_MIN + ' o más (casas, granjas…): elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. Lo que pongas en la cola de obras va antes, deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
+    if (!tipos.length) { box.append(el('p', { class: 'small muted' }, 'Todavía no tienes ' + A.SERIE_MIN + ' edificios del mismo tipo.')); return box; }
+    const rows = el('div', { class: 'guild-rows' });
+    for (const x of tipos) {
+      const meta = A.serieNivel(x.type), faltan = meta ? g.buildings.filter(b => b.owner === 'p' && b.done && b.type === x.type && b.lvl < meta).length : 0;
+      const subiendo = g.buildings.filter(b => b.owner === 'p' && b.type === x.type && b.upg).length;
+      rows.append(el('div', { class: 'g-row serie-row' }, el('img', { class: 'serie-ico', src: Sp.buildingIcon(x.type, 'p', x.max), alt: '' }),
+        el('b', { class: 'fw-name' }, D.BUILD[x.type].name + ' ×' + x.n),
+        el('span', { class: 'small muted' }, ' nivel ' + (x.min === x.max ? x.min : x.min + '–' + x.max) + ' '),
+        UI.serieCtl(x.type, () => UI.rerender()),
+        el('span', { class: 'small muted' }, meta ? (faltan ? ' · faltan ' + faltan + (subiendo ? ' (' + subiendo + ' mejorando)' : '') : ' · todas listas') : '')));
+    }
+    box.append(rows);
+    return box;
+  }
   UI.openForeman = function () {
     UI.modal('foreman', 'Aldeanos', body => {
       const st = S(), a = st.auto, A = PK.Auto, jc = A.jobCounts(), all = A.villagers().length;
@@ -49,7 +77,8 @@
         chk('rebal', 'Reequilibrar', 'cada 20 s pasa hasta 3 de sus aldeanos al recurso más lejos de su objetivo (nunca a los que mandaste tú)'),
         el('div', { class: 'reserve-row' }, el('b', null, 'Reserva de los talleres: '),
           ...[0, 0.15, 0.3, 0.5].map(v => UI.btn(Math.round(v * 100) + '%', () => { a.reserve = v; UI.rerender(); }, { small: true, cls: a.reserve === v ? 'gold' : '' })),
-          el('span', { class: 'small muted rr-help' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, los trabajadores que puso el Capataz salen a recolectar')));
+          el('span', { class: 'small muted rr-help' }, ' los talleres no gastan un insumo si la bodega queda bajo este porcentaje; si un taller pasa 20 s parado, los trabajadores que puso el Capataz salen a recolectar')),
+        serieEl());
       body.append(el('h3', null, 'Prioridades del Capataz'),
         el('div', { class: 'row plan-row' }, Object.keys(A.PLANES).map(id => UI.btn(A.PLANES[id].name, () => { A.setPlan(id); UI.rerender(); }, { small: true, cls: (a.plan || 'mano') === id ? 'gold' : '', title: A.PLANES[id].help }))),
         el('p', { class: 'small muted' }, 'Plan: ' + A.PLANES[a.plan || 'mano'].name + ' — ' + A.PLANES[a.plan || 'mano'].help + (a.plan === 'meta' ? ' (se recalcula cada minuto)' : '') + '.'));
