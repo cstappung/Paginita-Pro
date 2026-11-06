@@ -1022,3 +1022,17 @@ Each fix below came from a stall in that run; keep them in mind before touching 
   storage the era does not need, keeps a garrison of 14 per era, attempts the next 5-floor block of a dungeon at 80%
   before the Mariscal sends the army on missions, and builds the Taberna right after the Aserradero. Its `paso()`
   swallows exceptions (`console.error('piloto', …)`): a typo there silently stops everything after it.
+
+## Upgrades in series (`pk-35`, after the mega update)
+
+- **Aldeanos → Capataz → «Mejoras en serie»** and a «Capataz, tus N» row in the building panel (`UI.serieCtl`,
+  shared). Only the whitelist `A.SERIE_TIPOS` (house, farm, lumber, mining, mill, muelle, salinas; the same keys
+  are the sea's re-skins) and only when you own `A.SERIE_MIN` (3) or more (`A.serieOk`, `A.serieTipos`). The owner
+  chose it: workshops, storage, towers and single buildings stay out on purpose, because upgrading them is a decision. `st.auto.serie[type]` is the target level; `A.SERIE_ERA` (99) means «always the
+  era max» (`A.serieNivel` clamps to `G.maxLvl`). It is the early-game answer to clicking 12 houses one by one; the
+  Consejo's Maestro mayor (level 7) only arrives much later.
+- **`A.serieTick`** runs at the end of `A.tick` (offline too): never while `st.upq` has anything (your queue goes
+  first), uses at most `builders − 1` Maestros when you have more than one, lowest level first, only what it can
+  pay, and with «Meta de era» never spends below `G.metaNecesita()`. It starts upgrades directly (`G.upgrade`
+  under `UI.mute`), not through the queue, so it never fills your 6 queue slots.
+- Test: «Mejoras en serie…» in `prokingdoms.test.cjs`.

@@ -11,7 +11,8 @@
   A.RES = ['food', 'wood', 'stone', 'gold', 'ore', 'marble', 'gems'];
   A.QMAX = 6;
   A.init = function (st) {
-    st.auto = Object.assign({ idle: true, work: true, train: false, rebal: true, plan: 'mano', reserve: 0.15, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 } }, st.auto || {});
+    st.auto = Object.assign({ idle: true, work: true, train: false, rebal: true, plan: 'mano', reserve: 0.15, w: { food: 4, wood: 5, stone: 2, gold: 2, ore: 0, marble: 0, gems: 0 }, serie: {} }, st.auto || {});
+    if (!st.auto.serie || typeof st.auto.serie !== 'object') st.auto.serie = {};
     st.upq = (st.upq || []).filter(id => G().bById.get(id));
   };
 
@@ -252,6 +253,65 @@
       if (!b.done || !g.canAfford(g.upCost(b))) { i++; continue; }
       g.upgrade(b);
       st.upq.splice(i, 1);
+    }
+    A.serieTick(g, st);
+  };
+
+  // ---------- Mejoras en serie ----------
+  // Subir 12 casas una por una cansa. Para los tipos de A.SERIE_TIPOS de los que tienes A.SERIE_MIN o más, eliges un nivel
+  // (st.auto.serie[tipo]; A.SERIE_ERA = siempre el máximo de la era) y el Capataz los va subiendo, del más bajo al
+  // más alto. Tu cola de obras va primero (con algo en ella no empieza nada), deja un maestro libre si tienes más
+  // de uno, y con «Meta de era» no gasta lo que la era pide. Corre también sin conexión, como el resto de A.tick.
+  A.SERIE_MIN = 3;
+  A.SERIE_ERA = 99;
+  const enSerie = (b, obj) => b.owner === 'p' && !!obj[b.type];
+  // Solo lo repetitivo: vivienda y recolección (en el mar, los mismos tipos con otro nombre, más las Salinas).
+  // Talleres, bodegas, torres y edificios únicos quedan fuera a propósito: subirlos es una decisión, no un trámite.
+  A.SERIE_TIPOS = ['house', 'farm', 'lumber', 'mining', 'mill', 'muelle', 'salinas'];
+  A.serieOk = type => A.SERIE_TIPOS.includes(type) && !!D.BUILD[type] && !D.BUILD[type].noUp;
+  // Los tipos que califican, con cuántos hay y el rango de niveles: [{type, n, min, max}], los más numerosos primero.
+  A.serieTipos = function () {
+    const por = {};
+    for (const b of G().buildings) {
+      if (b.owner !== 'p' || !b.done || !A.serieOk(b.type)) continue;
+      const x = por[b.type] || (por[b.type] = { type: b.type, n: 0, min: Infinity, max: 0 });
+      x.n++; x.min = Math.min(x.min, b.lvl); x.max = Math.max(x.max, b.lvl);
+    }
+    return Object.values(por).filter(x => x.n >= A.SERIE_MIN).sort((a, b) => b.n - a.n || a.type.localeCompare(b.type));
+  };
+  A.serieNivel = type => { const v = (S().auto.serie || {})[type] || 0; return v >= A.SERIE_ERA ? G().maxLvl(type) : Math.min(v, G().maxLvl(type)); };
+  A.setSerie = function (type, v) { const s = S().auto.serie; if (v > 0) s[type] = v; else delete s[type]; };
+  // ¿Paga sin tocar lo que guarda la meta de era?
+  function cabeMeta(g, st, cost) {
+    if (st.auto.plan !== 'meta') return true;
+    const nec = g.metaNecesita();
+    for (const r in cost) if ((st.res[r] || 0) - cost[r] < (nec[r] || 0)) return false;
+    return true;
+  }
+  A.serieTick = function (g, st) {
+    const obj = st.auto.serie;
+    if (!obj || st.upq.length) return;
+    let tipos = null;
+    for (let k = 0; k < 4; k++) {
+      const total = g.builders(), busy = g.buildersBusy();
+      if (busy >= total) return;
+      const enCurso = g.buildings.filter(b => b.upg && enSerie(b, obj)).length;
+      if (enCurso >= (total > 1 ? total - 1 : 1)) return;
+      if (!tipos) { tipos = new Set(A.serieTipos().map(x => x.type)); if (!tipos.size) return; }
+      let mejor = null, mc = 0;
+      for (const b of g.buildings) {
+        if (!enSerie(b, obj) || !tipos.has(b.type) || !b.done || b.upg || b.lvl >= A.serieNivel(b.type)) continue;
+        if (mejor && b.lvl > mejor.lvl) continue;
+        const cost = g.upCost(b);
+        if (!g.canAfford(cost) || !cabeMeta(g, st, cost)) continue;
+        const c = Object.values(cost).reduce((s, v) => s + v, 0);
+        if (!mejor || b.lvl < mejor.lvl || c < mc) { mejor = b; mc = c; }
+      }
+      if (!mejor) return;
+      const ui = PK.UI;
+      if (ui) ui.mute = true;
+      try { if (!g.upgrade(mejor)) return; } finally { if (ui) ui.mute = false; }
+      st.auto.serieN = (st.auto.serieN || 0) + 1;
     }
   };
 

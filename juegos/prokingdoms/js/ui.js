@@ -812,7 +812,18 @@
       el('span', { class: 'small muted' }, ' ' + o.n + '/' + o.max));
   }
 
+  // Mejoras en serie: si tienes varios de este tipo, el nivel hasta el que el Capataz los sube, aquí mismo.
+  function serieLinea(b) {
+    const x = PK.Auto.serieTipos().find(t => t.type === b.type);
+    if (!x || !UI.serieCtl) return '';
+    return el('div', { class: 'row serie-linea' }, el('span', { class: 'small' }, 'Capataz, tus ' + x.n + ': '), UI.serieCtl(b.type, () => UI.refreshPanel(true)));
+  }
   function upgradeBox(b) {
+    const box = upgradeBox0(b);
+    if (box && b.owner === 'p') box.append(serieLinea(b));
+    return box;
+  }
+  function upgradeBox0(b) {
     const g = G(), box = el('div', { class: 'up-box' });
     if (b.def.noUp) return null;
     const max = g.maxLvl(b.type);
