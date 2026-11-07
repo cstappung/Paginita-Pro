@@ -30,7 +30,7 @@ import { createLinks, linkedAssets, ensureAccess, isLinked, slugTitle, LINK_DIR 
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
 import { SyncTex } from "./synctex.js";
-import { parseTexLog, groupByFile } from "./texlog.js";
+import { parseTexLog, groupByFile, pistasDeError } from "./texlog.js";
 import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
 import { loadKatex, visualExtensions } from "./visual.js";
 import { createBridge, vscodeUrl, claudeUrl, applyTextToY, LAUNCHER, LAUNCHER_CLAUDE } from "./bridge.js";
@@ -2338,6 +2338,12 @@ async function compile({ clean = false } = {}) {
     applyDiagnostics();
     renderDiagChip();
     for (const linea of explicarFigurasVinculadas(sum.errors)) anota(linea);
+    /* Lo que el motor no puede arreglar (fontspec, minted, Biber, un «α»
+       suelto…) va con una pista de qué poner en su lugar, y el panel se
+       abre aunque haya salido PDF: si no, nadie llega a leerla. */
+    const pistas = pistasDeError(sum.full);
+    for (const p of pistas) anota("💡 " + p);
+    if (pistas.length) $("logPanel").style.display = "flex";
 
     if (result.pdf && result.pdf.length > 0) {
       await state.pdfViewer.load(result.pdf);

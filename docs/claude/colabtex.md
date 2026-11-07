@@ -221,6 +221,31 @@ syncs through `y-rtdb.js`; the full RTDB schema (users, projects, members,
 roles, tokens, invites, doc snapshot/updates, assets, presence) is documented in
 [colabtex/README.md](colabtex/README.md).
 
+## What compiles and what cannot (tested against the real engine)
+
+- **EC/TS1 fonts → Latin Modern.** `\usepackage[T1]{fontenc}` without `lmodern`
+  and `textcomp` (pulled in by a bare `°` or `€`) asked for cm-super Type1s
+  BusyTeX doesn't ship, and the whole compile died (`Font ecrm1000 at 600 not
+  found`) — the header of almost every Spanish template, and `elsarticle`.
+  `build-fontmap.js` step 5 maps every `ecXXNNNN`/`tcXXNNNN` without an entry
+  to the LM Type1 of the same shape and nearest design size, copying the PS
+  name and encoding from the map's own `ec-lm…`/`ts1-lm…` line (555 entries).
+- **biblatex.** Its `.bst` was missing (no citation ever resolved), and its
+  default backend is Biber, which doesn't exist here. `texlive-revistas` brings
+  the `.bst`; the pipeline appends `backend=bibtex8` to biblatex's options from
+  the `package/biblatex/before` hook (last option wins, so an explicit
+  `backend=biber` works too) — *unless* the document already asks for a BibTeX
+  backend: two of those abort with «Toggle 'blx@bibtex8' already defined».
+  `biblatex.cfg` cannot do it: it is read after options are processed.
+  Biber-only styles (`biblatex-apa`) still fail, with a hint.
+- `texlive-revistas` (0.7 MB): biblatex.bst, `binhex.tex` (newtx), simplekv
+  (chemfig), apa7, biblatex-apa. **Libertine was left out on purpose**: ~20 MB
+  more in everyone's first download for a rarely used font.
+- `texlog.pistasDeError` turns what cannot work in a browser into a Spanish
+  hint in the log (fontspec/XeLaTeX, minted, Biber styles, a bare `α`, a
+  missing package/class/font, bbm). One hint per compile, and the log panel
+  opens even if a PDF came out.
+
 ## Vendor rebuild scripts (rarely needed)
 
 `colabtex/scripts/build-fontmap.js` and `build-texmf-package.js` regenerate

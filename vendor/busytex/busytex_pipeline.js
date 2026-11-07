@@ -782,6 +782,31 @@ class BusytexPipeline
             return partes.join('\n');
         };
 
+        /* biblatex usa biber por defecto, y biber (Perl) no existe aquí: con
+           él no se resolvía NINGUNA cita. Sin tocar el .tex de nadie, se
+           le añade «backend=bibtex8» al FINAL de sus opciones justo antes
+           de cargarlo (gancho package/biblatex/before del núcleo): en
+           biblatex la última opción gana, así que vale también para un
+           «backend=biber» explícito. Un biblatex.cfg no sirve: se lee
+           después de procesar las opciones y backend ya no se puede
+           cambiar. El -jobname mantiene main.pdf/main.aux/main.synctex. */
+        const usa_biblatex = files.some(f => typeof f.contents == 'string' && /\.(tex|sty|cls)$/.test(f.path) && /\\usepackage\s*(\[[^\]]*\])?\s*\{biblatex\}/.test(f.contents));
+        /* Si ya pide un backend de la familia BibTeX no se añade nada: cada
+           uno define el interruptor blx@bibtex8, y dos seguidos abortan con
+           «Toggle 'blx@bibtex8' already defined». */
+        const ya_bibtex = files.some(f => typeof f.contents == 'string' && /\\usepackage\s*\[[^\]]*backend\s*=\s*bibtex[^\]]*\]\s*\{biblatex\}/.test(f.contents));
+        if(usa_biblatex && !ya_bibtex)
+        {
+            const tex_path = PATH.basename(main_tex_path);
+            const i = pdftex.lastIndexOf(tex_path);
+            if(i >= 0)
+            {
+                pdftex = pdftex.slice();
+                pdftex.splice(i, 1, '-jobname=' + tex_path.replace(/\.tex$/, ''),
+                    '\\makeatletter\\AddToHook{package/biblatex/before}{\\@ifundefined{opt@biblatex.sty}{\\@namedef{opt@biblatex.sty}{backend=bibtex8}}{\\expandafter\\g@addto@macro\\csname opt@biblatex.sty\\endcsname{,backend=bibtex8}}}\\makeatother\\input{' + tex_path + '}');
+            }
+        }
+
         const logs = [];
         const mem_header = Uint8Array.from(Module.HEAPU8.slice(0, this.mem_header_size));
         const correr = (cmd, error_messages) =>
@@ -837,7 +862,10 @@ class BusytexPipeline
                 }
                 clave = k;
             }
-            const pide = /Rerun to get|Rerun LaTeX|Please rerun LaTeX|Please \(re\)run/.test(r.log);
+            /* Solo lo que pide repetir LATEX. «Please (re)run BibTeX» (biblatex)
+               no se arregla con otra pasada de pdflatex, y antes cada
+               documento con biblatex gastaba el tope de 4 pasadas. */
+            const pide = /Rerun to get|Rerun LaTeX|Please rerun LaTeX/.test(r.log);
             if((iguales(antes, despues) && !pide) || pasadas >= BusytexPipeline.MAX_PASADAS_LATEX)
                 break;
             antes = despues;

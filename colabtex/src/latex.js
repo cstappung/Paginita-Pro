@@ -9,7 +9,7 @@ const BUSYTEX_DIR = "vendor/busytex/";
 /* Súbelo al tocar busytex_worker.js o busytex_pipeline.js: el worker y el
    pipeline se cachean aparte del bundle, y sin esto un navegador que ya
    compiló seguiría usando el motor anterior. */
-const ENGINE_VERSION = "4";
+const ENGINE_VERSION = "5";
 const ALL_PACKAGES = [
   "texlive-basic.js",
   "ubuntu-texlive-latex-recommended.js",
@@ -33,7 +33,12 @@ const ALL_PACKAGES = [
   "texlive-bst.js",
   // Iconos de los CV (fontawesome, fontawesome5) y tikzfill, que tcolorbox
   // pide con la biblioteca «skins» (File `tikzfill.image.sty' not found).
-  "texlive-iconos.js"
+  "texlive-iconos.js",
+  // biblatex.bst (sin él biblatex no resolvía NINGUNA cita), binhex.tex
+  // (newtxtext/newtxmath), simplekv (chemfig), apa7 y biblatex-apa.
+  // 0,7 MB. Libertine se quedó fuera a propósito: serían 20 MB más en la
+  // primera descarga de todo el mundo para una fuente poco usada.
+  "texlive-revistas.js"
 ];
 
 export class LatexEngine {
@@ -117,7 +122,7 @@ export class LatexEngine {
       const used = ex.always || files.some(f => typeof f.contents === "string" && ex.trigger.test(f.contents));
       if (!used) continue;
       if (!this._extraCache) this._extraCache = {};
-      if (!this._extraCache[ex.name]) this._extraCache[ex.name] = await (await fetch(ex.url)).text();
+      if (!this._extraCache[ex.name]) this._extraCache[ex.name] = ex.contents != null ? ex.contents : await (await fetch(ex.url)).text();
       out.push({ path: ex.name, contents: this._extraCache[ex.name] });
     }
     return out;
