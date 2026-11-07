@@ -179,6 +179,10 @@ Key modules in [colabtex/src/](colabtex/src/):
   (highlight + click + a floating "Comentar" bubble) and a right-side panel.
   **Cloud only** — disabled in local mode; view-only users see them read-only
   (both the provider and the Firebase rules block their writes).
+  Thread ids and the author's colour live in the Y.Doc, which any editor can
+  write by hand: both went raw into the panel's HTML and ran code in other
+  people's browsers (verified). Ids go through `escapeHtml`/`CSS.escape` and a
+  colour only passes `colorSeguro` if it *is* a colour.
 - `zip-import.js` — imports Overleaf `.zip` exports.
 - `zip-export.js` — the reverse, shared by both apps: the whole project in a
   `.zip`. Uses fflate, already a dependency for reading them. Entry paths are
