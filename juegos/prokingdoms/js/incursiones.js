@@ -96,7 +96,10 @@
     const out = [];
     for (let i = 0; i < cuantos; i++) {
       const ang = (i / cuantos) * Math.PI * 2;
-      out.push({ id: nid++, x: x + Math.cos(ang) * 0.9, y: y + Math.sin(ang) * 0.9, hp, max: hp, path: [], anim: Math.random(), flip: i % 2 === 1, back: false, i, hair: i % 4, saco: 0, espera: i * 0.55, eng: null, fuera: false });
+      // dx/dy: su lugar dentro de cada casilla del camino (espiral de ángulo áureo). Sin esto todos pisaban
+      // el mismo centro de casilla y al llegar se veían como uno solo. (hasta 0,42)
+      const a2 = i * 2.39996, r2 = 0.42 * Math.sqrt((i + 0.5) / cuantos);
+      out.push({ id: nid++, x: x + Math.cos(ang) * 0.9, y: y + Math.sin(ang) * 0.9, dx: Math.cos(a2) * r2, dy: Math.sin(a2) * r2, hp, max: hp, path: [], anim: Math.random(), flip: i % 2 === 1, back: false, i, hair: i % 4, saco: 0, espera: i * 0.55, eng: null, fuera: false });
     }
     return out;
   }
@@ -133,7 +136,7 @@
   function paso(o, sp, dt) {
     let move = sp * dt;
     while (move > 0 && o.path.length) {
-      const cx = o.path[0][0] + 0.5, cy = o.path[0][1] + 0.5, dx = cx - o.x, dy = cy - o.y, d = Math.hypot(dx, dy);
+      const cx = o.path[0][0] + 0.5 + (o.dx || 0), cy = o.path[0][1] + 0.5 + (o.dy || 0), dx = cx - o.x, dy = cy - o.y, d = Math.hypot(dx, dy);
       if (d > 0.02) { o.flip = dx - dy < 0; o.back = dx + dy < 0; }
       if (d <= move) { o.x = cx; o.y = cy; o.path.shift(); move -= d; } else { o.x += (dx / d) * move; o.y += (dy / d) * move; move = 0; }
     }
@@ -153,7 +156,9 @@
       }
       if (bd.t >= bd.aviso) {
         bd.fase = 'marcha'; bd.t = 0;
-        for (const b of bd.bandidos) b.path = bd.path.slice();
+        // de a dos por casilla al llegar: los de atrás paran hasta 3 casillas antes (1 contra una muralla, para que no
+        // golpeen el aire; nunca antes de la mitad del camino). Así la banda se ve como banda y no como un solo bandido.
+        for (const b of bd.bandidos) { const atras = Math.min(Math.floor(b.i / 2), bd.muro ? 1 : 3, Math.floor(bd.path.length / 2)); b.paraEn = Math.max(1, bd.path.length - atras); b.path = bd.path.slice(0, b.paraEn); }
         toast(bd.olas > 1 ? '¡Oleada ' + bd.ola + ' de ' + bd.olas + ': marchan sobre tu pueblo!' : '¡Los bandidos ' + bd.lado + ' marchan sobre tu pueblo!', 'bad', { label: 'Ver', fn: () => Inc.ver() });
         sfx('cuerno');
         if (bd.olas > 1) refugio();
@@ -219,7 +224,7 @@
     for (const b of vivos()) {
       b.espera = 0;
       // los que llegaron vuelven por donde vinieron (sin otro A* de 20.000 pasos por bandido)
-      if (b.llego && !bd.muro) { b.path = bd.path.slice().reverse().concat([[Math.floor(bd.ox), Math.floor(bd.oy)]]); continue; }
+      if (b.llego && !bd.muro) { b.path = bd.path.slice(0, b.paraEn || bd.path.length).reverse().concat([[Math.floor(bd.ox), Math.floor(bd.oy)]]); continue; }
       const r = W.findPath(Math.floor(b.x), Math.floor(b.y), { x0: Math.floor(bd.ox), y0: Math.floor(bd.oy), x1: Math.floor(bd.ox), y1: Math.floor(bd.oy) }, 20000, true);
       b.path = r.path.length ? r.path : [[Math.floor(bd.ox), Math.floor(bd.oy)]];
     }

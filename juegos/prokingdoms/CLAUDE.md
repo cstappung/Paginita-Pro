@@ -1050,6 +1050,11 @@ Each fix below came from a stall in that run; keep them in mind before touching 
   `G.give`, not `G.addRes`, per the one storage-cap rule.
 - **Aldeanos rows:** `.job-row` has 6 grid columns and 7 children; the walking hint (`.jr-ef`) spans `2 / -1`. Without
   it, it fell into the 28 px icon column and read letter by letter on a landscape phone.
+- **Bandits no longer stack into one** (`incursiones.js`): each has its own spot inside every path tile (`b.dx/b.dy`,
+  golden-angle spiral up to 0.42, read by `paso`), and on arrival they stop two per tile, the back ones up to 3 tiles
+  short (1 against a wall) (`b.paraEn`, also where their retreat starts). Everything else keys off `b.llego`, not
+  distance, so looting and sieges are unchanged. All of them used to walk the same tile centres and stand on one
+  point: 7 bandits looked like one.
 - How these were found: a Playwright pass over every window and building panel at 390×844, 915×412 and 1280×800
   (squeezed text, overflow, «undefined/NaN/null», console errors), the same at sea, and a 6-minute `?timelapse`
   run with an invariant watcher (no NaN or negative resources or buffers, no level above the era cap). Worth
