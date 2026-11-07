@@ -4,7 +4,7 @@ importScripts('busytex_pipeline.js' + (self.location.search || ''));
 
 self.pipeline = null;
 
-onmessage = async ({data : {files, main_tex_path, bibtex, busytex_wasm, busytex_js, preload_data_packages_js, data_packages_js, texmf_local, preload, verbose, driver}}) => 
+onmessage = async ({data : {files, main_tex_path, bibtex, busytex_wasm, busytex_js, preload_data_packages_js, data_packages_js, texmf_local, preload, verbose, driver, clean}}) => 
 {
     // TODO: cache data packages from here? https://developer.mozilla.org/en-US/docs/Web/API/Cache
     
@@ -23,7 +23,7 @@ onmessage = async ({data : {files, main_tex_path, bibtex, busytex_wasm, busytex_
     {
         try
         {
-            postMessage(await self.pipeline.compile(files, main_tex_path, bibtex, verbose, driver, data_packages_js))
+            postMessage(await self.pipeline.compile(files, main_tex_path, bibtex, verbose, driver, data_packages_js, !!clean))
         }
         catch(err)
         {
