@@ -222,6 +222,8 @@
   .pdf-btn{width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:var(--ed-panel-fg);cursor:pointer;font-size:13px}
   .pdf-btn:hover{background:var(--ed-hover)}
   .pdf-sep{width:1px;height:16px;background:var(--ed-border)}
+  .pdf-auto{width:auto;padding:0 6px;font-size:11px;opacity:0.65}
+  .pdf-auto.on{opacity:1;background:var(--ed-accent);color:#fff}
   #zoomLabel{font-size:11.5px;font-family:'IBM Plex Mono',monospace;min-width:38px;text-align:center}
   #pageLabel{margin-left:auto;font-size:11.5px}
   #btnToggleLog{height:24px;padding:0 8px;border:none;border-radius:5px;background:transparent;color:var(--ed-panel-fg);cursor:pointer;font-size:11px}
@@ -249,7 +251,7 @@
   .cm-syncLine{background:var(--ed-accent)!important;opacity:1;
     animation:syncLine 1.6s ease-out}
   @keyframes syncLine{0%{background-color:rgba(127,127,127,0.55)}100%{background-color:transparent}}
-  #pdfScroll canvas{cursor:crosshair}
+  #pdfScroll .pdf-page{cursor:crosshair}
 
   /* ---- marcas de error en el editor ---- */
   .cm-lintRange-error{background:none;border-bottom:2px wavy #e57373;padding-bottom:1px}
@@ -598,11 +600,13 @@
       <!-- vista PDF -->
       <section class="ed-pdf">
         <div class="pdf-bar">
-          <button id="btnRecompile" class="pdf-btn" title="Recompilar">⟳</button>
+          <button id="btnRecompile" class="pdf-btn" title="Recompilar desde cero (olvida los .aux, .toc y .bbl guardados; úsalo si las referencias o el índice se quedan raros)">⟳</button>
+          <button id="btnAutoCompile" class="pdf-btn pdf-auto" aria-pressed="false" title="Compilar solo al dejar de escribir">Auto</button>
           <span class="pdf-sep"></span>
           <button id="btnZoomOut" class="pdf-btn" style="font-size:14px" title="Alejar (o Ctrl + rueda del ratón sobre el PDF)">−</button>
           <span id="zoomLabel" title="Ctrl + rueda del ratón sobre el PDF para acercar y alejar">100%</span>
           <button id="btnZoomIn" class="pdf-btn" style="font-size:14px" title="Acercar (o Ctrl + rueda del ratón sobre el PDF)">+</button>
+          <button id="btnFitWidth" class="pdf-btn" title="Ajustar al ancho del panel">↔</button>
           <span id="pageLabel"></span>
           <button id="btnDownloadPdf" class="pdf-btn" title="Descargar PDF">↓</button>
           <button id="btnToggleLog" title="Registro de compilación">Registro</button>
@@ -761,6 +765,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202611061202"></script>
+<script src="colabtex-app.js?v=202611071720"></script>
 </body>
 </html>

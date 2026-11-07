@@ -444,8 +444,11 @@ class BusytexPipeline
         return initialized_module;
     }
 
-    async compile(files, main_tex_path, bibtex, verbose, driver, data_packages_js = [])
+    async compile(files, main_tex_path, bibtex, verbose, driver, data_packages_js = [], clean = false)
     {
+        const args_originales = [files, main_tex_path, bibtex, verbose, driver, data_packages_js];
+        if(clean)
+            this.aux_cache = null;
         if(!this.supported_drivers.includes(driver))
             throw new Error(`Driver [${driver}] is not supported, only [${this.supported_drivers}] are supported`);
         this.print(`New compilation started: [${main_tex_path}]`);
@@ -538,7 +541,10 @@ class BusytexPipeline
         
         const source_dir = PATH.join(this.project_dir, dirname);
         FS.chdir(source_dir);
-        
+
+        if(driver == 'pdftex_bibtex8')
+            return this.compile_pdftex_incremental({Module, FS, PATH, files, main_tex_path, bibtex, verbose, pdftex, bibtex8, dirs, pdf_path, synctex_path, log_path, bbl_path, blg_path, args_originales});
+
         let cmds = [];
         if(driver == 'xetex_bibtex8_dvipdfmx')
         {
@@ -660,5 +666,212 @@ class BusytexPipeline
         this.Module = this.preload == false ? null : this.Module;
         
         return {pdf : pdf, log : logcat, exit_code : exit_code, logs : logs, synctex : synctex};
+    }
+
+    /* ================================================================
+       pdfLaTeX incremental (ColabTeX)
+
+       Antes cada compilación montaba un MEMFS vacío y corría una secuencia
+       fija: sin bibliografía UNA pasada —con lo que \ref, \cite e índice
+       nunca se resolvían, porque el .aux de la vez anterior ya no estaba:
+       «??» y un índice vacío para siempre—, y con bibliografía CUATRO
+       programas (pdflatex, bibtex, pdflatex, pdflatex) aunque solo se
+       hubiera cambiado una coma.
+
+       Ahora se hace lo que hace latexmk:
+       - Los auxiliares (.aux, .toc, .bbl…) de la compilación anterior se
+         guardan en el worker y se reponen antes de la siguiente, así que
+         una pasada ya ve las referencias bien.
+       - BibTeX solo corre si cambió lo que lo alimenta: las \citation,
+         \bibdata y \bibstyle del .aux y el contenido de los .bib/.bst.
+       - Se repite pdflatex solo mientras los auxiliares cambien al pasar
+         (con tope), en vez de un número fijo de veces.
+       Lo normal al editar es UNA pasada, con o sin bibliografía.
+
+       Un .aux envenenado (un comando roto dentro de un \section que
+       acaba escrito en el .toc) es el clásico «borra los auxiliares»: si
+       hay errores DENTRO de un auxiliar repuesto, o no sale PDF, se
+       repite una vez desde cero sin caché.
+       ================================================================ */
+    static AUX_EXT = ['.aux', '.toc', '.lof', '.lot', '.out', '.bbl', '.nav', '.snm', '.loa', '.lol', '.brf', '.vrb'];
+    static MAX_PASADAS_LATEX = 4;
+
+    compile_pdftex_incremental({Module, FS, PATH, files, main_tex_path, bibtex, verbose, pdftex, bibtex8, dirs, pdf_path, synctex_path, log_path, bbl_path, blg_path, args_originales})
+    {
+        const project_dir = this.project_dir;
+        const es_aux = p => BusytexPipeline.AUX_EXT.some(ext => p.endsWith(ext));
+        const norm = p => p.replace(/^\.\//, '');
+        const del_usuario = new Set(files.map(f => norm(f.path)));
+        const latin1 = new TextDecoder('latin1');
+
+        // reponer los auxiliares de la compilación anterior (solo los que el
+        // proyecto no trae ya: un .bbl subido por la persona manda)
+        const cache = this.aux_cache && this.aux_cache.main == main_tex_path ? this.aux_cache : null;
+        let repuestos = 0;
+        if(cache)
+        {
+            for(const [rel, bytes] of cache.files)
+            {
+                if(del_usuario.has(rel))
+                    continue;
+                const abs = PATH.join(project_dir, rel);
+                this.mkdir_p(FS, PATH, PATH.dirname(abs), dirs);
+                FS.writeFile(abs, bytes);
+                repuestos++;
+            }
+        }
+
+        // foto de los auxiliares: ruta relativa → {bytes, texto}
+        const foto = () =>
+        {
+            const out = new Map();
+            const walk = dir =>
+            {
+                for(const name of FS.readdir(dir))
+                {
+                    if(name == '.' || name == '..')
+                        continue;
+                    const abs = PATH.join(dir, name);
+                    const st = FS.stat(abs);
+                    if(FS.isDir(st.mode))
+                        walk(abs);
+                    else if(es_aux(name))
+                    {
+                        const rel = abs.slice(project_dir.length + 1);
+                        if(del_usuario.has(rel))
+                            continue;
+                        const bytes = FS.readFile(abs, {encoding : 'binary'});
+                        out.set(rel, {bytes, texto : latin1.decode(bytes)});
+                    }
+                }
+            };
+            walk(project_dir);
+            return out;
+        };
+        const iguales = (a, b) => a.size == b.size && Array.from(a).every(([k, v]) => b.has(k) && b.get(k).texto == v.texto);
+
+        // lo que alimenta a BibTeX: si no cambia, el .bbl guardado sigue valiendo
+        const clave_bib = f =>
+        {
+            const partes = [];
+            for(const [rel, {texto}] of f)
+            {
+                if(!rel.endsWith('.aux'))
+                    continue;
+                for(const linea of texto.split('\n'))
+                    if(/^\\(citation|bibdata|bibstyle)\b/.test(linea))
+                        partes.push(linea);
+            }
+            if(partes.length == 0)
+                return '';
+            const nombres = new Set();
+            for(const linea of partes)
+            {
+                const m = /^\\(bibdata|bibstyle)\{(.*)\}/.exec(linea);
+                if(m)
+                    for(const n of m[2].split(','))
+                        nombres.add([n.trim(), m[1] == 'bibdata' ? '.bib' : '.bst']);
+            }
+            for(const [n, ext] of nombres)
+            {
+                // \bibliography{refs} y \bibliography{refs.bib} valen las dos
+                const p = [n + ext, n].find(c => c && FS.analyzePath(c).exists && !FS.isDir(FS.stat(c).mode));
+                if(p)
+                    partes.push('%% ' + p + '\n' + latin1.decode(FS.readFile(p, {encoding : 'binary'})));
+            }
+            return partes.join('\n');
+        };
+
+        const logs = [];
+        const mem_header = Uint8Array.from(Module.HEAPU8.slice(0, this.mem_header_size));
+        const correr = (cmd, error_messages) =>
+        {
+            const is_bibtex = cmd[0].startsWith('bibtex');
+            const cmd_log_path = is_bibtex ? blg_path : log_path;
+            this.remove(FS, this.texmflog);
+            this.remove(FS, this.missfontlog);
+            this.remove(FS, cmd_log_path);
+
+            this.print('$ busytex ' + cmd.join(' '));
+            let {exit_code, stdout, stderr} = Module.callMainWithRedirects(cmd, verbose != BusytexPipeline.VerboseSilent);
+            Module.HEAPU8.fill(0);
+            Module.HEAPU8.set(mem_header);
+            this.print(`$ echo $?\n${exit_code}\n`);
+
+            const log = this.read_all_text(FS, cmd_log_path);
+            exit_code = stdout.trim() ? (error_messages.some(err => stdout.includes(err)) ? exit_code : 0) : exit_code;
+            logs.push({
+                cmd : cmd.join(' '),
+                texmflog : '', missfontlog : '',
+                log : log.trim(),
+                aux : is_bibtex ? this.read_all_text(FS, bbl_path).trim() : '',
+                stdout : stdout.trim(),
+                stderr : stderr.trim(),
+                exit_code : exit_code
+            });
+            return {exit_code, log, stdout};
+        };
+        /* Seguir con más pasadas solo se descarta ante un aborto de verdad.
+           Un «Undefined control sequence» en nonstopmode deja PDF y .aux
+           válidos: pararse ahí dejaba las citas sin resolver hasta que el
+           documento no tuviera ni un error. */
+        const aborto = ({stdout, log}) => !FS.analyzePath(pdf_path).exists || /Fatal error occurred|Emergency stop|That was a fatal error|No pages of output/.test(stdout + '\n' + log);
+
+        let pasadas = 0, bibtex_corrio = false;
+        let clave = cache ? cache.clave_bib : null;
+        let antes = foto();
+        let r = correr(pdftex, this.error_messages_all);
+        pasadas++;
+        while(!aborto(r))
+        {
+            let despues = foto();
+            if(bibtex && !bibtex_corrio)
+            {
+                const k = clave_bib(despues);
+                const bbl_rel = Array.from(despues.keys()).find(rel => rel.endsWith(bbl_path));
+                if(k && (k !== clave || !bbl_rel))
+                {
+                    correr(bibtex8, this.error_messages_fatal);
+                    bibtex_corrio = true;
+                    despues = foto();
+                }
+                clave = k;
+            }
+            const pide = /Rerun to get|Rerun LaTeX|Please rerun LaTeX|Please \(re\)run/.test(r.log);
+            if((iguales(antes, despues) && !pide) || pasadas >= BusytexPipeline.MAX_PASADAS_LATEX)
+                break;
+            antes = despues;
+            r = correr(pdftex, this.error_messages_all);
+            pasadas++;
+        }
+
+        const pdf_bytes = this.read_all_bytes(FS, pdf_path);
+        const pdf = pdf_bytes && pdf_bytes.length ? pdf_bytes : null;
+
+        // ¿auxiliar envenenado? → una vez desde cero
+        const error_en_aux = /^(?:\.\/)?\S+\.(?:aux|toc|lof|lot|out|nav|snm|loa|lol|brf|vrb):\d+:/m.test(r.log);
+        if(repuestos > 0 && (!pdf || error_en_aux))
+        {
+            this.print('$ # error con auxiliares guardados: se recompila desde cero');
+            this.aux_cache = null;
+            const [f, m, b, v, d, dp] = args_originales;
+            return this.compile(f, m, b, v, d, dp, true);
+        }
+
+        // guardar los auxiliares para la próxima vez (si hubo PDF: un aborto
+        // fatal deja .aux a medias que solo estorbarían)
+        if(pdf)
+        {
+            const f = foto();
+            this.aux_cache = {main : main_tex_path, clave_bib : clave, files : new Map(Array.from(f).map(([rel, {bytes}]) => [rel, bytes]))};
+        }
+        else
+            this.aux_cache = null;
+
+        const synctex = this.read_all_text(FS, synctex_path);
+        const logcat = logs.map(({cmd, log, exit_code, stdout, stderr}) => ([`$ ${cmd}`, `EXITCODE: ${exit_code}`, '', 'LOG:', log, '==', 'STDOUT:', stdout, '==', 'STDERR:', stderr, '======'].join('\n'))).join('\n\n');
+        this.Module = this.preload == false ? null : this.Module;
+
+        return {pdf, log : logcat, exit_code : r.exit_code, logs, synctex, pasadas, bibtex_corrio, auxiliares_repuestos : repuestos};
     }
 }

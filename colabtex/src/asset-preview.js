@@ -263,7 +263,7 @@ export class AssetPreview {
   async _fitPdf() {
     const v = this.pdf;
     if (!v) return;
-    const canvas = v.container.querySelector("canvas");
+    const canvas = v.container.querySelector(".pdf-page");
     if (!canvas) return;
     const avail = v.container.clientWidth - 36;   // margen del panel
     const shown = canvas.getBoundingClientRect().width;

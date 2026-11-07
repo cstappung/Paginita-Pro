@@ -9,7 +9,7 @@ const BUSYTEX_DIR = "vendor/busytex/";
 /* Súbelo al tocar busytex_worker.js o busytex_pipeline.js: el worker y el
    pipeline se cachean aparte del bundle, y sin esto un navegador que ya
    compiló seguiría usando el motor anterior. */
-const ENGINE_VERSION = "3";
+const ENGINE_VERSION = "4";
 const ALL_PACKAGES = [
   "texlive-basic.js",
   "ubuntu-texlive-latex-recommended.js",
@@ -123,8 +123,12 @@ export class LatexEngine {
     return out;
   }
 
-  /* files: [{path, contents: string|Uint8Array}] */
-  async compile(files, mainTexPath) {
+  /* files: [{path, contents: string|Uint8Array}]
+     clean: olvidar los auxiliares guardados (.aux, .toc, .bbl…) y compilar
+     desde cero, como el «Recompilar desde cero» de Overleaf. Sin él, el
+     worker repone los de la vez anterior y suele bastar UNA pasada
+     (ver compile_pdftex_incremental en busytex_pipeline.js). */
+  async compile(files, mainTexPath, { clean = false } = {}) {
     if (this.busy) throw new Error("Ya hay una compilación en curso");
     this.busy = true;
     try {
@@ -153,7 +157,8 @@ export class LatexEngine {
           bibtex: null,
           verbose: "silent",
           driver: "pdftex_bibtex8",
-          data_packages_js: null
+          data_packages_js: null,
+          clean
         });
       });
     } finally {
@@ -162,15 +167,29 @@ export class LatexEngine {
   }
 }
 
+/* «./main.tex:41: Undefined control sequence.» (--file-line-error) */
+const FILE_LINE_ERR = /^(?:\.\/)?[^\s:][^:\n]*\.[A-Za-z]{1,8}:\d+:\s/;
+
 /* Resumen legible del log de compilación */
 export function summarizeLog(result) {
   const logs = result.logs || [];
-  const full = logs.map(l => l.log || "").join("\n");
+  /* Solo la ÚLTIMA pasada de pdflatex (más los registros de BibTeX): las
+     anteriores avisan de «Citation undefined» o «Label(s) may have
+     changed» justo porque aún no estaba resuelto, y sumarlas duplicaba
+     cada error y advertencia. */
+  const latex = logs.filter(l => /^pdflatex\b/.test(l.cmd || ""));
+  const ultima = latex[latex.length - 1];
+  const usados = ultima ? logs.filter(l => l === ultima || !/^pdflatex\b/.test(l.cmd || "")) : logs;
+  const full = usados.map(l => l.log || "").join("\n");
   const lines = full.split("\n");
   const errors = [], warnings = [];
   for (let i = 0; i < lines.length; i++) {
     const ln = lines[i];
-    if (ln.startsWith("!")) {
+    /* Con --file-line-error los errores salen como «./main.tex:41: …», no
+       con «!». Mirar solo «!» hacía que un documento con errores se
+       anunciara como «✓ Compilación correcta» (los marcaba el editor,
+       pero el resumen no). */
+    if (ln.startsWith("!") || FILE_LINE_ERR.test(ln)) {
       let ctx = ln;
       for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
         if (/^l\.\d+/.test(lines[j])) { ctx += "\n" + lines[j]; break; }
@@ -181,5 +200,5 @@ export function summarizeLog(result) {
     }
   }
   const pagesMatch = full.match(/Output written on .*?\((\d+) pages?, (\d+) bytes\)/);
-  return { errors, warnings, pages: pagesMatch ? +pagesMatch[1] : 0, full };
+  return { errors, warnings, pages: pagesMatch ? +pagesMatch[1] : 0, full, pasadas: result.pasadas || latex.length || 1, bibtex: !!result.bibtex_corrio };
 }
