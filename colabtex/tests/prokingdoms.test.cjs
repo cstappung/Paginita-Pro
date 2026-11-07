@@ -822,3 +822,26 @@ test('«Respetar reserva» devuelve a la bodega lo que el taller juntó con «Pr
     assert.match(avisos.pop(), /Volvió a la bodega/);
   } finally { G.state = guarda; }
 });
+
+test('Aspectos (pk-36): cada aspecto del Pase se elige en algún lado y el de cada edificio se guarda', () => {
+  // los tipos que reparte la pista dorada
+  const tipos = new Set();
+  for (let n = 1; n <= D.PASE.niveles; n++) { const p = D.pasePremio(n, 'd', 3, 'dragon'); for (const a of [p.aspecto, p.aspecto2]) if (a) tipos.add(a.split(':')[1]); }
+  assert.deepEqual([...tipos].sort(), ['barco', 'deco', 'edificio', 'efecto', 'estandarte', 'heroe', 'heroe2', 'marco', 'tropa']);
+  const ven = JS('ui/aspectos.js'), pase = JS('ui/pase.js');
+  // dónde se elige cada uno (la ventana) y quién lo lee después (marco, efecto y barco no tenían quien: pk-36)
+  for (const t of ['edificio', 'deco', 'tropa', 'heroe', 'heroe2']) assert.ok(ven.includes("'" + t + "'"), 'la ventana no ofrece ' + t);
+  for (const t of ['estandarte', 'marco', 'efecto', 'barco']) assert.ok(ven.includes('inv.' + t), 'la ventana no ofrece ' + t);
+  assert.match(pase, /flags\.aspMarco[\s\S]*--marco/, 'el marco del Pase pinta los retratos');
+  assert.match(JS('batalla.js'), /Pase\.efectoCol\(\)/, 'el efecto se ve en la habilidad del héroe');
+  assert.match(pase, /Armada\.aspecto\(/, 'el barco tiñe las velas');
+  assert.match(JS('render.js'), /Sp\.building\(b\.type, b\.owner, b\.lvl, b\.asp\)/, 'el mapa dibuja el aspecto propio de cada edificio');
+  // el aspecto propio de un edificio viaja en la partida guardada y vuelve al cargar
+  const b = new PK.Building({ id: 7, type: 'house', owner: 'p', x: 1, y: 1, done: true, lvl: 2 });
+  assert.equal(JSON.parse(JSON.stringify(b)).asp, undefined, 'sin aspecto propio no ocupa lugar');
+  b.asp = 'carnaval:edificio';
+  assert.equal(JSON.parse(JSON.stringify(b)).asp, 'carnaval:edificio');
+  assert.match(JS('game.js'), /asp: o\.asp \|\| undefined/, 'loadSave lo repone');
+  // los aspectos de edificio y decoración apuntan a edificios que existen
+  for (const id in D.PASE_TEMAS) for (const k of ['edificio', 'deco']) assert.ok(D.BUILD[D.PASE_TEMAS[id][k].b], id + ':' + k + ' apunta a ' + D.PASE_TEMAS[id][k].b);
+});

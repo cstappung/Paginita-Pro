@@ -225,6 +225,7 @@
     mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
     mbtn('ancla', 'Galeón', () => PK.Mar.abrir(), null, 'galeon'); // Fase 9
+    mbtn('gems', 'Aspectos', () => UI.openAspectos(), null, 'aspectos'); // pk-36: ui/aspectos.js
     mbtn('crown', 'Regata', () => PK.Regata && PK.Regata.abrir(), null, 'regata'); // pk-30, solo en el mar
     mbtn('gear', 'Opciones', () => UI.openSettings(), null, 'settings');
     agrupar(menu);
@@ -303,11 +304,12 @@
     taberna: g => g.countAll('tavern') > 0,
     equipo: (g, st) => !!(st.heroes && st.heroes.lista.length),
     consejo: g => g.countAll('consejo') > 0,
+    aspectos: () => !!(UI.hayAspectos && UI.hayAspectos()), // pk-36: con el primer aspecto del Pase o de la tienda
   };
   // ---------- U1 (Fase 6): menú agrupado ----------
   // Cinco grupos con submenú, más Opciones. Un grupo se ve si se ve alguno de sus botones, y brilla si alguno es nuevo.
   const GRUPOS = [
-    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon'] },
+    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon', 'aspectos'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
     { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
     { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms', 'regata'] },
@@ -851,7 +853,7 @@
   function buildingPanel(b) {
     const def = b.def, own = b.owner === 'p';
     const head = el('div', null, el('h3', null, def.name + (def.noUp ? '' : ' · Nv ' + b.lvl)), el('p', { class: 'small' }, own ? def.desc : 'Pertenece a ' + D.BOTS.find(x => x.id === b.owner).realm + '.'));
-    panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(b.type, b.owner, b.lvl) }), head));
+    panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(b.type, b.owner, b.lvl, b.asp) }), head));
     if (!own) return;
     if (!b.done) {
       head.append(el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: b.progress * 100 + '%' } }), el('span', null, 'En construcción ' + Math.floor(b.progress * 100) + '% · ' + U.fmtTime(((1 - b.progress) * def.time) / G().buildMult('p')))));
@@ -961,6 +963,7 @@
     }
     else if (def.drop) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
     if (b.type === 'granary' || b.type === 'warehouse') act.append(el('p', { class: 'small muted' }, 'Capacidad total: comida ' + U.fmt(G().cap('food')) + ' · bienes ' + U.fmt(G().cap('wood')) + '.'));
+    if (UI.aspectoFila) act.append(UI.aspectoFila(b)); // pk-36: su aspecto (ui/aspectos.js)
     if (b.type !== 'tc') act.append(el('div', { class: 'row end' },
       G().canMove(b) ? UI.btn(el('span', null, 'Mover ', UI.costEl(G().moveCost(b))), () => PK.Input.startMoving(b), { small: true, title: 'Llévalo a otro lugar sin perder su nivel (tecla V)' }) : '',
       UI.btn('Demoler', () => UI.confirmDemolish(b), { small: true, cls: 'danger' })));

@@ -147,6 +147,7 @@
       const st = S(), m = PK.Platform.getCoins();
       body.append(el('p', null, 'Tienes ', el('b', null, U.fmt(m) + ' monedas del reino'), '. Aquí solo hay cosas que se ven y comodidades: nada que cambie el balance. Las monedas del reino salen de misiones, cofres y la Maravilla, y no son las de Juegos.'));
       const grupos = { color: 'Color del reino (banderas y estandartes)', marco: 'Marco para los retratos de héroe', fuegos: 'Al llegar a una era', cola: 'Comodidades', premio: 'Premios de las escaleras de misiones' };
+      if (UI.openAspectos) body.append(el('div', { class: 'row' }, UI.btn('Mis aspectos', () => UI.openAspectos(), { small: true }), el('span', { class: 'small muted' }, 'Lo de la tienda y lo del Pase del Reino, juntos (Reino → Aspectos).')));
       for (const g in grupos) {
         body.append(el('h3', null, grupos[g]));
         // V7: los premios no se compran: se ganan con el rango II (estandarte) y el último (marco) de cada escalera

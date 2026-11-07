@@ -108,7 +108,7 @@
       for (const tid of D.premiosRango(q)) if (st.tienda && !st.tienda.tengo[tid]) {
         st.tienda.tengo[tid] = 1;
         const it = D.TIENDA && D.TIENDA.find(o => o.id === tid);
-        if (it) PK.UI.toast('Ganaste ' + (it.t === 'color' ? 'el estandarte' : 'el marco de retrato') + ' «' + D.ESCALERAS[q.rango.esc].nombre + '». Úsalo desde la tienda del reino.', 'epic', { label: 'Ver', fn: () => PK.UI.openTienda() });
+        if (it) PK.UI.toast('Ganaste ' + (it.t === 'color' ? 'el estandarte' : 'el marco de retrato') + ' «' + D.ESCALERAS[q.rango.esc].nombre + '». Úsalo en Reino → Aspectos.', 'epic', { label: 'Ver', fn: () => (PK.UI.openAspectos || PK.UI.openTienda)() });
       }
     }
     if (q.unlock) {

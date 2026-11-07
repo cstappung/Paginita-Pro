@@ -1059,3 +1059,19 @@ Each fix below came from a stall in that run; keep them in mind before touching 
   (squeezed text, overflow, «undefined/NaN/null», console errors), the same at sea, and a 6-minute `?timelapse`
   run with an invariant watcher (no NaN or negative resources or buffers, no level above the era cap). Worth
   repeating before a big merge.
+- **Aspects window** (`js/ui/aspectos.js`, Reino → Aspectos; it shows up once you own a Pase aspect or a cosmetic
+  from the shop). There was no menu before: aspects only applied themselves the first time, and the **marco,
+  efecto and barco** ones were handed out but nothing read them. Now:
+  - **Per type** (`st.flags['asp_' + type]`) for buildings, decorations and troops. **Per building** with `b.asp`:
+    empty follows the type, `'normal'` means none, an id is that aspect. It is saved in `toJSON` and restored in
+    `loadSave`. `Sp.aspectoDe(type, owner, ov)` resolves it, and `Sp.building` and `Sp.buildingIcon` take it as a
+    4th argument (it is part of the cache key). Pass `b.asp` wherever a placed building is drawn.
+  - **Colour and frame share one slot** between the shop and the Pase: choosing one clears the other
+    (`tienda.color` vs `flags.aspEstandarte`, `tienda.marco` vs `flags.aspMarco`). Always reapply with
+    **`Vida.aplicarAspectos()`**, which runs the shop first and then `Pase.aplicar`, because the Pase only paints
+    what the shop leaves free.
+  - **Efecto** (`flags.aspEfecto`) tints the light of the hero's skill and adds a ring and sparks of its colour
+    (`Pase.efectoCol`, read in `fxHab` in `batalla.js`). **Barco** (`flags.aspBarco`) tints the sails of your
+    balandras, fragatas and galeones (`Armada.aspecto`, part of the `Ar.dibujo` key, mixed 30% with white).
+  - The building panel has an «Aspecto» row (`UI.aspectoFila`) only when you own aspects for that type.
+  - All of this is visual and client-only: the server never sees it.

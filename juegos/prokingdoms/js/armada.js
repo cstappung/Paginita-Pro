@@ -237,10 +237,19 @@
     return c;
   }
   const COL_P = () => D.PLAYER_COLOR;
+  // pk-36: el aspecto de barco del Pase tiñe las velas de tus balandras, fragatas y galeones (Ar.aspecto, desde
+  // PK.Pase.aplicar). Va mezclado con el blanco de la vela para que un tema oscuro no la deje negra.
+  let velaAsp = null;
+  const PROPIOS = { balandra: 1, fragata: 1, galeon: 1 };
+  Ar.aspecto = function (col, id) {
+    const n = col ? { col: col.map(v => Math.round(v * 0.7 + 236 * 0.3)), id } : null;
+    velaAsp = n; // la caché de Ar.dibujo separa por id: no hay nada que borrar
+  };
+  const VELA = def => (velaAsp ? velaAsp.col : def);
   const MODELOS = {
-    balandra: fr => barco({ L: 20, H: 20, mastiles: 1, vela: 9, velas: [236, 232, 220], franja: COL_P(), bandera: COL_P(), canones: 1 }, fr),
-    fragata: fr => barco({ L: 30, H: 26, mastiles: 2, vela: 9, velas: [240, 236, 226], franja: COL_P(), bandera: COL_P(), canones: 4 }, fr),
-    galeon: fr => barco({ L: 36, H: 32, mastiles: 3, vela: 10, velas: [244, 238, 222], franja: COL_P(), bandera: COL_P(), canones: 6, casco: [104, 62, 36] }, fr),
+    balandra: fr => barco({ L: 20, H: 20, mastiles: 1, vela: 9, velas: VELA([236, 232, 220]), franja: COL_P(), bandera: COL_P(), canones: 1 }, fr),
+    fragata: fr => barco({ L: 30, H: 26, mastiles: 2, vela: 9, velas: VELA([240, 236, 226]), franja: COL_P(), bandera: COL_P(), canones: 4 }, fr),
+    galeon: fr => barco({ L: 36, H: 32, mastiles: 3, vela: 10, velas: VELA([244, 238, 222]), franja: COL_P(), bandera: COL_P(), canones: 6, casco: [104, 62, 36] }, fr),
     brulote: fr => barco({ L: 20, H: 18, mastiles: 1, vela: 7, velas: [200, 190, 170], bandera: COL_P(), barriles: true, fuego: true, casco: [96, 70, 48] }, fr),
     infanteria: fr => bote({ ropa: css(COL_P()), gorro: '#2a2a3a', sable: true }, fr),
     arponero: fr => bote({ ropa: '#5a6a4a', gorro: css(COL_P()), arpon: true }, fr),
@@ -253,7 +262,7 @@
   };
   // { c, ax, ay } como los dibujos de batalla.js; ax en el medio y ay en la línea del agua
   Ar.dibujo = function (tipo, flip, fr, fantasma) {
-    const key = tipo + (flip ? 1 : 0) + (fr ? 1 : 0) + (fantasma ? 'f' : '');
+    const key = tipo + (PROPIOS[tipo] && velaAsp ? '|' + velaAsp.id + '|' : '') + (flip ? 1 : 0) + (fr ? 1 : 0) + (fantasma ? 'f' : '');
     if (cache[key]) return cache[key];
     const fn = MODELOS[tipo];
     if (!fn) return null;

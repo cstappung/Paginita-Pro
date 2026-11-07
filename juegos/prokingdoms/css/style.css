@@ -976,6 +976,28 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .pase-c.vacia { border-style: dashed; opacity: 0.4; }
 .pase-retos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
 .asp-chip { border: 2px solid; padding: 2px 6px; font-size: 13px; background: rgba(0, 0, 0, 0.06); }
+/* pk-36: ventana Aspectos (js/ui/aspectos.js) */
+.asp-fila { display: grid; grid-template-columns: minmax(150px, 230px) 1fr; gap: 6px 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(138, 106, 68, 0.3); }
+.asp-cab { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.asp-ops { display: flex; flex-wrap: wrap; gap: 4px; }
+.asp-ops .btn > span { display: inline-flex; align-items: center; gap: 4px; }
+.asp-ico { width: 32px; height: 32px; image-rendering: pixelated; flex: none; }
+.asp-ret { width: 32px; height: 32px; }
+.asp-muestra { width: 14px; height: 12px; border: 2px solid #2a1a0e; display: inline-block; flex: none; }
+.asp-muestra.marco { background: #6a5a48; border-width: 3px; }
+.asp-uno { margin: 2px 0 6px; padding-left: 10px; }
+.asp-uno summary { cursor: pointer; padding: 4px 0; }
+.asp-cab > span { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.asp-b { display: grid; grid-template-columns: 32px minmax(90px, 160px) minmax(0, 260px) auto; grid-template-areas: 'ico nom sel ver'; justify-content: start; gap: 6px; align-items: center; padding: 2px 0; }
+.asp-b > .asp-ico { grid-area: ico; }
+.asp-b > span { grid-area: nom; }
+.asp-b > .asp-sel { grid-area: sel; min-width: 0; max-width: 100%; }
+.asp-b > .btn { grid-area: ver; }
+.asp-panel { margin-top: 4px; gap: 4px; }
+@media (max-width: 560px) {
+  .asp-fila { grid-template-columns: 1fr; }
+  .asp-b { grid-template-columns: 32px 1fr auto; grid-template-areas: 'ico nom ver' 'sel sel sel'; justify-content: stretch; }
+}
 @media (max-width: 600px) {
   .pase-pistas { flex-direction: column; overflow-x: visible; }
   .pase-n { flex: 0 0 auto; flex-direction: row; text-align: left; }
