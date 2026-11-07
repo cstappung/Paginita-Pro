@@ -286,6 +286,24 @@ roles, tokens, invites, doc snapshot/updates, assets, presence) is documented in
   missing package/class/font, bbm). One hint per compile, and the log panel
   opens even if a PDF came out.
 
+## Tests
+
+Run from `colabtex/`:
+
+- `npm run test:colab` — Node only, under a second: log hints, `summarizeLog`,
+  completion/outline helpers, SVG export sanitizing, the EC/TS1 font map.
+- `npm run test:colab-navegador` — Playwright + the real BusyTeX engine
+  (~8 min; `-- --rapido` ~3 min; `-- --solo=seguridad,dibujo,…`). Groups:
+  `seguridad` (XSS in ColabDraw and comments), `dibujo`, `nube`, `local`,
+  `bateria`, `rapida` (⚡ vs normal, same result). Firebase, `y-rtdb` and
+  `fb-reports` are swapped for in-memory fakes (`tests/colab-navegador/
+  imitaciones/`) by an esbuild plugin; local mode runs on OPFS with a stubbed
+  `showDirectoryPicker`. The battery is `documentos.json` (59 real-world
+  documents, `espera: "ok"` or `"pista"` for what cannot compile here). **After
+  touching the engine, the pipeline or `pdftex.map`, run the full battery**:
+  it is how the T1/biblatex/newtx breakages were found. Add a document there
+  for every compile bug you fix.
+
 ## Vendor rebuild scripts (rarely needed)
 
 `colabtex/scripts/build-fontmap.js` and `build-texmf-package.js` regenerate
