@@ -104,7 +104,7 @@
     () => {
       const g = G(), st = S(), post = g.buildings.find(b => b.owner === 'p' && b.done && b.type === 'scout');
       if (!post || st.flags.scoutDoneR !== g.exploreRange()) return null;
-      return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su alcance (' + g.exploreRange() + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
+      return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su área (' + U.fmt(g.exploreArea()) + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
     },
     // la Biblioteca sin investigar
     () => {

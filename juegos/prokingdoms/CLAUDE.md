@@ -1075,3 +1075,34 @@ Each fix below came from a stall in that run; keep them in mind before touching 
     balandras, fragatas and galeones (`Armada.aspecto`, part of the `Ar.dibujo` key, mixed 30% with white).
   - The building panel has an «Aspecto» row (`UI.aspectoFila`) only when you own aspects for that type.
   - All of this is visual and client-only: the server never sees it.
+
+## Exploration by area and sounds by distance (`pk-37`)
+
+- **The scouts' range is an area in tiles, not a distance.** `G.exploreNominal()` is the old radius (Puesto,
+  Cartografía, tree, wonder, hero). `G.exploreArea()` = π·(radius + `D.SIGHT.scout`)², capped at the whole map.
+  With the sight included, the middle of the map reveals what it did before. `G.exploreRange()` is now the radius
+  at which *your* home gathers that many tiles inside the map (`G.radioDeArea`, sorted distances cached per home).
+  A kingdom on an edge or in a corner reaches farther and ends up seeing the same number of tiles as one in the
+  middle. Every user of the old number (flags, frontier, Asesor, `scoutDoneR`) keeps calling `exploreRange()`.
+  The Puesto at level 19 (Era IX) already covers the whole map with no Cartografía or hero (tested).
+- **A hand-moved scout used to reveal everything it walked past.** `G.command` sent it anywhere and
+  `entities.js` called `revealAt` on every tile. Now:
+  - an order outside the area is refused with a toast (`G.enAlcance`);
+  - all scout reveals go through `G.revealScout`, which passes a filter to `W.reveal(cx, cy, r, ok)` and never
+    reveals outside the area.
+  Never call `revealAt` for a scout directly.
+- **The frontier search only looked 60 tiles around the scout**, so at long range it said «terminé» with fog left.
+  `lejano` scans the whole area when the rings find nothing (cached until the fog or the radius changes). Far
+  targets get 60,000 A* steps instead of 7,000.
+- **What no one can walk to** (lake and mountain interiors, about 1.1% of the map) is revealed «desde la orilla»
+  (`G.verDesdeOrilla`) once no frontier is left. Without it the map stopped at 98.9%.
+- `G.areaInfo()` (cached on `W.fogVer`) feeds «Explora N casillas… (X% visto)» in the scout panel, the Puesto and
+  the Explore window. The server never sees fog, so none of this needs a deploy.
+- **Map sounds have a place** (`R.volumenEn`, `R.sonarEn`, `R.sonarEnCasilla` in `render.js` → `Sfx.playEn(name,
+  vol, pan)`). Volume = zoom × closeness to the screen centre, and there is pan by side. Off screen it is silent.
+  It is used for villager hits, deliveries, traps and the garrison's clashes. Measured average hit volume:
+  zoom 4 ≈ 0.3 (villagers off centre), 2 ≈ 0.4, 1 ≈ 0.23, 0.5 ≈ 0.08. Before, every hit on screen played at
+  1.0, so zoomed out you heard the whole town with no direction. The ambience's work sounds (`musica.js`: works,
+  anvils, saws, other realms' axes) weigh each source by its distance to the centre and follow the same zoom
+  curve (`cercaCosas`); nature keeps the old `cerca`. A new sound that happens *at a place* on the map should go
+  through `sonarEn`, not `Sfx.play`.

@@ -113,7 +113,7 @@
     u.hugId = null;
     if (u.kind === 'scout' && u.owner === 'p') {
       const tx = Math.floor(u.x), ty = Math.floor(u.y);
-      if (tx !== u.lx || ty !== u.ly) { u.lx = tx; u.ly = ty; g.revealAt(u.x, u.y, g.scoutSight()); }
+      if (tx !== u.lx || ty !== u.ly) { u.lx = tx; u.ly = ty; g.revealScout(u.x, u.y); }
     }
   }
 
@@ -297,9 +297,11 @@
     if (u.owner !== 'p') { u.task = null; return; }
     if (u.exT !== undefined && !W.fog[u.exT]) (u.skip = u.skip || new Set()).add(u.exT); // no pudo llegar
     const t = g.exploreTarget(u);
-    if (!t) { u.exT = undefined; u.mode = 'idle'; u.wait = 6; g.exploreDone(u); return; }
+    if (!t) { u.exT = undefined; u.mode = 'idle'; u.wait = 6; g.verDesdeOrilla(); g.exploreDone(u); return; }
     u.exT = t[1] * W.W + t[0];
-    const r = W.findPath(Math.floor(u.x), Math.floor(u.y), { x0: t[0], y0: t[1], x1: t[0], y1: t[1], adj: !W.passable(t[0], t[1]) }, 7000);
+    // un borde lejano (alcances grandes, pk-37) necesita más búsqueda: con 7000 pasos se daba por inalcanzable
+    const lejos = U.dist(u.x, u.y, t[0], t[1]) > 40;
+    const r = W.findPath(Math.floor(u.x), Math.floor(u.y), { x0: t[0], y0: t[1], x1: t[0], y1: t[1], adj: !W.passable(t[0], t[1]) }, lejos ? 60000 : 7000);
     if (!r.path.length) { (u.skip = u.skip || new Set()).add(u.exT); u.exT = undefined; u.wait = 0.3; u.mode = 'idle'; return; }
     u.path = r.path;
   }

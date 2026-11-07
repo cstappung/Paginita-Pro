@@ -3,7 +3,7 @@
   'use strict';
   const PK = window.PK, U = PK.U;
   const X = (PK.Sfx = { on: U.store.get('pk_sound') !== '0' });
-  let ctx = null, master = null;
+  let ctx = null, master = null, out = null; // out: adónde va el sonido que se arma ahora (master o un canal con paneo)
   const last = {};
 
   function ac() {
@@ -28,7 +28,7 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
+    o.connect(g); g.connect(out || master);
     o.start(t); o.stop(t + dur + 0.05);
   }
   function noise(at, dur, vol, freq) {
@@ -36,15 +36,35 @@
     for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
     const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq || 2000; g.gain.value = vol;
-    s.connect(f); f.connect(g); g.connect(master);
+    s.connect(f); f.connect(g); g.connect(out || master);
     s.start(t);
   }
   const GAP = { deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4 };
 
+  // pk-37: un sonido con lugar (PK.Render.sonarEn): vol 0..1 y pan -1..1. El tope de repetición no deja que uno
+  // lejano y bajito le quite el turno a uno cerca: si el nuevo suena más fuerte que el último, pasa igual.
+  const lastVol = {};
+  X.playEn = function (name, vol, pan) {
+    if (!X.on || !ctx || ctx.state !== 'running' || (PK.Game && PK.Game.offline) || !(vol > 0)) return;
+    const now = performance.now() / 1000;
+    if (last[name] && now - last[name] < (GAP[name] || 0.05) && vol <= (lastVol[name] || 0) * 1.4) return;
+    const g = ctx.createGain();
+    g.gain.value = Math.min(1.2, vol);
+    let p = null;
+    if (ctx.createStereoPanner) { p = ctx.createStereoPanner(); p.pan.value = Math.max(-0.85, Math.min(0.85, pan || 0)); g.connect(p); p.connect(master); } else g.connect(master);
+    out = g;
+    try { sonido(name, now); } finally { out = null; }
+    lastVol[name] = vol;
+    setTimeout(() => { try { g.disconnect(); if (p) p.disconnect(); } catch (e) { /* ya estaba */ } }, 1500);
+  };
   X.play = function (name) {
     if (!X.on || !ctx || ctx.state !== 'running' || (PK.Game && PK.Game.offline)) return;
     const now = performance.now() / 1000;
     if (last[name] && now - last[name] < (GAP[name] || 0.05)) return;
+    lastVol[name] = 1;
+    sonido(name, now);
+  };
+  function sonido(name, now) {
     last[name] = now;
     switch (name) {
       case 'deposit': tone(520, 0, 0.06, 'triangle', 0.035, 780); break;
@@ -71,7 +91,7 @@
       case 'derrota': [392, 349, 311, 262].forEach((f, i) => tone(f, i * 0.22, 0.35, 'triangle', 0.05)); break;
       case 'howl': tone(300, 0, 0.5, 'sine', 0.06, 620); tone(620, 0.5, 0.9, 'sine', 0.06, 380); break;
     }
-  };
+  }
   // para la música (musica.js): el mismo contexto y la misma salida, así M y el volumen la alcanzan
   X.ac = () => (ctx ? ac() : null); // sin crearlo: lo crea el primer toque del jugador
   X.salida = () => master;

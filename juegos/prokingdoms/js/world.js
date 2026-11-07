@@ -699,12 +699,13 @@
 
   // ---------- Niebla ----------
   W.explored = (x, y) => W.inb(x, y) && W.fog[y * W.W + x] === 1;
-  W.reveal = function (cx, cy, r) {
+  // ok(x, y), opcional: qué casillas se pueden revelar (el explorador, solo dentro de su área)
+  W.reveal = function (cx, cy, r, ok) {
     const out = [];
     for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
       if (!W.inb(x, y)) continue;
       const i = y * W.W + x;
-      if (W.fog[i] || U.dist(x + 0.5, y + 0.5, cx, cy) > r + 0.3) continue;
+      if (W.fog[i] || U.dist(x + 0.5, y + 0.5, cx, cy) > r + 0.3 || (ok && !ok(x, y))) continue;
       W.fog[i] = 1; W.fogCount++;
       out.push(i);
     }
