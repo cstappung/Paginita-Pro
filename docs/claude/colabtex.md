@@ -148,6 +148,22 @@ Key modules in [colabtex/src/](colabtex/src/):
     may, and are never dropped — that is what lets a heading keep its size when
     a formula is nested inside it.
 - `texlog.js` / `themes.js` — LaTeX log parsing, editor themes.
+- `tex-complete.js` — writing aids. **Autocomplete**: commands after `\`
+  (snippets with fields), environments after `\begin{` (writes its `\end{…}`
+  and an `\item` for lists; swallows the `}` closeBrackets already put),
+  labels after `\ref{`/`\eqref{`/`\cref{`…, and `.bib` keys after `\cite{`
+  and friends, also after a comma. Labels and keys come from **every** text
+  file of the project (`textosDelProyecto` in `main.js`): a chapter cites what
+  another defines. Also `esquemaDe` (the ESQUEMA panel under the file tree,
+  active file only, click jumps) and `contarPalabras` (footer, approximate:
+  no preamble, commands, maths or floats). The top half is pure and runs in
+  Node. In `main.js`: `closeBrackets` only for `( [ {` — never quotes, LaTeX
+  types `''` and apostrophes loose; `indentWithTab` (Tab indents, Esc+Tab
+  leaves); the **«abc» spellchecker is the browser's**, so it is off by
+  default (`colabtex.ortografia`): it underlines `\section` like a typo.
+  **Local mode had no undo at all** — CodeMirror keeps no history without
+  `history()` (cloud uses Yjs's UndoManager). It is imported as `cmHistory`:
+  a bare `history` shadows `window.history` and broke `history.pushState`.
 - `local-fs.js` — File System Access API layer for local mode.
 - `bridge.js` — **"Abrir en VS Code" / "Abrir con Claude"** (both inside the
   **✦ IA** menu of the editor bar, together with the assistant — three

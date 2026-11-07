@@ -125,6 +125,10 @@
   /* arrastrar y soltar. #fileTree ocupa el resto del panel para que el hueco
      de debajo también sirva de destino: soltar ahí saca a la raíz. */
   #fileTree{flex:1;min-height:60px}
+  #outline{max-height:40%;overflow:auto;padding-bottom:8px;flex-shrink:0}
+  .outline-row{font-size:12px;line-height:1.5;padding:2px 10px;color:var(--ed-panel-fg);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .outline-row:hover{background:var(--ed-hover)}
+  #btnSpell.on{background:var(--ed-accent);color:#fff;border-color:var(--ed-accent)}
   .file-entry.dragging{opacity:0.4}
   .file-entry.drag-over{background:var(--ed-sel);box-shadow:inset 0 0 0 1px var(--ed-accent)}
   #fileTree.drag-over-root{box-shadow:inset 0 0 0 1px var(--ed-accent);border-radius:4px}
@@ -539,6 +543,8 @@
           </div>
         </div>
         <div id="fileTree"></div>
+        <div id="outlineHead" class="ed-files-head" style="display:none"><span>ESQUEMA</span></div>
+        <div id="outline"></div>
       </aside>
 
       <div id="splitFiles" class="ed-split"></div>
@@ -565,6 +571,7 @@
             </button>
           </div>
           <button id="btnSyncToPdf" class="code-mini" title="Ir a esta línea en el PDF (Ctrl+Alt+J · o doble clic)">→ PDF</button>
+          <button id="btnSpell" class="code-mini" aria-pressed="false" title="Corrector ortográfico (español). Es el del navegador: también subraya los comandos, por eso va apagado por defecto">abc</button>
           <select id="themeSelect" class="code-mini-sel" title="Tema de color del editor"></select>
         </div>
         <div id="cmHost"></div>
@@ -695,6 +702,7 @@
       <span id="statusText">● Listo</span>
       <span>UTF-8 · LaTeX</span>
       <span id="lnCol">Ln 1, Col 1</span>
+      <span id="wordCount"></span>
       <span id="onlineCount"></span>
     </footer>
   </div>
@@ -780,6 +788,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202611071926"></script>
+<script src="colabtex-app.js?v=202611071935"></script>
 </body>
 </html>

@@ -11,9 +11,10 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLi
 import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import { setDiagnostics, lintGutter } from "@codemirror/lint";
-import { defaultKeymap } from "@codemirror/commands";
+import { defaultKeymap, history as cmHistory, historyKeymap, indentWithTab } from "@codemirror/commands";   // «history» a secas taparía window.history
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
-import { StreamLanguage, syntaxHighlighting } from "@codemirror/language";
+import { StreamLanguage, syntaxHighlighting, bracketMatching } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
@@ -25,7 +26,8 @@ import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
 import { createComments } from "./comments.js";
 import { readZip, foldersOf, titleFromZip, TEXT_EXT } from "./zip-import.js";
-import { downloadProjectZip } from "./zip-export.js";
+import { downloadProjectZip, safeFileName } from "./zip-export.js";
+import { texCompletion, esquemaDe, contarPalabras } from "./tex-complete.js";
 import { createLinks, linkedAssets, ensureAccess, isLinked, slugTitle, LINK_DIR } from "./draw-link.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
@@ -1872,6 +1874,19 @@ function commonExtensions() {
     syncLineField,
     EditorView.lineWrapping,
     autoCompileListener,
+    /* Ayudas de escritura (ver tex-complete.js). Las llaves se cierran
+       solas, pero NO las comillas: en LaTeX el apóstrofo y las comillas
+       `` '' se escriben sueltos todo el rato. */
+    texCompletion(textosDelProyecto),
+    closeBrackets(),
+    EditorState.languageData.of(() => [{ closeBrackets: { brackets: ["(", "[", "{"] } }]),
+    keymap.of(closeBracketsKeymap),
+    /* Tab sangra, como en Overleaf, en vez de sacar el foco del editor a
+       mitad de una línea. Esc y luego Tab sigue saliendo (accesibilidad). */
+    keymap.of([indentWithTab]),
+    bracketMatching(),
+    spellComp.of(spellExt()),
+    EditorView.updateListener.of(u => { if (u.docChanged) programarAyudas(); }),
     /* doble clic en el código → ir a esa parte del PDF (funcionalidad 4) */
     EditorView.domEventHandlers({
       dblclick(ev, view) {
@@ -1903,6 +1918,76 @@ const colabKeymap = [
   { key: "Mod-u", preventDefault: true, run: () => !!state.format && state.format.run("underline") }
 ];
 
+/* ---------- ayudas: esquema, palabras, corrector ----------
+   El esquema y el contador miran el archivo ABIERTO; el autocompletado,
+   todos (un \ref de un capítulo apunta a un \label de otro). */
+function textosDelProyecto() {
+  const tex = [], bib = [];
+  for (const n of texFileNames()) {
+    const t = fileText(n);
+    if (t == null) continue;
+    if (/\.bib$/i.test(n)) bib.push(t);
+    else if (/\.(tex|ltx|sty|cls)$/i.test(n)) tex.push(t);
+  }
+  return { tex, bib };
+}
+
+const SPELL_KEY = "colabtex.ortografia";
+const spellComp = new Compartment();
+function spellOn() { try { return localStorage.getItem(SPELL_KEY) === "1"; } catch (e) { return false; } }
+/* El corrector es el del navegador: no sabe qué es un comando y subraya
+   \section igual que una errata. Por eso va apagado por defecto y se
+   enciende con el botón «abc» cuando se va a repasar el texto. */
+function spellExt() {
+  return EditorView.contentAttributes.of(spellOn()
+    ? { spellcheck: "true", lang: "es", autocorrect: "off", autocapitalize: "off" }
+    : { spellcheck: "false" });
+}
+function toggleSpell() {
+  try { localStorage.setItem(SPELL_KEY, spellOn() ? "0" : "1"); } catch (e) {}
+  if (state.editorView) state.editorView.dispatch({ effects: spellComp.reconfigure(spellExt()) });
+  paintSpell();
+}
+function paintSpell() {
+  const b = $("btnSpell");
+  if (b) { b.classList.toggle("on", spellOn()); b.setAttribute("aria-pressed", spellOn() ? "true" : "false"); }
+}
+
+let ayudasTimer = null;
+function programarAyudas() {
+  clearTimeout(ayudasTimer);
+  ayudasTimer = setTimeout(pintarAyudas, 400);
+}
+function pintarAyudas() {
+  const v = state.editorView;
+  const host = $("outline"), wc = $("wordCount");
+  const texto = v && state.activeFile && /\.(tex|ltx)$/i.test(state.activeFile) ? v.state.doc.toString() : null;
+  if (wc) {
+    const n = texto == null ? null : contarPalabras(texto);
+    wc.textContent = n == null ? "" : `${n.toLocaleString("es")} palabra${n === 1 ? "" : "s"}`;
+    wc.title = "Palabras del texto de este archivo, sin comandos ni fórmulas (aproximado)";
+  }
+  if (!host) return;
+  const items = texto == null ? [] : esquemaDe(texto);
+  $("outlineHead").style.display = items.length ? "" : "none";
+  host.replaceChildren(...items.map(it => {
+    const row = document.createElement("div");
+    row.className = "outline-row";
+    row.style.paddingLeft = (10 + Math.max(0, it.nivel - 1) * 10) + "px";
+    row.textContent = it.titulo;                // texto, nunca HTML: lo escribió alguien
+    row.setAttribute("translate", "no");
+    row.title = `Ir a la línea ${it.linea}`;
+    row.onclick = () => {
+      const view = state.editorView;
+      if (!view) return;
+      const line = view.state.doc.line(Math.min(it.linea, view.state.doc.lines));
+      view.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }) });
+      view.focus();
+    };
+    return row;
+  }));
+}
+
 /* editor local: CodeMirror plano + autoguardado en disco */
 function mountLocalEditor(fileName) {
   if (!state.localContent.has(fileName)) return;
@@ -1913,7 +1998,11 @@ function mountLocalEditor(fileName) {
 
   const extensions = [
     ...commonExtensions(),
-    keymap.of([...colabKeymap, ...defaultKeymap, ...searchKeymap]),
+    /* En la nube deshace el UndoManager de Yjs; aquí no había NADA:
+       sin history() CodeMirror no guarda historial y Ctrl+Z no hacía
+       nada en el modo local. */
+    cmHistory(),
+    keymap.of([...colabKeymap, ...historyKeymap, ...defaultKeymap, ...searchKeymap]),
     EditorView.updateListener.of(u => {
       if (u.docChanged) {
         state.localContent.set(fileName, u.state.doc.toString());
@@ -1932,6 +2021,7 @@ function mountLocalEditor(fileName) {
   applyDiagnostics();
   applyVisualMode();
   if (state.format) state.format.refresh();
+  pintarAyudas();
 }
 
 function mountEditor(fileName) {
@@ -1966,6 +2056,7 @@ function mountEditor(fileName) {
   applyDiagnostics();
   applyVisualMode();
   if (state.format) state.format.refresh();
+  pintarAyudas();
   if (state.comments) state.comments.onFileChanged();   // repinta el resalte del archivo nuevo
 }
 
@@ -2826,7 +2917,11 @@ function wireEvents() {
   $("btnZoomIn").onclick = async () => { const s = await state.pdfViewer.setScale(state.pdfViewer.scale + 0.1); $("zoomLabel").textContent = Math.round(s * 100) + "%"; };
   $("btnZoomOut").onclick = async () => { const s = await state.pdfViewer.setScale(state.pdfViewer.scale - 0.1); $("zoomLabel").textContent = Math.round(s * 100) + "%"; };
   $("btnFitWidth").onclick = () => state.pdfViewer && state.pdfViewer.fitWidth();
-  $("btnDownloadPdf").onclick = () => state.pdfViewer && state.pdfViewer.download((state.project ? state.project.title.replace(/[^\w\- ]+/g, "") : "documento") + ".pdf");
+  /* safeFileName y no [^\w]: \w es solo ASCII y «Mi artículo» salía
+     como «Mi artculo.pdf». */
+  $("btnDownloadPdf").onclick = () => state.pdfViewer && state.pdfViewer.download(safeFileName(state.project ? state.project.title : "documento", "pdf"));
+  $("btnSpell").onclick = toggleSpell;
+  paintSpell();
   $("btnToggleLog").onclick = () => {
     const p = $("logPanel");
     p.style.display = p.style.display === "none" || !p.style.display ? "flex" : "none";
