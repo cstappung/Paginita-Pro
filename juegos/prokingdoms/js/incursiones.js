@@ -237,7 +237,7 @@
     b.hp -= dmg;
     if (b.hp > 0) return;
     const bd = Inc.banda, era = S().era, oro = 10 * era;
-    G().addRes('gold', oro);
+    G().give({ gold: oro }); // premio: entra entero aunque la bodega esté llena (regla única del tope)
     if (PK.Render.float) PK.Render.float(b.x, b.y, '+' + oro, 'gold');
     if (PK.Render.burst) PK.Render.burst(b.x, b.y, [150, 110, 90], 12);
     sfx('hit');

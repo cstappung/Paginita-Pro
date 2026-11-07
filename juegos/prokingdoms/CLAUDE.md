@@ -1027,7 +1027,8 @@ Each fix below came from a stall in that run; keep them in mind before touching 
 
 - **Aldeanos → Capataz → «Mejoras en serie»** and a «Capataz, tus N» row in the building panel (`UI.serieCtl`,
   shared). Only the whitelist `A.SERIE_TIPOS` (house, farm, lumber, mining, mill, muelle, salinas; the same keys
-  are the sea's re-skins) and only when you own `A.SERIE_MIN` (3) or more (`A.serieOk`, `A.serieTipos`). The owner
+  are the sea's re-skins), from the first one you own (`A.SERIE_MIN` 1 since `pk-36`: at 3, owning 2 mills or 2 farms
+  hid them and the owner could only set two types) (`A.serieOk`, `A.serieTipos`). The owner
   chose it: workshops, storage, towers and single buildings stay out on purpose, because upgrading them is a decision. `st.auto.serie[type]` is the target level; `A.SERIE_ERA` (99) means «always the
   era max» (`A.serieNivel` clamps to `G.maxLvl`). It is the early-game answer to clicking 12 houses one by one; the
   Consejo's Maestro mayor (level 7) only arrives much later.
@@ -1036,3 +1037,20 @@ Each fix below came from a stall in that run; keep them in mind before touching 
   pay, and with «Meta de era» never spends below `G.metaNecesita()`. It starts upgrades directly (`G.upgrade`
   under `UI.mute`), not through the queue, so it never fills your 6 queue slots.
 - Test: «Mejoras en serie…» in `prokingdoms.test.cjs`.
+
+## Playtest fixes after the merge (`pk-36`)
+
+- **The workshop reserve leaked in three places, all fixed.** (1) A cart checked the reserve when it chose the trip
+  (`findJob`) but `take` emptied the store at pickup, so carts leaving together drained it to zero: `L.cart` checks
+  `reserveOf` again when it loads from a store for a shop. (2) Offline belts (`L.offline`) took from the store with
+  no reserve at all. (3) «Producir igual» filled the input buffer (30 per slot) and turning it off kept spending it:
+  always toggle through **`G.setSinReserva(b, v)`**, which sends the buffer above one batch back to storage.
+- **Cargo is never lost:** a cart that cannot deliver returns it to where it came from (`dropCargo` and the «no
+  cupo» branch); it used to go through the storage cap and vanish. Kills by towers (bandit gold, wolf food) use
+  `G.give`, not `G.addRes`, per the one storage-cap rule.
+- **Aldeanos rows:** `.job-row` has 6 grid columns and 7 children; the walking hint (`.jr-ef`) spans `2 / -1`. Without
+  it, it fell into the 28 px icon column and read letter by letter on a landscape phone.
+- How these were found: a Playwright pass over every window and building panel at 390×844, 915×412 and 1280×800
+  (squeezed text, overflow, «undefined/NaN/null», console errors), the same at sea, and a 6-minute `?timelapse`
+  run with an invariant watcher (no NaN or negative resources or buffers, no level above the era cap). Worth
+  repeating before a big merge.

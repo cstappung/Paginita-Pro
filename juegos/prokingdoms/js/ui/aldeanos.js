@@ -15,7 +15,7 @@
     const A = PK.Auto, ef = A.eficiencia(res);
     if (ef === null) return '';
     const mal = ef > 0.5;
-    return el('span', { class: 'small ' + (mal ? 'warn-t' : 'muted') }, ' · caminan ' + Math.round(ef * 100) + '% del tiempo' + (mal ? ': pon un punto de acopio más cerca ' : ''),
+    return el('span', { class: 'small jr-ef ' + (mal ? 'warn-t' : 'muted') }, 'caminan ' + Math.round(ef * 100) + '% del tiempo' + (mal ? ': pon un punto de acopio más cerca ' : ''),
       mal && A.CAMPO[res] ? UI.btn('Ubicar ' + D.BUILD[A.CAMPO[res]].name, () => { const p = A.acopioCerca(res); if (!p) { UI.toast('No encuentro lugar libre junto a donde trabajan.', 'warn'); return; } UI.closeModal(); A.proponerCampo(p.tipo, p.x, p.y); }, { small: true }) : '');
   }
   // Mejoras en serie (PK.Auto.serieTick): − nivel + para un tipo. 0 = apagado; A.SERIE_ERA = siempre el máximo de la era.
@@ -31,8 +31,10 @@
   function serieEl() {
     const A = PK.Auto, g = PK.Game, tipos = A.serieTipos();
     const box = el('div', null, el('h3', null, 'Mejoras en serie'),
-      el('p', { class: 'small' }, 'Para casas, granjas, campamentos, molinos y muelles de los que tienes ' + A.SERIE_MIN + ' o más: elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. Lo que pongas en la cola de obras va antes, deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
-    if (!tipos.length) { box.append(el('p', { class: 'small muted' }, 'Todavía no tienes ' + A.SERIE_MIN + ' de un mismo tipo (casas, granjas, campamentos, molinos o muelles).')); return box; }
+      el('p', { class: 'small' }, 'Para casas, granjas, campamentos, molinos y muelles: elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. Lo que pongas en la cola de obras va antes, deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
+    if (!tipos.length) { box.append(el('p', { class: 'small muted' }, 'Todavía no tienes casas, granjas, campamentos, molinos ni muelles.')); return box; }
+    const enCola = g.state.upq.length;
+    if (enCola && Object.keys(g.state.auto.serie).length) box.append(el('p', { class: 'small warn-t' }, 'En pausa: primero va tu cola de obras (' + enCola + (enCola === 1 ? ' mejora' : ' mejoras') + '). Cuando se vacíe, el Capataz sigue.'));
     const rows = el('div', { class: 'guild-rows' });
     for (const x of tipos) {
       const meta = A.serieNivel(x.type), faltan = meta ? g.buildings.filter(b => b.owner === 'p' && b.done && b.type === x.type && b.lvl < meta).length : 0;

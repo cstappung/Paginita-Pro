@@ -30,7 +30,7 @@
     if (!r && !b.sinReserva) return '';
     return el('div', { class: 'row' },
       el('span', { class: 'small ' + (r ? 'warn-t' : 'muted') }, r ? G().reservaText(r) + '. ' : 'Este taller ignora la reserva de la bodega. '),
-      UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { b.sinReserva = !b.sinReserva; UI.refreshPanel(true); }, { small: true, cls: b.sinReserva ? '' : 'gold' }));
+      UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { G().setSinReserva(b, !b.sinReserva); UI.refreshPanel(true); }, { small: true, cls: b.sinReserva ? '' : 'gold' }));
   };
   // Pantalla táctil: cambia los textos de ayuda de "clic derecho" a "toca".
   UI.isTouch = () => !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
@@ -816,7 +816,7 @@
   function serieLinea(b) {
     const x = PK.Auto.serieTipos().find(t => t.type === b.type);
     if (!x || !UI.serieCtl) return '';
-    return el('div', { class: 'row serie-linea' }, el('span', { class: 'small' }, 'Capataz, tus ' + x.n + ': '), UI.serieCtl(b.type, () => UI.refreshPanel(true)));
+    return el('div', { class: 'row serie-linea' }, el('span', { class: 'small' }, x.n > 1 ? 'Capataz, tus ' + x.n + ': ' : 'Serie del Capataz: '), UI.serieCtl(b.type, () => UI.refreshPanel(true)));
   }
   function upgradeBox(b) {
     const box = upgradeBox0(b);

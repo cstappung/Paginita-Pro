@@ -584,6 +584,8 @@ ul.info li { margin: 2px 0; }
 .job-row .jr-n { font-size: 20px; font-weight: 700; text-align: center; color: var(--ink); }
 @media (max-width: 600px) { .job-row { grid-template-columns: 28px 1fr 36px auto auto; } .job-row > span.small { grid-column: 2 / -1; } }
 .job-row .btn { justify-content: center; min-width: 44px; }
+/* el aviso «caminan N%» va en su propia línea bajo la fila: sin esto caía en la columna de 28 px del ícono y se leía letra por letra */
+.job-row > .jr-ef { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 
 /* menú Construir */
 .bmenu { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
@@ -1171,6 +1173,8 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 
 /* Mejoras en serie del Capataz */
 .serie-ctl { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
-.serie-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.serie-row { display: grid; grid-template-columns: 24px minmax(120px, 240px) 72px auto 1fr; align-items: center; gap: 4px 6px; }
+.serie-row .fw-name { min-width: 0; }
+@media (max-width: 600px) { .serie-row { grid-template-columns: 24px 1fr auto; } .serie-row > .serie-ctl, .serie-row > span:last-child { grid-column: 2 / -1; } }
 .serie-ico { width: 24px; height: 24px; image-rendering: pixelated; }
 .serie-linea { margin-top: 6px; align-items: center; flex-wrap: wrap; }
