@@ -183,7 +183,7 @@
     for (const p of W.pois) { const st = S.pois[p.id]; if (st && st.d && p.kind === 'camp') W.poiFree(p); }
     for (const o of save.buildings || []) {
       const b = G.addBuilding(o.type, 'p', o.x, o.y, o.done, o.id, false, o.lvl);
-      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined });
+      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined, asp: o.asp || undefined });
       if (b.done) W.reveal(b.cx, b.cy, G.sight(b));
     }
     for (const o of save.units || []) G.addUnit(o);
@@ -782,6 +782,19 @@
   // Los talleres no gastan un insumo por debajo de la reserva que fija el Capataz (parte de la bodega),
   // así no dejan al reino sin madera ni piedra para construir. Si lo que fabrican escasea, la reserva baja.
   // Con «Producir igual» (b.sinReserva) ese taller la ignora.
+  // Encender o apagar «Producir igual». Al apagarlo, lo que el taller juntó en su depósito de entrada sin respetar la
+  // reserva vuelve a la bodega (se queda con una tanda): antes lo seguía gastando y dejaba la bodega en cero.
+  G.setSinReserva = function (b, v) {
+    if (!b || !b.def.recipe) return;
+    b.sinReserva = !!v;
+    if (v || !b.inb || !PK.Logi) return;
+    const r = PK.Logi.recipe(b), vuelve = {}, res = G.state.res;
+    for (const k in b.inb) {
+      const n = Math.floor((b.inb[k] || 0) - ((r && r.in[k]) || 0));
+      if (n > 0) { b.inb[k] -= n; res[k] = (res[k] || 0) + n; vuelve[k] = n; }
+    }
+    if (Object.keys(vuelve).length) toast('Volvió a la bodega: ' + Object.keys(vuelve).map(k => U.fmt(vuelve[k]) + ' de ' + D.RES[k].name.toLowerCase()).join(', ') + '.', 'info');
+  };
   G.reserveOk = function (cost, out, b) {
     if (b && b.sinReserva) return true;
     if (b) { const rm = G.reservaDe(b); if (rm && rm.meta) return false; }

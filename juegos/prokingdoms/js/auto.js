@@ -262,7 +262,7 @@
   // (st.auto.serie[tipo]; A.SERIE_ERA = siempre el máximo de la era) y el Capataz los va subiendo, del más bajo al
   // más alto. Tu cola de obras va primero (con algo en ella no empieza nada), deja un maestro libre si tienes más
   // de uno, y con «Meta de era» no gasta lo que la era pide. Corre también sin conexión, como el resto de A.tick.
-  A.SERIE_MIN = 3;
+  A.SERIE_MIN = 1; // era 3: con 2 molinos o 2 granjas no aparecían y el dueño solo podía elegir dos tipos
   A.SERIE_ERA = 99;
   const enSerie = (b, obj) => b.owner === 'p' && !!obj[b.type];
   // Solo lo repetitivo: vivienda y recolección (en el mar, los mismos tipos con otro nombre, más las Salinas).

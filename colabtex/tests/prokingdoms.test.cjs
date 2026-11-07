@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -755,7 +755,7 @@ test('Fase 9 «d»: la Regata, los duelos y los puentes entre mundos', () => {
   assert.ok(D.RANKINGS.regata);
 });
 
-test('Mejoras en serie: el Capataz sube los tipos numerosos, deja tu cola primero y un maestro libre', () => {
+test('Mejoras en serie: el Capataz sube vivienda y recolección, deja tu cola primero y un maestro libre', () => {
   const A = PK.Auto, guarda = {}, cambia = o => { for (const k in o) { guarda[k] = G[k]; G[k] = o[k]; } };
   const casa = (id, lvl, extra) => Object.assign({ id, owner: 'p', type: 'house', done: true, lvl, upg: null, def: D.BUILD.house }, extra);
   const bs = [casa(1, 1), casa(2, 3), casa(3, 2), casa(4, 1, { owner: 'b1' }),
@@ -771,18 +771,17 @@ test('Mejoras en serie: el Capataz sube los tipos numerosos, deja tu cola primer
     canAfford: () => plata, metaNecesita: () => ({ wood: 1e6 }), upgrade: b => { b.upg = { t: 0, total: 9 }; return true; } });
   try {
     const tipos = A.serieTipos();
-    assert.equal(JSON.stringify(tipos.map(x => [x.type, x.n, x.min, x.max])), JSON.stringify([['house', 3, 1, 3]]), 'solo lo tuyo, solo vivienda y recolección, y solo con 3 o más');
+    assert.equal(JSON.stringify(tipos.map(x => [x.type, x.n, x.min, x.max])), JSON.stringify([['house', 3, 1, 3], ['farm', 2, 1, 1]]), 'solo lo tuyo y solo vivienda y recolección, aunque haya pocos');
     A.serieTick(G, st);
     assert.equal(ocupados(), 0, 'sin nivel elegido no hace nada');
     A.setSerie('house', 3);
-    A.setSerie('farm', 5);
     st.upq = [2];
     A.serieTick(G, st);
     assert.equal(ocupados(), 0, 'con algo en tu cola, tu cola va primero');
     st.upq = [];
     A.serieTick(G, st);
     assert.deepEqual(bs.filter(b => b.upg).map(b => b.id), [1], 'el más bajo primero, y con 2 maestros deja 1 libre');
-    assert.ok(!bs[4].upg && !bs[5].upg, 'la granja no califica: solo hay 2');
+    assert.ok(!bs[4].upg && !bs[5].upg, 'las granjas sin nivel elegido no se tocan');
     A.setSerie('tower', 5); A.setSerie('sawmill', 5);
     maestros = 1; bs[0].upg = null;
     A.serieTick(G, st);
@@ -805,4 +804,44 @@ test('Mejoras en serie: el Capataz sube los tipos numerosos, deja tu cola primer
     A.setSerie('house', 0);
     assert.equal(st.auto.serie.house, undefined, 'apagar la borra');
   } finally { for (const k in guarda) G[k] = guarda[k]; }
+});
+
+test('«Respetar reserva» devuelve a la bodega lo que el taller juntó con «Producir igual»', () => {
+  const guarda = G.state, avisos = [];
+  PK.UI = Object.assign(PK.UI || {}, { toast: t => avisos.push(t) });
+  G.state = { res: { wood: 10 } };
+  const b = { type: 'sawmill', def: D.BUILD.sawmill, inb: { wood: 90 }, outb: {}, sinReserva: false };
+  try {
+    G.setSinReserva(b, true);
+    assert.equal(b.sinReserva, true);
+    assert.equal(G.state.res.wood, 10, 'encenderlo no mueve nada');
+    G.setSinReserva(b, false);
+    const tanda = PK.Logi.recipe(b).in.wood;
+    assert.equal(b.inb.wood, tanda, 'se queda con una tanda');
+    assert.equal(G.state.res.wood, 10 + 90 - tanda, 'el resto vuelve a la bodega');
+    assert.match(avisos.pop(), /Volvió a la bodega/);
+  } finally { G.state = guarda; }
+});
+
+test('Aspectos (pk-36): cada aspecto del Pase se elige en algún lado y el de cada edificio se guarda', () => {
+  // los tipos que reparte la pista dorada
+  const tipos = new Set();
+  for (let n = 1; n <= D.PASE.niveles; n++) { const p = D.pasePremio(n, 'd', 3, 'dragon'); for (const a of [p.aspecto, p.aspecto2]) if (a) tipos.add(a.split(':')[1]); }
+  assert.deepEqual([...tipos].sort(), ['barco', 'deco', 'edificio', 'efecto', 'estandarte', 'heroe', 'heroe2', 'marco', 'tropa']);
+  const ven = JS('ui/aspectos.js'), pase = JS('ui/pase.js');
+  // dónde se elige cada uno (la ventana) y quién lo lee después (marco, efecto y barco no tenían quien: pk-36)
+  for (const t of ['edificio', 'deco', 'tropa', 'heroe', 'heroe2']) assert.ok(ven.includes("'" + t + "'"), 'la ventana no ofrece ' + t);
+  for (const t of ['estandarte', 'marco', 'efecto', 'barco']) assert.ok(ven.includes('inv.' + t), 'la ventana no ofrece ' + t);
+  assert.match(pase, /flags\.aspMarco[\s\S]*--marco/, 'el marco del Pase pinta los retratos');
+  assert.match(JS('batalla.js'), /Pase\.efectoCol\(\)/, 'el efecto se ve en la habilidad del héroe');
+  assert.match(pase, /Armada\.aspecto\(/, 'el barco tiñe las velas');
+  assert.match(JS('render.js'), /Sp\.building\(b\.type, b\.owner, b\.lvl, b\.asp\)/, 'el mapa dibuja el aspecto propio de cada edificio');
+  // el aspecto propio de un edificio viaja en la partida guardada y vuelve al cargar
+  const b = new PK.Building({ id: 7, type: 'house', owner: 'p', x: 1, y: 1, done: true, lvl: 2 });
+  assert.equal(JSON.parse(JSON.stringify(b)).asp, undefined, 'sin aspecto propio no ocupa lugar');
+  b.asp = 'carnaval:edificio';
+  assert.equal(JSON.parse(JSON.stringify(b)).asp, 'carnaval:edificio');
+  assert.match(JS('game.js'), /asp: o\.asp \|\| undefined/, 'loadSave lo repone');
+  // los aspectos de edificio y decoración apuntan a edificios que existen
+  for (const id in D.PASE_TEMAS) for (const k of ['edificio', 'deco']) assert.ok(D.BUILD[D.PASE_TEMAS[id][k].b], id + ':' + k + ' apunta a ' + D.PASE_TEMAS[id][k].b);
 });

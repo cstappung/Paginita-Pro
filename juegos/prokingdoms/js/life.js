@@ -100,7 +100,7 @@
     if (w.hp <= 0) {
       L.wolves.splice(L.wolves.indexOf(w), 1);
       const era = S().era, food = 25 * era;
-      G().addRes('food', food);
+      G().give({ food }); // premio: entra entero aunque la bodega esté llena
       G().stat('wolves', 1);
       if (PK.Render.float) PK.Render.float(w.x, w.y, '+' + food, 'food');
       if (PK.Render.burst) PK.Render.burst(w.x, w.y, [160, 150, 140], 10);

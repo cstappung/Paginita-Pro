@@ -215,7 +215,11 @@
       return;
     }
     if (j.phase === 'go') {
-      const n = take(from, j.res, j.n);
+      // Al cargar en una bodega se vuelve a mirar la reserva del taller de destino: la de findJob era de cuando
+      // eligió el viaje, y varias carretas que salían a la vez vaciaban la bodega hasta cero entre todas.
+      let quiere = j.n;
+      if (!L.isShop(from) && L.isShop(to)) quiere = Math.min(quiere, Math.floor(S().res[j.res] - reserveOf(j.res, L.output(to), to)));
+      const n = quiere >= 1 ? take(from, j.res, quiere) : 0;
       if (n < 1) { u.job = null; return; }
       u.carry = n; u.carryRes = j.res; j.n = n; j.phase = 'back';
       u.mode = 'idle'; u.wait = 0.6;
@@ -226,13 +230,18 @@
       if (u.carry > 0.5) { // no cupo todo: al almacén más cercano
         const st2 = nearestStore(u.x, u.y, j.res, true);
         if (st2 && st2 !== to) { j.to = st2.id; return; }
+        // nadie lo recibe: vuelve a donde salió (antes se perdía). Lo de un taller, a su depósito de salida;
+        // lo de la bodega, a la bodega entero.
+        if (L.isShop(from)) { ensure(from); from.outb[j.res] = (from.outb[j.res] || 0) + u.carry; } else S().res[j.res] = (S().res[j.res] || 0) + u.carry;
       }
       u.carry = 0; u.carryRes = null; u.job = null; u.wait = 0.4;
       g.stat('hauled', n);
     }
   };
+  // Lo que llevaba vuelve entero a la bodega (aunque esté llena: es tuyo, no una cosecha). Antes pasaba por el
+  // tope de la bodega y lo que no cabía desaparecía.
   function dropCargo(u) {
-    if (u.carry > 0 && u.carryRes) put(nearestStore(u.x, u.y, u.carryRes) || { def: {}, type: 'tc' }, u.carryRes, u.carry);
+    if (u.carry > 0 && u.carryRes) S().res[u.carryRes] = (S().res[u.carryRes] || 0) + u.carry;
     u.carry = 0; u.carryRes = null;
   }
   // Sin trabajo, vuelven a la Carretería.
@@ -408,6 +417,9 @@
       const res = beltRes(bl, a, b);
       if (!res) continue;
       if (L.isShop(b)) n = Math.min(n, L.need(b, res));
+      // como en vivo (beltTick): de la bodega a un taller, nunca por debajo de la reserva. Sin esto, al volver
+      // la bodega estaba vacía aunque el taller respetara la reserva.
+      if (L.isShop(b) && !L.isShop(a)) n = Math.min(n, Math.max(0, S().res[res] - reserveOf(res, L.output(b), b)));
       n = take(a, res, n);
       if (n > 0) put(b, res, n);
     }

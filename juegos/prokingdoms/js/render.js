@@ -503,7 +503,7 @@
       if (b.owner !== 'p' && !seen(b.cx, b.cy)) continue;
       const [px, py] = R.iso(b.x, b.y);
       if (px < vx0 - 200 || px > vx0 + vw + 200 || py < vy0 - 40 || py > vy0 + vh + 200) continue;
-      const spr = Sp.building(b.type, b.owner, b.lvl);
+      const spr = Sp.building(b.type, b.owner, b.lvl, b.asp);
       const x = Math.round(px - spr.ox), y = Math.round(py - spr.oy);
       if (!vis(x, y, spr.c.width, spr.c.height)) continue;
       const item = { d: b.x + b.y + (b.w + b.h) / 2, k: 'building', o: b, spr, x, y };
