@@ -1868,6 +1868,7 @@ function commonExtensions() {
     visualComp.of([]),
     syncLineField,
     EditorView.lineWrapping,
+    autoCompileListener,
     /* doble clic en el código → ir a esa parte del PDF (funcionalidad 4) */
     EditorView.domEventHandlers({
       dblclick(ev, view) {
@@ -2235,8 +2236,65 @@ function explicarFigurasVinculadas(errores) {
   return avisos;
 }
 
-async function compile() {
+/* ---------- auto-compilación ----------
+   Opcional (botón «Auto» de la barra del PDF, se recuerda por navegador):
+   compila sola cuando dejas de escribir. Solo cuentan las ediciones
+   HECHAS EN ESTA PESTAÑA (escribir, borrar, pegar, deshacer): si contaran
+   las de los colaboradores, el portátil de cada uno compilaría sin parar
+   mientras otro escribe. Con el motor incremental una pasada suele
+   tardar un par de segundos, así que esto ya no es un lujo caro. */
+const AUTO_KEY = "colabtex.autocompile";
+const AUTO_MS = 2500;
+let autoTimer = null;
+function autoOn() { try { return localStorage.getItem(AUTO_KEY) === "1"; } catch (e) { return false; } }
+function setAuto(on) {
+  try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch (e) {}
+  paintAuto();
+  if (!on) clearTimeout(autoTimer);
+}
+function paintAuto() {
+  const b = $("btnAutoCompile");
+  if (!b) return;
+  const on = autoOn();
+  b.classList.toggle("on", on);
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+}
+function scheduleAutoCompile() {
+  if (!autoOn()) return;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    if (state.compiling) { state.compileAgain = true; return; }
+    compile();
+  }, AUTO_MS);
+}
+const autoCompileListener = EditorView.updateListener.of(u => {
+  if (!u.docChanged) return;
+  if (u.transactions.some(tr => ["input", "delete", "undo", "redo", "move"].some(ev => tr.isUserEvent(ev)))) scheduleAutoCompile();
+});
+
+/* Descarga los recursos con varias peticiones a la vez: de una en una,
+   la primera compilación de un proyecto con 59 figuras esperaba 59
+   viajes de ida y vuelta seguidos. La caché de assetBytes hace que las
+   siguientes no bajen nada. */
+async function collectAssets(anota) {
+  const out = new Array(state.assets.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < state.assets.length) {
+      const i = next++, a = state.assets[i];
+      try { out[i] = { path: a.name, contents: await assetBytes(a) }; }
+      catch (err) { anota(`⚠ No se pudo traer «${a.name}»: ${err.message || err}`); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, state.assets.length) }, worker));
+  return out.filter(Boolean);
+}
+
+/* clean: «⟳ Recompilar desde cero» — olvida los auxiliares guardados
+   (.aux, .toc, .bbl…) por si alguno quedó en mal estado. */
+async function compile({ clean = false } = {}) {
   if (state.compiling) return;
+  clearTimeout(autoTimer);
   if (state.mode === "cloud" && !state.yFiles) return;
   if (state.mode === "local") await flushLocalSaves();
   const texNames = texFileNames();
@@ -2265,14 +2323,13 @@ async function compile() {
        ido por `appendLog` se borra justo cuando hace falta leerlo. */
     const avisos = [];
     const anota = linea => { avisos.push(linea); appendLog(linea); };
-    for (const a of state.assets) {
-      try { files.push({ path: a.name, contents: await assetBytes(a) }); }
-      catch (err) { anota(`⚠ No se pudo traer «${a.name}»: ${err.message || err}`); }
-    }
+    files.push(...await collectAssets(anota));
 
-    const result = await state.engine.compile(files, main);
+    const result = await state.engine.compile(files, main, { clean });
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     const sum = summarizeLog(result);
+    // «pdflatex ×1 + BibTeX»: cuántas pasadas hicieron falta esta vez
+    const motor = `pdflatex${sum.pasadas > 1 ? " ×" + sum.pasadas : ""}${sum.bibtex ? " + BibTeX" : ""}${clean ? " · desde cero" : ""}`;
     state.lastCompile = { ok: !!(result.pdf && result.pdf.length > 0), errors: sum.errors, warnings: sum.warnings };
 
     // mapa de sincronía y errores por archivo/línea de esta compilación
@@ -2288,10 +2345,10 @@ async function compile() {
       if (nErr) {
         // sin --halt-on-error hay PDF aunque haya fallos: se avisa igualmente
         setStatus(`Compilado con ${nErr} error${nErr === 1 ? "" : "es"} (${secs} s)`, "#e2c08d");
-        $("logSummary").innerHTML = `<span style="color:#e2c08d;font-weight:500">⚠ PDF generado, pero con ${nErr} error${nErr === 1 ? "" : "es"} — pdflatex · ${secs} s · ${sum.warnings.length} advertencias</span>`;
+        $("logSummary").innerHTML = `<span style="color:#e2c08d;font-weight:500">⚠ PDF generado, pero con ${nErr} error${nErr === 1 ? "" : "es"} — ${motor} · ${secs} s · ${sum.warnings.length} advertencias</span>`;
       } else {
         setStatus(`Compilado en ${secs} s`, "#7ee0c2");
-        $("logSummary").innerHTML = `<span style="color:#7ee0c2;font-weight:500">✓ Compilación correcta — pdflatex · ${secs} s · 0 errores · ${sum.warnings.length} advertencias</span>`;
+        $("logSummary").innerHTML = `<span style="color:#7ee0c2;font-weight:500">✓ Compilación correcta — ${motor} · ${secs} s · 0 errores · ${sum.warnings.length} advertencias</span>`;
       }
     } else {
       setStatus("Error de compilación", "#e57373");
@@ -2303,7 +2360,7 @@ async function compile() {
        del documento (un comando mal escrito, una llave de más) se
        quedan fuera — ver el filtro de reports.js. */
     if (state.capture) {
-      state.capture.noteTex(sum.errors, {
+      state.capture.noteTex(sum.errors.map(e => e.replace(/^(?:\.\/)?[^\s:][^:\n]*\.[A-Za-z]{1,8}:\d+:\s*/, "! ")), {
         modo: state.mode, principal: main, archivos: texNames.length, figuras: state.assets.length
       });
     }
@@ -2328,6 +2385,8 @@ async function compile() {
   } finally {
     state.compiling = false;
     $("btnCompile").textContent = "▶ Compilar";
+    // se siguió escribiendo durante la compilación: otra vuelta
+    if (state.compileAgain) { state.compileAgain = false; scheduleAutoCompile(); }
   }
 }
 
@@ -2620,8 +2679,10 @@ function wireEvents() {
     state.project.title = t.slice(0, 140);
     $("edTitle").textContent = state.project.title;
   };
-  $("btnCompile").onclick = compile;
-  $("btnRecompile").onclick = compile;
+  $("btnCompile").onclick = () => compile();
+  $("btnRecompile").onclick = () => compile({ clean: true });
+  $("btnAutoCompile").onclick = () => setAuto(!autoOn());
+  paintAuto();
   $("btnShare").onclick = openShareModal;
   $("btnSyncToPdf").onclick = () => {
     const v = state.editorView;
@@ -2696,6 +2757,7 @@ function wireEvents() {
   // visor PDF
   $("btnZoomIn").onclick = async () => { const s = await state.pdfViewer.setScale(state.pdfViewer.scale + 0.1); $("zoomLabel").textContent = Math.round(s * 100) + "%"; };
   $("btnZoomOut").onclick = async () => { const s = await state.pdfViewer.setScale(state.pdfViewer.scale - 0.1); $("zoomLabel").textContent = Math.round(s * 100) + "%"; };
+  $("btnFitWidth").onclick = () => state.pdfViewer && state.pdfViewer.fitWidth();
   $("btnDownloadPdf").onclick = () => state.pdfViewer && state.pdfViewer.download((state.project ? state.project.title.replace(/[^\w\- ]+/g, "") : "documento") + ".pdf");
   $("btnToggleLog").onclick = () => {
     const p = $("logPanel");

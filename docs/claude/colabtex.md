@@ -45,6 +45,26 @@ Key modules in [colabtex/src/](colabtex/src/):
   out: otherwise one network blip during the first init killed the engine for
   the rest of the session. Restarting does not re-download the 150 MB — the
   HTTP cache serves the packages and the `.wasm`.
+- **Incremental compilation** lives in `compile_pdftex_incremental`
+  (`vendor/busytex/busytex_pipeline.js`, latexmk-style). The worker keeps the
+  auxiliaries (`.aux .toc .lof .lot .out .bbl .nav .snm…`) of the last compile
+  and restores them before the next one; BibTeX runs only when the
+  `\citation/\bibdata/\bibstyle` lines or the `.bib/.bst` contents change;
+  pdflatex repeats only while the auxiliaries change (max 4). Typical edit:
+  **1 pass** (was always 4 with a bibliography — and without one, `\ref` and
+  the ToC were *never* resolved, because each compile started on an empty
+  MEMFS). A user-uploaded aux file wins over the cache. Error inside a restored
+  auxiliary, or no PDF → it retries once from scratch by itself. ⟳ in the PDF
+  bar = «Recompilar desde cero» (`compile({clean:true})`). Touching the
+  pipeline or worker → bump `ENGINE_VERSION`.
+- `summarizeLog` reads **only the last pdflatex pass** (+ BibTeX): earlier
+  passes warn about exactly what the later ones resolve, and summing them
+  doubled every count. Errors are `!` lines **and** `file:line:` lines — with
+  `--file-line-error` they never start with `!`, and the summary said «✓
+  Compilación correcta» over a document full of errors.
+- **Auto** (PDF bar, `localStorage colabtex.autocompile`) compiles 2.5 s after
+  you stop typing. Only *local* user edits count (`tr.isUserEvent`), never
+  collaborators' — otherwise every laptop compiles while someone else types.
 - `pdfview.js` — pdf.js-based PDF viewer. **Ctrl/⌘ + wheel zooms** (that is
   also how a trackpad pinch arrives), and it must `preventDefault()` or the
   browser zooms the whole page instead. The percentage updates on every wheel
@@ -53,7 +73,17 @@ Key modules in [colabtex/src/](colabtex/src/):
   `0.999^deltaY` ≈ 13 % per notch; the obvious `0.995` nearly *doubles* the
   size in one notch. `render()` **queues** a repaint that arrives while another
   is running instead of dropping it, which is how a zoom asked for just as a
-  compile finished used to vanish.
+  compile finished used to vanish — now a newer `render()` bumps `gen` and the
+  older one withdraws without touching the DOM.
+  Each page is a `.pdf-page` div with canvas + pdf.js **text layer** (select,
+  copy, Ctrl+F) + a **link layer** (hyperref `\ref`/ToC jump inside, `\url`
+  opens a tab). Pages paint **lazily** (IntersectionObserver, released far
+  away); on recompile the pages in view are painted *before* the swap, so no
+  flicker. Layer CSS is injected by `pdfview.js` itself because
+  `asset-preview.js` reuses the viewer. pdf.js 6 has no
+  `convertToViewportRectangle`: convert two corners with
+  `convertToViewportPoint`. Do not add pdf.js viewer's «selecting /
+  endOfContent» trick naïvely: it killed selection entirely.
 - `asset-preview.js` — clicking an image/PDF in the file tree previews it in
   place of the code editor (which is only hidden, never destroyed). Images go
   to an `<img>` with a blob URL; PDFs reuse `PdfViewer`. Formats the browser
