@@ -183,7 +183,7 @@
     for (const p of W.pois) { const st = S.pois[p.id]; if (st && st.d && p.kind === 'camp') W.poiFree(p); }
     for (const o of save.buildings || []) {
       const b = G.addBuilding(o.type, 'p', o.x, o.y, o.done, o.id, false, o.lvl);
-      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined });
+      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined, asp: o.asp || undefined });
       if (b.done) W.reveal(b.cx, b.cy, G.sight(b));
     }
     for (const o of save.units || []) G.addUnit(o);
@@ -413,7 +413,7 @@
     if (u.owner === 'p' && u.carry > 0) {
       const n = G.addRes(u.carryRes, u.carry);
       gained(u.carryRes, n, u.carryZone, u.hunt);
-      if (PK.Sfx) PK.Sfx.play('deposit');
+      if (PK.Render && PK.Render.sonarEnCasilla) PK.Render.sonarEnCasilla('deposit', u.x, u.y); // pk-37: con lugar
     }
     u.carry = 0; u.carryRes = null; u.carryZone = -1; u.hunt = false;
     void b;
@@ -625,15 +625,53 @@
   }
 
   // ---------- Exploración ----------
-  G.exploreRange = () => { const r = best('scout', 'range'); return r ? Math.round((r + 4 * G.lvl('cartography') + vb('range')) * (1 + hp('range'))) : 0; };
+  // pk-37: el alcance de los exploradores es un ÁREA (casillas), no una distancia. Con una distancia, un reino en
+  // la orilla del mapa perdía la mitad de su círculo contra el borde y uno en el medio no. Ahora:
+  // - G.exploreNominal(): el radio de siempre (Puesto, Cartografía, árbol, Maravilla, héroe);
+  // - G.exploreArea(): cuántas casillas puede revelar = π·(radio + vista del explorador)², tope el mapa entero
+  //   (con la vista sumada, en el medio del mapa se revela lo mismo que antes);
+  // - G.exploreRange(): el radio REAL de tu reino: la distancia a la que tu Centro Urbano junta esas casillas
+  //   dentro del mapa. En una orilla da más que en el medio. Todo lo demás (banderas, borde de la niebla,
+  //   órdenes a mano, lo que revela al caminar) usa este radio.
+  G.exploreNominal = () => { const r = best('scout', 'range'); return r ? Math.round((r + 4 * G.lvl('cartography') + vb('range')) * (1 + hp('range'))) : 0; };
+  G.exploreArea = () => { const r = G.exploreNominal(); return r ? Math.min(W.W * W.H, Math.round(Math.PI * Math.pow(r + D.SIGHT.scout, 2))) : 0; };
+  let distCasa = null; // las distancias de todas las casillas a tu casa, ordenadas (una vez por casa y mapa)
+  G.radioDeArea = function (area) {
+    if (!area) return 0;
+    const [hx, hy] = D.PLAYER_HOME, N = W.W * W.H;
+    if (!distCasa || distCasa.k !== hx + ',' + hy + ',' + N) {
+      const a = new Float32Array(N);
+      for (let i = 0; i < N; i++) a[i] = Math.hypot((i % W.W) - hx, ((i / W.W) | 0) - hy);
+      a.sort();
+      distCasa = { k: hx + ',' + hy + ',' + N, a };
+    }
+    return area >= N ? distCasa.a[N - 1] + 1 : Math.round(distCasa.a[area - 1] * 10) / 10;
+  };
+  G.exploreRange = () => G.radioDeArea(G.exploreArea());
+  // cuánto del área ya se ve (para los paneles): se recalcula solo cuando cambia la niebla o el radio
+  let areaCache = null;
+  G.areaInfo = function () {
+    const R = G.exploreRange(), area = G.exploreArea(), [hx, hy] = D.PLAYER_HOME;
+    if (areaCache && areaCache.R === R && areaCache.v === W.fogVer) return areaCache;
+    let vistas = 0, total = 0;
+    if (R) { const r = Math.ceil(R); for (let y = Math.max(0, hy - r); y <= Math.min(W.H - 1, hy + r); y++) for (let x = Math.max(0, hx - r); x <= Math.min(W.W - 1, hx + r); x++) if (U.dist(x, y, hx, hy) <= R) { total++; if (W.fog[y * W.W + x]) vistas++; } }
+    return (areaCache = { R, v: W.fogVer, area: total || area, vistas, pct: total ? vistas / total : 0, todo: area >= W.W * W.H });
+  };
+  G.enAlcance = (x, y) => { const R = G.exploreRange(); return !!R && U.dist(x, y, D.PLAYER_HOME[0], D.PLAYER_HOME[1]) <= R; };
+  // lo que ve un explorador: su vista, pero nunca fuera del área (antes, llevado a mano, revelaba todo el camino)
+  G.revealScout = function (x, y) {
+    const R = G.exploreRange(), [hx, hy] = D.PLAYER_HOME;
+    if (!R) return;
+    G.revealAt(x, y, G.scoutSight(), (tx, ty) => U.dist(tx, ty, hx, hy) <= R);
+  };
   G.scoutSight = () => D.SIGHT.scout + (G.lvl('cartography') >= 3 ? 1 : 0);
   G.scoutMax = () => best('scout', 'scouts');
   G.poiState = p => S.pois[p.id] || null;
   G.poiTier = p => D.poiTier(U.dist(p.x + p.w / 2, p.y + p.h / 2, D.PLAYER_HOME[0], D.PLAYER_HOME[1]));
   G.explorePct = () => W.fogCount / (W.W * W.H);
 
-  G.revealAt = function (x, y, r) {
-    const idx = W.reveal(x, y, r);
+  G.revealAt = function (x, y, r, ok) {
+    const idx = W.reveal(x, y, r, ok);
     if (!idx.length) return;
     G.stat('explored', idx.length);
     for (const i of idx) {
@@ -686,7 +724,7 @@
     if (W.fog[W.idx(x, y)]) { toast('Esa zona ya está descubierta: pon la bandera en la niebla.', 'warn'); return null; }
     const R = G.exploreRange();
     if (!R) { toast('Necesitas un Puesto de Exploradores.', 'warn'); return null; }
-    if (U.dist(x, y, hx, hy) > R + 2) { toast('Queda fuera del alcance de tus exploradores (' + R + ' casillas): mejora el Puesto de Exploradores.', 'warn'); return null; }
+    if (U.dist(x, y, hx, hy) > R) { toast('Queda fuera del área de tus exploradores: mejora el Puesto de Exploradores.', 'warn'); return null; }
     if (fl.length >= G.BANDERAS_MAX) { toast('Ya tienes ' + G.BANDERAS_MAX + ' banderas: toca una para quitarla.', 'warn'); return null; }
     fl.push([x, y]);
     for (const u of G.units) if (u.owner === 'p' && u.kind === 'scout' && u.task && u.task.t === 'explore') { u.path = []; u.exT = undefined; } // que lo tomen ya
@@ -737,7 +775,39 @@
       }
       if (pick) return pick;
     }
-    return null;
+    return lejano(u, R, frontier);
+  };
+  // pk-37: el borde de la niebla quedó a más de 60 casillas del explorador (alcances grandes): el más cercano de
+  // todo el mapa. Antes devolvía null y el explorador decía «terminé» con niebla en su área.
+  let sinBorde = null; // {R, fog}: ya se buscó en todo el mapa y no quedaba nada; no repetir hasta que cambie
+  function lejano(u, R, frontier) {
+    if (sinBorde && sinBorde.R === R && sinBorde.fog === W.fogCount && !(u.skip && u.skip.size !== sinBorde.skip)) return null;
+    const [hx, hy] = D.PLAYER_HOME, skip = u.skip, r = Math.ceil(R);
+    let pick = null, bs = 1e9;
+    for (let y = Math.max(0, hy - r); y <= Math.min(W.H - 1, hy + r); y++) for (let x = Math.max(0, hx - r); x <= Math.min(W.W - 1, hx + r); x++) {
+      const i = y * W.W + x;
+      if (W.fog[i] || (skip && skip.has(i)) || U.dist(x, y, hx, hy) > R || !frontier(x, y)) continue;
+      const sc = U.dist(x, y, u.x, u.y) + (W.passable(x, y) ? 0 : 3);
+      if (sc < bs) { bs = sc; pick = [x, y]; }
+    }
+    if (!pick) sinBorde = { R, fog: W.fogCount, skip: skip ? skip.size : 0 };
+    return pick;
+  }
+  // Cuando ya no queda borde al que llegar, lo que sigue con niebla dentro del área es lo que nadie puede pisar
+  // (el medio de los lagos, montañas, islotes): el explorador lo mira desde la orilla. Así, con el área del
+  // mapa entero, se revela el mapa entero (caminando se llegaba al 98,9%).
+  let orillaVista = null;
+  G.verDesdeOrilla = function () {
+    const R = G.exploreRange(), [hx, hy] = D.PLAYER_HOME;
+    if (!R || (orillaVista && orillaVista.R === R && orillaVista.fog === W.fogCount)) return 0;
+    const r = Math.ceil(R), idx = [];
+    for (let y = Math.max(0, hy - r); y <= Math.min(W.H - 1, hy + r); y++) for (let x = Math.max(0, hx - r); x <= Math.min(W.W - 1, hx + r); x++) {
+      const i = y * W.W + x;
+      if (!W.fog[i] && U.dist(x, y, hx, hy) <= R) idx.push([x, y]);
+    }
+    for (const [x, y] of idx) G.revealAt(x + 0.5, y + 0.5, 0.2);
+    orillaVista = { R, fog: W.fogCount };
+    return idx.length;
   };
   G.exploreDone = function (u) {
     if (u.doneMsg) return;
@@ -746,7 +816,7 @@
     const range = G.exploreRange();
     if (S.flags.scoutDoneR === range) return;
     S.flags.scoutDoneR = range;
-    toast('Tu explorador ya recorrió todo su alcance. Mejora el Puesto de Exploradores para llegar más lejos.', 'info');
+    toast(G.areaInfo().todo ? 'Tus exploradores ya recorrieron el mapa entero.' : 'Tu explorador ya recorrió toda su área. Mejora el Puesto de Exploradores para ampliarla.', 'info');
   };
   G.trainScout = function (b) {
     if (G.scoutCount() + b.queue.length >= G.scoutMax()) { toast('Ya tienes los exploradores que permite el Puesto (mejóralo para más).', 'warn'); return false; }
@@ -782,6 +852,19 @@
   // Los talleres no gastan un insumo por debajo de la reserva que fija el Capataz (parte de la bodega),
   // así no dejan al reino sin madera ni piedra para construir. Si lo que fabrican escasea, la reserva baja.
   // Con «Producir igual» (b.sinReserva) ese taller la ignora.
+  // Encender o apagar «Producir igual». Al apagarlo, lo que el taller juntó en su depósito de entrada sin respetar la
+  // reserva vuelve a la bodega (se queda con una tanda): antes lo seguía gastando y dejaba la bodega en cero.
+  G.setSinReserva = function (b, v) {
+    if (!b || !b.def.recipe) return;
+    b.sinReserva = !!v;
+    if (v || !b.inb || !PK.Logi) return;
+    const r = PK.Logi.recipe(b), vuelve = {}, res = G.state.res;
+    for (const k in b.inb) {
+      const n = Math.floor((b.inb[k] || 0) - ((r && r.in[k]) || 0));
+      if (n > 0) { b.inb[k] -= n; res[k] = (res[k] || 0) + n; vuelve[k] = n; }
+    }
+    if (Object.keys(vuelve).length) toast('Volvió a la bodega: ' + Object.keys(vuelve).map(k => U.fmt(vuelve[k]) + ' de ' + D.RES[k].name.toLowerCase()).join(', ') + '.', 'info');
+  };
   G.reserveOk = function (cost, out, b) {
     if (b && b.sinReserva) return true;
     if (b) { const rm = G.reservaDe(b); if (rm && rm.meta) return false; }
@@ -864,6 +947,12 @@
     const scouts = units.filter(u => u.kind === 'scout');
     if (scouts.length) {
       const tx = target.kind === 'tile' ? target.x : target.obj.x, ty = target.kind === 'tile' ? target.y : target.obj.y;
+      // pk-37: a mano tampoco sale de su área (antes se lo podía llevar a cualquier parte, revelando todo el camino)
+      if (!G.enAlcance(tx, ty)) {
+        if (!silent) toast('Tu explorador no llega tan lejos: queda fuera de su área (' + U.fmt(G.exploreArea()) + ' casillas). Mejora el Puesto de Exploradores para ampliarla.', 'warn');
+        units = units.filter(u => u.kind === 'v');
+        return units.length ? G.command(units, target, silent) : false;
+      }
       scouts.forEach(u => { G.assign(u, { t: 'move', then: 'explore' }); u.doneMsg = false; moveUnit(u, tx, ty); });
       units = units.filter(u => u.kind === 'v');
       if (!units.length) return true;
@@ -1353,12 +1442,12 @@
     let budget = G.speed('p', u) * dt * 0.6;
     for (let k = 0; k < 40 && budget > 0; k++) {
       const t = G.exploreTarget(u);
-      if (!t) return;
+      if (!t) { G.verDesdeOrilla(); return; }
       const d = U.dist(u.x, u.y, t[0] + 0.5, t[1] + 0.5);
       const f = Math.min(1, budget / Math.max(0.1, d));
       const p = W.freeAround(Math.floor(u.x + (t[0] + 0.5 - u.x) * f), Math.floor(u.y + (t[1] + 0.5 - u.y) * f), Math.floor(u.x + (t[0] + 0.5 - u.x) * f), Math.floor(u.y + (t[1] + 0.5 - u.y) * f), t[0], t[1]);
       u.x = p[0] + 0.5; u.y = p[1] + 0.5; u.path = [];
-      G.revealAt(u.x, u.y, G.scoutSight());
+      G.revealScout(u.x, u.y);
       if (!W.fog[t[1] * W.W + t[0]]) G.revealAt(t[0] + 0.5, t[1] + 0.5, 1.5);
       budget -= d;
     }

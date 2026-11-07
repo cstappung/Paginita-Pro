@@ -36,9 +36,16 @@
     if (st.aspectos[id]) { G().give({ gems: 25 }); if (st.heroes) st.heroes.esencia = (st.heroes.esencia || 0) + 40; UI.toast('Ya tenías ese aspecto: te llegan 25 gemas y 40 de esencia en su lugar.', 'info'); return; }
     st.aspectos[id] = Date.now();
     const a = D.aspecto(id);
-    // los de edificio, tropa y decoración se ponen solos la primera vez
-    if (a && ['edificio', 'tropa', 'deco'].includes(a.tipo) && a.o) { st.flags['asp_' + (a.o.b || a.o.t)] = id; P.aplicar(); }
-    if (a && a.tipo === 'estandarte') { st.flags.aspEstandarte = id; P.aplicar(); }
+    // los de edificio, tropa y decoración se ponen solos la primera vez; el resto, si no usabas otro
+    // (el estandarte y el marco no le quitan el lugar a uno de la tienda). Se cambian en Reino → Aspectos.
+    if (a && ['edificio', 'tropa', 'deco'].includes(a.tipo) && a.o) st.flags['asp_' + (a.o.b || a.o.t)] = id;
+    const t = st.tienda || {};
+    if (a && a.tipo === 'estandarte' && !t.color) st.flags.aspEstandarte = id;
+    if (a && a.tipo === 'marco' && !t.marco && !st.flags.aspMarco) st.flags.aspMarco = id;
+    if (a && a.tipo === 'efecto' && !st.flags.aspEfecto) st.flags.aspEfecto = id;
+    if (a && a.tipo === 'barco' && !st.flags.aspBarco) st.flags.aspBarco = id;
+    P.aplicar();
+    if (a && a.tipo !== 'heroe' && a.tipo !== 'heroe2') UI.toast('✦ Nuevo aspecto: ' + P.nombre(id) + '. Elige dónde usarlo en Reino → Aspectos.', 'info', { label: 'Aspectos', fn: () => UI.openAspectos && UI.openAspectos() });
   };
 
   // ---------- Aspectos: cómo se ven ----------
@@ -52,6 +59,26 @@
     for (const t in D.ARMY) { const a = tipos[t]; Sp.colorTropa(t, a && a.tipo === 'tropa' ? a.o.col : null); }
     const e = st.flags.aspEstandarte && D.aspecto(st.flags.aspEstandarte);
     if (e && !(st.tienda && st.tienda.color) && Sp.colorPropio) Sp.colorPropio(e.T.col);
+    // pk-36: el marco de los retratos (si no usas uno de la tienda) y las velas de tus barcos
+    const m = st.flags.aspMarco && D.aspecto(st.flags.aspMarco);
+    if (!(st.tienda && st.tienda.marco) && typeof document !== 'undefined' && document.documentElement) document.documentElement.style.setProperty('--marco', m ? P.marcoCss(m) : 'transparent');
+    const bc = st.flags.aspBarco && D.aspecto(st.flags.aspBarco);
+    if (PK.Armada && PK.Armada.aspecto) PK.Armada.aspecto(bc ? bc.T.col : null, bc ? st.flags.aspBarco : null);
+  };
+  // el marco del Pase es el color del tema aclarado, como los de las escaleras (datos-vida.js)
+  P.marcoCss = a => 'rgb(' + a.T.col.map(v => Math.min(255, Math.round(v * 1.35 + 30))).join(',') + ')';
+  // el color del efecto de habilidad en uso (batalla.js), en [r, g, b]
+  P.efectoCol = function () {
+    const st = S(), a = st && st.flags && st.flags.aspEfecto && D.aspecto(st.flags.aspEfecto);
+    const h = a && a.o && /^#([0-9a-f]{6})$/i.exec(a.o.col || '');
+    return h ? [0, 2, 4].map(i => parseInt(h[1].slice(i, i + 2), 16)) : null;
+  };
+  P.nombre = function (id) {
+    const a = D.aspecto(id);
+    if (!a) return id;
+    // «Estandarte del Carnaval», «Marco de Invierno»; los que no empiezan con «De» van entre comillas: «Imperial»
+    const n = a.T.name, de = /^De(l)? /.test(n) ? n[0].toLowerCase() + n.slice(1) : '«' + n + '»';
+    return a.tipo === 'marco' ? 'Marco ' + de : a.tipo === 'estandarte' ? 'Estandarte ' + de : a.tipo === 'heroe2' ? a.o.name + ' (variante)' : a.o ? a.o.name : n;
   };
   P.aspectosDe = tipo => Object.keys(S().aspectos || {}).filter(id => { const a = D.aspecto(id); return a && (a.tipo === tipo || (tipo === 'heroe' && a.tipo === 'heroe2')); });
 
@@ -134,6 +161,7 @@
       // aspectos
       const mios = Object.keys(st.aspectos || {});
       body.append(el('h3', null, 'Tus aspectos (' + mios.length + ')'), mios.length ? el('div', { class: 'row wrap' }, mios.map(id => aspectoEl(id))) : el('p', { class: 'small muted' }, 'Los aspectos del tema salen en la pista dorada. Cada tema vuelve una vez al año, en la misma quincena.'));
+      if (mios.length && UI.openAspectos) body.append(el('div', { class: 'row' }, UI.btn('Administrar aspectos', () => UI.openAspectos(), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Elige cuáles usar, por tipo o edificio por edificio. También en Reino → Aspectos.')));
     }, { wide: true });
     function nivelEl(n) {
       const i = P.info, ok = n <= 30 ? i.nivel >= n : i.extras >= n - 30;
@@ -150,8 +178,7 @@
     function aspectoEl(id) {
       const a = D.aspecto(id);
       if (!a) return '';
-      const nombre = a.tipo === 'marco' ? 'Marco ' + a.T.name : a.tipo === 'estandarte' ? 'Estandarte ' + a.T.name : a.tipo === 'heroe2' ? a.o.name + ' (variante)' : a.o ? a.o.name : a.T.name;
-      return el('span', { class: 'asp-chip', style: { borderColor: 'rgb(' + a.T.col.join(',') + ')' }, title: a.tipo }, nombre);
+      return el('span', { class: 'asp-chip', style: { borderColor: 'rgb(' + a.T.col.join(',') + ')' }, title: a.tipo }, P.nombre(id));
     }
   };
 })();

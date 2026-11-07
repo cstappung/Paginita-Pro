@@ -355,9 +355,14 @@
     const st = S(), it = D.TIENDA.find(o => o.id === id);
     if (!it || (id && !st.tienda.tengo[id])) return false;
     st.tienda[it.t] = st.tienda[it.t] === id ? null : id; // tocar lo que ya se usa lo saca
-    aplicarTienda();
+    // pk-36: el color y el marco son uno solo: usar el de la tienda saca el del Pase (estandarte, marco)
+    if (st.tienda[it.t] && it.t === 'color') st.flags.aspEstandarte = null;
+    if (st.tienda[it.t] && it.t === 'marco') st.flags.aspMarco = null;
+    V.aplicarAspectos();
     return true;
   };
+  // la tienda primero y el Pase después: el Pase solo pinta lo que la tienda deja libre
+  V.aplicarAspectos = function () { aplicarTienda(); if (PK.Pase && PK.Pase.aplicar) PK.Pase.aplicar(); };
   function aplicarTienda() {
     const st = S(), t = st && st.tienda;
     if (!t) return;

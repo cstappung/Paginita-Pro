@@ -42,7 +42,7 @@
       if (!b) return null;
       const r = g.reservaDe(b), st = S(), menos = [0.5, 0.3, 0.15, 0].find(v => v < st.auto.reserve);
       return { id: 'reserva', prioridad: 70, texto: 'Taller parado: ' + b.def.name + ', falta ' + nombre(r.res) + ' (reserva ' + Math.round(st.auto.reserve * 100) + '%).',
-        acciones: [{ label: 'Producir igual', fn: () => { b.sinReserva = true; } }].concat(menos !== undefined ? [{ label: 'Bajar reserva a ' + Math.round(menos * 100) + '%', fn: () => { st.auto.reserve = menos; } }] : []) };
+        acciones: [{ label: 'Producir igual', fn: () => { g.setSinReserva(b, true); } }].concat(menos !== undefined ? [{ label: 'Bajar reserva a ' + Math.round(menos * 100) + '%', fn: () => { st.auto.reserve = menos; } }] : []) };
     },
     // la meta de era pide un recurso del mapa que nadie junta
     () => {
@@ -104,7 +104,7 @@
     () => {
       const g = G(), st = S(), post = g.buildings.find(b => b.owner === 'p' && b.done && b.type === 'scout');
       if (!post || st.flags.scoutDoneR !== g.exploreRange()) return null;
-      return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su alcance (' + g.exploreRange() + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
+      return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su área (' + U.fmt(g.exploreArea()) + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
     },
     // la Biblioteca sin investigar
     () => {

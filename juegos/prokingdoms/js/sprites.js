@@ -1339,9 +1339,23 @@
   };
   S.colorTropa = function (type, col) { if (col) ASP_T[type] = col; else delete ASP_T[type]; };
   S.colorDeTropa = type => ASP_T[type] || D.PLAYER_COLOR;
+  // pk-36: un edificio puede llevar su propio aspecto (b.asp, elegido en su panel o en la ventana Aspectos):
+  // 'normal' es sin aspecto, un id del Pase es ese aspecto y vacío sigue al de su tipo (ASP_B)
+  const ASP_OV = {};
+  S.aspectoDe = function (type, owner, ov) {
+    if (owner !== 'p') return null;
+    if (!ov) return ASP_B[type] || null;
+    if (ov === 'normal') return null;
+    if (!(ov in ASP_OV)) {
+      const a = D.aspecto ? D.aspecto(ov) : null;
+      ASP_OV[ov] = a && a.o && (a.tipo === 'edificio' || a.tipo === 'deco') ? { b: a.o.b, col: a.o.col || a.T.col, techo: a.o.techo || null, id: ov } : null;
+    }
+    const o = ASP_OV[ov];
+    return o && o.b === type ? o : ASP_B[type] || null;
+  };
   let techoAsp = null;
-  S.building = function (type, owner, lvl) {
-    const tier = S.tier(lvl || 1), asp = owner === 'p' ? ASP_B[type] : null, key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
+  S.building = function (type, owner, lvl, ov) {
+    const tier = S.tier(lvl || 1), asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (BCACHE[key]) return BCACHE[key];
     const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
     techoAsp = asp ? asp.techo : null;
@@ -2326,10 +2340,10 @@
     return (ICONS[key] = c.toDataURL());
   };
 
-  S.buildingIcon = function (type, owner, lvl) {
-    const key = 'b_' + type + (owner || 'p') + bkey(type, lvl);
+  S.buildingIcon = function (type, owner, lvl, ov) {
+    const asp = S.aspectoDe(type, owner || 'p', ov), key = 'b_' + type + (owner || 'p') + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (ICONS[key]) return ICONS[key];
-    const spr = S.building(type, owner || 'p', lvl);
+    const spr = S.building(type, owner || 'p', lvl, ov);
     const size = 48, c = mk(size, size), ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     const s = Math.min(size / spr.c.width, size / spr.c.height);

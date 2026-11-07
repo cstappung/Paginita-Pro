@@ -14,7 +14,7 @@
       const lodge = g.countB('scout');
       body.append(el('div', { class: 'war-top' },
         el('div', null, el('b', null, 'Mapa explorado: '), Math.round(g.explorePct() * 1000) / 10 + '% (' + U.fmt(W.fogCount) + ' casillas)'),
-        el('div', null, el('b', null, 'Exploradores: '), g.scoutCount() + '/' + g.scoutMax() + ' · alcance ' + g.exploreRange() + ' casillas'),
+        el('div', null, el('b', null, 'Exploradores: '), g.scoutCount() + '/' + g.scoutMax()), UI.areaTxt ? el('div', { class: 'small' }, UI.areaTxt()) : '',
         lodge ? null : el('p', { class: 'muted small' }, 'Construye un Puesto de Exploradores para entrenar exploradores. Su nivel define cuántos tienes y hasta dónde llegan. Las torres también ven lejos.')));
       const found = W.pois.filter(p => g.poiState(p) && g.poiState(p).f);
       const counts = {};

@@ -30,7 +30,7 @@
     if (!r && !b.sinReserva) return '';
     return el('div', { class: 'row' },
       el('span', { class: 'small ' + (r ? 'warn-t' : 'muted') }, r ? G().reservaText(r) + '. ' : 'Este taller ignora la reserva de la bodega. '),
-      UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { b.sinReserva = !b.sinReserva; UI.refreshPanel(true); }, { small: true, cls: b.sinReserva ? '' : 'gold' }));
+      UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { G().setSinReserva(b, !b.sinReserva); UI.refreshPanel(true); }, { small: true, cls: b.sinReserva ? '' : 'gold' }));
   };
   // Pantalla táctil: cambia los textos de ayuda de "clic derecho" a "toca".
   UI.isTouch = () => !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
@@ -225,6 +225,7 @@
     mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
     mbtn('ancla', 'Galeón', () => PK.Mar.abrir(), null, 'galeon'); // Fase 9
+    mbtn('gems', 'Aspectos', () => UI.openAspectos(), null, 'aspectos'); // pk-36: ui/aspectos.js
     mbtn('crown', 'Regata', () => PK.Regata && PK.Regata.abrir(), null, 'regata'); // pk-30, solo en el mar
     mbtn('gear', 'Opciones', () => UI.openSettings(), null, 'settings');
     agrupar(menu);
@@ -303,11 +304,12 @@
     taberna: g => g.countAll('tavern') > 0,
     equipo: (g, st) => !!(st.heroes && st.heroes.lista.length),
     consejo: g => g.countAll('consejo') > 0,
+    aspectos: () => !!(UI.hayAspectos && UI.hayAspectos()), // pk-36: con el primer aspecto del Pase o de la tienda
   };
   // ---------- U1 (Fase 6): menú agrupado ----------
   // Cinco grupos con submenú, más Opciones. Un grupo se ve si se ve alguno de sus botones, y brilla si alguno es nuevo.
   const GRUPOS = [
-    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon'] },
+    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon', 'aspectos'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
     { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
     { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms', 'regata'] },
@@ -753,12 +755,18 @@
       el('div', { class: 'row end' }, UI.btn('Desarmar (devuelve la mitad)', () => { PK.Logi.removeBelt(bl); G().sel = null; UI.refreshPanel(true); }, { small: true, cls: 'danger' }))));
   }
 
+  // pk-37: el área de los exploradores en casillas y cuánto ya se ve
+  function areaTxt() {
+    const a = G().areaInfo();
+    return a.todo ? 'Su área es el mapa entero: ' + Math.floor(a.pct * 1000) / 10 + '% visto.' : 'Explora ' + U.fmt(G().exploreArea()) + ' casillas alrededor de tu Centro Urbano (' + Math.floor(a.pct * 1000) / 10 + '% visto).';
+  }
+  UI.areaTxt = areaTxt;
   function scoutPanel(us) {
     const u = us[0], port = Sp.villager(D.PLAYER_COLOR, u.hair, u.skin, 'idle', 0, null, false, null, true).c.toDataURL();
     liveEl = el('p', { class: 'small' });
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
       el('div', null, el('h3', null, us.length === 1 ? 'Explorador' : us.length + ' exploradores'), liveEl,
-        el('p', { class: 'small muted' }, 'Explora solo hasta ' + G().exploreRange() + ' casillas de tu Centro Urbano. ' + UI.hint('Clic derecho', 'Toca el mapa') + ' para enviarlo a un lugar; después sigue explorando.'),
+        el('p', { class: 'small muted' }, areaTxt() + ' ' + UI.hint('Clic derecho', 'Toca el mapa') + ' dentro de esa área para enviarlo a un lugar; después sigue explorando.'),
         el('div', { class: 'row' }, UI.btn('Explorar', () => { us.forEach(x => { G().assign(x, { t: 'explore' }); x.doneMsg = false; x.skip = null; }); UI.refreshPanel(true); }, { small: true }),
           UI.btn('⚑ Bandera', () => PK.Input.startFlag(), { small: true, title: 'Marca un lugar en la niebla: va hacia allá antes que a lo más cercano' }),
           UI.btn('Detener', () => { us.forEach(x => G().release(x)); UI.refreshPanel(true); }, { small: true })))));
@@ -816,7 +824,7 @@
   function serieLinea(b) {
     const x = PK.Auto.serieTipos().find(t => t.type === b.type);
     if (!x || !UI.serieCtl) return '';
-    return el('div', { class: 'row serie-linea' }, el('span', { class: 'small' }, 'Capataz, tus ' + x.n + ': '), UI.serieCtl(b.type, () => UI.refreshPanel(true)));
+    return el('div', { class: 'row serie-linea' }, el('span', { class: 'small' }, x.n > 1 ? 'Capataz, tus ' + x.n + ': ' : 'Serie del Capataz: '), UI.serieCtl(b.type, () => UI.refreshPanel(true)));
   }
   function upgradeBox(b) {
     const box = upgradeBox0(b);
@@ -851,7 +859,7 @@
   function buildingPanel(b) {
     const def = b.def, own = b.owner === 'p';
     const head = el('div', null, el('h3', null, def.name + (def.noUp ? '' : ' · Nv ' + b.lvl)), el('p', { class: 'small' }, own ? def.desc : 'Pertenece a ' + D.BOTS.find(x => x.id === b.owner).realm + '.'));
-    panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(b.type, b.owner, b.lvl) }), head));
+    panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(b.type, b.owner, b.lvl, b.asp) }), head));
     if (!own) return;
     if (!b.done) {
       head.append(el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: b.progress * 100 + '%' } }), el('span', null, 'En construcción ' + Math.floor(b.progress * 100) + '% · ' + U.fmtTime(((1 - b.progress) * def.time) / G().buildMult('p')))));
@@ -902,7 +910,7 @@
       act.append(el('div', { class: 'row' },
         UI.btn(el('span', null, 'Explorador ', UI.costEl(D.SCOUT.cost)), () => { G().trainScout(b); UI.refreshPanel(true); }),
         b.queue.length ? UI.btn('Quitar de la cola', () => { G().cancelTrain(b); UI.refreshPanel(true); }, { small: true }) : null),
-        el('p', { class: 'small' }, 'Exploradores: ' + G().scoutCount() + '/' + G().scoutMax() + ' · Mapa explorado: ' + Math.round(G().explorePct() * 1000) / 10 + '%'));
+        el('p', { class: 'small' }, 'Exploradores: ' + G().scoutCount() + '/' + G().scoutMax() + ' · Mapa explorado: ' + Math.round(G().explorePct() * 1000) / 10 + '%'), el('p', { class: 'small muted' }, areaTxt()));
       if (b.queue.length) act.append(el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / G().trainTime(b)) * 100 + '%' } }), el('span', null, 'Entrenando explorador' + (b.status && b.status !== 'Entrenando' ? ' · ' + b.status : ''))));
       act.append(UI.btn('Ver descubrimientos', () => UI.openExplore(), { small: true }));
     } else if (b.type === 'monastery') {
@@ -961,6 +969,7 @@
     }
     else if (def.drop) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
     if (b.type === 'granary' || b.type === 'warehouse') act.append(el('p', { class: 'small muted' }, 'Capacidad total: comida ' + U.fmt(G().cap('food')) + ' · bienes ' + U.fmt(G().cap('wood')) + '.'));
+    if (UI.aspectoFila) act.append(UI.aspectoFila(b)); // pk-36: su aspecto (ui/aspectos.js)
     if (b.type !== 'tc') act.append(el('div', { class: 'row end' },
       G().canMove(b) ? UI.btn(el('span', null, 'Mover ', UI.costEl(G().moveCost(b))), () => PK.Input.startMoving(b), { small: true, title: 'Llévalo a otro lugar sin perder su nivel (tecla V)' }) : '',
       UI.btn('Demoler', () => UI.confirmDemolish(b), { small: true, cls: 'danger' })));

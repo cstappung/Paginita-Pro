@@ -202,25 +202,31 @@
       else if (ter === 0) suma('pasto', sx);
     }
     const enPantalla = (tx, ty) => { const p = R.iso(tx, ty), q = R.worldToScreen(p[0], p[1]); return q[0] > -40 && q[0] < w + 40 && q[1] > -40 && q[1] < h + 40 ? q : null; };
+    // pk-37: obras, talleres y aldeanos ajenos pesan según qué tan al centro de la pantalla están (lo de la orilla
+    // casi no cuenta), como los golpes de tus aldeanos (Render.volumenEn)
+    const alCentro = q => Math.pow(Math.max(0, 1 - 0.95 * Math.hypot((q[0] - w / 2) / (w / 2), (q[1] - h / 2) / (h / 2)) / Math.SQRT2), 1.3);
     for (const b of G.buildings || []) {
       const q = enPantalla(b.x + b.w / 2, b.y + b.h / 2);
       if (!q) continue;
-      if (!b.done || b.upg) suma('obra', q[0]);
-      else if (b.workers && b.workers.length && YUNQUE[b.type]) suma('yunque', q[0], b.workers.length);
-      else if (b.workers && b.workers.length && SIERRA[b.type]) suma('sierra', q[0], b.workers.length);
-      if (b.done && GENTE[b.type]) suma('gente', q[0], b.type === 'house' ? 1 : 3);
+      const c = alCentro(q);
+      if (c < 0.05) continue;
+      if (!b.done || b.upg) suma('obra', q[0], c);
+      else if (b.workers && b.workers.length && YUNQUE[b.type]) suma('yunque', q[0], b.workers.length * c);
+      else if (b.workers && b.workers.length && SIERRA[b.type]) suma('sierra', q[0], b.workers.length * c);
+      if (b.done && GENTE[b.type]) suma('gente', q[0], (b.type === 'house' ? 1 : 3) * c);
     }
     for (const u of G.units || []) {
       // los tuyos ya suenan en cada golpe (impact en render.js); aquí, los de los otros reinos
       if (u.owner === 'p' || u.inside || u.mode !== 'work' || !u.task || u.task.t !== 'gather') continue;
       const n = W.nodes[u.task.node], tipo = n && (TALA[n.kind] || PICO[n.kind]);
       if (!tipo) continue;
-      const q = enPantalla(u.x, u.y);
-      if (q) suma(tipo, q[0]);
+      const q = enPantalla(u.x, u.y), c = q ? alCentro(q) : 0;
+      if (c >= 0.05) suma(tipo, q[0], c);
     }
     for (const k in s) s[k].x = s[k].x / s[k].n; // de 0 (izquierda) a 1 (derecha)
     s.vistos = vistos;
-    s.cerca = Math.max(0.55, Math.min(1.5, (R.cam.z || 2) / 2)); // el zoom acerca
+    s.cerca = Math.max(0.55, Math.min(1.5, (R.cam.z || 2) / 2)); // el zoom acerca (la naturaleza)
+    s.cercaCosas = Math.pow(Math.max(0, Math.min(1, ((R.cam.z || 2) - 0.25) / 2.25)), 1.1); // y los trabajos, mucho más
     return s;
   }
   // un canal con paneo para un sonido: se desarma solo cuando termina
@@ -243,7 +249,8 @@
     else if (est !== 3) f.push(['pajaro', 0.15 + bosque * 3 + pasto * 0.5, s.bosque ? s.bosque.x : 0.5, 0.7 + Math.min(1, bosque * 2) * 0.5]);
     f.push(['viento', est === 3 ? 1.6 : 0.12 + (s.vistos < 40 ? 0.6 : 0), 0.5, est === 3 ? 1 : 0.7]);
     const cosas = [['obra', 1.2], ['hacha', 0.5], ['pico', 0.5], ['yunque', 0.6], ['sierra', 0.5], ['gente', 0.12]];
-    for (const [k, p] of cosas) if (s[k]) f.push([k, Math.min(2.2, p * s[k].n), s[k].x, Math.min(1.3, 0.6 + 0.1 * s[k].n)]);
+    // e[4]: es un trabajo (suena según el zoom, s.cercaCosas, no como la naturaleza)
+    for (const [k, p] of cosas) if (s[k] && s[k].n > 0.05) f.push([k, Math.min(2.2, p * s[k].n), s[k].x, Math.min(1.3, 0.6 + 0.1 * s[k].n), true]);
     return f;
   }
   function ambiente(ahora) {
@@ -256,7 +263,7 @@
     for (const x of f) { if ((r -= x[1]) <= 0) { e = x; break; } }
     // con mucho a la vista los sonidos vienen más seguido
     tAmb = ahora + Math.max(1.1, 4.5 - tot * 0.6) + Math.random() * 2.5;
-    if (e) sonar(e[0], ahora, e[2], 0.5 * e[3] * escena.cerca);
+    if (e) sonar(e[0], ahora, e[2], 0.5 * e[3] * (e[4] ? (escena.cercaCosas !== undefined ? escena.cercaCosas * 1.3 : 1) : escena.cerca));
   }
   function sonar(k, t, x, v) {
     if (k === 'olas') { const d = canal(x, 3.6); ruido(t, 3.2, v * 0.06, 420, 'lowpass', d, 1.4); return; }

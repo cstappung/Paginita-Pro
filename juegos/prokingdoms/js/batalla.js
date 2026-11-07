@@ -755,7 +755,13 @@
     const v = fxDe(b); if (!v) return;
     v.banner = { txt: h.hab.name + '!', sub: h.nombre, t: 0, dur: 1.4, chico: true };
     const [hx, hy] = aPx(h.fig.u, h.fig.v), id = h.hab.id;
-    luzTemp(v, hx, hy - 12, 50, [255, 230, 140], 0.5);
+    // pk-36: el efecto de habilidad del Pase (Aspectos) pinta la luz y suma un anillo y chispas de su color
+    const ef = PK.Pase && PK.Pase.efectoCol ? PK.Pase.efectoCol() : null;
+    luzTemp(v, hx, hy - 12, 50, ef || [255, 230, 140], 0.5);
+    if (ef) {
+      v.anillos.push({ x: hx, y: hy - 4, t: 0, dur: 0.8, col: ef, r: 22 });
+      for (let i = 0; i < 16; i++) { const a = rnd(0, 6.3), sp = rnd(20, 60); part(v, { x: hx, y: hy - 12, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20, life: rnd(0.5, 1), size: 2, col: ef, add: true }); }
+    }
     sfx('magia');
     if (id === 'muro' || id === 'cancion') for (const a of mios) {
       const [x, y] = aPx(a.u, a.v);

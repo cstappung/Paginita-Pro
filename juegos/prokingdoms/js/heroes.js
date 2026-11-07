@@ -21,7 +21,7 @@
   H.CLASES = {
     paladin: { name: 'Paladín', rol: 'Primera línea', col: [214, 178, 70], look: 'knight', gob: ['barracks'], pas: { armyTrain: 0.15 }, pasTxt: 'Cuartel: +15% velocidad de entrenamiento',
       hab: { id: 'muro', name: 'Muro de escudos', desc: '−50% de daño recibido por 8 s', cd: 30, dur: 8 }, vs: ['undead', 'bandit'], sp: 'hide' },
-    guarda: { name: 'Guardabosques', rol: 'Tirador', col: [86, 150, 70], look: 'archer', gob: ['scout'], pas: { range: 0.2, hunt: 0.2 }, pasTxt: 'Puesto de Exploradores: +20% alcance y +20% caza',
+    guarda: { name: 'Guardabosques', rol: 'Tirador', col: [86, 150, 70], look: 'archer', gob: ['scout'], pas: { range: 0.2, hunt: 0.2 }, pasTxt: 'Puesto de Exploradores: +20% de radio de exploración y +20% caza',
       hab: { id: 'lluvia', name: 'Lluvia de flechas', desc: 'daño en un área llena de enemigos', cd: 25 }, vs: ['beast', 'dragon', 'giant'], sp: 'hide' },
     clerigo: { name: 'Clériga', rol: 'Apoyo', col: [236, 228, 200], look: 'cleric', gob: ['monastery'], pas: { relicGold: 0.2, heridas: 0.3 }, pasTxt: 'Monasterio: +20% oro de reliquias y −30% tiempo de heridas',
       hab: { id: 'plegaria', name: 'Plegaria', desc: 'cura un 30% de vida a todos', cd: 40 }, vs: ['undead', 'arcane'], sp: 'lore', mujer: true },
