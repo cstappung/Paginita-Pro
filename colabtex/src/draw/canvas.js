@@ -25,6 +25,7 @@
 import * as Y from "yjs";
 import { SVG_NS, XLINK_NS, isEl, SHAPE_TAGS } from "./doc.js";
 import { boxOfPoints, transformBox, clamp } from "./geom.js";
+import { isSafeTag, isSafeAttr, isSafeAttrName, sanitizeCss } from "./svgio.js";
 
 const MIN_ZOOM = 0.2;     // px de pantalla por mm
 const MAX_ZOOM = 80;
@@ -126,14 +127,31 @@ export class Canvas {
     this.refreshPage();
   }
 
+  /* El espejo SANEA lo que pinta (isSafeTag / isSafeAttr de svgio). El
+     documento es Yjs y Yjs guarda cualquier nodo que le escriba alguien
+     con permiso de edición desde la consola: comprobado, un <script>, un
+     onerror y un onmouseover metidos así se ejecutaban en el navegador de
+     quien abría el dibujo, porque el saneado solo actuaba al importar.
+
+     Un nodo prohibido NO se salta: se pone en su sitio un comentario
+     inerte. Los deltas de Yjs cuentan posiciones, y un hueco en el DOM
+     haría que cada inserción o borrado posterior cayera en el elemento
+     de al lado. */
   _build(yNode) {
     if (yNode instanceof Y.XmlText) {
-      const t = document.createTextNode(yNode.toString());
+      const t = document.createTextNode(this._textoDe(yNode));
       this.domToY.set(t, yNode);
       this.yToDom.set(yNode, t);
       return t;
     }
     if (!isEl(yNode)) return null;
+    if (!isSafeTag(yNode.nodeName)) {
+      // solo en domToY: para el resto del editor el nodo no tiene DOM
+      // (yToDom → undefined), igual que uno que aún no se ha pintado
+      const hueco = document.createComment("bloqueado");
+      this.domToY.set(hueco, yNode);
+      return hueco;
+    }
     const el = svgEl(yNode.nodeName);
     const attrs = yNode.getAttributes();
     for (const [k, v] of Object.entries(attrs)) this._setAttr(el, k, v);
@@ -146,15 +164,26 @@ export class Canvas {
     return el;
   }
 
+  /* El CSS de un <style> no ejecuta nada, pero puede pedir recursos a
+     otro servidor al abrir el dibujo: se limpia igual que al importar. */
+  _textoDe(yText) {
+    const p = yText.parent;
+    const s = yText.toString();
+    return p && String(p.nodeName || "").toLowerCase() === "style" ? sanitizeCss(s) : s;
+  }
+
   _setAttr(el, key, value) {
     if (value == null) { this._removeAttr(el, key); return; }
+    if (el.nodeType !== 1) return;                          // hueco de un nodo bloqueado
     const v = String(value);
+    if (!isSafeAttrName(key) || !isSafeAttr(key, v)) { try { this._removeAttr(el, key); } catch (e) {} return; }
     if (key === "xmlns" || key === "xmlns:xlink") return;   // los pone el documento exportado
     if (key.startsWith("xlink:")) { el.setAttributeNS(XLINK_NS, key, v); return; }
     try { el.setAttribute(key, v); } catch (e) { /* nombre inválido: se ignora */ }
   }
 
   _removeAttr(el, key) {
+    if (el.nodeType !== 1) return;
     if (key.startsWith("xlink:")) el.removeAttributeNS(XLINK_NS, key.slice(6));
     else el.removeAttribute(key);
   }
@@ -169,7 +198,7 @@ export class Canvas {
 
         if (target instanceof Y.XmlText && ev.delta) {
           const dom = this.yToDom.get(target);
-          if (dom) dom.nodeValue = target.toString();
+          if (dom) dom.nodeValue = this._textoDe(target);
           continue;
         }
 
@@ -183,7 +212,7 @@ export class Canvas {
             else this._setAttr(dom, key, v);
           }
         }
-        if (ev.changes && ev.changes.delta && ev.changes.delta.length)
+        if (dom.nodeType === 1 && ev.changes && ev.changes.delta && ev.changes.delta.length)
           this._applyDelta(dom, ev.changes.delta);
       }
     } catch (err) {

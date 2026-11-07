@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202611071824"></script>
+<script src="i18n.js?v=202611061202"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png">
 <link rel="icon" type="image/png" sizes="64x64" href="marca/favicon-64.png">
@@ -125,6 +125,10 @@
   /* arrastrar y soltar. #fileTree ocupa el resto del panel para que el hueco
      de debajo también sirva de destino: soltar ahí saca a la raíz. */
   #fileTree{flex:1;min-height:60px}
+  #outline{max-height:40%;overflow:auto;padding-bottom:8px;flex-shrink:0}
+  .outline-row{font-size:12px;line-height:1.5;padding:2px 10px;color:var(--ed-panel-fg);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .outline-row:hover{background:var(--ed-hover)}
+  #btnSpell.on{background:var(--ed-accent);color:#fff;border-color:var(--ed-accent)}
   .file-entry.dragging{opacity:0.4}
   .file-entry.drag-over{background:var(--ed-sel);box-shadow:inset 0 0 0 1px var(--ed-accent)}
   #fileTree.drag-over-root{box-shadow:inset 0 0 0 1px var(--ed-accent);border-radius:4px}
@@ -224,6 +228,13 @@
   .pdf-sep{width:1px;height:16px;background:var(--ed-border)}
   .pdf-auto{width:auto;padding:0 6px;font-size:11px;opacity:0.65}
   .pdf-auto.on{opacity:1;background:var(--ed-accent);color:#fff}
+  .pdf-auto-sel{height:24px;border:1px solid var(--ed-border);border-radius:5px;background:transparent;color:var(--ed-panel-fg);font-size:11px;padding:0 2px;cursor:pointer}
+  .pdf-auto-sel option{background:var(--ed-panel);color:var(--ed-panel-fg)}
+  /* progreso dentro del botón ▶ Compilar: barra con --p, o franjas si no hay % */
+  #btnCompile.cp-on{min-width:150px;background:linear-gradient(90deg,rgba(255,255,255,.30) var(--p,0%),transparent var(--p,0%)),var(--ed-accent)}
+  #btnCompile.cp-busy{background:repeating-linear-gradient(-45deg,rgba(255,255,255,.18) 0 10px,transparent 10px 20px),var(--ed-accent);background-size:28px 28px,auto;animation:cpFranjas .8s linear infinite}
+  @keyframes cpFranjas{to{background-position:28px 0,0 0}}
+  @media (prefers-reduced-motion:reduce){#btnCompile.cp-busy{animation:none}}
   #zoomLabel{font-size:11.5px;font-family:'IBM Plex Mono',monospace;min-width:38px;text-align:center}
   #pageLabel{margin-left:auto;font-size:11.5px}
   #btnToggleLog{height:24px;padding:0 8px;border:none;border-radius:5px;background:transparent;color:var(--ed-panel-fg);cursor:pointer;font-size:11px}
@@ -532,6 +543,8 @@
           </div>
         </div>
         <div id="fileTree"></div>
+        <div id="outlineHead" class="ed-files-head" style="display:none"><span>ESQUEMA</span></div>
+        <div id="outline"></div>
       </aside>
 
       <div id="splitFiles" class="ed-split"></div>
@@ -558,6 +571,7 @@
             </button>
           </div>
           <button id="btnSyncToPdf" class="code-mini" title="Ir a esta línea en el PDF (Ctrl+Alt+J · o doble clic)">→ PDF</button>
+          <button id="btnSpell" class="code-mini" aria-pressed="false" title="Corrector ortográfico (español). Es el del navegador: también subraya los comandos, por eso va apagado por defecto">abc</button>
           <select id="themeSelect" class="code-mini-sel" title="Tema de color del editor"></select>
         </div>
         <div id="cmHost"></div>
@@ -601,7 +615,15 @@
       <section class="ed-pdf">
         <div class="pdf-bar">
           <button id="btnRecompile" class="pdf-btn" title="Recompilar desde cero (olvida los .aux, .toc y .bbl guardados; úsalo si las referencias o el índice se quedan raros)">⟳</button>
-          <button id="btnAutoCompile" class="pdf-btn pdf-auto" aria-pressed="false" title="Compilar solo al dejar de escribir">Auto</button>
+          <select id="autoMode" class="pdf-auto-sel" title="Compilar solo cuando hay cambios: cuánto esperar tras la última tecla">
+            <option value="0">Auto: no</option>
+            <option value="1">Auto: 1 s</option>
+            <option value="2">Auto: 2 s</option>
+            <option value="3">Auto: 3 s</option>
+            <option value="5">Auto: 5 s</option>
+            <option value="10">Auto: 10 s</option>
+          </select>
+          <button id="btnRapida" class="pdf-btn pdf-auto" aria-pressed="true" title="Compilación rápida: el preámbulo se prepara una vez y se reutiliza mientras no cambie (beamer: de ~14 s a ~2 s). Si un preámbulo no lo admite, se compila normal solo.">⚡</button>
           <span class="pdf-sep"></span>
           <button id="btnZoomOut" class="pdf-btn" style="font-size:14px" title="Alejar (o Ctrl + rueda del ratón sobre el PDF)">−</button>
           <span id="zoomLabel" title="Ctrl + rueda del ratón sobre el PDF para acercar y alejar">100%</span>
@@ -615,7 +637,7 @@
           <div class="pdf-placeholder">
             Aún no hay PDF.<br>
             Pulsa <b style="color:#e2ecf5">▶ Compilar</b> para generar el documento.<br>
-            <span style="font-size:11px">La primera compilación descarga el motor LaTeX (~150 MB) y puede tardar un poco; después queda en caché.</span>
+            <span style="font-size:11px">La primera compilación descarga el motor LaTeX (~260 MB) y puede tardar un poco; el botón muestra cuánto falta. Después queda en caché.</span>
           </div>
         </div>
         <div id="logPanel">
@@ -680,6 +702,7 @@
       <span id="statusText">● Listo</span>
       <span>UTF-8 · LaTeX</span>
       <span id="lnCol">Ln 1, Col 1</span>
+      <span id="wordCount"></span>
       <span id="onlineCount"></span>
     </footer>
   </div>
@@ -765,6 +788,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202611071824"></script>
+<script src="colabtex-app.js?v=202611071950"></script>
 </body>
 </html>

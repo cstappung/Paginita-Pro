@@ -62,6 +62,23 @@ const FORBIDDEN_TAGS = new Set([
   "animatemotion", "set", "iframe", "embed", "object", "audio", "video"
 ]);
 
+/* ¿Esta etiqueta puede existir en el DOM de la página? La usan tanto la
+   importación como el ESPEJO del lienzo (canvas.js) y la exportación:
+   el documento compartido es Yjs, y Yjs acepta cualquier nodo que le
+   escriba quien tenga permiso de edición desde la consola. Filtrar solo
+   al importar dejaba pasar un <script> o un onload escritos a mano, que
+   se ejecutaban en el navegador de todo el que abría el dibujo. */
+export function isSafeTag(tag) {
+  const t = String(tag || ""), lower = t.toLowerCase();
+  if (FORBIDDEN_TAGS.has(lower)) return false;
+  return ALLOWED_TAGS.has(t) || ALLOWED_TAGS.has(lower);
+}
+
+/* Nombre de atributo con forma de nombre: sin espacios, comillas ni «=»
+   que permitan colar otro atributo al serializar. */
+const ATTR_NAME = /^[A-Za-z_][\w.:-]*$/;
+export function isSafeAttrName(name) { return ATTR_NAME.test(String(name || "")); }
+
 const isSafeRef = v => {
   const s = String(v || "").trim();
   if (!s) return false;
@@ -391,8 +408,9 @@ function serializeNode(node, indent, out) {
   if (!(node instanceof Y.XmlElement)) return;
 
   const tag = node.nodeName;
+  if (!isSafeTag(tag)) return;          // ver isSafeTag: el .svg exportado también se abre en un navegador
   const attrs = node.getAttributes();
-  const keys = Object.keys(attrs).filter(k => attrs[k] != null && attrs[k] !== "");
+  const keys = Object.keys(attrs).filter(k => attrs[k] != null && attrs[k] !== "" && isSafeAttrName(k) && isSafeAttr(k, attrs[k]));
   // orden estable: dos exportaciones del mismo dibujo dan el mismo texto
   keys.sort((a, b) => (a === "id" ? -1 : b === "id" ? 1 : a.localeCompare(b)));
   const attrStr = keys.map(k => ` ${k}="${escAttr(attrs[k])}"`).join("");
@@ -408,7 +426,8 @@ function serializeNode(node, indent, out) {
   // de línea dentro de <text> se ven como espacios al pintar)
   const onlyText = kids.every(k => k instanceof Y.XmlText);
   if (onlyText) {
-    const inner = kids.map(k => escText(k.toString())).join("");
+    const crudo = kids.map(k => k.toString()).join("");
+    const inner = escText(tag.toLowerCase() === "style" ? sanitizeCss(crudo) : crudo);
     out.push(`${pad}<${tag}${attrStr}>${inner}</${tag}>`);
     return;
   }
@@ -557,7 +576,9 @@ export function textToNodes(text, { freshIds = true } = {}) {
 export function serialize(root, { header = true } = {}) {
   if (!root) return "";
   const out = [];
-  const attrs = Object.assign({}, root.getAttributes());
+  const attrs = {};
+  for (const [k, v] of Object.entries(root.getAttributes()))
+    if (isSafeAttrName(k) && isSafeAttr(k, v)) attrs[k] = v;
   attrs.xmlns = "http://www.w3.org/2000/svg";
   if (usesXlink(root)) attrs["xmlns:xlink"] = "http://www.w3.org/1999/xlink";
 

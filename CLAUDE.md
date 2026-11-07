@@ -185,7 +185,9 @@ npm start            # static preview server at http://localhost:8123
 - **`npm test` is the npm stub and exits 1.** The games have
   `npm run test:juegos` (`node --test` over `colabtex/tests/*.test.cjs`; a
   new game's test must be added to that script), and the Firebase rules have
-  the security-rules test below. For the rest there is no suite. The pure
+  the security-rules test below. ColabTeX/ColabDraw have `npm run test:colab`
+  (Node) and `npm run test:colab-navegador` (browser + real engine; see
+  `docs/claude/colabtex.md`). For the rest there is no suite. The pure
   modules (`reports.js`, `draw/geom.js`, and the path/format arithmetic in
   `file-move.js` and `format.js`) are written to be exercisable from Node
   without a browser, so ad-hoc checks are cheap — there is just no runner.

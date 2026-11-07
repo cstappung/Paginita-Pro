@@ -90,3 +90,70 @@ export function groupByFile(items) {
   }
   return byFile;
 }
+
+/* ============================================================
+   Pistas para lo que NO se puede arreglar desde el motor.
+
+   El registro de pdfTeX dice qué falló, nunca por qué aquí no puede
+   funcionar ni qué poner en su lugar. Estos son los casos que la
+   batería de pruebas encontró y que dependen de programas que no
+   existen en el navegador (XeTeX/LuaTeX, Biber, Pygments) o de un
+   detalle de pdfLaTeX que nadie adivina. Cada pista sale UNA vez por
+   compilación aunque el error se repita cien veces.
+   ============================================================ */
+const GRIEGAS = {
+  "α": "alpha", "β": "beta", "γ": "gamma", "δ": "delta", "ε": "epsilon", "ζ": "zeta", "η": "eta",
+  "θ": "theta", "ι": "iota", "κ": "kappa", "λ": "lambda", "μ": "mu", "ν": "nu", "ξ": "xi",
+  "π": "pi", "ρ": "rho", "σ": "sigma", "τ": "tau", "υ": "upsilon", "φ": "phi", "χ": "chi",
+  "ψ": "psi", "ω": "omega", "Γ": "Gamma", "Δ": "Delta", "Θ": "Theta", "Λ": "Lambda",
+  "Ξ": "Xi", "Π": "Pi", "Σ": "Sigma", "Φ": "Phi", "Ψ": "Psi", "Ω": "Omega"
+};
+
+export function pistasDeError(fullLog) {
+  const log = String(fullLog || "");
+  const out = [];
+  const di = (cond, texto) => { if (cond && !out.includes(texto)) out.push(texto); };
+
+  di(/fontspec[\s\S]{0,200}(cannot-use-pdftex|requires either XeTeX or LuaTeX)|Fatal Package fontspec Error/.test(log),
+    "fontspec (y unicode-math o polyglossia con fuentes del sistema) solo funciona con XeLaTeX o LuaLaTeX, " +
+    "y ColabTeX compila con pdfLaTeX. Quita \\usepackage{fontspec} y usa \\usepackage[T1]{fontenc} con " +
+    "\\usepackage{lmodern}, o una familia como \\usepackage{newtxtext,newtxmath} o \\usepackage{mathpazo}.");
+
+  di(/minted[\s\S]{0,120}(shell-escape|pygmentize)/i.test(log),
+    "minted necesita ejecutar Pygments (-shell-escape), que no existe en el navegador. Usa listings: " +
+    "\\usepackage{listings} y \\begin{lstlisting}[language=Python] … \\end{lstlisting}.");
+
+  di(/Biber backend (is )?required|requires? (the )?['`]?biber/i.test(log),
+    "Este estilo de biblatex (por ejemplo apa) solo funciona con Biber, que no existe en el navegador. " +
+    "Para APA usa \\usepackage{natbib} con \\bibliographystyle{apalike}, o la clase apa7 con natbib.");
+
+  const uni = new Set();
+  for (const m of log.matchAll(/Unicode character (\S) \(U\+([0-9A-F]{4,6})\)/g)) uni.add(m[1]);
+  if (uni.size) {
+    const g = [...uni].filter(c => GRIEGAS[c]);
+    const otros = [...uni].filter(c => !GRIEGAS[c]);
+    if (g.length) di(true, `pdfLaTeX no conoce ${g.map(c => `«${c}»`).join(", ")} ${g.length > 1 ? "escritos" : "escrito"} directamente en el texto. ` +
+      `Usa ${g.slice(0, 3).map(c => `$\\${GRIEGAS[c]}$`).join(", ")}${g.length > 3 ? "…" : ""} o añade \\usepackage{textgreek} al preámbulo.`);
+    if (otros.length) di(true, `pdfLaTeX no sabe pintar ${otros.slice(0, 4).map(c => `«${c}»`).join(", ")}. ` +
+      `Defínelo en el preámbulo con \\usepackage{newunicodechar} y \\newunicodechar{${otros[0]}}{…}, o escríbelo con un comando de LaTeX.`);
+  }
+
+  for (const m of log.matchAll(/File [`']([^'`]+)\.(sty|cls)' not found/g)) {
+    const nombre = m[1];
+    if (nombre === "libertine" || nombre === "libertinus")
+      di(true, `La fuente ${nombre} no está en el motor de ColabTeX (pesa ~20 MB y casi nadie la usa). ` +
+        "Alternativas parecidas que sí están: \\usepackage{newtxtext,newtxmath} o \\usepackage{mathpazo}.");
+    else
+      di(true, `El ${m[2] === "cls" ? "documento usa la clase" : "paquete"} «${nombre}», que no está en el motor de ColabTeX. ` +
+        "Si lo necesitas, repórtalo con el botón ⚑ (abajo a la derecha) para que se añada.");
+  }
+
+  di(/Font bbm\w* at \d+ not found/.test(log),
+    "bbm solo existe como fuente METAFONT, que no se puede ejecutar en el navegador. " +
+    "Para el 1 de doble trazo usa \\usepackage{dsfont} y $\\mathds{1}$ (o \\usepackage{bbold} y $\\mathbb{1}$).");
+
+  di(/Font (?!bbm)\S+ at \d+ not found/.test(log),
+    "Falta una fuente en el motor de ColabTeX. Repórtalo con el botón ⚑; mientras, \\usepackage{lmodern} suele evitarlo.");
+
+  return out;
+}

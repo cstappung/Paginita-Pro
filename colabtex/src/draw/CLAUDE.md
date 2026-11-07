@@ -148,6 +148,17 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   at the document origin drops it out of sight. `importPieces` writes the defs
   and the layers in **one** transaction: as two, a single Ctrl+Z would leave
   the gradients in and take the shapes out.
+- **The sanitiser also guards the canvas and the export, not only import.**
+  The shared document is Yjs, and Yjs stores whatever an editor writes from the
+  console: a hand-written `<script>`, `onerror` or `onmouseover` ran in the
+  browser of everyone who opened the drawing (verified, all three). So
+  `canvas._build`/`_setAttr` and `svgio.serializeNode`/`serialize` run the same
+  `isSafeTag`/`isSafeAttr`/`isSafeAttrName` and `<style>` text goes through
+  `sanitizeCss`. A blocked node is **replaced by an inert comment, never
+  skipped**: Yjs deltas count positions, and a gap in the DOM shifted every
+  later insert/delete onto the neighbouring element. The comment is only in
+  `domToY`, so to the rest of the editor the node has no DOM (`yToDom` →
+  undefined), like one not painted yet.
 - `canvas.js` — mirrors the Yjs tree into real SVG DOM and **patches it
   incrementally** (`observeDeep` → attribute sets and child deltas); a full
   repaint per change would destroy the selection and the frame rate. Measures

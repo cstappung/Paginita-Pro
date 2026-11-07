@@ -204,6 +204,58 @@ function absorbe(texto, etiqueta) {
 for (const m of mapasEnPaquete) absorbe(leeEntrada(m.man, m.entry).toString("latin1"), m.ruta);
 for (const m of mapasEnDisco)   absorbe(fs.readFileSync(m, "latin1"), m);
 
+/* ---------- 5. EC y TS1 sin Type1 → Latin Modern ----------
+   `\usepackage[T1]{fontenc}` sin `lmodern` pide las fuentes EC (ecrm1000,
+   ecbx1200…) y `textcomp` —que entra solo con un «°» o un «€»— las TS1
+   (tcrm1000…). Sus .tfm viajan en el paquete base, pero sus Type1 son las
+   de cm-super, que BusyTeX no trae: la compilación entera caía en «Font
+   ecrm1000 at 600 not found». Es la cabecera de casi cualquier plantilla
+   en español, y también la de elsarticle.
+
+   Latin Modern se dibujó a partir de las EC y comparte sus métricas, y sus
+   Type1 y codificaciones (lm-ec.enc, lm-ts1.enc) sí están. Así que cada
+   ecXXNNNN / tcXXNNNN que no esté en el mapa apunta al Type1 LM de la
+   misma forma y del tamaño de diseño más cercano —pdfTeX lo escala al
+   del .tfm—, copiando el nombre PostScript y la codificación de la línea
+   «ec-lm…»/«ts1-lm…» que ya tiene el mapa. Es lo mismo que hace cm-super,
+   con otras curvas. */
+const FAMILIA_LM = {
+  rm: "r", bx: "bx", ti: "ri", sl: "ro", cc: "csc", sc: "csco", xc: "csc", oc: "csco",
+  bi: "bxi", bl: "bxo", rb: "b", ui: "u", ci: "ri", dh: "dunh",
+  ss: "ss", si: "sso", sx: "ssbx", so: "ssbo",
+  tt: "tt", it: "tti", st: "tto", tc: "tcsc", vt: "vtt", vi: "vtto"
+};
+const lineaLM = new Map();        // "ec-lmr10" → campos de su línea
+for (const l of origLines.concat(added)) {
+  const c = l.trim().split(/\s+/);
+  if (/^(ec|ts1)-lm/.test(c[0])) lineaLM.set(c[0], l.trim());
+}
+const tamañosLM = {};             // "ec-lmr" → [5,6,7,8,9,10,12,17]
+for (const k of lineaLM.keys()) {
+  const m = /^((?:ec|ts1)-lm[a-z]+?)(\d+)$/.exec(k);
+  if (m) (tamañosLM[m[1]] ||= []).push(+m[2]);
+}
+let sustitutas = 0;
+for (const nombre of disponibles) {
+  const m = /^(ec|tc)([a-z]{2})(\d{4})\.tfm$/.exec(nombre);
+  if (!m) continue;
+  const tfm = m[1] + m[2] + m[3];
+  if (known.has(tfm)) continue;
+  const fam = FAMILIA_LM[m[2]];
+  if (!fam) continue;
+  const pref = (m[1] === "ec" ? "ec-lm" : "ts1-lm") + fam;
+  const tams = tamañosLM[pref];
+  if (!tams) continue;
+  const pt = +m[3] / 100;
+  const t = tams.reduce((a, b) => Math.abs(Math.log(b / pt)) < Math.abs(Math.log(a / pt)) ? b : a);
+  const modelo = lineaLM.get(pref + t);
+  if (!modelo) continue;
+  added.push(tfm + modelo.slice(modelo.indexOf(" ")));
+  known.add(tfm);
+  sustitutas++;
+}
+console.log(`  EC/TS1 → Latin Modern: ${sustitutas} entradas`);
+
 console.log(`  mapas leídos: ${mapasEnPaquete.length} de los .data` +
   (SRC ? ` + ${mapasEnDisco.length} del disco` : "") + ` → ${added.length} entradas añadidas`);
 if (huerfanas) console.log(`  descartadas ${huerfanas} entradas por citar archivos que no están: ${[...sinFuente].slice(0, 8).join(" ")}${sinFuente.size > 8 ? " …" : ""}`);

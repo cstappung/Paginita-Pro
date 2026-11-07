@@ -62,9 +62,33 @@ Key modules in [colabtex/src/](colabtex/src/):
   doubled every count. Errors are `!` lines **and** `file:line:` lines — with
   `--file-line-error` they never start with `!`, and the summary said «✓
   Compilación correcta» over a document full of errors.
-- **Auto** (PDF bar, `localStorage colabtex.autocompile`) compiles 2.5 s after
-  you stop typing. Only *local* user edits count (`tr.isUserEvent`), never
-  collaborators' — otherwise every laptop compiles while someone else types.
+- **Auto** (PDF bar select, `localStorage colabtex.autoSeg`, migrates the old
+  `colabtex.autocompile`) compiles N s after the last keystroke, and at most
+  every 2N s while typing non-stop. Only *local* user edits count
+  (`tr.isUserEvent`), never collaborators' — otherwise every laptop compiles
+  while someone else types.
+- **⚡ Compilación rápida** (`colabtex.rapida`, on by default): the pipeline
+  dumps the preamble to a `.fmt` with `mylatexformat` and later passes start
+  from it (beamer: 7.5 s → 1.1 s per compile; apa7 7.4 → 1.0). The format is
+  keyed by the preamble + user `.sty/.cls/.def/.cfg/.clo/.fd` + files the
+  preamble `\input`s, and lives in the worker. Three safety nets: if the ini
+  run fails, or the document aborts with the format, it compiles normally and
+  marks that key unusable; and the **first** compile with a new format that
+  shows errors is re-run normally — if the normal run has fewer errors the
+  format is dropped for that preamble (glossaries: false «Extra \fi»). With
+  biblatex the hook goes into the *ini* run and must **not** be repeated when
+  using the format (it aborted). ⟳ «desde cero» never uses it and clears it.
+- **Progress in the ▶ Compilar button.** The engine already reported bytes
+  («Downloading data… (loaded/total)», summed by Emscripten as packages start,
+  so the total grows and starts absurd — divide by `DATOS_MOTOR_BYTES` unless
+  the reported one is bigger and sane) and every `$ busytex pdflatex/bibtex8`;
+  `engineStatus` used to drop all of it. `summarizeLog` reads only the last
+  pdflatex log **plus BibTeX's** — not every non-pdflatex log, or the
+  `prefmt …` ini log would count as the document's.
+- **No Cache Storage / Service Worker for the engine**, on purpose: the `.data`
+  URLs carry no version, so a cache-first copy could pair a stale `.data` with
+  a new `.js` manifest and corrupt the virtual FS. The HTTP cache already
+  avoids re-downloading (GitHub Pages revalidates with 304).
 - `pdfview.js` — pdf.js-based PDF viewer. **Ctrl/⌘ + wheel zooms** (that is
   also how a trackpad pinch arrives), and it must `preventDefault()` or the
   browser zooms the whole page instead. The percentage updates on every wheel
@@ -124,6 +148,22 @@ Key modules in [colabtex/src/](colabtex/src/):
     may, and are never dropped — that is what lets a heading keep its size when
     a formula is nested inside it.
 - `texlog.js` / `themes.js` — LaTeX log parsing, editor themes.
+- `tex-complete.js` — writing aids. **Autocomplete**: commands after `\`
+  (snippets with fields), environments after `\begin{` (writes its `\end{…}`
+  and an `\item` for lists; swallows the `}` closeBrackets already put),
+  labels after `\ref{`/`\eqref{`/`\cref{`…, and `.bib` keys after `\cite{`
+  and friends, also after a comma. Labels and keys come from **every** text
+  file of the project (`textosDelProyecto` in `main.js`): a chapter cites what
+  another defines. Also `esquemaDe` (the ESQUEMA panel under the file tree,
+  active file only, click jumps) and `contarPalabras` (footer, approximate:
+  no preamble, commands, maths or floats). The top half is pure and runs in
+  Node. In `main.js`: `closeBrackets` only for `( [ {` — never quotes, LaTeX
+  types `''` and apostrophes loose; `indentWithTab` (Tab indents, Esc+Tab
+  leaves); the **«abc» spellchecker is the browser's**, so it is off by
+  default (`colabtex.ortografia`): it underlines `\section` like a typo.
+  **Local mode had no undo at all** — CodeMirror keeps no history without
+  `history()` (cloud uses Yjs's UndoManager). It is imported as `cmHistory`:
+  a bare `history` shadows `window.history` and broke `history.pushState`.
 - `local-fs.js` — File System Access API layer for local mode.
 - `bridge.js` — **"Abrir en VS Code" / "Abrir con Claude"** (both inside the
   **✦ IA** menu of the editor bar, together with the assistant — three
@@ -179,6 +219,10 @@ Key modules in [colabtex/src/](colabtex/src/):
   (highlight + click + a floating "Comentar" bubble) and a right-side panel.
   **Cloud only** — disabled in local mode; view-only users see them read-only
   (both the provider and the Firebase rules block their writes).
+  Thread ids and the author's colour live in the Y.Doc, which any editor can
+  write by hand: both went raw into the panel's HTML and ran code in other
+  people's browsers (verified). Ids go through `escapeHtml`/`CSS.escape` and a
+  colour only passes `colorSeguro` if it *is* a colour.
 - `zip-import.js` — imports Overleaf `.zip` exports.
 - `zip-export.js` — the reverse, shared by both apps: the whole project in a
   `.zip`. Uses fflate, already a dependency for reading them. Entry paths are
@@ -216,6 +260,49 @@ positions). Paths may include subfolders (`cap1/intro.tex`). In cloud mode this
 syncs through `y-rtdb.js`; the full RTDB schema (users, projects, members,
 roles, tokens, invites, doc snapshot/updates, assets, presence) is documented in
 [colabtex/README.md](colabtex/README.md).
+
+## What compiles and what cannot (tested against the real engine)
+
+- **EC/TS1 fonts → Latin Modern.** `\usepackage[T1]{fontenc}` without `lmodern`
+  and `textcomp` (pulled in by a bare `°` or `€`) asked for cm-super Type1s
+  BusyTeX doesn't ship, and the whole compile died (`Font ecrm1000 at 600 not
+  found`) — the header of almost every Spanish template, and `elsarticle`.
+  `build-fontmap.js` step 5 maps every `ecXXNNNN`/`tcXXNNNN` without an entry
+  to the LM Type1 of the same shape and nearest design size, copying the PS
+  name and encoding from the map's own `ec-lm…`/`ts1-lm…` line (555 entries).
+- **biblatex.** Its `.bst` was missing (no citation ever resolved), and its
+  default backend is Biber, which doesn't exist here. `texlive-revistas` brings
+  the `.bst`; the pipeline appends `backend=bibtex8` to biblatex's options from
+  the `package/biblatex/before` hook (last option wins, so an explicit
+  `backend=biber` works too) — *unless* the document already asks for a BibTeX
+  backend: two of those abort with «Toggle 'blx@bibtex8' already defined».
+  `biblatex.cfg` cannot do it: it is read after options are processed.
+  Biber-only styles (`biblatex-apa`) still fail, with a hint.
+- `texlive-revistas` (0.7 MB): biblatex.bst, `binhex.tex` (newtx), simplekv
+  (chemfig), apa7, biblatex-apa. **Libertine was left out on purpose**: ~20 MB
+  more in everyone's first download for a rarely used font.
+- `texlog.pistasDeError` turns what cannot work in a browser into a Spanish
+  hint in the log (fontspec/XeLaTeX, minted, Biber styles, a bare `α`, a
+  missing package/class/font, bbm). One hint per compile, and the log panel
+  opens even if a PDF came out.
+
+## Tests
+
+Run from `colabtex/`:
+
+- `npm run test:colab` — Node only, under a second: log hints, `summarizeLog`,
+  completion/outline helpers, SVG export sanitizing, the EC/TS1 font map.
+- `npm run test:colab-navegador` — Playwright + the real BusyTeX engine
+  (~8 min; `-- --rapido` ~3 min; `-- --solo=seguridad,dibujo,…`). Groups:
+  `seguridad` (XSS in ColabDraw and comments), `dibujo`, `nube`, `local`,
+  `bateria`, `rapida` (⚡ vs normal, same result). Firebase, `y-rtdb` and
+  `fb-reports` are swapped for in-memory fakes (`tests/colab-navegador/
+  imitaciones/`) by an esbuild plugin; local mode runs on OPFS with a stubbed
+  `showDirectoryPicker`. The battery is `documentos.json` (59 real-world
+  documents, `espera: "ok"` or `"pista"` for what cannot compile here). **After
+  touching the engine, the pipeline or `pdftex.map`, run the full battery**:
+  it is how the T1/biblatex/newtx breakages were found. Add a document there
+  for every compile bug you fix.
 
 ## Vendor rebuild scripts (rarely needed)
 

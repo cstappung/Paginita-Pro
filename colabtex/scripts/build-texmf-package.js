@@ -49,7 +49,8 @@ const EXISTING = [
   "ubuntu-texlive-fonts-recommended.js",
   // los generados por este mismo script: un paquete nuevo no puede repetir
   // un archivo de ellos (se omite el que se está regenerando)
-  "texlive-pictures.js", "texlive-extra.js", "texlive-bst.js", "texlive-iconos.js"
+  "texlive-pictures.js", "texlive-extra.js", "texlive-bst.js", "texlive-iconos.js",
+  "texlive-revistas.js"
 ].filter(f => f !== OUT_NAME + ".js" && fs.existsSync(path.join(VENDOR, f)));
 
 /* subárboles que se empaquetan: macros, estilos de bibliografía y lo que

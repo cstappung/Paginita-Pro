@@ -11,26 +11,28 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLi
 import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import { setDiagnostics, lintGutter } from "@codemirror/lint";
-import { defaultKeymap } from "@codemirror/commands";
+import { defaultKeymap, history as cmHistory, historyKeymap, indentWithTab } from "@codemirror/commands";   // «history» a secas taparía window.history
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
-import { StreamLanguage, syntaxHighlighting } from "@codemirror/language";
+import { StreamLanguage, syntaxHighlighting, bracketMatching } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-api.js";
 import { RtdbProvider } from "./y-rtdb.js";
 import { colorForUid, colorLight, timeAgo, escapeHtml, minimalDiff } from "./util.js";
-import { LatexEngine, summarizeLog } from "./latex.js";
+import { LatexEngine, summarizeLog, DATOS_MOTOR_BYTES } from "./latex.js";
 import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
 import { createComments } from "./comments.js";
 import { readZip, foldersOf, titleFromZip, TEXT_EXT } from "./zip-import.js";
-import { downloadProjectZip } from "./zip-export.js";
+import { downloadProjectZip, safeFileName } from "./zip-export.js";
+import { texCompletion, esquemaDe, contarPalabras } from "./tex-complete.js";
 import { createLinks, linkedAssets, ensureAccess, isLinked, slugTitle, LINK_DIR } from "./draw-link.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
 import { SyncTex } from "./synctex.js";
-import { parseTexLog, groupByFile } from "./texlog.js";
+import { parseTexLog, groupByFile, pistasDeError } from "./texlog.js";
 import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
 import { loadKatex, visualExtensions } from "./visual.js";
 import { createBridge, vscodeUrl, claudeUrl, applyTextToY, LAUNCHER, LAUNCHER_CLAUDE } from "./bridge.js";
@@ -401,11 +403,14 @@ function ensureViewerAndEngine() {
     state.engine = new LatexEngine({ onStatus: engineStatus });
     state.engine.init().then(() => {
       setStatus("Motor LaTeX listo — pulsa Compilar", "#7ee0c2");
+      if (!state.compiling) botonListo();
     }).catch(err => {
       setStatus("Error al cargar el motor LaTeX", "#e57373");
       appendLog("✗ " + err.message);
+      if (!state.compiling) botonListo();
     });
     setStatus("Cargando motor LaTeX en tu navegador…", "#e2c08d");
+    pintarBoton("Preparando motor…", null);
   }
 }
 
@@ -1869,6 +1874,19 @@ function commonExtensions() {
     syncLineField,
     EditorView.lineWrapping,
     autoCompileListener,
+    /* Ayudas de escritura (ver tex-complete.js). Las llaves se cierran
+       solas, pero NO las comillas: en LaTeX el apóstrofo y las comillas
+       `` '' se escriben sueltos todo el rato. */
+    texCompletion(textosDelProyecto),
+    closeBrackets(),
+    EditorState.languageData.of(() => [{ closeBrackets: { brackets: ["(", "[", "{"] } }]),
+    keymap.of(closeBracketsKeymap),
+    /* Tab sangra, como en Overleaf, en vez de sacar el foco del editor a
+       mitad de una línea. Esc y luego Tab sigue saliendo (accesibilidad). */
+    keymap.of([indentWithTab]),
+    bracketMatching(),
+    spellComp.of(spellExt()),
+    EditorView.updateListener.of(u => { if (u.docChanged) programarAyudas(); }),
     /* doble clic en el código → ir a esa parte del PDF (funcionalidad 4) */
     EditorView.domEventHandlers({
       dblclick(ev, view) {
@@ -1900,6 +1918,76 @@ const colabKeymap = [
   { key: "Mod-u", preventDefault: true, run: () => !!state.format && state.format.run("underline") }
 ];
 
+/* ---------- ayudas: esquema, palabras, corrector ----------
+   El esquema y el contador miran el archivo ABIERTO; el autocompletado,
+   todos (un \ref de un capítulo apunta a un \label de otro). */
+function textosDelProyecto() {
+  const tex = [], bib = [];
+  for (const n of texFileNames()) {
+    const t = fileText(n);
+    if (t == null) continue;
+    if (/\.bib$/i.test(n)) bib.push(t);
+    else if (/\.(tex|ltx|sty|cls)$/i.test(n)) tex.push(t);
+  }
+  return { tex, bib };
+}
+
+const SPELL_KEY = "colabtex.ortografia";
+const spellComp = new Compartment();
+function spellOn() { try { return localStorage.getItem(SPELL_KEY) === "1"; } catch (e) { return false; } }
+/* El corrector es el del navegador: no sabe qué es un comando y subraya
+   \section igual que una errata. Por eso va apagado por defecto y se
+   enciende con el botón «abc» cuando se va a repasar el texto. */
+function spellExt() {
+  return EditorView.contentAttributes.of(spellOn()
+    ? { spellcheck: "true", lang: "es", autocorrect: "off", autocapitalize: "off" }
+    : { spellcheck: "false" });
+}
+function toggleSpell() {
+  try { localStorage.setItem(SPELL_KEY, spellOn() ? "0" : "1"); } catch (e) {}
+  if (state.editorView) state.editorView.dispatch({ effects: spellComp.reconfigure(spellExt()) });
+  paintSpell();
+}
+function paintSpell() {
+  const b = $("btnSpell");
+  if (b) { b.classList.toggle("on", spellOn()); b.setAttribute("aria-pressed", spellOn() ? "true" : "false"); }
+}
+
+let ayudasTimer = null;
+function programarAyudas() {
+  clearTimeout(ayudasTimer);
+  ayudasTimer = setTimeout(pintarAyudas, 400);
+}
+function pintarAyudas() {
+  const v = state.editorView;
+  const host = $("outline"), wc = $("wordCount");
+  const texto = v && state.activeFile && /\.(tex|ltx)$/i.test(state.activeFile) ? v.state.doc.toString() : null;
+  if (wc) {
+    const n = texto == null ? null : contarPalabras(texto);
+    wc.textContent = n == null ? "" : `${n.toLocaleString("es")} palabra${n === 1 ? "" : "s"}`;
+    wc.title = "Palabras del texto de este archivo, sin comandos ni fórmulas (aproximado)";
+  }
+  if (!host) return;
+  const items = texto == null ? [] : esquemaDe(texto);
+  $("outlineHead").style.display = items.length ? "" : "none";
+  host.replaceChildren(...items.map(it => {
+    const row = document.createElement("div");
+    row.className = "outline-row";
+    row.style.paddingLeft = (10 + Math.max(0, it.nivel - 1) * 10) + "px";
+    row.textContent = it.titulo;                // texto, nunca HTML: lo escribió alguien
+    row.setAttribute("translate", "no");
+    row.title = `Ir a la línea ${it.linea}`;
+    row.onclick = () => {
+      const view = state.editorView;
+      if (!view) return;
+      const line = view.state.doc.line(Math.min(it.linea, view.state.doc.lines));
+      view.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }) });
+      view.focus();
+    };
+    return row;
+  }));
+}
+
 /* editor local: CodeMirror plano + autoguardado en disco */
 function mountLocalEditor(fileName) {
   if (!state.localContent.has(fileName)) return;
@@ -1910,7 +1998,11 @@ function mountLocalEditor(fileName) {
 
   const extensions = [
     ...commonExtensions(),
-    keymap.of([...colabKeymap, ...defaultKeymap, ...searchKeymap]),
+    /* En la nube deshace el UndoManager de Yjs; aquí no había NADA:
+       sin history() CodeMirror no guarda historial y Ctrl+Z no hacía
+       nada en el modo local. */
+    cmHistory(),
+    keymap.of([...colabKeymap, ...historyKeymap, ...defaultKeymap, ...searchKeymap]),
     EditorView.updateListener.of(u => {
       if (u.docChanged) {
         state.localContent.set(fileName, u.state.doc.toString());
@@ -1929,6 +2021,7 @@ function mountLocalEditor(fileName) {
   applyDiagnostics();
   applyVisualMode();
   if (state.format) state.format.refresh();
+  pintarAyudas();
 }
 
 function mountEditor(fileName) {
@@ -1963,6 +2056,7 @@ function mountEditor(fileName) {
   applyDiagnostics();
   applyVisualMode();
   if (state.format) state.format.refresh();
+  pintarAyudas();
   if (state.comments) state.comments.onFileChanged();   // repinta el resalte del archivo nuevo
 }
 
@@ -2184,8 +2278,48 @@ function renderPresence() {
 }
 
 /* ---------- compilación ---------- */
+/* ---------- progreso en el botón ▶ Compilar ----------
+   El motor ya contaba lo que hacía —los bytes descargados de cada
+   paquete, cada pasada de pdflatex, BibTeX— pero engineStatus solo dejaba
+   pasar los mensajes en español y el resto se tiraba: la primera vez se
+   esperaba un minuto mirando «Compilando…» sin saber si avanzaba. Ahora el
+   propio botón lo dice, con una barra cuando hay un porcentaje que dar y
+   una franja en movimiento cuando no. */
+function pintarBoton(texto, pct) {
+  const b = $("btnCompile");
+  if (!b) return;
+  b.textContent = texto;
+  b.classList.add("cp-on");
+  b.classList.toggle("cp-busy", pct == null);
+  if (pct == null) b.style.removeProperty("--p");
+  else b.style.setProperty("--p", Math.max(2, Math.min(100, pct)).toFixed(1) + "%");
+}
+function botonListo() {
+  const b = $("btnCompile");
+  if (!b) return;
+  b.classList.remove("cp-on", "cp-busy");
+  b.style.removeProperty("--p");
+  b.textContent = "▶ Compilar";
+}
+const mb = n => Math.round(n / 1048576);
+let pasadaActual = 0;
+
 function engineStatus(msg) {
   if (/Descargando|Preparando|downloads complete/i.test(msg)) appendLog(msg);
+  const d = /Downloading data\.\.\. \((\d+)\/(\d+)\)/.exec(msg);
+  if (d) {
+    const hecho = +d[1], dicho = +d[2];
+    // el total informado crece a medida que arrancan los paquetes (y al
+    // principio llega disparatado): ver DATOS_MOTOR_BYTES
+    const total = dicho > DATOS_MOTOR_BYTES && dicho < DATOS_MOTOR_BYTES * 1.5 ? dicho : DATOS_MOTOR_BYTES;
+    pintarBoton(`Descargando motor ${Math.min(99, Math.floor(hecho / total * 100))} % · ${mb(hecho)}/${mb(total)} MB`, hecho / total * 100);
+    return;
+  }
+  if (/All downloads complete|^Running\.\.\./.test(msg)) { pintarBoton("Preparando motor…", null); return; }
+  if (/Descargando motor/.test(msg)) { pintarBoton("Descargando motor…", null); return; }
+  if (/precompilando el preámbulo/.test(msg)) { pintarBoton("Preparando modo rápido…", null); return; }
+  if (/^\$ busytex pdflatex/.test(msg)) { pasadaActual++; pintarBoton(pasadaActual > 1 ? `Compilando · pasada ${pasadaActual}` : "Compilando…", null); return; }
+  if (/^\$ busytex bibtex/.test(msg)) { pintarBoton("BibTeX…", null); return; }
 }
 
 function appendLog(line) {
@@ -2237,35 +2371,50 @@ function explicarFigurasVinculadas(errores) {
 }
 
 /* ---------- auto-compilación ----------
-   Opcional (botón «Auto» de la barra del PDF, se recuerda por navegador):
-   compila sola cuando dejas de escribir. Solo cuentan las ediciones
-   HECHAS EN ESTA PESTAÑA (escribir, borrar, pegar, deshacer): si contaran
-   las de los colaboradores, el portátil de cada uno compilaría sin parar
-   mientras otro escribe. Con el motor incremental una pasada suele
-   tardar un par de segundos, así que esto ya no es un lujo caro. */
-const AUTO_KEY = "colabtex.autocompile";
-const AUTO_MS = 2500;
-let autoTimer = null;
-function autoOn() { try { return localStorage.getItem(AUTO_KEY) === "1"; } catch (e) { return false; } }
-function setAuto(on) {
-  try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch (e) {}
-  paintAuto();
-  if (!on) clearTimeout(autoTimer);
+   Opcional (selector «Auto» de la barra del PDF, se recuerda por
+   navegador): compila sola cuando hay cambios. El número es cuánto se
+   espera tras la última tecla; si se escribe sin parar, igual compila
+   como mucho cada el doble de ese tiempo, para ver el resultado mientras
+   se escribe. Solo cuentan las ediciones HECHAS EN ESTA PESTAÑA (escribir,
+   borrar, pegar, deshacer): si contaran las de los colaboradores, el
+   portátil de cada uno compilaría sin parar mientras otro escribe. */
+const AUTO_KEY = "colabtex.autoSeg";
+const AUTO_VIEJO = "colabtex.autocompile";          // versión anterior: "1" = encendido
+const RAPIDA_KEY = "colabtex.rapida";
+let autoTimer = null, autoDesde = 0;
+const leer = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+function autoSegundos() {
+  const v = leer(AUTO_KEY);
+  if (v != null) return Math.max(0, +v || 0);
+  return leer(AUTO_VIEJO) === "1" ? 2 : 0;
 }
+/* Compilación rápida (⚡): preámbulo precompilado, ver busytex_pipeline.js.
+   Encendida por defecto: si un preámbulo no se deja precompilar, el motor
+   compila normal solo, y «⟳ desde cero» nunca la usa. */
+function rapidaOn() { return leer(RAPIDA_KEY) !== "0"; }
 function paintAuto() {
-  const b = $("btnAutoCompile");
-  if (!b) return;
-  const on = autoOn();
-  b.classList.toggle("on", on);
-  b.setAttribute("aria-pressed", on ? "true" : "false");
+  const sel = $("autoMode");
+  if (sel) sel.value = String(autoSegundos());
+  const r = $("btnRapida");
+  if (r) { r.classList.toggle("on", rapidaOn()); r.setAttribute("aria-pressed", rapidaOn() ? "true" : "false"); }
+}
+function setAuto(seg) {
+  guardar(AUTO_KEY, String(seg));
+  paintAuto();
+  if (!seg) { clearTimeout(autoTimer); autoDesde = 0; }
 }
 function scheduleAutoCompile() {
-  if (!autoOn()) return;
+  const seg = autoSegundos();
+  if (!seg) return;
+  const ahora = Date.now();
+  if (!autoDesde) autoDesde = ahora;
+  const espera = Math.max(0, Math.min(seg * 1000, autoDesde + seg * 2000 - ahora));
   clearTimeout(autoTimer);
   autoTimer = setTimeout(() => {
     if (state.compiling) { state.compileAgain = true; return; }
     compile();
-  }, AUTO_MS);
+  }, espera);
 }
 const autoCompileListener = EditorView.updateListener.of(u => {
   if (!u.docChanged) return;
@@ -2295,6 +2444,7 @@ async function collectAssets(anota) {
 async function compile({ clean = false } = {}) {
   if (state.compiling) return;
   clearTimeout(autoTimer);
+  autoDesde = 0;
   if (state.mode === "cloud" && !state.yFiles) return;
   if (state.mode === "local") await flushLocalSaves();
   const texNames = texFileNames();
@@ -2302,7 +2452,8 @@ async function compile({ clean = false } = {}) {
   if (!main) { alert("No hay ningún archivo .tex con \\documentclass en el proyecto."); return; }
 
   state.compiling = true;
-  $("btnCompile").textContent = "Compilando…";
+  pasadaActual = 0;
+  pintarBoton("Compilando…", null);
   setStatus("Compilando…", "#e2c08d");
   $("logContent").textContent = "";
   const t0 = performance.now();
@@ -2325,11 +2476,12 @@ async function compile({ clean = false } = {}) {
     const anota = linea => { avisos.push(linea); appendLog(linea); };
     files.push(...await collectAssets(anota));
 
-    const result = await state.engine.compile(files, main, { clean });
+    const result = await state.engine.compile(files, main, { clean, rapida: !clean && rapidaOn() });
+    pintarBoton("Mostrando PDF…", null);
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     const sum = summarizeLog(result);
     // «pdflatex ×1 + BibTeX»: cuántas pasadas hicieron falta esta vez
-    const motor = `pdflatex${sum.pasadas > 1 ? " ×" + sum.pasadas : ""}${sum.bibtex ? " + BibTeX" : ""}${clean ? " · desde cero" : ""}`;
+    const motor = `pdflatex${sum.pasadas > 1 ? " ×" + sum.pasadas : ""}${sum.bibtex ? " + BibTeX" : ""}${result.rapida ? " · ⚡ rápida" : ""}${clean ? " · desde cero" : ""}`;
     state.lastCompile = { ok: !!(result.pdf && result.pdf.length > 0), errors: sum.errors, warnings: sum.warnings };
 
     // mapa de sincronía y errores por archivo/línea de esta compilación
@@ -2338,6 +2490,12 @@ async function compile({ clean = false } = {}) {
     applyDiagnostics();
     renderDiagChip();
     for (const linea of explicarFigurasVinculadas(sum.errors)) anota(linea);
+    /* Lo que el motor no puede arreglar (fontspec, minted, Biber, un «α»
+       suelto…) va con una pista de qué poner en su lugar, y el panel se
+       abre aunque haya salido PDF: si no, nadie llega a leerla. */
+    const pistas = pistasDeError(sum.full);
+    for (const p of pistas) anota("💡 " + p);
+    if (pistas.length) $("logPanel").style.display = "flex";
 
     if (result.pdf && result.pdf.length > 0) {
       await state.pdfViewer.load(result.pdf);
@@ -2384,7 +2542,7 @@ async function compile({ clean = false } = {}) {
     }
   } finally {
     state.compiling = false;
-    $("btnCompile").textContent = "▶ Compilar";
+    botonListo();
     // se siguió escribiendo durante la compilación: otra vuelta
     if (state.compileAgain) { state.compileAgain = false; scheduleAutoCompile(); }
   }
@@ -2681,7 +2839,8 @@ function wireEvents() {
   };
   $("btnCompile").onclick = () => compile();
   $("btnRecompile").onclick = () => compile({ clean: true });
-  $("btnAutoCompile").onclick = () => setAuto(!autoOn());
+  $("autoMode").onchange = e => setAuto(+e.target.value || 0);
+  $("btnRapida").onclick = () => { guardar(RAPIDA_KEY, rapidaOn() ? "0" : "1"); paintAuto(); };
   paintAuto();
   $("btnShare").onclick = openShareModal;
   $("btnSyncToPdf").onclick = () => {
@@ -2758,7 +2917,11 @@ function wireEvents() {
   $("btnZoomIn").onclick = async () => { const s = await state.pdfViewer.setScale(state.pdfViewer.scale + 0.1); $("zoomLabel").textContent = Math.round(s * 100) + "%"; };
   $("btnZoomOut").onclick = async () => { const s = await state.pdfViewer.setScale(state.pdfViewer.scale - 0.1); $("zoomLabel").textContent = Math.round(s * 100) + "%"; };
   $("btnFitWidth").onclick = () => state.pdfViewer && state.pdfViewer.fitWidth();
-  $("btnDownloadPdf").onclick = () => state.pdfViewer && state.pdfViewer.download((state.project ? state.project.title.replace(/[^\w\- ]+/g, "") : "documento") + ".pdf");
+  /* safeFileName y no [^\w]: \w es solo ASCII y «Mi artículo» salía
+     como «Mi artculo.pdf». */
+  $("btnDownloadPdf").onclick = () => state.pdfViewer && state.pdfViewer.download(safeFileName(state.project ? state.project.title : "documento", "pdf"));
+  $("btnSpell").onclick = toggleSpell;
+  paintSpell();
   $("btnToggleLog").onclick = () => {
     const p = $("logPanel");
     p.style.display = p.style.display === "none" || !p.style.display ? "flex" : "none";

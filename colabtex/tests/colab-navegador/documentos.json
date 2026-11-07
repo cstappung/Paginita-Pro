@@ -1,0 +1,369 @@
+{
+ "_nota": "Batería de ColabTeX contra el motor real. \"espera\": \"ok\" = PDF sin errores ni archivos que falten; \"pista\" = no puede funcionar en el navegador y el registro debe dar una pista en español (texlog.pistasDeError). Los binarios van como data:base64.",
+ "documentos": {
+  "algorithm2e": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[ruled]{algorithm2e}\n\\begin{document}\n\\begin{algorithm}x\\;\\end{algorithm}\n\\end{document}\n"
+   }
+  },
+  "algoritmos": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{algorithm,algpseudocode}\n\\begin{document}\n\\begin{algorithm}\\begin{algorithmic}\\State $x\\gets 1$\\end{algorithmic}\\end{algorithm}\n\\end{document}\n"
+   }
+  },
+  "apa7": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass[man]{apa7}\n\\usepackage[spanish]{babel}\\title{T}\\shorttitle{S}\\author{A}\\affiliation{U}\n\\begin{document}\n\\maketitle x\n\\end{document}\n"
+   }
+  },
+  "bbm": {
+   "espera": "pista",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{bbm}\n\\begin{document}\n$\\mathbbm{1}$\n\\end{document}\n"
+   }
+  },
+  "beamer": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{beamer}\n\\usetheme{Madrid}\\title{T}\\author{A}\n\\begin{document}\n\\begin{frame}\\titlepage\\end{frame}\\begin{frame}{F}\\begin{itemize}\\item<1-> a\\item<2-> b\\end{itemize}\\end{frame}\n\\end{document}\n"
+   }
+  },
+  "beamer_metropolis": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{beamer}\n\\usetheme{metropolis}\n\\begin{document}\n\\begin{frame}{F}x\\end{frame}\n\\end{document}\n"
+   }
+  },
+  "biblatex_apa": {
+   "espera": "pista",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[spanish]{babel}\n\\usepackage[style=apa]{biblatex}\n\\addbibresource{refs.bib}\n\\begin{document}\nVer \\cite{k} y \\textcite{l}.\n\\printbibliography\n\\end{document}\n",
+    "refs.bib": "@book{k,author={Donald E. Knuth},title={The {\\TeX}book},year={1984},publisher={Addison-Wesley}}\n@article{l,author={Leslie Lamport},title={LaTeX},journal={J},year={1994},volume={1},pages={1--2}}"
+   }
+  },
+  "biblatex_biber": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[spanish]{babel}\n\\usepackage[backend=biber]{biblatex}\n\\addbibresource{refs.bib}\n\\begin{document}\nVer \\cite{k} y \\textcite{l}.\n\\printbibliography\n\\end{document}\n",
+    "refs.bib": "@book{k,author={Donald E. Knuth},title={The {\\TeX}book},year={1984},publisher={Addison-Wesley}}\n@article{l,author={Leslie Lamport},title={LaTeX},journal={J},year={1994},volume={1},pages={1--2}}"
+   }
+  },
+  "biblatex_bibtex": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[backend=bibtex]{biblatex}\n\\addbibresource{refs.bib}\n\\begin{document}\n\\cite{k}\n\\printbibliography\n\\end{document}\n",
+    "refs.bib": "@book{k,author={D. Knuth},title={T},year={1984},publisher={AW}}"
+   }
+  },
+  "biblatex_defecto": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[spanish]{babel}\n\\usepackage[]{biblatex}\n\\addbibresource{refs.bib}\n\\begin{document}\nVer \\cite{k} y \\textcite{l}.\n\\printbibliography\n\\end{document}\n",
+    "refs.bib": "@book{k,author={Donald E. Knuth},title={The {\\TeX}book},year={1984},publisher={Addison-Wesley}}\n@article{l,author={Leslie Lamport},title={LaTeX},journal={J},year={1994},volume={1},pages={1--2}}"
+   }
+  },
+  "biblatex_ieee_num": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[spanish]{babel}\n\\usepackage[style=numeric,sorting=none]{biblatex}\n\\addbibresource{refs.bib}\n\\begin{document}\nVer \\cite{k} y \\textcite{l}.\n\\printbibliography\n\\end{document}\n",
+    "refs.bib": "@book{k,author={Donald E. Knuth},title={The {\\TeX}book},year={1984},publisher={Addison-Wesley}}\n@article{l,author={Leslie Lamport},title={LaTeX},journal={J},year={1994},volume={1},pages={1--2}}"
+   }
+  },
+  "cancel_tensor": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{cancel,tensor,braket,dsfont,mathrsfs,upgreek,stmaryrd,wasysym,marvosym,eurosym}\n\\begin{document}\n$\\cancel{x}\\tensor{T}{^a_b}\\braket{a|b}\\mathds{1}\\mathscr{L}\\upalpha$ \\euro\n\\end{document}\n"
+   }
+  },
+  "chem": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[version=4]{mhchem}\\usepackage{chemfig}\n\\begin{document}\n\\ce{H2O} \\chemfig{A-B}\n\\end{document}\n"
+   }
+  },
+  "circuitikz": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{circuitikz}\n\\begin{document}\n\\begin{circuitikz}\\draw (0,0) to[R=$R_1$] (2,0) to[C] (2,2);\\end{circuitikz}\n\\end{document}\n"
+   }
+  },
+  "codigo_minted": {
+   "espera": "pista",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{minted}\n\\begin{document}\n\\begin{minted}{python}x=1\\end{minted}\n\\end{document}\n"
+   }
+  },
+  "elsevier": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{elsarticle}\n\n\\begin{document}\n\\begin{frontmatter}\\title{T}\\end{frontmatter} x\n\\end{document}\n"
+   }
+  },
+  "epstopdf": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{graphicx,epstopdf}\n\\begin{document}\nx\n\\end{document}\n"
+   }
+  },
+  "espanol_basico": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[utf8]{inputenc}\\usepackage[T1]{fontenc}\\usepackage[spanish]{babel}\\usepackage{lmodern}\n\\begin{document}\n\\section{Introducción} Año, niño, acción. \\today. Cuadro~\\ref{t}. \\begin{table}\\caption{Tabla}\\label{t}\\end{table}\n\\end{document}\n"
+   }
+  },
+  "espanol_mexico": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[spanish,mexico]{babel}\n\\begin{document}\nHola ñandú.\n\\end{document}\n"
+   }
+  },
+  "exam": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{exam}\n\n\\begin{document}\n\\begin{questions}\\question x\\end{questions}\n\\end{document}\n"
+   }
+  },
+  "figuras_tikz": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{tikz}\\usetikzlibrary{arrows.meta,positioning,calc,shapes}\n\\begin{document}\n\\begin{tikzpicture}\\node[draw,circle](a){A};\\node[right=of a,draw](b){B};\\draw[-Stealth](a)--(b);\\end{tikzpicture}\n\\end{document}\n"
+   }
+  },
+  "fontawesome": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{fontawesome5}\n\\begin{document}\n\\faGithub\n\\end{document}\n"
+   }
+  },
+  "fontspec": {
+   "espera": "pista",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{fontspec}\n\\begin{document}\nx\n\\end{document}\n"
+   }
+  },
+  "formato_pagina": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[margin=2cm]{geometry}\\usepackage{fancyhdr,setspace,titlesec,enumitem,parskip,lastpage}\\pagestyle{fancy}\\fancyfoot[C]{\\thepage/\\pageref{LastPage}}\\onehalfspacing\n\\begin{document}\n\\section{A}\\begin{itemize}[label=--]\\item x\\end{itemize}\n\\end{document}\n"
+   }
+  },
+  "fuentes": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{newtxtext,newtxmath}\n\\begin{document}\nHola $x^2$\n\\end{document}\n"
+   }
+  },
+  "fuentes2": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{mathpazo}\\usepackage{helvet}\\usepackage{courier}\n\\begin{document}\nHola \\textsf{s} \\texttt{t} $x$\n\\end{document}\n"
+   }
+  },
+  "fuentes3": {
+   "espera": "pista",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[T1]{fontenc}\\usepackage{libertine}\\usepackage{libertinust1math}\n\\begin{document}\nHola $x$\n\\end{document}\n"
+   }
+  },
+  "fuentes4": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{palatino}\\usepackage{times}\\usepackage{charter}\n\\begin{document}\nHola\n\\end{document}\n"
+   }
+  },
+  "fuentes_newtx": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{newtxtext,newtxmath}\n\\begin{document}\nHola $x^2$\n\\end{document}\n"
+   }
+  },
+  "glossaries": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{glossaries}\\makeglossaries\\newacronym{ai}{AI}{Artificial Intelligence}\n\\begin{document}\n\\gls{ai} \\printglossaries\n\\end{document}\n"
+   }
+  },
+  "hyperref_cleveref": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{hyperref}\\usepackage{cleveref}\\usepackage{url}\n\\begin{document}\n\\section{A}\\label{s}\\Cref{s} \\href{http://a.b}{x}\n\\end{document}\n"
+   }
+  },
+  "ieee": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass[conference]{IEEEtran}\n\\usepackage{cite}\n\\begin{document}\n\\title{T}\\maketitle\\begin{abstract}x\\end{abstract}\\section{I} x\n\\end{document}\n"
+   }
+  },
+  "imagen_png": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{graphicx}\n\\begin{document}\n\\includegraphics[width=3cm]{fig.png}\n\\end{document}\n",
+    "fig.png": "data:iVBORw0KGgoAAAANSUhEUgAAABQAAAAKCAIAAAA7N+mxAAAAFUlEQVR4nGP4z8BANiJf56jmEaMZADFExzl02osRAAAAAElFTkSuQmCC"
+   }
+  },
+  "index": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{makeidx}\\makeindex\n\\begin{document}\nx\\index{x}\\printindex\n\\end{document}\n"
+   }
+  },
+  "input_include": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\begin{document}\n\\input{cap/a}\n\\include{cap/b}\n\\end{document}\n",
+    "cap/a.tex": "A \\label{a}",
+    "cap/b.tex": "B ver~\\ref{a}"
+   }
+  },
+  "koma": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{scrartcl}\n\n\\begin{document}\n\\section{A} x\n\\end{document}\n"
+   }
+  },
+  "listings_ok": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{listings,xcolor}\n\\lstset{language=Python,basicstyle=\\ttfamily}\n\\begin{document}\n\\begin{lstlisting}\ndef f(x): return x\n\\end{lstlisting}\n\\lstinputlisting{a.py}\n\\end{document}\n",
+    "a.py": "print(1)\n"
+   }
+  },
+  "matematicas": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{amsmath,amssymb,amsthm,mathtools,bm}\\newtheorem{teo}{Teorema}\n\\begin{document}\n\\begin{teo}$\\bm{x}$\\end{teo}\\begin{align}a&=b\\\\c&=d\\end{align}$\\mathbb{R}\\mathcal{L}\\mathfrak{g}$ \\[\\coloneqq\\]\n\\end{document}\n"
+   }
+  },
+  "memoir": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{memoir}\n\n\\begin{document}\n\\chapter{A} x\n\\end{document}\n"
+   }
+  },
+  "mhchem_solo": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[version=4]{mhchem}\n\\begin{document}\n\\ce{H2O + CO2 -> H2CO3}\n\\end{document}\n"
+   }
+  },
+  "moderncv": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{moderncv}\n\\moderncvstyle{classic}\\moderncvcolor{blue}\\name{A}{B}\n\\begin{document}\n\\makecvtitle\\section{E}\\cventry{2020}{x}{y}{}{}{}\n\\end{document}\n"
+   }
+  },
+  "multicol": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{multicol,pdfpages,afterpage,rotating,pdflscape}\n\\begin{document}\n\\begin{multicols}{2}x\\end{multicols}\n\\end{document}\n"
+   }
+  },
+  "natbib_apa": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{natbib}\n\\begin{document}\n\\citet{k}\n\\bibliographystyle{apalike}\n\\bibliography{refs}\n\\end{document}\n",
+    "refs.bib": "@book{k,author={D. Knuth},title={T},year={1984},publisher={AW}}"
+   }
+  },
+  "pgfgantt_forest": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{forest,tikz-cd,pgfgantt}\n\\begin{document}\n\\begin{forest}[a[b][c]]\\end{forest} \\begin{tikzcd}A\\arrow[r]&B\\end{tikzcd}\n\\end{document}\n"
+   }
+  },
+  "pgfplots": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\n\\begin{document}\n\\begin{tikzpicture}\\begin{axis}\\addplot{x^2};\\end{axis}\\end{tikzpicture}\n\\end{document}\n"
+   }
+  },
+  "report_book": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass[12pt,a4paper]{report}\n\\usepackage[spanish]{babel}\n\\begin{document}\n\\tableofcontents\\chapter{Uno}\\section{a}\\appendix\\chapter{Ap}\n\\end{document}\n"
+   }
+  },
+  "revtex": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass[aps,prl]{revtex4-2}\n\n\\begin{document}\n\\title{T}\\maketitle x\n\\end{document}\n"
+   }
+  },
+  "siunitx_solo": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{siunitx}\n\\begin{document}\n\\SI{9.8}{\\meter\\per\\second\\squared} \\qty{3}{\\kg} \\num{1e-3} \\ang{30}\n\\end{document}\n"
+   }
+  },
+  "standalone": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{standalone}\n\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}\\draw(0,0)--(1,1);\\end{tikzpicture}\n\\end{document}\n"
+   }
+  },
+  "subfig_float": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{graphicx,subcaption,float,caption,wrapfig}\n\\begin{document}\n\\begin{figure}[H]\\begin{subfigure}{.4\\linewidth}\\rule{1cm}{1cm}\\caption{a}\\end{subfigure}\\caption{b}\\end{figure}\n\\end{document}\n"
+   }
+  },
+  "svg_pkg": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{svg}\n\\begin{document}\nx\n\\end{document}\n"
+   }
+  },
+  "t1_sin_lmodern": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[utf8]{inputenc}\\usepackage[T1]{fontenc}\\usepackage[spanish]{babel}\n\\begin{document}\nAño niño «hola» \\textbf{x} \\textit{y} \\textsc{z} \\texttt{w}\n\\end{document}\n"
+   }
+  },
+  "tablas": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{booktabs,multirow,array,longtable,tabularx,colortbl,makecell}\\usepackage[table]{xcolor}\n\\begin{document}\n\\begin{tabularx}{\\linewidth}{lX}\\toprule a&b\\\\\\midrule\\multirow{2}{*}{x}&y\\\\\\bottomrule\\end{tabularx}\n\\end{document}\n"
+   }
+  },
+  "tcolorbox": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[most]{tcolorbox}\n\\begin{document}\n\\begin{tcolorbox}[title=T]x\\end{tcolorbox}\n\\end{document}\n"
+   }
+  },
+  "textcomp": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[utf8]{inputenc}\\usepackage{textcomp}\n\\begin{document}\n° € µ \\textdegree\n\\end{document}\n"
+   }
+  },
+  "todonotes": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{todonotes,lipsum,blindtext,csquotes,microtype}\n\\begin{document}\n\\todo{t}\\lipsum[1]\\enquote{q}\n\\end{document}\n"
+   }
+  },
+  "utf8_directo": {
+   "espera": "pista",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage[utf8]{inputenc}\n\\begin{document}\n€ ° µ “comillas” — ± × ÷ ¿¡ αβ\n\\end{document}\n"
+   }
+  },
+  "verbatim_fancyvrb": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{fancyvrb,verbatim}\n\\begin{document}\n\\begin{verbatim}\nx\n\\end{verbatim}\n\\end{document}\n"
+   }
+  },
+  "xcolor_soul": {
+   "espera": "ok",
+   "archivos": {
+    "main.tex": "\\documentclass{article}\n\\usepackage{xcolor,soul,ulem}\n\\begin{document}\n\\hl{x} \\sout{y} \\textcolor{red}{z}\n\\end{document}\n"
+   }
+  }
+ }
+}

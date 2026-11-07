@@ -9,7 +9,7 @@ const BUSYTEX_DIR = "vendor/busytex/";
 /* Súbelo al tocar busytex_worker.js o busytex_pipeline.js: el worker y el
    pipeline se cachean aparte del bundle, y sin esto un navegador que ya
    compiló seguiría usando el motor anterior. */
-const ENGINE_VERSION = "4";
+const ENGINE_VERSION = "6";
 const ALL_PACKAGES = [
   "texlive-basic.js",
   "ubuntu-texlive-latex-recommended.js",
@@ -33,7 +33,12 @@ const ALL_PACKAGES = [
   "texlive-bst.js",
   // Iconos de los CV (fontawesome, fontawesome5) y tikzfill, que tcolorbox
   // pide con la biblioteca «skins» (File `tikzfill.image.sty' not found).
-  "texlive-iconos.js"
+  "texlive-iconos.js",
+  // biblatex.bst (sin él biblatex no resolvía NINGUNA cita), binhex.tex
+  // (newtxtext/newtxmath), simplekv (chemfig), apa7 y biblatex-apa.
+  // 0,7 MB. Libertine se quedó fuera a propósito: serían 20 MB más en la
+  // primera descarga de todo el mundo para una fuente poco usada.
+  "texlive-revistas.js"
 ];
 
 export class LatexEngine {
@@ -57,7 +62,7 @@ export class LatexEngine {
      misma instancia rota. La única salida era recargar la página, cosa
      que nadie adivina.
 
-     Volver a arrancar no vuelve a descargar los 150 MB: los paquetes y
+     Volver a arrancar no vuelve a descargar los ~260 MB: los paquetes y
      el .wasm los sirve la caché HTTP del navegador, así que cuesta unos
      segundos. */
   _descartarMotor() {
@@ -117,7 +122,7 @@ export class LatexEngine {
       const used = ex.always || files.some(f => typeof f.contents === "string" && ex.trigger.test(f.contents));
       if (!used) continue;
       if (!this._extraCache) this._extraCache = {};
-      if (!this._extraCache[ex.name]) this._extraCache[ex.name] = await (await fetch(ex.url)).text();
+      if (!this._extraCache[ex.name]) this._extraCache[ex.name] = ex.contents != null ? ex.contents : await (await fetch(ex.url)).text();
       out.push({ path: ex.name, contents: this._extraCache[ex.name] });
     }
     return out;
@@ -127,8 +132,10 @@ export class LatexEngine {
      clean: olvidar los auxiliares guardados (.aux, .toc, .bbl…) y compilar
      desde cero, como el «Recompilar desde cero» de Overleaf. Sin él, el
      worker repone los de la vez anterior y suele bastar UNA pasada
-     (ver compile_pdftex_incremental en busytex_pipeline.js). */
-  async compile(files, mainTexPath, { clean = false } = {}) {
+     (ver compile_pdftex_incremental en busytex_pipeline.js).
+     rapida: compilar con el preámbulo precompilado (mylatexformat); si
+     no se puede, el worker compila normal por su cuenta. */
+  async compile(files, mainTexPath, { clean = false, rapida = false } = {}) {
     if (this.busy) throw new Error("Ya hay una compilación en curso");
     this.busy = true;
     try {
@@ -158,7 +165,8 @@ export class LatexEngine {
           verbose: "silent",
           driver: "pdftex_bibtex8",
           data_packages_js: null,
-          clean
+          clean,
+          rapida
         });
       });
     } finally {
@@ -166,6 +174,14 @@ export class LatexEngine {
     }
   }
 }
+
+/* Lo que pesan los paquetes de datos del motor (los .data), para la barra
+   de descarga: Emscripten informa «Downloading data... (cargado/total)»
+   sumando los paquetes a medida que empiezan, así que el total crece
+   durante la descarga y al principio llega incluso disparatado. Se divide
+   por este valor salvo que el informado sea mayor y razonable. Si cambian
+   los paquetes basta con que sea aproximado: solo mueve una barra. */
+export const DATOS_MOTOR_BYTES = 229e6;
 
 /* «./main.tex:41: Undefined control sequence.» (--file-line-error) */
 const FILE_LINE_ERR = /^(?:\.\/)?[^\s:][^:\n]*\.[A-Za-z]{1,8}:\d+:\s/;
@@ -179,7 +195,9 @@ export function summarizeLog(result) {
      cada error y advertencia. */
   const latex = logs.filter(l => /^pdflatex\b/.test(l.cmd || ""));
   const ultima = latex[latex.length - 1];
-  const usados = ultima ? logs.filter(l => l === ultima || !/^pdflatex\b/.test(l.cmd || "")) : logs;
+  // (solo BibTeX además: la precompilación del preámbulo deja su propio
+  // registro, «prefmt …», que no es del documento)
+  const usados = ultima ? logs.filter(l => l === ultima || /^bibtex/.test(l.cmd || "")) : logs;
   const full = usados.map(l => l.log || "").join("\n");
   const lines = full.split("\n");
   const errors = [], warnings = [];

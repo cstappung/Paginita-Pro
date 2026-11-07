@@ -34,6 +34,13 @@ import { EditorView, Decoration } from "@codemirror/view";
 import { StateField, StateEffect } from "@codemirror/state";
 import { escapeHtml, timeAgo } from "./util.js";
 
+/* El id del hilo y el color del autor viven en el Y.Doc, que cualquiera
+   con permiso de edición puede escribir a mano desde la consola. Iban
+   tal cual al HTML: un color como `red"><img onerror=…>` salía del
+   atributo style y ejecutaba código en el navegador de quien abriera el
+   panel. Por eso el id se escapa y el color solo pasa si ES un color. */
+const colorSeguro = c => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) || /^(?:rgb|hsl)a?\([\d\s.,%]+\)$/i.test(String(c || "")) ? c : "#888");
+
 const $ = id => document.getElementById(id);
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const QUOTE_MAX = 240;
@@ -295,7 +302,7 @@ export function createComments(ctx) {
       view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "center" }) });
     }
     // desplazar el panel a la tarjeta
-    const card = document.querySelector(`.comment-card[data-thread="${id}"]`);
+    const card = document.querySelector(`.comment-card[data-thread="${CSS.escape(String(id))}"]`);
     if (card) card.scrollIntoView({ block: "nearest" });
   }
 
@@ -303,7 +310,7 @@ export function createComments(ctx) {
     const a = msg.author || {};
     return `
       <div class="comment-msg">
-        <span class="comment-avatar" style="background:${a.color || "#888"}">${escapeHtml((a.name || "?").charAt(0).toUpperCase())}</span>
+        <span class="comment-avatar" style="background:${colorSeguro(a.color)}">${escapeHtml((a.name || "?").charAt(0).toUpperCase())}</span>
         <div class="comment-msg-body">
           <div class="comment-msg-head"><b>${escapeHtml(a.name || "—")}</b><span>${timeAgo(msg.createdAt)}</span></div>
           <div class="comment-msg-text">${escapeHtml(msg.text)}</div>
@@ -318,7 +325,7 @@ export function createComments(ctx) {
     const lost = rangeOf(t) == null && t.get("file") === ctx.getActiveFile();
     const rb = t.get("resolvedBy");
     return `
-      <div class="comment-card${active ? " comment-card-active" : ""}${resolved ? " comment-card-resolved" : ""}" data-thread="${id}">
+      <div class="comment-card${active ? " comment-card-active" : ""}${resolved ? " comment-card-resolved" : ""}" data-thread="${escapeHtml(id)}">
         <div class="comment-quote" title="Ir al fragmento">
           <span class="comment-file">${escapeHtml(t.get("file") || "")}</span>
           ${lost ? '<span class="comment-lost" title="El texto original se editó o borró">fragmento cambiado</span>' : ""}
@@ -328,9 +335,9 @@ export function createComments(ctx) {
         ${resolved ? `<div class="comment-resolved-tag">✓ Resuelto${rb && rb.name ? " por " + escapeHtml(rb.name) : ""}</div>` : ""}
         ${ctx.canWrite() ? `
           <div class="comment-actions">
-            <input class="comment-reply-input" data-thread="${id}" placeholder="Responder…" value="${escapeHtml(replyDrafts.get(id) || "")}">
-            <button class="comment-mini comment-resolve" data-thread="${id}">${resolved ? "Reabrir" : "Resolver"}</button>
-            ${canDelete(t) ? `<button class="comment-mini comment-del" data-thread="${id}" title="Eliminar hilo">🗑</button>` : ""}
+            <input class="comment-reply-input" data-thread="${escapeHtml(id)}" placeholder="Responder…" value="${escapeHtml(replyDrafts.get(id) || "")}">
+            <button class="comment-mini comment-resolve" data-thread="${escapeHtml(id)}">${resolved ? "Reabrir" : "Resolver"}</button>
+            ${canDelete(t) ? `<button class="comment-mini comment-del" data-thread="${escapeHtml(id)}" title="Eliminar hilo">🗑</button>` : ""}
           </div>` : ""}
       </div>`;
   }
