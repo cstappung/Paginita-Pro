@@ -755,12 +755,18 @@
       el('div', { class: 'row end' }, UI.btn('Desarmar (devuelve la mitad)', () => { PK.Logi.removeBelt(bl); G().sel = null; UI.refreshPanel(true); }, { small: true, cls: 'danger' }))));
   }
 
+  // pk-37: el área de los exploradores en casillas y cuánto ya se ve
+  function areaTxt() {
+    const a = G().areaInfo();
+    return a.todo ? 'Su área es el mapa entero: ' + Math.floor(a.pct * 1000) / 10 + '% visto.' : 'Explora ' + U.fmt(G().exploreArea()) + ' casillas alrededor de tu Centro Urbano (' + Math.floor(a.pct * 1000) / 10 + '% visto).';
+  }
+  UI.areaTxt = areaTxt;
   function scoutPanel(us) {
     const u = us[0], port = Sp.villager(D.PLAYER_COLOR, u.hair, u.skin, 'idle', 0, null, false, null, true).c.toDataURL();
     liveEl = el('p', { class: 'small' });
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
       el('div', null, el('h3', null, us.length === 1 ? 'Explorador' : us.length + ' exploradores'), liveEl,
-        el('p', { class: 'small muted' }, 'Explora solo hasta ' + G().exploreRange() + ' casillas de tu Centro Urbano. ' + UI.hint('Clic derecho', 'Toca el mapa') + ' para enviarlo a un lugar; después sigue explorando.'),
+        el('p', { class: 'small muted' }, areaTxt() + ' ' + UI.hint('Clic derecho', 'Toca el mapa') + ' dentro de esa área para enviarlo a un lugar; después sigue explorando.'),
         el('div', { class: 'row' }, UI.btn('Explorar', () => { us.forEach(x => { G().assign(x, { t: 'explore' }); x.doneMsg = false; x.skip = null; }); UI.refreshPanel(true); }, { small: true }),
           UI.btn('⚑ Bandera', () => PK.Input.startFlag(), { small: true, title: 'Marca un lugar en la niebla: va hacia allá antes que a lo más cercano' }),
           UI.btn('Detener', () => { us.forEach(x => G().release(x)); UI.refreshPanel(true); }, { small: true })))));
@@ -904,7 +910,7 @@
       act.append(el('div', { class: 'row' },
         UI.btn(el('span', null, 'Explorador ', UI.costEl(D.SCOUT.cost)), () => { G().trainScout(b); UI.refreshPanel(true); }),
         b.queue.length ? UI.btn('Quitar de la cola', () => { G().cancelTrain(b); UI.refreshPanel(true); }, { small: true }) : null),
-        el('p', { class: 'small' }, 'Exploradores: ' + G().scoutCount() + '/' + G().scoutMax() + ' · Mapa explorado: ' + Math.round(G().explorePct() * 1000) / 10 + '%'));
+        el('p', { class: 'small' }, 'Exploradores: ' + G().scoutCount() + '/' + G().scoutMax() + ' · Mapa explorado: ' + Math.round(G().explorePct() * 1000) / 10 + '%'), el('p', { class: 'small muted' }, areaTxt()));
       if (b.queue.length) act.append(el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / G().trainTime(b)) * 100 + '%' } }), el('span', null, 'Entrenando explorador' + (b.status && b.status !== 'Entrenando' ? ' · ' + b.status : ''))));
       act.append(UI.btn('Ver descubrimientos', () => UI.openExplore(), { small: true }));
     } else if (b.type === 'monastery') {

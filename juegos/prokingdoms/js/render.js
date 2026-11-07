@@ -39,6 +39,26 @@
     const s = R.scale();
     return [((wx - R.cam.x) * s + R.cv.width / 2) / R.dpr, ((wy - R.cam.y) * s + R.cv.height / 2) / R.dpr];
   };
+  // pk-37: los sonidos del mapa (golpes de los aldeanos, entregas…) suenan según qué tan cerca los miras:
+  // - el zoom: con zoom 3-4 a todo volumen, con 2 algo menos, con 1 bajito y alejado del todo (0,5) casi nada;
+  // - el centro de la pantalla: lo que miras suena, lo de la orilla apenas; fuera de la pantalla, nada;
+  // - el lado: paneo izquierda/derecha según dónde está.
+  // Antes cada golpe en pantalla sonaba igual de fuerte y en el medio: alejado se oía el pueblo entero picando
+  // sin saber de dónde. wx, wy: coordenadas del mundo en píxeles (R.iso).
+  R.volumenEn = function (wx, wy) {
+    if (!R.cv) return null;
+    const [sx, sy] = R.worldToScreen(wx, wy), w = R.cv.width / R.dpr, h = R.cv.height / R.dpr;
+    if (sx < -20 || sy < -20 || sx > w + 20 || sy > h + 20) return null;
+    const dn = Math.hypot((sx - w / 2) / (w / 2), (sy - h / 2) / (h / 2)) / Math.SQRT2; // 0 en el centro, 1 en la esquina
+    const cerca = Math.pow(U.clamp((R.cam.z - 0.25) / 2.25, 0, 1), 1.1), centro = Math.pow(U.clamp(1 - dn * 0.95, 0, 1), 1.3);
+    return { vol: cerca * centro, pan: (sx / w - 0.5) * 1.7 };
+  };
+  R.sonarEn = function (name, wx, wy) {
+    if (!PK.Sfx || !PK.Sfx.playEn) return;
+    const v = R.volumenEn(wx, wy);
+    if (v && v.vol >= 0.03) PK.Sfx.playEn(name, v.vol, v.pan);
+  };
+  R.sonarEnCasilla = function (name, tx, ty) { const [x, y] = R.iso(tx, ty); R.sonarEn(name, x, y); };
   R.centerOn = function (tx, ty) { const [x, y] = R.iso(tx, ty); R.cam.x = x; R.cam.y = y; R.clampCam(); };
   R.clampCam = function () {
     const maxX = (W.W + W.H) * 16, maxY = (W.W + W.H) * 8;
@@ -311,7 +331,7 @@
     else if (tool === 'sickle') { bits(3, [[230, 200, 100], [196, 164, 72], [120, 150, 60]], 10, 18, 70, 0.6); snd = 'reap'; }
     else if (tool === 'knife') bits(2, [[150, 112, 80], [120, 90, 62]], 6, 10, 80, 0.4);
     else if (tool === 'hand') bits(2, [[80, 140, 60], [206, 52, 56]], 6, 12, 80, 0.5);
-    if (snd && u.owner === 'p' && PK.Sfx) PK.Sfx.play(snd);
+    if (snd && u.owner === 'p') R.sonarEn(snd, x, y); // pk-37: según el zoom y qué tan al centro está
   }
 
   // Trozos visibles: se pasa de las esquinas de la pantalla a casillas y se revisa cada trozo del rango.

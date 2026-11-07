@@ -245,7 +245,7 @@
         const [cx, cy] = PK.Render.iso(f.x + f.ux * 0.35 + (Math.random() - 0.5) * 1.6 * px, f.y + f.uy * 0.35 + (Math.random() - 0.5) * 1.6 * py);
         PK.Render.particles.push({ x: cx, y: cy - 4, vx: (Math.random() - 0.5) * 14, vy: -6 - Math.random() * 6, life: 0, max: 0.8, s: 1, puff: [196, 176, 140] });
         if (Math.random() < 0.5) PK.Render.particles.push({ x: cx, y: cy - 10, vx: (Math.random() - 0.5) * 40, vy: -20 - Math.random() * 20, life: 0, max: 0.25, s: 1, rgb: [255, 236, 170] });
-        if (PK.Sfx && Math.random() < 0.25) PK.Sfx.play(Math.random() < 0.5 ? 'hit' : 'pick');
+        if (Math.random() < 0.25 && PK.Render.sonarEn) PK.Render.sonarEn(Math.random() < 0.5 ? 'hit' : 'pick', cx, cy); // pk-37: con lugar
       }
       if (!clash && !f.said) {
         f.said = true;

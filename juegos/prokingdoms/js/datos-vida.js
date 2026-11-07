@@ -67,7 +67,7 @@
     asedio: { rama: 'gue', era: 7, name: 'Ingenieros de asedio', desc: '+10% de fuerza contra monstruos.', ef: { pve_all: 0.1 } },
     // Saber
     escuelas: { rama: 'sab', era: 2, name: 'Escuelas', desc: '+5% de investigación.', ef: { researchP: 0.05 } },
-    cartografia: { rama: 'sab', era: 3, name: 'Cartografía avanzada', desc: 'Un explorador dirigido más (banderas de exploración) y +4 casillas de alcance.', ef: { dirigido: 1, range: 4 } },
+    cartografia: { rama: 'sab', era: 3, name: 'Cartografía avanzada', desc: 'Un explorador dirigido más (banderas de exploración) y más área de exploración.', ef: { dirigido: 1, range: 4 } },
     academia: { rama: 'sab', era: 5, name: 'Academia', desc: '+10% de investigación y mejoras 5% más rápidas.', ef: { researchP: 0.1, upSpeed: 0.05 } },
     astronomia: { rama: 'sab', era: 8, ex: 'alquimia', name: 'Astronomía', desc: 'Una opción de sala más en cada piso de las incursiones.', ef: { salas: 1 } },
     alquimia: { rama: 'sab', era: 8, ex: 'astronomia', name: 'Alquimia', desc: 'Las pociones del Herbolario salvan el doble.', ef: { pociones: 1 } },
@@ -105,7 +105,7 @@
     herreros: { name: 'Herreros', desc: '+30% herramientas y +20% lingotes.', ef: { c_tools: 0.3, c_ingots: 0.2 } },
     copistas: { name: 'Copistas', desc: '+30% libros.', ef: { c_books: 0.3 } },
     peregrinaje: { name: 'Peregrinaje', desc: '+40% oro de las reliquias.', ef: { relic: 0.4 } },
-    audaces: { name: 'Exploradores audaces', desc: '+6 casillas de alcance de exploración.', ef: { range: 6 } },
+    audaces: { name: 'Exploradores audaces', desc: 'Más área de exploración para tus exploradores.', ef: { range: 6 } },
     guerra: { name: 'Escuela de guerra', desc: '+15% de fuerza contra monstruos, −5% recolección.', ef: { pve_all: 0.15, gatherP: -0.05 } },
     cirujanos: { name: 'Cirujanos', desc: '−20% de bajas en las expediciones.', ef: { bajas: 0.2 } },
     gesta: { name: 'Cantares de gesta', desc: '+30% de experiencia de los héroes.', ef: { heroXp: 0.3 } },
@@ -150,7 +150,7 @@
   // Lo que da cada una además del +3% a todo por nivel (BSTATS.wonder): ef(nivel) entra por Vida.bono. `fase` son los
   // nombres de lo que se ve crecer cada 5 niveles (sprites.js dibuja las etapas).
   D.MARAV = {
-    m_faro: { ef: L => ({ sell: Math.min(0.1, 0.01 * L), vision: Math.min(8, Math.floor(L / 2)), range: Math.min(20, L) }), txt: L => '+' + Math.min(10, L) + '% de venta en el Mercado, torres +' + Math.min(8, Math.floor(L / 2)) + ' de visión y +' + Math.min(20, L) + ' casillas de exploración', fase: ['la base', 'la torre', 'la linterna', 'el espejo de bronce', 'la galería', 'la llama eterna', 'el halo'] },
+    m_faro: { ef: L => ({ sell: Math.min(0.1, 0.01 * L), vision: Math.min(8, Math.floor(L / 2)), range: Math.min(20, L) }), txt: L => '+' + Math.min(10, L) + '% de venta en el Mercado, torres +' + Math.min(8, Math.floor(L / 2)) + ' de visión y +' + Math.min(20, L) + ' de radio de exploración', fase: ['la base', 'la torre', 'la linterna', 'el espejo de bronce', 'la galería', 'la llama eterna', 'el halo'] },
     m_coloso: { ef: L => ({ pve_all: Math.min(0.4, 0.02 * L), raidDef: Math.min(0.5, 0.03 * L) }), txt: L => '+' + Math.min(40, 2 * L) + '% de fuerza contra monstruos y +' + Math.min(50, 3 * L) + '% de daño de las torres a los bandidos', fase: ['el pedestal', 'las piernas', 'el torso', 'la cabeza', 'la lanza', 'la antorcha', 'el halo'] },
     m_jardines: { ef: L => ({ gatherP: Math.min(0.15, 0.01 * L), animo: Math.min(20, L) }), txt: L => '+' + Math.min(15, L) + '% de recolección y +' + Math.min(20, L) + ' de ánimo', fase: ['la terraza', 'el segundo piso', 'las cascadas', 'el tercer piso', 'los árboles', 'las flores eternas', 'el halo'] },
     m_catedral: { ef: L => ({ researchP: Math.min(0.5, 0.03 * L), relic: Math.min(0.5, 0.04 * L) }), txt: L => '+' + Math.min(50, 3 * L) + '% de investigación y +' + Math.min(50, 4 * L) + '% de oro de las reliquias', fase: ['los cimientos', 'la nave', 'el rosetón', 'las torres', 'la cúpula', 'las campanas', 'el halo'] },

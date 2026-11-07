@@ -845,3 +845,26 @@ test('Aspectos (pk-36): cada aspecto del Pase se elige en algún lado y el de ca
   // los aspectos de edificio y decoración apuntan a edificios que existen
   for (const id in D.PASE_TEMAS) for (const k of ['edificio', 'deco']) assert.ok(D.BUILD[D.PASE_TEMAS[id][k].b], id + ':' + k + ' apunta a ' + D.PASE_TEMAS[id][k].b);
 });
+
+test('Exploración por área (pk-37): mismas casillas en el medio y en la orilla, el mapa entero al máximo y nada a mano fuera del área', () => {
+  const P = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js']);
+  const { D: D2, World: W2, Game: G2 } = P, N = W2.W * W2.H;
+  const dentro = (R, h) => { let n = 0; for (let i = 0; i < N; i++) if (Math.hypot(i % W2.W - h[0], ((i / W2.W) | 0) - h[1]) <= R) n++; return n; };
+  const radios = {};
+  for (const slot of [5, 0]) { // 5 queda en el medio del mapa; 0, en una esquina
+    P.D.setupRealms(slot, null); W2.generate(D2.SEED);
+    const area = 20000, R = G2.radioDeArea(area), n = dentro(R, D2.PLAYER_HOME);
+    assert.ok(Math.abs(n - area) < area * 0.01, 'slot ' + slot + ': ' + n + ' casillas dentro del radio, se pedían ' + area);
+    radios[slot] = R;
+    assert.equal(dentro(G2.radioDeArea(N), D2.PLAYER_HOME), N, 'con el área del mapa entero entra todo');
+  }
+  assert.ok(radios[0] > radios[5] * 1.3, 'la esquina llega más lejos para ver lo mismo (' + radios[0] + ' contra ' + radios[5] + ')');
+  // el Puesto en su nivel máximo de la Era X ya cubre el mapa entero, sin Cartografía ni héroe
+  const r = D2.BSTATS.scout(D2.maxLevel('scout', 10)).range;
+  assert.ok(Math.PI * Math.pow(r + D2.SIGHT.scout, 2) >= N, 'nivel ' + D2.maxLevel('scout', 10) + ': radio ' + r);
+  // lo que revela un explorador pasa por su área, también si lo llevaste a mano
+  const ent = JS('entities.js'), gm = JS('game.js');
+  assert.match(ent, /g\.revealScout\(u\.x, u\.y\)/);
+  assert.doesNotMatch(ent + gm, /revealAt\(u\.x, u\.y, g?G?\.?scoutSight\(\)\)/);
+  assert.match(gm, /if \(!G\.enAlcance\(tx, ty\)\)/, 'G.command no manda exploradores fuera del área');
+});

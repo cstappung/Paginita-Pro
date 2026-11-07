@@ -88,7 +88,7 @@
     t.u--;
     if (t.u <= 0) l.splice(l.indexOf(t), 1);
     if (PK.Render.burst) PK.Render.burst(o.x, o.y, t.t === 'brea' ? [30, 24, 20] : [190, 190, 200], 8);
-    if (PK.Sfx) PK.Sfx.play('hit');
+    if (PK.Render.sonarEnCasilla) PK.Render.sonarEnCasilla('hit', o.x, o.y);
     return t.t === 'brea' ? { lento: 4 } : { dano: 0.35 };
   };
   A.dibujar = function (ctx, R) {
