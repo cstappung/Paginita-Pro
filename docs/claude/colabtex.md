@@ -62,9 +62,33 @@ Key modules in [colabtex/src/](colabtex/src/):
   doubled every count. Errors are `!` lines **and** `file:line:` lines — with
   `--file-line-error` they never start with `!`, and the summary said «✓
   Compilación correcta» over a document full of errors.
-- **Auto** (PDF bar, `localStorage colabtex.autocompile`) compiles 2.5 s after
-  you stop typing. Only *local* user edits count (`tr.isUserEvent`), never
-  collaborators' — otherwise every laptop compiles while someone else types.
+- **Auto** (PDF bar select, `localStorage colabtex.autoSeg`, migrates the old
+  `colabtex.autocompile`) compiles N s after the last keystroke, and at most
+  every 2N s while typing non-stop. Only *local* user edits count
+  (`tr.isUserEvent`), never collaborators' — otherwise every laptop compiles
+  while someone else types.
+- **⚡ Compilación rápida** (`colabtex.rapida`, on by default): the pipeline
+  dumps the preamble to a `.fmt` with `mylatexformat` and later passes start
+  from it (beamer: 7.5 s → 1.1 s per compile; apa7 7.4 → 1.0). The format is
+  keyed by the preamble + user `.sty/.cls/.def/.cfg/.clo/.fd` + files the
+  preamble `\input`s, and lives in the worker. Three safety nets: if the ini
+  run fails, or the document aborts with the format, it compiles normally and
+  marks that key unusable; and the **first** compile with a new format that
+  shows errors is re-run normally — if the normal run has fewer errors the
+  format is dropped for that preamble (glossaries: false «Extra \fi»). With
+  biblatex the hook goes into the *ini* run and must **not** be repeated when
+  using the format (it aborted). ⟳ «desde cero» never uses it and clears it.
+- **Progress in the ▶ Compilar button.** The engine already reported bytes
+  («Downloading data… (loaded/total)», summed by Emscripten as packages start,
+  so the total grows and starts absurd — divide by `DATOS_MOTOR_BYTES` unless
+  the reported one is bigger and sane) and every `$ busytex pdflatex/bibtex8`;
+  `engineStatus` used to drop all of it. `summarizeLog` reads only the last
+  pdflatex log **plus BibTeX's** — not every non-pdflatex log, or the
+  `prefmt …` ini log would count as the document's.
+- **No Cache Storage / Service Worker for the engine**, on purpose: the `.data`
+  URLs carry no version, so a cache-first copy could pair a stale `.data` with
+  a new `.js` manifest and corrupt the virtual FS. The HTTP cache already
+  avoids re-downloading (GitHub Pages revalidates with 304).
 - `pdfview.js` — pdf.js-based PDF viewer. **Ctrl/⌘ + wheel zooms** (that is
   also how a trackpad pinch arrives), and it must `preventDefault()` or the
   browser zooms the whole page instead. The percentage updates on every wheel

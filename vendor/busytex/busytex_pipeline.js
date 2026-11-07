@@ -444,11 +444,14 @@ class BusytexPipeline
         return initialized_module;
     }
 
-    async compile(files, main_tex_path, bibtex, verbose, driver, data_packages_js = [], clean = false)
+    async compile(files, main_tex_path, bibtex, verbose, driver, data_packages_js = [], clean = false, rapida = false)
     {
         const args_originales = [files, main_tex_path, bibtex, verbose, driver, data_packages_js];
         if(clean)
+        {
             this.aux_cache = null;
+            this.fmt_cache = null;
+        }
         if(!this.supported_drivers.includes(driver))
             throw new Error(`Driver [${driver}] is not supported, only [${this.supported_drivers}] are supported`);
         this.print(`New compilation started: [${main_tex_path}]`);
@@ -543,7 +546,7 @@ class BusytexPipeline
         FS.chdir(source_dir);
 
         if(driver == 'pdftex_bibtex8')
-            return this.compile_pdftex_incremental({Module, FS, PATH, files, main_tex_path, bibtex, verbose, pdftex, bibtex8, dirs, pdf_path, synctex_path, log_path, bbl_path, blg_path, args_originales});
+            return this.compile_pdftex_incremental({Module, FS, PATH, files, main_tex_path, bibtex, verbose, pdftex, bibtex8, dirs, pdf_path, synctex_path, log_path, bbl_path, blg_path, args_originales, rapida : rapida && !clean});
 
         let cmds = [];
         if(driver == 'xetex_bibtex8_dvipdfmx')
@@ -696,7 +699,7 @@ class BusytexPipeline
     static AUX_EXT = ['.aux', '.toc', '.lof', '.lot', '.out', '.bbl', '.nav', '.snm', '.loa', '.lol', '.brf', '.vrb'];
     static MAX_PASADAS_LATEX = 4;
 
-    compile_pdftex_incremental({Module, FS, PATH, files, main_tex_path, bibtex, verbose, pdftex, bibtex8, dirs, pdf_path, synctex_path, log_path, bbl_path, blg_path, args_originales})
+    async compile_pdftex_incremental({Module, FS, PATH, files, main_tex_path, bibtex, verbose, pdftex, bibtex8, dirs, pdf_path, synctex_path, log_path, bbl_path, blg_path, args_originales, rapida})
     {
         const project_dir = this.project_dir;
         const es_aux = p => BusytexPipeline.AUX_EXT.some(ext => p.endsWith(ext));
@@ -795,6 +798,7 @@ class BusytexPipeline
            uno define el interruptor blx@bibtex8, y dos seguidos abortan con
            «Toggle 'blx@bibtex8' already defined». */
         const ya_bibtex = files.some(f => typeof f.contents == 'string' && /\\usepackage\s*\[[^\]]*backend\s*=\s*bibtex[^\]]*\]\s*\{biblatex\}/.test(f.contents));
+        let arg_biblatex = null;
         if(usa_biblatex && !ya_bibtex)
         {
             const tex_path = PATH.basename(main_tex_path);
@@ -802,8 +806,8 @@ class BusytexPipeline
             if(i >= 0)
             {
                 pdftex = pdftex.slice();
-                pdftex.splice(i, 1, '-jobname=' + tex_path.replace(/\.tex$/, ''),
-                    '\\makeatletter\\AddToHook{package/biblatex/before}{\\@ifundefined{opt@biblatex.sty}{\\@namedef{opt@biblatex.sty}{backend=bibtex8}}{\\expandafter\\g@addto@macro\\csname opt@biblatex.sty\\endcsname{,backend=bibtex8}}}\\makeatother\\input{' + tex_path + '}');
+                arg_biblatex = '\\makeatletter\\AddToHook{package/biblatex/before}{\\@ifundefined{opt@biblatex.sty}{\\@namedef{opt@biblatex.sty}{backend=bibtex8}}{\\expandafter\\g@addto@macro\\csname opt@biblatex.sty\\endcsname{,backend=bibtex8}}}\\makeatother\\input{' + tex_path + '}';
+                pdftex.splice(i, 1, '-jobname=' + tex_path.replace(/\.tex$/, ''), arg_biblatex);
             }
         }
 
@@ -842,6 +846,73 @@ class BusytexPipeline
            documento no tuviera ni un error. */
         const aborto = ({stdout, log}) => !FS.analyzePath(pdf_path).exists || /Fatal error occurred|Emergency stop|That was a fatal error|No pages of output/.test(stdout + '\n' + log);
 
+        /* ---- compilación rápida: el preámbulo precompilado ----
+           Cargar el preámbulo es casi todo el tiempo de una pasada en un
+           documento con beamer, TikZ o tcolorbox (medido: 8,7 s de 9 en
+           beamer). mylatexformat vuelca a un .fmt el estado de LaTeX justo
+           antes de \begin{document}; las pasadas siguientes arrancan de ahí
+           y se saltan el preámbulo del .tex (1,3 s). El .fmt se rehace solo
+           cuando cambia lo que lo determina (clave_fmt). Si no se puede
+           generar —hay paquetes que no se dejan volcar—, se apunta y se
+           compila normal sin volver a intentarlo hasta que cambie la clave. */
+        let fmt_usado = false;
+        if(rapida)
+        {
+            const principal = files.find(f => norm(f.path) == norm(main_tex_path));
+            const texto = principal && typeof principal.contents == 'string' ? principal.contents : '';
+            const corte = texto.search(/\\begin\s*\{document\}/);
+            if(corte > 0)
+            {
+                const preambulo = texto.slice(0, corte);
+                // lo que el preámbulo puede leer: estilos propios y \input del preámbulo
+                const leidos = new Set(Array.from(preambulo.matchAll(/\\(?:input|include)\s*\{([^}]+)\}/g)).map(m => m[1].trim()));
+                const partes = [preambulo, arg_biblatex ? 'biblatex-hook' : ''];
+                for(const f of files)
+                {
+                    if(typeof f.contents != 'string')
+                        continue;
+                    const p = norm(f.path), base = p.replace(/\.tex$/, '');
+                    if(/\.(sty|cls|def|cfg|clo|fd)$/.test(p) || leidos.has(p) || leidos.has(base))
+                        partes.push('%% ' + p + '\n' + f.contents);
+                }
+                const clave_fmt = main_tex_path + '\n' + partes.join('\n');
+                const fc = this.fmt_cache;
+                if(!fc || fc.clave !== clave_fmt)
+                {
+                    this.print('$ # precompilando el preámbulo (compilación rápida)');
+                    const base_fmt = '&' + this.fmt.pdftex.replace(/\.fmt$/, '');
+                    const tex_path = PATH.basename(main_tex_path);
+                    const primero = arg_biblatex
+                        ? arg_biblatex.replace(/\\input\{[^}]*\}$/, '\\input mylatexformat.ltx')
+                        : 'mylatexformat.ltx';
+                    const ini = ['pdflatex', '-ini', '--interaction=nonstopmode', '-jobname=prefmt', base_fmt, primero, tex_path];
+                    this.remove(FS, 'prefmt.fmt');
+                    const t0 = Date.now();
+                    const {exit_code, stdout} = Module.callMainWithRedirects(ini, false);
+                    Module.HEAPU8.fill(0);
+                    Module.HEAPU8.set(mem_header);
+                    const ok = FS.analyzePath('prefmt.fmt').exists;
+                    logs.push({cmd : 'prefmt ' + ini.join(' '), texmflog : '', missfontlog : '', log : this.read_all_text(FS, 'prefmt.log').slice(-4000), aux : '', stdout : stdout.slice(-2000), stderr : '', exit_code});
+                    this.print(`$ # preámbulo ${ok ? 'precompilado' : 'NO se pudo precompilar'} en ${Date.now() - t0} ms`);
+                    this.fmt_cache = {clave : clave_fmt, bytes : ok ? FS.readFile('prefmt.fmt') : null};
+                }
+                else if(this.fmt_cache.bytes)
+                    FS.writeFile('prefmt.fmt', this.fmt_cache.bytes);
+                if(this.fmt_cache.bytes)
+                {
+                    const i = pdftex.indexOf('--fmt');
+                    pdftex = pdftex.slice();
+                    pdftex[i + 1] = 'prefmt.fmt';
+                    /* biblatex ya va cargado DENTRO del formato con su backend:
+                       repetir el gancho delante del \input dejaba al formato
+                       de mylatexformat sin su archivo y abortaba. */
+                    if(arg_biblatex)
+                        pdftex[pdftex.indexOf(arg_biblatex)] = PATH.basename(main_tex_path);
+                    fmt_usado = true;
+                }
+            }
+        }
+
         let pasadas = 0, bibtex_corrio = false;
         let clave = cache ? cache.clave_bib : null;
         let antes = foto();
@@ -876,6 +947,41 @@ class BusytexPipeline
         const pdf_bytes = this.read_all_bytes(FS, pdf_path);
         const pdf = pdf_bytes && pdf_bytes.length ? pdf_bytes : null;
 
+        /* El formato se generó pero el documento no sale con él: se marca
+           como inservible (hasta que cambie el preámbulo) y se repite la
+           compilación normal. Mejor lento que sin PDF. */
+        if(fmt_usado && aborto(r))
+        {
+            this.print('$ # el preámbulo precompilado no sirve para este documento: compilación normal');
+            this.fmt_cache = {clave : this.fmt_cache.clave, bytes : null};
+            const [f, m, b, v, d, dp] = args_originales;
+            return this.compile(f, m, b, v, d, dp, false, false);
+        }
+        /* Hay paquetes que se dejan volcar pero luego fallan sin abortar
+           (glossaries: «Extra \fi» en \begin{document}). Si la PRIMERA
+           compilación con un formato nuevo trae errores, se compara con
+           una normal: si la normal tiene menos, el formato no sirve para
+           este preámbulo. Se verifica una sola vez por formato; después,
+           un error es del documento, no del formato. */
+        const cuenta_errores = log => (log.match(/^(?:\.\/)?[^\s:][^:\n]*\.[A-Za-z]{1,8}:\d+:\s|^! /gm) || []).length;
+        if(fmt_usado && !this.fmt_cache.verificado)
+        {
+            this.fmt_cache.verificado = true;
+            const con_fmt = cuenta_errores(r.log);
+            if(con_fmt > 0)
+            {
+                const [f, m, b, v, d, dp] = args_originales;
+                const fc = this.fmt_cache;
+                this.fmt_cache = null;                       // la normal no debe tocarlo
+                const normal = await this.compile(f, m, b, v, d, dp, false, false);
+                const sin_fmt = normal.logs.filter(l => /^pdflatex\b/.test(l.cmd)).map(l => cuenta_errores(l.log)).pop() || 0;
+                this.fmt_cache = sin_fmt < con_fmt ? {clave : fc.clave, bytes : null, verificado : true} : fc;
+                if(sin_fmt < con_fmt)
+                    this.print('$ # el preámbulo precompilado da errores que la compilación normal no da: se desactiva para este preámbulo');
+                return normal;
+            }
+        }
+
         // ¿auxiliar envenenado? → una vez desde cero
         const error_en_aux = /^(?:\.\/)?\S+\.(?:aux|toc|lof|lot|out|nav|snm|loa|lol|brf|vrb):\d+:/m.test(r.log);
         if(repuestos > 0 && (!pdf || error_en_aux))
@@ -900,6 +1006,6 @@ class BusytexPipeline
         const logcat = logs.map(({cmd, log, exit_code, stdout, stderr}) => ([`$ ${cmd}`, `EXITCODE: ${exit_code}`, '', 'LOG:', log, '==', 'STDOUT:', stdout, '==', 'STDERR:', stderr, '======'].join('\n'))).join('\n\n');
         this.Module = this.preload == false ? null : this.Module;
 
-        return {pdf, log : logcat, exit_code : r.exit_code, logs, synctex, pasadas, bibtex_corrio, auxiliares_repuestos : repuestos};
+        return {pdf, log : logcat, exit_code : r.exit_code, logs, synctex, pasadas, bibtex_corrio, auxiliares_repuestos : repuestos, rapida : fmt_usado};
     }
 }
