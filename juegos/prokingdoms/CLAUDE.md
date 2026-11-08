@@ -1106,3 +1106,20 @@ Each fix below came from a stall in that run; keep them in mind before touching 
   anvils, saws, other realms' axes) weigh each source by its distance to the centre and follow the same zoom
   curve (`cercaCosas`); nature keeps the old `cerca`. A new sound that happens *at a place* on the map should go
   through `sonarEn`, not `Sfx.play`.
+
+## Recorded sounds (`pk-38`)
+
+- **Every sound is now a recording** (`sfx/*.mp3`, made with ElevenLabs, 96 kbps mono, about 700 KB in all). sfx.js
+  loads them four at a time once the first touch creates the audio context. The names are the `sonido()` keys plus
+  `amb-*` for the ambience. Until a file arrives, or if it fails, the old synthesized sound plays, so nothing is ever
+  silent. The `switch` stays as that fallback: do not delete it.
+- **`GAN` (sfx.js) is each file's gain**, measured against the synthesized sound (loudest 100 ms window, so no
+  recording is louder than the old one) and played ×1.25. The murmur (`amb-gente`) and the saw are raised on purpose.
+  A new or replaced file needs its gain measured the same way, or it will sound out of place.
+- `VARIA` changes the pitch of repeated hits (0.93–1.07), and `VOCES` (4) caps how many copies of one file play at
+  once (the sickle and the shovel last about 1.3 s). `X.muestra(name, destino, vol, cuando)` and `X.duracion(name)` are
+  what musica.js uses: `GRABADO` maps each ambience sound to its file and its hits (axe, pick and anvil repeat as
+  before). `amb-hacha`/`amb-pico` reuse `chop`/`pick` (`ARCHIVO`).
+- The raid alarm (`cuerno`) is war drums now. The owner rejected two horns as «a train horn».
+- Test: «Sonidos grabados (pk-38)» checks that every name has a file, every synthesized case has a recording, and every
+  ambience sound goes through `GRABADO`.

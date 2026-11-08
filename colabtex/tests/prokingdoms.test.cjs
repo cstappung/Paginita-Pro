@@ -868,3 +868,24 @@ test('Exploración por área (pk-37): mismas casillas en el medio y en la orilla
   assert.doesNotMatch(ent + gm, /revealAt\(u\.x, u\.y, g?G?\.?scoutSight\(\)\)/);
   assert.match(gm, /if \(!G\.enAlcance\(tx, ty\)\)/, 'G.command no manda exploradores fuera del área');
 });
+
+test('Sonidos grabados (pk-38): cada nombre de sfx.js tiene su archivo, cada sonido sintetizado tiene grabación y el ambiente la usa', () => {
+  const sfx = JS('sfx.js'), mus = JS('musica.js');
+  const gan = sfx.slice(sfx.indexOf('const GAN = {'), sfx.indexOf('};', sfx.indexOf('const GAN = {')));
+  const nombres = [...gan.matchAll(/'?([a-z-]+)'?\s*:\s*[0-9.]+/g)].map(m => m[1]);
+  const archivo = { 'amb-hacha': 'chop', 'amb-pico': 'pick' };
+  assert.ok(nombres.length >= 33, 'leí ' + nombres.length + ' nombres');
+  for (const n of nombres) {
+    const f = path.join(PKDIR, 'sfx', (archivo[n] || n) + '.mp3');
+    assert.ok(fs.existsSync(f), 'falta ' + f);
+    assert.ok(fs.statSync(f).size < 150 * 1024, n + ' pesa demasiado');
+  }
+  // todo lo que el switch sintetiza tiene grabación (si no, ese sonido quedaría como antes sin que nadie lo note)
+  for (const m of sfx.matchAll(/case '([a-z]+)':/g)) assert.ok(nombres.includes(m[1]), 'sin grabación: ' + m[1]);
+  // y todo lo que el ambiente sabe sonar pasa primero por la grabación
+  const graba = mus.slice(mus.indexOf('const GRABADO = {'), mus.indexOf('};', mus.indexOf('const GRABADO = {')));
+  for (const m of mus.matchAll(/if \(k === '([a-z]+)'\)/g)) {
+    assert.ok(graba.includes(m[1] + ':'), 'el ambiente «' + m[1] + '» no usa grabación');
+    assert.ok(nombres.includes('amb-' + m[1]), 'sin ganancia: amb-' + m[1]);
+  }
+});

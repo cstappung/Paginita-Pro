@@ -265,7 +265,23 @@
     tAmb = ahora + Math.max(1.1, 4.5 - tot * 0.6) + Math.random() * 2.5;
     if (e) sonar(e[0], ahora, e[2], 0.5 * e[3] * (e[4] ? (escena.cercaCosas !== undefined ? escena.cercaCosas * 1.3 : 1) : escena.cerca));
   }
+  // pk-38: si la grabación de ese sonido ya llegó (sfx.js), suena ella; si no, lo sintetizado de abajo.
+  // [archivo, golpes (segundos desde t)]: hacha, pico y yunque repiten el golpe como antes.
+  const GRABADO = {
+    olas: ['amb-olas', [0]], viento: ['amb-viento', [0]], grillo: ['amb-grillo', [0]], pajaro: ['amb-pajaro', [0]], gaviota: ['amb-gaviota', [0]],
+    obra: ['amb-obra', [0]], sierra: ['amb-sierra', [0]], gente: ['amb-gente', [0]], yunque: ['amb-yunque', [0, 0.5]],
+    hacha: ['amb-hacha', [0, 0.6]], pico: ['amb-pico', [0, 0.36, 0.72]],
+  };
+  function grabado(k, t, x, v) {
+    const X = PK.Sfx, e = GRABADO[k];
+    if (!e || !X || !X.duracion || !X.duracion(e[0])) return false;
+    const d = canal(x, X.duracion(e[0]) + e[1][e[1].length - 1]);
+    // v ronda 0.5 con el zoom normal: la ganancia de sfx.js se midió así
+    for (const dt of e[1]) X.muestra(e[0], d, v / 0.5, t + dt);
+    return true;
+  }
   function sonar(k, t, x, v) {
+    if (grabado(k, t, x, v)) return;
     if (k === 'olas') { const d = canal(x, 3.6); ruido(t, 3.2, v * 0.06, 420, 'lowpass', d, 1.4); return; }
     if (k === 'viento') { const d = canal(x, 4.4); ruido(t, 4, v * 0.06, 520, 'bandpass', d, 1.8); return; }
     if (k === 'grillo') { grillo(t, canal(x, 0.6)); return; }
