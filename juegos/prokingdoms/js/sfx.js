@@ -1,4 +1,5 @@
-// Efectos de sonido sintetizados con Web Audio (sin archivos). Suenan bajito y se pueden silenciar (tecla M).
+// Efectos de sonido con Web Audio. Desde pk-38 suenan grabaciones (sfx/*.mp3, hechas con ElevenLabs); mientras un
+// archivo no llega, o si no carga, suena el sintetizado de antes, así nunca queda mudo. Se silencian con M.
 (function () {
   'use strict';
   const PK = window.PK, U = PK.U;
@@ -12,6 +13,7 @@
       master = ctx.createGain();
       master.gain.value = 0.5;
       master.connect(ctx.destination);
+      cargar();
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
@@ -39,6 +41,55 @@
     s.connect(f); f.connect(g); g.connect(out || master);
     s.start(t);
   }
+  // ---------- grabaciones (pk-38) ----------
+  // Ganancia de cada archivo: medida contra el sintetizado (la ventana de 100 ms más fuerte de cada uno), para que
+  // ninguno suene más fuerte que antes, por 1.25 porque una grabación se oye más «llena». Los amb-* los toca musica.js.
+  const GAN = { chop: 0.0226, pick: 0.0337, hammer: 0.0331, dig: 0.0127, reap: 0.0185, deposit: 0.0334, build: 0.0928, level: 0.0937,
+    era: 0.0781, quest: 0.0718, coin: 0.1296, event: 0.1114, cuerno: 0.0554, arrow: 0.0382, hit: 0.038, espada: 0.0252, boom: 0.0465,
+    fuego: 0.0363, magia: 0.0346, victoria: 0.1128, derrota: 0.0382, howl: 0.0593,
+    'amb-olas': 0.0073, 'amb-viento': 0.0092, 'amb-grillo': 0.0081, 'amb-pajaro': 0.014, 'amb-gaviota': 0.0085, 'amb-obra': 0.0092,
+    'amb-yunque': 0.0216, 'amb-sierra': 0.0081, 'amb-gente': 0.0066, 'amb-hacha': 0.0129, 'amb-pico': 0.0093 };
+  // (sierra y gente, ×1.5 y ×2 sobre lo medido: el murmullo de antes casi no se oía)
+  const ARCHIVO = { 'amb-hacha': 'chop', 'amb-pico': 'pick' }; // el ambiente reusa los golpes de los aldeanos
+  // los que se repiten mucho cambian un poco de altura en cada golpe, para que 20 aldeanos no suenen como uno
+  const VARIA = { chop: 1, pick: 1, hammer: 1, dig: 1, reap: 1, deposit: 1, hit: 1, espada: 1, arrow: 1, coin: 1, 'amb-hacha': 1, 'amb-pico': 1, 'amb-yunque': 1, 'amb-pajaro': 1, 'amb-grillo': 1 };
+  const VOCES = 4; // tope de copias sonando a la vez de un mismo archivo (la hoz dura 1,3 s y se golpea más seguido)
+  const bufs = {}, sonando = {};
+  const VER = ((document.currentScript && /[?&]v=([^&]+)/.exec(document.currentScript.src)) || [])[1] || '';
+  function cargar() {
+    const nombres = Object.keys(GAN).filter(n => !ARCHIVO[n]);
+    let i = 0;
+    // de a 4, sin apuro: el juego ya está andando y mientras tanto suena lo sintetizado
+    const sig = () => {
+      const n = nombres[i++];
+      if (!n) return;
+      fetch('sfx/' + n + '.mp3' + (VER ? '?v=' + VER : ''))
+        .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+        .then(b => new Promise((ok, mal) => ctx.decodeAudioData(b, ok, mal)))
+        .then(b => { bufs[n] = b; })
+        .catch(() => { /* queda el sintetizado */ })
+        .then(sig);
+    };
+    for (let k = 0; k < 4; k++) sig();
+  }
+  // toca la grabación «name» en «destino» (o out/master); false si todavía no está, para usar el sintetizado
+  function muestra(name, destino, vol, cuando) {
+    const b = ctx && bufs[ARCHIVO[name] || name];
+    if (!b) return false;
+    if ((sonando[name] || 0) >= VOCES) return true;
+    const s = ctx.createBufferSource(), g = ctx.createGain();
+    s.buffer = b;
+    if (VARIA[name]) s.playbackRate.value = 0.93 + Math.random() * 0.14;
+    g.gain.value = GAN[name] * 1.25 * (vol == null ? 1 : vol);
+    s.connect(g); g.connect(destino || out || master);
+    sonando[name] = (sonando[name] || 0) + 1;
+    s.onended = () => { sonando[name]--; try { g.disconnect(); } catch (e) { /* ya estaba */ } };
+    s.start(cuando || ctx.currentTime);
+    return true;
+  }
+  X.muestra = (name, destino, vol, cuando) => !!(ctx && muestra(name, destino, vol, cuando));
+  X.duracion = name => { const b = bufs[ARCHIVO[name] || name]; return b ? b.duration : 0; };
+
   const GAP = { deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4 };
 
   // pk-37: un sonido con lugar (PK.Render.sonarEn): vol 0..1 y pan -1..1. El tope de repetición no deja que uno
@@ -55,7 +106,7 @@
     out = g;
     try { sonido(name, now); } finally { out = null; }
     lastVol[name] = vol;
-    setTimeout(() => { try { g.disconnect(); if (p) p.disconnect(); } catch (e) { /* ya estaba */ } }, 1500);
+    setTimeout(() => { try { g.disconnect(); if (p) p.disconnect(); } catch (e) { /* ya estaba */ } }, 1500 + X.duracion(name) * 1000);
   };
   X.play = function (name) {
     if (!X.on || !ctx || ctx.state !== 'running' || (PK.Game && PK.Game.offline)) return;
@@ -66,6 +117,7 @@
   };
   function sonido(name, now) {
     last[name] = now;
+    if (muestra(name)) return;
     switch (name) {
       case 'deposit': tone(520, 0, 0.06, 'triangle', 0.035, 780); break;
       case 'coin': tone(988, 0, 0.08, 'square', 0.04); tone(1319, 0.07, 0.16, 'square', 0.04); break;
