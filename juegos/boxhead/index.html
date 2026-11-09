@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202611090644"></script>
+<script src="../../i18n.js?v=202611090656"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <!-- En el Solo Club (solo/club.js abre este archivo con ?club=1): el puente con la página y su tabla. -->
@@ -75,6 +75,7 @@ button{font:inherit;cursor:pointer}
 #premios div{font-size:18px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000;white-space:nowrap;animation:entra .2s ease-out;transition:opacity .3s}
 #premios div.sale{opacity:0}
 /* La elección de ventaja: tres cartas abajo al centro; no tapa el medio de la pantalla. */
+#eleccion[hidden]{display:none}
 #eleccion{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);z-index:3;display:grid;gap:6px;width:min(640px,calc(100vw - 24px));animation:entra .25s ease-out}
 .el-cab{display:flex;align-items:center;gap:10px;justify-content:center;font-weight:900;color:var(--oro);text-shadow:0 2px 0 #000;letter-spacing:.04em;text-transform:uppercase;font-size:14px}
 .el-barra{display:block;width:120px;height:5px;background:rgba(0,0,0,.55);border-radius:3px;overflow:hidden}
@@ -278,9 +279,9 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-21"></script>
-<script src="js/grafico.js?v=boxhead-21"></script>
-<script src="js/audio.js?v=boxhead-21"></script>
-<script src="js/juego.js?v=boxhead-21"></script>
+<script src="js/datos.js?v=boxhead-22"></script>
+<script src="js/grafico.js?v=boxhead-22"></script>
+<script src="js/audio.js?v=boxhead-22"></script>
+<script src="js/juego.js?v=boxhead-22"></script>
 </body>
 </html>

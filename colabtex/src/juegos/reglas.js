@@ -779,6 +779,14 @@ const REGLAS = {
           "Cada baja a uno del otro equipo suma para el tuyo. Gana el primer equipo en llegar al <b>doble de la meta</b> de la sala (10, 20 o 40), o el que queda si el otro se va entero."
         ])]
       ]},
+      infectado: { nombre: "Infectado", secciones: [
+        ["Humanos contra infectados", lista([
+          "Uno empieza <b>infectado</b> (el paciente cero, a la suerte); los demás son humanos con todas las armas. No hay horda: solo jugadores.",
+          "Un infectado se ve como un zombi y no dispara: <b>muerde</b> al humano que tenga delante (Espacio, o disparar en el mando o la pantalla). Corre un 20 % más y tiene 60 de vida extra. Al morir vuelve a los tres segundos, igual de infectado.",
+          "El humano que muere, por lo que sea, <b>vuelve infectado</b>. Entre humanos no hay fuego amigo, ni entre infectados.",
+          "Ganan los infectados cuando no queda ningún humano. Ganan los humanos si alguno aguanta <b>3 minutos</b> (el reloj está arriba) o si los infectados se van de la sala."
+        ])]
+      ]},
       jefes: { nombre: "Modo jefes", secciones: [
         ["Solo jefes", lista([
           "Cada nivel es <b>un jefe</b> con una escolta corta, en el orden de la rotación: el Carnicero, el Coloso, el Nigromante, la Reina… El jefe del nivel <i>n</i> pega como el del nivel 5<i>n</i> de la supervivencia, y desde el nivel 11 vuelven <b>corruptos</b>.",

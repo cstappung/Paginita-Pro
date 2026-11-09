@@ -379,7 +379,7 @@
     { id: 'nivel20', nom: 'Veinte noches', i: '👑', txt: 'Llega al nivel 20.' },
     { id: 'nivel30', nom: 'Fin del mundo', i: '🌋', txt: 'Llega al nivel 30.' },
     { id: 'mapas', nom: 'Trotamundos', i: '🗺️', txt: 'Llega al nivel 10 en la práctica de los cinco mapas clásicos (Patio, Sótano, Cruce, Fortaleza y Laberinto).' },
-    { id: 'arsenal', nom: 'Arsenal', i: '🧰', txt: 'Ten las ocho armas en una partida.' },
+    { id: 'arsenal', nom: 'Arsenal', i: '🧰', txt: 'Gana todas las armas en una partida.' },
     { id: 'maestro', nom: 'Maestro armero', i: '🔧', txt: 'Sube un arma al nivel 5 en la tienda.' },
     { id: 'diez', nom: 'Diez de un golpe', i: '💥', txt: 'Haz 10 bajas en el mismo instante.' },
     { id: 'chatarra', nom: 'Chatarrero', i: '🔩', txt: 'Junta 5000 de chatarra en una partida.' },

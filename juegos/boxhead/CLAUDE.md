@@ -446,3 +446,33 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
     follow.
 - The postman passes `equipos` in the config and `puntosEq` in the
   scoreboard.
+
+## Phase 3.5d: infected (`boxhead-22`)
+
+- Variant `infectado`. Patient zero is `jugadores[semilla % n]`.
+- The reducer returns:
+  - `infectados` (array), which the scoreboard passes to the game.
+  - `equipos`: uid → `humanos`/`infectados`, computed from the log. So
+    `equiposBoxhead` replays `redBoxhead` for this variant, and `ganoEn`
+    works.
+  - `nombresEq`, so the result screen says «el equipo Humanos».
+- Rules:
+  - A human who dies for any reason becomes infected.
+  - A kill counts only between a human and an infected.
+  - The infected win when no human is left. The humans win with
+    `{t:"aguanta"}`, which the director writes once `dir.t ≥ 180`
+    (`AGUANTE_T`), or when every infected player leaves.
+  - Moves carry no time, so a modified client could send `aguanta` early.
+    That is the same honest limit as deaths.
+- In the game:
+  - `versus()` includes `infectado`, and `equipoDe` returns
+    humanos/infectados, so `aliado`/`rival` and the colours come for free.
+  - `esZombi(u)` reads `marcador.infectados`. A zombie's `dispara` becomes
+    `muerde` (weapon 8, 34 dmg, 0.55 s, 24 px in front). It moves at ×1.2
+    with +60 max HP, and is drawn with `G.PAL_E[0]` and no weapon.
+  - In this variant the director spawns no horde (`dir.q = 0`). The HUD
+    shows the humans left and the clock from the shared `dir.t`.
+- `#eleccion` needs its own `[hidden]{display:none}`: its `display:grid`
+  beat the attribute, and the empty «ELIGE UNA VENTAJA» showed in every mode
+  from Phase 2.2 until 3.5d. The Arsenal medal counts only in `coop`, where
+  the weapons are earned.

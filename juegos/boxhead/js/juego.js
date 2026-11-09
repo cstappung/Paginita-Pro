@@ -103,7 +103,7 @@
   /* Las ventajas elegidas al empezar cada nivel (D.VENTAJAS): `vt(id)` es
      su nivel, 0 si no se tiene. */
   function vt(id) { return (yo.vt && yo.vt[id]) || 0; }
-  function hpMax() { return 100 + 20 * vt('aguante'); }
+  function hpMax() { return 100 + 20 * vt('aguante') + (esZombi(cfg && cfg.yo) ? 60 : 0); }
 
   /* **Elegir una ventaja.** Al empezar cada nivel desde el 2 salen tres
      (D.sorteaVentajas, con el azar del juego: en la práctica, el de la
@@ -442,12 +442,19 @@
      los 3 s, menos enemigos) en el que los del mismo equipo no se hieren.
      El equipo de cada uno llega en la config (`cfg.equipos`) y pinta su
      color: el nombre, el marcador y el «¡Aquí!». */
-  const COLOR_EQ = { rojo: '#ff5a4d', azul: '#4da3ff' };
+  const COLOR_EQ = { rojo: '#ff5a4d', azul: '#4da3ff', infectados: '#86e04a', humanos: '#efe9da' };
   const equipos = () => !!cfg && cfg.variante === 'equipos';
-  const equipoDe = u => (equipos() && cfg.equipos ? cfg.equipos[u] || '' : '');
+  /* Infectado (Fase 3.5): también es un versus, sin enemigos. Los
+     infectados los dice el marcador; muerden en vez de disparar, corren
+     más y aguantan más. Humanos e infectados son los dos «equipos». */
+  const infectado = () => !!cfg && cfg.variante === 'infectado';
+  const esZombi = u => infectado() && (marcador.infectados || []).includes(u);
+  const equipoDe = u => (infectado() ? (esZombi(u) ? 'infectados' : 'humanos') : equipos() && cfg.equipos ? cfg.equipos[u] || '' : '');
   const aliado = (a, b) => !!equipoDe(a) && equipoDe(a) === equipoDe(b);
   const colorDe = u => COLOR_EQ[equipoDe(u)] || PALETA[ordenDe(u) % PALETA.length];
-  const versus = () => !!cfg && (cfg.variante === 'versus' || cfg.variante === 'equipos');
+  const versus = () => !!cfg && (cfg.variante === 'versus' || cfg.variante === 'equipos' || cfg.variante === 'infectado');
+  const AGUANTE_T = 180;                                   // segundos que tienen que aguantar los humanos
+  const MORDISCO = { d: 34, cad: 0.55, alc: 24 };         // el ataque de un infectado
   // ¿Mis balas hieren a `u`? En versus sí; por equipos, solo a los del otro.
   const rival = u => versus() && !aliado(u, cfg.yo);
   // Modo jefes (Fase 3.5): reglas de cooperativo, pero cada nivel es un jefe.
@@ -490,7 +497,8 @@
     $('menu').hidden = true; $('pausa').hidden = true; $('fin').hidden = true; $('hud').hidden = false;
     if (!cfg.mirando) aparece();
     pintaArmas(true);
-    if (equipos()) banner('POR EQUIPOS · ' + (equipoDe(cfg.yo) === 'rojo' ? 'ROJO' : 'AZUL') + ' · ' + (cfg.meta || 20) + ' BAJAS');
+    if (infectado()) banner('INFECTADO · LOS HUMANOS AGUANTAN 3 MINUTOS');
+    else if (equipos()) banner('POR EQUIPOS · ' + (equipoDe(cfg.yo) === 'rojo' ? 'ROJO' : 'AZUL') + ' · ' + (cfg.meta || 20) + ' BAJAS');
     else if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
     else if (jefes()) banner('MODO JEFES');
     if (cfg.mut) premio('Mutador: ' + mutD().nombre + ' · ' + mutD().txt);
@@ -536,12 +544,13 @@
     eligeArma(l[(i + s + l.length) % l.length]);
   }
   function desbloquea(id, aviso) {
-    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; if (yo.tiene.size >= D.ARMAS_J.length) medalla('arsenal'); }
+    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; if (yo.tiene.size >= D.ARMAS_J.length && cfg && cfg.variante === 'coop') medalla('arsenal'); }   // en versus y en el modo jefes vienen todas de regalo
     if (aviso) premio(aviso);
   }
 
   function dispara() {
     if (yo.cd > 0 || !yo.v || yo.muerto) return;
+    if (esZombi(cfg.yo)) { muerde(); return; }
     const a = Object.assign({}, armaYo());
     if (!(yo.ammo[yo.w] > 0)) { eligeArma(0); return; }
     yo.cd = a.cad / (1 + 0.08 * vt('gatillo'));
@@ -619,6 +628,17 @@
     yo.dronT = vt('dron') >= 2 ? 0.55 : 0.85;
     rayo(yo.x, yo.y, Math.atan2(t.y - yo.y, t.x - yo.x), 240, Math.round(14 * factorVentajas()), 0, 0);
     son('pistola', 140);
+  }
+  // Un infectado no dispara: muerde al humano que tenga delante.
+  function muerde() {
+    yo.cd = MORDISCO.cad; yo.rec = 1;
+    const dv = DIRS[yo.d], l = hyp(dv[0], dv[1]);
+    const px = yo.x + dv[0] / l * 14, py = yo.y + dv[1] / l * 14;
+    yo.av = Math.atan2(dv[1], dv[0]);
+    for (const [u, r] of R) if (r.v && rival(u) && dist(px, py, r.x, r.y) < MORDISCO.alc) {
+      golpeaJugador(u, MORDISCO.d, 8); fx.sangre(r.x, r.y, yo.av, 6); son('mordida');
+      break;
+    }
   }
   function gasta() {
     if (yo.w === 0 || yo.ammo[yo.w] === Infinity || yo.dorada > 0 || mut('municion')) return;   // la furia dorada no gasta
@@ -1450,8 +1470,9 @@
         }
       } else {
         const n0 = dir.n;
-        dir.t += dt; dir.n = 1 + Math.floor(dir.t / 60); dir.q = 1;
+        dir.t += dt; dir.n = 1 + Math.floor(dir.t / 60); dir.q = infectado() ? 0 : 1;   // en el infectado no hay horda
         if (dir.n !== n0) reponBarriles();
+        if (infectado() && dir.t >= AGUANTE_T && T - (dir.aguantaT ?? -99) > 6) { dir.aguantaT = T; enviar('aguanta'); }
       }
       dir.ritmo -= dt;
       const cupo = Math.round(D.maxVivos(dir.n, np) * (versus() ? 0.5 : 1) * (mutD().cuantos ? 0.6 : 1));
@@ -1663,7 +1684,7 @@
   function config(m) {
     if (cfg) return;
     cfg = {
-      yo: String(m.yo || ''), mirando: !!m.mirando, variante: ['versus', 'jefes', 'equipos'].includes(m.variante) ? m.variante : 'coop', mut: D.mutador(m.mut),
+      yo: String(m.yo || ''), mirando: !!m.mirando, variante: ['versus', 'jefes', 'equipos', 'infectado'].includes(m.variante) ? m.variante : 'coop', mut: D.mutador(m.mut),
       equipos: m.equipos && typeof m.equipos === 'object' ? Object.fromEntries(Object.entries(m.equipos).filter(([, e]) => e === 'rojo' || e === 'azul')) : null,
       mapa: D.mapaValido(m.mapa), meta: m.meta | 0, semilla: m.semilla | 0,
       jugadores: (m.jugadores || []).map((j, i) => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador'), orden: Number.isInteger(j.orden) ? j.orden : i })),
@@ -1803,8 +1824,14 @@
       nivel: Math.max(1, m.nivel | 0), caidos: Array.isArray(m.caidos) ? m.caidos : [], bajas: m.bajas || {},
       muertes: m.muertes || {}, puntos: m.puntos || {}, fuera: Array.isArray(m.fuera) ? m.fuera : [], meta: m.meta | 0, fin: m.fin || null,
       puntosEq: m.puntosEq && typeof m.puntosEq === 'object' ? m.puntosEq : null,
+      infectados: Array.isArray(m.infectados) ? m.infectados.map(String) : [],
     };
     if (!cfg) return;
+    if (infectado() && esZombi(cfg.yo) && !(antes.infectados || []).includes(cfg.yo)) {
+      const cero = !(marcador.muertes || {})[cfg.yo];
+      banner(cero ? 'ERES EL PACIENTE CERO · MUERDE' : 'TE INFECTARON · AHORA MUERDES'); son('gemido');
+      yo.hp = Math.min(hpMax(), yo.hp + 60);
+    }
     const b = (marcador.bajas || {})[cfg.yo] | 0;
     if (versus() && b > misBajas) { premio(equipos() ? '¡Baja para tu equipo!' : '¡Baja! ' + b + ' de ' + (cfg.meta || marcador.meta)); son('premio'); }
     misBajas = b;
@@ -1825,7 +1852,8 @@
     terminado = true;
     let txt;
     const g = f.ganador || '';
-    if (equipos()) txt = g ? (g === 'eq:' + equipoDe(cfg.yo) ? '¡Ganó tu equipo!' : 'Gana el equipo ' + (g === 'eq:rojo' ? 'Rojo' : 'Azul') + '.') : 'Terminó sin ganador.';
+    if (infectado()) txt = g === 'eq:humanos' ? (esZombi(cfg.yo) ? 'Los humanos aguantaron.' : '¡Aguantaste! Ganan los humanos.') : g === 'eq:infectados' ? (esZombi(cfg.yo) ? '¡Infectaron a todos!' : 'Te alcanzaron: ganan los infectados.') : 'Terminó sin ganador.';
+    else if (equipos()) txt = g ? (g === 'eq:' + equipoDe(cfg.yo) ? '¡Ganó tu equipo!' : 'Gana el equipo ' + (g === 'eq:rojo' ? 'Rojo' : 'Azul') + '.') : 'Terminó sin ganador.';
     else if (versus()) txt = g ? (g === cfg.yo ? '¡Ganaste el versus!' : 'Gana ' + nombreDe(g) + '.') : 'Terminó sin ganador.';
     else txt = 'Cayeron todos en el nivel ' + (f.nivel || marcador.nivel) + '. ' +
       (g ? (g === cfg.yo ? '¡Hiciste más puntos que nadie!' : 'Más puntos: ' + nombreDe(g) + '.') : '');
@@ -1956,7 +1984,7 @@
     if (yo.mov) {
       const quieta = fija || mira >= 0;
       if (!quieta) yo.d = D.dirDe(dx, dy);
-      const l = hyp(dx, dy), v = 110 * vel * (quieta ? 0.88 : 1) * (1 + 0.07 * vt('pies'));
+      const l = hyp(dx, dy), v = 110 * vel * (quieta ? 0.88 : 1) * (1 + 0.07 * vt('pies')) * (esZombi(cfg.yo) ? 1.2 : 1);
       mover(yo, dx / l * v * dt, dy / l * v * dt, 9);
     }
     if (en.disp) dispara();
@@ -2294,11 +2322,13 @@
     cx.fillStyle = El ? El.color : VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9.5, hy, 19 * clamp(e.hp / e.max, 0, 1), 2.5);
   }
   // Un jugador: anillo de su color en el suelo y el modelo con el arma en la mano.
-  function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t, nv) {
+  function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t, nv, zombi) {
     cx.strokeStyle = color; cx.lineWidth = 1.6; cx.globalAlpha = 0.85;
     cx.beginPath(); cx.ellipse(x, y, 12.5, 6, 0, 0, 7); cx.stroke();
     cx.globalAlpha = 1;
-    G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC, nivel: nv || 0 });
+    // un infectado se ve como un zombi, sin arma
+    if (zombi) G.humanoide(cx, x, y, ang, G.PAL_E[0], { t, mov, atk: rec, talla: ESC });
+    else G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC, nivel: nv || 0 });
   }
 
   let camX = 0, camY = 0, W = 0, H = 0, esc = 1, dpr = 1, leadX = 0, leadY = 0;
@@ -2347,7 +2377,7 @@
     for (const e of E.values()) lista.push({ y: e.y, f: () => dibujaEnemigo(e) });
     for (const [u, r] of R) {
       if (!r.v) { lista.push({ y: r.y, f: () => G.tumba(cx, r.x, r.y) }); continue; }
-      lista.push({ y: r.y, f: () => dibujaJugador(r.x, r.y, r.av ?? angDir(r.d), r.sk, r.mv, r.w, r.rec || 0, colorDe(u), T + ordenDe(u), r.nv) });
+      lista.push({ y: r.y, f: () => dibujaJugador(r.x, r.y, r.av ?? angDir(r.d), r.sk, r.mv, r.w, r.rec || 0, colorDe(u), T + ordenDe(u), r.nv, esZombi(u)) });
     }
     const veoYo = cfg && !cfg.mirando && yo.v && !yo.muerto;
     if (cfg && !cfg.mirando && (yo.v || yo.muerto)) {
@@ -2355,7 +2385,7 @@
         if (yo.fija) flechaFija();
         if (yo.inv > 0 && Math.floor(T * 12) % 2) return;
         if (yo.dorada > 0) G.brilla(cx, G.sprites().brillo, yo.x, yo.y - 16, 30, 0.35 + 0.2 * Math.sin(T * 12));
-        dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w]);
+        dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w], esZombi(cfg.yo));
       } });
       else lista.push({ y: yo.y, f: () => G.tumba(cx, yo.x, yo.y) });
     }
@@ -2650,7 +2680,11 @@
     if (!versus() && quedan === 5 && quedanAntes > 5 && dir.q === 0) son('quedan');
     quedanAntes = quedan;
     const pe = marcador.puntosEq || {};
-    $('nivel').innerHTML = equipos()
+    const humanos = jugadores().filter(j => !(marcador.fuera || []).includes(j.uid) && !esZombi(j.uid)).length;
+    const resta = Math.max(0, Math.ceil(AGUANTE_T - dir.t));
+    $('nivel').innerHTML = infectado()
+      ? (esZombi(cfg.yo) ? '<b style="color:' + COLOR_EQ.infectados + '">Infectado</b>' : 'Humano') + ' · quedan <b>' + humanos + '</b> · ' + Math.floor(resta / 60) + ':' + String(resta % 60).padStart(2, '0')
+      : equipos()
       ? '<b style="color:' + COLOR_EQ.rojo + '">Rojo ' + (pe.rojo | 0) + '</b> · <b style="color:' + COLOR_EQ.azul + '">Azul ' + (pe.azul | 0) + '</b> · a ' + (marcador.meta || cfg.meta || 20)
       : versus()
       ? 'Versus · <b>' + ((marcador.bajas || {})[cfg.yo] | 0) + '</b> de ' + (cfg.meta || marcador.meta || 10)

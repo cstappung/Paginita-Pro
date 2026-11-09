@@ -699,3 +699,49 @@ test('boxhead en línea por equipos: las balas atraviesan al compañero y hieren
  assert.ok(golpes.some(g=>g[1]==='b'),'hiere al rival');
  assert.ok(!golpes.some(g=>g[1]==='c'),'no al compañero');
 });
+test('boxhead infectado: el paciente cero sale de la semilla y quien muere humano se infecta',()=>{
+ const p=sala(3,{variante:'infectado',semilla:4});let e=reducir(p);   // 4 % 3 = 1: b
+ assert.deepEqual(copia(e.infectados),['b']);assert.equal(minimoDe(p),2);
+ assert.deepEqual(copia(e.equipos),{a:'humanos',b:'infectados',c:'humanos'});
+ e=mover(p,{t:'muere',uid:'b',por:'a',a:1});
+ assert.equal(e.bajas.a,1,'un humano baja a un infectado');assert.deepEqual(copia(e.infectados),['b']);
+ e=mover(p,{t:'muere',uid:'a',por:'b',a:8});
+ assert.equal(e.bajas.b,1);assert.deepEqual(copia(e.infectados).sort(),['a','b']);
+ assert.ok(e.hist.some(h=>h.e==='infecta'&&h.uid==='b'&&h.v==='a'));
+ e=mover(p,{t:'muere',uid:'b',por:'a',a:8});assert.equal(e.bajas.a,1,'entre infectados no cuenta');
+ // c muere solo (un barril propio): también se infecta, y ya no queda humano
+ e=mover(p,{t:'muere',uid:'c',por:'c',a:3});
+ assert.equal(e.ganador,'eq:infectados');assert.equal(e.motivo,'infectados');
+ assert.ok(context.ganoEn(p,'eq:infectados','c'));
+ // el aguante a tiempo da la partida a los humanos
+ const q=sala(3,{variante:'infectado',semilla:0});
+ mover(q,{t:'muere',uid:'b',por:'a',a:8});e=mover(q,{t:'aguanta',uid:'b'});
+ assert.equal(e.ganador,'eq:humanos');assert.equal(e.motivo,'aguante');
+ assert.ok(context.ganoEn(q,'eq:humanos','c')&&!context.ganoEn(q,'eq:humanos','b'));
+ // si se van todos los infectados, ganan los humanos
+ const w=sala(3,{variante:'infectado',semilla:0});e=mover(w,{t:'abandona',uid:'a'});
+ assert.equal(e.ganador,'eq:humanos');assert.equal(e.motivo,'abandono');
+});
+test('boxhead en línea infectado: el infectado muerde, no hay horda y a los 3 minutos se pide el aguante',()=>{
+ const js=[{uid:'a',nombre:'A',orden:0},{uid:'b',nombre:'B',orden:1}];
+ let {bx,env,llega}=boxheadEnLinea('infectado',0,{jugadores:js});
+ llega({tipo:'marcador',nivel:1,caidos:[],bajas:{},muertes:{},puntos:{},fuera:[],meta:10,fin:null,infectados:['a']});
+ bx.inmortal(true);bx.paso(1/60);
+ let yo=bx.mundo().yo;
+ llega({tipo:'vivo',v:{b:{x:yo.x+20,y:yo.y,v:true,hp:100}}});
+ bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:true,disp:true});
+ for(let i=0;i<40;i++)bx.paso(1/60);
+ const golpes=env.filter(m=>m.tipo==='estado'&&m.e&&m.e.g).flatMap(m=>m.e.g);
+ assert.ok(golpes.some(g=>g[1]==='b'&&g[3]===8),'muerde');
+ assert.ok(!golpes.some(g=>g[1].startsWith('e:')));
+ assert.equal(bx.estado().yo.ammo[1],D.ARMAS[1].ini,'no dispara');
+ // un humano, quien dirige: sin enemigos, y el aguante a los 180 s
+ ({bx,env,llega}=boxheadEnLinea('infectado',0,{jugadores:js}));
+ llega({tipo:'marcador',nivel:1,caidos:[],bajas:{},muertes:{},puntos:{},fuera:[],meta:10,fin:null,infectados:['b']});
+ bx.inmortal(true);
+ for(let i=0;i<60*179;i++)bx.paso(1/60);
+ assert.equal(bx.mundo().E.length,0,'sin horda');
+ assert.ok(!env.some(m=>m.tipo==='aguanta'));
+ for(let i=0;i<60*2;i++)bx.paso(1/60);
+ assert.ok(env.some(m=>m.tipo==='aguanta'));
+});

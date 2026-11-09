@@ -53,7 +53,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     }
     enviar("marcador", {
       nivel: est.nivel || 1, caidos: est.caidos || [], bajas: est.bajas || {}, muertes: est.muertes || {},
-      puntos: est.puntos || {}, fuera: Object.keys(est.fuera || {}), meta: est.meta, puntosEq: est.puntosEq || null,
+      puntos: est.puntos || {}, fuera: Object.keys(est.fuera || {}), meta: est.meta, puntosEq: est.puntosEq || null, infectados: est.infectados || null,
       fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "", nivel: est.nivel || 1 } : null
     });
   }
@@ -76,6 +76,8 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       anota({ t: "nivel", uid, n: d.n });
     } else if (d.tipo === "revive" && typeof d.v === "string" && d.v.length <= 64) {
       anota({ t: "revive", uid, v: d.v });
+    } else if (d.tipo === "aguanta" && est.variante === "infectado") {
+      anota({ t: "aguanta", uid });
     }
   }
 
@@ -149,7 +151,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     const n = est.jugadores.length, cupo = est.cupo || n;
     aviso.hidden = !!est.listos;
     aviso.textContent = est.listos ? "" : "Esperando jugadores… " + n + " de " + cupo +
-      (n >= (est.variante === "versus" || est.variante === "equipos" ? 2 : 1) ? " · el anfitrión puede empezar ya" : "");
+      (n >= (["versus", "equipos", "infectado"].includes(est.variante) ? 2 : 1) ? " · el anfitrión puede empezar ya" : "");
   }
 
   function montar(el) {
@@ -168,7 +170,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-21";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-22";
     host.append(aviso, redEl, frame);
   }
 
