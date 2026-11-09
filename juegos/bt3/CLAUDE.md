@@ -433,7 +433,7 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
 
 The owner wants BT3 **only for a list of friends** (who own the game), and without anyone choosing an ISO.
 
-- **The list lives in one place**: the Worker's `AMIGOS` variable (Google emails, verified by Google in the token, or Firebase uids; comma-separated) in
+- **The list lives in the Worker** (the owner's variable plus the admins' list, below): the Worker's `AMIGOS` variable (Google emails, verified by Google in the token, or Firebase uids; comma-separated) in
   `fuente/disco/worker.js`, deployed by hand in the owner's Cloudflare dashboard (one file, no build). The
   Worker serves the ISO from an R2 bucket (`DISCO`) in 1 MiB pieces (`pieza/NNNNN.bin` + `indice.json`) only to
   a request carrying a **valid Firebase ID token** (RS256 checked against Google's JWKs, `aud`/`iss` =
@@ -457,9 +457,18 @@ The owner wants BT3 **only for a list of friends** (who own the game), and witho
   `juegos/ocultos.js`: the coins table, the shop's champion prize). A BT3 room opened by link shows only «Sala
   privada» — no players, no chat, no «Unirse» — and `entrar()` refuses it. `tests/bt3.test.cjs` pins these gates:
   a new view that lists games must go through `bt3Visible()` or `juegoOculto()`.
-- **Adding a friend is only the Worker's `AMIGOS`** (Cloudflare → Variables → save): nothing in Firebase. They must
-  sign in with that Google account and reload the page (`/soy` is asked once per session). The page's admins
-  (`admins/<uid>`) are not friends by being admins.
+- **Two ways to add a friend, both in the Worker, nothing in Firebase.** The owner's `AMIGOS` variable (Cloudflare →
+  Variables → save), and since November 2026 **the admins' list**: `/amigos` (GET, PUT/DELETE `{uid}`), driven from
+  the admin panel's «Juegos privados» tab (`admin.js` `privadosHtml`, through `listaAmigosBt3`/`cambiaAmigoBt3` in
+  `bt3-amigos.js`). Each friend is an R2 object `amigos/<uid>` in `DISCO` (one per friend, so two admins cannot
+  overwrite each other; `customMetadata.por` = who added them). The Worker decides who is an admin by asking the
+  site's database for `admins/<uid>` **with the caller's own token** (the rules let each account read only its own
+  entry; only the boolean `true` counts), so there is no second admin list and no new secret. Both answers are
+  remembered in memory (admin 60 s, friend 60 s, «not a friend» 20 s): removing someone can take a minute, and
+  Firebase or R2 failing means «no». Admins cannot see or remove the owner's `AMIGOS` (emails never leave the
+  Worker, only their count). A friend must reload the page (`/soy` is asked once per session). The page's admins
+  (`admins/<uid>`) are still not friends by being admins: they add themselves. **The owner must redeploy
+  `worker.js`**; an old Worker answers 404 and the tab says so. Pinned in `tests/bt3-disco.test.cjs`.
 - Honest limit: the lobby query still downloads waiting BT3 rooms to every signed-in browser (hidden in the UI), and
   the rules let any signed-in user create one from the console. Only the disc is truly locked (the Worker). BT3 rooms are never announced on Discord; they are in
   `enCurso` (juego and names only) so friends can watch, and only friends are shown them. This hides the game; the page files are public like the whole site (they hold nothing of the

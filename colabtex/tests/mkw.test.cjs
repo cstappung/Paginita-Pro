@@ -287,7 +287,7 @@ test('el marco recibe el token de Firebase para el Worker de amigos, solo él y 
  assert.match(src,/d\.tipo === "token"[\s\S]{0,200}getIdToken\(!!d\.nuevo\)[\s\S]{0,200}postMessage\(\{ canal: PADRE, tipo: "token"/);
  // y el Worker de BT3 tiene las rutas de Mario Kart detrás de la misma lista de amigos
  const w=fs.readFileSync(raiz('../juegos/bt3/fuente/disco/worker.js'),'utf8');
- assert.match(w,/if \(!esta\) return responde\("sin acceso", 403, c\);[\s\S]{0,200}if \(deMkw\) return mkw\(/,'primero la lista, después /mkw/');
+ assert.match(w,/if \(!\(await esAmigo\(quien, env\)\)\) return responde\("sin acceso", 403, c\);[\s\S]{0,200}if \(deMkw\) return mkw\(/,'primero la lista, después /mkw/');
 });
 
 test('las partidas de cada uno van a Storage (mkw/<uid>/partidas.mkwp): solo su dueño, y el marco las recibe antes de leerlas',()=>{

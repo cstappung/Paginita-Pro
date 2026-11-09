@@ -52,6 +52,13 @@ not the key: every write is re-checked by the rules. The tabs:
   their open tab) and admins read the whole list (`watchBetaTesters`). It is
   the same picker and buttons as Serie 01. Admins must add themselves too.
   Details: `juegos/prokingdoms/CLAUDE.md`.
+- **Juegos privados**: who sees and plays BT3 and Mario Kart Wii. The only
+  tab that is **not Firebase**: the list lives in the disc Worker (`/amigos`),
+  which checks `admins/<uid>` itself; `ctx.amigos` = `{lista, cambia}` comes
+  from `bt3-amigos.js`. Loaded when the tab opens (each load is a Worker
+  call), two lists over `cuentas()` — in (Quitar) and not in (Agregar, capped
+  at `PRIV_TOPE` rows) — with a name filter. Details and limits:
+  `juegos/bt3/CLAUDE.md`, «Friends only».
 - **Economía**: the economy cierre (`docs/claude/juegos/perfiles-y-economia.md`,
   «closed by periods»). *Preparar cierre* computes it up to a day ago,
   checks it (`verificaCierre`) and only then offers *Cerrar y archivar*;
