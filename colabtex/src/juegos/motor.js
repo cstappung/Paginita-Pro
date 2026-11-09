@@ -277,7 +277,7 @@ export function novedades(n = 3) {
 export function minimoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
   if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
-  if (p && p.juego === "boxhead" && varianteBoxhead(p) === "versus") return 2;
+  if (p && p.juego === "boxhead" && (varianteBoxhead(p) === "versus" || varianteBoxhead(p) === "equipos")) return 2;
   if (p && p.juego === "bt3" && cupoDe(p) <= 2) return 2;   // el duelo de BT3 es de dos; el torneo, desde uno (con CPU)
   if (p && p.juego === "pool") return plCupo(p) === 4 ? 4 : 2;   // 2 contra 2 no empieza hasta que están los cuatro
   return j.minimo || 2;
@@ -1148,6 +1148,7 @@ export function progreso(est, juego) {
     return c(lider / (est.meta || YM_META));
   }
   /* En Boxhead cooperativo, cuántos están caídos; en versus, la meta. */
+  if (juego === "boxhead" && est.puntosEq) return c(Math.max(est.puntosEq.rojo, est.puntosEq.azul) / (est.meta || 2 * BX_METAS[1]));
   if (juego === "boxhead" && est.variante !== "versus") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
   if (juego === "boxhead" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || BX_METAS[1]));
   /* En HaxBall, cuánto le falta al equipo que va ganando. */
@@ -1344,7 +1345,7 @@ export function ganoEn(p, ganador, uid) {
   if (!ganador || !uid) return false;
   if (ganador === uid) return true;
   if (!String(ganador).startsWith("eq:") || !p) return false;
-  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : p.juego === "pool" ? equiposPool(p) : null;
+  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : p.juego === "pool" ? equiposPool(p) : p.juego === "boxhead" ? equiposBoxhead(p) : null;
   return !!eq && eq[uid] === ganador.slice(3);
 }
 
@@ -6831,6 +6832,11 @@ function ajRepasa(bandos, jug, ritmo = null) {
      quien la escribe y una baja a `por` si es otro jugador que sigue en la
      sala. El primero en llegar a la meta gana; si queda uno solo, gana por
      abandono. Matarse uno mismo (un barril propio) no le da baja a nadie.
+   - **Versus por equipos** (`equipos`, Fase 3.5, de 2 a 8): rojo los
+     asientos pares y azul los impares (`equiposBoxhead`). Una baja vale
+     solo si `por` es del otro equipo y suma a `puntosEq`; gana el primer
+     equipo en llegar al doble de la meta (`"eq:rojo"`/`"eq:azul"`) o el
+     que queda si el otro se va entero.
    - **Modo jefes** (`jefes`, Fase 3.5): el registro y el final son los del
      cooperativo (niveles, caídos, revivir); lo distinto lo hace el juego:
      cada nivel es un jefe de la rotación (el nivel n de la sala simula el
@@ -6842,7 +6848,7 @@ function ajRepasa(bandos, jug, ritmo = null) {
 
    Nadie puede escribir una baja para sí mismo; el límite honesto es que un
    cliente modificado podría negarse a morir. */
-export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus", jefes: "Modo jefes" };
+export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus", equipos: "Versus por equipos", jefes: "Modo jefes" };
 export const BX_MUTADORES = { sangre: "Sed de sangre (cada baja cura)", cristal: "Cristal (pegas y recibes el doble)", veloz: "Horda veloz", municion: "Munición sin fin", blindados: "Blindados (la mitad, con el triple de vida)" };
 export const BX_METAS = [5, 10, 20];
 export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto", planta: "Planta", hangar: "Hangar", fabrica: "Fábrica", apagon: "Apagón" };
@@ -6856,13 +6862,21 @@ export const mapaBoxhead = p => tiene(BX_MAPAS, p && p.mapa) ? p.mapa : "patio";
 export const mutBoxhead = p => tiene(BX_MUTADORES, p && p.mut) ? p.mut : "";
 export function metaBoxhead(p) {
   const m = Math.floor(Number(p && p.meta));
-  return BX_METAS.includes(m) ? m : BX_METAS[1];
+  return (BX_METAS.includes(m) ? m : BX_METAS[1]) * (varianteBoxhead(p) === "equipos" ? 2 : 1);
+}
+/* El equipo de cada uno en el versus por equipos (por asiento); `null` en las otras variantes. */
+export function equiposBoxhead(p, js = jugadoresDe(p)) {
+  if (varianteBoxhead(p) !== "equipos") return null;
+  const eq = {};
+  js.forEach((j, i) => { eq[j.uid] = i % 2 ? "azul" : "rojo"; });
+  return eq;
 }
 
 export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const variante = varianteBoxhead(p), meta = metaBoxhead(p), mapa = mapaBoxhead(p);
-  const coop = variante !== "versus";   // el modo jefes lleva el registro del cooperativo
+  const coop = variante !== "versus" && variante !== "equipos";   // el modo jefes lleva el registro del cooperativo
+  const eq = equiposBoxhead(p, js), puntosEq = { rojo: 0, azul: 0 };
   const entero = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
   const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {}, revividas = {};
   for (const u of ids) { bajas[u] = 0; muertes[u] = 0; pts[u] = 0; kills[u] = 0; }
@@ -6923,14 +6937,19 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
     if (j.t !== "muere") continue;
     muertes[u]++;
     const k = j.por;
-    const vale = typeof k === "string" && ids.has(k) && k !== u && !fuera[k];
+    const vale = typeof k === "string" && ids.has(k) && k !== u && !fuera[k] && (!eq || eq[k] !== eq[u]);
     hist.push({ e: "baja", uid: vale ? k : "", v: u, a: entero(j.a, BX_ARMAS + 1) });
     if (!vale) continue;
     bajas[k]++;
-    if (bajas[k] >= meta) { ganador = k; motivo = "meta"; }
+    if (eq) { if (++puntosEq[eq[k]] >= meta) { ganador = "eq:" + eq[k]; motivo = "equipo"; } }
+    else if (bajas[k] >= meta) { ganador = k; motivo = "meta"; }
   }
   const activos = js.filter(j => !fuera[j.uid]);
-  if (ganador === null && listos && !coop && activos.length <= 1) {
+  if (ganador === null && listos && eq) {
+    const quedan = [...new Set(activos.map(j => eq[j.uid]))];
+    if (quedan.length <= 1) { ganador = quedan.length ? "eq:" + quedan[0] : ""; motivo = "abandono"; }
+  }
+  else if (ganador === null && listos && !coop && activos.length <= 1) {
     ganador = activos.length ? activos[0].uid : "";
     motivo = "abandono";
   }
@@ -6939,7 +6958,7 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
     variante, meta, mapa, nivel, mut: mutBoxhead(p),
     caidos: Object.keys(caidos).filter(u => !fuera[u]),
-    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera, revividas,
+    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera, revividas, equipos: eq, puntosEq: eq ? puntosEq : null,
     hist: hist.slice(-40), ganador: ganador === null ? null : ganador, motivo
   };
 }

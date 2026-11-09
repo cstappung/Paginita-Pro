@@ -618,7 +618,7 @@ test('boxhead coop (Fase 3.5): un compañero en pie revive al caído',()=>{
 });
 
 /* Fase 3.5: modo jefes y mutadores, solo en las salas en línea. */
-function boxheadEnLinea(variante,mut){
+function boxheadEnLinea(variante,mut,extra={}){
  const env=[];let oyente=null;
  const parent={postMessage:m=>env.push(m)};
  const ctx={console,Math,JSON,Date,Map,Set,Array,Object,Number,String,Boolean,Symbol,Proxy,Error,Int32Array,Float32Array,Uint8Array,URLSearchParams,Infinity,NaN,isFinite,parseInt,parseFloat,
@@ -626,7 +626,7 @@ function boxheadEnLinea(variante,mut){
  vm.createContext(ctx);
  for(const f of ['sin-pantalla.js','datos.js','juego.js'])vm.runInContext(fs.readFileSync(RAIZ+f,'utf8'),ctx,{filename:f});
  const llega=m=>oyente({source:parent,origin:'http://x',data:Object.assign({canal:'boxhead-padre'},m)});
- llega({tipo:'config',yo:'a',variante,mut,mapa:'patio',meta:10,semilla:7,jugadores:[{uid:'a',nombre:'A',orden:0}]});
+ llega(Object.assign({tipo:'config',yo:'a',variante,mut,mapa:'patio',meta:10,semilla:7,jugadores:[{uid:'a',nombre:'A',orden:0}]},extra));
  llega({tipo:'marcador',nivel:1,caidos:[],bajas:{},muertes:{},puntos:{},fuera:[],meta:10,fin:null});
  return {bx:ctx.__boxhead,env,llega};
 }
@@ -668,4 +668,34 @@ test('boxhead en línea: el modo jefes abre con el jefe y su escolta; blindados 
  bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:false,disp:true});
  for(let i=0;i<60;i++)bx.paso(1/60);
  assert.equal(bx.estado().yo.ammo[1],antes,'no gasta');
+});
+
+test('boxhead versus por equipos: rojo y azul por asiento, sin bajas entre compañeros',()=>{
+ const p=sala(4,{variante:'equipos',meta:5});let e=reducir(p);
+ assert.deepEqual(copia(e.equipos),{a:'rojo',b:'azul',c:'rojo',d:'azul'});
+ assert.equal(e.meta,10,'el doble de la meta');assert.equal(minimoDe(p),2);
+ e=mover(p,{t:'muere',uid:'c',por:'a',a:1});
+ assert.equal(e.bajas.a,0,'a un compañero no cuenta');assert.equal(e.puntosEq.rojo,0);
+ for(let i=0;i<5;i++)e=mover(p,{t:'muere',uid:'b',por:'a',a:1});
+ for(let i=0;i<4;i++)e=mover(p,{t:'muere',uid:'d',por:'c',a:1});
+ assert.equal(e.puntosEq.rojo,9);assert.equal(e.fase,'jugando');
+ e=mover(p,{t:'muere',uid:'b',por:'c',a:1});
+ assert.equal(e.ganador,'eq:rojo');assert.equal(e.motivo,'equipo');
+ assert.ok(context.ganoEn(p,'eq:rojo','c')&&!context.ganoEn(p,'eq:rojo','b'));
+ // si el otro equipo se va entero, gana el que queda
+ const q=sala(3,{variante:'equipos'});
+ e=mover(q,{t:'abandona',uid:'b'});
+ assert.equal(e.ganador,'eq:rojo');assert.equal(e.motivo,'abandono');
+});
+test('boxhead en línea por equipos: las balas atraviesan al compañero y hieren al rival',()=>{
+ const js=[{uid:'a',nombre:'A',orden:0},{uid:'b',nombre:'B',orden:1},{uid:'c',nombre:'C',orden:2}];
+ const {bx,env,llega}=boxheadEnLinea('equipos',0,{jugadores:js,equipos:{a:'rojo',b:'azul',c:'rojo'}});
+ bx.inmortal(true);bx.paso(1/60);
+ const yo=bx.mundo().yo;
+ llega({tipo:'vivo',v:{c:{x:yo.x+30,y:yo.y,v:true,hp:100},b:{x:yo.x+60,y:yo.y,v:true,hp:100}}});
+ bx.elige(0);bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:true,disp:true});
+ for(let i=0;i<40;i++)bx.paso(1/60);
+ const golpes=env.filter(m=>m.tipo==='estado'&&m.e&&m.e.g).flatMap(m=>m.e.g);
+ assert.ok(golpes.some(g=>g[1]==='b'),'hiere al rival');
+ assert.ok(!golpes.some(g=>g[1]==='c'),'no al compañero');
 });

@@ -438,8 +438,18 @@
   const fueraSet = () => new Set(marcador.fuera || []);
   const nombreDe = u => (jugadores().find(j => j.uid === u) || {}).nombre || 'Jugador';
   const ordenDe = u => { const j = jugadores().find(j => j.uid === u); return j ? j.orden : 0; };
-  const colorDe = u => PALETA[ordenDe(u) % PALETA.length];
-  const versus = () => cfg && cfg.variante === 'versus';
+  /* Versus por equipos (Fase 3.5): es un versus (todas las armas, volver a
+     los 3 s, menos enemigos) en el que los del mismo equipo no se hieren.
+     El equipo de cada uno llega en la config (`cfg.equipos`) y pinta su
+     color: el nombre, el marcador y el «¡Aquí!». */
+  const COLOR_EQ = { rojo: '#ff5a4d', azul: '#4da3ff' };
+  const equipos = () => !!cfg && cfg.variante === 'equipos';
+  const equipoDe = u => (equipos() && cfg.equipos ? cfg.equipos[u] || '' : '');
+  const aliado = (a, b) => !!equipoDe(a) && equipoDe(a) === equipoDe(b);
+  const colorDe = u => COLOR_EQ[equipoDe(u)] || PALETA[ordenDe(u) % PALETA.length];
+  const versus = () => !!cfg && (cfg.variante === 'versus' || cfg.variante === 'equipos');
+  // ¿Mis balas hieren a `u`? En versus sí; por equipos, solo a los del otro.
+  const rival = u => versus() && !aliado(u, cfg.yo);
   // Modo jefes (Fase 3.5): reglas de cooperativo, pero cada nivel es un jefe.
   const jefes = () => !!cfg && cfg.variante === 'jefes';
   // El mutador de la sala (solo en línea); `mut('cristal')`, o el dato con `mutD()`.
@@ -480,7 +490,8 @@
     $('menu').hidden = true; $('pausa').hidden = true; $('fin').hidden = true; $('hud').hidden = false;
     if (!cfg.mirando) aparece();
     pintaArmas(true);
-    if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
+    if (equipos()) banner('POR EQUIPOS · ' + (equipoDe(cfg.yo) === 'rojo' ? 'ROJO' : 'AZUL') + ' · ' + (cfg.meta || 20) + ' BAJAS');
+    else if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
     else if (jefes()) banner('MODO JEFES');
     if (cfg.mut) premio('Mutador: ' + mutD().nombre + ' · ' + mutD().txt);
   }
@@ -646,7 +657,7 @@
       }
       if (pega) break;
       if (versus()) {
-        for (const [u, r] of R) if (r.v && (px - r.x) ** 2 + (py - r.y) ** 2 < 121) { golpeaJugador(u, d, w); fx.sangre(r.x, r.y, ang, 5); pega = true; break; }
+        for (const [u, r] of R) if (r.v && rival(u) && (px - r.x) ** 2 + (py - r.y) ** 2 < 121) { golpeaJugador(u, d, w); fx.sangre(r.x, r.y, ang, 5); pega = true; break; }
         if (pega) break;
       }
     }
@@ -676,7 +687,7 @@
       golpeaEnemigo(e, a.d, a.id, x, y); pego = true;
     }
     if (versus()) for (const [u, r] of R) {
-      if (!r.v) continue;
+      if (!r.v || !rival(u)) continue;
       const dx = r.x - x, dy = r.y - y, l = hyp(dx, dy);
       if (l < 1 || l > a.alc || Math.acos(clamp((dx * cs + dy * sn) / l, -1, 1)) > med || !despejado(x, y, r.x, r.y)) continue;
       golpeaJugador(u, a.d, a.id);
@@ -756,7 +767,7 @@
           }
           pega = true; break;
         }
-        if (!pega && versus() && p.mio) for (const r of R.values()) if (r.v && dist(p.x, p.y, r.x, r.y) < 12) { pega = true; break; }
+        if (!pega && versus() && p.mio) for (const [u, r] of R) if (r.v && rival(u) && dist(p.x, p.y, r.x, r.y) < 12) { pega = true; break; }
         if (pega) { p.fin = true; if (p.mio) explota(p.x - p.vx * dt * 0.5, p.y - p.vy * dt * 0.5, p.r, p.d, p.w, p.id); }
       }
     }
@@ -851,6 +862,8 @@
   }
   function golpeaJugador(u, d, w, por) {
     if (d <= 0) return;
+    const de = por === undefined ? cfg.yo : por;
+    if (de && de !== u && aliado(de, u)) return;     // por equipos no hay fuego amigo
     misG.push([nid(), u, Math.round(d * 10) / 10, w, por === undefined ? cfg.yo : por]);
   }
   // Del director a un jugador (mordida, fuego, una explosión de barril).
@@ -863,6 +876,7 @@
   function recibe(d, w, por) {
     if (!yo.v || yo.muerto || terminado || d <= 0) return;
     if (yo.inv > 0 && por !== cfg.yo) return;
+    if (por && por !== cfg.yo && aliado(por, cfg.yo)) return;   // ni lo que llega de un compañero
     d *= mutD().recibe || 1;
     // La armadura se come una parte del golpe hasta gastarse.
     if (yo.arm > 0) { const ab = Math.min(yo.arm, d * D.ARMADURA.absorbe); yo.arm -= ab; d -= ab; }
@@ -1649,7 +1663,8 @@
   function config(m) {
     if (cfg) return;
     cfg = {
-      yo: String(m.yo || ''), mirando: !!m.mirando, variante: m.variante === 'versus' || m.variante === 'jefes' ? m.variante : 'coop', mut: D.mutador(m.mut),
+      yo: String(m.yo || ''), mirando: !!m.mirando, variante: ['versus', 'jefes', 'equipos'].includes(m.variante) ? m.variante : 'coop', mut: D.mutador(m.mut),
+      equipos: m.equipos && typeof m.equipos === 'object' ? Object.fromEntries(Object.entries(m.equipos).filter(([, e]) => e === 'rojo' || e === 'azul')) : null,
       mapa: D.mapaValido(m.mapa), meta: m.meta | 0, semilla: m.semilla | 0,
       jugadores: (m.jugadores || []).map((j, i) => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador'), orden: Number.isInteger(j.orden) ? j.orden : i })),
     };
@@ -1787,10 +1802,11 @@
     marcador = {
       nivel: Math.max(1, m.nivel | 0), caidos: Array.isArray(m.caidos) ? m.caidos : [], bajas: m.bajas || {},
       muertes: m.muertes || {}, puntos: m.puntos || {}, fuera: Array.isArray(m.fuera) ? m.fuera : [], meta: m.meta | 0, fin: m.fin || null,
+      puntosEq: m.puntosEq && typeof m.puntosEq === 'object' ? m.puntosEq : null,
     };
     if (!cfg) return;
     const b = (marcador.bajas || {})[cfg.yo] | 0;
-    if (versus() && b > misBajas) { premio('¡Baja! ' + b + ' de ' + (cfg.meta || marcador.meta)); son('premio'); }
+    if (versus() && b > misBajas) { premio(equipos() ? '¡Baja para tu equipo!' : '¡Baja! ' + b + ' de ' + (cfg.meta || marcador.meta)); son('premio'); }
     misBajas = b;
     if (!versus() && yo.muerto && !terminado) {
       if (marcador.caidos.includes(cfg.yo)) vistoCaido = true;
@@ -1809,7 +1825,8 @@
     terminado = true;
     let txt;
     const g = f.ganador || '';
-    if (versus()) txt = g ? (g === cfg.yo ? '¡Ganaste el versus!' : 'Gana ' + nombreDe(g) + '.') : 'Terminó sin ganador.';
+    if (equipos()) txt = g ? (g === 'eq:' + equipoDe(cfg.yo) ? '¡Ganó tu equipo!' : 'Gana el equipo ' + (g === 'eq:rojo' ? 'Rojo' : 'Azul') + '.') : 'Terminó sin ganador.';
+    else if (versus()) txt = g ? (g === cfg.yo ? '¡Ganaste el versus!' : 'Gana ' + nombreDe(g) + '.') : 'Terminó sin ganador.';
     else txt = 'Cayeron todos en el nivel ' + (f.nivel || marcador.nivel) + '. ' +
       (g ? (g === cfg.yo ? '¡Hiciste más puntos que nadie!' : 'Más puntos: ' + nombreDe(g) + '.') : '');
     $('finTxt').textContent = txt;
@@ -2632,7 +2649,10 @@
     const quedan = dir.q + E.size;
     if (!versus() && quedan === 5 && quedanAntes > 5 && dir.q === 0) son('quedan');
     quedanAntes = quedan;
-    $('nivel').innerHTML = versus()
+    const pe = marcador.puntosEq || {};
+    $('nivel').innerHTML = equipos()
+      ? '<b style="color:' + COLOR_EQ.rojo + '">Rojo ' + (pe.rojo | 0) + '</b> · <b style="color:' + COLOR_EQ.azul + '">Azul ' + (pe.azul | 0) + '</b> · a ' + (marcador.meta || cfg.meta || 20)
+      : versus()
       ? 'Versus · <b>' + ((marcador.bajas || {})[cfg.yo] | 0) + '</b> de ' + (cfg.meta || marcador.meta || 10)
       : (jefes() ? 'Jefe <b>' : 'Nivel <b>') + nivelObjetivo() + '</b> · quedan ' + quedan;
     pintaArmas(false);

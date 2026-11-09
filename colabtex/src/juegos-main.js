@@ -251,9 +251,9 @@ const OPCIONES = {
       valores: Object.keys(BX_VARIANTES).map(v => ({ v, t: BX_VARIANTES[v] })) },
     { clave: "mapa", etiqueta: "Mapa", por: "patio",
       valores: Object.keys(BX_MAPAS).map(v => ({ v, t: BX_MAPAS[v] })) },
-    /* La meta solo cuenta en versus: bajas para ganar. */
+    /* La meta solo cuenta en versus: bajas para ganar (por equipos, el doble, para el equipo). */
     { clave: "meta", etiqueta: "Bajas para ganar (versus)", por: BX_METAS[1],
-      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas" })) },
+      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas (" + 2 * n + " por equipos)" })) },
     /* Un mutador cambia una regla de la sala (Fase 3.5); 0 es ninguno (el vestíbulo lee "" como 0). */
     { clave: "mut", etiqueta: "Mutador", por: 0,
       valores: [{ v: 0, t: "Ninguno" }, ...Object.keys(BX_MUTADORES).map(v => ({ v, t: BX_MUTADORES[v] }))] }

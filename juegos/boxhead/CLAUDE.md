@@ -427,3 +427,22 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   so `VE` is unchanged.
 - Tests drive the iframe headless online (`boxheadEnLinea`): a fake
   `parent`, `?modo=online`, and the `config`/`marcador` messages.
+
+## Phase 3.5c: team versus (`boxhead-21`)
+
+- Variant `equipos`. The team is set by seat (even seats red, odd blue):
+  `equiposBoxhead` in motor.js. `ganoEn` knows it. The reducer returns
+  `equipos` and `puntosEq`.
+- The target is double the room `meta`, and a team wins by reaching it. A
+  kill counts only when `por` is on the other team. If one team leaves
+  entirely, the other wins.
+- In the game `versus()` is true for `equipos` too (all weapons, 3 s
+  respawn, fewer enemies). On top of that:
+  - `rival(u)` filters the bullet, flame and projectile loops, so bullets
+    pass through teammates.
+  - `golpeaJugador` and `recibe` drop anything coming from an ally
+    (`aliado`). Your own explosions still hurt you, at half.
+  - `colorDe` returns the team colour, so names, pings and the scoreboard
+    follow.
+- The postman passes `equipos` in the config and `puntosEq` in the
+  scoreboard.

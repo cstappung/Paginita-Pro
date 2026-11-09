@@ -772,6 +772,13 @@ const REGLAS = {
           "Gana el primero en llegar a la meta de bajas que eligió la sala (5, 10 o 20). Matarte a ti mismo cuenta como muerte y no da baja. Se necesitan al menos dos jugadores."
         ])]
       ]},
+      equipos: { nombre: "Versus por equipos", secciones: [
+        ["Rojo contra azul", lista([
+          "Como el versus (todas las armas, vuelves a los tres segundos, hay enemigos igual), pero en <b>dos equipos</b>: rojo y azul, por orden de llegada a la sala. Tu color es el de tu nombre, tus marcadores y el anillo del marcador.",
+          "Entre compañeros <b>no hay fuego amigo</b>: las balas los atraviesan y las explosiones no les hacen nada (las tuyas a ti sí, la mitad).",
+          "Cada baja a uno del otro equipo suma para el tuyo. Gana el primer equipo en llegar al <b>doble de la meta</b> de la sala (10, 20 o 40), o el que queda si el otro se va entero."
+        ])]
+      ]},
       jefes: { nombre: "Modo jefes", secciones: [
         ["Solo jefes", lista([
           "Cada nivel es <b>un jefe</b> con una escolta corta, en el orden de la rotación: el Carnicero, el Coloso, el Nigromante, la Reina… El jefe del nivel <i>n</i> pega como el del nivel 5<i>n</i> de la supervivencia, y desde el nivel 11 vuelven <b>corruptos</b>.",

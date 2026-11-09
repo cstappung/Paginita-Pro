@@ -45,7 +45,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       if (!est.listos) return;
       configurado = true;
       enviar("config", {
-        yo: uid, mirando: !juego(), variante: est.variante, mapa: est.mapa, meta: est.meta, mut: est.mut || "",
+        yo: uid, mirando: !juego(), variante: est.variante, mapa: est.mapa, meta: est.meta, mut: est.mut || "", equipos: est.equipos || null,
         semilla: (partida.semilla >>> 0) || 1,
         jugadores: est.jugadores.map((j, i) => ({ uid: j.uid, nombre: j.nombre || "Jugador", orden: i }))
       });
@@ -53,7 +53,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     }
     enviar("marcador", {
       nivel: est.nivel || 1, caidos: est.caidos || [], bajas: est.bajas || {}, muertes: est.muertes || {},
-      puntos: est.puntos || {}, fuera: Object.keys(est.fuera || {}), meta: est.meta,
+      puntos: est.puntos || {}, fuera: Object.keys(est.fuera || {}), meta: est.meta, puntosEq: est.puntosEq || null,
       fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "", nivel: est.nivel || 1 } : null
     });
   }
@@ -149,7 +149,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     const n = est.jugadores.length, cupo = est.cupo || n;
     aviso.hidden = !!est.listos;
     aviso.textContent = est.listos ? "" : "Esperando jugadores… " + n + " de " + cupo +
-      (n >= (est.variante === "versus" ? 2 : 1) ? " · el anfitrión puede empezar ya" : "");
+      (n >= (est.variante === "versus" || est.variante === "equipos" ? 2 : 1) ? " · el anfitrión puede empezar ya" : "");
   }
 
   function montar(el) {
@@ -168,7 +168,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-20";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-21";
     host.append(aviso, redEl, frame);
   }
 
