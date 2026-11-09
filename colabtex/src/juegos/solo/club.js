@@ -265,7 +265,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     /* Pro BoxHead no vive en juegos/club/: es el mismo marco de la sala, que con
        ?club=1 carga conexion.js y muestra la tabla en su menú (y no manda su alto:
        ocupa todo el marco). */
-    frame.src=(juego==='boxhead'?'juegos/boxhead/index.html?club=1&':'juegos/club/'+juego+'/index.html?')+'v=club-75&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src=(juego==='boxhead'?'juegos/boxhead/index.html?club=1&v=club-75':'juegos/club/'+juego+'/index.html?v=club-75')+'&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
