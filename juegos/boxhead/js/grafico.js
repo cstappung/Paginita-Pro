@@ -1092,6 +1092,14 @@
     }
     modelo(c, x, y, a, p, { linea: 0.6 });
   }
+  /* Un trozo de chatarra que suelta una baja propia: una tuerca o un
+     tornillo que gira y salta hacia quien lo ganó (lo mueve juego.js). */
+  function chatarra(c, x, y, T, id, z) {
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + 1, 3.4, 1.5, 0, 0, Math.PI * 2); c.fill();
+    const oro = id % 3 === 0;
+    const p = [{ r: 0, f: 0, z: (z || 0) + 1, w: oro ? 5 : 4, d: oro ? 5 : 3, h: 3, c: oro ? '#d9b34a' : '#a3adb8' }];
+    modelo(c, x, y, T * 7 + id, p, { linea: 0.4 });
+  }
   /* La estación de suministros: mostrador con toldo a rayas y el «$». */
   function puesto(c, x, y, T, cerca) {
     c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x + 3, y + 4, 16, 6, 0, 0, Math.PI * 2); c.fill();
@@ -1219,6 +1227,6 @@
 
   raiz.BoxheadGrafico = {
     KY, TS, PAL_E, SANGRE, sangreDe, palJugador, tono, rgba, sprites, modelo, proyecta, humanoide, boca, partesArma,
-    BLANCO, muroDe, cajaDe, bloque, crearSuelo, crearEfectos, barril, muroFalso, muroBlindado, carga, caja, puesto, tumba, granada, cohete, bola, iconoArma, brilla
+    BLANCO, muroDe, cajaDe, bloque, crearSuelo, crearEfectos, barril, muroFalso, muroBlindado, carga, caja, chatarra, puesto, tumba, granada, cohete, bola, iconoArma, brilla
   };
 })(typeof self !== 'undefined' ? self : this);

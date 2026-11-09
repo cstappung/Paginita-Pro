@@ -1,4 +1,4 @@
-// @controles: teclado  (los clics son solo los botones de la tienda; moverse y disparar, con el teclado)
+// @controles: tactil teclado  (teclado, mando o controles táctiles; la tienda también con clic)
 /* Pro BoxHead — el juego: un canvas visto desde arriba, en tres cuartos.
    Lo que se ve (modelos de cubos en 3D falso, muros, el suelo que guarda la
    sangre, los efectos) está en `grafico.js`; los sonidos, en `audio.js`.
@@ -57,8 +57,10 @@
   let yo = nuevoYo();
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
-    return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0 };
+    return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, chat: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
+      tiene: new Set([0]), mejoras: new Set(), arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
+      // para la pantalla final: disparos y aciertos (perdigón a perdigón), bajas por arma y jefes
+      st: { disp: 0, acierto: 0, armas: new Array(10).fill(0), jefes: 0 } };
   }
 
   // El mundo: lo que simula el director y lo que los demás reflejan.
@@ -102,18 +104,108 @@
   addEventListener('keyup', e => teclas.delete(e.code));
   addEventListener('blur', () => teclas.clear());
 
+  /* **El mando.** El stick izquierdo lo lee el juego (`pasoYo`, no como
+     WASD): ocho direcciones con histéresis (`D.dirStick`, para que una
+     diagonal no tirite) y, poco inclinado, el personaje gira sin avanzar;
+     más inclinado, camina más rápido. El stick derecho mira sin moverse, en
+     las mismas ocho direcciones, y LT fija hacia dónde se mira: así se
+     retrocede disparando de frente. La cruceta compra junto a un puesto $
+     (↑ munición, → armadura, ↓ botiquín, ← potencia); lejos de él cambia de
+     arma (← →), toma la mejor (↑) o pone un muro reforzado (↓). */
+  const enJuego = () => jugando && !terminado && !pausado && !quienPausa() && !!cfg && !cfg.mirando && yo.v && !yo.muerto;
+  const cruceta = (cerca, lejos) => () => { if (enJuego()) (tiendaCerca() ? cerca : lejos)(); };
+  const mejorArma = () => { const l = disponibles(); if (l.length) eligeArma(l[l.length - 1]); };
+  const MANDO_TIENDA = { balas: 'arriba', armadura: 'der', botiquin: 'abajo', potencia: 'izq', blindado: 'b' };
   if (window.Mando) Mando.configura({
-    stick: { izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS' },
+    stick: null, flechas: false,
     botones: {
-      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX', y: 'KeyB', b: 'KeyU', lt: 'KeyF',
-      izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS',
+      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX',
+      y: () => { if (enJuego()) subeArma(yo.w); },
+      b: () => { if (enJuego()) { if (tiendaCerca()) compra('blindado'); else ponBlindado(); } },
+      arriba: cruceta(() => compra('balas'), mejorArma),
+      der: cruceta(() => compra('armadura'), () => cicla(1)),
+      abajo: cruceta(() => compra('botiquin'), () => ponBlindado()),
+      izq: cruceta(() => compra('potencia'), () => cicla(-1)),
       start: () => { if (jugando && !terminado) ponPausa(!pausado); },
     },
     menu: () => !jugando || pausado || terminado,
     inicio: '#jugar',
     zonas: [{ sel: '#ayuda' }, { sel: '#menuAyuda' }],
-    pistas: [['stickL', 'moverte'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'], ['y', 'comprar munición en la tienda'], ['b', 'mejorar el arma en la tienda'], ['lt', 'poner muro reforzado'], ['start', 'pausa']],
+    pistas: [['stickL', 'moverte'], ['stickR', 'mirar sin moverte'], ['lt', 'fijar dirección'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'],
+      ['b abajo', 'muro reforzado'], ['dpad', 'comprar junto al $'], ['y', 'mejorar el arma en el $'], ['start', 'pausa']],
   });
+  const leeMando = () => { const m = window.Mando && Mando.estado ? Mando.estado() : null; return m && m.modo === 'juego' ? m : null; };
+  const conMando = () => !!(window.Mando && Mando.conectado && Mando.conectado());
+  // Un botón dicho para quien juega: el del mando si hay uno conectado, si no la tecla.
+  const boton = (tecla, b) => conMando() ? Mando.glifo(b) : tecla;
+  let dirL = -1, dirR = -1;
+
+  /* La vibración del mando (si lo deja el navegador): suave al disparar,
+     fuerte en explosiones cercanas y al recibir un golpe. Se apaga en la
+     pausa. Va aquí y no en `mando.js` para no cambiar el módulo común de
+     34 páginas por un juego. */
+  let vibraOn = lee('boxhead.vibra', '1') !== '0', vibraT = 0;
+  function vibra(fuerte, debil, ms) {
+    if (!vibraOn || !conMando()) return;
+    const ahora = performance.now();
+    if (ahora < vibraT && fuerte < 0.5) return;
+    vibraT = ahora + 60;
+    try {
+      for (const p of navigator.getGamepads ? navigator.getGamepads() : []) {
+        if (!p || !p.connected || !p.vibrationActuator) continue;
+        p.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: clamp(fuerte, 0, 1), weakMagnitude: clamp(debil, 0, 1) }).catch(() => {});
+        break;
+      }
+    } catch {}
+  }
+
+  /* **Controles táctiles** (celular y tableta): un joystick que nace donde se
+     apoya el pulgar en la mitad izquierda y botones a la derecha. Aparecen
+     con el primer toque, o de entrada en una pantalla de puntero grueso, y
+     el joystick se lee igual que el stick del mando. */
+  const toque = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0, disp: false, fija: false };
+  function armaTactil() {
+    const zona = $('tZona'), palo = $('tPalo');
+    if (!zona || !palo) return;
+    const bola = palo.firstElementChild, RT = 46;
+    zona.addEventListener('pointerdown', e => {
+      if (toque.id !== null) return;
+      e.preventDefault(); SND.inicia();
+      toque.id = e.pointerId; toque.ox = e.clientX; toque.oy = e.clientY; toque.x = toque.y = 0;
+      try { zona.setPointerCapture(e.pointerId); } catch {}
+      palo.style.left = e.clientX + 'px'; palo.style.top = e.clientY + 'px'; palo.hidden = false; bola.style.transform = '';
+    });
+    zona.addEventListener('pointermove', e => {
+      if (e.pointerId !== toque.id) return;
+      let dx = e.clientX - toque.ox, dy = e.clientY - toque.oy;
+      const l = Math.hypot(dx, dy);
+      if (l > RT) { dx *= RT / l; dy *= RT / l; }
+      toque.x = dx / RT; toque.y = dy / RT;
+      bola.style.transform = 'translate(' + dx.toFixed(0) + 'px,' + dy.toFixed(0) + 'px)';
+    });
+    const suelta = e => { if (e.pointerId !== toque.id) return; toque.id = null; toque.x = toque.y = 0; palo.hidden = true; };
+    zona.addEventListener('pointerup', suelta); zona.addEventListener('pointercancel', suelta);
+    for (const b of document.querySelectorAll('#tBotones [data-t]')) {
+      const k = b.dataset.t;
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); SND.inicia(); b.classList.add('on');
+        if (k === 'disp') toque.disp = true;
+        else if (k === 'fija') toque.fija = true;
+        else if (k === 'pausa') { if (jugando && !terminado) ponPausa(!pausado); }
+        else if (enJuego()) { if (k === 'ant') cicla(-1); else if (k === 'sig') cicla(1); else if (k === 'muro') ponBlindado(); else if (k === 'det') detona(); }
+      });
+      const fin = () => { b.classList.remove('on'); if (k === 'disp') toque.disp = false; else if (k === 'fija') toque.fija = false; };
+      b.addEventListener('pointerup', fin); b.addEventListener('pointercancel', fin); b.addEventListener('pointerleave', fin);
+    }
+  }
+  function muestraTactil() {
+    if (toque.on) return;
+    toque.on = true;
+    document.documentElement.classList.add('tactil');
+  }
+  armaTactil();
+  addEventListener('touchstart', muestraTactil, { passive: true });
+  try { if (matchMedia('(pointer: coarse)').matches) muestraTactil(); } catch {}
 
   // ---------- el mapa ----------
   const celda = (tx, ty) => (tx < 0 || ty < 0 || tx >= M.ancho || ty >= M.alto) ? 1 : M.celdas[ty * M.ancho + tx];
@@ -249,17 +341,24 @@
     if (a.tipo === 'bala') {
       rayo(yo.x, yo.y, ang + (Math.random() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
       gasta(); son(a.id === 1 ? 'uzi' : 'pistola');
+      vibra(a.id === 1 ? 0.05 : 0.12, a.id === 1 ? 0.25 : 0.35, a.id === 1 ? 40 : 60);
     } else if (a.tipo === 'perdigon') {
-      for (let i = 0; i < a.perdigones; i++)
-        rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + azar(-0.03, 0.03), a.alc * azar(0.85, 1), a.d, a.id, a.pen || 0);
+      // A quemarropa (cuatro perdigones o más en el mismo enemigo) el golpe se siente: pausa de impacto.
+      const cuenta = new Map();
+      for (let i = 0; i < a.perdigones; i++) {
+        const e = rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + azar(-0.03, 0.03), a.alc * azar(0.85, 1), a.d, a.id, a.pen || 0);
+        if (e) cuenta.set(e, (cuenta.get(e) || 0) + 1);
+      }
+      for (const [e, c] of cuenta) if (c >= 4 && dist(e.x, e.y, yo.x, yo.y) < 70) { impacto(0.045); break; }
       gasta(); son('escopeta');
       sacude = Math.min(10, sacude + 2.6);
+      vibra(0.55, 0.8, 120);
     } else if (a.tipo === 'granada' || a.tipo === 'cohete') {
       const id = nid();
       lanza({ id, w: a.id, x: yo.x + Math.cos(ang) * 12, y: yo.y + Math.sin(ang) * 12, ang, mio: true, r: a.r, d: a.d, vel: a.vel });
       pend.n.push([id, a.id, Math.round(yo.x), Math.round(yo.y), Math.round(ang * 100), Math.round(a.vel || 0)]);
       gasta(); son(a.tipo === 'cohete' ? 'cohete' : 'lanza');
-      if (a.tipo === 'cohete') sacude = Math.min(10, sacude + 1.5);
+      if (a.tipo === 'cohete') { sacude = Math.min(10, sacude + 1.5); vibra(0.45, 0.6, 140); }
     } else if (a.tipo === 'objeto') {
       if (pon(a)) { gasta(); son('pon'); } else yo.cd = 0.1;
     }
@@ -276,6 +375,7 @@
   function rayo(x, y, ang, alc, d, w, pen) {
     const cs = Math.cos(ang), sn = Math.sin(ang);
     const heridos = new Set();
+    yo.st.disp++;
     let l = 6, choque = false;
     for (; l < alc; l += 4) {
       const px = x + cs * l, py = y + sn * l;
@@ -308,6 +408,8 @@
     fx.trazo(bo[2], bo[3], x + cs * l, y + sn * l, bo[4], w === 2);
     if (choque) impactoMuro(x + cs * (l - 4), y + sn * (l - 4), ang, bo[4]);
     pend.s.push([nid(), w, Math.round(x), Math.round(y), Math.round(ang * 100), Math.round(l)]);
+    if (heridos.size) yo.st.acierto++;
+    return heridos.size ? heridos.values().next().value : null;
   }
 
   function lanza(p) {
@@ -388,6 +490,10 @@
   function golpeaEnemigo(e, d, w, sx, sy) {
     if (d <= 0) return;
     e.flash = 0.1;
+    armaUlt = w;
+    anotaDano(e, d);
+    // Un jefe no sale despedido, pero el golpe se le nota: se inclina y saca chispas.
+    if (D.esJefe(e.k)) { e.sac = 0.35; if (Math.random() < 0.5) fx.chispas(e.x, e.y, Math.random() * Math.PI * 2, 3, 22 * (TALLA_Z[e.k] || 1), '#ffd27a'); }
     // La sangre sale hacia donde iba el golpe y mancha el suelo para siempre.
     const ang = Number.isFinite(sx) && (sx !== e.x || sy !== e.y) ? Math.atan2(e.y - sy, e.x - sx) : Math.random() * Math.PI * 2, t = G.sangreDe(e.k);
     fx.sangre(e.x, e.y, ang, w === 2 ? 3 : 5, t, 14 * (TALLA_Z[e.k] || 1));
@@ -423,6 +529,7 @@
     yo.hp -= d;
     if (inmortal) yo.hp = Math.max(1, yo.hp);
     rojo = Math.min(1, rojo + d / 40);
+    vibra(Math.min(1, 0.35 + d / 40), 0.7, 150);
     if (w === 8) son('mordida');
     son('dolor');
     fx.sangre(yo.x, yo.y, Math.random() * Math.PI * 2, 5);
@@ -434,6 +541,8 @@
     fx.sangre(yo.x, yo.y, 0, 8); fx.sangre(yo.x, yo.y, Math.PI, 8);
     if (fx.suelo) fx.suelo.charco(yo.x, yo.y, 12, G.SANGRE[0]);
     son('muere');
+    vibra(1, 1, 500);
+    for (const c of CH) cobra(c);
     if (!ONLINE) { yo.fin = 1.4; return; }
     if (versus()) { enviar('muere', { por: por || '', w: w | 0 }); yo.respawn = 3; banner('TE MATARON'); }
     else {
@@ -443,19 +552,71 @@
     }
   }
 
-  function miBaja(k) {
+  /* Una baja mía: puntos (× multiplicador), chatarra (sin él) que salta del
+     cuerpo, el combo y, al pasar un récord del multiplicador, armas,
+     mejoras y los hitos ×10, ×25, ×50… */
+  const HITOS = [10, 25, 50, 100, 150, 200, 300];
+  let armaUlt = 0, armaMuerte = -1;
+  function miBaja(k, x, y) {
     yo.pts += D.PUNTOS[k] * yo.mul;
     yo.k++;
     yo.mul++;
+    yo.st.armas[armaMuerte >= 0 ? armaMuerte : armaUlt]++;
+    if (D.esJefe(k)) yo.st.jefes++;
+    if (Number.isFinite(x)) sueltaChatarra(x, y, D.chatarraDe(k));
     if (yo.mul > yo.maxMul) {
+      for (const h of HITOS) if (h > yo.maxMul && h <= yo.mul) hito(h);
       for (const p of D.premios(yo.maxMul, yo.mul)) {
-        if (p.arma !== undefined) { if (!versus()) desbloquea(p.arma, p.txt); }
-        else { yo.mejoras.add(p.mejora); premio(p.txt); }
+        if (p.arma !== undefined) { if (!versus()) { desbloquea(p.arma, p.txt); consejo('arma'); } }
+        else { yo.mejoras.add(p.mejora); premio(p.txt, 'mejora'); }
       }
       yo.maxMul = yo.mul;
       pintaArmas(true);
     }
+    if (yo.mul >= 3) consejo('combo');
     yo.combo = yo.comboMax = D.duracionCombo(yo.mul);
+  }
+  function hito(m) {
+    banner('¡RACHA ×' + m + '!');
+    pulso = 1; son('racha'); vibra(0.5, 0.8, 220);
+    const el = $('marca'); el.classList.remove('hito'); void el.offsetWidth; el.classList.add('hito');
+  }
+
+  /* La chatarra de mis bajas: salta del cuerpo y, a los 0,35 s, vuela hacia
+     mí si estoy cerca (pasados 2 s, esté donde esté). Es solo de esta
+     pantalla: nadie más la ve ni la puede recoger, así que no viaja. Al
+     morir se cobra lo que quedaba en el suelo. */
+  let CH = [], chatPulso = 0;
+  function sueltaChatarra(x, y, v) {
+    const n = Math.max(1, Math.min(6, Math.round(v / 15))), parte = Math.floor(v / n);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = azar(40, 95);
+      CH.push({ id: (Math.random() * 1e6) | 0, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: 0, vz: azar(70, 120), t: 0, v: parte + (i === 0 ? v - parte * n : 0) });
+    }
+    if (CH.length > 160) for (const c of CH.splice(0, CH.length - 160)) cobra(c);
+  }
+  function cobra(c) {
+    if (c.fin) return;
+    c.fin = true; yo.chat += c.v; chatPulso = 1;
+    son('chatarra'); consejo('chatarra');
+  }
+  function pasoChatarra(dt) {
+    if (!CH.length) return;
+    const vivo = yo.v && !yo.muerto;
+    for (const c of CH) {
+      c.t += dt;
+      if (!vivo || c.t > 6) { cobra(c); continue; }
+      c.vz -= 420 * dt; c.z += c.vz * dt;
+      if (c.z < 0) { c.z = 0; c.vz = Math.abs(c.vz) > 40 ? -c.vz * 0.35 : 0; }
+      const dd = dist(c.x, c.y, yo.x, yo.y);
+      if (c.t > 0.35 && (dd < 170 || c.t > 2)) {
+        const v = 240 + c.t * 260;
+        c.vx = (yo.x - c.x) / Math.max(1, dd) * v; c.vy = (yo.y - c.y) / Math.max(1, dd) * v;
+      } else { c.vx *= 1 - Math.min(1, dt * 4); c.vy *= 1 - Math.min(1, dt * 4); }
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.t > 0.35 && dd < 12) cobra(c);
+    }
+    CH = CH.filter(c => !c.fin);
   }
 
   // ---------- el director ----------
@@ -631,7 +792,9 @@
     const tipo = D.ENEMIGOS[e.k].explota ? 2 : ARMA_EXPLOTA(w) ? 1 : 0;
     const m = [nid(), quien || '', e.k, Math.round(e.x), Math.round(e.y), Math.round(ak * 100), tipo];
     dir.m.push(m); if (dir.m.length > 20) dir.m.shift();
+    armaMuerte = w | 0;
     procesaMuerte(m);
+    armaMuerte = -1;
     const C = D.ENEMIGOS[e.k];
     if (C.explota) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: C.radioExplota, d: C.explota, w: 3, u: quien || '' });
     if (C.jefe) {
@@ -1021,8 +1184,8 @@
     if (tipo !== 2) fx.cadaver(x, y, k, ak, ta * ESC);
     if (k === 1 || k === 13) fx.humo(x, y, 8, 18, 'fuego');
     son(k === 1 || k === 13 || k === 7 ? 'bajaDiablo' : 'baja', dist(x, y, yo.x, yo.y));
-    if (cfg && m[1] === cfg.yo) miBaja(k);
-    if (D.esJefe(k)) { fx.sangre(x, y, ak, 30, t, 30); efectoBoom(x, y, 60); banner('¡' + D.ENEMIGOS[k].nombre.toUpperCase() + ' DERROTADO!'); }
+    if (cfg && m[1] === cfg.yo) miBaja(k, x, y);
+    if (D.esJefe(k)) { fx.sangre(x, y, ak, 30, t, 30); efectoBoom(x, y, 60); banner('¡' + D.ENEMIGOS[k].nombre.toUpperCase() + ' DERROTADO!'); impacto(0.09); vibra(1, 1, 350); }
   }
 
   // ---------- la red ----------
@@ -1170,6 +1333,7 @@
     else txt = 'Cayeron todos en el nivel ' + (f.nivel || marcador.nivel) + '. ' +
       (g ? (g === cfg.yo ? '¡Hiciste más puntos que nadie!' : 'Más puntos: ' + nombreDe(g) + '.') : '');
     $('finTxt').textContent = txt;
+    if (!cfg.mirando) pintaStats(); else $('finStats').textContent = '';
     $('otra').hidden = true;
     setTimeout(() => { $('fin').hidden = false; }, 1200);
   }
@@ -1233,6 +1397,7 @@
       for (const f of F) { f.x += f.vx * dt; f.y += f.vy * dt; f.t -= dt; }
     }
     for (const e of E.values()) {
+      if (e.sac > 0) e.sac = Math.max(0, e.sac - dt * 2.5);
       e.tb = (e.tb || 0) + ((e.aturd > 0 ? 1 : 0) - (e.tb || 0)) * Math.min(1, dt * (e.aturd > 0 ? 18 : 7));
       // lo que se dibuja gira y ataca suave, no a saltos de 45°
       e.av = e.av === undefined ? angDir(e.d) : giraHacia(e.av, angDir(e.d), dt * 12);
@@ -1270,20 +1435,43 @@
       return;
     }
     if (!yo.v) return;
-    let dx = 0, dy = 0;
+    /* Moverse: teclado, stick (mando o táctil) y, para fijar hacia dónde se
+       mira, Shift / LT / el botón táctil. El stick derecho mira sin mover.
+       Con la dirección fija se camina un poco más lento: retroceder
+       disparando es una ventaja y cuesta algo. */
+    let dx = 0, dy = 0, vel = 1, mira = -1;
+    let fija = teclas.has('ShiftLeft') || teclas.has('ShiftRight') || toque.fija;
     if (!pausado) {
       if (teclas.has('KeyA') || teclas.has('ArrowLeft')) dx--;
       if (teclas.has('KeyD') || teclas.has('ArrowRight')) dx++;
       if (teclas.has('KeyW') || teclas.has('ArrowUp')) dy--;
       if (teclas.has('KeyS') || teclas.has('ArrowDown')) dy++;
+      const m = leeMando();
+      let sx = 0, sy = 0;
+      if (m) {
+        sx = m.ejes.lx; sy = m.ejes.ly;
+        if (m.b.lt > 0.5) fija = true;
+        if (Math.hypot(m.ejes.rx, m.ejes.ry) > 0.35) { dirR = D.dirStick(m.ejes.rx, m.ejes.ry, dirR); mira = dirR; } else dirR = -1;
+      }
+      if (toque.id !== null && Math.hypot(toque.x, toque.y) > Math.hypot(sx, sy)) { sx = toque.x; sy = toque.y; }
+      const r = Math.min(1, Math.hypot(sx, sy));
+      if (!dx && !dy && r > 0.12) {
+        dirL = D.dirStick(sx, sy, dirL);
+        // poco inclinado: gira sin avanzar; más, camina (más rápido cuanto más)
+        if (r < 0.38) { if (mira < 0 && !fija) mira = dirL; }
+        else { dx = DIRS[dirL][0]; dy = DIRS[dirL][1]; vel = 0.55 + 0.45 * (r - 0.38) / 0.62; }
+      } else if (r <= 0.12) dirL = -1;
     }
     yo.mov = !!(dx || dy);
+    yo.fija = fija || mira >= 0;
+    if (mira >= 0) yo.d = mira;
     if (yo.mov) {
-      yo.d = D.dirDe(dx, dy);
-      const l = Math.hypot(dx, dy), v = 110;
+      const quieta = fija || mira >= 0;
+      if (!quieta) yo.d = D.dirDe(dx, dy);
+      const l = Math.hypot(dx, dy), v = 110 * vel * (quieta ? 0.88 : 1);
       mover(yo, dx / l * v * dt, dy / l * v * dt, 9);
     }
-    if (!pausado && teclas.has('Space')) dispara();
+    if (!pausado && (teclas.has('Space') || toque.disp)) dispara();
     // Cajas.
     for (const b of [...B.values()]) {
       if (ocultas.has(b.id) || dist(b.x, b.y, yo.x, yo.y) > 18) continue;
@@ -1298,7 +1486,7 @@
     if (k === 1) { yo.hp = Math.min(100, yo.hp + 50); premio('+50 vida'); return; }
     if (k === 2) { yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + D.ARMADURA.caja); premio('+' + D.ARMADURA.caja + ' armadura'); return; }
     const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < armaDe(i).max);
-    if (!l.length) { yo.pts += 50; premio('+50 puntos'); return; }
+    if (!l.length) { yo.chat += 30; chatPulso = 1; premio('+30 chatarra'); return; }
     const i = l[(Math.random() * l.length) | 0], a = armaDe(i);
     yo.ammo[i] = Math.min(a.max, yo.ammo[i] + a.caja);
     premio('+' + a.caja + ' ' + a.nombre);
@@ -1318,16 +1506,16 @@
     if (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) { son('clic'); premio('Armadura completa'); return; }
     if (id === 'botiquin' && yo.hp >= 100) { son('clic'); premio('Vida completa'); return; }
     if (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max) { son('clic'); premio('Ya llevas ' + D.MURO_BLINDADO.max + ' muros reforzados'); return; }
-    const precio = D.precioTienda(id, yo.pot || 0);
-    if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
-    yo.pts -= precio;
+    const precio = D.precioTienda(id, yo.pot || 0, nivelObjetivo());
+    if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
+    yo.chat -= precio;
     if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = armaDe(i).max; }
     else if (id === 'armadura') yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 50);
     else if (id === 'botiquin') yo.hp = Math.min(100, yo.hp + 50);
     else if (id === 'potencia') yo.pot = (yo.pot || 0) + 1;
     else if (id === 'blindado') yo.bl++;
     son('compra');
-    premio(t.nombre + ' −' + precio + (id === 'blindado' ? ' · F para ponerlo' : ''));
+    premio(t.nombre + ' −' + precio + (id === 'blindado' ? ' · ' + boton('F', 'b') + ' para ponerlo' : ''));
     pintaTienda(true);
   }
   /* Subir un arma un nivel: más daño, cadencia, munición… y otro aspecto. */
@@ -1335,9 +1523,9 @@
     if (!tiendaCerca() || !yo.tiene.has(i)) return;
     const n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n), a = D.ARMAS[i];
     if (!Number.isFinite(precio)) { son('clic'); premio(a.nombre + ' al máximo'); return; }
-    if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
+    if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
     const antes = armaDe(i);
-    yo.pts -= precio;
+    yo.chat -= precio;
     yo.nv[i] = n + 1;
     // La munición crece con el tope: lo que faltaba sigue faltando.
     if (i !== 0) yo.ammo[i] = Math.min(armaDe(i).max, yo.ammo[i] + Math.max(0, armaDe(i).max - antes.max));
@@ -1348,7 +1536,7 @@
   }
   /* Pone un muro reforzado delante, como el muro falso pero de acero. */
   function ponBlindado() {
-    if (!(yo.bl > 0)) { son('clic'); premio(tiendaCerca() ? 'Compra un muro reforzado (M)' : 'No te quedan muros reforzados'); return; }
+    if (!(yo.bl > 0)) { son('clic'); premio(tiendaCerca() ? 'Compra un muro reforzado (' + boton('M', 'b') + ')' : 'No te quedan muros reforzados'); return; }
     if (yo.cd > 0) return;
     if (pon({ id: 5, obj: 'muro', vida: D.MURO_BLINDADO.vida, bl: 1 })) { yo.bl--; yo.cd = 0.35; son('pon'); pintaTienda(true); }
   }
@@ -1356,8 +1544,29 @@
   function finPractica() {
     terminado = true;
     $('finTxt').textContent = 'Llegaste al nivel ' + nivelLocal + ' con ' + yo.pts + ' puntos y ' + yo.k + ' bajas.';
+    pintaStats();
     $('otra').hidden = false;
     $('fin').hidden = false;
+  }
+  /* La pantalla final dice cómo jugaste: multiplicador máximo, precisión,
+     jefes y con qué arma hiciste más bajas. */
+  function pintaStats() {
+    const st = yo.st, el = $('finStats');
+    el.textContent = '';
+    let mejor = -1;
+    st.armas.forEach((n, i) => { if (n > 0 && D.ARMAS[i] && (mejor < 0 || n > st.armas[mejor])) mejor = i; });
+    const filas = [
+      ['Multiplicador máximo', '×' + yo.maxMul],
+      ['Bajas', yo.k],
+      ['Precisión', st.disp ? Math.round(100 * st.acierto / st.disp) + ' %' : '—'],
+      ['Jefes derrotados', st.jefes],
+      ['Arma favorita', mejor >= 0 ? D.ARMAS[mejor].nombre + ' (' + st.armas[mejor] + ')' : '—'],
+      ['Chatarra sin gastar', yo.chat],
+    ];
+    for (const [k, v] of filas) {
+      const d = document.createElement('div'), a = document.createElement('span'), b = document.createElement('b');
+      a.textContent = k; b.textContent = v; d.append(a, b); el.append(d);
+    }
   }
 
   // ---------- efectos ----------
@@ -1377,13 +1586,27 @@
   function efectoBoom(x, y, r) {
     fx.boom(x, y, r);
     sacude = Math.min(10, sacude + r / 12);
-    son('boom', dist(x, y, yo.x, yo.y));
+    const dd = dist(x, y, yo.x, yo.y);
+    son('boom', dd);
+    if (yo.v && !yo.muerto && dd < 360) {
+      const f = 1 - dd / 360;
+      vibra(0.4 + 0.6 * f, 0.6 * f + 0.2, 160 + r * 2);
+      if (r >= 80 && dd < 300) impacto(0.05);
+    }
   }
-  let sacude = 0;
+  /* **Pausa de impacto**: unas centésimas casi detenidas en lo que pega
+     fuerte (un jefe que cae, una explosión grande cerca, la escopeta a
+     quemarropa). Frena solo esta pantalla, y menos de una décima. */
+  let sacude = 0, hs = 0, pulso = 0;
+  const impacto = s => { hs = Math.max(hs, Math.min(0.1, s)); };
   function efectos(dt) {
     fx.paso(dt);
     rojo = Math.max(0, rojo - dt * 1.5);
     sacude = Math.max(0, sacude - dt * 25);
+    pulso = Math.max(0, pulso - dt * 2.2);
+    chatPulso = Math.max(0, chatPulso - dt * 3);
+    pasoChatarra(dt);
+    pasoNumeros(dt);
   }
   /* El gemido de la horda: cada tanto gime (o gruñe, si es un diablo) uno
      de los enemigos cercanos, más seguido cuantos más haya. */
@@ -1439,7 +1662,7 @@
     }
     const quieto = e.aa > 0.5 || e.aturd > 0;
     G.humanoide(cx, e.x, e.y, e.av ?? angDir(e.d), G.PAL_E[e.k] || G.PAL_E[0], {
-      t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: e.tb || 0,
+      t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: Math.max(e.tb || 0, e.sac || 0),
       flash: e.flash > 0, talla: ta * ESC, brillo: e.k === 4 ? 0.5 + 0.5 * Math.sin(T * 10 + e.id) : 0
     });
     cx.globalAlpha = 1;
@@ -1456,7 +1679,7 @@
     G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC, nivel: nv || 0 });
   }
 
-  let camX = 0, camY = 0, W = 0, H = 0, esc = 1, dpr = 1;
+  let camX = 0, camY = 0, W = 0, H = 0, esc = 1, dpr = 1, leadX = 0, leadY = 0;
   function dibuja() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
@@ -1465,10 +1688,14 @@
     cx.setTransform(1, 0, 0, 1, 0, 0);
     cx.fillStyle = '#1b1916'; cx.fillRect(0, 0, W, H);
     if (!M) { fondoMenu(); return; }
-    esc = clamp(Math.min(innerWidth / (22 * TS), innerHeight / (14 * TS)), 0.6, 3) * dpr;
-    // cámara
+    // un hito del multiplicador acerca la cámara un instante
+    esc = clamp(Math.min(innerWidth / (22 * TS), innerHeight / (14 * TS)), 0.6, 3) * dpr * (1 + 0.07 * pulso * pulso);
+    // cámara: se adelanta un poco hacia donde mira el personaje
     let tx = M.ancho * TS / 2, ty = M.alto * TS / 2;
-    if (yo.v && !yo.muerto) { tx = yo.x; ty = yo.y; }
+    if (yo.v && !yo.muerto) {
+      leadX += (DIRS[yo.d][0] * 34 - leadX) * 0.06; leadY += (DIRS[yo.d][1] * 26 - leadY) * 0.06;
+      tx = yo.x + leadX; ty = yo.y + leadY;
+    }
     else { const r = [...R.values()].find(r => r.v); if (r) { tx = r.x; ty = r.y; } else if (yo.muerto) { tx = yo.x; ty = yo.y; } }
     camX += (tx - camX) * 0.15; camY += (ty - camY) * 0.15;
     if (!Number.isFinite(camX) || Math.abs(camX - tx) > 600) { camX = tx; camY = ty; }
@@ -1493,6 +1720,7 @@
     for (const t of M.tiendas || []) lista.push({ y: t.y + 4, f: () => G.puesto(cx, t.x, t.y, T, yo.v && !yo.muerto && dist(t.x, t.y, yo.x, yo.y) < D.ALCANCE_TIENDA) });
     for (const o of O.values()) lista.push({ y: o.k === 'muro' ? o.y + TS / 2 : o.k === 'carga' ? o.y - 8 : o.y, f: () => dibujaObjeto(o) });
     for (const b of B.values()) lista.push({ y: b.y, f: () => G.caja(cx, b.x, b.y, b.k, T, b.id % 97) });
+    for (const c of CH) lista.push({ y: c.y, f: () => G.chatarra(cx, c.x, c.y, T, c.id, c.z) });
     for (const e of E.values()) lista.push({ y: e.y, f: () => dibujaEnemigo(e) });
     for (const [u, r] of R) {
       if (!r.v) { lista.push({ y: r.y, f: () => G.tumba(cx, r.x, r.y) }); continue; }
@@ -1501,6 +1729,7 @@
     const veoYo = cfg && !cfg.mirando && yo.v && !yo.muerto;
     if (cfg && !cfg.mirando && (yo.v || yo.muerto)) {
       if (veoYo) lista.push({ y: yo.y, f: () => {
+        if (yo.fija) flechaFija();
         if (yo.inv > 0 && Math.floor(T * 12) % 2) return;
         dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w]);
       } });
@@ -1533,6 +1762,7 @@
       G.bola(cx, f.x, f.y, f.vx, f.vy, f.k === 5 || !!(D.ENEMIGOS[f.k] || {}).acido);
     }
     fx.dibuja(cx);
+    if (numDano) dibujaNumeros();
     // Como en el original: vida, arma y balas justo encima de cada cabeza.
     for (const [u, r] of R) if (r.v) {
       barraVida(r.x, r.y, r.hp, r.arm);
@@ -1545,9 +1775,42 @@
     }
     $('rojo').style.boxShadow = 'inset 0 0 ' + Math.round(80 + 80 * rojo) + 'px rgba(200,0,0,' + (rojo * 0.7 + (yo.v && yo.hp < 30 ? 0.25 + 0.15 * Math.sin(T * 6) : 0)).toFixed(2) + ')';
   }
+  /* Con la dirección fija, una flecha en el suelo dice hacia dónde se dispara. */
+  function flechaFija() {
+    const a = angDir(yo.d), c = Math.cos(a), s = Math.sin(a), x = yo.x + c * 19, y = yo.y + s * 15;
+    cx.fillStyle = 'rgba(242,193,78,.75)';
+    cx.beginPath();
+    cx.moveTo(x + c * 6, y + s * 4.5);
+    cx.lineTo(x - s * 4 - c * 2, y + c * 3 - s * 1.5);
+    cx.lineTo(x + s * 4 - c * 2, y - c * 3 - s * 1.5);
+    cx.closePath(); cx.fill();
+  }
+  /* Los números de daño (opcionales, en la pausa): los golpes seguidos a un
+     mismo enemigo se suman en un número, para que la Uzi no llene la
+     pantalla. */
+  let numDano = lee('boxhead.numeros', '0') === '1', NUM = [];
+  function anotaDano(e, d) {
+    if (!numDano || d <= 0) return;
+    const n = NUM.find(n => n.e === e.id && n.t < 0.18);
+    if (n) { n.v += d; n.t = 0; n.x = e.x; n.y = e.y; return; }
+    NUM.push({ e: e.id, v: d, t: 0, x: e.x + azar(-4, 4), y: e.y, jefe: D.esJefe(e.k), ta: TALLA_Z[e.k] || 1 });
+    if (NUM.length > 40) NUM.shift();
+  }
+  function pasoNumeros(dt) { if (NUM.length) { for (const n of NUM) n.t += dt; NUM = NUM.filter(n => n.t < 0.8); } }
+  function dibujaNumeros() {
+    cx.textAlign = 'center'; cx.lineJoin = 'round';
+    for (const n of NUM) {
+      const q = n.t / 0.8, y = n.y - 44 * n.ta - 18 * q;
+      cx.globalAlpha = q < 0.6 ? 1 : 1 - (q - 0.6) / 0.4;
+      cx.font = 'bold ' + (n.jefe ? 11 : 9) + 'px Trebuchet MS, sans-serif';
+      cx.lineWidth = 2.4; cx.strokeStyle = 'rgba(0,0,0,.85)'; cx.strokeText(Math.round(n.v), n.x, y);
+      cx.fillStyle = n.v >= 60 ? '#ffd54a' : '#fff'; cx.fillText(Math.round(n.v), n.x, y);
+    }
+    cx.globalAlpha = 1;
+  }
   function rotulo(t, x, y, col) {
-    cx.font = 'bold 7.5px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
-    cx.lineWidth = 2.2; cx.strokeStyle = 'rgba(0,0,0,.85)'; cx.lineJoin = 'round';
+    cx.font = 'bold 9px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
+    cx.lineWidth = 2.4; cx.strokeStyle = 'rgba(0,0,0,.85)'; cx.lineJoin = 'round';
     cx.strokeText(t, x, y); cx.fillStyle = col; cx.fillText(t, x, y);
   }
   function barraVida(x, y, hp, arm) {
@@ -1600,6 +1863,7 @@
       banner((C.jefe === 'grande' ? '☠ ' : '⚠ ') + C.nombre);
       premio(C.txt || '');
       son('jefe'); sacude = Math.min(10, sacude + 4);
+      consejo('jefe');
     }
     const f = js.map(e => e.id + ':' + Math.round(100 * e.hp / e.max)).join(',');
     if (f === firmaJefe) return;
@@ -1616,11 +1880,17 @@
       tu.appendChild(i); d.append(n, tu); b.appendChild(d);
     }
   }
+  let caeAntes = false, quedanAntes = 0, consejoT = 0;
   function hud(dt) {
-    if (!cfg || !jugando) return;
+    pasoPremios(dt);
+    pasoConsejo(dt);
+    if (!cfg || !jugando) { SND.musica(-1); return; }
     hudJefes();
     const fr = yo.mul > 1 && yo.comboMax > 0 ? clamp(yo.combo / yo.comboMax, 0, 1) : 0;
     $('comboArco').setAttribute('stroke-dashoffset', (100 - fr * 100).toFixed(1));
+    // El combo a punto de caer: el arco parpadea y suena un aviso al cruzar el cuarto.
+    const cae = yo.mul > 1 && fr > 0 && fr < 0.25 && !yo.muerto;
+    if (cae !== caeAntes) { $('marca').classList.toggle('cae', cae); if (cae) son('avisoCombo'); caeAntes = cae; }
     if ($('mul').textContent !== '×' + yo.mul) {
       const m = $('mul'), sube = yo.mul > (parseInt(m.textContent.slice(1), 10) || 1);
       m.textContent = '×' + yo.mul;
@@ -1635,8 +1905,21 @@
     if (hudT > 0) return;
     hudT = 0.2;
     $('ptsN').textContent = yo.pts;
+    $('chatN').textContent = yo.chat;
+    $('chatN').parentNode.classList.toggle('pulso', chatPulso > 0.3);
+    // La música sigue a la partida: enemigos cerca, multiplicador y jefes.
+    const hayJefe = [...E.values()].some(e => D.esJefe(e.k));
+    SND.musica(terminado || quienPausa() ? -1 : clamp(E.size / 24, 0, 1) * 0.6 + clamp((yo.mul - 1) / 30, 0, 1) * 0.4, hayJefe);
+    // Consejos que dependen de dónde se está.
+    if (!cfg.mirando && yo.v && !yo.muerto) {
+      if (tiendaCerca()) consejo('tienda');
+      if (T > 25) consejo('fijar');
+      for (const o of O.values()) if (o.k === 'barril' && !o.u && dist(o.x, o.y, yo.x, yo.y) < 110) { consejo('barril'); break; }
+    }
     $('kN').textContent = yo.k;
-    const quedan = soyDir || !ONLINE ? dir.q + E.size : dir.q + E.size;
+    const quedan = dir.q + E.size;
+    if (!versus() && quedan === 5 && quedanAntes > 5 && dir.q === 0) son('quedan');
+    quedanAntes = quedan;
     $('nivel').innerHTML = versus()
       ? 'Versus · <b>' + ((marcador.bajas || {})[cfg.yo] | 0) + '</b> de ' + (cfg.meta || marcador.meta || 10)
       : 'Nivel <b>' + nivelObjetivo() + '</b> · quedan ' + quedan;
@@ -1647,7 +1930,7 @@
     pintaTienda(false);
     $('armN').textContent = Math.round(yo.arm || 0);
     $('potN').textContent = (yo.pot || 0) ? ' · Potencia +' + (yo.pot * 10) + ' %' : '';
-    $('blN').textContent = yo.bl ? ' · Muros reforzados ' + yo.bl + ' (F)' : '';
+    $('blN').textContent = yo.bl ? ' · Muros reforzados ' + yo.bl + ' (' + boton('F', 'b') + ')' : '';
     // tabla
     const filas = activos().map(j => {
       const u = j.uid, mio = u === cfg.yo, r = R.get(u);
@@ -1717,18 +2000,22 @@
     const tc = jugando && !cfg?.mirando && tiendaCerca(), el = $('tienda');
     if (!tc) { if (!el.hidden) el.hidden = true; return; }
     if (!tiendaArmada) armaTienda();
-    const firma = [yo.pts, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.')].join('|');
+    const mando = conMando() ? Mando.familia() : '', n = nivelObjetivo();
+    const firma = [yo.chat, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.'), n, mando].join('|');
     if (!fuerza && !el.hidden && firma === firmaTienda) return;
     firmaTienda = firma;
     el.hidden = false;
-    $('tPts').textContent = yo.pts;
+    $('tPts').textContent = yo.chat;
+    $('tAyuda').textContent = mando ? 'cruceta o clic' : 'clic o tecla';
+    $('tAyudaU').textContent = mando ? Mando.glifo('y') : 'U';
     for (const b of $('tSum').children) {
       const id = b.dataset.id, t = D.TIENDA.find(x => x.id === id);
       const lleno = (id === 'potencia' && (yo.pot || 0) >= t.max) || (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) ||
         (id === 'botiquin' && yo.hp >= 100) || (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max);
-      const precio = D.precioTienda(id, yo.pot || 0);
+      const precio = D.precioTienda(id, yo.pot || 0, n);
+      b.querySelector('kbd').textContent = mando ? Mando.glifo(MANDO_TIENDA[id]) : t.tecla;
       b.classList.toggle('max', lleno);
-      b.classList.toggle('caro', !lleno && yo.pts < precio);
+      b.classList.toggle('caro', !lleno && yo.chat < precio);
       b.querySelector('.pre').textContent = lleno ? (id === 'potencia' ? 'Máximo' : 'Lleno') : precio;
       b.querySelector('.lleva').textContent = id === 'potencia' ? (yo.pot ? '+' + yo.pot * 10 + '%' : '') : id === 'blindado' ? (yo.bl ? '×' + yo.bl : '') : '';
     }
@@ -1737,11 +2024,11 @@
       b.hidden = !yo.tiene.has(i);
       if (b.hidden) continue;
       if (+b.dataset.dibujado !== n) { b.dataset.dibujado = n; const c = b.querySelector('canvas'); G.iconoArma(c.getContext('2d'), i, c.width, c.height, n); }
-      b.className = 'art r' + ra + (yo.w === i ? ' mano' : '') + (!Number.isFinite(precio) ? ' max' : yo.pts < precio ? ' caro' : '');
+      b.className = 'art r' + ra + (yo.w === i ? ' mano' : '') + (!Number.isFinite(precio) ? ' max' : yo.chat < precio ? ' caro' : '');
       b.querySelector('.nom').textContent = a.nombre + (ra ? ' ' + D.RANGOS_ARMA[n].toLowerCase() : '');
       b.querySelector('.est').innerHTML = '<i>' + '★'.repeat(n) + '</i>' + '★'.repeat(D.NIVEL_ARMA.max - n);
       b.querySelector('.pre').textContent = Number.isFinite(precio) ? precio : 'Máximo';
-      b.querySelector('.lleva').textContent = yo.w === i ? 'U' : '';
+      b.querySelector('.lleva').textContent = yo.w === i ? (mando ? Mando.glifo('y') : 'U') : '';
       b.title = a.nombre + ' · nivel ' + n + ' de ' + D.NIVEL_ARMA.max + (Number.isFinite(precio) ? ' · subir: +15 % daño, más cadencia y munición' : '');
     }
   }
@@ -1774,22 +2061,69 @@
     });
   }
 
-  let bannerT = null, premios = [], premioT = null;
+  let bannerT = null;
   function banner(t) {
     const b = $('banner');
     b.textContent = t; b.classList.add('ver');
     clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('ver'), 2200);
   }
-  function premio(t) {
-    premios.push(t);
-    if (!premioT) sigPremio();
-  }
-  function sigPremio() {
-    const p = $('premio'), t = premios.shift();
-    if (t === undefined) { p.classList.remove('ver'); premioT = null; return; }
-    p.textContent = t; p.classList.add('ver');
+  /* **Los avisos van a la vez, no en fila**: hasta tres líneas, cada una
+     2,2 s, y las mejoras de arma seguidas se juntan en una («+3 más»). En
+     fila, una racha larga atrasaba los avisos decenas de segundos y el
+     «+50 vida» de una caja salía cuando ya no venía al caso. */
+  const PREMIOS = [];
+  function premio(t, tipo) {
+    if (!t) return;
+    if (tipo === 'mejora') {
+      const g = PREMIOS.find(p => p.tipo === 'mejora' && p.vida > 0.5);
+      if (g) { g.n++; g.el.textContent = g.txt + ' · +' + (g.n - 1) + ' más'; g.vida = 2.2; return; }
+    }
+    const el = document.createElement('div');
+    el.textContent = t;
+    $('premios').append(el);
+    PREMIOS.push({ el, txt: t, tipo, n: 1, vida: 2.2 });
+    while (PREMIOS.length > 3) PREMIOS.shift().el.remove();
     if (/^¡Nueva|:/.test(t)) son('premio');
-    premioT = setTimeout(() => { p.classList.remove('ver'); premioT = setTimeout(sigPremio, 250); }, 1600);
+  }
+  function pasoPremios(dt) {
+    for (const p of PREMIOS) {
+      p.vida -= dt;
+      if (p.vida < 0.3) p.el.classList.add('sale');
+    }
+    while (PREMIOS.length && PREMIOS[0].vida <= 0) PREMIOS.shift().el.remove();
+  }
+
+  /* **Consejos, una sola vez cada uno** (se recuerdan en `boxhead.consejos`;
+     la pausa los apaga). Salen cuando vienen al caso: la primera tienda, el
+     primer barril cerca, el primer jefe… y nombran el botón del mando si hay
+     uno conectado. */
+  const CONSEJOS = {
+    tienda: () => 'Junto al puesto $ se compra con chatarra: munición, armadura, botiquín y mejoras de arma' + (conMando() ? ' (cruceta y ' + Mando.glifo('y') + ').' : ' (clic o las teclas que muestra).'),
+    chatarra: () => 'La chatarra que sueltan tus bajas es la moneda de la tienda. Los puntos solo suben: son tu marcador.',
+    combo: () => 'Cada baja sube el multiplicador. Si la barra de arriba se vacía, baja de a uno: no dejes de disparar.',
+    arma: () => 'Arma nueva. Cámbiala con ' + boton('Q/E', 'lb') + (conMando() ? '/' + Mando.glifo('rb') : ' o los números 1–8') + '.',
+    barril: () => 'Dispárale a los barriles rojos: explotan y se llevan a la horda que esté cerca.',
+    jefe: () => 'Los jefes avisan antes de golpear: si el suelo se pone rojo, sal del círculo.',
+    fijar: () => 'Mantén ' + boton('Shift', 'lt') + ' para fijar hacia dónde miras: retrocedes disparando de frente.',
+  };
+  let consejosOn = lee('boxhead.consejosOn', '1') !== '0', vistosC = new Set();
+  try { vistosC = new Set(JSON.parse(lee('boxhead.consejos', '[]'))); } catch {}
+  const colaC = [];
+  function consejo(id) {
+    if (!consejosOn || vistosC.has(id) || !CONSEJOS[id] || (cfg && cfg.mirando)) return;
+    vistosC.add(id);
+    guarda('boxhead.consejos', JSON.stringify([...vistosC]));
+    colaC.push(id);
+  }
+  function pasoConsejo(dt) {
+    const el = $('consejo');
+    if (consejoT > 0) { consejoT -= dt; if (consejoT <= 0) el.classList.remove('ver'); return; }
+    if (consejoT > -1) { consejoT -= dt; return; }   // un respiro entre uno y otro
+    const id = colaC.shift();
+    if (!id || !jugando) return;
+    el.textContent = '💡 ' + CONSEJOS[id]();
+    el.classList.add('ver');
+    consejoT = 6.5;
   }
 
   function ponPausa(v) {
@@ -1797,6 +2131,25 @@
     if (v) pausaDesde = Date.now();
     $('pausa').hidden = !v;
   }
+  /* Las opciones de la pausa: música (y su volumen), números de daño,
+     vibración del mando y consejos. Se guardan en este navegador. */
+  function armaOpciones() {
+    const mus = SND.opcionesMusica();
+    const ch = (id, v, fn) => { const el = $(id); el.checked = v; el.onchange = () => fn(el.checked); };
+    ch('optMusica', mus.on, v => { SND.ponMusica(v, null); guarda('boxhead.musica', v ? '1' : '0'); });
+    const r = $('optMusVol'); r.value = Math.round(mus.vol * 100);
+    r.oninput = () => { SND.ponMusica(null, r.value / 100); guarda('boxhead.musVol', r.value); };
+    ch('optNumeros', numDano, v => { numDano = v; NUM = []; guarda('boxhead.numeros', v ? '1' : '0'); });
+    ch('optVibra', vibraOn, v => { vibraOn = v; guarda('boxhead.vibra', v ? '1' : '0'); if (v) vibra(0.6, 0.6, 120); });
+    ch('optConsejos', consejosOn, v => { consejosOn = v; guarda('boxhead.consejosOn', v ? '1' : '0'); if (v) { vistosC.clear(); guarda('boxhead.consejos', '[]'); } });
+  }
+  SND.ponMusica(lee('boxhead.musica', '1') !== '0', clamp((+lee('boxhead.musVol', '60') || 0) / 100, 0, 1));
+  armaOpciones();
+  // la ayuda de teclas se pliega y se recuerda
+  function ponAyuda(ver) { $('ayuda').classList.toggle('plegada', !ver); guarda('boxhead.ayuda', ver ? '1' : '0'); }
+  $('ayudaX').onclick = () => ponAyuda(false);
+  $('ayudaVer').onclick = () => ponAyuda(true);
+  ponAyuda(lee('boxhead.ayuda', '1') !== '0');
 
   // ---------- menú ----------
   function pintaMenu() {
@@ -1845,7 +2198,9 @@
   function cuadro(ahora) {
     const dt = Math.min(0.05, (ahora - ultimo) / 1000);
     ultimo = ahora;
-    if (!document.hidden) { paso(dt); dibuja(); hud(dt); }
+    let dts = dt;
+    if (hs > 0) { hs -= dt; dts = dt * 0.08; }
+    if (!document.hidden) { paso(dts); dibuja(); hud(dt); }
     requestAnimationFrame(cuadro);
   }
   requestAnimationFrame(cuadro);
@@ -1870,7 +2225,8 @@
     objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max, bl: o.bl || 0 })),
     // la tienda: puntos para probar, y lo comprado
     puntos: n => { yo.pts = n | 0; },
-    tienda: () => ({ nv: yo.nv.slice(), bl: yo.bl, pot: yo.pot, arm: yo.arm, pts: yo.pts, tiendas: (M.tiendas || []).map(t => [t.x, t.y]), arma: armaDe(yo.w) }),
+    chatarra: n => { yo.chat = n | 0; },
+    tienda: () => ({ nv: yo.nv.slice(), bl: yo.bl, pot: yo.pot, arm: yo.arm, pts: yo.pts, chat: yo.chat, tiendas: (M.tiendas || []).map(t => [t.x, t.y]), arma: armaDe(yo.w) }),
   };
   if (ONLINE) enviar('listo');
 })();

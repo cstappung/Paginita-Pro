@@ -135,3 +135,47 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `ORDEN_MAPAS`) and `meta` — not `modo`. `'boxhead'` was added to the
   rules' `juego` and `logros` whitelists, so they must be re-published.
   `tests/boxhead.test.cjs` covers the reducer and walks every map.
+
+## Phase 1 of the mega update (`boxhead-9`): controls, economy, feel, HUD, music
+
+- **Chatarra is the shop currency; points only go up.** `yo.chat` is local, never
+  in the log or the player state, like armour. My kills drop it (`miBaja` →
+  `sueltaChatarra`, `D.chatarraDe(k)` = 1.5 × base points, no multiplier) as
+  pieces in `CH` that fly to me (`pasoChatarra`); dying cashes what is left
+  (`cobra`). `compra`/`subeArma` charge `yo.chat`, never `yo.pts`: points decide
+  the coop winner, the room table and logros. `D.precioTienda(id, pot, nivel)`
+  raises supplies 5 % per level (cap ×2.5); potencia and weapon levels are fixed.
+- **Controls.** Shift / LT / the touch «Fijar» lock the facing (`yo.fija`, an
+  arrow on the floor, 0.88 speed). `Mando.configura` has `stick: null` and
+  `flechas: false`: the game reads the sticks itself (`leeMando`, only when
+  `modo === 'juego'`) with `D.dirStick` (8 directions with hysteresis; tested).
+  Light tilt turns without moving; the right stick looks without moving. The
+  d-pad buys at a `$` (`MANDO_TIENDA` maps items to buttons, and the shop shows
+  their glyphs) and cycles weapons away from it. Vibration (`vibra`) lives here,
+  not in `mando.js`, so the shared module (34 pages) did not change. Touch
+  controls (`#tactil`, shown with `html.tactil` on the first touch or a coarse
+  pointer) feed the same stick path; the header says `@controles: tactil teclado`.
+- **mando.js puts its hints next to `#ayuda` without the id**, so
+  `#hud>.mando-pista` must carry the position. Without it they landed on top of
+  `#info`.
+- **Hit-stop** (`impacto`, max 0.1 s) only scales this screen's `dt` (×0.08 in
+  `cuadro`): boss death, big explosion nearby, point-blank shotgun. Nothing may
+  depend on it, and it must stay short because a director's freeze is everyone's.
+- **HUD.** Rewards show at the same time (`PREMIOS`, at most 3, 2.2 s each) and
+  weapon upgrades merge into one line. A queue used to delay a box's «+50 vida»
+  by tens of seconds. Tips (`CONSEJOS`) show once each (`boxhead.consejos`). The
+  shop sits on the right side (on phones under the score). The combo arc blinks
+  under 25 % (`#marca.cae`, `avisoCombo`), and milestones ×10/25/50/100…
+  (`HITOS`) pulse the camera. The end screen shows `yo.st` (shots and hits per
+  pellet, kills per weapon, bosses). Options live in the pause and are stored as
+  `boxhead.*` keys.
+- **Music** (`audio.js`, `musica(meta, jefe)`): a 16th-note sequencer through
+  its own `mus.bus` into the compressor (`salida`), so `volumen.js` still governs
+  it. `juego.js` sends the intensity from enemies and the multiplier, −1 to fade
+  out, and a live boss switches the theme. Music pieces pass `libre` so they never
+  count in `carga`. Otherwise the horde's cap would mute the effects.
+- **Recorded effects:** the loader is ready (`MUESTRAS`/`GAN`/`muestra`), but
+  `MUESTRAS` stays empty until the ElevenLabs files exist as
+  `sfx/<key>-<n>.mp3`. Each file's `GAN` must be measured against the
+  synthesized sound. The `switch` in `son` remains the fallback.
+

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202611071824"></script>
+<script src="../../i18n.js?v=202611090118"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -31,9 +31,16 @@ button{font:inherit;cursor:pointer}
 #mul{position:absolute;left:0;right:0;top:34px;font-weight:900;color:var(--oro);font-size:40px;line-height:1;text-shadow:0 3px 0 #000,0 0 12px rgba(0,0,0,.6)}
 #mul.sube{animation:sube .25s ease-out}
 @keyframes sube{from{transform:scale(1.35)}to{transform:scale(1)}}
+/* el combo a punto de caer parpadea; un hito (×10, ×25…) hace saltar todo el marcador */
+#marca.cae .arco{animation:cae .32s steps(2) infinite}
+@keyframes cae{50%{stroke:#ff5a3a;opacity:.45}}
+#marca.hito{animation:hito .7s ease-out}
+@keyframes hito{0%{transform:translateX(-50%) scale(1)}25%{transform:translateX(-50%) scale(1.25)}100%{transform:translateX(-50%) scale(1)}}
 #ptsN{display:block;margin-top:-4px;font-size:24px;font-weight:900;color:#fff;text-shadow:0 2px 0 #000,0 0 10px rgba(0,0,0,.7);letter-spacing:.02em}
 #info{position:absolute;left:10px;top:10px;padding:5px 12px;white-space:nowrap;font-size:13px}
 #info b{color:var(--oro)}
+#info .chat b{color:#d9e2ea}
+#info .chat.pulso b{color:#fff;text-shadow:0 0 8px #ffd54a}
 #nivel b{font-size:16px}
 #armas{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:4px;padding:5px}
 .slot{width:62px;height:46px;border:2px solid #3d3227;border-radius:4px;background:#221c15;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:var(--tenue);position:relative}
@@ -56,18 +63,24 @@ button{font:inherit;cursor:pointer}
 #jefeBar .tubo{height:9px;border:2px solid #000;background:#3a0c08;border-radius:3px;overflow:hidden;box-shadow:0 2px 0 rgba(0,0,0,.5)}
 #jefeBar .tubo i{display:block;height:100%;background:linear-gradient(#ff6a4a,#b0160c);transition:width .15s}
 #jefeBar .mini .tubo i{background:linear-gradient(#ffd56a,#c07a0c)}
-#premio{position:absolute;left:50%;top:36%;transform:translateX(-50%);font-size:18px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000;white-space:nowrap;opacity:0;transition:opacity .3s}
-#premio.ver{opacity:1}
+#premios{position:absolute;left:50%;top:36%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none}
+#premios div{font-size:18px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000;white-space:nowrap;animation:entra .2s ease-out;transition:opacity .3s}
+#premios div.sale{opacity:0}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#consejo{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);max-width:min(520px,calc(100vw - 24px));padding:7px 12px;font-size:13px;color:var(--txt);background:rgba(20,17,13,.9);border:2px solid #8a6a3a;border-radius:6px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
+#consejo.ver{opacity:1}
 #aviso{position:absolute;left:50%;bottom:66px;transform:translateX(-50%);color:#fff;text-shadow:0 2px 0 #000;font-weight:700;white-space:nowrap}
 /* ---- la tienda: aparece junto a un puesto $, se usa con clic o con las teclas ---- */
-#tienda{position:absolute;left:50%;bottom:68px;transform:translateX(-50%);pointer-events:auto;width:max-content;max-width:min(900px,calc(100vw - 20px));padding:6px 8px 8px;background:rgba(18,14,10,.93);border-color:#8a6a3a;box-shadow:0 4px 0 rgba(0,0,0,.5),0 0 24px rgba(242,193,78,.18)}
+/* A un costado, para no tapar el centro (donde viene la horda). */
+#tienda{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:auto;width:308px;max-height:calc(100vh - 150px);overflow:auto;padding:6px 8px 8px;background:rgba(18,14,10,.93);border-color:#8a6a3a;box-shadow:0 4px 0 rgba(0,0,0,.5),0 0 24px rgba(242,193,78,.18)}
+#hud:has(#tienda:not([hidden])) #tabla{display:none}
 #tienda[hidden]{display:none}
 .t-cab{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 2px 2px;font-size:13px}
 .t-cab b{color:var(--oro);font-size:15px;letter-spacing:.04em;text-transform:uppercase}
 .t-cab span b{font-size:15px;color:#fff;text-transform:none}
 .t-sec{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--tenue);margin:4px 2px 3px}
 .t-fila{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-.art{position:relative;width:88px;min-height:80px;padding:5px 3px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;background:linear-gradient(#2e261c,#211b14);color:var(--txt);border:2px solid #4d3e2c;border-radius:6px;box-shadow:0 2px 0 rgba(0,0,0,.45);text-align:center;line-height:1.15}
+.art{position:relative;width:92px;min-height:74px;padding:5px 3px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;background:linear-gradient(#2e261c,#211b14);color:var(--txt);border:2px solid #4d3e2c;border-radius:6px;box-shadow:0 2px 0 rgba(0,0,0,.45);text-align:center;line-height:1.15}
 .art:hover{border-color:var(--oro);background:linear-gradient(#3b3022,#2a2219)}
 .art:active{transform:translateY(1px)}
 .art .ico{width:30px;height:30px;display:grid;place-items:center}
@@ -85,7 +98,25 @@ button{font:inherit;cursor:pointer}
 .art.max .pre{color:#8fd88a}.art.max .pre::before{content:""}
 .art.mano{border-color:#8a6a3a}
 #hud:has(#tienda:not([hidden])) #ayuda{display:none}
-#ayuda{position:absolute;left:10px;bottom:10px;font-size:11px;color:var(--tenue);max-width:260px;padding:5px 8px}
+#ayuda{position:absolute;left:10px;bottom:10px;font-size:11px;color:var(--tenue);max-width:260px;padding:5px 22px 5px 8px;pointer-events:auto}
+/* las pistas del mando: mando.js las pone junto a #ayuda, pero sin su id */
+#hud>.mando-pista{position:absolute;left:10px;bottom:10px;font-size:11px;line-height:1.7;color:var(--tenue);max-width:330px;padding:5px 8px}
+#hud:has(#tienda:not([hidden])) .mando-pista{display:none}
+#ayuda button{position:absolute;background:none;border:0;color:var(--tenue);padding:0 4px;font-size:13px}
+#ayudaX{right:2px;top:1px}
+#ayudaVer{display:none;position:static!important;font-size:11px!important}
+#ayuda.plegada{padding:3px 6px}#ayuda.plegada>span,#ayuda.plegada #ayudaX{display:none}#ayuda.plegada #ayudaVer{display:inline}
+/* ---- controles táctiles: aparecen con el primer toque ---- */
+html:not(.tactil) #tactil{display:none}
+#tZona{position:absolute;left:0;bottom:0;width:50%;height:62%;pointer-events:auto;touch-action:none}
+#tPalo{position:fixed;width:104px;height:104px;margin:-52px 0 0 -52px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.18);pointer-events:none}
+#tPalo[hidden]{display:none}
+#tPalo i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(242,193,78,.55);border:2px solid rgba(0,0,0,.4)}
+#tBotones{position:absolute;right:10px;bottom:64px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto;touch-action:none}
+#tBotones button{height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.3);background:rgba(20,17,13,.6);color:var(--txt);font-size:11px;font-weight:800;padding:0;touch-action:none}
+#tBotones button.on{background:rgba(242,193,78,.55);color:#2a1a06}
+#tBotones .disp{grid-column:2/4;grid-row:2/4;height:auto;border-radius:50%;font-size:15px;background:rgba(217,75,61,.55)}
+html.tactil #ayuda{display:none}
 #rojo{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(200,0,0,.0);transition:box-shadow .2s}
 /* ---- menú ---- */
 .capa{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,8,6,.72);z-index:5;padding:16px;overflow:auto}
@@ -103,11 +134,22 @@ h3{margin:6px 0 2px;font-size:13px;text-transform:uppercase;letter-spacing:.08em
 .menu-ayuda{font-size:12px;color:var(--tenue);margin-top:12px}
 kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0 4px;font:inherit;font-size:11px}
 #cuenta{color:var(--tenue);font-size:12px;margin-top:8px}
+.opciones{display:grid;gap:6px;justify-items:start;max-width:280px;margin:4px auto 14px;font-size:13px;text-align:left}
+.opciones label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.opciones input[type=range]{width:180px;margin-left:26px}
+.stats{display:grid;gap:3px;max-width:320px;margin:0 auto 14px;font-size:13px}
+.stats div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding:2px 0}
+.stats b{color:var(--oro)}
 @media (max-width:640px){
   #marca{transform:translateX(-50%) scale(.72);transform-origin:top center}#info{font-size:11px;padding:4px 8px}#tabla{display:none}.slot{width:40px;height:36px}.slot canvas{width:24px;height:14px}.slot span{font-size:9px}
   #ayuda{display:none}.logo{font-size:34px}#banner{font-size:22px}
-  #tienda{bottom:52px;padding:6px}.art{width:74px;min-height:78px}.art .det{display:none}.art .ico,.art .ico svg{width:26px;height:26px}.art .ico canvas{width:40px;height:23px}
+  #tienda{left:8px;right:8px;top:104px;transform:none;width:auto;max-height:44vh;padding:6px}.art{width:74px;min-height:70px}.art .det{display:none}.art .ico,.art .ico svg{width:26px;height:26px}.art .ico canvas{width:40px;height:23px}
+  #info{left:6px;top:6px;font-size:10px;padding:3px 7px}#marca{top:30px}
+  #vol{top:auto;right:6px;bottom:276px;transform:scale(.8);transform-origin:right bottom}
+  #jefeBar{top:104px}#consejo{bottom:auto;top:146px;font-size:12px}#hud:has(#tienda:not([hidden])) #consejo{display:none}#premios div{font-size:15px}
+  #tBotones{grid-template-columns:repeat(3,52px);gap:6px}#tBotones button{height:46px}
 }
+@media (max-width:640px),(max-height:520px){html.tactil #armas{bottom:6px;left:12px;transform:none}html.tactil #armas .slot{width:34px;height:32px}}
 </style>
 </head>
 <body>
@@ -124,22 +166,33 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
     <span id="mul">×1</span>
     <b id="ptsN">0</b>
   </div>
-  <div id="info" class="panel"><span id="nivel"></span> · Bajas <b id="kN">0</b> · Armadura <b id="armN">0</b><span id="potN"></span><span id="blN"></span></div>
+  <div id="info" class="panel"><span id="nivel"></span> · Bajas <b id="kN">0</b> · <span class="chat">Chatarra <b id="chatN" translate="no">0</b></span> · Armadura <b id="armN">0</b><span id="potN"></span><span id="blN"></span></div>
   <div id="vol" class="panel" data-volumen></div>
   <div id="tabla" class="panel" translate="no"></div>
   <div id="banner"></div>
   <div id="jefeBar" hidden></div>
-  <div id="premio"></div>
+  <div id="premios"></div>
+  <div id="consejo"></div>
   <div id="aviso"></div>
   <div id="tienda" class="panel" hidden>
-    <div class="t-cab"><b>$ Tienda</b><span>Tus puntos: <b id="tPts" translate="no">0</b></span></div>
-    <div class="t-sec">Suministros · clic o tecla</div>
+    <div class="t-cab"><b>$ Tienda</b><span>Chatarra: <b id="tPts" translate="no">0</b></span></div>
+    <div class="t-sec">Suministros · <span id="tAyuda">clic o tecla</span></div>
     <div class="t-fila" id="tSum"></div>
-    <div class="t-sec">Mejorar armas · clic, o <kbd>U</kbd> la que llevas</div>
+    <div class="t-sec">Mejorar armas · clic, o <kbd id="tAyudaU">U</kbd> la que llevas</div>
     <div class="t-fila" id="tArmas"></div>
   </div>
   <div id="armas" class="panel"></div>
-  <p id="ayuda" class="panel"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> o <kbd>1</kbd>–<kbd>8</kbd> arma · <kbd>X</kbd> detonar cargas · <kbd>F</kbd> poner muro reforzado · en la tienda <kbd>$</kbd>: clic, o <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia, <kbd>M</kbd> muro reforzado, <kbd>U</kbd> mejorar el arma · <kbd>Esc</kbd> pausa</p>
+  <p id="ayuda" class="panel"><span><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Shift</kbd> fijar hacia dónde miras · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> o <kbd>1</kbd>–<kbd>8</kbd> arma · <kbd>X</kbd> detonar cargas · <kbd>F</kbd> poner muro reforzado · en la tienda <kbd>$</kbd>: clic, o <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia, <kbd>M</kbd> muro reforzado, <kbd>U</kbd> mejorar el arma · <kbd>Esc</kbd> pausa</span><button type="button" id="ayudaX" title="Ocultar la ayuda" aria-label="Ocultar la ayuda">×</button><button type="button" id="ayudaVer">? Controles</button></p>
+  <div id="tactil">
+    <div id="tZona"></div>
+    <div id="tPalo" hidden><i></i></div>
+    <div id="tBotones">
+      <button type="button" data-t="ant">◀ Arma</button><button type="button" data-t="sig">Arma ▶</button><button type="button" data-t="pausa">❚❚</button>
+      <button type="button" data-t="fija">Fijar</button><button type="button" data-t="disp" class="disp">Disparar</button>
+      <button type="button" data-t="muro">Muro</button>
+      <button type="button" data-t="det">Detonar</button>
+    </div>
+  </div>
 </div>
 
 <div id="menu" class="capa">
@@ -151,14 +204,21 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
     <div class="fila" id="skins"></div>
     <button class="btn" id="jugar">¡A jugar!</button>
     <p id="cuenta"></p>
-    <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> cambiar arma · <kbd>X</kbd> detonar cargas.<br>Junto a un puesto <kbd>$</kbd> se abre la tienda: compra con clic o con <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia, <kbd>M</kbd> muro reforzado (lo pones con <kbd>F</kbd>) y <kbd>U</kbd> sube de nivel el arma que llevas.<br>Cada baja sube el multiplicador; las armas nuevas se ganan con él.</p>
+    <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Shift</kbd> fijar hacia dónde miras (retrocedes disparando de frente) · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> cambiar arma · <kbd>X</kbd> detonar cargas.<br>Tus bajas sueltan <b>chatarra</b>, la moneda de la tienda: junto a un puesto <kbd>$</kbd> compra con clic o con <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia, <kbd>M</kbd> muro reforzado (lo pones con <kbd>F</kbd>) y <kbd>U</kbd> sube de nivel el arma que llevas.<br>Cada baja sube el multiplicador y los puntos; las armas nuevas se ganan con él. En el celular, joystick a la izquierda y botones a la derecha.</p>
   </div>
 </div>
 
 <div id="pausa" class="capa" hidden>
   <div class="caja panel">
     <h2 class="logo" style="font-size:34px">PAUSA</h2>
-    <p class="sub" id="pausaSub">En línea la partida sigue: los zombis no esperan.</p>
+    <p class="sub" id="pausaSub">La partida está detenida.</p>
+    <div class="opciones">
+      <label><input type="checkbox" id="optMusica"> Música</label>
+      <input type="range" id="optMusVol" min="0" max="100" aria-label="Volumen de la música">
+      <label><input type="checkbox" id="optNumeros"> Números de daño</label>
+      <label><input type="checkbox" id="optVibra"> Vibración del mando</label>
+      <label><input type="checkbox" id="optConsejos"> Consejos</label>
+    </div>
     <button class="btn" id="seguir">Seguir</button>
   </div>
 </div>
@@ -167,13 +227,14 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   <div class="caja panel">
     <h2 class="logo" style="font-size:34px">FIN</h2>
     <p class="sub" id="finTxt"></p>
+    <div class="stats" id="finStats"></div>
     <button class="btn" id="otra">Jugar otra vez</button>
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-7"></script>
-<script src="js/grafico.js?v=boxhead-7"></script>
-<script src="js/audio.js?v=boxhead-8"></script>
-<script src="js/juego.js?v=boxhead-7"></script>
+<script src="js/datos.js?v=boxhead-9"></script>
+<script src="js/grafico.js?v=boxhead-9"></script>
+<script src="js/audio.js?v=boxhead-9"></script>
+<script src="js/juego.js?v=boxhead-9"></script>
 </body>
 </html>

@@ -21,7 +21,7 @@
      ganarla · caja: lo que da una caja de munición · max: tope · alc:
      alcance de la bala · r: radio de explosión · tipo: cómo dispara. */
   const ARMAS = [
-    { id: 0, nombre: 'Pistola', tipo: 'bala', d: 12, cad: 0.32, ini: Infinity, caja: 0, max: Infinity, alc: 360, desbloquea: 1 },
+    { id: 0, nombre: 'Pistola', tipo: 'bala', d: 15, cad: 0.28, ini: Infinity, caja: 0, max: Infinity, alc: 360, desbloquea: 1 },
     { id: 1, nombre: 'Uzi', tipo: 'bala', d: 9, cad: 0.08, ini: 150, caja: 100, max: 400, alc: 340, desv: 0.06, desbloquea: 5 },
     { id: 2, nombre: 'Escopeta', tipo: 'perdigon', d: 13, cad: 0.75, ini: 25, caja: 15, max: 60, alc: 240, perdigones: 8, abre: 0.42, desbloquea: 10 },
     { id: 3, nombre: 'Barriles', tipo: 'objeto', obj: 'barril', d: 120, r: 84, cad: 0.4, ini: 5, caja: 3, max: 15, desbloquea: 15 },
@@ -138,6 +138,11 @@
   const bajadaCombo = mul => duracionCombo(mul) * 0.5;
   /* Puntos por baja (× multiplicador), por tipo de enemigo. */
   const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000, 50];
+  /* **La chatarra es la moneda de la tienda; los puntos, solo la puntuación.**
+     Cada baja propia suelta chatarra (sin multiplicador: con él, pasado el
+     nivel 10 la tienda salía gratis). Comprar ya no baja los puntos, que son
+     los que deciden el coop, la tabla de la sala y los logros. */
+  const chatarraDe = k => Math.round((PUNTOS[k] || 10) * 1.5);
 
   /* ---------- enemigos ----------
      `desde`: primer nivel en que aparece · `parte`/`tope`: cuánto crece su
@@ -225,7 +230,7 @@
   const ritmoNivel = n => Math.max(0.35, 1.0 - 0.03 * (n - 1));
 
   /* ---------- tienda y armadura ----------
-     Se compra con los puntos, de pie junto a una estación de suministros
+     Se compra con la chatarra, de pie junto a una estación de suministros
      (`$` en el mapa). `potencia` sube el daño de todas las armas un 10 %
      por nivel; cada nivel cuesta más. */
   const ARMADURA = { max: 100, absorbe: 0.6, caja: 35 };
@@ -243,7 +248,7 @@
 
   /* ---------- mejoras de armas en la tienda ----------
      Aparte de las del multiplicador, cada arma sube hasta `NIVEL_ARMA.max`
-     niveles con puntos (tecla U, el arma en la mano, o clic en la tienda).
+     niveles con chatarra (tecla U, el arma en la mano, o clic en la tienda).
      Cada nivel cuesta `sube` veces el anterior y da +15 % de daño, −6 % de
      tiempo entre disparos, +20 % de munición, +6 % de radio de explosión y
      +25 % de vida a los muros. Con el nivel cambia cómo se ve el arma:
@@ -268,11 +273,16 @@
     if (b.vida) b.vida = Math.min(1200, Math.round(b.vida * (1 + 0.25 * n)));
     return b;
   }
-  const precioTienda = (id, nivel) => {
+  /* Los suministros (munición, armadura, botiquín, muro reforzado) suben un
+     5 % por nivel de la partida, hasta ×2,5: más adelante se gana más
+     chatarra por nivel y la tienda debe seguir pesando. La potencia es
+     permanente y no sube con el nivel. */
+  const factorNivelTienda = n => Math.min(2.5, 1 + 0.05 * Math.max(0, (n | 0) - 1));
+  const precioTienda = (id, nivel, nivelJuego) => {
     const t = TIENDA.find(x => x.id === id);
     if (!t) return Infinity;
     if (id === 'potencia') return (nivel || 0) >= t.max ? Infinity : t.precio * ((nivel || 0) + 1);
-    return t.precio;
+    return Math.round(t.precio * factorNivelTienda(nivelJuego) / 10) * 10;
   };
   const factorPotencia = nivel => 1 + 0.1 * Math.max(0, Math.min(5, nivel || 0));
   const ALCANCE_TIENDA = 40;
@@ -447,11 +457,22 @@
   const DIRS = [];
   for (let i = 0; i < 8; i++) DIRS.push([Math.round(Math.cos(i * Math.PI / 4) * 1e6) / 1e6, Math.round(Math.sin(i * Math.PI / 4) * 1e6) / 1e6]);
   const dirDe = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+  /* La dirección de un stick con histéresis: mientras el ángulo no se aleje
+     más de `hist` radianes del borde del sector de `prev`, sigue en `prev`.
+     Sin esto, un stick entre «derecha» y «abajo-derecha» tiritaba entre las
+     dos y el personaje disparaba hacia ambos lados. */
+  function dirStick(dx, dy, prev, hist) {
+    const a = Math.atan2(dy, dx), d = dirDe(dx, dy);
+    if (!(prev >= 0 && prev < 8) || prev === d) return d;
+    const c = prev * Math.PI / 4;
+    const dif = Math.abs(((a - c + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI);
+    return dif <= Math.PI / 8 + (hist === undefined ? 0.14 : hist) ? prev : d;
+  }
 
   return {
-    TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
+    TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
-    ARMADURA, TIENDA, precioTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
-    cargaMapa, DIRS, dirDe
+    ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
+    cargaMapa, DIRS, dirDe, dirStick
   };
 });

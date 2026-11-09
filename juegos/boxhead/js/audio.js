@@ -14,14 +14,22 @@
    - **Hay un tope de piezas sonando a la vez** (`carga`): con la horda
      encima, cada disparo, baja y gemido armaba sus osciladores y filtros, el
      hilo de audio no daba abasto y el sonido se entrecortaba hasta apagarse.
-     Pasado `TOPE_LEJOS` se callan los sonidos lejanos; pasado `TOPE`, todos. */
+     Pasado `TOPE_LEJOS` se callan los sonidos lejanos; pasado `TOPE`, todos.
+   - **Grabaciones** (`MUESTRAS`, archivos en `sfx/`): donde hay una, suena
+     ella; mientras no llega, o si falla, suena el sintetizado. El `switch`
+     de `son` es ese respaldo: no se borra.
+   - **La música** (`musica`) es por capas y la arma este archivo: un
+     colchón siempre, el bajo, la batería y el arpegio entran con la
+     intensidad que manda `juego.js` (enemigos cerca, multiplicador), y con
+     un jefe vivo cambia a su tema. Va por su propio bus al mismo compresor,
+     así que el volumen del Club también la gobierna. */
 (function (raiz) {
   'use strict';
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const azar = (a, b) => a + Math.random() * (b - a);
 
   function crear() {
-    let ac = null, bus = null, seco = null, eco = null, ruidoBuf = null, distor = null;
+    let ac = null, bus = null, seco = null, eco = null, ruidoBuf = null, distor = null, salida = null;
     const ultimo = {};
     // cuándo termina cada pieza (ruido, tono; una voz pesa cuatro) que suena
     let fines = [];
@@ -46,6 +54,7 @@
           const lim = ac.createDynamicsCompressor();
           lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.12;
           comp.connect(lim); lim.connect(ac.destination);
+          salida = comp;
           bus = ac.createGain(); bus.gain.value = 0.55;
           seco = ac.createGain(); seco.gain.value = 1;
           bus.connect(seco); seco.connect(comp);
@@ -67,6 +76,7 @@
           distor.curve = cur;
           const ds = ac.createGain(); ds.gain.value = 0.2;
           distor.connect(ds); ds.connect(bus);
+          cargaMuestras();
         } catch { ac = null; }
       }
       if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
@@ -88,7 +98,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       s.connect(fl); fl.connect(g); g.connect(o.dest || bus);
       s.start(t, Math.random() * Math.max(0, 1.9 - dur), dur + 0.05);
-      suena(t + dur);
+      if (!o.libre) suena(t + dur);
     }
     function tono(o) {
       const t = ac.currentTime + (o.t0 || 0), dur = o.dur || 0.1;
@@ -102,7 +112,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       os.connect(g); g.connect(o.dest || bus);
       os.start(t); os.stop(t + dur + 0.05);
-      suena(t + dur);
+      if (!o.libre) suena(t + dur);
     }
     /* Una voz: diente de sierra con vibrato por dos formantes. `f0` y `f1`
        el tono al empezar y al terminar; `a`/`b` los formantes; `sucio` la
@@ -137,7 +147,56 @@
     const clic = (t0, f = 2600, vol = 0.25) => { ruido({ tipo: 'bandpass', f, q: 6, dur: 0.025, vol, t0 }); tono({ f1: f * 0.7, dur: 0.012, vol: vol * 0.4, tipo: 'square', t0 }); };
 
     // ---------- el catálogo ----------
-    const ESPERA = { baja: 40, gemido: 0, impacto: 35, uzi: 20, rebote: 60, dolor: 120 };
+    /* ---------- grabaciones ----------
+       `MUESTRAS[k]` = cuántas tomas hay de ese sonido (`sfx/<k>-<n>.mp3`,
+       hechas con ElevenLabs); con varias se elige una al azar para que veinte
+       disparos no suenen iguales. `GAN[k]` es la ganancia de cada archivo,
+       medida contra el sintetizado (la ventana de 100 ms más fuerte) para que
+       nada suene más fuerte que antes. Se cargan de a cuatro después del
+       primer toque; mientras tanto suena el sintetizado. */
+    const MUESTRAS = {};
+    const GAN = {};
+    const VARIA = { pistola: 1, uzi: 1, escopeta: 1, impacto: 1, baja: 1, gemido: 1, grunido: 1, mordida: 1, chispa: 1, rebote: 1, chatarra: 1, dolor: 1 };
+    const VOCES = 6;
+    const bufs = {}, sonando = {};
+    const VER = ((typeof document !== 'undefined' && document.currentScript && /[?&]v=([^&]+)/.exec(document.currentScript.src)) || [])[1] || '';
+    function cargaMuestras() {
+      const lista = [];
+      for (const k of Object.keys(MUESTRAS)) for (let i = 1; i <= MUESTRAS[k]; i++) lista.push([k, i]);
+      let i = 0;
+      const sig = () => {
+        const it = lista[i++];
+        if (!it || !ac) return;
+        fetch('sfx/' + it[0] + '-' + it[1] + '.mp3' + (VER ? '?v=' + VER : ''))
+          .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+          .then(b => new Promise((ok, mal) => ac.decodeAudioData(b, ok, mal)))
+          .then(b => { (bufs[it[0]] || (bufs[it[0]] = [])).push(b); })
+          .catch(() => { /* queda el sintetizado */ })
+          .then(sig);
+      };
+      for (let k = 0; k < 4; k++) sig();
+    }
+    // Toca una grabación de `k` (false si no hay: suena el sintetizado).
+    function muestra(k, v, lp) {
+      const l = bufs[k];
+      if (!l || !l.length) return false;
+      if ((sonando[k] || 0) >= VOCES) return true;
+      const b = l[(Math.random() * l.length) | 0];
+      const s = ac.createBufferSource(), g = ac.createGain();
+      s.buffer = b;
+      if (VARIA[k]) s.playbackRate.value = azar(0.93, 1.07);
+      g.gain.value = (GAN[k] || 0.5) * 1.25 * v;
+      let n = s;
+      if (lp < 0.98) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700 + 11000 * lp * lp; s.connect(f); n = f; }
+      n.connect(g); g.connect(bus);
+      sonando[k] = (sonando[k] || 0) + 1;
+      s.onended = () => { sonando[k]--; try { g.disconnect(); } catch {} };
+      s.start();
+      suena(ac.currentTime + b.duration, 2);
+      return true;
+    }
+
+    const ESPERA = { baja: 40, gemido: 0, impacto: 35, uzi: 20, rebote: 60, dolor: 120, chatarra: 45, avisoCombo: 300, racha: 400 };
     function son(k, lejos) {
       if (!ac) return;
       if (ac.state !== 'running') { if (ac.state !== 'closed') ac.resume().catch(() => {}); return; }
@@ -148,6 +207,7 @@
       const v = lejos === undefined ? 1 : clamp(1 - lejos / 620, 0.06, 0.75);
       // a lo lejos se pierden los agudos
       const lp = lejos === undefined ? 1 : clamp(1 - lejos / 900, 0.25, 1);
+      if (muestra(k, v, lp)) return;
       switch (k) {
         case 'pistola': {
           const p = azar(0.94, 1.06);
@@ -293,9 +353,99 @@
           [392, 523, 659, 784].forEach((f, i) => tono({ f1: f, f2: f * 1.01, dur: 0.22, vol: 0.15, tipo: 'triangle', t0: i * 0.11 }));
           tono({ f1: 98, dur: 0.6, vol: 0.25, t0: 0.33 });
           break;
+        case 'chatarra':
+          // una tuerca que cae en el bolsillo: tintineo metálico corto
+          tono({ f1: azar(2300, 2900), f2: 2100, dur: 0.07, vol: 0.07, tipo: 'triangle' });
+          tono({ f1: azar(3800, 4600), dur: 0.05, vol: 0.035, tipo: 'sine', t0: 0.025 });
+          break;
+        case 'racha':
+          // un hito del multiplicador: subida brillante con golpe
+          [440, 554, 659, 880, 1109].forEach((f, i) => tono({ f1: f, dur: 0.14, vol: 0.12, tipo: 'square', t0: i * 0.05 }));
+          ruido({ tipo: 'highpass', f: 4000, dur: 0.35, vol: 0.12, t0: 0.22 });
+          tono({ f1: 110, f2: 55, dur: 0.3, vol: 0.35, t0: 0.2 });
+          break;
+        case 'avisoCombo':
+          // dos pitidos que bajan: el combo se está por caer
+          tono({ f1: 1320, dur: 0.06, vol: 0.09, tipo: 'square' });
+          tono({ f1: 990, dur: 0.08, vol: 0.09, tipo: 'square', t0: 0.09 });
+          break;
+        case 'quedan':
+          // quedan cinco: tres golpes graves de tambor
+          for (let i = 0; i < 3; i++) { tono({ f1: 150, f2: 60, dur: 0.16, vol: 0.32, t0: i * 0.14 }); ruido({ tipo: 'lowpass', f: 900, dur: 0.08, vol: 0.18, t0: i * 0.14 }); }
+          break;
       }
     }
-    return { inicia, son, activo: () => !!(ac && ac.state === 'running') };
+
+    /* ---------- la música ----------
+       Un secuenciador de semicorcheas con 0,2 s de adelanto (setInterval de
+       50 ms). `meta` es la intensidad que pide el juego (−1 = callar); `int`
+       la sigue despacio para que las capas entren y salgan sin saltos. */
+    const mus = { on: true, vol: 0.6, meta: -1, int: 0, jefe: false, paso: 0, t: 0, timer: null, bus: null };
+    const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+    // La menor, Fa, Sol, Mi menor; con jefe: La menor, Si bemol, Fa, Mi (tensión frigia)
+    const ACORDES = [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]];
+    const ACORDES_JEFE = [[57, 60, 64], [58, 62, 65], [53, 57, 60], [52, 56, 59]];
+    function nota(f, t, dur, vol, tipo, lp, ataque) {
+      const os = ac.createOscillator(), g = ac.createGain(), fl = ac.createBiquadFilter();
+      os.type = tipo; os.frequency.setValueAtTime(f, t);
+      fl.type = 'lowpass'; fl.frequency.value = lp; fl.Q.value = 0.8;
+      const at = Math.min(ataque || 0.006, dur * 0.5);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + at);
+      g.gain.setValueAtTime(vol, t + Math.max(at, dur * 0.6));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      os.connect(fl); fl.connect(g); g.connect(mus.bus);
+      os.start(t); os.stop(t + dur + 0.05);
+    }
+    function golpeMus(t, dur, vol, tipo, f, q) {
+      ruido({ tipo, f, q: q || 0.8, dur, vol, t0: Math.max(0, t - ac.currentTime), dest: mus.bus, libre: true });
+    }
+    function bombo(t, vol) {
+      const os = ac.createOscillator(), g = ac.createGain();
+      os.frequency.setValueAtTime(140, t); os.frequency.exponentialRampToValueAtTime(42, t + 0.18);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      os.connect(g); g.connect(mus.bus); os.start(t); os.stop(t + 0.3);
+    }
+    function pasoMusica(p, t, d) {
+      const i = mus.int, jefe = mus.jefe, s16 = p % 16, A = (jefe ? ACORDES_JEFE : ACORDES)[Math.floor(p / 16) % 4];
+      // colchón: los tres sonidos del acorde, todo el compás
+      if (s16 === 0) for (const m of A) nota(hz(m - 12), t, d * 16, 0.022, 'sawtooth', 500 + 700 * i, d * 4);
+      // bajo
+      if (i > 0.12 || jefe) {
+        const pat = jefe ? [0, 2, 3, 6, 8, 10, 11, 14] : [0, 3, 6, 8, 11, 14];
+        if (pat.includes(s16)) nota(hz(A[0] - 24 + (s16 === 3 || s16 === 11 ? 12 : 0)), t, d * 1.7, 0.085, 'sawtooth', 360 + 300 * i, 0.004);
+      }
+      // batería
+      if (i > 0.3 || jefe) {
+        if (s16 % 8 === 0 || ((i > 0.65 || jefe) && s16 % 4 === 0)) bombo(t, 0.42);
+        if (s16 % 4 === 2 || (i > 0.6 && s16 % 2 === 1)) golpeMus(t, 0.035, 0.035, 'highpass', 7500);
+      }
+      if ((i > 0.5 || jefe) && (s16 === 4 || s16 === 12)) { golpeMus(t, 0.12, 0.13, 'bandpass', 1800, 0.9); nota(190, t, 0.08, 0.05, 'triangle', 2000); }
+      // arpegio
+      if (i > 0.72 || jefe) nota(hz(A[[0, 1, 2, 1][s16 % 4]] + 12), t, d * 0.8, 0.02, 'square', 1800 + 1200 * i, 0.003);
+    }
+    function programa() {
+      if (!ac || ac.state !== 'running' || !mus.bus) return;
+      const quiere = mus.on && mus.meta >= 0;
+      mus.bus.gain.setTargetAtTime(quiere ? mus.vol * 0.6 : 0, ac.currentTime, quiere ? 0.8 : 0.4);
+      if (!quiere && mus.bus.gain.value < 0.003) { mus.t = 0; return; }
+      mus.int += ((mus.meta < 0 ? 0 : mus.meta) - mus.int) * 0.04;
+      const d = 60 / (mus.jefe ? 136 : 102 + 24 * mus.int) / 4;
+      if (mus.t < ac.currentTime) mus.t = ac.currentTime + 0.05;
+      while (mus.t < ac.currentTime + 0.2) { pasoMusica(mus.paso, mus.t, d); mus.t += d; mus.paso++; }
+    }
+    function musica(meta, jefe) {
+      mus.meta = meta; mus.jefe = !!jefe;
+      if (meta < 0 || !ac || mus.timer) return;
+      mus.bus = ac.createGain(); mus.bus.gain.value = 0; mus.bus.connect(salida);
+      mus.timer = setInterval(programa, 50);
+    }
+    function ponMusica(on, vol) {
+      if (on !== null && on !== undefined) mus.on = !!on;
+      if (vol !== null && vol !== undefined) mus.vol = clamp(+vol || 0, 0, 1);
+    }
+
+    return { inicia, son, activo: () => !!(ac && ac.state === 'running'), musica, ponMusica, opcionesMusica: () => ({ on: mus.on, vol: mus.vol }) };
   }
 
   raiz.BoxheadAudio = { crear };

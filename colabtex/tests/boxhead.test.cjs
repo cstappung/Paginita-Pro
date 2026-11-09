@@ -258,3 +258,30 @@ test('el Demoledor: el único que va a romper, poco común; cada tipo tiene sus 
  for(let n=1;n<=60;n++)assert.ok(D.mezclaNivel(n)[16]<=0.05+1e-9,'nivel '+n);
  assert.equal(D.mezclaNivel(5)[16],0);assert.ok(D.mezclaNivel(6)[16]>0);
 });
+
+test('la chatarra: moneda aparte de los puntos, sin multiplicador; los suministros suben con el nivel',()=>{
+ for(let k=0;k<D.ENEMIGOS.length;k++){const c=D.chatarraDe(k);assert.ok(Number.isInteger(c)&&c>0,'chatarra de '+k);}
+ assert.ok(D.chatarraDe(11)>D.chatarraDe(6)&&D.chatarraDe(6)>D.chatarraDe(0),'un jefe grande da más que uno chico, y este más que un zombi');
+ // sin nivel (o nivel 1) el precio es el de siempre
+ assert.equal(D.precioTienda('balas',0,1),250);
+ assert.equal(D.precioTienda('botiquin',0),300);
+ // sube con el nivel, con tope ×2,5, y la potencia no sube
+ let antes=0;for(let n=1;n<=40;n++){const p=D.precioTienda('armadura',0,n);assert.ok(p>=antes,'nivel '+n);antes=p;}
+ assert.equal(D.precioTienda('armadura',0,200),1000);
+ assert.equal(D.precioTienda('potencia',1,30),D.precioTienda('potencia',1,1));
+ assert.ok(D.precioTienda('blindado',0,11)>D.precioTienda('blindado',0,1));
+});
+
+test('el stick del mando: ocho direcciones con histéresis, sin tiritar en el borde',()=>{
+ const a=g=>[Math.cos(g),Math.sin(g)];
+ assert.equal(D.dirStick(1,0,-1),0);assert.equal(D.dirStick(0,1,-1),2);assert.equal(D.dirStick(-1,0,-1),4);
+ // justo pasado el borde entre «derecha» (0) y «abajo-derecha» (1): sigue en la que traía
+ const borde=Math.PI/8+0.05;
+ assert.equal(D.dirStick(...a(borde),0),0,'se queda en derecha');
+ assert.equal(D.dirStick(...a(borde),-1),1,'sin dirección previa, la del sector');
+ // lejos del borde cambia
+ assert.equal(D.dirStick(...a(Math.PI/8+0.3),0),1);
+ // igual por el otro lado y dando la vuelta por ±π
+ assert.equal(D.dirStick(...a(-borde),0),0);
+ assert.equal(D.dirStick(...a(Math.PI-borde),4),4);
+});

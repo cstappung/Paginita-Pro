@@ -685,14 +685,17 @@ const REGLAS = {
     lema: "Acción vista desde arriba: zombis, diablos y un multiplicador que no para de subir. De 1 a 8 jugadores.",
     secciones: [
       ["Controles", lista([
-        "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
+        "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí. Mantén <b>Shift</b> para <b>fijar hacia dónde miras</b>: caminas un poco más lento, pero puedes retroceder disparando de frente (una flecha en el suelo marca la dirección).",
+        "<b>Con mando</b>: el stick izquierdo mueve (poco inclinado gira sin avanzar), el <b>stick derecho</b> mira sin moverte, <b>LT</b> fija la dirección, <b>A</b> o <b>RT</b> dispara, <b>LB</b>/<b>RB</b> cambian de arma, <b>X</b> detona las cargas y <b>B</b> pone un muro reforzado. Junto al puesto <b>$</b> la cruceta compra (↑ munición, → armadura, ↓ botiquín, ← potencia), <b>B</b> compra un muro reforzado e <b>Y</b> mejora el arma; lejos de él, ← → cambian de arma, ↑ toma la mejor y ↓ pone un muro reforzado. Vibra (se apaga en la pausa).",
+        "<b>En el celular o la tableta</b>: un joystick nace donde apoyas el pulgar en la mitad izquierda, y a la derecha están Disparar, Fijar, cambiar de arma, Muro, Detonar y la pausa. La tienda se toca.",
         "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
         "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se abre la <b>tienda</b>: se compra con un clic o con las teclas <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín, <b>G</b> potencia y <b>M</b> muro reforzado; <b>U</b> sube de nivel el arma que llevas. <b>F</b> pone un muro reforzado, estés donde estés.",
         "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
       ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
-        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad. Cuando la barra está por vaciarse, parpadea y suena un aviso.",
+        "Pasar por primera vez ×10, ×25, ×50, ×100… es un <b>hito</b>: se anuncia y la cámara salta un instante.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
@@ -703,7 +706,8 @@ const REGLAS = {
       ["Enemigos y cajas", lista([
         "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos. Tus muros falsos y barriles los hacen <b>buscar otro camino</b>: solo los rompen si no queda ninguno libre. La excepción es el <b>demoledor</b> (nivel 6, casco amarillo y mazo, poco común): va derecho a tus muros y los tira a mazazos.",
         "La dificultad sube <b>de a poco y en línea recta</b>: cada nivel trae unos pocos enemigos más, un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. También salen más cuantos más jugadores haya en la sala.",
-        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas y las azules dan 35 de <b>armadura</b>.",
+        "Tus bajas sueltan <b>chatarra</b>, tuercas que vuelan hacia ti si estás cerca (y a los dos segundos, estés donde estés): es la moneda de la tienda. Da 1,5 veces los puntos de la baja <b>sin</b> el multiplicador; la de las bajas de otro no se ve ni se recoge.",
+        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas (si las tienes todas llenas, 30 de chatarra) y las azules dan 35 de <b>armadura</b>.",
         "La <b>armadura</b> (hasta 100, la barra azul bajo la de vida) absorbe el 60 % de cada golpe mientras dure.",
         "Cada golpe <b>empuja</b> al enemigo hacia atrás y lo deja medio segundo aturdido antes de volver a perseguirte. Hay <b>fuego amigo</b> entre ellos: las bolas de fuego de los diablos queman a los zombis (y a otros diablos) que se crucen.",
         "Tu vida, el arma en la mano y sus balas van justo encima de tu personaje, como en el original."
@@ -716,14 +720,16 @@ const REGLAS = {
         "Cuando ya salieron los cinco de cada clase, <b>vuelven a rotar</b> en el mismo orden, cada vuelta más duros."
       ])],
       ["Tienda", lista([
-        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una se abre un panel con cada artículo, su icono y su precio: se compra con un <b>clic</b> o con su tecla. <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Se compra con <b>chatarra</b>, nunca con puntos: tu marcador solo sube. Cada mapa tiene <b>estaciones de suministros</b>; de pie junto a una se abre, a un costado, un panel con cada artículo, su icono y su precio: se compra con un <b>clic</b>, con su tecla o con la cruceta del mando. <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Los suministros (munición, armadura, botiquín y muro reforzado) cuestan un 5 % más por cada nivel de la partida, hasta dos veces y media: más adelante se junta más chatarra. La potencia y las mejoras de arma tienen precio fijo.",
         "<b>Muro reforzado</b> (<b>M</b>, 450 cada uno, hasta 6 en la mochila): un bloque de acero con franja amarilla que aguanta lo que <b>seis muros falsos</b> (1000 de vida). Se pone con <b>F</b> delante de ti. Los enemigos lo rodean como a cualquier muro, y el <b>demoledor</b> igual va a por él a mazazos, solo que tarda mucho más.",
         "<b>Mejorar armas</b>: cada arma que tengas sube hasta el <b>nivel 5</b> (clic en su tarjeta, o <b>U</b> para la que llevas en la mano). Cada nivel da +15 % de daño, dispara un 6 % más rápido, +20 % de munición, +6 % de radio en las explosivas y +25 % de vida en el muro falso, y <b>cuesta casi el doble que el anterior</b> (la pistola: 300, 550, 950, 1750, 3150). Con el nivel cambia cómo se ve el arma: <b>pulida</b> (1–2), <b>dorada</b> (3–4) y de <b>plasma</b> (5), que brilla; las estrellas de la barra de armas dicen el nivel. Se suma a las mejoras del multiplicador.",
-        "Gastar puntos baja tu marcador: es el precio de llegar más lejos."
+        "Comprar no baja tus puntos: la chatarra es aparte. La que no gastes aparece en la pantalla final."
       ])],
       ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],
       ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
-      ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los cinco mapas."]
+      ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los cinco mapas. Al terminar muestra cómo jugaste: multiplicador máximo, precisión, jefes y tu arma favorita."],
+      ["Opciones", "En la pausa: la música (y su volumen; sube con la acción y cambia con los jefes), los números de daño, la vibración del mando y los consejos, que salen una sola vez cada uno cuando vienen al caso (activarlos de nuevo los vuelve a mostrar)."]
     ],
     modos: {
       coop: { nombre: "Supervivencia", secciones: [
