@@ -301,8 +301,8 @@ function boxheadSinPantalla(){
 // cercano, dispara siempre y se aleja si lo rodean; cambia de arma y compra.
 const DIRS8=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
 const dir8=(x,y)=>((Math.round(Math.atan2(y,x)/(Math.PI/4))%8)+8)%8;
-function juegaPartida(bx,{maxPasos=60*60*20,azar=1}={}){
- bx.practica();let t=0;
+function juegaPartida(bx,{maxPasos=60*60*20,azar=1,semilla=12345}={}){
+ bx.practica(semilla);let t=0;
  for(let i=0;i<maxPasos&&!bx.estado().terminado;i++){
   if(i%4===0){
    const m=bx.mundo();let best=null,bd=1e9,cx=0,cy=0;
