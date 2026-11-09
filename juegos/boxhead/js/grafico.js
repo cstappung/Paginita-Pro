@@ -274,6 +274,26 @@
         { r: 3, f: 6, z: 15, w: 2, d: 2.4, h: 3.6, c: NEGRO }], b: [3, 19.8, 20.9] };
       case 7: return { p: [
         { r: 1, f: 11, z: 15, w: 6.2, d: 4.2, h: 2.8, c: '#c9b48a', deco: { arriba: [[0.15, 0.2, 0.85, 0.4, '#3a4a5a'], [0.42, 0.6, 0.58, 0.8, '#ff2a2a', 1]] } }], b: [1, 13, 17] };
+      // lanzallamas: tanque rojo bajo el cañón y la boquilla con su llamita piloto
+      case 10: return { p: [
+        { r: 1, f: 10, z: 15.6, w: 3.4, d: 11, h: 3.4, c: OSC, deco: { arriba: [[0.2, 0.1, 0.8, 0.3, '#5a5d66']] } },
+        { r: 1, f: 8.5, z: 11.4, w: 3.6, d: 6, h: 3.6, c: '#b8281e', deco: { frente: [[0.2, 0.2, 0.8, 0.4, '#f2c14e']] } },
+        { r: 1, f: 16.4, z: 16.2, w: 2.2, d: 2.2, h: 2.2, c: '#ff8a1f', deco: { frente: [[0.2, 0.2, 0.8, 0.8, '#ffd27a', 1]] } }], b: [1, 17.8, 17.3] };
+      // ballesta: culata de madera y el arco cruzado delante
+      case 11: return { p: [
+        { r: 1, f: 10, z: 15.4, w: 2.4, d: 12, h: 2.6, c: '#6e4524', deco: { arriba: [[0.35, 0, 0.65, 1, '#3b2614']] } },
+        { r: 1, f: 15.5, z: 16.4, w: 11, d: 1.4, h: 1.6, c: '#3b3d43' },
+        { r: 1, f: 14, z: 17.4, w: 0.8, d: 6, h: 0.8, c: '#c9c2a8' }], b: [1, 17.2, 17.6] };
+      // minigun: seis cañones (un bloque con rayas) y el tambor
+      case 12: return { p: [
+        { r: 1.4, f: 8.5, z: 14.6, w: 5, d: 7, h: 5, c: '#3b3d43', deco: { frente: [[0.1, 0.1, 0.9, 0.9, '#22242a']] } },
+        { r: 1.4, f: 15.5, z: 15.4, w: 3.8, d: 9, h: 3.8, c: OSC, deco: { arriba: [[0.3, 0, 0.42, 1, '#9aa0aa'], [0.6, 0, 0.72, 1, '#9aa0aa']], der: [[0, 0.45, 1, 0.55, '#9aa0aa']], izq: [[0, 0.45, 1, 0.55, '#9aa0aa']] } },
+        { r: 1.4, f: 7, z: 10.8, w: 3, d: 3, h: 2.4, c: '#5c6a2a' }], b: [1.4, 20.2, 17.3] };
+      // rayo: el emisor de cobre con dos bobinas y la punta azul
+      case 13: return { p: [
+        { r: 1, f: 10.5, z: 15.4, w: 3.4, d: 8, h: 3.4, c: '#8a5a2a', deco: { arriba: [[0.2, 0.2, 0.8, 0.35, '#c98a4a'], [0.2, 0.6, 0.8, 0.75, '#c98a4a']] } },
+        { r: 1, f: 15.8, z: 15.9, w: 2.4, d: 3, h: 2.4, c: '#2a3a5a', deco: { frente: [[0.15, 0.15, 0.85, 0.85, '#9fd8ff', 1]] } },
+        { r: 1, f: 9, z: 11.6, w: 2.2, d: 2.4, h: 3.4, c: NEGRO }], b: [1, 17.5, 17.1] };
     }
     return { p: [], b: [0, 12, 17] };
   }
@@ -1099,6 +1119,11 @@
     c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x, y + 1, 8, 3.4, 0, 0, Math.PI * 2); c.fill();
     let p;
     if (k === 1) p = [{ r: 0, f: 0, z, w: 11, d: 11, h: 9, c: '#f4f4f4', deco: { arriba: [[0.4, 0.15, 0.6, 0.85, '#d42020', 1], [0.15, 0.4, 0.85, 0.6, '#d42020', 1]], frente: [[0.4, 0.2, 0.6, 0.8, '#d42020']], der: [[0.4, 0.2, 0.6, 0.8, '#d42020']], izq: [[0.4, 0.2, 0.6, 0.8, '#d42020']], atras: [[0.4, 0.2, 0.6, 0.8, '#d42020']] } }];
+    else if (k === 3) {
+      // la dorada brilla y gira más rápido
+      brilla(c, sprites().brillo, x, y - z - 6, 16, 0.35 + 0.2 * Math.sin(T * 6 + id));
+      p = [{ r: 0, f: 0, z, w: 12, d: 12, h: 10, c: '#e8b830', deco: { arriba: [[0.15, 0.15, 0.85, 0.85, '#fff0a0', 1]], frente: [[0.4, 0.1, 0.6, 0.9, '#a87a10']], der: [[0.4, 0.1, 0.6, 0.9, '#a87a10']], izq: [[0.4, 0.1, 0.6, 0.9, '#a87a10']], atras: [[0.4, 0.1, 0.6, 0.9, '#a87a10']] } }];
+    }
     else if (k === 2) p = [{ r: 0, f: 0, z, w: 11, d: 11, h: 9, c: '#2d6fb8', deco: { arriba: [[0.3, 0.2, 0.7, 0.8, '#9fd0ff', 1]], frente: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']], der: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']], izq: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']], atras: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']] } }];
     else {
       const fr = [[0, 0.4, 1, 0.6, '#d8c45a']];
@@ -1235,6 +1260,24 @@
         forma([2, 7, 27, 7, 27, 12, 2, 12], '#5d6b48'); forma([27, 6, 31, 6, 31, 13, 27, 13], '#2a2f22'); forma([1, 6.5, 4, 6.5, 4, 12.5, 1, 12.5], '#2a2f22');
         forma([11, 12, 14, 12, 14, 16.5, 11, 16.5], '#222'); forma([13, 4.5, 17, 4.5, 17, 7, 13, 7], '#222'); break;
       case 7: forma([8, 7, 26, 7, 26, 16, 8, 16], '#c9b48a'); c.fillStyle = '#3a4a5a'; c.fillRect(9.5, 9, 15, 2); c.fillRect(9.5, 12.5, 15, 2); c.fillStyle = '#ff2a2a'; c.fillRect(15, 4.5, 4, 2.5); break;
+      case 10:
+        forma([4, 7, 26, 7, 26, 10, 4, 10], metal(7, 10)); forma([6, 10.5, 16, 10.5, 16, 16, 6, 16], '#b8281e');
+        c.fillStyle = '#f2c14e'; c.fillRect(8, 12, 6, 1.4);
+        c.fillStyle = '#ff8a1f'; c.beginPath(); c.moveTo(26, 6.5); c.lineTo(32, 8.5); c.lineTo(26, 10.5); c.fill(); break;
+      case 11:
+        forma([3, 9, 24, 9, 24, 11.5, 3, 11.5], '#6e4524');
+        c.strokeStyle = '#3b3d43'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(22, 3); c.quadraticCurveTo(27, 10, 22, 17); c.stroke();
+        c.strokeStyle = '#c9c2a8'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(22, 3); c.lineTo(15, 10); c.lineTo(22, 17); c.stroke();
+        c.fillStyle = '#c9c2a8'; c.fillRect(15, 9.6, 16, 0.9); break;
+      case 12:
+        forma([3, 6, 14, 6, 14, 15, 3, 15], '#3b3d43');
+        for (let i = 0; i < 3; i++) forma([14, 6.4 + i * 2.9, 31, 6.4 + i * 2.9, 31, 8.4 + i * 2.9, 14, 8.4 + i * 2.9], metal(6, 15));
+        forma([5, 15, 10, 15, 10, 18.5, 5, 18.5], '#5c6a2a'); break;
+      case 13:
+        forma([5, 7, 22, 7, 22, 13, 5, 13], '#8a5a2a'); c.fillStyle = '#c98a4a'; c.fillRect(8, 6, 2, 8); c.fillRect(14, 6, 2, 8);
+        forma([22, 8, 27, 8, 27, 12, 22, 12], '#2a3a5a');
+        c.strokeStyle = '#9fd8ff'; c.lineWidth = 1; c.beginPath(); c.moveTo(27, 10); c.lineTo(29.5, 7.5); c.lineTo(30.5, 11); c.lineTo(33, 8.5); c.stroke();
+        forma([8, 13, 11, 13, 11, 17.5, 8, 17.5], '#222'); break;
     }
     c.restore();
   }

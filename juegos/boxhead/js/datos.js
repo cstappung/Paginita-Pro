@@ -28,8 +28,24 @@
     { id: 4, nombre: 'Granadas', tipo: 'granada', d: 90, r: 70, cad: 0.6, ini: 10, caja: 5, max: 30, desbloquea: 20 },
     { id: 5, nombre: 'Muro falso', tipo: 'objeto', obj: 'muro', vida: 160, cad: 0.35, ini: 10, caja: 5, max: 30, desbloquea: 25 },
     { id: 6, nombre: 'Cohetes', tipo: 'cohete', d: 110, r: 72, cad: 0.9, ini: 10, caja: 5, max: 30, vel: 380, desbloquea: 30 },
-    { id: 7, nombre: 'Cargas', tipo: 'objeto', obj: 'carga', d: 150, r: 96, cad: 0.35, ini: 5, caja: 3, max: 15, desbloquea: 40 }
+    { id: 7, nombre: 'Cargas', tipo: 'objeto', obj: 'carga', d: 150, r: 96, cad: 0.35, ini: 5, caja: 3, max: 15, desbloquea: 40 },
+    /* 8 y 9 no son armas del jugador: son los códigos de la mordida y de la
+       bola de fuego en los golpes y en el registro de la sala (`a`). Quedan
+       aquí para que `ARMAS[id]` siga valiendo por id; lo que recorre las
+       armas del jugador usa `ARMAS_J`. */
+    { id: 8, nombre: 'Mordida', tipo: 'enemigo', d: 0, desbloquea: Infinity },
+    { id: 9, nombre: 'Bola de fuego', tipo: 'enemigo', d: 0, desbloquea: Infinity },
+    /* Fase 3.3. `llama`: quema todo lo que hay en un cono corto (`alc`,
+       `abre`), atravesando. `gira` (minigun): la cadencia arranca a un 30 %
+       y sube mientras se mantiene el gatillo. `rayo`: pega al primero que
+       ve delante y salta a `saltos` más, cada uno a menos de `salto` px,
+       perdiendo un 20 % por salto. */
+    { id: 10, nombre: 'Lanzallamas', tipo: 'llama', d: 6, cad: 0.06, ini: 200, caja: 100, max: 400, alc: 130, abre: 0.55, desbloquea: 60 },
+    { id: 11, nombre: 'Ballesta', tipo: 'bala', d: 70, pen: 4, cad: 0.65, ini: 20, caja: 10, max: 60, alc: 520, desv: 0.004, desbloquea: 80 },
+    { id: 12, nombre: 'Minigun', tipo: 'bala', d: 9, pen: 1, cad: 0.045, gira: true, ini: 300, caja: 150, max: 900, alc: 360, desv: 0.1, desbloquea: 120 },
+    { id: 13, nombre: 'Rayo', tipo: 'rayo', d: 50, cad: 0.5, ini: 15, caja: 8, max: 45, alc: 280, saltos: 4, salto: 110, desbloquea: 160 }
   ];
+  const ARMAS_J = ARMAS.filter(a => a.tipo !== 'enemigo');
 
   /* **Cada nivel de multiplicador que no trae arma trae una mejora**, y van
      rotando entre las armas ya ganadas (en orden de id, la última recién
@@ -49,7 +65,11 @@
     4: [['r', 1.1, 'explosión mayor'], ['d', 1.15, 'más daño'], ['cad', 0.88, 'lanzamiento más rápido'], ['max', 1.3, 'más munición']],
     5: [['vida', 1.3, 'muros más resistentes'], ['max', 1.3, 'más munición']],
     6: [['d', 1.15, 'más daño'], ['r', 1.1, 'explosión mayor'], ['cad', 0.88, 'recarga más rápida'], ['vel', 1.15, 'cohetes más rápidos']],
-    7: [['d', 1.15, 'más daño'], ['r', 1.1, 'explosión mayor'], ['max', 1.3, 'más munición']]
+    7: [['d', 1.15, 'más daño'], ['r', 1.1, 'explosión mayor'], ['max', 1.3, 'más munición']],
+    10: [['d', 1.12, 'más daño'], ['alc', 1.1, 'más alcance'], ['abre', 1.1, 'llama más ancha'], ['max', 1.25, 'más combustible']],
+    11: [['d', 1.15, 'más daño'], ['pen', 1, 'atraviesa un enemigo más'], ['cad', 0.88, 'recarga más rápida'], ['max', 1.3, 'más virotes']],
+    12: [['d', 1.12, 'más daño'], ['desv', 0.85, 'más precisión'], ['max', 1.25, 'más munición'], ['pen', 1, 'atraviesa un enemigo más']],
+    13: [['d', 1.15, 'más daño'], ['saltos', 1, 'salta a un enemigo más'], ['salto', 1.12, 'saltos más largos'], ['cad', 0.9, 'descarga más rápida']]
   };
   /* Topes: cad como mucho baja a un tercio, d hasta ×4 (y 500), r 200… */
   function tope(a, k) {
@@ -57,11 +77,13 @@
     switch (k) {
       case 'd': return Math.min(b.d * 4, 500);
       case 'cad': return Math.max(b.cad / 3, 0.04);
-      case 'alc': return 640;
+      case 'alc': return a.tipo === 'llama' ? 200 : 640;
       case 'desv': return 0.012;
       case 'perdigones': return 16;
-      case 'pen': return a.id === 2 ? 2 : 4;
-      case 'abre': return 1.1;
+      case 'pen': return a.id === 2 ? 2 : a.id === 11 ? 6 : 4;
+      case 'abre': return a.tipo === 'llama' ? 0.9 : 1.1;
+      case 'saltos': return 8;
+      case 'salto': return 170;
       case 'r': return 200;
       case 'vel': return 900;
       case 'max': return b.max * 5;
@@ -87,9 +109,9 @@
         for (let j = 0; j < lista.length && !hecho; j++) {
           const [k, f, txt] = lista[(ciclo[id] + j) % lista.length];
           const lim = tope(a, k), antes = a[k];
-          let v = k === 'perdigones' || k === 'pen' ? (antes || 0) + 1 : antes * f;
+          let v = k === 'perdigones' || k === 'pen' || k === 'saltos' ? (antes || 0) + 1 : antes * f;
           v = baja(k) ? Math.max(v, lim) : Math.min(v, lim);
-          if (k === 'perdigones' || k === 'pen' || k === 'max' || k === 'vida' || k === 'd' || k === 'alc' || k === 'vel' || k === 'r') v = Math.round(v);
+          if (k === 'perdigones' || k === 'pen' || k === 'saltos' || k === 'salto' || k === 'max' || k === 'vida' || k === 'd' || k === 'alc' || k === 'vel' || k === 'r') v = Math.round(v);
           else v = Math.round(v * 1000) / 1000;
           if (v === antes) continue;
           ciclo[id] = (ciclo[id] + j + 1) % lista.length;
@@ -127,7 +149,7 @@
   /* Lo que se gana al llegar a `mul` por primera vez. */
   function premios(antes, ahora) {
     const out = [];
-    for (const a of ARMAS) if (a.desbloquea > antes && a.desbloquea <= ahora) out.push({ arma: a.id, txt: '¡Nueva arma! ' + a.nombre });
+    for (const a of ARMAS_J) if (a.desbloquea > antes && a.desbloquea <= ahora) out.push({ arma: a.id, txt: '¡Nueva arma! ' + a.nombre });
     for (const m of MEJORAS) if (m.m > antes && m.m <= ahora) out.push({ mejora: m.id, txt: m.txt });
     return out;
   }
@@ -291,7 +313,7 @@
      tiempo entre disparos, +20 % de munición, +6 % de radio de explosión y
      +25 % de vida a los muros. Con el nivel cambia cómo se ve el arma:
      pulida (1–2), dorada (3–4) y de plasma (5). */
-  const NIVEL_ARMA = { max: 5, sube: 1.8, base: [300, 500, 600, 500, 600, 400, 800, 800] };
+  const NIVEL_ARMA = { max: 5, sube: 1.8, base: [300, 500, 600, 500, 600, 400, 800, 800, 0, 0, 900, 1000, 1100, 1300] };
   const RANGOS_ARMA = ['Normal', 'Pulida', 'Pulida', 'Dorada', 'Dorada', 'Plasma'];
   const rangoArma = n => Math.max(0, Math.min(3, n >= 5 ? 3 : n >= 3 ? 2 : n >= 1 ? 1 : 0));
   function precioNivelArma(id, nivel) {
@@ -602,7 +624,10 @@
   /* Punto débil de los jefes: por la espalda, o mientras avisan una
      habilidad (est 2), cada golpe vale `DEBIL` veces. Entra en el tope. */
   const DEBIL = 1.5;
-  const TOPE_VENTAJAS = 1.5 * 1.4 * 1.3 * 2 * DEBIL;
+  /* Caja dorada (Fase 3.3): rara (0,6 % de las bajas, y una por jefe);
+     `DORADA_T` s de furia dorada: ×`DORADA` de daño sin gastar munición. */
+  const DORADA = 2, DORADA_T = 12, PARTE_DORADA = 0.006;
+  const TOPE_VENTAJAS = 1.5 * 1.4 * 1.3 * 2 * DEBIL * DORADA;
   function armaTope(w) {
     const a = ARMAS[w];
     if (!a) return null;
@@ -617,8 +642,8 @@
   const topeRadio = w => { const b = armaTope(w); return b && b.r ? Math.ceil(b.r * 1.5) : 0; };   // segundos para elegir; después se queda la primera
 
   return {
-    TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
-    ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
+    TS, ARMAS, ARMAS_J, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
+    ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, DORADA, DORADA_T, PARTE_DORADA, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio
   };

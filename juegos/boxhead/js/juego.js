@@ -87,7 +87,7 @@
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
     return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, chat: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
+      tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], giro: 0, dorada: 0, arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
       // para la pantalla final: disparos y aciertos (perdigón a perdigón), bajas por arma y jefes
       st: { disp: 0, acierto: 0, armas: new Array(10).fill(0), jefes: 0 } };
   }
@@ -200,9 +200,12 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 5, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 6, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
+  // Teclas de arma: la posición en ARMAS_J (los ids 8 y 9 no son armas del jugador).
+  const TECLAS_ARMA = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
+  const TECLA_ARMA = Object.fromEntries(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'].map((c, i) => [c, i]));
   const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
     i => { const t = D.TIENDA[i | 0]; if (t) compra(t.id); }, i => eligeVentaja(i | 0)];
   function accion(cod, a = 0) {
@@ -228,7 +231,7 @@
     else if (e.code === 'KeyX') accion(3);
     else if (e.code === 'KeyF') accion(4);
     else if (e.code === 'KeyU') accion(5, yo.w);
-    else if (/^Digit[1-8]$/.test(e.code)) accion(2, +e.code.slice(5) - 1);
+    else if (TECLA_ARMA[e.code] !== undefined) { const a = D.ARMAS_J[TECLA_ARMA[e.code]]; if (a) accion(2, a.id); }
     else { const t = TECLA_TIENDA[e.code]; if (t) accion(6, idxTienda(t)); }
   });
   addEventListener('keyup', e => teclas.delete(e.code));
@@ -494,7 +497,7 @@
     eligeArma(l[(i + s + l.length) % l.length]);
   }
   function desbloquea(id, aviso) {
-    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; if (yo.tiene.size >= D.ARMAS.length) medalla('arsenal'); }
+    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; if (yo.tiene.size >= D.ARMAS_J.length) medalla('arsenal'); }
     if (aviso) premio(aviso);
   }
 
@@ -503,7 +506,9 @@
     const a = Object.assign({}, armaYo());
     if (!(yo.ammo[yo.w] > 0)) { eligeArma(0); return; }
     yo.cd = a.cad / (1 + 0.08 * vt('gatillo'));
-    if (a.d) a.d = Math.round(a.d * D.factorPotencia(yo.pot) * factorVentajas());
+    // La minigun arranca lenta y gira más rápido mientras se mantiene el gatillo.
+    if (a.gira) { yo.cd /= 0.3 + 0.7 * yo.giro; yo.giro = Math.min(1, yo.giro + 0.06); }
+    if (a.d) a.d = Math.round(a.d * D.factorPotencia(yo.pot) * factorVentajas() * (yo.dorada > 0 ? D.DORADA : 1));
     const tiro = a.tipo === 'bala' || a.tipo === 'perdigon';
     if (tiro) {
       a.alc *= 1 + 0.15 * vt('mira'); a.pen = (a.pen || 0) + vt('perfora');
@@ -520,8 +525,17 @@
     }
     if (a.tipo === 'bala') {
       rayo(yo.x, yo.y, ang + (rn() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
-      gasta(); son(a.id === 1 ? 'uzi' : 'pistola');
-      vibra(a.id === 1 ? 0.05 : 0.12, a.id === 1 ? 0.25 : 0.35, a.id === 1 ? 40 : 60);
+      gasta(); son(a.id === 1 || a.id === 12 ? 'uzi' : a.id === 11 ? 'lanza' : 'pistola');
+      const fino = a.id === 1 || a.id === 12;
+      vibra(fino ? 0.05 : 0.12, fino ? 0.25 : 0.35, fino ? 40 : 60);
+    } else if (a.tipo === 'llama') {
+      llama(yo.x, yo.y, ang, a);
+      gasta(); if (Math.random() < 0.25) son('fuego');
+      vibra(0.04, 0.2, 30);
+    } else if (a.tipo === 'rayo') {
+      relampago(yo.x, yo.y, ang, a);
+      gasta(); son('premio');
+      sacude = Math.min(10, sacude + 1); vibra(0.3, 0.5, 80);
     } else if (a.tipo === 'perdigon') {
       // A quemarropa (cuatro perdigones o más en el mismo enemigo) el golpe se siente: pausa de impacto.
       const cuenta = new Map();
@@ -568,7 +582,7 @@
     son('pistola', 140);
   }
   function gasta() {
-    if (yo.w === 0 || yo.ammo[yo.w] === Infinity) return;
+    if (yo.w === 0 || yo.ammo[yo.w] === Infinity || yo.dorada > 0) return;   // la furia dorada no gasta
     yo.ammo[yo.w]--;
     if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; yo.vacio = 0.12; }   // a los 0,12 s vuelve a la pistola (pasoYo), por pasos y no con un reloj
   }
@@ -616,6 +630,66 @@
     pend.s.push([nid(), w, Math.round(x), Math.round(y), Math.round(ang * 100), Math.round(l)]);
     if (heridos.size) yo.st.acierto++;
     return heridos.size ? heridos.values().next().value : null;
+  }
+
+  /* Lanzallamas: quema a todo enemigo (y en versus a todo rival) que esté en
+     el cono, a la vista; atraviesa. Lo que se ve son llamas que salen de la
+     boca; a los demás les llega como un disparo de alcance `alc`. */
+  function llama(x, y, ang, a) {
+    const cs = Math.cos(ang), sn = Math.sin(ang), med = a.abre / 2;
+    yo.st.disp++;
+    let pego = false;
+    for (const e of [...E.values()]) {
+      if (bajoTierra(e)) continue;
+      const dx = e.x - x, dy = e.y - y, l = hyp(dx, dy);
+      if (l > a.alc + RG(e.k) || l < 1) continue;
+      if (Math.acos(clamp((dx * cs + dy * sn) / l, -1, 1)) > med + RG(e.k) / l) continue;
+      if (!despejado(x, y, e.x, e.y)) continue;
+      golpeaEnemigo(e, a.d, a.id, x, y); pego = true;
+    }
+    if (versus()) for (const [u, r] of R) {
+      if (!r.v) continue;
+      const dx = r.x - x, dy = r.y - y, l = hyp(dx, dy);
+      if (l < 1 || l > a.alc || Math.acos(clamp((dx * cs + dy * sn) / l, -1, 1)) > med || !despejado(x, y, r.x, r.y)) continue;
+      golpeaJugador(u, a.d, a.id);
+    }
+    if (pego) yo.st.acierto++;
+    const bo = G.boca(x, y, ang, a.id, ESC);
+    fx.humo(bo[2] + cs * a.alc * 0.45, bo[3] + sn * a.alc * 0.45, 2, a.alc * 0.35, 'fuego');
+    pend.s.push([nid(), a.id, Math.round(x), Math.round(y), Math.round(ang * 100), Math.round(a.alc)]);
+  }
+  /* Rayo: pega al enemigo a la vista más cercano delante (a menos de 20°
+     del frente, dentro de `alc`) y salta de uno en uno a `saltos` más, cada
+     salto a menos de `salto` px, con un 20 % menos de daño. */
+  const RAYOS = [];
+  function relampago(x, y, ang, a) {
+    yo.st.disp++;
+    const cs = Math.cos(ang), sn = Math.sin(ang), ya = new Set(), pts = [[x, y - 16]];
+    let t = null, bd = a.alc;
+    for (const e of E.values()) {
+      if (bajoTierra(e)) continue;
+      const dx = e.x - x, dy = e.y - y, l = hyp(dx, dy);
+      if (l > bd || l < 1 || (dx * cs + dy * sn) / l < Math.cos(0.35) || !despejado(x, y, e.x, e.y)) continue;
+      bd = l; t = e;
+    }
+    let d = a.d, cx0 = x, cy0 = y;
+    for (let i = 0; t && i <= (a.saltos || 0); i++) {
+      ya.add(t); pts.push([t.x, t.y - 14]);
+      golpeaEnemigo(t, Math.round(d), a.id, cx0, cy0);
+      cx0 = t.x; cy0 = t.y; d *= 0.8;
+      let sig = null, sd = a.salto || 110;
+      for (const e of E.values()) {
+        if (ya.has(e) || bajoTierra(e)) continue;
+        const l = dist(cx0, cy0, e.x, e.y);
+        if (l < sd && despejado(cx0, cy0, e.x, e.y)) { sd = l; sig = e; }
+      }
+      t = sig;
+    }
+    if (pts.length > 1) yo.st.acierto++;
+    else pts.push([x + cs * a.alc * 0.6, y + sn * a.alc * 0.6 - 16]);
+    RAYOS.push({ pts, t: 0.2 }); if (RAYOS.length > 30) RAYOS.shift();   // sin pantalla nadie los apaga
+    const l = Math.round(dist(x, y, pts[1][0], pts[1][1] + 16));
+    pend.s.push([nid(), a.id, Math.round(x), Math.round(y), Math.round(ang * 100), l]);
   }
 
   function lanza(p) {
@@ -1026,10 +1100,10 @@
   /* Cuánto empuja cada arma (por id; 8 mordida, 9 fuego). Los empujones
      se suman mientras dura el tumbo, con tope: la escopeta, que pega con
      todos sus perdigones a la vez, despide de verdad. */
-  const EMPUJE_ARMA = [1, 0.6, 1.3, 2.2, 2.2, 1, 2.2, 2.4, 0.8, 1];
+  const EMPUJE_ARMA = [1, 0.6, 1.3, 2.2, 2.2, 1, 2.2, 2.4, 0.8, 1, 0.12, 2, 0.5, 0.7];
   const ARMA_EXPLOTA = w => w === 3 || w === 4 || w === 6 || w === 7;
   // La escopeta derriba: el aturdimiento dura más (su nicho: frenar la horda de cerca).
-  const ATURDE_ARMA = { 2: 1.7 };
+  const ATURDE_ARMA = { 2: 1.7, 10: 0.35 };   // la llama casi no frena: si no, los dejaba quietos
   function danaEnemigo(id, d, quien, w, sx, sy) {
     const e = E.get(id);
     if (!e) return;
@@ -1072,8 +1146,8 @@
     }
     if (C.jefe) {
       // El jefe suelta siempre un premio de cada clase.
-      for (let i = 0; i < 3; i++) {
-        const a = i * 2.1, b = { id: nid(), k: i, x: Math.round(e.x + Math.cos(a) * 18), y: Math.round(e.y + Math.sin(a) * 18) };
+      for (let i = 0; i < 4; i++) {   // y una dorada
+        const a = i * 1.57, b = { id: nid(), k: i, x: Math.round(e.x + Math.cos(a) * 18), y: Math.round(e.y + Math.sin(a) * 18) };
         if (solidoEn(b.x, b.y)) { b.x = Math.round(e.x); b.y = Math.round(e.y); }
         B.set(b.id, b);
       }
@@ -1082,8 +1156,8 @@
       return;
     }
     const r = rn();
-    if (B.size < 12 && r < 0.2) {
-      const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : 2, x: Math.round(e.x), y: Math.round(e.y) };
+    if (B.size < 12 && (r < 0.2 || r > 1 - D.PARTE_DORADA)) {
+      const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : r < 0.2 ? 2 : 3, x: Math.round(e.x), y: Math.round(e.y) };
       B.set(b.id, b);
     }
   }
@@ -1544,7 +1618,7 @@
       jugadores: (m.jugadores || []).map((j, i) => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador'), orden: Number.isInteger(j.orden) ? j.orden : i })),
     };
     yo = nuevoYo();
-    if (cfg.variante === 'versus') for (const a of D.ARMAS) desbloquea(a.id);
+    if (cfg.variante === 'versus') for (const a of D.ARMAS_J) desbloquea(a.id);
     cargaMundo(cfg.mapa);
     $('menuMapas').hidden = true;
     $('cuenta').textContent = cfg.mirando ? 'Estás mirando la partida.' : '';
@@ -1602,7 +1676,7 @@
     else if (soyDir) {
       // Golpes de otro a enemigos u objetos: un arma que existe, con su tope por golpe y un cupo por segundo.
       if (dest.startsWith('e:') || dest.startsWith('o:')) {
-        if (!(w >= 0 && w < D.ARMAS.length) || !gastaCupo(de)) return;
+        if (!(D.ARMAS[w] && D.ARMAS[w].tipo !== 'enemigo') || !gastaCupo(de)) return;
       }
       const dm = dest.startsWith('e:') || dest.startsWith('o:') ? Math.min(dmg, TOPE_GOLPE[w | 0]) : dmg;
       if (dest.startsWith('e:')) {
@@ -1622,7 +1696,11 @@
       for (const a of Array.isArray(v.l) ? v.l : []) {
         if (!Array.isArray(a)) continue;
         if (k === 's') {
-          const ang = a[4] / 100, l = +a[5] || 0, w = clamp(a[1] | 0, 0, 2), cs = Math.cos(ang), sn = Math.sin(ang);
+          const w0 = a[1] | 0, ang0 = a[4] / 100, l0 = clamp(+a[5] || 0, 0, 700);
+          // Llama y rayo de otro: se dibujan aparte (un tiro común no los muestra).
+          if (w0 === 10) { const bo = G.boca(a[2], a[3], ang0, 10, ESC); fx.humo(bo[2] + Math.cos(ang0) * l0 * 0.45, bo[3] + Math.sin(ang0) * l0 * 0.45, 2, l0 * 0.35, 'fuego'); const r = R.get(u); if (r) { r.rec = 0.4; r.av = ang0; } continue; }
+          if (w0 === 13) { RAYOS.push({ pts: [[a[2], a[3] - 16], [a[2] + Math.cos(ang0) * l0, a[3] + Math.sin(ang0) * l0 - 14]], t: 0.2 }); son('premio', dist(a[2], a[3], yo.x, yo.y)); continue; }
+          const ang = ang0, l = l0, w = w0 === 11 || w0 === 12 ? w0 : clamp(w0, 0, 2), cs = Math.cos(ang), sn = Math.sin(ang);
           const bo = G.boca(a[2], a[3], ang, w, ESC), ex = a[2] + cs * l, ey = a[3] + sn * l;
           fx.trazo(bo[2], bo[3], ex, ey, bo[4], w === 2);
           const r = R.get(u);
@@ -1630,7 +1708,7 @@
           if (r && T - (r.fogT || -1) > 0.04) { r.fogT = T; r.rec = 1; r.av = ang; fx.fogonazo(bo[0], bo[1], bo[2], bo[3], ang, w); fx.casquillo(a[2], a[3], ang, w === 2); }
           if (solidoEn(ex + cs * 4, ey + sn * 4)) impactoMuro(ex - cs * 2, ey - sn * 2, ang, bo[4]);
           else for (const e of E.values()) if ((ex - e.x) ** 2 + (ey - e.y) ** 2 < (RG(e.k) + 8) ** 2) { fx.sangre(e.x, e.y, ang, 3, G.sangreDe(e.k)); break; }
-          son(w === 2 ? 'escopeta' : w === 1 ? 'uzi' : 'pistola', dist(a[2], a[3], yo.x, yo.y));
+          son(w === 2 ? 'escopeta' : w === 1 || w === 12 ? 'uzi' : w === 11 ? 'lanza' : 'pistola', dist(a[2], a[3], yo.x, yo.y));
         } else if (k === 'n') {
           const w = a[1] | 0;
           if (D.ARMAS[w] && (D.ARMAS[w].tipo === 'granada' || D.ARMAS[w].tipo === 'cohete')) {
@@ -1753,6 +1831,10 @@
     for (const e of E.values()) {
       if (e.sac > 0) e.sac = Math.max(0, e.sac - dt * 2.5);
       if (e.debil > 0) e.debil -= dt;
+    }
+    for (const r of RAYOS) r.t -= dt;
+    while (RAYOS.length && RAYOS[0].t <= 0) RAYOS.shift();
+    for (const e of E.values()) {
       e.tb = (e.tb || 0) + ((e.aturd > 0 ? 1 : 0) - (e.tb || 0)) * Math.min(1, dt * (e.aturd > 0 ? 18 : 7));
       // lo que se dibuja gira y ataca suave, no a saltos de 45°
       e.av = e.av === undefined ? angDir(e.d) : giraHacia(e.av, angDir(e.d), dt * 12);
@@ -1787,7 +1869,7 @@
     }
     if (yo.muerto) {
       if (!ONLINE) { if (yo.fin > 0 && (yo.fin -= dt) <= 0) finPractica(); return; }
-      if (versus()) { if ((yo.respawn -= dt) <= 0) { aparece(); for (const a of D.ARMAS) if (a.id) yo.ammo[a.id] = Math.max(yo.ammo[a.id], a.ini); } }
+      if (versus()) { if ((yo.respawn -= dt) <= 0) { aparece(); for (const a of D.ARMAS_J) if (a.id) yo.ammo[a.id] = Math.max(yo.ammo[a.id], a.ini); } }
       else if ((marcador.nivel || 1) > yo.nivelMuerte) { aparece(); banner('¡DE VUELTA!'); if (vt('relevo')) yo.arm = Math.max(yo.arm || 0, 50); }
       return;
     }
@@ -1809,6 +1891,8 @@
       mover(yo, dx / l * v * dt, dy / l * v * dt, 9);
     }
     if (en.disp) dispara();
+    if (!en.disp || !armaYo().gira) yo.giro = Math.max(0, yo.giro - dt * 1.5);
+    if (yo.dorada > 0) yo.dorada = Math.max(0, yo.dorada - dt);
     // Cajas.
     for (const b of [...B.values()]) {
       if (ocultas.has(b.id) || dist(b.x, b.y, yo.x, yo.y) > 18) continue;
@@ -1870,6 +1954,8 @@
 
   function abreCaja(k) {
     son('recoge');
+    // Caja dorada: furia dorada, doble daño y munición sin gastar por un rato.
+    if (k === 3) { yo.dorada = D.DORADA_T; premio('¡Furia dorada! ×' + D.DORADA + ' de daño y munición infinita'); son('premio'); return; }
     if (k === 1) { yo.hp = Math.min(hpMax(), yo.hp + 50); premio('+50 vida'); return; }
     if (k === 2) { yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + D.ARMADURA.caja); premio('+' + D.ARMADURA.caja + ' armadura'); return; }
     const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < armaDe(i).max);
@@ -2171,6 +2257,7 @@
       if (veoYo) lista.push({ y: yo.y, f: () => {
         if (yo.fija) flechaFija();
         if (yo.inv > 0 && Math.floor(T * 12) % 2) return;
+        if (yo.dorada > 0) G.brilla(cx, G.sprites().brillo, yo.x, yo.y - 16, 30, 0.35 + 0.2 * Math.sin(T * 12));
         dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w]);
       } });
       else lista.push({ y: yo.y, f: () => G.tumba(cx, yo.x, yo.y) });
@@ -2207,6 +2294,19 @@
         continue;
       }
       G.bola(cx, f.x, f.y, f.vx, f.vy, f.k === 5 || !!(D.ENEMIGOS[f.k] || {}).acido);
+    }
+    // los rayos: un zigzag azul que tiembla, con su halo
+    for (const r of RAYOS) {
+      cx.globalAlpha = clamp(r.t / 0.2, 0, 1);
+      for (const [ancho, col] of [[5, 'rgba(120,190,255,.35)'], [1.8, '#e8f6ff']]) {
+        cx.strokeStyle = col; cx.lineWidth = ancho; cx.beginPath(); cx.moveTo(r.pts[0][0], r.pts[0][1]);
+        for (let i = 1; i < r.pts.length; i++) {
+          const [x0, y0] = r.pts[i - 1], [x1, y1] = r.pts[i];
+          for (let j = 1; j <= 4; j++) { const q = j / 4, jit = j < 4 ? 7 : 0; cx.lineTo(x0 + (x1 - x0) * q + (Math.random() - 0.5) * jit, y0 + (y1 - y0) * q + (Math.random() - 0.5) * jit); }
+        }
+        cx.stroke();
+      }
+      cx.globalAlpha = 1;
     }
     fx.dibuja(cx);
     if (numDano) dibujaNumeros();
@@ -2446,7 +2546,7 @@
       b.addEventListener('click', () => accion(6, idxTienda(t.id)));
       sum.append(b);
     }
-    for (const a of D.ARMAS) {
+    for (const a of D.ARMAS_J) {
       const b = document.createElement('button'), c = document.createElement('canvas');
       b.type = 'button'; b.className = 'art'; b.dataset.arma = a.id; sinFoco(b);
       c.width = 104; c.height = 60;
@@ -2494,23 +2594,26 @@
   }
 
   function pintaArmas(fuerza) {
-    const firma = D.ARMAS.map(a => (yo.tiene.has(a.id) ? 1 : 0) + ':' + (a.id === 0 ? '∞' : yo.ammo[a.id]) + ':' + (yo.nv[a.id] || 0)).join() + '|' + yo.w;
+    const firma = D.ARMAS_J.map(a => (yo.tiene.has(a.id) ? 1 : 0) + ':' + (a.id === 0 ? '∞' : yo.ammo[a.id]) + ':' + (yo.nv[a.id] || 0)).join() + '|' + yo.w;
     if (!fuerza && firma === firmaArmas) return;
     firmaArmas = firma;
     const el = $('armas');
-    if (el.children.length !== D.ARMAS.length) {
+    if (el.children.length !== D.ARMAS_J.length) {
       el.textContent = '';
-      for (const a of D.ARMAS) {
+      for (const [i, a] of D.ARMAS_J.entries()) {
         const s = document.createElement('div'), c = document.createElement('canvas'), b = document.createElement('b'), nv = document.createElement('i'), sp = document.createElement('span');
-        s.className = 'slot'; c.width = 68; c.height = 40; b.textContent = a.id + 1; nv.className = 'nv';
+        s.className = 'slot'; c.width = 68; c.height = 40; b.textContent = TECLAS_ARMA[i] || ''; nv.className = 'nv';
         G.iconoArma(c.getContext('2d'), a.id, 68, 40);
         s.title = a.nombre;
         s.append(b, nv, c, sp);
         el.append(s);
       }
     }
-    D.ARMAS.forEach((a, i) => {
+    D.ARMAS_J.forEach((a, i) => {
       const s = el.children[i], tiene = yo.tiene.has(a.id);
+      // Las armas de multiplicador alto no ocupan la barra hasta que se ganan (salvo la siguiente).
+      const sig = D.ARMAS_J.find(b => !yo.tiene.has(b.id));
+      s.style.display = tiene || a.desbloquea < 60 || a === sig ? '' : 'none';
       s.classList.toggle('sel', yo.w === a.id);
       s.classList.toggle('no', !tiene || (a.id !== 0 && !(yo.ammo[a.id] > 0)));
       s.lastChild.textContent = !tiene ? '×' + a.desbloquea : a.id === 0 ? '∞' : yo.ammo[a.id];
@@ -2731,12 +2834,12 @@
   window.__boxhead = {
     rehace, prueba, accion, pasos: () => pasoN, entrada: en => { forzada = en || null; },
     paso: (dt = 1 / 60) => paso(dt),
-    estado: () => ({ cfg, eleccion: eleccion ? eleccion.ops.slice() : null, vt: Object.assign({}, yo.vt), yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice() },
+    estado: () => ({ cfg, eleccion: eleccion ? eleccion.ops.slice() : null, vt: Object.assign({}, yo.vt), yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice(), dorada: yo.dorada, giro: yo.giro },
       soyDir, dirUid, nivel: nivelObjetivo(), dir: { n: dir.n, q: dir.q, t: dir.t }, enemigos: E.size, objetos: O.size, cajas: B.size, remotos: R.size, terminado }),
     dbg: () => ({ cd: yo.cd, ps: pend.s.length, jugando, pausado, w: yo.w, ammo0: yo.ammo[0] }),
     mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp, max: e.max, est: e.est || 0, el: e.el || 0 })), F: F.map(f => ({ k: f.k, x: f.x, y: f.y })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
     teclas, practica, inmortal: v => { inmortal = !!v; },
-    armas: () => { for (const a of D.ARMAS) desbloquea(a.id); pintaArmas(true); },
+    armas: () => { for (const a of D.ARMAS_J) desbloquea(a.id); pintaArmas(true); },
     elige: i => eligeArma(i),
     salta: n => { if (!ONLINE) { nivelLocal = n | 0; dir.n = (n | 0) - 1; E.clear(); } },
     // para probar la IA en la práctica: enemigos y objetos donde se pida
@@ -2744,6 +2847,7 @@
     ponYo: (x, y) => { yo.x = x; yo.y = y; },
     enemigo: (k, x, y) => (ONLINE ? null : nuevoEnemigo(Math.max(1, dir.n), k, x, y).id),
     ponVida: (id, pc) => { const e = E.get(id); if (e && !ONLINE) e.hp = e.max * pc; },
+    ponCaja: (k, x, y) => { if (!ONLINE) { const b = { id: nid(), k: k | 0, x: Math.round(x), y: Math.round(y) }; B.set(b.id, b); } },
     pon: (k, x, y) => { if (!ONLINE) peticion(cfg.yo, { pon: [D.ARMAS.findIndex(a => a.obj === k), x, y] }); },
     objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max, bl: o.bl || 0 })),
     // la tienda: puntos para probar, y lo comprado

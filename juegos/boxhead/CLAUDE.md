@@ -334,3 +334,31 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   from `eliteDe`): ×1.5 hp, ×1.2 speed, cooldowns ×0.75, purple aura via the
   élite ring, «· corrupto» on the bar. `el` already rides `zb` for bosses.
 - `__boxhead.ponVida(id, pc)` sets an enemy's health for tests.
+
+## Phase 3.3: four weapons and golden boxes (`boxhead-17`, proof `ve: 6`)
+
+- **Ids 10–13** (lanzallamas ×60, ballesta ×80, minigun ×120, rayo ×160).
+  8 and 9 stay the bite and fireball codes, so `ARMAS` holds two
+  `tipo: 'enemigo'` placeholders there and `ARMAS[id]` still works by id.
+  **Anything that walks the player's weapons uses `D.ARMAS_J`** (HUD bar,
+  shop, unlock-all, arsenal medal, premios); `aplicaGolpe` refuses weapon
+  codes of `tipo: 'enemigo'`. `BX_ARMAS` in `motor.js` is now the highest id
+  (13), and a test pins `ARMAS[i].id === i`.
+- Weapon keys go by position in `ARMAS_J` (`TECLA_ARMA`: 1–9, 0, -, =), still
+  recorded as `accion(2, id)`. Locked weapons from ×60 up stay out of the bar
+  except the next one to unlock.
+- `llama`: every enemy in the cone (`alc`, `abre`) in sight, through; in
+  versus also rivals. `rayo` (`relampago`): nearest in sight within 20° of
+  the front, then `saltos` jumps of at most `salto` px, ×0.8 each; it never
+  hits players. `gira` (minigun): `yo.giro` 0→1 while firing, cadence
+  ÷(0.3 + 0.7·giro), decays when you stop. Others get a normal `pend.s` shot;
+  `sucesos` draws w 10 as flame and w 13 as a lightning line. `RAYOS` is
+  capped at 30 because nothing clears it without a screen.
+- **Golden box** `k: 3` (`PARTE_DORADA` 0.6 % of drops, on the same `rn()`
+  roll as the other boxes, plus one per boss): `yo.dorada` = `DORADA_T` s of
+  ×`DORADA` damage with no ammo spent. Local, like armour. `TOPE_VENTAJAS`
+  includes `DORADA`.
+- New upgrade stats: `saltos` (+1 like `pen`) and `salto`; `tope` has their
+  caps. Weapons from ×60 enter the upgrade wheel, so upgrades above ×60
+  changed (that is what `VE` is for).
+- `__boxhead.ponCaja(k, x, y)`; `estado().yo` has `dorada` and `giro`.

@@ -64,7 +64,9 @@ test('boxhead: mapa, variante y armas se recortan a lo que existe',()=>{
  assert.equal(reducir(sala(2,{mapa:'sotano'})).mapa,'sotano');
  assert.equal(reducir(sala(2,{variante:'otra'})).variante,'coop');
  assert.deepEqual(Object.keys(BX_MAPAS),copia(D.ORDEN_MAPAS));
- assert.equal(D.ARMAS.length,BX_ARMAS);
+ assert.equal(D.ARMAS.length-1,BX_ARMAS,'BX_ARMAS es el id más alto');
+ D.ARMAS.forEach((a,i)=>assert.equal(a.id,i,'ARMAS[id] vale por id'));
+ assert.deepEqual(D.ARMAS.filter(a=>a.tipo==='enemigo').map(a=>a.id),[8,9],'8 y 9: mordida y fuego');
 });
 
 test('boxhead: datos del juego — armas, mejoras, skins',()=>{
@@ -164,7 +166,7 @@ test('boxhead: tienda, potencia y armadura',()=>{
 });
 
 test('boxhead: niveles de arma en la tienda, cada vez más caros y con tope',()=>{
- for(const a of D.ARMAS){
+ for(const a of D.ARMAS_J){
   let antes=0;
   for(let n=0;n<D.NIVEL_ARMA.max;n++){const p=D.precioNivelArma(a.id,n);assert.ok(p>antes,a.nombre+' nivel '+n+' más caro');antes=p;}
   assert.equal(D.precioNivelArma(a.id,D.NIVEL_ARMA.max),Infinity,a.nombre+' tope');
@@ -248,7 +250,7 @@ test('boxhead: paletas, armas en la mano y proyección del dibujo',()=>{
  assert.equal(G.PAL_E.length,D.ENEMIGOS.length,'una paleta por enemigo');
  for(const p of G.PAL_E){for(const c of ['piel','camisa','pantalon','pelo'])assert.match(p[c],/^#[0-9a-f]{3,6}$/i);assert.ok(['zombi','lado'].includes(p.brazos));}
  for(let k=0;k<D.ENEMIGOS.length;k++)assert.equal(G.sangreDe(k).length,3);
- for(const a of D.ARMAS){const m=G.partesArma(a.id);assert.ok(m.p.length>=1,a.nombre+' sin modelo');assert.equal(m.b.length,3);}
+ for(const a of D.ARMAS_J){const m=G.partesArma(a.id);assert.ok(m.p.length>=1,a.nombre+' sin modelo');assert.equal(m.b.length,3);}
  for(const s of D.SKINS)assert.equal(G.palJugador(s).brazos,'arma');
  // mirando al este, la boca del arma queda a la derecha del jugador y en alto
  const b=G.boca(100,100,0,0);
@@ -330,10 +332,10 @@ function juegaPartida(bx,{maxPasos=60*60*20,azar=1,semilla=12345,cuenta='local'}
 }
 test('topes del director: ningún golpe legítimo los pasa, y cada arma tiene su nicho',()=>{
  const todasDe=w=>new Set(D.MEJORAS.filter(m=>m.arma===w).map(m=>m.id));
- for(const a of D.ARMAS){
+ for(const a of D.ARMAS_J){
   const b=D.conNivel(D.arma(a.id,todasDe(a.id)),5);
   // lo más que hace jugando: potencia 5, filo 5, furia, en compañía 2 y crítico
-  const real=(b.d||0)*D.factorPotencia(5)*1.5*1.4*1.3*2*(b.obj==='barril'||b.obj==='carga'?1.5:1);
+  const real=(b.d||0)*D.factorPotencia(5)*1.5*1.4*1.3*2*D.DEBIL*D.DORADA*(b.obj==='barril'||b.obj==='carga'?1.5:1);
   assert.ok(D.topeGolpe(a.id)>=Math.round(real),a.nombre+' tope '+D.topeGolpe(a.id)+' < '+real);
   if(b.r)assert.ok(D.topeRadio(a.id)>=Math.round(b.r*1.25),a.nombre+' radio');
   assert.ok(D.topeGolpe(a.id)>=60*1.5*5.46,'cubre el estallido y la bala ígnea');
@@ -544,4 +546,34 @@ test('jefes de la Fase 3: segunda habilidad, punto débil y corruptos',()=>{
  const cor=de(bx.enemigo(6,yo.x+200,yo.y));
  assert.equal(cor.el,D.ELITE_CORRUPTO);
  assert.equal(cor.max,Math.round(D.vidaJefe(6,51,1)*D.ELITES[D.ELITE_CORRUPTO].vida),'corrupto: ×'+D.ELITES[D.ELITE_CORRUPTO].vida+' de vida');
+});
+
+test('armas de la Fase 3.3: lanzallamas, ballesta, minigun, rayo y la caja dorada',()=>{
+ for(const id of [10,11,12,13]){const a=D.ARMAS[id];assert.ok(a&&D.ARMAS_J.includes(a)&&a.desbloquea>40,'arma '+id);assert.ok(D.PASOS[id]&&D.PASOS[id].length,'mejoras de '+a.nombre);}
+ assert.ok(D.MEJORAS.some(m=>m.arma===13&&m.k==='saltos'),'el rayo gana saltos');
+ const bx=boxheadSinPantalla(),pista={dx:0,dy:0,vel:1,mira:0,fija:true,disp:false};
+ const vivo=id=>bx.mundo().E.find(e=>e.id===id);
+ function prepara(w){bx.practica(1);bx.inmortal(true);bx.armas();bx.calma();bx.elige(w);bx.entrada(pista);for(let i=0;i<12;i++)bx.paso(1/60);return bx.mundo().yo;}
+ // quién perdió vida (o murió) con `pasos` pasos de gatillo
+ function pega(w,pos,pasos=1){
+  const yo=prepara(w),ids=pos.map(([dx,dy])=>bx.enemigo(0,yo.x+dx,yo.y+dy));
+  const h0=new Map(bx.mundo().E.map(e=>[e.id,e.hp]));
+  bx.entrada({...pista,disp:true});for(let i=0;i<pasos;i++)bx.paso(1/60);bx.entrada(pista);bx.paso(1/60);
+  return ids.map(id=>!vivo(id)||vivo(id).hp<h0.get(id));
+ }
+ assert.deepEqual(pega(10,[[40,0],[70,8],[100,-8],[-60,0],[200,0]]),[true,true,true,false,false],'la llama quema el cono y nada detrás ni lejos');
+ assert.deepEqual(pega(11,[[50,0],[90,0],[130,0],[170,0],[210,0],[250,0]]),[true,true,true,true,true,false],'la ballesta atraviesa a cuatro');
+ assert.deepEqual(pega(13,[[60,0],[120,22],[175,0],[-150,-150]]),[true,true,true,false],'el rayo salta de uno a otro');
+ // la minigun arranca lenta: gasta más balas en el segundo medio segundo que en el primero
+ prepara(12);
+ const am=()=>bx.estado().yo.ammo[12],a0=am();
+ bx.entrada({...pista,disp:true});for(let i=0;i<30;i++)bx.paso(1/60);const a1=am();for(let i=0;i<30;i++)bx.paso(1/60);const a2=am();bx.entrada(pista);
+ assert.ok(a0-a1>0&&(a1-a2)>(a0-a1),'gira más rápido: '+(a0-a1)+' y luego '+(a1-a2));
+ // caja dorada: furia, ×2 de daño y sin gastar munición
+ let yo=prepara(1);
+ bx.ponCaja(3,yo.x,yo.y);bx.paso(1/60);
+ assert.ok(bx.estado().yo.dorada>0,'la caja dorada da la furia');
+ const u0=bx.estado().yo.ammo[1];
+ bx.entrada({...pista,disp:true});for(let i=0;i<20;i++)bx.paso(1/60);bx.entrada(pista);
+ assert.equal(bx.estado().yo.ammo[1],u0,'con furia no gasta');
 });

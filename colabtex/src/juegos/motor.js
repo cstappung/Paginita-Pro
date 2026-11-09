@@ -6837,9 +6837,10 @@ function ajRepasa(bandos, jug, ritmo = null) {
 export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus" };
 export const BX_METAS = [5, 10, 20];
 export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto" };
-/* Ids de arma de juegos/boxhead/js/datos.js (0–7) más el mordisco (8) y
-   el fuego de un diablo (9). Nunca se renumeran. */
-export const BX_ARMAS = 8;
+/* El id de arma más alto de juegos/boxhead/js/datos.js: 0–7 y 10–13 son
+   del jugador, 8 el mordisco y 9 el fuego de un diablo. Nunca se
+   renumeran. */
+export const BX_ARMAS = 13;
 const tiene = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 export const varianteBoxhead = p => tiene(BX_VARIANTES, p && p.variante) ? p.variante : "coop";
 export const mapaBoxhead = p => tiene(BX_MAPAS, p && p.mapa) ? p.mapa : "patio";
