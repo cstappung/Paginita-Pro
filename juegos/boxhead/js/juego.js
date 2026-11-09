@@ -69,7 +69,15 @@
   let cfg = null, M = null;
   let jugando = false, pausado = false, terminado = false;
   let marcador = { nivel: 1, caidos: [], bajas: {}, muertes: {}, puntos: {}, fuera: [], fin: null };
+  /* Medallas (D.MEDALLAS) y récords por mapa de la práctica: del
+     dispositivo, también sin cuenta. Rehaciendo una prueba o mirando no
+     se gana nada. */
+  const leeJSON = (k, d) => { try { const v = JSON.parse(lee(k, '')); return v && typeof v === 'object' ? v : d; } catch { return d; } };
+  const medallas = new Set((leeJSON('boxhead.medallas', []) || []).filter(id => D.medallaDe(id)));
+  const records = leeJSON('boxhead.records', {});
+  const skinLibre = s => !s.medalla || medallas.has(s.medalla);
   let skinId = D.skin(lee('boxhead.skin', 'bambo')).id;
+  if (!skinLibre(D.skin(skinId))) skinId = 'bambo';
   let mapaElegido = D.mapaValido(lee('boxhead.mapa', 'patio'));
   let ultimoId = 0;
   const nid = () => (ultimoId = ONLINE ? Math.max(ultimoId + 1, Date.now()) : ultimoId + 1);
@@ -79,7 +87,7 @@
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
     return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, chat: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), vt: {}, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
+      tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
       // para la pantalla final: disparos y aciertos (perdigón a perdigón), bajas por arma y jefes
       st: { disp: 0, acierto: 0, armas: new Array(10).fill(0), jefes: 0 } };
   }
@@ -97,7 +105,14 @@
      lo mismo. En la práctica la horda del nivel espera a la elección
      (simDirector); en línea nadie espera a nadie. */
   let eleccion = null;
-  function alEmpezarNivel() {
+  function alEmpezarNivel(n) {
+    if (n - 1 >= 3 && yo.limpio && yo.v && !yo.muerto) medalla('limpio');
+    yo.limpio = true;
+    if (n >= 10) medalla('nivel10');
+    if (n >= 20) medalla('nivel20');
+    if (n >= 30) medalla('nivel30');
+    if (ONLINE && n >= 5 && (cfg.jugadores || []).length > 1) medalla('equipo');
+    anotaRecord(n);
     if (vt('coraza') && yo.v && !yo.muerto) yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 25 * vt('coraza'));
     if (eleccion) eligeVentaja(0);
     const ops = D.sorteaVentajas(rn, yo.vt, ONLINE && (cfg.jugadores || []).length > 1, 3);
@@ -112,6 +127,8 @@
     const v = D.ventaja(id), n = (yo.vt[id] || 0) + 1;
     yo.vt[id] = n;
     if (id === 'aguante' && yo.v && !yo.muerto) yo.hp += 20;
+    if (Object.values(yo.vt).reduce((a, b) => a + b, 0) >= 10) medalla('ventajas');
+    if (D.VENTAJAS.filter(x => x.rar === 2 && yo.vt[x.id]).reduce((a, x) => a + yo.vt[x.id], 0) >= 3) medalla('epicas');
     eleccion = null; pintaEleccion();
     son('mejora'); premio(v.nom + (v.max > 1 ? ' ' + n : ''), 'mejora');
   }
@@ -133,6 +150,21 @@
       cartas.append(b);
     });
     caja.hidden = false;
+  }
+  function medalla(id) {
+    if (repite || medallas.has(id) || !cfg || cfg.mirando) return;
+    const m = D.medallaDe(id); if (!m) return;
+    medallas.add(id); guarda('boxhead.medallas', JSON.stringify([...medallas]));
+    premio(m.i + ' Medalla: ' + m.nom); son('premio');
+    const s = D.SKINS.find(x => x.medalla === id);
+    if (s) premio('Nuevo personaje: ' + s.nombre);
+  }
+  // El récord de la práctica en cada mapa: el nivel más alto y, con ese nivel, los puntos.
+  function anotaRecord(n) {
+    if (ONLINE || repite || !cfg) return;
+    const r = records[cfg.mapa] || { n: 0, pts: 0 };
+    if (n > r.n || (n === r.n && yo.pts > r.pts)) { records[cfg.mapa] = { n, pts: yo.pts | 0 }; guarda('boxhead.records', JSON.stringify(records)); }
+    if (D.ORDEN_MAPAS.every(m => (records[m] || {}).n >= 10)) medalla('mapas');
   }
   // Las ventajas que se tienen, en una línea («Filo 2 · Dron 1»).
   const listaVentajas = () => D.VENTAJAS.filter(v => vt(v.id)).map(v => v.nom + (v.max > 1 ? ' ' + vt(v.id) : '')).join(' · ');
@@ -437,7 +469,7 @@
     eligeArma(l[(i + s + l.length) % l.length]);
   }
   function desbloquea(id, aviso) {
-    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; }
+    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; if (yo.tiene.size >= D.ARMAS.length) medalla('arsenal'); }
     if (aviso) premio(aviso);
   }
 
@@ -680,7 +712,7 @@
     // La armadura se come una parte del golpe hasta gastarse.
     if (yo.arm > 0) { const ab = Math.min(yo.arm, d * D.ARMADURA.absorbe); yo.arm -= ab; d -= ab; }
     d *= 1 - 0.08 * vt('piel');
-    yo.sinGolpe = 0;
+    yo.sinGolpe = 0; yo.limpio = false;
     yo.hp -= d;
     if (inmortal) yo.hp = Math.max(1, yo.hp);
     if (yo.hp <= 0 && vt('segunda') && !yo.segunda) {
@@ -721,7 +753,8 @@
     yo.k++;
     yo.mul++;
     yo.st.armas[armaMuerte >= 0 ? armaMuerte : armaUlt]++;
-    if (D.esJefe(k)) yo.st.jefes++;
+    if (D.esJefe(k)) { yo.st.jefes++; medalla('jefe'); if (D.ENEMIGOS[k].jefe === 'grande') medalla('coloso'); }
+    if (++yo.bajasPaso >= 10) medalla('diez');
     if (Number.isFinite(x)) sueltaChatarra(x, y, Math.round(D.chatarraDe(k) * (1 + 0.2 * vt('codicia'))));
     if (vt('vampiro') && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + vt('vampiro'));
     // estallido: revienta en el paso siguiente (pasoYo), no en medio de esta baja
@@ -736,6 +769,8 @@
       pintaArmas(true);
     }
     if (yo.mul >= 3) consejo('combo');
+    if (yo.mul >= 50) medalla('x50');
+    if (yo.mul >= 100) medalla('x100');
     yo.combo = yo.comboMax = D.duracionCombo(yo.mul) * (1 + 0.2 * vt('racha'));
   }
   function hito(m) {
@@ -760,6 +795,7 @@
   function cobra(c) {
     if (c.fin) return;
     c.fin = true; yo.chat += c.v; chatPulso = 1;
+    if ((yo.chatTot += c.v) >= 5000) medalla('chatarra');
     son('chatarra'); consejo('chatarra');
   }
   function pasoChatarra(dt) {
@@ -1548,6 +1584,7 @@
       return;
     }
     T += dt;
+    yo.bajasPaso = 0;
     eligeDirector();
     if (jugando && !terminado && !cfg.mirando) pasoYo(dt);
     if (soyDir) simDirector(dt);
@@ -1577,7 +1614,7 @@
     pasoProy(dt);
     efectos(dt);
     const n = nivelObjetivo();
-    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner('NIVEL ' + n); son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(); }
+    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner('NIVEL ' + n); son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(n); }
     if (eleccion && (eleccion.t -= dt) <= 0) eligeVentaja(0);
     if (ONLINE) {
       pubT += dt;
@@ -1721,6 +1758,7 @@
     const antes = armaDe(i);
     yo.chat -= precio;
     yo.nv[i] = n + 1;
+    if (!Number.isFinite(D.precioNivelArma(i, n + 1))) medalla('maestro');
     // La munición crece con el tope: lo que faltaba sigue faltando.
     if (i !== 0) yo.ammo[i] = Math.min(armaDe(i).max, yo.ammo[i] + Math.max(0, armaDe(i).max - antes.max));
     son('mejora');
@@ -1738,6 +1776,7 @@
   function finPractica() {
     terminado = true;
     finPaso = pasoN;
+    anotaRecord(nivelLocal);
     if (graba) graba.k = pasoN;
     // Al Club: el nivel al que llegaste y cuánto tardaste en llegar a él (en pasos), con la prueba.
     if (CLUB) Club.inmersivo(false);
@@ -2376,18 +2415,39 @@
       b.onclick = () => { mapaElegido = id; guarda('boxhead.mapa', id); pintaMenu(); if (CLUB) Club.category(catClub(id)); };
       ms.append(b);
     }
+    // récords de la práctica en cada mapa
+    const rec = D.ORDEN_MAPAS.filter(m => records[m] && records[m].n > 0).map(m => D.MAPAS[m].nombre + ' ' + records[m].n);
+    $('records').textContent = rec.length ? 'Tus récords (nivel): ' + rec.join(' · ') : '';
     const sk = $('skins');
     sk.textContent = '';
     for (const s of D.SKINS) {
+      const libre = skinLibre(s), m = s.medalla && D.medallaDe(s.medalla);
       const b = document.createElement('button'), c = document.createElement('canvas');
-      b.className = 'skin' + (s.id === skinId ? ' sel' : '');
+      b.type = 'button';
+      b.className = 'skin' + (s.id === skinId ? ' sel' : '') + (libre ? '' : ' cerrada');
       c.width = 80; c.height = 104;
       const g = c.getContext('2d');
       g.scale(2, 2);
       G.humanoide(g, 20, 47, 1.15, G.palJugador(s), { arma: 0, t: 0 });
-      b.append(c, document.createTextNode(s.nombre));
-      b.onclick = () => { skinId = s.id; guarda('boxhead.skin', s.id); pintaMenu(); };
+      b.append(c, document.createTextNode((libre ? '' : '🔒 ') + s.nombre));
+      if (!libre) b.title = 'Se gana con la medalla «' + m.nom + '»: ' + m.txt;
+      b.onclick = () => {
+        if (!libre) { $('skinInfo').textContent = '🔒 ' + s.nombre + ' se gana con la medalla «' + m.nom + '»: ' + m.txt; return; }
+        skinId = s.id; guarda('boxhead.skin', s.id); $('skinInfo').textContent = ''; pintaMenu();
+      };
       sk.append(b);
+    }
+    // las medallas: ganadas a color, el resto apagadas con lo que piden
+    $('medN').textContent = medallas.size + '/' + D.MEDALLAS.length;
+    const md = $('medallas');
+    md.textContent = '';
+    for (const m of D.MEDALLAS) {
+      const d = document.createElement('div'), ic = document.createElement('i'), t = document.createElement('b'), x = document.createElement('span');
+      d.className = 'medalla' + (medallas.has(m.id) ? ' ganada' : '');
+      ic.textContent = m.i; t.textContent = m.nom;
+      const s = D.SKINS.find(k => k.medalla === m.id);
+      x.textContent = m.txt + (s ? ' Abre a ' + s.nombre + '.' : '');
+      d.append(ic, t, x); md.append(d);
     }
   }
   $('jugar').onclick = () => {

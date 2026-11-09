@@ -249,3 +249,21 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   fires from the player's position; only the drawing hovers.
 - `practica` resets `eleccion`. Any change to an upgrade's numbers changes the
   sim: **bump `VE`**.
+
+## Phase 2.4: medals, unlockable skins, records (`boxhead-13`)
+
+- **Medals are the game's own logros** (`D.MEDALLAS`, 16), the user's call for
+  unlocking skins. They are stored per device in `boxhead.medallas`, guests
+  included, and earned solo, in the Club or online. `medalla(id)` never touches
+  the sim (storage and a `premio` only), so proofs are unaffected. It does
+  nothing while replaying (`repite`) or spectating. Grep `medalla('` for the
+  triggers. The site-wide room logros (`logros.js` `SALA.boxhead`) are
+  unchanged: they only see the room log.
+- **Six new skins** (`SKINS[].medalla`) reuse accessories `grafico.js` already
+  draws (sombrero, capucha, gorra, casco, corona, careta). Locked ones are
+  grey with a dashed border in the menu, and a click says which medal opens
+  them. A stored skin that is not unlocked falls back to Bambo. Online, others
+  see whatever `sk` you send: the lock is only local.
+- **Records**: `boxhead.records` = `{mapa: {n, pts}}` from practice only
+  (`anotaRecord` at each level start and in `finPractica`). The Trotamundos
+  medal reads it.

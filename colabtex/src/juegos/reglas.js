@@ -690,7 +690,8 @@ const REGLAS = {
         "<b>En el celular o la tableta</b>: un joystick nace donde apoyas el pulgar en la mitad izquierda, y a la derecha están Disparar, Fijar, cambiar de arma, Muro, Detonar y la pausa. La tienda se toca.",
         "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
         "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se abre la <b>tienda</b>: se compra con un clic o con las teclas <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín, <b>G</b> potencia y <b>M</b> muro reforzado; <b>U</b> sube de nivel el arma que llevas. <b>F</b> pone un muro reforzado, estés donde estés.",
-        "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
+        "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot, y seis más que se ganan con <b>medallas</b>: Cazador (derrota a un jefe grande), Calavera (multiplicador ×100), Dinamita (10 bajas en el mismo instante), Armero (un arma al nivel 5), Rey (nivel 20) y Careta (nivel 10 en la práctica de los cinco mapas).",
+        "Las <b>medallas</b> son los logros del propio juego: 16, que se ganan jugando solo, en el Club o en línea y quedan guardadas en ese dispositivo (también sin cuenta). Se ven en el menú, junto con tu <b>récord de nivel</b> en la práctica de cada mapa."
       ])],
       ["En el Solo Club", lista([
         "Pro BoxHead también se juega solo desde el <b>Solo Club</b>, con <b>una tabla por mapa</b> (Patio, Sótano, Cruce, Fortaleza y Laberinto). Lo que cuenta es el <b>nivel más alto al que llegas</b> antes de caer; con el mismo nivel gana quien llegó en menos tiempo de juego.",

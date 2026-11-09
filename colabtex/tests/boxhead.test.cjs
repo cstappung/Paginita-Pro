@@ -70,8 +70,15 @@ test('boxhead: mapa, variante y armas se recortan a lo que existe',()=>{
 test('boxhead: datos del juego — armas, mejoras, skins',()=>{
  const mul=D.ARMAS.map(a=>a.mul);
  assert.deepEqual(mul,[...mul].sort((x,y)=>x-y));
- assert.equal(D.SKINS.length,8);
- assert.equal(new Set(D.SKINS.map(s=>s.id)).size,8);
+ assert.equal(D.SKINS.length,14);
+ assert.equal(new Set(D.SKINS.map(s=>s.id)).size,14);
+ // las ocho de siempre son libres; las seis nuevas, cada una con una medalla distinta que existe
+ assert.ok(D.SKINS.slice(0,8).every(s=>!s.medalla));
+ const conM=D.SKINS.filter(s=>s.medalla);
+ assert.equal(conM.length,6);assert.equal(new Set(conM.map(s=>s.medalla)).size,6);
+ for(const s of conM)assert.ok(D.medallaDe(s.medalla),s.id);
+ assert.equal(new Set(D.MEDALLAS.map(m=>m.id)).size,D.MEDALLAS.length);
+ for(const m of D.MEDALLAS)assert.ok(m.nom&&m.i&&m.txt,m.id);
  for(const a of D.ARMAS)assert.ok(a.nombre&&a.id!==undefined||a.nombre);
 });
 

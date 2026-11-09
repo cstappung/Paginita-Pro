@@ -296,8 +296,38 @@
     { id: 'ninja', nombre: 'Ninja', piel: '#e6c39a', camisa: '#1d1d24', pantalon: '#1d1d24', pelo: '#1d1d24', extra: 'mascara' },
     { id: 'policia', nombre: 'Policía', piel: '#c99a6c', camisa: '#21386b', pantalon: '#18264a', pelo: '#111', extra: 'gorra' },
     { id: 'payaso', nombre: 'Payaso', piel: '#fafafa', camisa: '#e23b3b', pantalon: '#f3c623', pelo: '#ff7a00', extra: 'nariz' },
-    { id: 'robot', nombre: 'Robot', piel: '#b8c2cc', camisa: '#7d8a96', pantalon: '#55606b', pelo: '#e33', extra: 'antena' }
+    { id: 'robot', nombre: 'Robot', piel: '#b8c2cc', camisa: '#7d8a96', pantalon: '#55606b', pelo: '#e33', extra: 'antena' },
+    // Las seis que se ganan con una medalla del juego (`medalla`): sin ella salen con candado en el menú.
+    { id: 'cazador', nombre: 'Cazador', piel: '#d8ad7e', camisa: '#a8874f', pantalon: '#5a4a2e', pelo: '#3b2a18', extra: 'sombrero', medalla: 'coloso' },
+    { id: 'calavera', nombre: 'Calavera', piel: '#ece6d8', camisa: '#1c1a20', pantalon: '#1c1a20', pelo: '#121015', extra: 'capucha', medalla: 'x100' },
+    { id: 'dinamita', nombre: 'Dinamita', piel: '#e6bf92', camisa: '#d8402a', pantalon: '#2a2a30', pelo: '#f3b81f', extra: 'gorra', medalla: 'diez' },
+    { id: 'armero', nombre: 'Armero', piel: '#c99a6c', camisa: '#5d646e', pantalon: '#e07a1f', pelo: '#f0a020', extra: 'casco', medalla: 'maestro' },
+    { id: 'rey', nombre: 'Rey', piel: '#f0cfa8', camisa: '#6a2a8a', pantalon: '#2a1036', pelo: '#e8c040', extra: 'corona', medalla: 'nivel20' },
+    { id: 'careta', nombre: 'Careta', piel: '#e2d2c0', camisa: '#3e4a2e', pantalon: '#2a3020', pelo: '#2a2a2a', extra: 'careta', medalla: 'mapas' }
   ];
+  /* ---------- medallas: los logros del propio juego ----------
+     Se ganan jugando (práctica, Solo Club o en línea) y se guardan en el
+     dispositivo (`boxhead.medallas`), también sin cuenta. Seis abren un
+     personaje (SKINS[].medalla). Las cuenta juego.js (`medalla(id)`). */
+  const MEDALLAS = [
+    { id: 'jefe', nom: 'Primer jefe', i: '💀', txt: 'Derrota a un jefe.' },
+    { id: 'coloso', nom: 'Matagigantes', i: '🗿', txt: 'Derrota a un jefe grande (nivel 10, 20, 30…).' },
+    { id: 'x50', nom: 'En llamas', i: '🔥', txt: 'Llega a un multiplicador ×50.' },
+    { id: 'x100', nom: 'Imparable', i: '☠️', txt: 'Llega a un multiplicador ×100.' },
+    { id: 'limpio', nom: 'Sin un rasguño', i: '✨', txt: 'Supera un nivel desde el 3 sin recibir daño.' },
+    { id: 'nivel10', nom: 'Dos cifras', i: '🔟', txt: 'Llega al nivel 10.' },
+    { id: 'nivel20', nom: 'Veinte noches', i: '👑', txt: 'Llega al nivel 20.' },
+    { id: 'nivel30', nom: 'Fin del mundo', i: '🌋', txt: 'Llega al nivel 30.' },
+    { id: 'mapas', nom: 'Trotamundos', i: '🗺️', txt: 'Llega al nivel 10 en la práctica de los cinco mapas.' },
+    { id: 'arsenal', nom: 'Arsenal', i: '🧰', txt: 'Ten las ocho armas en una partida.' },
+    { id: 'maestro', nom: 'Maestro armero', i: '🔧', txt: 'Sube un arma al nivel 5 en la tienda.' },
+    { id: 'diez', nom: 'Diez de un golpe', i: '💥', txt: 'Haz 10 bajas en el mismo instante.' },
+    { id: 'chatarra', nom: 'Chatarrero', i: '🔩', txt: 'Junta 5000 de chatarra en una partida.' },
+    { id: 'ventajas', nom: 'A medida', i: '🃏', txt: 'Lleva 10 niveles de ventajas en una partida.' },
+    { id: 'epicas', nom: 'Coleccionista', i: '💎', txt: 'Elige tres ventajas épicas en una partida.' },
+    { id: 'equipo', nom: 'Escuadrón', i: '👥', txt: 'Llega al nivel 5 en una sala cooperativa con más gente.' }
+  ];
+  const medallaDe = id => MEDALLAS.find(m => m.id === id) || null;
   const skin = id => SKINS.find(s => s.id === id) || SKINS[0];
 
   /* ---------- mapas ----------
@@ -528,6 +558,6 @@
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
-    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA
+    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe
   };
 });
