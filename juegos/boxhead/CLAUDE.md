@@ -476,3 +476,22 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   beat the attribute, and the empty «ELIGE UNA VENTAJA» showed in every mode
   from Phase 2.2 until 3.5d. The Arsenal medal counts only in `coop`, where
   the weapons are earned.
+
+## Phase 3.6: sawtooth difficulty, compressed `zb`, explosion lights (`boxhead-23`, proof `ve: 7`)
+
+- **Sawtooth**: `totalNivel` and `ritmoNivel` are multiplied or divided by
+  `sierra(n)`, a five-level `SIERRA = [0.85, 0.95, 1.05, 1.15, 1]`. So the
+  level after each boss (6, 11, 16…) breathes and the stretch climbs to the
+  next boss.
+  - The saw goes **over** the caps (120 enemies, 0.35 s), so it survives at
+    high levels: peaks of 138 and 0.30 s.
+  - HP, speed, damage and `maxVivos` stay linear. The old «recta» test was
+    replaced on purpose by the sawtooth test.
+  - This changes the sim, hence `VE = 7`.
+- **zb**: the enemies travel as `z` (6 numbers per enemy: delta id, k, x,
+  y, pc, flags `d | atk<<3 | aturd<<4 | extra<<5`) plus `zx` (the extras),
+  via `D.empacaZb`/`D.desempacaZb`. The decoder still reads the old `e`.
+  Ids are `Date.now()`-sized, so the deltas alone save a lot.
+- **Lights**: `efectoBoom` always pushes to `LUCES`. On a lit map `luces()`
+  paints a warm `lighter` glow (0.26 peak, quadratic fade). On a dark map
+  `oscuridad` uses them as holes, as before. Drawing only.

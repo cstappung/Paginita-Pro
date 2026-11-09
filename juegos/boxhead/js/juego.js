@@ -208,7 +208,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 6, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 7, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   // Teclas de arma: la posición en ARMAS_J (los ids 8 y 9 no son armas del jugador).
@@ -1578,7 +1578,7 @@
   function zbSale() {
     return {
       n: dir.n, q: dir.q, t: Math.round(dir.t * 10) / 10,
-      e: [...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) || e.el || e.est || e.max !== D.vidaEnemigo(e.k, Math.max(1, dir.n)) ? [Math.round(e.max), e.est || 0, e.el || 0].concat(e.est === 1 && D.ENEMIGOS[e.k].vigia ? [e.ax, e.ay] : []) : [])),
+      ...D.empacaZb([...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) || e.el || e.est || e.max !== D.vidaEnemigo(e.k, Math.max(1, dir.n)) ? [Math.round(e.max), e.est || 0, e.el || 0].concat(e.est === 1 && D.ENEMIGOS[e.k].vigia ? [e.ax, e.ay] : []) : []))),
       f: F.map(f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy), f.k || 1, Math.round(f.t * 10)].concat(f.roca ? [Math.round(f.t0 * 10), Math.round(f.tx), Math.round(f.ty)] : [])),
       o: [...O.values()].map(o => [o.id, OBJ.indexOf(o.k), o.x, o.y, Math.max(1, Math.round(100 * Math.min(o.hp, o.max) / o.max)), o.u || '', o.r || 0, o.max >= 1e9 ? 0 : o.max, o.d || 0, o.bl ? 1 : 0]),
       b: [...B.values()].map(b => [b.id, b.k, b.x, b.y]),
@@ -1591,8 +1591,7 @@
     if (!zb || typeof zb !== 'object') return;
     dir.n = zb.n | 0; dir.q = zb.q | 0; dir.t = +zb.t || 0;
     const vistos = new Set();
-    for (const a of zb.e || []) {
-      if (!Array.isArray(a)) continue;
+    for (const a of D.desempacaZb(zb)) {
       const [id, k0, x, y, pc, d, atk, aturd, mx, est, el, ax, ay] = a, k = D.ENEMIGOS[k0 | 0] ? k0 | 0 : 0;
       vistos.add(id);
       ultimoId = Math.max(ultimoId, id);
@@ -2189,7 +2188,8 @@
   }
   function efectoBoom(x, y, r) {
     fx.boom(x, y, r);
-    if (M && M.oscuro) { LUCES.push({ x, y, r: r * 2.4, t: 0.6, t0: 0.6 }); if (LUCES.length > 20) LUCES.shift(); }
+    // la luz de la explosión: abre la oscuridad del Apagón y, en los demás mapas, alumbra el suelo (Fase 3.6)
+    LUCES.push({ x, y, r: r * (M && M.oscuro ? 2.4 : 1.9), t: 0.6, t0: 0.6 }); if (LUCES.length > 20) LUCES.shift();
     sacude = Math.min(10, sacude + r / 12);
     const dd = dist(x, y, yo.x, yo.y);
     son('boom', dd);
@@ -2443,6 +2443,7 @@
       rotulo(nombreDe(u), r.x, r.y - 59, colorDe(u));
     }
     if (M.oscuro) oscuridad(cxv, cyv);
+    else if (LUCES.length) luces();
     // marcadores «¡aquí!» (míos y de los demás) y el anillo de revivir
     const pinta = (p, color, nom) => {
       const q = (T - p.t) / 4, pul = 0.5 + 0.5 * Math.sin(T * 10);
@@ -2521,6 +2522,22 @@
     for (const l of LUCES) hueco(l.x, l.y, l.r, (l.t / l.t0).toFixed(2));
     if (yo.v && yo.cd > 0 && yo.w !== 5) hueco(yo.x, yo.y, 90, 0.5);   // el fogonazo propio
     cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.drawImage(c, 0, 0); cx.restore();
+  }
+  /* Fase 3.6: con luz, cada explosión alumbra un instante lo que la rodea:
+     un resplandor cálido sumado encima (modo «lighter»), que se apaga con
+     la luz. Solo se dibuja. */
+  function luces() {
+    cx.save();
+    cx.globalCompositeOperation = 'lighter';
+    for (const l of LUCES) {
+      const a = l.t / l.t0, f = a * a;
+      const g = cx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+      g.addColorStop(0, 'rgba(255,170,80,' + (0.26 * f).toFixed(3) + ')');
+      g.addColorStop(0.45, 'rgba(255,110,40,' + (0.11 * f).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,80,20,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(l.x, l.y, l.r, 0, 7); cx.fill();
+    }
+    cx.restore();
   }
   /* Con la dirección fija, una flecha en el suelo dice hacia dónde se dispara. */
   function flechaFija() {

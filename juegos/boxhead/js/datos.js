@@ -267,7 +267,14 @@
   const vidaEnemigo = (k, n) => Math.round(ENEMIGOS[k].vida * (1 + 0.08 * (n - 1)));
   const velEnemigo = (k, n) => Math.min(ENEMIGOS[k].vel + 1 * (n - 1), ENEMIGOS[k].velMax);
   const golpeNivel = (k, n) => Math.round(ENEMIGOS[k].golpe * (1 + 0.02 * (n - 1)));
-  const totalNivel = n => Math.min(16 + 4 * (n - 1), 120);
+  /* Fase 3.6, dificultad en sierra: la cantidad y el ritmo de la horda
+     suben dentro de cada tramo de cinco niveles y aflojan después de cada
+     jefe (el nivel 6, 11, 16… respira). La vida, la velocidad y el golpe
+     siguen rectos: lo que sube y baja es cuánta presión hay a la vez, no
+     cuánto aguanta cada uno. El nivel del jefe vale 1: no se suma a él. */
+  const SIERRA = [0.85, 0.95, 1.05, 1.15, 1];
+  const sierra = n => SIERRA[(Math.max(1, Math.floor(n)) - 1) % SIERRA.length];
+  const totalNivel = n => Math.round(Math.min(16 + 4 * (n - 1), 120) * sierra(n));   // la sierra va sobre el tope: sigue en los niveles altos
   /* Qué parte del nivel es de cada tipo: cada uno entra en su `desde` y
      crece de a poco; los zombis comunes son siempre al menos el 20 %. */
   function mezclaNivel(n) {
@@ -287,7 +294,7 @@
   const parteDiablos = n => mezclaNivel(n)[1];
   /* Cuántos caben a la vez, para que el nivel 20 no sea una alfombra. */
   const maxVivos = (n, jug) => Math.min(14 + 3 * jug + n, 48);
-  const ritmoNivel = n => Math.max(0.35, 1.0 - 0.03 * (n - 1));
+  const ritmoNivel = n => Math.max(0.35, 1.0 - 0.03 * (n - 1)) / sierra(n);
 
   /* ---------- tienda y armadura ----------
      Se compra con la chatarra, de pie junto a una estación de suministros
@@ -746,6 +753,40 @@
     const polvora = b.obj === 'barril' || b.obj === 'carga' ? 1.5 : 1;
     return Math.ceil(Math.max(b.d || 0, 60) * factorPotencia(5) * TOPE_VENTAJAS * polvora);
   }
+  /* ---------- el zb comprimido (Fase 3.6) ----------
+     Cada enemigo del zb es la tupla [id, k, x, y, pc, d, atk, aturd] y, si
+     hace falta (jefe, élite, estado o vida distinta), [max, est, el,
+     (ax, ay)]. En vez de una lista de listas viaja `z`, una lista plana de
+     seis números por enemigo (id como diferencia con el anterior, k, x, y,
+     pc y una bandera d | atk<<3 | aturd<<4 | extra<<5), y `zx`, lo extra
+     de los que lo llevan, en el mismo orden. Un 30–40 % menos de JSON con
+     la horda llena. `desempacaZb` también lee el `e` de antes. */
+  function empacaZb(lista) {
+    const z = [], zx = [];
+    let prev = 0;
+    for (const t of lista) {
+      const extra = t.length > 8;
+      z.push(t[0] - prev, t[1], t[2], t[3], t[4], (t[5] & 7) | (t[6] ? 8 : 0) | (t[7] ? 16 : 0) | (extra ? 32 : 0));
+      prev = t[0];
+      if (extra) zx.push(t.slice(8));
+    }
+    return { z, zx };
+  }
+  function desempacaZb(zb) {
+    if (!zb || typeof zb !== 'object') return [];
+    if (Array.isArray(zb.e)) return zb.e.filter(Array.isArray);
+    const z = Array.isArray(zb.z) ? zb.z : [], zx = Array.isArray(zb.zx) ? zb.zx : [];
+    const out = [];
+    let id = 0, j = 0;
+    for (let i = 0; i + 5 < z.length; i += 6) {
+      id += +z[i] || 0;
+      const f = z[i + 5] | 0, t = [id, z[i + 1], z[i + 2], z[i + 3], z[i + 4], f & 7, (f >> 3) & 1, (f >> 4) & 1];
+      if (f & 32) { const x = zx[j++]; if (Array.isArray(x)) t.push(...x.slice(0, 5)); }
+      out.push(t);
+    }
+    return out;
+  }
+
   /* ---------- salas en línea: modo jefes y mutadores (Fase 3.5) ----------
      En el modo jefes cada nivel de la sala vale cinco de la rotación: el 1
      es el nivel 5 (el Carnicero), el 2 el 10 (el Coloso)… y desde el 11 los
@@ -770,9 +811,9 @@
 
   return {
     TS, ARMAS, ARMAS_J, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
-    ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, DORADA, DORADA_T, PARTE_DORADA, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
+    ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, DORADA, DORADA_T, PARTE_DORADA, golpeNivel, totalNivel, SIERRA, sierra, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio,
-    PASO_JEFES, nivelJefes, escoltaJefes, MUTADORES, mutador
+    PASO_JEFES, nivelJefes, escoltaJefes, MUTADORES, mutador, empacaZb, desempacaZb
   };
 });

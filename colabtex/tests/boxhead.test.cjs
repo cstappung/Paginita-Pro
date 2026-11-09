@@ -135,13 +135,20 @@ test('boxhead: la mezcla de enemigos suma 1 y cada tipo entra en su nivel',()=>{
  }
 });
 
-test('boxhead: la dificultad sube de forma pausada y sin saltos',()=>{
+/* Fase 3.6: la presión (cantidad y ritmo) va en sierra de cinco niveles y
+   afloja después de cada jefe; antes este test pedía una recta. La vida,
+   la velocidad, el golpe y los vivos a la vez siguen rectos. */
+test('boxhead: la dificultad sube en sierra, sin saltos en lo que aguanta cada enemigo',()=>{
  let prev=null;
+ const base=n=>16+4*(n-1);
  for(let n=1;n<=40;n++){
   const c={total:D.totalNivel(n),ritmo:D.ritmoNivel(n),vida:D.vidaEnemigo(0,n),vel:D.velEnemigo(0,n),golpe:D.golpeNivel(0,n),max:D.maxVivos(n,1)};
+  assert.equal(c.total,Math.round(Math.min(120,base(n))*D.sierra(n)),'total en sierra en '+n);
+  assert.ok(c.total>=0.85*Math.min(base(n),120)-1&&c.total<=1.15*Math.min(base(n),120)+1&&c.ritmo>=0.3,'la sierra no se aleja de la recta en '+n);
   if(prev){
-   assert.ok(c.total>=prev.total&&c.total-prev.total<=4,'total recto en '+n);
-   assert.ok(c.ritmo<=prev.ritmo&&prev.ritmo-c.ritmo<=0.031,'ritmo recto en '+n);
+   assert.ok(c.total-prev.total<=15,'sin saltos de cantidad en '+n);   // bajar sí puede: es el respiro
+   if(n%5===1)assert.ok(c.total<=prev.total&&c.ritmo>prev.ritmo,'después del jefe '+(n-1)+' se respira');
+   if(n%5>=2&&n%5<=4)assert.ok(c.total>prev.total,'dentro del tramo sube en '+n);
    assert.ok(c.vida>=prev.vida&&c.vida/prev.vida<=1.1,'vida suave en '+n);
    assert.ok(c.vel>=prev.vel&&c.vel-prev.vel<=1,'velocidad suave en '+n);
    assert.ok(c.golpe>=prev.golpe&&c.golpe-prev.golpe<=1,'golpe suave en '+n);
@@ -149,6 +156,9 @@ test('boxhead: la dificultad sube de forma pausada y sin saltos',()=>{
   }
   prev=c;
  }
+ // cada tramo, en conjunto, pesa más que el anterior
+ const tramo=k=>[1,2,3,4,5].reduce((a,i)=>a+D.totalNivel(5*k+i),0);
+ for(let k=1;k<6;k++)assert.ok(tramo(k)>tramo(k-1),'tramo '+k);
 });
 
 test('boxhead: tienda, potencia y armadura',()=>{
@@ -744,4 +754,32 @@ test('boxhead en línea infectado: el infectado muerde, no hay horda y a los 3 m
  assert.ok(!env.some(m=>m.tipo==='aguanta'));
  for(let i=0;i<60*2;i++)bx.paso(1/60);
  assert.ok(env.some(m=>m.tipo==='aguanta'));
+});
+test('boxhead zb comprimido (Fase 3.6): ida y vuelta igual, y bastante más corto',()=>{
+ let s=99;const r=n=>{s=(s*1103515245+12345)%2147483648;return s%n;};
+ const lista=[];let id=1000;
+ for(let i=0;i<48;i++){
+  id+=1+r(5);
+  const t=[id,r(22),r(1200),r(700),1+r(100),r(8),r(2),r(2)];
+  if(i%9===0)t.push(500+r(4000),r(4),r(7));
+  if(i===18)t.push(120,-40);
+  lista.push(t);
+ }
+ lista.push([900,0,10,10,100,0,0,0]);   // un id menor que el anterior (adoptado de otro director)
+ const zb=D.empacaZb(lista);
+ assert.deepEqual(copia(D.desempacaZb(JSON.parse(JSON.stringify(zb)))),lista);
+ assert.deepEqual(copia(D.desempacaZb({e:lista})),lista,'lee el zb de antes');
+ assert.deepEqual(copia(D.desempacaZb({})),[]);assert.deepEqual(copia(D.desempacaZb({z:[1,2,3]})),[]);
+ const antes=JSON.stringify(lista).length,ahora=JSON.stringify(zb).length;
+ assert.ok(ahora<antes*0.8,'de '+antes+' a '+ahora);
+});
+test('boxhead en línea: el zb que sale lleva z/zx y otro marco lo lee igual',()=>{
+ const {bx,env}=boxheadEnLinea('coop',0);bx.inmortal(true);
+ for(let i=0;i<60*4;i++)bx.paso(1/60);
+ const zbs=env.filter(m=>m.tipo==='estado'&&m.e&&m.e.zb).map(m=>m.e.zb);
+ assert.ok(zbs.length,'sale el zb');
+ const ult=zbs.at(-1);
+ assert.ok(Array.isArray(ult.z)&&!ult.e,'formato nuevo');
+ const ids=D.desempacaZb(ult).map(t=>t[0]).sort((a,b)=>a-b);
+ assert.deepEqual(copia(ids),copia(bx.mundo().E.map(e=>e.id).sort((a,b)=>a-b)));
 });
