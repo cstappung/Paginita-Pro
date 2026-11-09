@@ -469,10 +469,65 @@
     return dif <= Math.PI / 8 + (hist === undefined ? 0.14 : hist) ? prev : d;
   }
 
+  /* ---------- ventajas a elección (Fase 2.2) ----------
+     Al empezar cada nivel desde el 2 se elige una de tres. Cada una sube de
+     a un nivel hasta su `max`; `rar` es la rareza (0 común, 1 rara, 2
+     épica) y pesa en el sorteo. Las `equipo` solo salen en una sala con
+     más de un jugador. Lo que hace cada una lo aplica juego.js (`vt(id)`);
+     aquí están el nombre, el texto y el sorteo, que es puro: recibe el azar
+     (en la práctica, el de la semilla) para que una prueba se rehaga igual. */
+  const VENTAJAS = [
+    // ofensivas
+    { id: 'filo', nom: 'Filo', rar: 0, max: 5, tipo: 'ataque', txt: '+10 % de daño' },
+    { id: 'gatillo', nom: 'Gatillo ligero', rar: 0, max: 4, tipo: 'ataque', txt: '+8 % de cadencia' },
+    { id: 'mira', nom: 'Mira larga', rar: 0, max: 2, tipo: 'ataque', txt: '+15 % de alcance de balas y perdigones' },
+    { id: 'critico', nom: 'Golpe crítico', rar: 0, max: 3, tipo: 'ataque', txt: 'Un 10 % más de disparos hace el doble de daño' },
+    { id: 'perfora', nom: 'Perforante', rar: 1, max: 2, tipo: 'ataque', txt: 'Balas y perdigones atraviesan un enemigo más' },
+    { id: 'ignea', nom: 'Bala ígnea', rar: 1, max: 3, tipo: 'ataque', txt: 'Cada 10 disparos uno estalla (8 y 6 en los niveles siguientes)' },
+    { id: 'furia', nom: 'Furia', rar: 1, max: 1, tipo: 'ataque', txt: 'Con menos de 30 de vida haces un 40 % más de daño' },
+    { id: 'estallido', nom: 'Estallido', rar: 2, max: 2, tipo: 'ataque', txt: 'Un 15 % de tus bajas revientan y dañan alrededor' },
+    // defensivas
+    { id: 'piel', nom: 'Piel dura', rar: 0, max: 4, tipo: 'defensa', txt: '−8 % de daño recibido' },
+    { id: 'coraza', nom: 'Coraza', rar: 0, max: 3, tipo: 'defensa', txt: '+25 de armadura al empezar cada nivel' },
+    { id: 'aguante', nom: 'Aguante', rar: 1, max: 3, tipo: 'defensa', txt: '+20 de vida máxima' },
+    { id: 'vampiro', nom: 'Vampirismo', rar: 1, max: 3, tipo: 'defensa', txt: 'Cada baja te cura 1 de vida' },
+    { id: 'regenera', nom: 'Regeneración', rar: 1, max: 2, tipo: 'defensa', txt: 'Si no te pegan en 3 s, recuperas 1 de vida por segundo' },
+    { id: 'segunda', nom: 'Segunda oportunidad', rar: 2, max: 1, tipo: 'defensa', txt: 'Una vez por partida, un golpe mortal te deja con 40 de vida' },
+    // utilidad
+    { id: 'iman', nom: 'Imán', rar: 0, max: 2, tipo: 'utilidad', txt: 'La chatarra llega desde más lejos' },
+    { id: 'codicia', nom: 'Codicia', rar: 0, max: 3, tipo: 'utilidad', txt: '+20 % de chatarra' },
+    { id: 'pies', nom: 'Pies ligeros', rar: 0, max: 3, tipo: 'utilidad', txt: '+7 % de velocidad' },
+    { id: 'cargador', nom: 'Cargador grande', rar: 0, max: 2, tipo: 'utilidad', txt: 'Las cajas traen un 30 % más de munición' },
+    { id: 'albanil', nom: 'Albañil', rar: 0, max: 2, tipo: 'utilidad', txt: 'Tus muros aguantan un 50 % más' },
+    { id: 'polvora', nom: 'Pólvora extra', rar: 0, max: 2, tipo: 'utilidad', txt: 'Tus barriles y cargas: +25 % de radio y daño' },
+    { id: 'racha', nom: 'Racha larga', rar: 1, max: 3, tipo: 'utilidad', txt: 'El combo dura un 20 % más' },
+    { id: 'dron', nom: 'Dron', rar: 2, max: 2, tipo: 'utilidad', txt: 'Un dron dispara al enemigo más cercano (más seguido en el nivel 2)' },
+    // de equipo
+    { id: 'compania', nom: 'En compañía', rar: 1, max: 2, tipo: 'equipo', equipo: true, txt: '+15 % de daño con un aliado a menos de 4 casillas' },
+    { id: 'relevo', nom: 'Relevo', rar: 1, max: 1, tipo: 'equipo', equipo: true, txt: 'Cuando vuelves al juego, vuelves con 50 de armadura' }
+  ];
+  const RAREZAS = ['Común', 'Rara', 'Épica'];
+  const PESO_RAREZA = [6, 3, 1];
+  const ventaja = id => VENTAJAS.find(v => v.id === id) || null;
+  /* Hasta `n` ventajas distintas que aún se pueden subir, por peso de
+     rareza. `azar` es una función que da [0, 1). */
+  function sorteaVentajas(azar, niveles, equipo, n = 3) {
+    const lib = VENTAJAS.filter(v => ((niveles && niveles[v.id]) || 0) < v.max && (!v.equipo || equipo));
+    const out = [];
+    while (out.length < n && lib.length) {
+      let tot = 0; for (const v of lib) tot += PESO_RAREZA[v.rar];
+      let r = azar() * tot, i = 0;
+      for (; i < lib.length - 1; i++) { r -= PESO_RAREZA[lib[i].rar]; if (r < 0) break; }
+      out.push(lib.splice(i, 1)[0].id);
+    }
+    return out;
+  }
+  const ESPERA_VENTAJA = 10;   // segundos para elegir; después se queda la primera
+
   return {
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
-    cargaMapa, DIRS, dirDe, dirStick
+    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA
   };
 });

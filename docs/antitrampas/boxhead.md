@@ -20,7 +20,7 @@ el mapa (índice de `ORDEN_MAPAS`), la semilla, las jugadas y el paso final. Cad
 jugada es `[paso, 0, mov, vel·20, mira+1, fija|disp<<1]` (lo que piden el teclado
 o el stick, solo cuando cambia) o `[paso, código, arg]` (1 cambiar de arma ±1,
 2 elegir arma, 3 detonar, 4 muro reforzado, 5 subir el nivel de un arma,
-6 comprar el ítem i de `D.TIENDA`).
+6 comprar el ítem i de `D.TIENDA`, 7 elegir la ventaja i de las tres que salieron; si no se elige, el juego toma la primera solo y eso no se graba).
 
 `solo/verifica/boxhead.js` la rehace con el juego mismo, sin pantalla
 (`js/sin-pantalla.js` vuelve inertes el DOM, el canvas y el audio): en el

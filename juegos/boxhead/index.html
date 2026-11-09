@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202611090254"></script>
+<script src="../../i18n.js?v=202611090303"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <!-- En el Solo Club (solo/club.js abre este archivo con ?club=1): el puente con la página y su tabla. -->
@@ -74,6 +74,23 @@ button{font:inherit;cursor:pointer}
 #premios{position:absolute;left:50%;top:36%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none}
 #premios div{font-size:18px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000;white-space:nowrap;animation:entra .2s ease-out;transition:opacity .3s}
 #premios div.sale{opacity:0}
+/* La elección de ventaja: tres cartas abajo al centro; no tapa el medio de la pantalla. */
+#eleccion{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);z-index:3;display:grid;gap:6px;width:min(640px,calc(100vw - 24px));animation:entra .25s ease-out}
+.el-cab{display:flex;align-items:center;gap:10px;justify-content:center;font-weight:900;color:var(--oro);text-shadow:0 2px 0 #000;letter-spacing:.04em;text-transform:uppercase;font-size:14px}
+.el-barra{display:block;width:120px;height:5px;background:rgba(0,0,0,.55);border-radius:3px;overflow:hidden}
+.el-barra i{display:block;height:100%;background:var(--oro)}
+.el-cartas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.el-carta{display:grid;gap:2px;align-content:start;text-align:left;padding:8px 10px 9px;border-radius:8px;border:2px solid #5a4a32;background:rgba(24,18,12,.92);color:#f1e6d2;font:inherit;cursor:pointer;min-width:0}
+.el-carta:hover,.el-carta:focus-visible{border-color:var(--oro);outline:none;transform:translateY(-2px)}
+.el-carta kbd{justify-self:start;font-size:11px}
+.el-carta b{font-size:15px;line-height:1.15}
+.el-carta small{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#a8977c}
+.el-carta span{font-size:12.5px;line-height:1.3;color:#d9cdb6}
+.el-carta.r1{border-color:#3d7fd0}.el-carta.r1 small{color:#7fb4ff}
+.el-carta.r2{border-color:#a66bd6;box-shadow:0 0 14px rgba(166,107,214,.45)}.el-carta.r2 small{color:#d3a6ff}
+.pausa-vent{margin:-4px 0 10px;font-size:13px;color:#d9cdb6}
+html.tactil .el-carta kbd{display:none}
+@media (max-width:640px),(max-height:520px){#eleccion{bottom:auto;top:126px}.el-carta{padding:6px 7px}.el-carta span{font-size:11px}.el-carta b{font-size:13px}}
 @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 #consejo{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);max-width:min(520px,calc(100vw - 24px));padding:7px 12px;font-size:13px;color:var(--txt);background:rgba(20,17,13,.9);border:2px solid #8a6a3a;border-radius:6px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #consejo.ver{opacity:1}
@@ -180,6 +197,10 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   <div id="banner"></div>
   <div id="jefeBar" hidden></div>
   <div id="premios"></div>
+  <div id="eleccion" hidden>
+    <div class="el-cab">Elige una ventaja <i class="el-barra"><i id="elecBarra"></i></i></div>
+    <div class="el-cartas" id="elecCartas"></div>
+  </div>
   <div id="consejo"></div>
   <div id="aviso"></div>
   <div id="tienda" class="panel" hidden>
@@ -221,6 +242,7 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   <div class="caja panel">
     <h2 class="logo" style="font-size:34px">PAUSA</h2>
     <p class="sub" id="pausaSub">La partida está detenida.</p>
+    <p class="pausa-vent" id="pausaVent" hidden></p>
     <div class="opciones">
       <label><input type="checkbox" id="optMusica"> Música</label>
       <input type="range" id="optMusVol" min="0" max="100" aria-label="Volumen de la música">
@@ -241,9 +263,9 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-11"></script>
-<script src="js/grafico.js?v=boxhead-11"></script>
-<script src="js/audio.js?v=boxhead-11"></script>
-<script src="js/juego.js?v=boxhead-11"></script>
+<script src="js/datos.js?v=boxhead-12"></script>
+<script src="js/grafico.js?v=boxhead-12"></script>
+<script src="js/audio.js?v=boxhead-12"></script>
+<script src="js/juego.js?v=boxhead-12"></script>
 </body>
 </html>

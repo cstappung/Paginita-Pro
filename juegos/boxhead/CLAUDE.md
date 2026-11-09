@@ -229,3 +229,23 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   bump them along with the page**, or a cached old engine rejects new proofs.
 - The old `bots-boxhead` practice card is gone: the club card replaces
   it in `SOLOS`.
+
+## Phase 2.2: upgrades to choose (`boxhead-12`, proof `ve: 2`)
+
+- **1 of 3 at the start of each level from 2** (`alEmpezarNivel`, from the
+  `nivelVisto` change in `paso`, so it fires solo and online alike). The 24 are
+  `D.VENTAJAS` (id, `rar` 0–2, `max`, `equipo`); `D.sorteaVentajas(azar, …)` is
+  pure and gets `rn`, so practice draws come from the seed. Their effects live in
+  juego.js behind `vt(id)`; grep `vt('` to find them all. `hpMax()` replaced the
+  literal 100.
+- **The pick is action 7** (`accion(7, i)`: 1/2/3, ← ↑ → on the pad, a click).
+  With no answer, `eligeVentaja(0)` runs **inside the sim** after
+  `D.ESPERA_VENTAJA` s, so a replay does the same without it being recorded.
+  In practice `simDirector` holds the next horde until the pick; online nobody
+  waits. Digits 1–3 pick an upgrade instead of a weapon while the panel is open.
+- Upgrade explosions (bala ígnea, estallido) call `explota(…, amigo = true)`:
+  they never hurt you or your allies. Estallido is queued in `yo.booms` and
+  fired in the next `pasoYo`, never inside the kill that caused it. The drone
+  fires from the player's position; only the drawing hovers.
+- `practica` resets `eleccion`. Any change to an upgrade's numbers changes the
+  sim: **bump `VE`**.

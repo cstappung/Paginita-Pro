@@ -313,16 +313,38 @@ function juegaPartida(bx,{maxPasos=60*60*20,azar=1,semilla=12345,cuenta='local'}
     else{t++;const d=DIRS8[(Math.floor(t/40)+azar)%8];en.dx=d[0];en.dy=d[1];en.vel=0.6}}
    bx.entrada(en);
   }
+  // una ventaja al rato de que salga la elección (la otra mitad de las veces se queda la primera sola)
+  if(i%300===150&&azar%2&&bx.estado().eleccion)bx.accion(7,(i/300|0)%3);
   if(i%400===200)bx.accion(1,1);
   if(i%1000===500)bx.accion(6,0);
   bx.paso(1/60);
  }
  return bx.prueba();
 }
+test('ventajas a elección: el sorteo es puro, sin repetir, con su tope y las de equipo solo en sala',()=>{
+ assert.equal(D.VENTAJAS.length,24);
+ assert.equal(new Set(D.VENTAJAS.map(v=>v.id)).size,24);
+ for(const v of D.VENTAJAS){assert.ok(v.max>=1&&[0,1,2].includes(v.rar)&&v.nom&&v.txt,v.id);}
+ const azar=s=>()=>{s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+ assert.deepEqual(D.sorteaVentajas(azar(7),{},false),D.sorteaVentajas(azar(7),{},false));
+ for(let k=1;k<200;k++){
+  const ops=D.sorteaVentajas(azar(k),{},false);
+  assert.equal(ops.length,3);assert.equal(new Set(ops).size,3);
+  for(const id of ops)assert.ok(!D.ventaja(id).equipo,'sin equipo en solitario');
+ }
+ const llenas=Object.fromEntries(D.VENTAJAS.map(v=>[v.id,v.max]));llenas.filo=0;
+ assert.deepEqual(D.sorteaVentajas(azar(3),llenas,true),['filo']);
+ llenas.filo=5;assert.deepEqual(D.sorteaVentajas(azar(3),llenas,true),[]);
+ // las comunes salen más que las épicas
+ const c=[0,0,0];for(let k=1;k<3000;k++)for(const id of D.sorteaVentajas(azar(k),{},true,1))c[D.ventaja(id).rar]++;
+ assert.ok(c[0]>c[1]&&c[1]>c[2]&&c[2]>0,String(c));
+});
 test('motor determinista: una práctica grabada se rehace idéntica en otro contexto',()=>{
  const a=boxheadSinPantalla();
- const p=juegaPartida(a,{azar:1});
+ const p=juegaPartida(a,{azar:1,semilla:3});
  assert.ok(a.estado().nivel>=3,'la partida de prueba pasa de nivel');
+ assert.ok(p.j.some(j=>j[1]===7),'eligió alguna ventaja a mano');
+ assert.ok(Object.keys(a.estado().vt).length>=2,'tiene ventajas');
  const fin=a.estado();
  assert.ok(fin.terminado,'el jugador de prueba tiene que morir');
  assert.ok(p.j.length>10&&p.k>0);
