@@ -45,7 +45,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       if (!est.listos) return;
       configurado = true;
       enviar("config", {
-        yo: uid, mirando: !juego(), variante: est.variante, mapa: est.mapa, meta: est.meta,
+        yo: uid, mirando: !juego(), variante: est.variante, mapa: est.mapa, meta: est.meta, mut: est.mut || "",
         semilla: (partida.semilla >>> 0) || 1,
         jugadores: est.jugadores.map((j, i) => ({ uid: j.uid, nombre: j.nombre || "Jugador", orden: i }))
       });
@@ -168,7 +168,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-19";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-20";
     host.append(aviso, redEl, frame);
   }
 

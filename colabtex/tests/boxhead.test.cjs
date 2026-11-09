@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const code=fs.readFileSync('src/juegos/motor.js','utf8').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto};vm.createContext(context);vm.runInContext(code,context);
 const {reducir,minimoDe}=context;
-const [JUEGOS,BX_MAPAS,BX_ARMAS]=vm.runInContext('[JUEGOS,BX_MAPAS,BX_ARMAS]',context);
+const [JUEGOS,BX_MAPAS,BX_ARMAS,BX_MUTADORES,BX_VARIANTES]=vm.runInContext('[JUEGOS,BX_MAPAS,BX_ARMAS,BX_MUTADORES,BX_VARIANTES]',context);
 const D=require('../../juegos/boxhead/js/datos.js');
 const copia=x=>JSON.parse(JSON.stringify(x));
 const sala=(n=3,extra={})=>({juego:'boxhead',semilla:1,estado:'jugando',cupo:n,
@@ -615,4 +615,57 @@ test('boxhead coop (Fase 3.5): un compañero en pie revive al caído',()=>{
  // si caen todos, se acabó: ya no hay a quién revivir
  for(const u of ['a','b','c'])e=mover(p,{t:'muere',uid:u,pts:1,k:0,n:1,a:8,por:''});
  assert.equal(e.fase,'fin');
+});
+
+/* Fase 3.5: modo jefes y mutadores, solo en las salas en línea. */
+function boxheadEnLinea(variante,mut){
+ const env=[];let oyente=null;
+ const parent={postMessage:m=>env.push(m)};
+ const ctx={console,Math,JSON,Date,Map,Set,Array,Object,Number,String,Boolean,Symbol,Proxy,Error,Int32Array,Float32Array,Uint8Array,URLSearchParams,Infinity,NaN,isFinite,parseInt,parseFloat,
+  location:{search:'?modo=online',href:'',origin:'http://x'},parent,addEventListener:(t,f)=>{if(t==='message')oyente=f;}};
+ vm.createContext(ctx);
+ for(const f of ['sin-pantalla.js','datos.js','juego.js'])vm.runInContext(fs.readFileSync(RAIZ+f,'utf8'),ctx,{filename:f});
+ const llega=m=>oyente({source:parent,origin:'http://x',data:Object.assign({canal:'boxhead-padre'},m)});
+ llega({tipo:'config',yo:'a',variante,mut,mapa:'patio',meta:10,semilla:7,jugadores:[{uid:'a',nombre:'A',orden:0}]});
+ llega({tipo:'marcador',nivel:1,caidos:[],bajas:{},muertes:{},puntos:{},fuera:[],meta:10,fin:null});
+ return {bx:ctx.__boxhead,env,llega};
+}
+test('boxhead (Fase 3.5): los mutadores son los mismos en la sala y en el juego',()=>{
+ assert.deepEqual(Object.keys(BX_MUTADORES),Object.keys(D.MUTADORES));
+ assert.equal(D.mutador('cristal'),'cristal');
+ for(const x of [0,'',null,'nada','toString'])assert.equal(D.mutador(x),'');
+ assert.ok(BX_VARIANTES.jefes);
+ // el nivel n del modo jefes simula el 5n: alterna mini y grande, y vuelven corruptos desde el 11
+ assert.equal(D.jefeDeNivel(D.nivelJefes(1)),6);assert.equal(D.jefeDeNivel(D.nivelJefes(2)),11);
+ for(let n=1;n<=30;n++)assert.ok(D.jefeDeNivel(D.nivelJefes(n))>=0,'cada nivel trae jefe');
+ assert.ok(!D.corrupto(D.nivelJefes(10))&&D.corrupto(D.nivelJefes(11)));
+});
+test('boxhead modo jefes: el registro es el del cooperativo, y la sala lleva su mutador',()=>{
+ const p=sala(2,{variante:'jefes',mut:'veloz'});let e=reducir(p);
+ assert.equal(e.variante,'jefes');assert.equal(e.mut,'veloz');
+ e=mover(p,{t:'nivel',uid:'a',n:2});assert.equal(e.nivel,2);
+ e=mover(p,{t:'muere',uid:'a',pts:30,k:3,n:2,a:8,por:''});assert.deepEqual(copia(e.caidos),['a']);
+ e=mover(p,{t:'revive',uid:'b',v:'a'});assert.deepEqual(copia(e.caidos),[]);
+ e=mover(p,{t:'muere',uid:'a',pts:30,k:3,n:2,a:8,por:''});e=mover(p,{t:'muere',uid:'b',pts:10,k:1,n:2,a:8,por:''});
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'a');
+ assert.equal(reducir(sala(2,{mut:'otro'})).mut,'');assert.equal(reducir(sala(2,{mut:0})).mut,'');
+});
+test('boxhead en línea: el modo jefes abre con el jefe y su escolta; blindados y munición sin fin',()=>{
+ let {bx}=boxheadEnLinea('jefes',0);bx.inmortal(true);
+ for(let i=0;i<60*2;i++)bx.paso(1/60);
+ let m=bx.mundo();
+ assert.equal(bx.estado().dir.n,5,'el nivel 1 simula el 5');
+ assert.ok(m.E.some(e=>e.k===6),'el Carnicero');
+ assert.equal(bx.estado().dir.q+m.E.length-1,D.escoltaJefes(1),'la escolta');
+ assert.ok(bx.estado().yo.ammo[D.ARMAS_J.at(-1).id]>0,'todas las armas desde el principio');
+ ({bx}=boxheadEnLinea('coop','blindados'));bx.inmortal(true);
+ for(let i=0;i<60*2;i++)bx.paso(1/60);
+ m=bx.mundo();
+ assert.ok(m.E.length&&m.E.every(e=>e.k!==0||e.max===D.vidaEnemigo(0,1)*3),'el triple de vida');
+ assert.equal(bx.estado().dir.q+m.E.length,Math.ceil(D.totalNivel(1)/2),'la mitad');
+ ({bx}=boxheadEnLinea('coop','municion'));
+ bx.armas();bx.elige(1);const antes=bx.estado().yo.ammo[1];
+ bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:false,disp:true});
+ for(let i=0;i<60;i++)bx.paso(1/60);
+ assert.equal(bx.estado().yo.ammo[1],antes,'no gasta');
 });

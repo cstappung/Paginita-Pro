@@ -1148,7 +1148,7 @@ export function progreso(est, juego) {
     return c(lider / (est.meta || YM_META));
   }
   /* En Boxhead cooperativo, cuántos están caídos; en versus, la meta. */
-  if (juego === "boxhead" && est.variante === "coop") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
+  if (juego === "boxhead" && est.variante !== "versus") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
   if (juego === "boxhead" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || BX_METAS[1]));
   /* En HaxBall, cuánto le falta al equipo que va ganando. */
   if (juego === "haxball" && est.goles) return c(Math.max(0, ...Object.values(est.goles)) / (est.meta || 5));
@@ -6831,10 +6831,19 @@ function ajRepasa(bandos, jug, ritmo = null) {
      quien la escribe y una baja a `por` si es otro jugador que sigue en la
      sala. El primero en llegar a la meta gana; si queda uno solo, gana por
      abandono. Matarse uno mismo (un barril propio) no le da baja a nadie.
+   - **Modo jefes** (`jefes`, Fase 3.5): el registro y el final son los del
+     cooperativo (niveles, caídos, revivir); lo distinto lo hace el juego:
+     cada nivel es un jefe de la rotación (el nivel n de la sala simula el
+     5n) con una escolta corta.
+
+   El mutador (`mut`, uno de `BX_MUTADORES` o ninguno) cambia una regla de
+   la sala dentro del juego; el registro no lo ve. La misma lista vive en
+   juegos/boxhead/js/datos.js (`MUTADORES`).
 
    Nadie puede escribir una baja para sí mismo; el límite honesto es que un
    cliente modificado podría negarse a morir. */
-export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus" };
+export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus", jefes: "Modo jefes" };
+export const BX_MUTADORES = { sangre: "Sed de sangre (cada baja cura)", cristal: "Cristal (pegas y recibes el doble)", veloz: "Horda veloz", municion: "Munición sin fin", blindados: "Blindados (la mitad, con el triple de vida)" };
 export const BX_METAS = [5, 10, 20];
 export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto", planta: "Planta", hangar: "Hangar", fabrica: "Fábrica", apagon: "Apagón" };
 /* El id de arma más alto de juegos/boxhead/js/datos.js: 0–7 y 10–13 son
@@ -6844,6 +6853,7 @@ export const BX_ARMAS = 13;
 const tiene = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 export const varianteBoxhead = p => tiene(BX_VARIANTES, p && p.variante) ? p.variante : "coop";
 export const mapaBoxhead = p => tiene(BX_MAPAS, p && p.mapa) ? p.mapa : "patio";
+export const mutBoxhead = p => tiene(BX_MUTADORES, p && p.mut) ? p.mut : "";
 export function metaBoxhead(p) {
   const m = Math.floor(Number(p && p.meta));
   return BX_METAS.includes(m) ? m : BX_METAS[1];
@@ -6852,7 +6862,7 @@ export function metaBoxhead(p) {
 export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const variante = varianteBoxhead(p), meta = metaBoxhead(p), mapa = mapaBoxhead(p);
-  const coop = variante === "coop";
+  const coop = variante !== "versus";   // el modo jefes lleva el registro del cooperativo
   const entero = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
   const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {}, revividas = {};
   for (const u of ids) { bajas[u] = 0; muertes[u] = 0; pts[u] = 0; kills[u] = 0; }
@@ -6927,7 +6937,7 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   if (ganador === null && listos && coop && !activos.length) finCoop();
   return {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
-    variante, meta, mapa, nivel,
+    variante, meta, mapa, nivel, mut: mutBoxhead(p),
     caidos: Object.keys(caidos).filter(u => !fuera[u]),
     puntos: coop ? pts : bajas, kills, bajas, muertes, fuera, revividas,
     hist: hist.slice(-40), ganador: ganador === null ? null : ganador, motivo

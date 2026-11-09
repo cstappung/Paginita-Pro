@@ -750,6 +750,7 @@ const REGLAS = {
         "En la sala cooperativa, quien cae deja una tumba. Si un compañero se queda <b>3 segundos junto a ella</b> (se llena un anillo verde), lo <b>revive</b> ahí mismo con media vida. Si nadie llega, vuelve al empezar el nivel siguiente; si caen todos, se acabó.",
         "<b>T</b> pone un marcador <b>«¡Aquí!»</b> un poco delante de ti, con tu color y tu nombre, que ven todos durante cuatro segundos."
       ])],
+      ["Mutadores", "Quien abre la sala puede elegir un <b>mutador</b>, que cambia una regla para todos: <b>Sed de sangre</b> (cada baja te cura 4), <b>Cristal</b> (pegas y recibes el doble), <b>Horda veloz</b> (los enemigos corren un 30 % más), <b>Munición sin fin</b> o <b>Blindados</b> (la mitad de enemigos, con el triple de vida). Solo en las salas en línea: la práctica y el Club se juegan siempre sin mutador."],
       ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
       ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los nueve mapas. Al terminar muestra cómo jugaste: multiplicador máximo, precisión, jefes y tu arma favorita."],
       ["Opciones", "En la pausa: la música (y su volumen; sube con la acción y cambia con los jefes), los números de daño, la vibración del mando y los consejos, que salen una sola vez cada uno cuando vienen al caso (activarlos de nuevo los vuelve a mostrar)."]
@@ -769,6 +770,12 @@ const REGLAS = {
           "Tus balas y explosiones hieren a los demás jugadores; tus propias explosiones te hacen la mitad.",
           "Al morir vuelves a los tres segundos, con la munición repuesta.",
           "Gana el primero en llegar a la meta de bajas que eligió la sala (5, 10 o 20). Matarte a ti mismo cuenta como muerte y no da baja. Se necesitan al menos dos jugadores."
+        ])]
+      ]},
+      jefes: { nombre: "Modo jefes", secciones: [
+        ["Solo jefes", lista([
+          "Cada nivel es <b>un jefe</b> con una escolta corta, en el orden de la rotación: el Carnicero, el Coloso, el Nigromante, la Reina… El jefe del nivel <i>n</i> pega como el del nivel 5<i>n</i> de la supervivencia, y desde el nivel 11 vuelven <b>corruptos</b>.",
+          "Se empieza con <b>todas las armas</b>. Lo demás es como en la supervivencia: se revive a los caídos, quien cae vuelve en el nivel siguiente y la partida termina cuando caen todos. Gana quien hizo más puntos."
         ])]
       ]}
     }

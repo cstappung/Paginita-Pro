@@ -44,7 +44,7 @@ import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, BX_MUTADORES, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -253,7 +253,10 @@ const OPCIONES = {
       valores: Object.keys(BX_MAPAS).map(v => ({ v, t: BX_MAPAS[v] })) },
     /* La meta solo cuenta en versus: bajas para ganar. */
     { clave: "meta", etiqueta: "Bajas para ganar (versus)", por: BX_METAS[1],
-      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas" })) },
+    /* Un mutador cambia una regla de la sala (Fase 3.5); 0 es ninguno (el vestíbulo lee "" como 0). */
+    { clave: "mut", etiqueta: "Mutador", por: 0,
+      valores: [{ v: 0, t: "Ninguno" }, ...Object.keys(BX_MUTADORES).map(v => ({ v, t: BX_MUTADORES[v] }))] }
   ],
   /* Tulones: `tiempo` son los segundos de cada turno y `rondas` 0 es sin fin
      (gana el último en pie). Ninguno es `modo`. */

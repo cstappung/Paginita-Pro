@@ -402,3 +402,28 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   Keyboard only for now.
 - Nothing of this touches the practice simulation (online only), so `VE` is
   unchanged.
+
+## Phase 3.5b: boss mode and mutators (`boxhead-20`)
+
+- **Boss mode** is room variant `jefes` (`BX_VARIANTES`). The reducer treats
+  every non-`versus` variant as coop (`coop = variante !== "versus"`), and so
+  does `progreso`. In the game everything coop-ish is `!versus()`, so revive
+  and markers work as-is. Two things differ:
+  - The director simulates `nivelSim(n) = D.nivelJefes(n) = 5n`. `dir.n` is
+    that simulated level, so the `nivel` request divides it back
+    (`dir.n / PASO_JEFES + 1`).
+  - The escort is `escoltaJefes(n)`, and a big boss does not clear `dir.q`.
+    All weapons unlock at start (`cfg.variante !== 'coop'`).
+- **Mutators** are room option `mut` (0 = none; the lobby reads "" as 0).
+  The list is `MUTADORES` in datos.js and must keep the same keys as
+  `BX_MUTADORES` in motor.js; a test pins that. `mut` is also in
+  `opcionesDe` (rematch).
+  - The game reads them through `mutD()`: `dano` (factorVentajas), `recibe`,
+    `cura` (miBaja), `vel` (both director speed lines), `vida` and `cuantos`
+    (nuevoEnemigo, dir.q, cupo), and `municion` in `gasta`.
+  - The director's per-hit cap is multiplied by `dano` too. Otherwise
+    Cristal hits from others would be clipped.
+- Practice and the Club never set `cfg.variante`/`cfg.mut` to anything else,
+  so `VE` is unchanged.
+- Tests drive the iframe headless online (`boxheadEnLinea`): a fake
+  `parent`, `?modo=online`, and the `config`/`marcador` messages.

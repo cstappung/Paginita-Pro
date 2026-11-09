@@ -746,12 +746,33 @@
     const polvora = b.obj === 'barril' || b.obj === 'carga' ? 1.5 : 1;
     return Math.ceil(Math.max(b.d || 0, 60) * factorPotencia(5) * TOPE_VENTAJAS * polvora);
   }
+  /* ---------- salas en línea: modo jefes y mutadores (Fase 3.5) ----------
+     En el modo jefes cada nivel de la sala vale cinco de la rotación: el 1
+     es el nivel 5 (el Carnicero), el 2 el 10 (el Coloso)… y desde el 11 los
+     jefes vuelven corruptos. Cada uno trae una escolta corta. */
+  const PASO_JEFES = 5;
+  const nivelJefes = n => PASO_JEFES * Math.max(1, Math.floor(n));
+  const escoltaJefes = n => 4 + 2 * Math.max(1, Math.floor(n));
+  /* Un mutador cambia una regla de toda la sala. La lista es la misma que
+     `BX_MUTADORES` de colabtex/src/juegos/motor.js (un test lo fija). No
+     existen en la práctica ni en el Club: la simulación de las tablas no
+     los conoce. */
+  const MUTADORES = {
+    sangre: { nombre: 'Sed de sangre', txt: 'cada baja te cura', cura: 4 },
+    cristal: { nombre: 'Cristal', txt: 'pegas y recibes el doble', dano: 2, recibe: 2 },
+    veloz: { nombre: 'Horda veloz', txt: 'los enemigos corren un 30 % más', vel: 1.3 },
+    municion: { nombre: 'Munición sin fin', txt: 'ningún arma se gasta' },
+    blindados: { nombre: 'Blindados', txt: 'la mitad de enemigos, con el triple de vida', vida: 3, cuantos: 0.5 }
+  };
+  const mutador = k => (typeof k === 'string' && Object.prototype.hasOwnProperty.call(MUTADORES, k) ? k : '');
+
   const topeRadio = w => { const b = armaTope(w); return b && b.r ? Math.ceil(b.r * 1.5) : 0; };   // segundos para elegir; después se queda la primera
 
   return {
     TS, ARMAS, ARMAS_J, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, DORADA, DORADA_T, PARTE_DORADA, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
-    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio
+    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio,
+    PASO_JEFES, nivelJefes, escoltaJefes, MUTADORES, mutador
   };
 });

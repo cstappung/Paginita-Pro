@@ -440,6 +440,13 @@
   const ordenDe = u => { const j = jugadores().find(j => j.uid === u); return j ? j.orden : 0; };
   const colorDe = u => PALETA[ordenDe(u) % PALETA.length];
   const versus = () => cfg && cfg.variante === 'versus';
+  // Modo jefes (Fase 3.5): reglas de cooperativo, pero cada nivel es un jefe.
+  const jefes = () => !!cfg && cfg.variante === 'jefes';
+  // El mutador de la sala (solo en línea); `mut('cristal')`, o el dato con `mutD()`.
+  const mut = k => !!cfg && cfg.mut === k;
+  const mutD = () => (cfg && cfg.mut ? D.MUTADORES[cfg.mut] : null) || {};
+  // El nivel que simula el director para un nivel de la sala.
+  const nivelSim = n => (jefes() ? D.nivelJefes(n) : n);
   const activos = () => { const f = fueraSet(); return jugadores().filter(j => !f.has(j.uid)); };
 
   function cargaMundo(mapa) {
@@ -474,6 +481,8 @@
     if (!cfg.mirando) aparece();
     pintaArmas(true);
     if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
+    else if (jefes()) banner('MODO JEFES');
+    if (cfg.mut) premio('Mutador: ' + mutD().nombre + ' · ' + mutD().txt);
   }
 
   /* Una partida de práctica: con semilla nueva (o la de una prueba, al
@@ -587,7 +596,7 @@
     let f = 1 + 0.1 * vt('filo');
     if (vt('furia') && yo.hp < 30) f *= 1.4;
     if (vt('compania')) for (const r of R.values()) if (r.v && dist(r.x, r.y, yo.x, yo.y) < TS * 4) { f *= 1 + 0.15 * vt('compania'); break; }
-    return f;
+    return f * (mutD().dano || 1);
   }
   /* El dron: da vueltas sobre la cabeza y dispara al enemigo más cercano
      que vea. El disparo sale del jugador (lo que se dibuja vuela encima). */
@@ -601,7 +610,7 @@
     son('pistola', 140);
   }
   function gasta() {
-    if (yo.w === 0 || yo.ammo[yo.w] === Infinity || yo.dorada > 0) return;   // la furia dorada no gasta
+    if (yo.w === 0 || yo.ammo[yo.w] === Infinity || yo.dorada > 0 || mut('municion')) return;   // la furia dorada no gasta
     yo.ammo[yo.w]--;
     if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; yo.vacio = 0.12; }   // a los 0,12 s vuelve a la pistola (pasoYo), por pasos y no con un reloj
   }
@@ -854,6 +863,7 @@
   function recibe(d, w, por) {
     if (!yo.v || yo.muerto || terminado || d <= 0) return;
     if (yo.inv > 0 && por !== cfg.yo) return;
+    d *= mutD().recibe || 1;
     // La armadura se come una parte del golpe hasta gastarse.
     if (yo.arm > 0) { const ab = Math.min(yo.arm, d * D.ARMADURA.absorbe); yo.arm -= ab; d -= ab; }
     d *= 1 - 0.08 * vt('piel');
@@ -902,6 +912,7 @@
     if (++yo.bajasPaso >= 10) medalla('diez');
     if (Number.isFinite(x)) sueltaChatarra(x, y, Math.round(D.chatarraDe(k) * (1 + 0.2 * vt('codicia'))));
     if (vt('vampiro') && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + vt('vampiro'));
+    if (mutD().cura && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + mutD().cura);
     // estallido: revienta en el paso siguiente (pasoYo), no en medio de esta baja
     if (vt('estallido') && Number.isFinite(x) && rn() < 0.15 * vt('estallido')) yo.booms.push([x, y]);
     if (yo.mul > yo.maxMul) {
@@ -1088,6 +1099,7 @@
     }
     // La segunda vuelta de los jefes (desde el nivel 51): corruptos.
     if (jefe && D.corrupto(n)) { e.el = D.ELITE_CORRUPTO; e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
+    if (mutD().vida && !jefe) e.max = e.hp = Math.round(e.max * mutD().vida);
     if (C.cava) { e.est = 1; e.estT = 0; }            // nace bajo tierra
     if (C.cura || C.vigia) { e.cdH = C.cd * rz(0.5, 1); e.est = 0; e.estT = 0; }
     if (!C.cava) desatasca(e, C.radio - 1);
@@ -1336,7 +1348,7 @@
      libre más cercano. */
   function cava(e, C, t, dd, dt) {
     if (e.est === 1) {
-      const v = D.velEnemigo(e.k, dir.n) * 1.15 * (e.el ? D.ELITES[e.el].vel : 1), l = dd || 1;
+      const v = D.velEnemigo(e.k, dir.n) * 1.15 * (e.el ? D.ELITES[e.el].vel : 1) * (mutD().vel || 1), l = dd || 1;
       if (dd > 52) { e.x += (t.x - e.x) / l * v * dt; e.y += (t.y - e.y) / l * v * dt; e.d = D.dirDe(t.x - e.x, t.y - e.y); }
       else { e.est = 2; e.estT = 1; }
       return;
@@ -1400,22 +1412,26 @@
     const np = Math.max(1, activos().length);
     if (!terminado) {
       if (!versus()) {
-        const meta = nivelObjetivo();
+        const meta = nivelSim(nivelObjetivo());
         if (dir.n < meta) {
           // en la práctica la horda espera a que elijas la ventaja (10 s como mucho)
           if (obj.length && !(!ONLINE && eleccion)) {
-            dir.n = meta; dir.q = Math.round(D.totalNivel(meta) * (1 + 0.25 * (np - 1)));
+            dir.n = meta; dir.q = Math.round((jefes() ? D.escoltaJefes(nivelObjetivo()) : D.totalNivel(meta)) * (1 + 0.25 * (np - 1)));
+            if (mutD().cuantos) dir.q = Math.ceil(dir.q * mutD().cuantos);
             dir.t = 0; dir.ritmo = 1.5;
             reponBarriles();
-            // Nivel que termina en 5: un mini jefe con la horda; en 0, un jefe solo.
+            // Nivel que termina en 5: un mini jefe con la horda; en 0, un jefe solo (en el modo jefes, con su escolta).
             const kj = D.jefeDeNivel(meta);
-            if (kj >= 0) { nuevoEnemigo(meta, kj); if (D.ENEMIGOS[kj].jefe === 'grande') dir.q = 0; }
+            if (kj >= 0) { nuevoEnemigo(meta, kj); if (D.ENEMIGOS[kj].jefe === 'grande' && !jefes()) dir.q = 0; }
           }
         } else if (dir.q === 0 && E.size === 0 && obj.length) {
           dir.t += dt;
           if (dir.t >= 2.5) {
             if (!ONLINE) { nivelLocal = dir.n + 1; pasoNivel = pasoN; }
-            else if (dir.pedido !== dir.n + 1 || T - dir.pedidoT > 6) { enviar('nivel', { n: dir.n + 1 }); dir.pedido = dir.n + 1; dir.pedidoT = T; }
+            else {
+              const sig = (jefes() ? Math.round(dir.n / D.PASO_JEFES) : dir.n) + 1;
+              if (dir.pedido !== sig || T - dir.pedidoT > 6) { enviar('nivel', { n: sig }); dir.pedido = sig; dir.pedidoT = T; }
+            }
           }
         }
       } else {
@@ -1424,7 +1440,7 @@
         if (dir.n !== n0) reponBarriles();
       }
       dir.ritmo -= dt;
-      const cupo = Math.round(D.maxVivos(dir.n, np) * (versus() ? 0.5 : 1));
+      const cupo = Math.round(D.maxVivos(dir.n, np) * (versus() ? 0.5 : 1) * (mutD().cuantos ? 0.6 : 1));
       if (dir.ritmo <= 0 && dir.q > 0 && E.size < cupo && obj.length && dir.n > 0) {
         nuevoEnemigo(dir.n);
         if (!versus()) dir.q--;
@@ -1479,7 +1495,7 @@
         const ex = e.x - f.x, ey = e.y - f.y, q = ex * ex + ey * ey, rr = C.radio * 2;
         if (q < rr * rr && q > 0.01) { const qq = Math.sqrt(q); sx += ex / qq * (rr - qq); sy += ey / qq * (rr - qq); }
       }
-      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1) * (e.el ? D.ELITES[e.el].vel : 1);
+      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1) * (e.el ? D.ELITES[e.el].vel : 1) * (mutD().vel || 1);
       const alcance = C.jefe ? C.rg + 8 : C.radio + 14;
       let bloq = null;
       if (dd > (C.jefe ? C.rg + 4 : C.radio + 10) && !planta) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
@@ -1633,12 +1649,13 @@
   function config(m) {
     if (cfg) return;
     cfg = {
-      yo: String(m.yo || ''), mirando: !!m.mirando, variante: m.variante === 'versus' ? 'versus' : 'coop',
+      yo: String(m.yo || ''), mirando: !!m.mirando, variante: m.variante === 'versus' || m.variante === 'jefes' ? m.variante : 'coop', mut: D.mutador(m.mut),
       mapa: D.mapaValido(m.mapa), meta: m.meta | 0, semilla: m.semilla | 0,
       jugadores: (m.jugadores || []).map((j, i) => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador'), orden: Number.isInteger(j.orden) ? j.orden : i })),
     };
     yo = nuevoYo();
-    if (cfg.variante === 'versus') for (const a of D.ARMAS_J) desbloquea(a.id);
+    // En versus y en el modo jefes se juega con todo desde el principio.
+    if (cfg.variante !== 'coop') for (const a of D.ARMAS_J) desbloquea(a.id);
     cargaMundo(cfg.mapa);
     $('menuMapas').hidden = true;
     $('cuenta').textContent = cfg.mirando ? 'Estás mirando la partida.' : '';
@@ -1701,7 +1718,7 @@
       if (dest.startsWith('e:') || dest.startsWith('o:')) {
         if (!(D.ARMAS[w] && D.ARMAS[w].tipo !== 'enemigo') || !gastaCupo(de)) return;
       }
-      const dm = dest.startsWith('e:') || dest.startsWith('o:') ? Math.min(dmg, TOPE_GOLPE[w | 0]) : dmg;
+      const dm = dest.startsWith('e:') || dest.startsWith('o:') ? Math.min(dmg, TOPE_GOLPE[w | 0] * (mutD().dano || 1)) : dmg;
       if (dest.startsWith('e:')) {
         const src = Array.isArray(extra) ? extra : [];
         danaEnemigo(+dest.slice(2), dm, de, w | 0, +src[0], +src[1]);
@@ -1886,7 +1903,7 @@
     pasoProy(dt);
     efectos(dt);
     const n = nivelObjetivo();
-    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner('NIVEL ' + n); son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(n); }
+    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner((jefes() ? 'JEFE ' : 'NIVEL ') + n); son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(n); }
     if (eleccion && (eleccion.t -= dt) <= 0) eligeVentaja(0);
     if (ONLINE) {
       pubT += dt;
@@ -2617,7 +2634,7 @@
     quedanAntes = quedan;
     $('nivel').innerHTML = versus()
       ? 'Versus · <b>' + ((marcador.bajas || {})[cfg.yo] | 0) + '</b> de ' + (cfg.meta || marcador.meta || 10)
-      : 'Nivel <b>' + nivelObjetivo() + '</b> · quedan ' + quedan;
+      : (jefes() ? 'Jefe <b>' : 'Nivel <b>') + nivelObjetivo() + '</b> · quedan ' + quedan;
     pintaArmas(false);
     if (cfg.mirando) $('aviso').textContent = 'Estás mirando';
     else if (yo.muerto && ONLINE) $('aviso').textContent = versus() ? 'Vuelves en ' + Math.max(0, Math.ceil(yo.respawn)) + '…' : 'Caíste: vuelves cuando tu equipo limpie el nivel';
