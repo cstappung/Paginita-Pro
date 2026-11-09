@@ -706,6 +706,7 @@ const REGLAS = {
       ])],
       ["Las armas", lista([
         "<b>Pistola</b> (desde el comienzo, munición infinita), <b>Uzi</b> (×5), <b>Escopeta</b> (×10), <b>Barriles</b> (×15), <b>Granadas</b> (×20), <b>Muro falso</b> (×25), <b>Cohetes</b> (×30) y <b>Cargas</b> (×40).",
+        "Cada una tiene su papel: la <b>uzi</b> atraviesa a un enemigo desde el comienzo, la <b>escopeta</b> derriba (deja a los enemigos aturdidos más tiempo, para frenar a la horda de cerca) y el <b>cohete</b> pasa a través del primer enemigo común, le hace medio golpe y revienta en el siguiente.",
         "Los <b>barriles</b> se dejan en el suelo y revientan cuando les disparas; los <b>muros falsos</b> tapan el paso a los enemigos hasta que los rompen; las <b>cargas</b> se ponen y se detonan todas juntas con <b>X</b>.",
         "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso, y <b>penetración</b> en pistola, uzi y escopeta: cada nivel hace que la bala atraviese un enemigo más. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],

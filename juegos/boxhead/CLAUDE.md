@@ -267,3 +267,23 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
 - **Records**: `boxhead.records` = `{mapa: {n, pts}}` from practice only
   (`anotaRecord` at each level start and in `finPractica`). The Trotamundos
   medal reads it.
+
+## Phase 2.5: robustness (`boxhead-14`, proof `ve: 3`)
+
+- **The director caps what others report** (`aplicaGolpe`): hits on enemies or
+  objects need a real weapon id, are cut to `D.topeGolpe(w)`, and spend from a
+  per-player bucket (`gastaCupo`: 200 hits/s, burst 400). `peticion` clamps a
+  placed barrel's or charge's damage and radius to `topeGolpe`/`topeRadio`.
+  The caps are the weapon fully upgraded with the damage upgrades at their top
+  (×5.46). They are generous on purpose: they stop absurd values, not a careful
+  cheater. **If an upgrade or weapon gains damage, check
+  `TOPE_VENTAJAS`** (a test compares them), or honest hits get cut.
+- **Enemy grid** (`armaRejilla`/`vecinos`, 40 px cells): bullets and the
+  separation between enemies look only at the 3×3 cells around them. It is
+  rebuilt at the start of `pasoYo` and of the director's enemy loop. An enemy
+  killed during the step stays in its cell, so check `E.get(id) === e`.
+  `vecinos` reuses one array: break out before calling it again. Measured at
+  42 enemies: 0.41 → 0.38 ms per step; the rest is movement, collisions and GC.
+- **Weapon roles**: the uzi has `pen: 1` from the start, the shotgun stuns 1.7×
+  longer (`ATURDE_ARMA`), and a rocket passes through the first non-boss enemy
+  for half damage (`p.pasa`) and explodes on the next.

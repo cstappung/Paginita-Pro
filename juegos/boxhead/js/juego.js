@@ -200,7 +200,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 2, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 3, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
@@ -346,6 +346,29 @@
   const celda = (tx, ty) => (tx < 0 || ty < 0 || tx >= M.ancho || ty >= M.alto) ? 1 : M.celdas[ty * M.ancho + tx];
   // Radio con el que se le pega (un jefe es más grande de lo que choca).
   const RG = k => D.ENEMIGOS[k].rg || D.ENEMIGOS[k].radio;
+  /* **Rejilla de enemigos** (celdas de REJ px), para no mirar a todos en
+     cada paso de una bala ni en la separación entre ellos. Se arma al
+     empezar `pasoYo` y la vuelta de los enemigos del director. REJ cubre el
+     mayor alcance que se busca (radio de jefe + 6 en una bala, dos radios
+     en la separación) con margen para lo que se mueven en un paso, así que
+     las 3×3 celdas de alrededor tienen a todos los que importan. Un enemigo
+     muerto en el paso sigue en su celda: quien la usa mira `E.get(id)`. */
+  const REJ = 40, rejE = new Map(), VEC = [];
+  const claveRej = (cx, cy) => (cx + 512) * 4096 + (cy + 512);
+  function armaRejilla() {
+    rejE.clear();
+    for (const e of E.values()) {
+      const k = claveRej(Math.floor(e.x / REJ), Math.floor(e.y / REJ));
+      let b = rejE.get(k); if (!b) rejE.set(k, b = []); b.push(e);
+    }
+  }
+  // Los enemigos de las 3×3 celdas alrededor de (x, y). El arreglo se reusa: hay que soltarlo antes de volver a pedir.
+  function vecinos(x, y) {
+    const cx = Math.floor(x / REJ), cy = Math.floor(y / REJ);
+    VEC.length = 0;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const b = rejE.get(claveRej(cx + i, cy + j)); if (b) for (const e of b) VEC.push(e); }
+    return VEC;
+  }
   const solidoEn = (x, y) => celda(Math.floor(x / TS), Math.floor(y / TS)) !== 0;
   function cajaObj(o) {
     if (o.k === 'muro') return [o.x - TS / 2, o.y - TS / 2, o.x + TS / 2, o.y + TS / 2];
@@ -569,8 +592,8 @@
         }
       }
       if (pega) break;
-      for (const e of E.values()) {
-        if (heridos.has(e)) continue;
+      for (const e of vecinos(px, py)) {
+        if (heridos.has(e) || E.get(e.id) !== e) continue;
         if ((px - e.x) ** 2 + (py - e.y) ** 2 < (RG(e.k) + 6) ** 2) {
           golpeaEnemigo(e, d, w, x, y); heridos.add(e); d *= 0.7;
           if (heridos.size > (pen || 0)) pega = true;
@@ -595,7 +618,8 @@
 
   function lanza(p) {
     const a = D.ARMAS[p.w];
-    if (a.tipo === 'cohete') { const v = p.vel || a.vel; p.vx = Math.cos(p.ang) * v; p.vy = Math.sin(p.ang) * v; p.t = 1.4; p.z = 0; }
+    // El cohete atraviesa al primer enemigo común (le pega medio golpe) y revienta en el siguiente.
+    if (a.tipo === 'cohete') { const v = p.vel || a.vel; p.vx = Math.cos(p.ang) * v; p.vy = Math.sin(p.ang) * v; p.t = 1.4; p.z = 0; p.pasa = 1; p.ya = new Set(); }
     else { p.vx = Math.cos(p.ang) * 220; p.vy = Math.sin(p.ang) * 220; p.t = 0.7; p.t0 = 0.7; p.z = 0; }
     proy.push(p);
   }
@@ -619,7 +643,15 @@
         if (Math.random() < 0.8) fx.humo(p.x - p.vx * 0.02, p.y - p.vy * 0.02, 1, 20);
         let pega = p.t <= 0 || solidoEn(p.x, p.y);
         if (!pega) for (const o of O.values()) { const b = cajaObj(o); if (b && p.x > b[0] && p.x < b[2] && p.y > b[1] && p.y < b[3]) { pega = true; break; } }
-        if (!pega) for (const e of E.values()) if (dist(p.x, p.y, e.x, e.y) < RG(e.k) + 4) { pega = true; break; }
+        if (!pega) for (const e of E.values()) {
+          if (p.ya.has(e.id) || dist(p.x, p.y, e.x, e.y) >= RG(e.k) + 4) continue;
+          if (p.pasa > 0 && !D.esJefe(e.k)) {
+            p.pasa--; p.ya.add(e.id);
+            if (p.mio && p.d) golpeaEnemigo(e, Math.round(p.d * 0.5), p.w, p.x - p.vx * 0.05, p.y - p.vy * 0.05);
+            continue;
+          }
+          pega = true; break;
+        }
         if (!pega && versus() && p.mio) for (const r of R.values()) if (r.v && dist(p.x, p.y, r.x, r.y) < 12) { pega = true; break; }
         if (pega) { p.fin = true; if (p.mio) explota(p.x - p.vx * dt * 0.5, p.y - p.vy * dt * 0.5, p.r, p.d, p.w, p.id); }
       }
@@ -962,6 +994,8 @@
      todos sus perdigones a la vez, despide de verdad. */
   const EMPUJE_ARMA = [1, 0.6, 1.3, 2.2, 2.2, 1, 2.2, 2.4, 0.8, 1];
   const ARMA_EXPLOTA = w => w === 3 || w === 4 || w === 6 || w === 7;
+  // La escopeta derriba: el aturdimiento dura más (su nicho: frenar la horda de cerca).
+  const ATURDE_ARMA = { 2: 1.7 };
   function danaEnemigo(id, d, quien, w, sx, sy) {
     const e = E.get(id);
     if (!e) return;
@@ -977,7 +1011,7 @@
       const sigue = e.aturd > 0 ? 1 : 0;
       const kx = (e.kvx || 0) * sigue + ax / l * em, ky = (e.kvy || 0) * sigue + ay / l * em, kl = hyp(kx, ky), tope = 60 + 420 * Math.min(1, masa);
       const f = kl > tope ? tope / kl : 1;
-      e.aturd = ATURDE * Math.min(1, masa) + 0.1; e.kvx = kx * f; e.kvy = ky * f;
+      e.aturd = (ATURDE * Math.min(1, masa) + 0.1) * (ATURDE_ARMA[w] || 1); e.kvx = kx * f; e.kvy = ky * f;
       return;
     }
     E.delete(id);
@@ -1165,7 +1199,7 @@
       if (!a || a.tipo !== 'objeto' || !Number.isFinite(x) || !Number.isFinite(y) || solidoEn(x, y) || O.size > 120) return;
       const k = a.obj, acero = k === 'muro' && bl === 1;
       const max = acero ? D.MURO_BLINDADO.vida : k === 'muro' ? clamp(+vida || VIDA_OBJ.muro, 1, 1200) : VIDA_OBJ[k];
-      O.set(nid(), { id: ultimoId, k, x, y, hp: max, max, u: de, r: clamp(+r || a.r || 0, 0, 200), d: clamp(+d || a.d || 0, 0, 500), bl: acero ? 1 : 0 });
+      O.set(nid(), { id: ultimoId, k, x, y, hp: max, max, u: de, r: clamp(+r || a.r || 0, 0, Math.min(200, TOPE_RADIO[w] || 200)), d: clamp(+d || a.d || 0, 0, Math.min(500, TOPE_GOLPE[w] || 500)), bl: acero ? 1 : 0 });
     } else if (p.det) {
       let i = 0;
       for (const o of [...O.values()]) if (o.k === 'carga' && o.u === de) {
@@ -1223,6 +1257,7 @@
     if (flujoT <= 0 && obj.length) { calculaFlujo(obj); flujoT = 0.4; }
 
     const lista = [...E.values()];
+    armaRejilla();
     for (const e of lista) {
       const C = D.ENEMIGOS[e.k];
       e.cd -= dt; e.cdF -= dt; e.atk = Math.max(0, e.atk - dt); e.flash = Math.max(0, e.flash - dt);
@@ -1245,7 +1280,7 @@
       else { const s = siguiente(e, libre); if (s) { dx = s.x - e.x; dy = s.y - e.y; } else { dx = t.x - e.x; dy = t.y - e.y; } }
       const l = hyp(dx, dy) || 1; dx /= l; dy /= l;
       let sx = 0, sy = 0;
-      for (const f of lista) {
+      for (const f of vecinos(e.x, e.y)) {
         if (f === e) continue;
         const ex = e.x - f.x, ey = e.y - f.y, q = ex * ex + ey * ey, rr = C.radio * 2;
         if (q < rr * rr && q > 0.01) { const qq = Math.sqrt(q); sx += ex / qq * (rr - qq); sy += ey / qq * (rr - qq); }
@@ -1445,17 +1480,35 @@
     if (!soyDir && dirUid && V[dirUid] && V[dirUid].zb) { ultimoZb = V[dirUid].zb; aplicaZb(ultimoZb, false); }
   }
 
+  /* Lo que el director le acepta a cada jugador: ningún golpe por encima
+     de lo que su arma puede (D.topeGolpe) y un cupo de golpes que se
+     rellena con el tiempo (CUPO_GOLPES por segundo, hasta CUPO_MAX: una
+     cadena de cargas en una horda entra entera). Lo que sobra se descarta. */
+  const TOPE_GOLPE = D.ARMAS.map(a => D.topeGolpe(a.id)), TOPE_RADIO = D.ARMAS.map(a => D.topeRadio(a.id));
+  const CUPO_GOLPES = 200, CUPO_MAX = 400, cupo = new Map();
+  function gastaCupo(de) {
+    let c = cupo.get(de);
+    if (!c) cupo.set(de, c = { n: CUPO_MAX, t: T });
+    c.n = Math.min(CUPO_MAX, c.n + (T - c.t) * CUPO_GOLPES); c.t = T;
+    if (c.n < 1) return false;
+    c.n--; return true;
+  }
   function aplicaGolpe(x, de) {
     const [, dest, d, w, extra] = x;
     if (typeof dest !== 'string') return;
     const dmg = Math.min(500, Math.max(0, +d || 0));
     if (dest === cfg.yo) recibe(dmg, w | 0, typeof extra === 'string' ? extra : '');
     else if (soyDir) {
+      // Golpes de otro a enemigos u objetos: un arma que existe, con su tope por golpe y un cupo por segundo.
+      if (dest.startsWith('e:') || dest.startsWith('o:')) {
+        if (!(w >= 0 && w < D.ARMAS.length) || !gastaCupo(de)) return;
+      }
+      const dm = dest.startsWith('e:') || dest.startsWith('o:') ? Math.min(dmg, TOPE_GOLPE[w | 0]) : dmg;
       if (dest.startsWith('e:')) {
         const src = Array.isArray(extra) ? extra : [];
-        danaEnemigo(+dest.slice(2), dmg, de, w | 0, +src[0], +src[1]);
+        danaEnemigo(+dest.slice(2), dm, de, w | 0, +src[0], +src[1]);
       }
-      else if (dest.startsWith('o:')) danaObjeto(+dest.slice(2), dmg, de);
+      else if (dest.startsWith('o:')) danaObjeto(+dest.slice(2), dm, de);
       else if (dest === 'p') peticion(de, extra);
     }
   }
@@ -1623,6 +1676,7 @@
   }
 
   function pasoYo(dt) {
+    armaRejilla();
     yo.cd -= dt; yo.inv = Math.max(0, yo.inv - dt);
     if (yo.mul > 1) {
       yo.combo -= dt;

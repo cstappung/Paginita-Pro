@@ -165,7 +165,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-13";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-14";
     host.append(aviso, redEl, frame);
   }
 

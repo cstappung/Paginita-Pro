@@ -22,7 +22,7 @@
      alcance de la bala · r: radio de explosión · tipo: cómo dispara. */
   const ARMAS = [
     { id: 0, nombre: 'Pistola', tipo: 'bala', d: 15, cad: 0.28, ini: Infinity, caja: 0, max: Infinity, alc: 360, desbloquea: 1 },
-    { id: 1, nombre: 'Uzi', tipo: 'bala', d: 9, cad: 0.08, ini: 150, caja: 100, max: 400, alc: 340, desv: 0.06, desbloquea: 5 },
+    { id: 1, nombre: 'Uzi', tipo: 'bala', d: 9, pen: 1, cad: 0.08, ini: 150, caja: 100, max: 400, alc: 340, desv: 0.06, desbloquea: 5 },
     { id: 2, nombre: 'Escopeta', tipo: 'perdigon', d: 13, cad: 0.75, ini: 25, caja: 15, max: 60, alc: 240, perdigones: 8, abre: 0.42, desbloquea: 10 },
     { id: 3, nombre: 'Barriles', tipo: 'objeto', obj: 'barril', d: 120, r: 84, cad: 0.4, ini: 5, caja: 3, max: 15, desbloquea: 15 },
     { id: 4, nombre: 'Granadas', tipo: 'granada', d: 90, r: 70, cad: 0.6, ini: 10, caja: 5, max: 30, desbloquea: 20 },
@@ -552,12 +552,33 @@
     }
     return out;
   }
-  const ESPERA_VENTAJA = 10;   // segundos para elegir; después se queda la primera
+  const ESPERA_VENTAJA = 10;
+
+  /* ---------- topes del director (en línea) ----------
+     Lo más que puede hacer un golpe de cada arma: con todas las mejoras del
+     multiplicador, nivel 5 de tienda, potencia 5 y las ventajas que suben
+     el daño al tope (filo 5 ×1,5, furia ×1,4, en compañía 2 ×1,3, crítico
+     ×2). 60 de base como mínimo: el estallido y la bala ígnea. Barriles y
+     cargas suman la pólvora extra (×1,5 en daño y radio). El director
+     recorta a esto lo que le llega de los demás. */
+  const TOPE_VENTAJAS = 1.5 * 1.4 * 1.3 * 2;
+  function armaTope(w) {
+    const a = ARMAS[w];
+    if (!a) return null;
+    return conNivel(arma(w, new Set(MEJORAS.filter(m => m.arma === w).map(m => m.id))), NIVEL_ARMA.max);
+  }
+  function topeGolpe(w) {
+    const b = armaTope(w);
+    if (!b) return 0;
+    const polvora = b.obj === 'barril' || b.obj === 'carga' ? 1.5 : 1;
+    return Math.ceil(Math.max(b.d || 0, 60) * factorPotencia(5) * TOPE_VENTAJAS * polvora);
+  }
+  const topeRadio = w => { const b = armaTope(w); return b && b.r ? Math.ceil(b.r * 1.5) : 0; };   // segundos para elegir; después se queda la primera
 
   return {
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
-    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe
+    cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio
   };
 });

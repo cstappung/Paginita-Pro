@@ -328,6 +328,23 @@ function juegaPartida(bx,{maxPasos=60*60*20,azar=1,semilla=12345,cuenta='local'}
  }
  return bx.prueba();
 }
+test('topes del director: ningún golpe legítimo los pasa, y cada arma tiene su nicho',()=>{
+ const todasDe=w=>new Set(D.MEJORAS.filter(m=>m.arma===w).map(m=>m.id));
+ for(const a of D.ARMAS){
+  const b=D.conNivel(D.arma(a.id,todasDe(a.id)),5);
+  // lo más que hace jugando: potencia 5, filo 5, furia, en compañía 2 y crítico
+  const real=(b.d||0)*D.factorPotencia(5)*1.5*1.4*1.3*2*(b.obj==='barril'||b.obj==='carga'?1.5:1);
+  assert.ok(D.topeGolpe(a.id)>=Math.round(real),a.nombre+' tope '+D.topeGolpe(a.id)+' < '+real);
+  if(b.r)assert.ok(D.topeRadio(a.id)>=Math.round(b.r*1.25),a.nombre+' radio');
+  assert.ok(D.topeGolpe(a.id)>=60*1.5*5.46,'cubre el estallido y la bala ígnea');
+ }
+ assert.equal(D.topeGolpe(99),0);
+ // la uzi atraviesa de entrada; la escopeta derriba y el cohete atraviesa (en juego.js)
+ assert.equal(D.ARMAS[1].pen,1);
+ const js=fs.readFileSync(RAIZ+'juego.js','utf8');
+ assert.match(js,/ATURDE_ARMA = \{ 2: /);assert.match(js,/p\.pasa = 1/);
+ assert.match(js,/gastaCupo\(de\)/);assert.match(js,/TOPE_GOLPE\[w \| 0\]/);
+});
 test('ventajas a elección: el sorteo es puro, sin repetir, con su tope y las de equipo solo en sala',()=>{
  assert.equal(D.VENTAJAS.length,24);
  assert.equal(new Set(D.VENTAJAS.map(v=>v.id)).size,24);
@@ -416,4 +433,22 @@ test('Solo Club: categorías y tope de Pro BoxHead en club-datos',async()=>{
  const C=mod.exports;
  for(const m of ['patio','sotano','cruce','fortaleza','laberinto'])assert.ok(C.categoriaClub('boxhead','club-boxhead-'+m),m);
  assert.ok(!C.categoriaClub('boxhead','club-boxhead-luna'));
+});
+test('nicho de las armas: la uzi atraviesa a uno y el cohete pasa al primero y revienta en el segundo',()=>{
+ const bx=boxheadSinPantalla();
+ function dispara(w){
+  bx.practica(1);bx.inmortal(true);bx.armas();bx.calma();
+  const m=bx.mundo(),x=m.yo.x,y=m.yo.y;
+  const ids=[bx.enemigo(0,x+60,y),bx.enemigo(0,x+110,y),bx.enemigo(0,x+260,y)];
+  bx.elige(w);bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:true,disp:false});
+  for(let i=0;i<12;i++)bx.paso(1/60);            // el cambio de arma demora 0,15 s
+  const hp0=new Map(bx.mundo().E.map(e=>[e.id,e.hp])),toca=new Set();
+  bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:true,disp:true});bx.paso(1/60);
+  bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:true,disp:false});
+  for(let i=0;i<40;i++){for(const e of bx.mundo().E)if(e.hp<hp0.get(e.id))toca.add(e.id);bx.paso(1/60);}
+  const vivos=new Set(bx.mundo().E.map(e=>e.id));
+  return ids.map(id=>!vivos.has(id)||toca.has(id));
+ }
+ assert.deepEqual(dispara(1),[true,true,false],'uzi: un disparo pega en dos');
+ assert.deepEqual(dispara(6),[true,true,false],'cohete: atraviesa al primero, revienta en el segundo');
 });
