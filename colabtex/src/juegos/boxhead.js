@@ -14,7 +14,8 @@ import { BX_ARMAS } from "./motor.js";
      posición de cada uno, sus disparos y, en el estado de quien dirige, los
      enemigos. Nada de eso pasa por la base.
    - **Al registro va solo lo que decide la partida**: `muere` (escrito por
-     quien muere) y `nivel` (escrito por quien dirige al limpiar uno).
+     quien muere), `nivel` (escrito por quien dirige al limpiar uno) y
+     `revive` (escrito por quien levanta a un compañero caído).
    - **La configuración espera a que la sala arranque**: antes el marco no
      sabe cuántos van a estar, y cuántos son decide cuántos enemigos salen. */
 const PADRE = "boxhead-padre", HIJO = "boxhead-hijo";
@@ -44,7 +45,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       if (!est.listos) return;
       configurado = true;
       enviar("config", {
-        yo: uid, mirando: !juego(), variante: est.variante, mapa: est.mapa, meta: est.meta,
+        yo: uid, mirando: !juego(), variante: est.variante, mapa: est.mapa, meta: est.meta, mut: est.mut || "", equipos: est.equipos || null,
         semilla: (partida.semilla >>> 0) || 1,
         jugadores: est.jugadores.map((j, i) => ({ uid: j.uid, nombre: j.nombre || "Jugador", orden: i }))
       });
@@ -52,7 +53,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     }
     enviar("marcador", {
       nivel: est.nivel || 1, caidos: est.caidos || [], bajas: est.bajas || {}, muertes: est.muertes || {},
-      puntos: est.puntos || {}, fuera: Object.keys(est.fuera || {}), meta: est.meta,
+      puntos: est.puntos || {}, fuera: Object.keys(est.fuera || {}), meta: est.meta, puntosEq: est.puntosEq || null, infectados: est.infectados || null,
       fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "", nivel: est.nivel || 1 } : null
     });
   }
@@ -73,6 +74,10 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       anota(j);
     } else if (d.tipo === "nivel" && Number.isInteger(d.n) && d.n > 1 && d.n < 1e4) {
       anota({ t: "nivel", uid, n: d.n });
+    } else if (d.tipo === "revive" && typeof d.v === "string" && d.v.length <= 64) {
+      anota({ t: "revive", uid, v: d.v });
+    } else if (d.tipo === "aguanta" && est.variante === "infectado") {
+      anota({ t: "aguanta", uid });
     }
   }
 
@@ -146,7 +151,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     const n = est.jugadores.length, cupo = est.cupo || n;
     aviso.hidden = !!est.listos;
     aviso.textContent = est.listos ? "" : "Esperando jugadores… " + n + " de " + cupo +
-      (n >= (est.variante === "versus" ? 2 : 1) ? " · el anfitrión puede empezar ya" : "");
+      (n >= (["versus", "equipos", "infectado"].includes(est.variante) ? 2 : 1) ? " · el anfitrión puede empezar ya" : "");
   }
 
   function montar(el) {
@@ -165,7 +170,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-7";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-23";
     host.append(aviso, redEl, frame);
   }
 

@@ -277,6 +277,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > a publicar las reglas se juega igual, pero las rondas no entran en la
 > clasificación y no pagan monedas.
 
+> **Pro BoxHead en el Solo Club (9 de noviembre de 2026):**
+> `club-boxhead-(patio|sotano|cruce|fortaleza|laberinto)` (el nivel más alto
+> al que se llegó en ese mapa) son categorías nuevas de `soloRanks` y
+> `soloPruebas`, y `boxhead` un juego nuevo de `clubJugadas`. Hasta volver a
+> publicar las reglas se juega igual, pero las partidas no entran en la
+> clasificación y no pagan monedas.
+
 > **PRO PACMAN (20 de octubre de 2026):** `club-propac-puntos` (el puntaje
 > de la partida, con tope de 10 000 000) es una categoría nueva de
 > `soloRanks` y `soloPruebas`, y `propac` un juego nuevo de `clubJugadas`.

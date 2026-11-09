@@ -685,25 +685,46 @@ const REGLAS = {
     lema: "Acción vista desde arriba: zombis, diablos y un multiplicador que no para de subir. De 1 a 8 jugadores.",
     secciones: [
       ["Controles", lista([
-        "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
+        "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí. Mantén <b>Shift</b> para <b>fijar hacia dónde miras</b>: caminas un poco más lento, pero puedes retroceder disparando de frente (una flecha en el suelo marca la dirección).",
+        "<b>Con mando</b>: el stick izquierdo mueve (poco inclinado gira sin avanzar), el <b>stick derecho</b> mira sin moverte, <b>LT</b> fija la dirección, <b>A</b> o <b>RT</b> dispara, <b>LB</b>/<b>RB</b> cambian de arma, <b>X</b> detona las cargas y <b>B</b> pone un muro reforzado. Junto al puesto <b>$</b> la cruceta compra (↑ munición, → armadura, ↓ botiquín, ← potencia), <b>B</b> compra un muro reforzado e <b>Y</b> mejora el arma; lejos de él, ← → cambian de arma, ↑ toma la mejor y ↓ pone un muro reforzado. Vibra (se apaga en la pausa).",
+        "<b>En el celular o la tableta</b>: un joystick nace donde apoyas el pulgar en la mitad izquierda, y a la derecha están Disparar, Fijar, cambiar de arma, Muro, Detonar y la pausa. La tienda se toca.",
         "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
         "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se abre la <b>tienda</b>: se compra con un clic o con las teclas <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín, <b>G</b> potencia y <b>M</b> muro reforzado; <b>U</b> sube de nivel el arma que llevas. <b>F</b> pone un muro reforzado, estés donde estés.",
-        "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
+        "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot, y seis más que se ganan con <b>medallas</b>: Cazador (derrota a un jefe grande), Calavera (multiplicador ×100), Dinamita (10 bajas en el mismo instante), Armero (un arma al nivel 5), Rey (nivel 20) y Careta (nivel 10 en la práctica de los cinco mapas clásicos).",
+        "Las <b>medallas</b> son los logros del propio juego: 16, que se ganan jugando solo, en el Club o en línea y quedan guardadas en ese dispositivo (también sin cuenta). Se ven en el menú, junto con tu <b>récord de nivel</b> en la práctica de cada mapa."
+      ])],
+      ["En el Solo Club", lista([
+        "Pro BoxHead también se juega solo desde el <b>Solo Club</b>, con <b>una tabla por mapa</b> (Patio, Sótano, Cruce, Fortaleza, Laberinto, Planta, Hangar, Fábrica y Apagón). Lo que cuenta es el <b>nivel más alto al que llegas</b> antes de caer; con el mismo nivel gana quien llegó en menos tiempo de juego.",
+        "Cada partida se graba (las teclas, el stick y cada compra, con su instante) y la página la <b>vuelve a jugar</b> antes de guardarla: si no llega al mismo nivel, no entra en la tabla. Por eso la partida del Club avanza en pasos fijos y el azar sale de una semilla.",
+        "Los logros del Club salen del nivel: 3, 5, 10, 15, 20, 30 y 40 en cualquier mapa, y tres de mapas difíciles (Sótano 10, Fortaleza 15, Laberinto 20)."
       ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
-        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto, 50 por un demoledor, 40 por un escudero o un vigía, 45 por un chamán, 35 por un excavador y 5 por cada bicho del enjambre, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad. Cuando la barra está por vaciarse, parpadea y suena un aviso.",
+        "Pasar por primera vez ×10, ×25, ×50, ×100… es un <b>hito</b>: se anuncia y la cámara salta un instante.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
-        "<b>Pistola</b> (desde el comienzo, munición infinita), <b>Uzi</b> (×5), <b>Escopeta</b> (×10), <b>Barriles</b> (×15), <b>Granadas</b> (×20), <b>Muro falso</b> (×25), <b>Cohetes</b> (×30) y <b>Cargas</b> (×40).",
+        "<b>Pistola</b> (desde el comienzo, munición infinita), <b>Uzi</b> (×5), <b>Escopeta</b> (×10), <b>Barriles</b> (×15), <b>Granadas</b> (×20), <b>Muro falso</b> (×25), <b>Cohetes</b> (×30) y <b>Cargas</b> (×40). Las teclas <b>1</b>–<b>9</b>, <b>0</b>, <b>-</b> y <b>=</b> eligen por la posición en la barra.",
+        "Y cuatro para los multiplicadores grandes: el <b>lanzallamas</b> (×60) quema todo lo que hay en un cono corto delante, atravesando; la <b>ballesta</b> (×80) dispara un virote lento que atraviesa a cuatro enemigos; la <b>minigun</b> (×120) arranca despacio y dispara cada vez más rápido mientras mantienes el gatillo; y el <b>rayo</b> (×160) pega al primero que ve delante y salta a cuatro más que estén cerca, un poco más débil en cada salto. En versus el lanzallamas quema también a los rivales; el rayo solo salta entre enemigos.",
+        "Muy de vez en cuando una baja suelta una <b>caja dorada</b> (y cada jefe suelta una): da 12 segundos de <b>furia dorada</b>, con el doble de daño y sin gastar munición.",
+        "Cada una tiene su papel: la <b>uzi</b> atraviesa a un enemigo desde el comienzo, la <b>escopeta</b> derriba (deja a los enemigos aturdidos más tiempo, para frenar a la horda de cerca) y el <b>cohete</b> pasa a través del primer enemigo común, le hace medio golpe y revienta en el siguiente.",
         "Los <b>barriles</b> se dejan en el suelo y revientan cuando les disparas; los <b>muros falsos</b> tapan el paso a los enemigos hasta que los rompen; las <b>cargas</b> se ponen y se detonan todas juntas con <b>X</b>.",
         "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso, y <b>penetración</b> en pistola, uzi y escopeta: cada nivel hace que la bala atraviese un enemigo más. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],
+      ["Ventajas", lista([
+        "Al empezar cada nivel desde el 2 salen <b>tres ventajas</b> y te quedas con una: <b>1</b>, <b>2</b> o <b>3</b>, <b>←</b> <b>↑</b> <b>→</b> en el mando, o un toque en la carta. Tienes 10 segundos; si no eliges, te quedas con la primera. Cada una sube de a un nivel hasta su tope, y en la pausa y en la pantalla final se ve cuáles llevas.",
+        "Hay 24, en tres rarezas (común, rara y épica; las épicas salen menos). <b>De ataque</b>: filo (+10 % de daño), gatillo ligero (cadencia), mira larga (alcance), golpe crítico, perforante, bala ígnea (cada tantos disparos uno estalla), furia (más daño con poca vida) y estallido (algunas bajas revientan). <b>De defensa</b>: piel dura, coraza (armadura al empezar cada nivel), aguante (vida máxima), vampirismo, regeneración y segunda oportunidad (una vez por partida, un golpe mortal te deja con 40). <b>De utilidad</b>: imán, codicia (más chatarra), pies ligeros, cargador grande, albañil (muros más duros), pólvora extra (barriles y cargas más grandes), racha larga (el combo dura más) y un <b>dron</b> que dispara solo.",
+        "Dos son <b>de equipo</b> y solo salen en una sala con más gente: en compañía (más daño con un aliado cerca) y relevo (vuelves al juego con armadura). Las explosiones de las ventajas no te dañan ni a ti ni a tus compañeros.",
+        "Jugando solo, la oleada del nivel espera a que elijas. En línea nadie espera a nadie: cada uno elige mientras juega. Las ventajas son tuyas y no viajan al resto."
+      ])],
       ["Enemigos y cajas", lista([
         "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos. Tus muros falsos y barriles los hacen <b>buscar otro camino</b>: solo los rompen si no queda ninguno libre. La excepción es el <b>demoledor</b> (nivel 6, casco amarillo y mazo, poco común): va derecho a tus muros y los tira a mazazos.",
-        "La dificultad sube <b>de a poco y en línea recta</b>: cada nivel trae unos pocos enemigos más, un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. También salen más cuantos más jugadores haya en la sala.",
-        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas y las azules dan 35 de <b>armadura</b>.",
+        "Más adelante llegan otros cinco. El <b>escudero</b> (nivel 12) lleva un escudo: de frente solo le entra un 20 % de cada bala, así que rodéalo o usa explosivos. El <b>enjambre</b> (nivel 14) son ocho bichos diminutos que llegan juntos y caen de un tiro. El <b>chamán</b> (nivel 16, capucha y fuego morado) se queda lejos y cada tanto cura a los zombis que tiene cerca: el anillo verde avisa. El <b>excavador</b> (nivel 20) viaja bajo tierra, donde no se le puede pegar, y asoma a tu lado tras un segundo de grietas en el suelo. El <b>vigía</b> (nivel 25, con antena) te apunta con un láser rojo y dispara una bala rápida adonde estabas: muévete cuando lo veas.",
+        "Desde el nivel 12 algunos enemigos salen <b>élite</b>, con un anillo de color en el suelo y la barra de vida de ese color: <b>blindado</b> (gris azulado, más del doble de vida), <b>veloz</b> (amarillo), <b>vampiro</b> (rojo, se cura al morder), <b>divisor</b> (verde, se parte en dos al morir) e <b>ígneo</b> (naranja, revienta al morir). Los jefes y el enjambre nunca son élite.",
+        "La dificultad sube <b>de a poco</b>: cada nivel trae un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. La <b>cantidad y el ritmo</b> de la horda van en <b>sierra</b>: aprietan cada vez más hasta el jefe (cada cinco niveles) y el nivel siguiente afloja un poco para respirar. También salen más cuantos más jugadores haya en la sala.",
+        "Tus bajas sueltan <b>chatarra</b>, tuercas que vuelan hacia ti si estás cerca (y a los dos segundos, estés donde estés): es la moneda de la tienda. Da 1,5 veces los puntos de la baja <b>sin</b> el multiplicador; la de las bajas de otro no se ve ni se recoge.",
+        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas (si las tienes todas llenas, 30 de chatarra) y las azules dan 35 de <b>armadura</b>.",
         "La <b>armadura</b> (hasta 100, la barra azul bajo la de vida) absorbe el 60 % de cada golpe mientras dure.",
         "Cada golpe <b>empuja</b> al enemigo hacia atrás y lo deja medio segundo aturdido antes de volver a perseguirte. Hay <b>fuego amigo</b> entre ellos: las bolas de fuego de los diablos queman a los zombis (y a otros diablos) que se crucen.",
         "Tu vida, el arma en la mano y sus balas van justo encima de tu personaje, como en el original."
@@ -713,17 +734,26 @@ const REGLAS = {
         "Minis: <b>El Carnicero</b> se agacha, brilla y embiste en línea recta; <b>El Nigromante</b> levanta zombis del suelo; <b>La Bruja</b> lanza anillos de fuego (dos seguidos cuando está herida); <b>La Larva Madre</b> pare corredores y revienta en más al morir; <b>El Espectro</b> se desvanece y reaparece a tu lado.",
         "Grandes: <b>El Coloso</b> pisa el suelo y lanza una onda (marca el círculo antes, sal de él); <b>La Reina de la Colmena</b> pare enjambres de corredores y explosivos; <b>El Archidiablo</b> gira soltando una espiral de fuego; <b>La Hidra</b> escupe ácido en cinco direcciones y le brotan escupidores al perder vida; <b>El Titán</b> lanza rocas que estallan donde caen (la sombra avisa) y, herido, se enfurece.",
         "Su barra de vida va arriba de la pantalla. La vida crece con el nivel y con la gente en la sala. Matar un mini da 300 puntos y un grande 1000, por el multiplicador.",
-        "Cuando ya salieron los cinco de cada clase, <b>vuelven a rotar</b> en el mismo orden, cada vuelta más duros."
+        "Bajo la mitad de su vida, cada jefe <b>alterna con una segunda habilidad</b>: el Carnicero también pisa el suelo, el Nigromante lanza anillos de fuego, la Bruja salta a tu lado, la Larva escupe ácido en abanico, el Espectro embiste, el Coloso lanza rocas, la Reina lanza anillos, el Archidiablo levanta diablos, la Hidra pisa y el Titán también.",
+        "Todos tienen un <b>punto débil</b>, el rombo amarillo en la espalda: por detrás, o mientras avisan una habilidad (cuando brillan), cada golpe vale una vez y media.",
+        "Cuando ya salieron los cinco de cada clase, <b>vuelven a rotar</b> en el mismo orden, cada vuelta más duros. Desde el nivel 51 vuelven <b>corruptos</b> (aura morada): con la mitad más de vida, más rápidos, con las habilidades más seguidas y la segunda desde el comienzo."
       ])],
       ["Tienda", lista([
-        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una se abre un panel con cada artículo, su icono y su precio: se compra con un <b>clic</b> o con su tecla. <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Se compra con <b>chatarra</b>, nunca con puntos: tu marcador solo sube. Cada mapa tiene <b>estaciones de suministros</b>; de pie junto a una se abre, a un costado, un panel con cada artículo, su icono y su precio: se compra con un <b>clic</b>, con su tecla o con la cruceta del mando. <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Los suministros (munición, armadura, botiquín y muro reforzado) cuestan un 5 % más por cada nivel de la partida, hasta dos veces y media: más adelante se junta más chatarra. La potencia y las mejoras de arma tienen precio fijo.",
         "<b>Muro reforzado</b> (<b>M</b>, 450 cada uno, hasta 6 en la mochila): un bloque de acero con franja amarilla que aguanta lo que <b>seis muros falsos</b> (1000 de vida). Se pone con <b>F</b> delante de ti. Los enemigos lo rodean como a cualquier muro, y el <b>demoledor</b> igual va a por él a mazazos, solo que tarda mucho más.",
         "<b>Mejorar armas</b>: cada arma que tengas sube hasta el <b>nivel 5</b> (clic en su tarjeta, o <b>U</b> para la que llevas en la mano). Cada nivel da +15 % de daño, dispara un 6 % más rápido, +20 % de munición, +6 % de radio en las explosivas y +25 % de vida en el muro falso, y <b>cuesta casi el doble que el anterior</b> (la pistola: 300, 550, 950, 1750, 3150). Con el nivel cambia cómo se ve el arma: <b>pulida</b> (1–2), <b>dorada</b> (3–4) y de <b>plasma</b> (5), que brilla; las estrellas de la barra de armas dicen el nivel. Se suma a las mejoras del multiplicador.",
-        "Gastar puntos baja tu marcador: es el precio de llegar más lejos."
+        "Comprar no baja tus puntos: la chatarra es aparte. La que no gastes aparece en la pantalla final."
       ])],
-      ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],
+      ["Mapas", "Nueve, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza, Laberinto, Planta, Hangar, Fábrica y Apagón. En la <b>Fábrica</b> las cintas transportadoras (las franjas con flechas) te arrastran a ti y a los zombis; en el <b>Apagón</b> se cortó la luz y solo se ve alrededor de los jugadores, del fuego y de las explosiones. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],
+      ["En equipo", lista([
+        "En la sala cooperativa, quien cae deja una tumba. Si un compañero se queda <b>3 segundos junto a ella</b> (se llena un anillo verde), lo <b>revive</b> ahí mismo con media vida. Si nadie llega, vuelve al empezar el nivel siguiente; si caen todos, se acabó.",
+        "<b>T</b> pone un marcador <b>«¡Aquí!»</b> un poco delante de ti, con tu color y tu nombre, que ven todos durante cuatro segundos."
+      ])],
+      ["Mutadores", "Quien abre la sala puede elegir un <b>mutador</b>, que cambia una regla para todos: <b>Sed de sangre</b> (cada baja te cura 4), <b>Cristal</b> (pegas y recibes el doble), <b>Horda veloz</b> (los enemigos corren un 30 % más), <b>Munición sin fin</b> o <b>Blindados</b> (la mitad de enemigos, con el triple de vida). Solo en las salas en línea: la práctica y el Club se juegan siempre sin mutador."],
       ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
-      ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los cinco mapas."]
+      ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los nueve mapas. Al terminar muestra cómo jugaste: multiplicador máximo, precisión, jefes y tu arma favorita."],
+      ["Opciones", "En la pausa: la música (y su volumen; sube con la acción y cambia con los jefes), los números de daño, la vibración del mando y los consejos, que salen una sola vez cada uno cuando vienen al caso (activarlos de nuevo los vuelve a mostrar)."]
     ],
     modos: {
       coop: { nombre: "Supervivencia", secciones: [
@@ -740,6 +770,27 @@ const REGLAS = {
           "Tus balas y explosiones hieren a los demás jugadores; tus propias explosiones te hacen la mitad.",
           "Al morir vuelves a los tres segundos, con la munición repuesta.",
           "Gana el primero en llegar a la meta de bajas que eligió la sala (5, 10 o 20). Matarte a ti mismo cuenta como muerte y no da baja. Se necesitan al menos dos jugadores."
+        ])]
+      ]},
+      equipos: { nombre: "Versus por equipos", secciones: [
+        ["Rojo contra azul", lista([
+          "Como el versus (todas las armas, vuelves a los tres segundos, hay enemigos igual), pero en <b>dos equipos</b>: rojo y azul, por orden de llegada a la sala. Tu color es el de tu nombre, tus marcadores y el anillo del marcador.",
+          "Entre compañeros <b>no hay fuego amigo</b>: las balas los atraviesan y las explosiones no les hacen nada (las tuyas a ti sí, la mitad).",
+          "Cada baja a uno del otro equipo suma para el tuyo. Gana el primer equipo en llegar al <b>doble de la meta</b> de la sala (10, 20 o 40), o el que queda si el otro se va entero."
+        ])]
+      ]},
+      infectado: { nombre: "Infectado", secciones: [
+        ["Humanos contra infectados", lista([
+          "Uno empieza <b>infectado</b> (el paciente cero, a la suerte); los demás son humanos con todas las armas. No hay horda: solo jugadores.",
+          "Un infectado se ve como un zombi y no dispara: <b>muerde</b> al humano que tenga delante (Espacio, o disparar en el mando o la pantalla). Corre un 20 % más y tiene 60 de vida extra. Al morir vuelve a los tres segundos, igual de infectado.",
+          "El humano que muere, por lo que sea, <b>vuelve infectado</b>. Entre humanos no hay fuego amigo, ni entre infectados.",
+          "Ganan los infectados cuando no queda ningún humano. Ganan los humanos si alguno aguanta <b>3 minutos</b> (el reloj está arriba) o si los infectados se van de la sala."
+        ])]
+      ]},
+      jefes: { nombre: "Modo jefes", secciones: [
+        ["Solo jefes", lista([
+          "Cada nivel es <b>un jefe</b> con una escolta corta, en el orden de la rotación: el Carnicero, el Coloso, el Nigromante, la Reina… El jefe del nivel <i>n</i> pega como el del nivel 5<i>n</i> de la supervivencia, y desde el nivel 11 vuelven <b>corruptos</b>.",
+          "Se empieza con <b>todas las armas</b>. Lo demás es como en la supervivencia: se revive a los caídos, quien cae vuelve en el nivel siguiente y la partida termina cuando caen todos. Gana quien hizo más puntos."
         ])]
       ]}
     }
@@ -1599,7 +1650,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", boxheadclub: "Pro BoxHead", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

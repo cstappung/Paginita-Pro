@@ -135,3 +135,365 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `ORDEN_MAPAS`) and `meta` — not `modo`. `'boxhead'` was added to the
   rules' `juego` and `logros` whitelists, so they must be re-published.
   `tests/boxhead.test.cjs` covers the reducer and walks every map.
+
+## Phase 1 of the mega update (`boxhead-9`): controls, economy, feel, HUD, music
+
+- **Chatarra is the shop currency; points only go up.** `yo.chat` is local, never
+  in the log or the player state, like armour. My kills drop it (`miBaja` →
+  `sueltaChatarra`, `D.chatarraDe(k)` = 1.5 × base points, no multiplier) as
+  pieces in `CH` that fly to me (`pasoChatarra`); dying cashes what is left
+  (`cobra`). `compra`/`subeArma` charge `yo.chat`, never `yo.pts`: points decide
+  the coop winner, the room table and logros. `D.precioTienda(id, pot, nivel)`
+  raises supplies 5 % per level (cap ×2.5); potencia and weapon levels are fixed.
+- **Controls.** Shift / LT / the touch «Fijar» lock the facing (`yo.fija`, an
+  arrow on the floor, 0.88 speed). `Mando.configura` has `stick: null` and
+  `flechas: false`: the game reads the sticks itself (`leeMando`, only when
+  `modo === 'juego'`) with `D.dirStick` (8 directions with hysteresis; tested).
+  Light tilt turns without moving; the right stick looks without moving. The
+  d-pad buys at a `$` (`MANDO_TIENDA` maps items to buttons, and the shop shows
+  their glyphs) and cycles weapons away from it. Vibration (`vibra`) lives here,
+  not in `mando.js`, so the shared module (34 pages) did not change. Touch
+  controls (`#tactil`, shown with `html.tactil` on the first touch or a coarse
+  pointer) feed the same stick path; the header says `@controles: tactil teclado`.
+- **mando.js puts its hints next to `#ayuda` without the id**, so
+  `#hud>.mando-pista` must carry the position. Without it they landed on top of
+  `#info`.
+- **Hit-stop** (`impacto`, max 0.1 s) only scales this screen's `dt` (×0.08 in
+  `cuadro`): boss death, big explosion nearby, point-blank shotgun. Nothing may
+  depend on it, and it must stay short because a director's freeze is everyone's.
+- **HUD.** Rewards show at the same time (`PREMIOS`, at most 3, 2.2 s each) and
+  weapon upgrades merge into one line. A queue used to delay a box's «+50 vida»
+  by tens of seconds. Tips (`CONSEJOS`) show once each (`boxhead.consejos`). The
+  shop sits on the right side (on phones under the score). The combo arc blinks
+  under 25 % (`#marca.cae`, `avisoCombo`), and milestones ×10/25/50/100…
+  (`HITOS`) pulse the camera. The end screen shows `yo.st` (shots and hits per
+  pellet, kills per weapon, bosses). Options live in the pause and are stored as
+  `boxhead.*` keys.
+- **Music** (`audio.js`, `musica(meta, jefe)`): a 16th-note sequencer through
+  its own `mus.bus` into the compressor (`salida`), so `volumen.js` still governs
+  it. `juego.js` sends the intensity from enemies and the multiplier, −1 to fade
+  out, and a live boss switches the theme. Music pieces pass `libre` so they never
+  count in `carga`. Otherwise the horde's cap would mute the effects.
+- **Recorded effects:** the loader is ready (`MUESTRAS`/`GAN`/`muestra`), but
+  `MUESTRAS` stays empty until the ElevenLabs files exist as
+  `sfx/<key>-<n>.mp3`. Each file's `GAN` must be measured against the
+  synthesized sound. The `switch` in `son` remains the fallback.
+  The chosen takes (generation and session ids) are listed in
+  `sfx/elevenlabs.md`.
+
+
+## Phase 2.1: deterministic practice engine (`boxhead-10`)
+
+- **Practice is replayable.** Gameplay randomness goes through `rn`/`rz`, a
+  mulberry32 seeded per game in `practica(semilla)`; `azar` (Math.random) is only
+  for what is seen. A new random call that changes the game must use `rn`/`rz`,
+  or proofs stop replaying. Rooms keep `rng = Math.random` (the director rules).
+  `dist`/`hyp` use `Math.sqrt`, never `Math.hypot`. Trig still differs in the
+  last bit between engines (same risk PRO DEFENDER took). In practice `nid()` is a
+  counter, and `practica` resets everything a sim carries across games
+  (`vistosM`, `marca`, `CH`…). A seen-id set left full silently ate kills.
+- **Fixed steps.** `cuadro` advances practice in steps of `PASO` (1/60 s, at
+  most 4 per frame); `pasoN` counts them (incremented at the end of `paso`, never
+  while paused). Online still uses a variable `dt`. No `setTimeout` in the sim:
+  the empty-weapon switch became `yo.vacio`.
+- **The recorder** (`graba`): `[paso, 0, mov, vel·20, mira+1, fija|disp<<1]`
+  when the stick or keys change (`entradaPaso`, speed in twentieths), and
+  `[paso, code, arg]` for each discrete action, which must go through
+  `accion(code, arg)` (1 cycle, 2 pick, 3 detonate, 4 reinforced wall, 5 weapon
+  level, 6 buy item i of `D.TIENDA`). Internal calls (`dispara` → `eligeArma(0)`)
+  stay direct. The proof is `{v: 1, ve: VE, u, m, s, j, k}` (`__boxhead.prueba()`),
+  with `k` = the step of `finPractica`. **Bump `VE` whenever the simulation
+  changes**: an old proof would replay to a different end.
+- **`__boxhead.rehace(p)`** replays it without a screen: `js/sin-pantalla.js`
+  turns DOM, canvas, audio and grafico into an inert proxy, so `datos.js` +
+  `juego.js` run in a worker or in Node (`tests/boxhead.test.cjs` plays a bot
+  through `__boxhead.entrada`, which records like real input, and replays in
+  another context). About 0.1 ms per step.
+
+## Phase 2.3: in the Solo Club (`boxhead-11`, card `boxheadclub`)
+
+- **Same game, `?club=1`.** `solo/club.js` opens `juegos/boxhead/index.html?club=1`
+  (not `juegos/club/<id>/`), and the head of `index.html` loads `conexion.js` only
+  then. The ranking panel goes in the menu's `#clubTabla.shell`. The frame is a
+  fixed 720 px; `alto` is ignored. Club key `boxheadclub` (as with
+  tetris→tetrisclub): route `#solo/boxhead`, categories `club-boxhead-<map>`.
+- **One table per map, ranked by highest level** (the user's call): `puntos` = the
+  level you died on, `tiempo` = ms of play until you **reached** that level
+  (`pasoNivel`, set in `simDirector`), not until death: equal levels rank by who got
+  there first. Cap 999 (`club-datos.js` and the rules).
+- **The account is in the seed** (`practica(s, grabar, cuenta)`, `?cuenta=` from
+  the club frame, FNV-1a mixed in). A proof copied to another account replays
+  differently. `rehace` rejects a proof without `u`.
+- **Verifier** `solo/verifica/boxhead.js` replays in a Worker
+  (`js/verificador.js`, which `importScripts` the game) or in Node through
+  `globalThis.BoxheadRehace` (`js/rehace-node.cjs`). Level, final step and time
+  must match exactly. **Its `RUTA` and the worker's imports carry `?v=boxhead-N`:
+  bump them along with the page**, or a cached old engine rejects new proofs.
+- The old `bots-boxhead` practice card is gone: the club card replaces
+  it in `SOLOS`.
+
+## Phase 2.2: upgrades to choose (`boxhead-12`, proof `ve: 2`)
+
+- **1 of 3 at the start of each level from 2** (`alEmpezarNivel`, from the
+  `nivelVisto` change in `paso`, so it fires solo and online alike). The 24 are
+  `D.VENTAJAS` (id, `rar` 0–2, `max`, `equipo`); `D.sorteaVentajas(azar, …)` is
+  pure and gets `rn`, so practice draws come from the seed. Their effects live in
+  juego.js behind `vt(id)`; grep `vt('` to find them all. `hpMax()` replaced the
+  literal 100.
+- **The pick is action 7** (`accion(7, i)`: 1/2/3, ← ↑ → on the pad, a click).
+  With no answer, `eligeVentaja(0)` runs **inside the sim** after
+  `D.ESPERA_VENTAJA` s, so a replay does the same without it being recorded.
+  In practice `simDirector` holds the next horde until the pick; online nobody
+  waits. Digits 1–3 pick an upgrade instead of a weapon while the panel is open.
+- Upgrade explosions (bala ígnea, estallido) call `explota(…, amigo = true)`:
+  they never hurt you or your allies. Estallido is queued in `yo.booms` and
+  fired in the next `pasoYo`, never inside the kill that caused it. The drone
+  fires from the player's position; only the drawing hovers.
+- `practica` resets `eleccion`. Any change to an upgrade's numbers changes the
+  sim: **bump `VE`**.
+
+## Phase 2.4: medals, unlockable skins, records (`boxhead-13`)
+
+- **Medals are the game's own logros** (`D.MEDALLAS`, 16), the user's call for
+  unlocking skins. They are stored per device in `boxhead.medallas`, guests
+  included, and earned solo, in the Club or online. `medalla(id)` never touches
+  the sim (storage and a `premio` only), so proofs are unaffected. It does
+  nothing while replaying (`repite`) or spectating. Grep `medalla('` for the
+  triggers. The site-wide room logros (`logros.js` `SALA.boxhead`) are
+  unchanged: they only see the room log.
+- **Six new skins** (`SKINS[].medalla`) reuse accessories `grafico.js` already
+  draws (sombrero, capucha, gorra, casco, corona, careta). Locked ones are
+  grey with a dashed border in the menu, and a click says which medal opens
+  them. A stored skin that is not unlocked falls back to Bambo. Online, others
+  see whatever `sk` you send: the lock is only local.
+- **Records**: `boxhead.records` = `{mapa: {n, pts}}` from practice only
+  (`anotaRecord` at each level start and in `finPractica`). The Trotamundos
+  medal reads it.
+
+## Phase 2.5: robustness (`boxhead-14`, proof `ve: 3`)
+
+- **The director caps what others report** (`aplicaGolpe`): hits on enemies or
+  objects need a real weapon id, are cut to `D.topeGolpe(w)`, and spend from a
+  per-player bucket (`gastaCupo`: 200 hits/s, burst 400). `peticion` clamps a
+  placed barrel's or charge's damage and radius to `topeGolpe`/`topeRadio`.
+  The caps are the weapon fully upgraded with the damage upgrades at their top
+  (×5.46). They are generous on purpose: they stop absurd values, not a careful
+  cheater. **If an upgrade or weapon gains damage, check
+  `TOPE_VENTAJAS`** (a test compares them), or honest hits get cut.
+- **Enemy grid** (`armaRejilla`/`vecinos`, 40 px cells): bullets and the
+  separation between enemies look only at the 3×3 cells around them. It is
+  rebuilt at the start of `pasoYo` and of the director's enemy loop. An enemy
+  killed during the step stays in its cell, so check `E.get(id) === e`.
+  `vecinos` reuses one array: break out before calling it again. Measured at
+  42 enemies: 0.41 → 0.38 ms per step; the rest is movement, collisions and GC.
+- **Weapon roles**: the uzi has `pen: 1` from the start, the shotgun stuns 1.7×
+  longer (`ATURDE_ARMA`), and a rocket passes through the first non-boss enemy
+  for half damage (`p.pasa`) and explodes on the next.
+
+## Phase 3.1: five new enemies and élites (`boxhead-15`, proof `ve: 4`)
+
+- **Enemies 17–21** are appended (never reorder: `PUNTOS`, `TALLA_Z`,
+  `VIDA_Z` and `PAL_E` are indexed by k, and the test pins one of each per
+  enemy). Escudero (`escudo` 0.8: a non-explosive hit within 60° of its
+  facing loses 80 %, computed in `golpeaEnemigo` on the shooter, so the
+  director gets the reduced hit), Enjambre (`grupo` 8: the first one spawns
+  the rest around it, only from the random spawn, not from `kFijo`), Chamán
+  (`cura`, heals non-boss enemies within `alcCura` every `cd`; est 1 = ring),
+  Excavador (`cava`: est 1 underground walks straight at you through walls,
+  est 2 one second of cracks, est 0 normal; `bajoTierra(e)` makes it immune
+  and invisible to bullets, rockets, blasts, fireballs, the drone and the
+  separation — **any new way to hit enemies must skip `bajoTierra`**), Vigía
+  (`vigia`: aims `apunta` s at a frozen point `ax/ay`, then pushes an F bullet
+  with `k: 21` that does not hit other enemies). Chamán and Vigía keep `lejos`
+  distance while they see you.
+- **Élites** (`D.ELITES`, `e.el`): from level 12 `nuevoEnemigo` rolls
+  `eliteDe(k, n, rn(), rn())`; below 12 it does **not** call `rn`, so the
+  early levels keep their RNG sequence. Never for bosses or the swarm, nor for
+  anything spawned with `kFijo` (summons, divisor halves). Blindado ×2.2 hp,
+  Veloz ×1.45 speed, Vampiro heals 20 % per bite, Divisor splits into two
+  plain copies at 45 % hp, Ígneo explodes (r 56, d 26) on death.
+- **zb**: an enemy that is a boss, an élite, has an `est` or a `max` other
+  than `vidaEnemigo(k, dir.n)` sends `[max, est, el]` (+ `ax, ay` while a
+  vigía aims) after the 8 base fields; `aplicaZb` reads them.
+- `__boxhead.mundo()` now also returns `max/est/el` per enemy and `F`.
+
+## Phase 3.2: bosses (`boxhead-16`, proof `ve: 5`)
+
+- **Second ability** (`hab2`, reusing the existing `hab` implementations;
+  each boss got the params it needs: `onda/dOnda`, `fuego`, `invoca` = kind
+  summoned). Below 50 % (hito bit 4), or from the start if corrupted, the
+  boss alternates: `e.alt` flips only when an ability actually started (`est`
+  changed or `cdH` was reset), and `e.hab` remembers which one is running so
+  the warning and execution phases use it. Nothing new on the network: the
+  others only draw `est`.
+- **Weak point** (`D.DEBIL` ×1.5): a hit from more than 120° off the boss's
+  facing, or while it warns (est 2). Applied in `golpeaEnemigo` on the
+  shooter, like the escudero's shield; `TOPE_VENTAJAS` includes it, so the
+  director's caps still pass honest hits. Drawn as a yellow diamond on the
+  back (`e.debil` lights it when hit).
+- **Corrupted bosses**: from level 51 (`D.corrupto`, the second time round the
+  rotation) a boss spawns with `el = ELITE_CORRUPTO` (6, `jefe: true`, never
+  from `eliteDe`): ×1.5 hp, ×1.2 speed, cooldowns ×0.75, purple aura via the
+  élite ring, «· corrupto» on the bar. `el` already rides `zb` for bosses.
+- `__boxhead.ponVida(id, pc)` sets an enemy's health for tests.
+
+## Phase 3.3: four weapons and golden boxes (`boxhead-17`, proof `ve: 6`)
+
+- **Ids 10–13** (lanzallamas ×60, ballesta ×80, minigun ×120, rayo ×160).
+  8 and 9 stay the bite and fireball codes, so `ARMAS` holds two
+  `tipo: 'enemigo'` placeholders there and `ARMAS[id]` still works by id.
+  **Anything that walks the player's weapons uses `D.ARMAS_J`** (HUD bar,
+  shop, unlock-all, arsenal medal, premios); `aplicaGolpe` refuses weapon
+  codes of `tipo: 'enemigo'`. `BX_ARMAS` in `motor.js` is now the highest id
+  (13), and a test pins `ARMAS[i].id === i`.
+- Weapon keys go by position in `ARMAS_J` (`TECLA_ARMA`: 1–9, 0, -, =), still
+  recorded as `accion(2, id)`. Locked weapons from ×60 up stay out of the bar
+  except the next one to unlock.
+- `llama`: every enemy in the cone (`alc`, `abre`) in sight, through; in
+  versus also rivals. `rayo` (`relampago`): nearest in sight within 20° of
+  the front, then `saltos` jumps of at most `salto` px, ×0.8 each; it never
+  hits players. `gira` (minigun): `yo.giro` 0→1 while firing, cadence
+  ÷(0.3 + 0.7·giro), decays when you stop. Others get a normal `pend.s` shot;
+  `sucesos` draws w 10 as flame and w 13 as a lightning line. `RAYOS` is
+  capped at 30 because nothing clears it without a screen.
+- **Golden box** `k: 3` (`PARTE_DORADA` 0.6 % of drops, on the same `rn()`
+  roll as the other boxes, plus one per boss): `yo.dorada` = `DORADA_T` s of
+  ×`DORADA` damage with no ammo spent. Local, like armour. `TOPE_VENTAJAS`
+  includes `DORADA`.
+- New upgrade stats: `saltos` (+1 like `pen`) and `salto`; `tope` has their
+  caps. Weapons from ×60 enter the upgrade wheel, so upgrades above ×60
+  changed (that is what `VE` is for).
+- `__boxhead.ponCaja(k, x, y)`; `estado().yo` has `dorada` and `giro`.
+
+## Phase 3.4: four maps (`boxhead-18`, proof still `ve: 6`)
+
+- **Planta, Hangar, Fábrica, Apagón**, appended to `ORDEN_MAPAS` (the proof's
+  `m` is an index into it: never reorder). They are in `BX_MAPAS` (room
+  options), `club-datos.js`, the verifier's `CATEGORIA`, `ranks.js` and the
+  two `club-boxhead-(…)` regexes of `database.rules.json` (**rules must be
+  re-published** or Club records on the new maps are refused). A test checks
+  every map id is in the rules and in `club-datos.js`.
+- **Belts** (`>` `<` `^` `v` in the rows → `M.cinta`, 1 + DIRS index, or
+  `null` when the map has none): `cinta(c, r, dt)` moves whoever stands on
+  one `VEL_CINTA` px/s through `mover`, the player in `pasoYo` and non-boss
+  enemies not underground in the director loop. The old maps have no belts,
+  so their simulation did not change and `VE` stayed 6.
+- **Apagón** (`oscuro: true`): `oscuridad()` draws a dark layer in screen
+  space with radial holes at players, shops, fireballs, a charging boss,
+  recent explosions (`LUCES`, from `efectoBoom`) and your own muzzle. Drawing
+  only; nothing in the sim knows the map is dark.
+- Medal Trotamundos (and skin Careta) stays on `MAPAS_CLASICOS`, the original
+  five.
+- `__boxhead.mapa(id)` picks the next practice's map.
+
+## Phase 3.5a: coop revive and markers (`boxhead-19`)
+
+- **Revive** is a log entry `{t:"revive", uid, v}` written by the reviver
+  (the rules already accept any `t` ≤ 16 chars: no rules change). `redBoxhead`
+  accepts it only when `v` is fallen, not gone, not the writer, and the writer
+  is standing; it clears `caidos[v]`, counts `revividas`, pushes `hist`
+  `{e:"revive"}`. Game side: `pasoRevive` fills a ring while you stand within
+  28 px of a fallen teammate's tomb for `REVIVIR_T` (3 s), then `enviar('revive')`
+  once per 5 s per target. The fallen player notices through the marcador:
+  `vistoCaido` turns true when `caidos` includes them, and if they later drop
+  out of `caidos` on the same level they stand up in place with half health.
+  (Without `vistoCaido`, the gap before the log counted the death revived you
+  at once.)
+- **Markers**: T puts `ping` 70 px ahead; it rides the player state as
+  `pg: [x, y, n]` for 4 s and the others draw it with the player's colour.
+  Keyboard only for now.
+- Nothing of this touches the practice simulation (online only), so `VE` is
+  unchanged.
+
+## Phase 3.5b: boss mode and mutators (`boxhead-20`)
+
+- **Boss mode** is room variant `jefes` (`BX_VARIANTES`). The reducer treats
+  every non-`versus` variant as coop (`coop = variante !== "versus"`), and so
+  does `progreso`. In the game everything coop-ish is `!versus()`, so revive
+  and markers work as-is. Two things differ:
+  - The director simulates `nivelSim(n) = D.nivelJefes(n) = 5n`. `dir.n` is
+    that simulated level, so the `nivel` request divides it back
+    (`dir.n / PASO_JEFES + 1`).
+  - The escort is `escoltaJefes(n)`, and a big boss does not clear `dir.q`.
+    All weapons unlock at start (`cfg.variante !== 'coop'`).
+- **Mutators** are room option `mut` (0 = none; the lobby reads "" as 0).
+  The list is `MUTADORES` in datos.js and must keep the same keys as
+  `BX_MUTADORES` in motor.js; a test pins that. `mut` is also in
+  `opcionesDe` (rematch).
+  - The game reads them through `mutD()`: `dano` (factorVentajas), `recibe`,
+    `cura` (miBaja), `vel` (both director speed lines), `vida` and `cuantos`
+    (nuevoEnemigo, dir.q, cupo), and `municion` in `gasta`.
+  - The director's per-hit cap is multiplied by `dano` too. Otherwise
+    Cristal hits from others would be clipped.
+- Practice and the Club never set `cfg.variante`/`cfg.mut` to anything else,
+  so `VE` is unchanged.
+- Tests drive the iframe headless online (`boxheadEnLinea`): a fake
+  `parent`, `?modo=online`, and the `config`/`marcador` messages.
+
+## Phase 3.5c: team versus (`boxhead-21`)
+
+- Variant `equipos`. The team is set by seat (even seats red, odd blue):
+  `equiposBoxhead` in motor.js. `ganoEn` knows it. The reducer returns
+  `equipos` and `puntosEq`.
+- The target is double the room `meta`, and a team wins by reaching it. A
+  kill counts only when `por` is on the other team. If one team leaves
+  entirely, the other wins.
+- In the game `versus()` is true for `equipos` too (all weapons, 3 s
+  respawn, fewer enemies). On top of that:
+  - `rival(u)` filters the bullet, flame and projectile loops, so bullets
+    pass through teammates.
+  - `golpeaJugador` and `recibe` drop anything coming from an ally
+    (`aliado`). Your own explosions still hurt you, at half.
+  - `colorDe` returns the team colour, so names, pings and the scoreboard
+    follow.
+- The postman passes `equipos` in the config and `puntosEq` in the
+  scoreboard.
+
+## Phase 3.5d: infected (`boxhead-22`)
+
+- Variant `infectado`. Patient zero is `jugadores[semilla % n]`.
+- The reducer returns:
+  - `infectados` (array), which the scoreboard passes to the game.
+  - `equipos`: uid → `humanos`/`infectados`, computed from the log. So
+    `equiposBoxhead` replays `redBoxhead` for this variant, and `ganoEn`
+    works.
+  - `nombresEq`, so the result screen says «el equipo Humanos».
+- Rules:
+  - A human who dies for any reason becomes infected.
+  - A kill counts only between a human and an infected.
+  - The infected win when no human is left. The humans win with
+    `{t:"aguanta"}`, which the director writes once `dir.t ≥ 180`
+    (`AGUANTE_T`), or when every infected player leaves.
+  - Moves carry no time, so a modified client could send `aguanta` early.
+    That is the same honest limit as deaths.
+- In the game:
+  - `versus()` includes `infectado`, and `equipoDe` returns
+    humanos/infectados, so `aliado`/`rival` and the colours come for free.
+  - `esZombi(u)` reads `marcador.infectados`. A zombie's `dispara` becomes
+    `muerde` (weapon 8, 34 dmg, 0.55 s, 24 px in front). It moves at ×1.2
+    with +60 max HP, and is drawn with `G.PAL_E[0]` and no weapon.
+  - In this variant the director spawns no horde (`dir.q = 0`). The HUD
+    shows the humans left and the clock from the shared `dir.t`.
+- `#eleccion` needs its own `[hidden]{display:none}`: its `display:grid`
+  beat the attribute, and the empty «ELIGE UNA VENTAJA» showed in every mode
+  from Phase 2.2 until 3.5d. The Arsenal medal counts only in `coop`, where
+  the weapons are earned.
+
+## Phase 3.6: sawtooth difficulty, compressed `zb`, explosion lights (`boxhead-23`, proof `ve: 7`)
+
+- **Sawtooth**: `totalNivel` and `ritmoNivel` are multiplied or divided by
+  `sierra(n)`, a five-level `SIERRA = [0.85, 0.95, 1.05, 1.15, 1]`. So the
+  level after each boss (6, 11, 16…) breathes and the stretch climbs to the
+  next boss.
+  - The saw goes **over** the caps (120 enemies, 0.35 s), so it survives at
+    high levels: peaks of 138 and 0.30 s.
+  - HP, speed, damage and `maxVivos` stay linear. The old «recta» test was
+    replaced on purpose by the sawtooth test.
+  - This changes the sim, hence `VE = 7`.
+- **zb**: the enemies travel as `z` (6 numbers per enemy: delta id, k, x,
+  y, pc, flags `d | atk<<3 | aturd<<4 | extra<<5`) plus `zx` (the extras),
+  via `D.empacaZb`/`D.desempacaZb`. The decoder still reads the old `e`.
+  Ids are `Date.now()`-sized, so the deltas alone save a lot.
+- **Lights**: `efectoBoom` always pushes to `LUCES`. On a lit map `luces()`
+  paints a warm `lighter` glow (0.26 peak, quadratic fade). On a dark map
+  `oscuridad` uses them as holes, as before. Drawing only.

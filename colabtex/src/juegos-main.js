@@ -44,7 +44,7 @@ import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, BX_MUTADORES, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -142,7 +142,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱", typerace: "⌨" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, mascotas: "🐣", prokingdoms: "👑", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", typeraceclub: "⌨️", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", prokingdoms: "👑", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", typeraceclub: "⌨️", boxheadclub: "🧟", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -251,9 +251,12 @@ const OPCIONES = {
       valores: Object.keys(BX_VARIANTES).map(v => ({ v, t: BX_VARIANTES[v] })) },
     { clave: "mapa", etiqueta: "Mapa", por: "patio",
       valores: Object.keys(BX_MAPAS).map(v => ({ v, t: BX_MAPAS[v] })) },
-    /* La meta solo cuenta en versus: bajas para ganar. */
+    /* La meta solo cuenta en versus: bajas para ganar (por equipos, el doble, para el equipo). */
     { clave: "meta", etiqueta: "Bajas para ganar (versus)", por: BX_METAS[1],
-      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas (" + 2 * n + " por equipos)" })) },
+    /* Un mutador cambia una regla de la sala (Fase 3.5); 0 es ninguno (el vestíbulo lee "" como 0). */
+    { clave: "mut", etiqueta: "Mutador", por: 0,
+      valores: [{ v: 0, t: "Ninguno" }, ...Object.keys(BX_MUTADORES).map(v => ({ v, t: BX_MUTADORES[v] }))] }
   ],
   /* Tulones: `tiempo` son los segundos de cada turno y `rondas` 0 es sin fin
      (gana el último en pie). Ninguno es `modo`. */
@@ -361,7 +364,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-integral", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-typerace", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender", "club-propac"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-integral", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-typerace", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender", "club-propac", "club-boxhead"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -955,7 +958,7 @@ const marcaInvitado = d => valorMarca(d.categoria, d);
 /* La ruta del club (`tetris`) y la clave de sus logros, monedas y nombre
    (`tetrisclub`) son lo mismo salvo en el Tetris. */
 // (Type Race igual: la sala se llama `typerace`, el club `typeraceclub`.)
-const CLAVE_CLUB = { tetris: "tetrisclub", typerace: "typeraceclub" };
+const CLAVE_CLUB = { tetris: "tetrisclub", typerace: "typeraceclub", boxhead: "boxheadclub" };
 const claveClub = juego => CLAVE_CLUB[juego] || juego;
 /* Los destacados que además se llevan la partida a medias o el avance. */
 const AVANCE_INVITADO = new Set(["bbtan", "fanal", "trigon", "dosmil"]);
@@ -1841,7 +1844,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|boxhead|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -2664,7 +2667,7 @@ function armazon() {
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
       ocultos: () => bt3Visible() ? [] : ["bt3", "mkw"]
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-integral": "integral", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-typerace": "typeraceclub", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-integral": "integral", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-typerace": "typeraceclub", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac", "club-boxhead": "boxheadclub" })[k] || k) });
     logrosVista.montar(h);
     return;
   }

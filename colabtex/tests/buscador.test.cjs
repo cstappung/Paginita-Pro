@@ -39,7 +39,7 @@ test('busca por apodo, género y de qué va, no solo por el nombre',()=>{
  assert.equal(ids('flappy bird')[0],'aleteo');
  assert.equal(ids('tres en raya')[0],'gato');
  assert.equal(ids('dragon ball')[0].replace('bots-',''),'bt3');
- assert.deepEqual(new Set(ids('zombis').map(x=>x.replace('bots-',''))),new Set(['yemas','boxhead']));
+ assert.deepEqual(new Set(ids('zombis').map(x=>x.replace('bots-',''))),new Set(['yemas','boxhead','boxheadclub']));
  const cartas=ids('cartas');
  for(const k of ['cartas','flip7','uno','presidente']) assert.ok(cartas.includes(k),'cartas sin '+k);
 });

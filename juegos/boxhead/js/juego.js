@@ -1,4 +1,4 @@
-// @controles: teclado  (los clics son solo los botones de la tienda; moverse y disparar, con el teclado)
+// @controles: tactil teclado  (teclado, mando o controles táctiles; la tienda también con clic)
 /* Pro BoxHead — el juego: un canvas visto desde arriba, en tres cuartos.
    Lo que se ve (modelos de cubos en 3D falso, muros, el suelo que guarda la
    sangre, los efectos) está en `grafico.js`; los sonidos, en `audio.js`.
@@ -30,6 +30,12 @@
   const fx = G.crearEfectos(), SND = window.BoxheadAudio.crear();
   const qs = new URLSearchParams(location.search);
   const ONLINE = qs.get('modo') === 'online' && window.parent !== window;
+  /* En el Solo Club (`?club=1`, el marco que abre solo/club.js con conexion.js):
+     una tabla por mapa con el nivel más alto al que llegaste, y cada partida
+     manda su prueba para que la página la rehaga antes de guardarla. */
+  const CLUB = !ONLINE && qs.get('club') === '1' && !!window.Club;
+  const CUENTA = qs.get('cuenta') || 'local';
+  const catClub = m => 'club-boxhead-' + m;
   const PALETA = ['#e74c3c', '#3d8fe0', '#37c25b', '#f1c40f', '#a66bd6', '#e67e22', '#1abc9c', '#ecf0f1'];
   const OBJ = ['barril', 'muro', 'carga'];
   const VIDA_OBJ = { barril: 30, muro: 160, carga: 1e9 };
@@ -38,8 +44,23 @@
   const lee = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } };
   const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-  const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
+  /* Raíz cuadrada y no Math.hypot: la raíz da el mismo número en todos los
+     navegadores (IEEE), hypot no está obligado a eso, y una partida grabada
+     tiene que rehacerse idéntica en otro motor de JavaScript. */
+  const hyp = (x, y) => Math.sqrt(x * x + y * y);
+  const dist = (ax, ay, bx, by) => hyp(bx - ax, by - ay);
+  // `azar` es para lo que solo se ve (chispas, sacudidas); lo que decide la partida usa `rn`/`rz`.
   const azar = (a, b) => a + Math.random() * (b - a);
+  /* **El azar del juego sale de una semilla** (mulberry32) en la práctica:
+     misma semilla y mismas jugadas dan la misma partida, que es lo que
+     permite rehacerla para verificar un récord del Solo Club. En una sala
+     sigue siendo Math.random (el director manda y nadie rehace nada). */
+  const mulberry32 = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  let rng = Math.random;
+  // La cuenta entra en la semilla (FNV-1a): una prueba copiada a otra cuenta ya no se rehace igual.
+  const hashCuenta = u => { let h = 2166136261; for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u.charCodeAt(i), 16777619); return h >>> 0; };
+  const rn = () => rng();
+  const rz = (a, b) => a + rng() * (b - a);
   // Gira `a` hacia `b` por el lado corto, una fracción `k`.
   const giraHacia = (a, b, k) => { const d = ((b - a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI; return a + d * Math.min(1, k); };
   const angDir = d => (d | 0) * Math.PI / 4;
@@ -48,18 +69,113 @@
   let cfg = null, M = null;
   let jugando = false, pausado = false, terminado = false;
   let marcador = { nivel: 1, caidos: [], bajas: {}, muertes: {}, puntos: {}, fuera: [], fin: null };
+  /* Revivir en cooperativo (Fase 3.5): 3 s junto a la tumba de un compañero
+     lo levantan (`revive` en el registro). `revive` lleva a quién y cuánto
+     llevo; `vistoCaido`: el registro ya me cuenta caído (si después deja de
+     contarme sin nivel nuevo, me revivieron). */
+  const REVIVIR_T = 3;
+  let revive = { u: '', t: 0, enviado: new Map() }, vistoCaido = false;
+  // Un marcador «¡aquí!» (T): viaja en mi estado unos segundos.
+  let ping = null, pingN = 0;
+  /* Medallas (D.MEDALLAS) y récords por mapa de la práctica: del
+     dispositivo, también sin cuenta. Rehaciendo una prueba o mirando no
+     se gana nada. */
+  const leeJSON = (k, d) => { try { const v = JSON.parse(lee(k, '')); return v && typeof v === 'object' ? v : d; } catch { return d; } };
+  const medallas = new Set((leeJSON('boxhead.medallas', []) || []).filter(id => D.medallaDe(id)));
+  const records = leeJSON('boxhead.records', {});
+  const skinLibre = s => !s.medalla || medallas.has(s.medalla);
   let skinId = D.skin(lee('boxhead.skin', 'bambo')).id;
+  if (!skinLibre(D.skin(skinId))) skinId = 'bambo';
   let mapaElegido = D.mapaValido(lee('boxhead.mapa', 'patio'));
   let ultimoId = 0;
-  const nid = () => (ultimoId = Math.max(ultimoId + 1, Date.now()));
+  const nid = () => (ultimoId = ONLINE ? Math.max(ultimoId + 1, Date.now()) : ultimoId + 1);
   let T = 0, nivelLocal = 1, nivelVisto = 0, misBajas = 0;
 
   let yo = nuevoYo();
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
-    return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0 };
+    return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, chat: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
+      tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], giro: 0, dorada: 0, arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
+      // para la pantalla final: disparos y aciertos (perdigón a perdigón), bajas por arma y jefes
+      st: { disp: 0, acierto: 0, armas: new Array(10).fill(0), jefes: 0 } };
   }
+
+  /* Las ventajas elegidas al empezar cada nivel (D.VENTAJAS): `vt(id)` es
+     su nivel, 0 si no se tiene. */
+  function vt(id) { return (yo.vt && yo.vt[id]) || 0; }
+  function hpMax() { return 100 + 20 * vt('aguante') + (esZombi(cfg && cfg.yo) ? 60 : 0); }
+
+  /* **Elegir una ventaja.** Al empezar cada nivel desde el 2 salen tres
+     (D.sorteaVentajas, con el azar del juego: en la práctica, el de la
+     semilla) y se elige con 1/2/3, ← ↑ → del mando o un clic. Es la
+     acción 7 de la grabadora. Sin respuesta en D.ESPERA_VENTAJA segundos
+     se queda la primera, dentro de la simulación, así que al rehacer pasa
+     lo mismo. En la práctica la horda del nivel espera a la elección
+     (simDirector); en línea nadie espera a nadie. */
+  let eleccion = null;
+  function alEmpezarNivel(n) {
+    if (n - 1 >= 3 && yo.limpio && yo.v && !yo.muerto) medalla('limpio');
+    yo.limpio = true;
+    if (n >= 10) medalla('nivel10');
+    if (n >= 20) medalla('nivel20');
+    if (n >= 30) medalla('nivel30');
+    if (ONLINE && n >= 5 && (cfg.jugadores || []).length > 1) medalla('equipo');
+    anotaRecord(n);
+    if (vt('coraza') && yo.v && !yo.muerto) yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 25 * vt('coraza'));
+    if (eleccion) eligeVentaja(0);
+    const ops = D.sorteaVentajas(rn, yo.vt, ONLINE && (cfg.jugadores || []).length > 1, 3);
+    if (!ops.length) return;
+    eleccion = { ops, t: D.ESPERA_VENTAJA };
+    pintaEleccion(); son('premio');
+  }
+  function eligeVentaja(i) {
+    if (!eleccion) return;
+    const id = eleccion.ops[i];
+    if (!id) return;
+    const v = D.ventaja(id), n = (yo.vt[id] || 0) + 1;
+    yo.vt[id] = n;
+    if (id === 'aguante' && yo.v && !yo.muerto) yo.hp += 20;
+    if (Object.values(yo.vt).reduce((a, b) => a + b, 0) >= 10) medalla('ventajas');
+    if (D.VENTAJAS.filter(x => x.rar === 2 && yo.vt[x.id]).reduce((a, x) => a + yo.vt[x.id], 0) >= 3) medalla('epicas');
+    eleccion = null; pintaEleccion();
+    son('mejora'); premio(v.nom + (v.max > 1 ? ' ' + n : ''), 'mejora');
+  }
+  const TECLA_EL = ['1', '2', '3'], MANDO_EL = ['←', '↑', '→'];
+  function pintaEleccion() {
+    const caja = $('eleccion');
+    if (!eleccion) { caja.hidden = true; return; }
+    const cartas = $('elecCartas');
+    cartas.textContent = '';
+    eleccion.ops.forEach((id, i) => {
+      const v = D.ventaja(id), n = (yo.vt[id] || 0) + 1, b = document.createElement('button');
+      b.type = 'button'; b.className = 'el-carta r' + v.rar + ' t-' + v.tipo;
+      const k = document.createElement('kbd'); k.textContent = conMando() ? MANDO_EL[i] : TECLA_EL[i];
+      const nom = document.createElement('b'); nom.textContent = v.nom + (v.max > 1 ? ' ' + n + '/' + v.max : '');
+      const rar = document.createElement('small'); rar.textContent = D.RAREZAS[v.rar];
+      const txt = document.createElement('span'); txt.textContent = v.txt;
+      b.append(k, nom, rar, txt);
+      b.onclick = () => { if (jugando && !terminado && !pausado && !quienPausa()) accion(7, i); };
+      cartas.append(b);
+    });
+    caja.hidden = false;
+  }
+  function medalla(id) {
+    if (repite || medallas.has(id) || !cfg || cfg.mirando) return;
+    const m = D.medallaDe(id); if (!m) return;
+    medallas.add(id); guarda('boxhead.medallas', JSON.stringify([...medallas]));
+    premio(m.i + ' Medalla: ' + m.nom); son('premio');
+    const s = D.SKINS.find(x => x.medalla === id);
+    if (s) premio('Nuevo personaje: ' + s.nombre);
+  }
+  // El récord de la práctica en cada mapa: el nivel más alto y, con ese nivel, los puntos.
+  function anotaRecord(n) {
+    if (ONLINE || repite || !cfg) return;
+    const r = records[cfg.mapa] || { n: 0, pts: 0 };
+    if (n > r.n || (n === r.n && yo.pts > r.pts)) { records[cfg.mapa] = { n, pts: yo.pts | 0 }; guarda('boxhead.records', JSON.stringify(records)); }
+    if (D.MAPAS_CLASICOS.every(m => (records[m] || {}).n >= 10)) medalla('mapas');
+  }
+  // Las ventajas que se tienen, en una línea («Filo 2 · Dron 1»).
+  const listaVentajas = () => D.VENTAJAS.filter(v => vt(v.id)).map(v => v.nom + (v.max > 1 ? ' ' + vt(v.id) : '')).join(' · ');
 
   // El mundo: lo que simula el director y lo que los demás reflejan.
   const E = new Map(), O = new Map(), B = new Map();
@@ -80,6 +196,31 @@
   // Proyectiles propios y ajenos (granadas, cohetes), solo de pantalla.
   let proy = [];
 
+  /* ---------- la grabadora (solo la práctica) ----------
+     La práctica avanza en pasos fijos de 1/60 s (`cuadro`) y `pasoN` cuenta
+     los que ya se dieron. Lo que el jugador hace se anota con ese número:
+     `[paso, 0, mov, vel, mira, botones]` cuando cambia lo que pide el
+     teclado o el stick (`entradaPaso`), y `[paso, código, arg]` para cada
+     acción suelta (`accion`: 1 cambiar de arma ±1, 2 elegir arma, 3
+     detonar, 4 muro reforzado, 5 mejorar arma, 6 comprar el ítem i de
+     D.TIENDA). Una acción entre dos pasos lleva el número de pasos dados,
+     y el movimiento se lee dentro del paso siguiente con el mismo número:
+     rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
+     en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
+     rehace la partida entera (`rehace`, lo usa el verificador del Club). */
+  const PASO = 1 / 60, VE = 7, MAX_JUGADAS = 200000;
+  let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
+  const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
+  // Teclas de arma: la posición en ARMAS_J (los ids 8 y 9 no son armas del jugador).
+  const TECLAS_ARMA = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
+  const TECLA_ARMA = Object.fromEntries(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'].map((c, i) => [c, i]));
+  const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
+    i => { const t = D.TIENDA[i | 0]; if (t) compra(t.id); }, i => eligeVentaja(i | 0)];
+  function accion(cod, a = 0) {
+    if (graba && jugando && !terminado && graba.j.length < MAX_JUGADAS) graba.j.push([pasoN, cod, a]);
+    ACCIONES[cod](a);
+  }
+
   // ---------- entrada ----------
   const teclas = new Set();
   const TECLA_TIENDA = {};
@@ -90,36 +231,159 @@
     teclas.add(e.code);
     SND.inicia();
     if (e.code === 'Escape' || e.code === 'KeyP') { if (jugando && !terminado) ponPausa(!pausado); return; }
-    if (!jugando || pausado || quienPausa() || !yo.v || yo.muerto) return;
-    if (e.code === 'KeyQ') cicla(-1);
-    else if (e.code === 'KeyE') cicla(1);
-    else if (e.code === 'KeyX') detona();
-    else if (e.code === 'KeyF') ponBlindado();
-    else if (e.code === 'KeyU') subeArma(yo.w);
-    else if (/^Digit[1-8]$/.test(e.code)) eligeArma(+e.code.slice(5) - 1);
-    else { const t = TECLA_TIENDA[e.code]; if (t) compra(t); }
+    if (!jugando || pausado || quienPausa()) return;
+    if (eleccion && /^Digit[1-3]$/.test(e.code)) { accion(7, +e.code.slice(5) - 1); return; }
+    if (!yo.v || yo.muerto) return;
+    if (e.code === 'KeyQ') accion(1, -1);
+    else if (e.code === 'KeyE') accion(1, 1);
+    else if (e.code === 'KeyX') accion(3);
+    else if (e.code === 'KeyF') accion(4);
+    else if (e.code === 'KeyU') accion(5, yo.w);
+    else if (e.code === 'KeyT') marcaAqui();
+    else if (TECLA_ARMA[e.code] !== undefined) { const a = D.ARMAS_J[TECLA_ARMA[e.code]]; if (a) accion(2, a.id); }
+    else { const t = TECLA_TIENDA[e.code]; if (t) accion(6, idxTienda(t)); }
   });
   addEventListener('keyup', e => teclas.delete(e.code));
   addEventListener('blur', () => teclas.clear());
 
+  /* **El mando.** El stick izquierdo lo lee el juego (`pasoYo`, no como
+     WASD): ocho direcciones con histéresis (`D.dirStick`, para que una
+     diagonal no tirite) y, poco inclinado, el personaje gira sin avanzar;
+     más inclinado, camina más rápido. El stick derecho mira sin moverse, en
+     las mismas ocho direcciones, y LT fija hacia dónde se mira: así se
+     retrocede disparando de frente. La cruceta compra junto a un puesto $
+     (↑ munición, → armadura, ↓ botiquín, ← potencia); lejos de él cambia de
+     arma (← →), toma la mejor (↑) o pone un muro reforzado (↓). */
+  const enJuego = () => jugando && !terminado && !pausado && !quienPausa() && !!cfg && !cfg.mirando && yo.v && !yo.muerto;
+  // Con la elección de ventaja abierta, ← ↑ → eligen la primera, la segunda o la tercera.
+  const cruceta = (cerca, lejos, el) => () => {
+    if (el !== undefined && eleccion && jugando && !terminado && !pausado && !quienPausa()) { accion(7, el); return; }
+    if (enJuego()) (tiendaCerca() ? cerca : lejos)();
+  };
+  const mejorArma = () => { const l = disponibles(); if (l.length) accion(2, l[l.length - 1]); };
+  const compraM = id => () => accion(6, idxTienda(id));
+  const MANDO_TIENDA = { balas: 'arriba', armadura: 'der', botiquin: 'abajo', potencia: 'izq', blindado: 'b' };
   if (window.Mando) Mando.configura({
-    stick: { izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS' },
+    stick: null, flechas: false,
     botones: {
-      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX', y: 'KeyB', b: 'KeyU', lt: 'KeyF',
-      izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS',
+      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX',
+      y: () => { if (enJuego()) accion(5, yo.w); },
+      b: () => { if (enJuego()) { if (tiendaCerca()) accion(6, idxTienda('blindado')); else accion(4); } },
+      arriba: cruceta(compraM('balas'), mejorArma, 1),
+      der: cruceta(compraM('armadura'), () => accion(1, 1), 2),
+      abajo: cruceta(compraM('botiquin'), () => accion(4)),
+      izq: cruceta(compraM('potencia'), () => accion(1, -1), 0),
       start: () => { if (jugando && !terminado) ponPausa(!pausado); },
     },
     menu: () => !jugando || pausado || terminado,
     inicio: '#jugar',
     zonas: [{ sel: '#ayuda' }, { sel: '#menuAyuda' }],
-    pistas: [['stickL', 'moverte'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'], ['y', 'comprar munición en la tienda'], ['b', 'mejorar el arma en la tienda'], ['lt', 'poner muro reforzado'], ['start', 'pausa']],
+    pistas: [['stickL', 'moverte'], ['stickR', 'mirar sin moverte'], ['lt', 'fijar dirección'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'],
+      ['b abajo', 'muro reforzado'], ['dpad', 'comprar junto al $'], ['y', 'mejorar el arma en el $'], ['start', 'pausa']],
   });
+  const leeMando = () => { const m = window.Mando && Mando.estado ? Mando.estado() : null; return m && m.modo === 'juego' ? m : null; };
+  const conMando = () => !!(window.Mando && Mando.conectado && Mando.conectado());
+  // Un botón dicho para quien juega: el del mando si hay uno conectado, si no la tecla.
+  const boton = (tecla, b) => conMando() ? Mando.glifo(b) : tecla;
+  let dirL = -1, dirR = -1;
+
+  /* La vibración del mando (si lo deja el navegador): suave al disparar,
+     fuerte en explosiones cercanas y al recibir un golpe. Se apaga en la
+     pausa. Va aquí y no en `mando.js` para no cambiar el módulo común de
+     34 páginas por un juego. */
+  let vibraOn = lee('boxhead.vibra', '1') !== '0', vibraT = 0;
+  function vibra(fuerte, debil, ms) {
+    if (!vibraOn || !conMando()) return;
+    const ahora = performance.now();
+    if (ahora < vibraT && fuerte < 0.5) return;
+    vibraT = ahora + 60;
+    try {
+      for (const p of navigator.getGamepads ? navigator.getGamepads() : []) {
+        if (!p || !p.connected || !p.vibrationActuator) continue;
+        p.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: clamp(fuerte, 0, 1), weakMagnitude: clamp(debil, 0, 1) }).catch(() => {});
+        break;
+      }
+    } catch {}
+  }
+
+  /* **Controles táctiles** (celular y tableta): un joystick que nace donde se
+     apoya el pulgar en la mitad izquierda y botones a la derecha. Aparecen
+     con el primer toque, o de entrada en una pantalla de puntero grueso, y
+     el joystick se lee igual que el stick del mando. */
+  const toque = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0, disp: false, fija: false };
+  function armaTactil() {
+    const zona = $('tZona'), palo = $('tPalo');
+    if (!zona || !palo) return;
+    const bola = palo.firstElementChild, RT = 46;
+    zona.addEventListener('pointerdown', e => {
+      if (toque.id !== null) return;
+      e.preventDefault(); SND.inicia();
+      toque.id = e.pointerId; toque.ox = e.clientX; toque.oy = e.clientY; toque.x = toque.y = 0;
+      try { zona.setPointerCapture(e.pointerId); } catch {}
+      palo.style.left = e.clientX + 'px'; palo.style.top = e.clientY + 'px'; palo.hidden = false; bola.style.transform = '';
+    });
+    zona.addEventListener('pointermove', e => {
+      if (e.pointerId !== toque.id) return;
+      let dx = e.clientX - toque.ox, dy = e.clientY - toque.oy;
+      const l = hyp(dx, dy);
+      if (l > RT) { dx *= RT / l; dy *= RT / l; }
+      toque.x = dx / RT; toque.y = dy / RT;
+      bola.style.transform = 'translate(' + dx.toFixed(0) + 'px,' + dy.toFixed(0) + 'px)';
+    });
+    const suelta = e => { if (e.pointerId !== toque.id) return; toque.id = null; toque.x = toque.y = 0; palo.hidden = true; };
+    zona.addEventListener('pointerup', suelta); zona.addEventListener('pointercancel', suelta);
+    for (const b of document.querySelectorAll('#tBotones [data-t]')) {
+      const k = b.dataset.t;
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); SND.inicia(); b.classList.add('on');
+        if (k === 'disp') toque.disp = true;
+        else if (k === 'fija') toque.fija = true;
+        else if (k === 'pausa') { if (jugando && !terminado) ponPausa(!pausado); }
+        else if (enJuego()) { if (k === 'ant') accion(1, -1); else if (k === 'sig') accion(1, 1); else if (k === 'muro') accion(4); else if (k === 'det') accion(3); }
+      });
+      const fin = () => { b.classList.remove('on'); if (k === 'disp') toque.disp = false; else if (k === 'fija') toque.fija = false; };
+      b.addEventListener('pointerup', fin); b.addEventListener('pointercancel', fin); b.addEventListener('pointerleave', fin);
+    }
+  }
+  function muestraTactil() {
+    if (toque.on) return;
+    toque.on = true;
+    document.documentElement.classList.add('tactil');
+  }
+  armaTactil();
+  addEventListener('touchstart', muestraTactil, { passive: true });
+  try { if (matchMedia('(pointer: coarse)').matches) muestraTactil(); } catch {}
 
   // ---------- el mapa ----------
   const celda = (tx, ty) => (tx < 0 || ty < 0 || tx >= M.ancho || ty >= M.alto) ? 1 : M.celdas[ty * M.ancho + tx];
   // Radio con el que se le pega (un jefe es más grande de lo que choca).
   const RG = k => D.ENEMIGOS[k].rg || D.ENEMIGOS[k].radio;
+  /* **Rejilla de enemigos** (celdas de REJ px), para no mirar a todos en
+     cada paso de una bala ni en la separación entre ellos. Se arma al
+     empezar `pasoYo` y la vuelta de los enemigos del director. REJ cubre el
+     mayor alcance que se busca (radio de jefe + 6 en una bala, dos radios
+     en la separación) con margen para lo que se mueven en un paso, así que
+     las 3×3 celdas de alrededor tienen a todos los que importan. Un enemigo
+     muerto en el paso sigue en su celda: quien la usa mira `E.get(id)`. */
+  const REJ = 40, rejE = new Map(), VEC = [];
+  const claveRej = (cx, cy) => (cx + 512) * 4096 + (cy + 512);
+  function armaRejilla() {
+    rejE.clear();
+    for (const e of E.values()) {
+      const k = claveRej(Math.floor(e.x / REJ), Math.floor(e.y / REJ));
+      let b = rejE.get(k); if (!b) rejE.set(k, b = []); b.push(e);
+    }
+  }
+  // Los enemigos de las 3×3 celdas alrededor de (x, y). El arreglo se reusa: hay que soltarlo antes de volver a pedir.
+  function vecinos(x, y) {
+    const cx = Math.floor(x / REJ), cy = Math.floor(y / REJ);
+    VEC.length = 0;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const b = rejE.get(claveRej(cx + i, cy + j)); if (b) for (const e of b) VEC.push(e); }
+    return VEC;
+  }
   const solidoEn = (x, y) => celda(Math.floor(x / TS), Math.floor(y / TS)) !== 0;
+  // El Excavador bajo tierra (est 1) o asomando (est 2): no se le puede pegar ni empujar.
+  const bajoTierra = e => e.est > 0 && !!D.ENEMIGOS[e.k].cava;
   function cajaObj(o) {
     if (o.k === 'muro') return [o.x - TS / 2, o.y - TS / 2, o.x + TS / 2, o.y + TS / 2];
     if (o.k === 'barril') return [o.x - 9, o.y - 9, o.x + 9, o.y + 9];
@@ -147,6 +411,15 @@
     }
     return s;
   }
+  /* Cintas transportadoras (la Fábrica): el suelo empuja hacia su flecha a
+     quien está encima, jugador o enemigo, a `VEL_CINTA` px/s. */
+  function cinta(c, r, dt) {
+    if (!M.cinta) return;
+    const tx = Math.floor(c.x / TS), ty = Math.floor(c.y / TS);
+    if (tx < 0 || ty < 0 || tx >= M.ancho || ty >= M.alto) return;
+    const k = M.cinta[ty * M.ancho + tx];
+    if (k) mover(c, DIRS[k - 1][0] * D.VEL_CINTA * dt, DIRS[k - 1][1] * D.VEL_CINTA * dt, r);
+  }
   function mover(c, dx, dy, r) {
     let bloq = null;
     const ign = encima(c, r);
@@ -165,8 +438,32 @@
   const fueraSet = () => new Set(marcador.fuera || []);
   const nombreDe = u => (jugadores().find(j => j.uid === u) || {}).nombre || 'Jugador';
   const ordenDe = u => { const j = jugadores().find(j => j.uid === u); return j ? j.orden : 0; };
-  const colorDe = u => PALETA[ordenDe(u) % PALETA.length];
-  const versus = () => cfg && cfg.variante === 'versus';
+  /* Versus por equipos (Fase 3.5): es un versus (todas las armas, volver a
+     los 3 s, menos enemigos) en el que los del mismo equipo no se hieren.
+     El equipo de cada uno llega en la config (`cfg.equipos`) y pinta su
+     color: el nombre, el marcador y el «¡Aquí!». */
+  const COLOR_EQ = { rojo: '#ff5a4d', azul: '#4da3ff', infectados: '#86e04a', humanos: '#efe9da' };
+  const equipos = () => !!cfg && cfg.variante === 'equipos';
+  /* Infectado (Fase 3.5): también es un versus, sin enemigos. Los
+     infectados los dice el marcador; muerden en vez de disparar, corren
+     más y aguantan más. Humanos e infectados son los dos «equipos». */
+  const infectado = () => !!cfg && cfg.variante === 'infectado';
+  const esZombi = u => infectado() && (marcador.infectados || []).includes(u);
+  const equipoDe = u => (infectado() ? (esZombi(u) ? 'infectados' : 'humanos') : equipos() && cfg.equipos ? cfg.equipos[u] || '' : '');
+  const aliado = (a, b) => !!equipoDe(a) && equipoDe(a) === equipoDe(b);
+  const colorDe = u => COLOR_EQ[equipoDe(u)] || PALETA[ordenDe(u) % PALETA.length];
+  const versus = () => !!cfg && (cfg.variante === 'versus' || cfg.variante === 'equipos' || cfg.variante === 'infectado');
+  const AGUANTE_T = 180;                                   // segundos que tienen que aguantar los humanos
+  const MORDISCO = { d: 34, cad: 0.55, alc: 24 };         // el ataque de un infectado
+  // ¿Mis balas hieren a `u`? En versus sí; por equipos, solo a los del otro.
+  const rival = u => versus() && !aliado(u, cfg.yo);
+  // Modo jefes (Fase 3.5): reglas de cooperativo, pero cada nivel es un jefe.
+  const jefes = () => !!cfg && cfg.variante === 'jefes';
+  // El mutador de la sala (solo en línea); `mut('cristal')`, o el dato con `mutD()`.
+  const mut = k => !!cfg && cfg.mut === k;
+  const mutD = () => (cfg && cfg.mut ? D.MUTADORES[cfg.mut] : null) || {};
+  // El nivel que simula el director para un nivel de la sala.
+  const nivelSim = n => (jefes() ? D.nivelJefes(n) : n);
   const activos = () => { const f = fueraSet(); return jugadores().filter(j => !f.has(j.uid)); };
 
   function cargaMundo(mapa) {
@@ -191,7 +488,8 @@
         if (m > mejor) { mejor = m; p = c; }
       }
     }
-    yo.x = p.x; yo.y = p.y; yo.hp = 100; yo.v = true; yo.muerto = false; yo.inv = 2;
+    yo.x = p.x; yo.y = p.y; yo.hp = hpMax(); yo.v = true; yo.muerto = false; yo.inv = 2;
+    vistoCaido = false;
   }
 
   function empieza() {
@@ -199,17 +497,36 @@
     $('menu').hidden = true; $('pausa').hidden = true; $('fin').hidden = true; $('hud').hidden = false;
     if (!cfg.mirando) aparece();
     pintaArmas(true);
-    if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
+    if (infectado()) banner('INFECTADO · LOS HUMANOS AGUANTAN 3 MINUTOS');
+    else if (equipos()) banner('POR EQUIPOS · ' + (equipoDe(cfg.yo) === 'rojo' ? 'ROJO' : 'AZUL') + ' · ' + (cfg.meta || 20) + ' BAJAS');
+    else if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
+    else if (jefes()) banner('MODO JEFES');
+    if (cfg.mut) premio('Mutador: ' + mutD().nombre + ' · ' + mutD().txt);
   }
 
-  function practica() {
+  /* Una partida de práctica: con semilla nueva (o la de una prueba, al
+     rehacerla) y, si se juega de verdad, con la grabadora encendida. Todo
+     lo que la simulación arrastra de una partida a otra se pone a cero
+     aquí: rehacer varias pruebas seguidas en el mismo verificador tiene que
+     dar lo mismo que rehacer cada una sola. */
+  function practica(semilla, grabar = true, cuenta = CUENTA) {
+    const s = semilla === undefined ? (Math.random() * 4294967296) >>> 0 : semilla >>> 0;
+    const u = String(cuenta);
+    rng = mulberry32((s ^ hashCuenta(u)) >>> 0);
+    ultimoId = 0; pasoN = 0; pasoNivel = 0; finPaso = -1; acumula = 0;
+    CH = []; armaUlt = 0; armaMuerte = -1; pend.s = []; pend.n = []; pend.x2 = [];
+    // los ids vuelven a empezar: lo visto de la partida anterior taparía bajas de esta
+    vistosM.clear(); vistosX.clear(); marca.clear(); for (const m of Object.values(visto)) m.clear(); ocultas.clear();
+    graba = grabar ? { v: 1, ve: VE, u, m: D.ORDEN_MAPAS.indexOf(mapaElegido), s, j: [], ult: '' } : null;
+    if (CLUB && grabar) Club.category(catClub(mapaElegido));
     cfg = { yo: 'yo', mirando: false, variante: 'coop', mapa: mapaElegido, meta: 0, semilla: 1,
       jugadores: [{ uid: 'yo', nombre: 'Tú', orden: 0 }] };
     marcador = { nivel: 1, caidos: [], bajas: {}, muertes: {}, puntos: {}, fuera: [], fin: null };
-    terminado = false; nivelLocal = 1; nivelVisto = 0; T = 0;
-    yo = nuevoYo();
+    terminado = false; pausado = false; nivelLocal = 1; nivelVisto = 0; T = 0;
+    yo = nuevoYo(); eleccion = null; pintaEleccion();
     cargaMundo(mapaElegido);
     empieza();
+    if (CLUB && grabar) Club.inmersivo(true);
   }
 
   // ---------- armas ----------
@@ -227,16 +544,24 @@
     eligeArma(l[(i + s + l.length) % l.length]);
   }
   function desbloquea(id, aviso) {
-    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; }
+    if (!yo.tiene.has(id)) { yo.tiene.add(id); yo.ammo[id] = D.ARMAS[id].ini; if (yo.tiene.size >= D.ARMAS_J.length && cfg && cfg.variante === 'coop') medalla('arsenal'); }   // en versus y en el modo jefes vienen todas de regalo
     if (aviso) premio(aviso);
   }
 
   function dispara() {
     if (yo.cd > 0 || !yo.v || yo.muerto) return;
+    if (esZombi(cfg.yo)) { muerde(); return; }
     const a = Object.assign({}, armaYo());
     if (!(yo.ammo[yo.w] > 0)) { eligeArma(0); return; }
-    yo.cd = a.cad;
-    if (a.d) a.d = Math.round(a.d * D.factorPotencia(yo.pot));
+    yo.cd = a.cad / (1 + 0.08 * vt('gatillo'));
+    // La minigun arranca lenta y gira más rápido mientras se mantiene el gatillo.
+    if (a.gira) { yo.cd /= 0.3 + 0.7 * yo.giro; yo.giro = Math.min(1, yo.giro + 0.06); }
+    if (a.d) a.d = Math.round(a.d * D.factorPotencia(yo.pot) * factorVentajas() * (yo.dorada > 0 ? D.DORADA : 1));
+    const tiro = a.tipo === 'bala' || a.tipo === 'perdigon';
+    if (tiro) {
+      a.alc *= 1 + 0.15 * vt('mira'); a.pen = (a.pen || 0) + vt('perfora');
+      if (vt('critico') && rn() < 0.1 * vt('critico')) a.d *= 2;
+    }
     const ang = Math.atan2(DIRS[yo.d][1], DIRS[yo.d][0]);
     yo.av = ang;
     if (a.tipo === 'bala' || a.tipo === 'perdigon' || a.tipo === 'cohete') {
@@ -247,35 +572,88 @@
       if (a.tipo !== 'cohete') fx.casquillo(yo.x, yo.y, ang, a.id === 2);
     }
     if (a.tipo === 'bala') {
-      rayo(yo.x, yo.y, ang + (Math.random() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
-      gasta(); son(a.id === 1 ? 'uzi' : 'pistola');
+      rayo(yo.x, yo.y, ang + (rn() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
+      gasta(); son(a.id === 1 || a.id === 12 ? 'uzi' : a.id === 11 ? 'lanza' : 'pistola');
+      const fino = a.id === 1 || a.id === 12;
+      vibra(fino ? 0.05 : 0.12, fino ? 0.25 : 0.35, fino ? 40 : 60);
+    } else if (a.tipo === 'llama') {
+      llama(yo.x, yo.y, ang, a);
+      gasta(); if (Math.random() < 0.25) son('fuego');
+      vibra(0.04, 0.2, 30);
+    } else if (a.tipo === 'rayo') {
+      relampago(yo.x, yo.y, ang, a);
+      gasta(); son('premio');
+      sacude = Math.min(10, sacude + 1); vibra(0.3, 0.5, 80);
     } else if (a.tipo === 'perdigon') {
-      for (let i = 0; i < a.perdigones; i++)
-        rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + azar(-0.03, 0.03), a.alc * azar(0.85, 1), a.d, a.id, a.pen || 0);
+      // A quemarropa (cuatro perdigones o más en el mismo enemigo) el golpe se siente: pausa de impacto.
+      const cuenta = new Map();
+      for (let i = 0; i < a.perdigones; i++) {
+        const e = rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + rz(-0.03, 0.03), a.alc * rz(0.85, 1), a.d, a.id, a.pen || 0);
+        if (e) cuenta.set(e, (cuenta.get(e) || 0) + 1);
+      }
+      for (const [e, c] of cuenta) if (c >= 4 && dist(e.x, e.y, yo.x, yo.y) < 70) { impacto(0.045); break; }
       gasta(); son('escopeta');
       sacude = Math.min(10, sacude + 2.6);
+      vibra(0.55, 0.8, 120);
     } else if (a.tipo === 'granada' || a.tipo === 'cohete') {
       const id = nid();
       lanza({ id, w: a.id, x: yo.x + Math.cos(ang) * 12, y: yo.y + Math.sin(ang) * 12, ang, mio: true, r: a.r, d: a.d, vel: a.vel });
       pend.n.push([id, a.id, Math.round(yo.x), Math.round(yo.y), Math.round(ang * 100), Math.round(a.vel || 0)]);
       gasta(); son(a.tipo === 'cohete' ? 'cohete' : 'lanza');
-      if (a.tipo === 'cohete') sacude = Math.min(10, sacude + 1.5);
+      if (a.tipo === 'cohete') { sacude = Math.min(10, sacude + 1.5); vibra(0.45, 0.6, 140); }
     } else if (a.tipo === 'objeto') {
       if (pon(a)) { gasta(); son('pon'); } else yo.cd = 0.1;
     }
+    // Bala ígnea: cada 10 disparos (8, 6) uno estalla donde pegó.
+    if (tiro && vt('ignea') && ++yo.ign >= 12 - 2 * vt('ignea')) {
+      yo.ign = 0;
+      explota(finRayo.x, finRayo.y, 42, Math.round(40 * factorVentajas()), a.id, nid(), true);
+    }
+  }
+  /* El daño que suman las ventajas: filo siempre, furia con poca vida y
+     «en compañía» con un aliado cerca. */
+  function factorVentajas() {
+    let f = 1 + 0.1 * vt('filo');
+    if (vt('furia') && yo.hp < 30) f *= 1.4;
+    if (vt('compania')) for (const r of R.values()) if (r.v && dist(r.x, r.y, yo.x, yo.y) < TS * 4) { f *= 1 + 0.15 * vt('compania'); break; }
+    return f * (mutD().dano || 1);
+  }
+  /* El dron: da vueltas sobre la cabeza y dispara al enemigo más cercano
+     que vea. El disparo sale del jugador (lo que se dibuja vuela encima). */
+  function pasoDron(dt) {
+    if ((yo.dronT -= dt) > 0) return;
+    let t = null, dd = 230;
+    for (const e of E.values()) { const v = dist(yo.x, yo.y, e.x, e.y); if (v < dd && !bajoTierra(e) && despejado(yo.x, yo.y, e.x, e.y)) { dd = v; t = e; } }
+    if (!t) { yo.dronT = 0.15; return; }
+    yo.dronT = vt('dron') >= 2 ? 0.55 : 0.85;
+    rayo(yo.x, yo.y, Math.atan2(t.y - yo.y, t.x - yo.x), 240, Math.round(14 * factorVentajas()), 0, 0);
+    son('pistola', 140);
+  }
+  // Un infectado no dispara: muerde al humano que tenga delante.
+  function muerde() {
+    yo.cd = MORDISCO.cad; yo.rec = 1;
+    const dv = DIRS[yo.d], l = hyp(dv[0], dv[1]);
+    const px = yo.x + dv[0] / l * 14, py = yo.y + dv[1] / l * 14;
+    yo.av = Math.atan2(dv[1], dv[0]);
+    for (const [u, r] of R) if (r.v && rival(u) && dist(px, py, r.x, r.y) < MORDISCO.alc) {
+      golpeaJugador(u, MORDISCO.d, 8); fx.sangre(r.x, r.y, yo.av, 6); son('mordida');
+      break;
+    }
   }
   function gasta() {
-    if (yo.w === 0 || yo.ammo[yo.w] === Infinity) return;
+    if (yo.w === 0 || yo.ammo[yo.w] === Infinity || yo.dorada > 0 || mut('municion')) return;   // la furia dorada no gasta
     yo.ammo[yo.w]--;
-    if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; setTimeout(() => { if (!(yo.ammo[yo.w] > 0)) eligeArma(0); }, 120); }
+    if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; yo.vacio = 0.12; }   // a los 0,12 s vuelve a la pistola (pasoYo), por pasos y no con un reloj
   }
 
   // Bala instantánea: avanza de 4 en 4 px hasta lo primero que toque. Con
   // `pen` (mejora de penetración) atraviesa ese número de enemigos más,
   // perdiendo un 30 % de daño en cada uno; muros y barriles la paran siempre.
+  const finRayo = { x: 0, y: 0 };
   function rayo(x, y, ang, alc, d, w, pen) {
     const cs = Math.cos(ang), sn = Math.sin(ang);
     const heridos = new Set();
+    yo.st.disp++;
     let l = 6, choque = false;
     for (; l < alc; l += 4) {
       const px = x + cs * l, py = y + sn * l;
@@ -289,8 +667,8 @@
         }
       }
       if (pega) break;
-      for (const e of E.values()) {
-        if (heridos.has(e)) continue;
+      for (const e of vecinos(px, py)) {
+        if (heridos.has(e) || E.get(e.id) !== e || bajoTierra(e)) continue;
         if ((px - e.x) ** 2 + (py - e.y) ** 2 < (RG(e.k) + 6) ** 2) {
           golpeaEnemigo(e, d, w, x, y); heridos.add(e); d *= 0.7;
           if (heridos.size > (pen || 0)) pega = true;
@@ -299,20 +677,84 @@
       }
       if (pega) break;
       if (versus()) {
-        for (const [u, r] of R) if (r.v && (px - r.x) ** 2 + (py - r.y) ** 2 < 121) { golpeaJugador(u, d, w); fx.sangre(r.x, r.y, ang, 5); pega = true; break; }
+        for (const [u, r] of R) if (r.v && rival(u) && (px - r.x) ** 2 + (py - r.y) ** 2 < 121) { golpeaJugador(u, d, w); fx.sangre(r.x, r.y, ang, 5); pega = true; break; }
         if (pega) break;
       }
     }
     l = Math.min(l, alc);
+    finRayo.x = x + cs * Math.max(0, l - 4); finRayo.y = y + sn * Math.max(0, l - 4);
     const bo = G.boca(x, y, ang, w, ESC);
     fx.trazo(bo[2], bo[3], x + cs * l, y + sn * l, bo[4], w === 2);
     if (choque) impactoMuro(x + cs * (l - 4), y + sn * (l - 4), ang, bo[4]);
     pend.s.push([nid(), w, Math.round(x), Math.round(y), Math.round(ang * 100), Math.round(l)]);
+    if (heridos.size) yo.st.acierto++;
+    return heridos.size ? heridos.values().next().value : null;
+  }
+
+  /* Lanzallamas: quema a todo enemigo (y en versus a todo rival) que esté en
+     el cono, a la vista; atraviesa. Lo que se ve son llamas que salen de la
+     boca; a los demás les llega como un disparo de alcance `alc`. */
+  function llama(x, y, ang, a) {
+    const cs = Math.cos(ang), sn = Math.sin(ang), med = a.abre / 2;
+    yo.st.disp++;
+    let pego = false;
+    for (const e of [...E.values()]) {
+      if (bajoTierra(e)) continue;
+      const dx = e.x - x, dy = e.y - y, l = hyp(dx, dy);
+      if (l > a.alc + RG(e.k) || l < 1) continue;
+      if (Math.acos(clamp((dx * cs + dy * sn) / l, -1, 1)) > med + RG(e.k) / l) continue;
+      if (!despejado(x, y, e.x, e.y)) continue;
+      golpeaEnemigo(e, a.d, a.id, x, y); pego = true;
+    }
+    if (versus()) for (const [u, r] of R) {
+      if (!r.v || !rival(u)) continue;
+      const dx = r.x - x, dy = r.y - y, l = hyp(dx, dy);
+      if (l < 1 || l > a.alc || Math.acos(clamp((dx * cs + dy * sn) / l, -1, 1)) > med || !despejado(x, y, r.x, r.y)) continue;
+      golpeaJugador(u, a.d, a.id);
+    }
+    if (pego) yo.st.acierto++;
+    const bo = G.boca(x, y, ang, a.id, ESC);
+    fx.humo(bo[2] + cs * a.alc * 0.45, bo[3] + sn * a.alc * 0.45, 2, a.alc * 0.35, 'fuego');
+    pend.s.push([nid(), a.id, Math.round(x), Math.round(y), Math.round(ang * 100), Math.round(a.alc)]);
+  }
+  /* Rayo: pega al enemigo a la vista más cercano delante (a menos de 20°
+     del frente, dentro de `alc`) y salta de uno en uno a `saltos` más, cada
+     salto a menos de `salto` px, con un 20 % menos de daño. */
+  const RAYOS = [];
+  function relampago(x, y, ang, a) {
+    yo.st.disp++;
+    const cs = Math.cos(ang), sn = Math.sin(ang), ya = new Set(), pts = [[x, y - 16]];
+    let t = null, bd = a.alc;
+    for (const e of E.values()) {
+      if (bajoTierra(e)) continue;
+      const dx = e.x - x, dy = e.y - y, l = hyp(dx, dy);
+      if (l > bd || l < 1 || (dx * cs + dy * sn) / l < Math.cos(0.35) || !despejado(x, y, e.x, e.y)) continue;
+      bd = l; t = e;
+    }
+    let d = a.d, cx0 = x, cy0 = y;
+    for (let i = 0; t && i <= (a.saltos || 0); i++) {
+      ya.add(t); pts.push([t.x, t.y - 14]);
+      golpeaEnemigo(t, Math.round(d), a.id, cx0, cy0);
+      cx0 = t.x; cy0 = t.y; d *= 0.8;
+      let sig = null, sd = a.salto || 110;
+      for (const e of E.values()) {
+        if (ya.has(e) || bajoTierra(e)) continue;
+        const l = dist(cx0, cy0, e.x, e.y);
+        if (l < sd && despejado(cx0, cy0, e.x, e.y)) { sd = l; sig = e; }
+      }
+      t = sig;
+    }
+    if (pts.length > 1) yo.st.acierto++;
+    else pts.push([x + cs * a.alc * 0.6, y + sn * a.alc * 0.6 - 16]);
+    RAYOS.push({ pts, t: 0.2 }); if (RAYOS.length > 30) RAYOS.shift();   // sin pantalla nadie los apaga
+    const l = Math.round(dist(x, y, pts[1][0], pts[1][1] + 16));
+    pend.s.push([nid(), a.id, Math.round(x), Math.round(y), Math.round(ang * 100), l]);
   }
 
   function lanza(p) {
     const a = D.ARMAS[p.w];
-    if (a.tipo === 'cohete') { const v = p.vel || a.vel; p.vx = Math.cos(p.ang) * v; p.vy = Math.sin(p.ang) * v; p.t = 1.4; p.z = 0; }
+    // El cohete atraviesa al primer enemigo común (le pega medio golpe) y revienta en el siguiente.
+    if (a.tipo === 'cohete') { const v = p.vel || a.vel; p.vx = Math.cos(p.ang) * v; p.vy = Math.sin(p.ang) * v; p.t = 1.4; p.z = 0; p.pasa = 1; p.ya = new Set(); }
     else { p.vx = Math.cos(p.ang) * 220; p.vy = Math.sin(p.ang) * 220; p.t = 0.7; p.t0 = 0.7; p.z = 0; }
     proy.push(p);
   }
@@ -336,8 +778,16 @@
         if (Math.random() < 0.8) fx.humo(p.x - p.vx * 0.02, p.y - p.vy * 0.02, 1, 20);
         let pega = p.t <= 0 || solidoEn(p.x, p.y);
         if (!pega) for (const o of O.values()) { const b = cajaObj(o); if (b && p.x > b[0] && p.x < b[2] && p.y > b[1] && p.y < b[3]) { pega = true; break; } }
-        if (!pega) for (const e of E.values()) if (dist(p.x, p.y, e.x, e.y) < RG(e.k) + 4) { pega = true; break; }
-        if (!pega && versus() && p.mio) for (const r of R.values()) if (r.v && dist(p.x, p.y, r.x, r.y) < 12) { pega = true; break; }
+        if (!pega) for (const e of E.values()) {
+          if (p.ya.has(e.id) || bajoTierra(e) || dist(p.x, p.y, e.x, e.y) >= RG(e.k) + 4) continue;
+          if (p.pasa > 0 && !D.esJefe(e.k)) {
+            p.pasa--; p.ya.add(e.id);
+            if (p.mio && p.d) golpeaEnemigo(e, Math.round(p.d * 0.5), p.w, p.x - p.vx * 0.05, p.y - p.vy * 0.05);
+            continue;
+          }
+          pega = true; break;
+        }
+        if (!pega && versus() && p.mio) for (const [u, r] of R) if (r.v && rival(u) && dist(p.x, p.y, r.x, r.y) < 12) { pega = true; break; }
         if (pega) { p.fin = true; if (p.mio) explota(p.x - p.vx * dt * 0.5, p.y - p.vy * dt * 0.5, p.r, p.d, p.w, p.id); }
       }
     }
@@ -347,11 +797,13 @@
   const caida = (dd, r, d) => dd <= r * 0.4 ? d : Math.max(0, d * (1 - (dd - r * 0.4) / (r * 0.6)));
 
   // Explosión mía (granada, cohete): cada cosa la aplica quien debe.
-  function explota(x, y, r, d, w, id) {
+  // `amigo`: la de una ventaja (bala ígnea, estallido), que no te daña a ti ni a los tuyos.
+  function explota(x, y, r, d, w, id, amigo) {
     efectoBoom(x, y, r);
     pend.x2.push([id, Math.round(x), Math.round(y), r]);
-    for (const e of [...E.values()]) { const dd = dist(x, y, e.x, e.y); if (dd < r + RG(e.k)) golpeaEnemigo(e, caida(dd, r, d), w, x, y); }
+    for (const e of [...E.values()]) { const dd = dist(x, y, e.x, e.y); if (dd < r + RG(e.k) && !bajoTierra(e)) golpeaEnemigo(e, caida(dd, r, d), w, x, y); }
     for (const o of [...O.values()]) { const dd = dist(x, y, o.x, o.y); if (dd < r && o.k !== 'carga') golpeaObjeto(o.id, caida(dd, r, d), w); }
+    if (amigo) return;
     if (yo.v && !yo.muerto) { const dd = dist(x, y, yo.x, yo.y); if (dd < r) recibe(caida(dd, r, d) * (versus() ? 0.5 : 1 / 3), w, cfg.yo); }
     for (const [u, rr] of R) if (rr.v) { const dd = dist(x, y, rr.x, rr.y); if (dd < r) golpeaJugador(u, caida(dd, r, d) * (versus() ? 1 : 1 / 3), w); }
   }
@@ -372,7 +824,9 @@
       if (choca(x, y, a.obj === 'barril' ? 9 : 4)) return false;
     }
     x = Math.round(x); y = Math.round(y);
-    const pide = { pon: [a.id, x, y, a.r || 0, a.d || 0, a.vida || 0, a.bl ? 1 : 0] };
+    // Albañil: muros con más vida; pólvora extra: barriles y cargas más grandes.
+    const pv = a.obj === 'muro' ? 1 : 1 + 0.25 * vt('polvora'), vida = Math.round((a.vida || 0) * (a.obj === 'muro' ? 1 + 0.5 * vt('albanil') : 1));
+    const pide = { pon: [a.id, x, y, Math.round((a.r || 0) * pv), Math.round((a.d || 0) * pv), vida, a.bl ? 1 : 0] };
     if (soyDir) peticion(cfg.yo, pide);
     else misG.push([nid(), 'p', 0, a.id, pide]);
     return true;
@@ -386,8 +840,30 @@
   // ---------- golpes ----------
   // (sx, sy) es de dónde vino el golpe: hacia el otro lado sale despedido.
   function golpeaEnemigo(e, d, w, sx, sy) {
-    if (d <= 0) return;
+    if (d <= 0 || bajoTierra(e)) return;
+    /* El Escudero para de frente lo que no explota: si el golpe viene a
+       menos de 60° de hacia donde mira, entra solo una parte. Se calcula
+       aquí, en quien dispara (el director recibe el golpe ya reducido). */
+    const esc = D.ENEMIGOS[e.k].escudo;
+    if (esc && !ARMA_EXPLOTA(w) && Number.isFinite(sx) && (sx !== e.x || sy !== e.y)) {
+      const dv = DIRS[e.d || 0], l = hyp(sx - e.x, sy - e.y) || 1;
+      if (((sx - e.x) * dv[0] + (sy - e.y) * dv[1]) / (l * hyp(dv[0], dv[1])) > 0.5) {
+        d *= 1 - esc;
+        if (Math.random() < 0.6) fx.chispas(e.x + dv[0] * 8, e.y + dv[1] * 8 - 14, Math.atan2(sy - e.y, sx - e.x), 3, 10, '#dfe6ee');
+      }
+    }
+    /* Punto débil de los jefes: por la espalda (a más de 120° de hacia
+       donde mira) o mientras avisa una habilidad (est 2) cada golpe vale más. */
+    if (D.esJefe(e.k)) {
+      const dv = DIRS[e.d || 0], l = hyp(sx - e.x, sy - e.y);
+      const espalda = Number.isFinite(sx) && l > 0 && ((sx - e.x) * dv[0] + (sy - e.y) * dv[1]) / (l * hyp(dv[0], dv[1])) < -0.5;
+      if (espalda || e.est === 2) { d *= D.DEBIL; e.debil = 0.25; }
+    }
     e.flash = 0.1;
+    armaUlt = w;
+    anotaDano(e, d);
+    // Un jefe no sale despedido, pero el golpe se le nota: se inclina y saca chispas.
+    if (D.esJefe(e.k)) { e.sac = 0.35; if (Math.random() < 0.5) fx.chispas(e.x, e.y, Math.random() * Math.PI * 2, 3, 22 * (TALLA_Z[e.k] || 1), '#ffd27a'); }
     // La sangre sale hacia donde iba el golpe y mancha el suelo para siempre.
     const ang = Number.isFinite(sx) && (sx !== e.x || sy !== e.y) ? Math.atan2(e.y - sy, e.x - sx) : Math.random() * Math.PI * 2, t = G.sangreDe(e.k);
     fx.sangre(e.x, e.y, ang, w === 2 ? 3 : 5, t, 14 * (TALLA_Z[e.k] || 1));
@@ -406,6 +882,8 @@
   }
   function golpeaJugador(u, d, w, por) {
     if (d <= 0) return;
+    const de = por === undefined ? cfg.yo : por;
+    if (de && de !== u && aliado(de, u)) return;     // por equipos no hay fuego amigo
     misG.push([nid(), u, Math.round(d * 10) / 10, w, por === undefined ? cfg.yo : por]);
   }
   // Del director a un jugador (mordida, fuego, una explosión de barril).
@@ -418,11 +896,20 @@
   function recibe(d, w, por) {
     if (!yo.v || yo.muerto || terminado || d <= 0) return;
     if (yo.inv > 0 && por !== cfg.yo) return;
+    if (por && por !== cfg.yo && aliado(por, cfg.yo)) return;   // ni lo que llega de un compañero
+    d *= mutD().recibe || 1;
     // La armadura se come una parte del golpe hasta gastarse.
     if (yo.arm > 0) { const ab = Math.min(yo.arm, d * D.ARMADURA.absorbe); yo.arm -= ab; d -= ab; }
+    d *= 1 - 0.08 * vt('piel');
+    yo.sinGolpe = 0; yo.limpio = false;
     yo.hp -= d;
     if (inmortal) yo.hp = Math.max(1, yo.hp);
+    if (yo.hp <= 0 && vt('segunda') && !yo.segunda) {
+      yo.segunda = true; yo.hp = 40; yo.inv = 2;
+      banner('¡SEGUNDA OPORTUNIDAD!'); son('premio');
+    }
     rojo = Math.min(1, rojo + d / 40);
+    vibra(Math.min(1, 0.35 + d / 40), 0.7, 150);
     if (w === 8) son('mordida');
     son('dolor');
     fx.sangre(yo.x, yo.y, Math.random() * Math.PI * 2, 5);
@@ -434,28 +921,90 @@
     fx.sangre(yo.x, yo.y, 0, 8); fx.sangre(yo.x, yo.y, Math.PI, 8);
     if (fx.suelo) fx.suelo.charco(yo.x, yo.y, 12, G.SANGRE[0]);
     son('muere');
+    vibra(1, 1, 500);
+    for (const c of CH) cobra(c);
     if (!ONLINE) { yo.fin = 1.4; return; }
     if (versus()) { enviar('muere', { por: por || '', w: w | 0 }); yo.respawn = 3; banner('TE MATARON'); }
     else {
       yo.nivelMuerte = marcador.nivel || 1;
       enviar('muere', { pts: yo.pts | 0, k: yo.k | 0, n: marcador.nivel || 1, w: w | 0, por: por || '' });
-      banner('CAÍSTE · VUELVES EN EL PRÓXIMO NIVEL');
+      banner(activos().length > 1 ? 'CAÍSTE · UN COMPAÑERO PUEDE REVIVIRTE' : 'CAÍSTE · VUELVES EN EL PRÓXIMO NIVEL');
     }
   }
 
-  function miBaja(k) {
+  /* Una baja mía: puntos (× multiplicador), chatarra (sin él) que salta del
+     cuerpo, el combo y, al pasar un récord del multiplicador, armas,
+     mejoras y los hitos ×10, ×25, ×50… */
+  const HITOS = [10, 25, 50, 100, 150, 200, 300];
+  let armaUlt = 0, armaMuerte = -1;
+  function miBaja(k, x, y) {
     yo.pts += D.PUNTOS[k] * yo.mul;
     yo.k++;
     yo.mul++;
+    yo.st.armas[armaMuerte >= 0 ? armaMuerte : armaUlt]++;
+    if (D.esJefe(k)) { yo.st.jefes++; medalla('jefe'); if (D.ENEMIGOS[k].jefe === 'grande') medalla('coloso'); }
+    if (++yo.bajasPaso >= 10) medalla('diez');
+    if (Number.isFinite(x)) sueltaChatarra(x, y, Math.round(D.chatarraDe(k) * (1 + 0.2 * vt('codicia'))));
+    if (vt('vampiro') && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + vt('vampiro'));
+    if (mutD().cura && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + mutD().cura);
+    // estallido: revienta en el paso siguiente (pasoYo), no en medio de esta baja
+    if (vt('estallido') && Number.isFinite(x) && rn() < 0.15 * vt('estallido')) yo.booms.push([x, y]);
     if (yo.mul > yo.maxMul) {
+      for (const h of HITOS) if (h > yo.maxMul && h <= yo.mul) hito(h);
       for (const p of D.premios(yo.maxMul, yo.mul)) {
-        if (p.arma !== undefined) { if (!versus()) desbloquea(p.arma, p.txt); }
-        else { yo.mejoras.add(p.mejora); premio(p.txt); }
+        if (p.arma !== undefined) { if (!versus()) { desbloquea(p.arma, p.txt); consejo('arma'); } }
+        else { yo.mejoras.add(p.mejora); premio(p.txt, 'mejora'); }
       }
       yo.maxMul = yo.mul;
       pintaArmas(true);
     }
-    yo.combo = yo.comboMax = D.duracionCombo(yo.mul);
+    if (yo.mul >= 3) consejo('combo');
+    if (yo.mul >= 50) medalla('x50');
+    if (yo.mul >= 100) medalla('x100');
+    yo.combo = yo.comboMax = D.duracionCombo(yo.mul) * (1 + 0.2 * vt('racha'));
+  }
+  function hito(m) {
+    banner('¡RACHA ×' + m + '!');
+    pulso = 1; son('racha'); vibra(0.5, 0.8, 220);
+    const el = $('marca'); el.classList.remove('hito'); void el.offsetWidth; el.classList.add('hito');
+  }
+
+  /* La chatarra de mis bajas: salta del cuerpo y, a los 0,35 s, vuela hacia
+     mí si estoy cerca (pasados 2 s, esté donde esté). Es solo de esta
+     pantalla: nadie más la ve ni la puede recoger, así que no viaja. Al
+     morir se cobra lo que quedaba en el suelo. */
+  let CH = [], chatPulso = 0;
+  function sueltaChatarra(x, y, v) {
+    const n = Math.max(1, Math.min(6, Math.round(v / 15))), parte = Math.floor(v / n);
+    for (let i = 0; i < n; i++) {
+      const a = rn() * Math.PI * 2, s = rz(40, 95);
+      CH.push({ id: (Math.random() * 1e6) | 0, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: 0, vz: rz(70, 120), t: 0, v: parte + (i === 0 ? v - parte * n : 0) });
+    }
+    if (CH.length > 160) for (const c of CH.splice(0, CH.length - 160)) cobra(c);
+  }
+  function cobra(c) {
+    if (c.fin) return;
+    c.fin = true; yo.chat += c.v; chatPulso = 1;
+    if ((yo.chatTot += c.v) >= 5000) medalla('chatarra');
+    son('chatarra'); consejo('chatarra');
+  }
+  function pasoChatarra(dt) {
+    if (!CH.length) return;
+    const vivo = yo.v && !yo.muerto;
+    for (const c of CH) {
+      c.t += dt;
+      if (!vivo || c.t > 6) { cobra(c); continue; }
+      c.vz -= 420 * dt; c.z += c.vz * dt;
+      if (c.z < 0) { c.z = 0; c.vz = Math.abs(c.vz) > 40 ? -c.vz * 0.35 : 0; }
+      const dd = dist(c.x, c.y, yo.x, yo.y);
+      if (c.t > 0.35 && (dd < 170 * (1 + 0.6 * vt('iman')) || c.t > 2)) {
+        const v = 240 + c.t * 260;
+        c.vx = (yo.x - c.x) / Math.max(1, dd) * v; c.vy = (yo.y - c.y) / Math.max(1, dd) * v;
+      } else { c.vx *= 1 - Math.min(1, dt * 4); c.vy *= 1 - Math.min(1, dt * 4); }
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.t > 0.35 && dd < 12) cobra(c);
+    }
+    CH = CH.filter(c => !c.fin);
   }
 
   // ---------- el director ----------
@@ -566,23 +1115,38 @@
       const obj = vivos();
       let cands = M.spawnsE.filter(s => obj.every(o => dist(s.x, s.y, o.x, o.y) > TS * 5));
       if (!cands.length) cands = M.spawnsE;
-      const s = cands[(Math.random() * cands.length) | 0];
-      x = s.x + azar(-4, 4); y = s.y + azar(-4, 4);
+      const s = cands[(rn() * cands.length) | 0];
+      x = s.x + rz(-4, 4); y = s.y + rz(-4, 4);
     }
-    const k = kFijo >= 0 ? kFijo : D.tipoEnemigo(versus() ? n + 2 : n, Math.random());
+    const k = kFijo >= 0 ? kFijo : D.tipoEnemigo(versus() ? n + 2 : n, rn());
     const jefe = D.esJefe(k);
     const max = jefe ? D.vidaJefe(k, n, Math.max(1, activos().length)) : D.vidaEnemigo(k, n);
-    const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: azar(1, 3), flash: 0 };
-    if (jefe) { e.cdH = D.ENEMIGOS[k].cd; e.est = 0; e.estT = 0; e.hitos = 0; }
-    desatasca(e, D.ENEMIGOS[k].radio - 1);
+    const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: rz(1, 3), flash: 0 };
+    const C = D.ENEMIGOS[k];
+    if (jefe) { e.cdH = C.cd; e.est = 0; e.estT = 0; e.hitos = 0; }
+    /* Élite: desde el nivel 12 una parte sale con un rasgo (más vida, más
+       rápido, vampiro, divisor, ígneo). Antes del 12 no se tira el dado:
+       así no cambia la secuencia de `rn` de los niveles bajos. */
+    if (!(kFijo >= 0) && n >= 12) {
+      e.el = D.eliteDe(k, n, rn(), rn());
+      if (e.el) { e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
+    }
+    // La segunda vuelta de los jefes (desde el nivel 51): corruptos.
+    if (jefe && D.corrupto(n)) { e.el = D.ELITE_CORRUPTO; e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
+    if (mutD().vida && !jefe) e.max = e.hp = Math.round(e.max * mutD().vida);
+    if (C.cava) { e.est = 1; e.estT = 0; }            // nace bajo tierra
+    if (C.cura || C.vigia) { e.cdH = C.cd * rz(0.5, 1); e.est = 0; e.estT = 0; }
+    if (!C.cava) desatasca(e, C.radio - 1);
     e.tx = e.x; e.ty = e.y;
     E.set(e.id, e);
+    // El enjambre llega en grupo: los demás alrededor del primero.
+    if (C.grupo && !(kFijo >= 0)) for (let i = 1; i < C.grupo; i++) nuevoEnemigo(n, k, e.x + rz(-14, 14), e.y + rz(-14, 14));
     return e;
   }
   // Un invocado nace junto a quien lo llama, en un sitio libre.
   function invoca(e, k, n) {
     for (let i = 0; i < 8; i++) {
-      const a = Math.random() * Math.PI * 2, r = azar(24, 46);
+      const a = rn() * Math.PI * 2, r = rz(24, 46);
       const x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r;
       if (choca(x, y, D.ENEMIGOS[k].radio)) continue;
       const h = nuevoEnemigo(dir.n, k, x, y);
@@ -601,8 +1165,10 @@
   /* Cuánto empuja cada arma (por id; 8 mordida, 9 fuego). Los empujones
      se suman mientras dura el tumbo, con tope: la escopeta, que pega con
      todos sus perdigones a la vez, despide de verdad. */
-  const EMPUJE_ARMA = [1, 0.6, 1.3, 2.2, 2.2, 1, 2.2, 2.4, 0.8, 1];
+  const EMPUJE_ARMA = [1, 0.6, 1.3, 2.2, 2.2, 1, 2.2, 2.4, 0.8, 1, 0.12, 2, 0.5, 0.7];
   const ARMA_EXPLOTA = w => w === 3 || w === 4 || w === 6 || w === 7;
+  // La escopeta derriba: el aturdimiento dura más (su nicho: frenar la horda de cerca).
+  const ATURDE_ARMA = { 2: 1.7, 10: 0.35 };   // la llama casi no frena: si no, los dejaba quietos
   function danaEnemigo(id, d, quien, w, sx, sy) {
     const e = E.get(id);
     if (!e) return;
@@ -613,12 +1179,12 @@
       let ax, ay;
       if (Number.isFinite(sx) && Number.isFinite(sy) && (sx !== e.x || sy !== e.y)) { ax = e.x - sx; ay = e.y - sy; }
       else { ax = -DIRS[e.d || 0][0]; ay = -DIRS[e.d || 0][1]; }
-      const l = Math.hypot(ax, ay) || 1, masa = D.ENEMIGOS[e.k].masa ?? 1;
+      const l = hyp(ax, ay) || 1, masa = D.ENEMIGOS[e.k].masa ?? 1;
       const em = EMPUJE * masa * (EMPUJE_ARMA[w] ?? 1);
       const sigue = e.aturd > 0 ? 1 : 0;
-      const kx = (e.kvx || 0) * sigue + ax / l * em, ky = (e.kvy || 0) * sigue + ay / l * em, kl = Math.hypot(kx, ky), tope = 60 + 420 * Math.min(1, masa);
+      const kx = (e.kvx || 0) * sigue + ax / l * em, ky = (e.kvy || 0) * sigue + ay / l * em, kl = hyp(kx, ky), tope = 60 + 420 * Math.min(1, masa);
       const f = kl > tope ? tope / kl : 1;
-      e.aturd = ATURDE * Math.min(1, masa) + 0.1; e.kvx = kx * f; e.kvy = ky * f;
+      e.aturd = (ATURDE * Math.min(1, masa) + 0.1) * (ATURDE_ARMA[w] || 1); e.kvx = kx * f; e.kvy = ky * f;
       return;
     }
     E.delete(id);
@@ -631,13 +1197,22 @@
     const tipo = D.ENEMIGOS[e.k].explota ? 2 : ARMA_EXPLOTA(w) ? 1 : 0;
     const m = [nid(), quien || '', e.k, Math.round(e.x), Math.round(e.y), Math.round(ak * 100), tipo];
     dir.m.push(m); if (dir.m.length > 20) dir.m.shift();
+    armaMuerte = w | 0;
     procesaMuerte(m);
+    armaMuerte = -1;
     const C = D.ENEMIGOS[e.k];
     if (C.explota) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: C.radioExplota, d: C.explota, w: 3, u: quien || '' });
+    const El = e.el ? D.ELITES[e.el] : null;
+    if (El && El.revienta) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: El.revienta.r, d: El.revienta.d, w: 3, u: '' });
+    // El divisor se parte en dos copias comunes con menos vida.
+    if (El && El.partes) for (let i = 0; i < El.partes; i++) {
+      const h = nuevoEnemigo(dir.n, e.k, e.x + (i ? 9 : -9), e.y + rz(-6, 6));
+      h.max = h.hp = Math.max(1, Math.round(D.vidaEnemigo(e.k, Math.max(1, dir.n)) * 0.45)); h.cd = 0.6;
+    }
     if (C.jefe) {
       // El jefe suelta siempre un premio de cada clase.
-      for (let i = 0; i < 3; i++) {
-        const a = i * 2.1, b = { id: nid(), k: i, x: Math.round(e.x + Math.cos(a) * 18), y: Math.round(e.y + Math.sin(a) * 18) };
+      for (let i = 0; i < 4; i++) {   // y una dorada
+        const a = i * 1.57, b = { id: nid(), k: i, x: Math.round(e.x + Math.cos(a) * 18), y: Math.round(e.y + Math.sin(a) * 18) };
         if (solidoEn(b.x, b.y)) { b.x = Math.round(e.x); b.y = Math.round(e.y); }
         B.set(b.id, b);
       }
@@ -645,9 +1220,9 @@
       if (C.hab === 'cria') for (let i = 0; i < 5; i++) invoca(e, 2, dir.n);
       return;
     }
-    const r = Math.random();
-    if (B.size < 12 && r < 0.2) {
-      const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : 2, x: Math.round(e.x), y: Math.round(e.y) };
+    const r = rn();
+    if (B.size < 12 && (r < 0.2 || r > 1 - D.PARTE_DORADA)) {
+      const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : r < 0.2 ? 2 : 3, x: Math.round(e.x), y: Math.round(e.y) };
       B.set(b.id, b);
     }
   }
@@ -664,7 +1239,7 @@
     efectoBoom(c.x, c.y, c.r);
     dir.x.push([nid(), Math.round(c.x), Math.round(c.y), c.r]); if (dir.x.length > 8) dir.x.shift();
     vistosX.add('z:' + dir.x[dir.x.length - 1][0]);
-    for (const e of [...E.values()]) { const dd = dist(c.x, c.y, e.x, e.y); if (dd < c.r + RG(e.k)) danaEnemigo(e.id, caida(dd, c.r, c.d), c.u, c.w, c.x, c.y); }
+    for (const e of [...E.values()]) { const dd = dist(c.x, c.y, e.x, e.y); if (dd < c.r + RG(e.k) && !bajoTierra(e)) danaEnemigo(e.id, caida(dd, c.r, c.d), c.u, c.w, c.x, c.y); }
     for (const o of [...O.values()]) { const dd = dist(c.x, c.y, o.x, o.y); if (dd < c.r) danaObjeto(o.id, caida(dd, c.r, c.d), c.u); }
     for (const v of vivos()) {
       const dd = dist(c.x, c.y, v.x, v.y);
@@ -697,7 +1272,7 @@
   }
   function libreJefe(e, x, y) {
     for (let i = 0; i < 12; i++) {
-      const a = Math.random() * Math.PI * 2, r = azar(56, 84);
+      const a = rn() * Math.PI * 2, r = rz(56, 84);
       const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
       if (!choca(px, py, D.ENEMIGOS[e.k].radio + 2)) return [px, py];
     }
@@ -728,12 +1303,16 @@
       if (!(e.hitos & 2) && pc < 0.33) { e.hitos |= 2; for (let i = 0; i < 3; i++) invoca(e, 5, n); son('jefe'); }
     }
     if (C.hab === 'roca' && !e.furia && pc < 0.4) { e.furia = true; e.est = 5; son('jefe'); }
+    // Bajo el 50 % (o corrupto desde el comienzo) alterna con su segunda habilidad.
+    const dos = !!C.hab2 && (pc < 0.5 || e.el === D.ELITE_CORRUPTO);
+    if (dos && !(e.hitos & 4)) { e.hitos |= 4; if (pc < 0.5) { son('jefe'); sacude = Math.min(10, sacude + 3); } }
     if (e.ring2 > 0 && (e.ring2 -= dt) <= 0) { for (let i = 0; i < 10; i++) bola(e, (i + 0.5) / 10 * Math.PI * 2, 150, C.fuego); son('fuego'); }
     const libre = e.est === 0 || e.est === 5;
-    if (libre) e.cdH -= dt * (e.furia ? 2 : 1);
+    if (libre) e.cdH -= dt * (e.furia ? 2 : 1) / (e.el ? D.ELITES[e.el].cd || 1 : 1);
     if (libre && e.cdH <= 0) {
-      const ve = despejado(e.x, e.y, t.x, t.y);
-      switch (C.hab) {
+      const ve = despejado(e.x, e.y, t.x, t.y), h = dos && e.alt ? C.hab2 : C.hab, est0 = e.est;
+      e.hab = h;
+      switch (h) {
         case 'embiste': if (dd < 360 && ve) { e.est = 2; e.estT = 0.8; e.ang = a; } break;
         case 'invoca': if (hijosDe(e) < 8) { e.est = 2; e.estT = 0.7; } break;
         case 'anillo': e.est = 2; e.estT = 0.6; break;
@@ -748,13 +1327,14 @@
         case 'hidra': if (dd < 380 && ve) { for (let i = -2; i <= 2; i++) bola(e, a + i * 0.22, 160, C.fuego); e.atk = 0.3; son('fuego'); e.cdH = C.cd; } break;
         case 'roca': if (dd < 420) { e.est = 2; e.estT = 0.5; e.ang = a; } break;
       }
+      if (dos && (e.est !== est0 || e.cdH > 0)) e.alt = !e.alt;   // salió: la próxima es la otra
       if (e.cdH <= 0 && (e.est === 0 || e.est === 5)) e.cdH = 0.5;   // no pudo: lo vuelve a mirar en un rato
       return e.est !== 0 && e.est !== 5;
     }
     if (libre) return false;
     e.d = D.dirDe(Math.cos(e.ang ?? a), Math.sin(e.ang ?? a));
     if (e.est === 3) {
-      if (C.hab === 'espiral') {
+      if ((e.hab || C.hab) === 'espiral') {
         e.estT -= dt; e.cdB -= dt;
         while (e.cdB <= 0) {
           e.cdB += 0.09; e.ang += 0.45;
@@ -762,7 +1342,7 @@
           if (pc < 0.5) bola(e, e.ang + Math.PI, 140, C.fuego);
         }
         if (e.estT <= 0) { e.est = 0; e.cdH = C.cd; }
-      } else embiste(e, C, t, dt, Math.hypot(e.vx, e.vy));
+      } else embiste(e, C, t, dt, hyp(e.vx, e.vy));
       if (e.est !== 3) e.cdH = C.cd;
       return true;
     }
@@ -770,12 +1350,12 @@
     // Termina el aviso: la habilidad sale.
     const fin = e.furia ? 5 : 0;
     e.est = fin; e.cdH = C.cd; e.atk = 0.3;
-    switch (C.hab) {
+    switch (e.hab || C.hab) {
       case 'embiste': {
         const b = e.ang; e.est = 3; e.estT = 0.9; e.vx = Math.cos(b) * 330; e.vy = Math.sin(b) * 330; e.pego = false; son('jefe');
         break;
       }
-      case 'invoca': for (let i = 0; i < 3; i++) invoca(e, 0, n); son('jefe'); break;
+      case 'invoca': for (let i = 0; i < 3; i++) invoca(e, C.invoca || 0, n); son('jefe'); break;
       case 'anillo': for (let i = 0; i < 10; i++) bola(e, i / 10 * Math.PI * 2, 150, C.fuego); if (pc < 0.5) e.ring2 = 0.35; son('fuego'); break;
       case 'salta': {
         const p = libreJefe(e, t.x, t.y);
@@ -796,6 +1376,51 @@
     return true;
   }
 
+  /* Excavador: bajo tierra (est 1) va derecho hacia ti sin mirar muros;
+     cerca asoma (est 2, 1 s de grietas en el suelo, aún inmune) y sale
+     (est 0) como un enemigo más. Si se queda bajo una pared, sale al sitio
+     libre más cercano. */
+  function cava(e, C, t, dd, dt) {
+    if (e.est === 1) {
+      const v = D.velEnemigo(e.k, dir.n) * 1.15 * (e.el ? D.ELITES[e.el].vel : 1) * (mutD().vel || 1), l = dd || 1;
+      if (dd > 52) { e.x += (t.x - e.x) / l * v * dt; e.y += (t.y - e.y) / l * v * dt; e.d = D.dirDe(t.x - e.x, t.y - e.y); }
+      else { e.est = 2; e.estT = 1; }
+      return;
+    }
+    if ((e.estT -= dt) <= 0) { e.est = 0; desatasca(e, C.radio - 1); e.cd = 0.25; humo(e.x, e.y, 0); }
+  }
+  // Chamán: cada `cd` s cura a los comunes que tiene cerca (no a los jefes).
+  function chaman(e, C, dt) {
+    if (e.est === 1 && (e.estT -= dt) <= 0) e.est = 0;
+    if ((e.cdH -= dt) > 0) return;
+    e.cdH = C.cd;
+    let curo = false;
+    for (const g of E.values()) {
+      if (g === e || D.esJefe(g.k) || !(g.hp < g.max) || dist(e.x, e.y, g.x, g.y) > C.alcCura) continue;
+      g.hp = Math.min(g.max, g.hp + g.max * C.cura); curo = true;
+    }
+    if (curo) { e.est = 1; e.estT = 0.6; e.atk = 0.3; }
+  }
+  /* Vigía: te apunta `apunta` s con un láser (est 1, quieto) y dispara una
+     bala rápida hacia donde estabas cuando empezó a apuntar: moverse la
+     esquiva. Devuelve true mientras apunta (no camina). */
+  function vigia(e, C, t, dd, dt) {
+    if (e.est === 1) {
+      e.d = D.dirDe(e.ax - e.x, e.ay - e.y);
+      if ((e.estT -= dt) > 0) return true;
+      const a = Math.atan2(e.ay - e.y, e.ax - e.x);
+      F.push({ id: nid(), x: e.x, y: e.y, vx: Math.cos(a) * C.velBala, vy: Math.sin(a) * C.velBala, t: 1.2, d: C.fuego, de: e.id, k: e.k });
+      e.est = 0; e.cdH = C.cd * rz(0.8, 1.2); e.atk = 0.3;
+      son('pistola', dist(e.x, e.y, camX, camY));
+      return true;
+    }
+    if ((e.cdH -= dt) <= 0 && dd < C.alcFuego && despejado(e.x, e.y, t.x, t.y)) {
+      e.est = 1; e.estT = C.apunta; e.ax = Math.round(t.x); e.ay = Math.round(t.y);
+      return true;
+    }
+    return false;
+  }
+
   function peticion(de, p) {
     if (!p || typeof p !== 'object') return;
     if (Array.isArray(p.pon)) {
@@ -804,7 +1429,7 @@
       if (!a || a.tipo !== 'objeto' || !Number.isFinite(x) || !Number.isFinite(y) || solidoEn(x, y) || O.size > 120) return;
       const k = a.obj, acero = k === 'muro' && bl === 1;
       const max = acero ? D.MURO_BLINDADO.vida : k === 'muro' ? clamp(+vida || VIDA_OBJ.muro, 1, 1200) : VIDA_OBJ[k];
-      O.set(nid(), { id: ultimoId, k, x, y, hp: max, max, u: de, r: clamp(+r || a.r || 0, 0, 200), d: clamp(+d || a.d || 0, 0, 500), bl: acero ? 1 : 0 });
+      O.set(nid(), { id: ultimoId, k, x, y, hp: max, max, u: de, r: clamp(+r || a.r || 0, 0, Math.min(200, TOPE_RADIO[w] || 200)), d: clamp(+d || a.d || 0, 0, Math.min(500, TOPE_GOLPE[w] || 500)), bl: acero ? 1 : 0 });
     } else if (p.det) {
       let i = 0;
       for (const o of [...O.values()]) if (o.k === 'carga' && o.u === de) {
@@ -821,30 +1446,36 @@
     const np = Math.max(1, activos().length);
     if (!terminado) {
       if (!versus()) {
-        const meta = nivelObjetivo();
+        const meta = nivelSim(nivelObjetivo());
         if (dir.n < meta) {
-          if (obj.length) {
-            dir.n = meta; dir.q = Math.round(D.totalNivel(meta) * (1 + 0.25 * (np - 1)));
+          // en la práctica la horda espera a que elijas la ventaja (10 s como mucho)
+          if (obj.length && !(!ONLINE && eleccion)) {
+            dir.n = meta; dir.q = Math.round((jefes() ? D.escoltaJefes(nivelObjetivo()) : D.totalNivel(meta)) * (1 + 0.25 * (np - 1)));
+            if (mutD().cuantos) dir.q = Math.ceil(dir.q * mutD().cuantos);
             dir.t = 0; dir.ritmo = 1.5;
             reponBarriles();
-            // Nivel que termina en 5: un mini jefe con la horda; en 0, un jefe solo.
+            // Nivel que termina en 5: un mini jefe con la horda; en 0, un jefe solo (en el modo jefes, con su escolta).
             const kj = D.jefeDeNivel(meta);
-            if (kj >= 0) { nuevoEnemigo(meta, kj); if (D.ENEMIGOS[kj].jefe === 'grande') dir.q = 0; }
+            if (kj >= 0) { nuevoEnemigo(meta, kj); if (D.ENEMIGOS[kj].jefe === 'grande' && !jefes()) dir.q = 0; }
           }
         } else if (dir.q === 0 && E.size === 0 && obj.length) {
           dir.t += dt;
           if (dir.t >= 2.5) {
-            if (!ONLINE) nivelLocal = dir.n + 1;
-            else if (dir.pedido !== dir.n + 1 || T - dir.pedidoT > 6) { enviar('nivel', { n: dir.n + 1 }); dir.pedido = dir.n + 1; dir.pedidoT = T; }
+            if (!ONLINE) { nivelLocal = dir.n + 1; pasoNivel = pasoN; }
+            else {
+              const sig = (jefes() ? Math.round(dir.n / D.PASO_JEFES) : dir.n) + 1;
+              if (dir.pedido !== sig || T - dir.pedidoT > 6) { enviar('nivel', { n: sig }); dir.pedido = sig; dir.pedidoT = T; }
+            }
           }
         }
       } else {
         const n0 = dir.n;
-        dir.t += dt; dir.n = 1 + Math.floor(dir.t / 60); dir.q = 1;
+        dir.t += dt; dir.n = 1 + Math.floor(dir.t / 60); dir.q = infectado() ? 0 : 1;   // en el infectado no hay horda
         if (dir.n !== n0) reponBarriles();
+        if (infectado() && dir.t >= AGUANTE_T && T - (dir.aguantaT ?? -99) > 6) { dir.aguantaT = T; enviar('aguanta'); }
       }
       dir.ritmo -= dt;
-      const cupo = Math.round(D.maxVivos(dir.n, np) * (versus() ? 0.5 : 1));
+      const cupo = Math.round(D.maxVivos(dir.n, np) * (versus() ? 0.5 : 1) * (mutD().cuantos ? 0.6 : 1));
       if (dir.ritmo <= 0 && dir.q > 0 && E.size < cupo && obj.length && dir.n > 0) {
         nuevoEnemigo(dir.n);
         if (!versus()) dir.q--;
@@ -861,9 +1492,11 @@
     if (flujoT <= 0 && obj.length) { calculaFlujo(obj); flujoT = 0.4; }
 
     const lista = [...E.values()];
+    armaRejilla();
     for (const e of lista) {
       const C = D.ENEMIGOS[e.k];
       e.cd -= dt; e.cdF -= dt; e.atk = Math.max(0, e.atk - dt); e.flash = Math.max(0, e.flash - dt);
+      if (M.cinta && !C.jefe && !bajoTierra(e)) cinta(e, C.radio - 1, dt);
       if (e.aturd > 0) {
         // Despedido: resbala hacia atrás y frena; ni persigue ni ataca.
         e.aturd -= dt;
@@ -874,26 +1507,35 @@
       let t = null, dd = 1e9;
       for (const o of obj) { const v = dist(e.x, e.y, o.x, o.y); if (v < dd) { dd = v; t = o; } }
       if (!t) continue;
+      if (C.cava && e.est > 0) { cava(e, C, t, dd, dt); continue; }
       desatasca(e, C.radio - 1);
       if (C.jefe && jefeIA(e, C, t, dd, dt)) continue;
+      if (C.cura) chaman(e, C, dt);
+      if (C.vigia && vigia(e, C, t, dd, dt)) continue;
       // Rodea los muros de los jugadores mientras haya otro camino; si no, rompe.
       const libre = rodea(e);
       let dx, dy;
       if (dd < TS * 1.6 && despejado(e.x, e.y, t.x, t.y) && !(libre && objetoEnMedio(e.x, e.y, t.x, t.y))) { dx = t.x - e.x; dy = t.y - e.y; }
       else { const s = siguiente(e, libre); if (s) { dx = s.x - e.x; dy = s.y - e.y; } else { dx = t.x - e.x; dy = t.y - e.y; } }
-      const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      const l = hyp(dx, dy) || 1; dx /= l; dy /= l;
+      // Chamán y Vigía guardan su distancia si te ven: retroceden o se plantan.
+      let planta = false;
+      if (C.lejos && despejado(e.x, e.y, t.x, t.y)) {
+        if (dd < C.lejos - 30) { dx = -dx; dy = -dy; }
+        else if (dd < C.lejos + 30) planta = true;
+      }
       let sx = 0, sy = 0;
-      for (const f of lista) {
-        if (f === e) continue;
+      for (const f of vecinos(e.x, e.y)) {
+        if (f === e || bajoTierra(f)) continue;
         const ex = e.x - f.x, ey = e.y - f.y, q = ex * ex + ey * ey, rr = C.radio * 2;
         if (q < rr * rr && q > 0.01) { const qq = Math.sqrt(q); sx += ex / qq * (rr - qq); sy += ey / qq * (rr - qq); }
       }
-      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1);
+      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1) * (e.el ? D.ELITES[e.el].vel : 1) * (mutD().vel || 1);
       const alcance = C.jefe ? C.rg + 8 : C.radio + 14;
       let bloq = null;
-      if (dd > (C.jefe ? C.rg + 4 : C.radio + 10)) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
+      if (dd > (C.jefe ? C.rg + 4 : C.radio + 10) && !planta) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
       else mover(e, sx * 0.3, sy * 0.3, C.radio - 1);
-      e.d = D.dirDe(dx, dy);
+      e.d = C.lejos && (planta || dd < C.lejos) ? D.dirDe(t.x - e.x, t.y - e.y) : D.dirDe(dx, dy);
       // Rodeando, un roce con un muro no es para romperlo; pero si lleva
       // más de 1.5 s trabado contra uno, lo rompe igual.
       e.tr = bloq ? (e.tr || 0) + dt : 0;
@@ -902,13 +1544,13 @@
       // El explosivo no muerde: se revienta al llegar.
       if (C.explota && dd < C.radio + 16) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
       if (C.explota && bloq && rompe) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
-      if (dd < alcance && e.cd <= 0) { golpea(t.uid, golpe, 8, ''); e.cd = 0.8; e.atk = 0.25; if (C.jefe) sacude = Math.min(10, sacude + 2); if (t.uid !== cfg.yo) son('mordida', dist(e.x, e.y, camX, camY)); }
+      if (dd < alcance && e.cd <= 0) { golpea(t.uid, golpe, 8, ''); e.cd = 0.8; e.atk = 0.25; if (e.el && D.ELITES[e.el].cura) e.hp = Math.min(e.max, e.hp + e.max * D.ELITES[e.el].cura); if (C.jefe) sacude = Math.min(10, sacude + 2); if (t.uid !== cfg.yo) son('mordida', dist(e.x, e.y, camX, camY)); }
       else if (bloq && e.cd <= 0 && rompe) { e.cd = 0.8; e.atk = 0.25; danaObjeto(bloq.id, golpe * 1.5 * (C.dObj || 1), ''); }
       if (C.fuego && C.cadFuego && e.cdF <= 0 && dd < (C.alcFuego || 320) && despejado(e.x, e.y, t.x, t.y)) {
         const a = Math.atan2(t.y - e.y, t.x - e.x);
-        if (C.jefe) { for (let i = -1; i <= 1; i++) bola(e, a + i * 0.2, 170, C.fuego); e.cdF = C.cadFuego * azar(0.8, 1.2) / (e.furia ? 1.6 : 1); e.atk = 0.3; son('fuego'); continue; }
+        if (C.jefe) { for (let i = -1; i <= 1; i++) bola(e, a + i * 0.2, 170, C.fuego); e.cdF = C.cadFuego * rz(0.8, 1.2) / (e.furia ? 1.6 : 1); e.atk = 0.3; son('fuego'); continue; }
         F.push({ id: nid(), x: e.x, y: e.y, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, t: 3, d: C.fuego, de: e.id, k: e.k });
-        e.cdF = C.cadFuego * azar(0.8, 1.2); e.atk = 0.3;
+        e.cdF = C.cadFuego * rz(0.8, 1.2); e.atk = 0.3;
         son(C.acido ? 'acido' : 'fuego', dist(e.x, e.y, camX, camY));
       }
     }
@@ -923,9 +1565,9 @@
       if (f.fin) continue;
       // Fuego amigo: la bola no distingue, quema al enemigo que se cruce.
       // La de un jefe sí: no iba a quemar a su propia escolta.
-      if (f.jefe) continue;
+      if (f.jefe || f.k === 21) continue;
       for (const g of [...E.values()]) {
-        if (g.id === f.de || dist(f.x, f.y, g.x, g.y) >= RG(g.k) + 3) continue;
+        if (g.id === f.de || bajoTierra(g) || dist(f.x, f.y, g.x, g.y) >= RG(g.k) + 3) continue;
         danaEnemigo(g.id, dmg, '', 9, f.x - f.vx * 0.1, f.y - f.vy * 0.1);
         f.fin = true; humo(f.x, f.y, f.k); break;
       }
@@ -936,7 +1578,7 @@
   function zbSale() {
     return {
       n: dir.n, q: dir.q, t: Math.round(dir.t * 10) / 10,
-      e: [...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) ? [Math.round(e.max), e.est || 0] : [])),
+      ...D.empacaZb([...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) || e.el || e.est || e.max !== D.vidaEnemigo(e.k, Math.max(1, dir.n)) ? [Math.round(e.max), e.est || 0, e.el || 0].concat(e.est === 1 && D.ENEMIGOS[e.k].vigia ? [e.ax, e.ay] : []) : []))),
       f: F.map(f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy), f.k || 1, Math.round(f.t * 10)].concat(f.roca ? [Math.round(f.t0 * 10), Math.round(f.tx), Math.round(f.ty)] : [])),
       o: [...O.values()].map(o => [o.id, OBJ.indexOf(o.k), o.x, o.y, Math.max(1, Math.round(100 * Math.min(o.hp, o.max) / o.max)), o.u || '', o.r || 0, o.max >= 1e9 ? 0 : o.max, o.d || 0, o.bl ? 1 : 0]),
       b: [...B.values()].map(b => [b.id, b.k, b.x, b.y]),
@@ -949,9 +1591,8 @@
     if (!zb || typeof zb !== 'object') return;
     dir.n = zb.n | 0; dir.q = zb.q | 0; dir.t = +zb.t || 0;
     const vistos = new Set();
-    for (const a of zb.e || []) {
-      if (!Array.isArray(a)) continue;
-      const [id, k0, x, y, pc, d, atk, aturd, mx, est] = a, k = D.ENEMIGOS[k0 | 0] ? k0 | 0 : 0;
+    for (const a of D.desempacaZb(zb)) {
+      const [id, k0, x, y, pc, d, atk, aturd, mx, est, el, ax, ay] = a, k = D.ENEMIGOS[k0 | 0] ? k0 | 0 : 0;
       vistos.add(id);
       ultimoId = Math.max(ultimoId, id);
       const max = +mx > 0 ? +mx : D.vidaEnemigo(k, Math.max(1, dir.n));
@@ -960,6 +1601,7 @@
       // Un salto del Espectro no se interpola: aparece donde cayó.
       if (dist(e.x, e.y, x, y) > 60) { e.x = x; e.y = y; }
       e.tx = x; e.ty = y; e.hp = max * pc / 100; e.d = d | 0; e.atk = atk ? 0.25 : 0; e.max = max; e.est = est | 0;
+      e.el = D.ELITES[el | 0] ? el | 0 : 0; e.ax = +ax || 0; e.ay = +ay || 0;
       if (aturd) e.aturd = Math.max(e.aturd || 0, 0.15);
       if (adoptar) { e.x = x; e.y = y; }
     }
@@ -1021,8 +1663,8 @@
     if (tipo !== 2) fx.cadaver(x, y, k, ak, ta * ESC);
     if (k === 1 || k === 13) fx.humo(x, y, 8, 18, 'fuego');
     son(k === 1 || k === 13 || k === 7 ? 'bajaDiablo' : 'baja', dist(x, y, yo.x, yo.y));
-    if (cfg && m[1] === cfg.yo) miBaja(k);
-    if (D.esJefe(k)) { fx.sangre(x, y, ak, 30, t, 30); efectoBoom(x, y, 60); banner('¡' + D.ENEMIGOS[k].nombre.toUpperCase() + ' DERROTADO!'); }
+    if (cfg && m[1] === cfg.yo) miBaja(k, x, y);
+    if (D.esJefe(k)) { fx.sangre(x, y, ak, 30, t, 30); efectoBoom(x, y, 60); banner('¡' + D.ENEMIGOS[k].nombre.toUpperCase() + ' DERROTADO!'); impacto(0.09); vibra(1, 1, 350); }
   }
 
   // ---------- la red ----------
@@ -1041,12 +1683,14 @@
   function config(m) {
     if (cfg) return;
     cfg = {
-      yo: String(m.yo || ''), mirando: !!m.mirando, variante: m.variante === 'versus' ? 'versus' : 'coop',
+      yo: String(m.yo || ''), mirando: !!m.mirando, variante: ['versus', 'jefes', 'equipos', 'infectado'].includes(m.variante) ? m.variante : 'coop', mut: D.mutador(m.mut),
+      equipos: m.equipos && typeof m.equipos === 'object' ? Object.fromEntries(Object.entries(m.equipos).filter(([, e]) => e === 'rojo' || e === 'azul')) : null,
       mapa: D.mapaValido(m.mapa), meta: m.meta | 0, semilla: m.semilla | 0,
       jugadores: (m.jugadores || []).map((j, i) => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador'), orden: Number.isInteger(j.orden) ? j.orden : i })),
     };
     yo = nuevoYo();
-    if (cfg.variante === 'versus') for (const a of D.ARMAS) desbloquea(a.id);
+    // En versus y en el modo jefes se juega con todo desde el principio.
+    if (cfg.variante !== 'coop') for (const a of D.ARMAS_J) desbloquea(a.id);
     cargaMundo(cfg.mapa);
     $('menuMapas').hidden = true;
     $('cuenta').textContent = cfg.mirando ? 'Estás mirando la partida.' : '';
@@ -1066,6 +1710,9 @@
       r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0; r.nv = clamp(s.nv | 0, 0, D.NIVEL_ARMA.max);
       r.pts = s.pts | 0; r.k = s.k | 0; r.mul = s.mul | 0; r.sk = s.sk; r.mv = !!s.mv; r.h = !!s.h;
       if (s.pz) { if (!r.pz) r.pzDesde = Date.now(); r.pz = true; } else r.pz = false;
+      if (Array.isArray(s.pg) && Number.isFinite(+s.pg[0]) && Number.isFinite(+s.pg[1])) {
+        if (r.pgN !== s.pg[2]) { r.pgN = s.pg[2]; r.pg = { x: +s.pg[0], y: +s.pg[1], t: T }; son('clic', dist(+s.pg[0], +s.pg[1], yo.x, yo.y)); }
+      }
       if (dist(r.x, r.y, r.tx, r.ty) > TS * 4) { r.x = r.tx; r.y = r.ty; }
       // Golpes: la primera vez solo marca; después, lo que pase la marca.
       const g = Array.isArray(s.g) ? s.g.filter(Array.isArray) : [];
@@ -1083,17 +1730,35 @@
     if (!soyDir && dirUid && V[dirUid] && V[dirUid].zb) { ultimoZb = V[dirUid].zb; aplicaZb(ultimoZb, false); }
   }
 
+  /* Lo que el director le acepta a cada jugador: ningún golpe por encima
+     de lo que su arma puede (D.topeGolpe) y un cupo de golpes que se
+     rellena con el tiempo (CUPO_GOLPES por segundo, hasta CUPO_MAX: una
+     cadena de cargas en una horda entra entera). Lo que sobra se descarta. */
+  const TOPE_GOLPE = D.ARMAS.map(a => D.topeGolpe(a.id)), TOPE_RADIO = D.ARMAS.map(a => D.topeRadio(a.id));
+  const CUPO_GOLPES = 200, CUPO_MAX = 400, cupo = new Map();
+  function gastaCupo(de) {
+    let c = cupo.get(de);
+    if (!c) cupo.set(de, c = { n: CUPO_MAX, t: T });
+    c.n = Math.min(CUPO_MAX, c.n + (T - c.t) * CUPO_GOLPES); c.t = T;
+    if (c.n < 1) return false;
+    c.n--; return true;
+  }
   function aplicaGolpe(x, de) {
     const [, dest, d, w, extra] = x;
     if (typeof dest !== 'string') return;
     const dmg = Math.min(500, Math.max(0, +d || 0));
     if (dest === cfg.yo) recibe(dmg, w | 0, typeof extra === 'string' ? extra : '');
     else if (soyDir) {
+      // Golpes de otro a enemigos u objetos: un arma que existe, con su tope por golpe y un cupo por segundo.
+      if (dest.startsWith('e:') || dest.startsWith('o:')) {
+        if (!(D.ARMAS[w] && D.ARMAS[w].tipo !== 'enemigo') || !gastaCupo(de)) return;
+      }
+      const dm = dest.startsWith('e:') || dest.startsWith('o:') ? Math.min(dmg, TOPE_GOLPE[w | 0] * (mutD().dano || 1)) : dmg;
       if (dest.startsWith('e:')) {
         const src = Array.isArray(extra) ? extra : [];
-        danaEnemigo(+dest.slice(2), dmg, de, w | 0, +src[0], +src[1]);
+        danaEnemigo(+dest.slice(2), dm, de, w | 0, +src[0], +src[1]);
       }
-      else if (dest.startsWith('o:')) danaObjeto(+dest.slice(2), dmg, de);
+      else if (dest.startsWith('o:')) danaObjeto(+dest.slice(2), dm, de);
       else if (dest === 'p') peticion(de, extra);
     }
   }
@@ -1106,7 +1771,11 @@
       for (const a of Array.isArray(v.l) ? v.l : []) {
         if (!Array.isArray(a)) continue;
         if (k === 's') {
-          const ang = a[4] / 100, l = +a[5] || 0, w = clamp(a[1] | 0, 0, 2), cs = Math.cos(ang), sn = Math.sin(ang);
+          const w0 = a[1] | 0, ang0 = a[4] / 100, l0 = clamp(+a[5] || 0, 0, 700);
+          // Llama y rayo de otro: se dibujan aparte (un tiro común no los muestra).
+          if (w0 === 10) { const bo = G.boca(a[2], a[3], ang0, 10, ESC); fx.humo(bo[2] + Math.cos(ang0) * l0 * 0.45, bo[3] + Math.sin(ang0) * l0 * 0.45, 2, l0 * 0.35, 'fuego'); const r = R.get(u); if (r) { r.rec = 0.4; r.av = ang0; } continue; }
+          if (w0 === 13) { RAYOS.push({ pts: [[a[2], a[3] - 16], [a[2] + Math.cos(ang0) * l0, a[3] + Math.sin(ang0) * l0 - 14]], t: 0.2 }); son('premio', dist(a[2], a[3], yo.x, yo.y)); continue; }
+          const ang = ang0, l = l0, w = w0 === 11 || w0 === 12 ? w0 : clamp(w0, 0, 2), cs = Math.cos(ang), sn = Math.sin(ang);
           const bo = G.boca(a[2], a[3], ang, w, ESC), ex = a[2] + cs * l, ey = a[3] + sn * l;
           fx.trazo(bo[2], bo[3], ex, ey, bo[4], w === 2);
           const r = R.get(u);
@@ -1114,7 +1783,7 @@
           if (r && T - (r.fogT || -1) > 0.04) { r.fogT = T; r.rec = 1; r.av = ang; fx.fogonazo(bo[0], bo[1], bo[2], bo[3], ang, w); fx.casquillo(a[2], a[3], ang, w === 2); }
           if (solidoEn(ex + cs * 4, ey + sn * 4)) impactoMuro(ex - cs * 2, ey - sn * 2, ang, bo[4]);
           else for (const e of E.values()) if ((ex - e.x) ** 2 + (ey - e.y) ** 2 < (RG(e.k) + 8) ** 2) { fx.sangre(e.x, e.y, ang, 3, G.sangreDe(e.k)); break; }
-          son(w === 2 ? 'escopeta' : w === 1 ? 'uzi' : 'pistola', dist(a[2], a[3], yo.x, yo.y));
+          son(w === 2 ? 'escopeta' : w === 1 || w === 12 ? 'uzi' : w === 11 ? 'lanza' : 'pistola', dist(a[2], a[3], yo.x, yo.y));
         } else if (k === 'n') {
           const w = a[1] | 0;
           if (D.ARMAS[w] && (D.ARMAS[w].tipo === 'granada' || D.ARMAS[w].tipo === 'cohete')) {
@@ -1153,11 +1822,27 @@
     marcador = {
       nivel: Math.max(1, m.nivel | 0), caidos: Array.isArray(m.caidos) ? m.caidos : [], bajas: m.bajas || {},
       muertes: m.muertes || {}, puntos: m.puntos || {}, fuera: Array.isArray(m.fuera) ? m.fuera : [], meta: m.meta | 0, fin: m.fin || null,
+      puntosEq: m.puntosEq && typeof m.puntosEq === 'object' ? m.puntosEq : null,
+      infectados: Array.isArray(m.infectados) ? m.infectados.map(String) : [],
     };
     if (!cfg) return;
+    if (infectado() && esZombi(cfg.yo) && !(antes.infectados || []).includes(cfg.yo)) {
+      const cero = !(marcador.muertes || {})[cfg.yo];
+      banner(cero ? 'ERES EL PACIENTE CERO · MUERDE' : 'TE INFECTARON · AHORA MUERDES'); son('gemido');
+      yo.hp = Math.min(hpMax(), yo.hp + 60);
+    }
     const b = (marcador.bajas || {})[cfg.yo] | 0;
-    if (versus() && b > misBajas) { premio('¡Baja! ' + b + ' de ' + (cfg.meta || marcador.meta)); son('premio'); }
+    if (versus() && b > misBajas) { premio(equipos() ? '¡Baja para tu equipo!' : '¡Baja! ' + b + ' de ' + (cfg.meta || marcador.meta)); son('premio'); }
     misBajas = b;
+    if (!versus() && yo.muerto && !terminado) {
+      if (marcador.caidos.includes(cfg.yo)) vistoCaido = true;
+      else if (vistoCaido && (marcador.nivel || 1) === yo.nivelMuerte) {
+        // me levantaron donde caí, con media vida
+        vistoCaido = false;
+        yo.v = true; yo.muerto = false; yo.hp = hpMax() * 0.5; yo.inv = 2;
+        banner('¡TE REVIVIERON!'); son('premio');
+      }
+    }
     if (marcador.fin && !terminado) acaba(marcador.fin);
     void antes;
   }
@@ -1166,10 +1851,13 @@
     terminado = true;
     let txt;
     const g = f.ganador || '';
-    if (versus()) txt = g ? (g === cfg.yo ? '¡Ganaste el versus!' : 'Gana ' + nombreDe(g) + '.') : 'Terminó sin ganador.';
+    if (infectado()) txt = g === 'eq:humanos' ? (esZombi(cfg.yo) ? 'Los humanos aguantaron.' : '¡Aguantaste! Ganan los humanos.') : g === 'eq:infectados' ? (esZombi(cfg.yo) ? '¡Infectaron a todos!' : 'Te alcanzaron: ganan los infectados.') : 'Terminó sin ganador.';
+    else if (equipos()) txt = g ? (g === 'eq:' + equipoDe(cfg.yo) ? '¡Ganó tu equipo!' : 'Gana el equipo ' + (g === 'eq:rojo' ? 'Rojo' : 'Azul') + '.') : 'Terminó sin ganador.';
+    else if (versus()) txt = g ? (g === cfg.yo ? '¡Ganaste el versus!' : 'Gana ' + nombreDe(g) + '.') : 'Terminó sin ganador.';
     else txt = 'Cayeron todos en el nivel ' + (f.nivel || marcador.nivel) + '. ' +
       (g ? (g === cfg.yo ? '¡Hiciste más puntos que nadie!' : 'Más puntos: ' + nombreDe(g) + '.') : '');
     $('finTxt').textContent = txt;
+    if (!cfg.mirando) pintaStats(); else $('finStats').textContent = '';
     $('otra').hidden = true;
     setTimeout(() => { $('fin').hidden = false; }, 1200);
   }
@@ -1182,6 +1870,7 @@
     };
     if (yo.nv[yo.w]) e.nv = yo.nv[yo.w];
     if (pausado && !cfg.mirando) e.pz = 1;
+    if (ping && T - ping.t < 4) e.pg = [ping.x, ping.y, ping.n];
     if (document.hidden) e.h = 1;
     const ahora = Date.now();
     misG = misG.filter(x => x[0] >= ahora - 3500).slice(-60);
@@ -1221,6 +1910,7 @@
       return;
     }
     T += dt;
+    yo.bajasPaso = 0;
     eligeDirector();
     if (jugando && !terminado && !cfg.mirando) pasoYo(dt);
     if (soyDir) simDirector(dt);
@@ -1232,6 +1922,14 @@
       }
       for (const f of F) { f.x += f.vx * dt; f.y += f.vy * dt; f.t -= dt; }
     }
+    for (const e of E.values()) {
+      if (e.sac > 0) e.sac = Math.max(0, e.sac - dt * 2.5);
+      if (e.debil > 0) e.debil -= dt;
+    }
+    for (const r of RAYOS) r.t -= dt;
+    for (const l of LUCES) l.t -= dt;
+    while (LUCES.length && LUCES[0].t <= 0) LUCES.shift();
+    while (RAYOS.length && RAYOS[0].t <= 0) RAYOS.shift();
     for (const e of E.values()) {
       e.tb = (e.tb || 0) + ((e.aturd > 0 ? 1 : 0) - (e.tb || 0)) * Math.min(1, dt * (e.aturd > 0 ? 18 : 7));
       // lo que se dibuja gira y ataca suave, no a saltos de 45°
@@ -1249,14 +1947,16 @@
     pasoProy(dt);
     efectos(dt);
     const n = nivelObjetivo();
-    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner('NIVEL ' + n); son('nivel'); }
+    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner((jefes() ? 'JEFE ' : 'NIVEL ') + n); son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(n); }
+    if (eleccion && (eleccion.t -= dt) <= 0) eligeVentaja(0);
     if (ONLINE) {
       pubT += dt;
       if (pubT >= 1 / 12) { pubT = 0; enviar('estado', { e: miEstado() }); }
-    }
+    } else pasoN++;
   }
 
   function pasoYo(dt) {
+    armaRejilla();
     yo.cd -= dt; yo.inv = Math.max(0, yo.inv - dt);
     if (yo.mul > 1) {
       yo.combo -= dt;
@@ -1265,25 +1965,31 @@
     }
     if (yo.muerto) {
       if (!ONLINE) { if (yo.fin > 0 && (yo.fin -= dt) <= 0) finPractica(); return; }
-      if (versus()) { if ((yo.respawn -= dt) <= 0) { aparece(); for (const a of D.ARMAS) if (a.id) yo.ammo[a.id] = Math.max(yo.ammo[a.id], a.ini); } }
-      else if ((marcador.nivel || 1) > yo.nivelMuerte) { aparece(); banner('¡DE VUELTA!'); }
+      if (versus()) { if ((yo.respawn -= dt) <= 0) { aparece(); for (const a of D.ARMAS_J) if (a.id) yo.ammo[a.id] = Math.max(yo.ammo[a.id], a.ini); } }
+      else if ((marcador.nivel || 1) > yo.nivelMuerte) { aparece(); banner('¡DE VUELTA!'); if (vt('relevo')) yo.arm = Math.max(yo.arm || 0, 50); }
       return;
     }
     if (!yo.v) return;
-    let dx = 0, dy = 0;
-    if (!pausado) {
-      if (teclas.has('KeyA') || teclas.has('ArrowLeft')) dx--;
-      if (teclas.has('KeyD') || teclas.has('ArrowRight')) dx++;
-      if (teclas.has('KeyW') || teclas.has('ArrowUp')) dy--;
-      if (teclas.has('KeyS') || teclas.has('ArrowDown')) dy++;
-    }
+    if (yo.vacio > 0 && (yo.vacio -= dt) <= 0 && !(yo.ammo[yo.w] > 0)) eligeArma(0);
+    yo.sinGolpe += dt;
+    if (vt('regenera') && yo.sinGolpe > 3 && yo.hp < hpMax()) yo.hp = Math.min(hpMax(), yo.hp + vt('regenera') * dt);
+    if (yo.booms.length) { const bs = yo.booms; yo.booms = []; for (const [bx, by] of bs) explota(bx, by, 50, Math.round(60 * factorVentajas()), 4, nid(), true); }
+    if (vt('dron')) pasoDron(dt);
+    const en = entradaPaso();
+    const { dx, dy, vel, mira, fija } = en;
     yo.mov = !!(dx || dy);
+    yo.fija = fija || mira >= 0;
+    if (mira >= 0) yo.d = mira;
     if (yo.mov) {
-      yo.d = D.dirDe(dx, dy);
-      const l = Math.hypot(dx, dy), v = 110;
+      const quieta = fija || mira >= 0;
+      if (!quieta) yo.d = D.dirDe(dx, dy);
+      const l = hyp(dx, dy), v = 110 * vel * (quieta ? 0.88 : 1) * (1 + 0.07 * vt('pies')) * (esZombi(cfg.yo) ? 1.2 : 1);
       mover(yo, dx / l * v * dt, dy / l * v * dt, 9);
     }
-    if (!pausado && teclas.has('Space')) dispara();
+    if (en.disp) dispara();
+    cinta(yo, 9, dt);
+    if (!en.disp || !armaYo().gira) yo.giro = Math.max(0, yo.giro - dt * 1.5);
+    if (yo.dorada > 0) yo.dorada = Math.max(0, yo.dorada - dt);
     // Cajas.
     for (const b of [...B.values()]) {
       if (ocultas.has(b.id) || dist(b.x, b.y, yo.x, yo.y) > 18) continue;
@@ -1291,17 +1997,94 @@
       else { ocultas.add(b.id); B.delete(b.id); misG.push([nid(), 'p', 0, 0, { caja: b.id }]); }
       abreCaja(b.k);
     }
+    if (ONLINE && !versus()) pasoRevive(dt);
+  }
+  // Junto a la tumba de un compañero caído (a menos de 28 px) se llena el anillo; a los 3 s, lo revivo.
+  function pasoRevive(dt) {
+    let u = '', mejor = 28;
+    for (const [k, r] of R) {
+      if (r.v || !marcador.caidos.includes(k) || marcador.fuera.includes(k)) continue;
+      const d = dist(r.x, r.y, yo.x, yo.y);
+      if (d < mejor) { mejor = d; u = k; }
+    }
+    if (u !== revive.u) { revive.u = u; revive.t = 0; }
+    if (!u) return;
+    revive.t += dt;
+    if (revive.t >= REVIVIR_T && T - (revive.enviado.get(u) ?? -99) > 5) {
+      revive.enviado.set(u, T); revive.t = 0;
+      enviar('revive', { v: u });
+      premio('Reviviste a ' + nombreDe(u)); son('premio');
+    }
+  }
+  // «¡Aquí!»: un marcador en el suelo, un poco delante de donde miro, que ven todos.
+  function marcaAqui() {
+    if (!ONLINE || !yo.v || yo.muerto) return;
+    const [dx, dy] = DIRS[yo.d];
+    ping = { x: Math.round(yo.x + dx * 70), y: Math.round(yo.y + dy * 70), t: T, n: ++pingN };
+    son('clic');
+  }
+
+  /* Lo que el jugador le pide al personaje en este paso. Rehaciendo una
+     partida sale de la prueba (`repite`); jugando, del teclado, el stick
+     (mando o táctil) y, para fijar hacia dónde se mira, Shift / LT / el
+     botón táctil. El stick derecho mira sin mover. Con la dirección fija
+     se camina un poco más lento: retroceder disparando es una ventaja y
+     cuesta algo. La velocidad va en veinteavos para que la grabadora
+     anote un cambio solo cuando el stick se mueve de verdad. */
+  function entradaPaso() {
+    if (repite) return repite.ent;
+    let dx = 0, dy = 0, vel = 1, mira = -1;
+    let fija = teclas.has('ShiftLeft') || teclas.has('ShiftRight') || toque.fija;
+    if (forzada) ({ dx, dy, vel, mira, fija } = forzada);   // los tests: un bot que pasa por la grabadora
+    else if (!pausado) {
+      if (teclas.has('KeyA') || teclas.has('ArrowLeft')) dx--;
+      if (teclas.has('KeyD') || teclas.has('ArrowRight')) dx++;
+      if (teclas.has('KeyW') || teclas.has('ArrowUp')) dy--;
+      if (teclas.has('KeyS') || teclas.has('ArrowDown')) dy++;
+      const m = leeMando();
+      let sx = 0, sy = 0;
+      if (m) {
+        sx = m.ejes.lx; sy = m.ejes.ly;
+        if (m.b.lt > 0.5) fija = true;
+        if (hyp(m.ejes.rx, m.ejes.ry) > 0.35) { dirR = D.dirStick(m.ejes.rx, m.ejes.ry, dirR); mira = dirR; } else dirR = -1;
+      }
+      if (toque.id !== null && hyp(toque.x, toque.y) > hyp(sx, sy)) { sx = toque.x; sy = toque.y; }
+      const r = Math.min(1, hyp(sx, sy));
+      if (!dx && !dy && r > 0.12) {
+        dirL = D.dirStick(sx, sy, dirL);
+        // poco inclinado: gira sin avanzar; más, camina (más rápido cuanto más)
+        if (r < 0.38) { if (mira < 0 && !fija) mira = dirL; }
+        else { dx = DIRS[dirL][0]; dy = DIRS[dirL][1]; vel = 0.55 + 0.45 * (r - 0.38) / 0.62; }
+      } else if (r <= 0.12) dirL = -1;
+    }
+    dx = Math.sign(dx); dy = Math.sign(dy);
+    vel = dx || dy ? Math.round(vel * 20) / 20 : 1;
+    const disp = forzada ? !!forzada.disp : !pausado && (teclas.has('Space') || toque.disp);
+    const en = { dx, dy, vel, mira, fija: !!fija, disp };
+    if (graba) {
+      const j = [pasoN, 0, dx + 1 + 3 * (dy + 1), Math.round(vel * 20), mira + 1, (en.fija ? 1 : 0) | (disp ? 2 : 0)];
+      const c = j.slice(2).join();
+      if (c !== graba.ult && graba.j.length < MAX_JUGADAS) { graba.ult = c; graba.j.push(j); }
+    }
+    return en;
+  }
+  // Una jugada grabada [paso, 0, …] → la entrada de los pasos que siguen.
+  function entradaDe(j) {
+    const m = j[2] | 0, b = j[5] | 0;
+    return { dx: (m % 3) - 1, dy: ((m / 3) | 0) - 1, vel: (j[3] | 0) / 20, mira: (j[4] | 0) - 1, fija: !!(b & 1), disp: !!(b & 2) };
   }
 
   function abreCaja(k) {
     son('recoge');
-    if (k === 1) { yo.hp = Math.min(100, yo.hp + 50); premio('+50 vida'); return; }
+    // Caja dorada: furia dorada, doble daño y munición sin gastar por un rato.
+    if (k === 3) { yo.dorada = D.DORADA_T; premio('¡Furia dorada! ×' + D.DORADA + ' de daño y munición infinita'); son('premio'); return; }
+    if (k === 1) { yo.hp = Math.min(hpMax(), yo.hp + 50); premio('+50 vida'); return; }
     if (k === 2) { yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + D.ARMADURA.caja); premio('+' + D.ARMADURA.caja + ' armadura'); return; }
     const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < armaDe(i).max);
-    if (!l.length) { yo.pts += 50; premio('+50 puntos'); return; }
-    const i = l[(Math.random() * l.length) | 0], a = armaDe(i);
-    yo.ammo[i] = Math.min(a.max, yo.ammo[i] + a.caja);
-    premio('+' + a.caja + ' ' + a.nombre);
+    if (!l.length) { yo.chat += 30; chatPulso = 1; premio('+30 chatarra'); return; }
+    const i = l[(rn() * l.length) | 0], a = armaDe(i), caja = Math.round(a.caja * (1 + 0.3 * vt('cargador')));
+    yo.ammo[i] = Math.min(a.max, yo.ammo[i] + caja);
+    premio('+' + caja + ' ' + a.nombre);
   }
 
   // La tienda: hay que estar al lado de un puesto ($) y tener los puntos.
@@ -1316,18 +2099,18 @@
     if (!t) return;
     if (id === 'potencia' && (yo.pot || 0) >= t.max) { son('clic'); premio('Potencia al máximo'); return; }
     if (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) { son('clic'); premio('Armadura completa'); return; }
-    if (id === 'botiquin' && yo.hp >= 100) { son('clic'); premio('Vida completa'); return; }
+    if (id === 'botiquin' && yo.hp >= hpMax()) { son('clic'); premio('Vida completa'); return; }
     if (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max) { son('clic'); premio('Ya llevas ' + D.MURO_BLINDADO.max + ' muros reforzados'); return; }
-    const precio = D.precioTienda(id, yo.pot || 0);
-    if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
-    yo.pts -= precio;
+    const precio = D.precioTienda(id, yo.pot || 0, nivelObjetivo());
+    if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
+    yo.chat -= precio;
     if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = armaDe(i).max; }
     else if (id === 'armadura') yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 50);
-    else if (id === 'botiquin') yo.hp = Math.min(100, yo.hp + 50);
+    else if (id === 'botiquin') yo.hp = Math.min(hpMax(), yo.hp + 50);
     else if (id === 'potencia') yo.pot = (yo.pot || 0) + 1;
     else if (id === 'blindado') yo.bl++;
     son('compra');
-    premio(t.nombre + ' −' + precio + (id === 'blindado' ? ' · F para ponerlo' : ''));
+    premio(t.nombre + ' −' + precio + (id === 'blindado' ? ' · ' + boton('F', 'b') + ' para ponerlo' : ''));
     pintaTienda(true);
   }
   /* Subir un arma un nivel: más daño, cadencia, munición… y otro aspecto. */
@@ -1335,10 +2118,11 @@
     if (!tiendaCerca() || !yo.tiene.has(i)) return;
     const n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n), a = D.ARMAS[i];
     if (!Number.isFinite(precio)) { son('clic'); premio(a.nombre + ' al máximo'); return; }
-    if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
+    if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
     const antes = armaDe(i);
-    yo.pts -= precio;
+    yo.chat -= precio;
     yo.nv[i] = n + 1;
+    if (!Number.isFinite(D.precioNivelArma(i, n + 1))) medalla('maestro');
     // La munición crece con el tope: lo que faltaba sigue faltando.
     if (i !== 0) yo.ammo[i] = Math.min(armaDe(i).max, yo.ammo[i] + Math.max(0, armaDe(i).max - antes.max));
     son('mejora');
@@ -1348,16 +2132,44 @@
   }
   /* Pone un muro reforzado delante, como el muro falso pero de acero. */
   function ponBlindado() {
-    if (!(yo.bl > 0)) { son('clic'); premio(tiendaCerca() ? 'Compra un muro reforzado (M)' : 'No te quedan muros reforzados'); return; }
+    if (!(yo.bl > 0)) { son('clic'); premio(tiendaCerca() ? 'Compra un muro reforzado (' + boton('M', 'b') + ')' : 'No te quedan muros reforzados'); return; }
     if (yo.cd > 0) return;
     if (pon({ id: 5, obj: 'muro', vida: D.MURO_BLINDADO.vida, bl: 1 })) { yo.bl--; yo.cd = 0.35; son('pon'); pintaTienda(true); }
   }
 
   function finPractica() {
     terminado = true;
+    finPaso = pasoN;
+    anotaRecord(nivelLocal);
+    if (graba) graba.k = pasoN;
+    // Al Club: el nivel al que llegaste y cuánto tardaste en llegar a él (en pasos), con la prueba.
+    if (CLUB) Club.inmersivo(false);
+    if (CLUB && graba && !repite) Club.result({ categoria: catClub(D.ORDEN_MAPAS[graba.m]), puntos: nivelLocal, tiempo: Math.round((pasoNivel + 1) * 1000 / 60) }, prueba());
     $('finTxt').textContent = 'Llegaste al nivel ' + nivelLocal + ' con ' + yo.pts + ' puntos y ' + yo.k + ' bajas.';
+    pintaStats();
     $('otra').hidden = false;
     $('fin').hidden = false;
+  }
+  /* La pantalla final dice cómo jugaste: multiplicador máximo, precisión,
+     jefes y con qué arma hiciste más bajas. */
+  function pintaStats() {
+    const st = yo.st, el = $('finStats');
+    el.textContent = '';
+    let mejor = -1;
+    st.armas.forEach((n, i) => { if (n > 0 && D.ARMAS[i] && (mejor < 0 || n > st.armas[mejor])) mejor = i; });
+    const filas = [
+      ['Multiplicador máximo', '×' + yo.maxMul],
+      ['Bajas', yo.k],
+      ['Precisión', st.disp ? Math.round(100 * st.acierto / st.disp) + ' %' : '—'],
+      ['Jefes derrotados', st.jefes],
+      ['Arma favorita', mejor >= 0 ? D.ARMAS[mejor].nombre + ' (' + st.armas[mejor] + ')' : '—'],
+      ['Chatarra sin gastar', yo.chat],
+      ['Ventajas', listaVentajas() || '—'],
+    ];
+    for (const [k, v] of filas) {
+      const d = document.createElement('div'), a = document.createElement('span'), b = document.createElement('b');
+      a.textContent = k; b.textContent = v; d.append(a, b); el.append(d);
+    }
   }
 
   // ---------- efectos ----------
@@ -1376,14 +2188,30 @@
   }
   function efectoBoom(x, y, r) {
     fx.boom(x, y, r);
+    // la luz de la explosión: abre la oscuridad del Apagón y, en los demás mapas, alumbra el suelo (Fase 3.6)
+    LUCES.push({ x, y, r: r * (M && M.oscuro ? 2.4 : 1.9), t: 0.6, t0: 0.6 }); if (LUCES.length > 20) LUCES.shift();
     sacude = Math.min(10, sacude + r / 12);
-    son('boom', dist(x, y, yo.x, yo.y));
+    const dd = dist(x, y, yo.x, yo.y);
+    son('boom', dd);
+    if (yo.v && !yo.muerto && dd < 360) {
+      const f = 1 - dd / 360;
+      vibra(0.4 + 0.6 * f, 0.6 * f + 0.2, 160 + r * 2);
+      if (r >= 80 && dd < 300) impacto(0.05);
+    }
   }
-  let sacude = 0;
+  /* **Pausa de impacto**: unas centésimas casi detenidas en lo que pega
+     fuerte (un jefe que cae, una explosión grande cerca, la escopeta a
+     quemarropa). Frena solo esta pantalla, y menos de una décima. */
+  let sacude = 0, hs = 0, pulso = 0;
+  const impacto = s => { hs = Math.max(hs, Math.min(0.1, s)); };
   function efectos(dt) {
     fx.paso(dt);
     rojo = Math.max(0, rojo - dt * 1.5);
     sacude = Math.max(0, sacude - dt * 25);
+    pulso = Math.max(0, pulso - dt * 2.2);
+    chatPulso = Math.max(0, chatPulso - dt * 3);
+    pasoChatarra(dt);
+    pasoNumeros(dt);
   }
   /* El gemido de la horda: cada tanto gime (o gruñe, si es un diablo) uno
      de los enemigos cercanos, más seguido cuantos más haya. */
@@ -1405,8 +2233,8 @@
   // Tamaño de cada tipo de enemigo (índice = k de ENEMIGOS) y color de su vida.
   // Los modelos se dibujan un poco más grandes que su radio de choque, como en el original.
   const ESC = 1.15;
-  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22];
-  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f'];
+  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22, 1.1, 0.62, 1, 1.05, 0.95];
+  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f', '#b8c0cc', '#e8483a', '#7fe08a', '#c9a46a', '#ff5a5a'];
   const PAL_SKIN = new Map();
   const palDe = id => { let p = PAL_SKIN.get(id); if (!p) { p = G.palJugador(D.skin(id)); PAL_SKIN.set(id, p); } return p; };
 
@@ -1437,26 +2265,73 @@
       }
       if (e.est === 4) cx.globalAlpha = 0.35;
     }
+    // Excavador bajo tierra: un montículo que avanza; asomando, grietas que laten.
+    if (Cj.cava && e.est > 0) {
+      const ex = e.x, ey = e.y;
+      if (e.est === 1) {
+        cx.fillStyle = 'rgba(0,0,0,.25)'; cx.beginPath(); cx.ellipse(ex, ey + 2, 13, 6, 0, 0, 7); cx.fill();
+        cx.fillStyle = '#5a4630'; cx.beginPath(); cx.ellipse(ex, ey, 11, 5.5, 0, Math.PI, 0); cx.fill();
+        cx.fillStyle = '#7a5f40';
+        for (let i = 0; i < 3; i++) { const a = T * 9 + i * 2.1 + e.id; cx.fillRect(ex + Math.cos(a) * 9, ey - 2 + Math.sin(a * 1.3) * 3, 2.4, 2.4); }
+      } else {
+        const pul = 0.5 + 0.5 * Math.sin(T * 22);
+        cx.strokeStyle = 'rgba(40,24,10,' + (0.6 + 0.4 * pul).toFixed(2) + ')'; cx.lineWidth = 2;
+        cx.beginPath();
+        for (let i = 0; i < 6; i++) { const a = i * 1.05 + e.id, r = 8 + 8 * pul; cx.moveTo(ex, ey); cx.lineTo(ex + Math.cos(a) * r, ey + Math.sin(a) * r * 0.6); }
+        cx.stroke();
+      }
+      return;
+    }
+    // Vigía apuntando: el láser hasta donde va a disparar.
+    if (Cj.vigia && e.est === 1 && (e.ax || e.ay)) {
+      cx.strokeStyle = 'rgba(255,40,40,' + (0.35 + 0.35 * Math.sin(T * 30)).toFixed(2) + ')'; cx.lineWidth = 1.2;
+      cx.beginPath(); cx.moveTo(e.x, e.y - 20 * ta); cx.lineTo(e.ax, e.ay - 14); cx.stroke();
+      cx.fillStyle = 'rgba(255,40,40,.8)'; cx.beginPath(); cx.arc(e.ax, e.ay - 14, 2, 0, 7); cx.fill();
+    }
+    // Chamán curando: un anillo verde que se abre.
+    if (Cj.cura && e.est === 1) {
+      const r = (Cj.alcCura || 120) * (1 - (e.estT || 0) / 0.6 * 0.6);
+      cx.strokeStyle = 'rgba(110,230,120,.55)'; cx.lineWidth = 2;
+      cx.beginPath(); cx.ellipse(e.x, e.y, r, r * 0.75, 0, 0, 7); cx.stroke();
+    }
+    // Élite: aura de su color en el suelo.
+    const El = e.el ? D.ELITES[e.el] : null;
+    if (El) {
+      cx.strokeStyle = El.color; cx.lineWidth = 2; cx.globalAlpha = 0.55 + 0.3 * Math.sin(T * 6 + e.id);
+      cx.beginPath(); cx.ellipse(e.x, e.y, 13 * ta, 6.5 * ta, 0, 0, 7); cx.stroke();
+      cx.globalAlpha = 1;
+    }
+    // El punto débil del jefe: un brillo amarillo en la espalda (delante del cuerpo solo si la espalda da a la cámara).
+    const debil = jf ? () => {
+      const dv = DIRS[e.d || 0], l = hyp(dv[0], dv[1]) || 1, rg = (Cj.rg || 18) * 0.55;
+      const pul = 0.5 + 0.5 * Math.sin(T * 7 + e.id), bx = e.x - dv[0] / l * rg, by = e.y - dv[1] / l * rg * 0.6 - 22 * ta;
+      cx.fillStyle = 'rgba(255,214,90,' + ((e.debil > 0 ? 0.95 : 0.35 + 0.35 * pul)).toFixed(2) + ')';
+      cx.beginPath(); cx.moveTo(bx, by - 4); cx.lineTo(bx + 3.2, by); cx.lineTo(bx, by + 4); cx.lineTo(bx - 3.2, by); cx.closePath(); cx.fill();
+    } : null;
+    if (debil && DIRS[e.d || 0][1] > 0) debil();
     const quieto = e.aa > 0.5 || e.aturd > 0;
     G.humanoide(cx, e.x, e.y, e.av ?? angDir(e.d), G.PAL_E[e.k] || G.PAL_E[0], {
-      t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: e.tb || 0,
+      t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: Math.max(e.tb || 0, e.sac || 0),
       flash: e.flash > 0, talla: ta * ESC, brillo: e.k === 4 ? 0.5 + 0.5 * Math.sin(T * 10 + e.id) : 0
     });
     cx.globalAlpha = 1;
+    if (debil && DIRS[e.d || 0][1] <= 0) debil();
     if (jf || !(e.hp < e.max)) return;   // la vida del jefe va arriba, en grande
     const hy = e.y - 54 * ta;
     cx.fillStyle = 'rgba(0,0,0,.7)'; cx.fillRect(e.x - 10, hy - 0.5, 20, 3.5);
-    cx.fillStyle = VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9.5, hy, 19 * clamp(e.hp / e.max, 0, 1), 2.5);
+    cx.fillStyle = El ? El.color : VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9.5, hy, 19 * clamp(e.hp / e.max, 0, 1), 2.5);
   }
   // Un jugador: anillo de su color en el suelo y el modelo con el arma en la mano.
-  function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t, nv) {
+  function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t, nv, zombi) {
     cx.strokeStyle = color; cx.lineWidth = 1.6; cx.globalAlpha = 0.85;
     cx.beginPath(); cx.ellipse(x, y, 12.5, 6, 0, 0, 7); cx.stroke();
     cx.globalAlpha = 1;
-    G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC, nivel: nv || 0 });
+    // un infectado se ve como un zombi, sin arma
+    if (zombi) G.humanoide(cx, x, y, ang, G.PAL_E[0], { t, mov, atk: rec, talla: ESC });
+    else G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC, nivel: nv || 0 });
   }
 
-  let camX = 0, camY = 0, W = 0, H = 0, esc = 1, dpr = 1;
+  let camX = 0, camY = 0, W = 0, H = 0, esc = 1, dpr = 1, leadX = 0, leadY = 0;
   function dibuja() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
@@ -1465,10 +2340,14 @@
     cx.setTransform(1, 0, 0, 1, 0, 0);
     cx.fillStyle = '#1b1916'; cx.fillRect(0, 0, W, H);
     if (!M) { fondoMenu(); return; }
-    esc = clamp(Math.min(innerWidth / (22 * TS), innerHeight / (14 * TS)), 0.6, 3) * dpr;
-    // cámara
+    // un hito del multiplicador acerca la cámara un instante
+    esc = clamp(Math.min(innerWidth / (22 * TS), innerHeight / (14 * TS)), 0.6, 3) * dpr * (1 + 0.07 * pulso * pulso);
+    // cámara: se adelanta un poco hacia donde mira el personaje
     let tx = M.ancho * TS / 2, ty = M.alto * TS / 2;
-    if (yo.v && !yo.muerto) { tx = yo.x; ty = yo.y; }
+    if (yo.v && !yo.muerto) {
+      leadX += (DIRS[yo.d][0] * 34 - leadX) * 0.06; leadY += (DIRS[yo.d][1] * 26 - leadY) * 0.06;
+      tx = yo.x + leadX; ty = yo.y + leadY;
+    }
     else { const r = [...R.values()].find(r => r.v); if (r) { tx = r.x; ty = r.y; } else if (yo.muerto) { tx = yo.x; ty = yo.y; } }
     camX += (tx - camX) * 0.15; camY += (ty - camY) * 0.15;
     if (!Number.isFinite(camX) || Math.abs(camX - tx) > 600) { camX = tx; camY = ty; }
@@ -1482,6 +2361,7 @@
     const y0 = Math.max(0, Math.floor((cyv - vh / 2) / TS) - 1), y1 = Math.min(M.alto - 1, Math.ceil((cyv + vh / 2) / TS) + 2);
     // el suelo, con toda la sangre y las quemaduras de la partida, y las sombras
     if (fx.suelo) fx.suelo.dibuja(cx, cxv - vw / 2 - 4, cyv - vh / 2 - 4, cxv + vw / 2 + 4, cyv + vh / 2 + 4);
+    if (M.cinta) dibujaCintas(x0, x1, y0, y1);
     // los cuerpos que caen, debajo de todo lo que sigue de pie
     fx.dibujaCadaveres(cx);
     // lo que tiene altura, ordenado por su base
@@ -1493,16 +2373,19 @@
     for (const t of M.tiendas || []) lista.push({ y: t.y + 4, f: () => G.puesto(cx, t.x, t.y, T, yo.v && !yo.muerto && dist(t.x, t.y, yo.x, yo.y) < D.ALCANCE_TIENDA) });
     for (const o of O.values()) lista.push({ y: o.k === 'muro' ? o.y + TS / 2 : o.k === 'carga' ? o.y - 8 : o.y, f: () => dibujaObjeto(o) });
     for (const b of B.values()) lista.push({ y: b.y, f: () => G.caja(cx, b.x, b.y, b.k, T, b.id % 97) });
+    for (const c of CH) lista.push({ y: c.y, f: () => G.chatarra(cx, c.x, c.y, T, c.id, c.z) });
     for (const e of E.values()) lista.push({ y: e.y, f: () => dibujaEnemigo(e) });
     for (const [u, r] of R) {
       if (!r.v) { lista.push({ y: r.y, f: () => G.tumba(cx, r.x, r.y) }); continue; }
-      lista.push({ y: r.y, f: () => dibujaJugador(r.x, r.y, r.av ?? angDir(r.d), r.sk, r.mv, r.w, r.rec || 0, colorDe(u), T + ordenDe(u), r.nv) });
+      lista.push({ y: r.y, f: () => dibujaJugador(r.x, r.y, r.av ?? angDir(r.d), r.sk, r.mv, r.w, r.rec || 0, colorDe(u), T + ordenDe(u), r.nv, esZombi(u)) });
     }
     const veoYo = cfg && !cfg.mirando && yo.v && !yo.muerto;
     if (cfg && !cfg.mirando && (yo.v || yo.muerto)) {
       if (veoYo) lista.push({ y: yo.y, f: () => {
+        if (yo.fija) flechaFija();
         if (yo.inv > 0 && Math.floor(T * 12) % 2) return;
-        dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w]);
+        if (yo.dorada > 0) G.brilla(cx, G.sprites().brillo, yo.x, yo.y - 16, 30, 0.35 + 0.2 * Math.sin(T * 12));
+        dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w], esZombi(cfg.yo));
       } });
       else lista.push({ y: yo.y, f: () => G.tumba(cx, yo.x, yo.y) });
     }
@@ -1530,28 +2413,182 @@
         G.modelo(cx, f.x, f.y - z, T * 3, [{ r: 0, f: 0, z: 6, w: 13, d: 12, h: 11, c: '#6e665e' }, { r: 2, f: 1, z: 15, w: 7, d: 6, h: 4, c: '#8a8278' }], {});
         continue;
       }
+      // la bala del Vigía: un trazo rojo corto
+      if ((D.ENEMIGOS[f.k] || {}).vigia) {
+        const l = hyp(f.vx, f.vy) || 1;
+        cx.strokeStyle = '#ffd0b0'; cx.lineWidth = 2.2;
+        cx.beginPath(); cx.moveTo(f.x, f.y - 14); cx.lineTo(f.x - f.vx / l * 14, f.y - 14 - f.vy / l * 14); cx.stroke();
+        continue;
+      }
       G.bola(cx, f.x, f.y, f.vx, f.vy, f.k === 5 || !!(D.ENEMIGOS[f.k] || {}).acido);
     }
+    // los rayos: un zigzag azul que tiembla, con su halo
+    for (const r of RAYOS) {
+      cx.globalAlpha = clamp(r.t / 0.2, 0, 1);
+      for (const [ancho, col] of [[5, 'rgba(120,190,255,.35)'], [1.8, '#e8f6ff']]) {
+        cx.strokeStyle = col; cx.lineWidth = ancho; cx.beginPath(); cx.moveTo(r.pts[0][0], r.pts[0][1]);
+        for (let i = 1; i < r.pts.length; i++) {
+          const [x0, y0] = r.pts[i - 1], [x1, y1] = r.pts[i];
+          for (let j = 1; j <= 4; j++) { const q = j / 4, jit = j < 4 ? 7 : 0; cx.lineTo(x0 + (x1 - x0) * q + (Math.random() - 0.5) * jit, y0 + (y1 - y0) * q + (Math.random() - 0.5) * jit); }
+        }
+        cx.stroke();
+      }
+      cx.globalAlpha = 1;
+    }
     fx.dibuja(cx);
+    if (numDano) dibujaNumeros();
     // Como en el original: vida, arma y balas justo encima de cada cabeza.
     for (const [u, r] of R) if (r.v) {
       barraVida(r.x, r.y, r.hp, r.arm);
       rotulo(nombreDe(u), r.x, r.y - 59, colorDe(u));
     }
+    if (M.oscuro) oscuridad(cxv, cyv);
+    else if (LUCES.length) luces();
+    // marcadores «¡aquí!» (míos y de los demás) y el anillo de revivir
+    const pinta = (p, color, nom) => {
+      const q = (T - p.t) / 4, pul = 0.5 + 0.5 * Math.sin(T * 10);
+      cx.globalAlpha = clamp(1.2 - q, 0, 1);
+      cx.strokeStyle = color; cx.lineWidth = 2;
+      cx.beginPath(); cx.ellipse(p.x, p.y, 10 + 6 * pul, 5 + 3 * pul, 0, 0, 7); cx.stroke();
+      cx.fillStyle = color; cx.beginPath(); cx.moveTo(p.x, p.y - 8); cx.lineTo(p.x - 6, p.y - 20); cx.lineTo(p.x + 6, p.y - 20); cx.fill();
+      rotulo('¡Aquí! · ' + nom, p.x, p.y - 26, color);
+      cx.globalAlpha = 1;
+    };
+    if (ping && T - ping.t < 4) pinta(ping, colorDe(cfg.yo), 'tú');
+    for (const [u, r] of R) if (r.pg && T - r.pg.t < 4) pinta(r.pg, colorDe(u), nombreDe(u));
+    if (revive.u && revive.t > 0) {
+      const r = R.get(revive.u);
+      if (r) {
+        cx.strokeStyle = 'rgba(0,0,0,.5)'; cx.lineWidth = 4; cx.beginPath(); cx.arc(r.x, r.y - 14, 15, 0, 7); cx.stroke();
+        cx.strokeStyle = '#7fe08a'; cx.lineWidth = 3; cx.beginPath(); cx.arc(r.x, r.y - 14, 15, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * clamp(revive.t / REVIVIR_T, 0, 1)); cx.stroke();
+        rotulo('Reviviendo…', r.x, r.y - 36, '#7fe08a');
+      }
+    }
     if (veoYo) {
-      barraVida(yo.x, yo.y, yo.hp, yo.arm);
+      barraVida(yo.x, yo.y, yo.hp, yo.arm, hpMax());
+      if (vt('dron') && yo.v && !yo.muerto) dibujaDron(yo.x + Math.cos(T * 2.4) * 20, yo.y - 40 + Math.sin(T * 4.8) * 3);
       const a = D.ARMAS[yo.w], bal = yo.w === 0 ? '∞' : String(yo.ammo[yo.w] | 0);
       rotulo(a.nombre + ': ' + bal, yo.x, yo.y - 59, yo.w !== 0 && !(yo.ammo[yo.w] > 0) ? '#ff6a5a' : '#fff');
     }
     $('rojo').style.boxShadow = 'inset 0 0 ' + Math.round(80 + 80 * rojo) + 'px rgba(200,0,0,' + (rojo * 0.7 + (yo.v && yo.hp < 30 ? 0.25 + 0.15 * Math.sin(T * 6) : 0)).toFixed(2) + ')';
   }
+  /* Las cintas: franjas oscuras con flechas que avanzan hacia donde empujan. */
+  function dibujaCintas(x0, x1, y0, y1) {
+    const fase = (T * D.VEL_CINTA) % 12;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const k = M.cinta[y * M.ancho + x];
+      if (!k) continue;
+      const px = x * TS, py = y * TS, [dx, dy] = DIRS[k - 1];
+      cx.fillStyle = '#3d3a36'; cx.fillRect(px + 1, py + 3, TS - 2, TS - 6);
+      cx.fillStyle = '#2a2826'; cx.fillRect(px + 1, py + 3, TS - 2, 2); cx.fillRect(px + 1, py + TS - 5, TS - 2, 2);
+      cx.save(); cx.beginPath(); cx.rect(px + 1, py + 5, TS - 2, TS - 10); cx.clip();
+      cx.strokeStyle = 'rgba(242,193,78,.55)'; cx.lineWidth = 2;
+      const mx = px + TS / 2, my = py + TS / 2;
+      for (let i = -2; i <= 2; i++) {
+        const o = i * 12 + fase, cxa = mx + dx * o, cya = my + dy * o;
+        cx.beginPath();
+        cx.moveTo(cxa - dx * 4 - dy * 6, cya - dy * 4 + dx * 6); cx.lineTo(cxa + dx * 2, cya + dy * 2); cx.lineTo(cxa - dx * 4 + dy * 6, cya - dy * 4 - dx * 6);
+        cx.stroke();
+      }
+      cx.restore();
+    }
+  }
+  /* El Apagón: una capa negra sobre el mundo con huecos de luz alrededor de
+     los jugadores, las tiendas, las bolas de fuego y las explosiones
+     recientes. Solo se dibuja: no cambia nada de la partida. */
+  const LUCES = [];
+  let capaOscura = null;
+  function oscuridad(cxv, cyv) {
+    if (!capaOscura) capaOscura = document.createElement('canvas');
+    const c = capaOscura;
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const o = c.getContext('2d');
+    if (!o) return;
+    o.globalCompositeOperation = 'source-over';
+    o.clearRect(0, 0, W, H);
+    o.fillStyle = 'rgba(4,6,12,.9)'; o.fillRect(0, 0, W, H);
+    o.globalCompositeOperation = 'destination-out';
+    const hueco = (wx, wy, r, a) => {
+      const sx = (wx - cxv) * esc + W / 2, sy = (wy - cyv) * esc + H / 2, sr = r * esc;
+      const g = o.createRadialGradient(sx, sy, sr * 0.25, sx, sy, sr);
+      g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      o.fillStyle = g; o.beginPath(); o.arc(sx, sy, sr, 0, 7); o.fill();
+    };
+    if (yo.v && !yo.muerto) hueco(yo.x, yo.y - 10, 170, 1);
+    for (const r of R.values()) if (r.v) hueco(r.x, r.y - 10, 150, 1);
+    for (const t of M.tiendas || []) hueco(t.x, t.y, 60, 0.7);
+    for (const f of F) hueco(f.x, f.y, 55, 0.8);
+    for (const e of E.values()) if (D.esJefe(e.k) && e.est === 2) hueco(e.x, e.y, 70, 0.6);   // el jefe que carga brilla
+    for (const l of LUCES) hueco(l.x, l.y, l.r, (l.t / l.t0).toFixed(2));
+    if (yo.v && yo.cd > 0 && yo.w !== 5) hueco(yo.x, yo.y, 90, 0.5);   // el fogonazo propio
+    cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.drawImage(c, 0, 0); cx.restore();
+  }
+  /* Fase 3.6: con luz, cada explosión alumbra un instante lo que la rodea:
+     un resplandor cálido sumado encima (modo «lighter»), que se apaga con
+     la luz. Solo se dibuja. */
+  function luces() {
+    cx.save();
+    cx.globalCompositeOperation = 'lighter';
+    for (const l of LUCES) {
+      const a = l.t / l.t0, f = a * a;
+      const g = cx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+      g.addColorStop(0, 'rgba(255,170,80,' + (0.26 * f).toFixed(3) + ')');
+      g.addColorStop(0.45, 'rgba(255,110,40,' + (0.11 * f).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,80,20,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(l.x, l.y, l.r, 0, 7); cx.fill();
+    }
+    cx.restore();
+  }
+  /* Con la dirección fija, una flecha en el suelo dice hacia dónde se dispara. */
+  function flechaFija() {
+    const a = angDir(yo.d), c = Math.cos(a), s = Math.sin(a), x = yo.x + c * 19, y = yo.y + s * 15;
+    cx.fillStyle = 'rgba(242,193,78,.75)';
+    cx.beginPath();
+    cx.moveTo(x + c * 6, y + s * 4.5);
+    cx.lineTo(x - s * 4 - c * 2, y + c * 3 - s * 1.5);
+    cx.lineTo(x + s * 4 - c * 2, y - c * 3 - s * 1.5);
+    cx.closePath(); cx.fill();
+  }
+  /* Los números de daño (opcionales, en la pausa): los golpes seguidos a un
+     mismo enemigo se suman en un número, para que la Uzi no llene la
+     pantalla. */
+  let numDano = lee('boxhead.numeros', '0') === '1', NUM = [];
+  function anotaDano(e, d) {
+    if (!numDano || d <= 0) return;
+    const n = NUM.find(n => n.e === e.id && n.t < 0.18);
+    if (n) { n.v += d; n.t = 0; n.x = e.x; n.y = e.y; return; }
+    NUM.push({ e: e.id, v: d, t: 0, x: e.x + azar(-4, 4), y: e.y, jefe: D.esJefe(e.k), ta: TALLA_Z[e.k] || 1 });
+    if (NUM.length > 40) NUM.shift();
+  }
+  function pasoNumeros(dt) { if (NUM.length) { for (const n of NUM) n.t += dt; NUM = NUM.filter(n => n.t < 0.8); } }
+  function dibujaNumeros() {
+    cx.textAlign = 'center'; cx.lineJoin = 'round';
+    for (const n of NUM) {
+      const q = n.t / 0.8, y = n.y - 44 * n.ta - 18 * q;
+      cx.globalAlpha = q < 0.6 ? 1 : 1 - (q - 0.6) / 0.4;
+      cx.font = 'bold ' + (n.jefe ? 11 : 9) + 'px Trebuchet MS, sans-serif';
+      cx.lineWidth = 2.4; cx.strokeStyle = 'rgba(0,0,0,.85)'; cx.strokeText(Math.round(n.v), n.x, y);
+      cx.fillStyle = n.v >= 60 ? '#ffd54a' : '#fff'; cx.fillText(Math.round(n.v), n.x, y);
+    }
+    cx.globalAlpha = 1;
+  }
   function rotulo(t, x, y, col) {
-    cx.font = 'bold 7.5px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
-    cx.lineWidth = 2.2; cx.strokeStyle = 'rgba(0,0,0,.85)'; cx.lineJoin = 'round';
+    cx.font = 'bold 9px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
+    cx.lineWidth = 2.4; cx.strokeStyle = 'rgba(0,0,0,.85)'; cx.lineJoin = 'round';
     cx.strokeText(t, x, y); cx.fillStyle = col; cx.fillText(t, x, y);
   }
-  function barraVida(x, y, hp, arm) {
-    const f = clamp(hp / 100, 0, 1);
+  // El dron de la ventaja: un cuerpo chico con dos hélices y una luz.
+  function dibujaDron(x, y) {
+    cx.fillStyle = 'rgba(0,0,0,.25)'; cx.beginPath(); cx.ellipse(x, y + 36, 6, 2.5, 0, 0, 7); cx.fill();
+    cx.fillStyle = '#2b2f36'; cx.fillRect(x - 6, y - 3, 12, 6);
+    cx.fillStyle = '#4d5560'; cx.fillRect(x - 6, y - 3, 12, 2);
+    cx.strokeStyle = 'rgba(220,230,240,.7)'; cx.lineWidth = 1.2;
+    const g = T * 40;
+    for (const s of [-1, 1]) { cx.beginPath(); cx.ellipse(x + s * 9, y - 4, 6, 1.6, g * s, 0, 7); cx.stroke(); }
+    cx.fillStyle = Math.sin(T * 8) > 0 ? '#ff4a3a' : '#7a1a14'; cx.fillRect(x - 1, y + 1, 2, 2);
+  }
+  function barraVida(x, y, hp, arm, max = 100) {
+    const f = clamp(hp / max, 0, 1);
     cx.fillStyle = '#000'; cx.fillRect(x - 13, y - 56, 26, 4.5);
     cx.fillStyle = '#4a0f0b'; cx.fillRect(x - 12.5, y - 55.5, 25, 3.5);
     cx.fillStyle = f < 0.3 ? '#ff4a3a' : '#3fe04a'; cx.fillRect(x - 12.5, y - 55.5, 25 * f, 3.5);
@@ -1597,11 +2634,12 @@
       jefesVistos.add(e.id);
       if (jefesVistos.size > 60) jefesVistos.delete(jefesVistos.values().next().value);
       const C = D.ENEMIGOS[e.k];
-      banner((C.jefe === 'grande' ? '☠ ' : '⚠ ') + C.nombre);
+      banner((C.jefe === 'grande' ? '☠ ' : '⚠ ') + C.nombre + (e.el === D.ELITE_CORRUPTO ? ' corrupto' : ''));
       premio(C.txt || '');
       son('jefe'); sacude = Math.min(10, sacude + 4);
+      consejo('jefe');
     }
-    const f = js.map(e => e.id + ':' + Math.round(100 * e.hp / e.max)).join(',');
+    const f = js.map(e => e.id + ':' + Math.round(100 * e.hp / e.max) + ':' + (e.el || 0)).join(',');
     if (f === firmaJefe) return;
     firmaJefe = f;
     const b = $('jefeBar');
@@ -1610,17 +2648,23 @@
     for (const e of js.slice(0, 3)) {
       const C = D.ENEMIGOS[e.k], d = document.createElement('div');
       d.className = 'fila-j ' + C.jefe;
-      const n = document.createElement('div'); n.textContent = C.nombre;
+      const n = document.createElement('div'); n.textContent = C.nombre + (e.el === D.ELITE_CORRUPTO ? ' · corrupto' : '');
       const tu = document.createElement('div'); tu.className = 'tubo';
       const i = document.createElement('i'); i.style.width = clamp(100 * e.hp / e.max, 0, 100).toFixed(1) + '%';
       tu.appendChild(i); d.append(n, tu); b.appendChild(d);
     }
   }
+  let caeAntes = false, quedanAntes = 0, consejoT = 0;
   function hud(dt) {
-    if (!cfg || !jugando) return;
+    pasoPremios(dt);
+    pasoConsejo(dt);
+    if (!cfg || !jugando) { SND.musica(-1); return; }
     hudJefes();
     const fr = yo.mul > 1 && yo.comboMax > 0 ? clamp(yo.combo / yo.comboMax, 0, 1) : 0;
     $('comboArco').setAttribute('stroke-dashoffset', (100 - fr * 100).toFixed(1));
+    // El combo a punto de caer: el arco parpadea y suena un aviso al cruzar el cuarto.
+    const cae = yo.mul > 1 && fr > 0 && fr < 0.25 && !yo.muerto;
+    if (cae !== caeAntes) { $('marca').classList.toggle('cae', cae); if (cae) son('avisoCombo'); caeAntes = cae; }
     if ($('mul').textContent !== '×' + yo.mul) {
       const m = $('mul'), sube = yo.mul > (parseInt(m.textContent.slice(1), 10) || 1);
       m.textContent = '×' + yo.mul;
@@ -1631,15 +2675,37 @@
     $('seguir').hidden = !pausado;
     $('pausaSub').textContent = !qp ? '' : !ONLINE ? 'La práctica está detenida.'
       : pausado ? 'Nadie se mueve hasta que sigas (máximo dos minutos).' : 'Pausa de ' + nombreDe(qp) + '.';
+    if (eleccion) $('elecBarra').style.width = clamp(100 * eleccion.t / D.ESPERA_VENTAJA, 0, 100).toFixed(1) + '%';
+    if (qp) { const lv = listaVentajas(); if ($('pausaVent').textContent !== lv) $('pausaVent').textContent = lv; $('pausaVent').hidden = !lv; }
     hudT -= dt;
     if (hudT > 0) return;
     hudT = 0.2;
     $('ptsN').textContent = yo.pts;
+    $('chatN').textContent = yo.chat;
+    $('chatN').parentNode.classList.toggle('pulso', chatPulso > 0.3);
+    // La música sigue a la partida: enemigos cerca, multiplicador y jefes.
+    const hayJefe = [...E.values()].some(e => D.esJefe(e.k));
+    SND.musica(terminado || quienPausa() ? -1 : clamp(E.size / 24, 0, 1) * 0.6 + clamp((yo.mul - 1) / 30, 0, 1) * 0.4, hayJefe);
+    // Consejos que dependen de dónde se está.
+    if (!cfg.mirando && yo.v && !yo.muerto) {
+      if (tiendaCerca()) consejo('tienda');
+      if (T > 25) consejo('fijar');
+      for (const o of O.values()) if (o.k === 'barril' && !o.u && dist(o.x, o.y, yo.x, yo.y) < 110) { consejo('barril'); break; }
+    }
     $('kN').textContent = yo.k;
-    const quedan = soyDir || !ONLINE ? dir.q + E.size : dir.q + E.size;
-    $('nivel').innerHTML = versus()
+    const quedan = dir.q + E.size;
+    if (!versus() && quedan === 5 && quedanAntes > 5 && dir.q === 0) son('quedan');
+    quedanAntes = quedan;
+    const pe = marcador.puntosEq || {};
+    const humanos = jugadores().filter(j => !(marcador.fuera || []).includes(j.uid) && !esZombi(j.uid)).length;
+    const resta = Math.max(0, Math.ceil(AGUANTE_T - dir.t));
+    $('nivel').innerHTML = infectado()
+      ? (esZombi(cfg.yo) ? '<b style="color:' + COLOR_EQ.infectados + '">Infectado</b>' : 'Humano') + ' · quedan <b>' + humanos + '</b> · ' + Math.floor(resta / 60) + ':' + String(resta % 60).padStart(2, '0')
+      : equipos()
+      ? '<b style="color:' + COLOR_EQ.rojo + '">Rojo ' + (pe.rojo | 0) + '</b> · <b style="color:' + COLOR_EQ.azul + '">Azul ' + (pe.azul | 0) + '</b> · a ' + (marcador.meta || cfg.meta || 20)
+      : versus()
       ? 'Versus · <b>' + ((marcador.bajas || {})[cfg.yo] | 0) + '</b> de ' + (cfg.meta || marcador.meta || 10)
-      : 'Nivel <b>' + nivelObjetivo() + '</b> · quedan ' + quedan;
+      : (jefes() ? 'Jefe <b>' : 'Nivel <b>') + nivelObjetivo() + '</b> · quedan ' + quedan;
     pintaArmas(false);
     if (cfg.mirando) $('aviso').textContent = 'Estás mirando';
     else if (yo.muerto && ONLINE) $('aviso').textContent = versus() ? 'Vuelves en ' + Math.max(0, Math.ceil(yo.respawn)) + '…' : 'Caíste: vuelves cuando tu equipo limpie el nivel';
@@ -1647,7 +2713,7 @@
     pintaTienda(false);
     $('armN').textContent = Math.round(yo.arm || 0);
     $('potN').textContent = (yo.pot || 0) ? ' · Potencia +' + (yo.pot * 10) + ' %' : '';
-    $('blN').textContent = yo.bl ? ' · Muros reforzados ' + yo.bl + ' (F)' : '';
+    $('blN').textContent = yo.bl ? ' · Muros reforzados ' + yo.bl + ' (' + boton('F', 'b') + ')' : '';
     // tabla
     const filas = activos().map(j => {
       const u = j.uid, mio = u === cfg.yo, r = R.get(u);
@@ -1700,16 +2766,16 @@
       b.querySelector('.nom').textContent = t.nombre;
       b.querySelector('.det').textContent = t.txt;
       b.title = t.nombre + ': ' + t.txt;
-      b.addEventListener('click', () => compra(t.id));
+      b.addEventListener('click', () => accion(6, idxTienda(t.id)));
       sum.append(b);
     }
-    for (const a of D.ARMAS) {
+    for (const a of D.ARMAS_J) {
       const b = document.createElement('button'), c = document.createElement('canvas');
       b.type = 'button'; b.className = 'art'; b.dataset.arma = a.id; sinFoco(b);
       c.width = 104; c.height = 60;
       b.innerHTML = '<span class="lleva"></span><i class="ico"></i><b class="nom"></b><span class="est"></span><span class="pre"></span>';
       b.querySelector('.ico').append(c);
-      b.addEventListener('click', () => subeArma(a.id));
+      b.addEventListener('click', () => accion(5, a.id));
       ar.append(b);
     }
   }
@@ -1717,18 +2783,22 @@
     const tc = jugando && !cfg?.mirando && tiendaCerca(), el = $('tienda');
     if (!tc) { if (!el.hidden) el.hidden = true; return; }
     if (!tiendaArmada) armaTienda();
-    const firma = [yo.pts, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.')].join('|');
+    const mando = conMando() ? Mando.familia() : '', n = nivelObjetivo();
+    const firma = [yo.chat, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.'), n, mando].join('|');
     if (!fuerza && !el.hidden && firma === firmaTienda) return;
     firmaTienda = firma;
     el.hidden = false;
-    $('tPts').textContent = yo.pts;
+    $('tPts').textContent = yo.chat;
+    $('tAyuda').textContent = mando ? 'cruceta o clic' : 'clic o tecla';
+    $('tAyudaU').textContent = mando ? Mando.glifo('y') : 'U';
     for (const b of $('tSum').children) {
       const id = b.dataset.id, t = D.TIENDA.find(x => x.id === id);
       const lleno = (id === 'potencia' && (yo.pot || 0) >= t.max) || (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) ||
-        (id === 'botiquin' && yo.hp >= 100) || (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max);
-      const precio = D.precioTienda(id, yo.pot || 0);
+        (id === 'botiquin' && yo.hp >= hpMax()) || (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max);
+      const precio = D.precioTienda(id, yo.pot || 0, n);
+      b.querySelector('kbd').textContent = mando ? Mando.glifo(MANDO_TIENDA[id]) : t.tecla;
       b.classList.toggle('max', lleno);
-      b.classList.toggle('caro', !lleno && yo.pts < precio);
+      b.classList.toggle('caro', !lleno && yo.chat < precio);
       b.querySelector('.pre').textContent = lleno ? (id === 'potencia' ? 'Máximo' : 'Lleno') : precio;
       b.querySelector('.lleva').textContent = id === 'potencia' ? (yo.pot ? '+' + yo.pot * 10 + '%' : '') : id === 'blindado' ? (yo.bl ? '×' + yo.bl : '') : '';
     }
@@ -1737,33 +2807,36 @@
       b.hidden = !yo.tiene.has(i);
       if (b.hidden) continue;
       if (+b.dataset.dibujado !== n) { b.dataset.dibujado = n; const c = b.querySelector('canvas'); G.iconoArma(c.getContext('2d'), i, c.width, c.height, n); }
-      b.className = 'art r' + ra + (yo.w === i ? ' mano' : '') + (!Number.isFinite(precio) ? ' max' : yo.pts < precio ? ' caro' : '');
+      b.className = 'art r' + ra + (yo.w === i ? ' mano' : '') + (!Number.isFinite(precio) ? ' max' : yo.chat < precio ? ' caro' : '');
       b.querySelector('.nom').textContent = a.nombre + (ra ? ' ' + D.RANGOS_ARMA[n].toLowerCase() : '');
       b.querySelector('.est').innerHTML = '<i>' + '★'.repeat(n) + '</i>' + '★'.repeat(D.NIVEL_ARMA.max - n);
       b.querySelector('.pre').textContent = Number.isFinite(precio) ? precio : 'Máximo';
-      b.querySelector('.lleva').textContent = yo.w === i ? 'U' : '';
+      b.querySelector('.lleva').textContent = yo.w === i ? (mando ? Mando.glifo('y') : 'U') : '';
       b.title = a.nombre + ' · nivel ' + n + ' de ' + D.NIVEL_ARMA.max + (Number.isFinite(precio) ? ' · subir: +15 % daño, más cadencia y munición' : '');
     }
   }
 
   function pintaArmas(fuerza) {
-    const firma = D.ARMAS.map(a => (yo.tiene.has(a.id) ? 1 : 0) + ':' + (a.id === 0 ? '∞' : yo.ammo[a.id]) + ':' + (yo.nv[a.id] || 0)).join() + '|' + yo.w;
+    const firma = D.ARMAS_J.map(a => (yo.tiene.has(a.id) ? 1 : 0) + ':' + (a.id === 0 ? '∞' : yo.ammo[a.id]) + ':' + (yo.nv[a.id] || 0)).join() + '|' + yo.w;
     if (!fuerza && firma === firmaArmas) return;
     firmaArmas = firma;
     const el = $('armas');
-    if (el.children.length !== D.ARMAS.length) {
+    if (el.children.length !== D.ARMAS_J.length) {
       el.textContent = '';
-      for (const a of D.ARMAS) {
+      for (const [i, a] of D.ARMAS_J.entries()) {
         const s = document.createElement('div'), c = document.createElement('canvas'), b = document.createElement('b'), nv = document.createElement('i'), sp = document.createElement('span');
-        s.className = 'slot'; c.width = 68; c.height = 40; b.textContent = a.id + 1; nv.className = 'nv';
+        s.className = 'slot'; c.width = 68; c.height = 40; b.textContent = TECLAS_ARMA[i] || ''; nv.className = 'nv';
         G.iconoArma(c.getContext('2d'), a.id, 68, 40);
         s.title = a.nombre;
         s.append(b, nv, c, sp);
         el.append(s);
       }
     }
-    D.ARMAS.forEach((a, i) => {
+    D.ARMAS_J.forEach((a, i) => {
       const s = el.children[i], tiene = yo.tiene.has(a.id);
+      // Las armas de multiplicador alto no ocupan la barra hasta que se ganan (salvo la siguiente).
+      const sig = D.ARMAS_J.find(b => !yo.tiene.has(b.id));
+      s.style.display = tiene || a.desbloquea < 60 || a === sig ? '' : 'none';
       s.classList.toggle('sel', yo.w === a.id);
       s.classList.toggle('no', !tiene || (a.id !== 0 && !(yo.ammo[a.id] > 0)));
       s.lastChild.textContent = !tiene ? '×' + a.desbloquea : a.id === 0 ? '∞' : yo.ammo[a.id];
@@ -1774,29 +2847,96 @@
     });
   }
 
-  let bannerT = null, premios = [], premioT = null;
+  let bannerT = null;
   function banner(t) {
     const b = $('banner');
     b.textContent = t; b.classList.add('ver');
     clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('ver'), 2200);
   }
-  function premio(t) {
-    premios.push(t);
-    if (!premioT) sigPremio();
-  }
-  function sigPremio() {
-    const p = $('premio'), t = premios.shift();
-    if (t === undefined) { p.classList.remove('ver'); premioT = null; return; }
-    p.textContent = t; p.classList.add('ver');
+  /* **Los avisos van a la vez, no en fila**: hasta tres líneas, cada una
+     2,2 s, y las mejoras de arma seguidas se juntan en una («+3 más»). En
+     fila, una racha larga atrasaba los avisos decenas de segundos y el
+     «+50 vida» de una caja salía cuando ya no venía al caso. */
+  const PREMIOS = [];
+  function premio(t, tipo) {
+    if (!t) return;
+    if (tipo === 'mejora') {
+      const g = PREMIOS.find(p => p.tipo === 'mejora' && p.vida > 0.5);
+      if (g) { g.n++; g.el.textContent = g.txt + ' · +' + (g.n - 1) + ' más'; g.vida = 2.2; return; }
+    }
+    const el = document.createElement('div');
+    el.textContent = t;
+    $('premios').append(el);
+    PREMIOS.push({ el, txt: t, tipo, n: 1, vida: 2.2 });
+    while (PREMIOS.length > 3) PREMIOS.shift().el.remove();
     if (/^¡Nueva|:/.test(t)) son('premio');
-    premioT = setTimeout(() => { p.classList.remove('ver'); premioT = setTimeout(sigPremio, 250); }, 1600);
+  }
+  function pasoPremios(dt) {
+    for (const p of PREMIOS) {
+      p.vida -= dt;
+      if (p.vida < 0.3) p.el.classList.add('sale');
+    }
+    while (PREMIOS.length && PREMIOS[0].vida <= 0) PREMIOS.shift().el.remove();
+  }
+
+  /* **Consejos, una sola vez cada uno** (se recuerdan en `boxhead.consejos`;
+     la pausa los apaga). Salen cuando vienen al caso: la primera tienda, el
+     primer barril cerca, el primer jefe… y nombran el botón del mando si hay
+     uno conectado. */
+  const CONSEJOS = {
+    tienda: () => 'Junto al puesto $ se compra con chatarra: munición, armadura, botiquín y mejoras de arma' + (conMando() ? ' (cruceta y ' + Mando.glifo('y') + ').' : ' (clic o las teclas que muestra).'),
+    chatarra: () => 'La chatarra que sueltan tus bajas es la moneda de la tienda. Los puntos solo suben: son tu marcador.',
+    combo: () => 'Cada baja sube el multiplicador. Si la barra de arriba se vacía, baja de a uno: no dejes de disparar.',
+    arma: () => 'Arma nueva. Cámbiala con ' + boton('Q/E', 'lb') + (conMando() ? '/' + Mando.glifo('rb') : ' o los números 1–8') + '.',
+    barril: () => 'Dispárale a los barriles rojos: explotan y se llevan a la horda que esté cerca.',
+    jefe: () => 'Los jefes avisan antes de golpear: si el suelo se pone rojo, sal del círculo.',
+    fijar: () => 'Mantén ' + boton('Shift', 'lt') + ' para fijar hacia dónde miras: retrocedes disparando de frente.',
+  };
+  let consejosOn = lee('boxhead.consejosOn', '1') !== '0', vistosC = new Set();
+  try { vistosC = new Set(JSON.parse(lee('boxhead.consejos', '[]'))); } catch {}
+  const colaC = [];
+  function consejo(id) {
+    if (!consejosOn || vistosC.has(id) || !CONSEJOS[id] || (cfg && cfg.mirando)) return;
+    vistosC.add(id);
+    guarda('boxhead.consejos', JSON.stringify([...vistosC]));
+    colaC.push(id);
+  }
+  function pasoConsejo(dt) {
+    const el = $('consejo');
+    if (consejoT > 0) { consejoT -= dt; if (consejoT <= 0) el.classList.remove('ver'); return; }
+    if (consejoT > -1) { consejoT -= dt; return; }   // un respiro entre uno y otro
+    const id = colaC.shift();
+    if (!id || !jugando) return;
+    el.textContent = '💡 ' + CONSEJOS[id]();
+    el.classList.add('ver');
+    consejoT = 6.5;
   }
 
   function ponPausa(v) {
     pausado = v;
     if (v) pausaDesde = Date.now();
+    if (CLUB) Club.inmersivo(!v && jugando && !terminado);
     $('pausa').hidden = !v;
   }
+  /* Las opciones de la pausa: música (y su volumen), números de daño,
+     vibración del mando y consejos. Se guardan en este navegador. */
+  function armaOpciones() {
+    const mus = SND.opcionesMusica();
+    const ch = (id, v, fn) => { const el = $(id); el.checked = v; el.onchange = () => fn(el.checked); };
+    ch('optMusica', mus.on, v => { SND.ponMusica(v, null); guarda('boxhead.musica', v ? '1' : '0'); });
+    const r = $('optMusVol'); r.value = Math.round(mus.vol * 100);
+    r.oninput = () => { SND.ponMusica(null, r.value / 100); guarda('boxhead.musVol', r.value); };
+    ch('optNumeros', numDano, v => { numDano = v; NUM = []; guarda('boxhead.numeros', v ? '1' : '0'); });
+    ch('optVibra', vibraOn, v => { vibraOn = v; guarda('boxhead.vibra', v ? '1' : '0'); if (v) vibra(0.6, 0.6, 120); });
+    ch('optConsejos', consejosOn, v => { consejosOn = v; guarda('boxhead.consejosOn', v ? '1' : '0'); if (v) { vistosC.clear(); guarda('boxhead.consejos', '[]'); } });
+  }
+  SND.ponMusica(lee('boxhead.musica', '1') !== '0', clamp((+lee('boxhead.musVol', '60') || 0) / 100, 0, 1));
+  armaOpciones();
+  // la ayuda de teclas se pliega y se recuerda
+  function ponAyuda(ver) { $('ayuda').classList.toggle('plegada', !ver); guarda('boxhead.ayuda', ver ? '1' : '0'); }
+  $('ayudaX').onclick = () => ponAyuda(false);
+  $('ayudaVer').onclick = () => ponAyuda(true);
+  ponAyuda(lee('boxhead.ayuda', '1') !== '0');
 
   // ---------- menú ----------
   function pintaMenu() {
@@ -1806,21 +2946,42 @@
       const b = document.createElement('button');
       b.className = 'btn2' + (id === mapaElegido ? ' sel' : '');
       b.textContent = D.MAPAS[id].nombre;
-      b.onclick = () => { mapaElegido = id; guarda('boxhead.mapa', id); pintaMenu(); };
+      b.onclick = () => { mapaElegido = id; guarda('boxhead.mapa', id); pintaMenu(); if (CLUB) Club.category(catClub(id)); };
       ms.append(b);
     }
+    // récords de la práctica en cada mapa
+    const rec = D.ORDEN_MAPAS.filter(m => records[m] && records[m].n > 0).map(m => D.MAPAS[m].nombre + ' ' + records[m].n);
+    $('records').textContent = rec.length ? 'Tus récords (nivel): ' + rec.join(' · ') : '';
     const sk = $('skins');
     sk.textContent = '';
     for (const s of D.SKINS) {
+      const libre = skinLibre(s), m = s.medalla && D.medallaDe(s.medalla);
       const b = document.createElement('button'), c = document.createElement('canvas');
-      b.className = 'skin' + (s.id === skinId ? ' sel' : '');
+      b.type = 'button';
+      b.className = 'skin' + (s.id === skinId ? ' sel' : '') + (libre ? '' : ' cerrada');
       c.width = 80; c.height = 104;
       const g = c.getContext('2d');
       g.scale(2, 2);
       G.humanoide(g, 20, 47, 1.15, G.palJugador(s), { arma: 0, t: 0 });
-      b.append(c, document.createTextNode(s.nombre));
-      b.onclick = () => { skinId = s.id; guarda('boxhead.skin', s.id); pintaMenu(); };
+      b.append(c, document.createTextNode((libre ? '' : '🔒 ') + s.nombre));
+      if (!libre) b.title = 'Se gana con la medalla «' + m.nom + '»: ' + m.txt;
+      b.onclick = () => {
+        if (!libre) { $('skinInfo').textContent = '🔒 ' + s.nombre + ' se gana con la medalla «' + m.nom + '»: ' + m.txt; return; }
+        skinId = s.id; guarda('boxhead.skin', s.id); $('skinInfo').textContent = ''; pintaMenu();
+      };
       sk.append(b);
+    }
+    // las medallas: ganadas a color, el resto apagadas con lo que piden
+    $('medN').textContent = medallas.size + '/' + D.MEDALLAS.length;
+    const md = $('medallas');
+    md.textContent = '';
+    for (const m of D.MEDALLAS) {
+      const d = document.createElement('div'), ic = document.createElement('i'), t = document.createElement('b'), x = document.createElement('span');
+      d.className = 'medalla' + (medallas.has(m.id) ? ' ganada' : '');
+      ic.textContent = m.i; t.textContent = m.nom;
+      const s = D.SKINS.find(k => k.medalla === m.id);
+      x.textContent = m.txt + (s ? ' Abre a ' + s.nombre + '.' : '');
+      d.append(ic, t, x); md.append(d);
     }
   }
   $('jugar').onclick = () => {
@@ -1837,6 +2998,9 @@
   if (ONLINE) {
     $('menuMapas').hidden = true;
     $('cuenta').textContent = 'Elige tu personaje; la partida empieza cuando la sala arranque.';
+  } else if (CLUB) {
+    $('cuenta').textContent = 'Solo Club: cada mapa tiene su tabla. Cuenta el nivel más alto al que llegas.';
+    Club.category(catClub(mapaElegido));
   } else $('cuenta').textContent = 'Práctica en solitario: nada se guarda.';
   pintaMenu();
 
@@ -1845,32 +3009,75 @@
   function cuadro(ahora) {
     const dt = Math.min(0.05, (ahora - ultimo) / 1000);
     ultimo = ahora;
-    if (!document.hidden) { paso(dt); dibuja(); hud(dt); }
+    let dts = dt;
+    if (hs > 0) { hs -= dt; dts = dt * 0.08; }
+    if (!document.hidden) {
+      // En la práctica, pasos fijos (la grabadora cuenta pasos); como mucho
+      // cuatro por cuadro, y lo que sobre de un tirón se pierde.
+      if (ONLINE) paso(dts);
+      else if (quienPausa()) acumula = 0;
+      else { acumula += dts; let n = 0; while (acumula >= PASO && n++ < 4) { paso(PASO); acumula -= PASO; } if (acumula > PASO) acumula = 0; }
+      dibuja(); hud(dt);
+    }
     requestAnimationFrame(cuadro);
   }
   requestAnimationFrame(cuadro);
   // Con la pestaña oculta requestAnimationFrame se para: el mundo sigue igual.
   setInterval(() => { if (document.hidden && ONLINE) { ultimo = performance.now(); paso(0.1); } }, 100);
 
+  /* Rehace una partida de práctica desde su prueba, sin dibujar ni sonar
+     (en el verificador del Club, que carga este archivo en un trabajador o
+     en Node con un DOM de mentira). Devuelve dónde terminó. */
+  function rehace(p) {
+    if (!p || p.v !== 1 || p.ve !== VE || typeof p.u !== 'string' || !Array.isArray(p.j) || !Number.isSafeInteger(p.k) || p.k < 0 || p.k > 6e6) throw new Error('La prueba de Pro BoxHead no tiene la forma esperada.');
+    const mapa = D.ORDEN_MAPAS[p.m];
+    if (!mapa) throw new Error('La prueba es de un mapa que no existe.');
+    mapaElegido = mapa;
+    practica(p.s >>> 0, false, p.u);
+    repite = { ent: { dx: 0, dy: 0, vel: 1, mira: -1, fija: false, disp: false } };
+    try {
+      let i = 0;
+      while (!terminado && pasoN <= p.k) {
+        for (; i < p.j.length && p.j[i][0] === pasoN; i++) {
+          const j = p.j[i];
+          if (!Array.isArray(j) || !j.every(Number.isSafeInteger)) throw new Error('Una jugada de la prueba no tiene la forma esperada.');
+          if (j[1] === 0) repite.ent = entradaDe(j);
+          else if (ACCIONES[j[1]]) ACCIONES[j[1]](j[2]);
+          else throw new Error('Una jugada de la prueba no existe.');
+        }
+        if (i < p.j.length && !(p.j[i][0] > pasoN)) throw new Error('Las jugadas de la prueba no van en orden.');
+        paso(PASO);
+      }
+      return { nivel: nivelLocal, pasos: finPaso, pasoNivel, terminada: terminado, pts: yo.pts, k: yo.k, mul: yo.maxMul, jefes: yo.st.jefes };
+    } finally { repite = null; }
+  }
+  // La prueba de la última partida de práctica (sin el dato interno `ult`).
+  const prueba = () => graba && { v: graba.v, ve: graba.ve, u: graba.u, m: graba.m, s: graba.s, j: graba.j, k: graba.k };
+
   window.__boxhead = {
+    rehace, prueba, accion, pasos: () => pasoN, entrada: en => { forzada = en || null; },
     paso: (dt = 1 / 60) => paso(dt),
-    estado: () => ({ cfg, yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice() },
+    estado: () => ({ cfg, eleccion: eleccion ? eleccion.ops.slice() : null, vt: Object.assign({}, yo.vt), yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice(), dorada: yo.dorada, giro: yo.giro },
       soyDir, dirUid, nivel: nivelObjetivo(), dir: { n: dir.n, q: dir.q, t: dir.t }, enemigos: E.size, objetos: O.size, cajas: B.size, remotos: R.size, terminado }),
     dbg: () => ({ cd: yo.cd, ps: pend.s.length, jugando, pausado, w: yo.w, ammo0: yo.ammo[0] }),
-    mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
+    mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp, max: e.max, est: e.est || 0, el: e.el || 0 })), F: F.map(f => ({ k: f.k, x: f.x, y: f.y })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
     teclas, practica, inmortal: v => { inmortal = !!v; },
-    armas: () => { for (const a of D.ARMAS) desbloquea(a.id); pintaArmas(true); },
+    mapa: id => { mapaElegido = D.mapaValido(id); },   // para las pruebas: el mapa de la próxima práctica
+    armas: () => { for (const a of D.ARMAS_J) desbloquea(a.id); pintaArmas(true); },
     elige: i => eligeArma(i),
     salta: n => { if (!ONLINE) { nivelLocal = n | 0; dir.n = (n | 0) - 1; E.clear(); } },
     // para probar la IA en la práctica: enemigos y objetos donde se pida
     calma: () => { if (!ONLINE) { dir.n = nivelObjetivo(); dir.q = 0; E.clear(); O.clear(); } },
     ponYo: (x, y) => { yo.x = x; yo.y = y; },
     enemigo: (k, x, y) => (ONLINE ? null : nuevoEnemigo(Math.max(1, dir.n), k, x, y).id),
+    ponVida: (id, pc) => { const e = E.get(id); if (e && !ONLINE) e.hp = e.max * pc; },
+    ponCaja: (k, x, y) => { if (!ONLINE) { const b = { id: nid(), k: k | 0, x: Math.round(x), y: Math.round(y) }; B.set(b.id, b); } },
     pon: (k, x, y) => { if (!ONLINE) peticion(cfg.yo, { pon: [D.ARMAS.findIndex(a => a.obj === k), x, y] }); },
     objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max, bl: o.bl || 0 })),
     // la tienda: puntos para probar, y lo comprado
     puntos: n => { yo.pts = n | 0; },
-    tienda: () => ({ nv: yo.nv.slice(), bl: yo.bl, pot: yo.pot, arm: yo.arm, pts: yo.pts, tiendas: (M.tiendas || []).map(t => [t.x, t.y]), arma: armaDe(yo.w) }),
+    chatarra: n => { yo.chat = n | 0; },
+    tienda: () => ({ nv: yo.nv.slice(), bl: yo.bl, pot: yo.pot, arm: yo.arm, pts: yo.pts, chat: yo.chat, tiendas: (M.tiendas || []).map(t => [t.x, t.y]), arma: armaDe(yo.w) }),
   };
   if (ONLINE) enviar('listo');
 })();

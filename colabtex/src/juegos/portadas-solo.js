@@ -614,6 +614,21 @@ const ARTE = {
 ARTE.tulonesclub = ARTE.tulones;
 /* PRO HERO: la tarjeta del club (`heroclub`) y la sala (`hero`) comparten escena. */
 ARTE.heroclub = ARTE.hero;
+/* Pro BoxHead (Club): el patio visto desde arriba, el sobreviviente de cubos
+   disparando a la horda verde y el nivel que se persigue, arriba a la derecha. */
+ARTE.boxheadclub = u => {
+  const muro = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e9e3d6"/><rect x="${x}" y="${y + h}" width="${w}" height="7" fill="#9c9282"/>`;
+  const zombi = (x, y, k) => `<g transform="translate(${x} ${y})"><rect x="-11" y="-6" width="22" height="22" rx="3" fill="${k ? "#b8432f" : "#4f8a3a"}"/><rect x="-9" y="-22" width="18" height="17" rx="3" fill="${k ? "#d9644b" : "#7fb35a"}"/><rect x="-6" y="-17" width="4" height="4" fill="#200"/><rect x="2" y="-17" width="4" height="4" fill="#200"/><rect x="-15" y="0" width="6" height="12" rx="2" fill="${k ? "#d9644b" : "#7fb35a"}"/><rect x="9" y="0" width="6" height="12" rx="2" fill="${k ? "#d9644b" : "#7fb35a"}"/></g>`;
+  return `<defs><radialGradient id="g${u}" cx=".45" cy=".55" r=".85"><stop offset="0" stop-color="#5b4a35"/><stop offset="1" stop-color="#1c1610"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <g opacity=".18" stroke="#000">${Array.from({ length: 10 }, (_, k) => `<line x1="${k * 44}" y1="0" x2="${k * 44}" y2="300"/>`).join("")}${Array.from({ length: 7 }, (_, k) => `<line x1="0" y1="${k * 44}" x2="400" y2="${k * 44}"/>`).join("")}</g>
+    ${muro(0, 70, 120, 26)}${muro(250, 210, 150, 26)}${muro(300, 110, 26, 70)}
+    <ellipse cx="300" cy="196" rx="30" ry="9" fill="#5a0d07" opacity=".55"/>
+    <line x1="152" y1="160" x2="262" y2="146" stroke="#ffe08a" stroke-width="3" class="a-late"/>
+    <g transform="translate(132 164)"><rect x="-13" y="-8" width="26" height="26" rx="3" fill="#2d5fa8"/><rect x="-11" y="-28" width="22" height="20" rx="3" fill="#f0c9a0"/><rect x="-11" y="-30" width="22" height="7" rx="2" fill="#3a2614"/><rect x="10" y="-2" width="22" height="7" rx="1" fill="#2b2b2b"/><rect x="-17" y="0" width="6" height="14" rx="2" fill="#2d5fa8"/></g>
+    <g class="a-mueve">${zombi(276, 150, 0)}${zombi(318, 176, 0)}</g>${zombi(236, 112, 1)}${zombi(352, 140, 0)}
+    <g transform="translate(330 46)"><rect x="-56" y="-22" width="112" height="44" rx="8" fill="#14100c" stroke="#f2c14e" stroke-width="2.5"/><text x="0" y="8" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="24" fill="#f2c14e" letter-spacing="1">NIVEL 25</text></g>`;
+};
 
 export function portadaSolo(id) {
   const f = ARTE[id];

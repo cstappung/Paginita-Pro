@@ -190,7 +190,17 @@
     { piel: '#5aaa48', camisa: '#2a6a24', panel: '#8ae05a', pantalon: '#16401a', pelo: '#0e2a10', ojos: '#b0ff3a', ojosLuz: 1, boca: '#a8ff4a', bocaLuz: 1, extra: 'cuernos', brazos: 'zombi', cabeza: 1.1, sangre: 2 },
     { piel: '#9a9aa2', camisa: '#5a5a62', panel: '#3a3a42', pantalon: '#2a2a30', pelo: '#3a3a40', ojos: '#ff4a1a', ojosLuz: 1, boca: '#1a1a1a', extra: 'casco', brazos: 'lado', ancho: 1.35, grueso: 1.35, sangre: 0 },
     // 16: el Demoledor, obrero zombi de casco amarillo, chaleco naranja y mazo
-    { piel: '#d9d4c4', camisa: '#ff7a1a', panel: '#e8f04a', pantalon: '#2f3f63', pelo: '#f2c40f', zapatos: '#3a2a1a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#4a1010', extra: 'casco', brazos: 'zombi', ancho: 1.22, grueso: 1.28, mazo: 1, sangre: 0 }
+    { piel: '#d9d4c4', camisa: '#ff7a1a', panel: '#e8f04a', pantalon: '#2f3f63', pelo: '#f2c40f', zapatos: '#3a2a1a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#4a1010', extra: 'casco', brazos: 'zombi', ancho: 1.22, grueso: 1.28, mazo: 1, sangre: 0 },
+    // 17: el Escudero, zombi con casco y un escudo de chapa remachada delante
+    { piel: '#c8cfc0', camisa: '#4a5260', panel: '#2e343e', pantalon: '#3a3f48', pelo: '#2a2d33', ojos: '#191919', boca: '#5a1c1c', extra: 'casco', brazos: 'zombi', escudo: '#8a8f98', ancho: 1.05, sangre: 0 },
+    // 18: el Enjambre, bichos chicos de caparazón verde oscuro
+    { piel: '#3e5a2a', camisa: '#22361a', panel: '#5a8a2a', pantalon: '#1a2a12', pelo: '#0e1a0a', ojos: '#d8ff4a', ojosLuz: 1, boca: '#0a1206', extra: 'cuernos', brazos: 'zombi', cabeza: 1.25, sangre: 2 },
+    // 19: el Chamán, capucha verde y fuego verde en las manos
+    { piel: '#b8c8a0', camisa: '#2a4a2a', panel: '#6ac04a', pantalon: '#1a2a1a', pelo: '#142414', ojos: '#9aff6a', ojosLuz: 1, boca: '#1a2a12', extra: 'capucha', brazos: 'lado', fuegoMano: 'morado', sangre: 0 },
+    // 20: el Excavador, minero zombi con casco de lámpara, cubierto de tierra
+    { piel: '#b0a088', camisa: '#6a5a40', panel: '#4a3e2c', pantalon: '#3e3426', pelo: '#e0b030', ojos: '#ffcf4a', ojosLuz: 1, boca: '#2a1a10', extra: 'casco', brazos: 'zombi', grueso: 1.1, sangre: 0 },
+    // 21: el Vigía, flaco, de gris, con un ojo rojo que apunta
+    { piel: '#9aa4ae', camisa: '#3a4048', panel: '#c02a2a', pantalon: '#2a2e34', pelo: '#ff2a2a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#1a1a1a', extra: 'antena', brazos: 'lado', ancho: 0.85, sangre: 3 }
   ];
   /* La sangre de cada cual: roja, la del diablo más oscura, verde el ácido. */
   const SANGRE = [[196, 14, 16], [120, 6, 10], [92, 150, 26], [70, 90, 150]];
@@ -264,6 +274,26 @@
         { r: 3, f: 6, z: 15, w: 2, d: 2.4, h: 3.6, c: NEGRO }], b: [3, 19.8, 20.9] };
       case 7: return { p: [
         { r: 1, f: 11, z: 15, w: 6.2, d: 4.2, h: 2.8, c: '#c9b48a', deco: { arriba: [[0.15, 0.2, 0.85, 0.4, '#3a4a5a'], [0.42, 0.6, 0.58, 0.8, '#ff2a2a', 1]] } }], b: [1, 13, 17] };
+      // lanzallamas: tanque rojo bajo el cañón y la boquilla con su llamita piloto
+      case 10: return { p: [
+        { r: 1, f: 10, z: 15.6, w: 3.4, d: 11, h: 3.4, c: OSC, deco: { arriba: [[0.2, 0.1, 0.8, 0.3, '#5a5d66']] } },
+        { r: 1, f: 8.5, z: 11.4, w: 3.6, d: 6, h: 3.6, c: '#b8281e', deco: { frente: [[0.2, 0.2, 0.8, 0.4, '#f2c14e']] } },
+        { r: 1, f: 16.4, z: 16.2, w: 2.2, d: 2.2, h: 2.2, c: '#ff8a1f', deco: { frente: [[0.2, 0.2, 0.8, 0.8, '#ffd27a', 1]] } }], b: [1, 17.8, 17.3] };
+      // ballesta: culata de madera y el arco cruzado delante
+      case 11: return { p: [
+        { r: 1, f: 10, z: 15.4, w: 2.4, d: 12, h: 2.6, c: '#6e4524', deco: { arriba: [[0.35, 0, 0.65, 1, '#3b2614']] } },
+        { r: 1, f: 15.5, z: 16.4, w: 11, d: 1.4, h: 1.6, c: '#3b3d43' },
+        { r: 1, f: 14, z: 17.4, w: 0.8, d: 6, h: 0.8, c: '#c9c2a8' }], b: [1, 17.2, 17.6] };
+      // minigun: seis cañones (un bloque con rayas) y el tambor
+      case 12: return { p: [
+        { r: 1.4, f: 8.5, z: 14.6, w: 5, d: 7, h: 5, c: '#3b3d43', deco: { frente: [[0.1, 0.1, 0.9, 0.9, '#22242a']] } },
+        { r: 1.4, f: 15.5, z: 15.4, w: 3.8, d: 9, h: 3.8, c: OSC, deco: { arriba: [[0.3, 0, 0.42, 1, '#9aa0aa'], [0.6, 0, 0.72, 1, '#9aa0aa']], der: [[0, 0.45, 1, 0.55, '#9aa0aa']], izq: [[0, 0.45, 1, 0.55, '#9aa0aa']] } },
+        { r: 1.4, f: 7, z: 10.8, w: 3, d: 3, h: 2.4, c: '#5c6a2a' }], b: [1.4, 20.2, 17.3] };
+      // rayo: el emisor de cobre con dos bobinas y la punta azul
+      case 13: return { p: [
+        { r: 1, f: 10.5, z: 15.4, w: 3.4, d: 8, h: 3.4, c: '#8a5a2a', deco: { arriba: [[0.2, 0.2, 0.8, 0.35, '#c98a4a'], [0.2, 0.6, 0.8, 0.75, '#c98a4a']] } },
+        { r: 1, f: 15.8, z: 15.9, w: 2.4, d: 3, h: 2.4, c: '#2a3a5a', deco: { frente: [[0.15, 0.15, 0.85, 0.85, '#9fd8ff', 1]] } },
+        { r: 1, f: 9, z: 11.6, w: 2.2, d: 2.4, h: 3.4, c: NEGRO }], b: [1, 17.5, 17.1] };
     }
     return { p: [], b: [0, 12, 17] };
   }
@@ -313,6 +343,10 @@
       const b = op.brillo || 0, luz = 'rgb(255,' + Math.round(80 + 140 * b) + ',40)';
       for (const r of [-4.2, -1.4, 1.4, 4.2]) P.push({ r, f: 4.9 * gr, z: zt + 2, w: 2.4, d: 2, h: 6, c: '#c8321e', deco: { arriba: [[0.3, 0.3, 0.7, 0.7, '#f0e0b0']] } });
       P.push({ r: 0, f: 6.1 * gr, z: zt + 4, w: 3, d: 1, h: 2.4, c: luz, luz: 1 });
+    }
+    // el escudo del Escudero: una chapa delante del cuerpo, que gira con él
+    if (pal.escudo) {
+      P.push({ r: 0.5, f: 8.4 * gr, z: zt - 5, w: 15.5 * an, d: 2.2, h: 19, c: pal.escudo, deco: { frente: [[0.08, 0.08, 0.92, 0.92, rgbOscuro(pal.escudo)], [0.14, 0.14, 0.86, 0.86, pal.escudo], [0.44, 0.3, 0.56, 0.7, '#c9b46a']] } });
     }
     // brazos
     const rec = op.rec || 0, atk = op.atk || 0;
@@ -456,7 +490,11 @@
     sotano: tinte('#f5f1ea', '#cec7bb', '#a69e91', '#e2dbcf', '#b5ad9f'),
     cruce: tinte('#f1f2f4', '#c6c9cf', '#9ea2aa', '#dcdfe4', '#adb1b8'),
     fortaleza: tinte('#f3f1e8', '#cbc7b6', '#a29e8c', '#dfdbcc', '#b3ae9b'),
-    laberinto: tinte('#f2f6f9', '#c4ced8', '#9ba7b4', '#dae2ea', '#abb6c2')
+    laberinto: tinte('#f2f6f9', '#c4ced8', '#9ba7b4', '#dae2ea', '#abb6c2'),
+    planta: tinte('#eef2e6', '#c3c9b5', '#9aa08b', '#d9dfcc', '#aab09a'),
+    hangar: ACERO,
+    fabrica: tinte('#f3ebe0', '#cdbfa9', '#a69580', '#e1d5c3', '#b6a690'),
+    apagon: tinte('#d9dde6', '#a9b0bd', '#838a98', '#c2c8d3', '#9298a6')
   };
   const CAJAS = tinte('#e9e8e4', '#bdbcb7', '#94938e', '#d3d2cd', '#a6a5a0');
   const muroDe = id => MUROS[id] || BLANCO;
@@ -519,7 +557,11 @@
     sotano: { base: '#c4bfb5', motas: ['#b2ada2', '#d2cec6', '#a8a296'], losa: 3, junta: 'rgba(54,48,42,.22)', grieta: 'rgba(40,36,30,.3)', deco: 'sotano' },
     cruce: { base: '#9a9c9f', motas: ['#8a8c90', '#a8aaad', '#7e8084'], losa: 0, junta: 'rgba(40,40,44,.2)', grieta: 'rgba(30,30,34,.38)', deco: 'cruce' },
     fortaleza: { base: '#c7cf9f', motas: ['#b5c088', '#d6dcb2', '#a8b47a'], losa: 0, junta: 'rgba(70,80,40,.15)', grieta: 'rgba(80,70,40,.25)', deco: 'fortaleza' },
-    laberinto: { base: '#d4dbe1', motas: ['#c6ced6', '#e2e7eb', '#b8c2cc'], losa: 1, junta: 'rgba(60,80,100,.24)', grieta: 'rgba(50,60,80,.25)', deco: 'laberinto' }
+    laberinto: { base: '#d4dbe1', motas: ['#c6ced6', '#e2e7eb', '#b8c2cc'], losa: 1, junta: 'rgba(60,80,100,.24)', grieta: 'rgba(50,60,80,.25)', deco: 'laberinto' },
+    planta: { base: '#c9cdbf', motas: ['#bcc0b0', '#d5d9cc', '#aeb3a2'], losa: 2, junta: 'rgba(60,70,50,.2)', grieta: 'rgba(50,60,40,.28)', deco: 'sotano' },
+    hangar: { base: '#a9acb0', motas: ['#9da0a5', '#b6b9bd', '#92959a'], losa: 0, junta: 'rgba(40,42,46,.2)', grieta: 'rgba(30,32,36,.32)', deco: 'cruce' },
+    fabrica: { base: '#c2b7a3', motas: ['#b4a994', '#cfc5b2', '#a89c86'], losa: 3, junta: 'rgba(70,56,40,.22)', grieta: 'rgba(60,46,30,.3)', deco: 'sotano' },
+    apagon: { base: '#a8adb6', motas: ['#9ca1ab', '#b4b8c0', '#90959f'], losa: 1, junta: 'rgba(40,48,60,.24)', grieta: 'rgba(30,36,48,.3)', deco: 'laberinto' }
   };
   const tema = id => TEMAS[id] || TEMAS.patio;
 
@@ -1085,12 +1127,25 @@
     c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x, y + 1, 8, 3.4, 0, 0, Math.PI * 2); c.fill();
     let p;
     if (k === 1) p = [{ r: 0, f: 0, z, w: 11, d: 11, h: 9, c: '#f4f4f4', deco: { arriba: [[0.4, 0.15, 0.6, 0.85, '#d42020', 1], [0.15, 0.4, 0.85, 0.6, '#d42020', 1]], frente: [[0.4, 0.2, 0.6, 0.8, '#d42020']], der: [[0.4, 0.2, 0.6, 0.8, '#d42020']], izq: [[0.4, 0.2, 0.6, 0.8, '#d42020']], atras: [[0.4, 0.2, 0.6, 0.8, '#d42020']] } }];
+    else if (k === 3) {
+      // la dorada brilla y gira más rápido
+      brilla(c, sprites().brillo, x, y - z - 6, 16, 0.35 + 0.2 * Math.sin(T * 6 + id));
+      p = [{ r: 0, f: 0, z, w: 12, d: 12, h: 10, c: '#e8b830', deco: { arriba: [[0.15, 0.15, 0.85, 0.85, '#fff0a0', 1]], frente: [[0.4, 0.1, 0.6, 0.9, '#a87a10']], der: [[0.4, 0.1, 0.6, 0.9, '#a87a10']], izq: [[0.4, 0.1, 0.6, 0.9, '#a87a10']], atras: [[0.4, 0.1, 0.6, 0.9, '#a87a10']] } }];
+    }
     else if (k === 2) p = [{ r: 0, f: 0, z, w: 11, d: 11, h: 9, c: '#2d6fb8', deco: { arriba: [[0.3, 0.2, 0.7, 0.8, '#9fd0ff', 1]], frente: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']], der: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']], izq: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']], atras: [[0.3, 0.25, 0.7, 0.75, '#9fd0ff']] } }];
     else {
       const fr = [[0, 0.4, 1, 0.6, '#d8c45a']];
       p = [{ r: 0, f: 0, z, w: 13, d: 9, h: 8, c: '#5d6b28', deco: { arriba: [[0.1, 0.42, 0.9, 0.58, '#d8c45a']], frente: fr, der: fr, izq: fr, atras: fr } }];
     }
     modelo(c, x, y, a, p, { linea: 0.6 });
+  }
+  /* Un trozo de chatarra que suelta una baja propia: una tuerca o un
+     tornillo que gira y salta hacia quien lo ganó (lo mueve juego.js). */
+  function chatarra(c, x, y, T, id, z) {
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + 1, 3.4, 1.5, 0, 0, Math.PI * 2); c.fill();
+    const oro = id % 3 === 0;
+    const p = [{ r: 0, f: 0, z: (z || 0) + 1, w: oro ? 5 : 4, d: oro ? 5 : 3, h: 3, c: oro ? '#d9b34a' : '#a3adb8' }];
+    modelo(c, x, y, T * 7 + id, p, { linea: 0.4 });
   }
   /* La estación de suministros: mostrador con toldo a rayas y el «$». */
   function puesto(c, x, y, T, cerca) {
@@ -1213,12 +1268,30 @@
         forma([2, 7, 27, 7, 27, 12, 2, 12], '#5d6b48'); forma([27, 6, 31, 6, 31, 13, 27, 13], '#2a2f22'); forma([1, 6.5, 4, 6.5, 4, 12.5, 1, 12.5], '#2a2f22');
         forma([11, 12, 14, 12, 14, 16.5, 11, 16.5], '#222'); forma([13, 4.5, 17, 4.5, 17, 7, 13, 7], '#222'); break;
       case 7: forma([8, 7, 26, 7, 26, 16, 8, 16], '#c9b48a'); c.fillStyle = '#3a4a5a'; c.fillRect(9.5, 9, 15, 2); c.fillRect(9.5, 12.5, 15, 2); c.fillStyle = '#ff2a2a'; c.fillRect(15, 4.5, 4, 2.5); break;
+      case 10:
+        forma([4, 7, 26, 7, 26, 10, 4, 10], metal(7, 10)); forma([6, 10.5, 16, 10.5, 16, 16, 6, 16], '#b8281e');
+        c.fillStyle = '#f2c14e'; c.fillRect(8, 12, 6, 1.4);
+        c.fillStyle = '#ff8a1f'; c.beginPath(); c.moveTo(26, 6.5); c.lineTo(32, 8.5); c.lineTo(26, 10.5); c.fill(); break;
+      case 11:
+        forma([3, 9, 24, 9, 24, 11.5, 3, 11.5], '#6e4524');
+        c.strokeStyle = '#3b3d43'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(22, 3); c.quadraticCurveTo(27, 10, 22, 17); c.stroke();
+        c.strokeStyle = '#c9c2a8'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(22, 3); c.lineTo(15, 10); c.lineTo(22, 17); c.stroke();
+        c.fillStyle = '#c9c2a8'; c.fillRect(15, 9.6, 16, 0.9); break;
+      case 12:
+        forma([3, 6, 14, 6, 14, 15, 3, 15], '#3b3d43');
+        for (let i = 0; i < 3; i++) forma([14, 6.4 + i * 2.9, 31, 6.4 + i * 2.9, 31, 8.4 + i * 2.9, 14, 8.4 + i * 2.9], metal(6, 15));
+        forma([5, 15, 10, 15, 10, 18.5, 5, 18.5], '#5c6a2a'); break;
+      case 13:
+        forma([5, 7, 22, 7, 22, 13, 5, 13], '#8a5a2a'); c.fillStyle = '#c98a4a'; c.fillRect(8, 6, 2, 8); c.fillRect(14, 6, 2, 8);
+        forma([22, 8, 27, 8, 27, 12, 22, 12], '#2a3a5a');
+        c.strokeStyle = '#9fd8ff'; c.lineWidth = 1; c.beginPath(); c.moveTo(27, 10); c.lineTo(29.5, 7.5); c.lineTo(30.5, 11); c.lineTo(33, 8.5); c.stroke();
+        forma([8, 13, 11, 13, 11, 17.5, 8, 17.5], '#222'); break;
     }
     c.restore();
   }
 
   raiz.BoxheadGrafico = {
     KY, TS, PAL_E, SANGRE, sangreDe, palJugador, tono, rgba, sprites, modelo, proyecta, humanoide, boca, partesArma,
-    BLANCO, muroDe, cajaDe, bloque, crearSuelo, crearEfectos, barril, muroFalso, muroBlindado, carga, caja, puesto, tumba, granada, cohete, bola, iconoArma, brilla
+    BLANCO, muroDe, cajaDe, bloque, crearSuelo, crearEfectos, barril, muroFalso, muroBlindado, carga, caja, chatarra, puesto, tumba, granada, cohete, bola, iconoArma, brilla
   };
 })(typeof self !== 'undefined' ? self : this);

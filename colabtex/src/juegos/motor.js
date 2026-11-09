@@ -277,7 +277,7 @@ export function novedades(n = 3) {
 export function minimoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
   if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
-  if (p && p.juego === "boxhead" && varianteBoxhead(p) === "versus") return 2;
+  if (p && p.juego === "boxhead" && ["versus", "equipos", "infectado"].includes(varianteBoxhead(p))) return 2;
   if (p && p.juego === "bt3" && cupoDe(p) <= 2) return 2;   // el duelo de BT3 es de dos; el torneo, desde uno (con CPU)
   if (p && p.juego === "pool") return plCupo(p) === 4 ? 4 : 2;   // 2 contra 2 no empieza hasta que están los cuatro
   return j.minimo || 2;
@@ -1148,7 +1148,9 @@ export function progreso(est, juego) {
     return c(lider / (est.meta || YM_META));
   }
   /* En Boxhead cooperativo, cuántos están caídos; en versus, la meta. */
-  if (juego === "boxhead" && est.variante === "coop") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
+  if (juego === "boxhead" && est.infectados) return c(est.infectados.length / Math.max(1, (est.jugadores || []).length));
+  if (juego === "boxhead" && est.puntosEq) return c(Math.max(est.puntosEq.rojo, est.puntosEq.azul) / (est.meta || 2 * BX_METAS[1]));
+  if (juego === "boxhead" && est.variante !== "versus") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
   if (juego === "boxhead" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || BX_METAS[1]));
   /* En HaxBall, cuánto le falta al equipo que va ganando. */
   if (juego === "haxball" && est.goles) return c(Math.max(0, ...Object.values(est.goles)) / (est.meta || 5));
@@ -1344,7 +1346,7 @@ export function ganoEn(p, ganador, uid) {
   if (!ganador || !uid) return false;
   if (ganador === uid) return true;
   if (!String(ganador).startsWith("eq:") || !p) return false;
-  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : p.juego === "pool" ? equiposPool(p) : null;
+  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : p.juego === "pool" ? equiposPool(p) : p.juego === "boxhead" ? equiposBoxhead(p) : null;
   return !!eq && eq[uid] === ganador.slice(3);
 }
 
@@ -6831,29 +6833,67 @@ function ajRepasa(bandos, jug, ritmo = null) {
      quien la escribe y una baja a `por` si es otro jugador que sigue en la
      sala. El primero en llegar a la meta gana; si queda uno solo, gana por
      abandono. Matarse uno mismo (un barril propio) no le da baja a nadie.
+   - **Versus por equipos** (`equipos`, Fase 3.5, de 2 a 8): rojo los
+     asientos pares y azul los impares (`equiposBoxhead`). Una baja vale
+     solo si `por` es del otro equipo y suma a `puntosEq`; gana el primer
+     equipo en llegar al doble de la meta (`"eq:rojo"`/`"eq:azul"`) o el
+     que queda si el otro se va entero.
+   - **Infectado** (`infectado`, Fase 3.5, de 2 a 8): el paciente cero es
+     el jugador `semilla % n`. Quien muere siendo humano queda infectado
+     (por lo que sea); una baja vale entre humano e infectado. Ganan los
+     infectados (`"eq:infectados"`) cuando no queda humano en la sala, y
+     los humanos (`"eq:humanos"`) con `{t:"aguanta"}`, que escribe quien
+     dirige a los 3 minutos de juego, o si los infectados se van todos. El
+     registro no tiene la hora: un cliente modificado podría adelantar el
+     aguante (el mismo límite honesto de las muertes).
+   - **Modo jefes** (`jefes`, Fase 3.5): el registro y el final son los del
+     cooperativo (niveles, caídos, revivir); lo distinto lo hace el juego:
+     cada nivel es un jefe de la rotación (el nivel n de la sala simula el
+     5n) con una escolta corta.
+
+   El mutador (`mut`, uno de `BX_MUTADORES` o ninguno) cambia una regla de
+   la sala dentro del juego; el registro no lo ve. La misma lista vive en
+   juegos/boxhead/js/datos.js (`MUTADORES`).
 
    Nadie puede escribir una baja para sí mismo; el límite honesto es que un
    cliente modificado podría negarse a morir. */
-export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus" };
+export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus", equipos: "Versus por equipos", infectado: "Infectado", jefes: "Modo jefes" };
+export const BX_MUTADORES = { sangre: "Sed de sangre (cada baja cura)", cristal: "Cristal (pegas y recibes el doble)", veloz: "Horda veloz", municion: "Munición sin fin", blindados: "Blindados (la mitad, con el triple de vida)" };
 export const BX_METAS = [5, 10, 20];
-export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto" };
-/* Ids de arma de juegos/boxhead/js/datos.js (0–7) más el mordisco (8) y
-   el fuego de un diablo (9). Nunca se renumeran. */
-export const BX_ARMAS = 8;
+export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto", planta: "Planta", hangar: "Hangar", fabrica: "Fábrica", apagon: "Apagón" };
+/* El id de arma más alto de juegos/boxhead/js/datos.js: 0–7 y 10–13 son
+   del jugador, 8 el mordisco y 9 el fuego de un diablo. Nunca se
+   renumeran. */
+export const BX_ARMAS = 13;
 const tiene = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 export const varianteBoxhead = p => tiene(BX_VARIANTES, p && p.variante) ? p.variante : "coop";
 export const mapaBoxhead = p => tiene(BX_MAPAS, p && p.mapa) ? p.mapa : "patio";
+export const mutBoxhead = p => tiene(BX_MUTADORES, p && p.mut) ? p.mut : "";
 export function metaBoxhead(p) {
   const m = Math.floor(Number(p && p.meta));
-  return BX_METAS.includes(m) ? m : BX_METAS[1];
+  return (BX_METAS.includes(m) ? m : BX_METAS[1]) * (varianteBoxhead(p) === "equipos" ? 2 : 1);
+}
+/* El equipo de cada uno en el versus por equipos (por asiento) y en el
+   infectado (humanos o infectados, según el registro); `null` en las otras. */
+export function equiposBoxhead(p, js = jugadoresDe(p)) {
+  if (varianteBoxhead(p) === "infectado") return redBoxhead(p, js).equipos;
+  if (varianteBoxhead(p) !== "equipos") return null;
+  const eq = {};
+  js.forEach((j, i) => { eq[j.uid] = i % 2 ? "azul" : "rojo"; });
+  return eq;
 }
 
 export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const variante = varianteBoxhead(p), meta = metaBoxhead(p), mapa = mapaBoxhead(p);
-  const coop = variante === "coop";
+  const infect = variante === "infectado";
+  const coop = variante !== "versus" && variante !== "equipos" && !infect;   // el modo jefes lleva el registro del cooperativo
+  const eq = infect ? null : equiposBoxhead(p, js), puntosEq = { rojo: 0, azul: 0 };
+  const infectados = {};
+  if (infect && js.length) infectados[js[(Number(p.semilla) >>> 0) % js.length].uid] = true;
+  const humanos = () => js.filter(x => !fuera[x.uid] && !infectados[x.uid]);
   const entero = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
-  const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {};
+  const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {}, revividas = {};
   for (const u of ids) { bajas[u] = 0; muertes[u] = 0; pts[u] = 0; kills[u] = 0; }
   const hist = [];
   let nivel = 1, ganador = null, motivo = "";
@@ -6888,6 +6928,18 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
         hist.push({ e: "nivel", n: nivel });
         continue;
       }
+      /* Revivir (Fase 3.5): un compañero en pie que pasó 3 s junto al caído
+         lo levanta. Lo escribe quien revive; no vale sobre sí mismo, sobre
+         alguien en pie o que se fue, ni si quien revive está caído. */
+      if (j.t === "revive") {
+        const v = j.v;
+        if (typeof v === "string" && v !== u && caidos[v] && !caidos[u] && !fuera[v]) {
+          delete caidos[v];
+          revividas[u] = (revividas[u] || 0) + 1;
+          hist.push({ e: "revive", uid: u, v });
+        }
+        continue;
+      }
       if (j.t !== "muere" || caidos[u]) continue;
       muertes[u]++;
       caidos[u] = true;
@@ -6897,26 +6949,47 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
       finCoop();
       continue;
     }
+    if (infect && j.t === "aguanta") {
+      if (humanos().length) { ganador = "eq:humanos"; motivo = "aguante"; }
+      continue;
+    }
     if (j.t !== "muere") continue;
     muertes[u]++;
     const k = j.por;
-    const vale = typeof k === "string" && ids.has(k) && k !== u && !fuera[k];
+    const vale = typeof k === "string" && ids.has(k) && k !== u && !fuera[k] && (!eq || eq[k] !== eq[u]) && (!infect || !infectados[k] !== !infectados[u]);
     hist.push({ e: "baja", uid: vale ? k : "", v: u, a: entero(j.a, BX_ARMAS + 1) });
+    if (infect && !infectados[u]) {
+      infectados[u] = true;
+      hist.push({ e: "infecta", uid: vale ? k : "", v: u });
+      if (!humanos().length) { ganador = "eq:infectados"; motivo = "infectados"; }
+    }
     if (!vale) continue;
     bajas[k]++;
-    if (bajas[k] >= meta) { ganador = k; motivo = "meta"; }
+    if (eq) { if (++puntosEq[eq[k]] >= meta) { ganador = "eq:" + eq[k]; motivo = "equipo"; } }
+    else if (!infect && bajas[k] >= meta) { ganador = k; motivo = "meta"; }
   }
   const activos = js.filter(j => !fuera[j.uid]);
-  if (ganador === null && listos && !coop && activos.length <= 1) {
+  if (ganador === null && listos && infect) {
+    if (!humanos().length) { ganador = "eq:infectados"; motivo = "abandono"; }
+    else if (!activos.some(j => infectados[j.uid])) { ganador = "eq:humanos"; motivo = "abandono"; }
+  }
+  else if (ganador === null && listos && eq) {
+    const quedan = [...new Set(activos.map(j => eq[j.uid]))];
+    if (quedan.length <= 1) { ganador = quedan.length ? "eq:" + quedan[0] : ""; motivo = "abandono"; }
+  }
+  else if (ganador === null && listos && !coop && activos.length <= 1) {
     ganador = activos.length ? activos[0].uid : "";
     motivo = "abandono";
   }
   if (ganador === null && listos && coop && !activos.length) finCoop();
   return {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
-    variante, meta, mapa, nivel,
+    variante, meta, mapa, nivel, mut: mutBoxhead(p),
     caidos: Object.keys(caidos).filter(u => !fuera[u]),
-    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera,
+    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera, revividas, puntosEq: eq ? puntosEq : null,
+    equipos: infect ? Object.fromEntries(js.map(x => [x.uid, infectados[x.uid] ? "infectados" : "humanos"])) : eq,
+    infectados: infect ? Object.keys(infectados).filter(u => !fuera[u]) : null,
+    nombresEq: infect ? { humanos: "Humanos", infectados: "Infectados" } : null,
     hist: hist.slice(-40), ganador: ganador === null ? null : ganador, motivo
   };
 }

@@ -36,6 +36,8 @@ function cargaVerificadores() {
      módulo: sus archivos se cargan en globalThis.PD (verifica/prodefender.js). */
   const pd = path.join(__dirname, '../../juegos/club/prodefender/js/');
   for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js', 'prueba.js']) require(pd + f);
+  // Pro BoxHead rehace con el juego mismo, sin pantalla (verifica/boxhead.js).
+  globalThis.BoxheadRehace = require('../../juegos/boxhead/js/rehace-node.cjs').rehace;
   const code = esbuild.buildSync({
     stdin: {
       contents: "export * from './juegos/solo/verifica.js'; export { senalesFila, hallazgo } from './juegos/admin-datos.js';",

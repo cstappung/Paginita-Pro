@@ -159,6 +159,7 @@ que se espera de cada uno:
 | PRO HERO | `club-hero-estrellas` | cada canción: el chart + cada acción con su instante, sobre la rejilla fija del motor; la tabla: la suma del mapa de estrellas | media |
 | PRO PACMAN | `club-propac-puntos` | semilla + cuenta + cada jugada (dirección, turbo, pulso) con su tic de 1/60 s; giros en el tic exacto del centro delatan un programa | baja |
 | PRO DEFENDER | `club-prodefender-<reino>` | semilla + cuenta + cada acción (colocar, mejorar, vender, objetivo, ronda, recarga) con su paso de 1/60 s; rehecho en un Web Worker con caché por ronda | media |
+| Pro BoxHead | `club-boxhead-<mapa>` | semilla (con la cuenta) + mapa + cada cambio de teclado/stick y cada acción (arma, compra, muro, detonar) con su paso de 1/60 s; el juego mismo rehecho sin pantalla en un Web Worker | media |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
 | Integrodle | `club-integral-*` | lo escrito en cada intento, corregido otra vez con el motor; la integral sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |
