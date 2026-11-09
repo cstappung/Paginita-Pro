@@ -174,12 +174,8 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   it. `juego.js` sends the intensity from enemies and the multiplier, −1 to fade
   out, and a live boss switches the theme. Music pieces pass `libre` so they never
   count in `carga`. Otherwise the horde's cap would mute the effects.
-- **Recorded effects:** the loader is ready (`MUESTRAS`/`GAN`/`muestra`), but
-  `MUESTRAS` stays empty until the ElevenLabs files exist as
-  `sfx/<key>-<n>.mp3`. Each file's `GAN` must be measured against the
-  synthesized sound. The `switch` in `son` remains the fallback.
-  The chosen takes (generation and session ids) are listed in
-  `sfx/elevenlabs.md`.
+- **Recorded effects:** see «ElevenLabs recordings» below (`boxhead-24`).
+  The `switch` in `son` remains the fallback.
 
 
 ## Phase 2.1: deterministic practice engine (`boxhead-10`)
@@ -497,3 +493,26 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
 - **Lights**: `efectoBoom` always pushes to `LUCES`. On a lit map `luces()`
   paints a warm `lighter` glow (0.26 peak, quadratic fade). On a dark map
   `oscuridad` uses them as holes, as before. Drawing only.
+
+## ElevenLabs recordings and a calmer camera (`boxhead-24`)
+
+- **29 recorded effects** live in `sfx/<key>-1.mp3` (mono, 96 kbps, 376 KB
+  in total). `MUESTRAS` lists them and `GAN` holds one gain per file. The
+  takes and how they were cut are in `sfx/elevenlabs.md`.
+- **Keep the sounds that repeat fast short** (uzi 0.25 s, pistol 0.55 s,
+  hits 0.3 s). `muestra` lets 6 copies of one sound play at once (`VOCES`).
+  A 7th returns `true` without sounding, so a long uzi at the minigun's
+  cadence would go mute.
+- **How `GAN` was measured:** the recording and the synthesized sound are
+  both rendered through this same chain in an OfflineAudioContext, and the
+  loudest 100 ms window of each is compared. Exceptions:
+  - Sounds that were just a click get a floor of 0.015.
+  - Impacto, rebote and chatarra get only ×3.
+  - Quedan gets ×1.5.
+  - Re-measure if a file or the chain changes.
+- **The distortion curve has 513 points**, so silence maps to exactly 0.
+  With 512 there was a constant DC offset at the output, even with nothing
+  playing. A test pins this.
+- **Camera look-ahead** is 18/14 px (it was 34/26). It is drawing only, so
+  `VE` is unchanged.
+

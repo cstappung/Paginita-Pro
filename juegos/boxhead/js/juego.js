@@ -2342,10 +2342,11 @@
     if (!M) { fondoMenu(); return; }
     // un hito del multiplicador acerca la cámara un instante
     esc = clamp(Math.min(innerWidth / (22 * TS), innerHeight / (14 * TS)), 0.6, 3) * dpr * (1 + 0.07 * pulso * pulso);
-    // cámara: se adelanta un poco hacia donde mira el personaje
+    // cámara: se adelanta un poco hacia donde mira el personaje (18/14 px;
+    // con 34/26 se movía demasiado al girar)
     let tx = M.ancho * TS / 2, ty = M.alto * TS / 2;
     if (yo.v && !yo.muerto) {
-      leadX += (DIRS[yo.d][0] * 34 - leadX) * 0.06; leadY += (DIRS[yo.d][1] * 26 - leadY) * 0.06;
+      leadX += (DIRS[yo.d][0] * 18 - leadX) * 0.06; leadY += (DIRS[yo.d][1] * 14 - leadY) * 0.06;
       tx = yo.x + leadX; ty = yo.y + leadY;
     }
     else { const r = [...R.values()].find(r => r.v); if (r) { tx = r.x; ty = r.y; } else if (yo.muerto) { tx = yo.x; ty = yo.y; } }

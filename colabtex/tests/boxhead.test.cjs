@@ -783,3 +783,17 @@ test('boxhead en línea: el zb que sale lleva z/zx y otro marco lo lee igual',()
  const ids=D.desempacaZb(ult).map(t=>t[0]).sort((a,b)=>a-b);
  assert.deepEqual(copia(ids),copia(bx.mundo().E.map(e=>e.id).sort((a,b)=>a-b)));
 });
+
+test('boxhead: cada grabación de MUESTRAS tiene su archivo, su GAN y su respaldo sintetizado',()=>{
+ const src=fs.readFileSync(__dirname+'/../../juegos/boxhead/js/audio.js','utf8');
+ const bloque=n=>{const m=new RegExp('const '+n+' = \\{([^}]*)\\}').exec(src);assert.ok(m,n);return Object.fromEntries([...m[1].matchAll(/(\w+): ([\d.]+)/g)].map(x=>[x[1],+x[2]]));};
+ const mu=bloque('MUESTRAS'),gan=bloque('GAN');
+ assert.ok(Object.keys(mu).length>=29);
+ for(const [k,n] of Object.entries(mu)){
+  for(let i=1;i<=n;i++){const f=__dirname+'/../../juegos/boxhead/sfx/'+k+'-'+i+'.mp3';assert.ok(fs.existsSync(f),'falta '+f);assert.ok(fs.statSync(f).size<80000,k+' pesa demasiado');}
+  assert.ok(gan[k]>0&&gan[k]<10,'GAN de '+k);
+  assert.ok(src.includes("case '"+k+"'"),k+' sin sintetizado de respaldo');
+ }
+ // la curva de distorsión tiene un punto en 0: si no, el silencio sale como corriente continua
+ assert.match(src,/new Float32Array\(513\)/);
+});
