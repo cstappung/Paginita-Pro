@@ -1,7 +1,7 @@
 /* Verificador antitrampas de Pro BoxHead en el Solo Club (ver
    docs/antitrampas.md y docs/antitrampas/boxhead.md).
 
-   Una tabla por mapa: `club-boxhead-<patio|sotano|cruce|fortaleza|laberinto>`;
+   Una tabla por mapa: `club-boxhead-<mapa>` (los nueve de `ORDEN_MAPAS`);
    puntos = el nivel al que se llegó en una práctica (el de la muerte), tiempo =
    los ms de juego que tardó en llegar a ese nivel (los pasos del motor, 1/60 s
    cada uno): con el mismo nivel gana quien llegó antes.
@@ -19,8 +19,8 @@
 export const PRUEBA = 1;
 
 const MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto'];
-const CATEGORIA = /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto)$/;
-const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-17';
+const CATEGORIA = /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/;
+const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-18';
 export const MAX_NIVEL = 999;
 
 let trabajador = null, serie = 0;

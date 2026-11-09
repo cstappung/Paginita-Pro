@@ -164,7 +164,7 @@
     if (ONLINE || repite || !cfg) return;
     const r = records[cfg.mapa] || { n: 0, pts: 0 };
     if (n > r.n || (n === r.n && yo.pts > r.pts)) { records[cfg.mapa] = { n, pts: yo.pts | 0 }; guarda('boxhead.records', JSON.stringify(records)); }
-    if (D.ORDEN_MAPAS.every(m => (records[m] || {}).n >= 10)) medalla('mapas');
+    if (D.MAPAS_CLASICOS.every(m => (records[m] || {}).n >= 10)) medalla('mapas');
   }
   // Las ventajas que se tienen, en una línea («Filo 2 · Dron 1»).
   const listaVentajas = () => D.VENTAJAS.filter(v => vt(v.id)).map(v => v.nom + (v.max > 1 ? ' ' + vt(v.id) : '')).join(' · ');
@@ -401,6 +401,15 @@
       if (b && c.x + r > b[0] && c.x - r < b[2] && c.y + r > b[1] && c.y - r < b[3]) (s || (s = new Set())).add(o);
     }
     return s;
+  }
+  /* Cintas transportadoras (la Fábrica): el suelo empuja hacia su flecha a
+     quien está encima, jugador o enemigo, a `VEL_CINTA` px/s. */
+  function cinta(c, r, dt) {
+    if (!M.cinta) return;
+    const tx = Math.floor(c.x / TS), ty = Math.floor(c.y / TS);
+    if (tx < 0 || ty < 0 || tx >= M.ancho || ty >= M.alto) return;
+    const k = M.cinta[ty * M.ancho + tx];
+    if (k) mover(c, DIRS[k - 1][0] * D.VEL_CINTA * dt, DIRS[k - 1][1] * D.VEL_CINTA * dt, r);
   }
   function mover(c, dx, dy, r) {
     let bloq = null;
@@ -1426,6 +1435,7 @@
     for (const e of lista) {
       const C = D.ENEMIGOS[e.k];
       e.cd -= dt; e.cdF -= dt; e.atk = Math.max(0, e.atk - dt); e.flash = Math.max(0, e.flash - dt);
+      if (M.cinta && !C.jefe && !bajoTierra(e)) cinta(e, C.radio - 1, dt);
       if (e.aturd > 0) {
         // Despedido: resbala hacia atrás y frena; ni persigue ni ataca.
         e.aturd -= dt;
@@ -1833,6 +1843,8 @@
       if (e.debil > 0) e.debil -= dt;
     }
     for (const r of RAYOS) r.t -= dt;
+    for (const l of LUCES) l.t -= dt;
+    while (LUCES.length && LUCES[0].t <= 0) LUCES.shift();
     while (RAYOS.length && RAYOS[0].t <= 0) RAYOS.shift();
     for (const e of E.values()) {
       e.tb = (e.tb || 0) + ((e.aturd > 0 ? 1 : 0) - (e.tb || 0)) * Math.min(1, dt * (e.aturd > 0 ? 18 : 7));
@@ -1891,6 +1903,7 @@
       mover(yo, dx / l * v * dt, dy / l * v * dt, 9);
     }
     if (en.disp) dispara();
+    cinta(yo, 9, dt);
     if (!en.disp || !armaYo().gira) yo.giro = Math.max(0, yo.giro - dt * 1.5);
     if (yo.dorada > 0) yo.dorada = Math.max(0, yo.dorada - dt);
     // Cajas.
@@ -2066,6 +2079,7 @@
   }
   function efectoBoom(x, y, r) {
     fx.boom(x, y, r);
+    if (M && M.oscuro) { LUCES.push({ x, y, r: r * 2.4, t: 0.6, t0: 0.6 }); if (LUCES.length > 20) LUCES.shift(); }
     sacude = Math.min(10, sacude + r / 12);
     const dd = dist(x, y, yo.x, yo.y);
     son('boom', dd);
@@ -2235,6 +2249,7 @@
     const y0 = Math.max(0, Math.floor((cyv - vh / 2) / TS) - 1), y1 = Math.min(M.alto - 1, Math.ceil((cyv + vh / 2) / TS) + 2);
     // el suelo, con toda la sangre y las quemaduras de la partida, y las sombras
     if (fx.suelo) fx.suelo.dibuja(cx, cxv - vw / 2 - 4, cyv - vh / 2 - 4, cxv + vw / 2 + 4, cyv + vh / 2 + 4);
+    if (M.cinta) dibujaCintas(x0, x1, y0, y1);
     // los cuerpos que caen, debajo de todo lo que sigue de pie
     fx.dibujaCadaveres(cx);
     // lo que tiene altura, ordenado por su base
@@ -2315,6 +2330,7 @@
       barraVida(r.x, r.y, r.hp, r.arm);
       rotulo(nombreDe(u), r.x, r.y - 59, colorDe(u));
     }
+    if (M.oscuro) oscuridad(cxv, cyv);
     if (veoYo) {
       barraVida(yo.x, yo.y, yo.hp, yo.arm, hpMax());
       if (vt('dron') && yo.v && !yo.muerto) dibujaDron(yo.x + Math.cos(T * 2.4) * 20, yo.y - 40 + Math.sin(T * 4.8) * 3);
@@ -2322,6 +2338,57 @@
       rotulo(a.nombre + ': ' + bal, yo.x, yo.y - 59, yo.w !== 0 && !(yo.ammo[yo.w] > 0) ? '#ff6a5a' : '#fff');
     }
     $('rojo').style.boxShadow = 'inset 0 0 ' + Math.round(80 + 80 * rojo) + 'px rgba(200,0,0,' + (rojo * 0.7 + (yo.v && yo.hp < 30 ? 0.25 + 0.15 * Math.sin(T * 6) : 0)).toFixed(2) + ')';
+  }
+  /* Las cintas: franjas oscuras con flechas que avanzan hacia donde empujan. */
+  function dibujaCintas(x0, x1, y0, y1) {
+    const fase = (T * D.VEL_CINTA) % 12;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const k = M.cinta[y * M.ancho + x];
+      if (!k) continue;
+      const px = x * TS, py = y * TS, [dx, dy] = DIRS[k - 1];
+      cx.fillStyle = '#3d3a36'; cx.fillRect(px + 1, py + 3, TS - 2, TS - 6);
+      cx.fillStyle = '#2a2826'; cx.fillRect(px + 1, py + 3, TS - 2, 2); cx.fillRect(px + 1, py + TS - 5, TS - 2, 2);
+      cx.save(); cx.beginPath(); cx.rect(px + 1, py + 5, TS - 2, TS - 10); cx.clip();
+      cx.strokeStyle = 'rgba(242,193,78,.55)'; cx.lineWidth = 2;
+      const mx = px + TS / 2, my = py + TS / 2;
+      for (let i = -2; i <= 2; i++) {
+        const o = i * 12 + fase, cxa = mx + dx * o, cya = my + dy * o;
+        cx.beginPath();
+        cx.moveTo(cxa - dx * 4 - dy * 6, cya - dy * 4 + dx * 6); cx.lineTo(cxa + dx * 2, cya + dy * 2); cx.lineTo(cxa - dx * 4 + dy * 6, cya - dy * 4 - dx * 6);
+        cx.stroke();
+      }
+      cx.restore();
+    }
+  }
+  /* El Apagón: una capa negra sobre el mundo con huecos de luz alrededor de
+     los jugadores, las tiendas, las bolas de fuego y las explosiones
+     recientes. Solo se dibuja: no cambia nada de la partida. */
+  const LUCES = [];
+  let capaOscura = null;
+  function oscuridad(cxv, cyv) {
+    if (!capaOscura) capaOscura = document.createElement('canvas');
+    const c = capaOscura;
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const o = c.getContext('2d');
+    if (!o) return;
+    o.globalCompositeOperation = 'source-over';
+    o.clearRect(0, 0, W, H);
+    o.fillStyle = 'rgba(4,6,12,.9)'; o.fillRect(0, 0, W, H);
+    o.globalCompositeOperation = 'destination-out';
+    const hueco = (wx, wy, r, a) => {
+      const sx = (wx - cxv) * esc + W / 2, sy = (wy - cyv) * esc + H / 2, sr = r * esc;
+      const g = o.createRadialGradient(sx, sy, sr * 0.25, sx, sy, sr);
+      g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      o.fillStyle = g; o.beginPath(); o.arc(sx, sy, sr, 0, 7); o.fill();
+    };
+    if (yo.v && !yo.muerto) hueco(yo.x, yo.y - 10, 170, 1);
+    for (const r of R.values()) if (r.v) hueco(r.x, r.y - 10, 150, 1);
+    for (const t of M.tiendas || []) hueco(t.x, t.y, 60, 0.7);
+    for (const f of F) hueco(f.x, f.y, 55, 0.8);
+    for (const e of E.values()) if (D.esJefe(e.k) && e.est === 2) hueco(e.x, e.y, 70, 0.6);   // el jefe que carga brilla
+    for (const l of LUCES) hueco(l.x, l.y, l.r, (l.t / l.t0).toFixed(2));
+    if (yo.v && yo.cd > 0 && yo.w !== 5) hueco(yo.x, yo.y, 90, 0.5);   // el fogonazo propio
+    cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.drawImage(c, 0, 0); cx.restore();
   }
   /* Con la dirección fija, una flecha en el suelo dice hacia dónde se dispara. */
   function flechaFija() {
@@ -2839,6 +2906,7 @@
     dbg: () => ({ cd: yo.cd, ps: pend.s.length, jugando, pausado, w: yo.w, ammo0: yo.ammo[0] }),
     mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp, max: e.max, est: e.est || 0, el: e.el || 0 })), F: F.map(f => ({ k: f.k, x: f.x, y: f.y })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
     teclas, practica, inmortal: v => { inmortal = !!v; },
+    mapa: id => { mapaElegido = D.mapaValido(id); },   // para las pruebas: el mapa de la próxima práctica
     armas: () => { for (const a of D.ARMAS_J) desbloquea(a.id); pintaArmas(true); },
     elige: i => eligeArma(i),
     salta: n => { if (!ONLINE) { nivelLocal = n | 0; dir.n = (n | 0) - 1; E.clear(); } },

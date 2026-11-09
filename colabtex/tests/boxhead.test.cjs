@@ -577,3 +577,24 @@ test('armas de la Fase 3.3: lanzallamas, ballesta, minigun, rayo y la caja dorad
  bx.entrada({...pista,disp:true});for(let i=0;i<20;i++)bx.paso(1/60);bx.entrada(pista);
  assert.equal(bx.estado().yo.ammo[1],u0,'con furia no gasta');
 });
+
+test('mapas de la Fase 3.4: nueve mapas, cintas que empujan y el Apagón a oscuras',()=>{
+ assert.equal(D.ORDEN_MAPAS.length,9);
+ assert.deepEqual(D.MAPAS_CLASICOS,['patio','sotano','cruce','fortaleza','laberinto']);
+ for(const m of D.ORDEN_MAPAS){const M=D.cargaMapa(m);assert.ok(M.spawnsP.length>=4&&M.tiendas.length>=1&&M.spawnsE.length>=4,m);}
+ assert.ok(D.cargaMapa('fabrica').cinta,'la Fábrica tiene cintas');
+ assert.ok(!D.cargaMapa('patio').cinta,'los clásicos no');
+ assert.ok(D.cargaMapa('apagon').oscuro&&!D.cargaMapa('planta').oscuro);
+ // las categorías del Club y las reglas conocen los nueve
+ const reglas=fs.readFileSync('../firebase/database.rules.json','utf8'),club=fs.readFileSync('src/juegos/solo/club-datos.js','utf8');
+ for(const m of D.ORDEN_MAPAS){assert.ok(reglas.includes(m),'reglas: '+m);assert.ok(club.includes(m),'club-datos: '+m);}
+ // la cinta arrastra al jugador quieto hacia su flecha
+ const bx=boxheadSinPantalla();
+ bx.mapa('fabrica');bx.practica(1);bx.inmortal(true);bx.calma();
+ const M=D.cargaMapa('fabrica'),i=M.cinta.findIndex(k=>k===1),x=(i%M.ancho)*D.TS+D.TS/2,y=Math.floor(i/M.ancho)*D.TS+D.TS/2;
+ bx.ponYo(x,y);bx.entrada({dx:0,dy:0,vel:1,mira:0,fija:true,disp:false});
+ for(let k=0;k<30;k++)bx.paso(1/60);
+ const yo=bx.mundo().yo;
+ assert.ok(yo.x-x>D.VEL_CINTA*0.4&&Math.abs(yo.y-y)<1,'empujado hacia el este: '+(yo.x-x));
+ bx.mapa('patio');
+});

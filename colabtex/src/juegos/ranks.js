@@ -105,7 +105,7 @@ const SOLO = {
   prodefender: { filas: [{ k: "n", t: "Reino", ops: [["prado", "Prado Esmeralda"], ["dunas", "Dunas de Ámbar"], ["glaciar", "Glaciar Cristal"], ["caldera", "Caldera Volcánica"], ["vacio", "Nexo del Vacío"], ["pantano", "Pantano Sombrío"], ["cumbres", "Cumbres Tormentosas"], ["fosa", "Fosa Abisal"], ["engranajes", "Ciudadela de Engranajes"], ["eclipse", "Trono del Eclipse"], ["necropolis", "Necrópolis Olvidada"], ["esporas", "Jardín de Esporas"], ["espejos", "Laberinto de Espejos"], ["archipielago", "Archipiélago Celeste"], ["noche", "La Noche Eterna"], ["jade", "Templo de Jade"], ["circo", "Circo de las Sombras"], ["biblioteca", "Biblioteca Infinita"], ["estelar", "Cinturón Estelar"], ["tiempo", "El Corazón del Tiempo"]] }],
     cat: s => `club-prodefender-${s.n}` },
   /* Pro BoxHead: una tabla por mapa, el nivel más alto al que se llegó. */
-  boxheadclub: { filas: [{ k: "n", t: "Mapa", ops: [["patio", "Patio"], ["sotano", "Sótano"], ["cruce", "Cruce"], ["fortaleza", "Fortaleza"], ["laberinto", "Laberinto"]] }],
+  boxheadclub: { filas: [{ k: "n", t: "Mapa", ops: [["patio", "Patio"], ["sotano", "Sótano"], ["cruce", "Cruce"], ["fortaleza", "Fortaleza"], ["laberinto", "Laberinto"], ["planta", "Planta"], ["hangar", "Hangar"], ["fabrica", "Fábrica"], ["apagon", "Apagón"]] }],
     cat: s => `club-boxhead-${s.n}` },
   /* PRO PACMAN: una sola tabla, el puntaje de la partida. */
   propac: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"]] }],

@@ -62,7 +62,7 @@ export function categoriaClub(juego, categoria) {
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     // Pro BoxHead: el nivel más alto al que se llegó en una partida, una tabla por mapa.
     : juego === 'boxhead'
-    ? /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto)$/.test(categoria)
+    ? /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
 }
 export function resultadoClub(juego, dato) {

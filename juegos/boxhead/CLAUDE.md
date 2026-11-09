@@ -362,3 +362,24 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   caps. Weapons from ×60 enter the upgrade wheel, so upgrades above ×60
   changed (that is what `VE` is for).
 - `__boxhead.ponCaja(k, x, y)`; `estado().yo` has `dorada` and `giro`.
+
+## Phase 3.4: four maps (`boxhead-18`, proof still `ve: 6`)
+
+- **Planta, Hangar, Fábrica, Apagón**, appended to `ORDEN_MAPAS` (the proof's
+  `m` is an index into it: never reorder). They are in `BX_MAPAS` (room
+  options), `club-datos.js`, the verifier's `CATEGORIA`, `ranks.js` and the
+  two `club-boxhead-(…)` regexes of `database.rules.json` (**rules must be
+  re-published** or Club records on the new maps are refused). A test checks
+  every map id is in the rules and in `club-datos.js`.
+- **Belts** (`>` `<` `^` `v` in the rows → `M.cinta`, 1 + DIRS index, or
+  `null` when the map has none): `cinta(c, r, dt)` moves whoever stands on
+  one `VEL_CINTA` px/s through `mover`, the player in `pasoYo` and non-boss
+  enemies not underground in the director loop. The old maps have no belts,
+  so their simulation did not change and `VE` stayed 6.
+- **Apagón** (`oscuro: true`): `oscuridad()` draws a dark layer in screen
+  space with radial holes at players, shops, fireballs, a charging boss,
+  recent explosions (`LUCES`, from `efectoBoom`) and your own muzzle. Drawing
+  only; nothing in the sim knows the map is dark.
+- Medal Trotamundos (and skin Careta) stays on `MAPAS_CLASICOS`, the original
+  five.
+- `__boxhead.mapa(id)` picks the next practice's map.

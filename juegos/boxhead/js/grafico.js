@@ -490,7 +490,11 @@
     sotano: tinte('#f5f1ea', '#cec7bb', '#a69e91', '#e2dbcf', '#b5ad9f'),
     cruce: tinte('#f1f2f4', '#c6c9cf', '#9ea2aa', '#dcdfe4', '#adb1b8'),
     fortaleza: tinte('#f3f1e8', '#cbc7b6', '#a29e8c', '#dfdbcc', '#b3ae9b'),
-    laberinto: tinte('#f2f6f9', '#c4ced8', '#9ba7b4', '#dae2ea', '#abb6c2')
+    laberinto: tinte('#f2f6f9', '#c4ced8', '#9ba7b4', '#dae2ea', '#abb6c2'),
+    planta: tinte('#eef2e6', '#c3c9b5', '#9aa08b', '#d9dfcc', '#aab09a'),
+    hangar: ACERO,
+    fabrica: tinte('#f3ebe0', '#cdbfa9', '#a69580', '#e1d5c3', '#b6a690'),
+    apagon: tinte('#d9dde6', '#a9b0bd', '#838a98', '#c2c8d3', '#9298a6')
   };
   const CAJAS = tinte('#e9e8e4', '#bdbcb7', '#94938e', '#d3d2cd', '#a6a5a0');
   const muroDe = id => MUROS[id] || BLANCO;
@@ -553,7 +557,11 @@
     sotano: { base: '#c4bfb5', motas: ['#b2ada2', '#d2cec6', '#a8a296'], losa: 3, junta: 'rgba(54,48,42,.22)', grieta: 'rgba(40,36,30,.3)', deco: 'sotano' },
     cruce: { base: '#9a9c9f', motas: ['#8a8c90', '#a8aaad', '#7e8084'], losa: 0, junta: 'rgba(40,40,44,.2)', grieta: 'rgba(30,30,34,.38)', deco: 'cruce' },
     fortaleza: { base: '#c7cf9f', motas: ['#b5c088', '#d6dcb2', '#a8b47a'], losa: 0, junta: 'rgba(70,80,40,.15)', grieta: 'rgba(80,70,40,.25)', deco: 'fortaleza' },
-    laberinto: { base: '#d4dbe1', motas: ['#c6ced6', '#e2e7eb', '#b8c2cc'], losa: 1, junta: 'rgba(60,80,100,.24)', grieta: 'rgba(50,60,80,.25)', deco: 'laberinto' }
+    laberinto: { base: '#d4dbe1', motas: ['#c6ced6', '#e2e7eb', '#b8c2cc'], losa: 1, junta: 'rgba(60,80,100,.24)', grieta: 'rgba(50,60,80,.25)', deco: 'laberinto' },
+    planta: { base: '#c9cdbf', motas: ['#bcc0b0', '#d5d9cc', '#aeb3a2'], losa: 2, junta: 'rgba(60,70,50,.2)', grieta: 'rgba(50,60,40,.28)', deco: 'sotano' },
+    hangar: { base: '#a9acb0', motas: ['#9da0a5', '#b6b9bd', '#92959a'], losa: 0, junta: 'rgba(40,42,46,.2)', grieta: 'rgba(30,32,36,.32)', deco: 'cruce' },
+    fabrica: { base: '#c2b7a3', motas: ['#b4a994', '#cfc5b2', '#a89c86'], losa: 3, junta: 'rgba(70,56,40,.22)', grieta: 'rgba(60,46,30,.3)', deco: 'sotano' },
+    apagon: { base: '#a8adb6', motas: ['#9ca1ab', '#b4b8c0', '#90959f'], losa: 1, junta: 'rgba(40,48,60,.24)', grieta: 'rgba(30,36,48,.3)', deco: 'laberinto' }
   };
   const tema = id => TEMAS[id] || TEMAS.patio;
 

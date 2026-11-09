@@ -378,7 +378,7 @@
     { id: 'nivel10', nom: 'Dos cifras', i: '🔟', txt: 'Llega al nivel 10.' },
     { id: 'nivel20', nom: 'Veinte noches', i: '👑', txt: 'Llega al nivel 20.' },
     { id: 'nivel30', nom: 'Fin del mundo', i: '🌋', txt: 'Llega al nivel 30.' },
-    { id: 'mapas', nom: 'Trotamundos', i: '🗺️', txt: 'Llega al nivel 10 en la práctica de los cinco mapas.' },
+    { id: 'mapas', nom: 'Trotamundos', i: '🗺️', txt: 'Llega al nivel 10 en la práctica de los cinco mapas clásicos (Patio, Sótano, Cruce, Fortaleza y Laberinto).' },
     { id: 'arsenal', nom: 'Arsenal', i: '🧰', txt: 'Ten las ocho armas en una partida.' },
     { id: 'maestro', nom: 'Maestro armero', i: '🔧', txt: 'Sube un arma al nivel 5 en la tienda.' },
     { id: 'diez', nom: 'Diez de un golpe', i: '💥', txt: 'Haz 10 bajas en el mismo instante.' },
@@ -517,16 +517,119 @@
         '#S...#.....####........#....$.S#',
         '################################'
       ]
+    },
+    /* Fase 3.4. La Fábrica tiene cintas transportadoras (`>` `<` `^` `v`:
+       suelo que empuja hacia ahí a jugadores y enemigos) y el Apagón está
+       a oscuras (`oscuro`: solo se ve cerca de los jugadores y del fuego). */
+    planta: {
+      nombre: 'Planta', suelo: ['#a9ad9f', '#9fa394'], muro: ['#7d8a6a', '#5f6a50', '#4c553f'],
+      filas: [
+        '################################',
+        '#S.......#..........#.........S#',
+        '#..$.....#....cc....#..........#',
+        '#..##....#..........#.....##...#',
+        '#..##.........b...........##...#',
+        '#..............................#',
+        '####..######......######..######',
+        '#........#..........#..........#',
+        '#..cc....#...P..P...#.....cc...#',
+        'S..........b..............b....S',
+        'S........#...P..P...#..........S',
+        '#..cc....#..........#.....cc...#',
+        '#........#..........#..........#',
+        '####..######......######..######',
+        '#..............................#',
+        '#..##...........b.........##...#',
+        '#..##....#..........#.....##...#',
+        '#........#....cc....#.....$....#',
+        '#S.......#..........#.........S#',
+        '################################'
+      ]
+    },
+    hangar: {
+      nombre: 'Hangar', suelo: ['#b9bcc0', '#afb2b6'], muro: ['#8a8f96', '#6b7076', '#565a60'],
+      filas: [
+        '####################################',
+        '#S...............SS...............S#',
+        '#..$...............................#',
+        '#.......cc..................cc.....#',
+        '#.....b.........................b..#',
+        '#..............####................#',
+        '#...............##.................#',
+        '#.......##########..########.......#',
+        '#...............##.................#',
+        'S.......b.......##.......P..P....b.S',
+        'S...............##.......P..P......S',
+        '#...............##.................#',
+        '#.......##########..########.......#',
+        '#...............##.................#',
+        '#..............####................#',
+        '#..b.............................b.#',
+        '#.....cc....................cc.....#',
+        '#..............................$...#',
+        '#S...............SS...............S#',
+        '####################################'
+      ]
+    },
+    fabrica: {
+      nombre: 'Fábrica', suelo: ['#b3a58c', '#a89a81'], muro: ['#9a6a3a', '#76502b', '#5f4022'],
+      filas: [
+        '##################################',
+        '#S..............SS..............S#',
+        '#.$..............................#',
+        '#..>>>>>>>>>>>>....<<<<<<<<<<<<..#',
+        '#................................#',
+        '#...cc....##..........##....cc...#',
+        '#.........##..........##.........#',
+        '#..v...............b..........^..#',
+        'S..v.......P..P...............^..S',
+        'S..v.......P..P...............^..S',
+        '#..v.....b....................^..#',
+        '#.........##..........##.........#',
+        '#...cc....##..........##....cc...#',
+        '#................................#',
+        '#..>>>>>>>>>>>>....<<<<<<<<<<<<..#',
+        '#..............................$.#',
+        '#S..............SS..............S#',
+        '##################################'
+      ]
+    },
+    apagon: {
+      nombre: 'Apagón', suelo: ['#8a8f9a', '#80858f'], muro: ['#4d5566', '#3a4150', '#2c3240'], oscuro: true,
+      filas: [
+        '################################',
+        '#S.....#........#.............S#',
+        '#..$...#...b....#....#####.....#',
+        '#......#........#........#.....#',
+        '#..######...cc......##...#.....#',
+        '#...........cc......##.........#',
+        '#.....#...............######...#',
+        '###...#.....P..P..........#..###',
+        'S.....#.....P..P....b.....#....S',
+        'S..........................#...S',
+        '#...######......####.......#...#',
+        '#........#......#..............#',
+        '#...b....#..cc..#....######....#',
+        '#........#......#.........#....#',
+        '#####....#..........b.....#..$.#',
+        '#S.............######.........S#',
+        '################################'
+      ]
     }
   };
-  const ORDEN_MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto'];
+  const ORDEN_MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto', 'planta', 'hangar', 'fabrica', 'apagon'];
+  // los cinco de siempre: la medalla Trotamundos (y la skin Careta) se ganan con ellos
+  const MAPAS_CLASICOS = ORDEN_MAPAS.slice(0, 5);
+  // las cintas: el carácter → hacia dónde empuja (índice de DIRS)
+  const CINTAS = { '>': 0, 'v': 2, '<': 4, '^': 6 }, VEL_CINTA = 48;
   const mapaValido = m => (MAPAS[m] ? m : 'patio');
 
   /* El mapa listo para jugar: rejilla de sólidos y los puntos marcados. */
   function cargaMapa(id) {
     const M = MAPAS[mapaValido(id)];
     const ancho = Math.max(...M.filas.map(f => f.length)), alto = M.filas.length;
-    const celdas = [], spawnsE = [], spawnsP = [], barriles = [], tiendas = [];
+    const celdas = [], spawnsE = [], spawnsP = [], barriles = [], tiendas = [], cinta = [];
+    let hayCintas = false;
     for (let y = 0; y < alto; y++) {
       const fila = M.filas[y].padEnd(ancho, '#');
       for (let x = 0; x < ancho; x++) {
@@ -538,9 +641,13 @@
         if (c === '$') tiendas.push({ x: x * TS + TS / 2, y: y * TS + TS / 2, tx: x, ty: y });
         if (borde && c !== 'S') c = '#';
         celdas.push(c === '#' ? 1 : c === 'c' ? 2 : 0);
+        // 0 sin cinta; 1 + la dirección de DIRS
+        const ci = CINTAS[c];
+        cinta.push(ci === undefined ? 0 : ci + 1);
+        if (ci !== undefined) hayCintas = true;
       }
     }
-    return { id: mapaValido(id), nombre: M.nombre, suelo: M.suelo, muro: M.muro, ancho, alto, celdas, spawnsE, spawnsP, barriles, tiendas };
+    return { id: mapaValido(id), nombre: M.nombre, suelo: M.suelo, muro: M.muro, ancho, alto, celdas, spawnsE, spawnsP, barriles, tiendas, cinta: hayCintas ? cinta : null, oscuro: !!M.oscuro };
   }
 
   /* Las 8 direcciones, como en el original: 0 = este y en sentido horario. */
@@ -644,7 +751,7 @@
   return {
     TS, ARMAS, ARMAS_J, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, DORADA, DORADA_T, PARTE_DORADA, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
-    ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
+    ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio
   };
 });

@@ -1,6 +1,6 @@
 # Antitrampas de Pro BoxHead (Solo Club)
 
-Cinco tablas, una por mapa: `club-boxhead-(patio|sotano|cruce|fortaleza|laberinto)`.
+Nueve tablas, una por mapa: `club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)`.
 `puntos` = el nivel al que llegaste en una práctica (en el que caíste); `tiempo` =
 los ms de juego que tardaste en llegar a ese nivel (`(paso + 1) × 1000 / 60`, el paso
 en que empezó). Con el mismo nivel manda el menor tiempo. Las monedas salen de la fila (`monedas.js`: 2 por nivel en

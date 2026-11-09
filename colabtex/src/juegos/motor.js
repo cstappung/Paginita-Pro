@@ -6836,7 +6836,7 @@ function ajRepasa(bandos, jug, ritmo = null) {
    cliente modificado podría negarse a morir. */
 export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus" };
 export const BX_METAS = [5, 10, 20];
-export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto" };
+export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto", planta: "Planta", hangar: "Hangar", fabrica: "Fábrica", apagon: "Apagón" };
 /* El id de arma más alto de juegos/boxhead/js/datos.js: 0–7 y 10–13 son
    del jugador, 8 el mordisco y 9 el fuego de un diablo. Nunca se
    renumeran. */
