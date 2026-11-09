@@ -1,11 +1,32 @@
 # Efectos grabados de Pro BoxHead (ElevenLabs)
 
 Las tomas elegidas, todas del flow `kLpCB7wXxkzSQReCbM1P`
-(`eleven_text_to_sound_v2`). Todavía no están descargadas: la red de la sesión
-que las generó no alcanzaba `elevenlabsusercontent.com`. Se bajan renovando el
-enlace con `creative_get_flow_run_status(flow, [sesión])` y se guardan aquí
-como `<clave>-1.mp3`, después se agregan a `MUESTRAS` y se mide su `GAN`
-contra el sonido sintetizado (`js/audio.js`).
+(`eleven_text_to_sound_v2`), ya descargadas como `<clave>-1.mp3`. Se
+procesaron así:
+
+- mono a 96 kbps;
+- sin el silencio del comienzo;
+- cortadas donde caen 45 dB bajo su máximo, con un fundido al final.
+
+Algunas llevan además un corte a mano, para que no llenen las `VOCES`:
+
+| clave | se usa | dura |
+|---|---|---|
+| dolor | solo el primer quejido | 0,15 s |
+| chatarra | el primer tintineo | 0,45 s |
+| escopeta | | 1,3 s |
+| compra | | 1,5 s |
+| lanza | | 0,35 s |
+| pistola | | 0,55 s |
+| uzi | | 0,25 s |
+| impacto | | 0,3 s |
+| baja | | 0,55 s |
+| bajaDiablo | | 0,7 s |
+| rebote | | 0,5 s |
+
+Para rehacer un archivo, el original sale de
+`creative_get_flow_run_status(flow, [sesión])`. Su `GAN` en `js/audio.js` se
+vuelve a medir (ver `../CLAUDE.md`).
 
 | clave | generación | sesión | nota |
 |---|---|---|---|
@@ -39,5 +60,5 @@ contra el sonido sintetizado (`js/audio.js`).
 | avisoCombo | O7lhp6Ys13Bm3hzN5ToI | QPSkObQBszwW3cSjj6I5 | 2 s, segunda toma (la elegida) |
 | quedan | lOKQFlRgGTXPjZ4BwbwZ | qQzipbDrDEpMpgs2CJXq | ~1 s, segunda toma (la elegida) |
 
-Las primeras once se generaron antes de anotar la sesión: su sesión se lee en
+Las primeras once se generaron antes de anotar la sesión. Su sesión se lee en
 el flow (`creative_get_flow`) o con `creative_get_generations`.
