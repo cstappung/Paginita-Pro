@@ -538,6 +538,21 @@ const SOLO = {
     { id: "p220", n: "Fuera de serie", d: "Llega a 220 ppm en una carrera de Type Race.", i: "🚀", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 220 },
     { id: "p260", n: "¿Eres humano?", d: "Llega a 260 ppm en una carrera de Type Race.", i: "🤖", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 260 }
   ],
+  /* Pro BoxHead en el Solo Club. Salen de las tablas por mapa
+     (club-boxhead-<mapa>, puntos = el nivel al que llegaste): siete por
+     nivel en cualquier mapa y tres por mapas difíciles. */
+  boxheadclub: [
+    { id: "n3", n: "Primera noche", d: "Llega al nivel 3 en cualquier mapa.", i: "🧟", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 3 },
+    { id: "n5", n: "Medio jefe", d: "Llega al nivel 5 en cualquier mapa.", i: "💀", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 5 },
+    { id: "n10", n: "Diez de diez", d: "Llega al nivel 10 en cualquier mapa.", i: "🔟", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 10 },
+    { id: "n15", n: "Horda domada", d: "Llega al nivel 15 en cualquier mapa.", i: "🪓", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 15 },
+    { id: "n20", n: "Veterano de la caja", d: "Llega al nivel 20 en cualquier mapa.", i: "📦", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 20 },
+    { id: "n30", n: "Superviviente", d: "Llega al nivel 30 en cualquier mapa.", i: "🛡️", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 30 },
+    { id: "n40", n: "Leyenda de la horda", d: "Llega al nivel 40 en cualquier mapa.", i: "👑", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 40 },
+    { id: "sotano10", n: "Bajo tierra", d: "Llega al nivel 10 en el Sótano.", i: "🕯️", m: "Mapas", s: d => cat(/^club-boxhead-sotano$/)(d) && d.puntos >= 10 },
+    { id: "fortaleza15", n: "Asedio", d: "Llega al nivel 15 en la Fortaleza.", i: "🏰", m: "Mapas", s: d => cat(/^club-boxhead-fortaleza$/)(d) && d.puntos >= 15 },
+    { id: "laberinto20", n: "Sin salida", d: "Llega al nivel 20 en el Laberinto.", i: "🌀", m: "Mapas", s: d => cat(/^club-boxhead-laberinto$/)(d) && d.puntos >= 20 }
+  ],
   /* PRO PACMAN. Todos salen de club-propac-puntos (el récord): siete por
      puntaje y tres por lo que aguantó esa partida (tiempo de juego). Un
      nivel limpio da unos 4 000; los fantasmas y la racha, el resto. */
@@ -650,7 +665,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", typeraceclub: "club-typerace-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", boxheadclub: "club-boxhead-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", typeraceclub: "club-typerace-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

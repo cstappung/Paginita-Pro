@@ -101,7 +101,7 @@ test('el invitado juega todo lo de un jugador menos PRO HERO, Tenkaichi 3 y los 
  assert.ok(solos.some(s=>s.modo==='bots'&&!S.bloqueado(s,true)),'las prácticas contra bots se juegan sin cuenta');
  // Las rutas #solo/<x>: el Tetris del club va por «tetris», PRO HERO por «hero».
  for(const s of solos.filter(s=>s.ruta&&s.ruta.startsWith('#solo/')))assert.equal(S.rutaLibre(s.ruta.slice(6)),!S.bloqueado(s,true),s.ruta);
- for(const r of ['snake','minas','tetris','sortem','bbtan','aleteo','fanal','trigon','sopa','electro','integral','sudoku','atasco','dosmil','protiles','metrorush','pokelike','prodefender','propac','tulones','frontera'])assert.ok(S.rutaLibre(r),r);
+ for(const r of ['snake','minas','tetris','sortem','bbtan','aleteo','fanal','trigon','sopa','electro','integral','sudoku','atasco','dosmil','protiles','metrorush','pokelike','prodefender','propac','boxhead','tulones','frontera'])assert.ok(S.rutaLibre(r),r);
  for(const r of ['hero','bt3','tetrisclub','nada',''])assert.ok(!S.rutaLibre(r),r);
  for(const k of ['solo','partida','ranks','logros','monedas','cartas','mascotas','mercado','perfil','casino'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
 });

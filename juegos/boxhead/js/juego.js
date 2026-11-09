@@ -30,6 +30,12 @@
   const fx = G.crearEfectos(), SND = window.BoxheadAudio.crear();
   const qs = new URLSearchParams(location.search);
   const ONLINE = qs.get('modo') === 'online' && window.parent !== window;
+  /* En el Solo Club (`?club=1`, el marco que abre solo/club.js con conexion.js):
+     una tabla por mapa con el nivel más alto al que llegaste, y cada partida
+     manda su prueba para que la página la rehaga antes de guardarla. */
+  const CLUB = !ONLINE && qs.get('club') === '1' && !!window.Club;
+  const CUENTA = qs.get('cuenta') || 'local';
+  const catClub = m => 'club-boxhead-' + m;
   const PALETA = ['#e74c3c', '#3d8fe0', '#37c25b', '#f1c40f', '#a66bd6', '#e67e22', '#1abc9c', '#ecf0f1'];
   const OBJ = ['barril', 'muro', 'carga'];
   const VIDA_OBJ = { barril: 30, muro: 160, carga: 1e9 };
@@ -51,6 +57,8 @@
      sigue siendo Math.random (el director manda y nadie rehace nada). */
   const mulberry32 = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   let rng = Math.random;
+  // La cuenta entra en la semilla (FNV-1a): una prueba copiada a otra cuenta ya no se rehace igual.
+  const hashCuenta = u => { let h = 2166136261; for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u.charCodeAt(i), 16777619); return h >>> 0; };
   const rn = () => rng();
   const rz = (a, b) => a + rng() * (b - a);
   // Gira `a` hacia `b` por el lado corto, una fracción `k`.
@@ -108,7 +116,7 @@
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
   const PASO = 1 / 60, VE = 1, MAX_JUGADAS = 200000;
-  let pasoN = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
+  let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
     i => { const t = D.TIENDA[i | 0]; if (t) compra(t.id); }];
@@ -335,14 +343,16 @@
      lo que la simulación arrastra de una partida a otra se pone a cero
      aquí: rehacer varias pruebas seguidas en el mismo verificador tiene que
      dar lo mismo que rehacer cada una sola. */
-  function practica(semilla, grabar = true) {
+  function practica(semilla, grabar = true, cuenta = CUENTA) {
     const s = semilla === undefined ? (Math.random() * 4294967296) >>> 0 : semilla >>> 0;
-    rng = mulberry32(s);
-    ultimoId = 0; pasoN = 0; finPaso = -1; acumula = 0;
+    const u = String(cuenta);
+    rng = mulberry32((s ^ hashCuenta(u)) >>> 0);
+    ultimoId = 0; pasoN = 0; pasoNivel = 0; finPaso = -1; acumula = 0;
     CH = []; armaUlt = 0; armaMuerte = -1; pend.s = []; pend.n = []; pend.x2 = [];
     // los ids vuelven a empezar: lo visto de la partida anterior taparía bajas de esta
     vistosM.clear(); vistosX.clear(); marca.clear(); for (const m of Object.values(visto)) m.clear(); ocultas.clear();
-    graba = grabar ? { v: 1, ve: VE, m: D.ORDEN_MAPAS.indexOf(mapaElegido), s, j: [], ult: '' } : null;
+    graba = grabar ? { v: 1, ve: VE, u, m: D.ORDEN_MAPAS.indexOf(mapaElegido), s, j: [], ult: '' } : null;
+    if (CLUB && grabar) Club.category(catClub(mapaElegido));
     cfg = { yo: 'yo', mirando: false, variante: 'coop', mapa: mapaElegido, meta: 0, semilla: 1,
       jugadores: [{ uid: 'yo', nombre: 'Tú', orden: 0 }] };
     marcador = { nivel: 1, caidos: [], bajas: {}, muertes: {}, puntos: {}, fuera: [], fin: null };
@@ -350,6 +360,7 @@
     yo = nuevoYo();
     cargaMundo(mapaElegido);
     empieza();
+    if (CLUB && grabar) Club.inmersivo(true);
   }
 
   // ---------- armas ----------
@@ -1045,7 +1056,7 @@
         } else if (dir.q === 0 && E.size === 0 && obj.length) {
           dir.t += dt;
           if (dir.t >= 2.5) {
-            if (!ONLINE) nivelLocal = dir.n + 1;
+            if (!ONLINE) { nivelLocal = dir.n + 1; pasoNivel = pasoN; }
             else if (dir.pedido !== dir.n + 1 || T - dir.pedidoT > 6) { enviar('nivel', { n: dir.n + 1 }); dir.pedido = dir.n + 1; dir.pedidoT = T; }
           }
         }
@@ -1619,6 +1630,9 @@
     terminado = true;
     finPaso = pasoN;
     if (graba) graba.k = pasoN;
+    // Al Club: el nivel al que llegaste y cuánto tardaste en llegar a él (en pasos), con la prueba.
+    if (CLUB) Club.inmersivo(false);
+    if (CLUB && graba && !repite) Club.result({ categoria: catClub(D.ORDEN_MAPAS[graba.m]), puntos: nivelLocal, tiempo: Math.round((pasoNivel + 1) * 1000 / 60) }, prueba());
     $('finTxt').textContent = 'Llegaste al nivel ' + nivelLocal + ' con ' + yo.pts + ' puntos y ' + yo.k + ' bajas.';
     pintaStats();
     $('otra').hidden = false;
@@ -2205,6 +2219,7 @@
   function ponPausa(v) {
     pausado = v;
     if (v) pausaDesde = Date.now();
+    if (CLUB) Club.inmersivo(!v && jugando && !terminado);
     $('pausa').hidden = !v;
   }
   /* Las opciones de la pausa: música (y su volumen), números de daño,
@@ -2235,7 +2250,7 @@
       const b = document.createElement('button');
       b.className = 'btn2' + (id === mapaElegido ? ' sel' : '');
       b.textContent = D.MAPAS[id].nombre;
-      b.onclick = () => { mapaElegido = id; guarda('boxhead.mapa', id); pintaMenu(); };
+      b.onclick = () => { mapaElegido = id; guarda('boxhead.mapa', id); pintaMenu(); if (CLUB) Club.category(catClub(id)); };
       ms.append(b);
     }
     const sk = $('skins');
@@ -2266,6 +2281,9 @@
   if (ONLINE) {
     $('menuMapas').hidden = true;
     $('cuenta').textContent = 'Elige tu personaje; la partida empieza cuando la sala arranque.';
+  } else if (CLUB) {
+    $('cuenta').textContent = 'Solo Club: cada mapa tiene su tabla. Cuenta el nivel más alto al que llegas.';
+    Club.category(catClub(mapaElegido));
   } else $('cuenta').textContent = 'Práctica en solitario: nada se guarda.';
   pintaMenu();
 
@@ -2294,11 +2312,11 @@
      (en el verificador del Club, que carga este archivo en un trabajador o
      en Node con un DOM de mentira). Devuelve dónde terminó. */
   function rehace(p) {
-    if (!p || p.v !== 1 || p.ve !== VE || !Array.isArray(p.j) || !Number.isSafeInteger(p.k) || p.k < 0 || p.k > 6e6) throw new Error('La prueba de Pro BoxHead no tiene la forma esperada.');
+    if (!p || p.v !== 1 || p.ve !== VE || typeof p.u !== 'string' || !Array.isArray(p.j) || !Number.isSafeInteger(p.k) || p.k < 0 || p.k > 6e6) throw new Error('La prueba de Pro BoxHead no tiene la forma esperada.');
     const mapa = D.ORDEN_MAPAS[p.m];
     if (!mapa) throw new Error('La prueba es de un mapa que no existe.');
     mapaElegido = mapa;
-    practica(p.s >>> 0, false);
+    practica(p.s >>> 0, false, p.u);
     repite = { ent: { dx: 0, dy: 0, vel: 1, mira: -1, fija: false, disp: false } };
     try {
       let i = 0;
@@ -2313,11 +2331,11 @@
         if (i < p.j.length && !(p.j[i][0] > pasoN)) throw new Error('Las jugadas de la prueba no van en orden.');
         paso(PASO);
       }
-      return { nivel: nivelLocal, pasos: finPaso, terminada: terminado, pts: yo.pts, k: yo.k, mul: yo.maxMul, jefes: yo.st.jefes };
+      return { nivel: nivelLocal, pasos: finPaso, pasoNivel, terminada: terminado, pts: yo.pts, k: yo.k, mul: yo.maxMul, jefes: yo.st.jefes };
     } finally { repite = null; }
   }
   // La prueba de la última partida de práctica (sin el dato interno `ult`).
-  const prueba = () => graba && { v: graba.v, ve: graba.ve, m: graba.m, s: graba.s, j: graba.j, k: graba.k };
+  const prueba = () => graba && { v: graba.v, ve: graba.ve, u: graba.u, m: graba.m, s: graba.s, j: graba.j, k: graba.k };
 
   window.__boxhead = {
     rehace, prueba, accion, pasos: () => pasoN, entrada: en => { forzada = en || null; },

@@ -301,8 +301,8 @@ function boxheadSinPantalla(){
 // cercano, dispara siempre y se aleja si lo rodean; cambia de arma y compra.
 const DIRS8=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
 const dir8=(x,y)=>((Math.round(Math.atan2(y,x)/(Math.PI/4))%8)+8)%8;
-function juegaPartida(bx,{maxPasos=60*60*20,azar=1,semilla=12345}={}){
- bx.practica(semilla);let t=0;
+function juegaPartida(bx,{maxPasos=60*60*20,azar=1,semilla=12345,cuenta='local'}={}){
+ bx.practica(semilla,true,cuenta);let t=0;
  for(let i=0;i<maxPasos&&!bx.estado().terminado;i++){
   if(i%4===0){
    const m=bx.mundo();let best=null,bd=1e9,cx=0,cy=0;
@@ -346,4 +346,45 @@ test('motor determinista: una prueba tocada no llega al mismo final',()=>{
  assert.ok(r.pasos!==ok.pasos||r.pts!==ok.pts||!r.terminada,'otra semilla, otra partida');
  assert.throws(()=>b.rehace({...p,ve:999}),/forma esperada/);
  assert.throws(()=>b.rehace({...p,j:[[5,0,4,20,0,0],[2,1,1]]}),/orden/);
+});
+test('Solo Club: el verificador rehace la prueba y rechaza la de otra cuenta, otro mapa o tocada',async()=>{
+ const esbuild=require('esbuild');
+ const mod={exports:{}};
+ new Function('module','exports','require',esbuild.buildSync({entryPoints:['src/juegos/solo/verifica/boxhead.js'],bundle:true,format:'cjs',platform:'node',write:false}).outputFiles[0].text)(mod,mod.exports,require);
+ const V=mod.exports;
+ globalThis.BoxheadRehace=require('../../juegos/boxhead/js/rehace-node.cjs').rehace;
+ try{
+  const a=boxheadSinPantalla();
+  const p=juegaPartida(a,{azar:2,cuenta:'uidA'});
+  assert.equal(p.u,'uidA');
+  const MAPAS=['patio','sotano','cruce','fortaleza','laberinto'];
+  const r=globalThis.BoxheadRehace(p);
+  assert.equal(r.nivel,a.estado().nivel,'el nivel rehecho es el de la partida');
+  const dato={categoria:'club-boxhead-'+MAPAS[p.m],puntos:r.nivel,tiempo:V.tiempoDe(r.pasoNivel)};
+  const ctx={uid:'uidA'};
+  assert.equal(await V.verifica(dato,p,ctx),null);
+  assert.match(await V.verifica(dato,p,{uid:'uidB'}),/otra cuenta/);
+  // la misma partida con la cuenta cambiada en la prueba ya no llega al mismo final
+  assert.ok(await V.verifica(dato,{...p,u:'uidB'},{uid:'uidB'}));
+  const otro=MAPAS[(p.m+1)%MAPAS.length];
+  assert.match(await V.verifica({...dato,categoria:'club-boxhead-'+otro},p,ctx),/otro mapa/);
+  assert.match(await V.verifica({...dato,puntos:dato.puntos+1},p,ctx),/nivel/);
+  assert.match(await V.verifica({...dato,tiempo:dato.tiempo-1},p,ctx),/tiempo/);
+  assert.ok(await V.verifica(dato,{...p,k:p.k+60},ctx));
+  // quitarle jugadas de la mitad de la partida la cambia (las del final, ya muerto, pueden no importar)
+  assert.ok(await V.verifica(dato,{...p,j:p.j.filter((x,i)=>i<5||i%3)},ctx));
+  assert.match(await V.verifica({...dato,categoria:'club-boxhead-luna'},p,ctx),/tabla/);
+  assert.match(await V.verifica({...dato,puntos:1000},p,ctx),/no es posible/);
+  // la sospecha mira solo la fila
+  assert.equal(V.sospecha(dato.categoria,{puntos:dato.puntos,tiempo:dato.tiempo}),null);
+  assert.ok(V.sospecha(dato.categoria,{puntos:20,tiempo:5000}));
+ }finally{delete globalThis.BoxheadRehace;}
+});
+test('Solo Club: categorías y tope de Pro BoxHead en club-datos',async()=>{
+ const esbuild=require('esbuild');
+ const mod={exports:{}};
+ new Function('module','exports','require',esbuild.buildSync({entryPoints:['src/juegos/solo/club-datos.js'],bundle:true,format:'cjs',platform:'node',write:false}).outputFiles[0].text)(mod,mod.exports,require);
+ const C=mod.exports;
+ for(const m of ['patio','sotano','cruce','fortaleza','laberinto'])assert.ok(C.categoriaClub('boxhead','club-boxhead-'+m),m);
+ assert.ok(!C.categoriaClub('boxhead','club-boxhead-luna'));
 });

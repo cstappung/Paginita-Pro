@@ -2,9 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202611090238"></script>
+<script src="../../i18n.js?v=202611090251"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
+<!-- En el Solo Club (solo/club.js abre este archivo con ?club=1): el puente con la página y su tabla. -->
+<script>if (/[?&]club=1(&|$)/.test(location.search)) document.write('<link rel="stylesheet" href="../club/conexion.css?v=club-21"><script src="../club/conexion.js?v=club-21"><\/script>');</script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pro BoxHead</title>
 <style>
@@ -12,6 +14,12 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--fondo);color:var(--txt);font:14px/1.35 "Trebuchet MS",system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
 #lienzo{position:fixed;inset:0;width:100%;height:100%;display:block}
+/* La tabla del Solo Club (conexion.js la pone en .shell, dentro del menú) */
+#clubTabla:empty{display:none}
+.club-integrado body{background:var(--fondo)}
+.club-integrado #clubTabla .club-ranking,#clubTabla .club-ranking{margin:10px 0 0;padding:10px 12px;background:rgba(0,0,0,.35);color:var(--txt);border:1px solid var(--borde);border-radius:6px;text-align:left;max-height:210px;overflow:auto;font:13px/1.4 "Trebuchet MS",system-ui,sans-serif}
+#clubTabla .club-ranking h2{font-size:14px;margin:0 0 6px;color:var(--oro)}#clubTabla .club-ranking ol{margin:0;padding-left:20px;line-height:1.6}#clubTabla .club-ranking p{margin:4px 0;color:var(--tenue)}
+#clubTabla .club-ranking button{background:#2c251c;color:var(--txt);border:1px solid var(--borde);border-radius:5px;padding:4px 10px}
 .panel{background:var(--panel);border:2px solid var(--borde);border-radius:6px;box-shadow:0 3px 0 rgba(0,0,0,.45)}
 button{font:inherit;cursor:pointer}
 .btn{background:linear-gradient(#e2b44a,#b9852a);color:#2a1a06;border:2px solid #6e4d14;border-radius:5px;padding:8px 18px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;box-shadow:0 3px 0 #4a3209}
@@ -204,6 +212,7 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
     <div class="fila" id="skins"></div>
     <button class="btn" id="jugar">¡A jugar!</button>
     <p id="cuenta"></p>
+    <div class="shell" id="clubTabla"></div>
     <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Shift</kbd> fijar hacia dónde miras (retrocedes disparando de frente) · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> cambiar arma · <kbd>X</kbd> detonar cargas.<br>Tus bajas sueltan <b>chatarra</b>, la moneda de la tienda: junto a un puesto <kbd>$</kbd> compra con clic o con <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia, <kbd>M</kbd> muro reforzado (lo pones con <kbd>F</kbd>) y <kbd>U</kbd> sube de nivel el arma que llevas.<br>Cada baja sube el multiplicador y los puntos; las armas nuevas se ganan con él. En el celular, joystick a la izquierda y botones a la derecha.</p>
   </div>
 </div>
@@ -232,9 +241,9 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-10"></script>
-<script src="js/grafico.js?v=boxhead-10"></script>
-<script src="js/audio.js?v=boxhead-10"></script>
-<script src="js/juego.js?v=boxhead-10"></script>
+<script src="js/datos.js?v=boxhead-11"></script>
+<script src="js/grafico.js?v=boxhead-11"></script>
+<script src="js/audio.js?v=boxhead-11"></script>
+<script src="js/juego.js?v=boxhead-11"></script>
 </body>
 </html>

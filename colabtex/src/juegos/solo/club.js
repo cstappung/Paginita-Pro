@@ -177,7 +177,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   function mensaje(e){
     if(muerto||e.source!==frame.contentWindow||e.origin!==location.origin||e.data?.canal!=='club-child')return;
     const d=e.data;
-    if(d.tipo==='alto'&&Number.isFinite(d.alto)){if(juego==='sortem')return;frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
+    if(d.tipo==='alto'&&Number.isFinite(d.alto)){if(juego==='sortem'||juego==='boxhead')return;frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
     if(d.tipo==='volver'){volver();return;}
     // Modo celular: mientras se juega, el iframe ocupa toda la ventana (como sortEm).
     if(d.tipo==='inmersivo'){document.documentElement.classList.toggle('jg-club-inm',!!d.v);return;}
@@ -250,9 +250,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
        iframe ocupa toda la ventana, como PRO HERO, y vuelve con su botón. */
     if(PLENO.has(juego))document.documentElement.classList.add('jg-club-pleno');
     for(const id of ['btnMusica','volMusica','btnSonido']){const el=document.getElementById(id);if(el){ocultos.push([el,el.style.display]);el.style.display='none';}}
-    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':juego==='sortem'?'sortEm':juego==='bbtan'?'BBTAN':juego==='sopa'?'Sopa de letras':juego==='electro'?'Electrodle':juego==='integral'?'Integrodle':juego==='sudoku'?'Sudoku Arcade':juego==='fanal'?'FANAL':juego==='atasco'?'Atasco':juego==='aleteo'?'ALETEO':juego==='dosmil'?'2048':juego==='trigon'?'Trigon':juego==='typerace'?'Type Race':juego==='protiles'?'PRO TILES':juego==='pokelike'?'Pokelike':juego==='metrorush'?'Metro Rush':juego==='tulones'?'Tulones':juego==='prodefender'?'PRO DEFENDER':juego==='propac'?'PRO PACMAN':'Snake Club';
+    frame=document.createElement('iframe');frame.title=juego==='boxhead'?'Pro BoxHead':juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':juego==='sortem'?'sortEm':juego==='bbtan'?'BBTAN':juego==='sopa'?'Sopa de letras':juego==='electro'?'Electrodle':juego==='integral'?'Integrodle':juego==='sudoku'?'Sudoku Arcade':juego==='fanal'?'FANAL':juego==='atasco'?'Atasco':juego==='aleteo'?'ALETEO':juego==='dosmil'?'2048':juego==='trigon'?'Trigon':juego==='typerace'?'Type Race':juego==='protiles'?'PRO TILES':juego==='pokelike'?'Pokelike':juego==='metrorush'?'Metro Rush':juego==='tulones'?'Tulones':juego==='prodefender'?'PRO DEFENDER':juego==='propac'?'PRO PACMAN':'Snake Club';
     frame.className='jg-solo-frame';
-    frame.style.height=juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='integral'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='aleteo'||juego==='dosmil'||juego==='trigon'||juego==='typerace'||juego==='protiles'||juego==='pokelike'||juego==='tulones'||juego==='propac'||juego==='metrorush'?'900px':'760px';
+    frame.style.height=juego==='boxhead'?'720px':juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='integral'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='aleteo'||juego==='dosmil'||juego==='trigon'||juego==='typerace'||juego==='protiles'||juego==='pokelike'||juego==='tulones'||juego==='propac'||juego==='metrorush'?'900px':'760px';
     const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
     frame.addEventListener('load',tema);
     /* El rango de admin de Juegos (conexion.js: Club.esAdmin): PRO DEFENDER abre con él sus reinos en pruebas. */
@@ -262,7 +262,10 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-74&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    /* Pro BoxHead no vive en juegos/club/: es el mismo marco de la sala, que con
+       ?club=1 carga conexion.js y muestra la tabla en su menú (y no manda su alto:
+       ocupa todo el marco). */
+    frame.src=(juego==='boxhead'?'juegos/boxhead/index.html?club=1&':'juegos/club/'+juego+'/index.html?')+'v=club-75&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

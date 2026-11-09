@@ -156,10 +156,13 @@ export const SOLOS = [
     url: "juegos/clue/index.html", reglas: "clue",
     lema: "Resuelve el crimen del edificio contra detectives automáticos.",
     modos: ["Contra bots"] },
-  { id: "bots-boxhead", tipo: "bots", juego: "boxhead", nombre: "Pro BoxHead · práctica", genero: "Acción", icono: "▣", alta: "2026-10-05",
-    url: "juegos/boxhead/index.html", reglas: "boxhead",
-    lema: "Tú solo contra los zombis y los diablos, en cualquiera de los cinco mapas.",
-    modos: ["Supervivencia"] },
+  /* Pro BoxHead solo: era una práctica sin tabla (bots-boxhead); desde la fase 2
+     de la mega actualización es del Solo Club, con una tabla por mapa del nivel
+     más alto al que se llega, verificado rehaciendo la partida. */
+  { id: "boxheadclub", tipo: "club", nombre: "Pro BoxHead", genero: "Acción", icono: "🧟", alta: "2026-11-09",
+    ruta: "#solo/boxhead", reglas: "boxhead", popular: "club-boxhead", ranking: true,
+    lema: "Tú solo contra la horda: ¿hasta qué nivel llegas en cada uno de los cinco mapas?",
+    modos: ["Nivel máximo", "5 mapas"] },
   { id: "bots-haxball", tipo: "bots", juego: "haxball", nombre: "HaxBall · práctica", genero: "Deporte", icono: "⚽", alta: "2026-10-12",
     url: "juegos/haxball/index.html", reglas: "haxball",
     lema: "Fútbol de discos contra bots, o con alguien a tu lado en el mismo teclado.",
@@ -242,7 +245,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos), { beta = fals
 export const COLOR_SOLO = {
   desafios: "#3ccf6e", prokingdoms: "#e8b84a",
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", typeraceclub: "#e2b714", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", typeraceclub: "#e2b714", boxheadclub: "#c9733a", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC

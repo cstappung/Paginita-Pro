@@ -127,6 +127,9 @@ export const NIVEL = {
   /* PRO PACMAN, en el orden de LOGROS.propac: p1k p5k p10k p25k p50k p100k
      p200k · t3 t6 t10. */
   propac: "1122334123",
+  /* Pro BoxHead (Club), en el orden de LOGROS.boxheadclub: n3 n5 n10 n15 n20
+     n30 n40 · sotano10 fortaleza15 laberinto20. */
+  boxheadclub: "1122334234",
   /* PRO TILES, en el orden de LOGROS.protiles: e1 e2 e3 c1 c2 c3 w ·
      m300 m1k m2500. */
   protiles: "1122344234",
@@ -152,7 +155,7 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, integral: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, aleteo: 30, dosmil: 30, trigon: 30, typeraceclub: 30, protiles: 20, pokelike: 40, metrorush: 40, propac: 30 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, boxheadclub: 40, sortem: 50, bbtan: 50, sopa: 30, electro: 30, integral: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, aleteo: 30, dosmil: 30, trigon: 30, typeraceclub: 30, protiles: 20, pokelike: 40, metrorush: 40, propac: 30 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
    (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). Lo que
    paga cada ronda deja de crecer en la 450 (112 por ronda desde ahí) y
@@ -249,6 +252,8 @@ function extraRecord(cat, f) {
   if (/^club-typerace-en-/.test(cat)) return Math.floor(Math.min(f.puntos || 0, 330) / 10);
   // PRO PACMAN: 1 por cada 500 puntos (un nivel limpio son unos 4 000), tope en 1 000 000.
   if (cat === "club-propac-puntos") return Math.floor(Math.min(f.puntos || 0, 1000000) / 500);
+  // Pro BoxHead: 2 por nivel alcanzado en cada mapa (cinco tablas), tope en el nivel 150.
+  if (/^club-boxhead-/.test(cat)) return 2 * Math.min(f.puntos || 0, 150);
   // PRO TILES: 1 por cada 50 puntos en cada tabla (nueve: 8 canciones y la mezcla), tope en 3000.
   if (/^club-protiles-/.test(cat)) return Math.floor(Math.min(f.puntos || 0, 3000) / 50);
   /* Pokelike: 1 por cada 50 puntos (la Liga, 1900, son 38; tope en 200) y
@@ -298,10 +303,10 @@ export function registraDia(prev, dia) {
    sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
    BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
    ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
-export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, integral: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, typeraceclub: 10, protiles: 15, pokelike: 25, metrorush: 20, hero: 50, propac: 15 };
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, boxheadclub: 15, sortem: 15, bbtan: 8, sopa: 25, electro: 20, integral: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, typeraceclub: 10, protiles: 15, pokelike: 25, metrorush: 20, hero: 50, propac: 15 };
 export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
 export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "integral", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "typeraceclub", "protiles", "pokelike", "metrorush", "hero", "propac"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "boxheadclub", "sortem", "bbtan", "sopa", "electro", "integral", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "typeraceclub", "protiles", "pokelike", "metrorush", "hero", "propac"];
 export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;

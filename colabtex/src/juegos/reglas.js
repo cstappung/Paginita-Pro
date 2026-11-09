@@ -692,6 +692,11 @@ const REGLAS = {
         "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se abre la <b>tienda</b>: se compra con un clic o con las teclas <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín, <b>G</b> potencia y <b>M</b> muro reforzado; <b>U</b> sube de nivel el arma que llevas. <b>F</b> pone un muro reforzado, estés donde estés.",
         "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
       ])],
+      ["En el Solo Club", lista([
+        "Pro BoxHead también se juega solo desde el <b>Solo Club</b>, con <b>una tabla por mapa</b> (Patio, Sótano, Cruce, Fortaleza y Laberinto). Lo que cuenta es el <b>nivel más alto al que llegas</b> antes de caer; con el mismo nivel gana quien llegó en menos tiempo de juego.",
+        "Cada partida se graba (las teclas, el stick y cada compra, con su instante) y la página la <b>vuelve a jugar</b> antes de guardarla: si no llega al mismo nivel, no entra en la tabla. Por eso la partida del Club avanza en pasos fijos y el azar sale de una semilla.",
+        "Los logros del Club salen del nivel: 3, 5, 10, 15, 20, 30 y 40 en cualquier mapa, y tres de mapas difíciles (Sótano 10, Fortaleza 15, Laberinto 20)."
+      ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
         "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad. Cuando la barra está por vaciarse, parpadea y suena un aviso.",
@@ -1605,7 +1610,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", boxheadclub: "Pro BoxHead", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

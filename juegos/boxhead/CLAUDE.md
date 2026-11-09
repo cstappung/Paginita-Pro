@@ -199,7 +199,7 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `[paso, code, arg]` for each discrete action, which must go through
   `accion(code, arg)` (1 cycle, 2 pick, 3 detonate, 4 reinforced wall, 5 weapon
   level, 6 buy item i of `D.TIENDA`). Internal calls (`dispara` → `eligeArma(0)`)
-  stay direct. The proof is `{v: 1, ve: VE, m, s, j, k}` (`__boxhead.prueba()`),
+  stay direct. The proof is `{v: 1, ve: VE, u, m, s, j, k}` (`__boxhead.prueba()`),
   with `k` = the step of `finPractica`. **Bump `VE` whenever the simulation
   changes**: an old proof would replay to a different end.
 - **`__boxhead.rehace(p)`** replays it without a screen: `js/sin-pantalla.js`
@@ -207,3 +207,25 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `juego.js` run in a worker or in Node (`tests/boxhead.test.cjs` plays a bot
   through `__boxhead.entrada`, which records like real input, and replays in
   another context). About 0.1 ms per step.
+
+## Phase 2.3: in the Solo Club (`boxhead-11`, card `boxheadclub`)
+
+- **Same game, `?club=1`.** `solo/club.js` opens `juegos/boxhead/index.html?club=1`
+  (not `juegos/club/<id>/`), and the head of `index.html` loads `conexion.js` only
+  then. The ranking panel goes in the menu's `#clubTabla.shell`. The frame is a
+  fixed 720 px; `alto` is ignored. Club key `boxheadclub` (as with
+  tetris→tetrisclub): route `#solo/boxhead`, categories `club-boxhead-<map>`.
+- **One table per map, ranked by highest level** (the user's call): `puntos` = the
+  level you died on, `tiempo` = ms of play until you **reached** that level
+  (`pasoNivel`, set in `simDirector`), not until death: equal levels rank by who got
+  there first. Cap 999 (`club-datos.js` and the rules).
+- **The account is in the seed** (`practica(s, grabar, cuenta)`, `?cuenta=` from
+  the club frame, FNV-1a mixed in). A proof copied to another account replays
+  differently. `rehace` rejects a proof without `u`.
+- **Verifier** `solo/verifica/boxhead.js` replays in a Worker
+  (`js/verificador.js`, which `importScripts` the game) or in Node through
+  `globalThis.BoxheadRehace` (`js/rehace-node.cjs`). Level, final step and time
+  must match exactly. **Its `RUTA` and the worker's imports carry `?v=boxhead-N`:
+  bump them along with the page**, or a cached old engine rejects new proofs.
+- The old `bots-boxhead` practice card is gone: the club card replaces
+  it in `SOLOS`.
