@@ -73,6 +73,9 @@
       acido: sprite(radial([[0, 'rgba(240,255,190,1)'], [0.35, 'rgba(150,240,70,.85)'], [1, 'rgba(40,160,0,0)']])),
       morado: sprite(radial([[0, 'rgba(250,220,255,1)'], [0.35, 'rgba(190,90,255,.85)'], [1, 'rgba(90,0,160,0)']])),
       niebla: sprite(radial([[0, 'rgba(190,20,20,.7)'], [1, 'rgba(150,0,0,0)']]), 32),
+      // las llamas del lanzallamas al envejecer: naranja y después rojo oscuro
+      llamaN: sprite(radial([[0, 'rgba(255,184,70,.9)'], [0.45, 'rgba(240,96,16,.62)'], [1, 'rgba(150,24,0,0)']])),
+      llamaR: sprite(radial([[0, 'rgba(255,96,24,.7)'], [0.5, 'rgba(170,30,6,.35)'], [1, 'rgba(70,0,0,0)']])),
     };
     return SP;
   }
@@ -693,6 +696,13 @@
       },
       /* La quemadura de una explosión: un centro tiznado, lenguas negras que
          salen como una estrella, hollín y una corona de ceniza clara. */
+      /* Lo que deja el lanzallamas: una mancha suave, sin las grietas de una
+         explosión (salen decenas por segundo). */
+      chamusca(x, y, r) {
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(18,13,10,.32)'); gr.addColorStop(0.6, 'rgba(30,22,16,.14)'); gr.addColorStop(1, 'rgba(40,30,22,0)');
+        g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); g.fill();
+      },
       quemadura(x, y, r) {
         const R = r * 0.8;
         let gr = g.createRadialGradient(x, y, 0, x, y, R);
@@ -864,6 +874,43 @@
           particula({ k: color ? 'luz' : 'humoC', x, y, z, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 4 + Math.random() * 10, t: 0.35 + Math.random() * 0.3, t0: 0.65, s: 3 + Math.random() * 3, crece: 10, sp: color });
         }
       },
+      /* El chorro del lanzallamas, una ráfaga por disparo: llamas que salen
+         de la boquilla (gx, gy a la altura z), corren hacia `ang` hasta `l`
+         px (lo que deja libre el muro) abriéndose en el cono `abre`, y crecen
+         al avanzar. Nacen casi blancas, pasan a naranja y a rojo, y al
+         apagarse dejan humo. Contra un muro, chispas; el piso se chamusca.
+         `napalm`: además unas llamas bajas que se quedan ardiendo al final. */
+      llamarada(gx, gy, z, ang, l, abre, napalm) {
+        l = Math.max(18, l);
+        for (let i = 0; i < 9; i++) {
+          const a = ang + (Math.random() - 0.5) * abre * 0.75, vida = 0.26 + Math.random() * 0.12;
+          const hasta = l * (0.82 + Math.random() * 0.2), vx = Math.cos(a) * hasta / vida, vy = Math.sin(a) * hasta / vida;
+          // algunas nacen ya un trecho adelante: el chorro queda lleno desde la boquilla
+          const ya = i < 3 ? Math.random() * 0.3 : 0;
+          particula({ k: 'llama', x: gx + Math.cos(a) * 3 + vx * vida * ya, y: gy + Math.sin(a) * 3 + vy * vida * ya, z: z * (0.8 + Math.random() * 0.3),
+            vx, vy, vz: 4 + Math.random() * 18,
+            t: vida * (1 - ya), t0: vida, s: 2, s0: 1.6 + Math.random() * 1.2, s1: 6 + l * (0.08 + Math.random() * 0.06) });
+        }
+        // el núcleo pegado a la boquilla, blanco
+        particula({ k: 'llama', x: gx, y: gy, z, vx: Math.cos(ang) * 90, vy: Math.sin(ang) * 90, vz: 0, t: 0.07, t0: 0.07, s: 3, s0: 3, s1: 5, nucleo: 1 });
+        if (Math.random() < 0.5) {
+          const a = ang + (Math.random() - 0.5) * abre;
+          particula({ k: 'chispa', x: gx, y: gy, z, vx: Math.cos(a) * (120 + Math.random() * 140), vy: Math.sin(a) * (120 + Math.random() * 140), vz: 20 + Math.random() * 60, t: 0.3 + Math.random() * 0.25, t0: 0.55, col: Math.random() < 0.5 ? '#ffd27a' : '#ff8a2a' });
+        }
+        const fx = gx + Math.cos(ang) * l, fy = gy + Math.sin(ang) * l;
+        if (suelo && Math.random() < 0.35) {
+          const d = l * (0.45 + Math.random() * 0.55), a = ang + (Math.random() - 0.5) * abre * 0.6;
+          suelo.chamusca(gx + Math.cos(a) * d, gy + Math.sin(a) * d, 5 + Math.random() * 7);
+        }
+        if (napalm && Math.random() < 0.4)
+          particula({ k: 'llama', x: fx + (Math.random() - 0.5) * 16, y: fy + (Math.random() - 0.5) * 12, z: 2, vx: 0, vy: 0, vz: 14, t: 0.5, t0: 0.5, s: 4, s0: 4, s1: 9, baja: 1 });
+      },
+      /* Un charco de napalm que arde (r px): llamas bajas que suben. */
+      napalm(x, y, r) {
+        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r;
+        particula({ k: 'llama', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, z: 1, vx: 0, vy: 0, vz: 16 + Math.random() * 14, t: 0.45, t0: 0.45, s: 3, s0: 3, s1: 7 + Math.random() * 4, baja: 1 });
+        if (Math.random() < 0.15) particula({ k: 'humoC', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, z: 8, vx: 0, vy: 0, vz: 14, t: 0.6, t0: 0.9, s: 4, crece: 8 });
+      },
       casquillo(x, y, ang, rojo) {
         const a = ang + Math.PI / 2 + (Math.random() - 0.5) * 0.6, v = 40 + Math.random() * 40;
         particula({ k: 'casquillo', x: x + Math.cos(ang) * 6, y: y + Math.sin(ang) * 6, z: 17, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 50 + Math.random() * 40, t: 1.6, t0: 1.6, col: rojo ? '#b8281e' : '#d9a83a', giro: Math.random() * 6, vg: (Math.random() - 0.5) * 30, rebota: 0 });
@@ -924,6 +971,14 @@
                 if (p.rebota >= 3) { p.vx = 0; p.vy = 0; }
               }
             }
+          } else if (p.k === 'llama') {
+            // avanza casi sin frenar, sube un poco, crece y al apagarse humea
+            p.z += p.vz * dt;
+            const fr = Math.exp(-1.1 * dt); p.vx *= fr; p.vy *= fr;
+            const edad = 1 - p.t / p.t0;
+            p.s = p.s0 + (p.s1 - p.s0) * Math.pow(Math.max(0, edad), 0.7);
+            if (p.t <= 0 && !p.nucleo && Math.random() < 0.22)
+              particula({ k: 'humo', x: p.x, y: p.y, z: p.z + 4, vx: p.vx * 0.1, vy: p.vy * 0.1, vz: 16 + Math.random() * 12, t: 0.5 + Math.random() * 0.4, t0: 0.9, s: p.s * 0.6, crece: 10 });
           } else {
             p.z += (p.vz || 0) * dt;
             const fr = Math.exp(-3 * dt); p.vx *= fr; p.vy *= fr;
@@ -1010,6 +1065,22 @@
             c.drawImage(img, p.x - p.s, p.y - p.z - p.s, p.s * 2, p.s * 2);
           }
         }
+        /* Las llamas con mezcla normal: sumadas sobre un piso claro se iban a
+           blanco y parecían una nube de leche. Naranja al salir, rojo oscuro
+           al final; un poco más altas que anchas, porque el fuego sube. */
+        for (const p of P) {
+          if (p.k !== 'llama' || p.nucleo) continue;
+          const edad = 1 - p.t / p.t0;
+          c.globalAlpha = Math.min(1, edad * 7 + (p.baja ? 0.5 : 0.15)) * Math.pow(1 - edad, 0.7) * (p.baja ? 0.75 : 0.85);
+          const img = edad < 0.5 ? sp.llamaN : sp.llamaR, v = Math.abs(p.vx) + Math.abs(p.vy);
+          if (p.baja || v < 40) c.drawImage(img, p.x - p.s, p.y - p.z - p.s * 1.15, p.s * 2, p.s * 2.15);
+          else {
+            // joven y rápida: una lengua estirada hacia donde corre
+            const e = 1 + 0.9 * (1 - edad);
+            c.save(); c.translate(p.x, p.y - p.z); c.rotate(Math.atan2(p.vy * 0.8, p.vx));
+            c.drawImage(img, -p.s * e, -p.s * 0.85, p.s * 2 * e, p.s * 1.7); c.restore();
+          }
+        }
         c.globalAlpha = 1;
         c.save(); c.globalCompositeOperation = 'lighter';
         for (const p of P) {
@@ -1018,6 +1089,11 @@
             c.globalAlpha = Math.min(1, f * 1.8);
             const img = p.sp ? sp[p.sp] || sp.fuego : sp.fuego;
             c.drawImage(img, p.x - p.s, p.y - p.z - p.s, p.s * 2, p.s * 2);
+          } else if (p.k === 'llama' && (p.nucleo || 1 - p.t / p.t0 < 0.3)) {
+            // el corazón del chorro, sumando luz: blanco amarillo
+            const edad = 1 - p.t / p.t0;
+            c.globalAlpha = (p.nucleo ? 0.9 : 0.45 * (1 - edad / 0.3));
+            c.drawImage(sp.fuego, p.x - p.s * 0.7, p.y - p.z - p.s * 0.8, p.s * 1.4, p.s * 1.5);
           } else if (p.k === 'chispa') {
             c.globalAlpha = Math.min(1, p.t / 0.15);
             c.strokeStyle = p.col; c.lineWidth = 1;

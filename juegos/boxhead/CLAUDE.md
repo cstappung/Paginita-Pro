@@ -516,3 +516,46 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
 - **Camera look-ahead** is 18/14 px (it was 34/26). It is drawing only, so
   `VE` is unchanged.
 
+
+## A real flamethrower and max-level abilities (`boxhead-25`, proof `ve: 8`)
+
+- **The flame is drawn with `fx.llamarada`**: about nine `llama` particles
+  per shot leave the nozzle and run to `libreHasta` (the jet stops at walls).
+  They grow and age from white to orange to red, then leave smoke.
+  - Only the core uses the `lighter` blend. On a light floor, many additive
+    flames turned into white milk, so the body of the flame uses the normal
+    blend with the `llamaN`/`llamaR` sprites.
+  - The floor gets `suelo.chamusca`, a soft mark. `quemadura` is too heavy
+    for dozens per second.
+  - `luzLlama` (one light per player) lights the cone on lit maps (`luces`)
+    and cuts a hole in the Apagón darkness.
+  - The shot sends the free length as the 6th field, so the other players
+    draw the same jet.
+- **At shop level 5 every weapon gains an ability** (`D.ESPECIALES`,
+  `especialDe`; in the game, `especial(id)`). The tooltips show them in the
+  shop and the weapon bar, and reaching level 5 shows a banner.
+  - Pistola (0): every 5th shot pierces everyone at ×2. `topeGolpe(0)` is
+    ×2 to match.
+  - Uzi (1): two bullets per round.
+  - Escopeta (2): a second free volley after 0.13 s (`yo.eco`, run in
+    `pasoYo`; `descarga` holds the volley).
+  - Barriles (3): two side by side. Muro (5): three in a row. Both go
+    through `pon(a, lado)`.
+  - Granadas (4): split into 4 grenadelets (`racimo`). A grenade `vel` under
+    200 means a grenadelet: slower, 0.45 s, for everyone.
+  - Cohetes (6): three in a fan.
+  - Cargas (7): mines. The `pon` request carries an 8th field `1`, and the
+    director blows the charge when an enemy comes within `r·0.5`. An old
+    director ignores it.
+  - Lanzallamas (10): napalm.
+    - Every 5th shot leaves a puddle in `yo.napalm`. `pasoNapalm` burns
+      enemies on it every 0.3 s; the damage is the shooter's, like any hit.
+    - The shot carries a 7th field `1`, so the others see the puddle in
+      `NAPALM`, which is drawing only.
+  - Ballesta (11): the bolt explodes where it stops (`explota` with
+    `amigo`).
+  - Minigun (12): starts at full spin and pierces +2.
+  - Rayo (13): +4 jumps, ×1.5 reach, no damage falloff.
+  - Any change to their numbers changes the sim: bump `VE`.
+- `__boxhead.nivelArma(i, n)` and `napalm()`, plus `disparos`/`proyectiles`
+  in `estado().yo`, let the tests check each ability.
