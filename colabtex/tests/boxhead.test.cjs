@@ -285,3 +285,65 @@ test('el stick del mando: ocho direcciones con histéresis, sin tiritar en el bo
  assert.equal(D.dirStick(...a(-borde),0),0);
  assert.equal(D.dirStick(...a(Math.PI-borde),4),4);
 });
+
+/* Fase 2: el motor determinista. Se juega una práctica sin pantalla
+   (sin-pantalla.js) con un «jugador» de teclas que cambia cada tanto, con
+   la grabadora encendida, y la prueba se rehace en OTRO contexto: tiene que
+   terminar en el mismo paso, nivel y puntos. */
+const RAIZ='../juegos/boxhead/js/';
+function boxheadSinPantalla(){
+ const ctx={console,Math,JSON,Date,Map,Set,Array,Object,Number,String,Boolean,Symbol,Proxy,Error,Int32Array,Float32Array,Uint8Array,URLSearchParams,Infinity,NaN,isFinite,parseInt,parseFloat};
+ vm.createContext(ctx);
+ for(const f of ['sin-pantalla.js','datos.js','juego.js'])vm.runInContext(fs.readFileSync(RAIZ+f,'utf8'),ctx,{filename:f});
+ return ctx.__boxhead;
+}
+// Un bot que pasa por la grabadora (__boxhead.entrada): mira al enemigo más
+// cercano, dispara siempre y se aleja si lo rodean; cambia de arma y compra.
+const DIRS8=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+const dir8=(x,y)=>((Math.round(Math.atan2(y,x)/(Math.PI/4))%8)+8)%8;
+function juegaPartida(bx,{maxPasos=60*60*20,azar=1}={}){
+ bx.practica();let t=0;
+ for(let i=0;i<maxPasos&&!bx.estado().terminado;i++){
+  if(i%4===0){
+   const m=bx.mundo();let best=null,bd=1e9,cx=0,cy=0;
+   for(const e of m.E){const d=Math.hypot(e.x-m.yo.x,e.y-m.yo.y);if(d<bd){bd=d;best=e}if(d<160){cx+=e.x-m.yo.x;cy+=e.y-m.yo.y}}
+   const en={dx:0,dy:0,vel:1,mira:-1,fija:false,disp:true};
+   if(best){en.mira=dir8(best.x-m.yo.x,best.y-m.yo.y);
+    if(bd<130){const d=DIRS8[dir8(-cx,-cy)];en.dx=d[0];en.dy=d[1]}
+    else{t++;const d=DIRS8[(Math.floor(t/40)+azar)%8];en.dx=d[0];en.dy=d[1];en.vel=0.6}}
+   bx.entrada(en);
+  }
+  if(i%400===200)bx.accion(1,1);
+  if(i%1000===500)bx.accion(6,0);
+  bx.paso(1/60);
+ }
+ return bx.prueba();
+}
+test('motor determinista: una práctica grabada se rehace idéntica en otro contexto',()=>{
+ const a=boxheadSinPantalla();
+ const p=juegaPartida(a,{azar:1});
+ assert.ok(a.estado().nivel>=3,'la partida de prueba pasa de nivel');
+ const fin=a.estado();
+ assert.ok(fin.terminado,'el jugador de prueba tiene que morir');
+ assert.ok(p.j.length>10&&p.k>0);
+ const b=boxheadSinPantalla();
+ const r=b.rehace(JSON.parse(JSON.stringify(p)));
+ assert.equal(r.terminada,true);
+ assert.equal(r.pasos,p.k);
+ assert.equal(r.nivel,fin.nivel);
+ assert.equal(r.pts,fin.yo.pts);
+ // rehacerla otra vez en el mismo contexto da lo mismo (practica lo pone todo a cero)
+ const r2=b.rehace(JSON.parse(JSON.stringify(p)));
+ assert.deepEqual(r2,r);
+});
+test('motor determinista: una prueba tocada no llega al mismo final',()=>{
+ const a=boxheadSinPantalla();
+ const p=juegaPartida(a,{azar:3});
+ const b=boxheadSinPantalla();
+ const ok=b.rehace(JSON.parse(JSON.stringify(p)));
+ const otra=JSON.parse(JSON.stringify(p));otra.s=(otra.s+1)>>>0;
+ const r=b.rehace(otra);
+ assert.ok(r.pasos!==ok.pasos||r.pts!==ok.pts||!r.terminada,'otra semilla, otra partida');
+ assert.throws(()=>b.rehace({...p,ve:999}),/forma esperada/);
+ assert.throws(()=>b.rehace({...p,j:[[5,0,4,20,0,0],[2,1,1]]}),/orden/);
+});

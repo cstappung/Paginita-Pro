@@ -179,3 +179,31 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `sfx/<key>-<n>.mp3`. Each file's `GAN` must be measured against the
   synthesized sound. The `switch` in `son` remains the fallback.
 
+
+## Phase 2.1: deterministic practice engine (`boxhead-10`)
+
+- **Practice is replayable.** Gameplay randomness goes through `rn`/`rz`, a
+  mulberry32 seeded per game in `practica(semilla)`; `azar` (Math.random) is only
+  for what is seen. A new random call that changes the game must use `rn`/`rz`,
+  or proofs stop replaying. Rooms keep `rng = Math.random` (the director rules).
+  `dist`/`hyp` use `Math.sqrt`, never `Math.hypot`. Trig still differs in the
+  last bit between engines (same risk PRO DEFENDER took). In practice `nid()` is a
+  counter, and `practica` resets everything a sim carries across games
+  (`vistosM`, `marca`, `CH`…). A seen-id set left full silently ate kills.
+- **Fixed steps.** `cuadro` advances practice in steps of `PASO` (1/60 s, at
+  most 4 per frame); `pasoN` counts them (incremented at the end of `paso`, never
+  while paused). Online still uses a variable `dt`. No `setTimeout` in the sim:
+  the empty-weapon switch became `yo.vacio`.
+- **The recorder** (`graba`): `[paso, 0, mov, vel·20, mira+1, fija|disp<<1]`
+  when the stick or keys change (`entradaPaso`, speed in twentieths), and
+  `[paso, code, arg]` for each discrete action, which must go through
+  `accion(code, arg)` (1 cycle, 2 pick, 3 detonate, 4 reinforced wall, 5 weapon
+  level, 6 buy item i of `D.TIENDA`). Internal calls (`dispara` → `eligeArma(0)`)
+  stay direct. The proof is `{v: 1, ve: VE, m, s, j, k}` (`__boxhead.prueba()`),
+  with `k` = the step of `finPractica`. **Bump `VE` whenever the simulation
+  changes**: an old proof would replay to a different end.
+- **`__boxhead.rehace(p)`** replays it without a screen: `js/sin-pantalla.js`
+  turns DOM, canvas, audio and grafico into an inert proxy, so `datos.js` +
+  `juego.js` run in a worker or in Node (`tests/boxhead.test.cjs` plays a bot
+  through `__boxhead.entrada`, which records like real input, and replays in
+  another context). About 0.1 ms per step.

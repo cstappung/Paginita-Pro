@@ -38,8 +38,21 @@
   const lee = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } };
   const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-  const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
+  /* Raíz cuadrada y no Math.hypot: la raíz da el mismo número en todos los
+     navegadores (IEEE), hypot no está obligado a eso, y una partida grabada
+     tiene que rehacerse idéntica en otro motor de JavaScript. */
+  const hyp = (x, y) => Math.sqrt(x * x + y * y);
+  const dist = (ax, ay, bx, by) => hyp(bx - ax, by - ay);
+  // `azar` es para lo que solo se ve (chispas, sacudidas); lo que decide la partida usa `rn`/`rz`.
   const azar = (a, b) => a + Math.random() * (b - a);
+  /* **El azar del juego sale de una semilla** (mulberry32) en la práctica:
+     misma semilla y mismas jugadas dan la misma partida, que es lo que
+     permite rehacerla para verificar un récord del Solo Club. En una sala
+     sigue siendo Math.random (el director manda y nadie rehace nada). */
+  const mulberry32 = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  let rng = Math.random;
+  const rn = () => rng();
+  const rz = (a, b) => a + rng() * (b - a);
   // Gira `a` hacia `b` por el lado corto, una fracción `k`.
   const giraHacia = (a, b, k) => { const d = ((b - a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI; return a + d * Math.min(1, k); };
   const angDir = d => (d | 0) * Math.PI / 4;
@@ -51,7 +64,7 @@
   let skinId = D.skin(lee('boxhead.skin', 'bambo')).id;
   let mapaElegido = D.mapaValido(lee('boxhead.mapa', 'patio'));
   let ultimoId = 0;
-  const nid = () => (ultimoId = Math.max(ultimoId + 1, Date.now()));
+  const nid = () => (ultimoId = ONLINE ? Math.max(ultimoId + 1, Date.now()) : ultimoId + 1);
   let T = 0, nivelLocal = 1, nivelVisto = 0, misBajas = 0;
 
   let yo = nuevoYo();
@@ -82,6 +95,28 @@
   // Proyectiles propios y ajenos (granadas, cohetes), solo de pantalla.
   let proy = [];
 
+  /* ---------- la grabadora (solo la práctica) ----------
+     La práctica avanza en pasos fijos de 1/60 s (`cuadro`) y `pasoN` cuenta
+     los que ya se dieron. Lo que el jugador hace se anota con ese número:
+     `[paso, 0, mov, vel, mira, botones]` cuando cambia lo que pide el
+     teclado o el stick (`entradaPaso`), y `[paso, código, arg]` para cada
+     acción suelta (`accion`: 1 cambiar de arma ±1, 2 elegir arma, 3
+     detonar, 4 muro reforzado, 5 mejorar arma, 6 comprar el ítem i de
+     D.TIENDA). Una acción entre dos pasos lleva el número de pasos dados,
+     y el movimiento se lee dentro del paso siguiente con el mismo número:
+     rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
+     en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
+     rehace la partida entera (`rehace`, lo usa el verificador del Club). */
+  const PASO = 1 / 60, VE = 1, MAX_JUGADAS = 200000;
+  let pasoN = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
+  const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
+  const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
+    i => { const t = D.TIENDA[i | 0]; if (t) compra(t.id); }];
+  function accion(cod, a = 0) {
+    if (graba && jugando && !terminado && graba.j.length < MAX_JUGADAS) graba.j.push([pasoN, cod, a]);
+    ACCIONES[cod](a);
+  }
+
   // ---------- entrada ----------
   const teclas = new Set();
   const TECLA_TIENDA = {};
@@ -93,13 +128,13 @@
     SND.inicia();
     if (e.code === 'Escape' || e.code === 'KeyP') { if (jugando && !terminado) ponPausa(!pausado); return; }
     if (!jugando || pausado || quienPausa() || !yo.v || yo.muerto) return;
-    if (e.code === 'KeyQ') cicla(-1);
-    else if (e.code === 'KeyE') cicla(1);
-    else if (e.code === 'KeyX') detona();
-    else if (e.code === 'KeyF') ponBlindado();
-    else if (e.code === 'KeyU') subeArma(yo.w);
-    else if (/^Digit[1-8]$/.test(e.code)) eligeArma(+e.code.slice(5) - 1);
-    else { const t = TECLA_TIENDA[e.code]; if (t) compra(t); }
+    if (e.code === 'KeyQ') accion(1, -1);
+    else if (e.code === 'KeyE') accion(1, 1);
+    else if (e.code === 'KeyX') accion(3);
+    else if (e.code === 'KeyF') accion(4);
+    else if (e.code === 'KeyU') accion(5, yo.w);
+    else if (/^Digit[1-8]$/.test(e.code)) accion(2, +e.code.slice(5) - 1);
+    else { const t = TECLA_TIENDA[e.code]; if (t) accion(6, idxTienda(t)); }
   });
   addEventListener('keyup', e => teclas.delete(e.code));
   addEventListener('blur', () => teclas.clear());
@@ -114,18 +149,19 @@
      arma (← →), toma la mejor (↑) o pone un muro reforzado (↓). */
   const enJuego = () => jugando && !terminado && !pausado && !quienPausa() && !!cfg && !cfg.mirando && yo.v && !yo.muerto;
   const cruceta = (cerca, lejos) => () => { if (enJuego()) (tiendaCerca() ? cerca : lejos)(); };
-  const mejorArma = () => { const l = disponibles(); if (l.length) eligeArma(l[l.length - 1]); };
+  const mejorArma = () => { const l = disponibles(); if (l.length) accion(2, l[l.length - 1]); };
+  const compraM = id => () => accion(6, idxTienda(id));
   const MANDO_TIENDA = { balas: 'arriba', armadura: 'der', botiquin: 'abajo', potencia: 'izq', blindado: 'b' };
   if (window.Mando) Mando.configura({
     stick: null, flechas: false,
     botones: {
       a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX',
-      y: () => { if (enJuego()) subeArma(yo.w); },
-      b: () => { if (enJuego()) { if (tiendaCerca()) compra('blindado'); else ponBlindado(); } },
-      arriba: cruceta(() => compra('balas'), mejorArma),
-      der: cruceta(() => compra('armadura'), () => cicla(1)),
-      abajo: cruceta(() => compra('botiquin'), () => ponBlindado()),
-      izq: cruceta(() => compra('potencia'), () => cicla(-1)),
+      y: () => { if (enJuego()) accion(5, yo.w); },
+      b: () => { if (enJuego()) { if (tiendaCerca()) accion(6, idxTienda('blindado')); else accion(4); } },
+      arriba: cruceta(compraM('balas'), mejorArma),
+      der: cruceta(compraM('armadura'), () => accion(1, 1)),
+      abajo: cruceta(compraM('botiquin'), () => accion(4)),
+      izq: cruceta(compraM('potencia'), () => accion(1, -1)),
       start: () => { if (jugando && !terminado) ponPausa(!pausado); },
     },
     menu: () => !jugando || pausado || terminado,
@@ -178,7 +214,7 @@
     zona.addEventListener('pointermove', e => {
       if (e.pointerId !== toque.id) return;
       let dx = e.clientX - toque.ox, dy = e.clientY - toque.oy;
-      const l = Math.hypot(dx, dy);
+      const l = hyp(dx, dy);
       if (l > RT) { dx *= RT / l; dy *= RT / l; }
       toque.x = dx / RT; toque.y = dy / RT;
       bola.style.transform = 'translate(' + dx.toFixed(0) + 'px,' + dy.toFixed(0) + 'px)';
@@ -192,7 +228,7 @@
         if (k === 'disp') toque.disp = true;
         else if (k === 'fija') toque.fija = true;
         else if (k === 'pausa') { if (jugando && !terminado) ponPausa(!pausado); }
-        else if (enJuego()) { if (k === 'ant') cicla(-1); else if (k === 'sig') cicla(1); else if (k === 'muro') ponBlindado(); else if (k === 'det') detona(); }
+        else if (enJuego()) { if (k === 'ant') accion(1, -1); else if (k === 'sig') accion(1, 1); else if (k === 'muro') accion(4); else if (k === 'det') accion(3); }
       });
       const fin = () => { b.classList.remove('on'); if (k === 'disp') toque.disp = false; else if (k === 'fija') toque.fija = false; };
       b.addEventListener('pointerup', fin); b.addEventListener('pointercancel', fin); b.addEventListener('pointerleave', fin);
@@ -294,11 +330,23 @@
     if (versus()) banner('VERSUS · ' + (cfg.meta || 10) + ' BAJAS');
   }
 
-  function practica() {
+  /* Una partida de práctica: con semilla nueva (o la de una prueba, al
+     rehacerla) y, si se juega de verdad, con la grabadora encendida. Todo
+     lo que la simulación arrastra de una partida a otra se pone a cero
+     aquí: rehacer varias pruebas seguidas en el mismo verificador tiene que
+     dar lo mismo que rehacer cada una sola. */
+  function practica(semilla, grabar = true) {
+    const s = semilla === undefined ? (Math.random() * 4294967296) >>> 0 : semilla >>> 0;
+    rng = mulberry32(s);
+    ultimoId = 0; pasoN = 0; finPaso = -1; acumula = 0;
+    CH = []; armaUlt = 0; armaMuerte = -1; pend.s = []; pend.n = []; pend.x2 = [];
+    // los ids vuelven a empezar: lo visto de la partida anterior taparía bajas de esta
+    vistosM.clear(); vistosX.clear(); marca.clear(); for (const m of Object.values(visto)) m.clear(); ocultas.clear();
+    graba = grabar ? { v: 1, ve: VE, m: D.ORDEN_MAPAS.indexOf(mapaElegido), s, j: [], ult: '' } : null;
     cfg = { yo: 'yo', mirando: false, variante: 'coop', mapa: mapaElegido, meta: 0, semilla: 1,
       jugadores: [{ uid: 'yo', nombre: 'Tú', orden: 0 }] };
     marcador = { nivel: 1, caidos: [], bajas: {}, muertes: {}, puntos: {}, fuera: [], fin: null };
-    terminado = false; nivelLocal = 1; nivelVisto = 0; T = 0;
+    terminado = false; pausado = false; nivelLocal = 1; nivelVisto = 0; T = 0;
     yo = nuevoYo();
     cargaMundo(mapaElegido);
     empieza();
@@ -339,14 +387,14 @@
       if (a.tipo !== 'cohete') fx.casquillo(yo.x, yo.y, ang, a.id === 2);
     }
     if (a.tipo === 'bala') {
-      rayo(yo.x, yo.y, ang + (Math.random() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
+      rayo(yo.x, yo.y, ang + (rn() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
       gasta(); son(a.id === 1 ? 'uzi' : 'pistola');
       vibra(a.id === 1 ? 0.05 : 0.12, a.id === 1 ? 0.25 : 0.35, a.id === 1 ? 40 : 60);
     } else if (a.tipo === 'perdigon') {
       // A quemarropa (cuatro perdigones o más en el mismo enemigo) el golpe se siente: pausa de impacto.
       const cuenta = new Map();
       for (let i = 0; i < a.perdigones; i++) {
-        const e = rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + azar(-0.03, 0.03), a.alc * azar(0.85, 1), a.d, a.id, a.pen || 0);
+        const e = rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + rz(-0.03, 0.03), a.alc * rz(0.85, 1), a.d, a.id, a.pen || 0);
         if (e) cuenta.set(e, (cuenta.get(e) || 0) + 1);
       }
       for (const [e, c] of cuenta) if (c >= 4 && dist(e.x, e.y, yo.x, yo.y) < 70) { impacto(0.045); break; }
@@ -366,7 +414,7 @@
   function gasta() {
     if (yo.w === 0 || yo.ammo[yo.w] === Infinity) return;
     yo.ammo[yo.w]--;
-    if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; setTimeout(() => { if (!(yo.ammo[yo.w] > 0)) eligeArma(0); }, 120); }
+    if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; yo.vacio = 0.12; }   // a los 0,12 s vuelve a la pistola (pasoYo), por pasos y no con un reloj
   }
 
   // Bala instantánea: avanza de 4 en 4 px hasta lo primero que toque. Con
@@ -590,8 +638,8 @@
   function sueltaChatarra(x, y, v) {
     const n = Math.max(1, Math.min(6, Math.round(v / 15))), parte = Math.floor(v / n);
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, s = azar(40, 95);
-      CH.push({ id: (Math.random() * 1e6) | 0, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: 0, vz: azar(70, 120), t: 0, v: parte + (i === 0 ? v - parte * n : 0) });
+      const a = rn() * Math.PI * 2, s = rz(40, 95);
+      CH.push({ id: (Math.random() * 1e6) | 0, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: 0, vz: rz(70, 120), t: 0, v: parte + (i === 0 ? v - parte * n : 0) });
     }
     if (CH.length > 160) for (const c of CH.splice(0, CH.length - 160)) cobra(c);
   }
@@ -727,13 +775,13 @@
       const obj = vivos();
       let cands = M.spawnsE.filter(s => obj.every(o => dist(s.x, s.y, o.x, o.y) > TS * 5));
       if (!cands.length) cands = M.spawnsE;
-      const s = cands[(Math.random() * cands.length) | 0];
-      x = s.x + azar(-4, 4); y = s.y + azar(-4, 4);
+      const s = cands[(rn() * cands.length) | 0];
+      x = s.x + rz(-4, 4); y = s.y + rz(-4, 4);
     }
-    const k = kFijo >= 0 ? kFijo : D.tipoEnemigo(versus() ? n + 2 : n, Math.random());
+    const k = kFijo >= 0 ? kFijo : D.tipoEnemigo(versus() ? n + 2 : n, rn());
     const jefe = D.esJefe(k);
     const max = jefe ? D.vidaJefe(k, n, Math.max(1, activos().length)) : D.vidaEnemigo(k, n);
-    const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: azar(1, 3), flash: 0 };
+    const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: rz(1, 3), flash: 0 };
     if (jefe) { e.cdH = D.ENEMIGOS[k].cd; e.est = 0; e.estT = 0; e.hitos = 0; }
     desatasca(e, D.ENEMIGOS[k].radio - 1);
     e.tx = e.x; e.ty = e.y;
@@ -743,7 +791,7 @@
   // Un invocado nace junto a quien lo llama, en un sitio libre.
   function invoca(e, k, n) {
     for (let i = 0; i < 8; i++) {
-      const a = Math.random() * Math.PI * 2, r = azar(24, 46);
+      const a = rn() * Math.PI * 2, r = rz(24, 46);
       const x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r;
       if (choca(x, y, D.ENEMIGOS[k].radio)) continue;
       const h = nuevoEnemigo(dir.n, k, x, y);
@@ -774,10 +822,10 @@
       let ax, ay;
       if (Number.isFinite(sx) && Number.isFinite(sy) && (sx !== e.x || sy !== e.y)) { ax = e.x - sx; ay = e.y - sy; }
       else { ax = -DIRS[e.d || 0][0]; ay = -DIRS[e.d || 0][1]; }
-      const l = Math.hypot(ax, ay) || 1, masa = D.ENEMIGOS[e.k].masa ?? 1;
+      const l = hyp(ax, ay) || 1, masa = D.ENEMIGOS[e.k].masa ?? 1;
       const em = EMPUJE * masa * (EMPUJE_ARMA[w] ?? 1);
       const sigue = e.aturd > 0 ? 1 : 0;
-      const kx = (e.kvx || 0) * sigue + ax / l * em, ky = (e.kvy || 0) * sigue + ay / l * em, kl = Math.hypot(kx, ky), tope = 60 + 420 * Math.min(1, masa);
+      const kx = (e.kvx || 0) * sigue + ax / l * em, ky = (e.kvy || 0) * sigue + ay / l * em, kl = hyp(kx, ky), tope = 60 + 420 * Math.min(1, masa);
       const f = kl > tope ? tope / kl : 1;
       e.aturd = ATURDE * Math.min(1, masa) + 0.1; e.kvx = kx * f; e.kvy = ky * f;
       return;
@@ -808,7 +856,7 @@
       if (C.hab === 'cria') for (let i = 0; i < 5; i++) invoca(e, 2, dir.n);
       return;
     }
-    const r = Math.random();
+    const r = rn();
     if (B.size < 12 && r < 0.2) {
       const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : 2, x: Math.round(e.x), y: Math.round(e.y) };
       B.set(b.id, b);
@@ -860,7 +908,7 @@
   }
   function libreJefe(e, x, y) {
     for (let i = 0; i < 12; i++) {
-      const a = Math.random() * Math.PI * 2, r = azar(56, 84);
+      const a = rn() * Math.PI * 2, r = rz(56, 84);
       const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
       if (!choca(px, py, D.ENEMIGOS[e.k].radio + 2)) return [px, py];
     }
@@ -925,7 +973,7 @@
           if (pc < 0.5) bola(e, e.ang + Math.PI, 140, C.fuego);
         }
         if (e.estT <= 0) { e.est = 0; e.cdH = C.cd; }
-      } else embiste(e, C, t, dt, Math.hypot(e.vx, e.vy));
+      } else embiste(e, C, t, dt, hyp(e.vx, e.vy));
       if (e.est !== 3) e.cdH = C.cd;
       return true;
     }
@@ -1044,7 +1092,7 @@
       let dx, dy;
       if (dd < TS * 1.6 && despejado(e.x, e.y, t.x, t.y) && !(libre && objetoEnMedio(e.x, e.y, t.x, t.y))) { dx = t.x - e.x; dy = t.y - e.y; }
       else { const s = siguiente(e, libre); if (s) { dx = s.x - e.x; dy = s.y - e.y; } else { dx = t.x - e.x; dy = t.y - e.y; } }
-      const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      const l = hyp(dx, dy) || 1; dx /= l; dy /= l;
       let sx = 0, sy = 0;
       for (const f of lista) {
         if (f === e) continue;
@@ -1069,9 +1117,9 @@
       else if (bloq && e.cd <= 0 && rompe) { e.cd = 0.8; e.atk = 0.25; danaObjeto(bloq.id, golpe * 1.5 * (C.dObj || 1), ''); }
       if (C.fuego && C.cadFuego && e.cdF <= 0 && dd < (C.alcFuego || 320) && despejado(e.x, e.y, t.x, t.y)) {
         const a = Math.atan2(t.y - e.y, t.x - e.x);
-        if (C.jefe) { for (let i = -1; i <= 1; i++) bola(e, a + i * 0.2, 170, C.fuego); e.cdF = C.cadFuego * azar(0.8, 1.2) / (e.furia ? 1.6 : 1); e.atk = 0.3; son('fuego'); continue; }
+        if (C.jefe) { for (let i = -1; i <= 1; i++) bola(e, a + i * 0.2, 170, C.fuego); e.cdF = C.cadFuego * rz(0.8, 1.2) / (e.furia ? 1.6 : 1); e.atk = 0.3; son('fuego'); continue; }
         F.push({ id: nid(), x: e.x, y: e.y, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, t: 3, d: C.fuego, de: e.id, k: e.k });
-        e.cdF = C.cadFuego * azar(0.8, 1.2); e.atk = 0.3;
+        e.cdF = C.cadFuego * rz(0.8, 1.2); e.atk = 0.3;
         son(C.acido ? 'acido' : 'fuego', dist(e.x, e.y, camX, camY));
       }
     }
@@ -1418,7 +1466,7 @@
     if (ONLINE) {
       pubT += dt;
       if (pubT >= 1 / 12) { pubT = 0; enviar('estado', { e: miEstado() }); }
-    }
+    } else pasoN++;
   }
 
   function pasoYo(dt) {
@@ -1435,43 +1483,19 @@
       return;
     }
     if (!yo.v) return;
-    /* Moverse: teclado, stick (mando o táctil) y, para fijar hacia dónde se
-       mira, Shift / LT / el botón táctil. El stick derecho mira sin mover.
-       Con la dirección fija se camina un poco más lento: retroceder
-       disparando es una ventaja y cuesta algo. */
-    let dx = 0, dy = 0, vel = 1, mira = -1;
-    let fija = teclas.has('ShiftLeft') || teclas.has('ShiftRight') || toque.fija;
-    if (!pausado) {
-      if (teclas.has('KeyA') || teclas.has('ArrowLeft')) dx--;
-      if (teclas.has('KeyD') || teclas.has('ArrowRight')) dx++;
-      if (teclas.has('KeyW') || teclas.has('ArrowUp')) dy--;
-      if (teclas.has('KeyS') || teclas.has('ArrowDown')) dy++;
-      const m = leeMando();
-      let sx = 0, sy = 0;
-      if (m) {
-        sx = m.ejes.lx; sy = m.ejes.ly;
-        if (m.b.lt > 0.5) fija = true;
-        if (Math.hypot(m.ejes.rx, m.ejes.ry) > 0.35) { dirR = D.dirStick(m.ejes.rx, m.ejes.ry, dirR); mira = dirR; } else dirR = -1;
-      }
-      if (toque.id !== null && Math.hypot(toque.x, toque.y) > Math.hypot(sx, sy)) { sx = toque.x; sy = toque.y; }
-      const r = Math.min(1, Math.hypot(sx, sy));
-      if (!dx && !dy && r > 0.12) {
-        dirL = D.dirStick(sx, sy, dirL);
-        // poco inclinado: gira sin avanzar; más, camina (más rápido cuanto más)
-        if (r < 0.38) { if (mira < 0 && !fija) mira = dirL; }
-        else { dx = DIRS[dirL][0]; dy = DIRS[dirL][1]; vel = 0.55 + 0.45 * (r - 0.38) / 0.62; }
-      } else if (r <= 0.12) dirL = -1;
-    }
+    if (yo.vacio > 0 && (yo.vacio -= dt) <= 0 && !(yo.ammo[yo.w] > 0)) eligeArma(0);
+    const en = entradaPaso();
+    const { dx, dy, vel, mira, fija } = en;
     yo.mov = !!(dx || dy);
     yo.fija = fija || mira >= 0;
     if (mira >= 0) yo.d = mira;
     if (yo.mov) {
       const quieta = fija || mira >= 0;
       if (!quieta) yo.d = D.dirDe(dx, dy);
-      const l = Math.hypot(dx, dy), v = 110 * vel * (quieta ? 0.88 : 1);
+      const l = hyp(dx, dy), v = 110 * vel * (quieta ? 0.88 : 1);
       mover(yo, dx / l * v * dt, dy / l * v * dt, 9);
     }
-    if (!pausado && (teclas.has('Space') || toque.disp)) dispara();
+    if (en.disp) dispara();
     // Cajas.
     for (const b of [...B.values()]) {
       if (ocultas.has(b.id) || dist(b.x, b.y, yo.x, yo.y) > 18) continue;
@@ -1481,13 +1505,63 @@
     }
   }
 
+  /* Lo que el jugador le pide al personaje en este paso. Rehaciendo una
+     partida sale de la prueba (`repite`); jugando, del teclado, el stick
+     (mando o táctil) y, para fijar hacia dónde se mira, Shift / LT / el
+     botón táctil. El stick derecho mira sin mover. Con la dirección fija
+     se camina un poco más lento: retroceder disparando es una ventaja y
+     cuesta algo. La velocidad va en veinteavos para que la grabadora
+     anote un cambio solo cuando el stick se mueve de verdad. */
+  function entradaPaso() {
+    if (repite) return repite.ent;
+    let dx = 0, dy = 0, vel = 1, mira = -1;
+    let fija = teclas.has('ShiftLeft') || teclas.has('ShiftRight') || toque.fija;
+    if (forzada) ({ dx, dy, vel, mira, fija } = forzada);   // los tests: un bot que pasa por la grabadora
+    else if (!pausado) {
+      if (teclas.has('KeyA') || teclas.has('ArrowLeft')) dx--;
+      if (teclas.has('KeyD') || teclas.has('ArrowRight')) dx++;
+      if (teclas.has('KeyW') || teclas.has('ArrowUp')) dy--;
+      if (teclas.has('KeyS') || teclas.has('ArrowDown')) dy++;
+      const m = leeMando();
+      let sx = 0, sy = 0;
+      if (m) {
+        sx = m.ejes.lx; sy = m.ejes.ly;
+        if (m.b.lt > 0.5) fija = true;
+        if (hyp(m.ejes.rx, m.ejes.ry) > 0.35) { dirR = D.dirStick(m.ejes.rx, m.ejes.ry, dirR); mira = dirR; } else dirR = -1;
+      }
+      if (toque.id !== null && hyp(toque.x, toque.y) > hyp(sx, sy)) { sx = toque.x; sy = toque.y; }
+      const r = Math.min(1, hyp(sx, sy));
+      if (!dx && !dy && r > 0.12) {
+        dirL = D.dirStick(sx, sy, dirL);
+        // poco inclinado: gira sin avanzar; más, camina (más rápido cuanto más)
+        if (r < 0.38) { if (mira < 0 && !fija) mira = dirL; }
+        else { dx = DIRS[dirL][0]; dy = DIRS[dirL][1]; vel = 0.55 + 0.45 * (r - 0.38) / 0.62; }
+      } else if (r <= 0.12) dirL = -1;
+    }
+    dx = Math.sign(dx); dy = Math.sign(dy);
+    vel = dx || dy ? Math.round(vel * 20) / 20 : 1;
+    const disp = forzada ? !!forzada.disp : !pausado && (teclas.has('Space') || toque.disp);
+    const en = { dx, dy, vel, mira, fija: !!fija, disp };
+    if (graba) {
+      const j = [pasoN, 0, dx + 1 + 3 * (dy + 1), Math.round(vel * 20), mira + 1, (en.fija ? 1 : 0) | (disp ? 2 : 0)];
+      const c = j.slice(2).join();
+      if (c !== graba.ult && graba.j.length < MAX_JUGADAS) { graba.ult = c; graba.j.push(j); }
+    }
+    return en;
+  }
+  // Una jugada grabada [paso, 0, …] → la entrada de los pasos que siguen.
+  function entradaDe(j) {
+    const m = j[2] | 0, b = j[5] | 0;
+    return { dx: (m % 3) - 1, dy: ((m / 3) | 0) - 1, vel: (j[3] | 0) / 20, mira: (j[4] | 0) - 1, fija: !!(b & 1), disp: !!(b & 2) };
+  }
+
   function abreCaja(k) {
     son('recoge');
     if (k === 1) { yo.hp = Math.min(100, yo.hp + 50); premio('+50 vida'); return; }
     if (k === 2) { yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + D.ARMADURA.caja); premio('+' + D.ARMADURA.caja + ' armadura'); return; }
     const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < armaDe(i).max);
     if (!l.length) { yo.chat += 30; chatPulso = 1; premio('+30 chatarra'); return; }
-    const i = l[(Math.random() * l.length) | 0], a = armaDe(i);
+    const i = l[(rn() * l.length) | 0], a = armaDe(i);
     yo.ammo[i] = Math.min(a.max, yo.ammo[i] + a.caja);
     premio('+' + a.caja + ' ' + a.nombre);
   }
@@ -1543,6 +1617,8 @@
 
   function finPractica() {
     terminado = true;
+    finPaso = pasoN;
+    if (graba) graba.k = pasoN;
     $('finTxt').textContent = 'Llegaste al nivel ' + nivelLocal + ' con ' + yo.pts + ' puntos y ' + yo.k + ' bajas.';
     pintaStats();
     $('otra').hidden = false;
@@ -1983,7 +2059,7 @@
       b.querySelector('.nom').textContent = t.nombre;
       b.querySelector('.det').textContent = t.txt;
       b.title = t.nombre + ': ' + t.txt;
-      b.addEventListener('click', () => compra(t.id));
+      b.addEventListener('click', () => accion(6, idxTienda(t.id)));
       sum.append(b);
     }
     for (const a of D.ARMAS) {
@@ -1992,7 +2068,7 @@
       c.width = 104; c.height = 60;
       b.innerHTML = '<span class="lleva"></span><i class="ico"></i><b class="nom"></b><span class="est"></span><span class="pre"></span>';
       b.querySelector('.ico').append(c);
-      b.addEventListener('click', () => subeArma(a.id));
+      b.addEventListener('click', () => accion(5, a.id));
       ar.append(b);
     }
   }
@@ -2200,14 +2276,51 @@
     ultimo = ahora;
     let dts = dt;
     if (hs > 0) { hs -= dt; dts = dt * 0.08; }
-    if (!document.hidden) { paso(dts); dibuja(); hud(dt); }
+    if (!document.hidden) {
+      // En la práctica, pasos fijos (la grabadora cuenta pasos); como mucho
+      // cuatro por cuadro, y lo que sobre de un tirón se pierde.
+      if (ONLINE) paso(dts);
+      else if (quienPausa()) acumula = 0;
+      else { acumula += dts; let n = 0; while (acumula >= PASO && n++ < 4) { paso(PASO); acumula -= PASO; } if (acumula > PASO) acumula = 0; }
+      dibuja(); hud(dt);
+    }
     requestAnimationFrame(cuadro);
   }
   requestAnimationFrame(cuadro);
   // Con la pestaña oculta requestAnimationFrame se para: el mundo sigue igual.
   setInterval(() => { if (document.hidden && ONLINE) { ultimo = performance.now(); paso(0.1); } }, 100);
 
+  /* Rehace una partida de práctica desde su prueba, sin dibujar ni sonar
+     (en el verificador del Club, que carga este archivo en un trabajador o
+     en Node con un DOM de mentira). Devuelve dónde terminó. */
+  function rehace(p) {
+    if (!p || p.v !== 1 || p.ve !== VE || !Array.isArray(p.j) || !Number.isSafeInteger(p.k) || p.k < 0 || p.k > 6e6) throw new Error('La prueba de Pro BoxHead no tiene la forma esperada.');
+    const mapa = D.ORDEN_MAPAS[p.m];
+    if (!mapa) throw new Error('La prueba es de un mapa que no existe.');
+    mapaElegido = mapa;
+    practica(p.s >>> 0, false);
+    repite = { ent: { dx: 0, dy: 0, vel: 1, mira: -1, fija: false, disp: false } };
+    try {
+      let i = 0;
+      while (!terminado && pasoN <= p.k) {
+        for (; i < p.j.length && p.j[i][0] === pasoN; i++) {
+          const j = p.j[i];
+          if (!Array.isArray(j) || !j.every(Number.isSafeInteger)) throw new Error('Una jugada de la prueba no tiene la forma esperada.');
+          if (j[1] === 0) repite.ent = entradaDe(j);
+          else if (ACCIONES[j[1]]) ACCIONES[j[1]](j[2]);
+          else throw new Error('Una jugada de la prueba no existe.');
+        }
+        if (i < p.j.length && !(p.j[i][0] > pasoN)) throw new Error('Las jugadas de la prueba no van en orden.');
+        paso(PASO);
+      }
+      return { nivel: nivelLocal, pasos: finPaso, terminada: terminado, pts: yo.pts, k: yo.k, mul: yo.maxMul, jefes: yo.st.jefes };
+    } finally { repite = null; }
+  }
+  // La prueba de la última partida de práctica (sin el dato interno `ult`).
+  const prueba = () => graba && { v: graba.v, ve: graba.ve, m: graba.m, s: graba.s, j: graba.j, k: graba.k };
+
   window.__boxhead = {
+    rehace, prueba, accion, pasos: () => pasoN, entrada: en => { forzada = en || null; },
     paso: (dt = 1 / 60) => paso(dt),
     estado: () => ({ cfg, yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice() },
       soyDir, dirUid, nivel: nivelObjetivo(), dir: { n: dir.n, q: dir.q, t: dir.t }, enemigos: E.size, objetos: O.size, cajas: B.size, remotos: R.size, terminado }),
