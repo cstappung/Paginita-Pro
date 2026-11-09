@@ -506,3 +506,42 @@ test('enemigos de la Fase 3: el escudo para de frente, el excavador es inmune ba
  let curado=false;for(let i=0;i<60*3&&de(z)&&!curado;i++){bx.paso(1/60);curado=de(z)&&de(z).hp>hz;}
  assert.ok(curado,'el chamán lo cura');
 });
+
+test('jefes de la Fase 3: segunda habilidad, punto débil y corruptos',()=>{
+ const HABS=['embiste','invoca','anillo','cria','salta','pisoton','enjambre','espiral','hidra','roca'];
+ for(const e of D.ENEMIGOS.filter(e=>e.jefe)){
+  assert.ok(HABS.includes(e.hab2)&&e.hab2!==e.hab,e.nombre+' tiene otra habilidad');
+  if(e.hab2==='pisoton'||e.hab2==='roca')assert.ok(e.onda>0&&e.dOnda>0,e.nombre+' necesita su onda');
+  if(['anillo','hidra','espiral'].includes(e.hab2))assert.ok(e.fuego>0,e.nombre+' necesita fuego');
+  if(e.invoca!==undefined)assert.ok(D.ENEMIGOS[e.invoca]&&!D.ENEMIGOS[e.invoca].jefe);
+ }
+ assert.ok(!D.corrupto(50)&&D.corrupto(51));
+ assert.ok(D.ELITES[D.ELITE_CORRUPTO].jefe&&D.ELITES[D.ELITE_CORRUPTO].vida>1);
+ for(let n=1;n<=80;n++)for(const e of D.ENEMIGOS)assert.notEqual(D.eliteDe(e.id,n,0,0.99),D.ELITE_CORRUPTO,'la mezcla nunca da un corrupto');
+ const bx=boxheadSinPantalla(),pista={dx:0,dy:0,vel:1,mira:0,fija:true,disp:false};
+ const de=id=>bx.mundo().E.find(e=>e.id===id);
+ function prepara(n){bx.practica(1);bx.inmortal(true);bx.armas();bx.salta(n);bx.calma();bx.elige(0);bx.entrada(pista);for(let i=0;i<12;i++)bx.paso(1/60);return bx.mundo().yo;}
+ const tiro=()=>{bx.entrada({...pista,disp:true});bx.paso(1/60);bx.entrada(pista);};
+ // Mientras avisa la embestida (est 2), el Carnicero recibe ×1,5.
+ let yo=prepara(5);
+ const c=bx.enemigo(6,yo.x+150,yo.y);
+ bx.paso(1/60);let h=de(c).hp;tiro();const frente=h-de(c).hp;
+ assert.ok(frente>0&&de(c).est!==2,'de frente pega normal');
+ let n=0;while(de(c).est!==2&&n++<60*8)bx.paso(1/60);
+ assert.equal(de(c).est,2,'avisa la embestida');
+ h=de(c).hp;tiro();
+ assert.ok(Math.abs((h-de(c).hp)-frente*D.DEBIL)<1e-6,'al avisar pega ×'+D.DEBIL+': '+(h-de(c).hp)+' vs '+frente);
+ // Bajo el 50 % alterna con la segunda: el Carnicero también pisa (est 1, la onda).
+ yo=prepara(5);
+ const c2=bx.enemigo(6,yo.x+60,yo.y);bx.ponVida(c2,0.4);
+ let pisa=false;for(let i=0;i<60*20&&!pisa&&de(c2);i++){bx.paso(1/60);pisa=de(c2).est===1;}
+ assert.ok(pisa,'herido usa su segunda habilidad');
+ // Desde el 51 los jefes salen corruptos: más vida.
+ yo=prepara(50);
+ const nor=de(bx.enemigo(6,yo.x+200,yo.y));
+ assert.equal(nor.el,0,'en el 50 todavía no');
+ yo=prepara(51);
+ const cor=de(bx.enemigo(6,yo.x+200,yo.y));
+ assert.equal(cor.el,D.ELITE_CORRUPTO);
+ assert.equal(cor.max,Math.round(D.vidaJefe(6,51,1)*D.ELITES[D.ELITE_CORRUPTO].vida),'corrupto: ×'+D.ELITES[D.ELITE_CORRUPTO].vida+' de vida');
+});

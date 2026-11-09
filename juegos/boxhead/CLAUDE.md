@@ -314,3 +314,23 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   than `vidaEnemigo(k, dir.n)` sends `[max, est, el]` (+ `ax, ay` while a
   vigía aims) after the 8 base fields; `aplicaZb` reads them.
 - `__boxhead.mundo()` now also returns `max/est/el` per enemy and `F`.
+
+## Phase 3.2: bosses (`boxhead-16`, proof `ve: 5`)
+
+- **Second ability** (`hab2`, reusing the existing `hab` implementations;
+  each boss got the params it needs: `onda/dOnda`, `fuego`, `invoca` = kind
+  summoned). Below 50 % (hito bit 4), or from the start if corrupted, the
+  boss alternates: `e.alt` flips only when an ability actually started (`est`
+  changed or `cdH` was reset), and `e.hab` remembers which one is running so
+  the warning and execution phases use it. Nothing new on the network: the
+  others only draw `est`.
+- **Weak point** (`D.DEBIL` ×1.5): a hit from more than 120° off the boss's
+  facing, or while it warns (est 2). Applied in `golpeaEnemigo` on the
+  shooter, like the escudero's shield; `TOPE_VENTAJAS` includes it, so the
+  director's caps still pass honest hits. Drawn as a yellow diamond on the
+  back (`e.debil` lights it when hit).
+- **Corrupted bosses**: from level 51 (`D.corrupto`, the second time round the
+  rotation) a boss spawns with `el = ELITE_CORRUPTO` (6, `jefe: true`, never
+  from `eliteDe`): ×1.5 hp, ×1.2 speed, cooldowns ×0.75, purple aura via the
+  élite ring, «· corrupto» on the bar. `el` already rides `zb` for bosses.
+- `__boxhead.ponVida(id, pc)` sets an enemy's health for tests.

@@ -200,7 +200,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 4, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 5, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
@@ -719,6 +719,13 @@
         if (Math.random() < 0.6) fx.chispas(e.x + dv[0] * 8, e.y + dv[1] * 8 - 14, Math.atan2(sy - e.y, sx - e.x), 3, 10, '#dfe6ee');
       }
     }
+    /* Punto débil de los jefes: por la espalda (a más de 120° de hacia
+       donde mira) o mientras avisa una habilidad (est 2) cada golpe vale más. */
+    if (D.esJefe(e.k)) {
+      const dv = DIRS[e.d || 0], l = hyp(sx - e.x, sy - e.y);
+      const espalda = Number.isFinite(sx) && l > 0 && ((sx - e.x) * dv[0] + (sy - e.y) * dv[1]) / (l * hyp(dv[0], dv[1])) < -0.5;
+      if (espalda || e.est === 2) { d *= D.DEBIL; e.debil = 0.25; }
+    }
     e.flash = 0.1;
     armaUlt = w;
     anotaDano(e, d);
@@ -986,6 +993,8 @@
       e.el = D.eliteDe(k, n, rn(), rn());
       if (e.el) { e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
     }
+    // La segunda vuelta de los jefes (desde el nivel 51): corruptos.
+    if (jefe && D.corrupto(n)) { e.el = D.ELITE_CORRUPTO; e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
     if (C.cava) { e.est = 1; e.estT = 0; }            // nace bajo tierra
     if (C.cura || C.vigia) { e.cdH = C.cd * rz(0.5, 1); e.est = 0; e.estT = 0; }
     if (!C.cava) desatasca(e, C.radio - 1);
@@ -1155,12 +1164,16 @@
       if (!(e.hitos & 2) && pc < 0.33) { e.hitos |= 2; for (let i = 0; i < 3; i++) invoca(e, 5, n); son('jefe'); }
     }
     if (C.hab === 'roca' && !e.furia && pc < 0.4) { e.furia = true; e.est = 5; son('jefe'); }
+    // Bajo el 50 % (o corrupto desde el comienzo) alterna con su segunda habilidad.
+    const dos = !!C.hab2 && (pc < 0.5 || e.el === D.ELITE_CORRUPTO);
+    if (dos && !(e.hitos & 4)) { e.hitos |= 4; if (pc < 0.5) { son('jefe'); sacude = Math.min(10, sacude + 3); } }
     if (e.ring2 > 0 && (e.ring2 -= dt) <= 0) { for (let i = 0; i < 10; i++) bola(e, (i + 0.5) / 10 * Math.PI * 2, 150, C.fuego); son('fuego'); }
     const libre = e.est === 0 || e.est === 5;
-    if (libre) e.cdH -= dt * (e.furia ? 2 : 1);
+    if (libre) e.cdH -= dt * (e.furia ? 2 : 1) / (e.el ? D.ELITES[e.el].cd || 1 : 1);
     if (libre && e.cdH <= 0) {
-      const ve = despejado(e.x, e.y, t.x, t.y);
-      switch (C.hab) {
+      const ve = despejado(e.x, e.y, t.x, t.y), h = dos && e.alt ? C.hab2 : C.hab, est0 = e.est;
+      e.hab = h;
+      switch (h) {
         case 'embiste': if (dd < 360 && ve) { e.est = 2; e.estT = 0.8; e.ang = a; } break;
         case 'invoca': if (hijosDe(e) < 8) { e.est = 2; e.estT = 0.7; } break;
         case 'anillo': e.est = 2; e.estT = 0.6; break;
@@ -1175,13 +1188,14 @@
         case 'hidra': if (dd < 380 && ve) { for (let i = -2; i <= 2; i++) bola(e, a + i * 0.22, 160, C.fuego); e.atk = 0.3; son('fuego'); e.cdH = C.cd; } break;
         case 'roca': if (dd < 420) { e.est = 2; e.estT = 0.5; e.ang = a; } break;
       }
+      if (dos && (e.est !== est0 || e.cdH > 0)) e.alt = !e.alt;   // salió: la próxima es la otra
       if (e.cdH <= 0 && (e.est === 0 || e.est === 5)) e.cdH = 0.5;   // no pudo: lo vuelve a mirar en un rato
       return e.est !== 0 && e.est !== 5;
     }
     if (libre) return false;
     e.d = D.dirDe(Math.cos(e.ang ?? a), Math.sin(e.ang ?? a));
     if (e.est === 3) {
-      if (C.hab === 'espiral') {
+      if ((e.hab || C.hab) === 'espiral') {
         e.estT -= dt; e.cdB -= dt;
         while (e.cdB <= 0) {
           e.cdB += 0.09; e.ang += 0.45;
@@ -1197,12 +1211,12 @@
     // Termina el aviso: la habilidad sale.
     const fin = e.furia ? 5 : 0;
     e.est = fin; e.cdH = C.cd; e.atk = 0.3;
-    switch (C.hab) {
+    switch (e.hab || C.hab) {
       case 'embiste': {
         const b = e.ang; e.est = 3; e.estT = 0.9; e.vx = Math.cos(b) * 330; e.vy = Math.sin(b) * 330; e.pego = false; son('jefe');
         break;
       }
-      case 'invoca': for (let i = 0; i < 3; i++) invoca(e, 0, n); son('jefe'); break;
+      case 'invoca': for (let i = 0; i < 3; i++) invoca(e, C.invoca || 0, n); son('jefe'); break;
       case 'anillo': for (let i = 0; i < 10; i++) bola(e, i / 10 * Math.PI * 2, 150, C.fuego); if (pc < 0.5) e.ring2 = 0.35; son('fuego'); break;
       case 'salta': {
         const p = libreJefe(e, t.x, t.y);
@@ -1738,6 +1752,7 @@
     }
     for (const e of E.values()) {
       if (e.sac > 0) e.sac = Math.max(0, e.sac - dt * 2.5);
+      if (e.debil > 0) e.debil -= dt;
       e.tb = (e.tb || 0) + ((e.aturd > 0 ? 1 : 0) - (e.tb || 0)) * Math.min(1, dt * (e.aturd > 0 ? 18 : 7));
       // lo que se dibuja gira y ataca suave, no a saltos de 45°
       e.av = e.av === undefined ? angDir(e.d) : giraHacia(e.av, angDir(e.d), dt * 12);
@@ -2076,12 +2091,21 @@
       cx.beginPath(); cx.ellipse(e.x, e.y, 13 * ta, 6.5 * ta, 0, 0, 7); cx.stroke();
       cx.globalAlpha = 1;
     }
+    // El punto débil del jefe: un brillo amarillo en la espalda (delante del cuerpo solo si la espalda da a la cámara).
+    const debil = jf ? () => {
+      const dv = DIRS[e.d || 0], l = hyp(dv[0], dv[1]) || 1, rg = (Cj.rg || 18) * 0.55;
+      const pul = 0.5 + 0.5 * Math.sin(T * 7 + e.id), bx = e.x - dv[0] / l * rg, by = e.y - dv[1] / l * rg * 0.6 - 22 * ta;
+      cx.fillStyle = 'rgba(255,214,90,' + ((e.debil > 0 ? 0.95 : 0.35 + 0.35 * pul)).toFixed(2) + ')';
+      cx.beginPath(); cx.moveTo(bx, by - 4); cx.lineTo(bx + 3.2, by); cx.lineTo(bx, by + 4); cx.lineTo(bx - 3.2, by); cx.closePath(); cx.fill();
+    } : null;
+    if (debil && DIRS[e.d || 0][1] > 0) debil();
     const quieto = e.aa > 0.5 || e.aturd > 0;
     G.humanoide(cx, e.x, e.y, e.av ?? angDir(e.d), G.PAL_E[e.k] || G.PAL_E[0], {
       t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: Math.max(e.tb || 0, e.sac || 0),
       flash: e.flash > 0, talla: ta * ESC, brillo: e.k === 4 ? 0.5 + 0.5 * Math.sin(T * 10 + e.id) : 0
     });
     cx.globalAlpha = 1;
+    if (debil && DIRS[e.d || 0][1] <= 0) debil();
     if (jf || !(e.hp < e.max)) return;   // la vida del jefe va arriba, en grande
     const hy = e.y - 54 * ta;
     cx.fillStyle = 'rgba(0,0,0,.7)'; cx.fillRect(e.x - 10, hy - 0.5, 20, 3.5);
@@ -2294,12 +2318,12 @@
       jefesVistos.add(e.id);
       if (jefesVistos.size > 60) jefesVistos.delete(jefesVistos.values().next().value);
       const C = D.ENEMIGOS[e.k];
-      banner((C.jefe === 'grande' ? '☠ ' : '⚠ ') + C.nombre);
+      banner((C.jefe === 'grande' ? '☠ ' : '⚠ ') + C.nombre + (e.el === D.ELITE_CORRUPTO ? ' corrupto' : ''));
       premio(C.txt || '');
       son('jefe'); sacude = Math.min(10, sacude + 4);
       consejo('jefe');
     }
-    const f = js.map(e => e.id + ':' + Math.round(100 * e.hp / e.max)).join(',');
+    const f = js.map(e => e.id + ':' + Math.round(100 * e.hp / e.max) + ':' + (e.el || 0)).join(',');
     if (f === firmaJefe) return;
     firmaJefe = f;
     const b = $('jefeBar');
@@ -2308,7 +2332,7 @@
     for (const e of js.slice(0, 3)) {
       const C = D.ENEMIGOS[e.k], d = document.createElement('div');
       d.className = 'fila-j ' + C.jefe;
-      const n = document.createElement('div'); n.textContent = C.nombre;
+      const n = document.createElement('div'); n.textContent = C.nombre + (e.el === D.ELITE_CORRUPTO ? ' · corrupto' : '');
       const tu = document.createElement('div'); tu.className = 'tubo';
       const i = document.createElement('i'); i.style.width = clamp(100 * e.hp / e.max, 0, 100).toFixed(1) + '%';
       tu.appendChild(i); d.append(n, tu); b.appendChild(d);
@@ -2719,6 +2743,7 @@
     calma: () => { if (!ONLINE) { dir.n = nivelObjetivo(); dir.q = 0; E.clear(); O.clear(); } },
     ponYo: (x, y) => { yo.x = x; yo.y = y; },
     enemigo: (k, x, y) => (ONLINE ? null : nuevoEnemigo(Math.max(1, dir.n), k, x, y).id),
+    ponVida: (id, pc) => { const e = E.get(id); if (e && !ONLINE) e.hp = e.max * pc; },
     pon: (k, x, y) => { if (!ONLINE) peticion(cfg.yo, { pon: [D.ARMAS.findIndex(a => a.obj === k), x, y] }); },
     objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max, bl: o.bl || 0 })),
     // la tienda: puntos para probar, y lo comprado

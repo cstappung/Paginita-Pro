@@ -159,26 +159,29 @@
        director al empezar un nivel que termina en 5 (mini) o en 0 (grande).
        `radio` es el de chocar con los muros, como los demás, para que
        quepan por los pasillos; `rg` es el de recibir balas y morder, y
-       `talla` la escala del dibujo. `hab` dice qué hace y `cd` cada cuánto. */
-    { id: 6, nombre: 'El Carnicero', jefe: 'mini', hab: 'embiste', cd: 4.5, vida: 900, vel: 50, velMax: 70, golpe: 20, radio: 13, rg: 20, talla: 1.6, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+       `talla` la escala del dibujo. `hab` dice qué hace y `cd` cada cuánto.
+       `hab2`: la segunda habilidad, que alterna con la primera bajo el 50 %
+       de vida (o desde el comienzo si es corrupto); `invoca`: a quién levanta
+       la habilidad 'invoca' (zombis si no dice). */
+    { id: 6, nombre: 'El Carnicero', jefe: 'mini', hab: 'embiste', hab2: 'pisoton', onda: 80, dOnda: 30, cd: 4.5, vida: 900, vel: 50, velMax: 70, golpe: 20, radio: 13, rg: 20, talla: 1.6, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
       txt: 'se agacha, brilla y embiste en línea recta' },
-    { id: 7, nombre: 'El Nigromante', jefe: 'mini', hab: 'invoca', cd: 6.5, vida: 700, vel: 38, velMax: 56, golpe: 12, radio: 12, rg: 18, talla: 1.45, fuego: 12, cadFuego: 3, alcFuego: 300, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+    { id: 7, nombre: 'El Nigromante', jefe: 'mini', hab: 'invoca', hab2: 'anillo', cd: 6.5, vida: 700, vel: 38, velMax: 56, golpe: 12, radio: 12, rg: 18, talla: 1.45, fuego: 12, cadFuego: 3, alcFuego: 300, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
       txt: 'levanta zombis del suelo a su alrededor' },
-    { id: 8, nombre: 'La Bruja', jefe: 'mini', hab: 'anillo', cd: 4, vida: 750, vel: 44, velMax: 62, golpe: 12, radio: 12, rg: 18, talla: 1.45, fuego: 14, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+    { id: 8, nombre: 'La Bruja', jefe: 'mini', hab: 'anillo', hab2: 'salta', cd: 4, vida: 750, vel: 44, velMax: 62, golpe: 12, radio: 12, rg: 18, talla: 1.45, fuego: 14, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
       txt: 'lanza anillos de fuego; dos seguidos cuando está herida' },
-    { id: 9, nombre: 'La Larva Madre', jefe: 'mini', hab: 'cria', cd: 5, vida: 1000, vel: 30, velMax: 44, golpe: 16, radio: 14, rg: 22, talla: 1.7, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+    { id: 9, nombre: 'La Larva Madre', jefe: 'mini', hab: 'cria', hab2: 'hidra', fuego: 10, acido: true, cd: 5, vida: 1000, vel: 30, velMax: 44, golpe: 16, radio: 14, rg: 22, talla: 1.7, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
       txt: 'pare corredores, y al morir revienta en más' },
-    { id: 10, nombre: 'El Espectro', jefe: 'mini', hab: 'salta', cd: 5, vida: 650, vel: 60, velMax: 80, golpe: 14, radio: 11, rg: 17, talla: 1.4, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+    { id: 10, nombre: 'El Espectro', jefe: 'mini', hab: 'salta', hab2: 'embiste', cd: 5, vida: 650, vel: 60, velMax: 80, golpe: 14, radio: 11, rg: 17, talla: 1.4, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
       txt: 'se desvanece y reaparece a tu lado' },
-    { id: 11, nombre: 'El Coloso', jefe: 'grande', hab: 'pisoton', cd: 5, vida: 3200, vel: 36, velMax: 52, golpe: 30, radio: 14, rg: 28, talla: 2.2, onda: 110, dOnda: 45, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+    { id: 11, nombre: 'El Coloso', jefe: 'grande', hab: 'pisoton', hab2: 'roca', cd: 5, vida: 3200, vel: 36, velMax: 52, golpe: 30, radio: 14, rg: 28, talla: 2.2, onda: 110, dOnda: 45, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'pisa el suelo y lanza una onda; marca el círculo antes' },
-    { id: 12, nombre: 'La Reina de la Colmena', jefe: 'grande', hab: 'enjambre', cd: 6, vida: 2800, vel: 32, velMax: 46, golpe: 22, radio: 14, rg: 26, talla: 2, fuego: 12, cadFuego: 2.5, alcFuego: 340, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+    { id: 12, nombre: 'La Reina de la Colmena', jefe: 'grande', hab: 'enjambre', hab2: 'anillo', cd: 6, vida: 2800, vel: 32, velMax: 46, golpe: 22, radio: 14, rg: 26, talla: 2, fuego: 12, cadFuego: 2.5, alcFuego: 340, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'pare enjambres de corredores y explosivos' },
-    { id: 13, nombre: 'El Archidiablo', jefe: 'grande', hab: 'espiral', cd: 6, vida: 3000, vel: 42, velMax: 58, golpe: 24, radio: 14, rg: 26, talla: 2.1, fuego: 16, cadFuego: 1.6, alcFuego: 420, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+    { id: 13, nombre: 'El Archidiablo', jefe: 'grande', hab: 'espiral', hab2: 'invoca', invoca: 1, cd: 6, vida: 3000, vel: 42, velMax: 58, golpe: 24, radio: 14, rg: 26, talla: 2.1, fuego: 16, cadFuego: 1.6, alcFuego: 420, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'gira soltando una espiral de fuego y dispara en abanico' },
-    { id: 14, nombre: 'La Hidra', jefe: 'grande', hab: 'hidra', cd: 3.5, vida: 3400, vel: 30, velMax: 44, golpe: 22, radio: 14, rg: 28, talla: 2.2, fuego: 12, acido: true, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+    { id: 14, nombre: 'La Hidra', jefe: 'grande', hab: 'hidra', hab2: 'pisoton', onda: 100, dOnda: 40, cd: 3.5, vida: 3400, vel: 30, velMax: 44, golpe: 22, radio: 14, rg: 28, talla: 2.2, fuego: 12, acido: true, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'escupe ácido en cinco direcciones; al perder vida le brotan escupidores' },
-    { id: 15, nombre: 'El Titán', jefe: 'grande', hab: 'roca', cd: 3, vida: 4000, vel: 34, velMax: 50, golpe: 34, radio: 14, rg: 30, talla: 2.4, onda: 70, dOnda: 40, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+    { id: 15, nombre: 'El Titán', jefe: 'grande', hab: 'roca', hab2: 'pisoton', cd: 3, vida: 4000, vel: 34, velMax: 50, golpe: 34, radio: 14, rg: 30, talla: 2.4, onda: 70, dOnda: 40, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'lanza rocas que estallan donde caen; herido, se enfurece' },
     /* El Demoledor: el único que va derecho a tus muros y barriles (`rompe`)
        y los tira a mazazos (`dObj`: cuánto más daño les hace). Los demás
@@ -213,7 +216,11 @@
     { id: 2, nombre: 'Veloz', vida: 1.2, vel: 1.45, color: '#f2d94e' },
     { id: 3, nombre: 'Vampiro', vida: 1.4, vel: 1.05, cura: 0.2, color: '#e0303a' },
     { id: 4, nombre: 'Divisor', vida: 1.4, vel: 1, partes: 2, color: '#6ee05a' },
-    { id: 5, nombre: 'Ígneo', vida: 1.3, vel: 1, revienta: { r: 56, d: 26 }, color: '#ff8a1f' }];
+    { id: 5, nombre: 'Ígneo', vida: 1.3, vel: 1, revienta: { r: 56, d: 26 }, color: '#ff8a1f' },
+    // solo jefes: la segunda vuelta de la rotación (desde el nivel 51) los trae corruptos
+    { id: 6, nombre: 'Corrupto', vida: 1.5, vel: 1.2, cd: 0.75, color: '#b04dff', jefe: true }];
+  const CORRUPTO_DESDE = 51, ELITE_CORRUPTO = 6;
+  const corrupto = n => n >= CORRUPTO_DESDE;
   const parteElites = n => (n < 12 ? 0 : Math.min(0.12, 0.05 + 0.007 * (n - 12)));
   // ¿Sale élite? `r1` decide si, `r2` cuál (los dos en [0, 1)).
   const eliteDe = (k, n, r1, r2) => (!ENEMIGOS[k] || ENEMIGOS[k].jefe || ENEMIGOS[k].grupo || r1 >= parteElites(n) ? 0 : 1 + Math.min(4, Math.floor(r2 * 5)));
@@ -592,7 +599,10 @@
      ×2). 60 de base como mínimo: el estallido y la bala ígnea. Barriles y
      cargas suman la pólvora extra (×1,5 en daño y radio). El director
      recorta a esto lo que le llega de los demás. */
-  const TOPE_VENTAJAS = 1.5 * 1.4 * 1.3 * 2;
+  /* Punto débil de los jefes: por la espalda, o mientras avisan una
+     habilidad (est 2), cada golpe vale `DEBIL` veces. Entra en el tope. */
+  const DEBIL = 1.5;
+  const TOPE_VENTAJAS = 1.5 * 1.4 * 1.3 * 2 * DEBIL;
   function armaTope(w) {
     const a = ARMAS[w];
     if (!a) return null;
@@ -608,7 +618,7 @@
 
   return {
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
-    ELITES, parteElites, eliteDe, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
+    ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio
   };
