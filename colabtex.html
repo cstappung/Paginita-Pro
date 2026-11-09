@@ -107,7 +107,7 @@
   body.resizing iframe,body.resizing canvas{pointer-events:none}
 
   /* árbol de archivos */
-  .ed-files{width:200px;flex-shrink:0;background:var(--ed-panel);border-right:1px solid var(--ed-border);display:flex;flex-direction:column;overflow:auto}
+  .ed-files{width:200px;flex-shrink:0;background:var(--ed-panel);border-right:1px solid var(--ed-border);display:flex;flex-direction:column;overflow:hidden}
   .ed-files-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px;font-size:10.5px;font-weight:700;letter-spacing:0.07em;color:var(--ed-com)}
   .tree-btn{width:20px;height:20px;border:none;border-radius:4px;background:transparent;color:var(--ed-muted);cursor:pointer;font-size:12px}
   .tree-btn:hover{background:var(--ed-hover)}
@@ -123,8 +123,12 @@
   .folder-entry{color:var(--ed-panel-fg);font-weight:600}
   .folder-arrow{flex-shrink:0;width:12px;font-size:10px;color:var(--ed-com)}
   /* arrastrar y soltar. #fileTree ocupa el resto del panel para que el hueco
-     de debajo también sirva de destino: soltar ahí saca a la raíz. */
-  #fileTree{flex:1;min-height:60px}
+     de debajo también sirva de destino: soltar ahí saca a la raíz.
+     Desplaza solo él: con el panel entero desplazable y min-height de 60px,
+     un proyecto con muchos archivos se salía de su caja y quedaba encima
+     del esquema, que además se movía con la lista. */
+  #fileTree{flex:1 1 0;min-height:60px;overflow-y:auto;overflow-x:hidden}
+  #outlineHead{flex-shrink:0;border-top:1px solid var(--ed-border)}
   #outline{max-height:40%;overflow:auto;padding-bottom:8px;flex-shrink:0}
   .outline-row{font-size:12px;line-height:1.5;padding:2px 10px;color:var(--ed-panel-fg);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .outline-row:hover{background:var(--ed-hover)}
