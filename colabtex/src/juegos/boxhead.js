@@ -14,7 +14,8 @@ import { BX_ARMAS } from "./motor.js";
      posición de cada uno, sus disparos y, en el estado de quien dirige, los
      enemigos. Nada de eso pasa por la base.
    - **Al registro va solo lo que decide la partida**: `muere` (escrito por
-     quien muere) y `nivel` (escrito por quien dirige al limpiar uno).
+     quien muere), `nivel` (escrito por quien dirige al limpiar uno) y
+     `revive` (escrito por quien levanta a un compañero caído).
    - **La configuración espera a que la sala arranque**: antes el marco no
      sabe cuántos van a estar, y cuántos son decide cuántos enemigos salen. */
 const PADRE = "boxhead-padre", HIJO = "boxhead-hijo";
@@ -73,6 +74,8 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       anota(j);
     } else if (d.tipo === "nivel" && Number.isInteger(d.n) && d.n > 1 && d.n < 1e4) {
       anota({ t: "nivel", uid, n: d.n });
+    } else if (d.tipo === "revive" && typeof d.v === "string" && d.v.length <= 64) {
+      anota({ t: "revive", uid, v: d.v });
     }
   }
 
@@ -165,7 +168,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-18";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-19";
     host.append(aviso, redEl, frame);
   }
 

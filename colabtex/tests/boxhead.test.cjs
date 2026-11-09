@@ -598,3 +598,21 @@ test('mapas de la Fase 3.4: nueve mapas, cintas que empujan y el Apagón a oscur
  assert.ok(yo.x-x>D.VEL_CINTA*0.4&&Math.abs(yo.y-y)<1,'empujado hacia el este: '+(yo.x-x));
  bx.mapa('patio');
 });
+
+test('boxhead coop (Fase 3.5): un compañero en pie revive al caído',()=>{
+ const p=sala(3);let e=reducir(p);
+ e=mover(p,{t:'muere',uid:'a',pts:10,k:1,n:1,a:8,por:''});
+ assert.deepEqual(copia(e.caidos),['a']);
+ // nadie se revive a sí mismo, ni un caído revive, ni se revive a quien está en pie
+ e=mover(p,{t:'revive',uid:'a',v:'a'});assert.deepEqual(copia(e.caidos),['a']);
+ e=mover(p,{t:'revive',uid:'b',v:'c'});assert.deepEqual(copia(e.caidos),['a']);
+ e=mover(p,{t:'muere',uid:'b',pts:5,k:1,n:1,a:8,por:''});
+ e=mover(p,{t:'revive',uid:'b',v:'a'});assert.deepEqual(copia(e.caidos).sort(),['a','b'],'un caído no revive');
+ // c, en pie, levanta a los dos
+ e=mover(p,{t:'revive',uid:'c',v:'a'});e=mover(p,{t:'revive',uid:'c',v:'b'});
+ assert.deepEqual(copia(e.caidos),[]);assert.equal(e.revividas.c,2);assert.equal(e.fase,'jugando');
+ assert.ok(e.hist.some(h=>h.e==='revive'&&h.uid==='c'&&h.v==='a'));
+ // si caen todos, se acabó: ya no hay a quién revivir
+ for(const u of ['a','b','c'])e=mover(p,{t:'muere',uid:u,pts:1,k:0,n:1,a:8,por:''});
+ assert.equal(e.fase,'fin');
+});

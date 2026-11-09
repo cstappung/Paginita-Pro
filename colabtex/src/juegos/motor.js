@@ -6854,7 +6854,7 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   const variante = varianteBoxhead(p), meta = metaBoxhead(p), mapa = mapaBoxhead(p);
   const coop = variante === "coop";
   const entero = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
-  const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {};
+  const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {}, revividas = {};
   for (const u of ids) { bajas[u] = 0; muertes[u] = 0; pts[u] = 0; kills[u] = 0; }
   const hist = [];
   let nivel = 1, ganador = null, motivo = "";
@@ -6889,6 +6889,18 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
         hist.push({ e: "nivel", n: nivel });
         continue;
       }
+      /* Revivir (Fase 3.5): un compañero en pie que pasó 3 s junto al caído
+         lo levanta. Lo escribe quien revive; no vale sobre sí mismo, sobre
+         alguien en pie o que se fue, ni si quien revive está caído. */
+      if (j.t === "revive") {
+        const v = j.v;
+        if (typeof v === "string" && v !== u && caidos[v] && !caidos[u] && !fuera[v]) {
+          delete caidos[v];
+          revividas[u] = (revividas[u] || 0) + 1;
+          hist.push({ e: "revive", uid: u, v });
+        }
+        continue;
+      }
       if (j.t !== "muere" || caidos[u]) continue;
       muertes[u]++;
       caidos[u] = true;
@@ -6917,7 +6929,7 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
     variante, meta, mapa, nivel,
     caidos: Object.keys(caidos).filter(u => !fuera[u]),
-    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera,
+    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera, revividas,
     hist: hist.slice(-40), ganador: ganador === null ? null : ganador, motivo
   };
 }

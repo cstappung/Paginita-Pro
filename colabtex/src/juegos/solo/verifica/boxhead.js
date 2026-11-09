@@ -20,7 +20,7 @@ export const PRUEBA = 1;
 
 const MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto'];
 const CATEGORIA = /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/;
-const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-18';
+const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-19';
 export const MAX_NIVEL = 999;
 
 let trabajador = null, serie = 0;

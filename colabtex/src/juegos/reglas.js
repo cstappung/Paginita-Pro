@@ -746,6 +746,10 @@ const REGLAS = {
         "Comprar no baja tus puntos: la chatarra es aparte. La que no gastes aparece en la pantalla final."
       ])],
       ["Mapas", "Nueve, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza, Laberinto, Planta, Hangar, Fábrica y Apagón. En la <b>Fábrica</b> las cintas transportadoras (las franjas con flechas) te arrastran a ti y a los zombis; en el <b>Apagón</b> se cortó la luz y solo se ve alrededor de los jugadores, del fuego y de las explosiones. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],
+      ["En equipo", lista([
+        "En la sala cooperativa, quien cae deja una tumba. Si un compañero se queda <b>3 segundos junto a ella</b> (se llena un anillo verde), lo <b>revive</b> ahí mismo con media vida. Si nadie llega, vuelve al empezar el nivel siguiente; si caen todos, se acabó.",
+        "<b>T</b> pone un marcador <b>«¡Aquí!»</b> un poco delante de ti, con tu color y tu nombre, que ven todos durante cuatro segundos."
+      ])],
       ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
       ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los nueve mapas. Al terminar muestra cómo jugaste: multiplicador máximo, precisión, jefes y tu arma favorita."],
       ["Opciones", "En la pausa: la música (y su volumen; sube con la acción y cambia con los jefes), los números de daño, la vibración del mando y los consejos, que salen una sola vez cada uno cuando vienen al caso (activarlos de nuevo los vuelve a mostrar)."]

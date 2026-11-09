@@ -383,3 +383,22 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
 - Medal Trotamundos (and skin Careta) stays on `MAPAS_CLASICOS`, the original
   five.
 - `__boxhead.mapa(id)` picks the next practice's map.
+
+## Phase 3.5a: coop revive and markers (`boxhead-19`)
+
+- **Revive** is a log entry `{t:"revive", uid, v}` written by the reviver
+  (the rules already accept any `t` ≤ 16 chars: no rules change). `redBoxhead`
+  accepts it only when `v` is fallen, not gone, not the writer, and the writer
+  is standing; it clears `caidos[v]`, counts `revividas`, pushes `hist`
+  `{e:"revive"}`. Game side: `pasoRevive` fills a ring while you stand within
+  28 px of a fallen teammate's tomb for `REVIVIR_T` (3 s), then `enviar('revive')`
+  once per 5 s per target. The fallen player notices through the marcador:
+  `vistoCaido` turns true when `caidos` includes them, and if they later drop
+  out of `caidos` on the same level they stand up in place with half health.
+  (Without `vistoCaido`, the gap before the log counted the death revived you
+  at once.)
+- **Markers**: T puts `ping` 70 px ahead; it rides the player state as
+  `pg: [x, y, n]` for 4 s and the others draw it with the player's colour.
+  Keyboard only for now.
+- Nothing of this touches the practice simulation (online only), so `VE` is
+  unchanged.

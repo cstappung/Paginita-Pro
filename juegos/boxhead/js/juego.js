@@ -69,6 +69,14 @@
   let cfg = null, M = null;
   let jugando = false, pausado = false, terminado = false;
   let marcador = { nivel: 1, caidos: [], bajas: {}, muertes: {}, puntos: {}, fuera: [], fin: null };
+  /* Revivir en cooperativo (Fase 3.5): 3 s junto a la tumba de un compañero
+     lo levantan (`revive` en el registro). `revive` lleva a quién y cuánto
+     llevo; `vistoCaido`: el registro ya me cuenta caído (si después deja de
+     contarme sin nivel nuevo, me revivieron). */
+  const REVIVIR_T = 3;
+  let revive = { u: '', t: 0, enviado: new Map() }, vistoCaido = false;
+  // Un marcador «¡aquí!» (T): viaja en mi estado unos segundos.
+  let ping = null, pingN = 0;
   /* Medallas (D.MEDALLAS) y récords por mapa de la práctica: del
      dispositivo, también sin cuenta. Rehaciendo una prueba o mirando no
      se gana nada. */
@@ -231,6 +239,7 @@
     else if (e.code === 'KeyX') accion(3);
     else if (e.code === 'KeyF') accion(4);
     else if (e.code === 'KeyU') accion(5, yo.w);
+    else if (e.code === 'KeyT') marcaAqui();
     else if (TECLA_ARMA[e.code] !== undefined) { const a = D.ARMAS_J[TECLA_ARMA[e.code]]; if (a) accion(2, a.id); }
     else { const t = TECLA_TIENDA[e.code]; if (t) accion(6, idxTienda(t)); }
   });
@@ -456,6 +465,7 @@
       }
     }
     yo.x = p.x; yo.y = p.y; yo.hp = hpMax(); yo.v = true; yo.muerto = false; yo.inv = 2;
+    vistoCaido = false;
   }
 
   function empieza() {
@@ -874,7 +884,7 @@
     else {
       yo.nivelMuerte = marcador.nivel || 1;
       enviar('muere', { pts: yo.pts | 0, k: yo.k | 0, n: marcador.nivel || 1, w: w | 0, por: por || '' });
-      banner('CAÍSTE · VUELVES EN EL PRÓXIMO NIVEL');
+      banner(activos().length > 1 ? 'CAÍSTE · UN COMPAÑERO PUEDE REVIVIRTE' : 'CAÍSTE · VUELVES EN EL PRÓXIMO NIVEL');
     }
   }
 
@@ -1648,6 +1658,9 @@
       r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0; r.nv = clamp(s.nv | 0, 0, D.NIVEL_ARMA.max);
       r.pts = s.pts | 0; r.k = s.k | 0; r.mul = s.mul | 0; r.sk = s.sk; r.mv = !!s.mv; r.h = !!s.h;
       if (s.pz) { if (!r.pz) r.pzDesde = Date.now(); r.pz = true; } else r.pz = false;
+      if (Array.isArray(s.pg) && Number.isFinite(+s.pg[0]) && Number.isFinite(+s.pg[1])) {
+        if (r.pgN !== s.pg[2]) { r.pgN = s.pg[2]; r.pg = { x: +s.pg[0], y: +s.pg[1], t: T }; son('clic', dist(+s.pg[0], +s.pg[1], yo.x, yo.y)); }
+      }
       if (dist(r.x, r.y, r.tx, r.ty) > TS * 4) { r.x = r.tx; r.y = r.ty; }
       // Golpes: la primera vez solo marca; después, lo que pase la marca.
       const g = Array.isArray(s.g) ? s.g.filter(Array.isArray) : [];
@@ -1762,6 +1775,15 @@
     const b = (marcador.bajas || {})[cfg.yo] | 0;
     if (versus() && b > misBajas) { premio('¡Baja! ' + b + ' de ' + (cfg.meta || marcador.meta)); son('premio'); }
     misBajas = b;
+    if (!versus() && yo.muerto && !terminado) {
+      if (marcador.caidos.includes(cfg.yo)) vistoCaido = true;
+      else if (vistoCaido && (marcador.nivel || 1) === yo.nivelMuerte) {
+        // me levantaron donde caí, con media vida
+        vistoCaido = false;
+        yo.v = true; yo.muerto = false; yo.hp = hpMax() * 0.5; yo.inv = 2;
+        banner('¡TE REVIVIERON!'); son('premio');
+      }
+    }
     if (marcador.fin && !terminado) acaba(marcador.fin);
     void antes;
   }
@@ -1787,6 +1809,7 @@
     };
     if (yo.nv[yo.w]) e.nv = yo.nv[yo.w];
     if (pausado && !cfg.mirando) e.pz = 1;
+    if (ping && T - ping.t < 4) e.pg = [ping.x, ping.y, ping.n];
     if (document.hidden) e.h = 1;
     const ahora = Date.now();
     misG = misG.filter(x => x[0] >= ahora - 3500).slice(-60);
@@ -1913,6 +1936,31 @@
       else { ocultas.add(b.id); B.delete(b.id); misG.push([nid(), 'p', 0, 0, { caja: b.id }]); }
       abreCaja(b.k);
     }
+    if (ONLINE && !versus()) pasoRevive(dt);
+  }
+  // Junto a la tumba de un compañero caído (a menos de 28 px) se llena el anillo; a los 3 s, lo revivo.
+  function pasoRevive(dt) {
+    let u = '', mejor = 28;
+    for (const [k, r] of R) {
+      if (r.v || !marcador.caidos.includes(k) || marcador.fuera.includes(k)) continue;
+      const d = dist(r.x, r.y, yo.x, yo.y);
+      if (d < mejor) { mejor = d; u = k; }
+    }
+    if (u !== revive.u) { revive.u = u; revive.t = 0; }
+    if (!u) return;
+    revive.t += dt;
+    if (revive.t >= REVIVIR_T && T - (revive.enviado.get(u) ?? -99) > 5) {
+      revive.enviado.set(u, T); revive.t = 0;
+      enviar('revive', { v: u });
+      premio('Reviviste a ' + nombreDe(u)); son('premio');
+    }
+  }
+  // «¡Aquí!»: un marcador en el suelo, un poco delante de donde miro, que ven todos.
+  function marcaAqui() {
+    if (!ONLINE || !yo.v || yo.muerto) return;
+    const [dx, dy] = DIRS[yo.d];
+    ping = { x: Math.round(yo.x + dx * 70), y: Math.round(yo.y + dy * 70), t: T, n: ++pingN };
+    son('clic');
   }
 
   /* Lo que el jugador le pide al personaje en este paso. Rehaciendo una
@@ -2331,6 +2379,26 @@
       rotulo(nombreDe(u), r.x, r.y - 59, colorDe(u));
     }
     if (M.oscuro) oscuridad(cxv, cyv);
+    // marcadores «¡aquí!» (míos y de los demás) y el anillo de revivir
+    const pinta = (p, color, nom) => {
+      const q = (T - p.t) / 4, pul = 0.5 + 0.5 * Math.sin(T * 10);
+      cx.globalAlpha = clamp(1.2 - q, 0, 1);
+      cx.strokeStyle = color; cx.lineWidth = 2;
+      cx.beginPath(); cx.ellipse(p.x, p.y, 10 + 6 * pul, 5 + 3 * pul, 0, 0, 7); cx.stroke();
+      cx.fillStyle = color; cx.beginPath(); cx.moveTo(p.x, p.y - 8); cx.lineTo(p.x - 6, p.y - 20); cx.lineTo(p.x + 6, p.y - 20); cx.fill();
+      rotulo('¡Aquí! · ' + nom, p.x, p.y - 26, color);
+      cx.globalAlpha = 1;
+    };
+    if (ping && T - ping.t < 4) pinta(ping, colorDe(cfg.yo), 'tú');
+    for (const [u, r] of R) if (r.pg && T - r.pg.t < 4) pinta(r.pg, colorDe(u), nombreDe(u));
+    if (revive.u && revive.t > 0) {
+      const r = R.get(revive.u);
+      if (r) {
+        cx.strokeStyle = 'rgba(0,0,0,.5)'; cx.lineWidth = 4; cx.beginPath(); cx.arc(r.x, r.y - 14, 15, 0, 7); cx.stroke();
+        cx.strokeStyle = '#7fe08a'; cx.lineWidth = 3; cx.beginPath(); cx.arc(r.x, r.y - 14, 15, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * clamp(revive.t / REVIVIR_T, 0, 1)); cx.stroke();
+        rotulo('Reviviendo…', r.x, r.y - 36, '#7fe08a');
+      }
+    }
     if (veoYo) {
       barraVida(yo.x, yo.y, yo.hp, yo.arm, hpMax());
       if (vt('dron') && yo.v && !yo.muerto) dibujaDron(yo.x + Math.cos(T * 2.4) * 20, yo.y - 40 + Math.sin(T * 4.8) * 3);
