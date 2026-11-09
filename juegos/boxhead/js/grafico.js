@@ -190,7 +190,17 @@
     { piel: '#5aaa48', camisa: '#2a6a24', panel: '#8ae05a', pantalon: '#16401a', pelo: '#0e2a10', ojos: '#b0ff3a', ojosLuz: 1, boca: '#a8ff4a', bocaLuz: 1, extra: 'cuernos', brazos: 'zombi', cabeza: 1.1, sangre: 2 },
     { piel: '#9a9aa2', camisa: '#5a5a62', panel: '#3a3a42', pantalon: '#2a2a30', pelo: '#3a3a40', ojos: '#ff4a1a', ojosLuz: 1, boca: '#1a1a1a', extra: 'casco', brazos: 'lado', ancho: 1.35, grueso: 1.35, sangre: 0 },
     // 16: el Demoledor, obrero zombi de casco amarillo, chaleco naranja y mazo
-    { piel: '#d9d4c4', camisa: '#ff7a1a', panel: '#e8f04a', pantalon: '#2f3f63', pelo: '#f2c40f', zapatos: '#3a2a1a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#4a1010', extra: 'casco', brazos: 'zombi', ancho: 1.22, grueso: 1.28, mazo: 1, sangre: 0 }
+    { piel: '#d9d4c4', camisa: '#ff7a1a', panel: '#e8f04a', pantalon: '#2f3f63', pelo: '#f2c40f', zapatos: '#3a2a1a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#4a1010', extra: 'casco', brazos: 'zombi', ancho: 1.22, grueso: 1.28, mazo: 1, sangre: 0 },
+    // 17: el Escudero, zombi con casco y un escudo de chapa remachada delante
+    { piel: '#c8cfc0', camisa: '#4a5260', panel: '#2e343e', pantalon: '#3a3f48', pelo: '#2a2d33', ojos: '#191919', boca: '#5a1c1c', extra: 'casco', brazos: 'zombi', escudo: '#8a8f98', ancho: 1.05, sangre: 0 },
+    // 18: el Enjambre, bichos chicos de caparazón verde oscuro
+    { piel: '#3e5a2a', camisa: '#22361a', panel: '#5a8a2a', pantalon: '#1a2a12', pelo: '#0e1a0a', ojos: '#d8ff4a', ojosLuz: 1, boca: '#0a1206', extra: 'cuernos', brazos: 'zombi', cabeza: 1.25, sangre: 2 },
+    // 19: el Chamán, capucha verde y fuego verde en las manos
+    { piel: '#b8c8a0', camisa: '#2a4a2a', panel: '#6ac04a', pantalon: '#1a2a1a', pelo: '#142414', ojos: '#9aff6a', ojosLuz: 1, boca: '#1a2a12', extra: 'capucha', brazos: 'lado', fuegoMano: 'morado', sangre: 0 },
+    // 20: el Excavador, minero zombi con casco de lámpara, cubierto de tierra
+    { piel: '#b0a088', camisa: '#6a5a40', panel: '#4a3e2c', pantalon: '#3e3426', pelo: '#e0b030', ojos: '#ffcf4a', ojosLuz: 1, boca: '#2a1a10', extra: 'casco', brazos: 'zombi', grueso: 1.1, sangre: 0 },
+    // 21: el Vigía, flaco, de gris, con un ojo rojo que apunta
+    { piel: '#9aa4ae', camisa: '#3a4048', panel: '#c02a2a', pantalon: '#2a2e34', pelo: '#ff2a2a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#1a1a1a', extra: 'antena', brazos: 'lado', ancho: 0.85, sangre: 3 }
   ];
   /* La sangre de cada cual: roja, la del diablo más oscura, verde el ácido. */
   const SANGRE = [[196, 14, 16], [120, 6, 10], [92, 150, 26], [70, 90, 150]];
@@ -313,6 +323,10 @@
       const b = op.brillo || 0, luz = 'rgb(255,' + Math.round(80 + 140 * b) + ',40)';
       for (const r of [-4.2, -1.4, 1.4, 4.2]) P.push({ r, f: 4.9 * gr, z: zt + 2, w: 2.4, d: 2, h: 6, c: '#c8321e', deco: { arriba: [[0.3, 0.3, 0.7, 0.7, '#f0e0b0']] } });
       P.push({ r: 0, f: 6.1 * gr, z: zt + 4, w: 3, d: 1, h: 2.4, c: luz, luz: 1 });
+    }
+    // el escudo del Escudero: una chapa delante del cuerpo, que gira con él
+    if (pal.escudo) {
+      P.push({ r: 0.5, f: 8.4 * gr, z: zt - 5, w: 15.5 * an, d: 2.2, h: 19, c: pal.escudo, deco: { frente: [[0.08, 0.08, 0.92, 0.92, rgbOscuro(pal.escudo)], [0.14, 0.14, 0.86, 0.86, pal.escudo], [0.44, 0.3, 0.56, 0.7, '#c9b46a']] } });
     }
     // brazos
     const rec = op.rec || 0, atk = op.atk || 0;

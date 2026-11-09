@@ -452,3 +452,57 @@ test('nicho de las armas: la uzi atraviesa a uno y el cohete pasa al primero y r
  assert.deepEqual(dispara(1),[true,true,false],'uzi: un disparo pega en dos');
  assert.deepEqual(dispara(6),[true,true,false],'cohete: atraviesa al primero, revienta en el segundo');
 });
+
+test('enemigos de la Fase 3: datos de los cinco nuevos y de las élites',()=>{
+ const por=n=>D.ENEMIGOS.find(e=>e.nombre===n);
+ for(const n of ['Escudero','Enjambre','Chamán','Excavador','Vigía'])assert.ok(por(n),n+' existe');
+ assert.ok(por('Escudero').escudo>0&&por('Escudero').escudo<1);
+ assert.equal(por('Enjambre').grupo,8);
+ assert.equal(D.ELITES[0],null);
+ for(let i=1;i<D.ELITES.length;i++){const el=D.ELITES[i];assert.equal(el.id,i);assert.ok(el.vida>=1&&el.vel>=1);assert.match(el.color,/^#[0-9a-f]{6}$/i);}
+ for(let n=1;n<=80;n++){
+  const p=D.parteElites(n);assert.ok(p>=0&&p<=0.12,'parte '+n);
+  if(n<12)assert.equal(p,0);
+  for(const e of D.ENEMIGOS){
+   const r=D.eliteDe(e.id,n,0,0.99);
+   if(e.jefe||e.grupo||n<12)assert.equal(r,0,e.nombre+' en '+n+' no es élite');
+   else{assert.ok(r>=1&&r<D.ELITES.length);assert.equal(D.eliteDe(e.id,n,0.5,0.5),0,'r1 alto: común');}
+  }
+ }
+});
+
+test('enemigos de la Fase 3: el escudo para de frente, el excavador es inmune bajo tierra, el vigía dispara y el chamán cura',()=>{
+ const bx=boxheadSinPantalla();
+ const pista={dx:0,dy:0,vel:1,mira:0,fija:true,disp:false};
+ function prepara(){bx.practica(1);bx.inmortal(true);bx.armas();bx.calma();bx.elige(0);bx.entrada(pista);for(let i=0;i<12;i++)bx.paso(1/60);return bx.mundo().yo;}
+ const tiro=()=>{bx.entrada({...pista,disp:true});bx.paso(1/60);bx.entrada(pista);};
+ const de=id=>bx.mundo().E.find(e=>e.id===id);
+ // Escudero de frente contra un zombi común: el mismo tiro le quita un 20 %.
+ function pierde(k){const yo=prepara();const id=bx.enemigo(k,yo.x+70,yo.y);for(let i=0;i<20;i++)bx.paso(1/60);const h0=de(id).hp;tiro();return h0-de(id).hp;}
+ const comun=pierde(0),escudo=pierde(17);
+ assert.ok(comun>0,'el tiro pega');
+ assert.ok(Math.abs(escudo-comun*0.2)<1e-6,'de frente entra el 20 %: '+escudo+' de '+comun);
+ // Excavador: bajo tierra no se le pega; al salir sí.
+ let yo=prepara();
+ const ex=bx.enemigo(20,yo.x+200,yo.y);
+ assert.equal(de(ex).est,1,'nace bajo tierra');
+ const hx=de(ex).hp;tiro();for(let i=0;i<5;i++)bx.paso(1/60);
+ assert.equal(de(ex).hp,hx,'bajo tierra es inmune');
+ let n=0;while(de(ex)&&de(ex).est!==0&&n++<600)bx.paso(1/60);
+ assert.ok(de(ex)&&de(ex).est===0,'sale a la superficie');
+ const s=de(ex);yo=bx.mundo().yo;
+ bx.entrada({...pista,mira:dir8(s.x-yo.x,s.y-yo.y),disp:true});bx.paso(1/60);bx.entrada(pista);
+ for(let i=0;i<3;i++)bx.paso(1/60);
+ assert.ok(!de(ex)||de(ex).hp<hx,'afuera se le pega');
+ // Vigía: apunta y suelta una bala propia.
+ yo=prepara();
+ bx.enemigo(21,yo.x+150,yo.y);   // a la vista: retrocede hasta la pared y apunta
+ let bala=false;for(let i=0;i<60*6&&!bala;i++){bx.paso(1/60);bala=bx.mundo().F.some(f=>f.k===21);}
+ assert.ok(bala,'el vigía dispara');
+ // Chamán: el zombi herido a su lado recupera vida.
+ yo=prepara();
+ const z=bx.enemigo(0,yo.x+120,yo.y);bx.enemigo(19,yo.x+150,yo.y);
+ tiro();const hz=de(z).hp;assert.ok(hz<de(z).max,'el zombi quedó herido');
+ let curado=false;for(let i=0;i<60*3&&de(z)&&!curado;i++){bx.paso(1/60);curado=de(z)&&de(z).hp>hz;}
+ assert.ok(curado,'el chamán lo cura');
+});

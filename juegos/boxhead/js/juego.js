@@ -200,7 +200,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 3, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 4, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   const ACCIONES = [null, s => cicla(s < 0 ? -1 : 1), i => eligeArma(i | 0), () => detona(), () => ponBlindado(), i => subeArma(i | 0),
@@ -370,6 +370,8 @@
     return VEC;
   }
   const solidoEn = (x, y) => celda(Math.floor(x / TS), Math.floor(y / TS)) !== 0;
+  // El Excavador bajo tierra (est 1) o asomando (est 2): no se le puede pegar ni empujar.
+  const bajoTierra = e => e.est > 0 && !!D.ENEMIGOS[e.k].cava;
   function cajaObj(o) {
     if (o.k === 'muro') return [o.x - TS / 2, o.y - TS / 2, o.x + TS / 2, o.y + TS / 2];
     if (o.k === 'barril') return [o.x - 9, o.y - 9, o.x + 9, o.y + 9];
@@ -559,7 +561,7 @@
   function pasoDron(dt) {
     if ((yo.dronT -= dt) > 0) return;
     let t = null, dd = 230;
-    for (const e of E.values()) { const v = dist(yo.x, yo.y, e.x, e.y); if (v < dd && despejado(yo.x, yo.y, e.x, e.y)) { dd = v; t = e; } }
+    for (const e of E.values()) { const v = dist(yo.x, yo.y, e.x, e.y); if (v < dd && !bajoTierra(e) && despejado(yo.x, yo.y, e.x, e.y)) { dd = v; t = e; } }
     if (!t) { yo.dronT = 0.15; return; }
     yo.dronT = vt('dron') >= 2 ? 0.55 : 0.85;
     rayo(yo.x, yo.y, Math.atan2(t.y - yo.y, t.x - yo.x), 240, Math.round(14 * factorVentajas()), 0, 0);
@@ -593,7 +595,7 @@
       }
       if (pega) break;
       for (const e of vecinos(px, py)) {
-        if (heridos.has(e) || E.get(e.id) !== e) continue;
+        if (heridos.has(e) || E.get(e.id) !== e || bajoTierra(e)) continue;
         if ((px - e.x) ** 2 + (py - e.y) ** 2 < (RG(e.k) + 6) ** 2) {
           golpeaEnemigo(e, d, w, x, y); heridos.add(e); d *= 0.7;
           if (heridos.size > (pen || 0)) pega = true;
@@ -644,7 +646,7 @@
         let pega = p.t <= 0 || solidoEn(p.x, p.y);
         if (!pega) for (const o of O.values()) { const b = cajaObj(o); if (b && p.x > b[0] && p.x < b[2] && p.y > b[1] && p.y < b[3]) { pega = true; break; } }
         if (!pega) for (const e of E.values()) {
-          if (p.ya.has(e.id) || dist(p.x, p.y, e.x, e.y) >= RG(e.k) + 4) continue;
+          if (p.ya.has(e.id) || bajoTierra(e) || dist(p.x, p.y, e.x, e.y) >= RG(e.k) + 4) continue;
           if (p.pasa > 0 && !D.esJefe(e.k)) {
             p.pasa--; p.ya.add(e.id);
             if (p.mio && p.d) golpeaEnemigo(e, Math.round(p.d * 0.5), p.w, p.x - p.vx * 0.05, p.y - p.vy * 0.05);
@@ -666,7 +668,7 @@
   function explota(x, y, r, d, w, id, amigo) {
     efectoBoom(x, y, r);
     pend.x2.push([id, Math.round(x), Math.round(y), r]);
-    for (const e of [...E.values()]) { const dd = dist(x, y, e.x, e.y); if (dd < r + RG(e.k)) golpeaEnemigo(e, caida(dd, r, d), w, x, y); }
+    for (const e of [...E.values()]) { const dd = dist(x, y, e.x, e.y); if (dd < r + RG(e.k) && !bajoTierra(e)) golpeaEnemigo(e, caida(dd, r, d), w, x, y); }
     for (const o of [...O.values()]) { const dd = dist(x, y, o.x, o.y); if (dd < r && o.k !== 'carga') golpeaObjeto(o.id, caida(dd, r, d), w); }
     if (amigo) return;
     if (yo.v && !yo.muerto) { const dd = dist(x, y, yo.x, yo.y); if (dd < r) recibe(caida(dd, r, d) * (versus() ? 0.5 : 1 / 3), w, cfg.yo); }
@@ -705,7 +707,18 @@
   // ---------- golpes ----------
   // (sx, sy) es de dónde vino el golpe: hacia el otro lado sale despedido.
   function golpeaEnemigo(e, d, w, sx, sy) {
-    if (d <= 0) return;
+    if (d <= 0 || bajoTierra(e)) return;
+    /* El Escudero para de frente lo que no explota: si el golpe viene a
+       menos de 60° de hacia donde mira, entra solo una parte. Se calcula
+       aquí, en quien dispara (el director recibe el golpe ya reducido). */
+    const esc = D.ENEMIGOS[e.k].escudo;
+    if (esc && !ARMA_EXPLOTA(w) && Number.isFinite(sx) && (sx !== e.x || sy !== e.y)) {
+      const dv = DIRS[e.d || 0], l = hyp(sx - e.x, sy - e.y) || 1;
+      if (((sx - e.x) * dv[0] + (sy - e.y) * dv[1]) / (l * hyp(dv[0], dv[1])) > 0.5) {
+        d *= 1 - esc;
+        if (Math.random() < 0.6) fx.chispas(e.x + dv[0] * 8, e.y + dv[1] * 8 - 14, Math.atan2(sy - e.y, sx - e.x), 3, 10, '#dfe6ee');
+      }
+    }
     e.flash = 0.1;
     armaUlt = w;
     anotaDano(e, d);
@@ -964,10 +977,22 @@
     const jefe = D.esJefe(k);
     const max = jefe ? D.vidaJefe(k, n, Math.max(1, activos().length)) : D.vidaEnemigo(k, n);
     const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: rz(1, 3), flash: 0 };
-    if (jefe) { e.cdH = D.ENEMIGOS[k].cd; e.est = 0; e.estT = 0; e.hitos = 0; }
-    desatasca(e, D.ENEMIGOS[k].radio - 1);
+    const C = D.ENEMIGOS[k];
+    if (jefe) { e.cdH = C.cd; e.est = 0; e.estT = 0; e.hitos = 0; }
+    /* Élite: desde el nivel 12 una parte sale con un rasgo (más vida, más
+       rápido, vampiro, divisor, ígneo). Antes del 12 no se tira el dado:
+       así no cambia la secuencia de `rn` de los niveles bajos. */
+    if (!(kFijo >= 0) && n >= 12) {
+      e.el = D.eliteDe(k, n, rn(), rn());
+      if (e.el) { e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
+    }
+    if (C.cava) { e.est = 1; e.estT = 0; }            // nace bajo tierra
+    if (C.cura || C.vigia) { e.cdH = C.cd * rz(0.5, 1); e.est = 0; e.estT = 0; }
+    if (!C.cava) desatasca(e, C.radio - 1);
     e.tx = e.x; e.ty = e.y;
     E.set(e.id, e);
+    // El enjambre llega en grupo: los demás alrededor del primero.
+    if (C.grupo && !(kFijo >= 0)) for (let i = 1; i < C.grupo; i++) nuevoEnemigo(n, k, e.x + rz(-14, 14), e.y + rz(-14, 14));
     return e;
   }
   // Un invocado nace junto a quien lo llama, en un sitio libre.
@@ -1029,6 +1054,13 @@
     armaMuerte = -1;
     const C = D.ENEMIGOS[e.k];
     if (C.explota) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: C.radioExplota, d: C.explota, w: 3, u: quien || '' });
+    const El = e.el ? D.ELITES[e.el] : null;
+    if (El && El.revienta) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: El.revienta.r, d: El.revienta.d, w: 3, u: '' });
+    // El divisor se parte en dos copias comunes con menos vida.
+    if (El && El.partes) for (let i = 0; i < El.partes; i++) {
+      const h = nuevoEnemigo(dir.n, e.k, e.x + (i ? 9 : -9), e.y + rz(-6, 6));
+      h.max = h.hp = Math.max(1, Math.round(D.vidaEnemigo(e.k, Math.max(1, dir.n)) * 0.45)); h.cd = 0.6;
+    }
     if (C.jefe) {
       // El jefe suelta siempre un premio de cada clase.
       for (let i = 0; i < 3; i++) {
@@ -1059,7 +1091,7 @@
     efectoBoom(c.x, c.y, c.r);
     dir.x.push([nid(), Math.round(c.x), Math.round(c.y), c.r]); if (dir.x.length > 8) dir.x.shift();
     vistosX.add('z:' + dir.x[dir.x.length - 1][0]);
-    for (const e of [...E.values()]) { const dd = dist(c.x, c.y, e.x, e.y); if (dd < c.r + RG(e.k)) danaEnemigo(e.id, caida(dd, c.r, c.d), c.u, c.w, c.x, c.y); }
+    for (const e of [...E.values()]) { const dd = dist(c.x, c.y, e.x, e.y); if (dd < c.r + RG(e.k) && !bajoTierra(e)) danaEnemigo(e.id, caida(dd, c.r, c.d), c.u, c.w, c.x, c.y); }
     for (const o of [...O.values()]) { const dd = dist(c.x, c.y, o.x, o.y); if (dd < c.r) danaObjeto(o.id, caida(dd, c.r, c.d), c.u); }
     for (const v of vivos()) {
       const dd = dist(c.x, c.y, v.x, v.y);
@@ -1191,6 +1223,51 @@
     return true;
   }
 
+  /* Excavador: bajo tierra (est 1) va derecho hacia ti sin mirar muros;
+     cerca asoma (est 2, 1 s de grietas en el suelo, aún inmune) y sale
+     (est 0) como un enemigo más. Si se queda bajo una pared, sale al sitio
+     libre más cercano. */
+  function cava(e, C, t, dd, dt) {
+    if (e.est === 1) {
+      const v = D.velEnemigo(e.k, dir.n) * 1.15 * (e.el ? D.ELITES[e.el].vel : 1), l = dd || 1;
+      if (dd > 52) { e.x += (t.x - e.x) / l * v * dt; e.y += (t.y - e.y) / l * v * dt; e.d = D.dirDe(t.x - e.x, t.y - e.y); }
+      else { e.est = 2; e.estT = 1; }
+      return;
+    }
+    if ((e.estT -= dt) <= 0) { e.est = 0; desatasca(e, C.radio - 1); e.cd = 0.25; humo(e.x, e.y, 0); }
+  }
+  // Chamán: cada `cd` s cura a los comunes que tiene cerca (no a los jefes).
+  function chaman(e, C, dt) {
+    if (e.est === 1 && (e.estT -= dt) <= 0) e.est = 0;
+    if ((e.cdH -= dt) > 0) return;
+    e.cdH = C.cd;
+    let curo = false;
+    for (const g of E.values()) {
+      if (g === e || D.esJefe(g.k) || !(g.hp < g.max) || dist(e.x, e.y, g.x, g.y) > C.alcCura) continue;
+      g.hp = Math.min(g.max, g.hp + g.max * C.cura); curo = true;
+    }
+    if (curo) { e.est = 1; e.estT = 0.6; e.atk = 0.3; }
+  }
+  /* Vigía: te apunta `apunta` s con un láser (est 1, quieto) y dispara una
+     bala rápida hacia donde estabas cuando empezó a apuntar: moverse la
+     esquiva. Devuelve true mientras apunta (no camina). */
+  function vigia(e, C, t, dd, dt) {
+    if (e.est === 1) {
+      e.d = D.dirDe(e.ax - e.x, e.ay - e.y);
+      if ((e.estT -= dt) > 0) return true;
+      const a = Math.atan2(e.ay - e.y, e.ax - e.x);
+      F.push({ id: nid(), x: e.x, y: e.y, vx: Math.cos(a) * C.velBala, vy: Math.sin(a) * C.velBala, t: 1.2, d: C.fuego, de: e.id, k: e.k });
+      e.est = 0; e.cdH = C.cd * rz(0.8, 1.2); e.atk = 0.3;
+      son('pistola', dist(e.x, e.y, camX, camY));
+      return true;
+    }
+    if ((e.cdH -= dt) <= 0 && dd < C.alcFuego && despejado(e.x, e.y, t.x, t.y)) {
+      e.est = 1; e.estT = C.apunta; e.ax = Math.round(t.x); e.ay = Math.round(t.y);
+      return true;
+    }
+    return false;
+  }
+
   function peticion(de, p) {
     if (!p || typeof p !== 'object') return;
     if (Array.isArray(p.pon)) {
@@ -1271,26 +1348,35 @@
       let t = null, dd = 1e9;
       for (const o of obj) { const v = dist(e.x, e.y, o.x, o.y); if (v < dd) { dd = v; t = o; } }
       if (!t) continue;
+      if (C.cava && e.est > 0) { cava(e, C, t, dd, dt); continue; }
       desatasca(e, C.radio - 1);
       if (C.jefe && jefeIA(e, C, t, dd, dt)) continue;
+      if (C.cura) chaman(e, C, dt);
+      if (C.vigia && vigia(e, C, t, dd, dt)) continue;
       // Rodea los muros de los jugadores mientras haya otro camino; si no, rompe.
       const libre = rodea(e);
       let dx, dy;
       if (dd < TS * 1.6 && despejado(e.x, e.y, t.x, t.y) && !(libre && objetoEnMedio(e.x, e.y, t.x, t.y))) { dx = t.x - e.x; dy = t.y - e.y; }
       else { const s = siguiente(e, libre); if (s) { dx = s.x - e.x; dy = s.y - e.y; } else { dx = t.x - e.x; dy = t.y - e.y; } }
       const l = hyp(dx, dy) || 1; dx /= l; dy /= l;
+      // Chamán y Vigía guardan su distancia si te ven: retroceden o se plantan.
+      let planta = false;
+      if (C.lejos && despejado(e.x, e.y, t.x, t.y)) {
+        if (dd < C.lejos - 30) { dx = -dx; dy = -dy; }
+        else if (dd < C.lejos + 30) planta = true;
+      }
       let sx = 0, sy = 0;
       for (const f of vecinos(e.x, e.y)) {
-        if (f === e) continue;
+        if (f === e || bajoTierra(f)) continue;
         const ex = e.x - f.x, ey = e.y - f.y, q = ex * ex + ey * ey, rr = C.radio * 2;
         if (q < rr * rr && q > 0.01) { const qq = Math.sqrt(q); sx += ex / qq * (rr - qq); sy += ey / qq * (rr - qq); }
       }
-      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1);
+      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1) * (e.el ? D.ELITES[e.el].vel : 1);
       const alcance = C.jefe ? C.rg + 8 : C.radio + 14;
       let bloq = null;
-      if (dd > (C.jefe ? C.rg + 4 : C.radio + 10)) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
+      if (dd > (C.jefe ? C.rg + 4 : C.radio + 10) && !planta) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
       else mover(e, sx * 0.3, sy * 0.3, C.radio - 1);
-      e.d = D.dirDe(dx, dy);
+      e.d = C.lejos && (planta || dd < C.lejos) ? D.dirDe(t.x - e.x, t.y - e.y) : D.dirDe(dx, dy);
       // Rodeando, un roce con un muro no es para romperlo; pero si lleva
       // más de 1.5 s trabado contra uno, lo rompe igual.
       e.tr = bloq ? (e.tr || 0) + dt : 0;
@@ -1299,7 +1385,7 @@
       // El explosivo no muerde: se revienta al llegar.
       if (C.explota && dd < C.radio + 16) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
       if (C.explota && bloq && rompe) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
-      if (dd < alcance && e.cd <= 0) { golpea(t.uid, golpe, 8, ''); e.cd = 0.8; e.atk = 0.25; if (C.jefe) sacude = Math.min(10, sacude + 2); if (t.uid !== cfg.yo) son('mordida', dist(e.x, e.y, camX, camY)); }
+      if (dd < alcance && e.cd <= 0) { golpea(t.uid, golpe, 8, ''); e.cd = 0.8; e.atk = 0.25; if (e.el && D.ELITES[e.el].cura) e.hp = Math.min(e.max, e.hp + e.max * D.ELITES[e.el].cura); if (C.jefe) sacude = Math.min(10, sacude + 2); if (t.uid !== cfg.yo) son('mordida', dist(e.x, e.y, camX, camY)); }
       else if (bloq && e.cd <= 0 && rompe) { e.cd = 0.8; e.atk = 0.25; danaObjeto(bloq.id, golpe * 1.5 * (C.dObj || 1), ''); }
       if (C.fuego && C.cadFuego && e.cdF <= 0 && dd < (C.alcFuego || 320) && despejado(e.x, e.y, t.x, t.y)) {
         const a = Math.atan2(t.y - e.y, t.x - e.x);
@@ -1320,9 +1406,9 @@
       if (f.fin) continue;
       // Fuego amigo: la bola no distingue, quema al enemigo que se cruce.
       // La de un jefe sí: no iba a quemar a su propia escolta.
-      if (f.jefe) continue;
+      if (f.jefe || f.k === 21) continue;
       for (const g of [...E.values()]) {
-        if (g.id === f.de || dist(f.x, f.y, g.x, g.y) >= RG(g.k) + 3) continue;
+        if (g.id === f.de || bajoTierra(g) || dist(f.x, f.y, g.x, g.y) >= RG(g.k) + 3) continue;
         danaEnemigo(g.id, dmg, '', 9, f.x - f.vx * 0.1, f.y - f.vy * 0.1);
         f.fin = true; humo(f.x, f.y, f.k); break;
       }
@@ -1333,7 +1419,7 @@
   function zbSale() {
     return {
       n: dir.n, q: dir.q, t: Math.round(dir.t * 10) / 10,
-      e: [...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) ? [Math.round(e.max), e.est || 0] : [])),
+      e: [...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) || e.el || e.est || e.max !== D.vidaEnemigo(e.k, Math.max(1, dir.n)) ? [Math.round(e.max), e.est || 0, e.el || 0].concat(e.est === 1 && D.ENEMIGOS[e.k].vigia ? [e.ax, e.ay] : []) : [])),
       f: F.map(f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy), f.k || 1, Math.round(f.t * 10)].concat(f.roca ? [Math.round(f.t0 * 10), Math.round(f.tx), Math.round(f.ty)] : [])),
       o: [...O.values()].map(o => [o.id, OBJ.indexOf(o.k), o.x, o.y, Math.max(1, Math.round(100 * Math.min(o.hp, o.max) / o.max)), o.u || '', o.r || 0, o.max >= 1e9 ? 0 : o.max, o.d || 0, o.bl ? 1 : 0]),
       b: [...B.values()].map(b => [b.id, b.k, b.x, b.y]),
@@ -1348,7 +1434,7 @@
     const vistos = new Set();
     for (const a of zb.e || []) {
       if (!Array.isArray(a)) continue;
-      const [id, k0, x, y, pc, d, atk, aturd, mx, est] = a, k = D.ENEMIGOS[k0 | 0] ? k0 | 0 : 0;
+      const [id, k0, x, y, pc, d, atk, aturd, mx, est, el, ax, ay] = a, k = D.ENEMIGOS[k0 | 0] ? k0 | 0 : 0;
       vistos.add(id);
       ultimoId = Math.max(ultimoId, id);
       const max = +mx > 0 ? +mx : D.vidaEnemigo(k, Math.max(1, dir.n));
@@ -1357,6 +1443,7 @@
       // Un salto del Espectro no se interpola: aparece donde cayó.
       if (dist(e.x, e.y, x, y) > 60) { e.x = x; e.y = y; }
       e.tx = x; e.ty = y; e.hp = max * pc / 100; e.d = d | 0; e.atk = atk ? 0.25 : 0; e.max = max; e.est = est | 0;
+      e.el = D.ELITES[el | 0] ? el | 0 : 0; e.ax = +ax || 0; e.ay = +ay || 0;
       if (aturd) e.aturd = Math.max(e.aturd || 0, 0.15);
       if (adoptar) { e.x = x; e.y = y; }
     }
@@ -1921,8 +2008,8 @@
   // Tamaño de cada tipo de enemigo (índice = k de ENEMIGOS) y color de su vida.
   // Los modelos se dibujan un poco más grandes que su radio de choque, como en el original.
   const ESC = 1.15;
-  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22];
-  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f'];
+  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22, 1.1, 0.62, 1, 1.05, 0.95];
+  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f', '#b8c0cc', '#e8483a', '#7fe08a', '#c9a46a', '#ff5a5a'];
   const PAL_SKIN = new Map();
   const palDe = id => { let p = PAL_SKIN.get(id); if (!p) { p = G.palJugador(D.skin(id)); PAL_SKIN.set(id, p); } return p; };
 
@@ -1953,6 +2040,42 @@
       }
       if (e.est === 4) cx.globalAlpha = 0.35;
     }
+    // Excavador bajo tierra: un montículo que avanza; asomando, grietas que laten.
+    if (Cj.cava && e.est > 0) {
+      const ex = e.x, ey = e.y;
+      if (e.est === 1) {
+        cx.fillStyle = 'rgba(0,0,0,.25)'; cx.beginPath(); cx.ellipse(ex, ey + 2, 13, 6, 0, 0, 7); cx.fill();
+        cx.fillStyle = '#5a4630'; cx.beginPath(); cx.ellipse(ex, ey, 11, 5.5, 0, Math.PI, 0); cx.fill();
+        cx.fillStyle = '#7a5f40';
+        for (let i = 0; i < 3; i++) { const a = T * 9 + i * 2.1 + e.id; cx.fillRect(ex + Math.cos(a) * 9, ey - 2 + Math.sin(a * 1.3) * 3, 2.4, 2.4); }
+      } else {
+        const pul = 0.5 + 0.5 * Math.sin(T * 22);
+        cx.strokeStyle = 'rgba(40,24,10,' + (0.6 + 0.4 * pul).toFixed(2) + ')'; cx.lineWidth = 2;
+        cx.beginPath();
+        for (let i = 0; i < 6; i++) { const a = i * 1.05 + e.id, r = 8 + 8 * pul; cx.moveTo(ex, ey); cx.lineTo(ex + Math.cos(a) * r, ey + Math.sin(a) * r * 0.6); }
+        cx.stroke();
+      }
+      return;
+    }
+    // Vigía apuntando: el láser hasta donde va a disparar.
+    if (Cj.vigia && e.est === 1 && (e.ax || e.ay)) {
+      cx.strokeStyle = 'rgba(255,40,40,' + (0.35 + 0.35 * Math.sin(T * 30)).toFixed(2) + ')'; cx.lineWidth = 1.2;
+      cx.beginPath(); cx.moveTo(e.x, e.y - 20 * ta); cx.lineTo(e.ax, e.ay - 14); cx.stroke();
+      cx.fillStyle = 'rgba(255,40,40,.8)'; cx.beginPath(); cx.arc(e.ax, e.ay - 14, 2, 0, 7); cx.fill();
+    }
+    // Chamán curando: un anillo verde que se abre.
+    if (Cj.cura && e.est === 1) {
+      const r = (Cj.alcCura || 120) * (1 - (e.estT || 0) / 0.6 * 0.6);
+      cx.strokeStyle = 'rgba(110,230,120,.55)'; cx.lineWidth = 2;
+      cx.beginPath(); cx.ellipse(e.x, e.y, r, r * 0.75, 0, 0, 7); cx.stroke();
+    }
+    // Élite: aura de su color en el suelo.
+    const El = e.el ? D.ELITES[e.el] : null;
+    if (El) {
+      cx.strokeStyle = El.color; cx.lineWidth = 2; cx.globalAlpha = 0.55 + 0.3 * Math.sin(T * 6 + e.id);
+      cx.beginPath(); cx.ellipse(e.x, e.y, 13 * ta, 6.5 * ta, 0, 0, 7); cx.stroke();
+      cx.globalAlpha = 1;
+    }
     const quieto = e.aa > 0.5 || e.aturd > 0;
     G.humanoide(cx, e.x, e.y, e.av ?? angDir(e.d), G.PAL_E[e.k] || G.PAL_E[0], {
       t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: Math.max(e.tb || 0, e.sac || 0),
@@ -1962,7 +2085,7 @@
     if (jf || !(e.hp < e.max)) return;   // la vida del jefe va arriba, en grande
     const hy = e.y - 54 * ta;
     cx.fillStyle = 'rgba(0,0,0,.7)'; cx.fillRect(e.x - 10, hy - 0.5, 20, 3.5);
-    cx.fillStyle = VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9.5, hy, 19 * clamp(e.hp / e.max, 0, 1), 2.5);
+    cx.fillStyle = El ? El.color : VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9.5, hy, 19 * clamp(e.hp / e.max, 0, 1), 2.5);
   }
   // Un jugador: anillo de su color en el suelo y el modelo con el arma en la mano.
   function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t, nv) {
@@ -2050,6 +2173,13 @@
         cx.fillStyle = 'rgba(0,0,0,.3)'; cx.beginPath(); cx.ellipse(f.x, f.y, 7, 3, 0, 0, 7); cx.fill();
         const z = Math.sin(q * Math.PI) * 120;
         G.modelo(cx, f.x, f.y - z, T * 3, [{ r: 0, f: 0, z: 6, w: 13, d: 12, h: 11, c: '#6e665e' }, { r: 2, f: 1, z: 15, w: 7, d: 6, h: 4, c: '#8a8278' }], {});
+        continue;
+      }
+      // la bala del Vigía: un trazo rojo corto
+      if ((D.ENEMIGOS[f.k] || {}).vigia) {
+        const l = hyp(f.vx, f.vy) || 1;
+        cx.strokeStyle = '#ffd0b0'; cx.lineWidth = 2.2;
+        cx.beginPath(); cx.moveTo(f.x, f.y - 14); cx.lineTo(f.x - f.vx / l * 14, f.y - 14 - f.vy / l * 14); cx.stroke();
         continue;
       }
       G.bola(cx, f.x, f.y, f.vx, f.vy, f.k === 5 || !!(D.ENEMIGOS[f.k] || {}).acido);
@@ -2580,7 +2710,7 @@
     estado: () => ({ cfg, eleccion: eleccion ? eleccion.ops.slice() : null, vt: Object.assign({}, yo.vt), yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice() },
       soyDir, dirUid, nivel: nivelObjetivo(), dir: { n: dir.n, q: dir.q, t: dir.t }, enemigos: E.size, objetos: O.size, cajas: B.size, remotos: R.size, terminado }),
     dbg: () => ({ cd: yo.cd, ps: pend.s.length, jugando, pausado, w: yo.w, ammo0: yo.ammo[0] }),
-    mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
+    mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp, max: e.max, est: e.est || 0, el: e.el || 0 })), F: F.map(f => ({ k: f.k, x: f.x, y: f.y })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
     teclas, practica, inmortal: v => { inmortal = !!v; },
     armas: () => { for (const a of D.ARMAS) desbloquea(a.id); pintaArmas(true); },
     elige: i => eligeArma(i),

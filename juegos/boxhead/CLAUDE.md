@@ -287,3 +287,30 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
 - **Weapon roles**: the uzi has `pen: 1` from the start, the shotgun stuns 1.7×
   longer (`ATURDE_ARMA`), and a rocket passes through the first non-boss enemy
   for half damage (`p.pasa`) and explodes on the next.
+
+## Phase 3.1: five new enemies and élites (`boxhead-15`, proof `ve: 4`)
+
+- **Enemies 17–21** are appended (never reorder: `PUNTOS`, `TALLA_Z`,
+  `VIDA_Z` and `PAL_E` are indexed by k, and the test pins one of each per
+  enemy). Escudero (`escudo` 0.8: a non-explosive hit within 60° of its
+  facing loses 80 %, computed in `golpeaEnemigo` on the shooter, so the
+  director gets the reduced hit), Enjambre (`grupo` 8: the first one spawns
+  the rest around it, only from the random spawn, not from `kFijo`), Chamán
+  (`cura`, heals non-boss enemies within `alcCura` every `cd`; est 1 = ring),
+  Excavador (`cava`: est 1 underground walks straight at you through walls,
+  est 2 one second of cracks, est 0 normal; `bajoTierra(e)` makes it immune
+  and invisible to bullets, rockets, blasts, fireballs, the drone and the
+  separation — **any new way to hit enemies must skip `bajoTierra`**), Vigía
+  (`vigia`: aims `apunta` s at a frozen point `ax/ay`, then pushes an F bullet
+  with `k: 21` that does not hit other enemies). Chamán and Vigía keep `lejos`
+  distance while they see you.
+- **Élites** (`D.ELITES`, `e.el`): from level 12 `nuevoEnemigo` rolls
+  `eliteDe(k, n, rn(), rn())`; below 12 it does **not** call `rn`, so the
+  early levels keep their RNG sequence. Never for bosses or the swarm, nor for
+  anything spawned with `kFijo` (summons, divisor halves). Blindado ×2.2 hp,
+  Veloz ×1.45 speed, Vampiro heals 20 % per bite, Divisor splits into two
+  plain copies at 45 % hp, Ígneo explodes (r 56, d 26) on death.
+- **zb**: an enemy that is a boss, an élite, has an `est` or a `max` other
+  than `vidaEnemigo(k, dir.n)` sends `[max, est, el]` (+ `ax, ay` while a
+  vigía aims) after the 8 base fields; `aplicaZb` reads them.
+- `__boxhead.mundo()` now also returns `max/est/el` per enemy and `F`.

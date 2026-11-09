@@ -137,7 +137,7 @@
   /* Al vaciarse, el multiplicador baja uno y la barra vuelve a la mitad. */
   const bajadaCombo = mul => duracionCombo(mul) * 0.5;
   /* Puntos por baja (× multiplicador), por tipo de enemigo. */
-  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000, 50];
+  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000, 50, 40, 5, 45, 35, 40];
   /* **La chatarra es la moneda de la tienda; los puntos, solo la puntuación.**
      Cada baja propia suelta chatarra (sin multiplicador: con él, pasado el
      nivel 10 la tienda salía gratis). Comprar ya no baja los puntos, que son
@@ -184,8 +184,39 @@
        y los tira a mazazos (`dObj`: cuánto más daño les hace). Los demás
        buscan otro camino y solo rompen si no hay ninguno. Es raro a
        propósito: entra en el nivel 6 y nunca pasa del 5 % de la horda. */
-    { id: 16, nombre: 'Demoledor', vida: 190, vel: 40, velMax: 58, golpe: 14, radio: 13, rompe: true, dObj: 4, desde: 6, parte: 0.01, tope: 0.05, masa: 0.35 }
+    { id: 16, nombre: 'Demoledor', vida: 190, vel: 40, velMax: 58, golpe: 14, radio: 13, rompe: true, dObj: 4, desde: 6, parte: 0.01, tope: 0.05, masa: 0.35 },
+    /* Fase 3: la horda nueva, siempre agregada al final (los índices por k no
+       se mueven). `escudo`: lo que absorbe de un golpe de frente (no de una
+       explosión) · `grupo`: cuántos salen juntos · `cura`: cuánto cura a los
+       de alrededor (fracción de su vida) cada `cd` s, a `alcCura` · `cava`:
+       viaja bajo tierra, intocable, y sale cerca del jugador · `vigia`:
+       apunta con un láser `apunta` s y dispara una bala `fuego` a `velBala`.
+       `lejos`: la distancia que intenta guardar con su blanco. */
+    { id: 17, nombre: 'Escudero', vida: 170, vel: 40, velMax: 58, golpe: 12, radio: 12, escudo: 0.8, desde: 12, parte: 0.02, tope: 0.1, masa: 0.5,
+      txt: 'un escudo de frente se come el 80 % de cada bala: rodéalo o usa explosivos' },
+    { id: 18, nombre: 'Enjambre', vida: 5, vel: 92, velMax: 118, golpe: 4, radio: 7, grupo: 8, desde: 14, parte: 0.02, tope: 0.07, masa: 1.6,
+      txt: 'salen de a ocho y caen de un tiro: la escopeta y las explosiones los barren' },
+    { id: 19, nombre: 'Chamán', vida: 120, vel: 36, velMax: 52, golpe: 8, radio: 11, cura: 0.25, alcCura: 120, cd: 2.6, lejos: 190, desde: 16, parte: 0.015, tope: 0.06, masa: 0.8,
+      txt: 'se queda atrás curando a la horda: mátalo primero' },
+    { id: 20, nombre: 'Excavador', vida: 150, vel: 72, velMax: 92, golpe: 16, radio: 11, cava: true, desde: 20, parte: 0.015, tope: 0.06, masa: 0.6,
+      txt: 'avanza bajo tierra; el suelo se agrieta un segundo antes de que salga' },
+    { id: 21, nombre: 'Vigía', vida: 90, vel: 38, velMax: 54, golpe: 6, radio: 10, vigia: true, fuego: 18, velBala: 430, apunta: 0.9, cd: 3.6, lejos: 270, alcFuego: 420, desde: 25, parte: 0.015, tope: 0.05, masa: 0.9,
+      txt: 'dispara de lejos; antes marca con un láser hacia dónde' }
   ];
+  /* **Élites** (desde el nivel 12, del 5 % al 12 % de lo que sale de la
+     mezcla; nunca jefes ni el enjambre). `el` en el enemigo: 1 blindado
+     (más vida), 2 veloz, 3 vampiro (se cura al morder), 4 divisor (al morir
+     se parte en dos más chicos), 5 ígneo (revienta al morir). Cada uno con
+     su aura (`color`). */
+  const ELITES = [null,
+    { id: 1, nombre: 'Blindado', vida: 2.2, vel: 1, color: '#9fb8d8' },
+    { id: 2, nombre: 'Veloz', vida: 1.2, vel: 1.45, color: '#f2d94e' },
+    { id: 3, nombre: 'Vampiro', vida: 1.4, vel: 1.05, cura: 0.2, color: '#e0303a' },
+    { id: 4, nombre: 'Divisor', vida: 1.4, vel: 1, partes: 2, color: '#6ee05a' },
+    { id: 5, nombre: 'Ígneo', vida: 1.3, vel: 1, revienta: { r: 56, d: 26 }, color: '#ff8a1f' }];
+  const parteElites = n => (n < 12 ? 0 : Math.min(0.12, 0.05 + 0.007 * (n - 12)));
+  // ¿Sale élite? `r1` decide si, `r2` cuál (los dos en [0, 1)).
+  const eliteDe = (k, n, r1, r2) => (!ENEMIGOS[k] || ENEMIGOS[k].jefe || ENEMIGOS[k].grupo || r1 >= parteElites(n) ? 0 : 1 + Math.min(4, Math.floor(r2 * 5)));
   /* Los jefes rotan en este orden: 5, 15, 25, 35, 45 los minis y 10, 20,
      30, 40, 50 los grandes; después vuelve a empezar. */
   const MINIS = [6, 7, 8, 9, 10];
@@ -577,7 +608,7 @@
 
   return {
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
-    golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
+    ELITES, parteElites, eliteDe, golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio
   };
