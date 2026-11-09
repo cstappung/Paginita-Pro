@@ -178,6 +178,8 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `MUESTRAS` stays empty until the ElevenLabs files exist as
   `sfx/<key>-<n>.mp3`. Each file's `GAN` must be measured against the
   synthesized sound. The `switch` in `son` remains the fallback.
+  The chosen takes (generation and session ids) are listed in
+  `sfx/elevenlabs.md`.
 
 
 ## Phase 2.1: deterministic practice engine (`boxhead-10`)
