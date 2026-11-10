@@ -348,35 +348,42 @@ function prodrop({ serie1 = false } = {}) {
 
 /* ---------- PRODROP · Fútbol: cuatro cartas de fútbol de verdad en
    abanico (foto, media arriba a la derecha, nombre y, en las especiales,
-   su cinta). Van siempre las tres especiales (las de `cinta`) y una
-   estrella más al azar de `ESTRELLAS_FUTBOL`, en un lugar al azar cada vez
-   que se pinta el banner. Las medias son las del motor
+   su cinta). Van siempre las tres especiales de `ESTRELLAS_FUTBOL` y una
+   del FW11 al azar (`FW11_FUTBOL`), en un lugar al azar cada vez que se
+   pinta el banner. Las medias son las del motor
    (juegos/prodrop/motor.js; un test las compara). ---------- */
 const ESTRELLAS_FUTBOL = [
-  { img: "champions/montreal/alexis-sanchez", nombre: "Alexis Sánchez", media: 75, cinta: "" },
   { img: "especiales/realmadrid/mbappe-dictador", nombre: "Mbappé", media: 91, cinta: "DICTADOR" },
-  { img: "futbol/realmadrid/bellingham", nombre: "Bellingham", media: 90, cinta: "" },
   { img: "especiales/bayern/harry-kane-balon", nombre: "Harry Kane", media: 94, cinta: "BALÓN DE ORO" },
-  { img: "premier/mancity/erling-haaland", nombre: "Haaland", media: 91, cinta: "" },
-  { img: "champions/intermiami/lionel-messi", nombre: "Messi", media: 89, cinta: "" },
-  { img: "champions/alnassr/cristiano-ronaldo", nombre: "C. Ronaldo", media: 84, cinta: "" },
-  { img: "especiales/alnassr/cristiano-balon-all-time", nombre: "C. Ronaldo", media: 96, cinta: "BOAT" },
-  { img: "futbol/barcelona/lamine-yamal", nombre: "Lamine Yamal", media: 90, cinta: "" },
-  { img: "leyendas/maradona", nombre: "Maradona", media: 95, cinta: "" },
-  { img: "leyendas/ronaldinho", nombre: "Ronaldinho", media: 93, cinta: "" }
+  { img: "especiales/alnassr/cristiano-balon-all-time", nombre: "C. Ronaldo", media: 96, cinta: "BOAT" }
 ];
-// las especiales más una estrella al azar, barajadas: [{...carta}] de cuatro
+/* El FIFA Pro World 11 del Mundial 2026: la cuarta carta del abanico es
+   una de estas, al azar, con el chip «Nuevo · Mundial». */
+const FW11_FUTBOL = [
+  { img: "especiales/arsenal/david-raya-fw11", nombre: "David Raya", media: 93, cinta: "FW11" },
+  { img: "especiales/barcelona/cubarsi-fw11", nombre: "Cubarsí", media: 93, cinta: "FW11" },
+  { img: "especiales/psg/achraf-hakimi-fw11", nombre: "Hakimi", media: 94, cinta: "FW11" },
+  { img: "especiales/psg/nuno-mendes-fw11", nombre: "Nuno Mendes", media: 94, cinta: "FW11" },
+  { img: "especiales/realmadrid/bellingham-fw11", nombre: "Bellingham", media: 96, cinta: "FW11" },
+  { img: "especiales/barcelona/rodri-fw11", nombre: "Rodri", media: 96, cinta: "FW11" },
+  { img: "especiales/psg/vitinha-fw11", nombre: "Vitinha", media: 94, cinta: "FW11" },
+  { img: "especiales/mancity/erling-haaland-fw11", nombre: "Haaland", media: 95, cinta: "FW11" },
+  { img: "especiales/realmadrid/mbappe-fw11", nombre: "Mbappé", media: 97, cinta: "FW11" },
+  { img: "especiales/intermiami/lionel-messi-fw11", nombre: "Messi", media: 96, cinta: "FW11" },
+  { img: "especiales/barcelona/lamine-yamal-fw11", nombre: "Lamine Yamal", media: 93, cinta: "FW11" }
+];
+// las tres especiales más una del FW11 al azar, barajadas: [{...carta}] de cuatro
 function manoFutbol(azar = Math.random) {
-  const otra = ESTRELLAS_FUTBOL.filter(c => !c.cinta).sort(() => azar() - 0.5).slice(0, 1);
-  return ESTRELLAS_FUTBOL.filter(c => c.cinta).concat(otra).sort(() => azar() - 0.5);
+  const fw = { ...FW11_FUTBOL[Math.floor(azar() * FW11_FUTBOL.length)], fw: true };
+  return ESTRELLAS_FUTBOL.concat([fw]).sort(() => azar() - 0.5);
 }
 function futbol() {
   const az = azar(31);
   let chispas = "";
   for (let i = 0; i < 12; i++) chispas += `<i class="ep-pd-chispa" style="left:${r1(az() * 100)}%;top:${r1(az() * 100)}%;animation-delay:${r1(-az() * 3)}s"></i>`;
   return `<div class="ep-pd ep-fu" aria-hidden="true"><i class="ep-pd-rayos"></i><i class="ep-pd-halo"></i>
-    <div class="ep-fu-mano">${manoFutbol().map((c, i) => `<div class="ep-fu-slot f${i + 1}"><span class="ep-fu-carta"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">
-      <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em></span></div>`).join("")}</div>${chispas}</div>`;
+    <div class="ep-fu-mano">${manoFutbol().map((c, i) => `<div class="ep-fu-slot f${i + 1}"><span class="ep-fu-carta${c.fw ? " fw" : ""}"><img src="juegos/prodrop/cards/${c.img}.webp" alt="" loading="lazy" decoding="async">
+      <b class="ep-fc-media">${c.media}<small>MEDIA</small></b>${c.cinta ? `<i class="ep-fc-cinta">${c.cinta}</i>` : ""}<em class="ep-fc-nombre">${c.nombre}</em>${c.fw ? `<i class="ep-fc-fw">🏆 Nuevo · Mundial</i>` : ""}</span></div>`).join("")}</div>${chispas}</div>`;
 }
 
 /* ---------- FANAL: el farol en la noche y lo que viene a su luz ---------- */

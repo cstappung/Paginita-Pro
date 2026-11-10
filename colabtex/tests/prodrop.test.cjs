@@ -14,13 +14,13 @@ const M=ctx.__M;
 const VE_TODO={mira:{at:1,por:'adm'}};
 M.fijaSerie1(VE_TODO,'mira');
 
-test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico, 155 de la Premier, 163 de siete clubes de la Champions, las dos cartas especiales, 20 del Bayern, 277 de Chile, Argentina, la MLS y Arabia y la especial de Cristiano, 43 leyendas, 26 del Atlético de Madrid y 27 del AC Milan, una carta cada uno), con su imagen',()=>{
- assert.equal(PM.TOTAL,170+275+48+155+163+2+20+61+72+72+72+1+43+26+27+1);
- assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[330,237,120,76]);assert.equal(PM.POOL.futbol.tope,3);
- assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[330,237,120,76]);
+test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico, 155 de la Premier, 163 de siete clubes de la Champions, las dos cartas especiales, 20 del Bayern, 277 de Chile, Argentina, la MLS y Arabia y la especial de Cristiano, 43 leyendas, 26 del Atlético de Madrid y 27 del AC Milan, y las 11 del FW11, una carta cada uno), con su imagen',()=>{
+ assert.equal(PM.TOTAL,170+275+48+155+163+2+20+61+72+72+72+1+43+26+27+1+11);
+ assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[330,237,120,87]);assert.equal(PM.POOL.futbol.tope,3);
+ assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[330,237,120,87]);
  assert.deepEqual(PM.POOL.futbol1.map(l=>l.length),[13,19,7,9],'el Clásico de antes: para rehacer sus sobres');
  // las de antes conservan su id: fútbol va después de todo
- assert.equal(PM.POR_COL.futbol.length,763);
+ assert.equal(PM.POR_COL.futbol.length,774);
  assert.ok(PM.POR_COL.futbol.every((c,i)=>c.n===445+i),'fútbol va después de todo: no mueve el id de nada');
  assert.ok(PM.POR_COL.futbol.slice(48,203).every(c=>/cards\/premier\//.test(c.img)),'los 155 de la Premier siguen con su id y su foto');
  assert.ok(PM.POR_COL.futbol.slice(203,366).every(c=>/cards\/champions\//.test(c.img)),'los de la Champions van después');
@@ -557,7 +557,7 @@ test('ampliaciones: un sobre g o h comprado antes sigue viendo solo las cartas d
  assert.equal(nuevasAntes,0,'un sobre de antes no ve las nuevas');
  assert.ok(nuevasDespues>500,'un sobre de ahora sí: '+nuevasDespues);
  assert.ok(PM.poolDe('g-N0',v.hasta-1).every(l=>l.every(c=>c.n<648)));
- assert.equal(PM.poolDe('g-N0').reduce((s,l)=>s+l.length,0),763,'sin hora: el catálogo de hoy');
+ assert.equal(PM.poolDe('g-N0').reduce((s,l)=>s+l.length,0),774,'sin hora: el catálogo de hoy');
  // la segunda ampliación (el Bayern): un sobre de antes de su corte ve las 813 de entonces, ni una más
  const b=PM.AMPLIACIONES[1];
  assert.equal(b.n,813);assert.ok(b.hasta>v.hasta);
@@ -619,7 +619,7 @@ test('cartas especiales por tiempo limitado: Mbappé (92), Kane (94) y Cristiano
  // las medias del banner de la página de Juegos son estas
  const arte=fs.readFileSync(path.join(__dirname,'..','src/juegos/novedades-arte.js'),'utf8');
  const cartas=[...arte.matchAll(/img: "([^"]+)", nombre: "[^"]+", media: (\d+)/g)];
- assert.equal(cartas.length,11,'las once estrellas del banner');
+ assert.equal(cartas.length,14,'las tres especiales y las once FW11 del banner');
  for(const [,img,media] of cartas){const c=PM.CARDS.find(x=>x.img==='cards/'+img+'.webp');assert.ok(c,'el banner nombra '+img+', que no está');assert.equal(c.media,+media,'el banner muestra la media de verdad: '+img);}
 });
 
@@ -859,16 +859,34 @@ test('las posiciones: cada futbolista tiene una o dos, la línea de su carta es 
 
 test('Mbappé · Dictador: especial con la misma media que su carta normal, solo en los sobres desde su corte',()=>{
  const d=PM.CARDS[1207],base=PM.CARDS.find(c=>c.person==='realmadrid-mbappe'&&!c.especial);
- assert.equal(PM.TOTAL,1208);assert.equal(d.name,'Mbappé');assert.equal(d.especial,'dictador');assert.match(d.cinta,/DICTADOR/);
+ assert.equal(PM.TOTAL,1219);assert.equal(d.name,'Mbappé');assert.equal(d.especial,'dictador');assert.match(d.cinta,/DICTADOR/);
  assert.equal(d.media,base.media,'la misma media que el Mbappé de siempre');assert.equal(d.person,base.person);
  assert.equal(d.liga,'especiales');assert.ok(d.limitada);
  assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',d.img)),'falta '+d.img);
- const v=PM.AMPLIACIONES[PM.AMPLIACIONES.length-1];
+ const v=PM.AMPLIACIONES[PM.AMPLIACIONES.length-2];
  assert.equal(v.n,1207);assert.ok(v.actual);
  // antes del corte: el mismo catálogo y los mismos pesos que el de hoy sin la Dictador
  const A=PM.poolDe('g-N0',v.hasta-1),H=PM.poolDe('g-N0',v.hasta);
  assert.equal(A.flat().length,762);assert.equal(H.flat().length,763);assert.deepEqual(A.bandas,PM.BANDAS);
  assert.deepEqual([0,1,2].map(i=>PM.sobre('u'+i,'g-Nx'+i+'abcdefg',v.hasta-1-i*1000).cartas.map(c=>c.id)).flat().filter(id=>id===1207),[]);
  const cuenta=desde=>{let n=0;for(let i=0;i<4000;i++)if(PM.sobre('u'+(i%9),'g-Nd'+i+'abcdefg',desde+i).cartas.some(c=>c.id===1207))n++;return n;};
+ assert.equal(cuenta(v.hasta-5000),0);assert.ok(cuenta(v.hasta)>0);
+});
+
+test('FIFA Pro World 11: once especiales del Mundial, el mismo jugador que su carta normal, solo en los sobres desde su corte',()=>{
+ const fw=PM.CARDS.filter(c=>c.especial==='fw11');
+ assert.equal(fw.length,11);assert.deepEqual(fw.map(c=>c.n),[...Array(11)].map((_,i)=>1208+i),'al final del catálogo');
+ const medias={'arsenal-david-raya':93,'barcelona-cubarsi':93,'psg-achraf-hakimi':94,'psg-nuno-mendes':94,'realmadrid-bellingham':96,'barcelona-rodri':96,'psg-vitinha':94,'mancity-erling-haaland':95,'realmadrid-mbappe':97,'intermiami-lionel-messi':96,'barcelona-lamine-yamal':93};
+ for(const c of fw){
+  const base=PM.CARDS.find(x=>x.person===c.person&&!x.especial);
+  assert.ok(base,'falta la carta normal de '+c.person);assert.equal(c.media,medias[c.person]);assert.ok(c.media>base.media,'más alta que la normal: '+c.person);
+  assert.equal(c.tier,3);assert.equal(c.cinta,'FW11');assert.ok(c.limitada);assert.equal(c.liga,'especiales');
+  assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',c.img)),'falta '+c.img);
+ }
+ const v=PM.AMPLIACIONES[PM.AMPLIACIONES.length-1];
+ assert.equal(v.n,1208);assert.ok(v.actual);
+ const A=PM.poolDe('g-N0',v.hasta-1),H=PM.poolDe('g-N0',v.hasta);
+ assert.equal(A.flat().length,763,'antes del corte: el catálogo con la Dictador');assert.equal(H.flat().length,774);
+ const cuenta=desde=>{let n=0;for(let i=0;i<4000;i++)if(PM.sobre('u'+(i%9),'g-Nf'+i+'abcdefg',desde+i).cartas.some(c=>c.id>=1208))n++;return n;};
  assert.equal(cuenta(v.hasta-5000),0);assert.ok(cuenta(v.hasta)>0);
 });

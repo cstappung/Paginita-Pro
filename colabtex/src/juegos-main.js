@@ -2970,8 +2970,8 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
 const ATAJO_RETOS = { ruta: "#cartas/retos", boton: "🏆 Desafío de plantilla" };
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
-    gancho: "Cartas especiales por tiempo limitado",
-    lema: "Los clubes más grandes de España (ahora con el Atlético de Madrid y el AC Milan), Inglaterra, Francia, Alemania e Italia, y ahora también Argentina (nuevo), Estados Unidos (nuevo) y Arabia Saudita (nuevo), con Messi, Alexis y Cristiano. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y más.",
+    gancho: "Nuevo: el FIFA Pro World 11 del Mundial",
+    lema: "Llegan las cartas FW11: el once del Mundial 2026, con Mbappé 97, Bellingham, Rodri y Messi 96, por tiempo limitado. Los clubes más grandes de España (ahora con el Atlético de Madrid y el AC Milan), Inglaterra, Francia, Alemania e Italia, y ahora también Argentina (nuevo), Estados Unidos (nuevo) y Arabia Saudita (nuevo), con Messi, Alexis y Cristiano. Y por tiempo limitado, Mbappé, MVP del Clásico, Harry Kane, Balón de Oro, y Cristiano, Balón de Oro All-Time. Y llegan las Leyendas: Pelé, Maradona, Zidane, R9, Figueroa y más.",
     datos: () => [[String(MOTOR.CARDS.filter(c => c.especial).length), "cartas especiales"], ["Limitadas", "por tiempo"], [String(MOTOR.POR_COL.futbol.length), "cartas en total"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true, atajo: ATAJO_RETOS },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",

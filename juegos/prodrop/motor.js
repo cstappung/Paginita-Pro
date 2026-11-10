@@ -440,6 +440,20 @@
   const ESPECIALES3 = [
     ["realmadrid", "mbappe-dictador", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "Real Madrid · Dictador", cinta: "DICTADOR", especial: "dictador", limitada: true, peso: 3 }]
   ];
+  /* FIFA Pro World 11 · 2026 (2026-11-10): el once del Mundial, una especial por jugador, con su corte en `AMPLIACIONES`. */
+  const ESPECIALES4 = [
+    ["arsenal", "david-raya-fw11", "David Raya", "POR", 1, "ES", { person: "arsenal-david-raya", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["barcelona", "cubarsi-fw11", "Cubarsí", "DEF", 5, "ES", { person: "barcelona-cubarsi", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["psg", "achraf-hakimi-fw11", "Achraf Hakimi", "DEF", 2, "MA", { person: "psg-achraf-hakimi", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["psg", "nuno-mendes-fw11", "Nuno Mendes", "DEF", 25, "PT", { person: "psg-nuno-mendes", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["realmadrid", "bellingham-fw11", "Bellingham", "MED", 5, "ENG", { person: "realmadrid-bellingham", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["barcelona", "rodri-fw11", "Rodri", "MED", 16, "ES", { person: "barcelona-rodri", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["psg", "vitinha-fw11", "Vitinha", "MED", 17, "PT", { person: "psg-vitinha", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["mancity", "erling-haaland-fw11", "Erling Haaland", "DEL", 9, "NO", { person: "mancity-erling-haaland", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["realmadrid", "mbappe-fw11", "Mbappé", "DEL", 10, "FR", { person: "realmadrid-mbappe", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["intermiami", "lionel-messi-fw11", "Messi", "DEL", 10, "AR", { person: "intermiami-lionel-messi", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }],
+    ["barcelona", "lamine-yamal-fw11", "Lamine Yamal", "DEL", 10, "ES", { person: "barcelona-lamine-yamal", sub: "FIFA Pro World 11 · 2026", cinta: "FW11", especial: "fw11", limitada: true, peso: 3 }]
+  ];
   /* ---------- las leyendas ----------
      Una categoría aparte: jugadores retirados, de los mejores de la historia.
      Sin club (solo la bandera de su selección) y con la media de la carta
@@ -724,6 +738,8 @@
      una sola carta, y su rareza sale de su media. */
   const MEDIAS = {
     realmadrid: {
+      "mbappe-fw11": 97,
+      "bellingham-fw11": 96,
       "courtois": 89, "lunin": 81, "asencio": 77, "militao": 84, "huijsen": 82,
       "trent": 86, "konate": 86, "cucurella": 84, "carreras": 80, "rudiger": 86,
       "mendy": 81, "dumfries": 84, "bellingham": 90, "camavinga": 83, "valverde": 89,
@@ -732,6 +748,9 @@
       "yan-diomande": 66
     },
     barcelona: {
+      "lamine-yamal-fw11": 93,
+      "rodri-fw11": 96,
+      "cubarsi-fw11": 93,
       "joan-garcia": 83, "szczesny": 84, "livakovic": 80, "cancelo": 84, "balde": 83,
       "cubarsi": 82, "christensen": 80, "gerard-martin": 74, "kounde": 87,
       "eric-garcia": 79, "gavi": 83, "fermin": 80, "pedri": 89,
@@ -747,6 +766,7 @@
       "matheus-cunha": 83, "joshua-zirkzee": 77, "amad": 79, "bryan-mbeumo": 85, "benjamin-sesko": 80
     },
     mancity: {
+      "erling-haaland-fw11": 95,
       "gianluigi-donnarumma": 89, "marcus-bettinelli": 70, "geronimo-rulli": 82, "ruben-dias": 86, "marc-guehi": 82,
       "rayan-ait-nouri": 81, "vitor-reis": 70, "josko-gvardiol": 84, "matheus-nunes": 79, "abdukodir-khusanov": 77, "rico-lewis": 77, "elliot-anderson": 80, "mateo-kovacic": 83, "rayan-cherki": 81,
       "enzo-fernandez": 84, "ayyoub-bouaddi": 75, "nico-o-reilly": 73, "phil-foden": 85,
@@ -777,6 +797,7 @@
       "dejan-kulusevski": 83, "omar-marmoush": 84, "mykhailo-mudryk": 76
     },
     arsenal: {
+      "david-raya-fw11": 93,
       "david-raya": 87, "kepa-arrizabalaga": 79, "illan-meslier": 72, "william-saliba": 87, "cristhian-mosquera": 77,
       "ben-white": 83, "piero-hincapie": 83, "gabriel-magalhaes": 88, "jurrien-timber": 82, "ezri-konsa": 82,
       "riccardo-calafiori": 78, "myles-lewis-skelly": 78, "martin-odegaard": 87, "eberechi-eze": 83, "mikel-merino": 83,
@@ -791,6 +812,9 @@
       "ez-abde": 77, "r-riquelme": 77, "troy-parrott": 74, "aitor-ruibal": 77, "j-morante": 68
     },
     psg: {
+      "vitinha-fw11": 94,
+      "nuno-mendes-fw11": 94,
+      "achraf-hakimi-fw11": 94,
       "achraf-hakimi": 89, "lucas-beraldo": 78, "marquinhos": 87, "illia-zabarnyi": 79, "khvicha-kvaratskhelia": 87,
       "fabian-ruiz": 85, "ferran-torres": 83, "ousmane-dembele": 90, "maghnes-akliouche": 80, "lucas-digne": 80,
       "desire-doue": 85, "vitinha": 89, "lucas-hernandez": 81, "mika-godts": 74, "senny-mayulu": 75,
@@ -877,6 +901,7 @@
       "jalil-elias": 71, "fabricio-iacovich": 70, "fabricio-perez": 70, "baltasar-rodriguez": 70, "lucas-alario": 70, "ramiro-funes-mori": 69
     },
     intermiami: {
+      "lionel-messi-fw11": 96,
       "lionel-messi": 89, "rodrigo-de-paul": 83, "casemiro": 83, "luis-suarez": 78, "german-berterame": 77, "dayne-st-clair": 73,
       "reguilon": 72, "tadeo-allende": 71, "facundo-mura": 71, "telasco-segovia": 71, "yannick-bright": 71, "matias-galarza": 69,
       "micael": 69, "david-ayala": 68, "maximiliano-falcon": 68, "gonzalo-lujan": 68, "ian-fray": 66, "mateo-silvetti": 65,
@@ -1053,17 +1078,17 @@
       "courtois": "POR", "lunin": "POR", "asencio": "DFC/LD", "militao": "DFC",
       "huijsen": "DFC", "trent": "LD", "konate": "DFC", "cucurella": "LI",
       "carreras": "LI", "rudiger": "DFC", "mendy": "LI", "dumfries": "LD",
-      "bellingham": "MC", "camavinga": "MC/LI", "valverde": "MC/LD", "tchouameni": "MC/DFC",
+      "bellingham-fw11": "MC", "bellingham": "MC", "camavinga": "MC/LI", "valverde": "MC/LD", "tchouameni": "MC/DFC",
       "arda-guler": "MD/MC", "bernardo": "MC/MD", "vini-jr": "EI/DC", "endrick": "DC/ED",
-      "mbappe": "DC/EI", "mbappe-mvp": "DC/EI", "mbappe-dictador": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
+      "mbappe-fw11": "DC/EI", "mbappe": "DC/EI", "mbappe-mvp": "DC/EI", "mbappe-dictador": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
       "yan-diomande": "EI/ED"
     },
     barcelona: {
       "joan-garcia": "POR", "szczesny": "POR", "livakovic": "POR", "cancelo": "LD/LI",
-      "balde": "LI", "cubarsi": "DFC", "christensen": "DFC/MC", "gerard-martin": "LI/DFC",
+      "balde": "LI", "cubarsi-fw11": "DFC", "cubarsi": "DFC", "christensen": "DFC/MC", "gerard-martin": "LI/DFC",
       "kounde": "LD/DFC", "eric-garcia": "DFC/LD", "gavi": "MC", "fermin": "MC/EI",
-      "pedri": "MC", "rodri": "MC", "dani-olmo": "MC/DC", "de-jong": "MC",
-      "marc-bernal": "MC", "gabriel-jesus": "DC/MC", "lamine-yamal": "ED", "raphinha": "EI",
+      "pedri": "MC", "rodri-fw11": "MC", "rodri": "MC", "dani-olmo": "MC/DC", "de-jong": "MC",
+      "marc-bernal": "MC", "gabriel-jesus": "DC/MC", "lamine-yamal-fw11": "ED", "lamine-yamal": "ED", "raphinha": "EI",
       "adeyemi": "ED/EI", "gordon": "EI/ED", "bardghji": "ED"
     },
     manutd: {
@@ -1080,7 +1105,7 @@
       "marc-guehi": "DFC", "rayan-ait-nouri": "LI", "vitor-reis": "DFC", "josko-gvardiol": "LI/DFC",
       "matheus-nunes": "LD/MC", "abdukodir-khusanov": "DFC", "rico-lewis": "LD/LI", "elliot-anderson": "MC",
       "mateo-kovacic": "MC", "rayan-cherki": "ED/MD", "enzo-fernandez": "MC", "ayyoub-bouaddi": "MC",
-      "nico-o-reilly": "LI/MC", "phil-foden": "ED/MC", "iliman-ndiaye": "EI", "erling-haaland": "DC",
+      "nico-o-reilly": "LI/MC", "phil-foden": "ED/MC", "iliman-ndiaye": "EI", "erling-haaland-fw11": "DC", "erling-haaland": "DC",
       "jeremy-doku": "EI/ED", "allan": "DC", "antoine-semenyo": "ED/EI"
     },
     chelsea: {
@@ -1111,7 +1136,7 @@
       "mohammed-kudus": "ED/EI", "dejan-kulusevski": "ED/MC", "omar-marmoush": "DC/MC", "mykhailo-mudryk": "EI/ED"
     },
     arsenal: {
-      "david-raya": "POR", "kepa-arrizabalaga": "POR", "illan-meslier": "POR", "william-saliba": "DFC",
+      "david-raya-fw11": "POR", "david-raya": "POR", "kepa-arrizabalaga": "POR", "illan-meslier": "POR", "william-saliba": "DFC",
       "cristhian-mosquera": "DFC", "ben-white": "LD", "piero-hincapie": "DFC/LI", "gabriel-magalhaes": "DFC",
       "jurrien-timber": "LD/LI", "ezri-konsa": "DFC/LD", "riccardo-calafiori": "LI/DFC", "myles-lewis-skelly": "LI/MC",
       "martin-odegaard": "MC", "eberechi-eze": "MC/EI", "mikel-merino": "MC/DC", "martin-zubimendi": "MC",
@@ -1128,10 +1153,10 @@
       "j-morante": "MC"
     },
     psg: {
-      "achraf-hakimi": "LD", "lucas-beraldo": "DFC/LI", "marquinhos": "DFC", "illia-zabarnyi": "DFC",
+      "achraf-hakimi-fw11": "LD", "achraf-hakimi": "LD", "lucas-beraldo": "DFC/LI", "marquinhos": "DFC", "illia-zabarnyi": "DFC",
       "khvicha-kvaratskhelia": "EI/ED", "fabian-ruiz": "MC", "ferran-torres": "EI/ED", "ousmane-dembele": "DC/ED",
-      "maghnes-akliouche": "MD/MC", "lucas-digne": "LI", "desire-doue": "ED/EI", "vitinha": "MC",
-      "lucas-hernandez": "DFC/LI", "mika-godts": "EI", "senny-mayulu": "MC", "nuno-mendes": "LI",
+      "maghnes-akliouche": "MD/MC", "lucas-digne": "LI", "desire-doue": "ED/EI", "vitinha-fw11": "MC", "vitinha": "MC",
+      "lucas-hernandez": "DFC/LI", "mika-godts": "EI", "senny-mayulu": "MC", "nuno-mendes-fw11": "LI", "nuno-mendes": "LI",
       "lucas-chevalier": "POR", "warren-zaire-emery": "MC", "matvey-safonov": "POR", "willian-pacho": "DFC",
       "joao-neves": "MC"
     },
@@ -1224,7 +1249,7 @@
       "fabricio-perez": "MI/MD", "baltasar-rodriguez": "MC/MI", "lucas-alario": "DC", "ramiro-funes-mori": "DFC"
     },
     intermiami: {
-      "lionel-messi": "MC/MD", "rodrigo-de-paul": "MC/MD", "casemiro": "MC", "luis-suarez": "DC/MC", "german-berterame": "DC/ED",
+      "lionel-messi-fw11": "ED/DC", "lionel-messi": "MC/MD", "rodrigo-de-paul": "MC/MD", "casemiro": "MC", "luis-suarez": "DC/MC", "german-berterame": "DC/ED",
       "dayne-st-clair": "POR", "reguilon": "LI", "tadeo-allende": "MD/MI", "facundo-mura": "LD/LI", "telasco-segovia": "MC/MI",
       "yannick-bright": "MC", "matias-galarza": "MC/MI", "micael": "DFC", "david-ayala": "MC", "maximiliano-falcon": "DFC",
       "gonzalo-lujan": "DFC/LD", "ian-fray": "LD/DFC", "mateo-silvetti": "MD/MI", "luis-barraza": "POR", "rocco-rios-novo": "POR",
@@ -1425,6 +1450,7 @@
   ATLETICO.forEach(j => cartaFutbol("futbol", "champions", j));
   MILAN.forEach(j => cartaFutbol("futbol", "champions", j));
   ESPECIALES3.forEach(j => cartaFutbol("futbol", "especiales", j));
+  ESPECIALES4.forEach(j => cartaFutbol("futbol", "especiales", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = (lista, w = TIERS.map(x => x.w), ultima = null, pesoDe = c => c.peso, tierDe = c => c.tier, bandas = BANDAS, pesoRerollDe = pesoDe) => {
@@ -1472,7 +1498,7 @@
   // Las leyendas (43 cartas, n = 1111) y los pesos nuevos de las especiales (publicado el 2026-10-29): el corte (2026-10-29 03:40 UTC) es 12 minutos después del push, para que ningún sobre ya comprado cambie.
   // Las medias de FC 27, las bandas nuevas de rareza, el Atlético de Madrid y el AC Milan (n = 1154, los pesos de hoy pero todavía con la rareza de antes; publicado el 2026-10-29): el corte (2026-10-29 04:26 UTC) es 13 minutos después del push, para que ningún sobre ya comprado cambie.
   // Mbappé · Dictador (1 carta, n = 1207, publicado el 2026-10-29): corte a las 12:27 UTC; `actual`: los sobres de antes del corte ya usaban la rareza y los pesos de hoy.
-  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }, { hasta: 1793247961952, n: 1154, hoy: true }, { hasta: 1793276830094, n: 1207, actual: true }];
+  const AMPLIACIONES = [{ hasta: 1793072603996, n: 648 }, { hasta: 1793202400000, n: 813 }, { hasta: 1793222209477, n: 833 }, { hasta: 1793237965743, n: 1110 }, { hasta: 1793245215690, n: 1111 }, { hasta: 1793247961952, n: 1154, hoy: true }, { hasta: 1793276830094, n: 1207, actual: true }, { hasta: 1794354176036, n: 1208, actual: true }];
   // desde este instante las cartas valen con su rareza nueva (las medias de FC 27 y las bandas nuevas)
   const CORTE_TIERS = AMPLIACIONES.find(x => x.hoy).hasta;
   // la rareza que tenía una carta a la hora `at` (un re-roll viejo se hizo con las de entonces)
@@ -1747,7 +1773,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, ESPECIALES3, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, ESPECIALES3, ESPECIALES4, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

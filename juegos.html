@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202611100122"></script>
+<script src="i18n.js?v=202611102323"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -4383,6 +4383,12 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 @keyframes ep-fu-flota{to{transform:translate(var(--x),calc(var(--y) - 10px)) rotate(var(--r))}}
 .ep-fu-carta{position:relative;display:block;width:100%;aspect-ratio:5/7;border-radius:12px;overflow:hidden;border:3px solid #ffcc3d;background:#1d0b3a;box-shadow:0 0 30px #ffcc3d77,0 18px 40px #000a}
 .ep-fu-carta img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 14%}
+/* la carta del FW11 (Mundial): marco azul y oro, cinta azul y el chip «Nuevo · Mundial» abajo */
+.ep-fu-carta.fw{border-color:#4f86ff;box-shadow:0 0 0 2px #ffd23d,0 0 34px #2b5bd7aa,0 18px 40px #000a}
+.ep-fu-carta.fw .ep-fc-cinta{background:linear-gradient(90deg,#0b1f5c,#1d3f9e 60%,#2b5bd7);color:#ffd23d;box-shadow:0 0 0 1px #ffd23d,0 2px 6px #0008}
+.ep-fc-fw{position:absolute;left:50%;bottom:26px;z-index:3;transform:translateX(-50%);padding:3px 7px;border-radius:999px;background:#ffd23d;color:#0b1f5c;font:800 8px/1 'Barlow Condensed',Rubik,sans-serif;font-style:normal;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;box-shadow:0 0 12px #ffd23daa;animation:epFwLate 1.6s ease-in-out infinite}
+@keyframes epFwLate{50%{transform:translateX(-50%) scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.ep-fc-fw{animation:none}}
 .ep-fc-nuevo{position:absolute;left:50%;bottom:calc(100% + 8px);z-index:4;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:linear-gradient(90deg,#d52b1e,#b31d14 55%,#0b3a8c);color:#fff;font:400 13px/1 Bungee,'Arial Black',sans-serif;white-space:nowrap;box-shadow:0 0 0 2px #fff,0 6px 18px #000b}
 .ep-fc-nuevo img{height:12px;border-radius:2px}
 .ep-fu-slot.f1 .ep-fc-nuevo{left:0;transform:none}
@@ -7061,6 +7067,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202611100122"></script>
+<script src="juegos-app.js?v=202611102323"></script>
 </body>
 </html>

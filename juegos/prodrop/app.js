@@ -757,7 +757,11 @@ const PORTADA = {
 };
 // una carta de la portada: por jugador (`club-id`) o, si es una especial, por su archivo (`club-id-especial`)
 const cartaDePortada = (club, id) => CARDS.find(c => c.person === club + '-' + id) || CARDS.find(c => c.uid.startsWith(club + '-' + id + '-'));
-const fanDe = (col, tier = 2) => PORTADA[col]
+// el sobre Plus promociona el FIFA Pro World 11: tres de sus once al azar, otras cada vez que se pinta
+const FW11 = CARDS.filter(c => /-fw11-/.test(c.uid));
+const fanDe = (col, tier = 2) => col === 'futbolplus' && FW11.length >= 3
+  ? FW11.slice().sort(() => Math.random() - .5).slice(0, 3)
+  : PORTADA[col]
   ? PORTADA[col].map(([club, id]) => cartaDePortada(club, id))
   : CARDS.filter(c => c.tier >= tier && c.col === col).sort(() => Math.random() - .5).slice(0, 3);
 function skinHTML(fan, col = coleccion) {
@@ -2299,6 +2303,9 @@ function tipFutbol() {
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Noviembre 2026 · FIFA Pro World 11', [
+    '<b>🏆 FW11</b>: el once del Mundial 2026, una carta especial por jugador con marco azul y oro: David Raya (<b>93</b>), Cubarsí (<b>93</b>), Hakimi (<b>94</b>), Nuno Mendes (<b>94</b>), Bellingham (<b>96</b>), Rodri (<b>96</b>), Vitinha (<b>94</b>), Haaland (<b>95</b>), Mbappé (<b>97</b>), Messi (<b>96</b>) y Lamine Yamal (<b>93</b>). Salen en los sobres de fútbol (el normal y el Plus) <b>por tiempo limitado</b>, igual de poco que las otras especiales. Son el mismo jugador que su carta normal: no puedes poner las dos en tu once. Los sobres que ya abriste no cambian.'
+  ]],
   ['Octubre 2026 · Medias de FC 27, el Atlético de Madrid y el AC Milan', [
     '<b>🔴 Atlético de Madrid</b> y <b>⚫ AC Milan</b>: sus 26 y 27 jugadores de EA SPORTS FC 27 (titulares, suplentes y la cantera), con Oblak, Julián Álvarez, Koke, Maignan, Modrić y Pulisic. También entran al álbum de clubes del Desafío de plantilla, cada uno con su marco de perfil.',
     '<b>📈 Medias de FC 27</b>: pusimos las medias de EA SPORTS FC 27 a todos los jugadores. Unas suben (Courtois 90, Yan Diomandé 84, Gerard Martín 79) y otras bajan (Trent 84). Como la rareza sale de la media, ahora es: <b>Común</b> hasta 76, <b>Rara</b> 77 a 82, <b>Épica</b> 83 a 87 y <b>Legendaria</b> 88 o más.',

@@ -1348,6 +1348,9 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .futbol.especial { --marco: 3.2cqw; --marco-bg: linear-gradient(135deg, #fffbe6, #ffd23d 22%, #fff 40%, #c58a00 58%, #ffe58a 78%, #fff6c8); box-shadow: 0 0 0 .6cqw #ffe58a66, 0 0 7cqw #ffcc3d88; }
 .futbol.especial .fu-marco { background-size: 220% 220%; animation: espBrillo 3.2s linear infinite; }
 @keyframes espBrillo { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+/* FIFA Pro World 11: marco azul noche con oro, como un equipo del año, y cinta azul con letras doradas */
+.futbol.esp-fw11 { --marco-bg: linear-gradient(135deg, #ffe58a, #0b1f5c 20%, #2b5bd7 36%, #ffd23d 50%, #0b1f5c 66%, #4f86ff 82%, #ffe58a); box-shadow: 0 0 0 .6cqw #4f86ff66, 0 0 7cqw #2b5bd7aa; }
+.futbol.esp-fw11 .fu-cinta { color: #ffd23d; background: linear-gradient(90deg, #0b1f5c, #1d3f9e 60%, #2b5bd7); box-shadow: 0 0 0 .3cqw #ffd23d, 0 .6cqw 1.6cqw #0008; }
 .fu-cinta {
   position: absolute; left: 4.5cqw; top: 15.5cqw; z-index: 2; max-width: 56cqw;
   font: 800 3.1cqw/1 "Barlow Condensed", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #3a2a00;

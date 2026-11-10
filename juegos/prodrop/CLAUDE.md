@@ -165,6 +165,12 @@ other file of the site. Things that hold it together:
 - **Mbappé · Dictador** (`ESPECIALES3`, the last card, id 1207, media 91 like his base card): its
   `AMPLIACIONES` entry carries `actual: true`, because the packs before its cut already used
   today's rarity and weights (`CORTE_TIERS` is the `hoy` entry, not the last one).
+- **FIFA Pro World 11** (`ESPECIALES4`, ids 1208–1218, last `AMPLIACIONES` entry `{ n: 1208, actual: true }`):
+  the 2026 World Cup eleven, one special per player (`especial: "fw11"`, ribbon «FW11», id `<base id>-fw11`,
+  `person` = the base card's). Medias chosen by the owner (91–97, always above the base card; a test pins them).
+  Own frame `.futbol.esp-fw11` (navy and gold). Photos are **5:7 portraits** (470×658), not squares: a square
+  lost the trophy on the sides. In the Salón banner the fourth card is a random one of `FW11_FUTBOL` with the
+  chip `.ep-fc-fw` («Nuevo · Mundial»; `.ep-fc-nuevo` was already taken in `juegos.html`).
 - **Leyendas** (`LEYENDAS` in the motor, photos `cards/leyendas/<id>.webp`, 43 cards, ids 1111+,
   last `AMPLIACIONES` entry `n: 1111`): retired greats (Pelé, Maradona, Zidane, R9, Cruyff, Figueroa,
   Zamorano…), a category of their own. **No club** (`club: null`, flag only), always tier 3 (Legendaria for
