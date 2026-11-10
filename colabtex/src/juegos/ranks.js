@@ -27,6 +27,7 @@ import { rankingColeccion, topColecciones, colVisible, PUNTOS_RAREZA, miniCarta,
 import { avatarMarco, marcoDeUid } from "./perfil-vista.js";
 import { nombreHtml } from "./tintas.js";
 import { podiosGeneral, MIN_PODIO } from "./perfil-tarjeta.js";
+import { crearListaMkw, tablasMkw, podioMkw, carrerasConDatos, MKW_TABLAS, MKW_CC_CORTO, ponEstiloMkr } from "./mkw-records.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -192,6 +193,24 @@ export function crearRanks(ctx) {
      colección completa («Ver colección», una a la vez). */
   let colC = "", verC = "";
   try { colC = localStorage.getItem("jg.rankCol") || ""; } catch (e) { /* sin almacenamiento */ }
+  /* Mario Kart Wii tiene dos tablas: la de la sala (victorias, como los demás juegos de sala) y los récords de tiempo
+     por pista (mkw-records.js, §267 de la bitácora del juego). «Ver: Récords de tiempo | Sala» elige; en Récords, la
+     tabla (Contrarreloj 150/200 o Carrera con su cilindrada) y el podio de quién tiene más récords. Se recuerda. */
+  let mkwVer = "records", mkwCat = "tt150", mkwRaw = null, mkwTablas = {}, mkwLista = null, mkwPistasPedidas = false;
+  try {
+    if (localStorage.getItem("jg.mkwVer") === "sala") mkwVer = "sala";
+    const c = localStorage.getItem("jg.mkwCat"); if (MKW_TABLAS[c]) mkwCat = c;
+  } catch (e) { /* sin almacenamiento */ }
+  const mkwRec = () => juego === "mkw" && mkwVer === "records" && !!ctx.watchMkwRecords;
+  /* El nombre del perfil de hoy encima del que el juego apuntó con el récord (el buscador busca por ese). */
+  const conPerfiles = t => {
+    for (const l of Object.values(t)) for (const p of l) for (const fi of p.filas) {
+      const q = mezcla({ uid: fi.uid, nombre: fi.nombre }, perfil(fi.uid));
+      if (q && q.nombre) fi.nombre = String(q.nombre).slice(0, 20);
+    }
+    return t;
+  };
+  const rehaceMkw = () => { mkwTablas = conPerfiles(tablasMkw(mkwRaw || {}, ctx.vetado || (() => false))); filas = podioMkw(mkwTablas[mkwCat] || []); };
 
   function montar(donde) {
     host = donde;
@@ -201,6 +220,7 @@ export function crearRanks(ctx) {
         <div id="rkSolo"></div><div id="rkAviso"></div>
         <div id="rkCartas" hidden></div>
         <section class="jg-rk" id="rkEscena"></section>
+        <div id="rkMkw" hidden></div>
         <div class="jg-tabla-caja"><table class="jg-tabla" id="rkTabla"></table></div>
         <p class="jg-nota-larga">
           Se suman 3 puntos por partida ganada y 1 por empate. Cada jugador apunta su propia
@@ -219,6 +239,7 @@ export function crearRanks(ctx) {
     muerto = true;
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     if (pararC) { try { pararC(); } catch (e) {} pararC = null; }
+    if (mkwLista) { mkwLista.destruir(); mkwLista = null; }
     if (host) { host.removeEventListener("click", alClic); host.innerHTML = ""; }
     host = null;
   }
@@ -233,6 +254,7 @@ export function crearRanks(ctx) {
       pinta();
       return;
     }
+    if (mkwRec()) { escuchaMkw(); return; }
     pinta();
     const individual = esSolo(juego);
     const oye = juego === "general" ? oyeGeneral
@@ -244,6 +266,32 @@ export function crearRanks(ctx) {
       filas = lista || [];
       pinta();
     });
+  }
+
+  function escuchaMkw() {
+    if (!mkwLista) {
+      ponEstiloMkr();
+      mkwLista = crearListaMkw({ uid, foto: (fi, t) => foto(mezcla(fi, perfil(fi.uid)), t), nombreHtml, fantasma: ctx.fantasmaMkw });
+      mkwLista.montar(host.querySelector("#rkMkw"));
+    }
+    mkwLista.tabla(mkwCat);
+    if (mkwRaw) { cargando = false; rehaceMkw(); }
+    pinta();
+    parar = ctx.watchMkwRecords((raw, err) => {
+      if (muerto) return;
+      cargando = false;
+      fallo = err ? String(err.code || err.message || err) : "";
+      mkwRaw = raw || {};
+      rehaceMkw();
+      if (mkwLista) mkwLista.datos(mkwTablas, err);
+      pintaCategorias();
+      pinta();
+    });
+    // los nombres y los íconos de las pistas, una vez (del Worker de amigos, guardados en la caché: mkw.js pistasMkw)
+    if (!mkwPistasPedidas && ctx.pistasMkw) {
+      mkwPistasPedidas = true;
+      Promise.resolve(ctx.pistasMkw()).then(p => { if (p && mkwLista && !muerto) mkwLista.pistas(p); }, () => {});
+    }
   }
 
   /* La general: los podios de todas las tablas que se ven aquí (las de
@@ -284,7 +332,10 @@ export function crearRanks(ctx) {
   function pinta() {
     if (!host) return;
     const deCartas = juego === CARTAS;
-    for (const sel of ["#rkEscena", ".jg-tabla-caja", ".jg-nota-larga"]) { const x = host.querySelector(sel); if (x) x.hidden = deCartas; }
+    const rec = mkwRec();
+    for (const sel of ["#rkEscena", ".jg-ranks > .jg-tabla-caja", ".jg-ranks > .jg-nota-larga"]) { const x = host.querySelector(sel); if (x) x.hidden = deCartas || (rec && sel !== "#rkEscena"); }
+    const cajaMkw = host.querySelector("#rkMkw");
+    if (cajaMkw) cajaMkw.hidden = !rec;
     const caja = host.querySelector("#rkCartas");
     if (caja) caja.hidden = !deCartas;
     if (deCartas) { const av = host.querySelector("#rkAviso"); if (av) av.innerHTML = ""; pintaCartas(caja); return; }
@@ -295,13 +346,18 @@ export function crearRanks(ctx) {
          no están publicadas en la consola de Firebase.</div>`
       : "";
 
+    if (rec) {
+      if (av && fallo) av.innerHTML = `<div class="jg-aviso">No se pueden leer los récords (<code>${esc(fallo)}</code>).</div>`;
+      pintaEscena(filas.map(fi => mezcla(fi, perfil(fi.uid))), false);
+      return;
+    }
     const t = host.querySelector("#rkTabla");
     if (!t) return;
     const solo = esSolo(juego);
     const general = juego === "general";
     const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)).map(f => mezcla(f, perfil(f.uid)))
       : general ? filas : ordenaRanks(filas);
-    host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
+    host.querySelector(".jg-ranks > .jg-nota-larga").textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
       : general ? `La general cuenta los podios de todas las clasificaciones (de sala y del club, con al menos ${MIN_PODIO} personas): cada primer puesto da 3 puntos, cada segundo 2 y cada tercero 1.`
       : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
@@ -437,6 +493,7 @@ export function crearRanks(ctx) {
   /* Lo que se compara en esta tabla, y cómo se dice. Las del club de
      buscaminas se ganan por tiempo (menos es mejor); el resto, por puntos. */
   function medida(solo) {
+    if (mkwRec()) return { valor: fi => fi.oro || 0, txt: v => plural(v, "récord", "récords"), unidad: "", menor: false };
     if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo.startsWith("club-sortem-") || categoriaSolo === "club-tetris-sprint" ||
         (categoriaSolo.startsWith("club-sopa-") && categoriaSolo !== "club-sopa-racha") ||
         /^club-sudoku-(facil|medio|dificil|experto)$/.test(categoriaSolo)))
@@ -490,6 +547,7 @@ export function crearRanks(ctx) {
     const detalle = solo && categoriaSolo === "club-hero-estrellas" ? `${plural(f.h || 0, "canción", "canciones")} · ${Math.max(0, (f.puntos || 0) % 10000 - Math.floor((f.puntos || 0) / 10000))} azules`
       : solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
       : juego === "general" ? medallas(f)
+      : mkwRec() ? `${f.plata || 0} 🥈 · ${f.bronce || 0} 🥉 · ${plural(f.pistas || 0, "pista", "pistas")}`
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
@@ -512,15 +570,21 @@ export function crearRanks(ctx) {
       if (m.menor) return `${Math.max(0.01, d + 0.01).toFixed(2)} s menos`;
       const n = d + 1;
       if (solo && categoriaSolo === "club-hero-estrellas") return plural(n, "estrella dorada", "estrellas doradas");
+      if (mkwRec()) return plural(n, "récord", "récords");
       return solo || juego === "general" ? plural(n, "punto", "puntos") : `${plural(n, "punto", "puntos")} (${plural(victorias(n), "victoria", "victorias")})`;
     };
+    /* «Te falta 1 récord», «Te faltan 2 récords» (el verbo concuerda con lo que falta) */
+    const faltan = c => (/^1 /.test(c) ? "Te falta " : "Te faltan ") + c;
     let icono = "⚔", tit, txt;
     if (!orden.length) {
       icono = "♛"; tit = "El trono está vacío";
-      txt = solo ? "El primer récord que se apunte se sienta en él." : juego === "general" ? "El primer podio que se gane se sienta en él." : "La primera victoria que se apunte se sienta en él.";
+      txt = mkwRec() ? "Quien bata más récords de pista se sienta en él. Corre una Contrarreloj y apunta el primero."
+        : solo ? "El primer récord que se apunte se sienta en él." : juego === "general" ? "El primer podio que se gane se sienta en él." : "La primera victoria que se apunte se sienta en él.";
     } else if (i < 0) {
       tit = "Todavía no estás en la tabla";
-      txt = juego === "general" ? (orden.length < 3 ? "Hay un puesto libre en el podio: sube al podio de cualquier clasificación y es tuyo."
+      txt = mkwRec() ? (orden.length < 3 ? "Hay un puesto libre en el podio: bate el récord de cualquier pista y es tuyo."
+          : `El podio empieza en ${m.txt(m.valor(orden[2]))}. Bate récords de pista y entras.`)
+        : juego === "general" ? (orden.length < 3 ? "Hay un puesto libre en el podio: sube al podio de cualquier clasificación y es tuyo."
           : `El podio empieza en ${plural(orden[2].puntos, "punto", "puntos")}: sube al podio de cualquier clasificación y entras.`)
         : orden.length < 3 ? "Hay un puesto libre en el podio: termina una partida y es tuyo."
         : `El podio empieza en ${m.txt(m.valor(orden[2]))}${m.unidad ? " " + m.unidad : ""}. Juega y entra.`;
@@ -529,13 +593,13 @@ export function crearRanks(ctx) {
       const r = orden[1];
       txt = !r ? "Nadie te la disputa todavía."
         : falta(orden[0], r) === 0 ? `${esc(r.nombre)} está empatado contigo. Defiéndela.`
-        : `${esc(r.nombre)} está a ${m.menor ? `${(m.valor(r) - m.valor(orden[0])).toFixed(2)} s` : plural(falta(r, orden[0]), "punto", "puntos")}. Que no te alcance.`;
+        : `${esc(r.nombre)} está a ${m.menor ? `${(m.valor(r) - m.valor(orden[0])).toFixed(2)} s` : mkwRec() ? plural(falta(r, orden[0]), "récord", "récords") : plural(falta(r, orden[0]), "punto", "puntos")}. Que no te alcance.`;
     } else if (i < 3) {
       icono = "♛"; tit = `#${i + 1} — a un paso del trono`;
-      txt = `Te faltan ${cuanto(orden[i], orden[0])} para quitarle la corona a ${esc(orden[0].nombre)}.`;
+      txt = `${faltan(cuanto(orden[i], orden[0]))} para quitarle la corona a ${esc(orden[0].nombre)}.`;
     } else {
       tit = `Vas #${i + 1}`;
-      txt = `Te faltan ${cuanto(orden[i], orden[2])} para subir al podio` +
+      txt = `${faltan(cuanto(orden[i], orden[2]))} para subir al podio` +
         (i > 3 ? `, y ${cuanto(orden[i], orden[i - 1])} para adelantar a ${esc(orden[i - 1].nombre)}.` : ".");
     }
     return `<div class="jg-rk-tu${i >= 0 && i < 3 ? " podio" : ""}"><i>${icono}</i><div><b>${tit}</b><span>${txt}</span></div></div>`;
@@ -547,11 +611,11 @@ export function crearRanks(ctx) {
     if (fallo || (cargando && !orden.length)) { el.innerHTML = ""; el.hidden = true; firma = ""; return; }
     el.hidden = false;
     const m = medida(solo);
-    const clave = solo ? categoriaSolo : juego;
+    const clave = solo ? categoriaSolo : mkwRec() ? "mkw-" + mkwCat : juego;
     const entra = animado !== clave;
     animado = clave;
     const j = JUEGOS[juego] || EXTRA[juego] || { nombre: juego === "general" ? "Todos los juegos" : juego };
-    const sub = solo ? subtitulo() : "";
+    const sub = solo ? subtitulo() : mkwRec() ? "Récords · " + MKW_TABLAS[mkwCat] : "";
     const html = `
       <div class="jg-rk-rayos"></div>
       <header class="jg-rk-cab"><span>Salón de la fama</span><h2>${esc(j.nombre)}</h2>${sub ? `<small>${esc(sub)}</small>` : ""}</header>
@@ -585,6 +649,7 @@ export function crearRanks(ctx) {
   function pintaCategorias() {
     const el = host && host.querySelector("#rkSolo");
     if (!el) return;
+    if (juego === "mkw" && ctx.watchMkwRecords) { el.innerHTML = categoriasMkw(); return; }
     if (!esSolo(juego)) { el.innerHTML = ""; return; }
     const d = SOLO[juego], e = elige(juego);
     el.innerHTML = `<div class="jg-rk-cats" style="--c:${EXTRA[juego].color}">${visibles(d, e).map(f =>
@@ -592,7 +657,43 @@ export function crearRanks(ctx) {
         `<button type="button" class="${e[f.k] === v ? "on" : ""}" aria-pressed="${e[f.k] === v}" data-cat-k="${f.k}" data-cat-v="${v}">${t}</button>`).join("")}</div></div>`).join("")}</div>`;
   }
 
+  /* Las filas de Mario Kart: «Ver», y en Récords «Tabla» y (en Carrera) la cilindrada: solo las que tienen tiempos. */
+  function categoriasMkw() {
+    const fila = (k, t, ops, on) => `<div class="jg-rk-fila"><span>${t}</span><div class="jg-rk-seg" role="group" aria-label="${t}">${ops.map(([v, x]) =>
+      `<button type="button" class="${on === v ? "on" : ""}" aria-pressed="${on === v}" data-mkw-k="${k}" data-mkw-v="${v}">${x}</button>`).join("")}</div></div>`;
+    let html = fila("ver", "Ver", [["records", "Récords de tiempo"], ["sala", "Sala"]], mkwVer);
+    if (mkwVer === "records") {
+      const carrera = mkwCat.startsWith("vs");
+      html += fila("tabla", "Tabla", [["tt150", "Contrarreloj 150cc"], ["tt200", "Contrarreloj 200cc"], ["carrera", "Carrera"]], carrera ? "carrera" : mkwCat);
+      if (carrera) {
+        const ccs = carrerasConDatos(mkwTablas);
+        if (!ccs.includes(mkwCat)) ccs.unshift(mkwCat);
+        html += fila("cc", "Cilindrada", ccs.map(c => [c, MKW_CC_CORTO[c]]), mkwCat);
+      }
+    }
+    return `<div class="jg-rk-cats" style="--c:${(JUEGOS.mkw && JUEGOS.mkw.color) || "#e60012"}">${html}</div>`;
+  }
+  function eligeMkw(k, v) {
+    const antes = mkwRec();
+    if (k === "ver") mkwVer = v === "sala" ? "sala" : "records";
+    else if (k === "tabla") mkwCat = v === "carrera" ? (mkwCat.startsWith("vs") ? mkwCat : carrerasConDatos(mkwTablas)[0] || "vs150") : v;
+    else if (k === "cc") mkwCat = v;
+    if (!MKW_TABLAS[mkwCat]) mkwCat = "tt150";
+    try { localStorage.setItem("jg.mkwVer", mkwVer); localStorage.setItem("jg.mkwCat", mkwCat); } catch (e) { /* nada */ }
+    pintaCategorias();
+    if (antes !== mkwRec()) escucha();
+    else {
+      filas = podioMkw(mkwTablas[mkwCat] || []);
+      if (mkwLista) mkwLista.tabla(mkwCat);
+      pinta();
+    }
+    const b = host && host.querySelector(`[data-mkw-k="${k}"][data-mkw-v="${v}"]`);
+    if (b) b.focus({ preventScroll: true });          // el cursor del mando se queda en el botón
+  }
+
   function alClic(ev) {
+    const mk = ev.target.closest("[data-mkw-k]");
+    if (mk && juego === "mkw") { eligeMkw(mk.getAttribute("data-mkw-k"), mk.getAttribute("data-mkw-v")); return; }
     const rc = juego === CARTAS && ev.target.closest("[data-rkc-col],[data-rkc-ver]");
     if (rc) {
       if (rc.hasAttribute("data-rkc-col")) {
@@ -641,7 +742,10 @@ export function crearRanks(ctx) {
 
   /* Un perfil que llega después de la tabla no trae fila nueva que
      escuchar, así que hay que decirle desde fuera que se repinte. */
-  function refresca() { pinta(); }
+  function refresca() {
+    if (mkwRec() && mkwRaw) { rehaceMkw(); if (mkwLista) { mkwLista.datos(mkwTablas, fallo ? { code: fallo } : null); mkwLista.refresca(); } }
+    pinta();
+  }
 
   return { montar, destruir, refresca };
 }

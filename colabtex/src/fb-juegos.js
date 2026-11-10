@@ -825,6 +825,17 @@ export function watchSolo(categoria, cb) {
   }, e => cb([], e));
   return () => { off(); offV(); };
 }
+/* Los récords de tiempo de Mario Kart Wii (`mkw/records/<pista>-<tabla>/<uid>`, los escribe el juego al cruzar la
+   meta; juegos/mkw-records.js los ordena). Un solo nodo para todas las tablas: con un grupo de amigos son decenas de
+   pistas, pocas filas cada una. Se entrega el nodo crudo y se vuelve a avisar cuando cambia la lista de vetados
+   (quien lo pinta los esconde con `estaVetado`). */
+export function watchMkwRecords(cb) {
+  let raw = null;
+  const emite = () => { if (raw) cb(raw, null); };
+  const offV = vigilaVetados(emite);
+  const off = onValue(ref(db, "mkw/records"), s => { raw = s.val() || {}; emite(); }, e => cb({}, e));
+  return () => { off(); offV(); };
+}
 /* La tabla de una modalidad, una vez: el aviso del podio la necesita
    *antes* del récord para saber de qué puesto venía. */
 export async function leerSolo(categoria) {

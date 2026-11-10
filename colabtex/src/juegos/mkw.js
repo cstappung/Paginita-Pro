@@ -69,6 +69,85 @@ const almacenRecords = {
   },
 };
 
+/* El fantasma de un récord de la Contrarreloj, para el botón «⬇ Fantasma del 1.º» del panel de récords. */
+export const fantasmaMkw = (k, u) => almacenRecords.fantasmaBajar(k, u);
+
+/* Los nombres de las pistas y los íconos de las copas para el panel de récords de Clasificaciones (mkw-records.js).
+   Son del juego: no están en el sitio. Se piden al Worker de amigos con el token, y son los MISMOS dos archivos que ya
+   baja el selector de pistas del juego (build/imagenes/paquetes/indice.json y copas.<huella>.pak, ~650 KB), así que
+   no hay nada nuevo en R2. Para gastar pocas llamadas al Worker (§104: 100 000 al día para todo el sitio) quedan en la
+   caché del navegador «jg-mkw-pistas»: el paquete lleva su huella en el nombre y no cambia nunca; el índice se vuelve
+   a preguntar como mucho una vez al día. Quien no es amigo (401/403) o no tiene sesión: null, recordado un día
+   (`jg.mkwPistas.no`), y el panel dice «Copa N · Pista M». Una sola carga por pestaña. */
+const UN_DIA = 864e5, CAJA_PISTAS = "jg-mkw-pistas";
+let pistasPromesa = null;
+export function pistasMkw({ privadoUrl = urlPrivada } = {}) {
+  return pistasPromesa || (pistasPromesa = cargarPistas(privadoUrl).catch(e => {
+    console.warn("[mkw] nombres de pistas:", e && e.message || e); pistasPromesa = null; return null;
+  }));
+}
+/* El formato de los paquetes (herramientas/empaquetar-imagenes.mjs del juego): «MKWI», el largo del índice, el
+   índice en JSON { nombre: [desde, cuánto, tipo] } y los archivos pegados. → Map(nombre → dirección blob:). */
+async function abrirPak(b) {
+  if (b[0] === 0x1F && b[1] === 0x8B)
+    b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+  if (String.fromCharCode(b[0], b[1], b[2], b[3]) !== "MKWI") throw new Error("copas: no es un paquete");
+  const largo = new DataView(b.buffer, b.byteOffset).getUint32(4, true);
+  const lista = JSON.parse(new TextDecoder().decode(b.subarray(8, 8 + largo)));
+  const urls = new Map();
+  for (const [n, [desde, cuanto, tipo]] of Object.entries(lista))
+    urls.set(n, URL.createObjectURL(new Blob([b.subarray(8 + largo + desde, 8 + largo + desde + cuanto)], { type: tipo })));
+  return urls;
+}
+async function cargarPistas(privadoUrl) {
+  try { if (Date.now() - Number(localStorage.getItem("jg.mkwPistas.no") || 0) < UN_DIA) return null; } catch (e) { /* nada */ }
+  const origen = await privadoUrl();
+  if (!origen) return null;
+  const dir = origen + "/build/imagenes/paquetes/";
+  const caja = typeof caches !== "undefined" ? await caches.open(CAJA_PISTAS).catch(() => null) : null;
+  let negado = false;
+  const pedir = async url => {
+    const t = await Promise.resolve(auth.currentUser && auth.currentUser.getIdToken()).catch(() => null);
+    if (!t) { negado = true; return null; }
+    const r = await fetch(url, { headers: { Authorization: "Bearer " + t } });
+    if (r.status === 401 || r.status === 403) negado = true;
+    return r.ok ? r : null;
+  };
+  // el índice: el de la caja si tiene menos de un día; si no, del Worker (si falla la red, el viejo de la caja)
+  let indice = null;
+  const viejo = caja && await caja.match(dir + "indice.json").catch(() => null);
+  const edad = viejo ? Date.now() - Number(viejo.headers.get("x-jg-guardado") || 0) : Infinity;
+  if (viejo && edad < UN_DIA) indice = await viejo.json();
+  else {
+    const r = await pedir(dir + "indice.json").catch(() => null);
+    if (r) {
+      const txt = await r.text();
+      indice = JSON.parse(txt);
+      if (caja) await caja.put(dir + "indice.json", new Response(txt, { headers: { "content-type": "application/json", "x-jg-guardado": String(Date.now()) } })).catch(() => {});
+    } else if (viejo && !negado) indice = await viejo.json();
+  }
+  if (!indice || !indice.nombres) {
+    if (negado) { try { localStorage.setItem("jg.mkwPistas.no", String(Date.now())); } catch (e) { /* nada */ } }
+    return null;
+  }
+  try { localStorage.removeItem("jg.mkwPistas.no"); } catch (e) { /* nada */ }
+  let icono = null;
+  if (indice.copas) {
+    const url = dir + indice.copas;
+    let r = caja && await caja.match(url).catch(() => null);
+    if (!r) {
+      r = await pedir(url).catch(() => null);
+      if (r && caja) {
+        await caja.put(url, r.clone()).catch(() => {});
+        // el paquete de antes (otra huella) ya no sirve: se suelta
+        for (const k of await caja.keys().catch(() => [])) if (!k.url.endsWith("/indice.json") && k.url !== url) caja.delete(k).catch(() => {});
+      }
+    }
+    if (r) { const urls = await abrirPak(new Uint8Array(await r.arrayBuffer())); icono = c => urls.get(String(c)) || ""; }
+  }
+  return { nombres: indice.nombres, icono };
+}
+
 /* Las partidas de cada uno en la nube (juegos/mkw/web/navegador/nube.mjs): un paquete por cuenta en Storage,
    mkw/<uid>/partidas.mkwp (firebase/storage.rules: solo su dueño lo lee y lo escribe). El marco decide qué subir o
    bajar; esto solo habla con Firebase. Lo que va y viene se copia: los Uint8Array del marco son de otro "reino" de
