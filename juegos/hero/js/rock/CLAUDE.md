@@ -232,7 +232,7 @@ drawing, `MINI.px` (192) square.
   to the old path, `miniProcesa`: rendered in a corner of the scene's canvas
   before the scene, but **one every 3 frames**.
 - Cached per piece and colours (`invId`) in localStorage under `claveMini(v)`
-  (`catalogo.js`, `rock-mini-4:<id>`: bump the number when the rocker's look
+  (`catalogo.js`, `rock-mini-5:<id>`: bump the number when the rocker's look
   changes; `limpiaMinisViejas` deletes the old prefix, since localStorage is
   ~5 MB for the whole site). The page keeps object URLs in memory and writes
   the data URL in the background (`FileReader`).
@@ -246,6 +246,69 @@ drawing, `MINI.px` (192) square.
   **`rock-visor.html`** in a hidden iframe (`{canal:'rock-visor-pide',
   lista}` → `{canal:'rock-visor', fotos:[{id,url}]}`, `rock.miniaturas`, ≤
   40); its import map carries `?v=hero-N` too.
+
+## Body, shading and clothes (the November 2026 polish)
+
+- **Shoulders**: the torso profile (`K` rows in `buildBodySrc`) keeps its
+  width up to the shoulder and slopes to the neck like a trapezius. It used to
+  narrow like a bottle, so the arm was a ball hanging outside. The chest→arm
+  weight (`u` in the arm grid) spreads over the whole deltoid (0.175 of `s`):
+  with a short blend the cap turned like a plug and its tip poked out as a
+  horn. The neck weight (`nk` in `torsoW`) also falls off with `|x|`, or the
+  trapezius bends with the head. The arm outline fades at the cap (`olw`),
+  both bodies: no seam line where arm and torso overlap.
+- Things placed on the shoulder ask `topY(x)` (the strap, the jacket studs):
+  a fixed height floated above it and looked like a black horn.
+- **Skin** uses `GRAD_SOFT`, a smooth 64-texel ramp: with four hard steps and
+  two spotlights the face got a diagonal wedge of shadow.
+- **Rim light** (`CONTORNO`, `rimShader`): `toon()` adds it only while a
+  `Rocker` is being built (`constructor` → `arma`); the stage shares `toon()`
+  and a far, flat floor is all «edge». Not on skin. `clipMat` and `bustMat`
+  chain the base material's `onBeforeCompile`, so clipped clothes keep it.
+- **Hair** is `hairMat` (smooth, not faceted, with the anime highlight band).
+  The cap has no strand texture: stretched at the crown it left square
+  blotches. Legendary hair keeps `legMat`.
+- **Clipped clothes need near-linear clip functions.** `clp` is interpolated
+  per triangle: a clip built from steep `smooth()` curves came out as a
+  staircase. The tank is `min(max(a, b), …)` of linear pieces. Its straps
+  used to be two vertical strips (they climbed the neck and left a square at
+  the nape).
+- **The leather jacket's lapels are a shell** of the body (third piece of
+  `TOPS.leather`), not rigid boxes: those floated across the tee as two
+  crossed rectangles. The opening keeps one angle up to the neck; since the
+  torso narrows, it reads as a V.
+- Legendary shaders (`LEG_GLSL`): lava has cracks of uneven width with a
+  white-hot core; fire has tongues (dark root, bright tips) and stays below
+  blow-out; chrome reflects a fake environment (`reflect`, horizon biased so
+  camera-facing surfaces are not black); `armor` (LK 9) is chrome in plates,
+  used only by `cromo`. The aura is dimmer (×1.2): with bloom it whited out
+  the hair and the face.
+- The stubble shadow fades before `FACE_UV.X`: past it the face repeats the
+  texture's last column, which showed as stretched streaks on the cheek.
+
+## Animation (`animGuitar`, `applyPose`)
+
+- **Standing height is `PARADO`** (hipDrop −0.072): at 0 the hip-to-ankle
+  distance was 0.83 against a 0.97 leg, a permanent squat. The singer uses it
+  too (the mic stand was raised 8 cm to match).
+- **The groove has three styles** (`st.gr`, picked per 4 bars from a hash of
+  the phrase and the rocker's seed, blended): knee bounce on every beat,
+  weight shifting between legs with the free foot tapping (`tapL`/`tapR`:
+  heel down, toes up), and half-time with a deep nod. All from `K.beat`, so
+  they land on the song's pulse.
+- **The body shows what is played**: each strum moves the shoulder (`rasg`),
+  a chord is a dip (`acento`), a sustain leans back with the neck up and eyes
+  closed (`sus`), a fast run (`dens` ≥ ~6 notes/s) looks down at the neck.
+- **Feet are planted in world space** (`L.w`, `L.paso`): the root can move,
+  turn or wander (`vagar`, metres, set in `battle.start`) and they don't
+  slide; the one farther than 11 cm from its place takes a step, one at a
+  time. They follow the root directly when airborne, kneeling, lifted
+  (`liftL/R` > 0.02) or `p.suelto` (the spin). `place()` resets them. The
+  foot's rotation order is `YXZ` (yaw, then toe pitch `L.pitch`).
+- **The hips never rise above what the legs reach** (`LEG_MAX`): with a foot
+  planted far away they drop by themselves (a lunge) instead of the foot
+  floating.
+- `jump` has three phases (crouch, flight with tucked knees, landing).
 
 ## Arms and hands
 
