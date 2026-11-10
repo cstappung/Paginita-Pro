@@ -12,16 +12,18 @@
 //      guarda en IndexedDB para la próxima visita.
 //
 // Formato de la lista (lo arma aurora): "MKWPIPE1", u32 cantidad, y por cada pipeline u32 tipo, u32 versión,
-// u32 primer cuadro, u32 tamaño y los bytes de su configuración. Son solo descripciones de cómo dibujar (no
+// u32 primer cuadro, u32 tamaño y los bytes de su configuración. Desde §174 (C2) también "MKWPIPE2" (con la etiqueta y
+// la visita de cada uno, lista-pipelines.mjs): las dos valen. Son solo descripciones de cómo dibujar (no
 // contienen imágenes ni código del juego), pero salen del juego: la semilla va con el .wasm (R2), nunca a git.
 
-const MAGIA = 'MKWPIPE1';
+const MAGIAS = ['MKWPIPE1', 'MKWPIPE2'];
 const CARPETA = '/datos/pipelines';            // donde aurora las busca (web_cargar_listas)
 
 // Cuántos pipelines trae una lista, o -1 si no es una lista válida.
 export function contarLista(bytes) {
   if (!bytes || bytes.length < 12) return -1;
-  for (let i = 0; i < 8; i++) if (bytes[i] !== MAGIA.charCodeAt(i)) return -1;
+  const magia = String.fromCharCode(...bytes.subarray(0, 8));
+  if (!MAGIAS.includes(magia)) return -1;
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(8, true);
 }
 
@@ -51,8 +53,13 @@ export function crearPipelines({
   cadaMs = 10000,
   documento = globalThis.document,
 } = {}) {
-  const estado = { semilla: 0, propia: 0, guardadas: 0, vecesGuardada: 0, error: '' };
+  const estado = { semilla: 0, propia: 0, guardadas: 0, vecesGuardada: 0, error: '', aplazadas: 0 };
   let reloj = null, ultimoConteo = -1, modulo = null, alEsconder = null;
+  // §122 (D13): armar la lista (copiarla de la memoria del juego y guardarla en IndexedDB) cuesta 2–10 ms en un
+  // teléfono: con aplazar() verdadero (una carrera andando) el reloj no guarda y lo deja para la vuelta siguiente; y cuando
+  // guarda, lo hace en un rato libre del hilo (requestIdleCallback, a lo más 1 s después). Al esconder la pestaña, igual.
+  let aplazar = () => false;
+  const enCalma = f => (globalThis.requestIdleCallback ? requestIdleCallback(() => f(), { timeout: 1000 }) : f());
   const basePromesa = () => abrirBase(indexedDB, base);
 
   // 1) Leer las dos listas (si falla algo, se sigue sin precalentar: el juego anda igual)
@@ -100,7 +107,7 @@ export function crearPipelines({
   function vigilar(M) {
     modulo = M;
     ultimoConteo = M._mkw_web_pipelines_cuantos();     // lo cargado al arrancar ya está guardado
-    reloj = setInterval(() => guardarAhora(), cadaMs);
+    reloj = setInterval(() => { if (aplazar()) { estado.aplazadas++; return; } enCalma(() => { if (!aplazar()) guardarAhora(); }); }, cadaMs);
     alEsconder = () => { if (documento.hidden) guardarAhora(); };
     documento?.addEventListener('visibilitychange', alEsconder);
   }
@@ -110,5 +117,5 @@ export function crearPipelines({
     if (alEsconder) documento?.removeEventListener('visibilitychange', alEsconder);
   }
 
-  return { estado, cargar, escribir, exportar, guardarAhora, vigilar, detener };
+  return { estado, cargar, escribir, exportar, guardarAhora, vigilar, detener, aplazarMientras: f => { aplazar = f || (() => false); } };
 }

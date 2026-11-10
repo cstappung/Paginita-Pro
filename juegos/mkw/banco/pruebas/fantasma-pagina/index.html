@@ -103,7 +103,7 @@ nube.records['100-tt150'] = { beto: { uid: 'beto', nombre: 'Beto', ms: 60000 }, 
 nube.fantasmas['100-tt150/caro'] = rkgFalso(69000, 250, 5);
 {
   const juego = juegoFalso(), avisos = [];
-  const f = crearFantasmaPagina({ modulo: juego, fs: fsFalso(), carpetaMod: MOD, aviso: x => avisos.push(x) });
+  const f = crearFantasmaPagina({ modulo: juego, fs: fsFalso(), carpetaMod: MOD, aviso: x => avisos.push(x), aLaVez: 1 });   // (de a uno: el orden exacto)
   f.conectar({ almacen: nube.almacen('dani'), uid: 'dani' });
   ok('fuera de la pantalla de fantasmas no hace nada', f.alActivarPagina(0x6F) === null && !nube.pedidos.length);
   const el = await f.alActivarPagina(PAGINA_FANTASMAS);
@@ -134,6 +134,25 @@ nube.fantasmas['100-tt150/caro'] = rkgFalso(69000, 250, 5);
   await espera(10); juego.pista = 0x104;                  // volvió atrás y eligió otra
   await pidiendo;
   ok('cambió la pista mientras bajaba: no se pone el de la otra pista', juego.puesto?.largo === 0);
+}
+// 5) §147 (D12): con la nube lenta (200 ms por bajada) y el fantasma en el 4.º de la tabla, de a 3 llega mucho antes que de
+// a uno; una bajada que se cuelga no frena: a los topeMs se sigue con el siguiente
+{
+  const n2 = nubeFalsa();
+  n2.records['105-tt150'] = Object.fromEntries(['a', 'b', 'c', 'd', 'e'].map((u, i) => [u, { uid: u, nombre: u.toUpperCase(), ms: 60000 + i * 1000 }]));
+  n2.fantasmas['105-tt150/d'] = rkgFalso(63000, 220, 9);
+  const medir = async (aLaVez, cuelga = '') => {
+    const juego = juegoFalso(); juego.pista = 0x105;
+    const base = n2.almacen('dani');
+    const almacen = { ...base, async fantasmaBajar(k, u) { if (u === cuelga) return new Promise(() => {}); await espera(200); return base.fantasmaBajar(k, u); } };
+    const f = crearFantasmaPagina({ modulo: juego, fs: fsFalso(), carpetaMod: MOD, aLaVez, topeMs: 600 });
+    f.conectar({ almacen, uid: 'dani' });
+    const t0 = performance.now(); const el = await f.alActivarPagina(PAGINA_FANTASMAS);
+    return { ms: Math.round(performance.now() - t0), uid: el?.uid, vencidos: f.estado.vencidos, puesto: juego.puesto?.largo };
+  };
+  const uno = await medir(1), tres = await medir(3), colgado = await medir(3, 'b');
+  ok('§147: con el fantasma en el 4.º de la tabla, de a 3 llega en ~2 idas y vueltas (de a uno, 4)', uno.uid === 'd' && tres.uid === 'd' && tres.ms * 1.6 < uno.ms && tres.puesto === 220, JSON.stringify({ uno, tres }));
+  ok('§147: una bajada colgada se da por perdida a los topeMs y se sigue: el fantasma llega igual', colgado.uid === 'd' && colgado.vencidos === 1 && colgado.ms < 1500, JSON.stringify(colgado));
 }
 fin();
 </script>

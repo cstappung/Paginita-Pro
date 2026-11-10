@@ -1,0 +1,712 @@
+diff --git a/translator/src/Translator.Cli/Program.cs b/translator/src/Translator.Cli/Program.cs
+index e1164dd..cc03946 100644
+--- a/translator/src/Translator.Cli/Program.cs
++++ b/translator/src/Translator.Cli/Program.cs
+@@ -1056,6 +1056,8 @@ int RunTranslateRecursive(string[] argsTail)
+                     $"[translator] Mod-overridable direct-call targets: {modOverridableCallTargets.Count:N0} " +
+                     "function(s) keep the full residency boundary.");
+             }
++            // MKW banderas (paso 6, §185): qué funciones devuelven el CR entero (solo con MKW_BANDERAS=seguro)
++            CxxLinearCodeGenerator.MkwBanderasCalcular(canonicalGuestFunctions, guestAbiContracts, modOverridableCallTargets);
+             var directlyCalledGuestFunctions = localGuestAbiContracts.Values
+                 .SelectMany(static contract => contract.DirectCallTargets)
+                 .Where(localGuestAbiContracts.ContainsKey)
+diff --git a/translator/src/Translator.Core/Analysis/GuestFlagLivenessAnalyzer.cs b/translator/src/Translator.Core/Analysis/GuestFlagLivenessAnalyzer.cs
+index 1a55f33..2ba51b8 100644
+--- a/translator/src/Translator.Core/Analysis/GuestFlagLivenessAnalyzer.cs
++++ b/translator/src/Translator.Core/Analysis/GuestFlagLivenessAnalyzer.cs
+@@ -45,6 +45,11 @@ public sealed record GuestFlagLivenessContext(
+ {
+     public static GuestFlagLivenessContext Empty { get; } = new(
+         new Dictionary<uint, GuestAbiContract>(), new HashSet<uint>());
++
++    // MKW (paso 6, M8 banderas, bitácora §193): lo que cada función lee de verdad al entrar (resuelto para todo el
++    // programa) y lo que lee una llamada indirecta. Solo el análisis de las banderas lo pone; el resto queda igual.
++    public IReadOnlyDictionary<uint, byte>? MkwLeeAlEntrar { get; init; }
++    public byte MkwIndirectaLee { get; init; } = byte.MaxValue;
+ }
+ 
+ public sealed record GuestFlagLivenessResult(
+@@ -123,6 +128,32 @@ public static class GuestFlagLivenessAnalyzer
+         return new GuestFlagLivenessResult(liveIn, liveOut);
+     }
+ 
++    /// <summary>
++    /// MKW (paso 6, M8 «banderas»): lo vivo justo DESPUÉS de cada llamada a otra función del juego (directa o
++    /// indirecta), con <paramref name="exitLive"/> = lo que quien llama a esta función lee al volver.
++    /// </summary>
++    public static List<(string Block, int Index, IrInstruction Call, GuestFlagState LiveAfter)> CallSitesLiveAfter(
++        IrFunction function, IrCfg cfg, GuestFlagLivenessContext context, GuestFlagState exitLive)
++    {
++        var result = Analyze(function, cfg, context, exitLive);
++        var sites = new List<(string, int, IrInstruction, GuestFlagState)>();
++        foreach (var block in function.Blocks)
++        {
++            var live = result.LiveOut[block.Label];
++            for (var index = block.Instructions.Count - 1; index >= 0; --index)
++            {
++                var instruction = block.Instructions[index];
++                if (instruction is IrIndirectCall ||
++                    (instruction is IrCall call && GuestTargetParser.TryParseAddress(call.Target, out _)))
++                {
++                    sites.Add((block.Label, index, instruction, live));
++                }
++                live = Transfer(instruction, live, context);
++            }
++        }
++        return sites;
++    }
++
+     /// <summary>
+     /// Backward transfer for one instruction: <c>(live \ kills) ∪ reads</c>.
+     /// </summary>
+@@ -165,6 +196,9 @@ public static class GuestFlagLivenessAnalyzer
+             case IrBranch branch:
+                 return GuestFlagState.Cr(BranchCrFields(branch));
+ 
++            case IrIndirectCall when context.MkwLeeAlEntrar is not null:
++                return new GuestFlagState(context.MkwIndirectaLee, true);
++
+             case IrIndirectCall:
+             case IrIndirectJump:
+             case IrUndefined:
+@@ -189,8 +223,18 @@ public static class GuestFlagLivenessAnalyzer
+     {
+         if (GuestTargetParser.TryParseAddress(call.Target, out var target))
+         {
+-            if (context.OpaqueCallTargets.Contains(target) ||
+-                !context.CalleeContracts.TryGetValue(target, out var contract))
++            if (context.OpaqueCallTargets.Contains(target))
++            {
++                return GuestFlagState.All;
++            }
++
++            if (context.MkwLeeAlEntrar is { } leeAlEntrar && leeAlEntrar.TryGetValue(target, out var lee))
++            {
++                return new GuestFlagState(lee,
++                    !context.CalleeContracts.TryGetValue(target, out var conocida) || conocida.ReadsXerBeforeWrite);
++            }
++
++            if (!context.CalleeContracts.TryGetValue(target, out var contract))
+             {
+                 return GuestFlagState.All;
+             }
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
+index 8c35b11..16941c0 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
+@@ -375,7 +375,13 @@ public sealed partial class CxxLinearCodeGenerator
+                         // the callee contract does not mention it.
+                         boundarySync = boundarySync.WithFpr(1);
+                     }
++                    _mkwCrVolatilMuerto = MkwBanderasMascara(modOverridableCallTargets.Contains(addr));
++                    _mkwCrMascara = MkwBanderasModo == "seguro" &&
++                                    !modOverridableCallTargets.Contains(addr) && _mkwBanderasLlamadas is { } plan &&
++                                    plan.TryGetValue((currentLabel, _mkwInstrIndex), out var guardar) ? guardar : 0UL;
+                     AppendFlush(sb, pad, boundarySync);
++                    _mkwCrVolatilMuerto = false;
++                    _mkwCrMascara = 0;
+                     sb.Append(argumentNormalization);
+                     if (usesStateFreeCall)
+                     {
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.LeafRegisterCache.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.LeafRegisterCache.cs
+index 6d23932..df9bf9a 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.LeafRegisterCache.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.LeafRegisterCache.cs
+@@ -898,7 +898,10 @@ public sealed partial class CxxLinearCodeGenerator
+         if (cacheCr || cacheXer || cacheCtr) declarationsBuilder.AppendLine();
+         var declarations = declarationsBuilder.ToString();
+         var returnFlushBuilder = new StringBuilder(BuildLeafRegisterCacheFlush(registers));
+-        if (writeCr) returnFlushBuilder.AppendLine("    ctx->cr = cached_cr;");
++        if (writeCr) returnFlushBuilder.AppendLine(MkwBanderasModo == "techo"   // MKW banderas (RegisterResidency.cs)
++            ? "    ctx->cr = cached_cr & 0x0FFFF000u;"
++            : (_mkwBanderasRetorno & MkwHay) != 0 && (uint)_mkwBanderasRetorno != 0xFFFFFFFFu
++                ? $"    ctx->cr = cached_cr & 0x{(uint)_mkwBanderasRetorno:X8}u;" : "    ctx->cr = cached_cr;");
+         if (writeXer) returnFlushBuilder.AppendLine("    ctx->xer = cached_xer;");
+         if (writeCtr) returnFlushBuilder.AppendLine("    ctx->ctr = cached_ctr;");
+         var returnFlush = returnFlushBuilder.ToString();
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs
+new file mode 100644
+index 0000000..6c1d0a6
+--- /dev/null
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs
+@@ -0,0 +1,458 @@
++using System;
++using System.Collections.Concurrent;
++using System.Collections.Generic;
++using System.Globalization;
++using System.IO;
++using System.Linq;
++using System.Text;
++using System.Threading.Tasks;
++using Translator.Core.Analysis;
++using Translator.Core.Analysis.Ssa;
++using Translator.Core.Ir;
++
++namespace Translator.Core.CodeGen;
++
++// MKW (paso 6, M8 «banderas solo cuando se leen», bitácora §193): con MKW_BANDERAS=seguro, el guardado del registro de
++// condiciones (CR) en ctx->cr antes de cada llamada y al volver lleva solo los campos que alguien puede leer. No se
++// supone la regla de la Wii: se resuelve el programa entero (juego base + mod).
++//
++// Cada campo del CR se resuelve solo (el análisis es de «bits sueltos»: lo que pasa con cr3 no depende de cr5), así que
++// hay una única solución mínima para todo el programa:
++//   R[F] = lo que F lee al entrar antes de escribirlo (contando lo que leen sus llamadas; una llamada indirecta lee U).
++//   U    = la unión de R de todas las funciones (cualquiera puede ser el destino de una indirecta).
++//   X[F] = los campos volátiles (cr0, cr1, cr5-cr7) que alguien lee después de que F vuelve (Xind = los que lee alguien
++//          después de una llamada indirecta: valen para todas). Al volver, F guarda cr2-cr4 + X[F] + Xind.
++// El código del mod se traduce en otra pasada: esa pasada vuelca la forma de cada función (qué pisa, qué lee, a quién
++// llama) en build/mkw-banderas-mod.txt; la pasada base de la traducción SIGUIENTE la junta con el juego, resuelve todo y
++// escribe build/mkw-banderas-resultado.txt, que lee la pasada del mod. Sin el volcado del mod, no se enmascara nada.
++public sealed partial class CxxLinearCodeGenerator
++{
++    private const byte MkwNoVolatiles = 0x1C;   // cr2, cr3 y cr4: los que una función tiene que devolver como estaban
++    private const byte MkwVolatiles = 0xE3;     // cr0, cr1, cr5, cr6, cr7
++    private const ulong MkwHay = 1UL << 32;     // marca «hay máscara» (una máscara de 0 campos también vale)
++
++    private static string MkwRuta(string nombre) => Path.Combine("build", nombre);
++
++    // Lo resuelto (lo carga la pasada base al calcular o la del mod desde el archivo).
++    private static Dictionary<uint, byte>? _mkwLeeAlEntrar;          // por dirección (base y mod juntos)
++    private static Dictionary<string, byte>? _mkwSalida;             // por clave «b:XXXXXXXX» / «m:XXXXXXXX»
++    private static byte _mkwIndirectaLee = 0xFF;
++    private static bool _mkwResultadoCargado;
++    private static readonly object MkwCerrojo = new();
++
++    // El volcado del mod (lo arma la pasada del mod mientras traduce).
++    private static readonly ConcurrentDictionary<uint, string> MkwVolcadoMod = new();
++    private static int _mkwVolcadoProgramado;
++
++    /// <summary>El plan de una función: qué guardar antes de cada llamada directa y al volver.</summary>
++    private static void MkwPlanBanderas(
++        uint entryPoint, IrFunction func, IrCfg cfg,
++        IReadOnlyDictionary<uint, GuestAbiContract> contracts, IReadOnlySet<uint> modOverridable,
++        IReadOnlySet<uint> nonReturning, IReadOnlySet<uint> lrContinuation, bool modCode)
++    {
++        _mkwBanderasLlamadas = null;
++        _mkwBanderasRetorno = 0;
++        if (MkwBanderasModo != "seguro") return;
++        if (modCode)
++        {
++            MkwVolcar(entryPoint, func, cfg, nonReturning, lrContinuation);
++            MkwCargarResultado();
++        }
++        if (_mkwLeeAlEntrar is null || _mkwSalida is null) return;          // sin resolver: todo entero
++        if (HasOutOfBandLocalEntry(func, nonReturning, lrContinuation)) return;
++        var clave = (modCode ? "m:" : "b:") + entryPoint.ToString("X8", CultureInfo.InvariantCulture);
++        if (!_mkwSalida.TryGetValue(clave, out var salida)) return;
++        var context = new GuestFlagLivenessContext(contracts, modOverridable)
++        {
++            MkwLeeAlEntrar = _mkwLeeAlEntrar, MkwIndirectaLee = _mkwIndirectaLee,
++        };
++        var plan = new Dictionary<(string, int), ulong>();
++        foreach (var (block, index, instruction, live) in
++                 GuestFlagLivenessAnalyzer.CallSitesLiveAfter(func, cfg, context, GuestFlagState.Cr(salida)))
++        {
++            if (instruction is not IrCall call || !TryParseAddress(call.Target, out var target)) continue;
++            if (modOverridable.Contains(target) || !_mkwLeeAlEntrar.TryGetValue(target, out var lee)) continue;
++            // lo que la llamada lee al entrar + lo que esta función sigue leyendo después
++            var guardar = (byte)(live.CrFields | lee);
++            if (guardar != 0xFF) plan[(block, index)] = MkwHay | MkwCampos(guardar);
++        }
++        _mkwBanderasLlamadas = plan;
++        if (salida != 0xFF) _mkwBanderasRetorno = MkwHay | MkwCampos(salida);
++    }
++
++    // ---------------------------------------------------------------------------------------------------------------
++    // La forma de una función para el análisis: por bloque, sus sucesores y una lista de operaciones.
++    private enum MkwTipo : byte { Comun, Llamada, Indirecta }
++    private readonly record struct MkwOp(MkwTipo Tipo, byte Pisa, byte Lee, uint Destino);
++    private sealed record MkwFuncion(string Clave, int Entrada, int[][] Sucesores, MkwOp[][] Ops);
++
++    private static MkwFuncion MkwForma(string clave, IrFunction func, IrCfg cfg,
++        IReadOnlySet<uint>? nonReturning, IReadOnlySet<uint>? lrContinuation)
++    {
++        var indice = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
++        for (var i = 0; i < func.Blocks.Count; ++i) indice[func.Blocks[i].Label] = i;
++        var sucesores = new int[func.Blocks.Count][];
++        var ops = new MkwOp[func.Blocks.Count][];
++        for (var b = 0; b < func.Blocks.Count; ++b)
++        {
++            var block = func.Blocks[b];
++            // un sucesor que no es de esta función = la salida (como en GuestFlagLivenessAnalyzer.Analyze)
++            sucesores[b] = cfg.Successors(block.Label).Select(s => indice.TryGetValue(s, out var j) ? j : -1).ToArray();
++            var lista = new List<MkwOp>();
++            foreach (var instruction in block.Instructions)
++            {
++                var pisa = GuestFlagLivenessAnalyzer.Kills(instruction).CrFields;
++                if (instruction is IrCall call && TryParseAddress(call.Target, out var target))
++                {
++                    lista.Add(new MkwOp(MkwTipo.Llamada, pisa, 0, target));
++                    // una llamada que puede volver a cualquier etiqueta de esta función: después, todo puede leerse
++                    if (nonReturning?.Contains(target) == true || lrContinuation?.Contains(target) == true)
++                        lista.Add(new MkwOp(MkwTipo.Comun, 0, 0xFF, 0));
++                }
++                else if (instruction is IrIndirectCall)
++                    lista.Add(new MkwOp(MkwTipo.Indirecta, pisa, 0, 0));
++                else
++                {
++                    var lee = GuestFlagLivenessAnalyzer.Reads(instruction, GuestFlagLivenessContext.Empty).CrFields;
++                    if (pisa != 0 || lee != 0) lista.Add(new MkwOp(MkwTipo.Comun, pisa, lee, 0));
++                }
++            }
++            ops[b] = lista.ToArray();
++        }
++        return new MkwFuncion(clave, indice.TryGetValue(func.EntryLabel, out var e) ? e : 0, sucesores, ops);
++    }
++
++    private static string MkwTexto(MkwFuncion f)
++    {
++        var sb = new StringBuilder();
++        sb.Append("F ").Append(f.Clave).Append(' ').Append(f.Ops.Length).Append(' ').Append(f.Entrada).Append('\n');
++        for (var b = 0; b < f.Ops.Length; ++b)
++        {
++            sb.Append("B ").Append(f.Sucesores[b].Length == 0 ? "-" : string.Join(',', f.Sucesores[b]));
++            foreach (var op in f.Ops[b])
++            {
++                sb.Append(' ');
++                switch (op.Tipo)
++                {
++                    case MkwTipo.Llamada: sb.Append('c').Append(op.Pisa.ToString("X2")).Append(op.Destino.ToString("X8")); break;
++                    case MkwTipo.Indirecta: sb.Append('i').Append(op.Pisa.ToString("X2")); break;
++                    default: sb.Append('n').Append(op.Pisa.ToString("X2")).Append(op.Lee.ToString("X2")); break;
++                }
++            }
++            sb.Append('\n');
++        }
++        return sb.ToString();
++    }
++
++    private static List<MkwFuncion> MkwLeerVolcado(string ruta)
++    {
++        var funciones = new List<MkwFuncion>();
++        var lineas = File.ReadAllLines(ruta);
++        for (var i = 0; i < lineas.Length; ++i)
++        {
++            var cabeza = lineas[i].Split(' ');
++            if (cabeza[0] != "F") continue;
++            var n = int.Parse(cabeza[2], CultureInfo.InvariantCulture);
++            var sucesores = new int[n][];
++            var ops = new MkwOp[n][];
++            for (var b = 0; b < n; ++b)
++            {
++                var partes = lineas[++i].Split(' ');
++                sucesores[b] = partes[1] == "-" ? Array.Empty<int>() : partes[1].Split(',').Select(int.Parse).ToArray();
++                ops[b] = partes.Skip(2).Select(static t => t[0] switch
++                {
++                    'c' => new MkwOp(MkwTipo.Llamada, Convert.ToByte(t.Substring(1, 2), 16), 0, Convert.ToUInt32(t.Substring(3, 8), 16)),
++                    'i' => new MkwOp(MkwTipo.Indirecta, Convert.ToByte(t.Substring(1, 2), 16), 0, 0),
++                    _ => new MkwOp(MkwTipo.Comun, Convert.ToByte(t.Substring(1, 2), 16), Convert.ToByte(t.Substring(3, 2), 16), 0),
++                }).ToArray();
++            }
++            funciones.Add(new MkwFuncion(cabeza[1], int.Parse(cabeza[3], CultureInfo.InvariantCulture), sucesores, ops));
++        }
++        return funciones;
++    }
++
++    private static void MkwVolcar(uint entryPoint, IrFunction func, IrCfg cfg,
++        IReadOnlySet<uint> nonReturning, IReadOnlySet<uint> lrContinuation)
++    {
++        if (System.Threading.Interlocked.Exchange(ref _mkwVolcadoProgramado, 1) == 0)
++            AppDomain.CurrentDomain.ProcessExit += (_, _) => MkwEscribirVolcado();
++        MkwVolcadoMod.TryAdd(entryPoint, MkwTexto(MkwForma("m:" + entryPoint.ToString("X8"), func, cfg, nonReturning, lrContinuation)));
++    }
++
++    private static void MkwEscribirVolcado()
++    {
++        Directory.CreateDirectory("build");
++        File.WriteAllText(MkwRuta("mkw-banderas-mod.txt"),
++            string.Concat(MkwVolcadoMod.OrderBy(static p => p.Key).Select(static p => p.Value)));
++        Console.WriteLine($"[translator] MKW banderas: {MkwVolcadoMod.Count:N0} función(es) del mod → build/mkw-banderas-mod.txt");
++    }
++
++    private static void MkwCargarResultado()
++    {
++        lock (MkwCerrojo)
++        {
++            if (_mkwResultadoCargado) return;
++            _mkwResultadoCargado = true;
++            MkwCargarResultadoAhora();
++        }
++    }
++
++    private static void MkwCargarResultadoAhora()
++    {
++        var ruta = MkwRuta("mkw-banderas-resultado.txt");
++        if (!File.Exists(ruta)) { Console.WriteLine("[translator] MKW banderas: sin resultado de la pasada base (el mod va entero)"); return; }
++        var lee = new Dictionary<uint, byte>();
++        var salida = new Dictionary<string, byte>(StringComparer.Ordinal);
++        byte u = 0xFF;
++        foreach (var linea in File.ReadAllLines(ruta))
++        {
++            var p = linea.Split(' ');
++            switch (p[0])
++            {
++                case "U": u = Convert.ToByte(p[1], 16); break;
++                case "R": lee[Convert.ToUInt32(p[1], 16)] = Convert.ToByte(p[2], 16); break;
++                case "S": salida[p[1]] = Convert.ToByte(p[2], 16); break;
++            }
++        }
++        _mkwIndirectaLee = u;
++        _mkwSalida = salida;
++        _mkwLeeAlEntrar = lee;   // al final: MkwPlanBanderas mira este para saber si ya está todo
++        Console.WriteLine($"[translator] MKW banderas: resultado leído ({lee.Count:N0} direcciones, U=0x{u:X2})");
++    }
++
++    // ---------------------------------------------------------------------------------------------------------------
++    /// <summary>
++    /// La pasada base: junta el juego con el volcado del mod (de la traducción anterior) y resuelve R, U y X para todo el
++    /// programa. Escribe build/mkw-banderas-resultado.txt y build/mkw-banderas-informe.txt (quién lee qué al volver).
++    /// </summary>
++    public static void MkwBanderasCalcular(
++        IReadOnlyDictionary<uint, IrFunction> funciones,
++        IReadOnlyDictionary<uint, GuestAbiContract> contratos,
++        IReadOnlySet<uint> modOverridable)
++    {
++        if (MkwBanderasModo != "seguro") return;
++        var rutaMod = MkwRuta("mkw-banderas-mod.txt");
++        File.Delete(MkwRuta("mkw-banderas-resultado.txt"));
++        if (!File.Exists(rutaMod))
++        {
++            Console.WriteLine("[translator] MKW banderas: falta build/mkw-banderas-mod.txt (traducir otra vez): todo entero");
++            return;
++        }
++
++        // 1. La forma de cada función: las del juego desde su IR, las del mod desde el volcado.
++        var direcciones = funciones.Keys.OrderBy(static a => a).ToArray();
++        var formas = new MkwFuncion[direcciones.Length];
++        Parallel.For(0, direcciones.Length, i =>
++        {
++            var f = funciones[direcciones[i]];
++            formas[i] = MkwForma("b:" + direcciones[i].ToString("X8"), f, IrCfg.Build(f), null, null);
++        });
++        var todas = formas.Concat(MkwLeerVolcado(rutaMod)).ToArray();
++        var numero = new Dictionary<string, int>(StringComparer.Ordinal);
++        for (var i = 0; i < todas.Length; ++i) numero[todas[i].Clave] = i;
++        var deMod = todas.Length - formas.Length;
++
++        // A qué funciones puede ir una llamada a la dirección A: la del mod (una sobrecapa gana en tiempo de ejecución)
++        // y la del juego. Si no hay ninguna con esa entrada (una etiqueta de adentro de otra función), la que la contiene.
++        var porEntrada = new SortedDictionary<uint, List<int>>();
++        for (var i = 0; i < todas.Length; ++i)
++        {
++            var dir = Convert.ToUInt32(todas[i].Clave.Substring(2), 16);
++            if (!porEntrada.TryGetValue(dir, out var l)) porEntrada[dir] = l = new List<int>();
++            l.Add(i);
++        }
++        var entradas = porEntrada.Keys.ToArray();
++        var adentro = new ConcurrentDictionary<uint, byte>();   // destinos que caen dentro de otra función
++        int[] Destinos(uint a)
++        {
++            if (porEntrada.TryGetValue(a, out var l)) return l.ToArray();
++            var k = Array.BinarySearch(entradas, a);
++            if (k < 0) k = ~k - 1;
++            adentro.TryAdd(a, 0);
++            return k >= 0 ? porEntrada[entradas[k]].ToArray() : Array.Empty<int>();
++        }
++        var destinos = new Dictionary<uint, int[]>();
++        foreach (var f in todas)
++            foreach (var bloque in f.Ops)
++                foreach (var op in bloque)
++                    if (op.Tipo == MkwTipo.Llamada && !destinos.ContainsKey(op.Destino))
++                        destinos[op.Destino] = Destinos(op.Destino);
++        // Una llamada que cae en medio de otra función lee todo al entrar (no sabemos desde dónde arranca).
++        // Y una que un mod puede reemplazar sin que esté su sobrecapa en el volcado: no sabemos qué corre.
++        bool Entera(uint a) => adentro.ContainsKey(a) || !destinos.TryGetValue(a, out var d) || d.Length == 0 ||
++                               (modOverridable.Contains(a) && !numero.ContainsKey("m:" + a.ToString("X8")));
++
++        // 2. R y U: el punto fijo mínimo (todo empieza en 0 y solo sube).
++        var r = new byte[todas.Length];
++        byte u = 0;
++        for (var vuelta = 1; ; ++vuelta)
++        {
++            var nuevo = new byte[todas.Length];
++            var uFoto = u;
++            Parallel.For(0, todas.Length, i =>
++                nuevo[i] = MkwVivo(todas[i], 0, (op, vivo) => op.Tipo switch
++                {
++                    MkwTipo.Llamada => (byte)(vivo | Lee(op.Destino)),
++                    MkwTipo.Indirecta => (byte)(vivo | uFoto),
++                    _ => vivo,
++                }, null));
++            var uNuevo = (byte)nuevo.Aggregate(0, static (acc, v) => acc | v);
++            var cambio = uNuevo != u || !nuevo.AsSpan().SequenceEqual(r);
++            r = nuevo;
++            u = uNuevo;
++            if (!cambio || vuelta >= 200)
++            {
++                Console.WriteLine($"[translator] MKW banderas: lo que leen al entrar, {vuelta} vueltas; U=0x{u:X2}; " +
++                                  $"{r.Count(static v => v != 0):N0} de {todas.Length:N0} funciones leen algo ({deMod:N0} del mod)");
++                break;
++            }
++        }
++        byte Lee(uint a)
++        {
++            if (Entera(a)) return 0xFF;
++            byte m = 0;
++            foreach (var j in destinos.TryGetValue(a, out var d) ? d : porEntrada[a].ToArray()) m |= r[j];
++            return m;
++        }
++
++        // 3. X y Xind: lo volátil que alguien lee después de que cada función vuelve (también punto fijo mínimo).
++        var x = new byte[todas.Length];
++        var forzadas = MkwForzadas();
++        foreach (var dir in forzadas)
++            if (porEntrada.TryGetValue(dir, out var l)) foreach (var j in l) x[j] = MkwVolatiles;
++        byte xind = 0;
++        var informe = new ConcurrentBag<string>();
++        for (var vuelta = 1; ; ++vuelta)
++        {
++            var aporte = new int[todas.Length];
++            var aporteInd = 0;
++            var xFoto = (byte[])x.Clone();
++            var xindFoto = xind;
++            informe.Clear();
++            Parallel.For(0, todas.Length, i =>
++            {
++                var f = todas[i];
++                var salida = (byte)(MkwNoVolatiles | xFoto[i] | xindFoto);
++                MkwVivo(f, salida, (op, vivo) => op.Tipo switch
++                {
++                    MkwTipo.Llamada => (byte)(vivo | Lee(op.Destino)),
++                    MkwTipo.Indirecta => (byte)(vivo | u),
++                    _ => vivo,
++                }, (op, despues) =>
++                {
++                    var vol = (byte)(despues & MkwVolatiles);
++                    if (vol == 0) return;
++                    if (op.Tipo == MkwTipo.Indirecta)
++                    {
++                        System.Threading.Interlocked.Or(ref aporteInd, vol);
++                        informe.Add($"{f.Clave} -> indirecta campos 0x{vol:X2}");
++                    }
++                    else
++                    {
++                        foreach (var j in destinos[op.Destino]) System.Threading.Interlocked.Or(ref aporte[j], vol);
++                        informe.Add($"{f.Clave} -> 0x{op.Destino:X8} campos 0x{vol:X2}");
++                    }
++                });
++            });
++            var cambio = false;
++            for (var i = 0; i < x.Length; ++i)
++            {
++                var v = (byte)(x[i] | aporte[i]);
++                if (v != x[i]) { x[i] = v; cambio = true; }
++            }
++            var xindNuevo = (byte)(xind | aporteInd);
++            if (xindNuevo != xind) { xind = xindNuevo; cambio = true; }
++            if (!cambio || vuelta >= 200)
++            {
++                Console.WriteLine($"[translator] MKW banderas: lo que se lee al volver, {vuelta} vueltas; indirecta 0x{xind:X2}; " +
++                                  $"{x.Count(static v => v != 0):N0} funciones devuelven algo volátil ({forzadas.Count:N0} forzadas)");
++                break;
++            }
++        }
++
++        // 4. El resultado.
++        var lee = new Dictionary<uint, byte>();
++        foreach (var a in destinos.Keys) lee[a] = Lee(a);
++        foreach (var a in entradas) lee[a] = Lee(a);
++        var salidas = new Dictionary<string, byte>(StringComparer.Ordinal);
++        for (var i = 0; i < todas.Length; ++i) salidas[todas[i].Clave] = (byte)(MkwNoVolatiles | x[i] | xind);
++        var texto = new StringBuilder();
++        texto.Append("U ").Append(u.ToString("X2")).Append('\n');
++        foreach (var (a, m) in lee.OrderBy(static p => p.Key)) texto.Append("R ").Append(a.ToString("X8")).Append(' ').Append(m.ToString("X2")).Append('\n');
++        foreach (var (k, m) in salidas.OrderBy(static p => p.Key, StringComparer.Ordinal)) texto.Append("S ").Append(k).Append(' ').Append(m.ToString("X2")).Append('\n');
++        File.WriteAllText(MkwRuta("mkw-banderas-resultado.txt"), texto.ToString());
++        File.WriteAllLines(MkwRuta("mkw-banderas-informe.txt"), informe.OrderBy(static l => l, StringComparer.Ordinal));
++        var enmascaradas = salidas.Count(static p => p.Value != 0xFF);
++        Console.WriteLine($"[translator] MKW banderas: {enmascaradas:N0} de {salidas.Count:N0} funciones vuelven con máscara " +
++                          "→ build/mkw-banderas-resultado.txt");
++        _mkwIndirectaLee = u;
++        _mkwSalida = salidas;
++        _mkwLeeAlEntrar = lee;
++    }
++
++    /// <summary>
++    /// Lo vivo hacia atrás en una función: devuelve lo vivo al entrar. <paramref name="llamada"/> agrega lo que lee una
++    /// llamada; <paramref name="despues"/> (si no es null) recibe, ya resuelto, lo vivo justo después de cada llamada.
++    /// </summary>
++    private static byte MkwVivo(MkwFuncion f, byte salida, Func<MkwOp, byte, byte> llamada, Action<MkwOp, byte>? despues)
++    {
++        var n = f.Ops.Length;
++        if (n == 0) return salida;
++        var entrada = new byte[n];
++        var salidaDe = new byte[n];
++        bool cambio;
++        do
++        {
++            cambio = false;
++            for (var b = n - 1; b >= 0; --b)
++            {
++                byte vivo = 0;
++                if (f.Sucesores[b].Length == 0) vivo = salida;
++                else foreach (var s in f.Sucesores[b]) vivo |= s < 0 ? salida : entrada[s];
++                var fuera = vivo;
++                var ops = f.Ops[b];
++                for (var k = ops.Length - 1; k >= 0; --k)
++                    vivo = MkwPaso(ops[k], vivo, llamada);
++                if (vivo != entrada[b] || fuera != salidaDe[b]) { entrada[b] = vivo; salidaDe[b] = fuera; cambio = true; }
++            }
++        } while (cambio);
++        if (despues is not null)
++        {
++            for (var b = 0; b < n; ++b)
++            {
++                var vivo = salidaDe[b];
++                var ops = f.Ops[b];
++                for (var k = ops.Length - 1; k >= 0; --k)
++                {
++                    if (ops[k].Tipo != MkwTipo.Comun) despues(ops[k], vivo);
++                    vivo = MkwPaso(ops[k], vivo, llamada);
++                }
++            }
++        }
++        return entrada[f.Entrada];
++    }
++
++    private static byte MkwPaso(MkwOp op, byte vivo, Func<MkwOp, byte, byte> llamada)
++    {
++        vivo = (byte)((vivo & ~op.Pisa) | op.Lee);
++        return op.Tipo == MkwTipo.Comun ? vivo : llamada(op, vivo);
++    }
++
++    /// <summary>
++    /// Las funciones que vuelven entero sí o sí: MKW_BANDERAS_EXCLUIR (direcciones con coma) y el archivo de
++    /// MKW_BANDERAS_NATIVOS (las que llaman nuestras funciones de C++: lo que devuelven pasa tal cual a quien llamó).
++    /// </summary>
++    private static HashSet<uint> MkwForzadas()
++    {
++        var forzadas = new HashSet<uint>();
++        void Agregar(string texto)
++        {
++            foreach (var t in texto.Split(new[] { ',', ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries))
++                forzadas.Add(Convert.ToUInt32(t.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? t[2..] : t, 16));
++        }
++        Agregar(Environment.GetEnvironmentVariable("MKW_BANDERAS_EXCLUIR") ?? "");
++        var archivo = Environment.GetEnvironmentVariable("MKW_BANDERAS_NATIVOS");
++        if (!string.IsNullOrEmpty(archivo)) Agregar(File.ReadAllText(archivo));
++        return forzadas;
++    }
++}
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs
+index 9c03dba..02a17a1 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs
+@@ -192,7 +192,14 @@ public sealed partial class CxxLinearCodeGenerator
+             foreach (var fpr in _writtenFprs)
+                 if (sync.FlushesFpr(fpr))
+                     sb.Append(pad).Append("ctx->fpr[").Append(fpr).Append("] = ").Append(FprLocal(fpr)).AppendLine(";");
+-            if (_writesCr && sync.FlushesCr) sb.Append(pad).AppendLine($"ctx->cr = {CrLocal};");
++            if (_writesCr && sync.FlushesCr)
++            {
++                // MKW banderas: solo los campos que alguien puede leer (techo: cr1-cr4; seguro: el plan de esta función)
++                var mascara = (_mkwCrMascara & MkwHay) != 0 ? (uint)_mkwCrMascara : _mkwCrVolatilMuerto ? 0x0FFFF000u : 0xFFFFFFFFu;
++                sb.Append(pad).AppendLine(mascara != 0xFFFFFFFFu
++                    ? $"ctx->cr = {CrLocal} & 0x{mascara:X8}u;"
++                    : $"ctx->cr = {CrLocal};");
++            }
+             if (_writesCtr && sync.FlushesCtr) sb.Append(pad).AppendLine($"ctx->ctr = {CtrLocal};");
+             if (_writesXer && sync.FlushesXer) sb.Append(pad).AppendLine($"ctx->xer = {XerLocal};");
+         }
+@@ -333,6 +340,38 @@ public sealed partial class CxxLinearCodeGenerator
+     [ThreadStatic]
+     private static RegisterResidency? _activeResidency;
+ 
++    // MKW (paso 6, M8 «banderas solo cuando se leen»), solo para medir: MKW_BANDERAS=techo guarda en ctx->cr, antes de
++    // cada llamada directa y al volver, solo cr1-cr4 (la regla de la Wii: cr0 y cr5-cr7 son volátiles, nadie los lee
++    // después de una llamada; cr1 lleva el bit 6 de las funciones de argumentos variables). Así el compilador ve que el
++    // cr0 de una comparación solo lo lee el salto y la arma ahí mismo. =seguro: no en el código del mod ni en llamadas
++    // que un mod puede reemplazar (las continuaciones de §178 leen el CR de otra función).
++    public static readonly string? MkwBanderasModo = Environment.GetEnvironmentVariable("MKW_BANDERAS");
++    [ThreadStatic]
++    internal static bool _mkwCrVolatilMuerto;
++    [ThreadStatic]
++    internal static bool _mkwBanderasModCode;
++    // =seguro (§185): nada se supone de la regla de la Wii. Antes de una llamada directa se guardan los campos que la
++    // llamada lee (su contrato) más los que esta función sigue leyendo después (el análisis de vida de banderas);
++    // al volver, solo cr2-cr4 si NINGUNA llamada del programa a esta función lee después cr0/cr1/cr5-cr7
++    // (MkwBanderasRetornoVivo = las que sí; MkwBanderasIndirectaViva = alguna llamada indirecta lee: ningún retorno).
++    [ThreadStatic]
++    internal static Dictionary<(string, int), ulong>? _mkwBanderasLlamadas;
++    [ThreadStatic]
++    internal static ulong _mkwBanderasRetorno;     // la máscara al volver (MkwHay | campos; 0 = entera)
++    [ThreadStatic]
++    internal static ulong _mkwCrMascara;           // la del guardado que se está escribiendo (MkwHay | campos; 0 = entera)
++    [ThreadStatic]
++    internal static int _mkwInstrIndex;
++    internal static uint MkwCampos(byte campos)
++    {
++        uint mascara = 0;
++        for (var campo = 0; campo < 8; ++campo)
++            if ((campos & (1 << campo)) != 0) mascara |= 0xFu << (28 - 4 * campo);
++        return mascara;
++    }
++    internal static bool MkwBanderasMascara(bool modOverridable) =>
++        MkwBanderasModo == "techo";   // =seguro: solo lo que dice el plan (sin plan, entero)
++
+     private static void AppendFlush(StringBuilder sb, string pad)
+     {
+         if (_activeResidency is { } residency) residency.AppendFlush(sb, pad);
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.StateFreeAbi.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.StateFreeAbi.cs
+index 224b303..ebca0ad 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.StateFreeAbi.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.StateFreeAbi.cs
+@@ -681,6 +681,7 @@ public sealed partial class CxxLinearCodeGenerator
+                     StringComparison.Ordinal);
+             }
+         }
++        body = System.Text.RegularExpressions.Regex.Replace(body, @"ctx->cr = cached_cr & 0x[0-9A-F]{8}u;", string.Empty);   // MKW banderas
+         body = body.Replace("ctx->cr = cached_cr;", string.Empty, StringComparison.Ordinal);
+         body = body.Replace("ctx->xer = cached_xer;", string.Empty, StringComparison.Ordinal);
+         body = body.Replace("ctx->ctr = cached_ctr;", string.Empty, StringComparison.Ordinal);
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs
+index ed6d82c..aed5538 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs
+@@ -148,6 +148,8 @@ public sealed partial class CxxLinearCodeGenerator
+         // Flattened once per function: the emitter used to hash a (block, index)
+         // tuple for every instruction of every emission of this body.
+         var suppressedInstructionMasks = BuildSuppressedInstructionMasks(func, flagElision);
++        MkwPlanBanderas(entryPoint, func, cfg, guestAbiContracts, modOverridableCallTargets,
++            nonReturningCallTargets, lrContinuationCallTargets, emitModRegistration);
+         var cxxName = SanitizeIdentifier(signature.Name);
+         var pairedFlow = ComputePairedFlowStates(func, cfg, _guestAbiProvider);
+         var pairedIn = pairedFlow.In;
+@@ -290,6 +292,8 @@ public sealed partial class CxxLinearCodeGenerator
+         string EmitFunctionBody(RegisterResidency? residency, int bufferBaseLength, bool discardResult = false)
+         {
+             var previousResidency = _activeResidency;
++            var previousMkwBanderasModCode = _mkwBanderasModCode;
++            _mkwBanderasModCode = emitModRegistration;
+             var previousDirectCallTargets = _emittedDirectCallTargets;
+             var previousLocalLabels = _emittedLocalLabelAddresses;
+             var previousFifoBurstSlot = _activeGpuFifoBurstSlot;
+@@ -410,6 +414,7 @@ public sealed partial class CxxLinearCodeGenerator
+                         var inlineGuestThunkStackBase = block.Instructions[i] is IrCall &&
+                             HasLocallyProvenStackFrameBase(block.Instructions, i, stackFacts);
+                         _activeGpuFifoBurstSlot = gpuFifoBurstPlan.Slot(block.Label, i);
++                        _mkwInstrIndex = i;
+                         try
+                         {
+                             EmitInstruction(block.Label, directCallOrdinal, block.Instructions[i], body, bufferBaseLength, 1, cfg, labelNames, types, signature, localPaired, _guestAbiProvider, knownConstants, localConstants, linkedAddressRemap, nonReturningCallTargets, lrContinuationCallTargets, stackFacts, inlineGuestThunkStackBase, localFallthroughLr, guestAbiContracts, stateFreeAbiContracts, stateFreeCallSymbols, stateFreeCallSiteVariants, modOverridableCallTargets, shareLrContinuationDispatch);
+@@ -436,7 +441,11 @@ public sealed partial class CxxLinearCodeGenerator
+                             break;
+ 
+                         case IrReturn ret:
++                            _mkwCrVolatilMuerto = MkwBanderasMascara(false);
++                            _mkwCrMascara = _mkwBanderasRetorno;
+                             AppendFlush(body, "    ");
++                            _mkwCrVolatilMuerto = false;
++                            _mkwCrMascara = 0;
+                             body.AppendLine("    return;");
+                             break;
+ 
+@@ -539,6 +548,7 @@ public sealed partial class CxxLinearCodeGenerator
+                 body.Clear();
+                 _reusableFunctionBodyBuilder = body;
+                 _activeResidency = previousResidency;
++                _mkwBanderasModCode = previousMkwBanderasModCode;
+                 _emittedDirectCallTargets = previousDirectCallTargets;
+                 _emittedLocalLabelAddresses = previousLocalLabels;
+                 _activeGpuFifoBurstSlot = previousFifoBurstSlot;

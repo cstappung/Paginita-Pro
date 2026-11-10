@@ -374,4 +374,6 @@ export const MOTIVO_CUENTA = {
    (`solo`); las salas que esperan no se ofrecen ni se puede entrar a
    ellas, y quien llega por un enlace ve el cartel. Para volver a
    abrirlas, se borra la línea del juego. */
-export const SALAS_EN_OBRA = { mkw: { solo: "#solo/mkw" } };
+// Mario Kart abrió sus salas en la v2.0 (el dueño, 2026-11-09): para cerrarlas otra vez,
+// `mkw: { solo: "#solo/mkw" }`.
+export const SALAS_EN_OBRA = {};

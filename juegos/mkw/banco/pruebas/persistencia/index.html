@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almacenamiento persistente</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Almacenamiento persistente: <span>pedirlo hasta que el navegador lo conceda</span></h1>
+<p>Prueba <code>web/navegador/persistencia.mjs</code> (plan de rendimiento D6, bitácora §118) <b>sin el juego</b>: un
+  <code>navigator.storage</code> de mentira que dice «no» las primeras veces (como Chrome con un sitio poco usado) y
+  después «sí». Comprueba que al arrancar siempre se pide, que al terminar carreras se vuelve a pedir pero no más de una
+  vez cada 5 min, que una vez concedido no se pide más, que se anota en qué intento lo dio, que un navegador sin la
+  función no falla y el texto del panel «Partida». También mira el <code>navigator.storage</code> de verdad de esta página.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPersistencia, textoPersistencia, ESPACIO_MS } from '/web/navegador/persistencia.mjs';
+
+const { ok, nota, fin } = prueba('persistencia', 'Almacenamiento persistente (sin el juego)');
+
+// Un navigator.storage de mentira: concede en el intento número `concedeEn` (Infinity = nunca)
+function storageFalso(concedeEn = Infinity) {
+  const s = { persistido: false, pedidos: 0, usado: 734e6,
+    async persisted() { return s.persistido; },
+    async persist() { s.pedidos++; if (s.pedidos >= concedeEn) s.persistido = true; return s.persistido; },
+    async estimate() { return { usage: s.usado, quota: 50e9 }; } };
+  return s;
+}
+function almacenFalso() { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; }
+
+try {
+  // ---- 1. Pedir y volver a pedir ----
+  let t = 1_000_000;
+  const st = storageFalso(3), al = almacenFalso();
+  const p = crearPersistencia({ storage: st, almacen: al, ahora: () => t });
+  ok('antes de pedir: no se sabe todavía', p.estado.persistido === null && p.estado.soporta);
+  ok('al arrancar se pide (y Chrome dice no)', (await p.pedir('arranque')) === false && st.pedidos === 1);
+  ok('el uso del origen queda anotado', p.estado.usado === 734e6);
+  t += 60_000;
+  ok('una carrera al minuto: no se vuelve a pedir (menos de 5 min)', (await p.pedir('carrera')) === false && st.pedidos === 1);
+  t += ESPACIO_MS;
+  ok('pasados 5 min, al terminar una carrera se pide otra vez', (await p.pedir('carrera')) === false && st.pedidos === 2);
+  ok('al arrancar de nuevo se pide aunque no pasaron 5 min', (await p.pedir('arranque')) === true && st.pedidos === 3);
+  ok('se anota en qué intento lo concedió (el 3.º)', p.estado.concedido === 3 && JSON.parse(al.getItem('mkw.persistencia')).concedido === 3);
+  t += 10 * ESPACIO_MS;
+  ok('ya concedido: no se pide nunca más', (await p.pedir('carrera')) === true && (await p.pedir('arranque')) === true && st.pedidos === 3);
+
+  // ---- 2. Lo anotado sobrevive a recargar ----
+  const p2 = crearPersistencia({ storage: storageFalso(), almacen: al, ahora: () => t });
+  ok('otra visita: la cuenta de intentos sigue', p2.estado.intentos === 3 && p2.estado.concedido === 3);
+
+  // ---- 3. Navegadores raros ----
+  const p3 = crearPersistencia({ storage: null, almacen: almacenFalso() });
+  ok('sin navigator.storage: no falla y dice que no', (await p3.pedir('arranque')) === false && /no deja/.test(textoPersistencia(p3.estado)));
+  const roto = { async persisted() { throw new Error('x'); }, async persist() { throw new Error('y'); } };
+  const p4 = crearPersistencia({ storage: roto, almacen: { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } } });
+  ok('si todo lanza (almacenamiento bloqueado): no falla', (await p4.pedir('arranque')) === false);
+
+  // ---- 4. El texto del panel ----
+  ok('texto: protegido, con el uso', /protegido: el navegador no lo borra solo · 734 MB usados/.test(textoPersistencia(p.estado)), textoPersistencia(p.estado));
+  const p5 = crearPersistencia({ storage: storageFalso(), almacen: almacenFalso() });
+  await p5.pedir('arranque');
+  ok('texto: sin proteger todavía, dice que se volverá a pedir', /sin proteger todavía.*cada carrera/.test(textoPersistencia(p5.estado)));
+  st.usado = 1.25e9; await p.revisar();
+  ok('texto: más de 1 GB con coma', /1,3 GB usados/.test(textoPersistencia(p.estado)), textoPersistencia(p.estado));
+
+  // ---- 5. El de verdad ----
+  if (navigator.storage?.persisted) {
+    const real = crearPersistencia({ almacen: almacenFalso() });
+    const si = await real.pedir('arranque');
+    nota(`navigator.storage de esta página: persistido = ${si}, usados ${real.estado.usado} bytes de ${real.estado.cuota}`);
+    ok('el de verdad contesta sí o no, sin colgarse', typeof si === 'boolean');
+  }
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

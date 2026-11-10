@@ -17,6 +17,8 @@
 <div class="caja"><span id="medidor" class="chip-estado" hidden></span></div>
 <script type="module">
 import { prueba } from '../../comun.js';
+import { notaHz, presupuesto, METAS_PRESUPUESTO, GRAFICOS } from '/web/navegador/graficos.mjs';
+import { dibujarGrafico } from '/web/navegador/imagenes-vista.mjs';
 import { normalizar, lineasVideo, textoMedidor, queFrena, SALIDAS, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES, medidaLimitada, limitarSalida, pixelesInternos } from '/web/navegador/graficos.mjs';
 
 const { ok, fin } = prueba('graficos', 'Gráficos opcionales y el medidor (sin el juego)');
@@ -33,7 +35,11 @@ try {
   const motorEscalas = [0, 1, 1.5, 2, 3, 4, 6, 8], motorFluidez = [0, 120, 180];
   ok('solo se ofrecen valores que el motor acepta', ESCALAS.every(v => motorEscalas.includes(v)) && FLUIDECES.every(v => motorFluidez.includes(v)));
   ok('un valor raro (guardado viejo o a mano: 240, 5×, "x") vuelve a lo de siempre', JSON.stringify(normalizar({ escala: 5, fluidez: 240, verFps: 'si' })) ===
-     JSON.stringify({ escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false, verDetalle: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
+     JSON.stringify({ escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false, verDetalle: false, n8: 'auto', quitar: 0, texturas: 0, verGrafico: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
+  ok('«Dibujar a 30 y mostrar 60» (§219, §223): Automático por omisión, el «No» elegido a mano (0 guardado) se mantiene, 1 («30 parejas») y 2 se guardan, lo raro vuelve a Automático, y no va al Config.toml',
+     normalizar({}).n8 === 'auto' && GRAFICOS.n8 === 'auto' && normalizar({ n8: 0 }).n8 === 0 && normalizar({ n8: '0' }).n8 === 0 &&
+     normalizar({ n8: 'auto' }).n8 === 'auto' && normalizar({ n8: '2' }).n8 === 2 && normalizar({ n8: 1 }).n8 === 1 && normalizar({ n8: '1' }).n8 === 1 && normalizar({ n8: 3 }).n8 === 'auto' &&
+     normalizar({ n8: 'x' }).n8 === 'auto' && lineasVideo({ n8: 2 }).length === 0);
 
   // ---- 2. El medidor ----
   const rtt = { yo1: 0, ana: 80.4, juan: 35 };
@@ -49,6 +55,13 @@ try {
   ok('qué frena: la tarjeta de video', /^la tarjeta de video/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, hz: 60 })));
   ok('qué frena: la pantalla a 30 Hz (ahorro de batería)', /^la pantalla: refresca a 30 Hz/.test(queFrena({ fps: 30, trabajo: 9, gpu: 4, hz: 30 })));
   ok('qué frena: el juego y la tarjeta juntos (§115: no se sabe cuál, y sin «baja la salida»)', /^el dibujo de cada cuadro/.test(queFrena({ fps: 31.7, trabajo: 33.4, gpu: 33.8, hz: 60 })) && !/salida/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, hz: 60 })));
+  // §124 (V5): los cuadros de lógica de la carrera
+  ok('§124: lógica a 60 y dibujo a 30 → frena el dibujo (el juego saltea dibujos)', /^el dibujo: la carrera se calcula a 60 pero se dibujan 30/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, hz: 60, logica: 60 })));
+  ok('§124: lógica y dibujo a 30 → sigue siendo el procesador', /^el procesador/.test(queFrena({ fps: 30, trabajo: 22, gpu: 5, hz: 60, logica: 30 })));
+  ok('§124: a 60 la lógica no cambia nada; fuera de la carrera (null) tampoco', queFrena({ fps: 59.9, logica: 60 }) === 'nada (va a 60)' && /^la tarjeta/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, logica: null })));
+  ok('§124: el medidor con el detalle dice «lógica N» después de los fps, y nada fuera de la carrera',
+     /^31 fps · lógica 60 · juego 9\.0 ms/.test(textoMedidor({ fps: 31, verDetalle: true, detalle: { trabajo: 9, logica: 60 } })) &&
+     !/lógica/.test(textoMedidor({ fps: 31, verDetalle: true, detalle: { trabajo: 9 } })));
   ok('qué frena: el ritmo (nada al tope)', /^el ritmo/.test(queFrena({ fps: 40, trabajo: 9, gpu: 4, hz: 60 })));
   ok('el medidor con el detalle: fps, juego, video, Hz, lienzo y qué frena', textoMedidor({ fps: 31.2, verFps: false, verPing: false, verDetalle: true,
      detalle: { trabajo: 22.4, gpu: 5.1, hz: 120, lienzo: '1280×720' } }) === '31 fps · juego 22.4 ms · video 5.1 ms · 120 Hz · 1280×720 · frena: el procesador: el juego no alcanza a calcular un cuadro en 16,7 ms',
@@ -106,6 +119,60 @@ try {
     sel.value = '0'; sel.dispatchEvent(new Event('change'));
     caja2.remove();
   }
+  // §252 (G11): los efectos de la escena, todos prendidos por omisión; cada casilla apagada es un bit de «quitar»,
+  // se aplica en el momento (sin reiniciar), se guarda y no va al Config.toml
+  { const pedidos = [];
+    const caja3 = document.createElement('div'); document.body.append(caja3);
+    montarGraficos(caja3, { reiniciar: () => pedidos.push('reinicio'), alQuitar: q => pedidos.push(q), alTexturas: k => pedidos.push('tex' + k) });
+    const casillas = [1, 2, 4, 8, 16].map(b => caja3.querySelector('#graficosEfecto' + b));
+    ok('G11/G13: cinco casillas de efectos (con las partículas), todas marcadas por omisión', casillas.every(c => c && c.checked) && GRAFICOS.quitar === 0 && normalizar({}).quitar === 0);
+    casillas[0].checked = false; casillas[0].dispatchEvent(new Event('change'));
+    casillas[2].checked = false; casillas[2].dispatchEvent(new Event('change'));
+    ok('G11: apagar el brillo y las sombras = quitar 5, en el momento y guardado', pedidos.join() === '1,5' && leerGraficos().quitar === 5 &&
+       caja3.querySelector('#graficosReiniciar').hidden && lineasVideo(leerGraficos()).length === 0, pedidos.join());
+    ok('G11/G13: lo raro se recorta a 5 bits (16 = las partículas)', normalizar({ quitar: 63 }).quitar === 31 && normalizar({ quitar: 'x' }).quitar === 0);
+    for (const c of casillas) { c.checked = true; c.dispatchEvent(new Event('change')); }
+    ok('G11: volver a marcar todo = 0', leerGraficos().quitar === 0);
+    // §253 (G12): las texturas (0 completas, 1 la mitad, 2 un cuarto): en el momento para lo que se cargue, sin reiniciar
+    const tex = caja3.querySelector('#graficosTexturas');
+    ok('G12: «Texturas» completas por omisión, con tres opciones', tex && tex.value === '0' && tex.options.length === 3 && GRAFICOS.texturas === 0);
+    tex.value = '2'; tex.dispatchEvent(new Event('change'));
+    ok('G12: «un cuarto» se aplica sin reiniciar y se guarda; lo raro vuelve a 0', pedidos.at(-1) === 'tex2' && leerGraficos().texturas === 2 &&
+       caja3.querySelector('#graficosReiniciar').hidden && normalizar({ texturas: 3 }).texturas === 0 && normalizar({ texturas: '1' }).texturas === 1, pedidos.join());
+    tex.value = '0'; tex.dispatchEvent(new Event('change'));
+    // §254 (G13): «Liviano» = efectos 1-8 apagados (las partículas como estaban), texturas a la mitad, salida 540; «Todo como venía» = 0
+    caja3.querySelector('#graficosLiviano').click();
+    const l = leerGraficos();
+    ok('G13: «Liviano» apaga los 4 efectos, deja las partículas, texturas a la mitad, salida 540, sin reiniciar',
+       l.quitar === 15 && l.texturas === 1 && l.salida === 540 && casillas[4].checked && !casillas[0].checked && caja3.querySelector('#graficosReiniciar').hidden, JSON.stringify(l));
+    caja3.querySelector('#graficosCompleto').click();
+    const c = leerGraficos();
+    ok('G13: «Todo como venía» vuelve a 0, 0, la de tu pantalla', c.quitar === 0 && c.texturas === 0 && c.salida === 0 && casillas.every(x => x.checked), JSON.stringify(c));
+    caja3.remove();
+  }
+
+  // §255 (G15): «Imagen» = 60 / 30 parejas / con imagen intermedia / Automático; se aplica en el momento (sin reiniciar)
+  { const pedidos = [], guardado = localStorage.getItem('mkw.graficos');
+    localStorage.removeItem('mkw.graficos');
+    const caja4 = document.createElement('div'); document.body.append(caja4);
+    montarGraficos(caja4, { reiniciar: () => pedidos.push('reinicio'), alImagen: v => pedidos.push('img' + v) });
+    const sel = caja4.querySelector('#graficosN8'), lab = caja4.querySelector('label[for="graficosN8"]');
+    ok('G15: el selector se llama «Imagen» y trae Automático, 30 parejas, 60 y con imagen intermedia (Automático por omisión)',
+       lab?.textContent === 'Imagen' && sel && [...sel.options].map(o => o.value).join() === 'auto,1,0,2' && sel.value === 'auto' &&
+       /30 parejas/.test(sel.options[1].textContent) && /^60/.test(sel.options[2].textContent) && /intermedia/.test(sel.options[3].textContent),
+       sel && [...sel.options].map(o => o.value + ' ' + o.textContent.slice(0, 20)).join(' | '));
+    sel.value = '1'; sel.dispatchEvent(new Event('change'));
+    ok('G15: elegir «30 parejas» avisa en el momento (alImagen 1), se guarda y NO pide reiniciar',
+       pedidos.join() === 'img1' && leerGraficos().n8 === 1 && caja4.querySelector('#graficosReiniciar').hidden && caja4.querySelector('#graficosAviso').hidden, pedidos.join());
+    for (const v of ['2', '0', 'auto']) { sel.value = v; sel.dispatchEvent(new Event('change')); }
+    ok('G15: intermedia → 60 → Automático: un aviso por cambio, en orden, y lo último guardado', pedidos.join() === 'img1,img2,img0,imgauto' &&
+       leerGraficos().n8 === 'auto' && caja4.querySelector('#graficosReiniciar').hidden, pedidos.join());
+    sel.value = '0'; sel.dispatchEvent(new Event('change'));
+    ok('G15: «60» guardado es 0 (lo que el arranque lee como «sin N8»)', normalizar(JSON.parse(localStorage.getItem('mkw.graficos'))).n8 === 0);
+    ok('G15: la ayuda dice que la lógica va siempre a 60 y que se aplica en el momento', /siempre calcula 60/.test(caja4.querySelector('#notaImagen')?.textContent || '') &&
+       /en el momento/.test(caja4.querySelector('#notaImagen').textContent));
+    caja4.remove(); if (guardado == null) localStorage.removeItem('mkw.graficos'); else localStorage.setItem('mkw.graficos', guardado);
+  }
 
   // ---- 4. El medidor en la página ----
   let jugando = false, fps = 60;
@@ -121,10 +188,44 @@ try {
   localStorage.setItem('mkw.graficos', JSON.stringify({})); await espera(120);
   ok('todo apagado: se esconde', med.hidden);
   m.detener();
+  // §256 (G16): el gráfico del tiempo de cada imagen y el 1 % bajo en el medidor
+  { const med2 = document.createElement('span'); document.body.append(med2);
+    localStorage.setItem('mkw.graficos', JSON.stringify({ verGrafico: true }));
+    let dibujos = 0;
+    const puntos = Array.from({ length: 240 }, (_, i) => ({ ms: i === 100 ? 50 : 16.7, causa: '' }));
+    const m2 = montarMedidor(med2, { fps: () => 60, jugando: () => true, cada: 40, cadaGrafico: 20,
+      imagenes: () => ({ imagenes: 600, bajo1: 57.4, razon: 0.957 }), grafico: () => puntos, esperado: () => 16.7,
+      dibujar: (g, p, o) => { dibujos++; dibujarGrafico(g, p, o); } });
+    await espera(150);
+    const lienzo = med2.querySelector('canvas');
+    ok('G16: con «Mostrar el tiempo de cada imagen» el medidor dice los fps y el 1 % bajo, y trae el gráfico', !med2.hidden &&
+       med2.textContent === '60 fps · 1 % bajo 57 (96 %)' && lienzo && !lienzo.hidden && dibujos >= 3, `${med2.textContent} · dibujos ${dibujos}`);
+    localStorage.setItem('mkw.graficos', JSON.stringify({ verFps: true })); await espera(150);
+    const d0 = dibujos; await espera(100);
+    ok('G16: apagado, el gráfico se esconde y no se redibuja', med2.textContent === '60 fps' && lienzo.hidden && dibujos === d0, `${med2.textContent} · ${dibujos - d0}`);
+    m2.detener(); med2.remove(); localStorage.removeItem('mkw.graficos');
+    const c = document.createElement('div'); document.body.append(c); montarGraficos(c);
+    ok('G16: la casilla del gráfico en el panel, apagada por omisión', c.querySelector('#graficosGrafico')?.checked === false && normalizar({}).verGrafico === false && normalizar({ verGrafico: true }).verGrafico === true);
+    c.remove(); }
 } catch (e) {
   ok('la prueba terminó sin errores', false, e?.stack || String(e));
 }
 try { localStorage.removeItem('mkw.graficos'); } catch {}
+// §144 (E6): la ayuda de Gráficos dice qué monitores se ven parejos
+{ // §149 (H2): el presupuesto de la gama media
+  const p = presupuesto({ juegoMs: 12.5, tarjetaMs: 1.8, paginaMs: 0.04 }), de = id => p.find(x => x.id === id);
+  ok('§149: el presupuesto: 6 piezas con las metas del plan (3,3 / 3,3 / 1 / 2 / 1 / 2 ms)',
+     p.length === 6 && METAS_PRESUPUESTO.map(m => m[2]).join() === '3.3,3.3,1,2,1,2', p.map(x => x.meta).join());
+  ok('§149: el juego a 12,5 ms en rojo, la tarjeta a 1,8 y la página a 0,04 en verde; lo que hoy no se separa, «sin medir»',
+     de('juego').estado === 'mal' && de('tarjeta').estado === 'bien' && de('pagina').estado === 'bien' && de('pagina').ms === 0.04 &&
+     ['dibujo', 'sonidoDisco', 'ayudantes'].every(id => de(id).estado === 'sin medir'), JSON.stringify(p.map(x => [x.id, x.ms, x.estado])));
+  ok('§149: sin medidas, todo «sin medir»', presupuesto().every(x => x.estado === 'sin medir' && x.ms === null));
+}
+ok('§144: la ayuda de Gráficos explica 60/120/180/240 Hz contra 75/144/165', /120, 180 o 240 Hz/.test(document.getElementById('notaHz')?.textContent || '') &&
+   /144/.test(document.getElementById('notaHz').textContent));
+// §137 (E6): el aviso del monitor que no es múltiplo de 60 Hz
+ok('§137: 60, 120, 144 y 240 Hz', notaHz(60) === '' && notaHz(119.9) === '' && notaHz(239.8) === '' && /144 Hz no es múltiplo/.test(notaHz(144)), notaHz(144));
+ok('§137: 165 y 75 Hz avisan; sin dato, nada', notaHz(165) !== '' && notaHz(75) !== '' && notaHz(null) === '' && notaHz(30) === '');
 fin();
 </script>
 </body>

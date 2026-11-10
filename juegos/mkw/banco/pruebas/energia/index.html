@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ahorro y calor</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Ahorro de energía y calor: <span>avisar por qué no va a 60</span></h1>
+<p>Prueba los dos vigías de <code>web/navegador/energia.mjs</code> (E1 y E2 del plan de rendimiento, bitácora §190)
+  <b>sin el juego</b>, con segundos de mentira: el período de la pantalla (ms entre refrescos), los ms de trabajo del juego
+  por cuadro y si la carrera está andando. El ahorro de energía de Chrome pone todo a 30 Hz (33 ms) mientras el juego
+  trabaja poco; un teléfono caliente tarda cada vez más por cuadro en la carrera.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearVigiaAhorro, crearVigiaCalor, prendido, TEXTO_AHORRO, TEXTO_CALOR } from '/web/navegador/energia.mjs';
+
+const { ok, nota, fin } = prueba('energia', 'Ahorro de energía y calor (sin el juego)');
+
+try {
+  // ---- 1. Las opciones de la página ----
+  ok('?ahorro / ?calor: sin nada = apagado; 1 = prendido; 0 = apagado', prendido(null) === false && prendido('1') === true && prendido('0') === false);
+  ok('§241: con porOmision = true (el ahorro en la página), sin nada = prendido y 0 = apagado', prendido(null, true) === true && prendido('0', true) === false && prendido('1', true) === true);
+
+  // ---- 2. E1: el ahorro de energía ----
+  const avisos = [];
+  const a = crearVigiaAhorro({ alAviso: t => avisos.push(t) });
+  for (let s = 0; s < 10; s++) a.segundo({ periodo: 16.67, trabajo: 6, visible: true });
+  ok('a 60 Hz con poco trabajo: no avisa', !a.estado.ahorro && avisos.length === 0);
+  a.segundo({ periodo: 33.3, trabajo: 6 }); a.segundo({ periodo: 33.3, trabajo: 6 });
+  ok('dos segundos a 30 Hz todavía no (un tirón no es el ahorro)', !a.estado.ahorro && avisos.length === 0);
+  a.segundo({ periodo: 33.3, trabajo: 6 });
+  ok('tres segundos seguidos a 30 Hz con el juego liviano: avisa el ahorro de energía', a.estado.ahorro && avisos[0] === TEXTO_AHORRO);
+  for (let s = 0; s < 20; s++) a.segundo({ periodo: 33.3, trabajo: 6 });
+  ok('el aviso sale una sola vez mientras dura', avisos.length === 1);
+  for (let s = 0; s < 4; s++) a.segundo({ periodo: 16.67, trabajo: 6 });
+  ok('vuelve a 60 Hz: todavía en ahorro hasta 5 s seguidos', a.estado.ahorro);
+  a.segundo({ periodo: 16.67, trabajo: 6 });
+  ok('5 s a 60 Hz: sale del ahorro y el aviso se va', !a.estado.ahorro && avisos[1] === '');
+  for (let s = 0; s < 5; s++) a.segundo({ periodo: 33.3, trabajo: 6 });
+  ok('si vuelve el ahorro en la misma visita, no se repite el aviso', a.estado.ahorro && avisos.length === 2);
+
+  const b = crearVigiaAhorro({ alAviso: t => avisos.push(t) }), n0 = avisos.length;
+  for (let s = 0; s < 20; s++) b.segundo({ periodo: 33.3, trabajo: 22 });
+  ok('30 por segundo con el juego pesado (22 ms por cuadro): no se culpa a la batería', !b.estado.ahorro && avisos.length === n0);
+  for (let s = 0; s < 20; s++) b.segundo({ periodo: 33.3, trabajo: 6, visible: false });
+  ok('pestaña oculta: no cuenta (oculta, Chrome frena los refrescos solo)', !b.estado.ahorro);
+  for (let s = 0; s < 20; s++) b.segundo({ periodo: 6.94, trabajo: 6 }), b.segundo({ periodo: null, trabajo: 6 });
+  ok('144 Hz o período desconocido: no avisa', !b.estado.ahorro);
+  const c = crearVigiaAhorro();
+  for (let s = 0; s < 5; s++) c.segundo({ periodo: 33.3, trabajo: null });
+  ok('sin saber cuánto trabaja el juego: no avisa (podría ser el juego)', !c.estado.ahorro);
+
+  // ---- 3. E2: el calor ----
+  const avc = [];
+  const k = crearVigiaCalor({ alAviso: t => avc.push(t) });
+  const minuto = (ms, enCarrera = true) => { for (let s = 0; s < 60; s++) k.segundo({ trabajo: ms, enCarrera }); };
+  minuto(10); minuto(9.5);
+  ok('los primeros 2 minutos de carrera son la referencia (el más bajo: 9,5 ms)', k.estado.base === 9.5 && k.estado.minutos.length === 2);
+  minuto(30, false);
+  ok('los menús no cuentan (otro trabajo)', k.estado.minutos.length === 2);
+  minuto(10.5); minuto(11);
+  ok('sube poco (10,5 y 11 ms, menos del 25 %): no avisa', !k.estado.caliente && avc.length === 0);
+  minuto(12.5);
+  ok('un minuto caliente (12,5 ms, +32 %) todavía no: hacen falta dos seguidos', !k.estado.caliente);
+  minuto(13);
+  ok('dos minutos seguidos un 25 % y 1,5 ms arriba: avisa el calor', k.estado.caliente && avc[0] === TEXTO_CALOR);
+  minuto(9.6);
+  ok('se enfría: deja de estar caliente (el aviso no vuelve a salir)', !k.estado.caliente && avc.length === 1);
+  const q = crearVigiaCalor({ alAviso: t => avc.push(t) }), n1 = avc.length;
+  for (const m of [2, 2, 2.6, 2.7, 2.8]) for (let s = 0; s < 60; s++) q.segundo({ trabajo: m, enCarrera: true });
+  ok('un PC rápido (2 → 2,8 ms: +40 % pero menos de 1,5 ms): no avisa', !q.estado.caliente && avc.length === n1);
+  nota(`minutos del teléfono de mentira: ${k.estado.minutos.join(', ')} ms`);
+} catch (e) {
+  ok('sin errores: ' + e.message, false);
+}
+fin();
+</script>
+</body>
+</html>

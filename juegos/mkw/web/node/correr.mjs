@@ -24,7 +24,8 @@ if (!('Suspending' in WebAssembly)) {
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cuadros = Number(process.argv[2] || 300);
 const wc = path.join(raiz, 'terceros/Wiicompiled');
-const datos = path.join(raiz, 'build/web/datos');              // hace de "AppData" del juego (partidas, config)
+// hace de "AppData" del juego (partidas, config); MKW_NODE_DATOS = otra carpeta (§165: una partida nueva, igual que el nativo)
+const datos = process.env.MKW_NODE_DATOS ? path.resolve(raiz, process.env.MKW_NODE_DATOS) : path.join(raiz, 'build/web/datos');
 const appdir = path.join(datos, 'WiiCompiled');
 mkdirSync(appdir, { recursive: true });
 
@@ -38,7 +39,9 @@ writeFileSync(path.join(appdir, 'Config.toml'), [
   '[discord]', 'enabled = false', '',
   '[paths]',
   `dvd_root = "${desdeConfig('extraido/disco')}"`,
-  `retro_rewind_root = "${desdeConfig('terceros/RetroRewind/RetroRewind6')}"`,
+  // MKW_RR_RAIZ = otro Retro Rewind (herramientas/partida-aislada.mjs: la partida de RR va a <esa>/../riivolution/save,
+  // limpia y propia de cada corrida; sin ella, a terceros/RetroRewind/riivolution/save, la de todos, §175)
+  `retro_rewind_root = "${desdeConfig(process.env.MKW_RR_RAIZ ? path.relative(raiz, path.resolve(raiz, process.env.MKW_RR_RAIZ)) : 'terceros/RetroRewind/RetroRewind6')}"`,
   '',
 ].join('\n'));
 
@@ -60,6 +63,14 @@ const M = await crea({
     // Node no tiene tarjeta de sonido: el driver "dummy" de SDL acepta el sonido y lo descarta, así el camino del
     // sonido del juego trabaja completo. Deja un temporizador vivo, por eso al final se llama a process.exit().
     m.ENV.SDL_AUDIO_DRIVER = 'dummy';
+    // §165 (N13): el guion de botones, el estado y el tramo (aurora_manual.cpp) llegan tal cual desde el entorno
+    for (const k of ['MKW_HEADLESS_GUION', 'MKW_HEADLESS_ESTADO', 'MKW_HEADLESS_TRAMO']) if (process.env[k]) m.ENV[k] = process.env[k];
+    // §196 (W1): MKW_SUMIDERO=1|2 (el programa de MKW_SUMIDERO_COMPILAR=1); §198 (W4): LLVM_PROFILE_FILE = dónde deja su
+    // perfil un programa compilado con -fprofile-instr-generate (ruta del PC, pasada a relativa a terceros/Wiicompiled*)
+    if (process.env.MKW_SUMIDERO) m.ENV.MKW_SUMIDERO = process.env.MKW_SUMIDERO;
+    if (process.env.MKW_ISLA) m.ENV.MKW_ISLA = process.env.MKW_ISLA;   // §199 (W2): 0 traducida, 1 isla, 2 comprobador
+    if (process.env.MKW_TECHO) m.ENV.MKW_TECHO = process.env.MKW_TECHO;   // §200 (W3): 1 = sin el modelo de la pista
+    if (process.env.LLVM_PROFILE_FILE) m.ENV.LLVM_PROFILE_FILE = path.relative(wc, path.resolve(raiz, process.env.LLVM_PROFILE_FILE)).split(path.sep).join('/');
   }],
 });
 escribe(`[node] wasm cargado en ${(performance.now() - t0).toFixed(0)} ms; arrancando (${cuadros} cuadros)`);
@@ -68,6 +79,8 @@ try {
 } catch (e) {
   escribe('[node] terminó con: ' + (e?.status !== undefined ? `exit(${e.status})` : e));
 }
+// §198 (W4): el programa de -fprofile-instr-generate deja su perfil aquí (su atexit no corre: Node sale con process.exit)
+if (M.___llvm_profile_write_file) escribe(`[node] perfil de PGO escrito (${M.___llvm_profile_write_file() === 0 ? 'bien' : 'falló'})`);
 escribe(`[node] ${((performance.now() - t0) / 1000).toFixed(1)} s en total`);
 // El temporizador del sonido de SDL mantendría vivo a Node para siempre: salir a mano cuando el log termine.
 log.end(() => process.exit(0));

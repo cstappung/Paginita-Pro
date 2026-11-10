@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bienvenida</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Bienvenida: <span>el mensaje de los ajustes y la Ayuda</span></h1>
+<p>Prueba <code>web/navegador/bienvenida.mjs</code> (bitácora §263, el dueño: «en la primera iniciada (hasta incluso
+  despues de la update) y en las ayudas, un mensaje claro limpio bonito sencillo explicando las settings») <b>sin el
+  juego</b>: sale la primera vez y con una versión vieja guardada; no vuelve a salir tras «No volver a mostrar» ni con la
+  versión al día; no sale en una carrera (y se cierra sin marcar si la sala larga); cada botón lleva a su ajuste (con la
+  hoja Gráficos de verdad); está en las ayudas (el mismo texto en Avanzado, y la página real lo monta).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<!-- un cajón de mentira con lo que buscan los destinos: Gráficos de verdad (graficos.mjs) y Controles con las mismas clases -->
+<div id="cajonFalso" style="max-height:200px;overflow:auto">
+  <section id="hojaAvanzado" hidden><div id="ayudaAjustes"></div><div id="graficosPanel"></div><div id="espacioPanel">espacio</div>
+    <button id="copiarRendimiento">informe</button></section>
+  <section id="hojaControles" hidden><div id="panelControles">
+    <div class="ctl-celular"><button>Sí</button></div>
+    <div class="ctl-ayudas"><div class="fila"><span>🚗 Acelerar solo</span><button>Sí</button></div></div>
+    <div class="ctl-pestanas"><button class="ctl-pestana">Jugador 1</button></div>
+    <div class="fila"><button aria-label="Menos zona muerta">−</button><button aria-label="Más zona muerta">+</button></div>
+  </div></section>
+</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { decidirBienvenida, montarBienvenida, montarAyuda, casos, llevarA, DESTINOS, VERSION_BIENVENIDA, CLAVE_VERSION, CLAVE_NUNCA }
+  from '/web/navegador/bienvenida.mjs';
+import { montarGraficos } from '/web/navegador/graficos.mjs';
+
+const { ok, nota, fin } = prueba('bienvenida', 'Bienvenida y Ayuda de ajustes (sin el juego)');
+const almacen = (inicial = {}) => { const m = new Map(Object.entries(inicial)); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), m }; };
+const roto = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } };
+const P = q => new URLSearchParams(q);
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const $ = id => document.getElementById(id);
+// abrirHoja de mentira: muestra esa hoja y anota cuál se pidió
+const pedidas = [];
+const abrirHoja = h => { pedidas.push(h); for (const s of ['Avanzado', 'Controles']) $('hoja' + s).hidden = s.toLowerCase() !== h; };
+const quitar = () => document.querySelectorAll('dialog.mkw-bv').forEach(d => { try { d.close(); } catch {} d.remove(); });
+
+try {
+  // ---- 1. Cuándo sale (la marca de versión, no «primera visita») ----
+  const V = VERSION_BIENVENIDA;
+  ok('sale la primera vez (nada guardado)', decidirBienvenida({ almacen: almacen() }).mostrar === true);
+  ok('sale con una versión vieja guardada (después de la actualización)', decidirBienvenida({ almacen: almacen({ [CLAVE_VERSION]: String(V - 1) }) }).mostrar === true
+    && decidirBienvenida({ almacen: almacen({ [CLAVE_VERSION]: '1' }), version: 2 }).mostrar === true);
+  ok('no sale con la versión al día', decidirBienvenida({ almacen: almacen({ [CLAVE_VERSION]: String(V) }) }).mostrar === false);
+  ok('no sale tras «No volver a mostrar», tampoco con una versión nueva', decidirBienvenida({ almacen: almacen({ [CLAVE_NUNCA]: '1' }), version: V + 5 }).mostrar === false);
+  ok('las pruebas automáticas (webdriver) no lo ven', decidirBienvenida({ almacen: almacen(), webdriver: true }).mostrar === false);
+  ok('?bienvenida=1 lo fuerza (también con webdriver y ya visto)', decidirBienvenida({ almacen: almacen({ [CLAVE_NUNCA]: '1' }), webdriver: true, parametros: P('bienvenida=1') }).mostrar === true);
+  ok('?bienvenida=0 lo apaga', decidirBienvenida({ almacen: almacen(), parametros: P('bienvenida=0') }).mostrar === false);
+  ok('con el almacén bloqueado no se rompe (sale)', decidirBienvenida({ almacen: roto }).mostrar === true);
+  ok('las claves son mkw.bienvenida.version y mkw.bienvenida.nunca', CLAVE_VERSION === 'mkw.bienvenida.version' && CLAVE_NUNCA === 'mkw.bienvenida.nunca');
+
+  // ---- 2. No sale en una carrera; sale al volver a los menús; si la sala larga, se cierra sin marcar ----
+  {
+    let carrera = true;
+    const a = almacen();
+    const b = montarBienvenida({ webdriver: false, almacen: a, parametros: P(''), cada: 30, puedeMostrar: () => !carrera, abrirHoja });
+    await espera(150);
+    ok('con una carrera en curso no se abre', !b.estado.abierto && !document.querySelector('dialog.mkw-bv[open]'));
+    carrera = false; await espera(120);
+    ok('terminada la carrera (en los menús) se abre', b.estado.abierto && !!document.querySelector('#bienvenida[open]'));
+    ok('el foco queda en «¡A jugar!»', document.activeElement?.id === 'bienvenidaJugar');
+    ok('el mando del sitio lo ve como un menú (dialog abierto)', !!document.querySelector('dialog[open]'));
+    ok('mientras está abierto, el body tiene .con-bienvenida (esconde el mando en pantalla)', document.body.classList.contains('con-bienvenida'));
+    carrera = true; await espera(120);
+    ok('si larga una carrera con el mensaje abierto, se cierra sin marcar visto', !b.estado.abierto && a.m.get(CLAVE_VERSION) === undefined && b.estado.cerradoCon === 'carrera');
+    carrera = false; await espera(120);
+    ok('y vuelve a salir en el siguiente descanso', b.estado.abierto);
+    $('bienvenidaJugar').click();
+    ok('«¡A jugar!» lo cierra y guarda la versión', !b.estado.abierto && a.m.get(CLAVE_VERSION) === String(V) && !document.body.classList.contains('con-bienvenida'));
+    await espera(120);
+    ok('cerrado, no vuelve a abrirse solo', !b.estado.abierto);
+    const b2 = montarBienvenida({ webdriver: false, almacen: a, parametros: P(''), cada: 30, puedeMostrar: () => true });
+    await espera(120);
+    ok('al recargar con la versión al día no sale', !b2.estado.abierto && !b2.estado.decision.mostrar);
+    quitar();
+  }
+  {
+    const a = almacen();
+    const b = montarBienvenida({ webdriver: false, almacen: a, parametros: P(''), cada: 30, puedeMostrar: () => true });
+    await espera(80);
+    $('bienvenidaNunca').click();
+    ok('«No volver a mostrar» guarda la versión y «nunca»', a.m.get(CLAVE_VERSION) === String(V) && a.m.get(CLAVE_NUNCA) === '1' && !b.estado.abierto);
+    ok('…y ni con la versión siguiente vuelve', !montarBienvenida({ webdriver: false, almacen: a, parametros: P(''), version: V + 1, cada: 30000 }).estado.decision.mostrar);
+    quitar();
+  }
+  {
+    const a = almacen();
+    const b = montarBienvenida({ webdriver: false, almacen: a, parametros: P(''), cada: 30, puedeMostrar: () => true });
+    await espera(80);
+    b.dialogo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    ok('Esc (y la B del mando, que manda un Escape) lo cierra y cuenta como visto', !b.estado.abierto && a.m.get(CLAVE_VERSION) === String(V));
+    quitar();
+    const a2 = almacen();
+    const b2 = montarBienvenida({ webdriver: false, almacen: a2, parametros: P(''), cada: 30, puedeMostrar: () => true });
+    await espera(80);
+    b2.dialogo.querySelector('.bv-x').click();
+    ok('la ✕ lo cierra y cuenta como visto', !b2.estado.abierto && a2.m.get(CLAVE_VERSION) === String(V));
+    quitar();
+  }
+  {
+    const a = almacen();
+    const b = montarBienvenida({ webdriver: false, almacen: roto, parametros: P(''), cada: 30, puedeMostrar: () => true });
+    await espera(80);
+    $('bienvenidaJugar').click(); await espera(100);
+    ok('con el almacén bloqueado se cierra igual y no vuelve en esta visita', !b.estado.abierto);
+    quitar();
+  }
+
+  // ---- 3. Las tarjetas: 3 en el PC, 4 en el teléfono; el texto del crítico, cortito ----
+  {
+    const b = montarBienvenida({ webdriver: false, almacen: almacen(), parametros: P(''), cada: 30000, telefono: false });
+    b.abrir();
+    const t = [...b.dialogo.querySelectorAll('.bv-tarjeta')].map(x => x.dataset.caso);
+    ok('en el PC: 3 tarjetas (lento, mando, sala), sin la del celular ni la de espacio', t.join() === 'lento,mando,sala', t.join());
+    const palabras = b.dialogo.textContent.trim().split(/\s+/).length;
+    ok('el mensaje es corto (menos de 120 palabras: se lee en 30 s)', palabras < 120, palabras + ' palabras');
+    quitar();
+    const bt = montarBienvenida({ webdriver: false, almacen: almacen(), parametros: P(''), cada: 30000, telefono: true });
+    bt.abrir();
+    ok('en el teléfono: 4 tarjetas (con «📱 Juegas en el celular»)', bt.dialogo.querySelectorAll('.bv-tarjeta').length === 4 && !!bt.dialogo.querySelector('[data-caso="celular"]'));
+    ok('cada tarjeta tiene al menos un botón', [...bt.dialogo.querySelectorAll('.bv-tarjeta')].every(x => x.querySelector('button.bv-ir')));
+    quitar();
+  }
+
+  // ---- 4. Cada botón lleva a su ajuste (la hoja Gráficos de verdad) ----
+  montarGraficos($('graficosPanel'), { avisosLag: { prendidos: () => true, forzado: false, fijar() {} } });
+  const destinosUsados = new Set(casos({ telefono: true }).flatMap(c => [...c.botones, ...c.botonesAyuda]).map(x => x.ir).filter(Boolean));
+  for (const d of destinosUsados) {
+    pedidas.length = 0;
+    const c = llevarA(d, { abrirHoja, ms: 300 });
+    const fila = c && ((DESTINOS[d].fila && document.querySelector(DESTINOS[d].fila)) || c.closest('.fila') || c);
+    ok(`«${d}» abre la hoja ${DESTINOS[d].hoja}, encuentra el ajuste y lo marca`, !!c && pedidas[0] === DESTINOS[d].hoja && !$('hoja' + DESTINOS[d].hoja[0].toUpperCase() + DESTINOS[d].hoja.slice(1)).hidden
+      && fila.classList.contains('bv-resaltado'), c ? (c.id || c.className) : 'no está');
+    ok(`«${d}» deja el foco en el ajuste`, !!document.activeElement && (document.activeElement === c || c?.contains(document.activeElement)), document.activeElement?.id || document.activeElement?.tagName);
+  }
+  await espera(400);
+  ok('la marca se apaga sola', !document.querySelector('.bv-resaltado'));
+  {
+    const b = montarBienvenida({ webdriver: false, almacen: almacen(), parametros: P(''), cada: 30000, abrirHoja });
+    b.abrir();
+    pedidas.length = 0;
+    b.dialogo.querySelector('[data-bv="imagen"]').click();
+    ok('«Ver Imagen» del mensaje: lo cierra y deja el foco en el selector «Imagen»', !b.estado.abierto && pedidas[0] === 'avanzado' && document.activeElement?.id === 'graficosN8');
+    quitar();
+  }
+  {
+    let puesto = 0, deshecho = 0, editor = 0;
+    const b = montarBienvenida({ webdriver: false, almacen: almacen(), parametros: P(''), cada: 30000, telefono: true, liviano: () => { puesto++; return () => deshecho++; }, editor: () => editor++ });
+    b.abrir();
+    b.dialogo.querySelector('[data-bv="liviano"]').click();
+    const hecho = b.dialogo.querySelector('.bv-hecho');
+    ok('«⚡ Liviano» lo pone ahí mismo y el mensaje sigue abierto con «Deshacer»', puesto === 1 && b.estado.abierto && !hecho.hidden && /Liviano puesto/.test(hecho.textContent) && document.activeElement?.textContent === 'Deshacer');
+    document.activeElement.click();
+    ok('«Deshacer» vuelve como estaba', deshecho === 1);
+    b.dialogo.querySelector('[data-bv="editor"]').click();
+    ok('«Mover botones» cierra el mensaje y abre el editor de los botones en pantalla', editor === 1 && !b.estado.abierto);
+    quitar();
+  }
+
+  // ---- 5. Está en las ayudas ----
+  {
+    const nodo = $('ayudaAjustes');
+    montarAyuda(nodo, { abrirHoja, telefono: false, abrirMensaje: () => {} });
+    const sec = [...nodo.querySelectorAll('details')].map(d => d.dataset.caso);
+    ok('la Ayuda tiene los casos del PC más «💾 Te falta espacio»', sec.join() === 'lento,mando,sala,espacio', sec.join());
+    ok('la Ayuda dice lo mismo que el mensaje, con una línea de más', casos().filter(c => !c.soloAyuda).every(c => nodo.querySelector(`[data-caso="${c.id}"]`).textContent.includes(c.corto) && (!c.extra || nodo.textContent.includes(c.extra))));
+    ok('en el PC todo plegado', [...nodo.querySelectorAll('details')].every(d => !d.open));
+    pedidas.length = 0;
+    nodo.querySelector('[data-caso="espacio"] [data-bv="datos"]').click();
+    ok('«Ver Datos del juego» de la Ayuda lleva a Datos del juego', pedidas[0] === 'avanzado' && $('espacioPanel').classList.contains('bv-resaltado'));
+    ok('la Ayuda tiene «Ver el mensaje de bienvenida»', !!nodo.querySelector('#ayudaVerMensaje'));
+    const n2 = document.createElement('div');
+    montarAyuda(n2, { telefono: true });
+    ok('en el teléfono la Ayuda trae el celular y lo abre de entrada', n2.querySelector('[data-caso="celular"]')?.open === true);
+    // la página de verdad: index.html tiene el lugar y mkw.mjs monta las dos cosas
+    const html = await fetch('/web/navegador/index.html').then(r => r.text());
+    const js = await fetch('/web/navegador/mkw.mjs').then(r => r.text());
+    ok('index.html tiene «Ayuda de ajustes» arriba del todo en Avanzado', /<h2>Avanzado<\/h2>\s*<h3>❓ Ayuda de ajustes<\/h3>\s*<div id="ayudaAjustes"><\/div>/.test(html));
+    ok('mkw.mjs monta el mensaje y la Ayuda', /montarBienvenida\(/.test(js) && /montarAyuda\(\$\('ayudaAjustes'\)/.test(js));
+    ok('mkw.mjs le dice al mando del sitio que el mensaje es un menú', /bienvenida'\)\?\.open/.test(js));
+  }
+} catch (e) {
+  ok('sin errores', false, String(e && e.stack || e));
+}
+fin();
+</script>
+</body>
+</html>

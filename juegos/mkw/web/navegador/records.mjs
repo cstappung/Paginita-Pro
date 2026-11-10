@@ -65,12 +65,16 @@ export function leerCarrera(L) {
 }
 
 // Mira las carreras y avisa una vez por carrera terminada: alTerminar({ pista, cat, ms, puesto, modo, cc })
-export function vigilarCarreras({ lector, alTerminar, cadaMs = 500 }) {
-  let avisada = false, parado = false;
+// hay() (opcional, §129): ¿hay una carrera andando? Si no la hay y la última lectura ya dio «fuera de carrera», no se
+// lee la memoria (en los menús). Terminada la carrera se sigue leyendo hasta salir de ella: el tiempo final llega ahí.
+export function vigilarCarreras({ lector, alTerminar, cadaMs = 500, hay = null }) {
+  let avisada = false, parado = false, afuera = false;
   const paso = () => {
     if (parado) return;
     try {
+      if (hay && afuera && !hay()) { setTimeout(paso, cadaMs); return; }
       const c = leerCarrera(lector);
+      afuera = !c;
       if (!c) avisada = false;                                 // fuera de carrera: la próxima vale de nuevo
       else if (c.terminado && !avisada && c.pista >= 0x100 && c.cat.length > 2) { avisada = true; alTerminar(c); }
       else if (!c.terminado) avisada = false;                  // empezó otra carrera (siguiente de la copa)

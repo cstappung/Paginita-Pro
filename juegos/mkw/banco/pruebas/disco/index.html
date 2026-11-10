@@ -17,7 +17,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearDisco, PREFIJO, leerPaquete } from '/web/navegador/disco.mjs';
+import { crearDisco, PREFIJO, CAJA_POR_ARCHIVO, leerPaquete, memoriaDeBloques } from '/web/navegador/disco.mjs';
 
 const { ok, nota, fin } = prueba('disco', 'Caché del disco (sin el juego)');
 const BLOQUE = 256 * 1024;
@@ -92,6 +92,91 @@ try {
   falla = false;
   r = await d3.leer('/falso/nuevo.szs', TAM, 0, 10);
   ok('después del error se puede volver a leer', iguales(r, esperado(0, 10)));
+  // (§175: este bloque estaba dentro del try de arriba, que falla a propósito: nunca corría)
+  // §171 (C5): en Cache Storage de a grupos de 8 bloques (2 MB) en una entrada
+  {
+    const GRANDE = '/falso/Race/grande.szs', TAM2 = 20 * BLOQUE;          // 20 bloques: grupos 0-7, 8-15 y 16-19
+    const pedidos2 = [];
+    const servidor2 = async (url, o = {}) => { const [, a, b] = /bytes=(\d+)-(\d+)/.exec(o.headers.Range); pedidos2.push(o.headers.Range);
+      const ini = +a, fin = Math.min(+b, TAM2 - 1); return new Response(esperado(ini, fin - ini + 1), { status: 206 }); };
+    const g1 = crearDisco({ version: 'prueba-c5', buscar: servidor2, adelantarActivo: false });
+    await g1.abrir();
+    let t = await g1.leer(GRANDE, TAM2, 0, TAM2);
+    await new Promise(r => setTimeout(r, 2500));                          // (los guardados y el índice, que va de a ráfagas de 2 s)
+    ok('§171: un tramo de 20 bloques se guarda en 3 entradas (2 grupos de 8 y el último de 4) + el índice, no en 20',
+       iguales(t, esperado(0, TAM2)) && g1.estado.escriturasGrandes === 3 && g1.estado.escrituras === 4, JSON.stringify({ e: g1.estado.escrituras, g: g1.estado.escriturasGrandes }));
+    pedidos2.length = 0;
+    const g2 = crearDisco({ version: 'prueba-c5', buscar: servidor2, adelantarActivo: false });   // (la visita siguiente)
+    await g2.abrir();
+    t = await g2.leer(GRANDE, TAM2, 3 * BLOQUE + 5, 14 * BLOQUE);
+    ok('§171: la visita siguiente lee de los grupos: 0 pedidos a la red y los bytes exactos', pedidos2.length === 0 && iguales(t, esperado(3 * BLOQUE + 5, 14 * BLOQUE)) && g2.estado.leidasGrandes === 3,
+       JSON.stringify({ pedidos: pedidos2.length, leidas: g2.estado.leidasGrandes }));
+    t = await g2.leer(GRANDE, TAM2, 19 * BLOQUE, BLOQUE);
+    ok('§171: el último grupo (más corto) también', iguales(t, esperado(19 * BLOQUE, BLOQUE)) && pedidos2.length === 0);
+    const g3 = crearDisco({ version: 'prueba-c5b', buscar: servidor2, adelantarActivo: false, cajaGrande: 0 });
+    await g3.abrir();
+    await g3.leer(GRANDE, TAM2, 0, TAM2);
+    ok('§171: con cajaGrande = 0 (?cajaGrande=0), de a un bloque como antes: 20 entradas', g3.estado.escrituras === 20 && g3.estado.escriturasGrandes === 0);
+    const g4 = crearDisco({ version: 'prueba-c5c', buscar: servidor2, adelantarActivo: false });
+    await g4.abrir();
+    await g4.leer(GRANDE, TAM2, 5 * BLOQUE, 2 * BLOQUE);                  // bloques 5 y 6: no cubren un grupo entero
+    ok('§171: un tramo que no cubre un grupo entero va de a un bloque', g4.estado.escrituras === 2 && g4.estado.escriturasGrandes === 0);
+    // §175: la precarga cierra la página al segundo; el índice (que va de a ráfagas de 2 s) se guarda al instante con
+    // guardarIndice(), y la visita siguiente ya ve los grupos (antes no los veía y volvía a bajarlos: prueba-precarga)
+    const g5 = crearDisco({ version: 'prueba-c5d', buscar: servidor2, adelantarActivo: false });
+    await g5.abrir();
+    await g5.leer(GRANDE, TAM2, 0, TAM2);
+    await new Promise(r => setTimeout(r, 300));                           // (los grupos sí; el reloj del índice todavía no)
+    await g5.guardarIndice();
+    pedidos2.length = 0;
+    const g6 = crearDisco({ version: 'prueba-c5d', buscar: servidor2, adelantarActivo: false });
+    await g6.abrir();
+    t = await g6.leer(GRANDE, TAM2, 0, TAM2);
+    ok('§175: guardarIndice() escribe el índice al instante: la visita siguiente lee los 3 grupos sin ir a la red',
+       pedidos2.length === 0 && iguales(t, esperado(0, TAM2)) && g6.estado.leidasGrandes === 3, JSON.stringify({ pedidos: pedidos2.length, leidas: g6.estado.leidasGrandes }));
+  }
+
+  // §174 (D5): una versión por archivo. Dos archivos grandes (A y B) y uno chico entero; la «subida nueva» cambia solo A
+  {
+    const A = '/falso/Race/A.szs', B = '/falso/Race/B.szs', C = '/falso/chico-d5.bin', TAM5 = 16 * BLOQUE;
+    const pedidos5 = [];
+    const servidor5 = async (url, o = {}) => { pedidos5.push(url.replace(/.*\//, '') + (o.headers?.Range ? ' ' + o.headers.Range : ''));
+      if (!o.headers?.Range) return new Response(esperado(0, 5000));
+      const [, x, y] = /bytes=(\d+)-(\d+)/.exec(o.headers.Range); const ini = +x, fin = Math.min(+y, TAM5 - 1);
+      return new Response(esperado(ini, fin - ini + 1), { status: 206 }); };
+    const huellas = mapa => url => mapa[new URL(url, location.href).pathname] || '';
+    const v1 = { [A]: 'a1', [B]: 'b1', [C]: 'c1' }, v2 = { [A]: 'a2', [B]: 'b1', [C]: 'c1' };
+    const h1 = crearDisco({ version: 'todo-1', buscar: servidor5, adelantarActivo: false, huellaDe: huellas(v1), barrerMs: 0 });
+    await h1.abrir();
+    const viejas = (await caches.keys()).filter(n => n.startsWith(PREFIJO));
+    ok('§174: con huellas por archivo, una sola caja de nombre fijo (la de la versión de todo, de antes, se borra)',
+       viejas.length === 1 && viejas[0] === CAJA_POR_ARCHIVO, viejas.join(', '));
+    await h1.leer(A, TAM5, 0, TAM5); await h1.leer(B, TAM5, 0, TAM5); await h1.entero(C);
+    await new Promise(r => setTimeout(r, 2500));
+    // la «subida nueva»: cambia la versión de todo y la huella de A; B y el chico quedan iguales
+    pedidos5.length = 0;
+    const h2 = crearDisco({ version: 'todo-2', buscar: servidor5, adelantarActivo: false, huellaDe: huellas(v2), barrerMs: 0 });
+    await h2.abrir();
+    let t = await h2.leer(B, TAM5, 0, TAM5); const ch = await h2.entero(C);
+    ok('§174: tras la subida, lo que no cambió sale de la caché: 0 pedidos por B y el chico', pedidos5.length === 0 && iguales(t, esperado(0, TAM5)) && ch.length === 5000, pedidos5.join(', '));
+    t = await h2.leer(A, TAM5, 0, TAM5);
+    ok('§174: …y el archivo que cambió se vuelve a pedir', pedidos5.length >= 1 && pedidos5.every(x => x.startsWith('A.szs')) && iguales(t, esperado(0, TAM5)), pedidos5.join(', '));
+    for (let i = 0; i < 50 && !h2.estado.barrido; i++) await new Promise(r => setTimeout(r, 100));
+    const b2 = h2.estado.barrido;
+    ok('§174: el barrido de fondo borra solo lo viejo de A (sus 2 grupos), no lo de B ni el chico', b2 && b2.borradas === 2, JSON.stringify(b2));
+    await new Promise(r => setTimeout(r, 2500));
+    const h3 = crearDisco({ version: 'todo-2', buscar: servidor5, adelantarActivo: false, huellaDe: huellas(v2), barrerMs: 0 });
+    pedidos5.length = 0;
+    await h3.abrir();
+    await h3.leer(A, TAM5, 0, TAM5); await h3.leer(B, TAM5, 0, TAM5);
+    await new Promise(r => setTimeout(r, 300));
+    ok('§174: la visita siguiente (misma versión) no barre y lee todo de la caché', !h3.estado.barrido && h3.estado.versionAntes === 'todo-2' && pedidos5.length === 0,
+       JSON.stringify({ antes: h3.estado.versionAntes, barrido: h3.estado.barrido, pedidos: pedidos5.length }));
+    const h4 = crearDisco({ version: 'todo-3', buscar: servidor5, adelantarActivo: false });   // (sin huellas: como antes)
+    await h4.abrir();
+    const n4 = (await caches.keys()).filter(n => n.startsWith(PREFIJO));
+    ok('§174: sin huellas (?versionArchivo=0 o un manifiesto viejo), la caja con la versión de todo, como antes', n4.length === 1 && n4[0] === PREFIJO + 'todo-3', n4.join(', '));
+  }
 
   // 6) memoria con tope
   const d4 = crearDisco({ version: 'prueba-2', buscar: servidor, memoriaMax: 2 * BLOQUE, adelantarActivo: false });
@@ -285,12 +370,46 @@ try {
     ok('§93: fijar no acepta lo que pasa de un bloque', !d16.fijar('/lento/pack/x', new Uint8Array(BLOQUE + 1)) && !d16.fijar('/lento/pack/y', new Uint8Array(0)));
   }
 
+  // §121 (D2): la fila baja en pausa durante la carrera
+  {
+    const d17 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+    const semilla = Array.from({ length: 10 }, (_, i) => archivo(`semilla${i}.szs`, 2 * BLOQUE));
+    d17.pausarBaja(true);                                  // empieza la carrera
+    lentos.length = 0;
+    for (const u of semilla) d17.adelantarBloques(u, tamDe.get(u), 0, 1);
+    await new Promise(r => setTimeout(r, 400));
+    ok('§121: con la fila baja en pausa (carrera), la semilla no sale a la red', lentos.length === 0 && d17.estado.colaBaja() === 10,
+       `${lentos.length} pedidos, ${d17.estado.colaBaja()} en fila`);
+    const aviso = archivo('pista.szs', 3000);
+    d17.adelantar(aviso, 3000);
+    const enCarrera = await d17.leer(archivo('meta.brstm', 5000), 5000, 0, 5000);
+    ok('§121: …pero lo que el juego anuncia o lee sí sale', lentos.some(l => l.startsWith('pista.szs')) && lentos.some(l => l.startsWith('meta.brstm')) && enCarrera.length === 5000,
+       lentos.join(', '));
+    ok('§121: …y lo leído de la red en plena carrera queda anotado (mkwFaltas)',
+       d17.estado.faltas.length === 1 && d17.estado.faltas[0][0].endsWith('/lento/meta.brstm') && d17.estado.faltas[0][2] === 1, JSON.stringify(d17.estado.faltas));
+    // §176 (D1): mkwRedEnCarrera = lo que de verdad salió a la red en pausa (lo anunciado y lo leído), con sus bytes
+    const red17 = d17.estado.redEnCarrera.map(x => x[0].split('/').pop());
+    ok('§176: lo que salió a la red con la carrera andando queda en redEnCarrera (archivo y bytes)',
+       red17.includes('pista.szs') && red17.includes('meta.brstm') && d17.estado.redEnCarrera.every(x => x[3] > 0) && !red17.some(n => n.startsWith('semilla')),
+       JSON.stringify(d17.estado.redEnCarrera));
+    const red17n = d17.estado.redEnCarrera.length;
+    lentos.length = 0;
+    d17.pausarBaja(false);                                 // la meta: la fila baja sigue sola
+    await new Promise(r => setTimeout(r, 1200));
+    ok('§121: al terminar la carrera la fila sigue sola: los 10 de la semilla bajan, cada uno una vez, y ya no se anota nada',
+       d17.estado.colaBaja() === 0 && lentos.filter(l => l.startsWith('semilla')).length === 10 && d17.estado.faltas.length === 1 && d17.estado.redEnCarrera.length === red17n,
+       `${lentos.length} pedidos, ${d17.estado.colaBaja()} en fila`);
+  }
+
   await d4.borrar();
   ok('borrar deja sin cachés del disco', (await caches.keys()).filter(n => n.startsWith(PREFIJO)).length === 0);
 } catch (e) {
   ok('la prueba corrió sin errores', false, String(e && e.stack || e));
 }
 await limpiar();
+// §138 (C9): la memoria de bloques según la RAM del aparato
+ok('§138: 8 GB o sin dato = 64 MB; 4 y 6 GB = 32; 2 GB = 16', memoriaDeBloques(8) === 64 * 1048576 && memoriaDeBloques(undefined) === 64 * 1048576 &&
+   memoriaDeBloques(4) === 32 * 1048576 && memoriaDeBloques(6) === 32 * 1048576 && memoriaDeBloques(2) === 16 * 1048576);
 fin();
 </script>
 </body>

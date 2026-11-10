@@ -59,9 +59,12 @@ const navegador = await chromium.launch({
   // Chrome manejado por Playwright (--enable-automation) no bloquea el sonido aunque se le pida
   // (--autoplay-policy=user-gesture-required no alcanza): la página lo simula con ?bloquearSonido=1.
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--autoplay-policy=user-gesture-required',
-         ...(gpu === 'alto' ? ['--force_high_performance_gpu'] : [])],
+         ...(gpu === 'alto' ? ['--force_high_performance_gpu'] : []),
+         // con --ventana: dónde abrirla (MKW_VENTANA="x,y"; el monitor decide los Hz del rAF: §144, E6 con 144 Hz)
+         // (y el alto que entra en un monitor de 1080: si no cabe, Windows la manda a otro monitor)
+         ...(conVentana ? [`--window-position=${process.env.MKW_VENTANA || '-1880,549'}`, '--window-size=1040,1000'] : [])],
 });
-const pagina = await navegador.newPage({ viewport: { width: 1000, height: 1100 } });
+const pagina = await navegador.newPage({ viewport: conVentana && process.env.MKW_VENTANA ? { width: 1000, height: 880 } : { width: 1000, height: 1100 } });
 let ultimo = Date.now();
 pagina.on('console', m => { const t = m.text(); log.write(t + '\n'); ultimo = Date.now(); if (/^[✓✗·]|^fin:/.test(t)) console.log(t); });
 pagina.on('pageerror', e => { log.write('[pageerror] ' + e.message + '\n'); console.log('[pageerror] ' + e.message); });

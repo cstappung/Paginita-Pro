@@ -73,7 +73,36 @@ const seg = () => ((Date.now() - t0) / 1000).toFixed(0) + ' s';
 async function abrir(nombre, uid) {
   const p = await contexto.newPage();
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); registro.push(`[${nombre}] pageerror ${e.message}`); });
-  p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
+  p.on('console', m => {
+    const t = m.text();
+    registro.push(`[${nombre}] ${t.slice(0, t.startsWith('[DEPURA]') ? 2000 : 300)}`);
+    // MKW_VIGIA_DIR=desde,tam (§248, depurar, solo con un programa de -DMKW_VIGIA): al volver a elegir en el descanso
+    // (la sección 0x49 ya armada) se vigilan las escrituras en esa zona; cada una sale al registro con su pila
+    if (process.env.MKW_VIGIA_DIR && nombre === 'A' && t.includes('elegir otra vez en el descanso') && t.includes('abierta')) {
+      const [d, n] = process.env.MKW_VIGIA_DIR.split(',').map(x => parseInt(x));
+      p.evaluate(([d, n]) => { const L = window.mkwMenus, w = []; for (let i = 0; i < n; i += 4) w.push((L.u32(d + i) >>> 0).toString(16)); window.mkw._mkw_vigia_poner(d, n); return w.join(' '); }, [d, n])
+        .then(s => registro.push(`[A] [vigia puesto] ${s}`), e => registro.push(`[A] vigia falló ${e.message}`));
+    }
+    // MKW_VOLCAR_CAIDA=1 (§248, depurar): cuando el juego se cae, la memoria alrededor de los registros r3/r27–r31 y la
+    // lista de grupos del GroupContainer (r30 = la cabeza de la lista: cada nodo −4 = un Group, su tabla y su nombre)
+    if (process.env.MKW_VOLCAR_CAIDA === '1' && t.includes('Guest refs:')) {
+      const rg = {}; for (const [, k, v] of t.matchAll(/\b(r\d+|lr|pc)=0x([0-9A-Fa-f]{8})/g)) rg[k] = parseInt(v, 16);
+      p.evaluate(rg => {
+        const L = window.mkwMenus, h = n => '0x' + (n >>> 0).toString(16).padStart(8, '0');
+        const fila = a => { const w = []; for (let i = 0; i < 16; i += 4) w.push(h(L.u32(a + i))); let s = ''; for (let i = 0; i < 16; i++) { const c = L.u8(a + i); s += c >= 32 && c < 127 ? String.fromCharCode(c) : '.'; } return `${h(a)}: ${w.join(' ')}  ${s}`; };
+        const out = [];
+        for (const k of ['r27', 'r3']) if (rg[k]) { out.push(`— alrededor de ${k}`); const desde = (rg[k] & ~15) - 0x40; for (let a = desde; a < desde + 0x180; a += 16) out.push(fila(a)); }
+        for (const k of ['r3', 'r29', 'r31']) if (rg[k]) { const vt = L.u32(rg[k]); out.push(`${k} ${h(rg[k])} tabla ${h(vt)}: ${[0, 4, 8, 12, 16].map(i => h(vt ? L.u32(vt + i) : 0)).join(' ')}`); }
+        const cab = rg.r30;
+        if (cab) for (let nodo = L.u32(cab), k = 0; nodo && nodo !== cab && k < 40; nodo = L.u32(nodo), k++) {
+          const g = nodo - 4, vt = L.u32(g);
+          let nom = ''; for (let i = 0; i < 17; i++) { const c = L.u8(g + 0x18 + i); if (!c) break; nom += String.fromCharCode(c); }
+          out.push(`grupo ${h(g)} tabla ${h(vt)} [+8]=${h(vt ? L.u32(vt + 8) : 0)} +0x25=${L.u8(g + 0x25)} nombre «${nom}»`);
+        }
+        return out.join('\n');
+      }, rg).then(s => { console.log(`[${nombre}] [volcado]\n${s}`); registro.push(`[${nombre}] [volcado]\n${s}`); }, e => console.log(`[${nombre}] volcado falló: ${e.message}`));
+    }
+  });
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
     `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}${EXTRA}`);
   return p;
@@ -161,6 +190,15 @@ const COPA = [{ copa: 0, fila: 0 }, { copa: 13, fila: 2 }];
 const puso = await A.evaluate(c => window.mkwSala.ponerPistas(c), COPA);
 await espera(300);
 const cerrado = await esperarQue(A, x => !x.picker && x.sala?.fase === 'elegir', 10000);
+// N12: el aparato lento se declara en el latido; debe verse antes de elegir y largar.
+if (EXTRA.includes('comoLento=')) {
+  const advertidas = await Promise.all([A, B].map(p => p.waitForFunction(() =>
+    window.mkwEstado?.lentos?.length > 0 && document.body.textContent.includes('no llegó a 60'),
+    null, { timeout: 12000 }).then(() => true, () => false)));
+  ok('N12: ambas páginas avisan antes de largar que el aparato no llegó a 60', advertidas.every(Boolean), advertidas.join(','));
+  const informes = await Promise.all([A, B].map(p => p.evaluate(() => window.mkwInformeRendimiento?.().escalon)));
+  ok('N12: el informe de rendimiento incluye el escalón', informes.every(e => !!e?.id), JSON.stringify(informes));
+}
 ok('la anfitriona fija la copa de 2 pistas y el selector se cierra', puso === true && !cerrado?.picker && cerrado?.sala?.pistas?.length === 2,
    `${JSON.stringify(cerrado?.sala?.pistas)}`);
 
@@ -363,6 +401,8 @@ if (!RECARGA) {
      !!filas1 && marcaDe(mB, 0, xa?.vr?.cambio) && marcaDe(mB, 1, xb?.vr?.cambio),
      `filas ${filas1?.slice(0, 2).join(',')} · ${JSON.stringify(mB?.marcasVisibles)}`);
   const rA = await reelegirA;
+  // Conservar evidencia aunque una evaluación posterior quede bloqueada dentro del juego.
+  writeFileSync(path.join(carpeta, 'registro-en-curso.txt'), registro.join('\n'));
   nuevoA = rA?.reeleccion?.eleccion || null;
   ok('M22: A vuelve a elegir en el descanso (opcional): la pantalla de personajes del juego, otro personaje, y la anfitriona lo tiene',
      rA?.reeleccion?.estado === 'listo' && !!nuevoA && (nuevoA.personaje !== ea?.eleccion?.personaje || nuevoA.vehiculo !== ea?.eleccion?.vehiculo) &&
@@ -399,6 +439,7 @@ if (!RECARGA) {
 
 // 5) la carrera 2: sola después de los resultados (con --recarga, B vuelve en su puesto y con lo que eligió)
 const [sa, sb] = [await esperarQue(A, x => enCarrera(x, 2), 90000), await esperarQue(B, x => enCarrera(x, 2), 60000)];
+writeFileSync(path.join(carpeta, 'registro-en-curso.txt'), registro.join('\n'));
 const p2 = sa?.sala?.pistas?.[1];
 if (nuevoA) ok('M22: la carrera 2 corre con lo que A volvió a elegir, en las dos (B con lo suyo)',
    [sa, sb].every(x => x?.pjs?.[0]?.[0] === nuevoA.personaje && x.pjs[0][1] === nuevoA.vehiculo &&
@@ -416,7 +457,7 @@ ok('§94: la parrilla de la carrera 2 es la llegada de la 1, la misma en las dos
 // (los puestos en la cuenta regresiva, etapa 1, los anota la página: en la etapa 0 el juego todavía no los calculó)
 const [ia, ib] = [await esperarQue(A, x => !!x.parrilla?.largada, 15000), await esperarQue(B, x => !!x.parrilla?.largada, 15000)];
 ok('§94: …y el juego larga en ese orden (los puestos en la cuenta regresiva, en las dos): quien ganó la 1 sale primero',
-   lleg1 && [ia, ib].every(x => x.parrilla.largada.join() === lleg1.puestos.join()), `A ${ia?.parrilla?.largada?.join(' ')} · B ${ib?.parrilla?.largada?.join(' ')}`);
+   lleg1 && [ia, ib].every(x => x?.parrilla?.largada?.join() === lleg1.puestos.join()), `A ${ia?.parrilla?.largada?.join(' ')} · B ${ib?.parrilla?.largada?.join(' ')}`);
 await A.screenshot({ path: path.join(carpeta, '5-A-largada2.png') }).catch(() => {});
 ok('después de los resultados, la carrera 2 abrió sola en las dos con la pista 2', enCarrera(sa, 2) && enCarrera(sb, 2) && [sa, sb].every(x => x.ganadora === 0x100 + 4 * p2.copa + p2.fila),
    `A ${hex(sa?.ganadora)} B ${hex(sb?.ganadora)} (pista 2 ${JSON.stringify(p2)}) a los ${seg()}`);
@@ -506,6 +547,19 @@ ok('M22: …y a los 8 s se va', !po2?.podioVisible);
 ok('§82/§95: al terminar la 2 también: lo que da vr-sala.mjs con esos puestos, igual en las dos y guardado', vrBien(fa, fb, 2) && fa.vr.antes === fotoVr2?.vrs?.[uidA],
    vrTexto(fa, fb));
 
+// §176 (D1): en las carreras de la sala nada fue a la red. mkwRedEnCarrera = los pedidos que de verdad salieron a la red
+// con la carrera andando ([archivo, primer bloque, último, bytes, urgente]); mkwFaltas cuenta también lo que vino de la
+// caché del navegador, así que solo se muestra como dato. Cuenta lo que salió de la cuenta a la meta (etapas 1 y 2 del
+// Raceinfo, el criterio del paso 5); lo de la presentación (etapa 0-1: el paquete mismo, con las voces de las skins que trae la ficha) se muestra
+const redDe = p => p.evaluate(() => ({ pres: (window.mkwRedEnCarrera?.() || []).filter(x => x[5] !== 1 && x[5] !== 2).length,
+                                       red: (window.mkwRedEnCarrera?.() || []).filter(x => x[5] === 1 || x[5] === 2).map(x => `${String(x[0]).split('/').pop()}@${x[1]} ${Math.round(x[3] / 1024)} KB`),
+                                       faltas: (window.mkwFaltas?.() || []).length,
+                                       sala: window.mkwEstado?.paquete?.sala ?? null })).catch(() => ({ red: ['(no se pudo leer)'], faltas: -1, sala: null }));
+const [faA, faB] = [await redDe(A), await redDe(B)];
+ok('D1 (§176): en las dos carreras, de la cuenta a la meta, nada fue a la red (las pistas de la sala, con su música, se pidieron en la elección y el descanso)',
+   faA.red.length === 0 && faB.red.length === 0,
+   `A: ${faA.red.length} pedidos (${faA.red.slice(0, 4).join(', ')}), B: ${faB.red.length} (${faB.red.slice(0, 4).join(', ')}); ` +
+   `en la presentación: A ${faA.pres}, B ${faB.pres}; bloques fuera de la memoria (red o caché): A ${faA.faltas}, B ${faB.faltas}; pistas pedidas por la sala: A ${faA.sala}, B ${faB.sala}`);
 ok('sin errores de JavaScript en las páginas', !registro.some(l => l.includes('pageerror')), registro.filter(l => l.includes('pageerror')).slice(0, 2).join(' · '));
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
 // (§102: y lo que anotó la red de cada una: el lockstep y la malla, para ver un corte o una espera)

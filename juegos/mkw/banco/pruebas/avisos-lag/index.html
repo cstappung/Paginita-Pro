@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avisos de lag</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Avisos de lag: <span>la casilla que los esconde</span></h1>
+<p>Prueba <code>web/navegador/avisos-lag.mjs</code> (bitácora §262, el dueño: «agrega una opcion para ocultar los mensajes
+  de lag») <b>sin el juego</b>. Con «Mostrar avisos de conexión y lag» <b>apagada</b> no se pinta ningún chip de lag en la
+  esquina (📶 del relevo, «la sala va lenta», 🔴 de conexión, «quién no llega a 60») y los demás chips sí;
+  <b>prendida</b> se pinta exactamente lo mismo que sin el filtro (como antes). También: lo guardado, <code>?avisosLag</code>
+  que la fuerza, el cambio en el momento y la casilla en la hoja Gráficos.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="esquinas" hidden></div>
+<div id="panel" hidden></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearAvisosLag, crearChips, leerAvisosLag, guardarAvisosLag, CHIPS_LAG, CLAVE } from '/web/navegador/avisos-lag.mjs';
+import { montarGraficos } from '/web/navegador/graficos.mjs';
+
+const { ok, nota, fin } = prueba('avisos-lag', 'Avisos de lag (sin el juego)');
+
+// Un almacén de mentira (no toca el localStorage de verdad)
+const almacen = (inicial = {}) => { const m = new Map(Object.entries(inicial)); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), m }; };
+const roto = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } };
+const P = q => new URLSearchParams(q);
+
+// Lo que pide la sala en una carrera con lag (las claves y textos de mkw.mjs), más dos que NO son de lag
+const PEDIDOS = [
+  ['red', '📶 jugador 2 va lento', false],
+  ['lento', 'La sala va lenta por jugador 2', true],
+  ['conexion', '🔴 jugador 2: llega por otro piloto', true],
+  ['lentos', 'jugador 2 no llega a 60 en esta PC', true],
+  ['arbitro', 'Oracle dejó de arbitrar. La carrera sigue con un host.', true],
+  ['calor', '🌡️ tu aparato se está calentando', true],
+];
+const esquina = () => { const d = document.createElement('div'); document.getElementById('esquinas').append(d); return d; };
+const foto = d => [...d.children].map(c => `${c.dataset.clave}|${c.textContent}|${c.classList.contains('mal')}`).join('\n');
+const pedirTodo = chip => { for (const [k, t, m] of PEDIDOS) chip(k, t, m, 60000); };
+
+try {
+  // ---- 1. Lo guardado ----
+  ok('sin nada guardado, a la vista (prendida por omisión)', leerAvisosLag(almacen()) === true);
+  ok('un «0» guardado = escondidos', leerAvisosLag(almacen({ [CLAVE]: '0' })) === false);
+  ok('con el almacén bloqueado no se rompe y quedan a la vista', leerAvisosLag(roto) === true && (guardarAvisosLag(false, roto), true));
+  ok('la clave es mkw.avisosLag', CLAVE === 'mkw.avisosLag');
+  ok('las 4 claves de lag', CHIPS_LAG.join() === 'red,lento,conexion,lentos', CHIPS_LAG.join());
+
+  // ---- 2. ?avisosLag fuerza ----
+  {
+    const a = almacen({ [CLAVE]: '1' });
+    const f0 = crearAvisosLag({ parametros: P('avisosLag=0'), almacen: a });
+    ok('?avisosLag=0 los esconde aunque lo guardado diga prendidos', !f0.prendidos() && f0.forzado);
+    f0.fijar(true);
+    ok('forzada, cambiarla no toca lo guardado', a.m.get(CLAVE) === '1');
+    const f1 = crearAvisosLag({ parametros: P('avisosLag=1'), almacen: almacen({ [CLAVE]: '0' }) });
+    ok('?avisosLag=1 los muestra aunque lo guardado diga escondidos', f1.prendidos() && f1.forzado);
+    const fx = crearAvisosLag({ parametros: P('avisosLag=x'), almacen: almacen({ [CLAVE]: '0' }) });
+    ok('un ?avisosLag que no se entiende no fuerza nada (vale lo guardado)', !fx.prendidos() && !fx.forzado);
+  }
+
+  // ---- 3. Prendida = igual que antes (sin filtro) ----
+  {
+    const antes = esquina(), ahora = esquina();
+    pedirTodo(crearChips(antes).chip);
+    const av = crearAvisosLag({ parametros: P(''), almacen: almacen() });
+    pedirTodo(crearChips(ahora, { filtroChip: av }).chip);
+    ok('prendida: se pintan los mismos chips, con los mismos textos y colores que sin el filtro', foto(antes) === foto(ahora) && antes.children.length === PEDIDOS.length, foto(ahora).split('\n').length + ' chips');
+    ok('prendida: el contador dice 4 chips de lag pintados y 0 escondidos', av.estado().mostrados === 4 && av.estado().ocultos === 0, JSON.stringify(av.estado()));
+  }
+
+  // ---- 4. Apagada = ningún chip de lag ----
+  {
+    const d = esquina();
+    const av = crearAvisosLag({ parametros: P('avisosLag=0'), almacen: almacen() });
+    const { chip } = crearChips(d, { filtroChip: av });
+    pedirTodo(chip);
+    for (let i = 0; i < 10; i++) chip('red', '📶 jugador 2 va lento', false, 60000);   // (cada 500 ms, el mismo texto)
+    chip('red', '📶 jugador 3 va lento');
+    const claves = [...d.children].map(c => c.dataset.clave);
+    ok('apagada: ningún chip de lag en la esquina', !claves.some(k => CHIPS_LAG.includes(k)), claves.join());
+    ok('apagada: los que no son de lag siguen (el árbitro, el calor)', claves.join() === 'arbitro,calor');
+    ok('apagada: 0 pintados y 5 escondidos (el mismo texto repetido cuenta una vez)', av.estado().mostrados === 0 && av.estado().ocultos === 5, JSON.stringify(av.estado()));
+    ok('apagada: un texto vacío igual saca el chip (no deja nada colgado)', (chip('arbitro', ''), d.children.length === 1));
+  }
+
+  // ---- 5. En el momento, sin reiniciar ----
+  {
+    const d = esquina(), a = almacen();
+    let ui = null;
+    const av = crearAvisosLag({ parametros: P(''), almacen: a, alCambiar: v => ui.repintarChips(CHIPS_LAG, v) });
+    ui = crearChips(d, { filtroChip: av });
+    pedirTodo(ui.chip);
+    ok('al empezar, los 4 de lag a la vista', [...d.children].filter(c => CHIPS_LAG.includes(c.dataset.clave)).length === 4);
+    av.fijar(false);
+    ok('apagarla en plena carrera saca los chips de lag puestos', [...d.children].map(c => c.dataset.clave).join() === 'arbitro,calor');
+    ok('apagarla se guarda en el navegador («0»)', a.m.get(CLAVE) === '0' && leerAvisosLag(a) === false);
+    ui.chip('red', '📶 jugador 4 va lento', false, 60000);
+    ok('apagada, un aviso nuevo de lag no sale', !d.querySelector('[data-clave="red"]'));
+    av.fijar(true);
+    const red = d.querySelector('[data-clave="red"]');
+    ok('prenderla de nuevo vuelve a mostrar lo vigente (el último pedido)', red?.textContent === '📶 jugador 4 va lento' && d.querySelectorAll('[data-clave]').length === 6);
+    ok('prenderla se guarda («1»)', a.m.get(CLAVE) === '1');
+  }
+
+  // ---- 6. La casilla en Avanzado → Gráficos ----
+  {
+    const panel = document.getElementById('panel');
+    const av = crearAvisosLag({ parametros: P(''), almacen: almacen() });
+    montarGraficos(panel, { avisosLag: av });
+    const c = panel.querySelector('#graficosAvisosLag');
+    ok('la hoja Gráficos tiene «Mostrar avisos de conexión y lag»', !!c && /Mostrar avisos de conexión y lag/.test(c.parentElement.textContent));
+    ok('viene marcada', c?.checked === true && !c.disabled);
+    c.checked = false; c.dispatchEvent(new Event('change'));
+    ok('desmarcarla esconde los avisos', av.prendidos() === false);
+    c.checked = true; c.dispatchEvent(new Event('change'));
+    ok('marcarla los vuelve a mostrar', av.prendidos() === true);
+    const panel2 = document.createElement('div');
+    montarGraficos(panel2, { avisosLag: crearAvisosLag({ parametros: P('avisosLag=0'), almacen: almacen() }) });
+    const c2 = panel2.querySelector('#graficosAvisosLag');
+    ok('con ?avisosLag=0 la casilla sale desmarcada y gris (fijada)', c2 && !c2.checked && c2.disabled && /avisosLag/.test(panel2.querySelector('#notaAvisosLag').textContent));
+  }
+} catch (e) {
+  ok('sin errores', false, String(e && e.stack || e));
+}
+fin();
+</script>
+</body>
+</html>

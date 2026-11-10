@@ -1,0 +1,236 @@
+diff --git a/translator/src/Translator.Cli/Program.cs b/translator/src/Translator.Cli/Program.cs
+index cc03946..36b8265 100644
+--- a/translator/src/Translator.Cli/Program.cs
++++ b/translator/src/Translator.Cli/Program.cs
+@@ -1057,7 +1057,8 @@ int RunTranslateRecursive(string[] argsTail)
+                     "function(s) keep the full residency boundary.");
+             }
+             // MKW banderas (paso 6, §185): qué funciones devuelven el CR entero (solo con MKW_BANDERAS=seguro)
+-            CxxLinearCodeGenerator.MkwBanderasCalcular(canonicalGuestFunctions, guestAbiContracts, modOverridableCallTargets);
++            CxxLinearCodeGenerator.MkwBanderasCalcular(canonicalGuestFunctions, guestAbiContracts, modOverridableCallTargets,
++                CxxLinearCodeGenerator.MkwBanderasModo == "seguro" ? MkwIndirectables() : null);
+             var directlyCalledGuestFunctions = localGuestAbiContracts.Values
+                 .SelectMany(static contract => contract.DirectCallTargets)
+                 .Where(localGuestAbiContracts.ContainsKey)
+@@ -3478,6 +3479,52 @@ IEnumerable<uint> DiscoverCallbackTargetsCore(
+     string NormalizeReg(string reg) => reg.ToLowerInvariant();
+ }
+ 
++/// <summary>
++/// MKW banderas (W14, bitácora §217): las direcciones que pueden ser destino de una llamada indirecta, de más (nunca de
++/// menos): las que están guardadas en los datos del DOL y del REL (tablas virtuales, callbacks) y toda constante que el
++/// código arma con «lis rD,H» seguido (hasta 8 instrucciones) de «addi rX,rD,L» u «ori rX,rD,L» y cae en código
++/// ejecutable, se use como se use después. Las funciones del mod se suman aparte (todas). Lo escribe en
++/// build/mkw-banderas-indirectas.txt para el vigía del runtime (MKW_VIGIA_INDIRECTAS), que avisa si en la carrera una
++/// indirecta va a una dirección que no está.
++/// </summary>
++HashSet<uint> MkwIndirectables()
++{
++    var set = CollectDataSectionFunctionPointerTargets();
++    var desdeDatos = set.Count;
++    var ranges = BuildExecutableRanges();
++    bool Exe(uint a) => (a & 3) == 0 && ranges.Any(r => r.Contains(a));
++    var mem = image.Value.Memory;
++    foreach (var r in ranges)
++    {
++        if (!image.Value.Contains(r.Start, checked((int)r.Length))) continue;
++        var off = image.Value.GetOffset(r.Start, checked((int)r.Length));
++        var n = (int)(r.Length / 4);
++        for (var i = 0; i < n; ++i)
++        {
++            var w = BinaryPrimitives.ReadUInt32BigEndian(mem.AsSpan(off + i * 4, 4));
++            if ((w >> 26) != 15 || ((w >> 16) & 31) != 0) continue;          // lis rD, H (addis rD, 0, H)
++            var rd = (w >> 21) & 31;
++            var alto = (w & 0xFFFF) << 16;
++            for (var k = 1; k <= 8 && i + k < n; ++k)
++            {
++                var v = BinaryPrimitives.ReadUInt32BigEndian(mem.AsSpan(off + (i + k) * 4, 4));
++                var op = v >> 26;
++                uint valor;
++                if (op == 14 && ((v >> 16) & 31) == rd) valor = alto + (uint)(short)(v & 0xFFFF);        // addi rX, rD, L
++                else if (op == 24 && ((v >> 21) & 31) == rd) valor = alto | (v & 0xFFFF);                // ori rX, rD, L
++                else continue;
++                if (Exe(valor)) set.Add(valor);
++            }
++        }
++    }
++    Directory.CreateDirectory("build");
++    File.WriteAllLines(Path.Combine("build", "mkw-banderas-indirectas.txt"),
++        set.OrderBy(static a => a).Select(static a => a.ToString("X8")));
++    Console.WriteLine($"[translator] MKW banderas: {set.Count:N0} posibles destinos de una indirecta " +
++                      $"({desdeDatos:N0} de los datos, el resto armados en el código) → build/mkw-banderas-indirectas.txt");
++    return set;
++}
++
+ /// <summary>
+ /// Function entry points stored as a data-section word (vtables, dispatch tables, callbacks). Not a
+ /// discovery seeder; answers which mod-build winners must stay reachable via dispatch table, not a static call.
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs
+index 6c1d0a6..04c8413 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.MkwBanderas.cs
+@@ -19,7 +19,8 @@ namespace Translator.Core.CodeGen;
+ // Cada campo del CR se resuelve solo (el análisis es de «bits sueltos»: lo que pasa con cr3 no depende de cr5), así que
+ // hay una única solución mínima para todo el programa:
+ //   R[F] = lo que F lee al entrar antes de escribirlo (contando lo que leen sus llamadas; una llamada indirecta lee U).
+-//   U    = la unión de R de todas las funciones (cualquiera puede ser el destino de una indirecta).
++//   U    = la unión de R de las funciones que pueden ser destino de una indirecta (W14 §217: las que tienen su dirección
++//          guardada en los datos o armada en el código, y todas las del mod; sin esa lista, todas).
+ //   X[F] = los campos volátiles (cr0, cr1, cr5-cr7) que alguien lee después de que F vuelve (Xind = los que lee alguien
+ //          después de una llamada indirecta: valen para todas). Al volver, F guarda cr2-cr4 + X[F] + Xind.
+ // El código del mod se traduce en otra pasada: esa pasada vuelca la forma de cada función (qué pisa, qué lee, a quién
+@@ -83,7 +84,9 @@ public sealed partial class CxxLinearCodeGenerator
+     // ---------------------------------------------------------------------------------------------------------------
+     // La forma de una función para el análisis: por bloque, sus sucesores y una lista de operaciones.
+     private enum MkwTipo : byte { Comun, Llamada, Indirecta }
+-    private readonly record struct MkwOp(MkwTipo Tipo, byte Pisa, byte Lee, uint Destino);
++    // Marca (W14 §217, solo para estudiar fuera del traductor): 'n' común, 'm' lee el CR entero por un registro (mfcr),
++    // 'j' salto indirecto o instrucción sin traducir (leen todo). El análisis las trata igual.
++    private readonly record struct MkwOp(MkwTipo Tipo, byte Pisa, byte Lee, uint Destino, char Marca = 'n');
+     private sealed record MkwFuncion(string Clave, int Entrada, int[][] Sucesores, MkwOp[][] Ops);
+ 
+     private static MkwFuncion MkwForma(string clave, IrFunction func, IrCfg cfg,
+@@ -111,10 +114,27 @@ public sealed partial class CxxLinearCodeGenerator
+                 }
+                 else if (instruction is IrIndirectCall)
+                     lista.Add(new MkwOp(MkwTipo.Indirecta, pisa, 0, 0));
++                // W14 §217: un salto indirecto (bctr) va a otra etiqueta de esta función (las de la tabla son sucesores
++                // en el grafo) o a otra función (una llamada de cola): lee lo de una indirecta (U), no los 8 campos.
++                else if (instruction is IrIndirectJump)
++                    lista.Add(new MkwOp(MkwTipo.Indirecta, pisa, 0, 0, 'j'));
++                // un phi de la forma SSA junta valores de dos caminos: no es una lectura del programa
++                else if (instruction is IrPhi)
++                    continue;
++                else if (MkwCampoExacto(instruction) is { } exacto)
++                {
++                    // W14 §217: las operaciones del CR con lo que de verdad leen y pisan (el análisis de siempre dice
++                    // «lee los 8 campos y no pisa ninguno»: seguro pero ciego, y llenaba U)
++                    if (exacto.Pisa != 0 || exacto.Lee != 0) lista.Add(new MkwOp(MkwTipo.Comun, exacto.Pisa, exacto.Lee, 0, 'x'));
++                }
+                 else
+                 {
+                     var lee = GuestFlagLivenessAnalyzer.Reads(instruction, GuestFlagLivenessContext.Empty).CrFields;
+-                    if (pisa != 0 || lee != 0) lista.Add(new MkwOp(MkwTipo.Comun, pisa, lee, 0));
++                    var marca = instruction is IrIndirectJump or IrUndefined ? 'j'
++                        : IrRegisterDataFlow.Uses(instruction).Any(static u => u is not null &&
++                            RegisterNameUtils.HardwareBase(u.AsSpan()).Equals("cr", StringComparison.OrdinalIgnoreCase)) ? 'm' : 'n';
++                    if (pisa != 0 || lee != 0) lista.Add(new MkwOp(MkwTipo.Comun, pisa, lee, 0, marca));
++                    if (lee >= 0xFC && instruction is not IrBranch && MkwMuestras.Count < 5000) MkwMuestras.Add($"{clave} {marca} lee {lee:X2}: {instruction}");
+                 }
+             }
+             ops[b] = lista.ToArray();
+@@ -122,6 +142,51 @@ public sealed partial class CxxLinearCodeGenerator
+         return new MkwFuncion(clave, indice.TryGetValue(func.EntryLabel, out var e) ? e : 0, sucesores, ops);
+     }
+ 
++    /// <summary>
++    /// W14 (§217): lo que de verdad lee y pisa una operación del CR, con los argumentos constantes que deja el traductor
++    /// (PpcLifter): crand/cror/crxor… = PPC_CrLogical(op, d, a, b) con bits 0–31 (el campo = bit / 4): lee los campos
++    /// de a, b y d (d se escribe a medias: los otros 3 bits de su campo pasan) y no pisa ninguno entero; crclr =
++    /// PPC_CrSetBit(bit, v): igual, su campo; mcrf = PPC_Mcrf(d, s): lee s, pisa d; mcrxr / mcrfs = pisan su campo;
++    /// mtcrf = «x_mtcrf_preserve = cr &amp; ~máscara»: no lee nada (lo de afuera de la máscara pasa tal cual) y pisa los
++    /// campos de la máscara (el bit i de la máscara de 32 bits es el campo 7 − i / 4). null = no es una de estas.
++    /// </summary>
++    private static (byte Pisa, byte Lee)? MkwCampoExacto(IrInstruction instruction)
++    {
++        static byte Campo(long bit) => (byte)(1 << (int)((bit & 31) / 4));
++        static byte Fld(long f) => (byte)(1 << (int)(f & 7));
++        static bool EsCr(string? n) => n is not null && RegisterNameUtils.HardwareBase(n.AsSpan()).Equals("cr", StringComparison.OrdinalIgnoreCase);
++        // las constantes (los registros, como «cr», que algunas formas pasan también como argumento, se saltan)
++        static long[] Consts(IReadOnlyList<IrValue> a) => a.Where(static v => v.Constant is not null).Select(static v => v.Constant!.Value).ToArray();
++        switch (instruction)
++        {
++            case IrCall c when EsCr(c.Destination):
++                {
++                    var k = Consts(c.Arguments);
++                    var t = c.Target.ToUpperInvariant();
++                    if (t is "PPC_CRLOGICAL" && k.Length == 4) return (0, (byte)(Campo(k[1]) | Campo(k[2]) | Campo(k[3])));
++                    if (t is "PPC_CRSETBIT" && k.Length == 2) return (0, Campo(k[0]));
++                    if (t is "PPC_MCRF" && k.Length == 2) return (Fld(k[0]), Fld(k[1]));
++                    if (t is "PPC_MCRXR" && k.Length == 1) return (Fld(k[0]), 0);
++                    if (t is "PPC_MCRFS" && k.Length == 2) return (Fld(k[0]), 0);
++                    return null;
++                }
++            case IrBinary { Op: "and", Left: { Kind: "register" } izq, Right.Constant: { } inv } b
++                when EsCr(izq.RegisterName) && b.Destination.Contains("mtcrf_preserve", StringComparison.Ordinal):
++                {
++                    var mascara = ~(uint)inv;
++                    byte pisa = 0;
++                    for (var f = 0; f < 8; ++f)
++                        if (((mascara >> ((7 - f) * 4)) & 0xF) != 0) pisa |= (byte)(1 << f);
++                    return (pisa, 0);
++                }
++            default:
++                return null;
++        }
++    }
++
++    // W14 §217: muestras de las operaciones comunes que leen campos volátiles (para ver qué son), a build/mkw-banderas-ff.txt
++    private static readonly ConcurrentBag<string> MkwMuestras = new();
++
+     private static string MkwTexto(MkwFuncion f)
+     {
+         var sb = new StringBuilder();
+@@ -136,7 +201,7 @@ public sealed partial class CxxLinearCodeGenerator
+                 {
+                     case MkwTipo.Llamada: sb.Append('c').Append(op.Pisa.ToString("X2")).Append(op.Destino.ToString("X8")); break;
+                     case MkwTipo.Indirecta: sb.Append('i').Append(op.Pisa.ToString("X2")); break;
+-                    default: sb.Append('n').Append(op.Pisa.ToString("X2")).Append(op.Lee.ToString("X2")); break;
++                    default: sb.Append(op.Marca).Append(op.Pisa.ToString("X2")).Append(op.Lee.ToString("X2")); break;
+                 }
+             }
+             sb.Append('\n');
+@@ -228,7 +293,8 @@ public sealed partial class CxxLinearCodeGenerator
+     public static void MkwBanderasCalcular(
+         IReadOnlyDictionary<uint, IrFunction> funciones,
+         IReadOnlyDictionary<uint, GuestAbiContract> contratos,
+-        IReadOnlySet<uint> modOverridable)
++        IReadOnlySet<uint> modOverridable,
++        IReadOnlySet<uint>? indirectables = null)
+     {
+         if (MkwBanderasModo != "seguro") return;
+         var rutaMod = MkwRuta("mkw-banderas-mod.txt");
+@@ -248,6 +314,9 @@ public sealed partial class CxxLinearCodeGenerator
+             formas[i] = MkwForma("b:" + direcciones[i].ToString("X8"), f, IrCfg.Build(f), null, null);
+         });
+         var todas = formas.Concat(MkwLeerVolcado(rutaMod)).ToArray();
++        // W14 §217: la forma de las funciones del juego también a un archivo, para estudiar el análisis fuera del traductor
++        File.WriteAllText(MkwRuta("mkw-banderas-base.txt"), string.Concat(formas.Select(MkwTexto)));
++        File.WriteAllLines(MkwRuta("mkw-banderas-ff.txt"), MkwMuestras.OrderBy(static l => l, StringComparer.Ordinal));
+         var numero = new Dictionary<string, int>(StringComparer.Ordinal);
+         for (var i = 0; i < todas.Length; ++i) numero[todas[i].Clave] = i;
+         var deMod = todas.Length - formas.Length;
+@@ -282,6 +351,13 @@ public sealed partial class CxxLinearCodeGenerator
+         bool Entera(uint a) => adentro.ContainsKey(a) || !destinos.TryGetValue(a, out var d) || d.Length == 0 ||
+                                (modOverridable.Contains(a) && !numero.ContainsKey("m:" + a.ToString("X8")));
+ 
++        // Cuáles cuentan para U: las del mod siempre; las del juego si su entrada está en la lista (sin lista, todas).
++        var cuentaU = new bool[todas.Length];
++        for (var i = 0; i < todas.Length; ++i)
++            cuentaU[i] = indirectables is null || todas[i].Clave.StartsWith("m:", StringComparison.Ordinal) ||
++                         indirectables.Contains(Convert.ToUInt32(todas[i].Clave.Substring(2), 16));
++        Console.WriteLine($"[translator] MKW banderas: {cuentaU.Count(static c => c):N0} de {todas.Length:N0} funciones cuentan para U");
++
+         // 2. R y U: el punto fijo mínimo (todo empieza en 0 y solo sube).
+         var r = new byte[todas.Length];
+         byte u = 0;
+@@ -296,7 +372,8 @@ public sealed partial class CxxLinearCodeGenerator
+                     MkwTipo.Indirecta => (byte)(vivo | uFoto),
+                     _ => vivo,
+                 }, null));
+-            var uNuevo = (byte)nuevo.Aggregate(0, static (acc, v) => acc | v);
++            byte uNuevo = 0;
++            for (var i = 0; i < nuevo.Length; ++i) if (cuentaU[i]) uNuevo |= nuevo[i];
+             var cambio = uNuevo != u || !nuevo.AsSpan().SequenceEqual(r);
+             r = nuevo;
+             u = uNuevo;
+@@ -304,6 +381,9 @@ public sealed partial class CxxLinearCodeGenerator
+             {
+                 Console.WriteLine($"[translator] MKW banderas: lo que leen al entrar, {vuelta} vueltas; U=0x{u:X2}; " +
+                                   $"{r.Count(static v => v != 0):N0} de {todas.Length:N0} funciones leen algo ({deMod:N0} del mod)");
++                // quién aporta a U (las que cuentan y leen algo al entrar): para entender una U grande
++                File.WriteAllLines(MkwRuta("mkw-banderas-u.txt"), Enumerable.Range(0, todas.Length)
++                    .Where(i => cuentaU[i] && r[i] != 0).Select(i => $"{todas[i].Clave} {r[i]:X2}"));
+                 break;
+             }
+         }

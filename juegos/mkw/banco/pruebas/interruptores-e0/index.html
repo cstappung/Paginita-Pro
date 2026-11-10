@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interruptores de la etapa 0</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Interruptores de la etapa 0: <span>qué hace cada <code>?x=</code></span></h1>
+<p>Prueba <code>web/navegador/interruptores-e0.mjs</code> (bitácora §196–§205, la etapa 0 del plan v4) <b>sin el
+  juego</b>: qué modo le pasa la página al programa con cada parámetro de la dirección. Todos tienen que quedar
+  <b>apagados</b> (o sin tocar lo del programa) cuando el parámetro no está, y con un valor raro también: prenderlos
+  es solo para medir o probar.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { modoPiscina, modoHuesosFilas, modoSoltarPipelines, modoTecho, mascaraTecho, modoIsla, modoSumidero, cuadroFoto, azarFijo } from '/web/navegador/interruptores-e0.mjs';
+
+const { ok, nota, fin } = prueba('interruptores-e0', 'Interruptores de la etapa 0 (sin el juego)');
+const q = s => new URLSearchParams(s);
+
+try {
+  // ---- 1. Sin nada en la dirección: todo apagado ----
+  {
+    const p = q('');
+    ok('sin ?piscina → no se toca (lo que diga el programa)', modoPiscina(p.get('piscina')) === null);
+    ok('sin ?huesosFilas → 0 (las matrices como siempre)', modoHuesosFilas(p.get('huesosFilas')) === 0);
+    ok('sin ?soltarPipelines → 0 (se guardan todos, como antes)', modoSoltarPipelines(p.get('soltarPipelines')) === 0);
+    ok('sin ?techo → 0 (la pista se dibuja)', modoTecho(p.get('techo')) === 0);
+    ok('sin ?isla → 0 (la traducida)', modoIsla(p.get('isla')) === 0);
+    ok('sin ?sumidero → 0 (nada)', modoSumidero(p.get('sumidero')) === 0);
+    ok('sin ?fotoCuadro → 0 (sin foto)', cuadroFoto(p.get('fotoCuadro')) === 0);
+    ok('sin ?azarFijo → el azar del reloj, como siempre', azarFijo(p.get('azarFijo')) === false);
+  }
+  // ---- 2. Prendidos ----
+  {
+    const p = q('piscina=1&huesosFilas=1&soltarPipelines=1&techo=1&isla=2&sumidero=2&fotoCuadro=900');
+    ok('?piscina=1 → 1 (soltar las copias ociosas) y ?piscina=0 → 0', modoPiscina(p.get('piscina')) === 1 && modoPiscina('0') === 0);
+    ok('?huesosFilas=1 → 1', modoHuesosFilas(p.get('huesosFilas')) === 1);
+    ok('?soltarPipelines=1 → 1', modoSoltarPipelines(p.get('soltarPipelines')) === 1);
+    ok('?techo=1 → 1', modoTecho(p.get('techo')) === 1);
+    ok('?isla=2 → 2 (el comprobador)', modoIsla(p.get('isla')) === 2);
+    ok('?sumidero=2 → 2 (deshacer)', modoSumidero(p.get('sumidero')) === 2);
+    ok('?fotoCuadro=900 → 900', cuadroFoto(p.get('fotoCuadro')) === 900);
+    ok('?azarFijo=1 → la semilla de la ficha; otra cosa, no', azarFijo('1') === true && ['0', 'si', ''].every(v => azarFijo(v) === false));
+  }
+  // ---- 3. Valores raros: apagado ----
+  {
+    const raros = ['si', '2', '-1', 'abc', ''];
+    ok('?piscina con otra cosa → no se toca', raros.every(v => modoPiscina(v) === null));
+    ok('?huesosFilas, ?soltarPipelines y ?techo con otra cosa → 0',
+       raros.every(v => modoHuesosFilas(v) === 0 && (v === '2' || modoSoltarPipelines(v) === 0) && (v === '2' || modoTecho(v) === 0)));
+    ok('?soltarPipelines=2 → 2 (además los sombreadores); 3 → 3 (W26, §248: solo los de lo soltado); 4 → 0', modoSoltarPipelines('2') === 2 && modoSoltarPipelines('3') === 3 && modoSoltarPipelines('4') === 0);
+    ok('?isla y ?sumidero fuera de 0-2 → 0', ['3', '-1', 'abc'].every(v => modoIsla(v) === 0 && modoSumidero(v) === 0));
+    ok('?fotoCuadro negativo, 0 o sin número → 0 (sin foto)', ['-5', '0', 'abc'].every(v => cuadroFoto(v) === 0));
+    // §222 (E4): ?techo es una suma de bits 0-7 y ?techoOp la máscara de las opciones de dibujo
+    ok('?techo=2/4/6 → 2/4/6 (efectos, máscara, los dos); 8 → 0', modoTecho('2') === 2 && modoTecho('4') === 4 && modoTecho('6') === 6 && modoTecho('8') === 0);
+    ok('?techoOp=0x402 → 1026 (karts y pilotos), 1026 → 1026', mascaraTecho('0x402') === 0x402 && mascaraTecho('1026') === 0x402);
+    ok('?techoOp sin valor, raro o de más de 24 bits → 0', ['', 'abc', '-1', '0x1000000', '0x12g'].every(v => mascaraTecho(v) === 0) && mascaraTecho(null) === 0);
+    nota(`?fotoCuadro=300.7 → ${cuadroFoto('300.7')} (se redondea para abajo)`);
+  }
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

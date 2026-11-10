@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mando dibujado</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Mando dibujado: <span>la vista estilo Big Picture, Switch 2 y los genéricos</span></h1>
+<p>Prueba (bitácora §263) <b>sin el juego</b> y con mandos de mentira: <code>mando-dibujo.mjs</code> (el dibujo con un rótulo
+  por botón, «¿Qué hace RT?», las luces y «Enséñale tu mando»), <code>disposicion-mando.mjs</code> (el mando que el navegador
+  no ordena, visto como uno «standard»: el Pro Controller y el de GameCube de Switch 2, y lo que enseña la persona),
+  <code>switch2.mjs</code> (las 17 órdenes que despiertan un mando de Switch 2 por cable, con un USB de mentira y el aviso de
+  Windows) y <code>controles.mjs</code> con todo eso junto (un Switch 2 crudo que maneja el juego como un mando cualquiera).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="dibujo" style="max-width:440px"></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { montarDibujoMando, ponerBoton, ponerStick, accionesDeFuente, modoDeStick, FISICOS, CSS_DIBUJO } from '/web/navegador/mando-dibujo.mjs';
+import { disposicionDe, estandarizar, medirCentro, revisarDisposicion, armarDisposicion, CONOCIDAS, PASOS } from '/web/navegador/disposicion-mando.mjs';
+import { ORDENES, mandarOrdenes, despertarSwitch2, switch2Disponible } from '/web/navegador/switch2.mjs';
+import { mapaPorOmision, nombreFuente } from '/web/navegador/asignacion-mando.mjs';
+import { crearControles, BOTON, tipoMando } from '/web/navegador/controles.mjs';
+
+const { ok, nota, fin } = prueba('mando-dibujo', 'Mando dibujado, Switch 2 y genéricos (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const btns = (n, apretados = []) => Array.from({ length: n }, (_, i) => ({ pressed: apretados.includes(i), value: apretados.includes(i) ? 1 : 0 }));
+const crudo = (id, n, ejes, apretados = []) => ({ id, index: 0, mapping: '', connected: true, buttons: btns(n, apretados), axes: ejes.slice() });
+document.head.append(Object.assign(document.createElement('style'), { textContent: CSS_DIBUJO }));
+let guardadoAntes = null;
+try { guardadoAntes = localStorage.getItem('mkw.mandos'); localStorage.removeItem('mkw.mandos'); } catch {}
+
+try {
+  // ---- 1. Leer y cambiar el mapa por botón (lo que muestra cada rótulo) ----
+  const def = mapaPorOmision();
+  ok('RT (b7) hace «R» (derrapar) y LT (b6) «L» (objeto)', accionesDeFuente(def, 'b7').join() === 'R' && accionesDeFuente(def, 'b6').join() === 'L');
+  ok('el stick izquierdo maneja y el derecho es el stick C', modoDeStick(def, ['a0-', 'a0+', 'a1-', 'a1+']) === 'stick' && modoDeStick(def, ['a2-', 'a2+', 'a3-', 'a3+']) === 'c');
+  let m = ponerBoton(def, 'b5', 'A');
+  ok('RB → Acelerar: se suma (A sigue en el botón de abajo) y RB deja de ser Z', m.A.join() === 'b0,b5' && !m.Z.includes('b5'));
+  m = ponerBoton(m, 'b0', null);
+  ok('«Nada» le quita todo a ese botón', accionesDeFuente(m, 'b0').length === 0 && m.A.join() === 'b5');
+  m = ponerStick(def, ['a2-', 'a2+', 'a3-', 'a3+'], 'stick');
+  ok('el stick derecho → «Manejar»: los dos sticks manejan, ya no hay stick C', modoDeStick(m, ['a2-', 'a2+', 'a3-', 'a3+']) === 'stick' && m['stick.izq'].join() === 'a0-,a2-' && !m['c.izq'].length);
+  ok('un stick → «Nada»', modoDeStick(ponerStick(def, ['a0-', 'a0+', 'a1-', 'a1+'], null), ['a0-', 'a0+', 'a1-', 'a1+']) === 'nada');
+  ok('un gatillo con reposo («a5+@-1») cuenta como esa fuente', accionesDeFuente({ R: ['a5+@-1'] }, 'a5+').join() === 'R');
+
+  // ---- 2. El dibujo: rótulos, colores, luces y «¿Qué hace…?» ----
+  const nombres = { A: 'Acelerar', B: 'Frenar', R: 'Derrapar y saltar', L: 'Usar objeto', X: 'Mirar atrás', arriba: 'Truco', START: 'Pausa', Y: 'Y', Z: 'Z', abajo: 'Cruz abajo', izquierda: 'Cruz izquierda', derecha: 'Cruz derecha' };
+  const elegidos = [];
+  const v = montarDibujoMando(document.getElementById('dibujo'), { nombres, alElegir: x => elegidos.push(x) });
+  const gp = { buttons: btns(17, [7]), axes: [0, 0, 0, 0] };
+  v.pintar({ mapa: def, tipo: 'xbox', gamepad: gp });
+  const rot = f => document.querySelector(`.bp-rotulo[data-f="${f}"]`);
+  ok('un rótulo por cada lugar del mando (16)', document.querySelectorAll('.bp-rotulo').length === FISICOS.length && FISICOS.length === 16);
+  ok('RT dice «Derrapar y saltar» y LS «Manejar (girar)»', /RT.*Derrapar y saltar/.test(rot('b7').textContent) && /Manejar/.test(rot('si').textContent), rot('b7').textContent);
+  ok('RT apretado: se enciende su rótulo y su pieza del dibujo', rot('b7').classList.contains('encendido') && document.querySelector('g[data-f="b7"]').classList.contains('encendido') && !rot('b0').classList.contains('encendido'));
+  ok('Xbox: la A en verde y la B en rojo', document.querySelector('g[data-f="b0"] text').style.fill !== '' && document.querySelector('g[data-f="b0"] text').style.fill !== document.querySelector('g[data-f="b1"] text').style.fill);
+  v.pintar({ mapa: def, tipo: 'playstation', gamepad: null });
+  ok('PlayStation: los símbolos (✕ abajo, R2 en el gatillo)', rot('b0').querySelector('.bp-glifo').textContent === '✕' && rot('b7').querySelector('.bp-glifo').textContent === 'R2');
+  v.pintar({ mapa: def, tipo: 'nintendo', gamepad: null });
+  ok('Switch: ZR en el gatillo derecho y A a la derecha', rot('b7').querySelector('.bp-glifo').textContent === 'ZR' && rot('b1').querySelector('.bp-glifo').textContent === 'A');
+  rot('b7').focus();
+  ok('el foco en un rótulo marca su botón en el dibujo', document.querySelector('g[data-f="b7"]').classList.contains('marcado'));
+  rot('b7').click();
+  const opciones = [...document.querySelectorAll('.bp-opcion')];
+  ok('tocar RT abre «¿Qué hace ZR?» con la acción de ahora marcada ✓', !document.querySelector('.bp-elegir').hidden && /¿Qué hace ZR\?/.test(document.querySelector('.bp-titulo').textContent)
+    && opciones.find(o => o.classList.contains('puesta'))?.dataset.objetivo === 'R');
+  ok('el foco queda en la acción de ahora', document.activeElement?.dataset?.objetivo === 'R');
+  opciones.find(o => o.dataset.objetivo === 'A').click();
+  ok('elegir «Acelerar» avisa { f: b7, objetivo: A } y vuelve al dibujo', elegidos.at(-1)?.f === 'b7' && elegidos.at(-1)?.objetivo === 'A' && document.querySelector('.bp-elegir').hidden && !document.querySelector('.bp-vista').hidden);
+  rot('si').click();
+  ok('un stick ofrece «Manejar», «Stick C» y «Nada»', [...document.querySelectorAll('.bp-opcion')].map(o => o.textContent.replace('✓ ', '')).join('|') === 'Manejar (girar)|Stick C|Nada');
+  document.querySelector('.bp-elegir').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok('Esc (o la B del mando) vuelve sin cambiar nada', document.querySelector('.bp-elegir').hidden && elegidos.length === 1);
+
+  // ---- 3. La disposición: el Switch 2 crudo visto como un mando «standard» ----
+  ok('el Pro Controller de Switch 2 (057e:2069, sin mapeo) tiene disposición conocida', !!disposicionDe('057e:2069·libre') && !!disposicionDe('057e:2073·libre') && !disposicionDe('045e:0b13'));
+  const pro2 = disposicionDe('057e:2069·libre');
+  let e = estandarizar(crudo('Pro (Vendor: 057e Product: 2069)', 21, [0, 0, 0, 0, 0, 0], [1]), pro2);
+  ok('Pro 2: su A (crudo 1, a la derecha) es el lugar 1 del estándar', e.mapping === 'standard' && e.buttons[1].pressed && !e.buttons[0].pressed);
+  e = estandarizar(crudo('x', 21, [0, 0, 0, 0, 0, 0], [5, 13, 6]), pro2);
+  ok('Pro 2: ZR → RT (7), ZL → LT (6), + → Start (9)', e.buttons[7].pressed && e.buttons[6].pressed && e.buttons[9].pressed);
+  e = estandarizar(crudo('x', 21, [0, 0, 0, 0, 0, 0], [11, 10]), pro2);
+  ok('Pro 2: la cruz (crudo 11 ↑, 10 ←) va a 12 y 14', e.buttons[12].pressed && e.buttons[14].pressed && !e.buttons[13].pressed);
+  e = estandarizar(crudo('x', 21, [0, 0.8, 0, 0, 0, 0]), pro2);
+  ok('Pro 2: el stick a fondo hacia ARRIBA (+0,8 en su eje) es −1 en el estándar', Math.abs(e.axes[1] + 1) < 0.01, e.axes[1]);
+  const reposo = crudo('x', 21, [0.0, 0.105, 0, 0.075, 0, 0]);
+  const centro = medirCentro(reposo);
+  e = estandarizar(reposo, pro2, { centro });
+  ok('Pro 2: el reposo torcido (+0,105) queda en 0 con el centro medido', Math.abs(e.axes[1]) < 0.01 && Math.abs(e.axes[2]) < 0.01, `${e.axes}`);
+  e = estandarizar(crudo('x', 21, [0, 0, 0, -0.8, 0, 0.8]), pro2, { centro: { 3: 0, 5: 0 } });
+  ok('Pro 2: el stick derecho (Rx, Rz) es el stick C', e.axes[2] < -0.95 && e.axes[3] < -0.95);
+  const gc2 = disposicionDe('057e:2073·libre');
+  e = estandarizar(crudo('x', 21, [0, 0, 0, 0, 0, 0], [1]), gc2);
+  ok('GameCube de Switch 2: la A grande va al lugar de «aceptar» (0): acelera', e.buttons[0].pressed && !e.buttons[1].pressed);
+  e = estandarizar(crudo('x', 21, [0, 0, 0, 0, 0, 0], [4, 12, 5]), gc2);
+  ok('GameCube de Switch 2: R → RT (derrapar), L → LT (objeto), Z → RB (Z)', e.buttons[7].pressed && e.buttons[6].pressed && e.buttons[5].pressed);
+  ok('el de GameCube de Switch 2 es tipo «gamecube» y el Pro 2 «nintendo»', tipoMando('Unknown (Vendor: 057e Product: 2073)') === 'gamecube' && tipoMando('Unknown (Vendor: 057e Product: 2069)') === 'nintendo');
+  ok('sus letras en el dibujo: A abajo, Z en RB', nombreFuente('b0', 'gamecube') === 'A' && nombreFuente('b5', 'gamecube') === 'Z');
+  ok('una disposición enseñada le gana a la conocida', disposicionDe('057e:2069·libre', { '057e:2069·libre': { b0: 'b9' } }).b0 === 'b9');
+  ok('lo guardado se revisa (lugares y fuentes válidos)', JSON.stringify(revisarDisposicion({ b0: 'b3', b99: 'b1', b1: 'xx', 'a0-': 'a4-', escala: 7 })) === '{"b0":"b3","a0-":"a4-"}');
+  ok('«Enséñale tu mando» recorre 22 lugares', PASOS.length === 22);
+
+  // ---- 4. «Enséñale tu mando» con un genérico de mentira (los botones en otro orden) ----
+  {
+    const g = crudo('Generic USB Joystick', 12, [0, 0, 0, 0]);
+    let resp, termino = false;
+    v.ensenar({ leer: () => g, alTerminar: r => { resp = r; termino = true; }, ms: 300 });
+    ok('al empezar: «Paso 1 de 22» y el dibujo marca el botón de abajo', /Paso 1 de 22/.test(document.querySelector('.bp-paso').textContent) && document.querySelector('g[data-f="b0"]').classList.contains('marcado'));
+    const aprieta = async i => { g.buttons[i] = { pressed: true, value: 1 }; await espera(90); g.buttons[i] = { pressed: false, value: 0 }; await espera(90); };
+    await aprieta(2);                                          // su «abajo» es el 2
+    ok('apretar el suyo pasa al paso 2 (el de la derecha)', v.ensenando?.paso === 1 && v.ensenando.resp.b0 === 'b2');
+    await aprieta(2);                                          // el mismo otra vez: no cuenta
+    ok('el mismo botón otra vez no cuenta en otro lugar', v.ensenando?.paso === 1);
+    await aprieta(1);
+    document.querySelector('.bp-paso button').click();         // «Saltar»
+    ok('«Saltar» deja ese lugar sin nada y sigue', v.ensenando?.paso === 3 && !('b2' in v.ensenando.resp));
+    g.axes[0] = -0.9; await espera(400);                        // (un eje en el lugar de un botón también vale; y si no, los 300 ms lo saltan)
+    g.axes[0] = 0; await espera(100);
+    for (let i = 0; i < 80 && !termino; i++) await espera(150);  // (el resto se salta solo a los 300 ms)
+    ok('termina y entrega lo enseñado', termino && resp?.b0 === 'b2' && resp?.b1 === 'b1', JSON.stringify(resp));
+    ok('lo enseñado se arma como disposición', JSON.stringify(armarDisposicion(resp)).includes('"b0":"b2"'));
+    let cancelado = 'no';
+    v.ensenar({ leer: () => g, alTerminar: r => { cancelado = r; } });
+    v.cancelarEnsenar();
+    ok('«Cancelar» termina sin nada', cancelado === null && !v.ensenando);
+  }
+
+  // ---- 5. Las órdenes del Switch 2, con un USB de mentira ----
+  ok('17 órdenes, con los largos de los textos verificados (22, 25 y 28 bytes en la 4, 5 y 10)', ORDENES.length === 17 &&
+    ORDENES.map(o => o.length).join() === '16,8,8,22,25,9,16,12,8,28,12,12,8,8,7,11,16');
+  ok('todas son del protocolo «91» y la última prende la luz del jugador 1', ORDENES.every(o => o[1] === 0x91) && ORDENES.at(-1)[0] === 0x09 && ORDENES.at(-1)[8] === 0x01);
+  const usbFalso = ({ falla = null } = {}) => {
+    const d = { productId: 0x2069, opened: false, configuration: null, salidas: [], reclamada: null, cerrado: false,
+      async open() { this.opened = true; }, async close() { this.opened = false; this.cerrado = true; },
+      async selectConfiguration() { this.configuration = { interfaces: [{ interfaceNumber: 0 }, { interfaceNumber: 1, alternate: { endpoints: [{ direction: 'out', type: 'bulk', endpointNumber: 2 }, { direction: 'in', type: 'bulk', endpointNumber: 2 }] } }] }; },
+      async claimInterface(n) { if (falla === 'claim') { const e = new Error('Unable to claim interface.'); e.name = 'NetworkError'; throw e; } this.reclamada = n; },
+      async releaseInterface() {},
+      async transferOut(ep, datos) { this.salidas.push([ep, [...datos]]); return { status: falla === 'stall' && this.salidas.length === 3 ? 'stall' : 'ok' }; },
+      async transferIn() { return { status: 'ok', data: new DataView(new ArrayBuffer(8)) }; } };
+    return d;
+  };
+  {
+    const d = usbFalso(); await d.open();
+    const pasos = [];
+    await mandarOrdenes(d, { alPaso: (i) => pasos.push(i), pausaMs: 0, respuestaMs: 0 });
+    ok('reclama la interfaz 1 y manda las 17 órdenes en orden por su salida bulk', d.reclamada === 1 && d.salidas.length === 17 && d.salidas.every(([ep], i) => ep === 2)
+      && d.salidas.every(([, b], i) => b.join() === [...ORDENES[i]].join()) && pasos.length === 17);
+    const d2 = usbFalso({ falla: 'stall' }); await d2.open();
+    const r = await mandarOrdenes(d2, { pausaMs: 0, respuestaMs: 0 }).then(() => 'ok', e => e.message);
+    ok('si una orden vuelve «stall», para y lo dice', /orden 3/.test(r), r);
+  }
+  {
+    const navFalso = (falla, ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)') => { const d = usbFalso({ falla }); return { d, nav: { userAgent: ua, usb: { requestDevice: async ({ filters }) => { navFalso.filtros = filters; return d; } } } }; };
+    let { d, nav } = navFalso(null);
+    let r = await despertarSwitch2({ nav });
+    ok('despertar: pide solo mandos de Nintendo de Switch 2 y queda activado', r.ok && r.nombre === 'Pro Controller de Switch 2' && navFalso.filtros.every(f => f.vendorId === 0x057e) && navFalso.filtros.length === 4 && d.cerrado);
+    ({ nav } = navFalso('claim'));
+    r = await despertarSwitch2({ nav });
+    ok('en Windows, si no deja abrir la interfaz: explica WinUSB y Zadig en palabras simples', !r.ok && /WinUSB/.test(r.error) && /Zadig/.test(r.error), r.error);
+    ({ nav } = navFalso('claim', 'Mozilla/5.0 (Linux; Android 14)'));
+    r = await despertarSwitch2({ nav });
+    ok('fuera de Windows, el otro aviso (desenchufar y probar otra vez)', !r.ok && /Desenchúfalo/.test(r.error));
+    r = await despertarSwitch2({ nav: { usb: { requestDevice: async () => { throw new DOMException('No device selected.', 'NotFoundError'); } } } });
+    ok('si no se elige ningún mando, no pasa nada malo', !r.ok && r.cancelado);
+    ok('sin WebUSB (otro navegador) no se ofrece', !switch2Disponible({}) && !(await despertarSwitch2({ nav: {} })).ok);
+  }
+
+  // ---- 6. Todo junto en controles.mjs: un Pro 2 crudo maneja el juego como un mando cualquiera ----
+  {
+    const lista = [];
+    const realGP = navigator.getGamepads;
+    navigator.getGamepads = () => lista;
+    const recibido = [];
+    const c = crearControles({ enviar: (p, con, botones, sx, sy) => { recibido[p] = { con, botones, sx, sy }; } });
+    const pro = { id: 'Pro Controller (Vendor: 057e Product: 2069)', index: 0, mapping: '', connected: true, buttons: btns(21), axes: [0, 0.1, 0, 0, 0, 0] };
+    lista.push(pro);
+    c.paso();
+    const m0 = c.estado.mandos[0];
+    ok('el Pro 2 crudo aparece como estándar, de Nintendo, con su nombre', m0?.estandar === true && !m0.sinMapa && m0.tipo === 'nintendo' && m0.modelo === 'Pro Controller de Switch 2' && m0.disposicion === 'conocida');
+    pro.buttons[1] = { pressed: true, value: 1 };              // su A (a la derecha) = A de GameCube: acelera
+    c.paso();
+    ok('su A acelera (botón A de GameCube)', (recibido[0].botones & BOTON.A) !== 0, recibido[0].botones.toString(16));
+    pro.buttons[1] = { pressed: false, value: 0 }; pro.axes[1] = 0.1 + 0.8;   // stick a fondo hacia arriba (desde su reposo)
+    c.paso();
+    ok('su stick hacia arriba llega como arriba', recibido[0].sy > 100, recibido[0].sy);
+    pro.axes[1] = 0.1; c.paso();
+    ok('en reposo, el stick en 0 (el reposo torcido no gira el kart)', Math.abs(recibido[0].sy) < 5, recibido[0].sy);
+    // un genérico sin mapeo: se enseña y desde ahí maneja
+    const gen = { id: 'Generic Pad (Vendor: 0810 Product: 0001)', index: 1, mapping: '', connected: true, buttons: btns(12), axes: [0, 0, 0, 0] };
+    lista.push(gen); c.paso();
+    const mg = c.estado.mandos.find(x => x.indice === 1);
+    ok('un genérico sin mapeo: «sin mapa» hasta enseñarlo', mg?.sinMapa === true && mg.estandar === false);
+    ok('crudoDe da su Gamepad tal cual (para enseñar)', c.crudoDe(mg.clave) === gen);
+    ok('guardar lo enseñado (su «abajo» = 3)', c.guardarDisposicion(mg.clave, { b0: 'b3', b1: 'b2', 'a0-': 'a0-', 'a0+': 'a0+' }));
+    c.paso();
+    const mg2 = c.estado.mandos.find(x => x.indice === 1);
+    ok('después: estándar y «enseñado por ti»', mg2.estandar === true && !mg2.sinMapa && mg2.disposicion === 'tuya');
+    gen.buttons[3] = { pressed: true, value: 1 }; c.paso();
+    const puertoGen = mg2.puerto;
+    ok('su botón 3 (que es su «abajo») acelera', (recibido[puertoGen].botones & BOTON.A) !== 0);
+    gen.buttons[3] = { pressed: false, value: 0 };
+    c.borrarDisposicion(mg2.clave); c.paso();
+    ok('«Olvidar lo enseñado» lo deja como antes', c.estado.mandos.find(x => x.indice === 1).sinMapa === true);
+    navigator.getGamepads = realGP;
+  }
+} catch (e) {
+  ok('sin errores', false, String(e && e.stack || e));
+}
+try { if (guardadoAntes === null) localStorage.removeItem('mkw.mandos'); else localStorage.setItem('mkw.mandos', guardadoAntes); } catch {}
+fin();
+</script>
+</body>
+</html>

@@ -20,6 +20,8 @@ import { createRequire } from 'node:module';
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const args = process.argv.slice(2);
+// (§192: --extra=&param=valor = para las dos visitas; p. ej. --extra=&saltarDibujo=2 = saltarse uno de cada dos dibujos)
+const EXTRA = (args.find(a => a.startsWith('--extra=')) || '').slice(8);
 const opcion = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
 const PUERTO = Number(opcion('--puerto', 8165));
 const carpeta = path.join(raiz, 'build/web/datos/fantasma');
@@ -64,7 +66,7 @@ try {
   // 1) Ana: Contrarreloj sola, unos segundos manejando, y la meta por código
   await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1`);
   await pagina.evaluate(() => window.mkwGuardado.borrarTodo());
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=tt&copa=0&fila=0&fantasma=0&quien=ana`);
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=tt&copa=0&fila=0&fantasma=0&quien=ana${EXTRA}`);
   let e = -1; const t0 = Date.now();
   while (Date.now() - t0 < 180000 && (e = await etapa()) !== 2) await espera(250);
   ok('Ana: la Contrarreloj sola abrió y corre', e === 2, `etapa ${e} a los ${((Date.now() - t0) / 1000).toFixed(0)} s`);
@@ -103,7 +105,7 @@ try {
   // 2) Bea, otra visita (sin las partidas de Ana): la misma pista contra el fantasma
   await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1`);
   await pagina.evaluate(() => window.mkwGuardado.borrarTodo());
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=tt&copa=0&fila=0&fantasma=1&quien=bea`);
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=tt&copa=0&fila=0&fantasma=1&quien=bea${EXTRA}`);
   const t3 = Date.now();
   while (Date.now() - t3 < 180000 && (e = await etapa()) < 1) await espera(250);
   await espera(3000);

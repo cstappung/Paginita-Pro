@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aislamiento: un marco</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<!-- Paso 8 (P9/H5, bitácora §187–§188): las pruebas de UN marco (servido con la cabecera que pide ?aislar=…). Le
+     manda el resultado a la página de afuera (index.html) con postMessage; abierto solo, lo muestra. -->
+<pre id="salida">probando…</pre>
+<script type="module">
+import { probarJspi } from './jspi.mjs';
+const aislar = new URLSearchParams(location.search).get('aislar') || 'ninguna';
+const nuevo = () => new Worker(new URL('./sonda.mjs', import.meta.url), { type: 'module' });
+const pedir = (w, m, transfer = []) => new Promise((ok, mal) => {
+  const t = setTimeout(() => mal(new Error('sin respuesta')), 20000);
+  w.onmessage = e => { clearTimeout(t); ok(e.data); };
+  w.onerror = e => { clearTimeout(t); mal(new Error(e.message || 'error en el Worker')); };
+  try { w.postMessage(m, transfer); } catch (e) { clearTimeout(t); mal(e); }
+});
+const mediana = v => { v.sort((a, b) => a - b); return v[v.length >> 1]; };
+
+const r = { aislar, aislado: !!self.crossOriginIsolated, sab: typeof SharedArrayBuffer === 'function', jspiPagina: false, sonda: null,
+            sabTrabajador: false, planB: {}, nucleos: null, errores: [] };
+// la cabecera con que llegó esta página (la que de verdad mandó el servidor)
+try {
+  const h = (await fetch(location.href, { method: 'HEAD', cache: 'no-store' })).headers;
+  r.cabecera = h.get('document-isolation-policy') ? 'DIP: ' + h.get('document-isolation-policy')
+    : h.get('cross-origin-embedder-policy') ? 'COOP ' + h.get('cross-origin-opener-policy') + ' + COEP ' + h.get('cross-origin-embedder-policy') : 'ninguna';
+  if (new URLSearchParams(location.search).get('sw') === 'dip') r.cabecera += ' (el servidor) + DIP del service worker';
+} catch (e) { r.errores.push('cabecera: ' + e); }
+// P9: ¿el marco aislado todavía puede tocar la página de afuera directo (lo que hoy hacen mkwConectarRecords,
+// mkwConectarNube, mando-sitio.mjs y privado.mjs) y comparte con ella el almacenamiento (mismo origen)?
+r.padre = { documento: false, llamada: false, almacen: null, mensajes: true };
+if (parent !== self) {
+  try { r.padre.documento = typeof parent.document.title === 'string'; } catch (e) { r.padre.documentoError = e.name; }
+  try { r.padre.llamada = parent.mkwSaludo?.() === 'hola'; } catch (e) { r.padre.llamadaError = e.name; }
+}
+try { r.padre.almacen = localStorage.getItem('aislamiento.prueba'); } catch (e) { r.padre.almacenError = e.name; }
+try { r.jspiPagina = await probarJspi(); } catch (e) { r.errores.push('jspi: ' + e); }
+const w = nuevo();
+try { r.sonda = await pedir(w, { t: 'probar' }); } catch (e) { r.errores.push('sonda: ' + e); }
+// ¿La memoria compartida llega al Worker y se avisan con Atomics? (lo que piden los hilos de verdad)
+if (r.sab) try {
+  const sab = new SharedArrayBuffer(16), v = new Int32Array(sab);
+  await pedir(w, { t: 'sab', sab });
+  r.sabTrabajador = Atomics.load(v, 0) === 42;
+} catch (e) { r.errores.push('sab al Worker: ' + e.name); }
+// El plan B (H5): «pasarse cajas». Un búfer de 1 MB y de 4 MB, de ida y vuelta, transferido (sin copiar)
+for (const mb of [1, 4]) try {
+  const ms = [];
+  let b = new ArrayBuffer(mb << 20);
+  for (let i = 0; i < (mb === 1 ? 60 : 20); i++) {
+    const t0 = performance.now();
+    const res = await pedir(w, { t: 'eco', b }, [b]);
+    ms.push(performance.now() - t0);
+    b = res.b;
+  }
+  // (el promedio: sin aislamiento el reloj de la página tiene pasos de 0,1 ms y la mediana de una sola sale 0)
+  r.planB[mb + 'MB'] = { idaVueltaMs: +(ms.reduce((s, x) => s + x, 0) / ms.length).toFixed(3), sinCopia: b.byteLength === (mb << 20) };
+} catch (e) { r.errores.push(`plan B ${mb} MB: ${e}`); }
+// ¿Varios núcleos de verdad? 1 Worker con una carga fija, y después N a la vez con la misma carga cada uno
+try {
+  const N = Math.max(2, Math.min(4, navigator.hardwareConcurrency || 2)), VUELTAS = 3e7;
+  const ws = Array.from({ length: N }, nuevo);
+  await Promise.all(ws.map(x => pedir(x, { t: 'girar', n: 1e5 })));          // (que carguen y calienten)
+  const uno = (await pedir(ws[0], { t: 'girar', n: VUELTAS })).ms;
+  const t0 = performance.now();
+  await Promise.all(ws.map(x => pedir(x, { t: 'girar', n: VUELTAS })));
+  const juntos = performance.now() - t0;
+  r.nucleos = { trabajadores: N, unoMs: +uno.toFixed(1), juntosMs: +juntos.toFixed(1), aceleracion: +(N * uno / juntos).toFixed(2) };
+  ws.forEach(x => x.terminate());
+} catch (e) { r.errores.push('núcleos: ' + e); }
+w.terminate();
+document.getElementById('salida').textContent = JSON.stringify(r, null, 1);
+if (parent !== self) parent.postMessage({ canal: 'aislamiento', r }, '*');
+</script>
+</body>
+</html>

@@ -49,6 +49,11 @@ try {
   ok('una lista válida dice cuántos pipelines trae; una rota o ajena da -1',
      contarLista(lista(5)) === 5 && contarLista(new Uint8Array(4)) === -1 &&
      contarLista(new TextEncoder().encode('<html>no encontrado</html>')) === -1 && contarLista(null) === -1);
+  // §175: la lista del formato 2 de C2 (§174: con etiqueta y visita) también vale; antes se descartaba y la lista propia
+  // nunca se guardaba (prueba-navegador: «guardados y leídos de vuelta 0»)
+  { const v2 = lista(6); v2.set([...'MKWPIPE2'].map(c => c.charCodeAt(0)));
+    ok('§175: una lista «MKWPIPE2» (con etiquetas, C2) también dice cuántos trae; «MKWPIPE3» no', contarLista(v2) === 6 &&
+       contarLista((() => { const x = lista(2); x[7] = '3'.charCodeAt(0); return x; })()) === -1); }
 
   // 2) primera visita: hay semilla en el servidor, nada en este navegador
   const semilla = lista(40);
@@ -90,6 +95,18 @@ try {
   ok('segunda visita: la lista guardada vuelve entera (70) aunque el servidor no tenga semilla',
      l2.semilla === null && contarLista(l2.propia) === 70 && iguales(l2.propia, lista(70, 9)));
 
+  // §175: una semilla del formato 2 (como pipelines-c2.bin, armada aquí con lista-pipelines.mjs: etiquetas de menús,
+  // común y una pista) llega por cargar() igual que una del formato 1 (antes se descartaba como «no es una lista»)
+  { const { escribir: escribirV2, MENUS, COMUN, dePista } = await import('/web/navegador/lista-pipelines.mjs');
+    const cfg = n => new Uint8Array(12).fill(n);
+    const v2 = escribirV2([{ tipo: 0, version: 7, cuadro: 0, etiqueta: MENUS, visita: 0, config: cfg(1) },
+                           { tipo: 1, version: 7, cuadro: 50, etiqueta: COMUN, visita: 0, config: cfg(2) },
+                           { tipo: 0, version: 7, cuadro: 900, etiqueta: dePista(13), visita: 0, config: cfg(3) }]);
+    const pv = crearPipelines({ base: base + '-v2', buscar: respuesta(v2) });
+    const lv = await pv.cargar();
+    ok('§175: una semilla «MKWPIPE2» con etiquetas (la de C2) se carga entera, no se ignora', contarLista(lv.semilla) === 3 && iguales(lv.semilla, v2),
+       `semilla ${lv.semilla ? contarLista(lv.semilla) : 'ignorada'}`); }
+
   // 6) datos malos o fallas: se sigue sin precalentar (el juego anda igual)
   const p3 = crearPipelines({ base, buscar: respuesta(new TextEncoder().encode('<html>404</html>')) });
   ok('una "semilla" que no es lista (p. ej. una página de error) se ignora', (await p3.cargar()).semilla === null);
@@ -100,6 +117,25 @@ try {
   const l5 = await p5.cargar();
   ok('con IndexedDB bloqueado (modo incógnito estricto) no se rompe: queda la semilla y el error anotado',
      iguales(l5.semilla, semilla) && l5.propia === null && /bloqueado/.test(p5.estado.error), p5.estado.error);
+  // 7) §122 (D13): con una carrera andando, el reloj no arma ni guarda la lista; al terminar, sí
+  const doc6 = Object.assign(new EventTarget(), { hidden: false });
+  const p6 = crearPipelines({ base, buscar: respuesta(null), cadaMs: 30, documento: doc6 });
+  const M6 = juegoFalso(10);
+  let carrera = true, armadas = 0;
+  const armar = M6._mkw_web_pipelines_armar;
+  M6._mkw_web_pipelines_armar = () => { armadas++; return armar(); };
+  p6.aplazarMientras(() => carrera);
+  p6.vigilar(M6);
+  M6.n = 20;
+  await new Promise(r => setTimeout(r, 200));
+  ok('§122: en plena carrera el reloj no arma la lista ni la guarda (la deja para después)', armadas === 0 && p6.estado.vecesGuardada === 0 && p6.estado.aplazadas >= 3,
+     `armadas ${armadas}, aplazadas ${p6.estado.aplazadas}`);
+  carrera = false;
+  ok('§122: …al terminar la carrera la guarda (en un rato libre del hilo)', await hasta(() => p6.estado.guardadas === 20), `guardadas ${p6.estado.guardadas}`);
+  carrera = true; M6.n = 25;
+  doc6.hidden = true; doc6.dispatchEvent(new Event('visibilitychange'));
+  ok('§122: esconder la pestaña en plena carrera la guarda igual', await hasta(() => p6.estado.guardadas === 25));
+  p6.detener();
   nota('formato: "MKWPIPE1" + cantidad + por cada pipeline (tipo, versión, primer cuadro, tamaño, configuración); ' +
        'aurora descarta las de otra versión al leerlas');
 } catch (e) {

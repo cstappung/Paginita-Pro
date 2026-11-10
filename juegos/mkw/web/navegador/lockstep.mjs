@@ -60,7 +60,7 @@ export const RETRASO = 3;                  // el de partida si no hay medidas (y
 export const RETRASO_MIN = 2;
 export const RETRASO_MAX = 12;             // 200 ms: más ya no se maneja (y solo lo sufre quien tiene esa conexión)
 const PING_CADA = 500, MARGEN_MS = 6, MUESTRAS = 3, VENTANA = 16, TIRON_MS = 100, REVISAR_MS = 40;
-const REPITE = 16, CADA_HUELLA = 120, ESPERA_PIDE = 7, ESPERA_CORTE = 4000, ESPERA_INICIO = 45000;
+const REPITE = 16, CADA_HUELLA = 30, ESPERA_PIDE = 7, ESPERA_CORTE = 4000, ESPERA_INICIO = 45000;
 // §93 (C4), la LARGADA: los primeros 600 cuadros (10 s) de cada carrera. La primera vez que alguien juega, ahí su
 // navegador todavía arma gráficos y lee pedazos del disco, y su pestaña puede quedar trabada varios segundos (medido:
 // 5-9 s justo al largar). En ese tramo no se usa el margen corto de la sala: al que se calla se le espera esperaLargada
@@ -74,6 +74,8 @@ const RELEVO_MIN = 6, SANO = 6;            // ratos: relevado al menos 3 s, y 3 
 const MALAS_AUTORIDAD = 2, VENTANA_AUTORIDAD = 20;
 // §99 (D): el papel pasa solo a quien tiene al menos PASO_MINIMO puntos más que la autoridad (ver puntaje)
 const PASO_MINIMO = 200;
+// §179 (R7): la subida mínima de la autoridad (kbit/s): con 12 manda ~2–3 Mbit/s
+const SUBIDA_MIN = 2000;
 // §99 (VR v2): el «ausente» se mira en el primer minuto de cada carrera
 const QUIETO_HASTA = 3600;
 // §99 (C3), ponerse al día: si voy más de UMBRAL_PRISA cuadros atrás de más de la mitad, pido correr seguido lo que
@@ -100,6 +102,13 @@ const PAUSA_MS = 150, APAGA_PAUSA = 60, VUELTA_MARGEN = 60, PAUSA_A_CORTE = 2000
 const IDO_MS = 1000;
 // §99 (H8): si no llega nada de NADIE hace SORDO_MS, el que se cortó soy yo (no «espero a X»)
 const SORDO_MS = 1000;
+// §191 (R1): con el árbitro, la autoridad se detiene si no oye a NADIE hace SORDO_MS (la aislada es ella); desde el cuadro
+// SOLO_MAX (antes, los demás todavía cargan)
+const SOLO_MAX = 60;
+// §191 (R1): con el árbitro, el traspaso voluntario del papel rige LEAD_TRASPASO cuadros después del aviso: lo que la
+// nueva autoridad ya escribió como «no autoridad» (va hasta su retraso adelante) no trae el registro de los demás, y
+// los demás tienen que alcanzar a mandarle lo suyo
+const LEAD_TRASPASO = RETRASO_MAX + 4;
 // §99 (S1): lo que manda un tercero de los botones de otro solo vale si lo pedí hace poco, si hay un corte en curso de
 // ese mando, o si su dueño se calló hace más de CALLADO_MS (ahí otro reparte lo que tenía de él)
 const PEDIDO_VALE = 2000, CALLADO_MS = 300;
@@ -113,13 +122,83 @@ const SIN_DATO = 127, NO_SE = 255;
 const ESPERAS_LOG = Number(new URLSearchParams(globalThis.location?.search || '').get('esperasLog')) || 500;
 // §91: hasta 12 humanos (Mario Kart en línea): los mandos de la sala van de 0 a 11 (pad_web.cpp: 0-3 con puerto, el resto virtuales)
 export const MANDOS = 12;
+// §236: el árbitro en un servidor (arbitro-servidor.mjs, herramientas/arbitro/servidor.mjs) es un participante más SIN
+// kart: su mando es el 12, uno después de los 12 de la carrera. Manda paquetes como cualquiera (los suyos, neutros, y
+// el registro de todos: es la autoridad), pero sus botones no van a ningún kart ni a la huella de la carrera, nadie lo
+// releva y el papel no se le pasa (solo empieza con él, si la sala lo eligió). Las tablas internas tienen SLOTS casillas
+// (la 12 es la suya); en los paquetes y en los informes de siempre siguen siendo 12 (el informe agrega la suya al final)
+export const SERVIDOR = MANDOS;
+const SLOTS = MANDOS + 1;
 const TODOS = Array.from({ length: MANDOS }, (_, m) => m);
-const fila = v => Array(MANDOS).fill(v);
+const fila = v => Array(SLOTS).fill(v);
 const NEUTRO = [0, 0, 0, 0, 0, 0, 0];
+// R4 (§230): las tablas de cada mando como ANILLOS de tamaño fijo, no `Map` que crecen toda la carrera (antes unas 216
+// mil entradas en 5 min con 12, y un arreglo nuevo por botón recibido: basura que el recolector tenía que limpiar a
+// cada rato). Un anillo guarda los últimos ANILLO cuadros: la casilla del cuadro f es f % ANILLO, con su «etiqueta» (qué
+// cuadro tiene) para no confundir el f con el f + ANILLO. Como un registro de desplazamiento circular de un osciloscopio:
+// la memoria es siempre la misma y se va escribiendo encima de lo más viejo. Cada casilla tiene su arreglo de 7 que se
+// reescribe en el lugar (se crea la primera vez que se usa la casilla; los anillos de una carrera vuelven a una reserva
+// y los usa la siguiente). 2048 cuadros = 34 s: lo más viejo que se lee es 64 cuadros atrás (el botón inventado, el
+// reparto de un corte) y una pausa se vuelve corte a los 20 s (PAUSA_A_CORTE).
+const ANILLO = 2048;
+class Anillo {
+  constructor() { this.tag = new Int32Array(ANILLO).fill(-1); this.val = new Array(ANILLO).fill(null); this.size = 0; this.mayor = -1; }
+  reiniciar() { this.tag.fill(-1); this.size = 0; this.mayor = -1; return this; }
+  has(f) { return f >= 0 && this.tag[f & (ANILLO - 1)] === f; }
+  get(f) { return f >= 0 && this.tag[f & (ANILLO - 1)] === f ? this.val[f & (ANILLO - 1)] : undefined; }
+  // ¿cabe el cuadro f? (uno más viejo que lo que el anillo guarda no se escribe: taparía uno nuevo)
+  cabe(f) { return f >= 0 && f > this.mayor - ANILLO; }
+  // la casilla del cuadro f, lista para escribir los 7 valores (size = cuántos cuadros distintos llegaron en la carrera)
+  casilla(f) {
+    const k = f & (ANILLO - 1);
+    if (this.tag[k] !== f) { this.tag[k] = f; this.size++; if (f > this.mayor) this.mayor = f; }
+    return this.val[k] || (this.val[k] = [0, 0, 0, 0, 0, 0, 0]);
+  }
+  set(f, v) { const c = this.casilla(f); for (let i = 0; i < 7; i++) c[i] = v[i]; return this; }
+}
+// Lo que agrega la autoridad a su cuadro (masc, sust, sig y los botones de los relevados), también en anillo: cada
+// casilla es un objeto que se reusa, con sus 12 arreglos de 7
+class AnilloReg {
+  constructor() { this.tag = new Int32Array(ANILLO).fill(-1); this.val = new Array(ANILLO).fill(null); }
+  reiniciar() { this.tag.fill(-1); return this; }
+  get(f) { return f >= 0 && this.tag[f & (ANILLO - 1)] === f ? this.val[f & (ANILLO - 1)] : undefined; }
+  // escribe la casilla del cuadro f (los slots se copian: k → arreglo de 7 o null)
+  poner(f, masc, sust, sig) {
+    const k = f & (ANILLO - 1);
+    let x = this.val[k];
+    if (!x) x = this.val[k] = { masc: 0, sust: 0, sig: 0xFF, slots: new Array(MANDOS).fill(null), buf: Array.from({ length: MANDOS }, () => [0, 0, 0, 0, 0, 0, 0]) };
+    this.tag[k] = f; x.masc = masc; x.sust = sust; x.sig = sig; x.slots.fill(null);
+    return x;
+  }
+  set(f, r) {
+    const x = this.poner(f, r.masc, r.sust, r.sig);
+    for (let m = 0; m < MANDOS; m++) if (r.slots[m]) { const b = x.buf[m], v = r.slots[m]; for (let i = 0; i < 7; i++) b[i] = v[i]; x.slots[m] = b; }
+    return this;
+  }
+}
+// la reserva de anillos: los de la carrera que terminó vuelven aquí y los usa la siguiente (sin crear 2048 arreglos más)
+const reservaAnillos = [], reservaRegs = [];
+const anilloNuevo = () => (reservaAnillos.pop() || new Anillo()).reiniciar();
+const regNuevo = () => (reservaRegs.pop() || new AnilloReg()).reiniciar();
+function soltarAnillos(tablas, regs) {
+  if (tablas) for (const t of tablas.values()) if (reservaAnillos.length < 4 * MANDOS) reservaAnillos.push(t);
+  if (regs) for (const r of regs.values()) if (reservaRegs.length < 4 * MANDOS) reservaRegs.push(r);
+}
+// el búfer de envío que se reusa (paqueteA): una vista del largo justo de cada paquete, guardada por largo
+const cuentaBits = x => { let n = 0; for (let k = 0; k < MANDOS; k++) if ((x >> k) & 1) n++; return n; };
+const memEnvio = new ArrayBuffer(8192), dvEnvio = new DataView(memEnvio), vistasEnvio = new Map();
+function bufEnvio(n) {
+  if (n > memEnvio.byteLength) return new Uint8Array(n);   // (no pasa: 16 cuadros con 12 relevados son ~1,8 KB)
+  let v = vistasEnvio.get(n); if (!v) vistasEnvio.set(n, v = new Uint8Array(memEnvio, 0, n));
+  v.fill(0);
+  return v;
+}
 const START = 0x1000;                      // pausa: en la carrera de la sala no se pausa (pausaría solo una consola)
 const BOTON_A = 0x0100;                    // acelerar (el botón inventado lo mantiene si estaba)
 
 export function crearLockstep({ yo, humanos, enviar, local, huella = null, retraso: retrasoBase = RETRASO, registro = () => {},
+  // R5 (§154): cada cuántos cuadros se compara la huella (antes 120; ?huellaCada=120 = como antes)
+  huellaCada = Number((globalThis.location?.search || '').match(/[?&]huellaCada=(\d+)/)?.[1]) || CADA_HUELLA,
   ahora = () => performance.now(), esperaCorte = ESPERA_CORTE, esperaInicio = ESPERA_INICIO,
   // §93: el margen de la largada (por omisión el mismo de siempre: lo agranda la página) y cuántos cuadros dura
   esperaLargada = esperaCorte, cuadrosLargada = LARGADA,
@@ -135,9 +214,35 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // §99 (C4): () => true mientras corre la cuenta regresiva (la página lo lee del juego; sin ella, no hay regla de la
   // cuenta: el banco y las pruebas de siempre)
   enCuenta = null,
+  // §250: () => la etapa de la carrera (Raceinfo +0x28: 0 presentación, 1 cuenta, 2 carrera…; la página la lee del
+  // juego). Solo para anotar en qué cuadro y a qué hora empezó cada una en esta consola (est.largada); null = no se anota
+  etapa = null,
+  // §250: (carrera, cuadro) => … cuando esta consola ve el «¡YA!» (la página se lo avisa al servidor de Oracle)
+  alYa = null,
+  // §250, la LARGADA PAREJA: hasta el «¡YA!» (mientras enCuenta() dice que no empezó la carrera, y a lo más los primeros
+  // cuadrosLargada) nadie corre sin los botones de verdad de todos: la autoridad no escribe los de nadie (ni con el
+  // árbitro ni con el relevo) y al callado no se lo pausa: se lo espera con el margen de la largada (§93). Así ninguna
+  // consola corre la cuenta sola mientras otra está trabada armando la pista, y todas largan a la vez (a lo más su
+  // retraso de la cuenta, 6 cuadros, de diferencia). Sin enCuenta (el servidor de Oracle, que no tiene el juego): los
+  // primeros cuadrosBarrera cuadros (0 = no hay barrera: el banco de siempre). ?largadaPareja=0 = como antes de §250
+  largadaPareja = !/[?&]largadaPareja=0\b/.test(globalThis.location?.search || ''), cuadrosBarrera = 0,
   // §99 (C1), el relevo rápido: al que se calla se lo PAUSA a los PAUSA_MS (no se lo corta a los 2 s); ?relevoRapido=0
   // = como antes
   relevoRapido = !/[?&]relevoRapido=0\b/.test(globalThis.location?.search || ''), pausaACorte = PAUSA_A_CORTE,
+  // §177.5 (R3): la traba VIVA (la pestaña contesta los pings pero su juego no avanza: JSPI esperando el disco) también
+  // se pausa a los PAUSA_MS, si su ping dice que no está esperando botones de nadie; ?trabaViva=0 = como antes
+  trabaViva = !/[?&]trabaViva=0\b/.test(globalThis.location?.search || ''),
+  // §179 (R7): () => { margen, subida, telefono } de esta consola: los ms libres por cuadro (16,7 − lo que trabaja), la
+  // subida que estima WebRTC (kbit/s) y si es un teléfono. Viajan en el informe y suman al puntaje de la autoridad:
+  // nunca un teléfono si hay un PC. null = no se sabe (como antes); ?autoridadCapaz=0 = no se usan
+  capacidad = null, autoridadCapaz = !/[?&]autoridadCapaz=0\b/.test(globalThis.location?.search || ''),
+  // §180.2: los inventados mientras me relevan no suben mi retraso (?calmaRelevado=0 = como antes)
+  calmaRelevado = !/[?&]calmaRelevado=0\b/.test(globalThis.location?.search || ''),
+  // §191 (R1), el árbitro (?arbitro=1; por omisión apagado, como el relevo de siempre): la autoridad escribe SIEMPRE los
+  // botones de todos en su paquete (los que le llegaron a tiempo; si no, el inventado). Cada uno espera solo a la
+  // autoridad y manda lo suyo solo a ella y al suplente (el que la reemplaza si se calla): la traba de uno no frena a
+  // los demás. Sin la sincronía de §80b (no hace falta)
+  arbitro = /[?&]arbitro=1\b/.test(globalThis.location?.search || ''),
   // §101: lo que esta pestaña estuvo trabada mientras esperaba no se le carga al que faltaba (es un tirón mío);
   // ?trabaPropia=0 = como antes, para comparar
   trabaPropia = !/[?&]trabaPropia=0\b/.test(globalThis.location?.search || ''),
@@ -149,12 +254,17 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // (la página lo lee del juego: igual en todas las consolas). Desde ahí no cuenta como «quieto»: el juego ya no le pide
   // botones. null = no se sabe (el banco)
   llego = null,
+  // §175: (islas) => {} cuando la sala se parte en dos o más (la página lo avisa); ver decidirIsla
+  alPartida = null,
   cuadroMs = 1000 / 60, informeCada = INFORME_CADA }) {
   const rtt = new Map();                  // uid → { s: ida y vuelta suavizada (ms, para mostrar), m: las últimas VENTANA medidas,
                                           //         n: los números de ping que contestó }
   let pings = 0;                          // número del último ping (va en el campo "cuadro": la respuesta lo devuelve)
   const oido = new Map();                 // uid → la última vez que llegó algo de él (para saber quién está)
+  const avanceDe = new Map();             // §177.5 (R3): mando → la última vez que su dueño mandó un botón nuevo (su juego avanza)
+  const esperaDe = new Map();             // §177.5 (R3): uid → 1 si su último ping dice que espera botones de otro, 0 si no
   const miMando = humanos.find(h => h.uid === yo)?.mando ?? -1;
+  const ISLAS = !/[?&]islas=0\b/.test(globalThis.location?.search || ''), ISLA_MS = 1500;   // (§175)
   const mandos = humanos.map(h => h.mando);
   const duenoDe = new Map(humanos.map(h => [h.mando, h.uid]));
   const mandoDe = new Map(humanos.map(h => [h.uid, h.mando]));
@@ -168,6 +278,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const relevados = new Map();            // (si soy la autoridad) mando → { desde, problema } (ms)
   let pasarA = null, traspaso = null;     // a quién voy a pasar la autoridad / a quién ya se la pasé
   let buenas = 0, sustituidosMios = 0, ultimaSubida = -Infinity, numInforme = 0;
+  let autoridadLenta = false;
+  // (§191, R1: con el árbitro, «holgura de sobra» desde 2 cuadros, no 3: lo mío da dos saltos —a la autoridad y de ella
+  // a todos— y con 3 de margen en cada uno el retraso quedaba 3–4 cuadros sobre el de la autoridad)
+  const HOLGADO = arbitro ? 2 : 3;              // §191 (R1): soy la autoridad y en el último rato corrí menos del 90 % del tiempo
   const malasAutoridad = [];               // §99: los ratos de los últimos VENTANA_AUTORIDAD (1 = la mayoría me vio mal)
   // §99 (D, autoridad por estabilidad): de cada mando, sus últimos VENTANA_AUTORIDAD ratos: si la mayoría lo vio mal
   // (su paquete llega tarde). La autoridad necesita además no ir atrás (delanteDe): si se traba o le llega todo tarde,
@@ -204,13 +318,14 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const planteles = new Map();            // §75: carrera → Set(mandos fuera desde el cuadro 0), lo dice la sala
   const saltos = new Map();               // §75: carrera → Set(mandos que avisaron que se la saltan: se cortan ya)
   const acciones = new Map();             // §75: "carrera:cuadro" → función (en ese cuadro, en todas las consolas)
-  const est = { cuadros: 0, esperas: 0, msEsperando: 0, maxEspera: 0, msLlegada: 0, desincronizado: null, huellasIguales: 0, cortes: [],
+  const est = { cuadros: 0, esperas: 0, msEsperando: 0, maxEspera: 0, esperasLargas: 0, msLlegada: 0, desincronizado: null, huellasIguales: 0, cortes: [],
     retrasos: {}, retrasoMax: {}, conflictos: 0, esperaDe: {}, relevos: 0, inventados: 0, inventadosViejos: 0, traspasos: 0, salidas: 0,
     hashBotones: 2166136261, relevadosAhora: [], autoridad: null, subidas: 0, bajadas: 0, frenos: 0, msFrenado: 0, adelanto: 0,
-    estable: { malas: 0, atras: 0, rtt: null }, prisas: 0, prisaCuadros: 0, pausas: [], vueltas: 0 };
+    estable: { malas: 0, atras: 0, rtt: null }, prisas: 0, prisaCuadros: 0, pausas: [], vueltas: 0, paquetesBotones: 0, enviosA: {}, arbitro };
 
-  const tabla = m => { let t = tablas.get(m); if (!t) tablas.set(m, t = new Map()); return t; };
-  const reg = m => { let r = regs.get(m); if (!r) regs.set(m, r = new Map()); return r; };
+  // (R4, §230: anillos, no Map; ver Anillo)
+  const tabla = m => { let t = tablas.get(m); if (!t) tablas.set(m, t = anilloNuevo()); return t; };
+  const reg = m => { let r = regs.get(m); if (!r) regs.set(m, r = regNuevo()); return r; };
   const cortadoEn = (m, c) => cortes.has(m) && c >= cortes.get(m);
   const vivos = () => humanos.filter(h => !cortes.has(h.mando));
   // §99 (C1): pausado en el cuadro c (en algún tramo: desde su pausa hasta su vuelta)
@@ -227,6 +342,9 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // el último cuadro que ya corrí (si estoy esperando el `ultimo`, ese todavía no)
   const ejecutado = () => espera ? ultimo - 1 : ultimo;
   const yoRelevado = () => est.relevadosAhora.includes(yo);
+  // (R4, §230: lo que se reusa en cada cuadro)
+  const vLocal = [0, 0, 0, 0, 0, 0, 0], datosPad = new Int32Array(8 * MANDOS);
+  let mascRelevados = 0;
 
   function empaca(tipo, mando, cuadro, extra = 0) {
     const b = new Uint8Array(8 + extra);
@@ -236,6 +354,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   }
   const escribe8 = (d, o, v) => { d.setUint16(o, v[0] & 0xFFFF); for (let k = 1; k < 5; k++) d.setInt8(o + 1 + k, v[k]); d.setUint8(o + 6, v[5]); d.setUint8(o + 7, v[6]); };
   const lee8 = (d, o) => [d.getUint16(o), d.getInt8(o + 2), d.getInt8(o + 3), d.getInt8(o + 4), d.getInt8(o + 5), d.getUint8(o + 6), d.getUint8(o + 7)];
+  // (R4: lo mismo, escrito en un arreglo que ya existe: la casilla del anillo)
+  const lee8en = (d, o, c) => { c[0] = d.getUint16(o); c[1] = d.getInt8(o + 2); c[2] = d.getInt8(o + 3); c[3] = d.getInt8(o + 4); c[4] = d.getInt8(o + 5); c[5] = d.getUint8(o + 6); c[6] = d.getUint8(o + 7); };
   const bits = x => TODOS.filter(m => (x >> m) & 1);
   // los botones del mando m desde `desde` hasta `hasta` (los que tenga seguidos), con lo que agrega la autoridad
   function paquete(m, desde, hasta) {
@@ -268,27 +388,33 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // al menos el último: así sigue llegando el adelanto de §80b). Tipo 15: como el 13, más un acuse (el último cuadro
   // seguido que tengo de SUS botones) y los 5 bytes de la autoridad solo si algún cuadro los trae. Antes se repetían
   // siempre los últimos 16 a todos: ~218 bytes por cuadro a cada uno con 12 pilotos
+  // (R4, §230: sin listas intermedias y en un búfer que se reusa: este paquete sale en cada cuadro a cada uno. El
+  // envío copia los bytes al mandar —RTCDataChannel.send, la red de mentira de las pruebas—, así que el mismo búfer sirve
+  // para el siguiente)
   function paqueteA(uid, m, hasta) {
     const t = tabla(m), r = reg(m);
     const desde = Math.min(hasta, Math.max(hasta - REPITE + 1, (ackDe.get(uid) ?? -1) + 1, 0));
-    const lista = [];
-    for (let c = desde; c <= hasta; c++) { const v = t.get(c); if (!v) { if (lista.length) break; continue; } lista.push([v, r.get(c), c]); }
-    if (!lista.length) return null;
-    const conReg = lista.some(([, x]) => x);
-    const largo = lista.reduce((suma, [, x]) => suma + 8 + (conReg ? 5 + (x ? 8 * bits(x.masc).length : 0) : 0), 0);
-    const b = empaca(15, m, lista[0][2], 8 + largo), d = new DataView(b.buffer);
-    b[8] = lista.length;
-    b[9] = m === miMando && lista.at(-1)[2] === escrito && ultimo >= 0 ? Math.min(254, Math.max(0, escrito - ultimo)) : 0xFF;
+    let c0 = -1, c1 = -1;
+    for (let c = desde; c <= hasta; c++) { if (!t.has(c)) { if (c0 >= 0) break; continue; } if (c0 < 0) c0 = c; c1 = c; }
+    if (c0 < 0) return null;
+    let conReg = false, largo = 0;
+    for (let c = c0; c <= c1; c++) if (r.get(c)) { conReg = true; break; }
+    for (let c = c0; c <= c1; c++) { const x = conReg ? r.get(c) : null; largo += 8 + (conReg ? 5 + (x ? 8 * cuentaBits(x.masc) : 0) : 0); }
+    const b = bufEnvio(16 + largo), d = b.buffer === memEnvio ? dvEnvio : new DataView(b.buffer);
+    b[0] = MARCA; b[1] = 15; b[2] = carrera & 255; b[3] = m; d.setUint32(4, c0 >>> 0);
+    b[8] = c1 - c0 + 1;
+    b[9] = m === miMando && c1 === escrito && ultimo >= 0 ? Math.min(254, Math.max(0, escrito - ultimo)) : 0xFF;
     const suyo = mandoDe.get(uid);
     // (§99, C1: bit 1 = hay una pausa (o su propuesta) para ti en camino: quédate quieto hasta saberla)
     b[10] = (conReg ? 1 : 0) | (suyo !== undefined && (propuestas.has(suyo) || bloqueos.has(suyo) || pausaAbierta(suyo)) ? 2 : 0);
     d.setUint32(12, suyo === undefined ? 0xFFFFFFFF : (contiguoDe(suyo) >>> 0));
     let o = 16;
-    for (const [v, x] of lista) {
-      escribe8(d, o, v); o += 8;
+    for (let c = c0; c <= c1; c++) {
+      escribe8(d, o, t.get(c)); o += 8;
       if (conReg) {
+        const x = r.get(c);
         d.setUint16(o, x?.masc ?? 0); d.setUint16(o + 2, x?.sust ?? 0); b[o + 4] = x?.sig ?? 0xFF; o += 5;
-        if (x) for (const k of bits(x.masc)) { escribe8(d, o, x.slots[k]); o += 8; }
+        if (x) for (let k = 0; k < MANDOS; k++) if ((x.masc >> k) & 1) { escribe8(d, o, x.slots[k]); o += 8; }
       }
     }
     return b;
@@ -323,8 +449,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   }
   // cada medio segundo: un ping a cada uno (las medidas sirven para el retraso de partida de la carrera siguiente)
   const latido = pingCada > 0 ? setInterval(() => {
-    const b = empaca(7, miMando & 255, ++pings, 8);
-    new DataView(b.buffer).setFloat64(8, ahora());
+    const b = empaca(7, miMando & 255, ++pings, 13);
+    const dv = new DataView(b.buffer);
+    dv.setFloat64(8, ahora());
+    dv.setUint32(16, Math.max(0, ejecutado()) >>> 0); b[20] = espera ? 1 : 0;   // (§177.5: el cuadro que corrí y si espero a alguien)
     aTodos(b, 'udp');
   }, pingCada) : null;
 
@@ -332,20 +460,23 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   ventanaNueva();
 
   function nuevaCarrera() {
-    carrera++; ultimo = -1; escrito = -1; espera = null; huellas.clear(); propuestas.clear(); bloqueos.clear();
+    carrera++; ultimo = -1; escrito = -1; espera = null; avanceDe.clear(); huellas.clear(); propuestas.clear(); bloqueos.clear();
     cadena = []; relevados.clear(); pasarA = null; traspaso = null; fuera = null; buenas = 0; sustituidosMios = 0;
     ultimaSubida = -Infinity; malasAutoridad.length = 0; rachas.fill(0); informes.clear(); nuevo.clear(); ventanaNueva();
     ackDe.clear(); contiguo.clear(); pedidosA.clear(); pausaUltima = -1; mitadDesde = null; largado = false;
-    alcance = { ratos: 0, ganado: 0, corriendo: 0 };
+    alcance = { ratos: 0, ganado: 0, corriendo: 0 }; cubiertoDesde = Infinity; enviadoA.clear();
+    barreraAhora = false; est.cuadrosBarrera = 0;
     deuda = 0; ultimoFreno = -Infinity; ventajas.fill(SIN_DATO); est.sumaRetraso = 0; est.cuadrosCarrera = 0;
     estab.clear(); delanteDe.clear(); est.estable = { malas: 0, atras: 0, rtt: null }; quieto.clear();
     pausas.clear(); ultimoUsado.clear(); pidoVuelta = 0; est.pausas = []; est.vueltas = 0; preferida = preferidas.get(carrera);
     for (const k of [...preferidas.keys()]) if (k < carrera) preferidas.delete(k);
-    est.relevadosAhora = []; est.hashBotones = 2166136261;
+    est.relevadosAhora = []; mascRelevados = 0; est.hashBotones = 2166136261;
+    soltarAnillos(tablas, regs);           // (R4: los de la carrera anterior vuelven a la reserva)
+    if (siguiente?.carrera !== carrera && siguiente) soltarAnillos(siguiente.tablas, siguiente.regs);
     tablas = siguiente?.carrera === carrera ? siguiente.tablas : new Map();
     regs = siguiente?.carrera === carrera ? siguiente.regs : new Map();
     cortes = siguiente?.carrera === carrera ? siguiente.cortes : new Map();
-    for (const [m, t] of tablas) for (const f of t.keys()) if (f > (nuevo.get(m) ?? -1)) nuevo.set(m, f);
+    for (const [m, t] of tablas) if (t.mayor > (nuevo.get(m) ?? -1)) nuevo.set(m, t.mayor);
     if (planteles.has(carrera)) {
       // §75: la sala dijo quiénes están fuera de esta carrera (desde el cuadro 0); los demás corren aunque se hayan
       // cortado en la anterior: volvieron
@@ -377,6 +508,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // cuadro con el paquete de su autoridad a (x = lo que agregó, o undefined); si fn devuelve false, para. Devuelve el
   // primer cuadro que no se pudo mirar y su autoridad (−1 = falta un paquete de la autoridad: no se sabe).
   function recorrer(desde, hasta, fn) {
+    if (arbitro) return recorrerArbitro(desde, hasta, fn);
     let c = Math.max(0, desde), a = autoridadEn(c);
     for (; c < hasta; c++) {
       if (a === undefined || !tabla(a).has(c)) return { c, a: -1 };
@@ -387,9 +519,57 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     }
     return { c, a: a ?? -1 };
   }
+  // §191 (R1): lo mismo con el árbitro, con el traspaso LEAD_TRASPASO cuadros después del aviso (los avisos ya corridos
+  // están en `cadena`; los que encuentra en el camino, en `pend`)
+  function recorrerArbitro(desde, hasta, fn) {
+    const c0 = Math.max(0, desde), pend = [];
+    let c = c0, a = autoridadEn(c);
+    for (; c < hasta; c++) {
+      if (c > c0) {
+        for (const [d, m] of cadena) if (d === c) a = m;
+        for (const [d, m] of pend) if (d === c) a = m;
+        if (a !== undefined && sinAutoridadEn(a, c)) a = primerVivoEn(c);
+      }
+      if (a === undefined || !tabla(a).has(c)) return { c, a: -1 };
+      const x = reg(a).get(c);
+      if (fn && fn(c, a, x) === false) return { c, a };
+      if (x && x.sig < MANDOS) pend.push([c + 1 + LEAD_TRASPASO, x.sig]);
+    }
+    if (c > c0) {
+      for (const [d, m] of cadena) if (d === c) a = m;
+      for (const [d, m] of pend) if (d === c) a = m;
+      if (a !== undefined && sinAutoridadEn(a, c)) a = primerVivoEn(c);
+    }
+    return { c, a: a ?? -1 };
+  }
   // ¿quién va a ser la autoridad en el cuadro f (que todavía no se corre)? Si falta un paquete en el medio, no se sabe
   // (−1): entonces no escribo relevos en ese cuadro (todos ven lo mismo: nada). Sirve para saber si los escribo yo.
   const autoridadPrevista = f => recorrer(Math.max(0, ultimo), f).a;
+  // §191 (R1): a quiénes mando lo mío con el árbitro: la autoridad del cuadro f y el suplente (el primero que sigue sin
+  // ella: el que toma el papel si se la pausa o se la corta). null = a todos (soy la autoridad, o no sé quién es)
+  let cubiertoDesde = Infinity;            // el primer cuadro en que vi lo mío escrito por la autoridad (desde ahí me cubre)
+  const enviadoA = new Map();              // uid → hasta qué cuadro le mandé lo mío sin ser autoridad ni suplente
+  // (la autoridad del cuadro f con lo que ya tengo de ella: lo que escribo va varios cuadros adelante y ese paquete suyo
+  // casi nunca llegó todavía; si falta, la del último que tengo. Y el suplente: el primero que sigue sin ella)
+  function autoridadConocida(f) {
+    const r = recorrer(Math.max(0, ultimo), f);
+    let a = r.a;
+    if (a === undefined || a < 0) { a = autoridadEn(Math.max(0, ultimo)); recorrer(Math.max(0, ultimo), r.c, (c, aa) => { a = aa; }); }
+    return a !== undefined && a >= 0 && sinAutoridadEn(a, f) ? primerVivoEn(f) : a;
+  }
+  const suplenteDe = (a, f) => humanos.find(h => h.mando !== a && !sinAutoridadEn(h.mando, f))?.mando;
+  const soySuplente = f => { const a = autoridadConocida(f); return a !== undefined && a >= 0 && a !== miMando && suplenteDe(a, f) === miMando; };
+  function destinosArbitro(f) {
+    const a = autoridadConocida(f);
+    if (a === undefined || a < 0 || a === miMando) return null;
+    const s = suplenteDe(a, f);
+    // (el suplente manda lo suyo a todos: si la autoridad se calla, desde ahí manda él y todos necesitan sus cuadros)
+    if (s === miMando) return null;
+    // (y el que decide mi pausa o mi corte: me tiene que oír seguido, los pings van cada medio segundo y la pausa es a los
+    // PAUSA_MS)
+    const dec = mandoDe.get(decisorDe(miMando));
+    return new Set([a, s, dec].filter(k => k !== undefined && k !== miMando));
+  }
   // El último cuadro hasta el que todo, desde lo que ya corrí, va con el mando m relevado (para saber hasta dónde
   // puedo seguir sin sus botones de verdad mientras se decide su corte)
   function alcanceRelevo(m) {
@@ -421,21 +601,31 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   }
   // lo que la autoridad agrega a su cuadro f: los relevados (su botón de verdad si ya llegó, si no uno inventado) y
   // el traspaso, si toca
-  function registroPara(f) {
+  // (R4, §230: lo que devuelve es un objeto que se reusa —el anillo de la autoridad lo copia en el momento—)
+  const regTmp = { masc: 0, sust: 0, sig: 0xFF, slots: fila(null) };
+  function registroPara(f, reserva = false) {
     let masc = 0, sust = 0, sig = 0xFF;
-    const slots = fila(null);
-    for (const m of relevados.keys()) {
-      if (m === miMando || cortadoEn(m, f)) continue;
+    const slots = regTmp.slots; slots.fill(null);
+    const uno = m => {
+      if (m === miMando || m >= MANDOS || cortadoEn(m, f)) return;   // (§236: el servidor no tiene kart: nadie lo releva)
       masc |= 1 << m;
       const real = tabla(m).get(f);
       if (real) slots[m] = real;
-      else { slots[m] = inventado(m, f); sust |= 1 << m; est.inventados++; }
-    }
-    if (pasarA !== null && !traspaso) {
+      else { slots[m] = inventado(m, f); sust |= 1 << m; if (!reserva) est.inventados++; }
+    };
+    // (§191, R1: con el árbitro, todos los que ya mandaron algo en esta carrera; el que todavía carga no: a ese se lo
+    // espera como siempre, y sus primeros botones van a todos)
+    // (§250: antes del «¡YA!», de nadie: todos corren con los botones de verdad de todos, la largada pareja)
+    if (barreraAhora) {}
+    else if (arbitro) { for (const m of mandos) if (tabla(m).size > 0) uno(m); }
+    else for (const m of relevados.keys()) uno(m);
+    if (!reserva && pasarA !== null && !traspaso) {
       sig = pasarA; traspaso = { cuadro: f, a: pasarA }; pasarA = null; est.traspasos++;
-      registro(`[lockstep] paso la autoridad a ${duenoDe.get(sig)} desde el cuadro ${f + 1} (me esperaban a mí)`);
+      registro(`[lockstep] paso la autoridad a ${duenoDe.get(sig)} desde el cuadro ${f + 1 + (arbitro ? LEAD_TRASPASO : 0)} (me esperaban a mí${autoridadLenta ? ': corro lenta' : ''})`);
     }
-    return masc || sig !== 0xFF ? { masc, sust, sig, slots } : null;
+    if (!(masc || sig !== 0xFF)) return null;
+    regTmp.masc = masc; regTmp.sust = sust; regTmp.sig = sig;
+    return regTmp;
   }
 
   // ---- §80: los informes de cada medio segundo ----
@@ -467,9 +657,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       const m = h.mando;
       if (m === miMando || cortes.has(m) || !tabla(m).size) { delanteDe.delete(h.uid); continue; }
       const inf = informes.get(h.uid);
-      if (!inf || t - inf.t > 1.5 * informeCada) continue;
+      // (§191, R1: con el árbitro, solo lo de este rato: una medida vieja —de antes de un traspaso— me frenaba sin motivo)
+      if (!inf || t - inf.t > 1.5 * informeCada) { if (arbitro) delanteDe.delete(h.uid); continue; }
       const mia = ventajas[m], suya = inf.ven?.[miMando];
-      if (mia === SIN_DATO || suya === undefined || suya === SIN_DATO) continue;
+      if (mia === SIN_DATO || suya === undefined || suya === SIN_DATO) { if (arbitro) delanteDe.delete(h.uid); continue; }
       delanteDe.set(h.uid, (mia - suya) / 2);
     }
   }
@@ -515,7 +706,20 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // ¿puedo ponerme al día yo solo? (el runtime sabe correr cuadros seguidos y la pestaña se ve)
   function puedoPrisa() { return !!prisa && !globalThis.document?.hidden && !fuera && !cortes.has(miMando); }
   // cuántos cuadros voy atrás de más de la mitad de los que se pueden medir (negativo = adelante; 0 = no sé)
+  // §191 (R1): cuánto voy delante de la autoridad según el último rato, medido solo por mí: mi cuadro menos el suyo
+  // cuando mandó su paquete (lo más chico del rato). Incluye lo que tarda la red (un poco «delante» de más), pero está
+  // desde el primer paquete: la medida de dos lados de §80b necesita su informe. 0 = soy la autoridad o no sé
+  function delanteAutoridad() {
+    const a = autoridadEn(Math.max(0, ultimo));
+    return a === undefined || a === miMando || ventajas[a] === SIN_DATO ? 0 : ventajas[a];
+  }
   function atrasDeLaMitad() {
+    // (§191, R1: con el árbitro, contra la autoridad sola: nadie la frena a ella, así que cada espera chica mía me deja
+    // atrás para siempre si no me pongo al día; y de los demás ya no recibo nada: sus medidas quedarían viejas)
+    if (arbitro) {
+      const a = autoridadEn(Math.max(0, ultimo)), d = a === undefined || a === miMando ? undefined : delanteDe.get(duenoDe.get(a));
+      return d === undefined ? -delanteAutoridad() : -d;
+    }
     const atras = [...delanteDe.values()].map(d => -d).sort((a, b) => b - a);   // (+ = voy atrás de él), de mayor a menor
     return atras.length ? atras[Math.floor(atras.length / 2)] : 0;
   }
@@ -533,7 +737,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   }
   // §99 (D): un rato más en la cuenta de estabilidad: de cada uno, si la mayoría lo vio mal; y de mí, además, si fui
   // atrás de la mayoría (más de un cuadro) o iba relevado
-  let ultimaPrisa = -Infinity, largado = false;
+  let ultimaPrisa = -Infinity, largado = false, barreraAhora = false;   // (§250: antes del «¡YA!»)
   let alDiaHasta = -Infinity;              // §99: hasta cuándo dura (más o menos) la ráfaga que pedí para ponerme al día
   function anotarEstabilidad() {
     medirDelantes();
@@ -547,8 +751,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       if (h.uid === yo) {
         // (atrás de MÁS DE LA MITAD de los que se pueden medir, por más de un cuadro)
         const ds = [...delanteDe.values()], atras = ds.filter(d => d < -1).length;
-        est.estable.malas += mal; est.estable.atras += yoRelevado() || (ds.length && 2 * atras > ds.length) ? 1 : 0;
+        est.estable.malas += mal; est.estable.atras += (!arbitro && yoRelevado()) || (ds.length && 2 * atras > ds.length) ? 1 : 0;
         est.estable.rtt = miRtt();
+        // (§179, R7: el margen más chico de la carrera y si es un teléfono, para que la sala elija la primera autoridad)
+        { const c = miCapacidad(); if (c.margen !== null) est.estable.margen = Math.min(est.estable.margen ?? 99, Math.round(c.margen)); if (c.telefono !== null) est.estable.tel = c.telefono; }
       }
     }
   }
@@ -559,7 +765,25 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     const e = estab.get(m), sum = a => a ? a.reduce((x, y) => x + y, 0) : 0, v = vista(m);
     const d = m === miMando ? 0 : (delanteDe.get(duenoDe.get(m)) ?? 0);
     return -1000 * (v.culpa(1) ? 1 : 0) - 100 * sum(e?.malas) - 300 * Math.max(0, d - 1) + 100 * Math.max(0, -d - 1) +
-      (v.minHol === SIN_DATO ? 0 : Math.min(v.minHol, 50));
+      (v.minHol === SIN_DATO ? 0 : Math.min(v.minHol, 50)) + puntosCapacidad(m);
+  }
+  // §179 (R7): lo que puede la consola de m. El margen por cuadro: +15 por cada ms libre hasta 10 (la autoridad que
+  // trabaja justo se traba y frena a todos), −300 con menos de 2; la subida: −300 con menos de SUBIDA_MIN (con 12 tiene
+  // que mandar los botones de todos a todos); un teléfono, −5000 si hay alguien que sabemos que no lo es
+  function capacidadDe(m) {
+    if (m === miMando) return miCapacidad();
+    const inf = informes.get(duenoDe.get(m));
+    return inf && ahora() - inf.t < 3 * informeCada ? inf : { margen: null, subida: null, telefono: null };
+  }
+  function hayPc() { return humanos.some(h => !cortes.has(h.mando) && capacidadDe(h.mando).telefono === false); }
+  function puntosCapacidad(m) {
+    if (!autoridadCapaz) return 0;
+    const c = capacidadDe(m);
+    let p = 0;
+    if (c.margen !== null) p += c.margen < 2 ? -300 : 15 * Math.min(10, c.margen);
+    if (c.subida !== null && c.subida < SUBIDA_MIN) p -= 300;
+    if (c.telefono && hayPc()) p -= 5000;
+    return p;
   }
   function vista(m) {
     const malos = new Set();
@@ -578,29 +802,60 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (!inf || ahora() - inf.t > 1.5 * informeCada) return false;
     return mandos.some(k => k !== m && inf.esp[k] > 0 && vista(k).culpa(1));
   }
+  // (R4, §230: con números: cuántos lo vieron mal 1 y 2 ratos seguidos, sin listas; el texto de «quien» se arma solo
+  // si alguien lo lee —el registro—, recorriendo los mismos informes en el mismo momento)
   function votos(m, ignorar = null) {
-    const u = duenoDe.get(m), t = ahora(), v = { con: 0, rachas: [], quien: [], peorHol: SIN_DATO, maxEsp: 0, holgados: 0, justos: 0, minHol: SIN_DATO, nuevo: false };
+    const u = duenoDe.get(m), t = ahora(), v = new Votos(m, u, ignorar, t);
     for (const [de, inf] of informes) {
       if (de === u || ignorar?.has(de) || t - inf.t > 1.5 * informeCada || inf.racha[m] === NO_SE) continue;
-      v.con++; v.rachas.push(inf.racha[m]); v.quien.push(`${de} ${inf.racha[m]}${inf.dud ? '?' : ''} (holgura ${inf.hol[m]}, esperó ${inf.esp[m]} ms)`);
+      v.con++;
+      const ra = inf.racha[m];
+      if (ra >= 1) v.r1++;
+      if (ra >= 2) v.r2++;
+      if (ra > v.rmax) v.rmax = ra;
       const justo = !inf.dud && inf.hol[m] !== SIN_DATO && inf.hol[m] < 1;
       if (justo) v.justos++;
       if (inf.racha[m] > 0 || justo) {
         if (inf.hol[m] !== SIN_DATO) v.peorHol = Math.min(v.peorHol, inf.hol[m]);
         v.maxEsp = Math.max(v.maxEsp, inf.max[m]);
         if (inf.t > ultimaSubida) v.nuevo = true;
-      } else if (!inf.dud && inf.hol[m] !== SIN_DATO && inf.hol[m] >= 3) v.holgados++;
+      } else if (!inf.dud && inf.hol[m] !== SIN_DATO && inf.hol[m] >= HOLGADO) v.holgados++;
       if (!inf.dud && inf.hol[m] !== SIN_DATO) v.minHol = Math.min(v.minHol, inf.hol[m]);
     }
-    v.culpa = k => v.con > 0 && 2 * v.rachas.filter(x => x >= k).length > v.con;    // la mayoría lo vio mal k ratos seguidos
     v.justo = v.con > 0 && 2 * v.justos > v.con;                                       // a la mayoría le llegan justos
     return v;
+  }
+  class Votos {
+    constructor(m, u, ignorar, t) {
+      this.m = m; this.u = u; this.ignorar = ignorar; this.t = t;
+      this.con = 0; this.r1 = 0; this.r2 = 0; this.rmax = 0; this.peorHol = SIN_DATO; this.maxEsp = 0; this.holgados = 0; this.justos = 0; this.minHol = SIN_DATO; this.nuevo = false; this.justo = false;
+    }
+    // la mayoría lo vio mal k ratos seguidos (k es 1 o 2; otro k, contando de nuevo)
+    culpa(k) {
+      if (!(this.con > 0)) return false;
+      const n = k <= 0 ? this.con : k === 1 ? this.r1 : k === 2 ? this.r2 : this.contar(k);
+      return 2 * n > this.con;
+    }
+    contar(k) {
+      let n = 0;
+      for (const [de, inf] of informes) if (!(de === this.u || this.ignorar?.has(de) || this.t - inf.t > 1.5 * informeCada || inf.racha[this.m] === NO_SE) && inf.racha[this.m] >= k) n++;
+      return n;
+    }
+    get quien() {
+      const l = [], m = this.m;
+      for (const [de, inf] of informes) if (!(de === this.u || this.ignorar?.has(de) || this.t - inf.t > 1.5 * informeCada || inf.racha[m] === NO_SE))
+        l.push(`${de} ${inf.racha[m]}${inf.dud ? '?' : ''} (holgura ${inf.hol[m]}, esperó ${inf.esp[m]} ms)`);
+      return l;
+    }
   }
   function informar() {
     const t = ahora();
     if (ultimo >= 0 && !fuera) {
       const corridos = est.cuadros - ven.c0, debia = (t - ven.t0) / cuadroMs;
       if (corridos > 1.3 * debia + 2) ven.dud = true;          // me estaba poniendo al día
+      // (§191, R1: con el árbitro nadie frena a la autoridad, así que si ella corre lenta —su CPU no da 60— todos la
+      // esperan y van a su ritmo. Lo sabe ella misma: corrió menos del 90 % de lo que debía; no en la largada)
+      autoridadLenta = arbitro && ultimo > 180 && autoridadEn(ultimo) === miMando && corridos < 0.9 * debia - 1;
       // si estoy esperando ahora mismo, eso también cuenta en este rato (y el rato es dudoso: mientras espero no
       // corro, y lo que llega o no llega de los demás no dice nada). Esperando la llegada (alguien todavía carga la
       // pista) no se le cuenta la espera a nadie
@@ -617,6 +872,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // haría bajar su retraso de más y después los esperaría todo el mundo)
       const atrasado = ahora() < alDiaHasta || atrasDeLaMitad() > UMBRAL_PRISA;
       if (atrasado) ven.dud = true;
+      // (§191, R1: con el árbitro, si voy delante de la autoridad, esperarla es cosa mía —voy adelantado y me freno—, no
+      // de su red: no se la cargo, que si no sube su retraso y lo de todos le llega tarde)
+      const autA = arbitro ? autoridadEn(Math.max(0, ultimo)) : undefined;
+      if (autA !== undefined && autA !== miMando && ven.ven[autA] !== SIN_DATO && ven.ven[autA] >= 1) { ven.dud = true; ven.esp[autA] = 0; ven.max[autA] = 0; }
       // §102: ¿me pongo al día de verdad? En los ratos seguidos que voy atrás, lo que corrí de más que el tiempo en que
       // corrí (sin lo que estuve parado: esperas, frenos, tirones). Si a los RATOS_PRUEBA no gané GANA_MIN, no digo «sé
       // ponerme al día»: los demás me esperan (si no, me quedaba cada vez más atrás y subía mi retraso hasta 12)
@@ -630,12 +889,19 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       }
       // (§99, D: y al final mi ida y vuelta típica, de a 2 ms; 255 = no sé)
       const yoRtt = miRtt(), puedo = puedoPrisa() && alcanzo;
-      const b = empaca(10, miMando & 255, ++numInforme, 2 + 5 * MANDOS),
-        inf = { t, hol: [], esp: [], max: [], racha: [], ven: [], dud: ven.dud, prisa: puedo, atras: atrasado, rtt: yoRtt };
+      const cap = miCapacidad();
+      // (§236: con un servidor en la sala, 5 bytes más al final con lo que veo de él; una página vieja no los lee)
+      const conServidor = mandos.includes(SERVIDOR);
+      const b = empaca(10, miMando & 255, ++numInforme, 5 + 5 * MANDOS + (conServidor ? 5 : 0)),
+        inf = { t, hol: [], esp: [], max: [], racha: [], ven: [], dud: ven.dud, prisa: puedo, atras: atrasado, rtt: yoRtt, ...cap };
       b[9 + 5 * MANDOS] = yoRtt === null ? 255 : Math.min(254, Math.round(yoRtt / 2));
+      // (§179, R7: el margen en ms enteros, la subida de a 100 kbit/s —255 = no sé— y 1 = teléfono, 2 = lo sé)
+      b[10 + 5 * MANDOS] = cap.margen === null ? 255 : Math.max(0, Math.min(254, Math.round(cap.margen)));
+      b[11 + 5 * MANDOS] = cap.subida === null ? 255 : Math.max(0, Math.min(254, Math.round(cap.subida / 100)));
+      b[12 + 5 * MANDOS] = cap.telefono === null ? 0 : 2 | (cap.telefono ? 1 : 0);
       // las banderas: 1 = rato dudoso; 2 = sé ponerme al día solo (§101; y me sale, §102); 4 = voy atrás / me estoy poniendo al día
       b[8] = (ven.dud ? 1 : 0) | (puedo ? 2 : 0) | (atrasado ? 4 : 0);
-      for (let p = 0; p < MANDOS; p++) {
+      for (let p = 0; p < (conServidor ? SLOTS : MANDOS); p++) {
         const sabe = mandos.includes(p) && p !== miMando && !cortes.has(p) && tabla(p).size > 0;
         const hol = ven.hol[p];
         // malo: lo esperé medio cuadro o más en el rato (menos no le hace perder el cuadro al juego), o sus botones
@@ -648,7 +914,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
         inf.esp[p] = Math.min(255, Math.ceil(ven.esp[p] / 4)) * 4; inf.max[p] = Math.min(255, Math.ceil(ven.max[p] / 4)) * 4;
         inf.racha[p] = sabe ? rachas[p] : NO_SE;
         inf.ven[p] = ventajas[p] = sabe ? ven.ven[p] : SIN_DATO;
-        const o = 9 + 5 * p;
+        const o = p < MANDOS ? 9 + 5 * p : 13 + 5 * MANDOS;   // (§236: la casilla del servidor, al final)
         b[o] = inf.hol[p] & 255; b[o + 1] = inf.esp[p] / 4; b[o + 2] = inf.max[p] / 4; b[o + 3] = inf.racha[p]; b[o + 4] = inf.ven[p] & 255;
       }
       aTodos(b, 'udp');
@@ -662,6 +928,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     repetirCortes();
     revisarPausas();
   }
+  // (§191, R1: con el árbitro, al que se calla lo pausa y lo corta la vigilancia de cada 50 ms, como a cualquier
+  // relevado: todos los que no son la autoridad van relevados)
   // §80b: ¿cuánto voy adelante de cada uno? Yo mido mi cuadro menos el suyo al mandar: lo que voy adelante MÁS lo que
   // tardó en llegar. Él mide lo mismo de mí: lo que va adelante (= menos lo mío) más lo que tarda en llegar lo mío. La
   // mitad de la diferencia de las dos medidas es lo que voy adelante: lo de la red se cancela (si tarda lo mismo en los
@@ -670,6 +938,17 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // conexión trae tarde lo de todos), frenarme no lo acerca —él se atrasa conmigo— y la sala iría más lenta para
   // siempre. Y no por uno relevado, cortado, ni muy atrás (TOPE_SINCRO): eso es cosa del relevo.
   function calcularDeuda() {
+    // (§191, R1: con el árbitro, contra la autoridad sola: si voy delante de ella la espero en cada cuadro, a ella la
+    // ven «justa» y sube su retraso, y entonces lo de todos le llega tarde y lo inventa. Me freno si voy más de
+    // UMBRAL_SINCRO delante; si voy atrás me pongo al día —pedirPrisa—)
+    if (arbitro) {
+      const delante = sincroTiempo && ultimo >= 0 && !fuera && !cortes.has(miMando) ? delanteAutoridad() : 0;
+      est.adelanto = Math.max(0, delante);
+      const antes = deuda;
+      deuda = Math.min(DEUDA_MAX, Math.max(0, Math.floor(delante) - UMBRAL_SINCRO));
+      if (deuda && !antes) registro(`[lockstep] voy ${delante.toFixed(1)} cuadros delante de la autoridad: me freno ${deuda}`);
+      return;
+    }
     if (!sincroTiempo || ultimo < 0 || fuera || cortes.has(miMando) || yoRelevado()) { deuda = 0; return; }
     const t = ahora();
     // §99 (C5): con 12 casi siempre hay alguien un poco atrás; frenarme por el peor frenaba a todos por cualquiera. Me
@@ -705,16 +984,22 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // si fue un rato suelto, lo que falte (hasta 4) si van dos seguidos; baja de a uno si a la mayoría le sobran 3
   // cuadros por 4 ratos (2 s) seguidos. Si me atrasé por esperar al que todos esperan (heredado), no subo.
   function ajustarRetraso() {
-    const sust = sustituidosMios; sustituidosMios = 0;
+    // §180.2: mientras la autoridad me releva, los botones que pone por mí (inventados) no dicen que lo mío llega tarde:
+    // los escribe ella de todas formas. Contarlos subía mi retraso de a 2 por rato durante los 3 s del relevo, hasta 12
+    // (banco relevo, caso 1, con el reloj virtual: la autoridad que pasa el papel quedaba en 12). ?calmaRelevado=0 = como antes
+    // (§191, R1: con el árbitro siempre «me relevan»: cuentan los inventados, salvo si voy atrás —me trabé y me pongo al
+    // día—: ahí llegan tarde porque los escribo tarde, no por la red)
+    const atrasado = ahora() < alDiaHasta || atrasDeLaMitad() > UMBRAL_PRISA;
+    const sust = arbitro ? (atrasado ? 0 : sustituidosMios) : calmaRelevado && yoRelevado() ? 0 : sustituidosMios; sustituidosMios = 0;
     if (!adaptar || ultimo < 0 || fuera || cortes.has(miMando)) return;
     const v = vista(miMando), antes = miRetraso;
     if (((v.culpa(1) || v.justo) && v.nuevo && !heredado(miMando)) || sust) {
       const falta = !v.culpa(2) && !sust ? 1 :
-        Math.max(1, v.peorHol < 1 ? 1 - v.peorHol : 0, v.maxEsp ? Math.ceil(v.maxEsp / cuadroMs) + 1 : 0, sust ? 2 : 0);
+        Math.max(1, v.peorHol < 1 ? 1 - v.peorHol : 0, v.maxEsp ? Math.ceil(v.maxEsp / cuadroMs) + 1 : 0, sust ? (arbitro ? 1 : 2) : 0);
       miRetraso = Math.min(retrasoMax, miRetraso + Math.min(4, falta));
       buenas = 0; ultimaSubida = ahora();
       if (miRetraso !== antes) { est.subidas++; registro(`[lockstep] subo mi retraso a ${miRetraso} (holgura ${v.peorHol === SIN_DATO ? '—' : v.peorHol}, espera más larga ${v.maxEsp} ms, inventados ${sust})`); }
-    } else if (v.con && 2 * v.holgados > v.con && !yoRelevado()) {
+    } else if (v.con && 2 * v.holgados > v.con && (arbitro || !yoRelevado())) {
       // (§80b: con la sincronía, si a todos les sobran 6 cuadros o más, baja cada 2 ratos y de una vez lo que sobra
       // (deja 3 de holgura): el desfase que lo hizo subir ya se corrigió frenando)
       const mucho = sincroTiempo && v.minHol !== SIN_DATO && v.minHol >= 6;
@@ -732,7 +1017,9 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (!relevo) { relevados.clear(); return; }
     if (ultimo < 0 || fuera || cortes.has(miMando) || autoridadPrevista(escrito + 1) !== miMando) return;
     const t = ahora();
-    for (const h of humanos) {
+    // (§191, R1: con el árbitro no hay a quién relevar: escribo a todos siempre; queda el traspaso del papel)
+    if (arbitro) relevados.clear();
+    else for (const h of humanos) {
       const m = h.mando;
       // (§99, C1: al pausado no se lo releva: su kart ya va con el botón calculado)
       if (m === miMando || cortes.has(m) || !tabla(m).size || pausaAbierta(m)) { relevados.delete(m); continue; }
@@ -748,21 +1035,25 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       }
     }
     // el papel se pasa si la mayoría me ve mal MALAS_AUTORIDAD ratos seguidos sin que yo esté esperando al que todos esperan
-    malasAutoridad.push(vista(miMando).culpa(1) && !heredado(miMando) ? 1 : 0);
+    malasAutoridad.push((vista(miMando).culpa(1) && !heredado(miMando)) || autoridadLenta ? 1 : 0);
     if (malasAutoridad.length > VENTANA_AUTORIDAD) malasAutoridad.shift();
-    if (pasarA !== null || traspaso || malasAutoridad.reduce((a, b) => a + b, 0) < MALAS_AUTORIDAD) return;
+    // §179 (R7): soy un teléfono y hay un PC: el papel no espera a que me vean mal (sí, a que tenga con qué mandar)
+    const telefonoConPc = autoridadCapaz && miCapacidad().telefono && hayPc();
+    if (pasarA !== null || traspaso || (!telefonoConPc && malasAutoridad.reduce((a, b) => a + b, 0) < MALAS_AUTORIDAD)) return;
     // §99 (D): a quien mejor manda Y recibe, y solo si es mejor que yo (si no, el papel quedaba en uno que recibe todo
     // tarde: inventaba los botones de los sanos y los obligaba a subir su retraso; medido en prueba-relevo)
     // (con PASO_MINIMO de ventaja: si no, con dos casi iguales el papel iba y volvía)
     let mejor = null, puntos = puntaje(miMando) + PASO_MINIMO;
     for (const h of humanos) {
       const m = h.mando;
-      if (m === miMando || cortes.has(m) || relevados.has(m) || !tabla(m).size || peorRed(m)) continue;
+      if (m === miMando || m >= MANDOS || cortes.has(m) || relevados.has(m) || !tabla(m).size || peorRed(m)) continue;   // (§236: al servidor no)
       const p = puntaje(m);
       if (p > puntos) { puntos = p; mejor = m; }
     }
-    if (mejor !== null) pasarA = mejor;
-    else malasAutoridad.length = 0;          // (nadie mejor: se vuelve a contar desde cero)
+    if (mejor !== null) {
+      pasarA = mejor;
+      if (telefonoConPc) { est.pasoTelefono = (est.pasoTelefono || 0) + 1; registro(`[lockstep] soy un teléfono: paso la autoridad a ${duenoDe.get(mejor)} (puntaje ${puntos})`); }
+    } else malasAutoridad.length = 0;          // (nadie mejor: se vuelve a contar desde cero)
   }
 
   // ---- lo que pide el juego (pad_web.cpp) ----
@@ -793,13 +1084,20 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       if (fuera) { ultimo = cuadro; return quietos(); }
     }
     ultimo = cuadro;
+    // (§250: ¿sigo antes del «¡YA!»? Lo lee del juego cada cuadro; vale para lo que escribo ahora —va mi retraso
+    // adelante: los cuadros de la cuenta y los primeros 6 de la carrera— y para no pausar a nadie mientras espero)
+    { let c = false; try { c = enCuenta ? !!enCuenta() : cuadro < cuadrosBarrera; } catch {}
+      barreraAhora = largadaPareja && cuadro < cuadrosLargada && c; if (barreraAhora) est.cuadrosBarrera = cuadro + 1; }
     est.cuadros++; est.cuadrosCarrera++; est.sumaRetraso += miRetraso;
     { const t = ahora(); if (pausaUltima >= 0 && t - pausaUltima > TIRON_MS) { est.tirones = (est.tirones || 0) + 1; msParado += t - pausaUltima - cuadroMs; tironPropio(t - pausaUltima); } pausaUltima = t; }
     // lo mío: el estado de ahora vale para cuadro + mi retraso (y para los cuadros intermedios si el retraso subió;
     // si bajó, no escribo nada hasta alcanzar lo ya escrito). Al empezar la carrera, los primeros (hasta mi retraso)
     // van neutros, escritos: nadie tiene que saber mi retraso
     if (miMando >= 0 && !cortes.has(miMando)) {
-      const v = (local() || NEUTRO).slice(0, 7); v[0] &= ~START;
+      // (R4: en un arreglo que se reusa; la tabla copia los 7 valores en su casilla)
+      const src = local() || NEUTRO, v = vLocal;
+      for (let i = 0; i < 7; i++) v[i] = src[i];
+      v[0] &= ~START;
       // (§99, C4: en la cuenta regresiva, al menos RETRASO_CUENTA; al «¡YA!» cada uno baja al suyo: lo ya escrito no
       // se toca)
       const cuenta = !!enCuenta?.();
@@ -807,11 +1105,21 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       for (let f = Math.max(escrito + 1, primero ? 0 : cuadro); f <= hasta; f++) {
         const t = tabla(miMando);
         if (!t.has(f)) { t.set(f, primero && f < hasta ? NEUTRO : v); if (f > ultimoDe(miMando)) nuevo.set(miMando, f); }
-        const x = autoridadPrevista(f) === miMando ? registroPara(f) : null;
+        // (§191, R1: con el árbitro, el suplente escribe también el registro —de reserva—: si la autoridad se corta o
+        // se pausa, el papel pasa a él justo ahí, y sus cuadros desde ese punto ya llevan los botones de todos)
+        const x = autoridadPrevista(f) === miMando ? registroPara(f) : arbitro && soySuplente(f) ? registroPara(f, true) : null;
         if (x) reg(miMando).set(f, x);
         escrito = f;
       }
-      for (const h of humanos) if (h.uid !== yo) { const p = paqueteA(h.uid, miMando, escrito); if (p) enviar(h.uid, p, 'udp'); }
+      // (§191, R1: con el árbitro, lo mío va entero solo a la autoridad y al suplente; a los demás, solo los cuadros que
+      // la autoridad todavía no cubre —el principio de la carrera—, que esos me los esperan como siempre, y una vez)
+      const dest = arbitro ? destinosArbitro(escrito) : null;
+      for (const h of humanos) if (h.uid !== yo) {
+        const directo = !dest || dest.has(h.mando), hasta = directo ? escrito : Math.min(escrito, cubiertoDesde - 1);
+        if (!directo && hasta <= (enviadoA.get(h.uid) ?? -1)) continue;
+        const p = paqueteA(h.uid, miMando, hasta);
+        if (p) { enviar(h.uid, p, 'udp'); est.paquetesBotones++; est.enviosA[h.uid] = (est.enviosA[h.uid] || 0) + 1; if (!directo) enviadoA.set(h.uid, hasta); }
+      }
     }
     let r = resolver(cuadro);
     // §99 (C4): si soy el último en llegar a la carrera (en mi primer cuadro ya tengo los de todos), los demás me
@@ -842,6 +1150,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       if (llegada) est.msLlegada += ms;
       else {
         est.esperas++; est.msEsperando += ms; est.maxEspera = Math.max(est.maxEspera, ms);
+        if (ms > 50) est.esperasLargas++;      // (V7, §235: las esperas de más de 50 ms, las que se notan)
         ven.dud = true;
         // a quién se esperó: los que faltaban justo antes de poder seguir (para avisar quién frena la sala); en el
         // informe, lo que no se contó ya en los ratos anteriores (informar)
@@ -856,66 +1165,112 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     }
     // los 12 mandos: conectado, botones, sx, sy, cx, cy, gl, gr (pad_web.cpp los copia al puerto de cada uno, o a su
     // mando virtual, §91). conectado = 2: ese humano se fue (desde su corte): el juego deja de esperarlo para terminar
-    const datos = new Int32Array(8 * MANDOS);
+    // (R4, §230: el mismo Int32Array cada cuadro: pad_web.cpp lo copia a la memoria del juego en el momento)
+    const datos = datosPad;
     for (const p of mandos) {
+      if (p >= MANDOS) continue;                 // (§236: el servidor no tiene kart)
       const x = r.vals[p];
       datos[p * 8] = x.con;
       for (let k = 0; k < 7; k++) datos[p * 8 + 1 + k] = x.v[k];
     }
     // §99 (C1): lo que se usó para cada uno (la base de una pausa que empieza en el cuadro siguiente)
+    // (R4: un arreglo por mando que se reescribe; la base de una pausa es una copia)
     for (const p of mandos) {
-      const v = Array.from(datos.subarray(p * 8 + 1, p * 8 + 8));
-      ultimoUsado.set(p, { f: cuadro, v });
-      for (const x of pausas.get(p) || []) if (!x.base && x.desde - 1 === cuadro) x.base = v;
+      if (p >= MANDOS) continue;
+      let u = ultimoUsado.get(p); if (!u) ultimoUsado.set(p, u = { f: cuadro, v: [0, 0, 0, 0, 0, 0, 0] });
+      u.f = cuadro;
+      for (let k = 0; k < 7; k++) u.v[k] = datos[p * 8 + 1 + k];
+      const ps = pausas.get(p);
+      if (ps) for (const x of ps) if (!x.base && x.desde - 1 === cuadro) x.base = u.v.slice();
     }
-    if (cuadro < QUIETO_HASTA) humanos.forEach((h, i) => {
-      const p = h.mando, q = quieto.get(p) || { racha: 0, max: 0 };
+    if (cuadro < QUIETO_HASTA) for (let i = 0; i < humanos.length; i++) {
+      const p = humanos[i].mando;
+      if (p >= MANDOS) continue;
+      let q = quieto.get(p); if (!q) quieto.set(p, q = { racha: 0, max: 0 });
       let nada = datos[p * 8] === 1;
       for (let k = 1; k < 8 && nada; k++) if (datos[p * 8 + k] !== 0) nada = false;
       // (§100: el que ya llegó no está ausente aunque no toque nada: antes, quien llegaba antes del minuto —en una pista
       // corta, o por código en prueba-sala— juntaba 30 s «quieto» esperando a los demás y perdía como cortado)
       if (nada && llego?.(i, p)) nada = false;     // (§110: con el mando: el puesto en la carrera lo sabe la página)
-      q.racha = nada ? q.racha + 1 : 0; q.max = Math.max(q.max, q.racha); quieto.set(p, q);
-    });
+      q.racha = nada ? q.racha + 1 : 0; q.max = Math.max(q.max, q.racha);
+    }
     // lo que dejó la autoridad de este cuadro: quiénes iban relevados (para avisar), si inventó los míos y si pasa el papel
     const a = r.autoridad, xa = a !== undefined ? reg(a).get(cuadro) : null;
     est.autoridad = a !== undefined ? duenoDe.get(a) : null;
-    est.relevadosAhora = xa ? bits(xa.masc).map(m => duenoDe.get(m)) : [];
+    // (R4: la lista se arma de nuevo solo si cambió quiénes van relevados)
+    { const mr = xa ? xa.masc : 0; if (mr !== mascRelevados) { mascRelevados = mr; est.relevadosAhora = mr ? bits(mr).map(m => duenoDe.get(m)) : []; } }
     if (xa && (xa.sust >> miMando) & 1) sustituidosMios++;
-    if (xa && xa.sig < MANDOS && !cadena.some(([d]) => d === cuadro + 1)) cadena.push([cuadro + 1, xa.sig]);
+    { const d = cuadro + 1 + (arbitro ? LEAD_TRASPASO : 0); if (xa && xa.sig < MANDOS && !cadena.some(([k]) => k === d)) cadena.push([d, xa.sig]); }
     for (let i = 0; i < datos.length; i++) est.hashBotones = Math.imul(est.hashBotones ^ datos[i], 16777619) >>> 0;
-    if (huella && cuadro % CADA_HUELLA === 0 && cuadro > 0) compararHuella(cuadro, huella());
+    if (huella && cuadro % huellaCada === 0 && cuadro > 0) compararHuella(cuadro, huella());
     // §75: lo que hay que hacer en este cuadro (en todas las consolas en el mismo: por ejemplo terminar la carrera)
-    const accion = acciones.get(`${carrera}:${cuadro}`);
+    const accion = acciones.size ? acciones.get(`${carrera}:${cuadro}`) : undefined;
     if (accion) { acciones.delete(`${carrera}:${cuadro}`); try { accion(); } catch (e) { registro(`[lockstep] acción del cuadro ${cuadro}: ${e?.message || e}`); } }
+    if (etapa && (!est.largada || est.largada.carrera !== carrera || est.largada.ya === null)) anotarLargada(cuadro);
     return datos;
+  }
+
+  // §250: en qué cuadro de lógica y a qué hora (la del reloj de pared, ms desde 1970: igual en todas las pestañas de un
+  // PC; la página le suma el desfase de la sala) corrió esta consola el cuadro 0, el primero de la cuenta y el primero
+  // con la carrera andando. El cuadro tiene que ser el mismo en todas (la carrera es la misma); la hora, casi la misma
+  const pared = () => (globalThis.performance?.timeOrigin ?? 0) + ahora();
+  function anotarLargada(c) {
+    let s = null; try { s = etapa(); } catch {}
+    if (!est.largada || est.largada.carrera !== carrera) {
+      est.largada = { carrera, c0: c, t0: pared(), cuenta: null, ya: null };
+      (est.largadas ||= []).push(est.largada); if (est.largadas.length > 8) est.largadas.shift();   // (las de la copa)
+    }
+    const L = est.largada;
+    if (s >= 1 && !L.cuenta) L.cuenta = { c, t: pared() };
+    if (s >= 2 && !L.ya) { L.ya = { c, t: pared() }; registro(`[lockstep] largada: cuadro 0 a las ${L.t0.toFixed(0)}, cuenta en el ${L.cuenta?.c}, carrera en el ${c} a las ${L.ya.t.toFixed(0)}`); try { alYa?.(carrera, c); } catch {} }
   }
 
   // Los botones de cada mando para el cuadro c, o quiénes faltan (mandos; −1 = estoy quieto por un corte en curso).
   // Para cada uno: cortado → neutro y "se fue"; relevado por la autoridad de ese cuadro → lo que dice ella; si no,
   // el suyo. Antes que nada hace falta el paquete de la autoridad de ese cuadro (dice quiénes van relevados).
+  // (R4, §230: cuando está todo, devuelve siempre el mismo objeto —se usa en el momento—; solo «faltan» es nuevo, y
+  // eso pasa solo cuando hay que esperar)
+  const faltan = new Set(), valsR = [], resR = { vals: valsR, autoridad: undefined };
+  const valDe = m => valsR[m] || (valsR[m] = { v: NEUTRO, con: 0 });
   function resolver(c) {
-    const faltan = new Set(), vals = [];
+    faltan.clear();
     for (const [, b] of bloqueos) if (c > b.hasta) faltan.add(-1);
     const a = autoridadEn(c), xa = a !== undefined && tabla(a).has(c) ? (reg(a).get(c) || null) : undefined;
+    // §191 (R1): con el árbitro, la autoridad no espera a nadie... salvo que no le llegue NADA de NINGUNO hace SOLO_MAX
+    // cuadros: entonces la aislada es ella (la red se le cortó) y no tiene que seguir sola inventándolos a todos (si no,
+    // armaba una carrera propia y cortaba a los demás); espera como siempre, y los demás deciden por ella
+    if (arbitro && a === miMando && c > SOLO_MAX) {
+      // (§246: ni el que ya tiene su corte decidido, aunque rija unos cuadros más adelante: se sabe que se fue —cerró la
+      // página en la cuenta regresiva— y no oírlo no dice que la aislada sea yo. Con dos en la sala no queda nadie que
+      // decida por mí y la largada quedaba quieta hasta el margen de 45 s: prueba-desconexion --casos=cuenta-otro)
+      const otros = mandos.filter(m => m !== miMando && !cortes.has(m) && !pausadoEn(m, c) && tabla(m).size > 0);
+      // (lo que se mira es si se los OYE, no sus cuadros: uno lento que va más de 1 s atrás pero sigue mandando no
+      // frena a la autoridad —prueba-sincro --lento con el árbitro—; esa es justamente la idea del árbitro)
+      if (otros.length && otros.every(m => oidoHace(m) > SORDO_MS)) for (const m of otros) faltan.add(m);
+    }
     for (const m of mandos) {
-      if (cortadoEn(m, c)) { vals[m] = { v: NEUTRO, con: 2 }; continue; }
+      // (§236: los botones del servidor solo hacen falta si es la autoridad: su paquete trae el registro de ese cuadro;
+      // si no, ni cortado ni pausado le importan a nadie: no tiene kart)
+      if (m >= MANDOS && m !== a) continue;
+      if (cortadoEn(m, c)) { const y = valDe(m); y.v = NEUTRO; y.con = 2; continue; }
       if (pausadoEn(m, c)) {                                    // §99 (C1): pausado: el botón calculado, igual en todas
         const x = pausas.get(m).find(y => c >= y.desde && (y.vuelve === null || c < y.vuelve));
         const base = x.base || (ultimoUsado.get(m)?.f === x.desde - 1 ? ultimoUsado.get(m).v : null);
         if (!base) { faltan.add(-1); continue; }               // (todavía no corrí el cuadro anterior a la pausa: no pasa)
-        vals[m] = { v: congelado(base, c - x.desde), con: 1 };
+        { const y = valDe(m); y.v = congelado(base, c - x.desde); y.con = 1; }
         continue;
       }
       if (m !== a) {
         if (xa === undefined) { faltan.add(a); continue; }       // todavía no sé si va relevado
-        if (xa && (xa.masc >> m) & 1) { vals[m] = { v: xa.slots[m], con: 1 }; continue; }
+        if (xa && (xa.masc >> m) & 1) { const y = valDe(m); y.v = xa.slots[m]; y.con = 1; continue; }
       }
       const v = tabla(m).get(c);
       if (!v) { faltan.add(m); continue; }
-      vals[m] = { v, con: 1 };
+      { const y = valDe(m); y.v = v; y.con = 1; }
     }
-    return faltan.size ? { faltan: [...faltan] } : { vals, autoridad: a };
+    if (faltan.size) return { faltan: [...faltan] };
+    resR.autoridad = a;
+    return resR;
   }
 
   // el decisor del corte del mando m: el primero que sigue que no es él, en el orden de la sala. §99 (H3): y que YO oigo
@@ -930,8 +1285,19 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // (algo suyo llegó hace menos de 1 s: la pestaña vive y solo espera al disco), esperaInicio. Después, el margen.
   const enLargada = c => c < cuadrosLargada && esperaLargada > esperaCorte;
   const oidoHace = m => ahora() - (oido.get(duenoDe.get(m)) ?? -Infinity);
+  // §179 (R7): lo que puede esta consola (lo da la página; null = no se sabe)
+  const miCapacidad = () => {
+    let c = null; try { c = capacidad ? capacidad() : null; } catch {}
+    const n = x => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+    return { margen: n(c?.margen), subida: n(c?.subida), telefono: typeof c?.telefono === 'boolean' ? c.telefono : null };
+  };
+  // §177.5 (R3): se lo oye pero su juego no avanza hace más de PAUSA_MS y no espera a nadie: trabado vivo
+  const trabadoVivo = m => trabaViva && esperaDe.get(duenoDe.get(m)) === 0 && avanceDe.has(m) && ahora() - avanceDe.get(m) > PAUSA_MS;
   // §100: ¿el mando m es de una consola que se fue? (ver la opción ido)
-  const seFue = m => !!ido && oidoHace(m) > IDO_MS && !!ido(duenoDe.get(m));
+  // (§175: solo quien ESTUVO se puede ir: a una consola que nunca se oyó —todavía carga la página o el juego, como las
+  // dos que cargaron últimas en doce— ido() también le dice «no está en el buzón ni tiene WebRTC», y se la cortaba en
+  // el cuadro 0; al llegar corría con sus botones y la sala se partía. La que todavía no llegó tiene el margen de carga)
+  const seFue = m => !!ido && oido.has(duenoDe.get(m)) && oidoHace(m) > IDO_MS && !!ido(duenoDe.get(m));
   // §99 (C4): desde cuándo cargó al menos la mitad de los que siguen (yo incluido), en esta carrera
   let mitadDesde = null;
   function revisarMitad() {
@@ -940,6 +1306,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (vs.length > 1 && 2 * llegaron >= vs.length) mitadDesde = ahora();
   }
   function margenDe(m, c) {
+    // §236: el servidor no carga gráficos. Si desaparece justo al largar, usar el margen corto incluso en el cuadro 0.
+    if (m === SERVIDOR) return esperaCorte;
     if (!tabla(m).size) {
       // (todavía cargando: el margen de siempre, salvo que ya cargó la mitad: entonces 15 s desde ese momento)
       revisarMitad();
@@ -965,6 +1333,14 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     const { cuadro } = espera;
     const r = resolver(cuadro);
     if (!r.faltan || fuera) { const f = espera.resolver; espera = null; f(); return; }
+    // E6 (§237): si el cuadro de la autoridad ya no cabe en mi anillo, ni un reenvío lo puede recuperar.
+    // Es mi atraso. Cortar a la autoridad dejaría al grupo sin sus botones actuales.
+    const a = autoridadEn(cuadro);
+    if (a !== undefined && a !== miMando && r.faltan.includes(a) && !tabla(a).cabe(cuadro)) {
+      salirme(`el cuadro ${cuadro} quedó fuera del historial de la autoridad (último ${tabla(a).mayor})`);
+      alPartida?.({ motivo: 'historial', cuadro, meSali: true });
+      return;
+    }
     // (§101: sin lo que estuve trabada yo: al despertar, lo de los demás todavía está en la cola de mensajes y no hay
     // que pausar ni cortar a nadie por eso)
     const t = ahora() - espera.desde - espera.congelado;
@@ -976,7 +1352,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       const a = autoridadEn(cuadro);
       registro(`[lockstep] espero ${t.toFixed(0)} ms el cuadro ${cuadro}: faltan ${JSON.stringify(r.faltan)}; tengo hasta ` +
         mandos.map(m => `${m}:${ultimoDe(m)}${pausadoEn(m, cuadro) ? 'p' : ''}${cortes.has(m) ? 'x' : ''}`).join(' ') +
-        `; autoridad ${a} (${a !== undefined && tabla(a).has(cuadro) ? 'llegó' : 'falta'}); bloqueos ${JSON.stringify([...bloqueos].map(([m, b]) => [m, b.hasta]))}` +
+        `; autoridad ${a} (${a !== undefined && tabla(a).has(cuadro) ? `llegó, cubre ${(reg(a).get(cuadro)?.masc ?? 0).toString(2)}` : 'falta'}); bloqueos ${JSON.stringify([...bloqueos].map(([m, b]) => [m, b.hasta]))}` +
         `; propuestas ${JSON.stringify([...propuestas.keys()])}; oigo ${humanos.filter(h => h.uid !== yo).map(h => `${h.mando}:${Math.round(oidoHace(h.mando))}`).join(' ')} ms`);
     }
     if (t > ESPERA_PIDE * cuadroMs && ahora() - espera.pedido > ESPERA_PIDE * cuadroMs) {
@@ -997,7 +1373,11 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // pestaña se trabó o se le cortó la red), a los PAUSA_MS se lo pausa (no espera nadie el margen entero). Al que
       // se le pierden paquetes pero se lo sigue oyendo no: se le piden de nuevo (si no, con una red que pierde,
       // pausaríamos a alguien que no se enteraría a tiempo y quedaría fuera de la carrera)
-      else if (relevoRapido && tabla(m).size > 0 && !pausaAbierta(m) && t > PAUSA_MS && oidoHace(m) > PAUSA_MS) proponer(m, true);
+      // (§250: antes del «¡YA!» no: se lo espera con el margen de la largada, así nadie corre la cuenta sin él)
+      else if (relevoRapido && !barreraAhora && tabla(m).size > 0 && !pausaAbierta(m) && t > PAUSA_MS && (oidoHace(m) > PAUSA_MS || trabadoVivo(m))) {
+        if (oidoHace(m) <= PAUSA_MS) { est.trabasVivas = (est.trabasVivas || 0) + 1; registro(`[lockstep] ${duenoDe.get(m)} contesta pero no avanza hace ${Math.round(ahora() - avanceDe.get(m))} ms: lo pauso (traba viva)`); }
+        proponer(m, true);
+      }
     }
     revisarPropuestas();
     if (espera) setTimeout(revisar, REVISAR_MS);
@@ -1064,7 +1444,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (pausas.get(m)?.some(x => x.vuelve !== null && desde < x.vuelve)) return;
     // (una pausa que empieza antes de la vuelta de la anterior no puede ser: la anterior ya está cerrada más atrás)
     let ps = pausas.get(m); if (!ps) pausas.set(m, ps = []);
-    ps.push({ desde, vuelve: null, base: ultimoUsado.get(m)?.f === desde - 1 ? ultimoUsado.get(m).v : null, t: ahora() });
+    // (R4: una copia: el arreglo de ultimoUsado se reescribe en cada cuadro)
+    ps.push({ desde, vuelve: null, base: ultimoUsado.get(m)?.f === desde - 1 ? ultimoUsado.get(m).v.slice() : null, t: ahora() });
     bloqueos.delete(m);
     relevados.delete(m);
     est.pausas.push({ mando: m, desde, carrera });
@@ -1139,54 +1520,134 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (espera) { const f = espera.resolver; espera = null; f(); }
   }
 
-  function compararHuella(cuadro, h) {
+  // R5 (§154): la huella puede venir ampliada ({ h, partes, nombres, valores }: h = la de siempre, que es la que decide;
+  // partes = una huella por pieza —cada kart, el azar—, solo para decir QUÉ se separó). El paquete 4 lleva las partes
+  // después de los 16 bytes de siempre: una página vieja lee solo los 16 primeros
+  function compararHuella(cuadro, hx) {
     let e = huellas.get(cuadro); if (!e) huellas.set(cuadro, e = { de: new Map() });
-    e.mia = h >>> 0; e.miaB = est.hashBotones;
-    const b = empaca(4, miMando & 255, cuadro, 8), d = new DataView(b.buffer);
+    const amp = hx && typeof hx === 'object';
+    e.mia = (amp ? hx.h : hx) >>> 0; e.miaB = est.hashBotones;
+    if (amp) { e.partes = Uint32Array.from(hx.partes); e.nombres = hx.nombres; e.valores = hx.valores; }
+    const np = amp ? e.partes.length : 0;
+    const b = empaca(4, miMando & 255, cuadro, 8 + 4 * np), d = new DataView(b.buffer);
     d.setUint32(8, e.mia); d.setUint32(12, e.miaB);
+    for (let k = 0; k < np; k++) d.setUint32(16 + 4 * k, e.partes[k]);
     aTodos(b, 'tcp');
     revisarHuella(cuadro);
   }
   function revisarHuella(cuadro) {
     const e = huellas.get(cuadro); if (!e || e.mia === undefined) return;
-    for (const [u, [h, hb]] of e.de) {
+    for (const [u, [h, hb, ps]] of e.de) {
       e.de.delete(u);
+      (e.todas ??= new Map()).set(u, `${h >>> 0}:${hb >>> 0}`);   // (§175: para decidir qué isla sigue)
+      // R5: qué partes difieren (si las dos mandaron partes)
+      const distintas = ps && e.partes ? [...e.partes].map((x, k) => x !== ps[k] ? (e.nombres?.[k] ?? 'parte' + k) : null).filter(Boolean) : null;
+      if (distintas?.length && !est.parteDistinta) {
+        // la primera vez: lo que difiere y mis valores de esas partes (el otro anota los suyos), aunque la huella de
+        // siempre coincida (entonces solo se avisa: nadie sale por esto)
+        est.parteDistinta = { cuadro, carrera, con: u, partes: distintas, volcado: Object.fromEntries(distintas.map(n => [n, e.valores?.[n]])) };
+        registro(`[lockstep] huella ampliada distinta con ${u} en el cuadro ${cuadro}: ${distintas.join(', ')} · mío ${JSON.stringify(est.parteDistinta.volcado)}`);
+      }
+      if (ps && e.partes) est.huellasAmpliadas = (est.huellasAmpliadas || 0) + 1;
       // (§80: con uno que está cortado desde ese cuadro o antes no se compara: si no se enteró del corte —se le cortó
       // la conexión justo cuando se lo mandaron—, su copia se separó a propósito, y al enterarse se sale de la carrera)
       const mu = mandoDe.get(u);
       if (cortes.has(mu) && cortes.get(mu) <= cuadro) { est.huellasDeCortados = (est.huellasDeCortados || 0) + 1; continue; }
       if (h === e.mia && hb === e.miaB) { est.huellasIguales++; continue; }
-      if (!est.desincronizado && !fuera) {
-        est.desincronizado = { cuadro, carrera, con: u, que: hb !== e.miaB ? 'botones' : 'carrera' };
+      // §176: con las islas, la distinta no se anota todavía: si hay un corte en ese cuadro o antes, la otra pudo correr
+      // más allá del corte con los botones de verdad del cortado (a mí no me llegaron) y se va a salir sola (paquete 14).
+      // Se anota en decidirIsla, si para entonces sigue en la carrera
+      if (ISLAS) { (e.distintas ??= new Map()).set(u, { cuadro, carrera, con: u, que: hb !== e.miaB ? 'botones' : 'carrera', partes: distintas || undefined }); }
+      else if (!est.desincronizado && !fuera) {
+        est.desincronizado = { cuadro, carrera, con: u, que: hb !== e.miaB ? 'botones' : 'carrera', partes: distintas || undefined };
         registro(`[lockstep] ¡DESINCRONIZADO con ${u} en el cuadro ${cuadro} (carrera ${carrera}): ${est.desincronizado.que}!`);
       }
       // §99 (H4): antes solo se anotaba y cada PC seguía con su carrera (puntos, VR y parrilla de carreras distintas).
       // Si el distinto es la autoridad de ese cuadro, el que se separó soy yo: me salgo de la carrera (vuelvo en la
       // siguiente, como al recargar). Si la autoridad soy yo, se sale el otro (él hace la misma cuenta)
-      const a = autoridadEn(cuadro);
-      if (!fuera && a !== undefined && a !== miMando && duenoDe.get(a) === u) {
-        est.desincronizado.meSali = true;
-        salirme(`mi carrera se separó de la de ${u} (la autoridad) en el cuadro ${cuadro}`);
+      // §175: antes decidía la autoridad («si el distinto es ella, me salgo yo»). Con 6 consolas en doce las dos que
+      // cargaron últimas se separaron, la autoridad era una de ellas y se salieron las otras CUATRO: la isla chica
+      // siguió sola y la grande quedó parada, sin decir nada. Ahora sigue la isla MÁS GRANDE: se juntan las huellas de
+      // ese cuadro de todas las consolas que corren (1,5 s como mucho), se agrupan las iguales y la que tiene más
+      // consolas sigue; empate = la de la autoridad, y si no, la del mando más chico. Todas hacen la misma cuenta con
+      // los mismos datos. Los de las otras islas se salen (vuelven en la carrera siguiente) y la página lo avisa
+      // (est.islas, alPartida). ?islas=0 = la regla de antes (la autoridad)
+      if (ISLAS) { if (!e.decision) e.decision = setTimeout(() => decidirIsla(cuadro), ISLA_MS); revisarIsla(cuadro); }
+      else {
+        const a = autoridadEn(cuadro);
+        if (!fuera && a !== undefined && a !== miMando && duenoDe.get(a) === u) {
+          est.desincronizado.meSali = true;
+          salirme(`mi carrera se separó de la de ${u} (la autoridad) en el cuadro ${cuadro}`);
+        }
       }
     }
+    revisarIsla(cuadro);   // (§175: una huella que llega después puede completar la cuenta)
+  }
+  // §175: ¿ya llegaron las huellas de todas las consolas que corren esta carrera? Entonces se decide sin esperar
+  function revisarIsla(cuadro) {
+    const e = huellas.get(cuadro); if (!e?.decision || e.decidida) return;
+    const fueraK = planteles.get(carrera) || new Set();
+    const corren = humanos.filter(h => h.uid !== yo && h.mando < MANDOS && !fueraK.has(h.mando) && !(cortes.has(h.mando) && cortes.get(h.mando) <= cuadro));   // (§236: el servidor no tiene huella)
+    // (§176: con un corte en ese cuadro o antes, se espera el plazo entero: da tiempo a que llegue el «me salgo» del
+    // que corrió más allá del corte)
+    const hayCorte = [...cortes.values()].some(c => c <= cuadro);
+    if (!hayCorte && corren.every(h => e.todas?.has(h.uid))) decidirIsla(cuadro);
+  }
+  function decidirIsla(cuadro) {
+    const e = huellas.get(cuadro); if (!e || e.decidida) return;
+    e.decidida = true; clearTimeout(e.decision);
+    const grupos = new Map();                       // huella → [mandos]
+    // (§176: el que ya se salió de la carrera —cortado después de ese cuadro, p. ej. por su «me salgo»— no cuenta)
+    const poner = (u, k) => { const m = mandoDe.get(u); if (m === undefined || (u !== yo && cortes.has(m))) return; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(m); };
+    poner(yo, `${e.mia >>> 0}:${e.miaB >>> 0}`);
+    for (const [u, k] of e.todas || []) poner(u, k);
+    const a = autoridadEn(cuadro);
+    const lista = [...grupos.entries()].map(([k, ms]) => ({ k, ms: ms.sort((x, y) => x - y) }));
+    lista.sort((x, y) => (y.ms.length - x.ms.length) || ((y.ms.includes(a) ? 1 : 0) - (x.ms.includes(a) ? 1 : 0)) || (x.ms[0] - y.ms[0]));
+    const gana = lista[0], mia = lista.find(g => g.ms.includes(miMando));
+    if (lista.length < 2) return;                   // (§176: las distintas se salieron solas: nadie se partió)
+    for (const [u, d] of e.distintas || []) {
+      if (cortes.has(mandoDe.get(u)) || est.desincronizado || fuera) continue;
+      est.desincronizado = d;
+      registro(`[lockstep] ¡DESINCRONIZADO con ${u} en el cuadro ${d.cuadro} (carrera ${d.carrera}): ${d.que}!`);
+    }
+    est.islas = { cuadro, carrera, grupos: lista.map(g => g.ms.map(m => duenoDe.get(m))), sigue: gana.ms.map(m => duenoDe.get(m)), meSali: mia !== gana };
+    registro(`[lockstep] la sala se partió en el cuadro ${cuadro} (carrera ${carrera}): ${lista.map(g => '[' + g.ms.map(m => duenoDe.get(m)).join(', ') + ']').join(' · ')}; sigue la isla de ${gana.ms.length}`);
+    if (mia !== gana && !fuera) {
+      if (est.desincronizado) est.desincronizado.meSali = true;
+      salirme(`la sala se partió en el cuadro ${cuadro} y sigue la isla más grande (${gana.ms.length} consolas), no la mía (${mia?.ms.length || 1})`);
+    }
+    try { alPartida?.(est.islas); } catch {}
   }
 
   // ---- cada 50 ms, haya o no espera: informes, cortes pendientes (saltos, silencios), propuestas y quietudes viejas ----
   let ultimoInforme = ahora();
+  let vueltaVigia = -Infinity, despierto = -Infinity;
   const vigilancia = informeCada > 0 ? setInterval(() => {
     const t = ahora();
+    // (§191, R1: si entre dos vueltas pasaron más de TIRON_MS, la trabada fui yo: lo que los demás mandaron mientras
+    // tanto está en la cola de mensajes. Por 250 ms no decido cortes por silencio: con el árbitro todos van relevados y
+    // la autoridad que despertaba cortaba a toda la sala)
+    if (arbitro && t - vueltaVigia > TIRON_MS && vueltaVigia > -Infinity) despierto = t;
+    vueltaVigia = t;
     if (t - ultimoInforme >= informeCada) { ultimoInforme = t; informar(); }
-    if (ultimo < 0) return;
+    if (ultimo < 0 || t - despierto < 250) return;
     for (const h of humanos) {
       const m = h.mando;
       // (§99, C1: al pausado no: si no vuelve, su pausa se vuelve corte en revisarPausas)
       if (m === miMando || cortes.has(m) || propuestas.has(m) || pausaAbierta(m) || decisorDe(m) !== yo || !tabla(m).size) continue;
       // el que avisó que se sale, o uno relevado que se calló del todo (nadie lo espera, pero el juego sí, en la meta)
-      const callado = t - (oido.get(h.uid) ?? t) > (enLargada(ultimo) ? esperaLargada : esperaCorte);   // (§93: en la largada, más)
+      // (§191, R1: con el árbitro nadie lo espera —la autoridad inventa lo suyo—, así que no hay apuro: se lo corta recién
+      // al plazo de la pausa, pausaACorte, como al pausado. Si no, una traba de 3 s, más que el margen, lo sacaba de la
+      // carrera: prueba-relevo con ?arbitro=1)
+      const callado = t - (oido.get(h.uid) ?? t) > (arbitro ? pausaACorte : enLargada(ultimo) ? esperaLargada : esperaCorte);   // (§93: en la largada, más)
       // (§99, C1: con el relevo rápido, al relevado que se calla se lo pausa a los PAUSA_MS: nadie lo esperaba —va
       // relevado— y el corte de los 2 s lo sacaba de la carrera)
-      if (saltos.get(carrera)?.has(m)) proponer(m);
-      else if (relevoRapido && est.relevadosAhora.includes(h.uid) && t - (oido.get(h.uid) ?? t) > PAUSA_MS) proponer(m, true);
+      // (§191, R1: con el árbitro, también al que se fue —§100—: nadie lo espera, así que revisar no lo vería)
+      if (saltos.get(carrera)?.has(m) || (arbitro && seFue(m))) proponer(m);
+      // (§191, R1: con el árbitro no se pausa al callado: la autoridad escribe lo suyo de todas formas y la pausa en dos
+      // fases frenaba a todos mientras se decidía; el corte, si se calla del todo, sí)
+      else if (relevoRapido && !arbitro && est.relevadosAhora.includes(h.uid) && t - (oido.get(h.uid) ?? t) > PAUSA_MS) proponer(m, true);
       else if (callado && est.relevadosAhora.includes(h.uid)) proponer(m);
     }
     revisarPropuestas();
@@ -1198,8 +1659,12 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   function alBinario(de, b) {
     if (b[0] !== MARCA || b.length < 8) return;
     const tipo = b[1], c = b[2], m = b[3], d = new DataView(b.buffer, b.byteOffset, b.byteLength), cuadro = d.getUint32(4);
+    // §236: después de transferir el mando a una PC, el servidor ya no decide pausas ni cortes de esta carrera.
+    if (mandoDe.get(de) === SERVIDOR && c === (carrera & 255) && sinAutoridadEn(SERVIDOR, Math.max(0, ultimo)) &&
+        [3, 5, 17].includes(tipo)) return;
     oido.set(de, ahora());
     if (tipo === 7 && b.length >= 16) {                         // ping: se devuelve tal cual (con su hora)
+      if (b.length >= 21) esperaDe.set(de, b[20] & 1);          // (§177.5: una página vieja no lo trae: sin traba viva)
       const r = b.slice(); r[1] = 8; enviar(de, r, 'udp'); return;
     }
     if (tipo === 8 && b.length >= 16) {                         // respuesta: ida y vuelta, suavizada como TCP
@@ -1238,31 +1703,44 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if ((tipo === 13 && b.length >= 10) || (tipo === 15 && b.length >= 16)) {
       const n = b[8], adelanto = b[9], conReg = tipo === 13 || !!(b[10] & 1), paso = conReg ? 13 : 8;
       let o = tipo === 15 ? 16 : 10, masNuevo = -1;
-      const tt = actual ? tabla(m) : (destino.tablas.get(m) || destino.tablas.set(m, new Map()).get(m));
-      const rr = actual ? reg(m) : (destino.regs.get(m) || destino.regs.set(m, new Map()).get(m));
+      const tt = actual ? tabla(m) : (destino.tablas.get(m) || destino.tablas.set(m, anilloNuevo()).get(m));
+      const rr = actual ? reg(m) : (destino.regs.get(m) || destino.regs.set(m, regNuevo()).get(m));
       for (let i = 0; i < n && o + paso <= b.length; i++) {
-        const f = cuadro + i, v = lee8(d, o), masc = conReg ? d.getUint16(o + 8) : 0, sust = conReg ? d.getUint16(o + 10) : 0, sig = conReg ? b[o + 12] : 0xFF;
+        const f = cuadro + i, o0 = o, masc = conReg ? d.getUint16(o + 8) : 0, sust = conReg ? d.getUint16(o + 10) : 0, sig = conReg ? b[o + 12] : 0xFF;
         o += paso;
-        const slots = fila(null);
-        for (const k of bits(masc)) { if (o + 8 > b.length) return; slots[k] = lee8(d, o); o += 8; }
-        if (tt.has(f)) continue;
-        tt.set(f, v);
+        // (R4: primero se mira si cabe y si ya lo tengo; recién ahí se lee, directo a la casilla del anillo: antes se
+        // armaban un arreglo de 12 y uno de 7 por cuadro aunque fuera repetido)
+        let nb = 0;
+        for (let k = 0; k < MANDOS; k++) if ((masc >> k) & 1) nb++;
+        if (o + 8 * nb > b.length) return;
+        const os = o; o += 8 * nb;
+        if (tt.has(f) || !tt.cabe(f)) continue;
+        lee8en(d, o0, tt.casilla(f));
+        if (actual && de === duenoDe.get(m)) avanceDe.set(m, ahora());   // (§177.5: su juego avanza)
         if (actual && f > ultimoDe(m)) nuevo.set(m, f);
-        if (masc || sig !== 0xFF) rr.set(f, { masc, sust, sig, slots });
+        if (masc || sig !== 0xFF) {
+          const x = rr.poner(f, masc, sust, sig);
+          for (let k = 0, q = os; k < MANDOS; k++) if ((masc >> k) & 1) { lee8en(d, q, x.buf[k]); x.slots[k] = x.buf[k]; q += 8; }
+        }
+        if (actual && arbitro && (masc >> miMando) & 1 && f < cubiertoDesde) cubiertoDesde = f;   // (§191: la autoridad ya me cubre)
         if (sig === miMando && actual) {
           // me pasaron la autoridad: sigo relevando a los que ella relevaba, y a ella misma (se atrasaba)
           const t = ahora();
           relevados.clear(); pasarA = null; traspaso = null;
           for (const k of bits(masc)) if (k !== miMando) relevados.set(k, { desde: t, problema: t });
           if (m !== miMando) relevados.set(m, { desde: t, problema: t });
-          registro(`[lockstep] ${duenoDe.get(m)} me pasó la autoridad desde el cuadro ${f + 1}`);
+          registro(`[lockstep] ${duenoDe.get(m)} me pasó la autoridad desde el cuadro ${f + 1 + (arbitro ? LEAD_TRASPASO : 0)}`);
         }
         masNuevo = f;
       }
       // la holgura: cuántos cuadros antes de necesitarlo llegó su botón más nuevo (solo lo que manda el dueño)
       if (actual && masNuevo >= 0 && de === duenoDe.get(m) && ultimo >= 0 && m !== miMando) {
         const necesito = espera ? espera.cuadro : ultimo + 1;
-        ven.hol[m] = Math.min(ven.hol[m], masNuevo - necesito);
+        // (§191, R1: si soy el árbitro, el cuadro f lo decido al escribir lo mío de ese cuadro: la holgura es contra lo
+        // próximo que escribo. Y la del que va atrás —se trabó y se pone al día— no cuenta: llega tarde porque lo escribe
+        // tarde, no por la red, y no tiene que subir su retraso)
+        if (!(arbitro && autoridadEn(Math.max(0, ultimo)) === miMando)) ven.hol[m] = Math.min(ven.hol[m], masNuevo - necesito);
+        else if (adelanto === 0xFF || ultimo - (cuadro + n - 1 - adelanto) <= UMBRAL_PRISA) ven.hol[m] = Math.min(ven.hol[m], masNuevo - (escrito + 1));
       }
       // §80b, mi ventaja sobre él: mi cuadro de ahora menos el suyo cuando lo mandó (= cuánto voy adelante, más lo que
       // tardó en llegar). Se queda la más chica del rato (la que llegó más rápido). Él mide lo mismo de mí; la mitad
@@ -1320,15 +1798,24 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       revisar();
     } else if (tipo === 4 && b.length >= 16 && actual) {
       let e = huellas.get(cuadro); if (!e) huellas.set(cuadro, e = { de: new Map() });
-      e.de.set(de, [d.getUint32(8), d.getUint32(12)]);
+      const ps = b.length >= 20 ? Array.from({ length: (b.length - 16) >> 2 }, (_, k) => d.getUint32(16 + 4 * k)) : null;   // (R5)
+      e.de.set(de, [d.getUint32(8), d.getUint32(12), ps]);
       revisarHuella(cuadro);
     } else if (tipo === 10 && b.length >= 9 + 5 * MANDOS && actual) {
       const inf = { t: ahora(), hol: [], esp: [], max: [], racha: [], ven: [], dud: !!(b[8] & 1), prisa: !!(b[8] & 2), atras: !!(b[8] & 4),
-                    rtt: b.length > 9 + 5 * MANDOS && b[9 + 5 * MANDOS] !== 255 ? b[9 + 5 * MANDOS] * 2 : null };
+                    rtt: b.length > 9 + 5 * MANDOS && b[9 + 5 * MANDOS] !== 255 ? b[9 + 5 * MANDOS] * 2 : null,
+                    // (§179, R7: una página vieja no los trae: null = no se sabe)
+                    margen: b.length > 12 + 5 * MANDOS && b[10 + 5 * MANDOS] !== 255 ? b[10 + 5 * MANDOS] : null,
+                    subida: b.length > 12 + 5 * MANDOS && b[11 + 5 * MANDOS] !== 255 ? b[11 + 5 * MANDOS] * 100 : null,
+                    telefono: b.length > 12 + 5 * MANDOS && (b[12 + 5 * MANDOS] & 2) ? !!(b[12 + 5 * MANDOS] & 1) : null };
       for (let p = 0; p < MANDOS; p++) {
         const o = 9 + 5 * p;
         inf.hol.push(d.getInt8(o)); inf.esp.push(b[o + 1] * 4); inf.max.push(b[o + 2] * 4); inf.racha.push(b[o + 3]); inf.ven.push(d.getInt8(o + 4));
       }
+      // (§236: lo que ve del servidor, si lo trae; si no, «no sé»)
+      { const o = 13 + 5 * MANDOS, hay = b.length >= o + 5;
+        inf.hol.push(hay ? d.getInt8(o) : SIN_DATO); inf.esp.push(hay ? b[o + 1] * 4 : 0); inf.max.push(hay ? b[o + 2] * 4 : 0);
+        inf.racha.push(hay ? b[o + 3] : NO_SE); inf.ven.push(hay ? d.getInt8(o + 4) : SIN_DATO); }
       informes.set(de, inf);
     } else if (tipo === 14 && de === duenoDe.get(m)) {
       // ese jugador se salió de la carrera (su copia se separó): se lo corta ya, como al que recargó. §99 (S2): solo si
@@ -1342,7 +1829,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // Si el juego está en medio de una carrera (la anterior), sus últimos cuadros van sin esperar (ver pad) y se suelta la
   // espera en curso: quien iba un cuadro atrás esperaría para siempre botones que ya nadie manda.
   let saliendo = null;
-  const quietos = () => { const d = new Int32Array(8 * MANDOS); for (const p of mandos) { d[p * 8] = 1; for (let k = 0; k < 7; k++) d[p * 8 + 1 + k] = NEUTRO[k]; } return d; };
+  const datosQuietos = new Int32Array(8 * MANDOS);
+  const quietos = () => { const d = datosQuietos; for (const p of mandos) { if (p >= MANDOS) continue; d[p * 8] = 1; for (let k = 0; k < 7; k++) d[p * 8 + 1 + k] = NEUTRO[k]; } return d; };
   function fijarCarrera(k, fuera_ = null, autoridad = null) {
     if (!(k >= 1)) return;
     if (Array.isArray(fuera_)) planteles.set(k, new Set(fuera_.filter(m => mandos.includes(m))));
@@ -1386,7 +1874,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     return true;
   }
   return { pad, alBinario, fijarCarrera, saltar, enCuadro, agregar,
-    estado: () => ({ ...est, esperaDe: { ...est.esperaDe }, estable: { ...est.estable }, delantes: Object.fromEntries(delanteDe),
+    estado: () => ({ ...est, largadas: (est.largadas || []).map(x => ({ ...x })), esperaDe: { ...est.esperaDe }, estable: { ...est.estable }, delantes: Object.fromEntries(delanteDe),
       quieto: Object.fromEntries([...quieto].map(([m, q]) => [m, q.max])),
       // §99 (C1): si estoy pausado (mi kart va solo hasta que vuelva) y las pausas de esta carrera
       pausado: !!pausaAbierta(miMando) && ultimo >= (pausaAbierta(miMando)?.desde ?? Infinity), pausasAhora: [...pausas].filter(([, ps]) => ps.some(x => x.vuelve === null)).map(([m]) => duenoDe.get(m)), retrasos: { ...est.retrasos }, retrasoMax: { ...est.retrasoMax },
@@ -1409,6 +1897,30 @@ export function huellaCarrera(L) {
   let h = 2166136261;
   for (let i = 0; i < 12; i++) h = Math.imul(h ^ L.u32(L.u32(lista + 4 * i) + 0xC), 16777619);
   return h >>> 0;
+}
+
+// R5 (§154): la huella AMPLIADA. h = la de siempre (decide); partes = una huella por cada uno de los 12 RaceinfoPlayer
+// (sus 0x54 bytes: avance, puesto, vuelta, puntos de control, tiempos) y una del azar de la carrera (los dos Random de
+// Raceinfo +4/+8: su estado +8/+0xC, el mismo que compara ?rastro=1); valores = lo mío de cada parte (el volcado, si
+// difiere). Lo que va adentro es lo que el rastro de §70 ya probó igual en todas las consolas.
+export function huellaAmpliada(L) {
+  const ri = L.u32(0x809BD730), lista = L.u32(ri + 0xC);
+  const partes = [], nombres = [], valores = {};
+  for (let i = 0; i < 12; i++) {
+    const pl = L.u32(lista + 4 * i);
+    let h = 2166136261;
+    const pal = [];
+    // (las palabras que son direcciones de la Wii —0x80000000 a 0x93FFFFFF: punteros a objetos del montón— no
+    // entran: cada consola puede tener sus objetos en otro lugar; medido en la sala: 0x903c73f4 en una, otro en la otra)
+    for (let o = 0; o < 0x54; o += 4) { const v = L.u32(pl + o); pal.push(v); if (v >= 0x80000000 && v < 0x94000000) continue; h = Math.imul(h ^ v, 16777619); }
+    partes.push(h >>> 0); nombres.push('kart' + i); valores['kart' + i] = pal.map(v => v.toString(16)).join(' ');
+  }
+  const az = [];
+  for (const r of [L.u32(ri + 4), L.u32(ri + 8)]) az.push(r ? L.u32(r + 8) : 0, r ? L.u32(r + 12) : 0);
+  let h = 2166136261;
+  for (const v of az) h = Math.imul(h ^ v, 16777619);
+  partes.push(h >>> 0); nombres.push('azar'); valores.azar = az.map(v => v.toString(16)).join(' ');
+  return { h: huellaCarrera(L), partes, nombres, valores };
 }
 
 // El plantel de la carrera: los humanos en los primeros puestos (cada uno con su mando: el orden de la sala) y CPU

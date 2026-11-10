@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escalón del aparato</title>
+</head>
+<body>
+<h1>Lo que no se puede, por física: <span>el escalón y el aviso antes de largar</span></h1>
+<p>Prueba <code>web/navegador/escalon.mjs</code> y el latido de <code>web/navegador/sala-carrera.mjs</code> (N12, bitácora
+  §233) <b>sin el juego y sin red</b>. (1) El escalón de un aparato con lo medido: la CPU por imagen y los cuadros de lógica
+  por segundo (sobrado, justo, con «dibujar a 30», lento), y los límites que no tienen arreglo (la memoria del teléfono,
+  el calor, la red móvil). (2) Lo que una página aprende de su última carrera (localStorage de mentira). (3) Una sala de
+  tres consolas <b>inventadas</b> con un reloj falso: Caro es un <b>aparato lento de mentira</b> (su última carrera,
+  30 cuadros por segundo con el hilo ocupado); al pasar a «elegir», antes de largar, las tres saben que Caro no llega a
+  60 y el aviso lo dice. Beto corrió a 50 pero con el hilo libre (lo frenaba la sala): no se lo culpa.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { escalonDe, anotarCarrera, leerCapacidad, capacidadLatido, noLlega, lentosDe, textoLentos, resumirCarrera, LOGICA_MIN } from '/web/navegador/escalon.mjs';
+import { crearSala, correnEn } from '/web/navegador/sala-carrera.mjs';
+
+const { ok, nota, fin } = prueba('escalon', 'Escalón del aparato y aviso antes de largar (sin el juego)');
+
+// ---- 1) el escalón con lo medido ----
+const e1 = escalonDe({ cpuPuraMs: 8, logica: 60 });
+ok('8 ms por imagen y 60 de lógica: «sobrado» (60 de verdad, con margen)', e1.id === 'sobrado', `${e1.id}: ${e1.esperar}`);
+const e2 = escalonDe({ cpuPuraMs: 14.5, logica: 60 });
+ok('14,5 ms: «justo» (60 al borde)', e2.id === 'justo', e2.id);
+const e3 = escalonDe({ cpuPuraMs: 22, logica: 59 });
+ok('22 ms con 59 de lógica: «n8» (60 de carrera con 30 dibujados)', e3.id === 'n8' && /Dibujar a 30/.test(e3.esperar), e3.id);
+const e4 = escalonDe({ cpuPuraMs: 12, logica: 41 });
+ok('la lógica manda: 41 cuadros de carrera por segundo = «lento» aunque la CPU por imagen salga baja', e4.id === 'lento' && /41 cuadros/.test(e4.por), `${e4.id} (${e4.por})`);
+const e5 = escalonDe({ cpuPuraMs: 40 });
+ok('40 ms por imagen sin carrera medida: «lento» (ni dibujando la mitad)', e5.id === 'lento', e5.id);
+const e6 = escalonDe({});
+ok('sin nada medido: «sin medir» y dice qué falta', e6.id === 'sin-medir' && /Mostrar qué frena/.test(e6.esperar), e6.esperar);
+const e7 = escalonDe({ cpuPuraMs: 14, logica: 60, telefono: true, memoriaGB: 4, rttMs: 140 });
+ok('teléfono de 4 GB con la red a 140 ms: los tres límites sin arreglo (memoria, calor, red)', e7.limites.length === 3 &&
+   e7.limites.some(t => /4 GB/.test(t)) && e7.limites.some(t => /calor/.test(t)) && e7.limites.some(t => /140 ms/.test(t)), e7.limites.join(' | '));
+ok('un PC con la red cerca: sin límites que avisar', escalonDe({ cpuPuraMs: 9, logica: 60, rttMs: 20 }).limites.length === 0);
+ok('con N8 prendido y 60 de lógica, el escalón dice «n8» (dibuja la mitad)', escalonDe({ cpuPuraMs: 10, logica: 60, n8: true }).id === 'n8');
+
+// ---- 2) lo que la página aprende de su última carrera ----
+const memoria = new Map();
+const almacen = { getItem: k => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, String(v)) };
+ok('sin carreras: no hay capacidad guardada (el latido no dice nada)', leerCapacidad(almacen) === null && capacidadLatido(null) === null);
+const seg = (n, logica, ms) => Array.from({ length: n }, (_, i) => ({ logica: logica + (i % 3) - 1, ms }));
+ok('una carrera de 5 s andando no dice nada', resumirCarrera(seg(5, 60, 9)) === null);
+const r1 = resumirCarrera(seg(60, 60, 9));
+ok('una carrera de 60 s: la mediana de los segundos', r1 && r1.logica === 60 && r1.cpuMs === 9, JSON.stringify(r1));
+anotarCarrera(r1, almacen);
+anotarCarrera({ logica: 50, cpuMs: 15 }, almacen);
+const c = leerCapacidad(almacen);
+ok('dos carreras: se promedia con la anterior (la mitad cada vez) y se cuentan', c.l === 55 && c.ms === 12 && c.n === 2, JSON.stringify(c));
+ok('el latido lleva solo dos números', JSON.stringify(capacidadLatido(c)) === JSON.stringify({ l: 55, ms: 12 }));
+const gpuGuardada = anotarCarrera({ logica: 30, cpuMs: 8, gpuMs: 34 }, { getItem: () => null, setItem() {} });
+ok('una tarjeta lenta se guarda y avisa aunque la CPU tenga tiempo libre',
+   capacidadLatido(gpuGuardada).g === 34 && noLlega(gpuGuardada) && !noLlega({ l: 60, ms: 8, g: 34 }));
+ok('¿no llega? 30 con el hilo ocupado: sí; 50 con el hilo libre: no; 60 de lógica manda sobre los ms por imagen',
+   noLlega({ l: 30, ms: 33 }) && !noLlega({ l: 50, ms: 8 }) && !noLlega({ l: 60, ms: 33 }) && !noLlega({ l: 60, ms: 9 }) && !noLlega(null));
+ok('N8 con 60 de lógica y 33 ms por imagen no es un aparato lento', escalonDe({ logica: 60, cpuPuraMs: 33, n8: true }).id === 'n8');
+ok(`LOGICA_MIN = 57 (el lockstep tolera unos pocos de menos por los tirones)`, LOGICA_MIN === 57);
+
+// ---- 3) la sala: un aparato lento de mentira avisa antes de largar ----
+let t = 1_000_000;
+const tareas = new Map(); let nId = 1;
+const cada = f => { tareas.set(nId, f); return nId++; }, parar = id => tareas.delete(id);
+const listo = () => new Promise(r => setTimeout(r, 0));
+const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); await listo(); await listo(); };
+const salas = new Map();
+const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }, { uid: 'caro', mando: 2 }];
+const enviar = de => (para, bytes) => setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0);
+// Ana: un PC (60, 9 ms) · Beto: 50 por segundo pero con el hilo libre (lo frenó otro) · Caro: el aparato lento (30, 33 ms)
+const caps = { ana: { l: 60, ms: 9 }, beto: { l: 50, ms: 8 }, caro: { l: 30, ms: 33 } };
+const persona = uid => {
+  const s = crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t, cada, parar,
+                        capacidad: () => caps[uid] });
+  salas.set(uid, s); return s;
+};
+const ana = persona('ana'), beto = persona('beto'), caro = persona('caro');
+await avanzar(1000); await avanzar(1000);
+ok('a los 2 s la sala está lista en las tres', [ana, beto, caro].every(s => s.lista));
+const capsDe = s => s.capacidades();
+ok('cada página sabe la capacidad de las otras dos por su latido (y la suya)', [ana, beto, caro].every(s => {
+  const c = capsDe(s); return c.ana?.l === 60 && c.beto?.l === 50 && c.caro?.l === 30 && c.caro?.ms === 33;
+}), JSON.stringify(capsDe(beto)));
+caps.caro = { l: 30, ms: 8, g: 34 }; await avanzar(1000); await avanzar(1000);
+ok('el latido transmite también la tarjeta lenta a las demás consolas', [ana, beto, caro].every(s =>
+   s.capacidades().caro?.g === 34 && noLlega(s.capacidades().caro)));
+ana.ponerPistas([{ copa: 1, fila: 0 }, { copa: 2, fila: 1 }]);
+await avanzar(0); await avanzar(1000);
+const fases = () => [ana, beto, caro].map(s => s.estado().fase).join(',');
+ok('con la copa armada, todas en «elegir» (todavía no se larga)', fases() === 'elegir,elegir,elegir', fases());
+// lo que hace mkw.mjs al entrar en «elegir»: los que corren esta carrera y no llegan a 60
+const avisoDe = s => {
+  const e = s.estado();
+  const corren = correnEn(humanos, e, e.carrera).map(h => h.uid).filter(u => !(e.fuera || []).includes(u));
+  return { lentos: lentosDe(s.capacidades(), corren), corren };
+};
+const aA = avisoDe(ana), aB = avisoDe(beto), aC = avisoDe(caro);
+ok('antes de largar, las tres ven a Caro (y solo a Caro) como «no llega a 60»', [aA, aB, aC].every(a => a.lentos.length === 1 && a.lentos[0].uid === 'caro'),
+   [aA, aB, aC].map(a => a.lentos.map(x => x.uid).join('+')).join(' / '));
+const nombres = { ana: 'Ana', beto: 'Beto', caro: 'Caro' };
+const tA = textoLentos(aA.lentos, u => nombres[u], 'ana'), tC = textoLentos(aC.lentos, u => nombres[u], 'caro');
+ok('el aviso de Ana nombra a Caro y explica el relevo sin garantizar 60', /Caro \(30 por segundo\)/.test(tA) && /relevo/.test(tA) && /puede haber saltos/.test(tA), tA);
+ok('el aviso de Caro le habla a ella: su aparato no llegó a 60 y qué puede hacer', /Tu aparato no llegó a 60/.test(tC) && /Dibujar a 30/.test(tC) && !/Caro \(/.test(tC), tC);
+ok('sin lentos, no hay aviso', textoLentos([], u => u, 'ana') === '');
+// un aparato sin carreras todavía (latido sin capacidad) no se marca
+caps.caro = null; await avanzar(1000); await avanzar(1000);
+ok('quien no dice capacidad en su latido (no corrió ninguna carrera aquí) no se marca', !avisoDe(ana).lentos.length && !('caro' in ana.capacidades()));
+nota('la sala con el juego: node web/navegador/prueba-sala.mjs --extra=&comoLento=30 (el aviso antes de largar)');
+fin();
+</script>
+</body>
+</html>

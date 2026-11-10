@@ -1,0 +1,495 @@
+diff --git a/runtime/include/isa/ppc_isa_quantized.h b/runtime/include/isa/ppc_isa_quantized.h
+index 48dd0a6..ea4d9a9 100644
+--- a/runtime/include/isa/ppc_isa_quantized.h
++++ b/runtime/include/isa/ppc_isa_quantized.h
+@@ -7,6 +7,7 @@
+ #include "big_endian.h"
+ 
+ #include "ppc_isa_memory.h"
++#include "mkw_motor.h"   // paso 6 (§170)
+ 
+ #include <algorithm>
+ #include <cmath>
+@@ -123,6 +124,16 @@ inline double PpcLoadPairPsqFloatFromHostInline(const uint8_t* host)
+     const __m128i raw = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(host));
+     return PpcM128ToPsInline(_mm_castsi128_ps(
+         PpcLoadPairPsqFloatBitsLanesInline(PpcPsqSwapPairBytesInline(raw))));
++#elif MKW_MOTOR_VUELTA64
++    // MKW web (§170): lo mismo que la rama de x86, con SIMD de wasm: dar vuelta los 8 bytes con una mezcla y aquietar
++    // los NaN de señal de cada carril (|x| > 0x7F800000 → bit 22 prendido), sin pasar por ~22 operaciones de enteros.
++    // Los carriles quedan igual que en la rama de abajo: el de 32 bits bajo = ps1, el alto = ps0.
++    v128_t lanes = wasm_v128_load64_zero(host);
++    lanes = wasm_i8x16_shuffle(lanes, lanes, 7, 6, 5, 4, 3, 2, 1, 0, 8, 9, 10, 11, 12, 13, 14, 15);
++    const v128_t magnitude = wasm_v128_and(lanes, wasm_i32x4_const_splat(0x7FFFFFFF));
++    const v128_t nanMask = wasm_i32x4_gt(magnitude, wasm_i32x4_const_splat(0x7F800000));
++    lanes = wasm_v128_or(lanes, wasm_v128_and(nanMask, wasm_i32x4_const_splat(0x00400000)));
++    return wasm_f64x2_extract_lane(lanes, 0);
+ #elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // The x86 path's full 8-byte pshufb reversal plus a same-endian load is,
+     // taken together, exactly a 64-bit byteswap of a plain little-endian load:
+@@ -143,6 +154,18 @@ inline void PpcStorePairPsqFloatToHostInline(uint8_t* host, double value)
+     const __m128i lanes = PpcStorePairPsqFloatBitsLanesInline(
+         _mm_castps_si128(PpcPsToM128Inline(value)));
+     _mm_storel_epi64(reinterpret_cast<__m128i*>(host), PpcPsqSwapPairBytesInline(lanes));
++#elif MKW_MOTOR_VUELTA64
++    // MKW web (§170): la regla de PpcStorePairPsqFloatBitsLanesInline (x86) en SIMD de wasm: |x| < 0x00800000 → solo
++    // el signo (cero con signo), NaN de señal → aquietado; después la vuelta de los 8 bytes y guardar 8 bytes
++    const v128_t lanes = wasm_f64x2_splat(value);
++    const v128_t magnitude = wasm_v128_and(lanes, wasm_i32x4_const_splat(0x7FFFFFFF));
++    const v128_t subnormalMask = wasm_i32x4_lt(magnitude, wasm_i32x4_const_splat(0x00800000));
++    const v128_t nanMask = wasm_i32x4_gt(magnitude, wasm_i32x4_const_splat(0x7F800000));
++    const v128_t quieted = wasm_v128_or(lanes, wasm_v128_and(nanMask, wasm_i32x4_const_splat(0x00400000)));
++    const v128_t signedZero = wasm_v128_and(lanes, wasm_i32x4_const_splat(static_cast<int32_t>(0x80000000u)));
++    v128_t result = wasm_v128_bitselect(signedZero, quieted, subnormalMask);
++    result = wasm_i8x16_shuffle(result, result, 7, 6, 5, 4, 3, 2, 1, 0, 8, 9, 10, 11, 12, 13, 14, 15);
++    wasm_v128_store64_lane(host, result, 0);
+ #elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // Inverse of the load path above: bswap64 is its own inverse, so applying
+     // it to the quieted packed value reproduces the on-disk big-endian bytes.
+@@ -265,7 +288,17 @@ inline void PpcWritePairPsqInline(uint32_t addr, T first, T second)
+ MKW_PPC_FORCE_INLINE const uint8_t* PpcTryGetPsqReadableHostInline(uint32_t addr)
+ {
+     if (GuestFlat::RequiresCheckedAccess()) [[unlikely]]
++    {
++#if MKW_MOTOR_RANGOS
++        // MKW web (M1, §170): la misma prueba que Memory::Read64 (TryReadGuestScalar<uint64_t>): la página de 1 MiB
++        // es RAM legible entera y la siguiente sigue pegada, así que el par de 8 bytes sale del mismo lugar
++        const uintptr_t bias = MemoryInline::g_fullReadablePageBias[addr >> MemoryInline::kPageShift];
++        if (bias == 0) return nullptr;
++        return reinterpret_cast<const uint8_t*>((bias - 1u) + addr);
++#else
+         return nullptr;
++#endif
++    }
+     return MKW_FLAT_GUEST_BASE + addr;
+ }
+ 
+@@ -277,7 +310,19 @@ MKW_PPC_FORCE_INLINE const uint8_t* PpcTryGetPsqReadableHostInline(uint32_t addr
+ MKW_PPC_FORCE_INLINE uint8_t* PpcTryGetPsqWritableHostInline(uint32_t addr)
+ {
+     if (GuestFlat::RequiresCheckedAccess()) [[unlikely]]
++    {
++#if MKW_MOTOR_RANGOS
++        // MKW web (M1, §170): el primer intento de Memory::Write64 (TryWriteGuestScalar<uint64_t>): los 8 bytes en la
++        // misma página de 1 MiB y esa página sin código; si no, null y Memory::Write64 hace todo lo de antes
++        const uint32_t page = addr >> MemoryInline::kPageShift;
++        if (((addr + 7u) >> MemoryInline::kPageShift) != page) return nullptr;
++        const uintptr_t bias = MemoryInline::g_fullWritablePageBias[page];
++        if (bias == 0) return nullptr;
++        return reinterpret_cast<uint8_t*>((bias - 1u) + addr);
++#else
+         return nullptr;
++#endif
++    }
+     if (addr > UINT32_MAX - 7u) [[unlikely]]
+         return nullptr;
+     if (MemoryInline::FlatWriteNeedsPolicy(addr) ||
+diff --git a/runtime/include/memory_access.h b/runtime/include/memory_access.h
+index 9c98986..93afd22 100644
+--- a/runtime/include/memory_access.h
++++ b/runtime/include/memory_access.h
+@@ -2,6 +2,7 @@
+ 
+ #include "guest_flat_memory.h"
+ #include "mkw_contadores.h"   // V4 (§152): MKW_CUENTA (nada sin -DMKW_CONTADORES)
++#include "mkw_motor.h"        // paso 6 (§170): los interruptores del motor en wasm
+ #include "memory.h"
+ #include "recomp_mod_loader.h"
+ 
+@@ -236,8 +237,23 @@ MKW_MEMORY_FORCE_INLINE uint8_t* ResolveRangeHost(uint32_t base, int32_t minOffs
+         // A host page can cover multiple independently-special Wii pages.
+         // Returning null keeps resolved accesses on the checked Memory::*
+         // path, which materializes deferred reads and applies write policy.
++#if MKW_MOTOR_RANGOS
++        // MKW web (M1, §170): en wasm no hay vista plana, pero la tabla de páginas de 1 MiB ya dice lo mismo que diría
++        // Memory::Read*/Write* para CADA dirección del rango cuando el rango entero cae en una sola página: la lectura
++        // usa g_fullReadablePageBias (cero si la página tiene una lectura diferida pendiente o no es RAM entera), la
++        // escritura g_fullWritablePageBias (cero si la página tiene código o no es RAM). Si valen, el puntero es el
++        // mismo que usaría el camino revisado, acceso por acceso: el resultado no cambia. Si no → null, como antes.
++        // Las tablas solo cambian dentro de llamadas al runtime, y el traductor corta los rangos en cada llamada.
++        const uint32_t page = guestStart >> kPageShift;
++        if (((guestStart + (length - 1u)) >> kPageShift) != page) return nullptr;
++        const uintptr_t bias = needsWrite ? g_fullWritablePageBias[page] : g_fullReadablePageBias[page];
++        if (bias == 0) return nullptr;
++        if (needsWrite && needsRead && g_fullReadablePageBias[page] != bias) return nullptr;
++        return reinterpret_cast<uint8_t*>((bias - 1u) + guestStart);
++#else
+         (void)needsWrite;
+         return nullptr;
++#endif
+     }
+     if (needsWrite &&
+         (FlatWriteNeedsPolicy(guestStart) || FlatWriteNeedsPolicy(guestStart + (length - 1))))
+@@ -274,15 +290,63 @@ inline T MaybeByteSwap(T value) {
+     }
+ }
+ 
++// MKW web (§170): leer/escribir T en el orden de la Wii (el byte grande primero) desde un puntero del anfitrión.
++// Con MKW_MOTOR_VUELTA64 los 8 bytes se dan vuelta con una mezcla SIMD (cargar 8 bytes, i8x16.shuffle, sacar el
++// carril): 3 operaciones contra ~22 de enteros, porque wasm no tiene bswap. Los bits que salen son los mismos.
++template <typename T>
++MKW_MEMORY_FORCE_INLINE T LoadGuestOrder(const uint8_t* p) {
++#if MKW_MOTOR_VUELTA64
++    if constexpr (sizeof(T) == 8) {
++        v128_t v = wasm_v128_load64_zero(p);
++        v = wasm_i8x16_shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0, 8, 9, 10, 11, 12, 13, 14, 15);
++        const uint64_t bits = static_cast<uint64_t>(wasm_i64x2_extract_lane(v, 0));
++        T out; std::memcpy(&out, &bits, sizeof(out)); return out;
++    }
++#endif
++#if MKW_MOTOR_VUELTA32
++    if constexpr (sizeof(T) == 4) {
++        v128_t v = wasm_v128_load32_zero(p);
++        v = wasm_i8x16_shuffle(v, v, 3, 2, 1, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
++        const uint32_t bits = static_cast<uint32_t>(wasm_i32x4_extract_lane(v, 0));
++        T out; std::memcpy(&out, &bits, sizeof(out)); return out;
++    }
++#endif
++    T value{};
++    std::memcpy(&value, p, sizeof(T));
++    return MaybeByteSwap(value);
++}
++
++template <typename T>
++MKW_MEMORY_FORCE_INLINE void StoreGuestOrder(uint8_t* p, T value) {
++#if MKW_MOTOR_VUELTA64
++    if constexpr (sizeof(T) == 8) {
++        uint64_t bits; std::memcpy(&bits, &value, sizeof(bits));
++        v128_t v = wasm_i64x2_splat(static_cast<int64_t>(bits));
++        v = wasm_i8x16_shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0, 8, 9, 10, 11, 12, 13, 14, 15);
++        wasm_v128_store64_lane(p, v, 0);
++        return;
++    }
++#endif
++#if MKW_MOTOR_VUELTA32
++    if constexpr (sizeof(T) == 4) {
++        uint32_t bits; std::memcpy(&bits, &value, sizeof(bits));
++        v128_t v = wasm_i32x4_splat(static_cast<int32_t>(bits));
++        v = wasm_i8x16_shuffle(v, v, 3, 2, 1, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
++        wasm_v128_store32_lane(p, v, 0);
++        return;
++    }
++#endif
++    const T swapped = MaybeByteSwap(value);
++    std::memcpy(p, &swapped, sizeof(T));
++}
++
+ template <typename T>
+ MKW_MEMORY_FORCE_INLINE bool ReadResolvedScalar(uint8_t* host, uint32_t rangeOffset, T& outValue) {
+     if (!host) return false;
+     if constexpr (sizeof(T) == 1) {
+         outValue = host[rangeOffset];
+     } else {
+-        T value = 0;
+-        std::memcpy(&value, host + rangeOffset, sizeof(T));
+-        outValue = MaybeByteSwap(value);
++        outValue = LoadGuestOrder<T>(host + rangeOffset);
+     }
+     return true;
+ }
+@@ -310,8 +374,7 @@ template <typename Packed>
+ MKW_MEMORY_FORCE_INLINE bool WriteResolvedPairFast(
+     uint8_t* host, uint32_t rangeOffset, Packed packed) {
+     if (!host) return false;
+-    const Packed swapped = MaybeByteSwap(packed);
+-    std::memcpy(host + rangeOffset, &swapped, sizeof(swapped));
++    StoreGuestOrder<Packed>(host + rangeOffset, packed);
+     return true;
+ }
+ 
+@@ -331,8 +394,7 @@ MKW_MEMORY_FORCE_INLINE bool WriteResolvedScalar(uint8_t* host, uint32_t rangeOf
+     if constexpr (sizeof(T) == 1) {
+         host[rangeOffset] = static_cast<uint8_t>(value);
+     } else {
+-        const T swapped = MaybeByteSwap(value);
+-        std::memcpy(host + rangeOffset, &swapped, sizeof(T));
++        StoreGuestOrder<T>(host + rangeOffset, value);
+     }
+     return true;
+ }
+@@ -344,9 +406,7 @@ inline bool TryReadMappedScalar(uint32_t address, T& outValue) {
+         if constexpr (sizeof(T) == 1) {
+             outValue = *ptr;
+         } else {
+-            T value = 0;
+-            std::memcpy(&value, ptr, sizeof(T));
+-            outValue = MaybeByteSwap(value);
++            outValue = LoadGuestOrder<T>(ptr);
+         }
+         return true;
+     }
+@@ -362,9 +422,7 @@ MKW_MEMORY_FORCE_INLINE bool TryReadGuestScalar(uint32_t address, T& outValue) {
+     if constexpr (sizeof(T) == 1) {
+         outValue = *ptr;
+     } else {
+-        T value = 0;
+-        std::memcpy(&value, ptr, sizeof(T));
+-        outValue = MaybeByteSwap(value);
++        outValue = LoadGuestOrder<T>(ptr);
+     }
+     return true;
+ }
+@@ -403,8 +461,7 @@ MKW_MEMORY_FORCE_INLINE bool TryWriteGuestScalar(uint32_t address, T value) {
+     if constexpr (sizeof(T) == 1) {
+         *ptr = static_cast<uint8_t>(value);
+     } else {
+-        const T swapped = MaybeByteSwap(value);
+-        std::memcpy(ptr, &swapped, sizeof(T));
++        StoreGuestOrder<T>(ptr, value);
+     }
+     return true;
+ }
+@@ -416,8 +473,7 @@ inline bool WriteStackScalarFast(uint32_t address, T value) {
+         if constexpr (sizeof(T) == 1) {
+             *ptr = static_cast<uint8_t>(value);
+         } else {
+-            const T swapped = MaybeByteSwap(value);
+-            std::memcpy(ptr, &swapped, sizeof(T));
++            StoreGuestOrder<T>(ptr, value);
+         }
+         return true;
+     }
+@@ -689,7 +745,49 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat64(uint32_t address, double value)
+ #undef MKW_MEMORY_NO_INLINE
+ #undef MKW_MEMORY_COLD
+ 
+-inline uint8_t Memory::Read8(uint32_t addr) {
++// MKW web (M2, §170): con MKW_MOTOR_EN_LINEA las lecturas y escrituras de la memoria de la Wii se meten siempre en
++// el código del juego (antes eran «inline» simple y V8/LLVM dejaba Write32 y WriteFloat32 como funciones aparte:
++// 2 % del perfil cada una). Para que el juego no crezca, la escritura en línea es solo el camino rápido (la página
++// de 1 MiB entera es RAM sin código, g_fullWritablePageBias); lo demás (páginas mezcladas con código, E/S, cruce de
++// página) va a una función aparte que hace exactamente lo de antes. Con el punto de vigilancia (MKW_VIGIA) va lo de
++// antes, para no avisar dos veces.
++#if MKW_MOTOR_EN_LINEA && !defined(MKW_VIGIA)
++#define MKW_MEM_EN_LINEA __attribute__((always_inline))
++#define MKW_MEM_ESCRITURA_RAPIDA 1
++namespace MemoryInline {
++template <typename T>
++__attribute__((always_inline)) inline bool TryWriteGuestScalarRapido(uint32_t address, T value) {
++    const uint32_t page = address >> kPageShift;
++    // también descarta la vuelta de 0xFFFFFFFF a 0 (la página del final no es la del principio)
++    if (((address + static_cast<uint32_t>(sizeof(T) - 1u)) >> kPageShift) != page) [[unlikely]] return false;
++    const uintptr_t bias = g_fullWritablePageBias[page];
++    if (bias == 0) [[unlikely]] return false;
++    uint8_t* ptr = reinterpret_cast<uint8_t*>((bias - 1u) + address);
++    if constexpr (sizeof(T) == 1) *ptr = static_cast<uint8_t>(value);
++    else StoreGuestOrder<T>(ptr, value);
++    return true;
++}
++// lo raro: el mismo camino de antes entero (subtablas de 4 KiB, guardas de código, y si no, la escritura lenta)
++__attribute__((noinline)) inline void Write8Raro(uint32_t a, uint8_t v) {
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write8Slow(a, v); } }
++__attribute__((noinline)) inline void Write16Raro(uint32_t a, uint16_t v) {
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write16Slow(a, v); } }
++__attribute__((noinline)) inline void Write32Raro(uint32_t a, uint32_t v) {
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write32Slow(a, v); } }
++__attribute__((noinline)) inline void Write64Raro(uint32_t a, uint64_t v) {
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write64Slow(a, v); } }
++__attribute__((noinline)) inline void WriteFloat32Raro(uint32_t a, double v) {
++    if (!TryWriteGuestScalar(a, ConvertPpcDoubleToSingleBits(v))) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat32Slow(a, v); } }
++__attribute__((noinline)) inline void WriteFloat64Raro(uint32_t a, double v) {
++    uint64_t bits = 0; std::memcpy(&bits, &v, sizeof(bits));
++    if (!TryWriteGuestScalar(a, bits)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat64Slow(a, v); } }
++}  // namespace MemoryInline
++#else
++#define MKW_MEM_EN_LINEA
++#define MKW_MEM_ESCRITURA_RAPIDA 0
++#endif
++
++MKW_MEM_EN_LINEA inline uint8_t Memory::Read8(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
+     uint8_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+@@ -699,7 +797,7 @@ inline uint8_t Memory::Read8(uint32_t addr) {
+     return value;
+ }
+ 
+-inline uint16_t Memory::Read16(uint32_t addr) {
++MKW_MEM_EN_LINEA inline uint16_t Memory::Read16(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
+     uint16_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+@@ -709,7 +807,7 @@ inline uint16_t Memory::Read16(uint32_t addr) {
+     return value;
+ }
+ 
+-inline uint32_t Memory::Read32(uint32_t addr) {
++MKW_MEM_EN_LINEA inline uint32_t Memory::Read32(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
+     uint32_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+@@ -719,7 +817,7 @@ inline uint32_t Memory::Read32(uint32_t addr) {
+     return value;
+ }
+ 
+-inline uint64_t Memory::Read64(uint32_t addr) {
++MKW_MEM_EN_LINEA inline uint64_t Memory::Read64(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
+     uint64_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+@@ -729,7 +827,7 @@ inline uint64_t Memory::Read64(uint32_t addr) {
+     return value;
+ }
+ 
+-inline float Memory::ReadFloat32(uint32_t addr) {
++MKW_MEM_EN_LINEA inline float Memory::ReadFloat32(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
+     uint32_t bits = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]] {
+@@ -741,7 +839,7 @@ inline float Memory::ReadFloat32(uint32_t addr) {
+     return value;
+ }
+ 
+-inline double Memory::ReadFloat64(uint32_t addr) {
++MKW_MEM_EN_LINEA inline double Memory::ReadFloat64(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
+     uint64_t bits = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]] {
+@@ -753,46 +851,81 @@ inline double Memory::ReadFloat64(uint32_t addr) {
+     return value;
+ }
+ 
+-inline void Memory::Write8(uint32_t addr, uint8_t val) {
++MKW_MEM_EN_LINEA inline void Memory::Write8(uint32_t addr, uint8_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
++#if MKW_MEM_ESCRITURA_RAPIDA
++    const uint8_t bits = val;
++    if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
++    MemoryInline::Write8Raro(addr, val);
++#else
+     if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
+         MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write8Slow(addr, val);
+     }
++#endif
+ }
+ 
+-inline void Memory::Write16(uint32_t addr, uint16_t val) {
++MKW_MEM_EN_LINEA inline void Memory::Write16(uint32_t addr, uint16_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
++#if MKW_MEM_ESCRITURA_RAPIDA
++    const uint16_t bits = val;
++    if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
++    MemoryInline::Write16Raro(addr, val);
++#else
+     if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
+         MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write16Slow(addr, val);
+     }
++#endif
+ }
+ 
+-inline void Memory::Write32(uint32_t addr, uint32_t val) {
++MKW_MEM_EN_LINEA inline void Memory::Write32(uint32_t addr, uint32_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
++#if MKW_MEM_ESCRITURA_RAPIDA
++    const uint32_t bits = val;
++    if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
++    MemoryInline::Write32Raro(addr, val);
++#else
+     if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
+         MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write32Slow(addr, val);
+     }
++#endif
+ }
+ 
+-inline void Memory::Write64(uint32_t addr, uint64_t val) {
++MKW_MEM_EN_LINEA inline void Memory::Write64(uint32_t addr, uint64_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
++#if MKW_MEM_ESCRITURA_RAPIDA
++    const uint64_t bits = val;
++    if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
++    MemoryInline::Write64Raro(addr, val);
++#else
+     if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
+         MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write64Slow(addr, val);
+     }
++#endif
+ }
+ 
+-inline void Memory::WriteFloat32(uint32_t addr, double val) {
++MKW_MEM_EN_LINEA inline void Memory::WriteFloat32(uint32_t addr, double val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
++#if MKW_MEM_ESCRITURA_RAPIDA
++    const uint32_t bits = MemoryInline::ConvertPpcDoubleToSingleBits(val);
++    if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
++    MemoryInline::WriteFloat32Raro(addr, val);
++#else
+     {
+         const uint32_t bits = MemoryInline::ConvertPpcDoubleToSingleBits(val);
+         if (MemoryInline::TryWriteGuestScalar(addr, bits))
+             return;
+     }
+     MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::WriteFloat32Slow(addr, val);
++#endif
+ }
+ 
+-inline void Memory::WriteFloat64(uint32_t addr, double val) {
++MKW_MEM_EN_LINEA inline void Memory::WriteFloat64(uint32_t addr, double val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
++#if MKW_MEM_ESCRITURA_RAPIDA
++    uint64_t bits = 0; std::memcpy(&bits, &val, sizeof(bits));
++    if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
++    MemoryInline::WriteFloat64Raro(addr, val);
++#else
+     {
+         uint64_t bits = 0;
+         std::memcpy(&bits, &val, sizeof(bits));
+@@ -800,4 +933,5 @@ inline void Memory::WriteFloat64(uint32_t addr, double val) {
+             return;
+     }
+     MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::WriteFloat64Slow(addr, val);
++#endif
+ }
+diff --git a/runtime/include/mkw_motor.h b/runtime/include/mkw_motor.h
+new file mode 100644
+index 0000000..36b70de
+--- /dev/null
++++ b/runtime/include/mkw_motor.h
+@@ -0,0 +1,48 @@
++#pragma once
++
++// MKW web, paso 6 del plan de rendimiento (bitácora §170): el motor en wasm. Cada arreglo tiene su interruptor; por
++// omisión van todos prendidos y cada uno se apaga al compilar con MKW_CFLAGS_EXTRA="-DMKW_MOTOR_<NOMBRE>=0"
++// (en un taller aparte: compilar-web.py --carpeta build/web-xxx). Solo cambian CÓMO se llega al dato, nunca qué
++// dato: la paridad, la huella y los fantasmas tienen que dar igual bit por bit.
++//
++//   MKW_MOTOR_RANGOS    (M1) los rangos del traductor y los psq resueltos con la tabla de páginas de 1 MiB en vez de
++//                       caer siempre a la función fría (en wasm ResolveRangeHost devolvía null siempre)
++//   MKW_MOTOR_EN_LINEA  (M2) el camino rápido de Memory::Read*/Write* metido en el código del juego; lo raro (páginas
++//                       mezcladas con código, E/S, cruces de página) queda en una función aparte
++//   MKW_MOTOR_VUELTA64  dar vuelta 8 bytes (lfd/stfd, pares de psq, pares de registros) con una mezcla SIMD (3
++//                       operaciones) en vez de ~22 de enteros: wasm no tiene la instrucción bswap
++//   MKW_MOTOR_VUELTA32  lo mismo para 4 bytes (se mide aparte: con 7 operaciones de enteros puede no ganar)
++
++#if defined(__EMSCRIPTEN__)
++#ifndef MKW_MOTOR_RANGOS
++#define MKW_MOTOR_RANGOS 1
++#endif
++#ifndef MKW_MOTOR_EN_LINEA
++#define MKW_MOTOR_EN_LINEA 1
++#endif
++#if defined(__wasm_simd128__)
++#ifndef MKW_MOTOR_VUELTA64
++#define MKW_MOTOR_VUELTA64 1
++#endif
++#ifndef MKW_MOTOR_VUELTA32
++#define MKW_MOTOR_VUELTA32 0
++#endif
++#endif
++#endif
++
++#ifndef MKW_MOTOR_RANGOS
++#define MKW_MOTOR_RANGOS 0
++#endif
++#ifndef MKW_MOTOR_EN_LINEA
++#define MKW_MOTOR_EN_LINEA 0
++#endif
++#ifndef MKW_MOTOR_VUELTA64
++#define MKW_MOTOR_VUELTA64 0
++#endif
++#ifndef MKW_MOTOR_VUELTA32
++#define MKW_MOTOR_VUELTA32 0
++#endif
++
++#if MKW_MOTOR_VUELTA64 || MKW_MOTOR_VUELTA32
++#include <wasm_simd128.h>
++#endif

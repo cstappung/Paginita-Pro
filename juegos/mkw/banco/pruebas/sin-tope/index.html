@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco sin tope</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Banco sin tope: <span>cuántos cuadros da de verdad cada aparato</span></h1>
+<p>Prueba <code>web/navegador/sin-tope.mjs</code> (bitácora §161) <b>sin el juego</b>: que <code>?sinTope=1</code> vale solo
+  si se pide y nunca en la sala, en línea ni con red; que durante la carrera se le pide al runtime ponerse al día sin fin
+  (2 s de cuadrícula cada vez) y fuera de la carrera nada; y la cuenta del margen contra 60 con las cifras de la escalera
+  de §159; y qué lastre de CPU va dónde (§162: el del runtime, por cuadro, sin tope). Con el juego lo mide <code>medir-sitio --extra "&amp;sinTope=1"</code>.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { sinTopeActivo, crearBomba, margen, PRISA_MS, repartoLastre, crearTramo, tramoDeParametros } from '/web/navegador/sin-tope.mjs';
+
+const { ok, fin } = prueba('sin-tope', 'Banco sin tope (sin el juego)');
+const p = (q) => new URLSearchParams(q);
+
+try {
+  // ---- 1. Cuándo vale ----
+  ok('por omisión, apagado', !sinTopeActivo(p('modo=vs&copa=0')));
+  ok('con sinTope=1 en una carrera suelta, prendido', sinTopeActivo(p('modo=vs&copa=0&sinTope=1')));
+  ok('sinTope=0 o cualquier otro valor: apagado', !sinTopeActivo(p('sinTope=0')) && !sinTopeActivo(p('sinTope=si')));
+  ok('nunca en la sala (modo=sala)', !sinTopeActivo(p('modo=sala&sinTope=1')));
+  ok('nunca en línea (modo=enlinea)', !sinTopeActivo(p('modo=enlinea&sinTope=1')));
+  ok('nunca con una carrera sincronizada (sincro=…)', !sinTopeActivo(p('modo=directa&sincro=a,b&sinTope=1')));
+  ok('nunca con la red de la sala (red=…)', !sinTopeActivo(p('red=1&sinTope=1')));
+
+  // ---- 2. La bomba de prisa ----
+  const pedidos = []; let enCarrera = false;
+  const bomba = crearBomba({ prisa: (ms) => pedidos.push(ms), enCarrera: () => enCarrera });
+  ok('en los menús no pide nada (0)', bomba.tic() === 0 && pedidos.at(-1) === 0);
+  enCarrera = true;
+  ok(`en la carrera pide ${PRISA_MS} ms (el tope del runtime)`, bomba.tic() === PRISA_MS && pedidos.at(-1) === 2000);
+  enCarrera = false;
+  ok('al terminar la carrera vuelve a 0 (deja de correr)', bomba.tic() === 0 && pedidos.length === 3);
+
+  // ---- 3. El margen (las cifras de la escalera de §159) ----
+  ok('este PC, 6,9 ms: ×2,42 de sobra', margen(6.9).texto === '×2.42 de sobra');
+  ok('PC típico, 14,2 ms: ×1,17 de sobra', margen(14.2).texto === '×1.17 de sobra');
+  ok('portátil, 39,4 ms: le falta ×2,36', margen(39.4).texto === 'le falta ×2.36');
+  ok('gama media, 49,5 ms: le falta ×2,97', margen(49.5).texto === 'le falta ×2.97');
+  ok('justo 16,7 ms: ×1,00', margen(1000 / 60).texto === '×1.00 de sobra');
+  ok('sin dato (0, null, NaN): nada', margen(0) === null && margen(null) === null && margen(NaN) === null);
+
+  // ---- 4. Qué lastre de CPU va dónde (§162) ----
+  const r = (q, st) => repartoLastre(p(q), st, Number(p(q).get('lastre')) || 1);
+  ok('con tope y lastre=3: el de la página, como en §155', JSON.stringify(r('lastre=3', false)) === '{"cuadro":1,"pagina":3}');
+  ok('sin tope y lastre=3: el del runtime (cuadro 3), la página solo mide', JSON.stringify(r('lastre=3&sinTope=1', true)) === '{"cuadro":3,"pagina":1}');
+  ok('sin tope sin lastre: ninguno', JSON.stringify(r('sinTope=1', true)) === '{"cuadro":1,"pagina":1}');
+  ok('lastreCuadro=2 manda (también con tope)', JSON.stringify(r('lastreCuadro=2', false)) === '{"cuadro":2,"pagina":1}');
+  ok('lastreCuadro=1 o basura: no cuenta', r('lastreCuadro=1', false).cuadro === 1 && r('lastreCuadro=x&lastre=2', false).pagina === 2);
+
+  // ---- 5. El tramo fijo (§163) ----
+  ok('tramo=600-2400 se lee; 2400-600 o basura, no', JSON.stringify(tramoDeParametros(p('tramo=600-2400'))) === '{"desde":600,"hasta":2400}' &&
+    tramoDeParametros(p('tramo=2400-600')) === null && tramoDeParametros(p('tramo=x')) === null);
+  {
+    let t = 0, x = { logica: null, imagenes: 0, esperaRuntime: 0, esperaSubida: 0, giro: 0 };
+    const tr = crearTramo({ desde: 600, hasta: 2400, leer: () => x, ahora: () => t });
+    ok('fuera de la carrera (logica null): no empieza', tr.tic() === null && !tr.empezo);
+    x = { ...x, logica: 590 }; tr.tic(); const noTodavia = !tr.empezo;
+    t = 1000; x = { logica: 600, imagenes: 100, esperaRuntime: 50, esperaSubida: 10, giro: 0 }; tr.tic();
+    ok('empieza al pasar «desde», no antes', noTodavia && tr.empezo);
+    // 1800 cuadros en 12 s: 150/s; 900 imágenes (75/s); por cuadro: esperas 1 ms + 0,5 ms, giro 2 ms, trabajo el resto
+    t = 13000; x = { logica: 2400, imagenes: 1000, esperaRuntime: 1850, esperaSubida: 910, giro: 3600 };
+    const r = tr.tic();
+    ok('al pasar «hasta»: 150 de lógica/s y 75 imágenes/s', r && r.logicaPorSeg === 150 && r.imagenesPorSeg === 75);
+    ok('por cuadro: pared 6,667, esperas 1 y 0,5, giro 2, trabajo 3,167', r.porCuadro.pared === 6.667 && r.porCuadro.esperaRuntime === 1 &&
+      r.porCuadro.esperaSubida === 0.5 && r.porCuadro.giro === 2 && r.porCuadro.trabajo === 3.167);
+    ok('techo de CPU = 1000 ÷ (trabajo + giro) = 193,53/s', Math.abs(r.cpuPorSeg - 193.53) < 0.02);
+    t = 20000; x = { ...x, logica: 3000 };
+    ok('después no cambia (queda el primero)', tr.tic() === r);
+  }
+} catch (e) {
+  ok('sin errores: ' + e.message, false);
+}
+fin();
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+diff --git a/runtime/include/guest_abi/memory_access.h b/runtime/include/guest_abi/memory_access.h
+index c0bf6c1..fa5b12a 100644
+--- a/runtime/include/guest_abi/memory_access.h
++++ b/runtime/include/guest_abi/memory_access.h
+@@ -22,6 +22,20 @@ extern "C" {
+     void GX_HLE_FIFO_WriteBurst(const uint8_t* data, uint32_t sizeBytes);
+ }
+ 
++// MKW RETRO, W10 de la etapa 1 del plan v4 (bitácora §207): con -DMKW_SUCIAS cada escritura del juego en la memoria de
++// la Wii anota su página de 4 KiB en g_mkwSucias (un byte por página de los 4 GiB de direcciones: 1 MiB). Así el
++// Worker de la carrera sabe qué páginas mandar al del dibujo sin comparar 152 MiB en cada cuadro. Como un relé de
++// enclavamiento por circuito: se dispara cuando pasa corriente y queda marcado hasta que alguien lo repone. Sin la
++// marca no es nada (solo el programa aparte de MKW_W10_COMPILAR=1). La tabla y el resto viven en web/juego/w10_nativo.cpp.
++#ifdef MKW_SUCIAS
++extern "C" uint8_t g_mkwSucias[1u << 20];
++#define MKW_SUCIA(a, n) (g_mkwSucias[static_cast<uint32_t>(a) >> 12] = 1, \
++                         g_mkwSucias[static_cast<uint32_t>((a) + (n) - 1u) >> 12] = 1)
++extern "C" void mkw_sucias_rango(uint32_t desde, uint32_t largo);
++#else
++#define MKW_SUCIA(a, n) ((void)0)
++#endif
++
+ namespace MemoryInline {
+ #if defined(_WIN32)
+ #define MKW_MEMORY_FORCE_INLINE __forceinline
+@@ -252,6 +266,9 @@ MKW_MEMORY_FORCE_INLINE uint8_t* ResolveRangeHost(uint32_t base, int32_t minOffs
+         const uintptr_t bias = needsWrite ? g_fullWritablePageBias[page] : g_fullReadablePageBias[page];
+         if (bias == 0) return nullptr;
+         if (needsWrite && needsRead && g_fullReadablePageBias[page] != bias) return nullptr;
++#ifdef MKW_SUCIAS
++        if (needsWrite) mkw_sucias_rango(guestStart, length);   // (W10, §207: el rango entero, por si se escribe)
++#endif
+         return reinterpret_cast<uint8_t*>((bias - 1u) + guestStart);
+ #else
+         (void)needsWrite;
+@@ -486,6 +503,7 @@ MKW_MEMORY_FORCE_INLINE bool TryWriteGuestScalar(uint32_t address, T value) {
+     } else if (!TryGetWritablePointerFast(address, sizeof(T), ptr)) [[unlikely]] {
+         return false;
+     }
++    MKW_SUCIA(address, sizeof(T));   // (W10, §207)
+     if constexpr (sizeof(T) == 1) {
+         *ptr = static_cast<uint8_t>(value);
+     } else {
+@@ -791,24 +809,25 @@ __attribute__((always_inline)) inline bool TryWriteGuestScalarRapido(uint32_t ad
+     const uintptr_t bias = g_fullWritablePageBias[page];
+     if (bias == 0) [[unlikely]] return false;
+     uint8_t* ptr = reinterpret_cast<uint8_t*>((bias - 1u) + address);
++    MKW_SUCIA(address, sizeof(T));   // (W10, §207)
+     if constexpr (sizeof(T) == 1) *ptr = static_cast<uint8_t>(value);
+     else StoreGuestOrder<T>(ptr, value);
+     return true;
+ }
+ // lo raro: el mismo camino de antes entero (subtablas de 4 KiB, guardas de código, y si no, la escritura lenta)
+ __attribute__((noinline)) inline void Write8Raro(uint32_t a, uint8_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write8Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 1u); Write8Slow(a, v); } }
+ __attribute__((noinline)) inline void Write16Raro(uint32_t a, uint16_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write16Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 2u); Write16Slow(a, v); } }
+ __attribute__((noinline)) inline void Write32Raro(uint32_t a, uint32_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write32Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 4u); Write32Slow(a, v); } }
+ __attribute__((noinline)) inline void Write64Raro(uint32_t a, uint64_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write64Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 8u); Write64Slow(a, v); } }
+ __attribute__((noinline)) inline void WriteFloat32Raro(uint32_t a, double v) {
+-    if (!TryWriteGuestScalar(a, ConvertPpcDoubleToSingleBits(v))) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat32Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, ConvertPpcDoubleToSingleBits(v))) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 4u); WriteFloat32Slow(a, v); } }
+ __attribute__((noinline)) inline void WriteFloat64Raro(uint32_t a, double v) {
+     uint64_t bits = 0; std::memcpy(&bits, &v, sizeof(bits));
+-    if (!TryWriteGuestScalar(a, bits)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat64Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, bits)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 8u); WriteFloat64Slow(a, v); } }
+ }  // namespace MemoryInline
+ #else
+ #define MKW_MEM_EN_LINEA
+diff --git a/runtime/include/isa/ppc_isa_quantized.h b/runtime/include/isa/ppc_isa_quantized.h
+index 3b23d50..cf6ef70 100644
+--- a/runtime/include/isa/ppc_isa_quantized.h
++++ b/runtime/include/isa/ppc_isa_quantized.h
+@@ -318,6 +318,7 @@ MKW_PPC_FORCE_INLINE uint8_t* PpcTryGetPsqWritableHostInline(uint32_t addr)
+         if (((addr + 7u) >> MemoryInline::kPageShift) != page) return nullptr;
+         const uintptr_t bias = MemoryInline::g_fullWritablePageBias[page];
+         if (bias == 0) return nullptr;
++        MKW_SUCIA(addr, 8u);   // (W10, §207)
+         return reinterpret_cast<uint8_t*>((bias - 1u) + addr);
+ #else
+         return nullptr;
+diff --git a/runtime/src/hle/gx/gx_copy.cpp b/runtime/src/hle/gx/gx_copy.cpp
+index 3dbdc8d..310a99c 100644
+--- a/runtime/src/hle/gx/gx_copy.cpp
++++ b/runtime/src/hle/gx/gx_copy.cpp
+@@ -122,7 +122,24 @@ PPC_NATIVE_OVERRIDE_VOID(8016fc24, GX__SetDispCopyGamma_8016fc24, (uint32_t g),
+ // Copy Execution
+ // ============================================================================
+ 
++#if defined(MKW_SUCIAS) && defined(__EMSCRIPTEN__)
++#include <emscripten/console.h>
++// (W10 parte B, §240: marcas a la consola del Worker antes de cada espera de la copia a la pantalla; las prende B)
++extern "C" int g_mkwW10Traza = 0;
++#define MKW_W10_MARCA(t) do { if (g_mkwW10Traza) emscripten_console_log(t); } while (0)
++#include <cstdio>
++// (marca con números, para gx_dl.cpp y gx_vertex.cpp)
++extern "C" double g_mkwW10Cuenta[2] = {0, 0};   // (§240: cuántas listas de dibujo y cuántos GXBegin, siempre)
++extern "C" void mkw_w10_marca3(const char* q, uint32_t a, uint32_t b, uint32_t c) {
++    if (q[2] == 'B') g_mkwW10Cuenta[1]++; else if (q[2] == 'C' && q[17] == 0) g_mkwW10Cuenta[0]++;
++    if (!g_mkwW10Traza) return;
++    char t[96]; std::snprintf(t, sizeof t, "[w10m] %s %08x %08x %08x", q, a, b, c); emscripten_console_log(t);
++}
++#else
++#define MKW_W10_MARCA(t) do {} while (0)
++#endif
+ extern "C" void GX__CopyDisp_8016fc38(uint32_t da, uint32_t c) {
++    MKW_W10_MARCA("[w10m] copia: EnsureAuroraFrameActive");
+     EnsureAuroraFrameActive();
+     if (GxWorker::ShouldDefer()) {
+         // The worker drains like the inline path; EndAuroraFrame joins it before the next frame.
+@@ -133,11 +150,14 @@ extern "C" void GX__CopyDisp_8016fc38(uint32_t da, uint32_t c) {
+     } else {
+         // GX copies are FIFO-ordered on hardware. Drain submitted draws before
+         // resolving the EFB so high-level copies see the same contents.
++        MKW_W10_MARCA("[w10m] copia: GXDrawDone");
+         GXDrawDone();
++        MKW_W10_MARCA("[w10m] copia: GXCopyDisp");
+         GXCopyDisp(GuestToHostPtr(da), (GXBool)c);
+         // Present immediately so post-copy draws don't leak into this frame. Join at the DONE phase
+         // (not the cheaper SEALED phase GXDrawDone waits for) because ImGui's draw lists, owned by
+         // Aurora's render worker, replay during encode; aurora_end_frame would join here anyway.
++        MKW_W10_MARCA("[w10m] copia: aurora_wait_for_frame_worker");
+         aurora_wait_for_frame_worker();
+     }
+     ++g_gxFrameCount;
+@@ -145,7 +165,9 @@ extern "C" void GX__CopyDisp_8016fc38(uint32_t da, uint32_t c) {
+     settings_overlay::Draw();
+     // Seal, pace to the VI retrace boundary (Aurora renders the sealed frame
+     // during the wait), and pre-warm the next frame.
++    MKW_W10_MARCA("[w10m] copia: VI_HLE_PresentFrame");
+     VI_HLE_PresentFrame(/*presentedXfb=*/true, /*paceToRetrace=*/true);
++    MKW_W10_MARCA("[w10m] copia: fin");
+ }
+ 
+ PPC_NATIVE_OVERRIDE_VOID(8016fc38, GX__CopyDisp_8016fc38, (uint32_t da, uint32_t c), (da, c));
+diff --git a/runtime/src/hle/gx/gx_dl.cpp b/runtime/src/hle/gx/gx_dl.cpp
+index daceeb7..744d63e 100644
+--- a/runtime/src/hle/gx/gx_dl.cpp
++++ b/runtime/src/hle/gx/gx_dl.cpp
+@@ -1293,7 +1293,14 @@ extern "C" void GxNotifyDisplayListMemoryWrite(uint32_t addr, uint32_t size) {
+     GxGuestWrite::NotifyWrite(addr, size);
+ }
+ 
++#ifdef MKW_SUCIAS
++extern "C" void mkw_w10_marca3(const char* q, uint32_t a, uint32_t b, uint32_t c);   // (§240, gx_copy.cpp)
++#endif
+ extern "C" void GX__CallDisplayList_80172f64(uint32_t listAddr, uint32_t nbytes) {
++#ifdef MKW_SUCIAS
++    mkw_w10_marca3("GXCallDisplayList", listAddr, nbytes, 0);
++    struct MkwW10Fin { uint32_t a; ~MkwW10Fin() { mkw_w10_marca3("GXCallDisplayList fin", a, 0, 0); } } mkwW10Fin{listAddr};
++#endif
+     if (nbytes == 0 || listAddr == 0) return;
+     // List bytes and the arrays it indexes are GPU-side reads, so they are read when the worker runs.
+     if (GxWorker::ShouldDefer()) {
+diff --git a/runtime/src/hle/gx/gx_vertex.cpp b/runtime/src/hle/gx/gx_vertex.cpp
+index 3a8c43b..aafe2a4 100644
+--- a/runtime/src/hle/gx/gx_vertex.cpp
++++ b/runtime/src/hle/gx/gx_vertex.cpp
+@@ -312,7 +312,13 @@ void ServiceDeferredTimingDuringGxWork() {
+ 
+ static void GxBeginImpl(uint32_t t, uint32_t vf, uint32_t nv);
+ 
++#ifdef MKW_SUCIAS
++extern "C" void mkw_w10_marca3(const char* q, uint32_t a, uint32_t b, uint32_t c);   // (§240, gx_copy.cpp)
++#endif
+ extern "C" void GX__Begin_8016f0f0(uint32_t t, uint32_t vf, uint32_t nv) {
++#ifdef MKW_SUCIAS
++    mkw_w10_marca3("GXBegin", t, vf, nv);
++#endif
+     if(IsDisplayListActive()){
+         WriteDisplayListData((u8)(t|vf), 1);
+         WriteDisplayListData((u16)nv, 2);
+diff --git a/runtime/src/hle/os/os_alarm.cpp b/runtime/src/hle/os/os_alarm.cpp
+index ecf8300..89917be 100644
+--- a/runtime/src/hle/os/os_alarm.cpp
++++ b/runtime/src/hle/os/os_alarm.cpp
+@@ -141,9 +141,18 @@ bool IsLikelyCodeAddress(uint32_t addr)
+ }
+ } // namespace
+ 
++#ifdef MKW_SUCIAS
++extern "C" int g_mkwW10SoloPropios;   // (W10 parte B, os_thread.cpp)
++#endif
+ namespace OsHleInternal {
+ bool ProcessAlarmQueue(CpuContext* cpu, int maxToProcess)
+ {
++#ifdef MKW_SUCIAS
++    // (W10 parte B, §240: el Worker del dibujo no atiende las alarmas del juego. Su lista está hecha de objetos que la
++    // memoria pegada de la otra copia pisa con otra cosa —se vio «0x524D4350», el texto RMCP— y recorrerla lo deja dando
++    // vueltas sin soltar el hilo. B solo dibuja: los temporizadores del juego son de la copia que calcula.)
++    if (g_mkwW10SoloPropios) return false;
++#endif
+     if (!cpu || maxToProcess <= 0) {
+         return false;
+     }
+diff --git a/runtime/src/hle/os/os_scheduler.cpp b/runtime/src/hle/os/os_scheduler.cpp
+index ffb0e8c..7aa4483 100644
+--- a/runtime/src/hle/os/os_scheduler.cpp
++++ b/runtime/src/hle/os/os_scheduler.cpp
+@@ -36,8 +36,15 @@ void UnlinkMutexFromThread(uint32_t threadPtr, uint32_t mutexPtr)
+ // Tail-enqueue `thread` on the run queue for `priority` and record which queue
+ // it is linked into. Marking the priority pending is a separate step because
+ // OSWakeupThread runs its fiber bookkeeping between the two.
++#ifdef MKW_SUCIAS
++extern "C" int g_mkwW10SoloPropios;   // (W10 parte B, §207.5; definida en os_thread.cpp)
++#endif
+ void LinkThreadOnRunQueue(uint32_t thread, int32_t priority)
+ {
++#ifdef MKW_SUCIAS
++    // (un hilo de la otra copia del juego, sin fibra aquí, no entra a las colas de listos)
++    if (g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() && !Fiber::GuestFiberManager::HasFiber(thread)) return;
++#endif
+     const uint32_t queueEntry = kThreadQueueArrayAddr + static_cast<uint32_t>(priority) * 8u;
+     const uint32_t tail = ::Memory::Read32(queueEntry + 4u);
+     if (tail == 0) {
+@@ -402,7 +409,14 @@ static void WakeupThreadQueue(CpuContext* ctx, bool allowImmediateReschedule)
+         PopThreadQueueHead(queueAddr, thread);
+ 
+         const uint16_t state = ::Memory::Read16(thread + kThreadStateOffset);
+-        if (ThreadStateIsTerminated(state) || Fiber::GuestFiberManager::IsTerminated(thread)) {
++#ifdef MKW_SUCIAS
++        // (W10 parte B, §207.5: un hilo de la otra copia del juego, sin fibra aquí, no se despierta; os_thread.cpp)
++        const bool ajeno = g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() &&
++                           !Fiber::GuestFiberManager::HasFiber(thread);
++#else
++        constexpr bool ajeno = false;
++#endif
++        if (ajeno || ThreadStateIsTerminated(state) || Fiber::GuestFiberManager::IsTerminated(thread)) {
+             ::Memory::Write32(thread + kThreadQueueOffset, 0);
+             ::Memory::Write32(thread + kThreadNextOffset, 0);
+             ::Memory::Write32(thread + kThreadPrevOffset, 0);
+@@ -497,6 +511,15 @@ extern "C" void OSLockMutex_HLE_801a7ee4(CpuContext* ctx)
+                 ::Memory::Write32(mutexPtr + kMutexCountOffset, count + 1u);
+                 break;
+             }
++#ifdef MKW_SUCIAS
++            // (W10 parte B, §240: el Worker del dibujo corre un solo hilo; un candado que la memoria pegada de la otra
++            // copia trae «tomado» por un hilo de allá nunca se suelta aquí. B lo toma igual: la caja siguiente lo pisa.)
++            if (g_mkwW10SoloPropios) {
++                ::Memory::Write32(mutexPtr + kMutexOwnerOffset, currentThread);
++                ::Memory::Write32(mutexPtr + kMutexCountOffset, 1u);
++                break;
++            }
++#endif
+ 
+             ::Memory::Write32(currentThread + kThreadMutexOffset, mutexPtr);
+             const int32_t priority =
+diff --git a/runtime/src/hle/os/os_thread.cpp b/runtime/src/hle/os/os_thread.cpp
+index d2423e6..f8e53d3 100644
+--- a/runtime/src/hle/os/os_thread.cpp
++++ b/runtime/src/hle/os/os_thread.cpp
+@@ -76,8 +76,20 @@ bool IsThpVideoDecoderEntry(uint32_t entryFunc)
+     return entryFunc == MKW_GADDR(805529A8) || entryFunc == MKW_GADDR(80552A74);
+ }
+ 
++#ifdef MKW_SUCIAS
++// MKW RETRO, W10 parte B (bitácora §207.5): el Worker del dibujo pega la memoria del de la carrera, que trae punteros a
++// hilos que en este programa no tienen fibra (sus montones no reparten igual). Con la marca puesta, un hilo sin fibra
++// no entra a las colas de listos: nunca se lo intenta correr. Sin MKW_SUCIAS esto no existe.
++extern "C" int g_mkwW10SoloPropios = 0;
++#endif
++
+ void InsertThreadIntoQueueByPriority(uint32_t queuePtr, uint32_t threadPtr, int32_t priority)
+ {
++#ifdef MKW_SUCIAS
++    if (g_mkwW10SoloPropios && queuePtr >= kThreadQueueArrayAddr && queuePtr < kThreadQueueArrayAddr + kThreadQueueArrayBytes &&
++        Fiber::GuestFiberManager::IsInitialized() && !Fiber::GuestFiberManager::HasFiber(threadPtr))
++        return;
++#endif
+     ::Memory::Write32(threadPtr + kThreadQueueOffset, queuePtr);
+ 
+     uint32_t insertBefore = ::Memory::Read32(queuePtr);

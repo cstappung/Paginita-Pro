@@ -38,9 +38,12 @@ export function tiempoRkg(b) {
   return min * 60000 + seg * 1000 + mil;
 }
 
-export function crearFantasmaPagina({ lector, modulo, fs, carpetaMod, aviso = () => {}, nota = () => {}, espera = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+export function crearFantasmaPagina({ lector, modulo, fs, carpetaMod, aviso = () => {}, nota = () => {}, espera = ms => new Promise(r => setTimeout(r, ms)),
+                                      // §147 (D12): los fantasmas de la tabla se bajan de a `aLaVez` a la vez (1 = de a uno, como
+                                      // antes) y cada bajada tiene un tope de `topeMs` (una que se cuelga no frena a las demás)
+                                      aLaVez = 3, topeMs = 4000 } = {}) {
   let almacen = null, uid = '';
-  const estado = { subidos: 0, puestos: 0, ultimo: null, error: '' };
+  const estado = { subidos: 0, puestos: 0, ultimo: null, error: '', vencidos: 0, msBajar: 0 };
   const cache = new Map();                                // clave → { bytes, nombre, ms } | null (en esta visita)
   // (Pulsar vive en 0x818…, fuera del alcance del lector de la página: los lee el juego, fantasma_pagina_nativo.cpp)
   const modoActual = () => (modulo._mkw_fantasma_pagina_modo ? modulo._mkw_fantasma_pagina_modo() | 0 : -1);
@@ -93,13 +96,27 @@ export function crearFantasmaPagina({ lector, modulo, fs, carpetaMod, aviso = ()
     let elegido = cache.get(k);
     if (elegido === undefined) {
       elegido = null;
+      let vencido = false;
+      const t0 = Date.now();
       try {
-        for (const fila of await almacen.top(k, 10)) {
-          const bytes = await almacen.fantasmaBajar(k, fila.uid).catch(() => null);
-          if (bytes && bytes.length <= MAX_RKG && tiempoRkg(bytes) > 0) { elegido = { bytes, nombre: fila.nombre || 'Piloto', ms: tiempoRkg(bytes), uid: fila.uid }; break; }
+        // §147: en orden de tiempo, pero con los siguientes ya pidiéndose (antes, de a uno: con 10 en la tabla y pocos
+        // con fantasma, 10 idas y vueltas en fila y el fantasma llegaba tarde). Se queda el mejor que baja bien.
+        const filas = await almacen.top(k, 10);
+        const bajar = fila => {
+          let reloj;
+          const tope = new Promise(r => { reloj = setTimeout(() => { vencido = true; estado.vencidos++; r(null); }, topeMs); });
+          return Promise.race([almacen.fantasmaBajar(k, fila.uid).catch(() => null), tope]).finally(() => clearTimeout(reloj));
+        };
+        const pedidas = [];
+        const pedirHasta = n => { while (pedidas.length < Math.min(n, filas.length)) pedidas.push(bajar(filas[pedidas.length])); };
+        for (let i = 0; i < filas.length; i++) {
+          pedirHasta(i + Math.max(1, aLaVez));
+          const bytes = await pedidas[i];
+          if (bytes && bytes.length <= MAX_RKG && tiempoRkg(bytes) > 0) { elegido = { bytes, nombre: filas[i].nombre || 'Piloto', ms: tiempoRkg(bytes), uid: filas[i].uid }; break; }
         }
       } catch (e) { estado.error = String(e.code || e.message); }
-      cache.set(k, elegido);
+      estado.msBajar = Date.now() - t0;
+      if (elegido || !vencido) cache.set(k, elegido);        // (si alguno se venció y no hubo fantasma, la próxima vez se reintenta)
     }
     if (!elegido || pistaActual() !== pista || modoActual() !== modo) { modulo._mkw_fantasma_pagina_poner?.(0, 0, 0); return null; }
     modulo.HEAPU8.set(elegido.bytes, modulo._mkw_fantasma_pagina_bufer());

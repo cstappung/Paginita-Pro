@@ -1,0 +1,188 @@
+diff --git a/runtime/include/guest_abi/memory_access.h b/runtime/include/guest_abi/memory_access.h
+index 881c537..349bf8b 100644
+--- a/runtime/include/guest_abi/memory_access.h
++++ b/runtime/include/guest_abi/memory_access.h
+@@ -22,6 +22,21 @@ extern "C" {
+     void GX_HLE_FIFO_WriteBurst(const uint8_t* data, uint32_t sizeBytes);
+ }
+ 
++// MKW RETRO, W10 de la etapa 1 del plan v4 (bitácora §207): con -DMKW_SUCIAS cada escritura del juego en la memoria de
++// la Wii anota su página de 4 KiB en g_mkwSucias (un byte por página de los 4 GiB de direcciones: 1 MiB). Así el
++// Worker de la carrera sabe qué páginas mandar al del dibujo sin comparar 152 MiB en cada cuadro. Como un relé de
++// enclavamiento por circuito: se dispara cuando pasa corriente y queda marcado hasta que alguien lo repone. Sin la
++// marca no es nada (solo el programa aparte de MKW_W10_COMPILAR=1). La tabla y el resto viven en web/juego/w10_nativo.cpp.
++// Junto con H6 (bitácora §219): la marca va también en cada escritura por la ventana fija (FijaEscribe, los rangos y
++// el par de psq que salen de la ventana).
++#ifdef MKW_SUCIAS
++extern "C" uint8_t g_mkwSucias[1u << 20];
++#define MKW_SUCIA(a, n) (g_mkwSucias[static_cast<uint32_t>(a) >> 12] = 1,                          g_mkwSucias[static_cast<uint32_t>((a) + (n) - 1u) >> 12] = 1)
++extern "C" void mkw_sucias_rango(uint32_t desde, uint32_t largo);
++#else
++#define MKW_SUCIA(a, n) ((void)0)
++#endif
++
+ namespace MemoryInline {
+ #if defined(_WIN32)
+ #define MKW_MEMORY_FORCE_INLINE __forceinline
+@@ -256,6 +271,9 @@ MKW_MEMORY_NO_INLINE inline uint8_t* ResolveRangeTabla(uint32_t guestStart, uint
+     const uintptr_t bias = needsWrite ? g_fullWritablePageBias[page] : g_fullReadablePageBias[page];
+     if (bias == 0) return nullptr;
+     if (needsWrite && needsRead && g_fullReadablePageBias[page] != bias) return nullptr;
++#ifdef MKW_SUCIAS
++    if (needsWrite) mkw_sucias_rango(guestStart, length);   // (W10, §207)
++#endif
+     return reinterpret_cast<uint8_t*>((bias - 1u) + guestStart);
+ }
+ #endif
+@@ -281,7 +299,12 @@ MKW_MEMORY_FORCE_INLINE uint8_t* ResolveRangeHost(uint32_t base, int32_t minOffs
+         // mismo que usaría el camino revisado, acceso por acceso: el resultado no cambia. Si no → null, como antes.
+         // Las tablas solo cambian dentro de llamadas al runtime, y el traductor corta los rangos en cada llamada.
+ #if MKW_MOTOR_FIJA
+-        if (FijaDentro(guestStart, length)) [[likely]] return FijaPtr(guestStart);   // (H6, §211)
++        if (FijaDentro(guestStart, length)) [[likely]] {   // (H6, §211)
++#ifdef MKW_SUCIAS
++            if (needsWrite) mkw_sucias_rango(guestStart, length);   // (W10, §207: el rango entero, por si se escribe)
++#endif
++            return FijaPtr(guestStart);
++        }
+ #if MKW_MOTOR_FIJA_RANGO_FUERA
+         return ResolveRangeTabla(guestStart, length, needsRead, needsWrite);   // lo de antes, fuera de línea
+ #endif
+@@ -291,6 +314,9 @@ MKW_MEMORY_FORCE_INLINE uint8_t* ResolveRangeHost(uint32_t base, int32_t minOffs
+         const uintptr_t bias = needsWrite ? g_fullWritablePageBias[page] : g_fullReadablePageBias[page];
+         if (bias == 0) return nullptr;
+         if (needsWrite && needsRead && g_fullReadablePageBias[page] != bias) return nullptr;
++#ifdef MKW_SUCIAS
++        if (needsWrite) mkw_sucias_rango(guestStart, length);   // (W10, §207: el rango entero, por si se escribe)
++#endif
+         return reinterpret_cast<uint8_t*>((bias - 1u) + guestStart);
+ #else
+         (void)needsWrite;
+@@ -430,6 +456,7 @@ __attribute__((always_inline)) inline T FijaLee(uint32_t a) {
+ }
+ template <typename T>
+ __attribute__((always_inline)) inline void FijaEscribe(uint32_t a, T v) {
++    MKW_SUCIA(a, sizeof(T));   // (W10, §207)
+     if constexpr (sizeof(T) == 1) *FijaPtr(a) = static_cast<uint8_t>(v);
+     else StoreGuestOrder<T>(FijaPtr(a), v);
+ }
+@@ -553,6 +580,7 @@ MKW_MEMORY_FORCE_INLINE bool TryWriteGuestScalar(uint32_t address, T value) {
+     } else if (!TryGetWritablePointerFast(address, sizeof(T), ptr)) [[unlikely]] {
+         return false;
+     }
++    MKW_SUCIA(address, sizeof(T));   // (W10, §207)
+     if constexpr (sizeof(T) == 1) {
+         *ptr = static_cast<uint8_t>(value);
+     } else {
+@@ -873,24 +901,25 @@ __attribute__((always_inline)) inline bool TryWriteGuestScalarRapido(uint32_t ad
+     const uintptr_t bias = g_fullWritablePageBias[page];
+     if (bias == 0) [[unlikely]] return false;
+     uint8_t* ptr = reinterpret_cast<uint8_t*>((bias - 1u) + address);
++    MKW_SUCIA(address, sizeof(T));   // (W10, §207)
+     if constexpr (sizeof(T) == 1) *ptr = static_cast<uint8_t>(value);
+     else StoreGuestOrder<T>(ptr, value);
+     return true;
+ }
+ // lo raro: el mismo camino de antes entero (subtablas de 4 KiB, guardas de código, y si no, la escritura lenta)
+ __attribute__((noinline)) inline void Write8Raro(uint32_t a, uint8_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write8Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 1u); Write8Slow(a, v); } }
+ __attribute__((noinline)) inline void Write16Raro(uint32_t a, uint16_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write16Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 2u); Write16Slow(a, v); } }
+ __attribute__((noinline)) inline void Write32Raro(uint32_t a, uint32_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write32Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 4u); Write32Slow(a, v); } }
+ __attribute__((noinline)) inline void Write64Raro(uint32_t a, uint64_t v) {
+-    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); Write64Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, v)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 8u); Write64Slow(a, v); } }
+ __attribute__((noinline)) inline void WriteFloat32Raro(uint32_t a, double v) {
+-    if (!TryWriteGuestScalar(a, ConvertPpcDoubleToSingleBits(v))) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat32Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, ConvertPpcDoubleToSingleBits(v))) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 4u); WriteFloat32Slow(a, v); } }
+ __attribute__((noinline)) inline void WriteFloat64Raro(uint32_t a, double v) {
+     uint64_t bits = 0; std::memcpy(&bits, &v, sizeof(bits));
+-    if (!TryWriteGuestScalar(a, bits)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat64Slow(a, v); } }
++    if (!TryWriteGuestScalar(a, bits)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); MKW_SUCIA(a, 8u); WriteFloat64Slow(a, v); } }
+ #if MKW_MOTOR_FIJA
+ // H6 (§211): en línea queda solo la ventana fija (FijaLee/FijaEscribe); fuera de la ventana, una función aparte con el
+ // camino de antes entero (la tabla de páginas, la caché bloqueada, E/S, y si no, lo lento). Para escribir, los *Raro.
+diff --git a/runtime/include/isa/ppc_isa_quantized.h b/runtime/include/isa/ppc_isa_quantized.h
+index 9fdec1f..c7fc2c4 100644
+--- a/runtime/include/isa/ppc_isa_quantized.h
++++ b/runtime/include/isa/ppc_isa_quantized.h
+@@ -318,12 +318,13 @@ MKW_PPC_FORCE_INLINE uint8_t* PpcTryGetPsqWritableHostInline(uint32_t addr)
+         // MKW web (M1, §170): el primer intento de Memory::Write64 (TryWriteGuestScalar<uint64_t>): los 8 bytes en la
+         // misma página de 1 MiB y esa página sin código; si no, null y Memory::Write64 hace todo lo de antes
+ #if MKW_MOTOR_FIJA
+-        if (MemoryInline::FijaDentro(addr, 8u)) return MemoryInline::FijaPtr(addr);   // (H6, §211)
++        if (MemoryInline::FijaDentro(addr, 8u)) { MKW_SUCIA(addr, 8u); return MemoryInline::FijaPtr(addr); }   // (H6 §211, W10 §207)
+ #endif
+         const uint32_t page = addr >> MemoryInline::kPageShift;
+         if (((addr + 7u) >> MemoryInline::kPageShift) != page) return nullptr;
+         const uintptr_t bias = MemoryInline::g_fullWritablePageBias[page];
+         if (bias == 0) return nullptr;
++        MKW_SUCIA(addr, 8u);   // (W10, §207)
+         return reinterpret_cast<uint8_t*>((bias - 1u) + addr);
+ #else
+         return nullptr;
+diff --git a/runtime/src/hle/os/os_scheduler.cpp b/runtime/src/hle/os/os_scheduler.cpp
+index ffb0e8c..fb82235 100644
+--- a/runtime/src/hle/os/os_scheduler.cpp
++++ b/runtime/src/hle/os/os_scheduler.cpp
+@@ -36,8 +36,15 @@ void UnlinkMutexFromThread(uint32_t threadPtr, uint32_t mutexPtr)
+ // Tail-enqueue `thread` on the run queue for `priority` and record which queue
+ // it is linked into. Marking the priority pending is a separate step because
+ // OSWakeupThread runs its fiber bookkeeping between the two.
++#ifdef MKW_SUCIAS
++extern "C" int g_mkwW10SoloPropios;   // (W10 parte B, §207.5; definida en os_thread.cpp)
++#endif
+ void LinkThreadOnRunQueue(uint32_t thread, int32_t priority)
+ {
++#ifdef MKW_SUCIAS
++    // (un hilo de la otra copia del juego, sin fibra aquí, no entra a las colas de listos)
++    if (g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() && !Fiber::GuestFiberManager::HasFiber(thread)) return;
++#endif
+     const uint32_t queueEntry = kThreadQueueArrayAddr + static_cast<uint32_t>(priority) * 8u;
+     const uint32_t tail = ::Memory::Read32(queueEntry + 4u);
+     if (tail == 0) {
+@@ -402,7 +409,14 @@ static void WakeupThreadQueue(CpuContext* ctx, bool allowImmediateReschedule)
+         PopThreadQueueHead(queueAddr, thread);
+ 
+         const uint16_t state = ::Memory::Read16(thread + kThreadStateOffset);
+-        if (ThreadStateIsTerminated(state) || Fiber::GuestFiberManager::IsTerminated(thread)) {
++#ifdef MKW_SUCIAS
++        // (W10 parte B, §207.5: un hilo de la otra copia del juego, sin fibra aquí, no se despierta; os_thread.cpp)
++        const bool ajeno = g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() &&
++                           !Fiber::GuestFiberManager::HasFiber(thread);
++#else
++        constexpr bool ajeno = false;
++#endif
++        if (ajeno || ThreadStateIsTerminated(state) || Fiber::GuestFiberManager::IsTerminated(thread)) {
+             ::Memory::Write32(thread + kThreadQueueOffset, 0);
+             ::Memory::Write32(thread + kThreadNextOffset, 0);
+             ::Memory::Write32(thread + kThreadPrevOffset, 0);
+diff --git a/runtime/src/hle/os/os_thread.cpp b/runtime/src/hle/os/os_thread.cpp
+index d2423e6..f8e53d3 100644
+--- a/runtime/src/hle/os/os_thread.cpp
++++ b/runtime/src/hle/os/os_thread.cpp
+@@ -76,8 +76,20 @@ bool IsThpVideoDecoderEntry(uint32_t entryFunc)
+     return entryFunc == MKW_GADDR(805529A8) || entryFunc == MKW_GADDR(80552A74);
+ }
+ 
++#ifdef MKW_SUCIAS
++// MKW RETRO, W10 parte B (bitácora §207.5): el Worker del dibujo pega la memoria del de la carrera, que trae punteros a
++// hilos que en este programa no tienen fibra (sus montones no reparten igual). Con la marca puesta, un hilo sin fibra
++// no entra a las colas de listos: nunca se lo intenta correr. Sin MKW_SUCIAS esto no existe.
++extern "C" int g_mkwW10SoloPropios = 0;
++#endif
++
+ void InsertThreadIntoQueueByPriority(uint32_t queuePtr, uint32_t threadPtr, int32_t priority)
+ {
++#ifdef MKW_SUCIAS
++    if (g_mkwW10SoloPropios && queuePtr >= kThreadQueueArrayAddr && queuePtr < kThreadQueueArrayAddr + kThreadQueueArrayBytes &&
++        Fiber::GuestFiberManager::IsInitialized() && !Fiber::GuestFiberManager::HasFiber(threadPtr))
++        return;
++#endif
+     ::Memory::Write32(threadPtr + kThreadQueueOffset, queuePtr);
+ 
+     uint32_t insertBefore = ::Memory::Read32(queuePtr);

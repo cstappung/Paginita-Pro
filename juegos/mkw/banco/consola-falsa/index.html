@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consola de mentira</title>
+</head>
+<body>
+<h1>Consola de mentira <span id="quien"></span></h1>
+<p>V7 (plan v4, etapa E6, bitácora §235): una consola de la sala <b>sin el juego</b>. Entra a la sala por la misma malla
+  WebRTC que las páginas de verdad (el buzón falso del banco, BroadcastChannel) y corre el mismo lockstep
+  (<code>web/navegador/lockstep.mjs</code>) a 60 cuadros por segundo, mandando botones grabados (acelerar y el volante
+  yendo y viniendo, cada una con su ritmo). No corre la carrera ni compara la huella: solo pone su carga en la red y en
+  el lockstep de las demás, como un jugador más. Con <code>&amp;redMala=ms,±ms,%</code> su red es la de una casa
+  cualquiera (lo que le llega; <code>,ida</code> = también lo que manda).</p>
+<pre id="estado">esperando…</pre>
+<script type="module">
+import { crearConsolaFalsa } from './consola.mjs';
+const p = new URLSearchParams(location.search);
+document.getElementById('quien').textContent = p.get('uid') || '';
+window.consola = crearConsolaFalsa({ sala: p.get('sala'), uid: p.get('uid'), sincro: (p.get('sincro') || '').split(',').filter(Boolean),
+  arbitro: p.get('arbitro') !== '0', soloCarga: p.get('soloCarga') === '1' });
+if (p.get('arrancar') === '1') window.consola.arrancar();   // (solo el banco: una sala de puras consolas de mentira)
+setInterval(() => { document.getElementById('estado').textContent = JSON.stringify(window.consola.resumen(), null, 1); }, 1000);
+</script>
+</body>
+</html>

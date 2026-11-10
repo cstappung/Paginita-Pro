@@ -1,0 +1,52 @@
+diff --git a/runtime/include/guest_abi/dispatch.h b/runtime/include/guest_abi/dispatch.h
+index 1762fca..20dd53e 100644
+--- a/runtime/include/guest_abi/dispatch.h
++++ b/runtime/include/guest_abi/dispatch.h
+@@ -302,9 +302,28 @@ struct IsPureTypedNativeCpuCall<T, std::void_t<decltype(T::kPure)>> : std::bool_
+ // Direct-mapped thread-local memo in front of the sorted registry lookup every bctrl performs;
+ // a miss just re-runs the sorted lookup. 512 entries (12 KiB) covers the per-frame indirect
+ // working set while staying L1/L2 resident, unlike 4096 which would thrash L2. Must stay a
+-// power of two, the index masks with (size - 1).
++// power of two (see IndirectDispatchCacheIndex).
+ inline constexpr size_t kIndirectDispatchCacheEntries = 512;
+ 
++// MKW RETRO, W19 de la etapa 0 del plan v4 (bitácora §195). Adaptado de KartPad (Chris Sotraidis,
++// https://github.com/chrissotraidis/wiicompiled, commit 20ad85d956038365bd584c01a4bcf37e2cf02eea, GPL-3.0; lo
++// encontró DriftDroid). El hash de Fibonacci mezcla todos los bits de la dirección en los bits ALTOS del producto,
++// así que el casillero se toma de arriba. Con la máscara de los bits bajos (lo de antes) el memo era un caché directo
++// sobre los bits 2-10 de la dirección: dos destinos a 2 KiB de distancia caían en el mismo casillero.
++// MKW_MOTOR_MEMO_ALTO=0 (MKW_CFLAGS_EXTRA="-DMKW_MOTOR_MEMO_ALTO=0") = el índice de antes, para comparar.
++#ifndef MKW_MOTOR_MEMO_ALTO
++#define MKW_MOTOR_MEMO_ALTO 1
++#endif
++MKW_PPC_FORCE_INLINE constexpr size_t IndirectDispatchCacheIndex(uint32_t address) noexcept {
++#if MKW_MOTOR_MEMO_ALTO
++    return static_cast<size_t>(((address >> 2) * 2654435761u) >> 23);
++#else
++    return static_cast<size_t>(((address >> 2) * 2654435761u) & (kIndirectDispatchCacheEntries - 1));
++#endif
++}
++static_assert(kIndirectDispatchCacheEntries == (size_t{1} << (32 - 23)),
++              "IndirectDispatchCacheIndex's shift must match the memo size");
++
+ // Namespace-scope `inline thread_local`, not function-local `static thread_local`, to avoid a
+ // thread-static init epoch check on every bctrl (same as g_currentCpuContext in guest_abi/cpu_context.h).
+ struct IndirectResolvedDispatchMemoEntry {
+@@ -336,7 +355,7 @@ public:
+         }
+ 
+         auto& cached = g_indirectResolvedDispatchMemo[
+-            ((address >> 2) * 2654435761u) & (kIndirectDispatchCacheEntries - 1)];
++            IndirectDispatchCacheIndex(address)];
+         if (cached.valid && cached.address == address) {
+             return cached.info;
+         }
+@@ -356,7 +375,7 @@ public:
+         }
+ 
+         auto& cached = g_indirectRawDispatchMemo[
+-            ((address >> 2) * 2654435761u) & (kIndirectDispatchCacheEntries - 1)];
++            IndirectDispatchCacheIndex(address)];
+         if (cached.valid && cached.address == address) {
+             return cached.record;
+         }

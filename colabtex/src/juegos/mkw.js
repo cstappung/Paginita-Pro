@@ -100,16 +100,15 @@ const almacenPartidas = {
    marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo y la cilindrada. §74: la copa es
    una copa existente (4 carreras: el anfitrión la elige en el juego) y la playlist es una lista que el anfitrión arma
    en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). M20: `cpu` = el nivel de la
-   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §103: `conexion=cloudflare` = el anfitrión prendió
-   «🛰 Todo por Cloudflare» (todo por el repetidor TURN; sin eso, nada en la dirección). Los nombres no van en la
-   dirección: se le mandan al marco. */
-export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, base = 0, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", relevo = false }) {
+   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §236: `conexion` lleva el modo elegido
+   (host, cloudflare u oracle; el antiguo `relevo` = cloudflare). Los nombres se le mandan al marco por mensaje. */
+export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, base = 0, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", conexion, relevo = false }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
   q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
   q.set("cpu", MKW_NIVEL[nivel] ? nivel : "maximo");
-  if (relevo === true) q.set("conexion", "cloudflare");
+  q.set("conexion", conexionMkw(conexion, relevo));
   // §110: cuántos de `sincro` estaban al empezar la copa (los demás llegaron después y se suman a una carrera)
   if (base > 0 && base < sincro.length) q.set("base", String(base));
   if (privado) q.set("privado", privado);
@@ -351,7 +350,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     frame.hidden = false;
     verMarco();
     frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, base: est.sincroBase, jefe: jefeMarco,
-                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, relevo: est.relevo === true });
+                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, conexion: est.conexion, relevo: est.relevo === true });
     frame.focus();
     conectarNube();
     // apenas la sala del juego exista (el marco la arma al cargar), los nombres y el anfitrión
@@ -492,7 +491,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     const tira = corre && enSala();
     if (!manda || corre) abierto.cambiar = false;
     if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.relevo, est.ultimaTabla,
+    const conexion = conexionMkw(est.conexion, est.relevo);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, conexion, est.ultimaTabla,
       est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe, conex]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
@@ -502,8 +502,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     vest.classList.toggle("jugando", tira);
     const estilo = est.estilo === "playlist" ? "playlist" : "copa", cc = MKW_CC[est.cc] ? est.cc : "c150", nivel = MKW_NIVEL[est.nivel] ? est.nivel : "maximo";
     const puede = manda && !corre, cupo = Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX), cpus = Math.max(0, MKW_SINCRO_MAX - js.length);
-    const relevo = est.relevo === true;
-    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())}${relevo ? " · 🛰 Cloudflare" : ""}`;
+    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())} · ${MKW_CONEXION[conexion]}`;
     const nom = j => escapeHtml(j.nombre || "Piloto");
     const cara = (j, tam) => avatar ? avatar(j, tam) : `<span class="jg2-inicial" style="width:${tam}px;height:${tam}px" aria-hidden="true">${escapeHtml((j.nombre || "?").charAt(0).toUpperCase())}</span>`;
     // el «⋯» de cada piloto, para el anfitrión y en las filas de los otros (con la copa andando, solo «Echar»)
@@ -555,8 +554,10 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           <div class="jg2-op"><span>Cilindrada</span>${seg("cc", cc, MKW_CC, v => `data-cc="${v}"`)}<small>${AYUDA_CC[cc]}</small></div>
           <div class="jg2-op"><span>CPU</span><div class="jg2-seg" role="group" aria-label="CPU">${Object.entries(MKW_NIVEL).map(([k, txt]) =>
             `<button type="button" data-nivel="${k}" data-foco="cpu-${k}" aria-pressed="${nivel === k}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_NIVEL[nivel]}</small></div>
-          <div class="jg2-op"><span>Conexión</span><div class="jg2-seg" role="group" aria-label="Conexión">${Object.entries(MKW_CONEXION).map(([k, txt]) =>
-            `<button type="button" class="jg-mkw-conexion" data-relevo="${k}" data-foco="con-${k}" aria-pressed="${(k === "cloudflare") === relevo}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_CONEXION[relevo ? "cloudflare" : "directa"]}</small></div>
+          <div class="jg2-op"><span>Conexión</span><div class="jg2-seg jg2-conexion" role="group" aria-label="Conexión">${Object.entries(MKW_CONEXION).map(([k, txt]) =>
+            `<span class="jg2-con-op"><button type="button" class="jg-mkw-conexion" data-relevo="${k}" data-foco="con-${k}"
+              aria-pressed="${k === conexion}" aria-describedby="jg2-con-${k}">${escapeHtml(txt)}</button>
+              <span class="jg2-con-tip" id="jg2-con-${k}" role="tooltip">${escapeHtml(AYUDA_CONEXION[k])}</span></span>`).join("")}</div></div>
           <button type="button" class="jg2-cerrar" data-cerrar data-foco="cerrar">Cerrar</button>
         </div>` : "";
       const ult = est.ultimaTabla;
@@ -602,7 +603,11 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (b.classList.contains("jg-mkw-modo")) { if (!elegido) anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); return; }
     if (b.dataset.cc) { if (!elegido) anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); return; }
     if (b.dataset.nivel) { if (!elegido) anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); return; }
-    if (b.dataset.relevo) { if (!elegido) anota({ t: "ajuste", uid, k: "relevo", v: b.dataset.relevo === "cloudflare" }); return; }
+    if (b.dataset.relevo) {
+      b.focus();   // también en el celular, donde un toque no siempre da foco al botón
+      if (!elegido) anota({ t: "ajuste", uid, k: "relevo", v: b.dataset.relevo });
+      return;
+    }
     if (b.classList.contains("jg-mkw-dar")) { b.disabled = true; abierto.menu = ""; anota({ t: "anfitrion", uid, a: b.dataset.a }); return; }
     // §87: echar (el anfitrión): sale al momento y no vuelve a esta sala; con la copa andando su kart sigue sin nadie
     if (b.classList.contains("jg-mkw-echa")) {
@@ -750,10 +755,14 @@ const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", nor
   dificil: "Más rápidas, y persiguen al que va primero.", maximo: "Todo al tope: el kart más rápido, sin frenarse nunca.",
   intenso: "El Hard AI de Retro Rewind: siempre a la velocidad máxima del juego. Casi imposible de ganar.",
   imposible: "Injusto a propósito: más rápidas que cualquier kart (un 15 % sobre el tope) y aceleran 1,5 veces más." };
-/* §103: cómo se conectan los pilotos (como el relevo de BT3: lo excepcional lo prende el anfitrión, nunca solo) */
-const MKW_CONEXION = { directa: "Directa", cloudflare: "🛰 Todo por Cloudflare" };
-const AYUDA_CONEXION = { directa: "Cada piloto se conecta directo con los demás: lo normal, con el ping más bajo. Si a alguien no le conecta, prueben «🛰 Todo por Cloudflare».",
-  cloudflare: "Todo pasa por el repetidor de Cloudflare. Solo si les cuesta conectarse o las carreras se cortan: un poco más de ping." };
+/* §236: las salas viejas solo guardaban si se usaba el repetidor de Cloudflare. */
+const MKW_CONEXION = { host: "Host: un jugador", cloudflare: "Host + repetidor Cloudflare", oracle: "Servidor Oracle" };
+const conexionMkw = (conexion, relevo) => Object.hasOwn(MKW_CONEXION, conexion) ? conexion : relevo === true ? "cloudflare" : "host";
+const AYUDA_CONEXION = {
+  host: "Un jugador arbitra desde su PC. La conexión directa suele dar menos demora. Depende de que los jugadores puedan conectarse entre sí.",
+  cloudflare: "Un jugador arbitra y el repetidor de Cloudflare ayuda si falla la conexión directa. Agrega demora y consume unos 35 MB por jugador por hora.",
+  oracle: "Un servidor propio en Santiago arbitra y le quita esa carga a los jugadores. Depende de la conexión a Santiago. Si no responde, la sala vuelve al host.",
+};
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
    una sola vez. Todo cuelga de `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de juegos.html
@@ -787,6 +796,13 @@ const ESTILO_VEST = `
 .jg-mkw2 .jg2-seg button:hover{background:#ffffff14}
 .jg-mkw2 .jg2-seg button[aria-pressed=true]{background:#ffd34d;color:#1b1400;font-weight:700;box-shadow:none;border:0}
 .jg-mkw2 .jg2-seg button[data-cc=azar]{margin-left:10px}
+.jg-mkw2 .jg2-conexion{position:relative}
+.jg-mkw2 .jg2-con-tip{display:none;position:absolute;inset:100% 0 auto;z-index:2;padding:9px 12px;border-radius:8px;background:#101a34;color:#fff;box-shadow:0 3px 10px #0009;font-size:.9rem}
+.jg-mkw2 .jg2-con-op:focus-within .jg2-con-tip{display:block}
+@media(hover:hover){
+  .jg-mkw2 .jg2-conexion:has(.jg2-con-op:hover) .jg2-con-tip{display:none}
+  .jg-mkw2 .jg2-conexion:has(.jg2-con-op:hover) .jg2-con-op:hover .jg2-con-tip{display:block}
+}
 .jg-mkw2 .jg2-cerrar{justify-self:end;border:1px solid #ffffff26;background:transparent;color:#eef2ff;border-radius:9px;padding:4px 12px;font:inherit;cursor:pointer}
 .jg-mkw2 .jg2-nota{margin:0}
 .jg-mkw2 .jg2-ultima{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border:1px solid #ffd34d40;background:#ffd34d0f;border-radius:12px;padding:8px 12px;font-size:.92rem}

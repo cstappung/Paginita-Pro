@@ -1,0 +1,164 @@
+diff --git a/lib/dolphin/gx/GXDispList.cpp b/lib/dolphin/gx/GXDispList.cpp
+index e39cc10..f65bd30 100644
+--- a/lib/dolphin/gx/GXDispList.cpp
++++ b/lib/dolphin/gx/GXDispList.cpp
+@@ -6,6 +6,100 @@
+ 
+ #include <cstring>
+ 
++#include "../../gfx/common.hpp"
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
++#ifndef EMSCRIPTEN_KEEPALIVE
++#define EMSCRIPTEN_KEEPALIVE
++#endif
++
++// MKW RETRO W31 (§259): el instrumento de la prueba barata de «guardar la traducción de las listas de dibujo».
++// Resumen: cada lista que el juego llama con GXCallDisplayList se reconoce por su dirección; se guarda la huella de sus
++// bytes y la de las matrices (pnMtx y la proyección) con que se llamó. Si la lista y las matrices son las de la última
++// vez, es «repetida» (los bytes) o «quieta» (además las matrices: un objeto que no se movió). Modos (mkw_web_w31):
++//   0 = apagado (lo de siempre: una sola comparación por llamada); 1 = contar (huellas y tiempo de cada lista);
++//   2 = techo de los quietos (sus dibujos se saltan: la imagen pierde esos objetos, solo para medir lo MÁS que
++//       ganaría repetirlos); 3 = techo de las repetidas; 4 = techo de todas las listas (los registros se leen igual).
++// Los registros de estado (BP/CP/XF) se decodifican siempre: el estado de GX queda como debe y nada cambia de receta.
++namespace aurora::gx { bool g_w31SaltarDibujos = false; uint32_t g_w31DibujosLista = 0; bool g_w31EnLista = false; }
++namespace {
++int s_w31Modo = 0;
++uint32_t s_w31Imagen = 0;            // imágenes terminadas desde el último reinicio (las cuenta end_frame)
++double s_w31Dato[16] = {};           // los contadores (mkw_web_w31_dato)
++struct W31Entrada {
++  const void* p = nullptr;
++  uint32_t n = 0;
++  uint64_t hBytes = 0, hMtx = 0;
++  uint32_t imagen = 0;
++};
++W31Entrada s_w31Tabla[4096];
++inline double w31Ahora() {
++#ifdef __EMSCRIPTEN__
++  return emscripten_get_now();
++#else
++  return 0.0;
++#endif
++}
++} // namespace
++extern "C" {
++// k = -1: reiniciar los contadores; 0..4: el modo. Devuelve el modo de antes.
++EMSCRIPTEN_KEEPALIVE int mkw_web_w31(int k) {
++  const int antes = s_w31Modo;
++  if (k < 0) { for (auto& d : s_w31Dato) d = 0; s_w31Imagen = 0; return antes; }
++  s_w31Modo = k > 4 ? 0 : k;
++  return antes;
++}
++// 0 imágenes, 1 llamadas, 2 KB de listas, 3 repetidas, 4 quietas, 5 ms en las listas, 6 ms en las repetidas,
++// 7 ms en las quietas, 8 dibujos saltados, 9 el modo, 10 dibujos dentro de listas, 11 dibujos de las quietas,
++// 12 ms de las huellas (lo que costaría reconocerlas), 13 dibujos de las repetidas
++EMSCRIPTEN_KEEPALIVE double mkw_web_w31_dato(int k) {
++  if (k == 0) return s_w31Imagen;
++  if (k == 9) return s_w31Modo;
++  return k >= 0 && k < 16 ? s_w31Dato[k] : 0.0;
++}
++void mkw_w31_fin_imagen() { if (s_w31Modo) ++s_w31Imagen; }
++}
++
++// Procesa una lista de dibujo ya fuera del FIFO; con W31 prendido la cuenta y, en los modos techo, se salta sus dibujos.
++static void w31_procesar(const u8* data, u32 nbytes) {
++  if (s_w31Modo == 0) LIKELY {
++    aurora::gx::fifo::process_all(data, nbytes, true);
++    return;
++  }
++  using aurora::gx::g_gxState;
++  const double t0 = w31Ahora();
++  const uint64_t hBytes = aurora::xxh3_hash_s(data, nbytes);
++  const uint64_t hMtx = aurora::xxh3_hash_s(g_gxState.pnMtx.data(), sizeof(g_gxState.pnMtx),
++                                             aurora::xxh3_hash_s(&g_gxState.proj, sizeof(g_gxState.proj)));
++  const uintptr_t clave = reinterpret_cast<uintptr_t>(data);
++  auto& e = s_w31Tabla[((clave >> 5) ^ (clave >> 17) ^ nbytes) & 4095];
++  // «la última vez» = la imagen anterior o esta misma (una lista llamada dos veces en una imagen cuenta también)
++  const bool reciente = e.p == data && e.n == nbytes && (e.imagen == s_w31Imagen || e.imagen + 1 == s_w31Imagen);
++  const bool repetida = reciente && e.hBytes == hBytes;   // los mismos bytes
++  const bool quieta = repetida && e.hMtx == hMtx;          // y las mismas matrices: un objeto que no se movió
++  const double t1 = w31Ahora();
++  const bool saltar = (s_w31Modo == 2 && quieta) || (s_w31Modo == 3 && repetida) || s_w31Modo == 4;
++  aurora::gx::g_w31SaltarDibujos = saltar;
++  aurora::gx::g_w31EnLista = true;
++  const uint32_t dib0 = aurora::gx::g_w31DibujosLista;
++  aurora::gx::fifo::process_all(data, nbytes, true);
++  aurora::gx::g_w31SaltarDibujos = false;
++  aurora::gx::g_w31EnLista = false;
++  const double t2 = w31Ahora();
++  const uint32_t dibujos = aurora::gx::g_w31DibujosLista - dib0;
++  const double t3 = w31Ahora();
++  e.p = data; e.n = nbytes; e.hBytes = hBytes; e.hMtx = hMtx; e.imagen = s_w31Imagen;
++  s_w31Dato[1] += 1;
++  s_w31Dato[2] += nbytes / 1024.0;
++  s_w31Dato[5] += t2 - t1;
++  s_w31Dato[10] += dibujos;
++  s_w31Dato[12] += (t1 - t0) + (t3 - t2);
++  if (repetida) { s_w31Dato[3] += 1; s_w31Dato[6] += t2 - t1; s_w31Dato[13] += dibujos; }
++  if (quieta) { s_w31Dato[4] += 1; s_w31Dato[7] += t2 - t1; s_w31Dato[11] += dibujos; }
++  if (saltar) s_w31Dato[8] += dibujos;
++}
++
+ static __GXData_struct sSavedGXData;
+ 
+ extern "C" {
+@@ -66,7 +160,7 @@ void GXCallDisplayList(const void* data, u32 nbytes) {
+ 
+   // Decode the display list immediately while its borrowed resources are valid.
+   aurora::gx::fifo::drain();
+-  aurora::gx::fifo::process_all(static_cast<const u8*>(data), nbytes, true);
++  w31_procesar(static_cast<const u8*>(data), nbytes);   // MKW RETRO W31 (§259)
+ }
+ 
+ void GXCallDisplayListLE(const void* data, u32 nbytes) {
+diff --git a/lib/gfx/common.cpp b/lib/gfx/common.cpp
+index 61dc159..f890857 100644
+--- a/lib/gfx/common.cpp
++++ b/lib/gfx/common.cpp
+@@ -29,6 +29,8 @@
+ 
+ #include "tracy/Tracy.hpp"
+ 
++extern "C" void mkw_w31_fin_imagen();   // MKW RETRO W31 (§259), en lib/dolphin/gx/GXDispList.cpp
++
+ namespace aurora::gfx {
+ static Module Log("aurora::gfx");
+ 
+@@ -1503,6 +1505,7 @@ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
+   end_pipeline_frame();
+   if (advanceFrame) {
+     ++g_frameIndex;
++    mkw_w31_fin_imagen();   // MKW RETRO W31 (§259): una imagen más para el instrumento de las listas
+   }
+ }
+ 
+diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
+index 0596aca..82daa8f 100644
+--- a/lib/gx/command_processor.cpp
++++ b/lib/gx/command_processor.cpp
+@@ -23,6 +23,9 @@
+ #include <optional>
+ #include <vector>
+ 
++// MKW RETRO W31 (§259): el instrumento de las listas de dibujo (lib/dolphin/gx/GXDispList.cpp)
++namespace aurora::gx { extern bool g_w31SaltarDibujos; extern uint32_t g_w31DibujosLista; extern bool g_w31EnLista; }
++
+ namespace aurora::gx::fifo {
+ static Module Log("aurora::gx::fifo");
+ 
+@@ -2207,6 +2210,14 @@ static bool handle_draw(u8 cmd, const u8* data, u32& pos, u32 size, bool bigEndi
+     handle_draw_overrun(cmd, vtxCount, vtxSize, totalVtxBytes, data, pos, size);
+     return false;
+   }
++  // MKW RETRO W31 (§259): contar los dibujos de las listas y, en los modos techo, saltarlos (solo para medir)
++  if (g_w31EnLista) UNLIKELY {
++    ++g_w31DibujosLista;
++    if (g_w31SaltarDibujos) {
++      pos += totalVtxBytes;
++      return true;
++    }
++  }
+ 
+ 
+   if (!has_complete_primitive(prim, vtxCount)) {

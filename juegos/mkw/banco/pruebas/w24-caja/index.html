@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La caja para la red</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>La caja para la red: <span>W24, el instrumento que midió la puerta</span></h1>
+<p>Prueba <code>web/navegador/w24-caja.mjs</code> (bitácora §227) <b>sin el juego</b>, con una memoria de mentira: que la
+  caja de W10 achicada para la red (la resta contra lo que el otro lado ya tiene, el código de ceros y deflate) vuelva
+  idéntica del otro lado y que la cuenta de lo medido diga bien los Mbit/s. W24 quedó «matado» (la caja de verdad pide
+  20–27 Mbit/s por teléfono, la puerta era 3): esto queda como el instrumento con que se midió.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { restarCaja, sumarCaja, ceros, sinCeros, empaquetar, desempaquetar, crearCuenta } from '/web/navegador/w24-caja.mjs';
+import { armarCaja, aplicarCaja, huellaDe, MEM1, MEM2 } from '/web/navegador/w10.mjs';
+
+const { ok, fin } = prueba('w24-caja', 'La caja para la red (sin el juego)');
+try {
+  const memA = new Uint8Array(MEM1 + MEM2), memB = new Uint8Array(MEM1 + MEM2);
+  let semilla = 7; const azar = () => (semilla = (semilla * 1103515245 + 12345) >>> 0) >>> 16;
+  // la memoria de los dos lados igual al empezar (como después de la foto entera)
+  for (let k = 0; k < 4096 * 64; k++) memA[k] = memB[k] = azar() & 255;
+  let iguales = true, crudo = 0, viaja = 0, viajaZ = 0;
+  for (let cuadro = 1; cuadro <= 30; cuadro++) {
+    // el PC cambia poco: números de 4 bytes que se mueven de a poco (como posiciones)
+    const tramos = [];
+    for (let j = 0; j < 40; j++) {
+      const lugar = ((azar() % (4096 * 60)) & ~7), b = new Uint8Array(32);
+      for (let q = 0; q < 32; q += 4) {
+        const x = new DataView(memA.buffer, lugar + q, 4).getFloat32(0, false) || 1;
+        new DataView(b.buffer).setFloat32(q, x * (1 + (azar() % 7 - 3) * 1e-4), false);
+      }
+      tramos.push([0x80000000 + lugar, b]);
+    }
+    const caja = armarCaja(tramos);
+    const p1 = await empaquetar(memB, caja, caja.length, cuadro, 1), p3 = await empaquetar(memB, caja, caja.length, cuadro, 3);
+    crudo += caja.length; viaja += p1.length; viajaZ += p3.length;
+    const { caja: vuelta, cuadro: c } = await desempaquetar(memB, cuadro % 2 ? p1 : p3);
+    if (c !== cuadro || vuelta.length !== caja.length || vuelta.some((x, k) => x !== caja[k])) iguales = false;
+    aplicarCaja(memA, caja); aplicarCaja(memB, vuelta);
+  }
+  ok('30 cuadros: cada caja desarmada es idéntica a la original (resta + ceros, y + deflate)', iguales);
+  ok('y las dos memorias quedan iguales (la huella)', huellaDe(memA) === huellaDe(memB));
+  ok('la resta + ceros achica la caja de mentira', viaja < crudo, `${crudo} → ${viaja} B (deflate encima: ${viajaZ} B)`);
+  const z = new Uint8Array([0, 0, 0, 5, 0, ...new Array(600).fill(0), 9]);
+  ok('el código de ceros: corridas largas y ceros sueltos vuelven igual', sinCeros(ceros(z), z.length).every((x, k) => x === z[k]));
+  const m0 = new Uint8Array(MEM1 + MEM2); m0[16] = 0xAA;
+  const c0 = armarCaja([[0x80000010, new Uint8Array([0xAB])]]);
+  ok('la resta es XOR contra lo que el otro lado tiene, y deshacerla da lo original',
+     restarCaja(m0, c0)[8] === (0xAB ^ 0xAA) && sumarCaja(m0, restarCaja(m0, c0))[8] === 0xAB);
+  const cu = crearCuenta(); cu.c.cajas = 2; cu.c.cruda = 2 * 100 * 1024;
+  cu.sumar(0, 2 * 100 * 1024, 0); cu.sumar(3, 2 * 40 * 1024, 2);
+  const r = cu.resumen();
+  ok('la cuenta: 100 KB por cuadro = 49,2 Mbit/s a 60; 40 KB = ×2,5 y 19,7 Mbit/s',
+     Math.abs(r.modos[0].mbitPor60 - 49.15) < 0.1 && Math.abs(r.modos[3].razon - 2.5) < 1e-9 && Math.abs(r.modos[3].mbitPor60 - 19.66) < 0.1,
+     JSON.stringify(r.modos.map(m => [m.nombre, m.mbitPor60.toFixed(2)])));
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

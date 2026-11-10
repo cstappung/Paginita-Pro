@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <wasm_simd128.h>
 
 static inline uint64_t bits64(double x) { uint64_t u; memcpy(&u, &x, 8); return u; }
 static inline double de64(uint64_t u) { double x; memcpy(&x, &u, 8); return x; }
@@ -38,6 +39,35 @@ float fmaf_rapida(float a, float b, float c) {
         s = de64(u);
     }
     return (float)s;                         /* el segundo redondeo, ahora sin doble redondeo */
+}
+
+/* fmaf_punto (§181, N14): lo mismo, más barato. Si el exacto x = a*b + c y s = su redondeo a double quedan en
+ * lados distintos de un punto medio m entre dos float, m (que cabe en un double: 25 bits) estaría entre x y s, más
+ * cerca de x que s, y el redondeo a double habría dado m y no s. Así que el doble redondeo solo puede fallar si s
+ * cae JUSTO en un punto medio de float: los 29 bits de abajo de su mantisa valen 1000…0. Solo ese caso (y lo que no
+ * es un float normal al bajar: subnormales, ceros, infinitos, NaN) va por la versión con TwoSum. */
+float fmaf_punto(float a, float b, float c) {
+    double s = (double)a * (double)b + (double)c;
+    uint64_t u = bits64(s);
+    uint32_t e = (uint32_t)(u >> 52) & 0x7FF;
+    if ((u & 0x1FFFFFFFull) != 0x10000000ull && e - (1023 - 126) <= 253u) return (float)s;
+    return fmaf_rapida(a, b, c);
+}
+
+/* fmaf_par_simd (§181, N14): dos fmaf_punto a la vez con SIMD de wasm (128 bits = dos double), como ps_madd, que
+ * hace las dos mitades del par juntas. Si alguna de las dos cae en un punto medio o fuera del rango normal, las dos
+ * van por la versión de a una. */
+void fmaf_par_simd(const float *a, const float *b, const float *c, float *o) {
+    v128_t s = wasm_f64x2_add(wasm_f64x2_mul(wasm_f64x2_promote_low_f32x4(wasm_v128_load64_zero(a)),
+                                             wasm_f64x2_promote_low_f32x4(wasm_v128_load64_zero(b))),
+                              wasm_f64x2_promote_low_f32x4(wasm_v128_load64_zero(c)));
+    v128_t medio = wasm_i64x2_eq(wasm_v128_and(s, wasm_i64x2_splat(0x1FFFFFFF)), wasm_i64x2_splat(0x10000000));
+    v128_t e = wasm_v128_and(wasm_u64x2_shr(s, 52), wasm_i64x2_splat(0x7FF));
+    v128_t fuera = wasm_v128_or(wasm_i64x2_lt(e, wasm_i64x2_splat(1023 - 126)), wasm_i64x2_gt(e, wasm_i64x2_splat(1023 + 127)));
+    if (wasm_v128_any_true(wasm_v128_or(medio, fuera))) {
+        o[0] = fmaf_rapida(a[0], b[0], c[0]); o[1] = fmaf_rapida(a[1], b[1], c[1]); return;
+    }
+    wasm_v128_store64_lane(o, wasm_f32x4_demote_f64x2_zero(s), 0);
 }
 
 /* ---------- double: fmadd ---------- */
@@ -84,18 +114,20 @@ static float float_azar(int emin, int emax) {
 }
 
 /* ---------- resultados para la página ---------- */
-static long gCasosD, gMalosD, gCasosF, gMalosF, gEmpatesD, gMalosEmpD;
-static double gMsMuslD, gMsRapD, gMsMuslF, gMsRapF, gMsSueltaD;
+static long gCasosD, gMalosD, gCasosF, gMalosF, gEmpatesD, gMalosEmpD, gMalosP, gEmpatesF, gMalosEmpF;
+static double gMsMuslD, gMsRapD, gMsMuslF, gMsRapF, gMsSueltaD, gMsPuntoF;
+static long gMalosS; static double gMsFlujoRap, gMsFlujoPunto, gMsFlujoSimd;
 static char gEjemplo[200] = "";
 EMSCRIPTEN_KEEPALIVE double dato(int i) {
-    double v[] = {gCasosD, gMalosD, gCasosF, gMalosF, gEmpatesD, gMalosEmpD, gMsMuslD, gMsRapD, gMsMuslF, gMsRapF, gMsSueltaD};
+    double v[] = {gCasosD, gMalosD, gCasosF, gMalosF, gEmpatesD, gMalosEmpD, gMsMuslD, gMsRapD, gMsMuslF, gMsRapF, gMsSueltaD,
+                  gMalosP, gEmpatesF, gMalosEmpF, gMsPuntoF, gMalosS, gMsFlujoRap, gMsFlujoPunto, gMsFlujoSimd};
     return v[i];
 }
 EMSCRIPTEN_KEEPALIVE const char *ejemplo(void) { return gEjemplo; }
 
 #define N 4000000
 static double A[4096], B[4096], C[4096];
-static float Af[4096], Bf[4096], Cf[4096];
+static float Af[4096], Bf[4096], Cf[4096], Of[4096];
 static volatile double gSumidero;            /* para que el compilador no borre los cálculos de las mediciones */
 
 EMSCRIPTEN_KEEPALIVE void corre(int millones) {
@@ -134,11 +166,36 @@ EMSCRIPTEN_KEEPALIVE void corre(int millones) {
     for (long i = 0; i < n; i++) {
         float a = float_azar(-40, 40), b = float_azar(-40, 40);
         float c = (azar() & 1) ? float_azar(-40, 40) : -(a * b) * (1 + (float)(int)(azar() % 201 - 100) * 0x1p-23f);
-        float r1 = fmaf(a, b, c), r2 = fmaf_rapida(a, b, c);
+        float r1 = fmaf(a, b, c), r2 = fmaf_rapida(a, b, c), r3 = fmaf_punto(a, b, c);
         gCasosF++;
         if (bits32(r1) != bits32(r2)) {
             if (!gMalosF && !gMalosD) snprintf(gEjemplo, sizeof gEjemplo, "float: fmaf(%a,%a,%a) musl=%a rapida=%a", a, b, c, r1, r2);
             gMalosF++;
+        }
+        { float pa[2] = {a, b}, pb[2] = {b, a}, pc[2] = {c, c}, po[2];   /* el par (a,b,c) y (b,a,c) */
+          fmaf_par_simd(pa, pb, pc, po); if (bits32(po[0]) != bits32(r1) || bits32(po[1]) != bits32(r1)) gMalosS++; }
+        if (bits32(r1) != bits32(r3)) {
+            if (!gMalosP) snprintf(gEjemplo, sizeof gEjemplo, "punto: fmaf(%a,%a,%a) musl=%a punto=%a", a, b, c, r1, r3);
+            gMalosP++;
+        }
+    }
+    /* 3b. empates de float fabricados (§181): c elegido para que a*b + c caiga en un punto medio m entre dos float, o
+     * a un pelo (c corrido ±1 ulp): justo el caso que fmaf_punto manda por el camino lento, y sus vecinos */
+    for (long i = 0; i < n / 2; i++) {
+        float a = float_azar(-30, 30), b = float_azar(-30, 30);
+        double p = (double)a * (double)b;
+        float r = (float)(p * (1.0 + (double)(int)(azar() % 2001 - 1000) * 0x1p-12));   /* un float cerca de p */
+        double m = (double)r + (double)(nextafterf(r, INFINITY) - r) / 2;              /* el punto medio de arriba */
+        float c = (float)(m - p);
+        int k = (int)(azar() % 3) - 1;
+        if (k) c = nextafterf(c, k > 0 ? INFINITY : -INFINITY);
+        float r1 = fmaf(a, b, c), r3 = fmaf_punto(a, b, c);
+        { float pa[2] = {a, a}, pb[2] = {b, b}, pc[2] = {c, c}, po[2];
+          fmaf_par_simd(pa, pb, pc, po); if (bits32(po[0]) != bits32(r1) || bits32(po[1]) != bits32(r1)) gMalosS++; }
+        gEmpatesF++;
+        if (bits32(r1) != bits32(r3)) {
+            if (!gMalosEmpF) snprintf(gEjemplo, sizeof gEjemplo, "empate float: fmaf(%a,%a,%a) musl=%a punto=%a", a, b, c, r1, r3);
+            gMalosEmpF++;
         }
     }
     /* 4. velocidad: 4096 tríos repetidos, N operaciones encadenadas de cada versión */
@@ -151,6 +208,11 @@ EMSCRIPTEN_KEEPALIVE void corre(int millones) {
     float sf;
     t = emscripten_get_now(); sf = 0; for (int i = 0; i < N; i++) sf += fmaf(Af[i & 4095], Bf[i & 4095], Cf[i & 4095]); gSumidero = sf; gMsMuslF = emscripten_get_now() - t;
     t = emscripten_get_now(); sf = 0; for (int i = 0; i < N; i++) sf += fmaf_rapida(Af[i & 4095], Bf[i & 4095], Cf[i & 4095]); gSumidero = sf; gMsRapF = emscripten_get_now() - t;
+    t = emscripten_get_now(); sf = 0; for (int i = 0; i < N; i++) sf += fmaf_punto(Af[i & 4095], Bf[i & 4095], Cf[i & 4095]); gSumidero = sf; gMsPuntoF = emscripten_get_now() - t;
+    /* 5. flujo (§181): las operaciones independientes, como en una matriz; N operaciones de cada una, en pares */
+    t = emscripten_get_now(); for (int k = 0; k < N / 4096; k++) for (int i = 0; i < 4096; i++) Of[i] = fmaf_rapida(Af[i], Bf[i], Cf[(i + k) & 4095]); gSumidero = Of[7]; gMsFlujoRap = emscripten_get_now() - t;
+    t = emscripten_get_now(); for (int k = 0; k < N / 4096; k++) for (int i = 0; i < 4096; i++) Of[i] = fmaf_punto(Af[i], Bf[i], Cf[(i + k) & 4095]); gSumidero = Of[7]; gMsFlujoPunto = emscripten_get_now() - t;
+    t = emscripten_get_now(); for (int k = 0; k < N / 4096; k++) for (int i = 0; i < 4096; i += 2) fmaf_par_simd(Af + i, Bf + i, Cf + ((i + k) & 4094), Of + i); gSumidero = Of[7]; gMsFlujoSimd = emscripten_get_now() - t;
 }
 
 int main(void) { return 0; }

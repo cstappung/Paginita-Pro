@@ -36,6 +36,12 @@ if (ej) nota('primer caso distinto: ' + ej);
 const ns = ms => ms * 1e6 / 4e6;
 ok('double rápida más veloz que musl', ns(d(7)) < ns(d(6)), `musl ${ns(d(6)).toFixed(2)} ns, rápida ${ns(d(7)).toFixed(2)} ns, sin fusionar ${ns(d(10)).toFixed(2)} ns`);
 ok('float rápida más veloz que musl', ns(d(9)) < ns(d(8)), `musl ${ns(d(8)).toFixed(2)} ns, rápida ${ns(d(9)).toFixed(2)} ns`);
+// §181 (N14): la FMA «punto medio» (solo el empate de float va por el camino largo) y la de a pares con SIMD
+ok('float «punto medio»: mismos bits que musl', d(11) === 0, `${d(2).toLocaleString('es')} casos, ${d(11)} distintos`);
+ok('float «punto medio»: empates fabricados', d(13) === 0, `${d(12).toLocaleString('es')} casos, ${d(13)} distintos`);
+ok('float de a pares con SIMD: mismos bits que musl', d(15) === 0, `${(d(2) + d(12)).toLocaleString('es')} pares, ${d(15)} distintos`);
+ok('con operaciones sueltas (como una matriz), «punto medio» más veloz que la rápida de hoy', ns(d(17)) < ns(d(16)),
+   `rápida ${ns(d(16)).toFixed(2)} ns, punto medio ${ns(d(17)).toFixed(2)} ns, de a pares con SIMD ${ns(d(18)).toFixed(2)} ns`);
 nota('presupuesto: aunque el juego hiciera un millón de FMA por cuadro, a ~5 ns son 5 ms de los 16,7 ms del cuadro');
 fin();
 </script>

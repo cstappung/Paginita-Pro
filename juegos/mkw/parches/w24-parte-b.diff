@@ -1,0 +1,264 @@
+# W24 (bitácora §227), la parte B que NO se compiló ni probó: la puerta 1 no pasó (la caja comprimida pide 20–27 Mbit/s
+# por teléfono, la puerta era 3). Guardada por si W10 la parte B vuelve: el bucle propio del dibujante en el hilo
+# principal (modo 11) + parches/motor-w24.diff (el planificador solo con el hilo principal). Aplicar con git apply.
+diff --git a/web/juego/w10_nativo.cpp b/web/juego/w10_nativo.cpp
+index 6570c13..c2ba27e 100644
+--- a/web/juego/w10_nativo.cpp
++++ b/web/juego/w10_nativo.cpp
+@@ -202,7 +202,11 @@ void juntarCaja() {
+ }  // namespace
+ 
+ extern "C" int g_mkwW10SoloPropios;   // (os_thread.cpp del runtime, con MKW_SUCIAS)
++// W24 (§227): 11 = el dibujante con su PROPIO bucle (el teléfono que solo dibuja): ver func_8023AE60, abajo
++namespace { bool g_bucle = false; }
+ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_w10_modo(int m) {
++    g_bucle = m == 11;
++    if (g_bucle) m = 8;   // (lo demás, como el dibujante de §207.4)
+     g_modo = m >= 0 && m <= 10 ? m : 0;
+     g_base = g_modo >= 5 && g_modo <= 7 ? g_modo - 4 : g_modo <= 4 ? g_modo : g_modo == 8 ? 0 : 2;
+     g_sinPresentar = (g_modo >= 5 && g_modo <= 7) || g_modo == 9;
+@@ -226,7 +230,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE double mkw_w10_dato(int i) {
+ 
+ extern "C" void func_8023AEAC_traducida(CpuContext* ctx);   // EGG::SceneManager::draw
+ extern "C" void func_805635E4(CpuContext* ctx);             // ScnMgr::SwitchScnRoot
++namespace { uint32_t s_r3Dibujo = 0, s_r3Copia = 0, s_r4Copia = 0, s_r5Copia = 0; }
+ extern "C" void func_8023AEAC(CpuContext* ctx) {
++    s_r3Dibujo = ctx->gpr[3];   // (W24: el SceneManager, para el bucle propio del dibujante)
+     if (g_modo <= 0 || g_dibujante) { func_8023AEAC_traducida(ctx); return; }
+     preparar();
+     g_c.cuadros++;
+@@ -263,16 +269,65 @@ extern "C" void func_8023AEAC(CpuContext* ctx) {
+ 
+ extern "C" void func_80244268_traducida(CpuContext* ctx);   // EGG::XfbManager::copyEFB (GXCopyDisp y el giro de los XFB)
+ extern "C" void func_80244268(CpuContext* ctx) {
+-    if (!g_sinPresentar) { func_80244268_traducida(ctx); return; }
++    if (!g_sinPresentar) {
++        s_r3Copia = ctx->gpr[3]; s_r4Copia = ctx->gpr[4]; s_r5Copia = ctx->gpr[5];   // (W24: con qué se llama)
++        func_80244268_traducida(ctx); return;
++    }
+     g_c.sinCopia++;
+ }
+ 
+ // la parte B: el Worker del dibujo no calcula: pega las cajas del Worker de la carrera (EGG::SceneManager::calc, 0x8023AE60:
+ // calcCurrentScene y calcCurrentFader) y deja que el bucle del juego dibuje y presente lo pegado
+ extern "C" void func_8023AE60_traducida(CpuContext* ctx);
++// W24 (§227), la parte B resuelta de otra forma (§207.4, punto 1): con el modo 11 el dibujante NO vuelve al bucle del
++// juego durante la carrera. Aquí mismo, en el hilo principal, da vueltas: pegar las cajas del cuadro, dibujar la escena
++// (EGG::SceneManager::draw, con el mismo SceneManager que el juego le pasó la última vez) y copiar la imagen a la
++// pantalla (XfbManager::copyEFB, que presenta). Ningún otro hilo del juego corre (g_mkwW24Solo, os_thread.cpp): sus
++// datos son los del PC que calcula y sus fibras, las de este programa. Si el hilo principal se durmiera, os_sleep.cpp
++// anota dónde. mkw_w24_salir() = volver (al terminar la carrera).
++extern "C" uint32_t g_mkwW24Solo;
++extern "C" uint32_t g_mkwW24Dormidas;
++namespace { int s_w24Salir = 0; double s_w24Vueltas = 0, s_w24MsDibujo = 0, s_w24MsPegar = 0; }
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_w24_salir() { s_w24Salir = 1; }
++// 0 vueltas, 1 ms dibujar (suma), 2 ms pegar/esperar (suma), 3 veces que se durmió el hilo principal, 4 ¿en el bucle?
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_w24_dato(int i) {
++    const double v[] = {s_w24Vueltas, s_w24MsDibujo, s_w24MsPegar, static_cast<double>(g_mkwW24Dormidas),
++                        static_cast<double>(g_mkwW24Solo != 0)};
++    return i >= 0 && i < 5 ? v[i] : -1;
++}
++static void bucleSoloDibujo(CpuContext* ctx) {
++    const uint32_t lr = ctx->lr, r1 = ctx->gpr[1], r3 = ctx->gpr[3], r4 = ctx->gpr[4], r5 = ctx->gpr[5];
++    g_mkwW24Solo = Memory::Read32(0x800000E4u);   // (el hilo que corre ahora: el principal)
++    if (!g_mkwW24Solo) g_mkwW24Solo = 0x803478B0u;
++    std::printf("[w24] bucle propio del dibujo: hilo %08x, SceneManager %08x, copyEFB(%08x, %08x)\n", g_mkwW24Solo,
++                s_r3Dibujo, s_r3Copia, s_r4Copia);
++    s_w24Salir = 0;
++    while (!s_w24Salir) {
++        double t0 = emscripten_get_now();
++        g_c.tramos += w10_pegar_js();
++        g_c.cuadros++;
++        double t1 = emscripten_get_now();
++        s_w24MsPegar += t1 - t0;
++        ctx->gpr[3] = s_r3Dibujo; ctx->lr = lr;
++        func_8023AEAC_traducida(ctx);
++        if (s_r3Copia) {
++            ctx->gpr[1] = r1; ctx->gpr[3] = s_r3Copia; ctx->gpr[4] = s_r4Copia; ctx->gpr[5] = s_r5Copia; ctx->lr = lr;
++            func_80244268_traducida(ctx);
++        }
++        ctx->gpr[1] = r1;
++        s_w24MsDibujo += emscripten_get_now() - t1;
++        s_w24Vueltas++;
++        if (static_cast<uint32_t>(s_w24Vueltas) % 600 == 0)
++            std::printf("[w24] %.0f vueltas: dibujar %.2f ms, pegar/esperar %.2f ms por vuelta; se durmió %u veces\n",
++                        s_w24Vueltas, s_w24MsDibujo / s_w24Vueltas, s_w24MsPegar / s_w24Vueltas, g_mkwW24Dormidas);
++    }
++    g_mkwW24Solo = 0;
++    ctx->lr = lr; ctx->gpr[1] = r1; ctx->gpr[3] = r3; ctx->gpr[4] = r4; ctx->gpr[5] = r5;
++}
+ extern "C" void func_8023AE60(CpuContext* ctx) {
+     if (!g_dibujante) { func_8023AE60_traducida(ctx); return; }
+     preparar();
++    if (g_bucle) { bucleSoloDibujo(ctx); return; }
+     g_c.cuadros++;
+     const double t0 = emscripten_get_now();
+     g_c.tramos += w10_pegar_js();
+diff --git a/web/navegador/prueba-w10-dos.mjs b/web/navegador/prueba-w10-dos.mjs
+index da44564..8d7fc6e 100644
+--- a/web/navegador/prueba-w10-dos.mjs
++++ b/web/navegador/prueba-w10-dos.mjs
+@@ -87,6 +87,9 @@ try {
+     ok(`cuadro ${n}: B pegó cajas sin tramos malos`, (e.b?.w10?.cuadros ?? 0) > 100 && (e.b?.w10?.malos ?? 1) === 0,
+        `B pegó ${e.b?.w10?.cuadros} cuadros (${e.b?.w10?.cajas} cajas, ${((e.b?.w10?.bytes ?? 0) / 1048576).toFixed(1)} MB), malos ${e.b?.w10?.malos}; A mandó ${e.a?.w10?.mandadas}`);
+     ok(`cuadro ${n}: sin errores de sombreadores ni de la página`, !errores.length, errores.slice(0, 2).join(' | '));
++    // W24 (§227, ?bucle=1): el bucle propio del dibujante y dónde se durmió el hilo principal, si se durmió
++    if (e.b?.w24) console.log(`  B (W24): ${JSON.stringify(e.b.w24)}`);
++    for (const l of await pagina.evaluate(() => window.mkwRegistro.filter(l => l.includes('[w24]')).slice(0, 30))) console.log('  ' + l);
+     if (llego) {
+       const pa = await pagina.locator('#lienzoA').screenshot(), pb = await pagina.locator('#lienzoB').screenshot();
+       writeFileSync(path.join(carpeta, `dos-A-${n}.png`), pa); writeFileSync(path.join(carpeta, `dos-B-${n}.png`), pb);
+diff --git a/web/navegador/trabajador-juego.mjs b/web/navegador/trabajador-juego.mjs
+index 8e3851a..e969224 100644
+--- a/web/navegador/trabajador-juego.mjs
++++ b/web/navegador/trabajador-juego.mjs
+@@ -216,9 +216,10 @@ export async function correr({ parametros, origen = '', lienzo, canal }) {
+     const W10 = modoW10(P.get('w10'));
+     let w10Prendido = false;
+     if (W10 >= 8 && M._mkw_w10_modo && canal.w10puerto) {
+-      w10 = W10 === 8 ? crearDibujanteB(M, canal.w10puerto, { sinHilos: P.get('w10Hilos') === '1' }) : crearEnlaceA(M, canal.w10puerto);
++      // (11 = W24, §227: el dibujante con su propio bucle de solo dibujar)
++      w10 = W10 === 8 || W10 === 11 ? crearDibujanteB(M, canal.w10puerto, { sinHilos: P.get('w10Hilos') === '1' }) : crearEnlaceA(M, canal.w10puerto);
+       estado.w10 = w10.estado;
+-      nota(`W10: ${W10 === 8 ? 'Worker del dibujo' : 'Worker de la carrera' + (W10 === 10 ? ' (también dibuja)' : '')}`);
++      nota(`W10: ${W10 === 8 || W10 === 11 ? 'Worker del dibujo' + (W10 === 11 ? ' (bucle propio, W24)' : '') : 'Worker de la carrera' + (W10 === 10 ? ' (también dibuja)' : '')}`);
+     }
+ 
+     // ¿Hay carrera andando? (Raceinfo con etapa < 4) y los cuadros de lógica
+@@ -226,6 +227,8 @@ export async function correr({ parametros, origen = '', lienzo, canal }) {
+       let en = false, n = null;
+       try { const ri = lector.u32(RACEINFO); if (ri) { const et = lector.u32(ri + 0x28); en = et < 4; if (et <= 2) n = lector.u32(ri + 0x20); } } catch {}
+       estado.enCarrera = en; estado.logica = n; estado.cuadros = M._mkw_web_cuadros();
++      if (M._mkw_w24_dato) estado.w24 = { vueltas: M._mkw_w24_dato(0), msDibujo: M._mkw_w24_dato(1) / Math.max(1, M._mkw_w24_dato(0)),
++        msPegar: M._mkw_w24_dato(2) / Math.max(1, M._mkw_w24_dato(0)), dormidas: M._mkw_w24_dato(3), enBucle: M._mkw_w24_dato(4) };
+       if (w10 && en && !w10Prendido) { w10Prendido = true; M._mkw_w10_modo(W10); nota(`W10: modo ${W10} con la carrera andando`); }
+     }, 100);
+     if (SIN_TOPE && M._mkw_prisa) {
+diff --git a/web/navegador/w10-dos.mjs b/web/navegador/w10-dos.mjs
+index b1a6378..1091571 100644
+--- a/web/navegador/w10-dos.mjs
++++ b/web/navegador/w10-dos.mjs
+@@ -22,7 +22,7 @@ window.mkwEstadoA = { fase: 'página' }; window.mkwEstadoB = { fase: 'página' }
+ 
+ const parametrosDe = (quien) => {
+   const p = new URLSearchParams(location.search);
+-  p.delete('verifica'); p.set('w10', quien === 'A' ? (VERIFICA ? '10' : '9') : '8');
++  p.delete('verifica'); p.delete('bucle'); p.set('w10', quien === 'A' ? (VERIFICA ? '10' : '9') : (P.get('bucle') === '1' ? '11' : '8'));   // (W24 §227: ?bucle=1)
+   if (quien === 'B') { p.delete('alto'); p.delete('tramo'); p.delete('huellas'); }
+   p.set('audio', 'viejo');   // (sin sonido: esta prueba mide la carrera y la imagen)
+   return '?' + p.toString();
+diff --git a/web/navegador/solo-dibuja.mjs b/web/navegador/solo-dibuja.mjs
+new file mode 100644
+index 0000000..1f0991a
+--- /dev/null
++++ b/web/navegador/solo-dibuja.mjs
+@@ -0,0 +1,109 @@
++// W24 del plan de rendimiento v4 (bitácora §227): «el teléfono solo dibuja». Opción del jugador, APAGADA por omisión.
++//
++// Qué es: en la sala, un teléfono que no alcanza a simular 60 cuadros por segundo deja de calcular la carrera. Un PC de la
++// sala corre la consola de ese teléfono por él (con lockstep, como hoy) y cada cuadro le manda la caja de W10 (§207: la
++// memoria de la Wii que cambió, ~90 KB). El teléfono pega la caja y solo dibuja, nítido a su propia resolución; manda
++// solo sus botones. Como un tablero remoto que solo tiene las lámparas: el PLC está en la sala de control y por el cable
++// llegan las lecturas, y de vuelta van los pulsadores.
++//
++// Este archivo es la parte PURA de la página (sin el juego; banco `solo-dibuja`):
++//   - quiereSoloDibuja(parametros, graficos): ?soloDibuja=0|1 manda; si no, lo guardado en Gráficos (mkw.graficos);
++//   - subidaMbit(kbPorCuadro): lo que el PC tiene que subir por cada teléfono a 60 cuadros por segundo;
++//   - elegirCalculador(consolas, {mbit}): el PC más capaz (como la autoridad por capacidad de §179): no un teléfono, que
++//     se oiga, que su subida alcance y con el mayor margen por cuadro; null si ninguno sirve;
++//   - crearVigia({plazoMs}): si las cajas dejan de llegar, el teléfono vuelve SOLO a simular (camino normal) y no lo
++//     reintenta en esa carrera;
++//   - crearDemora(): la demora del botón a la imagen: el teléfono sella cada botón con su hora, la caja dice qué botón
++//     ya entró en la carrera y al dibujarla se resta;
++//   - decidir(...): qué hace este teléfono ahora («dibuja» o «simula») y por qué (el motivo va al registro y al panel).
++
++// --- la opción ---
++export const CLAVE_OPCION = 'soloDibuja';
++// ?soloDibuja=1 / =0 gana; sin el parámetro vale lo guardado en Gráficos (apagado si nunca se tocó)
++export function quiereSoloDibuja(parametros, graficos = {}) {
++  const p = parametros?.get?.(CLAVE_OPCION);
++  if (p === '1') return true;
++  if (p === '0') return false;
++  return graficos?.soloDibuja === true;
++}
++
++// --- la red ---
++// Mbit/s que pide una caja de kb KB por cuadro a 60 cuadros por segundo (+ 5 % de cabeceras de WebRTC: SCTP/DTLS/UDP)
++export const subidaMbit = (kbPorCuadro, cuadros = 60) => kbPorCuadro * 1024 * 8 * cuadros * 1.05 / 1e6;
++
++// consolas = [{ uid, telefono, oido, margenMs, subidaMbit, calculaPor = [] }]: margenMs = lo que le sobra por cuadro a
++// 60 (16,7 ms − su trabajo; §179 lo lleva en el informe del lockstep), subidaMbit = lo que puede subir (medido), calculaPor
++// = los teléfonos que ya atiende (cada uno le come la mitad del margen de la carrera sin dibujo, §207: ×2–3,5 sin dibujar)
++export const MARGEN_MIN_MS = 4;   // menos que esto, el PC frenaría a la sala si corre otra consola más
++export function elegirCalculador(consolas = [], { mbit = 0, costoMs = 4 } = {}) {
++  const sirven = consolas.filter(c => !c.telefono && c.oido !== false &&
++    (c.subidaMbit ?? 0) >= mbit * ((c.calculaPor?.length ?? 0) + 1) &&
++    (c.margenMs ?? 0) - costoMs * ((c.calculaPor?.length ?? 0) + 1) >= MARGEN_MIN_MS);
++  if (!sirven.length) return null;
++  sirven.sort((a, b) => (b.margenMs - costoMs * (b.calculaPor?.length ?? 0)) - (a.margenMs - costoMs * (a.calculaPor?.length ?? 0)) ||
++                        (b.subidaMbit - a.subidaMbit) || String(a.uid).localeCompare(String(b.uid)));
++  return sirven[0].uid;
++}
++
++// --- la vigía: si no llegan cajas, volver a simular ---
++// estado: 'esperando' (todavía no llegó la primera), 'bien', 'caida' (no llegó nada en plazoMs: vuelve a simular y no
++// lo reintenta hasta rearmar(), que la página llama al empezar la carrera siguiente)
++export function crearVigia({ plazoMs = 500, primeraMs = 15000, ahora = () => performance.now() } = {}) {
++  let estado = 'esperando', ultima = ahora(), desde = ahora(), cuadro = -1, caidas = 0, motivo = '';
++  return {
++    get estado() { return estado; }, get caidas() { return caidas; }, get motivo() { return motivo; },
++    llego(c) {
++      if (estado === 'caida') return false;            // (ya volví a simular: lo que llegue tarde no se pega)
++      if (c <= cuadro) return false;                   // (repetida o vieja)
++      cuadro = c; ultima = ahora(); estado = 'bien';
++      return true;
++    },
++    revisar() {
++      const t = ahora();
++      if (estado === 'bien' && t - ultima > plazoMs) { estado = 'caida'; caidas++; motivo = `sin cajas ${Math.round(t - ultima)} ms`; }
++      else if (estado === 'esperando' && t - desde > primeraMs) { estado = 'caida'; caidas++; motivo = `la primera caja no llegó en ${Math.round(t - desde)} ms`; }
++      return estado;
++    },
++    rearmar() { estado = 'esperando'; ultima = desde = ahora(); cuadro = -1; motivo = ''; },
++  };
++}
++
++// --- la demora del botón a la imagen ---
++// boton(n) = el teléfono manda su botón número n (a la hora de ahora); imagen(n) = dibujé una caja que ya trae el botón
++// n: la demora es la resta. resumen() = la última, la media y la peor del último segundo (para el medidor).
++export function crearDemora({ ahora = () => performance.now(), tope = 512 } = {}) {
++  const sellos = new Map();
++  let ultimo = -1, ultima = null;
++  const ventana = [];
++  return {
++    boton(n) { sellos.set(n, ahora()); if (sellos.size > tope) sellos.delete(sellos.keys().next().value); },
++    imagen(n) {
++      if (n <= ultimo) return null;
++      const t = ahora();
++      let ms = null;
++      for (const [k, h] of sellos) { if (k > n) break; if (k > ultimo) ms = t - h; sellos.delete(k); }
++      ultimo = n;
++      if (ms !== null) { ultima = ms; ventana.push([t, ms]); }
++      while (ventana.length && t - ventana[0][0] > 1000) ventana.shift();
++      return ms;
++    },
++    resumen() {
++      if (!ventana.length) return { ultima, media: null, peor: null };
++      const v = ventana.map(x => x[1]);
++      return { ultima, media: v.reduce((s, x) => s + x, 0) / v.length, peor: Math.max(...v) };
++    },
++  };
++}
++export const textoDemora = r => r?.media == null ? '' : `botón→imagen ${Math.round(r.media)} ms (peor ${Math.round(r.peor)})`;
++
++// --- qué hace este teléfono ahora ---
++// quiere: la opción; enSala: solo en la sala (jugando solo no hay PC que calcule); programa: el programa trae el bucle
++// propio del dibujo (Module._mkw_w24_dato); calculador: el uid elegido (null = ninguno sirve); vigia: el estado.
++export function decidir({ quiere, enSala, programa, calculador, vigia = 'esperando' }) {
++  if (!quiere) return { modo: 'simula', motivo: 'opción apagada' };
++  if (!enSala) return { modo: 'simula', motivo: 'solo en la sala' };
++  if (!programa) return { modo: 'simula', motivo: 'este programa no trae el dibujo solo (W24)' };
++  if (!calculador) return { modo: 'simula', motivo: 'ningún PC de la sala puede calcular por ti' };
++  if (vigia === 'caida') return { modo: 'simula', motivo: 'se cortó la red con el PC: vuelvo a simular' };
++  return { modo: 'dibuja', motivo: `calcula ${calculador}` };
++}

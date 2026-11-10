@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consolas de mentira</title>
+</head>
+<body>
+<h1>Consolas de mentira: <span>una sala de 4 sin el juego</span></h1>
+<p>Prueba <code>banco/consola-falsa</code> (V7, bitácora §235) <b>sin el juego</b>: cuatro consolas de mentira en cuatro
+  marcos de esta página entran a la misma sala por la malla WebRTC de verdad (el buzón falso, BroadcastChannel) y corren
+  el lockstep a 60 cuadros por segundo con botones grabados; la cuarta con la red mala de mentira de una casa lejana
+  (80 ms ± 20, 2 % perdido, también lo que manda). Comprueba que se conectan, que van a 60, que la de la red mala tiene
+  un retraso más alto que las otras y que nadie se queda esperando.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="marcos" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+const { ok, nota, fin } = prueba('consola-falsa', 'Consolas de mentira (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const sala = 'cf-' + Date.now().toString(36), uids = ['a', 'b', 'c', 'd'].map(x => x + sala);
+const redes = ['', '', '', '&redMala=80,20,2,ida'];
+const marcos = uids.map((u, i) => {
+  const f = Object.assign(document.createElement('iframe'), { width: 260, height: 160,
+    src: `../../consola-falsa/index.html?sala=${sala}&uid=${u}&sincro=${uids.join(',')}${redes[i]}` });
+  document.getElementById('marcos').append(f); return f;
+});
+const res = () => marcos.map(f => f.contentWindow?.consola?.resumen?.() || null);
+// Abrir los canales antes del primer envío. Solo el anfitrión inicia su reloj.
+for (const tope = performance.now() + 12000; performance.now() < tope;) {
+  if (res().every(x => x?.conectados === 3)) break;
+  await espera(100);
+}
+marcos[0].contentWindow?.consola?.arrancar();
+await espera(4000);
+const a = res();
+ok('las cuatro cargaron y arrancaron', a.every(x => x?.empezo), a.map(x => x ? x.cuadro : '—').join(' '));
+await espera(20000);
+const b = res();
+const cps = b.map((x, i) => x && a[i] ? (x.cuadro - a[i].cuadro) / 20 : 0);
+ok('las cuatro corren el lockstep a ~60 cuadros por segundo (≥ 55)', cps.every(c => c >= 55), cps.map(c => c.toFixed(1)).join(' '));
+ok('se conectaron todas con todas (cada una recibe los botones de las otras: avanza)', b.every(x => x && x.cuadro > 400), b.map(x => x?.cuadro).join(' '));
+// (con el árbitro, §191, a la que llega tarde la releva la autoridad —sus botones inventados— en lugar de subirle el
+// retraso, §180.2; sin el árbitro le sube el retraso)
+ok('la red mala (80 ms) se nota en la sala: algún retraso sube o hay relevos (la sala reacciona; nadie la espera)', b.some(x => x && (x.retraso >= 4 || x.relevos > 0)),
+   b.map(x => `retraso ${x?.retraso}, relevos ${x?.relevos}`).join(' · '));
+ok('nadie se quedó esperando más de 50 ms (las de la red buena)', b.slice(0, 3).every(x => x.esperasLargas === 0), b.map(x => x?.esperasLargas).join(' '));
+ok('las de la red buena casi no esperan (menos de 1 ms por cuadro)', b.slice(0, 3).every(x => x.msEsperando / Math.max(1, x.cuadro) < 1),
+   b.map(x => (x.msEsperando / Math.max(1, x.cuadro)).toFixed(2)).join(' '));
+ok('ninguna cortada ni fuera de la carrera', b.every(x => x && !Object.keys(x.cortes || {}).length && !x.fuera), JSON.stringify(b.map(x => x?.cortes)));
+nota(b.map(x => `${x.uid.slice(0, 1)}: ${x.cuadro} cuadros, esperas >50 ms ${x.esperasLargas}, máx ${x.maxEspera} ms, autoridad ${x.autoridad}`).join(' · '));
+for (const f of marcos) try { f.contentWindow.consola.parar(); } catch {}
+fin();
+</script>
+</body>
+</html>

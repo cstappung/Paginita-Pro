@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MKW · W10 dos Workers</title>
+<!-- W10 (bitácora §207.4): la parte B, el dibujo en otro Worker. A (izquierda) corre la carrera; B (derecha) dibuja con
+     las cajas que le manda A. Solo para medir y probar: la página de siempre (index.html) no cambia.
+     Ejemplo: w10-dos.html?modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&verifica=1&alto=900
+     Probar: node web/navegador/prueba-w10-dos.mjs -->
+<style>
+  :root { color-scheme: dark; --fondo: #000; --suave: #a7a3bd; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--suave); overflow: hidden;
+    font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  #lienzos { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; align-items: center; }
+  canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+  #chip { position: fixed; left: 8px; top: 8px; padding: 4px 8px; border-radius: 6px; background: #000a;
+    pointer-events: none; white-space: pre; max-width: calc(100vw - 32px); overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="lienzos"><canvas id="lienzoA"></canvas><canvas id="lienzoB"></canvas></div>
+<div id="chip">cargando…</div>
+<script type="module" src="./w10-dos.mjs"></script>
+</body>
+</html>

@@ -35,6 +35,11 @@ EM_JS(int, mkw_web_reloj_pedido, (), { return Module.mkwRelojFijo ? 1 : 0; });
 // ¿Los arreglos de "todo a la vista" y "los CPU no miran la cámara" (lockstep_nativo.cpp)? Module.mkwLsArreglos (?arreglos=0 los apaga)
 EM_JS(int, mkw_web_ls_arreglos, (), { return Module.mkwLsArreglos === false ? 0 : 1; });
 extern "C" int g_mkwLsArreglos = 1;
+// §179 (G1): con «todo a la vista», ¿el dibujo recorta igual con las marcas de verdad de mi cámara (lockstep_nativo.cpp)?
+// Module.mkwRecorteDibujo (?recorteDibujo=0 = el dibujo también ve todo, como antes)
+// (2 = el dibujo entero, §179.2; 1 = solo las opciones de dibujo de los modelos, ?recorteDibujo=modelos; 0 = nada)
+EM_JS(int, mkw_web_recorte_dibujo, (), { return Module.mkwRecorteDibujo === undefined ? 2 : Module.mkwRecorteDibujo | 0; });
+extern "C" int g_mkwRecorteDibujo = 2;
 // ¿Sonido, HUD y cámara de mi kart (vista propia)? Module.mkwVistaPropia: bit 0 sonido/HUD, bit 1 cámara (?vista=0, ?camara=0 para comparar)
 EM_JS(int, mkw_web_vista_propia, (), { return Module.mkwVistaPropia === undefined ? 3 : Module.mkwVistaPropia | 0; });
 extern "C" int g_mkwVistaPropia = 3;
@@ -153,6 +158,7 @@ extern "C" void func_8052F924(CpuContext* ctx) {
             // la carrera (GetTick, lockstep_nativo.cpp), igual en todas, también en la de quien recargó y volvió
             if (Memory::Contains(0x818A0C28u, 4)) Memory::Write32(0x818A0C28u, 0);
             g_mkwLsArreglos = mkw_web_ls_arreglos();
+            g_mkwRecorteDibujo = mkw_web_recorte_dibujo();
             g_mkwVistaPropia = mkw_web_vista_propia();
         }
         // personaje y vehículo de los 12 puestos (los tipos los escribe el piloto en los menús, menus.mjs: aquí ya

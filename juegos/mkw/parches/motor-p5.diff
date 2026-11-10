@@ -1,0 +1,53 @@
+diff --git a/runtime/src/audio_backend.cpp b/runtime/src/audio_backend.cpp
+index dbd3641..ab750dc 100644
+--- a/runtime/src/audio_backend.cpp
++++ b/runtime/src/audio_backend.cpp
+@@ -27,13 +27,20 @@ EM_JS(int, mkw_web_sonido_abrir, (), {
+     const s = Module.mkwSonido;
+     return s && s.abrir ? (s.abrir() | 0) : 0;
+ });
+-EM_JS(void, mkw_web_sonido_entregar, (const float* datos, int cuadros, int canales), {
+-    Module.mkwSonido.entregar(HEAPF32.subarray(datos >> 2, (datos >> 2) + cuadros * canales));
++// P5 (E6, bitácora §232): ONE call into the page per push. It hands over the piece and, on the way back, brings the
++// worklet queue's level (the return value) and its target (written at *objetivo): the rate trim that follows the push
++// reads those two numbers instead of calling the page twice more (3 crossings -> 1, ~330 pushes a second).
++EM_JS(double, mkw_web_sonido_entregar, (const float* datos, int cuadros, int canales, double* objetivo), {
++    const s = Module.mkwSonido;
++    s.entregar(HEAPF32.subarray(datos >> 2, (datos >> 2) + cuadros * canales));
++    HEAPF64[objetivo >> 3] = s.objetivoMs();
++    return s.nivelMs();
+ });
+-EM_JS(double, mkw_web_sonido_nivel, (), { return Module.mkwSonido.nivelMs(); });
+-EM_JS(double, mkw_web_sonido_objetivo, (), { return Module.mkwSonido.objetivoMs(); });
+ 
+ namespace {
++// P5: what the last push brought back from the page (the worklet queue's level, -1 = not playing, and its target)
++double g_webNivelMs = -1.0;
++double g_webObjetivoMs = 60.0;
+ // §88, measuring the delay with a click (sonido.mjs medirDemora): 0 = normal; 1 = every push goes out silent (so only
+ // the click is heard); 2 = the next push starts with a click (4 samples at full scale) and its time is noted, then 1.
+ int g_webMarca = 0;
+@@ -332,12 +339,12 @@ void AudioBackend::WebTrimRateLocked() {
+     double targetMs = kTargetMs;
+     if (m_webWorklet) {
+         // §88: the queue is the page's worklet (its average over ~21 ms) and its target adapts to the page's hiccups
+-        ms = mkw_web_sonido_nivel();
++        ms = g_webNivelMs;           // (P5: brought back by the push just before this, one call instead of three)
+         if (ms < 0.0) {              // blocked, paused or refilling after running dry: hold what the loop learned
+             m_webLastMs = 0.0;
+             return;
+         }
+-        targetMs = mkw_web_sonido_objetivo();
++        targetMs = g_webObjetivoMs;
+     } else {
+         const int queued = SDL_GetAudioStreamQueued(m_stream);
+         const double bytesPerMs = static_cast<double>(m_spec.freq) * m_spec.channels * sizeof(int16_t) / 1000.0;
+@@ -384,7 +391,7 @@ void AudioBackend::WebDeliverLocked() {
+     const int got = SDL_GetAudioStreamData(m_stream, m_webFloat.data(), bytes);
+     const int frameBytes = static_cast<int>(sizeof(float) * m_channels);
+     if (got >= frameBytes) {
+-        mkw_web_sonido_entregar(m_webFloat.data(), got / frameBytes, static_cast<int>(m_channels));
++        g_webNivelMs = mkw_web_sonido_entregar(m_webFloat.data(), got / frameBytes, static_cast<int>(m_channels), &g_webObjetivoMs);
+     }
+ }
+ 

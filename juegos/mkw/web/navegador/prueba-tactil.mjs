@@ -43,7 +43,10 @@ const medir = pagina => pagina.evaluate(() => {
     pantalla: { w: innerWidth, h: innerHeight },
     capa: r(capa),
     aro: r(hijos[0]),
-    botones: hijos.slice(1).filter(e => e.textContent).map(e => ({ texto: e.textContent, ...r(e) })),
+    // §175: solo lo que se ve. Desde §113 la capa también trae los botones que no vienen puestos (X, Y, Z, la cruz:
+    // escondidos hasta que se agregan con el editor) y el panel del editor (cerrado): miden 0 px y no se pueden tocar
+    botones: hijos.slice(1).filter(e => e.textContent && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0)
+      .map(e => ({ texto: e.textContent, ...r(e) })),
   };
 });
 const pisan = (a, b) => Math.hypot(a.x + a.w / 2 - b.x - b.w / 2, a.y + a.h / 2 - b.y - b.h / 2) < (a.w + b.w) / 2 + 2;   // + 2 px de aire

@@ -55,23 +55,159 @@ extern "C" void func_801994E4(CpuContext* ctx) {
 // ClipInfoMgr::Update (0x80787774): ClipInfoMgr +0x10 = lista de ClipInfo (0x24 bytes cada uno), +0x18 = cuántos.
 // ClipInfo: +0xC distancia a la cámara de cada pantalla (4 floats), +0x20 marcas de cada pantalla (4 bytes; bit 0x20 =
 // apagado, no se toca).
+// §179 (G1): antes de ponerlas en «a la vista», se guardan las marcas y distancias de verdad (las de MI cámara) de cada
+// ClipInfo. La lógica sigue viendo «todo a la vista», igual en todas las consolas; solo las dos funciones que pasan las
+// marcas a las opciones de dibujo de cada modelo (abajo) ven las de verdad, así el dibujo recorta lo que no se ve
+extern "C" int g_mkwRecorteDibujo;   // semillas_nativo.cpp: 0 = el dibujo también ve todo (?recorteDibujo=0, como antes)
+static constexpr uint32_t kMaxClip = 4096;
+static uint32_t s_clipLista = 0, s_clipN = 0, s_clipMgr = 0;
+// §248: la lista guardada vale solo mientras viva el ClipInfoMgr que la armó. Su puntero único del juego
+// (ClipInfoMgr::sInstance, 0x809C2EF8: DestroyInstance, 0x80787538, lo pone en 0 al salir de la carrera) tiene que
+// seguir siendo ese, con la misma lista y la misma cantidad. Antes la dirección quedaba guardada después de la carrera
+// y ScnMgr::DrawMain de los menús seguía escribiendo marcas en esa memoria ya liberada: en la pantalla de personajes
+// del descanso (M22) ahí vivían los layouts de los botones, y al salir el juego se caía (Layout::__dt, puntero nulo)
+static constexpr uint32_t kClipInstancia = 0x809C2EF8u;
+static bool clipVigente() {
+    if (!s_clipN) return false;
+    if (Memory::Read32(kClipInstancia) != s_clipMgr || !s_clipMgr || !Memory::Contains(s_clipMgr, 0x1C) ||
+        Memory::Read32(s_clipMgr + 0x10) != s_clipLista || Memory::Read32(s_clipMgr + 0x18) != s_clipN) {
+        s_clipN = 0; s_clipLista = 0; s_clipMgr = 0;    // (la carrera terminó: no se vuelve a tocar)
+        return false;
+    }
+    return Memory::Contains(s_clipLista, s_clipN * 0x24);
+}
+static uint8_t s_clipMarcas[kMaxClip][4];
+static uint32_t s_clipDist[kMaxClip][4];
+static uint32_t s_recortes = 0;      // cuántas veces el dibujo usó las marcas de verdad (para la página y las pruebas)
 extern "C" void func_80787774_traducida(CpuContext* ctx);
 extern "C" void func_80787774(CpuContext* ctx) {
     const uint32_t mgr = ctx->gpr[3];
     func_80787774_traducida(ctx);
+    s_clipN = 0;
     if (!g_mkwRelojFijo || !g_mkwLsArreglos) return;
     const uint32_t lista = Memory::Read32(mgr + 0x10), n = Memory::Read32(mgr + 0x18);
-    if (!lista || n > 4096 || !Memory::Contains(lista, n * 0x24)) return;
+    if (!lista || n > kMaxClip || !Memory::Contains(lista, n * 0x24)) return;
     for (uint32_t i = 0; i < n; i++) {
         const uint32_t ci = lista + i * 0x24;
         for (uint32_t pantalla = 0; pantalla < 4; pantalla++) {
             const uint8_t m = Memory::Read8(ci + 0x20 + pantalla);
+            s_clipMarcas[i][pantalla] = m;
+            s_clipDist[i][pantalla] = Memory::Read32(ci + 0xC + 4 * pantalla);
             if (m & 0x20) continue;
             Memory::Write8(ci + 0x20 + pantalla, m & ~3u);
             Memory::Write32(ci + 0xC + 4 * pantalla, 0);
         }
     }
+    s_clipLista = lista; s_clipN = n; s_clipMgr = mgr;
 }
+
+// ModelDirector::SetAllScnOptionsFromClipInfo (0x8055D448) y ::SetDisableDrawScnOptionsFromClipInfo (0x8055D554):
+// leen la ClipInfo del modelo (ModelDirector +0x44) y deciden si se dibuja. Mientras corren, su ClipInfo tiene las
+// marcas de verdad; al volver, otra vez «a la vista y cerca» (la lógica no se entera). Solo si ese ClipInfo está en la
+// lista que guardó ClipInfoMgr::Update en este cuadro
+template <void (*Original)(CpuContext*)>
+static void conMarcasDeVerdad(CpuContext* ctx) {
+    const uint32_t md = ctx->gpr[3];
+    uint32_t ci = 0, i = 0;
+    if (g_mkwRelojFijo && g_mkwLsArreglos && g_mkwRecorteDibujo && clipVigente() && Memory::Contains(md + 0x44, 4)) {
+        ci = Memory::Read32(md + 0x44);
+        if (ci >= s_clipLista && ci < s_clipLista + s_clipN * 0x24 && (ci - s_clipLista) % 0x24 == 0) i = (ci - s_clipLista) / 0x24;
+        else ci = 0;
+    }
+    if (!ci) { Original(ctx); return; }
+    uint8_t antes[4]; uint32_t distAntes[4];
+    for (uint32_t p = 0; p < 4; p++) {
+        antes[p] = Memory::Read8(ci + 0x20 + p); distAntes[p] = Memory::Read32(ci + 0xC + 4 * p);
+        if (antes[p] & 0x20) continue;
+        Memory::Write8(ci + 0x20 + p, static_cast<uint8_t>((antes[p] & ~3u) | (s_clipMarcas[i][p] & 3u)));
+        Memory::Write32(ci + 0xC + 4 * p, s_clipDist[i][p]);
+    }
+    Original(ctx);
+    for (uint32_t p = 0; p < 4; p++) { Memory::Write8(ci + 0x20 + p, antes[p]); Memory::Write32(ci + 0xC + 4 * p, distAntes[p]); }
+    s_recortes++;
+}
+extern "C" void func_8055D448_traducida(CpuContext* ctx);
+extern "C" void func_8055D554_traducida(CpuContext* ctx);
+extern "C" void func_8055D448(CpuContext* ctx) { conMarcasDeVerdad<func_8055D448_traducida>(ctx); }
+extern "C" void func_8055D554(CpuContext* ctx) { conMarcasDeVerdad<func_8055D554_traducida>(ctx); }
+
+// §179.2: el dibujo ENTERO con las marcas de verdad (g_mkwRecorteDibujo == 2, lo de siempre): ScnMgr::DrawMain
+// (0x80564D60) corre después de la lógica del cuadro; antes de empezar, cada ClipInfo de la lista vuelve a sus marcas y
+// distancias de verdad (todos los que las leen al dibujar: los modelos, el nivel de detalle por la distancia, los
+// objetos de la pista que miran su ClipInfo por su cuenta) y al terminar, otra vez «a la vista y cerca», así la lógica
+// del cuadro siguiente ve lo mismo en todas las consolas. Con 1 (?recorteDibujo=modelos) solo las dos funciones de
+// arriba; con 0, nada (como antes)
+static int s_enDibujo = 0;
+static uint32_t s_dibujosEnteros = 0;   // cuántos ScnMgr::DrawMain corrieron con las marcas de verdad
+
+// §192 (R2): saltarse el dibujo de un cuadro sin tocar la lógica (para simular a 60 y dibujar menos: N8 de paso 7).
+// La página pide «el cuadro siguiente no se dibuja» con mkw_dibujo_saltar(1) (vale para UN cuadro: se fija en el gancho
+// del bucle principal, rr_kamek_81806568, abajo) o un patrón fijo con mkw_dibujo_patron(n) (n = 2: uno de cada dos;
+// solo para pruebas). Mientras corre ese cuadro, mkw_dibujo_este_saltado() devuelve 1: aurora lo lee y no presenta lo
+// que llegue (eso es de su lado). Con el modo 2 (mkw_dibujo_modo(2), lo de siempre) además el juego no arma el dibujo
+// 3D: ScnMgr::DrawMain corre solo lo que la lógica lee después, ScnMgr::SwitchScnRoot (0x805635E4), que es donde
+// ModelDirector::Update copia la posición de cada kart a su modelo y la IA de los CPU la usa (§62, §85). Lo demás de
+// DrawMain (las luces, la lista de cosas que dibujan y ScnMgr::DoneDraw) solo manda trabajo a la tarjeta. Con el modo 1
+// el juego dibuja todo y solo queda la marca (el paso seguro: la lógica es la misma por construcción).
+static int s_saltarPedido = 0, s_esteSaltado = 0, s_modoSalto = 2, s_patron = 0;
+static uint32_t s_saltados = 0, s_saltadosJuego = 0, s_vueltasDibujo = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_dibujo_saltar(int v) { s_saltarPedido = v ? 1 : 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_dibujo_patron(int n) { s_patron = n > 1 ? n : 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_dibujo_modo(int m) { s_modoSalto = m == 1 ? 1 : 2; }
+extern "C" EMSCRIPTEN_KEEPALIVE int mkw_dibujo_este_saltado() { return s_esteSaltado; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_dibujos_saltados() { return s_saltados; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_dibujos_saltados_juego() { return s_saltadosJuego; }
+// (el gancho del bucle llama esto cuando el bucle va a dibujar: fija si ESTE cuadro se salta)
+static void fijarSalto() {
+    s_vueltasDibujo++;
+    s_esteSaltado = s_saltarPedido || (s_patron && s_vueltasDibujo % static_cast<uint32_t>(s_patron) == 0);
+    s_saltarPedido = 0;
+    if (s_esteSaltado) s_saltados++;
+}
+
+extern "C" void func_80564D60_traducida(CpuContext* ctx);
+extern "C" void func_805635E4(CpuContext* ctx);   // ScnMgr::SwitchScnRoot
+extern "C" void func_80564D60(CpuContext* ctx) {
+    if (s_esteSaltado && s_modoSalto == 2) {
+        // (lo mismo que hace DrawMain al final, con las mismas condiciones: si el ScnMgr —0x809C1830— no está en pausa
+        // de dibujo (+0x44 bit 1), tiene su raíz (+0x20) y pide cambiarla (+0x44 bit 0): SwitchScnRoot(raíz, 1))
+        const uint32_t g = 0x809C1830u, banderas = Memory::Read32(g + 0x44), raiz = Memory::Read32(g + 0x20);
+        if (!(banderas & 2) && raiz && (banderas & 1)) {
+            const uint32_t lr = ctx->lr, r3 = ctx->gpr[3], r4 = ctx->gpr[4];
+            ctx->gpr[3] = raiz; ctx->gpr[4] = 1;
+            func_805635E4(ctx);
+            ctx->lr = lr; ctx->gpr[3] = r3; ctx->gpr[4] = r4;
+        }
+        s_saltadosJuego++;
+        return;
+    }
+    if (!(g_mkwRelojFijo && g_mkwLsArreglos && g_mkwRecorteDibujo == 2 && !s_enDibujo && clipVigente())) {
+        func_80564D60_traducida(ctx); return; }
+    for (uint32_t i = 0; i < s_clipN; i++) {
+        const uint32_t ci = s_clipLista + i * 0x24;
+        for (uint32_t p = 0; p < 4; p++) {
+            const uint8_t m = Memory::Read8(ci + 0x20 + p);
+            if (m & 0x20) continue;
+            Memory::Write8(ci + 0x20 + p, static_cast<uint8_t>((m & ~3u) | (s_clipMarcas[i][p] & 3u)));
+            Memory::Write32(ci + 0xC + 4 * p, s_clipDist[i][p]);
+        }
+    }
+    s_enDibujo = 1;
+    func_80564D60_traducida(ctx);
+    s_enDibujo = 0;
+    for (uint32_t i = 0; i < s_clipN; i++) {
+        const uint32_t ci = s_clipLista + i * 0x24;
+        for (uint32_t p = 0; p < 4; p++) {
+            const uint8_t m = Memory::Read8(ci + 0x20 + p);
+            if (m & 0x20) continue;
+            Memory::Write8(ci + 0x20 + p, m & ~3u);
+            Memory::Write32(ci + 0xC + 4 * p, 0);
+        }
+    }
+    s_dibujosEnteros++;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_dibujos_enteros() { return s_dibujosEnteros; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_recortes_dibujo() { return s_recortes; }
 
 // AI::Character::UpdateLookAtCamera (0x807379BC): los pilotos CPU miran a la cámara cuando pasa cerca, y eso arranca
 // gestos que sacan números del azar de la carrera (el mismo que deciden los objetos): con cámaras distintas, cada
@@ -167,9 +303,16 @@ extern "C" void func_801AAD74(CpuContext* ctx) {
 // carreras se separaban. En la carrera sincronizada se hace lo del juego original: si el bucle quiere dibujar (r25 ≠ 0)
 // se empieza el cuadro de pantalla (AsyncDisplay::beginFrame, la versión de arriba) y se dibuja siempre. Si una consola
 // no da abasto, su carrera va más lenta, y la sala la espera (lockstep).
+// §207.3: mkw_dibujar_siempre(1) = lo mismo también jugando solo (solo para medir: con el lastre de la gama baja la
+// compensación se salta casi todos los dibujos y la carrera suelta no se parece a la de la sala; ?dibujarSiempre=1)
+static int g_mkwDibujarSiempre = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_dibujar_siempre(int s) { g_mkwDibujarSiempre = s; }
 extern "C" void rr_kamek_81806568_traducida(CpuContext* ctx);
+extern "C" __attribute__((weak)) void mkw_n8_vuelta() {}   // (§219, N8: n8_nativo.cpp; sin él, nada)
 extern "C" void rr_kamek_81806568(CpuContext* ctx) {
-    if (!g_mkwRelojFijo || !g_mkwLsArreglos) { rr_kamek_81806568_traducida(ctx); return; }
+    mkw_n8_vuelta();                  // (§219: una vuelta del bucle = un cuadro de lógica, para el patrón de N8)
+    if (ctx->gpr[25]) fijarSalto();   // (§192: el bucle va a dibujar este cuadro: ¿se salta?)
+    if ((!g_mkwRelojFijo || !g_mkwLsArreglos) && !g_mkwDibujarSiempre) { rr_kamek_81806568_traducida(ctx); return; }
     const uint32_t sistema = ctx->gpr[21], dibujar = ctx->gpr[25];   // r21 = RKSystem, r25 = "este cuadro se dibuja"
     uint32_t resultado = 0;
     if (dibujar) {

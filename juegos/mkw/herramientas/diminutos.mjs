@@ -23,6 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { carpetaPartidaBase } from './partida-base.mjs';   // §175
 
 export const TOPE_DIMINUTO = 8192;           // el mismo tope que usa la página (mkw.mjs: «diminutos ≤ 8 KB»)
 export const MAGIA = 'MKWD';
@@ -58,7 +59,7 @@ export function carpetasLocales(raiz) {
   return [
     ['/mkw/disco/', path.join(raiz, 'extraido/disco')],
     ['/mkw/sd/RetroRewind6/', path.join(raiz, 'terceros/RetroRewind/RetroRewind6')],
-    ['/mkw/sd/riivolution/', path.join(raiz, 'terceros/RetroRewind/riivolution')],
+    ['/mkw/sd/riivolution/', carpetaPartidaBase(raiz)],   // §175: la copia limpia
     ['/wc/runtime/assets/', path.join(raiz, 'terceros/Wiicompiled/runtime/assets')],
   ];
 }

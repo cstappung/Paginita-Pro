@@ -74,18 +74,23 @@ test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la c
  assert.match(fuente,/data-nivel="\$\{k\}"/);assert.match(fuente,/k: "nivel", v: b\.dataset\.nivel/);
 });
 
-test('§103 «🛰 Todo por Cloudflare»: apagado por omisión, lo prende solo el anfitrión en el vestíbulo (como el relevo de BT3) y va al marco',()=>{
+test('§236 conexión: host por omisión, solo la cambia el anfitrión en el vestíbulo y respeta las jugadas TURN viejas',()=>{
  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
- let e=M.reducir(nueva());assert.equal(e.relevo,false,'apagado por omisión: es excepcional');
+ let e=M.reducir(nueva());assert.equal(e.conexion,'host');assert.equal(e.relevo,false);
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,true,'el anfitrión lo prende');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:true},{t:'ajuste',uid:'a',k:'relevo',v:false}));assert.equal(e.relevo,false,'y lo apaga');
  e=M.reducir(nueva({t:'ajuste',uid:'b',k:'relevo',v:true}));assert.equal(e.relevo,false,'b no es el anfitrión');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:'si'}));assert.equal(e.relevo,false,'solo true lo prende');
  e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,false,'corriendo no se cambia (cada marco lo lee al abrir)');
+ const ajuste=(v,uid='a')=>({t:'ajuste',uid,k:'relevo',v});
+ for (const modo of ['host','cloudflare','oracle']) assert.equal(M.reducir(nueva(ajuste(modo))).conexion,modo);
+ assert.equal(M.reducir(nueva(ajuste('oracle','b'))).conexion,'host');
+ assert.equal(M.reducir(nueva(ajuste('oracle'),{t:'empieza',uid:'a'},ajuste('host'))).conexion,'oracle');
+ assert.equal(M.reducir(nueva(ajuste('oracle'),ajuste('desconocido'))).conexion,'oracle');
  const fuente=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
- assert.match(fuente,/if \(relevo === true\) q\.set\("conexion", "cloudflare"\);/,'la dirección del marco solo lo lleva si está prendido');
- assert.match(fuente,/relevo: est\.relevo === true \}\)/);
- assert.match(fuente,/data-relevo="\$\{k\}"/);assert.match(fuente,/k: "relevo", v: b\.dataset\.relevo === "cloudflare"/);
+ assert.match(fuente,/conexion: est\.conexion, relevo: est\.relevo/);
+ assert.match(fuente,/data-relevo="\$\{k\}"/);assert.match(fuente,/k: "relevo", v: b\.dataset\.relevo/);
+ assert.match(fuente,/aria-describedby="jg2-con-\$\{k\}"/);assert.match(fuente,/id="jg2-con-\$\{k\}" role="tooltip"/);
  // el marco pide las credenciales (si no hay, [] y va directo); y el juego espera el repetidor solo con conexion=cloudflare
  assert.match(fuente,/if \(d\.tipo === "turn"\) \{/);assert.match(fuente,/tipo: "turn", iceServers: ice \|\| \[\]/);
  const juego=fs.readFileSync(raiz('../juegos/mkw/web/navegador/mkw.mjs'),'utf8');
@@ -230,7 +235,10 @@ test('diez logros propios, todos de partida, con su nivel; y su peso',()=>{
 
 test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla, su nodo, los pilotos, el anfitrión y la copa',()=>{
  const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
- const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist,MKW_NIVEL:M.MKW_NIVEL};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
+ const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist,MKW_NIVEL:M.MKW_NIVEL};
+ const trozo=(ini,fin)=>src.slice(src.indexOf(ini),src.indexOf(fin,src.indexOf(ini))).replace(/\bexport /g,'');
+ vm.runInNewContext(trozo('const PAGINA','let privado')+trozo('const MKW_CONEXION','const AYUDA_CONEXION')+
+   trozo('export function srcMkw(', 'export function crearMkwSolo')+';__s=srcMkw',c);
  const u=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'https://w.example',ronda:3,sincro:['a','b'],jefe:'a'}));
  assert.equal(u.pathname,'/juegos/mkw/web/navegador/index.html');
  const q=u.searchParams, t=M.mkwCarrera('p1',3);
@@ -249,8 +257,11 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  const nv=n=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',cc:'c100',nivel:n})).searchParams;
  assert.equal(nv('normal').get('cpu'),'normal','M20: el nivel del anfitrión, aparte de la cilindrada');assert.equal(nv('normal').get('cc'),'c100');
  assert.equal(nv('turbo').get('cpu'),'maximo','un nivel que no existe va como Máximo');
- assert.equal(nv('normal').get('conexion'),null,'§103: sin «Todo por Cloudflare», nada en la dirección');
- assert.equal(new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',relevo:true})).searchParams.get('conexion'),'cloudflare');
+ assert.equal(nv('normal').get('conexion'),'host');
+ const urlConexion=op=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,ronda:2,sincro:['a','b'],...op})).searchParams;
+ assert.equal(urlConexion({relevo:true}).get('conexion'),'cloudflare');
+ assert.equal(urlConexion({conexion:'oracle'}).get('conexion'),'oracle');
+ assert.equal(urlConexion({conexion:'oracle'}).get('arbitroUrl'),null);
  assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');
@@ -489,10 +500,10 @@ test('§100 (H1.2) la prueba de conexión: el marco dice cómo le llega cada pil
  assert.match(juego,/tipo: 'conexiones',\s*de: Object\.fromEntries\(lista\.map\(c => \[c\.uid, \{ e: c\.e, ms: c\.ms \?\? null, por: c\.por \|\| null \}\]\)\)/);
 });
 
-test('§116 «trabajando para usted»: las salas de Mario Kart no se abren ni se entra a ellas; la ficha ofrece jugar solo',()=>{
- // el dueño (2026-10-27): «el multiplayer está totalmente roto, ocúltalo por ahora y ponle trabajando para usted»
+test('§116 «trabajando para usted»: el cierre sigue listo; desde la v2.0 las salas de Mario Kart están abiertas',()=>{
+ // el dueño (2026-10-27) las cerró; en la v2.0 (2026-11-09) se abren: SALAS_EN_OBRA queda vacía
  const datos=fs.readFileSync(raiz('src/juegos/salon-datos.js'),'utf8');
- assert.match(datos,/export const SALAS_EN_OBRA = \{ mkw: \{ solo: "#solo\/mkw" \} \};/,'Mario Kart en obra, con su camino de un jugador');
+ assert.match(datos,/export const SALAS_EN_OBRA = \{\};/,'Mario Kart con sus salas abiertas');
  const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8');
  assert.match(main,/const salaEnObra = k => \(!PROBAR_OBRA && SALAS_EN_OBRA\[k\]\) \|\| null;/);
  assert.match(main,/const PROBAR_OBRA = \/\[\?&\]salasObra=0\(&\|\$\)\/\.test\(location\.search\);/,'?salasObra=0 = abrirlas igual para probar');

@@ -1,8 +1,8 @@
 diff --git a/aurora-main/lib/aurora.cpp b/aurora-main/lib/aurora.cpp
-index aede66a..ebaff70 100644
+index aede66a..5feaaeb 100644
 --- a/aurora-main/lib/aurora.cpp
 +++ b/aurora-main/lib/aurora.cpp
-@@ -17,6 +17,21 @@
+@@ -17,6 +17,32 @@
  
  #include <SDL3/SDL_filesystem.h>
  #include <SDL3/SDL_thread.h>
@@ -20,11 +20,22 @@ index aede66a..ebaff70 100644
 +// early and the next one waits a refresh longer: 3/5 refreshes instead of 4 at 240 Hz (bitácora §54).
 +EM_JS(int, mkw_aurora_toma_atrasada, (), { return Module.mkwTomaAtrasada ? (Module.mkwTomaAtrasada() ? 1 : 0) : 0; });
 +EM_ASYNC_JS(void, mkw_aurora_espera_atrasada, (), { await Module.mkwEsperaAtrasada(); });
++// MKW RETRO (browser, bitácora §155): the wait for a staging buffer to finish mapping (staging_map.hpp). With
++// Module.mkwEsperaSubida (only while the page's CPU ballast is on, ?lastre) that page function does the yield, so the
++// page knows this is waiting and not work; otherwise the old emscripten_sleep(0), exactly as before. Defined here, not in the header,
++// because EM_ASYNC_JS defines a function and the header is included by several files.
++EM_JS(int, mkw_aurora_hay_espera_subida, (), { return Module.mkwEsperaSubida ? 1 : 0; });
++EM_ASYNC_JS(void, mkw_aurora_espera_subida_js, (), { await Module.mkwEsperaSubida(); });
++extern "C" void mkw_aurora_espera_subida() {
++  static const bool hay = mkw_aurora_hay_espera_subida() != 0;
++  if (hay) mkw_aurora_espera_subida_js();
++  else emscripten_sleep(0);
++}
 +#endif
  #include <magic_enum.hpp>
  
  #include "system_info.hpp"
-@@ -93,9 +108,30 @@ void wait_until_precise(PresentClock::time_point deadline) noexcept {
+@@ -93,9 +119,30 @@ void wait_until_precise(PresentClock::time_point deadline) noexcept {
    // practice; 400 us absorbs the observed overshoot, about 1.6 ms of one core at 240 Hz.
    constexpr auto kSpinWindow = std::chrono::microseconds(400);
    auto now = PresentClock::now();
@@ -55,7 +66,7 @@ index aede66a..ebaff70 100644
  
    const auto timerDeadline = deadline - now > kSpinWindow ? deadline - kSpinWindow : deadline;
  #if defined(_WIN32)
-@@ -259,6 +295,10 @@ FrameWorkerState g_frameWorker;
+@@ -259,6 +306,10 @@ FrameWorkerState g_frameWorker;
  bool frame_worker_requested() noexcept {
  #ifdef AURORA_ENABLE_GX
    static const bool enabled = [] {
@@ -66,7 +77,7 @@ index aede66a..ebaff70 100644
  #if defined(__APPLE__)
      // ImGui's SDL backend may raise an SDL window from ImGui::NewFrame(). On
      // macOS that reaches AppKit, whose window operations are main-thread-only;
-@@ -943,6 +983,11 @@ bool present_presentation_job(const PresentationJob& job) {
+@@ -943,6 +994,11 @@ bool present_presentation_job(const PresentationJob& job) {
            webgpu::g_graphicsConfig.surfaceConfiguration.height);
      }
      if (!surfaceSizeChanged && window::is_presentable()) {
@@ -78,7 +89,7 @@ index aede66a..ebaff70 100644
        const auto acquireStarted = PresentClock::now();
        auto acquired = acquire_surface_texture();
        acquireDuration =
-@@ -1009,7 +1054,13 @@ bool present_presentation_job(const PresentationJob& job) {
+@@ -1009,7 +1065,13 @@ bool present_presentation_job(const PresentationJob& job) {
            wgpu::Status presentStatus;
            {
              std::lock_guard submitLock(g_queueSubmitMutex);
@@ -92,7 +103,7 @@ index aede66a..ebaff70 100644
            }
            presentDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
                PresentClock::now() - presentStarted);
-@@ -1679,7 +1730,8 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
+@@ -1679,7 +1741,8 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
  
  // Phase 3: hand the encoded group to whoever owns presentation.
  void publish_presentations(std::vector<PresentationJob>&& presentationJobs, bool interpolationActive) {
@@ -122,10 +133,10 @@ index bb8fba4..85de618 100644
  #else
    const auto props = SDL_GetWindowProperties(window);
 diff --git a/aurora-main/lib/gfx/common.cpp b/aurora-main/lib/gfx/common.cpp
-index e093901..538ba88 100644
+index e093901..61dc159 100644
 --- a/aurora-main/lib/gfx/common.cpp
 +++ b/aurora-main/lib/gfx/common.cpp
-@@ -132,6 +132,16 @@ constexpr size_t FrameSlotCount = 3;
+@@ -132,6 +132,45 @@ constexpr size_t FrameSlotCount = 3;
  static std::array<wgpu::Buffer, FrameSlotCount> g_stagingBuffers;
  static size_t currentStagingBuffer = 0;
  static StagingMapState s_mappingState;
@@ -139,13 +150,89 @@ index e093901..538ba88 100644
 +static std::unique_ptr<u8[]> g_webStaging;
 +static bool g_webStagingAbierto = false;  // a frame has the block "mapped" (begin_frame .. end_batch)
 +#endif
++// MKW RETRO (G3/H12, §181): los anillos persistentes de la subida (explicados junto a anillo_cerrar_lote)
++namespace {
++struct Anillo {
++  wgpu::Buffer* gpu = nullptr;
++  uint64_t base = 0;        // dónde empieza el anillo dentro del búfer de la tarjeta
++  uint64_t size = 0;        // bytes del anillo
++  uint64_t align = 4;
++  uint64_t head = 0;        // posición virtual (solo crece; la física es base + head % size)
++  uint64_t runStart = 0;    // desde dónde hay bytes que todavía no se subieron
++  std::vector<u8> run;      // su copia
++  uint64_t batchStart = 0;  // la cabeza al empezar el lote
++};
++struct EntradaAnillo {
++  uint64_t pos = UINT64_MAX;
++  uint64_t len = 0;
++  uint64_t gen = 0;
++  uint64_t hash = 0;
++  const void* ptr = nullptr;
++  size_t bytes = 0;
++};
++} // namespace
++static int g_anilloModo = 1;   // prendido por omisión (§181: verificado, 0 diferencias; KB por imagen ÷3); MKW_ANILLO=0 lo apaga, 2 verifica
++static Anillo g_anVerts, g_anIdx, g_anStorage;
++static absl::flat_hash_map<uint64_t, EntradaAnillo> g_anVertsMapa, g_anIdxMapa, g_anArreglos;
++// [0] bytes de vértices reusados, [1] escritos al anillo, [2] índices reusados, [3] escritos, [4] storage reusado,
++// [5] escrito, [6] diferencias de la verificación, [7] lotes con vértices/índices sin subir la parte de siempre,
++// [8] dibujos que no entraron al anillo, [9] storage por huella (memoria sin vigilar)
++static uint64_t g_anCuenta[10] = {};
++static constexpr uint64_t AnilloVertsSize = 8u << 20, AnilloIdxSize = 4u << 20, AnilloStorageSize = 16u << 20;
  static wgpu::Limits g_cachedLimits;
  // Advanced once per logical frame in the seal prologue, under the renderer GPU mutex and with the
  // producer blocked, so every later reader sees a value that no longer moves.
-@@ -894,6 +904,15 @@ void initialize() {
-                "Shared Index Buffer");
-   createBuffer(g_storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
-                "Shared Storage Buffer");
+@@ -654,6 +693,18 @@ void resolve_pass(TextureHandle texture, ClipRect rect, bool clearColor, bool cl
+                                rect.height >= static_cast<int32_t>(prevPass.targetSize.height);
+   const bool useAttachmentColorClear = clearFullTarget && clearColor && clearAlpha;
+   const bool useAttachmentDepthClear = clearFullTarget && clearDepth;
++  // MKW RETRO (G2, §177.2): cuántas copias del EFB limpian, y cuántas cubren la imagen entera (las únicas que pueden
++  // limpiar con la pasada en vez de con un dibujo recortado); el tamaño de la última recortada, para entender por qué
++  {
++    extern uint32_t g_mkwLimpiezas[8];
++    if (clearColor || clearAlpha || clearDepth) {
++      ++g_mkwLimpiezas[0];
++      if (clearDepth) ++g_mkwLimpiezas[1];
++      if (clearFullTarget) ++g_mkwLimpiezas[2];
++      else { g_mkwLimpiezas[3] = rect.x; g_mkwLimpiezas[4] = rect.y; g_mkwLimpiezas[5] = rect.width; g_mkwLimpiezas[6] = rect.height;
++             g_mkwLimpiezas[7] = (prevPass.targetSize.width << 16) | (prevPass.targetSize.height & 0xFFFF); }
++    }
++  }
+ 
+   // Populate new render pass from previous
+   const auto msaaSamples = prevPass.msaaSamples;
+@@ -886,14 +937,37 @@ void initialize() {
+     };
+     out = g_device.CreateBuffer(&descriptor);
+   };
++  // MKW RETRO (G3/H12, §181): cada búfer lleva su anillo persistente detrás de la parte de siempre
++  if (const char* modo = std::getenv("MKW_ANILLO")) {
++    g_anilloModo = std::string_view{modo} == "2" ? 2 : std::string_view{modo} == "0" ? 0 : 1;
++  }
++  const bool conAnillo = g_anilloModo != 0;
+   createBuffer(g_uniformBuffer, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, UniformBufferSize,
+                "Shared Uniform Buffer");
+-  createBuffer(g_vertexBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, VertexBufferSize,
+-               "Shared Vertex Buffer");
+-  createBuffer(g_indexBuffer, wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst, IndexBufferSize,
+-               "Shared Index Buffer");
+-  createBuffer(g_storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
+-               "Shared Storage Buffer");
++  createBuffer(g_vertexBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst,
++               VertexBufferSize + (conAnillo ? AnilloVertsSize : 0), "Shared Vertex Buffer");
++  createBuffer(g_indexBuffer, wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst,
++               IndexBufferSize + (conAnillo ? AnilloIdxSize : 0), "Shared Index Buffer");
++  createBuffer(g_storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst,
++               StorageBufferSize + (conAnillo ? AnilloStorageSize : 0), "Shared Storage Buffer");
++  g_anVerts = conAnillo ? Anillo{.gpu = &g_vertexBuffer, .base = VertexBufferSize, .size = AnilloVertsSize} : Anillo{};
++  g_anIdx = conAnillo ? Anillo{.gpu = &g_indexBuffer, .base = IndexBufferSize, .size = AnilloIdxSize} : Anillo{};
++  g_anStorage = conAnillo ? Anillo{.gpu = &g_storageBuffer, .base = StorageBufferSize, .size = AnilloStorageSize,
++                                   .align = std::max<uint64_t>(4, g_cachedLimits.minStorageBufferOffsetAlignment)}
++                          : Anillo{};
++  g_anVertsMapa.clear();
++  g_anIdxMapa.clear();
++  g_anArreglos.clear();
++  Log.info("anillo: {}", g_anilloModo == 0 ? "apagado (MKW_ANILLO=0)" : g_anilloModo == 2 ? "prendido, verificando" : "prendido");
 +#ifdef __EMSCRIPTEN__
 +  if (const char* modo = std::getenv("MKW_STAGING"); modo && std::string_view{modo} == "mapeo") {
 +    g_webStagingPlano = false;
@@ -158,7 +245,7 @@ index e093901..538ba88 100644
    for (int i = 0; i < g_stagingBuffers.size(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
      createBuffer(g_stagingBuffers[i], wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc, StagingBufferSize,
-@@ -1029,6 +1048,9 @@ void shutdown() {
+@@ -1029,6 +1103,9 @@ void shutdown() {
  }
  
  void map_staging_buffer() {
@@ -168,7 +255,7 @@ index e093901..538ba88 100644
    const auto generation = s_mappingState.request();
    if (generation == 0) {
      return;
-@@ -1051,6 +1073,9 @@ void map_staging_buffer() {
+@@ -1051,6 +1128,9 @@ void map_staging_buffer() {
  
  static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
    ZoneScoped;
@@ -178,7 +265,7 @@ index e093901..538ba88 100644
    {
      ZoneScopedN("Wait for buffer map");
      map_staging_buffer();
-@@ -1083,6 +1108,13 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
+@@ -1083,6 +1163,13 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
      if (size <= 0) {
        return;
      }
@@ -192,7 +279,7 @@ index e093901..538ba88 100644
      buf = ByteBuffer{static_cast<u8*>(stagingBuf.GetMappedRange(bufferOffset, size)), static_cast<size_t>(size)};
      bufferOffset += size;
    };
-@@ -1093,6 +1125,9 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
+@@ -1093,6 +1180,9 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
    if constexpr (UseTextureBuffer) {
      mapBuffer(g_textureUpload, TextureUploadSize);
    }
@@ -202,7 +289,7 @@ index e093901..538ba88 100644
  
    g_drawCallCount = 0;
    g_mergedDrawCallCount = 0;
-@@ -1139,6 +1174,12 @@ void abort_frame() noexcept {
+@@ -1139,6 +1229,12 @@ void abort_frame() noexcept {
      g_textureUploads.clear();
      g_textureUpload.release();
    }
@@ -215,7 +302,167 @@ index e093901..538ba88 100644
    if (s_mappingState.state() == BufferMapState::Mapped) {
      // Pending interpolation tasks hold raw pointers into the mapped staging
      // range; they must be dropped before the buffer is unmapped and rotated.
-@@ -1176,12 +1217,28 @@ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
+@@ -1159,6 +1255,159 @@ void abort_frame() noexcept {
+   end_pipeline_frame();
+ }
+ 
++// ---- MKW RETRO (G3 y H12 del plan de rendimiento, bitácora §181): lo que no cambió no se vuelve a subir ----
++// Antes, cada lote copiaba a la tarjeta todos los vértices, índices y arreglos de vértices (storage) que usó, aunque la
++// pista y los karts traen los mismos bytes cuadro tras cuadro. Ahora cada uno de los tres búferes de la tarjeta tiene,
++// después de su parte de siempre ([0, Size)), un ANILLO persistente: lo que ya se subió queda ahí y el dibujo apunta a
++// esa copia; solo lo nuevo se escribe (en el anillo, una llamada por lote). Cómo se reconoce lo mismo:
++// - los arreglos (storage): por su dirección y tamaño, y la generación de escrituras del juego sobre esa memoria
++//   (guest_write_generation: el runtime cuenta cada DCFlushRange/DCStoreRange; las texturas ya lo usan); si la memoria
++//   no está vigilada, por la huella xxh3 del contenido;
++// - los vértices e índices de cada dibujo (que salen de las listas de dibujo): por la huella xxh3 de sus bytes, al
++//   cerrar el lote, cuando los dibujos juntados ya están completos. Mover los vértices obliga a corregir el primer número
++//   del bloque de uniformes del dibujo (vtx_start), que todavía no se subió.
++// Seguridad del anillo: una entrada sirve mientras la cabeza no dio la vuelta encima (head <= pos + size); si quedó a
++// más de media vuelta se vuelve a escribir (así lo que se usa nunca está por ser pisado); un lote escribe a lo más 1/4
++// de vuelta y una entrada mide a lo más 1/8: lo que se usó en el lote no se pisa dentro del mismo lote. Lo que lotes ya
++// enviados leen de una zona que se reescribe lo protege el orden de la fila (WriteBuffer va después de lo ya enviado).
++// MKW_ANILLO=0 (la página con ?anillo=0) = como antes; MKW_ANILLO=2 (?anillo=verifica) = además, cada acierto por
++// generación se compara con la huella del contenido (cuenta las diferencias: tienen que ser 0).
++
++static inline uint64_t anillo_huella(const void* data, size_t len) {
++  return xxh3_hash_s(data, len, static_cast<HashType>(len));
++}
++static inline bool anillo_vale(const Anillo& a, const EntradaAnillo& e, uint64_t len) {
++  return e.pos != UINT64_MAX && e.len == len && a.head <= e.pos + a.size && a.head - e.pos <= a.size / 2;
++}
++static inline Range anillo_rango(const Anillo& a, const EntradaAnillo& e) {
++  return {static_cast<uint32_t>(a.base + e.pos % a.size), static_cast<uint32_t>(e.len)};
++}
++static void anillo_subir(Anillo& a) {
++  if (a.run.empty()) return;
++  g_queue.WriteBuffer(*a.gpu, a.base + a.runStart % a.size, a.run.data(), a.run.size());
++  a.run.clear();
++  a.runStart = a.head;
++}
++// Lugar para len bytes (len múltiplo de 4); copia data (y ceros hasta len). UINT64_MAX = no entra en este lote.
++static uint64_t anillo_poner(Anillo& a, const void* data, size_t bytes, uint64_t len) {
++  if (len > a.size / 8) return UINT64_MAX;
++  uint64_t pos = AURORA_ALIGN(a.head, a.align);
++  if (pos % a.size + len > a.size) pos = (pos / a.size + 1) * a.size;   // nunca partido en el borde: a la vuelta siguiente
++  if (pos + len - a.batchStart > a.size / 4) return UINT64_MAX;
++  if (!a.run.empty() && pos / a.size != a.runStart / a.size) anillo_subir(a);   // cambió de vuelta: subir lo anterior
++  if (a.run.empty()) a.runStart = pos;
++  a.run.resize(pos - a.runStart, 0);       // el hueco de alineación, en ceros
++  const auto* p = static_cast<const u8*>(data);
++  a.run.insert(a.run.end(), p, p + bytes);
++  a.run.resize(pos + len - a.runStart, 0);
++  a.head = pos + len;
++  return pos;
++}
++
++Range push_storage_cacheable(const uint8_t* data, size_t length) {
++  if (g_anilloModo == 0 || data == nullptr || length == 0) return push_storage(data, length);
++  const uint64_t len = AURORA_ALIGN(length, g_anStorage.align);
++  const uint64_t key = (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(data)) << 20) ^ length;
++  const uint64_t gen = guest_write_generation(data, length);
++  auto& e = g_anArreglos[key];
++  bool acierto = e.ptr == data && e.bytes == length && anillo_vale(g_anStorage, e, len);
++  uint64_t huella = 0;
++  if (acierto) {
++    if (gen != kGuestWriteUntracked && gen == e.gen) {
++      if (g_anilloModo == 2) {
++        huella = anillo_huella(data, length);
++        if (huella != e.hash) { ++g_anCuenta[6]; acierto = false; }
++      }
++    } else {
++      huella = anillo_huella(data, length);
++      acierto = huella == e.hash;
++      if (acierto) e.gen = gen;   // la escritura no cambió estos bytes
++      ++g_anCuenta[9];
++    }
++  }
++  if (acierto) {
++    g_anCuenta[4] += len;
++    return anillo_rango(g_anStorage, e);
++  }
++  const uint64_t pos = anillo_poner(g_anStorage, data, length, len);
++  if (pos == UINT64_MAX) {
++    ++g_anCuenta[8];
++    return push_storage(data, length);
++  }
++  if (huella == 0) huella = anillo_huella(data, length);
++  e = EntradaAnillo{.pos = pos, .len = len, .gen = gen, .hash = huella, .ptr = data, .bytes = length};
++  g_anCuenta[5] += len;
++  return anillo_rango(g_anStorage, e);
++}
++
++// Un rango del lote (vértices o índices de un dibujo) pasa al anillo: el mismo contenido ya subido, o se escribe ahora.
++static bool anillo_reubicar(Anillo& a, absl::flat_hash_map<uint64_t, EntradaAnillo>& mapa, ByteBuffer& buf,
++                            Range& r, uint64_t* reusado, uint64_t* escrito) {
++  if (r.offset >= a.base) return true;                       // ya está en el anillo
++  if (uint64_t(r.offset) + r.size > buf.size()) return false;
++  const u8* data = buf.data() + r.offset;
++  const uint64_t len = AURORA_ALIGN(uint64_t(r.size), 4);
++  const uint64_t huella = anillo_huella(data, r.size);
++  auto& e = mapa[huella];
++  if (e.bytes == r.size && anillo_vale(a, e, len)) {
++    *reusado += len;
++  } else {
++    const uint64_t pos = anillo_poner(a, data, r.size, len);
++    if (pos == UINT64_MAX) return false;
++    e = EntradaAnillo{.pos = pos, .len = len, .hash = huella, .bytes = r.size};
++    *escrito += len;
++  }
++  r.offset = static_cast<uint32_t>(a.base + e.pos % a.size);
++  return true;
++}
++
++static void anillo_cerrar_lote(bool& sinVerts, bool& sinIdx) {
++  sinVerts = sinIdx = false;
++  if (g_anilloModo != 0) {
++    // Los vértices se mueven solo sin interpolación de cuadros (la copia interpolada del uniforme lleva su vtx_start).
++    const bool moverVerts = !gx::frame_interpolation_active();
++    bool todosV = moverVerts, todosI = true, alguno = false;
++    for (auto& pass : g_renderPasses) {
++      for (auto& c : pass.commands) {
++        if (c.type != CommandType::Draw || c.data.draw.type != ShaderType::GX) continue;
++        auto& d = c.data.draw.gx;
++        alguno = true;
++        if (d.idxRange.size && !anillo_reubicar(g_anIdx, g_anIdxMapa, g_indices, d.idxRange, &g_anCuenta[2], &g_anCuenta[3]))
++          todosI = false, ++g_anCuenta[8];
++        if (!moverVerts || !d.vertRange.size) continue;
++        const uint32_t antes = d.vertRange.offset;
++        if (!anillo_reubicar(g_anVerts, g_anVertsMapa, g_verts, d.vertRange, &g_anCuenta[0], &g_anCuenta[1])) {
++          todosV = false, ++g_anCuenta[8];
++          continue;
++        }
++        if (d.vertRange.offset != antes && uint64_t(d.uniformRange.offset) + 4 <= g_uniforms.size()) {
++          const uint32_t vtxStart = d.vertRange.offset;   // build_uniform: el primer u32 del bloque es vtx_start
++          std::memcpy(g_uniforms.data() + d.uniformRange.offset, &vtxStart, sizeof(vtxStart));
++        }
++      }
++    }
++    // La parte de siempre se deja de subir solo si TODO dibujo de este lote ya apunta al anillo (y no hay una pasada
++    // suspendida que siga usando bytes de esta parte en el lote que viene).
++    sinVerts = alguno && todosV && !g_suspendedEfbPass;
++    sinIdx = alguno && todosI && !g_suspendedEfbPass;
++    if (sinVerts && sinIdx) ++g_anCuenta[7];
++  }
++  for (Anillo* a : {&g_anVerts, &g_anIdx, &g_anStorage}) {
++    if (a->gpu == nullptr) continue;
++    anillo_subir(*a);
++    a->batchStart = a->head;
++  }
++  // de vez en cuando, olvidar lo que el anillo ya pisó (para que los mapas no crezcan sin fin)
++  if (static uint32_t s_lotes = 0; ++s_lotes % 1200 == 0) {
++    const auto barrer = [](absl::flat_hash_map<uint64_t, EntradaAnillo>& m, const Anillo& a) {
++      absl::erase_if(m, [&](const auto& kv) { return kv.second.pos == UINT64_MAX || a.head > kv.second.pos + a.size; });
++    };
++    barrer(g_anVertsMapa, g_anVerts);
++    barrer(g_anIdxMapa, g_anIdx);
++    barrer(g_anArreglos, g_anStorage);
++  }
++}
++
+ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
+   ZoneScoped;
+   ASSERT(!advanceFrame || !g_inOffscreen, "end_frame called while offscreen rendering is active");
+@@ -1176,20 +1425,55 @@ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
    const auto writeBuffer = [&](ByteBuffer& buf, wgpu::Buffer& out, uint64_t size, std::string_view label) {
      const auto writeSize = buf.size(); // Only need to copy this many bytes
      if (writeSize > 0) {
@@ -244,7 +491,13 @@ index e093901..538ba88 100644
    g_stagingBuffers[currentStagingBuffer].Unmap();
    s_mappingState.reset();
    g_stats.drawCallCount = g_drawCallCount;
-@@ -1190,6 +1247,14 @@ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
+   g_stats.mergedDrawCallCount = g_mergedDrawCallCount;
++  // MKW RETRO (G3/H12, §181): los dibujos pasan a los anillos; si todos pasaron, la parte de siempre no se sube
++  bool anilloSinVerts = false, anilloSinIdx = false;
++  anillo_cerrar_lote(anilloSinVerts, anilloSinIdx);
++  if (anilloSinVerts) g_verts.release();
++  if (anilloSinIdx) g_indices.release();
+   g_stats.lastVertSize = writeBuffer(g_verts, g_vertexBuffer, VertexBufferSize, "Vertex");
    g_stats.lastUniformSize = writeBuffer(g_uniforms, g_uniformBuffer, UniformBufferSize, "Uniform");
    g_stats.lastIndexSize = writeBuffer(g_indices, g_indexBuffer, IndexBufferSize, "Index");
    g_stats.lastStorageSize = writeBuffer(g_storage, g_storageBuffer, StorageBufferSize, "Storage");
@@ -254,12 +507,62 @@ index e093901..538ba88 100644
 +    Log.info("staging: frame uploads vertices {} KB, uniforms {} KB, indices {} KB, storage {} KB; {} draws ({} merged), {} render passes",
 +             g_stats.lastVertSize / 1024, g_stats.lastUniformSize / 1024, g_stats.lastIndexSize / 1024,
 +             g_stats.lastStorageSize / 1024, g_drawCallCount, g_mergedDrawCallCount, g_renderPasses.size());
++    // MKW RETRO (§181): lo que los anillos ahorraron desde el principio (KB reusados / escritos)
++    if (g_anilloModo != 0)
++      Log.info("anillo: vertices {}/{} KB, indices {}/{} KB, storage {}/{} KB (reusados/escritos), lotes sin parte fija {}, "
++               "fuera {}, storage por huella {}, diferencias {}",
++               g_anCuenta[0] >> 10, g_anCuenta[1] >> 10, g_anCuenta[2] >> 10, g_anCuenta[3] >> 10, g_anCuenta[4] >> 10,
++               g_anCuenta[5] >> 10, g_anCuenta[7], g_anCuenta[8], g_anCuenta[9], g_anCuenta[6]);
 +  }
 +#endif
    if constexpr (UseTextureBuffer) {
      g_stats.lastTextureUploadSize = g_textureUpload.size();
      {
-@@ -1550,8 +1615,17 @@ static void render_pass_impl(const wgpu::RenderPassEncoder& pass, const std::vec
+@@ -1317,6 +1601,28 @@ static const char* render_pass_label(u32 index) noexcept {
+ static void render_pass_impl(const wgpu::RenderPassEncoder& pass, const std::vector<RenderPass>& passes, u32 idx,
+                              int32_t interpolatedFrame, DebugFrameData& debugFrame);
+ 
++// MKW RETRO (G2 del plan de rendimiento, bitácora §177.2): guardar la profundidad de una pasada solo si alguien la vuelve
++// a leer. En una tarjeta por baldosas (los teléfonos) cada "Store" es llevar el búfer de profundidad entero de la memoria
++// rápida del chip a la memoria principal. Se descarta solo en el caso seguro: dentro de este mismo cuadro, la siguiente
++// pasada que usa ESA profundidad la limpia antes de dibujar (clearDepth), y esta pasada no la copia (resolve de
++// profundidad) ni es la última (la instantánea de depth_peek y el cuadro siguiente la leen). Las pasadas vacías que se
++// saltan no la tocan. mkw_web_profundidad(0) (la página con ?descartarZ=0) = guardar siempre, como antes.
++static bool g_descartarProfundidad = true;
++uint32_t g_mkwLimpiezas[8] = {};   // [copias que limpian, de ellas con Z, de ellas enteras, x, y, ancho, alto, destino ancho<<16|alto]
++static uint32_t g_profundidadDescartada = 0;   // pasadas descartadas (para el informe)
++static bool depth_needed_after(const std::vector<RenderPass>& renderPasses, u32 i) {
++  const auto& p = renderPasses[i];
++  if (!g_descartarProfundidad || i + 1 >= renderPasses.size() || !p.depthView) return true;
++  if (p.resolveTarget && gx::is_depth_format(p.resolveFormat)) return true;   // la copia del EFB lee esta profundidad
++  for (u32 k = i + 1; k < renderPasses.size(); ++k) {
++    const auto& q = renderPasses[k];
++    if (q.depthView.Get() != p.depthView.Get()) continue;
++    if (q.clearDepth) return false;                // la próxima que la usa la limpia: nadie lee lo de ahora
++    return true;                                   // la próxima la carga (Load): hay que guardarla
++  }
++  return true;                                     // nadie más en este cuadro: el cuadro siguiente puede cargarla
++}
++
+ static void render_impl(std::vector<RenderPass>& renderPasses, wgpu::CommandEncoder& cmd, int32_t interpolatedFrame,
+                         bool finalize, DebugFrameData& debugFrame, const depth_peek::FrameMapping& depthMapping) {
+   ZoneScoped;
+@@ -1354,10 +1660,13 @@ static void render_impl(std::vector<RenderPass>& renderPasses, wgpu::CommandEnco
+                 },
+         },
+     };
++    const bool guardarZ = depth_needed_after(renderPasses, i);   // (G2, §177.2)
++    if (!guardarZ) ++g_profundidadDescartada;
++    const wgpu::StoreOp depthStore = guardarZ ? wgpu::StoreOp::Store : wgpu::StoreOp::Discard;
+     const wgpu::RenderPassDepthStencilAttachment depthStencilAttachment{
+         .view = passInfo.depthView,
+         .depthLoadOp = passInfo.clearDepth ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load,
+-        .depthStoreOp = wgpu::StoreOp::Store,
++        .depthStoreOp = depthStore,
+         .depthClearValue = passInfo.clearDepthValue,
+     };
+     const wgpu::RenderPassDescriptor renderPassDescriptor{
+@@ -1550,8 +1859,17 @@ static void render_pass_impl(const wgpu::RenderPassEncoder& pass, const std::vec
        // "in front" geometry silently vanishes. A full [0,1] viewport is unaffected either way,
        // which is why this only broke specific elements, not the whole scene. Matches upstream
        // aurora's apply_viewport (lib/gfx/encoding.cpp) exactly.
@@ -277,7 +580,7 @@ index e093901..538ba88 100644
        pass.SetViewport(vp.left, vp.top, vp.width, vp.height, minDepth, maxDepth);
      } break;
      case CommandType::SetScissor: {
-@@ -1605,6 +1679,22 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass, Pipelin
+@@ -1605,6 +1923,22 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass, Pipelin
    }
    wgpu::RenderPipeline pipeline;
    bool pipelineReady;
@@ -300,6 +603,31 @@ index e093901..538ba88 100644
    if (!skip_unready_pipelines()) {
      pipelineReady = wait_pipeline(ref, pipeline);
    } else if (requireReady) {
+@@ -1768,3 +2102,11 @@ void aurora_pop_debug_group() {
+ }
+ 
+ const AuroraStats* aurora_get_stats() { return &aurora::gfx::g_stats; }
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++// MKW RETRO (G2, §177.2): la página apaga el descarte con ?descartarZ=0 y lee cuántas pasadas lo usaron
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_profundidad(int descartar) { aurora::gfx::g_descartarProfundidad = descartar != 0; }
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_profundidad_cuenta() { return aurora::gfx::g_profundidadDescartada; }
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_limpiezas(uint32_t k) { return k < 8 ? aurora::gfx::g_mkwLimpiezas[k] : 0; }
++#endif
+diff --git a/aurora-main/lib/gfx/common.hpp b/aurora-main/lib/gfx/common.hpp
+index b2993a8..4d361cb 100644
+--- a/aurora-main/lib/gfx/common.hpp
++++ b/aurora-main/lib/gfx/common.hpp
+@@ -360,6 +360,8 @@ static Range push_uniform(const T& data) {
+   return push_uniform(reinterpret_cast<const uint8_t*>(&data), sizeof(T));
+ }
+ Range push_storage(const uint8_t* data, size_t length);
++// MKW RETRO (H12, §181): como push_storage, pero lo que no cambió se reusa del anillo persistente
++Range push_storage_cacheable(const uint8_t* data, size_t length);
+ template <typename T>
+ static Range push_storage(ArrayRef<T> data) {
+   return push_storage(reinterpret_cast<const uint8_t*>(data.data()), data.size() * sizeof(T));
 diff --git a/aurora-main/lib/gfx/dds_io.cpp b/aurora-main/lib/gfx/dds_io.cpp
 index 84eecc2..becc629 100644
 --- a/aurora-main/lib/gfx/dds_io.cpp
@@ -314,7 +642,7 @@ index 84eecc2..becc629 100644
    return ConvertedTexture{
        .format = parsedLayout->format,
 diff --git a/aurora-main/lib/gfx/pipeline_cache.cpp b/aurora-main/lib/gfx/pipeline_cache.cpp
-index d995e00..e43f691 100644
+index d995e00..5f98647 100644
 --- a/aurora-main/lib/gfx/pipeline_cache.cpp
 +++ b/aurora-main/lib/gfx/pipeline_cache.cpp
 @@ -23,6 +23,14 @@
@@ -332,7 +660,15 @@ index d995e00..e43f691 100644
  namespace aurora::gfx {
  static Module Log("aurora::gfx::pipeline_cache");
  
-@@ -69,12 +77,68 @@ constexpr size_t MaxPipelineWorkers = 22;
+@@ -33,6 +41,7 @@ constexpr const char* SdlVfsName = "aurora_pipeline_cache_sdl_vfs";
+ struct CachedPipeline {
+   wgpu::RenderPipeline pipeline;
+   uint32_t firstFrameUsed = UINT32_MAX;
++  uint32_t webGen = 0;                        // MKW RETRO C2 (§174): con qué etiqueta de la página se anotó el uso
+ };
+ 
+ struct PendingPipeline {
+@@ -69,12 +78,106 @@ constexpr size_t MaxPipelineWorkers = 22;
  // Cached clear and GX pipelines are prewarmed using the full worker pool.
  constexpr size_t MaxBackgroundPipelineWorkers = MaxPipelineWorkers;
  // For synchronous pipeline fallback (OpenGL)
@@ -373,9 +709,16 @@ index d995e00..e43f691 100644
 +struct WebRegistro {
 +  uint32_t tipo, version, primerCuadro;
 +  ByteBuffer config;
++  uint32_t etiqueta = 0xFFFFFFFFu;            // C2 (§174): dónde se usó (ver g_webEtiqueta); sin etiqueta = lista vieja
++  uint32_t visita = 0;                        // C2 (§174): en qué visita se usó por última vez (0 = nunca, la semilla)
 +};
 +static absl::flat_hash_map<PipelineRef, WebRegistro> g_webLista;
 +static ByteBuffer g_webExportado;
++// C3 (§172): los pipelines que alguna vez se tuvieron que armar de golpe (una pasada que no se puede saltar, como la
++// primera copia de cada imagen de la carrera, los pidió antes de que llegaran). Al exportar la lista van PRIMERO (con
++// primer cuadro 0): en la próxima visita el precalentado los pide en el título y los menús, mucho antes de la carrera.
++// El primer cuadro 0 queda guardado, así que siguen adelante en las visitas siguientes.
++static absl::flat_hash_set<PipelineRef> g_webUrgentes;
 +// Precalentado postergado (MKW_PRECALENTAR=tarde, bitácora §76): pedir los ~700 pipelines de la lista en el arranque
 +// ocupa el proceso de GPU del navegador varios segundos justo cuando el juego carga su título, y la música del título
 +// (lo primero que se oye, debajo del menú de inicio de la página) se atrasaba ~4,5 s. Con "tarde" las listas se leen
@@ -390,19 +733,50 @@ index d995e00..e43f691 100644
 +// juego necesita pipelines (un menú nuevo), el precalentado le cede el paso.
 +static bool g_webPrecalentarTarde = false;
 +static bool g_webPrecalentarPedido = false;
++// U1 (§140): la página pausa el precalentado mientras corre una carrera (mkw_web_pipelines_pausa): lo de la cola espera
++// a los menús; lo que el juego necesita para dibujar no pasa por aquí (web_crear lo pide en el momento)
++static bool g_webPrecalentarPausa = false;
 +static size_t g_webColaPorCuadro = BuildPipelinesPerFrame;
 +static size_t g_webEnCaminoMax = 0;           // 0 = sin tope (el precalentado de siempre)
 +static std::vector<std::function<void()>> g_webDiferidos;
 +constexpr size_t WebListaMax = 8192;
 +constexpr char WebMagia[8] = {'M', 'K', 'W', 'P', 'I', 'P', 'E', '1'};
++// C2 (§174): precalentar solo lo que viene. Cada pipeline de la lista lleva una ETIQUETA, dónde lo usó el juego: en los
++// menús (WebMenus), en la carrera de dos pistas o más (WebComun) o en una sola pista (0x10000 + la pista de Pulsar). La
++// página dice dónde está el juego (mkw_web_pipelines_etiqueta: los menús o la pista de la carrera). Al arrancar se
++// precalientan los de los menús, los comunes, los sin etiqueta (listas viejas) y los urgentes de C3; los de una pista
++// esperan a que se elija esa pista (mkw_web_pipelines_pista, desde el paquete de carrera): así el arranque ya no crece
++// con cada pista jugada. Y cada uno anota la última visita en que se usó: lo de una pista que no se juega hace
++// WebPoda visitas sale de la lista propia (la semilla los vuelve a traer si son de ella). Formato "MKWPIPE2": como el 1,
++// con u32 etiqueta y u32 visita después del primer cuadro. Sin MKW_PIPELINES_ETIQUETA=1 (?pipelinesPista=0): como antes.
++constexpr char WebMagia2[8] = {'M', 'K', 'W', 'P', 'I', 'P', 'E', '2'};
++constexpr uint32_t WebSinEtiqueta = 0xFFFFFFFFu, WebMenus = 0, WebComun = 1;
++constexpr uint32_t WebPoda = 8;
++static bool g_webPorEtiqueta = false;         // MKW_PIPELINES_ETIQUETA=1
++static uint32_t g_webEtiqueta = WebMenus;     // dónde está el juego ahora
++static uint32_t g_webGen = 1;                 // sube con cada cambio de etiqueta: cada pipeline se anota una vez por cambio
++static uint32_t g_webVisita = 1;              // esta visita (= la última de las listas + 1)
++static absl::flat_hash_map<uint32_t, std::vector<std::function<void()>>> g_webDePista;   // etiqueta → pedidos esperando
++static std::vector<std::function<void()>> g_webPistaPedida;                              // a encolar en el cuadro siguiente
++// Dos etiquetas de un mismo pipeline: los menús ganan; dos pistas distintas = común
++static uint32_t web_combinar(uint32_t a, uint32_t b) {
++  if (a == WebSinEtiqueta) return b;
++  if (b == WebSinEtiqueta) return a;
++  if (a == WebMenus || b == WebMenus) return WebMenus;
++  return a == b ? a : WebComun;
++}
++static void web_anotar_uso(PipelineRef hash);
 +// medidor (una línea por segundo en la consola)
 +static uint32_t g_webPedidos = 0, g_webListos = 0, g_webSaltados = 0, g_webForzados = 0, g_webSincronicos = 0;
++// G4 barato (§190): lo que el juego pidió (no el precalentado) sin estar listo ni en camino, en cada segundo: en la cola del
++// precalentado sin pedir todavía, en la lista pero esperando (su pista o el precalentado diferido), o nuevo (no estaba)
++static uint32_t g_webJuegoCola = 0, g_webJuegoLista = 0, g_webJuegoNuevo = 0;
 +static double g_webMsLlamada = 0.0, g_webMsEspera = 0.0, g_webMsForzados = 0.0, g_webDesde = 0.0;
 +#endif
  static bool g_pipelineThreadEnd = false;
  static size_t g_activeBackgroundPipelineWorkers = 0;
  static std::condition_variable g_pipelineCv;
-@@ -360,6 +424,15 @@ static PipelineCacheWrite make_pipeline_cache_write(ShaderType type, PipelineRef
+@@ -360,6 +463,18 @@ static PipelineCacheWrite make_pipeline_cache_write(ShaderType type, PipelineRef
  }
  
  static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
@@ -411,18 +785,31 @@ index d995e00..e43f691 100644
 +    g_webLista.try_emplace(write.hash, WebRegistro{.tipo = static_cast<uint32_t>(underlying(write.type)),
 +                                                   .version = write.configVersion,
 +                                                   .primerCuadro = write.firstFrameUsed,
-+                                                   .config = std::move(write.config)});
++                                                   .config = std::move(write.config),
++                                                   .etiqueta = g_webEtiqueta, .visita = g_webVisita});
++  } else {
++    web_anotar_uso(write.hash);
 +  }
 +  return;
 +#endif
    if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr) {
      return;
    }
-@@ -433,6 +506,90 @@ static bool remove_pending_pipeline(Queue& queue, PipelineRef hash) {
+@@ -433,6 +548,101 @@ static bool remove_pending_pipeline(Queue& queue, PipelineRef hash) {
    return true;
  }
  
 +#ifdef __EMSCRIPTEN__
++// C2 (§174): el juego usó este pipeline donde está ahora (g_webEtiqueta) y en esta visita
++static void web_anotar_uso(PipelineRef hash) {
++  const auto it = g_webLista.find(hash);
++  if (it == g_webLista.end()) {
++    return;
++  }
++  it->second.etiqueta = web_combinar(it->second.etiqueta, g_webEtiqueta);
++  it->second.visita = g_webVisita;
++}
++
 +static void web_guardar_listo(PipelineRef hash, wgpu::RenderPipeline pipeline, uint32_t firstFrameUsed) {
 +  std::scoped_lock guard{g_pipelineMutex};
 +  const auto [_, inserted] = g_pipelines.try_emplace(hash, CachedPipeline{
@@ -464,6 +851,7 @@ index d995e00..e43f691 100644
 +  auto pipeline = enCamino.create();  // g_webPedirAsync está apagado: build_pipeline lo crea sincrónico
 +  g_webMsForzados += emscripten_get_now() - t0;
 +  ++g_webForzados;
++  g_webUrgentes.insert(hash);
 +  web_guardar_listo(hash, std::move(pipeline), enCamino.firstFrameUsed);
 +  return true;
 +}
@@ -509,18 +897,50 @@ index d995e00..e43f691 100644
  template <typename PipelineConfig>
  static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& config, NewPipelineCallback&& cb,
                                        bool persist, std::optional<uint32_t> firstFrameUsedOverride) {
-@@ -456,6 +613,10 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -452,11 +662,28 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+     const bool skipUnreadyGxPipeline = deferGxPipeline && g_skipUnreadyGxPipelines.load(std::memory_order_relaxed);
+     auto pipelineIt = g_pipelines.find(hash);
+     if (pipelineIt != g_pipelines.end()) {
++#ifdef __EMSCRIPTEN__
++      if (!cachePreload && pipelineIt->second.webGen != g_webGen) {   // C2 (§174): una vez por etiqueta, no por dibujo
++        pipelineIt->second.webGen = g_webGen;
++        web_anotar_uso(hash);
++      }
++#endif
+       if (persist && firstFrameUsed < pipelineIt->second.firstFrameUsed) {
          pipelineIt->second.firstFrameUsed = firstFrameUsed;
          cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
        }
 +#ifdef __EMSCRIPTEN__
 +    } else if (g_webEnCamino.contains(hash)) {
 +      // ya pedido al navegador; llega solo
++      if (!cachePreload) web_anotar_uso(hash);
 +#endif
      } else if (g_pendingPipelines.contains(hash)) {
++#ifdef __EMSCRIPTEN__
++      if (!cachePreload) {
++        web_anotar_uso(hash);
++        ++g_webJuegoCola;   // G4 barato (§190): estaba en la cola del precalentado, todavía sin pedir
++      }
++#endif
        auto* pending = touch_pending_pipeline(hash, g_pipelineFrameActive);
        if (pending != nullptr && firstFrameUsed < pending->firstFrameUsed) {
-@@ -500,6 +661,25 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+         pending->firstFrameUsed = firstFrameUsed;
+@@ -468,6 +695,13 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+         syncCreate = true;
+       }
+     } else {
++#ifdef __EMSCRIPTEN__
++      // G4 barato (§190): el juego pide uno que nadie pidió todavía: ¿estaba en la lista (esperando su pista o el
++      // precalentado diferido) o es nuevo (ni la semilla ni la lista propia lo traían)?
++      if (!cachePreload) {
++        ++(g_webLista.contains(hash) ? g_webJuegoLista : g_webJuegoNuevo);
++      }
++#endif
+       if (g_pipelineFrameActive && !deferGxPipeline) {
+         syncCreate = true;
+       } else {
+@@ -500,6 +734,25 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
      }
    }
  
@@ -546,7 +966,7 @@ index d995e00..e43f691 100644
    if (syncCreate) {
      const auto pipeline = cb();
      {
-@@ -711,6 +891,14 @@ static void seed_pipeline_cache() {
+@@ -711,6 +964,14 @@ static void seed_pipeline_cache() {
  }
  
  static bool prepare_pipeline_cache_db() {
@@ -561,7 +981,7 @@ index d995e00..e43f691 100644
    if (g_pipelineCacheBroken) {
      return false;
    }
-@@ -968,7 +1156,23 @@ static void note_pipeline_queue_drained() {
+@@ -968,7 +1229,23 @@ static void note_pipeline_queue_drained() {
  }
  
  static void compile_pending_pipeline(PendingPipeline pending) {
@@ -585,13 +1005,26 @@ index d995e00..e43f691 100644
    {
      std::lock_guard lock{g_pipelineMutex};
      const auto [_, inserted] = g_pipelines.try_emplace(pending.hash, CachedPipeline{
-@@ -1025,8 +1229,43 @@ static void pipeline_worker() {
+@@ -1025,8 +1302,59 @@ static void pipeline_worker() {
    }
  }
  
 +#ifdef __EMSCRIPTEN__
 +// El precalentado postergado, ya pedido por la página: encolar todo lo diferido (de a 8 por cuadro, como siempre)
 +static void web_precalentar_diferidos() {
++  if (!g_webPistaPedida.empty()) {           // C2 (§174): lo de la pista recién elegida, al comienzo de este cuadro
++    auto lista = std::move(g_webPistaPedida);
++    g_webPistaPedida.clear();
++    for (auto& encolar : lista) {
++      encolar();
++    }
++    const auto enCola = queuedPipelines.load();
++    if (enCola > 0 && !g_prewarmActive.load()) {
++      g_prewarmCount = enCola;
++      g_prewarmStart = std::chrono::steady_clock::now();
++      g_prewarmActive.store(true, std::memory_order_release);
++    }
++  }
 +  if (!g_webPrecalentarPedido || g_webDiferidos.empty()) {
 +    return;
 +  }
@@ -616,6 +1049,9 @@ index d995e00..e43f691 100644
 -  while (g_pipelinesPerFrame < BuildPipelinesPerFrame) {
 +#ifdef __EMSCRIPTEN__
 +  web_precalentar_diferidos();
++  if (g_webPrecalentarPausa) {
++    return;                                    // U1 (§140): en pausa (una carrera andando): sigue en los menús
++  }
 +  // (en la web la cola solo lleva el precalentado: lo que el juego dibuja se pide en el momento, web_crear)
 +  const size_t porCuadro = g_webColaPorCuadro;
 +#else
@@ -630,7 +1066,7 @@ index d995e00..e43f691 100644
      PendingPipeline pending;
      {
        std::lock_guard lock{g_pipelineMutex};
-@@ -1107,7 +1346,123 @@ static void load_pipeline_cache_entries(ShaderType type, uint32_t configVersion,
+@@ -1107,7 +1435,154 @@ static void load_pipeline_cache_entries(ShaderType type, uint32_t configVersion,
    sqlite3_clear_bindings(g_pipelineCacheLoadStmt);
  }
  
@@ -639,7 +1075,7 @@ index d995e00..e43f691 100644
 +// Devuelve cuántas se aceptaron; descarta las de otra versión o tamaño (otra compilación de aurora).
 +template <typename PipelineConfig, typename CreateFn>
 +static bool web_precalentar_una(const uint8_t* datos, uint32_t tam, uint32_t primerCuadro, CreateFn&& create,
-+                                uint32_t version, ShaderType type) {
++                                uint32_t version, ShaderType type, uint32_t etiqueta = WebSinEtiqueta, uint32_t visita = 0) {
 +  if (tam != sizeof(PipelineConfig)) {
 +    return false;
 +  }
@@ -654,16 +1090,33 @@ index d995e00..e43f691 100644
 +    }
 +  }
 +  const PipelineRef hash = xxh3_hash(config, static_cast<HashType>(type));
-+  if (g_webPrecalentarTarde) {               // se pide después (mkw_web_pipelines_precalentar)
-+    g_webDiferidos.emplace_back([=] { find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro); });
-+  } else {
-+    find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro);
-+  }
-+  if (g_webLista.size() < WebListaMax) {
++  // C2 (§174): si ya vino en otra lista (la semilla y después la propia), se juntan las etiquetas; uno que ya iba al
++  // arranque o ya esperaba su pista no se pide dos veces
++  const auto previo = g_webLista.find(hash);
++  const bool yaEstaba = previo != g_webLista.end();
++  if (yaEstaba) {
++    previo->second.etiqueta = web_combinar(previo->second.etiqueta, etiqueta);
++    previo->second.visita = std::max(previo->second.visita, visita);
++  } else if (g_webLista.size() < WebListaMax) {
 +    ByteBuffer copia(tam);
 +    std::memcpy(copia.data(), datos, tam);
 +    g_webLista.try_emplace(hash, WebRegistro{.tipo = static_cast<uint32_t>(underlying(type)), .version = version,
-+                                             .primerCuadro = primerCuadro, .config = std::move(copia)});
++                                             .primerCuadro = primerCuadro, .config = std::move(copia),
++                                             .etiqueta = etiqueta, .visita = visita});
++  }
++  g_webVisita = std::max(g_webVisita, visita + 1);
++  if (yaEstaba) {
++    return true;
++  }
++  auto encolar = [=] { find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro); };
++  const bool dePista = g_webPorEtiqueta && etiqueta != WebSinEtiqueta && etiqueta != WebMenus && etiqueta != WebComun &&
++                       primerCuadro != 0;   // (los urgentes de C3 van al arranque igual)
++  if (dePista) {
++    g_webDePista[etiqueta].push_back(std::move(encolar));   // espera a que se elija su pista
++  } else if (g_webPrecalentarTarde) {        // se pide después (mkw_web_pipelines_precalentar)
++    g_webDiferidos.emplace_back(std::move(encolar));
++  } else {
++    encolar();
 +  }
 +  return true;
 +}
@@ -685,28 +1138,32 @@ index d995e00..e43f691 100644
 +    std::memcpy(&v, d.data() + o, 4);
 +    return v;
 +  };
-+  if (d.size() < 12 || std::memcmp(d.data(), WebMagia, 8) != 0) {
++  const bool v2 = d.size() >= 12 && std::memcmp(d.data(), WebMagia2, 8) == 0;   // C2 (§174): con etiqueta y visita
++  if (d.size() < 12 || (!v2 && std::memcmp(d.data(), WebMagia, 8) != 0)) {
 +    std::printf("[pipelines] %s no es una lista de pipelines; se ignora\n", ruta);
 +    return;
 +  }
 +  const uint32_t cantidad = u32(8);
++  const size_t cabeza = v2 ? 24 : 16;
 +  size_t o = 12;
 +  for (uint32_t i = 0; i < cantidad; ++i) {
-+    if (o + 16 > d.size()) {
++    if (o + cabeza > d.size()) {
 +      break;
 +    }
-+    const uint32_t tipo = u32(o), version = u32(o + 4), primerCuadro = u32(o + 8), tam = u32(o + 12);
-+    o += 16;
++    const uint32_t tipo = u32(o), version = u32(o + 4), primerCuadro = u32(o + 8);
++    const uint32_t etiqueta = v2 ? u32(o + 12) : WebSinEtiqueta, visita = v2 ? u32(o + 16) : 0;
++    const uint32_t tam = u32(o + cabeza - 4);
++    o += cabeza;
 +    if (o + tam > d.size()) {
 +      break;
 +    }
 +    bool ok = false;
 +    if (tipo == underlying(ShaderType::GX)) {
 +      ok = web_precalentar_una<gx::PipelineConfig>(d.data() + o, tam, primerCuadro, gx::create_pipeline,
-+                                                   gx::GXPipelineConfigVersion, ShaderType::GX);
++                                                   gx::GXPipelineConfigVersion, ShaderType::GX, etiqueta, visita);
 +    } else if (tipo == underlying(ShaderType::Clear)) {
 +      ok = web_precalentar_una<clear::PipelineConfig>(d.data() + o, tam, primerCuadro, clear::create_pipeline,
-+                                                      clear::ClearPipelineConfigVersion, ShaderType::Clear);
++                                                      clear::ClearPipelineConfigVersion, ShaderType::Clear, etiqueta, visita);
 +    }
 +    (ok ? aceptadas : descartadas)++;
 +    o += tam;
@@ -724,8 +1181,18 @@ index d995e00..e43f691 100644
 +    g_webColaPorCuadro = static_cast<size_t>(std::clamp(n, 1L, static_cast<long>(BuildPipelinesPerFrame)));
 +    g_webEnCaminoMax = static_cast<size_t>(std::clamp(m, 0L, 64L));
 +  }
++  const char* porEtiqueta = std::getenv("MKW_PIPELINES_ETIQUETA");
++  g_webPorEtiqueta = porEtiqueta != nullptr && std::strcmp(porEtiqueta, "1") == 0;
 +  web_leer_lista("/datos/pipelines/semilla.bin", aceptadas, descartadas);
 +  web_leer_lista("/datos/pipelines/propia.bin", aceptadas, descartadas);
++  if (g_webPorEtiqueta) {
++    size_t esperan = 0;
++    for (const auto& [e, lista] : g_webDePista) {
++      esperan += lista.size();
++    }
++    std::printf("[pipelines] por pista (C2): %zu esperan a que se elija su pista (%zu pistas); visita %u\n", esperan,
++                g_webDePista.size(), g_webVisita);
++  }
 +  if (g_webPrecalentarTarde) {
 +    if (!g_webDiferidos.empty()) {
 +      std::printf("[pipelines] precalentado postergado: %zu esperan a la primera pantalla del juego; "
@@ -754,7 +1221,7 @@ index d995e00..e43f691 100644
    if (!prepare_pipeline_cache_db()) {
      return;
    }
-@@ -1163,6 +1518,11 @@ PipelineRef find_pipeline(ShaderType type, const gx::PipelineConfig& config, New
+@@ -1163,6 +1638,11 @@ PipelineRef find_pipeline(ShaderType type, const gx::PipelineConfig& config, New
  }
  
  void initialize_pipeline_cache() {
@@ -766,7 +1233,7 @@ index d995e00..e43f691 100644
    g_pipelineCacheBroken = false;
    g_pipelineCacheWriterStop = false;
    g_pipelineFrameActive = false;
-@@ -1227,6 +1587,21 @@ void begin_pipeline_frame() {
+@@ -1227,6 +1707,23 @@ void begin_pipeline_frame() {
  
  void end_pipeline_frame() {
    g_pipelineFrameActive = false;
@@ -775,11 +1242,13 @@ index d995e00..e43f691 100644
 +  if (ahora - g_webDesde >= 1000.0) {
 +    if (g_webPedidos + g_webListos + g_webSincronicos + g_webForzados + g_webSaltados > 0) {
 +      std::printf("[pipelines] %u pedidos en segundo plano (llamada %.1f ms), %u llegaron (tardaron %.0f ms en "
-+                  "promedio), %u en camino, %u sincrónicos, %u armados en el momento (%.1f ms), %u dibujos saltados\n",
++                  "promedio), %u en camino, %u sincrónicos, %u armados en el momento (%.1f ms), %u dibujos saltados, "
++                  "el juego pidió %u de la cola, %u de la lista esperando, %u nuevos\n",
 +                  g_webPedidos, g_webMsLlamada, g_webListos, g_webListos ? g_webMsEspera / g_webListos : 0.0,
 +                  static_cast<unsigned>(g_webEnCamino.size()), g_webSincronicos, g_webForzados, g_webMsForzados,
-+                  g_webSaltados);
++                  g_webSaltados, g_webJuegoCola, g_webJuegoLista, g_webJuegoNuevo);
 +    }
++    g_webJuegoCola = g_webJuegoLista = g_webJuegoNuevo = 0;
 +    g_webPedidos = g_webListos = g_webSaltados = g_webForzados = g_webSincronicos = 0;
 +    g_webMsLlamada = g_webMsEspera = g_webMsForzados = 0.0;
 +    g_webDesde = ahora;
@@ -788,7 +1257,7 @@ index d995e00..e43f691 100644
    if (!g_hasPipelineThread) {
      build_synchronous_pipelines_for_frame();
    }
-@@ -1258,6 +1633,11 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+@@ -1258,6 +1755,11 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
  
  static bool wait_pipeline_impl(PipelineRef ref, wgpu::RenderPipeline& pipeline, bool fatalIfMissing,
                                 bool persistentPass) {
@@ -800,7 +1269,7 @@ index d995e00..e43f691 100644
    std::unique_lock lock{g_pipelineMutex};
    if (!g_pipelines.contains(ref) && g_pendingPipelines.contains(ref)) {
      ZoneScopedN("wait_pipeline");
-@@ -1297,6 +1677,58 @@ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pi
+@@ -1297,6 +1799,104 @@ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pi
  
  } // namespace aurora::gfx
  
@@ -815,16 +1284,25 @@ index d995e00..e43f691 100644
 +  using namespace aurora::gfx;
 +  std::vector<const WebRegistro*> orden;
 +  orden.reserve(g_webLista.size());
-+  for (const auto& [_, r] : g_webLista) {
++  for (auto& [hash, r] : g_webLista) {
++    if (g_webUrgentes.contains(hash)) {
++      r.primerCuadro = 0;                       // C3 (§172): los que se armaron de golpe, primero
++    }
++    // C2 (§174): lo de una sola pista que no se usa hace WebPoda visitas, fuera (la semilla trae lo suyo cada vez)
++    if (g_webPorEtiqueta && r.etiqueta != WebSinEtiqueta && r.etiqueta != WebMenus && r.etiqueta != WebComun &&
++        r.visita + WebPoda < g_webVisita) {
++      continue;
++    }
 +    orden.push_back(&r);
 +  }
 +  // los que se usan antes van primero (así el precalentado pide primero los del título y los menús)
 +  std::sort(orden.begin(), orden.end(), [](const WebRegistro* a, const WebRegistro* b) {
 +    return a->primerCuadro < b->primerCuadro;
 +  });
++  const bool v2 = g_webPorEtiqueta;              // C2 (§174): con etiqueta y visita
 +  size_t total = 12;
 +  for (const auto* r : orden) {
-+    total += 16 + r->config.size();
++    total += (v2 ? 24 : 16) + r->config.size();
 +  }
 +  g_webExportado = aurora::ByteBuffer(total);
 +  uint8_t* p = g_webExportado.data();
@@ -832,13 +1310,17 @@ index d995e00..e43f691 100644
 +    std::memcpy(p, &v, 4);
 +    p += 4;
 +  };
-+  std::memcpy(p, WebMagia, 8);
++  std::memcpy(p, v2 ? WebMagia2 : WebMagia, 8);
 +  p += 8;
 +  pon(static_cast<uint32_t>(orden.size()));
 +  for (const auto* r : orden) {
 +    pon(r->tipo);
 +    pon(r->version);
 +    pon(r->primerCuadro);
++    if (v2) {
++      pon(r->etiqueta);
++      pon(r->visita);
++    }
 +    pon(static_cast<uint32_t>(r->config.size()));
 +    std::memcpy(p, r->config.data(), r->config.size());
 +    p += r->config.size();
@@ -853,6 +1335,39 @@ index d995e00..e43f691 100644
 +extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_precalentar() {
 +  aurora::gfx::g_webPrecalentarPedido = true;
 +  return static_cast<uint32_t>(aurora::gfx::g_webDiferidos.size());
++}
++
++// C2 (§174): dónde está el juego: WebMenus (0) en los menús, 0x10000 + la pista de Pulsar en la carrera
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_pipelines_etiqueta(uint32_t etiqueta) {
++  if (etiqueta != aurora::gfx::g_webEtiqueta) {
++    aurora::gfx::g_webEtiqueta = etiqueta;
++    ++aurora::gfx::g_webGen;
++  }
++}
++
++// C2 (§174): se eligió una pista: sus pipelines (los que solo se usaron en ella) van a la cola de precalentado en el
++// cuadro siguiente. Devuelve cuántos (0 si no había o ya se pidieron).
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_pista(uint32_t etiqueta) {
++  using namespace aurora::gfx;
++  const auto it = g_webDePista.find(etiqueta);
++  if (it == g_webDePista.end()) {
++    return 0;
++  }
++  const auto n = static_cast<uint32_t>(it->second.size());
++  for (auto& encolar : it->second) {
++    g_webPistaPedida.push_back(std::move(encolar));
++  }
++  g_webDePista.erase(it);
++  std::printf("[pipelines] por pista (C2): pista 0x%x elegida, %u a la cola\n", etiqueta, n);
++  return n;
++}
++
++// U1 (§140): pausar (1) o seguir (0) el precalentado. Devuelve cuántos esperan todavía en la cola (los ya pedidos al
++// navegador siguen llegando: solo se deja de pedir más)
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_pausa(int si) {
++  aurora::gfx::g_webPrecalentarPausa = si != 0;
++  std::lock_guard lock{aurora::gfx::g_pipelineMutex};
++  return static_cast<uint32_t>(aurora::gfx::g_priorityPipelines.size() + aurora::gfx::g_backgroundPipelines.size());
 +}
 +#endif
 +
@@ -877,20 +1392,21 @@ index 737e531..16df982 100644
 +
  } // namespace aurora::gfx
 diff --git a/aurora-main/lib/gfx/staging_map.hpp b/aurora-main/lib/gfx/staging_map.hpp
-index 2c79e7f..4566ecc 100644
+index 2c79e7f..bd94237 100644
 --- a/aurora-main/lib/gfx/staging_map.hpp
 +++ b/aurora-main/lib/gfx/staging_map.hpp
-@@ -4,6 +4,9 @@
+@@ -4,6 +4,10 @@
  #include <condition_variable>
  #include <cstdint>
  #include <mutex>
 +#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
++extern "C" void mkw_aurora_espera_subida();   // aurora.cpp (MKW RETRO §155)
 +#endif
  
  namespace aurora::gfx {
  
-@@ -50,6 +53,15 @@ public:
+@@ -50,6 +54,15 @@ public:
    }
  
    void wait_for_progress() {
@@ -899,13 +1415,287 @@ index 2c79e7f..4566ecc 100644
 +    // condition-variable wait would spin forever on the only thread. Yield instead (JSPI suspends
 +    // the guest; the caller's loop then calls ProcessEvents and re-checks the state).
 +    if (state() == BufferMapState::Mapping) {
-+      emscripten_sleep(0);
++      mkw_aurora_espera_subida();   // (§155: through the page when its CPU ballast is on; else a plain yield)
 +    }
 +    return;
 +#endif
      std::unique_lock lock(mutex_);
      // ProcessEvents is still serviced between waits for implementations that
      // need it. A spontaneous completion wakes immediately, without polling.
+diff --git a/aurora-main/lib/gfx/texture.cpp b/aurora-main/lib/gfx/texture.cpp
+index f465f36..137b2c0 100644
+--- a/aurora-main/lib/gfx/texture.cpp
++++ b/aurora-main/lib/gfx/texture.cpp
+@@ -9,6 +9,9 @@
+ 
+ #include <algorithm>
+ #include <cstdint>
++#include <cstdlib>
++#include <cmath>
++#include <cstring>
+ #include <memory>
+ #include <utility>
+ 
+@@ -35,6 +38,73 @@ uint32_t clamp_mip_count(uint32_t width, uint32_t height, uint32_t mips, const c
+   return safeMips;
+ }
+ 
++// MKW RETRO (G6, §190): las texturas CMPR de la Wii suben como BC1 (comprimidas en la tarjeta) en vez de RGBA8.
++// MKW_TEXTURAS_BC=1 lo prende (la página: ?texturasBc=1); apagado por omisión hasta medirlo. Solo si la tarjeta tiene
++// texture-compression-bc. g_bcCuenta: [0] texturas en BC1, [1] KB en BC1, [2] KB que ocuparían en RGBA8, [3] CMPR que
++// no se pudieron (el índice transparente, medidas o mips «arbitrarios»), [4] CMPR vistas.
++// MKW_TEXTURAS_BC=verifica: además, cada BC1 se decodifica aquí (como la tarjeta) y se compara texel a texel con la
++// RGBA8 de siempre: [5] la mayor diferencia de un canal (0-255), [6] miles de texeles comparados, [7] PSNR × 100 de todo
++// (la relación señal/ruido en dB), [8] texeles con algún canal a más de 8 tonos.
++int g_texturasBc = -1;
++uint32_t g_bcCuenta[9] = {};
++double g_bcError2 = 0, g_bcTexeles = 0;
++void verificar_bc1(uint32_t w, uint32_t h, uint32_t mips, const ByteBuffer& bc, ArrayRef<uint8_t> rgba) noexcept {
++  const auto exp5 = [](uint32_t v) { return (v << 3) | (v >> 2); };
++  const auto exp6 = [](uint32_t v) { return (v << 2) | (v >> 4); };
++  size_t d = 0, r = 0;
++  for (uint32_t m = 0; m < mips; ++m) {
++    const uint32_t mw = std::max(w >> m, 1u), mh = std::max(h >> m, 1u);
++    for (uint32_t by = 0; by < (mh + 3) / 4; ++by) {
++      for (uint32_t bx = 0; bx < (mw + 3) / 4; ++bx, d += 8) {
++        if (d + 8 > bc.size()) return;
++        const uint8_t* b = bc.data() + d;
++        const uint32_t c0 = b[0] | (b[1] << 8), c1 = b[2] | (b[3] << 8);
++        int tabla[4][4];
++        const int a[3] = {int(exp5(c0 >> 11)), int(exp6((c0 >> 5) & 63)), int(exp5(c0 & 31))};
++        const int z[3] = {int(exp5(c1 >> 11)), int(exp6((c1 >> 5) & 63)), int(exp5(c1 & 31))};
++        for (int c = 0; c < 3; ++c) {
++          tabla[0][c] = a[c];
++          tabla[1][c] = z[c];
++          tabla[2][c] = c0 > c1 ? (2 * a[c] + z[c] + 1) / 3 : (a[c] + z[c] + 1) / 2;
++          tabla[3][c] = c0 > c1 ? (a[c] + 2 * z[c] + 1) / 3 : 0;
++        }
++        tabla[0][3] = tabla[1][3] = tabla[2][3] = 255;
++        tabla[3][3] = c0 > c1 ? 255 : 0;
++        for (uint32_t y = 0; y < 4; ++y) {
++          for (uint32_t x = 0; x < 4; ++x) {
++            const uint32_t X = bx * 4 + x, Y = by * 4 + y;
++            if (X >= mw || Y >= mh) continue;
++            const size_t o = r + (static_cast<size_t>(Y) * mw + X) * 4;
++            if (o + 4 > rgba.size()) return;
++            const int* t = tabla[(b[4 + y] >> (2 * x)) & 3];
++            int peor = 0;
++            for (int c = 0; c < 4; ++c) {
++              const int dif = std::abs(t[c] - int(rgba[o + c]));
++              peor = std::max(peor, dif);
++              g_bcError2 += double(dif) * dif;
++            }
++            g_bcCuenta[5] = std::max(g_bcCuenta[5], uint32_t(peor));
++            if (peor > 8) g_bcCuenta[8]++;
++            g_bcTexeles += 1;
++          }
++        }
++      }
++    }
++    r += static_cast<size_t>(mw) * mh * 4;
++  }
++  g_bcCuenta[6] = uint32_t(g_bcTexeles / 1000);
++  const double mse = g_bcError2 / (g_bcTexeles * 4);
++  g_bcCuenta[7] = mse > 0 ? uint32_t(100 * 10 * std::log10(255.0 * 255.0 / mse)) : 99999;
++}
++bool texturas_bc() noexcept {
++  if (g_texturasBc < 0) {
++    const char* v = std::getenv("MKW_TEXTURAS_BC");
++    g_texturasBc = v == nullptr ? 0 : v[0] == '1' ? 1 : std::strcmp(v, "verifica") == 0 ? 2 : 0;
++    Log.info("texturas BC1: {}{}", g_texturasBc == 2 ? "(verificando) " : "", g_texturasBc >= 1 ? (webgpu::g_bcTexturesSupported ? "prendidas" : "pedidas, pero la tarjeta no tiene BC") : "apagadas (MKW_TEXTURAS_BC=1 las prende)");
++  }
++  return g_texturasBc >= 1 && webgpu::g_bcTexturesSupported;
++}
++
+ wgpu::Extent3D physical_size(wgpu::Extent3D size, TextureFormatInfo info) {
+   const uint32_t width = ((size.width + info.blockWidth - 1) / info.blockWidth) * info.blockWidth;
+   const uint32_t height = ((size.height + info.blockHeight - 1) / info.blockHeight) * info.blockHeight;
+@@ -77,16 +147,44 @@ uint64_t calc_texture_size(wgpu::TextureFormat format, u32 width, u32 height, u3
+   return total;
+ }
+ 
++namespace {
++TextureHandle new_texture_2d_with_format(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
++                                         wgpu::TextureFormat wgpuFormat, const char* label) noexcept;
++} // namespace
++
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 format, ArrayRef<uint8_t> data,
+                                     bool tlut, const char* label) noexcept {
+   ZoneScoped;
+ 
+   mips = clamp_mip_count(width, height, mips, label);
+-  auto handle = new_dynamic_texture_2d(width, height, mips, format, label);
++  // MKW RETRO (G6, §190): CMPR → BC1 cuando se puede (ver texturas_bc); si los mips son «arbitrarios» (cada nivel con
++  // su propio dibujo: el juego los usa para efectos), se queda en RGBA8 como antes, porque esa marca se calcula en RGBA8
++  ByteBuffer bc;
++  bool usarBc = false;
++  if (!tlut && format == GX_TF_CMPR && texturas_bc()) {
++    g_bcCuenta[4]++;
++    usarBc = cmpr_to_bc1(width, height, mips, data, bc);
++    if (usarBc && (mips > 1 || g_texturasBc == 2)) {
++      const auto rgba = convert_texture(format, width, height, mips, data);
++      usarBc = !rgba.hasArbitraryMips;
++      if (usarBc && g_texturasBc == 2) verificar_bc1(width, height, mips, bc, {rgba.data.data(), rgba.data.size()});
++    }
++    if (usarBc) {
++      g_bcCuenta[0]++;
++      g_bcCuenta[1] += static_cast<uint32_t>(bc.size() / 1024);
++      g_bcCuenta[2] += static_cast<uint32_t>(calc_texture_size(wgpu::TextureFormat::RGBA8Unorm, width, height, mips) / 1024);
++    } else {
++      g_bcCuenta[3]++;
++    }
++  }
++  auto handle = usarBc ? new_texture_2d_with_format(width, height, mips, format, wgpu::TextureFormat::BC1RGBAUnorm, label)
++                       : new_dynamic_texture_2d(width, height, mips, format, label);
+   auto& ref = *handle;
+ 
+   ConvertedTexture converted;
+-  if (ref.gxFormat != InvalidTextureFormat) {
++  if (usarBc) {
++    data = {bc.data(), bc.size()};
++  } else if (ref.gxFormat != InvalidTextureFormat) {
+     if (tlut) {
+       CHECK(ref.size.height == 1, "new_static_texture_2d[{}]: expected tlut height 1, got {}", label, ref.size.height);
+       CHECK(ref.mipCount == 1, "new_static_texture_2d[{}]: expected tlut mipCount 1, got {}", label, ref.mipCount);
+@@ -149,7 +247,12 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+                                      const char* label) noexcept {
+   ZoneScopedS(3);
+   mips = clamp_mip_count(width, height, mips, label);
+-  const auto wgpuFormat = to_wgpu(gxFormat);
++  return new_texture_2d_with_format(width, height, mips, gxFormat, to_wgpu(gxFormat), label);
++}
++
++namespace {
++TextureHandle new_texture_2d_with_format(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
++                                         wgpu::TextureFormat wgpuFormat, const char* label) noexcept {
+   const wgpu::Extent3D size{
+       .width = width,
+       .height = height,
+@@ -176,6 +279,7 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+   return std::make_shared<TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size, wgpuFormat,
+                                       mips, gxFormat);
+ }
++} // namespace
+ 
+ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept {
+   ZoneScoped;
+@@ -301,3 +405,9 @@ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
+   }
+ }
+ } // namespace aurora::gfx
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++// MKW RETRO (G6, §190): la página lee cuántas texturas subieron en BC1 y cuánto se ahorró (k = 0..8, ver texturas_bc)
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_texturas_bc(uint32_t k) { return k < 9 ? aurora::gfx::g_bcCuenta[k] : 0; }
++#endif
+diff --git a/aurora-main/lib/gfx/texture_convert.cpp b/aurora-main/lib/gfx/texture_convert.cpp
+index f61bbeb..94e8f2e 100644
+--- a/aurora-main/lib/gfx/texture_convert.cpp
++++ b/aurora-main/lib/gfx/texture_convert.cpp
+@@ -6,6 +6,7 @@
+ #include <algorithm>
+ #include <array>
+ #include <cmath>
++#include <cstring>
+ #include <limits>
+ #include <optional>
+ #include <vector>
+@@ -723,4 +724,69 @@ ConvertedTexture convert_texture_palette(u32 textureFormat, uint32_t width, uint
+       .hasArbitraryMips = hasArbitraryMips,
+   };
+ }
++// MKW RETRO (G6, §190): CMPR (la textura comprimida de la Wii) → BC1, el formato comprimido de las tarjetas de PC, sin
++// pasar por RGBA8: 8 bytes por bloque de 4×4 en vez de 64 (la textura ocupa 8 veces menos en la tarjeta y se lee con 8
++// veces menos ancho de banda). Las dos guardan cada bloque igual (dos colores 565 y 16 índices de 2 bits); cambia:
++//   - el orden de los bloques: CMPR los agrupa en mosaicos de 8×8 (4 bloques: arriba izq., arriba der., abajo izq.,
++//     abajo der.); BC1 va bloque por bloque en filas;
++//   - los colores en big-endian (la Wii) contra little-endian;
++//   - los índices: en CMPR el texel de la izquierda va en los 2 bits ALTOS de cada byte; en BC1, en los BAJOS;
++//   - el modo de 3 colores (color0 <= color1): el índice 3 es «transparente», pero BC1 lo da NEGRO y la Wii con el color
++//     del medio. Filtrado, ese negro oscurecería los bordes de lo recortado: esas texturas NO se pasan (false).
++//   - los colores intermedios del modo de 4: la Wii mezcla 3/8–5/8 y BC1 1/3–2/3 (una diferencia de pocos tonos en los
++//     píxeles intermedios; medida con fotos en la bitácora).
++// false = no se puede (medidas que no son múltiplo de 4, datos cortos o el índice transparente): va por RGBA8 como antes.
++bool cmpr_to_bc1(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data, ByteBuffer& out) {
++  if (width == 0 || height == 0 || (width & 3) != 0 || (height & 3) != 0 || mips == 0) {
++    return false;
++  }
++  size_t total = 0;
++  for (uint32_t mip = 0; mip < mips; ++mip) {
++    const uint32_t w = std::max(width >> mip, 1u), h = std::max(height >> mip, 1u);
++    total += static_cast<size_t>((w + 3) / 4) * ((h + 3) / 4) * 8;
++  }
++  out = ByteBuffer{total};
++  uint8_t* dst = out.data();
++  size_t base = 0;                                    // dónde empieza el mip en los datos de la Wii
++  for (uint32_t mip = 0; mip < mips; ++mip) {
++    const uint32_t w = std::max(width >> mip, 1u), h = std::max(height >> mip, 1u);
++    const uint32_t bloquesX = (w + 3) / 4, bloquesY = (h + 3) / 4;
++    const uint32_t mosaicosX = (w + 7) / 8, mosaicosY = (h + 7) / 8;
++    const size_t tamMip = static_cast<size_t>(mosaicosX) * mosaicosY * 32;
++    if (base + tamMip > data.size()) {
++      return false;
++    }
++    for (uint32_t by = 0; by < bloquesY; ++by) {
++      for (uint32_t bx = 0; bx < bloquesX; ++bx) {
++        const uint8_t* src = data.data() + base +
++                             ((static_cast<size_t>(by / 2) * mosaicosX + bx / 2) * 4 + (by % 2) * 2 + (bx % 2)) * 8;
++        const uint16_t c0 = static_cast<uint16_t>((src[0] << 8) | src[1]);
++        const uint16_t c1 = static_cast<uint16_t>((src[2] << 8) | src[3]);
++        uint8_t filas[4];
++        bool transparente = false;
++        for (int y = 0; y < 4; ++y) {
++          const uint8_t b = src[4 + y];
++          // los 4 índices de la fila dados vuelta (el de la izquierda pasa de los bits altos a los bajos)
++          filas[y] = static_cast<uint8_t>(((b >> 6) & 3) | ((b >> 2) & 0x0C) | ((b << 2) & 0x30) | ((b << 6) & 0xC0));
++          if (c0 <= c1) {
++            for (int x = 0; x < 4; ++x) {
++              transparente |= ((b >> (6 - 2 * x)) & 3) == 3;
++            }
++          }
++        }
++        if (transparente) {
++          return false;
++        }
++        dst[0] = static_cast<uint8_t>(c0 & 0xFF);
++        dst[1] = static_cast<uint8_t>(c0 >> 8);
++        dst[2] = static_cast<uint8_t>(c1 & 0xFF);
++        dst[3] = static_cast<uint8_t>(c1 >> 8);
++        std::memcpy(dst + 4, filas, 4);
++        dst += 8;
++      }
++    }
++    base += tamMip;
++  }
++  return true;
++}
+ } // namespace aurora::gfx
+diff --git a/aurora-main/lib/gfx/texture_convert.hpp b/aurora-main/lib/gfx/texture_convert.hpp
+index aff4da8..f98af6b 100644
+--- a/aurora-main/lib/gfx/texture_convert.hpp
++++ b/aurora-main/lib/gfx/texture_convert.hpp
+@@ -31,4 +31,6 @@ ConvertedTexture convert_texture_palette(u32 textureFormat, uint32_t width, uint
+                                          ArrayRef<uint8_t> tlutData);
+ ConvertedTexture convert_tlut(u32 format, uint32_t width, ArrayRef<uint8_t> data);
+ GXTexFmt tlut_texture_format(GXTlutFmt format) noexcept;
++// MKW RETRO (G6, §190): CMPR → BC1 sin descomprimir; false = no se puede (va por RGBA8)
++bool cmpr_to_bc1(uint32_t width, uint32_t height, uint32_t mips, ArrayRef<uint8_t> data, ByteBuffer& out);
+ } // namespace aurora::gfx
+diff --git a/aurora-main/lib/gx/command_processor.cpp b/aurora-main/lib/gx/command_processor.cpp
+index d94f26c..aa8ca79 100644
+--- a/aurora-main/lib/gx/command_processor.cpp
++++ b/aurora-main/lib/gx/command_processor.cpp
+@@ -2288,7 +2288,8 @@ static void handle_draw_unmerged(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount,
+     if (array.cachedRange.size > 0) {
+       ranges.vaRanges[i - GX_VA_POS] = array.cachedRange;
+     } else {
+-      const auto range = gfx::push_storage(static_cast<const uint8_t*>(array.data), array.size);
++      // MKW RETRO (H12, §181): el arreglo que no cambió queda en la tarjeta (anillo persistente) y no se vuelve a subir
++      const auto range = gfx::push_storage_cacheable(static_cast<const uint8_t*>(array.data), array.size);
+       ranges.vaRanges[i - GX_VA_POS] = range;
+       array.cachedRange = range;
+     }
 diff --git a/aurora-main/lib/gx/frame_interpolation.cpp b/aurora-main/lib/gx/frame_interpolation.cpp
 index cd2d339..8148475 100644
 --- a/aurora-main/lib/gx/frame_interpolation.cpp

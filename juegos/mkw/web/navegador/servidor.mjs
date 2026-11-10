@@ -10,7 +10,7 @@
 //   POST /lote             §104: varios pedazos en una respuesta, como POST /mkw/lote del Worker (disco.mjs + lote.mjs)
 //   /mkw/disco/...         el disco extraído           (extraido/disco)
 //   /mkw/sd/RetroRewind6/  los archivos de Retro Rewind (terceros/RetroRewind/RetroRewind6)
-//   /mkw/sd/riivolution/   la partida guardada de RR    (terceros/RetroRewind/riivolution)
+//   /mkw/sd/riivolution/   la partida guardada de RR    (build/web/partida-base: la copia limpia de terceros/RetroRewind/riivolution, §175)
 //   /wc/runtime/assets/    archivos base del runtime    (terceros/Wiicompiled/runtime/assets)
 // Las rutas /mkw/... y /wc/... son las mismas que el juego usa adentro de su sistema de archivos de mentira,
 // así la página traduce "archivo que el juego pide" → "dirección que se descarga" sin tablas.
@@ -19,16 +19,21 @@
 // leer una sola página de un libro sin traer el libro entero. El juego lee así los archivos grandes del disco.
 //
 // Uso:  node web/navegador/servidor.mjs        (o con otro puerto: node web/navegador/servidor.mjs 8141)
+import { cabecerasAislar, cabecerasScriptAislado } from './aislar.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { armarDiminutos } from '../../herramientas/diminutos.mjs';   // §93: el paquete de los diminutos
+import { carpetaPartidaBase } from '../../herramientas/partida-base.mjs';   // §175
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PUERTO = Number(process.argv[2]) || 8140;
-const LATENCIA = Number(process.env.MKW_LATENCIA) || 0;   // ms extra por pedido a /mkw/ (simular la red del sitio)
+const LATENCIA = Number(process.env.MKW_LATENCIA) || 0;
+// §230 (R4), SOLO pruebas: MKW_SUSTITUIR="/lockstep.mjs=C:/ruta/vieja.mjs,…" = esa dirección se sirve de otro archivo (así
+// prueba-sincro mide la basura del lockstep viejo contra el nuevo sin tocar la carpeta, que comparten otras sesiones)
+const SUSTITUTOS = new Map((process.env.MKW_SUSTITUIR || '').split(',').filter(Boolean).map(x => [x.slice(0, x.indexOf('=')), x.slice(x.indexOf('=') + 1)]));   // ms extra por pedido a /mkw/ (simular la red del sitio)
 // MKW_CORS=http://127.0.0.1:8150: este servidor hace de "Worker de amigos" para una página de OTRO origen (el sitio
 // local de herramientas/sitio-local.mjs), como será en paginita-pro.cl: la página en GitHub Pages y lo privado (juego
 // y disco) en el Worker. Solo ese origen puede leer las respuestas (CORS: el permiso que da un servidor para que una
@@ -41,7 +46,7 @@ const PRIVADO = /^\/(build|mkw|wc)\/|^\/manifiesto\.json$/;
 const CARPETAS = [
   ['/mkw/disco/', path.join(raiz, 'extraido/disco')],
   ['/mkw/sd/RetroRewind6/', path.join(raiz, 'terceros/RetroRewind/RetroRewind6')],
-  ['/mkw/sd/riivolution/', path.join(raiz, 'terceros/RetroRewind/riivolution')],
+  ['/mkw/sd/riivolution/', carpetaPartidaBase(raiz, { nota: console.log })],   // §175: la copia limpia (Node y Windows escriben en la de terceros)
   ['/wc/runtime/assets/', path.join(raiz, 'terceros/Wiicompiled/runtime/assets')],
   ['/build/', path.join(raiz, process.env.MKW_BUILD || 'build/web/navegador')],   // MKW_BUILD: otro build (p. ej. build/web-sin-simd/navegador)
   ['/banco/', path.join(raiz, 'banco')],
@@ -57,6 +62,7 @@ const TIPOS = {
 
 // Recorre una carpeta y devuelve [[ruta relativa con "/", tamaño], ...]. Las carpetas vacías van con tamaño -1
 // (el juego también las busca: p. ej. RetroRewind6/MyStuff).
+const CAMBIADOS = new Set((process.env.MKW_CAMBIAR_HUELLA || '').split(',').filter(Boolean));
 function lista(carpeta, base = carpeta, salida = [], huella = null) {
   const entradas = fs.readdirSync(carpeta, { withFileTypes: true });
   if (entradas.length === 0 && carpeta !== base) salida.push([path.relative(base, carpeta).split(path.sep).join('/'), -1]);
@@ -65,8 +71,12 @@ function lista(carpeta, base = carpeta, salida = [], huella = null) {
     if (e.isDirectory()) lista(p, base, salida, huella);
     else if (e.isFile()) {
       const st = fs.statSync(p), ruta = path.relative(base, p).split(path.sep).join('/');
-      salida.push([ruta, st.size]);
-      if (huella) huella.update(`${ruta}|${st.size}|${st.mtimeMs};`);   // la fecha también: mismo tamaño, otro contenido
+      // §174 (D5): con la huella del archivo (tamaño y fecha; en R2, la de su contenido): la página lo guarda con ella.
+      // MKW_CAMBIAR_HUELLA=ruta[,ruta…] (solo pruebas, medir-version-archivo.mjs): esos archivos «cambiaron» (otra huella
+      // y otra versión de todo) sin tocar el archivo
+      const cambio = CAMBIADOS.has(ruta) ? '|cambio' : '';
+      salida.push([ruta, st.size, crypto.createHash('sha1').update(`${st.size}|${st.mtimeMs}${cambio}`).digest('hex').slice(0, 16)]);
+      if (huella) huella.update(`${ruta}|${st.size}|${st.mtimeMs}${cambio};`);   // la fecha también: mismo tamaño, otro contenido
     }
   }
   return salida;
@@ -90,7 +100,16 @@ console.log('versión de los archivos: ' + VERSION);
 // y viaja en la cabecera X-Mkw-Build del manifiesto. Sin ?v= (o con una huella vieja) va sin caché, como antes.
 // En el sitio, el Worker hace lo mismo con los objetos de R2 (bitácora §54).
 const carpetaBuild = CARPETAS.find(([p]) => p === '/build/')[1];
-const huellaBuild = () => {
+// §170: MKW_BUILD_B = un segundo programa, SOLO para pruebas (prueba-sincro --build-b: una consola de la sala con el
+// programa viejo y la otra con el nuevo; si la huella de la sala coincide toda la carrera, los dos hacen lo mismo).
+// La página abierta con build=b en su dirección (y todo lo que ella pide: el Referer la trae) recibe /build/ de esa carpeta.
+// Ojo: el import() de mkw.js lleva de Referer la dirección de mkw.mjs (sin build=b), no la de la página: por eso vale
+// también la huella ?v= del programa B (una vez llegó mkw.js de A con el mkw.wasm de B: «ASM_CONSTS[code] is not a function»).
+const CARPETA_B = process.env.MKW_BUILD_B ? path.join(raiz, process.env.MKW_BUILD_B) : null;
+const carpetasDe = pedido => CARPETA_B && (/[?&]build=b(&|$|\s)/.test(`${pedido.url} ${pedido.headers.referer || ''} `)
+    || new URLSearchParams(pedido.url.split('?')[1] || '').get('v') === huellaBuild(CARPETA_B))
+  ? CARPETAS.map(([p, c]) => [p, p === '/build/' ? CARPETA_B : c]) : CARPETAS;
+const huellaBuild = (carpetaBuild = CARPETAS.find(([p]) => p === '/build/')[1]) => {
   const h = crypto.createHash('sha1');
   for (const f of ['mkw.js', 'mkw.wasm']) { try { const st = fs.statSync(path.join(carpetaBuild, f)); h.update(`${f}|${st.size}|${st.mtimeMs};`); } catch {} }
   return h.digest('hex').slice(0, 16);
@@ -110,6 +129,7 @@ console.log(Object.entries(manifiesto).map(([p, l]) => `${p}: ${l.length} archiv
 let paqueteDiminutos = null;
 http.createServer((pedido, respuesta) => {
   const url = decodeURIComponent(pedido.url.split('?')[0]);
+  const CARP = carpetasDe(pedido), deBuild = CARP.find(([p]) => p === '/build/')[1];   // §170: con MKW_BUILD_B, la de esta página
   if (CORS) {
     respuesta.setHeader('Access-Control-Allow-Origin', CORS);
     respuesta.setHeader('Vary', 'Origin');
@@ -130,7 +150,7 @@ http.createServer((pedido, respuesta) => {
       try { p = JSON.parse(cuerpo).p; } catch {}
       const archivos = Array.isArray(p) && p.length >= 1 && p.length <= 12 ? p.map(x => {
         if (!Array.isArray(x) || typeof x[0] !== 'string' || !Number.isInteger(x[1]) || !Number.isInteger(x[2]) || x[2] < x[1] || x[1] < 0) return null;
-        const u = '/' + x[0], par = CARPETAS.slice(0, 5).find(([prefijo]) => u.startsWith(prefijo));
+        const u = '/' + x[0], par = CARP.slice(0, 5).find(([prefijo]) => u.startsWith(prefijo));
         if (!par || /^\/build\/mkw\.(js|wasm)/.test(u)) return null;
         const f = path.normalize(path.join(par[1], u.slice(par[0].length)));
         return f.startsWith(par[1]) ? [f, x[1], x[2]] : null;
@@ -150,7 +170,7 @@ http.createServer((pedido, respuesta) => {
   if (url === '/manifiesto.json') {
     return setTimeout(() => {
       respuesta.writeHead(200, { 'Content-Type': TIPOS['.json'], 'Cache-Control': 'no-store', 'X-Mkw-Version': VERSION,
-                                 'X-Mkw-Build': huellaBuild() });
+                                 'X-Mkw-Build': huellaBuild(deBuild) });
       respuesta.end(manifiestoJson);
     }, CORS ? LATENCIA : 0);
   }
@@ -163,10 +183,11 @@ http.createServer((pedido, respuesta) => {
       respuesta.end(paqueteDiminutos);
     }, LATENCIA);
   }
-  const par = CARPETAS.find(([prefijo]) => url.startsWith(prefijo));
+  const par = CARP.find(([prefijo]) => url.startsWith(prefijo));
   let archivo = path.normalize(path.join(par[1], url.slice(par[0].length)));
   if (!archivo.startsWith(par[1])) { respuesta.writeHead(403); return respuesta.end('fuera de la carpeta'); }  // nada de "../"
   if (url.endsWith('/')) archivo = path.join(archivo, 'index.html');
+  if (SUSTITUTOS.has(url)) archivo = SUSTITUTOS.get(url);   // §230: solo pruebas
   // MKW_LATENCIA=50: cada pedido de los archivos del juego (/mkw/) tarda 50 ms más en empezar, como la red hasta R2
   // en el sitio (aquí, en la misma PC, tarda ~1 ms). Sirve para medir lo que espera el juego de verdad (bitácora §52).
   const demora = (CORS ? PRIVADO.test(url) : url.startsWith('/mkw/')) ? LATENCIA : 0;
@@ -179,10 +200,19 @@ http.createServer((pedido, respuesta) => {
       // guarda la página en su propia caché (disco.mjs), así no quedan guardados dos veces (igual que el Worker de BT3)
       'Cache-Control': 'no-store',
     };
+    // Paso 8 (P9, §187): una página aislada en su propio proceso, con memoria compartida (SharedArrayBuffer). Pedida con
+    // ?aislar=dip (Document-Isolation-Policy: aísla SOLO esta página, el sitio que la contiene no cambia; Chrome 137 en el
+    // computador) o ?aislar=coop (COOP + COEP: la página entera, la manera vieja), o para todas con MKW_AISLAR=dip|coop.
+    // Solo las páginas (.html); lo demás es del mismo origen y no necesita nada. Sin eso, como siempre
+    // (aislar.mjs; los scripts, con COEP propio solo con MKW_AISLAR=coop: un Worker de una página con COEP lo necesita)
+    const consulta = new URLSearchParams(pedido.url.split('?')[1] || '');
+    const esPagina = path.extname(archivo).toLowerCase() === '.html';
+    Object.assign(cabeceras, esPagina ? cabecerasAislar(consulta.get('aislar') || process.env.MKW_AISLAR || '')
+      : /\.m?js$/.test(archivo) ? cabecerasScriptAislado(url.startsWith('/banco/pruebas/aislamiento/') ? 'coop' : process.env.MKW_AISLAR || '') : {});
     // el programa con su huella vigente: guardable para siempre (ver huellaBuild)
     const programa = /^\/build\/mkw\.(js|wasm)$/.test(url);
-    const v = new URLSearchParams(pedido.url.split('?')[1] || '').get('v');
-    if (programa && v && v === huellaBuild()) cabeceras['Cache-Control'] = 'public, max-age=31536000, immutable';
+    const v = consulta.get('v');
+    if (programa && v && v === huellaBuild(deBuild)) cabeceras['Cache-Control'] = 'public, max-age=31536000, immutable';
     const yaComprimido = programa && !pedido.headers.range ? comprimido(archivo, pedido.headers['accept-encoding'] || '') : null;
     if (yaComprimido) {
       const [otro, codificacion] = yaComprimido, largo = fs.statSync(otro).size;

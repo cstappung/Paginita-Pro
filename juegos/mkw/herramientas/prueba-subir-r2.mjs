@@ -137,11 +137,22 @@ try {
   orden.length = 0;
   await corre(['--subir']);
   ok('subir otra vez no sube nada (todo igual)', orden.length === 0, `${orden.length} subidos`);
+  // §174 (D5): la huella de cada archivo en el manifiesto (los 16 primeros de su SHA-256)
+  const huellasAntes = Object.fromEntries(man['/mkw/disco/'].filter(e => e[1] >= 0).map(([r, , h]) => [r, h]));
+  ok('§174: el manifiesto trae la huella de cada archivo (= el principio de su SHA-256; las carpetas vacías sin huella)',
+     huellasAntes['sys/main.dol'] === sha(bytes(300, 3)).slice(0, 16) && man['/mkw/disco/'].find(([r]) => r === 'files/vacia').length === 2);
   escribe('disco/files/Race/Course/pista_a.szs', bytes(5000, 99));
   await corre(['--subir']);
-  // (§93: pista_a es diminuta, ≤ 8 KB: cambia también el paquete de los diminutos)
-  ok('un archivo cambiado: sube él (y el paquete de los diminutos, que lo lleva), y la versión nueva al final',
-     orden.includes('mkw/mkw/disco/files/Race/Course/pista_a.szs') && orden.includes('mkw/build/diminutos.bin') && orden.at(-1) === 'mkw/version.json' && orden.length === 3, orden.join(', '));
+  // (§93: pista_a es diminuta, ≤ 8 KB: cambia también el paquete de los diminutos; §174: y el manifiesto, por su huella)
+  ok('un archivo cambiado: sube él (y el paquete de los diminutos, que lo lleva, y el manifiesto), y la versión nueva al final',
+     orden.includes('mkw/mkw/disco/files/Race/Course/pista_a.szs') && orden.includes('mkw/build/diminutos.bin') && orden.at(-1) === 'mkw/version.json' && orden.at(-2) === 'mkw/manifiesto.json' && orden.length === 4, orden.join(', '));
+  {
+    const man2 = JSON.parse(guardado.get('mkw/manifiesto.json').datos);
+    const h2 = Object.fromEntries(man2['/mkw/disco/'].filter(e => e[1] >= 0).map(([r, , h]) => [r, h]));
+    const cambiadas = Object.keys(h2).filter(r => h2[r] !== huellasAntes[r]);
+    ok('§174: en el manifiesto nuevo cambia solo la huella del archivo cambiado (la página guarda el resto)',
+       cambiadas.length === 1 && cambiadas[0] === 'files/Race/Course/pista_a.szs', cambiadas.join(', '));
+  }
 
   // 6) comprobar y sobrantes
   let r = await corre(['--comprobar']);

@@ -1,0 +1,418 @@
+diff --git a/runtime/include/guest_abi/memory_access.h b/runtime/include/guest_abi/memory_access.h
+index c0bf6c1..4849aa9 100644
+--- a/runtime/include/guest_abi/memory_access.h
++++ b/runtime/include/guest_abi/memory_access.h
+@@ -42,6 +42,25 @@ inline constexpr uint32_t kWritableSubPageShift = RecompMod::kExecutableWriteGua
+ inline constexpr uint32_t kWritableSubPageSize = 1u << kWritableSubPageShift;
+ inline constexpr uint32_t kWritableSubPagesPerPage = kPageSize / kWritableSubPageSize;
+ 
++#if MKW_MOTOR_FIJA
++// MKW web, H6 (§211, mkw_motor.h): la ventana fija. FijaDentro = los n bytes caen enteros en la vista con caché de la
++// MEM1, el módulo de Kamek o la MEM2 (0x80000000–0x97FFFFFF): una resta y una comparación sin signo. FijaPtr = dónde
++// están en la memoria de wasm: el «y» deja un índice que nunca pasa de 512 MiB, así que con la memoria inicial de
++// MKW_FIJA_BASE + 512 MiB el compilador de V8 puede saltarse la revisión de límites (la de Android, W5).
++// El hueco entre el módulo de Kamek (fin 0x81A00000) y la MEM2 (0x90000000) también cae «dentro»: allí no hay nada de
++// la Wii, el juego nunca lo toca (hoy sería un acceso inválido que corta el programa) y la ventana lo tiene reservado.
++// La guarda contra escribir en el código (que hoy corta el programa con «FATAL unsupported executable write») no está
++// en este camino: una carrera que hoy termina nunca la dispara, así que el resultado es el mismo.
++inline constexpr uint32_t kFijaVista = 0x80000000u;
++inline constexpr uint32_t kFijaLargo = 0x18000000u;
++MKW_MEMORY_FORCE_INLINE bool FijaDentro(uint32_t address, uint32_t n) {
++    return address - kFijaVista <= kFijaLargo - n;
++}
++MKW_MEMORY_FORCE_INLINE uint8_t* FijaPtr(uint32_t address) {
++    return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(MKW_FIJA_BASE) + (address & 0x1FFFFFFFu));
++}
++#endif
++
+ struct PageEntry {
+     uint8_t* base = nullptr;
+     uint32_t limit = 0;
+@@ -227,6 +246,20 @@ MKW_MEMORY_FORCE_INLINE bool TryGetWritablePointerFast(
+     return true;
+ }
+ 
++#if MKW_MOTOR_FIJA && MKW_MOTOR_FIJA_RANGO_FUERA
++// H6 (§211): un rango fuera de la ventana fija (la caché bloqueada, las vistas sin caché) se resuelve con la tabla de
++// páginas como antes (M1), pero en una función aparte: en línea queda solo la ventana, y el código del juego no crece.
++MKW_MEMORY_NO_INLINE inline uint8_t* ResolveRangeTabla(uint32_t guestStart, uint32_t length, bool needsRead,
++                                                       bool needsWrite) {
++    const uint32_t page = guestStart >> kPageShift;
++    if (((guestStart + (length - 1u)) >> kPageShift) != page) return nullptr;
++    const uintptr_t bias = needsWrite ? g_fullWritablePageBias[page] : g_fullReadablePageBias[page];
++    if (bias == 0) return nullptr;
++    if (needsWrite && needsRead && g_fullReadablePageBias[page] != bias) return nullptr;
++    return reinterpret_cast<uint8_t*>((bias - 1u) + guestStart);
++}
++#endif
++
+ // Flat form: guest_flat_memory.h's page protections already answer mapped/non-deferred/non-executable, so resolving is pure address arithmetic.
+ // Two checks stay inline: a wrapped guest address can't survive 64-bit `host + rangeOffset`, and an MMIO write's value isn't recoverable from a
+ // fault record, so a write touching that window must resolve null and fall back to Memory::Write*. Checking both range endpoints is a complete
+@@ -247,6 +280,12 @@ MKW_MEMORY_FORCE_INLINE uint8_t* ResolveRangeHost(uint32_t base, int32_t minOffs
+         // escritura g_fullWritablePageBias (cero si la página tiene código o no es RAM). Si valen, el puntero es el
+         // mismo que usaría el camino revisado, acceso por acceso: el resultado no cambia. Si no → null, como antes.
+         // Las tablas solo cambian dentro de llamadas al runtime, y el traductor corta los rangos en cada llamada.
++#if MKW_MOTOR_FIJA
++        if (FijaDentro(guestStart, length)) [[likely]] return FijaPtr(guestStart);   // (H6, §211)
++#if MKW_MOTOR_FIJA_RANGO_FUERA
++        return ResolveRangeTabla(guestStart, length, needsRead, needsWrite);   // lo de antes, fuera de línea
++#endif
++#endif
+         const uint32_t page = guestStart >> kPageShift;
+         if (((guestStart + (length - 1u)) >> kPageShift) != page) return nullptr;
+         const uintptr_t bias = needsWrite ? g_fullWritablePageBias[page] : g_fullReadablePageBias[page];
+@@ -368,6 +407,20 @@ MKW_MEMORY_FORCE_INLINE void StoreGuestOrder(uint8_t* p, T value) {
+     std::memcpy(p, &swapped, sizeof(T));
+ }
+ 
++#if MKW_MOTOR_FIJA
++// H6 (§211): leer y escribir en la ventana fija, en el orden de la Wii
++template <typename T>
++__attribute__((always_inline)) inline T FijaLee(uint32_t a) {
++    if constexpr (sizeof(T) == 1) return *FijaPtr(a);
++    else return LoadGuestOrder<T>(FijaPtr(a));
++}
++template <typename T>
++__attribute__((always_inline)) inline void FijaEscribe(uint32_t a, T v) {
++    if constexpr (sizeof(T) == 1) *FijaPtr(a) = static_cast<uint8_t>(v);
++    else StoreGuestOrder<T>(FijaPtr(a), v);
++}
++#endif
++
+ template <typename T>
+ MKW_MEMORY_FORCE_INLINE bool ReadResolvedScalar(uint8_t* host, uint32_t rangeOffset, T& outValue) {
+     if (!host) return false;
+@@ -736,18 +789,27 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRam8(uint32_t address, uint8_t value) {
+     MKW_CUENTA(MKWC_FLAT);
++#if MKW_MOTOR_FIJA_RAM
++    FijaEscribe<uint8_t>(address, value); return;
++#endif
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::Write8(address, value); return; }
+     FlatStore<uint8_t>(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRam16(uint32_t address, uint16_t value) {
+     MKW_CUENTA(MKWC_FLAT);
++#if MKW_MOTOR_FIJA_RAM
++    FijaEscribe<uint16_t>(address, value); return;
++#endif
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::Write16(address, value); return; }
+     FlatStore<uint16_t>(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRam32(uint32_t address, uint32_t value) {
+     MKW_CUENTA(MKWC_FLAT);
++#if MKW_MOTOR_FIJA_RAM
++    FijaEscribe<uint32_t>(address, value); return;
++#endif
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::Write32(address, value); return; }
+     FlatStore<uint32_t>(address, value);
+ }
+@@ -755,12 +817,18 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteRam32(uint32_t address, uint32_t value) {
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat32(uint32_t address, double value) {
+     MKW_CUENTA(MKWC_FLAT);
++#if MKW_MOTOR_FIJA_RAM
++    FijaEscribe<uint32_t>(address, ConvertPpcDoubleToSingleBits(value)); return;
++#endif
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat32(address, value); return; }
+     FlatStore<uint32_t>(address, ConvertPpcDoubleToSingleBits(value));
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat64(uint32_t address, double value) {
+     MKW_CUENTA(MKWC_FLAT);
++#if MKW_MOTOR_FIJA_RAM
++    { uint64_t b; std::memcpy(&b, &value, sizeof(b)); FijaEscribe<uint64_t>(address, b); return; }
++#endif
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat64(address, value); return; }
+     uint64_t bits = 0;
+     std::memcpy(&bits, &value, sizeof(bits));
+@@ -809,6 +877,26 @@ __attribute__((noinline)) inline void WriteFloat32Raro(uint32_t a, double v) {
+ __attribute__((noinline)) inline void WriteFloat64Raro(uint32_t a, double v) {
+     uint64_t bits = 0; std::memcpy(&bits, &v, sizeof(bits));
+     if (!TryWriteGuestScalar(a, bits)) { MKW_CUENTA(MKWC_ESCRIBE_LENTA); WriteFloat64Slow(a, v); } }
++#if MKW_MOTOR_FIJA
++// H6 (§211): en línea queda solo la ventana fija (FijaLee/FijaEscribe); fuera de la ventana, una función aparte con el
++// camino de antes entero (la tabla de páginas, la caché bloqueada, E/S, y si no, lo lento). Para escribir, los *Raro.
++#define MKW_FIJA_OTRO(nombre, T, lenta)                                                              \
++    __attribute__((noinline)) inline T nombre(uint32_t a) {                                          \
++        T v = 0; if (TryReadGuestScalar(a, v)) return v; MKW_CUENTA(MKWC_LEE_LENTA); return lenta(a); }
++MKW_FIJA_OTRO(Read8Otro, uint8_t, Read8Slow)
++MKW_FIJA_OTRO(Read16Otro, uint16_t, Read16Slow)
++MKW_FIJA_OTRO(Read32Otro, uint32_t, Read32Slow)
++MKW_FIJA_OTRO(Read64Otro, uint64_t, Read64Slow)
++#undef MKW_FIJA_OTRO
++__attribute__((noinline)) inline float ReadFloat32Otro(uint32_t a) {
++    uint32_t b = 0;
++    if (TryReadGuestScalar(a, b)) { float f; std::memcpy(&f, &b, sizeof(f)); return f; }
++    MKW_CUENTA(MKWC_LEE_LENTA); return ReadFloat32Slow(a); }
++__attribute__((noinline)) inline double ReadFloat64Otro(uint32_t a) {
++    uint64_t b = 0;
++    if (TryReadGuestScalar(a, b)) { double d; std::memcpy(&d, &b, sizeof(d)); return d; }
++    MKW_CUENTA(MKWC_LEE_LENTA); return ReadFloat64Slow(a); }
++#endif
+ }  // namespace MemoryInline
+ #else
+ #define MKW_MEM_EN_LINEA
+@@ -817,6 +905,10 @@ __attribute__((noinline)) inline void WriteFloat64Raro(uint32_t a, double v) {
+ 
+ MKW_MEM_EN_LINEA inline uint8_t Memory::Read8(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, 1)) [[likely]] return MemoryInline::FijaLee<uint8_t>(addr);
++    return MemoryInline::Read8Otro(addr);
++#endif
+     uint8_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+         MKW_CUENTA(MKWC_LEE_LENTA);
+@@ -827,6 +919,10 @@ MKW_MEM_EN_LINEA inline uint8_t Memory::Read8(uint32_t addr) {
+ 
+ MKW_MEM_EN_LINEA inline uint16_t Memory::Read16(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, 2)) [[likely]] return MemoryInline::FijaLee<uint16_t>(addr);
++    return MemoryInline::Read16Otro(addr);
++#endif
+     uint16_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+         MKW_CUENTA(MKWC_LEE_LENTA);
+@@ -837,6 +933,10 @@ MKW_MEM_EN_LINEA inline uint16_t Memory::Read16(uint32_t addr) {
+ 
+ MKW_MEM_EN_LINEA inline uint32_t Memory::Read32(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, 4)) [[likely]] return MemoryInline::FijaLee<uint32_t>(addr);
++    return MemoryInline::Read32Otro(addr);
++#endif
+     uint32_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+         MKW_CUENTA(MKWC_LEE_LENTA);
+@@ -847,6 +947,10 @@ MKW_MEM_EN_LINEA inline uint32_t Memory::Read32(uint32_t addr) {
+ 
+ MKW_MEM_EN_LINEA inline uint64_t Memory::Read64(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, 8)) [[likely]] return MemoryInline::FijaLee<uint64_t>(addr);
++    return MemoryInline::Read64Otro(addr);
++#endif
+     uint64_t value = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
+         MKW_CUENTA(MKWC_LEE_LENTA);
+@@ -857,6 +961,12 @@ MKW_MEM_EN_LINEA inline uint64_t Memory::Read64(uint32_t addr) {
+ 
+ MKW_MEM_EN_LINEA inline float Memory::ReadFloat32(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, 4)) [[likely]] {
++        const uint32_t b = MemoryInline::FijaLee<uint32_t>(addr); float v; std::memcpy(&v, &b, sizeof(v)); return v;
++    }
++    return MemoryInline::ReadFloat32Otro(addr);
++#endif
+     uint32_t bits = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]] {
+         MKW_CUENTA(MKWC_LEE_LENTA);
+@@ -869,6 +979,12 @@ MKW_MEM_EN_LINEA inline float Memory::ReadFloat32(uint32_t addr) {
+ 
+ MKW_MEM_EN_LINEA inline double Memory::ReadFloat64(uint32_t addr) {
+     MKW_CUENTA(MKWC_LEE);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, 8)) [[likely]] {
++        const uint64_t b = MemoryInline::FijaLee<uint64_t>(addr); double v; std::memcpy(&v, &b, sizeof(v)); return v;
++    }
++    return MemoryInline::ReadFloat64Otro(addr);
++#endif
+     uint64_t bits = 0;
+     if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]] {
+         MKW_CUENTA(MKWC_LEE_LENTA);
+@@ -883,6 +999,10 @@ MKW_MEM_EN_LINEA inline void Memory::Write8(uint32_t addr, uint8_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
+ #if MKW_MEM_ESCRITURA_RAPIDA
+     const uint8_t bits = val;
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, sizeof(bits))) [[likely]] { MemoryInline::FijaEscribe<uint8_t>(addr, bits); return; }
++    MemoryInline::Write8Raro(addr, val); return;   // (H6: fuera de la ventana, todo lo de antes fuera de línea)
++#endif
+     if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
+     MemoryInline::Write8Raro(addr, val);
+ #else
+@@ -896,6 +1016,10 @@ MKW_MEM_EN_LINEA inline void Memory::Write16(uint32_t addr, uint16_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
+ #if MKW_MEM_ESCRITURA_RAPIDA
+     const uint16_t bits = val;
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, sizeof(bits))) [[likely]] { MemoryInline::FijaEscribe<uint16_t>(addr, bits); return; }
++    MemoryInline::Write16Raro(addr, val); return;   // (H6: fuera de la ventana, todo lo de antes fuera de línea)
++#endif
+     if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
+     MemoryInline::Write16Raro(addr, val);
+ #else
+@@ -909,6 +1033,10 @@ MKW_MEM_EN_LINEA inline void Memory::Write32(uint32_t addr, uint32_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
+ #if MKW_MEM_ESCRITURA_RAPIDA
+     const uint32_t bits = val;
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, sizeof(bits))) [[likely]] { MemoryInline::FijaEscribe<uint32_t>(addr, bits); return; }
++    MemoryInline::Write32Raro(addr, val); return;   // (H6: fuera de la ventana, todo lo de antes fuera de línea)
++#endif
+     if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
+     MemoryInline::Write32Raro(addr, val);
+ #else
+@@ -922,6 +1050,10 @@ MKW_MEM_EN_LINEA inline void Memory::Write64(uint32_t addr, uint64_t val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
+ #if MKW_MEM_ESCRITURA_RAPIDA
+     const uint64_t bits = val;
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, sizeof(bits))) [[likely]] { MemoryInline::FijaEscribe<uint64_t>(addr, bits); return; }
++    MemoryInline::Write64Raro(addr, val); return;   // (H6: fuera de la ventana, todo lo de antes fuera de línea)
++#endif
+     if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
+     MemoryInline::Write64Raro(addr, val);
+ #else
+@@ -935,6 +1067,10 @@ MKW_MEM_EN_LINEA inline void Memory::WriteFloat32(uint32_t addr, double val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
+ #if MKW_MEM_ESCRITURA_RAPIDA
+     const uint32_t bits = MemoryInline::ConvertPpcDoubleToSingleBits(val);
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, sizeof(bits))) [[likely]] { MemoryInline::FijaEscribe<uint32_t>(addr, bits); return; }
++    MemoryInline::WriteFloat32Raro(addr, val); return;   // (H6: fuera de la ventana, todo lo de antes fuera de línea)
++#endif
+     if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
+     MemoryInline::WriteFloat32Raro(addr, val);
+ #else
+@@ -951,6 +1087,10 @@ MKW_MEM_EN_LINEA inline void Memory::WriteFloat64(uint32_t addr, double val) {
+     MKW_CUENTA(MKWC_ESCRIBE);
+ #if MKW_MEM_ESCRITURA_RAPIDA
+     uint64_t bits = 0; std::memcpy(&bits, &val, sizeof(bits));
++#if MKW_MOTOR_FIJA
++    if (MemoryInline::FijaDentro(addr, sizeof(bits))) [[likely]] { MemoryInline::FijaEscribe<uint64_t>(addr, bits); return; }
++    MemoryInline::WriteFloat64Raro(addr, val); return;   // (H6: fuera de la ventana, todo lo de antes fuera de línea)
++#endif
+     if (MemoryInline::TryWriteGuestScalarRapido(addr, bits)) [[likely]] return;
+     MemoryInline::WriteFloat64Raro(addr, val);
+ #else
+diff --git a/runtime/include/isa/ppc_isa_quantized.h b/runtime/include/isa/ppc_isa_quantized.h
+index 3b23d50..9fdec1f 100644
+--- a/runtime/include/isa/ppc_isa_quantized.h
++++ b/runtime/include/isa/ppc_isa_quantized.h
+@@ -292,6 +292,9 @@ MKW_PPC_FORCE_INLINE const uint8_t* PpcTryGetPsqReadableHostInline(uint32_t addr
+ #if MKW_MOTOR_RANGOS
+         // MKW web (M1, §170): la misma prueba que Memory::Read64 (TryReadGuestScalar<uint64_t>): la página de 1 MiB
+         // es RAM legible entera y la siguiente sigue pegada, así que el par de 8 bytes sale del mismo lugar
++#if MKW_MOTOR_FIJA
++        if (MemoryInline::FijaDentro(addr, 8u)) return MemoryInline::FijaPtr(addr);   // (H6, §211)
++#endif
+         const uintptr_t bias = MemoryInline::g_fullReadablePageBias[addr >> MemoryInline::kPageShift];
+         if (bias == 0) return nullptr;
+         return reinterpret_cast<const uint8_t*>((bias - 1u) + addr);
+@@ -314,6 +317,9 @@ MKW_PPC_FORCE_INLINE uint8_t* PpcTryGetPsqWritableHostInline(uint32_t addr)
+ #if MKW_MOTOR_RANGOS
+         // MKW web (M1, §170): el primer intento de Memory::Write64 (TryWriteGuestScalar<uint64_t>): los 8 bytes en la
+         // misma página de 1 MiB y esa página sin código; si no, null y Memory::Write64 hace todo lo de antes
++#if MKW_MOTOR_FIJA
++        if (MemoryInline::FijaDentro(addr, 8u)) return MemoryInline::FijaPtr(addr);   // (H6, §211)
++#endif
+         const uint32_t page = addr >> MemoryInline::kPageShift;
+         if (((addr + 7u) >> MemoryInline::kPageShift) != page) return nullptr;
+         const uintptr_t bias = MemoryInline::g_fullWritablePageBias[page];
+diff --git a/runtime/include/mkw_motor.h b/runtime/include/mkw_motor.h
+index a53e1d0..d1fe8cb 100644
+--- a/runtime/include/mkw_motor.h
++++ b/runtime/include/mkw_motor.h
+@@ -46,3 +46,32 @@
+ #if MKW_MOTOR_VUELTA64 || MKW_MOTOR_VUELTA32
+ #include <wasm_simd128.h>
+ #endif
++
++// MKW_MOTOR_FIJA (H6 de la etapa 2 del plan v4, bitácora §211): la RAM de la Wii en un lugar FIJO de la memoria de
++// wasm. La MEM1 (24 MiB), el módulo de Kamek (2 MiB, en 0x81800000) y la MEM2 (128 MiB) quedan en el mismo orden que
++// en la Wii a partir de MKW_FIJA_BASE: la dirección del anfitrión es MKW_FIJA_BASE + (dirección de la Wii & 0x1FFFFFFF)
++// (los 3 bits de arriba son la «vista»: 0x8… con caché, 0xC… sin caché, 0x0… física; la Wii borra esos bits igual).
++// Una lectura de las vistas con caché (0x80000000–0x97FFFFFF, casi todas) es entonces: una resta, una comparación, un
++// «y» y la carga, sin leer la tabla de páginas; lo demás (E/S, la caché bloqueada, las vistas sin caché) sigue por el
++// camino de antes, fuera de línea. Necesita el enlace con -sGLOBAL_BASE=MKW_FIJA_BASE+0x18000000 (lo de C++ empieza
++// después de la ventana) y la memoria inicial de al menos MKW_FIJA_BASE+512 MiB (compilar-web.py --fija lo pone).
++// El hueco de 232 MiB entre el módulo de Kamek y la MEM2 queda reservado y nadie lo toca (no ocupa RAM de verdad).
++//   MKW_MOTOR_FIJA_RAM   (apagado: para medir) las escrituras que el traductor ya demostró que son RAM (la pila,
++//                        FlatWriteRam*) directo a la ventana, sin comparar; con la caché bloqueada (0xE…) caería mal
++#ifndef MKW_MOTOR_FIJA
++#define MKW_MOTOR_FIJA 0
++#endif
++#if MKW_MOTOR_FIJA && !(defined(__EMSCRIPTEN__) && MKW_MOTOR_EN_LINEA)
++#error "MKW_MOTOR_FIJA es solo para wasm y con MKW_MOTOR_EN_LINEA"
++#endif
++#ifndef MKW_MOTOR_FIJA_RAM
++#define MKW_MOTOR_FIJA_RAM 0
++#endif
++// MKW_MOTOR_FIJA_RANGO_FUERA (H6): los rangos del traductor fuera de la ventana van a una función aparte (el código del
++// juego no crece con dos caminos en línea por cada rango)
++#ifndef MKW_MOTOR_FIJA_RANGO_FUERA
++#define MKW_MOTOR_FIJA_RANGO_FUERA MKW_MOTOR_FIJA
++#endif
++#ifndef MKW_FIJA_BASE
++#define MKW_FIJA_BASE 0x00100000u
++#endif
+diff --git a/runtime/src/guest_flat_memory_wasm.cpp b/runtime/src/guest_flat_memory_wasm.cpp
+index 57cb93d..fd3c556 100644
+--- a/runtime/src/guest_flat_memory_wasm.cpp
++++ b/runtime/src/guest_flat_memory_wasm.cpp
+@@ -11,6 +11,7 @@
+ #if defined(__EMSCRIPTEN__)
+ 
+ #include "guest_flat_memory.h"
++#include "mkw_motor.h"
+ 
+ #include <algorithm>
+ #include <cstdlib>
+@@ -49,6 +50,21 @@ uint64_t Offset(const RegionRequest& r) {
+     return 0;
+ }
+ 
++#if MKW_MOTOR_FIJA
++// H6 (§211): dónde va cada depósito dentro de la ventana fija (su dirección física, 0 = principio de la MEM1), o
++// kNoFija si se queda en el montón (la caché bloqueada 0xE…, cualquier otra región que no sea de la vista con caché).
++constexpr uint32_t kNoFija = 0xFFFFFFFFu;
++constexpr uint32_t kFijaVistaW = 0x80000000u;   // los mismos números que MemoryInline::kFijaVista/kFijaLargo
++constexpr uint64_t kFijaLargoW = 0x18000000u;
++uint32_t VentanaFija(const Store& s) {
++    if (s.kind == Backing::Mem1) return 0u;
++    if (s.kind == Backing::Mem2) return 0x10000000u;
++    if (s.owned - kFijaVistaW >= 0x01800000u && s.owned - kFijaVistaW < 0x10000000u)
++        return s.owned & 0x1FFFFFFFu;   // entre el fin de la MEM1 y la MEM2: el módulo de Kamek
++    return kNoFija;
++}
++#endif
++
+ bool Same(const std::vector<RegionRequest>& a, const std::vector<RegionRequest>& b) {
+     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
+         [](const auto& x, const auto& y) { return x.base == y.base && x.size == y.size && x.backing == y.backing; });
+@@ -83,10 +99,27 @@ void Initialize(const std::vector<RegionRequest>& regions) {
+     }
+ 
+     for (auto& s : stores) {
++#if MKW_MOTOR_FIJA
++        // MKW web, H6 (§211, mkw_motor.h): la MEM1, la MEM2 y lo que caiga entre las dos en la vista con caché (el
++        // módulo de Kamek en 0x81800000) no se piden al montón: viven en la ventana fija, en el lugar que dice la Wii
++        // (MKW_FIJA_BASE + dirección & 0x1FFFFFFF). Esa parte de la memoria de wasm queda debajo de GLOBAL_BASE: nadie más
++        // la usa. Se llena de ceros igual que antes (la memoria nueva de wasm ya viene en cero; el memset solo por las dudas).
++        if (const uint32_t fisica = VentanaFija(s); fisica != kNoFija) {
++            if (fisica + s.size > kFijaLargoW)
++                throw std::runtime_error("guest region does not fit in the fixed window (H6)");
++            s.host = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(MKW_FIJA_BASE) + fisica);
++            std::memset(s.host, 0, static_cast<size_t>(s.size));
++            continue;
++        }
++#endif
+         // Zero-filled like fresh pages: the game's BSS relies on it.
+         void* host = std::aligned_alloc(kGuestPageSize, static_cast<size_t>(s.size));
+         if (!host) {
++#if MKW_MOTOR_FIJA
++            for (auto& done : stores) if (VentanaFija(done) == kNoFija) std::free(done.host);
++#else
+             for (auto& done : stores) std::free(done.host);
++#endif
+             throw std::runtime_error("unable to allocate guest memory in the wasm heap");
+         }
+         std::memset(host, 0, static_cast<size_t>(s.size));

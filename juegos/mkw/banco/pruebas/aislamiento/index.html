@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aislamiento</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>
+  table { border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+  td, th { border: 1px solid #3a3361; padding: 4px 8px; text-align: left; vertical-align: top; }
+  .si { color: #3fd59a; font-weight: 600; } .no { color: #ff6b7a; font-weight: 600; }
+  iframe { width: 1px; height: 1px; border: 0; position: absolute; left: -10px; }
+  button { font: inherit; padding: 8px 14px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<h1>Aislamiento: <span>¿puede el juego tener su propio proceso y varios núcleos aquí?</span></h1>
+<p>Paso 8 del plan de rendimiento (P9 y H5, bitácora §187–§188). Esta página hace de <b>sitio</b> (sin ninguna cabecera
+  especial, como Juegos en GitHub Pages) y adentro abre tres <b>marcos</b>, como el marco del juego: uno sin nada, uno con
+  <code>Document-Isolation-Policy</code> (aísla solo ese marco) y uno con COOP/COEP (la manera vieja, que necesitaría
+  cambiar el sitio entero). En cada uno prueba: si quedó aislado y tiene memoria compartida (<code>SharedArrayBuffer</code>),
+  si un Worker puede usar JSPI y WebGPU con un lienzo fuera de pantalla (<code>OffscreenCanvas</code>), y el plan B sin
+  memoria compartida: pasarse búferes sin copiarlos y varios Workers calculando a la vez. <b>No usa nada del juego.</b></p>
+<p><b>En el teléfono</b> (para el dueño, <code>docs/medir-oppo.md</code> parte E): abra esta página, espere la tabla y
+  apriete «Copiar el informe».</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="tabla"></div>
+<button id="copiar" hidden>📋 Copiar el informe</button>
+<script type="module">
+import { prueba } from '../../comun.js';
+const { ok, nota, fin } = prueba('aislamiento', 'Aislamiento y varios núcleos (sin el juego)');
+const MARCOS = ['ninguna', 'dip', 'coop', 'sw'];
+const NOMBRE = { ninguna: 'Sin cabecera (hoy)', dip: 'Document-Isolation-Policy', coop: 'COOP + COEP', sw: 'DIP puesta por un service worker' };
+const res = {};
+const llegaron = new Promise(listo => addEventListener('message', e => {
+  if (e.data?.canal !== 'aislamiento') return;
+  res[e.data.r.aislar] = e.data.r;
+  if (MARCOS.every(m => res[m])) listo();
+}));
+window.mkwSaludo = () => 'hola';                          // (P9: ¿el marco la puede llamar directo?)
+try { localStorage.setItem('aislamiento.prueba', 'de-afuera'); } catch {}
+// P9: el service worker que pone la cabecera (sw.js) tiene que estar activo antes de abrir su marco
+let conSw = false;
+try { await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready; conSw = true; } catch (e) { res.sw = { aislar: 'sw', errores: ['service worker: ' + e], planB: {}, padre: {} }; }
+for (const m of MARCOS) {
+  if (m === 'sw' && !conSw) continue;
+  const f = document.createElement('iframe');
+  f.src = m === 'sw' ? 'marco.html?aislar=sw&sw=dip' : `marco.html?aislar=${m}`;
+  document.body.append(f);
+}
+const tope = new Promise(r => setTimeout(r, 90000));
+await Promise.race([llegaron, tope]);
+
+const chrome = (navigator.userAgentData?.brands || []).find(b => /Chrom/.test(b.brand))?.version || (/Chrome\/(\d+)/.exec(navigator.userAgent) || [])[1] || '?';
+const sn = v => v ? '<span class="si">sí</span>' : '<span class="no">no</span>';
+const fila = (t, f) => `<tr><th>${t}</th>${MARCOS.map(m => `<td>${res[m] ? f(res[m]) : '—'}</td>`).join('')}</tr>`;
+document.getElementById('tabla').innerHTML = `<p>Chrome ${chrome} · ${navigator.hardwareConcurrency || '?'} núcleos · ${navigator.deviceMemory || '?'} GB · ${navigator.userAgentData?.mobile ? 'teléfono' : 'computador'}</p>
+<table><tr><th></th>${MARCOS.map(m => `<th>${NOMBRE[m]}</th>`).join('')}</tr>
+${fila('Cabecera que llegó', r => r.cabecera || '?')}
+${fila('Aislado (crossOriginIsolated)', r => sn(r.aislado))}
+${fila('Memoria compartida (SAB)', r => sn(r.sab))}
+${fila('SAB llega al Worker + Atomics', r => sn(r.sabTrabajador))}
+${fila('Atomics.wait en el Worker', r => sn(r.sonda?.atomicsWait))}
+${fila('JSPI en la página', r => sn(r.jspiPagina))}
+${fila('JSPI en el Worker', r => sn(r.sonda?.jspi))}
+${fila('WebGPU en el Worker', r => sn(r.sonda?.adaptador) + (r.sonda?.adaptador ? ' ' + r.sonda.adaptador : ''))}
+${fila('OffscreenCanvas + WebGPU', r => sn(r.sonda?.offscreenWebgpu))}
+${fila('Toca la página de afuera directo', r => sn(r.padre?.documento && r.padre?.llamada) + (r.padre?.documentoError ? ' (' + r.padre.documentoError + ')' : ''))}
+${fila('Comparte el almacenamiento', r => sn(r.padre?.almacen === 'de-afuera'))}
+${fila('Plan B: 1 MB ida y vuelta', r => (r.planB['1MB']?.idaVueltaMs ?? '?') + ' ms')}
+${fila('Plan B: 4 MB ida y vuelta', r => (r.planB['4MB']?.idaVueltaMs ?? '?') + ' ms')}
+${fila('Varios núcleos (aceleración)', r => r.nucleos ? `×${r.nucleos.aceleracion} con ${r.nucleos.trabajadores}` : '?')}
+</table>`;
+const informe = JSON.stringify({ chrome, ua: navigator.userAgent, nucleos: navigator.hardwareConcurrency, memoria: navigator.deviceMemory, res }, null, 1);
+window.mkwInformeAislamiento = informe;
+const b = document.getElementById('copiar');
+b.hidden = false;
+b.onclick = () => navigator.clipboard.writeText(informe).then(() => { b.textContent = '✓ Copiado'; }, () => { prompt('Copie esto:', informe); });
+
+// ✓/✗: lo que tiene que pasar en el computador del proyecto (Chrome de escritorio, 137 o más); en el teléfono
+// los ✗ son la respuesta que buscamos (qué hay y qué no), no una falla de la prueba
+ok('llegaron los cuatro marcos', MARCOS.every(m => res[m]), MARCOS.filter(m => !res[m]).join(', ') || '');
+const N = res.ninguna, D = res.dip, C = res.coop;
+if (N) {
+  ok('sin cabecera: no aislado y sin memoria compartida (el sitio de hoy)', !N.aislado && !N.sabTrabajador, `aislado ${N.aislado}`);
+  ok('sin cabecera: JSPI anda en un Worker', !!N.sonda?.jspi);
+  ok('sin cabecera: el marco toca la página de afuera directo (como hoy)', !!(N.padre?.documento && N.padre?.llamada));
+  ok('plan B sin memoria compartida: el búfer de 1 MB va y vuelve sin copia', !!N.planB['1MB']?.sinCopia, `${N.planB['1MB']?.idaVueltaMs} ms`);
+  ok('plan B: varios Workers calculan a la vez (aceleración ≥ 1,5)', (N.nucleos?.aceleracion || 0) >= 1.5, JSON.stringify(N.nucleos));
+  nota(`WebGPU en el Worker: ${N.sonda?.adaptador || 'no'}${N.sonda?.gpuError ? ' (' + N.sonda.gpuError + ')' : ''}; OffscreenCanvas + WebGPU: ${N.sonda?.offscreenWebgpu}`);
+}
+const S = res.sw;
+const escritorio137 = Number(chrome) >= 137 && !navigator.userAgentData?.mobile;
+if (S && escritorio137) ok('P9: un service worker basta para poner Document-Isolation-Policy (GitHub Pages sin cabeceras)', S.aislado && S.sabTrabajador, `aislado ${S.aislado}, SAB al Worker ${S.sabTrabajador}`);
+else if (S) nota(`DIP puesta por un service worker: aislado ${S.aislado}, SAB al Worker ${S.sabTrabajador}${S.errores?.length ? ' (' + S.errores.join('; ') + ')' : ''}`);
+if (C) ok('COOP/COEP en un marco: NO alcanza (el sitio de afuera no lo tiene)', !C.aislado, `aislado ${C.aislado}`);
+if (D) {
+  const mayor = Number(chrome) >= 137;
+  if (mayor && !navigator.userAgentData?.mobile) ok('Document-Isolation-Policy: el marco queda aislado con memoria compartida (Chrome ≥ 137)', D.aislado && D.sabTrabajador, `aislado ${D.aislado}, SAB al Worker ${D.sabTrabajador}`);
+  else nota(`Document-Isolation-Policy: aislado ${D.aislado}, SAB al Worker ${D.sabTrabajador} (Chrome ${chrome}${navigator.userAgentData?.mobile ? ', teléfono' : ''})`);
+  if (D.aislado) ok('aislado: Atomics.wait en el Worker', !!D.sonda?.atomicsWait);
+  nota(`Document-Isolation-Policy y la página de afuera: documento ${D.padre?.documento}${D.padre?.documentoError ? ' (' + D.padre.documentoError + ')' : ''}, llamada ${D.padre?.llamada}${D.padre?.llamadaError ? ' (' + D.padre.llamadaError + ')' : ''}, almacenamiento compartido ${D.padre?.almacen === 'de-afuera'}`);
+  if (D.aislado) ok('aislado: el almacenamiento sigue siendo el del sitio (mismo origen: partidas y ajustes no se pierden)', D.padre?.almacen === 'de-afuera', String(D.padre?.almacen));
+}
+// H5 (§208): lo que el informe de rendimiento dice de los hilos (aislar.mjs estadoHilos), con navegadores de mentira
+{
+  const { estadoHilos } = await import('/web/navegador/aislar.mjs');
+  const ua = (v, android) => android ? `Mozilla/5.0 (Linux; Android 15) Chrome/${v}.0.0.0 Mobile Safari/537.36` : `Mozilla/5.0 (Windows NT 10.0) Chrome/${v}.0.0.0 Safari/537.36`;
+  // (sin aislar, SharedArrayBuffer no existe en esta página: uno de mentira para los navegadores de mentira)
+  const SharedArrayBuffer = function SharedArrayBuffer() {};
+  const real = estadoHilos();
+  ok('H5: esta página (sin cabecera) se informa sin aislar y sin memoria compartida', !real.aislada && !real.memoriaCompartida, JSON.stringify(real));
+  const pc = estadoHilos({ navigator: { userAgent: ua(140) }, crossOriginIsolated: false, SharedArrayBuffer, Atomics });
+  ok('H5: un PC con Chrome 140 sin aislar: DIP esperable, sin memoria compartida', pc.dipEsperable && !pc.memoriaCompartida && !pc.android && pc.chrome === 140);
+  const aisl = estadoHilos({ navigator: { userAgent: ua(140) }, crossOriginIsolated: true, SharedArrayBuffer, Atomics });
+  ok('H5: aislada y con SharedArrayBuffer → memoria compartida', aisl.aislada && aisl.memoriaCompartida);
+  const a145 = estadoHilos({ navigator: { userAgent: ua(145, true) }, crossOriginIsolated: false });
+  const a146 = estadoHilos({ navigator: { userAgent: ua(146, true) }, crossOriginIsolated: false });
+  ok('H5: Android 145 → DIP no esperable; Android 146 → esperable (blink-dev)', a145.android && !a145.dipEsperable && a146.dipEsperable);
+  ok('H5: sin versión de Chrome → no se espera nada', estadoHilos({ navigator: { userAgent: 'Firefox/130' } }).dipEsperable === false);
+}
+fin();
+</script>
+</body>
+</html>

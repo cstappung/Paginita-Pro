@@ -1,0 +1,32 @@
+diff --git a/runtime/include/guest_abi/memory_access.h b/runtime/include/guest_abi/memory_access.h
+index 4849aa9..881c537 100644
+--- a/runtime/include/guest_abi/memory_access.h
++++ b/runtime/include/guest_abi/memory_access.h
+@@ -380,6 +380,14 @@ MKW_MEMORY_FORCE_INLINE T LoadGuestOrder(const uint8_t* p) {
+ #endif
+     T value{};
+     std::memcpy(&value, p, sizeof(T));
++#if MKW_H7_TECHO
++    // H7 (§212), solo para medir: dar vuelta 2 y 4 bytes TRES veces (el mismo resultado) con una barrera entre medio para
++    // que el compilador no las borre; la diferencia con el programa normal = dos vueltas = el doble de lo que H7 ahorra
++    if constexpr (sizeof(T) == 2 || sizeof(T) == 4) {
++        value = MaybeByteSwap(value); __asm__ volatile("" : "+r"(value));
++        value = MaybeByteSwap(value); __asm__ volatile("" : "+r"(value));
++    }
++#endif
+     return MaybeByteSwap(value);
+ }
+ 
+@@ -402,6 +410,12 @@ MKW_MEMORY_FORCE_INLINE void StoreGuestOrder(uint8_t* p, T value) {
+         wasm_v128_store32_lane(p, v, 0);
+         return;
+     }
++#endif
++#if MKW_H7_TECHO
++    if constexpr (sizeof(T) == 2 || sizeof(T) == 4) {
++        value = MaybeByteSwap(value); __asm__ volatile("" : "+r"(value));
++        value = MaybeByteSwap(value); __asm__ volatile("" : "+r"(value));
++    }
+ #endif
+     const T swapped = MaybeByteSwap(value);
+     std::memcpy(p, &swapped, sizeof(T));

@@ -66,6 +66,24 @@ pon.tiempo(99, 99, 999); await espera(80); pon.tiempo(1, 45, 500); await espera(
 ok('la carrera siguiente vuelve a avisar', avisos.length === 2 && avisos[1].ms === 105500);
 v.parar();
 
+// 3b) §129 (P8): con hay(), en los menús no lee la memoria; terminada la carrera sigue leyendo hasta salir de ella
+{
+  let lecturas = 0, hay = false;
+  const L2 = new Proxy(L, { get: (o, k) => k === 'estado' ? () => { lecturas++; return o.estado(); } : o[k] });
+  const avisos2 = [];
+  pon.est.seccion = 0x41;
+  const v2 = vigilarCarreras({ lector: L2, alTerminar: r => avisos2.push(r), cadaMs: 20, hay: () => hay });
+  await espera(150);
+  ok('§129: en los menús lee una vez y después no mira la memoria', lecturas === 1, `${lecturas} lecturas`);
+  pon.est.seccion = 0x20; pon.tiempo(99, 99, 999); hay = true; await espera(80);
+  const enCarrera = lecturas;
+  hay = false; pon.tiempo(1, 40, 0); await espera(150);       // la carrera terminó (etapa 4) pero sigue en su sección
+  ok('§129: al terminar (sin carrera andando) sigue leyendo y avisa', avisos2.length === 1 && avisos2[0].ms === 100000 && lecturas > enCarrera, `${avisos2.length} avisos`);
+  pon.est.seccion = 0x41; await espera(60); const fuera = lecturas; await espera(150);
+  ok('§129: de vuelta en los menús deja de leer', lecturas === fuera, `${lecturas - fuera} lecturas de más`);
+  v2.parar();
+}
+
 // ---- Firebase falso: imita las reglas (docs/firebase-mkw.md §4) ----
 function firestoreFalso() {
   const docs = new Map();                                     // "k/uid" → dato

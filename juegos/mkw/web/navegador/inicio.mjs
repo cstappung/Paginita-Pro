@@ -10,7 +10,7 @@
 //   - Options → el cajón de la página (Controles, Partida, ajustes).
 //   - §116 (el dueño, 2026-10-27: «el multiplayer está totalmente roto, ocúltalo por ahora y ponle trabajando para
 //     usted»): con `multiEnObra` (por omisión sí) Multiplayer queda gris con el cartel «🚧 Trabajando para usted» y no
-//     abre nada; la línea de ayuda lo explica. `?multi=1` en la página lo devuelve (para probarlo mientras se arregla).
+//     abre nada; la línea de ayuda lo explica. Desde la v2.0 (el dueño, 2026-11-09) la página lo abre: `?multi=0` = en obra otra vez.
 //
 // PRIVADO: la imagen muestra a una persona real. No está en git ni en GitHub Pages: vive en la parte privada
 // (build/…/imagenes/inicio/jlokart.webp → R2 detrás del Worker de amigos, como el disco de BT3) y se baja con el token
@@ -159,6 +159,7 @@ body.cortina-mal #inicioJlo { display: none; }   /* un error del juego (sin WebG
     font-size: 14px; }
 }`;
 
+const INICIO_LIVIANO = new URLSearchParams(globalThis.location?.search || '').get('inicioLiviano') !== '0';
 export function crearInicio({ contenedor = document.body, imagen, buscar = (...a) => fetch(...a), leerMandos = () => [],
                               enSitio = false, ocupado = () => false, alElegir = () => {}, multiEnObra = true } = {}) {
   const estado = { imagen: 'sin pedir', mostrado: 0, elecciones: [], menu: 'principal', elegido: 0 };
@@ -260,8 +261,12 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
 
   // ---- Mandos: los bits del mando de GameCube que entrega controles.mjs (cada refresco) ----
   const A = 0x0100, B = 0x0200, STARTB = 0x1000, ARRIBA = 0x0008, ABAJO = 0x0004;
+  // §136 (P4, en parte): escondido el menú (casi todo el juego), la vuelta se detiene y mostrar() la vuelve a prender
+  // (antes seguía en cada refresco solo para ver que no estaba). ?inicioLiviano=0 = como antes
+  let girando = false;
   function vuelta(t) {
-    if (!vivo) return;
+    if (!vivo) { girando = false; return; }
+    if (!visible && INICIO_LIVIANO) { girando = false; return; }
     requestAnimationFrame(vuelta);
     if (!visible || ocupado()) { antes = 0xFFFF; return; }   // al volver, lo que siga apretado no cuenta como nuevo
     let botones = 0, sy = 0;
@@ -288,7 +293,8 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
     visible = true; estado.mostrado++;
     document.body.classList.add('con-inicio');
     antes = 0xFFFF;                                   // lo que ya estaba apretado al abrir no cuenta
-    if (!vivo) { vivo = true; addEventListener('keydown', alTecla, true); requestAnimationFrame(vuelta); }
+    if (!vivo) { vivo = true; addEventListener('keydown', alTecla, true); }
+    if (!girando) { girando = true; requestAnimationFrame(vuelta); }
     return true;
   }
   function ocultar() {

@@ -47,6 +47,10 @@ const PISTAS = opcion('--pistas', '0.0,13.2,20.2,30.2').split(',');
 const SEMILLAS = opcion('--semillas', '11,22').split(',').map(Number);
 const HUMANO = process.argv.includes('--humano');
 const ETIQUETA = opcion('--etiqueta', '');
+// W32 (§258): --extra "&…" = más parámetros para la página (p. ej. &ia30=1&azarFijo=1); --traza = guardar también el avance
+// de las 12 en cada lectura (cada medio segundo), para contar los tropiezos (choques, caídas, golpes: herramientas/comparar-ia30.mjs)
+const EXTRA = opcion('--extra', '');
+const TRAZA = process.argv.includes('--traza');
 const carpeta = path.join(raiz, 'build/web/datos', (HUMANO ? 'cpu-niveles-humano' : 'cpu-niveles') + (ETIQUETA ? '-' + ETIQUETA : ''));
 const archivo = path.join(carpeta, 'carreras.jsonl');
 mkdirSync(carpeta, { recursive: true });
@@ -80,7 +84,7 @@ async function correrCarrera(contexto, [cc, nivel], pista, semilla) {
   const p = await contexto.newPage({ viewport: { width: 640, height: 360 } });
   const errores = [];
   p.on('pageerror', e => errores.push(e.message));
-  const url = `http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=${pista}&cc=${cc}&cpu=${nivel}&semilla=${semilla}&pj=0&kart=1${HUMANO ? '' : '&soloCpu=1'}`;
+  const url = `http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=${pista}&cc=${cc}&cpu=${nivel}&semilla=${semilla}&pj=0&kart=1${HUMANO ? '' : '&soloCpu=1'}${EXTRA}`;
   const t0 = Date.now();
   await p.goto(url);
   const r = { cc, nivel, pista, semilla, humano: HUMANO, marcas: {}, fin: null, errores };
@@ -93,9 +97,11 @@ async function correrCarrera(contexto, [cc, nivel], pista, semilla) {
       empezo = Date.now();
       r.ficha = await p.evaluate(() => window.mkwEstado?.ficha?.puestos?.map(q => [q.tipo, q.personaje, q.vehiculo])).catch(() => null);
       // (M20) lo que dice el gancho: cargas, aplicadas, nivel, objetos, adv/bias/min escritos, datos ok, los del juego…
+      r.ia30 = await p.evaluate(() => { const M = window.mkw; return M?._mkw_ia30_estado ? Array.from({ length: 8 }, (_, k) => M._mkw_ia30_estado(k)) : null; }).catch(() => null);
       r.gancho = await p.evaluate(() => { const M = window.mkw; return M?._mkw_cpu_estado ? Array.from({ length: 20 }, (_, k) => M._mkw_cpu_estado(k)) : null; }).catch(() => null);
     }
     ultimo = c;
+    if (TRAZA && c.etapa === 2) (r.traza ??= []).push([c.reloj, ...c.jugadores.map(j => Math.round(j.avance * 1e5) / 1e5)]);
     // el avance de las 12 en cada marca de 10 s (la primera lectura pasada la marca: a lo más medio segundo después,
     // y se guarda también el reloj de esa lectura para corregir)
     const marca = Math.floor(c.reloj / 10000) * 10;
@@ -105,6 +111,11 @@ async function correrCarrera(contexto, [cc, nivel], pista, semilla) {
     if (c.reloj > 6 * 60000) break;                            // (6 min de carrera: alguna quedó trabada)
   }
   r.fin = ultimo;
+  r.ia30Fin = await p.evaluate(() => { const M = window.mkw; return M?._mkw_ia30_estado ? Array.from({ length: 8 }, (_, k) => M._mkw_ia30_estado(k)) : null; }).catch(() => null);
+  // W32 (§258): el manejo de las CPU (las marcas del estado de cada kart, por bit) y el cuadro en que cada uno empezó cada
+  // vuelta, del programa con el gancho (sin él, null)
+  r.ia30Bits = await p.evaluate(() => { const M = window.mkw; return M?._mkw_ia30_bits ? Array.from({ length: 321 }, (_, k) => M._mkw_ia30_bits(k)) : null; }).catch(() => null);
+  r.ia30Vueltas = await p.evaluate(() => { const M = window.mkw; return M?._mkw_ia30_vuelta ? Array.from({ length: 108 }, (_, k) => M._mkw_ia30_vuelta(k)) : null; }).catch(() => null);
   r.segundos = Math.round((Date.now() - t0) / 1000);
   await p.close().catch(() => {});
   return r;

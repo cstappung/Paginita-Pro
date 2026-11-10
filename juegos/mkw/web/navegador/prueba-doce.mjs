@@ -25,6 +25,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { compararLargadas } from './largada-pareja.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -110,6 +111,10 @@ x = await Promise.all(paginas.map(leer));
 await Promise.all(paginas.map((p, i) => p.locator('#canvas').screenshot({ path: path.join(carpeta, `${i}.png`) }).catch(() => {})));
 const cuadros = x.map(y => y?.ls?.cuadro ?? -1);
 ok(`la carrera sincronizada avanza en las ${N}`, cuadros.every(c => c >= CUADROS), cuadros.join(' '));
+// (§191: lo que esperó cada una, por cuadro, y los paquetes de botones que mandó por segundo de carrera —con el árbitro
+// (?arbitro=1) los que no son autoridad ni suplente mandan solo a 2 o 3—; y su retraso)
+console.log(`  ${x.map((y, k) => { const l = y?.ls; if (!l) return `${k}: —`; const c = Math.max(1, l.cuadros || 1);
+  return `${k}: espera ${(l.msEsperando / c).toFixed(2)} ms/cuadro, ${((l.paquetesBotones || 0) / c * 60).toFixed(0)} paq/s, retraso ${l.retraso}`; }).join(' · ')}${x[0]?.ls?.arbitro ? ' (árbitro)' : ''}`);
 
 const humanos = Array.from({ length: N }, (_, i) => i);
 ok(`los ${N} humanos son jugadores de verdad (tipo 0) en todas las consolas, el resto CPU`,
@@ -127,6 +132,9 @@ ok('la cámara de cada consola sigue a su kart', x.every((y, i) => y?.camara ===
 const iguales = x.map(y => y?.ls?.huellasIguales || 0), desinc = x.map(y => y?.ls?.desincronizado).filter(Boolean);
 ok(`las huellas coinciden en las ${N} (la misma carrera)`, iguales.every(n => n >= 3) && !desinc.length,
    `iguales ${iguales.join(' ')}${desinc.length ? ' · DESINCRONIZADO ' + JSON.stringify(desinc[0]) : ''}`);
+// §250: las N largan en el mismo cuadro de lógica y a la vez (cargaron de a una, 1,5 s entre cada una)
+{ const r = compararLargadas(x.map(y => y?.ls), x[0]?.ls?.carrera ?? 1, Number(opcion('--largada-ms', 200)));
+  console.log('  §250 ' + r.detalle); ok(`§250: las ${N} largan en el mismo cuadro de lógica y a la vez`, r.cumple, r.detalle); }
 const av = x[0]?.av || [];
 ok(`el kart de cada humano salió de la parrilla con lo que tocó (avance > 1)`, humanos.every(i => (av[i] || 0) > 1.0), humanos.map(i => (av[i] || 0).toFixed(3)).join(' '));
 ok('…y no todos igual (cada uno con sus teclas)', new Set(humanos.map(i => (av[i] || 0).toFixed(4))).size >= Math.min(N, 3));
@@ -154,6 +162,17 @@ ok(`los ${N} cruzaron la meta en el mismo cuadro y el juego pasó a los resultad
    fin.map(y => y?.colgada ? 'colgada' : y?.etapa).join(' '));
 ok('ninguna página se cayó', !caidas.length, caidas.slice(0, 3).join(' | '));
 
+// §175: lo del lockstep de cada página (va a su registro interno, no a la consola): relevos, cortes, la huella y el
+// estado al final, para saber quién se separó y por qué
+for (const [i, p] of paginas.entries()) {
+  const d = await Promise.race([new Promise(r => setTimeout(() => r(null), 10000)), p.evaluate(() => {
+    const ls = window.mkwSincro?.lockstep, e = ls?.estado?.() || {};
+    const log = [...(window.mkwRed?.registro || []), ...(window.mkwEstado?.log || [])].map(String).filter(l => /lockstep|relev|corte|autoridad|retraso|huella/i.test(l)).slice(0, 300);
+    return { log, estado: JSON.stringify({ cuadro: e.cuadro, autoridad: e.autoridad, desincronizado: e.desincronizado, parteDistinta: e.parteDistinta,
+      fuera: e.fuera, islas: e.islas, relevadosAhora: e.relevadosAhora, retraso: e.retraso, atrasados: e.atrasados }) };
+  }).catch(() => null)]);
+  if (d) { registro.push(`[${i}] [fin] ${d.estado}`); for (const l of d.log) registro.push(`[${i}] [ls] ${l.slice(0, 300)}`); }
+}
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
 await navegador.close(); servidor.kill();
 console.log(`\n${bien} bien, ${mal} mal  (${((Date.now() - t0) / 60000).toFixed(1)} min; registro y fotos en ${path.relative(raiz, carpeta).replaceAll('\\', '/')}/)`);

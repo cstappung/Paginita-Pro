@@ -22,10 +22,10 @@ import { crearPila, crearConmutador, crearRouterMalla } from '/web/navegador/red
 import { crearWfc } from '/web/navegador/wfc.mjs';
 import { consolaFalsa, hasta, lector } from './consola-falsa.mjs';
 import { enctypexCifrar, enctypexDescifrar, evaluarFiltro } from '/web/navegador/wfc-salas.mjs';
-import { crearMalla, senalCanal, leerRedMala, degradar } from '/web/navegador/malla.mjs';
+import { crearMalla, senalCanal, leerRedMala, degradar, trocear, crearArmador, TROZO } from '/web/navegador/malla.mjs';
 const nada = () => {};
 
-const { ok, fin } = prueba('red', 'Red en línea (sin el juego)');
+const { ok, nota, fin } = prueba('red', 'Red en línea (sin el juego)');
 const tx = new TextEncoder(), rx = new TextDecoder('latin1');
 
 try {
@@ -190,6 +190,37 @@ try {
     ok('§103: sin credenciales (el Worker no tiene TURN) va directo como siempre y lo avisa («sin»)',
        conG && G.malla.modo() === 'normal' && G.avisos.join() === 'sin' && cg && !cg.relevo, `${G.malla.modo()} · ${JSON.stringify(cg)} · ${G.avisos}`);
     G.malla.salir(); H.malla.salir();
+    // §135 (R8): lo grande por "tcp" va en trozos de 1 KB y llega entero; entre trozo y trozo pasan los de "udp"
+    {
+      const t = trocear(Uint8Array.from({ length: 2500 }, (_, i) => i & 255)), arma = crearArmador();
+      const res = t.map(x => arma(x)).filter(Boolean);
+      ok('§135: 2.500 bytes = 3 trozos (≤ 1 KB + 3) y el armador los junta igual', t.length === 3 && t.every(x => x.length <= TROZO + 3) && res.length === 1 &&
+         res[0].length === 2500 && res[0].every((v, i) => v === (i & 255)), `${t.length} trozos`);
+      const raro = new Uint8Array([0xF7, 0x7E, 5]);
+      ok('§135: uno chico que empieza con la marca va envuelto y vuelve igual; uno chico normal, tal cual',
+         trocear(raro).length === 1 && trocear(raro)[0].length === 6 && crearArmador()(trocear(raro)[0]).join() === '247,126,5' && trocear(new Uint8Array([1, 2]))[0].length === 2);
+      // con WebRTC de verdad: 200 KB por "tcp" (la copia de la sala, las skins) y enseguida uno por "udp": ¿cuánto tarda el de "udp"?
+      const medir = async (trozos, sala) => {
+        const llegan = { tcp: [], udp: [] }, mk = uid => crearMalla({ uid, senal: senalCanal({ sala: sala3 + sala, uid }), trozos,
+          alBinario: (de, b, canal) => llegan[canal].push({ b, t: performance.now() }) });
+        const M = mk('um'), N = mk('un');
+        await M.entrar(); await N.entrar();
+        await hasta(() => M.conectados().includes('un') && N.conectados().includes('um'), 15000);
+        const grande = Uint8Array.from({ length: 200 * 1024 }, (_, i) => (i * 7) & 255);
+        const t0 = performance.now();
+        M.enviar('un', grande, 'tcp');
+        M.enviar('un', new Uint8Array([9, 9, 9]), 'udp');
+        await hasta(() => llegan.tcp.length >= 1 && llegan.udp.length >= 1, 20000);
+        const g = llegan.tcp[0]?.b;
+        const r = { udpMs: Math.round((llegan.udp[0]?.t ?? NaN) - t0), tcpMs: Math.round((llegan.tcp[0]?.t ?? NaN) - t0),
+                    entero: !!g && g.length === grande.length && g.every((v, i) => v === grande[i]) };
+        M.salir(); N.salir();
+        return r;
+      };
+      const con = await medir(true, '-5'), sin = await medir(false, '-6');
+      ok('§135: 200 KB por "tcp" llegan enteros e iguales, en trozos y enteros', con.entero && sin.entero, JSON.stringify({ con, sin }));
+      nota(`§135: el paquete "udp" mandado detrás de 200 KB por "tcp": en trozos ${con.udpMs} ms (los 200 KB, ${con.tcpMs} ms) · enteros ${sin.udpMs} ms (los 200 KB, ${sin.tcpMs} ms)`);
+    }
     // si no llegan (el sitio no contesta): a los esperaRelevo ms, directo
     const I = navR('ui', { soloRelevo: true, esperaRelevo: 1200, sala: '-3' }), J = navR('uj', { sala: '-3' });
     await I.malla.entrar(); await J.malla.entrar();

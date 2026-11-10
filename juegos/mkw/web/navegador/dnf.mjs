@@ -58,6 +58,12 @@ const ESTILO = `
 .cuenta-dnf-numero canvas { display: block; height: 100%; width: auto; }
 .cuenta-dnf-numero .silueta { position: absolute; left: 0; top: 0; opacity: 0; }
 .cuenta-dnf-pila > .cuenta-dnf-letrero { display: block; height: max(4.6cqh, 12px); width: auto; max-width: 100cqw; }
+/* §148 (P3): la sombra en cada lienzo quieto, no en la pila: con la sombra en la pila, cada cuadro de la animación del
+   número (escala) obligaba a volver a calcular las dos sombras de todo; así se calculan una vez y la animación solo
+   mueve capas (will-change). Se ve igual. ?filtrosLivianos=0 = como antes */
+:root.filtros-livianos .cuenta-dnf-pila { filter: none; }
+:root.filtros-livianos .cuenta-dnf-pila canvas { filter: drop-shadow(0 0 .5cqh #000c) drop-shadow(0 .5cqh .7cqh #0008); }
+:root.filtros-livianos .cuenta-dnf-numero, :root.filtros-livianos .cuenta-dnf-numero canvas { will-change: transform, opacity; }
 .cuenta-dnf.espera .cuenta-dnf-numero { height: max(6cqh, 18px); }
 .cuenta-dnf.espera .cuenta-dnf-pila > .cuenta-dnf-letrero { height: max(3.4cqh, 10px); }
 .cuenta-dnf.espera .cuenta-dnf-pila { opacity: .92; }
@@ -123,7 +129,7 @@ function pintarReserva(texto, paleta, documento, lienzo) {
   return c;
 }
 
-export function crearCuentaDnf({ M, lector, leerArchivo = null, documento = document, manual = false, pitido = pitidoPorOmision,
+export function crearCuentaDnf({ M, lector, leerArchivo = null, documento = document, manual = false, saltoSinCuenta = 1, pitido = pitidoPorOmision,
                                  plazoMs = DNF_MS } = {}) {
   if (!documento.getElementById('estilo-cuenta-dnf')) {
     const st = documento.createElement('style'); st.id = 'estilo-cuenta-dnf'; st.textContent = ESTILO; documento.head.appendChild(st);
@@ -219,7 +225,10 @@ export function crearCuentaDnf({ M, lector, leerArchivo = null, documento = docu
     caja.hidden = false;
   }
 
-  const bucle = () => { if (!vivo) return; actualizar(); requestAnimationFrame(bucle); };
+  // §136 (P4, en parte): sin cuenta en pantalla (casi siempre) se mira cada `saltoSinCuenta` refrescos, no en cada uno
+  // (con un monitor de 240 Hz eran 240 lecturas por segundo de la memoria del juego); la cuenta aparece a lo más ~1/6 s tarde
+  let vuelta = 0;
+  const bucle = () => { if (!vivo) return; if (modo || ++vuelta >= saltoSinCuenta) { vuelta = 0; actualizar(); } requestAnimationFrame(bucle); };
   if (!manual) requestAnimationFrame(bucle);
   return {
     actualizar, listo, colocar,

@@ -26,6 +26,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { armarDiminutos } from './diminutos.mjs';
+import { carpetaPartidaBase } from './partida-base.mjs';   // §175
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -42,7 +43,7 @@ const EMULADOR = args.includes('--emulador');
 const CARPETAS = [
   ['mkw/mkw/disco/', path.join(raiz, 'extraido/disco')],
   ['mkw/mkw/sd/RetroRewind6/', path.join(raiz, 'terceros/RetroRewind/RetroRewind6')],
-  ['mkw/mkw/sd/riivolution/', path.join(raiz, 'terceros/RetroRewind/riivolution')],
+  ['mkw/mkw/sd/riivolution/', carpetaPartidaBase(raiz)],   // §175: la copia limpia
   ['mkw/wc/runtime/assets/', path.join(raiz, 'terceros/Wiicompiled/runtime/assets')],
   ['mkw/build/', BUILD],
 ];
@@ -56,7 +57,8 @@ function lista(carpeta, base = carpeta, salida = [], huella = null) {
     if (e.isDirectory()) lista(p, base, salida, huella);
     else if (e.isFile()) {
       const st = fs.statSync(p), ruta = path.relative(base, p).split(path.sep).join('/');
-      salida.push([ruta, st.size]);
+      // §174 (D5): con la huella del archivo (tamaño y fecha; en R2, la de su contenido): la página lo guarda con ella
+      salida.push([ruta, st.size, crypto.createHash('sha1').update(`${st.size}|${st.mtimeMs}`).digest('hex').slice(0, 16)]);
       if (huella) huella.update(`${ruta}|${st.size}|${st.mtimeMs};`);
     }
   }

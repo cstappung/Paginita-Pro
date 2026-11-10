@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarjetas Adreno</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Tarjetas Adreno: <span>el aviso de los personajes invisibles</span></h1>
+<p>Prueba <code>web/navegador/adreno.mjs</code> (bitácora §205, W9 del plan v4) <b>sin el juego</b>, con adaptadores de
+  mentira. En KartPad los personajes salían invisibles en las tarjetas Adreno de las series 600 y 700. Este PC no tiene
+  una, así que la página solo lee lo que el navegador dice de la tarjeta (<code>GPUAdapterInfo</code>) y lo anota en el
+  registro y en el informe de rendimiento. Comprueba que una «Adreno 730» de mentira da el aviso, que una 619 también,
+  que una 830 y las de otras marcas no, y que un navegador que no dice nada no rompe nada.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { riesgoAdreno } from '/web/navegador/adreno.mjs';
+
+const { ok, nota, fin } = prueba('adreno', 'Tarjetas Adreno (sin el juego)');
+
+try {
+  // ---- 1. Lo que dice Chrome en un Galaxy S22 (Adreno 730) ----
+  {
+    const r = riesgoAdreno({ vendor: 'qualcomm', architecture: 'adreno-7xx', device: '', description: 'Adreno (TM) 730' });
+    nota(`Adreno 730 → ${JSON.stringify(r)}`);
+    ok('una Adreno 730 de mentira es Adreno, serie 7, modelo 730', r.adreno && r.serie === 7 && r.modelo === '730');
+    ok('y da el aviso de los personajes invisibles', r.riesgo && /invisibles/.test(r.texto) && /Adreno 730/.test(r.texto), r.texto);
+  }
+  // ---- 2. Una 619 (Moto G85) y una 6xx que solo trae la arquitectura ----
+  {
+    const r = riesgoAdreno({ vendor: 'qualcomm', architecture: 'adreno-6xx', description: 'Adreno (TM) 619' });
+    ok('una Adreno 619 también avisa', r.riesgo && r.serie === 6 && r.modelo === '619');
+    const s = riesgoAdreno({ vendor: 'qualcomm', architecture: 'adreno-6xx', description: '' });
+    ok('sin descripción, la serie sale de la arquitectura (6xx → avisa)', s.riesgo && s.serie === 6 && s.modelo === null, s.texto);
+  }
+  // ---- 3. Las que no: Adreno 830, Adreno 5xx, otras marcas ----
+  {
+    const r8 = riesgoAdreno({ vendor: 'qualcomm', architecture: 'adreno-8xx', description: 'Adreno (TM) 830' });
+    ok('una Adreno 830 es Adreno pero sin aviso', r8.adreno && r8.serie === 8 && !r8.riesgo, r8.texto);
+    const r5 = riesgoAdreno({ vendor: 'qualcomm', architecture: 'adreno-5xx' });
+    ok('una Adreno 5xx sin aviso', r5.adreno && !r5.riesgo);
+    const otras = [
+      { vendor: 'arm', architecture: 'valhall', description: 'Mali-G715' },
+      { vendor: 'nvidia', architecture: 'ampere', description: 'NVIDIA GeForce RTX 3080' },
+      { vendor: 'google', architecture: 'swiftshader', description: '', isFallbackAdapter: true },
+      { vendor: 'img-tec', architecture: 'rogue', description: 'PowerVR B-Series' },
+    ].map(riesgoAdreno);
+    ok('Mali, NVIDIA, SwiftShader y PowerVR: no son Adreno, sin aviso', otras.every(r => !r.adreno && !r.riesgo && r.texto === ''));
+  }
+  // ---- 4. Un navegador que no dice nada ----
+  {
+    const vacios = [undefined, null, {}, { vendor: '' }].map(riesgoAdreno);
+    ok('sin información (o con información vacía) no rompe y no avisa', vacios.every(r => !r.adreno && !r.riesgo));
+    const soloDesc = riesgoAdreno({ vendor: '', description: 'Adreno (TM) 740' });
+    ok('si el fabricante viene vacío, basta la descripción («Adreno (TM) 740» → avisa)', soloDesc.adreno && soloDesc.riesgo && soloDesc.modelo === '740');
+  }
+  // ---- 5. Un adaptador de WebGPU de mentira, como lo lee mkw.mjs (adaptador.info) ----
+  {
+    const adaptador = { info: { vendor: 'qualcomm', architecture: 'adreno-7xx', description: 'Adreno (TM) 730' } };
+    const r = riesgoAdreno(adaptador?.info), nada = riesgoAdreno(null?.info);
+    const linea = r.adreno ? `[tarjeta] ${r.texto}` : '';
+    ok('con el adaptador de mentira, la línea del registro sale como la escribe mkw.mjs', linea.startsWith('[tarjeta] Adreno 730:'), linea);
+    ok('sin adaptador (sin WebGPU), nada', !nada.adreno && nada.texto === '');
+  }
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

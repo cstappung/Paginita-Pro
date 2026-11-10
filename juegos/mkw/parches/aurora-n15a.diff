@@ -1,0 +1,311 @@
+diff --git a/include/aurora/render_size_limits.hpp b/include/aurora/render_size_limits.hpp
+new file mode 100644
+index 0000000..20d92f3
+--- /dev/null
++++ b/include/aurora/render_size_limits.hpp
+@@ -0,0 +1,81 @@
++#pragma once
++
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++#include <limits>
++
++namespace aurora::render_size_limits {
++
++struct Size {
++  uint32_t width;
++  uint32_t height;
++};
++
++// The canvas follows the window aspect however wide it gets, since the presenter stretches it and
++// a cap would distort the UI. Only the portrait side clamps, where the guest cannot fill taller.
++inline constexpr float kMaxDynamicPortraitExpansion = 6.f;
++inline constexpr float kMinDynamicAspect = (16.f / 9.f) / kMaxDynamicPortraitExpansion;
++
++// The adapter limit is an API ceiling, not an allocation budget: a 16384-wide RGBA attachment is
++// near 100 MiB. 8192 plus an 8K-UHD pixel budget keeps 8x 16:9 while avoiding device removal.
++inline constexpr uint32_t kMaxFramebufferDimension = 8192;
++inline constexpr uint64_t kMaxFramebufferPixels = 7680ull * 4320ull;
++
++inline float clamp_dynamic_aspect(float aspect) noexcept {
++  if (!std::isfinite(aspect) || aspect <= 0.f) {
++    return 1.f;
++  }
++  return std::max(aspect, kMinDynamicAspect);
++}
++
++inline Size scale_framebuffer_to_aspect(uint32_t width, uint32_t height, float scale, float requestedAspect) noexcept {
++  if (width == 0 || height == 0 || !std::isfinite(scale) || scale <= 0.f) {
++    return {std::max(width, 1u), std::max(height, 1u)};
++  }
++
++  const auto scaledWidth = std::max(1u, static_cast<uint32_t>(std::lround(static_cast<double>(width) * scale)));
++  const auto scaledHeight = std::max(1u, static_cast<uint32_t>(std::lround(static_cast<double>(height) * scale)));
++  const float aspect = clamp_dynamic_aspect(requestedAspect);
++  if (aspect >= static_cast<float>(width) / static_cast<float>(height)) {
++    return {
++        std::max(1u, static_cast<uint32_t>(std::lround(static_cast<double>(scaledHeight) * aspect))),
++        scaledHeight,
++    };
++  }
++  return {
++      scaledWidth,
++      std::max(1u, static_cast<uint32_t>(std::lround(static_cast<double>(scaledWidth) / aspect))),
++  };
++}
++
++inline Size fit_framebuffer_to_budget(uint32_t width, uint32_t height, uint32_t adapterMaxDimension) noexcept {
++  if (width == 0 || height == 0) {
++    return {width, height};
++  }
++
++  uint32_t dimensionLimit = kMaxFramebufferDimension;
++  if (adapterMaxDimension != 0 && adapterMaxDimension != std::numeric_limits<uint32_t>::max()) {
++    dimensionLimit = std::min(dimensionLimit, adapterMaxDimension);
++  }
++  dimensionLimit = std::max(dimensionLimit, 1u);
++
++  double fitScale = 1.0;
++  fitScale = std::min(fitScale, static_cast<double>(dimensionLimit) / static_cast<double>(width));
++  fitScale = std::min(fitScale, static_cast<double>(dimensionLimit) / static_cast<double>(height));
++
++  const double requestedPixels = static_cast<double>(width) * static_cast<double>(height);
++  if (requestedPixels > static_cast<double>(kMaxFramebufferPixels)) {
++    fitScale = std::min(fitScale, std::sqrt(static_cast<double>(kMaxFramebufferPixels) / requestedPixels));
++  }
++
++  if (fitScale >= 1.0) {
++    return {width, height};
++  }
++  return {
++      std::max(1u, static_cast<uint32_t>(std::floor(static_cast<double>(width) * fitScale))),
++      std::max(1u, static_cast<uint32_t>(std::floor(static_cast<double>(height) * fitScale))),
++  };
++}
++
++} // namespace aurora::render_size_limits
+diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
+index 00c478d..fa750ba 100644
+--- a/include/aurora/aurora.h
++++ b/include/aurora/aurora.h
+@@ -125,6 +125,10 @@ typedef struct {
+   // Optional directory for the portable GX pipeline database. When null, the
+   // database is stored in cachePath with Dawn's machine-specific cache.
+   const char* pipelineCachePath;
++  // MKW web, N15a (§170): campos que el runtime v0.9.3 llena; en la web no hacen nada (la página pone el ritmo y
++  // la ventana es el canvas)
++  bool vsync;
++  bool startHidden;
+ } AuroraConfig;
+ 
+ typedef enum {
+@@ -148,6 +152,19 @@ void aurora_shutdown();
+ const AuroraEvent* aurora_update();
+ bool aurora_begin_frame();
+ void aurora_end_frame();
++
++// MKW web, N15a (§170): lo que el runtime v0.9.3 de WiiCompiled le pide a la aurora nueva, sobre esta aurora (la vieja,
++// ya portada al navegador). El reparto del cuadro entre la ventana y el hilo de GX existe solo para que enlace: en la
++// web el GX no va en otro hilo (GxWorker::ShouldDefer() da falso), así que el runtime llama a aurora_begin/end_frame.
++typedef struct AuroraImguiFrame AuroraImguiFrame;
++bool aurora_begin_frame_window();
++bool aurora_begin_frame_gx();
++AuroraImguiFrame* aurora_end_frame_window();
++void aurora_end_frame_gx(AuroraImguiFrame* frame);
++void aurora_release_imgui_frame(AuroraImguiFrame* frame);
++double aurora_get_display_refresh_rate();
++bool aurora_display_shows_interpolation();
++SDL_Window* aurora_get_window();
+ typedef void (*AuroraFrameWorkerWaitCallback)();
+ // Called from the producer thread at bounded intervals while Aurora waits for
+ // the asynchronous frame worker. The callback must not enter Aurora.
+diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
+index f58252f..b81ae2b 100644
+--- a/include/aurora/gfx.h
++++ b/include/aurora/gfx.h
+@@ -70,6 +70,8 @@ void aurora_get_frame_interpolation_diagnostics(AuroraFrameInterpolationDiagnost
+ // Generates transform-interpolated perspective frames between consecutive 60 Hz logical frames.
+ // Supported targets are 0 (off), 120, 180 and 240. Guest simulation and VI timing are unchanged.
+ void aurora_set_frame_interpolation_fps(uint32_t targetFps);
++// MKW web, N15a (§170): pedido por el runtime v0.9.3; en la web el ritmo lo pone el navegador (no hay vsync que tocar)
++void aurora_enable_vsync(bool enabled);
+ uint32_t aurora_get_frame_interpolation_fps();
+ 
+ // Newly encountered GX pipelines compile on the bounded worker queue. Draws whose pipeline is not
+diff --git a/include/dolphin/gx/GXAurora.h b/include/dolphin/gx/GXAurora.h
+index b227945..1b4d3ee 100644
+--- a/include/dolphin/gx/GXAurora.h
++++ b/include/dolphin/gx/GXAurora.h
+@@ -104,6 +104,8 @@ void AuroraGetRenderSize(u32* width, u32* height);
+ 
+ /** Retrieves the current native presentation-surface size, ignoring the GX sizing policy. */
+ void AuroraGetSurfaceSize(u32* width, u32* height);
++// MKW web, N15a (§170): pedido por el runtime v0.9.3 (el hilo de GX); en la web no hay ese hilo, no hace nada
++void AuroraSetGxProducerThread(void);
+ 
+ /**
+  * Sets the actual render viewport in native framebuffer coordinates.
+diff --git a/lib/aurora.cpp b/lib/aurora.cpp
+index 5feaaeb..6e13d14 100644
+--- a/lib/aurora.cpp
++++ b/lib/aurora.cpp
+@@ -2024,6 +2024,20 @@ void aurora_shutdown() { aurora::shutdown(); }
+ const AuroraEvent* aurora_update() { return aurora::update(); }
+ bool aurora_begin_frame() { return aurora::begin_frame(); }
+ void aurora_end_frame() { aurora::end_frame(); }
++// MKW web, N15a (bitácora §170): lo que pide el runtime v0.9.3. El reparto del cuadro entre la ventana y el hilo de GX
++// es para el hilo de GX, que en la página no existe (gx_worker.h: ShouldDefer() en falso fijo): mitades = cuadro entero.
++// El ritmo y la pantalla los pone el navegador: vsync no se toca y la tasa es la de la Wii (la del monitor la mide la
++// página, relojMonitor).
++bool aurora_begin_frame_window() { return aurora::begin_frame(); }
++bool aurora_begin_frame_gx() { return true; }
++AuroraImguiFrame* aurora_end_frame_window() { aurora::end_frame(); return nullptr; }
++void aurora_end_frame_gx(AuroraImguiFrame*) {}
++void aurora_release_imgui_frame(AuroraImguiFrame*) {}
++double aurora_get_display_refresh_rate() { return 60.0; }
++bool aurora_display_shows_interpolation() { return true; }
++SDL_Window* aurora_get_window() { return aurora::window::get_sdl_window(); }
++void aurora_enable_vsync(bool) {}
++extern "C" void AuroraSetGxProducerThread() {}
+ void aurora_set_frame_worker_wait_callback(AuroraFrameWorkerWaitCallback callback) {
+   aurora::g_frameWorkerWaitCallback.store(callback, std::memory_order_release);
+ }
+diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
+index d94f26c..e308e0d 100644
+--- a/lib/gx/command_processor.cpp
++++ b/lib/gx/command_processor.cpp
+@@ -1957,7 +1957,8 @@ static uint16_t pn_mtx_mask(const uint8_t* vertices, uint16_t vtxCount,
+   }
+   uint16_t mask = 0;
+   for (uint16_t vertex = 0; vertex < vtxCount; ++vertex) {
+-    const uint32_t matrixIndex = vertices[static_cast<size_t>(vertex) * vtxStride] / 3u;
++    // MKW web, N15a (§170): #376 de WiiCompiled v0.9.3, el índice de matriz son los 6 bits de abajo
++    const uint32_t matrixIndex = (vertices[static_cast<size_t>(vertex) * vtxStride] & 0x3fu) / 3u;
+     if (matrixIndex < MaxPnMtx) {
+       mask |= static_cast<uint16_t>(1u << matrixIndex);
+     }
+@@ -1981,7 +1982,7 @@ static PnMtxUsage pn_mtx_usage(const uint8_t* vertices, uint16_t vtxCount,
+   uint16_t mask = 0;
+   for (uint16_t vertex = 0; vertex < vtxCount; ++vertex) {
+     // GX matrix-index attributes precede every other vertex attribute and are always one byte.
+-    const uint8_t rawMatrixIndex = vertices[static_cast<size_t>(vertex) * vtxStride];
++    const uint8_t rawMatrixIndex = vertices[static_cast<size_t>(vertex) * vtxStride] & 0x3fu;   // #376 (§170)
+     topologyHasher.update(rawMatrixIndex);
+     const uint32_t matrixIndex = rawMatrixIndex / 3u;
+     if (matrixIndex < MaxPnMtx) {
+diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
+index 9bfc2b3..a51bae7 100644
+--- a/lib/gx/gx.cpp
++++ b/lib/gx/gx.cpp
+@@ -1,4 +1,9 @@
+ #include "gx.hpp"
++// MKW web, N15a (bitácora §170): #348 de WiiCompiled v0.9.3 (una etapa indirecta que apunta a una coordenada que no
++// existe → la 0, como la Wii; la parte del relieve, embossSrc, no aplica: esta aurora no guarda ese campo). -DMKW_AURORA_ARREGLOS_V093=0 = como antes.
++#ifndef MKW_AURORA_ARREGLOS_V093
++#define MKW_AURORA_ARREGLOS_V093 1
++#endif
+ 
+ #include "pipeline.hpp"
+ #include "texture_bind_group_cache_key.hpp"
+@@ -1833,6 +1838,11 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
+   }
+   for (u8 i = 0; i < g_gxState.numIndStages; ++i) {
+     config.shaderConfig.indStages[i] = g_gxState.indStages[i];
++#if MKW_AURORA_ARREGLOS_V093
++    if (underlying(config.shaderConfig.indStages[i].texCoordId) >= g_gxState.numTexGens) {
++      config.shaderConfig.indStages[i].texCoordId = GX_TEXCOORD0;
++    }
++#endif
+   }
+   config.shaderConfig.numIndStages = g_gxState.numIndStages;
+   for (u8 i = 0; i < MaxColorChannels; ++i) {
+diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
+index 5bbdc4d..875416d 100644
+--- a/lib/gx/shader.cpp
++++ b/lib/gx/shader.cpp
+@@ -1,4 +1,10 @@
+ #include "../gfx/common.hpp"
++// MKW web, N15a (bitácora §170): arreglos de dibujo de la aurora de WiiCompiled v0.9.3 traídos a esta aurora:
++// #376 (índices de matriz a 6 bits), #303 (Sky Station: colores constantes sin fuente = 0) y #348 (texgen sin
++// configurar). -DMKW_AURORA_ARREGLOS_V093=0 = como antes.
++#ifndef MKW_AURORA_ARREGLOS_V093
++#define MKW_AURORA_ARREGLOS_V093 1
++#endif
+ 
+ #include "../internal.hpp"
+ #include "../webgpu/gpu.hpp"
+@@ -174,6 +180,14 @@ static std::string color_arg_reg(GXTevColorArg arg, size_t stageIdx, const Shade
+   case GX_CC_KONST: {
+     switch (stage.kcSel) {
+       DEFAULT_FATAL("invalid kcSel {}", underlying(stage.kcSel));
++#if MKW_AURORA_ARREGLOS_V093
++    // Unsourced encodings evaluate to zero in hardware.
++    case static_cast<GXTevKColorSel>(0x08):
++    case static_cast<GXTevKColorSel>(0x09):
++    case static_cast<GXTevKColorSel>(0x0A):
++    case static_cast<GXTevKColorSel>(0x0B):
++      return "vec3f(0.0)";
++#endif
+     case GX_TEV_KCSEL_8_8:
+       return "vec3f(1.0)";
+     case GX_TEV_KCSEL_7_8:
+@@ -275,6 +289,18 @@ static std::string alpha_arg_reg(GXTevAlphaArg arg, size_t stageIdx, const Shade
+   case GX_CA_KONST: {
+     switch (stage.kaSel) {
+       DEFAULT_FATAL("invalid kaSel {}", underlying(stage.kaSel));
++#if MKW_AURORA_ARREGLOS_V093
++    // Unsourced encodings evaluate to zero in hardware.
++    case static_cast<GXTevKAlphaSel>(0x08):
++    case static_cast<GXTevKAlphaSel>(0x09):
++    case static_cast<GXTevKAlphaSel>(0x0A):
++    case static_cast<GXTevKAlphaSel>(0x0B):
++    case static_cast<GXTevKAlphaSel>(0x0C):
++    case static_cast<GXTevKAlphaSel>(0x0D):
++    case static_cast<GXTevKAlphaSel>(0x0E):
++    case static_cast<GXTevKAlphaSel>(0x0F):
++      return "0.0";
++#endif
+     case GX_TEV_KASEL_8_8:
+       return "1.0";
+     case GX_TEV_KASEL_7_8:
+@@ -727,7 +753,11 @@ auto attr_load(const ShaderConfig& config, GXAttr attr, std::string_view vidx) -
+   }
+   switch (attr) {
+   case GX_VA_PNMTXIDX:
++#if MKW_AURORA_ARREGLOS_V093
++    return fmt::format("((raw_fetch_u8_1(&{}, {}) & 0x3fu) / 3u)", buf, offs);
++#else
+     return fmt::format("(raw_fetch_u8_1(&{}, {}) / 3u)", buf, offs);
++#endif
+   case GX_VA_TEX0MTXIDX:
+   case GX_VA_TEX1MTXIDX:
+   case GX_VA_TEX2MTXIDX:
+@@ -736,7 +766,11 @@ auto attr_load(const ShaderConfig& config, GXAttr attr, std::string_view vidx) -
+   case GX_VA_TEX5MTXIDX:
+   case GX_VA_TEX6MTXIDX:
+   case GX_VA_TEX7MTXIDX:
++#if MKW_AURORA_ARREGLOS_V093
++    return fmt::format("(raw_fetch_u8_1(&{}, {}) & 0x3fu)", buf, offs);
++#else
+     return fmt::format("raw_fetch_u8_1(&{}, {})", buf, offs);
++#endif
+   case GX_VA_POS: {
+     const auto posLoad = fetch_attr(mapping, buf, offs, le);
+     if (mapping.cnt == 2) {
+@@ -1188,8 +1222,14 @@ wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept {
+       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}.rgb, 1.0);", i, vtx_attr(config, GX_VA_CLR0));
+     } else if (tcg.src == GX_TG_COLOR1) {
+       vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f({}.rgb, 1.0);", i, vtx_attr(config, GX_VA_CLR1));
+-    } else
++    } else {
++#if MKW_AURORA_ARREGLOS_V093
++      // Texgen was never configured
++      vtxXfrAttrs += fmt::format("\n    var tc{} = vec4f(0.0, 0.0, 1.0, 1.0);", i);
++#else
+       UNLIKELY FATAL("unhandled tcg src {}", underlying(tcg.src));
++#endif
++    }
+     if (tcg.inputFormAB11) {
+       vtxXfrAttrs += fmt::format("\n    tc{}.z = 1.0;", i);
+     }

@@ -1,0 +1,213 @@
+diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
+index 79f72a4..99d1228 100644
+--- a/lib/gfx/pipeline_cache.cpp
++++ b/lib/gfx/pipeline_cache.cpp
+@@ -171,6 +171,11 @@ static std::vector<std::function<void()>> g_webPistaPedida;
+ // 2 = además se vacía la memoria de sombreadores compilados (gx::clear_shader_module_cache: se rearman al pedirlos)
+ static int g_webSoltar = 0;
+ static uint32_t g_webSoltarConservar = WebSinEtiqueta;   // la pista que se queda (WebSinEtiqueta = nada pendiente)
++// W26 (§248): el conjunto acotado. Las últimas g_webGuardar pistas (la de ahora incluida) se quedan con sus pipelines;
++// solo se sueltan las más viejas. 1 = solo la de ahora (W8 como era); 4 = una copa entera no vuelve a preparar nada
++static uint32_t g_webGuardar = 1;
++static std::deque<uint32_t> g_webRecientes;   // la de ahora primero
++static bool web_reciente(uint32_t e) { return std::find(g_webRecientes.begin(), g_webRecientes.end(), e) != g_webRecientes.end(); }
+ static uint32_t g_webSoltados = 0;
+ static void web_soltar_otras_pistas();
+ // Dos etiquetas de un mismo pipeline: los menús ganan; dos pistas distintas = común
+@@ -1306,13 +1311,15 @@ static void web_soltar_otras_pistas() {
+   const uint32_t conservar = g_webSoltarConservar;
+   g_webSoltarConservar = WebSinEtiqueta;
+   uint32_t n = 0;
++  std::vector<gx::ShaderConfig> sombreadoresSoltados;   // (W26, modo 3: los sombreadores de lo soltado)
+   std::lock_guard lock{g_pipelineMutex};
+   for (auto it = g_pipelines.begin(); it != g_pipelines.end();) {
+     const PipelineRef ref = it->first;
+     const auto reg = g_webLista.find(ref);
+     const bool deOtraPista = reg != g_webLista.end() && reg->second.etiqueta != WebSinEtiqueta &&
+                              reg->second.etiqueta != WebMenus && reg->second.etiqueta != WebComun &&
+-                             reg->second.etiqueta != conservar && reg->second.primerCuadro != 0 &&
++                             reg->second.etiqueta != conservar && !web_reciente(reg->second.etiqueta) &&
++                             reg->second.primerCuadro != 0 &&
+                              !g_webUrgentes.contains(ref) && !g_pendingPipelines.contains(ref) &&
+                              !g_webEnCamino.contains(ref);
+     if (!deOtraPista) {
+@@ -1327,6 +1334,7 @@ static void web_soltar_otras_pistas() {
+       gx::PipelineConfig config;
+       std::memcpy(&config, r.config.data(), sizeof(config));
+       encolar = [=] { find_pipeline_impl(ShaderType::GX, config, [=] { return gx::create_pipeline(config); }, false, primerCuadro); };
++      if (g_webSoltar == 3) sombreadoresSoltados.push_back(config.shaderConfig);
+     } else if (r.tipo == underlying(ShaderType::Clear) && r.config.size() == sizeof(clear::PipelineConfig)) {
+       clear::PipelineConfig config;
+       std::memcpy(&config, r.config.data(), sizeof(config));
+@@ -1342,6 +1350,24 @@ static void web_soltar_otras_pistas() {
+   g_webSoltados += n;
+   if (n > 0) ++g_mkwPipelinesEpoca;   // las memorias de config → pipeline vuelven a preguntar
+   if (n > 0 && g_webSoltar == 2) gx::clear_shader_module_cache();   // y los sombreadores (W8, modo 2)
++  // W26 (§248), modo 3: el conjunto acotado. Se sueltan SOLO los sombreadores de los pipelines soltados que ningún
++  // pipeline que se queda usa (los de los menús, los comunes y los de la pista nueva siguen compilados: el modo 2 los
++  // vaciaba todos y la pista siguiente saltaba más dibujos mientras se rearmaban)
++  if (n > 0 && g_webSoltar == 3) {
++    std::vector<gx::ShaderConfig> enUso;
++    for (const auto& [ref, cp] : g_pipelines) {
++      const auto reg = g_webLista.find(ref);
++      if (reg != g_webLista.end() && reg->second.tipo == underlying(ShaderType::GX) &&
++          reg->second.config.size() == sizeof(gx::PipelineConfig)) {
++        gx::PipelineConfig c;
++        std::memcpy(&c, reg->second.config.data(), sizeof(c));
++        enUso.push_back(c.shaderConfig);
++      }
++    }
++    const uint32_t sueltos = gx::soltar_sombreadores(sombreadoresSoltados, enUso);
++    std::printf("[pipelines] W26: %u sombreadores soltados (de %zu pipelines soltados; %zu pipelines siguen)\n", sueltos,
++                sombreadoresSoltados.size(), enUso.size());
++  }
+   std::printf("[pipelines] W8: al entrar a la pista 0x%x se soltaron %u de otras pistas (%u en total; quedan %zu)\n",
+               conservar, n, g_webSoltados, g_pipelines.size());
+ }
+@@ -1916,6 +1942,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_pipelines_etiqueta(uint32_t etiquet
+     if (aurora::gfx::g_webSoltar && aurora::gfx::g_webPorEtiqueta && etiqueta != aurora::gfx::WebMenus &&
+         etiqueta != aurora::gfx::WebComun && etiqueta != aurora::gfx::WebSinEtiqueta) {
+       aurora::gfx::g_webSoltarConservar = etiqueta;
++      // W26 (§248): la lista de las últimas pistas (la de ahora primero, sin repetidas, a lo más g_webGuardar)
++      auto& rec = aurora::gfx::g_webRecientes;
++      rec.erase(std::remove(rec.begin(), rec.end(), etiqueta), rec.end());
++      rec.push_front(etiqueta);
++      while (rec.size() > std::max<uint32_t>(1, aurora::gfx::g_webGuardar)) rec.pop_back();
+     }
+   }
+ }
+@@ -1923,8 +1954,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_pipelines_etiqueta(uint32_t etiquet
+ // W8 (§203): 1 = soltar los pipelines de las otras pistas al entrar a una (0 = guardarlos todos, como antes);
+ // 2 = además vaciar la memoria de sombreadores.
+ // Devuelve cuántos se soltaron hasta ahora.
++// W26 (§248): cuántas pistas (la de ahora incluida) guardan sus pipelines al soltar (1 = solo la de ahora, como W8)
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_pipelines_guardar(int k) { aurora::gfx::g_webGuardar = k < 1 ? 1 : k; }
+ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_soltar(int si) {
+-  if (si >= 0) aurora::gfx::g_webSoltar = si > 2 ? 1 : si;
++  if (si >= 0) aurora::gfx::g_webSoltar = si > 3 ? 1 : si;   // (3 = W26, §248: solo los sombreadores de lo soltado)
+   return aurora::gfx::g_webSoltados;
+ }
+ 
+diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
+index 9b1571e..eaa08da 100644
+--- a/lib/gx/pipeline.cpp
++++ b/lib/gx/pipeline.cpp
+@@ -10,6 +10,7 @@
+ #include <mutex>
+ 
+ #include <absl/container/flat_hash_map.h>
++#include <absl/container/flat_hash_set.h>
+ 
+ namespace aurora::gx {
+ static Module Log("aurora::gx");
+@@ -60,9 +61,24 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   return build_pipeline(config, {}, shader, "GX Pipeline");
+ }
+ 
++uint32_t soltar_sombreadores(const std::vector<ShaderConfig>& soltados, const std::vector<ShaderConfig>& enUso) {
++  absl::flat_hash_set<ShaderConfig, ShaderConfigHash> quedan(enUso.begin(), enUso.end());
++  uint32_t n = 0;
++  std::lock_guard lock{sShaderModuleCacheMutex};
++  for (const auto& c : soltados) {
++    if (quedan.contains(c)) continue;
++    const auto it = sShaderModuleCache.find(c);
++    if (it == sShaderModuleCache.end() || it->second->compiling) continue;
++    sShaderModuleCache.erase(it);
++    ++n;
++  }
++  return n;
++}
++void mkw_wgsl_soltar();   // (shader.cpp, W26 §248)
+ void clear_shader_module_cache() {
+   std::lock_guard lock{sShaderModuleCacheMutex};
+   sShaderModuleCache.clear();
++  mkw_wgsl_soltar();
+ }
+ 
+ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass, DrawEncodeState& state,
+diff --git a/lib/gx/pipeline.hpp b/lib/gx/pipeline.hpp
+index a6752b8..5e73ae4 100644
+--- a/lib/gx/pipeline.hpp
++++ b/lib/gx/pipeline.hpp
+@@ -63,6 +63,8 @@ inline bool valid_pipeline_config(const PipelineConfig& config) noexcept {
+ 
+ wgpu::RenderPipeline create_pipeline([[maybe_unused]] const PipelineConfig& config);
+ void clear_shader_module_cache();
++// MKW RETRO W26 (§248): suelta de la memoria de sombreadores los de `soltados` que no estén en `enUso`; devuelve cuántos
++uint32_t soltar_sombreadores(const std::vector<ShaderConfig>& soltados, const std::vector<ShaderConfig>& enUso);
+ 
+ // Per-pass encoder state carried across the draws of one render pass, so the replay loop can elide Dawn calls that would re-bind what is already bound.
+ struct DrawEncodeState {
+diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
+index 496a328..d46f68e 100644
+--- a/lib/gx/shader.cpp
++++ b/lib/gx/shader.cpp
+@@ -18,6 +18,9 @@
+ #include <mutex>
+ #include <string_view>
+ #include <utility>
++#include <functional>
++#include <absl/container/flat_hash_map.h>
++#include <absl/container/flat_hash_set.h>
+ 
+ #include "tracy/Tracy.hpp"
+ 
+@@ -932,6 +935,12 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8
+ // postex_mtx y nrm_mtx se declaran como filas sueltas (array<vec4f, 3N>: los mismos bytes, stride 16 en vez de 48) y
+ // cada matriz se arma con sus 3 filas: la misma cuenta, el mismo resultado, otra forma de leerla para el controlador.
+ bool g_mkwHuesosFilas = false;
++// MKW RETRO W26 (§248): el censo de los textos WGSL y el módulo compartido por texto (ver build_shader)
++std::mutex g_mkwWgslMutex;
++bool g_mkwWgslCompartir = false;
++uint32_t g_mkwWgslLlamadas = 0, g_mkwWgslDistintos = 0, g_mkwWgslReusados = 0;
++absl::flat_hash_set<size_t> g_mkwWgslVistos;
++absl::flat_hash_map<size_t, wgpu::ShaderModule> g_mkwWgslMemo;
+ static void huesos_por_filas(std::string& s) {
+   for (const std::string_view nombre : {"postex_mtx"sv, "nrm_mtx"sv}) {
+     // la declaración: «postex_mtx: array<mat3x4f, N>,» → «postex_mtx: array<vec4f, 3N>,»
+@@ -2151,6 +2160,18 @@ fn fs_main(in: VertexOutput) -> {9} {{{6}{5}
+                                         fragmentFnPre, vtxXfrAttrsPre, uniformPre, fragmentReturnType,
+                                         fragmentReturn);
+   if (g_mkwHuesosFilas) huesos_por_filas(shaderSource);   // MKW RETRO (W9, §205)
++  // MKW RETRO W26 (§248): ¿cuántas configuraciones dan el MISMO texto WGSL? Se cuentan siempre (llamadas, textos
++  // distintos); con mkw_web_wgsl_compartir(1) (?wgslCompartido=1) un texto ya compilado devuelve el mismo módulo
++  const size_t huellaTexto = std::hash<std::string_view>{}(shaderSource);
++  {
++    std::lock_guard lock{g_mkwWgslMutex};
++    g_mkwWgslLlamadas++;
++    if (g_mkwWgslVistos.insert(huellaTexto).second) g_mkwWgslDistintos++;
++    if (g_mkwWgslCompartir) {
++      const auto it = g_mkwWgslMemo.find(huellaTexto);
++      if (it != g_mkwWgslMemo.end()) { g_mkwWgslReusados++; return it->second; }
++    }
++  }
+   wgpu::ShaderSourceWGSL wgslDescriptor{};
+   wgslDescriptor.code = shaderSource.c_str();
+   const auto label = fmt::format("GX Shader {:x}", hash);
+@@ -2158,8 +2179,12 @@ fn fs_main(in: VertexOutput) -> {9} {{{6}{5}
+       .nextInChain = &wgslDescriptor,
+       .label = label.c_str(),
+   };
+-  return webgpu::g_device.CreateShaderModule(&shaderDescriptor);
++  auto modulo = webgpu::g_device.CreateShaderModule(&shaderDescriptor);
++  if (g_mkwWgslCompartir) { std::lock_guard lock{g_mkwWgslMutex}; g_mkwWgslMemo.emplace(huellaTexto, modulo); }
++  return modulo;
+ }
++// (W26) lo llama clear_shader_module_cache (W8, ?soltarPipelines=2): los módulos compartidos también se sueltan
++void mkw_wgsl_soltar() { std::lock_guard lock{g_mkwWgslMutex}; g_mkwWgslMemo.clear(); }
+ } // namespace aurora::gx
+ 
+ #ifdef __EMSCRIPTEN__
+@@ -2167,4 +2192,12 @@ fn fs_main(in: VertexOutput) -> {9} {{{6}{5}
+ // MKW RETRO (W9, §205): la página prende el camino de reserva de las Adreno con ?huesosFilas=1 (antes de main: los
+ // shaders ya armados no cambian). Apagado por omisión: se prende para Adreno recién con el primer informe de un jugador
+ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_huesos_filas(int prender) { aurora::gx::g_mkwHuesosFilas = prender != 0; }
++// MKW RETRO W26 (§248): 0 = cuántas veces se armó un sombreador, 1 = textos WGSL distintos, 2 = módulos reusados por
++// texto, 3 = módulos compartidos vivos; mkw_web_wgsl_compartir(1) = un texto igual, un módulo (antes de main)
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_wgsl(int i) {
++  std::lock_guard lock{aurora::gx::g_mkwWgslMutex};
++  return i == 0 ? aurora::gx::g_mkwWgslLlamadas : i == 1 ? aurora::gx::g_mkwWgslDistintos
++       : i == 2 ? aurora::gx::g_mkwWgslReusados : i == 3 ? static_cast<double>(aurora::gx::g_mkwWgslMemo.size()) : -1;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_wgsl_compartir(int si) { aurora::gx::g_mkwWgslCompartir = si != 0; }
+ #endif

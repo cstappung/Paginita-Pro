@@ -1,0 +1,97 @@
+G12 (bitácora §253): las texturas más chicas, opción del jugador (?texturasMenos=0|1|2, Avanzado → Gráficos).
+Va sobre terceros/aurora-main-viejo-motor con aurora-e0.diff y aurora-w26.diff ya puestos: patch -p1 < parches/aurora-g12.diff
+
+--- a/lib/gfx/texture.cpp
++++ b/lib/gfx/texture.cpp
+@@ -154,12 +154,81 @@
+                               const char* label) noexcept;
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (G12, §253): texturas más chicas, una opción del jugador para la tarjeta justa de un teléfono. Al subir una
++// textura estática que trae niveles de detalle (mips), se saltan los K más grandes y el nivel K del propio juego queda
++// como el nivel 0 (la mitad con K = 1, un cuarto con K = 2): nada se recalcula, la imagen es la que el juego ya dibujó
++// para verla de lejos. Las texturas sin mips, las de mips «arbitrarios» (cada nivel con su dibujo: efectos), las de
++// paleta (tlut) y las copias del EFB no se tocan. Vale para lo que se carga después (la pista siguiente).
++// g_menosCuenta: [0] texturas achicadas, [1] KB que subieron, [2] KB que habrían subido, [3] estáticas vistas con mips.
++int g_texturasMenos = 0;
++uint32_t g_menosCuenta[4] = {};
++#endif
+ 
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 format, ArrayRef<uint8_t> data,
+                                     bool tlut, const char* label) noexcept {
+   ZoneScoped;
+ 
+   mips = clamp_mip_count(width, height, mips, label);
++#ifdef __EMSCRIPTEN__
++  // (G12) cuántos niveles se saltan: solo si quedan al menos 2 niveles y el más chico sigue teniendo 4×4
++  uint32_t saltar = 0;
++  ConvertedTexture convertidaG12;
++  if (!tlut && mips > 1) {
++    g_menosCuenta[3]++;
++    if (g_texturasMenos > 0) {
++      saltar = std::min<uint32_t>(static_cast<uint32_t>(g_texturasMenos), mips - 1);
++      while (saltar > 0 && ((width >> saltar) < 4 || (height >> saltar) < 4)) --saltar;
++    }
++  }
++  if (saltar > 0) {
++    // (G12) se convierte entero con su tamaño de verdad; con mips arbitrarios no se achica
++    convertidaG12 = convert_texture(format, width, height, mips, data);
++    if (convertidaG12.hasArbitraryMips) saltar = 0;
++  }
++  if (saltar > 0) {
++    auto handle = new_dynamic_texture_2d(width >> saltar, height >> saltar, mips - saltar, format, label);
++    auto& ref = *handle;
++    ArrayRef<uint8_t> todo = convertidaG12.data.empty() ? data : ArrayRef<uint8_t>{convertidaG12.data.data(), convertidaG12.data.size()};
++    const auto info = format_info(ref.format);
++    const auto tamano = [&](uint32_t w, uint32_t h) {
++      const auto f = physical_size(wgpu::Extent3D{.width = std::max(w, 1u), .height = std::max(h, 1u), .depthOrArrayLayers = 1}, info);
++      return (f.width / info.blockWidth) * info.blockSize * (f.height / info.blockHeight);
++    };
++    size_t inicio = 0, entero = 0;
++    for (uint32_t m = 0; m < mips; ++m) {
++      const size_t t = tamano(width >> m, height >> m);
++      if (m < saltar) inicio += t;
++      entero += t;
++    }
++    if (inicio < todo.size()) {
++      g_menosCuenta[0]++;
++      g_menosCuenta[1] += static_cast<uint32_t>((entero - inicio) / 1024);
++      g_menosCuenta[2] += static_cast<uint32_t>(entero / 1024);
++      uint32_t offset = static_cast<uint32_t>(inicio);
++      for (uint32_t mip = 0; mip < ref.mipCount; ++mip) {
++        const wgpu::Extent3D mipSize{.width = std::max(ref.size.width >> mip, 1u), .height = std::max(ref.size.height >> mip, 1u),
++                                     .depthOrArrayLayers = 1};
++        const auto physicalSize = physical_size(mipSize, info);
++        const uint32_t heightBlocks = physicalSize.height / info.blockHeight;
++        const uint32_t bytesPerRow = (physicalSize.width / info.blockWidth) * info.blockSize;
++        const uint32_t dataSize = bytesPerRow * heightBlocks;
++        if (offset > todo.size() || dataSize > todo.size() - offset) break;
++        const wgpu::TexelCopyTextureInfo dstView{.texture = ref.texture, .mipLevel = mip};
++        if constexpr (UseTextureBuffer) {
++          const auto range = push_texture_data(todo.data() + offset, dataSize, bytesPerRow, heightBlocks);
++          const wgpu::TexelCopyBufferLayout dataLayout{.offset = range.offset, .bytesPerRow = bytesPerRow, .rowsPerImage = heightBlocks};
++          g_textureUploads.emplace_back(dataLayout, std::move(dstView), physicalSize);
++        } else {
++          const wgpu::TexelCopyBufferLayout dataLayout{.bytesPerRow = bytesPerRow, .rowsPerImage = heightBlocks};
++          g_queue.WriteTexture(&dstView, todo.data() + offset, dataSize, &dataLayout, &physicalSize);
++        }
++        offset += dataSize;
++      }
++      return handle;
++    }
++  }
++#endif
+ #if MKW_CHICA_C2
+   // MKW RETRO (G6, §190): CMPR → BC1 cuando se puede (ver texturas_bc); si los mips son «arbitrarios» (cada nivel con
+   // su propio dibujo: el juego los usa para efectos), se queda en RGBA8 como antes, porque esa marca se calcula en RGBA8
+@@ -456,6 +525,9 @@
+   return i == 0 ? double(aurora::gfx::g_mkwTexturasVivas)
+        : i == 1 ? double(aurora::gfx::g_mkwTexturasBytes) / (1024.0 * 1024.0) : -1;
+ }
++// MKW RETRO (G12, §253): cuántos niveles de detalle se saltan al subir (0 = todo, 1 = la mitad, 2 = un cuarto) y su cuenta
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_texturas_menos(int k) { aurora::gfx::g_texturasMenos = k < 0 ? 0 : k > 2 ? 2 : k; }
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_texturas_menos_dato(uint32_t k) { return k < 4 ? aurora::gfx::g_menosCuenta[k] : static_cast<uint32_t>(aurora::gfx::g_texturasMenos); }
+ #endif
+ 
+ #if MKW_CHICA_C2   // MKW RETRO (E4c C2): k = 0..8, ver texturas_bc

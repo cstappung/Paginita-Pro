@@ -66,6 +66,12 @@ try {
     ok('los tiempos: las 3 pasadas, cada una con su tamaño, sus dibujos y 10 veces', t.length === 3 && de(0)?.tam === '640×528' && de(1)?.tam === '160×132' && de(2)?.tam === '640×528' &&
        de(0).dibujos === 50 && de(1).dibujos === 3 && de(2).dibujos === 1 && t.every(x => x.veces === 10 && x.ms >= 0));
     ok('la pasada grande de 50 dibujos tarda más que la chica de 3', de(0).ms >= de(1).ms, `${de(0).ms} ms contra ${de(1).ms} ms`);
+    // §173: el tramo de la tarjeta por cuadro (último fin − primer comienzo): cubre al menos la pasada más larga, y en una
+    // tarjeta que dibuja de a una pasada (este PC) la suma no lo pasa de 1,5 veces (mosaicos: no)
+    const tr = perfil.tramo();
+    ok('§173: el tramo por cuadro, de los 10 cuadros, cubre la pasada más larga', tr && tr.cuadros === 10 && tr.tramoMs >= Math.max(...t.map(x => x.ms)) - 0.01,
+       JSON.stringify(tr));
+    ok('§173: aquí las pasadas no se pisan (la suma ≤ 1,5 × el tramo: mosaicos = no)', tr && tr.mosaicos === false && tr.sumaMs <= 1.5 * tr.tramoMs + 0.01, JSON.stringify(tr));
   } else nota('esta tarjeta no tiene marcas de tiempo: solo se prueba el conteo');
   // el dibujo salió igual: la grande quedó roja (las marcas no cambian lo que se dibuja)
   const lectura = dev.createBuffer({ size: 256 * 1, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
@@ -77,6 +83,52 @@ try {
   const px = [...new Uint8Array(lectura.getMappedRange()).slice(0, 4)];
   ok('el dibujo sale igual con el perfil (rojo)', px.join() === '255,0,0,255', px.join());
   ok('sin errores de WebGPU ni del perfil', !errores.length && !perfil.fallo, errores.join(' | ') + (perfil.fallo || ''));
+  // §158: setBindGroup en sus tres formas (2, 3 y 5 argumentos) con el perfil puesto: antes el envoltorio rellenaba con
+  // undefined hasta 6, Chrome elegía la forma de 5 y lanzaba «parameter 3 is not of type 'TypedArray'» (el juego, en el cuadro 0)
+  {
+    const grupo = dev.createBindGroup({ layout: dev.createBindGroupLayout({ entries: [] }), entries: [] });
+    const g0 = perfil.foto().grupos, enc2 = dev.createCommandEncoder();
+    const p = enc2.beginRenderPass({ colorAttachments: [{ view: chica.createView(), loadOp: 'load', storeOp: 'store' }] });
+    const formas = [];
+    for (const [nombre, args] of [['2', [0, grupo]], ['3', [0, grupo, []]], ['5', [0, grupo, new Uint32Array(0), 0, 0]]])
+      try { p.setBindGroup(...args); formas.push(nombre); } catch (x) { formas.push(`${nombre}: ${x.message}`); }
+    p.end(); dev.queue.submit([enc2.finish()]); await dev.queue.onSubmittedWorkDone();
+    ok('§158: setBindGroup con 2, 3 y 5 argumentos pasa por el perfil sin error, y se cuenta', formas.join() === '2,3,5' && perfil.foto().grupos - g0 === 3,
+       formas.join(' | '));
+  }
+
+  // ---- §123 (G8): contar por ventanas, sin nada encima entre ventanas ----
+  const PR = GPURenderPassEncoder.prototype, PQ = GPUQueue.prototype;
+  perfil.desinstalar();
+  ok('§123: desinstalar deja los métodos originales del navegador', !PR.draw.__perfil && !PQ.submit.__perfil && !GPUCommandEncoder.prototype.beginRenderPass.__perfil);
+  let cuadro = 0;
+  const cuadroJuego = () => {                               // un «cuadro del juego»: las mismas 3 pasadas (54 dibujos)
+    const e2 = dev.createCommandEncoder();
+    pasada(e2, grande, 50, true); pasada(e2, chica, 3, true); pasada(e2, grande, 1, false);
+    dev.queue.submit([e2.finish()]); cuadro++;
+  };
+  // sin perfil: cuánto tardan 20 000 dibujos grabados (la referencia)
+  const tDibujos = () => { const e3 = dev.createCommandEncoder(); const p = e3.beginRenderPass({ colorAttachments: [{ view: chica.createView(), loadOp: 'load', storeOp: 'store' }] });
+    p.setPipeline(receta); const t0 = performance.now(); for (let i = 0; i < 20000; i++) p.draw(3); const ms = performance.now() - t0; p.end(); e3.finish(); return ms; };
+  const sinNada = Math.min(tDibujos(), tDibujos(), tDibujos());
+  const pv = instalarPerfilGpu({ ventana: { cadaMs: 400, durMs: 150 }, cuadros: () => cuadro });
+  ok('§123: con ventanas empieza contando (los métodos envueltos)', !!PR.draw.__perfil && pv.foto().contando);
+  const conConteo = Math.min(tDibujos(), tDibujos(), tDibujos());
+  let vistoSin = false;
+  for (const hasta = performance.now() + 1300; performance.now() < hasta; await espera(16)) {
+    cuadroJuego();
+    if (!pv.foto().contando && !PR.draw.__perfil && !PQ.submit.__perfil) vistoSin = true;
+  }
+  await dev.queue.onSubmittedWorkDone();
+  const fv = pv.foto();
+  ok('§123: entre ventanas los métodos son los originales (nada encima)', vistoSin);
+  ok('§123: se contó en varias ventanas, y por cuadro contado da justo lo dibujado (54 dibujos, 3 pasadas)',
+     fv.ventanas >= 3 && fv.cuadros > 0 && fv.cuadros < cuadro && (fv.dibujos - 60000) / fv.cuadros === 54 && (fv.pasadas - 3) / fv.cuadros === 3,
+     `${fv.ventanas} ventanas, ${fv.cuadros} de ${cuadro} cuadros contados, ${fv.dibujos} dibujos, ${fv.pasadas} pasadas`);
+  ok('§123: sin «Perfilar» no se envuelven setPipeline ni setBindGroup', !PR.setPipeline.__perfil && !PR.setBindGroup.__perfil && fv.recetas === 0);
+  pv.desinstalar();
+  nota(`§123: 20 000 dibujos grabados: ${sinNada.toFixed(2)} ms sin nada, ${conConteo.toFixed(2)} ms contando (${(1e6 * (conConteo - sinNada) / 20000).toFixed(0)} ns más por dibujo)`);
+  ok('§123: sin errores de WebGPU ni del perfil con ventanas', !errores.length && !pv.fallo, errores.join(' | ') + (pv.fallo || ''));
 } catch (e) {
   if (e !== null) ok('la prueba terminó sin errores', false, e?.stack || String(e));
 }

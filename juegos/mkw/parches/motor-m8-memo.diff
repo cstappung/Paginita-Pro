@@ -1,0 +1,52 @@
+diff --git a/runtime/include/guest_abi/dispatch.h b/runtime/include/guest_abi/dispatch.h
+index 1762fca..819b741 100644
+--- a/runtime/include/guest_abi/dispatch.h
++++ b/runtime/include/guest_abi/dispatch.h
+@@ -6,6 +6,7 @@
+ #include "isa/ppc_isa_config.h"
+ #include "isa/ppc_isa_cr.h"
+ #include "mkw_contadores.h"   // V4 (§152)
++#include "mkw_motor.h"
+ 
+ #include <array>
+ #include <atomic>
+@@ -303,7 +304,10 @@ struct IsPureTypedNativeCpuCall<T, std::void_t<decltype(T::kPure)>> : std::bool_
+ // a miss just re-runs the sorted lookup. 512 entries (12 KiB) covers the per-frame indirect
+ // working set while staying L1/L2 resident, unlike 4096 which would thrash L2. Must stay a
+ // power of two, the index masks with (size - 1).
+-inline constexpr size_t kIndirectDispatchCacheEntries = 512;
++// MKW (paso 6, M8 «más llamadas directas»): MKW_MOTOR_MEMO_INDIRECTA = cuántas casillas (en wasm cada una son 12 bytes:
++// 2048 = 24 KiB); el perfil con M1 (§182) daba ~0,027 ms por cuadro en FindRawByAddressPtrMiss con 512.
++inline constexpr size_t kIndirectDispatchCacheEntries = MKW_MOTOR_MEMO_INDIRECTA;
++static_assert((kIndirectDispatchCacheEntries & (kIndirectDispatchCacheEntries - 1)) == 0, "potencia de dos");
+ 
+ // Namespace-scope `inline thread_local`, not function-local `static thread_local`, to avoid a
+ // thread-static init epoch check on every bctrl (same as g_currentCpuContext in guest_abi/cpu_context.h).
+diff --git a/runtime/include/mkw_motor.h b/runtime/include/mkw_motor.h
+index a53e1d0..e0ec55a 100644
+--- a/runtime/include/mkw_motor.h
++++ b/runtime/include/mkw_motor.h
+@@ -12,8 +12,13 @@
+ //   MKW_MOTOR_VUELTA64  dar vuelta 8 bytes (lfd/stfd, pares de psq, pares de registros) con una mezcla SIMD (3
+ //                       operaciones) en vez de ~22 de enteros: wasm no tiene la instrucción bswap
+ //   MKW_MOTOR_VUELTA32  lo mismo para 4 bytes (se mide aparte: con 7 operaciones de enteros puede no ganar)
++//   MKW_MOTOR_MEMO_INDIRECTA  casillas de la memoria de las llamadas indirectas (bctrl: dirección → función); 512 en el
++//                       original, 2048 en wasm (se mide: M8 «más llamadas directas»)
+ 
+ #if defined(__EMSCRIPTEN__)
++#ifndef MKW_MOTOR_MEMO_INDIRECTA
++#define MKW_MOTOR_MEMO_INDIRECTA 2048
++#endif
+ #ifndef MKW_MOTOR_RANGOS
+ #define MKW_MOTOR_RANGOS 1
+ #endif
+@@ -33,6 +38,9 @@
+ #ifndef MKW_MOTOR_RANGOS
+ #define MKW_MOTOR_RANGOS 0
+ #endif
++#ifndef MKW_MOTOR_MEMO_INDIRECTA
++#define MKW_MOTOR_MEMO_INDIRECTA 512
++#endif
+ #ifndef MKW_MOTOR_EN_LINEA
+ #define MKW_MOTOR_EN_LINEA 0
+ #endif

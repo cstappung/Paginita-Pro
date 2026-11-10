@@ -30,7 +30,9 @@
 //   muestra salió el clic (la página lo convierte en "cuándo se oyó").
 // Mensajes que recibe: Float32Array (izq, der, izq, der…) = sonido; {t:'reiniciar'} = vaciar y volver a llenar;
 // {t:'marca'} = avisar en qué muestra sale el próximo clic; {t:'objetivo', ms} = cambiar el objetivo de partida.
-// Mensajes que manda: {t:'e', …} cada 8 bloques (~21 ms) con el estado; {t:'m', cuadro} cuando sale el clic.
+// Mensajes que manda: {t:'e', …} cada 32 bloques (~85 ms; antes 8, `informeBloques`) con el estado; {t:'m', cuadro}
+// cuando sale el clic. P5 (§232): con `devolver`, el informe lleva también `b` = los búferes ya copiados a la cola
+// (transferidos de vuelta: la página los reusa en lugar de crear uno nuevo por entrega), cada uno al puerto que lo mandó.
 
 const MS = ms => Math.round(ms * sampleRate / 1000);   // ms → muestras (cuadros de sonido) a la frecuencia de la tarjeta
 
@@ -48,6 +50,20 @@ class SalidaMkw extends AudioWorkletProcessor {
                                                                    // cortes y baja con la calma
     this.maximo = MS(o.maximoMs || 120);         // el objetivo nunca pasa de esto
     this.fase = 'llenando';                      // 'llenando' (juntando el objetivo) o 'sonando'
+    // §155 (H1): el lastre de este hilo de ayuda (?lastreAyuda=K de la página): cada bloque se queda girando (K−1) veces
+    // lo que tardó, como un núcleo chico K veces más lento. El worklet de Chrome no tiene reloj fino (performance.now),
+    // solo Date.now (de a 1 ms) y un bloque tarda microsegundos. Por eso: (1) lo que tarda un bloque se ESTIMA con la
+    // diferencia de Date.now entre la entrada y la salida, sumada en miles de bloques (cada bloque empieza en cualquier
+    // punto del milisegundo, así que el promedio de esas diferencias de 0 o 1 ms da la duración de verdad, como un
+    // voltímetro que promedia una señal con ruido); (2) el giro se hace con un lazo de vueltas contadas, calibrado una vez
+    // al arrancar (cuántas vueltas por ms en este núcleo).
+    this.lastreK = o.lastreAyuda > 1 ? o.lastreAyuda : 1;
+    if (this.lastreK > 1) {
+      const t0 = Date.now(); let v = 0, s = 0;
+      while (Date.now() - t0 < 20) { for (let i = 0; i < 1000; i++) s += i & 7; v += 1000; }
+      this.vueltasMs = v / (Date.now() - t0); this.basura = s;
+      this.estMs = 0; this.estBloques = 0;       // la suma estimada de lo trabajado y en cuántos bloques
+    }
     this.rampa = 1;                              // ganancia del fundido de entrada (0 → 1)
     this.colaIzq = 0; this.colaDer = 0;          // la última muestra, que se apaga suave cuando la cola se vacía
     this.apagar = Math.exp(-1 / MS(1.5));        // cuánto se achica por muestra: constante de tiempo de 1,5 ms
@@ -63,16 +79,31 @@ class SalidaMkw extends AudioWorkletProcessor {
     this.c = { recibidos: 0, sonados: 0, vacios: 0, huecos: 0, silencio: 0, saltos: 0, tirados: 0, bloques: 0, bloquesSilencio: 0,
                silencioSaltado: 0 };     // muestras de silencio descartadas (sin que se note) para bajar la demora
     this.suma = 0; this.n = 0; this.min = Infinity; this.pico = 0;   // nivel promedio, mínimo y pico de este informe
-    this.port.onmessage = e => this.recibir(e.data);
+    this.c.lastreMs = 0; this.c.lastreTrabajoMs = 0; this.c.lastreK = this.lastreK;   // (§155: van en el informe)
+    // P5 (§232): los búferes ya copiados vuelven con el informe (uno por puerto: la página y el juego en un Worker)
+    this.devolver = !!o.devolver;
+    this.vuelta = []; this.vueltaExtra = [];
+    this.cadaInforme = o.informeBloques > 0 ? o.informeBloques : 32;
+    // El informe se arma siempre sobre el mismo objeto (antes, uno nuevo con `...this.c` cada vez)
+    this.inf = { t: 'e', nivel: 0, min: 0, objetivo: 0, pico: 0, fase: '', b: undefined };
+    this.infExtra = { t: 'e', nivel: 0, objetivo: 0, fase: '', b: undefined };
+    this.port.onmessage = e => this.recibir(e.data, false);
   }
 
-  recibir(m) {
-    if (m instanceof Float32Array) return this.guardar(m);
+  recibir(m, deExtra) {
+    if (m instanceof Float32Array) {
+      this.guardar(m);
+      if (this.devolver) (deExtra ? this.vueltaExtra : this.vuelta).push(m.buffer);   // ya está en la cola: vuelve
+      return;
+    }
     if (m.t === 'reiniciar') {
       this.nivel = 0; this.fase = 'llenando'; this.vacioEn = -1; this.vacioOido = false; this.colaIzq = this.colaDer = 0; this.huboSonido = false;
       this.ventana.fill(0); this.minSeg = Infinity;   // (la ventana vuelve a juntar 4 s antes de dejar bajar el objetivo)
     }
     else if (m.t === 'marca') this.buscarMarca = true;
+    // Paso 8 (§186): el cable aparte del juego en un Worker (sonido.mjs puertoAparte): lo que llega por él se trata
+    // igual que lo de la página, y el informe de la cola sale también por él
+    else if (m.t === 'puerto') { this.extra = m.puerto; this.extra.onmessage = e => this.recibir(e.data, true); }
     else if (m.t === 'objetivo') { this.base = MS(m.ms); this.objetivo = Math.max(this.base, Math.min(this.objetivo, this.maximo)); if (m.ya) this.objetivo = this.base; }
   }
 
@@ -100,8 +131,21 @@ class SalidaMkw extends AudioWorkletProcessor {
     }
   }
 
+  // §155: con lastre, el bloque se mide y se gira (K−1) veces lo que tardó; sin lastre, directo
+  process(entradas, salidas) {
+    if (this.lastreK <= 1) return this.bloque(entradas, salidas);
+    const t0 = Date.now(), r = this.bloque(entradas, salidas);
+    this.estMs += Date.now() - t0; this.estBloques++;
+    const t = this.estMs / this.estBloques;      // lo que tarda un bloque, en promedio (estimado)
+    const n = Math.round((this.lastreK - 1) * t * this.vueltasMs);
+    let s = 0; for (let i = 0; i < n; i++) s += i & 7;
+    this.basura += s;
+    this.c.lastreTrabajoMs += t; this.c.lastreMs += (this.lastreK - 1) * t;
+    return r;
+  }
+
   // Lo que pide la tarjeta: 128 muestras por canal
-  process(_entradas, salidas) {
+  bloque(_entradas, salidas) {
     const sal = salidas[0], L = sal[0], R = sal[1] || sal[0], N = L.length;
     this.c.bloques++;
     this.suma += this.nivel; this.n++; if (this.nivel < this.min) this.min = this.nivel;
@@ -199,20 +243,44 @@ class SalidaMkw extends AudioWorkletProcessor {
     if (this.fase === 'sonando' && pico > 1e-4) {
       this.calma += N;
       // (y solo si la cola ya lo alcanzó, ±15 ms: así el ajuste de ritmo la sigue con ~0,3 % y no va al tope)
-      if (this.calma > MS(3000) && this.objetivo > this.base && Math.min(this.minSeg, ...this.ventana) > MS(8) &&
+      if (this.calma > MS(3000) && this.objetivo > this.base && this.minVentana() > MS(8) &&
           this.nivel < this.objetivo + MS(15)) {
         const porSegundo = Math.max(MS(2), (this.objetivo - this.base) * 0.2);   // muestras por segundo
         this.objetivo = Math.max(this.base, this.objetivo - porSegundo * N / sampleRate);
       }
     }
-    // Informe cada 8 bloques (~21 ms a 48 kHz)
-    if (this.n >= 8) {
-      const ms = 1000 / sampleRate;
-      this.port.postMessage({ t: 'e', nivel: this.suma / this.n * ms, min: this.min * ms, objetivo: this.objetivo * ms,
-                              pico: this.pico, fase: this.fase, ...this.c });
+    // Informe cada 32 bloques (~85 ms a 48 kHz; P5, antes 8)
+    if (this.n >= this.cadaInforme) {
+      const ms = 1000 / sampleRate, inf = this.inf;
+      inf.nivel = this.suma / this.n * ms; inf.min = this.min * ms; inf.objetivo = this.objetivo * ms;
+      inf.pico = this.pico; inf.fase = this.fase;
+      for (const k in this.c) inf[k] = this.c[k];
+      this.mandar(this.port, inf, this.vuelta);
+      if (this.extra) {
+        const e = this.infExtra;
+        e.nivel = inf.nivel; e.objetivo = inf.objetivo; e.fase = this.fase;
+        this.mandar(this.extra, e, this.vueltaExtra);
+      }
       this.suma = 0; this.n = 0; this.min = Infinity; this.pico = 0;
     }
     return true;                                 // seguir vivo aunque no haya entradas
+  }
+
+  // Manda un informe con los búferes que tiene para devolver (transferidos) y vacía esa lista
+  mandar(puerto, inf, lista) {
+    if (lista.length) {
+      inf.b = lista;
+      puerto.postMessage(inf, lista);
+      lista.length = 0;                          // (el arreglo se clonó al mandar: se puede vaciar y reusar)
+      inf.b = undefined;
+    } else puerto.postMessage(inf);
+  }
+
+  // El mínimo de la cola en los últimos ~4 s (el segundo en curso y los 4 de la ventana), sin armar arreglos
+  minVentana() {
+    let m = this.minSeg;
+    for (let i = 0; i < 4; i++) if (this.ventana[i] < m) m = this.ventana[i];
+    return m;
   }
 }
 

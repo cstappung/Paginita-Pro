@@ -16,7 +16,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearPreparacion, CALMA_MS, TOPE_MS, TOPE_CALMA_MS } from '/web/navegador/preparacion.mjs';
+import { crearPreparacion, graficosListos, CALMA_MS, TOPE_MS, TOPE_CALMA_MS, PARTE_CON_TOPE } from '/web/navegador/preparacion.mjs';
 
 const { ok, fin } = prueba('preparacion', 'Preparación de la sala (sin el juego)');
 let t = 0;
@@ -71,6 +71,48 @@ ok('sin nada todavía no está lista antes del tope', !s.lista());
 t4 = TOPE_MS;
 ok('a los 45 s, lista igual (tope)', s.lista() && s.estado.por === 'tope');
 ok('las líneas que no son de pipelines no cuentan', (() => { const u = crearPreparacion({ ahora: () => 0 }); u.linea('[medidor] 60 fps'); u.linea(null); return u.estado.pipesTotal === 0; })());
+
+// §117 (C1): el precalentado con tope (aurora pide de a poco: «con 4 compilándose como mucho»). No traba la página,
+// así que la sala no espera a que lleguen todos: basta la primera parte de la lista (PARTE_CON_TOPE) y la calma.
+let t5 = 0;
+const c = crearPreparacion({ ahora: () => t5 });
+c.marcar('manifiesto'); c.marcar('chicos', 1); c.marcar('programa');
+c.linea('[pipelines] precalentado postergado: 700 esperan a la primera pantalla del juego; 0 descartados (de otra versión)');
+c.linea('[pipelines] precalentando 700 (postergados; de a 2 por cuadro, con 4 compilándose como mucho)');
+const meta = Math.ceil(700 * PARTE_CON_TOPE);
+ok(`con tope: lee el tope (4) y espera ${meta} de 700, no todos`, c.estado.pipesTope === 4 && c.estado.pipesMeta === meta, JSON.stringify([c.estado.pipesTope, c.estado.pipesMeta]));
+c.linea('[pipelines] 120 pedidos en segundo plano (llamada 30.0 ms), 116 llegaron (tardaron 40 ms en promedio), 4 en camino, 0 sincrónicos');
+c.marcar('pantalla');
+ok(`116 de ${meta} llegaron: la barra va por esa parte (${Math.round(35 + 50 * 116 / meta)} %) y no está lista`,
+   !c.lista() && c.pct() === Math.round(35 + 50 * 116 / meta), String(c.pct()));
+t5 = 2000; c.larga(2000);
+c.linea(`[pipelines] 120 pedidos en segundo plano (llamada 30.0 ms), ${meta - 116} llegaron (tardaron 40 ms en promedio), 4 en camino, 0 sincrónicos`);
+ok(`llegaron ${meta} (la mitad) con 4 todavía en camino: hechos, 90 %, esperando la calma`, c.estado.pipesHechos && c.pct() === 90 && !c.lista(), String(c.pct()));
+t5 = 2000 + CALMA_MS;
+ok('un segundo sin tareas largas: lista, aunque el resto siga llegando de a poco', c.lista() && c.estado.por === 'calma', c.estado.por);
+
+// tope 0 (tarde:2:0) = sin tope: se esperan todos, como antes
+const d = crearPreparacion({ ahora: () => 0 });
+d.linea('[pipelines] precalentando 700 (postergados; de a 2 por cuadro, con 0 compilándose como mucho)');
+d.linea('[pipelines] 400 pedidos en segundo plano (llamada 90.0 ms), 400 llegaron (tardaron 900 ms en promedio), 300 en camino, 0 sincrónicos');
+ok('con «0 compilándose como mucho» (sin tope) se esperan los 700', d.estado.pipesTope === 0 && d.estado.pipesMeta === 700 && !d.estado.pipesHechos);
+// §133 (U1): el menú de inicio espera los pipelines de los menús (la misma meta de la sala, la primera mitad con tope)
+{
+  let t = 0;
+  const g = crearPreparacion({ ahora: () => t });
+  ok('§133: antes de la línea «precalentando N» (el juego recién arranca) espera', graficosListos(g.estado).listo === false);
+  const sin = crearPreparacion({ ahora: () => t }); sin.marcar('sinPipelines');
+  ok('§133: sin lista (aurora no la dijo a los 30 cuadros: «sinPipelines») no hay nada que esperar', graficosListos(sin.estado).listo === true);
+  g.linea('[pipelines] precalentando 700 con 4 compilándose como mucho');
+  g.linea('[pipelines] 100 llegaron, 4 en camino');
+  const a = graficosListos(g.estado);
+  ok('§133: con 100 de 350 (la mitad de 700) espera, y el % va sobre esa mitad', a.listo === false && a.pct === 29, JSON.stringify(a));
+  g.linea('[pipelines] 250 llegaron, 4 en camino');
+  ok('§133: con 350 llegados ya está', graficosListos(g.estado).listo === true, JSON.stringify(graficosListos(g.estado)));
+  const v = crearPreparacion({ ahora: () => t });
+  v.linea('[pipelines] precalentando 0');
+  ok('§133: lista vacía («precalentando 0»): listo', graficosListos(v.estado).listo === true);
+}
 fin();
 </script>
 </body>

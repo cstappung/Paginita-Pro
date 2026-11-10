@@ -28,9 +28,24 @@ const TIPOS = {                               // extensión → tipo de contenid
 let turn = null;
 const pideTurn = () => turn || (turn = import('../herramientas/turn-local.mjs').then(m => m.crearTurn()));
 
+// §236: /arbitro = el árbitro en un servidor de mentira de este PC (herramientas/arbitro/servidor.mjs, el mismo programa que
+// va a la máquina de Oracle, en 127.0.0.1 y un puerto libre; se prende con el primer pedido): contesta {url} para el
+// WebSocket. /arbitro?sala=X&que=callar|hablar|tumbar|estado = lo de las pruebas (callarse con la conexión abierta, cortar todo)
+let arbitro = null;
+const pideArbitro = () => arbitro || (arbitro = import('../herramientas/arbitro/servidor.mjs').then(m => m.crearServidorArbitro({ puerto: 0, pruebas: true, registro: () => {} })));
+
 http.createServer((pedido, respuesta) => {
   // la ruta pedida, sin "?v=..." y decodificada ("%20" → espacio)
   let ruta = decodeURIComponent(pedido.url.split('?')[0]);
+  if (ruta === '/arbitro') {
+    pideArbitro().then(a => {
+      const q = new URLSearchParams(pedido.url.split('?')[1] || ''), s = a.sala(q.get('sala') || ''), que = q.get('que');
+      if (s && que === 'callar') s.callar(true); else if (s && que === 'hablar') s.callar(false); else if (s && que === 'tumbar') s.tumbar();
+      respuesta.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Cross-Origin-Resource-Policy': 'same-origin' });
+      respuesta.end(JSON.stringify({ url: `ws://127.0.0.1:${a.puerto}/`, sala: s ? s.estado() : null }));
+    }, e => { respuesta.writeHead(500); respuesta.end(String(e?.message || e)); });
+    return;
+  }
   if (ruta === '/turn') {
     pideTurn().then(t => {
       respuesta.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Cross-Origin-Resource-Policy': 'same-origin' });
@@ -48,10 +63,17 @@ http.createServer((pedido, respuesta) => {
   if (!archivo.startsWith(base)) { respuesta.writeHead(403); return respuesta.end('fuera del banco'); }   // nada de "../"
   fs.readFile(archivo, (error, datos) => {
     if (error) { respuesta.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return respuesta.end('no existe: ' + ruta); }
+    // Paso 8 (§187): el banco «aislamiento» hace de sitio SIN cabeceras y pide cada una con ?aislar=dip|coop en sus
+    // marcos (como el marco del juego dentro de Juegos); el resto del banco, aislado como siempre
+    const aislar = ruta.startsWith('/pruebas/aislamiento/') ? (path.extname(archivo) === '.html' ? new URLSearchParams(pedido.url.split('?')[1] || '').get('aislar') || 'ninguna' : 'ninguna') : 'coop';
     respuesta.writeHead(200, {
       'Content-Type': TIPOS[path.extname(archivo).toLowerCase()] || 'application/octet-stream',
-      'Cross-Origin-Opener-Policy': 'same-origin',              // estas dos dejan la página "aislada"…
-      'Cross-Origin-Embedder-Policy': 'require-corp',           // …para poder usar SharedArrayBuffer
+      ...(aislar === 'coop' ? {
+        'Cross-Origin-Opener-Policy': 'same-origin',              // estas dos dejan la página "aislada"…
+        'Cross-Origin-Embedder-Policy': 'require-corp',           // …para poder usar SharedArrayBuffer
+      } : aislar === 'dip' ? { 'Document-Isolation-Policy': 'isolate-and-require-corp' } : {}),
+      // (los scripts del banco «aislamiento»: un Worker de un marco con COEP necesita COEP en su propio script)
+      ...(ruta.startsWith('/pruebas/aislamiento/') && path.extname(archivo) !== '.html' ? { 'Cross-Origin-Embedder-Policy': 'require-corp', 'Cross-Origin-Resource-Policy': 'same-origin' } : {}),
       'Cache-Control': 'no-store',                              // en el banco, siempre lo último
     });
     respuesta.end(datos);

@@ -1,0 +1,125 @@
+diff --git a/runtime/include/isa/ppc_isa_float.h b/runtime/include/isa/ppc_isa_float.h
+index 4f275bb..a03005c 100644
+--- a/runtime/include/isa/ppc_isa_float.h
++++ b/runtime/include/isa/ppc_isa_float.h
+@@ -24,6 +24,7 @@
+ #include "ppc_isa_config.h"
+ #include "guest_abi/cpu_context.h"
+ #include "mkw_contadores.h"   // V4 (§152)
++#include "mkw_motor.h"        // W30 (§257)
+ 
+ #include <array>
+ #include <cmath>
+@@ -204,6 +205,9 @@ inline bool MkwHostNiActiveInline() noexcept
+ 
+ inline float PpcForceSingleValueInline(double value)
+ {
++#if MKW_MOTOR_W30 & 2
++    return static_cast<float>(value);  // W30: sin el NI del FPSCR en cada cuenta
++#endif
+     // FPSCR[NI] flushes an exact pre-round single-subnormal even when rounding would promote it
+     // to the smallest normal. g_mkwNiFlushThreshold (2^-126 active, 0.0 inactive) turns the
+     // flush into a branchless mask: a set compare lane keeps just the sign bit, a clear lane
+@@ -229,6 +233,9 @@ inline float PpcForceSingleValueInline(double value)
+ 
+ inline float PpcFlushSingleForNiInline(float value)
+ {
++#if MKW_MOTOR_W30 & 2
++    return value;
++#endif
+     if (!MkwHostNiActiveInline())
+         return value;
+     const uint32_t bits = PpcBitCastToU32Inline(value);
+@@ -245,6 +252,9 @@ inline double PpcFlushPairedForNiInline(double value)
+ 
+ inline double PpcForce25BitInline(double value)
+ {
++#if MKW_MOTOR_W30 & 4
++    return value;  // W30: sin redondear C a 25 bits
++#endif
+     constexpr uint64_t kDoubleExpMask = 0x7FF0000000000000ULL;
+     constexpr uint64_t kDoubleFracMask = 0x000FFFFFFFFFFFFFULL;
+     constexpr int kDoubleFracWidth = 52;
+@@ -455,6 +465,15 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
+     // beyond a float32 halfway point can be rounded to a double tie first.
+     // Recover the direction of that discarded error for those tie cases.
+     const double roundedC = PpcForce25BitInline(c);
++#if MKW_MOTOR_W30 & 1
++    {
++        // W30: una multiplicación y una suma en double (deterministas); los NaN como antes.
++        const double r = Subtract ? a * roundedC - b : a * roundedC + b;
++        if (r != r) [[unlikely]]
++            return Subtract ? MkwFms(a, roundedC, b) : MkwFma(a, roundedC, b);
++        return r;
++    }
++#endif
+     const double signedB = Subtract ? -b : b;
+     double result = Subtract ? MkwFms(a, roundedC, b) : MkwFma(a, roundedC, b);
+     const uint64_t resultBits = PpcBitCastToU64Inline(result);
+diff --git a/runtime/include/isa/ppc_isa_wasm_neon.h b/runtime/include/isa/ppc_isa_wasm_neon.h
+index 834be87..9757211 100644
+--- a/runtime/include/isa/ppc_isa_wasm_neon.h
++++ b/runtime/include/isa/ppc_isa_wasm_neon.h
+@@ -13,6 +13,7 @@
+ #include <cmath>
+ #include <cstdint>
+ #include <cstring>
++#include "mkw_motor.h"
+ 
+ typedef float float32x2_t __attribute__((vector_size(8)));
+ typedef uint32_t uint32x2_t __attribute__((vector_size(8)));
+@@ -25,6 +26,10 @@ typedef uint64_t uint64x1_t __attribute__((vector_size(8)));
+ // Verified bit-identical to musl's fmaf on 40M cases (banco/pruebas/fma).
+ static inline __attribute__((always_inline)) float MkwWasmFmaf(float a, float b, float c) noexcept
+ {
++#if MKW_MOTOR_W30 & 1
++    // W30: el producto exacto en double + una suma en double + bajar a float (sin TwoSum ni redondeo a impar).
++    return static_cast<float>(static_cast<double>(a) * static_cast<double>(b) + static_cast<double>(c));
++#endif
+     const double p = static_cast<double>(a) * static_cast<double>(b);
+     double s = p + static_cast<double>(c);
+     const double bb = s - p;
+@@ -93,6 +98,9 @@ static inline __attribute__((always_inline)) float MkwFms(float a, float b, floa
+ // Verified bit-identical to musl's fma on 50M cases including fabricated ties (banco/pruebas/fma).
+ static inline __attribute__((always_inline)) double MkwWasmFmaRaw(double a, double b, double c) noexcept
+ {
++#if MKW_MOTOR_W30 & 1
++    return a * b + c;  // W30: dos redondeos, deterministas en wasm
++#endif
+     const uint32_t ea = (MkwWasmBits64(a) >> 52) & 0x7FF, eb = (MkwWasmBits64(b) >> 52) & 0x7FF,
+                    ec = (MkwWasmBits64(c) >> 52) & 0x7FF;
+     const int ep = static_cast<int>(ea) + static_cast<int>(eb) - 1023;
+@@ -191,6 +199,12 @@ MKW_WASM_NEON float32x2_t vdiv_f32(float32x2_t a, float32x2_t b) { return a / b;
+ // vfma_f32(acc, a, b) = acc + a*b per lane, one rounding.
+ MKW_WASM_NEON float32x2_t vfma_f32(float32x2_t acc, float32x2_t a, float32x2_t b)
+ {
++#if MKW_MOTOR_W30 & 1
++    typedef double MkwW30Double2 __attribute__((vector_size(16)));
++    const MkwW30Double2 r = __builtin_convertvector(a, MkwW30Double2) * __builtin_convertvector(b, MkwW30Double2)
++                          + __builtin_convertvector(acc, MkwW30Double2);
++    return __builtin_convertvector(r, float32x2_t);
++#endif
+     return float32x2_t{MkwWasmFmaf(a[0], b[0], acc[0]), MkwWasmFmaf(a[1], b[1], acc[1])};
+ }
+ 
+diff --git a/runtime/include/mkw_motor.h b/runtime/include/mkw_motor.h
+index d1fe8cb..f7f5df5 100644
+--- a/runtime/include/mkw_motor.h
++++ b/runtime/include/mkw_motor.h
+@@ -75,3 +75,16 @@
+ #ifndef MKW_FIJA_BASE
+ #define MKW_FIJA_BASE 0x00100000u
+ #endif
++
++// MKW_MOTOR_W30 (W30, bitácora §257): «igual entre nosotros, no igual a la Wii». En la sala todas las consolas corren el
++// mismo .wasm, así que basta con que den lo mismo ENTRE ELLAS. Bits (apagado = 0, la Wii al último bit):
++//   1 = la FMA con las cuentas de wasm: float = (double)a*b + c bajado a float (el producto de dos float cabe exacto en
++//       un double: solo cambia en los empates del doble redondeo); double = a*b + c con dos redondeos (sin Dekker ni
++//       TwoSum). Los NaN se siguen reescribiendo como antes (los bits de un NaN de wasm no son deterministas).
++//   2 = las banderas del FPSCR que se calculaban en cada cuenta: sin el «NI» (pasar a cero los subnormales) en cada
++//       paso a float; queda el static_cast de siempre.
++//   4 = sin redondear el operando C a 25 bits en fmuls/fmadds (la rareza del multiplicador de la Wii).
++// Todas son operaciones IEEE de wasm (sin FMA de la máquina, sin modos de redondeo): el mismo resultado en x86 y ARM.
++#ifndef MKW_MOTOR_W30
++#define MKW_MOTOR_W30 7   // adoptado (§257): 0 = las cuentas de la Wii al último bit
++#endif

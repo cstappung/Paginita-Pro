@@ -65,9 +65,19 @@ static inline bool esNaNd(double d) { return (PpcBitCastToU64Inline(d) & 0x7FFFF
 struct Huella { uint64_t h = 0xCBF29CE484222325ull; long n = 0; };
 static inline void mete(Huella &f, uint64_t v) { for (int i = 0; i < 8; i++) { f.h ^= (v >> (8 * i)) & 0xFF; f.h *= 0x100000001B3ull; } f.n++; }
 
-enum Op { MUL, ADD, SUB, DIV, MADD, MSUB, NEG, FORCE_SINGLE, FORCE_SINGLE_NI, PSQ_LOAD, PSQ_STORE, FMADD, FNMSUB, FMADDS, FMULS, PS_MADD_LANE, RECIP, RSQRT, FMSUB, FNMADD, FMSUBS, PS_MSUB_LANE, NUM_OPS };
+// MKW_PARIDAD_MOTOR (construir.ps1 -Motor, §170): además, leer y escribir la memoria de la Wii con las cabeceras del motor
+// (terceros/Wiicompiled-motor): psq desde y hacia la memoria, y dar vuelta 8 y 4 bytes (en wasm, con SIMD)
+enum Op { MUL, ADD, SUB, DIV, MADD, MSUB, NEG, FORCE_SINGLE, FORCE_SINGLE_NI, PSQ_LOAD, PSQ_STORE, FMADD, FNMSUB, FMADDS, FMULS, PS_MADD_LANE, RECIP, RSQRT, FMSUB, FNMADD, FMSUBS, PS_MSUB_LANE,
+#ifdef MKW_PARIDAD_MOTOR
+    PSQ_L_MEM, PSQ_ST_MEM, LEE64, ESCRIBE64, LEE32, ESCRIBE32,
+#endif
+    NUM_OPS };
 static const char *kNombre[] = { "ps_mul", "ps_add", "ps_sub", "ps_div", "ps_madd", "ps_msub", "ps_neg", "frsp", "frsp_NI",
-    "psq_l", "psq_st", "fmadd", "fnmsub", "fmadds", "fmuls", "ps_madd_lane", "fres", "frsqrte", "fmsub", "fnmadd", "fmsubs", "ps_msub_lane" };
+    "psq_l", "psq_st", "fmadd", "fnmsub", "fmadds", "fmuls", "ps_madd_lane", "fres", "frsqrte", "fmsub", "fnmadd", "fmsubs", "ps_msub_lane",
+#ifdef MKW_PARIDAD_MOTOR
+    "psq_l_mem", "psq_st_mem", "lee64", "escribe64", "lee32", "escribe32",
+#endif
+};
 
 static const char *gVolcarOp = nullptr; static int gVolcarClase = -1; static long gVolcarN = 0;
 static Huella gH[NUM_OPS][3];
@@ -114,6 +124,26 @@ int main(int argc, char **argv)
               PpcBitCastToU32Inline(PpcAccuratePsMaddLaneNoNiInline<true>(a0, c0, b0)), e3, 3);
         anota(PSQ_LOAD, 0, PpcLoadPairPsqFloatBitsPackedInline(e3[0]), e3, 1);
         anota(PSQ_STORE, 0, PpcStorePairPsqFloatBitsPackedInline(e3[0]), e3, 1);
+#ifdef MKW_PARIDAD_MOTOR
+        {
+            // la memoria de la Wii guarda el par con el byte grande primero: ps0 y después ps1
+            alignas(16) uint8_t mem[16] = {};
+            const uint64_t enMemoria = __builtin_bswap64(e3[0]);
+            std::memcpy(mem, &enMemoria, 8);
+            anota(PSQ_L_MEM, 0, PpcBitCastToU64Inline(PpcLoadPairPsqFloatFromHostInline(mem)), e3, 1);
+            PpcStorePairPsqFloatToHostInline(mem, A);
+            uint64_t crudo = 0; std::memcpy(&crudo, mem, 8);
+            anota(PSQ_ST_MEM, 0, crudo, e3, 1);
+            const uint64_t r[2] = { azar(), azar() };
+            std::memcpy(mem, r, 16);
+            anota(LEE64, 0, MemoryInline::LoadGuestOrder<uint64_t>(mem + (r[1] & 7)), r, 1);
+            anota(LEE32, 0, MemoryInline::LoadGuestOrder<uint32_t>(mem + (r[1] & 7)), r, 1);
+            MemoryInline::StoreGuestOrder<uint64_t>(mem + 3, r[0]);
+            std::memcpy(&crudo, mem, 8); anota(ESCRIBE64, 0, crudo ^ mem[8] ^ (uint64_t(mem[10]) << 8), r, 1);
+            MemoryInline::StoreGuestOrder<uint32_t>(mem + 1, static_cast<uint32_t>(r[1]));
+            std::memcpy(&crudo, mem, 8); anota(ESCRIBE32, 0, crudo, r, 1);
+        }
+#endif
 
         // Escalares en double (fmadd, frsp, fres…).
         const double x = doubleAzar(), y = doubleAzar(), z = doubleAzar();

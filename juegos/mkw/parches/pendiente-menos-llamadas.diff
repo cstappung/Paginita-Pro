@@ -1,0 +1,187 @@
+diff --git a/herramientas/medir-sitio.mjs b/herramientas/medir-sitio.mjs
+index 32ececc..f324486 100644
+--- a/herramientas/medir-sitio.mjs
++++ b/herramientas/medir-sitio.mjs
+@@ -30,6 +30,8 @@
+ //   --items: usa el ítem cada 2 s en la carrera (los hongos dan el mismo empujón que un booster pad)
+ //   --perfilar: perfil de CPU de la carrera → <etiqueta>-<perfil>-v1-perfil.txt
+ //   --visitas 2: abre dos veces seguidas en el mismo perfil de Chrome; la 2.ª mide la visita con caché
++//  --otra-persona: (§264) la 2.ª visita en un perfil nuevo (la segunda persona que juega; con MKW_BORDE=1 el caché de
++//    Cloudflare de mentira del Worker local ya está lleno)
+ //   --red 50: limita la bajada a 50 Mbit/s (como una conexión de casa; Chrome la frena con Network.emulateNetworkConditions)
+ //   --arranque: (§151, V2) además, lo que sufre el resto del navegador mientras el juego carga: otra pestaña con un latido
+ //     cada 50 ms (cuánto se atrasa = cuánto se trabó Chrome entero; meta del paso 4: ≤ 50 ms), el CPU de cada proceso de
+@@ -99,8 +101,12 @@ const tipoPedido = ([, metodo, ruta, rango]) => metodo === 'OPTIONS' ? 'pregunta
+   : rango !== '' ? 'pedazos del disco' : 'archivos enteros';
+ 
+ // 2) Chrome de verdad (el instalado), con un perfil nuevo (primera visita), sin sonido (pedido del dueño)
+-const carpetaPerfil = path.join(os.tmpdir(), 'mkw-medir-' + process.pid);
+-const contexto = await chromium.launchPersistentContext(carpetaPerfil, {
++// §264: --otra-persona = la 2.ª visita (y las siguientes) en un perfil NUEVO, con el mismo Worker local: lo que gasta la
++// segunda persona que juega (sin la caché de su navegador, pero con el caché de Cloudflare ya lleno si MKW_BORDE=1)
++const OTRA_PERSONA = args.includes('--otra-persona');
++let carpetaPerfil = path.join(os.tmpdir(), 'mkw-medir-' + process.pid), contexto = null;
++async function abrirContexto() {
++contexto = await chromium.launchPersistentContext(carpetaPerfil, {
+   // §158: --chrome "…" = banderas de más para Chrome (diagnóstico, p. ej. --js-flags=--liftoff-only), separadas por espacios
+   channel: 'chrome', headless: !args.includes('--ventana'), args: ['--mute-audio',
+     // --ventana: en el monitor de 144 Hz (el de la izquierda, §160); MKW_VENTANA="x,y" = otro lugar
+@@ -127,8 +133,18 @@ await contexto.addInitScript(() => {
+   try { new PerformanceObserver(l => { for (const t of l.getEntries()) window.__largas.push([Math.round(t.startTime), Math.round(t.duration)]); })
+     .observe({ type: 'longtask', buffered: true }); } catch {}
+ });
++}
++await abrirContexto();
+ const resultados = [];
+-for (let visita = 1; visita <= VISITAS; visita++) resultados.push(await medirUnaVez(visita));
++for (let visita = 1; visita <= VISITAS; visita++) {
++  if (visita > 1 && OTRA_PERSONA) {
++    await contexto.close();
++    try { rmSync(carpetaPerfil, { recursive: true, force: true }); } catch {}
++    carpetaPerfil = path.join(os.tmpdir(), `mkw-medir-${process.pid}-${visita}`);
++    await abrirContexto();
++  }
++  resultados.push(await medirUnaVez(visita));
++}
+ await contexto.close();
+ sitio.kill();
+ try { rmSync(carpetaPerfil, { recursive: true, force: true }); } catch {}
+@@ -364,10 +380,18 @@ async function medirUnaVez(visita) {
+   let pedidosWorker = null;
+   if (cw0 && cw1) {
+     const lista = cw1.lista.slice(cw0.pedidos), porTipo = {};
+-    for (const x of lista) { const k = tipoPedido(x); porTipo[k] = porTipo[k] || { n: 0, mb: 0 }; porTipo[k].n++; porTipo[k].mb += (x[3] || 0) / 1048576; }
++    // (§264: los MB que de verdad salieron, x[5], también los del lote, que no dice Range)
++    for (const x of lista) { const k = tipoPedido(x); porTipo[k] = porTipo[k] || { n: 0, mb: 0 }; porTipo[k].n++; porTipo[k].mb += (x[5] ?? x[3] ?? 0) / 1048576; }
+     for (const v of Object.values(porTipo)) v.mb = +v.mb.toFixed(1);
+     pedidosWorker = { total: lista.length, hastaPrimerCuadro: (marcas.primerCuadro ?? cw0.pedidos) - cw0.pedidos,
+-                      hastaCarrera: (marcas.carrera ?? cw0.pedidos) - cw0.pedidos, enCarrera: cw1.pedidos - (marcas.carrera ?? cw0.pedidos), porTipo };
++                      hastaCarrera: (marcas.carrera ?? cw0.pedidos) - cw0.pedidos, enCarrera: cw1.pedidos - (marcas.carrera ?? cw0.pedidos), porTipo,
++                      // §264: lo que el Worker le pidió a R2 (get y head = operaciones «clase B»), al caché de Cloudflare
++                      // (solo con MKW_BORDE=1: el Worker con dominio propio) y cuántas firmas de token verificó
++                      r2: { gets: (cw1.r2Gets ?? 0) - (cw0.r2Gets ?? 0), heads: (cw1.r2Heads ?? 0) - (cw0.r2Heads ?? 0),
++                            mb: +(((cw1.r2Bytes ?? 0) - (cw0.r2Bytes ?? 0)) / 1048576).toFixed(1) },
++                      borde: cw1.borde ? { match: cw1.borde.match - cw0.borde.match, aciertos: cw1.borde.aciertos - cw0.borde.aciertos, put: cw1.borde.put - cw0.borde.put } : null,
++                      verificaciones: (cw1.verificaciones ?? 0) - (cw0.verificaciones ?? 0),
++                      mb: +(lista.reduce((a, x) => a + (x[5] ?? 0), 0) / 1048576).toFixed(1) };
+     writeFileSync(`${base}-v${visita}-pedidos.json`, JSON.stringify({ ...pedidosWorker, lista }, null, 0));
+   }
+   const m1 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
+@@ -539,6 +563,9 @@ async function medirUnaVez(visita) {
+   if (pedidosWorker) console.log(`  pedidos al Worker: ${pedidosWorker.total} (hasta el primer cuadro ${pedidosWorker.hastaPrimerCuadro}, hasta la carrera ` +
+     `${pedidosWorker.hastaCarrera}, en la carrera ${pedidosWorker.enCarrera}): ` + Object.entries(pedidosWorker.porTipo).sort((a, b) => b[1].n - a[1].n)
+     .map(([k, v]) => `${k} ${v.n}${v.mb ? ` (${v.mb} MB)` : ''}`).join(', '));
++  if (pedidosWorker?.r2) console.log(`  R2 (§264): ${pedidosWorker.r2.gets} get + ${pedidosWorker.r2.heads} head (clase B), ${pedidosWorker.r2.mb} MB; ` +
++    `salieron ${pedidosWorker.mb} MB; firmas verificadas ${pedidosWorker.verificaciones}` +
++    (pedidosWorker.borde ? `; caché de Cloudflare: ${pedidosWorker.borde.aciertos} aciertos de ${pedidosWorker.borde.match}, ${pedidosWorker.borde.put} guardados` : ''));
+   await cdp.detach();
+   return r;
+ }
+diff --git a/herramientas/worker-local.mjs b/herramientas/worker-local.mjs
+index c20eae7..4d067df 100644
+--- a/herramientas/worker-local.mjs
++++ b/herramientas/worker-local.mjs
+@@ -87,16 +87,18 @@ function archivoDe(llave) {
+   if (f.endsWith('.br')) { try { if (fs.statSync(f).mtimeMs < fs.statSync(f.slice(0, -3)).mtimeMs) return null; } catch { return null; } }
+   return f;
+ }
++// (§264: cada lectura por tipo — get y head son «clase B» de R2 (10 millones al mes gratis), put es «clase A» — y los
++// bytes que salieron de R2)
+ const R2 = {
+-  operaciones: 0,
++  operaciones: 0, gets: 0, heads: 0, bytes: 0,
+   async head(llave) {
+-    R2.operaciones++;
++    R2.operaciones++; R2.heads++;
+     if (generados.has(llave)) return { size: generados.get(llave).length };
+     const f = archivoDe(llave);
+     try { const st = f && await fsp.stat(f); return st && st.isFile() ? { size: st.size } : null; } catch { return null; }
+   },
+   async get(llave, o = {}) {
+-    R2.operaciones++;
++    R2.operaciones++; R2.gets++;
+     let datos = generados.get(llave), tam;
+     const f = datos ? null : archivoDe(llave);
+     if (!datos) { try { const st = f && await fsp.stat(f); if (!st || !st.isFile()) return null; tam = st.size; } catch { return null; } }
+@@ -106,6 +108,7 @@ const R2 = {
+       inicio = o.range.offset || 0; largo = o.range.length ?? tam - inicio;
+       if (inicio >= tam || inicio + largo > tam) throw new Error('rango fuera del objeto');
+     }
++    R2.bytes += largo;
+     if (datos) return { body: datos.subarray(inicio, inicio + largo), size: tam };
+     const h = await fsp.open(f, 'r');
+     try { const b = Buffer.alloc(largo); await h.read(b, 0, largo, inicio); return { body: b, size: tam }; } finally { await h.close(); }
+@@ -113,6 +116,32 @@ const R2 = {
+   async put() { throw new Error('este bucket es de solo lectura'); },
+ };
+ 
++// ---- §264: el caché de Cloudflare de mentira (MKW_BORDE=1) ----
++// En Cloudflare, `caches.default` existe y guarda SOLO si el Worker tiene un dominio propio (en *.workers.dev no
++// guarda nada). Node no lo trae: sin MKW_BORDE no hay caché (= workers.dev, el caso de hoy); con MKW_BORDE=1, un caché
++// en memoria del mismo comportamiento (match/put por la dirección, sin vencer en el rato de una medición) = el Worker
++// con dominio propio y un solo centro de datos (todos los jugadores de Chile pasan por Santiago).
++const BORDE = { match: 0, aciertos: 0, put: 0, bytes: 0 };
++if (process.env.MKW_BORDE === '1') {
++  const guardado = new Map();
++  globalThis.caches = { default: {
++    async match(llave) {
++      BORDE.match++;
++      const g = guardado.get(String(llave));
++      if (!g) return undefined;
++      BORDE.aciertos++;
++      return new Response(g.cuerpo, { headers: g.cabeceras });
++    },
++    async put(llave, r) {
++      BORDE.put++;
++      const cuerpo = new Uint8Array(await r.arrayBuffer());
++      BORDE.bytes += cuerpo.length;
++      const cabeceras = {}; r.headers.forEach((v, k) => { cabeceras[k] = v; });
++      guardado.set(String(llave), { cuerpo, cabeceras });
++    },
++  } };
++}
++
+ // ---- las claves de Google (de mentira) y el token de prueba ----
+ const { webcrypto } = crypto;
+ const par = await webcrypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+@@ -144,6 +173,11 @@ async function firmarDelEmulador(autorizacion) {
+   } catch { return autorizacion; }
+ }
+ 
++// (§264: cuántas veces el Worker verifica de verdad la firma de un token: el resto sale de su memoria `vistos`)
++globalThis.__mkwVerificaciones = 0;
++{ const sutil = globalThis.crypto.subtle, verificar = sutil.verify.bind(sutil);
++  sutil.verify = (...a) => { globalThis.__mkwVerificaciones++; return verificar(...a); }; }
++
+ // ---- el Worker ----
+ const archivoWorker = path.join(raiz, 'terceros/Paginita-Pro/juegos/bt3/fuente/disco/worker.js');
+ const W = (await import(pathToFileURL(archivoWorker).href)).default;
+@@ -165,7 +199,8 @@ http.createServer(async (pedido, respuesta) => {
+     if (pedido.url.split('?')[0] === '/__cuenta') {                              // cuántos pedidos atendió (para medir)
+       respuesta.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ORIGEN });
+       const { lista, ...resto } = contador;
+-      return respuesta.end(JSON.stringify({ ...resto, r2: R2.operaciones, ...(new URL(pedido.url, 'http://x').searchParams.has('lista') ? { lista } : {}) }));
++      return respuesta.end(JSON.stringify({ ...resto, r2: R2.operaciones, r2Gets: R2.gets, r2Heads: R2.heads, r2Bytes: R2.bytes,
++        borde: process.env.MKW_BORDE === '1' ? BORDE : null, verificaciones: globalThis.__mkwVerificaciones || 0, ...(new URL(pedido.url, 'http://x').searchParams.has('lista') ? { lista } : {}) }));
+     }
+     const cab = {};
+     for (const k of PASAN) if (pedido.headers[k]) cab[k] = pedido.headers[k];
+@@ -178,12 +213,16 @@ http.createServer(async (pedido, respuesta) => {
+     contador.pedidos++; if (pedido.method === 'OPTIONS') contador.preguntas++;
+     contador.porEstado[r.status] = (contador.porEstado[r.status] || 0) + 1;
+     const rg = /^bytes=(\d+)-(\d+)$/.exec(cab.range || '');
+-    if (contador.lista.length < 50000) contador.lista.push([Date.now() - t0Contador, pedido.method, pedido.url.split('?')[0], rg ? rg[2] - rg[1] + 1 : '', r.status]);
++    let entrada = null;
++    if (contador.lista.length < 50000) contador.lista.push(entrada = [Date.now() - t0Contador, pedido.method, pedido.url.split('?')[0], rg ? rg[2] - rg[1] + 1 : '', r.status]);
+     const salida = {};
+     r.headers.forEach((v, k) => { salida[k] = v; });
+     respuesta.writeHead(r.status, salida);
+-    if (r.body && pedido.method !== 'HEAD') for await (const trozo of r.body) respuesta.write(trozo);
++    let enviados = 0;
++    if (r.body && pedido.method !== 'HEAD') for await (const trozo of r.body) { respuesta.write(trozo); enviados += trozo.length; }
+     respuesta.end();
++    // (§264: los bytes que de verdad salieron, también los del lote, que no dice Range; va como 6.º dato de la lista)
++    if (entrada) entrada.push(enviados);
+   } catch (e) {
+     console.error('[worker-local]', e);
+     if (!respuesta.headersSent) respuesta.writeHead(500);

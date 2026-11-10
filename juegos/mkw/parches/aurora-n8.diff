@@ -1,0 +1,149 @@
+diff --git a/lib/aurora.cpp b/lib/aurora.cpp
+index 6e13d14..aae871a 100644
+--- a/lib/aurora.cpp
++++ b/lib/aurora.cpp
+@@ -919,6 +919,18 @@ struct PresentationJob {
+ std::array<std::vector<std::shared_ptr<PresentationImage>>, gx::MaxInterpolatedFrames + 1>
+     g_presentationImagePools;
+ 
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (bitácora §219, N8): the game draws one frame out of two (the logic still runs at 60) and aurora shows the
++// interpolated image at the drawn frame's retrace and the real one a retrace later, while the guest runs the skipped
++// frame (aurora_mkw_presentar_pendiente). 0 = off (aurora as always).
++int g_mkwN8 = 0;
++std::optional<PresentationJob> g_mkwN8Pendiente;
++PresentClock::time_point g_mkwN8Guardada{};   // when the pending real image was stored
++uint32_t g_mkwN8Cuenta[5] = {0, 0, 0, 0, 0};   // pending stored, presented in the skipped frame, dropped, groups
++                                              // without slots, presented when the next drawn frame starts drawing
++double g_mkwN8EsperaMs = 0;                   // stored → presented, summed (how long the real image waited)
++#endif
++
+ std::shared_ptr<PresentationImage> acquire_presentation_image(size_t slot, uint32_t width,
+                                                               uint32_t height) {
+   auto& pool = g_presentationImagePools.at(slot);
+@@ -1613,6 +1625,17 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
+       return PresentClock::time_point{std::chrono::nanoseconds{
+           ctx.scheduleBaseNanos - ctx.scheduleIntervalNanos + kNativePresentOffsetNanos}};
+     }
++#ifdef __EMSCRIPTEN__
++    // N8: the drawn frame stands for two retraces. The interpolated image where a frame without interpolation would
++    // present (this retrace + 6.5 ms, or as soon as ready if later); the real one gets its deadline when the
++    // interpolated one really went out (publish_presentations: + one retrace), so the two are always one retrace apart
++    // (with a fixed grid, a late interpolated image and the real one went out ~5 ms apart: 2 and 4 refreshes, §219)
++    if (g_mkwN8) {
++      return PresentClock::time_point{std::chrono::nanoseconds{
++          ctx.scheduleBaseNanos - ctx.scheduleIntervalNanos + kNativePresentOffsetNanos +
++          ctx.scheduleIntervalNanos * static_cast<uint64_t>(slot)}};
++    }
++#endif
+     const uint64_t offsetNanos =
+         (ctx.scheduleIntervalNanos * static_cast<uint64_t>(slot)) / presentationJobCount;
+     return PresentClock::time_point{std::chrono::nanoseconds{ctx.scheduleBaseNanos + offsetNanos}};
+@@ -1698,7 +1721,14 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
+   // A group that finished encoding past its anchor slides forward by whole display periods, never
+   // per slot. The cursor keeps two groups off one anchor, which bursts then holds for a period.
+   static PresentClock::time_point s_lastGroupAnchor{};
+-  if (ctx.interpolationActive && ctx.scheduleIntervalNanos != 0 && !presentationJobs.empty() &&
++#ifdef __EMSCRIPTEN__
++  // (N8: no sliding; a late interpolated image goes out at once, like a late frame without interpolation, and the
++  // real one keeps its own retrace)
++  const bool deslizar = !g_mkwN8;
++#else
++  constexpr bool deslizar = true;
++#endif
++  if (deslizar && ctx.interpolationActive && ctx.scheduleIntervalNanos != 0 && !presentationJobs.empty() &&
+       presentationJobs.front().presentAt != PresentClock::time_point{}) {
+     const std::chrono::nanoseconds interval{static_cast<int64_t>(ctx.scheduleIntervalNanos)};
+     auto anchor = presentationJobs.front().presentAt;
+@@ -1744,6 +1774,30 @@ void publish_presentations(std::vector<PresentationJob>&& presentationJobs, bool
+ #if defined(__APPLE__) || defined(__EMSCRIPTEN__)
+   // MKW RETRO: same synchronous path in the browser (no presenter thread).
+   (void)interpolationActive;
++#ifdef __EMSCRIPTEN__
++  // N8: a real image still pending (the skipped frame did not reach its copy) is older than this group: drop it
++  if (g_mkwN8Pendiente) {
++    g_mkwN8Pendiente.reset();
++    ++g_mkwN8Cuenta[2];
++  }
++  // N8 with interpolation: everything but the real image now; the real one waits for the skipped frame
++  if (g_mkwN8 && interpolationActive && presentationJobs.size() > 1) {
++    for (size_t i = 0; i + 1 < presentationJobs.size(); ++i) {
++      present_presentation_job(presentationJobs[i]);
++    }
++    g_mkwN8Pendiente = std::move(presentationJobs.back());
++    // (the real one exactly one retrace after the interpolated one really went out)
++    const uint64_t intervalo = g_presentScheduleIntervalNanos.load(std::memory_order_acquire);
++    if (intervalo) {
++      const auto salio = (std::max)(PresentClock::now(), presentationJobs[presentationJobs.size() - 2].presentAt);
++      g_mkwN8Pendiente->presentAt = salio + std::chrono::nanoseconds{static_cast<int64_t>(intervalo)};
++    }
++    g_mkwN8Guardada = PresentClock::now();
++    ++g_mkwN8Cuenta[0];
++    return;
++  }
++  if (g_mkwN8 && !interpolationActive) ++g_mkwN8Cuenta[3];
++#endif
+   // Presenting reaches SDL/AppKit, whose window operations must stay on the
+   // main thread. Interpolation normally starts the presenter worker, so keep
+   // its jobs synchronous on Apple platforms.
+@@ -2046,11 +2100,60 @@ bool aurora_wait_for_frame_worker_for(uint32_t timeoutMicros) {
+   return aurora::wait_for_frame_worker_for(std::chrono::microseconds(timeoutMicros));
+ }
+ void aurora_set_present_schedule(uint64_t baseNanos, uint64_t intervalNanos) {
++#if defined(__EMSCRIPTEN__) && defined(AURORA_ENABLE_GX)
++  // N8 (§219): a drawn frame stands for two retraces, so the runtime's «more than one retrace since the last present»
++  // is the normal cadence, not a late frame (with it aurora dropped the slots: «60/60 frames overran»). Here the frame
++  // is late only if more than TWO retraces passed between the anchors of two drawn frames.
++  static uint64_t s_anclaAnterior = 0;
++  if (aurora::g_mkwN8 && baseNanos && intervalNanos) {
++    const bool paced = s_anclaAnterior == 0 || baseNanos <= s_anclaAnterior ||
++                       baseNanos - s_anclaAnterior <= 2 * intervalNanos + intervalNanos / 2;
++    aurora::gx::report_producer_paced(paced);
++  }
++  s_anclaAnterior = baseNanos;
++#endif
+   aurora::g_presentScheduleBaseNanos.store(baseNanos, std::memory_order_release);
+   aurora::g_presentScheduleIntervalNanos.store(intervalNanos, std::memory_order_release);
+ }
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (§219, N8): 1 = the game draws one frame out of two (interpolated image now, the real one a retrace later)
++extern "C" void aurora_mkw_n8(int on) {
++  aurora::g_mkwN8 = on;
++  if (!on) aurora::g_mkwN8Pendiente.reset();
++}
++// the real image held from the drawn frame. donde = 0: the skipped frame, at its copy: it waits (yielding) until its
++// deadline, but only if that deadline falls before the next drawn frame's retrace (+3 ms): waiting longer would push
++// the next drawn frame back (a drawn frame longer than a retrace, §219). donde = 1: the next drawn frame, when its draw
++// starts (after its logic): what is still pending goes out at once, without waiting. 1 = presented now
++extern "C" int aurora_mkw_presentar_pendiente(int donde) {
++  if (!aurora::g_mkwN8Pendiente) return 0;
++  auto& pendiente = *aurora::g_mkwN8Pendiente;
++  if (donde == 0) {
++    const uint64_t base = aurora::g_presentScheduleBaseNanos.load(std::memory_order_acquire);
++    const uint64_t intervalo = aurora::g_presentScheduleIntervalNanos.load(std::memory_order_acquire);
++    if (base && intervalo) {
++      const aurora::PresentClock::time_point limite{std::chrono::nanoseconds{base + intervalo + 3'000'000}};
++      if (pendiente.presentAt > limite) return 0;
++    }
++  } else if (pendiente.presentAt > aurora::PresentClock::now()) {
++    pendiente.presentAt = aurora::PresentClock::now();
++  }
++  const auto job = std::move(pendiente);
++  aurora::g_mkwN8Pendiente.reset();
++  aurora::present_presentation_job(job);
++  ++aurora::g_mkwN8Cuenta[donde == 0 ? 1 : 4];
++  aurora::g_mkwN8EsperaMs +=
++      std::chrono::duration<double, std::milli>(aurora::PresentClock::now() - aurora::g_mkwN8Guardada).count();
++  return 1;
++}
++extern "C" uint32_t aurora_mkw_n8_cuenta(int i) { return i >= 0 && i < 5 ? aurora::g_mkwN8Cuenta[i] : 0; }
++extern "C" double aurora_mkw_n8_espera_ms() { return aurora::g_mkwN8EsperaMs; }
++#endif
+ void aurora_report_producer_paced(bool paced) {
+ #ifdef AURORA_ENABLE_GX
++#ifdef __EMSCRIPTEN__
++  if (aurora::g_mkwN8) return;   // (N8: aurora_set_present_schedule decides, right after this)
++#endif
+   aurora::gx::report_producer_paced(paced);
+ #else
+   (void)paced;

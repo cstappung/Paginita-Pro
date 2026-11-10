@@ -1,0 +1,53 @@
+diff --git a/runtime/include/guest_abi/memory_access.h b/runtime/include/guest_abi/memory_access.h
+index 865a6e0..c0bf6c1 100644
+--- a/runtime/include/guest_abi/memory_access.h
++++ b/runtime/include/guest_abi/memory_access.h
+@@ -9,6 +9,9 @@
+ #include <cstddef>
+ #include <cstdint>
+ #include <cstring>
++#if defined(MKW_BYTES_LENTOS) && defined(__x86_64__)
++#include <immintrin.h>   // W6 (§197): la vuelta de 8 bytes con un vector, solo en el programa de medir
++#endif
+ 
+ // Hooks for GX HLE FIFO handling
+ extern "C" {
+@@ -263,6 +266,30 @@ MKW_MEMORY_FORCE_INLINE uint8_t* ResolveRangeHost(uint32_t base, int32_t minOffs
+ 
+ // Guest-address byte order. Distinct from isa/big_endian.h, which is the
+ // host-pointer codec; do not "unify" them.
++#if defined(MKW_BYTES_LENTOS) && defined(__x86_64__)
++// MKW RETRO, W6 de la etapa 0 (bitácora §197): SOLO en el programa de Windows para medir (compilar-nativo.py
++// --bytes-lentos). Da vuelta los bytes como lo hace wasm, que no tiene la instrucción bswap: 4 y 2 bytes con
++// desplazamientos y máscaras (las 7 operaciones que escribe LLVM para wasm) y 8 bytes con una mezcla de vector (la
++// de MKW_MOTOR_VUELTA64). La barrera vacía (un asm sin instrucciones) esconde cada parte, así clang no reconoce el
++// patrón y no lo vuelve a juntar en un bswap. La diferencia contra el nativo normal es el costo de dar vuelta los bytes.
++#define MKW_BARRERA(x) __asm__ volatile("" : "+r"(x))
++inline uint16_t ByteSwap16(uint16_t value) {
++    uint32_t a = static_cast<uint32_t>(value) << 8, b = static_cast<uint32_t>(value) >> 8;
++    MKW_BARRERA(a); MKW_BARRERA(b);
++    return static_cast<uint16_t>(a | b);
++}
++inline uint32_t ByteSwap32(uint32_t value) {
++    uint32_t a = value << 24, b = (value & 0xFF00u) << 8, c = (value >> 8) & 0xFF00u, d = value >> 24;
++    MKW_BARRERA(a); MKW_BARRERA(b); MKW_BARRERA(c); MKW_BARRERA(d);
++    return a | b | c | d;
++}
++inline uint64_t ByteSwap64(uint64_t value) {
++    __m128i v = _mm_cvtsi64_si128(static_cast<long long>(value));
++    v = _mm_shuffle_epi8(v, _mm_setr_epi8(7, 6, 5, 4, 3, 2, 1, 0, 8, 9, 10, 11, 12, 13, 14, 15));
++    __asm__ volatile("" : "+x"(v));
++    return static_cast<uint64_t>(_mm_cvtsi128_si64(v));
++}
++#else
+ inline uint16_t ByteSwap16(uint16_t value) {
+     return __builtin_bswap16(value);
+ }
+@@ -274,6 +301,7 @@ inline uint32_t ByteSwap32(uint32_t value) {
+ inline uint64_t ByteSwap64(uint64_t value) {
+     return __builtin_bswap64(value);
+ }
++#endif
+ 
+ template <typename T>
+ inline T MaybeByteSwap(T value) {

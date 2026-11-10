@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cinta de cajas</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Cinta de cajas: <span>dos núcleos sin memoria compartida (el plan B de H5)</span></h1>
+<p>Paso 8 del plan de rendimiento (H5, bitácora §188), <b>sin el juego</b>. Un Worker hace de «juego» (un cálculo fijo
+  como la lógica de la carrera, y escribe 30.000 vértices por cuadro, unos 360 KB) y otro de «aurora» (transforma y empaca
+  esos vértices). Primero todo en serie en un solo hilo, como hoy; después con la cinta de <code>cajas.mjs</code>: tres
+  cajas que van y vuelven transferidas (sin copiar) por un MessagePort, sin <code>SharedArrayBuffer</code>. Comprueba
+  que dan exactamente lo mismo cuadro por cuadro, que nada se copia, que la cinta frena al juego cuando aurora no da abasto,
+  y cuánto se gana.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearCinta, atenderCinta } from '/web/navegador/cajas.mjs';
+const { ok, nota, fin } = prueba('cajas', 'Cinta de cajas (sin el juego)');
+const CUADROS = 120;
+const hilo = () => new Worker(new URL('./hilo.mjs', import.meta.url), { type: 'module' });
+const pedir = (w, m, tr = []) => new Promise((r, mal) => { const t = setTimeout(() => mal(new Error('sin respuesta')), 120000); w.onmessage = e => { if (e.data.t === 'atendiendo') return r(e.data); clearTimeout(t); r(e.data); }; w.postMessage(m, tr); });
+try {
+  // ---- 1. La cinta sola, en este hilo (dos puertos de un MessageChannel) ----
+  const c = new MessageChannel();
+  const atendido = [];
+  atenderCinta({ puerto: c.port2, trabajar: (v, x) => { atendido.push([v.length, v[0], x]); return v[0] + 1; } });
+  const vueltas = [];
+  const cinta = crearCinta({ puerto: c.port1, piezas: 2, tam: 1024, alVolver: r => vueltas.push(r) });
+  const a = await cinta.tomar(), b = await cinta.tomar();
+  ok('dos cajas libres de 1 KB', a.length === 1024 && b.length === 1024 && a.buffer !== b.buffer);
+  a[0] = 7; cinta.entregar(a, 10, 'cuadro 0');
+  ok('al entregarla la caja queda vacía (largo 0): se TRANSFIRIÓ, no se copió', a.buffer.byteLength === 0);
+  let tercera = null;
+  const p = cinta.tomar().then(x => { tercera = x; });
+  b[0] = 9; cinta.entregar(b, 20, 'cuadro 1');
+  await p;
+  ok('sin cajas libres, tomar() espera a que vuelva una (la contrapresión)', !!tercera && cinta.estado.esperas === 1);
+  await new Promise(r => setTimeout(r, 50));
+  ok('el otro lado ve solo los bytes usados y el dato aparte', atendido[0][0] === 10 && atendido[0][1] === 7 && atendido[0][2] === 'cuadro 0' && atendido[1][0] === 20);
+  ok('lo que devuelve el otro lado llega en orden', vueltas[0] === 8 && vueltas[1] === 10);
+
+  // ---- 2. Un cuadro de mentira: en serie (un hilo) contra la cinta (dos Workers) ----
+  const w1 = hilo();
+  const serie = await pedir(w1, { t: 'juego', puerto: null, cuadros: CUADROS });
+  w1.terminate();
+  const juego = hilo(), aurora = hilo(), canal = new MessageChannel();
+  await pedir(aurora, { t: 'aurora', puerto: canal.port2 }, [canal.port2]);
+  const cint = await pedir(juego, { t: 'juego', puerto: canal.port1, cuadros: CUADROS, piezas: 3 }, [canal.port1]);
+  juego.terminate(); aurora.terminate();
+  const iguales = serie.sumas.length === CUADROS && cint.sumas.length === CUADROS && serie.sumas.every((s, i) => s === cint.sumas[i]);
+  ok('con la cinta, cada cuadro da EXACTAMENTE lo mismo que en serie (la suma de control)', iguales, `${cint.sumas.length} cuadros`);
+  const msSerie = serie.ms / CUADROS, msCinta = cint.ms / CUADROS, msJuego = cint.msJuego / CUADROS;
+  nota(`en serie ${msSerie.toFixed(2)} ms por cuadro; con la cinta ${msCinta.toFixed(2)} ms (el «juego» solo ${msJuego.toFixed(2)} ms); esperó una caja ${cint.estado.esperas} veces (${cint.estado.msEspera.toFixed(0)} ms)`);
+  ok('con la cinta el cuadro sale más rápido que en serie (≥ ×1,3: los dos núcleos a la vez)', msSerie / msCinta >= 1.3, `×${(msSerie / msCinta).toFixed(2)}`);
+  ok('el hilo del «juego» queda solo con su parte: ~lo de la lógica, sin lo de aurora', msJuego < msSerie * 0.8, `${msJuego.toFixed(2)} de ${msSerie.toFixed(2)} ms`);
+} catch (e) { ok('sin errores', false, String(e && e.stack || e)); }
+fin();
+</script>
+</body>
+</html>

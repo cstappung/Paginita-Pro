@@ -1,6 +1,8 @@
 // Prueba del menú de inicio «JloKart Wii» con el juego de verdad (bitácora §67).
 //
 // Resumen: abre la página con ?inicio=1 (Playwright no lo ve sin eso: navigator.webdriver) y comprueba:
+//   - §116: por omisión Multiplayer está «en obra» (gris, Enter no abre nada, el menú sigue en el principal); el resto de
+//     la prueba va con ?multi=1 (Multiplayer como antes), que es lo que se probaba antes de §116;
 //   - aparece con la imagen privada (200) y 3 botones: Single Player, Multiplayer, Options (sin «Championship»);
 //   - mientras está, el juego no recibe nada de la persona (controles silenciados) y arranca debajo hasta su título;
 //   - teclado: bajar, entrar a Multiplayer (Local y Back; «Online» solo dentro del sitio), volver con Esc;
@@ -15,7 +17,7 @@
 //     que le avisa a Juegos; la página suelta, sin sesión: el Worker contesta 401 y el menú NO aparece.
 // Fotos en build/web/datos/inicio/.
 //
-// Uso:  node web/navegador/prueba-inicio.mjs [--ventana]
+// Uso:  node web/navegador/prueba-inicio.mjs [--ventana]   (15 puntos)
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -61,11 +63,24 @@ const hasta = async (marco, cond, ms, cada = 200) => {
 
 let codigo = 1;
 try {
-  // ---------- A) la página del juego con el menú ----------
+  // ---------- 0) §116: Multiplayer «en obra» con ?multi=0 (abierto por omisión desde la v2.0) ----------
+  const c0 = await navegador.newContext({ viewport: { width: 1280, height: 720 } });
+  const p0 = await c0.newPage();
+  await p0.goto(`http://127.0.0.1:${PUERTO}/?inicio=1&multi=0`);
+  let m0 = await hasta(p0, x => x.visible, 20000);
+  for (const k of ['ArrowDown', 'Enter']) { await p0.keyboard.down(k); await espera(110); await p0.keyboard.up(k); await espera(400); }
+  m0 = await mirar(p0);
+  const obra = await p0.evaluate(() => ({ veces: window.mkwInicio?.estado.enObra || 0,
+    gris: !!document.querySelectorAll('#inicioJlo .ij-boton')[1]?.matches('[aria-disabled="true"], .en-obra, .ij-obra, [disabled]') }));
+  ok('§116: Multiplayer «en obra» con ?multi=0: Enter no abre nada y el menú sigue en el principal',
+     m0.visible && m0.menu === 'principal' && m0.elegido === 1 && obra.veces >= 1 && obra.gris, `menú ${m0.menu}, elegido ${m0.elegido}, en obra ${obra.veces} vez/veces, gris ${obra.gris}`);
+  await c0.close();
+
+  // ---------- A) la página del juego con el menú (?multi=1: Multiplayer como antes de §116) ----------
   const contexto = await navegador.newContext({ viewport: { width: 1280, height: 720 } });
   const p = await contexto.newPage();
   const tecla = async (k, ms = 400) => { await p.keyboard.down(k); await espera(110); await p.keyboard.up(k); await espera(ms); };
-  await p.goto(`http://127.0.0.1:${PUERTO}/?inicio=1`);
+  await p.goto(`http://127.0.0.1:${PUERTO}/?inicio=1&multi=1`);
   let m = await hasta(p, x => x.visible && x.arteAncho > 0, 20000);
   ok('aparece el menú de inicio con la imagen privada (200)', m.visible && m.imagen === 200 && m.arteAncho === 1448, `imagen ${m.imagen}, ${m.arteAncho} px`);
   ok('3 botones: Single Player, Multiplayer, Options (sin «Championship»)', JSON.stringify(m.textos) === '["Single Player","Multiplayer","Options"]', m.textos.join(' · '));
@@ -137,7 +152,7 @@ try {
   sitio = await arrancarServidor([path.join(raiz, 'herramientas/sitio-local.mjs'), '--puerto', String(PUERTO_SITIO)], 'la página sola');
   const cC = await navegador.newContext({ viewport: { width: 1280, height: 720 } });
   const pC = await cC.newPage();
-  await pC.goto(`http://127.0.0.1:${PUERTO_SITIO}/juegos.html?mkw=1%26inicio%3D1`);
+  await pC.goto(`http://127.0.0.1:${PUERTO_SITIO}/juegos.html?mkw=1%26inicio%3D1%26multi%3D1`);
   await pC.waitForFunction(() => window.mkwMarco && window.mkwMarco.contentWindow?.mkwInicio, null, { timeout: 30000 });
   await pC.evaluate(() => { window.__salas = 0; addEventListener('message', e => { if (e.data?.canal === 'mkw-hijo' && e.data.tipo === 'salas') window.__salas++; }); });
   const marco = pC.frames().find(f => f.url().includes('/juegos/mkw/web/navegador/index.html'));

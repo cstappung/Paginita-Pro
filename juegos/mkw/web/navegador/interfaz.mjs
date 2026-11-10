@@ -18,6 +18,7 @@
 
 import { leerRksys, resumenLicencia, queArchivo, RUTA_RKSYS, leerRating, RUTA_RATING } from './licencias.mjs';
 import { crearRespaldos } from './respaldos.mjs';
+import { crearChips } from './avisos-lag.mjs';
 import { abrirEditorMii } from './editor-mii.mjs';
 import { leerInvitados } from './invitados.mjs';
 import { crearImagenes } from './imagenes.mjs';
@@ -60,7 +61,8 @@ export const MODOS = [
 
 // estadoNube() = el estado de las partidas en la nube (nube.mjs) o null si no hay (sin sesión, fuera del sitio)
 export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado = () => {}, imagenes = '/build/imagenes',
-                               estadoNube = () => null }) {
+                               estadoNube = () => null, filtroChip = null }) {
+  // (§262: filtroChip = avisos-lag.mjs: con «Mostrar avisos de conexión y lag» apagado, los chips de lag no se pintan)
   const respaldos = crearRespaldos();
   const enJuegos = window.parent !== window;
   const conPortada = new URLSearchParams(location.search).get('portada') === '1';
@@ -134,11 +136,14 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   setInterval(() => {
     const m = controles.estado.mandos.slice().sort((a, b) => (a.puerto ?? 9) - (b.puerto ?? 9));
     const corto = x => x.nombre.replace(/\s*\(.*\)$/, '');
-    pastilla.classList.toggle('ok', m.length > 0);
-    pastilla.textContent = controles.estado.bloqueados ? 'Mandos bloqueados aquí'
+    // (§126: se escribe solo lo que cambió: reescribir el texto cada medio segundo hacía recalcular la página)
+    const texto = controles.estado.bloqueados ? 'Mandos bloqueados aquí'
       : !m.length ? 'Mando: aprieta un botón'
       : '🎮 ' + (m.length === 1 ? corto(m[0]) : m.map(x => `${x.puerto === undefined ? '–' : 'J' + (x.puerto + 1)} ${corto(x)}`).join(' · '));
-    pastilla.hidden = document.body.classList.contains('tactil') && !m.length;
+    const oculta = document.body.classList.contains('tactil') && !m.length;
+    if (pastilla.classList.contains('ok') !== m.length > 0) pastilla.classList.toggle('ok', m.length > 0);
+    if (pastilla.textContent !== texto) pastilla.textContent = texto;
+    if (pastilla.hidden !== oculta) pastilla.hidden = oculta;
   }, 500);
 
   // ---------------- Cajón ----------------
@@ -178,7 +183,10 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada'));
       return;
     }
-    if (hojaAbierta && !dialogo.open) { e.stopImmediatePropagation(); e.preventDefault(); cerrarCajon(); }
+    // §263: lo que está encima del cajón se cierra primero (la cuadrícula «¿Qué hace…?» del mando dibujado, un diálogo
+    // como el de bienvenida): su propio oyente se queda con el Esc (y con la B del mando del sitio, que manda un Esc)
+    if (document.querySelector('.bp-elegir:not([hidden])')) return;
+    if (hojaAbierta && !document.querySelector('dialog[open]')) { e.stopImmediatePropagation(); e.preventDefault(); cerrarCajon(); }
   }, true);
 
   // ---------------- Tu partida ----------------
@@ -441,19 +449,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   const esquina = el('div', { id: 'estadoJuego', role: 'status' });
   document.body.append(esquina);
   const sinEsquina = new URLSearchParams(location.search).get('esquina') === '0';   // (?esquina=0: sin chips, para medir)
-  const ultimoChip = new Map();                   // clave → el último texto pedido (el mismo de nuevo no vuelve a salir)
-  function chip(clave, texto, mal = false, ms = 6000) {
-    if (sinEsquina) return;
-    let c = esquina.querySelector(`[data-clave="${clave}"]`);
-    if (!texto) { ultimoChip.delete(clave); c?.remove(); return; }
-    if (ultimoChip.get(clave) === texto) return;
-    ultimoChip.set(clave, texto);
-    if (!c) { c = el('span', { className: 'chip-estado' }); c.dataset.clave = clave; esquina.append(c); }
-    c.textContent = texto;
-    c.classList.toggle('mal', mal);
-    clearTimeout(c._hasta);
-    c._hasta = setTimeout(() => c.remove(), ms);
-  }
+  // (§262: el pintado de los chips vive en avisos-lag.mjs crearChips, para probarlo en el banco con el filtro de lag)
+  const { chip, repintarChips } = crearChips(esquina, { filtroChip, sinEsquina });
   // ---------------- Elegir copa, pista o armar una copa ----------------
   // Las imágenes sacadas del juego (herramientas/sacar-imagenes.mjs, fotos-pistas.mjs, planos-pistas.mjs) van en unos
   // pocos paquetes en la parte privada (build/imagenes, en R2 detrás del Worker; imagenes.mjs los abre): ícono de cada
@@ -1278,7 +1275,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     };
   }
 
-  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, accion, chip, elegirPista, cortina, playlistBreve,
+  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, accion, chip, repintarChips, elegirPista, cortina, playlistBreve,
            conPortada, get cortinaPuesta() { return !document.body.classList.contains('sin-cortina'); },
            estado: t => { estado.textContent = t; } };
 }

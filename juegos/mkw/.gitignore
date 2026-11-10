@@ -41,3 +41,7 @@ node_modules/
 !banco/**/*.wasm
 # capturas y resultados de las pruebas
 banco/**/*.png
+
+# adb de Google (platform-tools), para telefono-seguro.mjs: programa de terceros, nunca a git
+platform-tools-latest-windows/
+platform-tools/

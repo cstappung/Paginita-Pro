@@ -1,0 +1,181 @@
+// Área N del plan de rendimiento (versión 2): lo que la primera versión no alcanzaba.
+// Sale de la pregunta del dueño «¿con estos cambios se llega a todos los objetivos?».
+// Cadenas con comillas simples: dentro se usan `código`, **negrita** y [[ID]] para citar otro ítem.
+
+const P = (...x) => x.join('\n\n');
+
+export const N = {
+  id: 'N', nombre: 'Lo profundo: lo que la primera versión no alcanzaba',
+  intro: P(
+    'Esta sección es nueva (versión 2). Sale de tu pregunta: «¿con estos cambios se llega a todos los objetivos?». La respuesta fue no, sobre todo fuera de los aparatos tope de gama (ver «¿Alcanza?»).',
+    'Aquí está lo que todavía puede mover la aguja: medir dónde juegan los demás ([[N1]], [[N2]]), sacar el juego del hilo de la página y repartirlo en varios núcleos ([[N3]], [[N4]]), lo que queda en el motor ([[N5]]–[[N7]]), mostrar 60 aunque se dibuje 30 ([[N8]]), entender la tarjeta del teléfono ([[N9]]), el plan C de la gama baja dentro de la página ([[N11]]; la app de Android, [[N10]], quedó descartada: el dueño, 2026-10-29: el producto final corre siempre en la página, nunca como app descargable) y lo que no se puede ([[N12]]).'
+  ),
+  items: [
+    {
+      id: 'N1', titulo: 'Medir el impuesto del navegador: el mismo juego nativo contra el del navegador',
+      prio: 'urgente', aparato: 'pc', modo: 'ambos', esfuerzo: '2–4 días', fuente: 'sospecha', banderas: ['medir', 'recompilar'],
+      pasa: 'Todo el plan supone cuánto le cuesta al juego correr dentro del navegador, y eso nunca se midió. En WebAssembly cada lectura o escritura de la memoria de la Wii pasa por una tabla de páginas (en un PC nativo es un acceso directo que vigila el sistema operativo) y da vuelta los bytes sin una instrucción para eso; la multiplicación-suma exacta se emula con más de diez operaciones ([[M5]]); cada cambio de hilo del juego crea una promesa ([[M10]]); y la tarjeta de video se usa a través de otro proceso. Un programa nativo no paga nada de eso.',
+      arreglo: 'WiiCompiled nació como programa nativo para PC (su CMake baja Dawn y SDL3 nativos). Compilarlo para Windows con el mismo juego, RR y los mismos ganchos de medida, y correr la misma carrera en el mismo PC contra el `.wasm`, en un solo hilo. La razón entre los dos es el impuesto del navegador. Si es chico (menos de ×1,3), todo se gana dentro del motor ([[N4]]–[[N7]]); si es grande (×1,5 o más), la gama baja solo se alcanza fuera del navegador ([[N10]]).',
+      gana: 'saber con un número medido cuánto cuesta el navegador y cuánto de eso se puede recuperar dentro de wasm (el programa nativo es solo un instrumento de medida: nunca se entrega)',
+      comprueba: 'CPU por cuadro nativo contra wasm en la misma carrera (misma pista, mismas CPU, el mismo cuadro de partida).',
+      refs: 'terceros/Wiicompiled (CMake nativo); runtime/include/guest_flat_memory.h:39-44 (wasm sin vista plana); herramientas/medir-cpu.sh',
+    },
+    {
+      id: 'N2', titulo: 'La escalera de aparatos: medir donde juegan los demás y fijar la meta de cada escalón',
+      prio: 'urgente', aparato: 'ambos', modo: 'ambos', esfuerzo: '3–5 días', fuente: 'dato', banderas: ['medir', 'dueno'],
+      pasa: 'Todo lo medido salió de los aparatos más rápidos de cada clase: el Ryzen 7 9800X3D (de los procesadores más rápidos para juegos; su caché de 96 MB le viene justo a un programa de 128 MB de código) y el Oppo Find X9 Pro (tope de gama de 2025). El juego usa un solo núcleo, y ese núcleo es 2–2,5 veces más lento en un PC típico, 3–4 veces en un teléfono de gama media y 5–9 veces en uno de gama baja (estimado por la velocidad de un núcleo). Sin medirlos, «60 fps» no tiene a quién referirse.',
+      arreglo: 'Seis escalones: PC para juegos, PC típico (2018–2021), portátil de oficina, teléfono tope de gama, de gama media y de gama baja ([[E4]], [[E5]]). Solo hay un aparato de verdad, este PC con varios Chrome (el Oppo ya no se mide, el dueño, 2026-10-31; lo que dio queda como referencia): los demás escalones se simulan con el aparato de mentira ([[H1]]), con el lastre de cada escalón sacado de la velocidad de un núcleo y de la tarjeta. En cada escalón, una carrera de 12 y una sala con el informe de rendimiento: CPU del juego, espera, tarjeta y cuadros de lógica ([[V1]], [[V5]]). Si algún día alguien con otro aparato corre el informe (`mkwInformeRendimiento`), se suma como un punto real que corrige la simulación. Con la tabla, el dueño fija la meta de cada escalón: 60 de verdad, 60 a la vista con interpolación ([[N8]]) o fuera del navegador ([[N10]]).',
+      gana: 'una meta que se puede cumplir y medir en cada escalón, y saber cuánto falta',
+      comprueba: 'la tabla de la escalera (medida en los dos aparatos y simulada en los demás) en `build/web/datos/escalera/` y en la bitácora, repetida al cerrar cada fase.',
+      refs: 'web/navegador/mkw.mjs (mkwInformeRendimiento); herramientas/medir-sitio.mjs --perfil',
+    },
+    {
+      id: 'N3', titulo: 'El juego en su propio proceso y fuera del hilo de la página',
+      prio: 'urgente', aparato: 'ambos', modo: 'ambos', esfuerzo: '2–4 semanas (1 de prueba)', fuente: 'dato', banderas: ['recompilar', 'r2', 'dueno'],
+      pasa: 'El juego corre en el hilo principal de un marco del mismo origen que Juegos: comparte el hilo con el sitio (Firebase, la sala, el DOM y su limpieza de memoria). Lo que hace el sitio sale de los 16,7 ms del juego, y una tarea larga del juego congela la página. Es como alimentar el motor y la iluminación con el mismo circuito: cuando arranca uno, parpadea el otro.',
+      arreglo: 'Servir la página del juego desde Cloudflare (el Worker de hoy o un dominio propio) con `Document-Isolation-Policy`: proceso propio y memoria compartida, sin tocar GitHub Pages ni el inicio de sesión de Firebase ([[P9]]). Y correr el juego entero en un Worker con `OffscreenCanvas` ([[P10]]): WebGPU funciona en Workers. La página queda para la interfaz, los mandos y la red, y le pasa los botones al juego por memoria compartida. Empieza con una semana de prueba (la puerta A): JSPI dentro del Worker, emdawnwebgpu con `OffscreenCanvas`, SDL3 sin DOM, el sonido por el AudioWorklet y el lockstep a través del Worker.',
+      gana: 'el sitio deja de robarle tiempo al juego y el juego deja de congelar la página; es la base de [[N4]]',
+      comprueba: 'con la sala, el chat y Firebase activos, la CPU por cuadro del juego no cambia; el latido de otra pestaña no se atrasa al cargar ([[V2]]).',
+      refs: 'web/navegador/mkw.mjs, index.html, privado.mjs; parches/runtime-web.diff (JSPI)',
+    },
+    {
+      id: 'N4', titulo: 'Varios núcleos: aurora, el sonido y el disco fuera del hilo del juego',
+      prio: 'urgente', aparato: 'ambos', modo: 'ambos', esfuerzo: '3–5 semanas', fuente: 'sospecha', banderas: ['recompilar', 'r2', 'medir'],
+      pasa: 'Un teléfono tiene 8 núcleos y el juego usa uno. En ese hilo van en fila la lógica, el dibujo del juego, aurora (decodificar el GX, convertir vértices, armar y mandar el trabajo de WebGPU), la mezcla del sonido (~6 %, [[M9]]) y el disco. Es el multiplicador grande que queda dentro del navegador.',
+      arreglo: 'Con la memoria compartida de [[N3]]: el hilo del juego corre el código traducido y deja lo que va a la tarjeta en una cola, como la FIFO de la Wii; otro hilo la consume con aurora ([[G9]], el «dual core» de Dolphin). La mezcla AX y la reverb, a su hilo o al AudioWorklet; el disco y la descompresión, a otro ([[D11]]). En el Worker el juego puede esperar con `Atomics.wait` en vez de suspenderse con JSPI. Cuidado: lo que la lógica le pregunta a la tarjeta (fin del dibujo, PeekZ) tiene que contestarse en el mismo cuadro en todos los aparatos.',
+      gana: '10–25 % menos en el hilo del juego (estimado; se mide antes con [[V4]])',
+      comprueba: 'huella ampliada igual ([[R5]]), `paridad` 22/0 y la CPU por cuadro del hilo del juego.',
+      refs: 'parches/aurora-web.diff (frame_worker_requested); aurora lib/gx/command_processor.cpp; runtime (AX)',
+    },
+    {
+      id: 'N5', titulo: 'Traductor y memoria: lo que queda por sacar',
+      prio: 'urgente', aparato: 'ambos', modo: 'ambos', esfuerzo: '3–6 semanas', fuente: 'codigo', banderas: ['recompilar', 'r2'],
+      pasa: 'El traductor ya es bueno: guarda los registros en variables dentro de cada función, copia en su lugar las funciones hoja chicas («inlined leaf») y llama directo, con los argumentos, a las que puede («statefree»). Lo que queda: en wasm cada acceso a la memoria de la Wii pasa por una tabla de páginas con revisiones ([[M1]], [[M2]]), las llamadas que no son directas escriben y releen los registros vivos en el contexto, y se calculan banderas (XER, CR) que a veces nadie lee.',
+      arreglo: 'Pasadas propias en `parches/` ([[M8]], más a fondo): más funciones con llamada directa, más hojas en línea, banderas solo cuando alguien las lee y, en wasm, la RAM de la Wii en un lugar fijo de la memoria con una sola comparación para apartar la E/S y las páginas de código. Cada pasada se prende sola y se compara con `paridad`, la huella y los fantasmas.',
+      gana: '1,1–1,3 veces más rápido el código traducido, que es ~60 % del cuadro (estimado)',
+      comprueba: '`paridad` 22/0, fantasmas expertos de RR, huella ampliada y `medir-cpu.sh` por pasada.',
+      refs: 'generated/build_shards (ej. func_80199D64 = PSMTXConcat; «inlined leaf», `_statefree`); runtime/include/memory_access.h:380-410,687-692',
+    },
+    {
+      id: 'N6', titulo: 'Reescribir en nativo lo que solo se ve: efectos, animación de los modelos y 2D',
+      prio: 'media', aparato: 'ambos', modo: 'ambos', esfuerzo: '4–8 semanas', fuente: 'sospecha', banderas: ['decompilar', 'recompilar', 'r2', 'medir'],
+      pasa: 'Parte del cuadro no cambia la carrera: las partículas (`nw4r::ef`), la animación y las matrices de los modelos para dibujarlos (`nw4r::g3d`) y el 2D (`nw4r::lyt`). Hoy corren traducidas instrucción por instrucción, con la coma flotante de la Wii en software, aunque no necesitan los bits de la Wii.',
+      arreglo: 'Medir cuánto pesa cada sistema ([[V4]]). Los más caros, reescritos en C++ propio con SIMD y enganchados en su dirección (entendidos con lo decompilado, nunca copiados). Antes, probar con el vigía y la huella que la lógica de verdad no los lee: en MKW hay objetos que chocan con huesos de su modelo, y lo que la lógica lee tiene que seguir saliendo igual en todos los aparatos.',
+      gana: 'hasta 3 veces más rápido en lo reescrito; en el cuadro, según cuánto pese (estimado 5–15 %)',
+      comprueba: 'huella ampliada y fantasmas iguales; capturas iguales a simple vista; `medir-cpu.sh`.',
+      refs: 'generated/guest_symbol_table.cpp (nombres de nw4r::ef, nw4r::g3d y nw4r::lyt); ver M4',
+    },
+    {
+      id: 'N7', titulo: 'Reescribir exacto lo caliente de la lógica',
+      prio: 'investigar', aparato: 'ambos', modo: 'ambos', esfuerzo: '3–6 semanas', fuente: 'sospecha', banderas: ['decompilar', 'recompilar', 'r2', 'medir'],
+      pasa: 'Lo que sí decide la carrera (los choques con la pista KCL, la física del kart, la IA de las CPU) tiene que dar los mismos bits que la Wii: los fantasmas expertos de RR se grabaron en una Wii de verdad y la sala exige lo mismo en todos los aparatos.',
+      arreglo: 'Como [[M4]], pero con los sistemas más caros del perfil: una versión propia en C++ que repite el orden de las operaciones y los redondeos de la Wii, probada contra la traducida con millones de entradas al azar, bit a bit, y con los fantasmas. Solo si el perfil muestra que pesa.',
+      gana: 'sin medir: depende del perfil',
+      comprueba: 'banco de entradas al azar bit a bit; fantasmas expertos de RR; huella ampliada.',
+      refs: 'generated/guest_symbol_table.cpp (KCL, Kart, AI)',
+    },
+    {
+      id: 'N8', titulo: 'Simular a 60, dibujar a 30 y mostrar 60: la interpolación de aurora',
+      prio: 'alta', aparato: 'celular', modo: 'ambos', esfuerzo: '2–3 semanas', fuente: 'codigo', banderas: ['recompilar', 'r2', 'medir'],
+      pasa: '**Visto en el original (2026-10-30)**: el PR cerrado sin juntar `aurora-wiicompiled#6` («fix frame stutters», rama `frame-stutter-tracing`) hace la interpolación con hilos ayudantes (`MKW_INTERPOLATION_HELPERS`), traza cada imagen real e interpolada y evita que el juego y el GX queden atados a pocos núcleos; el compañero `Wiicompiled#363` trae un analizador de tirones. En wasm sin hilos la interpolación cae en el hilo del juego: se mide su costo antes de contar con ella. Retro Rewind ya se salta el dibujo de un cuadro cuando va atrasado (`rr_kamek_81806568`, §85.4): la lógica sigue a 60 y la pantalla muestra menos, a tirones. Y aurora ya sabe inventar cuadros intermedios: su interpolación vuelve a dibujar cada modelo 3D con la posición a mitad de camino (hoy para monitores de 120/180 Hz, §107).',
+      arreglo: 'Usar la interpolación para rellenar el cuadro que el juego no dibujó: el teléfono que alcanza a simular 60 pero a dibujar 30 muestra 60 parejos, a cambio de un cuadro más de demora (16,7 ms) y del 2D (el marcador) a 30. En un jugador sirve desde ya; en la sala, después de [[R2]] (allí saltarse el dibujo separaba la carrera). No ayuda si lo que frena es la tarjeta: la tarjeta sigue dibujando 60.',
+      gana: '60 fps a la vista en aparatos que simulan a 60 pero no dibujan a 60 (la gama media, con el plan profundo)',
+      comprueba: 'cuadros mostrados contra cuadros de lógica por segundo ([[V5]]) y una grabación en el teléfono.',
+      refs: 'aurora lib/gx/frame_interpolation.hpp (MaxInterpolatedFrames = 3); web/navegador/graficos.mjs (frame_interpolation_fps)',
+      nota: 'Versión 4 (2026-10-31): es la etapa 3 y va en el Worker del dibujo ([[W10]]), así la imagen intermedia sale del hilo de la carrera (sola, sin hilos, no ganó nada en la gama baja: §170). Es la meta de la gama baja (60 de carrera, 30 dibujados) y la reserva de la media. KartPad tiene una versión ya hecha con el modo de 30 fps del propio juego (−26 % de CPU por segundo, `docs/kartpad.md` §3); el camino de [[R2]] es el seguro para la sala.',
+    },
+    {
+      id: 'N9', titulo: 'La tarjeta del teléfono: de qué están hechos los 34 ms',
+      prio: 'alta', aparato: 'celular', modo: 'ambos', esfuerzo: '1–4 semanas', fuente: 'medido', banderas: ['medir', 'recompilar', 'r2'],
+      pasa: 'Hoy el Oppo se ve a 30 porque la tarjeta tarda ~34 ms por imagen (§115), y una escena de Wii es poca cosa para esa tarjeta: el costo está en cómo se le pide el trabajo (12 pasadas que cargan y guardan todo, vértices leídos desde storage buffers, profundidad de 32 bits, cientos de llamadas que pasan por el proceso de GPU de Chrome). Los arreglos de gráficos de la lista suman, según sus propias estimaciones, 5–15 ms: podría no alcanzar ni en el mejor teléfono. Y las tarjetas de gama media y baja son 3 a 10 veces más débiles.',
+      arreglo: 'Primero medir por pasada con `timestamp-query` y separar la tarjeta del proceso de GPU ([[V1]], [[G8]]). Si [[G2]]–[[G7]] no la bajan de 14 ms con el lastre de tarjeta de la gama media (`?lastreGpu=6`): un camino de dibujo propio para teléfonos dentro de aurora (atributos de vértice para los formatos comunes, menos pasadas, profundidad de 24 bits donde dé igual, texturas ETC2, paquetes de dibujo ya validados —render bundles— para lo que no cambia entre cuadros). Es solo visual: no toca la simulación.',
+      gana: 'saber si los teléfonos pueden llegar a 60 por el lado de la tarjeta; sin esto, ningún arreglo de CPU alcanza',
+      comprueba: '`perfil-gpu.mjs` por pasada en este PC en el tramo fijo, sin lastre y con `?lastreGpu=6` (la gama media), antes y después.',
+      refs: 'web/navegador/perfil-gpu.mjs; aurora gfx/common.cpp, gx/shader.cpp; bitácora §115',
+    },
+    {
+      id: 'N10', titulo: 'Plan C1: una app de Android con el juego nativo (descartado: el producto es siempre la página)',
+      prio: 'investigar', aparato: 'celular', modo: 'ambos', esfuerzo: '2–4 meses', fuente: 'sospecha', banderas: ['recompilar', 'dueno', 'medir'],
+      pasa: 'Si el impuesto del navegador ([[N1]]) es grande, ningún arreglo dentro de Chrome lleva la gama baja a 60: ahí el juego necesita las instrucciones del procesador (dar vuelta los bytes, multiplicar-sumar exacto), todos sus núcleos y Vulkan directo, sin pasar por otro proceso.',
+      arreglo: 'Compilar el mismo C++ para ARM64 y llevar aurora a Android (usa Dawn y SDL3, que ya andan ahí, sobre Vulkan), con una app chica que baja el juego desde R2 detrás del Worker, igual que la página, y entra a la misma sala (WebRTC con el mismo protocolo del lockstep). Los mismos bits que el `.wasm` (sin fast-math; FMA por hardware solo si se prueba exacta), comprobado con `paridad` y la huella. Se instala aparte (fuera de Play Store) y nunca se publica: es el ejecutable traducido.',
+      gana: '1,5–2,5 veces el navegador en el mismo teléfono (estimado; [[N1]] lo mide antes en el PC)',
+      comprueba: 'una sala con un PC (navegador) y un teléfono (app): la huella igual en 3 carreras.',
+      refs: 'terceros/Wiicompiled (build nativo); aurora (Dawn sobre Vulkan); web/navegador/lockstep.mjs (el protocolo)',
+    },
+    {
+      id: 'N11', titulo: 'Plan C2: el teléfono débil ve la carrera en video desde un PC de la sala',
+      prio: 'alta', aparato: 'celular', modo: 'sala', esfuerzo: '3–5 semanas', fuente: 'sospecha', banderas: ['medir'],
+      pasa: 'Un teléfono que no puede simular 60 cuadros por segundo no puede estar en el lockstep. Pero el juego ya sabe dibujar la vista de otro jugador: la pantalla partida (`?unaPantalla=0`).',
+      arreglo: 'Un PC de la sala dibuja también la vista del jugador del teléfono y se la manda en video por WebRTC (con el codificador de video del PC); el teléfono solo muestra el video y manda sus botones. Anda a 60 en cualquier teléfono, pero suma la ida y vuelta de la red más 30–50 ms de codificar y decodificar, y el PC paga una vista más y 5–8 Mbit/s de subida por teléfono.',
+      gana: 'cualquier teléfono en la sala, a cambio de más demora',
+      comprueba: 'demora del botón a la imagen medida con una cámara; CPU y subida del PC.',
+      refs: 'web/juego/semillas_nativo.cpp (una pantalla); web/navegador/malla.mjs',
+    },
+    {
+      id: 'N12', titulo: 'Lo que no se puede, por física, y decirlo en la página',
+      prio: 'media', aparato: 'ambos', modo: 'ambos', esfuerzo: '2–3 días', fuente: 'dato', banderas: [],
+      pasa: 'Algunas cosas no las arregla ningún plan: (1) un aparato que no simula 60 cuadros por segundo ni sin dibujar no puede correr a la par en el lockstep (el árbitro solo evita que frene a los demás); (2) con datos móviles (saltos de 50–200 ms) el retraso de los botones tiene que crecer, y se siente; (3) la 1.ª visita siempre baja ~100 MB y compila 108 MB de código; (4) un teléfono con 3–4 GB de RAM puede cerrar la pestaña; (5) el calor: un teléfono baja su velocidad después de 10–20 minutos ([[E2]]).',
+      arreglo: 'Decirlo en vez de esconderlo: el informe de rendimiento dice en qué escalón está el aparato y qué esperar; la sala avisa antes de largar si un aparato no llega a simular a 60 (en vez de sacarlo a mitad de carrera); el retraso de cada uno se ve (📶).',
+      gana: 'nada de sorpresas a mitad de carrera',
+      comprueba: 'banco: la sala con un aparato lento de mentira avisa antes de largar.',
+      refs: 'web/navegador/conexiones.mjs; mkw.mjs (mkwInformeRendimiento); lockstep.mjs',
+    },
+    {
+      id: 'N13', titulo: 'Abrir el impuesto: dónde se va el 70 % que no es la memoria, y el impuesto en la carrera',
+      prio: 'urgente', aparato: 'pc', modo: 'ambos', esfuerzo: '3–5 días', fuente: 'medido', banderas: ['medir'],
+      pasa: 'Lo agregó el resultado de [[N1]] (bitácora §153): el juego en el navegador tarda **×2,2** lo del mismo juego nativo en este PC. De esa diferencia, la memoria de la Wii explica ~30 %, la multiplicación-suma ~0 y el resto, **~70 %, no se sabe qué es**. Arreglar la memoria a la perfección ([[H6]], [[H7]]) deja el juego en ~×1,8: unas 1,2 veces más rápido, no 1,3–1,8 como suponía el plan. Y se midió en la escena del título, sin dibujar: en la carrera la física pesa más y el reparto puede cambiar. Es como saber que un tablero pierde el 55 % de la energía y haber encontrado solo un tercio de la pérdida: antes de cambiar cables hay que medir circuito por circuito.',
+      arreglo: P(
+        '(1) Perfil función por función, nativo contra wasm, con los mismos cuadros: el nativo con el muestreador de Windows (o los contadores de [[V4]]) y el wasm con `node --cpu-prof`; la razón por función ordena las sospechas: el despacho de llamadas indirectas ([[M3]]), lo que el traductor genera ([[M6]]–[[M8]], [[H11]]), las comprobaciones de wasm, la conversión de coma flotante y las promesas del cambio de hilo ([[M10]]).',
+        '(2) El nativo con trabas de wasm, de a una (sin vectorizar, llamadas indirectas por tabla, memoria revisada como en §153): cuánto sube cada una dice cuánto pesa.',
+        '(3) Repetir [[N1]] en una carrera de 12 (Time Trial o con CPU, el mismo cuadro de partida), si el nativo llega a la carrera; si no, la escena más cargada a la que llegue.'
+      ),
+      gana: 'saber a qué ítems del motor (pasos 6, 7, 13 y 14) dedicarles los meses, en vez de suponerlo',
+      comprueba: 'una tabla en la bitácora con el 70 % repartido en partes con nombre (lo sin explicar, menos de 20 %), y la razón nativo/wasm en la carrera.',
+      refs: 'herramientas/medir-impuesto.mjs, compilar-nativo.py (§153); herramientas/medir-contadores.mjs (§152)',
+    },
+    {
+      id: 'N14', titulo: 'La IA reescribe las funciones calientes, con un comprobador automático que exige el mismo resultado',
+      prio: 'urgente', aparato: 'ambos', modo: 'ambos', esfuerzo: '2–4 semanas', fuente: 'medido', banderas: ['recompilar', 'medir'],
+      pasa: 'Lo pidió el dueño (2026-10-30), con alta prioridad. Reescribir el juego entero a mano (~29.600 funciones del juego y ~11.650 de Retro Rewind) no conviene: son años, y el tiempo está repartido (la función más pesada es ~2 % del cuadro y las 60 más pesadas ~37 %, perfil de [[N13]], `n13-carrera-nat-resumen.json`). Pero las más pesadas sí: lo lento no es escribirlas (la IA lo hace rápido) sino **comprobar** que dan exactamente lo mismo, bit por bit; sin eso la sala se desincroniza y los fantasmas no coinciden.',
+      arreglo: P(
+        '(1) **El comprobador primero**: un banco que graba, en una carrera real de 12 (el tramo fijo de §163 y la sala), lo que entra y sale de cada función candidata (registros, memoria que lee y escribe) y después corre la versión nueva con las mismas entradas y compara todo, bit por bit. Más `paridad`, la huella ampliada de la sala y los fantasmas.',
+        '(2) **Va después del traductor** (el paso anterior): se vuelve a perfilar y se reescribe solo lo que siga caliente, para no hacer a mano lo que el traductor ya arregla para todas.',
+        '(3) **Por tandas y en paralelo**: las 50, después 100, después 500 más pesadas, varias sesiones a la vez. Cada función entra solo si el comprobador dice idéntico **y** la medida dice más rápida (en la gama baja simulada y en este PC); si no, queda la traducida. Cada una con su bandera para volver a la traducida.',
+        '(4) Es código propio escrito para entender el juego (como manda la regla de decompilar uno mismo): vive en el runtime, nunca se publica fuera del `.wasm` privado.'
+      ),
+      gana: 'la parte del tiempo que el traductor no alcance a bajar, función por función y sin riesgo de desincronizar',
+      comprueba: 'el comprobador con 0 diferencias en cada función aceptada; la CPU por cuadro de la carrera (tramo fijo) más baja en la gama baja simulada y en este PC; `paridad`, la huella de la sala y los fantasmas iguales.',
+      refs: 'build/web/datos/impuesto-perfil/ (el perfil por función, §165–§166); banco paridad; lockstep (huella ampliada, §154)',
+    },
+    {
+      id: 'N15', titulo: 'Subir WiiCompiled a la versión 0.9.3 antes de tocar el traductor',
+      prio: 'urgente', aparato: 'ambos', modo: 'ambos', esfuerzo: '2–4 días', fuente: 'codigo', banderas: ['recompilar', 'medir'],
+      pasa: 'Revisado el 2026-10-30 (pedido del dueño): los PR abiertos de WiiCompiled no traen nada de rendimiento, pero `main` avanzó 47 commits desde el fijado (`bd219e3`, 2026-10-09) hasta la v0.9.3. La v0.9.0 (`ac99413`, 467 archivos) trae **GX en su propio hilo** (#325, el «dual core» de [[G9]] y [[H4]]), **la tabla de regiones por dirección cambiada por un mapa de rangos** (#328, la memoria de [[H6]]), cambios en el generador de C++ (memoria plana, variables locales, despacho) y aurora como submódulo; `cc6abd4` (#358) reescribe la parte del traductor donde irían [[M8]] y [[M1]] (rangos de memoria, ABI inferida, GQR); y hay arreglos de dibujo (matrices GX, niebla, texgen, Sky Station) y de mods (punteros reubicados, overlays). Hacer el paso 6 sobre la base vieja sería trabajar dos veces y juntarlo después con conflictos.',
+      arreglo: P(
+        '(1) En una copia aparte (`terceros/Wiicompiled-motor`, para no romper lo que mide el paso 5): el traductor y el runtime de la v0.9.3 (`0d5c402`) con **nuestra aurora ya portada** y un adaptador para las 10 funciones nuevas que piden (el principio y el fin de cada imagen del hilo de GX, vsync, la tasa del monitor, los eventos); nuestros parches (`parches/*.diff`) portados encima; lo que el original ya hace, no se repite. La aurora nueva del original es otra y queda en N15b (decidido 2026-10-30).',
+        '(2) Retraducir y compilar aparte (`build/web-motor`); `paridad`, `prueba-arranque`, `prueba-navegador`, la huella de la sala y `correr-todo` contra ese build.',
+        '(3) La línea base nueva contra la vieja, en la misma tanda: el tramo fijo en este PC y en la gama baja simulada, y la razón wasm/nativo.',
+        '(4) Ver si el GX en su hilo anda en wasm sin memoria compartida o deja una base para el paso 9; anotarlo en [[G9]] y [[H4]].',
+        '(5) Recién con todo verde, el cambio al clon principal, coordinado con la sesión que esté midiendo.',
+        '(6) El dueño, 2026-10-30: «usa todo lo que nos sirva de todas maneras y evalúalo». Cada pieza útil del original se adopta y se mide por separado, con su bandera para volver atrás: #325 GX en su hilo, #328 mapa de rangos, #358 traducción determinista, #360 ritmo del sonido (frente a nuestro AudioWorklet), los arreglos de dibujo (#376, #348, niebla, #303) y de mods (#321, #359, #336), y #351 `--headless`. También los PR cerrados sin juntar: aurora-wiicompiled#6 (interpolación con hilos ayudantes, afinidad y traza por imagen; sobre todo, cuánto cuesta interpolar en wasm sin hilos en la gama baja, ver [[N8]]) y Wiicompiled#363 (el analizador de tirones, frente a `medir-sitio`/`medir-enlinea`). Lo que no sirve para la página (Mac, Linux, Steam, NTSC, vsync…) se anota en una línea. Todo queda en una tabla en la bitácora: cambio, adoptado sí/no, cómo se comprobó y el efecto medido.'
+      ),
+      gana: 'el paso 6 sobre el código que el original sigue mejorando (sin conflictos al juntar), sus arreglos de dibujo y de mods, y una base para el GX en su hilo',
+      comprueba: 'todas las pruebas en verde con el build nuevo, la huella y los fantasmas iguales, y la línea base nueva medida contra la vieja (no peor).',
+      refs: 'terceros/Wiicompiled (origin/main, v0.9.3); parches/; herramientas/versiones.md',
+    },
+    {
+      id: 'N15b', titulo: 'La aurora nueva del original en el navegador',
+      prio: 'alta', aparato: 'ambos', modo: 'ambos', esfuerzo: '2–4 semanas', fuente: 'codigo', banderas: ['recompilar', 'medir'],
+      pasa: 'Visto al hacer [[N15]] (2026-10-30): la aurora de la v0.9.3 ya no es la nuestra con cambios, es otra (el submódulo aurora-wiicompiled, 667 commits: un hilo de dibujo `render_worker`, el armado y la presentación de cada imagen aparte, menús con RmlUi, y seis librerías nuevas: zlib-ng, libpng, freetype, zstd, RmlUi y fmt 12). Nuestro `aurora-web.diff` ya no se puede aplicar: `common.cpp` y `staging_map.hpp` desaparecieron. Portarla al navegador es rehacer buena parte de la fase 3 (§25–§54). Por eso [[N15]] se partió: N15 sube el traductor y el runtime nuevos con nuestra aurora y un adaptador de 10 funciones, y esto queda como ítem aparte, junto al dibujo en su hilo ([[G9]], [[H4]]).',
+      arreglo: P(
+        '(1) Portar la aurora nueva a Emscripten y WebGPU del navegador, con sus seis librerías y nuestros cambios de la fase 3 rehechos encima (la subida sin mapeo, la espera de la toma, el precalentado con tope y su pausa, la semilla de pipelines, `perfil-gpu`).',
+        '(2) Evaluar ahí, con foto antes y después, sus arreglos de dibujo: #376 matrices, #348 texgen, la niebla y #303 Sky Station. Los que sean de una línea ya se traen a nuestra aurora en [[N15]].',
+        '(3) Ver si su `render_worker` sirve para el dibujo en otro hilo del paso 9, sin memoria compartida o con ella ([[H5]], [[P9]]).',
+        '(4) Medir contra nuestra aurora en la misma tanda: el tramo fijo en la gama baja simulada y en este PC, y la tarjeta en el tramo (§164). Se adopta solo si no es peor.'
+      ),
+      gana: 'seguir los arreglos de dibujo del original sin portarlos a mano, y una base para el dibujo en su propio hilo',
+      comprueba: 'todas las pruebas del navegador en verde, las fotos de las pistas iguales o mejores, y el tramo fijo no peor que con nuestra aurora.',
+      refs: 'terceros/Wiicompiled-motor (submódulo aurora-wiicompiled); parches/aurora-web.diff; bitácora §25–§54',
+    },
+  ],
+};

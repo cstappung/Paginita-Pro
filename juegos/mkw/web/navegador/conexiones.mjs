@@ -53,9 +53,15 @@ export function avisoConexiones(lista, nombreDe = u => u) {
   return '🔴 ' + malos.map(c => textoConexion(c, nombreDe(c.uid), nombreDe)).join(' · ');
 }
 
+// §127 (R10): enCarrera() verdadero = hay una carrera andando. Ahí getStats (malla.camino, 3–15 ms en ráfaga con 11
+// pilotos) se pide para UN piloto por vuelta, en rueda; los demás repiten su última lectura (si siguen sanos). Y al
+// sitio solo se le avisa si cambia el estado de alguien, no porque se movieron los ms.
 export function crearConexiones({ malla, sala, quienes = () => [], alCambiar = () => {}, cada = CADA_MS,
-  ahora = () => performance.now(), reloj = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id) } = {}) {
+  ahora = () => performance.now(), reloj = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id),
+  enCarrera = () => false } = {}) {
   let lista = [], firma = '', corriendo = false, avisados = new Map();   // (avisados: uid → los ms del último aviso)
+  const ultimoCamino = new Map();   // §127: uid → la última lectura de getStats
+  let turno = 0;                    // §127: a quién le toca la lectura en la carrera
   const malDesde = new Map();       // uid → desde cuándo no está sana su conexión propia
   const anduvo = new Set();         // los que alguna vez tuvieron la conexión sana (si se cae, vuelve a «conectando»)
   const inicio = ahora();
@@ -64,12 +70,18 @@ export function crearConexiones({ malla, sala, quienes = () => [], alCambiar = (
     if (corriendo) return;           // (getStats es asíncrono: no se apilan)
     corriendo = true;
     try {
-      const t = ahora(), nueva = [];
-      for (const u of quienes()) {
+      const t = ahora(), nueva = [], todos = quienes(), carrera = !!enCarrera();
+      const leToca = carrera && todos.length ? todos[turno++ % todos.length] : null;
+      for (const u of todos) {
         const sano = !!malla?.sano?.(u);
         // (sin conexión desde que se abrió la página, o desde que se le cayó la que tenía)
         if (sano) { malDesde.delete(u); anduvo.add(u); } else if (!malDesde.has(u)) malDesde.set(u, anduvo.has(u) ? t : inicio);
-        const camino = sano ? await malla.camino?.(u).catch?.(() => null) ?? null : null;
+        let camino = null;
+        if (sano && (!carrera || u === leToca || !ultimoCamino.has(u))) {
+          camino = await malla.camino?.(u).catch?.(() => null) ?? null;
+          ultimoCamino.set(u, camino);
+        } else if (sano) camino = ultimoCamino.get(u);
+        if (!sano) ultimoCamino.delete(u);
         const c = clasificar({ sano, camino, oido: sala?.oido?.(u) ?? null, malMs: sano ? 0 : t - malDesde.get(u) });
         nueva.push({ uid: u, ...c });
       }
@@ -77,7 +89,7 @@ export function crearConexiones({ malla, sala, quienes = () => [], alCambiar = (
       // (los ms cambian un poco cada vez: se avisa si cambia el estado o si la ida y vuelta se movió más de 10 ms desde
       // la última avisada; como un comparador con histéresis, que no tirita con el ruido)
       const f = JSON.stringify(nueva.map(c => [c.uid, c.e, c.por || '']));
-      const movio = nueva.some(c => { const a = avisados.get(c.uid); return (c.ms == null) !== (a == null) || (c.ms != null && Math.abs(c.ms - a) > 10); });
+      const movio = !carrera && nueva.some(c => { const a = avisados.get(c.uid); return (c.ms == null) !== (a == null) || (c.ms != null && Math.abs(c.ms - a) > 10); });
       if (f !== firma || movio) { firma = f; avisados = new Map(nueva.map(c => [c.uid, c.ms ?? null])); alCambiar(lista); }
     } catch (e) { console.warn('[conexiones]', e); }
     finally { corriendo = false; }
