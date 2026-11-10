@@ -3,8 +3,14 @@
 Read before touching `firebase/database.rules.json`, `storage.rules`, or adding any RTDB node.
 
 - The site deploys to **GitHub Pages** from `main` at repo root. The repo is
-  ~220 MB because of `vendor/busytex/` (largest file ~99.7 MiB, just under
+  ~380 MB, mostly `vendor/busytex/` (largest file ~99.7 MiB, just under
   GitHub's 100 MiB limit); Pages on a free account needs the repo public.
+- **A Pages deploy stuck in `syncing_files`** until «Timeout reached» (10 min)
+  with a green `build` job is GitHub's side, not the site (November 2026: two
+  merges in a row, same files and weight as the last good deploy, which took
+  44 s). **Re-running it never works**: the deployment ID is the commit SHA,
+  the timeout leaves it cancelled, and every re-run of that SHA dies in
+  seconds with «Deployment cancelled». It needs a new commit on `main`.
 - **Firebase security rules and Storage CORS are NOT deployed by pushing to
   Pages** — they must be published in the Firebase/GCloud console manually. Full
   one-time setup (RTDB rules, Storage rules, CORS, authorized login domains) is
