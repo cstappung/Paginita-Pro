@@ -593,6 +593,10 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           `<button type="button" class="jg-mkw-echa" role="menuitem" data-e="${u}" data-foco="echa-${u}">Echar de la sala</button></div>` : "");
     };
     const corona = j => j.uid === est.anfitrion ? CORONA : "";
+    // el dueño (2026-11-10): «tienes que indicar quien es el host tambien en el icono» → la cara del anfitrión lleva un
+    // anillo dorado y una coronita encima (además de la corona junto al nombre)
+    const caraDe = (j, tam) => j.uid !== est.anfitrion ? cara(j, tam)
+      : `<span class="jg2-cara anf" title="Anfitrión">${cara(j, tam)}<span class="jg2-cara-corona" aria-hidden="true">${CORONA_ICONO}</span></span>`;
     // M22: cómo va la precarga de cada uno (lo que escribió en su presencia)
     const preDeJ = j => { const t = preDe[j.uid]; return !t ? "" : t === "listo" ? `<span class="jg2-pre listo" title="El juego ya está bajado en su navegador">● listo</span>`
       : `<span class="jg2-pre" title="Bajando el juego">⬇ ${escapeHtml(t)} %</span>`; };
@@ -617,7 +621,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     const salirBtn = sacado ? `<button type="button" class="jg2-salir" data-salir data-foco="salir">← Volver a Juegos</button>` : "";
 
     if (tira) {
-      const ficha = j => `<span class="jg2-ficha${j.uid === uid ? " yo" : ""}">${cara(j, 22)}<b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${conDe(j)}${menuDe(j)}</span>`;
+      const ficha = j => `<span class="jg2-ficha${j.uid === uid ? " yo" : ""}">${caraDe(j, 22)}<b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${conDe(j)}${menuDe(j)}</span>`;
       vest.innerHTML = `<div class="jg2-tira">
           <span class="jg2-ttit">${titular}</span>
           <span class="jg2-tcuenta">${js.length} de ${cupo}</span>
@@ -644,7 +648,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           <span class="jg2-podio">${ult.tabla.slice(0, 3).map((f, i) => `<span>${i + 1}.º <span translate="no">${escapeHtml(f.nombre)}</span> <i>${Number(f.puntos)}</i></span>`).join("")}</span>
           ${ult.tabla.length > 3 ? `<button type="button" class="jg2-vertabla" data-tabla data-foco="tabla" aria-expanded="${abierto.tabla}">${abierto.tabla ? "Ocultar tabla" : "Ver tabla"}</button>` : ""}
         </div>${abierto.tabla && ult.tabla.length > 3 ? `<ol class="jg2-tabla">${ult.tabla.map((f, i) => `<li><i>${i + 1}.º</i><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol>` : ""}` : "";
-      const fila = j => `<li class="jg2-fila${j.uid === uid ? " yo" : ""}">${cara(j, 30)}<span class="jg2-nombre"><b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${j.uid === uid ? "<small>tú</small>" : ""}</span>${preDeJ(j)}${vrDe(j)}${menuDe(j)}</li>`;
+      const fila = j => `<li class="jg2-fila${j.uid === uid ? " yo" : ""}">${caraDe(j, 30)}<span class="jg2-nombre"><b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${j.uid === uid ? "<small>tú</small>" : ""}</span>${preDeJ(j)}${vrDe(j)}${menuDe(j)}</li>`;
       const accion = manda && !corre
         ? `<button type="button" class="jg-mkw-empieza jg2-largar" data-foco="empieza" ${sinPrograma ? "disabled" : ""}>¡A correr!</button>`
         : espera ? `<p class="jg2-espera" role="status"><i class="jg2-punto" aria-hidden="true"></i><span>${espera}</span></p>` : "";
@@ -843,6 +847,7 @@ const AYUDA_CONEXION = {
   host: "Un jugador arbitra desde su PC. La conexión directa suele dar menos demora. Depende de que los jugadores puedan conectarse entre sí.",
   cloudflare: "Un jugador arbitra y el repetidor de Cloudflare ayuda si falla la conexión directa. Agrega demora y consume unos 35 MB por jugador por hora.",
 };
+const CORONA_ICONO = '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
    una sola vez. Todo cuelga de `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de juegos.html
@@ -910,6 +915,10 @@ const ESTILO_VEST = `
 .jg-mkw2 .jg2-nombre b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jg-mkw2 .jg2-nombre small{color:#b9c4e6;font-size:.78rem}
 .jg-mkw2 .jg2-corona{width:15px;height:15px;flex:none;color:#ffd34d}
+.jg-mkw2 .jg2-cara{position:relative;display:inline-flex;flex:none;border-radius:50%}
+.jg-mkw2 .jg2-cara.anf{box-shadow:0 0 0 2px #ffd34d}
+.jg-mkw2 .jg2-cara-corona{position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:14px;height:12px;color:#ffd34d;pointer-events:none}
+.jg-mkw2 .jg2-cara-corona svg{display:block;width:100%;height:100%;stroke:#0b1530;stroke-width:1.5px;paint-order:stroke}
 .jg-mkw2 .jg2-vr{font:600 .85rem "IBM Plex Mono",ui-monospace,monospace;color:#b9c4e6;white-space:nowrap}
 .jg-mkw2 .jg2-vr b{color:#eef2ff;font-weight:600}
 .jg-mkw2 .jg2-mas{flex:none;border:1px solid transparent;background:transparent;color:#b9c4e6;border-radius:8px;width:30px;height:28px;font:inherit;cursor:pointer;line-height:1}

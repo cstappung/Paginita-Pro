@@ -526,3 +526,11 @@ test('§116 «trabajando para usted»: el cierre sigue listo; desde la v2.0 las 
  const html=fs.readFileSync(raiz('../juegos.html'),'utf8');
  assert.match(html,/\.jg-mn-etq\.obra\{/);assert.match(html,/\.jg-hoja-obra\{/);assert.match(html,/html\[data-tema=oscuro\] \.jg-hoja-obra\{/);
 });
+
+test('el anfitrión se ve también en su ícono: anillo dorado y coronita sobre la cara (vestíbulo y tira)',()=>{
+ const f=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ assert.match(f,/const caraDe = \(j, tam\) => j\.uid !== est\.anfitrion \? cara\(j, tam\)/);
+ assert.match(f,/\$\{caraDe\(j, 22\)\}<b translate/,'la ficha de la tira');
+ assert.match(f,/\$\{caraDe\(j, 30\)\}<span class="jg2-nombre">/,'la fila del vestíbulo');
+ assert.match(f,/\.jg-mkw2 \.jg2-cara\.anf\{box-shadow:0 0 0 2px #ffd34d\}/);
+});
