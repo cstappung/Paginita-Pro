@@ -7864,7 +7864,7 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece (la CPU de relleno siempre completa los 12).
    - `{t:"ajuste", uid, k:"nivel", v}` (M20): el nivel de la CPU que completa los 12 (MKW_NIVEL), aparte de la
      cilindrada; "maximo" por omisión.
-   - `{t:"ajuste", uid, k:"relevo", v}` (§236): el anfitrión elige host, cloudflare u oracle en el vestíbulo.
+   - `{t:"ajuste", uid, k:"relevo", v}` (§236): el anfitrión elige host o cloudflare en el vestíbulo («oracle», de antes de §266, = host).
      Las jugadas viejas true y false significan cloudflare y host.
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
@@ -7986,8 +7986,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "relevo" && fase === "vestibulo") {
       if (j.v === true || j.v === "cloudflare") conexion = "cloudflare";
-      else if (j.v === "oracle") conexion = "oracle";
-      else if (j.v === false || j.v === "host") conexion = "host";
+      else if (j.v === false || j.v === "host" || j.v === "oracle") conexion = "host";   // §266: sin Oracle
       continue;
     }
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }

@@ -83,10 +83,11 @@ test('§236 conexión: host por omisión, solo la cambia el anfitrión en el ves
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:'si'}));assert.equal(e.relevo,false,'solo true lo prende');
  e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,false,'corriendo no se cambia (cada marco lo lee al abrir)');
  const ajuste=(v,uid='a')=>({t:'ajuste',uid,k:'relevo',v});
- for (const modo of ['host','cloudflare','oracle']) assert.equal(M.reducir(nueva(ajuste(modo))).conexion,modo);
- assert.equal(M.reducir(nueva(ajuste('oracle','b'))).conexion,'host');
- assert.equal(M.reducir(nueva(ajuste('oracle'),{t:'empieza',uid:'a'},ajuste('host'))).conexion,'oracle');
- assert.equal(M.reducir(nueva(ajuste('oracle'),ajuste('desconocido'))).conexion,'oracle');
+ for (const modo of ['host','cloudflare']) assert.equal(M.reducir(nueva(ajuste(modo))).conexion,modo);
+ assert.equal(M.reducir(nueva(ajuste('cloudflare','b'))).conexion,'host');
+ assert.equal(M.reducir(nueva(ajuste('cloudflare'),{t:'empieza',uid:'a'},ajuste('host'))).conexion,'cloudflare');
+ assert.equal(M.reducir(nueva(ajuste('cloudflare'),ajuste('desconocido'))).conexion,'cloudflare');
+ assert.equal(M.reducir(nueva(ajuste('cloudflare'),ajuste('oracle'))).conexion,'host','§266: «oracle» (de antes) = host');
  const fuente=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
  assert.match(fuente,/conexion: est\.conexion, relevo: est\.relevo/);
  assert.match(fuente,/data-relevo="\$\{k\}"/);assert.match(fuente,/k: "relevo", v: b\.dataset\.relevo/);
@@ -260,8 +261,9 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  assert.equal(nv('normal').get('conexion'),'host');
  const urlConexion=op=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,ronda:2,sincro:['a','b'],...op})).searchParams;
  assert.equal(urlConexion({relevo:true}).get('conexion'),'cloudflare');
- assert.equal(urlConexion({conexion:'oracle'}).get('conexion'),'oracle');
+ assert.equal(urlConexion({conexion:'oracle'}).get('conexion'),'host','§266: sin Oracle, una sala vieja va por host');
  assert.equal(urlConexion({conexion:'oracle'}).get('arbitroUrl'),null);
+ assert.doesNotMatch(fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8'),/oracle: "/,'§266: el vestíbulo no ofrece Oracle');
  assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');
