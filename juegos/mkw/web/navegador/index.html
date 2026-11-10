@@ -778,7 +778,7 @@
   <span class="vol-mini" id="volMini"><button type="button" id="volMiniMudo" title="Silencio">🔊</button><input type="range" id="volMiniBarra" min="0" max="100" aria-label="Volumen"></span>
   <button type="button" data-abre="partida" aria-expanded="false">Partida</button>
   <button type="button" data-abre="controles" aria-expanded="false">Controles</button>
-  <button type="button" data-abre="avanzado" aria-expanded="false" title="Ajustes y diagnóstico">⚙</button>
+  <button type="button" data-abre="ajustes" aria-expanded="false" title="Ajustes: la ayuda primero">⚙</button>
   <button type="button" id="completa" title="Pantalla completa">⛶</button>
   <span id="mando" role="status">Mando: aprieta un botón</span>
 </div>
@@ -815,11 +815,18 @@
 
 <aside id="cajon" aria-label="Opciones">
   <div class="pestanas" role="tablist">
+    <button type="button" role="tab" data-hoja="ayuda" aria-selected="false">❓ Ayuda</button>
     <button type="button" role="tab" data-hoja="partida" aria-selected="true">Partida</button>
     <button type="button" role="tab" data-hoja="controles" aria-selected="false">Controles</button>
     <button type="button" role="tab" data-hoja="avanzado" aria-selected="false">Avanzado</button>
     <button type="button" class="cerrar" id="cerrarCajon" title="Cerrar (Esc)">×</button>
   </div>
+
+  <!-- §265: la Ayuda de ajustes, su propia hoja; ⚙ y «Options» del menú de inicio abren siempre esta primero -->
+  <section class="hoja" id="hojaAyuda" role="tabpanel" hidden>
+    <h2>❓ Ayuda de ajustes</h2>
+    <div id="ayudaAjustes"></div>
+  </section>
 
   <section class="hoja" id="hojaPartida" role="tabpanel">
     <h2>Tu partida</h2>
@@ -861,8 +868,6 @@
 
   <section class="hoja" id="hojaAvanzado" role="tabpanel" hidden>
     <h2>Avanzado</h2>
-    <h3>❓ Ayuda de ajustes</h3>
-    <div id="ayudaAjustes"></div>
     <h3>Sonido</h3>
     <div class="fila">
       <label for="volumen">Volumen</label>

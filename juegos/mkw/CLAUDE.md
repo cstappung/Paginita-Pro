@@ -1,7 +1,7 @@
 # MKW RETRO — Mario Kart Wii (+ Retro Rewind) en el navegador
 
-**Conexión de la sala (§236).** En ✎ Cambiar → Conexión, el anfitrión elige host (por omisión), host + repetidor
-Cloudflare o servidor Oracle. El marco recibe `&conexion=host|cloudflare|oracle` y admite el antiguo modo
+**Conexión de la sala (§236).** En ✎ Cambiar → Conexión, el anfitrión elige host (por omisión) o host + repetidor
+Cloudflare (§266, el dueño 2026-11-10: «Servidor Oracle» ya no se ofrece en el sitio; una sala vieja con «oracle» va por host; la página y el servidor siguen sabiendo hacerlo). El marco recibe `&conexion=host|cloudflare|oracle` y admite el antiguo modo
 `&conexion=cloudflare`. Oracle usa `herramientas/arbitro/servidor.mjs` y toma la dirección de
 `<privado>/build/arbitro.json`. Si al largar falta una conexión a Oracle o el servidor se cae durante la carrera,
 la sala avisa y arbitra un jugador. Banco `node banco/correr.mjs arbitro-servidor` (21 puntos). Con el juego,
@@ -33,12 +33,19 @@ Probar: banco `avisos-lag` (26) y `prueba-sincro --directa --lento --extra-b=&av
 aparato) sale la primera vez y una vez por versión (`VERSION_BIENVENIDA`, `mkw.bienvenida.version`; «No volver a mostrar» =
 `mkw.bienvenida.nunca`; `?bienvenida=0` = nunca, `=1` = también con Playwright, que sin eso no lo ve), nunca en carrera, con
 la cortina ni con otro diálogo (`momentoBienvenida` de `mkw.mjs`; en la sala solo en el descanso con ≥ 10 s); cada tarjeta
-lleva a su ajuste (`DESTINOS`, `llevarA`); lo mismo en Avanzado → «Ayuda de ajustes» (`montarAyuda`, `#ayudaAjustes`);
+lleva a su ajuste (`DESTINOS`, `llevarA`); lo mismo en la hoja «❓ Ayuda» del cajón (`montarAyuda`, `#ayudaAjustes`; §265: primera pestaña y ⚙ / «Options» abren siempre ahí, `?ayudaPrimero=0` = ⚙ → Avanzado);
 `window.mkwBienvenida`. Controles: `mando-dibujo.mjs` (el dibujo con un globo por botón, «¿Qué hace RT?», «Enséñale tu mando»;
 `mkw.controles.vista` = `lista` para la de antes), `disposicion-mando.mjs` (mandos sin orden → `estandarizar`; conocidos el Pro y
 el GameCube de Switch 2; lo enseñado en `mkw.mandos.disposiciones`), `switch2.mjs` (las 17 órdenes por WebUSB; Windows necesita
 WinUSB con Zadig; sin probar con un mando real). Probar: banco `bienvenida` (58), `mando-dibujo` (59), `controles-panel` (29) y
 con el juego `node web/navegador/prueba-bienvenida.mjs` (18, con el candado).
+
+**El panel de récords en el sitio (§267).** Clasificación → Mario Kart Wii: «Ver: Récords de tiempo | Sala» (`jg.mkwVer`),
+la Tabla (CR 150/200, Carrera + solo las cc con tiempos, `jg.mkwCat`), el podio por récords y la lista de pistas con tiempo
+(buscador pista/«copa N»/piloto, filtros Tú y Consola con pastillas, top 10 por fila, fantasma del 1.º). Sitio: `colabtex/src/juegos/mkw-records.js`
++ `ranks.js`, `fb.watchMkwRecords`, `mkw.js` `pistasMkw` (los mismos `indice.json` y `copas.<huella>.pak` del juego, del Worker con el
+token, en Cache Storage `jg-mkw-pistas`: 0 llamadas al volver; no agregar llamadas por visita). Rama `mkw-records` (sin PR). Probar: sitio
+`node --test colabtex/tests/mkw-records.test.cjs` (14) y con los emuladores `node herramientas/prueba-panel-records.mjs` (28; fotos en `build/vistas/`).
 
 **W30, «igual entre nosotros, no igual a la Wii» (§257, adoptado).** La copia `terceros/Wiicompiled-motor-w30` (rama
 `motor-w30` = H6 + `parches/motor-w30.diff`) hace la FMA, el NI del FPSCR y el redondeo de C a 25 bits con las cuentas de

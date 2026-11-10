@@ -1,6 +1,6 @@
 # Panel de récords de MKW en Clasificaciones — borrador para la siguiente actualización
 
-Pausado el 2026-11-09 por el dueño («todo lo demás a una futura update»). No entró nada al sitio.
+Pausado el 2026-11-09 («todo lo demás a una futura update») y **terminado el 2026-11-10** («Sí, termínalo»): bitácora §267, rama `mkw-records` del sitio. Lo de abajo queda como historia del borrador.
 
 ## Qué hay aquí
 - `mkw-records.js` — el borrador del módulo `colabtex/src/juegos/mkw-records.js` (puro + `crearListaMkw`).

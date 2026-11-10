@@ -182,7 +182,8 @@ try {
     // la página de verdad: index.html tiene el lugar y mkw.mjs monta las dos cosas
     const html = await fetch('/web/navegador/index.html').then(r => r.text());
     const js = await fetch('/web/navegador/mkw.mjs').then(r => r.text());
-    ok('index.html tiene «Ayuda de ajustes» arriba del todo en Avanzado', /<h2>Avanzado<\/h2>\s*<h3>❓ Ayuda de ajustes<\/h3>\s*<div id="ayudaAjustes"><\/div>/.test(html));
+    ok('§265: index.html tiene la Ayuda en su hoja, primera pestaña, y ⚙ abre «ajustes»', /<section class="hoja" id="hojaAyuda"[^>]*>\s*<h2>❓ Ayuda de ajustes<\/h2>\s*<div id="ayudaAjustes"><\/div>/.test(html)
+       && /<div class="pestanas" role="tablist">\s*<button type="button" role="tab" data-hoja="ayuda"/.test(html) && /data-abre="ajustes"/.test(html) && !/<h3>❓ Ayuda de ajustes<\/h3>/.test(html));
     ok('mkw.mjs monta el mensaje y la Ayuda', /montarBienvenida\(/.test(js) && /montarAyuda\(\$\('ayudaAjustes'\)/.test(js));
     ok('mkw.mjs le dice al mando del sitio que el mensaje es un menú', /bienvenida'\)\?\.open/.test(js));
   }
