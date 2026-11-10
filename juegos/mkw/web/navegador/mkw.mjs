@@ -977,7 +977,7 @@ if (parametros.get('espacio') !== '0') {
   });
   window.mkwEspacio = espacio;              // (para las pruebas)
   // se cuenta al abrir la hoja Avanzado (no antes: recorrer la caja son unos ms)
-  document.querySelectorAll('[data-hoja="avanzado"], [data-abre="avanzado"]').forEach(b => b.addEventListener('click', () => { espacio.refrescar(); pintarDatosDisco(); }));
+  document.querySelectorAll('[data-hoja="avanzado"], [data-abre="ajustes"]').forEach(b => b.addEventListener('click', () => { espacio.refrescar(); pintarDatosDisco(); }));
 }
 
 // ---- Partidas guardadas (web/navegador/guardado.mjs) ----
@@ -1416,7 +1416,7 @@ function mostrarInicio() {
   return true;
 }
 function elegirInicio(que) {
-  if (que === 'opciones') return ui.abrirCajon('controles');
+  if (que === 'opciones') return ui.abrirCajon('ajustes');      // §265: la Ayuda primero (antes: Controles)
   if (que === 'salas') return window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'salas' }, location.origin);
   // 'unjugador' | 'local2'…'local4': el juego vuelve a recibir lo de la persona y se abre esa pantalla
   const local = /^local([234])$/.exec(que);

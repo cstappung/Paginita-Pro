@@ -147,15 +147,21 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   }, 500);
 
   // ---------------- Cajón ----------------
-  const HOJAS = ['partida', 'controles', 'avanzado'];
+  const HOJAS = ['ayuda', 'partida', 'controles', 'avanzado'];
   const hojaDe = n => $('hoja' + n[0].toUpperCase() + n.slice(1));
+  // §265 (el dueño: «haz que siempre se abra este primero cuando se abren los ajustes»): «ajustes» = ⚙ de la barra y
+  // «Options» del menú de inicio → la hoja de la Ayuda; los atajos con nombre (Partida, Controles, la pastilla del
+  // mando, las tarjetas de la ayuda) siguen yendo a su hoja. `?ayudaPrimero=0` = como antes (⚙ → Avanzado).
+  const ayudaPrimero = new URLSearchParams(location.search).get('ayudaPrimero') !== '0';
+  const hojaPedida = n => n === 'ajustes' ? (ayudaPrimero ? 'ayuda' : 'avanzado') : n;
   let hojaAbierta = null;
-  function abrirCajon(nombre) {
+  function abrirCajon(pedido) {
+    const nombre = hojaPedida(pedido);
     if (hojaAbierta === nombre) return cerrarCajon();
     hojaAbierta = nombre;
     for (const h of HOJAS) hojaDe(h).hidden = h !== nombre;
     document.querySelectorAll('.pestanas [data-hoja]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.hoja === nombre)));
-    document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', String(b.dataset.abre === nombre)));
+    document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', String(hojaPedida(b.dataset.abre) === nombre)));
     document.body.classList.add('cajon-abierto');
     if (nombre === 'partida') pintarRespaldos();
   }

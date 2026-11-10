@@ -75,11 +75,16 @@ try {
   ok('«Elegir imagen»: cierra el mensaje, abre Avanzado y deja el foco en «Imagen» marcado', !ir.abierto && ir.cajon && ir.hoja && ir.foco === 'graficosN8' && ir.marcado, JSON.stringify(ir));
   ok('cerrado: el juego vuelve a recibir lo de la persona y queda «visto» (versión guardada)', !ir.silenciado && ir.visto === '1');
   await p1.screenshot({ path: path.join(carpeta, 'ajuste-marcado.png') });
-  // la Ayuda, arriba en Avanzado
-  await p1.evaluate(() => { document.getElementById('hojaAvanzado').scrollTop = 0; document.querySelector('#ayudaAjustes [data-caso="lento"]').open = true; });
+  // §265: ⚙ abre siempre la Ayuda primero (su propia hoja, la primera pestaña)
+  await p1.evaluate(() => window.mkwInterfaz.cerrarCajon()); await espera(200);
+  await p1.locator('#barra [data-abre="ajustes"]').click(); await espera(300);
+  await p1.evaluate(() => { document.querySelector('#ayudaAjustes [data-caso="lento"]').open = true; });
   await espera(200);
-  const ay = await p1.evaluate(() => ({ casos: [...document.querySelectorAll('#ayudaAjustes details')].map(d => d.dataset.caso), primero: document.querySelector('#hojaAvanzado h3')?.textContent }));
-  ok('la Ayuda de ajustes está primera en Avanzado, con los 4 casos del PC', ay.primero === '❓ Ayuda de ajustes' && ay.casos.join() === 'lento,mando,sala,espacio', JSON.stringify(ay));
+  const ay = await p1.evaluate(() => ({ casos: [...document.querySelectorAll('#ayudaAjustes details')].map(d => d.dataset.caso),
+    ayuda: !document.getElementById('hojaAyuda').hidden, avanzado: !document.getElementById('hojaAvanzado').hidden,
+    pestana: document.querySelector('.pestanas [aria-selected="true"]')?.dataset.hoja, primera: document.querySelector('.pestanas [data-hoja]')?.dataset.hoja }));
+  ok('§265: ⚙ abre la Ayuda de ajustes primero (su hoja, primera pestaña), con los 4 casos del PC',
+     ay.ayuda && !ay.avanzado && ay.pestana === 'ayuda' && ay.primera === 'ayuda' && ay.casos.join() === 'lento,mando,sala,espacio', JSON.stringify(ay));
   await p1.screenshot({ path: path.join(carpeta, 'ayuda.png') });
   await p1.locator('#ayudaVerMensaje').click(); await espera(400);
   ok('«Ver el mensaje de bienvenida» lo vuelve a abrir (y cierra el cajón)', (await mirar(p1)).abierto && !(await p1.evaluate(() => document.body.classList.contains('cajon-abierto'))));

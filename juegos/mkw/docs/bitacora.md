@@ -7,6 +7,9 @@ para entender el proyecto y para repetirlo desde cero. El plan (lo que falta) es
 
 ## Glosario — qué es cada cosa (para un ingeniero eléctrico)
 
+- **Worktree de git (§266)**: una segunda carpeta de trabajo del mismo repositorio, con su propia rama, para cambiar algo
+  sin tocar lo que otra sesión tiene a medio hacer en la carpeta de siempre. Como un segundo banco de pruebas conectado
+  al mismo tablero: se trabaja en uno sin desarmar el otro.
 - **Bienvenida por versión (§263)**: el mensaje que sale una vez y vuelve a salir una vez cuando cambia su número de
   versión (`mkw.bienvenida.version`). Como la placa de instrucciones de un tablero: se lee al estrenarlo y otra vez si
   cambia el tablero.
@@ -1488,6 +1491,10 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Dibujo en dos pasos (sombra con plantilla)** | Las sombras de los karts y de las cajas se dibujan en dos pasos: primero se marca la forma redonda (sin pintar nada visible) y después se oscurece solo donde quedó marcado. Si se salta el primero, el segundo oscurece el rectángulo entero: sale una sombra cuadrada. Por eso una caché no puede mirar cada lista sola: hay dibujos que dependen del anterior. Como un relé de enclavamiento: el segundo contacto solo debe cerrar si el primero cerró (§259). |
 | **Textura pedida (acquire)** | El momento en que aurora le pide al navegador la hoja donde va a pintar la imagen siguiente (`getCurrentTexture`). La imagen se ve en la primera actualización de pantalla después de ese pedido. Por eso la página cuenta el compás desde ahí y no desde que el juego terminó el cuadro (§260). |
 | **Histéresis del compás (la zona del borde)** | Si una imagen llega justo antes del refresco que le toca (a menos de medio refresco), a veces el navegador la alcanza y a veces no: dura 3 o 5 refrescos en vez de 4. La página no intenta alcanzarlo: espera a propósito al refresco siguiente y queda lejos del borde. Como la banda de histéresis de un comparador Schmitt, que no deja que la salida oscile cuando la señal anda justo en el umbral (§260). |
+| **Acordeón (lista)** | Una lista donde cada renglón se abre debajo de sí mismo al tocarlo y se cierra al tocarlo otra vez, uno abierto a la vez (como un acordeón que se estira en un pliegue). El panel de récords lo usa para el top 10 de cada pista: la lista cerrada es corta y el detalle aparece solo donde se pide (§267). |
+| **Filtro con pastillas** | Los filtros se eligen en un panel que se esconde; lo elegido queda a la vista como etiquetas redondeadas («Corridas ✕») junto a la cuenta de resultados. Tocar la ✕ quita ese filtro. Así nunca hay una lista más corta sin que se vea por qué (§267). |
+| **sessionStorage** | Como localStorage, pero dura solo mientras la pestaña está abierta: al cerrarla se borra. El panel de récords guarda ahí la búsqueda y los filtros (recargar la página no los pierde; mañana empieza limpio) (§267). |
+| **Archivo con huella en el nombre** | Un archivo cuyo nombre lleva un resumen de su contenido (`copas.ab12cd34.pak`): si el contenido cambia, cambia el nombre. Por eso se puede guardar para siempre sin volver a preguntar: un archivo nuevo tendría otro nombre. Como un plano con número de revisión en el rótulo: el «rev. 3» nunca cambia; si hay cambios, sale el «rev. 4» (§104, §267). |
 
 ## 2026-10-16 · Día 1
 
@@ -20779,3 +20786,146 @@ entrando desde cero. Por eso se sacan los dos cierres, que funcionaban como dos 
 - La batería entera del sitio deja 3 fallas en `controles.test.cjs` y `tienda.test.cjs`, y esas 3 fallan igual en
   `origin/main`, que no tiene nada de esto: son de antes y no las causa este cambio.
 
+## §265 — La Ayuda de ajustes, siempre primero · 2026-11-10
+
+**Qué pidió el dueño.** «me gusto eso del menu de ayuda inicial antes que los otros, haz que siempre se abra este
+primero cuando se abren los ajustes».
+
+**Qué se hizo.**
+- La «Ayuda de ajustes» (§263: las recetas para PC lento, mando, sala, espacio y celular) estaba al principio de la
+  hoja Avanzado. Ahora tiene su propia hoja, «❓ Ayuda», que es **la primera pestaña** del cajón (`index.html`,
+  `#hojaAyuda`).
+- El botón ⚙ de la barra y «Options» del menú de inicio piden «ajustes». `interfaz.mjs` (`hojaPedida`) traduce ese
+  pedido a la hoja de la Ayuda. Antes ⚙ abría Avanzado y «Options» abría Controles.
+- Los atajos que nombran una hoja siguen yendo a la suya: los botones «Partida» y «Controles» de la barra, la pastilla
+  del mando, las tarjetas de la ayuda («llevar a» un ajuste) y el aviso de la tarjeta de video. Es como un tablero
+  con un interruptor general que siempre enciende primero la luz de la entrada, mientras cada interruptor de pared
+  sigue prendiendo su propia pieza.
+- `?ayudaPrimero=0` = como antes (⚙ → Avanzado).
+
+**Pruebas.**
+- Banco `bienvenida`: 58/58. Ahora mira la hoja propia, que sea la primera pestaña y que ⚙ pida «ajustes».
+- Bancos `inicio` 16 y `controles-panel` 29: sin cambios.
+- `prueba-bienvenida` con `build/web-final-w30`: todo ✓. El punto §265 hace clic en ⚙ y comprueba que se abra la
+  Ayuda, y no Avanzado, con sus 4 casos.
+- `prueba-inicio`: 15/15. El punto de Options ahora exige que el cajón se abra en la Ayuda.
+
+## §266 — La sala sin «Servidor Oracle» · 2026-11-10
+
+**Qué pidió el dueño.** «en el multiplayer quita eso de oracle».
+
+**Qué se hizo.**
+- El vestíbulo de Mario Kart (sitio, `colabtex/src/juegos/mkw.js`, `MKW_CONEXION`) ofrecía tres conexiones: host,
+  host + repetidor Cloudflare y servidor Oracle (§236). El servidor Oracle está pospuesto (sin capacidad, el
+  2026-11-09), así que la tercera opción se quitó: ✎ Cambiar → Conexión muestra solo las dos primeras.
+- Una sala creada antes, que ya tenía «oracle» guardado, queda en host. `conexionMkw` no reconoce «oracle» y
+  `motor.js` lo lee como host. Así nadie queda esperando a un servidor que no existe.
+- La página del juego y `herramientas/arbitro/servidor.mjs` no se tocaron: siguen sabiendo hablar con un servidor.
+  Si algún día hay servidor, basta volver a agregar la opción en el sitio. Es como dejar el cableado en la pared y
+  sacar solo el interruptor.
+
+**Dónde va.** Va en la rama `mkw-sin-oracle` del sitio (commit `b199e982`, subida, sin PR). Se hizo en una copia
+aparte (`terceros/Paginita-Pro-sin-oracle`, un *worktree* de git) porque la sesión del panel de récords estaba
+trabajando en la copia de siempre.
+
+**Pruebas.** Sitio `mkw.test.cjs` + `mkw-worker` + `salon` + `juegos`: 71/71. `mkw.test.cjs` ahora exige que el
+vestíbulo no ofrezca Oracle y que «oracle» = host.
+
+
+## §267 — El panel de récords de Mario Kart en «Clasificación» del sitio: buscador, filtros y el podio de récords · 2026-11-10
+
+**Qué se pidió.** El dueño (por la sesión principal): «actualiza el panel de las leaderboards de la paginita con los
+records para el MKW y hazlo junto a un crítico para que no sea overwhelming, tenga buscador, etc y sea organizado y
+limpio»; después, mirando el borrador, «agrega filtros en el buscador». El 2026-11-09 quedó para una actualización
+futura (guardado en `docs/panel-records-siguiente/`); el 2026-11-10 el dueño dijo «Sí, termínalo».
+
+**Qué es, en simple.** Hasta ahora la pestaña «Mario Kart Wii» de Clasificación solo mostraba la tabla de la sala
+(quién gana más copas). Los récords de tiempo que el juego ya guardaba en Firebase al cruzar la meta (§92) no se veían
+en ningún lado. Ahora hay un **interruptor «Ver: Récords de tiempo | Sala»**: en Récords se ve una lista de las pistas
+que alguien corrió, con el mejor tiempo de cada una, el tuyo y lo que te falta para el récord. Como un tablero de
+alarmas: solo se encienden las luces que tienen algo que decir (las pistas con tiempo), y al apretar una se ve su detalle.
+
+### 267.1 Qué se ve
+
+- **Arriba, dos filas de botones** (las mismas de las demás clasificaciones del sitio): «Ver» (Récords de tiempo · Sala)
+  y «Tabla» (Contrarreloj 150cc · Contrarreloj 200cc · Carrera). En Carrera aparece una tercera fila, «Cilindrada», **solo
+  con las cilindradas que tienen algún tiempo** (si nadie corrió 500cc, no hay botón de 500cc). Se recuerda lo elegido.
+- **El podio** del sitio (las peanas de oro, plata y bronce con corona): aquí gana quien tiene **más récords** (primeros
+  puestos) en la tabla elegida; abajo, «2 🥈 · 4 🥉 · 19 pistas». La tarjeta «tu posición» habla en récords: «Te falta
+  1 récord para subir al podio».
+- **El buscador**, ancho: «Buscar pista o piloto…». Busca por el nombre de la pista, por «copa 12» (la copa 12 entera)
+  o por un piloto (entonces la columna de la derecha muestra el tiempo de **ese** piloto en vez del tuyo). Tolera
+  tildes y un error de tipeo. Si lo buscado coincide con pistas que nadie corrió, al final dice «Sin récord todavía».
+- **Los filtros** (pedido del dueño), detrás del botón «Filtros»: «Tú» (Todas · 🥇 Mis récords · Corridas · Me faltan) y
+  «Consola» (SNES, N64, GBA, GCN, DS, Wii…: solo las que aparecen en la tabla, con cuántas pistas tiene cada una). Con el
+  panel cerrado, lo elegido queda a la vista como **pastillas** («Corridas ✕ · SNES ✕») junto a «6 de 34 pistas».
+- **La lista**: solo pistas con algún tiempo, la más recién batida primero, 10 y «Ver más». Cada fila es **un solo
+  botón**: el ícono de la copa, la pista y «Copa 17 · 4 pilotos», el 🥇 récord y quién, y tu tiempo con tu puesto y la
+  diferencia («Tú · #5 1:28.694 +3.861»). Tocarla abre debajo su top 10 (como un acordeón: una abierta a la vez), tu fila
+  aunque estés más abajo y, en la Contrarreloj, «⬇ Fantasma del 1.º» (baja el `.rkg` del récord).
+- **El mando** del sitio (`mando.js`, un cursor que salta de botón en botón) funciona sin nada especial porque todo es
+  botón: filas, filtros, pastillas, «Ver más». «Ver más» deja el cursor en la fila 11 (no salta arriba). Enter o Escape en
+  el buscador cierran el teclado del teléfono.
+- **El celular**: cada fila en dos líneas (pista y récord arriba, tu tiempo abajo), de 56 px o más (se toca con el
+  dedo), sin desborde a lo ancho; los filtros de consola se deslizan de lado en vez de partirse.
+
+### 267.2 De dónde salen los datos y cuánto cuesta
+
+- **Los tiempos**: `mkw/records/<pista>-<tabla>/<uid>`, el nodo que el juego ya escribe (§92; las reglas no cambian: la
+  lectura ya era pública y cada uno solo escribe su fila y solo si mejora). El panel lo escucha entero
+  (`fb.watchMkwRecords`, nuevo en `colabtex/src/fb-juegos.js`): con un grupo de amigos son decenas de pistas con pocas
+  filas cada una. Los vetados del sitio no aparecen. El nombre que se muestra es el del perfil de hoy (si cambió el
+  apodo, se busca por el nuevo).
+- **Los nombres de las pistas y los íconos de las copas son del juego**: no están en el sitio. `pistasMkw()` (nuevo, en
+  `colabtex/src/juegos/mkw.js`) pide al Worker de amigos, con el token, **los mismos dos archivos que ya baja el selector
+  de pistas del juego** (`build/imagenes/paquetes/indice.json` y `copas.<huella>.pak`, ~650 KB): nada nuevo en R2.
+  Para no gastar llamadas (§104: 100 000 al día para todo el sitio) quedan guardados en la **caché del navegador**
+  (`jg-mkw-pistas`): el paquete lleva su huella en el nombre, así que no cambia nunca; el índice se vuelve a preguntar
+  como mucho una vez al día. Medido con la prueba: la primera visita hace 2 llamadas; recargar la página, **0**. Quien no
+  es amigo del Worker (401/403) queda sin nombres y no vuelve a preguntar en un día; ve «Copa 12 · Pista 3» y un ícono
+  neutro.
+- **Solo lo ven quienes ven Mario Kart** (`bt3Visible()`, igual que la pestaña): para el resto no cambia nada.
+
+### 267.3 El crítico, dos rondas
+
+- **Primera ronda (2026-11-09), tres propuestas** (`docs/panel-records-siguiente/disenos.md`): A «explorador por copas»
+  (las 79 copas como acordeón: 316 filas, casi todas vacías), B «resumen primero» (solo pistas con tiempo) y C «pistas |
+  pilotos» (dos vistas). Eligió **B con el podio de C** y sacó: el acordeón de copas, el selector de orden, la tira de
+  récords recientes, el resumen aparte, la vista por piloto, personaje y kart en la fila cerrada y las cilindradas vacías.
+- **Segunda ronda (2026-11-10), con fotos del sitio de verdad** (escritorio, oscuro y Pixel 7). Veredicto: «casi
+  cumple: ordenado, limpio y no abruma». Arreglado: «Te faltan 1 récord» → «Te falta 1 récord» (vale para todas las
+  clasificaciones del sitio: «Te falta 1 punto»); en el escritorio las columnas quedaban a ~750 px del nombre → la lista
+  tiene un ancho máximo de 920 px y columnas fijas; la fila abierta tenía un marco rojo que parecía un error → una barra
+  a la izquierda, y el anillo de foco (el del cursor del mando) en azul; «Consola» se partía en dos líneas en el teléfono
+  → se desliza de lado; los botones flotantes del sitio (chat, bandera) tapaban el último tiempo → espacio al final; en
+  el teléfono «Sin correr» era una tercera línea de ruido → no se muestra; el texto del fantasma, más claro. El podio
+  «vacío» del tema oscuro era la foto tomada a mitad de su animación de entrada: la prueba ahora espera y comprueba que
+  se ve.
+- **Un error que encontraron las fotos** (no el crítico): en Récords se veía la nota de la sala («Se suman 3 puntos por
+  partida ganada…») y se escondía la de los récords, porque las dos tenían la misma clase y `ranks.js` tomaba la primera
+  que encontraba. Ahora busca solo la suya (`.jg-ranks > .jg-nota-larga`).
+
+### 267.4 Archivos
+
+- Sitio (`terceros/Paginita-Pro`, rama `mkw-records` desde `origin/main` 1ea2f060, commit `9d499bd2`, subida; **sin PR**: lo pide la orquestadora con el «sí» del dueño): `colabtex/src/juegos/mkw-records.js`
+  (nuevo: lo puro —ordenar, podio, buscar, filtrar— y la lista con su buscador y sus estilos), `ranks.js` (el interruptor,
+  las filas, el podio en récords), `fb-juegos.js` (`watchMkwRecords`), `mkw.js` (`pistasMkw`, `fantasmaMkw`),
+  `juegos-main.js` (se los pasa a `crearRanks`), `juegos-app.js` (rearmado con esbuild), `package.json` (la prueba nueva en
+  `test:juegos`), `docs/claude/juegos/perfiles-y-economia.md` (la nota para quien toque el panel). `juegos.html` no se tocó.
+- Aquí: `herramientas/prueba-panel-records.mjs` (nueva) y `docs/panel-records-siguiente/` (el borrador, ya cumplido).
+
+### 267.5 Pruebas
+
+- **Sin navegador** (`node --test tests/mkw-records.test.cjs`, 14): tiempos «1:07.873» y diferencias «+0.412»; el nodo
+  crudo ordenado (a tiempos iguales, primero quien llegó antes), lo mal formado fuera, los vetados fuera; solo las
+  cilindradas con tiempos; el podio por récords; buscar por pista, «copa N», piloto y con un tipeo; «Sin récord todavía»;
+  los filtros Tú y Consola; y **el cargador de nombres**: pide índice y paquete una vez con el token, la segunda vez no
+  llama al Worker, pasado un día pregunta solo el índice, y un 403 no se repite en un día. Con las del sitio de Mario Kart:
+  `mkw.test.cjs` + `mkw-worker.test.cjs` + esta = **51/51**.
+- **Con el sitio de verdad** (`node herramientas/prueba-panel-records.mjs`: los emuladores de Firebase con las reglas
+  del sitio, corridos 20 000 puertos para no chocar con `jugar.bat` ni con `prueba-experiencia`; el Worker de verdad; 34
+  pistas con récords de mentira sembrados en la base del emulador; escritorio y Pixel 7): **28/28** (la lista con nombres e íconos, las filas, el podio en récords, «Ver más» con el foco en la 11, Enter abre y cierra, buscar por piloto y por pista, Escape, los filtros y sus pastillas, Carrera con solo 150cc y 200cc, Sala y vuelta, el podio en oscuro, 0 llamadas al Worker al recargar; en el Pixel 7, sin desborde, filas de 67 px y los filtros). Las fotos
+  (con los nombres reales de las pistas, por eso fuera de git) en `build/vistas/records-*.png`.
+
+**Qué significa.** El panel ya está en el sitio, en su rama, esperando el «sí» del dueño para el PR. No usa nada nuevo
+de Firebase ni de R2: las reglas no cambian y no hay que publicar nada aparte.

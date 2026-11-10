@@ -73,7 +73,7 @@ import { crearTyperace } from "./juegos/typerace.js";
 import { memeHtml } from "./juegos/memazo-plantillas.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
-import { crearMkw, crearMkwSolo } from "./juegos/mkw.js";
+import { crearMkw, crearMkwSolo, pistasMkw, fantasmaMkw } from "./juegos/mkw.js";
 import { bt3Visible, revisaBt3, alCambiarBt3, listaAmigosBt3, cambiaAmigoBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { fijaVeRock, veRock, fichaRock } from "./juegos/rock-datos.js";
@@ -2761,7 +2761,9 @@ function armazon() {
          parece sospechoso, sin pasar por la cola del panel. La regla
          vuelve a mirar que lo sea. */
       esAdmin: () => !!state.admin, vetado: fb.estaVetado, watchVetados: fb.watchVetados,
-      borraRecord: (c, u, p) => fb.borraRecord(c, u, p, !!repDe(c)) });
+      borraRecord: (c, u, p) => fb.borraRecord(c, u, p, !!repDe(c)),
+      /* Mario Kart Wii: los récords de tiempo por pista (juegos/mkw-records.js), solo si el juego se ve. */
+      ...(bt3Visible() ? { watchMkwRecords: fb.watchMkwRecords, pistasMkw, fantasmaMkw } : {}) });
     ranks.montar(h);
     return;
   }

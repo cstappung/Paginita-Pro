@@ -261,6 +261,23 @@ choice persists in `jg.rankJuego`. Each game's ficha in the lobby carries
 that game's top three (`podioHtml`, from the `ranks` that
 `leerPopularidad()` now returns alongside the counts as `{n, ranks}`).
 
+**Mario Kart Wii has two tables** (`ranks.js` + `juegos/mkw-records.js`):
+«Ver: Récords de tiempo | Sala» (`jg.mkwVer`). Sala is the usual 3/1/0
+table; Récords reads `mkw/records` whole (`fb.watchMkwRecords`, written by
+the game: one row per pilot, track and table, only if faster) and shows
+Tabla CR 150 / CR 200 / Carrera + only the cc that have times (`jg.mkwCat`),
+a podium by records held, and the track list: one button per row (the
+`mando.js` cursor), accordion top 10, search over track/cup/pilot with
+filters «Tú» and «Consola» (`sessionStorage` `jg.mkwBusca`/`jg.mkwFiltro`).
+Track names and cup icons belong to the game and are never in the site:
+`pistasMkw()` in `mkw.js` fetches the same `indice.json` + `copas.<hash>.pak`
+the game uses from the friends Worker (Bearer token) and keeps them in Cache
+Storage `jg-mkw-pistas` (index refreshed at most daily, a 401/403 remembered
+a day in `jg.mkwPistas.no`): **do not add per-visit Worker calls** (100 k a
+day for the whole site). Without them rows say «Copa N · Pista M». Passed to
+`crearRanks` only when `bt3Visible()`. Tests: `tests/mkw-records.test.cjs`;
+with the emulators, `herramientas/prueba-panel-records.mjs` in the MKW repo.
+
 **Logros: ten per game, three sources, one table** (`juegos/logros.js`,
 the view in `logros-vista.js`, the **Logros** tab at `#logros`). Four of
 every room game's ten are **derived from its `ranks` row** (first win, ten

@@ -6,7 +6,7 @@
 //   - aparece con la imagen privada (200) y 3 botones: Single Player, Multiplayer, Options (sin «Championship»);
 //   - mientras está, el juego no recibe nada de la persona (controles silenciados) y arranca debajo hasta su título;
 //   - teclado: bajar, entrar a Multiplayer (Local y Back; «Online» solo dentro del sitio), volver con Esc;
-//   - Options abre el cajón (Controles) y mientras está abierto el menú no se mueve;
+//   - Options abre el cajón (§265: en la Ayuda de ajustes) y mientras está abierto el menú no se mueve;
 //   - Single Player: el menú se va y el juego ABRE DIRECTO su menú «Un jugador» (0x69), sin cortina (§71: por código,
 //     con el fundido del propio juego);
 //   - B, B (al título del juego): vuelve nuestro menú de inicio;
@@ -99,10 +99,11 @@ try {
   // Options: el cajón; con él abierto el menú no se mueve; Esc lo cierra
   await tecla('ArrowDown'); await tecla('ArrowDown'); await tecla('Enter', 600);
   const conCajon = await mirar(p);
+  const enAyuda = await p.evaluate(() => !document.getElementById('hojaAyuda').hidden);   // §265: la Ayuda primero
   await tecla('ArrowUp'); const quieto = await mirar(p);
   await tecla('Escape', 600); const sinCajon = await mirar(p);
-  ok('Options abre el cajón y mientras está abierto el menú no se mueve',
-     conCajon.cajon && conCajon.visible && quieto.elegido === 2 && !sinCajon.cajon && sinCajon.visible,
+  ok('Options abre el cajón en la Ayuda de ajustes (§265) y mientras está abierto el menú no se mueve',
+     conCajon.cajon && enAyuda && conCajon.visible && quieto.elegido === 2 && !sinCajon.cajon && sinCajon.visible,
      `cajón ${conCajon.cajon}, elegido con cajón ${quieto.elegido}, después ${sinCajon.cajon}`);
   await tecla('ArrowUp'); await tecla('ArrowUp');
 
