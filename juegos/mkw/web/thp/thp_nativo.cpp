@@ -72,6 +72,19 @@ void leerGuest(uint32_t addr, uint8_t* dst, size_t n) {
     }
 }
 
+// §174 (D8): leer el cuadro comprimido SIN copiarlo. Si el tramo [addr, addr + n) cae entero en una página común de la
+// memoria de la Wii (1 MiB), se devuelve el puntero a esos bytes tal cual (son los mismos que copiaba leerGuest: la
+// memoria guarda los bytes en el orden de la Wii); si cruza de página o la página es especial, nullptr (= copiar como
+// antes). Antes, cada cuadro de video llenaba 128 KB con ceros y después copiaba 128 KB encima. MKW_THP_DIRECTO=0
+// (?thpDirecto=0) = siempre copiar.
+const uint8_t* directoGuest(uint32_t addr, size_t n) {
+    using namespace MemoryInline;
+    static const bool activo = [] { const char* e = std::getenv("MKW_THP_DIRECTO"); return !(e && !std::strcmp(e, "0")); }();
+    if (!activo || (addr & kPageMask) + n > kPageSize) return nullptr;
+    const uintptr_t bias = g_fullReadablePageBias[addr >> kPageShift];
+    return bias ? reinterpret_cast<const uint8_t*>((bias - 1u) + addr) : nullptr;
+}
+
 // Copia n bytes del programa a la memoria de la Wii, de a 4 KiB (el tamaño de las "páginas" que el runtime vigila
 // por si alguien escribe sobre código). Cada pedazo se comprueba con la misma regla que usan las escrituras del
 // juego traducido (TryGetWritablePointerFast); si no se puede de una vez, va byte a byte por el camino normal.
@@ -141,13 +154,20 @@ extern "C" void func_801B3BAC(CpuContext* ctx) {
     // bloques): se copian 128 KB y, si no alcanzan, 4 veces más.
     thp::Resultado r = thp::Resultado::FaltaEntrada;
     for (size_t tam = 128 * 1024; r == thp::Resultado::FaltaEntrada && tam <= 8u * 1024 * 1024; tam *= 4) {
-        entrada.assign(tam + 8, 0);                    // + 8 bytes de margen: el lector de bits lee de a 8
-        leerGuest(archivo, entrada.data(), tam);
-        r = thp::leerCabecera(entrada.data(), tam, cuadro);
+        // (§174, D8: de la memoria de la Wii directo si se puede; si no, al búfer, que solo crece y solo se le pone en
+        // cero el margen de 8 bytes: el lector de bits lee de a 8)
+        const uint8_t* datos = directoGuest(archivo, tam + 8);
+        if (!datos) {
+            if (entrada.size() < tam + 8) entrada.resize(tam + 8);
+            leerGuest(archivo, entrada.data(), tam);
+            std::memset(entrada.data() + tam, 0, 8);
+            datos = entrada.data();
+        }
+        r = thp::leerCabecera(datos, tam, cuadro);
         if (r != thp::Resultado::Bien) continue;
         const size_t n = size_t(cuadro.ancho) * cuadro.alto;
         y.resize(n); u.resize(n / 4); v.resize(n / 4);
-        r = thp::decodificar(entrada.data(), tam, cuadro, y.data(), u.data(), v.data(), kRedondeo);
+        r = thp::decodificar(datos, tam, cuadro, y.data(), u.data(), v.data(), kRedondeo);
     }
     if (r != thp::Resultado::Bien) {
         if (avisos++ < 5) std::printf("[thp] cuadro que el nativo no hace (código %d): uso el traducido\n", int(r));

@@ -37,6 +37,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { armarDiminutos } from './diminutos.mjs';
+import { carpetaPartidaBase } from './partida-base.mjs';   // §175
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -93,8 +94,8 @@ export async function armarLista({ carpetas, build, conWasm = false, huellas }) 
   for (const [prefijo, carpeta] of carpetas) {                       // prefijo = lo que ve el juego: "/mkw/disco/"
     if (!fs.existsSync(carpeta)) throw new Error(`falta la carpeta ${carpeta} (${prefijo})`);
     const lista = recorrer(carpeta);
-    manifiesto[prefijo] = lista.map(f => [f.ruta, f.vacia ? -1 : f.bytes]);
     for (const f of lista) if (!f.vacia) objetos.push({ llave: 'mkw' + prefijo + f.ruta, ...f });
+    manifiesto[prefijo] = lista;                                     // (se arma abajo, con la huella de cada archivo)
   }
   // el programa: el .br tiene que ser del mismo programa (no más viejo que el .wasm), si no se sube algo viejo
   const prog = f => path.join(build, f);
@@ -114,6 +115,11 @@ export async function armarLista({ carpetas, build, conWasm = false, huellas }) 
     o.sha256 = await huellas.de(o);
     if (++hechos % 500 === 0) process.stdout.write(`  huellas: ${hechos} de ${objetos.length}\r`);
   }
+  // §174 (D5): el manifiesto con la huella de cada archivo ([ruta, tamaño, los 16 primeros de su SHA-256]): la página
+  // guarda cada archivo con la suya y una subida nueva solo le hace bajar lo que cambió (antes tiraba todo)
+  const shaDe = new Map(objetos.map(o => [o.llave, o.sha256]));
+  for (const [prefijo, lista] of Object.entries(manifiesto))
+    manifiesto[prefijo] = lista.map(f => f.vacia ? [f.ruta, -1] : [f.ruta, f.bytes, shaDe.get('mkw' + prefijo + f.ruta).slice(0, 16)]);
   // §93 (E2): los ~600 archivos diminutos (≤ 8 KB) en un solo objeto, armado de los mismos archivos que se suben
   // (herramientas/diminutos.mjs): la primera visita los baja de un pedido en vez de uno por archivo
   const paquete = armarDiminutos(carpetas);
@@ -183,7 +189,8 @@ export async function principal(argv = process.argv.slice(2), entorno = process.
   const carpetas = otra
     ? [['/mkw/disco/', path.join(otra, 'disco')], ['/mkw/sd/RetroRewind6/', path.join(otra, 'RetroRewind6')], ['/mkw/sd/riivolution/', path.join(otra, 'riivolution')], ['/wc/runtime/assets/', path.join(otra, 'assets')]]
     : [['/mkw/disco/', path.join(raiz, 'extraido/disco')], ['/mkw/sd/RetroRewind6/', path.join(raiz, 'terceros/RetroRewind/RetroRewind6')],
-       ['/mkw/sd/riivolution/', path.join(raiz, 'terceros/RetroRewind/riivolution')], ['/wc/runtime/assets/', path.join(raiz, 'terceros/Wiicompiled/runtime/assets')]];
+       ['/mkw/sd/riivolution/', carpetaPartidaBase(raiz, { nota: console.log })],   // §175: la copia limpia, sin licencias
+       ['/wc/runtime/assets/', path.join(raiz, 'terceros/Wiicompiled/runtime/assets')]];
   const build = otra ? path.join(otra, 'build') : path.join(raiz, entorno.MKW_BUILD || 'build/web/navegador');
   const salida = opcion('--salida', path.join(raiz, 'build/web/publicar'));
   const huellas = cacheHuellas(path.join(salida, 'huellas.json'));

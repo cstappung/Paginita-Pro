@@ -7,15 +7,17 @@
 #
 # Uso:  powershell -ExecutionPolicy Bypass -File herramientas\traducir.ps1
 #       (requiere: herramientas\instalar.ps1 ya corrido, Retro Rewind en terceros\RetroRewind\RetroRewind6)
+#       $env:MKW_WIICOMPILED = 'terceros\Wiicompiled-motor' → traducir en otra copia (paso 6/N15, §170); por omisión la de siempre
+#       $env:MKW_RR_PAYLOAD = ruta de un retro_wfc_payload.bin ya bajado (sin red; la v0.9.3 lo pide así) · $env:MKW_HILOS = N
 $ErrorActionPreference = 'Stop'                                            # cualquier error detiene el script
 
 $Raiz   = Split-Path -Parent $PSScriptRoot                                 # la carpeta del proyecto (MKW RETRO)
 $Disco  = Get-ChildItem -LiteralPath $Raiz -Recurse -Filter *.rvz | Select-Object -First 1   # la imagen del disco
 $Nod    = Join-Path $Raiz 'herramientas\cache\nodtool.exe'                 # extractor de discos de Wii (encounter/nod)
-$WC     = Join-Path $Raiz 'terceros\Wiicompiled'                           # el clon de WiiCompiled (commit fijo)
+$WC     = Join-Path $Raiz $(if ($env:MKW_WIICOMPILED) { $env:MKW_WIICOMPILED } else { 'terceros\Wiicompiled' })   # el clon de WiiCompiled (commit fijo)
 $RR     = Join-Path $Raiz 'terceros\RetroRewind\RetroRewind6'              # Retro Rewind instalado
 $Trad   = Join-Path $WC 'translator\src\Translator.Cli\bin\Release\net8.0\Translator.Cli.dll'   # el traductor
-$Hilos  = [Environment]::ProcessorCount                                    # usar todos los núcleos
+$Hilos  = if ($env:MKW_HILOS) { [int]$env:MKW_HILOS } else { [Environment]::ProcessorCount }   # usar todos los núcleos
 $env:DOTNET_ROLL_FORWARD = 'Major'                                         # el traductor pide .NET 8; corre en el 10
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 
@@ -59,7 +61,7 @@ try {
         --base-translation-output-metadata generated/base_translation_metadata.json --code-pul $pul `
         --mod-root (Join-Path $Pp 'RetroRewind6') --mod-name 'Retro Rewind' --region P `
         --out build/mods/retro_rewind_full_cpp --emit-cpp --threads $Hilos `
-        --retro-wfc-payload 'https://rwfc.net/api/wfc/payload?g=RMCPD00'
+        --retro-wfc-payload $(if ($env:MKW_RR_PAYLOAD) { $env:MKW_RR_PAYLOAD } else { 'https://rwfc.net/api/wfc/payload?g=RMCPD00' })
   Paso '7. Secciones de datos del DOL/REL y RuntimeConfig.h'
   Corre generate-data-init --project $Proy
   Paso '8. Grafo de compilación (shards de CMake)'

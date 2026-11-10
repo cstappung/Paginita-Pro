@@ -1,0 +1,34 @@
+diff --git a/translator/src/Translator.Core/Translation/FunctionTranslator.cs b/translator/src/Translator.Core/Translation/FunctionTranslator.cs
+index 86ab11a..01b35d8 100644
+--- a/translator/src/Translator.Core/Translation/FunctionTranslator.cs
++++ b/translator/src/Translator.Core/Translation/FunctionTranslator.cs
+@@ -481,6 +481,9 @@ public sealed class FunctionTranslator
+     /// the spliced guest instructions become ordinary instructions of the
+     /// caller for every later analysis and lowering.
+     /// </summary>
++    private static int MkwHojas(string variable, int porOmision) =>
++        int.TryParse(Environment.GetEnvironmentVariable(variable), out var v) ? v : porOmision;
++
+     private IrFunction ApplyLeafInlining(
+         PpcDisassembler disassembler,
+         uint entryPoint,
+@@ -493,11 +496,16 @@ public sealed class FunctionTranslator
+             return function;
+         }
+ 
++        // MKW (paso 6, M8 «hojas en línea»): MKW_HOJAS_INSTR / _CRECE / _MINIMO / _BLOQUES / _ACICLICOS cambian los
++        // límites solo para medir; sin las variables, los de siempre (56 instrucciones, 50 %, 48, 4, 8 bloques).
+         var policy = new LeafInliningPolicy(
+-            MaxCalleeGuestInstructions: Math.Max(1, options.LeafInliningMaxCalleeInstructions),
+-            MaxCallerGrowthPercent: Math.Max(0, options.LeafInliningMaxCallerGrowthPercent),
++            MaxCalleeGuestInstructions: Math.Max(1, MkwHojas("MKW_HOJAS_INSTR", options.LeafInliningMaxCalleeInstructions)),
++            MaxCallerGrowthPercent: Math.Max(0, MkwHojas("MKW_HOJAS_CRECE", options.LeafInliningMaxCallerGrowthPercent)),
++            MinCallerGrowthInstructions: MkwHojas("MKW_HOJAS_MINIMO", 48),
+             BlockedTargets: options.LeafInliningBlockedTargets,
+-            AllowAcyclicMultiBlockCallees: options.LeafInliningAllowMultiBlockCallees);
++            MaxCalleeBlocks: MkwHojas("MKW_HOJAS_BLOQUES", 4),
++            AllowAcyclicMultiBlockCallees: options.LeafInliningAllowMultiBlockCallees,
++            MaxCalleeAcyclicBlocks: MkwHojas("MKW_HOJAS_ACICLICOS", 8));
+ 
+         // Shared across callers: a callee decode is a pure function of (image, boundary answers,
+         // policy). Each entry carries the boundary questions it asked, so it gets recomputed the

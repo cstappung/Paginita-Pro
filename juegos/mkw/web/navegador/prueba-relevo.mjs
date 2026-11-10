@@ -29,6 +29,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { compararLargadas } from './largada-pareja.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -104,10 +105,12 @@ const med = n => {
   return { fps: cuadros / (ms / 1000), espera: (b.msEsperando - a.msEsperando) / Math.max(1, cuadros), max: b.maxEspera, retraso: b.retraso,
     retrasoMax: b.retrasoMax?.[b.carrera], huellas: b.huellasIguales, desinc: b.desincronizado, cortes: b.cortes, relevados: b.relevadosAhora,
     relevos: b.relevos, inventados: b.inventados, viejos: b.inventadosViejos, autoridad: b.autoridad, esperaDe: b.esperaDe,
-    retrasoMedio: b.retrasoMedio, frenos: b.frenos };
+    retrasoMedio: b.retrasoMedio, frenos: b.frenos,
+    // (§191: paquetes de botones que mandó por segundo, y si iba con el árbitro)
+    paq: ((b.paquetesBotones ?? 0) - (a.paquetesBotones ?? 0)) / (ms / 1000), arbitro: !!b.arbitro };
 };
 const m = Object.fromEntries(nombres.map(n => [n, med(n)]));
-const fila = n => `${n} ${m[n].fps.toFixed(1)} cuadros/s, espera ${m[n].espera.toFixed(2)} ms/cuadro, retraso ${m[n].retraso} (máx ${m[n].retrasoMax}, promedio ${m[n].retrasoMedio?.toFixed(1)}${m[n].frenos ? `, frenos ${m[n].frenos}` : ''})`;
+const fila = n => `${n} ${m[n].fps.toFixed(1)} cuadros/s, espera ${m[n].espera.toFixed(2)} ms/cuadro, retraso ${m[n].retraso} (máx ${m[n].retrasoMax}, promedio ${m[n].retrasoMedio?.toFixed(1)}${m[n].frenos ? `, frenos ${m[n].frenos}` : ''}), ${m[n].paq.toFixed(0)} paquetes de botones/s${m[n].arbitro ? ' (árbitro)' : ''}`;
 console.log('  ' + nombres.map(fila).join('\n  '));
 console.log(`  autoridad ${m.A.autoridad}; relevos ${m.A.relevos}, relevados ahora ${JSON.stringify(m.A.relevados)}, inventados ${m.A.inventados} (viejos ${m.A.viejos}); A esperó a ${JSON.stringify(m.A.esperaDe)}`);
 
@@ -119,6 +122,10 @@ if (!SIN_RELEVO) {
 } else {
   ok('sin relevo (?relevo=0): informativo, A y B frente a C', true, `${fila('A')} · ${fila('B')} · ${fila('C')}`);
 }
+// §250: las tres largan en el mismo cuadro y a la vez (C con la red mala: su retraso de la cuenta cubre su red, por eso
+// el tope es algo mayor que en prueba-sincro)
+{ const r = compararLargadas(nombres.map(n => ahora[n]?.ls), ahora.A?.ls?.carrera ?? 1, Number(arg('largada-ms', 250)));
+  console.log('  §250 ' + r.detalle); ok('§250: las tres largan en el mismo cuadro de lógica y a la vez', r.cumple, r.detalle); }
 ok('las tres corren la misma carrera: huellas (karts y botones) iguales, sin desincronizar ni cortes',
   nombres.every(n => m[n].huellas >= 6 && !m[n].desinc && !Object.keys(m[n].cortes || {}).length),
   nombres.map(n => `${n} ${m[n].huellas}${m[n].desinc ? ' DESINCRONIZADO ' + JSON.stringify(m[n].desinc) : ''}`).join(', '));
@@ -133,19 +140,25 @@ ok('nadie avisó «la sala va lenta» en A ni en B', !(ahora.A?.lento || []).len
 // pestaña que el navegador congela un rato. 1,5 s: menos que el margen (2 s), nadie se corta. §99 (C1), el relevo
 // rápido (salvo --extra=&relevoRapido=0): A y C ni siquiera lo esperan: lo pausan a los ~150 ms y B vuelve a manejar
 const RAPIDO = !EXTRA.includes('relevoRapido=0');
+// (§191: con el árbitro la autoridad escribe los botones de B mientras se traba: nadie lo pausa ni lo espera. §231: la
+// página lo prende por omisión en la sala y en modo=directa, así que se mira «salvo &arbitro=0»; antes la prueba lo daba
+// por apagado si no veía &arbitro=1 y exigía las pausas del relevo rápido, que con el árbitro ya no ocurren: §246)
+const ARBITRO = !/[?&]arbitro=0\b/.test(EXTRA);
 const traba = ms => paginas.B.evaluate(ms => { const t = performance.now(); while (performance.now() - t < ms); }, ms).catch(() => {});
 const t1 = await todas();
 await traba(1500); await espera(4000);
 const t2 = await todas();
 // (lo que esperó en el rato de la traba: msEsperando es la suma de la carrera; maxEspera es el máximo de toda la carrera)
 const esperaEn = (a, b, n) => Math.max(0, (b[n]?.ls?.msEsperando || 0) - (a[n]?.ls?.msEsperando || 0));
-ok(RAPIDO ? 'una traba de 1,5 s en B: A y C lo pausan (esperan menos que la traba), nadie se corta y B vuelve a manejar'
+ok(ARBITRO ? 'una traba de 1,5 s en B, con el árbitro: A no lo espera (< 150 ms) ni C (< 400), nadie se corta y la carrera sigue'
+   : RAPIDO ? 'una traba de 1,5 s en B: A y C lo pausan (esperan menos que la traba), nadie se corta y B vuelve a manejar'
           : 'una traba de 1,5 s en B (como un tirón): nadie se corta y la carrera sigue en las tres',
   nombres.every(n => !Object.keys(t2[n]?.ls?.cortes || {}).length && !t2[n]?.ls?.fuera && (t2[n]?.ls?.cuadro || 0) > (t1[n]?.ls?.cuadro || 0) + 100) &&
   // (C, la de la red mala, espera de por sí más —le llega todo tarde—: menos de 1,2 s; sin el relevo rápido, los 1,5 s)
   // (medido: A 317-1075 ms según la corrida, con tres juegos en la misma PC; sin el relevo rápido, los 1,5 s enteros más
   // lo que tenía guardado de B. C, la de la red mala, espera de por sí más)
-  (!RAPIDO || (esperaEn(t1, t2, 'A') < 1200 && esperaEn(t1, t2, 'C') < 1400 && (t2.A?.ls?.vueltas || 0) >= 1)),
+  (ARBITRO ? esperaEn(t1, t2, 'A') < 150 && esperaEn(t1, t2, 'C') < 400 :
+   (!RAPIDO || (esperaEn(t1, t2, 'A') < 1200 && esperaEn(t1, t2, 'C') < 1400 && (t2.A?.ls?.vueltas || 0) >= 1))),
   nombres.map(n => `${n} ${t1[n]?.ls?.cuadro}→${t2[n]?.ls?.cuadro} (esperó ${esperaEn(t1, t2, n).toFixed(0)} ms en el rato, ganó al ponerse al día ${Math.round(t2[n]?.ganada ?? -1)} ms, esperó a ${JSON.stringify(Object.fromEntries(Object.entries(t2[n]?.ls?.esperaDe || {}).map(([u, v]) => [u.slice(0, 1), Math.round(v - (t1[n]?.ls?.esperaDe?.[u] || 0))])))}, pausas ${JSON.stringify((t2[n]?.ls?.pausas || []).map(p => p.desde))}, vueltas ${t2[n]?.ls?.vueltas || 0})`).join(', '));
 // §101: más trabas de 1,5 s (--trabas=N): la espera de cada una, a quién y desde qué cuadro se pausó a B. Para ver de
 // dónde sale lo que varía entre corridas (0,3 a 1,1 s)
@@ -171,7 +184,13 @@ const t3 = await todas();
 const corteA = t3.A?.ls?.cortes?.[1], corteC = t3.C?.ls?.cortes?.[1];
 // (con --trabas, la 3 s compara con lo de después de la última traba de 1,5 s)
 const t2b = tAntes;
-if (RAPIDO) {
+if (ARBITRO) {
+  // (§191: con el árbitro, a los 3 s tampoco: al callado se lo corta recién a los 20 s —el plazo de la pausa—)
+  ok('una traba de 3 s en B, con el árbitro: nadie lo corta ni lo espera, siguen iguales y B sigue en la carrera',
+    corteA === undefined && corteC === undefined && (t3.A?.ls?.cuadro || 0) > (t2b.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado &&
+    !t3.B?.ls?.fuera && esperaEn(t2b, t3, 'A') < 150,
+    `cortes A ${JSON.stringify(t3.A?.ls?.cortes)}; A ${t2b.A?.ls?.cuadro}→${t3.A?.ls?.cuadro}, esperó ${esperaEn(t2b, t3, 'A').toFixed(0)} ms; B fuera ${t3.B?.ls?.fuera}`);
+} else if (RAPIDO) {
   // (§99, C1: con 3 s tampoco se lo corta —antes, pasado el margen de 2 s, sí—: se lo pausa y vuelve)
   ok('una traba de 3 s en B: A y C lo pausan (no lo esperan ni lo cortan), siguen iguales y B vuelve a manejar',
     corteA === undefined && corteC === undefined && (t3.A?.ls?.cuadro || 0) > (t2b.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado &&

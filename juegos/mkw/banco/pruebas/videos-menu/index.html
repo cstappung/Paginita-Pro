@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco videos de los menús</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Banco videos de los menús: <span>el principio de cada video, bajado de antemano</span></h1>
+<p>Prueba <code>web/navegador/videos-menu.mjs</code> (D8, bitácora §174) <b>sin el juego</b>, con un disco de mentira que
+  anota lo que se le pide y una lista de archivos inventada con los nombres de los videos: al abrir el juego el primer
+  video se pide el principio (2 MB) de los demás videos de los menús, una sola vez, sin el que ya se está leyendo, sin
+  los que no existen, nunca en la carrera y nada con 0 MB. Con el juego lo mide <code>medir-carrera-entera.mjs --menu</code>.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { VIDEOS_MENU, cabezasDeVideos, crearVideosMenu } from '/web/navegador/videos-menu.mjs';
+
+const { ok, fin } = prueba('videos-menu', 'Banco videos de los menús (sin el juego)');
+const MB = 1048576;
+// la lista de archivos de mentira: todos los videos (30 MB cada uno) menos battle_select, y uno chico de 1 MB
+const tamaños = new Map(VIDEOS_MENU.filter(r => !r.includes('battle_select')).map(r => [r, 30 * MB]));
+tamaños.set('/mkw/sd/RetroRewind6/UI/class.thp', 1 * MB);
+tamaños.set('/mkw/disco/files/thp/title/top_menu.thp', 20 * MB);
+tamaños.set('/mkw/disco/files/Race/Course/castle_course.szs', 5 * MB);
+const pedidos = [];
+const disco = { adelantarRango: (url, tam, ini, fin) => pedidos.push([url, tam, ini, fin]) };
+const direccion = r => 'https://worker.test' + r;
+let carrera = false;
+try {
+  const lista = cabezasDeVideos(r => tamaños.get(r), 2 * MB, '/mkw/disco/files/thp/button/single_top.thp');
+  ok('cabezasDeVideos: los videos que existen, sin el que se está leyendo, 2 MB cada uno (o el archivo entero si es más chico)',
+     lista.length === 5 && !lista.some(([r]) => r.includes('single_top') || r.includes('battle_select')) &&
+     lista.find(([r]) => r.includes('class.thp'))[2] === MB && lista.filter(([r]) => !r.includes('class.thp')).every(([, , b]) => b === 2 * MB),
+     lista.map(([r, , b]) => r.replace(/.*\//, '') + ' ' + b / MB).join(', '));
+  ok('cabezasDeVideos con 0 MB: nada', cabezasDeVideos(r => tamaños.get(r), 0).length === 0);
+  const v = crearVideosMenu({ disco, tamaños, direccion, cabeza: 2 * MB, enCarrera: () => carrera });
+  v.alLeer('/mkw/disco/files/Race/Course/castle_course.szs');
+  ok('una lectura que no es un video no dispara nada', pedidos.length === 0 && !v.estado.disparo);
+  v.alLeer('/mkw/disco/files/thp/title/top_menu.thp');
+  ok('al abrir el primer video (el del título) se piden de fondo los principios de los 6 videos de los menús que existen',
+     pedidos.length === 6 && pedidos.every(([u, , ini]) => u.startsWith('https://worker.test/mkw/') && ini === 0) &&
+     v.estado.disparo?.ruta.endsWith('top_menu.thp'), pedidos.map(([u, , , f]) => u.replace(/.*\//, '') + ' ' + f / MB).join(', '));
+  ok('…en el orden de los menús (single_top primero, indiv_team al final)', pedidos[0][0].endsWith('single_top.thp') && pedidos.at(-1)[0].endsWith('indiv_team.thp'));
+  ok('…con el tamaño del archivo (para que el disco sepa dónde termina)', pedidos[0][1] === 30 * MB);
+  v.alLeer('/mkw/disco/files/thp/button/single_top.thp');
+  ok('una sola vez por visita: el segundo video no vuelve a pedir', pedidos.length === 6);
+  pedidos.length = 0; carrera = true;
+  const v2 = crearVideosMenu({ disco, tamaños, direccion, cabeza: 2 * MB, enCarrera: () => carrera });
+  v2.alLeer('/mkw/disco/files/thp/title/top_menu.thp');
+  ok('en la carrera no pide nada', pedidos.length === 0 && !v2.estado.disparo);
+  carrera = false;
+  v2.alLeer('/mkw/disco/files/thp/title/top_menu.thp');
+  ok('…y al volver a los menús, sí', pedidos.length === 6);
+  pedidos.length = 0;
+  const v3 = crearVideosMenu({ disco, tamaños, direccion, cabeza: 0 });
+  v3.alLeer('/mkw/disco/files/thp/title/top_menu.thp');
+  ok('con ?videosCabeza=0 (cabeza 0) no pide nada, como antes', pedidos.length === 0);
+} catch (e) { ok('la prueba terminó sin errores', false, e.stack); }
+fin();
+</script>
+</body>
+</html>

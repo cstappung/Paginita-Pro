@@ -195,6 +195,8 @@ const NOMBRES = {
   xbox: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'LS', 'RS', '↑', '↓', '←', '→', 'Xbox'],
   playstation: ['✕', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Share', 'Options', 'L3', 'R3', '↑', '↓', '←', '→', 'PS', 'Panel'],
   nintendo: ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', '−', '+', 'L3', 'R3', '↑', '↓', '←', '→', 'Home', 'Captura'],
+  // §263: el de GameCube de Switch 2, ya ordenado por su disposición (disposicion-mando.mjs: la A grande abajo, Z en RB)
+  gamecube: ['A', 'B', 'X', 'Y', 'ZL', 'Z', 'L', 'R', '−', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Home'],
   generico: ['Abajo', 'Derecha', 'Izquierda', 'Arriba', 'L1', 'R1', 'L2', 'R2', 'Select', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Guía'],
 };
 const EJES = ['Stick izq. ', 'Stick izq. ', 'Stick der. ', 'Stick der. '];

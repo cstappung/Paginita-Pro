@@ -53,7 +53,10 @@ const PRUEBAS = [
   { n: 'sala', cmd: [nav('prueba-sala.mjs')], juego: true, datos: 'build/web/datos/sala' },                       // la sala sin Retro WFC
   { n: 'copa-azar', cmd: ['herramientas/copas-al-azar.mjs', '--copas', '1'], juego: true },   // una copa sincronizada al azar (C2)
   { n: 'doce', cmd: [nav('prueba-doce.mjs')], juego: true, datos: 'build/web/datos/doce' },     // §91: 6 humanos, 2 con mando virtual
+  { n: 'sala-doce', cmd: [nav('prueba-sala-doce.mjs'), '--carreras', '1'], juego: true, datos: 'build/web/datos/sala-doce' },   // V7 (§235): 3 juegos + 9 consolas de mentira
   { n: 'fantasma', cmd: [nav('prueba-fantasma.mjs')], juego: true },                          // §92: el fantasma del mejor de la página
+  // La comparación necesita B explícito; antes el descubrimiento automático la lanzaba sin ese argumento.
+  { n: 'fantasma-igual', cmd: [nav('prueba-fantasma-igual.mjs'), `--build-b=${process.env.MKW_BUILD_B || process.env.MKW_BUILD || 'build/web/navegador'}`], juego: true },
   { n: 'sincro-largada', cmd: [nav('prueba-sincro.mjs'), '--directa', '--traba-largada=6000'], juego: true, datos: 'build/web/datos/sincro', propios: true },   // §93
   { n: 'sincro-cloudflare', cmd: [nav('prueba-sincro.mjs'), '--directa', '--cloudflare'], juego: true, datos: 'build/web/datos/sincro', propios: true },   // §103: todo por el TURN de mentira
 ];
@@ -97,7 +100,11 @@ function correr(p, i) {
     const t0 = Date.now();
     const hijo = spawn(process.execPath, [...p.cmd, ...extra], { cwd: path.join(raiz, p.cwd || ''), stdio: ['ignore', 'pipe', 'pipe'] });
     let salida = '';
-    const tope = setTimeout(() => { salida += '\n(correr-todo: pasó de 40 min, la corté)\n'; hijo.kill(); }, 40 * 60000);
+    const tope = setTimeout(() => {
+      salida += '\n(correr-todo: pasó de 40 min, la corté con sus procesos hijos)\n';
+      if (process.platform === 'win32') spawn('taskkill', ['/PID', String(hijo.pid), '/T', '/F'], { windowsHide: true });
+      else hijo.kill();
+    }, 40 * 60000);
     hijo.stdout.on('data', d => { salida += d; });
     hijo.stderr.on('data', d => { salida += d; });
     hijo.on('close', codigo => {

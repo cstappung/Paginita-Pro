@@ -37,8 +37,11 @@ export const ESPERAS = [10, 20, 30, 50, 80, 120, Infinity];   // tramos del hist
 // Chrome manejado por Playwright (--enable-automation) nunca bloquea el sonido, y hay que probar el desbloqueo.
 // worklet: el camino nuevo (si el runtime lo pide con puente.abrir; si no, SDL3 como antes). objetivoMs: la cola de
 // reposo del worklet (se adapta sola si la página da tirones); arranqueMs: la cola con que empieza (el arranque se traba).
+import { crearReciclador } from './sonido-reciclar.mjs';
+
 export function crearSonido({ alCambiar = null, objetivoGestos = window, simularBloqueo = false, worklet = false, objetivoMs = 25,
-                              arranqueMs = 80, urlWorklet = new URL('./sonido-worklet.js', import.meta.url) } = {}) {
+                              arranqueMs = 80, lastreAyuda = 1, reciclar = true, informeBloques = 32,
+                              urlWorklet = new URL('./sonido-worklet.js', import.meta.url) } = {}) {
   const estado = {
     camino: 'viejo',         // 'worklet' recién cuando el runtime le pide el sonido a la página (puente.abrir)
     contextos: 0,            // cuántos AudioContext creó la página (SDL3 crea uno)
@@ -79,6 +82,9 @@ export function crearSonido({ alCambiar = null, objetivoGestos = window, simular
   let gestoVisto = false;    // ¿ya hubo un gesto de la persona? (con el bloqueo simulado, antes no se reanuda)
   let anteriorConSonido = false, silenciosSeguidos = 0;
   const avisar = () => { if (alCambiar) alCambiar(estado); };
+  // P5 (§232): los búferes de las entregas vuelven del worklet y se reusan (reciclar: false = uno nuevo cada vez, ?reciclarSonido=0)
+  const reciclador = reciclar ? crearReciclador() : null;
+  estado.reciclado = reciclador ? reciclador.estado : null;
 
   // El volumen que de verdad se aplica (0 si está en silencio). Una curva al cuadrado: el oído percibe el volumen
   // de forma logarítmica, y así la mitad de la barra "suena a la mitad" (con lineal, casi todo pasa arriba).
@@ -171,11 +177,13 @@ export function crearSonido({ alCambiar = null, objetivoGestos = window, simular
   // Informe del worklet (cada ~21 ms) o el aviso del clic
   function informe(m) {
     if (m.t === 'm') { if (marcaEspera) { const r = marcaEspera; marcaEspera = null; r(m.cuadro / contexto.sampleRate); } return; }
+    if (m.b) { if (reciclador) reciclador.devolver(m.b); m.b = undefined; }   // las cajas que el worklet ya copió (P5)
     colaInforme = m.fase === 'sonando' ? m.nivel : -1;
     Object.assign(estado, {
       nivelMs: m.nivel, nivelMinMs: m.min, objetivoMs: m.objetivo, pico: m.pico, muestrasBloque: 128,
       bloques: m.bloques, bloquesSilencio: m.bloquesSilencio, huecos: m.huecos, vacios: m.vacios, saltos: m.saltos, tirados: m.saltos,
       recibidos: m.recibidos, silencioSaltadoMs: m.silencioSaltado * 1000 / contexto.sampleRate,
+      lastreK: m.lastreK, lastreMs: m.lastreMs, lastreTrabajoMs: m.lastreTrabajoMs,   // §155 (H1, ?lastreAyuda=K)
     });
   }
   const puente = {
@@ -188,7 +196,7 @@ export function crearSonido({ alCambiar = null, objetivoGestos = window, simular
       estado.camino = 'worklet';
       ctx.audioWorklet.addModule(urlWorklet).then(() => {
         nodo = new AudioWorkletNode(ctx, 'mkw-salida', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-                                                         processorOptions: { objetivoMs, arranqueMs } });
+                                                         processorOptions: { objetivoMs, arranqueMs, lastreAyuda, devolver: !!reciclador, informeBloques } });
         nodo.port.onmessage = e => informe(e.data);
         nodo.connect(ctx.destination);         // = nuestra cadena (medidor → volumen → medidor → parlantes)
         listo = true;
@@ -205,7 +213,7 @@ export function crearSonido({ alCambiar = null, objetivoGestos = window, simular
       // ¿Cuánto pasó desde la entrega anterior? Es lo que la cola del worklet tuvo que tapar sola (un tirón de la página)
       if (ultimaEntrega) { const e = t0 - ultimaEntrega; estado.esperas[ESPERAS.findIndex(x => e < x)]++; if (e > estado.esperaMaxMs) estado.esperaMaxMs = e; }
       ultimaEntrega = t0;
-      const d = vista.slice();
+      const d = reciclador ? reciclador.copiar(vista) : vista.slice();   // (P5: una caja de la reserva)
       if (listo) nodo.port.postMessage(d, [d.buffer]);
       else { pendientes.push(d); if (pendientes.length > 64) pendientes.shift(); }   // (el worklet todavía carga)
       estado.entregas++;
@@ -216,6 +224,17 @@ export function crearSonido({ alCambiar = null, objetivoGestos = window, simular
     // Para el ajuste fino de ritmo del runtime (un PI): cuánto hay en la cola y cuánto debería haber
     nivelMs: () => (listo && colaInforme >= 0 && contexto.state === 'running' ? colaInforme : -1),
     objetivoMs: () => estado.objetivoMs,
+    // Paso 8 (§186): un cable aparte al worklet para el juego en un Worker (trabajador-hilo.mjs): el Worker le entrega
+    // el sonido directo por este MessagePort (sin pasar por el hilo de la página) y recibe por él el nivel de la cola.
+    // Abre el sonido si hacía falta. Devuelve Promise<{ puerto, tasa }> (null si no hay worklet)
+    async puertoAparte() {
+      const tasa = puente.abrir();
+      if (!tasa) return null;
+      while (!listo) { if (estado.camino === 'falló el worklet') return null; await new Promise(r => setTimeout(r, 20)); }
+      const c = new MessageChannel();
+      nodo.port.postMessage({ t: 'puerto', puerto: c.port2 }, [c.port2]);
+      return { puerto: c.port1, tasa };
+    },
   };
 
   // ---- La demora, medida con un clic (§88) ----

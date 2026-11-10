@@ -98,6 +98,26 @@ try {
   base = await enBase(g1);
   ok('guardar enseguida (al esconder o cerrar la pestaña)', base.get(AJUSTES).datos[0] === 42);
 
+  // §122 (D13): con una carrera andando, el guardado espera a que termine (esconder la pestaña guarda igual)
+  let carrera = true;
+  g1.aplazarMientras(() => carrera);
+  j1.escribe(AJUSTES, 3480, 50);
+  await espera(1000);
+  base = await enBase(g1);
+  ok('§122: en plena carrera lo escrito no se copia a IndexedDB (sigue pendiente)', base.get(AJUSTES).datos[0] === 42 && g1.pendientes === 1 && g1.estado.aplazadas === 1,
+     `valor ${base.get(AJUSTES)?.datos[0]}, pendientes ${g1.pendientes}`);
+  carrera = false;
+  await espera(1500);
+  base = await enBase(g1);
+  ok('§122: …y al terminar la carrera se guarda solo (en un rato libre)', base.get(AJUSTES).datos[0] === 50 && g1.pendientes === 0);
+  carrera = true;
+  j1.escribe(AJUSTES, 3480, 51);
+  await g1.guardarPendientes();
+  base = await enBase(g1);
+  ok('§122: esconder o cerrar la pestaña en plena carrera guarda igual, en el momento', base.get(AJUSTES).datos[0] === 51);
+  g1.aplazarMientras(null);
+  j1.escribe(AJUSTES, 3480, 42); await g1.guardarPendientes();   // (como estaba: lo que sigue espera el 42)
+
   // ---- 2) "abrir la página otra vez": la partida vuelve ----
   const j2 = await abrirJuego();
   j2.escribe(PARTIDA, 10, 0);                 // lo que traería el servidor (la partida vacía de RR)

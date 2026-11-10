@@ -1,0 +1,223 @@
+diff --git a/colabtex/src/juegos/mkw.js b/colabtex/src/juegos/mkw.js
+index ec5f28fc..8b97f9ec 100644
+--- a/colabtex/src/juegos/mkw.js
++++ b/colabtex/src/juegos/mkw.js
+@@ -98,16 +98,15 @@ const almacenPartidas = {
+    marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo y la cilindrada. §74: la copa es
+    una copa existente (4 carreras: el anfitrión la elige en el juego) y la playlist es una lista que el anfitrión arma
+    en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). M20: `cpu` = el nivel de la
+-   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §103: `conexion=cloudflare` = el anfitrión prendió
+-   «🛰 Todo por Cloudflare» (todo por el repetidor TURN; sin eso, nada en la dirección). Los nombres no van en la
+-   dirección: se le mandan al marco. */
+-export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", relevo = false }) {
++   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §236: `conexion` lleva el modo elegido.
++   Los nombres se le mandan al marco por mensaje. */
++export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", conexion, relevo = false }) {
+   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
+   const { semilla } = mkwCarrera(pid, ronda);
+   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
+   q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
+   q.set("cpu", MKW_NIVEL[nivel] ? nivel : "maximo");
+-  if (relevo === true) q.set("conexion", "cloudflare");
++  q.set("conexion", conexionMkw(conexion, relevo));
+   if (privado) q.set("privado", privado);
+   q.set("r", String(ronda));
+   return PAGINA + "?" + q.toString();
+@@ -335,7 +334,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
+     frame.hidden = false;
+     verMarco();
+     frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, jefe: jefeMarco,
+-                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, relevo: est.relevo === true });
++                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, conexion: est.conexion, relevo: est.relevo });
+     frame.focus();
+     conectarNube();
+     // apenas la sala del juego exista (el marco la arma al cargar), los nombres y el anfitrión
+@@ -474,7 +473,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
+     const tira = corre && enSala();
+     if (!manda || corre) abierto.cambiar = false;
+     if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
+-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.relevo, est.ultimaTabla,
++    const conexion = conexionMkw(est.conexion, est.relevo);
++    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, conexion, est.ultimaTabla,
+       est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe, conex]);
+     if (!forzar && firma === firmaVest) return;
+     firmaVest = firma;
+@@ -484,8 +484,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
+     vest.classList.toggle("jugando", tira);
+     const estilo = est.estilo === "playlist" ? "playlist" : "copa", cc = MKW_CC[est.cc] ? est.cc : "c150", nivel = MKW_NIVEL[est.nivel] ? est.nivel : "maximo";
+     const puede = manda && !corre, cupo = Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX), cpus = Math.max(0, MKW_SINCRO_MAX - js.length);
+-    const relevo = est.relevo === true;
+-    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())}${relevo ? " · 🛰 Cloudflare" : ""}`;
++    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())} · ${MKW_CONEXION[conexion]}`;
+     const nom = j => escapeHtml(j.nombre || "Piloto");
+     const cara = (j, tam) => avatar ? avatar(j, tam) : `<span class="jg2-inicial" style="width:${tam}px;height:${tam}px" aria-hidden="true">${escapeHtml((j.nombre || "?").charAt(0).toUpperCase())}</span>`;
+     // el «⋯» de cada piloto, para el anfitrión y en las filas de los otros (con la copa andando, solo «Echar»)
+@@ -537,8 +536,10 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
+           <div class="jg2-op"><span>Cilindrada</span>${seg("cc", cc, MKW_CC, v => `data-cc="${v}"`)}<small>${AYUDA_CC[cc]}</small></div>
+           <div class="jg2-op"><span>CPU</span><div class="jg2-seg" role="group" aria-label="CPU">${Object.entries(MKW_NIVEL).map(([k, txt]) =>
+             `<button type="button" data-nivel="${k}" data-foco="cpu-${k}" aria-pressed="${nivel === k}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_NIVEL[nivel]}</small></div>
+-          <div class="jg2-op"><span>Conexión</span><div class="jg2-seg" role="group" aria-label="Conexión">${Object.entries(MKW_CONEXION).map(([k, txt]) =>
+-            `<button type="button" class="jg-mkw-conexion" data-relevo="${k}" data-foco="con-${k}" aria-pressed="${(k === "cloudflare") === relevo}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_CONEXION[relevo ? "cloudflare" : "directa"]}</small></div>
++          <div class="jg2-op"><span>Conexión</span><div class="jg2-seg jg2-conexion" role="group" aria-label="Conexión">${Object.entries(MKW_CONEXION).map(([k, txt]) =>
++            `<span class="jg2-con-op"><button type="button" class="jg-mkw-conexion" data-relevo="${k}" data-foco="con-${k}"
++              aria-pressed="${k === conexion}" aria-describedby="jg2-con-${k}">${escapeHtml(txt)}</button>
++              <span class="jg2-con-tip" id="jg2-con-${k}" role="tooltip">${escapeHtml(AYUDA_CONEXION[k])}</span></span>`).join("")}</div></div>
+           <button type="button" class="jg2-cerrar" data-cerrar data-foco="cerrar">Cerrar</button>
+         </div>` : "";
+       const ult = est.ultimaTabla;
+@@ -584,7 +585,11 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
+     if (b.classList.contains("jg-mkw-modo")) { if (!elegido) anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); return; }
+     if (b.dataset.cc) { if (!elegido) anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); return; }
+     if (b.dataset.nivel) { if (!elegido) anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); return; }
+-    if (b.dataset.relevo) { if (!elegido) anota({ t: "ajuste", uid, k: "relevo", v: b.dataset.relevo === "cloudflare" }); return; }
++    if (b.dataset.relevo) {
++      b.focus();   // también en el celular, donde un toque no siempre da foco al botón
++      if (!elegido) anota({ t: "ajuste", uid, k: "relevo", v: b.dataset.relevo });
++      return;
++    }
+     if (b.classList.contains("jg-mkw-dar")) { b.disabled = true; abierto.menu = ""; anota({ t: "anfitrion", uid, a: b.dataset.a }); return; }
+     // §87: echar (el anfitrión): sale al momento y no vuelve a esta sala; con la copa andando su kart sigue sin nadie
+     if (b.classList.contains("jg-mkw-echa")) {
+@@ -723,10 +728,14 @@ const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", nor
+   dificil: "Más rápidas, y persiguen al que va primero.", maximo: "Todo al tope: el kart más rápido, sin frenarse nunca.",
+   intenso: "El Hard AI de Retro Rewind: siempre a la velocidad máxima del juego. Casi imposible de ganar.",
+   imposible: "Injusto a propósito: más rápidas que cualquier kart (un 15 % sobre el tope) y aceleran 1,5 veces más." };
+-/* §103: cómo se conectan los pilotos (como el relevo de BT3: lo excepcional lo prende el anfitrión, nunca solo) */
+-const MKW_CONEXION = { directa: "Directa", cloudflare: "🛰 Todo por Cloudflare" };
+-const AYUDA_CONEXION = { directa: "Cada piloto se conecta directo con los demás: lo normal, con el ping más bajo. Si a alguien no le conecta, prueben «🛰 Todo por Cloudflare».",
+-  cloudflare: "Todo pasa por el repetidor de Cloudflare. Solo si les cuesta conectarse o las carreras se cortan: un poco más de ping." };
++/* §236: las salas viejas solo guardaban si se usaba el repetidor de Cloudflare. */
++const MKW_CONEXION = { host: "Host: un jugador", cloudflare: "Host + repetidor Cloudflare", oracle: "Servidor Oracle" };
++const conexionMkw = (conexion, relevo) => Object.hasOwn(MKW_CONEXION, conexion) ? conexion : relevo === true ? "cloudflare" : "host";
++const AYUDA_CONEXION = {
++  host: "Un jugador arbitra desde su PC. La conexión directa suele dar menos demora. Depende de que los jugadores puedan conectarse entre sí.",
++  cloudflare: "Un jugador arbitra y el repetidor de Cloudflare ayuda si falla la conexión directa. Agrega demora y consume unos 35 MB por jugador por hora.",
++  oracle: "Un servidor propio en Santiago arbitra y le quita esa carga a los jugadores. Depende de la conexión a Santiago. Si no responde, la sala vuelve al host.",
++};
+ const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
+ /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
+    una sola vez. Todo cuelga de `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de juegos.html
+@@ -760,6 +769,13 @@ const ESTILO_VEST = `
+ .jg-mkw2 .jg2-seg button:hover{background:#ffffff14}
+ .jg-mkw2 .jg2-seg button[aria-pressed=true]{background:#ffd34d;color:#1b1400;font-weight:700;box-shadow:none;border:0}
+ .jg-mkw2 .jg2-seg button[data-cc=azar]{margin-left:10px}
++.jg-mkw2 .jg2-conexion{position:relative}
++.jg-mkw2 .jg2-con-tip{display:none;position:absolute;inset:100% 0 auto;z-index:2;padding:9px 12px;border-radius:8px;background:#101a34;color:#fff;box-shadow:0 3px 10px #0009;font-size:.9rem}
++.jg-mkw2 .jg2-con-op:focus-within .jg2-con-tip{display:block}
++@media(hover:hover){
++  .jg-mkw2 .jg2-conexion:has(.jg2-con-op:hover) .jg2-con-tip{display:none}
++  .jg-mkw2 .jg2-conexion:has(.jg2-con-op:hover) .jg2-con-op:hover .jg2-con-tip{display:block}
++}
+ .jg-mkw2 .jg2-cerrar{justify-self:end;border:1px solid #ffffff26;background:transparent;color:#eef2ff;border-radius:9px;padding:4px 12px;font:inherit;cursor:pointer}
+ .jg-mkw2 .jg2-nota{margin:0}
+ .jg-mkw2 .jg2-ultima{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border:1px solid #ffd34d40;background:#ffd34d0f;border-radius:12px;padding:8px 12px;font-size:.92rem}
+diff --git a/colabtex/src/juegos/motor.js b/colabtex/src/juegos/motor.js
+index 899c0817..023f8ab9 100644
+--- a/colabtex/src/juegos/motor.js
++++ b/colabtex/src/juegos/motor.js
+@@ -7779,9 +7779,8 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
+    - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece (la CPU de relleno siempre completa los 12).
+    - `{t:"ajuste", uid, k:"nivel", v}` (M20): el nivel de la CPU que completa los 12 (MKW_NIVEL), aparte de la
+      cilindrada; "maximo" por omisión.
+-   - `{t:"ajuste", uid, k:"relevo", v}` (§103): el anfitrión prende (true) o apaga «🛰 Todo por Cloudflare»: cada marco
+-     manda todo por el repetidor TURN de Cloudflare que entrega el Worker, aunque la conexión directa funcione. Apagado
+-     por omisión y nunca solo, como el relevo de BT3 (el dueño lo pidió así: es excepcional).
++   - `{t:"ajuste", uid, k:"relevo", v}` (§236): el anfitrión elige host, cloudflare u oracle en el vestíbulo.
++     Las jugadas viejas true y false significan cloudflare y host.
+    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
+      vive en su pestaña).
+    - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 12, en este orden: `sincro`) cargan el
+@@ -7876,7 +7875,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
+   // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
+   let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
+   let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
+-  let nivel = mkwNivelDe(p && p.nivel), relevo = false;
++  let nivel = mkwNivelDe(p && p.nivel), conexion = "host";
+   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+   const presentes = () => js.filter(j => !fuera[j.uid]);
+   for (const j of jugadasDe(p)) {
+@@ -7896,9 +7895,12 @@ export function redMkw(p, js = jugadoresDe(p)) {
+     if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
+     if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
+     if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
+-    // §103: «🛰 Todo por Cloudflare» (como el relevo de BT3: lo prende el anfitrión, nunca solo; solo en el vestíbulo,
+-    // porque cada marco lo lee al abrir la copa)
+-    if (j.t === "ajuste" && esAnf && j.k === "relevo" && fase === "vestibulo") { relevo = j.v === true; continue; }
++    if (j.t === "ajuste" && esAnf && j.k === "relevo" && fase === "vestibulo") {
++      if (j.v === true || j.v === "cloudflare") conexion = "cloudflare";
++      else if (j.v === "oracle") conexion = "oracle";
++      else if (j.v === false || j.v === "host") conexion = "host";
++      continue;
++    }
+     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
+     /* §99 (H2): con la copa andando, el anfitrión desapareció del buzón (se le cortó internet o se le cerró Chrome sin
+        escribir «abandona»): las páginas de los demás eligen al mismo reemplazo —el primero de la copa que sigue
+@@ -7927,7 +7929,8 @@ export function redMkw(p, js = jugadoresDe(p)) {
+   js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
+   const quedan = presentes().length;
+   return {
+-    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, relevo, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
++    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, conexion, relevo: conexion === "cloudflare",
++    ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
+     sincro: fase === "jugando" ? sincro : null,
+     ganador: "", motivo: quedan ? "" : "abandono"
+   };
+diff --git a/colabtex/tests/mkw.test.cjs b/colabtex/tests/mkw.test.cjs
+index 1e49ab95..a04ac8a5 100644
+--- a/colabtex/tests/mkw.test.cjs
++++ b/colabtex/tests/mkw.test.cjs
+@@ -74,18 +74,23 @@ test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la c
+  assert.match(fuente,/data-nivel="\$\{k\}"/);assert.match(fuente,/k: "nivel", v: b\.dataset\.nivel/);
+ });
+ 
+-test('§103 «🛰 Todo por Cloudflare»: apagado por omisión, lo prende solo el anfitrión en el vestíbulo (como el relevo de BT3) y va al marco',()=>{
++test('§236 conexión: host por omisión, solo la cambia el anfitrión en el vestíbulo y respeta las jugadas TURN viejas',()=>{
+  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
+- let e=M.reducir(nueva());assert.equal(e.relevo,false,'apagado por omisión: es excepcional');
++ let e=M.reducir(nueva());assert.equal(e.conexion,'host');assert.equal(e.relevo,false);
+  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,true,'el anfitrión lo prende');
+  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:true},{t:'ajuste',uid:'a',k:'relevo',v:false}));assert.equal(e.relevo,false,'y lo apaga');
+  e=M.reducir(nueva({t:'ajuste',uid:'b',k:'relevo',v:true}));assert.equal(e.relevo,false,'b no es el anfitrión');
+  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:'si'}));assert.equal(e.relevo,false,'solo true lo prende');
+  e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,false,'corriendo no se cambia (cada marco lo lee al abrir)');
++ const ajuste=(v,uid='a')=>({t:'ajuste',uid,k:'relevo',v});
++ for (const modo of ['host','cloudflare','oracle']) assert.equal(M.reducir(nueva(ajuste(modo))).conexion,modo);
++ assert.equal(M.reducir(nueva(ajuste('oracle','b'))).conexion,'host');
++ assert.equal(M.reducir(nueva(ajuste('oracle'),{t:'empieza',uid:'a'},ajuste('host'))).conexion,'oracle');
++ assert.equal(M.reducir(nueva(ajuste('oracle'),ajuste('desconocido'))).conexion,'oracle');
+  const fuente=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+- assert.match(fuente,/if \(relevo === true\) q\.set\("conexion", "cloudflare"\);/,'la dirección del marco solo lo lleva si está prendido');
+- assert.match(fuente,/relevo: est\.relevo === true \}\)/);
+- assert.match(fuente,/data-relevo="\$\{k\}"/);assert.match(fuente,/k: "relevo", v: b\.dataset\.relevo === "cloudflare"/);
++ assert.match(fuente,/conexion: est\.conexion, relevo: est\.relevo/);
++ assert.match(fuente,/data-relevo="\$\{k\}"/);assert.match(fuente,/k: "relevo", v: b\.dataset\.relevo/);
++ assert.match(fuente,/aria-describedby="jg2-con-\$\{k\}"/);assert.match(fuente,/id="jg2-con-\$\{k\}" role="tooltip"/);
+  // el marco pide las credenciales (si no hay, [] y va directo); y el juego espera el repetidor solo con conexion=cloudflare
+  assert.match(fuente,/if \(d\.tipo === "turn"\) \{/);assert.match(fuente,/tipo: "turn", iceServers: ice \|\| \[\]/);
+  const juego=fs.readFileSync(raiz('../juegos/mkw/web/navegador/mkw.mjs'),'utf8');
+@@ -206,7 +211,10 @@ test('diez logros propios, todos de partida, con su nivel; y su peso',()=>{
+ 
+ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla, su nodo, los pilotos, el anfitrión y la copa',()=>{
+  const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+- const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist,MKW_NIVEL:M.MKW_NIVEL};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
++ const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist,MKW_NIVEL:M.MKW_NIVEL};
++ const trozo=(ini,fin)=>src.slice(src.indexOf(ini),src.indexOf(fin,src.indexOf(ini))).replace(/\bexport /g,'');
++ vm.runInNewContext(trozo('const PAGINA','let privado')+trozo('const MKW_CONEXION','const AYUDA_CONEXION')+
++   trozo('export function srcMkw(', 'export function crearMkwSolo')+';__s=srcMkw',c);
+  const u=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'https://w.example',ronda:3,sincro:['a','b'],jefe:'a'}));
+  assert.equal(u.pathname,'/juegos/mkw/web/navegador/index.html');
+  const q=u.searchParams, t=M.mkwCarrera('p1',3);
+@@ -225,8 +233,11 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
+  const nv=n=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',cc:'c100',nivel:n})).searchParams;
+  assert.equal(nv('normal').get('cpu'),'normal','M20: el nivel del anfitrión, aparte de la cilindrada');assert.equal(nv('normal').get('cc'),'c100');
+  assert.equal(nv('turbo').get('cpu'),'maximo','un nivel que no existe va como Máximo');
+- assert.equal(nv('normal').get('conexion'),null,'§103: sin «Todo por Cloudflare», nada en la dirección');
+- assert.equal(new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',relevo:true})).searchParams.get('conexion'),'cloudflare');
++ assert.equal(nv('normal').get('conexion'),'host');
++ const urlConexion=op=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,ronda:2,sincro:['a','b'],...op})).searchParams;
++ assert.equal(urlConexion({relevo:true}).get('conexion'),'cloudflare');
++ assert.equal(urlConexion({conexion:'oracle'}).get('conexion'),'oracle');
++ assert.equal(urlConexion({conexion:'oracle'}).get('arbitroUrl'),null);
+  assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
+  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
+  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');

@@ -32,8 +32,12 @@ import subprocess
 import sys
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
-WC = RAIZ / "terceros/Wiicompiled"
+# MKW_WIICOMPILED=terceros/Wiicompiled-motor: otra copia del traductor y su C++ (paso 6 del plan, §170), sin tocar la de siempre
+WC = RAIZ / os.environ.get("MKW_WIICOMPILED", "terceros/Wiicompiled")
 RT = WC / "runtime"
+# MKW_AURORA=terceros/aurora-main-viejo-motor: aurora desde otra carpeta (N15a, §170: el runtime v0.9.3 con nuestra
+# aurora ya portada); por omisión la de adentro de WC
+AU_DIR = (RAIZ / os.environ["MKW_AURORA"]) if os.environ.get("MKW_AURORA") else WC / "aurora-main"
 EMSDK = RAIZ / "herramientas/emsdk"
 EMXX = EMSDK / "upstream/emscripten/em++.exe"
 
@@ -126,8 +130,70 @@ def main():
     # que solo sirven para los perfiles) y comprimido al final (herramientas/comprimir-build.mjs: mkw.wasm.br/.gz,
     # lo que el Worker entrega).
     ap.add_argument("--final", action="store_true")
+    # --memoria-inicial N (MB): el heap con que arranca el programa (C9, §141). El juego usa ~250 MB (sbrk medido en la
+    # carrera con 11 CPU); con 320 sobra y, si hiciera falta más, crece solo (ALLOW_MEMORY_GROWTH). 512 = como antes
+    ap.add_argument("--memoria-inicial", type=int, default=320)
+    # --memoria-fija N (MB) (W29, bitácora §239; apagada por omisión = 0): la memoria del programa NO crece. Se enlaza con
+    # ALLOW_MEMORY_GROWTH=0 e INITIAL_MEMORY=N: el tamaño es una constante y V8 no tiene que releerlo en cada acceso
+    # (en Android, que revisa los límites a mano, eso cuesta). Si el programa pidiera más de N, se cae: N debe cubrir el
+    # pico (~250 MB usados de verdad, §141) con margen. Con --fija (RAM de la Wii en lugar fijo) manda esta opción.
+    ap.add_argument("--memoria-fija", type=int, default=0)
+    # (§244, W29 adoptado) --final lleva la memoria fija si no se pide otra: 768 MB con la ventana de H6 (--fija: 385 MB
+    # de la Wii + el heap; el pico medido en 11 pistas es 510) y 512 sin ella (pico 278). --memoria-crece = como antes
+    ap.add_argument("--memoria-crece", action="store_true")
+    # --fija(H6 de la etapa 2, bitácora §211): la RAM de la Wii en un lugar fijo de la memoria de wasm (MKW_MOTOR_FIJA de
+    # runtime/include/mkw_motor.h, solo en la copia del motor que lo trae). La ventana va de 1 MiB a 385 MiB: lo de C++
+    # empieza después (-sGLOBAL_BASE). La memoria inicial = --memoria-inicial + 240 MB (560 con 320): la ventana se lleva
+    # MEM1 y MEM2 (~154 MB que antes salían del heap) y suma el hueco de 232 MB entre Kamek y la MEM2, que nadie toca:
+    # Windows lo cuenta como memoria privada (reservada), pero no ocupa RAM de verdad (la física no crece: §211).
+    ap.add_argument("--fija", action="store_true")
+    ap.add_argument("--frio", default=None)   # (H11, §214) la cabecera de lo frío de herramientas/h11-caliente.mjs
+    # Cierre de E2 (bitácora §218, decidido por la orquestadora): --final lleva lo adoptado en la etapa 2 por omisión:
+    # --fija (H6) si la copia del motor lo trae (MKW_MOTOR_FIJA en runtime/include/mkw_motor.h; --sin-fija = sin ella) y
+    # ThinLTO de M7 (MKW_LTO con los grupos de §213 si no viene puesto; MKW_LTO= vacío = sin LTO)
+    ap.add_argument("--sin-fija", action="store_true")
+    ap.add_argument("--sin-pgo", action="store_true")   # (W25, §228.2) --final sin el perfil de PGO
     args = ap.parse_args()
     args.simd = not args.sin_simd
+    if args.final and not args.sin_fija and not args.fija:
+        cabecera = WC / "runtime/include/mkw_motor.h"
+        if cabecera.exists() and "MKW_MOTOR_FIJA" in cabecera.read_text(encoding="utf-8", errors="replace"):
+            args.fija = True
+            print("--final: con --fija (H6, la copia del motor la trae)")
+    if args.final and not args.memoria_fija and not args.memoria_crece:
+        args.memoria_fija = 768 if args.fija else 512
+        print(f"--final: con --memoria-fija {args.memoria_fija} (W29, §244; --memoria-crece = que crezca como antes)")
+    if args.final and "MKW_LTO" not in os.environ:
+        os.environ["MKW_LTO"] = "runtime,aurora,aurora_finita,web,puente,thp"
+        print("--final: con ThinLTO de M7 (MKW_LTO=runtime,aurora,aurora_finita,web,puente,thp)")
+    # W25 (E4c, bitácora §228.2, adoptado por la orquestadora): --final compila guiado por un perfil (PGO). El perfil lo
+    # arma o lo reusa herramientas/pgo_final.py (el programa que cuenta en <carpeta>-pgo-gen, las 3 carreras de
+    # herramientas/pgo/, la partida base de §175); va fuera del repositorio (lleva nombres del juego). --sin-pgo o
+    # MKW_PGO=0 = sin él. (Va antes de MKW_CHICAS: la llamada de adentro aplica sus chicas por su cuenta.)
+    ap_pgo = args.final and not args.sin_pgo and os.environ.get("MKW_PGO") != "0" and \
+        os.environ.get("MKW_PGO_HIJO") != "1" and "-fprofile-instr" not in os.environ.get("MKW_CFLAGS_EXTRA", "")
+    if ap_pgo:
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+        import pgo_final
+        banderas = pgo_final.preparar(RAIZ, args.carpeta or "build/web", EMSDK)
+        os.environ["MKW_CFLAGS_EXTRA"] = " ".join(os.environ.get("MKW_CFLAGS_EXTRA", "").split() + banderas)
+        print("--final: con PGO (" + banderas[0] + ")")
+    # E4c (W25, docs/evaluacion-chicas.md): MKW_CHICAS="c2,c3,…" = las mejoras chicas, cada una con su marca. Sin la
+    # variable, nada cambia. c2 = las texturas CMPR en BC1 por omisión (aurora, MKW_CHICA_C2; la página: ?texturasBc=0
+    # las apaga); c3 = las funciones calientes de §181.2 por omisión (MKW_CALIENTE_COMPILAR + MKW_CALIENTE_DEF=1, sin la
+    # variante SIMD; ?caliente=0 = la traducida); c4 = el memo de las indirectas con 2048 casillas (§193); c7 = una pasada
+    # más de Binaryen con -O3 al enlazar (§54). c5 y c6 son del traductor (MKW_M8=seguro, MKW_BANDERAS=seguro): se eligen
+    # al traducir, no aquí.
+    chicas = set(filter(None, os.environ.get("MKW_CHICAS", "").replace(" ", "").lower().split(",")))
+    if chicas:
+        extra = os.environ.get("MKW_CFLAGS_EXTRA", "").split()
+        if "c3" in chicas:
+            os.environ["MKW_CALIENTE_COMPILAR"] = "1"
+            extra.append("-DMKW_CALIENTE_DEF=1")
+        if "c4" in chicas:
+            extra.append("-DMKW_MOTOR_MEMO_INDIRECTA=2048")
+        os.environ["MKW_CFLAGS_EXTRA"] = " ".join(extra)
+        print(f"E4c: las chicas {','.join(sorted(chicas))}")
 
     carpeta = args.carpeta or ("build/web-sin-simd" if args.sin_simd else "build/web")
     sal = RAIZ / (args.salida or f"{carpeta}/{args.modo}")   # aquí queda mkw.js + mkw.wasm de este modo
@@ -149,7 +215,7 @@ def main():
         if not c.exists() or c.stat().st_mtime < s.stat().st_mtime:
             convertir(str(s), str(c))
 
-    incs = [RT / "include", RT / "src", WC, WC / "aurora-main/include", RT / "third_party",
+    incs = [RT / "include", RT / "src", WC, AU_DIR / "include", RT / "third_party",
             RT / "third_party/pugixml", RT / "third_party/toml11", RAIZ / "terceros/xxhash-dl/xxHash-0.8.4"]
     base = ["-std=c++20", "-fwasm-exceptions", "-sSUPPORT_LONGJMP=wasm", "-w", "--use-port=sdl3",
             "-DTARGET_PC", "-DSDL_MAIN_HANDLED", "-DNOMINMAX",
@@ -160,6 +226,18 @@ def main():
     # MKW_CFLAGS_EXTRA="-DALGO": opciones extra para runtime y juego, para experimentos en un taller aparte
     # (--carpeta), p. ej. prender o apagar un cambio del runtime con una macro y comparar los dos builds (§47).
     base += os.environ.get("MKW_CFLAGS_EXTRA", "").split()
+    if args.fija:
+        base.append("-DMKW_MOTOR_FIJA=1")
+    # W10 (§207): el programa del instrumento del dibujo en otro Worker marca la página de cada escritura (MKW_SUCIAS
+    # en memory_access.h): tiene que llegar a todo el juego y al runtime
+    if os.environ.get("MKW_W10_COMPILAR") == "1":
+        base.append("-DMKW_SUCIAS")
+    # v0.9.3 (N15a, §170): el traductor anota en su manifiesto para qué región tradujo; el código traducido y
+    # runtime/game se arman con esa región (en la versión vieja no existe y no se agrega nada)
+    manifiesto = WC / "generated/build_shards/shards.cmake"
+    m = re.search(r"set\(MKW_TRANSLATED_GUEST_REGION (\d+)\)", manifiesto.read_text(encoding="utf-8")) if manifiesto.exists() else None
+    if m:
+        base.append(f"-DMKW_TRANSLATED_GUEST_REGION={m.group(1)}")
     traducido = ["-O2", "-fno-fast-math", "-ffp-contract=off", "-fno-slp-vectorize"]
     banderas = {
         "runtime": base + ["-O3", "-ffast-math"],
@@ -171,7 +249,7 @@ def main():
     }
 
     # ---- aurora de verdad (modo navegador) ----
-    AU = WC / "aurora-main"
+    AU = AU_DIR
     DEP = RAIZ / "terceros/deps-aurora"
     au_incs = [AU / "include", AU / "lib", DEP / "abseil", DEP / "fmt/include", DEP / "imgui",
                DEP / "sqlite", DEP / "tracy/public", RAIZ / "terceros/xxhash-dl/xxHash-0.8.4"]
@@ -183,6 +261,12 @@ def main():
     puertos = ["--use-port=sdl3", "--use-port=emdawnwebgpu", "-sUSE_LIBPNG=1", "-sUSE_ZLIB=1"]
     au_base = (["-std=c++20", "-fwasm-exceptions", "-sSUPPORT_LONGJMP=wasm", "-w"] + puertos + au_def +
                [f"-I{rutas(i)}" for i in au_incs] + (["-msimd128"] if args.simd else []))
+    # Paso 8 (§186): MKW_CFLAGS_TODO = opciones para TODAS las unidades, también aurora y sus librerías (p. ej. -pthread:
+    # con memoria compartida, cada objeto tiene que estar compilado con atomics; MKW_CFLAGS_EXTRA no llega a aurora)
+    base += os.environ.get("MKW_CFLAGS_TODO", "").split()
+    au_base += os.environ.get("MKW_CFLAGS_TODO", "").split()
+    if "c2" in chicas:   # E4c C2: las texturas BC1 (herramientas/e4c/portar-c2.py las puso en la aurora del motor)
+        au_base.append("-DMKW_CHICA_C2=1")
     if navegador:
         # fmt 11.1.4 usa malloc/free sin incluir <cstdlib> (el CMake de aurora lo arregla igual para MinGW)
         au_base_cpp = au_base + ["-include", "cstdlib"]
@@ -199,9 +283,13 @@ def main():
         if rel in EXCLUIDOS:
             continue
         unidades.append(("semantica" if rel in SEMANTICA else "runtime", f))
+    # v0.9.3 (N15a, §170): lo propio del juego se mudó a runtime/game (la región, la configuración, la versión)
+    for f in sorted((RT / "game").glob("*.cpp")) if (RT / "game").is_dir() else []:
+        unidades.append(("runtime", f))
     if navegador:
         # aurora sin pantalla NO; solo los extras de escritorio vacíos + el puente con la página
         unidades.append(("web", RAIZ / "web/headless/escritorio_vacio.cpp"))
+        unidades.append(("web", RAIZ / "web/headless/v093_vacio.cpp"))   # N15a: vacío con el runtime de siempre
         for f in sorted((RAIZ / "web/navegador").glob("*.cpp")):
             unidades.append(("puente", f))
         unidades += unidades_aurora(AU, DEP)
@@ -245,6 +333,10 @@ def main():
                   # (memoria en cero y todo "a la vista" en la carrera sincronizada, §61)
                   "func_80198D88": "func_80198D88_traducida", "func_801994E4": "func_801994E4_traducida",
                   "func_80787774": "func_80787774_traducida", "func_807379BC": "func_807379BC_traducida",
+                  # ModelDirector::SetAllScnOptionsFromClipInfo / SetDisableDrawScnOptionsFromClipInfo -> lockstep_nativo.cpp
+                  # (§179, G1: el dibujo recorta con las marcas de verdad; la lógica sigue con «todo a la vista»)
+                  "func_8055D448": "func_8055D448_traducida", "func_8055D554": "func_8055D554_traducida",
+                  "func_80564D60": "func_80564D60_traducida",   # ScnMgr::DrawMain (§179.2: el dibujo entero)
                   "func_807EC7F8": "func_807EC7F8_traducida", "func_807F7E80": "func_807F7E80_traducida",
                   "func_80536054": "func_80536054_traducida", "func_8020FE24": "func_8020FE24_traducida", "rr_kamek_81806568": "rr_kamek_81806568_traducida",
                   # OS::GetTick LLAMADO (no copiado adentro): en la carrera sincronizada da el reloj de la carrera; lo usan
@@ -342,7 +434,64 @@ def main():
                 ("thp", RAIZ / "web/juego/mandos_virtuales_nativo.cpp"),   # §91: más de 4 humanos en la sala
                 ("thp", RAIZ / "web/juego/fantasma_pagina_nativo.cpp"),    # §92: la Contrarreloj contra el mejor de la página
                 ("thp", RAIZ / "web/juego/cpu_dificultad_nativo.cpp"),     # §96: los niveles de la CPU de la página
-                ("thp", RAIZ / "web/juego/nombres_nativo.cpp")]            # §98: los nombres de la sala en el juego
+                ("thp", RAIZ / "web/juego/nombres_nativo.cpp"),            # §98: los nombres de la sala en el juego
+                ("thp", RAIZ / "web/juego/graficos_nativo.cpp")]           # §252 (G11): los caminos de dibujo opcionales
+    # G11 (§252): brillo, profundidad de campo, sombras por volumen y mapa de luz de EGG -> graficos_nativo.cpp
+    # G13 (§254): y las partículas de la carrera (el dibujo de Effects::Mgr, 0x8067CF74; con W10 lo envuelve w10_nativo.cpp)
+    REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("8021CCC0", "8021EEC0", "80220D7C", "802218EC", "8067CF74")})
+    # N14 (§181): las funciones calientes reescritas y su comprobador (web/juego/caliente_nativo.cpp; MKW_CALIENTE=0|1|2
+    # al correr). Por ahora solo con MKW_CALIENTE_COMPILAR=1: así los programas de las otras sesiones no cambian.
+    CALIENTE = ["func_80199D64", "func_8019A91C", "func_80085AB0"]
+    if os.environ.get("MKW_CALIENTE_COMPILAR") == "1":
+        REEMPLAZOS.update({f: f"{f}_traducida" for f in CALIENTE})
+        unidades += [("juego", RAIZ / "web/juego/caliente_nativo.cpp")]   # (las banderas del juego: sin fast-math, sin contraer)
+    # W1 (§196): ¿el dibujo es un sumidero? y las páginas que ensucia la carrera (web/juego/sumidero_nativo.cpp, fotos de
+    # la memoria alrededor de EGG::SceneManager::draw y de ScnMgr::SwitchScnRoot). Solo con MKW_SUMIDERO_COMPILAR=1
+    if os.environ.get("MKW_SUMIDERO_COMPILAR") == "1":
+        REEMPLAZOS.update({"func_8023AEAC": "func_8023AEAC_traducida", "func_805635E4": "func_805635E4_traducida"})
+        unidades += [("thp", RAIZ / "web/juego/sumidero_nativo.cpp")]
+    # W3 (§200): el techo del dibujo nativo de la pista (web/juego/techo_dibujo_nativo.cpp: anota el modelo de la pista
+    # al cargarlo y, con el modo 1, lo esconde antes de cada dibujo). Solo con MKW_TECHO_COMPILAR=1 (no con el sumidero:
+    # los dos envuelven EGG::SceneManager::draw)
+    if os.environ.get("MKW_TECHO_COMPILAR") == "1":
+        REEMPLAZOS.update({"func_8078E1B0": "func_8078E1B0_traducida", "rr_overlay_8078E1B0": "rr_overlay_8078E1B0_traducida",
+                           "func_8023AEAC": "func_8023AEAC_traducida",
+                           # §222 (E4): los techos de los karts, los objetos y los efectos
+                           "func_805B1CD8": "func_805B1CD8_traducida", "func_805625A8": "func_805625A8_traducida",
+                           "func_802251DC": "func_802251DC_traducida"})
+        unidades += [("thp", RAIZ / "web/juego/techo_dibujo_nativo.cpp")]
+    # W10 (§207): el techo y el costo de la caja del dibujo en otro Worker (web/juego/w10_nativo.cpp: salta
+    # EGG::SceneManager::draw con la carrera andando y junta las páginas marcadas). Solo con MKW_W10_COMPILAR=1 (no con
+    # el sumidero ni el techo de W3: los tres envuelven EGG::SceneManager::draw)
+    if os.environ.get("MKW_W10_COMPILAR") == "1":
+        REEMPLAZOS.update({"func_8023AEAC": "func_8023AEAC_traducida", "func_80244268": "func_80244268_traducida",
+                           "func_8023AE60": "func_8023AE60_traducida",
+                           # W11 (§209): las pruebas de saltar efectos, el gestor de sonido y el hilo de sonido
+                           "func_8067CB88": "func_8067CB88_traducida", "func_802135D0": "func_802135D0_traducida",
+                           "func_800A4AF0": "func_800A4AF0_traducida",
+                           # W10 parte B (§240): el dibujo de los efectos en B (para probar si es lo que se cuelga)
+                           "func_8067CF74": "func_8067CF74_traducida"})
+        unidades += [("thp", RAIZ / "web/juego/w10_nativo.cpp")]
+    # W32 (§258): la IA de las CPU piensa uno de cada dos cuadros (web/juego/ia30_nativo.cpp: envuelve la entrada del
+    # cerebro de cada kart, func_807261B8; ?ia30=1 en la página, MKW_IA30=1 en Node). Solo con MKW_IA30_COMPILAR=1: así
+    # el programa de jugar y los de las otras sesiones no cambian
+    if os.environ.get("MKW_IA30_COMPILAR") == "1":
+        REEMPLAZOS.update({"func_807261B8": "func_807261B8_traducida"})
+        unidades += [("thp", RAIZ / "web/juego/ia30_nativo.cpp")]
+    # N8 (§219): simular a 60, dibujar a 30 y mostrar 60 (web/juego/n8_nativo.cpp: con la carrera andando salta uno de
+    # cada dos EGG::SceneManager::draw y su copia a la pantalla; apagado por omisión, ?n8=1|2). En el programa de
+    # siempre (modo navegador: necesita la aurora de §219), salvo con los instrumentos que también envuelven el dibujo
+    N8 = navegador and "aurora_mkw_n8" in (AU_DIR / "lib" / "aurora.cpp").read_text(encoding="utf-8", errors="replace") and not any(os.environ.get(v) == "1" for v in ("MKW_SUMIDERO_COMPILAR", "MKW_TECHO_COMPILAR", "MKW_W10_COMPILAR"))
+    if N8:
+        REEMPLAZOS.update({"func_8023AEAC": "func_8023AEAC_traducida", "func_80244268": "func_80244268_traducida"})
+        unidades += [("thp", RAIZ / "web/juego/n8_nativo.cpp")]
+    # W2 (§199): la colisión con la pista como isla (web/juego/isla_kcl_nativo.cpp + terceros/islas/kcl_807C0884.inc,
+    # que arma herramientas/islas/generar-kcl.py). Solo con MKW_ISLA_COMPILAR=1; con las banderas del juego
+    if os.environ.get("MKW_ISLA_COMPILAR") == "1":
+        if not (RAIZ / "terceros/islas/kcl_807C0884.inc").exists():
+            sys.exit("falta terceros/islas/kcl_807C0884.inc: correr antes python -I herramientas/islas/generar-kcl.py")
+        REEMPLAZOS["func_807C0884"] = "func_807C0884_traducida"
+        unidades += [("juego", RAIZ / "web/juego/isla_kcl_nativo.cpp")]
     # la red del juego hacia la página (socket/connect/sendto… propios, bitácora §58): en los dos modos, porque el
     # runtime llama a mkw_red_cerrar/mkw_red_bloqueante; en Node no hay Module.mkwRed y todo da "red apagada"
     unidades += [("thp", RAIZ / "web/red/red_web.cpp")]
@@ -469,6 +618,17 @@ def main():
     # compilador y las de las opciones -I van entre comillas dobles a mano.
     emcc = EMSDK / "upstream/emscripten/emcc.exe"
     lin = [f'emxx = "{rutas(EMXX)}"', f'emcc = "{rutas(emcc)}"']
+    # H11 (etapa 2, bitácora §214): --frio <frio.h> = la cabecera de herramientas/h11-caliente.mjs (cada función
+    # traducida que no corre en la carrera, con minsize y cold) incluida antes de cada archivo del juego: lo frío sale
+    # más chico y lo caliente queda junto. Solo cambia cómo se compila (sin fast-math ni contracción: los mismos bits)
+    # (también a las copias de juego_reemplazo: W12 §215 lo usa para una macro que esas copias también llaman)
+    if args.frio:
+        for g in ("juego", "juego_reemplazo"):
+            banderas[g] = banderas[g] + ["-include", rutas(pathlib.Path(args.frio).resolve())]
+    # M7 (etapa 2, bitácora §213): MKW_LTO="runtime,aurora,…" = esos grupos con ThinLTO (-flto=thin): el enlace los
+    # optimiza juntos (meter en línea entre archivos). El código traducido (juego, semantica) nunca: son 265 MB de C++
+    for g in filter(None, os.environ.get("MKW_LTO", "").split(",")):
+        if g in banderas: banderas[g] = banderas[g] + ["-flto=thin"]
     reglas = dict(banderas)
     # C (no C++): mismas opciones de terceros pero sin -std=c++20 ni excepciones de C++
     reglas["c"] = [x for x in banderas["terceros"] if not x.startswith("-std=") and x not in ("-fwasm-exceptions", "-sSUPPORT_LONGJMP=wasm")]
@@ -508,12 +668,67 @@ def main():
                     # la lista de pipelines usados, para precalentarlos en la próxima visita (web/navegador/pipelines.mjs)
                     "_mkw_web_pipelines_cuantos", "_mkw_web_pipelines_armar", "_mkw_web_pipelines_datos",
                     # …y pedirlos recién cuando el juego llegó a su primera pantalla (MKW_PRECALENTAR=tarde, §76)
-                    "_mkw_web_pipelines_precalentar"]
+                    "_mkw_web_pipelines_precalentar",
+                    # U1 (§140): pausar el precalentado durante la carrera; C9 (§141): cuánta memoria usa el programa
+                    # de verdad (sbrk(0) = el final de lo pedido al sistema; el resto del heap está libre)
+                    "_mkw_web_pipelines_pausa", "_mkw_web_profundidad", "_mkw_web_profundidad_cuenta", "_mkw_web_limpiezas", "_sbrk",   # (§177.2: G2)
+                    "_mkw_recortes_dibujo", "_mkw_dibujos_enteros",   # (§179: G1)
+                    "_mkw_graficos_quitar", "_mkw_graficos_dato", "_mkw_dibujo_saltar", "_mkw_dibujo_patron", "_mkw_dibujo_modo", "_mkw_dibujo_este_saltado",   # (§192: R2)
+                    "_mkw_dibujos_saltados", "_mkw_dibujos_saltados_juego",
+                    # C2 (§174): dónde está el juego (los menús o una pista) y pedir los pipelines de la pista elegida
+                    "_mkw_web_pipelines_etiqueta", "_mkw_web_pipelines_pista"]
         propio = puertos + ["-sENVIRONMENT=web", "-sEXIT_RUNTIME=0", "-sFORCE_FILESYSTEM=1",
                             "-sEXPORTED_RUNTIME_METHODS=['callMain','ENV','FS','HEAPU8']"]
+        # §190 (G6): las texturas CMPR en BC1, solo si la aurora que se compila lo trae (la de la v0.9.3 todavía no)
+        _tex = (AU_DIR / "lib" / "gfx" / "texture.cpp").read_text(encoding="utf-8", errors="replace")
+        if "mkw_web_texturas_bc" in _tex and ("MKW_CHICA_C2" not in _tex or "c2" in chicas):
+            exports += ["_mkw_web_texturas_bc"]
+        # §205 (W9): el camino de reserva de las Adreno (las matrices de los huesos por filas), si la aurora lo trae
+        if "mkw_web_huesos_filas" in (AU_DIR / "lib" / "gx" / "shader.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_huesos_filas"]
+        # §248 (W26): el censo de los textos WGSL y el módulo compartido por texto, si la aurora lo trae
+        if "mkw_web_wgsl_compartir" in (AU_DIR / "lib" / "gx" / "shader.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_wgsl", "_mkw_web_wgsl_compartir"]
+        # §204 (W20): soltar las texturas de copia ociosas (la mitad de la piscina de KartPad 0cca4d2), si la aurora lo trae
+        if "mkw_web_piscina" in (AU_DIR / "lib" / "dolphin" / "gx" / "GXFrameBuffer.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_piscina", "_mkw_web_piscina_dato"]
+        # §203 (W8): soltar los pipelines de las otras pistas, si la aurora lo trae
+        if "mkw_web_pipelines_soltar" in (AU_DIR / "lib" / "gfx" / "pipeline_cache.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_pipelines_soltar"]
+        if "mkw_web_pipelines_guardar" in (AU_DIR / "lib" / "gfx" / "pipeline_cache.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_pipelines_guardar"]   # (§248: W26, el conjunto acotado)
+        # §203 (W8): cuántas texturas viven y cuántos MB ocupan, si la aurora lo trae
+        if "mkw_web_texturas_dato" in (AU_DIR / "lib" / "gfx" / "texture.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_texturas_dato"]
+        # §253 (G12): las texturas más chicas (saltar los niveles de detalle más grandes), si la aurora lo trae
+        if "mkw_web_texturas_menos" in (AU_DIR / "lib" / "gfx" / "texture.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_texturas_menos", "_mkw_web_texturas_menos_dato"]
+        # §259 (W31): el instrumento de las listas de dibujo (contar, techo), si la aurora lo trae
+        if "mkw_web_w31" in (AU_DIR / "lib" / "dolphin" / "gx" / "GXDispList.cpp").read_text(encoding="utf-8", errors="replace"):
+            exports += ["_mkw_web_w31", "_mkw_web_w31_dato"]
+        if os.environ.get("MKW_CALIENTE_COMPILAR") == "1":
+            exports += ["_mkw_caliente_estado", "_mkw_caliente_informe"]   # (§181: N14)
+        if os.environ.get("MKW_IA30_COMPILAR") == "1":
+            exports += ["_mkw_ia30_modo", "_mkw_ia30_estado", "_mkw_ia30_bits", "_mkw_ia30_vuelta"]   # (§258: W32)
+        if os.environ.get("MKW_SUMIDERO_COMPILAR") == "1":
+            exports += ["_mkw_sumidero_modo", "_mkw_sumidero_reiniciar", "_mkw_sumidero_dato"]   # (§196: W1)
+        if os.environ.get("MKW_ISLA_COMPILAR") == "1":
+            exports += ["_mkw_isla_modo", "_mkw_isla_reiniciar", "_mkw_isla_dato"]   # (§199: W2)
+        if os.environ.get("MKW_TECHO_COMPILAR") == "1":
+            exports += ["_mkw_techo_modo", "_mkw_techo_dato", "_mkw_techo_mascara", "_mkw_dibujar_siempre"]   # (§200: W3; §222: E4 mide dibujando siempre)
+        if os.environ.get("MKW_W10_COMPILAR") == "1":
+            exports += ["_mkw_w10_traza", "_mkw_w10_hecho", "_mkw_w10_cuenta", "_mkw_w10_tocadas_a", "_mkw_w10_bits_a", "_mkw_w10_palabras_deshechas", "_mkw_w10_sin_efectos", "_mkw_w10_sombra_b", "_mkw_w10_deshacer_efectos", "_mkw_w10_deshechas", "_mkw_w10_modo", "_mkw_w10_reiniciar", "_mkw_w10_dato", "_mkw_w10_host", "_mkw_w10_hilos", "_mkw_w10_rango",
+                        "_mkw_w11_saltar", "_mkw_w11_dato", "_mkw_dibujar_siempre"]   # (§207: W10)
+        if N8:
+            exports += ["_mkw_n8_modo", "_mkw_n8_estado", "_mkw_n8_reiniciar", "_mkw_dibujar_siempre"]   # (§219: N8)
     else:
         exports += ["_mkw_headless_frames", "_mkw_headless_set_pad"]
-        propio = ["--use-port=sdl3", "-sENVIRONMENT=node", "-sNODERAWFS=1", "-sEXIT_RUNTIME=1",
+        # W4 (§198): el programa que cuenta las ramas (-fprofile-instr-generate) escribe su perfil al salir con atexit,
+        # pero en Node el juego no termina por exit() (la promesa de JSPI vuelve y Node sale con process.exit):
+        # web/node/correr.mjs llama a __llvm_profile_write_file a mano
+        if "-fprofile-instr-generate" in os.environ.get("MKW_CFLAGS_EXTRA", ""):
+            exports += ["___llvm_profile_write_file"]
+        propio =["--use-port=sdl3", "-sENVIRONMENT=node", "-sNODERAWFS=1", "-sEXIT_RUNTIME=1",
                   "-sEXPORTED_RUNTIME_METHODS=['callMain','ENV']"]
     enlace = [str(EMXX), f"@{rutas(sal / 'objetos.rsp')}", "-o", rutas(sal / "mkw.js"),
               # --profiling-funcs: conserva los nombres de las funciones dentro del .wasm, para que el perfil
@@ -522,9 +737,20 @@ def main():
               "-sJSPI=1", "-sJSPI_EXPORTS=['mkw_host_context_trampoline']",
               f"-sEXPORTED_FUNCTIONS={exports!r}".replace("'", '"'),
               "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=['$stackSave','$stackRestore']",
-              "-sALLOW_MEMORY_GROWTH=1", "-sMAXIMUM_MEMORY=4GB", "-sINITIAL_MEMORY=512MB",
+              "-sALLOW_MEMORY_GROWTH=1", "-sMAXIMUM_MEMORY=4GB", f"-sINITIAL_MEMORY={args.memoria_inicial}MB",
               "-sSTACK_SIZE=8MB", "-sINVOKE_RUN=0", "-sMODULARIZE=1", "-sEXPORT_ES6=1",
               "-sERROR_ON_UNDEFINED_SYMBOLS=1"] + propio + (["-msimd128"] if args.simd else [])
+    # Paso 8 (§186, la puerta A): MKW_LDFLAGS_EXTRA="-pthread" (con MKW_CFLAGS_EXTRA="-pthread") = un programa aparte
+    # (--carpeta) con la memoria compartida, para probar JSPI y WebGPU en un Worker con SharedArrayBuffer
+    if args.fija:   # (H6, §211) la ventana fija: 0x00100000 + 0x18000000; lo de C++ después
+        enlace = [a for a in enlace if not a.startswith("-sINITIAL_MEMORY=")]
+        enlace += ["-sGLOBAL_BASE=403701760", f"-sINITIAL_MEMORY={args.memoria_inicial + 240}MB"]
+    if args.memoria_fija:   # (W29, §239) tamaño fijo: sin crecer, sin tope máximo, el inicial = el pedido
+        enlace = [a for a in enlace if not a.startswith(("-sINITIAL_MEMORY=", "-sALLOW_MEMORY_GROWTH=", "-sMAXIMUM_MEMORY="))]
+        enlace += ["-sALLOW_MEMORY_GROWTH=0", f"-sINITIAL_MEMORY={args.memoria_fija}MB"]
+    enlace += os.environ.get("MKW_LDFLAGS_EXTRA", "").split()
+    if "c7" in chicas:   # E4c C7: wasm-opt -O3 dentro de la misma pasada de Binaryen de emcc (con sus mismas «features»)
+        enlace += ["-sBINARYEN_EXTRA_PASSES=-O3"]
     print("enlazando…")
     r = subprocess.run(enlace, env=env)
     if r.returncode == 0 and args.final and navegador:

@@ -1,0 +1,33 @@
+diff --git a/runtime/include/guest_abi/dispatch.h b/runtime/include/guest_abi/dispatch.h
+index 20dd53e..856cb74 100644
+--- a/runtime/include/guest_abi/dispatch.h
++++ b/runtime/include/guest_abi/dispatch.h
+@@ -303,7 +303,12 @@ struct IsPureTypedNativeCpuCall<T, std::void_t<decltype(T::kPure)>> : std::bool_
+ // a miss just re-runs the sorted lookup. 512 entries (12 KiB) covers the per-frame indirect
+ // working set while staying L1/L2 resident, unlike 4096 which would thrash L2. Must stay a
+ // power of two (see IndirectDispatchCacheIndex).
+-inline constexpr size_t kIndirectDispatchCacheEntries = 512;
++// MKW RETRO (E4c C4, §193): MKW_MOTOR_MEMO_INDIRECTA = las casillas del memo (potencia de 2; 2048 en el paquete).
++#ifndef MKW_MOTOR_MEMO_INDIRECTA
++#define MKW_MOTOR_MEMO_INDIRECTA 512
++#endif
++inline constexpr size_t kIndirectDispatchCacheEntries = MKW_MOTOR_MEMO_INDIRECTA;
++inline constexpr unsigned kIndirectDispatchCacheBits = __builtin_ctz(MKW_MOTOR_MEMO_INDIRECTA);
+ 
+ // MKW RETRO, W19 de la etapa 0 del plan v4 (bitácora §195). Adaptado de KartPad (Chris Sotraidis,
+ // https://github.com/chrissotraidis/wiicompiled, commit 20ad85d956038365bd584c01a4bcf37e2cf02eea, GPL-3.0; lo
+@@ -316,12 +321,12 @@ inline constexpr size_t kIndirectDispatchCacheEntries = 512;
+ #endif
+ MKW_PPC_FORCE_INLINE constexpr size_t IndirectDispatchCacheIndex(uint32_t address) noexcept {
+ #if MKW_MOTOR_MEMO_ALTO
+-    return static_cast<size_t>(((address >> 2) * 2654435761u) >> 23);
++    return static_cast<size_t>(((address >> 2) * 2654435761u) >> (32 - kIndirectDispatchCacheBits));
+ #else
+     return static_cast<size_t>(((address >> 2) * 2654435761u) & (kIndirectDispatchCacheEntries - 1));
+ #endif
+ }
+-static_assert(kIndirectDispatchCacheEntries == (size_t{1} << (32 - 23)),
++static_assert(kIndirectDispatchCacheEntries == (size_t{1} << kIndirectDispatchCacheBits),
+               "IndirectDispatchCacheIndex's shift must match the memo size");
+ 
+ // Namespace-scope `inline thread_local`, not function-local `static thread_local`, to avoid a

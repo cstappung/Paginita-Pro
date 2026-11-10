@@ -6,7 +6,7 @@ $env:EMSDK_QUIET = '1'
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
-  emcc fma.c -O2 -fno-fast-math -ffp-contract=off -o fma.js `
+  emcc fma.c -O2 -fno-fast-math -ffp-contract=off -msimd128 -o fma.js `
     '-sEXPORTED_FUNCTIONS=["_main","_corre","_dato","_ejemplo"]' `
     '-sEXPORTED_RUNTIME_METHODS=["UTF8ToString"]' `
     -sMODULARIZE=1 -sEXPORT_ES6=1 '-sENVIRONMENT=web,node'

@@ -1,0 +1,100 @@
+diff --git a/runtime/src/hle/os/os_scheduler.cpp b/runtime/src/hle/os/os_scheduler.cpp
+index fb82235..0844f66 100644
+--- a/runtime/src/hle/os/os_scheduler.cpp
++++ b/runtime/src/hle/os/os_scheduler.cpp
+@@ -38,12 +38,14 @@ void UnlinkMutexFromThread(uint32_t threadPtr, uint32_t mutexPtr)
+ // OSWakeupThread runs its fiber bookkeeping between the two.
+ #ifdef MKW_SUCIAS
+ extern "C" int g_mkwW10SoloPropios;   // (W10 parte B, §207.5; definida en os_thread.cpp)
++extern "C" uint32_t g_mkwW24Solo;     // (W24, §227: el único hilo que corre; os_thread.cpp)
+ #endif
+ void LinkThreadOnRunQueue(uint32_t thread, int32_t priority)
+ {
+ #ifdef MKW_SUCIAS
+     // (un hilo de la otra copia del juego, sin fibra aquí, no entra a las colas de listos)
+     if (g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() && !Fiber::GuestFiberManager::HasFiber(thread)) return;
++    if (g_mkwW24Solo && thread != g_mkwW24Solo) return;
+ #endif
+     const uint32_t queueEntry = kThreadQueueArrayAddr + static_cast<uint32_t>(priority) * 8u;
+     const uint32_t tail = ::Memory::Read32(queueEntry + 4u);
+@@ -411,8 +413,8 @@ static void WakeupThreadQueue(CpuContext* ctx, bool allowImmediateReschedule)
+         const uint16_t state = ::Memory::Read16(thread + kThreadStateOffset);
+ #ifdef MKW_SUCIAS
+         // (W10 parte B, §207.5: un hilo de la otra copia del juego, sin fibra aquí, no se despierta; os_thread.cpp)
+-        const bool ajeno = g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() &&
+-                           !Fiber::GuestFiberManager::HasFiber(thread);
++        const bool ajeno = (g_mkwW10SoloPropios && Fiber::GuestFiberManager::IsInitialized() &&
++                            !Fiber::GuestFiberManager::HasFiber(thread)) || (g_mkwW24Solo && thread != g_mkwW24Solo);
+ #else
+         constexpr bool ajeno = false;
+ #endif
+diff --git a/runtime/src/hle/os/os_sleep.cpp b/runtime/src/hle/os/os_sleep.cpp
+index 5a66c02..6c3a7a1 100644
+--- a/runtime/src/hle/os/os_sleep.cpp
++++ b/runtime/src/hle/os/os_sleep.cpp
+@@ -4,6 +4,7 @@
+ #include <atomic>
+ #include <chrono>
+ #include <cstdint>
++#include <cstdio>
+ #include <iostream>
+ #include <mutex>
+ #include <unordered_map>
+@@ -390,10 +391,33 @@ void ReportUnparkableSleep(uint32_t queuePtr, uint32_t thread)
+ 
+ // OSSleepThread (0x801aa9b8)
+ // Puts the current thread to sleep on a specified wait queue.
++#ifdef MKW_SUCIAS
++// MKW RETRO, W24 (bitácora §227): el teléfono que solo dibuja corre su propio bucle (pegar la caja y dibujar) sin dejar
++// correr a ningún otro hilo. Si en ese modo el hilo principal se duerme, se anota dónde (la cola y la cadena de llamadas
++// de la pila de la Wii: [r1] = el marco de antes, [marco + 4] = de dónde se llamó), para saber qué espera.
++extern "C" uint32_t g_mkwW24Solo;
++extern "C" uint32_t g_mkwW24Dormidas = 0;
++static void mkwW24AnotarSueno(CpuContext* cpu, uint32_t cola) {
++    if (!g_mkwW24Solo || ++g_mkwW24Dormidas > 24) return;
++    std::printf("[w24] el hilo principal se duerme en la cola %08x, lr %08x, pila:", cola, cpu->lr);
++    uint32_t sp = cpu->gpr[1];
++    for (int i = 0; i < 16 && sp && ::Memory::Contains(sp, 8); i++) {
++        const uint32_t atras = ::Memory::Read32(sp);
++        if (!atras || !::Memory::Contains(atras, 8)) break;
++        std::printf(" %08x", ::Memory::Read32(atras + 4));
++        sp = atras;
++    }
++    std::printf("
++");
++}
++#endif
+ extern "C" void OSSleepThread_HLE_801aa9b8(CpuContext* ctx)
+ {
+     CpuContext* cpu = ctx ? ctx : &GetPersistentCpuContext();
+     const uint32_t queuePtr = cpu->gpr[3];
++#ifdef MKW_SUCIAS
++    mkwW24AnotarSueno(cpu, queuePtr);
++#endif
+     
+     if (queuePtr == 0) {
+         RT_LOG(RT_TAG_OS) << "OSSleepThread: null queue pointer!" << std::endl;
+diff --git a/runtime/src/hle/os/os_thread.cpp b/runtime/src/hle/os/os_thread.cpp
+index f8e53d3..b8a8386 100644
+--- a/runtime/src/hle/os/os_thread.cpp
++++ b/runtime/src/hle/os/os_thread.cpp
+@@ -81,6 +81,9 @@ bool IsThpVideoDecoderEntry(uint32_t entryFunc)
+ // hilos que en este programa no tienen fibra (sus montones no reparten igual). Con la marca puesta, un hilo sin fibra
+ // no entra a las colas de listos: nunca se lo intenta correr. Sin MKW_SUCIAS esto no existe.
+ extern "C" int g_mkwW10SoloPropios = 0;
++// W24 (§227): ≠ 0 = la dirección del único hilo que puede correr (el principal del teléfono que solo dibuja, en su propio
++// bucle): ningún otro entra a las colas de listos ni se despierta. Como dejar un solo relé del tablero con tensión.
++extern "C" uint32_t g_mkwW24Solo = 0;
+ #endif
+ 
+ void InsertThreadIntoQueueByPriority(uint32_t queuePtr, uint32_t threadPtr, int32_t priority)
+@@ -89,6 +92,9 @@ void InsertThreadIntoQueueByPriority(uint32_t queuePtr, uint32_t threadPtr, int3
+     if (g_mkwW10SoloPropios && queuePtr >= kThreadQueueArrayAddr && queuePtr < kThreadQueueArrayAddr + kThreadQueueArrayBytes &&
+         Fiber::GuestFiberManager::IsInitialized() && !Fiber::GuestFiberManager::HasFiber(threadPtr))
+         return;
++    if (g_mkwW24Solo && threadPtr != g_mkwW24Solo && queuePtr >= kThreadQueueArrayAddr &&
++        queuePtr < kThreadQueueArrayAddr + kThreadQueueArrayBytes)
++        return;
+ #endif
+     ::Memory::Write32(threadPtr + kThreadQueueOffset, queuePtr);
+ 

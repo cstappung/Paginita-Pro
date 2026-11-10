@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco paquete de carrera</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Banco paquete de carrera: <span>todo lo de la carrera, pedido de una vez</span></h1>
+<p>Prueba <code>web/navegador/paquete-carrera.mjs</code> (bitácora §169) <b>sin el juego</b>, con una memoria de
+  mentira que tiene la forma de la del juego (Racedata, la pista de Pulsar, las skins de Retro Rewind) y una lista de
+  archivos inventada: qué piezas pide para una carrera (la pista, los 12 karts, los grupos de sonido y las voces), las 3
+  de la copa en Grand Prix con prioridad baja, que una carrera igual no se vuelve a pedir y la música entera la primera
+  vez. Con el juego lo mide <code>medir-carrera-entera.mjs</code>.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { leerFicha, claveDe, armarPaquete, crearPaquete, musicaDe, musicaDePista, archivoDePista, vozDeSkin, leerPistaElegida, armarPista, SIGLAS, VEHICULOS, GRUPOS_PISTA, BRSAR, FANFARRIAS, COMUN_CARRERA } from '/web/navegador/paquete-carrera.mjs';
+
+const { ok, fin } = prueba('paquete-carrera', 'Banco paquete de carrera (sin el juego)');
+// la memoria de mentira (big endian, como la Wii)
+const mem = new Map();
+const w8 = (a, v) => mem.set(a >>> 0, v & 0xFF);
+const w32 = (a, v) => { for (let k = 0; k < 4; k++) w8(a + k, v >>> (24 - 8 * k)); };
+const L = { u8: a => mem.get(a >>> 0) || 0, u32: a => ((L.u8(a) << 24) | (L.u8(a + 1) << 16) | (L.u8(a + 2) << 8) | L.u8(a + 3)) >>> 0 };
+const RD = 0x80F00000, ESC = RD + 0x20;
+const skins = new Array(12).fill(0);      // (la copia de las skins de nombres_nativo.cpp: leerSkins)
+function carrera({ pista, casilla, modo = 1, puestos }) {
+  w32(0x809BD728, RD); w8(ESC + 4, puestos.length); w32(0x8043319C + 0x10, pista);
+  w32(0x809BD730, 0x80E00000);             // (Raceinfo: la carrera ya está en camino)
+  w32(ESC + 0xB48, casilla); w32(ESC + 0xB48 + 8, modo);
+  for (let i = 0; i < 12; i++) {
+    const p = puestos[i], j = ESC + 8 + i * 0xF0;
+    w32(j + 0x10, p ? p.tipo : 5); w32(j + 8, p ? p.veh : 0); w32(j + 0xC, p ? p.pj : 0); skins[i] = p ? p.skin : 0;
+  }
+}
+// 12 puestos: una persona (Mario, Standard Kart M, sin skin) y 11 CPU (algunas con skin de Retro Rewind)
+const PUESTOS = [{ tipo: 0, veh: 1, pj: 0, skin: 0 }, ...Array.from({ length: 11 }, (_, k) => ({ tipo: 1, veh: 18 + k, pj: k + 1, skin: k % 3 }))];
+// los archivos de mentira (tamaños inventados)
+const tamaños = new Map();
+const pon = (r, t) => tamaños.set(r, t);
+for (let n = 52; n < 56; n++) pon(`/mkw/sd/RetroRewind6/Tracks/${n}.szs`, 4_000_000 + n);
+pon(BRSAR, 102_000_000);
+for (const r of FANFARRIAS) pon(r, 5_000_000);
+for (const p of PUESTOS) {
+  const pj = SIGLAS[p.pj], veh = VEHICULOS[p.veh];
+  if (p.skin) {
+    pon(`/mkw/sd/RetroRewind6/Character/${veh}-${pj}-${p.skin}.szs`, 600_000);
+    pon(`/mkw/sd/RetroRewind6/Character/Driver/${pj}-${p.skin}.brres`, 300_000);     // (existe, pero el juego no lo lee)
+    if (p.skin === 1) {                 // la skin 1 trae voz propia (con las variantes que la carrera no lee); la 2, no
+      const v = `/mkw/sd/RetroRewind6/Character/Sound/GRP_VO_${pj.toUpperCase()}-${p.skin}_`;
+      pon(v + 'NPC.brwsd', 200_000); pon(v + 'NPC.brbnk', 9_000); pon(v + 'PC.brwsd', 200_000); pon(v + 'CAN_NPC.brwsd', 90_000); pon(v + 'GOL_TOP.brwsd', 90_000);
+    }
+  } else pon(`/mkw/disco/files/Race/Kart/${veh}-${pj}.szs`, 500_000);
+  pon(`/mkw/sd/RetroRewind6/Character/Portrait/${pj}-${p.skin || 3}-css.tpl`, 10_000);
+}
+pon(COMUN_CARRERA[0], 4_900_000); pon(COMUN_CARRERA[1], 1_700_000);
+pon('/mkw/sd/RetroRewind6/strm/54_N.brstm', 4_000_000); pon('/mkw/sd/RetroRewind6/strm/54_F.brstm', 4_100_000);
+const grupos = new Map([['GRP_RACE', [20_000_000, 22_000_000]], ['GRP_PRESENT', [17_700_000, 19_900_000]], [GRUPOS_PISTA[2], [22_800_000, 23_300_000]],
+  ...SIGLAS.flatMap((s, k) => [[`GRP_VO_${s.toUpperCase()}_PC`, [40e6 + k * 2e6, 40e6 + k * 2e6 + 800_000]],
+                               [`GRP_VO_${s.toUpperCase()}_NPC`, [40e6 + k * 2e6 + 900_000, 40e6 + k * 2e6 + 1_200_000]]])]);
+const existe = r => tamaños.get(r) || 0;
+
+try {
+  // ---- 1. Las tablas ----
+  ok('24 personajes y 36 vehículos; Mario = mr, Rosalina = rs', SIGLAS.length === 24 && VEHICULOS.length === 36 && SIGLAS[0] === 'mr' && SIGLAS[23] === 'rs');
+  ok('vehículo 1 = mdf_kart, 18 = sdf_bike, 28 = mc_bike, 32 = ld_bike', VEHICULOS[1] === 'mdf_kart' && VEHICULOS[18] === 'sdf_bike' && VEHICULOS[28] === 'mc_bike' && VEHICULOS[32] === 'ld_bike');
+  ok('32 casillas de pista: 2 = GRP_GP_N_KINOKO, 23 = GRP_GP_R_DS_TOWN', GRUPOS_PISTA.length === 32 && GRUPOS_PISTA[2] === 'GRP_GP_N_KINOKO' && GRUPOS_PISTA[23] === 'GRP_GP_R_DS_TOWN');
+
+  // ---- 2. Leer la ficha de la memoria ----
+  ok('sin Racedata: no hay ficha', leerFicha(L, skins) === null);
+  carrera({ pista: 0x100 + 54, casilla: 2, puestos: PUESTOS });
+  const f = leerFicha(L, skins);
+  ok('lee la pista de Pulsar (0x136 = la 13.2), la casilla (2) y el modo (VS = 1)', f.pista === 310 && f.casilla === 2 && f.modo === 1);
+  ok('lee los 12 puestos con tipo, vehículo, personaje y skin', f.puestos.length === 12 && f.puestos[0].tipo === 0 && f.puestos[5].pj === 5 && f.puestos[5].veh === 22 && f.puestos[5].skin === 1);
+
+  // ---- 3. Qué pide ----
+  const { piezas, baja, faltan } = armarPaquete(f, { existe, grupos, archivos: [...tamaños.keys()] });
+  const rutas = piezas.map(p => p[0]);
+  ok('la pista entera, primero', piezas[0][0].endsWith('/Tracks/54.szs') && piezas[0][1] === 0 && piezas[0][2] === tamaños.get(piezas[0][0]));
+  const karts = rutas.filter(r => /Race\/Kart\/|Character\/[a-z]+_(kart|bike)-/.test(r));
+  ok('los 12 karts (la skin 0 del disco, las otras de Retro Rewind)', karts.length === 12 && karts.includes('/mkw/disco/files/Race/Kart/mdf_kart-mr.szs') &&
+     karts.includes('/mkw/sd/RetroRewind6/Character/ma_bike-ka-1.szs'));
+  ok('Character/Driver/<pj>-<skin>.brres no se pide (el juego no lo lee)', !rutas.some(r => r.includes('/Driver/')));
+  // (con ?vocesAmbas=0: del brsar solo la voz del lado de cada uno, como antes de §176)
+  const enBrsar = armarPaquete(f, { existe, grupos, archivos: [...tamaños.keys()], vocesAmbas: false }).piezas.filter(p => p[0] === BRSAR);
+  ok('del brsar: GRP_RACE y GRP_PRESENT (los sonidos de la pista no: no salen de la casilla)', [grupos.get('GRP_RACE'), grupos.get('GRP_PRESENT')]
+     .every(g => enBrsar.some(p => p[1] === g[0] && p[2] === g[1])) && !enBrsar.some(p => p[1] === grupos.get('GRP_GP_N_KINOKO')[0]));
+  ok('archivoDePista: 0x100 + 4c + k → Tracks/<4c + k>; menos de 0x100 no es de Retro Rewind', archivoDePista(256) === 0 && archivoDePista(310) === 54 && archivoDePista(378) === 122 && archivoDePista(54) === -1);
+  const sinSkin = PUESTOS.filter(p => p.skin !== 1).length;
+  ok(`sin skin (o con una skin sin voz propia) la voz va del brsar (la persona _PC, cada CPU _NPC: ${sinSkin} voces)`, enBrsar.length === 2 + sinSkin &&
+     enBrsar.some(p => p[1] === grupos.get('GRP_VO_KP_NPC')[0]) &&
+     enBrsar.some(p => p[1] === grupos.get('GRP_VO_MR_PC')[0]) && !enBrsar.some(p => p[1] === grupos.get('GRP_VO_MR_NPC')[0]) &&
+     enBrsar.some(p => p[1] === grupos.get('GRP_VO_BPC_NPC')[0]));
+  const ambas = piezas.filter(p => p[0] === BRSAR), pjs = [...new Set(PUESTOS.map(p => SIGLAS[p.pj].toUpperCase()))];
+  ok(`§176: del brsar, las dos voces (_PC y _NPC) de cada personaje de la carrera, también con skin con voz propia (${pjs.length} personajes)`,
+     pjs.every(x => ['PC', 'NPC'].every(l => ambas.some(p => p[1] === grupos.get(`GRP_VO_${x}_${l}`)[0]))) && ambas.length === 2 + 2 * pjs.length);
+  ok('la voz de la skin de Retro Rewind (Character/Sound)', rutas.some(r => r.includes('/Character/Sound/GRP_VO_WL-1_NPC')));
+  const voces = rutas.filter(r => r.includes('/Character/Sound/'));
+  ok('de la voz de la skin, solo _NPC .brwsd y .brbnk (no _PC de una CPU, ni _CAN_ ni _GOL_)', voces.length === 2 * PUESTOS.filter(p => p.skin === 1).length &&
+     voces.every(r => /_NPC\.(brwsd|brbnk)$/.test(r)));
+  const arch = ['/x/Character/Sound/GRP_VO_KK-3_NPC.brwsd.baby_peach', '/x/Character/Sound/GRP_VO_dk-4_NPC.brbnk.funky_kong', '/x/Character/Sound/GRP_VO_KK-3_CAN_NPC.brwsd.baby_peach', '/x/Character/Sound/GRP_VO_KK-3_PC.brwsd.baby_peach'];
+  ok('vozDeSkin: con sufijo y sin importar mayúsculas; sin voz propia, nada', vozDeSkin(arch, 'kk', 3, 'NPC').length === 1 && vozDeSkin(arch, 'dk', 4, 'NPC').length === 1 &&
+     vozDeSkin(arch, 'kk', 3, 'PC').length === 1 && vozDeSkin(arch, 'mr', 3, 'NPC').length === 0);
+  ok('§176: la música de la pista va en el paquete, entera (Tracks/54 → strm/54_N); la de la última vuelta no', piezas.some(p => p[0] === musicaDePista(54) && p[1] === 0 && p[2] === 4_000_000) && !rutas.some(r => r.endsWith('_F.brstm')));
+  ok('§176: con ?musicaPaquete=0 la música no va en el paquete (como antes)', !armarPaquete(f, { existe, grupos, archivos: [...tamaños.keys()], musica: false }).piezas.some(p => musicaDe(p[0])));
+  ok('§176: lo de toda carrera: StaticR.rel entero y el principio (512 KB) de la fanfarria de la largada', piezas.some(p => p[0] === COMUN_CARRERA[0] && p[2] === 4_900_000) &&
+     piezas.some(p => p[0] === COMUN_CARRERA[1] && p[1] === 0 && p[2] === 512 * 1024));
+  ok('§176: con ?comunCarrera=0, sin eso', !armarPaquete(f, { existe, grupos, archivos: [...tamaños.keys()], comun: false }).piezas.some(p => COMUN_CARRERA.includes(p[0])));
+  ok('el principio de las 3 fanfarrias (512 KB)', FANFARRIAS.every(r => piezas.some(p => p[0] === r && p[1] === 0 && p[2] === 512 * 1024)));
+  ok('el retrato de cada skin (los que no tienen skin, no)', rutas.filter(r => r.endsWith('-css.tpl')).length === PUESTOS.filter(p => p.skin).length);
+  ok('en VS no hay pistas de prioridad baja', baja.length === 0);
+  ok('ninguna pieza repetida', new Set(piezas.map(p => p.join('|'))).size === piezas.length);
+  ok('lo que no existe se anota y no se pide', Array.isArray(faltan) && piezas.every(p => existe(p[0]) > 0));
+
+  // ---- 4. Grand Prix: las otras 3 de la copa con prioridad baja ----
+  const gp = armarPaquete({ ...f, modo: 0 }, { existe, grupos, archivos: [] });
+  ok('Grand Prix (modo 0), pista 54: 52, 53 y 55 con prioridad baja', gp.baja.map(p => p[0].match(/(\d+)\.szs/)[1]).sort().join(',') === '52,53,55');
+
+  // ---- 5. En la página: pedir una vez por carrera ----
+  const pedidos = [], bajos = [];
+  const disco = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedidos.push([url, i, e]), adelantarBloques: (url, tam, b0, b1) => bajos.push([url, b0, b1]) };
+  const paq = crearPaquete({ L, disco, tamaños, direccion: r => 'http://x' + r, grupos, skins: () => skins });
+  paq.revisar();
+  const n1 = pedidos.length;
+  ok('la primera vez pide todo el paquete (con prioridad normal)', n1 === piezas.length && paq.estado.carreras === 1 && bajos.length === 0);
+  paq.revisar(); paq.revisar();
+  ok('la misma carrera no se vuelve a pedir', pedidos.length === n1 && paq.estado.carreras === 1);
+  skins[1] = 2;       // (RR terminó de sortear una skin: otra clave)
+  paq.revisar();
+  ok('si cambia una skin (o un puesto), pide otra vez', paq.estado.carreras === 2 && pedidos.length > n1);
+  const n2 = pedidos.length;
+  paq.alLeer('/mkw/sd/RetroRewind6/strm/54_N.brstm'); paq.alLeer('/mkw/sd/RetroRewind6/strm/54_F.brstm');
+  ok('§176: la música ya fue con el paquete: la lectura del juego no la vuelve a pedir (ni la de la última vuelta)', pedidos.length === n2 && paq.estado.musicas === 1);
+  // sin la música en el paquete (?musicaPaquete=0): la primera lectura la pide entera, como antes de §176
+  const pedM = [], discoM = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedM.push([url, i, e]), adelantarBloques: () => {} };
+  const paqM = crearPaquete({ L, disco: discoM, tamaños, direccion: r => 'http://x' + r, grupos, skins: () => skins, musica: false });
+  paqM.revisar(); const m0 = pedM.length;
+  paqM.alLeer('/mkw/sd/RetroRewind6/strm/54_N.brstm');
+  ok('la primera lectura de la música la pide entera (la de la última vuelta no: 4 MB más en plena carrera)', pedM.length === m0 + 1 &&
+     pedM.at(-1)[0].endsWith('54_N.brstm') && pedM.at(-1)[2] === 4_000_000);
+  paqM.alLeer('/mkw/sd/RetroRewind6/strm/54_N.brstm'); paqM.alLeer('/mkw/sd/RetroRewind6/strm/54_F.brstm');
+  ok('la música no se vuelve a pedir', pedM.length === m0 + 1 && paqM.estado.musicas === 1);
+  // §176: la sala sabe la pista antes (la copa o la lista): pedirPista la pide con su música, una vez
+  const pedS = [], discoS = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedS.push([url, i, e]), adelantarBloques: () => {} };
+  const paqS = crearPaquete({ L, disco: discoS, tamaños, direccion: r => 'http://x' + r, grupos, skins: () => skins });
+  const pidio = paqS.pedirPista(0x100 + 54);
+  ok('§176: la sala pide la pista que ya sabe, entera y con su música', pidio && pedS.length === 2 && pedS[0][0].endsWith('/Tracks/54.szs') && pedS[1][0].endsWith('/strm/54_N.brstm'));
+  ok('§176: la misma pista de la sala no se pide dos veces; una que no es de Retro Rewind, nada', !paqS.pedirPista(0x100 + 54) && !paqS.pedirPista(20) && pedS.length === 2);
+  paqS.alLeer('/mkw/sd/RetroRewind6/strm/54_N.brstm');
+  // §176: lo que la carrera tuvo que bajar se aprende por pista y va con el paquete la vez siguiente
+  let guardado = {};
+  const memoria = { leer: () => JSON.parse(JSON.stringify(guardado)), guardar: o => { guardado = JSON.parse(JSON.stringify(o)); } };
+  const pedA = [], discoA = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedA.push([url, i, e]), adelantarBloques: () => {} };
+  const paqA = crearPaquete({ L, disco: discoA, tamaños, direccion: r => 'http://x' + r + '?v=1', grupos, skins: () => skins, memoria });
+  const faltas = [['http://x' + BRSAR, 88, 1], ['http://x' + BRSAR, 152, 2], ['http://x/no/existe.szs', 3, 1]];
+  ok('§176: aprende lo que bajó la carrera (las direcciones vuelven a su ruta; lo que no es del disco, no)', paqA.aprender(310, faltas) === 2 && guardado[310]?.length === 2);
+  ok('§176: lo ya aprendido no se repite', paqA.aprender(310, faltas) === 0 && guardado[310].length === 2);
+  const pedB = [], discoB = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedB.push([url, i, e]), adelantarBloques: () => {} };
+  const paqB = crearPaquete({ L, disco: discoB, tamaños, direccion: r => 'http://x' + r + '?v=1', grupos, skins: () => skins, memoria });
+  paqB.revisar();
+  ok('§176: la próxima carrera en esa pista lo pide con el paquete (los bloques 88 y 152–153 del brsar)', pedB.some(p => p[0].includes('revo_kart.brsar') && p[1] === 88 * 262144 && p[2] === 89 * 262144) &&
+     pedB.some(p => p[0].includes('revo_kart.brsar') && p[1] === 152 * 262144 && p[2] === 154 * 262144));
+  const pedC = [], discoC = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedC.push([url, i, e]), adelantarBloques: () => {} };
+  crearPaquete({ L, disco: discoC, tamaños, direccion: r => 'http://x' + r + '?v=1', grupos, skins: () => skins, memoria }).pedirPista(0x100 + 54);
+  // §176: la ficha que arma la página en la sala (antes de que el juego arme la carrera): todo menos los karts
+  const pedF = [], discoF = { bloque: 262144, adelantarRango: (url, tam, i, e) => pedF.push([url, i, e]), adelantarBloques: () => {} };
+  const fichaPagina = { pista: 0x100 + 54, puestos: PUESTOS.map(p => ({ tipo: p.tipo, personaje: p.pj, vehiculo: p.veh })) };
+  const nF = crearPaquete({ L, disco: discoF, tamaños, direccion: r => 'http://x' + r, grupos, skins: () => skins, memoria }).pedirFicha(fichaPagina);
+  ok('§176: con la ficha de la sala pide la pista, la música, lo común, las voces y lo aprendido, sin los karts (la skin la sortea el juego después)',
+     nF > 0 && pedF.some(p => p[0].endsWith('/Tracks/54.szs')) && pedF.some(p => p[0].endsWith('54_N.brstm')) && pedF.some(p => p[0].endsWith('StaticR.rel')) &&
+     pedF.some(p => p[0].includes('revo_kart.brsar') && p[1] === grupos.get('GRP_VO_MR_NPC')[0]) && pedF.some(p => p[1] === 88 * 262144) &&
+     !pedF.some(p => /\/Race\/Kart\/|\/Character\//.test(p[0])));
+  ok('§176: …y también la sala al pedir la pista (pedirPista)', pedC.length === 4 && pedC.some(p => p[1] === 88 * 262144));
+  ok('§176: …y la lectura del juego no vuelve a pedir la música', pedS.length === 2 && paqS.estado.musicas === 1 && paqS.estado.sala === 1);
+  ok('musicaDe: solo strm/<x>_N.brstm', musicaDe('/a/strm/uSSC_N.brstm')?.[0] === '/a/strm/uSSC_N.brstm' && musicaDe('/a/strm/uSSC_F.brstm') === null && musicaDe('/a/b.szs') === null);
+  ok('claveDe: sin ficha, vacía', claveDe(null) === '');
+
+  // ---- 5b. La ficha por omisión del arranque no cuenta ----
+  w32(0x809BD730, 0);                                  // sin Raceinfo
+  const SMD = 0x80E10000, SECD = 0x80E20000; w32(0x809C1E38, SMD); w32(SMD, SECD); w32(SECD, 0x3F); w32(SMD + 0xC, -1);   // en el título
+  ok('al arrancar (título, sin Raceinfo) la ficha por omisión no vale: nada que pedir', leerFicha(L, skins) === null);
+  w32(SMD + 0xC, 0x20);                                // la siguiente sección es la de VS: la carrera está cargando
+  ok('con la sección siguiente de carrera (0x20 VS) la ficha vale', leerFicha(L, skins)?.puestos.length === 12);
+  w32(SMD + 0xC, -1); w32(0x809BD730, 0x80E00000);
+
+  // ---- 6. U2: la pista apenas se elige en los menús (antes de que exista la ficha de la carrera) ----
+  const MENU = RD + 0xC10;
+  w8(ESC + 4, 0);                                     // (la carrera todavía no está armada: 0 puestos)
+  w32(0x8043319C + 0x10, 0x100 + 52); w32(MENU + 0xB48 + 8, 1);
+  const ped2 = [], baj2 = [];
+  const disco2 = { bloque: 262144, adelantarRango: (url, tam, i, e) => ped2.push([url, i, e]), adelantarBloques: (url, tam, b0, b1) => baj2.push([url, b0, b1]) };
+  let ahora = 0;
+  w32(SECD, 0x3F);                                    // primero el título (sección 0x3F)
+  const paq2 = crearPaquete({ L, disco: disco2, tamaños, direccion: r => 'http://x' + r, grupos, skins: () => skins, reloj: () => ahora });
+  paq2.revisar(); w32(0x8043319C + 0x10, 0x100 + 0); paq2.revisar(); ahora += 1500; paq2.revisar();
+  ok('U2: en el arranque y el título (fuera de los menús), un cambio de la pista de Pulsar no se pide', ped2.length === 0);
+  w32(SECD, 0x48); w32(0x8043319C + 0x10, 0x100 + 52);          // (ya en los menús: Single Player)
+  paq2.revisar();
+  ok('U2: la pista que ya estaba antes de elegir no se pide (puede ser la de la vez anterior)', ped2.length === 0 && paq2.estado.tempranas === 0);
+  w32(0x8043319C + 0x10, 0x100 + 51); paq2.revisar(); ahora += 200;
+  w32(0x8043319C + 0x10, 0x100 + 50); paq2.revisar(); ahora += 200;   // (pasó de largo por dos pistas)
+  w32(0x8043319C + 0x10, 0x100 + 54);                 // (el jugador eligió la 54 en VS)
+  paq2.revisar(); ahora += 600; paq2.revisar();
+  ok('U2: una pista que no queda quieta 1 s no se pide (pasar por la lista no baja nada)', ped2.length === 0);
+  ahora += 500; paq2.revisar(); ahora += 200; paq2.revisar();
+  ok('U2: al elegir otra pista la pide enseguida, entera y una sola vez, con su música (§176), sin la ficha de la carrera', ped2.length === 2 &&
+     ped2[1][0] === 'http://x' + musicaDePista(54) && ped2[0][0].endsWith('/Tracks/54.szs') && ped2[0][2] === tamaños.get('/mkw/sd/RetroRewind6/Tracks/54.szs') && baj2.length === 0 && paq2.estado.carreras === 0);
+  w32(MENU + 0xB48 + 8, 0); w32(0x8043319C + 0x10, 0x100 + 53);   // (Grand Prix: la copa de las pistas 52–55)
+  paq2.revisar(); ahora += 1100; paq2.revisar();
+  ok('U2: en Grand Prix pide la elegida y las otras 3 de la copa con prioridad baja', ped2.length === 3 && ped2[2][0].endsWith('/Tracks/53.szs') &&
+     baj2.map(b => b[0].match(/(\d+)\.szs/)[1]).sort().join(',') === '52,54,55');
+  paq2.alLeer('/mkw/sd/RetroRewind6/Tracks/53.szs');
+  ok('U2: anota cuánto antes de que el juego la abriera se pidió (estado.pista.adelantoMs)', paq2.estado.pista?.por === 'eleccion' && paq2.estado.pista.adelantoMs >= 0);
+  const paq3 = crearPaquete({ L, disco: disco2, tamaños, direccion: r => 'http://x' + r, grupos, skins: () => skins, pistaTemprana: false });
+  const antes3 = ped2.length;
+  paq3.revisar(); w32(0x8043319C + 0x10, 0x100 + 55); paq3.revisar(); paq3.revisar();
+  ok('U2: con ?pistaTemprana=0 no se pide al elegir (solo con la ficha, como antes)', ped2.length === antes3 && paq3.estado.tempranas === 0);
+  ok('armarPista: una pista que no es de Retro Rewind no pide nada', armarPista({ pista: 54, modo: 0 }, existe).piezas.length === 0);
+  w32(0x809BD728, 0);
+  ok('leerPistaElegida: sin Racedata, nada', leerPistaElegida(L) === null);
+} catch (e) {
+  ok('sin errores: ' + e.message, false);
+}
+fin();
+</script>
+</body>
+</html>

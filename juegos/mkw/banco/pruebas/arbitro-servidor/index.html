@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Árbitro en un servidor</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Árbitro en un servidor: <span>«Servidor Oracle», con un servidor de mentira de este PC</span></h1>
+<p>Prueba la tercera conexión de la sala (bitácora §236) <b>sin el juego</b>: tres consolas falsas en esta página (cada
+  una con su <code>lockstep.mjs</code> de verdad, un cuadro cada 16,7 ms, botones que cambian solos y una «carrera» que
+  es la mezcla de los botones usados) unidas por una red falsa con 15–25 ms de demora, y el <b>programa de verdad</b>
+  del servidor (<code>herramientas/arbitro/servidor.mjs</code>, el que va a la máquina de Oracle) corriendo en este PC
+  (<code>/arbitro</code> del banco), con WebSocket de verdad. Mira: la misma carrera en las tres (huellas y botones
+  iguales) con el servidor de árbitro; que si el servidor se cae (se cortan sus conexiones) o se cuelga (no contesta con
+  la conexión abierta) la carrera sigue con una PC de árbitro, igual en las tres; la sala sin servidor; y que la traba
+  de un jugador (1,5 s) no frena a los otros. <code>?solo=N</code> = una parte.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearLockstep, SERVIDOR } from '/web/navegador/lockstep.mjs';
+import { crearConexionArbitro, configArbitro, UID_SERVIDOR } from '/web/navegador/arbitro-servidor.mjs';
+import { crearSala } from '/web/navegador/sala-carrera.mjs';
+
+const { ok, nota, fin } = prueba('arbitro-servidor', 'Árbitro en un servidor (sin el juego)');
+const solo = Number(new URLSearchParams(location.search).get('solo')) || 0;
+const dormir = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
+const CUADRO = 1000 / 60;
+const hasta = async (f, ms = 10000) => { const t0 = performance.now(); while (!f()) { if (performance.now() - t0 > ms) return false; await dormir(20); } return true; };
+const control = (sala, que) => fetch(`/arbitro?sala=${encodeURIComponent(sala)}&que=${que}`).then(r => r.json());
+
+// los botones de cada piloto en el cuadro c: cambian cada 10 cuadros, distintos para cada uno (con la forma de los del
+// juego: botones u16, stick x/y, C x/y, gatillos)
+function botones(uid, c) {
+  let h = 2166136261; for (const ch of uid + ':' + Math.floor(c / 10)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return [h & 0x0F7F, ((h >>> 8) & 255) - 128, ((h >>> 16) & 255) - 128, 0, 0, (h >>> 24) & 255, 0];
+}
+
+// una red falsa entre las consolas de esta página: cada mensaje llega 15–25 ms después, en orden (por par)
+function crearRed() {
+  const nodos = new Map(), ultimo = new Map(), cortados = new Set();
+  return {
+    unir(uid, alBinario) { nodos.set(uid, alBinario); },
+    mandar(de, a, b) {
+      if (cortados.has(de) || cortados.has(a)) return;
+      const k = de + '>' + a, t = Math.max(performance.now() + 15 + Math.random() * 10, (ultimo.get(k) || 0) + 0.1);
+      ultimo.set(k, t);
+      const copia = b.slice();
+      setTimeout(() => nodos.get(a)?.(de, copia), t - performance.now());
+    },
+  };
+}
+
+// una consola falsa: su lockstep, su conexión con el servidor (si la sala lo usa) y su «juego» (el bucle de cuadros)
+// yaEn (§250) = el cuadro del «¡YA!»: antes va la cuenta (la largada pareja: nadie corre sin los botones de todos) y al
+// llegar la consola se lo avisa al servidor; 0 = sin cuenta (la carrera desde el cuadro 0, como las pruebas de antes)
+function crearConsola({ uid, todos, red, url, sala, conServidor, cuadros, trabaEn = -1, trabaMs = 0, yaEn = 0 }) {
+  const humanos = [{ uid: UID_SERVIDOR, mando: SERVIDOR }, ...todos.map((u, i) => ({ uid: u, mando: i }))];
+  const registro = [];
+  let c = 0, prisaMs = 0, estado = 2166136261, srv = null;
+  const ls = crearLockstep({ yo: uid, humanos, local: () => botones(uid, c), arbitro: true, esperaCorte: 2000, esperaLargada: 15000,
+    enviar: (u, b) => u === UID_SERVIDOR ? srv?.enviar(b) : red.mandar(uid, u, b),
+    huella: () => estado >>> 0, prisa: ms => { prisaMs += ms; },
+    enCuenta: () => c < yaEn,
+    ido: u => u === UID_SERVIDOR && !srv?.enCarrera(),
+    registro: t => registro.push(t) });
+  red.unir(uid, (de, b) => ls.alBinario(de, b));
+  if (url) srv = crearConexionArbitro({ url, sala, uid, humanos: () => humanos.filter(h => h.uid !== UID_SERVIDOR), alBinario: b => ls.alBinario(UID_SERVIDOR, b) });
+  const autoridades = new Set();
+  let maxPaso = 0, cuandoFin = null, tYa = null;
+  async function correr() {
+    const fuera = conServidor ? [] : [SERVIDOR];
+    ls.fijarCarrera(1, fuera, conServidor ? SERVIDOR : null);
+    if (conServidor) srv.carrera(1, fuera);
+    let tic = performance.now();
+    while (c < cuadros) {
+      if (c === trabaEn) await dormir(trabaMs);                      // la traba de esta PC (la pestaña se congela)
+      if (c === yaEn) { tYa = performance.now(); if (conServidor) srv.ya(1, c); }   // §250: el «¡YA!»
+      const t0 = performance.now();
+      const datos = await ls.pad(c);
+      if (c > 120) maxPaso = Math.max(maxPaso, performance.now() - t0);   // (después de la largada: cuánto esperó un cuadro)
+      for (let i = 0; i < 8 * 3; i++) estado = Math.imul(estado ^ datos[i], 16777619);
+      autoridades.add(ls.estado().autoridad);
+      c++;
+      if (prisaMs > 0) { prisaMs -= CUADRO; continue; }              // ponerse al día: cuadros seguidos (mkw_prisa)
+      // como el juego con el monitor: el cuadro siguiente al refresco siguiente; si me atrasé, no corro lo perdido
+      tic = performance.now() - tic > 2 * CUADRO ? performance.now() : tic + CUADRO;
+      await dormir(tic - performance.now());
+    }
+    cuandoFin = performance.now();
+  }
+  return { uid, ls, srv, registro, correr, autoridades, get estado() { return estado >>> 0; }, get maxPaso() { return maxPaso; }, get cuadro() { return c; }, get tYa() { return tYa; } };
+}
+
+let nSala = 0;
+// una carrera de las tres consolas; `durante(consolas, sala)` corre al lado (para cortar el servidor a mitad, etc.)
+async function carrera({ cuadros = 600, conServidor = true, url, traba = null, durante = null, yaEn = 0 }) {
+  const red = crearRed(), sala = `banco-${Date.now()}-${++nSala}`, todos = ['ana', 'beto', 'carla'];
+  const cs = todos.map(uid => crearConsola({ uid, todos, red, url: conServidor || url ? url : null, sala, conServidor, cuadros, yaEn,
+    ...(traba?.uid === uid ? { trabaEn: traba.en, trabaMs: traba.ms } : {}) }));
+  if (conServidor) ok(`las tres se conectan al servidor (${sala})`, await hasta(() => cs.every(x => x.srv.abierto()), 8000), cs.map(x => x.srv.estado().error || 'bien').join(', '));
+  const lado = durante ? durante(cs, sala) : null;
+  await Promise.race([Promise.all(cs.map(x => x.correr())), dormir(cuadros * CUADRO * 3 + 30000)]);
+  await lado;
+  return { cs, sala };
+}
+const iguales = cs => cs.every(x => x.estado === cs[0].estado && x.ls.estado().hashBotones === cs[0].ls.estado().hashBotones);
+const resumir = cs => cs.map(x => `${x.uid}: cuadro ${x.cuadro}, huella ${x.estado.toString(16)}, iguales ${x.ls.estado().huellasIguales}, autoridad ${[...x.autoridades].join('→')}`).join(' · ');
+const desinc = cs => cs.map(x => x.ls.estado().desincronizado).filter(Boolean);
+
+// La decisión de la sala usa el mismo latido y el mismo reparto que el vestíbulo de Juegos.
+function arranqueSala({ disponibleA, disponibleB }) {
+  const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }];
+  const salas = new Map(), relojes = [], cola = [];
+  let tiempo = 0;
+  for (const [yo, disponible] of [['ana', disponibleA], ['beto', disponibleB]]) {
+    salas.set(yo, crearSala({ yo, humanos, anfitrion: 'ana', servidor: () => disponible,
+      ahora: () => tiempo, cada: fn => relojes.push(fn),
+      enviar: (a, b) => cola.push(() => salas.get(a).alBinario(yo, b.slice())),
+    }));
+  }
+  const tic = () => {
+    tiempo += 1000;
+    for (const fn of relojes) fn();
+    while (cola.length) cola.shift()();
+  };
+  for (let i = 0; i < 5; i++) tic();
+  salas.get('ana').ponerPistas([{ copa: 0, fila: 0 }]);
+  tic();
+  for (const sala of salas.values()) sala.elegi({ personaje: 0, vehiculo: 1, derrape: 0 });
+  tic();
+  tic();
+  return [...salas.values()].map(s => s.estado());
+}
+
+try {
+  // la configuración: la de la dirección (las pruebas) gana; sin nada, el arbitro.json de lo privado; mal = null
+  {
+    const p = s => new URLSearchParams(s);
+    const c1 = await configArbitro({ parametros: p('arbitroUrl=ws://127.0.0.1:9/&arbitroClave=k') });
+    const c2 = await configArbitro({ parametros: p(''), origen: 'https://w', buscar: async u => ({ ok: true, json: async () => ({ url: 'wss://arbitro.ejemplo.cl/', clave: 'x', pedida: u }) }) });
+    const c3 = await configArbitro({ parametros: p(''), buscar: async () => ({ ok: false }) });
+    const c4 = await configArbitro({ parametros: p('arbitroUrl=ws://otro.cl/') });
+    const c5 = await configArbitro({ parametros: p(''), buscar: async () => { throw new Error('sin red'); } });
+    ok('configuración: la de la dirección (pruebas) y el arbitro.json del dueño; sin archivo, sin red o sin cifrar afuera = sin servidor',
+      c1?.url === 'ws://127.0.0.1:9/' && c1.clave === 'k' && c2?.url === 'wss://arbitro.ejemplo.cl/' && c3 === null && c4 === null && c5 === null,
+      JSON.stringify([c1, c2, c3, c4, c5]));
+  }
+  const { url } = await fetch('/arbitro').then(r => r.json());
+  nota(`el servidor de mentira escucha en ${url}`);
+
+  if (!solo || solo === 1) {
+    // ---- 1) la misma carrera, con el servidor de árbitro ----
+    const { cs, sala } = await carrera({ url });
+    const est = await control(sala, 'estado');
+    ok('1: la carrera entera con el servidor de árbitro (en las tres, siempre él)', cs.every(x => x.cuadro === 600 && x.autoridades.size === 1 && x.autoridades.has(UID_SERVIDOR)), resumir(cs));
+    ok('1: la misma carrera en las tres (huella y botones)', iguales(cs) && !desinc(cs).length && cs.every(x => x.ls.estado().huellasIguales >= 30), resumir(cs));
+    ok('1: el servidor llevó la carrera (corrió sus cuadros y repartió la hoja)', est.sala?.cuadro >= 500 && est.sala?.lockstep?.paquetesBotones > 1000,
+      `cuadro ${est.sala?.cuadro}, paquetes ${est.sala?.lockstep?.paquetesBotones}`);
+    ok('1: nadie esperó un cuadro más de 100 ms', cs.every(x => x.maxPaso < 100), cs.map(x => x.maxPaso.toFixed(0) + ' ms').join(', '));
+  }
+  if (!solo || solo === 2) {
+    // ---- 2) el servidor se cae a mitad (se cortan todas sus conexiones): sigue una PC ----
+    const { cs } = await carrera({ url, cuadros: 900, durante: async (cs, sala) => { await hasta(() => cs[0].cuadro >= 300, 20000); await control(sala, 'tumbar'); } });
+    ok('2: se cae el servidor en el cuadro 300 y la carrera sigue con una PC de árbitro', cs.every(x => x.cuadro === 900 && x.autoridades.has(UID_SERVIDOR) && x.ls.estado().autoridad === 'ana'), resumir(cs));
+    ok('2: la misma carrera en las tres', iguales(cs) && !desinc(cs).length, resumir(cs));
+    ok('2: el cambio de árbitro fue rápido (menos de 2,5 s quieta)', cs.every(x => x.maxPaso < 2500), cs.map(x => x.maxPaso.toFixed(0) + ' ms').join(', '));
+    nota('2: ' + cs[1].registro.filter(t => /pauso|corto|sigue sin nadie|autoridad/.test(t)).slice(0, 3).join(' | '));
+  }
+  if (!solo || solo === 3) {
+    // ---- 3) el servidor se cuelga (no contesta, con la conexión abierta): también sigue una PC ----
+    const { cs } = await carrera({ url, cuadros: 900, durante: async (cs, sala) => { await hasta(() => cs[0].cuadro >= 300, 20000); await control(sala, 'callar'); } });
+    ok('3: el servidor deja de contestar en el cuadro 300 y la carrera sigue con una PC de árbitro', cs.every(x => x.cuadro === 900 && x.ls.estado().autoridad === 'ana'), resumir(cs));
+    ok('3: la misma carrera en las tres', iguales(cs) && !desinc(cs).length, resumir(cs));
+    ok('3: el cambio de árbitro fue rápido (menos de 2,5 s quieta)', cs.every(x => x.maxPaso < 2500), cs.map(x => x.maxPaso.toFixed(0) + ' ms').join(', '));
+  }
+  if (!solo || solo === 4) {
+    // ---- 4) sin servidor (no está configurado o la sala no lo eligió): la PC de siempre ----
+    const { cs } = await carrera({ conServidor: false });
+    ok('4: sin servidor, la PC de árbitro desde el principio y nadie lo espera', cs.every(x => x.cuadro === 600 && x.autoridades.size === 1 && x.autoridades.has('ana') && x.maxPaso < 100), resumir(cs));
+    ok('4: la misma carrera en las tres', iguales(cs) && !desinc(cs).length, resumir(cs));
+    const decisiones = [[true, true], [true, false], [false, true], [false, false]].map(([a, b]) =>
+      arranqueSala({ disponibleA: a, disponibleB: b }).every(e => e.carrera === 1 && e.servidor === (a && b)));
+    ok('4: el anfitrión confirma Oracle a ambas páginas solo cuando ambas lo tienen vivo', decisiones.every(Boolean), decisiones.join(', '));
+  }
+  if (!solo || solo === 5) {
+    // ---- 5) la traba de un jugador (1,5 s) con el servidor de árbitro: los otros no la esperan ----
+    const { cs } = await carrera({ url, cuadros: 900, traba: { uid: 'carla', en: 300, ms: 1500 } });
+    const [a, b, c] = cs;
+    ok('5: Carla se traba 1,5 s y Ana y Beto no la esperan (ningún cuadro de más de 100 ms)', a.maxPaso < 100 && b.maxPaso < 100, `Ana ${a.maxPaso.toFixed(0)} ms, Beto ${b.maxPaso.toFixed(0)} ms, Carla ${c.maxPaso.toFixed(0)} ms`);
+    ok('5: la misma carrera en las tres (Carla se pone al día)', cs.every(x => x.cuadro === 900) && iguales(cs) && !desinc(cs).length, resumir(cs));
+    ok('5: el servidor siguió de árbitro', cs.every(x => x.autoridades.size === 1 && x.autoridades.has(UID_SERVIDOR)), resumir(cs));
+  }
+  if (!solo || solo === 6) {
+    // ---- 6) §250, la largada pareja con el servidor: Carla se traba 1,5 s en la CUENTA (cuadro 200; el «¡YA!» en el
+    // 400). El servidor no inventa sus botones antes del «¡YA!»: Ana y Beto la esperan y las tres largan a la vez ----
+    const { cs, sala } = await carrera({ url, cuadros: 900, yaEn: 400, traba: { uid: 'carla', en: 200, ms: 1500 } });
+    const ts = cs.map(x => x.tYa), d = Math.max(...ts) - Math.min(...ts);
+    ok('6: con la traba en la cuenta, las tres largan a la vez (el «¡YA!» con menos de 150 ms de diferencia)', ts.every(Number.isFinite) && d < 150,
+      cs.map(x => `${x.uid} ${x.tYa?.toFixed(0)}`).join(', ') + ` · diferencia ${d.toFixed(0)} ms`);
+    ok('6: Ana y Beto la esperaron en la cuenta (un cuadro de más de 1 s)', cs[0].maxPaso > 1000 && cs[1].maxPaso > 1000, cs.map(x => `${x.uid} ${x.maxPaso.toFixed(0)} ms`).join(', '));
+    ok('6: la misma carrera en las tres, con el servidor de árbitro', cs.every(x => x.cuadro === 900) && iguales(cs) && !desinc(cs).length &&
+      cs.every(x => x.autoridades.size === 1 && x.autoridades.has(UID_SERVIDOR)), resumir(cs));
+  }
+} catch (e) {
+  ok('sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

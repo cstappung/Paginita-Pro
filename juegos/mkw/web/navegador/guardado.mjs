@@ -98,7 +98,22 @@ export function crearGuardado({ base = 'mkw-partidas', almacen = 'archivos', esp
     addEventListener('pagehide', () => guardarPendientes());
   }
   function anotar(ruta) { pendientes.add(ruta); borrados.delete(ruta); programar(); }
-  function programar() { clearTimeout(temporizador); temporizador = setTimeout(guardarPendientes, esperaMs); }
+  // §122 (D13): copiar la partida (2,8 MB) a IndexedDB en plena carrera es un tirón: con aplazar() verdadero (una
+  // carrera andando) se vuelve a mirar cada esperaMs y se guarda al terminar, en un rato libre del hilo; como mucho se
+  // aplaza APLAZAR_MAX_MS (si no, se guarda igual). Esconder o cerrar la pestaña guarda siempre en el momento.
+  let aplazar = () => false, aplazadaDesde = 0;
+  const APLAZAR_MAX_MS = 5 * 60 * 1000;
+  const enCalma = f => (globalThis.requestIdleCallback ? requestIdleCallback(() => f(), { timeout: 1000 }) : f());
+  function alVencer() {
+    if (aplazar() && (!aplazadaDesde || Date.now() - aplazadaDesde < APLAZAR_MAX_MS)) {
+      if (!aplazadaDesde) { aplazadaDesde = Date.now(); estado.aplazadas = (estado.aplazadas || 0) + 1; }
+      temporizador = setTimeout(alVencer, esperaMs);
+      return;
+    }
+    aplazadaDesde = 0;
+    enCalma(guardarPendientes);
+  }
+  function programar() { clearTimeout(temporizador); temporizador = setTimeout(alVencer, esperaMs); }
 
   // Copiar a IndexedDB lo pendiente (y sacar lo borrado), todo en una sola transacción
   async function guardarPendientes() {
@@ -216,6 +231,7 @@ export function crearGuardado({ base = 'mkw-partidas', almacen = 'archivos', esp
   }
 
   return { estado, cargar, restaurar, vigilar, guardarPendientes, borrarTodo, pedirPersistencia, interesa, exportar, importar,
+           aplazarMientras: f => { aplazar = f || (() => false); },
            abrirPaquete, leerArchivo, ponerArchivo, detener,
            get pendientes() { return pendientes.size + borrados.size; } };
 }

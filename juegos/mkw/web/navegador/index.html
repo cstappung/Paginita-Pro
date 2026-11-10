@@ -4,7 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<title>Mario Kart Wii</title>
+<title>JloKart Wii</title>
+<script>
+// W21 (§225): con ?aislar=sw|sw-corp y la página todavía sin aislar, registrar el service worker que pone
+// Document-Isolation-Policy (sw-aislar.js) y recargar UNA vez (la primera carga no pasa por él). Sin el parámetro, nada.
+(() => {
+  const q = new URLSearchParams(location.search), modo = q.get('aislar');
+  if ((modo !== 'sw' && modo !== 'sw-corp') || self.crossOriginIsolated || !navigator.serviceWorker) return;
+  let intento = 0; try { intento = +sessionStorage.getItem('mkw.aislarIntento') || 0; } catch {}
+  if (intento >= 2) { console.warn('[aislar] el service worker no aisló la página (2 intentos)'); return; }
+  window.mkwEsperaAislar = true;
+  navigator.serviceWorker.register('sw-aislar.js', { scope: './' }).then(() => navigator.serviceWorker.ready).then(() => {
+    try { sessionStorage.setItem('mkw.aislarIntento', String(intento + 1)); } catch {}
+    console.log('[aislar] service worker listo: recargo para quedar aislada');
+    location.reload();
+  }).catch(x => { window.mkwEsperaAislar = false; console.warn('[aislar] no se pudo registrar: ' + x); });
+})();
+</script>
 <!-- La página del juego (bitácora §55), con la cara de Paginita Pro / Juegos y la forma de la de BT3: el juego ocupa toda
      la ventana; adelante, la tarjeta de inicio con "Tu partida" y la columna de modos; arriba a la derecha una barra que
      se esconde sola mientras se juega; a la derecha, un cajón con los paneles (Partida, Controles, Sonido, Avanzado).
@@ -265,6 +281,9 @@
   #medidor[hidden] { display: none; }
   #medidor { font-variant-numeric: tabular-nums; }
   .nota-graficos { margin: 4px 0 8px; font-size: 12.5px; color: var(--suave); }
+  .nota-graficos .mas-detalles { display: inline; } .nota-graficos .mas-detalles summary { display: inline; cursor: pointer; color: var(--acento, #7cc4ff); }
+  .nota-graficos .mas-detalles[open] > span { display: block; margin-top: 4px; }
+  .bv-resaltado { outline-offset: 8px; }
   #estadoJuego { position: fixed; z-index: 6; left: calc(10px + var(--sl)); top: calc(10px + var(--st)); display: flex; flex-direction: column;
     align-items: flex-start; gap: 6px; max-width: min(360px, calc(100vw - 32px)); pointer-events: none; }
   .chip-estado { padding: 4px 10px; border-radius: 999px; background: #161233e6; border: 1px solid #4b3d93; color: var(--texto);
@@ -425,6 +444,9 @@
   .vc-escenario > img.vc-plano { inset: 8px 8px auto auto; width: 104px; height: 78px; padding: 4px; box-sizing: border-box; object-fit: contain;
     background: #0d0a1fb8; backdrop-filter: blur(4px); border: 1px solid #ffffff1f; border-radius: 8px; transform-origin: top right; transition: transform .15s; }
   .vc-escenario > img.vc-plano:hover { transform: scale(1.92); }
+  /* §148 (P3): sin desenfoque detrás del plano (el juego se mueve detrás: el desenfoque se recalculaba en cada cuadro);
+     un fondo casi opaco del mismo color. ?filtrosLivianos=0 = como antes */
+  :root.filtros-livianos .vc-escenario > img.vc-plano { backdrop-filter: none; background: #0d0a1feb; }
   .vc-pie { position: absolute; inset: auto 0 0; padding: 24px 12px 9px; display: flex; align-items: end; gap: 8px;
     background: linear-gradient(#0d0a1f00, #0d0a1fe6 70%); font: 400 19px 'Lilita One', system-ui, sans-serif; color: #fff; text-shadow: 0 2px 0 #0008; }
   .vc-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -621,7 +643,13 @@
   .ctl:not(.con-pantalla) .ctl-col-pantalla, .ctl.sin-mando .ctl-col-mando { display: none; }
   .ctl-ayudas { padding: 8px 10px; border-radius: 12px; background: #161233; border: 1px solid #3d3378; }
   .ctl-ayudas .fila { margin-bottom: 4px; }
+  body.asistiendo-mando .ctl-ayudas { display: none; }   /* (§263: mientras se enseña o asigna, solo el paso y el dibujo) */
+  .ctl :is(.ctl-vistas, .ctl-mas-mandos, .ctl-switch2, .ctl-pie) { gap: 10px; } .ctl :is(.ctl-vistas, .ctl-mas-mandos, .ctl-switch2, .ctl-pie) .boton { min-height: 44px; }
   .ctl.sin-lista .ctl-lista, .ctl.sin-lista .ctl-pie { display: none; }
+  /* §263: con la vista del mando (estilo Big Picture) la lista se esconde; vuelve con «☰ Lista» */
+  .ctl.con-dibujo .ctl-lista { display: none; }
+  .ctl-vista[aria-pressed="true"] { border-color: var(--amarillo); color: var(--amarillo); }
+  .ctl-vistas, .ctl-mas-mandos { margin: 0; }
   .ctl .boton { min-height: 38px; }
   .ctl .boton[aria-pressed="true"] { background: var(--morado); border-color: var(--amarillo); color: #fff; }
   .ctl-pestanas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
@@ -730,7 +758,7 @@
 <div id="cortina" role="status" aria-live="polite">
   <div>
     <p class="ceja">El juego de Wii, en tu navegador</p>
-    <h1>Mario Kart Wii</h1>
+    <h1>JloKart Wii</h1>
     <span class="sub">+ Retro Rewind</span>
     <div class="carga"><i></i></div>
     <p id="cortinaTexto">Cargando el juego…</p>
@@ -758,7 +786,7 @@
 <div id="inicio">
   <div class="tarjeta">
     <p class="ceja">El juego de Wii, en tu navegador</p>
-    <h1>Mario Kart Wii</h1>
+    <h1>JloKart Wii</h1>
     <span class="sub">+ Retro Rewind</span>
     <p>Más de 200 pistas clásicas, todo desbloqueado. Se juega con el teclado, un mando o el celular.</p>
 
@@ -833,6 +861,8 @@
 
   <section class="hoja" id="hojaAvanzado" role="tabpanel" hidden>
     <h2>Avanzado</h2>
+    <h3>❓ Ayuda de ajustes</h3>
+    <div id="ayudaAjustes"></div>
     <h3>Sonido</h3>
     <div class="fila">
       <label for="volumen">Volumen</label>
@@ -853,8 +883,9 @@
     <h3>Gráficos</h3>
     <div id="graficosPanel"></div>
     <h3>Datos del juego</h3>
+    <div id="espacioPanel"></div>
     <div class="fila"><span id="datosDisco" style="color:var(--suave)">—</span>
-      <button type="button" class="boton" id="borrarDisco">Borrar</button></div>
+      <button type="button" class="boton" id="borrarDisco">Borrar todo</button></div>
     <h3>Diagnóstico</h3>
     <div class="fila">
       <span class="dato" id="fps">— fps</span>

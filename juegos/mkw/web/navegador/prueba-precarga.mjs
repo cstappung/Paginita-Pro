@@ -33,7 +33,8 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const ARGS = ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
   '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'];
-const CARRERA = `http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=13.2&cc=c150&cpu=normal&pj=0&kart=1`;
+const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '--extra=').slice(8);   // §175: «&param=…» en las dos visitas y en la precarga
+const CARRERA = `http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=13.2&cc=c150&cpu=normal&pj=0&kart=1${EXTRA}`;
 const perfiles = [];
 const perfilNuevo = async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'mkw-precarga-'));
@@ -81,7 +82,7 @@ await pp.addInitScript(() => {
   }, 10);
 });
 const t0 = Date.now();
-await pp.goto(`http://127.0.0.1:${PUERTO}/?precarga=1`);
+await pp.goto(`http://127.0.0.1:${PUERTO}/?precarga=1${EXTRA}`);
 let pre = null;
 for (const hasta = Date.now() + 300000; Date.now() < hasta; await espera(300)) {
   pre = await pp.evaluate(() => ({ p: window.mkwEstado?.precarga || null, juego: !!window.mkw })).catch(() => null);

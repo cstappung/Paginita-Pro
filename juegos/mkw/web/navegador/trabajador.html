@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MKW · prueba del Worker</title>
+<!-- Paso 8 (N3/P10, bitácora §186): la prueba de la puerta A. El juego entero en un Worker con OffscreenCanvas
+     (?hilo=trabajador, por omisión) o en el hilo de la página como hoy (?hilo=principal), con el mismo arnés
+     (trabajador-juego.mjs). Solo para medir y probar: la página de siempre (index.html) no cambia.
+     Ejemplo: trabajador.html?modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&sinTope=1&tramo=600-2400
+     Medir los dos lados: node herramientas/medir-trabajador.mjs -->
+<style>
+  :root { color-scheme: dark; --fondo: #000; --texto: #f1effa; --suave: #a7a3bd; --verde: #3fd59a; --rojo: #ff6b7a; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto); overflow: hidden;
+    font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  #pantalla { position: fixed; inset: 0; }
+  #canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; }
+  #chip { position: fixed; left: 8px; top: 8px; padding: 4px 8px; border-radius: 6px; background: #000a; color: var(--suave);
+    pointer-events: none; white-space: pre; max-width: calc(100vw - 32px); overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="pantalla"><canvas id="canvas" tabindex="0"></canvas></div>
+<div id="chip">cargando…</div>
+<script type="module" src="./trabajador.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dibujar a 30</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>N8: <span>dibujar a 30 y mostrar 60, solo donde hace falta</span></h1>
+<p>Prueba la regla de <code>web/navegador/n8.mjs</code> (bitácora §219) <b>sin el juego</b>, con segundos de mentira: cuántas
+  imágenes se vieron, cuántos cuadros de lógica corrieron y cuánto trabajó el hilo del juego por cuadro. Decisión del dueño:
+  la imagen del medio es opcional; se prende sola en el aparato que no llega a 60 por la CPU y se queda apagada en el que
+  sí llega (o cuando lo que frena es la tarjeta).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearVigiaN8, modoPedido, modoAutomatico, CAMBIOS_MAX } from '/web/navegador/n8.mjs';
+
+const { ok, nota, fin } = prueba('n8', 'N8: cuándo dibujar a 30 (sin el juego)');
+const almacen = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
+
+try {
+  // ---- 1. Lo que pide la página ----
+  ok('?n8: sin nada = no; 1 = a 30 sin la imagen del medio; 2 = con ella; auto = decide la vigía',
+     modoPedido(null) === 0 && modoPedido('1') === 1 && modoPedido('2') === 2 && modoPedido('auto') === 'auto' && modoPedido('3') === 0);
+  ok('Automático prende «30 parejas» (modo 1) en un teléfono y la imagen del medio (modo 2) en un PC (2026-11-07)',
+     modoAutomatico({ telefono: true }) === 1 && modoAutomatico({ telefono: false }) === 2 && modoAutomatico() === 2);
+
+  // ---- 2. Un PC que llega a 60 ----
+  const avisos = [];
+  const a = almacen();
+  const v = crearVigiaN8({ prender: p => avisos.push('prende ' + p), apagar: p => avisos.push('apaga ' + p), almacen: a });
+  for (let s = 0; s < 30; s++) v.segundo({ enCarrera: true, imagenes: 60, logica: 60, juegoMs: 4 });
+  ok('un PC que muestra 60 (4 ms por cuadro, 24 % ocupado): nunca se prende', !v.estado.prendido && avisos.length === 0);
+  for (let s = 0; s < 10; s++) v.segundo({ enCarrera: false, imagenes: 20, logica: 20, juegoMs: 40 });
+  ok('en los menús no cuenta (la carga de una pista no es la carrera)', !v.estado.prendido);
+  for (let s = 0; s < 10; s++) v.segundo({ enCarrera: true, visible: false, imagenes: 1, logica: 60, juegoMs: 15 });
+  ok('con la pestaña oculta no cuenta', !v.estado.prendido);
+
+  // ---- 3. El aparato que calcula 60 pero no dibuja 60 ----
+  v.segundo({ enCarrera: true, imagenes: 45, logica: 45, juegoMs: 21 }); v.segundo({ enCarrera: true, imagenes: 44, logica: 44, juegoMs: 22 });
+  ok('dos segundos a 45 todavía no (un tirón no basta)', !v.estado.prendido);
+  v.segundo({ enCarrera: true, imagenes: 60, logica: 60, juegoMs: 15 });
+  v.segundo({ enCarrera: true, imagenes: 45, logica: 45, juegoMs: 21 }); v.segundo({ enCarrera: true, imagenes: 44, logica: 44, juegoMs: 22 });
+  ok('un segundo bueno en el medio reinicia la cuenta', !v.estado.prendido);
+  v.segundo({ enCarrera: true, imagenes: 43, logica: 43, juegoMs: 22 });
+  ok('tres segundos seguidos bajo 57 con el hilo lleno (~95 %): se prende', v.estado.prendido && avisos[0] === 'prende no llega a 60');
+  ok('lo recuerda en el aparato (mkw.n8.auto = 1)', a.getItem('mkw.n8.auto') === '1');
+  for (let s = 0; s < 30; s++) v.segundo({ enCarrera: true, imagenes: 60, logica: 60, juegoMs: 12 });
+  ok('prendido y con el hilo al 72 %: se queda prendido', v.estado.prendido && avisos.length === 1);
+
+  // ---- 4. Lo que frena es la tarjeta ----
+  const g = crearVigiaN8({ almacen: almacen() });
+  for (let s = 0; s < 20; s++) g.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 5 });
+  ok('40 imágenes con el hilo al 20 % (frena la tarjeta o la pantalla): no se prende', !g.estado.prendido);
+
+  // ---- 5. Le sobra: se apaga, y no titubea ----
+  const b = almacen(); b.setItem('mkw.n8.auto', '1');
+  const cuenta = [];
+  const w = crearVigiaN8({ prender: p => cuenta.push(p), apagar: p => cuenta.push('-' + p), almacen: b });
+  ok('la carrera siguiente empieza prendida si la anterior terminó prendida', w.estado.prendido && cuenta[0] === 'recordado');
+  for (let s = 0; s < 9; s++) w.segundo({ enCarrera: true, imagenes: 60, logica: 60, juegoMs: 5 });
+  ok('9 s al 30 % todavía no se apaga', w.estado.prendido);
+  w.segundo({ enCarrera: true, imagenes: 60, logica: 60, juegoMs: 5 });
+  ok('10 s seguidos con el hilo bajo el 40 %: se apaga (dibujando todo le sobraría)', !w.estado.prendido && cuenta[1] === '-le sobra' && b.getItem('mkw.n8.auto') === '0');
+  for (let s = 0; s < 3; s++) w.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 23 });
+  ok('vuelve a no llegar: se prende otra vez', w.estado.prendido && w.estado.cambios === CAMBIOS_MAX);
+  for (let s = 0; s < 30; s++) w.segundo({ enCarrera: true, imagenes: 60, logica: 60, juegoMs: 5 });
+  ok(`después de ${CAMBIOS_MAX} cambios se queda prendido (no titubea cada carrera)`, w.estado.prendido && w.estado.fijo);
+  // ---- 6. La prueba: N8 prendido y la lógica no sube (la gama media de §219, que frena la tarjeta) ----
+  const m = almacen(); const avm = [];
+  const q = crearVigiaN8({ prender: p => avm.push(p), apagar: p => avm.push('-' + p), almacen: m });
+  for (let s = 0; s < 3; s++) q.segundo({ enCarrera: true, imagenes: 18, logica: 18, juegoMs: 56 });
+  ok('la gama media (18 imágenes, hilo lleno): se prende para probar', q.estado.prendido);
+  for (let s = 0; s < 9; s++) q.segundo({ enCarrera: true, imagenes: 13, logica: 13, juegoMs: 77 });
+  ok('9 s de prueba todavía no decide', q.estado.prendido);
+  q.segundo({ enCarrera: true, imagenes: 13, logica: 13, juegoMs: 77 });
+  ok('10 s con la lógica en 13 (menos que 18 × 1,08): se apaga «no mejora»', !q.estado.prendido && avm[1] === '-no mejora' && m.getItem('mkw.n8.auto') === 'no');
+  for (let s = 0; s < 10; s++) q.segundo({ enCarrera: true, imagenes: 18, logica: 18, juegoMs: 56 });
+  ok('ya probado: no se vuelve a prender', !q.estado.prendido && avm.length === 2);
+  const q2 = crearVigiaN8({ almacen: m });
+  for (let s = 0; s < 10; s++) q2.segundo({ enCarrera: true, imagenes: 18, logica: 18, juegoMs: 56 });
+  ok('la carrera siguiente tampoco (mkw.n8.auto = no)', !q2.estado.prendido && !q2.estado.sirve);
+  ok('sin datos del segundo no hace nada', crearVigiaN8({ almacen: almacen() }).segundo({ enCarrera: true, imagenes: null }).prendido === false);
+  const roto = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } };
+  const r = crearVigiaN8({ almacen: roto });
+  for (let s = 0; s < 3; s++) r.segundo({ enCarrera: true, imagenes: 30, logica: 30, juegoMs: 30 });
+  ok('con el almacenamiento bloqueado igual funciona (solo no recuerda)', r.estado.prendido);
+  nota(`último segundo del aparato de mentira: ${JSON.stringify(v.estado.ultimo)}`);
+} catch (e) {
+  ok('sin errores: ' + e.message, false);
+}
+fin();
+</script>
+</body>
+</html>

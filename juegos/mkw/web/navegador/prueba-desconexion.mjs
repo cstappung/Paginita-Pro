@@ -14,7 +14,8 @@
 // avanzan) y nadie queda con la pantalla quieta más de lo que permite cada caso. Al que se le cortó la red también le
 // sigue su juego (corre solo con la CPU). Lo que anotó la red de cada pestaña queda en build/web/datos/desconexion/.
 //
-// Uso:  node web/navegador/prueba-desconexion.mjs [--casos=elegir-anfitriona,carga-otro,…] [--lista] [--ventana] [--puerto=8166]
+// Uso:  node web/navegador/prueba-desconexion.mjs [--casos=elegir-anfitriona,carga-otro,…] [--lista] [--ventana] [--puerto=8166] [--extra=&…]
+//       (--extra = más parámetros para todas las pestañas, p. ej. --extra=&arbitro=0: §246)
 //       (sin --casos, todos: ~20 min)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -26,6 +27,7 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const arg = (n, d) => (process.argv.find(a => a.startsWith(`--${n}=`)) || `--${n}=${d}`).slice(n.length + 3);
 const PUERTO = Number(arg('puerto', 8166));
+const EXTRA = arg('extra', '');
 const carpeta = path.join(raiz, 'build/web/datos/desconexion');
 mkdirSync(carpeta, { recursive: true });
 
@@ -86,7 +88,7 @@ async function correrCaso(nombre, def) {
     const p = pag[l] = await contexto.newPage();
     p.on('pageerror', e => errores.push(`[${l}] ${e.message}`));
     await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uids[i]}&sincro=${uids.join(',')}&jefe=${uids[0]}` +
-      `&semilla=4242&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=normal&descanso=6&limite=120`);
+      `&semilla=4242&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=normal&descanso=6&limite=120${EXTRA}`);
     if (i < letras.length - 1) await espera(1500);
   }
   const quedan = letras.filter(l => l !== def.quien);

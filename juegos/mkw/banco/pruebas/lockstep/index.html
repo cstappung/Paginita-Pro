@@ -42,7 +42,7 @@ const START = 0x1000;
 // (§100) quietos = esas consolas no tocan nada (botones y sticks en 0); llego(i, consola) = la opción del lockstep (quién
 // ya llegó, visto desde esa consola)
 function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200, demora = [5, 40], adaptar = true, bloquear = () => false, trabas = {}, informeCada = 0,
-  esperaLargada, cuadrosLargada, ido = null, quietos = [], llego = null } = {}) {
+  esperaLargada, cuadrosLargada, ido = null, quietos = [], llego = null, ampliada = null } = {}) {
   const humanos = uids.map((uid, mando) => ({ uid, mando }));
   const t0 = performance.now();
   const consolas = {};
@@ -64,7 +64,8 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
         c.enviados.set(c.cuadro + c.ls.estado().retraso, v);   // vale para el cuadro actual + su retraso (§80: el de esta consola)
         return v;
       },
-      huella: () => c.estado,
+      // (R5, §154: con ampliada = la huella ampliada: la de siempre + partes con nombre; en uids «viejos», la de antes)
+      huella: () => ampliada && !ampliada.viejos?.includes(uid) ? { h: c.estado, partes: [c.estado, c.extra || 0], nombres: ['estado', 'extra'], valores: { estado: c.estado, extra: c.extra || 0 } } : c.estado,
       enviar: (a, bytes, canal) => {
         if (c.fuera || consolas[a].fuera || bloquear(uid, a, bytes) || performance.now() < (c.dormidaHasta || 0)) return;
         if (canal === 'udp' && Math.random() < perdida) return;
@@ -194,6 +195,52 @@ try {
     await conTiempo(Promise.all([pa, pb]), 30000);
     const ea = s.ana.ls.estado();
     ok('si una consola calcula distinto, la huella lo detecta', !!ea.desincronizado, JSON.stringify(ea.desincronizado));
+  }
+
+  // ---- 5c) §175: la sala se parte en dos islas (doce: las 2 que cargaron últimas contra las otras 4): sigue la MÁS
+  // GRANDE, aunque la autoridad esté en la chica (antes decidía la autoridad: se salían las 4 y la carrera de las 2
+  // seguía sola, sin aviso), y todas lo dicen (§176: con ?islas=0 es la regla de antes: este caso no va)
+  if (!/[?&]islas=0\b/.test(location.search)) {
+    const nombres = ['ana', 'beto', 'carla', 'dani', 'eva'];
+    const s = crearSala(nombres, { perdida: 0 });
+    const ps = nombres.map(n => correr(s[n], { hasta: 300 }));
+    await espera(200); s.dani.estado ^= 1; s.eva.estado ^= 1;   // dani y eva «se equivocan» igual: una isla de 2
+    await conTiempo(Promise.all(ps), 30000);
+    await espera(1800);                                            // (la decisión espera las huellas, 1,5 s como mucho)
+    const e = Object.fromEntries(nombres.map(n => [n, s[n].ls.estado()]));
+    const sigue = e.ana.islas?.sigue?.slice().sort().join();
+    // (dani y eva se separan también entre ellas: sus copias siguen cada una con sus botones; quedan 3 + 1 + 1)
+    ok('§175: la sala partida lo nota en todas (est.islas: la isla de 3 y las otras), la misma cuenta en las 5', nombres.every(n => e[n].islas?.grupos?.[0]?.length === 3 && e[n].islas.grupos.length >= 2 &&
+       JSON.stringify(e[n].islas.grupos) === JSON.stringify(e.ana.islas.grupos)), nombres.map(n => e[n].islas?.grupos?.map(g => g.length).join('+')).join(' · '));
+    ok('§175: …sigue la isla más grande (ana, beto, carla) en todas las cuentas', nombres.every(n => e[n].islas?.sigue?.slice().sort().join() === 'ana,beto,carla'), sigue);
+    ok('§175: …los de la isla chica se salen y los de la grande no', !!e.dani.fuera && !!e.eva.fuera && !e.ana.fuera && !e.beto.fuera && !e.carla.fuera,
+       nombres.map(n => `${n} ${e[n].fuera ? 'fuera' : 'sigue'}`).join(', '));
+  }
+
+  // ---- 5b) R5 (§154): la huella ampliada dice QUÉ parte se separó; si la de siempre coincide, nadie sale ----
+  {
+    const s = crearSala(['ana', 'beto'], { perdida: 0, ampliada: {} });
+    const pa = correr(s.ana, { hasta: 300 }), pb = correr(s.beto, { hasta: 300 });
+    await espera(200); s.beto.extra = 7;                  // solo una parte "de diagnóstico" difiere
+    await conTiempo(Promise.all([pa, pb]), 30000);
+    const ea = s.ana.ls.estado();
+    ok('huella ampliada: dice qué parte se separó (extra) y manda mis valores', ea.parteDistinta?.partes?.join() === 'extra' && ea.parteDistinta.volcado?.extra === 0 && ea.huellasAmpliadas > 0, JSON.stringify(ea.parteDistinta));
+    ok('huella ampliada: con la de siempre igual nadie se desincroniza ni sale', !ea.desincronizado && !s.beto.ls.estado().desincronizado && !ea.fuera && s.ana.cuadro === 299, JSON.stringify(ea.desincronizado));
+    ok('huella ampliada: se compara cada 30 cuadros (antes 120)', ea.huellasIguales >= 8, `${ea.huellasIguales} iguales en 300 cuadros`);
+  }
+  {
+    const s = crearSala(['ana', 'beto'], { perdida: 0, ampliada: {} });
+    const pa = correr(s.ana, { hasta: 300 }), pb = correr(s.beto, { hasta: 300 });
+    await espera(200); s.beto.estado ^= 1;               // la de siempre difiere: también lo dice con sus partes
+    await conTiempo(Promise.all([pa, pb]), 30000);
+    const ea = s.ana.ls.estado();
+    ok('huella ampliada: una desincronía de verdad se detecta y nombra la parte', !!ea.desincronizado && ea.desincronizado.partes?.includes('estado'), JSON.stringify(ea.desincronizado));
+  }
+  {
+    const s = crearSala(['ana', 'beto'], { perdida: 0, ampliada: { viejos: ['beto'] } });   // Beto con la página de antes
+    await conTiempo(Promise.all([correr(s.ana, { hasta: 300 }), correr(s.beto, { hasta: 300 })]), 30000);
+    const ea = s.ana.ls.estado(), eb = s.beto.ls.estado();
+    ok('huella ampliada: con una página vieja en la sala se entienden (sin partes, la de siempre igual)', !ea.desincronizado && !eb.desincronizado && ea.huellasIguales >= 8 && eb.huellasIguales >= 8, `${ea.huellasIguales}/${eb.huellasIguales}`);
   }
 
   // ---- 6) el plantel de 12 karts ----
@@ -380,6 +427,9 @@ try {
   // esperar el margen de los que vienen cargando (aquí 8 s; en la página, 15 s desde que cargó la mitad) ----
   {
     const s = crearSala(['ana', 'beto', 'carla'], { perdida: 0, esperaCorte: 400, esperaInicio: 8000, ido: u => u === 'carla' });
+    // (§175: como en la sala, a Carla ya se la oyó —sus pings del vestíbulo— y se va al cargar la carrera; a la que
+    // nunca se oyó no se la corta así: ver el caso de §175 de arriba)
+    await espera(1200);                                  // (los pings van cada 500 ms)
     s.carla.fuera = true;
     for (const u of ['ana', 'beto']) s[u].ls.fijarCarrera(1, []);
     const desde = performance.now();
@@ -388,6 +438,20 @@ try {
     ok('§100: la que se fue al cargar la carrera se corta enseguida (no el margen de 8 s): Ana y Beto siguen iguales',
        r !== 'tarde' && ea.cortes[2] !== undefined && ea.cortes[2] === eb.cortes[2] && s.ana.estado === s.beto.estado && ms < 4000,
        `${r === 'tarde' ? 'TARDE · ' : ''}corte en el ${ea.cortes[2]} / ${eb.cortes[2]}, ${(ms / 1000).toFixed(1)} s`);
+  }
+  // ---- §175 (doce): Carla todavía carga (nunca se la oyó: no está en el buzón ni tiene WebRTC, ido() dice «no está»)
+  // y llega a los 2 s: NO se la corta en el cuadro 0 como a la que se fue; se la espera (el margen de carga) y la carrera
+  // sale igual en las tres ----
+  {
+    const s = crearSala(['ana', 'beto', 'carla'], { perdida: 0, esperaCorte: 400, esperaInicio: 8000, ido: u => u === 'carla' && !s?.carla?.llego });
+    for (const u of ['ana', 'beto', 'carla']) s[u].ls.fijarCarrera(1, []);
+    const pa = correr(s.ana, { hasta: 120 }), pb = correr(s.beto, { hasta: 120 });
+    await espera(2000); s.carla.llego = true;
+    const r = await conTiempo(Promise.all([pa, pb, correr(s.carla, { hasta: 120 })]), 15000);
+    const ea = s.ana.ls.estado();
+    ok('§175: la que todavía carga (nunca se la oyó) no se corta como la que se fue: se la espera y las tres terminan iguales',
+       r !== 'tarde' && ea.cortes[2] === undefined && s.ana.estado === s.beto.estado && s.beto.estado === s.carla.estado && !ea.desincronizado,
+       `${r === 'tarde' ? 'TARDE · ' : ''}corte de Carla ${ea.cortes[2] ?? 'ninguno'}, iguales ${s.ana.estado === s.carla.estado}`);
   }
   // ---- §100 (la regla del ausente del VR, §99): Beto no toca nada en toda la carrera. Sin `llego` junta todos los
   // cuadros «quieto»; si llegó a la meta en el cuadro 50 (el juego ya no le pide botones), desde ahí ya no cuenta ----
@@ -405,6 +469,25 @@ try {
        `Beto quieto ${sin.qa[1]} / ${sin.qb[1]} cuadros, Ana ${sin.qa[0]}`);
     ok('§100: …pero desde que llegó a la meta ya no (el juego no le pide botones): ni ausente ni cortado por eso', con.r !== 'tarde' && con.qa[1] < 120 && con.igual,
        `Beto quieto ${con.qa[1]} / ${con.qb[1]} cuadros`);
+  }
+  // Una consola atrasada recibe el cuadro 2048 antes que el 0. El 0 ya no cabe en el historial.
+  {
+    const enviados = [];
+    const ls = crearLockstep({ yo: 'beto', humanos: [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }],
+      arbitro: true, local: () => [0, 0, 0, 0, 0, 0, 0], enviar: (u, b) => enviados.push(b[1]) });
+    todos.push(ls);
+    const pendiente = ls.pad(0);
+    const b = new Uint8Array(24);
+    b.set([0xA7, 15, 1, 0]);
+    const d = new DataView(b.buffer);
+    d.setUint32(4, 2048);
+    b[8] = 1;
+    d.setUint32(12, 0xFFFFFFFF);
+    ls.alBinario('ana', b);
+    const r = await conTiempo(pendiente, 1000);
+    const e = ls.estado();
+    ok('§237: al perder el historial, la atrasada sale sin cortar a la autoridad',
+      r !== 'tarde' && e.fuera && enviados.includes(14) && !enviados.includes(5) && !Object.keys(e.cortes).length);
   }
 } catch (e) {
   ok('la prueba corrió sin errores', false, e.stack || e.message);

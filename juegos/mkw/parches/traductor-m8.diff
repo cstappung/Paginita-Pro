@@ -1,0 +1,205 @@
+diff --git a/runtime/include/guest_abi/dispatch.h b/runtime/include/guest_abi/dispatch.h
+index 1762fca..f680274 100644
+--- a/runtime/include/guest_abi/dispatch.h
++++ b/runtime/include/guest_abi/dispatch.h
+@@ -16,6 +16,11 @@ namespace RuntimeCrash {
+ [[noreturn]] void FatalMissingGuestTarget(uint32_t target, struct CpuContext* cpu) noexcept;
+ } // namespace RuntimeCrash
+ 
++// MKW M8 (only the m8 experiment copy): translated code built with MKW_M8=vigia calls this after a call that reloads
++// every register when one of r14-r31 came back different from the value the caller had (the callee broke the EABI
++// rule "r14-r31 come back as they were"). runtime/src/mkw_m8_vigia.cpp prints each target once.
++extern "C" void mkw_m8_violacion(uint32_t target, uint32_t mask) noexcept;
++
+ inline void InvokeIndirectCpu(uint32_t target, CpuContext* ctx);
+ 
+ uint32_t FilterScnRendererPathMaskOption(uint32_t pathMask) noexcept;
+diff --git a/runtime/src/mkw_m8_vigia.cpp b/runtime/src/mkw_m8_vigia.cpp
+new file mode 100644
+index 0000000..701887e
+--- /dev/null
++++ b/runtime/src/mkw_m8_vigia.cpp
+@@ -0,0 +1,16 @@
++// MKW M8 vigía (solo la copia de experimento terceros/Wiicompiled-motor-m8): la lista de funciones que devuelven
++// r14-r31 distintos de como los recibieron (rompen la regla de la Wii). Cada una se imprime una vez, con la máscara de
++// registros cambiados; cada 64 veces más, otra línea con la cuenta. Ver herramientas/tanda-m8.sh y la bitácora (M8).
++#include <cstdint>
++#include <cstdio>
++#include <unordered_map>
++
++extern "C" void mkw_m8_violacion(uint32_t target, uint32_t mask) noexcept {
++    static std::unordered_map<uint32_t, uint64_t> vistas;   // destino -> veces
++    uint64_t& n = vistas[target];
++    ++n;
++    if (n == 1 || (n & 63) == 0) {
++        std::printf("[m8-vigia] 0x%08X mascara 0x%08X veces %llu\n", target, mask, static_cast<unsigned long long>(n));
++        std::fflush(stdout);
++    }
++}
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
+index 8c35b11..de87479 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
+@@ -437,7 +437,9 @@ public sealed partial class CxxLinearCodeGenerator
+                         break;
+                     }
+                     EmitNormalizeGuestCallFloatReturn(call.Target, sb, pad, localPaired, guestAbiProvider);
+-                    AppendReload(sb, pad, boundarySync);
++                    var mkwM8Mod = modOverridableCallTargets.Contains(addr);
++                    MkwM8Check(sb, pad, boundarySync, $"0x{addr:X8}u", target: addr, modOverridable: mkwM8Mod);
++                    AppendReload(sb, pad, MkwM8AfterGuestCall(boundarySync, target: addr, modOverridable: mkwM8Mod));
+                 }
+                 else if (IsGuestCallTarget(call.Target))
+                 {
+@@ -446,6 +448,7 @@ public sealed partial class CxxLinearCodeGenerator
+                     EmitNormalizeGuestCallFloatArguments(call.Target, call.Arguments, sb, pad, localPaired, guestAbiProvider);
+                     sb.AppendLine($"{pad}{targetSymbol}(ctx);");
+                     EmitNormalizeGuestCallFloatReturn(call.Target, sb, pad, localPaired, guestAbiProvider);
++                    // (by symbol, no guest address to check against MKW_M8_EXCLUIR: always the full reload)
+                     AppendReload(sb, pad);
+                 }
+                 else
+@@ -515,8 +518,18 @@ public sealed partial class CxxLinearCodeGenerator
+                 {
+                     var indirectTarget = ToExpression(icall.Target, types);
+                     AppendFlush(sb, pad);
+-                    sb.AppendLine($"{pad}InvokeIndirectCpu({indirectTarget}, ctx);");
+-                    AppendReload(sb, pad);
++                    if (MkwM8Mode == "vigia" || MkwM8VigiaOnly)
++                    {
++                        sb.AppendLine($"{pad}{{ const uint32_t mkw_m8_t = {indirectTarget};");
++                        sb.AppendLine($"{pad}InvokeIndirectCpu(mkw_m8_t, ctx);");
++                        MkwM8Check(sb, pad, ResidencyBoundarySync.Full, "(mkw_m8_t | 1u)", indirect: true);
++                        sb.AppendLine($"{pad}}}");
++                    }
++                    else
++                    {
++                        sb.AppendLine($"{pad}InvokeIndirectCpu({indirectTarget}, ctx);");
++                    }
++                    AppendReload(sb, pad, MkwM8AfterGuestCall(ResidencyBoundarySync.Full, indirect: true));
+                     // f1 is the conventional scalar floating-point return.
+                     // Do not retag the other volatile FPRs: a callee that leaves
+                     // one untouched also leaves its packed payload untouched.
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs
+index 9c03dba..d5c8cb7 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.RegisterResidency.cs
+@@ -203,6 +203,22 @@ public sealed partial class CxxLinearCodeGenerator
+         /// </summary>
+         public void AppendReload(StringBuilder sb, string pad) => AppendReload(sb, pad, ResidencyBoundarySync.Full);
+ 
++        /// <summary>
++        /// MKW M8 vigía: before a full reload, compares the resident r14-r31 locals (equal to ctx->gpr before the call,
++        /// the full flush published them) with what the callee left and reports the changed ones to the runtime.
++        /// </summary>
++        public void AppendM8Check(StringBuilder sb, string pad, string targetExpr)
++        {
++            if (_recording) return;
++            var changed = _gprs.Where(g => g >= 14 && g <= 31).OrderBy(g => g).ToList();
++            if (changed.Count == 0) return;
++            sb.Append(pad).AppendLine("{ uint32_t mkw_m8_m = 0;");
++            foreach (var gpr in changed)
++                sb.Append(pad).Append("  if (").Append(GprLocal(gpr)).Append(" != ctx->gpr[").Append(gpr)
++                  .Append("]) mkw_m8_m |= 1u << ").Append(gpr).AppendLine(";");
++            sb.Append(pad).Append("  if (mkw_m8_m) mkw_m8_violacion(").Append(targetExpr).AppendLine(", mkw_m8_m); }");
++        }
++
+         /// <summary>Contract-narrowed reload.</summary>
+         public void AppendReload(StringBuilder sb, string pad, ResidencyBoundarySync sync)
+         {
+@@ -327,6 +343,56 @@ public sealed partial class CxxLinearCodeGenerator
+         }
+     }
+ 
++    /// <summary>
++    /// MKW M8 (bitácora del proyecto): MKW_M8=techo is a deliberately UNSAFE ceiling measurement. After a guest call
++    /// (direct or indirect) it skips reloading r14-r31: the EABI makes every callee restore them, so the locals still
++    /// hold the right values unless something breaks the ABI (context switches, longjmp, hand-written mod code).
++    /// Only for measuring how much the reloads cost; unset = the translator as always.
++    /// </summary>
++    internal static readonly string? MkwM8Mode = Environment.GetEnvironmentVariable("MKW_M8");
++    private const uint MkwNonVolatileGprMask = 0xFFFFC000u;   // r14-r31
++
++    // Only the FULL reloads (indirect calls, callees with a full-sync fence): a call with a precise contract already
++    // reloads exactly what the callee can write, and some callees DO write r14-r31 on purpose (the _restgpr_N epilogue
++    // helpers load them from the stack). Stripping those too froze the game at boot (section 0x3f).
++    // MKW_M8=techo (both kinds), ind (only after indirect calls), dir (only after direct calls with a full fence):
++    // the full-mode ceiling froze the game at boot, so the two halves are measured apart to find which one breaks.
++    // MKW_M8_EXCLUIR = hex guest addresses (comma separated) whose direct calls keep the full reload (thread switches,
++    // context save/load: they resume a thread with r14-r31 as they were at another moment, like setjmp/longjmp).
++    // Entries are single addresses or inclusive ranges "lo-hi" (e.g. the Retro Rewind module, 81800000-81ffffff).
++    private static readonly (uint Lo, uint Hi)[] MkwM8Excluded =
++        (Environment.GetEnvironmentVariable("MKW_M8_EXCLUIR") ?? "")
++            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
++            .Select(x => x.Split('-'))
++            .Select(p => (Convert.ToUInt32(p[0], 16), Convert.ToUInt32(p[^1], 16)))
++            .ToArray();
++
++    private static bool MkwM8IsExcluded(uint target) => MkwM8Excluded.Any(r => target >= r.Lo && target <= r.Hi);
++
++    // MKW_M8=seguro: only after DIRECT calls, and never after a call to code a mod can replace (the 975
++    // modOverridableCallTargets, i.e. Retro Rewind overlays) nor to the excluded addresses (MKW_M8_EXCLUIR: the OS
++    // thread switches and the Retro Rewind module 81800000-81ffffff). The vigía run (MKW_M8=vigia) found that every
++    // function on the boot-to-race path that returns r14-r31 changed is Retro Rewind code.
++    private static bool MkwM8Strips(ResidencyBoundarySync sync, bool indirect, uint target, bool modOverridable) =>
++        sync.ReloadGprMask == uint.MaxValue && (indirect || !MkwM8IsExcluded(target)) &&
++        (MkwM8Mode == "techo" || (MkwM8Mode == "ind" && indirect) || (MkwM8Mode == "dir" && !indirect) ||
++         (MkwM8Mode == "seguro" && !indirect && !modOverridable && !_mkwM8ModCode));
++
++    // True while emitting a mod translation (Retro Rewind overlays, Kamek hooks, rr_continue_* continuations): the
++    // second vigía run found mod code calling continuations, which run the rest of a game function including its
++    // epilogue (r14-r31 restored from that function's frame), so calls made from mod code keep the full reload.
++    [ThreadStatic]
++    internal static bool _mkwM8ModCode;
++
++    // MKW_M8_VIGIA=1 with a stripping mode: keep the full reload but put the vigía check exactly where the mode would
++    // strip (a report = that mode would read a stale register there). MKW_M8=vigia alone checks every full reload.
++    private static readonly bool MkwM8VigiaOnly = Environment.GetEnvironmentVariable("MKW_M8_VIGIA") == "1";
++
++    private static ResidencyBoundarySync MkwM8AfterGuestCall(ResidencyBoundarySync sync, bool indirect = false, uint target = 0,
++        bool modOverridable = false) =>
++        !MkwM8VigiaOnly && MkwM8Strips(sync, indirect, target, modOverridable)
++            ? sync with { ReloadGprMask = sync.ReloadGprMask & ~MkwNonVolatileGprMask } : sync;
++
+     /// <summary>
+     /// Ambient residency for the body being emitted. Thread-local, not an explicit parameter, since threading one through 30+ static formatting helpers risks a missed path silently reading stale <c>ctx-&gt;gpr[N]</c>; also keeps parallel per-function emission independent.
+     /// </summary>
+@@ -353,6 +419,17 @@ public sealed partial class CxxLinearCodeGenerator
+         if (_activeResidency is { } residency) residency.AppendReload(sb, pad, sync);
+     }
+ 
++    // MKW_M8=vigia: the check above, only where the reload stays full (what M8 would strip)
++    // targetExpr: the direct address, or the indirect target with bit 0 set (guest code is 4-aligned)
++    private static void MkwM8Check(StringBuilder sb, string pad, ResidencyBoundarySync sync, string targetExpr,
++        bool indirect = false, uint target = 0, bool modOverridable = false)
++    {
++        var check = MkwM8Mode == "vigia" ? sync.ReloadGprMask == uint.MaxValue
++            : MkwM8VigiaOnly && MkwM8Strips(sync, indirect, target, modOverridable);
++        if (check && _activeResidency is { } residency)
++            residency.AppendM8Check(sb, pad, targetExpr);
++    }
++
+     /// <summary>
+     /// Resolves the boundary sync set for a direct guest call, falling back to <see cref="ResidencyBoundarySync.Full"/> when narrowing is disabled, residency is inactive, the callee has no contract or a full-sync fence, or a mod could replace the callee with a re-translation this body's contract doesn't describe.
+     /// </summary>
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs
+index ed6d82c..92518ca 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.cs
+@@ -290,6 +290,8 @@ public sealed partial class CxxLinearCodeGenerator
+         string EmitFunctionBody(RegisterResidency? residency, int bufferBaseLength, bool discardResult = false)
+         {
+             var previousResidency = _activeResidency;
++            var previousMkwM8ModCode = _mkwM8ModCode;
++            _mkwM8ModCode = emitModRegistration;
+             var previousDirectCallTargets = _emittedDirectCallTargets;
+             var previousLocalLabels = _emittedLocalLabelAddresses;
+             var previousFifoBurstSlot = _activeGpuFifoBurstSlot;
+@@ -539,6 +541,7 @@ public sealed partial class CxxLinearCodeGenerator
+                 body.Clear();
+                 _reusableFunctionBodyBuilder = body;
+                 _activeResidency = previousResidency;
++                _mkwM8ModCode = previousMkwM8ModCode;
+                 _emittedDirectCallTargets = previousDirectCallTargets;
+                 _emittedLocalLabelAddresses = previousLocalLabels;
+                 _activeGpuFifoBurstSlot = previousFifoBurstSlot;

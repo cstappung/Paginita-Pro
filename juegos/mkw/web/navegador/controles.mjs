@@ -16,10 +16,13 @@
 //     adaptadores de GameCube y mandos sin mapeo estándar), todo guardado en el navegador ("mkw.mandos").
 //   - Táctil (celular) → puerto 1: stick a la izquierda y botones a la derecha, cada dedo por separado.
 //   - Inclinar el teléfono (como el Wii Wheel) → mueve el stick a izquierda/derecha del puerto 1 (opcional).
-//   - Vibración: el juego la pide con vibrar(puerto, cmd); va al mando (vibrationActuator) o al celular.
+//   - Vibración: el juego la pide con vibrar(puerto, cmd); va al mando (vibrationActuator) o al celular, hecha pulsos
+//     parejos cada 100 ms por vibracion.mjs (§167).
 
 import { mapaPorOmision, revisarMapa, migrarPropio, aplicarMapa, fotoMando, capturar as capturarFuente, poner as ponerFuente,
          clavePerfil, ES_OBJETIVO, esPorOmision, conReposo } from './asignacion-mando.mjs';
+import { crearVibracion } from './vibracion.mjs';
+import { disposicionDe, estandarizar, medirCentro, revisarDisposicion, NOMBRES_SWITCH2 } from './disposicion-mando.mjs';
 
 // ---- Botones de GameCube (los mismos bits que dolphin/pad.h) ----
 export const BOTON = {
@@ -76,7 +79,8 @@ const MANDO_LETRA = [[1, BOTON.A], [0, BOTON.B], [3, BOTON.X], [2, BOTON.Y], ...
 // Qué mando es, por su nombre (el navegador pone el fabricante: 057e Nintendo, 054c Sony, 045e Microsoft)
 export function tipoMando(id = '') {
   const s = id.toLowerCase();
-  if (/0079.{0,12}1846|mayflash|gamecube|057e.{0,12}0337/.test(s)) return 'gamecube';
+  // (§263: el mando de GameCube de Switch 2, 057e:2073, también)
+  if (/0079.{0,12}1846|mayflash|gamecube|057e.{0,12}0337|057e.{0,12}2073/.test(s)) return 'gamecube';
   if (/057e|nintendo|pro controller|joy-con/.test(s)) return 'nintendo';
   // (§111: Xbox antes que PlayStation, como juegos/audio/mando.js: el nombre del de Xbox también dice «Wireless
   // Controller», que es el del DualShock 4; antes un mando de Xbox salía como PlayStation)
@@ -132,7 +136,10 @@ function aStickGC(x, y, zona = 0.15) {
 }
 const recorta = v => Math.max(-128, Math.min(127, Math.round(v)));
 
-export function crearControles({ enviar, objetivoTeclado = window, contenedorTactil = null, alCambiar = null } = {}) {
+// §131 (P6): el filtro de la sala (lee la memoria del juego) una vez por paso, no una por puerto. ?menusUnaVez=0 = antes
+const VIBRACION_VIEJA = new URLSearchParams(globalThis.location?.search || '').get('vibracion') === 'vieja';   // §167
+const MENUS_UNA_VEZ =new URLSearchParams(globalThis.location?.search || '').get('menusUnaVez') !== '0';
+export function crearControles({ enviar, objetivoTeclado = window, contenedorTactil = null, alCambiar = null, refresco = null } = {}) {
   // --- estado de cada fuente ---
   const teclasApretadas = new Set();              // KeyboardEvent.code de las teclas apretadas ahora
   let teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def]));
@@ -143,6 +150,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   const inclinacion = { activa: false, centro: null, x: 0 };
   const piloto = { botones: 0 };                  // la página aprieta botones sola (menus.mjs: ir a una copa/pista)
   let silencio = false;                           // true = el juego no recibe nada de la persona (menú de inicio)
+  let ocultaCero = false;                         // §177.6 (R9): la pestaña lleva más de 1 s oculta: el mando en reposo
   let cerrojo = null;                             // §94: función que dice si AHORA lo de la persona no va al juego (la sala)
   let filtro = null;                              // §99: función que dice qué botones de la persona NO van al juego ahora (la sala)
   let sinMandos = null;                           // §100: función que dice si AHORA los mandos son de la página (el cursor del sitio)
@@ -161,6 +169,11 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   prefsMandos.propios = { ...(prefsMandos.propios || {}) };            // (copias propias: el default no se toca)
   prefsMandos.mapas = { ...(prefsMandos.mapas || {}) };               // §111: el mapa entero de cada mando (asignacion-mando.mjs)
   prefsMandos.puertos = { ...(prefsMandos.puertos || {}) };
+  // §263: la disposición de cada modelo que no es «standard» (dónde está cada botón; disposicion-mando.mjs): la que
+  // enseñó la persona con «Enséñale tu mando», por perfil; las conocidas (Switch 2) vienen escritas en el módulo
+  prefsMandos.disposiciones = { ...(prefsMandos.disposiciones || {}) };
+  const centros = new Map();                      // índice del Gamepad → el reposo de sus ejes (para los que lo piden)
+  const crudos = new Map(), vistos = new Map();   // clave → el Gamepad del navegador / el que ve el resto (estandarizado)
   // §111: capturando = { clave (la de ESE mando: dos iguales no se escuchan los dos), objetivo, sumar, base (foto del
   // mando al empezar), listo } mientras se espera una entrada
   let capturando = null;
@@ -250,13 +263,20 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     // (§112: si el mando de lo capturado se desconectó antes de soltarlo, no queda «esperando que se suelte» para
     // siempre: con eso puesto ningún mando llegaba al juego)
     if (hastaSoltar && !claves.some(([, k]) => k === hastaSoltar.clave)) { hastaSoltar = null; ocupadoHasta = reloj() + 250; }
-    return lista.map(g => {
-      const tipo = tipoMando(g.id), perfil = clavePerfil(g.id, g.mapping);
+    return lista.map(crudo => {
+      // §263: un modelo con disposición (Switch 2, o uno que enseñó la persona) se ve como un mando «standard»
+      const perfil = clavePerfil(crudo.id, crudo.mapping), disp = disposicionDe(perfil, prefsMandos.disposiciones);
+      if (disp?.centrar && !centros.has(crudo.index)) centros.set(crudo.index, medirCentro(crudo));
+      const g = disp ? estandarizar(crudo, disp, { centro: centros.get(crudo.index) }) : crudo;
+      crudos.set(claveDe.get(crudo.index), crudo); vistos.set(claveDe.get(crudo.index), g);
+      const tipo = tipoMando(g.id);
+      const modelo = (/057e.{0,12}(20(?:66|67|69|73))/i.exec(g.id) || [])[1];
       const propio = !!guardadoDe(perfil, g.id) || !!prefsMandos.propios[g.id];
       const letra = prefsMandos.disposicion === 'letra' || (prefsMandos.disposicion === 'auto' && tipo === 'nintendo');
       const mapa = mapaDe(perfil, g.id, letra);
       const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), perfil, indice: g.index, tipo, letra, vibra: !!g.vibrationActuator,
-                      propio, sinMapa: g.mapping !== 'standard' && !propio, estandar: g.mapping === 'standard', mapa, mando: g };
+                      propio, sinMapa: g.mapping !== 'standard' && !propio, estandar: g.mapping === 'standard', mapa, mando: g,
+                      disposicion: disp ? (prefsMandos.disposiciones[perfil] ? 'tuya' : 'conocida') : null, modelo: NOMBRES_SWITCH2[modelo] || null };
       const quieto = { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };
       // §111: capturando para este mando: la primera entrada nueva (botón, eje o cruceta) queda para ese control
       if (capturando && capturando.clave === comun.clave) {
@@ -292,9 +312,38 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   }
 
   // --- vibración: el juego la pide por puerto ---
+  // §167: el juego prende y apaga el motor muy seguido (PWM) para vibrar suave; vibracion.mjs lo convierte en una orden
+  // pareja cada 100 ms (pulso proporcional en el teléfono, fuerza proporcional en el mando, tope de 2 s seguidos).
+  // ?vibracion=vieja = cada prendido/apagado directo como antes (navigator.vibrate(5000) / 0).
+  const vibracion = VIBRACION_VIEJA ? null : crearVibracion({
+    telefono: (puerto, ms) => {
+      if (puerto === 0 && tactil.activo && navigator.vibrate && (prefsMandos.vibrar || !ms)) navigator.vibrate(ms);
+    },
+    mando: (puerto, fuerza, ms) => {
+      for (const m of leerMandos()) {
+        if (m.puerto !== puerto || !m.mando.vibrationActuator) continue;
+        if (fuerza > 0 && prefsMandos.vibrar) m.mando.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: fuerza, weakMagnitude: fuerza }).catch(() => {});
+        else m.mando.vibrationActuator.reset().catch(() => {});
+      }
+    },
+  });
+  if (vibracion && globalThis.document) document.addEventListener('visibilitychange', () => { if (document.hidden) vibracion.parar(); });
+  // §177.6 (R9): con la pestaña oculta el refresco de pantalla deja de llamar y paso() no corre: el juego se quedaba con
+  // lo último que recibió (un acelerador o un giro apretado, para siempre, en la sala). Al segundo de ocultarse se le
+  // manda el mando en reposo (como el «callado»: lo del piloto sigue); al volver a verse, lo de la persona otra vez.
+  // ?ocultaCero=0 = como antes
+  if (globalThis.document && !/[?&]ocultaCero=0\b/.test(globalThis.location?.search || '')) {
+    let reloj = null;
+    document.addEventListener('visibilitychange', () => {
+      clearTimeout(reloj); reloj = null;
+      if (document.hidden) reloj = setTimeout(() => { ocultaCero = true; estado.ocultaCero = (estado.ocultaCero || 0) + 1; paso(); }, 1000);
+      else if (ocultaCero) { ocultaCero = false; paso(); }
+    });
+  }
   const vibrando = new Set();
   function vibrar(puerto, cmd) {
     const on = cmd === 1;
+    if (vibracion) { vibracion.pedir(puerto, on && prefsMandos.vibrar); return; }
     if (on === vibrando.has(puerto)) return;
     on ? vibrando.add(puerto) : vibrando.delete(puerto);
     for (const m of leerMandos()) {
@@ -314,7 +363,11 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     const grados = angulo - inclinacion.centro;
     inclinacion.x = Math.abs(grados) < 3 ? 0 : recorta((grados / 35) * 127);   // 35° = giro a fondo
   };
-  window.addEventListener('deviceorientation', alInclinar);
+  // §128 (E3): la orientación se escucha solo con «dirigir inclinando» prendido (antes, siempre: un aviso por cada
+  // movimiento del teléfono). ?tactilLiviano=0 = como antes
+  const TACTIL_LIVIANO = new URLSearchParams(globalThis.location?.search || '').get('tactilLiviano') !== '0';
+  const escucharInclinacion = si => { if (si) window.addEventListener('deviceorientation', alInclinar); else window.removeEventListener('deviceorientation', alInclinar); };
+  if (!TACTIL_LIVIANO) escucharInclinacion(true);
 
   // --- mando táctil ---
   let tactilUI = null;
@@ -342,13 +395,15 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     if (tactil.activo) suma(0, { ...tactil, gl: tactil.botones & BOTON.L ? 255 : 0, gr: tactil.botones & BOTON.R ? 255 : 0 }, 'táctil');
     if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
     if (piloto.botones) suma(0, piloto, 'piloto');
-    const callado = silencio || (cerrojo ? !!cerrojo() : false);
+    const callado = silencio || ocultaCero || (cerrojo ? !!cerrojo() : false);
     // §113c: «Acelerar solo». En la cuenta 3-2-1 no actúa: la salida rápida (el turbo de la largada) la hace la persona con
     // SU botón de acelerar, apretándolo justo cuando sale el «2»; si lo tiene apretado al «¡YA!», sigue sin corte. Desde
     // ahí A queda apretado en cada puerto con alguien, salvo que frene (B le gana: así hay marcha atrás)
     const solo = ayudas.acelerar && !callado && acelerar ? !!acelerar() : false;
     const enviados = estado.enviados || (estado.enviados = []);
     estado.acelerandoSolo = solo;
+    // §131 (P6): el filtro de la sala lee la memoria del juego: una vez por paso, no una por puerto (?menusUnaVez=0 = antes)
+    const quitaPaso = filtro && MENUS_UNA_VEZ ? (filtro() | 0) : 0;
     puertos.forEach((d0, p) => {
       const d = solo && d0.conectado && !(d0.botones & BOTON.B) ? { ...d0, botones: d0.botones | BOTON.A } : d0;
       // silenciado (el menú de inicio, inicio.mjs, está encima): al juego le llega solo lo del piloto; lo de la
@@ -356,7 +411,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       // salida pero deja el medidor conectado
       // §99: y los botones que la sala no deja pasar ahora (Start = la pausa del juego, que tiene «Salir»; B en la
       // primera pantalla de personajes = volver al menú): se borran de lo que se manda, como un relé que abre esa línea
-      const quita = filtro ? (filtro() | 0) : 0;
+      const quita = MENUS_UNA_VEZ ? quitaPaso : filtro ? (filtro() | 0) : 0;
       const s = callado ? { conectado: d.conectado, botones: p === 0 ? piloto.botones : 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 }
         : quita && (d.botones & quita) ? { ...d, botones: d.botones & ~quita } : d;
       const firma = [s.conectado, s.botones, s.sx, s.sy, s.cx, s.cy, s.gl, s.gr].join();
@@ -376,9 +431,12 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   const bucle = () => {
     if (!vivo) return;
     try { paso(); } catch (e) { if (errores++ < 5) console.warn('[controles]', e); }
-    requestAnimationFrame(bucle);
+    if (!refresco) requestAnimationFrame(bucle);
   };
-  requestAnimationFrame(bucle);
+  // §143 (P4): con refresco(f) (el planificador único de la página) el paso va en el mismo refresco que el reloj del
+  // monitor, sin un rAF propio; sin él, su propio rAF como antes. Se lee el mando en cada refresco a propósito: lo más
+  // fresco llega al cuadro siguiente del juego (leerlo una vez por cuadro le sumaría hasta 16 ms de demora)
+  if (refresco) refresco(bucle); else requestAnimationFrame(bucle);
 
   return {
     estado, teclas, vibrar, paso,
@@ -426,6 +484,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       prefsMandos.zona = Math.min(40, Math.max(3, Number(prefsMandos.zona) || 15));
       if (!['auto', 'posicion', 'letra'].includes(prefsMandos.disposicion)) prefsMandos.disposicion = 'auto';
       prefsMandos.vibrar = prefsMandos.vibrar !== false;
+      if (!prefsMandos.vibrar && vibracion) vibracion.parar();
       guardar(CLAVE_MANDOS, prefsMandos);
     },
     // asistente: espera que se apriete un botón del mando `id` y lo deja para el botón de GameCube `boton`.
@@ -439,7 +498,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       const m = mandoDe(k);
       if (!m || !ES_OBJETIVO.has(objetivo)) return Promise.resolve(null);
       let base = null;
-      try { const g = (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.index === m.indice); if (g) base = fotoMando(g); } catch {}
+      try { const g = vistos.get(m.clave) || (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.index === m.indice); if (g) base = fotoMando(g); } catch {}
       hastaSoltar = null;
       return new Promise(listo => { capturando = { clave: m.clave, objetivo, sumar, base, listo }; });
     },
@@ -458,6 +517,21 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     capturandoAhora: () => capturando ? { clave: capturando.clave, objetivo: capturando.objetivo } : null,
     // el mapa de un mando como está ahora (una copia), y cambiarlo a mano (se guarda para su modelo: su perfil)
     mapaDe(k) { const m = mandoDe(k); return m ? revisarMapa(m.mapa) : null; },
+    // §263: el Gamepad del navegador tal cual (para «Enséñale tu mando») y el que ve el resto (el dibujo lo enciende)
+    crudoDe(k) {
+      const m = mandoDe(k); if (!m) return null;
+      try { return (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.index === m.indice) || crudos.get(m.clave) || null; } catch { return crudos.get(m.clave) || null; }
+    },
+    vistoDe: k => vistos.get(mandoDe(k)?.clave) || null,
+    // la disposición enseñada de un modelo: guardarla (su mapa propio se borra: estaba escrito con los botones crudos)
+    // o borrarla (vuelve la conocida, si hay, o el mando como lo da el navegador)
+    guardarDisposicion(k, d) {
+      const m = mandoDe(k); if (!m) return false;
+      const r = revisarDisposicion(d); if (!Object.keys(r).length) return false;
+      prefsMandos.disposiciones[m.perfil] = r; delete prefsMandos.mapas[m.perfil]; delete prefsMandos.propios[m.nombre];
+      guardar(CLAVE_MANDOS, prefsMandos); return true;
+    },
+    borrarDisposicion(k) { const m = mandoDe(k); if (!m) return; delete prefsMandos.disposiciones[m.perfil]; delete prefsMandos.mapas[m.perfil]; guardar(CLAVE_MANDOS, prefsMandos); },
     ponerMapa(k, mapa) { const m = mandoDe(k); if (m) guardarMapa(m.perfil, m.nombre, revisarMapa(mapa), m.letra); },
     quitarFuente(k, objetivo, fuente) {
       const m = mandoDe(k); if (!m || !ES_OBJETIVO.has(objetivo)) return;
@@ -519,6 +593,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     async inclinar(activar) {
       // Android: funciona directo. (iPhone pide permiso, pero el juego no corre en iPhone.)
       inclinacion.activa = activar; inclinacion.centro = null; inclinacion.x = 0;
+      if (TACTIL_LIVIANO) escucharInclinacion(!!activar);
     },
     detener() { vivo = false; objetivoTeclado.removeEventListener('keydown', alBajar); objetivoTeclado.removeEventListener('keyup', alSubir); },
   };
@@ -646,16 +721,24 @@ function crearTactil(contenedor, tactil) {
     }
   };
   leerPiezas();
-  if (typeof ResizeObserver === 'function') new ResizeObserver(() => aplicarPiezas()).observe(capa);
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => { aplicarPiezas(); olvidarRects?.(); }).observe(capa);
 
   const dedos = new Map();                         // pointerId → { stick: bool, x, y }
-  const dentro = (el, x, y) => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
+  // §128 (E3): los recuadros de los botones se miden al empezar cada toque (pointerdown) y se reusan mientras el dedo se
+  // mueve (antes, getBoundingClientRect de cada botón en cada pointermove: decenas por segundo). Mientras se toca, los
+  // botones no se mueven (el editor tiene su propia capa); un cambio de tamaño borra lo medido.
+  const LIVIANO = new URLSearchParams(globalThis.location?.search || '').get('tactilLiviano') !== '0';
+  let medidos = new Map();
+  const rect = el => { if (!LIVIANO) return el.getBoundingClientRect(); let r = medidos.get(el); if (!r) medidos.set(el, r = el.getBoundingClientRect()); return r; };
+  const olvidarRects = () => { medidos = new Map(); };
+  addEventListener('resize', olvidarRects);
+  const dentro = (el, x, y) => { const r = rect(el); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
   const activos = () => botones.filter(visible);
   const recalcula = () => {
     let bits = 0, sx = 0, sy = 0;
     for (const d of dedos.values()) {
       if (d.stick) {                               // distancia al centro del aro, normalizada a su radio
-        const r = base.getBoundingClientRect();
+        const r = rect(base);
         const nx = (d.x - (r.left + r.width / 2)) / (r.width / 2);
         const ny = (d.y - (r.top + r.height / 2)) / (r.height / 2);
         [sx, sy] = aStickGC(Math.max(-1, Math.min(1, nx)), Math.max(-1, Math.min(1, ny)));
@@ -668,6 +751,7 @@ function crearTactil(contenedor, tactil) {
   capa.addEventListener('pointerdown', e => {
     if (editando) return;
     try { capa.setPointerCapture(e.pointerId); } catch {}   // (los toques simulados de las pruebas no se pueden "capturar")
+    olvidarRects();                                // (§128: se mide otra vez al empezar cada toque)
     // un dedo es del stick si cae en el aro o en su lado de la pantalla (hasta el borde derecho del aro + un poco),
     // salvo que caiga justo sobre un botón (con el tamaño grande, B queda cerca de esa zona; o un botón que se movió ahí)
     const aro = base.getBoundingClientRect();

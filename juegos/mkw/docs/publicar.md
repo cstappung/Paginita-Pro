@@ -10,6 +10,19 @@ dueño, 2026-10-19).
 
 ## 0. El programa final (lo hace Claude) — **hecho el 2026-10-24** (bitácora §102)
 
+> **Al día (2026-11-09, bitácora §261): el programa para subir es `build/web-final-w30/navegador`** (W30 + todo lo
+> adoptado, `--final` con PGO rehecho, `mkw.wasm.br` 13,7 MB; la planilla verde salvo el teléfono simulado de V7).
+> Subir: `MKW_BUILD=build/web-final-w30/navegador node herramientas/subir-r2.mjs` (revisar: 7.324 archivos, 5,00 GB),
+> después lo mismo con `--subir` y las llaves de R2. Rehacerlo:
+> `MKW_WIICOMPILED=terceros/Wiicompiled-motor-w30 MKW_AURORA=terceros/aurora-main-viejo-motor python herramientas/compilar-web.py --modo navegador --final --carpeta build/web-final-w30`
+> (o `bash herramientas/tanda-cierre.sh compilar`, que copia las semillas y comprime).
+>
+> **Antes (2026-11-08, bitácora §244):** el programa más nuevo es `build/web-e6-w29/navegador`: el de E6 (motor v0.9.3
+> con H6, M1/M2, ThinLTO y PGO) con la memoria fija de W29 (768 MB). Probado: arranque 13/13, la sala contra el de E6
+> 14/14 (huellas iguales), fantasmas 6/6, 11 pistas en una pestaña sin caerse, gama baja +7,7 % (6 pares). Para rehacerlo:
+> `MKW_WIICOMPILED=terceros/Wiicompiled-motor-h6 MKW_AURORA=terceros/aurora-main-viejo-motor python herramientas/compilar-web.py --final --modo navegador --carpeta build/web-e6 --salida build/web-e6-w29/navegador`
+> (sin las dos variables sale la línea vieja del traductor). Antes de subir falta la planilla entera (`correr-todo.mjs`) con ese programa.
+
 Ya está compilado y probado en `build/web-final/navegador` (`mkw.wasm.br` 15,7 MB, semillas de 729 pipelines y 483
 bloques). Para rehacerlo (si el código cambia antes de subir):
 
@@ -62,6 +75,7 @@ node herramientas/subir-r2.mjs --subir      # sube lo que falta (se puede cortar
 node herramientas/subir-r2.mjs --comprobar  # revisa en R2 cada archivo (tamaño y huella SHA-256)
 ```
 
+- **La partida base (§175).** La partida que reciben los navegadores sin partidas guardadas (`mkw/mkw/sd/riivolution/save/…/rksys.dat`) sale de `build/web/partida-base`, una copia limpia con las 4 licencias vacías (`node herramientas/partida-base.mjs`; `subir-r2.mjs` la arma solo si falta). La de `terceros/RetroRewind/riivolution` ya no se sube: el juego corrido en Node y en Windows escribía ahí y le dejaba una licencia «no name». La lista de §102 (2026-10-24 23:43) se armó **antes** de eso y está limpia: su `rksys.dat` tiene la misma huella SHA-256 (`708c7a04…`) que la copia limpia. Igual, **la lista se vuelve a armar justo antes de subir** (el primer comando, sin `--subir`): desde §174 el manifiesto lleva la huella de cada archivo.
 - La imagen del menú de inicio (`build/web-final/navegador/imagenes/inicio/jlokart.webp`, 264 KB) va en la misma subida: si
   falta, el juego abre sin ese menú. Se rehace con `python -I herramientas/preparar-inicio.py <imagen original>` (la deja en
   `build/web/navegador/imagenes/inicio/`: copiarla a la misma ruta de `build/web-final/navegador`).
@@ -162,3 +176,24 @@ en el sitio publicado.
   una vez cada 2 horas. Alcanza para ~800 primeras visitas o ~6.000 segundas al día.
 - **10 ms de procesador por pedido.** La revisión del token (RSA) se hace una vez y se recuerda; cada pedazo del disco
   es solo leer de R2.
+
+## 8. (Futuro, no publicar todavía) El marco del juego aislado: Document-Isolation-Policy — N3/H5 (bitácora §187, §208)
+
+**Nada de esto está prendido ni hay que publicarlo hoy.** Es para cuando el juego use varios hilos con memoria
+compartida (el paso 9 del plan de rendimiento). Lo probé solo en esta PC (`servidor.mjs`, `worker-local.mjs`, banco
+`aislamiento` 16/16 y `herramientas/prueba-aislamiento-telefono.mjs` 8/8).
+
+- **Qué es.** Una cabecera HTTP, `Document-Isolation-Policy: isolate-and-require-corp`, que le da al marco del juego su
+  propio proceso y la memoria compartida (`SharedArrayBuffer`), **sin cambiar el sitio** (GitHub Pages no deja poner
+  cabeceras). Chrome de escritorio la tiene desde la 137 y Android desde la 146 (no Android WebView).
+- **Cómo llegaría sin Cloudflare.** Un service worker del mismo origen que el juego contesta la página del juego
+  agregándole la cabecera (`banco/pruebas/aislamiento/sw.js` es el ejemplo que anda). Habría que publicar ese archivo
+  junto a `juegos/mkw/web/navegador/index.html`.
+- **Cómo llegaría con Cloudflare.** El Worker de BT3 sirve la página del juego con la cabecera (`aislar.mjs`,
+  `cabecerasAislar('dip')` dice cuáles). Cambia la dirección del marco: lo decides tú.
+- **Lo que hay que cambiar antes en el código (Claude).** Con la cabecera el marco ya no puede tocar la página de
+  afuera directo: `w.mkwConectarRecords`, `w.mkwConectarNube`, `w.mkwConectarVr` (colabtex `mkw.js`) y `parent.Mando`
+  (`mando-sitio.mjs`) tienen que pasar a mensajes. Hasta que eso esté, **no publicar la cabecera**: los récords, la nube
+  y el VR dejarían de andar.
+- **Cómo saber si un aparato la tiene.** «📋 Copiar el informe de rendimiento» trae `hilos` (`aislada`,
+  `memoriaCompartida`, `chrome`, `android`, `dipEsperable`).

@@ -25,12 +25,20 @@
 //      (controles.ocupado()); vuelve 250 ms después de soltar lo capturado.
 //   4. Botones de 38 px o más, con texto (el cursor del mando no muestra los «title»), y sin barras deslizantes (un clic
 //      simulado no las mueve): la zona muerta va con − y +.
+// §263 (el dueño: «debiera verse algo parecido al de Steam big picture»): con un mando «standard» (o ya ordenado por su
+// disposición), la hoja empieza por la VISTA DEL MANDO (mando-dibujo.mjs): el dibujo con un rótulo por botón; tocar uno
+// = «¿Qué hace RT?». La lista de siempre (con el teclado) queda en «☰ Lista». Abajo del dibujo, «🎓 Enséñale tu mando»
+// (para un mando que el navegador no ordena: el dibujo marca cada lugar y la persona aprieta el suyo) y, si el navegador
+// habla USB, «🔌 Activar mando de Switch 2» (switch2.mjs). La vista elegida se recuerda (`mkw.controles.vista`).
 // Como un tablero eléctrico con un diagrama al lado: cada fila es un circuito con su piloto (la luz) y su interruptor.
 //
 // Uso:  montarControles(document.getElementById('panelControles'), controles)  →  { refrescar, pintar, … }
 
 import { NOMBRE_TIPO, nombreTecla, MAX_TECLAS, ACCIONES } from './controles.mjs';
 import { BITS as BOTON, nombreFuente, MAX_FUENTES } from './asignacion-mando.mjs';
+import { montarDibujoMando, ponerBoton, ponerStick, CSS_DIBUJO } from './mando-dibujo.mjs';
+import { armarDisposicion } from './disposicion-mando.mjs';
+import { switch2Disponible, despertarSwitch2 } from './switch2.mjs';
 
 export const ESPERA_CAPTURA_MS = 8000;           // cuánto espera «Cambiar» una entrada antes de rendirse
 export const ESPERA_PASO_MS = 6000;              // cuánto espera cada paso del asistente («si no tocas nada, queda igual»)
@@ -110,11 +118,63 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     el('div', { className: 'gatillos' }, el('span', {}, 'L', el('b', { className: 'barra-gatillo' }, barraL)), el('span', {}, 'R', el('b', { className: 'barra-gatillo' }, barraR))),
     probar);
   const avisoSinMapa = el('div', { className: 'aviso ctl-sinmapa', hidden: true },
-    el('span', { textContent: 'Este mando no tiene mapeo estándar: el navegador no sabe qué botón es cuál. Asígnalos una vez y quedan guardados.' }));
-  const asistirAviso = boton('▶ Asignar paso a paso', 'principal');
+    el('span', { textContent: 'El navegador no sabe qué botón es cuál en este mando. Enséñaselo una vez (aprietas cada botón que te marca el dibujo) y queda guardado.' }));
+  const asistirAviso = boton('Cambiar todos los botones, uno por uno', 'principal');
   asistirAviso.onclick = () => asistir(PRINCIPALES);
-  avisoSinMapa.append(asistirAviso);
+  const ensenarAviso = boton('🎓 Enséñale tu mando', 'principal');   // (§263: lo de siempre en un mando así: enseñarlo)
+  ensenarAviso.onclick = () => ensenar();
+  asistirAviso.className = 'boton';
+  avisoSinMapa.append(el('div', { className: 'fila-botones' }, ensenarAviso, asistirAviso));
   const cabeza = el('div', { className: 'ctl-cabeza' }, el('div', { className: 'ctl-nombre' }, titulo, sub), filaJugador, traer, probador, estadoPrueba);
+
+  // ---------------- §263: la vista del mando (estilo Big Picture), «Enséñale tu mando» y el Switch 2 ----------------
+  if (!document.getElementById('estiloDibujoMando')) document.head.append(Object.assign(document.createElement('style'), { id: 'estiloDibujoMando', textContent: CSS_DIBUJO }));
+  let vistaMando = (() => { try { return localStorage.getItem('mkw.controles.vista') !== 'lista'; } catch { return true; } })();
+  const bVistaMando = boton('🎮 Mando', 'ctl-vista'), bVistaLista = boton('☰ Lista (mando y teclado)', 'ctl-vista');
+  const ponerVista = si => { vistaMando = si; try { localStorage.setItem('mkw.controles.vista', si ? 'mando' : 'lista'); } catch {} cancelarTodo(); elegir(null); dibujo.cerrarElegir(); pintar(); };
+  bVistaMando.onclick = () => ponerVista(true); bVistaLista.onclick = () => ponerVista(false);
+  const filaVistas = el('div', { className: 'fila-botones ctl-vistas', role: 'tablist' }, bVistaMando, bVistaLista);
+  const cajaDibujo = el('div', { className: 'ctl-dibujo' });
+  const nombresDibujo = Object.fromEntries(Object.entries(ACCION).map(([k, [n]]) => [k, n]));
+  const dibujo = montarDibujoMando(cajaDibujo, { nombres: nombresDibujo, alElegir: ({ f, objetivo, ejes, modo }) => {
+    const m = mandoDeAhora(); if (!m) return;
+    const antes = controles.mapaDe(m.clave);
+    controles.ponerMapa(m.clave, ejes ? ponerStick(antes, ejes, modo, MAX_FUENTES) : ponerBoton(antes, f, objetivo, MAX_FUENTES));
+    deshacer = { tipo: 'mando', clave: m.clave, mapa: antes };
+    const glifo = f === 'si' ? 'Stick izq.' : f === 'sd' ? 'Stick der.' : nombreFuente(f, m.tipo, true);
+    avisarAbajo(`✓ ${glifo}: ${ejes ? (modo === 'stick' ? 'manejar' : modo === 'c' ? 'stick C' : 'nada') : objetivo ? nombreDe(objetivo) : 'nada'}`);
+  } });
+  const bEnsenar = boton('🎓 Mi mando no sale bien: enséñaselo'), bSwitch2 = boton('🔌 ¿Mando de Switch 2 con cable? Actívalo aquí');
+  const notaMando = el('p', { className: 'ctl-nota', role: 'status' });
+  bEnsenar.onclick = () => ensenar();
+  bSwitch2.onclick = async () => {
+    texto(notaMando, 'Elige tu mando en la ventana del navegador…');
+    const r = await despertarSwitch2({ alPaso: (i, n) => texto(notaMando, `Activando ${i} de ${n}…`) });
+    texto(notaMando, r.ok ? `✓ ${r.nombre} activado: aprieta un botón y aparece aquí.` : r.error);
+  };
+  const filaMando = el('div', { className: 'fila-botones ctl-mas-mandos' }, bEnsenar);
+  // el Switch 2 solo cuando no hay un mando que ya ande (sin mando, o uno que el navegador no ordena): con cable y sin
+  // las órdenes de switch2.mjs ese mando ni aparece
+  const filaSwitch2 = el('div', { className: 'fila-botones ctl-switch2' }, switch2Disponible() ? bSwitch2 : null);
+  const bOlvidar = boton('↺ Olvidar lo enseñado');
+  bOlvidar.onclick = () => { const m = mandoDeAhora(); if (!m) return; controles.borrarDisposicion(m.clave); avisarAbajo('Ese mando volvió a como lo da el navegador.'); };
+  filaMando.append(bOlvidar);
+  // «Enséñale tu mando»: los mandos son del panel mientras dura (no manejan el juego ni el cursor)
+  function ensenar() {
+    const m = mandoDeAhora(); if (!m) return;
+    cancelarTodo(); elegir(null);
+    const clave = m.clave;
+    vistaMando = true;
+    controles.reservar(true); document.body.classList.add('asistiendo-mando');
+    dibujo.ensenar({ leer: () => controles.crudoDe(clave), alTerminar: resp => {
+      controles.reservar(false); document.body.classList.remove('asistiendo-mando');
+      const d = resp && armarDisposicion(resp);
+      if (d && Object.keys(d).length >= 4 && controles.guardarDisposicion(clave, d)) avisarAbajo(`✓ Aprendido (${Object.keys(d).length} de 22). Ahora funciona como cualquier mando: prueba los botones.`);
+      else avisarAbajo(resp ? 'Se aprendió muy poco: no se cambió nada.' : 'No se cambió nada.');
+      pintar();
+    } });
+    pintar();
+  }
 
   // ---------------- la lista de acciones ----------------
   const lista = el('div', { className: 'ctl-lista' },
@@ -154,7 +214,7 @@ export function montarControles(caja, controles, { ahora = () => performance.now
   bListo.onclick = () => { cancelarTodo(); elegir(null); };
 
   // ---------------- abajo: el asistente, restaurar y los ajustes de todos ----------------
-  const bAsistir = boton('▶ Asignar paso a paso', 'principal'), bRestaurarMando = boton('↺ Mando como siempre'), bRestaurarTeclado = boton('↺ Teclado como siempre', 'ctl-col-teclado');
+  const bAsistir = boton('Cambiar todos los botones, uno por uno'), bRestaurarMando = boton('↺ Mando como siempre'), bRestaurarTeclado = boton('↺ Teclado como siempre', 'ctl-col-teclado');
   bAsistir.onclick = () => asistir(PRINCIPALES);
   bRestaurarMando.onclick = () => { const m = mandoDeAhora(); if (!m) return; cancelarTodo(); deshacer = { tipo: 'mando', clave: m.clave, mapa: controles.mapaDe(m.clave) }; controles.borrarAsignacion(m.clave); avisarAbajo('El mando quedó como siempre.'); };
   bRestaurarTeclado.onclick = () => { cancelarTodo(); deshacer = { tipo: 'tecla', teclas: controles.copiaTeclas() }; controles.restaurarTeclas(); avisarAbajo('El teclado quedó como siempre.'); };
@@ -225,7 +285,7 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     el('p', { className: 'ctl-nota', textContent: 'Con la carrera andando, el kart acelera sin apretar nada; frenar le gana (para ir marcha atrás). ' +
       'La salida rápida la haces tú: en la cuenta 3-2-1, aprieta tu botón de acelerar justo cuando sale el «2» y mantenlo.' }));
 
-  const raiz = el('div', { className: 'ctl' }, seccionCelular, seccionAyudas, barraPestanas, cabeza, avisoSinMapa, asistente, lista, pie,
+  const raiz = el('div', { className: 'ctl' }, seccionCelular, seccionAyudas, barraPestanas, cabeza, avisoSinMapa, filaVistas, cajaDibujo, filaMando, filaSwitch2, notaMando, asistente, lista, pie,
     el('div', { className: 'fila-botones' }, mensajeAbajo, bDeshacerAbajo), ajustes);
   caja.replaceChildren(raiz);
 
@@ -417,14 +477,14 @@ export function montarControles(caja, controles, { ahora = () => performance.now
   }
 
   // Esc (interfaz.mjs) y cerrar el cajón cancelan cualquier espera, la prueba y el asistente
-  addEventListener('mkw-reasignacion-cancelada', () => { if (espera || ayudante || controles.probando()) cancelarTodo('No se cambió nada.'); });
+  addEventListener('mkw-reasignacion-cancelada', () => { if (espera || ayudante || controles.probando()) cancelarTodo('No se cambió nada.'); if (dibujo.ensenando) dibujo.cancelarEnsenar(); });
 
   // ---------------- pintar (cada 100 ms y después de cada cambio): solo textos, clases y atributos ----------------
   let firmaTraer = '';
   function pintar() {
     // (§114: con la hoja escondida —el cajón cerrado, otra pestaña— no hay nada que mostrar: el bucle de 100 ms no toca
     // nada; en un teléfono cada milisegundo de la página se lo quita al juego. Una espera en curso sí se sigue atendiendo)
-    if (!caja.isConnected || (!caja.offsetParent && !espera && !ayudante)) { if (quietoHasta) { quietoHasta = 0; document.body.classList.remove('mando-quieto'); } return; }
+    if (!caja.isConnected || (!caja.offsetParent && !espera && !ayudante && !dibujo.ensenando)) { if (quietoHasta) { quietoHasta = 0; document.body.classList.remove('mando-quieto'); } return; }
     // (la espera de una tecla terminó —alCambiar de controles.mjs lo avisa, y por si no está conectado, aquí también—)
     if (espera?.tipo === 'tecla' && !controles.esperando()) terminarTecla(espera);
     const t = ahora();
@@ -445,14 +505,14 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     pestanas.forEach(({ b, sub: s }, p) => {
       const x = mandos.find(y => y.puerto === p);
       const propio = celular?.visible ? (controles.tactilActivo() ? '📱 En pantalla' : 'sin mando') : '⌨ Teclado';
-      texto(s, x ? `${ICONO[x.tipo] || '🎮'} ${NOMBRE_TIPO[x.tipo]?.split(' (')[0] || 'Mando'}` + (p === 0 && !celular?.visible ? ' + ⌨' : '') : p === 0 ? propio : 'sin mando');
+      texto(s, x ? `${ICONO[x.tipo] || '🎮'} ${(x.tipo === 'generico' ? 'Mando' : NOMBRE_TIPO[x.tipo]?.split(' (')[0]) || 'Mando'}` + (p === 0 && !celular?.visible ? ' + ⌨' : '') : p === 0 ? propio : 'sin mando');
       b.setAttribute('aria-selected', String(p === pestana));
     });
     // la cabeza
     if (m) {
       texto(titulo, `${ICONO[m.tipo] || '🎮'} ${NOMBRE_TIPO[m.tipo] || 'Mando'}`);
       const iguales = mandos.filter(x => x.perfil === m.perfil).length;
-      texto(sub, `${m.nombre.replace(/\s*\(.*$/, '')} · ${m.propio ? 'botones asignados por ti' : m.letra ? 'botones por letra (A a la derecha)' : 'botones por posición'}` +
+      texto(sub, `${m.modelo || m.nombre.replace(/\s*\(.*$/, '')} · ${m.disposicion === 'tuya' ? 'enseñado por ti · ' : ''}${m.propio ? 'botones asignados por ti' : m.letra ? 'botones por letra (A a la derecha)' : 'botones por posición'}` +
         (iguales > 1 ? ` · ${iguales} iguales: comparten botones` : ''));
     } else {
       const enPantalla = pestana === 0 && celular?.visible;
@@ -476,7 +536,15 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     }
     oculto(traer, !!m || !mandos.length);
     oculto(probador, !m);
-    oculto(avisoSinMapa, !(m && m.sinMapa));
+    oculto(avisoSinMapa, !(m && m.sinMapa) || !!dibujo.ensenando);
+    // §263: la vista del mando (con un mando ordenado) o la lista; enseñando, el dibujo siempre
+    const conDibujo = !!m && (m.estandar || !!dibujo.ensenando);
+    const verDibujo = conDibujo && (vistaMando || !!dibujo.ensenando);
+    oculto(filaVistas, !conDibujo || !!dibujo.ensenando); marcado(bVistaMando, verDibujo); marcado(bVistaLista, !verDibujo);
+    oculto(cajaDibujo, !verDibujo);
+    raiz.classList.toggle('con-dibujo', verDibujo);
+    if (verDibujo) dibujo.pintar({ mapa: m.mapa, tipo: m.tipo, gamepad: dibujo.ensenando ? null : controles.vistoDe(m.clave) });
+    oculto(filaMando, !m || !!dibujo.ensenando); oculto(filaSwitch2, !switch2Disponible() || !!dibujo.ensenando || !!(m && !m.sinMapa)); oculto(bOlvidar, !m?.disposicion || m.disposicion !== 'tuya');
     // el probador
     if (m) {
       punto.style.transform = `translate(${(m.sx / 128) * 18}px, ${(-m.sy / 128) * 18}px)`;
@@ -542,7 +610,7 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     texto(zonaDato, `${pr.zona} %`); apagado(zonaMenos, pr.zona <= 3); apagado(zonaMas, pr.zona >= 40);
     marcado(vibSi, pr.vibrar); marcado(vibNo, !pr.vibrar);
     // (cada captura le cambia el modo a mando.js, que avisa con un cartel: mientras se usa el panel, sin carteles)
-    if (espera || ayudante || controles.ocupado()) quietoHasta = t + 9000;
+    if (espera || ayudante || dibujo.ensenando || controles.ocupado()) quietoHasta = t + 9000;
     document.body.classList.toggle('mando-quieto', t < quietoHasta);
   }
   const reloj = setInterval(pintar, 100);
@@ -554,7 +622,8 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     refrescar() { if (espera?.tipo === 'tecla' && !controles.esperando()) terminarTecla(espera); else pintar(); },
     cancelar: () => cancelarTodo('No se cambió nada.'),
     elegirPestana, tocarRecuadro, asistir,
-    get pestana() { return pestana; }, get espera() { return espera ? { ...espera } : null }, get ocupado() { return !!(espera || ayudante); },
+    get pestana() { return pestana; }, get espera() { return espera ? { ...espera } : null }, get ocupado() { return !!(espera || ayudante || dibujo.ensenando); },
+    dibujo, ensenar, ponerVista,
     detener() { clearInterval(reloj); },
   };
 }

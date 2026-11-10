@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imágenes a la vista</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>G16: <span>el 1 % bajo de las imágenes que se ven</span></h1>
+<p>Prueba <code>web/navegador/imagenes-vista.mjs</code> (bitácora §256) <b>sin el juego</b>: refrescos e imágenes de mentira,
+  el tiempo de cada imagen, los fps a la vista, el 1 % y el 0,1 % bajo, la causa de cada pico y el gráfico en vivo.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<canvas id="grafico" width="240" height="48" style="background:#000"></canvas>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearImagenesVista, resumir, percentil, textoResumen, dibujarGrafico, engancharImagenes, histograma, META, CAUSAS } from '/web/navegador/imagenes-vista.mjs';
+
+const { ok, fin } = prueba('imagenes-vista', 'G16: el 1 % bajo de las imágenes a la vista (sin el juego)');
+const P = 1000 / 60;
+// corre un monitor de mentira: hz refrescos por segundo, `seg` segundos; imagenEn(i) = ¿hubo imagen nueva antes del refresco i?
+function correr(v, { hz = 60, seg = 10, imagenEn = () => true, antes = () => {}, t0 = 0 } = {}) {
+  const p = 1000 / hz;
+  for (let i = 0; i < hz * seg; i++) { antes(i); if (imagenEn(i)) v.contar(); v.refresco(t0 + i * p, P); }
+}
+try {
+  ok('META = 95 %', META === 0.95);
+  ok('percentil: [1..100] p99 = 99, p50 = 50; vacío = null', percentil(Float64Array.from({ length: 100 }, (_, i) => i + 1), 0.99) === 99 &&
+     percentil([1, 2, 3, 4], 0.5) === 2 && percentil([], 0.5) === null);
+  // 1. todo parejo a 60
+  { const v = crearImagenesVista(); correr(v); const r = v.resumen();
+    ok('60 parejas: fps 60, 1 % bajo 60, 0,1 % bajo 60, cumple', Math.abs(r.fps - 60) < 0.01 && Math.abs(r.bajo1 - 60) < 0.01 && Math.abs(r.bajo01 - 60) < 0.01 && r.cumple,
+       textoResumen(r)); }
+  // 2. un tirón de 50 ms cada segundo: los fps casi no bajan, el 1 % bajo sí
+  { const v = crearImagenesVista(); correr(v, { imagenEn: i => i % 60 < 57 || i % 60 === 59 }); const r = v.resumen();
+    ok('un tirón de 3 refrescos cada segundo: fps ~58, pero el 1 % bajo cae a 20 (50 ms) y no cumple', r.fps > 57 && r.fps < 59 && Math.abs(r.bajo1 - 20) < 0.1 && !r.cumple,
+       textoResumen(r)); }
+  // 3. una imagen larga en 1000: el 1 % bajo sigue en 60, el 0,1 % bajo la ve
+  { const v = crearImagenesVista(); correr(v, { seg: 20, imagenEn: i => i !== 500 && i !== 900 }); const r = v.resumen();
+    ok('dos imágenes dobles en 1200 (0,17 %): el 1 % bajo sigue en 60, el 0,1 % bajo las ve (30)', Math.abs(r.bajo1 - 60) < 0.01 && Math.abs(r.bajo01 - 30) < 0.01 && r.cumple, textoResumen(r)); }
+  // 4. 30 parejas (N8 modo 1): 30 fps, 1 % bajo 30 = cumple (se mide contra lo que se ve)
+  { const v = crearImagenesVista(); correr(v, { imagenEn: i => i % 2 === 0 }); const r = v.resumen();
+    ok('30 parejas: 30 fps y 1 % bajo 30: cumple', Math.abs(r.fps - 30) < 0.1 && Math.abs(r.bajo1 - 30) < 0.1 && r.cumple, textoResumen(r)); }
+  // 5. monitor de 120 Hz, imagen cada 2 refrescos: 60 parejas; dos imágenes en un refresco cuentan como una
+  { const v = crearImagenesVista(); correr(v, { hz: 120, imagenEn: i => i % 2 === 0 }); const r = v.resumen();
+    ok('120 Hz con 60 imágenes: 60 fps parejos', Math.abs(r.fps - 60) < 0.1 && Math.abs(r.bajo1 - 60) < 0.1, textoResumen(r));
+    const w = crearImagenesVista(); for (let i = 0; i < 600; i++) { w.contar(); w.contar(); w.refresco(i * P, P); }
+    ok('dos imágenes antes de un mismo refresco = una a la vista', Math.abs(w.resumen().fps - 60) < 0.1 && w.contadas === 1200 && w.total === 599); }
+  // 6. la causa: el contador que creció
+  { let disco = 0, pipes = 0;
+    const v = crearImagenesVista({ causas: [['pipeline', () => pipes], ['disco', () => disco]] });
+    correr(v, { imagenEn: i => i !== 100 && i !== 101 && i !== 300, antes: i => { if (i === 101) disco++; if (i === 299) pipes++; } });
+    const c = v.causas();
+    ok('los picos con su causa: uno de disco, uno de pipeline', c.disco === 1 && c.pipeline === 1 && Object.keys(c).length === 2, JSON.stringify(c));
+    const u = v.ultimos(400);
+    ok('últimos(400): 400 puntos con su causa (el del disco quedó antes)', u.length === 400 && u.filter(x => x.causa).length === 1 && u.find(x => x.causa).causa === 'pipeline', u.filter(x => x.causa).map(x => x.causa).join()); }
+  // 7. sin contadores que crezcan: «otro»
+  { const v = crearImagenesVista(); correr(v, { imagenEn: i => i !== 50 }); ok('un pico sin sospechoso = «otro»', v.causas().otro === 1); }
+  // 8. marca y tramo
+  { const v = crearImagenesVista(); correr(v, { seg: 2, imagenEn: i => i % 2 === 0 }); const m = v.marca(); correr(v, { seg: 2, t0: 2000 });
+    const r = v.resumen(m); ok('el resumen desde una marca: solo lo de después (60 parejas)', Math.abs(r.fps - 60) < 0.5 && Math.abs(r.bajo1 - 60) < 0.01, textoResumen(r)); }
+  // 9. el anillo no crece
+  { const v = crearImagenesVista({ capacidad: 100 }); correr(v, { seg: 10 }); ok('el anillo guarda las últimas `capacidad`', v.tiempos().length === 100 && v.total === 599); }
+  // 10. cortar: la imagen después de una pestaña oculta no se mide contra la hora vieja
+  { const v = crearImagenesVista(); for (let i = 0; i < 60; i++) { v.contar(); v.refresco(i * P, P); } v.cortar();
+    for (let i = 0; i < 60; i++) { v.contar(); v.refresco(5000 + i * P, P); }
+    ok('cortar(): sin el hueco de la pestaña oculta', v.resumen().maxMs < 17, String(v.resumen().maxMs)); }
+  // 11. vacío
+  ok('sin imágenes: resumen vacío y el texto lo dice', resumir([]).imagenes === 0 && /sin datos/.test(textoResumen(resumir([]))));
+  // 12. el gancho de getCurrentTexture
+  { let n = 0; class C { getCurrentTexture() { return 't'; } }
+    const g = { GPUCanvasContext: C };
+    const r1 = engancharImagenes(() => n++, g), r2 = engancharImagenes(() => n++, g);
+    const x = new C().getCurrentTexture(); new C().getCurrentTexture();
+    ok('el gancho de getCurrentTexture cuenta una por llamada, devuelve lo mismo y no se pone dos veces', r1 && !r2 && x === 't' && n === 2, `n=${n}`); }
+  // 13. el gráfico
+  { const g = document.getElementById('grafico').getContext('2d');
+    const puntos = Array.from({ length: 240 }, (_, i) => ({ ms: i === 120 ? 50 : P, causa: i === 120 ? 'disco' : '' }));
+    dibujarGrafico(g, puntos, { esperado: P });
+    const alto = g.getImageData(120, 2, 1, 1).data, bajo = g.getImageData(10, 2, 1, 1).data;
+    ok('el gráfico: el pico de 50 ms llega arriba con el color del disco; lo parejo no', alto[2] > 200 && alto[0] < 50 && bajo[2] < 100, `${[...alto]} / ${[...bajo]}`); }
+  // 14. modo «entrega» (el de la página, §256): el tiempo de entrega a entrega, sin el redondeo del monitor
+  { const v = crearImagenesVista({ modo: 'entrega' }); v.esperado = P;
+    // 60 imágenes parejas en un monitor de 144 Hz: los refrescos dan 2 y 3 (13,9 y 20,8 ms), la entrega 16,7 parejo
+    const w = crearImagenesVista(); const p144 = 1000 / 144;
+    for (let i = 0; i < 600; i++) { const t = i * P + 0.3; v.contar(t); w.contar(); w.refresco(Math.ceil(t / p144) * p144, P); }
+    const r = v.resumen(), rw = w.resumen(), h = histograma(w.tiempos(), p144);
+    ok('entrega: 60 parejas en 144 Hz cumplen; medidas en refrescos dan 2 y 3 refrescos y no cumplen', v.modo === 'entrega' && r.cumple && Math.abs(r.bajo1 - 60) < 0.1 && !rw.cumple && h[2] > 200 && h[3] > 200,
+       `${textoResumen(r)} | refrescos: ${JSON.stringify(h)}`); }
+  { const v = crearImagenesVista({ modo: 'entrega', causas: [['disco', () => n]] }); let n = 0; v.esperado = P;
+    for (let i = 0; i < 300; i++) { if (i === 150) n++; v.contar(i * P + (i >= 150 ? 40 : 0)); v.refresco(i * P, P); }
+    ok('entrega: el pico de 56 ms con su causa; refresco() no mide en este modo', v.total === 299 && v.causas().disco === 1 && Math.abs(v.resumen().maxMs - (P + 40)) < 0.01, JSON.stringify(v.causas())); }
+  ok('histograma: cuántas duraron 1, 2… pasos', JSON.stringify(histograma([16.7, 16.6, 33.4, 50], 16.67)) === '{"1":2,"2":1,"3":1}' && JSON.stringify(histograma([1], 0)) === '{}');
+  ok('las causas conocidas', CAUSAS.join() === ',pipeline,disco,sala,juego,oculta,otro');
+} catch (e) { ok('la prueba terminó sin errores', false, e?.stack || String(e)); }
+fin();
+</script>
+</body>
+</html>

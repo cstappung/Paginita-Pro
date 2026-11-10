@@ -117,10 +117,12 @@ extern "C" void rr_overlay_8083D55C(CpuContext* MKW_RESTRICT ctx) {
 // B. al final de Racedata_InitRace (directo_nativo.cpp): el nombre de cada humano en el Mii de su casilla
 void mkwNombresEnCarrera() {
     const uint32_t rd = Memory::Read32(kRacedata), sp = sectionParams();
-    if (!esPuntero(rd) || Memory::Read32(rd + 0x20 + 0xB48 + 0x8) != 1) return;   // solo en una carrera VS
-    // las skins de la sala, después del sorteo de RR (que va al final de Racedata_InitRace de Pulsar): solo en los
-    // puestos de CPU y solo si esa skin existe para ese personaje. Antes, las del sorteo, para la página
+    if (!esPuntero(rd)) return;
+    // las del sorteo de RR, para la página, en cualquier modo (§169: el paquete de carrera las usa también en Grand Prix)
     for (int j = 0; j < 12; j++) g_skins.leidas[j] = Memory::Read8(kSkinsRR + static_cast<uint32_t>(j));
+    if (Memory::Read32(rd + 0x20 + 0xB48 + 0x8) != 1) return;   // lo demás, solo en una carrera VS
+    // las skins de la sala, después del sorteo de RR (que va al final de Racedata_InitRace de Pulsar): solo en los
+    // puestos de CPU y solo si esa skin existe para ese personaje
     if (g_skins.hay) for (int j = 0; j < 12; j++) {
         const uint32_t pj = rd + 0x20 + 0x8 + 0xF0u * static_cast<uint32_t>(j);
         const uint32_t personaje = Memory::Read32(pj + 0xC), s = g_skins.skin[j];

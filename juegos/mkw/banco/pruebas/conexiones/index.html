@@ -74,6 +74,25 @@ try {
   ok('…y si no vuelve, 🔴 sin conexión', c.lista()[0].e === 'sin', J(c.lista()));
   c.detener();
   ok('detener() para el reloj', tic === null);
+
+  // 4) §127 (R10): en la carrera, getStats de a un piloto por vuelta y avisos solo si cambia el estado
+  const uids = ['p1', 'p2', 'p3', 'p4'], llamadas = [];
+  const malla2 = { sano: () => true, camino: async u => { llamadas.push(u); return { relevo: false, ms: 20 + llamadas.length } } };
+  let carrera = false, tic2 = null;
+  const avisos2 = [];
+  const c2 = crearConexiones({ malla: malla2, sala, quienes: () => uids, alCambiar: l => avisos2.push(l.length), enCarrera: () => carrera,
+    ahora: () => t, reloj: f => { tic2 = f; return 2; }, parar: () => {} });
+  await new Promise(r => setTimeout(r, 20));          // (la primera mirada, con sus 4 esperas, termina)
+  ok('§127: fuera de la carrera se mira a los 4 en cada vuelta', llamadas.length === 4, J(llamadas));
+  carrera = true; llamadas.length = 0;
+  const avisosAntes = avisos2.length;
+  for (let k = 0; k < 4; k++) { t += 2000; await tic2(); }
+  ok('§127: en la carrera, un piloto por vuelta y en rueda (4 vueltas = cada uno una vez)', llamadas.length === 4 && new Set(llamadas).size === 4, J(llamadas));
+  ok('§127: …los demás siguen con su última lectura (todos 🟢 con sus ms)', c2.lista().every(x => x.e === 'directa' && Number.isFinite(x.ms)), J(c2.lista()));
+  ok('§127: …y los ms que se mueven no le avisan al sitio en la carrera', avisos2.length === avisosAntes, `${avisos2.length - avisosAntes} avisos`);
+  carrera = false; llamadas.length = 0;
+  t += 2000; await tic2();
+  ok('§127: terminada la carrera, otra vez los 4 cada vuelta', llamadas.length === 4);
 } catch (e) {
   ok('la prueba corrió sin errores', false, e.stack || e.message);
 }

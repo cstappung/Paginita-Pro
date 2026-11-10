@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El juego en un Worker</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>El juego en un Worker: <span>las piezas, sin el juego</span></h1>
+<p>Paso 8 del plan de rendimiento (N3 y P10, bitácora §186). Prueba sin el juego las piezas con que el juego corre en un
+  Worker (<code>trabajador.html</code>): el DOM de mentira (<code>trabajador-dom.mjs</code>) sobre un lienzo transferido
+  (OffscreenCanvas) con WebGPU de verdad, el cambio de tamaño y la visibilidad que manda la página, el sonido directo
+  del Worker al AudioWorklet de §88 por un cable aparte (<code>sonido.mjs</code> <code>puertoAparte</code>), lo que tarda
+  un mando en llegar al Worker, y las opciones <code>?hilo</code> y <code>?aislar</code>.</p>
+<button id="empezar">Empezar (el sonido necesita un toque)</button>
+<canvas id="lienzo" width="320" height="180" style="width:320px;height:180px;background:#000"></canvas>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { instalarDom } from '/web/navegador/trabajador-dom.mjs';
+import { cabecerasAislar, cabecerasScriptAislado, hiloDe } from '/web/navegador/aislar.mjs';
+import { crearSonido } from '/web/navegador/sonido.mjs';
+import { precargar } from '/web/navegador/trabajador-juego.mjs';
+
+const { ok, nota, fin } = prueba('trabajador', 'El juego en un Worker (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+try {
+  // ---- 1. Las opciones ----
+  const P = s => new URLSearchParams(s);
+  ok('?hilo=principal → en la página; sin ?hilo o ?hilo=trabajador → en un Worker', hiloDe(P('hilo=principal')) === 'principal' && hiloDe(P('')) === 'trabajador' && hiloDe(P('hilo=trabajador')) === 'trabajador');
+  ok('?aislar=dip → Document-Isolation-Policy: isolate-and-require-corp', cabecerasAislar('dip')['Document-Isolation-Policy'] === 'isolate-and-require-corp');
+  ok('?aislar=dip-cred → … isolate-and-credentialless', cabecerasAislar('dip-cred')['Document-Isolation-Policy'] === 'isolate-and-credentialless');
+  ok('?aislar=coop → COOP same-origin + COEP require-corp (y los scripts con COEP propio)', cabecerasAislar('coop')['Cross-Origin-Embedder-Policy'] === 'require-corp' && cabecerasScriptAislado('coop')['Cross-Origin-Embedder-Policy'] === 'require-corp');
+  ok('sin ?aislar → ninguna cabecera (como siempre)', !Object.keys(cabecerasAislar('')).length && !Object.keys(cabecerasScriptAislado('dip')).length);
+  ok('lo que se baja entero al arrancar es lo mismo que en mkw.mjs', precargar('/wc/runtime/assets/', 'x') && precargar('/mkw/disco/', 'sys/main.dol') && !precargar('/mkw/disco/', 'files/Race/Course/x.szs') && precargar('/mkw/sd/RetroRewind6/', 'a.xml'));
+
+  // ---- 2. El DOM de mentira, sobre un objeto (como en el Worker) ----
+  const g = new EventTarget();
+  const lienzoFalso = { width: 1, height: 1, getContext: () => null };
+  const d = instalarDom({ lienzo: lienzoFalso, ancho: 800, alto: 450, dpr: 1.5, global: g });
+  ok('document y window quedan puestos (window = el Worker mismo)', g.document && g.window === g);
+  ok('document.querySelector(#canvas) y getElementById(canvas) dan el lienzo', g.document.querySelector('#canvas') === lienzoFalso && g.document.getElementById('canvas') === lienzoFalso);
+  const r0 = lienzoFalso.getBoundingClientRect();
+  ok('el lienzo se mide con el recuadro que dijo la página', r0.width === 800 && r0.height === 450 && g.innerWidth === 800 && g.devicePixelRatio === 1.5);
+  let res = 0; g.addEventListener('resize', () => res++);
+  d.tam(1024, 576, 2);
+  ok('cambiar de tamaño: el recuadro nuevo y el evento resize', res === 1 && lienzoFalso.getBoundingClientRect().width === 1024 && lienzoFalso.clientHeight === 576 && g.devicePixelRatio === 2);
+  let vis = 0; g.document.addEventListener('visibilitychange', () => vis++);
+  d.visible(true);
+  ok('ocultar: hidden, visibilityState «hidden» y el evento (la partida se guarda ya)', vis === 1 && g.document.hidden && g.document.visibilityState === 'hidden');
+  d.visible(true);
+  ok('ocultar dos veces: un solo evento', vis === 1);
+  d.visible(false);
+  ok('volver a verse: visible y otro evento', vis === 2 && !g.document.hidden);
+  lienzoFalso.style.width = '50%';
+  ok('style se puede escribir y leer; lo que no existe da cadena vacía', lienzoFalso.style.width === '50%' && lienzoFalso.style.cursor === '');
+  ok('matchMedia, screen y body están (SDL3 los toca)', g.matchMedia('(x)').matches === false && g.screen.width === 1024 && !!g.document.body.appendChild({}));
+
+  // ---- 3. En un Worker de verdad con el lienzo transferido y WebGPU ----
+  const w = new Worker(new URL('./hilo-prueba.mjs', import.meta.url), { type: 'module' });
+  const pedir = (m, tr = []) => new Promise((okp, mal) => { const t = setTimeout(() => mal(new Error('sin respuesta: ' + m.t)), 20000); w.onmessage = e => { clearTimeout(t); okp(e.data); }; w.postMessage(m, tr); });
+  const fuera = document.getElementById('lienzo').transferControlToOffscreen();
+  const ini = (await pedir({ t: 'iniciar', lienzo: fuera }, [fuera])).r;
+  ok('en el Worker, #canvas (por specialHTMLTargets o querySelector) es el OffscreenCanvas transferido', ini.mismo);
+  ok('en el Worker: medida, style, innerWidth, devicePixelRatio, body y matchMedia', ini.rect.width === 320 && ini.estilo === '10px' && ini.ancho === 320 && ini.dpr === 2 && ini.cuerpo && ini.medios === false);
+  ok('en el Worker hay JSPI', ini.jspi);
+  if (ini.webgpu) ok('en el Worker: WebGPU dibuja en el lienzo transferido', true);
+  else nota('WebGPU en el Worker: no hay adaptador en este navegador (' + (ini.gpuError || 'sin tarjeta') + ')');
+  const t = await pedir({ t: 'tam', ancho: 640, alto: 360 });
+  ok('la página cambia el tamaño: el Worker lo ve y SDL3 recibiría resize', t.ancho === 640 && t.rect.height === 360 && t.eventos.resize === 1);
+  const v = await pedir({ t: 'visible', oculto: true });
+  ok('la página se oculta: el Worker lo ve', v.oculto && v.estado === 'hidden' && v.eventos.visibilidad === 1);
+
+  // ---- 4. Lo que tarda un mando en llegar al Worker (un mensaje de ida y vuelta) ----
+  const ms = [];
+  for (let i = 0; i < 300; i++) { const t0 = performance.now(); await pedir({ t: 'pad', id: i, t0 }); ms.push(performance.now() - t0); }
+  const prom = ms.reduce((s, x) => s + x, 0) / ms.length;
+  ok('un mando llega al Worker y vuelve en menos de 1 ms (promedio)', prom < 1, `${prom.toFixed(3)} ms ida y vuelta (la ida sola, la mitad)`);
+
+  // ---- 5. El sonido: del Worker directo al AudioWorklet de §88 ----
+  await new Promise(r => { const b = document.getElementById('empezar'); b.onclick = r; setTimeout(r, 4000); });
+  const sonido = crearSonido({ worklet: true, objetivoGestos: document.getElementById('empezar') });
+  sonido.instalar();
+  const cable = await sonido.puente.puertoAparte();
+  ok('sonido.mjs da un cable aparte al worklet (MessagePort + la frecuencia de la tarjeta)', !!cable?.puerto && cable.tasa > 8000, cable ? `${cable.tasa} Hz` : 'sin worklet');
+  if (cable) {
+    const s0 = await pedir({ t: 'sonido', sonido: cable }, [cable.puerto]);
+    ok('el Worker abre el sonido con esa frecuencia', s0.tasa === cable.tasa);
+    const e = await pedir({ t: 'entregar', n: 200, esperaMs: 600 });
+    ok('el Worker entrega 200 pedazos directo al worklet (sin pasar por la página)', e.estado.entregas === 200 && e.estado.descartadas === 0, JSON.stringify(e.estado));
+    await espera(300);
+    ok('el worklet los recibió (cuenta la página por su informe de siempre)', sonido.estado.recibidos > 0 || sonido.estado.bloques > 0, `recibidos ${sonido.estado.recibidos}, bloques ${sonido.estado.bloques}, camino ${sonido.estado.camino}`);
+    ok('el nivel de la cola vuelve al Worker por el mismo cable (el ajuste de ritmo del runtime lo lee)', e.nivel >= 0 || e.objetivo > 0, `nivel ${e.nivel}, objetivo ${e.objetivo}`);
+  }
+  w.terminate();
+} catch (e) { ok('sin errores', false, String(e && e.stack || e)); }
+fin();
+</script>
+</body>
+</html>

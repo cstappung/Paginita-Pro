@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anillos de subida</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Anillos de subida: <span>lo que no cambió no se vuelve a subir a la tarjeta</span></h1>
+<p>Prueba las reglas de los anillos persistentes de aurora (G3 y H12 del plan de rendimiento, bitácora §181) <b>sin el
+  juego</b>, con <code>web/navegador/anillo.mjs</code>, que repite en JS el mismo reparto que
+  <code>lib/gfx/common.cpp</code>. Los dibujos son de mentira con la forma de una carrera: una pista quieta (los mismos
+  bytes cada cuadro), 12 karts con sus listas fijas y lo que cambia cada cuadro (partículas, el HUD). Comprueba que lo
+  quieto se reusa, que lo usado en un lote nunca se pisa dentro del mismo lote, el tope de escritura por lote, las
+  entradas grandes, la vuelta del anillo y la opción <code>?anillo</code> de la página.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearAnillo, envAnillo, envCaliente } from '/web/navegador/anillo.mjs';
+
+const { ok, nota, fin } = prueba('anillo', 'Anillos de subida (sin el juego)');
+
+// Un azar fijo (la misma "carrera" cada vez)
+let semilla = 1234;
+const azar = () => (semilla = (semilla * 1103515245 + 12345) >>> 0) / 2 ** 32;
+
+// Un cuadro de una carrera de mentira: [clave, bytes] de cada dibujo. La pista: 300 dibujos fijos de 200–2000 bytes;
+// los karts: 12 × 25 dibujos fijos; lo que cambia: 150 dibujos con clave nueva cada cuadro.
+const pista = Array.from({ length: 300 }, (_, i) => [`pista-${i}`, 200 + Math.floor(azar() * 1800)]);
+const karts = Array.from({ length: 300 }, (_, i) => [`kart-${i}`, 100 + Math.floor(azar() * 900)]);
+function cuadro(n) {
+  const cambia = Array.from({ length: 150 }, (_, i) => [`f${n}-${i}`, 64 + Math.floor(azar() * 400)]);
+  return [...pista, ...karts, ...cambia];
+}
+
+try {
+  // ---- 1. La opción de la página ----
+  ok('?anillo=0 → MKW_ANILLO=0 (como antes)', envAnillo('0') === '0');
+  ok('?anillo=verifica → MKW_ANILLO=2 (comparar cada acierto)', envAnillo('verifica') === '2');
+  ok('?anillo=1 (u otra cosa) → prendido', envAnillo('1') === '1' && envAnillo('si') === '1');
+  ok('sin ?anillo → no se toca (lo que diga el programa)', envAnillo(null) === undefined);
+  ok('?caliente=0 / 1 / comprobar → MKW_CALIENTE 0 / 1 / 2 (N14); sin ?caliente no se toca', envCaliente('0') === '0' && envCaliente('1') === '1' && envCaliente('comprobar') === '2' && envCaliente(null) === undefined);
+
+  // ---- 2. Una carrera de 600 cuadros en un anillo de 8 MB ----
+  const T = 8 << 20;
+  const an = crearAnillo(T);
+  let primero = 0, resto = 0, total = 0, pisadas = 0;
+  for (let n = 0; n < 600; n++) {
+    const antes = an.a.escrito;
+    const usados = [];
+    for (const [clave, len] of cuadro(n)) {
+      const r = an.usar(clave, len);
+      total += Math.ceil(len / 4) * 4;
+      if (r) usados.push([r.pos, Math.ceil(len / 4) * 4]);
+    }
+    // lo que este lote usa tiene que seguir intacto al cerrarlo (nadie lo pisó en el mismo lote)
+    for (const [pos, len] of usados) if (!an.intacta(pos, len)) pisadas++;
+    an.cerrarLote();
+    if (n === 0) primero = an.a.escrito - antes; else resto += an.a.escrito - antes;
+  }
+  const porCuadro = resto / 599, sinAnillo = total / 600;
+  nota(`primer cuadro ${(primero / 1024).toFixed(0)} KB escritos; después ${(porCuadro / 1024).toFixed(1)} KB por cuadro (sin anillo: ${(sinAnillo / 1024).toFixed(0)} KB)`);
+  ok('el primer cuadro sube todo lo que usa', primero > 0.9 * sinAnillo);
+  ok('después se sube solo lo que cambia y alguna renovación: menos de 1/4 de lo de antes', porCuadro < sinAnillo / 4);
+  ok('lo usado en un lote nunca quedó pisado dentro del mismo lote', pisadas === 0);
+  ok('ningún dibujo se quedó fuera del anillo', an.a.fuera === 0);
+
+  // ---- 3. El tope por lote: un lote que querría escribir más de 1/4 de vuelta ----
+  const chico = crearAnillo(1 << 20);                 // 1 MiB: el tope del lote son 256 KB y una entrada, 128 KB
+  let dentro = 0, fuera = 0;
+  for (let i = 0; i < 100; i++) (chico.usar(`g${i}`, 8192) ? dentro++ : fuera++);
+  ok('un lote escribe como mucho 1/4 de vuelta (32 de 8 KB en 1 MiB); el resto va por la parte de siempre', dentro === 32 && fuera === 68);
+  ok('una entrada de más de 1/8 de vuelta no entra al anillo', chico.usar('grande', (1 << 17) + 4) === null);
+  chico.cerrarLote();
+  ok('en el lote siguiente vuelve a haber lugar', chico.usar('g99', 8192) !== null);
+
+  // ---- 4. La vuelta: nunca partido en el borde, y lo viejo se renueva antes de que lo pisen ----
+  const v = crearAnillo(1 << 16, 4);                  // 64 KiB
+  let partidas = 0, renovadas = 0;
+  const fija = v.usar('fija', 1000);
+  for (let n = 0; n < 400; n++) {
+    for (let i = 0; i < 4; i++) { const r = v.usar(`d${n}-${i}`, 1000 + 4 * i); if (r && r.fisica + 1000 + 4 * i > (1 << 16)) partidas++; }
+    const r = v.usar('fija', 1000);
+    if (r && r.nuevo) renovadas++;
+    if (!v.intacta(r.pos, 1000)) partidas++;
+    v.cerrarLote();
+  }
+  ok('ninguna entrada queda partida en el borde del anillo', partidas === 0);
+  ok('lo que se usa siempre se renueva (se vuelve a escribir) antes de que la vuelta lo pise', renovadas > 0 && fija !== null);
+  ok('la renovación es rara: una vez cada media vuelta (≈ 32 KB de lo que cambia)', renovadas <= Math.ceil(v.a.cabeza / (1 << 15)) + 1);
+} catch (e) {
+  ok('sin errores: ' + e.message, false);
+}
+fin();
+</script>
+</body>
+</html>

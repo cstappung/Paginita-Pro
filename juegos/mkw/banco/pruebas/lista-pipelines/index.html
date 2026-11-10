@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco lista de pipelines</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Banco lista de pipelines: <span>cada uno con dónde se usó</span></h1>
+<p>Prueba <code>web/navegador/lista-pipelines.mjs</code> (C2, bitácora §174) <b>sin el juego</b>, con listas inventadas
+  (configuraciones de mentira de 8 bytes): leer el formato viejo y el nuevo, escribir y volver a leer igual, juntar
+  listas de dos pistas (lo de las dos pasa a «común», los menús ganan), qué va al precalentado del arranque (menús,
+  común, sin etiqueta y los urgentes) y qué espera su pista, y qué se poda (lo de una pista sin usar hace 8 visitas).
+  Son las mismas reglas que sigue aurora (<code>pipeline_cache.cpp</code> del parche); con el juego lo mide
+  <code>medir-carrera-entera.mjs</code>.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { leer, escribir, juntar, combinar, alArrancar, podar, resumen, SIN, MENUS, COMUN, dePista } from '/web/navegador/lista-pipelines.mjs';
+
+const { ok, fin } = prueba('lista-pipelines', 'Banco lista de pipelines (sin el juego)');
+const cfg = n => Uint8Array.from({ length: 8 }, (_, i) => (n * 31 + i) & 255);
+const P = (n, cuadro, etiqueta, visita = 0) => ({ tipo: 0, version: 7, cuadro, etiqueta, visita, config: cfg(n) });
+// una lista vieja (formato 1) armada a mano: 2 pipelines
+function viejo(items) {
+  const b = new Uint8Array(12 + items.length * (16 + 8)), dv = new DataView(b.buffer);
+  for (let i = 0; i < 8; i++) b[i] = 'MKWPIPE1'.charCodeAt(i);
+  dv.setUint32(8, items.length, true);
+  let o = 12;
+  for (const [n, c] of items) { dv.setUint32(o, 0, true); dv.setUint32(o + 4, 7, true); dv.setUint32(o + 8, c, true); dv.setUint32(o + 12, 8, true); b.set(cfg(n), o + 16); o += 24; }
+  return b;
+}
+try {
+  const v1 = leer(viejo([[1, 5], [2, 0]]));
+  ok('lee el formato viejo (MKWPIPE1): sin etiqueta y visita 0', v1.length === 2 && v1.every(x => x.etiqueta === SIN && x.visita === 0) && v1[1].cuadro === 0);
+  const lista = [P(1, 10, MENUS, 3), P(2, 900, dePista(256), 3), P(3, 0, dePista(256), 2), P(4, 950, COMUN, 3)];
+  const ida = leer(escribir(lista));
+  ok('escribir (MKWPIPE2) y volver a leer da lo mismo', ida.length === 4 && ida.every((x, i) => x.cuadro === lista[i].cuadro && x.etiqueta === lista[i].etiqueta &&
+     x.visita === lista[i].visita && x.config.every((v, k) => v === lista[i].config[k])));
+  ok('combinar: los menús ganan, dos pistas = común, la misma pista sigue, sin etiqueta + algo = ese algo',
+     combinar(dePista(256), MENUS) === MENUS && combinar(dePista(256), dePista(310)) === COMUN && combinar(dePista(310), dePista(310)) === dePista(310) &&
+     combinar(SIN, dePista(256)) === dePista(256) && combinar(COMUN, dePista(256)) === COMUN && combinar(SIN, SIN) === SIN);
+  ok('al arranque: menús, común, sin etiqueta y los urgentes (primer cuadro 0) aunque sean de una pista',
+     alArrancar(P(1, 10, MENUS)) && alArrancar(P(1, 10, COMUN)) && alArrancar(P(1, 10, SIN)) && alArrancar(P(1, 0, dePista(256))) && !alArrancar(P(1, 10, dePista(256))));
+  // dos pistas: 256 (Luigi) y 310; el 5 se usa en las dos; el 6 solo en 310; el 1 en los menús y en 256
+  const a = [P(1, 10, MENUS), P(5, 800, dePista(256)), P(2, 900, dePista(256))];
+  const b = [P(1, 12, dePista(310)), P(5, 700, dePista(310)), P(6, 950, dePista(310))];
+  const j = juntar([a, b]);
+  const de = n => j.find(x => x.config[0] === cfg(n)[0]);
+  ok('juntar dos pistas: sin repetidos, lo de las dos pasa a «común», lo de los menús sigue en los menús, lo de una sola queda de su pista',
+     j.length === 4 && de(5).etiqueta === COMUN && de(1).etiqueta === MENUS && de(2).etiqueta === dePista(256) && de(6).etiqueta === dePista(310),
+     j.map(x => `${x.config[0]}:${x.etiqueta}`).join(' '));
+  ok('…con el primer cuadro menor de los dos, en orden y la visita en 0 (la semilla no se poda)',
+     de(5).cuadro === 700 && j.every((x, i) => i === 0 || j[i - 1].cuadro <= x.cuadro) && j.every(x => x.visita === 0));
+  const r = resumen(j);
+  ok('resumen: al arranque 2 (menús y común), esperan su pista 2, en 2 pistas', r.arranque === 2 && r.esperan === 2 && r.pistas === 2, JSON.stringify(r));
+  ok('juntar con una lista vieja: sus pipelines quedan sin etiqueta salvo que otra lista diga dónde',
+     juntar([v1, [P(1, 9, dePista(256))]]).find(x => x.config[0] === cfg(1)[0]).etiqueta === dePista(256));
+  ok('podar: lo de una pista sin usar hace más de 8 visitas sale; lo de los menús, lo común o lo reciente no',
+     podar(P(2, 900, dePista(256), 1), 10) && !podar(P(2, 900, dePista(256), 2), 10) && !podar(P(1, 10, MENUS, 1), 10) && !podar(P(4, 9, COMUN, 1), 10));
+  let error = '';
+  try { leer(new TextEncoder().encode('no es una lista')); } catch (e) { error = e.message; }
+  ok('algo que no es una lista da error', /no es una lista/.test(error));
+} catch (e) { ok('la prueba terminó sin errores', false, e.stack); }
+fin();
+</script>
+</body>
+</html>

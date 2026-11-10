@@ -166,6 +166,20 @@ ok('con el canvas de otra forma (1786×1575, §79) va sobre la imagen 16:9 del m
    `${Math.round(rf.left)},${Math.round(rf.top)} ${Math.round(rf.width)}×${Math.round(rf.height)}`);
 c.detener();
 ok('detener() la saca de la página', !document.getElementById('cuentaDnf'));
+// §148 (P3): con :root.filtros-livianos la sombra va en cada lienzo (quieto) y no en la pila (que se anima)
+{
+  const prueba3 = document.createElement('div'); prueba3.className = 'cuenta-dnf';    // (una copia propia: la de arriba ya se cerró)
+  prueba3.innerHTML = '<div class="cuenta-dnf-pila"><div class="cuenta-dnf-numero"><canvas></canvas></div></div>';
+  document.body.append(prueba3);
+  const pila = prueba3.querySelector('.cuenta-dnf-pila'), lienzo = prueba3.querySelector('.cuenta-dnf-numero canvas');
+  const antes = { pila: getComputedStyle(pila).filter, lienzo: getComputedStyle(lienzo).filter };
+  document.documentElement.classList.add('filtros-livianos');
+  const ahora = { pila: getComputedStyle(pila).filter, lienzo: getComputedStyle(lienzo).filter, mueve: getComputedStyle(prueba3.querySelector('.cuenta-dnf-numero')).willChange };
+  prueba3.remove();
+  document.documentElement.classList.remove('filtros-livianos');
+  ok('§148: con filtros livianos, la sombra pasa de la pila animada a los lienzos quietos (la misma sombra) y el número se anima en su capa',
+     /drop-shadow/.test(antes.pila) && antes.lienzo === 'none' && ahora.pila === 'none' && ahora.lienzo === antes.pila && /transform/.test(ahora.mueve), JSON.stringify({ antes, ahora }));
+}
 fin();
 </script>
 </body>

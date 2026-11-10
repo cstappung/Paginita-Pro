@@ -57,7 +57,40 @@ export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => 
     demora = Math.max(0, demora);
     cuenta.llegados++;
     cuenta.demoraMedia += (demora - cuenta.demoraMedia) / cuenta.llegados;
-    reloj(() => alBinario(u, bytes, canal), demora);
+    // (R4, §230: una copia, como hace RTCDataChannel.send: el lockstep reusa su búfer de envío)
+    const copia = bytes instanceof Uint8Array ? bytes.slice() : bytes;
+    reloj(() => alBinario(u, copia, canal), demora);
+  };
+}
+
+// §135 (R8): los dos canales de un par van por la misma asociación SCTP y Chrome no intercala mensajes: uno grande por
+// "tcp" (la copia de la sala, las skins) hace esperar a los paquetes de botones de "udp" hasta que termina de salir.
+// Partido en trozos de TROZO bytes, entre trozo y trozo pueden pasar los de "udp". Cada trozo lleva 3 bytes delante:
+// MARCA[0], MARCA[1] y 1 = vienen más / 0 = el último. Un mensaje chico que justo empiece con la MARCA también va
+// envuelto (un solo trozo), así nunca se confunde. Quien recibe arma siempre (el canal es ordenado: llegan en fila).
+export const TROZO = 1024, MARCA = [0xF7, 0x7E];
+const conMarca = b => b.length >= 2 && b[0] === MARCA[0] && b[1] === MARCA[1];
+export function trocear(bytes, max = TROZO) {
+  if (bytes.length <= max && !conMarca(bytes)) return [bytes];
+  const trozos = [];
+  for (let i = 0; i < bytes.length || i === 0; i += max) {
+    const parte = bytes.subarray(i, i + max), t = new Uint8Array(parte.length + 3);
+    t[0] = MARCA[0]; t[1] = MARCA[1]; t[2] = i + max < bytes.length ? 1 : 0; t.set(parte, 3);
+    trozos.push(t);
+  }
+  return trozos;
+}
+// armar(bytes) → el mensaje entero (Uint8Array) o null si faltan trozos
+export function crearArmador() {
+  let partes = [];
+  return bytes => {
+    if (!conMarca(bytes) || bytes.length < 3) return bytes;
+    partes.push(bytes.subarray(3));
+    if (bytes[2] === 1) return null;
+    const total = partes.reduce((s, p) => s + p.length, 0), todo = new Uint8Array(total);
+    let o = 0; for (const p of partes) { todo.set(p, o); o += p.length; }
+    partes = [];
+    return todo;
   };
 }
 
@@ -67,7 +100,7 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
   // conexiones solo por el repetidor TURN (iceTransportPolicy 'relay'), aunque la directa funcione. Hasta que llegan sus
   // credenciales (ponerIce) no se conecta a nadie; si no llegan en esperaRelevo ms, o llegan vacías (el Worker no tiene
   // TURN), va directo como siempre. alRelevo('relevo' | 'sin' | 'tarde') dice qué pasó
-  soloRelevo = false, esperaRelevo = 8000, alRelevo = () => {} }) {
+  soloRelevo = false, esperaRelevo = 8000, alRelevo = () => {}, trozos = true }) {
   alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
   // §103: 'normal' (directo; sin TURN desde §103b) · 'esperando' (las credenciales) · 'relevo' (todo por el repetidor)
   let modo = soloRelevo ? 'esperando' : 'normal', relojRelevo = null, pendienteIce = null;   // (las que llegaron antes de entrar)
@@ -113,11 +146,16 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     const x = { pc, udp, tcp, s, k, cola: [], remota: false, abrio: false, malDesde: ahora() };
     pares.set(u, x);
     const mio = () => pares.get(u) === x;
+    const armar = crearArmador();            // (§135: lo que llega por "tcp" en trozos)
     for (const [c, nombre] of [[udp, 'udp'], [tcp, 'tcp']]) {
       c.binaryType = 'arraybuffer';
       c.onopen = () => { if (mio() && sanoX(x)) { x.abrio = true; x.malDesde = 0; alCambiar(); } };
       c.onclose = () => { if (mio()) alCambiar(); };
-      c.onmessage = ev => { if (mio() && ev.data instanceof ArrayBuffer) alBinario(u, new Uint8Array(ev.data), nombre); };
+      c.onmessage = ev => {
+        if (!mio() || !(ev.data instanceof ArrayBuffer)) return;
+        const b = nombre === 'tcp' ? armar(new Uint8Array(ev.data)) : new Uint8Array(ev.data);
+        if (b) alBinario(u, b, nombre);
+      };
     }
     pc.onicecandidate = e => { if (e.candidate && mio()) senal.envia(u, { t: 'ice', s: sesion, a: s, k, d: e.candidate.toJSON() }); };
     pc.onconnectionstatechange = () => { if (mio()) alCambiar(); };
@@ -271,6 +309,9 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     if (!puedeMandar(x)) return false;
     const c = canal === 'tcp' ? x.tcp : x.udp;
     if (canal === 'udp' && c.bufferedAmount > colaUdp) return false;
+    if (canal === 'tcp' && trozos && (bytes instanceof Uint8Array || bytes instanceof ArrayBuffer)) {
+      if (bytes instanceof ArrayBuffer) bytes = new Uint8Array(bytes);
+      try { for (const t of trocear(bytes)) c.send(t); return true; } catch { return false; } }
     try { c.send(bytes); return true; } catch { return false; }
   }
 
@@ -301,7 +342,9 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
         if (!par) return { estado: x.pc.connectionState || '' };
         const l = cand.get(par.localCandidateId), r = cand.get(par.remoteCandidateId);
         return { estado: x.pc.connectionState || '', local: l?.candidateType, remoto: r?.candidateType, relevo: l?.candidateType === 'relay' || r?.candidateType === 'relay',
-          ms: par.currentRoundTripTime ? Math.round(par.currentRoundTripTime * 1000) : null, enviados: par.bytesSent, recibidos: par.bytesReceived };
+          ms: par.currentRoundTripTime ? Math.round(par.currentRoundTripTime * 1000) : null, enviados: par.bytesSent, recibidos: par.bytesReceived,
+          // (§179, R7: la subida que estima WebRTC para esa conexión, kbit/s)
+          subida: par.availableOutgoingBitrate ? Math.round(par.availableOutgoingBitrate / 1000) : null };
       } catch { return null; }
     },
     // §100, solo pruebas (prueba-desconexion): cortar la red de esta página como si se le fuera internet ('todo': sale

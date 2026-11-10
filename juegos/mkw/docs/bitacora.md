@@ -7,6 +7,114 @@ para entender el proyecto y para repetirlo desde cero. El plan (lo que falta) es
 
 ## Glosario — qué es cada cosa (para un ingeniero eléctrico)
 
+- **Bienvenida por versión (§263)**: el mensaje que sale una vez y vuelve a salir una vez cuando cambia su número de
+  versión (`mkw.bienvenida.version`). Como la placa de instrucciones de un tablero: se lee al estrenarlo y otra vez si
+  cambia el tablero.
+- **Disposición de un mando (§263)**: la tabla «lugar estándar → botón real» de un mando que el navegador no ordena. Como
+  el plano de borneras: dice en qué borne quedó conectado cada cable para que el resto del tablero no tenga que saberlo.
+- **«Enséñale tu mando» (§263)**: armar esa tabla apretando, uno por uno, el botón que marca el dibujo. Como identificar
+  cables con un probador de continuidad: se toca un extremo y se anota cuál suena.
+- **Vista estilo Big Picture (§263)**: la hoja Controles con el dibujo del mando y un globo por botón que dice qué hace
+  (como el modo de Steam para la tele). Tocar el globo cambia la acción.
+- **WebUSB (§263)**: la forma en que una página de Chrome o Edge habla directo con un aparato USB, con el permiso de la
+  persona (elige el aparato en una ventana del navegador).
+- **Saludo o handshake del Switch 2 (§263)**: las 17 órdenes cortas que un mando de Switch 2 por cable espera antes de
+  empezar a informar sus botones. Como la secuencia de habilitación que un variador espera del PLC antes de arrancar.
+- **WinUSB y Zadig (§263)**: WinUSB es un controlador genérico de Windows que deja a un programa (o al navegador) hablar con
+  un aparato USB; Zadig es el programa gratuito que se lo pone a un aparato. El mando de Switch 2 lo necesita una vez en Windows.
+- **Chip de la esquina y aviso del centro (§262)**: los dos tipos de cartel de la página encima del juego. El chip es un
+  texto corto en una esquina que dura unos segundos (el estado: «X va lento», 🔴); el aviso del centro es una píldora
+  más grande para lo que cambia la carrera (te cortaste, se espera a alguien). Como la lámpara piloto de un tablero
+  frente a la alarma con bocina: «Mostrar avisos de conexión y lag» apaga las lámparas de lag; la bocina queda.
+- **Aviso de lag (§262)**: un cartel que solo informa que la red o una PC van lentas, sin pedir nada. Esconderlo no
+  cambia la carrera: el relevo y el árbitro (los «relés» que la protegen) siguen trabajando igual.
+- **Programa final / candidato (§261)**: el `.wasm` que se sube a R2 para los jugadores. «Candidato» = el que se prueba
+  antes de subirlo. Como el lote de producción de una placa: se arma con todas las mejoras aprobadas y pasa el
+  protocolo de ensayos antes de despacharse.
+- **Perfil de PGO rehecho (§261)**: PGO compila guiado por un perfil de qué ramas del código se usan más. Si el código
+  cambia (aquí W30 cambió las cuentas), el perfil viejo ya no calza y se vuelve a medir con las 3 carreras de
+  `herramientas/pgo/`. Como recalibrar un instrumento después de cambiarle una pieza.
+- **Ventana frenada ×4 (§261)**: una de las 12 ventanas con la CPU 4 veces más lenta (el freno de DevTools de Chrome),
+  como un PC viejo en la sala. Sirve para ver si el árbitro aísla al lento: los demás siguen a su ritmo y el lento
+  corre con relevo. Como una carga mala en una barra: la protección la saca y el resto del tablero no cae.
+- **FMA (multiplicar-sumar en una cuenta) y «doble redondeo» (§257)**: la FMA hace a·b + c y redondea una sola vez, al
+  final. Hacerla en dos pasos (a·b redondeado, + c redondeado otra vez) puede cambiar el último bit. La Wii la hace
+  exacta. W30 la hace con la cuenta de wasm en double y después pasa a float: casi siempre da lo mismo y a veces cambia
+  un bit, pero **siempre el mismo bit en todos los aparatos**. Como dos multímetros de distinta marca: pueden diferir en
+  el último dígito, pero cada uno repite su lectura.
+- **NI del FPSCR / número subnormal (§257)**: el FPSCR es el registro de ajustes de las cuentas con coma de la Wii. Su
+  bandera NI («no IEEE») deja en cero los números diminutos (subnormales, menores que ~10⁻³⁸), en vez de guardarlos con
+  poca precisión. La traducción lo revisaba en cada paso a float; W30 ya no, porque el juego no depende de números tan
+  chicos. Como un umbral de ruido: por debajo, la lectura se fuerza a cero.
+- **Redondeo a 25 bits del operando C (§257)**: en fmuls/fmadds, el circuito de la Wii recorta uno de los factores a 25
+  bits antes de multiplicar. La traducción lo imitaba en 20.480 lugares; W30 lo deja con todos sus bits.
+- **ulp (una unidad en el último lugar, §257)**: la diferencia más chica posible entre dos floats vecinos. «Se separa en
+  1 ulp» quiere decir que difiere solo en el último bit. Como el último dígito de un instrumento digital.
+- **Largada pareja / barrera de la largada (§250)**: en la sala, desde el comienzo de la carrera hasta el «¡YA!», ninguna
+  consola corre un cuadro sin los botones de verdad de todas (nadie inventa ni pausa a nadie); después, el árbitro y el
+  relevo de siempre. Como el sincronismo antes de cerrar el interruptor de dos generadores: se espera a que estén en fase;
+  ya en paralelo, cada uno con su regulación.
+- **Cuadro de lógica contra hora de la sala (§250)**: el cuadro dice *qué* pasa en el juego (el «¡YA!» es el cuadro 412
+  en todas); la hora dice *cuándo* lo ve cada jugador. Las dos consolas pueden tener el mismo cuadro a horas distintas:
+  como dos relojes que marcan las mismas vueltas pero uno arrancó un segundo más tarde.
+- **Barra apilada (§251)**: una sola barra partida en tramos de colores, cada uno del largo de lo que pesa una parte.
+  Como el diagrama del consumo por circuito de un tablero: de un vistazo se ve cuál gasta más.
+- **Inventario de la caja (§251)**: contar lo guardado mirando la lista de entradas de la caja misma (`caja.keys()`),
+  no lo que la pestaña cree tener. Como medir con la pinza en el tablero en vez de sumar las placas de los equipos.
+- **Época de un archivo (§251)**: un número que sube cada vez que se borra el archivo; un pedido que salió con la época
+  vieja y llega después no se guarda. Como un enclavamiento: la orden que llega tarde, después de abrir el circuito, no
+  lo vuelve a cerrar.
+- **«Deshacer» (§251)**: lo pedido espera 8 s antes de hacerse; en ese rato se cancela. Como el retardo de un relé
+  temporizado antes de disparar.
+- **Puntero colgante (§248)**: una dirección guardada de algo que ya se borró. La memoria vuelve al montón y se le da
+  a otro objeto; quien sigue usando la dirección escribe encima del nuevo dueño. Como una etiqueta de un circuito
+  retirado, pegada en el borne donde ahora se conectó otro equipo: el que maniobra según la etiqueta opera el equipo
+  equivocado.
+- **`ClipInfo` y `ClipInfoMgr` (§248)**: la ficha que el juego lleva de cada cosa de la pista (karts, objetos) para
+  decidir si se ve desde cada cámara y a qué distancia está; el `ClipInfoMgr` las tiene todas en una lista y vive solo
+  durante la carrera. G1 (§179.1) les escribe las marcas de verdad mientras se dibuja.
+- **La planilla (`correr-todo.mjs`, §70, §246)**: todas las pruebas del proyecto corridas una detrás de otra, con una
+  tabla de bien/mal al final. Como el protocolo de ensayos de recepción de un tablero: cada circuito, uno por uno,
+  antes de energizar.
+- **Falla intermitente (§246)**: una prueba que a veces pasa y a veces no, con el mismo programa. Se repite para saber
+  si es el equipo o la medida. Como un contacto flojo: hay que golpear el tablero varias veces para verlo.
+- **La autoridad «aislada» (§191, §246)**: con el árbitro, la consola que escribe los botones de todos se detiene si no
+  oye a nadie, por si la que perdió la red es ella. Como un relé de protección que abre si se queda sin tensión de
+  referencia; pero si la referencia se cortó porque el otro equipo se apagó a propósito, no tiene que abrir.
+- **Destructor (§246)**: el código que el juego corre al borrar un objeto (una pantalla, un botón) para soltar lo que
+  usaba. Si apunta a algo ya borrado o nunca armado, salta a la dirección 0 y el juego se detiene. Como desconectar un
+  circuito que ya estaba desconectado y encontrar el borne suelto.
+- **Escalera de aparatos (N2, §245)**: la misma carrera medida en una fila de aparatos, del más rápido al más lento
+  (simulados frenando este PC). Como ensayar un equipo a varias tensiones de alimentación para ver desde cuál deja de
+  cumplir.
+- **Memoria fija del wasm (W29, §244)**: el programa recibe un tamaño de memoria que nunca cambia, en vez de crecer
+  cuando pide más. Así el límite es una constante y revisar cada acceso cuesta menos; a cambio, si algún día pidiera
+  más, se cae. Como un fusible de valor fijo: más simple, pero hay que dimensionarlo con margen.
+- **Ahorro de energía de Chrome (§243)**: un modo de Chrome que, con poca batería o desenchufado, dibuja todo a 30
+  imágenes por segundo en vez de 60 para gastar menos. Como bajarle la frecuencia a un variador para ahorrar: el motor
+  sigue andando, pero a media velocidad.
+- **`Local State` (§243)**: el archivo de ajustes generales de Chrome dentro de la carpeta del perfil (los de todo el
+  navegador, no los de una página). Como la hoja de configuración de un equipo que se lee al encenderlo.
+- **Árbitro de los botones (§191, §236, §241)**: la consola (o el servidor) que junta los botones de todos los pilotos
+  y reparte un solo registro, cuadro por cuadro; todos simulan con ese registro y por eso ven la misma carrera. Como
+  el reloj maestro de un sistema sincronizado: los demás se enganchan a él; si se cae, otro toma el papel.
+- **SDP e ICE**: mensajes previos a una conexión WebRTC. SDP describe lo que ofrece cada extremo;
+  ICE prueba los caminos de red. Como acordar los bornes y comprobar continuidad antes de conectar la carga.
+- **SSE (eventos del servidor)**: una conexión HTTP que queda abierta para recibir avisos. Aquí sirve solamente
+  como buzón local de prueba entre perfiles de Chrome; los botones del juego siguen por WebRTC.
+- **WebSocket seguro (`wss://`) y TLS**: WebSocket deja un canal abierto en ambos sentidos. TLS cifra ese canal
+  y comprueba el nombre del servidor con su certificado. Como una línea bidireccional dentro de un conducto protegido.
+- **Máquina virtual (VM), OCI y Always Free**: una computadora reservada dentro de un equipo físico de Oracle Cloud
+  Infrastructure. Always Free cubre ciertos recursos hasta una cuota. En Pay As You Go el uso fuera de cuota se cobra.
+- **DNS, Caddy y Let's Encrypt**: DNS traduce un nombre de dominio a la IP. Caddy recibe la conexión pública y la pasa
+  a Node. Let's Encrypt emite el certificado que Caddy renueva para mantener el canal cifrado.
+- **systemd**: el supervisor de Linux que enciende el árbitro al arrancar la VM y lo vuelve a levantar si falla.
+
+- **Pendiente de memoria (MB/h)**: cuánto crece la memoria mientras pasa el tiempo, ajustando una recta a varias
+  muestras. Se parece a medir la deriva térmica de una tensión. Sin muestras suficientes no hay veredicto.
+- **Comprobación de límites de wasm**: verificar que cada acceso queda dentro de la memoria del programa.
+  La bandera de Chrome `--wasm-enforce-bounds-checks` reproduce ese costo para el aparato Android simulado.
+
 Las palabras de software que aparecen en esta bitácora, en orden de "capas": del programa a la máquina, y de
 ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va ampliando con cada término nuevo.
 
@@ -57,6 +165,10 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Registro (de CPU)** | Las poquísimas "celdas" de memoria ultrarrápida dentro del procesador donde se hacen las cuentas. Como los flip-flops de un registro de desplazamiento. |
 | **Endianness / byteswap** | En qué orden se guardan los bytes de un número de varios bytes. La Wii pone primero el byte más significativo (big-endian, como mandar el MSB primero por un bus serie); el PC y wasm, el menos significativo. Cada lectura de memoria del juego invierte los bytes (byteswap). |
 | **Memoria plana / tabla de páginas** | Memoria plana: las direcciones de la Wii caen directo en una zona del PC (rápido). Tabla de páginas: cada dirección se busca primero en una tabla que dice dónde está de verdad y qué es (más lento, pero funciona en wasm). Como decodificar direcciones con lógica vs. pasar por una EEPROM de mapeo. |
+| **Ventana fija (H6)** | La RAM de la Wii puesta siempre en el mismo lugar de la memoria de wasm, en el mismo orden: la dirección del PC sale de la de la Wii con una cuenta (restar, comparar, «y» de bits), sin consultar la tabla de páginas. Como pasar de un decodificador de direcciones con una ROM de búsqueda a uno cableado: menos retardo por acceso. |
+| **LTO / ThinLTO (M7)** | *Optimizar al enlazar*: cada archivo de código queda a medio compilar y el compilador optimiza recién al juntarlos, viendo todo (mete funciones de un archivo dentro de otro, borra lo que no se usa). ThinLTO reparte ese trabajo en paralelo. Como diseñar varias tarjetas como una sola placa en vez de unirlas con conectores. |
+| **Código frío / `minsize, cold` (H11)** | Código que casi nunca corre (los menús, lo que una carrera no toca). Con `minsize` el compilador lo arma lo más chico posible, sin trucos de velocidad; con `cold` lo trata como un camino raro. La idea: que lo caliente quepa mejor en la caché del procesador. Como bobinar más fino los circuitos que solo se usan al encender, para que el tablero principal quede más cerca. |
+| **Memoria reservada / memoria física** | Reservada (privada en Windows): lo que el programa pidió y el sistema le promete. Física (conjunto de trabajo): lo que de verdad ocupa en la RAM, solo las páginas tocadas. Como la potencia contratada de un tablero contra la que se consume. |
 | **MMIO** | Registros de hardware de la Wii que el juego "ve" como direcciones de memoria (escribir ahí = mandarle algo a un chip). Igual que periféricos mapeados en el bus de direcciones de un microcontrolador. |
 | **GX / EFB / VI** | GX = el chip gráfico de la Wii y sus funciones. EFB = su framebuffer interno (la imagen que se está dibujando). VI = el que manda la imagen a la tele 60 veces por segundo (el "barrido vertical"). |
 | **Retro Rewind / Pulsar / Kamek / Code.pul** | Retro Rewind = el mod con pistas clásicas. Pulsar = el marco de mods en el que está hecho. Kamek = la herramienta que inyecta código en el juego. `Code.pul` = el código del mod (PowerPC), que WiiCompiled también traduce. |
@@ -77,6 +189,10 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **FPU / FPSCR / MXCSR / FPCR** | FPU = la parte del procesador que hace cuentas con decimales. FPSCR (Wii), MXCSR (x86) y FPCR (ARM) son sus registros de configuración (modo de redondeo, FTZ…). |
 | **Paridad (prueba)** | Comprobar que dos versiones (x86 y wasm) dan exactamente los mismos bits para las mismas entradas. |
 | **Hash / SHA-256 / FNV / huella** | Una "huella digital" de un archivo o de una lista de resultados: un número corto que cambia por completo si cambia un solo bit. Sirve para comparar millones de resultados de una vez o para verificar que un archivo es el correcto. |
+| **Doble redondeo / punto medio** | Redondear dos veces (primero a double, después a float) puede dar distinto que redondear una vez. Solo pasa si el primer redondeo cae justo en el **punto medio** entre dos float (el empate de un redondeo «al más cercano»): ahí el segundo no sabe hacia qué lado iba el número de verdad. Como medir 2,5 V con un instrumento de un decimal y después redondear a enteros: sin saber si eran 2,46 o 2,54, no se sabe si toca 2 o 3. La FMA «punto medio» (§181) mira solo ese caso y lo resuelve por el camino largo. |
+| **Latencia y flujo (throughput)** | Latencia = cuánto tarda UNA operación de punta a punta; flujo = cuántas salen por segundo si se encadenan muchas independientes. Un procesador superpone operaciones independientes como una línea de montaje. Una cadena (cada una espera a la anterior) mide la latencia; una matriz (12 cuentas sueltas) se acerca al flujo. Por eso una prueba encadenada puede no ver una mejora que sí está (§181). |
+| **Comprobador diferencial** | Correr la versión vieja y la nueva de una función con la misma entrada y comparar TODO lo que dejan (registros y memoria escrita), en el juego de verdad. Si en miles de llamadas no hay ni un bit distinto, la nueva hace lo mismo. Como probar un repuesto en paralelo con el original y comparar las dos salidas en el osciloscopio (§181, N14). |
+| **Función hoja** | Una función que no llama a ninguna otra: entra, calcula y sale. Es la más fácil de reemplazar entera, porque todo lo que hace se ve en sus entradas y salidas. |
 
 ### Hilos, pilas y esperas
 
@@ -149,6 +265,10 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Búfer de preparación (staging buffer)** | Un búfer intermedio donde el programa deja los datos del cuadro (vértices, uniformes, índices) antes de pasarlos a los búferes que usa la GPU para dibujar. Como el capacitor de entrada de una fuente: junta la carga y después se descarga de una vez. aurora usa uno de 37 MB por cuadro. |
 | **Mapear / desmapear (`GetMappedRange` / `Unmap`)** | Mapear = que el programa pueda escribir directo en un búfer de la GPU como si fuera su propia memoria; desmapear = devolvérselo a la GPU. En el PC es casi gratis (la misma memoria). En el navegador no: el wasm y la GPU viven en procesos distintos, así que Emscripten reserva una copia en la memoria del wasm, la llena de ceros y al desmapear copia **todo** el rango, se haya usado o no. |
 | **`WriteBuffer` (`Queue::WriteBuffer`)** | La otra forma de llenar un búfer de la GPU: "copia estos N bytes a este búfer". Copia solo lo que se le pasa, en el orden de la cola de la GPU (después de lo ya enviado, antes de lo que se envíe luego). |
+| **Anillo (búfer circular)** | Un bloque de memoria que se llena de corrido y, al llegar al final, vuelve a empezar por el principio, escribiendo encima de lo más viejo. Como la cinta sin fin de un grabador de vigilancia: siempre queda guardado lo último. En aurora (§181) hay tres en la tarjeta (vértices, índices y arreglos); lo que el juego vuelve a dibujar igual se encuentra ahí y no se sube de nuevo. |
+| **Huella rápida (xxh3)** | Como la huella SHA-256 pero mucho más rápida y sin pretensión de seguridad: un número de 64 bits que resume unos bytes. Sirve para preguntar «¿esto es igual a lo que subí antes?» sin comparar byte a byte (§181). |
+| **Generación de escrituras** | Un contador que el runtime sube cada vez que el juego escribe en una zona de su memoria. Si el contador de una zona no cambió desde la última vez, lo que hay ahí tampoco cambió: no hace falta ni calcular la huella. Como el cuentakilómetros: si marca lo mismo, el auto no se movió. |
+| **`vtx_start`** | El número del primer vértice de un dibujo dentro del búfer de vértices. Si los vértices se mudan (por ejemplo, al anillo), hay que corregir ese número o el dibujo lee los vértices de otro. |
 | **Pegamento (glue) de Emscripten** | El JavaScript que Emscripten genera junto al `.wasm` (`mkw.js`) para todo lo que el wasm no puede hacer solo: hablar con WebGPU, leer el reloj, pedir archivos. Cada vez que el wasm lo llama hay un pequeño costo de "cruzar la frontera". |
 | **Traza del ritmo** | Una lista, con hora, de los momentos de cada cuadro: el juego entrega el cuadro (1), aurora vuelve (2), el juego se pone a esperar ('e') y se despierta ('w'). Con `?traza=1` la página la guarda; `guion.mjs --traza` la vuelca y `herramientas/tiempos-cuadro.mjs` la convierte en "cuánto trabajó cada parte en cada cuadro". Como un osciloscopio con varias puntas sobre el mismo ciclo. |
 | **Origen** | La "dirección de la casa" de una página: protocolo + nombre + puerto (`https://paginita-pro.cl`). Dos páginas del mismo origen se tratan como de confianza entre sí; de orígenes distintos, el navegador las separa y pide permisos (CORS). El sitio está en GitHub Pages y lo privado en el Worker: dos orígenes. |
@@ -175,6 +295,24 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Pipeline / caché de pipelines** | Pipeline = la "receta" completa que la GPU necesita para dibujar algo (qué shaders, qué mezclas de color). Armarla cuesta; la caché las guarda para la próxima vez. |
 | **Enlace duro (hard link)** | Dos nombres para el mismo archivo en el disco. El runtime lo usaba para guardar archivos de la NAND sin pisar nada; el sistema de archivos de Emscripten no lo tiene, así que en la web se renombra. |
 | **Perfil (profiler)** | Una medición de en qué funciones pasa el tiempo un programa: el navegador mira miles de veces por segundo "¿qué función corre ahora?" y cuenta. Como un analizador que muestra qué etapa del circuito consume más. |
+| **Raíz de la escena (ScnRoot) y su cambio (SwitchScnRoot)** | La escena 3D del juego es un árbol de cosas para dibujar que cuelga de una «raíz». El juego tiene dos raíces y, al terminar cada dibujo, cambia de una a la otra (SwitchScnRoot), como un búfer doble. Si alguien hace ese cambio dos veces en el mismo cuadro, se dibuja la raíz equivocada. Como un conmutador de dos posiciones que dos operarios accionan a la vez: queda donde no debía. |
+| **Escritura que «se consume»** | Un dato que la lógica pone en 1 y que el dibujo vuelve a 0 en cada cuadro (por ejemplo, una marca de «hay que dibujar esto»). Si un programa solo copia lo que cambió, esa marca puede no volver a viajar nunca: en A sigue en 1 (nadie la apaga) y en B el dibujo la apagó. Como un relé con enclavamiento que el tablero esclavo suelta y que el maestro nunca vuelve a mandar a cerrar, porque para él sigue cerrado. |
+| **Conjunto acotado (de pipelines)** | Guardar en la tarjeta de video las recetas de dibujo solo de las últimas pistas (4) y soltar las más viejas, en vez de guardarlas todas para siempre. La memoria queda con tope y una copa repetida no vuelve a preparar nada. Como un banco de condensadores con solo cuatro etapas conectadas: se descarga la más vieja para cargar la nueva. |
+| **Perfil de CPU repartido** | Un perfil de CPU dice en qué función estaba el procesador cada pocos microsegundos. Repartirlo es sumar esas muestras por ramas (la lógica, el dibujo y, dentro del dibujo, cada parte) para saber cuánto pesa cada una. Como poner una pinza amperimétrica en cada rama de un tablero: el consumo total ya se sabe; falta saber qué rama se lo lleva. |
+| **Camino de dibujo (DrawPath)** | Una etapa de la biblioteca EGG del juego que dibuja un efecto de la escena en su propia pasada de la tarjeta (el brillo, el desenfoque de lo lejano, las sombras por volumen, el mapa de luz). Saltarse una es como desconectar un circuito de iluminación decorativa: lo demás del tablero sigue igual y se consume menos. |
+| **Brillo (bloom)** | El efecto que hace «resplandecer» lo muy claro: se copia la imagen, se desenfoca y se suma encima. Cuesta dos o tres pasadas de la tarjeta. Como un filtro pasa bajos aplicado a la señal y sumado a la original. |
+| **Profundidad de campo (DOF)** | Desenfocar lo que está lejos, como una cámara con poca profundidad de foco. |
+| **Sombra por volumen** | Una sombra que se calcula con la forma 3D del objeto proyectada sobre el suelo (la sombra del kart), en una pasada aparte. |
+| **Mapa de luz** | Una imagen con la iluminación de la pista ya calculada que se pinta encima de lo dibujado. |
+| **Nivel de detalle (mip)** | Cada textura guarda también copias de sí misma a la mitad, a un cuarto, etc. Lo que se ve de lejos usa la copia chica (menos lectura para la tarjeta y sin parpadeo). Saltarse los niveles más grandes es como usar una foto de menos resolución: ocupa menos y se ve más borrosa de cerca. |
+| **Ajuste rápido («Liviano»)** | Un botón que cambia varias opciones de una vez a una combinación pensada (aquí: efectos de la escena apagados, texturas a la mitad, salida 960×540). Como el selector de «modo económico» de un equipo: mueve varias perillas juntas; cada una se puede volver a tocar después. |
+| **Cambiar en caliente** | Cambiar un ajuste con el juego andando, sin reiniciarlo. Como cambiar el tap de un transformador con carga (OLTC): el equipo sigue entregando energía mientras se mueve el selector, pero el cambio se hace en un momento cuidadoso para no cortar la corriente. |
+| **Borde del par (punto muerto)** | Con «30 parejas» o la imagen intermedia, los cuadros van de a dos: uno dibujado y uno saltado. El modo solo se cambia al empezar un par nuevo, nunca entre los dos, así ninguna imagen se pierde ni se repite. Como cambiar la marcha de un motor de dos tiempos en el punto muerto y no a mitad del giro. |
+| **1 % bajo (1 % lows)** | De todas las imágenes de un rato, se toma el 1 % que más tardó y se pasa a fps. Si el 99 % de las imágenes tardó 18 ms o menos, el 1 % bajo es 1000 / 18 = 55 fps. Dice cuán parejo va el juego, no cuán rápido: como el valor mínimo de la tensión en una red con caídas cortas, que el voltímetro de promedio no ve. Meta del dueño: al menos el 95 % de los fps. |
+| **0,1 % bajo** | Lo mismo con el 0,1 % más lento (1 imagen de cada 1000): ve los tirones raros que el 1 % todavía no alcanza a ver. |
+| **Percentil (p99, p99,9)** | El valor que deja por debajo a ese porcentaje de las mediciones: p99 = el tiempo que el 99 % de las imágenes no pasa. Como el «valor que no se excede el 99 % del tiempo» con que se dimensiona un conductor por su carga. |
+| **Tiempo por imagen (de entrega a entrega)** | Cuánto pasa entre que el juego entrega una imagen y entrega la siguiente: 16,7 ms a 60 parejos. Es lo que miden PresentMon, MSI Afterburner y CapFrameX («MsBetweenPresents»). La otra forma, contar los refrescos del monitor en que se vio, redondea a refrescos (a 144 Hz da 13,9 y 20,8 ms aunque el juego vaya parejo). Como medir el período de cada pulso con un osciloscopio y no la frecuencia promedio. |
+| **Despertar antes y ceder** | El temporizador del navegador despierta tarde (0 a 7 ms). La página ahora pide despertar 3 ms antes del vencimiento y el resto lo espera cediendo el turno una y otra vez: despierta justo a tiempo, nunca antes. Como un relé que se prepara un poco antes y cierra en el instante exacto con un detector de cruce por cero. |
 | **CDP (Chrome DevTools Protocol)** | La "puerta de servicio" de Chrome: por ahí Playwright puede pausar la página, perfilarla o sacarle capturas. |
 | **Refresco del monitor (Hz) / vsync** | Cuántas veces por segundo el monitor dibuja una imagen nueva (60, 144, 180 Hz…). El vsync es el instante de cada refresco. Si el juego (60 fps) entrega sus cuadros parejos, en 180 Hz cada cuadro dura exactamente 3 refrescos. |
 | **Tirón (judder / stutter)** | Cuando un cuadro dura en pantalla más o menos que los otros (4 refrescos en vez de 3): el movimiento se ve a saltos aunque el promedio sea 60 fps. |
@@ -218,6 +356,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **MessageChannel** | Un "tubo" de mensajes de la página consigo misma: lo que se manda por un extremo llega al otro como una tarea nueva, casi sin demora. Aquí se usa para despertar al juego después de la actualización de la pantalla. |
 | **Alargue de temporizadores encadenados (clamping)** | Regla de los navegadores: si un `setTimeout` se pide desde otro, y eso pasa más de 5 veces seguidas, cada uno espera al menos 4 ms aunque se pida 1 ms. Evita que una página sature la CPU con temporizadores. |
 | **Ocupación del hilo (TaskDuration)** | Qué parte del tiempo el hilo principal de la página estuvo trabajando (o girando). 80 % = casi un núcleo entero; 37 % = el resto del tiempo duerme. Como el ciclo de trabajo (duty cycle) de una señal PWM. |
+| **Vibración por pulsos** (§167) | El juego no pide «vibra con tal fuerza»: prende y apaga el motor del mando muy seguido, como un regulador PWM que da la fuerza media con el ciclo de trabajo. Un teléfono no tiene fuerza regulable y su motor tarda en arrancar y frenar, así que cada prendido/apagado mandado al pie de la letra lo descontrolaba. La página mide el ciclo de trabajo de cada 100 ms y manda **un** pulso de esa fracción (teléfono) o una fuerza proporcional (mando): como un filtro pasabajos entre el PWM del juego y el motor. |
 | **IndexedDB** | Una base de datos que cada página tiene en el disco del usuario (no en internet). Aguanta varios MB y sobrevive a cerrar el navegador. Ahí van las partidas. |
 | **Enganche (hook) a una función** | Reemplazar una función por otra que hace lo mismo y además avisa ("el juego cerró un archivo escrito"). Como poner una pinza amperimétrica en un cable sin cortarlo. |
 | **Rebote (debounce)** | Esperar a que algo deje de cambiar antes de actuar: aquí, medio segundo sin escrituras antes de guardar. Es el antirrebote de un pulsador. |
@@ -302,7 +441,6 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Piloto (lazo cerrado)** | El programa de la página que maneja los menús solo: mira en qué página está el juego, aprieta el botón que corresponde y comprueba el resultado (el modo, la pista); si no es lo pedido, vuelve atrás y corrige. Como un regulador con realimentación, en vez de un temporizador a ciegas. |
 | **BMG** | El formato de las tablas de textos del juego (cada mensaje con su número). En la de Retro Rewind, el mensaje 0x20000 + n es el nombre de la pista n: de ahí salen los nombres de la lista para elegir pista. |
 | **Caras de partida (presets)** | Mii ya armados para empezar, como los "invitados" del juego: se elige uno y solo se le pone nombre y color. Los de la página los armamos nosotros (no son los datos de Nintendo). |
-
 | **Copia de una respuesta (`clone()`)** | Pedirle al navegador dos lecturas de la MISMA descarga: los bytes llegan una vez por la red y se reparten a dos lectores. La barra de descarga (§106) lee una copia solo para contar; el juego lee la original, intacta. Como una pinza amperimétrica: mide la corriente sin cortar el cable. |
 | **Ráfaga (de descargas)** | Un grupo de pedidos que se superponen en el tiempo (el juego pide varias cosas casi a la vez). La barra muestra lo recibido de lo esperado en la ráfaga actual y vuelve a cero cuando todo queda quieto un segundo. |
 | **Puerto (del mando)** | Cada uno de los 4 enchufes de mando de la GameCube: el puerto 1 es el jugador 1. La página decide qué mando del PC va a cada puerto; desde §106 la persona lo elige («Jugador 1–4»), como el selector de entrada de una mesa de sonido. |
@@ -1025,6 +1163,331 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 |---|---|
 | **Enlace (binding) del Worker** | El nombre con que el código del Worker ve un recurso de Cloudflare: `env.DISCO` es el bucket de la ISO de BT3 y, desde §105, `env.MKW` el de Mario Kart. Se conecta en el panel (Settings → Bindings), no en el código: el mismo archivo sirve para cualquier bucket. Como la bornera de un tablero: el equipo dice «entrada 1», y en la instalación se decide qué cable llega ahí. |
 | **Respaldo del enlace** | Si el Worker no tiene el enlace `MKW`, Mario Kart se busca en `DISCO`, como antes de §105 (`mkwR2 = env => env.MKW \|\| env.DISCO`). Así un Worker pegado antes de crear el bucket no se cae: dice «no está subido». |
+
+### El precalentado con tope (§117)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **En camino (un pipeline)** | Un pipeline que la página ya le pidió al navegador y que todavía se está compilando en el proceso de GPU. Mientras está «en camino» el juego no lo puede usar: si lo necesita, ese dibujo se salta (un objeto que falta unos cuadros). |
+| **Tope de «en camino»** | Cuántos pipelines del precalentado puede haber compilándose a la vez (`EN_CAMINO_MAX`). Si ya hay esos, el precalentado espera al cuadro siguiente; lo que el juego mismo necesita no espera nunca. Es el limitador de corriente de arranque: en vez de arrancar los 700 motores juntos, como mucho 4 a la vez, y el tablero (el PC y las demás pestañas) no se cae. |
+| **Núcleos lógicos (`navigator.hardwareConcurrency`)** | Cuántos hilos puede correr el procesador a la vez, según el navegador: 16 en esta PC (8 núcleos con 2 hilos cada uno), 8 en un teléfono típico. El tope es max(2, núcleos ÷ 4): deja libre la mayor parte del procesador para el juego, la página y las demás pestañas. |
+| **Ritmo del precalentado** | Cuántos pipelines nuevos se piden como mucho por cuadro (2). Junto con el tope, decide qué tan rápido avanza el precalentado: 2 por cuadro × 60 cuadros = 120 por segundo como máximo, menos si el navegador tarda en compilarlos. |
+
+### El almacenamiento persistente (§118)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Origen** | La dirección de un sitio sin la ruta (`https://ejemplo.github.io`): el navegador guarda todo por origen (las cachés, IndexedDB, `localStorage`) y lo borra por origen. Todo lo bajado del juego y las partidas viven en el mismo origen. |
+| **Almacenamiento «de mejor esfuerzo» / persistente** | Por omisión, lo que guarda un sitio es «de mejor esfuerzo»: si al disco le falta espacio, Chrome borra orígenes enteros, empezando por el menos usado, sin preguntar. «Persistente» quiere decir que ese origen ya no se borra solo: solo si la persona lo borra a mano. Como una carga «no esencial» de un tablero que el relé de deslastre puede cortar, contra una «esencial» que no se corta. |
+| **`navigator.storage.persist()`** | La función con que la página pide pasar a persistente. Chrome no muestra nada: decide solo según cuánto se usa el sitio (si está en marcadores, si se visita seguido, si se juega un rato). Por eso la primera vez suele decir «no» y más adelante «sí»: hay que volver a pedirlo. `persisted()` solo pregunta cómo está, sin pedir. |
+| **`navigator.storage.estimate()`** | Cuánto ocupa el origen (`usage`) y cuánto le dejaría usar el navegador (`quota`), en bytes. Es aproximado (Chrome redondea para no delatar qué hay guardado). |
+
+### La precarga liviana (§119)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **`ArrayBuffer`** | Un bloque de memoria cruda de JavaScript, de un tamaño fijo. `respuesta.arrayBuffer()` espera a que llegue TODO el archivo y lo deja entero en uno de estos: para el programa, 124 MB de una vez (el navegador lo descomprime al recibirlo). |
+| **Flujo (`ReadableStream`) y sumidero (`WritableStream`)** | Un archivo que llega por la red se puede leer como un flujo: pedazos chicos (decenas de KB) que van pasando. Un sumidero es el otro extremo del caño: aquí uno que solo cuenta los bytes y los olvida. Como medir el caudal de una cañería con un caudalímetro en vez de llenar un tanque con toda el agua. |
+| **Caché HTTP** | La caché propia del navegador: guarda las respuestas tal como llegaron (el programa, comprimido, 16 MB) para no volver a bajarlas. Se llena igual si el cuerpo se lee de una vez o de a pedazos, mientras se lea hasta el final. |
+| **Memoria privada (de un proceso)** | La memoria que un proceso tiene reservada para él solo (no compartida con otros). Windows la llama «Private Bytes» (`PrivatePageCount`). Chrome tiene varios procesos: el de la página (renderer), el de GPU, el de red y el principal. |
+| **Recolector de basura** | La parte de JavaScript que libera la memoria que ya nadie usa, pero cuando a él le parece, no en el momento. Por eso un `ArrayBuffer` que ya no sirve puede quedar ocupando memoria un buen rato. |
+
+### La pestaña oculta (§120)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Pestaña oculta** | Una pestaña que no se ve: otra al frente, la ventana minimizada o tapada. Chrome deja de refrescarla (`requestAnimationFrame` no llama) y frena sus temporizadores (`setTimeout`) a uno por segundo; `document.hidden` pasa a `true`. |
+| **Espera activa (girar)** | Esperar preguntando «¿ya?» una y otra vez sin descansar, en vez de dormir hasta la hora. Gasta el procesador entero sin hacer nada útil. Como tener un motor acelerado contra el freno de mano en vez de apagarlo en el semáforo. |
+| **Temporizador de un Worker** | Un `setTimeout` que corre en un Worker (un hilo aparte de la página). Chrome no frena los de un Worker cuando la pestaña está oculta: despierta a tiempo (≈1 ms) y avisa a la página con un mensaje. Así la espera puede dormir de verdad hasta el cuadro siguiente. |
+| **Despiertes** | Cuántas veces por segundo la espera del reloj del juego le devuelve el mando al juego (`mkwEstado.despiertes`). Con la espera activa eran decenas de miles; durmiendo, unas pocas por cuadro. |
+| **`TaskDuration`** | Lo que Chrome cuenta como tiempo ocupado del hilo de la página (en segundos, acumulado). Dividido por el tiempo que pasó da el % del hilo ocupado. |
+
+### Las descargas de fondo en pausa durante la carrera (§121)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Fila baja (de fondo)** | La lista de cosas que la página baja «por si acaso», con la prioridad más baja: la semilla de bloques (lo que el juego leyó en corridas de muestra), las voces de las CPU y los archivos diminutos. Solo sale cuando no hay nada más urgente. En la 1.ª visita son unos 59 MB. |
+| **Fila normal** | Lo que el juego anunció que va a leer (abre un archivo y la página baja el principio por adelantado, §52). Esa no se pausa: es lo que el juego necesita ya. |
+| **Pausa de la fila** | Mientras corre una carrera no sale nada nuevo de la fila baja (lo que ya iba en camino termina). Como desconectar las cargas no esenciales cuando arranca el motor grande: lo que había quedado esperando se conecta después. |
+| **`mkwFaltas`** | La lista de lo que el juego tuvo que bajar de la red en plena carrera (archivo, primer bloque, cuántos). Es la materia prima del «paquete de carrera» (D1): lo que habría que tener bajado ANTES de largar. |
+
+### Guardar fuera de la carrera (§122)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **IndexedDB** | La base de datos del navegador donde la página guarda las partidas y la lista de pipelines. Escribir ahí copia los datos y ocupa el hilo de la página un rato (milisegundos en un teléfono). |
+| **`requestIdleCallback`** | Pedirle al navegador «llamame cuando el hilo esté libre» (entre un cuadro y otro), con un plazo máximo (aquí 1 s) por si nunca queda libre. Como programar el lavarropas para la hora en que no se usa el horno. |
+| **Aplazar** | Dejar el guardado para después: con una carrera andando, el guardado espera y se hace al terminar. Si la pestaña se esconde o se cierra, se guarda en el momento igual (para no perder nada). |
+
+### El medidor de la tarjeta sin inflar lo que mide (§123)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Envoltura (de un método)** | Poner una función propia «delante» de una del navegador (por ejemplo `draw`): cuenta y después llama a la original. Cada envoltura cuesta un poco en CADA llamada; con 1.000–2.000 llamadas por cuadro se nota. |
+| **Medir por ventanas** | Contar solo 2 s de cada 10, y el resto del tiempo devolver las funciones originales del navegador. Como un amperímetro que se conecta un rato cada tanto en vez de quedar siempre en serie con la carga: su propia caída de tensión ya no afecta lo que se mide la mayor parte del tiempo. |
+| **`...a` y `apply`** | La forma genérica de pasar «todos los argumentos que vengan»: arma un arreglo nuevo en cada llamada (basura que después hay que recoger). Con argumentos fijos (`a, b, c…`) no se arma nada. |
+| **Efecto del observador** | Cuando medir cambia lo medido. Aquí: el medidor de la tarjeta le sumaba trabajo al hilo justo en el teléfono, donde se quería saber cuánto cuesta cada cuadro. |
+
+### Cuadros de lógica y cuadros dibujados (§124)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Cuadro de lógica** | Un paso de la simulación de la carrera: mover los karts, los objetos, las colisiones. Mario Kart hace 60 por segundo. |
+| **Cuadro dibujado** | Una imagen nueva que se manda a la pantalla. Normalmente uno por cada cuadro de lógica; si el juego se atrasa, Retro Rewind se saltea dibujos (calcula sin dibujar) para que la carrera no vaya en cámara lenta. |
+| **Contador del Raceinfo** | El Raceinfo (el «administrador de la carrera» del juego) cuenta sus propios cuadros de lógica: en la presentación (+0x1C) y desde la cuenta regresiva (+0x20). Leyendo esa memoria una vez por segundo, la página sabe cuántos cuadros calculó el juego, aparte de cuántos dibujó. Como medir la velocidad del eje de un motor aparte de las vueltas que marca el tablero. |
+
+### El registro liviano y los relojes chicos (§125, §126)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Registro (log)** | Las líneas que el juego y la página escriben para saber qué pasó («[medidor] …», «sala: …»). Se guardan en una lista y se muestran en un cuadro de texto del cajón. |
+| **Recalcular la disposición (layout)** | Cuando la página cambia un texto y después pregunta un tamaño (`scrollHeight`), el navegador tiene que volver a acomodar todo para contestar. Hacerlo en cada cuadro es trabajo tirado si nadie lo ve. |
+| **`IntersectionObserver`** | Un aviso del navegador: «este elemento ahora se ve / ya no se ve». Con él, el cuadro del registro se pinta solo con el cajón abierto. Como prender la luz de una sala solo cuando entra alguien (un sensor de presencia). |
+| **Tope circular** | Una lista con un largo máximo: al llenarse, lo más viejo se tira. Así la memoria no crece sin fin en una sesión larga. |
+| **Escribir solo si cambió** | Antes de poner un texto en la página, comparar con el que ya está; si es el mismo, no tocar nada (tocarlo, aunque sea igual, hace trabajar al navegador). |
+
+### La revisión de conexiones en rueda (§127)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **`getStats`** | La pregunta que la página le hace a una conexión WebRTC: por dónde va (directa o por el repetidor) y cuánto tarda la ida y vuelta. Es asíncrona y cuesta: con 11 pilotos, 3–15 ms juntos cada 2 s. |
+| **En rueda (round-robin)** | Revisar a uno por vez, por turno: en cada vuelta le toca a otro. Como un multímetro con selector que mide un circuito por vez en vez de tener 11 instrumentos a la vez. |
+
+### Lo táctil sin costo por cuadro (§128)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **`deviceorientation`** | El aviso del navegador con la inclinación del teléfono (decenas por segundo). Solo hace falta para «dirigir inclinando». |
+| **`getBoundingClientRect`** | Preguntar dónde está un elemento en la pantalla (su recuadro). Cada pregunta puede obligar al navegador a acomodar la página. Medir una vez por toque y reusar es como anotar las medidas de un tablero una vez en vez de medirlo con la cinta cada vez que se mira. |
+
+### Relojes que se apagan solos (§129, §131)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Vigía (reloj de sondeo)** | Un trabajo que la página repite cada tantos ms para mirar algo (¿llegó al título?, ¿terminó la carrera?). Cada vuelta cuesta poco, pero si son muchos y miran aunque no haga falta, se suman. Como un multímetro que alguien lee cada medio segundo aunque el circuito esté apagado. |
+| **Enclavamiento** | Seguir haciendo algo hasta confirmar que se puede parar (aquí: seguir leyendo la carrera terminada hasta salir de ella, para no perder el tiempo final). Como un contactor con contacto de retención. |
+
+### Armar los archivos del juego (§130)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **`preRun`** | Lo que la página le pide a Emscripten hacer justo antes de arrancar el juego (`callMain`): aquí se arma el sistema de archivos de mentira (MEMFS) con los ~6.000 archivos del disco. Es una sola tarea: mientras dura, la página no responde. |
+| **`mkdirTree`** | Crear una carpeta con todas las de arriba («/mkw/disco/Race/Course» crea las 4 si faltan). Para eso recorre la ruta pedazo a pedazo y pregunta cada uno. Hacerlo para cada archivo, aunque la carpeta ya exista, es repetir el mismo recorrido miles de veces. |
+
+### La prioridad de las descargas (§132)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Prioridad de la red (`priority` de `fetch`)** | Una etiqueta que la página pone en cada pedido: «high» (lo necesito ya), «low» (puede esperar). Chrome ordena con ella lo que sale y lo que lee primero cuando hay varios pedidos a la vez. No es un freno: si la línea está libre, lo «low» baja igual de rápido. Como las prioridades de un tablero de cargas: cuando falta corriente, primero se atiende la carga crítica. |
+| **Cubeta de fichas (token bucket)** | Un freno de velocidad: una cubeta se llena de fichas a ritmo fijo (por ejemplo 2 MB/s) y cada byte que se baja gasta una ficha; sin fichas, se espera. Deja pasar ráfagas cortas y limita el promedio. §139 la armó; §142 la prende sola en la sala ya cargada. |
+
+### Esperar los gráficos en el menú de inicio (§133)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Precalentado (de pipelines)** | Compilar de antemano los programas de dibujo que el juego va a usar, para que no se compilen en medio de la carrera (cada uno que falta es un tirón). Con el tope de §117 va de a pocos: tarda más pero no traba. |
+| **Esperar en el menú (barrera)** | No dejar pasar a la carrera hasta que llegó la parte de los gráficos que se usa primero. Es cambiar unos segundos de espera al principio por una carrera sin tirones. Como precargar un capacitor antes de cerrar el circuito: se espera un poco, pero no hay pico al arrancar. |
+
+### Mensajes en trozos (§135)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **SCTP** | El protocolo que lleva los dos canales de datos (`udp` y `tcp`) de cada conexión WebRTC. Los dos comparten la misma «asociación» (el mismo caño). |
+| **Bloqueo en la cabeza de la fila (head-of-line blocking)** | Chrome manda cada mensaje entero antes del siguiente, aunque sean de canales distintos: uno grande por `tcp` hace esperar a los paquetes de botones de `udp` que salen detrás. Como un camión largo en un puente de una vía: los autos esperan a que termine de cruzar. |
+| **Trocear** | Partir un mensaje grande en pedazos chicos (1 KB) con una marca delante; del otro lado se vuelven a juntar en orden. Entre pedazo y pedazo pueden pasar los paquetes urgentes. |
+
+### Bucles de cada refresco (§136)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **`requestAnimationFrame` (rAF)** | Pedirle al navegador «llamame antes del próximo refresco de la pantalla». Un bucle que se vuelve a pedir en cada llamada corre tantas veces por segundo como Hz tenga el monitor (60, 144, 240), aunque no haya nada que dibujar. Como un relé que conmuta con cada ciclo de la red aunque la carga esté apagada. |
+
+### Terminar los cinco «en curso» (§140–§144)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Heap del programa / `INITIAL_MEMORY`** | El heap es el bloque de memoria donde el programa del juego (el `.wasm`) guarda todo lo suyo: la RAM de la Wii simulada, aurora, las listas. `INITIAL_MEMORY` es con cuánto arranca. Si se pide de más, Chrome lo reserva igual aunque nunca se use. Es como dimensionar un banco de baterías: más grande no hace andar mejor la carga, solo ocupa lugar. |
+| **Memoria fija (`--memoria-fija`, W29)** | Enlazar el programa con `ALLOW_MEMORY_GROWTH=0` e `INITIAL_MEMORY=N`: la memoria del `.wasm` tiene un tamaño que no cambia. Con memoria ampliable, V8 (el motor de JavaScript de Chrome) debe releer el tamaño actual antes de cada acceso en Android, porque ahí revisa los límites a mano; con tamaño fijo es una constante. Como pasar de un divisor de tensión cuyo valor hay que medir a cada lectura a una resistencia de valor conocido. Costo: se reserva N MB de entrada (no necesariamente se usan). |
+| **`sbrk(0)`** | Pregunta al programa hasta dónde llegó de verdad su heap (la «marca de agua» de lo usado). Comparado con `INITIAL_MEMORY` dice cuánto se reservó sin usar. |
+| **Pausa del precalentado** | Un interruptor nuevo en aurora (`mkw_web_pipelines_pausa`): mientras corre una carrera, los pipelines que esperan en la cola de fondo no se compilan; al terminar la carrera siguen. Los que el juego necesita para dibujar el cuadro de ahora se compilan igual (esos no se pueden postergar). Es como dejar la carga de una batería de respaldo para cuando la máquina no está en su pico. |
+| **Planificador único (anillo de refrescos)** | Un solo bucle de cada refresco (`relojMonitor`) que mide el monitor y llama a los demás (el cajón, los mandos) en vez de que cada uno pida su propio `requestAnimationFrame`. Guarda los últimos 240 periodos en un anillo (un arreglo circular: cuando se llena, lo nuevo pisa a lo más viejo) y recalcula la mediana cada 30 refrescos. Como un solo reloj maestro con varias cargas colgadas en vez de un oscilador por carga. |
+| **Freno «solo en la sala»** | La cubeta de fichas de §139, ahora prendida sola en la sala una vez que el juego terminó de cargar (`preparacion.lista()`): ahí lo que importa es el WebRTC de los demás; en la carga, lo que importa es bajar rápido. |
+
+### Las tres pruebas que fallaban (§145)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Falla en cascada** | Una prueba que hace pasos seguidos (bajar, Enter, Esc…) y uno de los primeros no hace lo que esperaba: los siguientes caen en otro lugar y fallan todos, aunque lo que miden ande bien. Como un disparo de protección aguas arriba que deja sin tensión a todo el tablero: se busca el primero que falló, no los demás. |
+| **Zona muerta por eje** | El `mando.js` del sitio le aplica la zona muerta (0,22) a cada eje del stick por separado. Inclinado en diagonal con poca fuerza, cada eje queda apenas encima del margen y el cursor se arrastra. |
+
+### La hora del 27 al 28 (§146–§154)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Apurar (un pedido de fondo)** | Cuando el juego necesita ya un pedazo que estaba pedido «de fondo» (sin apuro), pasarlo a la fila urgente o, si ya viaja al final de un envío grande, pedirlo aparte. Como un paquete que viene en el último camión de un convoy: en vez de esperar todo el convoy, se manda una moto a buscar ese solo. |
+| **Tope de tiempo (timeout)** | El plazo máximo que se espera una respuesta; pasado ese plazo se la da por perdida y se sigue con otra cosa. Como el tiempo de disparo de un relé de protección. |
+| **Filtro CSS / desenfoque** | Efectos que el navegador calcula sobre la imagen ya pintada (sombra, `blur`). Si lo que está debajo o adentro se mueve, se recalculan en cada cuadro: trabajo extra de la tarjeta. Si se aplican a algo quieto, se calculan una vez y se reusan. |
+| **Presupuesto (de tiempo)** | Repartir los 16,7 ms de un cuadro entre las piezas, cada una con su meta, como el presupuesto de potencia de una fuente: si cada carga cumple la suya, el total entra. |
+| **Tramo de la carrera** | Para medir lecturas del disco: «antes» (hasta la largada), «carrera» (hasta que llega la primera) y «meta» (los 15 s siguientes: fanfarria y resultados). |
+| **Programa nativo** | El juego compilado directo para el procesador del PC (aquí, un `.exe` de Windows), sin navegador en el medio. Como conectar una carga directo a la fuente en vez de pasarla por un convertidor. |
+| **Impuesto del navegador** | Cuánto más trabaja el mismo juego dentro del navegador (WebAssembly) que nativo, en el mismo PC: la razón entre los dos tiempos por cuadro. Medido en §153: ×2,2. Como las pérdidas de un convertidor: la misma carga pide más a la fuente. |
+| **Contador (dentro del motor)** | Un número que se suma cada vez que el motor hace algo (leer la memoria, cambiar de hilo…). Va solo en un programa aparte para medir, como un amperímetro que se intercala para la prueba y después se saca. |
+| **Camino revisado / vista plana** | Dos maneras de llegar a la memoria de la Wii. Revisado: cada acceso busca en una tabla de páginas dónde está de verdad (es lo único que hay en wasm). Plano: el PC reserva un bloque fijo de 4 GiB y el acceso va directo (solo nativo). |
+| **x86-64-v2 / v3** | Niveles de instrucciones del procesador del PC. v3 tiene AVX2 y FMA (multiplicar y sumar en un solo paso); v2 no. Sirve para medir cuánto ayuda tener FMA. |
+| **clang** | El compilador (traductor de C++ a código de máquina) que usamos; emscripten es clang con salida a WebAssembly, y el de Visual Studio da programas de Windows. |
+| **Huella ampliada** | La huella de la sala (un número que resume la carrera para comparar consolas) partida en piezas: una por kart y una del azar. Si algo se separa, dice cuál pieza. Como medir la corriente por rama además de la total. |
+| **Volcado** | Los valores crudos de una pieza (aquí, las 21 palabras de un `RaceinfoPlayer`) guardados en el registro para compararlos después a mano. |
+
+### El aparato de mentira y la tanda del 29 (§155–)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Lastre (de CPU)** | Hacer que un núcleo rápido trabaje como uno K veces más lento: el hilo mide lo que trabajó (t) y después se queda girando (K−1)·t sin hacer nada útil. Como la carga ficticia (una resistencia de potencia) con que se prueba una fuente: no fabrica nada, pero consume igual que el circuito de verdad. |
+| **Girar (espera ocupada)** | Un lazo que solo mira el reloj hasta que llega la hora, sin soltar el núcleo. Gasta el núcleo entero, que es justo lo que se quiere en un lastre. |
+| **Hilo de ayuda** | Un hilo aparte del principal que hace una tarea chica: aquí, el del sonido (el AudioWorklet). El programa del juego es de un solo hilo (el sitio no tiene COOP/COEP, sin eso no hay hilos con memoria compartida). |
+| **Estimador (por promedio)** | Medir algo más chico que la resolución del instrumento promediando muchas medidas: el reloj del worklet solo marca milisegundos y un bloque de sonido tarda microsegundos, pero sumando miles de diferencias de 0 o 1 ms (cada bloque empieza en cualquier punto del milisegundo) el promedio da la duración de verdad. Como un voltímetro de baja resolución que con ruido y promedio mide por debajo de su último dígito (dithering). |
+| **Caché grande (L3) / ladrón de caché** | La caché es una memoria chica y muy rápida dentro del procesador que guarda lo usado hace poco; el 9800X3D tiene 96 MB, un teléfono medio 2–4 MB. El ladrón es un Worker que recorre 64 MB sin parar y llena la caché de su basura, así el juego tiene que ir más a la memoria lenta, como en un aparato chico. Como un condensador de desacople compartido con otra carga que lo vacía. |
+| **Lastre de la tarjeta (pasada repetida)** | Cada pasada de dibujo del juego se repite K−1 veces más con los mismos dibujos en imágenes de descarte (que nadie ve): la tarjeta hace K veces ese trabajo y la imagen no cambia. |
+| **Imagen de descarte** | Una imagen del mismo tamaño y formato que la del juego, creada solo para que las repeticiones dibujen en algún lado. |
+| **Subida de reloj de la tarjeta (boost)** | Las tarjetas suben su frecuencia cuando tienen mucho trabajo, como un motor que acelera con la carga: con el doble de trabajo no tardan el doble. Por eso la prueba primero la calienta 2 s y compara cada medida con lastre contra una sin lastre tomada justo al lado. |
+| **Procesador lógico (hilo de hardware)** | Lo que Windows ve como «un procesador». Cada núcleo de este Ryzen se presenta como dos (SMT): 16 lógicos = 8 núcleos. `medir-sitio --nucleos 4` = 4 lógicos = un PC de 2 núcleos, como un portátil de oficina. |
+| **Latido de otra pestaña** | Una página aparte que se anota cada 50 ms; cuánto se atrasa dice cuánto se trabó Chrome entero mientras el juego carga. Como un osciloscopio en otra rama del circuito para ver si la caída de tensión llega hasta ahí. |
+| **Compilar perezoso / TurboFan / caché de código** | V8 (el motor de Chrome) traduce cada función del programa recién la primera vez que se usa, primero rápido y sin pulir; las que se usan mucho las vuelve a traducir optimizadas (TurboFan). Solo esas optimizadas se guardan para la próxima visita (la caché de código). Por eso el arranque es rápido pero los primeros segundos de juego van más lentos, como un motor que se calienta. |
+| **Piloto (de la página)** | El código de la página que lleva el juego por los menús hasta una carrera pedida en la dirección (`?modo=tt&copa=0&fila=0`). `medir-sitio --piloto` lo usa para medir Contrarreloj y carreras sin las teclas de siempre. |
+| **Programa comprimido (`.br`)** | El `.wasm` empaquetado con brotli: 124,5 MB → ~20 MB. El navegador lo descomprime solo al llegar. Si el `.br` es más viejo que el `.wasm`, el servidor lo ignora y manda el grande. |
+| **Forma de un método (sobrecarga)** | Un mismo botón con dos usos según cuántos dedos aprietan: `setBindGroup` de WebGPU tiene una forma de 3 datos y otra de 5, y el navegador elige cuál por **cuántos** datos llegan. Pasarle «vacíos» de relleno lo hace creer que es la de 5. |
+| **`navigator.hardwareConcurrency`** | Lo que el navegador le dice a la página sobre cuántos procesadores lógicos tiene el PC. La página lo usa para decidir cuántas cosas pedir a la vez (el tope del precalentado). Atar Chrome a 4 núcleos no cambia este número: hay que decírselo aparte. |
+| **Línea de tiempo (de la carga)** | Una fila por segundo con lo que pasaba: cuánto se atrasó la otra pestaña, cuánto procesador gastó cada proceso de Chrome y qué decía el precalentado. Como un registrador de varios canales: se ve qué canal sube cuando hay una traba. |
+| **Muestreador (perfil por muestras)** | Un programa que mira cada pocos microsegundos dónde va otro programa (en qué función) y lo anota. Con cientos de miles de miradas, la proporción de miradas en cada función es la proporción de tiempo que gasta ahí. Como un osciloscopio con disparo periódico: no ve cada ciclo, pero con muchas muestras la forma de onda es fiel. El nuestro (`herramientas/muestreador/`) congela el hilo un instante para leer su dirección; el de V8 (`node --cpu-prof`) hace lo mismo dentro del motor. |
+| **Tiempo propio de una función** | Lo que se gastó **dentro** de la función misma, sin contar lo que gastaron las funciones que ella llamó. Como la caída de tensión en un tramo de cable, sin la de los tramos que cuelgan de él. Sumado sobre todas las funciones da el total sin contar dos veces. |
+| **Contador de ciclos del hilo** | Windows lleva la cuenta de cuántos ciclos de reloj gastó cada hilo (`QueryThreadCycleTime`). Trampa (§160): de un hilo que **está corriendo** no se actualiza en vivo, sino a saltos; leído con el hilo congelado sí es exacto. Como leer un medidor de energía que solo actualiza la pantalla cada tanto: hay que leerlo cuando se detuvo. |
+| **Mapa de símbolos (`/MAP`)** | Un archivo que escribe el enlazador con la dirección de cada función del programa. Con él, «el programa iba por la dirección 0x14001BA50» se traduce a «iba por func_801A1138». Es la lista de bornes de un tablero: sin ella, un número de borne no dice qué circuito es. |
+| **Binaryen / `wasm-opt`** | El optimizador que emscripten pasa sobre el `.wasm` ya armado. Entre otras cosas mete funciones chicas dentro de quien las llama, **en todo el programa a la vez** (clang solo dentro de cada archivo). Por eso en el perfil del wasm el bucle de espera aparece dentro del planificador del juego (`SelectThread`) y no como función aparte. |
+| **Revisión de límites / páginas de guarda** | Cada lectura de wasm debe caer dentro de su memoria. En un Chrome de 64 bits eso sale gratis: V8 reserva varios GB de direcciones «de guarda» alrededor y deja que el procesador avise si alguien se sale (como un fusible que no gasta nada hasta que salta). Sin ese atajo (p. ej. un Chrome de 32 bits) cada acceso lleva una comparación explícita: medido en §160, **+16 %** de CPU del juego. |
+| **Revisión de pila (stack check)** | Al entrar a cada función, V8 mira si queda pila (para no desbordarla). En §160, apagarla no cambió nada: no pesa. |
+| **Trampolín (de llamada)** | Una función chiquita que arma el traductor solo para saltar a otra (`InvokeDirectCpu<dirección>`, `AbiRawCpuThunk`): acomoda los registros de la Wii y llama. En el nativo clang casi siempre los borra (los mete adentro); en el wasm muchos quedan. Como un borne de paso entre dos cables. |
+| **Cambio de hilo por JSPI** | Cuando un hilo del juego se duerme (`OSSleepThread`) y otro despierta, en el nativo es saltar de una pila a otra (una fibra de Windows: unos pocos ciclos). En wasm es **suspender** el wasm (JSPI): salir a JavaScript, crear una promesa y volver cuando se resuelve. Cada vuelta deja objetos que después junta el recolector de basura. §160: es el ~30 % del impuesto en esta escena. |
+| **Sin tope (banco sin tope)** | El juego normalmente espera el reloj de 60 Hz entre cuadro y cuadro: aunque pudiera más, nunca pasa de 60 (el «tope»). Con `?sinTope=1` (§161, solo para medir) la página le quita esa espera durante la carrera y el juego corre sus cuadros seguidos: la carrera va más rápida que el tiempo real. Como un motor en un dinamómetro sin carga: así se ve hasta dónde llega, no solo que llega a la velocidad pedida. |
+| **Margen (contra 60)** | Cuántas veces entra el trabajo de un cuadro en los 16,7 ms que hay a 60 fps: margen = 16,7 ms ÷ CPU pura por cuadro. ×2 = sobra la mitad; ×0,5 = falta el doble. Es el factor de seguridad de un diseño: un cable que lleva 10 A con capacidad de 24 A tiene ×2,4 de margen. Con tope, los fps no lo muestran (todos los que llegan dicen «60»). |
+| **Lastre por cuadro** | El lastre de §155 hecho dentro del runtime (§162): al empezar cada cuadro del juego (cada retrazado de la Wii) mide cuánto trabajó el anterior, t, y gira (K−1)·t ahí mismo. El de la página giraba en las esperas, y sin tope casi no hay esperas: quedaba corto. Como frenar un motor con un freno en el eje en vez de con un freno que solo actúa cuando el motor está en ralentí. |
+| **Tramo fijo** | Una ventana de la carrera definida por cuadros del juego, no por segundos (§163): del cuadro de lógica 600 al 2400 desde la cuenta, en la misma pista y con la misma semilla. Así dos corridas miden exactamente el mismo pedazo de carrera, como comparar dos motores en el mismo tramo de ruta y no «los últimos 10 minutos» de viajes distintos. |
+| **Saltarse imágenes (frameskip)** | Cuando el juego va atrasado corre más de un cuadro de lógica por cada imagen que dibuja, para no quedar más atrás (§163: este PC sin tope dibuja 0,44 imágenes por cuadro de lógica; la gama baja simulada, 0,14). Como un osciloscopio que, si no le alcanza, muestra una de cada tantas formas de onda pero sigue midiendo todas. |
+| **Redondeo de las marcas de la tarjeta (cuantización)** | Chrome redondea las marcas de tiempo de la tarjeta a 100 µs, para que una página no pueda usarlas como un reloj muy fino. Las pasadas de este juego duran 0,01–0,08 ms, menos que ese redondeo, así que para medirlas hay que apagarlo con una bandera de diagnóstico de Chrome (§164). Es como medir pulsos de 50 µs con un osciloscopio de 100 µs por división: hay que cambiar la escala. |
+| **Guion de botones** | Una lista de qué botones apretar en qué número de cuadro (§165, `MKW_HEADLESS_GUION`). Como el juego sin pantalla avanza cuadro por cuadro igual en Node y en el programa de Windows, el mismo guion los lleva por los mismos menús a la misma carrera. Como una secuencia de un PLC: los mismos pasos en los mismos tiempos dan el mismo resultado. |
+| **Tiempo propio (de un evento de la traza)** | La duración de un evento menos la de los eventos que tiene adentro (§165). Así cada milisegundo del hilo se cuenta una sola vez, en lo más de adentro que lo explica. Como repartir el consumo de un tablero: a cada circuito se le carga lo que mide su propio medidor, sin volver a contar el de los subcircuitos. |
+| **Pares intercalados** | Medir A y enseguida B, otra vez A y B, y comparar cada par por separado (§166). Lo que cambia con la hora (otro programa que entra, el PC que se calienta) les pega a los dos del par casi igual y se cancela en su razón. Como medir una resistencia con un puente de Wheatstone: la temperatura mueve las dos ramas y la comparación queda. |
+| **Intervalo (de confianza)** | El rango donde cae el valor verdadero con 95 % de seguridad, sacado de la dispersión de las medidas y de cuántas son (§166). Baja con la raíz del número de medidas: para la mitad de error, cuatro veces más medidas. Como promediar una señal con ruido en el osciloscopio: más barridos, traza más fina. |
+| **Carga de fondo** | Lo que otros programas del PC hacen mientras se mide (§166: PLECS y otros Chrome). Aunque no le quiten núcleo al juego, le quitan la caché grande que comparten todos los núcleos. Como medir una caída de tensión en una línea que comparte otro consumidor que se prende y apaga. |
+| **Builtins de V8** | Las piezas internas de V8 escritas en su propio lenguaje (§166): convertir números, leer una variable global, cumplir una promesa. `--prof` las nombra; lo que V8 tiene en C++ sale sin nombre en Windows. |
+| **Contadores internos de V8 (RCS)** | Unos contadores de V8 que dicen cuánto tiempo pasa en cada pieza de adentro (§166). Las versiones que se distribuyen de Node y Chrome vienen compiladas **sin** ellos («RCS was disabled at compile-time»): no se pueden usar. |
+| **Ida y vuelta de JSPI** | Una suspensión y su reanudación (§166): el wasm se congela, la promesa se cumple y sigue en una microtarea. Cuesta ~4,8 µs y el perfil la carga a «(program)» sin nombre más fino. El juego hace ~10 por cuadro. |
+| **Paquete de carrera** | Lo que una carrera va a leer del disco (la pista, los 12 karts, las voces, los sonidos de la carrera, el principio de las fanfarrias), pedido de una vez apenas la página sabe la ficha de la carrera (§169), antes de que el juego lo pida de a poco. Como dejar todos los materiales de una obra en el terreno antes de que llegue la cuadrilla. |
+| **Tramo de la tarjeta (por cuadro)** | Lo que tardó la tarjeta de video en un cuadro entero: el último fin menos el primer comienzo de sus pasadas (§173). En una tarjeta de mosaicos las pasadas se pisan y sumarlas da de más; el tramo es el ancho del pulso, no la suma de lo que ve cada sonda. |
+| **Tarjeta de mosaicos (tile-based)** | La forma en que dibujan las tarjetas de los teléfonos (Mali, Adreno): parten la pantalla en baldosas chicas y hacen todas las pasadas de una baldosa antes de pasar a la otra, dentro de una memoria rápida propia. Por eso las marcas de tiempo de cada pasada se pisan (§173). |
+| **Pipeline urgente** | Un pipeline que alguna vez el juego necesitó en una pasada que no se puede saltar (la primera copia de una imagen) antes de que estuviera listo, y hubo que armarlo de golpe, frenando el cuadro (§172). Aurora lo anota y en la próxima visita va primero en la lista de precalentado. |
+| **Huella por archivo** | Desde §174 (D5) el manifiesto (la lista de archivos del disco que baja la página) trae para cada archivo un código corto que cambia solo si cambia ese archivo (los primeros 16 caracteres de su SHA-256). La caché del disco guarda cada pedazo con la huella de su archivo, no con la versión de todo el paquete: si se publica un arreglo que cambia un solo archivo, solo ese se vuelve a bajar. Como marcar cada fusible de un tablero con su propia fecha de cambio en vez de poner una sola fecha al tablero entero: al cambiar uno, no hace falta revisar los demás. `?versionArchivo=0` = una sola versión como antes. |
+| **Barrido (de la caché)** | La limpieza que hace la página 20 s después de abrir, solo si cambió la versión del paquete: recorre la caché del disco y borra los pedazos cuya huella ya no es la de su archivo (quedaron huérfanos, nadie los va a pedir). De a 200, en pausa durante la carrera. Como sacar del pañol los repuestos de un modelo que ya no se fabrica. |
+| **Cabeza de un video** | Los primeros bytes de un video THP de los menús (§174, D8: 2 MB ≈ 0,3 s). La página los baja de fondo apenas el juego empieza el primer video, para que cada pantalla del menú arranque su video sin esperar a la red; el resto lo trae la lectura seguida. Como cargar el condensador de entrada antes de conectar la carga. `?videosCabeza=0` = sin esto. |
+| **Sin copia (decodificar en el lugar)** | El decodificador de THP (`thp_nativo.cpp`) antes copiaba cada cuadro del video de la memoria del juego a un búfer propio y lo decodificaba ahí. Desde §174 (D8), si el cuadro está entero dentro de una página de memoria que se puede leer de corrido, lo decodifica donde está: una copia de ~200 KB menos por cuadro. Como medir la tensión directamente en el borne en vez de pasarla antes por un transformador de aislación. `?thpDirecto=0` = con copia. |
+| **Etiqueta de pipeline** | Desde §174 (C2) cada pipeline de la lista de aurora dice dónde se usó: en los menús (0), en dos pistas o más («común», 1), en una sola pista (0x10000 + el número de la pista) o no se sabe (lista vieja). Al arrancar se precalientan los de los menús, los comunes y los urgentes; los de una sola pista, recién cuando se elige esa pista. Así el arranque compila menos, y la pista elegida tiene lo suyo antes de la largada. Como etiquetar los cables de un tablero por circuito: se energiza solo el circuito que se va a usar. `?pipelinesPista=0` = todo al arranque como antes. |
+| **Poda (de la lista de pipelines)** | Aurora cuenta las visitas (cada vez que se abre el juego); un pipeline de una sola pista que no se usó en las últimas 8 visitas sale de la lista que se guarda. La lista no crece sin fin con pistas que ya no se corren. La semilla publicada no se poda. |
+| **Grupo de caché (2 MB)** | Ocho bloques del disco (8 × 256 KB) guardados como una sola entrada en la caché del navegador, con un índice que dice qué grupos están (§171). Menos entradas = menos trabajo de la base de datos de la caché, como juntar cables en un solo mazo con una etiqueta. |
+| **Partida base** | Desde §175 la partida de Retro Rewind que el servidor le da a un navegador nuevo es una copia fija y limpia (`build/web/partida-base`: las 4 licencias vacías, sin fantasmas, el código de comprobación al día), armada por `herramientas/partida-base.mjs`. Antes era la carpeta de `terceros/`, donde también escribían el juego en Node y el programa de Windows de las mediciones: cada perfil nuevo de Chrome recibía una licencia hecha por otra prueba. Como alimentar el banco de pruebas desde una barra propia en vez de la que usa otro equipo. Node y Windows corren cada uno con su copia (`partida-aislada.mjs`). |
+| **Isla (de la sala)** | Cuando las consolas de una carrera dejan de calcular lo mismo (su huella difiere), se agrupan las que siguen iguales entre sí: cada grupo es una isla. Desde §175 sigue la isla más grande (empate: la de la autoridad) y las demás se salen de esa carrera y vuelven en la siguiente; la página lo avisa (📶). Antes decidía la autoridad sola, y si ella era de la isla chica la grande se salía. Como una red eléctrica que se parte: sigue la zona con más generación y las otras se desconectan y se vuelven a sincronizar después. `?islas=0` = la regla de antes. |
+| **Candado de medición** | El archivo `build/medicion.lock`: quien mide en este PC lo crea con su nombre y lo borra al terminar, así dos sesiones nunca miden a la vez (una medición estorba a la otra). Desde §176 todas lo usan con `herramientas/candado.sh`: tomarlo de una vez (si dos llegan juntas gana una sola), soltarlo solo si es tuyo, y pedir un turno corto dejando `build/medicion.hueco`. Como el enclavamiento de un interruptor de transferencia: nunca quedan dos fuentes conectadas a la misma carga. |
+| **Lo aprendido por pista** | Desde §176 (D1), al terminar cada carrera la página anota qué pedazos del disco tuvo que bajar con la carrera andando (los sonidos propios de esa pista, que no se pueden saber antes) y los guarda en el navegador para esa pista. La próxima vez que se corre ahí, van con el paquete de carrera, antes de la largada. Como un técnico que anota qué repuesto le faltó en cada visita a un cliente y la próxima vez lo lleva en la camioneta. `?aprender=0` = sin esto. |
+| **Falta contra pedido a la red** | Dos cosas que parecían lo mismo y no lo son (§176.3). Una *falta* (`mkwFaltas`) es un pedazo del disco que el juego leyó y no estaba en la memoria de la página: puede venir de la red **o** de la caché del navegador (el disco del PC). Un *pedido a la red* (`mkwRedEnCarrera`) es lo que de verdad salió por internet. Como en un tablero: la corriente que pasa por el interruptor general de la casa contra la que entra por el medidor de la calle (con una batería de respaldo en medio, no son iguales). |
+| **Guardar o descartar (Store/Discard) y cargar o limpiar (Load/Clear)** | Lo que cada pasada de dibujo le dice a la tarjeta sobre una imagen (el color o la profundidad, «búfer Z»): al empezar, traer lo que había (*Load*) o empezar en blanco (*Clear*); al terminar, guardarla en la memoria principal (*Store*) o tirarla (*Discard*). En una tarjeta por baldosas cada Load y cada Store es un viaje de toda la imagen entre la memoria del chip y la principal; G2 (§177.2) trata de ahorrar los que nadie necesita. Como un mesón de taller chico: lo que no se va a volver a usar, no se lleva a la bodega. |
+| **Traba viva** | Un jugador de la sala cuyo juego se quedó quieto (por ejemplo, esperando un pedazo del disco) pero cuya pestaña sigue despierta y contesta. Antes solo se pausaba al que dejaba de oírse; al «vivo» se lo esperaba entero (§177.5). Ahora su propio ping avisa «no espero a nadie» y, si sus botones no avanzan, se lo pausa igual. Como un motor que sigue con la luz de encendido prendida pero el eje no gira: hay que mirar las vueltas del eje, no la luz. |
+| **Árbitro (lockstep)** | Un modo de la sala (`?arbitro=1`, §191) en que una sola consola, la autoridad, escribe en su paquete los botones de **todos** en cada cuadro: los que le llegaron a tiempo y, si no, uno inventado. Las demás esperan solo el paquete de ella, no el de cada uno. Así la traba de un jugador no frena a nadie: la autoridad sigue y él se pone al día. Como un tablero con un solo reloj maestro: cada equipo manda su lectura al maestro, y todos toman la hora del maestro, no la del vecino. |
+| **Suplente** | Con el árbitro, la consola que toma el papel si la autoridad se calla (la primera de la sala que sigue). Recibe los botones de todos y escribe su propio registro «de reserva», que no usa nadie mientras la autoridad responde. Si la autoridad cae, desde ese cuadro manda el suplente y sus cuadros ya traen lo de cada uno. Como el generador de respaldo que gira en vacío sincronizado con la red: cuando se va la red, toma la carga sin un corte. |
+| **Saltarse el dibujo** | (§192, R2) Correr un cuadro entero del juego —la física, la IA, los objetos, la huella de la sala— pero sin armar el dibujo 3D de ese cuadro ni mandarlo a la tarjeta de video. La lógica no se entera: el juego sigue igual, solo no se ve ese cuadro. Como un osciloscopio que muestrea la señal en cada ciclo pero refresca la pantalla uno de cada dos: lo medido es lo mismo, se dibuja menos. |
+| **Pestaña oculta** | Una pestaña que no se ve (minimizada o detrás de otra). El navegador deja de llamar al refresco de pantalla y la página deja de leer las teclas: el juego se quedaba con lo último (un acelerador apretado para siempre). §177.6: al segundo, se le manda el mando suelto. Como soltar el pedal por seguridad cuando el operador deja la cabina (el «hombre muerto» de un tren). |
+| **Sala de control (en una prueba)** | Una segunda sala de mentira que corre al mismo tiempo y en la misma página que la que se prueba, pero sin lo que se quiere estudiar (por ejemplo, sin la traba). Sufre la misma carga del PC: si las dos cambian igual, fue la carga; si solo cambia la probada, fue lo estudiado. Como medir con un instrumento patrón conectado al mismo circuito. |
+| **Registros no volátiles (r14–r31) y la EABI** | La EABI es la regla de conexión entre funciones de la Wii (§178). Una parte dice que los registros r14 a r31 son «no volátiles»: la función llamada puede usarlos, pero tiene que devolverlos como los recibió (los guarda en su pila al entrar y los repone al salir). Es como un instrumento prestado que se devuelve calibrado igual que llegó: quien lo prestó no tiene que volver a calibrarlo. El traductor igual los relee después de cada llamada que no conoce por dentro, por si alguien no cumple. |
+| **Continuación (de un gancho de RR)** | Retro Rewind reemplaza un pedazo de una función del juego con su código y después salta de vuelta a mitad de la función original para que corra el resto. Ese «resto» traducido es `rr_continue_<dirección>`. Como termina con el final de la función original, repone r14–r31 de la pila de *esa* función, no de quien la llamó: rompe la regla a propósito (§178). |
+| **Vigía de registros (M8)** | Un programa de prueba (`MKW_M8=vigia`, solo en la copia `terceros/Wiicompiled-motor-m8`) que después de cada llamada compara r14–r31 con lo que quedó en la memoria y anota qué función los cambió. Es una punta de osciloscopio en cada salida: en una corrida dice quién rompe la regla, sin adivinar (§178). |
+| **Rango de accesos (del traductor)** | Cuando una función lee o escribe varias veces cerca de una misma dirección base (por ejemplo los campos de un kart: base + 4, base + 8…), el traductor las junta en un «rango» para revisar una sola vez que esa zona es RAM común y después leer directo. En wasm el runtime nunca resolvía el rango y cada acceso iba al camino lento; M1 lo resuelve (§182). |
+| **Función fría (camino lento)** | La parte de un programa para los casos raros (aquí: una página con código, los registros de E/S, un dato que cruza de página). Se deja fuera de línea a propósito para que el camino de todos los días quede corto. El problema de §182 era que en wasm los accesos de todos los días también caían ahí. |
+| **Caché de instrucciones (tamaño del código)** | Además de los datos, el procesador guarda en una memoria chica y rápida las **instrucciones** que está ejecutando. Si un arreglo se copia «en línea» en miles de lugares (glosario: En línea), el programa crece y esas copias se pisan unas a otras en esa memoria: cada una cuesta poco, pero el programa entero corre más lento. Como un tablero con más cables de los que entran en la canaleta: cada cable anda, pero el armado se vuelve más lento. Por eso un arreglo más rápido «solo» en un banco puede perder en el juego (§184). |
+| **Vivacidad de las banderas (campos del CR)** | El registro de condiciones del procesador (CR) tiene 8 campos donde quedan los resultados de las comparaciones. Un campo está «vivo» en un punto del programa si alguien lo va a leer después sin haberlo pisado antes; si está muerto, guardarlo es trabajo perdido. El análisis de vivacidad recorre cada función de atrás para adelante anotando qué se lee. Los campos **volátiles** (cr0, cr1, cr5–cr7) son los que, por la regla de la Wii, cualquier función puede pisar. Como saber qué señales del tablero mira de verdad algún aparato aguas abajo antes de que otra las reemplace (§193). |
+| **Worker (de la página)** | Un segundo hilo de JavaScript que la página arranca para sí (`new Worker(…)`): corre en otro núcleo, a la par de la página, y no tiene pantalla ni DOM (ni botones, ni `document`). Se hablan solo con mensajes (`postMessage`). No confundir con el Worker de Cloudflare (un programa en los servidores). Como un segundo operario en otra máquina: trabaja solo y se comunican por un tubo neumático (§186). |
+| **OffscreenCanvas (lienzo fuera de pantalla)** | Un lienzo que se puede pasar a un Worker: la página le «entrega» su `<canvas>` (`transferControlToOffscreen`) y desde ahí lo dibuja el Worker; el navegador lo muestra igual en la página. Es lo que deja que el juego dibuje con WebGPU sin usar el hilo de la página (§186). |
+| **DOM de mentira (shim)** | Lo justo de `document`/`window` para que el programa del juego (hecho para una página) no se caiga dentro de un Worker: el lienzo se busca, se mide y «tiene estilo», pero no hay pantalla de verdad detrás (`trabajador-dom.mjs`). Como una carga ficticia en los bornes: el equipo cree que tiene pantalla conectada (§186). |
+| **Transferir (un búfer)** | Mandar un ArrayBuffer por `postMessage` pasándole la propiedad en vez de copiarlo: llega entero al otro hilo en microsegundos y el que lo mandó se queda con uno vacío (largo 0). Como pasar la bandeja entera de mano en mano en vez de copiar su contenido (§188). |
+| **MessagePort (cable de mensajes)** | Un extremo de un canal de mensajes (`MessageChannel` tiene dos). Se puede regalar a otro hilo: así el Worker del juego le habla directo al AudioWorklet del sonido sin pasar por la página (§186). |
+| **Document-Isolation-Policy (DIP)** | Una cabecera nueva de Chrome (137 en el computador) que aísla UNA página —también dentro de un marco— en su propio proceso, con memoria compartida, sin que la página de afuera cambie. Lo de antes (COOP/COEP) solo funciona si la página es la de arriba: el sitio entero habría tenido que cambiar y se rompía el inicio de sesión de Firebase. Como pasar un circuito a su propio tablero con su interruptor general (§187). |
+| **Service worker** | Un programita que el sitio instala en el navegador y que se pone entre la página y la red: puede contestar él mismo lo que la página pide, con las cabeceras que quiera. Así se le pone Document-Isolation-Policy al marco del juego aunque GitHub Pages no deje poner cabeceras (§187). |
+| **Esqueleto del cuadro** | Lo que cuesta cada imagen aunque se escondan todos los modelos: lo 2D, las copias de imagen, el posproceso y el trabajo fijo de aurora y del código de dibujo del juego. En la gama baja son ~9 de ~10 ms de dibujo (§222). Como el consumo en vacío de un transformador: está aunque no haya carga conectada (§224). |
+| **Render bundle (paquete de órdenes grabado)** | Un paquete de órdenes de dibujo de WebGPU que se graba una vez y después se repite con una sola llamada (`executeBundles`) en vez de volver a mandar cada orden. No puede llevar ni el recuadro de la vista (viewport), ni la tijera, ni el color de mezcla: esas cortan el paquete. Como grabar una secuencia en un PLC en vez de apretar cada botón a mano en cada ciclo (§224). |
+| **Censo de llamadas (de WebGPU)** | El instrumento de §224 (`censo-gpu.mjs`, `?censoGpu=1`): cuenta cada llamada que aurora le hace a WebGPU en cada imagen, mira cuántas son iguales a las del cuadro anterior y vuelve a codificar una imagen grabada para medir cuánto cuestan. Como un analizador de redes puesto en cada circuito del tablero antes de recablear. |
+| **Ensayo (repetir una imagen grabada)** | Volver a codificar muchas veces las órdenes de una imagen ya grabada, sin mandarlas a la tarjeta, para medir el costo puro de las llamadas: el tiempo total ÷ las veces. Así un reloj de 0,1 ms de resolución mide costos de microsegundos (§224). |
+| **call_indirect y call_ref** | Dos maneras de saltar a una función por su puntero en wasm. `call_indirect` busca el número de la función en la tabla y revisa su forma antes de saltar (lo que hace hoy el código traducido). `call_ref` salta a una «referencia» de función que ya trae su forma. Como un conmutador que lee el número de salida cada vez, contra un cable ya conectado a la salida (§226). |
+| **Inlining especulativo** | Cuando V8 ve que un salto por puntero casi siempre va a la misma función, la copia adentro de la que llama (con un control por si un día va a otra). Ahorra el salto entero. Como soldar directo el cable de la salida que más se usa y dejar el conmutador solo de respaldo (§226). |
+| **Document-Isolation-Policy por service worker** | El marco del juego pedido con `?aislar=sw`: el service worker de la carpeta del juego (`sw-aislar.js`) le agrega la cabecera Document-Isolation-Policy al contestar la página, y la página recarga una vez para quedar aislada. Solo ese marco pasa a su propio proceso con memoria compartida; Juegos sigue igual (§225). |
+| **Atomics / Atomics.wait** | Las operaciones para que dos hilos que miran la misma memoria se avisen sin pisarse: escribir «de una», y `Atomics.wait` = dormir hasta que el otro escriba y avise (`Atomics.notify`). Solo hay con memoria compartida, y `wait` solo fuera del hilo de la página. Como una línea de habilitación entre dos tableros (§187). |
+| **Cinta de cajas (plan B de los hilos)** | Sin memoria compartida, dos hilos se pasan unas pocas cajas (búferes) transferidas: uno llena una (los comandos de un cuadro) y la manda, el otro la vacía y la devuelve. Si no hay caja libre, el primero espera (contrapresión, como un búfer lleno que frena a la fuente). `cajas.mjs` (§188). |
+| **Puerta A** | La decisión del plan de rendimiento después de la prueba de una semana (paso 8): si el juego anda en un Worker (y con memoria compartida) sin perder velocidad, la arquitectura nueva se adopta y lo demás (los hilos, paso 9) se construye encima; si no, se sigue con la de hoy (§189). |
+| **Arnés (de una prueba)** | El mismo código que arranca y mide el juego, usado igual en los dos lugares que se comparan (en un Worker y en la página), para que lo único distinto sea dónde corre (`trabajador-juego.mjs`). Como probar el mismo motor en dos bancos con el mismo tacómetro (§186). |
+| **Ahorro de energía (de Chrome)** | Un modo de Chrome (Configuración → Rendimiento, o solo con batería baja) que, para gastar menos, refresca la página a 30 veces por segundo en vez de 60. La página no puede preguntarle a Chrome si está prendido: se reconoce porque los refrescos llegan cada ~33 ms mientras el juego trabaja poco. Como saber que una fuente entró en modo ahorro porque la frecuencia de su ondulación bajó a la mitad sin que cambiara la carga (§190, E1). |
+| **Estrangulamiento térmico** | Cuando un teléfono se calienta, el procesador baja solo su frecuencia de reloj para no pasarse de temperatura: el mismo trabajo tarda más. Se ve como «ms por cuadro» que suben minuto a minuto sin que el juego cambie. Como un motor con protección térmica que baja la potencia cuando el bobinado se calienta (§190, E2). |
+| **Textura comprimida (CMPR, BC1)** | Una imagen guardada en bloques de 4×4 píxeles, cada bloque con dos colores de punta (16 bits cada uno) y, para cada píxel, un índice de 2 bits que elige una de las puntas o una mezcla entre ellas: 8 bytes por bloque en vez de 64 (8 veces menos). La Wii lo llama **CMPR** y las tarjetas de PC **BC1** (o DXT1): son casi el mismo formato, con los bloques en otro orden, los bytes al revés y una mezcla un poco distinta. La tarjeta la lee comprimida, sin agrandarla. Como mandar por un cable las dos tensiones extremas y, por cada muestra, solo «cuál de las 4»: mucho menos ancho de banda (§190, G6). |
+| **PSNR (relación señal/ruido de pico)** | Una medida de cuánto se parece una imagen a otra: compara la diferencia promedio con el valor más alto posible (255) y la da en decibeles, como la relación señal/ruido de un amplificador. Más dB = más parecidas; desde ~40 dB la diferencia no se ve a simple vista, y dos imágenes idénticas dan infinito (§190). |
+| **Ubershader** | Un solo programa de la tarjeta de video que sabe dibujar cualquier material, leyendo la receta como datos en vez de tenerla compilada adentro. Sirve para dibujar mientras la receta especializada (el pipeline) todavía se compila. Es más lento por dibujo y mucho trabajo de hacer; en MKW se midió que no conviene (§190, G4). Como un instrumento universal que mide de todo pero peor, mientras llega el especializado. |
+| **Piloto (del plan v4) / umbral de éxito y de corte** | Una prueba chica y barata, hecha antes de una obra grande, para saber si la obra va a rendir. Cada piloto tiene dos números fijados de antemano: si pasa el de éxito, la obra entra en su etapa; si queda bajo el de corte, se «mata» con sus números y no se gasta más. Como el prototipo en protoboard antes de mandar a fabricar el PCB. |
+| **Memo de las llamadas indirectas** | Cuando el juego salta a una función por un puntero (en la Wii, `bctrl`), el runtime tiene que buscar qué función traducida corresponde a esa dirección en una lista ordenada (lento). El memo es una tabla chica de 512 casilleros que recuerda las últimas respuestas: si la dirección ya está en su casillero, se ahorra la búsqueda. El casillero sale de un *hash* de la dirección; si dos direcciones muy usadas caen en el mismo casillero, se pisan y se pierde la ventaja. Como una caché de mapeo directo en un microprocesador. |
+| **Hash de Fibonacci (bits altos)** | Una forma de repartir números en casilleros: se multiplica por 2 654 435 761 (≈ 2³² ÷ el número de oro) y se toman los bits ALTOS del producto, que dependen de todos los bits del número. Los bits bajos del producto dependen solo de los bits bajos de la dirección, así que tomar esos (lo que hacíamos) era como no mezclar nada. |
+| **PGO (compilar guiado por un perfil)** | Compilar dos veces: la primera, el programa cuenta cuántas veces pasa por cada rama mientras se lo usa (el perfil); la segunda, el compilador usa esos números para poner juntos los caminos que más se usan y alejar los que casi nunca. Como rediseñar un tablero sabiendo qué circuitos se usan todo el día y cuáles una vez al año. |
+| **Sumidero (el dibujo como sumidero)** | Si el dibujo solo LEE el estado de la carrera y nunca escribe algo que la carrera vuelva a leer, el dibujo es un sumidero: la información entra y no sale. Entonces el dibujo se puede correr en otro núcleo con una copia del estado, sin que la carrera cambie. Como una carga que solo consume de un bus y nunca le devuelve corriente. |
+| **Isla decompilada** | Una función del juego (o un grupo chico de funciones) escrita de nuevo a mano en C++, sabiendo lo que hace, en vez de usar la traducción instrucción por instrucción. Puede leer los datos ya dados vuelta (sin cambiar el orden de los bytes en cada lectura) y tener sus variables en registros. Tiene que dar exactamente los mismos resultados: un comprobador corre las dos y las compara en cada llamada. |
+| **Sombra (de la isla)** | Una copia de los datos de la pista (la colisión: triángulos, normales, el árbol) con los bytes ya en el orden del PC, armada una vez al cargar. La isla lee la sombra en vez de la memoria de la Wii. |
+| **Piscina de texturas de copia** | Las imágenes de trabajo donde el juego copia lo que dibujó (para el reflejo, el brillo, el minimapa). aurora guarda algunas de repuesto para no crearlas cada vez; si nunca se sueltan, ocupan memoria de la tarjeta para siempre aunque esa escena ya no exista. |
+| **Matrices de los huesos** | Para mover un personaje, cada vértice se multiplica por la matriz de su hueso (brazo, pierna). La tarjeta las lee de un búfer de uniformes con un número que viene del vértice. Algunos controladores (Adreno 6xx/7xx) se equivocan en esa lectura y los personajes salen invisibles. |
+| **Camino de reserva** | Otra forma de hacer lo mismo, preparada y apagada, para prenderla solo donde la forma de siempre falla. Como el circuito de respaldo de un tablero: está cableado y probado, pero el selector queda en la posición normal hasta que haga falta. |
+| **Prueba de control (A contra A)** | Antes de comparar dos cosas, comparar la misma contra sí misma: lo que sale distinto ahí es el ruido propio de la medición (lo que cambia solo), no el cambio. Como medir con las puntas del osciloscopio en corto antes de medir la señal. |
+| **Módulo de sombreador (memoria de sombreadores)** | El programa de la tarjeta ya compilado (el WGSL traducido a su idioma), del que salen las recetas (pipelines). Aurora guarda cada uno para no compilarlo otra vez; esa memoria crecía con cada pista nueva y nunca se vaciaba (§203). |
+| **Época (contador de)** | Un número que se suma cada vez que algo se tira. Quien guardó un atajo anota la época en que lo guardó; si al usarlo la época ya cambió, no confía en el atajo y vuelve a preguntar. Como el número de revisión de un plano: si el que tienes en la mano es de una revisión vieja, no se arma con él. |
+| **Marca de páginas sucias** | La memoria de la Wii se parte en páginas de 4 KiB; cada vez que el juego escribe, el motor pone en 1 un byte de «esta página cambió». Al final del cuadro solo se miran las páginas marcadas y se vuelven a 0. Como un tablero de relés de enclavamiento: cada relé queda caído hasta que alguien lo rearma, y el operador solo revisa los que cayeron. |
+| **Caja (de diferencias)** | Lo que cambió en la memoria en un cuadro, empaquetado como tramos `[dirección][largo][bytes]` seguidos: la carrera la arma, el Worker del dibujo la pega en su copia. Como mandar solo las lecturas de los medidores que se movieron, no la planilla entera. |
+| **Copia sombra** | Una copia de la memoria tal como estaba al armar la caja anterior; para saber qué bytes cambiaron dentro de una página marcada se compara contra ella. Como el valor de referencia de un comparador. |
+| **Contrapresión** | Cuando el que recibe va más lento que el que manda, el que manda espera a que se libere una caja en vez de perderla. Como un caño con válvula de retención: si aguas abajo se llena, sube la presión y frena el caudal de arriba. |
+| **Dibujar siempre (`?dibujarSiempre=1`)** | Apaga la compensación de lag de RR fuera de la sala: el juego dibuja todos los cuadros aunque vaya atrasado, como en la sala (§62). Solo para medir: sin esto, en la gama baja el juego dibuja 3–4 imágenes por segundo y no se ve cuánto cuesta dibujar. |
+| **Pila y ficha de un hilo** | Cada hilo de la Wii tiene su ficha (OSThread: registros guardados, estado, prioridad) y su pila (la memoria donde cada función guarda sus registros y vuelve). Dos copias del juego en puntos distintos tienen pilas distintas: si una recibe la pila de la otra, al volver de una función recupera registros ajenos y cae. Como conectar dos tableros por las bobinas de enclavamiento: cada uno tiene que conservar su propio estado de relés. |
+| **Alarma del sistema (OSAlarm)** | Un temporizador del sistema de la Wii: «a tal hora, llama a esta función». Las alarmas pendientes forman una cadena en la memoria del juego (cada una apunta a la siguiente). Como una lista de relés de tiempo encadenados: si alguien recablea un eslabón, el recorrido sigue a un borne equivocado. |
+| **Fila de imágenes (XFB)** | Los búferes donde el juego deja cada imagen terminada para la pantalla: uno se llena, otro se muestra y los demás esperan libres; el juego lleva la cuenta de cuál está ocupado. Como dos o tres tableros de salida que se turnan, con un registro de cuál está conectado. |
+| **Depurador (CDP)** | La herramienta de Chrome que permite detener un programa desde afuera y mirar en qué función está («la pila»), o hacerle una pregunta. Como enganchar un osciloscopio a un circuito sin desarmarlo. Si el programa está atascado en una espera del propio navegador, ni siquiera se deja detener. |
+| **Efectos (gestor de)** | La parte del juego que calcula las partículas (polvo, chispas del derrape, humo, agua) cada cuadro: `Effects::Mgr::Update`. Solo se ve: la carrera no lo lee (W11 lo probó con las huellas). |
+| **Dibujar a 30 y mostrar 60 (N8)** | En la carrera el juego calcula los 60 cuadros por segundo de siempre pero arma la imagen de uno de cada dos (`n8_nativo.cpp` se salta `EGG::SceneManager::draw` y la copia a la pantalla en el otro); el motor inventa la imagen del medio. Como un motor de 4 tiempos que hace fuerza en una de cada dos vueltas y el volante de inercia llena el hueco. |
+| **Cuadro saltado** | Un cuadro de lógica en que el juego no dibuja: la carrera avanza igual (la física, la IA, los objetos), solo no se arma la imagen. Las huellas de la sala y los fantasmas salen iguales a los de siempre. |
+| **La real guardada (N8)** | Con `?n8=2` aurora no muestra en el momento la última imagen de verdad de cada cuadro dibujado: la guarda y la muestra a la hora del cuadro saltado, así la imagen del medio queda entre dos reales. Cuesta un cuadro de demora (~16,7 ms): es una línea de retardo de una muestra. |
+| **La prueba de la vigía (N8 automático)** | Prendido N8 por sí solo, la vigía mira 10 s: si la lógica por segundo no subió un 8 % sobre lo de antes, lo apaga y no lo vuelve a prender en ese aparato (`mkw.n8.auto = no`). Como un arrancador que prueba si el motor arrancó y, si no, corta en vez de seguir forzándolo. |
+| **Automático por omisión (N8)** | Desde el 2026-11-04 (§223) «Dibujar a 30 y mostrar 60» viene en Automático: no quiere decir prendido, quiere decir que la vigía decide. En un PC que llega a 60 queda apagado; solo un «No» elegido a mano (un 0 guardado) lo apaga para siempre. Como un termostato puesto en Automático: la calefacción solo arranca si hace frío. |
+| **Techo por grupo (E4)** | Lo MÁS que se podría ganar dibujando un grupo de cosas (los karts, los objetos, los efectos, la pista) con un dibujo propio: se mide escondiendo ese grupo solo mientras se dibuja, así cuesta cero; lo que suben los cuadros por segundo es el techo. Como medir cuánto consume una carga desenchufándola: lo que baja la corriente total es lo más que se ahorra cambiándola por una más eficiente. |
+| **Opción de dibujo (ModelDirector +0x24)** | Cada modelo 3D del juego (un kart, una caja, un árbol) tiene un número de 0 a 23 que dice cómo se dibuja (luces, transparencia, sombra) y en qué grupo de la escena va. Sirve para elegir «todos los karts» (opción 10) o «todos los objetos» sin conocer cada modelo. Como el código de colores de los cables: por el color se sabe a qué circuito va sin seguirlo. |
+| **ScnGroup (grupo de la escena)** | La escena de la carrera tiene 3 grupos de modelos; cada cuadro el juego recorre los grupos y manda a dibujar lo que hay adentro. Sacar un modelo de su grupo (`ToggleVisible`) es como el juego lo esconde sin borrarlo. Como sacar un fusible de un tablero: el circuito sigue ahí, solo no recibe corriente. |
+| **El esqueleto del cuadro** | Lo que el dibujo hace cada cuadro aunque no haya ningún modelo: preparar las pasadas, las copias de la imagen (reflejos, brillo, minimapa), lo 2D (el velocímetro, la posición, los nombres) y el trabajo fijo de aurora para armar y mandar la imagen. E4 midió que ahí está casi todo el costo del dibujo. Como el consumo en vacío de un transformador: está aunque no se le conecte ninguna carga. |
+| **Resta XOR (contra lo que el otro ya tiene)** | Antes de mandar un tramo de la caja, se lo combina bit a bit (XOR) con lo que el otro lado ya tiene en ese lugar: lo que no cambió queda en 0 y el otro lado deshace la cuenta con el mismo XOR. Como mandar solo la variación de una lectura y no la lectura entera. En W24 (§227) achicó la caja apenas ×1,1–1,2: los números del juego (posiciones, matrices) cambian en casi todos sus bits aunque cambien poco. |
+| **Código de ceros** | Un compresor propio muy simple: cada corrida de ceros va como «0 + cuántos» y lo demás tal cual. Se arma y se desarma de una pasada, sin tablas. Sirve si lo que se manda es casi todo ceros (§227: no lo era). |
+| **Deflate / CompressionStream** | El compresor de siempre de los zip y del gzip (busca lo que se repite y lo codifica corto); el navegador lo trae listo (`CompressionStream('deflate-raw')`) y lo corre en otro hilo. En §227 achicó la caja ×2,4–2,7 a costa de 1,6–2,8 ms por cuadro en el PC. |
+| **Subida (Mbit/s)** | Lo que una conexión puede mandar hacia afuera por segundo; en las casas suele ser mucho menos que la bajada (10–20 Mbit/s es común). Para W24 el PC tendría que subir una caja por cuadro, 60 por segundo, por cada teléfono: es el «caudal» del caño de salida. |
+| **Paquete de mejoras chicas (E4c)** | Varias mejoras que solas dan +1 a +6 %, compiladas juntas en un solo programa y medidas contra la base de las MISMAS fuentes sin ellas: si cada una suma un poco, el total debería asomar por encima del ruido que tapa a cada una. Como medir la caída de tensión de varios contactos en serie cuando el voltímetro no alcanza a ver la de uno solo (§228). |
+| **Interruptor de compilación (`MKW_CHICAS`)** | Una lista de letras que `compilar-web.py` lee al armar el programa y que prende o apaga cada pieza del código (aquí `c2,c3,c4,c7`): el mismo código fuente da programas distintos según el interruptor. Como un puente de soldadura en la placa: el circuito está, pero conecta solo si se pone el puente (§228). |
+| **Espera por reloj y enganche al monitor** | Las dos maneras en que la página hace esperar al juego entre cuadros: sin enganche, el juego espera a una hora (`mkwEsperaReloj`); con el enganche (lo de siempre), espera el próximo refresco de la pantalla (`mkwEsperaHasta`). `?fotoCuadro=N` solo sabe frenar en la primera, por eso la foto igual se corre con `&enganche=0`. Como un circuito que se sincroniza con un oscilador propio o con la red de 50 Hz (§228). |
+| **Codificador de video (H.264, VP8)** | La pieza (casi siempre un circuito de la tarjeta de video) que comprime una seguidilla de imágenes para mandarlas por la red: manda una imagen entera de vez en cuando y, entre medio, solo lo que cambió. H.264 y VP8 son dos «idiomas» de compresión; WebRTC elige uno con `setCodecPreferences`. Como un modulador: convierte la señal grande en una que cabe por el canal (§229). |
+| **QP (paso de cuantización)** | Lo grueso que el codificador redondea cada bloque de la imagen para que quepa en el ancho de banda. Más alto = menos bits y más borroso (en H.264 de 0 a 51: 20–30 se ve bien, de 36 para arriba se ven bloques). Como la resolución de un conversor analógico-digital: menos bits por muestra, más ruido de cuantización (§229). |
+| **La marca pintada (demora de punta a punta)** | Para medir cuánto tarda una imagen del juego en verse del otro lado, la página pinta la hora en una tira de 24 cuadritos blancos y negros (un número binario de 24 bits) arriba de cada imagen antes de codificarla, y el receptor la lee al mostrarla. Como medir el retardo de un enlace inyectando un pulso con fecha en la señal y leyéndolo a la salida, en vez de creerle al equipo (§229.1). |
+| **Basura por cuadro / anillo con etiqueta** | Cada objeto o arreglo que el código crea y suelta en cada cuadro queda como «basura» que el recolector tiene que barrer (pausas cortas, Scavenge, y de vez en cuando una larga, Mark-Compact). Un **anillo con etiqueta** es una tabla fija de N casillas que se reusa: el cuadro f va a la casilla f mod N, y la casilla guarda también qué cuadro tiene (la etiqueta) para saber si lo guardado es de ahora o de una vuelta vieja. Como un búfer circular de un osciloscopio: la memoria no crece, se va pisando lo más viejo (§230, R4). |
+| **La IA de las CPU (el cerebro de cada kart)** | El código del juego que maneja a cada CPU: en cada cuadro elige la ruta, cuánto girar, cuándo derrapar y soltar el miniturbo, qué objeto usar y cuánto acelerar, y deja escrita la orden; la física del kart la lee como si fueran los botones de un mando. Es una **máquina de estados** (ver abajo). |
+| **Máquina de estados** | Un programa que en cada momento está en UN estado (por ejemplo «sigo la ruta», «derrapo», «me recupero de un golpe») y en cada cuadro decide si se queda o pasa a otro, con una función de entrada, una de cada cuadro y una de salida por estado. Como un circuito secuencial (flip-flops + lógica que calcula el estado siguiente) que avanza con cada flanco del reloj. |
+| **Retenedor de orden cero (cada N cuadros)** | Tomar una muestra cada N tics y mantenerla fija hasta la siguiente (la escalera de un conversor D/A). En W32: el cerebro de cada CPU piensa uno de cada 2 (o 3) cuadros y en los otros el kart repite la última orden. Es como bajar a la mitad la frecuencia de muestreo de un lazo de control sin volver a ajustar sus ganancias: más retardo de fase, menos margen, el lazo oscila (zigzag, choques). |
+| **Las marcas del estado del kart** | Cinco palabras de 32 bits en el estado de cada kart (KartState), cada bit una cosa que está pasando ahora (derrapando, con turbo, en el aire, tocando el suelo, golpeado…). Contar cuántas veces se prende cada bit y cuánto rato queda prendido es una «huella del manejo»: si la IA maneja distinto, cambian esas cuentas. Como medir en un tablero el ciclo de trabajo y los flancos de cada señal. |
+| **Tropiezo y caída (en la comparación de W32)** | Tropiezo: un tramo de al menos 1 s en que un kart avanza a menos del 40 % de su ritmo normal (choque, golpe de un objeto, quedarse pegado a una pared). Caída: el avance va hacia atrás (Lakitu lo devuelve a la pista porque se cayó). |
+| **Lista de dibujo (display list)** | Un trozo de memoria que el juego arma una vez con las órdenes de la tarjeta de la Wii para dibujar un objeto o preparar su material (los registros de color, de texturas, los vértices) y después «llama» con una sola orden cada vez que lo dibuja. aurora no tiene la tarjeta de la Wii: cada vez que el juego llama una lista, la lee orden por orden y la traduce a WebGPU. Como una subrutina grabada en un PLC que el programa principal llama en cada ciclo (§259). |
+| **Caché de la traducción (W31)** | Guardar lo que aurora ya tradujo de una lista y, si la próxima vez la lista y todo lo que la afecta son iguales, repetir lo guardado en vez de traducir de nuevo. Para saber si «es igual» hay que calcular una huella de la lista y del estado cada vez: si calcular la huella cuesta tanto como traducir, no se gana nada. Como guardar el resultado de una medición que cuesta: solo conviene si verificar que nada cambió es más barato que medir de nuevo (§259). |
+| **Lista repetida / objeto quieto** | En la medición de W31: una lista es *repetida* si sus bytes son los mismos que la última vez que el juego la llamó en esa dirección; es de un *objeto quieto* si además las matrices con que se dibuja (dónde está y hacia dónde mira, y la cámara) son las mismas: el objeto y la cámara no se movieron. En la carrera la cámara se mueve casi siempre, así que casi nada es «quieto» aunque la pista no se mueva (§259). |
+| **Dibujo en dos pasos (sombra con plantilla)** | Las sombras de los karts y de las cajas se dibujan en dos pasos: primero se marca la forma redonda (sin pintar nada visible) y después se oscurece solo donde quedó marcado. Si se salta el primero, el segundo oscurece el rectángulo entero: sale una sombra cuadrada. Por eso una caché no puede mirar cada lista sola: hay dibujos que dependen del anterior. Como un relé de enclavamiento: el segundo contacto solo debe cerrar si el primero cerró (§259). |
+| **Textura pedida (acquire)** | El momento en que aurora le pide al navegador la hoja donde va a pintar la imagen siguiente (`getCurrentTexture`). La imagen se ve en la primera actualización de pantalla después de ese pedido. Por eso la página cuenta el compás desde ahí y no desde que el juego terminó el cuadro (§260). |
+| **Histéresis del compás (la zona del borde)** | Si una imagen llega justo antes del refresco que le toca (a menos de medio refresco), a veces el navegador la alcanza y a veces no: dura 3 o 5 refrescos en vez de 4. La página no intenta alcanzarlo: espera a propósito al refresco siguiente y queda lejos del borde. Como la banda de histéresis de un comparador Schmitt, que no deja que la salida oscile cuando la señal anda justo en el umbral (§260). |
 
 ## 2026-10-16 · Día 1
 
@@ -10628,3 +11091,9691 @@ usted», con una lista nueva del sitio, **`SALAS_EN_OBRA`** (`colabtex/src/juego
 Pruebas: sitio `mkw.test.cjs` 25/25 (nuevo §116) y `npm run test:juegos` entero; la tarjeta y la ficha dibujadas con
 el `salon.js` de verdad y las hojas de `juegos.html`, en claro y oscuro y con una tarjeta angosta (el cartel no tapa
 nada; la ficha no ofrece abrir sala y su botón va a `#solo/mkw`).
+
+## 2026-10-27 · §117 El precalentado de pipelines, siempre con tope (C1 del plan de rendimiento)
+
+**Qué pasaba.** Al abrir el juego (1.ª visita, y en toda sala), aurora pedía los ~700 pipelines de la lista de golpe:
+de a 8 por cuadro y **sin límite de cuántos podían estar compilándose a la vez**. Chrome los compila en su **proceso de
+GPU**, que es uno solo para todas las pestañas y ventanas (y también dibuja la interfaz de Chrome). Es como arrancar
+700 motores a la vez en una planta: la corriente de arranque tumba el tablero entero, no solo la máquina que arrancó.
+Por eso, al cargar, se trababan el PC y las demás pestañas. El modo con tope ya existía en aurora (§76, «tarde»: 2 por
+cuadro, como mucho 4 compilándose), pero solo lo usaba quien volvía a jugar solo (`quiereInicio` exige que no haya
+`?modo`): ni la 1.ª visita ni la sala.
+
+**Qué se hizo** (solo la página: sin recompilar el `.wasm` ni subir nada a R2):
+
+- `web/navegador/mkw.mjs`: siempre `MKW_PRECALENTAR=tarde:2:T`, con **T = max(2, núcleos ÷ 4)**
+  (`navigator.hardwareConcurrency`: 4 en esta PC de 16 hilos, 2 en un teléfono de 8 núcleos). El modo «tarde» de aurora
+  deja la lista esperando hasta que la página dice «ya»; aquí la página lo dice apenas arranca `main()`
+  (`_mkw_web_pipelines_precalentar()`; si aurora todavía no leyó las listas, el aviso queda anotado y los encola al final
+  de su primer cuadro). Lo de esperar a la primera pantalla sigue solo para quien vuelve (§76). Lo que el juego necesita
+  para dibujar **nunca espera el tope**: lo pide en el momento (`web_crear` de `parches/aurora-web.diff`); el tope solo
+  frena al precalentado (`build_synchronous_pipelines_for_frame`: si hay T en camino, sigue en el cuadro siguiente).
+- Bandera de escape: **`?precalentarTope=0`** = sin tope (lo de antes); `?precalentarTope=N` = N compilándose como mucho
+  (para medir). `window.mkwEstado.precalentado` dice qué se usó.
+- `web/navegador/preparacion.mjs` (la cortina de la sala, §99): con tope ya no se espera a que lleguen **todos**: basta
+  la primera mitad de la lista (`PARTE_CON_TOPE = 0,5`; la lista va ordenada por el cuadro en que se usó cada uno, así
+  que primero vienen el título y los menús) más un segundo de calma. El resto sigue llegando de a poco mientras se
+  elige copa y personaje (45–90 s). La barra avanza sobre esa mitad. Lee el tope de la línea de aurora
+  «con N compilándose como mucho»; con 0 se espera todo, como antes.
+- Sin nada que precalentar (sin listas, o todas de otra versión del programa) aurora no escribe «precalentando N»; antes
+  la sala esperaba entonces el tope de 45 s. Ahora, si a los 30 cuadros no lo escribió, la sala deja de esperarlos.
+- `herramientas/medir-sitio.mjs` mide también **la carga** (del primer cuadro a la carrera): cuadros de más de 50 y
+  100 ms, tareas largas y lo que dice aurora cada segundo (pedidos por segundo, en camino, llegada media, dibujos
+  saltados).
+- `web/navegador/prueba-musica.mjs`: su «camino viejo» ahora lleva `&precalentarTope=0` (si no, el viejo también
+  tenía tope y la comparación no medía nada: dio ✗ «nuevo 3,5 s contra viejo 3,4 s»).
+
+**Medido** (`node herramientas/medir-sitio.mjs --perfil pc --etiqueta c1-antes|c1-despues`: esta PC, perfil de Chrome
+nuevo = 1.ª visita sin la caché de shaders, el sitio local con 50 ms de latencia, 20 s de carrera):
+
+| | antes (sin tope) | después (tope 4) |
+|---|---|---|
+| pipelines pedidos en un segundo, como mucho | 491 | 89 |
+| compilándose a la vez, como mucho | 465 | **4** |
+| llegada media más lenta (pedir → listo) | 2.474 ms | **101 ms** |
+| todos los de la lista pedidos a los | 1,7 s | 12,4 s |
+| dibujos saltados (pipeline que faltaba) | 84 | 45 |
+| carga: cuadros de más de 50 ms / de más de 100 ms | 43 / 12 | 29 / 9 |
+| carga: el peor cuadro | 594 ms | 541 ms |
+| carga: tareas largas (cuántas, suma, la peor) | 16, 2.932 ms, 560 ms | 12, 1.704 ms, 539 ms |
+| carrera: fps, cuadros > 16,7 ms, tirones en pantalla, peor imagen | 59,3, 7, 7, 258 ms | **60,0, 2, 0, 25 ms** |
+| carrera: CPU por cuadro p99 / máx | 12,9 / 146 ms | 10,7 / 19 ms |
+
+Qué significa: el proceso de GPU ya no recibe una avalancha (de 465 a 4 a la vez) y cada pipeline tarda 0,1 s en vez
+de 2,5 s, porque no hace fila. El precalentado dura más (12 s en vez de 1,7 s para pedirlos todos), pero corre de
+fondo sin trabar. Lo que **no** mejoró del todo: siguen 9 cuadros de más de 100 ms y una tarea larga de ~540 ms en la
+carga; esa no es de los pipelines (está en ambas medidas, casi igual): es otra cosa del arranque (el código del
+programa, el disco), que son C4/C6/C8 del plan. Una sola medida por lado: los números de la carrera varían de una
+corrida a otra, pero los del precalentado (en camino, llegada) son el efecto directo y no dejan duda. No se midió el
+latido de una 2.ª pestaña ni la CPU del proceso de GPU (eso es V2 del plan).
+
+`prueba-musica` confirma lo mismo por otro lado: con caché, el camino viejo (sin tope) hacía sonar la música del título
+a los 5,9 s (mediana), y el nuevo a los 3,4 s; y el precalentado con tope sin postergar (el de la sala y la 1.ª
+visita) ya la dejaba sonar a los 3,4 s.
+
+**Pruebas:** banco `preparacion` 20/20 (5 nuevas: el tope leído de la línea, la meta de la mitad, la barra, lista con
+la mitad y la calma, y «0 compilándose» = esperar todo) y `disco` 38/38; `prueba-musica` 11/11; `prueba-navegador
+1800` 22/22; `prueba-sincro --directa` 13/13.
+
+**Trampas:** la línea de aurora dice «precalentando 700 (postergados; …)» aunque ya no se posterga: cambiarla exige
+recompilar; se dejó. Un teléfono con 4 núcleos o menos queda con tope 2 (el mínimo).
+
+## 2026-10-27 · §118 Pedir el almacenamiento persistente hasta que lo den (D6 del plan de rendimiento)
+
+**Qué pasaba.** Todo lo que el juego baja (cientos de MB: los pedazos del disco, la semilla de pipelines, el programa)
+y las partidas viven en el mismo **origen** del navegador. Sin **almacenamiento persistente**, si al disco le falta
+espacio Chrome borra orígenes enteros, empezando por el menos usado: el jugador volvería a la «1.ª visita» (todo a
+bajar de nuevo, con los tirones de la primera vez) y, si no tiene la partida en su cuenta, la perdería. La página ya lo
+pedía, pero **una sola vez, al arrancar** (`guardado.pedirPersistencia()` en `mkw.mjs`). Chrome no pregunta nada:
+concede o niega según cuánto se usa el sitio, así que en la primera visita casi siempre dice «no», y nunca se volvía a
+pedir en esa visita.
+
+**Qué se hizo** (solo la página):
+
+- `web/navegador/persistencia.mjs` (nuevo, puro): `crearPersistencia()` con `pedir(motivo)` y `revisar()`.
+  Al arrancar siempre pide; con el motivo `carrera` vuelve a pedir **como mucho una vez cada 5 min** (`ESPACIO_MS`);
+  una vez concedido, ya no pide. Anota en `localStorage` (`mkw.persistencia`) cuántas veces se pidió y en qué intento
+  lo concedió (para saber si insistir sirve). También lee cuánto ocupa el origen (`estimate()`).
+- `web/navegador/mkw.mjs`: una **vigía de la carrera** (cada 200 ms: el Raceinfo existe y su etapa, +0x28, es menor
+  que 4) con una lista `alCambiarCarrera` de quienes quieren saber cuándo empieza y termina una carrera (la usará también
+  D2). Al terminar cada carrera se vuelve a pedir. `window.mkwEstado.enCarrera` dice si hay carrera.
+- El panel «Partida» (debajo de las licencias) dice ahora «guardado protegido: el navegador no lo borra solo · N MB
+  usados» o «guardado sin proteger todavía (…se vuelve a pedir al terminar cada carrera)».
+- Bandera de escape: **`?persistir=0`** = solo el pedido al arrancar, como antes. `window.mkwPersistencia.estado`
+  para mirar.
+
+**Comprobado.** Banco `persistencia` 15/15: un `navigator.storage` de mentira que dice «no» las dos primeras veces y
+«sí» a la tercera; se pide al arrancar, no se repite antes de 5 min, se repite pasados 5 min, se deja de pedir al
+concederse, la cuenta sobrevive a recargar, sin la función o con todo bloqueado no falla, y el texto del panel. En la
+página del banco (servida en 127.0.0.1, un Chrome de Playwright nuevo) el de verdad contestó «no» (lo esperado: un
+perfil sin uso). Con el juego: `prueba-partidas` 6/6 (crear la licencia, recargar y que siga: el guardado no cambió).
+
+**Lo que no se pudo medir aquí:** si Chrome lo concede «después de dos visitas» depende de su puntaje de uso del sitio,
+que en un perfil de Playwright nuevo no crece. Se verá en el sitio real: el informe de rendimiento y
+`mkwPersistencia.estado.concedido` dicen en qué intento lo dio.
+
+## 2026-10-27 · §119 La precarga de la sala sin el bloque de 124 MB (C7 del plan de rendimiento)
+
+**Qué pasaba.** En el vestíbulo de la sala el sitio abre la página escondida con `?precarga=1` (§98): baja lo que el
+juego necesita y lo deja en las cachés del navegador, sin arrancar el juego. Para el programa (`mkw.wasm`) hacía
+`fetch(…).then(x => x.arrayBuffer())`: el navegador lo recibía comprimido (16 MB), lo descomprimía y lo dejaba **entero en
+la memoria de la página como un `ArrayBuffer` de 124 MB que nadie usaba** (solo hacía falta que quedara en la caché
+HTTP). Encima corrían 24 trabajos a la vez, y los bloques del disco quedaban también en la memoria de la página (hasta
+64 MB), aunque aquí nadie los vuelve a leer. Todo eso en todos los PCs a la vez, mientras se conversa en el vestíbulo.
+
+**Qué se hizo** (solo la página, `web/navegador/mkw.mjs`):
+
+- `bajarSinGuardar(url)`: el cuerpo de la respuesta pasa por un **sumidero** que solo cuenta los bytes (`pipeTo` a un
+  `WritableStream`): llega de a pedazos chicos que se olvidan al llegar. La caché HTTP queda igual de llena. Lo mismo
+  para `mkw.js`.
+- 12 trabajos a la vez en vez de 24 (con 12 se llena igual un lote de 12 pedazos, §104; `?precargaHilos=N` para probar).
+- La memoria de bloques del disco de la precarga, 4 MB en vez de 64 (`memoriaMax`): los bloques van a Cache Storage.
+- Bandera de escape: **`?precargaLiviana=0`** = como antes (`arrayBuffer`, 24 a la vez, 64 MB).
+- `herramientas/medir-precarga-memoria.mjs` (nuevo): para cada camino, un perfil de Chrome nuevo, la red frenada a
+  100 Mbit/s (`--mbit`), y cada ~0,3 s la memoria privada de los procesos de Chrome de ese perfil (Windows,
+  `PrivatePageCount`); dice el pico y lo que queda al terminar.
+- No se hizo la «cubeta de C4» que menciona el plan (repartir la descarga en el tiempo): C4 no está hecho todavía.
+
+**Medido** (`node herramientas/medir-precarga-memoria.mjs --vueltas 2`, esta PC, 100 Mbit/s + 50 ms, dos vueltas por
+camino, el programa comprimido como en R2):
+
+| | antes | §119 |
+|---|---|---|
+| pico de memoria de la página (renderer) | 550 / 544 MB | **417 / 427 MB** |
+| pico de todo el perfil de Chrome | 912 / 904 MB | 773 / 780 MB |
+| la página al terminar (1,5 s después) | 483 / 487 MB | **309 / 318 MB** |
+| tiempo hasta «listo» | 7,2 / 7,2 s | 7,2 / 7,3 s |
+
+Qué significa: unos 125 MB menos en el pico y unos 170 MB menos al terminar (el bloque viejo seguía ahí porque el
+recolector todavía no lo había soltado), sin tardar más. Antes de comprimir el programa se midió igual con el `.wasm`
+sin comprimir (17 s): 481 → 350–365 MB de pico. Lo que sigue ocupando la página (~300–400 MB) es el resto de la página
+y de Chrome, no la precarga; no se investigó aquí (C9 del plan).
+
+**Pruebas:** `prueba-precarga` 8/8 (la precarga termina, el porcentaje sube, el disco queda en Cache Storage, **el
+programa después sale de la caché HTTP: 0 bytes transferidos**, el juego llega antes a la carrera: 4,4 s contra 5,3 s, y
+baja 21,9 MB del disco en vez de 61,0).
+
+**Trampa:** la primera corrida dio 7/8 («el programa sale de la caché HTTP» ✗, 130 MB transferidos): `mkw.wasm.br`
+era del 21 y `mkw.wasm` del 22, así que el servidor entregaba el programa sin comprimir, y eso no entra en la caché
+HTTP. No era de este cambio: con `node herramientas/comprimir-build.mjs` (2,5 min) dio 8/8. La memoria también se
+volvió a medir con el comprimido (la tabla de arriba).
+
+## 2026-10-27 · §120 La pestaña oculta ya no gira (C10 del plan de rendimiento, la parte de la página)
+
+**Qué pasaba.** Cuando la pestaña no se ve (otra pestaña al frente, la ventana minimizada), Chrome deja de refrescarla y
+el reloj del monitor deja de valer: el juego pasa a esperar cada cuadro con `esperaReloj` de `mkw.mjs` (§63). Con la
+pestaña oculta esa función hacía «ceder una vuelta y seguir»: contestaba **al instante** por un `MessageChannel`
+(porque los `setTimeout` de una pestaña oculta los frena Chrome a uno por segundo, y la sala se atrasaría). El runtime,
+al recibir «todavía no», atendía el sonido y las alarmas y volvía a llamar enseguida: **una espera activa** de unas
+21.000 vueltas por segundo que tenía el hilo de la página ocupado todo el rato que la pestaña estaba escondida.
+
+**Qué se hizo** (solo la página, `web/navegador/mkw.mjs`):
+
+- Un temporizador en un **Worker** chiquito (armado desde un `Blob`, sin archivo nuevo): Chrome no frena los
+  temporizadores de un Worker en una pestaña oculta. Con la pestaña oculta, `esperaReloj` duerme con él hasta el
+  vencimiento del cuadro, de a 4 ms como mucho (`OCULTA_MS`, para que el juego siga atendiendo su sonido y sus alarmas),
+  y recién entonces contesta. El juego sigue a su ritmo (en la sala hace falta: el lockstep no espera a nadie), pero el
+  procesador descansa entre cuadro y cuadro.
+- `window.mkwEstado.despiertes`: cuántas veces se esperó (para medir).
+- Banderas: **`?esperaOculta=0`** = como antes (girar); `?ocultaMs=N` = dormir de a N ms.
+- `herramientas/medir-oculta.mjs` (nuevo): una carrera directa con 11 CPU en un Chrome con ventana minimizada desde el
+  arranque, y 10 s «oculta» con cada camino: % del hilo ocupado (`TaskDuration`), cuadros por segundo y despiertes.
+
+**Medido** (`node herramientas/medir-oculta.mjs`, esta PC):
+
+| con la pestaña oculta | antes (`?esperaOculta=0`) | §120 |
+|---|---|---|
+| despiertes de la espera por segundo | 21.316 | **22** |
+| hilo de la página ocupado | 78 % | **59 %** |
+| cuadros de juego por segundo | 56 | 53 |
+
+Qué significa: la espera ya no gira (mil veces menos vueltas) y el hilo queda libre una quinta parte del tiempo. Que
+siga ocupado un 59 % es el juego mismo: sigue simulando la carrera a 60 cuadros por segundo con la pestaña oculta.
+Los cuadros (53–56, no 60) son iguales con los dos caminos: en este Chrome minimizado el juego no llega a 60 ni antes
+ni después, así que no es de este cambio. Una sola medida por camino.
+
+**Trampa (cómo se midió).** No se pudo ocultar la pestaña «de verdad» con Chrome manejado por las herramientas de
+pruebas: sin ventana, con la ventana minimizada, sin las banderas que pone Playwright y sin su «emulación de foco»,
+`document.hidden` seguía en `false`. (Además, la primera prueba con una ventana «fuera de la pantalla» en −2400 caía en
+el otro monitor del dueño: se cambió a minimizada desde el arranque.) Así que la herramienta **simula** lo que una
+pestaña oculta le hace a nuestro código: `document.hidden = true` y `requestAnimationFrame` que no llama (el reloj del
+monitor deja de valer y el runtime pasa a `esperaReloj`, igual que oculta). Lo que Chrome frena de verdad en una pestaña
+oculta (los `setTimeout` de la página) no lo usa ninguno de los dos caminos, así que la comparación vale; lo que no
+dice es cuánto gasta Chrome en lo suyo con la pestaña oculta.
+
+**Lo que falta de C10** (por eso queda «en curso»): el plan pide además **pausar el juego en un jugador** al ocultar la
+pestaña y cambiar la espera de 1 ms del runtime por una sola hasta el cuadro siguiente. Las dos necesitan recompilar el
+programa: el reloj del juego es una grilla fija (`g_vi.lastRetrace` en `vi.cpp`) y, si la página dejara de contestar un
+minuto, al volver el juego correría de un tirón los 3.600 cuadros perdidos; hace falta un `mkw_…` que corra la grilla
+hacia adelante al volver (`mkw_prisa` solo la corre hacia atrás). Va con la próxima fase que recompile.
+
+**Pruebas:** `prueba-navegador 1800` 22/22 (60 fps, el enganche al monitor, el sonido sin cortes y con poca demora: la espera con la pestaña a la vista no cambió).
+
+## 2026-10-27 · §121 Las descargas de fondo, en pausa durante la carrera (D2 del plan de rendimiento)
+
+**Qué pasaba.** En la 1.ª visita la página baja «por si acaso» unos 59 MB con la prioridad más baja (la **fila baja**:
+la semilla de bloques, las voces de las CPU, los diminutos). Arranca en el cuadro 300 y solo se aparta 300 ms después
+de que el juego espera algo; no sabe si hay carrera. Con la red de una casa sigue bajando en la primera carrera: le
+quita red al juego (si en plena carrera necesita algo, compite con el fondo) y algo de hilo a la página.
+
+**Qué se hizo** (solo la página):
+
+- `web/navegador/disco.mjs`: `pausarBaja(si)`. En pausa no sale nada nuevo de la fila baja; lo que ya iba en camino
+  termina; la **fila normal** (lo que el juego anunció que va a leer) y las lecturas del juego siguen igual. Al quitar
+  la pausa la fila sigue sola. Mientras está en pausa, cada lectura del juego que tuvo que ir a la red queda anotada en
+  `estado.faltas` (como mucho 500).
+- `web/navegador/mkw.mjs`: la vigía de la carrera de §118 pausa la fila al empezar una carrera (el Raceinfo existe y su
+  etapa es menor que 4: presentación, cuenta y carrera) y la suelta en la meta o en los menús. `window.mkwFaltas()` da
+  la lista (para el paquete de carrera, D1). En la consola: «carrera: descargas de fondo en pausa (N en fila)».
+- Bandera de escape: **`?pausaCarrera=0`** = como antes.
+- `herramientas/medir-fondo-carrera.mjs` (nuevo): un perfil de Chrome nuevo, una carrera directa (larga a los pocos
+  segundos, con el fondo todavía bajando), la red a 20 Mbit/s y 50 ms; suma los bytes que llegan mientras corre la
+  carrera, con cada camino.
+
+**Medido.**
+
+`node herramientas/medir-fondo-carrera.mjs` (20 Mbit/s, 30 s de carrera, una vez por camino):
+
+| | antes (`?pausaCarrera=0`) | §121 |
+|---|---|---|
+| bajado durante la carrera | 59,1 MB en 86 pedidos | **28,0 MB en 44** |
+| lecturas del juego que fueron a la red en la carrera | — | 17 |
+| trabajos de la fila baja esperando al final | 0 | 177 |
+
+Qué significa: la mitad de lo que llegaba en la carrera era fondo; ahora espera a la meta. Los 28 MB que siguen
+llegando son del juego mismo: la carrera empieza a contar desde que existe el Raceinfo, cuando el juego todavía está
+cargando la pista y los karts (eso va siempre, es lo que necesita). Esas 17 lecturas son las «faltas»: lo que un paquete
+de carrera (D1) tendría que traer antes. El plan pedía «0 bytes de fondo en carrera»: el fondo ya no sale, pero lo que
+ya iba en camino al empezar termina (un lote de hasta 12 pedazos).
+
+`medir-sitio --perfil pc --red 20` (la página de Juegos real, 1.ª visita), antes y después: **aquí no cambió nada**,
+porque esa secuencia llega a la carrera a los ~120 s y para entonces la fila baja ya había terminado (la consola dice
+«descargas de fondo en pausa (0 en fila)»). La corrida «después» tuvo 19 llamadas al Worker en la carrera (contra 1) y
+dos esperas del disco de ~1 s, pero son de un «Scene Restart» del juego (la carrera volvió a cargar) con la fila baja en
+0 todo el rato: no son de la pausa. Lo dejo anotado porque bajó los fps medidos de esa carrera (58,2 → 52,5).
+
+**Pruebas:** banco `disco` 42/42 (4 nuevas: en pausa la semilla no sale; lo que el juego anuncia o lee sí; lo leído en
+pausa queda en las faltas; al soltar, la fila sigue sola y cada bloque llega una vez).
+
+**Trampa:** la primera versión del último punto del banco leía todo enseguida al soltar la pausa (el juego leyendo, no
+la fila) y daba ✗ por la pausa de 300 ms que la fila hace después de que el juego espera algo (`quietud`). La prueba
+correcta es no leer nada y ver que la fila baja sola.
+
+## 2026-10-27 · §122 Guardar la partida y la lista de pipelines fuera de la carrera (D13 del plan de rendimiento)
+
+**Antes, U1 (no se hizo).** El siguiente de la lista era U1, «el precalentado no sigue dentro de la carrera». Leído el
+código: la página no puede pausarlo. Aurora pide los pipelines del precalentado desde su propia cola
+(`build_synchronous_pipelines_for_frame` en `parches/aurora-web.diff`) y no hay ninguna función `mkw_…` para pararla y
+seguirla; desde JavaScript, un pipeline del precalentado y uno que el juego necesita para dibujar ya son la misma
+llamada (`createRenderPipelineAsync`), así que frenar esas llamadas en la carrera también frenaría lo que la carrera
+necesita (karts o pista sin dibujar unos cuadros). Hace falta un `mkw_web_pipelines_pausa(si)` en aurora: recompilar.
+Queda para la próxima fase que recompile (junto con lo que falta de C10).
+
+**Qué pasaba (D13).** Dos cosas se guardaban en IndexedDB a cualquier hora, también en plena carrera:
+1. la **lista de pipelines** (`pipelines.mjs`): cada 10 s, si apareció alguno nuevo, se copia la lista entera de la
+   memoria del juego y se escribe (2–10 ms en un teléfono: justo después de un tirón por el pipeline nuevo, otro tirón);
+2. la **partida** (`guardado.mjs`): medio segundo después de que el juego escribe, se leen los archivos (el
+   `rksys.dat` es de 2,8 MB) y se escriben.
+
+**Qué se hizo** (solo la página):
+
+- `pipelines.mjs`: `aplazarMientras(f)`. Con una carrera andando el reloj no arma ni guarda la lista (lo cuenta en
+  `estado.aplazadas`); cuando guarda, lo hace en un rato libre del hilo (`requestIdleCallback`, como mucho 1 s después).
+  Al esconder la pestaña guarda igual.
+- `guardado.mjs`: `aplazarMientras(f)`. Con una carrera andando lo pendiente se queda pendiente (se vuelve a mirar cada
+  medio segundo) y se guarda al terminar, en un rato libre; como mucho se aplaza 5 min (por si una carrera no termina
+  nunca). Esconder o cerrar la pestaña guarda siempre en el momento.
+- `mkw.mjs`: los dos usan la vigía de la carrera de §118. Bandera: **`?aplazarGuardado=0`** = como antes.
+
+**Comprobado.** Banco `guardado` 18/18 (3 nuevas: en carrera no se copia y queda pendiente; al terminar se guarda solo;
+esconder la pestaña en carrera guarda igual) y `pipelines` 17/17 (3 nuevas: en carrera no se arma la lista; al terminar
+se guarda; esconder guarda igual). Con el juego: `prueba-partidas` 6/6 (la licencia que se crea en los menús se guarda
+sola y vuelve al recargar). En las dos corridas de `medir-sitio` de §123 (con esto puesto) hubo **0 tareas largas en la
+carrera**; no se midió el camino viejo (`?aplazarGuardado=0`) con la misma carrera, así que no hay un «antes» medido.
+
+**Trampa:** al agregar los puntos al banco `guardado`, dos puntos viejos fallaron: esperaban el archivo de ajustes con
+el valor 42 y la parte nueva lo dejaba en 51. Se vuelve a dejar en 42 al final de la parte nueva.
+
+## 2026-10-27 · §123 El medidor de la tarjeta ya no infla lo que mide (G8 del plan de rendimiento)
+
+**Qué pasaba.** Con «Mostrar qué frena» (o `?gpu=1`, que `medir-sitio.mjs` pone **siempre**) se instala
+`perfil-gpu.mjs` (§115): envuelve las funciones de WebGPU (cada dibujo, cada pasada, cada subida) para contarlas. Cada
+envoltura era genérica (`function (...a)` + `apply`: un arreglo nuevo por llamada) y cada dibujo buscaba su pasada en un
+`WeakMap`. Con 1.000–2.000 llamadas por cuadro eso cuesta 0,2–1 ms por cuadro en un PC, más en un teléfono: el
+**efecto del observador**, justo en lo que se quería medir.
+
+**Qué se hizo** (solo la página):
+
+- `web/navegador/perfil-gpu.mjs`: el conteo va **por ventanas** (opción `ventana`; en la página 2 s de cada 10). Entre
+  ventanas, los métodos de WebGPU son los originales del navegador, sin nada encima. Envolturas de **argumentos fijos**
+  (sin `...a` ni `apply`), la pasada abierta en una variable, y `setPipeline`/`setBindGroup` y el tamaño de las
+  imágenes solo se envuelven para «Perfilar» (los tiempos por pasada, que siguen siempre puestos esos 20 s).
+  `foto().cuadros` = cuántos cuadros del juego pasaron mientras se contaba; `desinstalar()` deja todo como estaba.
+- `web/navegador/mkw.mjs`: el historial por segundo (pasadas, dibujos, KB, copias por cuadro) divide por los cuadros
+  contados; un segundo sin ventana repite lo de la última. Bandera: **`?ventanaGpu=0`** = contar siempre, como antes.
+
+**Medido.** `medir-sitio --perfil pc` (con `gpu=1`, como siempre), contar siempre (`&ventanaGpu=0`) contra ventanas,
+una corrida cada uno:
+
+| carrera, 20 s | siempre | ventanas |
+|---|---|---|
+| CPU por cuadro, promedio | 8,27 ms | **8,09 ms** |
+| p95 / p99 | 9,4 / 11,7 ms | 9,1 / 10,0 ms |
+| cuadros de más de 16,7 ms | 3 | 1 |
+| imágenes parejas en pantalla | 97,3 % | 99,0 % |
+
+Qué significa: en esta PC, unos 0,2 ms por cuadro (lo que estimaba el plan para un PC). En un teléfono la diferencia
+debería ser varias veces más (no se midió: queda para la próxima prueba en el Oppo). Una corrida por lado: el promedio
+puede variar unas décimas entre corridas. Una consecuencia para atrás: **todas las mediciones de `medir-sitio` hasta
+§122 tenían el contador puesto**, así que los ms por cuadro anotados estaban inflados en esa cantidad.
+
+**Pruebas:** banco `perfil-gpu` 14/14 (6 nuevas: desinstalar deja los originales; con ventanas empieza contando; entre
+ventanas no hay nada encima; contado en varias ventanas, por cuadro contado da justo lo dibujado —54 dibujos y 3
+pasadas—; sin «Perfilar» no se envuelven setPipeline ni setBindGroup; sin errores). En el banco, 20.000 dibujos grabados
+cuestan 0,49 ms sin nada y 0,69 ms contando: unos 10 ns por dibujo con la envoltura nueva.
+
+## 2026-10-27 · §124 Contar los cuadros de lógica, no solo los dibujados (V5 del plan de rendimiento, sin recompilar)
+
+**Qué pasaba.** El medidor de la página cuenta cuadros **dibujados** (`_mkw_web_cuadros`). Fuera de la sala, Retro
+Rewind deja de dibujar cuando va atrasado (calcula sin dibujar), así que «30 fps» podía ser la carrera calculándose a 60
+y dibujando una de cada dos, o la carrera de verdad a 30. Sin saberlo no se sabe qué arreglar (la tarjeta o el
+procesador). El plan proponía un contador nuevo dentro del programa (recompilar).
+
+**Qué se hizo** (solo la página, sin recompilar). La regla de §71/«decompilar uno mismo»: se buscó en la memoria del
+juego corriendo. El **Raceinfo** (en 0x809BD730, el mismo que da la etapa en +0x28) tiene sus propios contadores de
+cuadros: +0x1C avanza en la presentación de la pista y +0x20 desde la cuenta regresiva. Medido con una carrera directa
+(herramienta de un uso, en la carpeta de borradores): 60,0 por segundo en +0x20 con 54 dibujados, y con la CPU 6 veces
+más lenta, 15,9 de lógica contra 2,3 dibujados. Es decir, cuenta lógica, se dibuje o no.
+
+- `web/navegador/mkw.mjs`: cada segundo, en la carrera, `mkwEstado.logica` = cuadros de lógica por segundo (la suma de
+  +0x1C y +0x20; null fuera de la carrera, donde no hay Raceinfo). Va al historial por segundo, al medidor con
+  «Mostrar qué frena» («31 fps · lógica 60 · juego 9,0 ms…») y al «📋 informe de rendimiento» (`ultimos10s.logica`
+  y `logicaN` en cada renglón).
+- `web/navegador/graficos.mjs`: `queFrena` con `logica`: si la lógica va a 57 o más y se dibujan menos, dice «el
+  dibujo: la carrera se calcula a 60 pero se dibujan N».
+- Bandera: **`?logica=0`** = sin esto.
+
+**Comprobado.** Banco `graficos` 43/43 (4 nuevas: lógica a 60 y dibujo a 30 = frena el dibujo; los dos a 30 = el
+procesador; a 60 o fuera de la carrera no cambia nada; el texto del medidor). Con el juego (carrera directa, `gpu=1`):
+normal 58,9 dibujados y 59,9 de lógica; con la CPU 6 veces más lenta, 2,7 dibujados y 18,9 de lógica; el informe trae
+`logica` en cada segundo.
+
+**Lo que no cubre:** solo en la carrera (en los menús no hay Raceinfo; ahí lo que cuenta es la carrera de todos modos).
+El contador «dentro del programa» que proponía el plan no hace falta para esto.
+
+## 2026-10-27 · §125 El registro con tope, pintado solo si se ve (P7 del plan de rendimiento)
+
+**Qué pasaba.** Cada línea del registro (`escribe` de `mkw.mjs`) iba a la consola, a una lista sin tope
+(`todoElLog`, la que leen las pruebas) y, como mucho una vez por cuadro, al cuadro de texto del cajón: se reescribía
+entero (400 líneas) y se pedía `scrollHeight` (el navegador recalcula la disposición para contestar). Eso pasaba
+**aunque el cajón estuviera cerrado**, varias veces por segundo (el medidor solo escribe una línea cada segundo). Y la
+lista crecía sin fin en sesiones largas.
+
+**Qué se hizo** (solo la página, `web/navegador/mkw.mjs`):
+
+- El cuadro del registro se pinta solo mientras se ve (`IntersectionObserver`); al abrir el cajón se pinta lo que haya.
+- `todoElLog` con tope de 20.000 líneas: al pasarlo se sacan las 2.000 más viejas de una vez
+  (`mkwEstado.logRecortado` dice cuántas). El tope es alto a propósito: varias pruebas buscan en el registro líneas de
+  toda la sesión (una copa entera son unas 1.500 líneas de medidor más las demás).
+- **No** se sacó la línea del medidor de la consola (el plan lo proponía con `?medidor=1`): `prueba-sincro.mjs` lee las
+  líneas «[medidor]» de la consola. Queda para cuando se cambie esa prueba.
+- Bandera: **`?logLiviano=0`** = como antes.
+
+**Comprobado.** Ninguna prueba lee el cuadro del cajón (buscado en `web/`, `herramientas/` y `banco/`).
+`prueba-navegador 1800` 22/22. No se midió la memoria de 1 h de sala (eso es V6).
+
+## 2026-10-27 · §126 Relojes chicos: escribir solo si algo cambió (P8 del plan de rendimiento, en parte)
+
+**Qué pasaba.** Varios relojes de la página hacen trabajo aunque nada haya cambiado: la pastilla del mando reescribía
+su texto cada medio segundo; el medidor leía los gráficos de `localStorage` y hacía `JSON.parse` cada segundo; en la
+sala, la vigía del fin de cada carrera leía los nombres de las CPU de la memoria del juego cada medio segundo toda la
+carrera, aunque ya los tuviera.
+
+**Qué se hizo** (solo la página):
+
+- `interfaz.mjs`: la pastilla del mando escribe el texto, la clase y si se esconde solo cuando cambian.
+- `graficos.mjs`: `leerGraficos` guarda el último texto leído; si el texto guardado es el mismo, devuelve una copia de
+  lo ya interpretado, sin `JSON.parse`.
+- `mkw.mjs`: en la sala, una vez leídos los nombres de las CPU de la carrera n, ya no se leen más en esa carrera.
+- **No** se tocaron: la vigía de la cortina (en la sala no se apaga, pero vuelve enseguida cuando no hay nada que hacer
+  y está metida en el arranque de la sala) ni el reloj de `records.mjs`. Por eso P8 queda «en curso».
+- Sin bandera: no cambia lo que se ve ni lo que se hace, solo deja de repetir lo mismo.
+
+**Comprobado.** Bancos `graficos` 43/43, `mandos-jugador` 18/18, `inicio` 16/16, `controles` 48/48; con el juego,
+`prueba-sala --rapida` 43/43 (los nombres de las CPU llegan igual en las dos pestañas). No se contaron los temporizadores vivos con DevTools (lo que pide el plan).
+
+## 2026-10-27 · §127 La revisión de conexiones, liviana en la carrera (R10 del plan de rendimiento)
+
+**Qué pasaba.** En la sala, `conexiones.mjs` (§100) mira cada 2 s cómo le llega cada piloto: le pide `getStats` a la
+conexión WebRTC de cada uno, uno detrás del otro, **también en la carrera**. Con 11 pilotos son 3–15 ms de trabajo
+seguidos cada 2 s, justo cuando cada cuadro tiene 16,7 ms. Y cuando la ida y vuelta de alguien se movía más de 10 ms le
+avisaba al sitio, que rehace el vestíbulo (escondido detrás del juego).
+
+**Qué se hizo** (solo la página):
+
+- `conexiones.mjs`: opción `enCarrera()`. Con una carrera andando, `getStats` se pide para **un piloto por vuelta, en
+  rueda**; los demás repiten su última lectura (si su conexión sigue sana; si se cae se ve igual, porque «sano» viene
+  de la malla y no de `getStats`). Y en la carrera al sitio solo se le avisa si cambia el estado de alguien, no los ms.
+- `mkw.mjs`: `enCarrera` = la vigía de la carrera (§118). Bandera: **`?conexionesRueda=0`** = como antes.
+
+**Comprobado.** Banco `conexiones` 24/24 (5 nuevas: fuera de la carrera se mira a todos; en la carrera, uno por vuelta y
+cada uno una vez en 4 vueltas; los demás siguen con su lectura; los ms que se mueven no avisan; al terminar, todos otra
+vez). Con el juego: `prueba-sala --rapida` 43/43 (dos pestañas, la copa de 2 con los avisos de conexión). No se midió cuánto baja el trabajo en la carrera con 12 pilotos (el plan pide «tareas en
+carrera»; con dos pestañas en una PC no se nota).
+
+## 2026-10-27 · §128 Lo táctil y la inclinación, sin costo por cuadro (E3 del plan de rendimiento)
+
+**Qué pasaba.** En el teléfono, `controles.mjs` escuchaba la inclinación (`deviceorientation`) **siempre**, aunque
+«dirigir inclinando» estuviera apagado: decenas de avisos por segundo para nada. Y con el mando en pantalla, en cada
+movimiento del dedo (`pointermove`) se preguntaba el recuadro (`getBoundingClientRect`) de cada botón y del aro del stick.
+
+**Qué se hizo** (solo la página, `web/navegador/controles.mjs`):
+
+- La inclinación se escucha solo mientras «dirigir inclinando» está prendido (`inclinar(true/false)` pone y saca el aviso).
+- Los recuadros de los botones y del aro se miden al empezar cada toque (`pointerdown`) y se reusan mientras el dedo se
+  mueve; un cambio de tamaño de la ventana o del mando los borra. Mientras se toca, los botones no se mueven (el editor
+  tiene su propia capa, §113).
+- Bandera: **`?tactilLiviano=0`** = como antes.
+
+**Comprobado.** Banco `controles` 48/48; `controles-panel` 24/25: el punto que falla («zona muerta: + con el cursor
+la sube», 15 → 15) **ya fallaba antes de este cambio** (con E3 apagado a mano dio lo mismo); queda anotado para otra
+sesión. `herramientas/prueba-celular.mjs` no arrancó en esta PC: le falta el navegador propio de Playwright
+(`chromium_headless_shell-1194`, «npx playwright install»); no se instaló nada. Con el juego: `prueba-tactil` 10/14, y **con E3 apagado da lo mismo** (los 4 ✗ son las piezas escondidas de §113 —X, Y, Z, la cruz, la barra del editor— que miden 0 px: la prueba es de antes de §113 y hay que ponerla al día; queda anotado).
+
+## 2026-10-27 · §129 La cortina y los récords, sin mirar el juego cuando no hace falta (P8 del plan de rendimiento, terminado)
+
+**Qué faltaba de §126.** Dos relojes seguían leyendo la memoria del juego aunque no hubiera nada que ver:
+
+- **La vigía de la cortina** (§66), cada 200 ms: lee el estado de los menús (sección, páginas) para saber si tapar la
+  pantalla. En la sala nunca se apaga (puede volver a hacer falta entre carreras), así que leía también **toda la carrera**.
+- **El reloj de los récords** (`records.mjs` `vigilarCarreras`), cada 500 ms: lee el estado de los menús para saber si
+  hay una carrera, **también en los menús**, donde la respuesta es siempre «no».
+
+**Qué se hizo** (solo la página):
+
+- `mkw.mjs`: con una carrera andando (la vigía de §118, `hayCarrera`), la vigía de la cortina no hace nada: en la carrera
+  el piloto no recorre menús, así que la cortina no cambia.
+- `records.mjs`: `vigilarCarreras` acepta `hay()` (¿hay una carrera andando?). Si no la hay **y** la última lectura ya dio
+  «fuera de carrera», no lee la memoria. Terminada la carrera (la etapa pasa a 4, `hay()` da «no») se sigue leyendo hasta
+  salir de la sección de la carrera: el tiempo final llega justo ahí, y no se puede perder. Como un relé con
+  enclavamiento: se suelta solo después de que la lectura confirma que ya salió.
+- Bandera: **`?relojesLivianos=0`** = como antes (las dos cosas).
+
+**Comprobado.** Banco `records` 22/22 (3 nuevas: en los menús lee una vez y después nada; al terminar sin carrera andando
+sigue leyendo y avisa el récord; de vuelta en los menús deja de leer). Con el juego: `prueba-sala --rapida` **43/43** (con §130 y §131 también puestos). Una corrida
+anterior dio 39/43: la pestaña A no llegó a elegir personaje (y de eso cuelgan otros 3 puntos); repetida, 43/43: intermitente,
+no de estos cambios (en la elección no corre ninguna carrera, y la cortina y los récords solo cambian con carrera). No se contaron los temporizadores vivos con DevTools.
+
+## 2026-10-27 · §130 Armar los archivos del juego más rápido (C6 del plan de rendimiento)
+
+**Qué pasaba.** Antes de arrancar el juego, la página arma el sistema de archivos de mentira (MEMFS): 6.065 archivos (los
+chicos con su contenido, 10,4 MB; los grandes «perezosos», solo con su tamaño). Es **una sola tarea** y nunca se había
+medido. El plan decía: medirla y, si pasa de 50 ms (el límite de una «tarea larga»), achicarla. Por cada archivo se
+llamaba `mkdirTree` con su carpeta, aunque la carpeta ya existiera: el mismo recorrido de la ruta miles de veces.
+
+**Qué se hizo** (solo la página, `web/navegador/mkw.mjs` `armarArchivos`):
+
+- Cada carpeta se crea **una vez**: se anotan las ya hechas en un conjunto (`Set`) y se saltan.
+- Se mide la tarea: `window.mkwEstado.armado = { ms, archivos, mb }` y una línea en el registro («armar archivos (§130): …»).
+- Bandera: **`?armadoRapido=0`** = como antes.
+- Herramienta nueva: `node herramientas/medir-armado.mjs [--veces 3]` (abre la página N veces de cada forma en un
+  Chrome en el tercer monitor y lee `mkwEstado.armado`).
+
+**Medido** (esta PC, 3 veces cada una, alternadas):
+
+| | antes | §130 |
+|---|---|---|
+| armar los 6.065 archivos | 58,9 / 56,6 / 68,8 ms (mediana **58,9**) | 44,7 / 35,0 / 33,8 ms (mediana **35,0**) |
+
+Qué significa: la tarea bajó un 40 % y quedó **debajo de los 50 ms** de una tarea larga en esta PC. En un teléfono
+(3–5 veces más lento) seguiría siendo larga (~100–175 ms); el paso siguiente del plan (nodos perezosos sin copiar, o
+partirla con `scheduler.yield()`) queda para cuando se mida en el Oppo. El contenido (10,4 MB) se sigue copiando.
+
+**Comprobado.** `prueba-sala --rapida` 43/43 (el juego arranca con el armado nuevo en las dos pestañas).
+
+## 2026-10-27 · §131 El filtro de la sala, una vez por cuadro (P6 del plan de rendimiento)
+
+**Qué pasaba.** En la sala, cada vez que la página manda los mandos al juego (`controles.mjs` `paso`, en cada refresco)
+pregunta el **filtro** de la sala (§99: qué botones no pasan; Start nunca, B en la primera pantalla de personajes). El
+filtro lee el estado de los menús de la memoria del juego (y arma un objeto y una lista nuevos). Se preguntaba **una vez
+por puerto**: 4 lecturas iguales por refresco.
+
+**Qué se hizo** (solo la página, `web/navegador/controles.mjs`): el filtro se pregunta **una vez por paso** y el
+resultado sirve para los 4 puertos. El cerrojo (§94) ya se preguntaba una sola vez y en la carrera no lee los menús.
+Bandera: **`?menusUnaVez=0`** = como antes.
+
+**Lo que no se hizo** del ítem: guardar el estado de los menús por cuadro para todos los que lo leen (la cortina, el
+piloto, la vigía de cortes). Esos van con sus propios relojes (200–500 ms), no por refresco; §129 ya apagó los que no
+hacían falta en la carrera.
+
+**Comprobado.** Banco `controles` 49/49 (1 nueva: el filtro se pregunta una vez por paso). Con el juego:
+`prueba-sala --rapida` 43/43.
+
+## 2026-10-27 · §132 Las descargas con prioridad (C4 del plan de rendimiento, en parte)
+
+**Qué pasaba.** Ninguna descarga de la página decía qué tan urgente era. Los lotes del disco (§104) que el juego espera
+(está parado leyendo un archivo) y los de fondo (bajar adelantado lo que vendrá) salían iguales: en una conexión lenta,
+lo de fondo podía ocupar la fila delante de lo que el juego necesitaba.
+
+**Qué se hizo** (solo la página, `web/navegador/lote.mjs`): cada lote sale con `priority`: **«high»** si lleva algún
+pedazo urgente (el juego esperando) y **«low»** si es todo de fondo. `estado.prioridades` cuenta cuántos de cada uno.
+Bandera: **`?prioridad=0`** = sin prioridad (como antes).
+
+**Lo que falta de C4** (por eso queda «en curso»): la **cubeta de fichas** (frenar lo de fondo al 40–50 % del ancho
+medido y a 0 en la carrera —lo de «a 0 en la carrera» ya lo hace §121 para el disco—), lotes de fondo de 2–4 MB, y nada
+de fondo antes del título. Y medirlo con `medir-sitio --red 50` (MB por segundo y el latido de la red).
+
+**Comprobado.** Banco `lote` 22/22 (2 nuevas: fondo «low» y urgente «high»; con `prioridad:false`, nada) y `disco`
+42/42. Con el juego: `prueba-navegador 1800` 22/22. No se midió si cambia algo con la red lenta: en esta
+PC, con la red local, no se nota.
+
+## 2026-10-27 · §133 Esperar los gráficos de los menús antes de jugar, en el teléfono (U1 del plan de rendimiento, en parte)
+
+**Qué pasaba.** Con el precalentado con tope (§117), en el teléfono los ~700 pipelines tardaron 41 s en llegar y se
+metieron en la 1.ª carrera: los primeros ~21 s fueron a 20–37 fps (plan, U1). Fuera de la sala nada espera al
+precalentado (la sala tiene su cortina, §99).
+
+**Qué se hizo** (solo la página):
+
+- `preparacion.mjs`: `graficosListos(estado)` → `{ listo, pct }`: listo cuando llegó la primera mitad de la lista (la
+  misma meta de la sala, §117: el título y los menús primero) o cuando se sabe que no hay lista («sinPipelines»). Mientras
+  aurora no dijo «precalentando N» (el juego recién arranca) **se espera** (el primer intento contaba eso como «listo» y
+  no esperaba nunca: lo encontró la medición).
+- `mkw.mjs`: al elegir Single Player o Local en el menú de inicio, si no está listo se espera con la cortina
+  «Preparando los gráficos… N %», como mucho 30 s (`mkwEstado.esperaGraficos.ms`).
+- **Solo en el teléfono** por omisión (el mismo «teléfono» de §113: toque sin puntero fino). Bandera:
+  **`?esperaGraficos=1`** = también en el PC, **`=0`** = nunca.
+- Herramienta nueva: `node herramientas/medir-espera-graficos.mjs [--visitas 2] [--extra "&esperaGraficos=0"]` (Chrome en
+  el tercer monitor; Enter en cuanto aparece el menú; del Enter al menú «Un jugador», la espera y cuántos pipelines
+  habían llegado a los 20 s).
+
+**Medido en esta PC** (con `?esperaGraficos=1` contra `=0`; Enter apenas aparece el menú, con el juego todavía cargando):
+
+| | con la espera | sin la espera |
+|---|---|---|
+| 1.ª visita: del Enter al menú «Un jugador» | 8,6 s (esperó 8,0 s) | 4,4 s |
+| 2.ª visita (caché de Chrome) | 10,0 s (esperó 9,4 s) | 3,5 s |
+| pipelines llegados 20 s después | ~693 de 700 | ~695 de 700 |
+
+Qué significa: **en el PC la espera no gana nada** (a los 20 s ya llegaron casi todos de las dos maneras, y antes de
+eso uno todavía está eligiendo copa y personaje) y cuesta 4–6 s: por eso queda solo para el teléfono, donde el
+precalentado dura 41 s. **En el teléfono no se midió** (hace falta el Oppo: fps de los primeros 30 s de la 1.ª carrera
+con la caché vacía). Lo otro de U1, **pausar el precalentado durante la carrera**, necesita un aviso nuevo en aurora
+(recompilar): U1 queda «en curso».
+
+**Comprobado.** Banco `preparacion` 25/25 (5 nuevas). `prueba-inicio` 8/14 en el PC con y sin el cambio: las 6 fallas son
+de antes (§116 dejó Multiplayer «en obra» y la prueba sigue esperando el menú Multiplayer de antes; Options y la vuelta
+al título también fallan sin el cambio); con la espera prendida a la fuerza dio 9/14 (la cortina de §133 se vio:
+«Preparando los gráficos… 98 %»). Hay que poner `prueba-inicio` al día con §116 (queda anotado).
+
+## 2026-10-27 · §134 Jugando solo, la pestaña oculta pausa el juego (C10 del plan de rendimiento, terminado)
+
+**Qué faltaba de §120.** §120 hizo que, con la pestaña oculta, la espera del reloj durmiera en vez de girar (de 21.316 a
+22 despertares por segundo), pero el juego **seguía corriendo** a ~52 cuadros por segundo sin que nadie lo viera: 63 %
+de un núcleo. En la sala tiene que seguir (el lockstep no espera a nadie), pero jugando solo no hace falta. Parecía
+necesitar un cambio en el runtime; no: alcanza con que la espera **no termine**.
+
+**Qué se hizo** (solo la página, `web/navegador/mkw.mjs` `esperaReloj`): jugando solo (sin `sincro`, sin `red`, sin
+`modo=sala`/`enlinea`), con la pestaña oculta la promesa de la espera no se cumple hasta que llega el aviso
+`visibilitychange` con la pestaña a la vista. El juego queda detenido en el medio de su espera, como un motor con el
+freno puesto: no calcula, no dibuja, no suena. `mkwEstado.pausaOculta = { veces, ms }`. Bandera: **`?pausaOculta=0`** =
+sigue corriendo dormido como en §120. (`window.mkwRelojMonitor` queda a la vista para la herramienta de medir.)
+
+**Medido** (`node herramientas/medir-oculta.mjs`: la carrera directa con 11 CPU, 10 s con la pestaña oculta simulada, y
+después 5 s a la vista otra vez; Chrome minimizado en el tercer monitor):
+
+| | oculta: CPU | oculta: cuadros/s | despertares/s | al volver: el 1.er segundo | después |
+|---|---|---|---|---|---|
+| antes de §120 | 80 % | 53 | 17.755 | 58 cuadros | 54/s |
+| §120 | 63 % | 52 | 20 | 56 cuadros | 58/s |
+| **§134** | **0 %** | **0** | **0** | 29 cuadros | 57/s |
+
+Qué significa: oculta, la pestaña ya no gasta nada (en el teléfono, batería y calor). Al volver **no hay ráfaga** (el
+juego no intenta correr los 11 s perdidos: sigue desde donde quedó); el primer segundo va a medias porque el reloj del
+monitor necesita 30 refrescos para volver a valer y mientras tanto el juego espera por reloj.
+
+**Trampas:** la oculta es simulada en la página (`document.hidden` y `requestAnimationFrame`), igual que en §120: con
+Chrome manejado por CDP la pestaña no llega a «oculta» de verdad. El sonido se corta mientras está pausado (nadie lo
+oye) y vuelve solo.
+
+**Comprobado.** `medir-oculta.mjs` (arriba) y `prueba-navegador 1800` 22/22 (a la vista nada cambia).
+
+## 2026-10-27 · §135 Lo grande por el canal fiable, en trozos de 1 KB (R8 del plan de rendimiento)
+
+**Qué pasaba.** Cada conexión de la malla tiene dos canales: `udp` (los botones de cada cuadro: rápido, se puede perder) y
+`tcp` (ordenado y seguro: avisos del lockstep, mensajes de la sala, la red del juego). Los dos van por la misma
+asociación SCTP y **Chrome no intercala mensajes**: si sale uno grande por `tcp` (la copia de la sala para quien vuelve,
+las skins, los Mii), los paquetes de `udp` esperan a que termine. Además Chrome no deja mandar un mensaje de más de
+~256 KB (en el banco, 4 MB enteros no llegaron nunca).
+
+**Qué se hizo** (solo la página, `web/navegador/malla.mjs`):
+
+- `trocear(bytes)`: lo de más de 1 KB (`TROZO`) por `tcp` sale en trozos de 1 KB, cada uno con 3 bytes delante (la marca
+  `F7 7E` y «vienen más» / «el último»). Un mensaje chico que justo empiece con la marca también va envuelto, así nunca se
+  confunde. Lo chico normal sale igual que antes (sin costo).
+- `crearArmador()`: quien recibe junta los trozos en orden (el canal es ordenado) y entrega el mensaje entero. Arma
+  **siempre**, aunque mande sin trozos.
+- Bandera: **`?trozos=0`** = mandar enteros, como antes (la opción `trozos` de `crearMalla`). Toda la sala tiene que
+  tener la misma página: una página vieja no sabría armar los trozos.
+
+**Medido** (banco `red`, WebRTC de verdad entre dos mallas en la misma PC; un paquete por `udp` mandado justo detrás de
+200 KB por `tcp`; dos corridas):
+
+| | el paquete `udp` llega a los | los 200 KB llegan a los |
+|---|---|---|
+| enteros (antes) | 9 ms / 9 ms | 9 ms / 9 ms |
+| en trozos (§135) | **1 ms / 1 ms** | 9 ms / 8 ms |
+
+Qué significa: antes el paquete de botones esperaba a que pasara el mensaje grande entero; ahora pasa en seguida, y lo
+grande no tarda más. En la misma PC son 9 ms; con una subida de 10 Mbit/s, 200 KB son ~160 ms de botones esperando.
+
+**Comprobado.** Banco `red` 38/38 (3 nuevas: trozos y armado, la marca, 200 KB enteros e iguales con y sin trozos).
+Con el juego: `prueba-sincro --directa` 13/13 (los avisos del lockstep por `tcp` pasan por el armador).
+
+## 2026-10-27 · §136 Dos bucles de cada refresco que trabajaban para nada (P4 del plan de rendimiento, en parte)
+
+**Qué pasaba.** Algunos módulos de la página tienen su propio bucle `requestAnimationFrame`, que corre una vez **por
+refresco del monitor** (60, 144 o 240 veces por segundo, aunque el juego vaya a 60):
+
+- `dnf.mjs` (el contador de los que faltan, §78) leía la memoria del juego en cada refresco para saber si había cuenta,
+  aunque casi nunca la hay (solo los 30 s después de que llega el primero).
+- `inicio.mjs` (el menú «JloKart Wii», §67) seguía su vuelta en cada refresco toda la partida, solo para ver que estaba
+  escondido.
+
+**Qué se hizo** (solo la página):
+
+- `dnf.mjs`: sin cuenta en pantalla se mira cada 10 refrescos (`saltoSinCuenta`); con la cuenta puesta, en cada uno
+  (la animación del número). La cuenta aparece a lo más ~1/6 s más tarde. Bandera: **`?dnfLiviano=0`** = en cada refresco.
+- `inicio.mjs`: escondido el menú, la vuelta se detiene; al mostrarse otra vez (`mostrar()`) vuelve a arrancar.
+  Bandera: **`?inicioLiviano=0`** = como antes.
+
+**Lo que falta de P4** (queda «en curso»): el planificador único (el reloj del monitor sin copiar y ordenar sus 240
+diferencias en cada refresco, las esperas sin promesas nuevas) y los bucles de `controles` y `alRefrescar`. Toca el ritmo
+de §80 y §88: va con su medida de «parejos en pantalla».
+
+**Comprobado.** Bancos `inicio` 16/16 y `cuenta-dnf` 25/25. Con el juego: `prueba-sala --rapida` 43/43 (con el contador DNF); `prueba-inicio` 8/14, las mismas 6 fallas que sin el cambio (§133: la prueba es de antes de §116).
+
+## 2026-10-27 · §137 El medidor avisa cuando el monitor no es múltiplo de 60 Hz (E6 del plan de rendimiento, en parte)
+
+**Qué pasaba.** Con un monitor de 75, 144 o 165 Hz los 60 cuadros del juego no caen parejos sobre los refrescos: unos
+duran un refresco y otros dos (con 144 Hz: 2, 3, 2, 3…). Se ve un temblor leve que no es falta de rendimiento y que
+ninguna optimización arregla; la persona no tenía cómo saberlo.
+
+**Qué se hizo** (solo la página, `web/navegador/graficos.mjs`): `notaHz(hz)` dice si los Hz medidos están a menos de
+1,5 % de 60, 120, 180 o 240; si no, el medidor con «Mostrar qué frena» (§114) agrega «144 Hz no es múltiplo de 60: el
+juego no se ve del todo parejo (en 60, 120, 180 o 240 Hz sí)». Sin bandera: es solo un texto del medidor, que ya es
+opcional (apagado por omisión).
+
+**Lo que falta de E6** (queda «en curso»): que la página trabaje una vez por cuadro del juego y no por refresco (es P4;
+§136 hizo dos bucles) y probarlo con un monitor de 144 Hz (esta PC tiene uno de 240 Hz).
+
+**Comprobado.** Banco `graficos` 45/45 (2 nuevas).
+
+## 2026-10-27 · §138 La memoria de bloques del disco según la RAM del aparato (C9 del plan de rendimiento, en parte)
+
+**Qué pasaba.** La página guarda en su memoria hasta 64 MB de bloques del disco del juego (lo último leído, para no ir
+a la caché ni a la red otra vez). Es lo mismo en un PC de 32 GB que en un teléfono de 4 GB, donde Android mata primero
+a la pestaña que más ocupa.
+
+**Qué se hizo** (solo la página): `disco.mjs` `memoriaDeBloques(gb)`: con `navigator.deviceMemory` de 8 o más (el
+navegador nunca dice más de 8) o sin dato, 64 MB como siempre; con 4–6 GB, 32 MB; con menos, 16 MB. `mkw.mjs` la usa al
+crear el disco y la anota en `mkwEstado.memoriaBloquesMB`. Bandera: **`?memoriaBloques=N`** = N MB (64 = como antes).
+En esta PC (8 o más) no cambia nada.
+
+**Lo que falta de C9** (queda «en curso»): medir la memoria por proceso (pestaña y proceso de GPU, con 1 y 2 pestañas),
+bajar `INITIAL_MEMORY` (recompilar) y quitar copias.
+
+**Comprobado.** Banco `disco` 43/43 (1 nueva). No se probó en un teléfono.
+
+## 2026-10-27 · §139 El freno de lo que se baja de fondo, apagado hasta medirlo (C4 del plan de rendimiento, en parte)
+
+**Qué pasaba.** Lo que el disco baja de fondo (adelantar lo que el juego va a leer) no tiene freno: 4 lotes de hasta
+16 MB a la vez llenan la conexión de la casa, y ahí hacen fila el WebRTC de la sala y lo que el juego necesita ya (§132
+ya les puso prioridad).
+
+**Qué se hizo** (solo la página, `web/navegador/lote.mjs`): una **cubeta de fichas** para lo de fondo:
+
+- El ancho se mide con los lotes que llegan (bytes / lo que tardó × los que iban a la vez; promedio que se mueve,
+  `estado.freno.ancho` en bytes por ms).
+- Las fichas se recargan a `parteFondo` (la mitad) de ese ancho, con un tope de 250 ms de recarga; un lote de fondo gasta
+  sus bytes; sin fichas, espera (`estado.freno.esperas`). **Lo urgente nunca espera.**
+- Con el freno, los lotes de fondo son de 4 MB como mucho (`maxBytesFondo`).
+- **Apagado por omisión**: `?freno=1` lo prende. No se midió todavía con una red lenta (`medir-sitio --red 50`, MB por
+  segundo y el latido de la red): podría alargar la primera carga, y sin esa medida no se deja prendido.
+
+**Medido** (`node herramientas/medir-sitio.mjs --perfil pc --red 20 --etiqueta freno-no|freno-si --extra "&freno=1"`:
+1.ª visita, red de 20 Mbit/s, una corrida por lado):
+
+| | sin freno | con freno |
+|---|---|---|
+| la carrera llega a los | 122,8 s | **161,5 s** |
+| carga: cuadros de más de 100 ms (el peor) | 49 (3,4 s) | 79 (8,2 s) |
+| lecturas urgentes (el juego esperando al disco) | 6 | **38** |
+| carrera: tirones en pantalla (el peor) | 10 (1.070 ms, 888 de disco) | 1 (29 ms) |
+| carrera: fps / CPU p99 | 58,1 / 13,9 ms | 60,0 / 12,1 ms |
+
+Qué significa: frenar lo de fondo **durante la carga** hace que el juego encuentre menos cosas ya bajadas y tenga que
+esperarlas (38 lecturas urgentes en vez de 6): la carga se alarga 39 s. La carrera salió mejor con freno, pero con una
+sola corrida no se sabe si es por el freno (el tirón de 1 s sin freno fue el disco al largar). Por eso queda **apagado**;
+lo que sigue es frenar solo con una sala o una carrera andando (o tener todo bajado antes, D1), no en la carga.
+
+**Comprobado.** Banco `lote` 24/24 (2 nuevas: con freno, lotes de fondo ≤ 4 MB y esperas; el urgente no tarda más que
+sin freno). El Worker falso del banco no comparte un enlace entre lotes, así que ahí no se ve cuánto frena: eso es la
+medida pendiente. C4 sigue «en curso».
+
+## 2026-10-27 · §140 El precalentado en pausa durante la carrera (U1 del plan de rendimiento, terminado)
+
+**Qué faltaba de §133.** §133 hizo que, en el teléfono, Single Player y Local esperen la primera mitad de los pipelines
+con la cortina. La otra mitad sigue compilándose de fondo, y el plan pedía que eso **no** pase durante una carrera (cada
+pipeline compilado le quita tiempo al cuadro). Eso es del programa (aurora): había que recompilar.
+
+**Qué se hizo:**
+
+- aurora (`pipeline_cache.cpp`, en `parches/aurora-web.diff`): un interruptor `g_webPrecalentarPausa` y la función
+  exportada **`mkw_web_pipelines_pausa(si)`**: con 1, el reparto de cada cuadro no saca nada de la cola del precalentado
+  (lo que el juego necesita para dibujar el cuadro de ahora no pasa por esa cola: se sigue pidiendo en el momento); con 0
+  sigue. Devuelve cuántos esperan en la cola. `compilar-web.py` la exporta. **Recompilado.**
+- `mkw.mjs`: la vigía de la carrera (`alCambiarCarrera`, §118) llama a la pausa al empezar cada carrera y la suelta al
+  terminar; `mkwEstado.pausaPrecalentado` = cuántas veces y cuántos había en la cola cada vez; una línea en el registro
+  («precalentado en pausa (N en su cola)»). **`?pausaPrecalentado=0`** = sin pausa (como antes).
+
+**Medido** (`node herramientas/medir-sitio.mjs --perfil celular-alto --etiqueta u1-no --extra "&pausaPrecalentado=0"`
+contra `--etiqueta u1-si`: 1.ª visita, perfil nuevo, una corrida por lado):
+
+| | sin pausa | con pausa |
+|---|---|---|
+| los 700 pipelines del precalentado, todos pedidos a los | 14,1 s | 15,8 s |
+| la carrera llega a los | 105,1 s | 105,5 s |
+| carrera: fps / CPU por cuadro (prom. / p99) | 34,0 / 29,4 / 53,2 ms | 34,5 / 29,0 / 51,6 ms |
+| carrera: tareas largas | 14 | 9 |
+
+Qué significa: con el tope de §117 la cola del precalentado **se vacía a los 14–16 s**, mucho antes de que empiece
+cualquier carrera (la primera llega a los ~105 s con los menús, y en la sala hay que esperar la preparación y elegir
+personaje). Así que la pausa encontró la cola vacía (en las pruebas con el juego el registro dice «0 en su cola») y las
+diferencias de la tabla son ruido de una corrida. La pausa queda como **seguro**: si algún día la cola llega con trabajo
+a una carrera (un teléfono muy lento, una carrera que empieza enseguida), ese trabajo espera al menú en vez de quitarle
+tiempo al cuadro. Los 34 fps de `celular-alto` son el juego mismo en un celular simulado (la CPU de la página 2,5×
+más lenta), no el precalentado: eso es de las fases de motor del plan.
+
+**Comprobado.** `prueba-navegador 1800` 22/22, `prueba-sincro --directa` 13/13, `prueba-partidas` 6/6, `prueba-sala
+--rapida` 43/43 con el programa nuevo. **Falta (del dueño):** recompilar el programa final y subirlo a R2 (ver §141); en
+el Oppo, «📋 Copiar el informe de rendimiento» dice `pausaPrecalentado`.
+## 2026-10-27 · §141 La memoria medida por proceso, y 230 MB menos por pestaña (C9 del plan de rendimiento, terminado)
+
+**Qué faltaba de §138.** El plan pedía medir la memoria de verdad (la pestaña y el proceso de la tarjeta, con 1 y con 2
+pestañas) y después bajar lo que sobra: `INITIAL_MEMORY` (el heap con que arranca el programa) y copias.
+
+**La herramienta.** `node herramientas/medir-memoria.mjs [--segundos 30] [--una] [--extra "&…"]`: Chrome en el tercer
+monitor, perfil nuevo, una carrera directa con 11 CPU; a los 30 s de carrera, la memoria privada
+(`Win32_Process.PrivatePageCount`) de cada proceso de Chrome de ese perfil por tipo (la pestaña, la tarjeta, el
+navegador, los demás) y, dentro de la página, el heap del programa, lo **usado de verdad** (`sbrk(0)`: el programa ahora
+lo exporta, recompilado), el heap de JavaScript y los bloques del disco en memoria. Después abre una 2.ª pestaña y repite.
+
+**Lo que se encontró** (antes, el programa con 512 MB):
+
+- La pestaña del juego: **1.186 MB**. De eso, el heap del programa reserva **512 MB pero usa 248** (la RAM de la Wii, el
+  juego, aurora…): 264 MB reservados y nunca usados. El resto: el código compilado del programa, ~120 MB de JavaScript y
+  ~57 MB de bloques del disco.
+- El proceso de la tarjeta: **895 MB** con un juego, **1.542 MB** con dos (≈ 650 MB por juego: texturas, pipelines, la
+  imagen). Eso es de aurora y de lo que dibuja el juego (las fases G y H del plan), no de la página.
+- Total de Chrome: 2.290 MB con un juego, 3.936 MB con dos.
+
+**Qué se hizo:**
+
+- `herramientas/compilar-web.py`: **`--memoria-inicial 320`** (MB) por omisión, en vez de 512. El programa sigue pudiendo
+  crecer solo (`ALLOW_MEMORY_GROWTH`, hasta 4 GB) si algún día usa más de 320. `--memoria-inicial 512` = como antes.
+  **Es un cambio del programa: hay que recompilar el final y volver a subir `mkw.wasm`/`mkw.js` a R2.**
+- `mkw.mjs`: los ~10 MB de archivos chicos, ya copiados al sistema de archivos del juego, se sueltan
+  (`contenidos.clear()`; **`?soltarChicos=0`** = guardarlos).
+- `disco.mjs`: `estado.memoriaMB()` (los bloques en memoria, para medir). §138 ya ajusta su tope a la RAM del aparato.
+
+**Medido** (`medir-memoria.mjs`, esta PC, carrera directa con 11 CPU, a los 30 s):
+
+| | antes (512 MB) | 320 MB | 320 MB + soltar los chicos |
+|---|---|---|---|
+| la pestaña, 1 juego | 1.186 MB | 954 MB | **938 MB** |
+| heap reservado / usado | 512 / 248 MB | 320 / 248 MB | 320 / 248 MB |
+| JavaScript | 120 MB | 113 MB | 100 MB |
+| las pestañas, 2 juegos | 1.155 + 1.031 MB | 936 + 825 MB | — |
+| total de Chrome, 2 juegos | 3.936 MB | 3.458 MB | — |
+
+Qué significa: cada juego abierto ocupa ~250 MB menos de RAM (−21 %), sin cambiar nada de lo que hace: lo que se quitó era
+memoria reservada que nadie usaba. Lo que queda grande es la tarjeta (~650 MB por juego), que se baja en la tarjeta misma
+(texturas y la pista quieta: G y H del plan).
+
+**Comprobado** con el programa nuevo: `prueba-navegador 1800` 22/22, `prueba-sincro --directa` 13/13, `prueba-partidas`
+6/6, `prueba-sala --rapida` 43/43 (una corrida dio 42/43: B leyó 30.000,5 ms restantes contra un tope de 30.000, un borde del reloj entre dos pestañas; repetida, 43/43); bancos `disco` 43/43.
+## 2026-10-27 · §142 El freno de fondo, prendido solo en la sala ya cargada (C4 del plan de rendimiento, terminado)
+
+**Qué faltaba de §139.** El freno de lo que se baja de fondo alargaba la primera carga 39 s con una red de 20 Mbit/s
+(el juego encontraba menos cosas bajadas y esperaba al disco: 38 lecturas urgentes en vez de 6). §139 lo dejó apagado y
+anotó lo que seguía: frenar solo cuando hay una sala con otros jugadores, no en la carga.
+
+**Qué se hizo** (solo la página):
+
+- `lote.mjs`: opción nueva **`frenoActivo`** (una función que se consulta en cada lote: si dice que no, el lote sale sin
+  freno). `estado.freno.frenando` dice si en este momento frena.
+- `mkw.mjs`: el freno se arma **en la sala** (`modo=sala`) y se activa recién cuando la preparación de §99 terminó
+  (`preparacion.lista()`: el juego bajó, compiló sus pipelines y quedó un segundo tranquilo). Jugando solo, nunca frena
+  (no hay WebRTC que proteger).
+- Banderas: **`?freno=0`** = nunca (como antes de §139), **`?freno=1`** = siempre, también en la carga y jugando solo (la
+  medida de §139).
+
+**Qué significa.** En la carga, lo de fondo baja a toda velocidad (la carga de §139 sin freno: 122,8 s con 20 Mbit/s,
+6 lecturas urgentes). Con la sala andando, lo de fondo usa como mucho la mitad del ancho medido y deja la otra mitad
+para el WebRTC de los demás y lo urgente.
+
+**Comprobado.** Banco `lote` 25/25 (1 nueva: con `frenoActivo` en «no», los lotes de fondo salen sin esperar ni
+recortarse); `prueba-sala --rapida` 43/43 con el freno prendido en la sala. **No medido**: el latido de la red en una
+sala con la red lenta mientras baja lo de fondo (hace falta una sala de dos con una red de verdad lenta; el banco no
+comparte un enlace entre lotes).
+
+## 2026-10-27 · §143 Un solo bucle de cada refresco (P4 del plan de rendimiento, terminado)
+
+**Qué faltaba de §136.** §136 calmó dos bucles (el contador DNF y el menú de inicio). Quedaban tres pidiendo cada uno
+su `requestAnimationFrame`: el reloj del monitor, el cajón (`alRefrescar`) y los mandos (`controles.mjs`). Y el reloj
+del monitor ordenaba los últimos periodos en cada refresco para sacar la mediana.
+
+**Qué se hizo** (`mkw.mjs`, `controles.mjs`):
+
+- **`relojMonitor` es el planificador único**: un solo `requestAnimationFrame` (atado una vez, sin crear una función
+  nueva por refresco); los demás se suscriben a `relojMonitor.alRefresco` y él los llama en cada refresco (cada uno en
+  su `try/catch`: si uno falla, los demás siguen).
+- Los periodos van a un **anillo** (`Float64Array` de 240) y la mediana se recalcula solo en los primeros 60 refrescos
+  y después cada 30, no en cada uno.
+- Las colas de esperas y tomas se miran solo si tienen algo.
+- `controles.mjs`: `crearControles({refresco})`; con él, el bucle de los mandos se cuelga del planificador en vez de
+  pedir su propio refresco. **Los mandos se siguen leyendo en cada refresco** a propósito: es la demora del botón al
+  juego.
+- **`?planificador=0`** = los bucles de antes, cada uno con su refresco.
+
+**Medido.** Con el juego, la prueba de las tomas parejas (`prueba-navegador 1800`, monitor de 240 Hz), 3 corridas por
+lado: con el planificador 91,9 / 90,4 / 92,1 % de imágenes parejas, sin él 90,4 / 90,4 / 91,0 %; las 6 corridas 22/22.
+`medir-sitio --perfil pc` (una corrida por lado): CPU por cuadro 8,54 ms (p99 12,8) con, 8,24 (p99 11,2) sin: dentro
+del ruido de una corrida. Qué significa: no cambia el ritmo ni se pierde nada; lo que se gana es trabajo de la página en
+cada refresco (dos llamadas del navegador y un orden de 240 números menos por refresco), que en un monitor de 240 Hz son
+240 veces por segundo. Es chico frente a los 8 ms del juego; el plan lo pedía por los celulares.
+
+**Comprobado.** Bancos `controles` 49/49, `sonido-worklet` 34/34, `relevo` 46/46; `prueba-navegador` 22/22 (6 veces).
+
+## 2026-10-27 · §144 Qué Hz conviene, dicho en la hoja de Gráficos (E6 del plan de rendimiento, terminado en la página)
+
+**Qué faltaba de §137.** §137 puso el aviso en el medidor (`notaHz`) cuando el monitor no es múltiplo de 60 Hz (75,
+144, 165: el juego hace 60 imágenes por segundo y unas duran 2 refrescos y otras 3, y se ve a saltitos). Faltaba
+decirlo antes de que pase, y probarlo en el monitor de 144 Hz de esta PC.
+
+**Qué se hizo:**
+
+- `graficos.mjs`: un párrafo de ayuda en Avanzado → Gráficos (`id: 'notaHz'`, debajo de «fluidez»): «Tu monitor: con
+  60, 120, 180 o 240 Hz el juego se ve parejo. Con 75, 144 o 165 Hz… ponlo en 120 Hz.»
+- `prueba-navegador.mjs`: con `--ventana`, **`MKW_VENTANA="x,y"`** pone la ventana en ese lugar (y de un alto que entra
+  en un monitor de 1080), para correrla en el monitor que se quiera.
+
+**La prueba en 144 Hz** (el dueño la aprobó: una ventana ~1 minuto en el monitor izquierdo): dos corridas con
+`MKW_VENTANA=-1880,530` (la primera con la ventana más alta que el monitor). Las dos midieron **240,1 Hz**: Chrome manejado
+por Playwright siguió el ritmo del monitor principal (o Windows la dejó en él), así que **no se pudo ver el caso de
+144 Hz** en esta PC. La segunda corrida dio 22/22 y 98,8 % de imágenes parejas. Lo que el banco sí prueba: `graficos`
+46/46 (1 nueva: el párrafo está y `notaHz(144)` avisa, `notaHz(240)` no).
+
+**Para el dueño:** abrir el juego en el monitor de 144 Hz, Avanzado → Gráficos → «Mostrar qué frena»: el medidor debe
+decir 144 Hz y el aviso; en Windows, ponerlo en 120 Hz lo deja parejo.
+
+## 2026-10-27 · §145 Las tres pruebas que fallaban de antes, arregladas
+
+**Qué pasaba.** Tres pruebas venían fallando desde antes del plan de rendimiento (anotadas en §140–§144 como «fallas de
+antes»). Ninguna era un error del juego ni de la página: las tres eran **la prueba misma**, que había quedado vieja o
+miraba demasiado pronto.
+
+**1. `prueba-inicio` daba 8/14.** §116 dejó Multiplayer «🚧 Trabajando para usted» (gris, Enter no abre nada). La prueba
+seguía apretando ↓ Enter para entrar a Multiplayer: no entraba, y todas las teclas siguientes caían en otro botón (una
+**falla en cascada**: Options apretaba Single Player, y de ahí en adelante todo corrido). Arreglo
+(`web/navegador/prueba-inicio.mjs`):
+
+- un punto nuevo, primero: **por omisión Multiplayer está en obra** (el botón gris, `aria-disabled`, Enter no cambia de
+  menú y `estado.enObra` cuenta el intento);
+- el resto de la prueba abre la página con **`?multi=1`** (Multiplayer como antes de §116), que es lo que esa parte
+  siempre probó; en el sitio, `juegos.html?mkw=1%26inicio%3D1%26multi%3D1`.
+
+Resultado: **15/15** (`node web/navegador/prueba-inicio.mjs`).
+
+**2. `controles-panel`: «la zona muerta: + con el cursor» fallaba.** La prueba lleva el cursor del sitio con un stick de
+mentira. Con poca distancia empujaba a 0,5 repartido en la dirección: en diagonal, 0,35 por eje. El `mando.js` del sitio
+aplica la zona muerta **por eje** (0,22), así que quedaba 0,17 de cada lado y el cursor avanzaba ~0,2 px por cuadro: a
+los 400 cuadros seguía a 40 px del «+» y el clic caía en nada (medido con una traza de la posición cada 40 cuadros). Una
+persona empuja más fuerte: no es de la página. Arreglo (`banco/pruebas/controles-panel/index.html`, `ir()`): cada eje
+por su cuenta, con al menos 0,45 si falta más de 2 px. Resultado: **25/25**, dos corridas.
+
+**3. `mando-sitio` §106: intermitente** (fallaba 3 de 4 corridas). El `mando.js` del sitio cambia la ayuda de teclado
+por la del mando **cada 500 ms** (`aplicaPistas` en su bucle); la prueba miraba unos cuadros después de cerrar un menú y
+a veces llegaba antes de esa vuelta. Arreglo (`banco/pruebas/mando-sitio/index.html`): espera el cambio hasta 2 s y, si
+falla, dice qué vio (la ayuda, si está escondida y si `html.mando-on`). Resultado: **11/11, cinco corridas seguidas**.
+
+**Qué significa.** Las fallas que se arrastraban eran de las pruebas, no del juego; ahora las tres dan todo bien y una
+falla en ellas vuelve a querer decir algo.
+
+## 2026-10-27 · §146 Apurar lo que el juego espera y estaba pedido de fondo (D3 del plan de rendimiento)
+
+**Qué pasaba.** El cartero de los lotes (`lote.mjs`, §104) tiene dos filas: la **urgente** (lo que el juego está esperando
+ya) y la **de fondo** (lo que se baja por adelantado). Si el juego pedía un pedazo que ya estaba en la fila de fondo, o que
+ya viajaba en un lote de fondo, esperaba a que llegara **todo** ese lote: si el pedazo iba al final de un envío de 8 MB, el
+juego quedaba parado lo que tarda en bajar el envío entero.
+
+**Qué se hizo.**
+
+- `web/navegador/lote.mjs`: `apurar(url, inicio, fin)`. Si el pedazo todavía está en la fila de fondo, **pasa a la
+  urgente** (sale en el próximo envío urgente: «subido»). Si ya viaja en un lote y delante de él faltan más de 512 KB
+  (`lejosBytes`), contesta «lejos». Si está cerca, «no» (conviene esperarlo). Lleva la cuenta de cuánto llegó de cada
+  lote en camino (`llegado`) para saber qué tan lejos está. `estado.apurados`, `estado.lejos`.
+- `web/navegador/disco.mjs`: cuando el juego lee un bloque que está en camino de fondo, lo apura; si está «lejos», lo
+  pide **aparte** (un pedido urgente solo de ese pedazo) y usa lo que llegue primero, el pedido aparte o el lote.
+  `estado.apurados`, `estado.aparte`, `estado.aparteGano` (cuántas veces el aparte llegó antes).
+- **`?apurar=0`** = como antes (esperar el lote). `medir-sitio.mjs` muestra estos contadores en su informe.
+
+**Medido.** Banco `lote` (red de mentira, un pedazo al final de un lote de 8 MB): **50 ms** con apurar contra **1.672 ms**
+esperando el lote. En la página real (`medir-sitio --red 20`, una corrida de cada una) los pedidos urgentes pasaron de 6
+a 33: el juego dejó de esperar pedazos de fondo. La carga total salió 164,4 s con apurar y 167,1 s sin él, pero esas dos
+corridas se pisaron con otra medida (V3) que corría al mismo tiempo: **la comparación limpia está pendiente** (la vuelve
+a correr §151 con `--arranque`).
+
+**Comprobado.** Banco `lote` 28/28 (3 nuevas) y `disco` (todo bien con la PC libre; con dos compilaciones al lado, el
+punto de tiempo «10 archivos en paralelo» dio 525 contra 236 ms y no pasó su umbral).
+
+## 2026-10-27 · §147 El fantasma de la página, de a 3 y con tope (D12 del plan de rendimiento)
+
+**Qué pasaba.** En Contrarreloj, al abrir la pantalla de fantasmas, la página pide la tabla de los 10 mejores de esa pista
+y prueba sus fantasmas **de a uno, en fila**: si los primeros no subieron fantasma, son varias idas y vueltas a Firebase
+seguidas. Si llega tarde, el juego corre contra el experto de Retro Rewind. Y una bajada que se colgaba frenaba todo.
+
+**Qué se hizo** (`web/navegador/fantasma-pagina.mjs`):
+
+- los fantasmas de la tabla se piden **de a 3 a la vez** (`aLaVez`), pero se elige igual que antes: el mejor tiempo que
+  baja bien (se miran en orden; los siguientes ya vienen en camino);
+- cada bajada tiene un **tope de 4 s** (`topeMs`): una colgada se da por perdida y se sigue con la siguiente; si alguna
+  se venció y no hubo fantasma, no se recuerda «no hay» (la próxima vez se reintenta);
+- `estado.vencidos`, `estado.msBajar`. **`?fantasmaParalelo=0`** = de a uno y sin tope (como antes).
+
+**Medido** (banco `fantasma-pagina`, nube de mentira con 200 ms por bajada y el fantasma en el 4.º de la tabla): de a uno
+**804 ms**, de a 3 **406 ms**; con una bajada colgada, el fantasma llega igual a los 602 ms (tope de 600 ms en la prueba).
+
+**Comprobado.** Banco `fantasma-pagina` 21/21 (2 nuevas); `node web/navegador/prueba-fantasma.mjs` 10/10 con el juego.
+Lo que no se hizo: esperar el fantasma **dentro del juego** antes de la cuenta (el gancho nativo tendría que esperar a la
+página: es recompilar); hoy se gana llegando antes.
+
+## 2026-10-27 · §148 Sin filtros que se recalculen encima del juego (P3 del plan de rendimiento)
+
+**Qué pasaba.** Algunos adornos de la página encima del juego usan filtros (sombra, desenfoque) que el navegador recalcula
+en **cada cuadro** si lo que tienen adentro o detrás se mueve: el contador DNF tenía dos sombras sobre la pila entera
+mientras el número se anima (golpe, crece), y el plano del minimapa del selector de pistas desenfocaba lo que tenía
+detrás (el juego, moviéndose). El cuadro de la barra del descanso (`.playlist-breve`) ya no tenía desenfoque.
+
+**Qué se hizo** (todo con la clase `filtros-livianos` en `<html>`, que pone `mkw.mjs`; **`?filtrosLivianos=0`** = como antes):
+
+- `dnf.mjs`: la misma sombra pasa de la pila (que se anima) a cada lienzo (quietos: se calcula una vez) y el número
+  se anima en su propia capa (`will-change: transform, opacity`): **se ve igual**;
+- `index.html`: el plano del selector (`.vc-plano`) sin desenfoque, con un fondo casi opaco del mismo color.
+- **No se tocó** el menú de inicio (`inicio.mjs`: el panel y los botones con desenfoque sobre la imagen, y sus
+  animaciones): cambia el aspecto y eso lo decide el dueño (el plan lo dice así).
+
+**Comprobado.** Banco `cuenta-dnf` 26/26 (1 nueva: con la clase, la pila sin filtro, cada lienzo con la misma sombra y el
+número en su capa). No se midió el tiempo de la tarjeta con el contador en pantalla (el perfil de la tarjeta de §115 mide
+WebGPU, no lo que compone el navegador encima): queda para el informe en el Oppo.
+
+## 2026-10-27 · §149 El presupuesto de la gama media en el informe (H2 del plan de rendimiento)
+
+**Qué pasaba.** «60 fps en la gama media» no decía qué pieza tiene que bajar ni cuánto. El plan fija una meta por pieza,
+medida en el Oppo (el teléfono que hay), para que en un teléfono medio cada una entre en 12 ms: hilo del juego ≤ 3,3 ms,
+hilo de dibujo ≤ 3,3, sonido y disco ≤ 1, ayudantes ≤ 2, la página ≤ 1, la tarjeta ≤ 2.
+
+**Qué se hizo:**
+
+- `graficos.mjs`: `METAS_PRESUPUESTO` y `presupuesto({ juegoMs, tarjetaMs, paginaMs })` → cada pieza con su meta y su
+  estado (🟢 entra, 🔴 no entra, ⚪ sin medir). Hoy el juego, aurora, el sonido y el disco van en **un solo hilo**: esa pieza
+  se mide junta (dice «hoy incluye el dibujo, el sonido, el disco y la espera a la tarjeta») y las que todavía no se
+  pueden separar van como «sin medir» hasta que los hilos (H4) las separen;
+- `mkw.mjs`: el planificador de §143 mide **lo que la página gasta en cada refresco** (`relojMonitor.paginaMs`, promedio
+  que se mueve) y «📋 Copiar el informe de rendimiento» trae la parte `presupuesto` (**`?presupuesto=0`** = sin ella);
+- `medir-sitio.mjs` la imprime y la guarda en su JSON (y los contadores de §146).
+
+**Comprobado.** Banco `graficos` 49/49 (3 nuevas). Con el juego, en esta PC, ver la tabla de §146 (la corrida de
+`medir-sitio`). **Falta (el dueño):** el informe en el Oppo, con y sin el lastre de H1 (eso es lo que el plan pide para
+cerrar H2 del todo).
+
+## 2026-10-27 · §150 Qué lee el juego en una carrera entera, hasta la meta (V3 del plan de rendimiento)
+
+**Qué pasaba.** Todas las medidas de la carga cortaban a los 15–20 s de carrera, y las pruebas terminan la carrera por
+código. Nadie había visto qué lee el juego del disco **en la última vuelta y en la meta** (la música de la última vuelta,
+la fanfarria, los retratos de la tabla). Si algo de eso viene por la red en mitad de la carrera, es un tirón.
+
+**Qué se hizo.** `herramientas/medir-carrera-entera.mjs`: carreras directas con las 12 en CPU (`?soloCpu=1`: la carrera
+se maneja sola hasta la meta), cada una con un perfil de Chrome vacío (sin caché) y `?trazaDisco=1` (la página escribe
+cada lectura del juego). Cada lectura se anota en su **tramo**: «antes» (hasta la largada), «carrera» (hasta que llega la
+primera o las 12) y «meta» (los 15 s siguientes). Además `mkwFaltas()` (lo que en la carrera fue a la red, §121) y cuántas
+veces el juego **esperó** a la red. Salida en `build/web/datos/carrera-entera/` (nombres de archivos del juego: no va a git).
+
+**Medido** (`node herramientas/medir-carrera-entera.mjs`, pistas 0.0, 13.2 y 30.2):
+
+| Pista | Carrera | Antes | Carrera | Meta | A la red en carrera | El juego esperó a la red |
+|---|---|---|---|---|---|---|
+| 0.0 | 113 s | 369 lecturas, 31,3 MB | 204, 3,2 MB, 2 archivos | 120, 1,8 MB, 7 archivos | 14 | 0 |
+| 13.2 | 160 s | 389, 33,6 MB | 268, 4,2 MB, 2 archivos | 135, 2,0 MB, 8 archivos | 15 | 0 |
+| 30.2 | 145 s | 390, 35,6 MB | 258, 4,0 MB, 2 archivos | 117, 1,8 MB, 7 archivos | 15 | 0 |
+
+En la carrera el juego lee **dos archivos**: la música de la pista (`*_N.brstm`, leída de a poco mientras suena) y el
+principio de la fanfarria del final. En la meta: el resto de la fanfarria (~1,8–2 MB) y 7–8 retratos de personajes
+(`*-css.tpl`, 10 KB cada uno). Unas 15 lecturas por carrera fueron a la red, y **el juego no esperó ninguna vez**: el disco
+las tenía pedidas antes de que hicieran falta. **Lo que no se vio:** la música de la última vuelta (`*_F.brstm`): con solo
+CPU nadie dispara ese cambio de música como un humano (queda para una carrera con un humano que llegue a la vuelta 3).
+
+## 2026-10-27 · §151 Medir la carga como la sufre un amigo (V2 del plan de rendimiento, la herramienta)
+
+**Qué pasaba.** `medir-sitio.mjs` mide la CPU por cuadro en la carrera y cuánto se bajó, pero no **cómo se siente la
+carga**: si la página se traba mientras arranca (el hilo ocupado), qué proceso de Chrome usa la CPU (la página, la GPU,
+la red) y qué pasa en un PC con pocos núcleos.
+
+**Qué se hizo** (`herramientas/medir-sitio.mjs`):
+
+- **`--arranque`**: mientras carga, una página aparte (`data:`) marca cada 50 ms cuánto se atrasó su temporizador (si el
+  navegador está tomado, se atrasa), y cada 1 s se pregunta a Chrome la CPU de cada proceso por tipo
+  (`SystemInfo.getProcessInfo`). Imprime una línea «arranque (§151)» y lo guarda en el JSON (`arranque`).
+- **`--nucleos N`**: deja a Chrome usar solo N núcleos (afinidad de los procesos de Chrome por PowerShell), para ver la
+  carga en un PC más chico.
+
+**Estado.** La herramienta está; **las corridas no se hicieron todavía** (esta hora se las llevó N1). La primera que toca
+es la pareja limpia de D3 (§146): `node herramientas/medir-sitio.mjs --perfil pc --red 20 --etiqueta d3-no --extra
+"&apurar=0" --arranque` y lo mismo con `--etiqueta d3-si`.
+
+## 2026-10-28 · §152 Los contadores dentro del motor (V4 del plan de rendimiento)
+
+**Qué pasaba.** El plan supone cosas como «cada acceso a la memoria de la Wii cuesta X» o «la multiplicación-suma exacta
+pesa Y», pero nunca se había **contado** cuántas veces por cuadro pasa cada cosa dentro del motor. Sin eso no se puede
+decir qué arreglo del motor (H6–H8, N4–N7) mueve la aguja.
+
+**Qué se hizo.** Un programa **aparte**, con contadores dentro del motor (nunca en el que se publica):
+
+- `terceros/Wiicompiled/runtime/include/mkw_contadores.h` + `src/mkw_contadores.cpp` (en el parche de `parches/`): 11
+  contadores de 64 bits y `MKW_CUENTA(k)`, que **solo existe con `-DMKW_CONTADORES`**; sin esa marca no es nada y el
+  programa normal no cambia (comprobado: el programa de Node se compiló y anduvo igual).
+- Dónde cuenta: cada lectura y escritura de la memoria de la Wii por el camino revisado (`Memory::Read*/Write*`, la tabla
+  de páginas) y cuántas caen al camino lento (dispositivos); los accesos «resueltos» (`ReadResolved*`) y cuántos vuelven al
+  camino revisado; los «planos» (`Flat*`); la multiplicación-suma exacta (`MkwFma/MkwFms`); las llamadas indirectas
+  (`InvokeIndirectCpu`); los cambios de fibra (`Switch`, en wasm cada uno es una suspensión JSPI) y las esperas JSPI del
+  ritmo (`vi.cpp`).
+- Compilar: `MKW_CFLAGS_EXTRA=-DMKW_CONTADORES python herramientas/compilar-web.py --modo navegador --carpeta
+  build/web-contadores` (6 min, 595 piezas). La página, con **`?contadores=1`**, lee los 11 cada segundo (`mkw_contador(k)`),
+  los divide por los cuadros de ese segundo y los deja en `mkwEstado.contadores` y en el registro («[contadores] por
+  cuadro …»).
+- Medir: `node herramientas/medir-contadores.mjs` (un jugador + 11 CPU de nivel máximo, pista 13.2, 40 s acelerando) y
+  `--registro <archivo>` para resumir un registro ya hecho (la sala: `prueba-sincro --directa` con ese programa y
+  `--extra=&contadores=1`). Salida `build/web/datos/contadores/`.
+
+**Medido** (mediana por cuadro de la carrera):
+
+| Contador | Un jugador + 11 CPU | Sala (2 humanos + 10 CPU) |
+|---|---|---|
+| Lecturas por el camino revisado | 710.356 | 640.573 |
+| …que cayeron al camino lento | 0 | 0 |
+| Escrituras por el camino revisado | 405.523 | 379.827 |
+| …al camino lento | 0 | 1 |
+| Accesos «resueltos» | 200.017 | 186.101 |
+| …que volvieron al camino revisado | **todos** (200.017) | todos (186.101) |
+| Accesos «planos» | 765.393 | 686.333 |
+| Multiplicación-suma exacta escalar | 0 | 0 |
+| Llamadas indirectas | 11.047 | 8.905 |
+| Cambios de fibra | 8 | 7 |
+| Esperas JSPI | 2 | 1 |
+
+**Qué significa.**
+
+- Por cuadro el juego toca la memoria de la Wii unas **1,1 millones de veces** (710 mil lecturas + 406 mil escrituras).
+  Los «planos» (765 mil) y los «resueltos» (200 mil) **no se suman**: en wasm los dos terminan llamando al camino revisado,
+  así que ya están adentro de ese millón (dicen por qué puerta entró cada acceso). Todos pagan la tabla de páginas y dar
+  vuelta los bytes. Es, de lejos, lo que más se repite: si cada acceso cuesta 2–3 ns de más que en un PC nativo, son
+  2–3 ms por cuadro. Esto apunta a H6/H7 (la RAM en un lugar fijo, guardada ya dada vuelta) como el arreglo del motor que
+  más puede mover; N1 (§153) lo mide.
+- El camino lento casi no se usa (0–1 por cuadro): la tabla de páginas siempre encuentra RAM.
+- Los «resueltos» en wasm **siempre** vuelven al camino revisado (200 mil por cuadro): en wasm ese atajo no existe
+  (`ResolveRangeHost` da nulo) y paga dos veces la revisión.
+- La multiplicación-suma exacta **escalar** no aparece en la carrera: el juego usa casi solo la de **pares**
+  (`PPC_PsMadd*`, 1.254 lugares en el código traducido contra 98 de la escalar), que en wasm va por `vfma_f32` y no pasa
+  por `MkwFma`: este contador no la ve. Para medirla hace falta otro contador ahí (queda anotado).
+- Fibras y esperas JSPI: 7–8 cambios y 1–2 esperas por cuadro: **no** es un costo que importe (M10 baja de prioridad).
+- Llamadas indirectas: ~9–11 mil por cuadro (cada una busca la función por su dirección).
+
+**Comprobado.** `medir-contadores` (un jugador, 37 s de carrera) y `prueba-sincro --directa` con el programa de
+contadores **13/13**; el programa normal de Node compilado con los mismos fuentes (la marca apagada) arranca y corre.
+
+## 2026-10-28 · §153 El impuesto del navegador, medido: el mismo juego nativo contra wasm (N1 del plan de rendimiento)
+
+**La pregunta.** Todo el plan de rendimiento suponía cuánto le cuesta al juego correr **dentro del navegador**, y nunca
+se había medido. En WebAssembly cada lectura o escritura de la memoria de la Wii pasa por una tabla de páginas (en un PC
+nativo es un acceso directo que vigila el sistema operativo), los bytes se dan vuelta sin una instrucción para eso, la
+multiplicación-suma exacta se arma con varias operaciones y cada cambio de hilo del juego es una suspensión JSPI. Un
+programa nativo no paga nada de eso. La razón entre los dos es el **impuesto del navegador**: si es chico (menos de
+×1,3) todo se gana dentro del motor; si es grande (×1,5 o más), la gama baja solo se alcanza fuera del navegador (N10).
+
+**Qué se hizo.**
+
+- `herramientas/compilar-nativo.py`: arma **el mismo juego** (runtime de WiiCompiled con nuestros cambios, aurora sin
+  pantalla de `web/headless`, Crypto++, pugixml, xxhash, los datos y los 114 shards traducidos de Retro Rewind) como
+  programa de Windows, con clang 22 de Visual Studio 18, las **mismas opciones por grupo** que `compilar-web.py` (el juego
+  traducido sin atajos de punto flotante) y SDL3 estática armada de la fuente que ya trae emsdk. Tres variantes:
+  - `--cpu v3` (por omisión): x86-64-v3 (AVX2 + FMA), como la versión de escritorio de WiiCompiled;
+  - `--cpu v2`: x86-64-v2, **sin FMA** (lo mínimo que acepta el runtime: sus barajadas de bytes piden SSSE3);
+  - `--revisado`: v3 pero la memoria de la Wii **siempre por la tabla de páginas, como en wasm**
+    (`-DMKW_FORZAR_REVISADO`, una línea nueva en `guest_flat_memory.h`, en el parche).
+  Salida `build/nativo-*/mkw-nativo.exe` (82 MB). **Nunca a git**: es el ejecutable de Nintendo traducido.
+- Lo que no entra en el nativo: los ganchos de la página (`web/juego`, `web/dvd`, `web/thp`, `web/red`: usan EM_JS y casi
+  no corren fuera de la sala). Tres arreglos para que compile con clang + la biblioteca de Microsoft: la marca de Crypto++
+  que permite clang en Windows (`MKW_CRYPTOPP_ALLOW_CLANG_MSVC_ABI`), `music_attenuation.cpp` sin `_WIN32` (su camino de
+  «otro sistema», el mismo que en wasm: WinRT no compila con clang) y las funciones de apoyo de clang para dividir
+  números de 128 bits.
+- `vi.cpp`: con `-DMKW_NATIVO_MEDIR` las esperas del ritmo (`SleepPreciselyUntil`) se suman a `g_mkwHostIdleMs`, igual
+  que en wasm. Así la línea «trabajo X ms por cuadro» que imprime `aurora_manual.cpp` cada 60 cuadros dice **lo mismo en
+  los dos**: el tiempo del cuadro menos lo que el juego esperó al siguiente barrido de la tele.
+- `herramientas/medir-impuesto.mjs`: corre cada programa **uno detrás del otro** (nunca juntos: se robarían la CPU), 3.600
+  cuadros (1 minuto), sin pantalla, sin sonido (SDL «dummy»), sin red, en un hilo (`mix_worker = false`), dos veces cada
+  uno, y compara las ventanas de 60 cuadros con el mismo número. El wasm es el modo Node (`web/node/correr.mjs`): el
+  mismo motor de V8 que Chrome, sin la página. Salida `build/web/datos/impuesto/`.
+- De paso: **el modo Node no enlazaba desde §91** (dos símbolos de los mandos virtuales que solo da la página del
+  navegador): `web/headless/pad_vacio.cpp` los da vacíos. Y el `.exe` nativo no termina solo al final (queda esperando un
+  hilo al cerrar): la herramienta lo cierra al ver «listo».
+
+**Qué escena es.** Sin nadie que toque nada, el juego pasa por el arranque y el título; la imagen de fondo del título de
+Mario Kart Wii **es una carrera de verdad de CPU** («New race started» en el registro, cuadro ~180). Los dos programas ven
+los mismos cuadros, en el mismo orden.
+
+**Medido** (`node herramientas/medir-impuesto.mjs --cuadros 3600 --nativos v3,v2,v3-revisado --repetir 2`; trabajo
+promedio por cuadro, ms):
+
+| Tramo | Nativo v3 | Nativo v2 (sin FMA) | Nativo «revisado» | wasm | wasm ÷ nativo v3 |
+|---|---|---|---|---|---|
+| Arranque (cuadros 1–600) | 0,78 | 0,79 | 0,91 | 1,85 | ×2,36 |
+| Título (600–1.800) | 0,57 | 0,55 | 0,73 | 1,20 | ×2,12 |
+| Después (1.800–3.600) | 0,54 | 0,56 | 0,72 | 1,16 | ×2,15 |
+| **Todo** | **0,58** | 0,59 | 0,75 | **1,29** | **×2,2** |
+
+**El impuesto del navegador en este PC: ×2,2.** El mismo trabajo del juego que el PC hace en 1 ms nativo, el navegador lo
+hace en 2,2 ms.
+
+**De dónde sale** (tramo «después», la diferencia entre wasm y nativo es 0,62 ms por cuadro):
+
+| Causa | Cómo se separa | ms | Parte |
+|---|---|---|---|
+| La memoria de la Wii por la tabla de páginas | nativo «revisado» − nativo v3 | 0,18 | ~30 % |
+| La multiplicación-suma exacta (FMA) | nativo v2 − nativo v3 | 0,02 (dentro del ruido) | ~0–3 % |
+| El resto: dar vuelta los bytes sin instrucción, las revisiones propias de wasm, el código que arma V8, JSPI | wasm − nativo «revisado» | 0,44 | ~70 % |
+
+Comparación eléctrica: es como medir las pérdidas de una línea y separarlas por prueba: con y sin la carga
+«memoria revisada», con y sin FMA. Lo que no se pudo aislar con un interruptor queda junto como «resto».
+
+**Qué significa.**
+
+- ×2,2 es **grande** (el plan ponía la raya en ×1,5). Dentro del navegador el juego trabaja más del doble que nativo.
+- La memoria revisada explica ~30 %: H6/H7 (la RAM en un lugar fijo, guardada ya dada vuelta) atacan justo eso, y V4
+  (§152) cuenta 1,1 millones de accesos por cuadro en la carrera.
+- La FMA **no** pesa (en wasm la de pares va por `vfma_f32`, y la escalar casi no aparece: V4): H8 baja de prioridad.
+- El ~70 % restante es del propio wasm. Una parte se puede bajar (dar vuelta los bytes con una barajada de SIMD, menos
+  revisiones de límites), pero buena parte es el precio de la plataforma: refuerza que la gama baja necesita la app
+  nativa (N10) o decirlo (N12).
+
+**Cuidado con el número.** La escena es la carrera de fondo del título: **liviana** (1,2 ms por cuadro en wasm, sin dibujo
+porque no hay pantalla). En la carrera de 12 karts del navegador el hilo del juego trabaja ~13 ms, la mayor parte en
+dibujar con aurora (que aquí no corre). La razón ×2,2 es la del **código del juego y del runtime**; lo de la tarjeta de
+video y el proceso de GPU de Chrome no está en este número (lo mide la parte de la tarjeta: §115, V1). Para la misma
+medida en una carrera de 12 karts haría falta un guion de botones igual en los dos programas (queda anotado).
+
+**Comprobado.** Los tres programas nativos y el de Node corrieron los 3.600 cuadros dos veces cada uno; las dos vueltas
+se parecen (tramo «después»: nativo 0,51 y 0,53 ms; revisado 0,71 y 0,67; wasm 1,15 y 1,06: ±8 %), así que la razón
+está entre ×2,0 y ×2,3. El parche `parches/runtime-web.diff` regenerado se aplica al revés
+limpio sobre `terceros/Wiicompiled` (o sea: guarda exactamente lo que hay).
+
+## 2026-10-28 · §154 La huella ampliada: saber qué se separó y cuándo (R5 del plan de rendimiento)
+
+**Qué pasaba.** En la sala, cada consola corre su propia copia de la carrera; para saber que siguen iguales, cada 120
+cuadros (2 s) se comparaba una **huella**: un número que mezcla el avance de los 12 karts, más otro de los botones. Si
+no coincidían, se sabía *que* se separaron, pero tarde y sin saber *qué* (¿un kart? ¿el azar?). Es la red de seguridad
+de todo lo que toque la simulación (R2, G1, M1 del plan).
+
+**Qué se hizo** (`web/navegador/lockstep.mjs`, `mkw.mjs`; solo la página, sin recompilar):
+
+- **cada 30 cuadros** (medio segundo) en vez de 120 (`huellaCada`; **`?huellaCada=120`** = como antes);
+- `huellaAmpliada(L)`: la de siempre (que **sigue siendo la que decide**) más **13 partes**: una por cada uno de los 12
+  `RaceinfoPlayer` (sus 0x54 bytes: avance, puesto, vuelta, puntos de control, tiempos) y una del **azar** de la carrera
+  (los dos `Random` de Raceinfo); además lleva **mis valores** de cada parte (el volcado). **Trampa:** dentro de
+  cada `RaceinfoPlayer` hay punteros a objetos del montón (por ejemplo `0x903c73f4`) que no tienen por qué ser iguales en
+  dos consolas; la primera prueba con el juego marcó «los 12 karts distintos» desde el cuadro 30. Las palabras que son
+  direcciones de la Wii (0x80000000–0x93FFFFFF) no entran en la parte (sí en el volcado);
+- el paquete 4 lleva las partes **después** de los 16 bytes de siempre: una página vieja en la misma sala lee los 16 y
+  sigue entendiendo (probado en el banco);
+- si una parte difiere, la primera vez se anota `estado().parteDistinta = {cuadro, con, partes: ['kart3', …], volcado}`
+  y una línea en el registro con mis valores (el otro anota los suyos: juntando los dos registros se ve el campo exacto).
+  Si la huella de siempre coincide, **nadie sale** por esto: solo se avisa. Si la de siempre difiere (una desincronía de
+  verdad), `desincronizado.partes` dice qué partes;
+- **`?huellaAmpliada=0`** = la huella de siempre sola.
+
+**Lo que no entra todavía.** El plan pedía también la posición, la velocidad y los objetos de cada kart. Esos viven en los
+objetos de física del kart (`KartObjectManager` → cada kart → su cuerpo y su física) y la cadena de punteros no está
+verificada en esta versión: meter una dirección adivinada en algo que puede sacar a alguien de la carrera no vale la
+pena. Queda para cuando se decompile con el vigía (§62); la forma del paquete ya admite más partes.
+
+**Comprobado.** Con el juego, `prueba-sincro --directa` **13/13**: 74 huellas iguales en cada pestaña (con 120 cuadros
+eran ~18), ninguna parte distinta. (Una primera corrida dio 11/13 con dos compilaciones nativas andando al lado —B a 36
+cuadros/s— y con los punteros todavía adentro; repetida con la PC libre y sin punteros, limpia.) Banco `lockstep` **55/55** (4 nuevas: una parte de diagnóstico distinta se nombra y manda mis valores sin
+sacar a nadie; cada 30 cuadros; una desincronía de verdad nombra su parte; una página vieja en la sala se entiende).
+
+## 2026-10-29 · §155 El aparato de mentira: la gama media simulada en este PC (H1 del plan de rendimiento, la parte del PC)
+
+**Hora de inicio de esta tanda de 2 h: 15:17.**
+
+**Qué pasaba.** El plan quiere 60 fps también en un teléfono de gama media, pero para probar solo hay este PC (Ryzen 7
+9800X3D, de lo más rápido que existe) y el Oppo (también de gama alta). Lo que en ellos entra holgado puede no entrar en
+un aparato medio, y sin un aparato medio «la gama media llega» no se puede comprobar. Casi todos los ítems del plan que
+dicen «en la gama media» dependen de esto: por eso fue primero.
+
+**La idea.** Frenar este PC con un **lastre calibrado**, como la carga ficticia con que se prueba una fuente de poder:
+no hace nada útil, pero consume lo mismo que el circuito de verdad. Cuatro frenos, cada uno con su bandera (sin la
+bandera, o con 1, no se instala nada):
+
+| Freno | Bandera | Qué hace |
+|---|---|---|
+| CPU del hilo del juego | `?lastre=K` | Cada vez que el juego va a esperar, mide cuánto trabajó desde la espera anterior (t) y gira (K−1)·t más. Así cada trozo de trabajo dura K veces: un núcleo K veces más lento. `?lastre=1` = solo mide (la «CPU pura» por cuadro en el informe). |
+| El hilo del sonido | `?lastreAyuda=K` | Lo mismo dentro del AudioWorklet (el único hilo aparte: el programa del juego es de un solo hilo). El worklet no tiene reloj fino: lo que tarda un bloque se **estima** promediando miles de diferencias de `Date.now` y el giro es un lazo de vueltas contadas, calibrado al arrancar. |
+| La caché grande | `?ladron=64` | Un Worker que recorre 64 MB sin parar y llena la caché L3 (96 MB en este procesador, 2–4 MB en un teléfono medio) con su basura. |
+| La tarjeta de video | `?lastreGpu=K` | Cada pasada de dibujo se repite K−1 veces más, con los mismos dibujos, en imágenes de descarte del mismo tamaño y formato. La imagen que se ve no cambia. Si el perfil de la tarjeta mide esa pasada (`?perfilGpu=1`), la marca de fin va en la última repetición: el tiempo incluye el lastre. |
+| Pocos núcleos | `medir-sitio --nucleos N` | Ya estaba (§151): Chrome atado a N procesadores lógicos (§156). |
+
+El aparato «gama media» que propone el plan: `?lastre=3.5&lastreAyuda=3&ladron=64&lastreGpu=6` (CPU ×3,5, tarjeta ×6:
+los factores de H2, §149).
+
+**Qué se hizo:**
+
+- `web/navegador/lastre.mjs` (nuevo): `crearLastreCpu`, `crearLadron`, `instalarLastreGpu`, `lastreDeParametros`.
+- `web/navegador/mkw.mjs`: las cuatro esperas del juego (`mkwEsperaHasta`, `mkwEsperaReloj`, `mkwEsperaToma`,
+  `mkwEsperaAtrasada`) pasan por el lastre de CPU; el de la tarjeta se instala **antes** del perfil de la tarjeta
+  (`perfil-gpu.mjs` pone y saca sus envolturas con las ventanas de §123: si fuera después, taparía las nuestras); el
+  medidor no cuenta lo girado como espera; el informe de rendimiento trae `lastre` y, con `?lastre`, `cpuPuraMs`;
+  `window.mkwLastre()`. También `?perfilGpu=1` en la dirección (antes solo desde el cajón): `medir-sitio` abre un
+  perfil de Chrome nuevo cada vez y no puede tocar el `localStorage`. El informe suma las pasadas medidas
+  (`perfilTarjeta.msPorCuadro`).
+- `web/navegador/sonido-worklet.js` y `sonido.mjs`: la opción `lastreAyuda` y su informe (`lastreMs`, `lastreTrabajoMs`).
+- `herramientas/medir-sitio.mjs`: `--puerto N` (para medir al lado de otra medición), la línea del medidor de la página
+  (con la CPU pura) y la del perfil de la tarjeta.
+- Banco **`lastre`** (nuevo, 15 puntos).
+
+**Trampas que aparecieron:**
+
+1. **El «juego ms» del medidor no es CPU pura.** Con `?lastre=2` en la carrera, el medidor pasó de 9,6 a 14,3 ms y no a
+   19,2. La razón: aurora espera a que el navegador tome la imagen (`mkwEsperaToma`) y el runtime no cuenta esa espera
+   como espera, así que el «juego ms» lleva adentro unos 5 ms que son de esperar a la tarjeta y al compositor. El lastre
+   escala lo que de verdad trabaja la CPU (lo que pasa entre una espera y la siguiente), que es lo correcto para «un
+   núcleo K veces más lento». Para verlo, `?lastre=1` da la CPU pura por cuadro.
+2. **La tarjeta sube su reloj con la carga.** En el banco, con el doble de pasadas la tarjeta tardaba ×1,7, no ×2: la
+   NVIDIA acelera cuando tiene trabajo. La prueba ahora calienta 2 s y compara cada medida con lastre contra una sin
+   lastre tomada justo al lado; además mide con las marcas de tiempo de la propia tarjeta, no con el reloj de la página
+   (que suma una demora fija del aviso de «terminé»).
+3. **«GPU por cuadro» de `medir-sitio` no ve el lastre de la tarjeta.** Con `?lastreGpu=4` en el juego se repitieron
+   395.820 pasadas sin un error, pero ese número (del envío a que la tarjeta avisa) no subió: en una RTX 3080 Ti el
+   trabajo de dibujo de la Wii es chico al lado de la demora de la cola. El que sí lo ve es el perfil con marcas de
+   tiempo (`?perfilGpu=1`), que mide cuánto tarda cada pasada adentro de la tarjeta.
+4. **`setBindGroup` tiene dos formas** (con 3 o con 5 argumentos): una envoltura que pasa siempre 5 (con `undefined` de
+   más) cambia de forma y falla. Las envolturas pasan los argumentos tal cual llegaron. Y los desplazamientos que Dawn
+   pasa son un pedazo de la memoria entera del programa: se copia ese pedazo al grabar, porque al repetir ya puede ser otro.
+5. **La integrada del Ryzen (una tarjeta débil de verdad) está prendida**, pero Chrome no la entrega: con
+   `--use-webgpu-power-preference=force-low-power` no da ningún adaptador. Para usarla habría que cambiar en Windows la
+   tarjeta de Chrome (Configuración → Pantalla → Gráficos): es un ajuste del sistema, lo decide el dueño.
+
+**Comprobado (banco `lastre`, 15/15, tres corridas):** CPU con K = 1/2/4: 5,85 / 11,66 / 23,32 ms por cuadro (×2,00 y
+×3,99); lo girado es 3 veces lo trabajado con K = 4; un trozo enorme se corta en el tope. Tarjeta (WebGPU de verdad, la
+NVIDIA, marcas de tiempo): 7,68 / 15,96 / 31,09 ms (×2,08 y ×4,05), cada pasada repetida K−1 veces con profundidad +
+stencil, 4 muestras con resolve y desplazamiento de grupo, sin errores y la misma imagen; desinstalado vuelve a lo de
+antes. Sonido: el worklet de verdad gira 3 veces lo estimado con K = 4, y con K = 8 tarda ×7 en hacer 4 s de sonido.
+Ladrón: recorre ~9–24 GB/s y una lectura al azar de 48 MB de la página tarda ×1,38.
+
+**Medido con el juego** (`medir-sitio --perfil pc`, 20 s de carrera, la misma pista; CPU pura = `?lastre=1` o la del
+lastre, ver la trampa 1):
+
+| Corrida | fps | «juego ms» del medidor | CPU pura | Tarjeta (medidor) |
+|---|---|---|---|---|
+| sin lastre (`&lastre=1`) | 60 | 7,7 | **6,1** | 5,3 |
+| `&lastre=2` | 59,8 | 14,5 | **12,1 (×1,98)** | 8,8 |
+| `&lastre=4` (programa viejo) | 29 | 59,4 | 32,8 (×5,4) | 31,4 |
+| `&lastreGpu=4` (y `lastre=1`) | 60 | 8,7 | 7,2 | 5,4 |
+| `&ladron=64` | 60 | 11,3 (antes 9,6) | — | 7,5 |
+| gama media (programa viejo) | 26,2 | 64,3 | 36,5 | 35,3 |
+| `&lastre=4` (programa nuevo) | 30,8 | 55,5 | 30,5 | 28,5 |
+| gama media, programa nuevo, 12 karts CPU máximo (`--piloto`) | 23 (26,2 el medidor) | 63,8 | 35,8 | 29,8 |
+
+6. **Con K = 4 la CPU pura salió ×5,4, no ×4.** Con el cuadro a 30 fps la tarjeta se atrasa y aurora espera que se
+   libere su búfer de subida (`staging_map.hpp`): esa espera era un `emscripten_sleep(0)` que no pasa por la página, y el
+   lastre la contaba como trabajo y la multiplicaba. Lo mismo, más chico, con `lastreGpu=4` solo: +1,1 ms de «CPU». Arreglo
+   (**recompilado**, `parches/aurora-web.diff`): aurora pregunta una vez si la página ofrece `Module.mkwEsperaSubida`
+   (solo con `?lastre`) y, si está, espera por ahí; si no, el `emscripten_sleep(0)` de siempre, igual que antes.
+   Con el programa nuevo, K = 4 dio 30,5 ms de CPU pura (antes 32,8): el arreglo quitó algo, pero sigue ×5. **No es un
+   error del lastre:** con el juego a 30 fps cada cuadro dura el doble y lleva el doble de lo que se calcula por tiempo
+   de reloj (el sonido y los temporizadores del juego se producen por milisegundo real): de 6,1 pasa a ~7,6 ms por cuadro
+   **antes** de multiplicar, y un aparato lento de verdad paga lo mismo. Los cuadros de lógica (§124) lo confirman: 32,2
+   por segundo con 30,8 imágenes, o sea una lógica por imagen, no dos. La prueba limpia de la escala es K = 2, donde el
+   juego sigue a 60: ×1,98.
+
+**Estado.** La parte del PC está entera (los cuatro frenos, el banco, la medida con el juego); falta **la parte del Oppo**
+(manejarlo por USB con `chrome://inspect` y correr la misma carrera con `?lastre=3.5&lastreGpu=6`), que necesita la
+depuración USB prendida: **H1 queda «en curso»**. El criterio del paso 2 «con K = 1, 2 y 4 el cuadro crece 1, 2 y 4
+veces» se cumple (banco `lastre` y K = 2 en el juego ×1,98).
+
+## 2026-10-29 · §156 La carga en un PC chico, la pareja de D3 y una sola tarjeta al cargar (V2 cerrado, E5)
+
+**Qué faltaba.** La herramienta de V2 (§151) estaba hecha pero nunca se había corrido. Y E5 pedía dos cosas: medir con
+Chrome atado a pocos núcleos, y dejar de pedirle tres tarjetas al navegador al cargar.
+
+**Las corridas** (`node herramientas/medir-sitio.mjs --perfil pc --arranque [--nucleos N] [--red 20]`, perfil de Chrome
+nuevo cada vez; `--nucleos N` = N procesadores **lógicos**: en este Ryzen cada núcleo tiene dos, así que 8 = un PC de 4
+núcleos y 8 hilos, y 4 = uno de 2 núcleos y 4 hilos, como un portátil de oficina):
+
+| Corrida | La otra pestaña: atraso p99 / peor / veces > 50 ms | Tareas largas al cargar (la peor) | Carrera |
+|---|---|---|---|
+| PC entero (16 lógicos) | 14 / 15 ms / 0 | 12, la peor 539 ms | 60 fps, 1 cuadro > 16,7 ms |
+| 8 lógicos (4C/8T) | 14 / 32 ms / 0 | 16, la peor 545 ms | 60 fps |
+| **4 lógicos (2C/4T)** | **104 / 317 ms / 48** | 21, la peor 552 ms | 60 fps, 3 cuadros > 16,7 ms |
+| **4 lógicos, programa comprimido (`v2b-n4`, 16:47)** | **91 / 351 ms / 38** | 18, la peor 568 ms | 60 fps, 1 cuadro > 16,7 ms |
+| 20 Mbit/s, sin apurar | 13 / 15 ms / 0 | — | 53,6 fps; primer cuadro a los 63 s |
+| 20 Mbit/s, con apurar | 13 / 15 ms / 0 | — | 53,4 fps; primer cuadro a los 63 s |
+
+CPU por tipo de proceso mientras carga, 2C/4T (en núcleos: 1 = un núcleo entero): **proceso de la tarjeta 0,69**,
+la página 0,55, el navegador 0,13, la red 0,01. La tarjeta de video (el proceso que habla con ella) gasta **más** que la
+página en la carga.
+
+**Qué quiere decir:**
+
+- **Falla de verdad para la meta: en un PC de 2 núcleos, abrir el juego traba a todo Chrome** (otra pestaña se atrasa
+  hasta 317 ms, 48 veces más de 50 ms). En este PC y en uno de 4 núcleos no pasa nada. La meta del paso 4 («abrir el juego
+  no atrasa más de 50 ms el latido de otra pestaña») **no se cumple** en un PC chico (repetido con el programa comprimido, `v2b-n4`: p99 91 ms, el peor 351 ms, 38 veces > 50 ms; **igual de mal**: no era
+  la descarga, lo que traba es el procesador después de bajarlo: los pipelines y el armado), así que ese criterio sigue abierto:
+  no se da por bueno con este PC solo. Sospechosos, por lo medido: el proceso de la tarjeta (0,69 núcleos: compilar los
+  700 pipelines del precalentado, C1/C2) y las tareas largas de la página (~540 ms la peor, siempre la misma: el armado del
+  programa).
+- **La pareja limpia de D3** (§146, «apurar lo de fondo que el juego espera»), a 20 Mbit/s: con apurar, 27 pedazos se
+  pidieron aparte y los 27 llegaron antes, pero la carga entera no se acortó (165 contra 163 s) y el peor cuadro de la
+  carga fue peor (5,4 contra 3,7 s): D3 no gana nada medible aquí. **Trampa de esta tanda:** estas corridas (y las de V2)
+  usaron el programa recién recompilado sin su copia comprimida (el `.br` quedó más viejo que el `.wasm` y el Worker lo
+  ignora), así que el programa viajó entero, 124,5 MB, en vez de ~20 MB: a 20 Mbit/s eso son los 63 s hasta el primer
+  cuadro, que en el sitio de verdad no existen. La comparación con y sin apurar es justa (las dos igual), pero la pareja
+  conviene repetirla con el programa comprimido (`node herramientas/comprimir-build.mjs`, ya hecho a las 16:30). D3 queda
+  prendido (no empeora la carrera) y lo vuelve a mirar el paquete de carrera (D1).
+- En la carrera, con pocos núcleos el juego sigue a 60: la carrera de un jugador no necesita más de un núcleo.
+
+**E5, una sola tarjeta al cargar** (`web/navegador/mkw.mjs`): antes la página pedía tres adaptadores juntos (el del
+juego, «alto rendimiento» y «bajo consumo») y esperaba los tres antes de seguir. En un portátil con dos tarjetas, pedir
+«alto rendimiento» despierta la dedicada (y su ventilador). Ahora se pide solo la del juego; las otras dos preguntas, que
+solo sirven para ofrecer la ayuda «Windows le está dando la integrada», van 20 s después y **solo si sirven** (si ya dio
+una NVIDIA, que siempre es dedicada, o una por software, la ayuda no cambia nada y no se pregunta). `aviso-gpu.mjs` lee
+el resultado del mismo objeto cuando lo necesita. **`?unaTarjeta=0`** = las tres juntas como antes. Banco `aviso-gpu`
+18/18. En este PC (NVIDIA) no hay diferencia que medir. `powerPreference` sigue en «alto rendimiento»: Chrome en Windows
+no le hace caso, y la integrada del Ryzen no se la entrega (§155, trampa 5). Un portátil con dos tarjetas no lo hay para
+probar.
+
+**Arreglo de paso** (`medir-sitio.mjs`): la CPU por proceso (`SystemInfo.getProcessInfo`) solo contesta en una sesión
+del navegador entero; se pedía en la de una pestaña y fallaba siempre. Ahora usa `newBrowserCDPSession`.
+
+**V2 cerrado:** los informes están en `build/web/datos/medir-sitio/v2-*.json` y `d3-*.json`. **E5 hecho** en lo que este
+PC puede probar.
+
+## 2026-10-29 · §157 Contrarreloj contra 12 karts: qué pesa de verdad (U3), y C8 descartado
+
+**Qué es U3.** Una prueba barata para separar causas: en Contrarreloj corre **un** kart (y, si hay, un fantasma, que es
+un kart movido por botones grabados); en una carrera hay 12. Si Contrarreloj cuesta casi lo mismo que la carrera, lo que
+pesa es **la base** (el motor, el dibujo de la pista, aurora, la página), no simular a los 11 rivales.
+
+**Cómo** (`medir-sitio --sola --piloto`, nuevo: el piloto de la página va solo a la carrera que diga la dirección, sin
+las teclas de siempre): `&modo=tt&copa=0&fila=0` (Contrarreloj, la primera pista de la primera copa) contra `&modo=vs&copa=0&fila=0&cpu=maximo`
+(la misma pista, 12 karts, la CPU al máximo), las dos con `&lastre=1` (la CPU pura).
+
+| Este PC (9800X3D) | fps | CPU pura | «juego ms» | Tarjeta |
+|---|---|---|---|---|
+| Contrarreloj | 60 | **4,9 ms** | 6,1 | 3,9 ms |
+| 12 karts | 60 | **6,6 ms** | 7,5 | 4,9 ms |
+| 12 karts, gama media simulada (`&lastre=3.5&lastreAyuda=3&ladron=64&lastreGpu=6`) | 23 | 35,8 ms | 63,8 | 29,8 ms |
+| Contrarreloj, gama media simulada | 33,5 (30,8 el medidor) | 30,3 ms | 54,2 | 29 ms |
+
+**Qué quiere decir.** Los 11 rivales suman 1,7 ms de CPU (+35 %) y 1 ms de tarjeta: **unas tres cuartas partes del costo
+son la base**, que está aunque corra un solo kart. Lo primero que hay que atacar es el motor y el dibujo (las fases 6 y 7
+del plan), no la simulación de las CPU, y **nunca** sacar rivales (regla del dueño). En la gama media simulada ni
+Contrarreloj llega a 60. Falta la mitad del ítem: medirlo en el Oppo, primera y segunda visita (U3 queda «en curso»).
+
+**C8 descartado** («compilar el programa antes de la carrera y conservar su caché de código»). Medido **solo en este PC**
+(`medir-sitio --visitas 2 --segundos 30`, con 16 y con 4 procesadores lógicos): el programa queda listo **0,08 s**
+después de llegar el último byte (V8 compila perezoso: cada función recién cuando se usa) y la primera carrera va a 60
+desde el primer segundo, en la 1.ª y en la 2.ª visita. Y el mecanismo no da: V8 solo guarda en su caché el código ya
+optimizado (TurboFan), que sale jugando; compilar en el vestíbulo no lo produce. **El problema del teléfono sigue
+abierto**: allí la 1.ª carrera va unos 21 s a 20–37 fps mientras V8 optimiza lo caliente. Quedó escrito en H11 (lo
+caliente más chico y junto) como problema abierto, y pesa más en la gama baja, que ahora es meta. «Nada que precompilar»
+vale para este PC, no para un teléfono.
+
+**Trampa de paso:** con el programa sin comprimir (124,5 MB) la 2.ª visita lo volvió a bajar entero (lo más probable: una respuesta tan
+grande no entra en la caché HTTP de un perfil nuevo). Con el `.br` (19,5 MB, como en el sitio) sí (`c8b-pc`, 16:45): la 2.ª visita trajo el programa **de la caché HTTP**
+(0,0 MB por la red, llegó en 0,2 s, listo 0,14 s después), bajó 4,4 MB del Worker en vez de 227,6 y llamó al Worker
+17 veces en vez de 129. Las dos carreras a 60 fps (juego 8,7 / 8,9 ms, tarjeta 5,8 / 6,1 ms). Lo que queda en la carga
+son unas pocas tareas largas (la peor ~540 ms en las dos visitas): es la carga, no la carrera.
+
+## 2026-10-29 · §158 La traba de la carga en un PC chico: era el tope que la página creía (V2 abierto, paso 4) · 16:50–
+
+**Por qué esto y no N13.** N13 («abrir el impuesto») pide un perfil función por función del programa nativo contra el
+wasm: un muestreador para el nativo de Windows, varias compilaciones nativas y una carrera en nativo. No entra en una
+hora con resultado. La traba de la carga en un PC de 2 núcleos (§156: otra pestaña atrasada hasta 317 ms) es el
+criterio abierto del paso 4 y una falla de verdad para la meta (PCs de gama media y baja), y se puede medir y arreglar
+aquí mismo.
+
+**Lo primero que apareció: la medida no era la de un PC chico de verdad.** `medir-sitio --nucleos 4` ata Chrome a 4
+procesadores lógicos (la afinidad de Windows), pero Chrome le sigue diciendo a la página que tiene 16
+(`navigator.hardwareConcurrency`). El tope del precalentado (§117) sale de ese número: max(2, 16 ÷ 4) = **4** pipelines
+compilándose a la vez, cuando un PC de 4 lógicos de verdad usa **2**. O sea: §156 midió un PC chico con el tope de uno
+grande. Ahora `--nucleos N` también le dice N a la página (`--nucleos-sin-decir` = como antes).
+
+**Lo segundo: la línea de tiempo.** `--arranque` guarda ahora una fila por segundo (`-v1-linea.json`) con el peor atraso
+de la otra pestaña, el CPU de cada proceso de Chrome, la línea «[pipelines]» y la tarea larga más larga del juego, y
+el informe imprime las 6 peores trabas con lo que pasaba en cada una. Es un registrador de varios canales.
+
+**Lo medido** (`medir-sitio --perfil pc --arranque --nucleos 4 --segundos 10`; 4 lógicos = un PC de 2 núcleos y 4 hilos;
+el programa comprimido; la carrera a 60 fps en cinco de las seis corridas: la de `--liftoff-only` no, ver abajo; CPU por
+cuadro de `cpuMs.promedio` de cada `build/web/datos/medir-sitio/<corrida>-pc.json`):
+
+| Corrida | La página cree | Tope | La otra pestaña: p99 / peor / veces > 50 ms | Pipelines todos pedidos | Dibujos saltados |
+|---|---|---|---|---|---|
+| `v2b-n4` (§156, como antes) | 16 núcleos | 4 | 91 / 351 ms / 38 | — | — |
+| `v2c-n4` | 4 núcleos | 2 | **15 / 301 ms / 3** | a los 25 s | 73 |
+| `v2d-n4-tope1` (`&precalentarTope=1`) | 4 núcleos | 1 | 14 / 141 ms / 5 | a los 47 s | 100 |
+| `v2e-n4-aparte` (`--latido-aparte`) | 4 núcleos | 2 | **14 / 296 ms / 1** | a los 25 s | 25 |
+| `v2f-n4-liftoff` (`--latido-aparte`, `--js-flags=--liftoff-only`) | 4 núcleos | 2 | 14 / **63 ms** / 2 | — | — (carrera a **59,2 fps**, el juego a **15,0 ms** por cuadro contra 8,3–8,8 de las otras) |
+| `v2g-n4-aparte` (repetición de `v2e`, 17:40) | 4 núcleos | 2 | 14 / 246 ms / 1 (a los 54 s, la pestaña a 2,0 núcleos) | — | — |
+
+**Qué quiere decir:**
+
+1. **Casi toda la «falla del PC chico» de §156 era la medida, no el juego.** Con el tope que un PC de 4 lógicos de verdad
+   usa (2, la regla de §117 que ya está en la página), las trabas de más de 50 ms bajan de 38–48 a 1–3 y el p99 de
+   91–104 a 14–15 ms. El juego ya hace lo correcto en un PC chico; la herramienta lo medía con el tope de este PC.
+2. **Un tope más estricto (1) no sirve**: no baja las trabas (5 en vez de 3; la peor, 141 en vez de 301, es ruido de una
+   corrida) y atrasa el precalentado al doble (47 s) con más dibujos saltados. **No se cambió la regla del producto**;
+   `?precalentarTope=N` ya existe para quien quiera probar otra cosa.
+3. **La página `data:` del latido compartía el proceso del juego.** Sus trabas chicas caían justo en los segundos de una
+   tarea larga del juego (167 ms a los 3 s, 114 ms a los 53 s). En otro sitio (`--latido-aparte`, localhost: otro proceso
+   seguro) esas desaparecen: mide el navegador entero, que es lo que pide el criterio. Las tareas largas del juego sí
+   traban la página de Juegos (mismo proceso que el marco), y eso es N3.
+4. **Queda una traba de ~300 ms, siempre a los 54 s: la largada de la carrera.** El juego pasa de los menús a la carrera
+   («Scene Exit → New race started») y el proceso de la pestaña sube a 1,5–1,9 núcleos con la tarjeta quieta y sin tarea
+   larga del juego en ese segundo. Con `--js-flags=--liftoff-only` (V8 sin el compilador optimizador; solo diagnóstico,
+   no es algo que la página pueda pedir) **desaparece** (la peor, 63 ms), pero el juego pasa a **15,0 ms de CPU por cuadro en vez de ~8,7** (~70 % más) y la carrera
+   baja a 59,2 fps (`v2f-n4-liftoff-pc.json`, `fpsCarrera` y `cpuMs`): apagar el optimizador es **solo un diagnóstico,
+   nunca el arreglo**. Es V8 optimizando con TurboFan, en hilos de
+   fondo, el código de la carrera que corre por primera vez: en 4 procesadores lógicos esos hilos dejan sin procesador al
+   resto de Chrome ~300 ms. **Es la misma causa que la 1.ª carrera lenta del teléfono** (§157, anotada en H11): lo
+   caliente de la carrera se optimiza recién al largar.
+
+**Estado.** El criterio del paso 4 («abrir el juego no atrasa más de 50 ms el latido de otra pestaña») **sigue abierto**:
+en un PC de 2 núcleos queda una traba de ~300 ms al largar la 1.ª carrera, por TurboFan. Desde la página no se arregla
+(no hay forma de pedirle a V8 que optimice antes ni más despacio); los caminos son H11 (el código caliente más chico y
+junto: menos que optimizar) y N3 (el juego en su propio proceso, que no cambia el CPU pero sí deja la página de Juegos
+libre). Mejoró de 38–48 trabas a 1, medido como un PC chico de verdad. Igual que en §156: medido en este PC atado a 4
+lógicos; un portátil de 2 núcleos de verdad tiene además menos caché y reloj más bajo.
+
+**Arreglo de paso: «🔬 Perfilar la tarjeta» dejaba el juego en el cuadro 0.** Con `?perfilGpu=1` (o la casilla del
+teléfono, §115) el registro decía `Failed to execute 'setBindGroup'… parameter 3 is not of type 'TypedArray'`. Las
+envolturas de `perfil-gpu.mjs` llamaban al original siempre con 6 argumentos (los que faltan, como «vacíos») para no
+crear arreglos en cada dibujo (§123), y suponían que un vacío de más es lo mismo que no pasarlo. Para `setBindGroup` no:
+tiene una forma de 3 datos y otra de 5, y Chrome elige por **cuántos** llegan; con 6 tomaba la de 5 y el tercero
+(vacío) no era un `Uint32Array`. Ahora se llama al original con tantos argumentos como llegaron (un `switch`, sin
+arreglos nuevos). Banco `perfil-gpu` 15/15 (punto nuevo: las tres formas, con 2, 3 y 5 argumentos). Esto también tapaba
+el h1c-k1 de §155 (por eso quedó colgado en el cuadro 0: no era el choque de puertos).
+Comprobado con el juego (`h1c-k1c`, `--extra "&lastre=1&perfilGpu=1"`): carrera a 60 fps, 0 errores de página, y el
+perfil por pasada por fin sale: **0,16 ms de pasadas por cuadro** en la 3080 Ti (la más cara, «Render pass 2», 939×528,
+139 dibujos: 0,06 ms). Los «5,4 ms de tarjeta» del medidor son espera (cola y presentación), no trabajo de la tarjeta.
+
+## 2026-10-29 · §159 La escalera simulada: la línea base de los cuatro escalones de mentira (N2, la parte simulada) · 17:08–
+
+**Qué.** La escalera del plan (N2) tiene seis escalones: dos de verdad (este PC y el Oppo) y cuatro que solo se pueden
+simular con el aparato de mentira de §155. Con el aparato ya calibrado, esta es la primera foto de los cuatro simulados
+(y la de este PC con el mismo guion), para que cada arreglo que venga se compare contra ella. No se cambió nada del juego.
+
+**Cómo** (`medir-sitio --perfil pc --sola --piloto --segundos 15`, VS con 12 karts y la CPU en máximo,
+`--extra "&modo=vs&copa=0&fila=0&cpu=maximo&…"`; el lastre de cada escalón sale de la tabla de la escalera: cuánto más
+lento es un núcleo de ese aparato que el de este PC; `--nucleos` = cuántos procesadores lógicos tiene):
+
+| Escalón | Lastre | fps en la carrera | CPU pura del juego por cuadro | «juego» del medidor | «tarjeta» del medidor |
+|---|---|---|---|---|---|
+| Este PC (9800X3D, 16 lógicos) `esc-pc` | `lastre=1` (solo mide) | **59,0** | 6,9 ms | 7,5 ms | 4,5 ms |
+| PC típico (2018–2021) `esc-tipico` | `lastre=2.2`, 8 lógicos | **52,7** | 14,2 ms | 18 ms | 11,3 ms |
+| Portátil de oficina `esc-portatil` | `lastre=3&ladron=64`, 4 lógicos | **22,8** | 39,4 ms | 67,4 ms | 38,8 ms |
+| Teléfono de gama media `esc-media` | `lastre=4&lastreAyuda=3&ladron=64&lastreGpu=6`, 8 lógicos | **17,6** | 49,5 ms | 88,9 ms | 43,9 ms |
+| Teléfono de gama baja `esc-baja` | `lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`, 8 lógicos | **no llega a la carrera** | — | 157–186 ms en los menús | — |
+
+**Ojo, corrección del 2026-10-29 (§161, el dueño): los fps de esta tabla tienen tope.** El juego nunca pasa de 60
+cuadros por segundo: «59 fps» en este PC no dice cuánto le sobra. La columna que manda es el **margen** = 16,7 ms ÷ CPU
+pura por cuadro (de `ultimos10s.cpuPuraMs` de cada `build/web/datos/medir-sitio/esc-*-pc.json`; la tarjeta, de
+`ultimos10s.videoMs`, que incluye esperas):
+
+| Escalón | CPU pura por cuadro | Margen contra 60 | Tarjeta (medidor) |
+|---|---|---|---|
+| Este PC | 6,9 ms | **×2,42 de sobra** | 4,5 ms |
+| PC típico | 14,2 ms | **×1,17 de sobra** | 11,3 ms |
+| Portátil de oficina | 39,4 ms | **le falta ×2,36** | 38,8 ms |
+| Teléfono de gama media | 49,5 ms | **le falta ×2,97** | 43,9 ms |
+
+El dueño pidió además medirla **sin tope** (cuántos cuadros por segundo da de verdad cada escalón): eso es §161.
+
+(La gama baja, dos veces: con 240 s y con 600 s de espera (`--piloto-espera`, nuevo), el juego anduvo a 5–12 fps en los
+menús, ~160–180 ms por cuadro, y el piloto no llegó a la carrera en 15 minutos. Sin número de carrera: se anota así.)
+
+**Qué quiere decir:**
+
+- **Este PC y el PC típico ya están cerca** (59 y 53 fps): al PC típico le faltan ~3,5 ms de CPU (14,2 contra 16,7 hay
+  margen en la CPU pura, pero el «juego» del medidor da 18 ms porque incluye esperar a la presentación). Con la lista de
+  los pasos 4–10 debería entrar.
+- **El portátil de oficina y la gama media están a un cuarto o un tercio de la meta** (23 y 18 fps). Ojo: la CPU pura
+  de esos escalones es **más** que la de este PC por el lastre (×3 en el portátil daría 21 ms y midió 39; ×4 daría 28 y
+  midió 50). **Por qué, no está probado** (corrección del 2026-10-29, §160): el escalón del portátil mezcla tres cosas a
+  la vez (el lastre ×3, el ladrón de caché y 4 lógicos en vez de 8) y la gama media cuatro; puede ser cualquiera de
+  ellas, o que a menos fps lo que va por tiempo de reloj (el sonido, los relojes de la página) pese más por cuadro, como
+  sospechaba §155. Para separarlo hace falta un escalón con **solo** `lastre=3` a 8 lógicos (no se midió). Es justo lo que el aparato de mentira tiene
+  que mostrar: en esos aparatos el problema es más grande que «el núcleo es K veces más lento».
+- **La gama baja no llega ni a los menús a velocidad jugable.** Coincide con lo que el plan ya dice (la meta más difícil):
+  hace falta el motor de los pasos 11–13 (la carrera a un cuarto) y los hilos del paso 8, no ajustes de la página.
+- Igual que todo lo simulado: **es este PC frenado, no un aparato de verdad.** Sirve para comparar antes y después de
+  cada arreglo con el mismo guion; el número absoluto de un teléfono de verdad puede ser otro (la tarjeta, el calor).
+
+**Estado.** N2 **en curso**: la línea base simulada está guardada (`build/web/datos/medir-sitio/esc-*.json`); falta el
+Oppo de verdad (H1 por USB) y que el dueño fije la meta de cada escalón.
+
+## 2026-10-29 · §160 Abrir el impuesto: dónde se va el ×2,2, función por función (N13, partes 1 y 2, y la carrera del lado wasm) · 19:05–
+
+**Primero, dos correcciones a §158 y §159** (las pidió quien revisa el trabajo):
+
+- **§158, la corrida `--liftoff-only`.** El texto decía «la carrera, en las cinco, a 60 fps», pero la tabla tiene seis
+  corridas, y la de `--js-flags=--liftoff-only` dio **59,2 fps con el juego a 15,0 ms de CPU por cuadro** contra 8,3–8,8
+  de las otras (`build/web/datos/medir-sitio/v2f-n4-liftoff-pc.json`: `fpsCarrera` 59,21, `cpuMs.promedio` 14,96).
+  Apagar el optimizador de V8 quita la traba de ~300 ms al largar, pero cuesta ~70 % más de CPU todo el tiempo: es un
+  diagnóstico, **nunca el arreglo**. Corregido en §158, `PLAN.md` y `avance.mjs`.
+- **§159, «la CPU pura crece más que el lastre».** No está probado: el escalón del portátil mezcla tres cosas (el
+  lastre ×3, el ladrón de caché y 4 lógicos en vez de 8) y el de la gama media, cuatro. Queda marcado como no probado;
+  para separarlo hace falta un escalón con **solo** `lastre=3` a 8 lógicos. No se midió: la CPU de esta sesión fue para N13.
+
+**La pregunta.** N1 (§153) midió que el mismo juego trabaja ×2,2 en wasm que en el nativo, y que la memoria explica
+~30 %. ¿En qué se va el resto? Sin eso no se sabe a qué ítems del motor (pasos 11–13) dedicarles meses.
+
+**Qué se hizo.**
+
+- **Un muestreador propio para el nativo** (`herramientas/muestreador/muestreador.c`, ~170 líneas de C; la herramienta
+  lo compila sola con el clang de Visual Studio). Windows trae uno (WPR), pero pide administrador y aquí no lo hay. El
+  nuestro lanza el programa y, cada ~40 µs, congela el hilo del juego (el que más CPU gastó en los últimos 200 ms), lee
+  en qué dirección iba y cuántos ciclos gastó desde la mirada anterior, y lo suelta. Con el mapa de símbolos del
+  enlazador (`compilar-nativo.py` ahora escribe `mkw-nativo.map`) cada dirección es una función. Una línea «fin» por su
+  entrada cierra el juego y la medida (el juego nativo no sale solo, §153).
+- **El wasm, con el muestreador de V8**: `node --cpu-prof --cpu-prof-interval 50` sobre el modo Node, el mismo `.wasm`.
+- **`herramientas/perfil-impuesto.mjs`** corre los dos uno detrás del otro con los mismos 3.600 cuadros (como N1),
+  cuenta solo desde el cuadro 600 (sin la carga, que lee archivos distinto en Node que en la página), saca las esperas
+  del ritmo, empareja las funciones (las del juego por su dirección de la Wii) y suma por grupos.
+  `herramientas/reparto-impuesto.mjs` arma con eso la tabla de partes. Los perfiles tienen nombres de funciones del
+  juego: se quedan en `build/web/datos/impuesto-perfil/`, nunca a git.
+
+**Las trampas** (cada una dio números falsos antes de entenderla):
+
+1. **El hilo del juego trabaja ~1 ms por cuadro y duerme el resto.** Mirando cada 1 ms casi siempre se lo veía dormido:
+   el muestreador tiene que girar en un núcleo propio y mirar cada pocas decenas de microsegundos.
+2. **Las dos esperas giran.** El nativo gira los últimos 0,5 ms antes de cada barrido mirando el reloj (en ntdll) y el
+   wasm también. Eso no es trabajo. En el wasm, Binaryen metió el bucle de espera **dentro** del planificador del juego
+   (`SelectThread`, 0x801A9C08), así que «espera» = la propia SelectThread o mirar el reloj debajo de ella; lo que hace el
+   runtime entre siesta y siesta (las alarmas y el sonido) sí es trabajo, igual que lo contó §153.
+3. **El contador de ciclos de un hilo que corre no se actualiza en vivo.** Leído antes de congelarlo, los ciclos caían
+   sobre muestras al azar: el nativo daba 0,12, 0,26 o 0,38 ms en corridas iguales. Se lo congela primero y se lee después.
+4. **Congelar los ~10 hilos y recorrer la pila en cada mirada** hacía mirar una vez cada ~600 µs, y los ciclos del
+   trabajo caían sobre la espera. Ahora se mira solo el hilo del juego y sin pila (`MUESTREO_PILA=1` = con pila).
+5. Con eso, dos corridas iguales dan lo mismo: nativo 0,373 y 0,367 ms, wasm 1,277 y 1,247 ms
+   (`build/web/datos/impuesto-perfil/n13-a-resumen.json` y `n13-b-resumen.json`, campo `perfil`).
+
+**El comando.**
+
+```
+python herramientas/compilar-nativo.py                 # y --revisado: ahora con el mapa de símbolos (~1,5 min, re-enlaza)
+node herramientas/perfil-impuesto.mjs --cuadros 3600 --etiqueta n13-a            # ~2 min
+node herramientas/perfil-impuesto.mjs --cuadros 3600 --etiqueta n13-b
+node herramientas/perfil-impuesto.mjs --cuadros 3600 --nativo v3-revisado --etiqueta n13-revisado
+node herramientas/reparto-impuesto.mjs                 # → build/web/datos/impuesto-perfil/reparto.json
+```
+
+**Medido: CPU del hilo del juego por cuadro, pantalla de título, cuadros 600–3.600** (`reparto.json`; nativo = promedio
+de `n13-a` y `n13-b`; wasm = promedio de las tres corridas):
+
+| | ms de CPU por cuadro |
+|---|---|
+| Nativo (x86-64-v3) | **0,370** |
+| Nativo «revisado» (la memoria por la tabla de páginas, como en wasm) | 0,543 |
+| wasm (modo Node, el mismo V8 que Chrome) | **1,260** |
+| **Razón wasm ÷ nativo, en CPU** | **×3,4** |
+
+**El impuesto, repartido** (diferencia wasm − nativo = 0,890 ms por cuadro):
+
+| Parte | ms por cuadro | del total | del «resto» (sin la memoria) | Ítems del plan |
+|---|---|---|---|---|
+| La memoria de la Wii por la tabla de páginas (revisado − nativo) | 0,173 | 19,5 % | — | H6, H7 |
+| **El código del juego traducido** (lo que arma V8 contra lo que arma clang, con la misma memoria) | **0,309** | **34,7 %** | 43,1 % | M6, M7, M8, H11, N5 |
+| **Salir del wasm: el cambio de hilo por JSPI, su vuelta, las promesas y la basura** (en Node; ver la carrera abajo) | **0,268** | **30,1 %** | 37,4 % | M10 |
+| El sistema operativo de mentira: hilos, alarmas y la hora | 0,055 | 6,2 % | 7,6 % | M10, M4 |
+| El sonido (el DSP imitado) | 0,051 | 5,7 % | 7,1 % | N4 (otro hilo) |
+| Las llamadas: trampolines directos y despacho indirecto | 0,043 | 4,8 % | 5,9 % | M3, M8 |
+| Varios del runtime sin causa común (FIFO de GX, texturas, red, música) | 0,013 | 1,4 % | 1,8 % | — |
+| Lo que el nativo hace en el sistema y el wasm no (ntdll, kernel) | −0,021 | −2,4 % | −2,9 % | — |
+
+**Sin causa con nombre: 1,4 %** (la meta de N13 era menos de 20 %).
+
+De dónde sale cada fila (los grupos de `n13-*-resumen.json`, campos `grupos` y `porGrupo`):
+
+- **El código traducido**: las funciones del juego (`func_…`) y de Retro Rewind (`rr_…`), sus ayudantes de PowerPC y los
+  accesos a memoria fuera de línea. Contra el «revisado» (que ya paga la tabla de páginas), el código del juego tarda
+  ×2,1 en wasm: 0,276 → 0,577 ms. Los accesos a memoria fuera de línea, en cambio, cuestan lo mismo en los dos
+  (0,077 → 0,085 ms, ×1,1): con la memoria igualada, lo que queda es **cómo se traduce el código**, no la memoria.
+- **Salir del wasm**: `wasm-to-js` desde `OSSleepThread_HLE` (0,08 ms por cuadro: es el cambio de hilo del juego, que en
+  wasm es una suspensión JSPI), la vuelta desde la raíz (`wasm-to-js`, `get`, `(program)`: ~0,10 ms) y el **recolector
+  de basura de V8: 0,10–0,11 ms por cuadro**. En el nativo nada de esto existe: un cambio de fibra son unos pocos ciclos.
+- **La hora**: en wasm cada lectura del reloj sale a JavaScript (`ReadSystemTime` → `_clock_time_get` → `performance.now`,
+  que devuelve un BigInt); en el nativo es una instrucción. 0,015 ms por cuadro, ×27.
+
+**Por qué el ×3,4 y no el ×2,2 de N1.** Las dos cuentas miden cosas distintas. N1 restó al tiempo de pared el rato dentro
+de la espera del ritmo. En el wasm, la vuelta de cada suspensión (las promesas, la basura) ocurre **dentro** de ese rato
+y N1 no la vio: el wasm gasta 1,26 ms de CPU y N1 le contó ~1,0–1,2. En el nativo pasa lo contrario: N1 le contó
+~0,55 ms y la CPU es 0,37 (el resto es tiempo de pared en llamadas al sistema, sin gastar procesador). Para un aparato
+lento importa la **CPU del hilo**: en esta escena el impuesto es **×3,4**, no ×2,2.
+
+**Parte 2 al revés: sacarle trabas al wasm, de a una** (banderas de diagnóstico de V8, nunca para el producto;
+`--solo-wasm --nativo-de n13-a --wasm-flags "…"`; CPU del wasm por cuadro, base 1,25–1,28):
+
+| Bandera | wasm ms/cuadro | Qué dice |
+|---|---|---|
+| `--no-wasm-stack-checks` (sin revisar la pila al entrar a cada función) | 1,319 | no pesa (dentro del ruido) |
+| `--no-wasm-inlining` (V8 sin meter funciones adentro de otras) | el registro da 1,00, igual que la base; el perfil sale roto (sin el bucle metido en SelectThread la espera ya no se reconoce) | no pesa en esta escena |
+| `--wasm-enforce-bounds-checks` (revisión de límites explícita en cada acceso) | **1,459 (+0,20 ms, +16 %)** | lo que pagaría un Chrome **sin** páginas de guarda |
+
+(`n13-w__no_wasm_stack_checks-resumen.json`, `n13-w__no_wasm_inlining-resumen.json`,
+`n13-w__wasm_enforce_bounds_checks-resumen.json`.) Las revisiones de límites de wasm hoy **no** cuestan en este PC (las
+cubren las páginas de guarda de 64 bits). El código más lento de V8 es otra cosa: cómo reparte los registros, cómo da
+vuelta los bytes sin la instrucción del procesador, los trampolines que clang borra y V8 no.
+
+**La carrera de 12, del lado wasm** (parte 3 a medias: el nativo no llega a una carrera, porque sin pantalla nadie
+aprieta botones). `medir-sitio --perfilar` ya tomaba el perfil de V8 de la carrera en Chrome; ahora lo guarda entero
+(`<base>-v1.cpuprofile`) y `perfil-impuesto.mjs --solo-perfil <archivo>` lo reparte por los mismos grupos.
+
+```
+node herramientas/medir-sitio.mjs --perfil pc --sola --piloto --perfilar --segundos 15 --etiqueta n13-carrera \
+  --extra "&modo=vs&copa=0&fila=0&cpu=maximo&lastre=1"
+node herramientas/perfil-impuesto.mjs --solo-perfil build/web/datos/medir-sitio/n13-carrera-pc-v1.cpuprofile --etiqueta n13-carrera
+```
+
+VS con 12 karts, CPU en máximo, este PC sin ventana; la carrera a 60 fps, el juego 9,3 ms por cuadro
+(`build/web/datos/medir-sitio/n13-carrera-pc.json`). El hilo principal, ocupado 678 ms de cada segundo de los 26 s del perfil
+(`build/web/datos/impuesto-perfil/n13-carrera-pagina.json`):
+
+| Grupo | ms por segundo | del tiempo ocupado |
+|---|---|---|
+| Código del juego traducido (`func_…`) | 271 | 40,0 % |
+| `(program)`: lo que V8 no atribuye a ninguna función (código de Chrome por dentro) | 146 | 21,5 % |
+| aurora / GX (el dibujo, del lado del juego) | 51 | 7,5 % |
+| Otro runtime | 45 | 6,6 % |
+| Memoria de la Wii (fuera de línea) | 41 | 6,1 % |
+| JavaScript de la página | 39 | 5,7 % |
+| Retro Rewind traducido | 30 | 4,5 % |
+| Despacho indirecto + trampolines | 32 | 4,8 % |
+| Puentes wasm↔JS + recolector de basura + promesas | 4 | 0,7 % |
+
+Qué dice:
+
+- **En la carrera manda el código del juego**: traducido + Retro Rewind + su memoria + despacho + trampolines + ayudantes
+  = 377 ms por segundo, **6,3 ms por cuadro, el 56 % del hilo ocupado**. Es justo lo que mueven los pasos 11 y 13.
+- **Lo visible de «salir del wasm» es chico en Chrome**: recolector 0,2 %, puentes 0,5 %. El 30 % de Node era en buena
+  parte la espera de Node (sus temporizadores y promesas, que en la página no existen). Pero queda el **`(program)` de
+  21,5 % sin repartir** (2,4 ms por cuadro): ahí puede estar el cambio de pila de JSPI y también el trabajo de Chrome al
+  recibir las llamadas de WebGPU. Separarlo pide una traza de Chrome con las categorías de V8 (pendiente).
+
+**Qué cambia en el orden de los pasos 11–13.**
+
+- **El código traducido (M8 pasadas propias del traductor, H11 lo caliente junto y chico, M6 PGO, M7 ThinLTO) es lo que
+  más pesa en las dos medidas**: ~35 % del impuesto en el título y el 56 % del hilo en la carrera (con su memoria). El
+  paso 13 deja de ser «lo último»: M8 (por ejemplo, sacar trampolines que V8 no borra) y H11 suben al frente del motor.
+- **H6/H7 (paso 11, la memoria) siguen, pero valen menos de lo supuesto**: 19,5 % de la diferencia en CPU (N1 decía
+  ~30 % de una diferencia medida en pared). Arreglarla perfecta deja el título en ×2,9 de CPU ((1,260 − 0,173) ÷ 0,370), no en ×1,8.
+- **M10 (paso 12) no se mueve todavía**: en Node pesa 30 %, en la carrera de Chrome lo visible es 0,7 %. Antes de
+  dedicarle semanas hay que repartir el `(program)` de Chrome (la traza). Es barato y decide.
+- **M3 (llamadas indirectas) baja**: trampolines y despacho son 4,8 % en el título y 4,8 % en la carrera. **H8 (la
+  multiplicación-suma) sigue abajo** (~0, como en N1).
+- Nada de esto quita karts ni efectos: todo es el motor y su traducción.
+
+**Qué significa para la gama media y baja.** El lastre (§155) multiplica todo el trabajo del hilo por el mismo factor:
+en un núcleo 3–7 veces más lento, los 6,3 ms por cuadro del código del juego en la carrera se vuelven 19–44 ms. Por eso
+el código traducido es lo primero también para la gama baja: es lo único lo bastante grande para mover la aguja ahí.
+Dos cosas pesan **más** en un teléfono que en este PC: (1) **la basura**: el recolector trabaja más con poca memoria y
+núcleos lentos; (2) **las páginas de guarda**: si un teléfono corre un Chrome sin ellas (por ejemplo, de 32 bits; hay
+que mirarlo en cada aparato, `chrome://version`), cada acceso a memoria paga la revisión explícita: **+16 %** medido aquí.
+
+**Cuidado con los números.**
+
+- El reparto con nativo es **la pantalla de título sin dibujo** (como N1). La razón nativo/wasm **en una carrera de 12
+  no se midió** (falta que el nativo llegue a la carrera; ver lo pendiente).
+- Ese wasm es el **modo Node**, no Chrome: el mismo V8, pero la espera del ritmo es otra.
+- El muestreador nativo estorba un poco: con él, el registro del nativo dice 0,67 ms de trabajo por pared contra ~0,55
+  sin él (§153). La CPU que cuenta es la de los ciclos, que no incluye los ratos congelado.
+- El reparto **por función** (no por grupo) es menos fiable: clang mete en línea cosas que V8 deja afuera, y al revés.
+- Una trampa mía de paso: `node herramientas/medir-sitio.mjs --help` no es una ayuda: lanzó una medida entera con la
+  etiqueta `base` (sobrescribió `build/web/datos/medir-sitio/base-pc.*`).
+- De paso: el monitor de 144 Hz que pidió el dueño para las ventanas es el de la **izquierda** (`\\.\DISPLAY5`,
+  x=−1920, y=509, en la gráfica integrada de AMD); el de la derecha (3840,522), donde abrían hasta ahora, es de 240 Hz.
+  Las herramientas que abren ventana (`medir-armado`, `medir-oculta`, `medir-memoria`, `medir-espera-graficos`, y
+  `medir-sitio --ventana`) ahora abren por omisión en −1880,549 (`MKW_VENTANA` = otro lugar).
+
+**Pendiente de N13.**
+
+1. **(3) La razón en la carrera**: un guion de botones por número de cuadro dentro del runtime (el mismo en los dos
+   programas: `MKW_HEADLESS_GUION`, en la lectura del mando), con la secuencia de menús del piloto de la página
+   (`menus.mjs`), para llevar el nativo y el modo Node a la misma carrera de 12 y repetir `perfil-impuesto`.
+2. **Repartir el `(program)` de Chrome en la carrera** (21,5 %): una traza con las categorías de V8 y de WebGPU
+   (`medir-sitio --trazaChrome`) para saber cuánto es JSPI y cuánto WebGPU. Decide si M10 sube.
+3. **(2) El nativo con más trabas de wasm, de a una** (además del «revisado»): sin vectorizar, llamadas indirectas
+   por tabla.
+
+## 2026-10-29 · §161 El banco sin tope y el margen: cuánto le sobra o le falta a cada aparato (N2) · 20:15–20:30
+
+**Por qué** (pedido del dueño por la orquestadora): los fps de la escalera de §159 tienen **tope en 60**. «Este PC
+59 fps» y «PC típico 52,7» no dicen cuánto le sobra al primero ni cuánto le falta al segundo: un motor con el
+limitador puesto marca lo mismo en el tacómetro aunque tenga el doble de potencia. Dos maneras de ver la reserva:
+
+1. **El margen** (sin medir nada nuevo): 16,7 ms ÷ CPU pura de un cuadro. Más de 1 = sobra; menos de 1 = falta.
+   Con las cifras de §159 (`ultimos10s` de `build/web/datos/medir-sitio/esc-*-pc.json`): este PC ×2,42 de sobra,
+   PC típico ×1,17 de sobra, al portátil le falta ×2,36 y a la gama media ×2,97 (tabla en la nota de §159).
+   `medir-sitio` ahora lo imprime («margen contra 60 (CPU pura)»).
+2. **El banco sin tope** (medirlo de verdad): `?sinTope=1` (`web/navegador/sin-tope.mjs`, usado por `mkw.mjs`). Suelta
+   la cuadrícula del juego del monitor (sin enganche ni presentación a compás) y, durante la carrera, le pide al
+   runtime **ponerse al día** sin fin (`mkw_prisa(2000)` cada 100 ms, el mecanismo de §99): el juego corre sus cuadros
+   seguidos, como un motor en un dinamómetro sin carga. Fuera de la carrera no pide nada (los menús a su ritmo).
+   Cuenta aparte **los cuadros de lógica por segundo** (Raceinfo +0x20, §124) y **las imágenes por segundo**
+   (`mkwEstado.sinTope`); si la tarjeta no sigue, el juego dibuja menos imágenes que cuadros de lógica, y eso separa
+   el techo de la CPU del de la tarjeta. **Solo para medir: apagado por omisión, y nunca con `modo=sala`,
+   `modo=enlinea`, `sincro=` ni `red=`** (ahí todas las consolas tienen que ir al mismo ritmo). Prueba: banco
+   `sin-tope` (16/16 ✓). Comando: `node herramientas/medir-sitio.mjs --sola --piloto --extra "&modo=vs&copa=0&fila=0&cpu=maximo&sinTope=1" --etiqueta esc-pc-st`.
+
+**Resultado en este PC** (`esc-pc-st-pc.json`, `esc-pc-st-salida.txt`): **151,4 cuadros de lógica por segundo** y
+74,7 imágenes por segundo; la tarjeta 6,7 ms por imagen (no frena: con 6,7 ms daría ~150). El juego dibuja una
+imagen de cada dos cuadros de lógica porque la CPU del dibujo va en el mismo hilo: la CPU por imagen (12,9 ms) es
+la de ~2 cuadros de lógica → **~6,4 ms por cuadro de lógica, margen ×2,5**, igual que el ×2,42 calculado.
+Ojo: sin tope, el «margen» que imprime `medir-sitio` (×1,29) divide por la CPU **por imagen**; el que vale es el de
+los cuadros de lógica (151,4 ÷ 60).
+
+**Los escalones simulados sin tope no valen** (`esc-tipico-st`, `esc-portatil-st`, `esc-portatil-st2`,
+`esc-media-st`, `esc-baja-st` en la misma carpeta). El lastre de §155 hace más lento el hilo **girando en las
+esperas** entre cuadro y cuadro; sin tope casi no hay esperas, así que el lastre se queda corto:
+| escalón | lógica/s | imágenes/s | lastre debido → girado | ¿vale? |
+|---|---|---|---|---|
+| PC típico (`lastre=2.2`) | 81,7 | 37 | ~89 s → 71 s (~80 %) | a medias (el techo verdadero es menor) |
+| portátil (`lastre=3`) | 11.428.738 (*) | 41,2 | 210 s → 35 s (~17 %) | no |
+| portátil, con deuda (`st2`) | 98 | 39 | quedaron 49 s debidos | no (deuda revertida) |
+| gama media (`lastre=4…`) | 98,9 | 39,2 | 290 s → 54 s (~19 %) | no |
+| gama baja (`lastre=7…`) | — | — | — | el piloto no llegó a la carrera en 240 s |
+(*) el contador de lógica salta a millones cuando termina la carrera (Raceinfo cambia); la cifra de antes era ~100–110,
+imposible para un aparato con margen ×0,4. Probé quitar el tope de 250 ms por giro (la página se congeló y la foto final
+venció) y llevar una deuda de giro (quedaron 49 s sin pagar): **revertido**, el lastre quedó como en §155.
+
+**El techo derivado** (calculado, no medido): 60 × margen ≈ PC típico ~70 cuadros de lógica/s, portátil ~25,
+gama media ~20. La gama baja no llega a la carrera ni con tope (§159): su margen no se pudo medir.
+
+**Qué significa para la gama baja**: el número que hay que mover es el margen, no los fps; a la gama media le falta
+×3 y a la baja más. Ningún ajuste de la página lo da: es el motor (lo de §160: código traducido y salir del wasm).
+
+**Además (de §160, la traza de Chrome en la carrera, `build/web/datos/medir-sitio/n13-traza-pc-v1-traza.log`)**: de
+658 ms/s del hilo ocupado, 614 caen dentro de `v8.callFunction` (el wasm y lo que llama) y ~30 ms/s son Blink/Dawn
+fuera de JS. O sea, el `(program)` del perfil (21,5 %) es V8 por dentro (JSPI, envolturas o el pegamento de WebGPU),
+no la tarjeta ni la página; repartirlo sigue pendiente.
+
+**Pendiente**: un lastre **por cuadro de lógica dentro del runtime** (que gire (K−1)·t después de cada cuadro, no en
+las esperas; hay que recompilar) para que los escalones simulados valgan sin tope; arreglar el contador de lógica al
+terminar la carrera; que `medir-sitio` imprima el margen por cuadro de lógica con `sinTope`.
+
+## 2026-10-29 · §162 El lastre por cuadro dentro del runtime y la escalera sin tope (N2) · 20:31–21:50
+
+**Por qué** (la orquestadora, por el pedido del dueño de §161): la escalera sin tope de §161 no valía, porque el lastre
+de la página (§155) gira **en las esperas** y sin tope el juego casi no espera (giró el 17–80 % de lo debido). Hacía
+falta un lastre que frene **cada cuadro**, espere o no el juego, como un freno en el eje del motor en vez de uno que
+solo actúa en ralentí.
+
+**Qué se hizo**
+1. **El lastre por cuadro** (`terceros/Wiicompiled/runtime/src/hle/vi.cpp`, guardado en `parches/runtime-web.diff`;
+   comprobado con `git apply --check` sobre una copia limpia). Al empezar cada retrazado (`AdvanceRetrace`; un
+   retrazado = un cuadro del juego) mide lo trabajado desde el anterior, t, y gira (K−1)·t ahí mismo (tope 1 s por
+   giro). Funciones: `mkw_lastre_cuadro(K)` (1 = apagado), `mkw_lastre_cuadro_todo(0|1)` y `mkw_lastre_cuadro_estado(i)`
+   (0 girado, 1 trabajado, 2 cuadros, 3 topes, 4 K). Recompilado con `python herramientas/compilar-web.py --modo navegador`.
+2. **Quién usa cuál** (`repartoLastre` de `web/navegador/sin-tope.mjs`):
+   - con `?sinTope=1&lastre=K` va el del runtime, y el de la página queda en K = 1 (solo mide la CPU pura);
+   - `?lastreCuadro=K` lo fuerza;
+   - **con tope sigue el de la página, sin cambios**: las cifras de §155 no se tocan (banco `lastre` 15/15 ✓).
+
+   Banco `sin-tope`: 21/21 ✓ (5 puntos nuevos para el reparto).
+3. **«Todo» en la carrera sin tope** (`mkw_lastre_cuadro_todo`; la bomba de `mkw.mjs` lo prende en la carrera). La
+   primera versión restaba de t las esperas del runtime. Con K = 2 dio 82,4 cuadros de lógica por segundo contra 137
+   con K = 1, o sea ×0,60 (`st162-k1`, `st162-k2`). Sin tope esas «esperas» son solo turnos que el hilo le cede al
+   navegador (la hora ya pasó), y el trabajo del navegador corre en el mismo hilo: un procesador K veces más lento
+   también lo haría K veces más lento. Ahora, en la carrera, t = toda la pared desde el retrazado anterior, menos lo
+   girado. En los menús sigue restando las esperas, porque ahí sí son esperas de verdad (60 Hz).
+4. **El historial por segundo** dice lo girado, la pared y los retrazados de cada segundo (p. ej. `giro497/996ms ret117`).
+5. **Arreglos chicos**:
+   - `medir-sitio --help` (y `-h`) imprime la ayuda de la cabecera y sale; antes medía con la etiqueta «base» (§160).
+   - Con `sinTope`, el margen va **por cuadro de lógica** (CPU pura × imágenes ÷ cuadros de lógica), y se imprime
+     también «= ×N contra 60».
+   - El contador de lógica cuenta solo con la carrera andando (etapa 0–2, antes y ahora) y nunca más de 2000 por
+     segundo. Al terminar la carrera el Raceinfo cambia sus campos y la resta daba millones (§161).
+
+**La comprobación K = 1 contra K = 2** (`build/web/datos/medir-sitio/st162b-k1-*`, `st162b-k2-*`, `st162c-k2-*`).
+
+El lastre hace lo que tiene que hacer. En la carrera, con K = 2, cada segundo gira la mitad de la pared (`st162c-k2`,
+`porSegundo`: `giro497/996ms`, `giro523/1050ms`, …), y en total lo girado es igual a lo trabajado
+(`"cuadro":{"k":2,"ms":30801,"trabajoMs":30801}`).
+
+**Pero los cuadros de lógica no bajan a la mitad.** En el mismo tramo de la pista (el de ~132 dibujos), K = 1 da ~135
+(`st162-k1`, `st162b-k1`) y K = 2 da ~93–98 (`st162b-k2`, `st162c-k2`): **×0,70**. El juego dibuja lo mismo por cuadro
+de lógica en los dos casos (una imagen cada dos), así que no es que dibuje menos.
+
+La explicación que cuadra, **no probada**: con K = 1 el hilo pierde ~1/4 de su tiempo en esperas que no son CPU. Serían
+las esperas de aurora a la tarjeta o a la toma del lienzo, que ni el runtime ni la página cuentan como espera. Con
+K = 2 esas esperas quedan escondidas detrás del giro. Si es así, el techo de CPU de este PC es ~190 cuadros de lógica
+por segundo, no 135, y las cifras con K > 1 son de CPU. Para probarlo hay que contar esas esperas de aurora (pendiente).
+
+Además, **K = 1 varía mucho entre corridas y según el tramo**:
+- entre corridas, en los últimos 10 s: 151 (`esc-pc-st`), 137 (`st162-k1`) y 112,8 (`st162b-k1`);
+- dentro de una misma corrida: 158 en la salida (~268 dibujos) y 105 más adelante.
+
+Hay que comparar siempre en el mismo tramo.
+
+**La escalera sin tope** (las banderas de §159 más `&sinTope=1`). Comando: `medir-sitio --perfil pc --sola --piloto
+--segundos 15 --ventana`, en el monitor de 144 Hz. Archivos: `esc-*-st162b-pc.json` y `-salida.txt`; la gama baja,
+`esc-baja-st162`.
+
+| Escalón | Cuadros de lógica/s | Imágenes/s | Margen (lógica ÷ 60) | CPU pura por cuadro de lógica | Tarjeta (medidor) |
+|---|---|---|---|---|---|
+| PC típico (`lastre=2.2`, 8 lógicos) | **90,2** | 41,3 | **×1,50 de sobra** | 10,8 ms | 30,3 ms (*) |
+| Portátil (`lastre=3&ladron=64`, 4 lógicos) | **38,1** | 12,3 | **le falta ×1,57** | — (**) | 90,8 ms (*) |
+| Gama media (`lastre=4&lastreAyuda=3&ladron=64&lastreGpu=6`, 8 lógicos) | **33,2** | 9,9 | **le falta ×1,81** | — (**) | 169,7 ms (*) |
+| Gama baja (`lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`, 8 lógicos) | — | — | — | — | el piloto no llegó a la carrera en 240 s de piloto (24 min de pared) |
+
+(*) La «tarjeta» del medidor llega tarde con el hilo girando: `onSubmittedWorkDone` se contesta en el hilo ocupado. Con
+el lastre por cuadro, esa columna no sirve para saber si frena la tarjeta; para eso está el perfil de la tarjeta por la
+dirección (§155).
+(**) Con K ≥ 3 sin tope, la CPU pura de la página sale 0: casi no hay esperas de la página entre las que medir. El
+margen sale de los cuadros de lógica.
+
+Con la primera versión (sin «todo»: `esc-*-st162`) daban: típico 76,6, portátil 34,5 y gama media 32,2.
+
+**Qué significa**
+- Sin tope, estos aparatos dan **más cuadros de lógica que los fps con tope de §159** (portátil 38 contra 22,8; gama
+  media 33 contra 17,6), porque el juego se salta imágenes: dibuja 1 de cada 3.
+- Los cuadros de lógica miden el techo de la **CPU de la carrera**, no lo que se ve. Con tope, ese aparato corre la
+  carrera más lenta que el tiempo real y además muestra pocas imágenes.
+- **Al portátil le falta ×1,6 y a la gama media ×1,8** de CPU para 60 cuadros de lógica. §159 decía ×2,4 y ×3,0, pero
+  medía la CPU por imagen. Para ver 60 imágenes les falta más, porque cada imagen dibujada cuesta.
+- **La gama baja** sigue sin llegar a la carrera: en los menús, con K = 7, el piloto no termina. Para ella sigue
+  mandando el motor (§160: el código traducido y la salida del wasm), no la página.
+
+**Pendiente**
+- Contar las esperas de aurora (la toma del lienzo y los búferes de subida) como espera del runtime, para explicar el
+  ×0,70 de K = 2.
+- Un tramo fijo de la carrera para comparar (p. ej. de la vuelta 2 en adelante).
+- Que la gama baja llegue a la carrera: que el piloto llegue, o arrancar directo en la carrera con `?modo=directa`.
+
+## 2026-10-29 · §163 Calibrar el freno: el tramo fijo, la dispersión, el ×0,70 medido y la escalera con la gama baja (N2) · 21:58–22:20
+
+**Por qué** (el dueño, por la orquestadora: «Sí, calíbralo»). §162 dejó dos dudas. Con K = 2 los cuadros de lógica
+bajaban a ×0,70 y no a ×0,5, y la explicación (esperas de aurora que nadie contaba) era una suposición. Además, K = 1
+variaba mucho, porque cada corrida medía «los últimos 10 s», que caían en tramos distintos de la pista. Para saber si
+el freno está bien calibrado hacía falta comparar siempre **lo mismo** y **medir** dónde se va el tiempo.
+
+**Qué se hizo**
+1. **El tramo fijo** (`?tramo=600-2400`; `crearTramo` y `tramoDeParametros` de `web/navegador/sin-tope.mjs`; usado por
+   `mkw.mjs`). La página mira el contador de cuadros de lógica de la carrera (Raceinfo +0x20, desde la cuenta) cada
+   2 ms. Al pasar el cuadro 600 y al pasar el 2400 anota la pared, las imágenes, las esperas del runtime, la espera de
+   aurora a sus búferes de subida (`mkwEsperaSubida`, que ahora se cuenta) y lo girado por el lastre. Así entrega los
+   cuadros de lógica por segundo y el reparto **por cuadro de lógica**: pared = esperas + giro + trabajo.
+   `medir-sitio` espera a que el tramo termine, lo imprime («tramo (§163): …») y lo guarda en `<base>-v1-tramo.json`.
+   Banco `sin-tope`: 28/28 ✓ (7 puntos nuevos del tramo). Banco `lastre`: 15/15 ✓.
+2. **La misma carrera siempre, sin piloto ni teclas**: `?modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo`. La
+   página arma la ficha y el juego salta directo a la carrera (§73, por código, sin menús). Corren las **12 en CPU**
+   (también el puesto 1: `soloCpu=1`), así que no depende de cuándo se aprieta una tecla, y con la misma semilla.
+   Siguen siendo 12 karts y todos los efectos. Con esto **la gama baja llega a la carrera**: a los 135 s, contra «no
+   llega» en 24 min con el piloto (§162).
+3. Comando de cada medida: `node herramientas/medir-sitio.mjs --perfil pc --sola --piloto --segundos 5 --ventana
+   --piloto-espera 600 [--nucleos N] --extra "&modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&sinTope=1&tramo=600-2400&lastre=K…"`.
+   Ventana en el monitor de 144 Hz y sin sonido; una medida a la vez.
+
+**La dispersión de K = 1 en el tramo** (este PC, 16 lógicos; `build/web/datos/medir-sitio/t163-k1a-v1-tramo.json`,
+`t163-k1b-…`, `t163-k1c-…`): **146,8, 142,3 y 142,0 cuadros de lógica por segundo**. Promedio 143,7, ±1,7 %. Antes,
+en «los últimos 10 s», iba de 112,8 a 151 (§162).
+
+**El ×0,70, medido** (cada cifra, del `…-tramo.json` de su corrida):
+
+| Corrida | Lógica/s | ÷ K = 1 | Imágenes por cuadro de lógica | Por cuadro de lógica (ms): esperas · giro · trabajo |
+|---|---|---|---|---|
+| K = 1 (`t163-k1a/b/c`) | 146,8 · 142,3 · 142,0 | 1 | 0,46 · 0,44 · 0,43 | 0,10–0,14 · 0 · 6,7–6,9 |
+| K = 2 (`t163-k2a/b/c`) | 84,9 · 94,4 · 77,8 | **×0,60 ±10 %** | 0,36 · 0,35 · 0,33 | 0,00–0,01 · 5,3–6,4 · 5,3–6,4 |
+| K = 4 (`t163-k4a/b`) | 37,5 · 37,0 | **×0,259** | 0,32 · 0,33 | 0,00 · 20,0–20,3 · 6,7–6,8 |
+
+Lo que dicen las cifras:
+- **El freno gira exactamente lo pedido.** En todas las corridas, giro = (K−1) × trabajo con menos de 0,5 % de
+  diferencia: K = 2, 5,288 contra 5,295; K = 4, 20,263 contra 3 × 6,782 = 20,346. Lo mismo en la escalera de abajo.
+- **No hay esperas escondidas.** La suposición de §162 queda **descartada por la medida**: la espera de aurora a la
+  subida da 0 ms y las del runtime, 0,1 ms por cuadro con K = 1. Sin tope, el hilo trabaja todo el tiempo.
+- **Lo que cambia es el trabajo de cada cuadro de lógica, porque el juego dibuja menos cuando va atrasado.** Mario
+  Kart, cuando no le alcanza el tiempo, corre más de un cuadro de lógica por imagen: es su propio «saltarse imágenes».
+  Con K = 1 dibuja 0,44 imágenes por cuadro de lógica; con K = 2 o 4, 0,33–0,36; la gama baja, 0,14. Dibujar es la
+  mayor parte del trabajo. Un cuadro de lógica con menos dibujo cuesta menos, así que la lógica no baja a 1/K. Con
+  K = 2 el juego está justo en el borde entre dibujar 1 de cada 2 y 1 de cada 3, y por eso es tan inestable (±10 %).
+  Con K = 4 ya está del otro lado, y entonces sí da ×0,259 (×0,25 + 3,6 %, dentro del ±5 %).
+- Quise separar cuánto cuesta la lógica y cuánto el dibujo con un ajuste (trabajo = lógica + dibujo × imágenes +
+  fijo por segundo). Salen 1,2 ms, 11 ms por imagen y 68 ms/s, pero con errores de hasta 0,6 ms: **no es confiable** y
+  no se usa.
+
+**¿Se puede llegar a K = 2 → ×0,50?** No sin falsear el freno. Un procesador de verdad K veces más lento también haría
+que el juego se saltara imágenes, igual que el lastre. Que la lógica no baje a 1/K es **la respuesta del juego**, no
+un error del freno. Forzar ×0,50 con una tabla (por ejemplo K = 2,4 para «parecer 2») haría el aparato simulado más
+lento de lo que es su núcleo. **Lo que se propone**:
+- comprobar el freno por su identidad, giro = (K−1) × trabajo, que da en todas las corridas;
+- comparar aparatos por los cuadros de lógica por segundo **en el tramo fijo**, con al menos dos corridas donde el
+  ritmo esté cerca del borde (como K = 2);
+- si alguna vez hace falta un número que no dependa de cuánto dibuja, medir la lógica y el dibujo por separado con
+  contadores dentro del motor (§152), no con un ajuste.
+
+**La escalera sin tope, calibrada, en el tramo fijo** (las banderas de §159; archivos `esc163-*-v1-tramo.json` y
+`-salida.txt`; resumen en `esc163.txt`):
+
+| Escalón | Cuadros de lógica/s | Imágenes/s | Margen para 60 de lógica | Trabajo por cuadro (ms) | Giro = (K−1) × trabajo |
+|---|---|---|---|---|---|
+| Este PC (K = 1, promedio de 3) | **143,7** | 64 | ×2,40 de sobra | 6,8 | — |
+| PC típico (`lastre=2.2`, 8 lógicos; 2 corridas) | **77,5 · 83,7** (80,6) | 26,5 · 30,5 | **×1,34 de sobra** | 5,9 · 5,4 | 7,02 / 7,05 ✓ |
+| Portátil (`lastre=3&ladron=64`, 4 lógicos) | **36,4** | 10,2 | **le falta ×1,65** | 9,2 | 18,30 / 18,36 ✓ |
+| Gama media (`lastre=4&lastreAyuda=3&ladron=64&lastreGpu=6`, 8) | **29,8** | 7,4 | **le falta ×2,01** | 8,4 | 25,15 / 25,22 ✓ |
+| Gama baja (`lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`, 8) | **19,7** | 2,8 | **le falta ×3,04** | 7,3 | 43,46 / 43,58 ✓ |
+
+- **La tarjeta no se pudo medir.** El medidor de la tarjeta (`onSubmittedWorkDone`) se contesta en el hilo, y el hilo
+  está girando: da 485 ms en la gama baja, lo que no es la tarjeta. Para medirla de verdad hace falta el perfil de la
+  tarjeta (`?perfilGpu=1`), con las marcas de tiempo de la propia tarjeta (§115). Queda pendiente.
+- **El ladrón de caché se nota**: el portátil y la gama media trabajan 8,4–9,2 ms por cuadro, contra 6,8 de este PC.
+  Es la memoria más lenta que simula el ladrón, encima del lastre.
+
+**Qué significa para la gama media y la baja.** Sin tope y con todos los efectos y 12 karts, a la **gama media le
+falta ×2** de CPU para correr la carrera a 60 cuadros de lógica, y a la **gama baja ×3**. Eso es solo la lógica: la
+gama baja dibuja 2,8 imágenes por segundo y la media 7,4. Para que además **se vean** 60 imágenes, les falta bastante
+más, porque cada imagen es la mayor parte del trabajo. Lo que hay que bajar es el costo por imagen del motor (§160: el
+código traducido y la salida del wasm), no la página.
+
+**Pendiente**
+- La tarjeta con `?perfilGpu=1` en el mismo tramo.
+- Repetir el portátil, la gama media y la gama baja (una corrida cada uno).
+- Si hiciera falta, los contadores del motor (§152) para separar la lógica del dibujo.
+
+## 2026-10-29 · §164 La tarjeta en el tramo fijo, y la segunda corrida de cada escalón (N2) · 22:21–22:53
+
+**Por qué** (el dueño, por la orquestadora: «Sí, sigue»). En §163 quedó sin medir la tarjeta de video. El medidor de
+siempre (`onSubmittedWorkDone`) se contesta en el hilo del juego, y con el lastre el hilo está girando: dio 485 ms en la
+gama baja, que no es la tarjeta. Las **marcas de tiempo de la tarjeta** (§115) las pone la tarjeta misma y no dependen
+del hilo. Además faltaba una segunda corrida del portátil, la gama media y la gama baja, para saber cuánto varían.
+
+**Qué se hizo**
+1. **Las marcas cubren el tramo** (`mkw.mjs`). Con `?tramo=600-2400&perfilGpu=1` las marcas se prenden al pasar el
+   cuadro de lógica 600 y se apagan al pasar el 2400; antes medían solo los primeros 20 s de la carrera. El resultado
+   del tramo trae:
+   - la tarjeta por imagen (la suma de todas las pasadas medidas ÷ las imágenes del tramo),
+   - las pasadas más caras,
+   - la CPU por imagen = (trabajo + giro de cada cuadro de lógica) × cuadros de lógica por imagen,
+   - y cuál de las dos pone el techo.
+
+   `medir-sitio` lo imprime («tarjeta en el tramo (§164)») y lo guarda en el `-v1-tramo.json`.
+2. **Las marcas sin redondeo.** Chrome redondea las marcas de la tarjeta a 100 µs (para que una página no pueda usarlas
+   como reloj fino), y las pasadas de este juego duran 0,01–0,08 ms, menos que el redondeo. Con el redondeo,
+   K = 1 contra K = 4 dio 0,200 contra 0,166 ms por imagen, un 17 % de diferencia (`t164-k1-salida.txt`,
+   `t164-k4-salida.txt`). Para medir se apaga con la bandera de diagnóstico de Chrome
+   `--chrome "--disable-dawn-features=timestamp_quantization"`. Es solo para medir: el juego no la necesita.
+3. Comando de cada corrida: `node herramientas/medir-sitio.mjs --perfil pc --sola --piloto --segundos 5 --ventana
+   --piloto-espera 600 --chrome "--disable-dawn-features=timestamp_quantization" [--nucleos N] --extra
+   "&modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&sinTope=1&tramo=600-2400&perfilGpu=1&lastre=K…"`.
+   Ventana en el monitor de 144 Hz y sin sonido; una medida a la vez.
+
+**La comprobación: la tarjeta no cambia con el lastre de CPU** (este PC; `t164q-k1-salida.txt`, `t164q-k4-salida.txt`,
+resumen en `t164q.txt`): **0,200 ms por imagen con K = 1 y 0,210 con K = 4**, un 5 % (meta ±10 % ✓). La pasada más
+cara es la misma en las dos (#4, 939×528, 0,08 ms). Así que las marcas sirven aunque el hilo esté girando.
+(Ojo: esta corrida de K = 1 dio 158,1 cuadros de lógica por segundo, fuera del 142–147 de §163. Es la primera con
+`perfilGpu=1` y la bandera de Chrome; no la uso para la escalera.)
+
+**La escalera con la tarjeta** (archivos `esc164-*-salida.txt` y `-v1-tramo.json`, resumen en `esc164.txt`; las
+corridas de §163 en `esc163.txt`):
+
+| Escalón | Cuadros de lógica/s (corridas) | Dispersión | Margen para 60 | Imágenes/s | Tarjeta por imagen | CPU por imagen | Techo |
+|---|---|---|---|---|---|---|---|
+| PC típico (`lastre=2.2`, 8) | 77,5 · 83,7 · 78,3 | ±4 % | ×1,33 de sobra | 27,1 | 0,19 ms | 36,9 ms | **CPU** |
+| Portátil (`lastre=3&ladron=64`, 4) | 36,4 · 36,4 · 36,3 | ±0,2 % | le falta ×1,65 | 9,8 · 10,9 | 0,21 · 0,20 ms | 102 · 91 ms | **CPU** |
+| Gama media (`lastre=4&lastreAyuda=3&ladron=64&lastreGpu=6`, 8) | 29,8 · 30,9 · 31,6 | ±3 % | le falta ×1,95 | 6,6 · 5,8 | 1,22 · 1,49 ms | 151 · 173 ms | **CPU** |
+| Gama baja (`lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`, 8) | 19,7 · 18,6 · 19,0 | ±3 % | le falta ×3,14 | 2,7 · 2,7 | 3,27 · 2,78 ms | 377 · 369 ms | **CPU** |
+
+(El margen sale del promedio de las corridas ÷ 60. La primera corrida de cada escalón es la de §163, sin la tarjeta.)
+
+Cómo se leen:
+- **El lastre de la tarjeta se mide tal cual.** La gama media (`lastreGpu=6`) da 1,2–1,5 ms, unas 6 veces los
+  0,2 ms de este PC; la baja (`lastreGpu=15`), 2,8–3,3 ms, unas 15 veces. Así que las marcas también ven las pasadas
+  repetidas del lastre de la tarjeta.
+- **La «CPU por imagen» es todo lo que la CPU hace entre una imagen y la siguiente.** Como el juego se salta imágenes
+  (§163), entre dos imágenes corre varios cuadros de lógica: 3 en el típico, 3,5 en el portátil, 5 en la gama media y 7
+  en la gama baja.
+- **En todos los escalones frena la CPU, y por mucho**: la tarjeta trabaja entre 0,2 y 3,3 ms por imagen, y la CPU
+  entre 37 y 377 ms. Aunque la CPU dibujara todas las imágenes, la tarjeta tendría tiempo de sobra.
+- **La segunda corrida confirma la primera**: los tres escalones lentos varían ±3 % o menos. Ninguno queda en el borde
+  inestable de K = 2, así que la gama baja no necesitó una corrida más.
+
+**Una duda importante: ¿el lastre de la tarjeta es demasiado liviano?** En el Oppo de verdad (§115) el medidor decía
+~34 ms de tarjeta por imagen, pero con el otro método (`onSubmittedWorkDone`, que mide más que la tarjeta), a pantalla
+completa y con otra resolución. La gama media simulada da 1,2–1,5 ms con las marcas de la tarjeta. Si el Oppo midiera
+de verdad cerca de 34 ms, `lastreGpu=6` estaría muy por debajo de un teléfono, y en el teléfono el techo podría ser la
+tarjeta. **No hay que suponer ninguna de las dos cosas**: hace falta medir el Oppo con «🔬 Perfilar la tarjeta de
+video» (las mismas marcas) y recalibrar `lastreGpu` con eso.
+
+**Qué significa para la gama media y la baja.** En este simulador **frena la CPU**: a la gama media le falta ×2 y a la
+baja ×3 solo para la lógica de la carrera a 60. La tarjeta simulada sobra de lejos. Lo que hay que bajar es el trabajo
+de la CPU del motor (§160: el código traducido y la salida del wasm). La tarjeta del teléfono de verdad queda en duda
+hasta medir el Oppo con las marcas.
+
+**Pendiente**
+- Medir el Oppo con «Perfilar la tarjeta» y recalibrar `lastreGpu`.
+- Entender por qué K = 1 subió a 158 con `perfilGpu` y la bandera de Chrome: ¿mide la bandera o mide la corrida?
+- El trabajo de CPU por imagen dibujando todas las imágenes (con tope, en el tramo fijo), para comparar con la meta de
+  3,3 ms del hilo del juego.
+
+## 2026-10-29 · §165 N13 cerrado: el impuesto en la carrera, el «(program)» de Chrome y la traba de los vectores · 23:00–23:40
+
+**Por qué** (la orquestadora, con la regla nueva del dueño: «si se empieza una tarea, tipo N13, debe terminarse al 100 %
+autónomamente»). Para cerrar N13 faltaba lo que pide su comprobación: **la razón nativo/wasm en una carrera** y el
+impuesto de la carrera repartido en partes con nombre, con lo sin explicar en menos de 20 %. Además había que repartir
+el «(program)» que el perfil de Chrome no sabe a qué cargarle, y probar en el programa de Windows más trabas de wasm, de
+a una.
+
+El programa de Windows **no es parte del producto**: es solo un instrumento de medida (el producto es la página). Sirve
+de «transformador ideal»: es el mismo juego sin navegador, así que la diferencia con el wasm son las pérdidas del
+navegador.
+
+**1. Llevar los dos a la misma carrera: el guion de botones** (`web/headless/aurora_manual.cpp`, que entra en Node y en
+el programa de Windows). Sin página no existe la entrada directa por código (§73), así que el mando del puerto 0 se
+maneja con un guion por número de cuadro:
+- `MKW_HEADLESS_GUION="inicio+duración=máscara,…"` (máscara en hexadecimal: A = 100, B = 200, START = 1000).
+- `MKW_HEADLESS_ESTADO=1` imprime cada segundo la sección, la página, la etapa de la carrera y el cuadro de lógica.
+  Con eso se armó el guion.
+- `MKW_HEADLESS_TRAMO=600-2400` imprime el trabajo por cuadro de lógica entre esos dos cuadros de la carrera.
+- Node lo recibe por `web/node/correr.mjs`, que ahora pasa esas variables al juego y acepta `MKW_NODE_DATOS` (otra
+  carpeta de datos).
+
+Los dos programas parten de **una partida nueva** (si no, cada uno recorre menús distintos). El guion es A cada 150
+cuadros entre el 400 y el 2900, y desde el 3000 A apretado (acelerar):
+`build/web/datos/impuesto-perfil/guion-165.txt`. Así los dos pasan por la partida nueva, el título, Un jugador y los
+menús hasta una carrera de 12 (sección 0x1e, 11 CPU). **Los dos llegan al cuadro de lógica 600 en el mismo cuadro, el
+2998**: el recorrido es determinista.
+
+Dos trampas, mías, que el dueño vio en pantalla:
+- Lancé el programa de Windows desde su carpeta y no desde `terceros/Wiicompiled`, donde busca `dsp_coef.bin`: salió
+  un cartel de error.
+- Al terminar, `std::exit` desde una fibra del juego daba «std::terminate() without current exception»: otro cartel,
+  que esperaba un clic. Ahora en Windows sale con `std::_Exit(0)`, ya con todo escrito.
+
+**2. La razón nativo/wasm en la carrera**
+- **Pared menos esperas, sin muestreador** (`build/web/datos/impuesto-perfil/n13-tramo-carrera.txt` y
+  `n13c-tramo-wasm.txt`; el primer nativo, en esta sección):
+
+  | | Corridas (ms por cuadro de lógica) | Media |
+  |---|---|---|
+  | Programa de Windows (x86-64-v3) | 1,894 · 2,039 · 2,093 | **2,01** (±5 %) |
+  | wasm en Node | 5,126 · 6,942 · 6,617 | **6,23** (±15 %) |
+
+  **Razón: ×3,1** (entre ×2,45 y ×3,66 según la corrida). El wasm de Node varía más: Node recompila por etapas y su
+  recolector entra cuando quiere.
+- **CPU función por función** (`perfil-impuesto.mjs --cuadros 4800 --desde 3000 --etiqueta n13-carrera-nat`, con el
+  muestreador propio y `node --cpu-prof`; archivos `n13-carrera-nat-salida.txt` y `-resumen.json`): **nativo 2,302 →
+  wasm 5,632 ms por cuadro, ×2,45**. El muestreador le suma ~15 % al nativo, por eso da más que la pared sin
+  muestreador.
+
+**El impuesto de la carrera repartido** (de `n13-carrera-nat-resumen.json`; diferencia 3,33 ms por cuadro = 100 %):
+
+| Parte | Nativo → wasm (ms/cuadro) | Parte de la diferencia |
+|---|---|---|
+| Código del juego traducido (`func_…`) | 1,458 → 3,578 | **63,7 %** (×2,45) |
+| Memoria de la Wii (runtime) | 0,014 → 0,566 | **16,6 %** |
+| Retro Rewind traducido (`rr_…`) | 0,141 → 0,349 | 6,3 % |
+| Salir del wasm: recolector 2,7 % + puentes wasm↔JS 2,1 % + la hora 0,9 % + JSPI 0,2 % + (program) 0,5 % | | 6,4 % |
+| Despacho de llamadas 1,9 % + trampolines 1,4 % | | 3,3 % |
+| Hilos y alarmas (HLE) 0,9 % + sonido 0,8 % + ayudantes de PowerPC 0,4 % + archivos 0,3 % + JavaScript 0,2 % | | 2,6 % |
+| Otro runtime / bibliotecas (lo único sin nombre fino) | 0,111 → 0,177 | **2,0 % = sin explicar** |
+| Sistema −0,3 %, aurora sin pantalla −0,6 % (van más rápido en wasm) | | −0,9 % |
+
+**Lo sin explicar es 2 %** (meta: menos de 20 % ✓).
+
+Comparado con la pantalla de título (§160):
+- **En la carrera manda el código traducido**: 64 % + 6 % de RR = **70 %**, contra 35 % en el título.
+- **Salir del wasm baja de 30 % a 6 %**: en la carrera los hilos del juego casi no se duermen y despiertan.
+- **La memoria sigue en ~17–20 %.**
+
+**3. La traba de los vectores, de a una** (`python herramientas/compilar-nativo.py --cpu v3 --sin-vector`, nueva
+opción: `-fno-vectorize -fno-slp-vectorize` en todas las piezas; el traductor ya iba sin la de bloques →
+`build/nativo-v3-sinvector/`). En el mismo tramo da 2,380 y 2,271 ms (media 2,33) contra 2,01: **+16 %, el 8 % del
+impuesto de la carrera**. Está dentro del «código traducido» de la tabla.
+
+Lo que no se repitió y por qué:
+- La memoria revisada (§153, §160) y la revisión de límites explícita (+16 %, §160): ya estaban medidas.
+- Las llamadas indirectas por tabla: no es barato (hay que cambiar el despacho del runtime), y el despacho entero pesa
+  solo 3,3 %. No se hizo.
+
+**4. El «(program)» de Chrome en la carrera** (la carrera directa de §163 con tope, 12 CPU, semilla fija; perfil y traza
+en la misma corrida: `medir-sitio --perfilar --trazaChrome --trazaV8`, la opción nueva que suma las categorías de
+adentro de V8 y de Blink; archivos `build/web/datos/medir-sitio/n13-prog-ambos-*`). Script nuevo:
+`node herramientas/reparto-program.mjs <traza -chrome.json>`. Toma el hilo principal de la pestaña, arma el árbol de
+eventos y calcula el **tiempo propio** de cada uno: cada milisegundo se cuenta una vez, en el evento más de adentro.
+- El perfil: el hilo ocupado 825 ms/s y el `(program)` **65 ms/s (7,9 %)**. En otra corrida dio 130 ms/s (16,2 %,
+  `n13-prog-perfil`), y en §160, con otra carrera, 21,5 %. Varía con la corrida y con el propio perfilador encima.
+- La traza: con JSPI el juego corre **dentro de `RunMicrotasks`** (818 ms/s): cada vez que vuelve de una espera, el
+  wasm sigue en una microtarea. Lo de afuera tiene nombre: tareas de Blink y de la página 42 ms/s, mensajes y
+  compositor 9, WebGPU/Dawn (serializar y mandar los comandos a la tarjeta) 4, recolector 3, compilar wasm y
+  JavaScript 1,5. **Son 45–59 ms/s con nombre, entre el 70 % y el 90 % del `(program)`.** El resto (6–20 ms/s) pasa
+  dentro de las reanudaciones de JSPI y la traza no lo separa del wasm. Las estadísticas internas de V8
+  (`--runtime-call-stats`) no salieron en la traza.
+- En la carrera completa de Chrome, lo sin nombre queda en 1–2 % del hilo (meta: menos de 20 % ✓).
+
+**Qué cambia en los pasos 11–13** (`herramientas/plan-rendimiento/orden.mjs`):
+- **El traductor (M8, H11, M6, M7) pasa al paso 11, delante de la memoria (H6, H7, M1, M2)**: en la carrera es ~70 %
+  del impuesto, contra ~17 % de la memoria. El paso 11 pasa a llamarse «El motor: el código traducido y la memoria
+  de la Wii», 6–9 semanas.
+- El paso 13 queda con lo visual en paralelo (N5, N6, H10, N7, M11).
+- En el paso 12, M10 (las promesas del cambio de hilo) y M3 (el despacho) quedan donde estaban: pesan 6 % y 3 % en la
+  carrera.
+- Los vectores (8 %) entran como parte del traductor (M8/M6).
+
+**Qué significa para la gama media y la baja.** A la gama media le falta ×2 de CPU y a la baja ×3 (§163–§164). La
+mayor parte de esa CPU es el código traducido, que en wasm cuesta ~×2,45 lo del nativo. Si el traductor se acercara al
+nativo, eso solo daría más que todo lo demás junto. La memoria es el segundo frente. Salir del wasm, el despacho y la
+página son chicos en la carrera.
+
+**Desde ahora** (la orquestadora, por el dueño): cada optimización se mide en **el peor caso (la gama baja simulada,
+§163) y en este PC como control**, en el tramo fijo; la escalera entera, solo al terminar un paso del plan.
+
+**Pendiente** (no impide cerrar N13): por qué el wasm de Node varía ±15 %; las estadísticas internas de V8 para el resto
+del `(program)`; las llamadas indirectas por tabla, solo si M3 sube.
+
+## 2026-10-30 · §166 Lo que quedaba de N13: por qué varía el wasm, el «(program)», las llamadas indirectas, el 158 y la CPU por imagen · 00:00–03:00
+
+**Por qué** (la orquestadora, por el dueño: «no debe quedar nada pendiente de un task»). §165 cerró N13, pero dejó cinco
+dudas anotadas como «Pendiente». Aquí se cierran todas, una por una, con números y archivos. La sexta (medir el Oppo)
+la tiene que hacer el dueño: queda como instrucción en `docs/medir-oppo.md`.
+
+### 166.1 Por qué el wasm de Node variaba ±15 % entre corridas
+
+**Herramienta nueva:** `node herramientas/medir-node-estable.mjs`. Corre el tramo fijo de la carrera (guion de §165,
+cuadros de lógica 600–2400) N veces, cada vez con una partida nueva, y anota lo que puede mover el número:
+- el recolector de V8 (`--trace-gc`) dentro del tramo;
+- el rendimiento del procesador, el contador de Windows «% Processor Performance», una muestra por segundo;
+- el plan de energía.
+
+Opciones:
+- `--fijo`: prioridad alta y el proceso atado a 4 núcleos, uno por núcleo físico y sin el 0.
+- `--nativo v3`: el programa de Windows en lugar de Node.
+- `--alternar v3`: pares intercalados, nativo y enseguida wasm, y la razón de cada par.
+
+Resultados en `build/web/datos/node-estable/<etiqueta>.json`.
+
+**Medido** (ms de trabajo por cuadro de lógica):
+
+| Tanda (hora) | Corridas | Mediana | Dispersión (± medio rango) |
+|---|---|---|---|
+| wasm sin control (`libre`, 00:00) | 5 | 6,256 | ±4,7 % |
+| wasm prioridad alta + 4 núcleos (`fijo`, 00:07) | 5 | 6,608 | **±1,5 %** |
+| wasm igual + sin compilar por etapas (`fijo-sin-escalones`, `--no-wasm-dynamic-tiering`) | 5 | 6,800 | ±5,8 % |
+| nativo prioridad alta + 4 núcleos (`nativo-fijo`, 00:15) | 5 | 2,357 | ±2,6 % |
+| nativo sin control (`nativo-libre`, 00:22) | 3 | 2,653 | ±1,2 % |
+| wasm prioridad alta + 7 núcleos (`fijo-7nucleos`, 00:26) | 5 | 7,065 | ±5,3 % |
+| wasm todo con el compilador fuerte (`fijo-sin-liftoff`, `--no-liftoff`, 01:59) | 4 | 6,760 | ±13,4 % |
+
+Qué se descartó, y por qué:
+- **La frecuencia del procesador:** estuvo siempre entre 104 % y 109 % de la nominal (4,7 GHz), con el plan «Ultimate
+  Performance». No cambia lo bastante para explicar ±15 %.
+- **El recolector:** se lleva siempre lo mismo, 0,075–0,10 ms por cuadro (1,2–1,6 %). Además, las corridas con más pasadas
+  del recolector son las **más rápidas**. Es un efecto, no una causa: cuando sobra tiempo, el runtime pregunta más
+  veces la hora mientras espera, y cada pregunta deja un número grande que hay que recoger.
+- **El compilador por etapas de V8** (Liftoff → TurboFan): ni sin etapas ni con todo compilado fuerte desde el
+  principio se aquieta (±5,8 % y ±13,4 %).
+
+Lo que sí mueve el número:
+1. **La carga de fondo del PC, que cambia con la hora.** En el momento de medir, PLECS (el simulador de circuitos del
+   dueño) ocupaba un núcleo entero y unos Chrome que no son de las pruebas, unos 2. Por eso **cada tanda sale distinta de
+   la anterior aunque dentro de la tanda las corridas se parezcan**:
+   - el nativo pasó de 2,01 (§165) a 2,36 y 2,65 ms;
+   - el wasm, de 6,26 a 6,61 y 7,07.
+
+   Las dos cosas se mueven juntas: es el PC, no el programa. Todos los núcleos del 9800X3D comparten la misma caché
+   grande (L3), así que otro programa pesado le quita caché al juego aunque no le quite núcleo.
+2. **Cada proceso de wasm arranca con el código y la memoria en otro lugar.** Dentro de un mismo proceso el número es
+   estable, pero de un proceso al otro varía. Medido con pares intercalados (el nativo y el wasm uno pegado al otro, con la
+   misma carga de fondo), el wasm varía un 16,6 % entre procesos y el nativo un 10,1 %.
+
+**La forma de medir que queda** (§166, para N13 y lo que siga):
+- **Un mismo programa** (antes y después de un cambio): `--fijo`, 5 corridas seguidas y la mediana. Da **±1,5 %**
+  dentro de la tanda. El antes y el después se corren **en la misma tanda, intercalados**: con eso la deriva de la hora
+  se cancela.
+- **La razón nativo/wasm:** `--fijo --alternar v3`, pares intercalados, la mediana de las razones y su intervalo.
+
+**La razón de la carrera, con esa forma** (25 pares, 00:30–02:48; `pares.json`, `pares-b.json`, `pares-c.json`, resumen
+`razon-25.json`):
+- **wasm ÷ nativo = ×2,63** (mediana; media ×2,65).
+- Intervalo de la mediana (95 %, remuestreo): 2,41–2,72.
+- Nativo 2,01 ms y wasm 5,57 ms por cuadro de lógica (medianas).
+- El ×3,1 de §165 salió de 3 corridas sin intercalar, alto por la deriva. **El que vale es ×2,63.**
+- **Coincide con el ×2,45 de la CPU función por función de §165**, que no se ve afectado por las esperas.
+
+**Lo que no se alcanzó.** Medida así, la razón no baja de ±3 % en este PC con la carga que tiene: cada tanda de 5–15 pares
+se corre entera, y la de las 02:00 dio ×2,46 sola. Para bajar de ±3 % hacen falta las dos cosas juntas:
+- unos 25 pares más, porque el error baja con la raíz del número de pares: unos 50 en total;
+- **el PC sin otros programas abiertos** (sin PLECS ni otros Chrome).
+
+Lo segundo depende del dueño. Mientras tanto, cada antes/después se compara **dentro de la misma tanda** (±1,5 %), que es
+lo que deciden las optimizaciones.
+
+### 166.2 El resto del «(program)» de Chrome
+
+- **Las estadísticas internas de V8 no se pueden sacar.** Node lo dice claro al pedirlas:
+  «RCS was disabled at compile-time». Las versiones que se distribuyen de Node y de Chrome vienen compiladas sin esos
+  contadores. Por eso en §165 la traza de Chrome trajo 0 eventos de esa categoría aunque se pidió.
+- **`--prof` (el perfilador de V8 por intervalos), en Node, sobre el juego entero** (`build/web/datos/rcs/prof/procesado.txt`):
+  - El wasm y el JavaScript salen con nombre (59 %). Ahí se ve la consulta de la hora del juego (`_clock_time_get`,
+    6,8 % de toda la corrida, que incluye el arranque y los menús) y los «Builtins» de V8 que la acompañan (13 %).
+    Los Builtins son sus piezas internas escritas en su propio lenguaje, por ejemplo convertir números grandes o leer
+    una variable global.
+  - Lo que V8 tiene escrito en C++ sale entero como «node.exe» (37,5 %), **sin nombres**: en Windows faltan los
+    símbolos de Node.
+  - Además, en Windows `--prof` toma una muestra cada ~16 ms (5.297 en 85 s), demasiado grueso para la carrera.
+  - O sea: separa los Builtins, pero no lo de C++.
+- **La prueba chica de JSPI** (`node herramientas/micro-jspi/correr.mjs`, `herramientas/micro-jspi/jspi.c`; resultado en
+  `build/micro-jspi/resultado.txt`). Un bucle con un trabajo conocido que se suspende 4.000 veces con JSPI, como el juego
+  al esperar el cuadro siguiente. El perfil de V8 carga cada ida y vuelta (congelar el wasm, cumplir la promesa, seguir
+  en una microtarea) a «(program)»: **4,8 µs cada una**, sin ningún nombre más fino. **Queda demostrado en chico que el
+  perfil no puede separar lo de adentro de una reanudación de JSPI.**
+- **Cuánto explica eso.** §152 contó 7–8 cambios de fibra y 1–2 esperas por cuadro: unas 10 idas y vueltas. A 143 cuadros
+  de lógica por segundo (este PC sin tope) son ~1.430 por segundo × 4,8 µs = **~7 ms/s**. Lo sin nombre de §165 era 6–20
+  ms/s: las reanudaciones de JSPI explican el piso de eso. El resto varía con la corrida, igual que el «(program)» mismo
+  (7,9–16 %).
+
+### 166.3 Las llamadas indirectas, medidas
+
+En el juego cada «bctrl» de la Wii (llamar a una función por su dirección) pasa por `InvokeIndirectCpu`, que busca la
+dirección en un memo de 512 casillas y llama por el puntero que encuentra. §152 contó **~9–11 mil por cuadro**. Armar el
+programa de Windows con otro despacho era caro, así que se midió la versión barata: **una prueba chica con la misma
+forma** (`herramientas/micro-indirectas/generar.py`; el C generado y los programas van a `build/micro-indirectas/`, sin nada
+del juego):
+- 20.000 funciones chicas como las traducidas;
+- 2.000 destinos en orden de azar fijo;
+- cuatro bucles de 20 millones de llamadas: directa, por puntero siempre al mismo, por puntero a 2.000 destinos, y
+  «como el juego» (el memo de 512 casillas + el puntero).
+
+Se compiló con clang `-O2 -march=x86-64-v3` (como el nativo) y con emcc `-O2` (wasm en Node), y se corrió intercalado
+con prioridad alta y 4 núcleos (`resultado.txt`):
+
+| ns por llamada | Programa de Windows | wasm en Node |
+|---|---|---|
+| directa | 0,81–0,96 | 1,70–2,07 |
+| por puntero, siempre la misma | 1,03–1,14 | 2,04–2,69 |
+| por puntero, 2.000 destinos al azar | 9,3–9,9 | 21,3–23,3 |
+| como el juego (memo + puntero) | 12,5–13,4 | 25,5–27,2 |
+
+- **Una llamada como las del juego cuesta ~13 ns más en wasm.** Por 11 mil llamadas por cuadro son como mucho
+  **0,15 ms por cuadro**, el **3,5 %** del impuesto (5,57 − 2,01 = 3,56 ms).
+- Es un techo: el juego no salta al azar entre 2.000 destinos, así que el procesador adivina mejor que en la prueba.
+- Lo que wasm agrega por llamar «por la tabla» (`call_indirect` revisa el índice y la firma) es chico: ~1 ns más que
+  por puntero al mismo destino. Casi todo es el procesador sin poder adivinar adónde salta.
+- Coincide con el «despacho 1,9 % + trampolines 1,4 %» que el muestreador vio en §165. **M3 sigue en el paso 12**: es
+  chico.
+
+### 166.4 Por qué K = 1 dio 158 cuadros de lógica por segundo
+
+§164 sospechaba de dos cosas: la bandera de Chrome que quita el redondeo de las marcas y `?perfilGpu=1`. Se corrieron los
+cuatro casos intercalados, tres rondas (este PC, sin tope, tramo fijo; `k166-<caso>-r<n>-salida.txt` y
+`-pc-v1-tramo.json` en `build/web/datos/medir-sitio/`):
+
+| Caso | Ronda 1 · 2 · 3 | Mediana |
+|---|---|---|
+| ninguno | 142,3 · 132,7 · 138,3 | **138,3** |
+| solo `perfilGpu=1` | 132,9 · 135,7 · 133,3 | 133,3 |
+| los dos | 122,3 · 136,1 · 131,1 | 131,1 |
+| solo la bandera | 126,8 · 129,1 · 128,6 | 128,6 |
+
+- **Ningún caso se acerca a 158.** El 158 de `t164q-k1` fue la corrida misma, a las 22:31, con menos carga de fondo:
+  lo mismo de §166.1.
+- Las banderas no lo suben: si algo, lo bajan un 3–7 %, y medir la tarjeta cuesta un poco.
+- Por eso la escalera se mide **sin** las banderas, y la tarjeta en una corrida aparte.
+
+### 166.5 La CPU por imagen dibujando todas las imágenes (con tope)
+
+Con tope (el juego a 60, como lo juega una persona), en el tramo fijo, con la tarjeta medida
+(`t166-pc-r<n>` y `t166-baja-r<n>`, mismo lugar):
+
+| | Cuadros de lógica/s · imágenes/s | Trabajo por cuadro de lógica | CPU por imagen | Tarjeta por imagen | Meta del hilo del juego |
+|---|---|---|---|---|---|
+| Este PC (K = 1) | 60,0 · 60,0 (todas) | 10,8 · 11,4 ms | **10,8 · 11,4 ms** | 0,17 · 0,18 ms | 3,3 ms |
+| Gama baja simulada (`lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`, 8 núcleos) | 22,2 · 3,2 / 22,8 · 3,3 | 44–45 ms (trabajo 8,2–9,3 + giro 35,7) | 307–315 ms (dibuja 1 de cada 7) | 3,0–3,3 ms | 3,3 ms |
+
+- **Este PC, dibujando las 60 imágenes, gasta ~11 ms de CPU por imagen: ×3,4 la meta de 3,3 ms.** Le alcanza porque
+  le sobran 16,7 ms; su techo de CPU con tope es 88–92 imágenes por segundo.
+- **Separar la lógica del dibujo.** Sin tope dibuja 0,42 imágenes por cuadro de lógica y trabaja 7,2 ms por cuadro (las
+  tres corridas «ninguno»); con tope dibuja 1 y trabaja 11,1. Con dos ecuaciones, trabajo = lógica + dibujo × imágenes
+  por cuadro:
+  - **lógica ≈ 4,4 ms por cuadro**;
+  - **dibujo ≈ 6,7 ms de CPU por imagen**: armar los comandos de WebGPU, el JavaScript de aurora y los llamados a
+    Dawn.
+
+  O sea: **en este PC, dibujar cuesta más CPU que la carrera misma.** Es un dato nuevo para el paso 13 (lo visual):
+  las imágenes también cuestan CPU, no solo tarjeta.
+- **La gama baja**, dibujando todas, se estima con la misma proporción lógica/dibujo, escalada a sus 44,4 ms por cuadro con
+  1 de cada 7: **~92 ms de CPU por imagen, ×28 la meta**. Su tarjeta da 3,0–3,3 ms por imagen, al borde de la meta de
+  tarjeta (2 ms del presupuesto del Oppo), pero frena la CPU, que va ~30 veces más lejos.
+
+### 166.6 El Oppo (lo hace el dueño)
+
+Las instrucciones exactas están en **`docs/medir-oppo.md`**:
+- la bandera de Chrome para Android que quita el redondeo (`chrome://flags/#enable-webgpu-developer-features`);
+- ⚙ → Avanzado → Diagnóstico → «🔬 Perfilar la tarjeta de video»;
+- una carrera de 30 s;
+- «📋 Copiar el informe de rendimiento» y pegarlo en el chat.
+
+Con `perfilTarjeta.msPorCuadro` se recalibra: `lastreGpu` = ms del Oppo ÷ 0,20. En H1/H2 queda como **«falta el Oppo (el
+dueño)»**. No es un pendiente de N13.
+
+### 166.7 La tabla del reparto de la carrera (§165), con lo de hoy
+
+No cambia el reparto por función (×2,45, lo sin explicar 2 %). Cambian y se agregan estas cosas:
+- **la razón de pared: ×2,63** (25 pares), no ×3,1;
+- **dentro de «despacho»: las llamadas indirectas, como mucho 3,5 %** (medido en chico; el muestreador vio 3,3 % para
+  todo el despacho);
+- **dentro del «(program)» de Chrome: las reanudaciones de JSPI, ~7 ms/s** (4,8 µs cada una), el piso de lo sin nombre;
+- **el dibujo cuesta CPU: ~6,7 ms por imagen en este PC**, más que la lógica (4,4).
+
+**N13 queda sin pendientes propios.** Lo único abierto es lo del dueño: el Oppo (`docs/medir-oppo.md`) y, si se quiere la
+razón a ±3 %, medir con el PC sin otros programas abiertos.
+
+## 2026-10-30 · §167 La vibración del teléfono, hecha pulsos parejos · 16:55–17:15
+
+**Qué pasó.** El dueño, probando en el Oppo: «la vibración del móvil vibra de manera descontrolada en la mayoría de
+ocasiones».
+
+**Por qué pasaba.** El juego (la función `PADControlMotor` de la GameCube) no pide «vibra con tal fuerza»: solo prende y
+apaga el motor. Para una vibración suave lo prende y apaga muy seguido, por ejemplo un cuadro sí y uno no, como un
+regulador PWM que da la fuerza media con el ciclo de trabajo. Antes la página pasaba cada prendido tal cual a
+`navigator.vibrate(5000)` («vibra 5 s») y cada apagado a `navigator.vibrate(0)`. En el teléfono eso era:
+- **hasta ~60 órdenes por segundo** a un motor que tarda en arrancar y en frenar: el resultado no sigue al juego, es un
+  zumbido irregular;
+- **si un apagado se perdía o llegaba tarde** (el juego trabado cargando a 1 cuadro por segundo, como en el informe del
+  Oppo del mismo día, `docs/datos-oppo-2026-10-30.json`, segundos 53–64), el motor seguía **5 s a fondo**.
+
+En el mando de PC pasaba lo mismo con `playEffect` de 5 s, pero esos motores reaccionan más rápido y se notaba menos.
+
+**Qué se hizo.**
+- `web/navegador/vibracion.mjs` (nuevo, sin nada del juego ni del navegador adentro): por cada puerto anota cuándo el
+  juego prende y apaga, y cada 100 ms calcula qué fracción del periodo estuvo prendido (el ciclo de trabajo). Manda **una
+  sola orden por periodo**:
+  - al teléfono, un pulso de esa fracción del periodo: 50 % → 50 ms de cada 100. El teléfono no tiene fuerza regulable,
+    solo duración. Prendido todo el periodo → 130 ms, para que el pulso siguiente empalme sin hueco;
+  - al mando, la fuerza proporcional (0,8 × la fracción) durante 130 ms.
+
+  Es como poner un filtro pasabajos entre el PWM del juego y el motor.
+- **Seguros:**
+  - nunca más de **2 s seguidos** (se corta hasta que el juego apague y vuelva a prender);
+  - ninguna orden pasa de 130 ms, así que si el juego se traba la vibración se acaba sola;
+  - pestaña oculta o «Vibración: No» en Controles → para en el acto;
+  - sin nada que vibrar, el temporizador se apaga y no gasta nada.
+- `controles.mjs` usa ese módulo; **`?vibracion=vieja`** = cada prendido/apagado directo, como antes.
+
+**Pruebas.**
+- Banco `vibracion`: 18/18, con un reloj de mentira. Entre otras cosas, 1 s de PWM al 50 % son 60 cambios del juego y
+  10 órdenes, cada pulso de 49–51 ms y la fuerza del mando 0,39–0,41. Un golpe de 150 ms vibra 151 ms. Trabado con el
+  motor prendido, el último pulso llega a los 2 s.
+- Los bancos `controles` (49/49: el punto de vibración ahora espera un periodo), `mandos-jugador` (18/18) y
+  `controles-panel` (25/25).
+
+Comandos: `node banco/correr.mjs vibracion controles mandos-jugador controles-panel`.
+
+**Falta comprobarlo en el teléfono de verdad** (lo hace el dueño): jugar una carrera con el mando en pantalla y chocar,
+pisar cáscaras, etc. Si se siente débil, el número que se mueve es `PULSO_MIN_MS` o el empalme de 130 ms.
+
+**Trampas.**
+- `navigator.vibrate` solo funciona después de que la persona tocó la página (activación del usuario); en la carrera
+  siempre la hay.
+- Llamarlo muy seguido es justamente lo que hace mal: Chrome y Android reinician el motor en cada llamada.
+
+## 2026-10-30 · §168 La semilla de bloques con el camino de verdad (D9 del plan de rendimiento) · 16:12–18:40
+
+**Qué pasaba.** La «semilla de bloques» (`bloques.json`, junto al `.wasm`) es la lista de pedazos del disco que la 1.ª
+visita baja de fondo antes de que el juego los pida, como un electricista que deja los cables tirados antes de que
+lleguen los artefactos. La de hoy era del 18 de octubre: 6 corridas del mismo guion por los menús de un jugador, con dos
+pistas (0 y 54). Desde entonces la página entra directo a la carrera (§66, §71, §73) y casi nadie pasa por esos menús.
+
+**Qué se hizo.**
+- `herramientas/medir-carrera-entera.mjs` (§150) ahora graba la semilla (`--semilla`: lo que el juego leyó en cada corrida,
+  con el cuadro de la primera vez), corta en la largada si se pide (`--hasta-largada`), simula la gama baja para lo que se
+  baja (`--baja`: la CPU 4 veces más lenta y la red de 20 Mbit/s con 50 ms) y dice por tramo los pedidos y MB a la red,
+  las esperas del juego, los pipelines (§172) y las escrituras en la caché (§171).
+- Se grabaron 3 carreras enteras con el camino de hoy (pistas 0.0, 13.2 y 30.2, perfil nuevo, 12 CPU) y
+  `herramientas/juntar-semilla.mjs` armó la semilla nueva: lo que se repite en 2 de las 3 corridas (134 bloques; lo de
+  cada pista queda para el paquete de carrera, §169) más, de la vieja, solo lo de los menús (160 bloques: nada de
+  `Tracks/`, `strm/`, karts ni personajes). En total 294 bloques (~73 MB, 157 del arranque).
+- La página elige la semilla con `?bloques=<nombre>.json` (por omisión `bloques.json`; la vieja quedó como
+  `bloques-viejo.json` para comparar). **La semilla nueva queda en `build/web/navegador/bloques-d9.json`; para publicarla,
+  copiarla sobre `bloques.json` y subirla a R2 (el dueño, `docs/publicar.md`).** Es contenido del juego: nunca a git.
+
+**Medido** (`node herramientas/medir-carrera-entera.mjs`, `bash herramientas/tanda-168.sh`: las configuraciones una
+detrás de otra en la misma tanda, perfil nuevo, sin el paquete de §169 → `build/web/datos/carrera-entera/t168-*/`):
+
+| | Largada | Esperas del juego a la red antes de largar | Lecturas a la red con la carrera ya armada |
+|---|---|---|---|
+| A: semilla vieja (`t168-a-vieja`) | 12,8–13,6 s | 17 / 18 / 19 | 14 / 15 / 15 |
+| B: semilla nueva (`t168-b-semilla`) | 12,8–13,6 s | 6 / 7 / 9 | 4 / 5 / 6 |
+
+(«con la carrera ya armada» = desde que existe el Raceinfo: la presentación y la cuenta, `mkwFaltas()` de §121.) **De la
+cuenta a la meta, el juego no esperó a la red ni una vez en ninguna configuración** (0 de 0, también en la gama baja):
+lo que todavía baja en la carrera es la música, leída de a poco por delante.
+
+**Qué significa.** La semilla nueva baja de fondo lo que el juego de verdad va a pedir: la carga espera a la red un tercio
+de las veces y lo que se tocaba por primera vez en la presentación (las voces y los sonidos de la carrera) baja de 15 a 5.
+La largada no cambia en este PC (la red es local); en la gama baja, el paquete de §169 se mide junto.
+
+**Dato del teléfono** (el informe del Oppo del 30-10, `docs/datos-oppo-2026-10-30.json`): entre los segundos 53 y 62 de los
+menús el juego va a 1–2 cuadros por segundo con el disco esperando 600–1.280 ms cada segundo, y en la presentación igual:
+es la red del teléfono en la 1.ª visita. Es lo que atacan esta semilla y el paquete de §169; queda anotado en D1 para
+medirlo en el teléfono con la próxima visita nueva.
+
+**Trampas.** La primera grabación terminó sin escribir la semilla (un cambio del script no se había aplicado) y estuve
+casi una hora esperando una línea que no iba a salir: ahora la semilla se escribe después de cada pista, y cada espera
+larga tiene un tope y un vigilante que avisa si el registro se queda quieto.
+
+## 2026-10-30 · §169 El paquete de la carrera: lo de cada carrera se pide apenas se elige (D4 y U2 del plan de rendimiento) · 17:50–01:00 (del 31)
+
+**Qué pasaba.** El juego lee lo de cada carrera (la pista, los 12 karts, las voces, los sonidos) recién cuando lo
+necesita, en la presentación, y cada lectura que no está en la caché es una espera a la red. En el teléfono, la
+presentación iba a 1–2 cuadros por segundo con el disco esperando (§173).
+
+**Qué se hizo.** `web/navegador/paquete-carrera.mjs` (nuevo; `mkw.mjs` lo crea, `?paqueteCarrera=0` = sin él). Cada 200 ms,
+hasta que la carrera arranca, lee la «ficha» del juego: el escenario de Racedata (0x809BD728 → +0x20: cuántos, y por
+puesto vehículo, personaje y si es persona o CPU), la pista que eligió Pulsar (0x8043319C + 0x10) y las skins que sorteó
+Retro Rewind (la copia de `nombres_nativo.cpp`, porque la página no lee arriba de 0x81800000). Si la ficha cambió, pide de
+una vez, en el orden en que se van a usar:
+1. la pista: las de Retro Rewind van desde 0x100 (medido: 0.0 → 256, 13.2 → 310), archivo `Tracks/<id − 256>.szs`; en
+   Grand Prix, las otras 3 de la copa con prioridad baja (U2);
+2. los 12 karts (D4): sin skin el del disco (`Race/Kart/<vehículo>-<personaje>.szs`), con skin el de Retro Rewind
+   (`Character/<vehículo>-<personaje>-<skin>.szs`);
+3. del archivo de sonido (`revo_kart.brsar`), los grupos de la carrera (GRP_RACE, GRP_PRESENT) y la voz de cada uno: la
+   persona `_PC`, cada CPU `_NPC`; con una skin que trae voz propia, sus dos archivos `GRP_VO_<PJ>-<skin>_NPC|PC.brwsd` y
+   `.brbnk` (a veces con un sufijo, como `.baby_peach`);
+4. el principio (512 KB) de las 3 fanfarrias de la meta, y el retrato de cada skin.
+La primera lectura de la música de la pista (`strm/<x>_N.brstm`) la pide entera (~4 MB) para que no baje de a poco en la
+carrera. El paquete queda en `mkwEstado.paquete` (cuántas carreras, piezas, MB, rutas).
+
+**Lo que enseñó medirlo** (cada uno se encontró con `medir-carrera-entera.mjs`, que ahora dice qué piezas del paquete leyó
+el juego: `paqueteUsado`):
+- la pista de Pulsar viene con 0x100 sumado: el primer paquete pedía un archivo que no existe;
+- los sonidos de cada pista no salen de su casilla (cada pista toca dos grupos GRP_GP_* propios): se quitaron;
+- la música de la última vuelta (`_F`) eran 4 MB más bajando en plena carrera: se quitó;
+- las skins: el lector de la página no llega a 0x818A08A8 y la vigía se paraba al existir el Raceinfo, así que todas
+  salían 0 (se pedían karts que nadie usaba): se leen con `leerSkins` y también en la etapa 0;
+- las voces de las skins: el primer arreglo pedía todas sus variantes (_CAN_, _GOL_ ×9 y _PC de las CPU, ~15 archivos
+  por piloto) y el Driver `.brres`, que el juego no lee: acertaba 28 de 92 piezas; con solo `_NPC|_PC` acierta 30 de 32.
+
+**Probado.** Banco `paquete-carrera` (28/28: la ficha de mentira con la forma del juego, qué pide y en qué orden, la skin
+con y sin voz, `vozDeSkin` con sufijo y minúsculas, GP con la copa en baja, no repite, vuelve a pedir si cambia una skin).
+
+**Medido** (`bash herramientas/tanda-173.sh`: sin y con el paquete intercalados por pista, perfil nuevo, 12 CPU, con las
+semillas nuevas de §168 y §172 → `build/web/datos/carrera-entera/t173-sin|con|baja-sin|baja-con/`, registro
+`build/web/datos/tanda-173.log`):
+
+| Pista | Largada (sin → con) | Esperas a la red antes de largar | Lecturas a la red con la carrera armada | Bajado en la carrera | Piezas del paquete que el juego leyó |
+|---|---|---|---|---|---|
+| 0.0 | 12,3 → 11,9 s | 4 → 8 | 2 → 6 | 1,0 → 17,7 MB | 41 de 44 |
+| 13.2 | 12,4 → 12,2 s | 7 → 6 | 5 → 4 | 0 → 12,1 MB | 32 de 34 |
+| 30.2 | 12,1 → 12,0 s | 8 → 11 | 5 → 8 | 4,8 → 4,3 MB | 18 de 20 |
+| 13.2, gama baja | 104,8 → 104,6 s | 23 → 21 | 8 → 5 | 0 → 0 | 22 de 24 |
+
+El juego no esperó a la red de la cuenta a la meta en ninguna, salvo **una vez en la gama baja sin el paquete (con el
+paquete, 0)**.
+
+**Qué significa, sin adornos.** El paquete acierta (9 de cada 10 piezas que pide se usan), pero en un jugador **casi no
+cambia nada**: la ficha de la carrera existe recién cuando el juego empieza a cargarla, así que le gana por milisegundos,
+y la semilla nueva (§168) y los lotes (§104) ya traían a tiempo casi todo. En la gama baja quita la única espera de la
+carrera y tres de las lecturas sueltas; la largada queda igual. En este PC, en dos pistas, hizo que una parte de la
+descarga de fondo (12–18 MB de la semilla, que sin el paquete baja después de la meta) cayera en la carrera: el juego no
+la esperó, pero en un teléfono es trabajo de más en plena carrera. Donde el paquete sí tiene tiempo para ganar es en la
+sala: los 45 s de elegir y los 30 s del descanso (D1, paso 2 de su plan). Queda prendido (`?paqueteCarrera=0` lo apaga):
+en el peor caso medido ayuda un poco y no frena la largada.
+
+**D4 y U2.** D4 (los karts de las CPU en un solo lote) está hecho: los 12 karts y sus voces salen en un pedido, con 0
+esperas en la carrera. U2 se terminó después, por los menús (abajo).
+
+**¿Cuesta algo tenerlo prendido? (lo pidió la orquestadora).** Con los mismos archivos de la tanda:
+- **Memoria:** el paquete no guarda nada aparte: lo que pide entra en la memoria de bloques del disco, que tiene tope
+  (§138). Medido al terminar cada carrera de la tanda de U2: 63,8–64,0 MB con y sin el paquete, en este PC y en la gama
+  baja (`memoriaMB` en cada `.json`).
+- **Bajada de más:** en total (antes, carrera y meta) baja lo mismo o menos: 119,0/122,6/123,6 MB sin el paquete →
+  104,3/106,1/106,7 con él, y en la gama baja 108,7 → 109,8 MB. Lo que cambia es *cuándo*: parte de la semilla de fondo
+  cae en la carrera en vez de después de la meta (el juego no la espera).
+- **Pedidos al Worker:** **menos**: 427/434/434 → 302/291/275 por visita nueva (−29 a −37 %) y 366 → 284 en la gama baja
+  (−22 %), porque lo de la carrera sale en lotes grandes en vez de pedido por pedido. Con el tope diario de 100.000
+  pedidos del Worker gratis (D14), es una ganancia.
+- **Un costo que sí había, ya arreglado:** al arrancar, el escenario de la carrera trae una ficha por omisión (Luigi
+  Circuit con 12 puestos), y el paquete la pedía a los 3,8 s de abrir la página: 13 MB de más en cada arranque si después
+  se elegía otra pista. Ahora la ficha vale solo con una carrera en camino (`carreraEnCamino`: la sección actual o la
+  siguiente es de carrera, 0x1E–0x2B, o ya hay Raceinfo). Comprobado en la tanda: una sola carrera pedida en cada corrida.
+Por eso **queda prendido por omisión**: no gasta memoria, no baja de más y ahorra pedidos; `?paqueteCarrera=0` lo apaga.
+
+### U2: la pista apenas se elige en los menús · 20:40–01:00 (del 31)
+
+**Qué se hizo.** En los menús, la página vigila (cada 200 ms) la pista que anotó Pulsar (0x8043319C + 0x10) y el modo del
+escenario de los menús (Racedata + 0xC10; el de la carrera, +0x20, se arma recién al cargar). Cuando la pista cambia y
+queda quieta 1 s, la pide entera con prioridad normal y, en Grand Prix, las otras 3 de la copa con prioridad baja, sin
+esperar la ficha (`leerPistaElegida`, `armarPista`, `revisarPista` en `paquete-carrera.mjs`; `?pistaTemprana=0` = solo con
+la ficha). La primera pista que se ve no se pide (es la de antes de elegir), y una que no queda quieta 1 s tampoco (si el
+valor cambiara al pasar por la lista, no se baja cada una). `estado.pista` dice quién la pidió y cuántos ms antes de que el
+juego la abriera (`adelantoMs`). `medir-carrera-entera.mjs --menu vs|gp` va a la carrera por los menús (el piloto de la
+página, el jugador manejado por la CPU) y ahora dice también la memoria del disco.
+
+**Medido** (`bash herramientas/tanda-u2.sh`, por los menús, perfil nuevo → `build/web/datos/carrera-entera/tu2-*/`, registro
+`build/web/datos/tanda-u2.log`; sin el paquete / con el paquete pero solo la ficha / con todo):
+
+| | Largada | Esperas a la red antes de largar | La pista se pidió… |
+|---|---|---|---|
+| VS 13.2, este PC | 48,4 / 46,6 / 46,8 s | 19 / 13 / 16 | — / con la ficha, ya abierta / **al elegirla, 6,4 s antes** |
+| VS 13.2, gama baja | 183,2 / 190,8 / 187,3 s | **32 / 26 / 22** | — / con la ficha, ya abierta / **al elegirla, 14,9 s antes** |
+| GP copa 0 (0.0), este PC | — / 46,1 / 44,9 s | — / 19 / 12 | con la ficha, 20,7 s antes (las dos) |
+| VS 0.0, este PC (`tu2b-*`, ya sin la ficha por omisión) | 44,5 / 46,5 / 44,4 s | 18 / 12 / **9** | — / con la ficha, ya abierta / «al elegirla», 17,9 s antes (falso: ver la trampa 3) |
+
+**Qué significa.** Por los menús el paquete sí tiene tiempo: la ficha llega con la carga, pero la pista se pide en cuanto
+se elige, 6–15 s antes de que el juego la abra. En la gama baja las esperas a la red antes de largar bajan un tercio (32 →
+22); la largada se mueve dentro del ruido de la gama baja (±4 %, se baja casi todo lo demás igual). En el GP las otras 3
+pistas de la copa (11,4 MB) bajan con prioridad baja antes de terminar la 1.ª carrera. **U2 queda hecho.**
+
+**Trampas.** (1) La ficha por omisión del arranque (arriba): la primera tanda de 0.0 la tomó como buena porque justo es
+Luigi Circuit; se repite en `tanda-u2b.sh`. (2) En la gama baja la pista de Pulsar cambió dos veces antes de la carrera: de
+ahí la espera de 1 s quieta. (3) En la tanda `tu2b` la pista de 0.0 salió «elegida» 17,9 s antes: al arrancar, Pulsar pasa
+de 0 a su pista por omisión (Luigi Circuit) con el modo de los menús en 0 (Grand Prix), así que además pidió las otras 3 de
+la copa (11 MB). Primero se probó exigir la pantalla de copas (0x6E) o de pistas (0x6F) arriba de todo (tanda `tu2c`):
+demasiado estricto, en el VS de RR la pantalla de arriba cuando Pulsar anota la pista no es la 0x6F y todo salió «por la
+ficha». Lo que quedó (`enMenus`): la pista elegida vale solo con la sección de los menús en curso (0x41 en adelante, no
+de carrera); el arranque (título, 0x3F) ya no cuenta, y si lo elegido es justo la pista que ya estaba (0.0, la de
+omisión), la pide la ficha. Banco `paquete-carrera` 39/39.
+
+**La tanda final** (`bash herramientas/tanda-u2d.sh`, con `enMenus`, perfil nuevo → `build/web/datos/carrera-entera/tu2d-*/`,
+registro `build/web/datos/tanda-u2d.log`, 2026-10-31 00:10–00:59):
+
+| | Largada | Esperas antes de largar | La pista se pidió… | Copa |
+|---|---|---|---|---|
+| VS 13.2, este PC | 45,3 s | 13 | **al elegirla, 3,7 s antes** | — |
+| VS 0.0, este PC | 47,0 s | 12 | con la ficha (es la de omisión: no hay cambio que ver) | — |
+| GP copa 0, este PC | 44,8 s | 13 | con la ficha, 20,8 s antes | las otras 3 con prioridad baja (`baja: 3`) |
+| VS 13.2, gama baja | 198,4 s | 29 | **al elegirla, 15,7 s antes** | — |
+
+Ningún arranque falso: 0.0 y el GP ya no piden nada al arrancar. En el juego, con el paquete, en carrera y en la meta
+nadie esperó a la red (0 en las cuatro). La largada de la gama baja (198 s) cae dentro del ruido de esa máquina simulada
+(183–199 s en las tandas de esta noche); lo que U2 cambia es que la pista ya está en camino cuando el juego la abre.
+
+
+## 2026-10-30 · §170 N15a: WiiCompiled v0.9.3 (traductor y runtime) con nuestra aurora · 14:30–
+
+*(En curso: las mediciones esperan su turno con el candado; lo de abajo es lo hecho hasta las 19:20.)*
+
+**Qué es.** WiiCompiled (el traductor que convierte el programa de la Wii en C++, y el «runtime», el C++ que hace de
+consola alrededor) sacó la versión 0.9.3 con 47 cambios desde la que usamos (`bd219e3`, del 9 de octubre). N15 es
+subirnos a esa versión **antes** de las pasadas propias del traductor (M8), para no hacerlas dos veces. El dueño pidió
+además evaluar uno por uno los cambios útiles del original y traer solo lo que mejora la página (rendimiento, que el
+juego funcione bien, el dibujo, las herramientas de medir); lo demás va en una línea: «no aporta a la página».
+
+**Cómo se partió (lo acordó el orquestador).** La v0.9.3 trae también una aurora nueva (el que dibuja), reescrita casi
+entera: un hilo propio para dibujar (`render_worker`), otra biblioteca de menús (RmlUi) y otras dependencias. Nuestra
+aurora tiene 5 semanas de cambios para la web (§26–§54: dibujar en el `<canvas>`, pipelines pedidos de fondo, la
+semilla, el compás del monitor…) que no entran en la nueva sin rehacerlos. Entonces:
+- **N15a (esta sección):** el traductor y el runtime de la v0.9.3, con **nuestra** aurora y un adaptador de 10
+  funciones.
+- **N15b (paso 9, con G9/H4):** la aurora nueva en el navegador, sus arreglos de dibujo con fotos, y si su hilo de
+  dibujo sirve cuando la página tenga hilos.
+
+**Dónde está.** Todo en copias aparte; `terceros/Wiicompiled` (la de siempre) no se tocó: lo cambia el orquestador.
+- `terceros/Wiicompiled-motor` = WiiCompiled @ `0d5c402` + `parches/runtime-web-v093.diff` (nuestro
+  `runtime-web.diff` rehecho: el código de la memoria se mudó a `runtime/include/guest_abi/`).
+- `terceros/aurora-main-viejo-motor` = nuestra aurora + `parches/aurora-n15a.diff` (el adaptador y los arreglos
+  cortos de dibujo).
+- Programas: `build/web-motor/node` y `build/web-motor/navegador` (v0.9.3), `build/web-motor-base/node` (la base vieja
+  congelada, para comparar). Nada de eso va a git (es el juego traducido).
+- Compilar: `MKW_WIICOMPILED=terceros/Wiicompiled-motor MKW_AURORA=terceros/aurora-main-viejo-motor python
+  herramientas/compilar-web.py --modo navegador --carpeta build/web-motor` (las dos variables son nuevas; sin ellas,
+  todo como siempre). Traducir: `$env:MKW_WIICOMPILED='terceros\Wiicompiled-motor'` antes de `traducir.ps1`.
+
+**El adaptador (`aurora-n15a.diff` y `web/headless/aurora_compat_v093.cpp`).** El runtime nuevo parte cada cuadro en
+dos mitades (la de la ventana y la del hilo de GX) y le pregunta a la aurora cosas que la nuestra no tiene (la tasa del
+monitor, la ventana de SDL, el vsync). Como en la página no hay hilo de GX, cada mitad responde «el cuadro entero»:
+`aurora_begin_frame_window()` = `aurora_begin_frame()`, `aurora_end_frame_window()` = `aurora_end_frame()`, las de GX
+no hacen nada. Es como poner un puente en los bornes de un relé que en esta placa no se monta: el circuito sigue
+cerrado por el camino de siempre.
+
+**El hilo de GX del original (#325), apagado.** En la v0.9.3 los comandos de dibujo de la Wii (GX) se pasan a otro
+hilo. La página no tiene hilos (sin COOP/COEP no hay memoria compartida), así que en wasm `gx_worker.h` deja
+`Active()`, `OnWorker()` y `ShouldDefer()` en falso fijo (el compilador borra el camino diferido) y `Start()` no lo
+arranca. Lo mismo en el programa de Windows de medir (`MKW_NATIVO_MEDIR`), para que la razón wasm/nativo compare el
+mismo trabajo. Usarlo es de N15b/G9/H4.
+
+**Trampas.**
+- `git checkout --ours` en un archivo con conflicto se llevó TODOS nuestros cambios de ese archivo, no solo el bloque
+  en conflicto (`ppc_isa_float.h`): se rehízo el conflicto con `git checkout -m` y se resolvió a mano solo ese bloque.
+- `Header` del hilo de GX mide 16 bytes en x64 pero 12 en wasm32 (punteros de 4 bytes): `alignas(8)`.
+- La v0.9.3 lleva la región (PAL/NTSC) que tradujo el traductor en su manifiesto (`shards.cmake`,
+  `MKW_TRANSLATED_GUEST_REGION`) y lo propio del juego en `runtime/game/`: `compilar-web.py` y `compilar-nativo.py`
+  lo leen solos.
+- Dos funciones del escritorio que la página no tiene (`posix_spawnp` del cambio de distribución de Steam y
+  `PADGetKeyButtonBindings` de «agitar para el truco») van vacías en `web/headless/v093_vacio.cpp`.
+
+### 170.1 Lo del original, uno por uno (borrador: la columna «efecto» se llena con la tanda)
+
+| Cambio del original | ¿Lo adoptamos? | Cómo se comprueba | Efecto medido |
+|---|---|---|---|
+| #325 GX en su propio hilo | **No por ahora**: apagado en wasm (sin hilos en la página) y en el programa de medir; va a N15b/G9/H4 | compila y arranca con él apagado (`prueba-arranque` 13/13) | — (sin hilos no hay a dónde mandarlo) |
+| #328 «mapa de rangos» | **Sí** (viene con el runtime). No es la memoria de la Wii: es el mapa de direcciones PAL ↔ NTSC; con PAL es una constante y el código traducido lo resuelve al compilar | la sala con un programa en cada consola (`prueba-sincro --directa --build-b`) y la tanda antes/después | la misma carrera (huellas 75/75); velocidad igual (170.2) |
+| #358 traducción determinista más rápida | **Sí** (es el traductor nuevo) | traducir dos veces y comparar las huellas SHA-256 de los 378 archivos (`tanda-170-traduccion.sh`); el viejo, en una copia descartable | las dos traducciones de la v0.9.3, idénticas; el viejo también es determinista con este disco. Tiempo: **26 s** la v0.9.3 contra **35 s** el viejo (49,6 s la primera vez, con el disco frío): −25 %. Solo ahorra al retraducir; no cambia el juego |
+| #360 el resto del reloj del sonido | **Sí** (viene con el runtime): cada sondeo del sonido guarda la fracción de microsegundo que antes se perdía | banco `sonido-worklet` y la «poca demora» de `prueba-navegador` | banco 34/34; `prueba-navegador`: cola 19,7 ms, del juego al parlante 63,6 ms (antes ~60, §88: igual). No se oye ni se mide diferencia: el error que arregla era de 1 µs por sondeo |
+| #376 índices de matriz a 6 bits | **Sí**, traído a nuestra aurora (`MKW_AURORA_ARREGLOS_V093`) | `prueba-navegador` y fotos | 22/22, 701 pipelines como siempre; en MKW no se vio nada distinto (el juego no usa los 2 bits de arriba): es un seguro, no cuesta nada |
+| #303 Sky Station: colores constantes sin fuente = 0 | **Sí**, traído a nuestra aurora (antes: el juego se caía con un aviso) | lo mismo | sin caídas en las pruebas; la pista retro que lo usa no está en las carreras de prueba |
+| #348 texgen sin configurar | **Sí** lo de la coordenada sin configurar y la etapa indirecta fuera de rango; **no** lo del relieve (`embossSrc`: nuestra aurora no guarda ese campo) → N15b | lo mismo | lo mismo que #376: antes era una caída, ahora un dibujo neutro |
+| niebla `fsel` | ya estaba en nuestra aurora | — | — |
+| #321 confiar solo en punteros de módulos reubicados, #359 que los nativos envolventes corran los parches de los mods, #336 arreglos de otras copias | **Sí** (vienen con el runtime y el traductor) | `prueba-sincro --directa` (13/13) y la sala vieja contra nueva (13/13), `correr-todo` | la misma carrera bit por bit que la base vieja; ver 170.3 |
+| #351 `--headless` (con `--race`/`--race-cpu` de la v0.9.0: una carrera al arrancar, sin ventana ni sonido) | **No reemplaza** nuestro guion de §165: `--race` arma la carrera escribiendo `Racedata` del juego base (Luigi Circuit, 12 personajes fijos, CPU «difícil» de Nintendo) y se salta los menús de RR; nuestro guion llega por los menús de RR a la carrera de 12 CPU que miden §163–§166 y la página (`modo=directa`) ya abre la carrera por código. Cambiar de carrera rompería la serie comparable de mediciones | leído en `runtime/src/hle/boot_race.cpp` | — |
+| aurora#6 (PR cerrado): ayudantes de la interpolación, afinidad de núcleos, la traza de cada cuadro | ayudantes: **no aplica** (son hilos; nuestra aurora ya los deja en 0 en wasm); se midió la interpolación sin hilos (`fluidez=120` contra nada, gama baja) | `tanda-170.sh eval`, 2 vueltas cada una | sin la interpolación 20,4 y 19,5 cuadros de lógica/s; con ella 20,0 y 20,5: **igual**. En la gama baja no hay tiempo libre para imágenes intermedias (2,9 imágenes/s con y sin): ni ayuda ni cuesta. No se cambia nada |
+| #363 (PR sin unir): «stutter checks» (una traza CSV de aurora#6 y un analizador en Python que reparte cada traba entre sus causas) | **La idea sí, el código no**: nuestra traza del ritmo (`?traza=1`, §53) ya marca en cada cuadro lo mismo que la de aurora#6 (empieza, entrega, vuelve aurora, esperas del runtime y del disco). Se le sumó a `herramientas/tiempos-cuadro.mjs` la opción `--trabas`: cada cuadro de más de 20,8 ms (16,7 + 25 %, el margen de #363) con su causa («juego», «aurora», «disco», «despertar tarde», «sin causa» = navegador o monitor) y el reparto de los ciclos (mediana, p95, p99) | probada sobre la traza guardada de `medir-cpu.sh` con la CPU ×4 (`freno4.log`): 5.647 trabas de 5.647 cuadros, todas «juego» (13 también «aurora»): lo esperado con la CPU cuatro veces más lenta | una herramienta, no cambia el juego |
+| Mac, Linux, Steam (íconos, distribución, Valve), Bluetooth y Wii Remote (#304, #306, #312, #313, #299, #347), NTSC-U/J (#326, #346), agitar para el truco (#378), selector de aspecto (#339), vsync (#333), íconos (#334, #340), actualizaciones (#310) | no aporta a la página | — | — |
+
+### 170.2 ¿Corre más rápido? (la tanda del 30-10, 20:28–22:33)
+
+Comando: `bash herramientas/tanda-170.sh resto` (con el candado toda la tanda). Datos en `build/web/datos/n15/` y
+`build/web/datos/medir-sitio/n15-*` (nunca a git).
+
+| Dónde | Base vieja | v0.9.3 | Cambio |
+|---|---|---|---|
+| Node, tramo fijo, 6 pares intercalados (`--fijo`), 1.ª tanda | 4,147 ms/cuadro (±3,4 %) | 4,268 ms/cuadro (±2,9 %) | ×1,023 (de ×0,993 a ×1,088) |
+| Node, lo mismo, 2.ª tanda (23:04) | 4,153 ms/cuadro (±2,2 %) | 4,203 ms/cuadro (±4,6 %) | ×1,001 (de ×0,984 a ×1,066) |
+| Node, 3.ª tanda (31-10 11:36, **partida limpia propia en cada corrida** y `guion-170`, 6 pares con el nativo al lado) | 4,165 ms/cuadro (±5,1 %) | 4,202 ms/cuadro (±3,5 %) | ×1,018 (de ×0,966 a ×1,029) |
+| El nativo de Windows en esa tanda (mismos cuadros) y la razón wasm/nativo | 1,698 ms · ×2,45 | 1,695 ms · ×2,48 | igual |
+| Chrome, este PC, 2 vueltas (cuadros de lógica/s sin tope) | 148,7 · 150,1 | 151,3 · 153,6 | +2,1 % |
+| Chrome, este PC, trabajo por cuadro | 6,59 · 6,52 ms | 6,46 · 6,37 ms | −2,1 % |
+| Chrome, gama baja simulada (lastre 7, ayuda 5, ladrón 64, tarjeta 15), 2 vueltas + las 2 de `eval` sin interpolación | 17,3 · 18,4 | 21,9 · 17,2 · 20,4 · 19,5 | +10 % de promedio, pero cada corrida varía ±12 % |
+
+**La razón con la partida limpia** (§175: hasta ahí Node y Windows guardaban la partida en la misma carpeta y cada
+corrida encontraba la licencia que dejó la anterior; ahora `medir-node-estable` le da a cada corrida su propia partida
+base limpia con `herramientas/partida-aislada.mjs`, Node por `MKW_RR_RAIZ` y Windows por su `UserData/Config.toml`): el
+wasm cuesta **×2,45–2,48 lo del nativo**, un poco menos que el ×2,63 de §166, que se midió por el camino compartido.
+Las dos bases dan lo mismo también en nativo (1,70 ms), así que lo que cambia entre ellas no es el juego sino el ruido.
+
+**Qué significa.** Las dos direcciones caen dentro de lo que varía una medición: Node dice 2 % más lenta, Chrome
+2 % más rápida, la gama baja «más rápida» con una dispersión más grande que la diferencia. Conclusión: **la v0.9.3 no
+cambia la velocidad del juego** (ni para bien ni para mal). Era lo esperado: sus 47 cambios son arreglos, otras
+plataformas y el hilo de GX (apagado aquí); nada toca el código traducido de la carrera. N15 no se hizo para ganar
+velocidad: es la base nueva donde van las pasadas propias del traductor (M8) y el resto del paso 6, para no hacerlas dos
+veces. Para la gama media y baja: **ni gana ni pierde**; recibe los arreglos de dibujo y de los mods sin costo.
+
+**¿Hace lo mismo? La sala con un programa en cada consola.** `MKW_BUILD=build/web-motor/navegador node
+web/navegador/prueba-sincro.mjs --directa --build-b=build/web-motor-base/navegador`: la pestaña A corre la v0.9.3 y la
+B la base vieja, en la misma carrera de la sala (lockstep). Cada 30 cuadros las dos comparan su huella (la memoria de
+los 12 karts y el azar, §154): si una sola cuenta diera distinto, la sala lo diría «desincronizada». Resultado: **13
+bien, 0 mal, las 75 huellas iguales**. Es como medir dos placas con el mismo generador de señal y ver en el osciloscopio
+las dos curvas una encima de la otra: cambió el armado por dentro, no la señal. La primera vez dio 3/10 por una falla de
+la prueba, no del juego: el servidor le dio a B el `mkw.js` de A con el `.wasm` de B («ASM_CONSTS[code] is not a
+function»), porque el `import()` del programa lleva de Referer la dirección de `mkw.mjs` (sin `build=b`); ahora
+`servidor.mjs` reconoce al programa B también por su huella `?v=`.
+
+### 170.3 Todas las pruebas (correr-todo) y el veredicto de las que fallaron
+
+`MKW_BUILD=build/web-motor/navegador node herramientas/correr-todo.mjs` (30-10, 23:21; `build/web/datos/todo/20261030-2321`):
+**617 bien, 46 mal**, con fallas en 11 corridas. Una placa nueva que no pasa todo el banco de pruebas no dice todavía si
+la falla es de la placa o del banco: hay que pasar la placa vieja por el mismo banco el mismo día. Eso hace la fase
+`reprueba` de `tanda-170.sh`: las 10 pruebas con fallas, primero con la v0.9.3 y enseguida con la base vieja, las dos
+carpetas con lo mismo al lado del programa.
+
+**Primero, dos fallas de la carpeta, no del juego.** A `build/web-motor/navegador` le faltaban las imágenes de la
+página (el menú de inicio daba 404: `inicio` 2/13, `musica` 5/11) y el programa comprimido `mkw.wasm.br` (la precarga
+necesita que el programa entre en la caché HTTP). `tanda-170.sh` ahora los copia y comprime (`preparar`). Con eso,
+`inicio` 15/15, `musica` 11/11, `caida` 7/7 y `relevo` 10/10 pasaron en las dos.
+
+**El veredicto (31-10, 01:56 y 02:08; `todo/20261031-0156` y `todo/20261031-0208`):**
+
+| Prueba | v0.9.3 | Base vieja | ¿Es de la v0.9.3? |
+|---|---|---|---|
+| partidas | 4 bien, 2 mal | 4 bien, 2 mal (las mismas) | No |
+| tactil | 10 bien, 4 mal | 10 bien, 4 mal (las mismas: «X mide 0 px») | No |
+| menus | 3 bien, 5 mal | 3 bien, 5 mal (las mismas: «recuadro null») | No |
+| inicio, musica, caida, relevo | todas bien | todas bien | — |
+| doce | 8 bien, 3 mal | 8 bien, 3 mal (las mismas: desincronizado en el cuadro 30 por «botones») | No |
+| invitados | 9 bien, 4 mal | 9 bien, 4 mal (las mismas) | No |
+| precarga | 7 bien, 1 mal | 7 bien, 1 mal (la misma: 53 contra 76 MB, pide menos de la mitad) | No |
+| **Total** | **84 bien, 19 mal** | **84 bien, 19 mal** | **Ninguna** |
+
+**Qué significa.** Las 19 fallas salen igual, con los mismos mensajes, con el programa viejo y con el nuevo: no las trajo
+la v0.9.3. Vienen del código de la página o de las pruebas mismas (cambios de los últimos días en `web/` o en el sitio,
+que ninguna corrida entera había cruzado desde el 24-10). No son parte de N15; quedan anotadas para el orquestador
+como trabajo aparte.
+
+### 170.4 Lo que pasa a N15b (la aurora nueva, con G9/H4 en el paso de los hilos)
+
+- **El hilo de GX (#325)** y el hilo de dibujo de la aurora nueva (`render_worker`): solo sirven con hilos, y la página
+  no los tiene (sin COOP/COEP no hay memoria compartida). Se mide recién cuando G9/H4 decidan si la página puede tener hilos.
+- **La aurora nueva entera** (RmlUi, sus dependencias, sus arreglos de dibujo con fotos lado a lado): hay que rehacer
+  encima de ella las 5 semanas de cambios web de la nuestra (§26–§54).
+- **El relieve de #348** (`embossSrc`): nuestra aurora no guarda ese campo; viene solo con la nueva.
+- **Los ayudantes de la interpolación (aurora#6)**: también son hilos.
+
+Nada de eso cambia lo que ya se adoptó: el traductor y el runtime v0.9.3 siguen con nuestra aurora y el adaptador.
+
+**La partida de Retro Rewind compartida (lo encontró N13, §175).** Node y el programa de Windows guardan la partida de
+RR (`rksys.dat`) en `<retro_rewind_root>/../riivolution/save`, o sea en `terceros/RetroRewind/riivolution/save`, la
+carpeta de todos: `MKW_NODE_DATOS` (la «partida nueva» de §165) aislaba la NAND, no esa. Desde la primera corrida del
+29-10 la licencia 1 («no name») quedó hecha y todas las corridas siguientes la encontraron. ¿Afecta a las medidas de
+§170? Todas mis corridas de N15 (Node y Windows, vieja y nueva) partieron con esa licencia hecha: recorrieron el mismo
+camino entre sí, así que las comparaciones valen, pero por el camino de «licencia ya hecha», no por el de partida nueva
+para el que se armó el guion. Y en la tanda de las 02:21 una corrida de Node no llegó al tramo (sin «trabajo», la
+mitad de recolecciones): lo más probable, que otra prueba cambió la partida compartida en medio. Arreglo:
+`herramientas/partida-aislada.mjs` arma `build/aislado/<etiqueta>/RetroRewind6` como árbol de **enlaces duros** (los
+mismos 4.002 archivos con otro nombre: 1 s, sin copiar 2 GB) y antes de **cada** corrida pone en
+`build/aislado/<etiqueta>/riivolution` la partida base limpia de §175 (4 licencias vacías). Un enlace «junction» no
+sirve: el runtime pasa la ruta por `weakly_canonical` (`riivolution.cpp`, `RiivoAddRoot`), que lo sigue hasta
+`terceros/`. Node lo recibe por `MKW_RR_RAIZ` (`web/node/correr.mjs`) y el programa de Windows por su `Config.toml`;
+lo usan `medir-node-estable.mjs` (`--partida-compartida` = como antes), `perfil-impuesto.mjs` y `medir-impuesto.mjs`
+(este último lo puso N13). Es como descargar el condensador entre una medición y la siguiente: cada una parte del mismo
+estado. La etapa Node se repite con la partida aislada (abajo).
+
+**La trampa del programa de Windows v0.9.3.** No enlazaba: la v0.9.3 trae el Wii Remote por Bluetooth y le faltaba
+`Bthprops.lib` (`compilar-nativo.py` ahora la agrega). Ya enlazado, se paraba con una ventana «No DVD root is
+configured»: busca su `Config.toml` en `%LOCALAPPDATA%\WiiCompiled` salvo que haya un `portable.txt` al lado del `.exe`
+(entonces usa `UserData/` al lado). Los programas viejos de medir ya tenían el suyo; `medir-node-estable.mjs` ahora lo
+copia de `build/nativo-v3` si falta. La carpeta que creó en `%LOCALAPPDATA%` (617 MB de volcados de las caídas) se
+borró con permiso del dueño.
+
+## 2026-10-30 · §171 La caché del disco en grupos de 2 MB (C5 del plan de rendimiento) · 18:10–20:31
+
+**Qué pasaba.** El disco de la página guarda en la caché del navegador (Cache Storage) cada bloque de 256 KB como una
+entrada propia: una carrera nueva son ~400 escrituras, cada una con su trabajo en la base de datos del navegador y una
+copia de los bytes. En un teléfono eso es tiempo de procesador mientras carga.
+
+**Qué se hizo** (`web/navegador/disco.mjs`, opción `cajaGrande`, por omisión 8; `?cajaGrande=0` = de a un bloque como
+antes):
+- si un tramo bajado de la red cubre un grupo entero de 8 bloques alineado (2 MB), se guarda en **una** entrada
+  (`…?grupo=<g>x8`); si no, de a bloque como antes;
+- a la caché van vistas de los mismos bytes (`subarray`), sin copiar; solo lo que queda en la memoria se copia;
+- un índice de los grupos guardados (`?indice-grupos=8`) se lee al abrir y se escribe por tandas cada 2 s; en la visita
+  siguiente, un bloque que está en un grupo se lee del grupo y los 8 quedan en memoria;
+- cuántas escrituras, cuántas de 2 MB y cuántas lecturas de grupo: `disco.estado.escrituras/escriturasGrandes/leidasGrandes`.
+
+**Probado.** Banco `disco` (43/43; 5 puntos nuevos: 20 bloques → 3 entradas + el índice; la visita siguiente lee de los
+grupos con 0 pedidos y los bytes exactos; el último grupo, más corto; `cajaGrande=0` → 20 entradas; un tramo parcial va
+de a bloque). En las carreras de §172: 344–433 escrituras por carrera, 204–282 de ellas en grupo (hasta 2 MB: un archivo chico entero es un grupo de 1 a 7 bloques, así que no todas son de 2 MB).
+
+**Medido** (`tanda-173.sh`: `medir-sitio.mjs --sola --visitas 2` con `&cajaGrande=0` y con 8, en este PC y con la CPU ×4
+(`--perfil cpu4`), la 2.ª visita con la caché de la 1.ª → `build/web/datos/medir-sitio/t173-caja0|caja8-pc|cpu4.json`):
+
+| | Tareas largas en la carga, 1.ª visita (0 → 8) | 2.ª visita, desde la caché (0 → 8) | Hasta la carrera, 2.ª visita |
+|---|---|---|---|
+| Este PC | 11 / 1.599 ms → 11 / 1.555 ms | 6 / 1.031 ms → 7 / 1.111 ms | 64,1 → 64,1 s |
+| CPU ×4 | 448 / 31,6 s → 427 / 30,3 s | **343 / 22,8 s → 245 / 17,2 s** | 130,0 → 131,0 s |
+
+(«tarea larga» = más de 50 ms seguidos del hilo de la página sin soltar: lo que se siente como tirón.)
+
+**Qué significa.** En este PC no se nota. En la PC lenta la visita que lee de la caché tiene **un 25 % menos de tiempo
+bloqueado** (de 22,8 a 17,2 s; 98 tareas largas menos): leer 8 bloques de una vez es una consulta a la base de datos de la
+caché en vez de ocho. La 1.ª visita gana poco (−4 %: ahí manda bajar y descomprimir) y la llegada a la carrera no cambia
+(la marca la carga del juego, no la caché). Es una medida de cada lado; el sentido coincide con lo esperado.
+
+## 2026-10-30 · §172 Ningún pipeline armado de golpe en la carrera (C3 del plan de rendimiento) · 18:20–19:28
+
+**Qué pasaba.** Un pipeline es la «receta» que la tarjeta necesita para dibujar una clase de cosa; el navegador tarda en
+compilarla. La página los precalienta (§117, con tope) con una lista, la semilla `pipelines.bin` (del 18-10, hecha con
+los menús). Si el juego pide uno que todavía no está, aurora tiene dos caminos: saltarse ese dibujo hasta que llegue (lo
+normal), o, en una pasada que no se puede saltar —la primera copia de cada imagen—, **armarlo de golpe** y esperar
+(`requireReadyPipelines` → `web_terminar_ya`): un tirón en ese cuadro. Medido antes (perfil nuevo, `t172-antes`): de
+golpe 28 / 101 / 125 por pista antes de la largada, y otros 93 en la gama baja. Durante la carrera, 0 de golpe, pero
+25–56 pedidos de fondo y 298–515 dibujos saltados; en el teléfono (§173), 64 pipelines compilados en plena carrera.
+
+**Qué se hizo.**
+- **aurora** (`pipeline_cache.cpp`, `parches/aurora-web.diff` regenerado): cada pipeline armado de golpe se anota
+  (`g_webUrgentes`); al exportar la lista de pipelines usados (`mkw_web_pipelines_armar`) esos van con primer cuadro 0:
+  en la próxima visita el precalentado los pide **primero**, en el título y los menús, mucho antes de la carrera, y el 0
+  queda guardado para las visitas siguientes. Recompilado. *También hay que llevarlo a la v0.9.3 (N15, el paso 6):
+  `parches/aurora-n15a.diff` parte de esta aurora.*
+- **La semilla con carreras enteras**: `medir-carrera-entera.mjs --pipelines` guarda la lista de aurora al terminar cada
+  pista (`pipelines-<etiqueta>-<pista>.bin`), y `herramientas/juntar-pipelines.mjs` las une con la vieja sin repetir, los
+  urgentes primero y el resto por el primer cuadro en que se usaron: **795 pipelines (163 urgentes), 2,10 MB →
+  `build/web/navegador/pipelines-c3.bin`** (contenido armado con el juego: va con el `.wasm` a R2, nunca a git; para
+  publicarla, copiarla sobre `pipelines.bin`).
+- La página elige la semilla con `?pipelines=<nombre>.bin` (por omisión `pipelines.bin`, así se compara en la misma
+  tanda; la de hoy quedó copiada como `pipelines-viejo.bin`: publicada la nueva, `?pipelines=pipelines-viejo.bin` vuelve a la de antes).
+
+**Medido** (`bash herramientas/tanda-172.sh`, perfil nuevo, 12 CPU, la semilla de bloques de §168; el antes y el después
+en la misma tanda → `build/web/datos/carrera-entera/t172-*/`, registro `build/web/datos/tanda-172.log`):
+
+| Pista | De golpe antes de largar (antes → después) | Pedidos de fondo en la carrera | Dibujos saltados en la carrera | Largada |
+|---|---|---|---|---|
+| 0.0 | 28 → **10** | 56 → 34 | 501 → 376 | 12,3 → 12,3 s |
+| 13.2 | 101 → **10** | 25 → 18 | 298 → 182 | 42,1* → 11,6 s |
+| 30.2 | 125 → **42** | 51 → 57 | 515 → 453 | 12,7 → 11,9 s |
+| 13.2, gama baja (CPU ×4, 20 Mbit/s, 50 ms) | 93 → **19** | 30 → 38 | 343 → 392 | 105,7 → 107,4 s |
+
+En la sala (`node web/navegador/prueba-sincro.mjs --directa`, dos pestañas, 13/13 las dos veces; la semilla vieja contra la
+nueva → `build/web/datos/sincro-173-viejo|nuevo/registro.txt`): al empezar la carrera, **114 y 106 de golpe → 84 y 77**
+(A y B). Baja menos que en un jugador porque la sala abre la carrera enseguida y el precalentado tiene menos tiempo.
+
+De golpe **durante la carrera: 0 en todas**, antes y después. (*La largada de 42 s de 13.2 en «antes» no es de esto: la
+red fue la misma —7 esperas— y PLECS estuvo usando el procesador esa tarde; en las otras dos pistas y en la repetición dio
+12 s.)
+
+**Qué significa.** Los armados de golpe antes de largar bajan entre un 66 y un 90 % (en la gama baja de 93 a 19): son
+los tirones de la presentación y la cuenta. En este PC cada uno cuesta poco (0–6 ms en total, el navegador los tenía casi
+listos), pero en un teléfono cada compilación de golpe es un cuadro perdido. Lo que **no** baja solo con la semilla son
+los pedidos de fondo en la carrera: dependen de qué karts y skins salieron en el sorteo (otros materiales) y de que el
+precalentado, con tope, no alcanza a terminar la lista de 795 antes de la largada (se pausa en la carrera, §140). Eso es
+lo que vio el teléfono (64 en la carrera). Para el teléfono vale el antes y el después: 64 pipelines en la carrera del
+30-10; medir la próxima visita nueva con el informe (`pipelines` en `porSegundo`).
+
+**Trampa.** El arreglo de las voces del paquete (§169) entró a mitad de la corrida «después»: la página carga los
+módulos de nuevo en cada pista, así que 0.0 corrió con el paquete viejo y 13.2 y 30.2 con el nuevo. Para C3 no cambia
+nada (los pipelines no dependen del paquete), pero por eso el paquete se midió aparte, en su propia tanda. Y una lección:
+mientras una tanda corre, no tocar lo que la página sirve.
+
+## 2026-10-30 · §173 Lo que dicen los datos del Oppo del 30-10, y el informe que separa juego y tarjeta · 18:30–19:30
+
+**De dónde salen.** El dueño jugó una carrera en el Oppo Find X9 Pro (Mali-G1-Ultra, 8 núcleos, 8 GB) con «Mostrar qué
+frena» y «🔬 Perfilar la tarjeta» y copió el informe de rendimiento: `docs/datos-oppo-2026-10-30.json` (120 segundos, uno
+por línea en `porSegundo`). Resumen: 35 fps, «juego» 29 ms y «video» 28 ms por cuadro (`ultimos10s`); el medidor no
+podía decir cuál de los dos frenaba (`frena`: «el juego y la tarjeta tardan juntos»).
+
+**La lectura, punto por punto.**
+1. **La tarjeta trabaja ≈ 3 ms por cuadro, no 28.** En `perfilTarjeta.pasadasCaras` las pasadas «más caras» dan
+   2,1–3,1 ms, pero crecen de a poco con el número de pasada (#13 2,1 · #20 2,8 · #24 3,1): en una tarjeta de mosaicos
+   (*tile-based*, la de los teléfonos) las pasadas se pisan, y lo que mide cada marca es casi el cuadro entero hasta ahí.
+   Sumarlas daría ~40 ms, que es imposible a 35 fps. Lo que vale es el **tramo**: el último fin menos el primer comienzo
+   del cuadro, ≈ 3,1 ms. Como un osciloscopio con 24 sondas en un mismo cable: cada una ve casi el mismo pulso, y el
+   ancho del pulso es lo que cuenta, no la suma de las 24 lecturas. **Lo que frena en el teléfono es la CPU** (el hilo
+   del juego y el lado CPU del dibujo), no la tarjeta. *Pendiente de confirmar con `tramoMs`: los datos del 30-10 dan la
+   tarjeta ≈ 3 ms* (anotado en el paso 10 y en H13 del plan).
+2. **Pipelines en la carrera.** En el segundo 98, en plena carrera, `pip57 sh56`: 57 recetas de dibujo pedidas y 56
+   programas de sombreado compilados en ese segundo (25,7 fps); después pip3 (s. 107), pip2 (108) y pip1 (123, 130). Todos
+   pedidos «de fondo» (0 ms armados de golpe): el dibujo se salta hasta que llegan, y la compilación le roba CPU al juego.
+   Es lo que ataca C3 (§172): la cuenta de antes y después del teléfono es 57 + 3 + 2 + 1 + 1 = **64 pipelines en la
+   carrera**, a medir de nuevo en la próxima visita nueva.
+3. **2–3,7 MB por cuadro subidos a la tarjeta** (`kb` 1.250–2.960 en la carrera, 3.686 en el menú del s. 30): 60–110 MB por
+   segundo copiados desde el wasm. Es el principal sospechoso del lado de la CPU (cada KB es una copia y una llamada del
+   navegador). Queda anotado en H12 y G3 (la caché de geometría): no se implementa aquí.
+4. **La carga.** Segundos 53–62 (menús) y 62–70 (presentación): 1–2 fps con el disco esperando 600–1.280 ms cada segundo:
+   la red del teléfono en la 1.ª visita. Es lo de D9 (§168) y el paquete (§169); anotado en D1 y D9.
+
+**Qué se hizo para que la próxima vez se vea sin preguntar.**
+- `perfil-gpu.mjs`: por cada cuadro de verdad, el tramo (último fin − primer comienzo) y la suma de sus pasadas; el método
+  `tramo()` devuelve la mediana de los últimos 600 cuadros: `{tramoMs, sumaMs, cuadros, mosaicos}` (mosaicos = la suma
+  pasa 1,5 veces el tramo: las pasadas se pisan). El informe (`mkwInformeRendimiento`) trae `perfilTarjeta.tramoMs`,
+  `sumaMs`, `cuadrosTramo`, `mosaicos` y un `aviso` que explica que en una tarjeta de mosaicos las pasadas no se suman.
+- `mkw.mjs`: con «Mostrar qué frena» prendido, la página mide también la **CPU pura** del juego (`lastre.mjs` con K = 1:
+  solo mide lo trabajado entre dos esperas, no frena nada; §155) y el informe la trae en `ultimos10s.cpuPuraMs`. Al dueño
+  no hay que pedirle nada aparte. `?cpuPura=0` = como antes.
+- `docs/medir-oppo.md` al día: qué mirar en el informe (cpuPuraMs contra tramoMs).
+
+**Probado.** Banco `perfil-gpu` (17/17: el tramo de 10 cuadros cubre la pasada más larga; aquí no se pisan) y
+`node web/navegador/prueba-informe.mjs` con el juego: **6/6** (`build/web/datos/informe-2.log`, `informe/informe.json`):
+en este PC `cpuPuraMs` 7,0 ms por cuadro con la página en K = 1 (0 ms de giro), la tarjeta `tramoMs` 0,30 y `sumaMs` 0,22
+(no se pisan: `mosaicos` no); con `?cpuPura=0` el informe sale como antes. La primera corrida dio 5/6 por un error de la
+prueba (comparaba el objeto `lastre.cpu` con el número 1).
+
+## 2026-10-31 · §174 Una versión por archivo, los videos de los menús y los pipelines por pista (D5, D8 y C2 del plan de rendimiento) · 00:30–05:45
+
+Los tres ítems que siguen del paso 5 (la red y la carga). Términos nuevos en el Glosario: **huella por archivo**,
+**barrido**, **cabeza de un video**, **sin copia**, **etiqueta de pipeline**, **poda**.
+
+### §174.1 D5: una versión por archivo
+
+**El problema.** La caché del disco (Cache Storage del navegador) guardaba cada pedazo con la versión de TODO el
+paquete (`X-Mkw-Version`, una huella del manifiesto entero). Publicar un arreglo que toca un solo archivo cambiaba esa
+versión y la visita siguiente volvía a bajar todo lo que ya tenía guardado: como cambiar todos los fusibles del tablero
+porque se quemó uno.
+
+**Qué se hizo.**
+- El manifiesto pasa de `[ruta, tamaño]` a `[ruta, tamaño, huella]` por archivo: `subir-r2.mjs` pone los primeros 16
+  caracteres del SHA-256 que ya calculaba para subir; `servidor.mjs` y `worker-local.mjs` (los de esta PC) un sha1 de
+  tamaño y fecha. El Worker publicado **no cambia**: entrega el manifiesto de R2 tal cual (lo nuevo llega con la próxima
+  subida de `subir-r2.mjs --subir`, que hace el dueño).
+- `disco.mjs`: opción `huellaDe(url)`; cada clave de la caché (bloque, grupo de 2 MB de §171, archivo entero) lleva
+  la huella de SU archivo (`verDe`), y todo va a una caja fija `mkw-disco:por-archivo` (`CAJA_POR_ARCHIVO`). El índice
+  de los grupos guarda la huella de cada archivo y descarta lo que ya no coincide. Una marca (`?marca-version=1`)
+  recuerda la versión del paquete de la visita anterior: si cambió, 20 s después de abrir corre el **barrido**
+  (`barrer()`, de a 200, espera si la bajada está en pausa) y borra lo huérfano. La primera vez, las cajas viejas
+  `mkw-disco:<versión>` se borran enteras (una sola vez).
+- `mkw.mjs`: `huellasDelManifiesto` arma el mapa (null si el manifiesto no trae huellas o con `?versionArchivo=0`),
+  en el juego y en la precarga (§98); `mkwEstado.versionArchivo`.
+- Banco `disco` 43 → 49 (§174: clave por archivo, cambio de un archivo, barrido, índice de grupos, sin huellas = como
+  antes, migración); `prueba-subir-r2.mjs` 23 → 25 (el manifiesto con huellas, y que cambiar un archivo sube ese y el
+  manifiesto).
+
+**La medida** (`node herramientas/medir-version-archivo.mjs`, 2026-10-31 02:21, este PC: perfil nuevo, dos visitas de
+precarga (`?precarga=1`, lo que baja la sala antes de jugar), el servidor reiniciado entre visitas y en la 2.ª
+`files/sound/revo_kart.brsar` «cambiado» con `MKW_CAMBIAR_HUELLA`, como si se hubiera publicado un arreglo de ese
+archivo → `build/web/datos/version-archivo/medida-1793424060193.json`):
+
+| Caso | 1.ª visita | 2.ª visita | De la caché en la 2.ª | Barrido |
+|---|---|---|---|---|
+| Antes (`?versionArchivo=0`), un archivo cambiado | 62,8 MB, 172 pedidos | **62,8 MB**, 172 pedidos | 0 bloques | — |
+| §174, un archivo cambiado | 62,8 MB, 172 pedidos | **50,2 MB**, 138 pedidos | 40 bloques | 89 de 329 entradas, 129 ms |
+| §174, nada cambiado (referencia) | 62,8 MB, 172 pedidos | 25,3 MB, 111 pedidos | 129 bloques | — |
+
+**Qué significa.** Antes, cambiar un archivo hacía que la 2.ª visita bajara todo de nuevo (0 de la caché). Con una
+versión por archivo se vuelven a bajar solo los pedazos de `revo_kart.brsar` (el banco de sonidos, 107 MB en el
+disco, del que la precarga trae una parte: la diferencia 50,2 − 25,3 ≈ 25 MB es esa parte); el resto sale de la caché.
+El barrido borró las 89 entradas viejas de ese archivo en 129 ms, de fondo. Lo que la 2.ª visita baja igual sin ningún
+cambio (25,3 MB) es lo que la precarga no guarda en la caché del disco (el programa va por la caché HTTP y no entra en
+este conteo de la misma manera): no es de D5. En la gama baja no cambia nada de la cuenta (son los mismos bytes que no
+se bajan); solo baja la red, que es justo lo que la gama baja tiene más lento.
+
+
+### §174.2 D8: los videos de los menús
+
+**El problema.** Los menús muestran videos THP (el del botón elegido, la cilindrada, las copas…) que el juego lee
+mientras los reproduce (hasta ~52 Mbit/s en `cup_select`). En la 1.ª visita el primer pedazo de cada video se espera a
+la red al abrir cada pantalla, y la lectura seguida del disco (§104) recién empieza a adelantar cuando el juego ya está
+leyendo. Además, el decodificador (`web/thp/thp_nativo.cpp`) copiaba cada cuadro del video de la memoria del juego a un
+búfer propio antes de decodificarlo.
+
+**Qué se hizo.**
+- `web/navegador/videos-menu.mjs`: apenas el juego lee el primer `.thp` (el del título: ya terminó de arrancar), pide
+  de fondo, con prioridad normal (lo urgente pasa primero), los primeros 2 MB (~0,3 s) de los 7 videos de los menús
+  (`VIDEOS_MENU`, en el orden en que aparecen, medido con `medir-carrera-entera --menu`). Una vez por visita, nunca en
+  la carrera. `?videosCabeza=MB` (0 = no). Banco `videos-menu` 10/10.
+- `thp_nativo.cpp`: si el cuadro entero está dentro de una página de 1 MiB de la memoria del juego que se lee de corrido,
+  se decodifica ahí mismo (**sin copia**); si no, como antes, pero el búfer solo crece (no se rehace cada cuadro) y solo
+  se ponen en cero sus 8 bytes de margen. `MKW_THP_DIRECTO=0` / `?thpDirecto=0` = la copia de antes. **También hay que
+  llevarlo a la v0.9.3** (`terceros/Wiicompiled-motor`).
+
+### §174.3 C2: los pipelines por pista
+
+**El problema.** La 1.ª visita precalienta (le pide al navegador que compile) toda la lista de pipelines de la semilla
+(~800) al arrancar, con tope (§117): también los de pistas que esa persona no va a correr. Eso alarga la carga, y los
+de la pista elegida compiten con todos los demás.
+
+**Qué se hizo.**
+- Aurora (`pipeline_cache.cpp` del parche, `parches/aurora-web.diff`): cada pipeline de la lista lleva su **etiqueta**
+  (dónde se usó: los menús, «común» = dos pistas o más, una sola pista = 0x10000 + su número de Pulsar) y la visita en
+  que se usó por última vez (formato `MKWPIPE2`; el `MKWPIPE1` de antes se lee igual, sin etiqueta = al arranque). Al
+  arrancar se precalientan los de los menús, los comunes, los sin etiqueta y los urgentes de C3 (primer cuadro 0); los
+  de una sola pista esperan hasta `mkw_web_pipelines_pista(0x10000 + pista)`. Los de una pista que no se usaron en 8
+  visitas salen de la lista que se guarda (**poda**). Con `MKW_PIPELINES_ETIQUETA=1` (la página lo pone salvo con
+  `?pipelinesPista=0`). **También hay que llevarlo a la v0.9.3** (`terceros/aurora-main-viejo-motor`).
+- La página: el paquete de carrera (§169) avisa la pista apenas la conoce (en los menús con U2 o con la ficha) →
+  `mkw_web_pipelines_pista`; en cada cambio de carrera fija la etiqueta de lo que se arme (`mkw_web_pipelines_etiqueta`:
+  la pista en la carrera, los menús fuera). La pausa del precalentado en la carrera (§140) espera a la cuenta si se
+  acaban de pedir los de la pista (`mkwEstado.pausaPrecalentado.esperoCuenta`).
+- `web/navegador/lista-pipelines.mjs`: las mismas reglas en JavaScript (leer, escribir, combinar etiquetas: los menús
+  ganan, dos pistas distintas = común; podar) para `juntar-pipelines.mjs`, que arma la semilla `pipelines-c2.bin` de
+  tres carreras enteras con etiquetas. Banco `lista-pipelines` 10/10.
+
+### §174.4 D8 y C2 medidos (tanda 174b, 04:33–05:45)
+
+**Cómo.** `bash herramientas/tanda-174.sh medir` con el candado (`build/web/datos/tanda-174b.log`): una carrera entera
+por los menús (`medir-carrera-entera --menu vs --pistas 13.2`, perfil nuevo = 1.ª visita) en tres versiones, en este PC
+y en la gama baja simulada (`--baja`: CPU ×4, 20 Mbit/s, 50 ms); y la carga con la CPU ×4 (`medir-sitio --perfil cpu4
+--arranque`) A contra C. **A** = como antes (`&pipelinesPista=0&videosCabeza=0&thpDirecto=0`, semilla `pipelines-c3.bin`),
+**B** = solo D8, **C** = D8 + C2 (semilla `pipelines-c2.bin`, 840 pipelines: 762 al arranque y 78 que esperan su pista).
+La primera tanda (174, 03:30) no sirvió para C: la página no reconocía el formato nuevo de la lista (`MKWPIPE2`, ver §175.4)
+y C corría con la semilla vieja sin saberlo.
+
+| | A (antes) | B (D8) | C (D8 + C2) |
+|---|---|---|---|
+| Este PC: de la página a la largada | 53,7 s | 52,5 s | 51,1 s |
+| Este PC: veces que el juego esperó a la red antes de largar | 17 | 15 | 12 |
+| Este PC: pipelines armados de golpe antes de largar | 6 | 6 | 3 |
+| Gama baja: de la página a la largada | 157,2 s | 154,0 s | 158,0 s |
+| Gama baja: esperas a la red antes de largar | 17 | 22 | 20 |
+| Gama baja: pipelines armados de golpe antes de largar | 15 | 13 | **3** |
+| En la carrera y la meta: el juego esperó a la red | 0 | 0 | 0 |
+
+| La carga con la CPU ×4 (191 s / 181 s) | A | C |
+|---|---|---|
+| Tareas largas del juego (> 50 ms), cuántas y cuánto suman | 142, 21,7 s | 141, **19,9 s** (−8 %) |
+| La más larga | 1.019 ms | 861 ms |
+| La otra pestaña: el peor atraso | 24 ms | 15 ms |
+| Pipelines precalentados al arranque | 795 | 762 |
+
+**Qué significa.** C2 hace lo que prometía en lo que se ve en la carrera: con la semilla por pista, los pipelines que hay
+que armar de golpe (un tirón: el cuadro espera a que el navegador compile) bajan de 15 a 3 en la gama baja y de 6 a 3 en
+este PC, y la carga reparte menos trabajo (−8 % de tareas largas: 33 pipelines menos al arrancar, que ahora se piden
+cuando se elige la pista). D8 adelanta poco: 1–3 s de la largada en una corrida, dentro del ruido de una sola corrida en
+la gama baja (B 154 s, C 158 s); las esperas a la red en los menús siguen en 12–22 porque los videos llegan igual por
+pedazos y la cabeza de 2 MB solo cubre su primer tercio de segundo. Lo que manda en la gama baja sigue siendo la red de
+20 Mbit/s (≈ 150 MB antes de largar = 60 s solo de bajada) y la CPU ×4 (el título y los menús a 12 fps: 80 ms de juego
+por cuadro). Las tres siguen sin esperar a la red en la carrera (§169). Una corrida por versión: para decidir algo fino
+haría falta repetirlas; para lo que se buscaba (que C2 no empeore y saque los armados de golpe) alcanza.
+
+Los dos quedan **hechos**. La v0.9.3 compila con los dos (`build/web-motor-c2`, fase `motor` de la tanda 174;
+`thp_nativo.cpp` es nuestro, de `web/`, y entra igual en los dos programas).
+
+## 2026-10-31 · §175 Las 6 pruebas que fallaban en la planilla: la partida compartida, el botón escondido, el índice que no se guardaba, la lista nueva que no se leía y la sala que cortaba a quien carga · 02:10–06:03
+
+La planilla de todas las pruebas (`correr-todo.mjs`, §70) tenía 6 en rojo: **partidas**, **menus**, **invitados**,
+**tactil**, **precarga** y **doce**. Ninguna era un detalle de la prueba: cada una escondía algo que también le pasaría a
+una persona. Las 6 están en verde (`build/web/datos/todo/20261031-0303`, `-0428` y `-0602`).
+
+### §175.1 La partida compartida (partidas, menus, invitados)
+
+**Qué pasaba.** Un perfil nuevo de Chrome tiene que ver las 4 licencias vacías («NEW»). Recibía una ya hecha: la partida
+que sirve el servidor (`/mkw/sd/riivolution/`) era la carpeta `terceros/RetroRewind/riivolution`, y en esa misma
+carpeta escriben su partida el juego en Node y el programa de Windows de las mediciones de §153–§170 (el runtime manda la
+partida de RR a `<retro_rewind_root>/../riivolution/save`), y el guion de botones de §165 crea una licencia. Las pruebas
+que crean una licencia o recorren los menús con teclas iban a otra pantalla.
+
+**Qué se hizo.**
+- `herramientas/partida-base.mjs`: copia la carpeta una vez a `build/web/partida-base` y en `rksys.dat` pone las 4
+  licencias como la casilla vacía que encuentra (de molde: así las escribe el juego), deja en ceros los fantasmas (desde
+  0x28000) y rehace el CRC32 del final de la parte principal (0x27FFC, formato de Tockdom). `--rehacer` = otra vez.
+- La sirven `servidor.mjs`, `worker-local.mjs`, `diminutos.mjs` y `subir-r2.mjs` (`carpetaPartidaBase(raiz)`). Su
+  SHA-256 es el mismo de la lista de R2 de §102 (708c7a04…): lo publicado ya era limpio; `docs/publicar.md` lo dice.
+- Para Node y Windows, cada corrida con su copia: `herramientas/partida-aislada.mjs` (de paso6, §170: un árbol de
+  enlaces duros; un «junction» falla porque el runtime resuelve la ruta real) y `MKW_RR_RAIZ`; `medir-impuesto.mjs` ya
+  la usa. La partida de `terceros/` se devolvió a la limpia.
+- **Ojo (paso6):** con la partida limpia el guion de §165 llega a la carrera, pero la cuenta empieza en el cuadro ~3180:
+  `medir-node-estable` pasó a 6000 cuadros y `perfil-impuesto --cuadros 4800 --desde 3000` tampoco llega al tramo: hay
+  que subirlo a ~6000.
+
+**Probado.** `node herramientas/prueba-partida-base.mjs` 10/10 (con un `rksys.dat` inventado), `prueba-subir-r2` 25/25,
+partidas 6/6, menus 8/8, invitados 13/13 (03:03).
+
+### §175.2 El botón escondido (tactil)
+
+Desde §113 el mando en pantalla trae botones que vienen ocultos (X, Y, Z, la cruz): la prueba los tocaba igual y fallaba.
+`prueba-tactil.mjs` ahora toca solo los que se ven (ancho y alto mayores que 0). 14/14.
+
+### §175.3 El índice que no se guardaba y la lectura doble (precarga)
+
+**Qué pasaba.** La precarga (`?precarga=1`, §98) baja todo a la caché y avisa «listo». El índice de los grupos de 2 MB
+(§171) se guardaba con un temporizador de 2 s, y la página de la precarga se cerraba antes: el juego de verdad encontraba
+los grupos pero no su índice y bajaba todo otra vez. Además el banco `disco` no corría el bloque de §171 (estaba dentro
+de un `try` que ya había fallado antes) y, al correrlo, mostró que dos bloques del mismo grupo pedidos a la vez leían el
+grupo dos veces.
+
+**Qué se hizo.** `disco.guardarIndice()` escribe el índice en el momento (el temporizador lo llama); la precarga lo
+espera antes de avisar «listo» y la página lo llama al cerrarse (`pagehide`). Una lectura de grupo compartida por todos
+los bloques que la esperan (`leyendoGrupo`). Banco `disco` 55/55 (con el caso de §175), precarga 8/8 (04:28; con
+`&cajaGrande=0`, `&precargaLiviana=0` y `&paqueteCarrera=0` también).
+
+### §175.4 La lista nueva que no se leía (pipelines)
+
+C2 (§174.3) escribe la lista de pipelines en el formato 2 (`MKWPIPE2`). `web/navegador/pipelines.mjs` solo aceptaba
+`MKWPIPE1`: la lista propia nunca se guardaba y la semilla `pipelines-c2.bin` se ignoraba sin avisar (la primera medición
+de C no valía). Ahora acepta las dos (`MAGIAS`). El banco `pipelines` carga una semilla del formato 2 con etiquetas (19/19).
+
+### §175.5 La sala que cortaba a quien todavía cargaba (doce)
+
+**Qué pasaba.** En la prueba de 6 humanos (`prueba-doce.mjs`) las dos consolas que terminaban de cargar últimas
+quedaban fuera en el cuadro 0, y la autoridad era una de ellas: se salían las otras cuatro (la isla grande) y la chica
+seguía sola. El volcado del final (`[fin]` y `[ls]` de cada página, que `prueba-doce` ahora escribe) lo mostró: las 4
+primeras proponían cortar a j4 y j5 «sin nadie desde el cuadro 0», porque la regla de §100 «se fue» (`ido`,
+`consolaSeFue`: fuera del buzón y sin WebRTC sano) dice «se fue» también de alguien a quien **nunca** se oyó, es decir,
+de quien todavía está cargando.
+
+**Qué se hizo.**
+- `lockstep.mjs`: `seFue` exige haber oído alguna vez a esa consola (`oido.has(uid)`). Quien no se oyó nunca espera el
+  margen de la largada (§93), como antes de §100.
+- **Las islas**: si la sala se parte, sigue la isla más grande (ver Glosario). Las huellas de ese cuadro se juntan 1,5 s
+  como mucho (`ISLA_MS`), se agrupan las iguales y gana la que tiene más consolas (empate: la de la autoridad; después,
+  el mando más chico). Todas hacen la misma cuenta con los mismos datos. Las de las otras islas se salen y vuelven en la
+  carrera siguiente (`est.islas`); la página avisa «📶 Tu carrera se separó…» o «📶 Una parte de la sala se separó…»
+  (`alPartida`). `?islas=0` = la regla de antes (la autoridad).
+
+**Probado.** Banco `lockstep` 59/59 (5c: 5 consolas, dos se separan distinto → islas de 3 + 1 + 1, sigue la de 3; §175:
+una que se oye recién a los 2 s no se corta), doce **11/11** (06:02, 64 s; a las 04:28, sin el arreglo, 7/11).
+
+## 2026-10-31 · §176 El candado sin trabas, el banco relevo sin depender de la carga y que nada se baje en la carrera (D1) · 04:50–
+
+### §176.1 Los 20 minutos perdidos con el candado
+
+**Qué pasó.** Para darle un turno corto a paso6 en medio de la tanda 174b, congelé la tanda y dejé una espera que
+soltaba el candado cuando terminara la carrera que corría. La espera buscaba ese programa por su número de proceso en
+la lista de Windows (`tasklist`), pero el número que conoce Git Bash (`$!`, `ps`) **no es** el de Windows: había otro
+programa con ese número y la espera creyó que la carrera seguía. El candado quedó tomado 20 minutos sin medir nada,
+hasta que paso6 lo notó en su revisión de cada 20 minutos (pedido del dueño: que ninguna sesión quede esperando a la
+otra sin saberlo).
+
+**Qué se hizo.** `herramientas/candado.sh`, una sola forma de usar el candado para todas las tandas (ver Glosario):
+`candado_tomar ETIQUETA` (lo crea de una vez con `noclobber`: si dos sesiones llegan juntas gana una sola; antes
+`tanda-170.sh`/`tanda-m8.sh` miraban y después escribían con `>`, y podían ganar las dos), `candado_soltar` (solo si es
+mío), `candado_hueco` (en un punto limpio de la tanda: si otra sesión dejó `build/medicion.hueco`, le doy el turno y lo
+retomo) y `esperar_pid $!` (por el número de Git Bash, con `kill -0`; **nunca** `tasklist`). `tanda-174.sh` lo usa y
+mira el pedido de hueco entre medición y medición; paso6 pasó `tanda-m8.sh` y pasa `tanda-170.sh` cuando termine.
+Las dos sesiones se preguntan cada 20 minutos (y solo cuando algo cambia) si la otra necesita el candado.
+
+### §176.2 El banco relevo: el caso 17 dependía de la carga del PC
+
+**Qué pasaba.** Con el banco entero, el punto «…Ana sigue a su ritmo sin subir su retraso, y Carla termina a la par»
+(caso 17, §101: a Carla se le traba la pestaña 600 ms y se pone al día despacio) falló 2 de 3 veces; solo, 3 de 3 bien.
+Para saber cuál de sus 6 condiciones fallaba, el punto ahora lo dice («falla: retraso»), y el caso trae una **sala de
+control** que corre al mismo tiempo en la misma página sin la traba. Con tres copias del caso a la vez (el PC ocupado):
+
+- la sala de control se queda siempre en retraso 3: la carga sola no sube el retraso;
+- el de Ana sube a 6–8 justo después de que Carla vuelve a manejar (también con el PC tranquilo): Carla, al ponerse al
+  día, gasta los botones de Ana apenas llegan y en sus informes salen «justos» (holgura 0). Después baja de a uno cada 2 s;
+- con el PC tranquilo, a los 1500 cuadros ya bajó a 3–4; con el PC ocupado, esos ratos salen dudosos, baja más
+  despacio y a veces terminaba en 5: la condición «a lo más 1 más que al principio» fallaba.
+
+Probé que el informe de quien va atrás y se pone al día no cuente para subir el retraso (como §101 ya hacía para
+bajarlo): **no cambió nada** (los mismos picos de 6–7, con y sin), así que se sacó; la subida tiene otra parte que no
+encontré y que no hace daño (Ana no se frena, va al 100 %, y el retraso vuelve). Lo que sí: el caso corre **2100
+cuadros** en vez de 1500 (10 s más para que baje) y la condición del final es la misma. Resultado: 3 de 3 con tres
+copias a la vez y el banco entero **46/46 dos veces seguidas** (07:16–07:26).
+
+**Un error mío de §175 que salió aquí.** El interruptor `?islas=0` nunca funcionó: el patrón `/[?&]islas=0\b/` se
+escribió con un script y el `\b` quedó como un carácter de retroceso (código 8), así que nunca coincidía. Arreglado; el
+banco `lockstep` con `?islas=0` da 56/56 (el caso 5c, que prueba justamente las islas, no corre con la regla de antes)
+y sin el interruptor 59/59.
+
+### §176.3 D1: que nada se baje durante la carrera
+
+**De dónde se partió.** Con el paquete de carrera (§169) y U2, el juego ya no **espera** a la red en la carrera, pero
+todavía pedía cosas con la carrera andando (tanda 174b, la 13.2): 3 pedidos y 5,6 MB en este PC, y 8–15 pedazos que no
+estaban en la caché. Mirando 33 carreras guardadas (`build/web/datos/carrera-entera/*/`, el campo `faltas`) y qué grupo
+del archivo de sonido es cada pedazo (con el mismo lector de la página, `brsar.mjs`, sobre el archivo del disco):
+
+| Lo que se bajaba en plena carrera | Qué es | Arreglo |
+|---|---|---|
+| `strm/54_N.brstm` (4,6 MB) | la música de la pista: se pedía recién cuando el juego la empezaba a leer | la música va en el paquete (`Tracks/<n>.szs` → `strm/<n>_N.brstm`); `?musicaPaquete=0` |
+| `StaticR.rel` (2 pedazos), `o_Start32_fan.brstm` | partes del código del juego y la fanfarria de la largada | van siempre (`COMUN_CARRERA`: StaticR entero, 512 KB de la fanfarria); `?comunCarrera=0` |
+| bloques 184–307 de `revo_kart.brsar`, distintos en cada carrera | las voces de los personajes (`GRP_VO_<PJ>_PC` y `_NPC`): el paquete pedía solo la del lado de cada uno y ninguna con una skin con voz propia, y el juego lee las dos | las dos voces de cada personaje de la carrera; `?vocesAmbas=0` |
+| bloques fijos por pista (0.0 → 142, 13.2 → 88 y 152, 30.2 → 103 y 125) | los dos grupos de sonido de la pista (`GRP_GP_*`), que no salen de ningún dato que la página pueda leer antes | **se aprenden**: al terminar cada carrera, lo que tuvo que ir a la red se guarda para esa pista (`localStorage` `mkw.paquete.aprendido`, 60 pistas × 64 pedazos) y la próxima vez va con el paquete; `?aprender=0` |
+
+Y en la sala: la pista no se elige en los menús del juego (U2 no la ve); la elige la sala, y la página la sabe apenas se
+arma la copa o la lista. Ahora pide la pista de la carrera que viene y la de la siguiente, con su música y lo aprendido,
+en la elección y en el descanso, nunca con la carrera andando (`pedirPista`; `?pistaSala=0`). `prueba-sala` tiene un
+punto nuevo: en las dos carreras nada fue a la red (`mkwFaltas` de las dos pestañas).
+
+**Probado (banco).** `paquete-carrera` 52/52: la música entera en el paquete y en la pista elegida (U2), sin la de la
+última vuelta; sin `?musicaPaquete` la lectura del juego la pide como antes; lo común; las dos voces de cada personaje;
+aprender (las direcciones vuelven a su ruta, sin repetir) y que la carrera siguiente y la sala lo pidan.
+
+**Medido (primera vuelta, tanda 176, 06:16–06:35, sin las voces ni lo aprendido).** La música ya va en el paquete
+(`54_N.brstm` entre las piezas) y deja de leerse de la red, pero los números casi no cambian: en este PC 3 pedidos (5,6 MB)
+en la carrera, como antes; en la gama baja 0 en la carrera (también antes) y en la meta 1 en vez de 3. Lo que quedaba eran
+los pedazos de las voces y de los sonidos de la pista, que van juntos en los mismos lotes. En la sala,
+`prueba-sala` 45/46: el punto nuevo falló (A 35 pedazos, B 11, todos del brsar): es lo que llevó a la tabla de arriba.
+
+
+**La trampa de la medida (segunda vuelta, tandas 176b–176d, 07:29–08:10).** Con las dos voces y lo aprendido, el punto
+de la sala seguía en rojo (A 33 pedazos, B 15) y la carrera entera seguía diciendo «3 pedidos, 5,6 MB». Mirando de cerca:
+`mkwFaltas` **no es la red**. Anota cada bloque que el juego leyó y que no estaba en la memoria de la página (la RAM de
+64 MB) con la fila de fondo en pausa; eso incluye lo que salió de la **caché del navegador** (el disco del PC, sin
+red) y lo que ya venía en camino. Es como medir el consumo de una casa con un amperímetro puesto en el tablero
+interior: también cuenta lo que da la batería de respaldo, no solo lo que entra de la calle. La red de verdad la cuenta
+otro contador (`disco.estado.pedidosRed`, cada vez que sale un pedido), y ese no decía *qué* era.
+
+Arreglo de la medida (no del juego): `disco.mjs` anota ahora cada pedido que **sale a la red** con la fila en pausa:
+archivo, bloques, bytes, si era urgente y una **marca** que pone la página: la etapa de la carrera en ese momento
+(`Raceinfo +0x28`: 0 presentación, 1 cuenta, 2 carrera andando, 4 resultados; y 3 = la carrera sigue pero el jugador
+de esta pantalla ya cruzó la meta, `RaceinfoPlayer +0x38` bit 2 de su puesto, `Racedata +0x20 +0xB64`). Se lee con
+`window.mkwRedEnCarrera()`; `medir-carrera-entera` lo imprime (`red en pausa: … con la carrera andando …` y una línea
+`red:` por pedido) y `prueba-sala` cuenta solo los de la etapa 2. Banco `disco` 56/56 (un punto nuevo: lo anunciado y lo
+leído quedan anotados con sus bytes, la semilla de fondo no, y al soltar la pausa no se anota nada más).
+
+Con eso se vio qué era todo lo de «en pausa»: **el paquete mismo**, pedido en la presentación (etapa 0) cuando llega la
+ficha: las voces de las skins de Retro Rewind (`GRP_VO_CA-3_PC.brbnk`…, que solo se saben con la ficha) y los pedazos
+del brsar. Eso es justo para lo que está el paquete: la carrera todavía no arrancó. Y el «1 pedido de 3,9 MB en la
+carrera» del contador de siempre era un pedido de la presentación que *terminó* de llegar después de la largada (el
+contador suma al terminar).
+
+Para que lo aprendido se pueda ver, `medir-carrera-entera --mismo-perfil` corre todas las pistas en el mismo perfil (la
+caché y `localStorage` siguen): `--pistas 13.2,13.2` = la segunda carrera ya tiene lo de la primera.
+
+**Medido (tanda 176e, 08:14–08:49; la carrera entera con 12 CPU, la gama baja = CPU ×4 y 20 Mbit/s).**
+
+| | presentación (el paquete) | con la carrera andando | el juego esperó a la red |
+|---|---|---|---|
+| este PC, 13.2, 1.ª (perfil nuevo) | 58 pedidos, 23,8 MB | **0** | 0 |
+| este PC, 13.2, 2.ª (mismo perfil) | 29 pedidos, 8,9 MB | **0** | 0 |
+| gama baja, 13.2, 1.ª (perfil nuevo) | 36 pedidos, 17,4 MB | **0** | 0 |
+| gama baja, 13.2, 2.ª (mismo perfil) | 24 pedidos, 7,8 MB | **0** | 0 |
+
+En la sala (`prueba-sala`, dos pestañas, la copa de 2): B 0 con la carrera andando; A 1, el resto de la fanfarria de la
+meta (`o_FanfareGP1_32.brstm`, 2,1 MB desde el bloque 16), que el juego lee recién cuando esa pestaña **ya cruzó la
+meta** y los demás siguen corriendo (la etapa sigue en 2 hasta que termina la carrera de todos). Ahí ya no se maneja: es
+la marca 3 de arriba y no cuenta como «bajar en la carrera». Con eso, `prueba-sala` **46/46** (tanda 176f, 08:53): de la cuenta a la
+meta (etapas 1 y 2, el criterio del paso 5) A 0 y B 0 pedidos; en la presentación, A 10 y B 33. Las 3 fanfarrias enteras en el paquete serían ~20 MB por
+carrera la primera vez para algo que suena después de llegar; no vale la pena.
+
+**Qué significa.** Con la carrera andando ya no sale nada a la red, ni en este PC ni en la gama baja, y el juego no
+esperó a la red ninguna vez: D1 cumplido. Lo que se baja, se baja en la presentación (los ~5–10 s de la vuelta de cámara
+antes de la cuenta), que es el paquete de carrera haciendo su trabajo; la segunda vez en la misma pista es menos de la
+mitad (lo demás ya está en la caché) y la largada de la gama baja llega antes (151 → 102 s desde abrir la página). Queda
+una idea para más adelante, no de D1: armar «lo aprendido» de todas las pistas de una vez con una tanda (un manifiesto
+de carreras publicado con el programa), así la primera carrera en una pista nueva tampoco depende de la presentación.
+
+## 2026-10-31 · §177 El paso 4 sin el Oppo: lo que queda de «nada se congela al cargar» · 08:58–09:10
+
+**Qué pide el paso 4** (orden del plan de rendimiento, «Listo cuando»): (1) abrir el juego no atrasa más de 50 ms el
+latido de otra pestaña; (2) cero descargas de fondo y cero tareas largas durante la carrera. Sus diez ítems ya estaban
+hechos (C8 descartado, §157); faltaba ver los dos criterios con lo de hoy (D1, §176, y la semilla nueva).
+
+**El criterio 2, medido** (tanda `build/web/datos/tanda-p4.sh`, 08:58–09:10, bajo el candado;
+`medir-sitio --perfil pc|cpu4 --etiqueta p4b-… --segundos 40 --extra "&bloques=bloques-d9.json&pipelines=pipelines-c2.bin"`,
+la página como en el sitio, con el Worker local y 50 ms de latencia; una *tarea larga* es un rato de 50 ms o más en que
+el hilo de la página no atiende otra cosa):
+
+| | fps en la carrera | tareas largas en la carrera | pedidos al Worker en la carrera | juego ms por cuadro |
+|---|---|---|---|---|
+| este PC (`pc`) | 60,0 | **0** | **0** | 8,7 |
+| la CPU ×4 (`cpu4`) | 19,7 | 1.158 (la peor 115 ms) | **0** | 68,1 |
+
+En este PC el criterio se cumple entero. Con la CPU ×4 no sale nada a la red (D1), pero **cada cuadro del juego es una
+tarea larga**: el cuadro cuesta 68 ms y el juego corre en el hilo de la página, así que cada uno pasa de los 50 ms. Eso
+no es la carga ni algo de fondo: es el motor, que en un procesador 4 veces más lento no entra en 16,7 ms. Lo arreglan
+el motor más rápido (paso 6: H6/H7/M1, el traductor) y el juego en su propio hilo (paso 8: N3, que además deja libre la
+página de Juegos aunque el cuadro siga largo). Como un motor eléctrico chico para la carga: no se arregla en el
+arrancador, sino con el motor o repartiendo la carga.
+
+**El criterio 1** sigue como en §158: en un PC de 2 núcleos queda una traba de ~300 ms al largar la 1.ª carrera, que es
+V8 optimizando (TurboFan) el código de la carrera la primera vez que corre. Desde la página no hay cómo pedirle que lo
+haga antes o más despacio; los caminos son H11 (paso 6: el código caliente más chico y junto) y N3 (paso 8). En este PC
+(16 lógicos) la carga tuvo 14 tareas largas (la peor 544 ms, en los menús): las mismas de antes, sin que se sumara
+ninguna con D1.
+
+**Estado.** Paso 4: el criterio 2 cumplido en este PC y, en la gama baja, en lo que toca a la carga (cero descargas); el
+resto del criterio 2 en la gama baja y el criterio 1 pasan a los pasos 6 y 8, donde están sus arreglos. Nada se cambió
+en el código: es medición.
+
+### §177.1 G5: ¿el teléfono ve más ancho? En este PC, no
+
+**La sospecha** (G5, del informe del Oppo, §115.5): a pantalla completa el lienzo del teléfono era 2,18:1 y el cuadro
+costaba 34 ms; con el cajón abierto (lienzo angosto) 20 ms. Si la vista del juego siguiera al lienzo, a 2,18:1 vería
+más pista y dibujaría más cosas, aunque `force_16_9` (§79) debería dejarla en 16:9.
+
+**Cómo se miró.** `node herramientas/medir-aspecto.mjs [--libre]` (nuevo): una carrera directa de 12 CPU y, ya
+corriendo, la ventana en 16:9, 2,18:1 (el teléfono acostado), parada (como el cajón abierto) y otra vez 16:9; en cada
+forma una foto (`build/web/datos/aspecto/` y `aspecto-libre/`). Tanda `tanda-g5.sh`, 09:14, bajo el candado.
+
+**Resultado.** Con `force_16_9` (lo de siempre) la vista es **la misma en las cuatro formas**: a 2,18:1 la imagen 16:9
+con barras negras a los lados, parada con barras arriba y abajo, y el mismo campo visual. Con `?aspecto=libre` (solo
+para comparar) a 2,18:1 la escena y el HUD se estiran hasta los bordes. O sea: en este PC el juego no dibuja más con un
+lienzo más ancho. El «2,18:1» del informe del teléfono es la forma del **lienzo**, no la de la vista; si en el Oppo
+la vista estaba en 16:9, la diferencia 34 → 20 ms no venía de «ver más pista» y hay que buscarla en otra parte (lo que
+cuesta llevar la imagen a un lienzo grande, la composición del navegador o la tarjeta misma; eso es N9, con el perfil
+por pasada del teléfono). Desde ahora el informe de rendimiento dice qué vista usó (`vista`: «16:9 fija» o «libre»),
+para que el próximo informe del Oppo lo confirme.
+
+Los valores que la herramienta lee de la memoria (el registro 16:9 de `EGG::Screen` que escribe
+`dynamic_aspect.cpp`, 0x802A3EF4, y la escala de la proyección, 0x80386F24) no cambiaron en ninguna forma, tampoco con
+`libre`, donde la foto sí cambia: no son las direcciones que mandan en esta versión; se dejaron en la salida solo como
+dato. **Estado de G5:** en este PC no hay nada que arreglar; queda confirmar en el Oppo con el informe (lo corre el dueño).
+
+### §177.2 G2: la profundidad que nadie vuelve a leer (y por qué en Mario Kart casi no hay)
+
+**Qué es.** Una tarjeta de video de teléfono trabaja «por baldosas»: dibuja la imagen de a pedacitos en una memoria
+chica y rapidísima dentro del chip, y al terminar cada pasada lleva el resultado a la memoria principal (*Store*); al
+empezar la siguiente, si hace falta lo que había, lo trae de vuelta (*Load*). Cada ida y vuelta a 939×528 son unos 2 MB
+por búfer. Es como un taller con un mesón chico: si la pieza va a volver a usarse, se guarda en la bodega; si no, se tira
+sin hacer el viaje. G2 propone no guardar la profundidad (el búfer Z: qué tan lejos está cada pixel) cuando nadie la va a
+leer, y limpiar con la pasada en vez de traer lo viejo cuando todo se va a borrar.
+
+**El cambio** (aurora, `lib/gfx/common.cpp`; `parches/aurora-web.diff`): antes de cada pasada, `depth_needed_after`
+mira si alguien vuelve a leer su profundidad. La descarta (`StoreOp::Discard`) **solo** si la siguiente pasada que usa esa
+misma profundidad la limpia antes de dibujar, esta pasada no la copia (copia de profundidad del EFB) y no es la última
+(la instantánea de `depth_peek` y el cuadro siguiente la leen). En cualquier otro caso la guarda como siempre.
+`?descartarZ=0` = guardar siempre (`mkw_web_profundidad(0)`); `mkwEstado.zDescartadas()` y el informe de rendimiento
+cuentan las pasadas que la descartaron; `medir-sitio` lo imprime en el tramo.
+
+**Medido** (tanda `tanda-g2.sh`, 09:35–09:49; el tramo fijo de §163/§164 con el perfil de la tarjeta, intercalado):
+
+| | tarjeta ms por imagen (antes → con G2) | CPU ms por imagen | pasadas sin guardar Z |
+|---|---|---|---|
+| este PC, par 1 | 0,19 → 0,20 | 14,6 → 15,0 | 0 |
+| este PC, par 2 | 0,23 → 0,22 | 14,3 → 15,4 | 0 |
+| gama baja simulada (`lastre=4&lastreGpu=6`) | 0,97 → 0,98 | 65,4 → 69,3 | 0 |
+
+`prueba-navegador` 21/21. Ninguna diferencia (era lo esperable en una tarjeta de escritorio) y, sobre todo, **ninguna
+pasada descartó la profundidad**: la regla nunca se cumplió.
+
+**Por qué** (tanda `tanda-g2b.sh`, con contadores nuevos de aurora, `mkw_web_limpiezas`, que imprime
+`medir-aspecto.mjs`): en ~1 minuto de carrera hubo 4.171 copias del EFB que limpian, 1.129 de ellas también la
+profundidad, y **ninguna cubre la imagen entera**: todas limpian el recuadro de 893×456 desde (0,0) dentro de una imagen
+interna de 939×528 (la parte que el juego usa del EFB de la Wii, 608×456, agrandada). Como un pedazo de la imagen queda
+sin limpiar, aurora limpia con un dibujo recortado y la pasada tiene que traer (Load) y guardar todo. Limpiar la imagen
+entera supondría que el juego nunca lee ese borde; es probable, pero no lo puedo asegurar, y el ahorro solo se vería en
+una tarjeta por baldosas, que aquí no hay.
+
+**Estado de G2.** Queda puesto el descarte seguro (no cambia nada en este PC y puede servir en otros juegos o
+escenas) con su bandera. La parte que sí ahorraría en el teléfono, limpiar el recuadro como si fuera la imagen entera,
+pasa a N9: primero el perfil por pasada del Oppo (§115) tiene que decir cuánto pesan los Load/Store; si pesan, se hace
+con una prueba de que nadie lee fuera del recuadro.
+
+### §177.3 R6: una sala con pantallas distintas (la parte de este PC)
+
+**Qué se quería saber.** En una sala de verdad cada jugador tiene su pantalla: un PC con monitor ancho, un teléfono
+parado, otro con «Fluidez 180» o la escala ×2. Nada de eso debería cambiar la carrera, porque la lógica del juego corre
+en cuadros fijos de 1/60 s y lo que cambia es solo cómo se dibuja. Pero si algo del dibujo se colara en la lógica (el
+ancho de la vista en una cuenta de la cámara, por ejemplo), las dos consolas se separarían.
+
+**Cómo se probó.** `prueba-sincro.mjs` ganó `--vista-b=AxB` (la ventana de B de otro tamaño) y `--extra-b=&…`
+(ajustes solo para B). La carrera directa de dos pestañas con:
+
+| B con | tanda | resultado | huellas iguales |
+|---|---|---|---|
+| ventana 1260×540 (2,33:1, como el Oppo acostado) | `tanda-r7.sh` | 13/13 | 74 de 74 |
+| ventana 400×800 (parada) | `tanda-r7.sh` | 13/13 | 74 de 74 |
+| 1260×540 + `fluidez=120&escala=2` | `tanda-r7.sh` | 13/13 | 74 de 74 |
+| `fluidez=180` | `tanda-r69.sh` | 13/13 | 74 de 74 |
+| `aspecto=libre` (sin el 16:9 fijo; la ventana, la de siempre) | `tanda-r69.sh` | 13/13 | 74 de 74 |
+
+**Una trampa mía (corregida).** En la primera tanda (`tanda-r69.sh`) los casos con otra ventana no valían: el patrón
+que lee `--vista-b=1260x540` se escribió con un script que se comió las barras invertidas (`(d+)x(d+)` en vez de
+`(\d+)x(\d+)`), así que B nunca cambió de tamaño y las pestañas corrían con la ventana de siempre. Se arregló y se
+repitieron en `tanda-r7.sh` (las tres primeras filas). La lección (también en §179): lo que lleva expresiones
+regulares se escribe con la herramienta de edición, nunca a través de un script, y cada interruptor nuevo tiene en su
+banco un punto que lo prende de verdad.
+
+La *huella* es un resumen de la memoria de la carrera (posiciones, velocidades, el azar) que cada consola calcula cada
+30 cuadros y compara con la otra: igual en todas = las dos corrieron exactamente la misma carrera. Como medir la tensión
+en el mismo punto de dos tableros gemelos: si coincide siempre, el circuito es el mismo aunque las lámparas sean
+distintas.
+
+**Lo que falta.** Lo mismo con el Oppo de verdad (parte D de `docs/medir-oppo.md`): otra tarjeta y otro procesador
+podrían redondear distinto, algo que aquí no se puede simular.
+
+### §177.4 Los pasos 1, 2 y 3 del plan: qué se cierra en este PC y qué queda para el Oppo
+
+**Qué se pidió.** La orquestadora: antes de la sala asíncrona, cerrar lo que se pueda en este PC de los pasos de base
+(paso 1 iba 3/4, el 2 iba 0/2 y el 3 iba 6/10), y dejar escrito en `docs/medir-oppo.md` lo que el dueño tiene que
+hacer con el teléfono para cerrar el resto.
+
+**Cómo quedó cada uno.**
+
+| Ítem | Estado | Por qué |
+|---|---|---|
+| paso1.2 (los cuadros de lógica) | **hecho** | ya estaba en §124 (Raceinfo +0x1C/+0x20 en el medidor y el informe) y el tramo fijo de §163 los cuenta por segundo; faltaba marcarlo |
+| V1 (el informe del teléfono) | en curso | la página ya mide todo (§173: CPU pura sin esperas, el tramo de la tarjeta por pasada, «Mostrar qué frena»); falta el informe del Oppo (parte A de `medir-oppo.md`) |
+| H1 (el aparato de mentira) | en curso | la parte del PC está entera (§155, banco `lastre` 15/15); la tarjeta se recalibra con el número del Oppo (`lastreGpu` = ms del Oppo ÷ 0,20) |
+| H2 (el presupuesto) | en curso | el presupuesto ya sale en el informe (§149); faltan los números del Oppo para fijar las metas |
+| U3 (Contrarreloj contra VS) | en curso | en este PC ya se midió (§157: ~3/4 del costo es la base); falta el Oppo en la 1.ª y la 2.ª visita (parte B) |
+| N2 (la línea base de la escalera) | en curso | los 4 escalones simulados están (§159); el escalón de verdad es el Oppo |
+| E4 (conseguir otros aparatos) | **descartado** | el dueño (2026-10-27): solo este PC y el Oppo; lo demás se simula con H1 |
+| R6 (la sala con pantallas distintas) | ver §177.3 | la parte del PC: dos pestañas con ventanas, fluidez y escala distintas |
+
+**Lo que se le dejó al dueño** (`docs/medir-oppo.md`, partes A a D): A, un informe de rendimiento en VS y en GP (cierra
+V1, H1, H2, N2 y G5); B, Contrarreloj contra VS, 1.ª y 2.ª visita (U3); C, los bancos `paridad` y `fma` en el teléfono
+con `chrome://inspect` y el puerto 8140 reenviado (el paso 3); D, una sala del PC con el Oppo, 3 carreras (R6 de
+verdad). Cada parte dice qué apretar, qué copiar y a quién pegárselo.
+
+**Por qué no se puede más aquí.** Los números del teléfono (cuánto tarda su tarjeta, cuánto su CPU, cuánto su memoria)
+son justamente lo que el aparato de mentira copia; medir el aparato de mentira contra sí mismo no dice nada. Es como
+calibrar un amperímetro contra el mismo amperímetro: hace falta el patrón.
+
+### §177.5 R3: la traba viva (el que contesta pero no avanza)
+
+**Qué pasaba.** En la sala, cuando el juego de alguien se queda quieto, los demás lo esperan hasta 150 ms y después lo
+**pausan** (el relevo rápido de §99: siguen la carrera con su mando calculado y él la retoma después). Pero esa pausa
+se decidía solo por **silencio**: «hace más de 150 ms que no llega nada de él». Si su juego se quedaba quieto con la
+pestaña despierta (lo típico: JSPI esperando un pedazo del disco, o la tarjeta armando un pipeline), la pestaña seguía
+contestando los pings: se lo «oía», nadie lo pausaba y los otros lo esperaban el rato entero.
+
+**Qué se hizo** (`web/navegador/lockstep.mjs`, `?trabaViva=0` = como antes):
+1. El ping (tipo 7) lleva ahora 5 bytes más: el cuadro que la consola ya corrió y una marca «estoy esperando los botones
+   de otro». Una página vieja no los manda (el ping mide 16) y entonces no hay traba viva para ella.
+2. Cada consola anota la última vez que el **dueño** de cada mando mandó un botón nuevo (`avanceDe`).
+3. Si un mando no avanza hace más de 150 ms, su dueño se oye **y su ping dice que no espera a nadie**, está trabado él
+   mismo: se lo pausa igual que al callado (`est.trabasVivas`, «contesta pero no avanza … (traba viva)» en el
+   registro). La marca importa: el que no avanza porque espera a un tercero no tiene la culpa y no se lo pausa.
+
+**La prueba** (banco `relevo`, caso 20, `node banco/correr.mjs "relevo?solo=20"`): tres consolas, el juego de Beto
+queda quieto 1 s en el cuadro 400 con la pestaña viva (pings cada 100 ms, para que siempre se lo oiga).
+
+| | Ana esperó a lo más | trabas vivas | pausas | misma carrera |
+|---|---|---|---|---|
+| sin el arreglo (`trabaViva: false`) | 985 ms | 0 | ninguna | sí |
+| con el arreglo | 181 ms | 1 | 1 (desde el cuadro 403) | sí |
+
+3/3 ✓. Ana y Carla siguen la carrera a los ~150 ms, Beto vuelve a manejar cuando su juego despierta y las tres consolas
+corren exactamente la misma carrera (la huella igual en todo el tramo). Como un tablero que dispara por baja tensión y
+no solo por falta de señal: el aparato que «responde» pero no entrega potencia también se aísla.
+
+**El banco entero y el resto.** `relevo` entero: 48 de 49; falló el caso 17 (el retraso de Ana subió un rato por
+Carla), el mismo que en §176 dependía de la carga del PC. ¿Lo rompió la traba viva? Tanda `tanda-r3b.sh`: el caso 17
+solo, 3 veces con y 3 sin (`&trabaViva=0`), intercalados: **6 de 6 bien** en las dos. En el caso 17 Carla se calla
+(su traba es «callada»), así que la traba viva ni entra. `lockstep` 59/59. (Lo de «es la carga» resultó no ser
+cierto: el caso 17 solo, con el PC casi libre, también se trabó; ver §180.)
+
+### §177.6 R9: la pestaña oculta en la sala (el acelerador pegado)
+
+**Qué pasaba.** En la sala, si alguien cambiaba de pestaña con el acelerador apretado, el navegador dejaba de llamar al
+refresco de pantalla y la página dejaba de leer el teclado: el juego se quedaba con lo último que recibió, A apretado,
+para siempre. Al volver, el kart había seguido acelerando a ciegas (o contra una pared).
+
+**Qué se hizo** (`web/navegador/controles.mjs`, `?ocultaCero=0` = como antes): al segundo de ocultarse la pestaña, se le
+manda al juego el mando **en reposo** (nada apretado, el stick al centro), igual que cuando la página «calla» los mandos;
+al volver a verse, otra vez lo de la persona. El segundo de espera es para no soltar nada por un parpadeo (una
+notificación que tapa un instante). `estado.ocultaCero` cuenta las veces.
+
+**Las pruebas.**
+- Banco `controles` (53/53, 4 puntos nuevos): con K apretada (= A), a los 0,4 s de ocultarse A todavía llega, a los
+  1,3 s llega el mando en reposo aunque la tecla siga apretada, y al volver A llega otra vez.
+- Con el juego: `prueba-sincro.mjs --directa --oculta-b=12` (B se «oculta» 12 s a mitad de la carrera con la tecla
+  apretada, simulado dentro de la página: `document.hidden` y sin refresco). A siguió a 56 cuadros/s (no la esperó: la
+  relevaron), a B le llegó el mando en reposo (`ocultaCero` 1, lo último mandado 0) y al volver las dos corrieron la
+  misma carrera (huellas 57 de 57). El juego de B no avanzó mientras estuvo oculta (0 cuadros/s: sin refresco de
+  pantalla su bucle no gira); el punto que pedía que B siguiera corriendo se cambió por «A no la espera», que es lo que
+  importa en la sala, y se volvió a correr (`tanda-r7b.sh`): **15/15**, A a 59,1 cuadros/s, huellas 57 de 57.
+- La marca apagada de verdad: `controles?ocultaCero=0` (el banco lee la dirección) = al segundo de ocultarse el juego
+  sigue con A apretado, como antes (53/53).
+
+Es el «hombre muerto» de los trenes: si el maquinista suelta la manilla (o se va de la cabina), el tren no sigue a
+fondo.
+
+
+## 2026-10-31 · §178 M8, primera pasada: no volver a leer r14–r31 después de cada llamada (medido: no gana nada) · 09:00–11:10
+
+**Qué es.** El código traducido guarda los registros de la Wii en variables locales de C++ (rápidas) y, después de cada
+llamada a otra función del juego que el traductor no conoce por dentro, los vuelve a leer todos de la memoria
+(`r14 = ctx->gpr[14];` …), por si la función llamada los cambió. Pero la regla de la Wii (la **EABI**, ver glosario
+«Registros no volátiles») dice que toda función devuelve r14–r31 como los recibió. Si la regla se cumple, esas lecturas
+sobran. M8 (primera pasada del plan de rendimiento, paso 6) era sacarlas y medir cuánto se gana.
+
+**Por qué con cuidado.** Hay código que rompe la regla a propósito: los cambios de hilo del sistema (OS de la Wii) y los
+parches de Retro Rewind. Si se quita una lectura donde la función sí cambió el registro, el juego sigue con un valor viejo
+y se rompe (como medir con el voltímetro antes de que la fuente termine de conmutar: lees lo que había, no lo que hay).
+
+**Cómo se hizo** (todo en una copia aparte, `terceros/Wiicompiled-motor-m8`; el cambio entero en `parches/traductor-m8.diff`;
+la tanda `bash herramientas/tanda-m8.sh traducir compilar probar medir`, con `M8=<modo>` y el candado común):
+
+1. **El techo** (`MKW_M8=techo`: sacar todas las lecturas después de toda llamada, a propósito inseguro): el juego se
+   congelaba al arrancar. Partido en dos: solo después de las llamadas indirectas (`ind`) anda; solo después de las
+   directas (`dir`) se rompía, aun dejando fuera las funciones de hilos del sistema y todo el módulo de RR
+   (`MKW_M8_EXCLUIR`, `build/web/datos/m8/excluir-os-rr.txt`): caía en el cuadro ~1200 leyendo la dirección 0x524D435C.
+2. **La vigía** (`MKW_M8=vigia`): en vez de partir a ciegas, el traductor pone después de cada llamada que relee todo una
+   comprobación (92.670 puntos): «¿algún r14–r31 volvió distinto de como se fue?»; si sí, anota quién
+   (`runtime/src/mkw_m8_vigia.cpp`, «[m8-vigia] dirección máscara veces») y relee igual, así el juego corre bien. Una sola
+   corrida hasta la carrera dio la lista completa del camino: **8 funciones, y las 8 son de Retro Rewind**:
+   - 4 «ganchos» de RR (0x818308C8 cambia r27, 11.968 veces; 0x8184B4B8, 0x81806568, 0x818061D8), en el módulo de RR;
+   - 4 **continuaciones** (`rr_continue_807BB6DC`, `807BB7DC`, `8079B860`, `807E2F24`): código de RR que vuelve a
+     mitad de una función del juego y corre el resto, incluido su final, que repone r14–r31 de la pila de *esa* función
+     (ver glosario «Continuación»). Llamadas desde código de RR.
+3. **El modo seguro** (`MKW_M8=seguro`): saca la lectura solo después de llamadas **directas** desde código del juego, y
+   nunca hacia lo que un mod puede reemplazar (las 975 funciones que el traductor ya conoce), hacia el módulo de RR o
+   hacia los hilos del sistema; desde código de mod (ganchos, overlays, continuaciones) no se saca nada. Probado con la
+   vigía puesta solo donde el modo seguro saca (`MKW_M8_VIGIA=1`, 61.810 puntos): **0 avisos** hasta la carrera,
+   arranque 13/13 y la corrida entera llega al tramo.
+
+**Resultado** (tramo fijo en Node, partida limpia propia de cada corrida, `--fijo`, v0.9.3 contra M8 intercalados,
+`build/web/datos/node-estable/m8-*.json`):
+
+| Variante | Lecturas de r14–r31 en el C++ | Trabajo por cuadro (mediana) | M8 / v0.9.3 |
+|---|---|---|---|
+| v0.9.3 (base) | 496.003 | 4,212 ms | — |
+| `ind` (solo indirectas) | (sin contar) | 4,25 ms | ×0,99 (de 0,985 a 1,032; 6 pares) |
+| **`seguro`** | **262.761 (−47 %)** | **4,209 ms** | **×1,00** (de 0,995 a 1,099; 6 pares, uno con un tirón) |
+
+**Qué significa.** Casi la mitad de esas lecturas desaparecieron y el juego va exactamente igual de rápido. Cada lectura es
+de una línea de memoria que el procesador ya tiene a mano (la caché L1): cuesta alrededor de un ciclo y el procesador la
+hace en paralelo con otras cosas. El impuesto de wasm (×2,6 frente al nativo, §166) **no está ahí**. Por eso:
+
+- **Esta pasada no se adopta**: queda solo en la copia de experimento (sin `MKW_M8` el traductor hace lo de siempre) y no
+  se midió en la gama baja simulada del navegador, porque en Node no movió nada.
+- Quedan del ítem M8 las otras pasadas del plan (más llamadas directas, más hojas en línea, banderas solo cuando alguien
+  las lee); por lo medido en N13, conviene ir antes a la memoria de la Wii (H6/H7, M1/M2: ~17 % del impuesto) y a lo que
+  genera el compilador (M6 PGO, M7 ThinLTO).
+- La vigía sí queda como herramienta: dice qué funciones rompen la regla de los registros sin adivinar.
+
+**Trampas.** (1) Un lanzamiento en segundo plano hecho con `( … ) &` dentro de otro sobrevivió y corrieron **dos** tandas a la vez
+compilando en la misma carpeta: siempre un solo lanzamiento por tanda. (2) `prueba-arranque` (600 cuadros) pasaba 13/13 con
+el techo congelado: la prueba de verdad es la corrida que tiene que llegar a la carrera (la fase `probar` de la tanda).
+(3) Las continuaciones no están en la lista de lo que un mod puede reemplazar: hay que mirar quién llama (código de mod),
+no solo a quién.
+
+## §179 R7: la autoridad, la PC con más margen (nunca un teléfono si hay un PC)
+
+**Qué es la autoridad.** En la sala, una de las consolas manda: escribe los botones de quien se atrasa (el relevo, §80)
+y es la única que puede frenar a todos. Hasta ahora se elegía solo por *estabilidad* (a quién la mayoría ve llegar a
+tiempo). No miraba si a esa consola le sobra procesador, ni si su red sube lo suficiente, ni si es un teléfono.
+
+**Qué se hizo** (`web/navegador/lockstep.mjs`; `?autoridadCapaz=0` = como antes):
+1. El informe que cada consola manda cada 500 ms (tipo 10) lleva 3 bytes más: el **margen por cuadro** (los ms libres:
+   16,7 menos lo que trabaja el juego, promedio de los últimos 5 s del medidor), la **subida** que estima WebRTC
+   (`availableOutgoingBitrate` de la conexión, la más chica de todas; `malla.mjs` `camino`, una conexión cada 5 s) y si
+   es un **teléfono** (`esTelefono` de §113). Una página vieja no los manda: «no se sabe» y cuenta como antes.
+2. El puntaje de cada candidata suma: +15 por cada ms libre hasta 10; −300 con menos de 2 ms libres; −300 con menos de
+   2 Mbit/s de subida (con 12 jugadores la autoridad manda los botones de todos a todos); **−5000 si es un teléfono y
+   hay alguien que dice que es un PC**.
+3. La autoridad que es un teléfono no espera a que la vean mal: apenas sabe que hay un PC sano, le pasa el papel
+   (`estado().pasoTelefono`, «soy un teléfono: paso la autoridad a …» en el registro).
+4. Para la carrera siguiente (la primera autoridad la elige la anfitriona, §99): cada consola cuenta además su margen
+   más chico y si es teléfono; en `ratosMalos` de `sala-carrera.mjs` cada ms que le falte para 6 vale 20 ratos malos y
+   un teléfono suma 10000 (va siempre detrás de cualquier PC).
+
+Como en un tablero con dos fuentes: la transferencia elige la red de la calle y deja el generador chico de respaldo;
+aunque el generador ande bien, no es el que tiene que cargar la casa.
+
+**Las pruebas.**
+- Banco `relevo`, caso 21 (Ana teléfono con 3 ms libres, Beto y Carla PC con 11 y 12): Ana pasa el papel a un PC a los
+  ~1,3 s y las tres lo ven igual; sin la marca (`autoridadCapaz: false`) Ana se lo queda; la misma carrera; y la cuenta
+  para la sala pone a Ana 10000 ratos detrás. 4/4. Con `relevo?solo=21&autoridadCapaz=0` (la marca apagada en la
+  dirección) Ana se queda con el papel y la sala no suma el +10000: 4/4.
+- Con el juego: `prueba-sincro.mjs --directa --extra-a=&comoTelefono=1` (A, la primera autoridad, dice ser un teléfono;
+  `?comoTelefono=1` es solo para pruebas): A le pasa la autoridad a B y las dos lo ven igual, la misma carrera (huellas
+  75 de 75): 14/14.
+- Una expectativa mía que estaba mal: el banco pedía que el papel fuera a Carla (la de más margen). Entre dos PC el
+  margen (11 contra 12 ms) pesa 15 puntos, menos que la holgura con que llega lo de cada uno; el teléfono se lo dio a
+  Beto. Lo que importa es «a un PC»: así quedó la prueba.
+
+**Una lección (tres veces el mismo error en un día).** `?islas=0` (§175), `--vista-b` (§177.3) y `?autoridadCapaz=0`
+(aquí) se escribieron con un script cuyo texto pasaba por una plantilla de JavaScript, que se come las barras
+invertidas: `\b` quedó como el carácter de retroceso y `\d` como `d`. El programa anda igual, pero el interruptor no se
+prende nunca. Desde ahora: lo que lleva expresiones regulares se escribe con la herramienta de edición, y **cada
+interruptor nuevo tiene en su banco un punto que lo prende por la dirección** (`relevo?solo=20&trabaViva=0`,
+`relevo?solo=21&autoridadCapaz=0`, `controles?ocultaCero=0`): si está roto, la prueba falla sola.
+
+## 2026-10-31 · §181 El paso 7: no volver a subir lo que no cambió (G3 y H12, adoptados) y las funciones calientes (N14: no hay dónde; la FMA del runtime tampoco, §184) · 10:30–16:40
+
+**Qué se pidió.** El paso 7 del plan de rendimiento tiene tres ítems: G3 (no volver a subir a la tarjeta lo que no cambió),
+H12 (la pista quieta en la tarjeta) y N14 (reescribir a mano las funciones más pesadas del juego, con un comprobador que
+demuestre que dan exactamente los mismos bits). Metas: la subida por imagen en la carrera baja a una fracción, y la CPU
+por cuadro del tramo fijo (§163) baja en la gama baja simulada y en este PC.
+
+### 181.1 G3 y H12: los anillos de subida
+
+**El problema.** Cada cuadro, aurora (el dibujante) arma en la memoria del programa todo lo que la tarjeta necesita
+—los vértices (las esquinas de cada triángulo), los índices (qué esquinas forman cada triángulo), los arreglos
+«storage» (listas de datos que leen los programas de la tarjeta) y los uniformes (la cámara, las luces y la posición
+de cada objeto)— y lo **sube entero** a la tarjeta. Pero casi todo es igual que en el cuadro anterior: la pista no se
+mueve, y los karts usan siempre las mismas listas de vértices; lo que cambia es dónde se dibujan (eso va en los
+uniformes). Medido en la carrera de 12 CPU: ~1,2–1,4 MB por imagen, de los cuales los uniformes son ~0,3–0,5 MB.
+
+**La idea.** Detrás de cada búfer de la tarjeta se reserva un **anillo** (ver Glosario): vértices +8 MB, índices +4 MB,
+storage +16 MB. Al cerrar cada lote de dibujos, aurora calcula una huella rápida (xxh3) de los vértices y los índices de
+cada dibujo; si ya están en el anillo, el dibujo los usa desde ahí y no se suben. Los arreglos storage se reconocen
+antes, por su lugar en la memoria del juego y la **generación de escrituras** (si el juego no escribió ahí desde la
+última vez, son los mismos; solo si la memoria no está vigilada se calcula la huella). Al mudar los vértices se corrige
+el `vtx_start` de cada dibujo (el primer número de su bloque de uniformes). Si todos los dibujos del lote pasaron al
+anillo, la parte de siempre ni se sube.
+
+**Por qué no se pisa nada.** Las reglas del anillo (las mismas en `lib/gfx/common.cpp` y en
+`web/navegador/anillo.mjs`, que las repite en JS para el banco): una entrada nunca queda partida en el borde; sirve
+mientras la cabeza no le dio la vuelta y está a media vuelta o menos; un lote escribe a lo más 1/4 de vuelta y una
+entrada mide a lo más 1/8. Así lo que un dibujo usa nunca se escribe encima dentro del mismo lote, y lo que la tarjeta
+todavía está dibujando del lote anterior queda protegido por el orden de la cola (`WriteBuffer` va detrás de lo ya
+enviado).
+
+**Lo que se cambió.**
+- `terceros/Wiicompiled/aurora-main/lib/gfx/common.cpp` (+ `common.hpp`): los tres anillos, `push_storage_cacheable`,
+  `anillo_cerrar_lote` (corrige `vtx_start` y sube lo nuevo una vez por lote) y la línea «anillo: …» del registro cada
+  600 cuadros. `lib/gx/command_processor.cpp`: los arreglos de `handle_draw_unmerged` pasan por `push_storage_cacheable`.
+  En git: `parches/aurora-web.diff` (rehecho).
+- `MKW_ANILLO` (la página: `?anillo=0` = como antes, `?anillo=verifica` = además comparar cada acierto con su huella
+  completa; `web/navegador/anillo.mjs` `envAnillo`, puesto en `mkw.mjs`). **Prendido por omisión.**
+- Banco `anillo` (15/15, sin el juego): una carrera de mentira de 600 cuadros (lo quieto se reusa, nada se pisa dentro
+  del lote, el tope por lote, las entradas grandes, la vuelta del anillo y la opción de la página).
+- La tanda: `bash herramientas/tanda-181.sh compilar medir verificar` (con el candado).
+
+**Medido** (tramo fijo §163, carrera directa de 12 CPU, semilla 1234; apagado y prendido intercalados, 2 vueltas; la gama
+baja = 8 núcleos y `&lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`):
+
+| | Este PC sin anillo | Este PC con anillo | Gama baja sin | Gama baja con |
+|---|---|---|---|---|
+| Subida por imagen (muestras del registro) | 1.161–1.442 KB | 470–529 KB (solo uniformes) | 619–1.359 KB | 164–405 KB (solo uniformes) |
+| Tarjeta por imagen | 0,20 / 0,24 ms | 0,19 / 0,19 ms | 3,22 / 3,06 ms | 2,95 / 2,70 ms (**−10 %**) |
+| CPU (trabajo por cuadro) | 6,76 / 6,85 ms | 6,91 / 6,66 ms | 7,22 / 7,28 ms | 7,11 / 6,29 ms |
+
+En una carrera, el anillo de vértices reusó ~590 MB y escribió ~14 MB (el 2,4 %, casi todo al cargar la pista); el de
+índices, 307 MB contra 0,24 MB; el de storage, 952 MB contra 0,83 MB. **Qué significa:** la tarjeta recibe un tercio
+de lo de antes (lo que queda son los uniformes, que cambian con la cámara en cada cuadro), la tarjeta de la gama baja
+trabaja un 10 % menos por imagen y la CPU queda igual dentro del ruido. La verificación (`?anillo=verifica`: cada acierto comparado con su huella completa, la misma carrera): **0 diferencias** con 629 MB de vértices, 341 MB de índices y 1.064 MB de storage reusados (calcular las huellas cuesta más o menos lo que se
+ahorra en copiar). La meta 2 del paso se cumple.
+
+**Lo que no se puede.** Los uniformes no se pueden reusar con provecho: cambian con la cámara en cada cuadro, y la fusión
+de dibujos de aurora ya junta los iguales. Una idea para más adelante: dibujar con «baseVertex» para no tener que
+corregir `vtx_start` en los uniformes.
+
+**Trampas.** Los objetos compilados de aurora los comparten todas las sesiones: mientras se medía, el anillo quedó
+apagado por omisión (`MKW_ANILLO=1|2` para prenderlo). `common.cpp` venía con finales de línea mezclados en una copia
+y Python no encontraba el texto: se normaliza antes de editar. Editar un `.sh` mientras bash lo está corriendo lo rompe
+(bash lo lee de a pedazos).
+
+**La aurora de la v0.9.3.** Pasado a `terceros/aurora-main-viejo-motor` cuando el paso 6 terminó su tanda de la FMA
+(si no, su comparación se mezclaba): commits locales `2a99260` (los anillos, apagados) y `5aa3fca` (prendidos tras la
+verificación); `common.cpp`/`common.hpp` siguen idénticos en las dos auroras (`herramientas/versiones.md`). Mientras se
+verificaba, el anillo quedó apagado por omisión en la aurora compartida (las otras sesiones compilan con ella); se
+prendió recién con la verificación en 0.
+
+### 181.2 N14: las funciones calientes — medido: no hay dónde reescribir de a una (la FMA del runtime, medida después en el juego, tampoco gana: §184)
+
+**La idea del plan.** Elegir las funciones del juego que más pesan, reescribirlas a mano en C++ (leyendo el código
+traducido para entender qué hacen, nunca copiándolo) y aceptar solo las que dan **exactamente** los mismos bits.
+
+**El comprobador** (`web/juego/caliente_nativo.cpp`, solo en un programa armado con `MKW_CALIENTE_COMPILAR=1`): el
+compilador renombra la traducida a `func_X_traducida` (`REEMPLAZOS` de `compilar-web.py`) y `func_X` elige según
+`MKW_CALIENTE`: 0 = la traducida, 1 = la nueva, 2 = las dos en cada llamada (el **comprobador diferencial**, ver
+Glosario): copia los registros, corre la traducida, guarda lo que dejó, repone, corre la nueva y compara todo el
+CpuContext y la memoria escrita; cada 997 llamadas, además, la huella de la memoria entera de la Wii. El juego sigue
+siempre con lo de la traducida. Tres funciones hoja de matrices: PSMTXConcat (`func_80199D64`), PSMTXMultVec
+(`func_8019A91C`) y una matriz 3×3 por vector (`func_80085AB0`).
+
+**Correctas.** Sobre la base vieja y sobre M1 (§182, `build/web-caliente-m1/node`), una carrera entera de 12 CPU:
+**0 diferencias** en 5,4 M llamadas de PSMTXConcat, 1,6 M de MultVec y 1,4 M de la 3×3 (150 comprobaciones de la
+memoria entera cada una).
+
+**Pero no ganan.** Lo que tarda cada llamada (medido dentro del comprobador): 77 → 73 ns (×1,04), 50 → 41 ns (×1,24) y
+66 → 63 ns (×1,04). En el cuadro, con el antes y el después intercalados (`medir-node-estable --fijo`, 6 vueltas):
+
+| | Mediana (ms por cuadro) | Contra la traducida |
+|---|---|---|
+| Traducida | 3,871 (±3,7 %) | — |
+| Nueva | 3,887 (±4,6 %) | ×1,010 |
+| Nueva con las ps_madds de a pares por SIMD (`MKW_CALIENTE_MADD=1`) | 3,835 (±2,9 %) | ×0,991 |
+
+Todo dentro del ruido. La versión SIMD da 0 diferencias pero cada llamada sale **más lenta** (77 → 89 ns): sacar y
+volver a meter cada mitad del par cuesta más que lo que ahorra. **No se adopta ninguna** (`MKW_CALIENTE` queda en 0 y el
+programa de siempre no las lleva).
+
+**Por qué: el perfil.** El perfil por funciones de la carrera sobre M1 (del paso 6,
+`build/web/datos/impuesto-perfil/m1-carrera-resumen.json`, 2.700 cuadros) dice que el impuesto del navegador está
+**repartido**: el juego traducido son 3,43 de los 4,80 ms por cuadro, en 1.886 funciones; la más pesada de todo el wasm
+es el 2,5 %, las 10 primeras el 15,7 %, las 50 el 34 %. Y todas pagan más o menos el mismo impuesto contra el programa
+de Windows. Una función reescrita en C++ y compilada a wasm con el mismo compilador paga ese mismo impuesto: solo gana
+donde el código traducido hace algo raro, y eso se ve como una razón mucho peor que la media. Hay dos:
+- `func_80199D64` (PSMTXConcat): 2,5 veces la media. Es la **FMA** emulada (abajo).
+- `func_8059A278`: 1,5 veces la media, 0,5 % del cuadro. Mirada en el traducido: una función corta de la física, sin
+  bucle, sin conversiones ni denormales; lo único que se nota es que al entrar guarda y repone f30/f31 con stores de
+  pares (`psq_st`), que pasan por el camino de los cuantizados. No da para una reescritura.
+
+Las que aparecían peor que todas en el perfil viejo (la reverberación del sonido, `AXFXReverbStdExpCallback`, ×36, y
+otras de 0x8012xxxx) son un error de la medida: en el programa de Windows el sonido corre en otro hilo y el muestreador
+solo cuenta el del juego. En el wasm el sonido sí corre en el hilo del juego (~0,5 % del cuadro o más): eso se ataca
+sacándolo del hilo (M9/N4, paso 9), no reescribiéndolo.
+
+> **Corrección (2026-10-31 16:50, después de §184).** La FMA «punto medio» que sigue **no se adoptó**: medida en el juego
+> por el paso 6 es exacta (la sala 75/75 huellas iguales) pero más lenta (Node ×1,018, Chrome este PC −2,8 %, gama baja
+> −7,5 % de cuadros de lógica/s). El 3× del banco era la función suelta; en el juego va copiada en línea en miles de
+> lugares con sus dos caminos, el programa crece y la caché de instrucciones del procesador (la memoria chiquita y rápida
+> donde espera el código que se va a correr) rinde peor. Así que N14 cierra sin ninguna ganancia y el criterio 7.1 del
+> plan («la CPU por cuadro más baja») queda **sin cumplir**: el impuesto está repartido y bajarlo es trabajo del motor
+> (pasos 6, 13 y 14).
+
+**La ganancia que parecía haber: la FMA «punto medio».** El juego hace todo su cálculo de física y matrices con «multiplicar
+y sumar» de un solo redondeo (ps_madd, fmadds). wasm no tiene esa instrucción y el runtime la imita exacta en software
+(`MkwWasmFmaf`: suma en double, recupera el error con TwoSum y redondea a impar). La idea nueva (banco `fma`,
+`fmaf_punto`): el producto de dos float cabe exacto en un double, así que s = a·b + c en double tiene UN solo redondeo, y
+bajarlo a float da el resultado correcto **salvo** que s caiga justo en un **punto medio** entre dos float (ver Glosario:
+doble redondeo) o fuera del rango normal; solo esos casos van por el camino largo. Medido en el banco: 0 diferencias
+contra musl en 30 M casos al azar, 10 M empates fabricados y 30 M pares; con operaciones sueltas (como una matriz)
+**3× más rápida** (5,2 → 1,5–2,0 ns). La primera prueba encadenaba las operaciones (cada una espera a la anterior) y ahí
+empatan: mide la latencia, no el flujo (ver Glosario). SIMD de a pares no le gana a la de a una (1,7–2,1 ns): para H9
+(paso 13), en la FMA SIMD no suma. Como es del runtime, la adopta y mide el paso 6 (`MKW_MOTOR_FMAF_PUNTO` en
+`mkw_motor.h`, la copia `terceros/Wiicompiled-motor-fma`; su paridad 28/0).
+
+**Cómo repetirlo.** `bash` con el candado: compilar `MKW_CALIENTE_COMPILAR=1 MKW_WIICOMPILED=terceros/Wiicompiled-motor
+MKW_AURORA=terceros/aurora-main-viejo-motor python herramientas/compilar-web.py --carpeta build/web-caliente-m1`;
+comprobar `MKW_CALIENTE=2 MKW_BUILD_NODE=build/web-caliente-m1/node node herramientas/medir-node-estable.mjs --corridas 1`;
+medir `node herramientas/medir-node-estable.mjs --fijo --corridas 6 --intercalar "traducida=…@MKW_CALIENTE=0,nueva=…@MKW_CALIENTE=1"`
+(`--intercalar` acepta ahora variables por programa: `nombre=ruta@VAR=v;VAR2=v`). La FMA: `node banco/correr.mjs fma`
+(9 puntos) o `node banco/pruebas/fma/prueba-node.mjs 40`.
+
+**Trampas.** El comprobador mide su propio tiempo: la nueva puede escribir encima de su entrada (PSMTXConcat con AB = A),
+así que antes de cada repetición se repone lo escrito; si las zonas se pisan con el marco de pila, se llama a la
+traducida («sin nueva»). Los números del perfil sobre M1 salen ~1,6× inflados para todas por igual (el nativo es de otra
+corrida): lo que vale es quién se aparta de la media, no la razón suelta.
+
+## 2026-10-31 · §182 M1 y M2 (paso 6): la memoria de la Wii más barata en wasm — se adopta (−7 % en Node, +5 % en la gama baja) · 11:30–13:40
+
+**Qué es.** Cada vez que el juego traducido lee o escribe la memoria de la Wii, wasm hace más pasos que el programa
+nativo. El perfil de N13 (§165) ponía arriba de todo, en la carrera, a `Memory::Write32` y `Memory::WriteFloat32`
+(~0,38 ms por cuadro que el nativo casi no gasta) y a la multiplicación de matrices del juego (`func_80199D64`, ×6 más
+lenta que en nativo). Tres arreglos, cada uno con su interruptor en `runtime/include/mkw_motor.h` (se apaga con
+`MKW_CFLAGS_EXTRA="-DMKW_MOTOR_<NOMBRE>=0"`):
+- **M1, `MKW_MOTOR_RANGOS`**: el traductor junta los accesos de una misma base en «rangos» (glosario), pero en wasm el
+  runtime no los resolvía nunca y cada acceso caía a la función fría. Ahora el rango se resuelve con la tabla de páginas
+  de 1 MiB (si no cruza de página ni toca código o E/S) y se usa el puntero directo; lo mismo los psq.
+- **M2, `MKW_MOTOR_EN_LINEA`**: el camino rápido de `Memory::Read*/Write*` metido dentro del código del juego (en
+  línea); lo raro (páginas con código, E/S, cruces de página) queda en una función aparte.
+- **`MKW_MOTOR_VUELTA64`**: dar vuelta 8 bytes (los pares de psq, `lfd`/`stfd`) con una sola mezcla de SIMD en vez de
+  ~22 operaciones con enteros (wasm no tiene la instrucción que da vuelta los bytes).
+
+Solo cambia **cómo** se llega al dato, nunca qué dato. Es como cambiar un multímetro que pasaba por un conmutador de
+escalas en cada medición por uno con la escala ya fija: la lectura es la misma, pero llega antes.
+
+**Dónde.** La copia `terceros/Wiicompiled-motor-m1` (commit `8165125`, `parches/motor-paso6-v093.diff`; solo cabeceras del
+runtime: usa la traducción de la v0.9.3 por enlaces `generated/` y `build/`); ya juntado en `terceros/Wiicompiled-motor`
+(rama `motor-n15`, la base del paso 6). La tanda: `bash herramientas/tanda-m1.sh compilar probar medir navegador
+equivalencia chrome` (candado común con la fila de §180; `M1_NOMBRE` + `MKW_CFLAGS_EXTRA` = una variante con algo apagado).
+
+**Correcto.**
+- Paridad (`MKW_WIICOMPILED='terceros\Wiicompiled-motor-m1' banco/pruebas/paridad/construir.ps1 -Motor`, después
+  `node banco/pruebas/paridad/prueba-node.mjs --motor`): **28 bien, 0 mal** (1.000.000 de casos × 28 operaciones, igual
+  bit por bit a x86, incluidas las lecturas y escrituras de 32 y 64 bits). Trampa: `construir.ps1` lanzado desde Git Bash
+  no encuentra las bibliotecas de g++ (error −1073741515 = «falta una DLL»); se corre desde PowerShell con
+  `C:\Strawberry\c\bin` en el PATH.
+- `prueba-arranque` 13/13 y la corrida entera llega a la carrera.
+- **La misma carrera en la sala**: `MKW_BUILD=build/web-m1/navegador node web/navegador/prueba-sincro.mjs --directa
+  --build-b=build/web-motor/navegador` (A con M1, B con la v0.9.3): **13 bien, 0 mal, 74 huellas iguales**.
+
+**Cuánto gana.**
+
+| Dónde | v0.9.3 | M1/M2 | Cambio |
+|---|---|---|---|
+| Node, tramo fijo, 6 pares intercalados (`--fijo`, partida limpia propia) | 4,075 ms/cuadro (±1,7 %) | 3,769 ms/cuadro (±5,4 %) | **×0,930** (de ×0,887 a ×0,980: los 6 pares más rápidos) |
+| Chrome, este PC, cuadros de lógica/s sin tope (3 vueltas) | 147,5 · 156,6 · 153,4 | 157,9 · 156,7 · 150,4 | +1,6 % (dentro del ruido) |
+| Chrome, gama baja simulada (lastre 7, ayuda 5, ladrón 64, tarjeta 15), 3 vueltas alternadas | 20,6 · 21,3 · 20,3 | 20,9 · 22,5 · 21,9 | **+5,2 %** (mejor en las 3 vueltas: +1,6, +5,8, +7,8 %) |
+
+Datos: `build/web/datos/node-estable/m1.json`, `build/web/datos/medir-sitio/m1-*` (nunca a git).
+
+**Qué significa.** En Node, donde se mide solo el juego, M1/M2 le saca el 7 % del trabajo. En Chrome el cuadro incluye
+también el dibujo (aurora y WebGPU), que no cambia, así que en este PC la ganancia se diluye en el ruido; en la gama baja
+simulada, donde el hilo del juego es el que frena, se ve: **+5 %**. Es lo que pedía la regla del dueño: medido en el peor
+caso y en este PC, nunca peor en ninguno. **Se adopta**: queda en la base del paso 6 (`terceros/Wiicompiled-motor`) y
+desde ahora las pasadas siguientes se comparan contra `build/web-m1` (no contra `build/web-motor`). Cuando la v0.9.3
+pase a ser el programa de la página (decisión del orquestador), M1/M2 va con ella; cada interruptor sigue apagable.
+
+**Lo que no se midió aparte.** Cuánto pone cada uno de los tres interruptores (se puede con `M1_NOMBRE=-sin-vuelta
+MKW_CFLAGS_EXTRA=-DMKW_MOTOR_VUELTA64=0 bash herramientas/tanda-m1.sh compilar medir`, etc.). Por el perfil, el siguiente
+paso es otro perfil por funciones del programa con M1 para ver qué quedó arriba y elegir con eso las pasadas de M8.
+
+### §179.1 G1: el dibujo recorta con lo que de verdad ve la cámara; la lógica sigue viendo «todo a la vista»
+
+**Qué pasaba.** En la sala, para que la carrera dé igual en todas las consolas, el juego marca todo como «a la vista y
+cerca» (§61, `ClipInfoMgr::Update` en `lockstep_nativo.cpp`): parte de la lógica actualiza menos lo que no se ve, y
+cada consola mira desde otro kart. El precio: también el **dibujo** creía que todo estaba a la vista y cerca, y
+dibujaba la pista entera con todo detalle, también lo que está detrás de la cámara.
+
+**Qué se hizo** (`web/juego/lockstep_nativo.cpp`; `?recorteDibujo=0` = como antes, `?recorteDibujo=modelos` = solo el
+primer paso):
+1. El gancho de `ClipInfoMgr::Update` guarda, antes de borrarlas, las marcas y distancias de verdad (las de la cámara
+   de esta consola) de cada ClipInfo (hasta 4096).
+2. Primer paso: las dos funciones que pasan las marcas a las opciones de dibujo de cada modelo
+   (`ModelDirector::SetAllScnOptionsFromClipInfo` 0x8055D448 y `SetDisableDrawScnOptionsFromClipInfo` 0x8055D554,
+   sacadas del C++ traducido: leen la ClipInfo del modelo en ModelDirector +0x44 y sus marcas en +0x20) ven las de
+   verdad mientras corren.
+3. El dibujo entero (§179.2, lo de siempre): `ScnMgr::DrawMain` (0x80564D60) corre después de la lógica del cuadro;
+   antes de empezar, cada ClipInfo vuelve a sus marcas y distancias de verdad, y al terminar otra vez «a la vista y
+   cerca». Así **todo** lo que las lee al dibujar (los modelos, el nivel de detalle por la distancia, los objetos de la
+   pista que miran su ClipInfo por su cuenta) recorta como fuera de la sala, sin tener que encontrarlos uno por uno, y
+   la lógica del cuadro siguiente ve lo mismo en todas las consolas.
+
+Como el alumbrado de un edificio con sensores: los sensores (la lógica) siguen leyendo «todas las luces prendidas»,
+igual en todos los pisos, pero las lámparas (el dibujo) solo se prenden donde hay alguien mirando.
+
+**Las pruebas** (`prueba-sincro.mjs --directa` con el programa `build/web-g1`, tandas `tanda-g1.sh`, `tanda-g1b.sh` y
+`tanda-g1c.sh`, intercaladas en la misma tanda): la carrera **igual** en todas (huellas 74–75 de 74–75 en las 11
+salas con el recorte —6 solo modelos y 5 dibujo entero— y en las 9 de comparación); el
+gancho corre (`mkwEstado.recortesDibujo()` ~1,33 millones de veces por carrera; `mkwEstado.dibujosEnteros()` ~2.300
+dibujos enteros); con `?recorteDibujo=0`, 0 (14/14).
+
+**Cuánto gana** (lo que trabaja el juego por cuadro en la carrera, pestaña A / B, ms):
+
+| | vuelta 1 | vuelta 2 | vuelta 3 |
+|---|---|---|---|
+| sin recorte (`?recorteDibujo=0`, como antes) | 9,7 / 8,6 · 9,8 / 8,6 | 9,6 / 8,6 · 10,2 / 9,8 | 9,7 / 8,0 |
+| solo modelos (`?recorteDibujo=modelos`) | 11,6 / 7,4 | 8,9 / 7,9 | 9,1 / 8,0 |
+| el dibujo entero (lo de siempre) | 9,1 / 8,1 · 9,1 / 7,5 | 9,1 / 7,7 · 9,3 / 8,2 | 9,0 / 8,0 |
+| **el techo**: sin «todo a la vista» (`?arreglos=0`; separaría la carrera, solo para saber cuánto cuesta el arreglo) | 8,8 / 6,8 | 10,3 / 8,3 | — |
+
+En este PC el recorte gana ~0,7 ms por cuadro (de ~9,8 a ~9,1 en A, de ~8,7 a ~7,9 en B) y llega al techo: sin el
+arreglo entero el juego trabaja lo mismo. El plan estimaba −4 a −5 ms porque usaba la medida de §85 (el dibujo
+2,1 → 6,4 ms con «todo a la vista»), de un programa de hace dos semanas; desde entonces el dibujo se abarató mucho
+(§140–§177) y hoy «todo a la vista» cuesta ~0,7–1 ms aquí. En el teléfono, donde frena la tarjeta (§115), lo que no se
+dibuja ahorra más; eso lo dirá la parte D de `docs/medir-oppo.md`.
+
+**Lo que no se tocó a propósito.** La lógica de la carrera sigue con «todo a la vista»: es la que tiene que dar igual
+en todas las consolas.
+
+## §180 La fila del candado, el banco relevo con reloj virtual y el retraso del relevado
+
+### §180 La fila (la hizo la orquestadora sobre mi §176)
+
+Con tres sesiones midiendo (paso 5, 6 y 7), quien miraba primero el candado ganaba, y una podía tomar tanda tras
+tanda. `herramientas/candado.sh` ahora:
+- `candado_tomar` saca **número** en `build/medicion.fila/` y toma el candado solo cuando su número es el más viejo
+  (como el número de una fila del banco); quien suelta y vuelve a pedir queda detrás de las que esperaban. Un número
+  que nadie renueva en 3 min es de una sesión que ya no espera.
+- `build/medicion.hueco` (un turno corto pedido) se adelanta a la fila.
+- `candado_hueco` cede el turno si hay otras esperando y yo ya llevo más de 45 min (`TURNO_MAX`).
+- Todas las tandas llaman a `candado_hueco` entre etapas.
+
+Una trampa que tuve: parar una tanda con la herramienta de tareas detenía el envoltorio pero no siempre el `bash` de la
+tanda, que siguió y volvió a tomar el candado (11:34). Hay que cortar el proceso del script mismo (su número de Git
+Bash), nunca uno de Windows.
+
+### §180.1 El banco relevo con reloj virtual
+
+**El problema.** Los casos del banco `relevo` corrían contra el reloj de pared: con el PC ocupado los temporizadores
+llegaban tarde, los ratos de 250 ms salían dudosos y algunos casos (el 1 y el 17) pasaban o fallaban según la carga.
+Alargarlos no lo arreglaba (el caso 17 ya se había alargado en §176).
+
+**Qué se hizo** (`banco/pruebas/relevo/index.html`; `?relojVirtual=0` = el reloj de verdad, como antes): la página
+tiene su propio reloj. `setTimeout`/`setInterval` van a una fila y el tiempo **salta** al próximo aviso, en vez de
+esperarlo; entre dos avisos se dejan terminar las promesas pendientes. `performance.now` y `Date.now` dan esa hora.
+La red de mentira (demora y pérdida) sale de una semilla fija (`?semillaRed=N` para otra). Es lo que hace un simulador
+de circuitos «por eventos»: no espera en tiempo real, calcula de un evento al siguiente; mismo circuito y misma
+entrada = misma salida, siempre.
+
+**Dos trampas que salieron al pasar al reloj virtual.**
+- El juego de mentira trabajaba 0 ms por cuadro: el freno de un cuadro de la sincronía (§80b) caía justo en la
+  casilla siguiente y no frenaba. Ahora cada cuadro trabaja 2 ms (`TRABAJO`), como el juego de verdad. Eso era lo que
+  dejaba a Carla 2 cuadros delante para siempre en el caso 17 (con el reloj de verdad, el temblor de los
+  temporizadores a veces lo tapaba).
+- El caso 1 («el retraso lo paga Dani») miraba el retraso en el último cuadro, que puede caer en una subida pasajera;
+  ahora mira el promedio desde el cuadro 300 (que es lo que dice la frase: quién lo paga).
+
+**Resultado.** El banco entero tarda **7 s** en vez de ~6 min, y da exactamente lo mismo cada vez: **54/54 tres veces
+seguidas**, y 53/53 con las semillas de red 5 y 9.
+
+### §180.2 El que pasa el papel no queda con el retraso por las nubes
+
+Con el reloj virtual el caso 1 mostró una cadena real del lockstep: Ana (la autoridad) sube su retraso por dos ratos
+justos, pasa el papel a Beto, Beto la releva (al menos 3 s) y los botones que pone por ella (inventados) le subían el
+retraso de a 2 por rato: 6 → 8 → 10 → 12. Mientras la relevan, esos inventados no dicen que lo de Ana llega tarde: la
+autoridad los escribe de todas formas. Ahora no cuentan (`lockstep.mjs`, `?calmaRelevado=0` = como antes). Banco
+`relevo` caso 1: Ana termina en 6 (con `?calmaRelevado=0`, en 12, el punto lo exige: así el interruptor se prueba solo).
+
+## 2026-10-31 · §184 La FMA «punto medio» en el juego (paso 6): no se adopta — más lenta en Node, en Chrome y en la gama baja · 14:30–16:45
+
+**Qué es.** La idea de paso 7 (§181.2, banco `fma`): la «multiplicar y sumar de un solo redondeo» que el juego usa en
+toda su física (`ps_madd`, `fmadds`) se puede hacer casi siempre con una suma en double y bajarla a float, y dejar el
+camino exacto de siempre (TwoSum + redondeo a impar, `MkwWasmFmaf`) solo para el caso raro del **punto medio** (Glosario:
+doble redondeo) o fuera del rango normal. En el banco, con operaciones sueltas, era 3× más rápida. Va en el runtime:
+`MKW_MOTOR_FMAF_PUNTO` en `runtime/include/mkw_motor.h` (1 en wasm), copia `terceros/Wiicompiled-motor-fma`
+(rama motor-fma, 7c465ab, encima de M1 = 8165125). Se comparó contra M1 ya adoptado (`build/web-m1`).
+
+**Comando.** `M1_WC=terceros/Wiicompiled-motor-fma M1_NOMBRE=-fma M1_BASE=build/web-m1 bash herramientas/tanda-m1.sh
+compilar probar medir navegador equivalencia chrome` (→ `build/web/datos/m1/tanda-fma.log`) y, porque la 1.ª vuelta de
+Node chocó con una compilación mía (abajo, trampas), el tramo de Node otra vez entero: `node herramientas/medir-node-estable.mjs
+--fijo --corridas 6 --tope-min 12 --etiqueta m1-fma-repite --intercalar antes=build/web-m1/node,despues=build/web-m1-fma/node`
+(→ `build/web/datos/m1/fma-repite.log`, `build/web/datos/node-estable/m1-fma-repite.json`).
+
+**Resultado.**
+
+| | M1 | M1 + FMA punto medio | cambio |
+|---|---|---|---|
+| Correcto: prueba-arranque | 13/13 | 13/13 | — |
+| Correcto: la sala con un programa en cada consola (prueba-sincro --build-b) | — | huellas 75/75 iguales, 14/14 | la misma carrera |
+| Node, tramo fijo, 6 pares intercalados (la repetición) | 4,060 ms/cuadro | 4,102 | **×1,018** (de ×0,94 a ×1,03) |
+| Chrome, este PC, 3 vueltas (cuadros de lógica/s) | 157,0 | 152,6 | **−2,8 %** |
+| Chrome, gama baja simulada, 3 vueltas (lógica/s) | 22,45 | 20,76 | **−7,5 %** |
+| ídem, trabajo por cuadro (ms) | 6,39 | 6,91 | +8 % |
+
+Es exacta (la misma carrera bit a bit en la sala), pero **más lenta en las tres medidas**: no se adopta, y por lo tanto
+no cuenta para H8 (paso 13). El interruptor queda en 0 para todos: `MKW_MOTOR_FMAF_PUNTO` sigue solo en la copia
+motor-fma, no entra en `terceros/Wiicompiled-motor`.
+
+**Por qué el banco decía 3× y el juego dice −3 a −8 %.** El camino exacto de antes ya era corto: una multiplicación y
+una suma en double, cuatro restas para el error y, casi siempre, ajustar un bit. El «punto medio» ahorra parte de eso,
+pero agrega leer los bits del resultado, dos comparaciones y un salto; y como la función se copia **en línea** en cada
+lugar del código del juego que hace una FMA (miles), ahora cada copia lleva los dos caminos enteros (el corto y,
+detrás, el de siempre para el caso raro). El código del juego crece y rinde peor en la caché de instrucciones (Glosario).
+El banco medía una sola función caliente que entra entera en esa caché: ahí no se ve. Es la lección de M8 (§178) al revés:
+lo que se mide suelto no dice cuánto gana en el programa entero; solo la medida en el juego decide.
+
+**Trampas.**
+- **Dos tandas mías con el mismo nombre se creyeron dueñas del mismo candado.** `tanda-m1.sh` reconoce «el candado ya es
+  mío» buscando su nombre (`paso6-M1 (local_…)`) en `build/medicion.lock`; la tanda de memo (otra variante, el mismo
+  script) arrancó a compilar mientras la del FMA medía la 1.ª vuelta de Node (antes 7,1 ms en vez de 3,9). Se detuvo esa
+  tanda (solo sus procesos), se repitió la medida entera de Node y ahora el nombre lleva la variante:
+  `paso6-M1${M1_NOMBRE}` y `paso6-M8-${M8_NOMBRE:-$M8}`. La vuelta chocada no se cuenta.
+- **Los anillos de paso 7 (§181) se prendieron por omisión durante esta tanda**: la fase de Chrome de `tanda-m1.sh`
+  pasa ahora `&anillo=0` (`M1_CHROME_EXTRA`), así la variante y la base (de antes de los anillos) miden igual.
+- **La espera del candado**: con tres sesiones en la fila una tanda esperó más de 90 min y se cortó (`sin turno en
+  5400 s`); ahora espera hasta 6 h (`CANDADO_ESPERA`).
+
+**Los fantasmas iguales** (`web/navegador/prueba-fantasma-igual.mjs`, la Contrarreloj contra el fantasma experto, dos
+programas cuadro por cuadro): la primera versión falló **también con el mismo programa contra sí mismo** (M1 contra M1):
+una palabra de la ficha de cada corredor cambia de una corrida a otra (2 / 0x10 en el jugador, 4 / 0x400 en el
+fantasma), siempre la misma en toda la carrera. No es la física (todo lo demás coincide, y el fantasma cruza la meta en el
+cuadro 2242 en las dos), pero hay que saber qué campo es antes de ignorarlo: la prueba ahora guarda el desplazamiento de
+cada palabra, imprime cuáles se separan y acepta `--ignorar 0x…`.
+
+### §184.1 Los fantasmas iguales: qué eran las dos palabras, y M1 pasa
+
+**Qué se separaba.** Con los desplazamientos impresos: **+0x4 y +0x4c** de la ficha (`RaceinfoPlayer`, 0x54 bytes), las
+dos con el mismo valor, siempre una potencia de dos (0x40 / 0x400 el jugador, 8 / 4 el fantasma), fija durante toda la
+carrera y distinta en cada corrida, aun con el mismo programa.
+
+**Qué son (decompilado, regla del dueño).** El constructor de la ficha es `func_80533ED8` (pone la tabla virtual
+0x808B34A4 en +0x0): escribe +0x0, +0x8 (el número del corredor), +0xA, +0xC a +0x20, +0x24 a +0x28, +0x38, +0x3C, +0x40,
++0x44 y +0x48 (el mando, `PadProxy`), **y nunca +0x4 ni +0x4c**. mkw-sp los tiene como relleno sin nombre
+(`RaceManager.hh`: `_00[8]` y `_4c[8]`). Lo que se lee ahí es lo que quedó en esa memoria de un uso anterior (el montón
+del juego no se limpia al pedirlo), y eso depende de lo que hizo la página antes de la carrera: no es la física. Como
+comprobar un tablero midiendo también los bornes libres: lo que marquen no dice nada del circuito.
+
+**Resultado** (`--ignorar 0x4,0x4c`, ahora lo de siempre de la prueba):
+
+| | cuadros comparados | fantasma | jugador | meta |
+|---|---|---|---|---|
+| M1 contra M1 | 2.115 | iguales | iguales | cuadro 2242 las dos, la misma ficha |
+| M1 contra la v0.9.3 (`build/web-motor`) | 2.113 | iguales | iguales | cuadro 2242 las dos, la misma ficha |
+
+6/6 las dos: **M1 y M2 (§182) también dejan al fantasma igual cuadro por cuadro**. Comando:
+`MKW_BUILD=build/web-m1/navegador node web/navegador/prueba-fantasma-igual.mjs --build-b=build/web-motor/navegador`
+(→ `build/web/datos/fantasma-igual/`; nunca a git: las fichas son memoria del juego). A la FMA «punto medio» no se le
+corrió: no se adopta por lenta (arriba).
+
+## 2026-10-31 · §191 R1: el árbitro, como opción (`?arbitro=1`): la traba de uno ya no frena a los demás
+
+(Paso 11 del plan de rendimiento, la sala asíncrona. Primero se iba a llamar §183, pero ese número y el §184 ya los
+usaba el paso 6.)
+
+**El problema.** En la sala de siempre (el «lockstep», §61), cada consola espera los botones de **todas** antes de correr
+un cuadro. Si una pestaña se traba 1,5 s, las demás la esperan. El relevo rápido (§99) la pausa a los ~150 ms, pero la
+pausa se decide en dos fases y en ese rato todas quedan quietas: en `prueba-relevo --trabas=8`, A esperó una mediana de
+**310 ms** por traba (de 58 a 409 ms).
+
+**La idea (R1).** Una sola consola, la **autoridad**, escribe en su paquete los botones de **todos** en cada cuadro: los
+que le llegaron a tiempo y, si no llegaron, uno inventado (el último que tenía, como ya hacía el relevo). Las demás
+esperan **solo el paquete de ella**. La que se traba no frena a nadie: la autoridad sigue escribiendo por ella, y al
+despertar se pone al día (§99, C3). Cada consola manda lo suyo solo a la autoridad, al **suplente** (el que toma el
+papel si la autoridad se calla) y a quien decide su corte. Comparación eléctrica: en vez de que cada equipo se
+sincronice con cada vecino (una malla de 11 relojes), todos toman la hora de un reloj maestro.
+
+**Cómo se usa.** `?arbitro=1` en la dirección de la página (lo tienen que llevar todas las de la sala). Por omisión está
+apagado: la sala de siempre no cambió en nada (banco `relevo` 59/59 y `lockstep` 59/59 sin la marca).
+
+**Lo que hizo falta para que funcione** (cada cosa salió de una falla del banco o del juego):
+1. **La sincronía contra la autoridad sola.** Sin nadie que frene a la autoridad, quien iba un poco adelantado la
+   esperaba en cada cuadro; eso la hacía ver «justa», ella subía su retraso, y entonces lo de todos le llegaba tarde y lo
+   inventaba (el banco llegó a 12 cuadros de retraso). Ahora cada uno mide cuánto va delante de la autoridad en el último
+   rato (`delanteAutoridad`, su cuadro menos el de ella cuando mandó su paquete), se frena si va más de un cuadro
+   delante y se pone al día si va atrás. La espera de quien va adelantado no se le carga a la autoridad.
+2. **El suplente escribe un registro de reserva y manda lo suyo a todos.** Si la autoridad se corta, el papel pasa al
+   suplente justo en ese cuadro. Pero los cuadros que el suplente ya había escrito como «no autoridad» no traían los
+   botones de los demás, y nadie más los tenía: Carla cortaba a Beto. Ahora el suplente escribe siempre ese registro (no
+   lo usa nadie mientras la autoridad contesta).
+3. **El traspaso voluntario rige 16 cuadros después del aviso** (`LEAD_TRASPASO` = retraso máximo + 4), para que todos
+   alcancen a mandarle lo suyo a la nueva autoridad.
+4. **La autoridad lenta pasa el papel:** si en un rato corrió menos del 90 % de lo que debía (su CPU no da 60), cuenta
+   como un rato malo (`autoridadLenta`).
+5. **La autoridad aislada se detiene:** si no oye a nadie hace 1 s, la cortada es ella; antes seguía sola inventando a
+   todos y cortaba a la sala entera. Se mira si se los oye, no sus cuadros: un jugador lento que va atrás pero sigue
+   mandando no la frena (eso es justamente lo que se busca).
+6. **Al callado no se lo pausa** (nadie lo espera: la autoridad escribe lo suyo de todas formas) y se lo corta recién a
+   los 20 s, el plazo de la pausa. Al que cerró la pestaña (§100, «se fue»), en 1 s.
+7. **La que despierta de una traba no corta a nadie** por silencio durante 250 ms: los mensajes de los demás estaban en
+   la cola (como §101 hace con las esperas).
+8. «Holgura de sobra» desde 2 cuadros, no 3: lo de cada uno da dos saltos (a la autoridad y de ella a todos).
+
+**Banco** (`node banco/correr.mjs "relevo?solo=22"`, reloj virtual, 4 consolas, Dani se traba entero 400 ms cada 150
+cuadros):
+
+| | sin árbitro | con árbitro |
+|---|---|---|
+| Ana, Beto y Carla esperan desde el cuadro 300 | 1350 / 1357 / 1362 ms | **0 / 0 / 0 ms** |
+| su ritmo | 90 % | **100 %** |
+| paquetes de botones de Carla + Dani (ni autoridad ni suplente) | 9000 | **6010** (2/3) |
+| retraso final Ana / Beto / Carla / Dani | 2 / 3 / 3 / 3 | 4 / 6 / 5 / 7 |
+| la misma carrera en las cuatro | sí | sí |
+
+5/5, también con `relevo?solo=22&arbitro=1` (el punto prueba que la marca de la dirección prende). Con `?arbitro=1` en
+el banco relevo entero fallan 21 de 59: son los casos que exigen esperas o pausas que con el árbitro ya no hay; los tres
+problemas de verdad que mostró esa corrida son los puntos 4, 5 y 7 de arriba (el caso 10, la autoridad sin conexión 3 s,
+pasa).
+
+**Con el juego** (`build/web/datos/tanda-r1.sh` y `tanda-r1b.sh`, tres pestañas en este PC):
+
+| | sin árbitro | con árbitro |
+|---|---|---|
+| `prueba-relevo --trabas=8`: lo que esperó A en 8 trabas de 1,5 s | 58–409 ms (mediana **310**) | **0 ms** las ocho |
+| …C (la de la red mala) | mediana 390 ms | mediana 31 ms |
+| traba de 3 s en B | se la pausa y vuelve | nadie la corta ni la espera |
+| retraso de B (red buena), promedio | 4,7 | **8,2** |
+| `prueba-sincro --directa --lento` (B a ~45 cuadros/s) | A espera a B: la sala va a 49–53 | A no espera (0 ms): A a 60, B sola atrás |
+| `prueba-doce --n 6`: paquetes de botones por segundo | 300 cada una | 120 (los 4 que no son autoridad ni suplente), 300 la autoridad |
+| la misma carrera (huellas) | sí | sí (150, 55, 175 iguales) |
+
+**El precio, medido.** Lo de cada uno da dos saltos y la autoridad tiene que decidir antes de que lo necesiten los
+demás: los que no son autoridad quedan con **3–5 cuadros más de retraso** que en la sala de siempre (el plan estimaba
+1–2). Es decir, el kart responde ~60–80 ms más tarde. Y el que no da 60 cuadros por segundo no frena a nadie, pero queda
+atrás solo: su kart lo maneja la autoridad con sus botones viejos (que se sueltan de a poco), como dice el plan («queda
+fuera de la carrera»). Por eso queda como **opción**: decidir si va por omisión es de la sesión de prueba con el PC y el
+Oppo (paso 11 del plan).
+
+**Para probar.** Banco `relevo` 59 (caso 22 = el árbitro; `relevo?arbitro=1` = todo el banco con él, informativo).
+`prueba-relevo --trabas=8 --extra=&arbitro=1` y `prueba-sincro --directa --lento --extra=&arbitro=1` (las dos piden lo
+que corresponde con el árbitro: nadie espera ni pausa); `prueba-doce --n 6 --extra "&arbitro=1"` (ahora imprime la espera,
+los paquetes por segundo y el retraso de cada pestaña); `prueba-relevo` imprime los paquetes de botones por segundo.
+
+**Repetido con el programa de §192** (`tanda-r2.sh`, `tanda-r2b.sh`): `prueba-sincro --directa --lento
+--extra=&arbitro=1` 13/13; `prueba-relevo --trabas=8 --extra=&arbitro=1` 10/10 dos veces y 9/10 una (A esperó 0 ms
+en las 24 trabas; la que falló fue C, la de la red mala, que en esa corrida esperó hasta 460 ms y el punto le pide menos
+de 400: la red mala de mentira varía entre corridas; las otras dos, mediana 44 y 0 ms). **¿Era de verdad?** Se buscó con tres
+corridas más (`tanda-r1c.sh`, con `&esperasLog=250`: cada espera de C de más de 250 ms se anota con lo que le faltaba):
+10/10 las tres seguidas, ninguna espera suelta de C pasó de 250 ms (las cifras de C son la suma de las esperas del
+rato: 239, 139 y 70 ms como mucho). En cinco corridas seguidas no se repitió, así que el límite de 400 ms no se toca. El
+9/10 fue la primera corrida tras la compilación, con otras sesiones trabajando en el PC: lo más probable es que C, con la
+red de mentira de 70 ms y 5 % perdido, cayera en una racha de paquetes perdidos de A mientras el PC estaba cargado. Si
+vuelve a pasar, el registro trae la línea «espero N ms el cuadro…» con lo que faltaba.
+
+**Trampa (otra vez).** Un reemplazo hecho con un script de Python dentro de un heredoc de bash se comió la `\b` de dos
+expresiones regulares (`/[?&]arbitro=1\b/` quedó con un carácter de retroceso). Se buscó el byte 0x08 en cada archivo
+tocado y se arregló con un script aparte (`String.raw`).
+
+## §192 — R2 (paso 11): saltarse el dibujo de un cuadro sin cambiar la carrera
+
+**Qué es y para qué.** El plan (R2) pide «simular a 60 aunque se dibuje menos»: si un aparato no alcanza a dibujar 60
+imágenes por segundo, que al menos la carrera (la lógica) siga a 60 y se dibuje una de cada dos. El paso 7 lo necesita
+para N8. Esta parte es solo el interruptor dentro del juego: decir «el cuadro siguiente no lo dibujes» y saber después si
+ese cuadro se saltó. Qué hacer con eso (no mandarlo a la pantalla, elegir cuándo) es de N8.
+
+**Cómo se partió el dibujo.** Leyendo el C++ traducido: `ScnMgr::DrawMain` (0x80564D60, el que dibuja la escena 3D)
+hace cuatro cosas: las luces, la lista de dibujos (una llamada indirecta por cada cosa de la escena), `DoneDraw` y, si la
+escena tiene la marca 1 en +0x44, `ScnMgr::SwitchScnRoot` (0x805635E4). Y esta última **no es dibujo**: adentro llama a
+`ModelDirector::Update` (0x8055D23C), que es lo que la lógica lee (qué modelos están a la vista, la animación). Saltarse
+DrawMain entero cambiaría la carrera. Por eso, en un cuadro saltado, la envoltura de DrawMain (`lockstep_nativo.cpp`)
+corre **solo** SwitchScnRoot, como lo haría DrawMain, y nada de lo demás. Así la tarjeta no recibe la escena 3D, y la
+lógica ve lo mismo que siempre.
+
+**Cuándo se decide.** Al principio de cada vuelta del bucle del juego (`RKSystem::Run`, el gancho de RR
+`rr_kamek_81806568`, cuando r25 ≠ 0) se «engancha» el pedido: lo que pidió la página vale para ese cuadro entero
+(`fijarSalto`), como un biestable que toma el dato en el flanco del reloj y no cambia hasta el siguiente.
+
+**Lo que queda a la vista** (todo apagado por omisión):
+
+| nombre | qué hace |
+|---|---|
+| `_mkw_dibujo_saltar(1 o 0)` | el cuadro siguiente se salta (1) o no (0); vale para ese cuadro solo |
+| `_mkw_dibujo_patron(n)` | saltar n−1 de cada n cuadros solo (2 = uno sí, uno no); 0 = nada |
+| `_mkw_dibujo_modo(m)` | 2 = el juego no arma la escena 3D (por omisión); 1 = solo la marca, el juego dibuja igual |
+| `_mkw_dibujo_este_saltado()` | 1 si el cuadro que corre ahora es uno saltado (para que aurora no lo presente) |
+| `_mkw_dibujos_saltados()` / `_mkw_dibujos_saltados_juego()` | cuántos se marcaron / cuántos no armó el juego |
+| `?saltarDibujo=N`, `?saltarDibujoModo=1` | lo mismo desde la página (`mkw.mjs`); `mkwEstado.dibujosSaltados()` = {total, juego} |
+
+**Resultado** (`build/web/datos/tanda-r2.sh`, programa `build/web-r2`, este PC; la sala de dos con la carrera directa,
+solo B salta):
+
+| B con | dibujos que B se saltó (el juego) | huellas A = B | puntos |
+|---|---|---|---|
+| `saltarDibujo=2` | 1179 (1138) | 75 = 75 | 15/15 |
+| `saltarDibujo=3` | 808 (781) | 75 = 75 | 15/15 |
+| `saltarDibujo=2&saltarDibujoModo=1` | 1193 (0) | 75 = 75 | 15/15 |
+| `saltarDibujo=2` otra vez | 1200 (1159) | 74 = 74 | 14/15 (ver la trampa) |
+| Contrarreloj con `saltarDibujo=2` (`prueba-fantasma`) | — | el fantasma grabado y el de la página, iguales byte por byte | 10/10 |
+
+Es decir: **la misma carrera** saltándose la mitad o dos tercios de los dibujos, y la grabación de la Contrarreloj (que
+guarda lo que hizo el kart cuadro por cuadro) queda igual.
+
+**No se mide el tiempo ganado aquí, a propósito.** Solo, esto no ahorra nada que se vea: aurora todavía presenta el
+cuadro saltado (sin la escena 3D) y la pantalla parpadea. Lo que se gana (el trabajo de la tarjeta y del dibujo en la CPU
+de esos cuadros) se mide con N8, cuando aurora deje de presentar los cuadros saltados; medirlo antes daría un número que
+nadie va a usar.
+
+**Trampa.** En la 4.ª corrida falló «en la foto se ve UNA vista»: la foto de B salió vacía (costura 0, típico 0) porque
+cayó justo en un cuadro saltado, que hoy se presenta sin la escena 3D. No es la carrera (las huellas son iguales): es lo
+del párrafo de arriba, y desaparece cuando N8 no presente esos cuadros. `prueba-sincro` tiene ahora el punto
+«§192 R2: B se saltó dibujos y la carrera es la misma» cuando `--extra-b` lleva `saltarDibujo`.
+
+**Para probar.** `node web/navegador/prueba-sincro.mjs --directa --extra-b=&saltarDibujo=2` (15) y
+`node web/navegador/prueba-fantasma.mjs --extra=&saltarDibujo=2` (10, ahora acepta `--extra=`).
+
+## 2026-10-31 · §193 M8, las otras pasadas del traductor (paso 6): hojas en línea, memo de indirectas y banderas — ninguna se adopta todavía · 14:00–20:20
+
+**Qué es M8.** El traductor convierte cada función del juego en C++. M8 son «pasadas propias»: cambios a cómo el
+traductor escribe ese C++, para que el programa haga menos trabajo por cuadro sin cambiar lo que calcula. La §178
+midió la primera (no releer r14–r31). Aquí van las otras tres que pidió el plan: **más hojas en línea**, **más
+llamadas que se resuelven directo** (la memo de las indirectas) y **banderas solo cuando alguien las lee**. Cada una
+tiene su copia del traductor en `terceros/` y su parche en `parches/`, y se midió como todo el paso 6: Node intercalado
+contra M1 (`build/web-m1`), Chrome en este PC y en la gama baja simulada (tramo fijo, §163), y la prueba de que no
+cambia el juego (la huella de la sala con un programa en cada consola y los fantasmas iguales).
+
+### Hojas en línea al doble — no se adopta
+
+Una **hoja** es una función que no llama a nadie (una «rama final del árbol»). Copiarla dentro de quien la llama
+(«en línea») ahorra el salto, pero agranda el código. El traductor ya lo hace con límites (56 instrucciones, que el
+llamador no crezca más del 50 %…). La copia `terceros/Wiicompiled-motor-hojas` (parche `parches/traductor-m8-hojas.diff`)
+lee esos límites de variables (`MKW_HOJAS_INSTR`, `_CRECE`, `_MINIMO`, `_BLOQUES`, `_ACICLICOS`) y se probó con el
+doble: 27.919 lugares en línea en vez de 24.829.
+
+| Medida | M1 | Hojas al doble |
+|---|---|---|
+| Node (tramo fijo, intercalado) | 1 | ×0,9995 (ruido) |
+| Chrome este PC, cuadros de lógica/s | 155,5 | 154,7 (−0,5 %) |
+| Gama baja, cuadros de lógica/s | 20,59 | 19,35 (**−6,0 %**; trabajo 6,96 → 7,41 ms) |
+| La sala, huellas iguales | — | 75/75 |
+
+Lo mismo que la FMA (§184): más copias en línea = más código = la caché de instrucciones (glosario) se llena, y en la
+gama baja, donde esa caché es lo que más falta, pierde.
+
+### La memo de las llamadas indirectas al cuádruple — no se adopta
+
+Una **llamada indirecta** es «llamá a la función cuya dirección está en este registro» (las funciones virtuales de
+C++). El runtime guarda las últimas 512 direcciones resueltas en una tablita (la memo) para no buscarlas cada vez. La
+copia `terceros/Wiicompiled-motor-memo` (`parches/motor-m8-memo.diff`, `MKW_MOTOR_MEMO_INDIRECTA`) la lleva a 2048
+casillas en wasm. Node: ×0,993 con vueltas entre 0,92 y 1,04 → dentro del ruido. La memo de 512 ya acierta casi
+siempre: el costo de las indirectas (§166: 13 → 26 ns) está en el salto mismo, no en buscar la dirección.
+
+### Banderas solo cuando alguien las lee — el techo rompe la sala; el modo seguro aún no gana
+
+**Qué son las banderas.** El procesador de la Wii tiene un registro de condiciones, el **CR**, con 8 campos de 4 bits
+(cr0…cr7): ahí quedan los resultados de las comparaciones («fue menor», «fue igual») que después deciden los saltos.
+El C++ traducido lleva el CR en una variable local rápida y, antes de cada llamada y al volver, lo **guarda entero** en
+la memoria (`ctx->cr = cr;`), por si la otra función lo mira. La regla de la Wii (la «ABI») dice que cr0, cr1 y cr5–cr7
+son **volátiles** (cualquiera puede pisarlos: nadie debería esperar que sobrevivan a una llamada) y cr2–cr4 no. Si se
+guardara solo lo que alguien de verdad lee, serían menos escrituras. Comparación eléctrica: en vez de registrar las 8
+señales del tablero cada vez que se pasa la llave, registrar solo las que algún aparato aguas abajo mira.
+
+**El techo** (`MKW_BANDERAS=techo`, la copia `terceros/Wiicompiled-motor-banderas`): confiar en la regla y guardar solo
+cr1–cr4. Node ×0,8825 (12 % más rápido): ese es **el máximo posible** de esta pasada. Pero **la sala se separa en el
+cuadro 270** (los karts 2–11 y el azar): alguna función del juego o de Retro Rewind **no cumple la regla** (lee al
+volver un campo volátil que dejó la otra; uno conocido es nuestra `lockstep_nativo.cpp:309`, que devuelve su resultado
+en cr0). El techo queda solo como medida del máximo.
+
+**El modo seguro** (`MKW_BANDERAS=seguro`, la copia `terceros/Wiicompiled-motor-seguro`, parche
+`parches/traductor-m8-banderas.diff`): no supone la regla, la **comprueba en todo el programa**. Un análisis de
+vivacidad (glosario: Vivacidad de las banderas) recorre cada función hacia atrás y anota, para cada llamada, qué
+campos se leen después; con eso:
+- antes de cada llamada directa se guardan solo los campos que la llamada lee al entrar + los que esta función lee
+  después (92.726 guardados con máscara en todo el programa);
+- al volver, una función guarda solo cr2–cr4 si **nadie** de los que la llaman lee un campo volátil después (un «punto
+  fijo» de todo el programa: si F devuelve todo, las llamadas de adentro de F pueden volverse vivas; se itera hasta que
+  no cambia);
+- el código de Retro Rewind se traduce en otra pasada: anota a quién llama y qué lee después en
+  `build/mkw-banderas-desde-mod.txt`, que la pasada del juego base lee en la traducción siguiente (por eso se traduce
+  dos veces).
+
+Medido: Node mediana **×0,9928** (de ×0,96 a ×1,10): nada. **Por qué:** los retornos nunca se enmascararon. El análisis
+dice «una llamada indirecta lee lo que dejó la función: sí», y si una indirecta lee, cualquier función puede ser su
+destino y todas tienen que devolver todo. Ya en la primera traducción (sin el archivo del mod) salió «sí»; con él,
+13.471 funciones devuelven todo (4.695 por el mod).
+
+**La causa, encontrada al final (20:10), sin arreglar todavía.** El analizador original de WiiCompiled
+(`GuestFlagLivenessAnalyzer.Reads`) supone que **una llamada indirecta lee todo el CR** al entrar (no sabe a quién
+llama). Entonces en `bctrl` (indirecta) … `cmpwi` (pisa cr0) … `bctrl` (otra indirecta), la segunda «lee» cr1 y
+cr5–cr7, y eso hace que la primera parezca leída después: los campos que aparecen son justo 0xE2 = cr1, cr5, cr6, cr7
+(sin cr0, que el `cmpwi` pisó). Es una lectura de mentira por no saber, no una función que rompa la regla. Además el
+código del mod se analizó con «quien me llama lee todo al volver», demasiado prudente.
+
+**Lo que falta para cerrar las banderas** (lo deja esta sesión por el tope de uso semanal del dueño):
+1. Que una llamada indirecta lea al entrar solo la **unión de lo que cualquier función lee al entrar**
+   (`CrReadBeforeWriteMask` de todos los contratos, base y mod; se espera cr1, el aviso de las funciones con argumentos
+   variables), solo dentro de este análisis (el resto del traductor no cambia).
+2. Que el código del mod salga con «quien me llama lee solo cr2–cr4 + lo que se lee tras llamar a una función
+   enganchada», iterado entre las dos pasadas hasta que los dos archivos no cambien.
+3. Mirar las indirectas que **de verdad** leen (si quedan) y, si son de Retro Rewind, arreglarlas con un gancho propio
+   (el dueño lo autoriza, sin copiar archivos de RR); `lockstep_nativo.cpp:309` a la lista de los que leen.
+4. Traducir (dos veces, bajo el candado), Node contra M1, y si gana: la sala (huella contra `build/web-m1`), los
+   fantasmas iguales, Chrome en este PC y la gama baja. El techo dice que lo máximo es un 12 % en Node.
+
+### Para repetir
+
+- Cada variante con `M8=<modo>` en `bash herramientas/tanda-m8.sh traducir compilar probar medir` (la copia la elige
+  `M8_WC`, la base `M8_BASE`, el nombre `M8_NOMBRE`; las hojas con las variables `MKW_HOJAS_*`; el log de cada tanda en
+  `build/web/datos/m8/tanda-<nombre>.log`).
+- Las banderas: `MKW_BANDERAS=techo|seguro` al traducir, `MKW_BANDERAS_MOD=0` = el código del mod sin máscara,
+  `MKW_BANDERAS_EXCLUIR=0x…,…` = funciones que devuelven todo igual; deja `build/mkw-banderas-lectores.txt` (quién lee
+  qué al volver) y `build/mkw-banderas-desde-mod.txt`.
+- La memo: `MKW_CFLAGS_EXTRA="-DMKW_MOTOR_MEMO_INDIRECTA=N"` (potencia de 2) con la copia `-memo`.
+
+**Trampas.** El techo «gana» un 12 % pero cambia el juego: nunca medir una pasada de banderas sin la huella de la sala.
+La lista de lectores de la segunda traducción no sirve para diagnosticar (con «indirecta = sí» todo sale vivo): mirar
+la de la primera.
+
+## 2026-10-31 · §190 El paso 15, lo que alcanzó a hacerse: el ahorro de energía y el calor (E1, E2), las texturas comprimidas (G6) y el ubershader medido (G4) · 16:30–21:40
+
+El paso 15 del plan de rendimiento (texturas, interpolación y calor) lo pidió la orquestadora; el dueño lo cortó a la
+mitad (no lo había pedido él): G6 se terminó porque estaba andando, **N8 (la interpolación) no se hizo** —R2, lo que
+necesitaba, lo dejó listo N13 en §192— y nada más se empezó. Todo lo de esta sección queda **apagado por omisión**: el
+juego de siempre no cambia.
+
+### 190.1 E1 y E2: avisar por qué no va a 60 (el ahorro de energía y el calor)
+
+**El problema.** Dos cosas bajan los cuadros sin que el juego tenga la culpa, y la página no puede preguntarlas:
+- **El ahorro de energía de Chrome** (ver Glosario): con el portátil a batería o la batería baja, Chrome refresca la
+  página a 30 por segundo. El juego se ve a 30 y la persona cree que el juego anda mal.
+- **El calor del teléfono** (estrangulamiento térmico, ver Glosario): después de unos minutos el procesador baja su
+  reloj; el mismo cuadro tarda más. Android no tiene la «Compute Pressure» de Chrome que lo diría.
+
+**Qué se hizo.** `web/navegador/energia.mjs` (nuevo, sin nada del juego): dos «vigías» que la página alimenta una vez
+por segundo con lo que ya mide (el período de la pantalla que calcula el reloj del monitor, §143, y los ms de trabajo del
+juego por cuadro del medidor). Solo avisan, en la esquina (`ui.chip`):
+- `crearVigiaAhorro`: si los refrescos llegan cada 29–37,5 ms (30 Hz con margen) **y** el juego trabaja 14 ms o menos
+  por cuadro, 3 segundos seguidos → «🔋 Chrome está ahorrando batería y dibuja a 30 por segundo: enchufa el equipo o
+  apaga el Ahorro de energía». La condición del trabajo es para no culpar a la batería de una PC que no alcanza: si el
+  juego trabaja más de 14 ms, los 33 ms pueden ser suyos. Sale del aviso con 5 s de refrescos rápidos (< 25 ms).
+- `crearVigiaCalor`: junta los ms por cuadro de cada minuto de carrera (los menús no cuentan: otro trabajo). La
+  referencia es el mejor de los 2 primeros minutos; si un minuto viene **un 25 % y 1,5 ms** por encima, dos minutos
+  seguidos → «🌡️ El teléfono se está calentando…» (una vez por visita).
+- `mkw.mjs`: `?ahorro=1` y `?calor=1` los prenden; `window.mkwEnergia` (sus estados) y el informe de rendimiento
+  (`energia`: si está ahorrando, los minutos de calor). Sin los parámetros no existen (como antes).
+
+**Probado.** Banco `energia` (19/19: las dos reglas con secuencias de mentira, la salida del ahorro, que no avise con el
+juego pesado, la pestaña oculta). Con el juego, `node web/navegador/prueba-energia.mjs` (**7/7**): en una carrera normal
+el vigía recibe el período de verdad (4,2 ms: Chrome sin ventana refresca a 240 Hz) y no avisa, y el del calor junta su
+primer minuto (7,5–7,8 ms por cuadro); con `requestAnimationFrame` frenado a 30 Hz (la prueba lo hace en la página:
+`--limit-fps=30` de Chrome no hace nada) ve 33,4 ms y saca el 🔋 a los 3 s. *Trampa:* la primera versión de la prueba
+«saltaba un refresco de cada dos» y a 240 Hz eso da 8 ms, no 33: ahora espera 33 ms desde el último refresco entregado.
+
+**Lo que falta (el aparato de verdad).** El Ahorro de energía real y el calor real solo los da un portátil con batería y
+el teléfono: anotado para el dueño en `docs/medir-oppo.md` §F. Hasta entonces quedan apagados.
+
+### 190.2 G6: las texturas CMPR subidas comprimidas (BC1)
+
+**El problema.** La Wii guarda muchas texturas en **CMPR** (ver Glosario: bloques de 4×4 con dos colores de punta y un
+índice de 2 bits por píxel, 8 veces menos que sin comprimir). aurora las descomprimía a RGBA8 (4 bytes por píxel) antes
+de subirlas: 8 veces más memoria en la tarjeta y 8 veces más bytes que leer en cada dibujo. Las tarjetas de PC tienen
+casi el mismo formato, **BC1**, y lo leen comprimido.
+
+**Qué se hizo (aurora, `parches/aurora-web.diff` rehecho).**
+- `texture_convert.cpp` `cmpr_to_bc1`: pasa CMPR a BC1 **sin volver a comprimir** (los bloques son los mismos): cambia
+  el orden de los bloques (CMPR los agrupa en mosaicos de 8×8; BC1 va en filas), da vuelta los bytes de los colores (la
+  Wii es big-endian) y los índices (en CMPR el píxel de la izquierda va en los bits altos; en BC1 en los bajos). Se niega
+  (y la textura queda en RGBA8 como antes) si usa el **índice transparente** del modo de 3 colores (en la Wii es el color
+  del medio con alfa 0; BC1 lo da negro transparente: los bordes se oscurecerían), si las medidas no son múltiplo de 4 o
+  si los mips son «arbitrarios» (cada nivel con su propio dibujo, para efectos).
+- `texture.cpp`: con `MKW_TEXTURAS_BC=1` (la página: `?texturasBc=1`) y si la tarjeta tiene `texture-compression-bc`,
+  la textura nace en BC1; `mkw_web_texturas_bc(k)` cuenta cuántas, cuánto ocupan y cuántas no se pudieron
+  (`mkwEstado.texturasBc()` y el informe). **`?texturasBc=verifica`**: además, cada BC1 se decodifica en el momento como
+  la tarjeta y se compara texel por texel con la RGBA8 de siempre (el peor canal, la PSNR —ver Glosario— y cuántos
+  texeles pasan de 8 tonos), en **todas** las texturas CMPR que carga el juego.
+- `compilar-web.py` exporta `_mkw_web_texturas_bc` solo si la aurora que se compila lo trae (la de la v0.9.3 no: se le
+  cayó una compilación al paso 6 a las 17:47 hasta este arreglo).
+
+**La única diferencia de color (inevitable).** En el modo de 4 colores, los dos colores intermedios: la Wii mezcla
+3/8–5/8 de las puntas y BC1 1/3–2/3. Difieren a lo más 1/24 del salto entre las puntas: en un degradé suave (lo común)
+un tono o menos; con dos puntas opuestas (negro y blanco en el mismo bloque, raro) hasta 11 tonos de 255. Las puntas
+dan exacto; el color del medio del modo de 3, a lo más 1 tono (la Wii trunca, BC1 redondea).
+
+**Probado y medido.**
+- Banco `texturas-bc` (10/10, texturas de mentira con la misma regla en JavaScript): puntas exactas, intermedios ≤ 11
+  tonos y ≤ 1 en degradés suaves, el orden de los mosaicos, el índice transparente rechazado, medidas y datos cortos, 8
+  veces menos, y una BC1 subida de verdad por WebGPU leída de vuelta (≤ 3 tonos: cada tarjeta redondea a su manera).
+- Con el juego, `node web/navegador/prueba-texturas-bc.mjs` (**7/7**, la misma carrera sin y con, foto en la cuenta de
+  salida): **66 de las 89** texturas CMPR van en BC1 (23 se quedan: el índice transparente), **15,2 MB → 1,9 MB** en la
+  tarjeta; textura por textura **51 dB** en 3,9 millones de texeles, el peor canal 11 tonos y solo el 0,18 % a más de 8;
+  la foto con BC1 se diferencia de la de siempre en el 1,96 % de los píxeles (a más de 8 tonos), **menos** que dos fotos
+  de siempre entre sí (4,16 %: Lakitu y el público se mueven en la cuenta). Fotos en `build/web/datos/g6/` (del juego:
+  nunca a git). **No baja la calidad visible.**
+- El tramo fijo (§163, `bash herramientas/tanda-190.sh medir`, sin y con intercalados, 2 vueltas, con el perfil de la
+  tarjeta):
+
+| | sin BC1 | con BC1 |
+|---|---|---|
+| Este PC: cuadros de lógica por segundo | 144,2 / 147,9 | 143,9 / 144,4 |
+| Este PC: tarjeta por imagen | 0,20 / 0,21 ms | 0,20 / 0,21 ms |
+| Gama baja: cuadros de lógica por segundo | 20,2 / 21,0 | 21,3 / 22,6 |
+| Gama baja: tarjeta por imagen (`lastreGpu=15`) | 2,23 / 2,02 ms | 2,13 / 1,93 ms |
+
+**Qué significa.** La tarjeta de este PC no siente la diferencia (0,2 ms por imagen: la carrera no está limitada por
+leer texturas a 939×528). En la gama baja simulada la tarjeta baja ~4,5 % y la lógica sube ~6 %, pero las dos vueltas
+se pisan con el ruido de esas corridas (el lastre de la CPU varía ±5 %). Lo seguro es la memoria de la tarjeta (−13 MB) y
+menos bytes subidos al cargar. **Y el teléfono no lo aprovecha**: las tarjetas de teléfono no traen BC1 sino ETC2/ASTC,
+y pasar CMPR a ETC2 sería volver a comprimir (otro trabajo, con pérdida). **Decisión: G6 queda hecho y apagado por
+omisión** (opción `?texturasBc=1`), sin llevarlo a la aurora de la v0.9.3: con una ganancia que no se distingue del ruido
+no vale tocar la aurora de las dos. Si un día frena la memoria de la tarjeta en un PC, se prende.
+
+### 190.3 G4: el ubershader — medido, no conviene ahora (y la parte barata)
+
+**Qué sería.** Un ubershader (ver Glosario) dibujaría con un programa universal mientras el pipeline especializado se
+compila, en vez de saltarse ese dibujo. **Lo que daría**: en la 1.ª visita, unos pocos cientos de dibujos saltados por
+carrera de ~250 mil (~0,1 %: un objeto que falta un par de cuadros); en la 2.ª visita, nada. **Lo que costaría**: un
+intérprete de todo el GX en WGSL (16 etapas de TEV, luces, coordenadas, etapas indirectas, niebla, la lectura de cada
+formato de vértice) y cambiar cómo aurora arma los uniformes de cada dibujo (cada shader tiene su disposición compacta):
+semanas, con riesgo de que se vea distinto, en las dos auroras. La orquestadora lo dejó **«medido, no conviene ahora»**.
+
+**La parte barata: ¿qué pide el juego en la carrera?** aurora ahora cuenta, de lo que el juego pide sin estar listo, si
+estaba **en la cola** del precalentado sin pedir todavía, **en la lista esperando** (su pista o lo diferido) o es
+**nuevo** (ni la semilla ni la lista propia lo traían): una línea más en «[pipelines]» y `medir-carrera-entera.mjs` lo
+suma por tramo. Medido con perfil nuevo, por los menús a la 13.2 con las semillas candidatas (`bloques-d9`,
+`pipelines-c2`; `bash herramientas/tanda-190.sh pipes`):
+
+| | antes de largar | en la carrera |
+|---|---|---|
+| Este PC | 768 pedidos, 3 de golpe, 128 saltados (el juego: 21 de la cola, 3 de la lista, 1 nuevo) | **3 pedidos**, 0 de golpe, 10 saltados (1 de la lista, 2 nuevos) |
+| Gama baja | 771 pedidos, 4 de golpe, 259 saltados (28 de la cola, 4 de la lista, 3 nuevos) | **1 pedido**, 0 de golpe, 12 saltados (1 de la lista) |
+
+**Qué significa.** Con la semilla por pista de C2 (§174) la carrera ya casi no pide nada (antes de C2 eran 18–57): lo
+que quedaba para la parte barata ya lo hizo C2, y no hizo falta otro arreglo. Lo que se pide antes de largar es la
+presentación de la pista (la cámara que la recorre). **Las 64 del Oppo** (§173, 30-10) eran **todas de fondo** (0 de
+golpe; 57 juntas en el segundo 98) con la semilla vieja de los menús: las saca **publicar `pipelines-c2.bin`** (el
+dueño, `docs/publicar.md`); a confirmar en el teléfono con una visita nueva (`docs/medir-oppo.md` §F, punto 4).
+
+### 190.4 Archivos y comandos
+
+- Nuevos: `web/navegador/energia.mjs`, `web/navegador/prueba-energia.mjs`, `web/navegador/prueba-texturas-bc.mjs`,
+  `banco/pruebas/energia/`, `banco/pruebas/texturas-bc/`, `herramientas/tanda-190.sh` (fases `compilar`, `energia`,
+  `fotos`, `medir`, `pipes`; el candado con el nombre `paso7 (local_8351f225)`).
+- Cambiados: `web/navegador/mkw.mjs` (`?ahorro`, `?calor`, `?texturasBc=1|verifica`, `mkwEnergia`,
+  `mkwEstado.texturasBc`, el informe), `herramientas/compilar-web.py` (el export condicional),
+  `herramientas/medir-carrera-entera.mjs` (lo que pide el juego por tramo), `banco/index.html`, `docs/medir-oppo.md` §F,
+  `parches/aurora-web.diff` (aurora: `texture.cpp`, `texture_convert.cpp/.hpp`, `pipeline_cache.cpp`; solo en
+  `terceros/Wiicompiled/aurora-main`, no en la de la v0.9.3).
+- El programa de las mediciones: `build/web-g6/navegador` (del juego: nunca a git); datos en `build/web/datos/g6/` y
+  `build/web/datos/carrera-entera/g4-*`.
+
+### §193.1 El arreglo de las banderas «seguro», a medias (detenido por el dueño, 21:45)
+
+**Un error en lo medido antes.** Al revisar el modo seguro apareció un error mío: cuando una llamada o un retorno no
+tenía plan, el guardado caía en la máscara del **techo** (`0x0FFFF000`, sin cr0 ni cr5–cr7), no en el guardado entero.
+El programa «seguro» de §193 era en parte techo: su ×0,99 no vale como medida del modo seguro (y nunca se probó en la
+sala). Arreglado: sin plan, el guardado va entero (`MkwBanderasMascara` solo vale para `techo`; la máscara lleva una marca
+aparte, `MkwHay`, para que «0 campos» también se pueda escribir).
+
+**El análisis nuevo (la copia `terceros/Wiicompiled-motor-seguro`, commit `3796636`, `parches/traductor-m8-banderas.diff`).**
+Lo que WiiCompiled anota de cada función («qué lee del CR al entrar») no sirve: 16.240 funciones figuran como «lee todo»
+porque cualquier función con una llamada indirecta adentro queda así. Por eso se resuelve aparte, para todo el programa:
+- Cada campo del CR se puede resolver solo (lo que pasa con cr3 no depende de cr5): hay **una** solución mínima, que se
+  calcula subiendo desde «nadie lee nada» hasta que no cambia (un punto fijo).
+- R[F] = lo que F lee al entrar (contando lo que leen sus llamadas); U = la unión de R de todas las funciones (lo que puede
+  leer una llamada indirecta); X[F] = lo volátil que alguien lee después de que F vuelve. Al volver, F guarda cr2–cr4 + X[F].
+- El mod se traduce en otra pasada: esa pasada vuelca la forma de cada función suya (qué pisa, qué lee, a quién llama) en
+  `build/mkw-banderas-mod.txt` (4.0 mil funciones); la pasada base de la traducción siguiente lo junta con el juego,
+  resuelve todo y escribe `build/mkw-banderas-resultado.txt`, que lee la pasada del mod. Una llamada a una función que un
+  mod puede reemplazar sin que esté su sobrecapa, o que cae en medio de otra función, lee todo.
+- Las funciones que llaman nuestras funciones de C++ (`web/juego/*.cpp`: 48, en `build/mkw-banderas-nativos.txt`,
+  `MKW_BANDERAS_NATIVOS`) vuelven enteras siempre. Las alarmas del runtime corren sobre una copia propia de los registros
+  (`os_alarm.cpp`): no pisan el CR del que interrumpen.
+
+**Hasta dónde llegó.** La primera traducción volcó el mod. En la segunda, el análisis corrió entero (33.622 funciones, el
+juego + 3.985 del mod), pero la traducción se cayó al escribir el resultado (una clave que faltaba en un diccionario; ya
+arreglado en el código, sin volver a correr) y la tanda siguió con lo de la primera traducción, que no enmascara nada.
+Esa medida no vale; el dueño pidió detener todo y se detuvo a mitad del tramo de Node.
+
+**Lo que dijo el análisis, y es lo importante:** `U = 0xFF`: **alguna función lee el CR entero al entrar** (por ejemplo,
+las que guardan el contexto de un hilo copian el CR completo), y mientras se suponga que **cualquier** función puede ser
+el destino de una llamada indirecta, eso hace que después de cada indirecta todo quede vivo (`indirecta 0xE3`), y casi la
+mitad de las funciones (13.948) vuelve entera. Es decir: con este supuesto, el arreglo descrito en §193 **no alcanza**.
+
+**Para retomarla** (en orden):
+1. Saber **qué funciones pueden ser destino de una llamada indirecta**: las que tienen su dirección guardada en algún lado
+   (tablas de funciones virtuales y punteros en los datos del juego y del mod, o la dirección armada en el código con un par
+   `lis`/`addi`). U = la unión de R solo de esas. Si las que leen el CR entero (guardar el contexto) no están entre ellas,
+   U baja a lo que de verdad leen.
+2. Traducir dos veces con `MKW_BANDERAS=seguro MKW_BANDERAS_NATIVOS=<ruta> M8_WC=terceros/Wiicompiled-motor-seguro
+   M8_BASE=build/web-m1 M8=banderas-seguro2 bash herramientas/tanda-m8.sh traducir traducir` y mirar en
+   `build/web/datos/m8/traducir-banderas-seguro2.log` las líneas «MKW banderas» (U, indirecta, cuántas vuelven con máscara).
+   **Ojo:** `tanda-m8.sh` sigue con las fases aunque la traducción falle («traducir: salida 1»): mirarlo antes de medir.
+3. Si U y la indirecta quedan chicas: compilar, probar, Node contra M1, y si gana, la sala (huella contra `build/web-m1`),
+   los fantasmas iguales, Chrome en este PC y la gama baja.
+
+## 2026-10-31 · §186–§189 Paso 8: el juego entero en un Worker, la página aislada y los hilos sin memoria compartida (N3, P9, P10, H5) — detenido a medias por pedido del dueño · 14:00–21:45
+
+**Qué es y por qué.** Hoy el juego corre en el hilo principal de la página: comparte el mismo «operario» con el sitio
+(Firebase, la sala, el DOM). El paso 8 es la prueba de una semana de la **puerta A** (glosario): ¿puede el juego correr
+entero en un **Worker** (glosario), dibujando con WebGPU en un **OffscreenCanvas**, sin perder velocidad y dando la misma
+carrera? ¿Y puede la página tener memoria compartida para los hilos del paso 9, aunque el sitio no cambie sus cabeceras?
+Todo es opcional: la página de siempre (`index.html` + `mkw.mjs`) **no cambió**; la prueba vive en `trabajador.html`.
+
+### §186 El juego en un Worker (N3/P10)
+
+- **Cómo.** Un **arnés** (glosario) común, `web/navegador/trabajador-juego.mjs`, corre todo **igual** en los dos lugares:
+  en un Worker (`trabajador-hilo.mjs`, `?hilo=trabajador`, por omisión) o en la página (`?hilo=principal`). Así solo cambia
+  dónde corre. El arnés hace:
+  - el manifiesto y el disco, con lotes y Cache Storage;
+  - la partida en IndexedDB y la lista de pipelines;
+  - el programa y la carrera directa;
+  - el tramo fijo de §163 y la huella de cada cuadro.
+- **El DOM de mentira.** En el Worker, `trabajador-dom.mjs` pone un **DOM de mentira** (glosario) para que el pegamento de
+  Emscripten + SDL3 + emdawnwebgpu no se caiga, **sin recompilar** el programa.
+- **Lo que queda en la página** (`trabajador.mjs`):
+  - el lienzo;
+  - los mandos: `controles.mjs` manda cada cambio al Worker como `mkw_web_pad`, igual que hoy; el teclado, los mandos y
+    lo táctil no cambian;
+  - el sonido: el AudioWorklet de §88 le da al Worker un **MessagePort** propio, así el sonido va del Worker al hilo de
+    audio sin pasar por la página. Lo hacen `sonido.mjs` (`puertoAparte`), `sonido-worklet.js` (acepta `{t:'puerto'}` y
+    manda su informe también por ahí) y `trabajador-sonido.mjs`.
+- **Primera corrida** (`tanda-paso8.sh espiga`): arrancó al primer intento; solo faltaba el Mii de la licencia en un perfil
+  nuevo (ahora `prepararMii` antes de `main()`, como `mkw.mjs`). JSPI, WebGPU sobre OffscreenCanvas, SDL3 y el disco
+  andan en el Worker: 14.428 cuadros en 240 s (60 por segundo), la carrera abre y corre.
+- **La huella** (`medir-trabajador.mjs --con-tope --huellas 1-3000 --extra "&reloj=fijo"`, 2 pares intercalados): **0
+  cuadros distintos** en los 6 pares (Worker contra página, Worker contra Worker y página contra página). Cada par tiene
+  unos 2.930 cuadros en común, y se comparan la huella de siempre y las 13 partes de la ampliada de §154.
+  - **Trampa**: sin `?reloj=fijo` las huellas difieren desde el cuadro 1, **también página contra página**: jugando solo,
+    el azar sale del reloj de la PC.
+  - Con `reloj=fijo`, el arnés usa la semilla de la ficha y el reloj de la carrera, como la sala.
+- **La velocidad, este PC** (tramo fijo §163 sin tope, 12 CPU, 3 pares intercalados, `build/web-m1`). **Empata o gana un
+  poco**:
+
+  | Lo medido | Worker | Página | Diferencia |
+  |---|---|---|---|
+  | Cuadros de lógica por segundo | 155,7 | 153,7 | +1,3 % (dentro del ruido de ±1,5 %) |
+  | Imágenes por segundo | 71,4 | 68,6 | +4 % (la página ya no se mete entre cuadro y cuadro) |
+  | Cuadros de lógica por segundo, programa armado de nuevo de las mismas fuentes (`build/web-paso8`, 2 pares) | 164,4 | 163,7 | +0,4 % |
+
+- **La gama baja simulada** (`lastre=3.5&lastreAyuda=3`, 3 pares). En promedio, el Worker da 52,0 cuadros de lógica por
+  segundo y la página 54,9 (−5 %), pero con mucho ruido:
+
+  | Corrida | Worker | Página |
+  |---|---|---|
+  | 1.ª | 47,0 | 56,0 |
+  | 2.ª | 56,0 | 53,8 |
+  | 3.ª | 52,9 | 55,1 |
+
+  Sin la primera corrida del Worker, da 54,5 contra 54,9 (−0,8 %). **Falta repetirla con 5 pares** (quedó en la tanda
+  detenida).
+- **Mandar un mando al Worker** cuesta 0,02 ms de ida y vuelta (banco `trabajador`), nada al lado de un cuadro.
+
+### §187 La página aislada: Document-Isolation-Policy y el service worker (P9)
+
+- `web/navegador/aislar.mjs` (`cabecerasAislar`) arma las cabeceras de `?aislar=dip` (Document-Isolation-Policy),
+  `dip-cred` y `coop`. Las usan:
+  - `servidor.mjs`: solo en las páginas `.html`; con `MKW_AISLAR=coop`, los scripts llevan además su propio COEP;
+  - `banco/servir.cjs`: para el banco nuevo.
+- **Banco `aislamiento` (11/11)**. La página hace de sitio sin cabeceras, como Juegos en GitHub Pages, y abre cuatro marcos.
+  En este PC (Chrome de escritorio):
+  - **con Document-Isolation-Policy el marco queda aislado con memoria compartida**, y la memoria compartida llega al
+    Worker con `Atomics.wait`;
+  - **COOP/COEP en un marco no alcanza**;
+  - **un service worker basta para poner la cabecera** (`sw.js` contesta la página con la cabecera agregada). Es lo más
+    útil: el marco del juego podría aislarse **sin dejar GitHub Pages ni pasar por Cloudflare**.
+- **Lo que cuesta**: con Document-Isolation-Policy el marco **ya no puede tocar la página de afuera directo**: leer su
+  documento o llamar una función da `SecurityError`. Sí comparte el almacenamiento, porque es el mismo origen: las partidas
+  y los ajustes no se pierden. Hay que pasar a mensajes:
+  - el sitio llama directo a `w.mkwConectarRecords`, `w.mkwConectarNube` y `w.mkwConectarVr`
+    (`colabtex/src/juegos/mkw.js:143-147, 303-310`) y les pasa objetos con funciones (los almacenes de Firebase);
+  - el marco toca `parent.Mando` y `parent.document` (`mando-sitio.mjs:30-31`);
+  - lo demás ya va por `postMessage`.
+- **Android**: según Chrome, Document-Isolation-Policy llega a Android en la versión 146, también a los teléfonos de gama
+  baja (blink-dev, 2026-01-23); en el escritorio, desde la 137. No está en Android WebView.
+
+### §188 Varios núcleos sin memoria compartida: la cinta de cajas (H5, plan B)
+
+- `web/navegador/cajas.mjs` (`crearCinta`/`atenderCinta`): la **cinta de cajas** (glosario). Unas pocas cajas van y vuelven
+  **transferidas** (glosario) por un MessagePort, sin copiar el contenido. Si no hay caja libre, el que llena espera
+  (contrapresión).
+- **Banco `cajas` (8/8, sin el juego)**. Un Worker hace de juego: la lógica más 30.000 vértices (360 KB) por cuadro. Otro
+  hace de aurora: transforma y empaca. Con la cinta, cada cuadro da **exactamente la misma suma de control** que en serie.
+  - en serie: 6,37 ms por cuadro;
+  - con la cinta: **2,79 ms (×2,28)**;
+  - el hilo del «juego» queda con 2,75 ms (solo su parte).
+- **Banco `aislamiento`, sin memoria compartida**:
+  - una caja de 1 MB va y vuelve en ~0,03 ms;
+  - 4 Workers calculan a la vez con ×2,5–3,5.
+- **Conclusión de H5**: el plan B anda en cualquier Chrome, y en Android 146 o más debería haber memoria compartida con
+  Document-Isolation-Policy. Por pedido del dueño ya no se mide en el Oppo. La página de diagnóstico, el banco
+  `aislamiento`, quedó hecha y sirve igual en el PC.
+
+### §189 Hasta dónde llegó y qué falta (detenido 21:45 por pedido del dueño)
+
+- **Dónde se cortó.** Detener la tarea de fondo paró solo su envoltura: la tanda siguió sola, tomó el candado a las 21:40 y
+  la orquestadora la mató en la fase «pc-c» (el árbol de procesos 46488) y borró el candado y la fila.
+  - «espiga-c» falló de entrada: sin `mkw.js`, porque el programa compartido no enlazó.
+  - «pc-c» midió 1 de los 2 pares del programa de referencia `build/web-paso8`: el Worker dio 153,4 cuadros de lógica/s; la
+    página, 148,7 y 153,0. No llegó al programa compartido.
+  - «baja» (5 pares) no empezó.
+  - **Trampa**: para cortar una tanda hay que matar su `bash` por número, no solo la tarea que la lanzó.
+
+- **El programa con memoria compartida** (`-pthread`, para probar el juego entero con SharedArrayBuffer en el Worker): no
+  enlazó. `compilar-web.py` tiene ahora `MKW_LDFLAGS_EXTRA` y `MKW_CFLAGS_TODO` (este último llega también a aurora).
+  Quedan dos cosas:
+  - borrar `build/web-compartida/node/obj` para que se rearmen todos los objetos (había objetos viejos sin atomics del
+    primer intento);
+  - una declaración que no coincide: `g_indirectResolvedDispatchMemo` es `thread_local` en una unidad y común en otra
+    (`semillas_nativo.cpp` la ve sin `thread_local`). Con hilos, eso es un error de enlace. Hay que ver dónde se declara
+    en el runtime (es del paso 6) y avisarle.
+- **Falta**:
+  1. el programa compartido (enlazar, `espiga-c`, `pc-c`);
+  2. la gama baja con 5 pares (`PARES=5 bash herramientas/tanda-paso8.sh baja`);
+  3. las pruebas de la página de siempre que tocan lo cambiado (`tanda-paso8.sh pruebas`: los bancos `sonido-worklet`,
+     `sonido` y `controles`, y `prueba-navegador`);
+  4. decidir la puerta A con eso.
+- **Lo que ya se sabe para la puerta A**:
+  - el juego anda en un Worker con la huella igual;
+  - en este PC empata o gana un poco;
+  - la gama baja está por confirmar, entre −1 y −5 %, con ruido;
+  - la página puede quedar aislada con un service worker, sin Cloudflare;
+  - el costo es pasar a mensajes todo lo que hoy cruza directo entre el sitio y el marco;
+  - la página real (`mkw.mjs`: 65 funciones del programa que la página llama, 8 módulos que leen la memoria del juego) todavía
+    corre en la página. Llevarla al Worker es el trabajo grande de P10, después de la puerta A.
+- **Para retomar**:
+
+  ```bash
+  rm -rf build/web-compartida/node/obj
+  ```
+
+  ```bash
+  PARES=5 bash herramientas/tanda-paso8.sh compartida espiga-c pc-c baja pruebas
+  ```
+
+  `QUIEN` ya dice `paso8 (local_1064410d)`. Datos en `build/web/datos/trabajador/` (números y huellas, nada del juego;
+  los `.png` son fotos del juego: no van a git).
+
+---
+
+## §194 — W5 (etapa 0 del plan v4): la simulación del teléfono paga la revisión de límites de Android
+
+**Qué es.** Cada vez que el juego lee o escribe la memoria de la Wii, el wasm comprueba que la dirección caiga dentro
+de su memoria (la **revisión de límites**, ver el glosario). En este PC (Chrome de 64 bits en Windows) esa revisión sale
+gratis: V8 reserva varios GB de direcciones «de guarda» alrededor y deja que el procesador avise si alguien se sale,
+como un fusible que no gasta nada hasta que salta. En **Chrome de Android** ese atajo no siempre está (la memoria
+virtual de un teléfono es más chica y Chrome lo apaga), y cada acceso lleva una comparación de verdad. Nuestra gama
+baja y media simuladas (el aparato de mentira de §155 con el tramo fijo de §163) se medían **sin** ese costo: eran
+optimistas.
+
+**Qué se hizo.** La misma carrera del tramo fijo (`modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&sinTope=1&tramo=600-2400`,
+12 CPU, Chrome con 8 núcleos, `build/web-m1`), sin y con la bandera de V8 que obliga a revisar cada acceso
+(`--js-flags=--wasm-enforce-bounds-checks`), en la gama media (`&lastre=4&lastreAyuda=3&ladron=64&lastreGpu=6`), la
+gama baja (`&lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`) y este PC, 3 vueltas con el orden alternado; y en Node el
+tramo fijo con `medir-node-estable --fijo`, 3 pares.
+
+```bash
+bash herramientas/tanda-w5.sh chrome node
+```
+
+(la tanda toma el candado de medición; los datos quedan en `build/web/datos/w5/`).
+
+**Resultado** (cuadros de lógica por segundo en el tramo, media de 3; «trabajo» = ms de CPU pura del juego por cuadro):
+
+| Aparato | Sin revisión | Con revisión | Cambio | Trabajo por cuadro |
+|---|---|---|---|---|
+| Gama media simulada | 32,32 | 30,11 | **−6,8 %** | 7,76 → 8,32 ms (+7,2 %) |
+| Gama baja simulada | 21,74 | 16,76 | **−22,9 %** | 6,60 → 8,55 ms (+29,5 %) |
+| Este PC (control) | 151,8 | 142,7 | **−6,0 %** | 6,45 → 6,91 ms (+7,1 %) |
+| Node (el motor solo) | 3,81 ms/cuadro | 4,61 ms/cuadro | **+21 %** | — |
+
+Las vueltas son parejas (la gama baja sin revisión: 22,68 / 21,86 / 20,68; con: 16,89 / 16,36 / 17,04).
+
+**Qué significa.**
+- La revisión de límites cuesta lo que §160 había medido en Node (+16 %, ahora +21 %): es el motor traducido el que
+  la paga, porque hace millones de lecturas de memoria por cuadro.
+- En Chrome con todo (aurora, la página) pesa menos en el total (+7 %), salvo en la gama baja, donde pesa +30 %. La
+  gama baja tiene el mismo lastre de CPU que la media pero más «ladrón» de tarjeta y de sonido; la revisión agrega
+  saltos y comparaciones que se llevan peor con la caché ensuciada. No hay una explicación cerrada: lo que importa es
+  que el número es estable en las 3 vueltas.
+- **El piso de la gama baja baja de ~21,7 a ~16,8 cuadros de lógica por segundo.** Lo que creíamos que faltaba para
+  60 era ×2,8; es ×3,6.
+
+**Veredicto: hecho.** Desde ahora toda medición del teléfono simulado (gama media y baja, la escalera, cada piloto)
+va con `--chrome "--js-flags=--wasm-enforce-bounds-checks"`; este PC sigue sin la bandera (es el control). Las
+tandas de W19, W1, W2, W4 ya la usan. Recomendación para la etapa 2 (el motor): todo lo que saque accesos a memoria
+del camino caliente (W12 la pila en variables locales, W13 el contexto en una dirección fija, las islas) rinde **más**
+en el teléfono que en este PC, porque cada acceso que se ahorra también se ahorra su revisión.
+
+**Trampas.** La bandera se pasa a Chrome como `--js-flags=…` dentro de `medir-sitio --chrome "…"`; a Node, como
+`--v8 "--wasm-enforce-bounds-checks"` de `medir-node-estable`. Sin `--fijo` Node varía ±4 %: con `--fijo` las tres
+vueltas quedan dentro del 2 %.
+
+---
+
+## §195 — W19 (etapa 0 del plan v4): el índice del memo de las llamadas indirectas (el arreglo `20ad85d` de KartPad)
+
+**Qué es.** Cuando el juego llama a una función por un puntero (en la Wii, la instrucción `bctrl`: las funciones
+virtuales de C++, las tablas de saltos), el runtime no sabe de antemano a qué función traducida ir: tiene que buscar la
+dirección en una lista ordenada de unas 30.000 funciones. Para no buscar siempre, guarda las últimas respuestas en un
+**memo** de 512 casilleros (ver el glosario). El casillero de cada dirección salía de un hash de Fibonacci, pero
+tomando los bits **bajos** del producto, que solo dependen de los bits bajos de la dirección: en la práctica era un
+caché directo sobre los bits 2–10 de la dirección, y dos funciones muy usadas a 2 KiB de distancia se pisaban el
+casillero en cada cuadro. Lo encontró DriftDroid y KartPad (el mismo traductor, nativo en Android) lo arregló en una
+línea: tomar los bits **altos** (`20ad85d`).
+
+**Qué se hizo.** El mismo cambio en nuestro motor (`terceros/Wiicompiled-motor`, `runtime/include/guest_abi/dispatch.h`,
+la función `IndirectDispatchCacheIndex`, con el interruptor `MKW_MOTOR_MEMO_ALTO`; `-DMKW_MOTOR_MEMO_ALTO=0` = el de
+antes), con la atribución en el código, en `parches/motor-w19.diff` y en `herramientas/versiones.md` (Chris Sotraidis,
+GPL-3.0). Commit local `da2c7b8` sobre `8165125` en esa copia. El programa nuevo, `build/web-w19` (M1 + los anillos +
+W19), es **la base de la etapa 0**: lo que sigue se compara contra él.
+
+```bash
+bash herramientas/tanda-w19.sh compilar probar igual medir chrome
+```
+
+(Ese programa también trae, apagados, los dos interruptores nuevos de aurora de W20 y W9, §204 y §205: con lo de
+siempre no cambian nada.)
+
+**Resultado.**
+- `prueba-arranque` 13/13. La sala con un programa en cada consola (A = W19, B = la base): **las huellas 75/75**,
+  14 bien. Los fantasmas cuadro por cuadro: 6 bien. La paridad x86 ↔ wasm (`banco/pruebas/paridad`, `-Motor`): 28/0.
+- Node, el tramo fijo intercalado (6 pares, `--fijo`): base 3,805 ms por cuadro, W19 3,823; razón ×0,989 (de ×0,95 a
+  ×1,05): **no se distingue del ruido**.
+- Chrome, el tramo fijo, 3 vueltas alternadas (cuadros de lógica por segundo):
+
+| Aparato | Base (build/web-m1) | W19 | Cambio |
+|---|---|---|---|
+| Gama baja simulada (con la revisión de límites, W5) | 17,08 · 18,66 · 17,73 = **17,82** | 18,49 · 18,41 · 18,82 = **18,57** | **+4,2 %** (trabajo 8,05 → 7,71 ms) |
+| Este PC | 159,8 · 152,1 · 159,9 = 157,3 | 160,5 · 159,1 · 154,8 = 158,1 | +0,5 % |
+
+**Qué significa.** En este PC (caché grande, 96 MB) un memo que falla un poco no se nota: la búsqueda en la lista sale
+de la caché. En la gama baja simulada el ladrón de caché (§155) ensucia la caché y cada fallo del memo cuesta de verdad:
+ahí W19 da +4 %. Pero la gama baja varía ±5 % entre vueltas (la base dio 17,1 y 18,7), así que el +4 % es una
+tendencia, no un número firme. Lo importante: no empeora en nada, la carrera es la misma y es un arreglo de una línea.
+
+**Veredicto: hecho** (es un arreglo, no un experimento). Queda en la base. Recomendación para la etapa 2 (el motor):
+las llamadas indirectas pesan más en la gama baja que en este PC; W13 (el contexto en una dirección fija) y lo que
+quite saltos por puntero se mide en la gama baja, no en este PC.
+
+---
+
+## §196 — W1 (etapa 0 del plan v4): las páginas que ensucia la carrera y el dibujo como sumidero — **hecho**
+
+**Qué es.** Toda la etapa 1 (W10: el dibujo en otro núcleo) descansa en que el dibujo del juego es un **sumidero**
+(ver el glosario): la carrera nunca lee lo que el dibujo escribe. Si es así, el dibujo puede ir en otro núcleo
+recibiendo una **foto** de la memoria de la Wii de cada cuadro, y lo que cuesta mandarla depende de cuántas páginas de
+4 KiB cambia la carrera en cada cuadro. Como un medidor de consumo por circuito: no mira cada electrón, solo anota qué
+circuitos se usaron.
+
+**Qué se hizo** (`web/juego/sumidero_nativo.cpp`, solo en un programa aparte: `MKW_SUMIDERO_COMPILAR=1`, la página
+con `?sumidero=1|2`):
+- Envuelve `EGG::SceneManager::draw` (el dibujo de cada imagen). Antes del dibujo compara la memoria de la Wii (MEM1 y
+  los primeros 64 MiB de MEM2) con una foto, página por página: las que cambiaron desde el dibujo anterior son **de la
+  carrera**. Después del dibujo cuenta las que cambió **el dibujo**.
+- Modo 1 = solo contar. Modo 2 = además **deshacer** lo que escribió el dibujo (la memoria vuelve a la foto), salvo lo
+  que escribe `ScnMgr::SwitchScnRoot` dentro del dibujo, que la carrera sí lee (lo que R2 ya conserva, §192). Si con el
+  modo 2 la carrera sale igual, el dibujo es un sumidero.
+- La prueba: la sala de dos (`prueba-sincro --directa`, 2 humanos + 10 CPU = 12) con A contando y B deshaciendo: las
+  huellas de la carrera tienen que coincidir. Y la Contrarreloj contra el experto (`prueba-fantasma-igual`), con B
+  deshaciendo: el fantasma tiene que hacer lo mismo cuadro por cuadro.
+- Tres trampas del camino: (1) en wasm, `Memory::GetPointer` con un largo grande falla (la memoria va en bloques de
+  1 MiB y el camino rápido solo acepta largos chicos): se pide el primer byte de cada página de 4 KiB; (2) la página
+  prendía el instrumento mientras cargaba, antes de que existiera la memoria de la Wii: ahora se prepara en el primer
+  dibujo; (3) **en los menús el dibujo NO es un sumidero**: deshaciéndolo, la Contrarreloj por los menús se quedaba
+  trabada. La página deshace solo mientras corre una carrera (en los menús solo cuenta).
+
+```bash
+bash herramientas/tanda-w1.sh compilar sala fantasma     # → build/web/datos/w1/
+```
+
+**Resultado: el sumidero se cumple en las 6 pistas** (2 de Nintendo y 4 de Retro Rewind, semilla 1234):
+
+| Pista | Huellas iguales (A cuenta, B deshace) | La carrera cambia por cuadro (media) | Máximo en un cuadro | El dibujo cambia por cuadro | B deshizo por cuadro |
+|---|---|---|---|---|---|
+| 0.0 | 44 de 44 | 377 páginas (1,47 MB) | 35,5 MB | 55 páginas | 33,2 KB |
+| 2.1 | 44 de 44 | 384 (1,50 MB) | 34,4 MB | 54 | 33,3 KB |
+| 13.2 | 42 de 42 | 507 (1,98 MB) | 36,6 MB | 66 | 35,5 KB |
+| 30.2 | 42 de 42 | 419 (1,64 MB) | 38,9 MB | 56 | 32,7 KB |
+| 50.2 | 42 de 42 | 466 (1,82 MB) | 38,3 MB | 59 | 34,3 KB |
+| 65.0 | 40 de 40 | 496 (1,94 MB) | 42,1 MB | 54 | 32,5 KB |
+
+- La Contrarreloj: Luigi Circuit (copa 0, fila 0) 6 bien (1.629 cuadros iguales, el fantasma cruza la meta en el mismo
+  cuadro 2242) y una de RR (copa 13, fila 2) 6 bien (1.913 iguales).
+- `SwitchScnRoot` escribe 1,4–2,7 KB por cuadro que la carrera sí lee: va en la foto, no se deshace.
+- Arriba de los 64 MiB de MEM2 hay 135 páginas usadas (0,5 MB): conviene que la foto las incluya.
+- (Otros puntos de `prueba-sincro` fallan en algunas pistas sin que tenga que ver: «el kart de B avanzó con lo que
+  tocó B» con los dos karts a ~1,05 vueltas, y la «costura» de la foto en 50.2, con las cuentas del juego diciendo una
+  pantalla en las dos.)
+
+**Qué significa.** El máximo (35–42 MB) es el cuadro en que la carrera carga; con la carrera andando cambian **1,5–2 MB
+por cuadro**, justo en el borde de lo que el plan llamó barato (≲ 2 MB). **Recomendación para la etapa 1: W10 sigue**,
+y la foto va por diferencias (solo las páginas que cambiaron) y comprimida o con memoria compartida si el envío por
+mensajes no alcanza a 2 MB × 60 = 120 MB/s; en los menús el dibujo se queda en el hilo del juego (allí no es un
+sumidero).
+
+## §197 — W6 (etapa 0 del plan v4): en la carrera, cuánto pesan dar vuelta los bytes y la tabla de páginas
+
+**Qué es.** El programa de Windows (el mismo juego compilado para el procesador del PC, solo para medir, §153) corre la
+carrera 2,3 veces más rápido que el wasm. Dos de las diferencias son de la memoria de la Wii:
+1. **Dar vuelta los bytes.** La Wii guarda los números «al revés» que el PC (big-endian). En cada lectura y escritura hay
+   que invertir el orden de los bytes. El procesador del PC tiene una instrucción para eso (`bswap`/`movbe`); wasm no la
+   tiene y lo hace con 5 a 7 operaciones de desplazar y enmascarar.
+2. **La tabla de páginas.** El nativo pone la memoria de la Wii en un lugar fijo y cada dirección es una suma. En wasm
+   cada dirección se busca en una tabla de páginas de 1 MiB (como un decodificador de direcciones por EEPROM en vez de
+   por lógica fija). El nativo «revisado» (`--revisado`) usa la misma tabla que wasm.
+
+Hacía falta saber cuánto pesa cada una en la **carrera** (en §160 solo se midió en el título) antes de decidir si los
+ítems caros de la etapa 2, H6 (la memoria en un lugar fijo) y H7 (la RAM guardada ya dada vuelta), van primero.
+
+**Qué se hizo.** Una bandera nueva para el programa de medir, `compilar-nativo.py --bytes-lentos`
+(`-DMKW_BYTES_LENTOS`, `parches/motor-w6.diff`, commit local `2ab4195` en `terceros/Wiicompiled-motor`): invierte los
+bytes como wasm, con desplazamientos y máscaras para 2 y 4 bytes y con una mezcla de vector para 8 (lo que hace nuestro
+M1). Una «barrera» vacía (una instrucción de ensamblador que no hace nada) esconde cada parte, para que clang no
+reconozca el patrón y lo vuelva a juntar en un `bswap`. Tres programas de Windows desde el mismo C++ (el de `build/web-w19`):
+normal, con los bytes lentos y revisado; el tramo fijo de la carrera (el guion de §170, `medir-node-estable --fijo`),
+5 vueltas con el orden rotado.
+
+```bash
+bash herramientas/tanda-w6.sh compilar medir
+```
+
+**Resultado** (ms de CPU por cuadro en el tramo de la carrera):
+
+| Programa de Windows | Las 5 vueltas | Promedio | Contra el normal |
+|---|---|---|---|
+| Normal | 1,647 · 1,663 · 1,660 · 1,694 · 1,666 | **1,666** | — |
+| Bytes dados vuelta como wasm | 2,078 · 2,085 · 2,028 · 2,038 · 2,060 | **2,058** | **+23,5 %** (+0,39 ms) |
+| Memoria por la tabla de páginas (revisado) | 2,412 · 2,345 · 2,393 · 2,398 · 2,368 | **2,383** | **+43,1 %** (+0,72 ms) |
+
+Las 5 vueltas de cada uno quedan dentro de ±1,7 %. El wasm, en el mismo tramo de Node: 3,82 ms (§195), ×2,29 del normal.
+
+**Qué significa.**
+- De los 2,16 ms que el wasm pierde contra el nativo, dar vuelta los bytes explica ~0,39 ms (18 %) y la tabla de
+  páginas ~0,72 ms (33 %): juntas, **cerca de la mitad del impuesto** del navegador en la carrera. La otra mitad son las
+  llamadas indirectas, la entrada y salida del wasm y lo que el compilador de wasm hace peor.
+- Sumadas, son el **67 % del nativo**, muy por encima del umbral del plan (30 %): **H6 y H7 van primero en la etapa
+  2, sin discusión.** Y como dar vuelta los bytes pesa mucho más del 5 %, la parte cara de H7 (guardar la RAM ya dada
+  vuelta, 4–6 semanas) **no se corta**.
+- Ojo: en wasm M1/M2 (§182) ya aliviaron un poco las dos cosas (la vuelta de 8 bytes con vector, los rangos); el
+  nativo con bytes lentos usa la misma vuelta de 8 bytes, así que la comparación es justa.
+
+**Veredicto: hecho.** Recomendación para la etapa 2: H6 (la memoria en un lugar fijo: una suma en vez de la tabla)
+primero, después H7 (la RAM dada vuelta). En la gama baja simulada cuentan más todavía, porque cada lectura también paga
+la revisión de límites de W5.
+
+**Trampa.** El `#include <immintrin.h>` (las funciones de vector de Intel) tiene que ir arriba del archivo, fuera del
+`namespace MemoryInline`; adentro, las declaraciones del vector quedaban con el nombre del espacio y no compilaba.
+
+---
+
+## §198 — W4 (etapa 0 del plan v4): compilar guiado por un perfil (PGO)
+
+**Qué es.** PGO (ver el glosario) = compilar dos veces: la primera con un programa que **cuenta** cuántas veces pasa
+por cada rama del código; se lo hace correr unas carreras; la segunda compilación lee esas cuentas y ordena el código
+según lo que de verdad es caliente (lo caliente junto y optimizado para velocidad, lo frío apartado y compilado chico).
+Como un ingeniero que mide la corriente de cada rama de un tablero antes de decidir qué cables engrosar. KartPad (el
+mismo traductor, nativo en Android) ganó −12 % de CPU y −13 % de código. **Éxito:** 5 % o más en la gama baja simulada,
+en una pista que el perfil no vio, y el `.wasm` no más grande. **Se mata** bajo 2 % o si el código crece.
+
+**Qué se hizo.**
+- El perfil se saca del **wasm mismo** (en Node), no del programa de Windows como decía el plan: el compilador reconoce
+  cada función por una huella de su forma, y la forma cambia entre clang 22 para x86 y clang 24 para wasm (los punteros
+  de 4 bytes en vez de 8); el perfil de wasm calza exacto.
+- Tres carreras para el perfil, con guiones de botones (`build/web/datos/w4/guion-{a,b,c}.txt` = el de §165 más toques
+  en la copa y la pista) que llegan a las pistas 0x1E, 0x10 y 0x0A. El tramo fijo es Luigi Circuit (0x08): **una pista
+  que el perfil no vio**, como pide la prueba.
+- Dos trampas del camino, con su arreglo:
+  1. El programa que cuenta escribe su perfil al salir (`atexit`), y en Node el programa nunca «sale» (se corta con
+     `process.exit`): el perfil quedaba en 0 bytes. Arreglo: `compilar-web.py` exporta `__llvm_profile_write_file` cuando
+     `MKW_CFLAGS_EXTRA` trae `-fprofile-instr-generate`, y `web/node/correr.mjs` lo llama al terminar («perfil de PGO
+     escrito (bien)»).
+  2. El perfil salía «de la versión 10» y `llvm-profdata` de emsdk pedía la 11. La causa: el compilador (LLVM 24) arma
+     la ficha de cada función con el formato 11 (56 bytes: suma un contador «uniforme» y el tamaño de onda de las
+     tarjetas de video), pero la copia de compiler-rt que trae emscripten es más vieja: escribe la cabecera del 10 y
+     cuenta las fichas como si midieran 48 bytes. Los datos están bien, la cabecera miente (como un rótulo viejo en un
+     tablero nuevo). `herramientas/profraw-v11.mjs` reescribe la cabecera (19 campos, 128.040 fichas de verdad en vez de
+     149.380) y copia el resto tal cual; la tanda lo corre antes de juntar los perfiles.
+- El programa de verdad se compila con `-fprofile-instr-use` y `-mllvm -hot-cold-split=true`.
+
+```bash
+bash herramientas/tanda-w4.sh gen perfilar usar probar igual medir chrome
+W4_VUELTAS="4 5 6" bash herramientas/tanda-w4.sh chrome     # 3 vueltas más (la gama baja quedó en la zona gris)
+```
+
+**Resultado.**
+- **La misma carrera:** prueba-arranque 13/13; la sala con A = PGO y B = la base, la huella toda la carrera: 14 bien;
+  los fantasmas cuadro por cuadro: 6 bien.
+- **El código, más chico:** el `.wasm` del navegador 118,0 → **108,3 MB (−8,3 %)**; el de Node 111,9 → 102,1 MB.
+- **Node, tramo fijo intercalado (6 vueltas):** 3,780 → 3,772 ms por cuadro (**×0,998**: nada).
+- **Chrome, tramo fijo intercalado (cuadros de lógica por segundo, base → PGO):**
+
+| vuelta | este PC | gama baja (con la revisión de límites) |
+|---|---|---|
+| 1 | 149,6 → 160,0 (+7,0 %) | 20,09 → 19,77 (−1,6 %) |
+| 2 | 155,1 → 164,9 (+6,3 %) | 18,63 → 19,05 (+2,3 %) |
+| 3 | 153,0 → 155,3 (+1,5 %) | 16,97 → 18,82 (+10,9 %) |
+| mediana | 153,0 → 160,0 (**+4,6 %**) | 18,63 → 19,05 (**+2,3 %**) |
+
+  En CPU por cuadro de la gama baja («trabajo», mediana): 7,69 → 7,52 ms (−2,2 %). La gama baja quedó **entre** el corte
+  (2 %) y el éxito (5 %), con un ruido de ±5 % entre vueltas: se sumaron 3 vueltas más.
+- **Las 3 vueltas más** (la 4 a la 6, en el puerto 8188: el 8179 lo había tomado de salida otro programa del PC):
+
+| vuelta | este PC | gama baja |
+|---|---|---|
+| 4 | 155,4 → 150,9 (−2,9 %) | 14,86 → 17,45 (+17,4 %; la base corrió con el PC cargado) |
+| 5 | 162,6 → 157,1 (−3,4 %) | 16,61 → 16,96 (+2,1 %) |
+| 6 | 151,3 → 158,7 (+4,8 %) | 17,34 → 17,42 (+0,5 %) |
+
+- **Las 6 vueltas juntas**, por pares (cada vuelta corre base y PGO una detrás de la otra, así la carga del PC les toca
+  parecida a las dos; la mediana de los pares no se deja arrastrar por una vuelta rara): **gama baja +2,2 %** (la
+  media, +5,3 %, la levantan las vueltas 3 y 4, en que la base corrió con el PC ocupado), CPU por cuadro −2,1 %; **este
+  PC +3,2 %**; Node ×0,998.
+
+**Veredicto: zona gris, no se adopta por ahora.** La gama baja gana +2,2 %: apenas arriba del corte (2 %) y lejos del
+éxito (5 %), con un ruido del mismo tamaño. Lo seguro es que el código queda un 8 % más chico (10 MB menos de
+programa). Pero un perfil de PGO hay que rehacerlo cada vez que cambia la traducción o el motor (se ata a la forma de
+cada función), y lleva nombres de funciones del juego (no va a git): mantenerlo cuesta más que +2 %. Queda la
+herramienta lista (`tanda-w4.sh`, `profraw-v11.mjs` y la exportación de `__llvm_profile_write_file`) para cuando el
+motor se quede quieto.
+
+**Recomendación.** M6 (la etapa 2) **no entra completo**: PGO solo como último paso del programa para publicar, si
+para entonces el tamaño importa (los 10 MB menos se bajan en cada primera visita). Lo que sí rinde en el código
+caliente es atacar lo que W6 midió (dar vuelta los bytes y la tabla de páginas: H6 y H7).
+
+## §199 — W2 (etapa 0 del plan v4): la colisión con la pista como isla decompilada — **matado**
+
+**Qué es.** La primera isla (ver el glosario): la consulta de choque contra la pista, `KCLController::IsCollidingImpl`
+(0x807C0884), escrita de nuevo sobre la traducción en vez de usar la traducción instrucción por instrucción. La idea:
+la isla lee los triángulos de la pista desde una **sombra** (una copia con los bytes ya en el orden del PC, armada una
+vez por pista) y guarda su pila y el controlador en variables propias, así no paga dar vuelta los bytes ni la tabla de
+páginas en cada lectura (lo que W6, §197, midió como la mitad del impuesto). Era el piloto de la etapa 4 (las islas):
+**éxito ×2,0** en la función, **se mata bajo ×1,4**.
+
+**El peso de la isla** (del perfil de la carrera de `build/web-m1`): las consultas KCL son ~0,7 % del perfil contando lo
+que llaman, ~6,6 % de la lógica; `IsCollidingImpl` sola, 0,24 %.
+
+**Qué se hizo** (todo lo derivado del código del juego queda fuera de git):
+- `herramientas/islas/generar-kcl.py` (en git: no trae código del juego, solo las reglas para transformarlo): toma la
+  función del C++ traducido (`generated/build_shards/`), cambia su entrada y su salida y pasa cada lectura y escritura
+  de memoria a la isla. El resultado va a `terceros/islas/kcl_807C0884.inc` (1.147 líneas, ignorado por git: es código
+  derivado del de Nintendo).
+- `web/juego/isla_kcl_nativo.cpp`: la sombra (8 a la vez, se borran al cambiar de carrera), el borde de la isla (la pila
+  de 224 bytes y los primeros 0x6C bytes del controlador en variables; lo demás, de la sombra o de la memoria) y tres
+  modos: 0 = la traducida, 1 = la isla (si algo no cuadra, cae a la traducida), 2 = el **comprobador** (la isla en seco
+  —sin escribir— y después la traducida de verdad; compara el resultado, el cursor y las tres salidas, y mide cada una).
+  Solo en un programa aparte (`MKW_ISLA_COMPILAR=1`); `MKW_ISLA=N` en Node, `?isla=N` en la página.
+
+```bash
+bash herramientas/tanda-w2.sh generar compilar comparar medir igual
+```
+
+**Resultado.**
+- **Correcta:** el comprobador, en la carrera entera de Node: **400.000 llamadas, 0 distintas**. La sala con B por la
+  isla: 15 bien, la misma carrera. Los fantasmas cuadro por cuadro (Luigi y una de RR): 6 bien y 6 bien.
+- **Pero no es más rápida:** en el comprobador, la isla 424 ns por llamada y la traducida 402 ns (**×0,95**). En el
+  tramo fijo de Node, el mismo programa con la isla y sin ella, intercalados 6 vueltas: 3,793 → 3,802 ms por cuadro
+  (**×1,002**, dentro del ruido de ±1 %).
+
+**Por qué no ganó.** La isla se armó transformando la traducción, así que hace las mismas cuentas en el mismo orden; lo
+único que cambia es de dónde lee. Y cada lectura ahora pregunta «¿es de la pila?, ¿del controlador?, ¿de la sombra?»
+antes de ir a la memoria: esas preguntas cuestan lo mismo que lo que ahorra no dar vuelta los bytes. Para ganar ×2 la
+isla tendría que hacer **otra cuenta**, no la misma con otros cables: los datos de la pista ya en el formato del PC desde
+la carga (sin preguntar de dónde viene cada lectura), las variables en registros y las 4 aristas del prisma con vectores.
+Además la función es chica: ~140 llamadas por cuadro × 0,4 µs ≈ 55 µs de 3,8 ms (1,5 %); aunque fuera el doble de
+rápida, la carrera ganaría menos del 1 %.
+
+**Veredicto: matado** (×0,95 en la función, bajo el corte de ×1,4; ×1,002 en el cuadro). No se mide en Chrome (la
+tanda se paró antes: no tenía sentido medir un piloto muerto). La isla, el comprobador y el generador quedan como
+herramienta (la isla nunca se prende en el programa de jugar).
+
+**Recomendación para la etapa 4 (las islas, W15–W17).** El camino «transformar la traducción» no rinde: lo que se
+ahorra en cada lectura se pierde en el borde. Una isla tiene que ser **una implementación propia de lo que hace la
+función** (leída del C++ traducido para entender, como pide la regla, y escrita de cero con los datos en el formato del
+PC), y tiene que cubrir **mucho** tiempo de una vez (toda la colisión y la física del kart, ~13 % de la lógica, no una
+función de 1,5 %). Antes de empezar W17 conviene medir el techo igual que en W3: cuánto baja el cuadro si esa parte no
+costara nada. El comprobador de dos modos (seco + de verdad, comparar cada llamada) sirve tal cual para cualquier isla.
+
+## §200 — W3 (etapa 0 del plan v4): el techo de dibujar la pista en nativo — **matado**
+
+**Qué es.** La idea de W3 (y después de W15): dibujar el modelo fijo de la pista **por fuera del juego** (sus vértices
+y materiales a la tarjeta una vez, en un paquete de dibujo ya validado) y apagar el dibujo del juego para ese modelo,
+porque dibujar le cuesta a la CPU más que la carrera misma. Antes de escribir ese dibujo propio (una semana), se midió
+el **techo**: cuánto baja la CPU por imagen si dibujar la pista **no costara nada**. Si ni así baja, el dibujo propio
+no puede ganar. Como medir cuánto ahorraría apagar un circuito entero antes de cambiarle los cables.
+
+**Qué se hizo** (`web/juego/techo_dibujo_nativo.cpp`, solo en un programa aparte: `MKW_TECHO_COMPILAR=1`, la página
+con `?techo=1`, Node con `MKW_TECHO=1`):
+- Envuelve la función que carga cada modelo de la pista (`CourseMgr::LoadModels`, 0x8078E1B0) y anota el
+  `ModelDirector` del de la pista; con el modo 1, antes de cada dibujo (`EGG::SceneManager::draw`) lo saca de la escena
+  con la misma función que usa el juego para esconder un modelo (`ModelDirector::ToggleVisible`, 0x8055C9F0). La imagen
+  queda sin la pista (solo para medir): se ven el cielo, los karts y los objetos.
+- Dos trampas: (1) **Retro Rewind reemplaza esa función** (`rr_overlay_8078E1B0`): en RR la carga pasa por su copia,
+  así que se envuelven las dos; (2) el nombre que llega es el del **archivo** («course_model.brres»), no el del modelo,
+  y la pista carga **dos** (se esconden las dos).
+
+```bash
+bash herramientas/tanda-w3.sh compilar nombres medir chrome
+```
+
+**Resultado** (tramo fijo de Luigi Circuit, intercalado; cuadros de lógica por segundo, con la pista → sin ella):
+
+| vuelta | este PC | gama baja (con la revisión de límites) |
+|---|---|---|
+| 1 | 148,1 → 162,2 (+9,5 %) | 16,93 → 17,20 (+1,6 %) |
+| 2 | 152,9 → 154,1 (+0,8 %) | 16,65 → 17,68 (+6,2 %) |
+| 3 | 151,6 → 146,2 (−3,6 %) | 17,53 → 18,29 (+4,3 %) |
+| mediana de los pares | **+0,8 %** | **+4,3 %** |
+
+- Con el perfil de la tarjeta (este PC): con la pista 13,27 ms de CPU por imagen y 0,20 ms de tarjeta; sin ella 13,63 y
+  0,18 ms. **No baja.**
+- Node (el mismo programa, sin la pista y con ella): 3,806 → 3,799 ms por cuadro (×0,998); la segunda corrida se cortó
+  sin aviso, solo queda un par.
+
+**Veredicto: matado.** Aunque dibujar la pista no costara **nada**, este PC no baja ni un 2 % (el corte) y la gama baja
+apenas +4,3 % (el éxito pedía 5 % con un dibujo propio, que algo cuesta). La pista es un modelo grande pero son pocas
+órdenes de dibujo: lo caro del dibujo no está ahí. El plan decía que si W3 moría había que ir a W16 (el recorrido de la
+escena, meses); este techo dice algo más fuerte: **sacar la pista entera, recorrido incluido, tampoco gana**. Lo que
+cuesta está repartido en los muchos modelos chicos (karts, objetos, efectos, el HUD) y en el trabajo de aurora por cada
+orden. **Recomendación para la etapa 4: no empezar W15 por la pista**; antes medir el techo de esos otros grupos con el
+mismo instrumento (esconder los karts, los objetos o los efectos) y atacar el que mueva la aguja.
+
+## §201 — N2 (etapa 0 del plan v4): la escalera de aparatos con la base de la etapa 0
+
+**Qué es.** Volver a medir los cinco escalones de §163/§164 (de este PC a la gama baja simulada) con la base de la
+etapa 0 (`build/web-w19` = M1 + los anillos + W19) y con lo que el teléfono paga de verdad (W5, §194: los dos
+teléfonos con `--js-flags=--wasm-enforce-bounds-checks`). Así la etapa 1 parte de números de hoy. El tramo fijo, la
+tarjeta medida por sus marcas de tiempo (`perfilGpu=1`, sin el redondeo de Chrome), 2 corridas por escalón.
+
+```bash
+bash herramientas/tanda-n2.sh escalera     # → build/web/datos/escalera/n2-*
+```
+
+| Escalón | Cuadros de lógica/s (2 corridas) | Margen para 60 | Antes (§164) | Tarjeta por imagen | CPU por imagen | Techo |
+|---|---|---|---|---|---|---|
+| Este PC | 147,5 · 157,8 | ×2,54 de sobra | — | 0,20 · 0,21 ms | 14,6 · 13,3 ms | **CPU** |
+| PC típico (`lastre=2.2`, 8 núcleos) | 90,5 · 96,1 | ×1,55 de sobra | 79,8 (+17 %) | 0,19 · 0,20 ms | 29,7 · 28,7 ms | **CPU** |
+| Portátil (`lastre=3&ladron=64`, 4) | 43,8 · 43,7 | le falta ×1,37 | 36,4 (+20 %) | 0,19 · 0,20 ms | 69,5 · 72,6 ms | **CPU** |
+| Gama media (teléfono, con la revisión de límites) | 30,6 · 30,6 | le falta ×1,96 | 30,8 (sin la revisión) | 0,94 · 0,98 ms | 170 · 196 ms | **CPU** |
+| Gama baja (teléfono, con la revisión de límites) | 18,5 · 18,8 | le falta ×3,21 | 19,1 (sin la revisión) | 2,12 · 2,00 ms | 379 · 372 ms | **CPU** |
+
+Cómo se lee:
+- **Los PC ganaron un 17–20 %** desde §164: es lo de M1 (§182), los anillos (§181) y W19 (§195).
+- **Los teléfonos quedaron casi iguales, pero ahora pagan la revisión de límites** (W5 midió que cuesta −22,9 % en la
+  gama baja): lo ganado desde §164 se lo come esa revisión, que antes no se simulaba. Los números de hoy son los
+  honestos.
+- **En todos los escalones frena la CPU**, y por mucho: la tarjeta trabaja de 0,2 a 2,1 ms por imagen (un poco menos
+  que en §164, por los anillos), la CPU de 13 a 379 ms.
+- **Lo que falta para 60 cuadros por segundo:** al portátil ×1,37, a la gama media ×1,96 y a la gama baja ×3,21. Eso es
+  lo que tienen que dar las etapas siguientes del plan.
+
+## §202 — W7 (etapa 0 del plan v4): las escrituras parciales de las matrices XF — **no hace falta**
+
+**Qué es.** El juego carga matrices (posición, normales, texturas) en la memoria de la parte de la consola que
+transforma los vértices (el «XF»). KartPad adaptó un arreglo de la aurora de WiiCompiled (`998c456`) para la carga que
+empieza a mitad de una matriz o cruza dos. Nuestra `copy_xf_data` (`lib/gx/command_processor.cpp`) la rechaza con el
+aviso «XF: … sub-copy unsupported» y se salta esa carga: si Mario Kart la usara, algo se dibujaría con la matriz vieja.
+El plan: primero mirar si el aviso sale en varias pistas; si nunca sale, se anota y no se toca.
+
+**Qué se hizo.** `medir-carrera-entera.mjs` cuenta las líneas «sub-copy unsupported» de la consola (por tipo y
+tamaño) y las guarda en el JSON (`subcopias`). El camino del aviso está completo: aurora lo manda a su
+`logCallback` con el nivel «warning» (el runtime pide todo desde «debug»), el runtime lo escribe por `std::cerr`, que en
+el navegador es la consola que lee Playwright.
+
+```bash
+bash herramientas/tanda-w7.sh w7      # 5 pistas enteras con 12 CPU: 0.0, 5.3, 13.2, 30.2 (RR) y 65.0 (RR)
+```
+
+**Resultado:** **0 avisos** en las 5 pistas, de la cuenta a la meta (`build/web/datos/carrera-entera/w7/`).
+
+**Veredicto: no hace falta.** Mario Kart (con RR) no hace esas cargas parciales en estas pistas; el arreglo de KartPad
+no se trae. Si alguna vez aparece el aviso (el contador queda en `medir-carrera-entera`), el arreglo es chico y va con
+su atribución.
+
+## §203 — W8 (etapa 0 del plan v4): lo que crece en la tarjeta en una copa entera — **hecho (queda apagado)**
+
+**Qué es.** En KartPad los pipelines compilados nunca se sueltan: el juego crece al pasar por varias pistas, y un
+teléfono llegó a 2 GB y bajó de velocidad tras una hora. Nuestra aurora es de la misma familia, y una copa de la sala
+(o una hora de juego) es justo ese caso. La meta del plan: tras 8 pistas distintas, menos de +50 MB que tras 1 (o lo
+que crezca, explicado), y `prueba-sala` en verde.
+
+**Cómo se mide.** `herramientas/medir-memoria-pistas.mjs` pasa por 8 pistas en **la misma pestaña**, sin recargar (como
+la sala entre carreras: `mkwDirecto.carrera` con la ficha de la siguiente) y, 20 s después de largar cada una, lee la
+memoria privada de cada proceso de Chrome (la pestaña, el proceso de la tarjeta de video, el total) y, dentro de la
+página, el heap, los pipelines, la piscina de copias (W20, §204), las texturas vivas de aurora (un contador nuevo,
+`mkw_web_texturas_dato`, solo cuenta) y, desde ahora, **el costo** de cada pista: de las líneas «[pipelines]» del
+registro, cuántos pipelines se armaron en el momento (el juego esperó), cuántos dibujos se saltaron porque su receta no
+estaba lista y cuántos se soltaron al entrar.
+
+**1. Qué crece.** Sin tocar nada, de la pista 1 a la 8 la pestaña crece +65 a +83 MB, pero **el proceso de la tarjeta
+crece +1,07 a +1,14 GB**. Las texturas de aurora no son: van y vienen con la pista (31–105 MB, sin subir). Los
+pipelines conocidos van de ~740 a ~1.230: la sospecha era ellos.
+
+**2. Soltar los pipelines no alcanza.** `?soltarPipelines=1` (aurora `mkw_web_pipelines_soltar(1)`): al entrar a la
+carrera de una pista, al comienzo del cuadro siguiente se sueltan los pipelines que solo se usaron en **otra** pista
+(con las etiquetas por pista de C2, §174; nunca los de los menús, los comunes, los urgentes ni los que están en camino);
+cada uno vuelve a la espera de su pista, así que si esa pista vuelve se precalienta como siempre.
+
+- La primera versión dejó la 3.ª pista trabada en negro (lo vio el dueño): aurora guarda dos atajos «esta configuración
+  → este pipeline» (`cached_pipeline_state` y `resolve_pipeline_state` en `lib/gx/command_processor.cpp`) que seguían
+  apuntando a los soltados, y al dibujar con uno de ellos el juego se caía. Arreglo: un **contador de época**
+  (glosario, `g_mkwPipelinesEpoca`): cada vez que se suelta algo sube, y un atajo de otra época no se usa.
+- Con eso las 8 pistas pasan y se sueltan 413 pipelines, pero el proceso de la tarjeta crece igual: **+1.132 MB** contra
+  +1.142 MB guardándolos.
+
+**3. Lo que crece son los sombreadores.** Aurora guarda aparte cada **módulo de sombreador** compilado
+(`sShaderModuleCache` de `lib/gx/pipeline.cpp`, glosario) y nunca lo suelta; el pipeline soltado deja su sombreador
+vivo, y el controlador guarda lo compilado. `?soltarPipelines=2`: además, cada vez que se sueltan pipelines se vacía esa
+memoria (`gx::clear_shader_module_cache()`; se vuelven a compilar los que se pidan).
+
+```bash
+bash herramientas/tanda-w8.sh compilar medir probar    # el contador de texturas; las 8 pistas sin soltar y con =1
+bash herramientas/tanda-w8b.sh compilar medir probar   # el modo 2 → build/web-w8b
+bash herramientas/tanda-w8d.sh foto costo sala         # el costo: sin soltar y con el modo 2, intercalados (+ W9, §205)
+```
+
+**Resultado** (`build/web/datos/memoria-pistas/w8-*.json` y `w8d-*.json`; el mismo programa `build/web-w8b` en las 4
+de abajo, intercaladas):
+
+| | proceso de la tarjeta, pista 1 → 8 | dibujos saltados (8 pistas) | armados en el momento |
+|---|---|---|---|
+| sin soltar, 1.ª | 943 → 2.068 MB (**+1.125**) | 7.589 | 217 |
+| modo 2, 1.ª | 983 → 836 MB (**−147**) | 10.313 | 227 |
+| modo 2, 2.ª | 944 → 812 MB (**−132**) | 11.370 | 233 |
+| sin soltar, 2.ª | 972 → 2.039 MB (**+1.067**) | 8.208 | 221 |
+| (antes: `=1`, solo pipelines) | 945 → 2.077 MB (+1.132) | — | — |
+
+Con el modo 2 la tarjeta queda plana (entre 790 y 1.000 MB en las 8 pistas) y el total de Chrome baja 60–95 MB en vez
+de subir 1,1–1,2 GB. Los armados en el momento (los que hacen esperar al juego, ~0,5 ms en total por pista) no cambian.
+Lo que sube es **dibujos saltados**: +37 % (10.842 contra 7.899 de media), sobre todo en la 2.ª y la 3.ª pista, cuando
+la pista nueva se precalienta y sus sombreadores ya no están: unos pocos cuadros, durante la carga y la presentación,
+dibujan sin algún material hasta que llega su receta (como ya pasa en la primera visita a cualquier pista).
+
+`prueba-navegador`: con `=1` 22 bien, 0 mal; con `=2` 21 bien, 0 mal (el punto que falta es el de «parejos en
+pantalla», que este monitor no puede dar). `prueba-sala --rapida`: falla en el mismo punto **con y sin W8**, así que no es
+de W8: ver «La sala» más abajo.
+
+**Veredicto: hecho, queda apagado.** El crecimiento está explicado y el arreglo cumple la meta (−132 a −168 MB, contra
+la meta de menos de +50 MB): son los sombreadores, no las texturas ni los pipelines. No se prende ahora porque cambia
+algo que se ve (más dibujos saltados al cargar cada pista nueva) y la etapa 0 no adopta; la recomendación para E1
+(§206): prenderlo en el teléfono y en la sala (las copias largas, donde 1 GB de más cierra la pestaña) después de medir
+en qué etapa caen los dibujos saltados de más (si caen en la presentación, no se notan; si caen con la carrera
+andando, precalentar los sombreadores de la pista elegida antes de soltar los de las otras). Las dos copias del juego
+de W10 (E1) hacen esto más urgente.
+
+**La sala (lo que se encontró de paso).** `prueba-sala --rapida` falla en el punto M22 («la carrera 2 corre con lo
+que A volvió a elegir»: A elige otro personaje en el descanso y la carrera 2 no lo usa) y después se cae al leer la
+parrilla; dos veces de cinco, además, la página A se pierde y la prueba queda colgada hasta que se la para. Se corrió
+con cada programa (`herramientas/tanda-w8c.sh` y `tanda-sala-programas.sh` → `build/web/datos/w8/sala-*.txt` y
+`build/web/datos/sala-programas/`):
+
+| programa | resultado |
+|---|---|
+| `build/web/navegador` (la línea vieja de WiiCompiled, 31-10 09:58) | **44 bien, 0 mal** |
+| `build/web-m1` (WiiCompiled v0.9.3 + M1, §170/§182, 31-10 13:07) | falla M22 |
+| `build/web-w19` (la base de la etapa 0), sin soltar, 2 veces | falla M22 (una vez colgada) |
+| `build/web-w8` con `=1`, 2 veces; `build/web-w8b` con `=2` | falla M22 (con `=2` colgada) |
+
+La página es la misma en todas: **lo rompió el programa, desde la línea del motor** (v0.9.3 de N15a o M1), antes de la
+etapa 0. §170 comprobó «la misma carrera» con `prueba-sincro` (75/75), que no vuelve a elegir personaje a mitad de una
+copa; `prueba-sala` no se corrió con esa línea. No se arregla aquí (no es de la etapa 0): queda para la sesión del
+motor, con esta tabla para empezar.
+
+## §204 — W20 (etapa 0 del plan v4): soltar las texturas de copia ociosas — **no rinde (queda apagado)**
+
+**Qué es.** Cuando el juego copia la imagen que está armando a una textura (la «copia del EFB»: para los reflejos, el
+desenfoque, la imagen del espejo retrovisor…), aurora la saca de una **piscina** de texturas de repuesto, y nunca
+devuelve las que dejaron de usarse. KartPad (`0cca4d2`, Chris Sotraidis, GPL‑3.0) suelta las que llevan 300 cuadros
+sin que nadie las pida. Se trajo solo esa parte, con su atribución (`parches/aurora-e0.diff`,
+`herramientas/versiones.md`), detrás de un interruptor apagado: `mkw_web_piscina(1)`, la página con `?piscina=1`;
+`mkwEstado.piscina()` dice cuántas hay, sus MB y cuántas se soltaron.
+
+```bash
+bash herramientas/tanda-w7.sh w8 w20     # 8 pistas en la misma pestaña, sin y con ?piscina=1
+```
+
+**Resultado** (`build/web/datos/memoria-pistas/w8.json` y `w20.json`, la misma pestaña pasando por 8 pistas):
+
+| | piscina (texturas · MB) | proceso de la tarjeta, pista 1 → 8 |
+|---|---|---|
+| sin soltar (`?piscina=0`) | 20–34 · 5,7–7,5 MB | 1.009 → 2.082 MB (**+1.073 MB**) |
+| soltando (`?piscina=1`) | 20–36 · 5,7–7,8 MB, 28 soltadas | 997 → 2.125 MB (**+1.128 MB**) |
+
+`prueba-navegador` con `?piscina=1`: 21 bien, 0 mal.
+
+**Veredicto: no rinde, queda apagado.** La piscina de copias de Mario Kart pesa unos 6 MB y no crece: soltar las
+ociosas funciona (28 sueltas) pero no cambia nada que se note. Lo que crece de verdad, +1 GB en 8 pistas, es otra
+cosa: eso es W8 (§203).
+
+
+## §205 — W9 (etapa 0 del plan v4): personajes invisibles en las tarjetas Adreno 6xx/7xx — **hecho**
+
+**Qué es.** En KartPad (el Mario Kart Wii para teléfonos) los personajes salen invisibles en las tarjetas Adreno de las
+series 600 y 700, muy comunes en la gama media (Galaxy S24, Moto G85, OnePlus). La causa es cómo su controlador de
+Vulkan lee las **matrices de los huesos** (glosario): cada vértice dice con un número qué matriz usar, y la tarjeta la
+busca en un arreglo de matrices. Chrome en Android también dibuja con Vulkan, así que nos puede pasar. Este PC no
+tiene una Adreno y la regla es no comprar aparatos: se prepara todo, apagado, y se prende con el primer informe.
+
+**Qué se hizo** (las tres partes del plan):
+
+1. **El aviso** (`web/navegador/adreno.mjs`): la página lee lo que el navegador dice de la tarjeta (`GPUAdapterInfo`:
+   fabricante, arquitectura, descripción) y, si es una Adreno 6xx o 7xx, lo anota en el registro («[tarjeta] Adreno
+   730: … pueden salir invisibles») y en el informe de rendimiento (`adreno`). Banco `adreno` (11 puntos, adaptadores
+   de mentira: 730 y 619 avisan, 830 y otras marcas no, un navegador que no dice nada no rompe nada).
+2. **El camino de reserva** (glosario), apagado: aurora (`lib/gx/shader.cpp`, `huesos_por_filas`) cambia el texto de
+   cada sombreador antes de compilarlo: las matrices `postex_mtx` y `nrm_mtx` se declaran como filas sueltas (un arreglo
+   de 3·N filas de 4 números en vez de N matrices de 3×4: los mismos bytes en el mismo lugar) y cada uso arma la matriz
+   con sus 3 filas. La cuenta es la misma; cambia solo cómo se le pide el dato al controlador, que es la forma en que
+   KartPad lo esquivó. Se prende con `?huesosFilas=1` (aurora `mkw_web_huesos_filas`, antes de arrancar);
+   `mkwEstado.huesosFilas` dice si quedó prendido. Toda imagen 3D lo usa: la posición de cada vértice pasa por
+   `postex_mtx[índice del vértice]`.
+3. **Prenderlo para las Adreno** recién cuando llegue el informe de un jugador (el plan): no se hace ahora.
+
+**Cómo se comprobó que dibuja igual: la foto del mismo cuadro.** `web/navegador/prueba-foto-igual.mjs` corre la misma
+carrera dos veces, A normal y B con `?huesosFilas=1`, y con `?fotoCuadro=N` la página deja el juego quieto en el cuadro
+de lógica N de la carrera; se saca la foto del lienzo de cada una y se cuentan los píxeles que difieren en más de 2
+niveles de 255 en algún color. La meta del plan: menos del 0,5 %.
+
+Dos trampas antes de que la foto sirviera:
+
+- **La carrera de 12 CPU no se repite igual**, aunque lleve la misma semilla (probado también con `?azarFijo=1`, que
+  hace que el azar de la carrera salga de la semilla de la ficha y no del reloj): las CPU eligen su personaje en los
+  menús con el reloj de verdad, así que cada corrida tiene otra parrilla (en una salía Mario, en la otra un Mii). Se
+  cambió a la **Contrarreloj contra el fantasma experto** sin tocar el mando, la misma que usa `prueba-fantasma-igual`:
+  es idéntica cuadro por cuadro, y las dos corridas quedan quietas en el mismo cuadro (la prueba lo exige: Raceinfo
+  +0x20).
+- **La prueba de control** (glosario): el mismo programa contra sí mismo daba ~1 % de píxeles distintos, siempre en la
+  franja de arriba: los rayos del sol del cielo (se mueven con el reloj, no con los cuadros de la carrera) y el último
+  dígito del cronómetro. La prueba compara desde el 32 % del alto hacia abajo (`--desde 0.32`, `--desde 0` = la imagen
+  entera) e imprime igual el número de la imagen entera.
+
+```bash
+MKW_BUILD=build/web-w8b/navegador node web/navegador/prueba-foto-igual.mjs                          # el control
+MKW_BUILD=build/web-w8b/navegador node web/navegador/prueba-foto-igual.mjs --extra-b=&huesosFilas=1  # la reserva
+# (en la tanda: bash herramientas/tanda-w8d.sh foto)
+```
+
+**Resultado** (`build/web/datos/w8/foto-control.txt` y `foto-huesos.txt`; las fotos en `build/web/datos/foto-igual/`,
+son imágenes del juego: nunca a git):
+
+| | cuadro 600 | cuadro 1500 |
+|---|---|---|
+| control (A y B iguales) | **0,000 %**, máximo 0 niveles (imagen entera 1,146 %) | **0,000 %**, máximo 0 (0,942 %) |
+| B con `?huesosFilas=1` | **0,000 %**, máximo 0 niveles (imagen entera 1,293 %) | **0,000 %**, máximo 0 (0,677 %) |
+
+Ningún error de sombreadores (WGSL) en ninguna corrida; `prueba-navegador` con `?huesosFilas=1`: 21 bien, 0 mal.
+
+**Veredicto: hecho.** El camino de reserva dibuja exactamente lo mismo (ni un píxel distinto debajo del cielo) y
+compila sin errores; el aviso sale en el registro y en el informe. Queda apagado hasta el primer informe de un jugador
+con una Adreno 6xx/7xx; entonces se prende solo para esas (lo que falta es elegirlo por `riesgoAdreno` en vez de por
+`?huesosFilas`, una línea). No se pudo comprobar que **arregle** el problema: eso solo se ve en una Adreno.
+
+**Lo que quedó para otras pruebas:** `prueba-foto-igual.mjs` sirve para cualquier cambio del dibujo que no debería
+verse (`--extra-a`/`--extra-b`, `--cuadros`, `--copa --fila`, `--desde`); `?azarFijo=1` queda (banco
+`interruptores-e0`) aunque no alcanza para repetir una carrera de CPU.
+
+## §206 — La etapa 0 del plan v4, el resumen: qué quedó y qué se recomienda para E1 y E4
+
+**Qué era la etapa 0.** Pilotos cortos, cada uno con un umbral de éxito y uno de corte, para decidir con números qué
+partes grandes del plan v4 valen la pena antes de gastar semanas en ellas, y de paso traer los arreglos útiles de
+KartPad. Doce ítems; todo medido en la gama baja simulada (el tramo fijo de §163, con la revisión de límites de
+Android) y en este PC como control, intercalados; la carrera tenía que salir igual (huellas de la sala, fantasmas,
+paridad). Todo lo nuevo quedó **apagado por omisión** o en programas aparte: el programa de jugar no cambió de
+comportamiento, salvo W19, que es un arreglo y está en la base.
+
+| Ítem | Qué se preguntaba | Resultado | Veredicto |
+|---|---|---|---|
+| W5 (§194) | ¿cuánto cuesta en el teléfono la revisión de límites de Android? | gama baja −23 %, media −6,8 % | hecho: el teléfono simulado se mide **siempre** con ella |
+| W19 (§195) | el memo de las indirectas con los bits altos (KartPad) | gama baja +4,2 %, este PC +0,5 %; la misma carrera | hecho: en la base (`build/web-w19`) |
+| W6 (§197) | en la carrera, ¿cuánto pesan dar vuelta los bytes y la tabla de páginas? | +23,5 % y +43,1 % del nativo: juntas el 67 % | hecho: H6 y H7 primero en la etapa 2 |
+| W2 (§199) | la colisión como isla transformada de la traducción | correcta, pero ×0,95 (corte ×1,4) | **matado** |
+| W4 (§198) | compilar guiado por un perfil (PGO) | gama baja +2,2 % (zona gris), `.wasm` −8,3 % | no se adopta; la herramienta queda |
+| W1 (§196) | ¿el dibujo es un sumidero? ¿cuánta memoria cambia por cuadro? | en la carrera sí (6 pistas y 2 fantasmas iguales deshaciendo lo que escribe); 1,5–2 MB por cuadro; en los menús no | hecho: W10 sigue |
+| W3 (§200) | el techo de dibujar la pista en nativo | aun gratis: este PC +0,8 %, gama baja +4,3 % | **matado** |
+| N2 (§201) | la escalera de aparatos con la base nueva | PC típico +17 %, portátil +20 %; frena la CPU en todos; faltan ×1,37 / ×1,96 / ×3,21 | hecho |
+| W7 (§202) | las cargas parciales de matrices XF (KartPad) | 0 avisos en 5 pistas enteras | no hace falta |
+| W8 (§203) | ¿crece la memoria en una copa entera? | la tarjeta +1,1 GB en 8 pistas: los sombreadores; con el modo 2, −132 a −168 MB | hecho, apagado (`?soltarPipelines=2`) |
+| W20 (§204) | soltar las texturas de copia ociosas (KartPad) | la piscina pesa ~6 MB | no rinde, apagado |
+| W9 (§205) | los personajes invisibles de las Adreno 6xx/7xx | aviso listo; la reserva dibuja 0,000 % distinto | hecho, apagado (`?huesosFilas=1`) |
+
+**Lo que dice el conjunto.** Frena la CPU en todos los aparatos (N2), y lo caro no está en un solo lugar: ni la
+colisión (W2) ni la pista (W3) alcanzan solas; en el motor, la memoria (bytes y tabla de páginas, W6) es la parte más
+grande que se puede atacar de una vez, y en el teléfono cada acceso además paga la revisión de límites (W5). Lo que sí
+se abrió: **el dibujo es un sumidero en la carrera** (W1), así que puede ir entero a otro núcleo sin cambiar la carrera.
+
+**Recomendaciones para la etapa 1 (W10 y W11, el dibujo en otro núcleo).**
+
+1. **W10 sigue** (W1 pasó). La foto de la memoria que viaja al Worker del dibujo va **por diferencias**: con la carrera
+   andando cambian 1,5–2 MB por cuadro (el máximo, 35–42 MB, es el cuadro en que carga); si el envío por mensajes no
+   alcanza a ~120 MB/s, comprimida. Las ~135 páginas usadas arriba de los 64 MiB de MEM2 van en la foto, y lo que
+   escribe `SwitchScnRoot` (1,4–2,7 KB por cuadro que la carrera sí lee) no se deshace: viaja.
+2. **En los menús el dibujo se queda en el hilo del juego** (allí no es un sumidero: la Contrarreloj por los menús se
+   trababa al deshacerlo). W10 se prende solo con la carrera andando.
+3. **Mover el dibujo entero, no acelerar un pedazo**: W3 mostró que el costo está repartido en muchos modelos chicos y
+   en el trabajo de aurora por orden; W10 se lleva todo eso de una vez.
+4. **La memoria de la tarjeta, junto con W10**: dos copias del juego (W10) duplican lo que crece. Prender el modo 2 de
+   W8 en el teléfono y en la sala, después de medir en qué etapa caen los dibujos saltados de más (+37 %, al cargar
+   cada pista nueva); si caen con la carrera andando, precalentar los sombreadores de la pista elegida antes de soltar
+   los de las otras.
+5. **Cómo comprobar W10**: la foto del mismo cuadro de `prueba-foto-igual.mjs` (W9 la dejó lista: la Contrarreloj contra
+   el experto, que se repite igual; desde el 32 % del alto, porque los rayos del sol cambian solos) entre el programa de
+   hoy y el de W10, además de las huellas de la sala y los fantasmas.
+6. **Medir el teléfono simulado siempre con la revisión de límites** (W5), y comparar intercalado (§166).
+
+**Recomendaciones para la etapa 4 (las islas, W15–W18).**
+
+1. **W17 (la colisión y la física) no entra como estaba escrito**: su condición era que W2 pasara, y W2 murió. Si se
+   vuelve a intentar, una isla tiene que ser una **implementación propia** de lo que hace la función (leída del C++
+   traducido para entender, escrita de cero con los datos en el formato del nativo), no la traducción transformada:
+   esa ahorra en cada lectura lo que pierde en el borde.
+2. **W15 no empieza por la pista** (W3 murió: aunque la pista no costara nada, la gama baja gana 4,3 %). Antes, medir el
+   techo de los otros grupos con el mismo instrumento (`techo_dibujo_nativo.cpp`: esconder los karts, los objetos, los
+   efectos) y empezar por el que mueva la aguja; si ninguno pasa del 5 % solo, W15/W16 bajan de prioridad frente a W10.
+3. **W18 (los efectos)**: igual, primero su techo escondiéndolos.
+4. Lo que facilita la etapa 4: el dibujo es un sumidero (W1), así que una isla del dibujo se comprueba con la foto y
+   las huellas sin tocar la carrera.
+
+**Lo que no se tocó o quedó abierto.**
+- **Una regresión de antes de la etapa 0**: `prueba-sala --rapida` falla en M22 (la carrera 2 no usa el personaje que
+  A volvió a elegir en el descanso) y a veces se cuelga, con todos los programas de la línea del motor (`build/web-m1`
+  en adelante); con `build/web/navegador` (la línea vieja) pasa 44/0. La tabla en §203; es de la sesión del motor.
+- En Node, el arranque se cayó una vez en la elección de pista (página 0x4b) durante el descubrimiento de W4: no se
+  repitió; anotado por si vuelve.
+- Nada se subió ni se publicó; nada del juego entró a git.
+
+
+## §207 — W10 (etapa 1 del plan v4): el dibujo en otro Worker
+
+**Qué se preguntaba.** W1 (§196) mostró que en la carrera el dibujo es un **sumidero** (glosario): lee el estado de la
+carrera y nada de lo que escribe vuelve a la carrera. Entonces el dibujo podría correr en otro núcleo (otro Worker,
+«B») con una copia de la memoria de la Wii, mientras el Worker de la carrera («A») solo calcula. W10 mide tres cosas:
+1. **el techo**: cuánto más rápido calcula A si no dibuja;
+2. **el costo de la copia**: cuánto le cuesta a A juntar y mandar, cada cuadro, lo que cambió en la memoria;
+3. **si B dibuja lo mismo** con esa copia (la parte B: dos copias del programa en dos Workers).
+
+Como pasar de un solo operario que arma y pinta cada pieza a dos en línea: el primero arma y pone la pieza en la cinta,
+el segundo la pinta. Solo conviene si poner la pieza en la cinta cuesta poco.
+
+### §207.1 La marca de páginas sucias y la caja
+
+- **La marca** (`parches/motor-w10.diff` sobre `terceros/Wiicompiled-motor`, solo con `-DMKW_SUCIAS`): cada escritura del
+  juego en la memoria de la Wii pone en 1 el byte de su página de 4 KiB en `g_mkwSucias` (1 MiB, un byte por página de
+  los 4 GiB de direcciones). Es la **marca de páginas sucias** (glosario). Sin la marca, el programa es el de siempre.
+- **La caja** (`web/juego/w10_nativo.cpp`, solo en el programa aparte `MKW_W10_COMPILAR=1`): al empezar el dibujo de
+  cada cuadro (`EGG::SceneManager::draw`, 0x8023AEAC) se recorren solo las páginas marcadas; cada una se compara de a 8
+  bytes con la **copia sombra** (glosario) y lo distinto se escribe en la caja como tramos `[dirección][largo][bytes]`
+  (**caja de diferencias**, glosario). El primer cuadro manda la foto entera (152 MiB: MEM1 y MEM2).
+- **Lo que la carrera sí lee del dibujo**: `ScnMgr::SwitchScnRoot` (0x805635E4), lo mismo que se corre en R2 (§192). Sin
+  dibujo, A lo llama igual.
+- **Los modos** (`?w10=N`, solo con la carrera andando; en los menús el dibujo se queda en el hilo del juego, §206): 0 =
+  la marca sola, dibujando; 1 = sin dibujo (el techo); 2 = + juntar la caja; 3 = + mandarla a un Worker de mentira que
+  la pega (`w10.mjs` `crearMandadero`, `w10-dibujo.js`); 4 = + comprobar la marca (la memoria entera contra la sombra
+  cada cuadro); 5, 6, 7 = 1, 2, 3 sin presentar (no corre `XfbManager::copyEFB`, 0x80244268: con 1–3 la imagen vacía
+  se presentaba en cada cuadro y la espera de la presentación marcaba el paso).
+
+### §207.2 El costo de la caja y el techo (este PC y la gama baja)
+
+**Comando**: `bash herramientas/tanda-w10.sh compilar comprobar chrome sala fantasma` (el programa en
+`build/web-w10`, motor + aurora de la base `build/web-w19`, semillas copiadas).
+
+- **La marca no deja escapar nada**: con `?w10=4`, 2.400 cuadros de carrera, **0 páginas cambiadas sin marca** (la
+  memoria entera contra la sombra en cada cuadro).
+- **El tamaño de la caja**: ~490–500 páginas marcadas por cuadro (máximo 534), pero dentro de ellas cambia poco:
+  **83–125 KB por cuadro** (máximo 185 KB; W1 contaba 1,5–2 MB porque contaba páginas enteras). Juntarla cuesta
+  **0,17–0,19 ms**, mandarla 0,012 ms; la foto entera del primer cuadro, 12,5–14,2 ms (una vez).
+- **El costo de la marca sola** (modo 0 contra la base, cuadros de lógica por segundo, 2 vueltas): este PC 154,8 / 154,7
+  contra 151,7 / 154,8; gama baja 17,1 / 15,5 contra 16,1 / 15,9: **dentro del ruido**.
+- **El techo y el costo completo, este PC**: base 151,7 / 154,8 → modo 5 (techo sin presentar) 267,5 / 294,7, modo 6
+  (+ juntar) 288,3 / 299,6, modo 7 (+ juntar + mandar) 291,8 / 274,9: **×1,8–1,9**. Juntar y mandar no se ven.
+- **La misma carrera**: la sala de dos con A en `w10=7` y B normal, **huellas 75/75** en las pistas 0.0 y 13.2 (los ✗
+  de la prueba son esperados: la foto de A es negra porque A no dibuja, y «el kart de B avanzó» en 13.2 mira la foto);
+  la Contrarreloj contra el experto con `w10=3`: **2.119/2.119 cuadros iguales**, la meta en el mismo cuadro (2.242).
+
+### §207.3 La trampa de la gama baja: la compensación de lag de RR, y `?dibujarSiempre=1`
+
+- En la gama baja (`&lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`, con la revisión de límites de Android) el modo 5
+  salió **más lento** que la base: 11,6 / 12,3 contra 16,1 / 15,9.
+- **Aislado por partes** (fase `aislar`, la base contra el modo 5 con un solo lastre por vez): con el lastre de la CPU ×1
+  (3,60 contra 7,16 ms por cuadro), con el de la tarjeta (3,71 contra 6,93) y con el de ayuda + ladrón (5,59 contra
+  9,44) el modo 5 gana ×1,7–2,0; solo con `lastre=7` no gana (23,2 contra 24,2 cuadros de lógica/s), y ahí la base
+  presentaba **3,5 imágenes por segundo**.
+- **La causa**: la **compensación de lag** de RR (glosario; `rr_kamek_81806568`, enganchada en `RKSystem::Run`): si el
+  juego va atrasado, se salta el dibujo. Con el lastre la base ya casi no dibujaba, así que sacarle el dibujo no ahorraba
+  nada. En la sala no pasa: allí se dibuja siempre (§62).
+- **`?dibujarSiempre=1`** (`web/juego/lockstep_nativo.cpp` `mkw_dibujar_siempre`, en el programa de siempre pero apagado
+  por omisión; `mkw.mjs`): apaga la compensación fuera de la sala, para medir como en la sala. **Dibujar siempre**
+  (glosario).
+- **Con `dibujarSiempre`** (fase `siempre`, 2 vueltas intercaladas, cuadros de lógica por segundo):
+
+  | | Modo 0 (dibuja) | Modo 5 (techo) | Modo 7 (+ caja a un Worker) | Trabajo por cuadro 0 → 7 |
+  |---|---|---|---|---|
+  | Gama baja (límites) | 6,97 / 6,79 | 15,05 / 15,11 (**×2,19**) | 14,29 / 14,59 (**×2,10**) | 20,9 → 9,8 ms |
+  | Este PC | 85,9 / 81,8 | 276,8 / 293,5 (×3,40) | 294,2 / 286,1 (**×3,46**) | 11,5 → 3,0 ms |
+
+  Dibujando todos los cuadros, el dibujo es **~74 % del hilo de la carrera en este PC y ~53 % en la gama baja**, y la
+  caja cuesta ~4 % del techo en la gama baja (nada en el PC). Ojo: el «151» de §207.2 en el PC ya saltaba dibujos (el
+  modo sin tope va atrasado a propósito); jugando a 60 cuadros por segundo se dibuja siempre.
+
+### §207.4 La parte B: dos copias del programa, el dibujo en el Worker B — **prototipo, no cierra todavía**
+
+- **Cómo** (todo solo para probar; la página de siempre no cambia): `web/navegador/w10-dos.html` + `w10-dos.mjs` arrancan
+  **dos Workers** con el arnés del paso 8 (`trabajador-hilo.mjs` → `trabajador-juego.mjs`), cada uno con su copia del
+  programa de `MKW_W10_COMPILAR=1` y su lienzo, unidos por un `MessageChannel` (un cable directo entre los dos):
+  - **A** (`?w10=9`: no dibuja ni presenta; con `?verifica=1`, modo 10: dibuja igual, para comparar) corre la carrera,
+    recibe los mandos y al final de cada cuadro manda su caja (`w10.mjs` `crearEnlaceA`: si no hay caja libre,
+    **espera**: la **contrapresión**, glosario; nunca se pierde una caja, B quedaría distinto para siempre);
+  - **B** (`?w10=8`) no calcula: donde su bucle iba a calcular (`EGG::SceneManager::calc`, 0x8023AE60) pega las cajas
+    que llegan hasta la del fin del cuadro (`crearDibujanteB`) y deja que el juego dibuje y presente lo pegado.
+  - La prueba: `MKW_BUILD=build/web-w10c/navegador node web/navegador/prueba-w10-dos.mjs --alto 900,1500 --medir` (A y B
+    quietos en el cuadro N, las dos fotos iguales como `prueba-foto-igual`; y el tramo fijo con B dibujando al lado).
+- **Primera vuelta** (`build/web-w10b`, tanda 7): B pegó la foto entera (40 cajas, 152 MB) y **cayó** («unreachable»).
+  - **Causa: las pilas de los hilos.** Cada hilo de la Wii es una fibra del runtime parada en su propio punto; B recibía
+    la pila de A y al volver de una función recuperaba registros de A. Arreglo: B **no pega** la ficha (`OSThread`,
+    0x318 bytes) ni la pila de ninguno de sus hilos (`mkw_w10_hilos`/`mkw_w10_rango` en `w10_nativo.cpp` recorren la
+    lista de hilos, 0x800000DC; `w10.mjs` `recortar` deja fuera esos rangos al pegar; banco `w10` 19/19). **Pila y
+    ficha de un hilo** (glosario).
+- **Segunda vuelta** (`build/web-w10c`): sin la caída, pero el planificador de B quiso correr un hilo de carga que
+  existía en A y no en B («`ResumeGuestThread: no fiber for 0x909266e8`», un salto a 0x80176b7c, y el programa paró).
+  - **Causa: los montones no reparten igual.** A y B arrancan cada uno por su cuenta; los objetos que se crean al
+    cargar la carrera (hilos incluidos) caen en direcciones distintas. Al pegar la memoria de A, B recibe punteros a
+    hilos de A que el runtime de B no conoce (el runtime guarda las fibras fuera de la memoria de la Wii).
+  - Arreglos: B tampoco pega las variables del planificador (memoria baja 0x800000C0–0xF0, los hilos por omisión y
+    ocioso, las 32 colas de listos, las alarmas, las marcas; direcciones de `os_internal.h`), y con la marca
+    `g_mkwW10SoloPropios` (solo en el programa de `MKW_SUCIAS`, `parches/motor-w10.diff`: `os_thread.cpp`
+    `InsertThreadIntoQueueByPriority`, `os_scheduler.cpp` `LinkThreadOnRunQueue` y `WakeupThreadQueue`) un hilo sin
+    fibra en B no entra a las colas de listos ni se despierta.
+- **Tercera vuelta**: ya no se cae; B pegó la foto y **14 cuadros** y se quedó quieto, y A con él (A espera cajas
+  libres que B no devuelve). B no está esperando cajas: su propio bucle quedó esperando algo de un hilo (una cola de
+  mensajes o un mutex de la memoria de A, que nombra hilos de A que B ya no despierta).
+- **Qué falta para cerrar la parte B** (lo que se aprendió: copiar la memoria entera de una copia del juego a otra
+  choca con lo que cada runtime guarda fuera de ella —las fibras de los hilos, ligadas a direcciones de la Wii—):
+  1. que B **no corra el bucle del juego**: un bucle propio de B que solo llame al dibujo de la escena
+     (`EGG::SceneManager::draw`), la copia a la pantalla (`XfbManager::copyEFB`) y la presentación, sin pasar nunca por
+     el planificador ni por otros hilos (el sonido iría aparte, W11). Así lo que B pega es solo dato para dibujar;
+  2. o bien que B arranque **desde la foto de A** (las mismas direcciones de los montones) antes de la carrera, y no por
+     su cuenta;
+  3. después, la foto igual (`prueba-w10-dos`, cuadros 900 y 1500) y la sala/fantasmas con el par A+B.
+- Todo queda **apagado** (`?w10=` solo existe en el programa de `MKW_W10_COMPILAR=1`; el runtime cambia solo con
+  `-DMKW_SUCIAS`).
+
+### §207.5 Veredicto de W10
+
+- **El techo y el costo: hecho y medido.** Sacar el dibujo del hilo de la carrera rinde **×2,1 en la gama baja y ×3,5 en
+  este PC** (dibujando cada cuadro), la caja de diferencias cuesta ~0,2 ms por cuadro (83–125 KB) y la carrera es la
+  misma (huellas 75/75 en dos pistas, el fantasma 2.119/2.119). La marca de páginas no cuesta nada medible.
+- **La parte B (el dibujo andando de verdad en B): prototipo, no cierra en E1**: dos de los tres obstáculos resueltos
+  (pilas y planificador), el tercero (las esperas entre hilos de dos copias) pide cambiar el diseño de B (§207.4, 1 o 2).
+- **Recomendación**: W10 sigue siendo lo que más promete del plan (más que todo lo de la etapa 0 junto). La próxima
+  etapa que lo retome empieza por el punto 1 de §207.4 (B con su propio bucle de dibujo), con `w10-dos.html` y
+  `prueba-w10-dos.mjs` como banco.
+
+**Archivos.** `web/juego/w10_nativo.cpp`, `parches/motor-w10.diff` (la marca y los ganchos del planificador, todo bajo
+`MKW_SUCIAS`), `herramientas/compilar-web.py` (`MKW_W10_COMPILAR=1`: REEMPLAZOS y exportaciones), `web/navegador/w10.mjs`,
+`w10-dibujo.js`, `w10-dos.html`, `w10-dos.mjs`, `prueba-w10-dos.mjs`, `trabajador-juego.mjs`/`trabajador-hilo.mjs` (el
+cable de W10), `mkw.mjs` (`?w10=`, `?dibujarSiempre=1`), `web/juego/lockstep_nativo.cpp` (`mkw_dibujar_siempre`),
+banco `w10` (19), `herramientas/tanda-w10.sh` (fases `compilar comprobar chrome sala fantasma perfil aislar siempre dos
+w11 puerta`). Los resultados en `build/web/datos/w10/` (`tanda-1…12.txt`; fotos del juego: nunca a git). Los programas:
+`build/web-w10`, `build/web-w10b`, `build/web-w10c` (nunca a git).
+
+
+## §208 — N3, P10 y H5 (etapa 1 del plan v4): el juego en un Worker, la página que lo maneja y los hilos — **cerrados**
+
+Los tres venían del paso 8 (§186–§189), que el dueño detuvo a medias: faltaba la gama baja con 5 pares para decidir la
+**puerta A** (glosario), y H5 tenía su página de diagnóstico pero no el informe.
+
+### §208.1 N3: la puerta A en la gama baja
+
+**Comando** (fase `puerta` de `herramientas/tanda-w10.sh`, con el candado):
+
+```bash
+MKW_BUILD=build/web-w19/navegador node herramientas/medir-trabajador.mjs --repetir 5 --lastre 3.5 \
+  --extra "&lastreAyuda=3" --segundos 600 --etiqueta puerta-baja --chrome "--js-flags=--wasm-enforce-bounds-checks"
+```
+
+(el arnés de §186 con la base de la etapa 0, la carrera directa de 12 CPU con semilla fija, el tramo fijo §163 sin
+tope, la gama media/baja del plan con la revisión de límites de Android, W5; Worker y página intercalados, el orden se
+da vuelta en cada par. `medir-trabajador.mjs` tiene ahora `--chrome "…"` para las banderas.)
+
+| Par | Worker | Página | Diferencia |
+|---|---|---|---|
+| 1 | 42,38 | 44,08 | −3,9 % |
+| 2 | 46,06 | 48,80 | −5,6 % |
+| 3 | 47,80 | 46,71 | +2,3 % |
+| 4 | 43,88 | 49,44 | −11,2 % |
+| 5 | 46,38 | 47,60 | −2,6 % |
+| **Media** | **45,30** | **47,33** | **−4,3 %** (trabajo por cuadro 6,34 contra 6,07 ms) |
+
+(cuadros de lógica por segundo. En este PC empata: +1,3 %, §186.)
+
+**La decisión de la puerta A.** El juego en un Worker, solo, **no conviene**: en la gama baja pierde ~4 % (4 de 5
+pares), y en el PC empata. Lo que sí vale es **otro núcleo trabajando** (W10: ×2,1 en la gama baja, §207). Y para W10
+no hace falta mover el juego: la carrera puede seguir en el hilo de la página y solo el dibujo ir a un Worker (B). Así:
+- **N3 queda cerrado: no pasa como «el juego entero al Worker»**; el arnés (`trabajador-juego.mjs`) queda como
+  instrumento y como la base de B en W10.
+- Si algún día se quiere aislar la página por otra razón (memoria compartida, H5), el Worker cuesta ese ~4 %.
+
+### §208.2 P10: la página que maneja un juego en un Worker — **no hace falta (por N3)**
+
+P10 era llevar la página real (`mkw.mjs`: 65 funciones del programa que la página llama, 8 módulos que leen la memoria
+del juego) a hablar con un juego en un Worker. Con la puerta A cerrada así (la carrera se queda en la página), **no hace
+falta**: el arnés de §186 ya probó que se puede (la huella igual, 0 cuadros distintos) y es la base del Worker del
+dibujo de W10, que no necesita nada de la página (no lee la memoria del juego para la interfaz: solo pega la caja y
+dibuja). Lo que habría que pasar a mensajes si se retoma está en §189 y en `docs/publicar.md` §8.
+
+### §208.3 H5: los hilos, en el informe y en un teléfono simulado — **hecho**
+
+- **El informe dice los hilos**: `web/navegador/aislar.mjs` `estadoHilos()` (aislada o no, memoria compartida de verdad,
+  la versión de Chrome, si es Android y si Document-Isolation-Policy es esperable: Chrome 137 en el computador, 146 en
+  Android) va en el informe de rendimiento (`mkw.mjs`, campo `hilos`). El día que un teléfono de verdad copie su informe
+  con la página servida con la cabecera, la pregunta de H5 se contesta sola.
+- **Banco `aislamiento`: 16/16** (cuatro puntos nuevos para `estadoHilos` con navegadores de mentira: aislada sin
+  memoria compartida, Android 145 contra 146, escritorio 137).
+- **El teléfono simulado**: `node herramientas/prueba-aislamiento-telefono.mjs` (**8/8**, Pixel 7 de Playwright, sin el
+  juego): el banco `aislamiento` se porta igual cuando el navegador dice ser Android; el plan B (cajas transferidas,
+  varios Workers) anda. **Ojo**: la emulación cambia lo que la página ve, no el motor (sigue siendo Chrome de
+  escritorio), así que **no** prueba que Android 146 traiga Document-Isolation-Policy.
+- **Lo que publicaría el dueño** (nada se publicó): `docs/publicar.md` §8 — la cabecera `Document-Isolation-Policy:
+  isolate-and-require-corp` en el marco del juego, por el service worker o por Cloudflare, y lo que hay que cambiar en el
+  código antes (lo que hoy cruza directo entre el sitio y el marco: `mkwConectarRecords/Nube/Vr`, `parent.Mando`).
+- **Conclusión de H5** (igual que §188, ahora con el informe): sin memoria compartida, la **cinta de cajas** (glosario)
+  anda en cualquier Chrome; W10 la usa tal cual (la caja de cada cuadro, 83–125 KB, se copia y viaja en ~0,012 ms).
+
+
+## §209 — W11 (etapa 1 del plan v4): lo que solo se ve, del lado de calcular — **hecho (instrumento; se mueve con W10)**
+
+**Qué se preguntaba.** W10 lleva el *dibujo* a otro núcleo. Pero en cada cuadro, antes de dibujar, el juego también
+*calcula* cosas que solo se ven o se oyen: las partículas (polvo, chispas, humo), qué sonidos poner y el hilo de sonido.
+Si la carrera no las lee, pueden irse con el dibujo al Worker B y el hilo de la carrera queda más liviano todavía.
+W11 pregunta: ¿cuáles se pueden sacar sin que la carrera cambie, y cuánto pesan?
+
+**Qué se miró (decompilando, la regla del dueño).** `RaceScene::OnCalc` (0x80554E6C) llama a
+`UpdateRaceInstances` (0x80554AD4) y a `SectionMgr::Update` (0x8063550C). `UpdateRaceInstances` llama, en orden, a
+Raceinfo, las entidades, los objetos, la IA, los conductores, los karts, Lakitu, los objetos de carrera, y al final a
+**`Effects::Mgr::Update` (0x8067CB88)**. El sonido: **`EGG::SimpleAudioMgr::Calc` (0x802135D0)**, una vez por cuadro, y
+el hilo de sonido del juego, **`SoundThread::FrameProcess` (0x800A4AF0)**, que en el runtime es una fibra más del hilo
+del juego. **La interfaz 2D** (el velocímetro, los puestos, el mapa) vive dentro de `SectionMgr::Update`, que además
+manda la carrera (la cuenta, el fin, el cambio de pantalla; RR lo envuelve): **se queda en A**.
+
+**Cómo.** En el programa de medir de W10 (`MKW_W10_COMPILAR=1`), `web/juego/w10_nativo.cpp` envuelve las tres funciones
+(`compilar-web.py` las pone en `REEMPLAZOS`, `func_X → func_X_traducida`); `mkw_w11_saltar(máscara)` hace que no corran:
+1 = efectos, 2 = `SimpleAudioMgr::Calc`, 4 = el hilo de sonido. En la página, `?w11=máscara` (solo con la carrera
+andando: `alCambiarCarrera` en `mkw.mjs`; `mkwEstado.w11()` = cuántas veces saltó cada una). Apagado por omisión, y en
+el programa de jugar no existe.
+
+**Comandos.**
+
+```bash
+W10_SAL=build/web-w10b bash build/tanda-w10-corre.sh w11
+```
+
+(la fase `w11` de `herramientas/tanda-w10.sh`: para cada máscara 1, 2 y 4, la sala de dos con B saltando
+—`prueba-sincro.mjs --directa --pistas=0.0 --semilla=1234 --extra-b=&w11=M`— y la Contrarreloj contra el experto con B
+saltando —`prueba-fantasma-igual.mjs --copa 0 --fila 0 --extra-b=&w11=M`—; después el tramo fijo §163 con
+`&dibujarSiempre=1` (§207.3), sin y con `&w11=7`, este PC y la gama baja con los límites de Android, 2 vueltas
+intercaladas.)
+
+**Resultado: la carrera no lee ninguna de las tres.**
+
+| Máscara (lo que B no corre) | Sala, huellas | Contrarreloj: el fantasma, cuadro por cuadro | Meta |
+|---|---|---|---|
+| 1 = efectos | 75/75 iguales (14 bien, 0 mal) | 2114/2114 iguales | el mismo cuadro, 2242 |
+| 2 = qué suena | 75/75 (14/0) | 2114/2114 | 2242 |
+| 4 = el hilo de sonido | 75/75 (14/0) | 2115/2115 | 2242 |
+
+**Cuánto pesan** (las tres juntas, `&w11=7`, dibujando cada cuadro, cuadros de lógica por segundo):
+
+| | Sin saltar (vuelta 1 / 2) | Con `w11=7` (1 / 2) | Diferencia | Trabajo por cuadro |
+|---|---|---|---|---|
+| Gama baja (límites) | 6,76 / 6,41 | 8,40 / 8,50 | **+28 %** | 21,8 → 16,8 ms |
+| Este PC | 83,8 / 87,4 | 88,9 / 94,3 | **+7 %** | 11,3 → 10,5 ms |
+
+En la gama baja pesa más porque el aparato de mentira multiplica el trabajo del hilo del juego (×7) y el del hilo de
+ayuda (×5): lo que se ahorra en el PC (~0,7 ms) llega a ~5 ms allá.
+
+**Qué significa.** Efectos y sonido son **sumideros** (glosario) como el dibujo: pueden ir a B con él, y la carrera
+(A) ahorra otro 7 % (PC) a 28 % (gama baja) además de lo de W10. **Ojo**: sin W10 esto no sirve para jugar (sin efectos
+no se ven las chispas, sin sonido no se oye nada); es solo la prueba de que se pueden mover. El paso siguiente, con la
+parte B de W10 andando: A con `w10=9` y `w11=7`, y B que **sí** corra los tres después de pegar la caja (las páginas de
+los efectos solo las escribiría B, así que la caja de A no las pisa).
+
+**Archivos.** `web/juego/w10_nativo.cpp` (la parte W11), `herramientas/compilar-web.py` (REEMPLAZOS y exportaciones),
+`web/navegador/mkw.mjs` (`?w11=`), `herramientas/tanda-w10.sh` (fase `w11`). Resultados en `build/web/datos/w10/`
+(`w11-*`, `tanda-7.txt`; nada del juego).
+
+## §210 — La etapa 1 del plan v4, el resumen: el dibujo en otro núcleo (W10, W11, N3, P10, H5)
+
+**Qué era la etapa 1.** Llevar el trabajo que solo se ve (el dibujo, los efectos, el sonido) a otro núcleo, para que el
+hilo de la carrera haga solo la carrera. Cinco ítems, en orden lógico; todo medido en la gama baja simulada (el tramo
+fijo §163 con la revisión de límites de Android, W5) y en este PC como control, intercalados; la carrera tenía que salir
+igual. Todo lo nuevo quedó **apagado por omisión** o en el programa aparte de `MKW_W10_COMPILAR=1`: el programa de jugar
+no cambió de comportamiento (solo ganó `?dibujarSiempre=1`, apagado, para medir).
+
+| Ítem | Qué se preguntaba | Resultado | Veredicto |
+|---|---|---|---|
+| W10 (§207) | ¿cuánto gana la carrera sin el dibujo y cuánto cuesta mandarle a otro Worker lo que cambió? | **×2,10 gama baja, ×3,46 este PC** (con la caja); la caja 83–125 KB y ~0,2 ms por cuadro; la marca no cuesta; huellas 75/75, fantasma 2.119/2.119 | techo y costo **hechos**; la parte B (el dibujo andando en B) es un **prototipo**: faltan las esperas entre hilos de las dos copias (§207.4) |
+| W11 (§209) | ¿efectos y sonido se pueden mover también? | la carrera no los lee (huellas 75/75 y fantasmas iguales con cada uno saltado); pesan **+28 % gama baja, +7 % PC** | hecho: van a B con el dibujo |
+| N3 (§208.1) | la puerta A: ¿el juego entero en un Worker? | gama baja **−4,3 %** (5 pares, 4 peores), PC empata | **cerrado: no**; la carrera se queda en la página, solo el dibujo va a un Worker |
+| P10 (§208.2) | la página real hablando con un juego en un Worker | sin la puerta A, no se necesita | **no hace falta** |
+| H5 (§208.3) | los hilos en el teléfono | el informe dice `hilos` (aislada, memoria compartida, Chrome, Android); banco `aislamiento` 16/16, teléfono simulado 8/8; `docs/publicar.md` §8 | hecho (sin publicar) |
+
+**Lo que dice el conjunto.** El dibujo pesa **~74 % del hilo de la carrera en este PC y ~53 % en la gama baja** cuando se
+dibuja cada cuadro, y efectos + sonido otro 7–28 %. Mandar lo que cambió es barato. Lo difícil no es la copia de datos
+sino que **dos copias del juego no comparten lo que cada runtime guarda fuera de la memoria de la Wii** (las fibras de los
+hilos): por eso la parte B necesita que B tenga su propio bucle de solo dibujo, no el bucle entero del juego.
+
+**Recomendaciones para la etapa que siga con esto.**
+1. **B con su propio bucle de dibujo** (§207.4, punto 1): llamar desde B solo `SceneManager::draw`, `copyEFB` y la
+   presentación, sin el planificador; los efectos y el sonido (W11) también en B, después de pegar.
+2. **La carrera en la página, el dibujo en un Worker** (N3): sin pagar el ~4 % de mover el juego.
+3. Cómo comprobar: `prueba-w10-dos.mjs` (la foto igual en los cuadros 900 y 1500 y el tramo con B dibujando), y la sala y
+   los fantasmas con el par A+B; medir siempre con `?dibujarSiempre=1` fuera de la sala (§207.3).
+
+**Lo que no se tocó.** La regresión de antes de la etapa 0 (`prueba-sala --rapida` falla en M22 con `build/web-m1` en
+adelante, §206) sigue anotada y no es de E1. Nada se subió ni se publicó; nada del juego entró a git.
+
+## §211 — H6 (etapa 2 del plan v4): la RAM de la Wii en un lugar fijo — **hecho (prendido con `--fija`)**
+
+**Qué es.** Cada lectura o escritura que hace el juego en la memoria de la Wii pasaba por la **tabla de páginas** (glosario):
+primero se lee en una tabla dónde está esa página en el PC y recién con eso se lee el dato. Son dos lecturas encadenadas,
+la segunda esperando a la primera. W6 (§197) midió que la tabla cuesta **+43 %** del tiempo del programa de Windows.
+H6 pone la MEM1 (24 MB), el módulo de Kamek de RR (2 MB, en 0x81800000) y la MEM2 (128 MB) en un **lugar fijo** de la
+memoria de wasm, desde 1 MiB, en el mismo orden que en la Wii: la dirección del PC = 0x00100000 + (dirección de la Wii
+y 0x1FFFFFFF). Comprobar que una dirección cae ahí es una resta y una comparación (clang las junta en una sola); lo
+demás (los registros de hardware, la caché bloqueada 0xE…, las vistas sin caché) sigue por el camino de antes, en una
+función aparte. Es la **ventana fija** del glosario.
+
+**Por qué.** Era lo primero que recomendaba E0 (§206): la tabla es la mitad del impuesto del navegador que queda.
+
+**Cómo está hecho** (rama `e2-h6` en `terceros/Wiicompiled-motor-h6`, commit `35b63ac`, `parches/motor-h6.diff`):
+- `runtime/include/mkw_motor.h`: `MKW_MOTOR_FIJA` (apagado en la cabecera), `MKW_MOTOR_FIJA_RANGO_FUERA`,
+  `MKW_MOTOR_FIJA_RAM` (apagado: solo para medir, inseguro con 0xE…), `MKW_FIJA_BASE`.
+- `memory_access.h`: `FijaDentro`/`FijaPtr`; `Memory::Read*` y `Write*` van primero a la ventana y, si no cae, a una
+  función fuera de línea (`Read*Otro`, `Write*Raro`); `ResolveRangeHost` (los rangos del traductor) igual, con la tabla
+  vieja en `ResolveRangeTabla` fuera de línea. `ppc_isa_quantized.h`: los psq también.
+- `guest_flat_memory_wasm.cpp`: al arrancar, MEM1, Kamek y MEM2 se ubican en la ventana en vez de pedirse al heap.
+- `herramientas/compilar-web.py --fija`: prende la marca, enlaza con `-sGLOBAL_BASE=403701760` (lo de C++ empieza
+  después de la ventana, en 0x18100000) y la memoria inicial en `--memoria-inicial` + 240 MB (560).
+- `herramientas/tanda-h6.sh compilar probar igual medir chrome memoria` (`H6_SAL`, `H6_BASE`, `H6_WC`, `H6_CFLAGS`).
+
+**Trampas.**
+- Primera versión (`build/web-h6`): el `.wasm` creció +10 % y ganaba menos (Node ×0,913). Era que cada escritura y
+  cada rango dejaban en línea los dos caminos, el nuevo y el viejo. Con lo que no cae en la ventana mandado directo a la
+  función aparte (`build/web-h6b`), el `.wasm` queda **3 % más chico** que la base y gana más.
+- `-sGLOBAL_BASE` exige decimal (`0x18100000` da «invalid byte size»).
+- `ln -s` en Git Bash copia carpetas enteras: los enlaces de `generated/` y `build/` de la copia se hacen con
+  `New-Item -ItemType Junction` de PowerShell.
+- La memoria: con 640 MB iniciales Windows marcaba +282 MB en la pestaña. Es **reservada**, no física (glosario):
+  el hueco de 232 MB entre Kamek y la MEM2 nadie lo toca. `medir-memoria.mjs` ahora imprime también la física
+  (`fisica`, el conjunto de trabajo) y la memoria inicial bajó a 560.
+- En Node con la revisión de límites, una corrida de la base no llegó al tramo (la rareza conocida de Node antes de la
+  carrera); la primera tanda se cortó en 4 pares y se repitió entera con h6b.
+
+**Resultado** (`build/web-h6b` contra `build/web-w19`, intercalados, `build/web/datos/e2/h6b/`):
+
+| Prueba | Resultado |
+|---|---|
+| prueba-arranque | 13/13 |
+| La sala, A = H6, B = la base (`prueba-sincro --directa --build-b`) | 14 bien, **huellas 75/75** |
+| Fantasmas cuadro por cuadro | **2.115/2.115 iguales**, meta en el mismo cuadro (2.242) |
+| Paridad del motor (`construir.ps1 -Motor` con la copia H6) | **28 bien, 0 mal** |
+| Node, este PC (6 pares) | **×0,838** (de ×0,72 a ×0,88) |
+| Node con la revisión de límites de Android (6 pares) | **×0,881** (de ×0,85 a ×0,91) |
+| Chrome, gama baja con límites (`lastre=7…`, tramo fijo) | **20,26 / 20,40 / 19,65** cuadros de lógica/s contra 14,77 / 16,72 de la base (la base de la vuelta 2 midió solo 50 cuadros: descartada): **+21 % a +37 %, ~+29 %**; trabajo por cuadro 7,1 ms contra 8,6–9,7 |
+| Chrome, este PC | 151,4 / 158,3 / 154,2 contra 148,6 / 147,6 / 144,6: **+2 % a +7 %** |
+| Memoria física de la pestaña en carrera | 934 MB contra 951 (igual); reservada 1.192 contra 969 (el hueco) |
+| `.wasm` del navegador | 114,7 MB contra 118,0 |
+
+**Qué significa.** Es la ganancia más grande del plan v4 hasta ahora en la gama baja: casi un tercio más de cuadros con
+la misma CPU, y la carrera sale idéntica. En el PC rápido gana poco porque ahí lo que frena es el dibujo (§210).
+
+**Veredicto: se adopta.** El motor de E2 es la rama `e2-h6` (`herramientas/versiones.md`). No se juntó en
+`terceros/Wiicompiled-motor` porque ahí están los cambios sin commit de W10 en los mismos archivos (no se tocan). El
+programa se arma con `compilar-web.py --fija` y la copia `MKW_WIICOMPILED=terceros/Wiicompiled-motor-h6`; los ítems
+siguientes de E2 miden contra `build/web-h6b`. Para el programa de publicar, la orquestadora decidió que `--fija` entra a
+`--final` (y es la base de E2): se pone por omisión al cerrar E2.
+
+## §212 — H7 (etapa 2 del plan v4): la RAM guardada ya dada vuelta — **descartado con su medida** (y VUELTA32 tampoco)
+
+**Qué es.** La Wii guarda cada número con el byte grande primero; el PC y el teléfono, al revés (glosario: *Endianness*).
+Hoy cada lectura o escritura de 2 o 4 bytes los da vuelta con ~6 operaciones, porque wasm no tiene la instrucción. H7
+propone guardar la RAM ya dada vuelta de a palabras de 4 bytes (el truco de los emuladores de Nintendo 64): la lectura
+de 4 bytes sale derecha, la de 1 byte cambia la dirección con un «o exclusivo», la de 8 intercambia mitades.
+
+**Por qué medir primero.** El costo de H7 es grande (3–5 semanas en el plan): todo lo que lee la RAM de la Wii desde
+fuera del código traducido tendría que leer dando vuelta: aurora (texturas, vértices, listas de dibujo: le llegan como
+punteros, 69 usos de `Memory::GetPointer` en 25 archivos del runtime), el disco, el sonido (AX), la NAND, y 9 archivos
+de la página que leen la memoria del juego (`mkwEstado`, los letreros, `directo.mjs`…). Antes de eso, dos medidas
+baratas sobre H6 (`build/web-h6b`, intercalados en Node, 6 pares sin y 6 con la revisión de límites de Android):
+
+**1. VUELTA32** (`MKW_MOTOR_VUELTA32=1`, ya existía en `mkw_motor.h` y nunca se había medido): dar vuelta los 4 bytes
+con una mezcla SIMD (meter el número en un registro de 16 bytes, reordenar con una tabla fija, sacarlo) en vez de 6
+operaciones de enteros. Es lo que ganó para 8 bytes (VUELTA64).
+- `H6_SAL=build/web-h7v32 H6_BASE=build/web-h6b H6_CFLAGS="-DMKW_MOTOR_VUELTA32=1" bash herramientas/tanda-h6.sh compilar probar medir`
+- Resultado: este PC **×0,986** (ruido), con límites **×1,064** (peor); `.wasm` +2,3 %. Ir y volver del registro SIMD
+  cuesta lo que se ahorra. **No se adopta.**
+
+**2. El techo de H7** (`MKW_H7_TECHO=1`, rama `e2-h6` commit `0256944`, `parches/motor-h7-techo.diff`, apagado): un
+programa que da vuelta los 2 y 4 bytes **tres veces** (el mismo resultado, con una barrera entre cada una para que el
+compilador no las borre). Lo que tarda de más son dos vueltas: la mitad es lo que cuesta la vuelta que H7 sacaría.
+- `H6_SAL=build/web-h7techo H6_BASE=build/web-h6b H6_CFLAGS="-DMKW_H7_TECHO=1" bash herramientas/tanda-h6.sh compilar probar medir`
+- Resultado: este PC **×1,165**, con límites **×1,202** (pares de ×1,18 a ×1,33); arranque 13/13. Una vuelta ≈
+  **8–10 %** del cuadro, y eso ya incluye que el programa con las vueltas de más crece +23 % (más caché ocupada): el
+  techo real es un poco menor.
+
+**Qué significa.** Lo más que H7 puede ganar es ~×1,08–1,10. A eso hay que restarle lo que agrega: el «o exclusivo» en
+cada lectura de 1 y 2 bytes, el camino aparte para las lecturas desalineadas y las copias dando vuelta para aurora
+(1,2–1,4 MB de vértices por cuadro, §181) y el sonido. Queda ~×1,04–1,06, contra 3–5 semanas que tocan el dibujo, el
+sonido, la NAND y la página (el plan estimaba ×1,15–1,3). Además W12 (la pila en variables) saca entero cerca de un
+cuarto de esos accesos, con su vuelta incluida, y achica todavía más lo que le quedaría a H7.
+
+**Veredicto: H7 descartado en E2** (con esta medida); VUELTA32 descartado. El instrumento queda en la rama, apagado, por
+si después de W12–W14 hay que volver a mirarlo. Datos: `build/web/datos/node-estable/datos-h7v32-*`, `datos-h7techo-*`.
+
+**Regla nueva del dueño (2026-11-02, para toda E2).** El programa nativo (`mkw-nativo.exe`, `compilar-nativo.py`,
+`--nativo-tambien`, `medir-impuesto`) no se usa en E2: «no sirve mucho ahora». Node queda solo como filtro rápido y para
+comprobar el arranque y la paridad; **los veredictos se deciden con Chrome** (la gama baja simulada con la revisión de
+límites + este PC, intercalados). Y otra del mismo día: «si ves que no sirve descartalo, no vale la pena seguir
+haciendo más vueltas»: se decide con las vueltas que hay, sin sumar más.
+
+**Regla del dueño (2026-11-02, contestó «sí» a la propuesta de la orquestadora): menos pares cuando el resultado es
+claro, también cuando gana.** Si los 2 primeros pares intercalados en Chrome gama baja con límites van los dos del mismo
+lado y lejos de la zona gris (los dos ≥ +8 % o los dos ≤ −2 %), se decide con esos 2. Lo que cae entre −2 y +8 %, o con
+pares contradictorios, lleva más vueltas (hasta 5–6). Las pruebas de «igual» (sala, fantasmas, arranque, paridad) no se
+recortan nunca. Rige desde H11.
+
+### §212.1 — VUELTA32 en Chrome (pedido de la orquestadora)
+
+El «×1,064 con límites» de Node era una **pérdida** (ms por cuadro, 6,4 % más). En Chrome, intercalado
+(`H6_SAL=build/web-h7v32 H6_BASE=build/web-h6b bash herramientas/tanda-h6.sh chrome`), cuadros de lógica/s:
+
+| vuelta | gama baja con límites (base → VUELTA32) | este PC |
+|---|---|---|
+| 1 | 19,94 → 17,82 (−10,6 %) | 158,4 → 154,0 (−2,8 %) |
+| 2 | 20,66 → 18,85 (−8,8 %) | 156,1 → 162,7 (+4,3 %) |
+| 3 | 20,30 → 18,96 (−6,6 %) | 164,0 → 160,7 (−2,0 %) |
+
+Pierde en las tres en la gama baja: **descartado**. El techo de H7 no se repitió en Chrome: H7 ya no pasa por el costo
+(3–5 semanas para ≤ ×1,06) y el dueño pidió no sumar vueltas a lo que no sirve.
+
+## §213 — M6 (PGO) y M7 (ThinLTO) (etapa 2 del plan v4): M6 **descartado**, M7 **hecho**
+
+**M6, compilar guiado por un perfil.** Se decide con la medida de W4 (§198), como pedía la etapa, sin repetirla: gama
+baja +2,2 % (zona gris, con un ruido de ±5 %), este PC +3,2 %, `.wasm` −8,3 %. H6 cambió cómo se llega a la memoria,
+no qué ramas son calientes, que es lo que ordena PGO: el cuadro no cambia. Y el perfil se ata a la forma de cada función
+(hay que rehacerlo con cada cambio del motor) y lleva nombres del juego. **Descartado en E2**; `tanda-w4.sh` queda lista
+por si al final interesa el `.wasm` 8 % más chico.
+
+**M7, ThinLTO del runtime y aurora.** LTO (*optimizar al enlazar*, glosario) deja cada archivo a medio compilar y
+optimiza recién al juntarlos, viendo todo: mete en línea funciones de un archivo dentro de otro y borra lo que nadie usa.
+«Thin» = la versión que reparte el trabajo en paralelo (el LTO completo junta todo en un bloque). Solo el runtime,
+aurora y el código propio de la página; nunca el código traducido (265 MB de C++).
+- `herramientas/compilar-web.py`: `MKW_LTO="runtime,aurora,aurora_finita,web,puente,thp"` agrega `-flto=thin` a esos
+  grupos; el enlace (`wasm-ld`) los optimiza juntos.
+- `MKW_LTO=… H6_SAL=build/web-m7 H6_BASE=build/web-h6b bash herramientas/tanda-h6.sh compilar probar igual medir chrome`
+  (y `H6_VUELTAS="4 5 6 7"` para más vueltas: corté en la 5 porque con 7 pares el resultado ya era claro; decisión
+  mía, no del dueño: su pedido fue no seguir sumando vueltas a lo que no sirve, y M7 sí sirve).
+
+| Prueba | Resultado |
+|---|---|
+| prueba-arranque | 13/13 |
+| La sala, A = M7, B = H6 | 14 bien, **huellas 75/75** |
+| Fantasmas | **2.113/2.113 iguales** |
+| Node (filtro) | ×1,029 este PC, ×0,975 con límites (ruido) |
+| Chrome gama baja con límites, 7 pares (base → M7) | 17,79→20,59 · 18,80→20,70 · 18,39→19,97 · 17,86→20,07 · 19,15→17,23 · 18,13→17,53 · 17,13→18,20: **mediana +8,6 %** (5 de 7 a favor, media +5,6 %) |
+| Chrome este PC, 7 pares | +5,8 · −2,5 · −2,2 · −1,2 · −1,4 · −0,5 · −3,6 %: **mediana −1,4 %** |
+| `.wasm` del navegador | 115,3 MB contra 114,7 (+0,5 %) |
+
+**Trampas.** Lancé dos tandas con el mismo nombre en el candado (`QUIEN`): la segunda creyó que el candado era suyo y
+empezó a medir encima de la primera; al pararla, su salida soltó el candado de la otra. Arreglo: se paró, se mataron
+solo mis procesos por número y se repuso el candado; desde entonces las tandas propias van encadenadas en un solo
+proceso (una detrás de la otra).
+
+**Veredicto: M7 se adopta.** La gama baja gana ~+9 % de mediana con un ruido grande, y este PC queda dentro del ~1,5 %
+que se acepta; no cuesta mantenerlo (es una bandera). El programa de E2 se arma con `MKW_LTO` en esos grupos.
+
+## §214 — H11 (etapa 2 del plan v4): lo frío del código traducido, compilado chico — **descartado con su medida**
+
+**Qué es.** El código traducido tiene ~33.000 funciones del juego y de RR; una carrera usa ~2.600. H11 compila las que
+nunca corren en una carrera con `minsize` y `cold` (glosario: *código frío*), para que el programa sea más chico y lo
+caliente quede más junto. No toca qué hace ninguna función.
+
+**Cómo.**
+- `herramientas/correr-guion.mjs --cpuprof carpeta`: el perfil de V8 de una corrida en Node.
+- `herramientas/h11-caliente.mjs`: junta los perfiles de los 3 guiones de W4 (pistas 0x1E, 0x10, 0x0A; el tramo fijo es
+  Luigi Circuit, que el perfil **no** ve, para no medir con trampa) y escribe `frio.h`, una línea por función fría que
+  repite su declaración con `__attribute__((minsize, cold))`. Por archivo no servía: 120 de 202 archivos traducidos
+  tienen algo caliente (cubren el 99,5 % del tiempo).
+- `compilar-web.py --frio <frio.h>`: lo agrega con `-include` solo al código traducido.
+- `bash herramientas/tanda-h11.sh perfilar cabecera compilar probar igual medir chrome` (`build/web/datos/e2/h11/`; el
+  perfil y `frio.h` llevan nombres y direcciones del juego: nunca a git). Contra `build/web-h6b`, sin `MKW_LTO`.
+
+| Prueba | Resultado |
+|---|---|
+| Funciones | 2.646 con tiempo; **30.426 de 33.057 frías** |
+| `.wasm` del navegador | 108,9 MB contra 114,7 (**−5,0 %**) |
+| prueba-arranque | 13/13 |
+| La sala, A = H11, B = H6 | 14 bien, huellas 74/74 |
+| Fantasmas | 2.113/2.113 iguales |
+| Node (filtro) | ×1,034 (más lento) este PC, ×0,996 con límites |
+| Chrome gama baja con límites, 4 pares (base → H11) | 19,44→19,41 · 20,80→19,69 · 19,14→19,56 · 19,96→19,45: −0,2 · −5,3 · +2,2 · −2,6 % (**mediana −1,4 %**) |
+| Chrome este PC, 4 pares | −1,2 · −1,8 · +1,7 · +4,0 % (mediana +0,3 %) |
+
+Los dos primeros pares quedaron uno en la zona gris y otro por debajo de −2 %: por la regla del dueño (2 pares deciden
+solo si los dos son claros del mismo lado) se sumaron 2 vueltas. Con 4 pares no hay nada que ganar: para llegar a +8 %
+de mediana harían falta vueltas que contradicen todo lo medido, y el dueño pidió descartar lo que no sirve sin más vueltas.
+
+**Por qué no gana.** V8 ya compila cada función por separado y solo optimiza (TurboFan) las calientes: el código frío
+nunca entra en la caché del procesador durante la carrera, sea chico o grande. Lo que achica `minsize` es el archivo,
+no el cuadro.
+
+**Veredicto: H11 se descarta.** Queda `--frio` en `compilar-web.py` y la tanda, por si interesa el `.wasm` 5 % más chico
+(menos para bajar y compilar la primera vez); no entra al programa de E2.
+
+## §215 — W12 (etapa 2 del plan v4): la pila de la Wii en variables locales — **el techo medido: no alcanza, se descarta**
+
+**Qué es.** ~29 % de los accesos directos a la memoria del código traducido son a la pila de la Wii (la dirección
+r1 + k: guardar y reponer registros, variables temporales). W12 los convertiría en variables de C++ en las funciones
+que nunca pasan la dirección de su pila a otra (3–4 semanas en el traductor). Antes de gastarlas, el **techo**: cuánto
+cuestan hoy esos accesos.
+
+**Cómo (instrumento, nunca al programa para jugar).**
+- `python -I herramientas/w12/techo.py` arma `terceros/Wiicompiled-motor-w12t` (atajos de carpeta a la rama e2-h6 y el
+  código traducido reescrito): **238.412** accesos `(r1 + k)` envueltos en `MKW_PILA(…)` (186.319 directos y 52.093
+  por rangos ya resueltos).
+- `herramientas/w12/pila-doble.h` (con `compilar-web.py --frio`, que ahora lo incluye también en `juego_reemplazo`):
+  cada uno de esos accesos se hace **dos veces**, con una barrera entre las dos para que el compilador no las junte.
+  Lo que el programa se frena ≈ lo que cuestan ≈ lo máximo que W12 puede ganar (W12 saca solo una parte, y lo que
+  saca pasa a ser una variable local, que tampoco es gratis).
+- `H6_WC=terceros/Wiicompiled-motor-w12t H6_SAL=build/web-w12t H6_BASE=build/web-h6b H6_ARGS="--frio herramientas/w12/pila-doble.h" bash herramientas/tanda-h6.sh compilar probar chrome medir`
+
+| Prueba | Resultado (base = H6, «nuevo» = cada acceso a la pila dos veces) |
+|---|---|
+| prueba-arranque | 13/13 |
+| Chrome gama baja con límites, 3 pares (lógica/s base → doble) | 18,20→18,26 · 19,26→17,01 · 18,07→18,71: **0 · −11,7 · +3,5 %** (mediana ≈ 0) |
+| Chrome este PC, 3 pares | 163,96→156,23 · 153,63→155,72 · 158,00→160,25: −4,7 · +1,4 · +1,4 % |
+| Node sin límites, 6 vueltas | ×1,011 (de ×0,954 a ×1,253) |
+| Node con límites | ×1,228 y ×1,137 en 2 vueltas; la 5.ª corrida no llegó al tramo (terminó en 46 s, sin explicar) y la tanda paró |
+
+**Lectura.** En Chrome, que es donde se decide, hacer **dos veces** cada acceso a la pila no se distingue del ruido:
+la pila ya es barata (H6 la dejó en una suma y un acceso, y lo caliente cabe en la caché). Solo Node con la revisión de
+límites dice ~15–20 %, en 2 vueltas. Si lo de dos veces no cuesta, sacarlo no gana: **W12 se descarta** (3–4 semanas
+contra un techo dentro del ruido). El 4.º par quedó a medias: el dueño pidió parar (abría otros programas); se cortó
+la tanda y se soltó el candado.
+
+**Trampas (y el detector nuevo).**
+- `--frio` con una ruta con espacios se partía (`MKW RETRO`): usar la ruta relativa.
+- Las copias de `juego_reemplazo` no recibían el `-include`: no compilaba (`MKW_PILA` no declarado).
+- La tanda seguía después de un compilar fallido y abría Chrome con un programa que no existía («el Worker contestó
+  404 a …/build/mkw.js», lo vio el dueño). Y parar la tarea de fondo no mata el `bash` de la tanda (vive en MSYS): hay
+  que matarlo por su número con `kill -9` (sin `-9` su trampa suelta el candado de otro) y sus hijos de Windows con
+  `taskkill /T`. **Detector** en `tanda-h6.sh` (pedido del dueño: «agrega detector automatico para que sea instantanea
+  la deteccion»): `compilar_vigilado` mira el registro cada 2 s y con el primer `error:` mata ese compilar y para con
+  ✗; cada compilar bueno deja `compilar-<m>.log.bien` y `hay_programa` no deja probar ni medir sin esa marca; `sin_mal`
+  para la tanda si `prueba-arranque` da algún «mal».
+- No editar una tanda mientras corre: `bash` lee el archivo a medida que avanza.
+
+**Retomar.** E2 sigue con W13 (el contexto en una dirección fija) y W14 (el CR perezoso), y el cierre (`--fija` por
+omisión en `--final`, `MKW_LTO`, cómo juntar e2-h6 con W10, el resumen). Si se quiere el 4.º par de W12:
+`H6_VUELTAS="4" H6_WC=terceros/Wiicompiled-motor-w12t H6_SAL=build/web-w12t H6_BASE=build/web-h6b H6_ARGS="--frio herramientas/w12/pila-doble.h" bash herramientas/tanda-h6.sh chrome`.
+
+## §216 — W13 (etapa 2 del plan v4): el contexto de la CPU en una dirección fija — **el techo medido: no alcanza, se descarta**
+
+**Qué es.** Cada función traducida recibe un puntero al *contexto* (los registros de la Wii guardados en memoria:
+`ctx->gpr[n]`, `ctx->cr`, `ctx->lr`, …), lo lee al entrar y lo escribe al salir y antes de cada llamada. W13 los
+pondría en una dirección constante: V8 podría saltarse la revisión de límites de esos accesos y quedaría libre un
+registro. Pero **no los saca**: los abarata. Hay muchos contextos aparte (interrupciones con sus propios registros,
+fibras de los hilos, NAND, el despacho), así que cambiarlo es delicado.
+
+**El techo, como en W12 (§215).** Si hacer **dos veces** cada acceso al contexto no se nota, abaratarlos tampoco gana.
+- `python -I herramientas/w13/techo.py` → `terceros/Wiicompiled-motor-w13t`: **4.306.008** accesos reescritos
+  (2.182.189 escrituras `ctx->x = v;` seguidas de `MKW_CTX_E(ctx->x)` = leer y escribir otra vez; 2.123.819 lecturas
+  `= ctx->x;` como `MKW_CTX_L(…)` = leer dos veces). Son ~7 veces más que los accesos a la memoria de la Wii.
+- `herramientas/w13/ctx-doble.h` (con `--frio`): entre los dos accesos, una barrera de memoria (estorba algo más que el
+  acceso solo: el techo sale más alto, nunca más bajo).
+- `H6_WC=terceros/Wiicompiled-motor-w13t H6_SAL=build/web-w13t H6_BASE=build/web-h6b H6_ARGS="--frio herramientas/w13/ctx-doble.h" bash herramientas/tanda-h6.sh compilar probar chrome`
+
+| Prueba | Resultado (base = H6, «nuevo» = cada acceso al contexto dos veces) |
+|---|---|
+| prueba-arranque | 13/13 |
+| `.wasm` | 130,6 MB contra 114,7 |
+| Chrome gama baja con límites, 2 pares | 21,59→19,26 · 18,67→19,48: **−10,8 · +4,3 %** |
+| Chrome este PC, 2 pares | 166,03→161,64 · 163,71→146,70: −2,6 · −10,4 % |
+
+**Lectura.** Duplicar **todos** los accesos al contexto cuesta en la gama baja algo entre nada y ~10 % (los dos pares
+se contradicen), y en este PC 3–10 %. W13 no saca ni uno: a lo sumo le quita a cada uno la revisión de límites (una
+comparación, que el procesador casi siempre adivina). Lo que puede ganar es una fracción chica de ese techo, contra
+1–2 semanas y el riesgo de los contextos de interrupción y de las fibras. **W13 se descarta**, sin más vueltas (el
+dueño: «si ves que no sirve descartalo, no vale la pena seguir haciendo mas vueltas»).
+
+**Arreglo de paso.** `tanda-h6.sh` terminaba con «salida 1» aunque todo anduviera (la última línea del bucle,
+`[ $n -lt $# ]`, da falso después de la última fase): ahora termina con `exit 0`; las fallas de verdad salen por
+`falla` del detector (§215).
+
+## §217 — W14 (etapa 2 del plan v4): las banderas del CR «perezosas» y el modo seguro de §193 — **descartado con su medida**
+
+**Qué es.** Antes de cada llamada y al volver, el código traducido guarda el CR entero (los 8 campos de comparaciones)
+en el contexto. Si se guardaran solo los campos que alguien va a leer, el compilador podría borrar las cuentas de los que
+nadie lee. En §193 el **techo** (guardar solo cr1–cr4, suponiendo la regla de la Wii) separaba la sala en el cuadro 270
+(RR no cumple esa regla), y el **seguro** (calcular para el programa entero qué se lee) quedaba en U = 0xFF.
+
+**1. El techo, bien medido en Chrome.** El programa techo de §193 dibujaba **cada** cuadro de lógica y la base uno de
+cada dos (al no ser exacto, la compensación de lag de RR decide distinto): 79 contra 150 cuadros/s, no comparable. Se
+rearmaron los dos con el código de la página de hoy (`H6_FIJA=0`: copias de antes de H6; `build/web-w14b` = M1,
+`build/web-w14t` = techo) y se midieron con `&dibujarSiempre=1` (`H6_EXTRA`, nuevo en `tanda-h6.sh`), así los dos dibujan
+cada cuadro:
+
+| Chrome, cuadros de lógica/s (base → techo) | par 1 | par 2 |
+|---|---|---|
+| Gama baja con límites | 7,16 → 7,99 (**+11,6 %**) | 6,68 → 7,86 (**+17,7 %**) |
+| Este PC | 87,0 → 79,0 (**−9,2 %**) | 87,0 → 77,2 (**−11,3 %**) |
+
+**2. El seguro, terminado lo que §193.1 dejó pendiente** (la copia `terceros/Wiicompiled-motor-seguro`, commit
+`8812e4f`, `parches/traductor-w14.diff`; traducir con `MKW_BANDERAS=seguro MKW_BANDERAS_NATIVOS=… M8_WC=terceros/Wiicompiled-motor-seguro M8=banderas-seguro3 bash herramientas/tanda-m8.sh traducir`):
+- **Qué funciones pueden ser destino de una indirecta** (`MkwIndirectables`, de más, nunca de menos): las direcciones
+  guardadas en los datos del DOL y del REL y toda constante que el código arma con `lis` + `addi`/`ori` y cae en código:
+  **14.303**; con todo el mod, 18.252 de 33.622 funciones cuentan para U (`build/mkw-banderas-indirectas.txt`).
+- **Las operaciones del CR con lo que de verdad leen y pisan** (`MkwCampoExacto`; el análisis de siempre dice «lee los 8
+  y no pisa ninguno»): `crxor/cror/…` y `crclr` leen el campo de sus bits; `mcrf d,s` lee s y pisa d; `mtcrf` no lee y
+  pisa los campos de su máscara.
+- **El phi de la forma SSA** (donde se juntan dos caminos) ya no cuenta como lectura, y **un salto indirecto** (`bctr`)
+  lee lo de una indirecta (U), no los 8.
+- La forma de cada función del juego va a `build/mkw-banderas-base.txt` y **`herramientas/w14/banderas.py`** repite el
+  análisis fuera del traductor en segundos (35 min cada traducción), con interruptores para probar reglas.
+
+| Análisis | U | Funciones que vuelven con máscara |
+|---|---|---|
+| Como quedó §193.1 | 0xFF | 0 de 33.622 |
+| + destinos posibles, CR exacto, phi y saltos | 0xFF | 0 |
+| + (no seguro) las ayudas `PPC_Ps*` sin leer y todo `mfcr` = solo cr2–cr4 | **0x1F** | 33.621 (5 campos de 8) |
+| + la regla segura de `mfcr` (solo si la función restaura con `mtcrf` de cr2–cr4) | 0xFF | 0 |
+
+**Por qué se queda en 0xFF.** Unas **180 funciones leen el CR entero de verdad** (`mfcr` a un registro que usan, no solo
+para guardarlo y restaurarlo: `r3 = cr;`) y son posibles destinos de una indirecta. Para bajar U hay que suponer que
+nadie lee los campos volátiles de quien lo llamó: la misma regla de la Wii que en §193 separó la sala, porque RR no la
+cumple siempre.
+
+**Veredicto: W14 se descarta.** Lo seguro no saca nada (U = 0xFF), y aun el techo, que guarda menos de lo que el seguro
+podría guardar nunca, **pierde 9–11 % en este PC** (guardar «solo algunos campos» es leer, enmascarar y escribir, más
+trabajo que una escritura entera, y el techo no corre la misma carrera). Con la regla de E2 (ganar en la gama baja y
+perder a lo más ~1,5 % en este PC) no pasa ni en su techo. Lo que sí queda: el análisis ya exacto en las operaciones del
+CR, la lista de destinos de las indirectas (útil también para el vigía) y `banderas.py`. La forma de Dolphin (cada campo
+del CR una variable aparte) es un cambio distinto del traductor, no medido; no entra en E2.
+
+**Trampas.** El nombre de las ayudas en el IR es `PPC_CrLogical`/`PPC_CRLOGICAL` según la etapa (comparar sin mayúsculas)
+y los registros llevan sufijo SSA (`cr_3`): comparar por el nombre base. Lancé la medición con un `&` dentro de una tarea
+de fondo: la tanda quedó suelta (sin aviso al terminar); se agregó un vigilante que espera a que termine.
+
+## §218 — El cierre de la etapa 2 del plan v4 (E2, el motor): el resumen
+
+**Qué se hizo y qué se decidió, ítem por ítem** (cada uno medido en Chrome, gama baja simulada con la revisión de
+límites de Android y este PC, intercalados; las pruebas de igualdad nunca se recortaron):
+
+| Ítem | Veredicto | La medida que decidió | § |
+|---|---|---|---|
+| H6 — la RAM de la Wii en una ventana fija de wasm | **hecho** | gama baja ~+29 %, este PC +2 a +7 %, Node ×0,838; la misma carrera | §211 |
+| H7 — la RAM guardada ya dada vuelta | descartado | el techo: una vuelta de bytes vale 8–10 % del cuadro, alcanzable ~×1,05 contra 3–5 semanas | §212 |
+| M6 — compilar guiado por un perfil (PGO) | descartado | gama baja +2,2 % (zona gris, de W4) y el perfil se ata a cada cambio | §213 |
+| M7 — ThinLTO del runtime, aurora y lo propio | **hecho** | gama baja +8,6 % de mediana en 7 pares, este PC −1,4 % | §213 |
+| H11 — lo frío del código traducido, compilado chico | descartado | `.wasm` −5 %, pero gama baja −1,4 % de mediana en 4 pares | §214 |
+| W12 — la pila de la Wii en variables locales | descartado | el techo (cada acceso a la pila dos veces) no se distingue del ruido | §215 |
+| W13 — el contexto de la CPU en una dirección fija | descartado | el techo (cada acceso al contexto dos veces): pares contradictorios; W13 solo abarataría | §216 |
+| W14 — las banderas del CR «perezosas» | descartado | lo seguro deja U = 0xFF (~180 destinos leen el CR entero) y el techo pierde ~10 % en este PC | §217 |
+
+**El programa de E2.** `python herramientas/compilar-web.py --modo navegador --final` con
+`MKW_WIICOMPILED=terceros/Wiicompiled-motor-h6 MKW_AURORA=terceros/aurora-main-viejo-motor` lleva ahora **por omisión**
+lo adoptado (decidido por la orquestadora): `--fija` (H6) si la copia del motor trae `MKW_MOTOR_FIJA` (`--sin-fija` =
+sin ella; con una copia vieja no cambia nada) y el ThinLTO de M7 (`MKW_LTO` con los grupos de §213 si no viene puesto;
+`MKW_LTO=` vacío = sin LTO). Armado y probado contra M7 (`build/web-m7` = H6 + ThinLTO, con nombres):
+
+| Prueba | Resultado |
+|---|---|
+| `build/web-e2/navegador/mkw.wasm` | 112,4 MB (M7 con nombres: 115,3 MB) |
+| prueba-arranque | 13/13 |
+| La sala, A = E2 final, B = M7 | 14 bien, **huellas 75/75** |
+| Fantasmas | **2.114/2.114 iguales** |
+
+(`H6_SAL=build/web-e2 H6_BASE=build/web-m7 H6_ARGS="--final" bash herramientas/tanda-h6.sh compilar probar igual`.
+El dueño detuvo la tanda una vez a mitad de la sala, el 2026-11-03 12:16; se retomó con la fase `igual` el 2026-11-04.)
+Nada publicado: subir el programa a R2 sigue siendo del dueño (`docs/publicar.md`).
+
+**Cómo juntar la rama e2-h6 con W10** (W10 quedó sin commit en `terceros/Wiicompiled-motor`, guardado en
+`parches/motor-w10.diff`; la rama `e2-h6` está en `terceros/Wiicompiled-motor-h6`, commits `35b63ac` H6 y `0256944` el
+instrumento de H7, apagado):
+1. En la copia de e2-h6, `git apply --check parches/motor-w10.diff` (probado el 2026-11-03): `ppc_isa_quantized.h`,
+   `os_scheduler.cpp` y `os_thread.cpp` entran limpios; **`runtime/include/guest_abi/memory_access.h` choca**, porque
+   H6 rehízo los caminos de escritura. Aplicar los tres que entran (`git apply --include=…` o `--exclude=…/memory_access.h`).
+2. En `memory_access.h`, a mano: el bloque de `MKW_SUCIAS` (`g_mkwSucias`, `MKW_SUCIA(a, n)`, `mkw_sucias_rango`) va
+   igual, antes de los caminos de escritura; y la marca `MKW_SUCIA(dirección, bytes)` en **cada escritura de H6**:
+   `FijaEscribe` (la directa de la ventana), cada `Write*Raro` (los lentos, como estaba en W10), `WriteResolvedScalar` /
+   `WriteResolvedPairFast` (las de un rango ya resuelto: o `mkw_sucias_rango(guestStart, length)` cuando se resuelve un
+   rango para escribir, como hacía W10 con `needsWrite`, en `ResolveRangeHost` y `ResolveRangeTabla`).
+3. Comprobar como en §207: `MKW_W10_COMPILAR=1` + `--fija`, «0 páginas sin marca», huellas 75/75 y el fantasma igual.
+4. Recién entonces juntar e2-h6 en `terceros/Wiicompiled-motor` (o al revés), un commit por pieza, y actualizar
+   `herramientas/versiones.md`.
+
+**Lo que queda para después de E2.** E3 (N8 en el Worker B) y el resto del plan v4; W10 sigue a medias (§207: la parte
+B se cuelga a los 14 cuadros). La regresión vieja de `prueba-sala --rapida` en M22 (§206) no la tocó E2.
+
+
+## §219 — N8 (etapa 3 del plan v4): simular a 60, dibujar a 30 y mostrar 60 — **hecho, opcional y apagado por omisión**
+
+> **2026-11-04, §223:** el dueño lo pasó a **Automático por omisión** («permito que se prenda N8 en automatico»): la vigía decide; quien elige «No» a mano lo mantiene; las pruebas con Playwright siguen sin N8.
+
+**Qué es.** En la carrera, el juego sigue calculando sus 60 cuadros por segundo (la física, la IA, los objetos), pero arma
+la imagen solo de uno de cada dos. El otro es un **cuadro saltado**: no se dibuja ni se copia a la pantalla. Hay dos
+formas:
+- `?n8=1` = solo eso: se ven 30 imágenes por segundo.
+- `?n8=2` = además, aurora (el motor de dibujo) inventa la imagen del medio con su interpolación: se ven 60. Para que
+  esa imagen quede entre dos imágenes de verdad, aurora guarda la última real de cada cuadro dibujado y la muestra a la
+  hora del cuadro saltado (**la real guardada**).
+
+Es como un motor de 4 tiempos: hace fuerza en una de cada dos vueltas y el volante de inercia llena el hueco.
+
+**Por qué.** En el aparato que no alcanza, cada cuadro cuesta la carrera más el dibujo. Saltar el dibujo de la mitad de
+los cuadros deja más tiempo para la carrera, que es lo que el jugador siente (el juego va a velocidad real y no en
+cámara lenta).
+
+**Decisión del dueño (2026-11-02).** La interpolación es **opcional**. Se prende sola solo en los aparatos que no llegan
+a 60, o si el jugador la pide, y queda apagada en los PC que sí llegan: ahí no ganan nada y pagarían la demora. Además,
+en las medidas de E3 no se usa el programa de Windows; Node sirve solo de filtro y los veredictos salen de Chrome. Con
+pocos pares: si los 2 primeros pares intercalados de la gama baja dan del mismo lado y ≥ +8 % (o ≤ −2 %), se decide con
+2; las pruebas de «igual» no se recortan nunca.
+
+### 219.1 Cómo está hecho
+
+- **`web/juego/n8_nativo.cpp`** (nuevo; lo compila `compilar-web.py` solo si la aurora trae `aurora_mkw_n8`) envuelve
+  dos funciones del juego:
+  - `EGG::SceneManager::draw` 0x8023AEAC: en el cuadro saltado no dibuja, pero sí corre `ScnMgr::SwitchScnRoot`
+    0x805635E4, que la lógica lee (como R2 de §192).
+  - `EGG::XfbManager::copyEFB` 0x80244268: en el cuadro saltado tampoco copia a la pantalla.
+
+  Solo actúa con la carrera andando (Raceinfo +0x28 < 4). La vuelta del bucle la cuenta el gancho de la compensación
+  de lag de RR (`rr_kamek_81806568`, en `lockstep_nativo.cpp`: `mkw_n8_vuelta()`). Exporta `mkw_n8_modo(0|1|2)`,
+  `mkw_n8_estado(i)` (dibujados, saltados, copias saltadas, lo de aurora) y `mkw_n8_reiniciar()`.
+- **Aurora** (`parches/aurora-n8.diff`, solo `lib/aurora.cpp` de `terceros/aurora-main-viejo-motor`, todo bajo
+  `#ifdef __EMSCRIPTEN__` y apagado mientras el juego no llame `aurora_mkw_n8(1)`):
+  - Con `?n8=2`, de cada cuadro dibujado se publican las imágenes del medio y la última real se guarda con hora =
+    la de la interpolación + un intervalo.
+  - El cuadro saltado la muestra (`aurora_mkw_presentar_pendiente(0)`). Si el dibujado siguiente empieza antes, la
+    muestra en ese momento (`(1)`).
+  - Lo «a compás» lo mide aurora con sus propias horas (anclas a ≤ 2,5 intervalos). El de siempre (`retracesElapsed
+    ≤ 1`) le decía «atrasado» a cada cuadro y bajaba las imágenes del medio a 0: «interpolation slots reduced to 0:
+    60/60 frames overran».
+- **La página**:
+  - `web/navegador/n8.mjs` (nuevo; banco `n8`, 22 puntos): `modoPedido(?n8)` y la **vigía** de `?n8=auto`. Prende si
+    3 s seguidos se vieron menos de 57 imágenes con el hilo del juego ocupado más del 60 %. Apaga si 10 s seguidos le
+    sobra (< 40 %). Tras 3 cambios se queda prendida. Recuerda la elección por aparato (`mkw.n8.auto`). Además hace
+    **la prueba**: los primeros 10 s prendida, la lógica tiene que subir un 8 % sobre los segundos que la prendieron;
+    si no, la apaga y no la vuelve a prender (`mkw.n8.auto = no`). Es la histéresis de un termostato, más un arrancador
+    que corta si el motor no arranca.
+  - `mkw.mjs`: `mkwEstado.n8()`, «[n8]» en el registro al terminar cada carrera y en el tramo.
+  - `graficos.mjs`: Gráficos → **«Dibujar a 30 y mostrar 60»** (No por omisión / Automático / Sí). Sin `?n8`, vale lo
+    que eligió el jugador; se aplica al reiniciar. Banco `graficos`, 50 puntos.
+- **`herramientas/tanda-n8.sh`** (nuevo, con el candado de siempre). Las fases:
+  - `compilar` → `build/web-n8` desde `terceros/Wiicompiled-motor-h6`, rama `e2-w10`, con `--final`, encima de la base
+    `build/web-e2w10`.
+  - `probar`, `igual` (fantasmas y sala), `chrome` (el tramo fijo, gama baja con límites y este PC, intercalados), `vista`
+    (40 s a tiempo real), `foto` y `ver` (una mirada rápida).
+
+  Uso: `bash herramientas/tanda-n8.sh compilar probar igual chrome vista foto`. `N8_VUELTAS="3 4"` = más pares;
+  `N8_CUADROS=…` = los cuadros de la foto.
+
+### 219.2 Igualdad (la carrera no cambia)
+
+Todo contra la base `build/web-e2w10`:
+
+| Prueba | Resultado |
+|---|---|
+| `prueba-arranque` (Node) | 13/13 |
+| Fantasmas cuadro por cuadro, `?n8=2` | 2.117/2.117 iguales; meta en el cuadro 2242 en las dos |
+| Fantasmas cuadro por cuadro, `?n8=1` | 2.113/2.113 iguales |
+| La sala, A con `?n8=2` y B la base (`prueba-sincro --directa --build-b`) | 14/0; huellas iguales 74 = 74 toda la carrera |
+
+Saltarse el dibujo no toca la carrera: **vale también en la sala** (la condición de R2 de §192 se cumple).
+
+### 219.3 La medida
+
+**El tramo fijo** (§163: 12 CPU, semilla 1234, cuadros 600–2400, sin tope, `&dibujarSiempre=1` para que fuera de la
+sala se dibuje cada cuadro como en la sala; la gama baja con `--js-flags=--wasm-enforce-bounds-checks` y
+`&lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15`; 2 vueltas en orden alterno):
+
+| Aparato | `?n8=0` lógica/s | `?n8=1` | `?n8=2` | Trabajo por cuadro (ms) n0 → n1 / n2 |
+|---|---|---|---|---|
+| Gama baja, vuelta 1 | 7,19 | 9,65 (**+34 %**) | 10,16 (**+41 %**) | 19,9 → 14,7 / 14,0 |
+| Gama baja, vuelta 2 | 7,34 | 10,82 (**+47 %**) | 9,56 (**+30 %**) | 19,5 → 13,1 / 14,9 |
+| Este PC, vuelta 1 | 87,8 | 153,4 (+75 %) | 82,2 (−6 %) | 11,1 → 6,0 / 11,9 |
+| Este PC, vuelta 2 | 80,4 | 153,3 (+91 %) | 78,6 (−2 %) | 12,2 → 6,0 / 12,4 |
+
+- **Veredicto por la regla de los pares:** los 2 pares de la gama baja dan del mismo lado y lejos de +8 %: decidido con 2.
+- **Por qué `?n8=2` no gana en el PC sin tope:** con `?n8=2` la imagen real espera su hora (16,3 ms de promedio, el
+  intervalo). El tramo sin tope corre más rápido que el tiempo real, así que esa espera lo frena. No es CPU.
+- **Por qué en la gama baja no hay imágenes del medio** («1287 sin intermedia»): a 5 imágenes por segundo aurora no
+  alcanza a inventarlas. Ahí `?n8=2` vale lo mismo que `?n8=1`.
+- **El costo de la interpolación en el hilo del juego:** no se distingue. A tiempo real, con el lastre 2, la CPU pura
+  por imagen es 20,5/20,1 ms con `?n8=1` y 19,8/21,7 con `?n8=2`.
+
+**A tiempo real** (40 s de carrera; el monitor de ~175 Hz, así que una imagen pareja dura 3 refrescos; «parejas» = las
+que duraron 3; un tirón = una imagen que duró mucho más; 2 vueltas):
+
+| Aparato | `?n8=0` | `?n8=2` | `?n8=1` |
+|---|---|---|---|
+| Este PC (llega a 60) | 84 / 84 % parejas, 5 / 2 tirones | 82 / 80 %, 2 / 3 tirones | 30 imágenes/s |
+| Lastre 2 (justo en 60) | 68 / 69 %, 39 / 37 tirones | 62 / 63 %, 17 / 6 tirones | 30 imágenes/s |
+| Lastre 3 (no llega; una vuelta, la mirada) | lógica 43,5 (otra corrida 52,6), 26 % parejas, 777 tirones | lógica **54**, 45 %, 554 tirones | lógica 59,7 a 30 parejas |
+| Gama media de §155 (frena la **tarjeta**: 46–51 ms) | 17 / 18,7 imágenes/s | 13,4 / 12,7 | 12,3 / 12,8 |
+
+- **Donde ayuda:** el aparato que se queda corto de procesador (lastre 3). La carrera pasa de 43–53 a 54–60 cuadros de
+  lógica por segundo y se ve más pareja.
+- **Donde no sirve:**
+  - En el PC que llega a 60 da casi lo mismo y suma la demora: por eso queda apagado.
+  - En el aparato que frena la **tarjeta de video** empeora (18 → 13): la tarjeta igual dibuja la imagen del medio. La
+    vigía lo prendería, porque el hilo del juego también va lleno con el lastre. Por eso se agregó la prueba del 8 %,
+    que en ese caso lo apaga a los 10 s y lo deja apagado.
+- **La demora extra**, medida dos veces:
+  - La real espera **16,3 ms** de promedio (el «[n8]» del tramo en el PC).
+  - En la foto del mismo cuadro, con `?n8=2`, el reloj del juego en pantalla dice 20,988 s contra 21,008 s de la base:
+    se ve la imagen de un cuadro antes.
+
+  Con `?n8=1` no hay demora extra, pero se ve a 30.
+- **Los defectos de las imágenes inventadas:**
+  - La foto del mismo cuadro (`prueba-foto-igual`, cuadros 600, 1500, 1501, 2101) da 1,4–3,0 % de píxeles distintos.
+    Viendo las fotos, es todo lo de esa demora: el reloj y lo que se movió en un cuadro. No hay rayas, fantasmas ni
+    marcador roto.
+  - El marcador y lo 2D van a 30 con `?n8=1` y con `?n8=2`. La interpolación mueve la cámara y los modelos, no los
+    números.
+  - Lo que la foto **no** puede ver es la imagen inventada en sí: al congelar el juego se queda la real. Los cortes de
+    cámara (al caer y volver con Lakitu, al cruzar la meta) y las partículas en la imagen del medio no se fotografiaron.
+    Hacerlo pide sacar la foto del lienzo entre dos reales, sin congelar. Queda anotado.
+- **Trampa:** la primera foto del cuadro 1500 salió 100 % distinta porque la página de la base todavía tenía la
+  cortina «Yendo a la carrera…» encima. Repetida, salió bien; es de la prueba, no de N8.
+
+### 219.4 Qué queda
+
+- **N8 hecho**, opcional y apagado por omisión: `?n8=1|2|auto` y la opción de Gráficos.
+- **Prenderlo en «Automático» por omisión en los teléfonos** es decisión del dueño. En la gama baja simulada sube la
+  lógica +30–47 %; en el aparato que frena la tarjeta, la prueba lo apaga sola.
+- Falta la foto de la imagen inventada sin congelar (los cortes de cámara y las partículas).
+
+**Archivos:**
+- Nuevos: `web/juego/n8_nativo.cpp`, `web/navegador/n8.mjs`, `banco/pruebas/n8/index.html`, `herramientas/tanda-n8.sh`,
+  `parches/aurora-n8.diff`.
+- Cambiados: `herramientas/compilar-web.py`, `web/juego/lockstep_nativo.cpp`, `web/navegador/mkw.mjs`,
+  `web/navegador/graficos.mjs`, `banco/pruebas/graficos/index.html`, `banco/index.html`, `herramientas/versiones.md`.
+- Los datos están en `build/web/datos/e3/` (nunca a git).
+
+## §221 — El cierre de la etapa 3 del plan v4 (E3, N8): el resumen
+
+**Qué se hizo.** La etapa 3 tenía un solo ítem: N8, que en la carrera calcula a 60, dibuja a 30 y muestra 60. Está
+**hecho**, opcional y apagado por omisión, como decidió el dueño el 2026-11-02 (§219).
+
+**En números**, contra la base `build/web-e2w10`:
+- **La misma carrera:** fantasmas 2.117/2.117 y 2.113/2.113, la sala con huellas 74 = 74, el arranque 13/13.
+- **La gama baja simulada** (tramo fijo, con la revisión de límites de Android): +30 a +47 % de cuadros de lógica por
+  segundo (de 7,3 a 9,6–10,8). Sigue lejos de 60: no es la solución entera de la gama baja, pero es la mejora más
+  grande de una sola pieza del plan v4.
+- **Este PC:** sin tope, +75–91 % con `?n8=1`. A tiempo real se ve igual que sin N8, así que queda apagado.
+- **El precio:** un cuadro más de demora (16,3 ms medidos) con `?n8=2`; el marcador a 30; nada en el hilo del juego.
+- **Donde no sirve:** el aparato que frena la tarjeta de video. La vigía lo prueba 10 s y lo apaga.
+
+**Para el dueño:**
+1. Si «Automático» debe venir prendido en los teléfonos.
+2. Si se acepta la demora de un cuadro (lo que cuesta `?n8=2`) o se prefiere `?n8=1` (sin demora, a 30 a la vista).
+
+**Lo que no se hizo:** la foto de la imagen inventada sin congelar. E4 no se empezó (no es de esta sesión).
+
+
+## §223 — N8 en «Automático» por omisión (decisión del dueño) · 2026-11-04 11:30
+
+**Qué decidió el dueño** (2026-11-04, sus palabras): «permito que se prenda N8 en automatico». Responde la primera
+pregunta de §221. Desde ahora, la opción de Gráficos «Dibujar a 30 y mostrar 60» viene en **Automático** para todos,
+no solo en los teléfonos. Esto reemplaza al «apagado por omisión» de §219.
+
+**Qué cambia y qué no:**
+- Automático quiere decir que **la vigía decide sola** (`n8.mjs`, §219). Es como un termostato: no prende la calefacción
+  por estar puesto en Automático, la prende solo si hace frío.
+  - En un PC que llega a 60 nunca se prende.
+  - Se prende en el aparato que no llega a 60 por el procesador.
+  - Donde frena la tarjeta de video, «la prueba» lo apaga a los 10 s y no se vuelve a prender en ese aparato.
+- Quien eligió **«No» a mano** lo mantiene: lo guardado manda.
+- `?n8=0` sigue apagándolo, y `?n8=1|2|auto` sigue forzando cada modo.
+
+**Cómo se hizo:**
+- `graficos.mjs`: `GRAFICOS.n8 = 'auto'`. `normalizar` deja en «No» **solo un 0 guardado**. Sin nada guardado, o con
+  algo que no entiende, vale Automático. Hay que guardar el 0 porque «nada guardado» ahora significa Automático.
+- En la lista, «(lo de siempre)» pasó de «No» a «Automático».
+- `mkw.mjs`: sin `?n8`, vale lo de Gráficos.
+- **Las pruebas y mediciones no cambian.** Con Playwright (`navigator.webdriver`, la marca que pone Chrome cuando lo
+  maneja un programa) la página va sin N8, salvo que la dirección lleve `?n8=…`. Así `medir-sitio`, las `tanda-*`,
+  `prueba-sincro`, `prueba-fantasma-igual`, `prueba-foto-igual` y el resto siguen comparando contra la base como
+  siempre. Es la misma costumbre que el menú de inicio (`?inicio=1`) y la foto de los Mii (`?invitados=1`).
+- Hay cinco herramientas que abren Chrome sin Playwright y se conectan después; ahí la marca no está. Son
+  `medir-armado`, `medir-espera-graficos`, `medir-memoria`, `medir-memoria-pistas` y `medir-oculta`. Las cinco agregan
+  `&n8=0`, salvo que su `--extra` ya traiga un `n8=`.
+- `jugar.bat` y la página real (sin Playwright) quedan en Automático, como lo verá un jugador.
+
+**Pruebas** (`build/web-n8`, con el candado; los registros están en `build/web/datos/n8-auto/`):
+- Banco `graficos` (50/50: la omisión, el «No» guardado que se mantiene y lo raro que vuelve a Automático) y banco
+  `n8` (22/22).
+- `prueba-arranque` 13/13.
+- La sala con las dos pestañas en Automático (`prueba-sincro --directa --extra=&n8=auto`): 14/14, huellas 75 = 75.
+  En este PC la vigía no se prendió en ninguna de las dos.
+- Con B frenada (`--lento`, CPU ×2) y las dos en Automático: huellas 77 = 77. La vigía de B **se prendió** («no llega
+  a 60», en la largada) y **se apagó sola** con la prueba («no mejora»). Así, en una sala de verdad, prenderse y
+  apagarse a mitad de carrera no separa la carrera.
+  - Fallan 2 puntos de esa prueba («A la espera» y «lo avisan»). Sin N8 fallan igual (12/14, huellas 76 = 76): con el
+    motor de ahora, CPU ×2 ya no alcanza para que B frene a la sala. Es un problema de la prueba (habría que
+    frenarla más), no de N8.
+
+## §220 — W10 junto con E2: el programa base para E3 y E4
+
+**Qué es.** La etapa 2 dejó el motor en la rama `e2-h6` (H6, la ventana fija) y W10 (la marca de las páginas que el
+juego escribe, `MKW_SUCIAS`, §207) seguía sin commit en otra copia. Se juntaron siguiendo los pasos de §218, para que
+E3 y E4 trabajen sobre un solo motor. **W10 queda apagado por omisión**: el programa de jugar no marca nada; la marca
+solo existe en el instrumento (`MKW_W10_COMPILAR=1`).
+
+**Qué se hizo** (en `terceros/Wiicompiled-motor-h6`, rama nueva **`e2-w10`**, commit `f7181fe` sobre `0256944`;
+el parche: `parches/motor-e2-w10.diff`, 188 líneas):
+- `parches/motor-w10.diff` aplicado sin `memory_access.h`: `ppc_isa_quantized.h`, `os_scheduler.cpp`, `os_thread.cpp`.
+- `memory_access.h` a mano: el bloque de `MKW_SUCIAS` después del bloque `extern "C"`; `mkw_sucias_rango` en
+  `ResolveRangeTabla`, en el camino rápido de la ventana de `ResolveRangeHost` y en el de la tabla; `MKW_SUCIA(a, n)` en
+  `FijaEscribe`, `TryWriteGuestScalar`, `TryWriteGuestScalarRapido` y los seis `Write*Raro`.
+- **Un hueco que no estaba en la guía**: en `ppc_isa_quantized.h` (las escrituras de a pares, `psq_st`) H6 había puesto
+  un atajo por la ventana que volvía **antes** de la marca de W10. Sin arreglarlo, esas escrituras no se marcaban. Ahora
+  el atajo marca primero: `if (FijaDentro(addr, 8)) { MKW_SUCIA(addr, 8); return FijaPtr(addr); }`. (Como un medidor
+  de energía puesto después de una derivación: lo que salía por la derivación no se contaba.)
+
+**Cómo se comprobó** (`bash herramientas/tanda-e2w10.sh final marca foto`; cada parte con el candado):
+
+| Prueba | Programa | Resultado |
+|---|---|---|
+| prueba-arranque | `build/web-e2w10` (`--final`, W10 apagado) | **13/13** |
+| La sala, A = e2w10, B = `build/web-e2` | | 14 bien, **huellas 75/75** |
+| Fantasmas contra `build/web-e2` | | **2.116/2.116 iguales** (y el jugador quieto también) |
+| La marca, `?w10=4` (la memoria entera contra su sombra cada cuadro) | `build/web-e2w10i` (el instrumento, `--fija`) | **0 páginas sin marca** en los cuadros 600, 1200, 1800 y 2400 |
+| La foto del mismo cuadro, A = e2w10, B = el instrumento con la marca (`&cortina=0`) | | **12/12**: cuadros 600, 1500 y 2400 quietos en el mismo cuadro, **0,000 % de píxeles distintos** |
+
+El tamaño de la caja sale como en §207: ~492–497 páginas marcadas por cuadro (máximo 521) y 85–99 KB que de verdad
+cambian. El «juntar 6,6 ms» del modo 4 **no se compara** con los 0,17–0,19 ms de §207.2: el modo 4 además compara la
+memoria entera con la sombra en cada cuadro, y ese tiempo entra en la misma cuenta. Lo de §207.2 se midió en los modos
+2/6, que solo juntan.
+
+**Trampas.**
+- La primera foto falló (A no se quedó quieta en el 600 ni en el 1500; B solo en el 1500). Un control con el mismo
+  programa en las dos (`build/web-e2` contra sí mismo) dio 4/4: era el PC cargado en ese momento, no W10.
+- El instrumento contra sí mismo dio «100 % distinto»: la foto de B salió con la **cortina de la página** encima
+  («Yendo a la carrera…»). El instrumento es más lento y en el cuadro 600 la cortina seguía puesta; la foto se saca del
+  lienzo con lo que tenga encima. Con `&cortina=0` en las dos, 12/12. `tanda-e2w10.sh` ya lo lleva.
+
+**El programa base para E3 y E4**: la rama `e2-w10` (`terceros/Wiicompiled-motor-h6`, `f7181fe`) compilada con
+`MKW_WIICOMPILED=terceros/Wiicompiled-motor-h6 MKW_AURORA=terceros/aurora-main-viejo-motor python
+herramientas/compilar-web.py --modo navegador --final` → `build/web-e2w10` (112,4 MB, `.br` 14,4 MB). Todavía **no** se
+juntó en `terceros/Wiicompiled-motor` (ahí sigue W10 sin commit). Rehacer desde cero: sobre `2ab4195`,
+`git apply parches/motor-h6.diff parches/motor-h7-techo.diff parches/motor-e2-w10.diff`.
+Nada publicado.
+
+## §222 — E4 (etapa 4 del plan v4): los techos del dibujo por grupo, W15/W16/W18 y W17 — **W15/W16 bajan de prioridad, W17 y W18 descartados con su medida** · 2026-11-04 08:30
+
+**Qué se quería saber.** Antes de escribir un dibujo propio (W15: el renderizador nativo; W16: el dibujo en el Worker
+con los datos en formato nativo; W18: los efectos) o una física propia de los karts (W17), medir lo MÁS que podrían
+ganar. La regla del encargo: W15/W16 empiezan solo con un grupo cuyo techo pase el **5 %** en la gama baja simulada con
+la revisión de límites; si ninguno pasa, «bajan de prioridad frente a W10» con la medida. W17 solo como implementación
+propia, y antes de construirla, su techo medido o estimado con números.
+
+### 222.1 El instrumento: esconder un grupo solo mientras se dibuja
+
+Es el de W3 (§200) ampliado, `web/juego/techo_dibujo_nativo.cpp`, solo en un programa aparte (`MKW_TECHO_COMPILAR=1`
+de `compilar-web.py`, nunca en el de jugar). El modo es una suma de bits (`?techo=N` en la página, `MKW_TECHO` en Node):
+
+- **1 = la pista** (lo de W3): el ModelDirector de `course_model.brres` fuera de la escena antes de cada dibujo.
+- **2 = los efectos**: `EGG::EffectManager::Draw` (0x802251DC, el único camino al dibujo de las partículas) vuelve sin
+  dibujar. El cálculo (`CalcEffect`, con su azar propio) sigue igual: la carrera no cambia.
+- **4 = los modelos de unas «opciones de dibujo»** (`?techoOp=` máscara, bit k = opción k de la tabla 0x808B6ED0):
+  dentro de `ScnMgrRace::DrawModels` (0x805B1CD8), justo alrededor de `ScnMgr::DrawModelsImpl` (0x805625A8), se recorre
+  la lista de ModelDirector del ScnMgr (+0x58), se sacan de su grupo con `ToggleVisible(false)` los que están en la
+  escena con una opción de la máscara y se vuelven a poner después, **antes** de `SwitchScnRoot` (la lógica lee lo que
+  ve la cámara: sigue viendo todo). Lo que carga la pista (`CourseMgr::LoadModels`) nunca entra en la máscara.
+
+Los grupos: karts y pilotos = opciones 10 y 1 (`0x402`); objetos = el grupo 1 sin la 1 (2–9, 11–17, 19–21, `0x3BFBFC`);
+«op0» = los ~43 modelos de la opción 0 que no son la pista; «todo» = `?techo=7&techoOp=0xFFFFFF`. En la carrera hay por
+opción: 0:42–44, 4:1, 5:1, 6:1, 10:99–101, 11:3–4, 12:29–30 (Node y Chrome dan lo mismo).
+
+Comprobado que esconde de verdad (Chrome, este PC; `medir-sitio` ahora imprime «techo (§222)»): con «todo», **178
+modelos escondidos en cada dibujo**, la pista escondida en los 2.581 dibujos y ~8 dibujos de efectos saltados por cuadro;
+con karts + efectos, 99 modelos. En Node (sin la compensación de lag) el trabajo por cuadro pasa de 3,263 a 3,200 ms.
+
+La página: `interruptores-e0.mjs` (`modoTecho` 0–7, `mascaraTecho`), `mkw.mjs` (`mkwEstado.techo()` con
+`efectosSinDibujar`, `escondidosUltimo`, `dibujosMascara`, `mascara`, `porOpcion`); banco `interruptores-e0` 24/0.
+
+### 222.2 La medida
+
+El tramo fijo (§163: 12 CPU, semilla 1234, cuadros 600–2400, sin tope, `&anillo=0&dibujarSiempre=1`; sin eso la
+compensación de lag de RR casi no dibuja en la gama baja y el techo sale chico, lo que le pasó a W3), sobre la base de
+E3/E4 (`build/web-e2w10` con el instrumento → `build/web-e4t`, `--final`), N8 apagado. Gama baja = `&lastre=7&lastreAyuda=5
+&ladron=64&lastreGpu=15` con `--js-flags=--wasm-enforce-bounds-checks`; este PC sin lastre; intercalados, la base al
+principio y al final de cada vuelta (el orden de los grupos al revés en las vueltas pares). Cada grupo contra el
+promedio de las dos bases de su vuelta. `bash herramientas/tanda-e4.sh compilar nombres chrome` (`E4_GRUPOS=todo
+E4_DESDE=3 E4_VUELTAS=4` para «todo»), datos en `build/web/datos/e4/`.
+
+| Grupo escondido | Gama baja, vuelta 1 | vuelta 2 | Este PC, vuelta 1 | vuelta 2 |
+|---|---|---|---|---|
+| (bases, cuadros de lógica/s) | 7,30 / 8,20 | 7,79 / 7,50 | 82,07 / 86,64 | 89,47 / 87,73 |
+| La pista | −1,8 % | −2,4 % | +4,7 % | −0,1 % |
+| Los efectos (= el techo de W18) | +3,0 % | −0,5 % | +5,7 % | +1,7 % |
+| Karts y pilotos | +0,6 % | +1,6 % | +4,0 % | −2,3 % |
+| Los objetos | −2,6 % | −3,2 % | −2,4 % | +2,0 % |
+| La opción 0 (sin la pista) | −3,2 % | −2,3 % | +3,3 % | +3,4 % |
+| **Todo junto** (vueltas 3 y 4; bases 7,72/7,56 y 8,32/7,30; PC 88,38/84,59 y 86,33/86,65) | **+3,7 %** | **+2,2 %** | −2,4 % | +3,2 % |
+
+El trabajo por cuadro de la gama baja con todo escondido: 18,71 → 17,98 ms y 18,40 → 17,82 ms (**−0,6 a −0,7 ms**).
+
+**Qué significa.**
+- **Ningún grupo pasa el 5 %**, ni siquiera todos juntos (+2,9 % de promedio en la gama baja, +0,4 % en este PC). Las dos
+  bases de una misma vuelta llegan a separarse 12 % (7,30 contra 8,20): cada grupo solo está dentro del ruido. Por la
+  regla de los pocos pares no hace falta seguir: aunque el ruido se fuera, la suma de todo no llega a la puerta.
+- **Lo caro del dibujo no son los modelos.** N8 (§219), que se salta el dibujo entero uno de cada dos cuadros, bajó el
+  trabajo de la gama baja de 19,9 a 14,7 ms: el dibujo entero cuesta ~10 ms de ~20. Sacar los 178 modelos, la pista y
+  los efectos ahorra ~0,7 ms. Los otros ~9 ms son **el esqueleto del cuadro**: preparar las pasadas, las copias de la
+  imagen (reflejo, brillo, minimapa), lo 2D (el velocímetro, posiciones, nombres) y el trabajo fijo de aurora por imagen.
+  Un dibujo propio de los modelos (W15/W16) ataca la parte barata.
+
+### 222.3 Los veredictos
+
+- **W15 y W16: bajan de prioridad frente a W10** (no se construyen): el techo de todos los modelos juntos es +2,9 % en la
+  gama baja (+3,7/+2,2), por debajo del 5 %; de cada grupo, entre −3 % y +1,2 % de promedio.
+- **W18 (los efectos): descartado con la medida**: su techo de dibujo es +1,2 % de promedio (+3,0/−0,5) en la gama baja;
+  el cálculo ya es un sumidero que puede salir del hilo (W11, §209). Ya estaba podado como duplicado (2026-10-31); ahora
+  con el número.
+- **W17 (la física y la colisión de los karts, propia): descartado con la estimación.** No se puede medir el techo
+  saltándose la física (cambia la carrera), así que se estimó con los perfiles que ya había (Chrome y Node, m1 y n13:
+  `Kart::Manager::Update` = 42–47 % de la lógica; la física y la colisión ≈ 33–40 % de la lógica, la colisión KCL sola
+  6–7 %, las ruedas 8–9 %; 94 % es tiempo propio de código traducido repartido en ~1.900 funciones, ninguna pasa el
+  2,5 % del cuadro). En la gama baja que dibuja cada cuadro la lógica es ~9,7 ms de ~19,7 (la otra mitad es el dibujo,
+  por N8), así que la física y la colisión son ~3,4 ms ≈ **17 % del cuadro**. Una versión propia compilada a wasm sigue
+  pagando la revisión de límites; lo que se ahorra es lo que queda del impuesto de la traducción después de H6: dar
+  vuelta los bytes (H7: 8–10 %) y la forma del código; la pila (W12), el contexto (W13) y las banderas (W14) dieron ~0.
+  Con ×1,3 sobre esa parte: 17 % × (1 − 1/1,3) ≈ **+4 %**; con ×1,4, +5 %, y eso solo reescribiendo exactas al bit las
+  ~1.900 funciones (semanas; con la colisión sola, < 1 %). Los datos en formato nativo obligan además a copiar el estado
+  de los 12 karts de ida y vuelta cada cuadro, porque el resto del juego lo lee en la memoria de la Wii. La isla anterior
+  (W2, §199) dio ×0,95 en la función. No pasa la puerta con margen: no se construye.
+
+### 222.4 Para E5
+
+1. **Medir dónde está el esqueleto del cuadro** antes de cualquier obra de dibujo: los ~9 ms de la gama baja que no son
+   modelos. Candidatos: lo 2D (los layouts del HUD), las copias de la imagen y el posproceso (brillo, profundidad), y el
+   trabajo fijo de aurora por imagen (armar y mandar las órdenes, `queue.submit`). Instrumento barato: el mismo de E4
+   con un bit más que salte `ScnMgr::DrawModelsImpl` entero, y el perfil de Chrome con nombres (`medir-sitio --perfilar`
+   sobre un programa sin `--final`) repartido por esos grupos.
+2. **N8 ya cosecha esa mitad** (opcional, apagado por omisión): es la palanca medida más grande del dibujo (+34–47 % de
+   lógica en la gama baja). Prenderlo en «Automático» en los teléfonos es decisión del dueño (§219.4).
+3. **W10** (el juego en el Worker) sigue yendo antes que W15/W16.
+
+**Archivos** (míos, sin nada del juego): `web/juego/techo_dibujo_nativo.cpp`, `herramientas/compilar-web.py` (los
+reemplazos y exportes del techo), `web/navegador/interruptores-e0.mjs`, `web/navegador/mkw.mjs` (`?techoOp`,
+`mkwEstado.techo()`), `banco/pruebas/interruptores-e0/index.html` (24/0), `herramientas/medir-sitio.mjs` (imprime
+«techo (§222)»), `herramientas/tanda-e4.sh`. El programa `build/web-e4t` y los datos de `build/web/datos/e4/` no van a git.
+Nada publicado.
+
+## §224 — W22 (etapa E4b del plan v4): el censo de las llamadas a WebGPU — **la sospecha no se confirma: no se construye el dibujo retenido** · 2026-11-05 00:15
+
+**Qué se quería saber.** E4 (§222) dejó medido que en la gama baja el dibujo cuesta ~10 de ~20 ms por cuadro y que
+esconder todos los modelos ahorra solo 0,6–0,7 ms: ~9 ms son el **esqueleto del cuadro** (glosario). La sospecha de W22:
+buena parte de ese esqueleto serían las órdenes que aurora le manda a WebGPU, cada una cruzando wasm → JavaScript →
+Chrome, y casi iguales de un cuadro al siguiente. Si fuera así, el «dibujo retenido» (render bundles, glosario) las
+ahorraría. La regla del encargo: construir solo si **más de ~2 ms** de la gama baja son llamadas que se repiten.
+
+### 224.1 El instrumento: el censo
+
+`web/navegador/censo-gpu.mjs` (el **censo de llamadas**, glosario), con `?censoGpu=1` en la página (`mkw.mjs` lo
+prende apenas empieza el tramo fijo, §163). Es solo un instrumento: no cambia lo que se dibuja y, fuera de sus fases,
+WebGPU queda sin nada encima. Tres fases seguidas dentro de la carrera:
+1. **Tiempo** (240 imágenes): desde el primer `createCommandEncoder` hasta el último `queue.submit` de cada imagen.
+2. **Conteo** (120 imágenes): cuántas llamadas de **cada** método de las 9 clases de WebGPU hay por imagen.
+3. **Grabación** (4 imágenes): cada orden de cada pasada, con sus objetos y números, para comparar en el mismo lugar
+   con el cuadro anterior (igual / solo cambia el desplazamiento del búfer de constantes / distinta).
+
+Al final, el **ensayo** (glosario): la última imagen grabada se vuelve a codificar 40 veces sin mandarla a la tarjeta
+(con una textura de descarte en lugar del lienzo) en tres formas: completa, sin las llamadas de constantes
+(`setBindGroup` del grupo 1, lo que ahorraría poner las constantes en un búfer indexado) y como render bundles ya
+grabados. Y las mismas subidas (`writeBuffer`, misma cantidad y tamaño) a un búfer de descarte.
+
+`herramientas/medir-sitio.mjs` espera el censo después del tramo, lo imprime («censo (§224)») y lo guarda en
+`<etiqueta>-v1-tramo.json` (`censoGpu`).
+
+**Comando** (con el candado, `QUIEN=e4b`):
+
+```bash
+bash herramientas/tanda-e4b.sh censo
+```
+
+(el tramo fijo de siempre en este PC: `build/web-e2w10`, carrera directa de 12 CPU, semilla 1234, cuadros 600–2400, sin
+tope, `&anillo=0&dibujarSiempre=1&n8=0`, más `&censoGpu=1`; dos corridas. Datos: `build/web/datos/e4b/` y
+`build/web/datos/medir-sitio/e4b-censo-pc-*`.)
+
+### 224.2 Lo medido (este PC)
+
+| | Corrida 1 | Corrida 2 |
+|---|---|---|
+| Trabajo por cuadro (del tramo) | 10,68 ms | 10,68 ms |
+| Llamadas a WebGPU por imagen | 1.416 | 1.568 |
+| De ellas: `setBindGroup` / `drawIndexed` / `setPipeline` / `setBlendConstant` | 577 / 268 / 250 / 150 | (parecido) |
+| Pasadas por imagen | 26 (una de 826 órdenes, otra de 240; el resto 3–36) | 26 |
+| Órdenes iguales al cuadro anterior, en el mismo lugar | 58–71 % | 47–60 % |
+| Solo cambia el desplazamiento de las constantes | 11–12 % | 10–14 % |
+| Distintas de verdad | 18–31 % | 24–27 % |
+| Pasadas enteras iguales | 5 de 26 | 5 de 26 |
+| **Ensayo: la imagen entera codificada otra vez** | **0,17 ms** | **0,19 ms** |
+| Sin las llamadas de constantes | 0,12 ms | 0,14 ms |
+| Como render bundles ya grabados (indicativo, ver trampas) | 0,09 ms | 0,11 ms |
+| Las 4 subidas de la imagen (1,4–1,6 MB con `&anillo=0`) | 0,53 ms | 0,73 ms |
+
+**Qué significa.**
+- **Todas las llamadas de dibujo de una imagen cuestan ~0,18 ms de ~10,7: el 1,7 % del cuadro.** El ensayo no cuenta el
+  paso de wasm a JavaScript de cada llamada (el «pegamento» de emscripten); aun suponiendo 100 ns por llamada, son
+  0,15 ms más: como mucho ~3 % del cuadro. Como el lastre estira todo el hilo por igual, en la gama baja es la misma
+  proporción: **≤ 0,6 ms de ~19**, lejos de los 2 ms de la puerta.
+- **Lo que ahorraría retener** es todavía menos: los bundles bajan el ensayo de 0,18 a ~0,10 ms (−0,08 ms, ~0,8 % del
+  cuadro), y además solo la mitad de las órdenes se repiten iguales: un dibujo retenido igual tendría que comparar la
+  lista entera cada cuadro para saber qué cambió (eso ya lo hace aurora al grabarla).
+- **Las subidas pesan más que las órdenes** (0,5–0,7 ms en el ensayo con `&anillo=0`), pero eso ya lo ataca el anillo de
+  §181 (prendido por omisión: 0,4–0,5 MB por imagen en vez de 1,2–1,6).
+- **Conclusión: el esqueleto del cuadro NO está en las llamadas a WebGPU.** Está del lado de wasm: aurora armando su
+  lista (convertir el estado de GX, buscar recetas, armar las constantes) y el propio código de dibujo del juego
+  traducido (lo 2D, el recorrido de la escena). Ahí apuntaba ya §222.4: el perfil de Chrome con nombres, repartido por
+  grupos, antes de cualquier obra de dibujo.
+
+### 224.3 Veredicto
+
+**W22 no se construye**: la prueba barata no promete (≤ 0,6 ms en la gama baja, y lo que se podría retener, ~0,1 ms). El
+censo queda como instrumento (`?censoGpu=1`). No hay nada nuevo en el programa de jugar.
+
+### 224.4 Trampas
+
+- **La primera corrida congeló el juego** (cuadro 1402, «Invalid array length»): emscripten llama `setBindGroup(i, g,
+  HEAPU32, inicio, largo)` y el censo copiaba el arreglo entero, que es **toda la memoria del programa**. Arreglado: solo
+  se copian los desplazamientos que se usan, las vistas grandes no se copian y un error del censo nunca corta la llamada
+  del juego (cada grabación va en su `try`). Al pararla, quedó viva la segunda corrida (pc-2, que arrancó al morir la 1)
+  ocupando el puerto 8186: se mataron solo esos procesos (los de esa línea de comandos y su perfil de Chrome).
+- **«La ráfaga» no mide lo que se quería**: aurora crea su `CommandEncoder` al **empezar** el cuadro, no al final, así
+  que del primer `createCommandEncoder` al último `submit` es casi el cuadro entero (11–12 ms, igual que la pared). Por
+  eso el número que vale es el del ensayo.
+- **Los bundles del ensayo salieron inválidos** («No color or depthStencil attachments specified»): de las vistas creadas
+  antes de la grabación el censo no sabe el formato, y esa pasada pidió un bundle sin formatos. El tiempo de los bundles
+  es indicativo (una cota de abajo); no cambia el veredicto, porque aun sin bundles el total es 0,18 ms.
+- Una vigía (pedido del dueño: «revisa continuamente que no se freezee») miró cada 20 s que el cuadro avanzara mientras
+  el registro crece; avisó una vez en falso (el registro de una corrida ya terminada) y se ajustó.
+
+**Archivos** (míos, sin nada del juego): `web/navegador/censo-gpu.mjs`, `web/navegador/mkw.mjs` (`?censoGpu=1`),
+`herramientas/medir-sitio.mjs` (imprime y guarda el censo), `herramientas/tanda-e4b.sh`. Nada publicado.
+
+## §226 — W23 (etapa E4b del plan v4): `call_ref` contra `call_indirect`, la prueba chica — **descartado con su medida** · 2026-11-05 00:10
+
+**Qué se quería saber.** El código traducido salta a muchas funciones por su puntero (cada «bctrl» del PowerPC); hoy en
+wasm eso es `call_indirect`. La idea de W23: con `call_ref` (glosario) V8 podría hacer **inlining especulativo**
+(glosario) y ahorrar parte del costo. Antes de tocar el traductor, una prueba chica sin nada del juego.
+
+**La prueba.** `herramientas/micro-indirectas/generar-callref.py` escribe a mano (texto WAT, armado con el `wasm-as` de
+binaryen que trae emsdk) un módulo con 2.000 funciones chicas con la forma de las traducidas (reciben el puntero al
+contexto, tocan dos registros y el LR) y tres bucles: directa, `call_indirect` y `call_ref` (por una tabla de
+referencias tipadas). Cada salto con tres grados de polimorfismo del mismo lugar de llamada: **uno** (siempre el mismo
+destino), **cuatro** (se turnan) y **muchos** (2.000 en orden de azar fijo). `correr-callref.mjs` calienta (para que V8
+pase de Liftoff a TurboFan con lo aprendido) y mide 5 × 20 millones de llamadas en Node y en Chrome, con y sin la
+revisión de límites del teléfono.
+
+```bash
+bash herramientas/tanda-e4b.sh callref     # dos veces seguidas, con el candado
+```
+
+**Lo medido** (ns por llamada; el mejor de 5; las dos corridas dieron lo mismo ±3 %):
+
+| Destinos | Node 24: indirect / ref | Chrome 156: indirect / ref | Chrome 156 con límites: indirect / ref |
+|---|---|---|---|
+| (directa) | 0,33 | 0,33 | 0,34 |
+| uno | 2,62 / **0,72** | **0,61** / 0,80 | **0,68–0,74** / 0,95–0,98 |
+| cuatro | 2,61 / 3,72 | **2,83** / 3,90 | **2,98–3,05** / 4,20–4,63 |
+| muchos | 14,3 / 18,0 | **15,1–15,4** / 18,3–18,4 | **14,8–15,7** / 19,2–19,7 |
+
+**Qué significa.**
+- **En Chrome, `call_ref` pierde en los tres casos: +20 a +52 %.** Chrome 156 **ya** hace el inlining especulativo de
+  `call_indirect`: con un solo destino cuesta 0,61 ns, casi lo de una directa (0,33). Lo que W23 buscaba ya lo da el
+  navegador, sin cambiar el traductor.
+- Node 24 (un V8 más viejo) todavía no lo hace con `call_indirect` (2,62 ns) y sí con `call_ref` (0,72): por eso la idea
+  parecía buena en Node. El veredicto es de Chrome.
+- Con muchos destinos (el despacho general) nada adivina, y `call_ref` igual paga más: la tabla de referencias tipadas
+  lleva un control de nulo y de tipo que `call_indirect` hace más barato.
+
+**Veredicto: W23 descartado** con la medida (la regla: seguir con el juego solo si la prueba gana claro; pierde). No se
+tocó el traductor ni el juego.
+
+**Archivos**: `herramientas/micro-indirectas/generar-callref.py`, `herramientas/micro-indirectas/correr-callref.mjs`;
+resultado en `build/micro-callref/resultado.json` y `build/web/datos/e4b/callref-*.txt` (fuera de git). Trampa: la
+primera corrida de la prueba chica se hizo sin el candado, al mismo tiempo que el censo de §224; se repitió dos veces
+dentro de la tanda (con el candado) y dio lo mismo.
+
+## §225 — W21 (etapa E4b del plan v4): el marco del juego aislado por un service worker, en el sitio local — **anda (8/8); por sí solo no gana** · 2026-11-05 00:45
+
+**Qué se quería saber.** El sitio está en GitHub Pages, que no deja poner cabeceras. Sin aislamiento no hay memoria
+compartida (`SharedArrayBuffer`) y por eso se atascaron la parte B de W10 y los hilos propios de aurora y del sonido.
+§187 ya había probado, en el banco `aislamiento` y sin el juego, que un service worker puede ponerle
+Document-Isolation-Policy a un marco. Faltaba el día 1 de W21: **con el juego de verdad, dentro del sitio servido como
+GitHub Pages** (`herramientas/sitio-local.mjs`), ¿queda aislado el marco sin romper la página de Juegos, el token del
+Worker de R2 (otro origen, con CORS), el sonido y el resto? Y medir qué gana. Nada se tocó en `terceros/Paginita-Pro`.
+
+### 225.1 Qué se hizo
+
+- `web/navegador/sw-aislar.js`: el service worker de la carpeta del juego. Solo cuando la página se pide con
+  `?aislar=sw` (o `?aislar=sw-corp`) contesta la carga del documento con la respuesta de siempre más
+  `Document-Isolation-Policy: isolate-and-credentialless` (o `isolate-and-require-corp`). Todo lo demás pasa de largo.
+- `web/navegador/index.html`: con `?aislar=sw|sw-corp` y la página todavía sin aislar, registra el service worker y
+  recarga **una vez** (la primera carga no pasa por él; máximo 2 intentos por pestaña, `sessionStorage`). Sin el
+  parámetro, nada (**apagado por omisión**).
+- `web/navegador/mkw.mjs`: mientras espera esa recarga no arranca nada (sin eso, la primera carga empezaba a bajar el
+  juego para tirarlo).
+- `herramientas/prueba-aislar-sw.mjs`: la prueba con ✓/✗ (8 puntos), con el sitio local y el Worker de verdad.
+
+```bash
+bash herramientas/tanda-e4b.sh aislar          # las dos formas, con el candado
+bash herramientas/tanda-e4b.sh aislar-medir    # el tramo fijo aislado contra sin aislar
+```
+
+### 225.2 Lo comprobado: 8/8 con las dos formas
+
+| Punto | `?aislar=sw` | `?aislar=sw-corp` |
+|---|---|---|
+| 1. El marco del juego queda aislado (`crossOriginIsolated`) | ✓ | ✓ |
+| 2. Memoria compartida de verdad (un Worker escribe con `Atomics`; memoria de wasm compartida) | ✓ | ✓ |
+| 3. La página de Juegos no cambia (sigue sin aislar, con su marco) | ✓ | ✓ |
+| 4. El token llega por mensaje y el juego baja lo privado del Worker (otro origen) | ✓ | ✓ |
+| 5. El juego llega a la carrera dentro del marco aislado | ✓ | ✓ |
+| 6. El sonido (AudioWorklet) arranca | ✓ | ✓ |
+| 7. El sitio y el marco ya no se tocan directo (`SecurityError` en los dos sentidos) | ✓ (lo esperado) | ✓ |
+| 8. Sin `?aislar` la misma página queda como siempre (el service worker la ve y pasa de largo) | ✓ | ✓ |
+
+El dueño miró la ventana mientras corría: la carrera entera a 60 fps dentro del marco aislado (con `sw-corp`), hasta el
+menú del final («Next Race / Quit Game»: la prueba no aprieta botones).
+
+**Lo que habría que cambiar en el sitio antes de llevarlo** (el punto 7, ya listado en §187 y en `docs/publicar.md`
+§8): el sitio llama directo a `mkwConectarRecords`, `mkwConectarNube` y `mkwConectarVr` del marco
+(`colabtex/src/juegos/mkw.js`) y les pasa objetos con funciones (los almacenes de Firebase); el marco mira
+`parent.Mando` (`mando-sitio.mjs`, que ya lo atrapa con `try` y sigue sin el mando del sitio). Con el aislamiento todo
+eso tiene que ir por `postMessage`. El inicio de sesión de Firebase no se toca: vive en la página de afuera, que no se
+aísla. Llevarlo al sitio es un PR en Paginita-Pro, **que el dueño confirma antes (cada vez)**: no se hizo.
+
+### 225.3 Lo medido: el tramo fijo aislado contra sin aislar (un par de cada uno)
+
+| | Sin aislar | Aislado (`&aislar=sw`) | Diferencia |
+|---|---|---|---|
+| Este PC (cuadros de lógica/s) | 88,10 (trabajo 10,96 ms) | 84,14 (11,89 ms) | −4,5 % |
+| Gama baja simulada, con límites | 7,07 (trabajo 20,30 ms) | 6,83 (20,89 ms) | −3,4 % |
+
+**Qué significa.**
+- **Aislar el marco, por sí solo, no gana cuadros** (lo que el plan ya estimaba). Un par de cada uno cae dentro del
+  ruido de ±5 % de este tramo (§222: dos bases de una misma vuelta llegaron a separarse 12 %), así que no se puede
+  decir que pierda; a lo más, unos pocos por ciento por el proceso propio.
+- **Qué gana la memoria compartida en lo que hoy viaja por mensajes**: casi nada medible. El sonido le entrega cada
+  bloque al AudioWorklet por mensaje en 0,015 ms (el medidor, «costo 0,015 ms/entrega»), y la caja de W10 (83–125 KB)
+  va y vuelve en ~0,012–0,03 ms (§188, §208). Con memoria compartida eso baja a casi cero: < 0,05 ms por cuadro.
+- **Lo que de verdad abriría** es un programa compilado con hilos (pthreads): aurora y el sonido en hilos propios
+  leyendo la misma memoria, y W10 sin copias. Eso es otro programa (`MKW_CFLAGS_EXTRA="-pthread"
+  MKW_LDFLAGS_EXTRA="-pthread"`, §186) y semanas de obra. Además, para jugar así en el sitio hace falta el PR del dueño.
+  No entra en el día 1.
+
+### 225.4 Veredicto
+
+**El día 1 de W21 está hecho**: el sitio local funciona entero con el marco del juego aislado y `crossOriginIsolated`
+en verdadero (el criterio de la etapa). Queda **apagado por omisión** (`?aislar=sw`), sin efecto en el programa de jugar
+ni en el sitio. No se adopta nada por rendimiento: aislar solo no gana. Seguir (los hilos de verdad) pide dos
+decisiones del dueño: el PR del sitio (pasar a mensajes lo del punto 7) y gastar semanas en un programa con hilos.
+
+### 225.5 Trampas
+
+- La prueba falló dos veces por culpa de ella misma, no del juego: (1) miraba solo el último estado, que ya era
+  después de la meta; (2) leía `mkwEstado.logica()`, que no es una función: cada lectura daba error y se descartaba
+  entera. Arreglado: anota si vio la carrera alguna vez y lee solo lo que necesita.
+- En la gama baja simulada el medidor pasa hasta ~70 s sin escribir el cuadro (el hilo está lleno con el lastre): la
+  vigía de congelamientos espera 3 min ahí (1 min en este PC).
+- Con el marco aislado `esperaRuntime` sale 0: con memoria compartida el runtime espera de otra manera. Por eso se
+  comparan los cuadros de lógica por segundo y no las esperas.
+
+**Archivos** (sin nada del juego): `web/navegador/sw-aislar.js`, `web/navegador/index.html`, `web/navegador/mkw.mjs`,
+`herramientas/prueba-aislar-sw.mjs`, `herramientas/tanda-e4b.sh`. Datos en `build/web/datos/e4b/`. Nada publicado.
+
+## §227 — W24 (plan v4, opcional): el teléfono solo dibuja y un PC de la sala calcula por él — **piloto con puerta: matado** (§227.2) · 2026-11-05 01:10
+
+**Qué es.** En la sala, un teléfono de gama baja no llega a simular 60 cuadros por segundo. La idea: un PC de la sala
+corre la consola de ese teléfono (con lockstep, como hoy) y cada cuadro le manda la **caja** de W10 (§207: lo que cambió en
+la memoria de la Wii); el teléfono la pega y **solo dibuja**, nítido a su resolución, y manda solo sus botones. Como un
+tablero remoto con solo las lámparas: el PLC está en la sala de control, por el cable llegan las lecturas y vuelven los
+pulsadores. El dueño (2026-11-05) lo pidió como opción del jugador, apagada por omisión, «pero solo si es que sirve»:
+por eso es un **piloto con puerta**: se mide primero y la opción se construye solo si pasa.
+
+**La puerta** (anotada antes de medir; la puso la orquestadora con la frase del dueño):
+1. La caja comprimida pide **como mucho ~3 Mbit/s** de subida al PC por cada teléfono, medida en una carrera de 12 en
+   varias pistas.
+2. El dibujo solo, sin la lógica, en el teléfono simulado de gama baja (con el lastre y `--wasm-enforce-bounds-checks`)
+   llega a **60 imágenes por segundo**, o gana **al menos +20 %** contra simular la carrera entera (se puede estimar con
+   el costo del dibujo contra el cuadro entero de §207 y con N8).
+3. La **demora extra** del botón a la imagen, contra la sala normal, queda en **~50 ms o menos**.
+
+Si algo no pasa: se para y se documenta el veredicto con su medida, como los pilotos de la etapa 0.
+
+### §227.1 Cómo se midió la caja · 2026-11-05 02:10
+
+- **El instrumento**: el programa de W10 de siempre (`build/web-e2w10i`, `MKW_W10_COMPILAR=1`, con la marca de páginas), en
+  el modo 7 (`?w10=7`: la carrera sin dibujo junta la caja de cada cuadro y la manda a un Worker que la pega). El Worker
+  (`web/navegador/w10-dibujo.js`) ahora además la achica como iría por la red (`web/navegador/w24-caja.mjs`): la caja
+  tal cual, la **resta XOR** contra su copia de la memoria + el **código de ceros** (todas las cajas), y **deflate**
+  (`CompressionStream('deflate-raw')`, una de cada 4, contada ×4, sin frenar la vuelta). Cada caja achicada se deshace y
+  se compara con la original: **0 vueltas malas** en las cuatro pistas. Las primeras 120 cajas no cuentan (la copia del
+  Worker nace en cero y cada tramo se completa la primera vez que viaja; en W24 de verdad la foto entera iría una vez).
+  Al cerrar el tramo, `mkw.mjs` escribe «[w24] …» en el registro (`mkwEstado.w24compresion`).
+- **La carrera**: la directa de 12 CPU en máximo, semilla 1234, el tramo fijo 600–2400, 30 s, en cuatro pistas.
+- **Comando**: `bash herramientas/tanda-w24.sh caja` (con el candado; `build/web/datos/w24/`, el registro en
+  `build/web/datos/medir-sitio/w24-caja-*-pc.log`).
+- **Banco**: `node banco/correr.mjs w24-caja` (7: la ida y vuelta de 30 cajas de mentira idéntica, las huellas, el código
+  de ceros, el XOR y la cuenta de los Mbit/s).
+
+### §227.2 Lo medido y el veredicto: **matado** · 2026-11-05 02:15
+
+**Puerta 1, la subida** (KB por cuadro de media y Mbit/s a 60 cuadros por segundo, sin las cabeceras de WebRTC; este PC):
+
+| Pista | La caja tal cual | Resta + ceros | Resta + deflate | Resta + ceros + deflate (armar en el PC) |
+|---|---|---|---|---|
+| 0.0 | 104,5 KB · 51,4 | 91,2 · 44,8 (×1,15) | 40,9 · **20,1** (×2,56) | 42,1 · 20,7 (×2,48; 1,59 ms) |
+| 13.2 | 107,4 · 52,8 | 91,6 · 45,0 (×1,17) | 40,4 · **19,9** (×2,66) | 41,4 · 20,3 (×2,60; 1,56 ms) |
+| 30.2 | 114,6 · 56,3 | 102,2 · 50,3 (×1,12) | 46,7 · **22,9** (×2,46) | 48,3 · 23,7 (×2,37; 1,74 ms) |
+| 50.2 | 133,8 · 65,8 | 118,0 · 58,0 (×1,13) | 54,0 · **26,5** (×2,48) | 55,6 · 27,3 (×2,41; 1,96 ms) |
+
+- Lo mejor que se logró pide **20–27 Mbit/s por teléfono** (con cabeceras, 21–28). La puerta era **~3**: falta ×7–9.
+  Para 3 Mbit/s la caja tendría que pesar ~6 KB por cuadro, **×17–22 menos que la cruda**. Ni dibujando a 30 (N8: una
+  caja cada dos cuadros) alcanza: 10–14 Mbit/s.
+- **Por qué no se achica más**: la resta XOR deja casi nada en cero (×1,1–1,2). Lo que cambia cada cuadro son números con
+  coma (posiciones, velocidades, las matrices de los huesos y de la cámara de 12 karts): aunque cambien poco, cambian casi
+  todos sus bits. Deflate solo encuentra lo que se repite entre tramos (×2,5). Un compresor mejor puede ganar algo, no ×8.
+- **Y cuesta en el PC**: deflate es 1,6–2,8 ms por cuadro por teléfono, encima de correr otra consola entera: se come el
+  margen que el PC necesita para no frenar la sala.
+- **La gama baja** (pista 0.0, 60 s, límites de Android): la caja sale igual (86,7 KB por cuadro cruda, 475 páginas; es
+  el estado del juego, no depende del aparato), pero el Worker casi no recibió cajas (4 de 7.392: con el lastre la cinta
+  no tenía pedazo libre) y no hay compresión medida ahí. No cambia nada: la razón de la compresión es de los datos.
+
+**Puerta 2, el dibujo solo en la gama baja** (estimada con §207.3, sin construir): dibujando siempre, el cuadro entero es
+20,9 ms de trabajo y sin dibujo 9,8 ms: el dibujo ≈ 11 ms (53 %). El teléfono que solo dibuja haría eso + pegar la caja +
+el sonido y los efectos (W11, §209: ~5 ms en la gama baja): ~11–16 ms, entre **+30 % y +85 %** contra simular todo.
+Pasaría el +20 %. Contra N8 en Automático (que ya está por omisión, §223) la ganancia sería bastante menor.
+
+**Puerta 3, la demora** (estimada, sin construir): el botón va al PC (media ida y vuelta), el PC lo corre y manda la caja
+(40–55 KB: ~17 ms de caño a 20 Mbit/s) y el teléfono la dibuja en el cuadro siguiente (~17 ms): unos **media ida y
+vuelta + 33 ms** de más contra la sala normal. Pasaría solo con pings de menos de ~34 ms entre el teléfono y el PC.
+
+**Veredicto: W24 queda «matado» por la puerta 1** (la subida pide ×7–9 lo permitido). Como pidió el dueño («solo si es
+que sirve»), **no se construye**: no hay opción en Gráficos ni `?soloDibuja` en la página. Lo que queda:
+- `web/navegador/w24-caja.mjs` y la medida en `w10-dibujo.js` (solo corre con el programa de W10 y `?w10=3|7`), con su
+  banco `w24-caja` (7);
+- la parte B que se había escrito antes de la puerta y **no se compiló ni probó** (el bucle propio del dibujante en el
+  hilo principal, `w10_nativo.cpp` modo 11, y la página de la opción, `solo-dibuja.mjs`), guardada en
+  `parches/w24-parte-b.diff` (`git apply`), y el planificador del runtime que solo deja correr el hilo principal en
+  `parches/motor-w24.diff`. Sirven si W10 (§207.4) vuelve a intentar la parte B;
+- la copia `terceros/Wiicompiled-motor-w24` (ignorada, 554 MB): se puede borrar.
+
+**Trampas**: los «máx» de deflate del registro salen ×4 (se cuentan así porque se mide una de cada 4: el pico real es
+~77–115 KB); en el registro la fila «cruda» dice armar 0 ms porque no se arma nada; con el lastre de la gama baja la cinta
+de W10 se llena y el Worker se queda sin cajas (para medir la compresión ahí habría que darle más pedazos, `piezas`).
+
+## §228 — W25 / E4c (plan v4): las mejoras chicas, juntas — **el paquete no gana: no se adopta** · 2026-11-05 03:40
+
+**Qué y por qué.** Varias mejoras se habían descartado una por una porque daban +1 a +6 % y el ruido de la gama baja
+simulada es de ±5 % o más (`docs/evaluacion-chicas.md`). La idea de E4c: compilarlas JUNTAS y ver si la suma asoma por
+encima del ruido. Se comparan dos programas armados de las mismas fuentes el mismo día (el motor de la etapa,
+`terceros/Wiicompiled-motor-h6` rama `e2-w10`, con `--final`): la **base** (`build/web-e4c-base`, sin ninguna) y el
+**paquete** (`build/web-e4c-paq`). Así la única diferencia entre los dos son las mejoras (`build/web-e2w10` no servía de
+base: la aurora del motor cambió desde entonces con las otras etapas).
+
+**Paso 0, cada pieza con su interruptor** (`MKW_CHICAS=c2,c3,c4,c7` de `herramientas/compilar-web.py`, glosario):
+| Pieza | Qué es | Cómo quedó |
+|---|---|---|
+| C2 | Texturas CMPR subidas como BC1 (§190) | Pasada a la aurora del motor con `herramientas/e4c/portar-c2.py` (todo bajo `#if MKW_CHICA_C2`: sin el interruptor el código no existe). Con el interruptor va prendida por omisión; `?texturasBc=0` la apaga en la página |
+| C3 | Las funciones calientes reescritas (§181, sin SIMD) | `MKW_CALIENTE_COMPILAR=1` + `-DMKW_CALIENTE_DEF=1` (`caliente_nativo.cpp`: la nueva por omisión; `?caliente=0` = la traducida) |
+| C4 | El memo de las indirectas ×4 (2.048 casillas) | `-DMKW_MOTOR_MEMO_INDIRECTA=2048` (`guest_abi/dispatch.h` de la copia del motor: el tamaño era fijo en 512) |
+| C7 | `wasm-opt -O3` | `-sBINARYEN_EXTRA_PASSES=-O3` en el enlace (en la misma pasada de Binaryen, con las mismas funciones del wasm) |
+| C5, C6 | No releer r14–r31 (`MKW_M8=seguro`) y las banderas CR «seguro» | **No se hicieron**: son del traductor y piden traducir el juego de nuevo (~35 min cada vez) con los parches `traductor-m8.diff` y `traductor-w14.diff` pasados a la copia `-h6`. Con el paquete sin ganancia medible (abajo), sumar dos piezas que medían ×1,00 y ×0,993 en Node no cambia el veredicto |
+
+Desvío del plan, dicho: cada pieza NO tuvo su arranque 13/13 y su fantasma propios; se probó el paquete entero (si
+fallaba, se separaba). No falló.
+
+**Paso 1, la igualdad entera** (`bash herramientas/tanda-e4c.sh compilar igual`, después `foto`; todo con el candado,
+`QUIEN=e4c`):
+| Prueba | Resultado |
+|---|---|
+| `prueba-arranque` (Node, el paquete) | **13/13** |
+| La sala, A = paquete, B = base (`prueba-sincro --directa --build-b`) | 14 bien, **huellas 75/75** |
+| Los fantasmas cuadro por cuadro (`prueba-fantasma-igual`) | **2.113/2.113 iguales**, meta en el cuadro 2242 en las dos |
+| La foto igual, C2 apagado (`prueba-foto-igual --extra-a=&texturasBc=0&enganche=0`) | **12/12**: cuadros 600, 1500 y 2400 con **0,000 %** de píxeles distintos |
+| C2 aparte (`prueba-texturas-bc`, `?texturasBc=verifica`) | **7/7**: 58 de 80 CMPR en BC1, 51 dB, tarjeta 15,4 → 1,9 MB (×8,02) |
+
+**Paso 2, la medida** (`bash herramientas/tanda-e4c.sh medir`, luego `E4C_VUELTAS="3 4 5 6"`): el tramo fijo de §163
+en Chrome, intercalado, la gama baja con la revisión de límites de Android y `&n8=0`, y este PC. Cuadros de lógica por
+segundo, base → paquete:
+| Par | Gama baja | Este PC |
+|---|---|---|
+| 1 | 17,14 → 18,86 (+10,0 %) | 167,0 → 158,3 (−5,2 %) |
+| 2 | 18,94 → 16,71 (−11,8 %) | 159,2 → 160,2 (+0,6 %) |
+| 3 | 18,31 → 16,89 (−7,8 %) | 155,8 → 160,1 (+2,8 %) |
+| 4 | 17,45 → 18,89 (+8,3 %) | 161,1 → 160,9 (−0,1 %) |
+| 5 | 16,99 → 16,57 (−2,5 %) | 166,2 → 164,6 (−0,9 %) |
+| 6 | 17,63 → 18,01 (+2,2 %) | 153,3 → 155,3 (+1,3 %) |
+| **Media (95 %)** | **−0,3 % (−9,4 a +8,9)** | **−0,3 % (−3,2 a +2,6)** |
+
+Los dos primeros pares quedaron en la zona gris (+10 y −12): por la regla del dueño se sumaron hasta 6. El `.wasm` del
+navegador: 112,36 → 112,09 MB (−0,24 %; C7 daba −2,4 % antes de ThinLTO, que ya hace casi lo mismo).
+
+**Veredicto: el paquete no se adopta.** La regla pedía la media de 6 pares positiva con su intervalo por encima de
+cero; da −0,3 % con un intervalo de ±9 %. Lo que se ve: el ruido de la gama baja simulada (pares de +10 y −12 % con el
+mismo programa) es más grande que todo lo que estas piezas pueden sumar, y en este PC, donde el ruido es chico (±3 %),
+tampoco aparece nada. C2 sigue disponible apagado en `terceros/Wiicompiled/aurora-main` (`?texturasBc=1`), y ahora
+también en la aurora del motor con su interruptor. El paso 3 (sacar C2 y C5) no tiene sentido sin un paquete que gane:
+no se hizo.
+
+**Trampas.**
+- `prueba-foto-igual` fallaba en las dos (también en la base, igual que en E2 el 2026-11-04): con el enganche al monitor
+  (glosario) la espera del juego es `mkwEsperaHasta` y `?fotoCuadro` solo frena en `mkwEsperaReloj`; el juego seguía
+  hasta el cuadro ~16.000. Con `&enganche=0` en A y B anda (12/12). `tanda-e4c.sh foto` ya lo pasa.
+- `python -I` no hace caso a `PYTHONIOENCODING`: el ✓ no se podía imprimir en la consola cp1252 (`sys.stdout.reconfigure`).
+- `texture.cpp` de la aurora del motor tiene finales de línea mezclados: `portar-c2.py` lee y escribe bytes y prueba con
+  CRLF cuando no encuentra el texto con LF.
+- Con 45 min de candado y otro en la fila, la tanda cede el turno sola (`candado_hueco`) y espera: parece trabada y no lo
+  está (`cat build/medicion.lock`, `ls build/medicion.fila/`).
+
+**Dónde quedó cada cambio.** C4 en la copia del motor (`terceros/Wiicompiled-motor-h6` @ `f7181fe`, sin commit): el
+parche `parches/e4c-motor-c4.diff`. C2 en `terceros/aurora-main-viejo-motor`: lo repone `python -I
+herramientas/e4c/portar-c2.py` (si ya está, no hace nada). C3, C7 y los interruptores: `herramientas/compilar-web.py`,
+`web/juego/caliente_nativo.cpp`, `web/navegador/mkw.mjs` (`?texturasBc=0`). Sin `MKW_CHICAS`, todos dan el programa de
+siempre (la base de E4c se compiló así).
+
+**Paso 4, PGO (C1)** — ver §228.1.
+
+### §228.1 — PGO sobre la base (el sello de E4c) — **se queda a 0,2 puntos de la regla: lo decide la orquestadora** · 2026-11-05 05:20
+
+**Qué.** PGO (glosario) es compilar dos veces: un programa que cuenta cuántas veces pasa por cada rama corre 3 carreras
+con guion (las de W4, `build/web/datos/w4/guion-{a,b,c}.txt`: copas que el tramo fijo NO usa) y el programa de verdad
+se compila con esos números (`-fprofile-instr-use`, `-mllvm -hot-cold-split=true`). Como el paquete no se adoptó, el
+perfil va sobre la base. `bash herramientas/tanda-e4c.sh pgo igual-pgo medir-pgo` (luego `E4C_VUELTAS="3 4 5 6"
+… medir-pgo`) → `build/web-e4c-pgo` (`--final`). El perfil y los programas que cuentan quedan en
+`C:/Users/zilon/AppData/Local/Temp/mkw-pgo-e4c/` y `build/web-e4c-pgo-gen/`: llevan nombres del juego, nunca a git.
+
+**La igualdad, entera:**
+| Prueba | Resultado |
+|---|---|
+| `prueba-arranque` (Node) | **13/13** |
+| La sala, A = PGO, B = base | 14 bien, **huellas 75/75** |
+| Los fantasmas | **2.113/2.113 iguales**, meta en el 2242 en las dos |
+| La foto igual (`&enganche=0`) | **12/12**, 0,000 % en los cuadros 600, 1500 y 2400 |
+
+**La medida** (tramo fijo de §163, intercalado, gama baja con la revisión de límites y `&n8=0`), cuadros de lógica/s,
+base → PGO:
+| Par | Gama baja | Este PC |
+|---|---|---|
+| 1 | 18,27 → 18,83 (+3,1 %) | 152,2 → 156,3 (+2,7 %) |
+| 2 | 16,86 → 18,50 (+9,7 %) | 149,8 → 156,1 (+4,2 %) |
+| 3 | 19,68 → 22,59 (+14,8 %) | 150,6 → 155,2 (+3,1 %) |
+| 4 | 17,25 → 19,35 (+12,2 %) | 164,9 → 164,2 (−0,4 %) |
+| 5 | 20,20 → 19,14 (−5,2 %) | 166,4 → 160,1 (−3,8 %) |
+| 6 | 19,34 → 21,42 (+10,8 %) | 160,5 → 161,7 (+0,8 %) |
+| **Media (95 %)** | **+7,5 % (−0,2 a +15,3)**, mediana +10,2 %, 5 de 6 a favor | **+1,1 % (−2,0 a +4,2)** |
+
+El `.wasm` del navegador: **112,36 → 102,41 MB (−8,9 %)**: eso es seguro (menos descarga y menos que compilar al abrir).
+
+**Veredicto, con la regla escrita antes de medir** (media de 6 pares positiva con su intervalo del 95 % por encima de
+cero, y este PC sin perder más del 1,5 %): este PC pasa (+1,1 %); la gama baja da una media de +7,5 % pero el borde de
+abajo del intervalo queda en **−0,2 %**: **no pasa, por 0,2 puntos**. No lo adopto yo: es justo el borde y la regla
+dice 6 pares como mucho. Queda para la orquestadora (o el dueño): (a) aplicar la regla tal cual (no se adopta), o
+(b) adoptarlo por el `.wasm` −8,9 % y la mediana +10 %. Comparado con W4 (§198, antes de H6 y M7: gama baja +2,2 % de
+mediana, este PC +3,2 %, `.wasm` −8,3 %), ahora la gama baja gana más y este PC menos.
+
+**Si se adopta, falta** (no se hizo): que `compilar-web.py --final` rehaga el perfil solo (armar el programa que cuenta,
+correr los 3 guiones, `profraw-v11.mjs`, `llvm-profdata merge`, compilar con el perfil): son ~15 min más en cada
+`--final`, y el perfil se ata a la forma de cada función (con un cambio del motor, el viejo deja funciones sin perfil).
+
+**Trampas.**
+- El programa que cuenta se cae al escribir el perfil, con `--final` y sin él: «memory access out of bounds» en
+  `initializeValueProfRuntimeRecord`. Lo armé sin `--final` (como W4) creyendo que era eso; no lo era, pero sirve: se cae
+  DESPUÉS de escribir los contadores, y lo que se pierde es solo la parte de los valores (los destinos de las llamadas
+  indirectas), que este PGO no usa. El perfil marca cada función por la forma de su código, no por cómo se enlaza: sirve
+  para el programa `--final`. La causa es la de siempre: la copia de compiler-rt de emscripten recorre las fichas
+  de a 48 bytes y el compilador las arma de 56.
+- Por lo mismo, la última ficha llega cortada (la sección de 56 × N bytes no es múltiplo de 48): `profraw-v11.mjs`
+  ahora la deja afuera (se pierde el perfil de una sola función) y saca sus bytes sueltos para que los contadores
+  queden donde el formato 11 los espera. Antes paraba con «no es múltiplo de 56».
+- Los números del perfil parecen absurdos (`ByteSwap32` con 7,5 × 10¹¹): lo mismo en el perfil de W4; importa la
+  proporción entre ramas, no el número.
+- Una orden mía con `$PWD` sin comillas («MKW RETRO» tiene un espacio) hizo que la tanda no arrancara una vez.
+
+**Qué quedó sin hacer en E4c** (dicho en §228): C5 y C6 (del traductor), la prueba de cada pieza por separado y el paso
+3. Ninguno cambia el veredicto del paquete.
+
+## §229 — N11 (plan v4, etapa E5): el teléfono débil ve la carrera en video desde un PC de la sala — **piloto con puerta** · 2026-11-05 05:40
+
+**Qué es.** En la sala, un teléfono que no llega a simular 60 cuadros por segundo no puede ir en el lockstep. La idea de
+N11: un PC de la sala dibuja **también** la vista del jugador del teléfono (el juego ya sabe dibujar la vista de otro
+jugador: la pantalla partida) y se la manda **en video** por WebRTC, con el codificador de video del PC; el teléfono
+solo muestra el video y manda sus botones. Es lo contrario de W24 (§227): allá viajaba el estado del juego (la caja de
+W10, 20–27 Mbit/s); acá viaja la imagen ya hecha, comprimida por el codificador de la tarjeta, que está hecho justo para
+eso. Como un monitor remoto por un enlace de video, en vez de mandar las lecturas de los sensores para que el otro
+arme el tablero.
+
+**La puerta** (anotada antes de medir, con lo que pidió la orquestadora para E5):
+1. **La subida**: mandar la vista del teléfono a 720 de alto y 60 imágenes por segundo con el codificador del PC por
+   WebRTC pide **como mucho ~8 Mbit/s por teléfono**. Se mide con el tope en 3, 5 y 8 Mbit/s (H.264, el que suele ir por
+   la tarjeta en Windows; y VP8 para comparar): pasa si **con 8 Mbit/s o menos** llegan **≥ 57 imágenes/s**, el
+   codificador no se queja de CPU (`qualityLimitationReason` ≠ `cpu`) y la calidad es buena: **QP medio ≤ 32** en H.264
+   (el QP es el «paso» de la cuantización: cuanto más alto, más bloques; 20–30 se ve bien, de 36 para arriba se ve
+   borroso), y se anota cómo se ve (una foto del video recibido).
+2. **El PC que dibuja de más**: con la vista de más (la pantalla partida de dos, `&vistas=2`) y el codificador andando,
+   (2a) **este PC sigue a 60** (imágenes por segundo ≥ 59 con el tope de siempre) y en el tramo fijo sin tope (§163) no
+   pierde más del **15 %** de cuadros de lógica/s; (2b) **la gama media simulada** (`&lastre=3.5&lastreAyuda=3&ladron=64&lastreGpu=6`,
+   con la revisión de límites) no pierde más del **10 %** de cuadros de lógica/s en el tramo fijo sin tope (y se anota si
+   sigue llegando a 60: si no llega, la gama media no puede ser la que manda el video). Base y «dos vistas + video»
+   intercalados, 2 pares (la regla del dueño; más solo en la zona gris).
+3. **La demora del botón a la imagen**: se mide lo que agrega el video sin la red (codificar + colchón + decodificar,
+   de la toma de la imagen a la pantalla: `requestVideoFrameCallback`, `expectedDisplayTime − captureTime`) y se anota;
+   el total es eso + una ida y vuelta de la red (el botón va al PC, la imagen vuelve). Pasa si lo que agrega el video,
+   sin la red, es **≤ 50 ms** (la misma vara que W24).
+
+Si una condición falla de forma clara, N11 queda «matado» con su medida, como W24. Si pasa todo, se construye
+**apagado por omisión**, como opción.
+
+**Cómo se mide** (el instrumento, sin construir nada del producto):
+- `web/navegador/n11-video.mjs` (solo con `?n11=MBIT`, nunca en la sala): toma el lienzo del juego
+  (`captureStream(60)`), lo codifica por un `RTCPeerConnection` y lo recibe en otro **dentro de la misma página** (como
+  medir un enlace de radio con el transmisor y el receptor en la misma mesa unidos por un cable: sale la potencia y la
+  calidad, no el camino del aire; la red se suma aparte). Cada segundo guarda los contadores de `getStats` (bytes,
+  imágenes codificadas y decodificadas, QP, tiempos de codificar y decodificar, el colchón de llegada) y la demora de
+  cada imagen. `&n11Alto=720`, `&n11Codec=h264|vp8|vp9|av1`. Como el receptor decodifica en este mismo PC, lo que cuesta
+  en el PC sale **un poco peor** que en la realidad (ahí lo decodifica el teléfono).
+- `&vistas=2` (en `?modo=directa`, solo para medir): la ficha con dos humanos de esta consola y dos pantallas (sección
+  0x21, la pantalla partida). El juego da pantalla solo a las personas (`directo_nativo.cpp`), así que las dos quedan
+  quietas en la largada (el puesto 1 acelera con la tecla del piloto de medir-sitio) y las otras 10 son CPU. La base es
+  la misma carrera con un solo humano: la única diferencia es la segunda vista (y el video).
+- `medir-sitio.mjs` imprime «n11 (§229)» y guarda `<base>-v1-n11.json`. La tanda: `bash herramientas/tanda-n11.sh prueba
+  video vista` (con el candado, `QUIEN=e5`; `build/web/datos/n11/`), con el programa `build/web-e4c-base` (la base de E4c).
+
+### §228.2 — PGO adoptado: `compilar-web.py --final` rehace el perfil solo · 2026-11-05 06:10
+
+**La decisión.** La tomó la orquestadora, no el dueño, con dos medidas a favor (§198 y §228.1: gama baja +7,5 % de media
+y +10,2 % de mediana, 5 de 6 pares), este PC sin pérdida (+1,1 %), la igualdad entera y el `.wasm` 8,9 % más chico. Lo
+que pedía el paso 4: que el perfil deje de rehacerse a mano (la razón por la que se había descartado en §213).
+
+**Cómo quedó.** `python herramientas/compilar-web.py --final [--modo navegador] [--carpeta X]` llama a
+`herramientas/pgo_final.py` antes de compilar:
+1. Arma o pone al día el programa que cuenta (`-fprofile-instr-generate`) en su taller `<carpeta>-pgo-gen`, con el
+   mismo motor, aurora y chicas del final, pero sin `--final` (sin la ventana fija ni ThinLTO: como se midió). Ninja solo
+   recompila lo que cambió.
+2. Si ese programa es el mismo de la última vez (la huella de su `mkw.wasm`), reusa el perfil. Si no, corre las 3
+   carreras de `herramientas/pgo/guion-{a,b,c}.txt` en Node con `correr-guion.mjs` (cada una con la partida base de §175,
+   por `partida-aislada.mjs`), arregla cada perfil con `profraw-v11.mjs` y los junta con `llvm-profdata merge`.
+3. Compila el final con `-fprofile-instr-use=…/mkw-<huella>.profdata -mllvm -hot-cold-split=true`. La huella va en el
+   nombre del perfil: si el perfil cambia, cambia la bandera y ninja recompila todo lo que lo usa.
+
+El perfil queda en `%TEMP%/mkw-pgo/<carpeta>/` (o `MKW_PGO_CARPETA`): lleva nombres del juego, **nunca a git**. Los
+guiones sí entran a git (`herramientas/pgo/`): son solo cuadros y botones («inicio+duración=máscara», el formato de §165),
+nada del juego. `--sin-pgo` o `MKW_PGO=0` = el final sin PGO.
+
+**Un desvío, dicho:** la orquestadora pidió «el guion de §165». Usé los 3 guiones de W4, que tienen el formato de §165
+pero llevan a copas que el tramo fijo NO usa: es el perfil que se midió y se adoptó. El guion mismo de §165 llega a la
+carrera que se mide, y un perfil sacado de ahí haría parecer mejor de lo que es la medida de esa carrera.
+
+**Cuánto cuesta.** La primera vez, ~15 min más (el programa que cuenta ~7 min, las 3 carreras ~6 min, juntar segundos).
+Si ya está hecho, unos minutos (el programa que cuenta se vuelve a enlazar y se compara la huella). El segundo modo del mismo
+`--final` (Node y después navegador) ya reusa el perfil.
+
+**La prueba** (`bash herramientas/tanda-e4c.sh final igual-final` → `build/web-e4c-final`, con el candado):
+| Prueba | Resultado |
+|---|---|
+| Node: el perfil se arma solo | 3 carreras, `mkw-9bdeeb69d0ab40d8.profdata` |
+| Navegador: el perfil se reusa | «no cambió (huella 9bdeeb69d0ab40d8): reuso» |
+| `prueba-arranque` (Node) | **13/13** |
+| La sala, A = final con PGO, B = final sin PGO (`build/web-e4c-base`) | 14 bien, **huellas 75/75** |
+| Los fantasmas | **2.113/2.113 iguales**, meta en el 2242 en las dos |
+| `.wasm` del navegador / comprimido | 112,36 → **102,40 MB**; `mkw.wasm.br` **13,9 MB** |
+
+**Para el dueño:** el programa nuevo para publicar hay que subirlo a R2 (`node herramientas/subir-r2.mjs --subir`, ver
+`docs/publicar.md`). Lo hace el dueño; está armado en `build/web-e4c-final/navegador` (el motor de la etapa,
+`MKW_WIICOMPILED=terceros/Wiicompiled-motor-h6`), o se arma de nuevo con el `--final` de siempre.
+
+**Trampas.** La flecha «→» en un `print` de Python rompe la consola de Windows (cp1252): los mensajes de `pgo_final.py`
+van con «->». Una tilde sale mal escrita en el registro de la tanda (la consola), pero no pasa nada.
+
+### §229.1 — N11, lo medido y el veredicto: **matado** · 2026-11-05 08:20
+
+**Lo que se corrió** (`bash herramientas/tanda-n11.sh prueba video vista`, el programa `build/web-e4c-base`, con el
+candado; los números en `build/web/datos/n11/`). La carrera directa de la pista 0.0, semilla 1234, 12 karts (CPU
+máximo); para el video, `&soloCpu=1` (la cámara sigue a un kart que corre de verdad: con los humanos quietos en la
+largada la imagen casi no cambia y el video pedía 0,67 Mbit/s, que no dice nada).
+
+**1. La subida (30 s de carrera, este PC; «img/s» = imágenes codificadas por segundo):**
+
+| Prueba | Tamaño que salió | Mbit/s | img/s | QP medio | Codificar | Qué lo limitó |
+|---|---|---|---|---|---|---|
+| H.264 a 3 | 854×480 | 3,0 | 60 | 31,6 | 2,4 ms | el ancho de banda, todo el rato |
+| H.264 a 5 | 854×480 | 5,0 | 60 | 28,3 | 2,7 ms | el ancho de banda, todo el rato |
+| H.264 a 8 | 1281×720 | 7,8 | **56,3** | 27,5 | 4,8 ms | el ancho de banda casi la mitad del rato |
+| H.264 a 8 (2.ª, con la marca) | 1280×720 | 7,8 | 59,9 | 28,7 | 4,7 ms | nada |
+| VP8 a 8 | 1281×720 | 8,0 | 60 | 44 (en VP8 va de 0 a 127) | 3,2 ms | nada |
+| H.264 a 8, a 540 | 961×540 | 7,8 | 50,5 | 25,3 | 4,1 ms | nada |
+
+Las de 3 y 5 Mbit/s salieron a 480 (antes de arreglar el `--dpr`, o porque WebRTC bajó la resolución: no sirven para
+juzgar 720). A 720, con 8 Mbit/s, una corrida dio 56,3 img/s (bajo la vara de 57) y la otra 59,9: **raspando**, sin
+nada de margen; con menos de 8 no da 720. Es decir: la condición 1 pasa apenas, justo en el tope.
+
+**3. La demora que agrega el video, sin la red** (la «marca»: la página pinta la hora en una tira de 24 cuadritos
+blancos y negros arriba de cada imagen, y el receptor la lee al mostrarla; así se mide de punta a punta sin creerle al
+navegador). La primera manera, `expectedDisplayTime − captureTime`, daba números que no cuadraban (198 ms en una
+corrida, 16 en otra con el mismo video): se descartó. Con la marca, H.264 a 8, 720, 60 s de carrera:
+
+| | Mediana | p90 | p99 | imágenes medidas |
+|---|---|---|---|---|
+| colchón de llegada automático | **56,3 ms** | **87,5 ms** | 104,8 ms | 3.506 |
+| colchón pedido en 0 (`jitterBufferTarget = 0`) | 60,8 ms | 102,5 ms | 117,5 ms | 3.565 |
+
+La vara era **≤ 50 ms** sin la red. La mediana ya la pasa y 1 de cada 10 imágenes llega con más de 87 ms; esto es el
+mejor caso posible (el transmisor y el receptor en la misma página, sin cable de por medio). En la sala se le suma una
+ida y vuelta de la red (el botón va al PC y la imagen vuelve: 20–60 ms en una casa), o sea **~80–150 ms del botón a la
+imagen**, contra los ~16–33 de jugar en la propia máquina. Pedir el colchón en 0 no ayuda (el navegador lo vuelve a
+subir). **La condición 3 falla de forma clara.**
+
+**2. El PC que dibuja la vista de más** (tramo fijo sin tope, §163, a 720 de verdad: `--dpr 1.5`, Chrome en 8 núcleos;
+base contra «dos vistas + video a 8», intercalados, 2 pares):
+
+| | Base, par 1 | Base, par 2 | Dos vistas + video |
+|---|---|---|---|
+| este PC | 119,4 lógica/s · 75,6 img/s | 122,6 · 76,3 | el tramo **no terminó** (abajo) |
+| gama media simulada | 42,1 lógica/s · 13,8 img/s | 38,9 · 12,1 | no terminó en 25 min; el video salía a **5–8 img/s** |
+
+- **La gama media simulada no llega a 60 ni sin la vista de más**: a 720, con su lastre de tarjeta (×6), da 12–14
+  imágenes por segundo y ~40 cuadros de lógica por segundo (la tarjeta tarda 144 ms por imagen). Con la vista de más y
+  el codificador, el video le salía a 5–8 img/s con 50–100 ms de colchón. Lo que anotaba la puerta («si no llega, la
+  gama media no puede ser la que manda el video») se cumple: **solo un PC alto podría mandar el video**, y en una sala
+  con un solo PC alto, ese PC carga con todo. La condición 2b falla.
+- **Este PC con la vista de más**: el contador de cuadros de lógica (Raceinfo +0x20 con la etapa ≤ 2) no avanzó en la
+  pantalla partida de la carrera directa (el tramo quedó en «no terminó»; los dos humanos quietos, la etapa no pasa de
+  la cuenta), así que la pérdida del 15 % no quedó medida. Lo que sí se vio: 100 img/s sin tope, 9,7 ms de juego por
+  imagen y la tarjeta en 3,7–3,8 ms. No se arregló para medir más: con la 3 y la 2b caídas, la puerta ya está cerrada
+  (como en W24, no se repiten medidas que no cambian el veredicto).
+
+**Veredicto: N11 queda matado** por la condición 3 (el video agrega 56 ms de mediana y 87 de p90 sin red, contra 50) y
+por la 2b (la gama media no puede mandar el video); la 1 pasa raspando. No se construye nada del producto: no hay
+opción. Quedan solo los instrumentos, apagados: `web/navegador/n11-video.mjs` (`?n11=MBIT`, `&n11Codec=`, `&n11Alto=`,
+`&n11Marca=1`, `&n11Colchon=ms`; nunca en la sala), `&vistas=2` en `?modo=directa` (la pantalla partida con dos humanos
+de esta consola), `medir-sitio --dpr N` y `--viewport AxB` (el lienzo de verdad del tamaño pedido) y la tanda
+`herramientas/tanda-n11.sh`.
+
+**Trampas.**
+- El recuadro del juego en la página es de 854×480 puntos: con el tope de 720 el video salía a 480 igual. `--viewport`
+  no cambia el recuadro y `--force-device-scale-factor` lo pisa Playwright; lo que sirve es el `deviceScaleFactor` del
+  contexto (`medir-sitio --dpr 1.5` → lienzo de 1281×720).
+- `captureTime` de `requestVideoFrameCallback` en un video que viene del lienzo no es la hora de la toma: no sirve para
+  la demora. La marca pintada sí.
+- La vista quieta engaña: sin nadie corriendo, el video casi no cambia y pide 10 veces menos ancho de banda.
+
+## §230 — R4 (plan v4, etapa E5): el lockstep sin basura por cuadro — **hecho: hace lo mismo y su basura baja, pero en Chrome no se nota** · 2026-11-05 08:40
+
+**Qué es.** El lockstep (`web/navegador/lockstep.mjs`) es el que junta los botones de todas las consolas de la sala
+para cada cuadro. Hasta ahora, en cada cuadro creaba objetos y arreglos nuevos (una tabla `Map` por mando con una
+entrada por cuadro, el paquete de botones armado con arreglos de paso, los votos de la autoridad como objetos) y los
+soltaba al rato: «basura» que el recolector de V8 tiene que barrer (ver el glosario: «Basura por cuadro / anillo con
+etiqueta»). R4 pedía sacarla: anillos fijos, búferes reusados, tablas podadas, votos con números.
+
+**Qué se cambió** (solo `lockstep.mjs`, más dos copias para que no se rompa nada):
+- **Anillos con etiqueta** en lugar de los `Map` por cuadro: `Anillo` (los botones de cada mando: el cuadro f va a la
+  casilla f mod 2048 y la casilla guarda f, para saber si es de esta vuelta) y `AnilloReg` (el registro del árbitro);
+  al cambiar de carrera vuelven a una reserva y se reusan (`anilloNuevo`, `soltarAnillos`). 2048 cuadros = 34 s:
+  mucho más que el retraso más grande (12) y que lo que se guarda para ponerse al día.
+- **El paquete de botones (tipo 15) se escribe en un búfer fijo** (`bufEnvio`, 8 KB, con su `DataView`) en vez de
+  armarlo con arreglos. `RTCDataChannel.send` copia los bytes en el momento, así que se puede reusar al cuadro
+  siguiente. **Ojo:** lo que guarda los bytes para mandarlos *después* tiene que copiarlos: `malla.mjs` `degradar` (la
+  red mala de mentira, `?redMala`) y el banco `relevo` (su red con demora) ahora copian (`bytes.slice()`).
+- La lectura de los paquetes escribe directo en la casilla del anillo; `pad` y `resolver` reusan sus arreglos
+  (`datosPad`, `faltan`, `valsR`…); los votos de la autoridad son un objeto `Votos` con contadores (el `quien` se arma
+  solo si alguien lo pide).
+- Un error que encontró la comparación: `pausar` guardaba una **referencia** al último botón usado, que ahora se reusa
+  y cambia; se guarda una copia (`.slice()`).
+
+**Cómo se comprobó que hace lo mismo** (sin el juego): `node --expose-gc herramientas/r4-igual.mjs <lockstep viejo>
+--gc`. Corre el viejo y el nuevo con **el mismo reloj virtual y la misma red con semilla** (como dos circuitos con la
+misma señal de entrada y el mismo reloj, comparando las salidas muestra a muestra) en 6 escenarios: 4 consolas con red
+con pérdida y una traba de 1,5 s; lo mismo con el árbitro; 3 consolas con una lenta; 6 con una que se va (corte); 12
+con el árbitro y dos trabas; 12 sin árbitro y una traba larga (pausa). Compara byte a byte cada paquete mandado, los
+botones de cada cuadro, el registro y el estado. **Las 6 iguales.** Y la basura del lockstep solo (las limpiezas del
+recolector por corrida, media de 3; viejo → nuevo):
+
+| Escenario | chicas (Scavenge) | grandes (Mark-Compact) | ms de limpieza | tiempo real |
+|---|---|---|---|---|
+| 4 consolas, traba | 38,7 → 12,7 | 2,7 → 0 | 15,1 → 3,3 | 305 → 249 ms |
+| 4 con el árbitro | 11 → 7,3 | 1,3 → 1 | 12,2 → 7,4 | 306 → 280 |
+| 3, una lenta | 4,3 → 3 | 0,7 → 1 | 4,5 → 3 | 185 → 162 |
+| 6, un corte | 17,3 → 12 | 2,7 → 0 | 22,8 → 3,2 | 466 → 379 |
+| 12 con el árbitro | 64 → 44,7 | 4,3 → 2 | 115,8 → 28,2 | 1.042 → 781 |
+| 12 sin árbitro, pausa | 383,7 → 358 | 7 → 5,3 | 197,2 → 89,6 | 2.881 → 2.484 |
+
+(Lo que queda es en buena parte de la red de mentira de la prueba misma, que también crea basura.) El lockstep pasa
+a limpiar 2 a 7 veces menos tiempo y corre un 8–25 % más rápido.
+
+**Con el juego** (`bash herramientas/tanda-r4.sh gc relevo telefono`, el programa `build/web-e4c-base`, con el candado;
+`build/web/datos/r4/`). El viejo se sirvió en lugar del nuevo con `MKW_SUSTITUIR=/lockstep.mjs=<el de git>` en el
+servidor (nuevo, solo pruebas: así no se toca la carpeta que comparten otras sesiones).
+- **La basura en Chrome** (`prueba-sincro --directa --traza-gc=40`: 40 s de carrera con la traza del recolector,
+  2 pestañas, nuevo y viejo intercalados, 2 pares): por pestaña, **23–25 limpiezas chicas y 1–2 grandes en 40 s, con
+  los dos** (18–19 ms de chicas, 1,7–3,9 de grandes). **No se distingue**: en la página la basura la hace casi toda el
+  resto (el juego, el medidor, la malla), no el lockstep. Lo que R4 saca se ve en la prueba sin el juego, no en la
+  carrera. El «casi ninguna limpieza en un minuto de carrera» de E6 depende del resto de la página (P5 y lo demás).
+- **Las huellas**: las 4 corridas de la basura, 14/14 cada una (157 huellas iguales).
+- **Las trabas con el árbitro** (`prueba-relevo --trabas=8 --extra=&arbitro=1`, 2 corridas con el nuevo y 2 con el
+  viejo): A (la que espera a B, la que se traba) esperó **0 ms en 8 de 8 trabas** en 3 de las 4 corridas (en la otra,
+  con el nuevo: 0 en 7 trabas y 321 ms en una). C, la de la red mala, a veces espera a A (no a B): 92 y 94 ms de
+  mediana (nuevo y viejo), y en 1 de cada 2 corridas una vez ~500 ms, **con los dos lockstep** (el nuevo dio 8/10 las
+  dos veces; el viejo 10/10 y 8/10). La falla ya estaba antes de R4 (es la red mala de C, no la traba). El «menos de
+  20 ms» de E5 se cumple para A (mediana 0) y no para C mientras C tenga la red mala.
+- **Un Chrome normal y otro «como teléfono»** (B con ventana de teléfono acostado 915×412, `?comoTelefono=1` y el
+  lastre de la gama media), 3 carreras (pistas 0.0, 13.2, 30.2): **la huella ampliada igual en las 3** (36, 30 y 32
+  huellas iguales). B va a 17–22 cuadros por segundo y la sala a su ritmo (A a 57–59), como debe ser; las ✗ de esas
+  corridas son el aviso «tu PC no alcanza», que la prueba no espera (en B es verdad), y en la 2 «el kart de B avanzó»
+  (B corrió muy poco en el rato que mira la prueba). No es una emulación completa del teléfono: Playwright solo emula
+  el aparato en un contexto aparte, y las dos pestañas comparten el suyo.
+
+**Lo que queda propuesto (no se decide aquí):** si el árbitro (`?arbitro=1`, §191) queda prendido por omisión. Lo
+medido acá: con el árbitro, A no espera la traba de B (0 ms en 8 trabas, 3 de 4 corridas). Lo decide el dueño.
+
+**Trampas.**
+- Un búfer reusado más algo que guarda los bytes para después (la red de mentira con demora): el paquete llega pisado
+  por el del cuadro siguiente. Quien demora, copia.
+- Una referencia guardada a un arreglo que se reusa: `pausar` guardaba los botones «del último cuadro» y se los
+  cambiaban por debajo. La comparación byte a byte lo pescó en los escenarios con pausa.
+- La traza del recolector de Chrome cuenta todo el proceso de la pestaña: la basura de una pieza chica se pierde en la
+  del resto.
+
+## §236 — Las 3 conexiones de la sala: el árbitro en un servidor (Oracle) · 2026-11-07
+
+**Qué se pidió.** Tres opciones de conexión que elige el anfitrión: el árbitro en una PC (por omisión, §191/§231), «Host +
+repetidor Cloudflare» (el «🛰 Todo por Cloudflare» de §103, solo con nombre nuevo) y un **servidor propio** en Oracle Cloud
+(Santiago) que hace de árbitro; si no contesta, la sala vuelve sola a la PC y lo avisa.
+
+**Circuito.** Node corre el mismo `lockstep.mjs` de los navegadores. Se anota como mando 12, una estación sin kart.
+Sigue el ritmo de los botones que llegan, porque un reloj fijo de 60 Hz se adelantaría a los navegadores al cargar
+o si el juego corre más lento. Las páginas mantienen la malla WebRTC y mandan también al suplente. Ante un corte,
+el suplente toma el mando en un cuadro acordado, como una transferencia con enclavamiento entre dos fuentes.
+
+**Elección.** El vestíbulo ofrece las tres opciones con descripción al pasar el cursor, dar foco o tocar.
+`{t:"ajuste",k:"relevo"}` admite los tres nombres y traduce los booleanos de salas viejas. El marco lleva
+`conexion=host|cloudflare|oracle`. Oracle requiere que todos los presentes que van a correr informen al anfitrión
+que el servidor contesta. El anfitrión incluye esa decisión en el estado común de la carrera. Si falta el archivo
+del dueño o una conexión, se usa la PC y aparece el aviso en el juego. La dirección y la clave salen de
+`<privado>/build/arbitro.json`. La guía para la máquina real está en [publicar-oracle.md](publicar-oracle.md).
+
+**Pruebas.** El primer intento quedó interrumpido el 5 de noviembre. Al retomarlo, una prueba de corte brusco
+transfirió el mando pero dejó una huella distinta. El servidor que reconectaba volvía a mandar decisiones de una
+carrera que ya tenía otro árbitro. Ahora la reconexión recupera el latido y queda disponible para la próxima
+carrera. El lockstep descarta decisiones del servidor después de acordar su pausa o corte.
+
+- `node banco/correr.mjs arbitro-servidor` con Chrome silenciado. **21/21**. Tres consolas, huellas iguales
+  con Oracle, caída y cuelgue en el cuadro 300, traba de 1,5 s de un piloto, y acuerdo del anfitrión en las cuatro
+  combinaciones de disponibilidad entre dos pilotos. En la última corrida, el peor cuadro del traspaso esperó
+  **223 ms** y los dos pilotos sanos no esperaron durante la traba. Los bancos de regresión `sala-carrera` y
+  `lockstep` pasaron **101/101** y **59/59**.
+- `bash herramientas/tanda-conexion-sala.sh oracle host cloudflare oracle-sin-servidor`, bajo el candado.
+  En `build/web/datos/conexion-sala/20261107-001733/` quedaron los registros de Chrome con el juego:
+
+  | Modo | Puntos | Huellas iguales por pestaña | Camino confirmado |
+  |---|---:|---:|---|
+  | Host | 13/13 | 75 | Árbitro de la sala por omisión |
+  | Cloudflare | 15/15 | 74 | Ambos extremos TURN, 1.329 kB en 16.412 reenvíos por el repetidor local |
+  | Oracle | 14/14 | 75 | El árbitro Node local mandó 4.622 paquetes |
+  | Oracle sin configuración | 14/14 | 75 | Ambas pestañas usaron el host |
+
+- El transporte final volvió a pasar Oracle **14/14**, con 75 huellas por pestaña y 4.776 paquetes del árbitro.
+  `build/web/datos/conexion-sala/20261107-002418/` contiene `oracle.log` y `banco.log`.
+- En el clon de Paginita-Pro, `node --test colabtex/tests/mkw.test.cjs` dio **23/23** y se rearmó
+  `juegos-app.js` con el comando de esbuild de CLAUDE.md. El parche fuente reproducible está en
+  `parches/paginita-mkw-conexion.diff`. La VM, el certificado público y la publicación quedan para el dueño.
+
+**Archivos para el commit de §236.**
+
+- Red y servidor. `web/navegador/{arbitro-servidor,lockstep,mkw,sala-carrera}.mjs` y
+  `herramientas/arbitro/servidor.mjs`.
+- Pruebas. `banco/index.html`, `banco/servir.cjs`, `banco/pruebas/arbitro-servidor/index.html`,
+  `web/navegador/prueba-sincro.mjs` y `herramientas/tanda-conexion-sala.sh`.
+- Sitio y notas. `parches/paginita-mkw-conexion.diff`, `herramientas/versiones.md`, `docs/publicar-oracle.md`,
+  `docs/bitacora.md`, `PLAN.md` y `CLAUDE.md`. De los archivos compartidos, incluir los cambios de §236.
+- En la copia local de Paginita-Pro quedaron los cambios de `colabtex/src/juegos/{mkw,motor}.js`,
+  `colabtex/tests/mkw.test.cjs` y el `juegos-app.js` rearmado.
+
+## §232 — E6 (plan v4, etapa 6): la página liviana y la prueba final (P5, N12, V6, V7) — **a medias: parado por el dueño** · 2026-11-05 12:25
+
+**Qué es.** La última etapa del plan v4: cuatro ítems (P5, N12, V6, V7), la escalera medida otra vez contra las metas
+de la versión 4 y `correr-todo` en verde. La sesión esperó a que cerrara E5 (§229–§230) y empezó a las ~11:30. El dueño
+pidió parar a las 12:22, con la tanda `compilar igual gc` a mitad de camino. Se cortó la tanda, se pararon solo los
+procesos de esta sesión (la prueba de fantasmas en el puerto 8178 y su servidor) y se soltó el candado. **Todavía no se
+midió la basura ni la escalera: lo que falta está en §232.2.** Sin commit (lo hace la orquestadora).
+
+Términos nuevos (van también al glosario de arriba en la próxima pasada):
+- **Reserva de búferes (reciclar)**: en vez de pedir memoria nueva para cada pedazo de sonido y tirarla, se usan siempre
+  las mismas cajas, que vuelven vacías. Como una cinta transportadora con cajas retornables: no hay montaña de cajas
+  tiradas (basura) que alguien tenga que barrer (el recolector).
+- **Escalón del aparato**: en qué grupo cae un aparato según lo que midió (sobrado, justo, con «dibujar a 30», lento).
+  Como la placa de un motor: dice la potencia que da y no promete más.
+- **Consola de mentira**: una página sin el juego que se porta como un jugador más en la red de la sala. Como una carga
+  resistiva de prueba: no hace nada útil, pero pesa lo mismo que un aparato de verdad.
+
+### §232.1 — P5: el sonido sin basura (el código hecho, falta medirlo)
+
+**Qué pasaba.** El juego le entrega a la página ~330 pedazos de sonido por segundo, uno cada ~3 ms. Cada uno era un
+búfer NUEVO (`vista.slice()`) que iba al AudioWorklet y quedaba ahí como basura: ~380 KB por segundo que el recolector
+tenía que barrer. Además, por cada pedazo el runtime llamaba tres veces a la página (entregar, el nivel de la cola y el
+objetivo), y el worklet mandaba su informe cada 8 bloques (~21 ms) armando un objeto nuevo cada vez.
+
+**Qué se cambió.**
+- `web/navegador/sonido-reciclar.mjs` (nuevo): una **reserva de búferes**. El pedazo se copia en una caja de la
+  reserva y se transfiere al worklet; el worklet lo copia a su cola y **devuelve la caja con su informe**
+  (`sonido-worklet.js`: `devolver`, con una lista por puerto: la página y el juego en un Worker), y la caja vuelve a la
+  reserva. Lo usan `sonido.mjs` y `trabajador-sonido.mjs` (el juego en un Worker, §186).
+- El worklet manda su informe **cada 32 bloques (~85 ms)**, armado siempre sobre el mismo objeto, y el mínimo de la
+  cola se calcula sin armar arreglos (`minVentana`).
+- El runtime (`terceros/Wiicompiled-motor-h6/runtime/src/audio_backend.cpp`, parche `parches/motor-p5.diff`): **una
+  sola llamada a la página por entrega**. `mkw_web_sonido_entregar` pasa el pedazo y a la vuelta trae el nivel de la
+  cola (lo que devuelve) y el objetivo (escrito en un `double`): 3 cruces → 1.
+- Para comparar: `?reciclarSonido=0` = un búfer nuevo por entrega, como antes; `?informeSonido=8` = el informe cada 8.
+
+**Probado.** Banco `sonido-worklet` **39/39**: los 34 de antes y 5 nuevos de P5 (el informe cada 32 bloques; los búferes
+que vuelven transferidos, cada uno a su puerto; la lista que se vacía; `informeBloques: 8` como antes; y, de verdad,
+**460 reusados contra 31 nuevos** en 491 entregas). Banco `sonido` **14/14**.
+
+**El programa.** `bash herramientas/tanda-e6.sh compilar` armó `build/web-e6` (el final de E4c con P5: el mismo motor
+`-h6`, la aurora `aurora-main-viejo-motor`, `--final`; el perfil PGO se rehízo solo porque cambió el programa que
+cuenta, `mkw-f4055fd2be332022.profdata`): `mkw.wasm` 102,38 MB, `.br` 13,9 MB. Con ese programa, `prueba-arranque`
+**13/13** y la sala A = E6 / B = e4c-final **14/14, con huellas 74 = 74** (P5 no cambia la carrera). La prueba de los
+fantasmas iguales quedó a medias (cortada).
+
+### §233 — N12: lo que no se puede, por física, y decirlo en la página (hecho; falta probarlo con el juego)
+
+**Qué es.** Hay límites que ningún arreglo del motor saca:
+1. Un aparato que no simula 60 cuadros de carrera por segundo, ni dibujando la mitad, no puede ir a la par en la sala.
+   El lockstep lo releva para no frenar a los demás, pero él ve saltos.
+2. Con datos móviles (saltos de 50–200 ms) el retraso de los botones crece.
+3. La primera visita baja ~100 MB.
+4. Un teléfono con 3–4 GB puede cerrar la pestaña.
+5. El calor baja la velocidad del teléfono después de 10–20 minutos.
+
+En vez de esconderlo, la página lo dice.
+
+**Qué se hizo.**
+- `web/navegador/escalon.mjs` (nuevo, sin el juego): `escalonDe` da el **escalón** del aparato con lo medido. Por la
+  CPU pura por imagen: **sobrado** ≤ 11 ms (60 con margen), **justo** ≤ 15,5 ms (60 al borde), **n8** ≤ 30 ms (60 de
+  carrera con «Dibujar a 30 y mostrar 60»), **lento** > 30 ms. Si hay cuadros de lógica medidos en la carrera, mandan
+  esos (menos de 57 por segundo = lento). Suma los límites sin arreglo que tocan a ese aparato: la memoria del teléfono,
+  el calor y una red de más de 80 ms.
+- El **informe de rendimiento** (`mkwInformeRendimiento`) trae `escalon`: el id, qué esperar, qué medida lo decidió, los
+  límites y la última carrera guardada.
+- Cada página guarda **cómo le fue en su última carrera**: la mediana de los segundos de carrera visibles, en cuadros de
+  lógica y en ms por cuadro (`anotarCarrera` → localStorage `mkw.capacidad`, promediada con la anterior). Lo cuenta en el
+  **latido de la sala** (`sala-carrera.mjs`: la opción `capacidad`, el campo `cap` y `sala.capacidades()`).
+- **Antes de largar** (al entrar en «elegir»), cada página mira quién de los que corren no llega a 60 (`lentosDe`) y
+  lo dice en la esquina por 15 s (`ui.chip('lentos', …)`, `textoLentos`). A los demás les dice que la carrera va a 60
+  para todos y que a esa consola la releva la sala; al lento, qué le pasa y qué puede probar. No se culpa a quien tuvo
+  pocos cuadros con el hilo libre: si trabajó menos de 14 ms por cuadro, lo frenaba la sala y no él.
+- `?escalon=0` = sin nada de esto; `?comoLento=L` = el **aparato lento de mentira**, que dice L cuadros por segundo en
+  el latido (solo pruebas).
+
+**Probado.** Banco `escalon` (nuevo) **24/24**: los cuatro escalones, que la lógica mande, los límites, lo aprendido de
+las carreras y una sala de tres consolas inventadas con Caro como aparato lento de mentira, que las tres ven y avisan
+antes de largar. Banco `sala-carrera` **101/101** (el latido nuevo no rompe la sala).
+
+### §234 — V6: sesiones largas (la herramienta hecha, sin correr)
+
+`herramientas/medir-sesion-larga.mjs` (nuevo): abre dos pestañas en `modo=sala`, en un Chrome propio para poder leer la
+memoria de sus procesos (como `medir-memoria.mjs`). La anfitriona arma una lista de `--pistas` carreras: 20 son ~1 hora,
+con los humanos quietos (llegan las CPU y 30 s después el DNF termina la carrera) y `&descanso=5`.
+
+Cada minuto anota:
+- la memoria privada de cada pestaña y de la tarjeta;
+- el wasm usado (`_sbrk`) y el heap de JS;
+- el largo del registro, los fps y los ms por cuadro.
+
+Al final da la pendiente en MB por hora, desde el minuto 10, y la CPU por cuadro de los primeros 10 min contra los
+últimos 10. «Plana» = cada proceso crece menos de 30 MB por hora. Con `--telefono --pistas 4` corre una copa entera con
+B como teléfono de gama media simulado. En `tanda-e6.sh` son las fases `hora` y `telefono`.
+
+### §235 — V7: la sala de 12 con consolas de mentira (las herramientas hechas; falta correrlas con el juego)
+
+- **La consola de mentira** (`banco/consola-falsa/`, nueva): una página sin el juego que entra a la sala por la misma
+  malla WebRTC (el buzón falso del banco) y corre el mismo lockstep a 60 cuadros por segundo con botones grabados.
+  Arranca con el primer paquete de botones de un juego de verdad. `&redMala=…` le da la red de una casa.
+- El lockstep cuenta las esperas de más de 50 ms (`estado().esperasLargas`, nuevo).
+- `web/navegador/prueba-sala-doce.mjs` (nueva): 3 juegos de verdad (el último como teléfono de gama media simulado) y 9
+  consolas de mentira, cada una con la red de otra casa, durante 3 carreras. Mide los cuadros de lógica por segundo, las
+  esperas de más de 50 ms, los refrescos (como `medir-enlinea`), las huellas y la meta. En `correr-todo` entra como
+  `sala-doce` (una carrera).
+- Desvío, dicho: todo va en un solo Chrome, porque el buzón falso (BroadcastChannel) no cruza perfiles. Y el teléfono
+  simulado va sin la revisión de límites de Android, que es una bandera de todo el navegador.
+- Banco `consola-falsa` (nuevo, cuatro consolas de mentira en marcos): **5/7, sin cerrar**. Corrió mientras se
+  compilaba el programa y con las cuatro consolas en el mismo hilo (los marcos de una página comparten hilo). Dos de
+  las consolas con buena red esperaron hasta 134 ms, y una llegó a retraso 12. Hay que repetirlo con el PC libre antes
+  de decidir si es la carga o un error.
+
+### §232.2 — Lo que falta (en orden)
+
+1. `bash herramientas/tanda-e6.sh igual` otra vez: la prueba de los fantasmas iguales (A = E6, B = e4c-final) quedó cortada.
+2. `bash herramientas/tanda-e6.sh gc`: la basura de un minuto de carrera con la página nueva contra
+   `&reciclarSonido=0&informeSonido=8`, 2 pares. Es el «casi ninguna limpieza en un minuto de carrera» del plan.
+3. El banco `consola-falsa` con el PC libre. Si las esperas siguen, ver si es el hilo compartido de los marcos.
+4. El aviso de N12 con el juego. En `modo=directa` no hay `sala-carrera` y el aviso es de la sala: probarlo con
+   `prueba-sala.mjs` y `--extra=&comoLento=30` en B (sumarle esa opción a la prueba).
+5. `tanda-e6.sh doce` (V7), `hora` y `telefono` (V6), y `escalera` (las metas v4, intercalada con este PC).
+6. `node herramientas/correr-todo.mjs`, y también con `MKW_BUILD=build/web-e6/navegador`.
+7. CLAUDE.md, `avance.mjs` y `docs/plan-rendimiento.md` (`generar.mjs`): todavía no se tocaron.
+
+**Trampas.**
+1. **Nunca editar un `.sh` mientras corre.** Bash lo lee de a pedazos: al terminar lo que ya leyó, sigue leyendo en el
+   mismo byte del archivo nuevo y podría correr cualquier renglón. Pasó con `tanda-e6.sh`: mientras corría se volvió a
+   dejar como estaba, y la versión nueva (con `doce`, `hora` y `telefono`) se puso recién al cortar la tanda.
+2. Otra sesión usa §231 y §236; esta usa §232–§235.
+3. Con el árbitro (§191, ya por omisión en la sala), a una consola con la red mala la relevan en lugar de subirle el
+   retraso (§180.2). Un banco no puede exigir que suba su retraso.
+
+## §237 — E6 retomada: comprobación final en Chrome · 2026-11-06 18:59
+
+El dueño pidió terminar E6. Se retomó con candado libre, sobre `build/web-e6` (PGO de E4c y P5).
+No se toca el trabajo pendiente del servidor Oracle. Sin commits ni publicación.
+
+**Igualdad.** `bash herramientas/tanda-e6.sh igual` dejó `build/web/datos/e6/retomar-igual.txt`.
+Arranque 13/13. Sala: las 74 huellas coinciden, pero B espera 5,12 ms/cuadro (límite 4): esa comprobación falla.
+Fantasmas 6/6: 2.118 cuadros comunes iguales tanto en el fantasma como en el jugador quieto;
+ambos llegan en el cuadro 2242. No se recortó la comparación.
+
+**Banco.** `node banco/correr.mjs sonido-worklet sonido escalon sala-carrera consola-falsa`: cinco páginas verdes.
+Consola-falsa 7/7, las cuatro a 60 y ninguna espera >50 ms con el PC libre.
+
+**N12.** Se agregó a `prueba-sala.mjs` la comprobación con `--extra=&comoLento=30&n8=0`.
+Ambas páginas muestran el aviso antes de largar y el informe incluye el escalón (al empezar dice sin medir,
+correctamente: declarar un aparato lento de mentira en la sala no inventa una medición en el informe).
+Los textos ya no garantizan 60 al activar N8 ni prometen que el relevo sostenga siempre 60.
+El calor de un teléfono real no se puede validar en este PC.
+
+**Instrumentos corregidos.** La sesión larga rechaza pendientes de memoria ausentes y una duración menor
+que la exigida; las sesiones y la sala de doce activan la comprobación de límites de Android.
+La traza GC compara nuevo/viejo en este PC y gama baja; la escalera intercala controles de este PC.
+`herramientas/continuar-e6.sh` ejecuta todo en secuencia y guarda cada resultado en `build/web/datos/e6/retomar-*`.
+Los siguientes veredictos se completarán al terminar las corridas; una herramienta escrita no equivale a prueba pasada.
+
+### §237.1 — Bloqueo de V7 localizado · 2026-11-06 19:12
+
+El dueño avisó que había quedado pegado. Se detuvo el árbol propio de la tanda y se soltó el candado.
+El registro por consola mostró los tres juegos en cuadro 0 y las nueve consolas falsas con `empezo=false`,
+aunque estaban conectadas. La consola falsa esperaba solo paquetes de botones tipo 13; `lockstep.mjs`
+también usa tipo 15 (formato compacto). Corregido en `banco/consola-falsa/consola.mjs`: acepta ambos.
+Es un error del instrumento V7, no evidencia de que el motor no pueda avanzar.
+
+Se agregó `herramientas/correr-acotado.mjs`: supervisor fuera de Chrome que al vencer el plazo termina
+solo el árbol que creó. Su corte de 90 segundos fue comprobado. La prueba de doce guarda `progreso.json`
+y acota el envío de teclas a diez segundos. La tanda ahora para ante un código de fallo.
+La prueba larga, GC, escalera y correr-todo todavía no se ejecutaron: no se hereda un pase del arranque.
+
+Verificación del arreglo de arranque: `verificar-arranque.txt` muestra las nueve consolas falsas en marcha,
+los PC por encima de 1.200 cuadros y el teléfono simulado por encima de 500; los doce puestos son humanos en
+los tres juegos. La reproducción se cortó deliberadamente a 90 segundos mediante el supervisor (no es un pase
+V7 completo). El banco ahora arranca automáticamente solo su primera consola: las otras deben reconocer los
+botones recibidos, para que esta regresión no vuelva a quedar oculta por `arrancar=1` en todas.
+
+### §237.2 — Primer minuto de V7 tras corregir el instrumento · 2026-11-06 19:18
+
+La carrera con doce humanos pasa la largada: las nueve consolas falsas van a 60,1 cuadros/s y se verifican
+los doce tipos humanos en los tres juegos. En el minuto estable, PC A/B = 53,7/53,3 cuadros de lógica/s;
+el teléfono de gama media simulado = 2,6. No se cumple la meta de 60. Las huellas coinciden (112/112/10
+comparaciones), sin esperas >50 ms nuevas en los PC durante ese minuto. No significa que toda la carrera
+carezca de esperas: el máximo acumulado de la largada fue ~12 segundos. Tres juegos comparten este PC:
+esta prueba no demuestra el rendimiento de tres PC físicos independientes.
+Registro: `build/web/datos/e6/v7-corregido.txt`. Los veredictos de tres carreras y sesiones largas siguen pendientes.
+
+### §237.3 — Limitación de un solo Chrome y comprobación de memoria
+
+La corrida de tres carreras en pestañas terminó 23/30: no llega a la meta de ritmo; el teléfono no alcanza los
+resultados dentro del plazo y en la tercera ventana no aporta tres huellas comunes. No se detectó diferencia de
+huella, pero la muestra insuficiente tampoco es un pase. El máximo de espera de la largada llega a 16 segundos.
+
+La herramienta ahora usa varios Chrome independientes, con revisión de límites solo en el teléfono. Un buzón HTTP
+local (`banco/consola-falsa/buzon-http.mjs`) cruza sus perfiles para presencia, SDP e ICE; los botones y los 66 enlaces
+siguen por WebRTC. Es un sustituto local del buzón del sitio, no un servidor de carrera. El envío HTTP básico fue
+comprobado en Node; la validación de Chrome de esta variante sigue pendiente y no se heredan los números anteriores.
+**SDP** describe la conexión ofrecida; **ICE** busca su camino por la red: son como el acuerdo de bornes y la prueba
+de continuidad antes de conectar la carga. No son los botones durante la carrera.
+
+Para la memoria se deben evaluar los dos renderers mayores, no el mayor y un marco auxiliar de 17 MB. El JSON crudo
+conserva todos los tamaños: recalcular la segunda pendiente de la corrida en marcha con `pestañas[1]`. La herramienta
+quedó corregida para las siguientes corridas. No se considera plano un dato ausente.
+
+### §237.4 — Afinar la clasificación N12 durante la revisión
+
+La lógica observada tiene prioridad: con N8 puede haber 60 cuadros de lógica y 33 ms por imagen dibujada.
+Eso no debe etiquetarse como aparato lento por el solo tiempo por imagen. Corregido en `escalon.mjs` y añadido al banco.
+También se conserva y transmite el tiempo de tarjeta, si estuvo medido: una tarjeta de 34 ms puede frenar con la CPU
+libre. Sin ese dato no se inventa una medida GPU. El banco ahora tiene 27 puntos (tres casos nuevos); falta su nueva
+corrida Chrome dentro de la planilla. Las 24 comprobaciones anteriores no certifican automáticamente estos casos nuevos.
+
+Corrección del informe preliminar de V7: los valores 2,6/2,4/0,7 eran cuadros **sincronizados**, no necesariamente fps
+propios del teléfono. El contador del lockstep deja de crecer cuando sale de la carrera compartida. La variante nueva
+lee además el contador real de Raceinfo y distingue ambas medidas; exige no estar fuera de la sala para pasar.
+Con consolas sin huella, `islas=0` en esta prueba evita posponer una diferencia real esperando votos de quienes no
+corren el juego. No se cambia el comportamiento por omisión del producto.
+
+### §237.5 — Alcance del audio de la sesión larga
+
+La inspección adicional por CDP del audio de la corrida en marcha no pudo ejecutarse: el entorno devolvió
+`Access is denied` al intentar iniciar Node. No se intentó otro ejecutable ni otra vía para esa inspección.
+No se cambió la corrida en marcha para activar audio a mitad de la hora. Su estado de audio queda sin verificar.
+Para las corridas siguientes, la herramienta da un gesto neutral (Control, no asignado al mando), exige AudioContext
+activo y guarda sus contadores junto a cada muestra, manteniendo `--mute-audio`. También limpia al fallar antes de
+la primera muestra. Esos cambios no certifican retroactivamente la hora ya iniciada.
+
+El analizador separado conserva los JSON crudos y calcula la pendiente de ambos juegos y GPU. La comparación de CPU
+usa un umbral instrumental de +10 % entre medianas inicial/final; no es una nueva meta atribuida al dueño ni una
+prueba de calentamiento de un teléfono real, y distintas pistas pueden explicar parte de esa variación.
+
+### §237.6 — V6, primera sesión terminada · 2026-11-06 20:36
+
+`hora-retomada.txt` y `sesion-larga/hora.json`: **62 minutos, 20 carreras, ninguna caída**.
+CPU mediana inicial/final A 9,63/9,96 ms (+3,4 %), B 9,35/9,09 ms (-2,7 %); ambas páginas rondaron 60 cuadros/s.
+`node herramientas/analizar-sesion-e6.mjs build/web/datos/sesion-larga/hora.json` recalcula desde las 63 muestras:
+procesos de juego +66,1 y +98,2 MB/h; proceso de vídeo +1.363,8 MB/h; wasm +7,8 y +17,9 MB/h.
+**No cumple memoria plana** (umbral instrumental 30 MB/h). No es un pase de V6 ni una demostración nueva de fuga:
+la memoria de sombreadores ya se explicó en §203, y aquí se observa el conjunto de procesos.
+El archivo `hora-analisis-e6.json` conserva el cálculo corregido del segundo juego; no se modificó el JSON crudo.
+La condición del audio en esta hora sigue sin verificar por la inspección denegada descrita arriba.
+
+La copa telefónica ya comenzó con el instrumento que exige audio activo y lo registra. Su primera muestra completa
+confirma audio activo en ambas páginas, cero entregas descartadas, 17.315 búferes reusados frente a 69 nuevos en A,
+y 16.306 reusados frente a 73 nuevos en B. Son contadores Chrome del puente; no sustituyen la traza GC pendiente.
+
+### §237.7 — Resultados de la tanda y atasco reproducido · 2026-11-07 00:46
+
+**P5.** `bash herramientas/tanda-e6.sh gc escalera` dejó dos pares de trazas Chrome de 60 s por perfil.
+Sumando ambos renderers por corrida, el puente nuevo hizo **68 y 67** limpiezas en este PC y **131 y 117**
+en gama baja. El puente viejo hizo **65 y 70** en PC y **129 y 128** en baja. Cuentan las menores y mayores.
+El reciclaje de búferes está probado. La meta de casi ninguna limpieza queda incumplida y no hay una caída clara
+atribuible al puente en la traza global. Los dos caminos usaron el candidato E6 con una sola llamada nativa.
+
+**Escalera.** Cuadros de lógica/s en el tramo fijo sin N8, con controles PC intercalados y revisión de límites
+Android en los teléfonos simulados. PC del proyecto 132,78 / 149,25. PC típico 93,43 / 90,71.
+Portátil 47,33 / 45,64. Gama media 31,70 / 32,25. Gama baja 19,67 / 19,92.
+Los dos PC tienen margen de lógica. Los tres escalones siguientes quedan por debajo de 60 con este ajuste.
+Las imágenes del tramo sin tope no certifican presentación a 60 en una sala. El teléfono tope queda con la
+referencia histórica, sin una calibración nueva. Gama media y baja tienen una comprobación N8 separada.
+
+**V7.** `v7-varios-chrome.txt` terminó 22/33. En la primera carrera los dos PC dieron 60,0/59,9 y el teléfono
+11,4 cuadros/s. En las otras dos, la espera inicial de 600 cuadros del teléfono dejó que los PC llegaran a resultados
+antes de tomar una ventana comparable. Se corrigió la ventana para medir simultáneamente con los PC ya calientes
+y registrar explícitamente si termina la carrera o queda una espera abierta. La meta por código deja ahora una marca
+por consola para distinguirla de un final natural. Los tres Chrome y las nueve consolas falsas sí se conectaron.
+
+**Planilla.** `todo-retomado.txt` terminó 658 bien y 22 mal en 9 pruebas. Hay fallos propios de los instrumentos y
+casos externos a E6, entre ellos el árbitro Oracle y pruebas de funciones que el candidato no trae activas.
+Se corrigió el banco de consolas falsas para abrir los canales antes del primer envío. El banco final de E6 da
+5/5 páginas, incluido escalón 27/27. Se corrigió también una lectura de parrilla que lanzaba TypeError si faltaba
+la marca. El fallo de M22 al volver a elegir permanece registrado y no se cambió el criterio de esa prueba.
+
+**Copa telefónica.** `copa-telefono-diag2.json` reproduce el bloqueo. B esperaba el cuadro 710 de A y recibió hasta
+2790, una diferencia de 2.080 cuadros. El anillo conserva 2.048. B acabó proponiendo cortar a A, que siguió sin nadie
+desde 2886. A quedó esperando a B en 2886 y B seguía esperando a A en 710. Ambos seguían oyéndose por WebRTC.
+El arreglo usa la salida ya prevista en el protocolo cuando falta un cuadro de la autoridad que ya no cabe en el
+anillo. Sale quien quedó atrás y se le avisa que puede volver en la siguiente carrera. La corrida de diagnóstico
+terminó al confirmar dos minutos sin avance. La validación del arreglo en el banco y en el juego sigue aparte.
+
+### §237.8 — Host de un jugador con tres y doce plazas · 2026-11-07 00:56
+
+El dueño pidió probar el modo en que un jugador hace de servidor para tres o más. Se eligió **Host**, con
+`conexion=host&arbitro=1`. El Chrome anfitrión reúne los botones y distribuye el cuadro acordado. Se parece a
+un relé maestro que reparte la orden a varios tableros. Cloudflare y Oracle quedan fuera de esta comparación.
+
+Con `MKW_BUILD=build/web-e6/navegador`, audio silenciado y candado `e6`, se corrió
+`node web/navegador/prueba-relevo.mjs --trabas=8 '--extra=&conexion=host&arbitro=1&n8=0'`.
+El control agrega `--red=0`. Resultados en `build/web/datos/e6/host-tres-{control,red-mala}.txt`.
+En control A y B dieron 60,0 cuadros/s y se cotejaron 150 huellas iguales por consola. Con C a 70 ± 10 ms
+y 5 % de pérdida simulada en ambas direcciones, los tres dieron 59,6–59,7 cuadros/s, con 148 huellas iguales
+por consola. A esperó 0 ms en las ocho trabas de 1,5 s y en la de 3 s, y B siguió en la carrera.
+C acumuló hasta 44 ms de espera en una traba del control y hasta 728 ms en una traba con mala red.
+Cada cifra de C suma las esperas dentro de esa traba. Las dos variantes dieron 8/10: el control incluye una
+exigencia de retraso que corresponde a red mala y hubo avisos de equipo lento. Con red mala, además,
+C superó 400 ms acumulados en la primera traba.
+
+`node web/navegador/prueba-sala-doce.mjs --carreras 3 --extra '&conexion=host&arbitro=1'` conectó
+tres Chrome independientes y nueve consolas falsas. En la primera carrera los doce figuraron como humanos.
+En el minuto medido, los PC hicieron 59,8 y 59,7 cuadros de lógica/s, el teléfono 10,8 y las consolas falsas 60,1.
+Se cotejaron 141, 141 y 42 huellas iguales en los tres juegos respectivamente. En ese minuto los PC registraron
+cero esperas mayores a 50 ms. Sus máximos acumulados desde el inicio eran 1.041 y 883 ms por espera.
+Se corrigió la prueba para informar por separado el minuto y la carrera entera, y exigir la marca de meta
+en cada juego. Ese ajuste no llegó a correrse. El teléfono no alcanzó su meta y esta corrida quedó interrumpida
+antes de comprobar la meta de la primera carrera. Registro `build/web/datos/e6/host-doce-final.txt`.
+
+**Pausa pedida por el dueño.** Se cerraron los procesos de E6, se retiró su turno en la fila y se liberó su
+candado a las 00:56. No arrancaron la copa telefónica con el arreglo, el control de doce con tres PC, el nuevo
+banco Chrome del historial ni la escalera N8. E6 queda abierta. Para cerrar faltan esas comprobaciones, la meta
+de doce sin esperas largas, memoria plana en una hora, la meta de limpiezas y la planilla completa en verde.
+
+### §237.9 — E6 retomada y banco de historial verde · 2026-11-07 01:24
+
+El dueño pidió seguir con E6. El candado estaba libre. `node banco/correr.mjs lockstep`, con Chrome
+silenciado y el candidato `build/web-e6/navegador`, dio **60/60**. En particular, la consola que recibe el
+cuadro 2.048 cuando todavía espera el cero se retira sin cortar a la autoridad. El cero quedó fuera de la
+memoria circular, como una captura de osciloscopio que ya fue sobrescrita. Queda comprobarlo en la copa real.
+Registro `build/web/datos/e6/lockstep-historial-final.txt`.
+
+Las trazas de P5 también dan la duración de las limpiezas. Suma de ambas páginas, por minuto, con puente nuevo
+56,2–56,5 ms en PC y 111,3–116,2 ms en baja. Con el viejo, 56,5–63,3 ms y 109,3–125,2 ms respectivamente.
+En baja eso es menos de 0,22 % de un minuto incluso sumando los dos procesos. La cantidad incumple la meta,
+y la duración observada no explica la diferencia entre los cuadros/s del teléfono y los del PC.
+
+### §237.10 — Control de Host con tres PC y doce plazas · 2026-11-07 01:45
+
+Con el candidato E6 y el candado se ejecutó `node web/navegador/prueba-sala-doce.mjs --sin-telefono --carreras 3
+--datos build/web/datos/e6/host-tres-pc-doce --extra '&conexion=host&arbitro=1'`. Fueron tres Chrome independientes
+y nueve consolas de mentira, todas en el mismo PC. Las falsas jugaron con retardo y pérdidas de red simulados.
+Se anotó tanto el minuto de ritmo como la espera acumulada desde la largada, para que el minuto estable no oculte
+las esperas al principio. Registro `build/web/datos/e6/host-tres-pc-doce.txt` y `resumen.json` en la carpeta homónima.
+
+**27/33.** Las tres páginas dieron entre 59,8 y 61,0 cuadros de lógica/s durante el minuto en las tres carreras.
+En la primera y la tercera coincidieron las huellas y los tres ejecutaron la meta en el mismo cuadro (4.608 y 4.625).
+En la segunda, la primera página salió de la carrera compartida y las otras dos pasaron a la autoridad del tercer
+jugador y marcaron la meta. La prueba de ritmo compartido falla aunque el juego local de la primera página siga a 60.
+Ningún minuto de PC registró una espera mayor a 50 ms, pero en la carrera completa hubo máximos de 146, 595 y
+149 ms en las carreras 1, 2 y 3. El origen de la salida en la segunda queda sin confirmar. Para próximas corridas
+se guarda la cola del registro de sincronía de cada juego que quede fuera, y se graban resultados carrera por carrera.
+
+**Primer contraste N8, inválido para medir su ahorro.** `escalera-n8.txt` dio 32,04 y 32,49 cuadros de lógica/s en
+gama media. El registro `[n8]` contó cero dibujos saltados: fuera de la sala RR ya omitía dibujos en la escena.
+Para el contraste corregido se usa `dibujarSiempre=1` en ambos modos, como en §219, y se coteja ese contador.
+La tanda vieja escribió un error de lectura al final porque el guion cambió durante su ejecución. Las muestras
+de esa tanda se conservan como diagnóstico del instrumento. El guion corregido pasó `bash -n`.
+
+### §237.11 — La copa con el arreglo y el Host de doce con teléfono · 2026-11-07 02:07
+
+`node herramientas/medir-sesion-larga.mjs --pistas 4 --telefono --etiqueta copa-telefono-corregida
+--extra '&conexion=host&arbitro=1'`, con el candidato E6, llegó a fin en ambas páginas en 16 minutos y no hubo
+caídas. Al minuto 2 el anfitrión ya iba en el cuadro 3.747, con el teléfono fuera de la carrera compartida en el
+998. El anfitrión siguió, el teléfono volvió a la segunda pista y ambos alcanzaron las cuatro. El teléfono salió
+de la sincronía una vez por pista, sin dejar bloqueado al anfitrión. Así pasa la prueba del arreglo del historial
+en el juego. La meta de V6 de correr la copa entera juntos sigue incumplida. Durante la carrera el teléfono mostró
+11–19 cuadros/s en las muestras. El proceso de vídeo llegó a 2.790 MB y tampoco pasó la comprobación de memoria.
+El tiempo de CPU por cuadro subió más que el margen de la prueba, con la salvedad de que cambiaron las pistas.
+
+El instrumento exige sonido activo y guarda las limpiezas de cada minuto. Para atribuirlas, deja una marca en la
+traza de Chrome por página y por muestra, como un pulso de referencia junto a la señal en el osciloscopio. Se
+obtuvieron 16 intervalos por juego. A contó 594 limpiezas menores y 72 mayores (638 ms en unos 953 s); B, 396 y
+53 (533 ms). A recicló 315.132 búferes y creó 70. B recicló 315.688 y creó 74. Ninguna entrega se descartó.
+Datos `build/web/datos/sesion-larga/copa-telefono-corregida.json` y `build/web/datos/e6/telefono-corregido.txt`.
+
+La tanda Host con teléfono y doce plazas, `host-doce-reanudado.txt`, dio **24/36**. Los PC hicieron 58,4–59,7
+cuadros/s y ambos marcaron las tres metas. El teléfono quedó fuera en las tres; el minuto común había comenzado
+durante su presentación o cuenta regresiva y esa corrida no da fps de carrera comparables para él. Sí se conserva
+la lectura previa de 10,8 (§237.8). En la primera carrera de esta tanda una consola falsa acabó de árbitro, porque
+su reloj sin juego parecía más capaz. Para repetir, el banco anuncia la capacidad de un aparato justo en las
+consolas falsas y verifica quién arbitra. La ventana común requiere que el teléfono esté en carrera al inicio,
+sin esperar a sus primeros 600 cuadros. Solo se cambió el instrumento para estos dos puntos.
+
+### §237.12 — V7 con árbitros reales y ventana común · 2026-11-07 02:15
+
+Se repitió `node web/navegador/prueba-sala-doce.mjs --carreras 3
+--datos build/web/datos/e6/host-doce-autoridad-real --extra '&conexion=host&arbitro=1'`. **27/39**. Los tres
+juegos y las nueve consolas falsas entraron. Los árbitros observados fueron los juegos 0 y 1, ambos PC. En el
+minuto de carrera los PC hicieron 59,3–60,0 cuadros de lógica/s y el teléfono 10,4, 11,0 y 13,8. Este último
+siguió simulando localmente pero ya no avanzó en la carrera compartida. En las tres corridas se registró que
+había perdido el historial de la autoridad, entre los cuadros 423–456 que necesitaba y 2.471–2.508 recibidos.
+
+Los PC marcaron la meta las tres veces. No hubo huellas iguales registradas durante el minuto común en esta
+repetición y el teléfono no marcó ninguna meta. Hubo una espera mayor de 50 ms en el primer PC en cada carrera
+(117, 55 y 96 ms), aunque dentro del minuto medido no hubo ninguna. Ninguna página se cayó. El resultado
+de V7 sigue negativo. La simulación separa perfiles y aplica demoras a los enlaces WebRTC, y las cargas siguen
+compartiendo un mismo PC. Datos `build/web/datos/e6/host-doce-autoridad-real.txt` y `resumen.json` homónimo.
+
+### §237.13 — Pausa durante el contraste de N8 · 2026-11-07 02:23
+
+El dueño pidió parar. Se cerraron los procesos de esta tanda y se liberó su candado a las 02:23. El contraste
+`bash herramientas/tanda-e6.sh escalera-n8` con `dibujarSiempre=1` conservó dos referencias **sin N8**,
+18,21 cuadros de lógica e imágenes/s en gama media y 85,91 en este PC. Quedó incompleta la referencia de gama baja
+y no hay un par válido con N8. Los datos parciales quedan en `build/web/datos/e6/escalera-n8-fija.txt`. La planilla
+rápida y la repetición dirigida de sala, sincronía y fantasmas quedaron en la secuencia cancelada y no arrancaron.
+
+**Estado al parar.** N12 comprobado. P5 pasa sonido e igualdad y excede la meta de limpiezas. V6 pasa el caso del
+atasco y completa la copa en ambas páginas, con cuatro salidas del teléfono y memoria creciente. V7 pasa la conexión
+de doce plazas y el ritmo de los PC, y falla las esperas, la huella y la meta conjunta con el teléfono. La planilla
+completa más reciente es 658 bien y 22 mal. Quedan los pares N8, el criterio de memoria plana y las pruebas rojas.
+
+### §237.14 — E6 cerrada con lo medido · 2026-11-07 14:10
+
+**Qué.** El dueño pidió terminar E6 con el uso semanal que quedaba (~5 %). No alcanza para repetir las corridas de
+horas, así que se revisó lo que dejó Codex (§237–§237.13), se corrieron los bancos rápidos y se cierran los cuatro
+ítems con lo ya medido, cada uno con su veredicto. Nada se da por pasado si no se midió.
+
+**Revisión.** El trabajo de Codex está bien hecho y es honesto: cada número tiene su registro en
+`build/web/datos/e6/` y cada instrumento corregido dice qué no quedó certificado. Sin errores de sintaxis ni
+caracteres de control en los `.mjs` cambiados; nada del juego en git.
+
+**Una corrección de fondo.** El teléfono simulado de V6/V7 (la gama media, `lastre` 3,5) va a 10–13 cuadros/s en la
+sala de doce, con tres juegos y nueve consolas falsas en **un solo PC**. Pero el Oppo de verdad medido el mismo día
+por USB (`docs/telefono-seguro.md`) equivale a `lastre` ≈ 1,7: la gama media simulada es ~3,4 veces más lenta que el
+teléfono real del dueño. Además, tres juegos en un PC se roban el procesador entre sí. Por eso «el teléfono queda fuera
+de la sala» mide el peor caso de un aparato muy flojo en un PC compartido, no al Oppo en una sala real. Es como probar
+un tablero con la fuente compartida con otros dos: la caída de tensión no es la del tablero solo.
+
+**Veredictos.**
+- **P5 hecho.** El puente del sonido recicla sus búferes (315 mil reusados contra ~70 nuevos por página en la copa) y
+  hace una sola llamada nativa por entrega; igualdad 13/13 y fantasmas 6/6. La meta «casi ninguna limpieza» no se
+  cumple (65–131 por minuto, igual que el viejo), pero su duración es < 0,22 % del minuto: la basura que queda no es
+  del puente ni frena. La meta estaba mal puesta; no se persigue más.
+- **N12 hecho** (§237): el aviso antes de largar con el juego, banco escalón 27/27.
+- **V6 hecho, medido con resultado negativo en memoria.** 62 min y 20 carreras sin caídas, CPU estable (±3 %); la copa
+  con teléfono termina en ambas páginas sin bloquear al anfitrión. El proceso de vídeo crece +1,36 GB/h: es la memoria
+  de los sombreadores de §203, que pasa a **W26** (etapa 7), no a E6.
+- **V7 hecho, medido.** Host de un jugador con doce plazas: los PC a 59,3–60,0 cuadros/s, metas en las tres carreras,
+  sin esperas > 50 ms en el minuto medido (máximos de 55–117 ms en la largada). El teléfono simulado flojo sale de la
+  carrera compartida sin frenar a los demás, que es lo diseñado (§80). Queda para después (no bloquea): repetir con
+  el teléfono calibrado al Oppo (`lastre=1.7`) y en PC separados.
+- El contraste con N8 de la escalera quedó sin un par válido (§237.13): no hace falta para cerrar E6, N8 ya está medido
+  en §219.
+
+**Bancos al cerrar.** Ver la línea siguiente (`node banco/correr.mjs lockstep sonido-worklet sonido escalon
+sala-carrera consola-falsa arbitro-servidor relevo`).
+**Resultado:** 8 de 8 páginas bien (relevo 59/59 entre ellas). E6 cerrada.
+
+## §238 — Estado del plan y arrancada de W10 parte B · 2026-11-07 17:40
+
+**Qué.** El dueño pidió terminar lo que alcanzara del plan gastando todo el uso. Quedaba **4 %** del uso semanal (96 %
+gastado; se reinicia el 2026-11-08 a las 10:00 de Chile). Con eso no se puede abrir la etapa siguiente, que es grande
+(W10 parte B: semanas de trabajo en el motor), así que se usó en dejarla lista para empezar sin buscar nada.
+
+**Dónde va el plan combinado** (`docs/plan-combinado.md`):
+- **A (E6): hecha** (§237.14).
+- **B (R11, las tres conexiones de la sala): hecha en local** (§236: host 13/13, Cloudflare 15/15, Oracle 14/14 y
+  Oracle sin configurar 14/14; banco 21/21). Falta solo lo del dueño: crear la máquina en Oracle y el archivo privado
+  (`docs/publicar-oracle.md`).
+- **E (W10 parte B): lo siguiente.** Se queda como estaba en §207.4 (tres vueltas del prototipo, la tercera quieta a
+  los 14 cuadros).
+
+**Por qué se atascó B, en simple.** Son dos copias del juego: A calcula la carrera y B solo dibuja. A le manda a B
+cada cuadro la memoria que cambió (la «caja»). Pero B seguía corriendo el bucle entero del juego, con su propio
+planificador de hilos. Al pegar la memoria de A, B recibía colas y candados (mutex) que nombran hilos que solo
+existen en A, y se quedaba esperando a alguien que nunca iba a llegar. Es como conectar dos tableros que comparten un
+bus de control: si uno espera la señal de un relé que solo está en el otro, se queda trabado.
+
+**La arrancada (en orden).**
+1. **Un bucle propio para B**: B no corre `main()` ni el planificador; después de pegar cada caja llama solo al dibujo
+   de la escena (`EGG::SceneManager::draw`, el par de 0x8023AE60), la copia a la pantalla (`XfbManager::copyEFB`) y la
+   presentación de aurora. Lo que pega queda como dato para dibujar, nada más. Se construye en `web/juego/w10_nativo.cpp`
+   (programa de `MKW_W10_COMPILAR=1`, con `-DMKW_SUCIAS`).
+2. **La foto igual**: `MKW_BUILD=build/web-w10c/navegador node web/navegador/prueba-w10-dos.mjs --alto 900,1500 --medir`
+   (con el programa nuevo en lugar de `web-w10c`).
+3. **En el sitio**: la caja por mensaje ya alcanza (83–125 KB, ~0,2 ms por cuadro, §207.2); con el marco aislado de
+   §225 (`?aislar=sw`) se puede pasar a memoria compartida después, no antes.
+4. La sala y los fantasmas con el par A+B; medir en la gama baja simulada (tramo fijo, §163) y en este PC.
+
+**Archivos tocados.** `CLAUDE.md` (la decisión de E6 ya no dice «pausada»), `docs/plan-combinado.md` (A y B ✅ y la
+arrancada), esta entrada, el registro de `PLAN.md`. No se corrió ninguna medición ni se tocó código.
+
+
+
+## §239 — W29: la memoria del wasm de tamaño fijo (piloto chico, etapa 7) · 2026-11-07 21:30
+
+(Nota: el encargo decía «§238», pero §238 ya es la arrancada de W10 parte B; esta entrada es §239.)
+
+**Qué y por qué.** En Android, Chrome revisa los límites de cada lectura/escritura de memoria a mano (W5, §194: −6,8 % en la
+gama media simulada, −22,9 % en la baja). Con memoria ampliable (hoy: arranca con 320 MB y puede crecer a 4 GB) V8 tiene que
+releer el tamaño actual en cada acceso; con tamaño fijo es una constante. Idea aprobada por el dueño el 2026-11-07; nunca se había probado.
+
+**Qué se hizo.**
+- `herramientas/compilar-web.py`: opción `--memoria-fija N` (MB, apagada por omisión = 0). Enlaza con `-sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=NMB` y quita `MAXIMUM_MEMORY`.
+- `herramientas/tanda-w29.sh compilar igual medir` (candado de siempre): `build/web-w29-base` (como hoy) y `build/web-w29-fija` (1024 MB), mismos objetos, sin `--final` ni PGO; semillas de `web-w19`. El `.wasm` solo difiere en 1 byte.
+
+**Igualdad.** `prueba-navegador.mjs` con la fija: 22 bien, 0 mal. `prueba-fantasma-igual.mjs --build-b=fija`: 6 bien, 0 mal (2123 cuadros iguales, la meta en el cuadro 2242 en las dos).
+
+**Medición** (tramo fijo §163, `medir-sitio --perfil pc --nucleos 8 --lastre=3.5 --chrome "--js-flags=--wasm-enforce-bounds-checks"`; pares intercalados, orden alternado; `n8` apagado por ir con Playwright):
+
+| | base | fija | cambio |
+|---|---|---|---|
+| gama baja, par 1 (lógica/s) | 44,29 | 50,38 | +13,7 % |
+| gama baja, par 2 | 42,84 | 49,49 | +15,5 % |
+| este PC (control), par 1 | 159,71 | 161,65 | +1,2 % |
+| este PC (control), par 2 | 158,07 | 158,30 | +0,1 % |
+
+Los dos pares de la gama baja pasan de +8 %: la regla de «2 pares deciden» se cumple, no hizo falta más. El control en este PC no se mueve (este PC no paga la revisión a mano), como se esperaba.
+
+**Memoria** (`medir-memoria-pistas.mjs`, 6 pistas en una pestaña, `&n8=0`): el heap **usado** de verdad llega a 279 MB en las dos (`sbrk`), así que 1024 MB deja 3,7 veces de margen y nunca creció. Pero Windows cuenta lo reservado como memoria privada: la pestaña pasa de 1.080 a 1.783 MB (+~700 MB = 1024 − 320) y el total de Chrome de 2.148 a 2.881 MB tras la pista 1 (3.079 → 3.778 MB tras 6 pistas). El crecimiento por pista es el mismo (la tarjeta, no el heap).
+
+**Veredicto.** *Velocidad: aprobada* (+14,6 % de cuadros de lógica en la gama baja contra la meta de +5 %). *Memoria: sin matar, pero con condición.* 1024 MB es más de lo necesario: el pico usado es 279 MB. En Android una reserva no tocada normalmente no ocupa RAM física, pero **eso no se midió** (no hay teléfono; el dueño no mide con el Oppo). Con 1024 MB, Chrome en una pestaña llega a 3,8 GB contados en Windows, que en un teléfono de 4 GB sería arriesgado si la reserva se contara entera. **Siguiente paso recomendado:** recompilar con `--memoria-fija 512` (pico 279 MB, margen ×1,8; reserva solo +190 MB), repetir la prueba de igualdad y un par de la gama baja (la velocidad no debería depender del tamaño), y adoptarla en el programa final con el aviso: si algún día el juego pide más de 512 MB, el programa se cae en vez de crecer.
+
+**Trampas.**
+1. `--perfil cpu4` + `lastre` apila dos frenos: el juego iba a 12 fps y el tramo nunca terminaba (el `timeout 900` mataba la medida sin dejar salida). La gama baja de §163/W5 es `--perfil pc --nucleos 8` con el lastre; el CPU ×4 es otra cosa.
+2. Un `timeout` que mata a `medir-sitio` deja el `.txt` vacío (la salida se imprime al final): si sale vacío, fue el tiempo, no un error del programa.
+3. La memoria privada de Windows no distingue reservado de usado; para saber lo usado hay que mirar `sbrk`.
+
+
+## §240 — W10 parte B (etapa 7): el dibujante con su propio bucle — **la foto sale igual; la medición todavía se traba** · 2026-11-08 01:10
+
+**Qué y por qué.** W10 reparte el juego en dos copias en núcleos distintos: A calcula la carrera y B solo dibuja lo que A
+le manda cada cuadro (la «caja» con la memoria que cambió). La etapa 1 dejó a B quieto a los 14 cuadros (§207.4): B
+seguía corriendo el bucle entero del juego y se quedaba esperando cosas de hilos que solo existen en A. La arrancada
+(§238) pedía un bucle propio para B. Es la apuesta grande de CPU del plan (techo ×2,1 en la gama baja, §207.5).
+
+**Qué se hizo** (todo en el programa de prueba `MKW_W10_COMPILAR=1`; el de jugar no cambia):
+1. **El bucle propio de B** (`web/juego/w10_nativo.cpp`): la primera vez que B iba a calcular con la carrera andando
+   pega la caja y ya no vuelve al bucle del juego. Cada vuelta: dibujar lo pegado (`EGG::SceneManager::draw`), copiarlo a la
+   pantalla con los mismos registros con que el juego llamó a `XfbManager::copyEFB` (anotados antes) y pegar la caja
+   siguiente. `mkw_w10_bucle(0)` = el B de §207.4.
+2. **Los candados** (`parches/motor-w10.diff`, `os_scheduler.cpp`, solo con `MKW_SUCIAS` y en B): un mutex que la memoria
+   pegada trae tomado por un hilo de A, B lo toma igual (la caja siguiente lo pisa). Sin esto B dormía esperando a un
+   hilo que en B no existe.
+3. **La vuelta de más** (`w10.mjs`): cuando A se queda quieto para la foto, B recibe un «repite»; antes B volvía a dibujar el
+   mismo cuadro, y lo que el juego calcula al dibujar (el zoom suave de la cámara) avanzaba un paso más que en A: la foto
+   difería en 72 % de los píxeles (toda la imagen corrida unos píxeles). Ahora B no dibuja en esa vuelta.
+4. **B no corre el modo sin tope** (`w10-dos.mjs`): `?sinTope` es de la lógica, y B no la corre.
+5. **La fila de imágenes de B es de B** (`mkw_w10_hilos` excluye el `XfbManager` y sus XFB de lo que B pega) y **B no
+   atiende las alarmas del juego** (`os_alarm.cpp`, `ProcessAlarmQueue`, solo con la marca de B): en el registro de B salió
+   «ProcessAlarmQueue: memory error at 0x524D4350» (el texto «RMCP»): su cadena de alarmas apuntaba a memoria que la caja de
+   A había pisado.
+6. Instrumentos: la fase del bucle de B (`mkw_w10_dato(19)`), «esperando» en los dos lados, la hora del informe, y
+   `build/depurar-w10e.mjs` (sin el juego dentro: abre el par, y al final le pregunta en vivo a cada Worker por el depurador
+   de Chrome y lo detiene para leer su pila).
+
+**Comando.** `W10_SAL=build/web-w10d W10_ARGS="--memoria-fija 1024" bash herramientas/tanda-w10.sh compilar dos`
+(resultados en `build/web/datos/w10/tanda-240*.txt`, `dos-pc.txt`, `dos-baja.txt`; fotos del juego: nunca a git).
+
+**Resultado.**
+| Prueba | Antes (§207.4) | Ahora |
+|---|---|---|
+| B pega y dibuja | 14 cuadros y quieto | 1.672 cuadros seguidos, 0 tramos malos |
+| La foto de B contra la de A, cuadro 900 | — | **0,000 %** de píxeles distintos |
+| La foto, cuadro 1500 | — | **0,000 %** |
+| El tramo fijo con A sin dibujar (modo 9) | — | **se traba**: A en el cuadro de lógica 263, B ~20 cuadros atrás |
+
+**Qué significa.** B ya dibuja la carrera de A, y la imagen es exactamente la misma: la idea de las dos copias funciona.
+Lo que falta es que funcione con A sin dibujar, que es justamente el caso que gana. El diagnóstico separó las causas: con
+A dibujando (modo 10) y sin tope, B llegó a 4.800 cuadros; con A sin dibujar se traba siempre en el mismo punto, con reloj
+fijo o sin tope. Preguntándole por el depurador, **B no contesta y no se deja detener**: está atascado en una espera del
+propio navegador (no en un cálculo, que sí se deja detener), sin `Atomics.wait` en la página ni en el programa. Lo más
+probable es una espera de la presentación (aurora esperando su ayudante de cuadro o una llamada de WebGPU) que nunca se
+cumple porque algo que A no hace (dibujar y presentar) falta en la memoria que B recibe.
+
+**Dónde se queda B (la última vuelta, 01:40).** Marcas a la consola del Worker, leídas desde afuera por el depurador (no
+dependen de que B suelte el hilo): en B, antes de dibujar, de copiar y de pegar (`w10_nativo.cpp`), y dentro de la copia a la
+pantalla antes de cada espera (`gx_copy.cpp`, `MKW_W10_MARCA`, solo con `MKW_SUCIAS` y cuando B prende `g_mkwW10Traza`, desde
+su cuadro 380). Las últimas ocho: «copia: EnsureAuroraFrameActive → GXDrawDone → GXCopyDisp → aurora_wait_for_frame_worker →
+VI_HLE_PresentFrame → fin», «B: pegar», **«B: dibujar»** y nada más. La copia a la pantalla anda; **B se queda dentro del
+dibujo del juego** (`EGG::SceneManager::draw`), en algo que no es JavaScript ni un cálculo de wasm (los dos se dejan detener).
+Sospecha: con A sin dibujar, lo que el dibujo de B lee (listas de objetos, contadores de efectos que la lógica de A toca sin
+que el dibujo de A los haya preparado) llega incoherente y una llamada del motor que sale al navegador (WebGPU, una copia de
+memoria enorme) se queda colgada. Es el mismo tipo de choque que los hilos, las alarmas y la fila de imágenes: estado que el
+dibujo escribe y la lógica lee.
+
+**La causa encontrada (04:20–05:15, la ventana extra que dio el dueño).** Pasos, cada uno con su prueba del caso trabado:
+1. B sano (A dibujando) **sí** contesta y se deja detener por el depurador: la traba es real.
+2. La tarjeta de Chrome sigue atendiendo durante la traba (otra pestaña: un trabajo de WebGPU contesta en 67 ms): no es la GPU.
+3. Contador de choques en B (`?w10Choques=1`, `w10.mjs`: bytes que el dibujo de B cambió y la caja de A pisa con otro valor): los
+   únicos choques de cada cuadro son el sonido (0x802F7000–0x80308000: pares de 16 bits = PCM estéreo, y sus descriptores), la
+   cuenta de retrazados (0x80386BE4), la fila de búferes del sonido (0x80386498–B8), una marca de GX (0x802ED1EC) y una pila al
+   final de las globales (0x80398000–0x80399180). B ahora conserva esos rangos propios (`propiosB` en `mkw_w10_hilos`): **no**
+   arregló la traba (no eran la causa), pero quedan (son estado de cada copia).
+4. Pegar en B las pilas de los demás hilos (B en su bucle no los corre): **no** arregló la traba; queda (`if (!g_enBucle)`).
+5. Marcas en `GXCallDisplayList` (entrada y salida, `gx_dl.cpp`): la última lista termina bien; después B ya no llama a GX.
+6. **El perfilador de V8 en la traza de Chrome** (`depurar-w10e.mjs`: `Tracing.start` con `disabled-by-default-v8.cpu_profiler`;
+   las muestras las escribe el hilo del perfilador, aunque el Worker no suelte el hilo): las últimas 400 muestras de B están en
+   **`func_80225354`** ← `func_802251A8` ← **`func_8067CF74`** (junto a `Effects::Mgr::Update` 0x8067CB88) ← `func_805B3A9C` ←
+   `func_8022A314`. `func_80225354` recorre listas enlazadas anidadas (efectos → emisores → partículas: el «siguiente» de
+   `nw4r::ut::List`, 0x800AF180, copiado en línea). Una de esas listas quedó cerrada en círculo: el recorrido no termina.
+7. **Prueba decisiva**: B sin dibujar los efectos (`?w10SinEfectos=1`, `mkw_w10_sin_efectos`, envoltura de `func_8067CF74`):
+   **el par pasa del cuadro 263** (A llegó al 591 y seguía). La traba es solo el dibujo de los efectos.
+
+**Por qué.** El dibujo de los efectos de nw4r también escribe sus listas (el orden de dibujo, las partículas reenlazadas al
+ordenarlas). Con A sin dibujar, la lógica de A sigue enlazando y soltando partículas sobre un orden que el dibujo de A nunca
+tocó; B pega esos enlaces encima de los que su dibujo reordenó y la lista se cierra en círculo.
+
+**La pista concreta para arreglarlo** (lo siguiente): que lo que el dibujo de los efectos escribe en B no quede de un cuadro
+al siguiente. B guarda una sombra de lo que recibió de A (`sombraB`, ya escrita para el contador); antes del dibujo de los efectos
+borra las marcas de páginas (`reponer`), y al volver devuelve desde la sombra las páginas que el dibujo de los efectos marcó,
+salvo la pila del hilo que corre el bucle y los rangos propios de B. Así cada cuadro los efectos se dibujan sobre el estado de
+A, como en el modo 10. Comprobar: el par sin dibujar en A pasa del 263, la foto igual (900 y 1500) y después medir.
+
+**El arreglo, hecho (05:40).** `w10_nativo.cpp`: envoltura de `func_8067CF74` en B con `g_sombraB` (lo último recibido de A,
+escrito por `w10.mjs` al pegar; `mkw_w10_sombra_b`), `reponer()` antes, y al volver las páginas marcadas por el dibujo de los
+efectos vuelven a la sombra (salvo la pila del hilo actual y los rangos propios; `mkw_w10_deshacer_efectos(0)` = sin esto).
+Con A sin dibujar y B dibujando los efectos, **el par pasa del cuadro 263** (A llegó al 603 y seguía, en el diagnóstico con el
+perfilador prendido, que lo frena). Falta: la foto igual y medir (la tanda `dos` corre).
+
+**La tanda con el arreglo (05:15–05:45).** `bash herramientas/tanda-w10.sh dos` (`build/web/datos/w10/tanda-240f.txt`):
+- **El tramo fijo con A sin dibujar y B dibujando, completo** («A cerró el tramo con B dibujando» ✓; A esperó a B 26,8 s en
+  1.145 esperas, 2.609 cajas, 424 MB, 0 tramos malos). Es la primera vez que la parte B corre el caso que gana.
+- El número de esa corrida (7,8 cuadros de lógica/s) **no sirve todavía**: la tanda usa el aparato viejo de §207
+  (`GAMA_BAJA=&lastre=7…`), no el de la etapa 7 (`lastre=3.5` y `1.7` con la revisión de límites), y no hay base al lado.
+- **La foto igual (modo 10, A dibujando) se rompió con el arreglo**: con A dibujando, A no manda lo que escribe su dibujo, así
+  que la sombra de B tiene esos bytes viejos y deshacer le devolvía listas viejas. Arreglo: con `?verifica=1` B no deshace
+  (`w10Deshacer=0`, `w10-dos.mjs` → `mkw_w10_deshacer_efectos(0)`). Al repetir, **la página de prueba se cerró a los ~80 s**
+  (Playwright: «Target page… has been closed»; antes del arreglo la foto pasaba): sospecha, memoria del proceso (dos copias
+  con 1 GB fijo cada una más la sombra de 152 MB de B). Sin confirmar.
+
+**Siguiente paso concreto.** (1) Repetir la foto sin `--memoria-fija` (o con 512) y crear `g_sombraB` solo si B deshace:
+si pasa, era la memoria. (2) Una foto del caso real (A sin dibujar) contra una partida normal en el mismo cuadro (con
+`prueba-foto-igual.mjs` como modelo). (3) Medir con el aparato de la etapa 7: base `build/web-w19` contra el par, tramo
+fijo, `lastre=3.5` y `1.7`, `--chrome "--js-flags=--wasm-enforce-bounds-checks"`, este PC de control; cambiar `GAMA_BAJA`
+de `tanda-w10.sh`. (4) La igualdad entera (arranque, sala 75/75, fantasma).
+
+**Lo que sigue (en orden).**
+1. Marcas dentro del dibujo (cada llamada al motor de aurora que sale al navegador: crear recetas de dibujo, subir búferes,
+   `GXDrawDone`), o la opción 2 de §207.4: que B arranque **desde la foto de A** antes de la carrera, para que el dibujo de
+   B y la lógica de A partan del mismo estado. La tercera salida: que A corra la parte del dibujo que escribe memoria sin
+   mandar nada a la tarjeta (gana menos que el techo ×2,1, hay que medir cuánto).
+2. Comparar qué páginas pega B con A sin dibujar contra A dibujando cerca del cuadro 250 (el modo 4 cuenta lo que cambia).
+3. Con el tramo andando: medir en la gama baja (lastre 3,5 y 1,7) y en este PC, y la igualdad entera (arranque, sala 75/75,
+   fantasma).
+4. Aparte: en una de las corridas la página dio «Maximum call stack size exceeded» en el cuadro 900 (no se repitió).
+
+**Trampas.**
+1. Los contadores de espera solo suman al terminar la espera: una espera eterna no aparece. Se agregó «esperando» (cuánto
+   lleva ahora).
+2. El informe de un Worker sale de un temporizador: si el Worker se traba, el informe se congela con lo último, y la «fase»
+   que se lee es la de su última espera, no la de ahora. Para saber de verdad, preguntarle por el depurador.
+3. En un script de Python dentro de bash, `
+` en un texto se volvió un salto de línea de verdad y partió el `printf`
+   (el compilador lo rechazó). Y `grep -v "[audio]"` es una clase de letras: borra casi todo; va `grep -vF`.
+
+## §241 — R11 (las 3 conexiones de la sala): comprobada de nuevo y **cerrada** · 2026-11-08 13:40
+
+**Qué es.** R11 son las tres formas de conectar la sala que elige el anfitrión (§236): el árbitro en la PC de un jugador
+(por omisión), la misma con todo por el repetidor de Cloudflare, o el árbitro en un servidor propio en Oracle (Santiago).
+El **árbitro** (Glosario) es quien escribe los botones de todos en un solo registro, cuadro por cuadro. Quedó «en curso»
+porque el 5 de noviembre se pausó a medias; el 7 se terminó (§236) pero su línea en el avance no se cambió.
+
+**Por qué se vuelve a medir.** Para cerrar un ítem hay que verlo pasar hoy, con el programa y la página de hoy (desde el 7
+cambiaron la página y el lockstep por W10 y E6).
+
+**Comandos y resultado.**
+```bash
+node banco/correr.mjs arbitro-servidor          # sin el juego: 21 bien, 0 mal
+bash herramientas/tanda-conexion-sala.sh        # con el juego, bajo el candado → build/web/datos/conexion-sala/20261108-131334/
+```
+
+| Modo | Puntos | Huellas iguales por pestaña | Lo que se comprobó del camino |
+|---|---:|---:|---|
+| Host (por omisión) | 13/13 | 75 / 75 | árbitro = una de las pestañas |
+| Cloudflare | 15/15 | 74 / 74 | los dos extremos «relay»: 1.385 kB en 17.021 reenvíos por el repetidor local |
+| Oracle | 14/14 | 75 / 75 | el árbitro Node local repartió los botones: 4.644 paquetes |
+| Oracle sin configurar | 14/14 | 74 / 74 | sin `arbitro.json` las dos usan el host, sin cortar la carrera |
+
+En el banco (21/21): la carrera entera con el servidor de árbitro, el servidor que se cae o deja de contestar en el
+cuadro 300 (la PC toma el mando en 229–300 ms y la carrera sigue igual en las tres), una traba de 1,5 s de un piloto que
+no frena a los otros dos (0 ms de espera), y el anfitrión que confirma Oracle solo cuando todos lo tienen vivo.
+
+**Qué significa.** Las tres conexiones andan con el juego de verdad y dan la misma carrera en todas las pestañas
+(«huellas iguales» = el resumen del estado de la carrera coincide cuadro por cuadro, como comparar dos registros de un
+osciloscopio punto a punto). **R11 queda hecha en local.** Lo que falta no es de Claude: crear la máquina en Oracle, su
+certificado y publicarla (`docs/publicar-oracle.md`), y el PR del vestíbulo en el sitio (`parches/paginita-mkw-conexion.diff`).
+
+**Trampas.** 74 en lugar de 75 huellas en dos modos no es una diferencia: la carrera de prueba se corta por tiempo y a
+veces la última comparación no alcanza a viajar; lo que cuenta es que **ninguna** difiera.
+
+## §242 — N15 y P9: ya estaban cerrados; las líneas viejas del avance estaban repetidas · 2026-11-08 14:00
+
+**Qué pasó.** Al pedir el cierre de los ítems «en curso», N15, N2, E1, E2 y P9 aparecían así en
+`herramientas/plan-rendimiento/avance.mjs`. Pero cada uno tenía **dos** líneas: una vieja «en curso» arriba y otra más
+nueva abajo («hecho» o «descartado», de la poda del 31-10 a las 23:10 y de §201). En un objeto de JavaScript, cuando
+una clave se repite **vale la última**, así que la página del plan ya los mostraba cerrados; la línea de arriba solo
+confundía a quien leía el archivo de arriba hacia abajo. Es como un tablero con dos etiquetas en el mismo interruptor:
+manda la que está pegada encima, pero la de abajo se sigue viendo.
+
+**Qué se hizo.** Se borraron las líneas viejas de N15 y P9 (las de N2, E1 y E2 se reescriben en sus propias secciones,
+porque esos ítems se midieron otra vez hoy). Comprobado con `node -e "import('./herramientas/plan-rendimiento/avance.mjs')…"`:
+N15 = hecho, P9 = descartado, y ninguna clave repetida (`grep -oE "^  '[A-Za-z0-9.]+'" … | sort | uniq -d`, vacío al final de §246).
+
+**N15 (subir WiiCompiled a la v0.9.3): hecho.** Revisado contra lo que pide su ficha:
+- (1)–(3) en §170: el traductor y el runtime de la v0.9.3 con nuestra aurora, paridad 22/0, la misma carrera 75/75, la
+  misma velocidad ±3 %.
+- (4) el hilo de GX de la v0.9.3 (#325) no corre en wasm sin memoria compartida; lo reemplaza W10 (G9 y H4 descartados
+  como duplicados en la poda).
+- (5) el cambio al clon principal: en la práctica, **todo programa desde §182 sale de esta línea**. El programa final de E6
+  (`build/web-e6`) se arma desde `terceros/Wiicompiled-motor-h6` (descendiente de `Wiicompiled-motor`), con
+  `MKW_WIICOMPILED`/`MKW_AURORA` (ver `herramientas/tanda-e6.sh`). Trampa anotada: `compilar-web.py` sin esas variables
+  sigue usando `terceros/Wiicompiled`, la línea vieja; el comando exacto del final queda en §244.
+- (6) la tabla de lo adoptado está en §170. La aurora nueva (N15b) se descartó en la poda (no trae velocidad).
+- **Queda abierto, fuera de N15:** la falla de `prueba-sala --rapida` en el punto M22 (la carrera 2 no usa el personaje
+  que se volvió a elegir) apareció con esta línea del motor (§203) y no se arregló. Se anota como pendiente aparte.
+
+**P9 (la página del juego en su propio proceso): descartado** en la poda del 31-10 (W10 va sin memoria compartida). Lo
+que su ficha pedía comprobar ya está: un **service worker** basta para aislar el marco (banco `aislamiento` 11/11, §187)
+y con el juego de verdad dentro del sitio local anda (W21, §225: 8/8) pero no gana por sí solo (−4,5 % / −3,4 %, ruido).
+Llevarlo al sitio sería un PR del dueño.
+
+## §243 — E1 (el ahorro de energía) y E2 (el calor): comprobados en el PC — **hechos; lo del teléfono queda para el dueño** · 2026-11-08 14:20
+
+**Qué son.** Dos «vigías» de la página (`web/navegador/energia.mjs`, §190.1) que solo avisan, no cambian el juego:
+- **E1:** cuando Chrome activa su **Ahorro de energía** (Glosario) dibuja todo a 30 imágenes por segundo, y el jugador
+  juega a media velocidad sin saber por qué. El vigía mide cada cuánto refresca la pantalla; si son ~33 ms durante 3 s
+  y el juego no es el que tarda (≤ 14 ms por cuadro), pone 🔋 en la esquina.
+- **E2:** un teléfono que se calienta baja el reloj de su procesador, y el juego tarda más por cuadro con los minutos.
+  El vigía compara la media de cada minuto de carrera con los dos primeros; si sube +25 % y +1,5 ms dos minutos
+  seguidos, pone 🌡️.
+
+**Por qué estaban «descartados».** La poda del 31-10 los dejó así porque no se podían probar sin un portátil con batería
+ni el Oppo. Hoy se encontró cómo probar los dos en este PC.
+
+**Cómo se probó E1 de verdad.** Chrome guarda su ajuste del Ahorro de energía en el archivo `Local State` (Glosario) del
+perfil: `performance_tuning.battery_saver_mode.state` (0 apagado, 1 bajo el 20 % de batería, 2 sin enchufe, **3 siempre**).
+Un perfil nuevo con ese archivo y el valor 3 abre Chrome con el ahorro prendido aunque el PC no tenga batería. Primero
+sin el juego (una página vacía, la mediana de 180 refrescos): **4,2 ms normal → 33,3 ms con el ahorro**. Es el mismo
+freno que en un portátil desenchufado; lo que no se prueba aquí es la regla de Chrome que lo prende sola (la batería).
+
+**Cómo se probó E2 en el PC.** Un PC no se calienta lo bastante, así que se simuló el efecto: el «aparato de mentira»
+(`lastre.mjs`, §155) hace el hilo del juego K veces más lento; ahora `estado.k` se puede cambiar **con la carrera
+andando** (`window.mkwLastre().cpu.k = 2.5`), que es lo que hace un teléfono que baja su reloj. Para que la prueba no
+dure 5 minutos, `?calorSeg=15` hace que el «minuto» del vigía dure 15 s (solo pruebas).
+
+**Comandos.**
+```bash
+node banco/correr.mjs energia                                                  # 20/20 (uno nuevo: ?ahorro sin nada = prendido)
+MKW_BUILD=build/web-e6-w29/navegador node web/navegador/prueba-energia.mjs      # con el juego, bajo el candado (tanda-241.sh energia)
+```
+
+**Resultado** (`build/web/datos/cierre-241/energia.txt`, **12 bien, 0 mal**):
+
+| Caso | Lo que vio el vigía | Aviso |
+|---|---|---|
+| Carrera normal (pantalla a ~5,7 ms) | 4 «minutos» de 6,93 / 6,62 / 6,65 / 6,49 ms | ninguno (bien: sin falsa alarma) |
+| Refrescos frenados a 30 por la página (la prueba de §190) | 34,4 ms entre refrescos | 🔋 |
+| **El Ahorro de energía de verdad de Chrome** | 34,7 ms entre refrescos | 🔋 |
+| «Calor» de mentira: lastre 1 → 2,5 a los 40 s | 7,23 / 6,46 / 14,21 / 18,11 / 18,15 / 17,54 ms | 🌡️ (a los ~75 s) |
+| `?ahorro=0` y sin `?calor` | los vigías no existen | — |
+
+**Qué significa.** Los dos vigías hacen lo que dicen y no dan falsas alarmas en una carrera normal. Además la copa de 62
+minutos de V6 (§237.14) dio la CPU estable ±3 %: en un PC el vigía del calor no saltaría. **Decisión:** el del ahorro
+queda **prendido por omisión** (con Playwright, `navigator.webdriver`, solo con `?ahorro=1`, como N8; `?ahorro=0` lo apaga),
+porque ya se vio con el ahorro de verdad y solo pone un aviso. El del calor sigue **apagado** (`?calor=1`) hasta verlo
+en un teléfono: no se sabe todavía cuánto sube uno real ni si +25 % es el umbral justo.
+
+**Falta en el teléfono (lo hace el dueño al final):** el ahorro de Android con poca batería (¿Chrome de Android frena a 30
+igual?), y una copa entera en el Oppo con `?calor=1` para ver si el procesador de verdad se frena y si el aviso sale.
+
+**Archivos.** `web/navegador/mkw.mjs` (el ahorro por omisión, `?calorSeg`), `energia.mjs` (comentario), `lastre.mjs`
+(`estado.k` en vivo), `prueba-energia.mjs` (los casos «ahorro de verdad» y «calor de mentira»; los chips se miran cada
+segundo porque duran 15 s), `banco/pruebas/energia/index.html`.
+
+**Trampas.**
+1. El aviso de la esquina dura 15 s: leerlo al final de la carrera da «sin aviso» aunque haya salido. La prueba lo mira
+   cada segundo y anota si lo vio.
+2. Con el ahorro, Chrome no pide ventana especial, pero la medición tiene que ser **con ventana** (headless no frena igual).
+3. Un perfil con `Local State` escrito a mano tiene que ser nuevo: Chrome reescribe ese archivo al cerrar.
+
+## §244 — W29: 512 MB alcanzan; adoptada en el programa final (768 MB con la ventana de H6) · 2026-11-08 15:10
+
+**Qué es.** W29 (§239) fija el tamaño de la memoria del wasm: en lugar de «arranca con 320 MB y puede crecer hasta 4 GB»,
+un tamaño que nunca cambia. En Android Chrome revisa a mano que cada lectura caiga dentro de la memoria (W5); con un
+tamaño fijo ese límite es una constante y la revisión sale más barata. Es como un fusible de valor fijo comparado con uno
+que hay que ir a medir antes de cada maniobra. §239 lo probó con 1024 MB (+14,6 % en la gama baja simulada) y dejó dos
+cosas pendientes: ver si basta con 512 MB (menos memoria reservada) y adoptarla en el programa final.
+
+**La trampa del tamaño en el final.** El programa final no es como el de §239: lleva **H6** (`--fija`, §211), que pone la
+RAM de la Wii en una ventana fija de 385 MB al principio de la memoria; lo de C++ empieza después. Por eso «512 MB» no
+significa lo mismo en los dos: en el final de hoy (`build/web-e6`, arranca con 560 MB y puede crecer) el pico **contando
+la ventana** es 510 MB, así que 512 fijos no alcanzarían. El mismo margen que deja 512 en el programa sin ventana
+(234 MB sobre el pico) es, en el final, ~744 MB → **768 MB**.
+
+**Comandos** (todo bajo el candado, `herramientas/tanda-241.sh`, resultados en `build/web/datos/cierre-241/`):
+```bash
+bash herramientas/tanda-241.sh compilar512 memoria512 igual512 memoria-e6
+W29_FINAL_MB=768 bash herramientas/tanda-241.sh final memoria-final igual-final energia medir
+W29_FINAL_MB=768 W29_PARES=4 bash herramientas/tanda-241.sh medir      # la zona gris: 4 pares más
+```
+
+**1. ¿Alcanzan 512 MB?** (`medir-memoria-pistas.mjs`, 11 pistas seguidas en una pestaña, las 8 de siempre más 3.2, 3.3 y
+7.3, `&n8=0`; el «usado» es `sbrk`, lo que el programa de verdad pidió):
+
+| Programa | Tamaño | Usado tras la 1.ª pista | Pico (11 pistas) | ¿Creció? | Pestaña tras 11 pistas |
+|---|---|---:|---:|---|---:|
+| `web-w29-512` (sin H6, como §239) | 512 fijo | 255 MB | 278 MB | no puede | 1.436 MB |
+| `web-e6` (el final de hoy) | 560, crece | 486 MB | 510 MB | no (nunca pasó de 560) | 1.418 MB |
+| `web-e6-w29` (el final fijo) | **768 fijo** | — | 510 MB | no puede | 1.618 MB |
+
+Sí: con 512 el programa de §239 corre las 11 pistas sin caerse y `prueba-navegador` da **22/22**. Lo usado sube ~23 MB en
+11 pistas (no es una fuga del heap: lo que crece con las pistas es la tarjeta, §203). La pestaña del final fijo cuenta
++200 MB contra la de hoy: es la reserva (768 − 560), que Windows anota pero no ocupa RAM.
+
+**2. Igualdad del final fijo** contra el final de hoy (mismos objetos, mismo perfil PGO reusado; el `.wasm` difiere en 1 byte):
+- `prueba-arranque` (Node, el final fijo): **13 bien, 0 mal**.
+- La sala con dos programas (`prueba-sincro --directa`, A = fijo, B = `web-e6`): **14 bien, 0 mal**, huellas iguales 74/74.
+- Los fantasmas (`prueba-fantasma-igual`, A = fijo, B = `web-e6`): **6 bien, 0 mal**.
+
+**3. Velocidad** (el tramo fijo de §163 con 12 CPU y semilla fija; gama baja = `lastre=3.5` con la revisión de límites de
+Android; este PC de control; pares intercalados con el orden alternado). Los dos primeros pares dieron +2,8 % y +14,3 %:
+zona gris, así que se corrieron 4 más (la regla: hasta 6).
+
+| | 6 pares (cuadros de lógica/s, fijo contra hoy) | Media | Mediana |
+|---|---|---:|---:|
+| Gama baja | +0,6 · +2,7 · +7,3 · +8,8 · +12,1 · +14,3 % (6 de 6 a favor) | **+7,7 %** | +8,1 % |
+| Este PC | −0,6 · +1,3 · +2,1 · +2,3 · +2,4 · +6,4 % | +2,3 % | +2,2 % |
+
+**Veredicto: adoptada.** Gana en la gama baja en los seis pares, no pierde en este PC, da la misma carrera y los mismos
+fantasmas, y la memoria alcanza con margen. La ganancia es menor que en §239 (+14,6 %) porque el final ya tenía H6:
+la ventana fija ya le había quitado a V8 parte del trabajo de las revisiones.
+- `compilar-web.py --final` ahora pone `--memoria-fija 768` (con H6) o `512` (sin H6) si no se pide otra cosa;
+  `--memoria-crece` = como antes.
+- El programa nuevo es `build/web-e6-w29/navegador` (`mkw.wasm.br` 14,0 MB). El comando exacto para rehacerlo está en
+  `docs/publicar.md` §0 y en `CLAUDE.md`.
+
+**Qué falta.** La planilla entera (`correr-todo.mjs`) con ese programa antes de subirlo (la subida es del dueño), y en el
+teléfono (lo hace el dueño al final): que Android no cuente la reserva de 768 MB como memoria usada.
+
+**Trampas.**
+1. `--memoria-fija` cuenta la memoria entera, ventana de H6 incluida: el número no se traslada entre un programa con
+   `--fija` y uno sin ella.
+2. Con un tamaño fijo, si algún día el juego pide más de lo que hay, el programa **se cae** en vez de crecer. Por eso se
+   midieron 11 pistas seguidas; si se agregan cosas grandes al heap, hay que volver a medir `sbrk`.
+3. `--salida` lleva solo el enlace a otra carpeta: los objetos y el perfil de PGO (`build/web-e6-pgo-gen`) se reusan, y
+   compilar el final fijo tomó 10 minutos en vez de horas.
+
+## §245 — N2 (la escalera de aparatos) con el programa final de hoy, y el teléfono del dueño como escalón · 2026-11-08 14:45
+
+**Qué es.** La **escalera de aparatos** (Glosario): medir el juego en el mismo tramo de carrera, desde este PC hasta un
+teléfono de gama baja, para saber cuánto falta en cada escalón para 60 cuadros de lógica por segundo. Solo hay un aparato
+de verdad (este PC); los demás se simulan con el aparato de mentira (§155: el hilo del juego K veces más lento, el ladrón
+de caché, la tarjeta más lenta) y, en los teléfonos, con la revisión de límites de Android (W5). La última vez (§201) se
+midió con `build/web-w19`; desde entonces entraron H6, M7, PGO, E6 y W29. Hoy se suma un sexto escalón: **el teléfono del
+dueño** (el Oppo medido por USB el 7-11 equivale a `lastre` ≈ 1,7, `docs/telefono-seguro.md`).
+
+**Comando** (bajo el candado; el tramo fijo de §163, 12 CPU en máximo, semilla fija, `sinTope=1`; la tarjeta por sus marcas de
+tiempo sin el redondeo de Chrome):
+```bash
+N2_BUILD=build/web-e6-w29 N2_PREFIJO=n2f N2_OPPO=1 bash herramientas/tanda-n2.sh escalera   # → build/web/datos/escalera/n2f-*
+```
+(`tanda-n2.sh` aprendió `N2_BUILD`, `N2_PREFIJO`, `N2_OPPO` y `N2_QUIEN`, y suelta el candado entre vueltas si otro espera.)
+
+| Escalón | Simulado con | Cuadros de lógica/s (2 corridas) | Antes (§201) | Para 60 | Tarjeta / CPU por imagen |
+|---|---|---|---:|---|---|
+| Este PC (Ryzen 7 9800X3D) | nada | 167,2 · 166,7 | 152,7 | ×2,78 de sobra | 0,21 / 12,8 ms |
+| PC típico | `lastre=2.2`, 8 núcleos | 105,1 · 104,4 | 93,3 | ×1,75 de sobra | 0,21 / 26 ms |
+| **Teléfono del dueño (Oppo)** | `lastre=1.7` + límites, 8 núcleos | 121,0 · 125,2 | — | ×2,05 de sobra | 0,22 / 22 ms |
+| Portátil de oficina | `lastre=3&ladron=64`, 4 núcleos | 48,9 · 50,7 | 43,8 | le falta ×1,20 | 0,22 / 61 ms |
+| Teléfono de gama media | `lastre=4…lastreGpu=6` + límites | 33,4 · 34,6 | 30,6 | le falta ×1,76 | 0,93 / 109 ms |
+| Teléfono de gama baja | `lastre=7…lastreGpu=15` + límites | 26,4 · 21,8 | 18,7 | le falta ×2,49 | 2,0 / 292 ms |
+
+**Qué significa.**
+- Todos los escalones subieron desde §201: los PC un 9–14 %, la gama media un 11 % y la gama baja un 29 %. La gama baja
+  es la que más gana porque H6 y W29 atacan justo lo que más le cuesta a un teléfono: revisar los límites de la memoria.
+- **En todos frena la CPU**, por mucho: la tarjeta trabaja de 0,2 a 2,2 ms por imagen; la CPU, de 13 a 320 ms.
+- **El teléfono del dueño, simulado, sobra**: 123 cuadros de lógica/s, el doble de lo necesario. Ojo: el Oppo de verdad
+  iba a 30 fps por **la tarjeta** (§115), y este escalón simula la CPU y no su tarjeta. Para el Oppo queda ver si la
+  tarjeta llega (por eso existe el plan de gráficos bajos opcionales).
+- **Lo que falta para 60:** el portátil ×1,20, la gama media ×1,76 y la gama baja ×2,49. Es lo que tienen que dar las
+  piezas grandes que quedan (W10, la etapa 7).
+- La gama baja varía bastante entre corridas (26,4 y 21,8): con un freno de ×7 cualquier ruido del PC se multiplica.
+
+**Las metas de cada escalón** (lo que la ficha dejaba para el dueño). El dueño ya las fijó (`CLAUDE.md`, §114.6): 60 de
+lógica en todos, también en los teléfonos de gama menor, sin quitar karts ni efectos. La tabla de arriba es el «cuánto
+falta» contra esa meta; se repite al cerrar cada etapa. N2 queda **hecho**: tabla medida, simulada y con la meta.
+
+**Falta en el teléfono (lo hace el dueño al final):** la escalera en el Oppo de verdad (`mkwInformeRendimiento` en una
+carrera de 12) para corregir el escalón simulado, sobre todo la tarjeta.
+
+**Trampas.**
+1. El título de la vuelta dice «los cinco escalones» aunque con `N2_OPPO=1` son seis (se dejó el texto de antes).
+2. «Antes (§201)» es la media de sus dos corridas; el PC de §201 iba con `build/web-w19`, no con PGO.
+
+## §246 — La planilla entera sobre el programa final nuevo (`build/web-e6-w29`) · 2026-11-08 19:30
+
+**Qué se hizo.** El dueño va a subir el programa final de §244 (W29 adoptada). Antes, se corrieron **todas** las pruebas
+sobre él. Las fallas que eran culpa nuestra se arreglaron. Las que venían del instrumento o de afuera se anotan aquí con
+su porqué. Las pruebas en el teléfono real no entran: las hace el dueño al final.
+
+**Comando.** `bash herramientas/tanda-246.sh`, un script nuevo. Hace tres cosas:
+- toma el candado;
+- pone las ventanas en el monitor de 144 Hz;
+- corre `MKW_BUILD=build/web-e6-w29/navegador node herramientas/correr-todo.mjs "$@"`.
+
+Dónde quedaron los datos:
+- la planilla, en `build/web/datos/todo/20261108-1454/` (tardó unas 2 h);
+- las repeticiones (`--solo … --repetir 2`), en `build/web/datos/todo/20261108-1701/`;
+- todo lo demás de esta sección, en `build/web/datos/cierre-241/`.
+
+**Resultado de la primera pasada: 706 bien y 29 mal.** Las 29 fallas caen en 10 de las 43 pruebas. Se compararon con
+dos planillas anteriores:
+- la del 06-11, con `build/web-e6`: 9 pruebas con fallas, casi las mismas;
+- la del 30-10, con `build/web-motor`.
+
+| prueba | qué falló | de quién | qué se hizo |
+|---|---|---|---|
+| `relevo` (3) | esperaba que A y C **pausaran** a B en sus trabas | **nuestra, de la prueba** | arreglada: 9/0 |
+| `desconexion` (2) | `cuenta-otro`: B cierra en la cuenta y A queda 44 s quieta | **nuestra, de la página** | arreglada: 95/0 |
+| `sincro-directa`, `sincro-cloudflare` (1 c/u) | B espera más de 4 ms por cuadro | del árbitro (§231), no de W29 | anotada; intermitente |
+| `precarga` (1) | baja 40,4 MB contra 79,9: tenía que ser menos de la mitad (39,95) | intermitente, en el borde | anotada: 8/0 y 8/0 al repetir |
+| `sala` (9) | el juego de A se detiene al pasar a la carrera 2 | nuestra, **del motor** (§203) | anotada con el diagnóstico nuevo |
+| `copa-azar` (sin cuenta) | B se cuelga al pasar a la carrera 2 | la misma del motor | anotada |
+| `sala-doce` (4) | el teléfono simulado no llega a 60 | meta abierta de V7 (§237.8–§237.12) | anotada |
+| `texturas-bc` (5) | nada se sube en BC1 | **función apagada en ese programa** | anotada |
+| `w10-dos` (2) | faltan las cajas de W10 | **trabajo de E7 sin commit** | anotada |
+
+### 1. `relevo`: la prueba creía que el árbitro estaba apagado
+
+Desde §231 la página prende el árbitro por omisión, en la sala y en `modo=directa` (`mkw.mjs`:
+`parametros.get('arbitro') !== '0'`). La prueba, en cambio, lo daba por **apagado** si no veía `&arbitro=1`. Por eso
+exigía lo del camino viejo: que A y C pausaran a B.
+
+Con el árbitro nadie pausa. La autoridad escribe los botones de B mientras B está trabado. Los números lo confirman: A
+esperó 0 ms y nadie cortó a B.
+
+El arreglo está en `web/navegador/prueba-relevo.mjs`: `ARBITRO = !/[?&]arbitro=0\b/.test(EXTRA)`.
+
+Resultado: **9 bien, 0 mal**. Antes eran 10 puntos y ahora 9, porque la rama del árbitro revisa la traba de 3 s en un
+solo punto.
+
+### 2. `desconexion` / `cuenta-otro`: un error real de la página
+
+**Qué pasaba.** B cierra su pestaña durante la cuenta regresiva. A decide bien cortarlo (`propongo cortar … llego hasta
+el cuadro 247`). Pero después se queda 44 s quieta, con el aviso «su navegador todavía arma la pista».
+
+**Primera pista.** Con `&arbitro=0` el mismo caso pasa (6/0). El problema era del árbitro.
+
+**Cómo se vio.** Se agregó al registro de «espero» qué mandos cubre el registro de la autoridad. Por ejemplo, `cubre 10`
+es el bit de B escrito en binario.
+
+**La causa.** A es la autoridad, y §191 le da esta regla: «si no oigo a **nadie**, la aislada soy yo; me detengo y que
+los demás decidan». En una sala de dos, el único otro es B, y B se había ido. Entonces A se creía aislada y esperaba
+que alguien decidiera por ella. Como no había nadie, A recién se soltaba al vencer el margen de la largada (45 s).
+
+**El arreglo.** Está en `web/navegador/lockstep.mjs`, en `resolver`. Para esa regla ya no cuenta quien tiene su corte
+decidido: dice `!cortes.has(m)` en vez de `!cortadoEn(m, c)`. El corte rige unos cuadros más adelante, pero ya se sabe
+que esa consola se fue.
+
+**Comprobado:**
+- `cuenta-otro`: **6/0**;
+- `prueba-desconexion.mjs` entera: **95/0**;
+- bancos `lockstep` y `relevo`: **59/0**;
+- `prueba-relevo`: 9/0;
+- `herramientas/r4-igual.mjs` (6 escenarios comparados byte a byte contra el `lockstep.mjs` del último commit): **igual
+  en los 6**, con la línea de diagnóstico quitada. Con la línea puesta, lo único que cambia es el texto del registro de
+  las esperas.
+
+`prueba-desconexion.mjs` ahora también acepta `--extra=&…`, como las otras pruebas. Así se comparó con `&arbitro=0`.
+
+### 3. La espera de B en `sincro-*`: viene del árbitro, no de W29
+
+**Qué se mide.** Cuánto espera B, en promedio por cuadro, a que le llegue lo de A. La meta es menos de 4 ms.
+
+**Cómo.** Se intercalaron los dos programas en tres pares, y se agregaron tres corridas sin árbitro. Los datos están en
+`build/web/datos/cierre-241/sincro-*.txt`.
+
+| corrida | web-e6 | web-e6-w29 |
+|---|---|---|
+| 1 | 0,61 ms | 2,76 ms |
+| 2 | 0,33 ms | 0,46 ms |
+| 3 | **5,07 ms** ✗ | **9,25 ms** ✗ |
+| `&arbitro=0` | 0,19 ms | 0,12 y 0,39 ms |
+
+**Qué dice.**
+- Los dos programas fallan a veces.
+- Sin árbitro, la espera es de 10 a 50 veces menor.
+- El 30-10, antes de que el árbitro viniera prendido, estaba entre 0,06 y 0,19 ms.
+
+**Por qué pasa.** Con el árbitro, B (que no es la autoridad) necesita el paquete de A en cada cuadro. Cuando el PC está
+cargado, ese paquete llega tarde.
+
+No se tocó aquí: es una decisión de diseño del árbitro (§191 y §231), y el lockstep de la carrera es trabajo de la
+etapa E. Queda pendiente medirlo y bajarlo.
+
+### 4. `precarga`: quedó en el borde
+
+La prueba pide que, con la precarga, se baje menos de la mitad que sin ella. Dio 40,4 contra 79,9 MB, a 0,45 MB de la
+raya. Repetida dos veces dio 8/0 y 8/0. Es ruido de la medida, no un cambio.
+
+### 5. `sala` y `copa-azar`: el juego se detiene al salir de una sección (la regresión de §203)
+
+**En la sala.** En el descanso A volvió a elegir personaje (M22). Al abrir la carrera 2, el juego de A se detiene con
+este mensaje: «The game stopped because it tried to execute guest address 0x0».
+
+La pila, del llamador al llamado:
+- `GameScene::Reset`
+- `MenuScene::OnExit`
+- `SectionMgr::ExitSection`
+- `Section::Exit`
+- `Pages::BattleStageSelect::__dt`
+- `StageButton::__dt`
+- `PushButton::__dt`
+- `LayoutUIControl::__dt`
+- `MainLayout::__dt`
+- `rr_kamek_8185F920`: el gancho de RR que borra el layout
+- `nw4r::lyt::Layout::__dt`
+- `GroupContainer::__dt+0x74`: aquí hay una llamada virtual por un puntero nulo
+
+En palabras: al borrar los botones de la pantalla de pistas de batalla, uno de los grupos de su layout ya no tiene su
+tabla de funciones. Después la página tira «Maximum call stack size exceeded».
+
+Los demás ✗ de la sala vienen de esto mismo: M22, la parrilla, la carrera 2 y el contador DNF. En la planilla del 06-11
+(`build/web-e6`), la misma prueba se cayó en el mismo punto.
+
+**En la copa al azar.** Se corrió la misma copa a mano: `prueba-sincro --copa --pistas=1.0,40.1,50.3,52.2
+--semilla=2658203969`. La carrera 1 entera fue igual en las dos páginas (266 huellas iguales). Al terminarla, en el
+cuadro 7980, la página B quedó con el hilo tomado para siempre. Es el mismo síntoma que §203 vio en la sala: «la página
+se pierde».
+
+**De dónde viene.** §203 midió que con la línea vieja de WiiCompiled la sala pasa (44/0), y que falla desde la línea del
+motor (v0.9.3/M1). El código de la página es el mismo en las dos.
+
+**Arreglado en §248:** no era el motor, era G1 (un puntero colgante a la lista de `ClipInfo` de la carrera).
+
+**No se arregló aquí.** El problema está en el motor (lo traducido o el runtime). Ese código es de la sesión del motor y
+de W10, y esta sesión no lo toca. El diagnóstico de arriba es el punto de partida.
+
+### 6. `sala-doce`: la meta de V7, que sigue abierta
+
+El tercer juego hace de teléfono de gama media simulado y no llega a 60 cuadros por segundo: dio 14 de lógica. La
+escalera de §245 explica por qué: en la gama media frena la CPU, que da 34 cuadros/s aun sin la sala. Es la misma
+conclusión de §237.8–§237.12. No es una falla nueva ni viene de W29.
+
+### 7. `texturas-bc`: la función no está en ese programa
+
+G6 (§190) vive solo en `terceros/Wiicompiled/aurora-main`. El programa final se arma con
+`terceros/aurora-main-viejo-motor`, que no la trae. La prueba: `_mkw_web_texturas_bc` aparece 0 veces en el `mkw.js` de
+`build/web-e6` y de `build/web-e6-w29`, y 1 vez en el de `build/web-g6`.
+
+Por eso, con `?texturasBc=1` no pasa nada, como se esperaba. La función es opcional y quedó apagada (§190).
+
+### 8. `w10-dos`: trabajo de otra sesión
+
+Es la prueba de W10 parte B (E7). Necesita su propio programa y archivos que todavía no tienen commit:
+`w10_nativo.cpp`, `w10-dos.mjs` y `trabajador-juego.mjs`. No se tocaron.
+
+### Qué significa
+
+El programa final `build/web-e6-w29` no trae fallas nuevas. Todo lo que falló cae en uno de estos casos:
+- ya fallaba con `build/web-e6`;
+- es intermitente;
+- es una función apagada en ese programa;
+- es trabajo de otra sesión.
+
+Se arreglaron dos cosas nuestras:
+- la prueba de relevo;
+- un error real del árbitro: la sala de dos quedaba 44 s quieta si el otro cerraba durante la cuenta.
+
+Lo grave que sigue abierto es la caída al salir de una sección: en la sala al volver a elegir, y a veces en la copa.
+**Conviene arreglarla antes de abrir las salas**, porque pasa en el uso normal.
+
+### Trampas
+
+1. El banco `relevo` entero con `?arbitro=1` da 39/20, porque sus expectativas son del camino sin árbitro. Del árbitro
+   es solo el caso 22. No sirve como prueba del árbitro.
+2. `prueba-desconexion.mjs` pisa sus registros (`build/web/datos/desconexion/<caso>-<letra>.txt`) en cada corrida. Hay
+   que copiarlos antes de correr otra variante.
+3. `copas-al-azar.mjs` guarda lo que escribe cada copa recién al terminar. Si una copa se cuelga, la planilla queda sin
+   nada. Para verla hay que correr `prueba-sincro --copa` a mano, con la salida a un archivo.
+
+
+## §247 — W10 parte B: **descartada** (el par es 3,5 veces más lento en la gama baja) · 2026-11-08 20:40
+
+### Qué es W10 y qué se quería
+
+W10 reparte el juego en dos copias, cada una en su propio núcleo (Worker):
+- **A** corre la carrera (la lógica) y no dibuja;
+- **B** solo dibuja.
+
+Al final de cada cuadro, A le manda a B una «caja» con lo que cambió en la memoria de la Wii. La idea era que, en un
+teléfono, el trabajo del dibujo saliera del núcleo de la lógica y la carrera llegara a 60.
+
+### Lo que se arregló (sigue de §240)
+
+1. **Las marcas de diagnóstico van apagadas por omisión** (`?w10Traza=N`). Con ellas prendidas, la página de prueba se
+   cerraba a los ~80 s por la cantidad de mensajes a la consola.
+2. **La foto del modo de comprobar sale igual** (A dibuja y además manda la caja): 0,000 % distintos en el cuadro 900 y en
+   el 1500. Queda una falla intermitente: a veces B dibuja sin el HUD (tiempo, vuelta, nombres). La causa es una
+   **escritura que «se consume»** (ver el Glosario): una marca que la lógica de A pone y el dibujo de B apaga, y que A no
+   vuelve a mandar porque en A no cambió.
+3. **Deshacer lo que escribe el dibujo de B** (`?w10Deshacer=`):
+   - 1 = solo el dibujo de los efectos (lo de §240, el arreglo de la traba del cuadro 263);
+   - 2 = el dibujo entero, pero solo las palabras que A mandó alguna vez desde que B entró a su bucle (un bit por cada
+     4 bytes, `g_bitsA`);
+   - 3 = el dibujo entero, por páginas enteras. **Se cae**: el dibujo arma una sola vez objetos que guarda para siempre
+     (el de `EGG::GlobalScreenCapture`), y deshacerlo deja un puntero en cero.
+
+   Además, la sombra de B ahora empieza con la memoria de B; antes empezaba en ceros.
+4. **El caso real tiene su propia foto** (`prueba-w10-dos.mjs --real`).
+   - **Qué compara:** la foto de B en el par (A sin dibujar) contra la de una corrida normal (solo A, `?soloA=1`) en el
+     mismo cuadro, con `?reloj=fijo` (la misma carrera).
+   - **Qué sale:** la corrida normal se repite exacta (el mismo tiempo en pantalla). **B sale con el HUD bien y la
+     escena 3D en negro a ratos.** Arma la mitad de las listas de dibujo de un cuadro normal: ~660 contra ~1.300 por
+     cuadro, contadas con `_mkw_w10_cuenta`. Pasados ~2.600 cuadros se cae por desborde de pila.
+   - **Lo que se probó y no era:**
+     - el cambio de raíz de la escena que A hace sin dibujar (ahora A no lo manda: `absorberDibujo` después de
+       SwitchScnRoot);
+     - el recorte por la cámara (con `?recorteDibujo=0` sale igual de negra);
+     - el «dibujo terminado» de la raíz (A ahora corre `ScnMgr::DoneDraw`, 0x80562520; `?w10Hecho=0` = sin eso).
+   - **La comparación de memoria** página por página (`--huellas-mem`) da 2.675 páginas distintas. Son demasiadas para
+     leerlas así, porque la corrida normal también guarda lo que escribe su propio dibujo.
+   - **La causa quedó sin encontrar.** Con la medición de abajo ya no hace falta.
+
+### La medición que decide
+
+El tramo fijo §163 (12 CPU, semilla fija, sin tope, cuadros 600–2400) en `w10-dos.html`, con dos vueltas intercaladas y el
+candado (`bash herramientas/tanda-w10-medir.sh 2`). Se compara:
+- **base** = solo A, el juego de siempre en un Worker (`build/web-w19`);
+- **par** = A sin dibujar (modo 9) y B dibujando (`build/web-w10d`).
+
+| Aparato | Base (cuadros de lógica/s) | Par | Cambio | Trabajo de A por cuadro |
+|---|---|---|---|---|
+| Gama baja (lastre 3,5, límites) | 48,8 · 52,9 | 13,7 · 15,4 | **−71 %** | 5,6 → 19,6 ms |
+| «Oppo» (lastre 1,7, límites) | 99,0 · 104,4 | 59,9 · 59,9 | −41 % | 5,8 → 9,6 ms |
+| Este PC | 153,9 · 147,6 | 60,0 · 60,0 | −60 % | 6,5 → 16,7 ms |
+
+Qué significa:
+- **El par es más lento en todos los aparatos, y por mucho.** Además es el caso más optimista posible para W10: B dibuja
+  a medias (la mitad de las listas), así que con el dibujo completo sería todavía peor.
+- **La causa es lo que A tiene que hacer para que B sepa qué cambió:**
+  - marcar cada escritura en la memoria (la marca de páginas);
+  - comparar lo marcado contra la sombra;
+  - armar la caja.
+
+  En la gama baja eso triplica el trabajo de A por cuadro (5,6 → 19,6 ms), más de lo que se ahorra al no dibujar.
+  Además, A espera a B: 33–37 s de espera en la gama baja.
+- **En el PC y en el «Oppo» el par queda clavado en 60.** B presenta al ritmo del monitor y A lo espera: es el tope del
+  diseño del par. Pero aun sin ese tope, A trabaja más por cuadro que la base.
+- **¿El dibujo va parejo con tope?** (la lección del dueño, 2026-11-08):
+  - con el par, no: en la gama baja la lógica ni siquiera llega a 20;
+  - con la base, la gama baja da ~51 cuadros de lógica/s sin tope. Ahí el tope parejo que conviene es N8 a 30 (ya
+    hecho, §219), no W10.
+
+### Decisión
+
+**W10 queda descartada; no se adopta.** Por la regla de los pares, 2 pares bastan si el cambio es de −2 % o peor, y en la
+gama baja los dos dan −71 %.
+
+El código queda como instrumento:
+- todo apagado por omisión;
+- solo en el programa de `MKW_W10_COMPILAR=1` (`w10_nativo.cpp`, `w10.mjs`, `w10-dos.html`).
+
+En el programa de jugar no cambia nada.
+
+### Comandos
+
+- La foto del caso real: `MKW_BUILD=build/web-w10d/navegador node web/navegador/prueba-w10-dos.mjs --real --alto 900,1500
+  --ventana [--huellas-mem] [--extra "&w10Deshacer=1|2"]`.
+- La medición: `bash herramientas/tanda-w10-medir.sh [vueltas]` → `build/web/datos/w10/medir-<aparato>-<base|par>-<n>.txt`.
+  La base con `prueba-w10-dos.mjs --solo-medir --solo-a`.
+- El diagnóstico, fuera de git en `build/`: `node build/depurar-w10e.mjs "&…"` (`FOTOS=1` = 8 fotos de B cada 10 s).
+
+### Trampas
+
+1. **El modo de comprobar (10) no sirve para probar el deshacer.**
+   - La caja de A lleva solo lo de su lógica, pero la memoria de A tiene también lo de su dibujo.
+   - Entonces B arma listas de efectos que no calzan y queda dando vueltas en una lista cerrada en círculo.
+   - El deshacer solo tiene sentido con A sin dibujar (modo 9).
+2. **En la copia del motor, `gx_copy.cpp` cuenta las listas de dibujo y los `GXBegin`** (`g_mkwW10Cuenta`, solo con
+   `MKW_SUCIAS`). Ese cambio va en `parches/motor-w10.diff`.
+3. **Una función de `w10_nativo.cpp` no compila si usa variables declaradas más abajo en el archivo** (pasó con
+   `g_deshacerEfectos`). La solución es llamarlas por una función declarada arriba.
+
+### Qué queda para el Oppo
+
+Nada de W10: no se adopta.
+
+## §248 — La caída al salir de la pantalla de personajes (M22) y el cuelgue de la copa: era G1, no el motor · 2026-11-08 22:30
+
+### El problema (§203 y §246.5)
+
+En la sala, si A volvía a elegir personaje en el descanso (M22), al abrir la carrera 2 su juego se detenía con «tried
+to execute guest address 0x0». La pila terminaba en el destructor de un layout de los botones de la pantalla de pistas
+de batalla (`Section::Exit` de la sección 0x49 → `BattleStageSelect::__dt` → … → `nw4r::lyt::Layout::__dt` →
+`GroupContainer::__dt`), con una llamada por un puntero nulo. En la copa al azar, la página B se quedaba trabada para
+siempre en el cuadro 7980, al pasar a la carrera 2. §203 había visto que «la línea vieja de WiiCompiled pasa y la del
+motor no».
+
+### Cómo se encontró
+
+1. **El volcado en el momento de la caída** (`MKW_VOLCAR_CAIDA=1` en `prueba-sala.mjs`): cuando el juego escribe
+   «Guest refs:», la prueba lee la memoria alrededor de los registros. En dos corridas la caída fue en dos lugares
+   distintos del mismo destructor, pero **en las mismas direcciones** (el `GroupContainer` siempre en 0x811630C8). Eso
+   dice que no es azar: alguien pisa siempre la misma zona del montón.
+2. **El punto de vigilancia** (glosario): un programa aparte con `-DMKW_VIGIA` sobre la misma línea del final
+   (`MKW_DEPURAR_LS=1 MKW_CFLAGS_EXTRA=-DMKW_VIGIA … --carpeta build/web-vigia-caida`, sin `--fija` para que ninguna
+   escritura se salte la trampa) y `MKW_VIGIA_DIR=0x811630B8,0x148` en `prueba-sala.mjs`: al abrir de nuevo la pantalla
+   de personajes se vigila esa zona y cada escritura sale al registro con su pila.
+3. **El culpable**: cada cuadro, en los menús, escribía ahí `func_80564D60`, que es **nuestra envoltura de
+   `ScnMgr::DrawMain`** (G1, §179.1, `web/juego/lockstep_nativo.cpp`). Escribía un byte y una palabra cada 0x24 bytes:
+   el tamaño de un `ClipInfo`.
+
+### Por qué pasaba
+
+G1 hace que el dibujo use lo que de verdad ve mi cámara, mientras la lógica sigue con «todo a la vista». Para eso, el
+gancho de `ClipInfoMgr::Update` guarda **la dirección** de la lista de `ClipInfo` de la carrera, y `DrawMain` (y las dos
+funciones de los modelos) le escriben las marcas antes de dibujar y las borran después.
+
+Al terminar la carrera, el juego destruye el `ClipInfoMgr` y su lista vuelve al montón. Pero la dirección seguía
+guardada en el gancho, y `DrawMain` también corre en los menús: seguía escribiendo marcas en esa memoria liberada. En
+la pantalla de personajes del descanso, esa memoria ya era de los layouts de los botones; al salir de la sección, su
+destructor leía basura y saltaba a la dirección 0. En la copa, lo pisado era otra cosa, y B se colgaba.
+
+Es un **puntero colgante** (glosario): como una etiqueta de un circuito que se retiró del tablero, pegada en el borne
+donde ahora se conectó otro equipo; el que maniobra según la etiqueta opera el equipo equivocado.
+
+**Por qué parecía «del motor».** El programa viejo que pasa (`build/web/navegador`, 31-10 09:58) es de antes de G1. El
+primero que falla (`build/web-m1`, 31-10 13:07) ya traía su primera parte: exporta `_mkw_recortes_dibujo` (las dos
+funciones de los modelos, que también escribían en la lista vieja), y el viejo no. La línea del motor coincidió en el
+tiempo, pero no tenía nada que ver.
+
+### El arreglo
+
+`clipVigente()` en `lockstep_nativo.cpp`: la lista guardada vale solo si el `ClipInfoMgr` que la armó sigue vivo. Se
+mira su puntero único del juego (`ClipInfoMgr::sInstance`, 0x809C2EF8; `DestroyInstance`, 0x80787538, lo pone en 0) y
+que tenga la misma lista (+0x10) y la misma cantidad (+0x18). Si no, se olvida la lista y no se toca nada. Lo usan
+`DrawMain` y las dos funciones de los modelos. La carrera no cambia: dentro de la carrera la lista es siempre la del
+`ClipInfoMgr` vivo.
+
+```bash
+bash herramientas/tanda-248.sh compilar sala copa g1   # el final con el arreglo → build/web-e6-w29-clip, y las tres pruebas
+```
+
+`compilar` = `--final --modo navegador --memoria-fija 768` con la línea H6, los objetos y el perfil PGO de
+`build/web-e6` (como §241), las semillas de `web-e6`.
+
+### Resultado (`build/web/datos/caida-248/`)
+
+| prueba | antes (`web-e6-w29`) | con el arreglo (`web-e6-w29-clip`) |
+|---|---|---|
+| `prueba-sala.mjs` entera (sin `--rapida`) | M22, la parrilla, la carrera 2 y el VR mal; A se cae | **46 bien, 0 mal** |
+| `prueba-sincro --copa --pistas=1.0,40.1,50.3,52.2 --semilla=2658203969` | B trabada en el cuadro 7980 | **4 bien, 0 mal**: las dos pasan a la carrera 2, 298 huellas iguales |
+| `prueba-sincro --directa` (G1 sigue andando) | — | **14 bien, 0 mal**: 1.344.952 recortes y 2.303 dibujos enteros con las marcas de verdad; 73 huellas iguales |
+
+La copa de `prueba-sincro --copa` mide las carreras 1 y 2 (así está hecha la prueba); pasó el punto donde se colgaba.
+
+### Qué queda
+
+- El programa para publicar sigue siendo `build/web-e6-w29` en la lista; `build/web-e6-w29-clip` es el mismo con el
+  arreglo. Reemplazarlo antes de subir (lo sube el dueño): `bash herramientas/tanda-248.sh compilar` con `CLIP_BUILD`
+  apuntando a donde se quiera.
+- `prueba-sala.mjs` guarda las dos herramientas de depuración: `MKW_VOLCAR_CAIDA=1` (la memoria al caerse) y
+  `MKW_VIGIA_DIR=desde,tam` (solo con un programa de `-DMKW_VIGIA`).
+
+### Trampas
+
+1. «La línea vieja pasa y la nueva no» no prueba que sea la línea: hay que mirar **qué más** cambió entre los dos
+   programas. Aquí bastó buscar en `mkw.js` las funciones exportadas de cada uno.
+2. El punto de vigilancia no ve las escrituras de la ventana fija de H6 (`MKW_MOTOR_FIJA_RAM`): el programa de
+   vigilancia va sin `--fija`. Tampoco ve lo que escribe código nativo directo (THP, disco).
+3. Sin `MKW_DEPURAR_LS=1`, un programa con `-DMKW_VIGIA` no enlaza (falta `depurar_lockstep.cpp`, donde vive
+   `g_mkwVigiaTam`).
+4. Guardar una dirección del montón del juego en un gancho exige saber cuándo muere ese objeto. La forma segura es
+   mirar el puntero único del juego (`sInstance`), no confiar en que «la carrera sigue».
+
+
+## §248 — W26: la memoria durante horas — **el conjunto acotado, prendido en el teléfono** · 2026-11-08 23:10
+
+### Qué es y por qué
+
+Cada material del juego necesita en la tarjeta de video una «receta» compilada (pipeline) y su sombreador. Aurora las
+arma la primera vez que se usan y nunca las suelta. Con cada pista nueva, la memoria del proceso de la tarjeta crece:
++1,1 GB en 8 pistas (W8, §203). En una sesión larga de sala eso puede cerrar la pestaña, sobre todo en un teléfono.
+W8 ya había dejado `?soltarPipelines=2` (soltar lo de las otras pistas y vaciar los sombreadores), pero apagado: después
+hay que volver a prepararlo, y mientras tanto el juego se salta dibujos.
+
+### 1. La prueba barata: ¿cuántos textos WGSL distintos? (la idea de Codex)
+
+Aurora ahora cuenta, cada vez que arma un sombreador:
+- cuántas veces lo arma;
+- cuántos **textos WGSL** distintos salen (`mkw_web_wgsl`, `mkwEstado.wgsl()`).
+
+Con `?wgslCompartido=1`, un texto ya compilado devuelve el mismo módulo.
+
+8 pistas en una pestaña (`bash herramientas/tanda-w26.sh censo`): **808 sombreadores armados salen de 712 textos
+distintos**. Compartir ahorraría como mucho un 12 %. Medido (`memoria`): la tarjeta sube +1.140 MB con el módulo
+compartido y +1.112 MB sin él, o sea igual. **No sirve**; queda apagado.
+
+### 2. Dónde se va la memoria
+
+| Variante (8 pistas, perfil nuevo) | Tarjeta: 1.ª pista → 8.ª | Dibujos saltados (suma) |
+|---|---|---|
+| Base (todo guardado) | 955 → 2.063 MB | 6.800–7.200 |
+| Soltar solo los pipelines (`=1`) | 938 → 2.092 MB | 8.800–9.400 |
+| Soltar pipelines y todos los sombreadores (`=2`) | 928 → 837 MB (plana) | 10.000–11.500 |
+| Soltar los sombreadores de lo soltado (`=3`, nuevo) | 941 → 1.488–1.671 MB | 9.700–10.300 |
+
+Qué significa:
+- **La memoria está en los sombreadores compilados, no en los pipelines**: soltar solo los pipelines no baja nada.
+- El modo 3 (soltar solo los sombreadores que ningún pipeline que se queda usa) baja a la mitad en 8 pistas, pero en
+  16 carreras sigue subiendo (2.042 MB al final): **no acota**.
+- Soltar siempre (2) cuesta dibujos saltados. En un perfil nuevo, cada pipeline parece «de su pista» hasta que se ve
+  en dos, así que se sueltan cosas que la pista siguiente vuelve a necesitar.
+
+### 3. El arreglo: el conjunto acotado (guardar las últimas K pistas)
+
+`?pistasGuardadas=K` (aurora `mkw_web_pipelines_guardar`): al entrar a una pista, se sueltan solo los pipelines de las
+pistas que **no** están entre las últimas K (la de ahora incluida). Con el modo 2, también se vacían los sombreadores.
+
+Medido con dos copas de 4, cada una corrida dos veces (A B C D A B C D, E F G H E F G H: 16 carreras en una pestaña):
+
+| Variante | Saltados al repetir la copa (5.ª–8.ª / 13.ª–16.ª) | 1.ª carrera de la copa nueva | Tarjeta |
+|---|---|---|---|
+| Base | 715 / 257 | 452 | 969 → 2.338 MB, sigue subiendo |
+| Soltar todo (2) | 2.426 / 727 | 127 | ~800–1.070 MB |
+| **Conjunto acotado (2 + últimas 4)** | **516 / 431** | 2.282 | pico 1.810 MB, después ~850–950 MB |
+
+Qué significa:
+- **Repetir una copa no vuelve a preparar nada** (saltados como la base, dentro del ruido).
+- **La memoria tiene tope**: el pico es de unas 4 pistas.
+- El costo es la primera carrera después de cambiar de copa (2.282 saltados en un perfil nuevo): se rearman los
+  sombreadores que se vaciaron. En un perfil con su lista de pipelines guardada y la semilla, eso es menos.
+- La meta «una hora con la memoria plana y 0 dibujos saltados» no se alcanza: **la base misma salta dibujos** en cada
+  pista nueva con un perfil nuevo (los pipelines todavía no están listos). Eso es de C2/C3, no de W26.
+
+### Decisión
+
+- **En el teléfono, el conjunto acotado va prendido por omisión** (`?soltarPipelines=2` y las últimas 4 pistas),
+  porque ahí el riesgo de memoria es real y una copa entera no paga nada.
+- **En el PC sigue como antes** (todo guardado): sobra memoria y no conviene el costo al cambiar de copa.
+- `?soltarPipelines=0|1|2|3` y `?pistasGuardadas=K` mandan sobre lo de omisión. `mkwEstado.pipelinesAcotado` dice si
+  quedó prendido.
+- Lo que no rindió queda apagado: el módulo compartido (`?wgslCompartido=1`) y el modo 3.
+
+### Igualdad
+
+- La sala con dos programas (`build/web-w19` contra `build/web-w26`): huellas 75/75 (14/14 en la segunda corrida; la primera tuvo una espera de 5 ms, de tiempo).
+- El fantasma igual cuadro por cuadro (`prueba-fantasma-igual`, w19 contra w26): 6/6, 2.112 cuadros iguales.
+- El teléfono emulado con el juego (`prueba-tactil`, Pixel 7: el camino que ahora prende el conjunto acotado): 14/14.
+- Bancos `interruptores-e0` 24/24, `lista-pipelines` 10/10, `pipelines` 19/19.
+- No toca la lógica: solo cuándo aurora suelta recetas de la tarjeta.
+
+### Comandos
+
+- `bash herramientas/tanda-w26.sh compilar censo memoria acotado copa guardar` (`build/web-w26`) →
+  `build/web/datos/memoria-pistas/w26-<fase>-<variante>.txt`.
+- Aurora: `parches/aurora-w26.diff`, que va sobre `parches/aurora-e0.diff`.
+
+### Trampas
+
+1. `medir-memoria-pistas` abre siempre un perfil nuevo: todos los números de dibujos saltados son de primera visita.
+2. Si la compilación falla, la página sigue andando con el programa viejo y un modo desconocido (`=3`) se toma como 1.
+   `tanda-w26.sh` ahora para si no compila.
+3. Otra vez la trampa de las plantillas: un `\n` dentro de un `printf` de C++ escrito desde un script de Python se
+   vuelve un salto de línea de verdad y no compila.
+
+### Qué queda para el Oppo
+
+Una copa larga en el teléfono real (16 carreras), mirando que la pestaña no se cierre y cuánto tarda la primera carrera
+de cada copa nueva. El informe de rendimiento dice si el conjunto acotado quedó prendido (`pipelinesAcotado`).
+
+
+## §249 — V8: el lado CPU del dibujo, repartido — **ninguna pieza da los 3,3 ms; W27 y W28 descartados** · 2026-11-08 23:20
+
+### Qué se quería saber
+
+En la gama baja el dibujo cuesta ~10 ms de CPU por imagen. La meta de V8 era encontrar dónde bajar 3,3 ms de un
+cuadro de 20 ms y, con eso, decidir si W27 (rehacer la preparación de cada imagen) y W28 (traducir subsistemas enteros
+a mano) tienen dónde ganar.
+
+### Cómo se midió
+
+`bash herramientas/tanda-v8.sh build/web-w26`:
+- un perfil de CPU de la carrera en el tramo fijo §163, con la revisión de límites de Android, en este PC;
+- repartido con la herramienta nueva `node herramientas/reparto-dibujo.mjs <perfil>`, que separa la lógica
+  (`EGG::SceneManager::calc`) del dibujo (`SceneManager::draw` y la copia a la pantalla) y agrupa el dibujo por partes.
+
+El perfil con el lastre de la gama baja no sirve para repartir: el giro del lastre (`emscripten_get_now`) se mete en
+todas partes. Como el lastre estira todo el hilo por igual, las proporciones del PC valen para la gama baja.
+
+### Lo medido (este PC; la gama baja ≈ ×3,5)
+
+El dibujo es el 23 % de la CPU ocupada: ~2,8 ms por imagen en este PC, ~9,7 ms en la gama baja.
+
+| Parte del dibujo | % del dibujo | ms por imagen en la gama baja |
+|---|---|---|
+| El código de dibujo del juego (traducido) | 38 % | ~3,7 |
+| aurora: convertir el estado de GX, constantes y vértices | 18 % | ~1,8 |
+| WebGPU y el pegamento de JavaScript | 9 % | ~0,9 |
+| Ayudantes del traductor (llamadas, semántica de PowerPC) | 9 % | ~0,8 |
+| Otro | 8 % | ~0,8 |
+| El runtime de GX: listas de dibujo | 6 % | ~0,6 |
+| El runtime de GX: lo demás | 5 % | ~0,4 |
+| aurora: buscar recetas (pipelines) | 3,5 % | ~0,3 |
+| aurora: texturas | 2 % | ~0,2 |
+
+Tiempo incluido, todo lo que cuelga de cada cosa:
+- **Las listas de dibujo** (lo que preguntaba Codex: volver a interpretarlas cada cuadro): 21 % del dibujo, ~2 ms en
+  la gama baja.
+- **El atajo de la última configuración** (`resolve_pipeline_state` y su huella XXH3): ~3 %, ~0,3 ms.
+- **Los efectos** (nw4r::ef): 12 %, ~1,2 ms.
+- **Presentar** (la copia a la pantalla): 13 %, ~1,3 ms.
+
+### Qué significa
+
+- **Ninguna pieza sola da los 3,3 ms.** La más grande que no es del juego, las listas de dibujo (~2 ms), ya tiene techo
+  medido: esconder todos los modelos (cuyas listas entonces no se leen) ahorró solo 0,6–0,7 ms (§222).
+- **El atajo de aurora casi no pesa** (~0,3 ms): arreglar cuándo falla no puede dar más que eso.
+- **Lo que no es del juego** (aurora, el runtime de GX y WebGPU) suma ~44 % del dibujo, ~4 ms. Para bajar 3,3 ms de
+  ahí habría que quitar tres cuartos de todo eso: es justo W27 entero.
+- **El código de dibujo del juego** (38 %) solo lo tocaría W28.
+- Los vértices (`ApplyAuroraVtxAttrFmt`, `GXSetVtxDesc`, el armado de cada dibujo) pesan poco y la tarjeta no frena:
+  **G14 (modelos low poly) no tiene dónde ganar.**
+- En la gama baja, N8 (§219) ya dibuja una imagen de cada dos: el costo del dibujo por cuadro de lógica ya está a la
+  mitad.
+
+### Decisiones
+
+- **V8 queda hecho**: está medido el reparto, que era el ítem.
+- **W27 (rehacer la preparación de cada imagen) queda descartado.** Su techo es ~4 ms por imagen en la gama baja,
+  ~2 ms por cuadro de lógica con N8, y eso solo si se quitara casi todo. Además son meses de trabajo, y W22 (§224) ya
+  mostró que las llamadas finales a WebGPU no dejan margen.
+- **W28 (traducir subsistemas enteros a mano) queda descartado.** Tocaría el 38 % del dibujo y la lógica, pero las
+  pruebas parecidas no ganaron (N14, W2, M8, la FMA), son muchos meses y exige resultados iguales bit a bit.
+- **G14 queda descartado**: los vértices no pesan.
+- **G11–G13 siguen**, como opciones del jugador para un aparato que frene por la tarjeta (el dueño lo pidió).
+
+### Comandos
+
+- `bash herramientas/tanda-v8.sh [programa]` → `build/web/datos/medir-sitio/v8-<pc|baja>-*.cpuprofile` y
+  `-reparto-dibujo.json` (con nombres del juego: nunca a git).
+- `node herramientas/reparto-dibujo.mjs <archivo.cpuprofile> [--top 40]` sirve con cualquier perfil de `medir-sitio --perfilar`.
+
+### Trampas
+
+1. **Un perfil con lastre no se puede repartir**: el giro del lastre aparece como `emscripten_get_now` y `now`.
+2. **El tramo sin tope se salta dibujos** (65 imágenes por 142 cuadros de lógica en este PC): el costo del dibujo hay
+   que contarlo por imagen, no por cuadro.
+3. **Un perfil de `?w10=1` no tiene dibujo** (el modo «techo»): `reparto-dibujo` da 1,5 % de dibujo. No es un error de
+   la herramienta.
+
+### Qué queda para el Oppo
+
+Nada nuevo de V8. El informe del teléfono ya trae `ultimos10s.cpuPuraMs` y la tarjeta por pasada (§173).
+
+---
+
+## §250 — La largada pareja: en la sala todas largan en el mismo cuadro y a la vez · 2026-11-09 05:00
+
+**Qué vio el dueño.** En la sala en línea, con dos jugadores, uno en un PC con muchísimo lag y otro en un PC sano, uno
+largaba antes que el otro y después «todo terminaba desincronizado».
+
+**Resumen corto.** El juego de las dos consolas era siempre el mismo: el «¡YA!» caía en el mismo **cuadro de lógica**, el
+412, y las huellas coincidían. Pero la **hora** del «¡YA!» no coincidía: hasta 1 s de diferencia con el lag y 4,3 s si
+una se trababa al cargar la pista. La consola sana corría la cuenta regresiva sin esperar a la lenta. Dos piezas lo
+permitían:
+1. **el árbitro** (§191, prendido por omisión desde §231): la autoridad escribe los botones de todos, e inventa los de
+   quien no llegó a tiempo;
+2. **el relevo rápido** (§99 C1): a quien se calla 150 ms se lo pausa y se le calcula el botón.
+
+Eso está bien en la carrera: nadie frena a nadie. En la cuenta regresiva es injusto, porque la consola trabada larga
+segundos más tarde que la otra.
+
+**El arreglo.** Desde el comienzo de la carrera hasta el «¡YA!», nadie corre sin los botones de verdad de todos:
+- la autoridad no inventa los de nadie, ni con el árbitro ni con el relevo;
+- a quien se calla no se lo pausa: se lo espera con el margen de la largada de §93 (15 s, o 45 s si la pestaña sigue
+  contestando).
+
+Lo llamo la **barrera de la largada**. Después del «¡YA!», todo sigue igual que antes: el árbitro y el relevo vuelven a
+funcionar y un lento no frena a los demás. La lógica sigue siempre a 60 y nadie sale de la carrera.
+
+Comparación eléctrica: es como el **sincronismo antes de cerrar el interruptor** entre dos generadores. Antes de conectar
+se espera a que los dos estén en fase (la barrera). Una vez en paralelo, cada uno sigue con su regulación (el árbitro).
+
+### Cómo se encontró
+
+- **El instrumento.** `lockstep.mjs` anota en cada consola la largada de cada carrera (`estado().largadas`):
+  - el cuadro y la hora (la de la sala, `performance.timeOrigin + ahora()`) del cuadro 0;
+  - el cuadro y la hora de la cuenta (etapa 1 de Raceinfo +0x28);
+  - el cuadro y la hora del «¡YA!» (etapa 2).
+
+  Lo lee `web/navegador/largada-pareja.mjs` (`compararLargadas`). Pasa si los cuadros son iguales y las horas del
+  «¡YA!» difieren en menos de un tope (200 ms; 250 en relevo y 400 con la red de 600 ms). En el registro sale la línea
+  `[lockstep] largada: cuadro 0 a las …, cuenta en el 172, carrera en el 412 a las …`.
+- **Las pruebas que lo miran:** prueba-sincro (las dos de la carrera; en la copa, la carrera 1 y la 2), prueba-relevo
+  (3 pestañas) y prueba-doce (4). Cada una tiene el punto «§250: … largan en el mismo cuadro de lógica y a la vez» y
+  guarda `largada.json`.
+- **El camino viejo:** `?largadaPareja=0` en la página, y `MKW_ARBITRO_LARGADA_PAREJA=0` para el servidor de Oracle.
+
+### Lo medido con el juego
+
+Programa `build/web-e6-w29-clip/navegador`. Tandas `bash herramientas/tanda-250.sh antes` y `… despues`, registros en
+`build/web/datos/largada-250/`. La tabla da la diferencia de hora del «¡YA!» entre las consolas; el cuadro fue el 412
+en todas, siempre:
+
+| Caso | Antes | Después |
+|---|---|---|
+| El del dueño: B con lag `redMala=300,100,10,ida` y lenta, árbitro prendido | **738–988 ms** ✗ | **49–84 ms** ✓ |
+| El mismo, `&arbitro=0` | 485 ms ✗ | 106 ms ✓ |
+| Lag peor `600,200,20,ida` y lenta, árbitro prendido | 1.067 ms ✗ | 289–363 ms (tope 400) ✓ |
+| A trabada 6 s al cargar (`--traba-largada=6000`) | **4.256 ms** ✗ | **47 ms** ✓ |
+| La misma, `&arbitro=0` | 4.293 ms ✗ | 77 ms ✓ |
+| La misma con el servidor de Oracle | 4.712 ms ✗ | 56 ms ✓ |
+| Normal (host), Cloudflare, Oracle, Oracle sin configurar, red mala 70 ms | 92–99 ms ✓ | 5–99 ms ✓ |
+| prueba-relevo (3 pestañas, C con red mala) | — | 15 ms (con árbitro) / 18 ms (sin árbitro) ✓ |
+| prueba-doce, 4 pestañas | — | 51 ms ✓ |
+| La copa: carrera 1 / carrera 2 | — | 41 / 11 ms ✓ |
+| prueba-sala `--rapida` | — | 44/44 ✓ |
+
+Las huellas coincidieron en todos los casos con el árbitro prendido (lo que trae la sala). El precio del arreglo es que,
+en la cuenta, la consola sana espera a la del lag: en el caso del dueño A espera 3,6 ms por cuadro en promedio, casi
+todo en esos 7 s. Después del «¡YA!» ya no la espera.
+
+### Los cambios
+
+- **`web/navegador/lockstep.mjs`.** Opciones nuevas:
+  - `largadaPareja` (`?largadaPareja=0` = como antes);
+  - `cuadrosBarrera`: sin `enCuenta`, los primeros N cuadros; por omisión 0;
+  - `etapa`: para anotar la largada;
+  - `alYa`: el aviso del «¡YA!».
+
+  En cada cuadro, `barreraAhora = largadaPareja && cuadro < cuadrosLargada && enCuenta()`. Con la barrera,
+  `registroPara` no escribe a nadie y `revisar` no pausa a nadie. Lo ya escrito no cambia: cada cuadro se escribe una
+  sola vez, y por eso todas las consolas ven lo mismo.
+- **`web/navegador/mkw.mjs`.** Agrega `etapa` (Raceinfo +0x28) y `alYa`, que se lo avisa al servidor de Oracle.
+- **`herramientas/arbitro/servidor.mjs` y `web/navegador/arbitro-servidor.mjs`.**
+  - El servidor no lee el juego, así que no sabe cuándo es el «¡YA!»: se lo dice la primera página que llega a él con
+    `{t:'ya', n, c}`.
+  - Hasta ese aviso, y como mucho los primeros 600 cuadros, no inventa a nadie (`enCuenta: () => !yaVisto`).
+  - Una página vieja que no avisa deja la barrera los 600 cuadros.
+- **Las pruebas:**
+  - **banco `relevo`, caso 23.** Beto se congela 1 s en la cuenta (cuadros 149 y 299; el «¡YA!» en el 200), con y sin
+    árbitro, antes y después. Antes la diferencia del «¡YA!» era de 430–600 ms; después, 54–55 ms, sin pausas ni
+    cortes en la cuenta.
+  - **Las expectativas del árbitro en el banco `relevo`** (con `?arbitro=1` daba 39/20), reescritas caso por caso.
+    `soltarViejas()` apaga el lockstep de las salas de los casos anteriores, que con el árbitro seguían mandando pings.
+  - **banco `arbitro-servidor`, caso 6.** Carla se traba 1,5 s en la cuenta; el servidor la espera y las tres largan
+    con 45 ms de diferencia. El caso 5 de siempre, la traba después de largar, sigue sin esperar a nadie.
+  - **prueba-sincro.** El punto del lento con el árbitro miraba `&arbitro=1` y quedó viejo con §231: ahora vale salvo
+    `&arbitro=0`.
+  - **Con la traba en la largada.** El punto §99 C1 decía «B no la esperó»; con el arreglo, B **sí** la espera y lo
+    avisa.
+
+**Bancos:** lockstep 60/60, relevo 65/65 (y 65/65 con `?arbitro=1`), red 38/38, sala-carrera 101/101,
+arbitro-servidor 25/25.
+
+### Lo que queda y las trampas
+
+- **Con la red de 600 ms ±200 y 20 % de pérdida y `&arbitro=0`, la sala se parte justo después del «¡YA!»** (cuadro
+  420). B deja de oír a A más de 150 ms y la pausa en un cuadro que A ya pasó, así que A se sale. Ya pasaba sin el
+  arreglo, solo que antes, en plena cuenta. Con el árbitro, que es lo que viene por omisión, no pasa. El relevo rápido
+  no aguanta una red así; queda como pendiente.
+- **Los puntos «con B lenta…» de prueba-sincro no sirven con red mala** (miden la espera de la red, no la del lento).
+  «B sabe que su PC no alcanza» depende de cuánto frene la PC en ese momento.
+- **«Sincronizar cuesta poco» por Cloudflare** falla a veces con y sin el arreglo (8 ms): es el repetidor local.
+- **Trampa de bash:** en bash 5.2, un `&` dentro del reemplazo de `${x/a/b}` se vuelve el texto encontrado. Por eso
+  `&largadaPareja=0` llegaba roto en la primera tanda. Arreglado cortando la cadena con `%%` y `#`.
+- **Trampa del candado:** una tanda detenida a mano (TaskStop) no corre su `trap EXIT` y deja `build/medicion.lock`
+  tomado. Una tanda mía dejó la fila parada casi 3 h. Si se detiene una tanda, hay que mirar el candado y borrarlo si
+  es propio.
+
+---
+
+## §251 — La pantalla «Espacio»: borrar por partes lo que el juego guarda en el navegador · 2026-11-09 00:20
+
+(El pedido decía «§249», pero ese número ya era de V8, y la sesión E7 usa §250 para G11 en un trabajo sin commit:
+esto va en §251.)
+
+### Qué se pidió y por qué
+
+Hasta ahora, en el cajón (⚙ Avanzado → Datos del juego) había un solo botón: **borrar todo**. El juego guarda en el
+navegador lo que baja (la caja del disco, `disco.mjs`, en **Cache Storage**): con varias pistas jugadas son cientos de
+MB o algunos GB. Borrar todo obliga a bajar todo de nuevo. El dueño eligió un diseño de dos pisos:
+
+- **arriba (la opción B):** una **barra apilada** con cuatro partes —Pistas, Karts y sonidos comunes, Básico del juego
+  y Partidas y fantasmas 🔒— y un botón grande «Borrar todas las pistas salvo las ⭐»;
+- **adentro (la opción A):** al tocar «Pistas», la lista: casilla, nombre, copa, MB y «última vez jugada», para ordenar
+  y marcar.
+
+Como el tablero de una casa: antes había un solo interruptor general; ahora hay un medidor por circuito y se puede
+cortar uno sin apagar la casa.
+
+### Qué se hizo
+
+1. **`disco.mjs`, borrar por archivo** (`borrarArchivos(urls)`): borra de la caja todas las entradas de esos archivos
+   (los bloques de 256 KB, los grupos de 2 MB y los «enteros»), los saca del **índice de grupos** que la pestaña lleva en
+   la memoria y de la memoria de bloques, y escribe el índice de inmediato. El botón viejo («Borrar todo») ahora también
+   pasa por el disco (`disco.borrar({ seguir: true })`): antes hacía `caches.delete` por debajo, el índice quedaba
+   diciendo que había grupos guardados que ya no estaban, y la pestaña dejaba de guardar lo que bajaba después (la caja
+   quedaba cerrada) hasta recargar.
+2. **La cuenta sale de la caja misma** (`inventario(tamDe)`): recorre `caja.keys()` (la lista de entradas guardadas) y,
+   con el tamaño de cada archivo del manifiesto, suma los bytes de verdad. No usa `navigator.storage.estimate`, que
+   cuenta todo el sitio (BT3 incluido). De paso arregla el índice de la pestaña si mentía.
+3. **Dos pestañas** (el riesgo 2 del crítico): con el juego abierto en dos pestañas, la otra tenía en su memoria el
+   índice viejo y, al reescribirlo, volvía a anotar lo recién borrado («resucitaba»). Ahora las pestañas se hablan por un
+   **BroadcastChannel** (`mkw-disco`): la que borra avisa qué borró y las otras lo olvidan; y antes de borrar pregunta
+   «¿qué están usando?» y no toca eso. Además, un pedido a la red que salió *antes* del borrado y llega *después* ya no se
+   guarda (la **época** de cada archivo: un número que sube al borrarlo).
+4. **La fecha de cada pista** (el riesgo 3): se anota en `localStorage` (`mkw.pistas.uso`) al empezar cada carrera. Y
+   cada archivo de pista que el juego lee mientras tiene una pista elegida queda **atado** a ella (la pista misma, su
+   música, su versión de pantalla partida). Así se sabe qué es de cada pista sin adivinar, también para las de Nintendo
+   (`Race/Course/<nombre>.szs`) y las de Retro Rewind con nombre en vez de número (`Tracks/sw2RR.szs`): de los 222
+   archivos de `Tracks/` de RR, 100 no se llaman `<n>.szs`, así que la regla `Tracks/<n − 0x100>.szs` no alcanzaba.
+5. **Las pistas de Nintendo, leídas del juego** (regla «decompilar uno mismo»): la tabla de nombres de archivo que usa
+   el cargador está en `StaticR.rel`, desde 0x38023C, una cadena cada 16 bytes, en el orden de los números de pista
+   (0x00 `castle_course` … 0x08 `beginner_course` = Luigi Circuit … 0x1F `old_heyho_gba`); es el mismo orden que los
+   grupos de sonido `GRP_GP_*` que ya usaba `paquete-carrera.mjs`. Va en `espacio.mjs` (`CURSOS`), con el nombre
+   conocido para la persona.
+6. **Nunca se borra lo que la carrera usa** (el riesgo 4): la pista de la carrera en curso (o la elegida), la que corre
+   ahora y la siguiente de la sala quedan «🏁 en uso»: no se pueden marcar, y el disco las salta aunque se las pidan (y
+   le pregunta lo mismo a las otras pestañas). Lo pedido con la carrera andando se borra al terminarla (en la carrera no
+   se toca la caja: §176).
+7. **La pantalla** (`espacio-panel.mjs`): la barra y las cuatro partes; «Partidas y fantasmas 🔒» solo lleva al panel
+   «Partida» (aquí nunca se borran); la lista de pistas con orden por última vez (la más vieja primero, por omisión),
+   tamaño, nombre o copa (tocar el mismo orden lo invierte; con el mando, **LT/RT** cambian el orden; el resto, con el
+   cursor del sitio); «Marcar todas» (nunca marca una ⭐) y «Ninguna»; la ⭐ en cada fila; el botón dice «Borrar N
+   pistas (X MB)» y pide confirmación; después, «Deshacer» durante 8 s, y recién al vencer se borra de verdad. Filas de
+   51 px, toda la fila marca, sin salirse de 360 px de ancho. «Karts y sonidos comunes» y «Básico» abren su lista, igual.
+8. **El tope de espacio** (opcional, **apagado** por omisión): «No / 1 / 2 / 4 GB». Prendido, 3 s después de terminar
+   cada carrera (y fuera de ella) suelta las pistas jugadas hace más tiempo hasta bajar del tope; nunca las ⭐ ni las de
+   la sala.
+
+`?espacio=0` = sin la pantalla (el botón «Borrar todo» queda).
+
+### Archivos
+
+`web/navegador/espacio.mjs` (la lógica, sin dibujar), `espacio-panel.mjs` (la pantalla), `disco.mjs` (`inventario`,
+`borrarArchivos`, `protegidas`, el canal, la época, el índice siempre por la dirección absoluta), `mkw.mjs` (lo atado,
+la fecha, lo protegido, el tope), `index.html` (`#espacioPanel`), el banco `banco/pruebas/espacio/`, la prueba con el
+juego `web/navegador/prueba-espacio.mjs` y `herramientas/tanda-espacio.sh` (la corre con el candado).
+
+### Resultados
+
+- Banco nuevo `node banco/correr.mjs espacio`: **73/73** (las partes, la fecha y los archivos atados, las cuentas,
+  ordenar y marcar, el «Deshacer» con un reloj de mentira, el tope, la caja de verdad con dos «pestañas» —dos discos en
+  la misma página por el mismo canal—, el pedido que llega después del borrado, el índice arreglado, y la pantalla en
+  360 px con ratón y un mando de mentira).
+- Siguen bien: `disco` 56/56, `paquete-carrera` 53/53, `controles-panel` 25/25.
+- Con el juego (`bash herramientas/tanda-espacio.sh`, perfil nuevo, 0.0 y 13.2): **16/16**. Las dos
+  pistas quedan enteras en la caja (1.760.214 y 1.533.159 bytes) con su fecha y sus archivos atados; la de la carrera
+  en curso dice «🏁 en uso» y no se marca; la fila mide 50,5 px; con la carrera andando, vencidos los 8 s, lo pedido
+  espera («se borran al terminar la carrera») sin tocar la caja; al recargar con eso pendiente no se borró nada; desde
+  los menús, a los 8 s la pista 0.0 y su música quedan en 0 bytes y la 13.2 sigue entera; «✓ Listo: se liberó 3,5 MB»;
+  al volver a jugar la 0.0 se pide a la red (un lote `Tracks/0.szs` de 0 a 1.760.213) y queda guardada de nuevo, y la
+  13.2 no se baja.
+
+### Trampas
+
+- El índice de grupos guardaba la dirección tal como la daba la página (relativa con el servidor local, absoluta con el
+  Worker); la cuenta desde la caja da siempre la absoluta, y la otra pestaña no encontraba sus grupos y volvía a bajar.
+  Ahora el índice va siempre por la dirección absoluta (uno viejo se lee igual).
+- En la carrera la barra de la página queda debajo del juego: la prueba abre el cajón por código (`mkwInterfaz.abrirCajon`).
+- En un jugador la carrera no termina por código (`mkwTerminarCarrera` es del modo en línea), así que la prueba no
+  espera el fin: recarga y borra desde los menús. El aviso del «Deshacer» ya vencido dice «se borran al terminar la
+  carrera» (antes quedaba en «0 s» y parecía trabado).
+- El lote del disco lleva la ruta sin la barra del principio (`mkw/sd/…`): para ver si se pidió un archivo, mirar desde
+  `/Tracks/`.
+- `Object.assign(boton, { dataset: {…} })` lanza un error (`dataset` no se puede reemplazar): se pone de a una clave.
+
+## §252 — G11 (etapa 7): apagar efectos de la escena como opción del jugador — **la tarjeta gasta 30–40 % menos; la carrera es la misma** · 2026-11-09 04:03
+
+### Qué se quería
+
+Un teléfono con la tarjeta de video justa (el Oppo frenaba por la tarjeta, §115) necesita poder pedirle menos trabajo
+a la tarjeta **sin** quitar karts ni tocar la lógica. G11 = cada efecto grande de la escena como casilla del jugador,
+**todos prendidos por omisión** (calidad normal, el juego como siempre).
+
+### Cómo funciona
+
+El juego dibuja la escena 3D por **caminos de dibujo** de su biblioteca EGG (DrawPath): cada uno es una pasada aparte
+en la tarjeta. `web/juego/graficos_nativo.cpp` envuelve cuatro (el traductor renombra la original
+`func_X_traducida` y nuestra función toma su nombre, la lista `REEMPLAZOS` de `compilar-web.py`):
+
+| Bit | Efecto | Función del juego |
+|---|---|---|
+| 1 | Brillo (bloom) | `EGG::DrawPathBloom::DrawImpl` 0x8021CCC0 |
+| 2 | Desenfoque de lo lejano (profundidad de campo) | `EGG::DrawPathDOF::DrawImpl` 0x8021EEC0 |
+| 4 | Sombras por volumen | `EGG::DrawPathShadowVolume::DrawImpl` 0x80220D7C |
+| 8 | Mapa de luz | `EGG::DrawPathLightMap::DrawImpl` 0x802218EC |
+
+Con el bit puesto la envoltura vuelve sin dibujar (y cuenta: `mkw_graficos_dato(i)`); sin él llama a la original.
+La lógica no lee nada de lo que esos caminos dibujan, así que la carrera no cambia.
+
+- **La página:** Avanzado → Gráficos, «Efectos de la escena», una casilla por efecto (marcada = se dibuja). Se guarda en
+  `mkw.graficos.quitar` y se aplica en el momento (`_mkw_graficos_quitar`). `?quitarEfectos=N` lo fuerza para medir.
+  `mkwEstado.efectosQuitados`, y el informe de rendimiento lo dice.
+- **Arreglo de paso en la herramienta de fotos** (`?fotoCuadro=N`): la foto quieta solo estaba en una de las dos
+  esperas del cuadro (`esperaReloj`); con la cuadrícula enganchada al monitor (`mkwEsperaHasta`, lo de siempre) la
+  carrera seguía de largo. Ahora está en las dos. La foto va sin la cortina de carga (`&cortina=0`) y las ventanas
+  de las pruebas de fotos y fantasma van a la pantalla 3 (`MKW_VENTANA`).
+
+### Lo medido
+
+`bash herramientas/tanda-g11.sh compilar fotos medir igual` (programa `build/web-g11`; datos en
+`build/web/datos/g11/`). Tramo fijo §163 (12 CPU, semilla fija, sin tope), con la tarjeta (`perfilGpu=1`) y la
+revisión de límites de Android; gama baja = lastre 3,5. 2 pares, todo (0) contra los cuatro apagados (15):
+
+| | Tarjeta ms por imagen (0 → 15) | Cuadros de lógica/s (0 → 15) |
+|---|---|---|
+| Este PC, par 1 | 0,21 → 0,12 | 143,3 → 139,3 (−2,8 %) |
+| Este PC, par 2 | 0,19 → 0,12 | 145,4 → 146,9 (+1,0 %) |
+| Gama baja, par 1 | 0,99 → 0,65 | 31,7 → 30,8 (−2,7 %) |
+| Gama baja, par 2 | 0,89 → 0,65 | 31,9 → 31,1 (−2,6 %) |
+
+- **La tarjeta: −40 % en este PC, −30 % en la gama baja.** Las pasadas #22 y #24 (el brillo) desaparecen del perfil.
+- **La CPU no mejora.** En este PC es ruido. En la gama baja los dos pares dan −2,6 %: es poco y del lado malo. La
+  causa probable es que la combinación sin efectos usa recetas (pipelines) que no están en la semilla. No importa
+  para la decisión: G11 es para el aparato que frena por la tarjeta, no por la CPU.
+- En estas mediciones no hay tope (`sinTope`): la cuestión de «dibujo parejo con tope» no aplica aquí.
+
+Las fotos (la Contrarreloj contra el experto, cuadros 600 y 1500, `prueba-foto-igual`):
+- desenfoque de lo lejano (2) y mapa de luz (8): **0 % de diferencia** (esa pista no los usa: el ahorro de la tarjeta sale del brillo y las sombras);
+- sombras por volumen (4): ~1,2 % (la sombra bajo el kart);
+- brillo (1): 0,6–0,9 % de la imagen entera, casi todo arriba (el resplandor del cielo); del 32 % del alto para
+  abajo, 0,013 %. Es el que más ahorra en la tarjeta (las pasadas #22 y #24) y el que menos se nota en esta pista.
+- (La primera foto del brillo salió 100 % distinta: la cortina de carga tapaba una de las dos. Se repitió con
+  `&cortina=0`.)
+
+La igualdad: la sala con 0 contra 15 (huellas 74/74 iguales), la sala con dos programas w26 contra g11 (74/74), el
+fantasma con 0 y con 15 (2113/2113 y 2112/2112 cuadros iguales, la meta en el mismo cuadro, 2242), y el arranque,
+`prueba-navegador` 21/21. Banco `graficos` 58/58.
+
+### Decisiones
+
+- **G11 queda hecho, como opción del jugador, todo prendido por omisión.** Ahorra tarjeta (30–40 %) y no toca la
+  carrera.
+- **Para el Oppo (el dueño, al final):** comprobar que con los cuatro apagados el «tarjeta ms» del medidor baja y si
+  eso alcanza para 60, o al menos para un 30 parejo.
+
+## §253 — G12 (etapa 7): las texturas más chicas como opción del jugador — **−39 % de memoria de texturas; la velocidad no cambia en este PC** · 2026-11-09 04:46
+
+### Qué se quería
+
+Para un teléfono con poca memoria o una tarjeta justa: subir las texturas a la mitad o a un cuarto de su tamaño.
+**Por omisión, completas** (el juego como siempre).
+
+### Cómo funciona
+
+Casi todas las texturas del juego traen **niveles de detalle** (mips): la misma imagen a la mitad, a un cuarto, etc.,
+que la tarjeta usa para lo que se ve de lejos. G12 no recalcula nada. Al subir una textura, aurora salta los K niveles
+más grandes y el nivel K del propio juego pasa a ser el nivel 0 (`new_static_texture_2d` de `lib/gfx/texture.cpp`,
+`parches/aurora-g12.diff`).
+
+- **No se tocan:**
+  - las texturas sin mips;
+  - las de paleta (tlut);
+  - las de mips «arbitrarios», donde cada nivel trae su propio dibujo (el juego los usa para efectos);
+  - las copias de lo dibujado (EFB).
+- **Límite de tamaño:** el nivel más chico que queda nunca baja de 4×4.
+- **Cuándo rige:** vale para lo que se carga después (desde la pista siguiente).
+- **La página:**
+  - Avanzado → Gráficos → «Texturas»: completas, la mitad o un cuarto (`mkw.graficos.texturas`);
+  - `?texturasMenos=0|1|2` para medir;
+  - `mkwEstado.texturasMenos()` devuelve las texturas achicadas, los KB subidos y los KB que habrían subido completas.
+- `compilar-web.py` exporta `_mkw_web_texturas_menos` solo si la aurora trae el cambio.
+
+### Lo medido
+
+`bash herramientas/tanda-g12.sh compilar fotos memoria medir igual` (`build/web-g12`, datos en `build/web/datos/g12/`).
+
+**Memoria**: 4 pistas seguidas en una pestaña (`medir-memoria-pistas`, 0.0 → 1.1 → 2.2 → 3.3):
+
+| | Completas | Un cuarto (2) |
+|---|---|---|
+| Texturas de aurora tras 4 pistas | 916, 106 MB | 885, 65 MB (−39 %) |
+| Proceso de la tarjeta | 1626 MB | 1522 MB (−104 MB) |
+| Total (pestaña + tarjeta) | 2843 MB | 2715 MB (−128 MB) |
+| Crecimiento de la pista 1 a la 4 | +676 MB | +611 MB |
+
+**Velocidad**: tramo fijo §163 con la tarjeta, revisión de límites de Android, 2 pares, completas (0) contra un cuarto (2).
+
+| | Tarjeta ms por imagen (0 → 2) | Cuadros de lógica/s (0 → 2) |
+|---|---|---|
+| Este PC, par 1 | 0,18 → 0,19 | 147,2 → 145,5 (−1,1 %) |
+| Este PC, par 2 | 0,18 → 0,20 | 150,5 → 145,4 (−3,4 %) |
+| Gama baja, par 1 | 0,93 → 1,05 | 31,9 → 32,1 (+0,5 %) |
+| Gama baja, par 2 | 0,93 → 0,90 | 32,1 → 32,6 (+1,5 %) |
+
+- **En este PC la velocidad no cambia**, ni en la tarjeta ni en la CPU: es ruido. La tarjeta de este PC no está
+  limitada por leer texturas.
+- El trabajo extra de G12 (convertir la textura entera antes de recortarla) ocurre al cargar, no en la carrera.
+- **Su ganancia es la memoria.** En un teléfono de 4–6 GB, donde la tarjeta comparte la memoria con todo, eso es lo
+  que evita que Android cierre la pestaña.
+
+**Las fotos** (Contrarreloj contra el experto, cuadros 600 y 1500):
+- la mitad: 37 % de los píxeles cambian, como mucho 21 niveles de 255;
+- un cuarto: 48 %, como mucho 30.
+
+Se ve algo más borroso de cerca, sin nada roto ni texturas que falten.
+
+**La igualdad:**
+- sala 0 contra 2: huellas 75/75;
+- sala con dos programas, g11 contra g12: 74/74;
+- fantasma con 2: 2116/2116 cuadros, la meta en el 2242;
+- arranque: `prueba-navegador` 21/21.
+
+En la sala de dos programas falló un punto, «sincronizar cuesta poco»: B esperó 4,6 ms por cuadro. Pasa también
+**sin ninguna opción cambiada** (B era el programa de G12 con texturas completas), y lo mismo en G13 (§254). Es la
+sala que, a veces, le baja el retraso a 2 cuadros a la segunda pestaña: espera más los botones de la otra y las dos
+siguen a 60. No lo causa G12.
+
+### Decisiones
+
+- **G12 queda hecho como opción del jugador, completas por omisión.**
+- **Para el Oppo (el dueño, al final):**
+  - mirar si «un cuarto» baja el «tarjeta ms» del medidor; en un teléfono el ancho de banda de memoria sí puede
+    frenar;
+  - comprobar que después de varias pistas la pestaña no se cierra.
+
+## §254 — G13 (etapa 7): sin partículas y el ajuste rápido «Liviano» — **sin partículas −4 a −9 % de CPU por imagen; «Liviano» −30 % de tarjeta; la carrera es la misma** · 2026-11-09 04:54
+
+### Qué se quería
+
+Lo último de las opciones gráficas del jugador (después de G11, §252, y G12, §253):
+- apagar las **partículas** de la carrera;
+- un botón que deje el juego **liviano** de una vez, para el teléfono que frena por la tarjeta.
+
+Por omisión, todo como siempre.
+
+### Cómo funciona
+
+- **Partículas (bit 16 de la máscara de G11):** `graficos_nativo.cpp` envuelve el dibujo del gestor de efectos,
+  `Effects::Mgr` 0x8067CF74, que va justo después de su `Update` 0x8067CB88 en los símbolos de Pulsar. El cálculo de
+  las partículas sigue igual y solo no se dibujan, así que la lógica no cambia. El programa de W10 ya envolvía esa
+  misma función (§240); ahí G13 no va (`#ifndef MKW_SUCIAS`).
+- **La casilla «Partículas»** está en Avanzado → Gráficos, junto a las de G11. `?quitarEfectos=16` la fuerza.
+- **«⚡ Liviano»** (`LIVIANO` de `graficos.mjs`) deja tres cosas: los cuatro efectos de G11 apagados (máscara 15), las
+  texturas a la mitad (G12) y la salida en 960×540 (§108).
+  - Las partículas quedan como estaban: dicen el color del miniturbo, que es información del juego.
+  - Se aplica en el momento, sin reiniciar. Las texturas valen desde la pista siguiente.
+- **«↺ Todo como venía»** vuelve a 0, 0 y la salida de tu pantalla.
+
+### Lo medido
+
+`bash herramientas/tanda-g13.sh fotos medir igual` (`build/web-g12`, datos en `build/web/datos/g13/`). Tramo fijo
+§163 con la tarjeta y la revisión de límites de Android. Se comparan tres variantes: lo de siempre (base), sin
+partículas (16) y «Liviano».
+
+| | Tarjeta ms por imagen | CPU ms por imagen | Lógica/s | Imágenes/s |
+|---|---|---|---|---|
+| PC, base (2 pares) | 0,20 / 0,19 | 14,9 / 14,9 | 145,2 / 146,3 | 66,1 / 65,9 |
+| PC, sin partículas | 0,18 / 0,17 | 14,2 / 14,3 | 147,4 / 146,0 | 69,1 / 68,7 |
+| PC, Liviano | 0,13 / 0,13 | 14,3 / 14,9 | 148,6 / 141,7 | 68,2 / 66,2 |
+| Gama baja, base (4 pares) | 0,85 / 0,91 / 0,94 / 1,00 | 116 / 109 / 132 / 126 | 33,2 / 32,6 / 31,6 / 32,0 | 8,6 / 9,2 / 7,6 / 8,0 |
+| Gama baja, sin partículas | 1,00 / 0,89 / 0,85 / 1,12 | 112 / 103 / 104 / 114 | 29,3 / 31,3 / 31,1 / 28,9 | 8,9 / 9,7 / 9,6 / 8,8 |
+| Gama baja, Liviano (2 pares) | 0,63 / 0,61 | 121 / 114 | 30,3 / 31,7 | 8,3 / 8,8 |
+
+- **Sin partículas, la CPU por imagen baja.** En este PC es −4 %. En la gama baja es −3 a −21 % según el par, −9 % de
+  promedio en 4 pares. La tarjeta casi no cambia: dibujar las partículas cuesta sobre todo CPU (preparar cada dibujo), no tarjeta.
+- **Ojo con los cuadros de lógica/s en la gama baja** (−2 a −12 %). En el modo sin tope de esta medición, el tiempo
+  que se ahorra se va en dibujar **más imágenes** (+4 a +27 % de imágenes/s), no en más lógica. Con el juego normal
+  (lógica fija en 60 y N8) esa CPU queda libre. Se corrieron 2 pares más justo para no confundir esto con una pérdida.
+  Como un regulador que reparte la potencia sobrante: la carga baja, pero el sobrante va a otra rama.
+- **«Liviano» baja la tarjeta un 30 % en la gama baja** (0,85–0,91 → 0,61–0,63 ms) y un 35 % en este PC, que es G11
+  más la salida 540. Su CPU queda donde está, porque G11 y G12 no tocan la CPU.
+- En estas mediciones no hay tope (`sinTope`): la cuestión de «dibujo parejo con tope» no aplica aquí.
+
+**Las fotos** (Contrarreloj contra el experto, cuadros 600 y 1500):
+- sin partículas: 2,3–2,7 % de los píxeles (el polvo y las chispas);
+- «Liviano»: 38 % (más borroso por las texturas a la mitad y la salida 540). No hay nada roto.
+
+**La igualdad:**
+- la sala con lo de siempre contra todo apagado (máscara 31, texturas 2, salida 540): huellas 74/74 y 75/75;
+- la misma sala al revés: 74/74;
+- el fantasma con todo apagado: 2115/2115 cuadros, la meta en el 2242;
+- el panel en el teléfono emulado: `prueba-celular` 41/41;
+- banco `graficos` 58/58.
+
+En la sala con B liviano falló dos veces «sincronizar cuesta poco» (B esperó 6–7 ms por cuadro). Las dos pestañas
+siguieron a 60. Al revés no pasó, y en G12 pasó sin ninguna opción (§253). Es la sala bajándole el retraso a 2
+cuadros a la segunda pestaña cuando le sobra tiempo: espera más los botones de la otra. Queda anotado para quien
+trabaje en el lockstep; no lo causa G13.
+
+### Decisiones
+
+- **G13 queda hecho**: la casilla «Partículas» y los botones «⚡ Liviano» y «↺ Todo como venía», todo como siempre
+  por omisión.
+- **Con esto, G11–G13 están cerrados** y la etapa 7 (W10 parte B, W26, V8, W27/W28/G14, G11–G13) queda terminada.
+- **Para el Oppo (el dueño, al final):**
+  - apretar «⚡ Liviano» y mirar en el medidor cuánto baja el «tarjeta ms» y si llega a 60, o a 30 parejas;
+  - sin partículas, mirar si baja el «juego ms».
+
+## §255 — G15 (etapa 7): «Imagen» se cambia en plena carrera, sin reiniciar — **21 cambios en una carrera sin cuadro negro ni imagen perdida; la lógica sigue en 60; la sala idéntica** · 2026-11-09 12:20
+
+### Qué se quería
+
+El dueño (2026-11-08), mirando lo que ofrece *framepacer*: elegir **cómo se ve la imagen** en pleno juego, sin reiniciar:
+- **60**: el juego dibuja los 60 cuadros por segundo (lo de siempre en un PC que llega);
+- **30 parejas**: dibuja uno de cada dos, 30 imágenes fijas (N8 modo 1, §219: más parejo que 40 o 50 que suben y bajan);
+- **con imagen intermedia**: dibuja a 30 y aurora inventa la del medio, 60 a la vista (N8 modo 2).
+
+**La lógica sigue siempre en 60**, «para que sea justo para todos»: solo cambia lo que se muestra. Antes, N8 se elegía al
+arrancar (el panel decía «Se aplica al reiniciar el juego»).
+
+### Cómo funciona
+
+- **El juego** (`web/juego/n8_nativo.cpp`). `mkw_n8_modo(m)` ya no cambia el modo en el acto: anota lo **pedido**
+  (`g_pedido`). La envoltura del dibujo (`EGG::SceneManager::draw`, 0x8023AEAC) llama a `aplicarPedido()` al empezar
+  cada cuadro, y el pedido pasa a ser el modo en uso **solo en el borde de un par** (ver Glosario):
+  - con N8 apagado, o en un cuadro que de todos modos se dibuja, cambia;
+  - si este cuadro es el saltado de un par, espera al siguiente (a lo más dos cuadros de lógica, 33 ms);
+  - antes de cambiar desde la imagen intermedia, la imagen de verdad que aurora guardó sale a la pantalla
+    (`aurora_mkw_presentar_pendiente(1)`): así no se tira ninguna.
+  - Por qué hace falta: el modo 2 guarda la imagen de verdad del cuadro dibujado y la muestra un refresco después,
+    en el cuadro saltado. Si el modo se apagaba entre los dos, aurora la tiraba (`aurora_mkw_n8(0)` la borra) y la
+    pantalla repetía la intermedia: un tirón chico en cada cambio.
+  - Dos datos nuevos en `mkw_n8_estado`: 14 = lo pedido, 15 = cuántos cambios se aplicaron.
+- **La página** (`web/navegador/mkw.mjs`). `window.mkwImagen(v)` (0, 1, 2 o `'auto'`) aplica una elección en cualquier
+  momento: con `'auto'` arma la vigía de N8 (§219, la de siempre); con 0/1/2 la quita y pide ese modo. Al arrancar se
+  usa lo guardado (o `?n8=`). Cada cambio va al registro: «[n8] imagen: 0 → 1 (el jugador)».
+  `mkwEstado.n8()` dice también `pedido`, `cambiosModo` y `eleccion`.
+- **El panel** (`graficos.mjs`, Avanzado → Gráficos). El selector «Dibujar a 30 y mostrar 60» pasa a llamarse
+  **«Imagen»**, con Automático (lo de siempre), 30 parejas, 60 y Con imagen intermedia. Al elegir, `alImagen` lo aplica
+  en el momento y se guarda (`mkw.graficos`, el mismo campo `n8` de antes: lo guardado sigue valiendo). Ya no pide
+  reiniciar. La «Fluidez» 120/180 del §107 sí sigue pidiendo reiniciar (es otra cosa: imágenes intermedias de más en
+  un monitor rápido).
+- `?imagenCiclo=S` (solo pruebas): cambia la imagen cada S segundos de carrera, 60 → 30 parejas → intermedia → 60…
+- El consejo de `escalon.mjs` ahora nombra «Gráficos → Imagen «Con imagen intermedia»».
+
+### Las pruebas
+
+`bash herramientas/tanda-g15.sh compilar sala ciclo ciclo1 medir` (programa `build/web-g15`, datos en `build/web/datos/g15/`).
+
+- **Banco `graficos`** (63/63, +5 puntos de G15): el selector «Imagen» con sus 4 opciones, elegir avisa en el momento
+  y no pide reiniciar, lo último queda guardado, la ayuda dice que la lógica va a 60.
+- **Un jugador cambiando 21 veces en una carrera** (`node web/navegador/prueba-imagen.mjs`, 7/7):
+  - 21 cambios aplicados por el juego, y cada vez quedó en lo pedido;
+  - en 60 no se salta ningún dibujo (salvo el del par del cambio), en 30 parejas y en intermedia exactamente la mitad;
+  - 63 fotos de la pantalla justo después de cada cambio: ninguna negra (la peor, 2,7 % de píxeles oscuros);
+  - aurora tiró **0 de 290** imágenes de verdad guardadas;
+  - la lógica fue a **60,0** cuadros por segundo todo el rato.
+- **La sala con modos distintos** (`prueba-sincro --directa --extra-a=&n8=1 --extra-b=&n8=2`): huellas iguales 75/75,
+  la largada pareja de §250 bien, sincronizar cuesta poco (B 0,76 ms por cuadro).
+- **La sala con B cambiando cada 3 s** (`--extra-b=&imagenCiclo=3`): 13 cambios en la carrera, huellas iguales 74/74.
+  Cambiar lo que se ve no cambia la carrera.
+
+### Lo medido
+
+Lo que ve un jugador en línea, 60 s de carrera (`medir-enlinea.mjs "&n8=0" "&n8=1" "&n8=2"`, Chrome sin ventana,
+que refresca a ~238 Hz):
+
+| Imagen | Cuadros del juego por s | Refrescos con cuadro nuevo | Repetidos | Saltados | Latido máx |
+|---|---|---|---|---|---|
+| 60 | 60,0 | 25,1 % | 74,9 % | 0 % | 125 ms |
+| 30 parejas | 30,0 | 12,6 % | 87,4 % | 0 % | 114 ms |
+| Con imagen intermedia | 30,0 | 12,7 % | 87,3 % | 0 % | 112 ms |
+
+- A ~238 Hz lo ideal es un cuadro nuevo cada 4 refrescos (25 %) con 60 y cada 8 (12,5 %) con 30: los tres modos lo
+  cumplen, sin refrescos saltados.
+- Con la imagen intermedia el juego entrega 30 cuadros, pero aurora muestra 60 imágenes (las del medio no pasan por el
+  contador del juego). Contar lo que de verdad sale a la pantalla, imagen por imagen, es G16 (§256).
+
+### Qué significa
+
+El jugador elige suavidad o nitidez en el momento, también en la sala, y la carrera es la misma para todos. No hay
+nada nuevo que medir en velocidad: los modos son los de N8 (§219–§223), ahora con un cambio que no se nota.
+Falta, como siempre, el teléfono real (lo hace el dueño al final).
+
+---
+
+## §256 — G16 (etapa 7): el 1 % bajo de las imágenes que se ven — **medido en todas las herramientas y en vivo; el juego despierta a tiempo: a 60, imágenes desparejas 5,2 → 1,2 %, el 1 % bajo 87 → 90 %; la sala idéntica** · 2026-11-09 17:20
+
+**Qué se pidió.** El dueño: «que los 1 % lows sean casi iguales a los fps mostrados». Meta: 1 % bajo ≥ 95 % de los fps a la
+vista. Tres partes: (1) que `medir-sitio`, `medir-enlinea` y `tiempos-cuadro.mjs` impriman el 1 % y el 0,1 % bajo; (2) un
+gráfico en vivo del tiempo de cada imagen en el medidor; (3) buscar y arreglar lo que produce las imágenes largas, en este
+PC y en la gama baja simulada.
+
+**Qué es el 1 % bajo** (ver el Glosario). Los «fps» cuentan imágenes por segundo: 58 fps puede ser 58 parejas o 50 parejas y
+8 que tardaron el doble (un tirón que se siente). El 1 % bajo mira solo las más lentas: 1000 / p99 del tiempo de cada imagen.
+El 0,1 % bajo, 1000 / p99,9.
+
+### 1. Medirlo (`web/navegador/imagenes-vista.mjs`)
+
+- **Qué es una imagen:** cada vez que aurora pide la textura del lienzo (`GPUCanvasContext.getCurrentTexture`) sale una
+  imagen nueva a la pantalla. La página envuelve esa función una vez (`engancharImagenes`); con N8 las intermedias cuentan,
+  porque se ven.
+- **El tiempo de cada imagen es de entrega a entrega** (`modo: 'entrega'`, la hora de `performance.now()`), la definición de
+  PresentMon/Afterburner/CapFrameX. La primera versión medía en los refrescos del monitor (`?imagenesVista=refresco` todavía
+  la da), pero redondea: con 60 imágenes en un monitor de 144 Hz da 2 y 3 refrescos (13,9 y 20,8 ms) aunque el juego vaya
+  perfecto, y nunca cumpliría la meta. Lo que de verdad llegó al monitor lo mide aparte `medir-sitio`, con
+  `Display::FrameDisplayed` de Chrome.
+- Un anillo de 36.000 imágenes (10 min). Para cada imagen larga (más de 1,5 × la esperada) se anota su **causa**: el primer
+  contador que creció desde la anterior. Los contadores son pipeline armado (`_mkw_web_pipelines_cuantos`), espera del disco
+  (`esperaRed`) y espera de la sala (`esperasLargas` del lockstep); si ninguno creció, «otro».
+- `mkwEstado.imagenes` (`marca`, `resumen`, `causas`, `texto`, `tiempos`); al cambiar de carrera, la nota
+  `[imagenes] carrera: …` en el registro.
+- **Las herramientas:**
+  - `medir-sitio`: «1 % bajo (§256), lo que llegó al monitor» y «las imágenes de aurora en la página»;
+  - `medir-enlinea`: lo mismo, más el reparto de cada imagen en refrescos y en ms, el compás de la toma, el despertar del
+    juego y `--ventana` (sin ella Chrome no tiene monitor de verdad: el suyo es de mentira, de 240 Hz);
+  - `tiempos-cuadro.mjs`: el resumen de los ciclos del tramo al final.
+- **El gráfico en vivo:** Avanzado → Gráficos «Gráfico del tiempo de cada imagen» (`verGrafico`, apagado por omisión;
+  `?verGrafico=1` para probar). Debajo del medidor, un lienzo de 240×40 con una barra por imagen (las últimas 240), verde si
+  va pareja y con el color de su causa si es un pico; líneas guía en lo esperado y el doble. Al texto se le suma
+  «1 % bajo N (k %)». Se pinta cada 250 ms y solo si se ve.
+
+### 2. La medición «antes» (`build/web/datos/g16/`)
+
+- **Gama baja simulada** (§155/§163 + la revisión de límites de Android): la CPU no llega. 12,7 fps en la carrera, 78 ms por
+  cuadro, y el 1 % bajo da 40–65 % según el modo. Cada cuadro tarda lo que tarda la CPU y eso varía ±30 %. Ahí la meta no se
+  alcanza ordenando las imágenes: hace falta un motor más rápido o un tope parejo más bajo (lo de N8).
+- **Este PC, la sala** (`medir-enlinea --ventana`, 60 s de carrera):
+  - a 60, 1 % bajo 47–52 = 79–88 %;
+  - en un monitor de 240 Hz, el 3,7–6 % de las imágenes duraba 3 o 5 refrescos en vez de 4, siempre de a pares.
+
+### 3. Buscar la causa
+
+1. **El compás de la toma** (§54) se rearmaba en el 11–17 % de las imágenes. Primera sospecha: cuando la pausa de presentar
+   (`esperaToma`) vence antes del refresco, `ultimaToma` queda en la toma anterior. El arreglo es anotar el refresco de la
+   toma en `relojMonitor.tic` (`?tomaTic=0` = antes). Medido intercalado ×2: **ningún cambio** (79 % / 79 %). Queda, porque
+   es lo correcto, pero no era la causa.
+2. **El despertar del juego.** Sin enganche (la sala, en línea, un monitor que no divide los 60 Hz) el juego espera su
+   vencimiento con un `setTimeout`. Se anotó cuánto después del vencimiento despertaba de verdad:
+   `{0: 20, 1: 120, 2: 106, 3: 85, 4: 185, 5: 267, 6: 72, 7: 7}` a 178 Hz, y 1–2 ms a 240 Hz. Cada imagen sale con ese
+   atraso. Cuando el atraso cruza un refresco, la imagen dura uno más y la siguiente uno menos (el reloj del juego no se
+   corre, `lastRetrace = target`). **Esta era la causa.**
+
+### 4. El arreglo: despertar antes y ceder (`mkw.mjs` `esperaReloj`)
+
+- En el último tramo de la espera, el temporizador se pide `DESPERTAR_ANTES` = 3 ms antes. El resto se espera cediendo el
+  turno (una tarea nueva por vuelta con `MessageChannel`, sin el redondeo de los temporizadores) hasta el vencimiento.
+  Despierta en el vencimiento, nunca antes: la lógica y la sala no cambian.
+- `?despertarAntes=0` = antes, `=M` = M ms. 6 ms no mejora sobre 3.
+- Sirve en la sala, en línea y en los monitores de 75/144/165 Hz. Con el monitor enganchado (60/120/240 Hz, un jugador) el
+  juego ya despertaba con el refresco.
+
+### 5. La medición «después»
+
+`medir-enlinea --ventana`, monitor de 240 Hz, intercalado en la misma tanda (`enlinea-despues.txt`):
+
+| Imagen | despertarAntes | 1 % bajo / fps | 0,1 % bajo | imágenes fuera de su refresco |
+|---|---|---|---|---|
+| 60 | 0 (antes) | 52,4 / 60 = **87 %** | 44,1 | 3 o 5 refrescos: 187 de 3601 (5,2 %) |
+| 60 | 3 | 53,8 / 60 = **90 %** | 47,8 | 42 de 3601 (1,2 %) |
+| 30 parejas | 0 | 27,7 / 30 = **92 %** | 26,6 | 7 o 9 refrescos: 123 de 1801 (6,8 %) |
+| 30 parejas | 3 | 28,2 / 30 = **94 %** | 27,2 | 28 de 1800 (1,6 %) |
+| intermedia | 0 | 43,9 / 60 = 73 % | 41,7 | 3 y 5 alternados (~44 % cada uno) |
+| intermedia | 3 | 44,8 / 60 = 75 % | 43,3 | igual |
+
+- En la otra tanda (6 corridas intercaladas, también a 240 Hz): 88 → 90 %, con el despertar siempre en 0 ms.
+- **Lo que se ve:** a 60 en un monitor de 240 Hz, 4 refrescos por imagen en el 98,8 % de las imágenes. Lo que queda entre el
+  90 % y el 95 % de entrega a entrega es un vaivén de ±1–2 ms, más chico que un refresco (16–18 ms), que el monitor no
+  muestra. La meta sale casi justa a 30 parejas y no del todo a 60.
+- **La imagen intermedia no mejora y queda como hallazgo:** las dos imágenes del par salen en momentos distintos del cuadro.
+  La imagen guardada sale en la copia del cuadro saltado (`aurora_mkw_presentar_pendiente(0)`, apenas termina su lógica);
+  la intermedia, al final del cuadro dibujado. Por eso se alternan 13 y 20 ms. Arreglarlo es C++ (`n8_nativo.cpp` y
+  aurora, que la guardada salga a medio camino entre dos dibujadas) y una recompilación: queda propuesto como paso siguiente.
+- **Gama baja**, el control (`medir-sitio`, carrera directa de 12 CPU, `n8=0`): CPU por cuadro 53,5 ms antes y 53,9 después
+  (ruido); 1 % bajo en la página 62 → 64 %. No cuesta nada: ahí el juego casi nunca espera.
+- **La sala:** `prueba-sincro --directa` 15/15, huellas 74/74.
+- **El gráfico con el juego:** `prueba-imagen` 8/8; el punto nuevo ve el lienzo con 1768 píxeles verdes y el texto «1 % bajo».
+
+**Pruebas:**
+- banco `imagenes-vista` 21/21 (incluye «60 parejas en 144 Hz cumplen de entrega a entrega y no en refrescos»);
+- banco `graficos` 66/66;
+- `prueba-imagen` 8/8;
+- `prueba-sincro --directa` 15/15.
+
+**Tandas:** `bash herramientas/tanda-g16.sh medir|enlinea|diag|sala` (`G16_ETIQUETA`, `G16_EXTRA`, `G16_PERFILES`,
+`G16_MODOS`, `G16_VENTANAS`, `G16_VARIANTES`).
+
+**Qué significa.** El juego ya no suelta las imágenes con el atraso del temporizador: en la sala, a 60 o a 30 parejas, el
+monitor muestra casi todas las imágenes el mismo tiempo. El 1 % bajo se puede ver en vivo y lo imprimen todas las
+herramientas. Lo que falta para la meta en todas partes:
+- la imagen intermedia pareja (C++, propuesto);
+- en la gama baja, la CPU (el motor) o un tope parejo más bajo.
+
+La prueba en el teléfono real la hace el dueño al final.
+
+---
+
+## §257 — W30, el piloto «igual entre nosotros, no igual a la Wii»: **adoptado** — gama baja +7,1 / +3,4 %, este PC +5,9 / +7,7 %; la sala idéntica; el fantasma del experto llega en el mismo cuadro · 2026-11-09 13:57
+
+### Qué y por qué
+
+La traducción de WiiCompiled imita el procesador de la Wii **al último bit** en las cuentas con coma (float), y eso
+cuesta en tres lugares:
+- cada multiplicar-sumar (FMA) se hace «exacto», con varias cuentas de más;
+- cada paso a float revisa la bandera NI del FPSCR (con ella la Wii deja en cero los números diminutos);
+- en `fmuls`/`fmadds` el operando C se redondea antes a 25 bits, como hace el circuito de la Wii.
+
+El dueño (2026-11-09) aceptó que el juego deje de ser idéntico a la Wii **siempre que siga idéntico entre todos los
+jugadores y que el manejo no cambie**. Eso se cumple porque en la sala todas las consolas corren el mismo `.wasm`, y
+wasm da las mismas cuentas en cualquier aparato. La excepción son los bits de los NaN, que se siguen reescribiendo igual
+que antes.
+
+Comparación eléctrica: dos relojes iguales que no marcan la hora oficial al milisegundo, pero sí **marcan lo mismo entre
+ellos**. Para una carrera entre los dos, eso es lo que importa.
+
+### Qué se cambió
+
+El cambio vive en una copia nueva, `terceros/Wiicompiled-motor-w30`:
+- es la rama `motor-w30`, sacada de la línea H6 de hoy;
+- los cambios sin guardar de H6 quedaron en el commit d46667f;
+- nuestro cambio está en `parches/motor-w30.diff`.
+
+El interruptor es `MKW_MOTOR_W30`, en `runtime/include/mkw_motor.h`. Sus bits se suman:
+
+| Bit | Qué hace | Dónde |
+|---|---|---|
+| 1 | La FMA con las cuentas de wasm: en float, `(double)a·b + c` pasado a float; en double, `a·b + c`. También la de 2 floats de la imitación de NEON y el arreglo del empate de `fmadds` | `ppc_isa_wasm_neon.h` (`MkwWasmFmaf`, `MkwWasmFmaRaw`, `vfma_f32`), `ppc_isa_float.h` |
+| 2 | Sin el NI del FPSCR en cada paso a float (25.062 lugares del C++ traducido) | `PpcForceSingleValueInline`, `PpcFlushSingleForNiInline` |
+| 4 | Sin redondear C a 25 bits en `fmuls`/`fmadds` (20.480 lugares) | `PpcForce25BitInline` |
+
+**Adoptado: en esa copia vale 7 por omisión (los tres bits).** Con `-DMKW_MOTOR_W30=0` se vuelve a la Wii al último bit.
+
+Las **banderas CR** no entran. Su techo ya se midió en §217 (W14): +11,6 / +17,7 % en la gama baja y −9,2 / −11,3 % en
+este PC. Además cambian la carrera entre consolas, porque RR no respeta la regla del CR volátil (§193: la sala se
+separaba en el cuadro 270).
+
+Para compilar el programa con W30:
+
+```bash
+MKW_WIICOMPILED=terceros/Wiicompiled-motor-w30 MKW_AURORA=terceros/aurora-main-viejo-motor python herramientas/compilar-web.py --modo navegador --carpeta build/web-w30
+```
+
+La tanda que lo midió todo es `bash herramientas/tanda-w30.sh compilar probar medir chrome igual fantasma`:
+- compila la base con `MKW_MOTOR_W30=0` y el nuevo con `W30_BITS` (7 por omisión);
+- los dos salen **de la misma copia**, así que lo único distinto es el interruptor;
+- los dos van con `--fija` y sin PGO.
+
+### Lo medido
+
+**El tamaño:** el `.wasm` baja de 114,7 a 109,6 MB (−5 MB), porque hay miles de cuentas de imitación menos.
+
+**Node (solo como filtro):** el tramo fijo con la revisión de límites, 4 vueltas intercaladas. Pasa de 5,215 a 4,386 ms
+por cuadro: ×0,841 de mediana (de ×0,755 a ×1,022).
+
+**Chrome, el tramo fijo de §163:**
+- la carrera es `modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&sinTope=1&tramo=600-2400`, con 12 karts y
+  `&anillo=0&dibujarSiempre=1&n8=0`;
+- se mide en cuadros de lógica por segundo;
+- los pares van intercalados, con el orden alternado.
+
+| Par | Gama baja (`lastre=7…`, `--wasm-enforce-bounds-checks`), base → W30 | Este PC, base → W30 |
+|---|---|---|
+| 1 | 6,95 → 7,44 (**+7,1 %**) | 89,03 → 94,24 (**+5,9 %**) |
+| 2 | 7,11 → 7,35 (**+3,4 %**) | 87,22 → 93,93 (**+7,7 %**) |
+
+Los dos pares quedan en la zona gris (entre −2 y +8 %), pero siempre a favor y en los dos aparatos. El dueño decidió no
+correr más pares («no necesitas correr mas, sigue nomas») y adoptarlo con esto. Los pares de más que estaban en la fila
+del candado se cortaron antes de empezar.
+
+**La justicia** (el nuevo en las dos pestañas):
+- `prueba-sincro --directa`: **15 bien, 0 mal**. Las huellas son iguales toda la carrera (74/74) y la largada pareja de
+  §250 cae en el mismo cuadro (cuenta 172/172, «¡YA!» 412/412).
+- `prueba-sala --rapida` (la copa de 2): **44 bien, 0 mal**. Los puntos, la parrilla, el VR y la tabla son iguales en
+  las dos.
+
+**El fantasma del experto** (grabado en una Wii real), en una Contrarreloj entera, cuadro por cuadro:
+- A es la base (la Wii al último bit) y B es W30;
+- se midió con `prueba-fantasma-igual.mjs --build-b=… --crudas 100000` y después `herramientas/w30-fantasma.mjs`.
+
+Lo que salió:
+- **Dónde se separa:** en el cuadro 293. El avance en la carrera (+0xC) cambia en el último bit: `3f8754fa` contra
+  `3f8754f9`.
+- **Cuánto se aparta antes de la meta:** como mucho 1,2·10⁻⁵ vueltas (en el cuadro 2084), unos milímetros. Al 25, 50 y
+  75 % de la carrera va en 7·10⁻⁶, 3·10⁻⁶ y 2·10⁻⁶ vueltas. La diferencia no crece: sube y baja.
+- **La meta:** el fantasma la cruza en los dos programas **en el mismo cuadro, el 2242**, sin caerse ni ser rescatado.
+- **Después de la meta:** el kart sigue solo y la diferencia llega a 3·10⁻⁴ vueltas, pero eso ya no cuenta.
+- **El jugador quieto:** 2121 cuadros iguales.
+- **El tiempo de meta en milésimas no se pudo leer.** El cronómetro que supuse en +0x40 dio 0:00.000 en los dos. Como
+  el fantasma llega en el mismo cuadro y la diferencia es de ~0,015 de cuadro, el tiempo mostrado podría cambiar a lo
+  más en 1 ms.
+
+### Qué significa
+
+- **La ganancia:** de +3 a +8 % de CPU, en la gama baja y en este PC.
+- **La sala:** sigue idéntica entre consolas.
+- **El fantasma:** se aguanta. Se aparta en millonésimas y llega en el mismo cuadro, así que no hace falta la salida de
+  «cuentas exactas solo en la Contrarreloj».
+
+Para el jugador no cambia nada que se note. Hay dos cuidados:
+- los fantasmas y récords de la página grabados antes del cambio pueden quedar a milésimas de lo que daría el programa
+  nuevo;
+- dos programas distintos en la misma sala no corren la misma carrera, así que W30 tiene que entrar con una versión
+  nueva para todos de una vez, como cualquier cambio del `.wasm`.
+
+### Lo que falta para que llegue al jugador
+
+Esto lo hace el dueño o la etapa siguiente:
+1. Juntar W30 con la línea del programa final de hoy (`build/web-e6-w29-clip`, la de §244/§248), con PGO y `--final`.
+2. Correr `correr-todo.mjs` con ese programa.
+3. Publicarlo.
+
+## §258 — W32, la IA de las CPU pensando 1 de cada 2 (o 3) cuadros: **descartado** — las CPU manejan mucho peor (recorren −17 %, el doble de tropiezos, el triple de caídas) y la ganancia no se distingue del ruido · 2026-11-09 17:33
+
+**Qué es.** El dueño, el 2026-11-09: «evaluemos E, si la diferencia es imperceptible por el humano seria bueno
+considerarlo». La idea (W32 del plan): en cada cuadro el juego le corre a cada una de las 11 CPU su «cerebro» (la
+máquina de estados de la IA, ver el Glosario); si cada CPU pensara uno de cada dos cuadros y en el otro repitiera la
+última orden (un retenedor de orden cero), la lógica se ahorraría la mitad de lo que cuesta la IA. La física de todos
+sigue a 60, los humanos no se tocan y siempre 12 karts. Solo se adoptaría si no se nota.
+
+**Cómo se probó.** Un programa aparte, nunca el de jugar: `build/web-w32` (y `build/web-w32b`), compilado con
+`MKW_IA30_COMPILAR=1` (`herramientas/compilar-web.py`, solo esa marca agrega la pieza y sus dos o cuatro exportaciones).
+La pieza es `web/juego/ia30_nativo.cpp`: envuelve `func_807261B8`, la entrada del cerebro de cada kart, leída en el
+código traducido (pone en 0 una marca del objeto de la IA, mira si la carrera está en pausa y llama al «calc» del
+cerebro, que corre la máquina de estados `func_8074AF38`). Con `?ia30=2` (o 1) y la carrera andando (Raceinfo +0x28 = 2),
+la CPU número k piensa solo cuando `(cuadro + k)` es múltiplo de 2; con `?ia30=3`, de 3. El cuadro es el del juego
+(Raceinfo +0x1C + +0x20), igual en todas las consolas, y las CPU se reparten: en cada cuadro piensa la mitad (o un tercio),
+así cada cuadro cuesta lo mismo. `?ia30=0` = el juego tal cual. `mkw_ia30_estado(q)` dice llamadas, pensadas, retenidas,
+karts y CPU vistas. En `build/web-w32b` el gancho además cuenta, con cualquier modo, las marcas del estado de cada kart
+CPU cuadro por cuadro y el cuadro exacto de cada vuelta (`mkw_ia30_bits`, `mkw_ia30_vuelta`; ver el Glosario).
+
+**1. Cuánto pesa la IA** (`herramientas/peso-ia.mjs` sobre el perfil de `medir-sitio --perfilar`, tramo fijo §163, 12 CPU,
+máximo): la entrada del cerebro es el **6,3 % de la lógica** (4,3 % de lógica + dibujo del juego; 2,2 % de todo el hilo).
+En Node, con el perfil de §165, 5,0–5,4 %. Pasaba la puerta (~5 %) por poco: lo más que se podía ganar con 1 de cada 2 era
+la mitad, ~3 % de la lógica. Con `?ia30=1` el perfil la muestra en 3,9 %.
+
+**2. La sala es justa** (`prueba-sincro --directa`): con `&ia30=1` 15/15 y las huellas iguales 75/75; con `&ia30=3` 15/15 y
+75/75. Las dos pestañas deciden lo mismo en el mismo cuadro: lo de W32 no es un problema de justicia.
+
+**3. ¿Se nota? Sí, y mucho.** `medir-cpu-niveles` (con `--traza`) en los 6 niveles a 150cc, pistas 0.0, 13.2, 20.2 y 30.2,
+semillas 11 y 22: el base, 1 de cada 2, y el base otra vez (la diferencia entre los dos base es lo que cambia una carrera
+solo por la suerte: el **ruido**). 48 carreras cada uno, emparejadas kart por kart (`herramientas/comparar-ia30.mjs`):
+
+| | base repetido (el ruido) | **1 de cada 2** |
+|---|---|---|
+| lo que recorre el mismo kart (la última marca de 10 s antes de que llegue la primera) | +0,80 % ± 0,48 | **−17,4 % ± 1,4** (más lento en 93–96 de 96 karts en cada nivel) |
+| el tiempo de la ganadora | −0,32 % ± 0,56 | **+19,2 % ± 1,9** |
+| tropiezos por carrera (≥ 1 s a menos del 40 % de su ritmo) | 36,5 → 36,6 | **36,5 → 83,0** |
+| caídas por carrera (Lakitu) | 7,9 → 7,1 | **7,9 → 22,8** |
+| el puesto medio de cada kart cambia | 1,10 | 1,22 |
+
+Por nivel (lo que recorre / la ganadora): fácil −10,1 % / +10,2 %; normal −11,5 % / +13,2 %; difícil −14,3 % / +13,1 %;
+**máximo −17,1 % / +16,7 %**; intenso −22,3 % / +24,0 %; imposible −29,1 % / +38,1 %. Cuanto más rápido el nivel, peor:
+«Máximo» se vuelve bastante más fácil (la condición del plan pedía lo contrario). Todo muy fuera del ruido.
+
+**Por qué maneja tan mal** (lo más probable): la IA no es «una decisión que se puede repetir»: es un lazo de control
+cerrado (mira dónde está el kart, corrige el giro, mira otra vez). Pensar a 30 por segundo con las mismas ganancias es
+como bajar a la mitad la frecuencia de muestreo de un PID sin reajustarlo: más retardo, el lazo se pasa y oscila, el kart
+zigzaguea y choca. Además, lo que se salta es el paso entero del cerebro (también sus relojes internos, que cuentan
+llamadas). Con 1 de cada 3 sería peor todavía.
+
+**4. La ganancia** (tramo fijo §163, intercalados; la gama baja = `&lastre=3.5` + `--wasm-enforce-bounds-checks`):
+
+| programa | | base | 1 de cada 2 | 1 de cada 3 |
+|---|---|---|---|---|
+| `web-w32` | gama baja (lógica/s) | 39,0 · 38,8 | 39,6 · 42,8 (+1,6 / +10,3 %) | — |
+| `web-w32` | este PC | 154,8 · 152,9 | 150,9 · 149,4 (−2,5 / −2,3 %) | — |
+| `web-w32b` | gama baja | 42,1 · 41,6 | 44,6 · 48,5 | 41,0 · 44,5 |
+| `web-w32b` | este PC | 153,7 · 152,4 | 157,3 · 161,8 | 168,6 · 162,2 |
+
+Va de −2,5 % a +11 % según la tanda, sin un orden claro (1 de cada 3 sale a veces peor que 1 de cada 2): la ganancia se
+pierde en el ruido de la medición. Lo esperable por el perfil era ~+3 %.
+
+**El veredicto: descartado.** El dueño, al ver los números de 1 de cada 2: «ok no apliquez esto entonces, se ve claro que
+sufre mucho la cpu». No se prende ni como opción. La segunda tanda (1 de cada 3 con las marcas del manejo,
+`herramientas/tanda-w32-tres.sh`) se paró a las 17:31, en el primero de sus cuatro juegos de niveles: de 1 de cada 3
+quedan la sala (15/15, 75/75), la ganancia de arriba y una carrera de prueba que cuenta bien (46 bits activos, las vueltas
+de los 12). El video lado a lado no se grabó: el `recordVideo` de Playwright pide su propio ffmpeg (no está en este PC y no
+se bajó); `herramientas/video-ia30.mjs` quedó grabando el lienzo dentro de la página (MediaRecorder), sin probar.
+
+**Lo que queda** (instrumentos, por si se vuelve a evaluar algo de la IA): el programa aparte con `MKW_IA30_COMPILAR=1`;
+`bash herramientas/tanda-w32.sh compilar perfil niveles comparar ganar sincro video` y `bash herramientas/tanda-w32-tres.sh …`
+(con `esperar`, `revisar` = una carrera que dice si cuenta); `medir-cpu-niveles.mjs --extra "&…" --traza` (y guarda
+`ia30Bits`/`ia30Vueltas` si el programa los trae); `comparar-ia30.mjs <A> <A repetida> <B> …` (lo de arriba, más las
+vueltas 1 y 2 del mismo kart y cada marca del estado contra el ruido); `peso-ia.mjs <perfil>`. Los resultados están en
+`build/web/datos/w32/` y `build/web/datos/cpu-niveles-w32-*` (tiempos del juego: nunca a git).
+
+## §259 — W31, guardar la traducción de las listas de dibujo y los render bundles: **descartado por su techo** — saltarse TODOS los dibujos de las listas (sin imagen) da +4 % en la gama baja; reconocer una lista cuesta casi lo mismo que traducirla; solo el 3,5 % de las listas son de objetos quietos · 2026-11-09 19:15
+
+**Qué se quería saber.** El dueño pidió W31 el 2026-11-09 («Sí, arranca W31»). El juego llama en cada imagen ~1.300–2.300
+**listas de dibujo** (glosario) y aurora las vuelve a traducir a WebGPU cada vez. La idea: guardar la traducción de cada
+lista (la **caché de la traducción**, glosario) y grabar como **render bundles** (glosario) las órdenes de los objetos
+que no se mueven. La ficha estimaba +5–10 % en la gama baja. Antes de construirla (semanas), la prueba barata: medir lo
+MÁS que podría ganar, como en E4 (§222) y W22 (§224).
+
+### 259.1 El instrumento
+
+Una copia propia de aurora, `terceros/aurora-w31` (la de hoy de `terceros/aurora-main-viejo-motor` con sus cambios, sin
+tocarla ni a la de N8; el cambio en `parches/aurora-w31.diff`). En `GXCallDisplayList` (`lib/dolphin/gx/GXDispList.cpp`)
+cada lista se reconoce por su dirección y se calcula la huella xxh3 de sus bytes y la de las matrices con que se llama
+(las 10 `pnMtx` y la proyección). Es **repetida** si sus bytes son los de la última vez y de un **objeto quieto** si además
+las matrices son las mismas (glosario). El interruptor de la página `?w31=…` (`web/navegador/mkw.mjs`,
+`mkwEstado.w31()`; `medir-sitio` imprime «w31 (§259)»):
+- `contar`: solo cuenta (listas, KB, dibujos, ms de traducir cada clase y ms de las huellas);
+- `todas`: el **techo**: ningún dibujo de ninguna lista se traduce ni se manda (los registros de estado sí se leen, así el
+  estado de GX queda como debe). Es lo más que podría ganar CUALQUIER caché de la traducción, que además tendría que
+  reconocer la lista y mandar igual los dibujos. La imagen pierde la pista y los karts: es solo para medir;
+- `quietos`: lo mismo, solo con las listas de los objetos quietos.
+
+Un solo programa (W30 adoptada, `MKW_MOTOR_W30=7`, + esta aurora): `build/web-w31`. Lo único distinto entre corridas es
+`?w31`. `bash herramientas/tanda-w31.sh compilar contar chrome` (el tramo fijo §163: 12 CPU, semilla 1234, cuadros
+600–2400, sin tope, `&dibujarSiempre=1&n8=0`; la gama baja `&lastre=7&lastreAyuda=5&ladron=64&lastreGpu=15` con
+`--js-flags=--wasm-enforce-bounds-checks`). Datos en `build/web/datos/w31/` (con nombres del juego: nunca a git).
+
+### 259.2 Lo medido
+
+**El reparto** (`?w31=contar`, por imagen):
+
+| | Este PC | Gama baja |
+|---|---|---|
+| Trabajo por cuadro | 10,27 ms | 21,49 ms |
+| Listas por imagen / KB | 1.352 / 288 | 2.316 / 405 |
+| Dibujos dentro de listas | 4.151 | 6.438 |
+| **Traducir todas las listas** | **0,48 ms (4,7 %)** | **1,48 ms (6,9 %)** |
+| …de ellas las repetidas (46 % de las listas) | 0,37 ms | 1,01 ms |
+| …de ellas las de objetos quietos (3,5 % de las listas, ~10 % de los dibujos) | 0,03 ms | 0,07 ms |
+| **Las huellas para reconocerlas** | **0,39 ms** | **1,17 ms** |
+
+**El techo en Chrome** (cuadros de lógica por segundo, cada modo contra el `0` de su vuelta, intercalados):
+
+| | vuelta 1 | vuelta 2 | vuelta 3 |
+|---|---|---|---|
+| Gama baja: 0 | 7,95 | 7,46 | 7,37 |
+| Gama baja: todas | 7,96 (+0,1 %) | 8,05 (+7,9 %) | 7,75 (+5,2 %) |
+| Gama baja: quietos | 7,81 (−1,8 %) | 8,14 (+9,1 %) | — |
+| Este PC: 0 | 86,14 | 98,96 | — |
+| Este PC: todas | 97,71 (+13,4 %) | 93,72 (−5,3 %) | — |
+| Este PC: quietos | 94,87 (+10,1 %) | 96,13 (−2,9 %) | — |
+
+La vuelta 2 se cruzó con las fotos del 259.3 (corrieron a la par). La vuelta 3 se cortó tras su primer par, por pedido
+del dueño («no necesitas tercera vuelta»).
+
+**Qué significa.**
+- **Traducir las listas es poco: 4,7 % del cuadro en este PC y ~7 % en la gama baja.** Aun sin dibujar ninguna, el techo
+  da +4,4 % de promedio en la gama baja (+0,1 / +7,9 / +5,2) y ~+4 % en este PC (+13,4 / −5,3, dentro del ruido). Está
+  por debajo del +8 % que pide la regla de los pares para adoptar, y es un techo imposible: la imagen queda sin pista ni
+  karts.
+- **Reconocer una lista cuesta casi lo mismo que traducirla:** las huellas de los bytes y las matrices suman 0,39 ms en
+  este PC contra 0,48 ms de traducir todo (0,37 de las repetidas). Una caché de verdad tendría que pagar eso en cada
+  llamada y, además, volver a mandar los dibujos (vértices, constantes, la orden): lo que queda para ganar es ~0.
+- **Casi nada está quieto:** en la carrera la cámara se mueve en cada cuadro, así que solo el 3,5 % de las listas (0,03 ms)
+  llegan con las mismas matrices. **Guardar las matrices de los objetos quietos (la pregunta 2 del encargo) no tiene dónde
+  ganar.** La pista no se mueve, pero la cámara sí y cada matriz la incluye.
+- **Los render bundles ya estaban medidos** por W22 (§224): repetir la imagen entera como bundles grabados baja su
+  codificación de 0,18 a ~0,10 ms (−0,08 ms, ~0,8 % del cuadro). No se volvieron a medir.
+
+### 259.3 La imagen: las sombras cuadradas (lo vio el dueño)
+
+El dueño vio en la ventana de la medición sombras cuadradas y grises bajo las cajas y los karts («antes no las veía»), y la
+pantalla negra con solo el marcador. Eran los modos techo. Comprobado con `prueba-foto-igual.mjs` en el mismo programa
+(`--extra-a=&w31=0 --extra-b=&w31=quietos`, la Contrarreloj contra el experto, cuadro 600): con `?w31=0` la sombra del kart
+es la mancha suave de siempre; con `quietos` se vuelve un cuadro gris. La sombra es un **dibujo en dos pasos** (glosario):
+la lista que marca la forma es «quieta» y se saltaba, la que oscurece no. **Es una trampa más para cualquier caché:** no
+se puede decidir lista por lista, porque hay dibujos que dependen del anterior. El programa de jugar no tiene nada de esto
+(el instrumento vive solo en `build/web-w31` y solo con `?w31=…`).
+
+### 259.4 Veredicto
+
+**W31 queda descartado por su techo**, como W24 (§227) y N11 (§229). No se construyen la caché por lista, los bundles ni
+el modo `verifica`: aun el techo imposible (sin dibujar ninguna lista) no llega al +8 %, reconocer una lista cuesta casi
+lo mismo que traducirla, los objetos quietos son el 3,5 % y los bundles ya estaban medidos en −0,08 ms. Como nada se
+adopta, no se corrieron la sala, el fantasma ni la foto igual contra la base (el programa de jugar no cambia).
+
+**Archivos** (míos, sin nada del juego): `parches/aurora-w31.diff` (sobre `terceros/aurora-w31` @ `004b6c9`, el estado
+del 2026-11-09 de la aurora de siempre), `herramientas/tanda-w31.sh`, `herramientas/compilar-web.py` (exporta
+`_mkw_web_w31`/`_mkw_web_w31_dato` si la aurora los trae), `web/navegador/mkw.mjs` (`?w31`, `mkwEstado.w31()`),
+`herramientas/medir-sitio.mjs` (imprime «w31 (§259)»). El programa `build/web-w31` no va a git.
+
+### 259.5 Trampas
+
+1. **El techo cambia la imagen:** los modos `quietos` y `todas` dejan la pantalla con sombras cuadradas o negra; avisar al
+   dueño antes de correrlos (mira las ventanas de la medición).
+2. **«Quieto» depende de la cámara:** una lista de la pista se llama con las matrices de la vista, que cambian en cada
+   cuadro aunque la pista no se mueva.
+3. **Medir con `emscripten_get_now` alrededor de cada lista** cuesta algo (unas 4 llamadas por lista): por eso `contar`
+   sube el trabajo de la gama baja de ~18 a ~21,5 ms. Los ms de cada clase valen como proporción, no como absoluto.
+
+---
+
+## §260 — La imagen intermedia de N8 pareja (después de G16): **adoptado** — la toma se anota cuando aurora pide la textura y el compás se aleja del borde; con la intermedia a 240 Hz, imágenes de 4 refrescos 50–64 % → 92–97 %; a 60, el 1 % bajo 89 → 92 %; la sala idéntica; la gama baja sin costo · 2026-11-09 19:40
+
+**Qué se pidió.** G16 (§256) dejó un hallazgo. Con «Imagen: con imagen intermedia» (N8 modo 2) las imágenes salían de
+a pares desparejos: una de 3 refrescos y la siguiente de 5 (13 y 20 ms en un monitor de 240 Hz), en vez de 4 y 4
+(16,7 ms). El 1 % bajo era el 75 % de los fps. Hecho = la mayoría de las imágenes en 4 refrescos y el 1 % bajo hacia
+el 90 %, sin empeorar la gama baja y con la sala idéntica.
+
+**Cómo es la intermedia** (§219). Con N8 modo 2 el juego dibuja uno de cada dos cuadros. En el cuadro dibujado aurora
+muestra una imagen inventada a medio camino (la «intermedia») y guarda la de verdad para mostrarla en el cuadro
+saltado. Son dos imágenes por cada dibujo, y las dos tienen que salir separadas por el mismo tiempo.
+
+### 1. Buscar la causa (`?diagN8=1`, solo para medir)
+
+- La sospecha de §256: las dos imágenes salen en momentos distintos del cuadro, y el arreglo sería en C++.
+- Para comprobarlo se agregó a la página un contador por tipo de imagen (`?diagN8=1`, `window.__diagN8`;
+  `medir-enlinea` lo imprime como «N8 por tipo»). Cuenta, para cada imagen, cuántos ms pasaron desde la anterior y a
+  cuántos refrescos de la toma anterior aurora pidió la textura (`getCurrentTexture`). Sabe de qué tipo es cada imagen
+  por el contador de dibujos de N8 (`mkw_n8_estado(0)`).
+- **Resultado:** el momento de la entrega no era el problema. La imagen guardada se pide siempre a 3 refrescos de la
+  toma anterior. La intermedia se pide entre 3 y 3,5 refrescos, justo en el borde de una actualización de pantalla.
+  Si el navegador alcanza a tomarla en ese refresco, dura 3; si no, sale en el siguiente y dura 5. Al otro lado, la
+  siguiente compensa. Por eso salían 3 y 5 alternados.
+
+### 2. El arreglo (`web/navegador/mkw.mjs`, el compás de la toma)
+
+El compás (§54) decide a qué refresco del monitor se espera cada imagen: el de la toma anterior + 4 refrescos (a 240 Hz).
+Se cambiaron dos cosas:
+
+1. **La toma se anota cuando aurora pide la textura**, no cuando el juego entrega el cuadro. El gancho de
+   `getCurrentTexture` marca `relojMonitor.adquirida`. El siguiente `tic` del monitor anota ese refresco como la última
+   toma (`?tomaTic=0` = como antes). Así el compás cuenta desde lo que de verdad se vio.
+2. **El compás no se queda en el borde** (la histéresis, `MARGEN_TOMA`). Si la imagen llega a menos de medio refresco
+   antes del refresco que le toca, no se intenta alcanzarlo: se espera a propósito al siguiente. La fase se corre una
+   vez y las imágenes que siguen quedan lejos del borde. `?margenToma=0` = sin el margen, `=M` = M refrescos (0,5 por
+   omisión). `relojMonitor.diagCompas.corridas` cuenta cuántas veces se corrió.
+
+**Comparación eléctrica.** Es como un comparador con histéresis (Schmitt). Si la señal anda justo en el umbral, el
+comparador sin histéresis cambia de estado a cada rato con el ruido. Con una banda de histéresis decide una vez y se
+queda.
+
+### 3. Medido (`medir-enlinea --ventana`, monitor de 240 Hz, 60 s de carrera de la sala, intercalado ×2)
+
+`build/web/datos/g16/diag-margen-ventana.txt`:
+
+| Imagen | margen | imágenes de 4 refrescos | 3 / 5 refrescos | 1 % bajo / fps | corridas |
+|---|---|---|---|---|---|
+| intermedia | 0 (antes) | 1819 y 2316 de 3601 (50 % y 64 %) | 872/876 y 636/635 | 74 % y 78 % | 0 |
+| intermedia | 0,5 | 3331 y 3486 (**92 % y 97 %**) | 86/132 y 34/58 | 76 % y 80 % | 85 y 43 |
+| 60 | 0 | 3541 y 3541 (98,3 %) | 25/33 y 25/31 | 89 % y 89 % | 0 |
+| 60 | 0,5 | 3564 y 3570 (**99,0 %**) | 17/16 y 8/15 | **92 % y 92 %** | 17 y 18 |
+
+- **Lo que se ve en el monitor:** con la intermedia, casi todas las imágenes duran ahora 4 refrescos, como a 60.
+- **El 1 % bajo de entrega a entrega** de la intermedia sube poco (74–78 → 76–80 %). La intermedia y la guardada siguen
+  entregándose en momentos distintos del cuadro, separadas por 12–17 ms y 17–21 ms. El monitor ya no lo muestra: las dos
+  caen en su refresco. Ese vaivén es más chico que un refresco. Igualarlo también en la entrega sería mover la imagen
+  guardada en C++ (aurora); para lo que se ve no hace falta.
+- **A 60 también mejora:** el 1 % bajo de 89 a 92 %.
+
+### 4. La gama baja (control; `medir-sitio`, carrera directa de 12 CPU, la revisión de límites de Android)
+
+| n8 | margen 0 | margen 0,5 |
+|---|---|---|
+| 0 | 15,7 fps, CPU 63,7 ms, 1 % bajo 54 % | 16,6 fps, CPU 60,2 ms, 54 % |
+| 2 | 10,9 fps, CPU 72,0 ms, 39 % | 11,5 fps, CPU 65,9 ms, 51 % |
+
+No cuesta nada (la diferencia es ruido, a favor). Ahí el juego no espera al monitor: la CPU no llega.
+
+### 5. Pruebas
+
+- `prueba-imagen` 8/8: los 21 cambios en caliente de G15, sin fotos negras, la lógica a 60, el gráfico de G16.
+- La sala con A en «30 parejas» (`n8=1`) y B en «intermedia» (`n8=2`): `prueba-sincro --directa` 15/15, huellas 75/75.
+  Solo cambia cuándo se muestra, no la carrera.
+- Los bancos `imagenes-vista` y `graficos` no se tocaron.
+
+**Tanda:** `G16_ETIQUETA=margen G16_VENTANAS=--ventana G16_VARIANTES="&n8=2&margenToma=0 &n8=2 …" bash
+herramientas/tanda-g16.sh diag` y `G16_PERFILES=baja G16_MODOS="0 2" [G16_EXTRA=&margenToma=0] bash
+herramientas/tanda-g16.sh medir`.
+
+**Qué significa.** Con «imagen intermedia» el monitor muestra ahora cada imagen el mismo tiempo, igual que a 60. La
+causa no estaba en el juego: el compás de la página intentaba alcanzar un refresco que quedaba justo en el borde. A 60
+sale casi en la meta (92 % de 95 %). La prueba en el teléfono real la hace el dueño al final.
+
+---
+
+## §261 — El cierre del plan de rendimiento: el programa final con W30 y PGO nuevo (`build/web-final-w30`), su planilla y 12 jugadores desde la página · 2026-11-09 21:20
+
+**Qué se pidió.** Terminado el plan de rendimiento, armar el programa que se publica con **todo lo adoptado** y probarlo
+(el dueño, 2026-11-09: «Sí, al terminar G16»), y además 12 jugadores a la vez entrando desde la página. Después el dueño
+acortó las pruebas a lo esencial («solo las esenciales, livianas y cortas», todo listo antes de las 22:00) y pidió no
+probar los aparatos que ya se sabe que no llegan a 60 de lógica. Recordatorio del dueño: el juego final va **siempre a
+60 de lógica**; lo que pasa de 60 es solo visual (más suave).
+
+**Qué entró** (partiendo del candidato de hoy, `build/web-e6-w29-clip` = E6 + H6 + W29 + el arreglo de §248):
+- **W30** (§257): las cuentas de wasm en vez de imitar la Wii al último bit (la copia `terceros/Wiicompiled-motor-w30`
+  = H6 + `parches/motor-w30.diff`, `MKW_MOTOR_W30=7` por omisión);
+- **G11–G13, G15, G16 y §260** (la imagen intermedia pareja): son de la página (`web/navegador/`) o de aurora y entran
+  solos (la página se sirve tal cual; aurora es la misma `terceros/aurora-main-viejo-motor`);
+- **no entran** W31 (§259) ni W32 (§258), descartados.
+
+### 1. Compilar (19:33–19:55, con el candado)
+
+```bash
+MKW_WIICOMPILED=terceros/Wiicompiled-motor-w30 MKW_AURORA=terceros/aurora-main-viejo-motor \
+  python herramientas/compilar-web.py --modo navegador --final --carpeta build/web-final-w30
+```
+(o `bash herramientas/tanda-cierre.sh compilar`, que además copia las semillas `pipelines.bin`/`bloques.json` y las
+imágenes del candidato de hoy, y comprime). `--final` puso solo: `--fija` (H6), `--memoria-fija 768` (W29), ThinLTO y
+**PGO con un perfil nuevo** (el programa que cuenta cambió con W30: huella `800adad38bc220eb`; las 3 carreras en
+`%TEMP%/mkw-pgo/web-final-w30/`, nunca a git). Tardó 22 min. Resultado: `mkw.wasm.br` **13,7 MB** (el de hoy, 14,0).
+
+### 2. La planilla (`correr-todo.mjs` con `MKW_BUILD=build/web-final-w30/navegador` → `build/web/datos/todo/20261109-1956/`)
+
+Pasaron (bien/mal): banco 10/0 · sitio 0 fallas · subir-r2 25/0 · arranque-node 13/0 · navegador 22/0 · partidas 6/0 ·
+nube 9/0 · trofeos 9/0 · táctil 14/0 · elegir 69/0 · piloto 9/0 · menús 8/0 · inicio 15/0 · caída 7/0 · copa 11/0 ·
+sincro 13/0 · sincro-sala 13/0 · enlinea-sala 11/0 · modos 9/0 · modos-playlist 9/0 · directa 13/0 · directa-elegir 15/0 ·
+**sincro-directa 15/0** (la misma carrera en dos pestañas del final, huellas iguales; por eso no se repitió aparte) ·
+copa-azar 6/0 · doce 12/0 · fantasma 10/0 · **fantasma-igual 6/0** · sincro-largada 17/0 · sincro-cloudflare 17/0 ·
+desconexión 95/0.
+- `sala-doce` 9/4: el teléfono simulado no llega a 60. Son **las mismas 4 que con el programa de ayer** (2026-11-08),
+  la meta abierta de V7 (§237): no es de W30. El dueño pidió no gastar tiempo en esos aparatos.
+- `sala` 45/1: un punto del VR de la carrera 2 (A contó como cortada en el cuadro 100, con la máquina cargada). El resto
+  de la sala (puntos, descanso, parrilla) está bien. Sin tiempo para repetirla (el dueño acortó); queda anotado.
+- No se corrieron (cortado por el dueño a las 21:00; son de la página y W30 no los toca): energía, espacio, foto-igual,
+  imagen, informe, invitados, música, playlist, precarga, relevo, texturas-bc, vr, w10-dos.
+
+### 3. La velocidad en este PC (el tramo fijo de §163, 2 pares intercalados; sin la gama baja, por pedido del dueño)
+
+`medir-sitio --sola --piloto … &modo=directa&pista=0.0&semilla=1234&soloCpu=1&cpu=maximo&sinTope=1&tramo=600-2400&anillo=0&dibujarSiempre=1&n8=0`
+(`CIERRE_SIN_BAJA=1 bash herramientas/tanda-cierre.sh chrome`). Con `sinTope` la lógica corre sin freno **solo para
+medir el margen** de la CPU; en el juego va siempre a 60.
+
+| par | hoy (`web-e6-w29-clip`) | final (`web-final-w30`) | diferencia |
+|---|---:|---:|---:|
+| 1 (el final primero) | 93,95 cuadros/s | 88,67 | −5,6 % |
+| 2 (hoy primero) | 90,14 | 99,28 | +10,1 % |
+| media | | | **+2,2 %** |
+
+Es la zona gris (la regla permite hasta 6 pares), con mucho ruido entre pares (otra sesión esperando y las ventanas
+abiertas). W30 ya se midió solo en §257 (este PC +5,9/+7,7 %, gama baja +7,1/+3,4 %); aquí no sale peor. El margen a 60
+es de ~1,5× (10–11 ms de CPU por cuadro de los 16,7 que hay).
+
+### 4. Los 12 jugadores desde la página (pedido del dueño; `herramientas/prueba-doce-sitio.mjs`, nueva)
+
+**Cómo.** El ensayo de `experiencia.mjs` (emuladores de Firebase con las reglas del sitio, el Worker de verdad) con
+**12 cuentas** (`--cuentas 12`, nuevo: Piloto Uno … Piloto Doce) y los emuladores corridos 20000 puertos; 12 Chrome
+**separados, cada uno con su perfil nuevo** (caché vacía = otro PC, con su propio proceso de tarjeta), en una cuadrícula
+de 4 × 3 en el monitor de `MKW_VENTANA`, con `--mute-audio`. Cada uno: Juegos → la ventanita del emulador → la sala por
+el enlace («Unirse a la partida») → la precarga → «¡A correr!» → la cortina → elegir personaje en el juego → la carrera.
+La ronda 0 es la anfitriona **sola** (1 humano + 11 CPU): la vara de una ventana en este PC. La ronda 1 son los 12. Por el
+tiempo se corrió `--rondas 0,1 --corta` (una carrera, con una ventana frenada). Las rondas largas (la recarga, echar, el
+cambio de anfitrión, 6 + 6 CPU y los modos) quedan en la herramienta; se ensayaron con 3 ventanas y el programa de hoy
+(37/40: los 3 mal eran de la prueba y se arreglaron; la recarga, echar a una con la carrera andando, el descanso de
+30 s y el fin de la copa anduvieron). Resultados en `build/web/datos/doce-sitio/`.
+
+**Resultado: 26 bien, 1 mal, 5,3 min.**
+- **Entraron los 12 desde cero**: la sesión en 12 s la última; el «● listo» de la precarga a los 110–122 s de abrir
+  Chrome (las 12 bajando a la vez del Worker local, con 50 ms de demora); «12 de 12» en el vestíbulo; ninguna se cayó.
+- **Al apretar «¡A correr!»**: la cortina de preparación termina entre los 27 s (la anfitriona, que ya traía la caché de
+  la ronda 0) y los 46 s; todas eligen en el juego; el «¡YA!» sale en **las 12 a los 98,5–98,7 s**, en el mismo cuadro
+  (la cuenta en el 172, el «¡YA!» en el 412). La diferencia de hora del «¡YA!» fue de **244 ms** contra un tope de 200
+  (§250): el único mal. Con 12 juegos en un PC de 16 hilos cada uno va justo y se atrasa algo; con una sola ventana
+  (ronda 0) la diferencia es 0.
+- **El rendimiento de una no tumba a las otras**: con los 12, la lógica fue en promedio de **56,2 cuadros/s** (55,2–56,8)
+  contra **59,3** de la ventana sola, y la espera a los demás de 0,2 ms por cuadro. Lo que falta es **la máquina**
+  (12 juegos comparten 16 hilos; el juego subió de 19,7 a 21,9 ms por cuadro), no la red. Con la ventana 12 frenada ×4
+  (corría a 4 cuadros/s) **las otras 11 subieron a 58,3** (quedó CPU libre) y nadie se separó: las huellas coinciden en
+  las 12 y los puntos (suman 73) son iguales en todas.
+- Llamadas al Worker de toda la prueba: 1.559 (12 jugadores desde cero).
+
+### 5. Lo que sube el dueño (`node herramientas/subir-r2.mjs`, solo revisar: nada salió de este PC)
+
+Con `MKW_BUILD=build/web-final-w30/navegador`: **7.324 archivos, 5,00 GB** → `build/web/publicar/lista.tsv`; versión
+`9722410715fb92a7`, programa `cc6fba23ac6bec58`. Lo que cambió desde la subida anterior es el programa (`mkw/build/`:
+`mkw.wasm.br`, `mkw.js`, …); el disco, Retro Rewind y las semillas son los mismos. Subir: `--subir` con las llaves de R2
+(`docs/publicar.md` §0).
+
+**Herramientas nuevas**: `herramientas/tanda-cierre.sh` (`compilar todo igual chrome doce r2`; `CIERRE_SIN_BAJA=1`,
+`DOCE_ARGS`), `herramientas/prueba-doce-sitio.mjs` (`--n`, `--rondas`, `--corta`) y `experiencia.mjs --cuentas N`.
+
+**Trampas.** (1) La planilla entera dura ~75 min, no 25 (`desconexion` sola, ~25). (2) Con 12 juegos en un PC el «¡YA!»
+puede pasar el tope de 200 ms de §250 por la carga, no por la sala. (3) Matar la tanda con `kill -9` deja el candado
+puesto a mi nombre (sin el `trap`): la tanda siguiente con el mismo `QUIEN` lo reusa y lo suelta al final.
+
+## §262 — Ocultar los avisos de lag: la casilla «Mostrar avisos de conexión y lag» (Avanzado → Gráficos), prendida por omisión · 2026-11-09
+
+**Qué se pidió.** El dueño: «agrega una opcion para ocultar los mensajes de lag». En la sala, cuando la red o una PC van
+lentas, salen carteles encima del juego (📶 «X va lento», 🔴 «X llega por otro piloto», «la sala va lenta por X»…). Hay
+jugadores que prefieren no verlos. Hecho = una casilla que los esconde en el momento, sin tocar la carrera, y que deja a
+la vista los avisos graves.
+
+**Cómo es.** Es como poner un interruptor en la lámpara piloto de un tablero: la lámpara deja de encenderse, pero el
+relé que vigila la línea sigue trabajando igual. Aquí la «lámpara» es el cartel y el «relé» es el lockstep, el relevo y
+el árbitro, que no cambian.
+
+- **La casilla.** Avanzado → Gráficos, abajo, junto a «Mostrar los fps» y «Mostrar el ping»: «Mostrar avisos de
+  conexión y lag». Viene marcada. Se guarda en el navegador (`localStorage` `mkw.avisosLag`: `'0'` = escondidos; si el
+  navegador no deja guardar, vale igual en esa visita). Se aplica en el momento: al desmarcarla en plena carrera, los
+  carteles puestos se van; al marcarla de nuevo vuelve lo que todavía estaba vigente. `?avisosLag=0|1` la fuerza (para
+  las pruebas; la casilla sale gris y la nota lo dice).
+- **El código.** `web/navegador/avisos-lag.mjs` (nuevo): `crearAvisosLag` (lo guardado, `?avisosLag`, `fijar`, `pasa`,
+  los contadores `estado()`), `CHIPS_LAG` (las claves de lag) y `crearChips`, el pintado de los chips de la esquina, que
+  antes vivía dentro de `interfaz.mjs` y se trajo aquí para probarlo en el banco (hace exactamente lo mismo que antes
+  cuando no hay filtro). `interfaz.mjs` lo usa con `filtroChip`; `graficos.mjs` pone la casilla (`avisosLag` en
+  `montarGraficos`); `mkw.mjs` crea el filtro antes de la interfaz, esconde el aviso de «otra parte de la sala se
+  separó» y suma `avisosLag` al informe de rendimiento.
+- **El registro sigue completo.** `mkwEstado.log` anota lo mismo que antes (más una línea «[avisos] … escondidos» al
+  arrancar o al cambiar la casilla). Las listas de las pruebas (`window.mkwAvisosRelevo`, `mkwAvisosLento`,
+  `mkwAvisosCorte`) también. `window.mkwAvisosLag.estado()` = `{prendidos, forzado, ocultos, mostrados, porClave}`
+  (cuántos chips de lag se escondieron y cuántos se pintaron). `mkwInformeRendimiento().avisosLag` dice lo mismo.
+
+### 1. Cuál se esconde y cuál no (uno por uno)
+
+El criterio: se esconde lo que solo informa que algo va lento. Queda lo que pide una acción o explica algo grave (tu
+carrera se cortó, la carrera está parada esperando a alguien, te echaron, la sala se cerró).
+
+| Aviso | Dónde sale | Con la casilla apagada |
+|---|---|---|
+| 📶 «X va lento» / «X y Y van lentos» (el relevo de la sincronía) | chip `red`, esquina | **se esconde** |
+| 📶 «Tu conexión o tu PC van lentas: tu kart responde con retraso» | chip `red` | **se esconde** |
+| 📶 «Tu PC o tu conexión se trabaron: tu kart siguió solo un momento…» (pausa del relevo rápido) | chip `red` | **se esconde** (vuelve sola en un momento) |
+| «La sala va lenta por X» / «Tu PC no alcanza» (la vigía de cada 3 s, `vigiaLento`) | chip `lento` | **se esconde** |
+| 🔴 «X llega por otro piloto» / «X sin conexión» (`conexiones.mjs`) | chip `conexion` | **se esconde** |
+| «X no llega a 60 en esta PC» antes de largar (N12, §233) | chip `lentos` | **se esconde** |
+| 📶 «Una parte de la sala se separó de esta carrera: vuelven en la siguiente» (`alPartida`, no soy yo) | centro | **se esconde** (es de otros, no cambia nada para mí) |
+| 📶 «Tu carrera se separó de la de los demás…: vuelves en la siguiente» (`alPartida`, soy yo) | centro | **queda**: mi carrera terminó y tengo que saber por qué |
+| 📶 «Tu aparato quedó demasiado atrás para seguir esta carrera…» | centro | **queda** (lo mismo) |
+| 📶 «Te desconectaste de esta carrera…» / «Se cortó tu conexión: tu kart sigue sin ti…» | centro | **queda** |
+| 📶 «Se cortó TU conexión: no llega nada de los demás. Esperando volver…» | centro | **queda** (la carrera está parada para mí) |
+| «Se cortó la conexión con X: lo esperamos N s…» / «Esperando a X: su navegador todavía arma la pista…» | centro | **queda** (la carrera está parada: explica por qué) |
+| «Esperando a que X termine de cargar la pista…» | centro | **queda** (lo mismo) |
+| «Se cortó la conexión con la sala: volviendo a entrar…» / «No se pudo volver a la sala» | centro | **queda** |
+| «Oracle no está disponible…» / «Oracle dejó de arbitrar…» (chip `arbitro`, §236) | esquina | **queda**: dice cómo quedó armada la sala, una vez, no es lag |
+| Te echaron, la sala se cerró, el anfitrión se fue (lo dice el sitio) | sitio | **queda** (no pasa por aquí) |
+| 🔋 ahorro, 🌡️ calor (§190), el medidor de fps/ping | esquina | **queda** (no son de la sala; el medidor ya es opcional) |
+
+Fuera de la página: el ícono 🟢/🛰/🔴 al lado de cada piloto en la tira del vestíbulo es del sitio
+(`colabtex/src/juegos/mkw.js`) y no se tocó (esta tarea era solo de la página; además está fuera de la carrera).
+
+### 2. Pruebas
+
+- **Banco `avisos-lag`** (nuevo, 26 puntos, sin el juego): lo guardado (por omisión a la vista, `'0'` = escondidos, el
+  almacén bloqueado no rompe), `?avisosLag` fuerza y no toca lo guardado; **prendida = los mismos chips, textos y
+  colores que sin el filtro** (como antes); **apagada = ningún chip de lag** y los demás siguen (árbitro, calor), el
+  mismo texto repetido cuenta una vez; apagar en plena carrera saca los puestos y prender los devuelve; la casilla en
+  Gráficos (marcada, desmarcarla esconde, con `?avisosLag=0` gris). `node banco/correr.mjs avisos-lag`.
+- Los bancos que toca el cambio, sin fallas: `graficos` 66, `conexiones` 24, `sala-carrera` 101, `letreros` 17,
+  `ocultar` 11.
+- **Con el juego:** `prueba-sincro --directa --lento --extra-b=&avisosLag=0` (B con la CPU a la mitad y los avisos
+  apagados; el punto nuevo «§262» mira que B no pintó ningún chip de lag pero los anotó igual, que A los pintó, y las
+  huellas de siempre dicen que la carrera es la misma). Resultado (2026-11-09): 13 bien, 2 mal. El punto §262 pasó: A con la casilla prendida pintó 4 chips de lag y no escondió ninguno; B forzada a apagada escondió 14 (13 «la sala va lenta», 1 📶 del relevo) y no pintó ninguno; las huellas coinciden (A 57, B 57: la misma carrera). Los 2 que fallan no son de esta opción: la largada §250 (298 ms de diferencia de hora en el «¡YA!», el tope es 200) y «con el árbitro y B lenta, A no la espera» (A esperó 2,04 ms por cuadro, el tope es 1). Para saberlo se corrió la misma prueba **sin** `&avisosLag=0` (control, `build/web/datos/sincro-262-control/`): 12 bien, 2 mal, los mismos dos (298 ms y 2,04 ms). O sea, fallan igual con la opción o sin ella: es un tema de la largada y de la espera con B frenada en este PC (había otra sesión midiendo), no de los avisos. Queda anotado como pendiente aparte.
+
+### 3. Qué significa
+
+Un jugador que no quiere ver los carteles de lag los apaga con una casilla y la carrera sigue exactamente igual (la
+misma huella en las dos pantallas). Si su propia carrera se corta, o la carrera queda parada esperando a alguien, igual
+se entera.
+
+## §263 — La bienvenida, la «Ayuda de ajustes», Controles al estilo Big Picture y los mandos de Switch 2 y genéricos · 2026-11-09
+
+**Qué se pidió.** La sesión principal (para el dueño): un mensaje de bienvenida «claro, limpio, bonito y simple» que explique
+los ajustes y cómo dejarlos a gusto según el aparato (PC, teléfono, mando), que salga la primera vez y una vez después de cada
+actualización, que se pueda cerrar con «No volver a mostrar», que nunca salga en una carrera, y lo mismo siempre a mano en
+la ayuda. Después el dueño, directo en esta sesión: «no se entiende» (había que escribirlo más simple); «haz un leve rework
+de la interfaz de reasignación de botones con mando, debiera verse algo parecido al de Steam Big Picture»; «agrega
+compatibilidad con mando Switch y Switch 2», «y mandos genéricos»; «mejora un poco este render» (el dibujo del mando).
+
+**Qué es, en simple.** Es como la placa de instrucciones pegada en la tapa de un tablero nuevo: la ves al abrirlo la primera
+vez, dice «si pasa esto, mueve aquel interruptor» y, al lado de cada frase, una flecha que lleva al interruptor. Si cambia
+el tablero (una versión nueva del mensaje), la placa vuelve a aparecer una vez.
+
+### 263.1 El mensaje de bienvenida (`web/navegador/bienvenida.mjs`, nuevo)
+
+- **Cuándo sale.** Una vez por versión del mensaje: la página guarda `mkw.bienvenida.version` (hoy `1`) al cerrarlo de
+  cualquier forma; si la versión guardada es menor (o no hay), sale. «No volver a mostrar» guarda además
+  `mkw.bienvenida.nunca` (ya no sale ni con versiones nuevas). Si el navegador no deja guardar (modo privado), sale una vez
+  por visita y no rompe nada. Con Playwright (`navigator.webdriver`) no sale salvo `?bienvenida=1`; `?bienvenida=0` lo apaga.
+- **El momento** (`momentoBienvenida` en `mkw.mjs`): sin la cortina de carga, sin carrera (ni su cuenta), con la pestaña a
+  la vista, sin otro diálogo, selector de pistas, editor de Mii o del mando en pantalla abierto. En la sala, solo en el
+  descanso entre carreras y con 10 s o más por delante; si la carrera empieza con el mensaje abierto, se cierra solo **sin**
+  marcarlo visto (sale en el próximo buen momento). Mientras está abierto, el juego sigue andando debajo pero no recibe los
+  botones de la persona (`controles.silenciar`): una A en «¡A jugar!» no es también una A en el menú del juego.
+- **Qué dice** (114 palabras en el PC, se lee en menos de 30 s). Título «Te damos la bienvenida a JloKart Wii» (el nombre de la pantalla de inicio, pedido del dueño) y una tarjeta por
+  caso, cada una con su botón que lleva al ajuste: 💻 «El juego va lento o se traba» → «Elegir imagen» (Gráficos → Imagen,
+  «30 parejas»); 📱 «Juegas en el celular» (solo en un teléfono) → ⚡ «Liviano» (lo pone ahí mismo, con «Deshacer») y
+  «Mover botones» (el editor del mando en pantalla); 🎮 «Juegas con mando o teclado» → «Cambiar botones» (la hoja Controles);
+  🌐 «Juegas con otros en una sala» → «Ocultar avisos» (la casilla de §262). Abajo: «Para volver a verlo: ⚙ → Avanzado →
+  Ayuda de ajustes», «No volver a mostrar» y «¡A jugar!» (con el foco: Enter o A lo cierra).
+- **Llevar al ajuste** (`llevarA`): abre la hoja del cajón, desplaza hasta el control, le pone el foco y lo marca con un borde
+  lila que late dos veces (`.bv-resaltado`, 2,5 s; quieto si el sistema pide menos movimiento).
+- **Cómo se maneja.** Con el ratón, el teclado (Tab, Enter, Esc), el cursor del mando del sitio (`mando-sitio.mjs`: el
+  mensaje es un `<dialog>` y `menuDePagina` lo cuenta como menú; B del mando = Esc) y el dedo (botones de 44–48 px). En un
+  teléfono parado es una hoja que sube desde abajo; acostado, título y tarjetas compactos; si las tarjetas no caben, el
+  borde de abajo se difumina y sale «▾ Más abajo». El mando en pantalla se esconde mientras tanto.
+- **La «Ayuda de ajustes»** (`montarAyuda`): primera cosa de la hoja Avanzado (`#ayudaAjustes`), los mismos casos plegables
+  con una frase más cada uno y más botones (Resolución de salida, Zona muerta, Acelerar solo, Ver Celular), un 5.º caso «El
+  navegador se queda sin espacio» → «Datos del juego» (§251), «Ver el mensaje de bienvenida» y «¿Pedirás ayuda a alguien?
+  Copia el informe en ⚙ → Avanzado → Diagnóstico y pégaselo».
+- **Primera versión rechazada.** El dueño vio la primera («no se entiende»): hablaba de «N8», «lógica» y «modos de imagen».
+  Se reescribió todo en palabras de jugador: el problema que la persona nota («va lento», «el kart dobla solo») y qué tocar.
+
+### 263.2 Controles al estilo Big Picture (`web/navegador/mando-dibujo.mjs`, nuevo)
+
+En Steam Big Picture la configuración de un mando es un dibujo del mando con un globo al lado de cada botón que dice qué hace;
+se toca el globo y se elige otra acción. Aquí igual:
+
+- **La vista del mando** (por omisión con un mando que el navegador ordena): el dibujo en SVG (gatillos, bumpers, sticks con
+  su aro y capuchón, cruz con flechas, los cuatro de la cara con los colores y letras de su marca: Xbox, PlayStation,
+  Nintendo, GameCube) y, a cada lado, un globo por botón: «RT · Derrapar y saltar». Apretar un botón de verdad lo enciende en
+  el dibujo y en su globo (el dibujo es también el probador). Lo que casi no se usa en la carrera (Y, Z, la cruz salvo ↑, el
+  stick C) va en gris cursiva, con la leyenda «En gris: casi no se usa en la carrera».
+- **«¿Qué hace RT?».** Tocar un globo (o A con el cursor del mando) abre una cuadrícula de acciones grandes; la elegida queda
+  en ese botón (`ponerBoton`: si el botón ya hacía otra cosa, se suma solo si cabe; «Nada» lo vacía) y abajo sale «✓ RT:
+  Derrapar y saltar» con «Deshacer». Esc o B cierran la cuadrícula sin cerrar el cajón (`interfaz.mjs`). Los sticks eligen
+  «Manejar», «Stick C» o «Nada».
+- **«☰ Lista (mando y teclado)».** La lista de siempre (§112) sigue a un toque; lo elegido se recuerda
+  (`localStorage` `mkw.controles.vista`). Los botones del pie se llaman ahora por lo que hacen: «Cambiar todos los botones,
+  uno por uno» (antes «Asignar paso a paso»).
+
+### 263.3 Mandos genéricos y de Switch: la disposición (`web/navegador/disposicion-mando.mjs`, nuevo)
+
+Un mando «standard» (Xbox, PlayStation, el Pro de Switch por Bluetooth en Chrome) llega ordenado: el navegador sabe que el
+botón 0 es el de abajo de la cara, el 7 el gatillo derecho, etc. Un mando genérico barato o uno de Switch 2 llega
+**desordenado**: números de botón que no dicen nada. La **disposición** es la tabla de conexión «lugar estándar → borne
+real» (como el plano de borneras de un tablero): con ella `estandarizar` arma un mando virtual ordenado y todo lo demás (el
+dibujo, el mapa de botones, el juego) lo trata como uno cualquiera.
+
+- **Conocidas.** El Pro Controller de Switch 2 (`057e:2069`, mapeo vacío en Chrome: 21 botones, ejes con +Y hacia arriba,
+  recorrido ~0,8 y reposo corrido ~0,1: se escala y se centra) y el de GameCube de Switch 2 (`057e:2073`: la A grande al lugar
+  de «aceptar», R → derrapar, L → objeto, Z → RB; tipo «gamecube» con sus nombres). El Pro de Switch 1 por Bluetooth ya llega
+  «standard».
+- **«🎓 Mi mando no sale bien: enséñaselo».** Para cualquier otro: el dibujo marca un lugar por vez («Paso 3 de 22 · Aprieta
+  el botón de ABAJO de los cuatro de la derecha»; «Mueve» para los sticks), la persona aprieta el suyo, se espera que lo
+  suelte (si no, contaba dos veces), lo repetido se ignora, «Saltar (no lo tiene)» y «Cancelar». Con 4 lugares o más se
+  guarda por modelo (`controles.guardarDisposicion`, `mkw.mandos.disposiciones`) y el subtítulo dice «enseñado por ti»;
+  «↺ Olvidar lo enseñado» lo vuelve a como lo da el navegador. Un mando sin orden ofrece esto primero.
+
+### 263.4 El Switch 2 con cable (`web/navegador/switch2.mjs`, nuevo)
+
+Los mandos de Switch 2 por cable no mandan nada hasta recibir un **saludo** (handshake): 17 órdenes cortas por el USB que les
+dicen «estás conectado a una consola, empieza a informar». Es como un variador que no arranca hasta que el PLC le manda la
+secuencia de habilitación. El navegador puede mandarlas con **WebUSB** (Chrome y Edge): el botón «🔌 ¿Mando de Switch 2 con
+cable? Actívalo aquí» (solo si no hay un mando que ya ande) pide elegir el mando en la ventana del navegador, manda las 17
+órdenes (los bytes verificados contra las dos implementaciones públicas del protocolo que documentó la comunidad: se tomaron
+los datos, no el código) y lo suelta; desde ahí aparece como mando normal y la disposición conocida lo ordena.
+
+- **Trampa de Windows**: Windows le pone su propio controlador al mando y el navegador no puede reclamar la interfaz; hay que
+  cambiarle el controlador a **WinUSB** una vez con **Zadig**. La página lo detecta (el error al reclamar) y lo explica. En
+  Android y Linux no hace falta.
+- **Por Bluetooth no se puede** desde una página (el navegador no habla ese Bluetooth). El Switch 1 (Pro, Joy-Con por
+  Bluetooth) no necesita nada.
+- **Sin probar con un mando de verdad**: no hay uno en este PC. Las órdenes, el aviso de Windows y el mando ya despierto están
+  probados con un USB de mentira y un mando de mentira con los números medidos por otros; la prueba real la hace el dueño al
+  final (como las de teléfono).
+
+### 263.5 El crítico
+
+Un crítico independiente propuso tres formas para el mensaje (se eligió «tarjetas por caso con un botón cada una») y después
+revisó con fotos (PC y Pixel 7). Lo que pidió y se hizo: los globos del dibujo con nombres de GameCube poco usados → en gris
+con leyenda; el selector «Imagen» con nombres cortados → «Automático (recomendado)», «30 parejas (sin tirones)», «60
+siempre», «30 con imagen intermedia» y una frase, lo largo plegado en «Más detalles»; las tarjetas cortadas en el teléfono →
+difuminado y «▾ Más abajo»; los botones de Controles con nombres que dicen para qué son; «Enséñale» desplaza el paso a la
+vista y esconde «Acelerar solo» mientras dura; la cruz con flechas cortas; pies de texto con la ruta completa (⚙ → Avanzado
+→ …); «zona muerta» explicada en la ayuda; la pestaña «🎮 Mando» (no «Mando gen…»); botones de 44 px en el PC.
+
+### 263.6 Pruebas
+
+- **Banco** (sin el juego): `bienvenida` 58 (sale la primera vez y con una versión vieja; no después de «No volver a
+  mostrar» ni con la versión al día; no en la carrera ni con la cortina; cada botón lleva a su ajuste; está en la ayuda; 115
+  palabras), `mando-dibujo` 59 (el dibujo, los globos, «¿Qué hace?», las luces, «Enséñale» con un genérico de mentira, las
+  disposiciones del Switch 2, las 17 órdenes con un USB de mentira y el aviso de Windows, un Pro 2 crudo manejando como uno
+  cualquiera), `controles-panel` 29 (con 4 puntos nuevos: el dibujo primero, el globo se abre con el cursor del mando, B
+  vuelve, «☰ Lista»), `controles` 53, `asignacion` 62, `mandos-jugador` 18, `mando-sitio`, `graficos` 66, `n8` 23,
+  `avisos-lag`, `espacio`, `inicio`. Con el ratón de verdad: `prueba-raton-controles` y `prueba-raton-avanzado` todo ✓;
+  `prueba-celular` 41/41.
+- **Con el juego** (`node web/navegador/prueba-bienvenida.mjs`, con el candado; 18 puntos): sale en un perfil nuevo a los ~4 s,
+  nunca con la cortina puesta, el juego sigue andando debajo y no recibe los botones, «Elegir imagen» deja «Imagen» con el
+  foco y marcado, en el Pixel 7 parado y acostado cabe con la tarjeta del celular y el mando en pantalla escondido, y en una
+  carrera de 12 CPU no sale nunca (0 de 200 miradas). En la sala (`prueba-sincro --directa --extra=&bienvenida=1`, 14/14) el
+  registro dice «se mostrará» y no se abre nunca en la carrera.
+- Fotos: `build/web/datos/bienvenida/` (escritorio, ajuste marcado, ayuda, teléfono parado y acostado, Controles con Xbox,
+  «¿Qué hace?», Switch 2, genérico enseñando y teléfono).
+
+### 263.7 El nombre: JloKart Wii
+
+El dueño: «recuerda que debe decir JLO kart Wii como en la imagen que generamos en la pantalla de inicio». El título del
+mensaje, el de la pestaña del navegador (`<title>`), la cortina de carga y la portada vieja (`?portada=1`) dicen ahora
+«JloKart Wii» (`index.html`, `bienvenida.mjs`). Los avisos de «Cargar mi partida» siguen diciendo «Mario Kart Wii»: hablan del
+archivo del juego original (el rksys.dat de una Wii). El sitio (`colabtex/`) no se tocó: es de otra sesión. Bancos
+`bienvenida` 58, `controles-panel` 29, `inicio` 16, `preparacion` 25; `prueba-celular` 41; foto `portada-jlokart.png`.
+
+## §264 — El multijugador abierto · 2026-11-09
+
+**Qué.** El dueño pidió: «abre las sesiones de multijugador». Desde el 2026-10-27 (§116) el multijugador estaba
+cerrado con un cartel «🚧 Trabajando para usted», porque entonces andaba mal. Desde ese día se arreglaron la largada
+pareja (§250), el árbitro (§191, §231), el relevo y la conexión de la sala (§236), y se probaron las 12 ventanas
+entrando desde cero. Por eso se sacan los dos cierres, que funcionaban como dos interruptores:
+- En la página del juego: `multiEnObra` de `mkw.mjs` ahora vale «sí» solo con `?multi=0`. Antes era «sí» salvo que
+  la dirección llevara `?multi=1`. Así, Multiplayer → Local (2 a 4 en la misma pantalla) y Online abren.
+- En el sitio: `SALAS_EN_OBRA` de `colabtex/src/juegos/salon-datos.js` queda vacía (`{}`). Las salas de Mario Kart se
+  crean, se ofrecen y se puede entrar por enlace. Para cerrarlas otra vez basta volver a poner `mkw: { solo: "#solo/mkw" }`.
+
+**Pruebas.**
+- Banco `inicio`: 16/16.
+- `prueba-inicio` con `build/web-final-w30`: 15/15. Su punto 0 ahora prueba el cierre con `?multi=0`.
+- Sitio `mkw.test.cjs` + `mkw-worker.test.cjs`: 37/37. Su prueba §116 ahora exige la lista vacía.
+- La batería entera del sitio deja 3 fallas en `controles.test.cjs` y `tienda.test.cjs`, y esas 3 fallan igual en
+  `origin/main`, que no tiene nada de esto: son de antes y no las causa este cambio.
+

@@ -1,0 +1,376 @@
+diff --git a/lib/dolphin/gx/GXFrameBuffer.cpp b/lib/dolphin/gx/GXFrameBuffer.cpp
+index abd9f6c..c8e7e0a 100644
+--- a/lib/dolphin/gx/GXFrameBuffer.cpp
++++ b/lib/dolphin/gx/GXFrameBuffer.cpp
+@@ -173,13 +173,28 @@ struct CopyTexturePoolEntry {
+   u32 scaledWidth = 0;
+   u32 scaledHeight = 0;
+   aurora::gfx::TextureHandle handle;
++  u32 lastUsedFrame = 0;   // MKW RETRO (W20): el último cuadro en que una copia la pidió
+ };
+ std::vector<CopyTexturePoolEntry> g_copyTexturePool;
+   // Keep only a few reusable copy targets per destination.
+ constexpr size_t kCopyTexturePoolPerKey = 3;
++// MKW RETRO (W20, bitácora §204): soltar las de repuesto ociosas. Adaptado de KartPad/wiicompiled, commit 0cca4d2
++// («Release idle copy spares…», Chris Sotraidis, https://github.com/chrissotraidis/wiicompiled, GPL-3.0), solo la
++// parte de la piscina: una textura de repuesto que nadie más tiene (use_count 1) y que ninguna copia pidió en 300
++// cuadros (5 s) es de una escena que ya terminó; guardarla solo ocupa memoria de la tarjeta para siempre.
++// g_mkwPiscinaOciosa = 0 = guardarlas como antes.
++constexpr u32 kCopyTexturePoolIdleFrames = 300;
++int g_mkwPiscinaOciosa = 0;   // (apagada hasta medir W20: la página la prende con ?piscina=1)
++u64 g_mkwPiscinaSueltas = 0;
+ 
+ aurora::gfx::TextureHandle acquire_copy_texture(const aurora::gx::GXState::CopyTextureKey& key, u32 width, u32 height,
+                                                 GXTexFmt texCopyFmt) {
++  const u32 frame = aurora::gfx::current_frame();
++  if (g_mkwPiscinaOciosa) {
++    g_mkwPiscinaSueltas += std::erase_if(g_copyTexturePool, [frame](const CopyTexturePoolEntry& entry) {
++      return entry.handle.use_count() <= 1 && frame - entry.lastUsedFrame > kCopyTexturePoolIdleFrames;
++    });
++  }
+   size_t sameKey = 0;
+   for (auto it = g_copyTexturePool.begin(); it != g_copyTexturePool.end();) {
+     if (!(it->key == key)) {
+@@ -193,6 +208,7 @@ aurora::gfx::TextureHandle acquire_copy_texture(const aurora::gx::GXState::CopyT
+     }
+     ++sameKey;
+     if (it->scaledWidth == width && it->scaledHeight == height && it->handle.use_count() == 1) {
++      it->lastUsedFrame = frame;
+       return it->handle;
+     }
+     ++it;
+@@ -200,7 +216,7 @@ aurora::gfx::TextureHandle acquire_copy_texture(const aurora::gx::GXState::CopyT
+ 
+   auto handle = create_copy_texture(width, height, texCopyFmt);
+   if (sameKey < kCopyTexturePoolPerKey) {
+-    g_copyTexturePool.push_back({key, width, height, handle});
++    g_copyTexturePool.push_back({key, width, height, handle, frame});
+   }
+   return handle;
+ }
+@@ -242,6 +258,19 @@ void prune_copy_texture_pool(const void* dest) noexcept {
+ }
+ } // namespace aurora::gx
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++// MKW RETRO (W20, §204): ?piscina=1 = soltar las ociosas, 0 = guardarlas; el dato para medir: 0 cuántas hay en la
++// piscina, 1 sus MB (aprox.: 4 bytes por texel), 2 cuántas se soltaron, 3 el modo
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_piscina(int modo) { g_mkwPiscinaOciosa = modo; }
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_piscina_dato(int i) {
++  double mb = 0;
++  for (const auto& e : g_copyTexturePool) mb += double(e.scaledWidth) * e.scaledHeight * 4 / (1024.0 * 1024.0);
++  return i == 0 ? double(g_copyTexturePool.size()) : i == 1 ? mb : i == 2 ? double(g_mkwPiscinaSueltas)
++       : i == 3 ? double(g_mkwPiscinaOciosa) : -1;
++}
++#endif
++
+ extern "C" {
+ GXRenderModeObj GXNtsc480IntDf = {
+     VI_TVMODE_NTSC_INT,
+diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
+index 9e53c5e..79f72a4 100644
+--- a/lib/gfx/pipeline_cache.cpp
++++ b/lib/gfx/pipeline_cache.cpp
+@@ -163,6 +163,16 @@ static uint32_t g_webGen = 1;                 // sube con cada cambio de etiquet
+ static uint32_t g_webVisita = 1;              // esta visita (= la última de las listas + 1)
+ static absl::flat_hash_map<uint32_t, std::vector<std::function<void()>>> g_webDePista;   // etiqueta → pedidos esperando
+ static std::vector<std::function<void()>> g_webPistaPedida;                              // a encolar en el cuadro siguiente
++// MKW RETRO W8 (§203): soltar los pipelines de las otras pistas. Cada pipeline armado vive en la tarjeta (en Chrome con
++// D3D12, ~2 MB en el proceso de GPU) y nunca se soltaba: 8 pistas = +1 GB. Con g_webSoltar (mkw_web_pipelines_soltar(1),
++// la página con ?soltarPipelines=1), al entrar a la carrera de una pista se sueltan, al comienzo del cuadro siguiente,
++// los que solo se usaron en OTRA pista (no los de los menús, los comunes ni los urgentes de C3); cada uno vuelve a la
++// espera de su pista (g_webDePista), así que si esa pista vuelve, mkw_web_pipelines_pista los precalienta como siempre.
++// 2 = además se vacía la memoria de sombreadores compilados (gx::clear_shader_module_cache: se rearman al pedirlos)
++static int g_webSoltar = 0;
++static uint32_t g_webSoltarConservar = WebSinEtiqueta;   // la pista que se queda (WebSinEtiqueta = nada pendiente)
++static uint32_t g_webSoltados = 0;
++static void web_soltar_otras_pistas();
+ // Dos etiquetas de un mismo pipeline: los menús ganan; dos pistas distintas = común
+ static uint32_t web_combinar(uint32_t a, uint32_t b) {
+   if (a == WebSinEtiqueta) return b;
+@@ -179,6 +189,7 @@ static bool g_pipelineThreadEnd = false;
+ static size_t g_activeBackgroundPipelineWorkers = 0;
+ static std::condition_variable g_pipelineCv;
+ static absl::flat_hash_map<PipelineRef, CachedPipeline> g_pipelines;
++uint32_t g_mkwPipelinesEpoca = 0;   // MKW RETRO W8 (§203), ver pipeline_cache.hpp
+ static std::deque<PendingPipeline> g_priorityPipelines;
+ static std::deque<PendingPipeline> g_backgroundPipelines;
+ static absl::flat_hash_set<PipelineRef> g_pendingPipelines;
+@@ -1290,8 +1301,56 @@ static void pipeline_worker() {
+ }
+ 
+ #ifdef __EMSCRIPTEN__
++// W8 (§203): suelta los pipelines armados que solo se usaron en una pista que no es g_webSoltarConservar
++static void web_soltar_otras_pistas() {
++  const uint32_t conservar = g_webSoltarConservar;
++  g_webSoltarConservar = WebSinEtiqueta;
++  uint32_t n = 0;
++  std::lock_guard lock{g_pipelineMutex};
++  for (auto it = g_pipelines.begin(); it != g_pipelines.end();) {
++    const PipelineRef ref = it->first;
++    const auto reg = g_webLista.find(ref);
++    const bool deOtraPista = reg != g_webLista.end() && reg->second.etiqueta != WebSinEtiqueta &&
++                             reg->second.etiqueta != WebMenus && reg->second.etiqueta != WebComun &&
++                             reg->second.etiqueta != conservar && reg->second.primerCuadro != 0 &&
++                             !g_webUrgentes.contains(ref) && !g_pendingPipelines.contains(ref) &&
++                             !g_webEnCamino.contains(ref);
++    if (!deOtraPista) {
++      ++it;
++      continue;
++    }
++    // vuelve a la espera de su pista, armado de la configuración guardada (como al leer la lista al arrancar)
++    const WebRegistro& r = reg->second;
++    const uint32_t primerCuadro = r.primerCuadro;
++    std::function<void()> encolar;
++    if (r.tipo == underlying(ShaderType::GX) && r.config.size() == sizeof(gx::PipelineConfig)) {
++      gx::PipelineConfig config;
++      std::memcpy(&config, r.config.data(), sizeof(config));
++      encolar = [=] { find_pipeline_impl(ShaderType::GX, config, [=] { return gx::create_pipeline(config); }, false, primerCuadro); };
++    } else if (r.tipo == underlying(ShaderType::Clear) && r.config.size() == sizeof(clear::PipelineConfig)) {
++      clear::PipelineConfig config;
++      std::memcpy(&config, r.config.data(), sizeof(config));
++      encolar = [=] { find_pipeline_impl(ShaderType::Clear, config, [=] { return clear::create_pipeline(config); }, false, primerCuadro); };
++    } else {
++      ++it;
++      continue;
++    }
++    g_webDePista[r.etiqueta].push_back(std::move(encolar));
++    g_pipelines.erase(it++);
++    ++n;
++  }
++  g_webSoltados += n;
++  if (n > 0) ++g_mkwPipelinesEpoca;   // las memorias de config → pipeline vuelven a preguntar
++  if (n > 0 && g_webSoltar == 2) gx::clear_shader_module_cache();   // y los sombreadores (W8, modo 2)
++  std::printf("[pipelines] W8: al entrar a la pista 0x%x se soltaron %u de otras pistas (%u en total; quedan %zu)\n",
++              conservar, n, g_webSoltados, g_pipelines.size());
++}
++
+ // El precalentado postergado, ya pedido por la página: encolar todo lo diferido (de a 8 por cuadro, como siempre)
+ static void web_precalentar_diferidos() {
++  if (g_webSoltarConservar != WebSinEtiqueta) {   // W8 (§203): al comienzo del cuadro, antes de cualquier dibujo
++    web_soltar_otras_pistas();
++  }
+   if (!g_webPistaPedida.empty()) {           // C2 (§174): lo de la pista recién elegida, al comienzo de este cuadro
+     auto lista = std::move(g_webPistaPedida);
+     g_webPistaPedida.clear();
+@@ -1853,9 +1912,22 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_pipelines_etiqueta(uint32_t etiquet
+   if (etiqueta != aurora::gfx::g_webEtiqueta) {
+     aurora::gfx::g_webEtiqueta = etiqueta;
+     ++aurora::gfx::g_webGen;
++    // W8 (§203): entrar a la carrera de una pista suelta (en el cuadro siguiente) lo de las otras pistas
++    if (aurora::gfx::g_webSoltar && aurora::gfx::g_webPorEtiqueta && etiqueta != aurora::gfx::WebMenus &&
++        etiqueta != aurora::gfx::WebComun && etiqueta != aurora::gfx::WebSinEtiqueta) {
++      aurora::gfx::g_webSoltarConservar = etiqueta;
++    }
+   }
+ }
+ 
++// W8 (§203): 1 = soltar los pipelines de las otras pistas al entrar a una (0 = guardarlos todos, como antes);
++// 2 = además vaciar la memoria de sombreadores.
++// Devuelve cuántos se soltaron hasta ahora.
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_soltar(int si) {
++  if (si >= 0) aurora::gfx::g_webSoltar = si > 2 ? 1 : si;
++  return aurora::gfx::g_webSoltados;
++}
++
+ // C2 (§174): se eligió una pista: sus pipelines (los que solo se usaron en ella) van a la cola de precalentado en el
+ // cuadro siguiente. Devuelve cuántos (0 si no había o ya se pidieron).
+ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_pista(uint32_t etiqueta) {
+diff --git a/lib/gfx/pipeline_cache.hpp b/lib/gfx/pipeline_cache.hpp
+index 16df982..21b98a2 100644
+--- a/lib/gfx/pipeline_cache.hpp
++++ b/lib/gfx/pipeline_cache.hpp
+@@ -32,6 +32,9 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline);
+ // Waits indefinitely for a draw about to be committed to a persistent texture with no re-issue
+ // path. Separate from wait_pipeline so skip-unready mode never becomes blocking for other passes.
+ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pipeline);
++// MKW RETRO W8 (§203): sube cada vez que se sueltan pipelines; las memorias de «esta configuración → este pipeline»
++// (cached_pipeline_state de command_processor.cpp) no valen de una época a otra y vuelven a pedirlo con find_pipeline
++extern uint32_t g_mkwPipelinesEpoca;
+ 
+ #ifdef __EMSCRIPTEN__
+ // MKW RETRO (web): build_pipeline pide el pipeline con CreateRenderPipelineAsync si corresponde (devuelve true y
+diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
+index f465f36..f211f82 100644
+--- a/lib/gfx/texture.cpp
++++ b/lib/gfx/texture.cpp
+@@ -301,3 +301,16 @@ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
+   }
+ }
+ } // namespace aurora::gfx
++
++namespace aurora::gfx {
++uint64_t g_mkwTexturasVivas = 0, g_mkwTexturasBytes = 0;   // MKW RETRO (W8, §203)
++} // namespace aurora::gfx
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++// MKW RETRO (W8, §203): 0 = texturas vivas, 1 = MB que ocupan (estimado); solo para medir la memoria tras varias pistas
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_texturas_dato(int i) {
++  return i == 0 ? double(aurora::gfx::g_mkwTexturasVivas)
++       : i == 1 ? double(aurora::gfx::g_mkwTexturasBytes) / (1024.0 * 1024.0) : -1;
++}
++#endif
+diff --git a/lib/gfx/texture.hpp b/lib/gfx/texture.hpp
+index 4c1d4cc..533a6c9 100644
+--- a/lib/gfx/texture.hpp
++++ b/lib/gfx/texture.hpp
+@@ -36,6 +36,9 @@ TextureFormatInfo format_info(wgpu::TextureFormat format) noexcept;
+ uint64_t calc_texture_size(wgpu::TextureFormat format, uint32_t width, uint32_t height, uint32_t mips) noexcept;
+ 
+ constexpr u32 InvalidTextureFormat = -1;
++// MKW RETRO (W8, §203): cuántas texturas viven y cuántos bytes ocupan en la tarjeta (estimado por formato y mips);
++// solo cuenta, no cambia nada. La página lo lee con mkw_web_texturas_dato.
++extern uint64_t g_mkwTexturasVivas, g_mkwTexturasBytes;
+ struct TextureRef {
+   wgpu::Texture texture;
+   wgpu::TextureView sampleTextureView;
+@@ -55,7 +58,17 @@ struct TextureRef {
+   , size(size)
+   , format(format)
+   , mipCount(mipCount)
+-  , gxFormat(gxFormat) {}
++  , gxFormat(gxFormat) {
++    g_mkwTexturasVivas++;
++    g_mkwTexturasBytes += bytesMkw();
++  }
++  ~TextureRef() {
++    g_mkwTexturasVivas--;
++    g_mkwTexturasBytes -= bytesMkw();
++  }
++  uint64_t bytesMkw() const noexcept {
++    return calc_texture_size(format, size.width, size.height, mipCount) * std::max(size.depthOrArrayLayers, 1u);
++  }
+ };
+ 
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
+index c9de003..0596aca 100644
+--- a/lib/gx/command_processor.cpp
++++ b/lib/gx/command_processor.cpp
+@@ -1,6 +1,7 @@
+ #include "command_processor.hpp"
+ 
+ #include "../gfx/common.hpp"
++#include "../gfx/pipeline_cache.hpp"   // MKW RETRO W8 (§203): g_mkwPipelinesEpoca
+ #include "../dolphin/gx/__gx.h"
+ #include "../gfx/texture_replacement.hpp"
+ #include "dolphin/gx/GXAurora.h"
+@@ -2052,6 +2053,7 @@ static const CachedPipelineState& cached_pipeline_state(const PipelineConfig& co
+   constexpr size_t CacheSize = 1024;
+   struct Entry {
+     bool valid = false;
++    u32 epoca = 0;   // MKW RETRO W8 (§203): de qué época de pipelines es (gfx::g_mkwPipelinesEpoca)
+     PipelineConfig config{};
+     CachedPipelineState state{};
+   };
+@@ -2059,12 +2061,13 @@ static const CachedPipelineState& cached_pipeline_state(const PipelineConfig& co
+ 
+   const HashType hash = xxh3_hash(config, static_cast<HashType>(gfx::ShaderType::GX));
+   auto& entry = cache[hash & (CacheSize - 1)];
+-  if (entry.valid && entry.state.configHash == hash &&
++  if (entry.valid && entry.epoca == gfx::g_mkwPipelinesEpoca && entry.state.configHash == hash &&
+       std::memcmp(&entry.config, &config, sizeof(config)) == 0) LIKELY {
+     return entry.state;
+   }
+ 
+   entry.valid = true;
++  entry.epoca = gfx::g_mkwPipelinesEpoca;
+   entry.config = config;
+   entry.state = {
+       .ref = gfx::pipeline_ref(config),
+@@ -2080,6 +2083,7 @@ static const CachedPipelineState& resolve_pipeline_state(GXPrimitive prim, GXVtx
+   struct Memo {
+     const CachedPipelineState* state = nullptr;
+     u32 generation = 0;
++    u32 epoca = 0;   // MKW RETRO W8 (§203)
+     u32 sampleCount = 0;
+     GXPrimitive prim = static_cast<GXPrimitive>(0);
+     GXVtxFmt fmt = static_cast<GXVtxFmt>(0);
+@@ -2088,7 +2092,8 @@ static const CachedPipelineState& resolve_pipeline_state(GXPrimitive prim, GXVtx
+ 
+   const u32 sampleCount = gfx::get_sample_count();
+   const u32 generation = g_gxState.pipelineStateGeneration;
+-  if (memo.state != nullptr && memo.generation == generation && memo.sampleCount == sampleCount &&
++  if (memo.state != nullptr && memo.generation == generation && memo.epoca == gfx::g_mkwPipelinesEpoca &&
++      memo.sampleCount == sampleCount &&
+       memo.prim == prim && memo.fmt == fmt) LIKELY {
+     return *memo.state;
+   }
+@@ -2100,6 +2105,7 @@ static const CachedPipelineState& resolve_pipeline_state(GXPrimitive prim, GXVtx
+   memo = Memo{
+       .state = &state,
+       .generation = generation,
++      .epoca = gfx::g_mkwPipelinesEpoca,
+       .sampleCount = sampleCount,
+       .prim = prim,
+       .fmt = fmt,
+diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
+index 875416d..496a328 100644
+--- a/lib/gx/shader.cpp
++++ b/lib/gx/shader.cpp
+@@ -926,6 +926,35 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8
+                      outputValue);
+ }
+ 
++// MKW RETRO (W9, bitácora §205): el camino de reserva para las Adreno 6xx/7xx, apagado por omisión. En KartPad los
++// personajes salían invisibles en esas tarjetas, por cómo su controlador de Vulkan indexa un arreglo de matrices de
++// un búfer de uniformes con un índice que viene del vértice (los huesos). Con g_mkwHuesosFilas las matrices
++// postex_mtx y nrm_mtx se declaran como filas sueltas (array<vec4f, 3N>: los mismos bytes, stride 16 en vez de 48) y
++// cada matriz se arma con sus 3 filas: la misma cuenta, el mismo resultado, otra forma de leerla para el controlador.
++bool g_mkwHuesosFilas = false;
++static void huesos_por_filas(std::string& s) {
++  for (const std::string_view nombre : {"postex_mtx"sv, "nrm_mtx"sv}) {
++    // la declaración: «postex_mtx: array<mat3x4f, N>,» → «postex_mtx: array<vec4f, 3N>,»
++    const std::string decl = fmt::format("{}: array<mat3x4f, ", nombre);
++    if (const auto p = s.find(decl); p != std::string::npos) {
++      const auto q = s.find('>', p);
++      const unsigned n = std::stoul(s.substr(p + decl.size(), q - p - decl.size()));
++      s.replace(p, q + 1 - p, fmt::format("{}: array<vec4f, {}>", nombre, n * 3));
++    }
++    // cada uso: «ubuf.postex_mtx[E]» → «mat3x4f(ubuf.postex_mtx[(E)*3u], …[(E)*3u+1u], …[(E)*3u+2u])»
++    const std::string uso = fmt::format("ubuf.{}[", nombre);
++    for (size_t p = s.find(uso); p != std::string::npos; p = s.find(uso, p)) {
++      size_t i = p + uso.size();
++      int nivel = 1;
++      for (; i < s.size() && nivel; i++) nivel += s[i] == '[' ? 1 : s[i] == ']' ? -1 : 0;
++      const std::string e = s.substr(p + uso.size(), i - 1 - p - uso.size());
++      const std::string nuevo = fmt::format("mat3x4f(ubuf.{0}[({1})*3u], ubuf.{0}[({1})*3u+1u], ubuf.{0}[({1})*3u+2u])", nombre, e);
++      s.replace(p, i - p, nuevo);
++      p += nuevo.size();
++    }
++  }
++}
++
+ wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept {
+   ZoneScoped;
+   const auto hash = xxh3_hash(config);
+@@ -1703,7 +1732,7 @@ wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept {
+         "    return out;";
+   }
+ 
+-  const auto shaderSource = fmt::format(R"""(
++  auto shaderSource = fmt::format(R"""(
+ fn bswap32(v: u32, le: bool) -> u32 {{
+   if (le) {{
+     return v;
+@@ -2121,6 +2150,7 @@ fn fs_main(in: VertexOutput) -> {9} {{{6}{5}
+                                         uniBufAttrs, texBindings, vtxOutAttrs, vtxInAttrs, vtxXfrAttrs, fragmentFn,
+                                         fragmentFnPre, vtxXfrAttrsPre, uniformPre, fragmentReturnType,
+                                         fragmentReturn);
++  if (g_mkwHuesosFilas) huesos_por_filas(shaderSource);   // MKW RETRO (W9, §205)
+   wgpu::ShaderSourceWGSL wgslDescriptor{};
+   wgslDescriptor.code = shaderSource.c_str();
+   const auto label = fmt::format("GX Shader {:x}", hash);
+@@ -2131,3 +2161,10 @@ fn fs_main(in: VertexOutput) -> {9} {{{6}{5}
+   return webgpu::g_device.CreateShaderModule(&shaderDescriptor);
+ }
+ } // namespace aurora::gx
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++// MKW RETRO (W9, §205): la página prende el camino de reserva de las Adreno con ?huesosFilas=1 (antes de main: los
++// shaders ya armados no cambian). Apagado por omisión: se prende para Adreno recién con el primer informe de un jugador
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_huesos_filas(int prender) { aurora::gx::g_mkwHuesosFilas = prender != 0; }
++#endif

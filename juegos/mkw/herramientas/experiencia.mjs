@@ -19,6 +19,7 @@
 //       --limpiar: borra lo guardado en los emuladores (cuentas, salas, partidas en la nube) y empieza de cero.
 //       --emu-desplazar N: los emuladores en sus puertos + N (§87: la prueba usa 10000, así corre aunque el jugar.bat
 //       esté abierto con los de siempre: 9099, 9000, 9199, 4400, 4500).
+//       --cuentas N (§261): N pilotos amigos (3 por omisión, hasta 12: Piloto Cuatro … Piloto Doce).
 //       Requiere: Java (los emuladores de base y Storage) y firebase-tools en herramientas/cache/firebase-tools
 //       (npm install --prefix herramientas/cache/firebase-tools firebase-tools@14.27.0).
 import { spawn, spawnSync } from 'node:child_process';
@@ -44,6 +45,11 @@ const CUENTAS = [
   { sub: 'piloto3', email: 'piloto3@paginita.test', name: 'Piloto Tres', amigo: true },
   { sub: 'intruso', email: 'intruso@paginita.test', name: 'Intruso (no es amigo)', amigo: false },
 ];
+// --cuentas N (§261, la prueba de 12 desde el sitio: herramientas/prueba-doce-sitio.mjs): más amigos, hasta 12 pilotos
+// (Piloto Cuatro … Piloto Doce; nombres en palabras para que ninguno sea el comienzo de otro en la ventanita)
+const MAS = ['Cuatro', 'Cinco', 'Seis', 'Siete', 'Ocho', 'Nueve', 'Diez', 'Once', 'Doce'];
+for (let i = 4; i <= Math.min(12, Number(opcion('--cuentas', 3)) || 3); i++)
+  CUENTAS.splice(i - 1, 0, { sub: `piloto${i}`, email: `piloto${i}@paginita.test`, name: `Piloto ${MAS[i - 4]}`, amigo: true });
 const DESPLAZAR = Number(opcion('--emu-desplazar', 0)) || 0;       // §87: otros puertos para los emuladores
 const PUERTOS_EMU = Object.fromEntries(Object.entries({ auth: 9099, database: 9000, storage: 9199, hub: 4400, logging: 4500 }).map(([k, p]) => [k, p + DESPLAZAR]));
 const hijos = [];

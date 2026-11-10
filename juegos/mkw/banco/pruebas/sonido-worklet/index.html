@@ -70,7 +70,7 @@ globalThis.registerProcessor = (nombre, c) => { if (nombre === 'mkw-salida') Cla
 await import('/web/navegador/sonido-worklet.js');
 ok('el worklet se registra como «mkw-salida»', !!Clase);
 
-const p = new Clase({ processorOptions: { objetivoMs: 25, arranqueMs: 0 } });   // (el arranque alto se prueba aparte, al final)
+const p = new Clase({ processorOptions: { objetivoMs: 25, arranqueMs: 0, informeBloques: 8 } });   // (P5: el informe como antes, cada 8)   // (el arranque alto se prueba aparte, al final)
 let fase = 0;                                         // fase del tono de prueba
 const AMP = 0.5, PASO = 2 * Math.PI * 440 / SR;
 const PENDIENTE = AMP * PASO;                         // lo más que cambia el tono de una muestra a la otra (0,029)
@@ -188,8 +188,40 @@ correr(Math.ceil((delante + 144) / N) + 1);
 const m = p.port.salidos.find(x => x.t === 'm');
 ok('el clic se avisa en la muestra exacta en que sale', m && m.cuadro === desde + delante, m ? `muestra ${m.cuadro} (esperada ${desde + delante})` : 'no avisó');
 const inf = p.port.salidos.filter(x => x.t === 'e');
-ok('manda su estado cada 8 bloques (~21 ms)', inf.length >= 1 && 'nivel' in inf[0] && 'objetivo' in inf[0] && 'huecos' in inf[0],
+ok('manda su estado (con `informeBloques: 8`, cada ~21 ms)', inf.length >= 1 && 'nivel' in inf[0] && 'objetivo' in inf[0] && 'huecos' in inf[0],
    inf.length ? `nivel ${inf[0].nivel.toFixed(1)} ms, objetivo ${inf[0].objetivo.toFixed(1)} ms` : 'ninguno');
+// 9b) P5 (§232): con `devolver`, los búferes ya copiados vuelven con el informe (transferidos), cada uno a su puerto;
+// el informe sale cada 32 bloques (o cada `informeBloques`)
+{
+  const r = new Clase({ processorOptions: { objetivoMs: 25, arranqueMs: 0, devolver: true } });
+  const vistos = [];                                  // (el informe se reusa: se copia al mandarlo, como haría el clon)
+  r.port.postMessage = (m, t) => vistos.push({ ...m, b: m.b ? [...m.b] : undefined, transfer: t ? [...t] : [] });
+  const extraVistos = [];
+  const extra = { postMessage: (m, t) => extraVistos.push({ ...m, b: m.b ? [...m.b] : undefined, transfer: t ? [...t] : [] }), onmessage: null };
+  r.recibir({ t: 'puerto', puerto: extra }, false);
+  const mandados = [], mandadosExtra = [];
+  for (let k = 0; k < 20; k++) { const d = new Float32Array(288).fill(0.05); mandados.push(d.buffer); r.port.onmessage({ data: d }); }
+  for (let k = 0; k < 5; k++) { const d = new Float32Array(288).fill(0.05); mandadosExtra.push(d.buffer); extra.onmessage({ data: d }); }
+  const sal = [[new Float32Array(N), new Float32Array(N)]];
+  for (let b = 0; b < 31; b++) { r.process([], sal); globalThis.currentFrame += N; }
+  const antes = vistos.filter(x => x.t === 'e').length;
+  r.process([], sal); globalThis.currentFrame += N;
+  const infs = vistos.filter(x => x.t === 'e'), ie = extraVistos.filter(x => x.t === 'e');
+  const u = infs[infs.length - 1] || {}, ue = ie[ie.length - 1] || {};
+  ok('P5: el informe sale cada 32 bloques (no antes)', antes === 0 && infs.length === 1, `${antes} antes del bloque 32, ${infs.length} en el 32`);
+  ok('P5: el informe devuelve los búferes que ya están en la cola, transferidos, cada uno a su puerto',
+     u.b && u.b.length === 20 && u.b.every((x, i) => x === mandados[i]) && u.transfer.length === 20 &&
+     ue.b && ue.b.length === 5 && ue.b.every((x, i) => x === mandadosExtra[i]),
+     `página ${u.b ? u.b.length : 0} de 20, Worker ${ue.b ? ue.b.length : 0} de 5`);
+  r.process([], sal);
+  for (let b = 0; b < 31; b++) { r.process([], sal); globalThis.currentFrame += N; }
+  const otro = vistos.filter(x => x.t === 'e').pop();
+  ok('P5: el informe siguiente no repite búferes (la lista se vació)', !otro.b, otro.b ? `${otro.b.length} de nuevo` : 'sin búferes');
+  const r8 = new Clase({ processorOptions: { objetivoMs: 25, arranqueMs: 0, informeBloques: 8 } });
+  const v8 = []; r8.port.postMessage = m => v8.push(m.t);
+  for (let b = 0; b < 32; b++) { r8.process([], sal); globalThis.currentFrame += N; }
+  ok('P5: `informeBloques: 8` = como antes (4 informes en 32 bloques) y sin `devolver` no manda búferes', v8.filter(t => t === 'e').length === 4);
+}
 // 10) Reiniciar (el sonido vuelve tras una pausa): de cero, sin contar hueco
 const huecosR = p.c.huecos;
 p.port.onmessage({ data: { t: 'reiniciar' } });
@@ -245,6 +277,9 @@ await tocado;
   ok('la cola del worklet queda cerca del objetivo (25 ms)', e.nivelMs > 12 && e.nivelMs < 45 && so.puente.nivelMs() > 0,
      `promedio ${e.nivelMs.toFixed(1)} ms, mínimo ${e.nivelMinMs.toFixed(1)} ms, objetivo ${e.objetivoMs.toFixed(1)} ms`);
   ok('sin huecos ni saltos con el juego parejo', e.huecos === 0 && e.saltos === 0, `huecos ${e.huecos}, vacíos ${e.vacios}, saltos ${e.saltos}`);
+  const rc = e.reciclado || { nuevos: 0, reusados: 0 };
+  ok('P5: los búferes vuelven del worklet y se reusan (casi ninguno nuevo)', rc.reusados > 10 * rc.nuevos && rc.nuevos < 80,
+     `${rc.reusados} reusados, ${rc.nuevos} nuevos, ${rc.devueltos} devueltos, ${e.entregas} entregas`);
   ok('pasar cada entrega al worklet cuesta poco', e.msBloqueTotal / e.entregas < 0.05, `${(e.msBloqueTotal / e.entregas * 1000).toFixed(1)} µs por entrega (máx ${e.msBloqueMax.toFixed(2)} ms)`);
   // Volumen: igual que en el camino viejo (misma cadena)
   so.volumen(0.5);

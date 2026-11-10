@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibración pareja</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Vibración: <span>el prendido y apagado del juego hecho pulsos parejos</span></h1>
+<p>Prueba <code>web/navegador/vibracion.mjs</code> (bitácora §167, el dueño: «vibra de manera descontrolada») <b>sin el
+  juego</b>, con un reloj de mentira. El juego prende y apaga el motor muy seguido para vibrar suave (como un PWM).
+  Comprueba que eso se convierte en <b>una orden cada 100 ms</b> con el pulso proporcional al ciclo de trabajo (teléfono)
+  y la fuerza proporcional (mando), que nunca pasa de 2 s seguidos, que un juego trabado no deja el motor prendido, que
+  parar corta todo y que, sin nada que hacer, el temporizador se apaga.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearVibracion, PERIODO_MS, MAX_SEGUIDO_MS } from '/web/navegador/vibracion.mjs';
+
+const { ok, nota, fin } = prueba('vibracion', 'Vibración pareja (sin el juego)');
+
+// Un banco de mentira: reloj manual, temporizador manual y lo que se mandó al teléfono y al mando
+function banco() {
+  const b = { t: 0, tel: [], man: [], fn: null, programados: 0, cancelados: 0 };
+  b.v = crearVibracion({
+    ahora: () => b.t,
+    telefono: (p, ms) => b.tel.push([b.t, p, ms]),
+    mando: (p, f, ms) => b.man.push([b.t, p, Math.round(f * 100) / 100, ms]),
+    programar: fn => { b.fn = fn; b.programados++; return 1; },
+    cancelar: () => { b.fn = null; b.cancelados++; },
+  });
+  // avanzar el reloj de a 1 ms; el juego cambia el motor con `patron(t)` → true/false; el temporizador cada 100 ms
+  b.correr = (ms, patron) => {
+    for (let i = 0; i < ms; i++) {
+      b.t++;
+      if (patron) b.v.pedir(0, patron(b.t));
+      if (b.fn && b.t % PERIODO_MS === 0) b.fn();
+    }
+  };
+  return b;
+}
+
+try {
+  // ---- 1. El PWM del juego: prendido 1 cuadro, apagado 1 cuadro (60 Hz) ----
+  {
+    const b = banco();
+    const cuadro = t => Math.floor(t / (1000 / 60));
+    b.correr(1000, t => cuadro(t) % 2 === 0);
+    const cambios = b.v.estado.cambios, ordenes = b.tel.filter(x => x[2] > 0).length;
+    nota(`1 s de PWM al 50 %: ${cambios} cambios del juego → ${b.tel.length} órdenes al teléfono (antes eran ${cambios})`);
+    ok('el juego cambia el motor ~60 veces por segundo', cambios >= 55 && cambios <= 62);
+    ok('al teléfono le llega a lo más una orden cada 100 ms (10 en 1 s)', b.tel.length <= 10 && ordenes >= 9);
+    const pulsos = b.tel.filter(x => x[2] > 0).map(x => x[2]);
+    ok('cada pulso es ~la mitad del periodo (40–60 ms)', pulsos.every(ms => ms >= 40 && ms <= 60), pulsos.join(','));
+    const fuerzas = b.man.filter(x => x[2] > 0).map(x => x[2]);
+    ok('el mando recibe ~la mitad de la fuerza (0,32–0,48)', fuerzas.every(f => f >= 0.32 && f <= 0.48), fuerzas.join(','));
+  }
+
+  // ---- 2. Un PWM suave: prendido 1 de cada 4 cuadros ----
+  {
+    const b = banco();
+    b.correr(1000, t => Math.floor(t / (1000 / 60)) % 4 === 0);
+    const pulsos = b.tel.filter(x => x[2] > 0).map(x => x[2]);
+    ok('al 25 %: pulsos cortos (15–35 ms), una vibración suave', pulsos.length >= 8 && pulsos.every(ms => ms >= 15 && ms <= 35), pulsos.join(','));
+  }
+
+  // ---- 3. Prendido seguido: continuo, pero nunca más de 2 s ----
+  {
+    const b = banco();
+    b.correr(3000, () => true);
+    const largos = b.tel.filter(x => x[2] > 0);
+    const ultimo = largos.at(-1)?.[0] ?? 0;
+    ok('prendido seguido: pulsos que se empalman (más largos que el periodo)', largos.slice(0, 5).every(x => x[2] > PERIODO_MS));
+    ok(`a los ${MAX_SEGUIDO_MS / 1000} s se corta aunque el juego siga prendido`, ultimo <= MAX_SEGUIDO_MS + PERIODO_MS && b.v.estado.cortes === 1, `último pulso en ${ultimo} ms`);
+    ok('al cortar se manda parar al teléfono (0)', b.tel.some(x => x[2] === 0 && x[0] > MAX_SEGUIDO_MS));
+    b.correr(200, () => false); b.correr(300, () => true);
+    ok('apagar y volver a prender: vibra otra vez', b.tel.filter(x => x[2] > 0 && x[0] > 3200).length >= 2);
+  }
+
+  // ---- 4. Golpe corto (un choque): 150 ms prendido y apagado ----
+  {
+    const b = banco();
+    b.correr(150, () => true); b.correr(400, () => false);
+    const total = b.tel.filter(x => x[2] > 0).reduce((s, x) => s + Math.min(x[2], PERIODO_MS), 0);
+    ok('un golpe de 150 ms vibra ~150 ms en total (100–200)', total >= 100 && total <= 200, `${total} ms`);
+    ok('después del golpe, una orden de parar y nada más', b.tel.at(-1)[2] === 0);
+    ok('sin nada que hacer, el temporizador se apaga solo', !b.v.activo() && b.cancelados >= 1);
+  }
+
+  // ---- 5. Un juego trabado (cargando a 1 cuadro por segundo) con el motor prendido ----
+  {
+    const b = banco();
+    b.v.pedir(0, true);            // el juego prendió y se quedó trabado (ya no manda nada)
+    b.correr(5000, null);
+    const ultimo = b.tel.filter(x => x[2] > 0).at(-1)?.[0] ?? 0;
+    ok('trabado con el motor prendido: no vibra más de 2 s', ultimo <= MAX_SEGUIDO_MS + PERIODO_MS, `último pulso en ${ultimo} ms`);
+    ok('antes: un solo navigator.vibrate(5000); ahora ninguna orden pasa de 130 ms', b.tel.every(x => x[2] <= 130));
+  }
+
+  // ---- 6. Parar (pestaña oculta o vibración apagada en los ajustes) ----
+  {
+    const b = banco();
+    b.correr(250, () => true);
+    b.v.parar();
+    ok('parar: manda 0 al teléfono y apaga el mando en el acto', b.tel.at(-1)[2] === 0 && b.man.at(-1)[2] === 0);
+    ok('parar: apaga el temporizador', !b.v.activo());
+    const antes = b.tel.length; b.correr(500, null);
+    ok('después de parar no sale nada más', b.tel.length === antes);
+  }
+
+  // ---- 7. Varios puertos a la vez (mandos de 4 jugadores) ----
+  {
+    const b = banco();
+    for (let i = 0; i < 300; i++) { b.t++; b.v.pedir(1, true); b.v.pedir(2, i % 2 === 0); if (b.fn && b.t % 100 === 0) b.fn(); }
+    const p1 = b.man.filter(x => x[1] === 1 && x[2] > 0).map(x => x[2]), p2 = b.man.filter(x => x[1] === 2 && x[2] > 0).map(x => x[2]);
+    ok('cada puerto lleva su propia fuerza (1 a fondo, 2 a la mitad)', p1.every(f => f >= 0.76) && p2.every(f => f >= 0.32 && f <= 0.48), `p1 ${p1} · p2 ${p2}`);
+  }
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

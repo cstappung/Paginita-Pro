@@ -39,7 +39,7 @@ async function worker(url, o = {}) {
     await espera(demora);
     if (url === URL_LOTE && o.method === 'POST') {
       const { p } = JSON.parse(o.body);
-      llamadas.push({ tipo: 'lote', p, yo });
+      llamadas.push({ tipo: 'lote', p, yo, pr: o.priority });
       if (modo === 'viejo') return new Response('no existe', { status: 404 });
       const partes = p.map(([ruta, ini, fin]) => esperado(ruta, ini, fin - ini + 1));
       let total = partes.reduce((s, x) => s + x.length, 0);
@@ -85,6 +85,85 @@ try {
   ok('…y la primera viaja sola: ninguna sale antes de que conteste (así encuentran la pregunta previa ya hecha)', lotes1.slice(1).every(x => x.yo.t0 >= lotes1[0].yo.t1));
   ok('…la ruta va sin codificar («Mi Pista.szs», no «Mi%20Pista.szs»)', lotes1.some(x => x.p.some(([r]) => r === 'sd/Mi Pista.szs')));
   ok('…y nada de a uno', !llamadas.some(x => x.tipo === 'uno'));
+
+  // 1b) §132 (C4, en parte): la prioridad de la red. Lo de fondo va «low»; un lote con algo urgente, «high»; prioridad:false = sin
+  reiniciar();
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker });
+  await L.pedir(dir('disco/a.szs'), 0, 999);                        // (la primera: de fondo)
+  await Promise.all([L.pedir(dir('disco/b.szs'), 0, 999, true), L.pedir(dir('disco/a.szs'), 5000, 5999)]);
+  const prs = llamadas.filter(x => x.tipo === 'lote').map(x => x.pr);
+  ok('§132: el lote de fondo sale con prioridad «low» y el que lleva algo urgente con «high»', prs[0] === 'low' && prs[1] === 'high', prs.join(','));
+  reiniciar();
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker, prioridad: false });
+  await L.pedir(dir('disco/a.szs'), 0, 999, true);
+  ok('§132: con prioridad:false (?prioridad=0) no se manda prioridad', llamadas[0].pr === undefined);
+
+  // 1c) §139 (C4): el freno de lo de fondo. El Worker falso tarda según los bytes (un enlace de ~20 MB/s): con freno, lo de
+  // fondo va en lotes de 4 MB como mucho y espera fichas; un pedido urgente en medio pasa en seguida
+  {
+    reiniciar();
+    const viejo = demora; let porByte = 1 / 20000;            // 20.000 bytes por ms
+    const lento = async (u, o) => { if (o?.method === 'POST') { const { p } = JSON.parse(o.body); await espera(p.reduce((s, [, a, b]) => s + b - a + 1, 0) * porByte); } return worker(u, o); };
+    const medir = async (freno, frenoActivo = () => true) => {
+      llamadas = [];
+      const L2 = crearLotes({ url: URL_LOTE, base: BASE, buscar: lento, freno, frenoActivo });
+      const t0 = performance.now();
+      const fondo = [];
+      for (let i = 0; i < 24; i++) fondo.push(L2.pedir(dir('thp/video.thp'), i * 600000, i * 600000 + 599999));   // 24 × 600 KB = 14 MB
+      await espera(120);
+      const tu = performance.now(); await L2.pedir(dir('disco/b.szs'), 0, 1000, true); const urgenteMs = performance.now() - tu;
+      await Promise.all(fondo);
+      const mayor = Math.max(...llamadas.filter(x => x.tipo === 'lote' && !x.p.some(([r]) => r === 'disco/b.szs')).map(x => x.p.reduce((s, [, a, b]) => s + b - a + 1, 0)));
+      return { ms: Math.round(performance.now() - t0), urgenteMs: Math.round(urgenteMs), mayorMB: +(mayor / 1048576).toFixed(1), esperas: L2.estado.freno.esperas, ancho: L2.estado.freno.ancho };
+    };
+    const sin = await medir(false), con = await medir(true), apagado = await medir(true, () => false);
+    ok('§139: con freno, lo de fondo en lotes de 4 MB como mucho y esperando fichas (sin freno, de hasta 16 MB y sin esperas)',
+       con.mayorMB <= 4 && con.esperas > 0 && sin.esperas === 0, JSON.stringify({ sin, con }));
+    // (el Worker falso no comparte un enlace entre lotes: aquí no se ve el freno en el tiempo total; eso se mide con
+    // medir-sitio --red 50. Sí se ve que lo urgente no espera más que sin freno)
+    ok('§139: con freno el urgente no tarda más que sin freno', con.urgenteMs <= sin.urgenteMs * 1.2 + 50, JSON.stringify({ sin, con }));
+    ok('§142: con freno pero frenoActivo() en no (la carga, o jugando solo) va como sin freno: sin esperas y lotes grandes',
+       apagado.esperas === 0 && apagado.mayorMB > 4, JSON.stringify(apagado));
+    demora = viejo;
+  }
+
+  // 1d) §146 (D3): lo que el juego espera y ya venía de fondo. En la fila: pasa a urgente (sale «high»). Ya en un lote con
+  // mucho delante: el disco lo pide aparte, urgente, y gana el primero que llega
+  {
+    reiniciar();
+    const porByte = 1 / 20000;                                  // el mismo enlace de mentira de 20 MB/s
+    const lento = async (u, o) => { if (o?.method === 'POST') { const { p } = JSON.parse(o.body); await espera(p.reduce((s, [, a, b]) => s + b - a + 1, 0) * porByte); } return worker(u, o); };
+    // a) en la fila (ventana larga): apurar lo sube
+    const La = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker, ventana: 300 });
+    La.pedir(dir('disco/b.szs'), 0, 1000, true);                 // (la primera llamada, sola)
+    await espera(20);
+    const pf = La.pedir(dir('thp/video.thp'), 262144, 524287);
+    const que = La.apurar(dir('thp/video.thp'), 300000, 310000);
+    const da = await pf;
+    const loteDe = llamadas.find(x => x.tipo === 'lote' && x.p.some(([r]) => r === 'thp/video.thp'));
+    ok('§146: un trozo de fondo que el juego espera y sigue en la fila pasa a urgente (sale ya, «high», sin esperar la ventana)',
+       que === 'subido' && La.estado.apurados === 1 && loteDe?.pr === 'high' && iguales(da, esperado('thp/video.thp', 262144, 262144)), `${que} · ${loteDe?.pr}`);
+    // b) ya en camino con 7,75 MB delante: el disco lo pide aparte
+    const leerUltimo = async apurarActivo => {
+      llamadas = [];
+      const Lb = crearLotes({ url: URL_LOTE, base: BASE, buscar: lento });
+      const d = crearDisco({ version: 'lote-apurar-' + apurarActivo + Math.random(), buscar: lento, lotes: Lb, cajas: null, apurarActivo });
+      await d.abrir();
+      const TV = TAMS['thp/video.thp'];
+      await Lb.pedir(dir('disco/b.szs'), 0, 1000, true);          // (calentar: la primera sale sola)
+      d.adelantarRango(dir('thp/video.thp'), TV, 0, 32 * 262144);  // 8 MB de fondo, un solo trozo
+      await espera(40);
+      const t0 = performance.now();
+      const r = await d.leer(dir('thp/video.thp'), TV, 31 * 262144 + 10, 1000);
+      return { ms: Math.round(performance.now() - t0), bien: iguales(r, esperado('thp/video.thp', 31 * 262144 + 10, 1000)),
+               aparte: d.estado.aparte, gano: d.estado.aparteGano, lejos: Lb.estado.lejos };
+    };
+    const conA = await leerUltimo(true), sinA = await leerUltimo(false);
+    ok('§146: con el bloque al fondo de un lote de 8 MB ya en camino, se pide aparte y llega mucho antes (sin esto, espera el lote entero)',
+       conA.bien && sinA.bien && conA.aparte === 1 && conA.gano === 1 && conA.lejos === 1 && sinA.aparte === 0 && conA.ms * 3 < sinA.ms, JSON.stringify({ conA, sinA }));
+    const Lc = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker });
+    ok('§146: apurar algo que nadie pidió no hace nada', Lc.apurar(dir('disco/a.szs'), 0, 10) === 'no' && Lc.estado.apurados === 0);
+  }
 
   // 2) la primera llamada sale sola; después, como mucho 4 (+2 urgentes) a la vez
   reiniciar(); demora = 30;

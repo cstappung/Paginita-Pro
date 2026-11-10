@@ -22,13 +22,23 @@
 
 #include "memory.h"
 
+#if defined(__EMSCRIPTEN__)
 #include <emscripten.h>
+#else
+// N1 (§153): el mismo «sin pantalla» compilado como programa de Windows (herramientas/compilar-nativo.py)
+#include <chrono>
+#define EMSCRIPTEN_KEEPALIVE
+static double emscripten_get_now() {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+#endif
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <vector>
 
 extern "C" double g_mkwHostIdleMs;  // vi.cpp: tiempo total que el juego pasó esperando
 
@@ -79,9 +89,69 @@ static void VuelcaMemoria(const char* ruta)
     std::printf("[aurora-headless] volcado de memoria (MEM1 + MEM2, 152 MB) en %s\n", ruta);
 }
 
+// ---- N13 (§165): el guion de botones y el tramo de la carrera, iguales en Node y en el programa de Windows ----
+// MKW_HEADLESS_GUION="inicio+duración=máscara,…": del cuadro «inicio», durante «duración» cuadros, el mando del puerto 0
+// tiene apretados los botones de «máscara» (hexadecimal, PAD_BUTTON_*: A = 100, B = 200, START = 1000; las que se pisan
+// se suman). Ejemplo: "400+6=100,560+6=100" = apretar A dos veces. Así los dos programas recorren los mismos menús en los
+// mismos cuadros y llegan a la misma carrera (sin página no hay la entrada directa por código de §73).
+// MKW_HEADLESS_ESTADO=1: cada 60 cuadros, la sección y la página de arriba del juego, y la etapa y el cuadro de lógica
+// de la carrera (para armar el guion). MKW_HEADLESS_TRAMO="600-2400": al pasar esos cuadros de lógica de la carrera
+// (Raceinfo +0x20, desde la cuenta) se anotan la hora y las esperas, y se imprime el trabajo por cuadro de lógica.
+namespace {
+struct PasoGuion { uint32_t desde, hasta; uint16_t mascara; };
+std::vector<PasoGuion> LeerGuion() {
+    std::vector<PasoGuion> v;
+    const char* g = std::getenv("MKW_HEADLESS_GUION");
+    while (g && *g) {
+        unsigned a = 0, d = 0, m = 0; int n = 0;
+        if (std::sscanf(g, "%u+%u=%x%n", &a, &d, &m, &n) == 3) v.push_back({a, a + d, static_cast<uint16_t>(m)});
+        const char* c = std::strchr(g, ',');
+        g = c ? c + 1 : nullptr;
+    }
+    return v;
+}
+uint32_t LeerSeguro(uint32_t dir) { uint32_t v = 0; return dir && Memory::TryRead32(dir, v) ? v : 0; }
+}  // namespace
+
+static void GuionYTramo() {
+    static const std::vector<PasoGuion> guion = LeerGuion();
+    if (!guion.empty()) {
+        uint16_t m = 0;
+        for (const auto& p : guion) if (g_frames >= p.desde && g_frames < p.hasta) m |= p.mascara;
+        g_pad[0].button = m;
+    }
+    // la carrera: Raceinfo (0x809BD730) +0x28 = etapa (0 presentación, 1 cuenta, 2 carrera, 3+ fin), +0x20 = cuadros desde la cuenta
+    const uint32_t ri = LeerSeguro(0x809BD730);
+    const uint32_t etapa = ri ? LeerSeguro(ri + 0x28) : 0xFFFFFFFFu, logica = ri ? LeerSeguro(ri + 0x20) : 0;
+    static const bool estado = std::getenv("MKW_HEADLESS_ESTADO") != nullptr;
+    if (estado && g_frames % 60 == 0) {
+        const uint32_t sm = LeerSeguro(0x809C1E38), sec = sm ? LeerSeguro(sm) : 0;
+        const uint32_t n = sec ? LeerSeguro(sec + 0x37C) : 0, pag = n && n < 16 ? LeerSeguro(sec + 0x354 + 4 * (n - 1)) : 0;
+        // (W4, §198: y la pista de la ficha de la carrera, Racedata 0x809BD728 +0x20 +0xB48: a qué pista llegó el guion)
+        const uint32_t rd = LeerSeguro(0x809BD728);
+        std::printf("[aurora-headless] estado cuadro %u: seccion 0x%x pagina 0x%x etapa %d logica %u pista 0x%x\n", g_frames,
+                    sec ? LeerSeguro(sec) : 0xFFFFFFFFu, pag ? LeerSeguro(pag + 4) : 0xFFFFFFFFu, static_cast<int>(etapa), logica,
+                    rd ? LeerSeguro(rd + 0x20 + 0xB48) : 0xFFFFFFFFu);
+    }
+    static unsigned desde = 0, hasta = 0;
+    static const bool hayTramo = [] { const char* t = std::getenv("MKW_HEADLESS_TRAMO"); return t && std::sscanf(t, "%u-%u", &desde, &hasta) == 2 && hasta > desde; }();
+    static double t0 = -1.0, e0 = 0.0; static uint32_t l0 = 0, f0 = 0; static bool listo = false;
+    if (!hayTramo || listo || !ri || etapa > 2) return;
+    if (t0 < 0.0 && logica >= desde) { t0 = emscripten_get_now(); e0 = g_mkwHostIdleMs; l0 = logica; f0 = g_frames;
+        std::printf("[aurora-headless] tramo empieza: logica %u cuadro %u\n", logica, g_frames); }
+    else if (t0 >= 0.0 && logica >= hasta) {
+        listo = true;
+        const double pared = emscripten_get_now() - t0, espera = g_mkwHostIdleMs - e0; const uint32_t n = logica - l0;
+        std::printf("[aurora-headless] tramo %u-%u: %u cuadros de logica en %u cuadros, pared %.1f ms, espera %.1f ms, trabajo %.3f ms por cuadro de logica\n",
+                    l0, logica, n, g_frames - f0, pared, espera, (pared - espera) / n);
+        std::fflush(stdout);
+    }
+}
+
 extern "C" void aurora_end_frame()
 {
     ++g_frames;
+    GuionYTramo();
     // Cada 60 cuadros (1 s de juego): cuánto tardaron de verdad, para ver si alcanza los 60 fps, y cuánto de cada
     // cuadro fue trabajo (el resto el juego esperó al siguiente barrido de la tele: vi.cpp suma esas esperas).
     static double ultimo = emscripten_get_now();
@@ -104,7 +174,13 @@ extern "C" void aurora_end_frame()
         // MKW_HEADLESS_DUMP=ruta: además, guardar la memoria del juego al terminar
         if (const char* ruta = std::getenv("MKW_HEADLESS_DUMP")) VuelcaMemoria(ruta);
         std::fflush(stdout);
+#if defined(__EMSCRIPTEN__)
         std::exit(0);
+#else
+        // §165: en Windows std::exit desde una fibra del juego terminaba en «std::terminate() without current exception»
+        // (un cartel de error que esperaba un clic): salir sin destructores, ya con todo escrito
+        std::_Exit(0);
+#endif
     }
 }
 

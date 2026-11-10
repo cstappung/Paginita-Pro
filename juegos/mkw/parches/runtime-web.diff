@@ -1,3 +1,21 @@
+diff --git a/runtime/include/abi_bridge.h b/runtime/include/abi_bridge.h
+index e4b87f9..b483839 100644
+--- a/runtime/include/abi_bridge.h
++++ b/runtime/include/abi_bridge.h
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "mkw_contadores.h"   // V4 (§152)
+ #include "memory.h"
+ #include "ppc_runtime.h"
+ #include "system_bridge.h"
+@@ -637,6 +638,7 @@ inline void InvokeIndirectJump(uint32_t target, CpuContext* ctx) {
+ }
+ 
+ inline void InvokeIndirectCpu(uint32_t target, CpuContext* ctx) {
++    MKW_CUENTA(MKWC_INDIRECTA);   // V4 (§152)
+     CpuContext* cpu = ctx ? ctx : &GetPersistentCpuContext();
+     if (target == 0) {
+         ReportMissingCpuTarget(target, cpu);
 diff --git a/runtime/include/audio_backend.h b/runtime/include/audio_backend.h
 index ae05827..33f84cb 100644
 --- a/runtime/include/audio_backend.h
@@ -38,7 +56,7 @@ index ae05827..33f84cb 100644
 +#endif
  };
 diff --git a/runtime/include/guest_flat_memory.h b/runtime/include/guest_flat_memory.h
-index 6c0bdd3..8c7c085 100644
+index 6c0bdd3..148b940 100644
 --- a/runtime/include/guest_flat_memory.h
 +++ b/runtime/include/guest_flat_memory.h
 @@ -36,6 +36,12 @@ inline constexpr uintptr_t kFixedFlatGuestBase = 0x0000'0080'0000'0000ull;
@@ -54,12 +72,14 @@ index 6c0bdd3..8c7c085 100644
  #else
  #error "guest_flat_memory.h has no fixed flat guest base chosen for this architecture"
  #endif
-@@ -77,7 +83,9 @@ bool IsActive();
+@@ -77,7 +83,11 @@ bool IsActive();
  #define MKW_GUEST_FLAT_FIXED_PAGE_SIZE 1
  #endif
  
 -#if defined(MKW_GUEST_FLAT_FIXED_PAGE_SIZE)
-+#if defined(__EMSCRIPTEN__)
++// MKW_FORZAR_REVISADO (N1, bitácora §153): un programa nativo que va siempre por el camino revisado, como wasm, para
++// medir cuánto del «impuesto del navegador» es la memoria de la Wii
++#if defined(__EMSCRIPTEN__) || defined(MKW_FORZAR_REVISADO)
 +inline constexpr bool RequiresCheckedAccess() noexcept { return true; }
 +#elif defined(MKW_GUEST_FLAT_FIXED_PAGE_SIZE)
  inline constexpr bool RequiresCheckedAccess() noexcept { return false; }
@@ -129,27 +149,35 @@ index b062184..7cc0764 100644
  #error "ppc_isa_config.h has no SIMD intrinsics header for this architecture"
  #endif
 diff --git a/runtime/include/isa/ppc_isa_float.h b/runtime/include/isa/ppc_isa_float.h
-index e5f6c62..2bd8b74 100644
+index e5f6c62..9114856 100644
 --- a/runtime/include/isa/ppc_isa_float.h
 +++ b/runtime/include/isa/ppc_isa_float.h
-@@ -30,6 +30,16 @@
+@@ -23,6 +23,7 @@
+ 
+ #include "ppc_isa_config.h"
+ #include "ppc_isa_context.h"
++#include "mkw_contadores.h"   // V4 (§152)
+ 
+ #include <array>
+ #include <cmath>
+@@ -30,6 +31,16 @@
  #include <cstring>
  #include <limits>
  
 +// Fused multiply-add with a single rounding. wasm (no FMA instruction) supplies its own exact
 +// version with x86 NaN answers in ppc_isa_wasm_neon.h; elsewhere this is the hardware FMA.
 +#if !defined(__EMSCRIPTEN__)
-+inline double MkwFma(double a, double b, double c) { return std::fma(a, b, c); }
-+inline float MkwFma(float a, float b, float c) { return std::fma(a, b, c); }
++inline double MkwFma(double a, double b, double c) { MKW_CUENTA(MKWC_FMA); return std::fma(a, b, c); }
++inline float MkwFma(float a, float b, float c) { MKW_CUENTA(MKWC_FMA); return std::fma(a, b, c); }
 +// a*b - c; the compiler folds the negation into one fmsub, which keeps a NaN c's sign.
-+inline double MkwFms(double a, double b, double c) { return std::fma(a, b, -c); }
-+inline float MkwFms(float a, float b, float c) { return std::fma(a, b, -c); }
++inline double MkwFms(double a, double b, double c) { MKW_CUENTA(MKWC_FMA); return std::fma(a, b, -c); }
++inline float MkwFms(float a, float b, float c) { MKW_CUENTA(MKWC_FMA); return std::fma(a, b, -c); }
 +#endif
 +
  inline uint64_t PpcBitCastToU64Inline(double value)
  {
      uint64_t integral = 0;
-@@ -80,7 +90,7 @@ inline void PpcSetPairedFprInline(PPC_FPR& fpr, double packed)
+@@ -80,7 +91,7 @@ inline void PpcSetPairedFprInline(PPC_FPR& fpr, double packed)
  
  #if defined(__x86_64__)
  using PpcPairVec = __m128;
@@ -158,7 +186,7 @@ index e5f6c62..2bd8b74 100644
  // Only 2 lanes are ever meaningful (a PPC paired-single register), so a 2-lane float32x2_t
  // (one 64-bit D register) is a more natural fit than mirroring x86's 128-bit register usage.
  using PpcPairVec = float32x2_t;
-@@ -93,7 +103,7 @@ inline PpcPairVec PpcPsToM128Inline(double value)
+@@ -93,7 +104,7 @@ inline PpcPairVec PpcPsToM128Inline(double value)
  {
  #if defined(__x86_64__)
      return _mm_castpd_ps(_mm_set_sd(value));
@@ -167,7 +195,7 @@ index e5f6c62..2bd8b74 100644
      return vreinterpret_f32_f64(vdup_n_f64(value));
  #endif
  }
-@@ -102,7 +112,7 @@ inline double PpcM128ToPsInline(PpcPairVec value)
+@@ -102,7 +113,7 @@ inline double PpcM128ToPsInline(PpcPairVec value)
  {
  #if defined(__x86_64__)
      return _mm_cvtsd_f64(_mm_castps_pd(value));
@@ -176,7 +204,7 @@ index e5f6c62..2bd8b74 100644
      return vget_lane_f64(vreinterpret_f64_f32(value), 0);
  #endif
  }
-@@ -112,7 +122,7 @@ inline PpcPairVec PpcBroadcastPs0Inline(double value)
+@@ -112,7 +123,7 @@ inline PpcPairVec PpcBroadcastPs0Inline(double value)
  #if defined(__x86_64__)
      const __m128 lanes = PpcPsToM128Inline(value);
      return _mm_shuffle_ps(lanes, lanes, _MM_SHUFFLE(1, 1, 1, 1));
@@ -185,7 +213,7 @@ index e5f6c62..2bd8b74 100644
      // ps0 lives in lane 1 (see the lane-accessor comment below).
      return vdup_lane_f32(PpcPsToM128Inline(value), 1);
  #endif
-@@ -123,7 +133,7 @@ inline PpcPairVec PpcBroadcastPs1Inline(double value)
+@@ -123,7 +134,7 @@ inline PpcPairVec PpcBroadcastPs1Inline(double value)
  #if defined(__x86_64__)
      const __m128 lanes = PpcPsToM128Inline(value);
      return _mm_shuffle_ps(lanes, lanes, _MM_SHUFFLE(0, 0, 0, 0));
@@ -194,7 +222,7 @@ index e5f6c62..2bd8b74 100644
      // ps1 is already lane 0.
      return vdup_lane_f32(PpcPsToM128Inline(value), 0);
  #endif
-@@ -136,7 +146,7 @@ inline PpcPairVec PpcNegateNonNanLanesInline(PpcPairVec value)
+@@ -136,7 +147,7 @@ inline PpcPairVec PpcNegateNonNanLanesInline(PpcPairVec value)
      const __m128 negated = _mm_xor_ps(value, signMask);
      const __m128 ordered = _mm_cmpord_ps(value, value);
      return _mm_or_ps(_mm_and_ps(ordered, negated), _mm_andnot_ps(ordered, value));
@@ -203,7 +231,7 @@ index e5f6c62..2bd8b74 100644
      const uint32x2_t signMask = vdup_n_u32(0x80000000u);
      const float32x2_t negated = vreinterpret_f32_u32(veor_u32(vreinterpret_u32_f32(value), signMask));
      // NEON has no direct "ordered compare"; a value compares equal to itself iff it's not NaN.
-@@ -155,7 +165,7 @@ inline float PpcGetPs0Inline(double value)
+@@ -155,7 +166,7 @@ inline float PpcGetPs0Inline(double value)
      // ps0 lives in lane 1; PpcBroadcastPs0Inline already splats it.
  #if defined(__x86_64__)
      return _mm_cvtss_f32(PpcBroadcastPs0Inline(value));
@@ -212,7 +240,7 @@ index e5f6c62..2bd8b74 100644
      return vget_lane_f32(PpcBroadcastPs0Inline(value), 0);
  #endif
  }
-@@ -165,7 +175,7 @@ inline float PpcGetPs1Inline(double value)
+@@ -165,7 +176,7 @@ inline float PpcGetPs1Inline(double value)
      // ps1 is already lane 0 of the packed representation.
  #if defined(__x86_64__)
      return _mm_cvtss_f32(PpcPsToM128Inline(value));
@@ -221,7 +249,7 @@ index e5f6c62..2bd8b74 100644
      return vget_lane_f32(PpcPsToM128Inline(value), 0);
  #endif
  }
-@@ -176,7 +186,7 @@ inline double PpcPackPairedInline(float ps0, float ps1)
+@@ -176,7 +187,7 @@ inline double PpcPackPairedInline(float ps0, float ps1)
      // _mm_unpacklo_ps(x, y) -> { x[0], y[0], x[1], y[1] }, so lane 0 becomes
      // ps1 and lane 1 becomes ps0, matching the union layout bit for bit.
      return PpcM128ToPsInline(_mm_unpacklo_ps(_mm_set_ss(ps1), _mm_set_ss(ps0)));
@@ -230,7 +258,7 @@ index e5f6c62..2bd8b74 100644
      // Lane 0 = ps1, lane 1 = ps0, matching the union layout bit for bit.
      const float32x2_t lane0 = vdup_n_f32(ps1);
      return PpcM128ToPsInline(vset_lane_f32(ps0, lane0, 1));
-@@ -205,7 +215,7 @@ inline float PpcForceSingleValueInline(double value)
+@@ -205,7 +216,7 @@ inline float PpcForceSingleValueInline(double value)
      const __m128d flush = _mm_cmplt_sd(magnitude, _mm_set_sd(g_mkwNiFlushThreshold));
      const __m128d kept = _mm_andnot_pd(_mm_andnot_pd(signMask, flush), v);
      return static_cast<float>(_mm_cvtsd_f64(kept));
@@ -239,7 +267,7 @@ index e5f6c62..2bd8b74 100644
      const float64x1_t v = vdup_n_f64(value);
      const uint64x1_t signMask = vdup_n_u64(0x8000000000000000ULL);
      const float64x1_t magnitude = vreinterpret_f64_u64(vbic_u64(vreinterpret_u64_f64(v), signMask));
-@@ -422,19 +432,17 @@ inline double PpcPackIntegerWordInline(int32_t value)
+@@ -422,19 +433,17 @@ inline double PpcPackIntegerWordInline(int32_t value)
  template <bool Subtract>
  inline float PpcAccuratePsMaddLaneInline(float a, float c, float b)
  {
@@ -261,7 +289,7 @@ index e5f6c62..2bd8b74 100644
  }
  
  template <bool Subtract>
-@@ -447,7 +455,7 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
+@@ -447,7 +456,7 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
      // Recover the direction of that discarded error for those tie cases.
      const double roundedC = PpcForce25BitInline(c);
      const double signedB = Subtract ? -b : b;
@@ -270,7 +298,7 @@ index e5f6c62..2bd8b74 100644
      const uint64_t resultBits = PpcBitCastToU64Inline(result);
      constexpr uint64_t kDiscardedMask = 0x000000001FFFFFFFULL;
      constexpr uint64_t kEvenTie = 0x0000000010000000ULL;
-@@ -455,7 +463,7 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
+@@ -455,7 +464,7 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
      {
          const double aPrime = signedB - result;
          const double bPrime = result + aPrime;
@@ -279,7 +307,7 @@ index e5f6c62..2bd8b74 100644
          const double deltaB = signedB - bPrime;
          const double error = deltaA + deltaB;
          if (error != 0.0)
-@@ -480,23 +488,23 @@ inline double PpcFmulsNoNiInline(double a, double c)
+@@ -480,23 +489,23 @@ inline double PpcFmulsNoNiInline(double a, double c)
  
  inline double PpcFmaddInline(double a, double c, double b)
  {
@@ -307,7 +335,7 @@ index e5f6c62..2bd8b74 100644
      return std::isnan(result) ? result : -result;
  }
  
-@@ -526,7 +534,7 @@ inline double PpcFnmsubsInline(double a, double c, double b)
+@@ -526,7 +535,7 @@ inline double PpcFnmsubsInline(double a, double c, double b)
      return static_cast<double>(std::isnan(result) ? result : -result);
  }
  
@@ -316,7 +344,7 @@ index e5f6c62..2bd8b74 100644
  // x86 resolves a single NaN source operand (SNaN or QNaN alike) to that operand quieted with
  // sign and payload kept, and an invalid op with no NaN input to 0xFFC00000; NEON prefers SNaNs,
  // checks the accumulator first, and yields the positive default NaN 0x7FC00000. NaN result
-@@ -569,13 +577,13 @@ inline PpcPairVec PpcResolveNanLanes3Inline(
+@@ -569,13 +578,13 @@ inline PpcPairVec PpcResolveNanLanes3Inline(
      const uint32x2_t resultNan = vmvn_u32(vceq_f32(result, result));
      return vbsl_f32(resultNan, replacement, result);
  }
@@ -332,7 +360,7 @@ index e5f6c62..2bd8b74 100644
      const PpcPairVec result = vmul_f32(lhs, rhs);
      if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
          return PpcResolveNanLanesInline(result, lhs, rhs);
-@@ -619,7 +627,7 @@ inline PpcPairVec PpcFmaddPairInline(PpcPairVec multiplicand, PpcPairVec multipl
+@@ -619,7 +628,7 @@ inline PpcPairVec PpcFmaddPairInline(PpcPairVec multiplicand, PpcPairVec multipl
          PpcAccuratePsMaddLaneNoNiInline<false>(PpcGetPs0Inline(a), PpcGetPs0Inline(c), PpcGetPs0Inline(b)),
          PpcAccuratePsMaddLaneNoNiInline<false>(PpcGetPs1Inline(a), PpcGetPs1Inline(c), PpcGetPs1Inline(b))));
  #endif
@@ -341,7 +369,7 @@ index e5f6c62..2bd8b74 100644
      const PpcPairVec result = vfma_f32(addend, multiplicand, multiplier);
      if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
          return PpcResolveNanLanes3Inline(result, multiplicand, multiplier, addend);
-@@ -640,7 +648,7 @@ inline PpcPairVec PpcFmsubPairInline(PpcPairVec multiplicand, PpcPairVec multipl
+@@ -640,7 +649,7 @@ inline PpcPairVec PpcFmsubPairInline(PpcPairVec multiplicand, PpcPairVec multipl
          PpcAccuratePsMaddLaneNoNiInline<true>(PpcGetPs0Inline(a), PpcGetPs0Inline(c), PpcGetPs0Inline(b)),
          PpcAccuratePsMaddLaneNoNiInline<true>(PpcGetPs1Inline(a), PpcGetPs1Inline(c), PpcGetPs1Inline(b))));
  #endif
@@ -350,7 +378,7 @@ index e5f6c62..2bd8b74 100644
      const PpcPairVec result = vfma_f32(vneg_f32(subtractor), multiplicand, multiplier);
      if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
          return PpcResolveNanLanes3Inline(result, multiplicand, multiplier, subtractor);
-@@ -746,7 +754,7 @@ inline double PPC_PsMerge00Inline(double aValue, double bValue)
+@@ -746,7 +755,7 @@ inline double PPC_PsMerge00Inline(double aValue, double bValue)
      const __m128 gathered = _mm_shuffle_ps(
          PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue), _MM_SHUFFLE(1, 1, 1, 1));
      return PpcM128ToPsInline(_mm_shuffle_ps(gathered, gathered, _MM_SHUFFLE(0, 0, 2, 0)));
@@ -359,7 +387,7 @@ index e5f6c62..2bd8b74 100644
      return PpcPackPairedInline(PpcGetPs0Inline(aValue), PpcGetPs0Inline(bValue));
  #endif
  }
-@@ -758,7 +766,7 @@ inline double PPC_PsMerge01Inline(double aValue, double bValue)
+@@ -758,7 +767,7 @@ inline double PPC_PsMerge01Inline(double aValue, double bValue)
      const __m128 gathered = _mm_shuffle_ps(
          PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue), _MM_SHUFFLE(1, 1, 0, 0));
      return PpcM128ToPsInline(_mm_shuffle_ps(gathered, gathered, _MM_SHUFFLE(0, 0, 2, 0)));
@@ -368,7 +396,7 @@ index e5f6c62..2bd8b74 100644
      return PpcPackPairedInline(PpcGetPs0Inline(aValue), PpcGetPs1Inline(bValue));
  #endif
  }
-@@ -770,7 +778,7 @@ inline double PPC_PsMerge10Inline(double aValue, double bValue)
+@@ -770,7 +779,7 @@ inline double PPC_PsMerge10Inline(double aValue, double bValue)
      const __m128 gathered = _mm_shuffle_ps(
          PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue), _MM_SHUFFLE(0, 0, 1, 1));
      return PpcM128ToPsInline(_mm_shuffle_ps(gathered, gathered, _MM_SHUFFLE(0, 0, 2, 0)));
@@ -377,7 +405,7 @@ index e5f6c62..2bd8b74 100644
      return PpcPackPairedInline(PpcGetPs1Inline(aValue), PpcGetPs0Inline(bValue));
  #endif
  }
-@@ -782,7 +790,7 @@ inline double PPC_PsMerge11Inline(double aValue, double bValue)
+@@ -782,7 +791,7 @@ inline double PPC_PsMerge11Inline(double aValue, double bValue)
  #if defined(__x86_64__)
      return PpcM128ToPsInline(
          _mm_unpacklo_ps(PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue)));
@@ -386,7 +414,7 @@ index e5f6c62..2bd8b74 100644
      return PpcPackPairedInline(PpcGetPs1Inline(aValue), PpcGetPs1Inline(bValue));
  #endif
  }
-@@ -791,7 +799,7 @@ inline PpcPairVec PpcAddPairInline(PpcPairVec lhs, PpcPairVec rhs)
+@@ -791,7 +800,7 @@ inline PpcPairVec PpcAddPairInline(PpcPairVec lhs, PpcPairVec rhs)
  {
  #if defined(__x86_64__)
      return _mm_add_ps(lhs, rhs);
@@ -395,7 +423,7 @@ index e5f6c62..2bd8b74 100644
      const PpcPairVec result = vadd_f32(lhs, rhs);
      if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
          return PpcResolveNanLanesInline(result, lhs, rhs);
-@@ -803,7 +811,7 @@ inline PpcPairVec PpcSubPairInline(PpcPairVec lhs, PpcPairVec rhs)
+@@ -803,7 +812,7 @@ inline PpcPairVec PpcSubPairInline(PpcPairVec lhs, PpcPairVec rhs)
  {
  #if defined(__x86_64__)
      return _mm_sub_ps(lhs, rhs);
@@ -404,7 +432,7 @@ index e5f6c62..2bd8b74 100644
      const PpcPairVec result = vsub_f32(lhs, rhs);
      if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
          return PpcResolveNanLanesInline(result, lhs, rhs);
-@@ -815,7 +823,7 @@ inline PpcPairVec PpcDivPairInline(PpcPairVec lhs, PpcPairVec rhs)
+@@ -815,7 +824,7 @@ inline PpcPairVec PpcDivPairInline(PpcPairVec lhs, PpcPairVec rhs)
  {
  #if defined(__x86_64__)
      return _mm_div_ps(lhs, rhs);
@@ -499,10 +527,18 @@ index a5066f8..48dd0a6 100644
      // (its own !(scaled > 0) rule maps NaN to 0, matching what MAXPS-with-zero
      // does on the x86 path per the comment there), packed the same way the
 diff --git a/runtime/include/memory_access.h b/runtime/include/memory_access.h
-index 7ac535d..1d1ff22 100644
+index 7ac535d..9c98986 100644
 --- a/runtime/include/memory_access.h
 +++ b/runtime/include/memory_access.h
-@@ -368,9 +368,20 @@ MKW_MEMORY_FORCE_INLINE bool TryReadGuestScalar(uint32_t address, T& outValue) {
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "guest_flat_memory.h"
++#include "mkw_contadores.h"   // V4 (§152): MKW_CUENTA (nada sin -DMKW_CONTADORES)
+ #include "memory.h"
+ #include "recomp_mod_loader.h"
+ 
+@@ -368,9 +369,20 @@ MKW_MEMORY_FORCE_INLINE bool TryReadGuestScalar(uint32_t address, T& outValue) {
      return true;
  }
  
@@ -523,7 +559,36 @@ index 7ac535d..1d1ff22 100644
      // A mixed executable/data 1 MiB page zeroes the coarse writable bias even though most of
      // its 4 KiB sub-pages are plain data; MKW's THP buffers share such a page with .text, which
      // used to force ~15% of total CPU through the cold path. The sparse sub-page tier below
-@@ -539,6 +550,9 @@ MKW_MEMORY_FORCE_INLINE void WriteResolvedFloat64(uint8_t* r, uint32_t o, uint32
+@@ -476,11 +488,13 @@ inline void WriteStackFloat64(uint32_t address, double value) {
+ template <typename T, typename SlowRead>
+ MKW_MEMORY_FORCE_INLINE T ReadResolved(uint8_t* host, uint32_t rangeOffset, uint32_t address,
+                       SlowRead slow) {
++    MKW_CUENTA(MKWC_RESUELTA);
+     T value = 0;
+     if (ReadResolvedScalar(host, rangeOffset, value)) {
+         return value;
+     }
+-    [[unlikely]] return slow(address);
++    MKW_CUENTA(MKWC_RESUELTA_CAE);
++    return slow(address);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE uint8_t ReadResolved8(uint8_t* r, uint32_t o, uint32_t a) { return ReadResolved<uint8_t>(r, o, a, ReadResolvedFallback<uint8_t>); }
+@@ -503,10 +517,12 @@ MKW_MEMORY_FORCE_INLINE double ReadResolvedFloat64(uint8_t* r, uint32_t o, uint3
+ template <typename T, typename SlowWrite>
+ MKW_MEMORY_FORCE_INLINE void WriteResolved(uint8_t* host, uint32_t rangeOffset, uint32_t address, T value,
+                           SlowWrite slow) {
++    MKW_CUENTA(MKWC_RESUELTA);
+     if (WriteResolvedScalar(host, rangeOffset, value)) {
+         return;
+     }
+-    [[unlikely]] slow(address, value);
++    MKW_CUENTA(MKWC_RESUELTA_CAE);
++    slow(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void WriteResolved8(uint8_t* r, uint32_t o, uint32_t a, uint8_t v) { WriteResolved(r, o, a, v, WriteResolvedFallback<uint8_t>); }
+@@ -539,6 +555,9 @@ MKW_MEMORY_FORCE_INLINE void WriteResolvedFloat64(uint8_t* r, uint32_t o, uint32
  
  template <typename T>
  MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
@@ -533,7 +598,7 @@ index 7ac535d..1d1ff22 100644
      T value{};
      std::memcpy(&value, MKW_FLAT_GUEST_BASE + address, sizeof(T));
      return MaybeByteSwap(value);
-@@ -546,6 +560,9 @@ MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
+@@ -546,19 +565,25 @@ MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
  
  template <typename T>
  MKW_MEMORY_FORCE_INLINE void FlatStore(uint32_t address, T value) {
@@ -543,7 +608,69 @@ index 7ac535d..1d1ff22 100644
      const T swapped = MaybeByteSwap(value);
      std::memcpy(MKW_FLAT_GUEST_BASE + address, &swapped, sizeof(T));
  }
-@@ -616,25 +633,32 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
+ 
+ MKW_MEMORY_FORCE_INLINE uint8_t FlatRead8(uint32_t address) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) return Memory::Read8(address);
+     return FlatLoad<uint8_t>(address);
+ }
+ MKW_MEMORY_FORCE_INLINE uint16_t FlatRead16(uint32_t address) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) return Memory::Read16(address);
+     return FlatLoad<uint16_t>(address);
+ }
+ MKW_MEMORY_FORCE_INLINE uint32_t FlatRead32(uint32_t address) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) return Memory::Read32(address);
+     return FlatLoad<uint32_t>(address);
+ }
+@@ -571,6 +596,7 @@ MKW_MEMORY_FORCE_INLINE float FlatReadFloat32(uint32_t address) {
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE double FlatReadFloat64(uint32_t address) {
++    MKW_CUENTA(MKWC_FLAT);
+     const uint64_t bits = GuestFlat::RequiresCheckedAccess()
+         ? Memory::Read64(address) : FlatLoad<uint64_t>(address);
+     double value = 0.0;
+@@ -579,18 +605,21 @@ MKW_MEMORY_FORCE_INLINE double FlatReadFloat64(uint32_t address) {
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWrite8(uint32_t address, uint8_t value) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::Write8(address, value); return; }
+     if (FlatWriteNeedsPolicy(address)) [[unlikely]] { Write8Slow(address, value); return; }
+     FlatStore<uint8_t>(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWrite16(uint32_t address, uint16_t value) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::Write16(address, value); return; }
+     if (FlatWriteNeedsPolicy(address)) [[unlikely]] { Write16Slow(address, value); return; }
+     FlatStore<uint16_t>(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWrite32(uint32_t address, uint32_t value) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::Write32(address, value); return; }
+     if (FlatWriteNeedsPolicy(address)) [[unlikely]] { Write32Slow(address, value); return; }
+     FlatStore<uint32_t>(address, value);
+@@ -598,6 +627,7 @@ MKW_MEMORY_FORCE_INLINE void FlatWrite32(uint32_t address, uint32_t value) {
+ 
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat32(uint32_t address, double value) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat32(address, value); return; }
+     const uint32_t bits = ConvertPpcDoubleToSingleBits(value);
+     if (FlatWriteNeedsPolicy(address)) [[unlikely]] { WriteFloat32Slow(address, value); return; }
+@@ -605,6 +635,7 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat32(uint32_t address, double value) {
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
++    MKW_CUENTA(MKWC_FLAT);
+     if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat64(address, value); return; }
+     uint64_t bits = 0;
+     std::memcpy(&bits, &value, sizeof(bits));
+@@ -616,25 +647,37 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
  // of flat stores), skipping the MMIO mask/compare that's pure overhead there. Still safe if that proof were ever wrong: the flat view maps
  // 0xCC000000..0xCDFFFFFF PAGE_NOACCESS, so a stray MMIO store faults into the same handler and diagnostic as the checked path, just reported
  // instead of dispatched inline. Never use these for an address the translator hasn't proven.
@@ -551,31 +678,167 @@ index 7ac535d..1d1ff22 100644
 +// pages to fall back on, so there these go through the checked Memory::Write* like FlatWrite* does.
  
  MKW_MEMORY_FORCE_INLINE void FlatWriteRam8(uint32_t address, uint8_t value) {
++    MKW_CUENTA(MKWC_FLAT);
 +    if (GuestFlat::RequiresCheckedAccess()) { Memory::Write8(address, value); return; }
      FlatStore<uint8_t>(address, value);
  }
  
  MKW_MEMORY_FORCE_INLINE void FlatWriteRam16(uint32_t address, uint16_t value) {
++    MKW_CUENTA(MKWC_FLAT);
 +    if (GuestFlat::RequiresCheckedAccess()) { Memory::Write16(address, value); return; }
      FlatStore<uint16_t>(address, value);
  }
  
  MKW_MEMORY_FORCE_INLINE void FlatWriteRam32(uint32_t address, uint32_t value) {
++    MKW_CUENTA(MKWC_FLAT);
 +    if (GuestFlat::RequiresCheckedAccess()) { Memory::Write32(address, value); return; }
      FlatStore<uint32_t>(address, value);
  }
  
  
  MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat32(uint32_t address, double value) {
++    MKW_CUENTA(MKWC_FLAT);
 +    if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat32(address, value); return; }
      FlatStore<uint32_t>(address, ConvertPpcDoubleToSingleBits(value));
  }
  
  MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat64(uint32_t address, double value) {
++    MKW_CUENTA(MKWC_FLAT);
 +    if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat64(address, value); return; }
      uint64_t bits = 0;
      std::memcpy(&bits, &value, sizeof(bits));
      FlatStore<uint64_t>(address, bits);
+@@ -647,86 +690,114 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat64(uint32_t address, double value)
+ #undef MKW_MEMORY_COLD
+ 
+ inline uint8_t Memory::Read8(uint32_t addr) {
++    MKW_CUENTA(MKWC_LEE);
+     uint8_t value = 0;
+-    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]]
++    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
++        MKW_CUENTA(MKWC_LEE_LENTA);
+         return MemoryInline::Read8Slow(addr);
++    }
+     return value;
+ }
+ 
+ inline uint16_t Memory::Read16(uint32_t addr) {
++    MKW_CUENTA(MKWC_LEE);
+     uint16_t value = 0;
+-    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]]
++    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
++        MKW_CUENTA(MKWC_LEE_LENTA);
+         return MemoryInline::Read16Slow(addr);
++    }
+     return value;
+ }
+ 
+ inline uint32_t Memory::Read32(uint32_t addr) {
++    MKW_CUENTA(MKWC_LEE);
+     uint32_t value = 0;
+-    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]]
++    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
++        MKW_CUENTA(MKWC_LEE_LENTA);
+         return MemoryInline::Read32Slow(addr);
++    }
+     return value;
+ }
+ 
+ inline uint64_t Memory::Read64(uint32_t addr) {
++    MKW_CUENTA(MKWC_LEE);
+     uint64_t value = 0;
+-    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]]
++    if (!MemoryInline::TryReadGuestScalar(addr, value)) [[unlikely]] {
++        MKW_CUENTA(MKWC_LEE_LENTA);
+         return MemoryInline::Read64Slow(addr);
++    }
+     return value;
+ }
+ 
+ inline float Memory::ReadFloat32(uint32_t addr) {
++    MKW_CUENTA(MKWC_LEE);
+     uint32_t bits = 0;
+-    if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]]
++    if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]] {
++        MKW_CUENTA(MKWC_LEE_LENTA);
+         return MemoryInline::ReadFloat32Slow(addr);
++    }
+     float value = 0.0f;
+     std::memcpy(&value, &bits, sizeof(value));
+     return value;
+ }
+ 
+ inline double Memory::ReadFloat64(uint32_t addr) {
++    MKW_CUENTA(MKWC_LEE);
+     uint64_t bits = 0;
+-    if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]]
++    if (!MemoryInline::TryReadGuestScalar(addr, bits)) [[unlikely]] {
++        MKW_CUENTA(MKWC_LEE_LENTA);
+         return MemoryInline::ReadFloat64Slow(addr);
++    }
+     double value = 0.0;
+     std::memcpy(&value, &bits, sizeof(value));
+     return value;
+ }
+ 
+ inline void Memory::Write8(uint32_t addr, uint8_t val) {
+-    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]]
+-        MemoryInline::Write8Slow(addr, val);
++    MKW_CUENTA(MKWC_ESCRIBE);
++    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
++        MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write8Slow(addr, val);
++    }
+ }
+ 
+ inline void Memory::Write16(uint32_t addr, uint16_t val) {
+-    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]]
+-        MemoryInline::Write16Slow(addr, val);
++    MKW_CUENTA(MKWC_ESCRIBE);
++    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
++        MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write16Slow(addr, val);
++    }
+ }
+ 
+ inline void Memory::Write32(uint32_t addr, uint32_t val) {
+-    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]]
+-        MemoryInline::Write32Slow(addr, val);
++    MKW_CUENTA(MKWC_ESCRIBE);
++    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
++        MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write32Slow(addr, val);
++    }
+ }
+ 
+ inline void Memory::Write64(uint32_t addr, uint64_t val) {
+-    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]]
+-        MemoryInline::Write64Slow(addr, val);
++    MKW_CUENTA(MKWC_ESCRIBE);
++    if (!MemoryInline::TryWriteGuestScalar(addr, val)) [[unlikely]] {
++        MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::Write64Slow(addr, val);
++    }
+ }
+ 
+ inline void Memory::WriteFloat32(uint32_t addr, double val) {
++    MKW_CUENTA(MKWC_ESCRIBE);
+     {
+         const uint32_t bits = MemoryInline::ConvertPpcDoubleToSingleBits(val);
+         if (MemoryInline::TryWriteGuestScalar(addr, bits))
+             return;
+     }
+-    [[unlikely]] MemoryInline::WriteFloat32Slow(addr, val);
++    MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::WriteFloat32Slow(addr, val);
+ }
+ 
+ inline void Memory::WriteFloat64(uint32_t addr, double val) {
++    MKW_CUENTA(MKWC_ESCRIBE);
+     {
+         uint64_t bits = 0;
+         std::memcpy(&bits, &val, sizeof(bits));
+         if (MemoryInline::TryWriteGuestScalar(addr, bits))
+             return;
+     }
+-    [[unlikely]] MemoryInline::WriteFloat64Slow(addr, val);
++    MKW_CUENTA(MKWC_ESCRIBE_LENTA); MemoryInline::WriteFloat64Slow(addr, val);
+ }
 diff --git a/runtime/include/nand_settings.h b/runtime/include/nand_settings.h
 index 055f4c2..5dfe865 100644
 --- a/runtime/include/nand_settings.h
@@ -614,7 +877,7 @@ index 2204f70..d837567 100644
      return std::find(values.begin(), values.end(), value) != values.end();
  }
 diff --git a/runtime/src/audio_backend.cpp b/runtime/src/audio_backend.cpp
-index 7ceda4c..8c6a9f3 100644
+index 7ceda4c..7f7b802 100644
 --- a/runtime/src/audio_backend.cpp
 +++ b/runtime/src/audio_backend.cpp
 @@ -3,12 +3,59 @@
@@ -772,7 +1035,7 @@ index 7ceda4c..8c6a9f3 100644
  
      return true;
  }
-@@ -198,6 +298,104 @@ bool AudioBackend::PushSamplesLE16(const int16_t* samples, size_t sampleCount) {
+@@ -198,6 +298,109 @@ bool AudioBackend::PushSamplesLE16(const int16_t* samples, size_t sampleCount) {
          RT_LOG(RT_TAG_AUDIO) << "SDL_PutAudioStreamData failed: " << SDL_GetError() << std::endl;
          return false;
      }
@@ -827,7 +1090,12 @@ index 7ceda4c..8c6a9f3 100644
 +    }
 +    // Queue above target -> play slightly faster (ratio > 1 consumes input faster), and vice versa
 +    const double error = m_webQueuedMs - targetMs;
-+    m_webIntegral = std::clamp(m_webIntegral + kIntegralPerMsS * error * dt, -kMaxTrim, kMaxTrim);
++    // §88 (worklet): the integral learns only near the target (|error| < 10 ms), where the error is the clock mismatch;
++    // while the worklet's target comes down the queue lags behind it, and learning that lag (windup) left the queue
++    // well under the target for many seconds afterwards
++    if (!m_webWorklet || std::abs(error) < 10.0) {
++        m_webIntegral = std::clamp(m_webIntegral + kIntegralPerMsS * error * dt, -kMaxTrim, kMaxTrim);
++    }
 +    // §88: twice as firm with the page's worklet: its queue is small and its target moves (it starts high and comes
 +    // down once the game has booted), and the queue should follow it within seconds (10 ms off -> 0.2%, ~3 cents)
 +    const double gain = m_webWorklet ? 2.0 * kGainPerMs : kGainPerMs;
@@ -1164,10 +1432,15 @@ index f09d88e..e59c1af 100644
          if (publishEc) {
              LogNandError("NANDMove", "failed to publish cross-mount copy: %s",
 diff --git a/runtime/src/hle/vi.cpp b/runtime/src/hle/vi.cpp
-index 7ee76b5..d58be64 100644
+index 7ee76b5..e68c2c6 100644
 --- a/runtime/src/hle/vi.cpp
 +++ b/runtime/src/hle/vi.cpp
-@@ -15,12 +15,77 @@
+@@ -1,3 +1,4 @@
++#include "mkw_contadores.h"   // V4 (§152)
+ #include "hle_stubs.h"
+ #include "memory.h"
+ #include "abi_bridge.h"
+@@ -15,12 +16,80 @@
  #include <array>
  #include <atomic>
  #include <chrono>
@@ -1178,11 +1451,14 @@ index 7ee76b5..d58be64 100644
  #include <mutex>
  #include <thread>
  
++#if defined(__EMSCRIPTEN__) || defined(MKW_NATIVO_MEDIR)
++// Milliseconds the host spent waiting (not running the game) since start; the headless driver
++// reads it to report how much of each 16.7 ms frame is real work. (N1, §153: the native headless
++// build counts its waits too, so both report the same "work per frame".)
++extern "C" double g_mkwHostIdleMs = 0.0;
++#endif
 +#if defined(__EMSCRIPTEN__)
 +#include <emscripten.h>
-+// Milliseconds the host spent waiting (not running the game) since start; the headless driver
-+// reads it to report how much of each 16.7 ms frame is real work.
-+extern "C" double g_mkwHostIdleMs = 0.0;
 +// Frames handed to aurora so far; the browser page reads it to show fps.
 +extern "C" unsigned g_mkwCuadros = 0;
 +
@@ -1245,7 +1521,20 @@ index 7ee76b5..d58be64 100644
  #if defined(_WIN32)
  #ifndef WIN32_LEAN_AND_MEAN
  #define WIN32_LEAN_AND_MEAN
-@@ -167,6 +232,21 @@ void SleepPreciselyUntil(Clock::time_point deadline, bool finishWithSpin = false
+@@ -161,12 +230,35 @@ constexpr std::chrono::microseconds kFinalSpinWindow{500};
+ 
+ void SleepPreciselyUntil(Clock::time_point deadline, bool finishWithSpin = false,
+                          std::chrono::microseconds spinWindow = 750us) {
++#if !defined(__EMSCRIPTEN__) && defined(MKW_NATIVO_MEDIR)
++    // N1 (§153): everything spent in here is waiting, not game work
++    struct SumaEspera {
++        Clock::time_point t0 = Clock::now();
++        ~SumaEspera() { g_mkwHostIdleMs += std::chrono::duration<double, std::milli>(Clock::now() - t0).count(); }
++    } sumaEspera;
++#endif
+     const auto now = Clock::now();
+     if (now >= deadline) {
+         return;
      }
      const auto timerDeadline =
          finishWithSpin && deadline - now > spinWindow ? deadline - spinWindow : deadline;
@@ -1257,6 +1546,7 @@ index 7ee76b5..d58be64 100644
 +    const double idleStart = emscripten_get_now();
 +    const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
 +    if (remaining >= 2) {
++        MKW_CUENTA(MKWC_ESPERA_JSPI);
 +        emscripten_sleep(static_cast<unsigned int>(remaining - 1));
 +    }
 +    while (Clock::now() < deadline) {
@@ -1267,7 +1557,7 @@ index 7ee76b5..d58be64 100644
  #if defined(_WIN32)
  #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
  #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
-@@ -238,6 +318,59 @@ void WriteGuestStateLocked() {
+@@ -238,6 +330,99 @@ void WriteGuestStateLocked() {
      }
  }
  
@@ -1277,6 +1567,46 @@ index 7ee76b5..d58be64 100644
 +// MKW RETRO (§99, C3): ms of retrace grid the page asked to win back, and how much was won (see PaceToRetraceBoundary)
 +double s_mkwPrisaMs = 0.0;
 +double s_mkwPrisaGanada = 0.0;
++// MKW RETRO (§162, N2): the ballast per game frame. The page's ballast (lastre.mjs, §155) spins inside the waits,
++// and with ?sinTope=1 the game hardly waits, so it fell short (it spun 17-80 % of what it owed, §161). This one lives
++// here, at the start of every retrace (one retrace = one game frame): the work t since the previous retrace (wall
++// clock minus the host's waits minus our own spin) is measured and (K-1)*t is spun right away. Like turning a motor
++// K times slower: each frame lasts K times its work, whether the game waits afterwards or not. K = 1 = off (default).
++// The page turns it on with mkw_lastre_cuadro(K) (?lastreCuadro=K, or ?lastre=K together with ?sinTope=1).
++double s_mkwLastreK = 1.0;
++double s_mkwLastreDesde = -1.0;      // when the previous retrace started (after its spin); < 0 = none yet
++double s_mkwLastreEsperaDesde = 0.0; // g_mkwHostIdleMs at that moment
++// «todo» (§162.2): count the host's waits as work too. Without the cap (?sinTope=1, in the race) those waits are only
++// yields to the browser (the deadline already passed), and the browser's own work in them runs on the same thread: a
++// K times slower processor makes it K times slower as well. Measured: without it, K = 2 gave 0.60x the frames, not 0.5x.
++bool s_mkwLastreTodo = false;
++double s_mkwLastreGirado = 0.0, s_mkwLastreTrabajo = 0.0, s_mkwLastreVeces = 0.0, s_mkwLastreTopes = 0.0;
++constexpr double kMkwLastreTope = 1000.0;  // ms spun at most at once (a huge "work" gap is a load or a pause)
++void MkwLastreCuadro() {
++    if (s_mkwLastreK <= 1.0) {
++        return;
++    }
++    const double ahora = emscripten_get_now();
++    if (s_mkwLastreDesde >= 0.0) {
++        double t = (ahora - s_mkwLastreDesde) - (s_mkwLastreTodo ? 0.0 : g_mkwHostIdleMs - s_mkwLastreEsperaDesde);
++        if (t < 0.0) {
++            t = 0.0;
++        }
++        double extra = (s_mkwLastreK - 1.0) * t;
++        if (extra > kMkwLastreTope) {
++            extra = kMkwLastreTope;
++            s_mkwLastreTopes += 1.0;
++        }
++        s_mkwLastreTrabajo += t;
++        s_mkwLastreVeces += 1.0;
++        const double fin = ahora + extra;
++        while (emscripten_get_now() < fin) {  // the ballast: spin without giving the thread away
++        }
++        s_mkwLastreGirado += extra;
++    }
++    s_mkwLastreDesde = emscripten_get_now();
++    s_mkwLastreEsperaDesde = g_mkwHostIdleMs;
++}
 +// Where in the refresh period the retrace grid should sit (ms after a refresh). What has to land at a
 +// fixed place in the refresh is not the retrace itself but Chrome's present of the frame: MKW hands the
 +// frame to aurora ~0.6 ms after the retrace (GXCopyDisp), aurora encodes and submits it and then yields
@@ -1327,7 +1657,17 @@ index 7ee76b5..d58be64 100644
  void EnsureInitializedLocked() {
      if (g_vi.initialized) {
          return;
-@@ -390,6 +523,19 @@ bool AdvanceDueRetraces(CpuContext* ctx, int maxToProcess, bool serviceAurora)
+@@ -269,6 +454,9 @@ void AdvanceRetrace(CpuContext* ctx, Clock::time_point retraceStamp, bool servic
+     if (s_inAdvanceRetrace.exchange(true)) {
+         return;
+     }
++#if defined(__EMSCRIPTEN__)
++    MkwLastreCuadro();  // §162: the ballast per game frame (off unless the page asked for it)
++#endif
+     
+     uint32_t preCb = 0;
+     uint32_t postCb = 0;
+@@ -390,6 +578,19 @@ bool AdvanceDueRetraces(CpuContext* ctx, int maxToProcess, bool serviceAurora)
                  return advancedAny;
              }
              target = g_vi.lastRetrace + g_vi.retraceInterval;
@@ -1347,7 +1687,7 @@ index 7ee76b5..d58be64 100644
              if (now < target) {
                  return advancedAny;
              }
-@@ -465,6 +611,40 @@ void VI_HLE_WaitForNextRetracePoll() {
+@@ -465,6 +666,42 @@ void VI_HLE_WaitForNextRetracePoll() {
      if (now >= retraceDeadline) {
          return;
      }
@@ -1363,6 +1703,7 @@ index 7ee76b5..d58be64 100644
 +        const double idleStart = emscripten_get_now();
 +        const double deadlineMs =
 +            idleStart + std::chrono::duration<double, std::milli>(retraceDeadline - now).count();
++        MKW_CUENTA(MKWC_ESPERA_JSPI);
 +        const int woke = mkw_web_espera_hasta(deadlineMs, 1.0);
 +        if (woke != 0) {  // the refresh before the retrace (or the deadline already passed)
 +            while (Clock::now() < retraceDeadline) {
@@ -1377,6 +1718,7 @@ index 7ee76b5..d58be64 100644
 +        const double idleStart = emscripten_get_now();
 +        const double deadlineMs =
 +            idleStart + std::chrono::duration<double, std::milli>(retraceDeadline - now).count();
++        MKW_CUENTA(MKWC_ESPERA_JSPI);
 +        if (mkw_web_espera_reloj(deadlineMs, 1.0) != 0) {  // the retrace is due
 +            while (Clock::now() < retraceDeadline) {
 +            }
@@ -1388,7 +1730,7 @@ index 7ee76b5..d58be64 100644
      // Audio DMA and alarm queues still need regular service even when the VI
      // deadline is farther away. The high-resolution wait removes the 1 ms
      // scheduler overshoot when retrace is the next event.
-@@ -485,10 +665,84 @@ uint32_t s_lastPacedRetraceCount = ~0u;
+@@ -485,10 +722,86 @@ uint32_t s_lastPacedRetraceCount = ~0u;
  // comment at the stamping site). Producer-thread only, like the memo above.
  uint64_t s_lastPresentAnchorNanos = 0;
  
@@ -1431,6 +1773,7 @@ index 7ee76b5..d58be64 100644
 +        const double deadlineMs =
 +            idleStart + std::chrono::duration<double, std::milli>(deadline - Clock::now()).count();
 +        for (;;) {
++            MKW_CUENTA(MKWC_ESPERA_JSPI);
 +            const int woke = mkw_web_espera_hasta(deadlineMs, 1.0);
 +            mkw_web_traza(4, woke);
 +            OS_HLE_ProcessAlarmsDeferred(8);
@@ -1456,6 +1799,7 @@ index 7ee76b5..d58be64 100644
 +        const double deadlineMs =
 +            idleStart + std::chrono::duration<double, std::milli>(deadline - Clock::now()).count();
 +        for (;;) {
++            MKW_CUENTA(MKWC_ESPERA_JSPI);
 +            const int woke = mkw_web_espera_reloj(deadlineMs, 1.0);
 +            OS_HLE_ProcessAlarmsDeferred(8);
 +            Audio_HLE_PollDeferred();
@@ -1473,7 +1817,7 @@ index 7ee76b5..d58be64 100644
      for (;;) {
          const auto now = Clock::now();
          if (now >= deadline) {
-@@ -512,6 +766,14 @@ void PaceToRetraceBoundary(Clock::time_point deadline) {
+@@ -512,6 +825,23 @@ void PaceToRetraceBoundary(Clock::time_point deadline) {
  
  } // namespace
  
@@ -1483,12 +1827,21 @@ index 7ee76b5..d58be64 100644
 +    s_mkwPrisaMs = ms > 0.0 ? (ms < 2000.0 ? ms : 2000.0) : 0.0;
 +}
 +extern "C" EMSCRIPTEN_KEEPALIVE double mkw_prisa_ganada() { return s_mkwPrisaGanada; }
++// MKW RETRO (§162): the ballast per game frame: K (1 = off), and what it did (0 spun ms, 1 work ms, 2 frames, 3 caps, 4 K)
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_lastre_cuadro(double k) {
++    s_mkwLastreK = k > 1.0 ? (k < 20.0 ? k : 20.0) : 1.0;
++    s_mkwLastreDesde = -1.0;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_lastre_cuadro_todo(int todo) { s_mkwLastreTodo = todo != 0; }
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_lastre_cuadro_estado(int i) {
++    return i == 0 ? s_mkwLastreGirado : i == 1 ? s_mkwLastreTrabajo : i == 2 ? s_mkwLastreVeces : i == 3 ? s_mkwLastreTopes : s_mkwLastreK;
++}
 +#endif
 +
  // Single owner of the Aurora frame presentation sequence: seals the active frame, optionally paces the
  // producer to the VI retrace boundary, and pre-warms the next frame. Paced from GXCopyDisp; unpaced for
  // the retrace-context black/boot present path in AdvanceRetrace.
-@@ -524,6 +786,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -524,6 +854,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
      } sequenceGuard;
      Clock::time_point paceDeadline{};
      bool paceThisFrame = false;
@@ -1498,7 +1851,7 @@ index 7ee76b5..d58be64 100644
      if (paceToRetrace) {
          uint64_t baseNanos = 0;
          uint64_t intervalNanos = 0;
-@@ -531,6 +796,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -531,6 +864,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
          {
              std::lock_guard<std::mutex> lock(g_viMutex);
              EnsureInitializedLocked();
@@ -1510,7 +1863,7 @@ index 7ee76b5..d58be64 100644
              paceDeadline = g_vi.lastRetrace + g_vi.retraceInterval;
              retraceCount = g_vi.retraceCount;
              baseNanos = static_cast<uint64_t>(
-@@ -577,7 +847,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -577,7 +915,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
          aurora_set_present_schedule(0, 0);
      }
  
@@ -1527,10 +1880,16 @@ index 7ee76b5..d58be64 100644
          PaceToRetraceBoundary(paceDeadline);
          std::lock_guard<std::mutex> lock(g_viMutex);
 diff --git a/runtime/src/host_context.cpp b/runtime/src/host_context.cpp
-index 502f72c..3d576df 100644
+index 502f72c..487fe9f 100644
 --- a/runtime/src/host_context.cpp
 +++ b/runtime/src/host_context.cpp
-@@ -19,6 +19,59 @@ extern "C" void* mkw_co_init(void* stackTop, void (*entry)(void*), void* argumen
+@@ -1,4 +1,5 @@
+ #include "host_context.h"
++#include "mkw_contadores.h"   // V4 (§152): los cambios de fibra
+ 
+ #if defined(_WIN32)
+ #ifndef NOMINMAX
+@@ -19,6 +20,59 @@ extern "C" void* mkw_co_init(void* stackTop, void (*entry)(void*), void* argumen
  
  #include <cstdlib>
  #include <unordered_map>
@@ -1590,7 +1949,31 @@ index 502f72c..3d576df 100644
  #else
  #error "HostContext needs a supported cooperative-context backend"
  #endif
-@@ -265,6 +318,115 @@ void Switch(Handle target)
+@@ -69,6 +123,7 @@ bool IsCurrent(Handle context)
+ 
+ void Switch(Handle target)
+ {
++    MKW_CUENTA(MKWC_FIBRA);
+     SwitchToFiber(target);
+ }
+ 
+@@ -147,6 +202,7 @@ bool IsCurrent(Handle context)
+ 
+ void Switch(Handle target)
+ {
++    MKW_CUENTA(MKWC_FIBRA);
+     auto* destination = static_cast<Context*>(target);
+     Context* source = g_current;
+     if (!destination || destination == source) {
+@@ -254,6 +310,7 @@ bool IsCurrent(Handle context)
+ 
+ void Switch(Handle target)
+ {
++    MKW_CUENTA(MKWC_FIBRA);
+     auto* destination = static_cast<Context*>(target);
+     Context* source = g_current;
+     if (!destination || destination == source) {
+@@ -265,6 +322,116 @@ void Switch(Handle target)
      g_current = source;
  }
  
@@ -1692,6 +2075,7 @@ index 502f72c..3d576df 100644
 +
 +void Switch(Handle target)
 +{
++    MKW_CUENTA(MKWC_FIBRA);
 +    auto* destination = static_cast<Context*>(target);
 +    Context* source = g_current;
 +    if (!destination || destination == source) {
@@ -2006,6 +2390,40 @@ index 0000000..834be87
 +}
 +
 +#undef MKW_WASM_NEON
+diff --git a/runtime/include/mkw_contadores.h b/runtime/include/mkw_contadores.h
+new file mode 100644
+index 0000000..6b52d91
+--- /dev/null
++++ b/runtime/include/mkw_contadores.h
+@@ -0,0 +1,28 @@
++#pragma once
++// V4 del plan de rendimiento (bitácora §152): contadores por cuadro dentro del motor, SOLO en un programa aparte
++// compilado con -DMKW_CONTADORES (MKW_CFLAGS_EXTRA). Sin esa bandera MKW_CUENTA no es nada: el programa normal no cambia.
++// Cada contador es un entero de 64 bits que se suma en el lugar del motor que lo hace; la página los lee cada segundo
++// (mkw_contador(k)) y los divide por los cuadros de ese segundo (?contadores=1 en mkw.mjs).
++#include <cstdint>
++
++enum MkwContador : uint32_t {
++    MKWC_LEE = 0,          // lecturas de la memoria de la Wii por el camino revisado (Memory::Read*: tabla de páginas)
++    MKWC_LEE_LENTA,        // ...de esas, las que cayeron al camino lento (Read*Slow: dispositivos, páginas especiales)
++    MKWC_ESCRIBE,          // escrituras por el camino revisado (Memory::Write*)
++    MKWC_ESCRIBE_LENTA,    // ...de esas, al camino lento (Write*Slow)
++    MKWC_RESUELTA,         // accesos del nivel "resuelto" (ReadResolved*/WriteResolved*: la dirección calculada una vez)
++    MKWC_RESUELTA_CAE,     // ...que no pudieron ir directo y volvieron al camino revisado (en wasm: todos)
++    MKWC_FLAT,             // accesos del nivel "plano" (Flat*: en Windows, la memoria directa; en wasm, el camino revisado)
++    MKWC_FMA,              // multiplicaciones-sumas exactas (MkwFma/MkwFms: en wasm, una función de biblioteca)
++    MKWC_INDIRECTA,        // llamadas indirectas del juego (InvokeIndirectCpu: buscar la función por su dirección)
++    MKWC_FIBRA,            // cambios de hilo del juego (fibras; en wasm, cada uno es una suspensión JSPI)
++    MKWC_ESPERA_JSPI,      // esperas del ritmo que suspenden al juego por JSPI (vi.cpp)
++    MKWC_TOTAL
++};
++
++#ifdef MKW_CONTADORES
++extern "C" uint64_t g_mkwContadores[MKWC_TOTAL];
++#define MKW_CUENTA(k) (++g_mkwContadores[(k)])
++#else
++#define MKW_CUENTA(k) ((void)0)
++#endif
 diff --git a/runtime/src/guest_flat_memory_wasm.cpp b/runtime/src/guest_flat_memory_wasm.cpp
 new file mode 100644
 index 0000000..57cb93d
@@ -2140,3 +2558,22 @@ index 0000000..57cb93d
 +} // namespace GuestFlat
 +
 +#endif // defined(__EMSCRIPTEN__)
+diff --git a/runtime/src/mkw_contadores.cpp b/runtime/src/mkw_contadores.cpp
+new file mode 100644
+index 0000000..5e68ab9
+--- /dev/null
++++ b/runtime/src/mkw_contadores.cpp
+@@ -0,0 +1,13 @@
++// V4 (bitácora §152): el almacén de los contadores y la función que la página lee. Solo con -DMKW_CONTADORES.
++#include "mkw_contadores.h"
++#ifdef MKW_CONTADORES
++#if defined(__EMSCRIPTEN__)
++#include <emscripten/emscripten.h>
++#define MKW_EXPORTA EMSCRIPTEN_KEEPALIVE
++#else
++#define MKW_EXPORTA
++#endif
++extern "C" uint64_t g_mkwContadores[MKWC_TOTAL] = {};
++// el contador k (como double: alcanza para 2^53) o -1 si no existe
++extern "C" MKW_EXPORTA double mkw_contador(int k) { return (k >= 0 && k < MKWC_TOTAL) ? static_cast<double>(g_mkwContadores[k]) : -1.0; }
++#endif

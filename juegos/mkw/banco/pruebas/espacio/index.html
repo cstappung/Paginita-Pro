@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco espacio por partes</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>
+  /* el panel dentro de un recuadro del ancho de un teléfono (360 px) */
+  #telefono { width: 360px; box-sizing: border-box; padding: 8px; background: #17142a; border: 1px solid #3a3361; border-radius: 12px; margin: 8px 0; }
+  .boton { padding: 7px 12px; border-radius: 10px; border: 1px solid #3a3361; background: #201c38; color: #f1effa; font: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>Banco espacio por partes: <span>borrar lo guardado del juego de a pedazos</span></h1>
+<p>Prueba la pantalla «Espacio» del cajón (bitácora §251: <code>web/navegador/espacio.mjs</code>,
+  <code>espacio-panel.mjs</code> y lo nuevo de <code>disco.mjs</code>) <b>sin el juego</b>. Los archivos tienen las
+  rutas con la forma de las del juego, pero sus bytes son inventados (el byte <i>i</i> vale <i>i</i>·7 mod 256) y los
+  sirve un servidor de mentira que cuenta los pedidos. Se comprueba: a qué parte va cada archivo, la fecha y los
+  archivos de cada pista, las cuentas (del manifiesto y de la caja, no de <code>storage.estimate</code>), ordenar,
+  marcar (la ⭐ y lo que está en uso no se marcan con «Marcar todas»), el «Deshacer» de 8 s, el tope, el borrado por
+  archivo en la caja de verdad (entradas, índice de grupos y memoria a la vez), <b>dos pestañas</b> (dos discos en esta
+  página hablando por el mismo canal) y la pantalla con el ancho de un teléfono, el ratón y un mando de mentira.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="telefono"></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearDisco, PREFIJO } from '/web/navegador/disco.mjs';
+import { clasificar, esDePista, CURSOS, nombreDe, crearUsoPistas, armarResumen, ordenar, crearSeleccion, crearPendiente,
+         elegirPorTope, archivosDePista, pistaDeArchivo, haceCuanto, CLAVE_USO, CLAVE_ESTRELLAS, CLAVE_TOPE } from '/web/navegador/espacio.mjs';
+import { montarEspacio } from '/web/navegador/espacio-panel.mjs';
+
+const { ok, nota, fin } = prueba('espacio', 'Banco espacio por partes (sin el juego)');
+const MB = 1048576, DIA = 86400000, AHORA = Date.UTC(2026, 10, 8, 12);
+const RR = '/mkw/sd/RetroRewind6', D = '/mkw/disco/files';
+// un localStorage de mentira (no toca el de verdad)
+const almacenFalso = () => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), m }; };
+
+try {
+  // ---------- 1) a qué parte va cada archivo ----------
+  const casos = [
+    [`${RR}/Tracks/54.szs`, 'pista'], [`${RR}/Tracks/sw2RR.szs`, 'pista'], [`${RR}/strm/54_N.brstm`, 'pista'],
+    [`${D}/Race/Course/beginner_course.szs`, 'pista'], [`${D}/sound/strm/n_Circuit32_n.brstm`, 'pista'],
+    [`${D}/sound/strm/o_FanfareGP1_32.brstm`, 'comun'], [`${D}/rel/StaticR.rel`, 'comun'], [`${D}/Race/Kart/sdf_kart-mr.szs`, 'comun'],
+    [`${RR}/Character/sdf_kart-mr-1.szs`, 'comun'], [`${D}/sound/revo_kart.brsar`, 'comun'], [`${D}/thp/title/title.thp`, 'comun'],
+    ['/build/diminutos.bin', 'comun'], ['/mkw/disco/sys/main.dol', 'basico'], [`${D}/Scene/UI/Title.szs`, 'basico'],
+  ];
+  const malos = casos.filter(([r, c]) => clasificar(r) !== c);
+  ok('cada archivo va a su parte (pista, karts y sonidos comunes, básico)', !malos.length, malos.map(x => x[0]).join(', ') || `${casos.length} casos`);
+  ok('la tabla de las pistas de Nintendo tiene las 32, en el orden del juego (8 = Luigi Circuit)',
+     CURSOS.length === 32 && CURSOS[8] === 'beginner_course' && CURSOS[0] === 'castle_course' && CURSOS[31] === 'old_heyho_gba');
+  ok('una pista de Nintendo se nombra por el archivo que leyó el juego',
+     nombreDe(8, null, [`${D}/Race/Course/beginner_course.szs`]).nombre === 'Luigi Circuit' && nombreDe(8, null, []).copa === 'Nintendo');
+  ok('una de Retro Rewind: su nombre y su copa salen de la lista de copas', nombreDe(0x100 + 54, [[], [], [], [], [], [], [], [], [], [], [], [], [], ['a', 'b', 'Pista X', 'c']]).nombre === 'Pista X' &&
+     nombreDe(0x100 + 54, null).copa === 'Copa 14');
+  ok('lo que se sabe sin jugarla: Tracks/<n>.szs y strm/<n>_N.brstm; y al revés, de qué pista es un archivo',
+     archivosDePista(0x100 + 54).includes(`${RR}/Tracks/54.szs`) && archivosDePista(0x100 + 54).includes(`${RR}/strm/54_N.brstm`) &&
+     archivosDePista(8).length === 0 && pistaDeArchivo(`${RR}/strm/54_N.brstm`) === 0x136 && pistaDeArchivo(`${RR}/Tracks/sw2RR.szs`) === -1);
+
+  // ---------- 2) lo que se sabe de cada pista (localStorage) ----------
+  const al = almacenFalso();
+  const uso = crearUsoPistas({ almacen: al, ahora: () => AHORA });
+  uso.jugada(0x100 + 54, AHORA - 3 * DIA);
+  uso.archivo(0x100 + 54, `${RR}/Tracks/54.szs`); uso.archivo(0x100 + 54, `${RR}/strm/54_N.brstm`);
+  uso.archivo(0x100 + 54, `${D}/rel/StaticR.rel`);                 // (no es de pista: no se ata)
+  uso.jugada(8, AHORA - 10 * DIA); uso.archivo(8, `${D}/Race/Course/beginner_course.szs`); uso.archivo(8, `${D}/sound/strm/n_Circuit32_n.brstm`);
+  uso.jugada(0x100 + 300, AHORA - 1 * DIA); uso.archivo(0x100 + 300, `${RR}/Tracks/sw2RR.szs`);
+  uso.jugada(0x100 + 1);                                           // hoy
+  const u = uso.leer();
+  ok('la fecha de cada pista se anota al jugarla (localStorage)', u[0x136].t === AHORA - 3 * DIA && u[0x101].t === AHORA && JSON.parse(al.getItem(CLAVE_USO))[8].t === AHORA - 10 * DIA);
+  ok('los archivos de pista que leyó el juego quedan atados a su pista; los que no son de pista, no',
+     u[0x136].a.length === 2 && !u[0x136].a.includes(`${D}/rel/StaticR.rel`) && u[8].a.includes(`${D}/sound/strm/n_Circuit32_n.brstm`));
+  ok('volver a jugar no borra los archivos atados', (uso.jugada(0x136, AHORA - 3 * DIA), uso.leer()[0x136].a.length === 2));
+  uso.estrella(0x101, true);
+  ok('la ⭐ y el tope se guardan (tope apagado por omisión)', uso.estrellas().has(0x101) && JSON.parse(al.getItem(CLAVE_ESTRELLAS)).includes(0x101) && uso.tope() === 0 &&
+     (uso.ponerTope(2), uso.tope() === 2) && (uso.ponerTope(3), uso.tope() === 0));
+  ok('«hace cuánto» para la persona', haceCuanto(0, AHORA) === 'nunca' && haceCuanto(AHORA, AHORA) === 'hoy' && haceCuanto(AHORA - 3 * DIA, AHORA) === 'hace 3 días');
+
+  // ---------- 3) las cuentas ----------
+  const inv = new Map([
+    [`${RR}/Tracks/54.szs`, 30 * MB], [`${RR}/strm/54_N.brstm`, 4 * MB],             // pista 0x136, jugada hace 3 días
+    [`${RR}/Tracks/1.szs`, 20 * MB], [`${RR}/strm/1_N.brstm`, 5 * MB],               // 0x101 ⭐, hoy (atada por número)
+    [`${RR}/Tracks/7.szs`, 25 * MB],                                                  // 0x107: nunca jugada (de la copa, de fondo)
+    [`${D}/Race/Course/beginner_course.szs`, 3 * MB], [`${D}/sound/strm/n_Circuit32_n.brstm`, 2 * MB],   // Nintendo 8, hace 10 días
+    [`${RR}/Tracks/sw2RR.szs`, 40 * MB],                                              // 0x22C por lo que leyó el juego, ayer
+    [`${RR}/Tracks/gMC.szs`, 6 * MB],                                                 // sin atar: «otras»
+    [`${D}/rel/StaticR.rel`, 5 * MB], [`${D}/sound/revo_kart.brsar`, 60 * MB], [`${D}/Race/Kart/sdf_kart-mr.szs`, 1 * MB],
+    [`${D}/thp/title/title.thp`, 33 * MB], ['/build/diminutos.bin', 1.5 * MB], ['/mkw/disco/sys/main.dol', 4 * MB], [`${D}/Scene/UI/Title.szs`, 2 * MB],
+  ]);
+  const proteg = new Set([0x22C]);
+  const R = armarResumen({ inventario: inv, uso: uso.leer(), estrellas: uso.estrellas(), protegidas: proteg, copas: null, partidasBytes: 2 * MB });
+  const por = p => R.pistas.lista.find(f => f.pista === p);
+  ok('pistas: cuántas y cuánto pesan (5 pistas + «otras»)', R.pistas.n === 5 && R.pistas.bytes === 135 * MB, `${R.pistas.n}, ${R.pistas.bytes / MB} MB`);
+  ok('karts y sonidos comunes y básico, cada uno con lo suyo', R.comun.bytes === 100.5 * MB && R.basico.bytes === 6 * MB && R.total === 241.5 * MB,
+     `común ${R.comun.bytes / MB}, básico ${R.basico.bytes / MB}`);
+  ok('cada pista con sus archivos y su fecha; la de Nintendo con su nombre', por(0x136).bytes === 34 * MB && por(0x136).t === AHORA - 3 * DIA &&
+     por(8).nombre === 'Luigi Circuit' && por(8).bytes === 5 * MB && por(0x22C).bytes === 40 * MB && por(0x107).t === 0 && por(0x101).estrella && por(0x22C).protegida);
+  ok('las partes comunes, separadas (StaticR, sonidos, karts, videos, diminutos)', ['staticr', 'brsar', 'karts', 'videos', 'diminutos'].every(id => R.comun.lista.some(x => x.id === id)));
+
+  // ---------- 4) ordenar y marcar ----------
+  const L = R.pistas.lista.filter(f => f.pista >= 0);
+  ok('por última vez (por omisión): la más vieja primero, «nunca» antes que todas', ordenar(L).map(f => f.pista).join() === [0x107, 8, 0x136, 0x22C, 0x101].join());
+  ok('por tamaño (la más grande primero), nombre y copa', ordenar(L, 'tamano')[0].pista === 0x22C && ordenar(L, 'copa')[0].pista === 0x101 &&
+     ordenar(L, 'copa').at(-1).pista === 8 && ordenar(L, 'vez', true)[0].pista === 0x101);
+  const sel = crearSeleccion({ claveDe: f => f.pista });
+  sel.todas(L);
+  ok('«Marcar todas» nunca marca una ⭐ ni la que está en uso', sel.cuenta(L).n === 3 && !sel.tiene(por(0x101)) && !sel.tiene(por(0x22C)));
+  ok('…la ⭐ sí se marca a mano; la que está en uso, nunca', sel.alternar(por(0x101)) === true && sel.alternar(por(0x22C)) === false && sel.cuenta(L).n === 4);
+  sel.ninguna();
+  ok('«Ninguna» desmarca todo', sel.cuenta(L).n === 0);
+
+  // ---------- 5) el «Deshacer» de 8 s (con un reloj de mentira) ----------
+  let t = 0; const avisos = [];
+  const relojF = { poner: (f, ms) => { const a = { f, t: t + ms }; avisos.push(a); return a; }, quitar: a => { a.f = null; }, ahora: () => t };
+  const avanza = async ms => { t += ms; for (const a of [...avisos]) if (a.f && a.t <= t) { const f = a.f; a.f = null; await f(); } await Promise.resolve(); };
+  const ejecutados = [];
+  let enCarrera = false;
+  const pend = crearPendiente({ ms: 8000, reloj: relojF, ejecutar: async items => { ejecutados.push(items); return 'ok'; }, aplazar: () => enCarrera });
+  pend.pedir(['a']); await avanza(7900);
+  ok('pedido: a los 7,9 s todavía no se borró nada', ejecutados.length === 0 && pend.restan() === 1);
+  ok('«Deshacer» antes de los 8 s: no se borra nunca', pend.deshacer() && (await avanza(5000), ejecutados.length === 0));
+  pend.pedir(['b']); await avanza(8000);
+  ok('al vencer los 8 s se borra de verdad, una vez', ejecutados.length === 1 && ejecutados[0][0] === 'b' && (await avanza(20000), ejecutados.length === 1));
+  enCarrera = true; pend.pedir(['c']); await avanza(9000);
+  ok('con la carrera andando espera (§176: en la carrera no se toca la caja)', ejecutados.length === 1);
+  enCarrera = false; await avanza(1000);
+  ok('…y se borra apenas termina la carrera', ejecutados.length === 2 && ejecutados[1][0] === 'c');
+
+  // ---------- 6) el tope ----------
+  const soltar = elegirPorTope(R, 150 * MB);   // sobran 91,5 MB
+  ok('tope: suelta las jugadas hace más tiempo hasta bajar del tope, nunca la ⭐ ni la que está en uso',
+     soltar.map(f => f.pista).join() === [0x107, 8, 0x136, ].join() || soltar.map(f => f.pista).join() === [0x107, 8, 0x136].join(), soltar.map(f => f.pista.toString(16)).join());
+  ok('sin tope (o por debajo) no suelta nada', elegirPorTope(R, 0).length === 0 && elegirPorTope(R, 300 * MB).length === 0);
+  ok('el tope nunca suelta la ⭐ ni la que está en uso aunque no alcance', !elegirPorTope(R, 1 * MB).some(f => f.estrella || f.protegida));
+} catch (e) { ok('la parte sin caja corrió sin errores', false, String(e?.stack || e)); }
+
+// ---------- 7) el borrado por archivo en la caja de verdad (disco.mjs) y DOS PESTAÑAS ----------
+const BLOQUE = 256 * 1024;
+const esperado = (ini, largo) => Uint8Array.from({ length: largo }, (_, k) => ((ini + k) * 7) & 255);
+const iguales = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const TAM = new Map([[`${RR}/Tracks/54.szs`, 5 * BLOQUE * 8 + 1000], [`${RR}/Tracks/1.szs`, 3 * BLOQUE + 77], [`${D}/rel/StaticR.rel`, 2 * BLOQUE]]);
+const abs = r => new URL(r, location.href).href;
+const tamDe = u => { for (const [r, t] of TAM) if (abs(r) === u) return t; return 0; };
+const pedidos = [];
+let demora = 0;
+async function servidor(url, o = {}) {
+  const ruta = new URL(url, location.href).pathname, tam = tamDe(abs(ruta));
+  const [, a, b] = /bytes=(\d+)-(\d+)/.exec(o.headers?.Range || 'bytes=0-0');
+  pedidos.push(ruta);
+  if (demora) await new Promise(r => setTimeout(r, demora));
+  const ini = Number(a), fin = Math.min(Number(b), tam - 1);
+  return new Response(esperado(ini, fin - ini + 1), { status: 206 });
+}
+const limpiar = async () => { for (const n of await caches.keys()) if (n.startsWith(PREFIJO)) await caches.delete(n); };
+await limpiar();
+const X = `${RR}/Tracks/54.szs`, Y = `${RR}/Tracks/1.szs`, Z = `${D}/rel/StaticR.rel`;
+const CANAL = 'banco-espacio-' + Math.random().toString(36).slice(2);
+let protegidasB = [];
+const A = crearDisco({ version: 'esp-1', buscar: servidor, adelantarActivo: false, canal: CANAL });
+const B = crearDisco({ version: 'esp-1', buscar: servidor, adelantarActivo: false, canal: CANAL, protegidas: () => protegidasB });
+try {
+  await A.abrir(); await B.abrir();
+  // A lee X entero (5 grupos de 2 MB: en la caja como 5 entradas grandes), Y y Z
+  const leeTodo = async (d, r) => d.leer(r, TAM.get(r), 0, TAM.get(r));
+  ok('A lee los tres archivos bien', iguales(await leeTodo(A, X), esperado(0, TAM.get(X))) && iguales(await leeTodo(A, Y), esperado(0, TAM.get(Y))) && iguales(await leeTodo(A, Z), esperado(0, TAM.get(Z))));
+  await A.guardarIndice();
+  await new Promise(r => setTimeout(r, 100));
+  const inv1 = await A.inventario(tamDe);
+  ok('el inventario cuenta desde la caja, con el tamaño del manifiesto: cada archivo, exacto',
+     inv1.get(abs(X)) === TAM.get(X) && inv1.get(abs(Y)) === TAM.get(Y) && inv1.get(abs(Z)) === TAM.get(Z), [...inv1.values()].join(', '));
+  // B también tiene X en su memoria (la otra pestaña)
+  await B.inventario(tamDe);                       // (B arma su índice con la verdad de la caja: la abrió antes que A guardara)
+  pedidos.length = 0;
+  ok('B (la otra pestaña) lee X de la caja, sin red', iguales(await leeTodo(B, X), esperado(0, TAM.get(X))) && pedidos.length === 0, `${pedidos.length} pedidos`);
+  // A borra X
+  const caja = await caches.open(PREFIJO + 'esp-1');
+  const entradas = async r => (await caja.keys()).filter(k => k.url.startsWith(abs(r) + '?')).length;
+  const antes = await entradas(X);
+  const res = await A.borrarArchivos([X]);
+  await new Promise(r => setTimeout(r, 150));
+  ok('borrar X: se van todas sus entradas de la caja; Y y Z quedan', antes >= 5 && await entradas(X) === 0 && await entradas(Y) > 0 && await entradas(Z) > 0 && res.borrados.length === 1,
+     `${antes} → ${await entradas(X)}, ${res.entradas} entradas`);
+  const indice = async () => { const k = (await caja.keys()).find(k => k.url.includes('indice-grupos')); return k ? await (await caja.match(k)).text() : ''; };
+  ok('…y del índice de los grupos (no queda mintiendo)', !(await indice()).includes('54.szs'), (await indice()).slice(0, 120));
+  ok('la otra pestaña recibió el aviso y olvidó X (su índice y su memoria)', (B.estado.avisosBorrado || 0) >= 1);
+  await B.guardarIndice();                         // B reescribe su índice: no debe «resucitar» X
+  await new Promise(r => setTimeout(r, 50));
+  ok('B reescribe su índice y X NO resucita', !(await indice()).includes('54.szs'));
+  pedidos.length = 0;
+  ok('B vuelve a leer X: va a la red (no lo entrega de su memoria vieja) y llega bien', iguales(await leeTodo(B, X), esperado(0, TAM.get(X))) && pedidos.some(p => p.endsWith('54.szs')), `${pedidos.length} pedidos`);
+  pedidos.length = 0;
+  ok('Y sigue en la caja: leerlo no va a la red', iguales(await leeTodo(A, Y), esperado(0, TAM.get(Y))) && pedidos.length === 0);
+  // lo que B está usando (la pista de su carrera): A no lo puede borrar
+  protegidasB = [Y];
+  const res2 = await A.borrarArchivos([Y, Z]);
+  ok('lo que la otra pestaña está usando no se borra (le pregunta por el canal)', res2.saltados.includes(abs(Y)) && res2.borrados.includes(abs(Z)) && await entradas(Y) > 0 && await entradas(Z) === 0);
+  protegidasB = [];
+  const C = crearDisco({ version: 'esp-1', buscar: servidor, adelantarActivo: false, canal: CANAL + '-solo', protegidas: () => [Y] });
+  await C.abrir();
+  ok('lo que esta misma pestaña está usando tampoco', (await C.borrarArchivos([Y], { otras: 0 })).saltados.length === 1 && await entradas(Y) > 0);
+  C.cerrar();
+  // un pedido que viaja mientras se borra: lo que llega no vuelve a la caja
+  await A.borrarArchivos([X]);
+  demora = 300;
+  const enViaje = A.leer(X, TAM.get(X), 0, 3 * BLOQUE);
+  await new Promise(r => setTimeout(r, 50));
+  await A.borrarArchivos([X], { otras: 0 });
+  const llego = await enViaje;
+  await new Promise(r => setTimeout(r, 100));
+  demora = 0;
+  ok('un pedido que salió antes del borrado: llega bien al juego pero no vuelve a la caja', iguales(llego, esperado(0, 3 * BLOQUE)) && await entradas(X) === 0);
+  // inventario arregla el índice si alguien lo dejó mal
+  await A.leer(X, TAM.get(X), 0, TAM.get(X)); await new Promise(r => setTimeout(r, 200)); await A.guardarIndice();
+  for (const k of (await caja.keys()).filter(k => k.url.startsWith(abs(X) + '?'))) await caja.delete(k);   // (alguien borró por debajo, como el botón viejo)
+  const inv2 = await A.inventario(tamDe);
+  ok('el inventario recuenta desde caja.keys() y arregla el índice que mentía', !inv2.has(abs(X)) && (A.estado.indiceArreglado || 0) > 0 && !(await indice()).includes('54.szs'));
+  // borrar todo (el botón viejo, ahora por el disco): sigue guardando después
+  const avisosB = B.estado.avisosBorrado || 0;
+  await A.borrar({ seguir: true });
+  await new Promise(r => setTimeout(r, 100));
+  await A.leer(Y, TAM.get(Y), 0, 1000);
+  await new Promise(r => setTimeout(r, 100));
+  const cajaNueva = await caches.open(PREFIJO + 'esp-1');
+  ok('«Borrar todo» por el disco: la caja queda vacía, la otra pestaña se entera y lo que se baja después se sigue guardando',
+     (await cajaNueva.keys()).some(k => k.url.startsWith(abs(Y) + '?')) && (B.estado.avisosBorrado || 0) > avisosB);
+  ok('el inventario no usa storage.estimate (que cuenta todo el sitio, BT3 incluido)', !/storage\.estimate/.test(A.inventario.toString()));
+} catch (e) { ok('la parte de la caja corrió sin errores', false, String(e?.stack || e)); }
+A.cerrar(); B.cerrar();
+await limpiar();
+
+// ---------- 8) la pantalla (en el ancho de un teléfono, con el ratón y un mando de mentira) ----------
+try {
+  const nodo = document.getElementById('telefono');
+  const al = almacenFalso();
+  const uso = crearUsoPistas({ almacen: al, ahora: () => AHORA });
+  const inv = new Map();
+  const pista = (n, mbs, dias, ruta = `${RR}/Tracks/${n}.szs`) => { inv.set(ruta, mbs * MB); if (dias != null) { uso.jugada(0x100 + n, AHORA - dias * DIA); uso.archivo(0x100 + n, ruta); } };
+  pista(0, 30, 5); pista(1, 20, 0); pista(2, 50, 20); pista(3, 10, null); pista(54, 15, 2);
+  inv.set(`${D}/rel/StaticR.rel`, 5 * MB); inv.set(`${D}/sound/revo_kart.brsar`, 60 * MB); inv.set('/mkw/disco/sys/main.dol', 4 * MB);
+  uso.estrella(0x101, true);
+  const protegidas = new Set([0x136]);               // la de la carrera en curso
+  const copas = [['Pista Cero', 'Pista Uno', 'Pista Dos', 'Pista Tres']];
+  const leer = async () => armarResumen({ inventario: inv, uso: uso.leer(), estrellas: uso.estrellas(), protegidas, copas, partidasBytes: 1 * MB });
+  const borrados = [];
+  const borrar = async rutas => { borrados.push(rutas); for (const r of rutas) inv.delete(r); return { borrados: rutas, saltados: [] }; };
+  let t = 0; const avisos = [];
+  const relojF = { poner: (f, ms) => { const a = { f, t: t + ms }; avisos.push(a); return a; }, quitar: a => { a.f = null; }, ahora: () => t };
+  const avanza = async ms => { t += ms; for (const a of [...avisos]) if (a.f && a.t <= t) { const f = a.f; a.f = null; await f(); } await new Promise(r => setTimeout(r, 30)); };
+  const preguntas = [];
+  let mando = { buttons: Array.from({ length: 16 }, () => ({ pressed: false })) };
+  let partida = 0;
+  const p = montarEspacio(nodo, { leer, borrar, uso, preguntar: async q => { preguntas.push(q); return true; }, alPartida: () => partida++,
+                                  mandos: () => [mando], reloj: relojF, ahora: () => AHORA });
+  await p.refrescar();
+  const $ = s => nodo.querySelector(s), $$ = s => [...nodo.querySelectorAll(s)];
+  ok('arriba: la barra con las 4 partes y las 4 partes para tocar', $$('.esp-barra > span').length === 4 && $$('.esp-parte').length === 4,
+     $$('.esp-parte').map(b => b.textContent.split('·')[0]).join(' | '));
+  ok('Pistas dice cuántas y cuánto pesan', /125 MB · 5 guardadas/.test($('[data-parte="pistas"]').textContent), $('[data-parte="pistas"]').textContent);
+  $('[data-parte="partidas"]').click();
+  ok('Partidas y fantasmas 🔒 solo lleva al panel «Partida» (aquí no se borran)', partida === 1 && p.estado.vista === 'resumen' && /🔒/.test($('[data-parte="partidas"]').textContent));
+  ok('nada sale del ancho del teléfono (360 px)', nodo.scrollWidth <= nodo.clientWidth + 1, `${nodo.scrollWidth} ≤ ${nodo.clientWidth}`);
+  $('[data-parte="pistas"]').click();
+  const nombres = () => $$('.esp-fila .esp-nombre > span').map(s => s.textContent);
+  ok('la lista: por omisión la jugada hace más tiempo primero («nunca» antes)', nombres().join() === ['Pista Tres', 'Pista Dos', 'Pista Cero', 'Pista 14.3', 'Pista Uno'].join(), nombres().join());
+  const altos = $$('.esp-fila').map(f => f.getBoundingClientRect().height);
+  ok('filas de 48 px o más (dedo del teléfono)', altos.every(h => h >= 48), altos.map(Math.round).join(', '));
+  ok('cada fila con casilla, nombre, copa, MB y la última vez jugada', /Copa 1 · hace 20 días/.test($$('.esp-fila')[1].textContent) && /50 MB/.test($$('.esp-fila')[1].textContent));
+  ok('la que está en uso (la carrera) dice «en uso» y no se puede marcar', /en uso/.test($('[data-clave="p:310"]').textContent) && $('[data-clave="p:310"] input').disabled);
+  ok('nada sale del ancho del teléfono en la lista', nodo.scrollWidth <= nodo.clientWidth + 1, `${nodo.scrollWidth}`);
+  // toda la fila marca (un clic en el nombre, no en la casilla)
+  $('[data-clave="p:258"] .esp-nombre').click();
+  ok('toda la fila marca (clic en el nombre)', $('[data-clave="p:258"] input').checked && $('[data-clave="p:258"]').classList.contains('marcada'));
+  ok('el botón dice cuántas y cuántos MB', /Borrar 1 pista \(50 MB\)/.test($('#espBorrar').textContent), $('#espBorrar').textContent);
+  $('#espNinguna').click();
+  ok('«Ninguna»', !$$('.esp-fila input').some(i => i.checked) && $('#espBorrar').disabled);
+  $('#espTodas').click();
+  ok('«Marcar todas» no marca la ⭐ ni la que está en uso', $$('.esp-fila input:checked').length === 3 && !$('[data-clave="p:257"] input').checked, $('#espBorrar').textContent);
+  // la estrella
+  $('[data-estrella="256"]').click();
+  ok('la ⭐ de una fila la protege (y tocarla no marca la fila)', uso.estrellas().has(0x100) && $('[data-estrella="256"]').getAttribute('aria-pressed') === 'true');
+  $('#espNinguna').click(); $('#espTodas').click();
+  ok('…y desde ahí «Marcar todas» la deja afuera', $$('.esp-fila input:checked').length === 2 && /Borrar 2 pistas \(60 MB\)/.test($('#espBorrar').textContent), $('#espBorrar').textContent);
+  // ordenar: con el ratón y con los gatillos del mando
+  $('[data-orden="tamano"]').click();
+  ok('ordenar por tamaño', nombres()[0] === 'Pista Dos');
+  $('[data-orden="nombre"]').click();
+  ok('ordenar por nombre', nombres()[0] === 'Pista 14.3' || nombres()[0] === 'Pista Cero', nombres().join());
+  $('[data-orden="vez"]').click();
+  mando.buttons[7].pressed = true; await new Promise(r => setTimeout(r, 250)); mando.buttons[7].pressed = false; await new Promise(r => setTimeout(r, 150));
+  ok('mando: RT pasa al orden siguiente (tamaño)', p.estado.orden === 'tamano' && nombres()[0] === 'Pista Dos');
+  mando.buttons[6].pressed = true; await new Promise(r => setTimeout(r, 250)); mando.buttons[6].pressed = false; await new Promise(r => setTimeout(r, 150));
+  ok('mando: LT vuelve (última vez)', p.estado.orden === 'vez');
+  ok('lo marcado sigue marcado al cambiar el orden', $$('.esp-fila input:checked').length === 2);
+  // borrar con confirmación y deshacer
+  $('#espBorrar').click(); await new Promise(r => setTimeout(r, 30));
+  ok('borrar pide confirmación (dice cuántas y cuántos MB)', preguntas.length === 1 && /2 pistas \(60 MB\)/.test(preguntas[0].texto));
+  ok('después: «Deshacer» con la cuenta, las filas ya no se ven y todavía no se borró nada', !!$('#espDeshacer') && /8 s/.test($('#espCuenta').textContent) && borrados.length === 0 &&
+     !$('[data-clave="p:259"]'), $('#espCuenta')?.textContent);
+  await avanza(7000);
+  ok('a los 7 s todavía nada', borrados.length === 0);
+  $('#espDeshacer').click(); await avanza(5000);
+  ok('«Deshacer»: vuelven las filas y nunca se borró', borrados.length === 0 && !!$('[data-clave="p:259"]') && !$('#espDeshacer'));
+  $('#espTodas').click(); $('#espBorrar').click(); await new Promise(r => setTimeout(r, 30));
+  await avanza(8000); await new Promise(r => setTimeout(r, 50));
+  ok('al vencer los 8 s se borra de verdad justo lo marcado (2 pistas, sus archivos)', borrados.length === 1 && borrados[0].length === 2 &&
+     borrados[0].includes(`${RR}/Tracks/2.szs`) && borrados[0].includes(`${RR}/Tracks/3.szs`), JSON.stringify(borrados));
+  ok('y la lista se vuelve a contar (quedan 3)', $$('.esp-fila').length === 3 && /Listo/.test($('#espListo')?.textContent || ''));
+  // volver y el botón grande
+  $('#espVolver').click();
+  ok('«Borrar todas las pistas salvo las ⭐» cuenta bien (las ⭐ y la que está en uso, afuera)', /\(0 · /.test($('#espBorrarPistas').textContent) && $('#espBorrarPistas').disabled, $('#espBorrarPistas').textContent);
+  uso.estrella(0x100, false); p.pintar();
+  $('#espBorrarPistas').click(); await new Promise(r => setTimeout(r, 30)); await avanza(8000); await new Promise(r => setTimeout(r, 50));
+  ok('…y borra solo esas', borrados.length === 2 && borrados[1].join() === `${RR}/Tracks/0.szs`, JSON.stringify(borrados[1]));
+  // el tope
+  $('[data-tope="2"]').click();
+  ok('el tope (apagado por omisión) se elige: 1/2/4 GB', uso.tope() === 2 && $('[data-tope="2"]').getAttribute('aria-pressed') === 'true' && JSON.parse(al.getItem(CLAVE_TOPE)) === 2);
+  ok('con un tope que alcanza, al terminar una carrera no suelta nada', (await p.aplicarTope()).length === 0);
+  for (let n = 10; n < 30; n++) pista(n, 100, 30 - n);  // 2 GB más, jugadas de más vieja a más nueva
+  const sueltas = await p.aplicarTope();
+  ok('con el tope pasado suelta las jugadas hace más tiempo hasta bajar (nunca ⭐ ni la que está en uso)',
+     sueltas.length > 0 && sueltas[0].pista === 0x10A && !sueltas.some(f => f.estrella || f.protegida) && (await leer()).total <= 2 * 1073741824, `${sueltas.length} sueltas`);
+  p.cerrar();
+} catch (e) { ok('la pantalla corrió sin errores', false, String(e?.stack || e)); }
+fin();
+</script>
+</body>
+</html>

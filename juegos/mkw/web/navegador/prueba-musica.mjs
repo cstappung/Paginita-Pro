@@ -19,7 +19,7 @@
 //   3. con caché, alternando el camino viejo (?precalentarTarde=0) y el nuevo: el nuevo posterga el precalentado al
 //      título, no corta la música y la hace sonar claramente antes.
 // Con --comparar: además una 1.ª visita por el camino viejo (otro perfil nuevo), para anotar el antes en la bitácora.
-// El camino viejo: ?precalentarTarde=0&semillaArranque=0 (y &vecinos=0 en la 1.ª visita).
+// El camino viejo: ?precalentarTarde=0&precalentarTope=0&semillaArranque=0 (y &vecinos=0 en la 1.ª visita; §117: sin tope, el de antes).
 //
 // Uso:  node web/navegador/prueba-musica.mjs [--ventana] [--comparar] [--vueltas 2] [--puerto 8170]
 //       (MKW_BUILD=otro build, como en servidor.mjs)
@@ -44,7 +44,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const s = ms => (ms / 1000).toFixed(1) + ' s';
 const mediana = l => [...l].sort((a, b) => a - b)[l.length >> 1];
 // el camino de antes: precalentado al arrancar y sin la semilla del arranque
-const VIEJO = '&precalentarTarde=0&semillaArranque=0';
+const VIEJO = '&precalentarTarde=0&precalentarTope=0&semillaArranque=0';
 
 // El servidor de siempre, con la latencia de la red del sitio
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)],

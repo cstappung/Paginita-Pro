@@ -29,6 +29,15 @@ await p.evaluate(() => window.mkwInterfaz.abrirCajon('controles'));
 await p.waitForTimeout(500);
 const ok = (n, c, d = '') => console.log(`${c ? '✓' : '✗'} ${n}${d ? ' — ' + d : ''}`);
 const clic = async sel => { const l = p.locator(sel).first(); await l.scrollIntoViewIfNeeded(); const c = await l.boundingBox(); await p.mouse.move(c.x + c.width / 2, c.y + c.height / 2); await p.mouse.down(); await p.waitForTimeout(150); await p.mouse.up(); await p.waitForTimeout(250); };
+// §263: la hoja empieza por el dibujo del mando (estilo Big Picture): clic real en el rótulo de RT, «Acelerar» en la
+// cuadrícula, y «☰ Lista» para lo de siempre (lo que sigue)
+await clic('.bp-rotulo[data-f="b7"]');
+ok('§263: clic real en el rótulo de RT abre «¿Qué hace RT?»', await p.evaluate(() => !document.querySelector('.bp-elegir').hidden));
+await clic('.bp-opcion[data-objetivo="A"]');
+ok('§263: clic real en «Acelerar»: RT también acelera', await p.evaluate(() => window.mkwControles.mapaDe(window.mkwControles.estado.mandos[0].clave).A.includes('b7')));
+await p.evaluate(() => window.mkwControles.borrarAsignacion(window.mkwControles.estado.mandos[0].clave));
+await clic('.ctl-vista:has-text("Lista")');
+ok('§263: clic real en «☰ Lista» muestra la lista', await p.evaluate(() => !!document.querySelector('.ctl-lista').offsetParent));
 let bien = 0;
 for (let i = 0; i < 4; i++) {
   await clic('.ctl-fila[data-objetivo="R"] .ctl-chip[data-col="mando"]');
