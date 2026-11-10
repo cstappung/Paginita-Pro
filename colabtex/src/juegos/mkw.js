@@ -180,7 +180,7 @@ const almacenPartidas = {
    una copa existente (4 carreras: el anfitrión la elige en el juego) y la playlist es una lista que el anfitrión arma
    en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). M20: `cpu` = el nivel de la
    CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §236: `conexion` lleva el modo elegido
-   (host, cloudflare u oracle; el antiguo `relevo` = cloudflare). Los nombres se le mandan al marco por mensaje. */
+   (host o cloudflare; el antiguo `relevo` = cloudflare; §266: «Servidor Oracle» se quitó, el dueño 2026-11-10). Los nombres se le mandan al marco por mensaje. */
 export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, base = 0, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", conexion, relevo = false }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
@@ -835,12 +835,13 @@ const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", nor
   intenso: "El Hard AI de Retro Rewind: siempre a la velocidad máxima del juego. Casi imposible de ganar.",
   imposible: "Injusto a propósito: más rápidas que cualquier kart (un 15 % sobre el tope) y aceleran 1,5 veces más." };
 /* §236: las salas viejas solo guardaban si se usaba el repetidor de Cloudflare. */
-const MKW_CONEXION = { host: "Host: un jugador", cloudflare: "Host + repetidor Cloudflare", oracle: "Servidor Oracle" };
+// §266 (el dueño, 2026-11-10: «en el multiplayer quita eso de oracle»): solo host y Cloudflare; una sala vieja con
+// «oracle» queda en host (`conexionMkw` no lo reconoce)
+const MKW_CONEXION = { host: "Host: un jugador", cloudflare: "Host + repetidor Cloudflare" };
 const conexionMkw = (conexion, relevo) => Object.hasOwn(MKW_CONEXION, conexion) ? conexion : relevo === true ? "cloudflare" : "host";
 const AYUDA_CONEXION = {
   host: "Un jugador arbitra desde su PC. La conexión directa suele dar menos demora. Depende de que los jugadores puedan conectarse entre sí.",
   cloudflare: "Un jugador arbitra y el repetidor de Cloudflare ayuda si falla la conexión directa. Agrega demora y consume unos 35 MB por jugador por hora.",
-  oracle: "Un servidor propio en Santiago arbitra y le quita esa carga a los jugadores. Depende de la conexión a Santiago. Si no responde, la sala vuelve al host.",
 };
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
