@@ -232,7 +232,7 @@ drawing, `MINI.px` (192) square.
   to the old path, `miniProcesa`: rendered in a corner of the scene's canvas
   before the scene, but **one every 3 frames**.
 - Cached per piece and colours (`invId`) in localStorage under `claveMini(v)`
-  (`catalogo.js`, `rock-mini-5:<id>`: bump the number when the rocker's look
+  (`catalogo.js`, `rock-mini-6:<id>`: bump the number when the rocker's look
   changes; `limpiaMinisViejas` deletes the old prefix, since localStorage is
   ~5 MB for the whole site). The page keeps object URLs in memory and writes
   the data URL in the background (`FileReader`).
@@ -286,6 +286,22 @@ drawing, `MINI.px` (192) square.
 - The stubble shadow fades before `FACE_UV.X`: past it the face repeats the
   texture's last column, which showed as stretched streaks on the cheek.
 
+- **Human proportions (second pass, from the owner's reference art)**: the
+  head is scaled (`head.scale` 0.86 f / 0.84 m, before `root.scale`; hair
+  collision radii follow it), builds are narrow (`BASE_BUILD` sw 0.188 f /
+  0.236 m; Rex and Kid carry their own), and the torso rows end the
+  trapezius at y ≈ 0.61 so the neck is a long thin column over sloped
+  shoulders. Raising those rows or `shY` brings back the "coat hanger".
+  `torsoW`'s neck weight starts at 0.575 to match.
+- Clavicles and the sternal notch are bumps in `feat()`; their height `yc`
+  must move with the shoulder rows.
+- Rockers shade with `GRAD_ROPA` (soft three tones) and a thin brown outline
+  (`CONTORNO`: half width, `0x2e161a`); the skin ramp is `GRAD_SOFT`.
+- Hair locks carry a `hu` attribute (`ribbonGeo`): `hairMat` draws fine
+  strands from it. A mesh without it (the cap) reads 0 and stays plain.
+- The crop top's straps use the tank's neckline/armhole formula: a thin
+  `|x − x0| < w` band came out as a zigzag (clips must stay near-linear).
+
 ## Animation (`animGuitar`, `applyPose`)
 
 - **Standing height is `PARADO`** (hipDrop −0.072): at 0 the hip-to-ankle
@@ -296,6 +312,12 @@ drawing, `MINI.px` (192) square.
   weight shifting between legs with the free foot tapping (`tapL`/`tapR`:
   heel down, toes up), and half-time with a deep nod. All from `K.beat`, so
   they land on the song's pulse.
+- **Body tempo is capped (`RITMO`)**: guitarist and singer animate from
+  `K.gb` = beat / `RITMO.d`, where `d` (1, 2 or 4, with hysteresis) halves
+  the pulse when the song runs faster than ~1.18 scene-beats per real
+  second; `addMove` stretches spins and jumps by the same rate (spin ≥ 1 s).
+  On fast songs the body thrashed and the air spin was a blur. The drummer
+  keeps `K.beat`.
 - **The body shows what is played**: each strum moves the shoulder (`rasg`),
   a chord is a dip (`acento`), a sustain leans back with the neck up and eyes
   closed (`sus`), a fast run (`dens` ≥ ~6 notes/s) looks down at the neck.
