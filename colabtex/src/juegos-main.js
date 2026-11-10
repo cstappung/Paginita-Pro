@@ -74,7 +74,7 @@ import { memeHtml } from "./juegos/memazo-plantillas.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
 import { crearMkw, crearMkwSolo } from "./juegos/mkw.js";
-import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
+import { bt3Visible, revisaBt3, alCambiarBt3, listaAmigosBt3, cambiaAmigoBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { fijaVeRock, veRock, fichaRock } from "./juegos/rock-datos.js";
 import { fotoRock, pideFotosRock } from "./juegos/rock-fotos.js";
@@ -2731,7 +2731,8 @@ function armazon() {
     }
     h.innerHTML = "";
     adminVista = crearAdmin({ uid: state.user.uid, fb, datos: datosPerfil, ahora: fb.ahora, ver: VER_PUBLICA,
-      nombre: u => (datosP && nombreEnDatos(u, datosP)) || "" });
+      nombre: u => (datosP && nombreEnDatos(u, datosP)) || "",
+      amigos: { lista: listaAmigosBt3, cambia: cambiaAmigoBt3 } });   // la lista del disco privado (bt3-amigos.js)
     adminVista.montar(h);
     return;
   }

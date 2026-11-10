@@ -23,6 +23,10 @@
    - **Serie 01**: quién ve la colección de los profes de PRODROP
      (`prodropSerie1`). Es solo de vista: quitar a alguien no le toca
      ninguna carta, solo deja de verlas hasta que se le vuelva a poner.
+   - **Juegos privados**: quién ve y juega BT3 y Mario Kart Wii (la lista
+     de amigos del disco privado). No está en Firebase: la guarda el Worker
+     del disco (`/amigos`, juegos/bt3/fuente/disco/worker.js), que comprueba
+     por su cuenta que quien la cambia es administrador.
    - **Beta testers**: quién juega lo que todavía está a prueba
      (`betaTesters`; las entradas del salón con `beta: true`, hoy Pro
      Kingdoms). Se pone y se quita igual que la Serie 01.
@@ -73,6 +77,11 @@ export function crearAdmin(ctx) {
   let offDatos = null, offAdm = null, offSerie1 = null, aviso = "";
   let serie1 = {};                       // prodropSerie1: {uid: {at, por}}
   let betas = {}, errBetas = null, offBetas = null;   // betaTesters: {uid: {at, por}}
+  /* La pestaña «Juegos privados»: lo que contestó el Worker del disco
+     ({amigos, fijos, correos}; null = todavía no se pidió), si se está
+     pidiendo y el error de la última vez ({estado}). Se pide al abrir la
+     pestaña, no al montar: cada pedido es una llamada al Worker. */
+  let privados = null, pidiendoPriv = false, errPriv = null;
   /* La pestaña Economía: el cierre preparado ({c, dif, ms}), el avance de
      la escritura ({hechas, total}) y el recálculo desde el archivo
      ({cargando} o {full, difs, ms}). */
@@ -123,11 +132,11 @@ export function crearAdmin(ctx) {
       ${sinReglas ? `<p class="jg-adm-aviso">Faltan publicar las reglas nuevas en la consola de Firebase (revisiones, suspensiones, auditados, ajustesMonedas). Hasta entonces el panel no puede leer ni escribir.</p>` : ""}
       ${aviso ? `<p class="jg-adm-aviso" role="status">${esc(aviso)}</p>` : ""}
       <nav class="jg-adm-tabs" role="tablist">
-        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"], ["beta", `Beta testers${Object.keys(betas).length ? ` <b>${Object.keys(betas).length}</b>` : ""}`], ["economia", "Economía"]]
+        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"], ["beta", `Beta testers${Object.keys(betas).length ? ` <b>${Object.keys(betas).length}</b>` : ""}`], ["privados", "Juegos privados"], ["economia", "Economía"]]
           .map(([k, t]) => `<button type="button" role="tab" class="btn2${pestaña === k ? " on" : ""}" data-tab="${k}" aria-selected="${pestaña === k}">${t}</button>`).join("")}
       </nav>
       ${detalle ? detalleHtml() : ""}
-      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : pestaña === "beta" ? betaHtml() : pestaña === "economia" ? economiaHtml() : suspensionesHtml()}</div>
+      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : pestaña === "beta" ? betaHtml() : pestaña === "privados" ? privadosHtml() : pestaña === "economia" ? economiaHtml() : suspensionesHtml()}</div>
     </section>`;
     if (pl) { const sitio = host.querySelector(".jg-adm-player-sitio"); if (sitio) sitio.replaceWith(pl); else cierraPlayer(); }
     for (const [id, v] of Object.entries(escrito)) { const i = host.querySelector("#" + id); if (i && id !== "admBusca") i.value = v; }
@@ -355,6 +364,7 @@ export function crearAdmin(ctx) {
     if (datos && datos.completo && datos.cierre) for (const u of Object.keys(economia(datos).usuarios)) s.add(u);
     for (const u of Object.keys(serie1)) s.add(u);
     for (const u of Object.keys(betas)) s.add(u);
+    for (const a of (privados && privados.amigos) || []) s.add(a.uid);
     return [...s];
   }
   function buscadorHtml(ph) {
@@ -560,13 +570,80 @@ export function crearAdmin(ctx) {
         : `<p class="jg-nada">Todavía no hay beta testers.</p>`);
   }
 
+  /* ---------- juegos privados (BT3 y Mario Kart Wii) ----------
+     La lista de amigos del disco privado. La guarda el Worker del disco,
+     no Firebase: aquí solo se le pide (ctx.amigos, bt3-amigos.js). */
+  async function cargaPrivados() {
+    if (pidiendoPriv || !ctx.amigos) return;
+    pidiendoPriv = true; pinta();
+    try { privados = await ctx.amigos.lista(); errPriv = null; }
+    catch (err) { errPriv = err; }
+    pidiendoPriv = false; pinta();
+  }
+  // Qué pasó, en palabras: el número HTTP dice de quién es el problema
+  const porQuePriv = err => !err ? "" : err.estado === 404 ? "el Worker del disco es de antes de esta lista: el dueño tiene que volver a pegar worker.js en Cloudflare"
+    : err.estado === 403 ? "el Worker no te reconoce como administrador (¿estás en admins con el valor true?)"
+    : err.estado === 409 ? "la lista está llena"
+    : err.estado === 0 ? (err.message || "no se pudo llegar al Worker") : "el Worker contestó " + err.estado;
+  async function cambiaPrivado(u, poner) {
+    try {
+      await ctx.amigos.cambia(u, poner);
+      aviso = poner ? `${nombre(u)} ya está en la lista. Tiene que recargar la página para ver los juegos.`
+        : `${nombre(u)} ya no está en la lista (puede tardar un minuto en notarse).`;
+      privados = await ctx.amigos.lista(); errPriv = null;
+    } catch (err) { aviso = "No se pudo: " + porQuePriv(err) + "."; }
+    pinta();
+  }
+  /* Dos listas: quién está (con «Quitar») y
+     quién no (con «Agregar»), sobre todas las cuentas que el panel conoce
+     (`cuentas()`: quien jugó o cobró algo alguna vez). El cuadro de arriba
+     filtra las dos por nombre; la de «no están» se corta en PRIV_TOPE
+     filas para no pintar cientos de botones. */
+  const PRIV_TOPE = 60;
+  function privadosHtml() {
+    const nota = `<p class="jg-adm-nota"><b>Budokai Tenkaichi 3</b> y <b>Mario Kart Wii</b> solo los ve y los juega quien está en amigos: para el resto no aparecen en ninguna parte del sitio. Agrega solo a quien el dueño quiera dentro. Tú también tienes que estar para jugarlos. Quien agregues tiene que recargar la página para verlos.</p>`;
+    if (!privados) return nota + (errPriv ? `<p class="jg-adm-aviso">No se pudo leer la lista: ${esc(porQuePriv(errPriv))}.</p><p class="jg-adm-btns"><button type="button" class="btn2" data-recargapriv>Reintentar</button></p>`
+      : `<p class="jg-nada">Cargando…</p>`);
+    // lo escrito en el filtro (se lee del cuadro que ya está en pantalla, como hace el buscador)
+    const q = String(host && host.querySelector("#admFiltroPriv") ? host.querySelector("#admFiltroPriv").value : "").trim().toLowerCase();
+    const pasa = u => !q || u.toLowerCase().startsWith(q) || nombre(u).toLowerCase().includes(q);
+    const porNombre = (a, b) => nombre(a).localeCompare(nombre(b));
+    const puesto = new Map(privados.amigos.map(a => [a.uid, a]));   // los agregados desde el panel
+    const deDueño = new Set(privados.fijos || []);                  // los uid que el dueño puso en Cloudflare
+    const dentro = [...new Set([...puesto.keys(), ...deDueño])].filter(pasa).sort(porNombre);
+    const fuera = cuentas().filter(u => !puesto.has(u) && !deDueño.has(u) && pasa(u)).sort(porNombre);
+    const filaDentro = u => {
+      const a = puesto.get(u);
+      return `<li><div><b translate="no">${esc(nombre(u))}</b>
+          <small>${a ? `desde ${fecha(a.at)}${a.por ? " · por " + esc(nombre(a.por)) : ""}` : "lo puso el dueño en Cloudflare"}</small></div>
+          <span class="jg-adm-btns">${a ? `<button type="button" class="btn2 jg-adm-rojo" data-quitapriv="${esc(u)}">Quitar</button>` : ""}</span></li>`;
+    };
+    const filaFuera = u => `<li><div><b translate="no">${esc(nombre(u))}</b> <small translate="no">${esc(u.slice(0, 8))}…</small></div>
+          <span class="jg-adm-btns"><button type="button" class="btn" data-ponpriv="${esc(u)}">Agregar</button></span></li>`;
+    return nota +
+      `<div class="jg-adm-busca"><input id="admFiltroPriv" class="inp" type="search" placeholder="Filtra por nombre" autocomplete="off" value="${esc(q)}"></div>` +
+      `<h3>✅ En amigos (${dentro.length})</h3>` +
+      (dentro.length ? `<ul class="jg-adm-lista">${dentro.map(filaDentro).join("")}</ul>` : `<p class="jg-nada">${q ? "Nadie con ese nombre." : "Todavía nadie."}</p>`) +
+      (privados.correos ? `<p class="jg-adm-nota">Además hay ${privados.correos} ${privados.correos === 1 ? "cuenta que el dueño puso" : "cuentas que el dueño puso"} por correo en Cloudflare: aquí pueden salir abajo como si no estuvieran, pero ya entran.</p>` : "") +
+      `<h3>➕ No están en amigos (${fuera.length})</h3>` +
+      (fuera.length ? `<ul class="jg-adm-lista">${fuera.slice(0, PRIV_TOPE).map(filaFuera).join("")}</ul>` +
+          (fuera.length > PRIV_TOPE ? `<p class="jg-adm-nota">Se muestran ${PRIV_TOPE} de ${fuera.length}: escribe un nombre arriba para encontrar al resto.</p>` : "")
+        : `<p class="jg-nada">${q ? "Nadie con ese nombre." : "No queda nadie por agregar."}</p>`);
+  }
+
   /* ---------- los eventos ---------- */
   const partes = s => String(s || "").split("|");
   async function alClic(e) {
     const b = e.target.closest("button, input[type=checkbox]");
     if (!b || !host.contains(b)) return;
     const ds = b.dataset;
-    if (ds.tab) { pestaña = ds.tab; aviso = ""; pinta(); return; }
+    if (ds.tab) { pestaña = ds.tab; aviso = ""; pinta(); if (pestaña === "privados" && !privados) cargaPrivados(); return; }
+    if ("recargapriv" in ds) { errPriv = null; cargaPrivados(); return; }
+    if (ds.ponpriv) { cambiaPrivado(ds.ponpriv, true); return; }
+    if (ds.quitapriv) {
+      if (confirm(`¿Quitar a ${nombre(ds.quitapriv)} de los juegos privados? Deja de verlos y de poder jugarlos.`)) cambiaPrivado(ds.quitapriv, false);
+      return;
+    }
     if ("sinprueba" in ds) { verSinPrueba = b.checked; pinta(); return; }
     if (ds.ver) { const [c, u, p, o] = partes(ds.ver); abreDetalle(c, u, p, o); return; }
     if ("cierra" in ds) { detalle = null; cierraPlayer(); pinta(); return; }
@@ -649,7 +726,7 @@ export function crearAdmin(ctx) {
     if (f.dataset.form === "suspende") aplicaSuspension(cuenta, host.querySelector("#admDur").value, host.querySelector("#admMotivoS").value.trim());
   }
   /* El buscador repinta mientras se escribe (pinta() conserva el foco). */
-  function alEscribir(e) { if (e.target.id === "admBusca") pinta(); }
+  function alEscribir(e) { if (e.target.id === "admBusca" || e.target.id === "admFiltroPriv") pinta(); }
 
   return { montar, destruir };
 }

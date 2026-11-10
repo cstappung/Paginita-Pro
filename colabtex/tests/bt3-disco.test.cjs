@@ -16,16 +16,26 @@ async function token(datos,{firmaCon,alg='RS256'}={}){
 const ahora=()=>Math.floor(Date.now()/1000);
 const datos=(uid,o={})=>({aud:'mi-pagina-pro',iss:'https://securetoken.google.com/mi-pagina-pro',sub:uid,iat:ahora()-10,exp:ahora()+3600,...o});
 
-let W, env;
+let W, env, r2, preguntasAdmin=0;
 const pide=(ruta,{metodo='GET',cab={},cuerpo}={})=>W.fetch(new Request('https://disco.ejemplo'+ruta,{method:metodo,headers:{Origin:'https://paginita-pro.cl',...cab},body:cuerpo}),env);
 
 test.before(async()=>{
   par=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
   jwk={...await crypto.subtle.exportKey('jwk',par.publicKey),kid:'k1',alg:'RS256',use:'sig'};
-  globalThis.fetch=async()=>new Response(JSON.stringify({keys:[jwk]}),{headers:{'cache-control':'max-age=3600'}});
+  // Lo que el Worker pide afuera: las claves de Google y, para `/amigos`, `admins/<uid>` de la base del sitio
+  // (que contesta `true` solo a «jefa» y a «jefe2», y solo si la pregunta lleva un token).
+  globalThis.fetch=async u=>{
+    const m=/firebaseio\.com\/admins\/([^.]+)\.json\?auth=(.+)$/.exec(String(u));
+    if(m){preguntasAdmin++;return new Response(JSON.stringify(m[2]&&(m[1]==='jefa'||m[1]==='jefe2')?true:null));}
+    return new Response(JSON.stringify({keys:[jwk]}),{headers:{'cache-control':'max-age=3600'}});
+  };
   W=(await import(require('node:url').pathToFileURL(path.join(__dirname,'../../juegos/bt3/fuente/disco/worker.js')).href)).default;   // (file://: en Windows import() no acepta C:\…)
-  const r2=new Map([['pieza/00000.bin',new Uint8Array([1,2,3])],['indice.json',new TextEncoder().encode('{"size":3,"pieza":1048576}')]]);
-  env={AMIGOS:'yo, amigo1',CLAVE_SUBIDA:'secreto',DISCO:{get:async k=>r2.has(k)?{body:r2.get(k)}:null,put:async(k,v)=>{r2.set(k,new Uint8Array(v));}}};
+  r2=new Map([['pieza/00000.bin',new Uint8Array([1,2,3])],['indice.json',new TextEncoder().encode('{"size":3,"pieza":1048576}')]]);
+  const meta=new Map();   // llave → lo que R2 guarda al lado del objeto (customMetadata)
+  env={AMIGOS:'yo, amigo1',CLAVE_SUBIDA:'secreto',DISCO:{get:async k=>r2.has(k)?{body:r2.get(k)}:null,
+    put:async(k,v,o)=>{r2.set(k,typeof v==='string'?new TextEncoder().encode(v):new Uint8Array(v));meta.set(k,(o&&o.customMetadata)||{});},
+    head:async k=>r2.has(k)?{key:k}:null,delete:async k=>{r2.delete(k);meta.delete(k);},
+    list:async({prefix})=>({objects:[...r2.keys()].filter(k=>k.startsWith(prefix)).map(k=>({key:k,uploaded:new Date(1e12),customMetadata:meta.get(k)})),truncated:false})}};
 });
 
 test('un amigo de la lista lee los pedazos y el índice',async()=>{
@@ -123,4 +133,58 @@ test('el relevo TURN: solo para amigos, con la llave guardada en el Worker y sin
     assert.ok(!JSON.stringify(iceServers).includes('clave-secreta'),'la llave no sale del Worker');
     await pide('/turn',{cab:A});assert.equal(pedidos,1,'las credenciales se reusan mientras no vencen');
   }finally{globalThis.fetch=fetchGoogle;delete env.TURN_ID;delete env.TURN_CLAVE;}
+});
+
+test('la lista de los administradores: solo ellos la leen y la cambian, y quien agregan entra al disco',async()=>{
+  const A=async uid=>({Authorization:'Bearer '+await token(datos(uid)),'Content-Type':'application/json'});
+  const jefa=await A('jefa'),nueva=await A('nueva');
+  // nadie más toca la lista: ni sin sesión, ni un jugador cualquiera, ni un amigo del disco
+  assert.equal((await pide('/amigos')).status,401,'sin sesión');
+  assert.equal((await pide('/amigos',{cab:await A('extraño')})).status,403,'un jugador cualquiera no la lee');
+  assert.equal((await pide('/amigos',{cab:await A('amigo1')})).status,403,'ser amigo no es ser administrador');
+  assert.equal((await pide('/amigos',{metodo:'PUT',cab:await A('amigo1'),cuerpo:'{"uid":"colado"}'})).status,403,'ni agrega');
+  assert.equal(r2.has('amigos/colado'),false);
+  assert.equal((await pide('/amigos',{metodo:'POST',cab:jefa,cuerpo:'{}'})).status,404,'otros métodos no existen');
+  // la administradora: no es amiga por serlo, y lee la lista vacía (con los uid del dueño, sin sus correos)
+  assert.equal((await pide('/soy',{cab:jefa})).status,403,'ser administradora no da el disco');
+  env.AMIGOS='yo, amigo1, Amiga@Gmail.com';
+  let r=await pide('/amigos',{cab:jefa});assert.equal(r.status,200);
+  assert.deepEqual(await r.json(),{amigos:[],fijos:['yo','amigo1'],correos:1});
+  env.AMIGOS='yo, amigo1';
+  // agrega a «nueva»: antes no entraba, después sí (el «no» recordado se pisa al agregar)
+  assert.equal((await pide('/soy',{cab:nueva})).status,403,'todavía no');
+  assert.equal((await pide('/amigos',{metodo:'PUT',cab:jefa,cuerpo:'{"uid":"nueva"}'})).status,200);
+  assert.equal((await pide('/soy',{cab:nueva})).status,200,'ya es amiga');
+  assert.equal((await pide('/pieza/00000.bin',{cab:nueva})).status,200,'y lee el disco');
+  assert.equal((await pide('/amigos',{cab:nueva})).status,403,'pero no administra');
+  r=await pide('/amigos',{cab:jefa});
+  assert.deepEqual((await r.json()).amigos,[{uid:'nueva',por:'jefa',at:1e12}],'queda anotado quién la puso');
+  // lo que no es una cuenta no se guarda (va en una llave de R2)
+  for(const malo of ['{"uid":"../indice.json"}','{"uid":"a/b"}','{"uid":""}','{"uid":7}','{}','no es json'])
+    assert.equal((await pide('/amigos',{metodo:'PUT',cab:jefa,cuerpo:malo})).status,400,malo);
+  assert.deepEqual([...r2.keys()].filter(k=>k.startsWith('amigos/')),['amigos/nueva']);
+  // otro administrador la quita: deja de entrar
+  assert.equal((await pide('/amigos',{metodo:'DELETE',cab:await A('jefe2'),cuerpo:'{"uid":"nueva"}'})).status,200);
+  assert.equal((await pide('/soy',{cab:nueva})).status,403,'ya no');
+  assert.equal((await pide('/pieza/00000.bin',{cab:nueva})).status,403);
+  // los del dueño (AMIGOS) no dependen de esta lista
+  assert.equal((await pide('/amigos',{metodo:'DELETE',cab:jefa,cuerpo:'{"uid":"amigo1"}'})).status,200);
+  assert.equal((await pide('/soy',{cab:await A('amigo1')})).status,200,'amigo1 sigue: es de la variable del dueño');
+  // CORS deja pasar el DELETE del panel, y a Firebase se le preguntó poco (se recuerda un minuto)
+  const pre=await pide('/amigos',{metodo:'OPTIONS'});
+  assert.match(pre.headers.get('access-control-allow-methods'),/DELETE/);
+  assert.ok(preguntasAdmin<=5,'una pregunta por cuenta, no por llamada: '+preguntasAdmin);
+});
+
+test('si Firebase o R2 fallan, nadie pasa de más',async()=>{
+  const bueno=globalThis.fetch;
+  globalThis.fetch=async u=>/firebaseio/.test(String(u))?new Response('{"error":"Permission denied"}',{status:401}):bueno(u);
+  try{
+    assert.equal((await pide('/amigos',{cab:{Authorization:'Bearer '+await token(datos('otra-jefa'))}})).status,403,'Firebase dice que no: no administra');
+  }finally{globalThis.fetch=bueno;}
+  const head=env.DISCO.head;env.DISCO.head=async()=>{throw new Error('R2 caído');};
+  try{
+    assert.equal((await pide('/soy',{cab:{Authorization:'Bearer '+await token(datos('desconocida'))}})).status,403,'R2 falla: no es amiga');
+    assert.equal((await pide('/soy',{cab:{Authorization:'Bearer '+await token(datos('amigo1'))}})).status,200,'los del dueño no dependen de R2');
+  }finally{env.DISCO.head=head;}
 });

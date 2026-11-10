@@ -65,3 +65,29 @@ export function revisaBt3() {
   })().then(v => { pidiendo = null; if (auth.currentUser && auth.currentUser.uid === deQuien) pone(v); return v; });
   return pidiendo;
 }
+
+/* La lista de amigos que llevan los administradores del sitio (panel de administración → «Juegos privados»). El
+   Worker del disco vuelve a comprobar que quien llama está en `admins/<uid>`: esto es solo el recado.
+   `listaAmigosBt3()` → {amigos: [{uid, por, at}], fijos: [uid…], correos: n}; `cambiaAmigoBt3(uid, true|false)`
+   agrega o quita. Las dos lanzan un Error con `estado` (el número HTTP; 0 si no hay disco privado o no hay red): un
+   Worker de antes de la lista contesta 404, y a quien no es administrador, 403. */
+async function pideAmigos(metodo, uid) {
+  const falla = (estado, texto) => Object.assign(new Error(texto), { estado });
+  const u = auth.currentUser;                                        // la sesión de Google de esta pestaña
+  if (!u) throw falla(401, "sin sesión");
+  let base = "";
+  try { base = String((await (await fetch("juegos/bt3/disco-privado.json", { cache: "no-store" })).json()).url || "").replace(/\/+$/, ""); } catch (e) {}
+  if (!base) throw falla(0, "el sitio no tiene disco privado");      // (disco-privado.json vacío)
+  let r;
+  try {
+    r = await fetch(base + "/amigos", {
+      method: metodo,
+      headers: { Authorization: "Bearer " + await u.getIdToken(), ...(uid ? { "Content-Type": "application/json" } : {}) },
+      body: uid ? JSON.stringify({ uid }) : undefined                // GET no lleva cuerpo
+    });
+  } catch (e) { throw falla(0, "no se pudo llegar al Worker"); }
+  if (!r.ok) throw falla(r.status, await r.text().catch(() => ""));
+  return r.json();
+}
+export const listaAmigosBt3 = () => pideAmigos("GET");
+export const cambiaAmigoBt3 = (uid, poner) => pideAmigos(poner ? "PUT" : "DELETE", uid);

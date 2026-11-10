@@ -6,8 +6,9 @@
    1. verifica ese token como lo haría Firebase: firma RS256 con las claves públicas de Google, emitido para el
       proyecto (`aud`, `iss`), vigente (`exp`, `iat`);
    2. mira que su correo (verificado por Google) o su uid esté en `AMIGOS` (variable del Worker, separados por
-      comas: lo más fácil son los correos con que inician sesión en el sitio). Nadie más pasa: ni los
-      demás jugadores del sitio, ni quien copie la dirección;
+      comas: lo más fácil son los correos con que inician sesión en el sitio) **o en la lista que llevan los
+      administradores del sitio** (`/amigos`, más abajo). Nadie más pasa: ni los demás jugadores del sitio, ni
+      quien copie la dirección;
    3. solo entonces entrega el pedazo. Solo responde a las páginas de `ORIGENES` (CORS).
    Rapidez: R2 no tiene servidores en Sudamérica, así que cada pedazo se guarda además en el caché de Cloudflare
    más cercano (`caches.default`, después de revisar que es amigo: ese caché no es público, solo este Worker lo
@@ -29,6 +30,14 @@
    **su propio bucket** (el enlace `MKW`; sin ese enlace, en `DISCO`, como antes), con llaves que empiezan con `mkw/`
    (ver «Mario Kart Wii» más abajo). Se sube con juegos/mkw/herramientas/subir-r2.mjs (la API S3 de R2, desde el PC
    del dueño), no por este Worker.
+
+   `/amigos`: la lista que llevan los administradores del sitio, para que el dueño no tenga que entrar a Cloudflare
+   por cada amigo. GET la lee, PUT `{"uid": …}` agrega una cuenta y DELETE `{"uid": …}` la quita. Solo contesta a
+   quien está en `admins/<uid>` de la base del sitio: el Worker se lo pregunta a Firebase con el token del propio
+   administrador (las reglas dejan a cada cuenta leer solo su entrada), así que no hay otra lista de administradores
+   que mantener ni un secreto nuevo. Cada amigo es un objeto `amigos/<uid>` del bucket `DISCO` (uno por amigo: dos
+   administradores a la vez no se pisan), con quién lo puso. Ser administrador no da acceso al disco: también tiene
+   que agregarse. Los de `AMIGOS` no se pueden quitar desde aquí: esos son del dueño.
 
    Variables del Worker (Settings → Variables and Secrets):
      AMIGOS        correos de Google (o uids de Firebase) con acceso, separados por comas (el tuyo incluido)
@@ -99,7 +108,7 @@ function cors(req, env) {
   if (!permitidos.includes(origen)) return {};
   // (Range y HEAD, y las cabeceras X-Mkw-* y Content-Range a la vista: los pide la página de Mario Kart Wii)
   return { "Access-Control-Allow-Origin": origen, "Access-Control-Allow-Headers": "Authorization, X-Clave, Content-Type, Range",
-           "Access-Control-Allow-Methods": "GET, HEAD, PUT, POST, OPTIONS", "Access-Control-Max-Age": "86400", "Vary": "Origin",
+           "Access-Control-Allow-Methods": "GET, HEAD, PUT, POST, DELETE, OPTIONS", "Access-Control-Max-Age": "86400", "Vary": "Origin",
            "Access-Control-Expose-Headers": "X-Borde, X-Mkw-Version, X-Mkw-Build, Content-Range, Content-Length",
            "Timing-Allow-Origin": origen };
 }
@@ -319,6 +328,80 @@ async function mkw(req, url, env, ctx, c) {
   return responde(bytes, 206, { ...c, "Content-Type": tipo, "Content-Range": contenido, "Cache-Control": guardar, "X-Borde": cache ? "MISS" : "NO" });
 }
 
+// ---------- la lista de amigos que llevan los administradores del sitio ----------
+const BASE_DATOS = "https://mi-pagina-pro-default-rtdb.firebaseio.com";   // la base del sitio (ahí está `admins/<uid>`)
+const UID_OK = /^[A-Za-z0-9_-]{1,128}$/;                           // un uid de Firebase: va en una dirección y en una llave de R2
+const AMIGOS_MAX = 500;                                            // amigos en la lista de los administradores, como mucho
+const memAmigo = new Map(), memAdmin = new Map();                  // uid → {si, hasta}: una partida pide miles de pedazos
+const recuerda = (mem, uid, si, ms) => { if (mem.size > 500) mem.clear(); mem.set(uid, { si, hasta: Date.now() + ms }); };
+const fijos = env => (env.AMIGOS || "").split(",").map(s => s.trim()).filter(Boolean);   // los que puso el dueño
+
+/* ¿Tiene acceso al disco? Primero la variable del dueño (como siempre, sin leer nada); si no, la lista de los
+   administradores: un `head` de R2 que se recuerda un minuto (20 s el «no», para que el recién agregado entre pronto).
+   Por eso quitar a alguien tarda hasta un minuto en notarse. Si R2 falla, no pasa nadie. */
+async function esAmigo(quien, env) {
+  const f = fijos(env);
+  if (f.includes(quien.uid) || (!!quien.correo && f.some(a => a.toLowerCase() === quien.correo))) return true;
+  if (!UID_OK.test(quien.uid) || !env.DISCO || !env.DISCO.head) return false;
+  const m = memAmigo.get(quien.uid);
+  if (m && m.hasta > Date.now()) return m.si;
+  let si;
+  try { si = !!(await env.DISCO.head("amigos/" + quien.uid)); } catch (e) { return false; }
+  recuerda(memAmigo, quien.uid, si, si ? 60000 : 20000);
+  return si;
+}
+
+/* ¿Es administrador del sitio? Se le pregunta a la base con SU token: las reglas dejan leer `admins/<uid>` solo a
+   esa cuenta, y vale únicamente el booleano `true` (igual que `esAdminJuegos` en el sitio). Cualquier fallo = no. */
+async function esAdmin(quien, token) {
+  if (!UID_OK.test(quien.uid)) return false;
+  const m = memAdmin.get(quien.uid);
+  if (m && m.hasta > Date.now()) return m.si;
+  let si = false;
+  try {
+    const r = await fetch(BASE_DATOS + "/admins/" + quien.uid + ".json?auth=" + encodeURIComponent(token));
+    if (!r.ok) return false;
+    si = (await r.json()) === true;
+  } catch (e) { return false; }
+  recuerda(memAdmin, quien.uid, si, 60000);
+  return si;
+}
+
+/* Todos los amigos de la lista de los administradores: [{uid, por, at}] (R2 entrega de a mil: se sigue el cursor). */
+async function listaAmigos(env) {
+  const l = [];
+  let cursor;
+  do {
+    const r = await env.DISCO.list({ prefix: "amigos/", cursor, include: ["customMetadata"] });
+    for (const o of r.objects) l.push({ uid: o.key.slice(7), por: (o.customMetadata && o.customMetadata.por) || "", at: o.uploaded ? new Date(o.uploaded).getTime() : 0 });
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
+  return l;
+}
+
+/* `/amigos`, ya comprobado que quien llama es administrador. */
+async function amigos(req, quien, env, c) {
+  const json = (d, estado) => responde(JSON.stringify(d), estado || 200, { ...c, "Content-Type": "application/json", "Cache-Control": "no-store" });
+  if (!env.DISCO || !env.DISCO.list) return responde("falta el bucket", 500, c);
+  if (req.method === "GET") {
+    // `fijos`: los uid que el dueño puso en AMIGOS (sus correos no salen del Worker: solo cuántos son)
+    const f = fijos(env);
+    return json({ amigos: await listaAmigos(env), fijos: f.filter(a => UID_OK.test(a)), correos: f.filter(a => a.includes("@")).length });
+  }
+  let uid;
+  try { uid = (await req.json()).uid; } catch (e) { uid = null; }
+  if (typeof uid !== "string" || !UID_OK.test(uid)) return responde("cuenta inválida", 400, c);
+  if (req.method === "PUT") {
+    if (!(await env.DISCO.head("amigos/" + uid)) && (await listaAmigos(env)).length >= AMIGOS_MAX) return responde("la lista está llena", 409, c);
+    await env.DISCO.put("amigos/" + uid, "1", { customMetadata: { por: quien.uid } });
+    recuerda(memAmigo, uid, true, 60000);
+  } else {
+    await env.DISCO.delete("amigos/" + uid);
+    recuerda(memAmigo, uid, false, 20000);
+  }
+  return json({ ok: true });
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url), c = cors(req, env);
@@ -340,13 +423,14 @@ export default {
     const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || url.pathname === "/lote" || url.pathname === "/turn" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
     const deMkw = ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/mkw/"))   // Mario Kart Wii
                || (req.method === "POST" && url.pathname === "/mkw/lote");                              // (§104: el lote)
-    if (!lee && !deMkw && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
+    const deLista = url.pathname === "/amigos" && (req.method === "GET" || req.method === "PUT" || req.method === "DELETE");   // los administradores
+    if (!lee && !deMkw && !deLista && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const quien = token ? await uidDe(token) : null;
     if (!quien) return responde("inicia sesión", 401, c);
-    const amigos = (env.AMIGOS || "").split(",").map(s => s.trim()).filter(Boolean);
-    const esta = amigos.includes(quien.uid) || (!!quien.correo && amigos.some(a => a.toLowerCase() === quien.correo));
-    if (!esta) return responde("sin acceso", 403, c);
+    // La lista de los administradores: antes de mirar si es amigo (un administrador puede no serlo).
+    if (deLista) return (await esAdmin(quien, token)) ? amigos(req, quien, env, c) : responde("solo administradores", 403, c);
+    if (!(await esAmigo(quien, env))) return responde("sin acceso", 403, c);
     if (url.pathname === "/soy") return responde("amigo", 200, { ...c, "Cache-Control": "no-store" });
     if (deMkw) return mkw(req, url, env, ctx, c);
     if (url.pathname === "/turn") {   // el relevo para las peleas en línea, solo para amigos
