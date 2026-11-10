@@ -340,6 +340,25 @@
     if (b.vida) b.vida = Math.min(1200, Math.round(b.vida * (1 + 0.25 * n)));
     return b;
   }
+  /* ---------- habilidad de nivel máximo ----------
+     Un arma al nivel 5 de tienda (plasma) gana una habilidad propia. Sus
+     efectos viven en juego.js detrás de `especial(id)`; aquí, lo que dice
+     la tienda y el aviso. Cambiar uno cambia la simulación: subir `VE`. */
+  const ESPECIALES = {
+    0: { nombre: 'Bala perforante', txt: 'Cada 5.º disparo atraviesa a todos y pega el doble.', cada: 5, por: 2 },
+    1: { nombre: 'Ráfaga doble', txt: 'Dispara dos balas por cada una que gasta.' },
+    2: { nombre: 'Doble cartucho', txt: 'Cada disparo suelta una segunda descarga gratis.', tras: 0.13 },
+    3: { nombre: 'Barril doble', txt: 'Pone dos barriles por cada uno que gasta.' },
+    4: { nombre: 'Racimo', txt: 'Al explotar suelta cuatro granaditas.', n: 4, r: 0.55, d: 0.45 },
+    5: { nombre: 'Muralla', txt: 'Pone tres muros en fila por cada uno que gasta.' },
+    6: { nombre: 'Abanico', txt: 'Lanza tres cohetes en abanico.', abre: 0.2 },
+    7: { nombre: 'Minas', txt: 'Las cargas explotan solas si un enemigo pasa cerca.', alc: 0.5 },
+    10: { nombre: 'Napalm', txt: 'Deja charcos de fuego que siguen quemando.', r: 26, t: 2.6, cada: 0.3, d: 0.7, tope: 10 },
+    11: { nombre: 'Saeta explosiva', txt: 'La saeta estalla donde se detiene.', r: 56, d: 0.8 },
+    12: { nombre: 'Al rojo vivo', txt: 'Arranca girando al máximo y sus balas atraviesan dos más.', pen: 2 },
+    13: { nombre: 'Tormenta', txt: 'Salta a cuatro enemigos más, más lejos y sin perder fuerza.', saltos: 4, salto: 1.5 },
+  };
+  const especialDe = (id, nivel) => ((nivel | 0) >= NIVEL_ARMA.max && ESPECIALES[id]) || null;
   /* Los suministros (munición, armadura, botiquín, muro reforzado) suben un
      5 % por nivel de la partida, hasta ×2,5: más adelante se gana más
      chatarra por nivel y la tienda debe seguir pesando. La potencia es
@@ -751,7 +770,9 @@
     const b = armaTope(w);
     if (!b) return 0;
     const polvora = b.obj === 'barril' || b.obj === 'carga' ? 1.5 : 1;
-    return Math.ceil(Math.max(b.d || 0, 60) * factorPotencia(5) * TOPE_VENTAJAS * polvora);
+    // la bala perforante de la pistola al máximo pega ×2: si no, el director la recortaba
+    const esp = w === 0 ? ESPECIALES[0].por : 1;
+    return Math.ceil(Math.max(b.d || 0, 60) * factorPotencia(5) * TOPE_VENTAJAS * polvora * esp);
   }
   /* ---------- el zb comprimido (Fase 3.6) ----------
      Cada enemigo del zb es la tupla [id, k, x, y, pc, d, atk, aturd] y, si
@@ -812,7 +833,7 @@
   return {
     TS, ARMAS, ARMAS_J, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, chatarraDe, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     ELITES, parteElites, eliteDe, CORRUPTO_DESDE, ELITE_CORRUPTO, corrupto, DEBIL, DORADA, DORADA_T, PARTE_DORADA, golpeNivel, totalNivel, SIERRA, sierra, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
-    ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
+    ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, ESPECIALES, especialDe, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio,
     PASO_JEFES, nivelJefes, escoltaJefes, MUTADORES, mutador, empacaZb, desempacaZb
   };

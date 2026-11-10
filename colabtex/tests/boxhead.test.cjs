@@ -783,3 +783,59 @@ test('boxhead en línea: el zb que sale lleva z/zx y otro marco lo lee igual',()
  const ids=D.desempacaZb(ult).map(t=>t[0]).sort((a,b)=>a-b);
  assert.deepEqual(copia(ids),copia(bx.mundo().E.map(e=>e.id).sort((a,b)=>a-b)));
 });
+
+test('boxhead: cada grabación de MUESTRAS tiene su archivo, su GAN y su respaldo sintetizado',()=>{
+ const src=fs.readFileSync(__dirname+'/../../juegos/boxhead/js/audio.js','utf8');
+ const bloque=n=>{const m=new RegExp('const '+n+' = \\{([^}]*)\\}').exec(src);assert.ok(m,n);return Object.fromEntries([...m[1].matchAll(/(\w+): ([\d.]+)/g)].map(x=>[x[1],+x[2]]));};
+ const mu=bloque('MUESTRAS'),gan=bloque('GAN');
+ assert.ok(Object.keys(mu).length>=29);
+ for(const [k,n] of Object.entries(mu)){
+  for(let i=1;i<=n;i++){const f=__dirname+'/../../juegos/boxhead/sfx/'+k+'-'+i+'.mp3';assert.ok(fs.existsSync(f),'falta '+f);assert.ok(fs.statSync(f).size<80000,k+' pesa demasiado');}
+  assert.ok(gan[k]>0&&gan[k]<10,'GAN de '+k);
+  assert.ok(src.includes("case '"+k+"'"),k+' sin sintetizado de respaldo');
+ }
+ // la curva de distorsión tiene un punto en 0: si no, el silencio sale como corriente continua
+ assert.match(src,/new Float32Array\(513\)/);
+});
+
+test('boxhead: cada arma gana una habilidad al nivel máximo de tienda',()=>{
+ for(const a of D.ARMAS_J){const e=D.ESPECIALES[a.id];assert.ok(e&&e.nombre&&e.txt,'habilidad de '+a.nombre);assert.equal(D.especialDe(a.id,D.NIVEL_ARMA.max),e);assert.equal(D.especialDe(a.id,D.NIVEL_ARMA.max-1),null);}
+ const bx=boxheadSinPantalla(),pista={dx:0,dy:0,vel:1,mira:0,fija:true,disp:false};
+ const yoE=()=>bx.estado().yo;
+ function prepara(w,nv){bx.practica(1);bx.inmortal(true);bx.armas();bx.calma();bx.nivelArma(w,nv);bx.elige(w);bx.entrada(pista);for(let i=0;i<12;i++)bx.paso(1/60);return bx.mundo().yo;}
+ const gatillo=(pasos,suelta=1)=>{bx.entrada({...pista,disp:true});for(let i=0;i<pasos;i++)bx.paso(1/60);bx.entrada(pista);for(let i=0;i<suelta;i++)bx.paso(1/60);};
+ // uzi: dos balas por disparo
+ const disparos=(w,nv,pasos,suelta)=>{prepara(w,nv);const d0=yoE().disparos;gatillo(pasos,suelta);return yoE().disparos-d0;};
+ assert.equal(disparos(1,4,1),1);assert.equal(disparos(1,5,1),2,'ráfaga doble');
+ // escopeta: la segunda descarga sale sola un instante después
+ assert.equal(disparos(2,4,1,15),8);assert.equal(disparos(2,5,1,15),16,'doble cartucho');
+ // cohetes: tres en abanico por una munición
+ prepara(6,5);const c0=yoE().ammo[6];gatillo(1);assert.equal(yoE().proyectiles,3,'abanico');assert.equal(yoE().ammo[6],c0-1);
+ // granadas: al explotar se parten en cuatro
+ prepara(4,5);gatillo(1);let mx=0;for(let i=0;i<60;i++){bx.paso(1/60);mx=Math.max(mx,yoE().proyectiles);}assert.equal(mx,4,'racimo');
+ // barriles y muros: dos y tres por una munición
+ prepara(3,5);let o0=bx.estado().objetos;gatillo(1);assert.equal(bx.estado().objetos-o0,2,'barril doble');
+ prepara(5,5);o0=bx.estado().objetos;gatillo(1);assert.equal(bx.estado().objetos-o0,3,'muralla');
+ // cargas: minas que explotan solas con un enemigo cerca
+ let yo=prepara(7,5);gatillo(1);assert.equal(bx.objetos().filter(o=>o.k==='carga').length,1);
+ const car=bx.objetos().find(o=>o.k==='carga');const z=bx.enemigo(3,car.x+30,car.y);
+ for(let i=0;i<20;i++)bx.paso(1/60);
+ assert.equal(bx.objetos().filter(o=>o.k==='carga').length,0,'la mina explotó');
+ const ez=bx.mundo().E.find(e=>e.id===z);assert.ok(!ez||ez.hp<ez.max,'y le pegó');
+ // minigun: arranca girando al máximo
+ prepara(12,5);bx.entrada({...pista,disp:true});bx.paso(1/60);assert.equal(yoE().giro,1,'al rojo vivo');bx.entrada(pista);
+ // lanzallamas: deja napalm, que sigue quemando cuando ya no se dispara
+ yo=prepara(10,5);gatillo(40);assert.ok(bx.napalm()>0,'hay charcos');
+ const quema=bx.enemigo(3,yo.x+100,yo.y);const h0=bx.mundo().E.find(e=>e.id===quema).hp;
+ for(let i=0;i<40;i++)bx.paso(1/60);
+ const hq=bx.mundo().E.find(e=>e.id===quema);assert.ok(!hq||hq.hp<h0,'el charco quema sin disparar');
+ // rayo: con la tormenta salta más lejos y a más enemigos
+ const salta=nv=>{const yo=prepara(13,nv);const ids=[0,1,2,3,4,5,6].map(i=>bx.enemigo(3,yo.x+60+i*150,yo.y));const h=new Map(bx.mundo().E.map(e=>[e.id,e.hp]));gatillo(1);return ids.filter(id=>{const e=bx.mundo().E.find(x=>x.id===id);return !e||e.hp<h.get(id);}).length;};
+ assert.ok(salta(5)>salta(4),'tormenta: '+salta(5)+' contra '+salta(4));
+ // pistola: el 5.º disparo atraviesa a todos
+ const fila=nv=>{const yo=prepara(0,nv);const ids=[0,1,2,3,4,5].map(i=>bx.enemigo(3,yo.x+40+i*30,yo.y));const h=new Map(bx.mundo().E.map(e=>[e.id,e.hp]));gatillo(60);return ids.filter(id=>{const e=bx.mundo().E.find(x=>x.id===id);return !e||e.hp<h.get(id);}).length;};
+ const f5=fila(5),f4=fila(4);
+ assert.ok(f5>f4&&f5>=5,'bala perforante: '+f5+' contra '+f4);
+ // el director deja pasar la bala perforante entera
+ assert.ok(D.topeGolpe(0)>=2*Math.ceil(60*D.factorPotencia(5)*1.5*1.4*1.3*2*1.5*2)-1);
+});

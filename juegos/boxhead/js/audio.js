@@ -71,8 +71,10 @@
           for (let i = 0; i < m; i++) d[i] = Math.random() * 2 - 1;
           // una curva de saturación para gruñidos
           distor = ac.createWaveShaper();
-          const k = 18, cur = new Float32Array(512);
-          for (let i = 0; i < 512; i++) { const x = i / 256 - 1; cur[i] = (1 + k) * x / (1 + k * Math.abs(x)); }
+          // 513 puntos: el del medio es justo 0. Con 512, el silencio caía entre
+          // dos puntos y salía una corriente continua constante por el parlante
+          const k = 18, cur = new Float32Array(513);
+          for (let i = 0; i < 513; i++) { const x = i / 256 - 1; cur[i] = (1 + k) * x / (1 + k * Math.abs(x)); }
           distor.curve = cur;
           const ds = ac.createGain(); ds.gain.value = 0.2;
           distor.connect(ds); ds.connect(bus);
@@ -151,11 +153,31 @@
        `MUESTRAS[k]` = cuántas tomas hay de ese sonido (`sfx/<k>-<n>.mp3`,
        hechas con ElevenLabs); con varias se elige una al azar para que veinte
        disparos no suenen iguales. `GAN[k]` es la ganancia de cada archivo,
-       medida contra el sintetizado (la ventana de 100 ms más fuerte) para que
-       nada suene más fuerte que antes. Se cargan de a cuatro después del
-       primer toque; mientras tanto suena el sintetizado. */
-    const MUESTRAS = {};
-    const GAN = {};
+       medida contra el sintetizado (la ventana de 100 ms más fuerte, las dos
+       versiones renderizadas por esta misma cadena en un OfflineAudioContext)
+       para que la mezcla no cambie. Excepciones: lo que era apenas un clic
+       sube a un mínimo de 0,015 (si no, la grabación quedaba inaudible);
+       impacto, rebote y chatarra, que suenan sin parar, solo ×3; y «quedan
+       cinco» ×1,5, que no se sentía. Los archivos están recortados (sin
+       silencios, los que suenan seguido cortos para no llenar las `VOCES`)
+       y en mono a 96 kbps. Se cargan de a cuatro después del primer toque;
+       mientras tanto suena el sintetizado. */
+    const MUESTRAS = {
+      pistola: 1, uzi: 1, escopeta: 1, cohete: 1, boom: 1, lanza: 1,
+      rebote: 1, pon: 1, impacto: 1, baja: 1, bajaDiablo: 1, gemido: 1,
+      grunido: 1, mordida: 1, dolor: 1, muere: 1, recoge: 1, fuego: 1,
+      acido: 1, golpe: 1, jefe: 1, premio: 1, compra: 1, mejora: 1, nivel: 1,
+      chatarra: 1, racha: 1, avisoCombo: 1, quedan: 1
+    };
+    const GAN = {
+      pistola: 0.016, uzi: 0.052, escopeta: 0.336, cohete: 0.102, boom: 0.566,
+      lanza: 0.036, rebote: 0.057, pon: 0.052, impacto: 0.088, baja: 0.13,
+      bajaDiablo: 0.146, gemido: 0.024, grunido: 0.074, mordida: 0.064,
+      dolor: 0.464, muere: 0.35, recoge: 0.237, fuego: 0.018, acido: 0.034,
+      golpe: 0.095, jefe: 0.184, premio: 0.188, compra: 0.107, mejora: 0.164,
+      nivel: 0.332, chatarra: 0.089, racha: 0.37, avisoCombo: 0.017,
+      quedan: 4.76
+    };
     const VARIA = { pistola: 1, uzi: 1, escopeta: 1, impacto: 1, baja: 1, gemido: 1, grunido: 1, mordida: 1, chispa: 1, rebote: 1, chatarra: 1, dolor: 1 };
     const VOCES = 6;
     const bufs = {}, sonando = {};
