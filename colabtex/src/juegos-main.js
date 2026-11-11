@@ -89,6 +89,7 @@ import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMone
   registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender, dropsRock, ganariaInvitado } from "./juegos/monedas.js";
 import { precioDe, tiendaHalloweenAbierta } from "./juegos/tienda.js";
 import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta, firmaYoTienda } from "./juegos/tienda-halloween.js";
+import { abreEstrenos, tocaEstrenos, estrenosAbiertos } from "./juegos/estrenos.js";
 import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
@@ -823,6 +824,18 @@ function quizaAbreTienda() {
     if (document.querySelector(".jg-modal-capa, .jg-bv") || salon.abiertaPara()) return;
     abreTienda();
   }, 1400);
+}
+/* Los estrenos (juegos/estrenos.js): la ventana de «mira lo nuevo», media
+   para cada juego. Sale sola en el salón, con cuenta o de invitado, con las
+   mismas condiciones que la tienda (nada más delante) y después de ella:
+   si la tienda está en temporada y aún no salió hoy, hoy le toca a la tienda. */
+function quizaAbreEstrenos() {
+  if (!tocaEstrenos() || (tiendaHalloweenAbierta(Date.now()) && !yaVistaHoy())) return;
+  setTimeout(() => {
+    if (state.vista !== "vestibulo" || estrenosAbiertos() || tiendaAbierta() || !tocaEstrenos() || castigoActivo()) return;
+    if (document.querySelector(".jg-modal-capa, .jg-bv, .jg-fin-capa") || $("jgBienvenida") || salon.abiertaPara()) return;
+    abreEstrenos({ ir, ficha: id => salon.abre(id), suena });
+  }, 1600);
 }
 /* `#tienda` no es una vista: abre la ventana encima de lo que hubiera y
    la dirección vuelve a la ruta de antes (`hashPrevio`), para que la barra
@@ -4456,7 +4469,7 @@ function wire() {
       /* Una ficha abierta (se salió de la cuenta con ella delante) se
          repinta en su versión de invitado. */
       if (salon.abiertaPara()) salon.abre(salon.abiertaPara());
-      if (!revisaRutaTienda()) abreBienvenida();
+      if (!revisaRutaTienda()) { abreBienvenida(); quizaAbreEstrenos(); }
       return;
     }
     /* Con cuenta la bienvenida ya no hace falta, en este aparato tampoco
@@ -4539,7 +4552,7 @@ function wire() {
     subeDeInvitado(state.user);
     /* La tienda de Halloween: pedida por el enlace (`#tienda`) o, al
        entrar al salón, sola una vez al día. */
-    if (!revisaRutaTienda() && !reabrir) quizaAbreTienda();
+    if (!revisaRutaTienda() && !reabrir) { quizaAbreTienda(); quizaAbreEstrenos(); }
   });
 })();
 
