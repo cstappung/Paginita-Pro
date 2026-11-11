@@ -238,9 +238,10 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-es-otro{min-height:48px;padding:0 14px;border-radius:12px;border:2px solid var(--es);background:transparent;color:var(--es);font-size:.9rem;font-weight:700;cursor:pointer}
   .jg-es-otro:hover{background:#ffffff14}
   .jg-es-jugar:focus-visible,.jg-es-otro:focus-visible,.jg-es-x:focus-visible,.jg-es-pie button:focus-visible{outline:3px solid #fff;outline-offset:2px}
-  .jg-es-pie{display:flex;justify-content:space-between;gap:10px;padding:8px 14px;background:#0b0d14;border-top:1px solid #ffffff1a}
-  .jg-es-pie button{border:0;background:none;color:#aab0c0;font-size:.82rem;font-weight:600;cursor:pointer;padding:8px 10px;border-radius:8px}
-  .jg-es-pie button:hover{color:#fff;background:#ffffff14}
+  /* «No mostrar más» y «Ahora no» van discretos a propósito (la dueña: que no los aprieten tanto): chicos, apagados y sin forma de botón */
+  .jg-es-pie{display:flex;justify-content:center;gap:18px;padding:2px 14px 4px;background:#0b0d14}
+  .jg-es-pie button{border:0;background:none;color:#7c8294;font-size:.7rem;font-weight:400;cursor:pointer;padding:7px 6px;border-radius:6px}
+  .jg-es-pie button:hover{color:#c9cede;text-decoration:underline}
   @media (max-width:700px){
     .jg-es-capa{padding:8px}
     .jg-es{border-radius:16px}
@@ -251,7 +252,6 @@ try { var t = localStorage.getItem("jg.tema");
     .jg-es-tx h3{font-size:1.4rem}
     .jg-es-lema{display:none}
     .jg-es-tit{font-size:.66rem;padding:5px 12px;top:10px;left:12px;transform:none}
-    .jg-es-pie{justify-content:flex-start}
   }
   @media (prefers-reduced-motion:reduce){.jg-es,.jg-es-foto{animation:none}.jg-es-jugar{transition:none}}
   /* Reportes de Pro Kingdoms (errores y sugerencias): la ventana de la página (juegos/prokingdoms.js, pk-reportes.js) */
