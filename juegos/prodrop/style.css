@@ -1107,6 +1107,24 @@ body[data-phase="reveal"] .pack-extras, body[data-phase="summary"] .pack-extras 
 .rr-pos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .rr-pos .mini { width: 52px; }
 .rr-envio { z-index: 2; }
+.rr-flujo.cinco .rr-huecos { grid-template-columns: repeat(5, minmax(0, 76px)); justify-content: center; }
+.rr-sale.esp { border-color: transparent; background: radial-gradient(circle at 50% 40%, #ff7ad955, #1b1036 75%) padding-box, conic-gradient(#ff7ad9, #ffcc3d, #9be9ff, #ff7ad9) border-box; box-shadow: 0 0 28px #ff7ad977; }
+.rr-tab-esp { background: linear-gradient(90deg, #ff7ad922, #ffcc3d22) !important; }
+.rr-lote { grid-column: 1 / -1; display: grid; gap: 6px; align-content: center; min-width: 0; }
+.rr-lote b { font-size: 26px; font-weight: 900; line-height: 1; }
+.rr-lote small { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.rr-lote i { display: block; height: 8px; border-radius: 99px; background: linear-gradient(90deg, var(--c2) var(--p), #ffffff14 var(--p)); }
+.rr-veces { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--muted); font-weight: 700; }
+.rr-veces > b { min-width: 2ch; text-align: center; font-size: 20px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rr-veces .mk-mini { min-width: 34px; }
+.rl-lote { color: var(--gold); margin-right: 6px; }
+.rl-resumen { width: 100%; max-width: 760px; display: grid; gap: 8px; text-align: center; }
+.rl-resumen p { margin: 0; color: var(--muted); font-size: 14px; }
+.rl-res-l { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-height: 30vh; overflow-y: auto; }
+.rl-res-c { position: relative; padding: 0; border: 0; background: none; cursor: pointer; }
+.rl-res-c .mini { width: 58px; }
+.rl-res-c:hover .mini { filter: brightness(1.2); }
+.rl-res-nueva { position: absolute; left: 50%; top: -4px; translate: -50% 0; font-style: normal; font-size: 9px; font-weight: 800; color: #1a1030; background: var(--gold); border-radius: 3px; padding: 0 3px; }
 .rr-envio .btn.primary:disabled { animation: none; }
 
 /* la ruleta, como la de las cajas del CS2 */

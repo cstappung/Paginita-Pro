@@ -1692,7 +1692,7 @@
      distancia al centro en décimas): `Math.exp` no da el mismo último bit
      en todos los navegadores, y dos navegadores no pueden ver notas
      distintas de la misma carta. */
-  const REROLL = { n: 10, bono: 1, sigma: 1.3 };
+  const REROLL = { n: 10, nLeg: 5, bono: 1, sigma: 1.3 };
   const PESO_REROLL = [1000000,997046,988235,973724,953766,928705,898967,865048,827498,786907,743893,699081,653093,606531,559965,513924,468886,425271,383437,343679,306226,271245,238842,209069,181928,157377,135335,115694,98320,83062,69758,58239,48336,39879,32709,26669,21616,17417,13951,11109,8794,6920,5413,4209,3254,2501,1911,1451,1095,822,613,455,335,246,179,130,93,67,48,34,24,17,12,8,5,4,3,2,1,1,1];
   /* El peso de cada nota 1…10 (índice 0…9), en enteros. */
   function pesosReroll(notas) {
@@ -1730,13 +1730,33 @@
     w.forEach((x, i) => { p[Math.min(tope, tier + 1 + i)] += x / t; });
     return p;
   }
+  /* Desde `REROLL_V2` (hora del servidor del re-roll) hay dos cambios:
+     1. Lo que cae en legendaria desde común, rara o épica es siempre una
+        legendaria «de jugador»: nunca una especial ni una leyenda.
+     2. En fútbol hay un re-roll más: **cinco** legendarias (`REROLL.nLeg`)
+        por una especial o una leyenda, todas con la misma probabilidad.
+     Un re-roll escrito antes de `REROLL_V2` vuelve a dar la carta que dio. */
+  const REROLL_V2 = 1794413553439;   // publicado el 2026-11-11: 15 minutos después del push
+  const esRaraFut = c => !!(c.especial || c.leyenda);
+  // cuántas cartas entran en un re-roll de esa rareza
+  const rerollN = tier => (tier >= 3 ? REROLL.nLeg : REROLL.n);
+  // se puede re-rollear esa rareza de esa colección (las legendarias, solo en fútbol)
+  const rerollable = (col, tier) => tier >= 0 && (tier < 3 || (tier === 3 && col === "futbol"));
+  /* Lo que puede salir de un re-roll de rareza `tier` que cae en `destino`. */
+  function posiblesReroll(P, tier, destino, at = Infinity) {
+    if (tier >= 3) return P[3].filter(esRaraFut);
+    const l = P[destino];
+    if (destino === 3 && at >= REROLL_V2) { const f = l.filter(c => !esRaraFut(c)); if (f.length) return f; }
+    return l;
+  }
   const memoR = new Map();
   function reroll(uid, clave, at, tier, notas) {
     const k = uid + "|" + clave + "|" + at + "|" + tier + "|" + notas.join(",");
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
-    const P = poolDe(clave, at), posibles = P[Math.min(P.tope, tier + saltoReroll(k, at, tier))];
-    const c = elige(r, posibles, P.uniforme, P.pesoRerollDe);
+    const P = poolDe(clave, at), destino = tier >= 3 ? 3 : Math.min(P.tope, tier + saltoReroll(k, at, tier));
+    const posibles = posiblesReroll(P, tier, destino, at);
+    const c = elige(r, posibles, tier >= 3 || P.uniforme, P.pesoRerollDe);
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
     return res;
@@ -1776,6 +1796,6 @@
     PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, ESPECIALES3, ESPECIALES4, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
-    REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
+    REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, REROLL_V2, rerollN, rerollable, posiblesReroll, SALTO_W, SALTOS_DESDE, probSalida
   };
 });

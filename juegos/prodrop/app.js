@@ -1852,9 +1852,17 @@ $('#colBtn2').onclick = openCollection;
    a izquierda y se detiene en ella. Las notas ocultas de lo que entra no
    se enseñan: la cuenta de la nota esperada solo se hace cuando las diez
    están graduadas. */
-const NR = M.REROLL.n;
-const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
-const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false, orden: 'media', club: '', ver: 'todas' };
+/* Cuántas entran: diez, o cinco legendarias de fútbol (por una especial o
+   una leyenda). Y varios de una vez: `rr.veces` re-rolls de `nr(t)` cartas
+   cada uno, que después corren uno tras otro en la ruleta. */
+const nr = t => M.rerollN(t);
+const MAX_VECES = 50;
+const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias', 'especiales o leyendas'], UNA = ['común', 'rara', 'épica', 'legendaria', 'especial o leyenda'];
+// la rareza que sale de un re-roll de rareza `t` (de una legendaria sale una especial o una leyenda)
+const ESP_LEY = { sym: '✦', label: 'Especial o Leyenda', color: '#ff7ad9' };
+const destinoRr = t => (t >= 3 ? ESP_LEY : TIERS[t + 1]);
+const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false, orden: 'media', club: '', ver: 'todas', veces: 1 };
+const maxVeces = (t, lista) => Math.max(1, Math.min(MAX_VECES, Math.floor(lista.length / nr(t))));
 /* Fútbol: la rejilla se ordena (por media, junta las copias del mismo
    jugador) y se filtra por club y por estado; cada carta dice su media, su
    posición y, si está graduada, su nota. «Elegir automático» no mira el
@@ -1879,12 +1887,13 @@ function vistaRerollFutbol(lista) {
   return v.sort((x, y) => { const a = CARDS[x.id], b = CARDS[y.id]; return cmp(a, b) || a.name.localeCompare(b.name) || a.n - b.n || (y.gr - x.gr) || ((y.gr ? y.g : 0) - (x.gr ? x.g : 0)); });
 }
 const keyDe = cp => cp.key;
-// las rarezas que se pueden re-rollear: todas bajo la más alta de la colección (fútbol no tiene legendarias)
-const rrTiers = (co = rr.col) => [0, 1, 2].filter(i => i < M.POOL[co].tope);
+// las rarezas que se pueden re-rollear: todas bajo la más alta de la colección, y en fútbol también las legendarias
+const rrTiers = (co = rr.col) => [0, 1, 2, 3].filter(i => i < M.POOL[co].tope || (i === 3 && M.rerollable(co, 3) && ahora() >= M.REROLL_V2));
 // lo que se puede meter: mis copias de esa rareza y esa colección que no están a la venta
 const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => M.tierEn(CARDS[cp.id], ahora()) === t && CARDS[cp.id].col === co && !cp.venta);
 /* El orden en que «Elegir automático» las toma: primero las repetidas (de
    cada carta se guarda la mejor), las sin graduar antes que las graduadas,
+   las especiales y las leyendas después de todas,
    y de las graduadas las de nota más baja; las exhibidas al final. */
 function ordenAuto(lista) {
   const mejor = {};
@@ -1892,7 +1901,8 @@ function ordenAuto(lista) {
     const u = CARDS[cp.id].uid, m = mejor[u];
     if (!m || (cp.gr && (!m.gr || cp.g > m.g))) mejor[u] = cp;
   }
-  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || enDesafios(cp.key).length || enBorradores(cp.key).length ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
+  // las especiales y las leyendas (que también son legendarias) van al final: son lo que se busca
+  const peso = cp => (CARDS[cp.id].especial || CARDS[cp.id].leyenda ? 2000 : 0) + (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || enDesafios(cp.key).length || enBorradores(cp.key).length ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
   return lista.slice().sort((a, b) => peso(a) - peso(b));
 }
 // el nombre en una mini: la primera palabra, o el apellido si va con inicial («S. Rodríguez», «J. I. Díaz»)
@@ -1908,66 +1918,85 @@ function abreReroll() {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
   // abre en la colección del sobre, o en la otra si solo ahí alcanza, y en la rareza más baja que alcanza
-  const alcanza = co => rrTiers(co).some(i => elegibles(i, co).length >= NR);
+  const alcanza = co => rrTiers(co).some(i => elegibles(i, co).length >= nr(i));
   const colActual = colDe(coleccion);
   rr.col = alcanza(colActual) || !COLS.some(co => alcanza(co.key)) ? colActual : COLS.find(co => alcanza(co.key)).key;
-  const t = rrTiers().find(i => elegibles(i).length >= NR);
+  const t = rrTiers().find(i => elegibles(i).length >= nr(i));
   if (!rrTiers().includes(rr.tier)) rr.tier = 0;
-  if (t !== undefined && elegibles(rr.tier).length < NR) rr.tier = t;
-  rr.seguro = false;
+  if (t !== undefined && elegibles(rr.tier).length < nr(rr.tier)) rr.tier = t;
+  rr.seguro = false; rr.veces = 1; rr.sel = [];
   $('#collection').hidden = true; $('#summary').hidden || 0;
   renderReroll();
   $('#reroll').hidden = false;
 }
 $('#rrBtn').onclick = abreReroll;
 $('#rrBtn2').onclick = abreReroll;
-function notaEsperadaHTML(cps) {
-  if (cps.length < NR) {
+function notaEsperadaHTML(cps, n) {
+  const LAS = n === 5 ? 'las cinco' : 'las diez';
+  if (rr.veces > 1) return `La nota de cada nueva sale de ${LAS} de su grupo (en el orden en que las elegiste): alrededor de su promedio <b>más un punto</b>.`;
+  if (cps.length < n) {
     const gr = cps.filter(cp => cp.gr);
-    return `La nota de la nueva sale de las diez que entran: alrededor de su promedio <b>más un punto</b>.${gr.length ? ` Tus graduadas aquí promedian <b>${(gr.reduce((t, cp) => t + cp.g, 0) / gr.length).toFixed(1).replace('.', ',')}</b>.` : ''}`;
+    return `La nota de la nueva sale de ${LAS} que entran: alrededor de su promedio <b>más un punto</b>.${gr.length ? ` Tus graduadas aquí promedian <b>${(gr.reduce((t, cp) => t + cp.g, 0) / gr.length).toFixed(1).replace('.', ',')}</b>.` : ''}`;
   }
-  if (!cps.every(cp => cp.gr)) return 'La nota de la nueva sale de las diez: alrededor de su promedio <b>más un punto</b>. Algunas no están graduadas, así que la cuenta exacta queda oculta, como su nota.';
+  if (!cps.every(cp => cp.gr)) return 'La nota de la nueva sale de ' + LAS + ': alrededor de su promedio <b>más un punto</b>. Algunas no están graduadas, así que la cuenta exacta queda oculta, como su nota.';
   const d = M.distribucionReroll(cps.map(cp => cp.g)), max = Math.max(...d.prob);
-  return `Promedio de las diez <b>${(d.centro - M.REROLL.bono).toFixed(1).replace('.', ',')}</b> → la nueva sale cerca de <b>${d.centro.toFixed(1).replace('.', ',')}</b>:
+  return `Promedio de ${LAS} <b>${(d.centro - M.REROLL.bono).toFixed(1).replace('.', ',')}</b> → la nueva sale cerca de <b>${d.centro.toFixed(1).replace('.', ',')}</b>:
     <span class="rr-campana">${d.prob.map((p, i) => `<span title="Nota ${i + 1}: ${(p * 100).toFixed(1).replace('.', ',')} %"><i style="height:${Math.max(2, p / max * 100)}%;--gc:${gradeColor(i + 1)}"></i><small>${i + 1}</small></span>`).join('')}</span>`;
 }
 function renderReroll() {
   if (!rrTiers().includes(rr.tier)) rr.tier = 0;
-  const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
-  rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
+  const t = rr.tier, sig = destinoRr(t), lista = ordenAuto(elegibles(t)), NR = nr(t);
+  rr.veces = Math.min(rr.veces, maxVeces(t, lista));
+  const tope = NR * rr.veces;
+  rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k)).slice(0, tope);
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
   const enRetos = [...new Set(rr.sel.flatMap(enDesafios))], enBorr = [...new Set(rr.sel.flatMap(enBorradores))];
   const fut = M.esFutbol(rr.col), vista = fut ? vistaRerollFutbol(lista) : lista;
   const clubesRr = fut ? Object.keys(M.CLUBES).filter(k => lista.some(cp => CARDS[cp.id].club === k)) : [];
   if (rr.club && !clubesRr.includes(rr.club)) rr.club = '';
-  $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
+  $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las ${NR === 5 ? 'cinco' : 'diez'} se pierden.`;
   $('#rrCols').innerHTML = COLS.map(co => {
-    const n = rrTiers(co.key).reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
-    return `<button role="tab" data-col="${co.key}" aria-selected="${co.key === rr.col}">${co.label}<b class="rr-n${n >= NR ? ' ok' : ''}">${n >= NR ? '♻' : '·'}</b></button>`;
+    const ok = rrTiers(co.key).some(i => elegibles(i, co.key).length >= nr(i));
+    return `<button role="tab" data-col="${co.key}" aria-selected="${co.key === rr.col}">${co.label}<b class="rr-n${ok ? ' ok' : ''}">${ok ? '♻' : '·'}</b></button>`;
   }).join('');
-  $('#rrCols').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { rr.col = b.dataset.col; rr.sel = []; rr.seguro = false; renderReroll(); });
+  $('#rrCols').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { rr.col = b.dataset.col; rr.sel = []; rr.seguro = false; rr.veces = 1; renderReroll(); });
   $('#rrTabs').innerHTML = rrTiers().map(i => {
     const n = elegibles(i).length;
-    return `<button role="tab" data-t="${i}" aria-selected="${i === t}">${TIERS[i].sym} ${TIERS[i].label} <span class="rr-flecha">→ ${TIERS[i + 1].sym}</span><b class="rr-n${n >= NR ? ' ok' : ''}">${n}</b></button>`;
+    return `<button role="tab" data-t="${i}" aria-selected="${i === t}"${i === 3 ? ' class="rr-tab-esp"' : ''}>${TIERS[i].sym} ${TIERS[i].label} <span class="rr-flecha">→ ${destinoRr(i).sym}${i === 3 ? ' Especial' : ''}</span><b class="rr-n${n >= nr(i) ? ' ok' : ''}">${n}</b></button>`;
   }).join('');
-  $('#rrTabs').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { rr.tier = +b.dataset.t; rr.sel = []; rr.seguro = false; renderReroll(); });
-  const P = M.POOL[rr.col], posibles = P[t + 1];
+  $('#rrTabs').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { rr.tier = +b.dataset.t; rr.sel = []; rr.seguro = false; rr.veces = 1; renderReroll(); });
+  const P = M.POOL[rr.col], posibles = M.posiblesReroll(P, t, t + 1, ahora());
   // con pesos (Navidad sale menos), cada temática dice su probabilidad
-  const pesoTxt = P.uniforme ? `(${(100 / posibles.length).toFixed(1).replace('.', ',')} % cada una)`
-    : `(${[...new Set(posibles.map(c => c.vkey))].map(k => { const c = posibles.find(x => x.vkey === k); return `${c.vlabel} ${(c.peso / P.peso[t + 1] * 100).toFixed(1).replace('.', ',')} %`; }).join(' · ')} cada una)`;
-  const huecos = Array.from({ length: NR }, (_, i) => cps[i] ? `<button class="rr-hueco lleno" data-quita="${esc(cps[i].key)}" title="Quitar">${miniCp(cps[i])}</button>` : `<span class="rr-hueco"></span>`).join('');
+  const pesoDe = t >= 3 ? () => 1 : P.uniforme ? () => 1 : P.pesoRerollDe, pesoTot = posibles.reduce((a, c) => a + pesoDe(c), 0);
+  const parejo = posibles.every(c => pesoDe(c) === pesoDe(posibles[0]));
+  const pesoTxt = parejo ? `(${(100 / posibles.length).toFixed(1).replace('.', ',')} % cada una)`
+    : `(${[...new Set(posibles.map(c => c.vkey))].map(k => { const c = posibles.find(x => x.vkey === k); return `${c.vlabel} ${(pesoDe(c) / pesoTot * 100).toFixed(1).replace('.', ',')} %`; }).join(' · ')} cada una)`;
+  const huecos = rr.veces > 1
+    ? `<div class="rr-lote"><span><b>${rr.veces}</b> re-rolls de una vez</span><small>${rr.sel.length} de ${tope} cartas · ${Math.floor(rr.sel.length / NR)} listos</small><i style="--p:${rr.sel.length / tope * 100}%"></i></div>`
+    : Array.from({ length: NR }, (_, i) => cps[i] ? `<button class="rr-hueco lleno" data-quita="${esc(cps[i].key)}" title="Quitar">${miniCp(cps[i])}</button>` : `<span class="rr-hueco"></span>`).join('');
+  const mx = maxVeces(t, lista);
+  const salidaTxt = t >= 3 ? `<span style="--c:${ESP_LEY.color}"><i>${ESP_LEY.sym}</i> Especial o Leyenda <b>100 %</b></span>`
+    : M.probSalida(t, P.tope).map((p, i) => p ? `<span style="--c:${TIERS[i].color}"><i>${TIERS[i].sym}</i> ${TIERS[i].label}${i === 3 && ahora() >= M.REROLL_V2 ? ' (de jugador)' : ''} <b>${(p * 100).toFixed(p < .01 ? 1 : p < .1 ? 1 : 0).replace('.', ',')} %</b></span>` : '').filter(Boolean).join('');
   $('#rrBody').innerHTML = `
-    <div class="rr-flujo" style="--c:${TIERS[t].color};--c2:${accentOf(CARDS[posibles[0].n])}">
+    <div class="rr-flujo${NR === 5 ? ' cinco' : ''}" style="--c:${TIERS[t].color};--c2:${accentOf(CARDS[posibles[0].n])}">
       <div class="rr-huecos">${huecos}</div>
       <span class="rr-a" aria-hidden="true">➜</span>
-      <span class="rr-sale t${t + 1}"><b>?</b><small>${sig.sym} ${sig.label}</small></span>
+      <span class="rr-sale t${Math.min(3, t + 1)}${t >= 3 ? ' esp' : ''}"><b>${rr.veces > 1 ? '×' + rr.veces : '?'}</b><small>${sig.sym} ${sig.label}</small></span>
     </div>
-    <p class="rr-sale-p">Sale ${M.probSalida(t, P.tope).map((p, i) => p ? `<span style="--c:${TIERS[i].color}"><i>${TIERS[i].sym}</i> ${TIERS[i].label} <b>${(p * 100).toFixed(p < .01 ? 1 : p < .1 ? 1 : 0).replace('.', ',')} %</b></span>` : '').filter(Boolean).join('')}</p>
-    <p class="rr-nota">${notaEsperadaHTML(cps)}</p>
+    <p class="rr-sale-p">Sale ${salidaTxt}</p>
+    <p class="rr-nota">${notaEsperadaHTML(cps, NR)}</p>
+    <div class="rr-veces" title="Cuántos re-rolls hacer de una vez">
+      <span>Re-rolls de una vez</span>
+      <button class="btn mk-mini" data-veces="-1"${rr.veces <= 1 ? ' disabled' : ''} aria-label="Uno menos">−</button>
+      <b>${rr.veces}</b>
+      <button class="btn mk-mini" data-veces="1"${rr.veces >= mx ? ' disabled' : ''} aria-label="Uno más">+</button>
+      ${[5, 10].filter(v => v < mx).map(v => `<button class="chip${rr.veces === v ? ' on' : ''}" data-veces-a="${v}">×${v}</button>`).join('')}
+      <button class="chip${rr.veces === mx && mx > 1 ? ' on' : ''}" data-veces-a="${mx}"${mx <= 1 ? ' disabled' : ''}>Máx ×${mx}</button>
+    </div>
     <div class="rr-acc">
       <button class="btn mk-mini" id="rrAuto"${lista.length < NR ? ' disabled' : ''}>Elegir automático</button>
       <button class="btn mk-mini" id="rrLimpia"${rr.sel.length ? '' : ' disabled'}>Quitar todas</button>
-      <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
+      <span class="rr-cuenta"><b>${rr.sel.length}</b>/${tope}</span>
     </div>
     ${enBorr.length ? `<p class="rr-aviso borrador">📝 Elegiste cartas de tu borrador de ${listaY(enBorr)} (sin subir): si haces el re-roll, esas casillas quedan vacías.</p>` : ''}
     ${enRetos.length ? `<p class="rr-aviso">🏆 Elegiste cartas de tu plantilla subida en ${listaY(enRetos)}: si haces el re-roll, ${enRetos.length === 1 ? 'esa plantilla sale' : 'esas plantillas salen'} de la clasificación hasta que subas otra.</p>` : ''}
@@ -1982,13 +2011,13 @@ function renderReroll() {
     <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
       <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
     <div class="tc-envio rr-envio">
-      <button class="btn primary" id="rrGo"${rr.sel.length === NR && !rr.enviando ? '' : ' disabled'}>${rr.enviando ? 'Enviando…' : rr.seguro ? '¿Seguro? Toca otra vez' : `♻ Re-roll ${rr.sel.length}/${NR}`}</button>
+      <button class="btn primary" id="rrGo"${rr.sel.length === tope && !rr.enviando ? '' : ' disabled'}>${rr.enviando ? 'Enviando…' : rr.seguro ? '¿Seguro? Toca otra vez' : `♻ Re-roll${rr.veces > 1 ? ' ×' + rr.veces : ''} ${rr.sel.length}/${tope}`}</button>
       <button class="chip rl-rapido" id="rrRapido" aria-pressed="${rlRapido}">⚡ Rápido</button>
-      <span class="mk-nota" id="rrMsg">${rr.seguro ? `Las ${NR} cartas se cambian por una ${UNA[t + 1]}. No se puede deshacer.` : lista.length < NR ? `Te faltan ${NR - lista.length} cartas ${PLURAL[t]}.` : ''}</span>
+      <span class="mk-nota" id="rrMsg">${rr.seguro ? (rr.veces > 1 ? `Las ${tope} cartas se cambian por ${rr.veces} ${PLURAL[t + 1]}. No se puede deshacer.` : `Las ${NR} cartas se cambian por una ${UNA[t + 1]}. No se puede deshacer.`) : lista.length < NR ? `Te faltan ${NR - lista.length} cartas ${PLURAL[t]}.` : ''}</span>
     </div>`;
   const toca = k => {
     const i = rr.sel.indexOf(k);
-    if (i >= 0) rr.sel.splice(i, 1); else if (rr.sel.length < NR) rr.sel.push(k); else { Snd.blip(); return; }
+    if (i >= 0) rr.sel.splice(i, 1); else if (rr.sel.length < tope) rr.sel.push(k); else { Snd.blip(); return; }
     rr.seguro = false; Snd.init(); Snd.tick(); renderRerollKeep();
   };
   $('#rrBody').querySelectorAll('.tc-elige').forEach(b => b.onclick = () => toca(b.dataset.c));
@@ -1998,11 +2027,14 @@ function renderReroll() {
     $('#rrBody').querySelectorAll('[data-rr-ver]').forEach(b => b.onclick = () => { rr.ver = b.dataset.rrVer; renderReroll(); });
   }
   $('#rrBody').querySelectorAll('[data-quita]').forEach(b => b.onclick = () => toca(b.dataset.quita));
-  $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, NR).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
+  $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, tope).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
+  const ponVeces = v => { rr.veces = Math.max(1, Math.min(mx, v)); rr.sel = rr.sel.slice(0, NR * rr.veces); rr.seguro = false; Snd.init(); Snd.tick(); renderRerollKeep(); };
+  $('#rrBody').querySelectorAll('[data-veces]').forEach(b => b.onclick = () => ponVeces(rr.veces + +b.dataset.veces));
+  $('#rrBody').querySelectorAll('[data-veces-a]').forEach(b => b.onclick = () => ponVeces(+b.dataset.vecesA));
   $('#rrLimpia').onclick = () => { rr.sel = []; rr.seguro = false; renderRerollKeep(); };
   $('#rrRapido').onclick = cambiaRapido; pintaRapido();
   $('#rrGo').onclick = () => {
-    if (rr.sel.length !== NR || rr.enviando) return;
+    if (rr.sel.length !== tope || rr.enviando) return;
     if (!rr.seguro) { rr.seguro = true; renderRerollKeep(); return; }
     hazReroll();
   };
@@ -2014,19 +2046,25 @@ function renderRerollKeep() {
   const g2 = $('#rrBody .rr-rejilla'); if (g2) g2.scrollTop = y;
 }
 async function hazReroll() {
-  const usadas = rr.sel.slice(), t = rr.tier;
+  const usadas = rr.sel.slice(), t = rr.tier, NR = nr(t);
+  const grupos = Array.from({ length: Math.floor(usadas.length / NR) }, (_, i) => usadas.slice(i * NR, (i + 1) * NR));
   rr.enviando = true; renderRerollKeep();
   try {
-    const r = await Red.pide('reroll', { c: usadas });
-    const nueva = !col[CARDS[r.id].uid];
-    // se anota aquí mismo; la cuenta real llega sola
-    cuenta.mias = cuenta.mias.filter(x => !usadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
-    cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
-    cuenta.exh = cuenta.exh.filter(k => !usadas.includes(k));
+    const res = await Red.pide('reroll', { grupos });
+    const lista = res && Array.isArray(res.lista) ? res.lista : [res];
+    // «NUEVA»: la primera vez que sale una carta que no tenías (si sale dos veces en el lote, solo la primera)
+    const vistas = new Set();
+    for (const r of lista) { const u = CARDS[r.id].uid; r.nueva = !col[u] && !vistas.has(u); vistas.add(u); }
+    // se anota aquí mismo; la cuenta real llega sola (si alguno no valió, sus cartas siguen siendo tuyas)
+    const gastadas = grupos.slice(0, lista.length).flat();
+    cuenta.mias = cuenta.mias.filter(x => !gastadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
+    for (const r of lista) cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
+    cuenta.exh = cuenta.exh.filter(k => !gastadas.includes(k));
     rehazColeccion(); updateColCount();
-    rr.sel = []; rr.seguro = false; rr.enviando = false;
+    rr.sel = []; rr.seguro = false; rr.enviando = false; rr.veces = 1;
     $('#reroll').hidden = true;
-    ruleta(r, t, nueva);
+    rl.lote = lista; rl.idx = 0;
+    ruleta(lista[0], t, lista[0].nueva);
   } catch (e) {
     rr.enviando = false; rr.seguro = false; renderRerollKeep();
     $('#rrMsg').innerHTML = `<span class="err">${esc(e.message || 'No se pudo.')}</span>`;
@@ -2036,7 +2074,7 @@ async function hazReroll() {
 /* La ruleta: una tira de cartas de la rareza que sale, que corre de
    derecha a izquierda y frena hasta dejar la que tocó bajo la marca. Cada
    carta que cruza la marca hace tic, cada vez más espaciado. */
-const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false, t: 0, col: 'profes' };
+const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false, t: 0, col: 'profes', lote: [], idx: 0 };
 /* Dos velocidades: la normal es larga a propósito (casi once segundos, cien
    cartas), y «⚡ Rápido» —recordado en este navegador— la deja en dos y
    medio. Apretarlo con la ruleta girando acelera esa misma tirada. */
@@ -2060,7 +2098,10 @@ pintaRapido();
 /* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
    cuando de las de más arriba, que es lo que da el «casi» al pasar. */
 function cartaTira(base, sinRaras) {
-  const P = M.POOL[rl.col], x = Math.random(), t = Math.min(P.tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2));
+  const P = M.POOL[rl.col];
+  // el re-roll de legendarias: solo especiales y leyendas, todas igual
+  if (rl.t >= 3) { const l = M.posiblesReroll(P, 3); return l[Math.floor(Math.random() * l.length)].n; }
+  const x = Math.random(), t = Math.min(P.tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2));
   let l = P[t];
   // las especiales y las leyendas salen poco: en la tira, con los pesos del re-roll y nunca más de tres
   if (sinRaras) { const comunes = l.filter(c => !c.especial && !c.leyenda); if (comunes.length) l = comunes; }
@@ -2071,9 +2112,10 @@ function cartaTira(base, sinRaras) {
 const esRara = id => !!(CARDS[id].especial || CARDS[id].leyenda);
 const RL_RARAS = 3;   // como mucho tres especiales o leyendas en toda la tira
 function ruleta(r, t, nueva) {
-  const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
+  const sig = Math.min(3, t + 1), dest = destinoRr(t), tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
   rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t; rl.col = CARDS[r.id].col;
-  $('#rlTitulo').innerHTML = `${NR} ${PLURAL[t]} → <b style="color:${TIERS[sig].color}">${TIERS[sig].sym} ${TIERS[sig].label}</b>`;
+  const n = rl.lote.length;
+  $('#rlTitulo').innerHTML = `${n > 1 ? `<span class="rl-lote">${rl.idx + 1} / ${n}</span> ` : ''}${nr(t)} ${PLURAL[t]} → <b style="color:${dest.color}">${dest.sym} ${dest.label}</b>`;
   $('#rlFin').hidden = true; $('#rlFin').innerHTML = '';
   $('#rlSaltar').hidden = false;
   $('#ruleta').classList.remove('fin');
@@ -2082,12 +2124,13 @@ function ruleta(r, t, nueva) {
   let raras = 0;
   for (let i = 0; i < RL_N; i++) {
     let id;
-    do { id = cartaTira(sig, raras >= RL_RARAS); } while (i && id === ids[i - 1]);
+    // desde REROLL_V2, de común, rara o épica ya no sale una especial ni una leyenda: tampoco en la tira
+    do { id = cartaTira(sig, raras >= RL_RARAS || ahora() >= M.REROLL_V2); } while (i && id === ids[i - 1]);
     if (esRara(id)) raras++;
     ids.push(id);
   }
   ids[RL_GANA] = r.id;
-  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig, true);
+  for (const j of [RL_GANA - 1, RL_GANA + 1]) for (let k = 0; k < 50 && ids[j] === r.id; k++) ids[j] = cartaTira(sig, true);
   tira.innerHTML = ids.map((id, i) => {
     const c = CARDS[id];
     return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
@@ -2118,7 +2161,7 @@ function finRuleta() {
   if (!rl.girando) return;
   rl.girando = false; cancelAnimationFrame(rl.raf);
   $('#rlSaltar').hidden = true;
-  const r = rl.r, c = CARDS[r.id], t = c.tier, gana = $('#rlTira .gana'), salto = t - rl.t;
+  const r = rl.r, c = CARDS[r.id], t = c.tier, gana = $('#rlTira .gana'), salto = rl.t >= 3 ? 0 : t - rl.t;
   $('#ruleta').classList.add('fin');
   const [x, y] = centerOf(gana), pl = t >= 2 ? paletteOf(c) : [accentOf(c), '#fff'];
   if (t >= 2 || salto > 1) flash(pl[0], t === 3 ? .9 : .6, t === 3 ? 1000 : 650);
@@ -2126,23 +2169,39 @@ function finRuleta() {
   Snd.reveal(t); buzz(t >= 2 ? [30, 60, 30, 60, 90] : [40]);
   const cp = copiaDe(cuenta.mias.find(m => m.c === r.c) || { c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, rr: { id: r.id, g: r.g, w: r.w } });
   const inst = fromCopy(c, cp);
-  const fin = $('#rlFin');
+  const fin = $('#rlFin'), quedan = rl.idx < rl.lote.length - 1;
   fin.innerHTML = `<div class="rl-carta"></div>
-    <div class="rl-txt">${salto > 1 ? `<span class="rl-salto">¡SALTO! Subió ${salto === 2 ? 'dos' : 'tres'} calidades</span>` : ''}<span class="rl-tier" style="--c:${accentOf(c)}">${TIERS[t].label.toUpperCase()} ${TIERS[t].sym}</span>
+    <div class="rl-txt">${salto > 1 ? `<span class="rl-salto">¡SALTO! Subió ${salto === 2 ? 'dos' : 'tres'} calidades</span>` : ''}<span class="rl-tier" style="--c:${accentOf(c)}">${rl.t >= 3 ? (c.leyenda ? 'LEYENDA' : 'ESPECIAL') + ' ' + ESP_LEY.sym : TIERS[t].label.toUpperCase() + ' ' + TIERS[t].sym}</span>
       <b>${esc(c.name)}</b><small>${esc(subtitle(c))} · N.º ${pad(c.num)}${rl.nueva ? ' <em>NUEVA</em>' : ''}</small>
       <small>Su nota está oculta, como la de un sobre: gradúala para verla.</small></div>
-    <div class="rl-acc"><button class="btn primary" id="rlVer">Ver carta</button><button class="btn" id="rlOtro">♻ Otro re-roll</button><button class="btn" id="rlCerrar">Listo</button></div>`;
+    ${quedan ? `<div class="rl-acc"><button class="btn primary" id="rlSig">Siguiente ▶ <small>${rl.idx + 2}/${rl.lote.length}</small></button><button class="btn" id="rlTodas">Ver todas</button></div>`
+      : `${rl.lote.length > 1 ? resumenLote() : ''}<div class="rl-acc"><button class="btn primary" id="rlVer">Ver carta</button><button class="btn" id="rlOtro">♻ Otro re-roll</button><button class="btn" id="rlCerrar">Listo</button></div>`}`;
   const el = makeCard(inst, { back: false });
   light(el); hoverTilt(el);
   fin.querySelector('.rl-carta').appendChild(el);
   fin.hidden = false;
   el.animate([{ transform: 'translateY(40px) scale(.6) rotate(-6deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 650, easing: 'cubic-bezier(.2,1.3,.4,1)' });
+  if (quedan) {
+    $('#rlSig').onclick = () => { rl.idx++; const s = rl.lote[rl.idx]; ruleta(s, rl.t, s.nueva); };
+    $('#rlTodas').onclick = () => { rl.idx = rl.lote.length - 1; const s = rl.lote[rl.idx]; ruleta(s, rl.t, s.nueva); if (rl.anim) rl.anim.finish(); };
+    return;
+  }
   $('#rlVer').onclick = () => { cierraRuleta(); zoomVuelve = ''; openZoom(inst); };
   $('#rlOtro').onclick = () => { cierraRuleta(); abreReroll(); };
   $('#rlCerrar').onclick = cierraRuleta;
+  fin.querySelectorAll('[data-rl-ver]').forEach(b => b.onclick = () => {
+    const s = rl.lote[+b.dataset.rlVer], cs = copiaDe(cuenta.mias.find(m => m.c === s.c) || { c: s.c, o: cuenta.uid, k: s.k, i: 0, at: s.at, rr: { id: s.id, g: s.g, w: s.w } });
+    cierraRuleta(); zoomVuelve = ''; openZoom(fromCopy(CARDS[s.id], cs));
+  });
+}
+// al final de un lote: todas las que salieron, de la mejor a la peor
+function resumenLote() {
+  const orden = rl.lote.map((s, i) => [s, i]).sort((a, b) => CARDS[b[0].id].tier - CARDS[a[0].id].tier || (CARDS[b[0].id].media || 0) - (CARDS[a[0].id].media || 0));
+  return `<div class="rl-resumen"><p>Salieron <b>${rl.lote.length}</b> cartas:</p><div class="rl-res-l">${orden.map(([s, i]) => `<button class="rl-res-c" data-rl-ver="${i}" title="Ver">${miniCp({ id: s.id, gr: 0 }, (M.esFutbol(CARDS[s.id].col) && CARDS[s.id].media ? `<i class="pl-med">${CARDS[s.id].media}</i>` : '') + (s.nueva ? '<em class="rl-res-nueva">NUEVA</em>' : ''))}</button>`).join('')}</div></div>`;
 }
 function cierraRuleta() {
   if (rl.anim) { rl.anim.cancel(); rl.anim = null; }
+  rl.lote = []; rl.idx = 0;
   rl.girando = false; cancelAnimationFrame(rl.raf);
   $('#ruleta').hidden = true; $('#rlTira').innerHTML = ''; $('#rlFin').innerHTML = '';
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }

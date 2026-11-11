@@ -454,6 +454,16 @@ other file of the site. Things that hold it together:
   `localStorage`, in the panel and on the roulette) makes it 42 cards in
   2.6 s; pressing it mid-spin sets the running animation's
   `playbackRate` to 4. A jump of two or more tiers shows «¡SALTO!».
+- **Re-roll v2** (from `REROLL_V2`, server time; a re-roll written earlier keeps its card): anything that lands
+  on legendary from común/rara/épica is a plain legendary, never a special or a legend (`posiblesReroll`; the
+  roulette strip hides them too). New football-only tier: **five** legendaries (`REROLL.nLeg`, `rerollN(tier)`,
+  `rerollable(col, tier)`) → one special or legend, all equally likely; grade bell from the five. The rule
+  `cartas/r/.../c` accepts exactly 5 or 10 children (**rules must be re-published by hand**); `economia`
+  checks the count per tier. **Batches**: the panel's «Re-rolls de una vez» (`rr.veces`, up to `MAX_VECES` 50)
+  takes `nr(t) × veces` cards, grouped in pick order; the frame sends `reroll` with `grupos`, the postman
+  validates all, `fb.rerollCartas` writes them in one multi-path `update` (one key each) and answers
+  `{lista}` (`c` alone still answers one card, for an old frame). The roulette plays them one by one
+  (`rl.lote`, «Siguiente ▶», «Ver todas» jumps to the last) and ends with a summary of all of them.
 - **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four copy keys
   `o~k.i`, or the old `k.i` meaning one's own pack; validated by regex in
   the rules), shown only while that account still owns the copy, toggled from the card's zoom. The

@@ -410,7 +410,7 @@
             ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'c']) && newData.child('at').val() === now",
             "at": { ".validate": "newData.isNumber()" },
             "c": {
-              ".validate": "newData.hasChildren(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])",
+              ".validate": "newData.hasChildren(['0', '1', '2', '3', '4']) && (!newData.hasChild('5') || newData.hasChildren(['5', '6', '7', '8', '9']))",
               "$i": { ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
             },
             "$otro": { ".validate": false }

@@ -890,3 +890,32 @@ test('FIFA Pro World 11: once especiales del Mundial, el mismo jugador que su ca
  const cuenta=desde=>{let n=0;for(let i=0;i<4000;i++)if(PM.sobre('u'+(i%9),'g-Nf'+i+'abcdefg',desde+i).cartas.some(c=>c.id>=1208))n++;return n;};
  assert.equal(cuenta(v.hasta-5000),0);assert.ok(cuenta(v.hasta)>0);
 });
+
+test('re-roll v2: épica da solo legendarias de jugador, y cinco legendarias dan una especial o una leyenda',()=>{
+ const V=PM.REROLL_V2;
+ assert.equal(PM.rerollN(2),10);assert.equal(PM.rerollN(3),5);
+ assert.ok(PM.rerollable('futbol',3));assert.ok(!PM.rerollable('profes',3));assert.ok(!PM.rerollable('comp',3));
+ // desde V2, de épica (y de común o rara con salto) nunca sale una especial ni una leyenda
+ for(let i=0;i<3000;i++){const t=i%3,c=PM.CARDS[PM.reroll('usr'+(i%7),'g-Nv2'+i+'abcdef',V+i,t,Array(10).fill(6)).id];if(c.tier===3)assert.ok(!c.especial&&!c.leyenda,c.name);}
+ // antes de V2, un re-roll de épica sigue pudiendo dar una (el que ya se hizo no cambia)
+ let antes=0;for(let i=0;i<20000;i++){const c=PM.CARDS[PM.reroll('usr'+(i%9),'g-Nrr'+i+'abcdef',PM.CORTE_TIERS+i,2,Array(10).fill(6)).id];if(c.especial||c.leyenda)antes++;}
+ assert.ok(antes>0);
+ // cinco legendarias: siempre especial o leyenda, y salen muchas distintas
+ const cuales=new Set();
+ for(let i=0;i<2000;i++){const r=PM.reroll('usr'+(i%5),'g-Nl'+i+'abcdefg',V+i,3,[5,6,7,8,9]),c=PM.CARDS[r.id];assert.equal(c.tier,3);assert.ok(c.especial||c.leyenda,c.name);assert.ok(r.g>=1&&r.g<=10);cuales.add(r.id);}
+ assert.ok(cuales.size>=40,'salen '+cuales.size);
+ assert.equal(PM.posiblesReroll(PM.POOL.futbol,3).length,PM.POOL.futbol[3].filter(c=>c.especial||c.leyenda).length);
+});
+test('re-roll v2 en la economía: cinco legendarias valen desde V2, no antes ni con cuatro',()=>{
+ const u='usrAAAA',V=PM.REROLL_V2,s={},legs=[];
+ for(let i=0;legs.length<12&&i<20000;i++){const k='g-Nleg'+String(i).padStart(6,'0');const at=V-86400000+i*1000;
+  const so=PM.sobre(u,k,at);let ok=false;so.cartas.forEach((c,j)=>{const C=PM.CARDS[c.id];if(C.tier===3&&!C.especial&&!C.leyenda&&legs.length<12){legs.push(`${u}~${k}.${j}`);ok=true;}});if(ok)s[k]={at,p:50};}
+ assert.equal(legs.length,12);
+ const base=r=>conGanado({[u]:100000},0,{cartas:{s:{[u]:s},r:{[u]:r}},mercado:{o:{},t:{}}});
+ const rk='g-Nrr5legend01',e=M.economia(base({[rk]:{at:V+10,c:legs.slice(0,5)}}));
+ for(const cc of legs.slice(0,5))assert.equal(e.dueno[cc],undefined);
+ const res=e.sobres[u+'~'+rk].r,c=PM.CARDS[res.id];assert.ok(c.especial||c.leyenda);
+ const e2=M.economia(base({[rk]:{at:V-10,c:legs.slice(0,5)}}));assert.equal(e2.sobres[u+'~'+rk],undefined,'antes de V2 no vale');
+ const e3=M.economia(base({[rk]:{at:V+10,c:legs.slice(0,4)}}));assert.equal(e3.sobres[u+'~'+rk],undefined,'cuatro no');
+ const e4=M.economia(base({[rk]:{at:V+10,c:legs.slice(0,10)}}));assert.equal(e4.sobres[u+'~'+rk],undefined,'diez legendarias tampoco');
+});

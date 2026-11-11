@@ -504,12 +504,14 @@ export async function sobreGratis(uid, pre = "") {
 /* Re-roll: `cartas/r/<uid>/<clave>` = {at, c}: diez copias de una misma
    rareza a cambio de una de la siguiente. La carta nueva sale del motor
    con `at`, la hora del servidor (la regla exige `at === now`), y la
-   economía comprueba que las diez fueran de quien lo escribe. */
-export async function rerollCartas(uid, c, pre = "") {
-  const r = ref(db, `cartas/r/${uid}/${pre}${push(ref(db, `cartas/r/${uid}`)).key}`);
-  await set(r, { at: serverTimestamp(), c });
-  const x = (await get(r)).val();
-  return { k: r.key, at: x.at };
+   economía comprueba que las diez fueran de quien lo escribe.
+   `grupos` = [[copias], …]: varios re-rolls, escritos de una vez (cada
+   uno con su clave; la regla mira cada uno por separado). */
+export async function rerollCartas(uid, grupos, pre = "") {
+  const ks = grupos.map(() => pre + push(ref(db, `cartas/r/${uid}`)).key), cambios = {};
+  grupos.forEach((c, i) => { cambios[`cartas/r/${uid}/${ks[i]}`] = { at: serverTimestamp(), c }; });
+  await update(ref(db), cambios);
+  return Promise.all(ks.map(async k => ({ k, at: (await get(ref(db, `cartas/r/${uid}/${k}/at`))).val() })));
 }
 /* Graduar la copia `o~k.i`. Si el sobre es de quien gradúa, `o` no se
    escribe (así eran las graduaciones de antes del mercado). */

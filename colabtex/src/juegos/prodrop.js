@@ -22,6 +22,7 @@ import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia, esC
 import { MOTOR, MAX_EXHIBIDAS, veSerie1, colVisible, copiaVisible } from "./prodrop-cartas.js";
 import { pendientesDe, puedeComprar } from "./mercado-datos.js";
 import PR from "../../../juegos/prodrop/retos.js";
+const MAX_REROLLS = 50;   // re-rolls de una vez (cada uno, una escritura en cartas/r)
 
 const MAX_PRECIO = 100000;
 
@@ -166,32 +167,48 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           await fb.graduarCarta(uid, q.o, q.k, q.i);
           responde(true, null);
         } else if (x.accion === "reroll") {
-          /* Diez de una misma rareza por una de la siguiente. Se comprueba
-             aquí lo mismo que la economía comprobará al rehacerlo (que el
-             iframe puede estar mirando algo viejo), y la carta que sale se
-             lee de la economía cuando llega lo escrito. */
-          const cs = [...new Set((Array.isArray(x.c) ? x.c : []).map(String))];
-          if (cs.length !== MOTOR.REROLL.n) throw new Error(`Elige ${MOTOR.REROLL.n} cartas distintas.`);
-          if (!cs.every(c => esCarta(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
-          if (cs.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
-          const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
-          if (fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
-          const ahoraSrv = fb.ahora(), tier = MOTOR.tierEn(MOTOR.CARDS[fichas[0].id], ahoraSrv);
-          if (tier >= 3) throw new Error("Las legendarias no se pueden cambiar: no hay nada por encima.");
-          if (fichas.some(f => MOTOR.tierEn(MOTOR.CARDS[f.id], ahoraSrv) !== tier)) throw new Error("Las diez tienen que ser de la misma rareza.");
-          const col = MOTOR.CARDS[fichas[0].id].col;
-          if (fichas.some(f => MOTOR.CARDS[f.id].col !== col)) throw new Error("Las diez tienen que ser de la misma colección.");
+          /* Diez de una misma rareza por una de la siguiente (cinco
+             legendarias de fútbol por una especial o una leyenda), y varios
+             de una vez: `grupos` = [[copias], …] (o `c` = un solo grupo, el
+             iframe de antes). Se comprueba aquí lo mismo que la economía
+             comprobará al rehacerlo (que el iframe puede estar mirando algo
+             viejo), y cada carta que sale se lee de la economía cuando llega
+             lo escrito. */
+          const crudos = Array.isArray(x.grupos) ? x.grupos : [x.c];
+          if (!crudos.length || crudos.length > MAX_REROLLS) throw new Error(`Se pueden hacer hasta ${MAX_REROLLS} re-rolls de una vez.`);
+          const grupos = crudos.map(g => [...new Set((Array.isArray(g) ? g : []).map(String))]);
+          const todas = grupos.flat();
+          if (new Set(todas).size !== todas.length) throw new Error("Una misma carta no puede entrar en dos re-rolls.");
+          if (!todas.every(c => esCarta(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
+          if (todas.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
-          const r = await fb.rerollCartas(uid, cs, MOTOR.COL[col].prefijo);
-          const nueva = claveCopia(uid, r.k, 0);
-          let so = null;
-          for (let i = 0; i < 30 && !(so = economia(d).sobres[uid + "~" + r.k]); i++) {
-            const escrito = d && d.cartas && d.cartas.r && d.cartas.r[uid] && d.cartas.r[uid][r.k];
-            if (escrito && escrito.at === r.at) break;   // ya llegó y la economía no lo aceptó
-            await new Promise(ok => setTimeout(ok, 100));
+          const ahoraSrv = fb.ahora();
+          let col = null;
+          for (const cs of grupos) {
+            const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
+            if (!fichas.length || fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
+            const tier = MOTOR.tierEn(MOTOR.CARDS[fichas[0].id], ahoraSrv);
+            if (fichas.some(f => MOTOR.tierEn(MOTOR.CARDS[f.id], ahoraSrv) !== tier)) throw new Error("Las cartas de un re-roll tienen que ser de la misma rareza.");
+            const c0 = MOTOR.CARDS[fichas[0].id].col;
+            if (fichas.some(f => MOTOR.CARDS[f.id].col !== c0) || (col && c0 !== col)) throw new Error("Las cartas tienen que ser de la misma colección.");
+            col = c0;
+            if (!MOTOR.rerollable(col, tier) || (tier >= 3 && ahoraSrv < MOTOR.REROLL_V2)) throw new Error("Las legendarias de esta colección no se pueden cambiar: no hay nada por encima.");
+            if (cs.length !== MOTOR.rerollN(tier)) throw new Error(`Elige ${MOTOR.rerollN(tier)} cartas distintas.`);
           }
-          if (!so || !so.r) throw new Error("El re-roll no valió: alguna carta cambió de manos a la vez.");
-          responde(true, { k: r.k, at: r.at, c: nueva, id: so.r.id, g: so.r.g, w: so.r.w, tier: MOTOR.CARDS[so.r.id].tier });
+          const escritos = await fb.rerollCartas(uid, grupos, MOTOR.COL[col].prefijo);
+          const salen = [];
+          for (const r of escritos) {
+            let so = null;
+            for (let i = 0; i < 40 && !(so = economia(d).sobres[uid + "~" + r.k]); i++) {
+              const escrito = d && d.cartas && d.cartas.r && d.cartas.r[uid] && d.cartas.r[uid][r.k];
+              if (escrito && escrito.at === r.at) break;   // ya llegó y la economía no lo aceptó
+              await new Promise(ok => setTimeout(ok, 100));
+            }
+            if (!so || !so.r) { if (!salen.length) throw new Error("El re-roll no valió: alguna carta cambió de manos a la vez."); break; }
+            salen.push({ k: r.k, at: r.at, c: claveCopia(uid, r.k, 0), id: so.r.id, g: so.r.g, w: so.r.w, tier: MOTOR.CARDS[so.r.id].tier, de: so.tier });
+          }
+          // el iframe de antes espera una sola carta; el de ahora, la lista
+          responde(true, Array.isArray(x.grupos) ? { lista: salen } : salen[0]);
         } else if (x.accion === "exhibir") {
           const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => esCarta(c) && mia(c));
           /* Las que tenía puestas de una serie que ya no ve se quedan, si
@@ -317,7 +334,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-93" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-94" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

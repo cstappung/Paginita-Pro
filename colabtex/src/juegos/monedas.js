@@ -871,18 +871,21 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
     } else if (e.t === "r") {
       /* Un re-roll vale si quien lo hace no está parado y las diez son
          suyas, distintas, no están a la venta y son de la misma rareza
-         (menos que legendaria) y de la colección de su clave. Las diez desaparecen y queda una copia
+         (menos que legendaria) y de la colección de su clave. Desde
+         `REROLL_V2`, en fútbol también cinco legendarias (`rerollN`).
+         Las que entran desaparecen y queda una copia
          nueva, `<uid>~<clave>.0`, cuya carta y nota salen del motor. */
       const x = U(e.u), cs = e.c;
-      if (x.parada || cs.length !== PM.REROLL.n || new Set(cs).size !== cs.length) continue;
+      if (x.parada || (cs.length !== PM.REROLL.n && cs.length !== PM.REROLL.nLeg) || new Set(cs).size !== cs.length) continue;
       if (!cs.every(cc => dueno[cc] === e.u && !enVenta[cc])) continue;
       const fs = cs.map(ficha);
       if (fs.some(f => !f)) continue;
       // la rareza que tenían a la hora del re-roll (las medias de FC 27 la cambiaron después)
       const tier = PM.tierEn(PM.CARDS[fs[0].id], e.at);
-      if (tier >= 3 || fs.some(f => PM.tierEn(PM.CARDS[f.id], e.at) !== tier)) continue;
+      if (fs.some(f => PM.tierEn(PM.CARDS[f.id], e.at) !== tier) || cs.length !== PM.rerollN(tier)) continue;
       // y de la colección que dice su clave (antes de las colecciones, todo era de los profes)
       if (fs.some(f => PM.CARDS[f.id].col !== PM.coleccionDe(e.k))) continue;
+      if (!PM.rerollable(PM.coleccionDe(e.k), tier) || (tier >= 3 && e.at < PM.REROLL_V2)) continue;
       const res = PM.reroll(e.u, e.k, e.at, tier, fs.map(f => f.g));
       for (const cc of cs) delete dueno[cc];
       sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, r: res, de: cs.slice(), tier };
