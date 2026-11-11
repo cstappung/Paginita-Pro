@@ -3,7 +3,7 @@
    firebase emulators:start --only auth,database,functions --project mi-pagina-pro
    cd functions && npm run prueba        (prepara.js + esta prueba)
 
-   Comprueba: CORS, que join exige sesión de Firebase y estar en betaTesters, que la cuenta es el
+   Comprueba: CORS, que join exige sesión de Firebase (ya no estar en betaTesters), que la cuenta es el
    uid (un reino por cuenta), sync, guardar y leer la partida (también como sendBeacon, text/plain),
    que lo guardado en la RTDB vuelve igual en un arranque en frío (arreglos con null, listas vacías)
    y que nadie de la web puede leer prokingdoms/, la versión del mundo, el Pase del Reino (pkPase → refresh), la Regata y los duelos navales, y el rechazo de un cliente de otro
@@ -54,10 +54,9 @@ async function main() {
   ok(A.uid && A.tok && B.uid, 'dos cuentas en el emulador de Auth');
   ok((await api('POST', '/api/join', { cuerpo: { name: 'Ana' } })).status === 401, 'join sin sesión: 401');
   ok((await api('POST', '/api/join', { cuerpo: { name: 'Ana' }, bearer: 'token-falso' })).status === 401, 'join con un token inventado: 401');
-  ok((await api('POST', '/api/join', { cuerpo: { name: 'Beto' }, bearer: B.tok })).status === 403, 'join de alguien que no es beta tester: 403');
-  await dbPut(`betaTesters/${A.uid}`, { at: Date.now(), por: A.uid });
+  // Desde el 2026-11-11 `SOLO_BETA` está apagado: entra cualquier cuenta, esté o no en `betaTesters`.
   const ja = await api('POST', '/api/join', { cuerpo: { name: 'Ana', token: 'uno-robado' }, bearer: A.tok });
-  ok(ja.status === 200 && ja.d.player && ja.d.player.token, 'la beta tester entra', ja.status + ' ' + JSON.stringify(ja.d).slice(0, 120));
+  ok(ja.status === 200 && ja.d.player && ja.d.player.token, 'una cuenta cualquiera entra (sin estar en betaTesters)', ja.status + ' ' + JSON.stringify(ja.d).slice(0, 120));
   const yo = ja.d.player || {};
   const ja2 = await api('POST', '/api/join', { cuerpo: { name: 'Ana' }, bearer: A.tok });
   ok(ja2.d.player && ja2.d.player.id === yo.id && ja2.d.player.token === yo.token, 'otra vez (otro aparato): el mismo reino');
@@ -94,8 +93,7 @@ async function main() {
   const rg = await api('POST', '/api/regata', { cuerpo: { ruta: 'canal', barco: { casco: 10, velas: 10, timon: 10 } }, token: yo.token });
   ok(rg.status === 200 && rg.d.tiempo > 0 && rg.d.barcoUsado.velas === 1 && rg.d.puesto === 1, 'la regata da un tiempo y frena el barco inventado', rg.status + ' ' + rg.d.tiempo + ' s ' + JSON.stringify(rg.d.barcoUsado));
   ok((await api('POST', '/api/regata', { cuerpo: { ruta: 'atajo' }, token: yo.token })).status === 400, 'una ruta inventada: 400');
-  const C = await cuenta('cata@prueba.cl'); // Beto no: el «no es beta» de arriba queda recordado un minuto
-  await dbPut(`betaTesters/${C.uid}`, { at: Date.now(), por: A.uid });
+  const C = B;
   const jb = await api('POST', '/api/join', { cuerpo: { name: 'Beto' }, bearer: C.tok });
   ok(jb.status === 200, 'entra una segunda capitana', jb.status);
   const beto = jb.d.player || {};

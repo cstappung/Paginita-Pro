@@ -46,7 +46,8 @@ not the key: every write is re-checked by the rules. The tabs:
   shows how many Serie 01 copies each account owns, and the admin must add
   themselves to see it too.
 - **Beta testers**: who plays what is still being tested (the `SOLOS`
-  entries with `beta: true`, today Pro Kingdoms). The node is
+  entries with `beta: true`; none today, since Pro Kingdoms left its closed
+  beta on 2026-11-11, but the role and the tab stay for the next one). The node is
   `betaTesters/<uid>` = `{at, por}`, written by admins. Each account reads only
   its own entry (`fb.watchBeta`, live, so adding someone shows the game in
   their open tab) and admins read the whole list (`watchBetaTesters`). It is

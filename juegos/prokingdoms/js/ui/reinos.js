@@ -119,7 +119,7 @@
         el('div', { class: 'row quick-say' }, D.QUICK_SAY.map(t => UI.btn(t, () => send(t), { small: true }))));
       setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 0);
       if (!net.online) {
-        body.append(el('p', { class: 'muted' }, (PK.Platform.name === 'paginita-pro-beta' ? 'Beta cerrada: por ahora los demás reinos son simulados y tu partida se guarda en este navegador. El mundo compartido con otras personas llega más adelante.' : 'No hay servidor: los demás reinos son simulados. Ejecuta "node server.js" y abre el juego desde http://localhost:8080 para jugar con otras personas.')));
+        body.append(el('p', { class: 'muted' }, (PK.Platform.name === 'paginita-pro' ? 'Sin conexión con el mundo compartido: por ahora los demás reinos son simulados y tu partida se guarda en este navegador. Recarga la página para volver a intentarlo.' : 'No hay servidor: los demás reinos son simulados. Ejecuta "node server.js" y abre el juego desde http://localhost:8080 para jugar con otras personas.')));
         return;
       }
       body.append(el('p', { class: 'muted small' }, 'Cada mundo tiene 16 reinos. Las casillas libres las ocupan reinos simulados hasta que llegue un jugador.'));

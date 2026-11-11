@@ -95,6 +95,7 @@ export const APODOS = {
   tulones: "escalar trepar torre fisica calzoncillos pudu",
   hero: "guitar hero clone hero guitarra bajo bateria musica canciones",
   mascotas: "tamagotchi crianza criar mascota gallina gato 3d adoptar",
+  prokingdoms: "reino reinos kingdoms kingdom isometrico construir aldeanos eras castillo age of empires estrategia imperio",
   prodrop: "sobres cartas coleccionables coleccion stickers album"
 };
 

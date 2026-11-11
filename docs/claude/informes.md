@@ -60,6 +60,10 @@ Four decisions worth keeping:
   nine. The counter is bumped with `runTransaction` because several people write
   it at once, and `quien/<uid>` is a map rather than a number so "how many
   people" can actually be counted.
+- **Pro Kingdoms writes here too.** Its «🐞 Reportes» window stores bugs and
+  ideas as `feedback` entries with `app: "prokingdoms"` (`APPS` has the label)
+  and reads them with `readFeedbackDe` (a query by `app`, hence the
+  `.indexOn`). Details: `juegos/prokingdoms/CLAUDE.md`.
 - **It degrades instead of breaking.** `errors` and `feedback` are new nodes, so
   until the rules are re-published by hand in the console everything fails with
   `PERMISSION_DENIED`. The page then shows a plain-language warning naming that

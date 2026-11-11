@@ -341,7 +341,7 @@ const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
   invitado: false,      // sin sesión: se ve el salón y se juega a lo de un jugador
   admin: false,         // `admins/<uid>`: ve el escudo 🛡️ y el panel #admin (null mientras se comprueba)
-  beta: false,          // `betaTesters/<uid>`: juega lo que está a prueba (Pro Kingdoms); null mientras se comprueba
+  beta: false,          // `betaTesters/<uid>`: juega lo que está a prueba (hoy, nada); null mientras se comprueba
   base: null,           // lo que dice Google, sin tocar
   vista: "vestibulo",     // vestibulo | partida | ranks
   pid: "",
@@ -2556,8 +2556,8 @@ function armazon() {
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
-  /* Pro Kingdoms (beta) también: su iframe trae su barra, con «← Juegos» y el volumen. */
-  document.documentElement.classList.toggle("jg-prokingdoms", state.vista === "prokingdoms" && !motivo && state.beta === true);
+  /* Pro Kingdoms también: su iframe trae su barra, con «← Juegos» y el volumen. */
+  document.documentElement.classList.toggle("jg-prokingdoms", state.vista === "prokingdoms" && !motivo);
   h.closest("main").classList.toggle("jg-ancho", !motivo && (state.vista === "partida" || state.vista.startsWith("solo-")));
   if (motivo) { h.innerHTML = puertaHtml(motivo); return; }
   const u = state.user;
@@ -2700,25 +2700,18 @@ function armazon() {
     return;
   }
   if (state.vista === "prokingdoms") {
-    /* Pro Kingdoms, solo para beta testers (`betaTesters/<uid>`, la pestaña
-       del panel de admin). Esconde el juego; no es una cerradura: la
-       página del juego es pública como todo el sitio y no escribe en la base. */
-    if (state.beta !== true) {
-      h.innerHTML = `<section class="jg-puerta" aria-labelledby="jgPuertaT">
-        <span class="jg-puerta-ico" aria-hidden="true">🧪</span>
-        <h2 id="jgPuertaT">${state.beta === null ? "Comprobando…" : "Pro Kingdoms está en beta cerrada"}</h2>
-        <p>${state.beta === null ? "Un segundo: estamos mirando si estás en la lista de beta testers." : "Por ahora solo lo juegan los beta testers. Si quieres probarlo, pídele a un administrador que te agregue a la lista."}</p>
-        <div class="jg-puerta-btns"><a class="btn2" href="#">Volver al salón</a></div>
-      </section>`;
-      return;
-    }
+    /* Pro Kingdoms: de todos los que tienen cuenta desde el 2026-11-11 (antes,
+       solo de los beta testers). Un juego que vuelva a salir a prueba mira
+       `state.beta` aquí, en su ruta. */
     h.innerHTML = "";
     const yoPk = state.user.uid;
     datosPerfil(nadaPk); // el saldo para el Pase del Reino (la misma escucha de toda la sesión)
     proKingdomsVista = crearProKingdoms({ usuario: state.user, volver: () => ir(""),
       saldo: () => datosP && datosP.completo ? monedasDe(yoPk, datosP).saldo : null,
       yaTiene: n => !!(datosP && datosP.pkPase && datosP.pkPase[yoPk] && datosP.pkPase[yoPk][n]),
-      comprarPase: (n, p) => fb.comprarPase(yoPk, n, p) });
+      comprarPase: (n, p) => fb.comprarPase(yoPk, n, p),
+      /* Los reportes del juego (🐞): ¿es admin? decide quién descarga y borra. */
+      esAdmin: () => (state.admin === null || state.admin === undefined ? fb.esAdminJuegos(yoPk) : Promise.resolve(!!state.admin)) });
     proKingdomsVista.montar(h);
     return;
   }
@@ -4506,8 +4499,7 @@ function wire() {
       if (!state.user || state.user.uid !== user.uid || state.beta === v) return;
       state.beta = v;
       vesFirma = "";
-      if (state.vista === "prokingdoms") vistaPintada = "";   // el cartel se cambia por el juego (o al revés)
-      if (state.vista === "vestibulo" || state.vista === "prokingdoms") render();
+      if (state.vista === "vestibulo") render();
     });
     /* ¿Es administrador? Una lectura por sesión. */
     state.admin = null;

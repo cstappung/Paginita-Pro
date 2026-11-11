@@ -29,7 +29,7 @@
    todas las letras en vez de quedarse en blanco.
    ============================================================ */
 import { db } from "./firebase.js";
-import { ref, get, set, update, push, remove, onValue, runTransaction, serverTimestamp } from "firebase/database";
+import { ref, get, set, update, push, remove, onValue, runTransaction, serverTimestamp, query, orderByChild, equalTo } from "firebase/database";
 
 const ERRORES = "errors";
 const FEEDBACK = "feedback";
@@ -116,6 +116,22 @@ export function watchFeedback(cb) {
     cb(Object.entries(val).map(([id, v]) => Object.assign(conId(id, v), { adjuntos: aLista(v.adjuntos) })), null);
   }, err => cb([], err));
   return off;
+}
+
+/* Lo de UNA app, en una lectura (los reportes de Pro Kingdoms, que se ven
+   dentro del juego). Va por consulta para no bajar el nodo entero; pide el
+   `.indexOn: ["app"]` de las reglas. Mientras no estén publicadas, `get`
+   con una consulta sin índice falla («Index not defined»): entonces se lee
+   todo y se filtra aquí, que es lo que ya hace la página de Informes. */
+export async function readFeedbackDe(app) {
+  let val;
+  try { val = (await get(query(ref(db, FEEDBACK), orderByChild("app"), equalTo(app)))).val(); }
+  catch (e) {
+    if (/permission/i.test(String((e && (e.code || e.message)) || ""))) throw e;
+    val = (await get(ref(db, FEEDBACK))).val();
+  }
+  return Object.entries(val || {}).filter(([, v]) => v && v.app === app)
+    .map(([id, v]) => Object.assign(conId(id, v), { adjuntos: aLista(v.adjuntos) }));
 }
 
 export const setFeedbackState = (id, estado) =>

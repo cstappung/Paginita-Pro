@@ -176,9 +176,12 @@ places.
 
 Add `beta: true` to its `SOLOS` row. `entradasSalon(..., {beta})` hides it
 from everyone outside `betaTesters/<uid>` (the admin panel's «Beta testers»
-tab), and guests never see it. Its route must still check `state.beta` itself,
-the way `#prokingdoms` does. To open it to everyone, delete `beta: true`.
-Example: `juegos/prokingdoms/CLAUDE.md`.
+tab), and guests never see it. Its route must still check `state.beta` itself
+(`true` plays, `null` is «Comprobando…», `false` gets a «beta cerrada» card)
+and force a repaint when `fb.watchBeta` answers. To open it to everyone,
+delete `beta: true` and that check, and add its nicknames to `APODOS` in
+`buscador.js`. Pro Kingdoms did exactly that on 2026-11-11 (see the commit
+and `juegos/prokingdoms/CLAUDE.md`); nothing is in beta today.
 
 ## Before pushing
 

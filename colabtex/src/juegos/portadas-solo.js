@@ -45,7 +45,7 @@ const ARTE = {
     <g class="a-late" transform="translate(340 62)"><path d="M-20 -26 H20 V-6 A20 20 0 0 1 -20 -6 Z" fill="url(#c${u})"/><path d="M-20 -20 H-30 A10 10 0 0 0 -20 -2 M20 -20 H30 A10 10 0 0 1 20 -2" fill="none" stroke="#ffcf33" stroke-width="4"/>
       <rect x="-5" y="12" width="10" height="10" fill="#ffcf33"/><rect x="-15" y="22" width="30" height="7" rx="2" fill="#b8860b"/></g>`;
   },
-  /* Pro Kingdoms (beta): una isla isométrica al atardecer con el castillo,
+  /* Pro Kingdoms: una isla isométrica al atardecer con el castillo,
      dos casas, un árbol y la corona del reino. Pixel art: bordes duros. */
   prokingdoms: u => {
     const casa = (x, y, t) => `<g transform="translate(${x} ${y})"><path d="M-14 0 L0 7 L14 0 L14 -14 L0 -7 L-14 -14 Z" fill="#d9c08c"/><path d="M0 7 L14 0 L14 -14 L0 -7 Z" fill="#b89a64"/>

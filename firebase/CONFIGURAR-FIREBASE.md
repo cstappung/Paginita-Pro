@@ -457,6 +457,22 @@ segundo y recibe la de los demás. Con seis en la sala son del orden de
 plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
 al mes; si se juega mucho conviene mirar el uso en la consola.
 
+### ⚠ Pro Kingdoms sale de la beta: hay que subir la función (2026-11-11)
+
+Pro Kingdoms ya es de todos los que tienen cuenta. Dos pasos a mano:
+
+1. **Sube la función** (sección 5): `firebase deploy --only functions --project
+   mi-pagina-pro`. Trae `SOLO_BETA = false`. Hasta que la subas, el servidor
+   sigue rechazando a quien no está en la lista de beta testers y esa gente
+   juega en «○ Modo local» (su reino queda en su navegador).
+2. **Publica las reglas** (sección 1). Lo único nuevo es un índice
+   (`feedback` → `.indexOn: ["app"]`) para que la ventana «🐞 Reportes» del
+   juego baje solo sus reportes. Sin publicarlas funciona igual, pero baja
+   todos los de Informes cada vez que se abre.
+
+La lista de beta testers y su pestaña del panel siguen ahí para el próximo
+juego que salga a prueba; hoy no esconden nada.
+
 ### ⚠ Los beta testers (Pro Kingdoms) piden publicar otra vez (2026-11-02)
 
 Hay un nodo nuevo, `betaTesters/<uid>` = `{at, por}`: la lista de quién juega
@@ -1107,10 +1123,11 @@ Una vez:
    sincroniza cada 15 s.
 
 6. Pega la dirección en `juegos/prokingdoms/servidor.json` (`"url": "https://…"`)
-   y publica el sitio. Desde ese momento, los beta testers que abren Pro
+   y publica el sitio. Desde ese momento, quienes abren Pro
    Kingdoms entran al mundo compartido: arriba ven «● Mundo 1» en vez de
-   «○ Modo local». Si el servidor no contesta o la cuenta no es beta tester,
-   el juego entra solo en modo local.
+   «○ Modo local». Si el servidor no contesta, el juego entra solo en modo
+   local. (Hasta el 2026-11-11 solo entraban los beta testers: `SOLO_BETA`
+   en `functions/index.js`.)
 
 Cada vez que cambie `functions/` o el servidor del juego
 (`juegos/prokingdoms/server/sim.js`, `js/data.js` o `js/world.js`), repite el

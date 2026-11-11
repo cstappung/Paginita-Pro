@@ -524,7 +524,6 @@ ul.info li { margin: 2px 0; }
 .pk-sitio-volver:hover { background: #8a6038; }
 .pk-sitio-volver:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .pk-sitio .vj-ctl { color: var(--parch); font-family: var(--font); font-size: 12px; }
-.pk-sitio-beta { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #1d120a; background: var(--gold); padding: 1px 5px; border: 2px solid var(--edge); }
 @media (max-width: 900px) { .pk-sitio .vj-ctl input, .pk-sitio .vj-ctl output { display: none; } }
 
 /* ======================================================================
