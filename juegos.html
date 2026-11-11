@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202611110236"></script>
+<script src="i18n.js?v=202611110305"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -204,6 +204,56 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-pkp-ya{color:#b45309;font-weight:600}
   .jg-pkp-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
   .jg-pkp-nota{font-size:.85rem;opacity:.75;margin:10px 0 0}
+  /* Estrenos (juegos/estrenos.js): la ventana de «mira lo nuevo», media para cada juego. Oscura en los dos temas, como las portadas. */
+  .jg-es-capa{z-index:72;padding:14px;background:#070912d9;backdrop-filter:blur(3px);overflow-y:auto}
+  .jg-es{position:relative;width:min(940px,100%);margin:auto;border-radius:22px;overflow:hidden;color:#f4f1e8;background:#12141c;box-shadow:0 30px 90px #000a,0 0 0 2px #ffffff1f;animation:jgEsEntra .32s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes jgEsEntra{from{opacity:0;transform:translateY(22px) scale(.95)}}
+  .jg-es-tit{position:absolute;z-index:3;top:12px;left:50%;transform:translateX(-50%);margin:0;padding:6px 16px;border-radius:999px;background:#0b0d14e6;border:1px solid #ffffff33;font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;color:#ffe08a}
+  .jg-es-x{position:absolute;z-index:4;top:10px;right:10px;width:38px;height:38px;border-radius:50%;border:1px solid #ffffff40;background:#0b0d14cc;color:#fff;font-size:1rem;cursor:pointer}
+  .jg-es-x:hover{background:#000}
+  .jg-es-mitades{display:grid;grid-template-columns:1fr 1fr}
+  .jg-es-mitad{--es:#e8b84a;--es-f:#1a1420;position:relative;display:flex;flex-direction:column;min-width:0;background:var(--es-f)}
+  .jg-es-mitad+.jg-es-mitad{box-shadow:-3px 0 0 #0b0d14}
+  .jg-es-prokingdoms{--es:#f2c14e;--es-f:#141a2e}
+  .jg-es-boxhead{--es:#ff5a3c;--es-f:#1c1410}
+  .jg-es-arte{position:relative;height:310px;overflow:hidden;background:var(--es-f)}
+  /* una captura real del juego (juegos/estrenos/*.webp), con un acercamiento lento para que no sea una foto quieta */
+  .jg-es-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;animation:jgEsFoto 16s ease-in-out infinite alternate}
+  .jg-es-boxhead .jg-es-foto{animation-delay:-8s}
+  @keyframes jgEsFoto{from{transform:scale(1)}to{transform:scale(1.09)}}
+  .jg-es-arte::after{content:"";position:absolute;inset:auto 0 0 0;height:46%;background:linear-gradient(180deg,transparent,var(--es-f))}
+  .jg-es-arte::before{content:"";position:absolute;z-index:1;inset:0 0 auto 0;height:26%;background:linear-gradient(180deg,#0b0d14b3,transparent)}
+  .jg-es-tx{position:relative;display:flex;flex-direction:column;gap:7px;flex:1;padding:0 22px 20px;margin-top:-34px}
+  .jg-es-sello{align-self:flex-start;background:var(--es);color:#170d02;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+  .jg-es-tx h3{margin:2px 0 0;font-size:1.75rem;line-height:1.1;font-weight:900;letter-spacing:-.01em;text-shadow:0 2px 0 #0008}
+  .jg-es-gancho{margin:0;color:var(--es);font-weight:700;font-size:1rem}
+  .jg-es-lema{margin:0;font-size:.88rem;line-height:1.4;color:#d8d4c8}
+  .jg-es-tx ul{margin:2px 0 4px;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:.86rem}
+  .jg-es-tx li{position:relative;padding-left:18px}
+  .jg-es-tx li::before{content:"";position:absolute;left:2px;top:.45em;width:8px;height:8px;background:var(--es);transform:rotate(45deg)}
+  .jg-es-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:8px}
+  .jg-es-jugar{flex:1 1 auto;min-height:48px;padding:0 18px;border:0;border-radius:12px;background:var(--es);color:#170d02;font-size:1rem;font-weight:800;cursor:pointer;box-shadow:0 4px 0 #0007;transition:transform .12s,filter .12s}
+  .jg-es-jugar:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .jg-es-jugar:active{transform:translateY(2px);box-shadow:0 2px 0 #0007}
+  .jg-es-otro{min-height:48px;padding:0 14px;border-radius:12px;border:2px solid var(--es);background:transparent;color:var(--es);font-size:.9rem;font-weight:700;cursor:pointer}
+  .jg-es-otro:hover{background:#ffffff14}
+  .jg-es-jugar:focus-visible,.jg-es-otro:focus-visible,.jg-es-x:focus-visible,.jg-es-pie button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  /* «No mostrar más» y «Ahora no» van discretos a propósito (la dueña: que no los aprieten tanto): chicos, apagados y sin forma de botón */
+  .jg-es-pie{display:flex;justify-content:center;gap:18px;padding:2px 14px 4px;background:#0b0d14}
+  .jg-es-pie button{border:0;background:none;color:#7c8294;font-size:.7rem;font-weight:400;cursor:pointer;padding:7px 6px;border-radius:6px}
+  .jg-es-pie button:hover{color:#c9cede;text-decoration:underline}
+  @media (max-width:700px){
+    .jg-es-capa{padding:8px}
+    .jg-es{border-radius:16px}
+    .jg-es-mitades{grid-template-columns:1fr}
+    .jg-es-mitad+.jg-es-mitad{box-shadow:0 -3px 0 #0b0d14}
+    .jg-es-arte{height:150px}
+    .jg-es-tx{padding:0 16px 16px;margin-top:-26px;gap:5px}
+    .jg-es-tx h3{font-size:1.4rem}
+    .jg-es-lema{display:none}
+    .jg-es-tit{font-size:.66rem;padding:5px 12px;top:10px;left:12px;transform:none}
+  }
+  @media (prefers-reduced-motion:reduce){.jg-es,.jg-es-foto{animation:none}.jg-es-jugar{transition:none}}
   /* Reportes de Pro Kingdoms (errores y sugerencias): la ventana de la página (juegos/prokingdoms.js, pk-reportes.js) */
   .jg-pkr-capa{align-items:start;overflow-y:auto}
   .jg-pkr{background:var(--jg-card,#fff);color:var(--jg-ink,#1e2433);border-radius:14px;max-width:640px;width:100%;margin:auto;padding:16px 18px 18px;box-shadow:0 20px 60px #0006;border:3px solid #e8b84a;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -7112,6 +7162,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202611110236"></script>
+<script src="juegos-app.js?v=202611110305"></script>
 </body>
 </html>

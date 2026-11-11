@@ -513,6 +513,25 @@ wide screens: a hard hill edge with the orange glow behind it, and a
 `slice` crop that flattened the tree and the chimney, read as an orange
 line across the page.
 
+**Estrenos: the «look what is new» window** (`juegos/estrenos.js`, CSS block
+«Estrenos» in juegos.html, `tests/estrenos.test.cjs`). Half the window per
+game (today Pro Kingdoms and the Pro BoxHead update), each with a **real
+screenshot of the game** (`juegos/estrenos/<id>.webp`, 1000×1000, `pos` is its
+`object-position`; the owner rejected the drawn covers) and a play button
+that closes it and goes to the route. The screenshots were taken with
+Playwright and no HUD: Pro Kingdoms with `index.html?local&timelapse` after
+100 s (zoom 2, `flags.sinNoche`), BoxHead with the `__boxhead` test hooks
+(`inmortal`, `armas`, `salta(11)`, a bot through `entrada`) at 1600×1000 ×2,
+cropped around the fight. A replaced image needs a new `?v=`.
+It opens by itself in the lobby (`quizaAbreEstrenos` in juegos-main.js), for
+accounts and guests, when nothing else is in front, and it yields to the
+Halloween shop and to the phone welcome. `debeAbrirEstrenos` is the rule:
+until `ESTRENOS.hasta`, once a day per device, `VECES` (3) times in all, and
+never after «No mostrar más» (`jg.estrenos`). A new campaign replaces
+`ESTRENOS` whole with a new `id`, which shows it to everyone again.
+`?estrenos=1` forces it for a preview. Write only what the game really has:
+the test checks routes and images, not the claims.
+
 **The Halloween shop strip** (`tiraTiendaHtml`, inside `.jg-sal-intro`
 under the Halloween ribbon, so no grid area changed) shows while the
 limited shop sells, whether or not the decoration is on; its countdown is
