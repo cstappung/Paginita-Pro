@@ -43,16 +43,31 @@ test('cada juego de un jugador tiene adónde ir, manual y fecha',()=>{
  }
 });
 
-/* Lo que está a prueba (`beta: true`, hoy Pro Kingdoms) solo entra en el
-   salón de un beta tester, y nunca es del invitado: ni siquiera lo ve. */
+/* Lo que está a prueba (`beta: true`) solo entra en el salón de un beta
+   tester, y nunca es del invitado: ni siquiera lo ve. Hoy no hay nada en
+   beta (Pro Kingdoms salió el 2026-11-11), pero el rol y el filtro siguen. */
 test('lo que está en beta solo lo ven los beta testers',()=>{
  const betas=S.SOLOS.filter(s=>s.beta).map(s=>s.id);
- assert.deepEqual([...betas],['prokingdoms']);
+ assert.deepEqual([...betas],[]);
+ /* el filtro, con una entrada a prueba inventada (se quita al terminar) */
+ S.SOLOS.push({id:'zz-beta',tipo:'sitio',beta:true,nombre:'A prueba',genero:'Reinos',icono:'🧪',alta:'2026-11-11',ruta:'#zz',lema:'x',modos:[]});
+ try{
+  const s0=S.entradasSalon(J).solos.map(e=>e.id),c0=S.entradasSalon(J,undefined,{beta:true}).solos;
+  assert.ok(!s0.includes('zz-beta'),'lo que está a prueba se ve sin ser beta tester');
+  assert.ok(c0.some(e=>e.id==='zz-beta'),'el beta tester no ve lo que está a prueba');
+  assert.equal(S.bloqueado(c0.find(e=>e.id==='zz-beta'),true),true,'el invitado no abre lo que está a prueba');
+ }finally{S.SOLOS.pop();}
  const sin=S.entradasSalon(J).solos.map(e=>e.id),con=S.entradasSalon(J,undefined,{beta:true}).solos.map(e=>e.id);
  for(const id of betas){assert.ok(!sin.includes(id),id+' se ve sin ser beta tester');assert.ok(con.includes(id),id+' no se ve siendo beta tester');}
  assert.equal(con.length,sin.length+betas.length);
  for(const id of betas)assert.equal(S.bloqueado(S.entradasSalon(J,undefined,{beta:true}).solos.find(e=>e.id===id),true),true,id+': el invitado no lo abre');
  assert.ok(S.MOTIVO_CUENTA.prokingdoms.t&&S.MOTIVO_CUENTA.prokingdoms.d,'la puerta del invitado en #prokingdoms');
+ /* Pro Kingdoms: de todos los que tienen cuenta, y solo de ellos */
+ const pk=S.entradasSalon(J).solos.find(e=>e.id==='prokingdoms');
+ assert.ok(pk,'Pro Kingdoms se ve sin ser beta tester');
+ assert.equal(S.bloqueado(pk,true),true,'Pro Kingdoms pide cuenta al invitado');
+ assert.equal(S.bloqueado(pk,false),false);
+ assert.doesNotMatch(main,/state\.vista === "prokingdoms"[^\n]*state\.beta/,'la ruta de Pro Kingdoms ya no mira la lista de beta testers');
  assert.match(main,/entradasSalon\(JUEGOS, orden, \{ beta: state\.beta === true \}\)/,'el salón filtra por la lista de beta testers');
  assert.match(main,/fb\.watchBeta\(user\.uid/,'cada sesión escucha su propia entrada de betaTesters');
 });
@@ -89,11 +104,11 @@ test('«Nuevo» marca los cuatro últimos de las dos últimas semanas, sin empat
  assert.deepEqual([...S.nuevos([{id:'x',alta:'mal'}],hoy)],[]);
 });
 
-test('el invitado juega todo lo de un jugador menos PRO HERO, Tenkaichi 3 y los desafíos de plantilla',()=>{
+test('el invitado juega todo lo de un jugador menos PRO HERO, Tenkaichi 3, los desafíos de plantilla y Pro Kingdoms',()=>{
  const {multi,solos}=S.entradasSalon(J);
  for(const m of multi){assert.equal(S.bloqueado(m,true),true);assert.equal(S.bloqueado(m,false),false);}
  const cerrados=solos.filter(s=>S.bloqueado(s,true)).map(s=>s.id).sort();
- assert.deepEqual([...cerrados],['bots-bt3','desafios','heroclub']);
+ assert.deepEqual([...cerrados],['bots-bt3','desafios','heroclub','prokingdoms']);
  assert.deepEqual([...S.CON_CUENTA_SOLO].sort(),[...cerrados],'la lista y lo que se ve con candado son lo mismo');
  assert.deepEqual([...S.DESTACADOS_INVITADO],['bbtan','aleteo','fanal','trigon']);
  for(const d of S.DESTACADOS_INVITADO)assert.ok(solos.some(s=>s.id===d&&s.ruta==='#solo/'+d),'el destacado tiene su ruta: '+d);

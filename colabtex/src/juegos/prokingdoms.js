@@ -1,7 +1,6 @@
 /* Pro Kingdoms — el cartero entre Juegos y el juego (un iframe en
-   juegos/prokingdoms/). Solo para beta testers (`betaTesters/<uid>`, la
-   pestaña «Beta testers» del panel de admin): juegos-main.js no monta esta
-   vista si la cuenta no está en la lista.
+   juegos/prokingdoms/). Abierto a todos los que tienen cuenta desde el
+   2026-11-11 (antes, solo a los beta testers).
 
    El juego nunca escribe en Firebase: o corre en **modo local** (`?local`,
    los demás reinos, el mercado y el gremio simulados en el navegador) o
@@ -9,17 +8,25 @@
    cuya URL está en juegos/prokingdoms/servidor.json (vacía = modo local).
    Con servidor, lo único que este cartero hace por el juego es darle el
    token de Firebase de la sesión cuando lo pide (`token`): el servidor lo
-   verifica y mira `betaTesters/<uid>`. La partida local va por cuenta
+   verifica. La partida local va por cuenta
    (`?perfil=<uid>`) y las monedas son del reino, no las de Juegos
-   (juegos/prokingdoms/sitio.js). */
+   (juegos/prokingdoms/sitio.js).
+
+   El botón «🐞 Reportes» de la barra del juego (`reportes`) abre aquí la
+   ventana de errores y sugerencias (pk-reportes.js): la pinta la página
+   porque el marco no toca Firebase. */
 import { ambientar } from "./sonido.js";
+import { escapeHtml } from "../util.js";
+import { navegador, descargar } from "../reports.js";
+import { readFeedbackDe, sendFeedback, deleteFeedback, setFeedbackState } from "../fb-reports.js";
+import { APP_PK, LARGO, TIPOS_PK, limpiaReporte, ordenaReportes, fechaReporte, nombreTxt, aTxt } from "./pk-reportes.js";
 import { auth } from "../firebase.js";
 import { PRECIO_PASE, periodoPase, inicioPase } from "./pase-pk.js";
 import { MONEDA } from "./monedas-vista.js";
 
 /* El ?v= de la página del juego: súbelo junto con los `?v=pk-N` de
    juegos/prokingdoms/index.html cada vez que cambie un archivo del juego. */
-export const PK_VER = "pk-38";
+export const PK_VER = "pk-39";
 
 /* La URL del servidor, leída una vez por pestaña y sin caché (cambiarla no
    pide compilar). Solo https, o localhost con el emulador de Functions. */
@@ -73,14 +80,127 @@ function confirmaPase({ saldo, yaTiene, comprar }, periodo) {
   });
 }
 
-export function crearProKingdoms({ usuario, volver, saldo = () => null, yaTiene = () => false, comprarPase = null }) {
-  let host = null, frame = null, muerto = false;
+/* Reportes de errores y sugerencias (pk-reportes.js). Todos leen los de
+   todos y escriben los suyos; quien es administrador ve además «Descargar
+   todo (.txt)», ✓ y 🗑. Los botones solo se esconden: quien manda son las
+   reglas de `feedback`, que no dejan borrar lo ajeno sin estar en `admins`.
+   Una lectura al abrir y otra tras cada cambio, sin escucha en vivo.
+   Devuelve una función que la cierra. */
+function abreReportes({ usuario, esAdmin, alCerrar }) {
+  const capa = document.createElement("div");
+  capa.className = "jg-modal-capa jg-pkr-capa";
+  let lista = null, error = "", admin = false, filtro = "", borrando = "", aviso = "", cerrada = false;
+  const cierra = () => {
+    if (cerrada) return;
+    cerrada = true; capa.remove(); document.removeEventListener("keydown", tecla, true);
+    if (alCerrar) alCerrar();
+  };
+  const tecla = e => { if (e.key === "Escape") { e.stopPropagation(); cierra(); } };
+  document.addEventListener("keydown", tecla, true);
+  capa.innerHTML = `<div class="jg-pkr" role="dialog" aria-modal="true" aria-labelledby="jgPkrT">
+    <header><h2 id="jgPkrT">🐞 Reportes de Pro Kingdoms</h2><button type="button" class="jg-pkr-x" data-cerrar aria-label="Cerrar">✕</button></header>
+    <p class="jg-pkr-intro">¿Algo falló o se te ocurrió una mejora? Cuéntalo aquí. Todos ven los reportes de todos: antes de escribir, mira si ya está.</p>
+    <form class="jg-pkr-form">
+      <div class="jg-pkr-tipos" role="radiogroup" aria-label="Qué es">
+        <label><input type="radio" name="pkrTipo" value="bug" checked> 🐞 Error</label>
+        <label><input type="radio" name="pkrTipo" value="idea"> 💡 Sugerencia</label>
+      </div>
+      <input type="text" name="titulo" maxlength="${LARGO.titulo}" placeholder="En una línea: qué pasó o qué propones" aria-label="Título" autocomplete="off" required>
+      <textarea name="cuerpo" maxlength="${LARGO.cuerpo}" rows="3" placeholder="Detalles (opcional): qué estabas haciendo, qué esperabas, en qué era vas…" aria-label="Detalles"></textarea>
+      <div class="jg-pkr-envia"><span class="jg-pkr-aviso" role="status"></span><button type="submit" class="btn">Enviar</button></div>
+    </form>
+    <div class="jg-pkr-barra"></div>
+    <div class="jg-pkr-lista" aria-live="polite"></div>
+  </div>`;
+  const form = capa.querySelector("form"), elBarra = capa.querySelector(".jg-pkr-barra"), elLista = capa.querySelector(".jg-pkr-lista"), elAviso = capa.querySelector(".jg-pkr-aviso");
+
+  function pinta() {
+    elAviso.textContent = aviso;
+    const todos = ordenaReportes(lista || []), ves = ordenaReportes(lista || [], filtro);
+    const cuenta = t => todos.filter(r => (r.tipo === "idea" ? "idea" : "bug") === t).length;
+    elBarra.innerHTML = `<div class="jg-pkr-filtros">${[["", `Todos (${todos.length})`], ["bug", `🐞 Errores (${cuenta("bug")})`], ["idea", `💡 Sugerencias (${cuenta("idea")})`]]
+      .map(([k, t]) => `<button type="button" class="jg-pkr-chip${filtro === k ? " on" : ""}" data-filtro="${k}" aria-pressed="${filtro === k}">${t}</button>`).join("")}</div>
+      ${admin ? `<button type="button" class="btn2" data-txt ${todos.length ? "" : "disabled"} title="Solo administradores">⬇ Descargar todo (.txt)</button>` : ""}`;
+    if (error) { elLista.innerHTML = `<p class="jg-pkr-nada">${escapeHtml(error)}</p>`; return; }
+    if (!lista) { elLista.innerHTML = `<p class="jg-pkr-nada">Cargando reportes…</p>`; return; }
+    if (!ves.length) { elLista.innerHTML = `<p class="jg-pkr-nada">${todos.length ? "No hay nada de ese tipo." : "Todavía no hay reportes. El primero puede ser el tuyo."}</p>`; return; }
+    elLista.innerHTML = ves.map(r => {
+      const tipo = r.tipo === "idea" ? "idea" : "bug", hecho = r.estado === "hecho";
+      return `<article class="jg-pkr-item${hecho ? " hecho" : ""}">
+        <div class="jg-pkr-cab"><span class="jg-pkr-pill ${tipo}">${tipo === "idea" ? "💡" : "🐞"} ${TIPOS_PK[tipo]}</span>${hecho ? `<span class="jg-pkr-pill ok">✓ ${tipo === "idea" ? "Hecho" : "Arreglado"}</span>` : ""}
+          <b translate="no">${escapeHtml(r.titulo || "")}</b></div>
+        ${r.cuerpo ? `<p class="jg-pkr-cuerpo" translate="no">${escapeHtml(r.cuerpo)}</p>` : ""}
+        <div class="jg-pkr-pie"><span><span translate="no">${escapeHtml(r.userName || "Alguien")}</span>${r.uid === usuario.uid ? " (tú)" : ""} · ${fechaReporte(r.at)}${r.ver ? " · " + escapeHtml(r.ver) : ""}</span>
+          ${admin ? `<span class="jg-pkr-adm">
+            <button type="button" class="btn2" data-hecho="${escapeHtml(r.id)}" data-a="${hecho ? "abierto" : "hecho"}">${hecho ? "↩ Reabrir" : "✓ Marcar arreglado"}</button>
+            ${borrando === r.id ? `<button type="button" class="btn2 jg-pkr-rojo" data-borra-si="${escapeHtml(r.id)}">¿Seguro? Eliminar</button><button type="button" class="btn2" data-borra-no>No</button>`
+              : `<button type="button" class="btn2" data-borra="${escapeHtml(r.id)}" aria-label="Eliminar este reporte">🗑 Eliminar</button>`}
+          </span>` : ""}</div>
+      </article>`;
+    }).join("");
+  }
+  const falla = e => /permission/i.test(String((e && (e.code || e.message)) || "")) ? "La base de datos no lo permitió (¿sesión vencida?). Recarga la página y prueba otra vez." : "No se pudo: revisa tu conexión y prueba otra vez.";
+  function carga() {
+    return readFeedbackDe(APP_PK).then(l => { lista = l; error = ""; }, e => { console.warn("pkReportes", e); if (!lista) error = falla(e); }).then(() => { if (!cerrada) pinta(); });
+  }
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const r = limpiaReporte({ tipo: form.pkrTipo.value, titulo: form.titulo.value, cuerpo: form.cuerpo.value });
+    if (!r) { aviso = "Escribe un título."; pinta(); form.titulo.focus(); return; }
+    const u = auth.currentUser;
+    if (!u || u.uid !== usuario.uid) { aviso = "Tu sesión se cerró: recarga la página."; pinta(); return; }
+    const b = form.querySelector("[type=submit]");
+    b.disabled = true; aviso = "Enviando…"; pinta();
+    sendFeedback(Object.assign(r, { app: APP_PK, ver: PK_VER, nav: navegador(navigator.userAgent).slice(0, 80) }), { uid: usuario.uid, userName: String(usuario.name || "Alguien").slice(0, 120) })
+      .then(() => { form.titulo.value = ""; form.cuerpo.value = ""; aviso = "¡Gracias! Tu reporte quedó guardado."; filtro = ""; return carga(); },
+        er => { console.warn("pkReportes", er); aviso = falla(er); pinta(); })
+      .then(() => { b.disabled = false; });
+  });
+  capa.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b || !capa.contains(b)) return;
+    if (b.hasAttribute("data-cerrar")) { cierra(); return; }
+    if (b.hasAttribute("data-filtro")) { filtro = b.getAttribute("data-filtro"); borrando = ""; pinta(); return; }
+    if (!admin) return;
+    if (b.hasAttribute("data-txt")) {
+      /* Se vuelve a leer para que el archivo traiga lo último, no lo que había al abrir. */
+      b.disabled = true;
+      readFeedbackDe(APP_PK).then(l => { lista = l; }, () => {}).then(() => { if (lista) descargar(aTxt(lista, Date.now()), nombreTxt(Date.now()), "text/plain;charset=utf-8"); if (!cerrada) pinta(); });
+      return;
+    }
+    if (b.hasAttribute("data-borra")) { borrando = b.getAttribute("data-borra"); pinta(); return; }
+    if (b.hasAttribute("data-borra-no")) { borrando = ""; pinta(); return; }
+    const id = b.getAttribute("data-borra-si") || b.getAttribute("data-hecho");
+    if (!id) return;
+    b.disabled = true;
+    (b.hasAttribute("data-borra-si") ? deleteFeedback(id) : setFeedbackState(id, b.getAttribute("data-a")))
+      .then(() => { aviso = ""; }, er => { console.warn("pkReportes", er); aviso = falla(er); })
+      .then(() => { borrando = ""; return carga(); });
+  });
+  capa.addEventListener("pointerdown", e => { if (e.target === capa) cierra(); });
+
+  /* A pantalla completa el marco tapa la página: se sale para que la ventana se vea. */
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  document.body.appendChild(capa);
+  pinta();
+  form.titulo.focus();
+  carga();
+  Promise.resolve(esAdmin ? esAdmin() : false).then(a => { admin = a === true; if (!cerrada) pinta(); }, () => {});
+  return cierra;
+}
+
+export function crearProKingdoms({ usuario, volver, saldo = () => null, yaTiene = () => false, comprarPase = null, esAdmin = null }) {
+  let host = null, frame = null, muerto = false, cierraReportes = null;
 
   function mensaje(e) {
     if (muerto || !frame || e.source !== frame.contentWindow || e.origin !== location.origin) return;
     const x = e.data;
     if (!x || x.canal !== "prokingdoms-child") return;
     if (x.tipo === "volver") volver();
+    if (x.tipo === "reportes" && !cierraReportes) {
+      cierraReportes = abreReportes({ usuario, esAdmin, alCerrar: () => { cierraReportes = null; if (!muerto && frame) frame.focus(); } });
+    }
     if (x.tipo === "pkPase") {
       const responde = ok => { if (!muerto && frame) frame.contentWindow.postMessage({ canal: "prokingdoms-parent", tipo: "pkPaseOk", id: x.id, ok }, location.origin); };
       if (!comprarPase || !auth.currentUser || auth.currentUser.uid !== usuario.uid) { responde(false); return; }
@@ -113,6 +233,7 @@ export function crearProKingdoms({ usuario, volver, saldo = () => null, yaTiene 
     },
     destruir() {
       muerto = true;
+      if (cierraReportes) cierraReportes();
       window.removeEventListener("message", mensaje);
       if (frame) frame.remove(); frame = null;
       if (host) host.innerHTML = ""; host = null;

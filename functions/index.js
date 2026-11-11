@@ -15,7 +15,7 @@
    dominio: el juego llama a la URL de la función (juegos/prokingdoms/servidor.json) y aquí se
    responde CORS solo a las páginas del sitio. `POST /api/join` exige el token de Firebase de la
    sesión (`Authorization: Bearer`, verificado con el Admin SDK) y que la cuenta esté en
-   `betaTesters/<uid>` mientras dure la beta (`SOLO_BETA`). La cuenta es el uid: un reino por
+   `betaTesters/<uid>` solo si `SOLO_BETA` (apagado desde el 2026-11-11: entra cualquier cuenta). La cuenta es el uid: un reino por
    cuenta, en todos sus aparatos. join devuelve el token del juego (`X-PK-Token`), que sirve para
    el resto de las rutas, también para `sendBeacon` al cerrar (que no puede mandar cabeceras).
 
@@ -31,7 +31,7 @@ initializeApp({ databaseURL: 'https://mi-pagina-pro-default-rtdb.firebaseio.com'
 process.env.PK_TICK_PEREZOSO = '1';
 process.env.PK_SAVE_MAX = '2000000';   // una partida pesa 10–20 KB; 2 MB es de sobra
 
-const SOLO_BETA = true;                 // mientras Pro Kingdoms sea beta cerrada
+const SOLO_BETA = false;                // true = solo `betaTesters/<uid>` (la beta cerrada terminó el 2026-11-11)
 const ORIGENES = new Set(['https://paginita-pro.cl', 'https://www.paginita-pro.cl', 'https://cstappung.github.io', 'http://localhost:8123', 'http://127.0.0.1:8123']);
 
 const store = require('./juego/server/store.js');

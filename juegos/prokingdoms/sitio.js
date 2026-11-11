@@ -15,14 +15,15 @@
    - **Una partida por cuenta.** `?perfil=<uid>` hace que el juego le ponga el
      sufijo a sus claves de `localStorage` (U.key). Las dos que el juego no
      sufija (`pk_site_coins`, `pk_player_name`) las sufija este archivo.
-   - **Las monedas son del reino, no del sitio.** Durante la beta, lo que el
+   - **Las monedas son del reino, no del sitio.** Lo que el
      juego llama «monedas» vive solo en este navegador y no toca la economía
      de Juegos (monedas.js): el navegador las suma y nadie las valida. Para
      conectarlas a las monedas reales hace falta el servidor (CLAUDE.md).
    - El nombre que ven los reinos vecinos simulados es el de la cuenta
      (`?nombre=`).
 
-   Nunca toca Firebase. Al padre le dice `listo` y `volver`, y le pide `token` y `pkPase` (comprar el pase). */
+   Nunca toca Firebase. Al padre le dice `listo`, `volver` y `reportes` (abrir la ventana de errores y
+   sugerencias, que pinta la página), y le pide `token` y `pkPase` (comprar el pase). */
 (function () {
   'use strict';
   const q = new URLSearchParams(location.search);
@@ -66,7 +67,7 @@
   }
 
   window.ProKingdomsPlatform = {
-    name: 'paginita-pro-beta',
+    name: 'paginita-pro',
     apiBase,
     getAuthToken: apiBase ? getAuthToken : undefined,
     comprarPase: apiBase ? comprarPase : undefined,
@@ -84,7 +85,7 @@
       this.addCoins(-n, reason);
       return true;
     },
-    reportStat() { /* sin logros ni clasificación durante la beta */ }
+    reportStat() { /* sin logros ni clasificación del sitio, por ahora */ }
   };
 
   /* Dentro de Juegos: «← Juegos» y el volumen común (volumen.js), en la
@@ -106,11 +107,14 @@
     const vol = document.createElement('span');
     vol.setAttribute('data-volumen', '');
     caja.appendChild(vol);
-    const beta = document.createElement('span');
-    beta.className = 'pk-sitio-beta'; beta.textContent = 'BETA';
-    beta.title = window.PK && PK.Net && PK.Net.online ? 'Beta cerrada: mundo compartido. Las monedas del reino se guardan en este navegador'
-      : 'Beta cerrada: la partida y las monedas del reino se guardan en este navegador';
-    caja.appendChild(beta);
+    /* Errores y sugerencias: la ventana la pinta la página de Juegos (el marco no toca Firebase). */
+    if (enMarco) {
+      const r = document.createElement('button');
+      r.type = 'button'; r.className = 'pk-sitio-volver pk-sitio-reportes'; r.textContent = '🐞 Reportes';
+      r.title = 'Reportar un error o sugerir una mejora, y ver lo que reportaron los demás';
+      r.addEventListener('click', e => { e.stopPropagation(); avisa('reportes'); });
+      caja.appendChild(r);
+    }
     barra.prepend(caja);   // al principio: en el celular la barra se desliza y el final queda fuera
     if (window.VolumenJuego) window.VolumenJuego.control(vol);
     return true;

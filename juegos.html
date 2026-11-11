@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202611110052"></script>
+<script src="i18n.js?v=202611110236"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -204,6 +204,41 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-pkp-ya{color:#b45309;font-weight:600}
   .jg-pkp-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
   .jg-pkp-nota{font-size:.85rem;opacity:.75;margin:10px 0 0}
+  /* Reportes de Pro Kingdoms (errores y sugerencias): la ventana de la página (juegos/prokingdoms.js, pk-reportes.js) */
+  .jg-pkr-capa{align-items:start;overflow-y:auto}
+  .jg-pkr{background:var(--jg-card,#fff);color:var(--jg-ink,#1e2433);border-radius:14px;max-width:640px;width:100%;margin:auto;padding:16px 18px 18px;box-shadow:0 20px 60px #0006;border:3px solid #e8b84a;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .jg-pkr header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .jg-pkr h2{margin:0;font-size:1.15rem}
+  .jg-pkr-x{border:0;background:none;font-size:1.1rem;cursor:pointer;color:inherit;width:36px;height:36px;border-radius:8px}
+  .jg-pkr-x:hover{background:#0001}
+  .jg-pkr-intro{margin:0;font-size:.9rem;opacity:.8}
+  .jg-pkr-form{display:flex;flex-direction:column;gap:8px}
+  .jg-pkr-tipos{display:flex;gap:14px;flex-wrap:wrap;font-size:.92rem}
+  .jg-pkr-tipos label{display:flex;align-items:center;gap:5px;cursor:pointer}
+  .jg-pkr-form input[type=text],.jg-pkr-form textarea{width:100%;box-sizing:border-box;border:1px solid #d4dce2;border-radius:8px;padding:8px 10px;font:inherit;font-size:.92rem;background:#fff;color:#1e2433}
+  .jg-pkr-form textarea{resize:vertical;min-height:64px}
+  .jg-pkr-envia{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .jg-pkr-aviso{font-size:.85rem;color:#b45309;font-weight:600;min-width:0}
+  .jg-pkr-barra{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;border-top:1px solid #0002;padding-top:10px}
+  .jg-pkr-filtros{display:flex;gap:6px;flex-wrap:wrap}
+  .jg-pkr-chip{border:1px solid #d4dce2;background:#fff;color:#42505c;border-radius:999px;padding:5px 11px;font-size:.8rem;font-weight:600;cursor:pointer}
+  .jg-pkr-chip.on{background:#1e2433;border-color:#1e2433;color:#fff}
+  .jg-pkr-lista{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;overscroll-behavior:contain}
+  .jg-pkr-nada{margin:8px 0;opacity:.7;font-size:.9rem;text-align:center}
+  .jg-pkr-item{border:1px solid #0002;border-radius:10px;padding:9px 11px;display:flex;flex-direction:column;gap:5px;min-width:0}
+  .jg-pkr-item.hecho{opacity:.72}
+  .jg-pkr-cab{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .jg-pkr-cab b{overflow-wrap:anywhere;min-width:0}
+  .jg-pkr-pill{font-size:.72rem;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .jg-pkr-pill.bug{background:#fde2e2;color:#9b1c1c}
+  .jg-pkr-pill.idea{background:#fdf2d0;color:#7a4b00}
+  .jg-pkr-pill.ok{background:#d9f5e4;color:#12693a}
+  .jg-pkr-cuerpo{margin:0;font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
+  .jg-pkr-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.78rem;opacity:.85}
+  .jg-pkr-adm{display:flex;gap:6px;flex-wrap:wrap}
+  .jg-pkr-adm .btn2{height:28px;font-size:11.5px;padding:0 9px}
+  .jg-pkr-rojo{border-color:#c0392b!important;color:#c0392b!important}
+  @media (max-width:600px){.jg-pkr-capa{padding:10px}.jg-pkr-lista{max-height:none;overflow:visible}}
   .jg-modal{position:relative;width:460px;max-width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:24px 22px 20px;border-radius:14px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 18px 50px #0f172840;animation:jgEntra .35s ease-out;text-align:left}
   .jg-modal-t{font-size:19px;font-weight:700;color:#1f2933}
   .jg-modal-s{font-size:12px;color:#5a6772;line-height:1.55;margin:6px 0 0}
@@ -3174,7 +3209,7 @@ html.jg-mascotas .head,html.jg-mascotas .bar,html.jg-mascotas .rp-fab{display:no
 html.jg-mascotas #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#fff8ee}
 .jg-mascotas-frame{display:block;width:100%;height:100%;border:0;background:#fff8ee}
 html[data-tema=oscuro].jg-mascotas #pantalla,html[data-tema=oscuro] .jg-mascotas-frame{background:#17131f}
-/* Pro Kingdoms (beta): el iframe ocupa la ventana; su barra trae «← Juegos» y el volumen. El juego es oscuro en los dos temas. */
+/* Pro Kingdoms: el iframe ocupa la ventana; su barra trae «← Juegos» y el volumen. El juego es oscuro en los dos temas. */
 html.jg-prokingdoms,html.jg-prokingdoms body{overflow:hidden;height:100%}
 html.jg-prokingdoms .head,html.jg-prokingdoms .bar,html.jg-prokingdoms .rp-fab{display:none!important}
 html.jg-prokingdoms #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#16140f}
@@ -6469,6 +6504,16 @@ html[data-tema=oscuro] .jg-tira-m{background:linear-gradient(120deg,#2a1406,#5c2
 html[data-tema=oscuro] .jg-dropm-f{background-color:#3a2a1c}
 html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 html[data-tema=oscuro] .jg-pkp{background:#1e2433;color:#e8ecf4}
+html[data-tema=oscuro] .jg-pkr{background:#1e2433;color:#e8ecf4}
+html[data-tema=oscuro] .jg-pkr-x:hover{background:#fff1}
+html[data-tema=oscuro] .jg-pkr-form input[type=text],html[data-tema=oscuro] .jg-pkr-form textarea{background:#141926;color:#e8ecf4;border-color:#3a4358}
+html[data-tema=oscuro] .jg-pkr-aviso{color:#fcd581}
+html[data-tema=oscuro] .jg-pkr-barra,html[data-tema=oscuro] .jg-pkr-item{border-color:#fff2}
+html[data-tema=oscuro] .jg-pkr-chip{background:#141926;color:#c9d2e3;border-color:#3a4358}
+html[data-tema=oscuro] .jg-pkr-chip.on{background:#e8b84a;border-color:#e8b84a;color:#2a1a00}
+html[data-tema=oscuro] .jg-pkr-pill.bug{background:#4a1d1d;color:#ffb4b4}
+html[data-tema=oscuro] .jg-pkr-pill.idea{background:#3a2a08;color:#fcd581}
+html[data-tema=oscuro] .jg-pkr-pill.ok{background:#12372a;color:#9be7bf}
 
 /* Casino (casino.js y casino-*.js): siempre de
    noche, felpa verde oscura y oro, igual en los dos temas; por eso no
@@ -7067,6 +7112,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202611110052"></script>
+<script src="juegos-app.js?v=202611110236"></script>
 </body>
 </html>
