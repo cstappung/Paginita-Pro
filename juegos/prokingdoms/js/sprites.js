@@ -1703,6 +1703,17 @@
     return { c: pb.canvas(), ax: 5, ay: 5 };
   }
 
+  // un árbol recién plantado (despeje.js): tallo y unas hojas
+  function makeBrote() {
+    const pb = new PB(10, 12);
+    ellipseShadow(pb, 5, 10, 3, 1, 60);
+    for (let y = 5; y <= 10; y++) pb.set(4, y, [96, 66, 40]);
+    const hoja = [[2, 4], [3, 3], [3, 4], [5, 2], [5, 3], [6, 3], [6, 4], [4, 1], [4, 2], [3, 6], [5, 6], [6, 6], [2, 6]];
+    for (const [x, y] of hoja) pb.set(x, y, y < 3 ? [150, 210, 90] : [90, 170, 60]);
+    pb.set(4, 3, [70, 140, 50]);
+    return { c: pb.canvas(), ax: 5, ay: 10 };
+  }
+
   function makeBush(seed, berries) {
     const r = U.rng(seed), w = 18, h = 14, pb = new PB(w, h), cx = 9, base = 11;
     ellipseShadow(pb, cx + 2, base, 7, 2, 70);
@@ -2518,6 +2529,7 @@
     for (let i = 0; i < 6; i++) { S.trees.oak.push(makeOak(100 + i)); S.trees.pine.push(makePine(200 + i)); }
     for (let i = 0; i < 2; i++) S.trees.aut.push(makeOak(300 + i, AUT));
     S.stump = makeStump();
+    S.brote = makeBrote();
     S.bush = [makeBush(11, true), makeBush(12, true), makeBush(13, true)];
     S.bushBare = makeBush(14, false);
     S.rocks = {};

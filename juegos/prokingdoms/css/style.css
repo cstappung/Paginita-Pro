@@ -387,6 +387,12 @@ ul.info li { margin: 2px 0; }
 
 /* ---- móvil ---- */
 #toasts { top: calc(var(--top-h, 50px) + 8px); }
+/* El cartel del evento y los avisos compartían el borde de arriba y se tapaban (reporte de un jugador, pk-40).
+   --evh es la altura real del cartel (ui.js la mide); los avisos van justo debajo de él. */
+@media (min-width: 901px) and (min-height: 501px) {
+  #event { top: calc(var(--top-h, 50px) + 8px); }
+  #hud:has(#event:not([style*="none"])) #toasts { top: calc(var(--top-h, 50px) + 8px + var(--evh, 0px)); }
+}
 #hud button, .modal button { touch-action: manipulation; }
 #panel, .modal-body, .build-grid { touch-action: pan-y; }
 .modal:focus { outline: none; }
@@ -494,7 +500,7 @@ ul.info li { margin: 2px 0; }
 
   /* avisos y evento: abajo, en el hueco entre el panel y el menú */
   #toasts { top: auto; bottom: calc(8px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); width: auto; transform: none; flex-direction: column-reverse; }
-  #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(84px + var(--sb)); }
+  #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(4px + var(--evh, 80px) + var(--sb)); }
   #event { top: auto; bottom: calc(4px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); transform: none; max-width: none; padding: 4px 8px; }
 
   /* ventanas: bajo la barra, alto máximo de la pantalla menos la barra, todo el ancho y dos columnas donde hay */
@@ -548,8 +554,8 @@ ul.info li { margin: 2px 0; }
   #event { top: auto; transform: none; left: calc(6px + env(safe-area-inset-left, 0px)); right: 104px; max-width: none; bottom: calc(var(--ph) + 14px + var(--sab)); padding: 4px 8px; font-size: 14px; }
   #event.min { right: auto; }
   #hud:has(#panel.collapsed) #event { bottom: calc(66px + var(--sab)); }
-  #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(var(--ph) + 66px + var(--sab)); }
-  #hud:has(#panel.collapsed):has(#event:not([style*="none"])) #toasts { bottom: calc(118px + var(--sab)); }
+  #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(var(--ph) + 14px + var(--evh, 52px) + var(--sab)); }
+  #hud:has(#panel.collapsed):has(#event:not([style*="none"])) #toasts { bottom: calc(66px + var(--evh, 52px) + var(--sab)); }
 }
 
 /* ventanas a pantalla completa en el celular (antes no llegaban arriba y se sentían chicas) */
@@ -708,7 +714,7 @@ ul.info li { margin: 2px 0; }
   .book-tab { flex: none; white-space: nowrap; }
 }
 @media (max-width: 900px) and (orientation: portrait) {
-  #hud:has(#event:not(.min):not([style*="none"])) #toasts { bottom: calc(var(--ph) + 150px + var(--sab)); }
+  #hud:has(#event:not(.min):not([style*="none"])) #toasts { bottom: calc(var(--ph) + 14px + var(--evh, 136px) + var(--sab)); }
 }
 
 /* ---- Playtest, nov. 2026 ---- */

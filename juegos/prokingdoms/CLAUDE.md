@@ -1145,3 +1145,35 @@ Each fix below came from a stall in that run; keep them in mind before touching 
 - The raid alarm (`cuerno`) is war drums now. The owner rejected two horns as «a train horn».
 - Test: «Sonidos grabados (pk-38)» checks that every name has a file, every synthesized case has a recording, and every
   ambience sound goes through `GRABADO`.
+
+## Bug hunt, player reports and owner's requests (`pk-40`)
+
+- **The workshop reserve stops production** (owner's request): `L.produce` returns «En reserva» whenever `G.reservaDe(b)`
+  holds, even with input left in its buffer or a cart bringing more. It used to only stop asking and kept spending what
+  it had. `L.puede(b)` (not held, output not full) is what `openShop` checks, and a workshop the Capataz released for
+  being stalled gets `b.paradoHasta` (90 s) so it is not refilled 3 s later.
+- **The upgrade queue is the player's** (owner's request): the Maestro mayor and «Mejoras en serie» never enqueue and
+  never wait for the queue to empty. They start upgrades directly (`A.mejorarYa`) when a Maestro de Obras is free, yield
+  only when something in the queue can be paid now (`A.colaLista`), and never spend what the first waiting queue item
+  lacks (`G.colaNecesita`, also a workshop hold `{ cola: true }` in `G.reservaDe`). The Obras window shows what each
+  queued item lacks and «Comprar» buys it.
+- **Only trees inside your land** (`js/despeje.js`, `PK.Despeje`, owner's request): POIs and every non-tree node in a
+  parcel of yours move to the nearest no-man's tile (no owner, no zone, `W.reserved` free), on load and whenever
+  `W.terrVer` changes. Moves are saved (`st.despeje.n` / `.p`) and replayed on load. Land only. Common-zone nodes are
+  never in an owned parcel, so the server's node ids and amounts never move.
+- **Talar / plantar / quitar** are `PK.Def.tool` values routed by `Def.click`/`Def.ghost`: an area (two taps, ≤ 24 per
+  side) for talar (trees gone for good: `n.gone`, `st.despeje.talados`, half the wood back) and quitar (walls, gates,
+  roads; half back), one tap per sapling for plantar (`n.planta`, a dead tree that regrows in `Dz.CRECE`). Planted trees
+  keep their state in `st.despeje.plantas`, not `W.saveNodes`: their ids shift when an event made temp nodes first.
+- **Market:** `BSTATS.market` keeps sell ≤ buy − 0.10 at every level (Nv 8–9 sold above the buy price: free gold;
+  tested), `mkRate` enforces it with bonuses too, and buys/sells charge the operation's mid price (`1.03^(n/200)`),
+  clamped to 0.25–4× base. Buttons do 100 / 1,000 / 10,000 (`flags.mkCant`). Online, `Soc.mercadoLibre` mirrors the
+  server's daily cap (`Soc.MERCADO` = `LIM.marketSync`/`marketDay`, UTC day) and `net.js` splits queued ops so each sync
+  stays under `marketSync`: going over used to clip the op and log a suspicion. The offer form says what is fair and the
+  ×3 limit (`Soc.OFERTA_MAX`, the server's «Pides demasiado a cambio»).
+- **Offline calculation uses the simulated clock** (`G.ahora()`) in expeditions, incursions and road encounters, runs
+  `Life.offline` (timed mods and the current event spend their time) and skips Terr/Leyendas/Campana at sea, like live.
+- **Toasts sit under the event banner** via `--evh` (its measured height, set in `ui.js`); a fixed offset hid them.
+- `sfx/level.mp3` is now a short synthesized chime (`GAN.level` measured the pk-38 way); `level` has a 0.6 s gap.
+- Node regen raised (tree regrow 1.5 h, stone 0.5, ore 0.12, gold 0.1…, own nodes ×0.8): `D.NODES` is also read by
+  the server for common zones, which picks it up on the next function deploy (no `D.PROTO` bump needed).

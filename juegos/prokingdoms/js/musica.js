@@ -147,14 +147,22 @@
     const e = st.era || 1;
     return e <= 3 ? 'rustico' : e <= 6 ? 'medieval' : e <= 9 ? 'reino' : 'imperio';
   }
-  function suena() {
+  // Lo común a la música y al ambiente. La música además pide su volumen > 0: antes «Música» en 0 también callaba el
+  // ambiente (pájaros, olas, obras), aunque «Ambiente» estuviera en 60.
+  function puedeSonar() {
     const X = PK.Sfx;
-    return X && X.on && vol > 0 && ctx && ctx.state === 'running' && !document.hidden && !(PK.Game && PK.Game.offline);
+    return X && X.on && ctx && ctx.state === 'running' && !document.hidden && !(PK.Game && PK.Game.offline);
   }
+  function suena() { return vol > 0 && puedeSonar(); }
   function tick() {
     if (!ctx && !armar()) return;
     const ahora = ctx.currentTime;
-    if (!suena()) { if (bus.gain.value > 0.001) { bus.gain.cancelScheduledValues(ahora); bus.gain.setTargetAtTime(0, ahora, 0.2); } prox = 0; return; }
+    if (!suena()) {
+      if (bus.gain.value > 0.001) { bus.gain.cancelScheduledValues(ahora); bus.gain.setTargetAtTime(0, ahora, 0.2); }
+      prox = 0;
+      if (puedeSonar()) { const m = elegir(); if (m) modo = m; ambiente(ahora); } // sin música, el ambiente sigue
+      return;
+    }
     const m = elegir(), n = PK.Vida && PK.Vida.noche ? PK.Vida.noche() >= 0.5 : false;
     if (!m) return;
     // cambio de tema: se apaga, silencio corto y entra el nuevo (al empezar un compás para no cortar una frase en la calma)

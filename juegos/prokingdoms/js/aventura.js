@@ -108,7 +108,7 @@
   A.puntos = r => (!r.heroe || !PK.Heroes || r.travel < 60 ? [] : r.travel >= 240 ? [0.35, 0.7] : [0.5]);
   A.update = function (r, offline) {
     if (r.phase !== 'go' || (r.inc && r.inc.llego)) return;
-    const now = Date.now(), pts = A.puntos(r);
+    const now = G().ahora(), pts = A.puntos(r);
     r.encN = r.encN || 0;
     if (r.enc) { if (offline || now >= r.enc.hasta || now >= r.arrive) A.elegir(r.id, r.enc.ops.findIndex(o => o.cauta), true); return; }
     if (r.encN >= pts.length) return;
@@ -136,11 +136,16 @@
     const malo = ef.riesgo ? rng() < ef.riesgo : !!ef.perder;
     if (ef.perder && malo) {
       let n = 0;
-      for (const k in r.units) { const l = Math.min(r.units[k], Math.round(r.units[k] * ef.perder)); r.units[k] -= l; n += l; if (r.inc) r.inc.perdidos[k] = (r.inc.perdidos[k] || 0) + l; }
+      for (const k in r.units) {
+        const l = Math.min(r.units[k], Math.round(r.units[k] * ef.perder));
+        r.units[k] -= l; n += l;
+        if (r.inc) r.inc.perdidos[k] = (r.inc.perdidos[k] || 0) + l;
+        else if (l) { r.encPerdidos = r.encPerdidos || {}; r.encPerdidos[k] = (r.encPerdidos[k] || 0) + l; } // para el informe (cerrar)
+      }
       if (n) { r.power = Math.round(r.power * (1 - ef.perder)); notas.push('perdiste ' + n + ' soldado' + (n > 1 ? 's' : '')); }
     }
-    if (ef.fuerza) { if (r.inc) r.inc.bend += ef.fuerza; else r.power = Math.round(r.power * (1 + ef.fuerza)); notas.push('+' + Math.round(ef.fuerza * 100) + '% de fuerza'); }
-    if (ef.tiempo) { const left = Math.max(0, r.arrive - Date.now()); r.arrive += left * ef.tiempo; notas.push('el viaje se alarga'); }
+    if (ef.fuerza) { if (r.inc) r.inc.bend += ef.fuerza; else { r.power = Math.round(r.power * (1 + ef.fuerza)); r.encFuerza = (r.encFuerza || 1) * (1 + ef.fuerza); } notas.push('+' + Math.round(ef.fuerza * 100) + '% de fuerza'); }
+    if (ef.tiempo) { const left = Math.max(0, r.arrive - G().ahora()); r.arrive += left * ef.tiempo; notas.push('el viaje se alarga'); }
     if (ef.botin && !(ef.riesgo && malo && ef.perder)) {
       const b = {}; for (const k in ef.botin) b[k] = Math.round(ef.botin[k] * escala());
       r.encBotin = r.encBotin || {};
@@ -150,17 +155,19 @@
     if (ef.xp && H()) { const h = H().de(r.heroe); if (h) { H().darXp(h, ef.xp); notas.push('+' + ef.xp + ' de experiencia'); } }
     if (ef.objeto && H() && rng() < ef.objeto) { (r.encObjetos = r.encObjetos || []).push(H().crearObjeto(0.4, 0)); notas.push('un objeto'); }
     if (ef.mapa && rng() < ef.mapa) { A.nuevoMapa('encuentro', r.id * 31 + r.enc.n); notas.push('un mapa del tesoro'); }
-    if (ef.tropa) { r.encTropa = (r.encTropa || 0) + ef.tropa; notas.push('+' + ef.tropa + ' milicianos al volver'); }
+    if (ef.tropa) { r.encTropa = (r.encTropa || 0) + ef.tropa; notas.push('+' + ef.tropa + (D.ARMY.militia ? ' milicianos' : ' soldados') + ' al volver'); }
     G().stat('encounters', 1);
     (r.encLog = r.encLog || []).push(c.name + ': ' + op.label.toLowerCase() + (notas.length ? ' (' + notas.join(', ') + ')' : ''));
     r.enc = null;
     if (!sola && !G().offline) toast(c.name + ': ' + (notas.length ? notas.join(', ') : 'siguen su camino') + '.', malo && ef.perder ? 'warn' : 'good');
     return true;
   };
+  A.tropaBasica = () => (D.ARMY.militia ? 'militia' : D.ARMY.infanteria ? 'infanteria' : Object.keys(D.ARMY)[0]);
   // Al volver al Cuartel: lo juntado en el camino (lo llama arrive en expeditions.js).
   A.volver = function (r) {
     if (r.encBotin) G().give(r.encBotin);
-    if (r.encTropa) S().war.army.militia = (S().war.army.militia || 0) + r.encTropa;
+    // La tropa básica del mundo: en el mar no hay milicianos, y un `militia` en la Flota rompía Social.power para siempre.
+    if (r.encTropa) { const k = A.tropaBasica(); if (k) S().war.army[k] = (S().war.army[k] || 0) + r.encTropa; }
     if (r.encObjetos && H()) for (const o of r.encObjetos) H().guardarObjeto(o);
   };
 

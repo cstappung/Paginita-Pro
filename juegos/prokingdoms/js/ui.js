@@ -245,6 +245,10 @@
     evEl = el('div', { id: 'event' });
     qsEl = el('div', { id: 'qstrip' });
     hud.append(bar, menu, panel, mmWrap, qsEl, toastBox, tip, evEl);
+    // Altura real del cartel del evento (--evh), para que los avisos se pongan al lado y no debajo de él: crece o se
+    // achica según el evento (opciones, píldora) y una distancia fija lo tapaba o quedaba corta.
+    const medirEv = () => { const h = evEl.style.display === 'none' ? 0 : evEl.getBoundingClientRect().height; hud.style.setProperty('--evh', h ? Math.ceil(h + 6) + 'px' : '0px'); };
+    if (window.ResizeObserver) new ResizeObserver(medirEv).observe(evEl);
     watchTouch(panel, () => { panelTouch = performance.now(); });
     initMobile(menu);
     UI.aplicarAcceso();
@@ -633,6 +637,19 @@
     if (hud) hud.classList.toggle('p-none', !panel.childNodes.length);
   };
   function fillPanel(g, sel) {
+    if (PK.Despeje && PK.Despeje.HERR[PK.Def.tool]) { // quitar, talar y plantar (despeje.js, pk-40)
+      const tl = PK.Def.tool, Dz = PK.Despeje, ini = PK.Def.start;
+      const tit = { quitar: 'Quitar murallas y caminos', talar: 'Talar árboles', plantar: 'Plantar árboles' }[tl];
+      const txt = tl === 'plantar' ? 'Toca casillas libres de tus tierras para plantar: cada brote es un árbol en ' + Math.round(Dz.CRECE / 60) + ' minutos y después rebrota como los demás. No va pegado a un edificio. Cada uno cuesta '
+        : (ini ? 'Ahora toca la otra esquina (o la misma casilla para una sola).' : 'Toca una esquina de la zona y después la otra (hasta ' + Dz.ZONA_MAX + ' casillas por lado).') +
+          (tl === 'talar' ? ' Se quitan para siempre los árboles de tus tierras que caigan dentro y vuelve la mitad de su madera.' : ' Se quitan las murallas, puertas y caminos que caigan dentro y vuelve la mitad del material.');
+      panel.append(el('div', { class: 'p-help' }, el('h3', null, tit), el('p', { class: 'small' }, txt), tl === 'plantar' ? UI.costEl(Dz.PLANTAR) : '',
+        el('div', { class: 'row' },
+          tl !== 'plantar' ? UI.btn('Plantar', () => Dz.empezar('plantar'), { small: true }) : UI.btn('Talar', () => Dz.empezar('talar'), { small: true }),
+          tl !== 'quitar' ? UI.btn('Quitar muros y caminos', () => Dz.empezar('quitar'), { small: true }) : UI.btn('Talar', () => Dz.empezar('talar'), { small: true }),
+          UI.btn('Terminar', () => PK.Input.cancelTool(), { small: true }))));
+      return;
+    }
     if (PK.Def.tool) {
       const gate = PK.Def.tool === 'gate';
       panel.append(el('div', { class: 'p-help' }, el('h3', null, gate ? 'Poner puerta' : 'Trazar muralla (' + PK.Def.tier().name.toLowerCase() + ')'),
@@ -745,6 +762,7 @@
         el('p', { class: 'small muted' }, PK.Def.isWalled(W.parcel(x, y)) ? 'Esta parcela está amurallada (defensa x' + (1 + t.bonus).toFixed(1) + ').' : 'Esta parcela todavía no está encerrada.'),
         el('div', { class: 'row' }, gate ? null : UI.btn('Convertir en puerta', () => { PK.Def.gate(x, y); UI.refreshPanel(true); }, { small: true }),
           UI.btn('Desarmar (devuelve la mitad)', () => { PK.Def.remove(k); G().sel = null; UI.refreshPanel(true); }, { small: true, cls: 'danger' }),
+          UI.btn('Quitar varios…', () => { G().sel = null; PK.Despeje.empezar('quitar'); }, { small: true, title: 'Marca una zona y quita todas las murallas, puertas y caminos que tenga' }),
           UI.btn('Murallas', () => UI.openBarracks('defense'), { small: true })))));
   }
   function beltPanel(bl) {
@@ -778,6 +796,8 @@
     if (us.every(x => x.kind === 'scout')) return scoutPanel(us);
     if (us.every(x => x.kind === 'cart')) return cartPanel(us);
     us = us.filter(x => x.kind === 'v');
+    // Exploradores + carretas sin ningún aldeano: no hay aldeano que mostrar (antes reventaba con u undefined).
+    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart')); }
     const u = us[0];
     const port = Sp.villager(D.PLAYER_COLOR, u.hair, u.skin, 'idle', 0, null, false).c.toDataURL();
     liveEl = el('p', { class: 'small' });
@@ -892,7 +912,7 @@
         ? el('span', { class: 'small good-t' }, '🎉 Fiesta en curso: +25% de recolección y talleres (' + U.fmtTime(fi.left) + ')')
         : UI.btn(el('span', null, '🎉 Fiesta ', UI.costEl(fi.cost)), () => { G().fiesta(); UI.refreshPanel(true); },
           { small: true, cls: 'ot', disabled: !fi.ok, title: 'Gasta lo que te sobra: +25% de recolección y de talleres durante 5 minutos. Cada fiesta del mismo día cuesta un 40% más.' })));
-      act.append(el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / G().trainTime(b)) * 100 + '%' } }), el('span', null, b.queue.length ? 'En cola: ' + b.queue.length + (b.status && b.status !== 'Entrenando' ? ' · ' + b.status : '') : UI.hint('Sin cola · clic derecho para punto de reunión', 'Sin cola · toca el mapa para punto de reunión'))));
+      act.append(el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / G().trainTime(b)) * 100 + '%' } }), el('span', null, b.queue.length ? 'En cola: ' + b.queue.length + (b.status && b.status !== 'Entrenando' ? ' · ' + b.status : '') : UI.hint('Sin cola · clic derecho para punto de reunión', 'Sin cola · toca un recurso para punto de reunión'))));
       const n = st.era + 1;
       if (st.eraProg) {
         act.append(el('div', { class: 'era-box' }, el('b', null, 'Avanzando a ' + D.eraName(st.eraProg.to)),
@@ -985,7 +1005,14 @@
       el('div', null, el('h3', null, def.name),
         el('p', { class: 'small' }, z ? (z.common ? 'Zona común: ' + z.name : z.name) : 'Tierra salvaje (de todos)'),
         el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: (n.amount / n.max) * 100 + '%' } }), el('span', null, n.dead ? 'Agotado' : U.fmt(n.amount) + ' / ' + U.fmt(n.max))),
-        el('p', { class: 'small muted' }, workers.length + ' recolectando (' + mine + ' tuyos) · ' + (def.regrow ? 'rebrota ' + U.fmtTime(def.regrow) + ' después de agotarse' : 'se regenera un ' + Math.round(def.regen * 100) + '% por hora')))));
+        el('p', { class: 'small muted' }, workers.length + ' recolectando (' + mine + ' tuyos) · ' + (n.planta && n.dead ? 'brote: crece solo' : def.regrow ? 'rebrota ' + U.fmtTime(def.regrow) + ' después de agotarse' : 'se regenera un ' + Math.round(def.regen * 100) + '% por hora')))));
+    // pk-40: en tus tierras puedes talar árboles (para siempre) y plantar otros
+    if (n.kind === 'tree' && PK.Despeje && W.ownerAt(n.x, n.y) === 'p' && !W.isShared(n) && !G().enMar()) {
+      panel.append(el('div', { class: 'row' },
+        UI.btn('Talar este árbol', () => { const r = PK.Despeje.talar([n]); G().sel = null; UI.toast('Árbol talado' + (r.madera ? ': +' + U.fmt(r.madera) + ' de madera' : '') + '.', 'good'); UI.refreshPanel(true); }, { small: true, cls: 'danger', title: 'Lo quita para siempre y devuelve la mitad de su madera' }),
+        UI.btn('Talar varios…', () => { G().sel = null; PK.Despeje.empezar('talar'); }, { small: true }),
+        UI.btn('Plantar árboles', () => { G().sel = null; PK.Despeje.empezar('plantar'); }, { small: true })));
+    }
     if (z && z.common) {
       const st = W.zoneStats(n.zone);
       panel.append(el('p', { class: 'small' }, z.name + ': ' + Math.round((st.amt / st.max) * 100) + '% de sus recursos disponibles. Compartida con todos los reinos.'));
@@ -1116,7 +1143,7 @@
   UI.hideTip = function () { tip.style.display = 'none'; };
   let hoverKey = '';
   UI.hoverInfo = function (h, x, y) {
-    if (!h) { if (hoverKey) { hoverKey = ''; UI.hideTip(); } return; }
+    if (!h) { hoverKey = ''; UI.hideTip(); return; }
     let text = '';
     if (h.k === 'node') { const z = W.zoneOf(h.o); text = D.NODES[h.o.kind].name + ' · ' + (h.o.dead ? 'agotado' : U.fmt(h.o.amount)) + (z ? ' · ' + z.name : ''); }
     else if (h.k === 'building') text = h.o.def.name + (h.o.def.noUp ? '' : ' · Nv ' + h.o.lvl) + (h.o.upg ? ' (mejorando)' : '') + (h.o.owner !== 'p' ? ' · ' + D.BOTS.find(b => b.id === h.o.owner).name : '');
@@ -1124,6 +1151,11 @@
     else if (h.k === 'cap') { const c = D.CAPITULOS[h.o.n - 1]; text = c.lugar.name + ' · Capítulo ' + U.roman(h.o.n) + ' de la Crónica'; }
     else if (h.k === 'troop') text = h.o.march ? 'Tus tropas marchan hacia ' + (h.o.march.back ? 'casa' : h.o.march.name) : 'Tus soldados · ' + UI.hint('clic', 'toca') + ' para abrir el Cuartel';
     else if (h.k === 'unit') text = h.o.owner === 'p' ? (h.o.kind === 'scout' ? 'Explorador · ' : 'Aldeano · ') + taskText(h.o) : 'Aldeano de ' + D.BOTS.find(b => b.id === h.o.owner).name;
+    else if (h.k === 'galeon') text = 'Galeón · ' + UI.hint('clic', 'toca') + ' para abrirlo';
+    else if (h.k === 'wall') text = 'Muralla';
+    else if (h.k === 'belt') text = 'Cinta transportadora';
+    // Sin texto (parcelas, barcos…) no hay cartel: antes salía un recuadro vacío que además quedaba pegado.
+    if (!text) { hoverKey = ''; UI.hideTip(); return; }
     hoverKey = text;
     tip.textContent = text;
     tip.style.display = 'block';

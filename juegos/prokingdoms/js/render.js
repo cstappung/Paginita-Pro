@@ -6,6 +6,7 @@
   const PK = window.PK, U = PK.U, D = PK.D, W = PK.World, Sp = PK.Sprites;
   const R = (PK.Render = { cam: { x: 0, y: 0, z: 2 }, drawn: [], particles: [], showZones: true, hover: null });
   const G = () => PK.Game;
+  const I0 = () => (PK.Input && PK.Input.mouse && PK.Input.mouse.in ? PK.Input.mouse : null); // el puntero sobre el mapa
   const MOBILE = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || (navigator.deviceMemory && navigator.deviceMemory <= 4);
   const MAX_CHUNKS = MOBILE ? 36 : 90;
 
@@ -77,10 +78,12 @@
       budget--;
       g = Sp.renderGroundChunk(W, cx, cy);
       ground.set(ci, g);
+      // Solo se olvida un trozo que no se usó en este cuadro: a zoom 0,5 se ven más trozos que el tope, y sacar uno
+      // visible obligaba a repintarlo al cuadro siguiente sin fin (parpadeo). Ese cuadro se pasa del tope y listo.
       if (ground.size > MAX_CHUNKS) {
         let worst = null, wu = Infinity;
-        for (const [k, o] of ground) if (o.used < wu && k !== ci) { wu = o.used; worst = k; }
-        ground.delete(worst);
+        for (const [k, o] of ground) if (o.used < wu && o.used < frameNo && k !== ci) { wu = o.used; worst = k; }
+        if (worst !== null) ground.delete(worst);
       }
     }
     g.used = frameNo;
@@ -127,9 +130,12 @@
         if (b.owner !== 'p' || !b.done || !LUZ[b.type]) continue;
         const [x, y] = R.iso(b.x + b.w / 2, b.y + b.h / 2);
         if (!vis(x - 30, y - 50, 60, 60)) continue;
-        const n = LUZ[b.type], hh = b.h * 6 + 6;
+        // Las luces van en las dos paredes del frente (la de la izquierda y la de la derecha de la esquina de abajo),
+        // un poco sobre el suelo: antes salían en medio del techo.
+        const n = LUZ[b.type], [fx, fy] = R.iso(b.x + b.w, b.y + b.h), [lx, ly] = R.iso(b.x, b.y + b.h), [rx, ry] = R.iso(b.x + b.w, b.y);
         for (let i = 0; i < n; i++) {
-          const wx = x + (i - (n - 1) / 2) * 7, wy = y - hh, fl = 0.8 + 0.2 * Math.sin(t * 3 + U.hash(b.x, b.y, 4) * 20 + i);
+          const izq = i % 2 === 0, k = (Math.floor(i / 2) + 1) / (Math.ceil(n / 2) + 1), ax = izq ? lx : rx, ay = izq ? ly : ry;
+          const wx = fx + (ax - fx) * (0.35 + 0.3 * k), wy = fy + (ay - fy) * (0.35 + 0.3 * k) - 7 - b.h, fl = 0.8 + 0.2 * Math.sin(t * 3 + U.hash(b.x, b.y, 4) * 20 + i);
           ctx.globalAlpha = noche * fl;
           ctx.drawImage(gl, wx - 9, wy - 9, 18, 18);
           ctx.fillRect(Math.round(wx - 1), Math.round(wy - 1), 2, 2);
@@ -260,7 +266,7 @@
     if (n.gone) return null;
     if (D.NODES[n.kind] && D.NODES[n.kind].mar && Sp.nodoMar) return Sp.nodoMar(n, G().mareaBaja()); // Fase 9 (pk-28)
     if (n.kind === 'deer') return n.dead ? null : n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
-    if (n.kind === 'tree') return n.dead ? Sp.stump : Sp.trees[n.sp][n.v % Sp.trees[n.sp].length];
+    if (n.kind === 'tree') return n.dead ? (n.planta && Sp.brote ? Sp.brote : Sp.stump) : Sp.trees[n.sp][n.v % Sp.trees[n.sp].length];
     if (n.kind === 'berry') return n.dead || n.amount < n.max * 0.15 ? Sp.bushBare : Sp.bush[n.v % 3];
     const r = n.amount / n.max, sz = r > 0.5 ? 2 : r > 0.15 ? 1 : 0;
     return Sp.rocks[n.kind][sz][n.v % 2];
@@ -611,7 +617,7 @@
 
     // barras de progreso y marcas
     const puertas = g.encierro && g.encierro.puertas.length ? new Set(g.encierro.puertas) : null;
-    for (const it of list) {
+    for (const it of flats.length ? flats.concat(list) : list) { // las granjas, jardines y plazas van en `flats`
       if (it.k === 'building') {
         const b = it.o;
         if (!b.done) bar(ctx, it.x + it.spr.c.width / 2 - 14, it.y + it.spr.oy - 10, 28, b.progress, '#e8c050');
@@ -673,7 +679,18 @@
       }
     }
     if (R.roadGhost) for (const [x, y] of R.roadGhost) diamondFill(ctx, x, y, 'rgba(230,200,120,0.45)');
-    if (R.wallGhost) for (const [x, y] of R.wallGhost) diamondFill(ctx, x, y, PK.Def.tool === 'gate' ? 'rgba(232,184,74,0.6)' : 'rgba(210,210,220,0.55)');
+    if (R.wallGhost) {
+      const tl = PK.Def.tool, col = tl === 'gate' ? 'rgba(232,184,74,0.6)' : tl === 'quitar' || tl === 'talar' ? 'rgba(230,60,50,0.5)' : tl === 'plantar' ? 'rgba(80,220,90,0.45)' : 'rgba(210,210,220,0.55)';
+      for (const [x, y] of R.wallGhost) diamondFill(ctx, x, y, col);
+    }
+    // la zona elegida para talar o quitar (el primer toque y el puntero)
+    if ((PK.Def.tool === 'quitar' || PK.Def.tool === 'talar') && PK.Def.start && I0()) {
+      const [sx, sy] = PK.Def.start, m = I0(), [tx, ty] = R.screenToTile(m.x, m.y), L = (PK.Despeje && PK.Despeje.ZONA_MAX) || 24;
+      const x1 = U.clamp(Math.floor(tx), sx - L + 1, sx + L - 1), y1 = U.clamp(Math.floor(ty), sy - L + 1, sy + L - 1);
+      ctx.strokeStyle = 'rgba(255,120,100,0.9)'; ctx.lineWidth = 1;
+      const c = [[Math.min(sx, x1), Math.min(sy, y1)], [Math.max(sx, x1) + 1, Math.min(sy, y1)], [Math.max(sx, x1) + 1, Math.max(sy, y1) + 1], [Math.min(sx, x1), Math.max(sy, y1) + 1]].map(([a, b]) => R.iso(a, b));
+      ctx.beginPath(); ctx.moveTo(c[0][0], c[0][1]); for (const p of c.slice(1)) ctx.lineTo(p[0], p[1]); ctx.closePath(); ctx.stroke();
+    }
     if (R.beltGhost) for (const [x, y] of R.beltGhost) diamondFill(ctx, x, y, 'rgba(140,200,255,0.45)');
 
     // mapas del tesoro (H7): una X roja en el suelo, también sobre la niebla
@@ -1132,11 +1149,12 @@
       if (dal && b.owner !== 'p') { const c = Math.max(1, Math.round(s / 3)), r = Math.round(s / 2) + 1; ctx.fillRect(Math.round(x - r), Math.round(y - c / 2), r * 2, c); ctx.fillRect(Math.round(x - c / 2), Math.round(y - r), c, r * 2); } // ajenos: una cruz, los tuyos: un cuadrado
       else ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
     }
+    const escCss = Math.max(1, Math.round(mc.width / Math.max(1, mc.clientWidth))), pu = Math.max(zk > 1.5 ? 2 : 1, escCss); // puntos visibles en el celular
     for (const u of G().units) {
       if (u.inside || (u.owner !== 'p' && !seen(u.x, u.y))) continue;
       const [x, y] = toMM(u.x, u.y);
       ctx.fillStyle = u.owner === 'p' ? '#cfe0ff' : 'rgb(' + Sp.ownerColor(u.owner).map(c => Math.min(255, c + 60)).join(',') + ')';
-      ctx.fillRect(Math.round(x), Math.round(y), zk > 1.5 ? 2 : 1, zk > 1.5 ? 2 : 1);
+      ctx.fillRect(Math.round(x), Math.round(y), pu, pu);
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
     if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
@@ -1159,8 +1177,11 @@
     // vista de la cámara
     const s = R.scale(), vw = R.cv.width / s, vh = R.cv.height / s;
     const ax = ((R.cam.x - vw / 2) / 16 - v.x) * sx, ay = ((R.cam.y - vh / 2) / 16 - v.y) * sy;
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
-    ctx.strokeRect(Math.round(ax) + 0.5, Math.round(ay) + 0.5, Math.round((vw / 16) * sx), Math.round((vh / 16) * sy));
+    // El lienzo es más grande que lo que se ve (en el celular, 384 px mostrados en 120–160): el trazo de 1 px se
+    // perdía al achicarse. Se engruesa según esa escala para que siempre mida al menos 1 px en pantalla.
+    const lw = Math.max(1, Math.round(mc.width / Math.max(1, mc.clientWidth)));
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = lw;
+    ctx.strokeRect(Math.round(ax) + lw / 2, Math.round(ay) + lw / 2, Math.round((vw / 16) * sx), Math.round((vh / 16) * sy));
   };
   R.minimapToTile = function (mc, mx, my) {
     const w = W.W + W.H, h = (W.W + W.H) / 2, v = R.mmView || { x: 0, y: 0, w, h };

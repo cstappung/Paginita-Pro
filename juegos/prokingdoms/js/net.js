@@ -109,8 +109,21 @@
   Net.sync = async function (first) {
     if (!Net.online || syncing) return;
     syncing = true;
-    const sent = pending, ops = marketOps;
-    pending = {}; marketOps = [];
+    const sent = pending, ops = [];
+    pending = {};
+    // El servidor acepta hasta LIM.marketSync × escala de oro por sync y recorta (y anota como sospecha) lo demás:
+    // lo que no cabe en esta vuelta (una compra de 10.000, o lo que el Tesorero hizo sin conexión) espera a la siguiente.
+    const Soc = PK.Social, lim = Soc.MERCADO.sync * Soc.escala(S().era) * 0.9, resto = [];
+    let usado = 0;
+    for (const op of marketOps) {
+      const v1 = Soc.valor(op.res, 1), cabe = v1 > 0 ? Math.floor((lim - usado) / v1) : op.n;
+      if (cabe <= 0) { resto.push(op); continue; }
+      const n = Math.min(op.n, cabe);
+      ops.push(n === op.n ? op : Object.assign({}, op, { n }));
+      usado += n * v1;
+      if (n < op.n) resto.push(Object.assign({}, op, { n: op.n - n }));
+    }
+    marketOps = resto;
     const t0 = performance.now();
     try {
       // Pase del Reino: las estadísticas que el servidor convierte en puntos (D.PASE_STATS, js/pase.js)

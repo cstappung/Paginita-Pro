@@ -112,11 +112,44 @@
   // Mejores precios con un Mercado de más nivel.
   const mkRate0 = k => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'market').reduce((m, b) => (k === 'buy' ? Math.min(m, G().bst(b).buy) : Math.max(m, G().bst(b).sell)), k === 'buy' ? 1.1 : 0.65);
   // árbol y cartas (Moneda acuñada, Puertas abiertas): nunca se vende más caro de lo que se compra
-  const mkRate = k => { const v = !G().bono ? 0 : k === 'buy' ? G().bono('buy') : G().bono('sell'); return k === 'buy' ? Math.max(0.8, mkRate0('buy') - v) : Math.min(0.97, mkRate0('sell') + v); };
+  // y siempre con 10 puntos entre las dos (pk-40): sin eso, comprar y vender lo mismo daba oro.
+  const mkRate = k => {
+    const vb = !G().bono ? 0 : G().bono('buy'), vs = !G().bono ? 0 : G().bono('sell');
+    const buy = Math.max(0.8, mkRate0('buy') - vb), sell = Math.min(0.97, mkRate0('sell') + vs, buy - 0.1);
+    return k === 'buy' ? buy : sell;
+  };
   // S1 (pk-23): un tratado de comercio abarata la compra, sin bajar nunca de la venta + 10% (no hay compra-venta gratis)
   const buyRate = () => { const b = mkRate('buy'); return PK.Diplo && PK.Diplo.tratado() ? Math.min(b, Math.max(mkRate('sell') + 0.1, b * D.DIPLO.tratado.buy)) : b; };
-  Soc.buyPrice = (r, n) => Math.ceil((S().market.p[r] * buyRate() * n) / 100);
-  Soc.sellPrice = (r, n) => Math.floor((S().market.p[r] * mkRate('sell') * n) / 100);
+  // Se cobra al precio medio de la operación: cada 100 que compras sube el precio un 3% (y vender lo baja un 3%).
+  // Antes se cobraba todo al precio de antes y después se movía, así que comprar un lote grande y venderlo inflaba
+  // el precio a favor de uno (el Tesorero imprimía oro así). El precio queda entre 0,25 y 4 veces el base.
+  const tope = (r, p) => U.clamp(p, (D.MARKET_BASE[r] || 100) * 0.25, (D.MARKET_BASE[r] || 100) * 4);
+  const medioCompra = (r, n) => tope(r, S().market.p[r] * Math.pow(1.03, n / 200));
+  const medioVenta = (r, n) => tope(r, S().market.p[r] * Math.pow(0.97, n / 200));
+  Soc.buyPrice = (r, n) => Math.ceil((medioCompra(r, n) * buyRate() * n) / 100);
+  Soc.sellPrice = (r, n) => Math.floor((medioVenta(r, n) * mkRate('sell') * n) / 100);
+  // Tope del servidor con los mercaderes (LIM.marketSync y LIM.marketDay en sim.js, medido en oro al precio del
+  // mercado): 2 × escala por sync y 20 × escala por día UTC. Sin conexión no hay tope. Pasarlo recortaba la
+  // operación en el servidor y marcaba a un jugador honesto como sospechoso.
+  Soc.MERCADO = { sync: 2, dia: 20 };
+  Soc.escala = era => 1000 * Math.pow(1.6, era - 1);
+  Soc.diaUTC = () => new Date().toISOString().slice(0, 10);
+  Soc.valor = (r, n) => value(r, n);
+  function mercadoDia() {
+    const m = S().market, d = Soc.diaUTC();
+    if (!m.dia || m.dia.d !== d) m.dia = { d, v: 0 };
+    return m.dia;
+  }
+  Soc.mercadoLibre = () => (online() ? Math.max(0, Soc.MERCADO.dia * Soc.escala(S().era) * 0.97 - mercadoDia().v) : Infinity);
+  // ¿Cuánto se puede comprar o vender hoy de ese recurso? (en unidades; Infinity sin conexión)
+  Soc.cuantoHoy = r => { const l = Soc.mercadoLibre(); return isFinite(l) ? Math.floor((l * 100) / price(r)) : Infinity; };
+  function cabeHoy(r, n) {
+    if (!online()) return true;
+    const v = value(r, n), libre = Soc.mercadoLibre();
+    if (v <= libre) { mercadoDia().v += v; return true; }
+    toast('Los mercaderes ya comerciaron mucho contigo hoy: te quedan ' + U.fmt(Math.floor(libre)) + ' de oro en compras o ventas (unos ' + U.fmt(Soc.cuantoHoy(r)) + ' de ' + D.RES[r].name.toLowerCase() + ') hasta mañana.', 'warn');
+    return false;
+  }
   function botOffer() {
     const m = S().market, pool = tradePool(), bot = U.pick(D.BOTS);
     const give = U.pick(pool);
@@ -132,22 +165,26 @@
   Soc.buy = function (res, n) {
     const m = S().market;
     const cost = Soc.buyPrice(res, n);
-    if (S().res.gold < cost) { toast('Oro insuficiente.', 'warn'); return; }
+    if (S().res.gold < cost) { toast('Oro insuficiente.', 'warn'); return false; }
+    if (!cabeHoy(res, n)) return false;
     // Lo que se compra, se vende o se cambia siempre entra entero, aunque pase el tope: el tope solo frena
     // lo que juntan los aldeanos (antes «Comprar» se negaba mientras premios y tratos sí lo pasaban).
     S().res.gold -= cost; S().res[res] += n;
-    m.p[res] *= Math.pow(1.03, n / 100);
+    m.p[res] = tope(res, m.p[res] * Math.pow(1.03, n / 100));
     G().stat('market_ops', 1); G().stat('gold_volume', cost); G().stat('compras', 1);
     if (online()) PK.Net.marketOp({ res, n, side: 'buy' });
+    return true;
   };
   Soc.sell = function (res, n) {
     const m = S().market;
-    if (S().res[res] < n) { toast('No tienes suficiente.', 'warn'); return; }
+    if (S().res[res] < n) { toast('No tienes suficiente.', 'warn'); return false; }
     const gain = Soc.sellPrice(res, n);
+    if (!cabeHoy(res, n)) return false;
     S().res[res] -= n; S().res.gold += gain; // con el oro lleno, addRes se comía la venta
-    m.p[res] *= Math.pow(0.97, n / 100);
+    m.p[res] = tope(res, m.p[res] * Math.pow(0.97, n / 100));
     G().stat('market_ops', 1); G().stat('gold_volume', gain);
     if (online()) PK.Net.marketOp({ res, n, side: 'sell' });
+    return true;
   };
   Soc.accept = function (id) {
     const m = S().market, o = m.offers.find(x => x.id === id);
@@ -159,9 +196,11 @@
     G().stat('trades_accepted', 1); G().stat('gold_volume', Math.round(value(o.give, o.gn)));
     toast('Trato cerrado con ' + o.by + '.', 'good');
   };
+  Soc.OFERTA_MAX = 3; // el servidor rechaza pedir más de 3 veces el valor de lo que das (postOffer en sim.js)
   Soc.post = function (give, gn, want, wn) {
     const m = S().market;
     if (give === want || gn <= 0 || wn <= 0) { toast('Oferta no válida.', 'warn'); return false; }
+    if (value(want, wn) > Soc.OFERTA_MAX * value(give, gn)) { toast('Pides demasiado a cambio.', 'warn'); return false; }
     if (m.mine.length >= 3) { toast('Máximo 3 ofertas publicadas.', 'warn'); return false; }
     if ((S().res[give] || 0) < gn) { toast('No tienes suficiente para ofrecer.', 'warn'); return false; }
     S().res[give] -= gn;
@@ -607,16 +646,24 @@
       const st = S(), m = st.market;
       if (!G().countB('market')) { body.append(el('p', { class: 'muted' }, 'Construye un Mercado (Era II) para comerciar con otros reinos.')); return; }
       const grid = el('div', { class: 'mk-grid' });
+      // Cuánto se compra o vende por toque (reporte de un jugador, pk-40: antes siempre 100).
+      const CANT = [100, 1000, 10000], cant = CANT.includes(st.flags.mkCant) ? st.flags.mkCant : 100, cn = U.fmt(cant);
+      const hoy = Soc.mercadoLibre();
       for (const r of TRADEABLE) {
         if (!tradePool().includes(r)) continue;
         const base = D.MARKET_BASE[r], p = m.p[r], trend = p > base * 1.05 ? 'up' : p < base * 0.95 ? 'down' : '';
+        const pc = Soc.buyPrice(r, cant), pv = Soc.sellPrice(r, cant), cabe = !isFinite(hoy) || value(r, cant) <= hoy;
         grid.append(el('div', { class: 'mk-row' },
           UI().resIcon(r), el('span', { class: 'mk-name' }, D.RES[r].name),
-          el('span', { class: 'mk-price ' + trend }, 'Compra ' + Soc.buyPrice(r, 100) + ' · Venta ' + Soc.sellPrice(r, 100)),
-          UI().btn('Comprar 100', () => { Soc.buy(r, 100); UI().rerender(); }, { small: true, disabled: st.res.gold < Soc.buyPrice(r, 100) }),
-          UI().btn('Vender 100', () => { Soc.sell(r, 100); UI().rerender(); }, { small: true, disabled: st.res[r] < 100 })));
+          el('span', { class: 'mk-price ' + trend, title: 'Oro por ' + cn + ' (por 100: compra ' + Soc.buyPrice(r, 100) + ', venta ' + Soc.sellPrice(r, 100) + ')' }, 'Compra ' + U.fmt(pc) + ' · Venta ' + U.fmt(pv)),
+          UI().btn('Comprar ' + cn, () => { Soc.buy(r, cant); UI().rerender(); }, { small: true, disabled: st.res.gold < pc || !cabe }),
+          UI().btn('Vender ' + cn, () => { Soc.sell(r, cant); UI().rerender(); }, { small: true, disabled: st.res[r] < cant || !cabe })));
       }
-      body.append(el('h3', null, 'Precios (oro por 100)'), el('p', { class: 'muted small' }, 'Los precios suben cuando todos compran y bajan cuando todos venden. Lo que compras o vendes entra entero aunque pase el tope de tus bodegas. Mejora el Mercado para pagar menos y cobrar más (ahora compras al ' + Math.round(mkRate('buy') * 100) + '% y vendes al ' + Math.round(mkRate('sell') * 100) + '%).'), grid);
+      const chips = el('div', { class: 'row mk-cant' }, el('span', { class: 'small' }, 'De a: '),
+        CANT.map(c => UI().btn(U.fmt(c), () => { st.flags.mkCant = c; UI().rerender(); }, { small: true, cls: c === cant ? 'gold' : '' })));
+      body.append(el('h3', null, 'Precios (oro por ' + cn + ')'), chips,
+        el('p', { class: 'muted small' }, 'Los precios suben cuando todos compran y bajan cuando todos venden: cada 100 que compras de una vez encarece un 3% (y vender lo abarata), así que un lote grande sale a precio medio. Lo que compras o vendes entra entero aunque pase el tope de tus bodegas. Mejora el Mercado para pagar menos y cobrar más (ahora compras al ' + Math.round(buyRate() * 100) + '% y vendes al ' + Math.round(mkRate('sell') * 100) + '%).' +
+          (isFinite(hoy) ? ' Hoy puedes mover ' + U.fmt(Math.floor(hoy)) + ' de oro más con los mercaderes (el servidor pone un tope diario).' : '')), grid);
 
       const net = online(), cache = net ? PK.Net.cache.offers : null;
       body.append(el('h3', null, net ? 'Tablón de ofertas (jugadores y mercaderes)' : 'Tablón de ofertas de otros reinos'));
@@ -635,16 +682,33 @@
       body.append(el('h3', null, 'Publicar tu oferta'));
       const pool = tradePool();
       const sel = (id, def) => el('select', { id }, pool.map(r => el('option', { value: r, selected: r === def }, D.RES[r].name)));
+      // Ayuda (reporte de un jugador, pk-40): cuánto vale lo que das, cuánto es lo justo pedir y cuánto es lo máximo
+      // antes de «Pides demasiado a cambio» (el servidor rechaza pedir más de 3 veces lo que das).
+      const ayuda = el('p', { class: 'small of-ayuda' });
+      const q = id => form.querySelector('#' + id);
+      const justo = () => { const g = q('of-g').value, w = q('of-w').value, gn = Math.max(0, Math.floor(+q('of-gn').value) || 0); return { g, w, gn, wn: Math.max(0, Math.floor(+q('of-wn').value) || 0), fair: Math.round((value(g, gn) * 100) / price(w)) }; };
+      const pinta = () => {
+        const o = justo();
+        if (o.g === o.w || !o.gn) { ayuda.textContent = 'Elige qué das y qué pides (distintos).'; ayuda.className = 'small of-ayuda muted'; return; }
+        const max = Math.floor(o.fair * Soc.OFERTA_MAX), r = o.wn / Math.max(1, o.fair);
+        ayuda.textContent = U.fmt(o.gn) + ' de ' + D.RES[o.g].name.toLowerCase() + ' valen unos ' + U.fmt(Math.round(value(o.g, o.gn))) + ' de oro. Lo justo es pedir unos ' + U.fmt(o.fair) + ' de ' + D.RES[o.w].name.toLowerCase() +
+          '. Los mercaderes la toman pronto si pides hasta unos ' + U.fmt(Math.floor(o.fair * 1.2)) + ' y casi nunca pasado ' + U.fmt(Math.floor(o.fair * 1.3)) + ' (un jugador sí puede aceptarla). Lo máximo que se puede pedir es ' + U.fmt(max) + '.' + (o.wn ? ' Tu oferta: ' + (Math.round(r * 100) / 100).toString().replace('.', ',') + ' veces lo justo.' : '');
+        ayuda.className = 'small of-ayuda ' + (r > Soc.OFERTA_MAX ? 'warn-t' : r > 1.5 ? 'muted' : 'good-t');
+      };
       const form = el('div', { class: 'offer-form' },
         'Doy ', el('input', { id: 'of-gn', type: 'number', value: 200, min: 10, step: 10 }), sel('of-g', 'wood'),
         ' por ', el('input', { id: 'of-wn', type: 'number', value: 150, min: 10, step: 10 }), sel('of-w', 'stone'),
+        UI().btn('Precio justo', () => { q('of-wn').value = justo().fair; pinta(); }, { small: true, title: 'Pide lo que vale según el mercado' }),
         UI().btn('Publicar', () => {
-          const q = id => document.getElementById(id);
-          const args = [q('of-g').value, Math.floor(+q('of-gn').value), q('of-w').value, Math.floor(+q('of-wn').value)];
-          if (net) { if (args[0] === args[2] || !(args[1] > 0) || !(args[3] > 0)) toast('Oferta no válida.', 'warn'); else PK.Net.postOffer(...args); }
+          const o = justo(), args = [o.g, o.gn, o.w, o.wn];
+          if (o.g === o.w || !(o.gn > 0) || !(o.wn > 0)) { toast('Oferta no válida.', 'warn'); return; }
+          if (o.wn > o.fair * Soc.OFERTA_MAX) { toast('Pides demasiado a cambio: como mucho ' + U.fmt(Math.floor(o.fair * Soc.OFERTA_MAX)) + ' de ' + D.RES[o.w].name.toLowerCase() + ' (3 veces lo que vale lo que das).', 'warn'); return; }
+          if (net) PK.Net.postOffer(...args);
           else if (Soc.post(...args)) UI().rerender();
         }, { small: true }));
-      body.append(form, el('p', { class: 'muted small' }, net ? 'Cualquier jugador del servidor puede aceptarla; los mercaderes aceptan antes las ofertas justas. Expira en 24 h.' : 'Las ofertas justas (según el precio del mercado) se aceptan antes.'));
+      for (const i of form.querySelectorAll('input, select')) { i.addEventListener('input', pinta); i.addEventListener('change', pinta); i.addEventListener('keydown', e => e.stopPropagation()); }
+      pinta();
+      body.append(form, ayuda, el('p', { class: 'muted small' }, net ? 'Cualquier jugador del servidor puede aceptarla; los mercaderes aceptan antes las ofertas justas. Expira en 24 h.' : 'Las ofertas justas (según el precio del mercado) se aceptan antes.'));
       const mine = net ? (cache ? cache.mine : []) : m.mine;
       for (const o of mine) body.append(el('div', { class: 'offer mine' }, 'Tu oferta: ', UI().amount(o.give, o.gn), ' por ', UI().amount(o.want, o.wn),
         UI().btn('Retirar', () => { if (net) PK.Net.cancelOffer(o); else { Soc.cancel(o.id); UI().rerender(); } }, { small: true })));

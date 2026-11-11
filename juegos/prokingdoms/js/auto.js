@@ -62,6 +62,7 @@
       if (isla(b.cx, b.cy)) continue;
       const rc = D.RECIPES[b.def.recipe];
       if (!g.reserveOk(rc.in, Object.keys(rc.out)[0], b) && !PK.Logi.carts().length) continue;
+      if (!PK.Logi.puede(b) || (b.paradoHasta && g.ahora() < b.paradoHasta)) continue; // parado: no volver a mandarlos
       if (!PK.Logi.supplied(b)) continue; // sin abastecimiento no sirve de nada
       const reserved = g.units.filter(o => o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length;
       if (b.workers.length + reserved >= g.slots(b)) continue;
@@ -204,7 +205,7 @@
     if (st.auto.rebal && (rebalT += el) >= 20) { rebalT = 0; A.rebalance(3, 0.08 * A.villagers().length); }
     // «Ocupar los talleres» también con todos ocupados: cada 10 s pasa a un recolector que puso el Capataz (nunca uno
     // que mandaste tú) a un taller con puesto libre. Antes solo usaba ociosos y, sin ociosos, no hacía nada (playtest).
-    if (st.auto.work && (shopT += 1) >= 10) {
+    if (st.auto.work && (shopT += el) >= 10) { // segundos, no pasadas: sin conexión cada pasada trae 60 s
       shopT = 0;
       const b = openShop();
       if (b) {
@@ -224,9 +225,10 @@
         if (b.owner !== 'p' || !b.def.recipe || !b.workers.length) continue;
         // si una carreta o una cinta ya trae lo que falta, no cuenta como parado
         const coming = b.status === 'Faltan insumos' && (PK.Logi.carts().some(c => c.job && c.job.to === b.id) || st.logi.belts.some(x => x.b === b.id && x.items.length));
-        b.stallT = b.status === 'Produciendo' || coming ? 0 : (b.stallT || 0) + 1;
+        b.stallT = b.status === 'Produciendo' || coming ? 0 : (b.stallT || 0) + el;
         if (b.stallT < 20) continue;
         b.stallT = 0;
+        b.paradoHasta = g.ahora() + 90e3; // por un rato nadie vuelve a ocuparlo (ver openShop)
         // los que pusiste tú se quedan: una orden tuya no la deshace el Capataz
         for (const id of b.workers.slice()) { const u = g.uById.get(id); if (u && !(u.task && u.task.m)) { g.release(u); u.task = null; u.mode = 'idle'; } }
       }
@@ -281,16 +283,32 @@
   };
   A.serieNivel = type => { const v = (S().auto.serie || {})[type] || 0; return v >= A.SERIE_ERA ? G().maxLvl(type) : Math.min(v, G().maxLvl(type)); };
   A.setSerie = function (type, v) { const s = S().auto.serie; if (v > 0) s[type] = v; else delete s[type]; };
-  // ¿Paga sin tocar lo que guarda la meta de era?
+  // ¿Paga sin tocar lo que guarda la meta de era ni lo que pide la próxima obra de tu cola (G.colaNecesita)?
   function cabeMeta(g, st, cost) {
+    const cola = g.colaNecesita();
+    for (const r in cost) if ((st.res[r] || 0) - cost[r] < (cola[r] || 0)) return false;
     if (st.auto.plan !== 'meta') return true;
     const nec = g.metaNecesita();
     for (const r in cost) if ((st.res[r] || 0) - cost[r] < (nec[r] || 0)) return false;
     return true;
   }
+  A.cabeMeta = cost => cabeMeta(G(), S(), cost);
+  // La cola de obras es tuya (pedido del dueño, pk-40): las automatizaciones (Mejoras en serie, Maestro mayor) ya no
+  // la llenan ni esperan a que se vacíe. Solo ceden el paso si algo de la cola ya se puede pagar (un maestro lo toma
+  // en esta misma pasada); lo que espera recursos no las frena.
+  A.colaLista = function () {
+    const g = G();
+    return S().upq.some(id => { const b = g.bById.get(id); return b && b.done && !b.upg && g.canAfford(g.upCost(b)); });
+  };
+  // Empieza una mejora sin pasar por la cola, en silencio (lo usan las automatizaciones).
+  A.mejorarYa = function (b) {
+    const g = G(), ui = PK.UI;
+    if (ui) ui.mute = true;
+    try { return !!g.upgrade(b); } finally { if (ui) ui.mute = false; }
+  };
   A.serieTick = function (g, st) {
     const obj = st.auto.serie;
-    if (!obj || st.upq.length) return;
+    if (!obj || A.colaLista()) return;
     let tipos = null;
     for (let k = 0; k < 4; k++) {
       const total = g.builders(), busy = g.buildersBusy();
@@ -308,9 +326,7 @@
         if (!mejor || b.lvl < mejor.lvl || c < mc) { mejor = b; mc = c; }
       }
       if (!mejor) return;
-      const ui = PK.UI;
-      if (ui) ui.mute = true;
-      try { if (!g.upgrade(mejor)) return; } finally { if (ui) ui.mute = false; }
+      if (!A.mejorarYa(mejor)) return;
       st.auto.serieN = (st.auto.serieN || 0) + 1;
     }
   };

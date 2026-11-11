@@ -31,10 +31,9 @@
   function serieEl() {
     const A = PK.Auto, g = PK.Game, tipos = A.serieTipos();
     const box = el('div', null, el('h3', null, 'Mejoras en serie'),
-      el('p', { class: 'small' }, 'Para casas, granjas, campamentos, molinos y muelles: elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. Lo que pongas en la cola de obras va antes, deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
+      el('p', { class: 'small' }, 'Para casas, granjas, campamentos, molinos y muelles: elige hasta qué nivel y el Capataz los mejora solo, primero los más bajos. No usa tu cola de obras: lo que pongas ahí va antes apenas se pueda pagar, y el Capataz no gasta lo que pide la próxima obra de la cola. Deja un Maestro de Obras libre si tienes más de uno y con «Meta de era» no gasta lo que la era necesita.'));
     if (!tipos.length) { box.append(el('p', { class: 'small muted' }, 'Todavía no tienes casas, granjas, campamentos, molinos ni muelles.')); return box; }
-    const enCola = g.state.upq.length;
-    if (enCola && Object.keys(g.state.auto.serie).length) box.append(el('p', { class: 'small warn-t' }, 'En pausa: primero va tu cola de obras (' + enCola + (enCola === 1 ? ' mejora' : ' mejoras') + '). Cuando se vacíe, el Capataz sigue.'));
+    if (A.colaLista() && Object.keys(g.state.auto.serie).length) box.append(el('p', { class: 'small warn-t' }, 'Un momento: primero empieza lo de tu cola de obras que ya se puede pagar.'));
     const rows = el('div', { class: 'guild-rows' });
     for (const x of tipos) {
       const meta = A.serieNivel(x.type), faltan = meta ? g.buildings.filter(b => b.owner === 'p' && b.done && b.type === x.type && b.lvl < meta).length : 0;
@@ -149,6 +148,12 @@
         }
         if (grid.children.length) body.append(el('h3', null, name), grid);
       }
+      // pk-40: el terreno de tus tierras (despeje.js)
+      if (D.temaActivo !== 'mar' && PK.Despeje) body.append(el('h3', null, 'Terreno'), el('div', { class: 'row' },
+        UI.btn('Plantar árboles', () => PK.Despeje.empezar('plantar'), { small: true, title: 'Un brote en una casilla libre de tus tierras; en 20 minutos es un árbol' }),
+        UI.btn('Talar árboles', () => PK.Despeje.empezar('talar'), { small: true, title: 'Marca una zona: sus árboles se quitan para siempre (vuelve la mitad de la madera)' }),
+        UI.btn('Quitar muros y caminos', () => PK.Despeje.empezar('quitar'), { small: true, title: 'Marca una zona: se quitan sus murallas, puertas y caminos (vuelve la mitad del material)' })),
+        el('p', { class: 'small muted' }, 'Dentro de tus tierras solo quedan árboles: las minas, cuevas y campamentos que caen en una parcela tuya se mudan solos a la tierra de nadie más cercana.'));
     }, { wide: true });
   };
 })();

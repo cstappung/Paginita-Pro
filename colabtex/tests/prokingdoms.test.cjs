@@ -755,7 +755,7 @@ test('Fase 9 «d»: la Regata, los duelos y los puentes entre mundos', () => {
   assert.ok(D.RANKINGS.regata);
 });
 
-test('Mejoras en serie: el Capataz sube vivienda y recolección, deja tu cola primero y un maestro libre', () => {
+test('Mejoras en serie: el Capataz sube vivienda y recolección, deja tu cola primero (si se puede pagar) y un maestro libre', () => {
   const A = PK.Auto, guarda = {}, cambia = o => { for (const k in o) { guarda[k] = G[k]; G[k] = o[k]; } };
   const casa = (id, lvl, extra) => Object.assign({ id, owner: 'p', type: 'house', done: true, lvl, upg: null, def: D.BUILD.house }, extra);
   const bs = [casa(1, 1), casa(2, 3), casa(3, 2), casa(4, 1, { owner: 'b1' }),
@@ -764,11 +764,12 @@ test('Mejoras en serie: el Capataz sube vivienda y recolección, deja tu cola pr
   // torres y talleres pueden ser muchos, pero subirlos es una decisión: nunca entran
   for (let i = 0; i < 3; i++) for (const t of ['tower', 'sawmill']) bs.push({ id: 20 + bs.length, owner: 'p', type: t, done: true, lvl: 1, upg: null, def: D.BUILD[t] });
   const st = { auto: { serie: {}, plan: 'mano' }, upq: [], res: { food: 1e6, wood: 1e6, stone: 1e6, gold: 1e6 } };
-  let maestros = 2, plata = true;
+  let maestros = 2, plata = true, caro = false;
   const ocupados = () => bs.filter(b => b.upg).length;
   PK.UI = PK.UI || {};
-  cambia({ state: st, buildings: bs, maxLvl: () => 5, builders: () => maestros, buildersBusy: ocupados, upCost: () => ({ wood: 10 }),
-    canAfford: () => plata, metaNecesita: () => ({ wood: 1e6 }), upgrade: b => { b.upg = { t: 0, total: 9 }; return true; } });
+  cambia({ state: st, buildings: bs, bById: new Map(bs.map(b => [b.id, b])), maxLvl: () => 5, builders: () => maestros, buildersBusy: ocupados,
+    upCost: b => (caro && b.id === 2 ? { stone: 2e6 } : { wood: 10 }), canAfford: c => plata && Object.keys(c).every(r => (st.res[r] || 0) >= c[r]),
+    colaNecesita: () => (caro ? { stone: 2e6 } : {}), metaNecesita: () => ({ wood: 1e6 }), upgrade: b => { b.upg = { t: 0, total: 9 }; return true; } });
   try {
     const tipos = A.serieTipos();
     assert.equal(JSON.stringify(tipos.map(x => [x.type, x.n, x.min, x.max])), JSON.stringify([['house', 3, 1, 3], ['farm', 2, 1, 1]]), 'solo lo tuyo y solo vivienda y recolección, aunque haya pocos');
@@ -777,7 +778,11 @@ test('Mejoras en serie: el Capataz sube vivienda y recolección, deja tu cola pr
     A.setSerie('house', 3);
     st.upq = [2];
     A.serieTick(G, st);
-    assert.equal(ocupados(), 0, 'con algo en tu cola, tu cola va primero');
+    assert.equal(ocupados(), 0, 'con algo de tu cola que ya se puede pagar, tu cola va primero');
+    caro = true;
+    A.serieTick(G, st);
+    assert.deepEqual(bs.filter(b => b.upg).map(b => b.id), [1], 'lo que espera recursos en tu cola no frena al Capataz (pk-40)');
+    bs[0].upg = null; caro = false;
     st.upq = [];
     A.serieTick(G, st);
     assert.deepEqual(bs.filter(b => b.upg).map(b => b.id), [1], 'el más bajo primero, y con 2 maestros deja 1 libre');
@@ -888,4 +893,19 @@ test('Sonidos grabados (pk-38): cada nombre de sfx.js tiene su archivo, cada son
     assert.ok(graba.includes(m[1] + ':'), 'el ambiente «' + m[1] + '» no usa grabación');
     assert.ok(nombres.includes('amb-' + m[1]), 'sin ganancia: amb-' + m[1]);
   }
+});
+
+test('pk-40: el Mercado nunca vende más caro de lo que compra (oro infinito en Nv 8–9) y los eventos no se pisan', () => {
+  const D = PK.D;
+  for (let L = 1; L <= 12; L++) {
+    const s = D.BSTATS.market(L);
+    assert.ok(s.sell <= s.buy - 0.1 + 1e-9, 'Nv ' + L + ': compra ' + s.buy + ' y venta ' + s.sell);
+    if (L > 1) { const a = D.BSTATS.market(L - 1); assert.ok(s.buy <= a.buy && s.sell >= a.sell, 'mejorar el Mercado nunca empeora el precio (Nv ' + L + ')'); }
+  }
+  // dos claves iguales en un objeto literal se pisan en silencio: el Torneo de caballeros nunca salía
+  const life = fs.readFileSync(path.join(PKDIR, 'js', 'life.js'), 'utf8');
+  const claves = [...life.matchAll(/^ {4}([a-zA-Z]+): \{\s*$/gm)].map(m => m[1]);
+  const rep = claves.filter((k, i) => claves.indexOf(k) !== i);
+  assert.deepEqual(rep, [], 'eventos repetidos en life.js');
+  assert.ok(PK.Life.EVENTS.torneo && PK.Life.EVENTS.torneoVerano);
 });

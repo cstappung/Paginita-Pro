@@ -191,7 +191,12 @@
   B.filaPorDefecto = k => (TROPA[k].fila >= 6 ? 'f' : TROPA[k].fila >= 3.6 ? 'm' : 'a');
   const filaDe = (r, k) => { const x = r.form && r.form.filas && r.form.filas[k]; return x && FILAS[x] && x !== B.filaPorDefecto(k) ? FILAS[x] : TROPA[k].fila; };
   B.empezar = function (r) {
-    if (B.lista.some(b => b.id === r.id)) return true;
+    // Una batalla terminada de la misma run (una sala anterior de la incursión, con su cartel abierto) no es esta:
+    // antes devolvía true sin armar la nueva, la run quedaba en 'go' y salía un aviso por segundo.
+    const vieja = B.lista.find(b => b.id === r.id);
+    if (vieja && !vieja.fin) return true;
+    let reabrir = false;
+    if (vieja) { reabrir = !!(vista && vista.b === vieja); if (reabrir) B.cerrar(); const i = B.lista.indexOf(vieja); if (i >= 0) B.lista.splice(i, 1); }
     const tipos = Object.keys(r.units).filter(k => r.units[k] > 0 && TROPA[k]);
     if (!tipos.length && !(r.baterias > 0)) return false; // un asalto pirata se puede pelear solo con las baterías
     const tac = PK.Exp.TACTICS[r.tactic] || PK.Exp.TACTICS.normal;
@@ -199,6 +204,9 @@
     // tropas reciben solo una parte (HERO_TROPAS) y el resto lo pone su habilidad, que se usa sola si nadie mira:
     // así el resultado medio en vivo se parece al del cálculo por proporción (regla 8). Medido con B.adelantar.
     const hm = 1 + (PK.Exp.heroMult(r.heroe, r.enemy || { bandit: 1 }) - 1) * HERO_TROPAS;
+    // Lo que el planificador ya contó y las figuras (armadas contra {}) perdían: la Bendición y el Misterio de una
+    // incursión, los +% de los encuentros del camino y los bonos contra dragones y de las leyendas.
+    const extra = (1 + (r.inc ? r.inc.bend || 0 : 0)) * (r.encFuerza || 1) * PK.Exp.contra(r.enemy || { bandit: 1 });
     const b = {
       id: r.id, nombre: r.name, lugar: lugarDe(r), nivel: nivelDe(r), piso: r.floor || 0, t: 0, fin: null, orden: r.tactic === 'cauto' ? 'linea' : 'cargar', foco: null, vel: 1,
       tac, suerte: U.rand(0.8, 1.2), mios: [], suyos: [], tiros: [], efectos: [], textos: [], enviados: Object.assign({}, r.units), enemigo: r.enemy || { bandit: 1 },
@@ -218,7 +226,7 @@
         if (!rep) continue;
         // la vida también sale de cuánto rinde esa tropa contra este enemigo: así la «fuerza contra» del planificador
         // (Exp.powerVs) es la que pelea (vida x daño crecen igual que la fuerza al cuadrado de los dos lados)
-        const pow = rep * porUnidad(k) * hm, f = figura('p', k, st, pow, rep, filaDe(r, k) + (Math.random() - 0.5) * 0.6, 0);
+        const pow = rep * porUnidad(k) * hm * extra, f = figura('p', k, st, pow, rep, filaDe(r, k) + (Math.random() - 0.5) * 0.6, 0);
         f.max = f.hp = f.hp * PK.Exp.vsFactor(k, b.enemigo);
         f.rango = D.rankOf(xp[k] || 0); // C8: estrellas sobre la figura (solo se dibujan)
         b.mios.push(f);
@@ -255,6 +263,7 @@
     B.lista.push(b);
     r.phase = 'battle';
     r.battleAt = Date.now();
+    if (reabrir) r.watch = true; // la estabas mirando: se abre la nueva sala (Exp.update la abre con r.watch)
     return true;
   };
   // Fase 4 (pk-21): un enemigo común no puede valer más de TOPE_EN veces su fuerza (vida x daño). Los gólems, osos y

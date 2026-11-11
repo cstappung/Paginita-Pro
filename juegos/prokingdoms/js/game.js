@@ -51,6 +51,7 @@
     PK.Terr.init(S);
     PK.Logi.init(S);
     PK.Def.init(S);
+    if (PK.Despeje) PK.Despeje.init(S); // pk-40: en tus tierras solo quedan árboles (después del territorio y los edificios)
     PK.Exp.init(S);
     PK.Incursiones.init(S);
     PK.Auto.init(S);
@@ -867,7 +868,7 @@
   };
   G.reserveOk = function (cost, out, b) {
     if (b && b.sinReserva) return true;
-    if (b) { const rm = G.reservaDe(b); if (rm && rm.meta) return false; }
+    if (b) { const rm = G.reservaDe(b); if (rm && (rm.meta || rm.cola)) return false; }
     if (G.metaPide(out)) return true;
     let rv = S.auto ? S.auto.reserve || 0 : 0;
     if (out && S.res[out] < 0.05 * G.cap(out)) rv /= 3;
@@ -891,6 +892,24 @@
   };
   // Con «Meta de era», un taller cuyo producto le falta a la meta no respeta la reserva. Si no, se trababa: la meta veía
   // hierro de sobra para los 9 lingotes que faltaban (nadie juntaba hierro) y la reserva no dejaba usarlo (prueba de ritmo).
+  // La cola de obras (reporte de un jugador, pk-40): lo que pide la próxima obra de la cola (la primera que espera).
+  // Los talleres no gastan un insumo que esa obra pide y le falta (salvo que también pida lo que hace ese taller, o se
+  // trabaría: las mejoras piden madera y tablones), y las automatizaciones no se lo comen (auto.js, cabeMeta). Antes las
+  // obras de la cola se quedaban esperando materiales para siempre. Solo la primera: si guardara para toda la cola,
+  // una cola larga frenaba todo el reino.
+  let colaC = null, colaT = -1;
+  G.colaNecesita = function () {
+    if (colaC && Math.abs(G.time - colaT) < 1) return colaC;
+    let c = {};
+    for (const id of S.upq || []) { const b = G.bById.get(id); if (b && b.done && !b.upg) { c = Object.assign({}, G.upCost(b)); break; } }
+    colaT = G.time;
+    return (colaC = c);
+  };
+  G.colaFalta = function (b) {
+    const k = G.upCost(b), out = {};
+    for (const r in k) { const f = Math.ceil(k[r] - (S.res[r] || 0)); if (f > 0) out[r] = f; }
+    return out;
+  };
   G.metaPide = out => !!(S.auto && S.auto.plan === 'meta' && (G.metaNecesita()[out] || 0) > (S.res[out] || 0));
   G.reservaDe = function (b) {
     if (!b || !b.def.recipe || b.sinReserva) return null;
@@ -902,6 +921,10 @@
       const nec = G.metaNecesita();
       if ((S.res[out] || 0) >= Math.max((nec[out] || 0) * 1.25, 0.2 * G.cap(out)) && (metaJunta || nec[out])) for (const k in rc.in) if (nec[k] && (S.res[k] || 0) < nec[k]) return { res: k, have: S.res[k], keep: nec[k], meta: true };
     }
+    if (S.upq && S.upq.length) {
+      const nc = G.colaNecesita();
+      if (!((nc[out] || 0) > (S.res[out] || 0))) for (const k in rc.in) if (nc[k] && (S.res[k] || 0) < nc[k]) return { res: k, have: S.res[k], keep: nc[k], cola: true };
+    }
     if (G.metaPide(out)) return null; // la meta pide lo que hace: la reserva no lo frena (ver G.metaPide)
     let rv = S.auto ? S.auto.reserve || 0 : 0;
     if (!rv) return null;
@@ -909,7 +932,7 @@
     for (const k in rc.in) { const keep = rv * G.cap(k); if (S.res[k] - rc.in[k] < keep) return { res: k, have: S.res[k], keep }; }
     return null;
   };
-  G.reservaText = r => r.meta ? 'En reserva para la meta de era: guarda ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + ' de ' + U.fmt(Math.ceil(r.keep)) + ')' : 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
+  G.reservaText = r => r.cola ? 'En reserva para la cola de obras: guarda ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + ' de ' + U.fmt(Math.ceil(r.keep)) + ')' : r.meta ? 'En reserva para la meta de era: guarda ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + ' de ' + U.fmt(Math.ceil(r.keep)) + ')' : 'En reserva: falta ' + D.RES[r.res].name.toLowerCase() + ' (tienes ' + U.fmt(Math.floor(r.have)) + '; la reserva guarda ' + U.fmt(Math.ceil(r.keep)) + ')';
   G.relicGold = () => S.relics * best('monastery', 'relicGold') * (1 + 0.25 * G.lvl('faith')) * (1 + hp('relicGold')) * (1 + vb('relic')); // por minuto
 
   // ---------- Órdenes ----------
@@ -1234,7 +1257,7 @@
     if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }
     const ox = b.cx, oy = b.cy;
-    b.x = x; b.y = y; b._nsT = null; b._agua = undefined; G.blockVer++;
+    b.x = x; b.y = y; b._nsT = null; b._agua = undefined; b._bote = undefined; G.blockVer++;
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) {
       const k = W.idx(x + i, y + j);
       W.bAt[k] = b.id;
@@ -1409,6 +1432,7 @@
     if (regrowT > 5) { regrowT = 0; regrowNow(); G.checkMastery(); G.checkEncierro(); if (tierra && PK.Vida) PK.Vida.tick(); }
     questT += dt;
     if (questT > 1) { questT = 0; PK.Quests.check(); } // en el mar, con la Crónica del Mar (pk-28)
+    if (tierra && PK.Despeje) PK.Despeje.tick(dt);
     if (!tierra && PK.Arch) PK.Arch.tick(dt);
     if (!tierra && PK.Armada) PK.Armada.tick(dt);
   };
@@ -1506,12 +1530,14 @@
       G.updateTimers(dt);
       PK.Auto.tick(dt);
       PK.Logi.offline(dt);
-      PK.Terr.update(dt, true);
+      const tierra = !G.enMar(); // como en vivo: en el archipiélago no corren los sistemas de la tierra
+      if (tierra) PK.Terr.update(dt, true);
       PK.Exp.update(dt, true);
       if (PK.Heroes) PK.Heroes.update(dt);
       if (PK.Aventura) PK.Aventura.tick(dt);
-      if (PK.Leyendas) PK.Leyendas.tick(dt);
-      if (PK.Campana) PK.Campana.tick(dt);
+      if (tierra && PK.Leyendas) PK.Leyendas.tick(dt);
+      if (tierra && PK.Campana) PK.Campana.tick(dt);
+      if (tierra && PK.Life.offline) PK.Life.offline(dt); // los bonos pasajeros se gastan también sin ti
       if (S.relics) G.addRes('gold', (G.relicGold() / 60) * dt);
       frutales(dt);
       PK.Social.update(dt, true);
@@ -1564,6 +1590,7 @@
     S.at = S.lastSeen; // cuándo se guardó (main.js elige entre la local y la nube por esto: lastSeen es del mundo)
     S.units = G.units.filter(u => u.owner === 'p').map(u => u.toJSON());
     S.buildings = G.buildings.filter(b => b.owner === 'p').map(b => b.toJSON());
+    if (PK.Despeje) PK.Despeje.guardar();
     S.nodes = W.saveNodes();
     S.fog = W.saveFog();
     PK.Terr.save(S);

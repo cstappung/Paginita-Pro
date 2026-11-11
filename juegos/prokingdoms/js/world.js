@@ -663,11 +663,11 @@
 
   W.regrow = function (now, occupied, hoursPassed) {
     for (const n of W.nodes) {
-      if (n.temp || (W.serverNodes && W.isShared(n))) continue;
+      if (n.temp || n.gone || (W.serverNodes && W.isShared(n))) continue; // gone: talado para siempre (despeje.js)
       const def = D.NODES[n.kind];
       if (def.regen) {
         if (n.amount < n.max && hoursPassed > 0) {
-          const mult = W.zoneOf(n) && W.zoneOf(n).common ? 1 : 0.6;
+          const mult = W.zoneOf(n) && W.zoneOf(n).common ? 1 : 0.8; // las tuyas, casi como las comunes (era 0,6; pk-40)
           n.amount = Math.min(n.max, n.amount + n.max * def.regen * mult * hoursPassed);
           if (n.dead && n.amount >= 1) n.dead = false;
         }
@@ -681,7 +681,7 @@
 
   W.saveNodes = function () {
     const out = {};
-    for (const n of W.nodes) if (!n.temp && (n.dead || n.amount < n.max)) out[n.id] = [Math.round(n.amount * 10) / 10, n.dead ? n.t : 0];
+    for (const n of W.nodes) if (!n.temp && !n.gone && !n.planta && (n.dead || n.amount < n.max)) out[n.id] = [Math.round(n.amount * 10) / 10, n.dead ? n.t : 0];
     return out;
   };
   W.loadNodes = function (data) {
