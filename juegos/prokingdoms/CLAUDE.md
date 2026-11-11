@@ -1157,12 +1157,13 @@ Each fix below came from a stall in that run; keep them in mind before touching 
   only when something in the queue can be paid now (`A.colaLista`), and never spend what the first waiting queue item
   lacks (`G.colaNecesita`, also a workshop hold `{ cola: true }` in `G.reservaDe`). The Obras window shows what each
   queued item lacks and «Comprar» buys it.
-- **Only trees inside your land** (`js/despeje.js`, `PK.Despeje`, owner's request): POIs and every non-tree node in a
-  parcel of yours move to the nearest no-man's tile (no owner, no zone, `W.reserved` free), on load and whenever
-  `W.terrVer` changes. Moves are saved (`st.despeje.n` / `.p`) and replayed on load. Land only. Common-zone nodes are
+- **Only trees and berry bushes inside your land** (`js/despeje.js`, `PK.Despeje`, owner's request; `Dz.QUEDAN`): POIs
+  and every other node in a parcel of yours (mines, veins, deer) move to the nearest no-man's tile (no owner, no zone, `W.reserved` free), on load and whenever
+  `W.terrVer` changes. Moves are saved (`st.despeje.n` / `.p`) and replayed on load, except for kinds now in `QUEDAN`
+  (they go back to where the map put them). Land only. Common-zone nodes are
   never in an owned parcel, so the server's node ids and amounts never move.
 - **Talar / plantar / quitar** are `PK.Def.tool` values routed by `Def.click`/`Def.ghost`: an area (two taps, ≤ 24 per
-  side) for talar (trees gone for good: `n.gone`, `st.despeje.talados`, half the wood back) and quitar (walls, gates,
+  side) for talar (trees and bushes gone for good: `n.gone`, `st.despeje.talados`, half the wood or food back) and quitar (walls, gates,
   roads; half back), one tap per sapling for plantar (`n.planta`, a dead tree that regrows in `Dz.CRECE`). Planted trees
   keep their state in `st.despeje.plantas`, not `W.saveNodes`: their ids shift when an event made temp nodes first.
 - **Market:** `BSTATS.market` keeps sell ≤ buy − 0.10 at every level (Nv 8–9 sold above the buy price: free gold;

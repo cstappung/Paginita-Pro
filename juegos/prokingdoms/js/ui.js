@@ -639,10 +639,10 @@
   function fillPanel(g, sel) {
     if (PK.Despeje && PK.Despeje.HERR[PK.Def.tool]) { // quitar, talar y plantar (despeje.js, pk-40)
       const tl = PK.Def.tool, Dz = PK.Despeje, ini = PK.Def.start;
-      const tit = { quitar: 'Quitar murallas y caminos', talar: 'Talar árboles', plantar: 'Plantar árboles' }[tl];
+      const tit = { quitar: 'Quitar murallas y caminos', talar: 'Talar árboles y arbustos', plantar: 'Plantar árboles' }[tl];
       const txt = tl === 'plantar' ? 'Toca casillas libres de tus tierras para plantar: cada brote es un árbol en ' + Math.round(Dz.CRECE / 60) + ' minutos y después rebrota como los demás. No va pegado a un edificio. Cada uno cuesta '
         : (ini ? 'Ahora toca la otra esquina (o la misma casilla para una sola).' : 'Toca una esquina de la zona y después la otra (hasta ' + Dz.ZONA_MAX + ' casillas por lado).') +
-          (tl === 'talar' ? ' Se quitan para siempre los árboles de tus tierras que caigan dentro y vuelve la mitad de su madera.' : ' Se quitan las murallas, puertas y caminos que caigan dentro y vuelve la mitad del material.');
+          (tl === 'talar' ? ' Se quitan para siempre los árboles y arbustos de tus tierras que caigan dentro y vuelve la mitad de su madera o comida.' : ' Se quitan las murallas, puertas y caminos que caigan dentro y vuelve la mitad del material.');
       panel.append(el('div', { class: 'p-help' }, el('h3', null, tit), el('p', { class: 'small' }, txt), tl === 'plantar' ? UI.costEl(Dz.PLANTAR) : '',
         el('div', { class: 'row' },
           tl !== 'plantar' ? UI.btn('Plantar', () => Dz.empezar('plantar'), { small: true }) : UI.btn('Talar', () => Dz.empezar('talar'), { small: true }),
@@ -1006,10 +1006,11 @@
         el('p', { class: 'small' }, z ? (z.common ? 'Zona común: ' + z.name : z.name) : 'Tierra salvaje (de todos)'),
         el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: (n.amount / n.max) * 100 + '%' } }), el('span', null, n.dead ? 'Agotado' : U.fmt(n.amount) + ' / ' + U.fmt(n.max))),
         el('p', { class: 'small muted' }, workers.length + ' recolectando (' + mine + ' tuyos) · ' + (n.planta && n.dead ? 'brote: crece solo' : def.regrow ? 'rebrota ' + U.fmtTime(def.regrow) + ' después de agotarse' : 'se regenera un ' + Math.round(def.regen * 100) + '% por hora')))));
-    // pk-40: en tus tierras puedes talar árboles (para siempre) y plantar otros
-    if (n.kind === 'tree' && PK.Despeje && W.ownerAt(n.x, n.y) === 'p' && !W.isShared(n) && !G().enMar()) {
+    // pk-40: en tus tierras puedes quitar árboles y arbustos (para siempre) y plantar árboles
+    if (PK.Despeje && PK.Despeje.QUEDAN[n.kind] && W.ownerAt(n.x, n.y) === 'p' && !W.isShared(n) && !G().enMar()) {
+      const arbol = n.kind === 'tree';
       panel.append(el('div', { class: 'row' },
-        UI.btn('Talar este árbol', () => { const r = PK.Despeje.talar([n]); G().sel = null; UI.toast('Árbol talado' + (r.madera ? ': +' + U.fmt(r.madera) + ' de madera' : '') + '.', 'good'); UI.refreshPanel(true); }, { small: true, cls: 'danger', title: 'Lo quita para siempre y devuelve la mitad de su madera' }),
+        UI.btn(arbol ? 'Talar este árbol' : 'Quitar este arbusto', () => { const r = PK.Despeje.talar([n]); G().sel = null; UI.toast((arbol ? 'Árbol talado' : 'Arbusto quitado') + (Object.keys(r.vuelve).length ? ': ' + PK.Despeje.vuelveTxt(r.vuelve) : '') + '.', 'good'); UI.refreshPanel(true); }, { small: true, cls: 'danger', title: 'Lo quita para siempre y devuelve la mitad de lo que le quedaba' }),
         UI.btn('Talar varios…', () => { G().sel = null; PK.Despeje.empezar('talar'); }, { small: true }),
         UI.btn('Plantar árboles', () => { G().sel = null; PK.Despeje.empezar('plantar'); }, { small: true })));
     }

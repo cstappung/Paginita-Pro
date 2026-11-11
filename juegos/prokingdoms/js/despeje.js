@@ -1,13 +1,14 @@
 // Despeje del territorio, tala y plantación (pk-40, pedido del dueño), y la herramienta de quitar por zona.
 //
-// - Dentro de tus tierras solo pueden quedar árboles. Cuevas, mazmorras, campamentos, ruinas, cofres y lugares
-//   legendarios, y las minas, vetas, arbustos y ciervos que caen en una parcela tuya se mudan a la tierra de nadie más
+// - Dentro de tus tierras solo pueden quedar árboles y arbustos de bayas. Cuevas, mazmorras, campamentos, ruinas, cofres
+//   y lugares legendarios, y las minas, vetas y ciervos que caen en una parcela tuya se mudan a la tierra de nadie más
 //   cercana (sin dueño, fuera de las zonas comunes). Pasa al cargar y cada vez que tu territorio cambia (W.terrVer).
 //   Solo en la tierra: en el archipiélago las islas son tuyas enteras y quedarían sin nada.
 // - Lo movido se guarda (st.despeje.n / .p: id → [x, y]) y se repone al cargar, antes de buscar lo nuevo: el mapa
 //   se genera igual para todos (W.generate) y esto es solo de tu partida. El servidor no ve posiciones: los nodos de
 //   las zonas comunes nunca caen en una parcela con dueño, así que nunca se mueven.
-// - Talar (zona) quita árboles de tus tierras para siempre (st.despeje.talados) y devuelve la mitad de su madera.
+// - Talar (zona) quita árboles y arbustos de tus tierras para siempre (st.despeje.talados) y devuelve la mitad de lo
+//   que les quedaba (madera o comida).
 //   Plantar (de a un toque) pone un brote que a los 20 minutos es un árbol que rebrota como cualquier otro
 //   (st.despeje.plantas, con su estado: sus ids cambian si un evento creó nodos temporales antes).
 // - Quitar (zona) desarma murallas y puertas (mitad de vuelta, como Def.remove) y caminos (PK.Logi.removeRoad).
@@ -18,7 +19,7 @@
   const G = () => PK.Game, S = () => PK.Game.state;
   const toast = (t, k) => PK.UI && PK.UI.toast(t, k);
 
-  Dz.QUEDAN = { tree: 1 };                  // lo único que puede quedar dentro de tu territorio
+  Dz.QUEDAN = { tree: 1, berry: 1 };        // lo único que puede quedar dentro de tu territorio (y se puede talar)
   Dz.PLANTAR = { wood: 10, food: 10 };      // costo de un brote
   Dz.CRECE = 20 * 60;                       // segundos hasta que el brote es un árbol
   Dz.ZONA_MAX = 24;                         // lado máximo de la zona de talar o quitar, en casillas
@@ -115,7 +116,7 @@
       g.blockVer++;
       // los aldeanos que iban a algo que se mudó buscan de nuevo el camino
       for (const u of g.units) if (u.owner === 'p' && u.task && u.task.t === 'gather') u.path = [];
-      if (!g.offline && !Dz.cargando) toast('Lo que quedó dentro de tus tierras (minas, cuevas, campamentos…) se mudó a la tierra de nadie más cercana. Dentro solo quedan árboles.', 'info');
+      if (!g.offline && !Dz.cargando) toast('Lo que quedó dentro de tus tierras (minas, cuevas, ciervos, campamentos…) se mudó a la tierra de nadie más cercana. Dentro solo quedan árboles y arbustos.', 'info');
     }
     return n;
   };
@@ -125,30 +126,34 @@
     sacarNodo(n);
     n.gone = true; n.dead = true; n.amount = 0;
   }
-  // Los árboles de la zona que se pueden talar: en tus tierras y de tu partida (los de las zonas comunes son de todos).
+  // Los árboles y arbustos de la zona que se pueden talar: en tus tierras y de tu partida (los de las zonas comunes son de todos).
   Dz.talables = function (x0, y0, x1, y1) {
     const out = [];
     for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
       if (!W.inb(x, y) || !mio(x, y)) continue;
       const id = W.nodeAt[W.idx(x, y)], n = id >= 0 ? W.nodes[id] : null;
-      if (n && n.kind === 'tree' && !n.gone && !n.temp && !W.isShared(n)) out.push(n);
+      if (n && Dz.QUEDAN[n.kind] && !n.gone && !n.temp && !W.isShared(n)) out.push(n);
     }
     return out;
   };
   Dz.talar = function (nodes) {
-    const st = S();
+    const st = S(), vuelve = {};
     let madera = 0;
     for (const n of nodes) {
-      madera += n.dead ? 0 : Math.floor(n.amount * 0.5);
+      const r = D.NODES[n.kind].res, k = n.dead ? 0 : Math.floor(n.amount * 0.5);
+      if (k) vuelve[r] = (vuelve[r] || 0) + k;
+      if (r === 'wood') madera += k;
       for (const u of G().units) if (u.task && u.task.t === 'gather' && u.task.node === n.id) u.path = []; // ven el árbol agotado y buscan otro
       quitarArbol(n);
       if (n.planta) st.despeje.plantas = st.despeje.plantas.filter(o => !(o[0] === n.x && o[1] === n.y));
       else if (!st.despeje.talados.includes(n.id)) st.despeje.talados.push(n.id);
     }
-    if (madera) G().give({ wood: madera });
+    if (Object.keys(vuelve).length) G().give(vuelve);
     G().blockVer++;
-    return { n: nodes.length, madera };
+    return { n: nodes.length, madera, vuelve };
   };
+
+  Dz.vuelveTxt = v => Object.keys(v).map(r => '+' + U.fmt(v[r]) + ' de ' + D.RES[r].name.toLowerCase()).join(' y ');
 
   // ---------- Plantar ----------
   Dz.porQueNoPlantar = function (x, y) {
@@ -227,9 +232,9 @@
     PK.Def.start = null;
     if (tool === 'talar') {
       const ns = Dz.talables(x0, y0, x1, y1);
-      if (!ns.length) { toast('No hay árboles tuyos en esa zona.', 'info'); return; }
+      if (!ns.length) { toast('No hay árboles ni arbustos tuyos en esa zona.', 'info'); return; }
       const r = Dz.talar(ns);
-      toast('Talaste ' + r.n + (r.n === 1 ? ' árbol' : ' árboles') + (r.madera ? ': +' + U.fmt(r.madera) + ' de madera' : '') + '.', 'good');
+      toast('Quitaste ' + r.n + (r.n === 1 ? ' árbol o arbusto' : ' árboles y arbustos') + (Object.keys(r.vuelve).length ? ': ' + Dz.vuelveTxt(r.vuelve) : '') + '.', 'good');
     } else {
       const ts = Dz.quitables(x0, y0, x1, y1);
       if (!ts.length) { toast('No hay murallas ni caminos en esa zona.', 'info'); return; }
@@ -247,8 +252,13 @@
     try {
       // lo que ya se había mudado vuelve a su lugar nuevo (si sigue libre; si no, se busca otro)
       for (const id in dz.p) { const p = W.pois[id], to = dz.p[id]; if (!p) continue; if (cabePoi(p, to[0], to[1]) || poiEnTierras(p)) moverPoi(p, to[0], to[1]); }
-      for (const id in dz.n) { const n = W.nodes[id], to = dz.n[id]; if (!n || n.gone) continue; const k = W.idx(to[0], to[1]); if (W.inb(to[0], to[1]) && W.nodeAt[k] < 0 && W.bAt[k] < 0 && W.poiAt[k] < 0) moverNodo(n, to[0], to[1]); }
+      for (const id in dz.n) {
+        const n = W.nodes[id], to = dz.n[id];
+        if (n && Dz.QUEDAN[n.kind]) { delete dz.n[id]; continue; } // ahora se queda dentro: vuelve a donde lo generó el mapa
+        if (!n || n.gone) continue; const k = W.idx(to[0], to[1]); if (W.inb(to[0], to[1]) && W.nodeAt[k] < 0 && W.bAt[k] < 0 && W.poiAt[k] < 0) moverNodo(n, to[0], to[1]); }
       for (const id of dz.talados) { const n = W.nodes[id]; if (n && !n.gone) quitarArbol(n); }
+      // un arbusto que vuelve a su lugar y encuentra un edificio encima (se construyó mientras estaba mudado): no va
+      for (const n of W.nodes) if (Dz.QUEDAN[n.kind] && !n.gone && !n.temp && W.bAt[W.idx(n.x, n.y)] >= 0) quitarArbol(n);
       const plantas = dz.plantas;
       dz.plantas = [];
       for (const [x, y, sp, v, amount, dead, t] of plantas) {
