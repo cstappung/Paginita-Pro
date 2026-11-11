@@ -60,23 +60,23 @@ const SY = 1.8;           // altura del piso del escenario
 const BPM = 140, BEAT = 60 / BPM, S16 = BEAT / 4, BAR = BEAT * 4;
 /* ---------- modelo base: dos cuerpos (hombre / mujer). Todo lo demás es personalizable ---------- */
 const BASE_BUILD = {
-  m: { sw: 0.28, chest: 0.232, waist: 0.145, hip: 0.165, arm: 1.0, bust: 0, height: 1.0, neck: 0.012, shX: 0.95, shY: 0 },
-  f: { sw: 0.215, chest: 0.19, waist: 0.122, hip: 0.168, arm: 1.0, bust: 1, height: 0.96, neck: -0.008, shX: 0.86, shY: 0.03 },   // shX/shY: articulación del hombro (en la mujer más adentro y más baja: hombro caído, sin escalón)
+  m: { sw: 0.214, chest: 0.2, waist: 0.14, hip: 0.16, arm: 1.0, bust: 0, height: 1.0, neck: 0, shX: 0.9, shY: 0 },
+  f: { sw: 0.176, chest: 0.136, waist: 0.104, hip: 0.168, arm: 1.0, bust: 1, height: 0.96, neck: -0.005, shX: 0.86, shY: 0.066 },   // shX/shY: articulación del hombro (en la mujer más adentro y más baja: hombro caído, sin escalón)
 };
 const BASE_FACE = {
-  m: { eyeSize: 1.07, eyeGap: 0.98, nose: 1, noseW: 1, lips: 0.8, mouthW: 1, jaw: 1, chin: 1, cheek: 0.7, browThick: 1, browArch: 0.25, browRidge: 1 },
-  f: { eyeSize: 1.12, eyeGap: 1, nose: 0.95, noseW: 1.0, lips: 1.3, mouthW: 0.92, jaw: 0.25, chin: 0.55, cheek: 1, browThick: 0.85, browArch: 0.7, browRidge: 0.35 },
+  m: { eyeSize: 1.4, eyeGap: 0.95, nose: 1.3, noseW: 1, lips: 1.12, mouthW: 1.08, jaw: 1, chin: 1, cheek: 0.7, browThick: 1, browArch: 0.25, browRidge: 1 },
+  f: { eyeSize: 1.24, eyeGap: 0.95, nose: 0.75, noseW: 1.0, lips: 1.3, mouthW: 0.86, jaw: 0.25, chin: 0.55, cheek: 1, browThick: 0.85, browArch: 0.7, browRidge: 0.35 },
 };
 
 const BAND = {
   singer: { name: 'Max', ui: '#ffd23a', body: 'm', skin: 0xe9b98f, face: { eyes: 0x2a4a7a, brow: 0x9a7a3a, jaw: 1.05 },
     hair: { style: 'long', color: 0xe8c86a, color2: 0xf6e3a0 }, beard: { type: 'goatee', color: 0xc8a050 },
     top: { type: 'tee', color: 0x151515 }, bottom: { type: 'jeans', color: 0x2e3d63 }, belt: 0x222222, shoes: { type: 'boot', color: 0x151515 },
-    acc: { gloves: 0x111111, wrist: 0x222222 }, build: { sw: 0.275, chest: 0.225, waist: 0.14, hip: 0.16 } },
+    acc: { gloves: 0x111111, wrist: 0x222222 }, build: { sw: 0.25, chest: 0.214, waist: 0.14, hip: 0.16 } },
   drummer: { name: 'Bruno', ui: '#ffffff', body: 'm', skin: 0xe2ad84, face: { eyes: 0x3a2a18, brow: 0x3a2412, nose: 1.15, jaw: 1.2 },
     hair: { style: 'short', color: 0x7a4a22 }, beard: { type: 'full', color: 0x6a3e1a },
     top: { type: 'tee', color: 0xeeeeee }, bottom: { type: 'shorts', color: 0x6b5a3e }, legwear: { type: 'socks', color: 0xffffff },
-    shoes: { type: 'sneaker', color: 0xd8262b }, acc: { sweatband: true }, build: { sw: 0.29, chest: 0.24, waist: 0.16, hip: 0.17, arm: 1.05 } },
+    shoes: { type: 'sneaker', color: 0xd8262b }, acc: { sweatband: true }, build: { sw: 0.258, chest: 0.226, waist: 0.158, hip: 0.17, arm: 1.05 } },
 };
 
 /* ---------- la capa del editor: su CSS y su HTML (los del paquete, sin el panel del director) ---------- */
@@ -260,7 +260,7 @@ function invClamp(L) {
 const FACE_PRE = {
   faceShape: {
     ovalF: { faceW: 0.93 }, corazonF: { faceW: 0.95, jaw: 0.06, chin: 0.38, cheek: 1.35 }, redondaF: { faceW: 1.0, jaw: 0.58, chin: 0.45, cheek: 1.25, faceLong: 0.965 }, fina: { faceW: 0.87, jaw: 0.18, chin: 0.72, faceLong: 1.035 }, suave: { faceW: 0.97, jaw: 0.78, chin: 0.62, cheek: 0.85 },
-    cuadrada: { jaw: 1.2, chin: 1.1, faceW: 0.99 }, ovalM: { jaw: 0.7, chin: 0.9, faceW: 0.96 }, alargada: { jaw: 0.95, chin: 1.15, faceW: 0.91, faceLong: 1.045 }, redondaM: { jaw: 0.52, chin: 0.85, faceW: 1.05, cheek: 1.05, faceLong: 0.965 }, angulosa: { jaw: 1.15, chin: 1.3, cheek: 1.35, faceW: 0.95, browRidge: 1.6 },
+    cuadrada: { jaw: 1.1, chin: 1.1, faceW: 0.97 }, ovalM: { jaw: 0.7, chin: 0.9, faceW: 0.96 }, alargada: { jaw: 0.95, chin: 1.15, faceW: 0.91, faceLong: 1.045 }, redondaM: { jaw: 0.52, chin: 0.85, faceW: 1.05, cheek: 1.05, faceLong: 0.965 }, angulosa: { jaw: 1.15, chin: 1.3, cheek: 1.35, faceW: 0.95, browRidge: 1.6 },
   },
   eyeShape: {
     grandes: {}, almendra: { eyeSize: 1.06, eyeOpen: 0.82, lowLid: 0.78, tilt: 1.5, irisK: 0.96 }, gata: { eyeSize: 1.1, eyeOpen: 0.74, lowLid: 0.7, tilt: 3, liner: 1.6, irisK: 0.92 }, redondos: { eyeSize: 1.08, eyeOpen: 1.16, lowLid: 1.25, tilt: -0.6, irisK: 0.9 },
@@ -345,7 +345,9 @@ ovScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMat
 
 /* ---------- materiales toon + contorno ---------- */
 const GRAD = (() => { const d = new Uint8Array([62, 128, 196, 255]); const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
-const GRAD_SOFT = (() => { const n = 64, d = new Uint8Array(n); for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; d[i] = Math.round(148 + 98 * smooth(clamp((u - 0.22) / 0.62, 0, 1))); } const t = new THREE.DataTexture(d, n, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();   // sombreado suave para la piel de la cara
+const GRAD_SOFT = (() => { const n = 64, d = new Uint8Array(n); for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; d[i] = Math.round(116 + 134 * smooth(clamp((u - 0.24) / 0.56, 0, 1))); } const t = new THREE.DataTexture(d, n, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();   // sombreado suave para la piel de la cara
+/* la ropa y el pelo de los rockeros: tres tonos con los bordes difuminados (los cuatro escalones duros quedan para el escenario) */
+const GRAD_ROPA = (() => { const n = 64, d = new Uint8Array(n); for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; d[i] = Math.round(84 + 76 * smooth(clamp((u - 0.3) / 0.22, 0, 1)) + 95 * smooth(clamp((u - 0.56) / 0.3, 0, 1))); } const t = new THREE.DataTexture(d, n, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
 const _tc = new Map();
 function toon(color, o = {}) {
   // las texturas entran a la clave por su uuid: JSON.stringify llama a su toJSON antes que al reemplazo, y
@@ -353,7 +355,7 @@ function toon(color, o = {}) {
   const k = color + '|' + JSON.stringify(Object.fromEntries(Object.entries(o).map(([key, v]) => [key, v && v.isTexture ? v.uuid : v])));
   const rim = CONTORNO && o.gradientMap !== GRAD_SOFT, kk = rim ? k + '|rim' : k;
   if (_tc.has(kk)) return _tc.get(kk);
-  const m = new THREE.MeshToonMaterial({ color, gradientMap: GRAD, ...o }); _tc.set(kk, m);
+  const m = new THREE.MeshToonMaterial({ color, gradientMap: rim ? GRAD_ROPA : GRAD, ...o }); _tc.set(kk, m);
   if (rim) { m.onBeforeCompile = rimShader; m.customProgramCacheKey = () => 'rim'; }
   return m;
 }
@@ -370,23 +372,26 @@ function rimShader(sh) { sh.fragmentShader = sh.fragmentShader.replace('#include
 /* Pelo: liso (no facetado), con la franja de brillo del anime —una banda clara donde el mechón mira hacia arriba
    y adelante, que da la vuelta a la cabeza— y un tono más oscuro hacia las puntas de abajo. */
 const _hmC = new Map();
-function hairMat(color, o = {}) {
-  const k = color + '|' + (o.map ? o.map.uuid : '') + (CONTORNO ? 'r' : ''); if (_hmC.has(k)) return _hmC.get(k);
-  const m = new THREE.MeshToonMaterial({ color, gradientMap: GRAD, ...o }), rim = CONTORNO;
+function hairMat(color, o = {}, banda = 1) {
+  const k = color + '|' + (o.map ? o.map.uuid : '') + (CONTORNO ? 'r' : '') + banda; if (_hmC.has(k)) return _hmC.get(k);
+  const m = new THREE.MeshToonMaterial({ color, gradientMap: GRAD_ROPA, ...o }), rim = CONTORNO;
   m.onBeforeCompile = sh => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', (rim ? RIM_GLSL : '#include <emissivemap_fragment>') + `
+    sh.vertexShader = 'attribute vec2 hu;\nvarying vec2 vHu;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHu = hu;');
+    sh.fragmentShader = 'varying vec2 vHu;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', (rim ? RIM_GLSL : '#include <emissivemap_fragment>') + `
+  { float hw1 = sin(vHu.x * 30.0 + sin(vHu.y * 5.0) * 1.2), hw2 = sin(vHu.x * 71.0 + 1.7 + sin(vHu.y * 3.0));
+    diffuseColor.rgb *= 1.0 - 0.2 * smoothstep(0.7, 0.97, hw1) - 0.09 * smoothstep(0.8, 0.98, hw2) + 0.12 * smoothstep(0.75, 0.98, -hw1); }
   { vec3 hn = normalize(normal); float hb = dot(hn, normalize(vec3(0.0, 0.78, 0.62)));
     float band = smoothstep(0.80, 0.85, hb) * (1.0 - smoothstep(0.925, 0.965, hb));
-    diffuseColor.rgb = diffuseColor.rgb * (1.0 + 0.55 * band) + vec3(0.1) * band;
+    diffuseColor.rgb = diffuseColor.rgb * (1.0 + ${(0.45 * banda).toFixed(2)} * band) + vec3(${(0.08 * banda).toFixed(3)}) * band;
     diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(-0.55, 0.1, hn.y); }`);
   };
-  m.customProgramCacheKey = () => 'hair' + (rim ? 'r' : '');
+  m.customProgramCacheKey = () => 'hair' + (rim ? 'r' : '') + banda;
   _hmC.set(k, m); return m;
 }
 const _oc = new Map();
 function outlineMat(th, perVertex = false, clip = false) {
-  const k = th.toFixed(4) + (perVertex ? 'w' : '') + (clip ? 'c' : ''); if (_oc.has(k)) return _oc.get(k);
-  const m = new THREE.MeshBasicMaterial({ color: 0x0a0710, side: THREE.BackSide }); m.userData.ol = true;
+  const k = th.toFixed(4) + (perVertex ? 'w' : '') + (clip ? 'c' : '') + (CONTORNO ? 'r' : ''); if (_oc.has(k)) return _oc.get(k);
+  const m = new THREE.MeshBasicMaterial({ color: CONTORNO ? 0x2e161a : 0x0a0710, side: THREE.BackSide }); m.userData.ol = true;
   m.onBeforeCompile = s => { s.vertexShader = (perVertex ? 'attribute float olw;\n' : '') + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normalize(normal) * ' + th.toFixed(5) + (perVertex ? ' * olw' : '') + ';'); if (clip) clipShader(s); };
   m.customProgramCacheKey = () => 'outline' + k; _oc.set(k, m); return m;
 }
@@ -547,6 +552,7 @@ const G = (key, fn) => geoCache[key] || (geoCache[key] = fn());
 let LIVIANO = false;
 function mesh(parent, geo, mat, { pos, rot, scale, outline = 0.01, shadow = false, receive = false } = {}) {
   if (LIVIANO) { outline = 0; shadow = false; }
+  if (CONTORNO) outline *= 0.5;   // en los rockeros, la línea fina
   const m = new THREE.Mesh(geo, mat);
   if (pos) m.position.set(...pos);
   if (rot) m.rotation.set(...rot);
@@ -595,22 +601,23 @@ function taperTube(pts, r0, r1, segs = 18, radial = 7, flat = 1) {
 }
 /* mechón plano (cinta gruesa de sección hexagonal): el ancho va tangente a la cabeza; punta afilada o cortada en recto */
 function ribbonGeo(pts, w0, w1, th, { tip = 'point', segs = 12, ctr = V(0, 0, -0.01), nrm = null } = {}) {
-  const curve = new THREE.CatmullRomCurve3(pts), pos = [], idx = [], SEC = [[1, 0], [0.55, 1], [-0.55, 1], [-1, 0], [-0.55, -1], [0.55, -1]], n = SEC.length;
+  const curve = new THREE.CatmullRomCurve3(pts), pos = [], idx = [], SEC = [[1, 0], [0.55, 1], [-0.55, 1], [-1, 0], [-0.55, -1], [0.55, -1]], n = SEC.length, hu = [], HU = [0, 0.33, 0.67, 1, 0.67, 0.33];
   const N = V(), W = V();
   for (let i = 0; i <= segs; i++) {
     const t = i / segs, P = curve.getPointAt(t), T = curve.getTangentAt(t).normalize();
     if (nrm) N.copy(nrm); else N.subVectors(P, ctr);
     N.addScaledVector(T, -N.dot(T)); if (N.lengthSq() < 1e-10) N.set(1, 0, 0).addScaledVector(T, -T.x); N.normalize(); W.crossVectors(T, N);
     let w = lerp(w0, w1, t), h = th * lerp(1, 0.7, t);
+    if (tip === 'round' && t > 0.8) { const k = (t - 0.8) / 0.2; w *= Math.sqrt(Math.max(0.02, 1 - k * k)); h *= lerp(1, 0.5, k); }
     if (tip === 'point' && t > 0.62) { const k = (t - 0.62) / 0.38; w *= lerp(1, 0.06, k * k * (3 - 2 * k)); h *= lerp(1, 0.3, k); }
     if (t < 0.08) { const k = t / 0.08; w *= lerp(0.7, 1, k); }
-    for (const [a, b] of SEC) pos.push(P.x + W.x * a * w + N.x * b * h, P.y + W.y * a * w + N.y * b * h, P.z + W.z * a * w + N.z * b * h);
+    for (let j = 0; j < n; j++) { const [a, b] = SEC[j]; pos.push(P.x + W.x * a * w + N.x * b * h, P.y + W.y * a * w + N.y * b * h, P.z + W.z * a * w + N.z * b * h); hu.push(HU[j] * lerp(w0, w1, t) / 0.02, t); }
   }
   for (let i = 0; i < segs; i++) for (let j = 0; j < n; j++) { const a = i * n + j, b = i * n + (j + 1) % n, c = a + n, d = b + n; idx.push(a, c, b, b, c, d); }
   // tapas
-  const e0 = pos.length / 3; const P0 = curve.getPointAt(0), P1 = curve.getPointAt(1); pos.push(P0.x, P0.y, P0.z, P1.x, P1.y, P1.z);
+  const e0 = pos.length / 3; const P0 = curve.getPointAt(0), P1 = curve.getPointAt(1); pos.push(P0.x, P0.y, P0.z, P1.x, P1.y, P1.z); hu.push(0, 0, 0, 1);
   for (let j = 0; j < n; j++) { idx.push(e0, j, (j + 1) % n); const L = segs * n; idx.push(e0 + 1, L + (j + 1) % n, L + j); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('hu', new THREE.Float32BufferAttribute(hu, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 /* zapato con forma de pie: la parte de arriba es una esfera deformada (puntera redonda, empeine que sube al tobillo);
    la suela es una losa con la misma huella. Origen = tobillo */
@@ -1161,7 +1168,11 @@ function handFrame(f, p, i, out) {
   return out.setFromRotationMatrix(_hm.makeBasis(f, p, _hc).multiply(HAND_BT[i]));
 }
 /* manos sobre la guitarra (espacio de la guitarra): mano del mástil rodea el mástil desde abajo; la de la púa cae sobre las cuerdas */
-const HAND_G = [{ f: V(0.1, 0.35, 1), p: V(0, 1, -0.25) }, { f: V(0.3, -1, 0.05), p: V(0, 0.1, -1) }];
+/* mano del mástil: la muñeca queda debajo y algo detrás del mástil, la palma mira hacia arriba y atrás (hacia el dorso
+   del mástil) y los nudillos asoman justo bajo el borde del diapasón; desde ahí los dedos se arquean y caen con la
+   punta sobre las cuerdas (antes la palma apuntaba hacia afuera y los nudillos flotaban 5 cm delante del diapasón) */
+const HAND_G = [{ f: V(0.05, 0.55, 0.83), p: V(0, 0.83, -0.55) }, { f: V(0.3, -1, 0.05), p: V(0, 0.1, -1) }];
+const FRET_W = V(0, -0.104, -0.016);   // muñeca de la mano del mástil respecto del traste (espacio de la guitarra)
 const HAND_C = [1, -1].map(s => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(0, 0, -s, 0, 0, -1, 0, 0, -s, 0, 0, 0, 0, 0, 0, 1)));
 function ik2(a, t, l1, l2, pole, outE, outT) {
   _v2.subVectors(t, a); let d = _v2.length(); _v2.divideScalar(d || 1);
@@ -1172,7 +1183,11 @@ function ik2(a, t, l1, l2, pole, outE, outT) {
 }
 const HAND_POSES = {
   grip: [[1.15, 1.25], [1.2, 1.3], [1.25, 1.3], [1.3, 1.3], [0.5, 0.4]],
-  pick: [[1.1, 1.15], [1.2, 1.1], [1.25, 1.05], [1.3, 1.0], [0.8, 0.5]],
+  // pisando: los dedos se arquean sobre el diapasón (falange media muy doblada, punta apenas) y el pulgar va por detrás del mástil
+  traste: [[0.58, 1.33, 0.4], [0.6, 1.32, 0.4], [0.62, 1.32, 0.4], [0.68, 1.12, 0.4], [2, 0.45, 0.25]],
+
+  // púa entre índice y pulgar; medio, anular y meñique sueltos en abanico (cerrados como un puño se leía como un guante)
+  pick: [[1.15, 1.2], [0.42, 0.6, 0.3], [0.52, 0.6, 0.3], [0.62, 0.6, 0.3], [0.8, 0.5]],
   fist: [[1.6, 1.7], [1.6, 1.7], [1.6, 1.7], [1.6, 1.7], [0.6, 0.7]],
   open: [[0.15, 0.1], [0.1, 0.05], [0.12, 0.08], [0.2, 0.1], [0.1, 0.1]],
   point: [[0.05, 0.0], [1.6, 1.7], [1.6, 1.7], [1.6, 1.7], [0.6, 0.6]],
@@ -1183,6 +1198,10 @@ const POSE0 = { rootX: 0, rootY: 0, rootZ: 0, rootYaw: 0, hipX: 0, hipZ: 0, hipD
 /* de pie: la cadera a esta altura deja las rodillas apenas dobladas (con 0 quedaba en sentadilla: la pierna mide 0,97
    y de la cadera al tobillo había 0,83). `LEG_MAX`: lo más que se estira una pierna antes de que la cadera baje sola */
 const PARADO = -0.072, LEG_MAX = 0.955;
+/* El reloj de la coreografía (`mt`) corre al tempo de la canción: a 220 pulsos por minuto todo iba 1,6 veces más
+   rápido (el vaivén, el salto, el giro). `RITMO.r` = segundos de coreografía por segundo real; el vaivén va a
+   medio tiempo (`d` = 2) o a un cuarto cuando el pulso pasa de ~165 por minuto, y los movimientos se estiran. */
+const RITMO = { r: 1, d: 1, prev: 0 };
 
 const B_HIPS = 0, B_SPINE = 1, B_CHEST = 2, B_NECK = 3, B_HEAD = 4, B_JAW = 5, B_UA = [6, 8], B_FA = [7, 9], B_TH = [10, 12], B_SH = [11, 13], B_FTW = [14, 31], B_HAND = [15, 32];   // torsión del antebrazo + mano + 5 dedos × 3 falanges por lado
 const L_UP = 0.33, L_FO = 0.31, L_TH = 0.5, L_SH = 0.47;
@@ -1196,7 +1215,7 @@ function crRows(K, step) {
   const out = [], m = K.length;
   for (let i = 0; i < m - 1; i++) {
     const P0 = K[Math.max(0, i - 1)], P1 = K[i], P2 = K[i + 1], P3 = K[Math.min(m - 1, i + 2)];
-    const n = Math.max(1, Math.round(Math.abs(P2[0] - P1[0]) / step));
+    const n = Math.max(1, Math.round(Math.abs(P2[0] - P1[0]) / (typeof step === 'function' ? step(P1[0]) : step)));
     for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; out.push(P1.map((_, c) => 0.5 * (2 * P1[c] + (-P0[c] + P2[c]) * t + (2 * P0[c] - 5 * P1[c] + 4 * P2[c] - P3[c]) * t2 + (-P0[c] + 3 * P1[c] - 3 * P2[c] + P3[c]) * t3))); }
   }
   out.push(K[m - 1].slice()); return out;
@@ -1268,19 +1287,19 @@ function shellGeo(src, pred, inflate = 0.005, any = false, clip = null) {
 }
 
 /* ---------- cuerpo base (una sola malla continua: torso + brazos + piernas) ---------- */
-function torsoW(y, x, nkL = 0, sw = 0.28) {
+function torsoW(y, x, nkL = 0, sw = 0.28, fem = 0) {
   const h = 1 - smooth(clamp((y + 0.02) / 0.12, 0, 1)), c = smooth(clamp((y - 0.24) / 0.14, 0, 1));
-  const nk = smooth(clamp((y - 0.59) / 0.05, 0, 1)) * (1 - smooth(clamp((Math.abs(x) - 0.06) / 0.07, 0, 1))), hd = smooth(clamp((y - 0.66 - nkL) / 0.05, 0, 1));
+  const nk = smooth(clamp((y - 0.575) / 0.05, 0, 1)) * (1 - smooth(clamp((Math.abs(x) - 0.06) / 0.07, 0, 1))), hd = smooth(clamp((y - 0.66 - nkL) / 0.05, 0, 1));
   let W = [[B_HIPS, h], [B_SPINE, (1 - h) * (1 - c)], [B_CHEST, c * (1 - nk)], [B_NECK, nk * (1 - hd)], [B_HEAD, nk * hd]];
   const t = smooth(clamp((-0.07 - y) / 0.09, 0, 1)) * smooth(clamp(Math.abs(x) / 0.07, 0, 1)) * 0.55;
   if (t > 0) { W = W.map(([i, w]) => [i, w * (1 - t)]); W.push([x > 0 ? B_TH[0] : B_TH[1], t]); }
   // hombro: la parte alta y lateral del torso sigue en parte al brazo (sin pliegue entre el deltoides y el trapecio)
-  const sh = 0.42 * smooth(clamp((Math.abs(x) - sw * 0.5) / (sw * 0.4), 0, 1)) * smooth(clamp((y - 0.34) / 0.12, 0, 1)) * (1 - nk);
+  const sh = 0.42 * smooth(clamp((Math.abs(x) - sw * 0.5) / (sw * 0.4), 0, 1)) * smooth(clamp((y - 0.34) / 0.12, 0, 1)) * (1 - nk) * (1 - 0.97 * fem * smooth(clamp((y - 0.5) / 0.07, 0, 1)));   // mujer: el borde alto del hombro sigue menos al brazo (al subirlo salía un cuerno de piel)
   if (sh > 0) { W = W.map(([i, w]) => [i, w * (1 - sh)]); W.push([x > 0 ? B_UA[0] : B_UA[1], sh]); }
   return W;
 }
 // busto femenino: elipse por lado (más ancha hacia la axila, pendiente larga arriba, pliegue definido abajo)
-const BUST = { x: 0.082, y: 0.416, ro: 0.122, ri: 0.07, ru: 0.096, rl: 0.07, h: 0.054 };
+const BUST = { x: 0.068, y: 0.438, ro: 0.098, ri: 0.062, ru: 0.09, rl: 0.066, h: 0.082 };
 function bustZ(x, y) {
   let bz = 0;
   for (const s of [-1, 1]) {
@@ -1297,18 +1316,31 @@ float bustSh(float cl) {
   for (int i = 0; i < 2; i++) {
     float s = i == 0 ? -1.0 : 1.0, dx = x - s * ${BUST.x}, dy = y - ${BUST.y};
     float d = length(vec2(dx / (dx * s > 0.0 ? ${BUST.ro} : ${BUST.ri}), dy / (dy > 0.0 ? ${BUST.ru} : ${BUST.rl})));
-    sh = max(sh, smoothstep(0.78, 0.97, d) * (1.0 - smoothstep(1.0, 1.24, d)) * (1.0 - smoothstep(-0.035, 0.0, dy)));
-    sh = max(sh, cl * 0.8 * smoothstep(0.56, 0.7, d) * (1.0 - smoothstep(0.72, 0.84, d)) * smoothstep(0.004, 0.026, dy) * (1.0 - smoothstep(0.1, 0.85, (dx * s) / ${BUST.ro})));
+    sh = max(sh, smoothstep(0.78, 0.97, d) * (1.0 - smoothstep(1.0, 1.24, d)) * (1.0 - smoothstep(-0.035, 0.0, dy)) * (1.0 - smoothstep(0.05, 0.1, dx * s)));   // el pliegue se apaga hacia el costado: expuesto parecía una mancha
+    sh = max(sh, cl * 0.3 * smoothstep(0.56, 0.7, d) * (1.0 - smoothstep(0.72, 0.84, d)) * smoothstep(0.004, 0.026, dy) * (1.0 - smoothstep(0.1, 0.85, (dx * s) / ${BUST.ro})));
   }
-  float x1 = x / 0.009, x2 = x / 0.026, c = (0.85 * exp(-x1 * x1) + 0.3 * exp(-x2 * x2)) * smoothstep(0.35, 0.39, y) * (1.0 - smoothstep(0.485, 0.525, y));
+  float x1 = x / 0.009, x2 = x / 0.026, c = (0.85 * exp(-x1 * x1) + 0.3 * exp(-x2 * x2)) * smoothstep(0.37, 0.41, y) * (1.0 - smoothstep(0.505, 0.545, y));
+  sh *= mix(1.0, smoothstep(0.052, 0.066, vRest.z), smoothstep(0.065, 0.085, abs(x)));   // el brazo en reposo cae dentro de la elipse: sin esto le salía una mancha
   return clamp(max(sh, cl * c), 0.0, 1.0) * uBust;
+}
+`;
+// brillo suave sobre la cúpula de cada pecho: la tela negra no se leía (un tono multiplicado no se ve sobre negro)
+const BUST_HI = `float bustHi() {
+  if (vRest.z < 0.052 || uBust <= 0.0) return 0.0;
+  float x = vRest.x, y = vRest.y - uSp, h = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float s = i == 0 ? -1.0 : 1.0, dx = x - s * ${BUST.x}, dy = y - ${(BUST.y + 0.012).toFixed(3)};
+    float d = length(vec2(dx / ${BUST.ri}, dy / ${BUST.ru}));
+    h = max(h, (1.0 - smoothstep(0.1, 0.8, d)) * smoothstep(-0.02, 0.025, dy + 0.02));
+  }
+  return h * uBust * smoothstep(0.065, 0.085, abs(x));
 }
 `;
 function bustShade(sh, U, cl, col) {
   Object.assign(sh.uniforms, U);
   sh.vertexShader = 'varying vec3 vRest;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
-  sh.fragmentShader = BUST_GLSL + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(${col.join(', ')}), bustSh(${cl.toFixed(1)}));`);
+  sh.fragmentShader = BUST_GLSL + (cl === 0 ? BUST_HI : '') + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(${col.join(', ')}), bustSh(${cl.toFixed(1)}));${cl === 0 ? 'diffuseColor.rgb += vec3(0.03, 0.028, 0.036) * bustHi();' : ''}`);
 }
 const _bsC = new Map();
 function bustMat(base, sp, bust) {   // ropa: copia del material con el pliegue bajo el busto
@@ -1323,47 +1355,59 @@ function buildBodySrc(fem, b, hipRest) {
   const K = fem ? [
     [-0.175, 0.02, 1, 1, 0], [-0.16, hip * 0.62, 0.8, 0.8, 0], [-0.12, hip * 1.0, 0.6, 0.72, 0], [-0.06, hip * 1.14, 0.58, 0.74, 0], [0.02, hip * 1.04, 0.6, 0.66, 0],
     [0.1, waist * 1.05, 0.72, 0.7, 0], [0.17, waist, 0.74, 0.7, 0], [0.25, waist * 1.08, 0.74, 0.68, 0], [0.33, chest * 0.9, 0.7, 0.64, 0], [0.4, chest * 0.95, 0.64, 0.6, 0],
-    [0.46, chest, 0.58, 0.56, 0], [0.51, sw * 0.98, 0.5, 0.52, 0], [0.545, sw, 0.47, 0.5, -0.002], [0.572, sw * 0.94, 0.45, 0.48, -0.003], [0.593, sw * 0.8, 0.44, 0.49, -0.004], [0.609, sw * 0.63, 0.46, 0.52, -0.005],
-    [0.621, sw * 0.47, 0.52, 0.58, -0.006], [0.63, sw * 0.37, 0.68, 0.74, -0.007], [0.638, 0.068, 0.92, 0.98, -0.008], [0.655 + nkL / 2, 0.056, 0.95, 1, -0.01], [0.68 + nkL, 0.056, 0.95, 1.05, -0.012], [0.72 + nkL, 0.06, 0.92, 1.05, -0.014], [0.755 + nkL, 0.045, 1, 1, -0.015], [0.77 + nkL, 0.002, 1, 1, -0.015]]
+    // hombro → trapecio → cuello: una sola pendiente diagonal (el ancho baja parejo con la altura y el trapecio trepa al cuello);
+    // con un hombro plano a y≈0.584 y el cuello recto encima, de frente se veía un escalón donde termina el pelo.
+    [0.46, chest, 0.58, 0.56, 0], [0.51, sw * 0.85, 0.5, 0.52, 0], [0.544, sw * 0.87, 0.47, 0.56, -0.002], [0.571, sw * 0.85, 0.45, 0.54, -0.003], [0.587, sw * 0.79, 0.44, 0.54, -0.004], [0.599, sw * 0.68, 0.46, 0.52, -0.005],
+    [0.609, sw * 0.57, 0.53, 0.6, -0.006], [0.618, sw * 0.45, 0.64, 0.72, -0.007], [0.625, 0.064, 0.76, 0.86, -0.008], [0.633, 0.049, 0.88, 0.98, -0.009], [0.644, 0.0385, 0.95, 1, -0.01], [0.662 + nkL / 2, 0.0345, 0.95, 1, -0.011], [0.69 + nkL, 0.034, 0.95, 1.05, -0.012], [0.72 + nkL, 0.038, 0.92, 1.05, -0.014], [0.755 + nkL, 0.038, 1, 1, -0.015], [0.77 + nkL, 0.002, 1, 1, -0.015]]
     : [
     [-0.175, 0.02, 1, 1, 0], [-0.16, hip * 0.6, 0.8, 0.8, 0], [-0.12, hip * 0.96, 0.62, 0.68, 0], [-0.06, hip * 1.08, 0.6, 0.7, 0], [0.02, hip * 1.03, 0.6, 0.64, 0],
     [0.1, waist, 0.7, 0.66, 0], [0.18, waist * 1.04, 0.72, 0.64, 0], [0.27, waist * 1.14, 0.7, 0.62, 0], [0.35, chest * 0.97, 0.66, 0.6, 0.004], [0.42, chest, 0.64, 0.6, 0.006],
-    [0.47, sw * 0.9, 0.6, 0.56, 0.004], [0.515, sw * 0.95, 0.5, 0.52, 0], [0.548, sw * 0.93, 0.44, 0.49, -0.003], [0.572, sw * 0.8, 0.43, 0.5, -0.005], [0.592, sw * 0.6, 0.47, 0.55, -0.007], [0.608, sw * 0.41, 0.56, 0.64, -0.008],
-    [0.621, sw * 0.28, 0.78, 0.86, -0.008], [0.632, 0.066, 0.95, 1, -0.008], [0.655 + nkL / 2, 0.058, 0.95, 1, -0.01], [0.7 + nkL, 0.059, 0.95, 1.05, -0.012], [0.74 + nkL, 0.062, 0.92, 1.05, -0.014], [0.765 + nkL, 0.035, 1, 1, -0.015], [0.775 + nkL, 0.002, 1, 1, -0.015]];
-  const rows = crRows(K, fem ? 0.011 : 0.016).map(r => { r[1] = Math.max(r[1], 0.0005); return r; });
-  const pw = 2 / 2.3;
+    [0.47, sw * 0.9, 0.6, 0.56, 0.004], [0.512, sw * 0.95, 0.5, 0.52, 0], [0.54, sw * 0.93, 0.44, 0.49, -0.003], [0.558, sw * 0.82, 0.43, 0.5, -0.005], [0.573, sw * 0.65, 0.47, 0.55, -0.007], [0.586, sw * 0.47, 0.56, 0.64, -0.008],
+    [0.597, sw * 0.33, 0.74, 0.82, -0.008], [0.608, 0.058, 0.93, 0.98, -0.008], [0.628 + nkL / 2, 0.051, 0.95, 1, -0.009], [0.657 + nkL / 2, 0.05, 0.95, 1, -0.01], [0.7 + nkL, 0.051, 0.95, 1.05, -0.012], [0.74 + nkL, 0.054, 0.92, 1.05, -0.014], [0.765 + nkL, 0.035, 1, 1, -0.015], [0.775 + nkL, 0.002, 1, 1, -0.015]];
+  const rows = crRows(K, fem ? (y => y > 0.48 ? 0.0055 : 0.011) : 0.016).map(r => { r[1] = Math.max(r[1], 0.0005); return r; });
+  const pw0 = 2 / 2.3;
+  const pwY = y => fem ? lerp(pw0, 1.0, smooth(clamp((y - 0.47) / 0.05, 0, 1)) * (1 - smooth(clamp((y - 0.585) / 0.02, 0, 1)))) : pw0;   // mujer: la sección del hombro más redonda (con 0.87 quedaba una arista cuadrada que sobresalía del brazo)
   const feat = (x, y, ca) => {
     let z = 0;
     if (ca > 0 && fem) z += BUST.h * bust * bustZ(x, y);
     else if (ca > 0) for (const s of [-1, 1]) z += 0.03 * Math.exp(-((x - s * 0.074) ** 2) / 0.0036 - ((y - 0.435) ** 2) / (y > 0.435 ? 0.004 : 0.0007)) - 0.006 * Math.exp(-(x * x) / 0.0004 - ((y - 0.43) ** 2) / 0.004);
     else for (const s of [-1, 1]) z -= (fem ? 0.032 : 0.02) * Math.exp(-((x - s * 0.068) ** 2) / 0.0045 - ((y + 0.065) ** 2) / 0.004);
+    if (ca > 0) {   // clavículas (una cresta suave del esternón al hombro) y el hueco entre las dos
+      const ax = Math.abs(x), yc = (fem ? 0.586 : 0.546) + (fem ? 0.012 : 0.016) * ax / 0.18, k = smooth(clamp((ax - 0.018) / 0.02, 0, 1)) * (1 - smooth(clamp((ax - sw * 0.62) / 0.05, 0, 1)));
+      z += (fem ? 0.015 : 0.016) * k * Math.exp(-((y - yc) ** 2) / (2 * 0.0055 ** 2)) - 0.005 * Math.exp(-(x * x) / 0.0003 - ((y - yc - 0.004) ** 2) / 0.00012);
+    }
     return z;
   };
-  const NT = fem ? 64 : 40;
+  const NT = fem ? 80 : 40;
   GB.grid(rows.length, NT, (i, j) => {
     const [y, w, kf, kb, zo] = rows[i]; const a = Math.PI + j / NT * Math.PI * 2, sa = Math.sin(a), ca = Math.cos(a);
-    const x = w * Math.sign(sa) * Math.pow(Math.abs(sa), pw);
+    const pw = pwY(y), x = w * Math.sign(sa) * Math.pow(Math.abs(sa), pw);
     const z = w * (ca > 0 ? kf : kb) * Math.sign(ca) * Math.pow(Math.abs(ca), pw) + feat(x, y, ca) * Math.min(1, w / 0.08) + zo;
-    GB.vert(x, ySp + y, z, j / NT, (y + 0.2) / 0.95, torsoW(y, x, nkL, sw), { part: 0, s: y, a: wrapA(a), x, w });
+    GB.vert(x, ySp + y, z, j / NT, (y + 0.2) / 0.95, torsoW(y, x, nkL, sw, fem ? 1 : 0), { part: 0, s: y, a: wrapA(a), x, w });
   });
   const torsoAt = y => { let i = 0; while (i < rows.length - 2 && rows[i + 1][0] < y) i++; const A = rows[i], B2 = rows[i + 1], t = clamp((y - A[0]) / (B2[0] - A[0] || 1), 0, 1); return A.map((v, k) => lerp(v, B2[k], t)); };
   const frontZ = y => { const [, w, kf, , zo] = torsoAt(y); return w * kf + feat(0, y, 1) + zo; };
   const backZ = y => { const [, w, , kb, zo] = torsoAt(y); return w * kb - feat(0, y, -1) - zo; };
   // brazos: el tubo sigue sin cortes por la muñeca hasta la palma (que se aplana); los dedos son tubos con 3 falanges
-  const cH = fem ? 0.044 : 0.05, armK = [[cH, 0.003], [cH * 0.9, 0.03], [cH * 0.7, 0.047], [cH * 0.4, 0.058], [0, 0.063], [-0.06, 0.062], [-0.12, 0.058], [-0.2, 0.052], [-0.27, 0.045], [-0.31, 0.041], [-0.35, 0.043], [-0.41, 0.05], [-0.48, 0.045], [-0.56, 0.037], [-0.615, 0.031], [-0.645, 0.03], [-0.675, 0.035], [-0.71, 0.037], [-0.733, 0.036], [-0.746, 0.03], [-0.754, 0.018], [-0.758, 0.003]];
-  const aRows = crRows(armK.slice().reverse(), 0.01), ak = b.arm ?? 1, fk = fem ? 0.86 : 1;
+  const cH = fem ? 0.024 : 0.05, armK = [[cH, fem ? 0.006 : 0.003], [cH * 0.9, fem ? 0.018 : 0.03], [cH * 0.7, fem ? 0.026 : 0.047], [cH * 0.4, fem ? 0.033 : 0.055], [0, fem ? 0.038 : 0.059], /* mujer: cúpula más cónica, sigue la pendiente del trapecio (redonda salía como un lóbulo aparte con muesca) */ [-0.06, fem ? 0.044 : 0.059], [-0.12, fem ? 0.047 : 0.056], [-0.2, fem ? 0.046 : 0.052], [-0.27, fem ? 0.042 : 0.046], [-0.31, fem ? 0.04 : 0.042], [-0.35, 0.045], [-0.41, 0.053], [-0.48, 0.049], [-0.56, 0.04], [-0.615, 0.032], [-0.645, 0.03], [-0.675, 0.035], [-0.71, 0.037], [-0.733, 0.036], [-0.746, 0.03], [-0.754, 0.018], [-0.758, 0.003]];
+  const aRows = crRows(armK.slice().reverse(), 0.01), ak = b.arm ?? 1, fk = fem ? 0.88 : 0.93;
   const hs = fk, hand = [];
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? 1 : -1, Sx = side * sw * (b.shX ?? 0.95), Sy = ySp + 0.5 + (b.shY ?? 0);
     GB.grid(aRows.length, 22, (r, j) => {
       const [s0, r0] = aRows[r]; const s = s0 < -0.62 ? -0.62 + (s0 + 0.62) * hs : s0;
       const a = Math.PI + j / 22 * Math.PI * 2, sa = Math.sin(a), ca = Math.cos(a);
-      const mus = fem ? -0.1 * gauss(s, -0.03, 0.06) - 0.04 * gauss(s, -0.17, 0.07) : 0.09 * gauss(s, -0.05, 0.05) * (0.6 + 0.4 * Math.max(0, side * sa)) + 0.09 * gauss(s, -0.2, 0.05) * Math.max(0, ca);   // deltoides (más afuera) y bíceps (adelante)
+      const mus = fem ? 0.015 * gauss(s, -0.1, 0.08) - 0.02 * gauss(s, -0.19, 0.07) : 0.03 * gauss(s, -0.05, 0.05) * (0.6 + 0.4 * Math.max(0, side * sa)) + 0.06 * gauss(s, -0.2, 0.05) * Math.max(0, ca);   // deltoides (más afuera) y bíceps (adelante)
       const rad = Math.max(0.0005, r0 * fk * (1 + mus + (ak - 1) * (gauss(s, -0.1, 0.09) + 0.7 * gauss(s, -0.43, 0.06))));
-      const k = smooth(clamp((-0.6 - s0) / 0.07, 0, 1)), fx = lerp(1, 0.45, k), fz = lerp(0.92, 1.13, k);
+      /* mano: la muñeca se afina (más ancha que gruesa), la palma es más angosta (del ancho de los cuatro dedos) y de
+         sección casi rectangular (superelipse) en vez de un óvalo: redonda y ancha se leía como un guante */
+      const k = smooth(clamp((-0.6 - s0) / 0.07, 0, 1)), fx = lerp(1, 0.45, k) * (1 - 0.12 * gauss(s0, -0.635, 0.016)), fz = lerp(0.92, 0.99, k) * (1 - 0.06 * gauss(s0, -0.635, 0.016));
+      // la última fila cierra el tubo en un punto: con radio 0,003 quedaba un agujerito por el que se veía el contorno (una mancha oscura en los nudillos)
+      const cz = s0 < -0.7575 ? 0.02 : 1, kp = smooth(clamp((-0.655 - s0) / 0.03, 0, 1)), pe = lerp(1, 0.7, kp), sq = cz * Math.sign(sa) * Math.abs(sa) ** pe, cq = cz * Math.sign(ca) * Math.abs(ca) ** pe;
       const th = 0.007 * fk * gauss(s0, -0.69, 0.022) * Math.max(0, ca) * Math.max(0, -side * sa);   // eminencia tenar (base del pulgar)
-      const x = Sx + side * (fem ? 0.004 : 0.01) * gauss(s, -0.01, 0.05) + sa * rad * fx - side * th, z = 0.006 * gauss(s, -0.14, 0.05) + ca * rad * fz + th * 0.4;
-      const u = 1 - 0.85 * smooth(clamp((s + 0.125) / 0.175, 0, 1)), f = smooth(clamp((-0.29 - s) / 0.08, 0, 1)), h = smooth(clamp((-0.622 - s0) / 0.04, 0, 1)), tw = clamp((-0.36 - s0) / 0.25, 0, 1);
+      const nud = 0.0035 * fk * gauss(s0, -0.716, 0.008) * Math.max(0, side * sa) ** 2;   // línea de nudillos en el dorso
+      const x = Sx + side * 0.004 * gauss(s, -0.01, 0.05) + sq * rad * fx - side * th + side * nud, z = 0.006 * gauss(s, -0.14, 0.05) + cq * rad * fz + th * 0.4;
+      const u = 1 - (fem ? 0.58 : 0.85) * smooth(clamp((s + 0.125) / 0.175, 0, 1)), f = smooth(clamp((-0.29 - s) / 0.08, 0, 1)), h = smooth(clamp((-0.622 - s0) / 0.04, 0, 1)), tw = clamp((-0.36 - s0) / 0.25, 0, 1);
       GB.vert(x, Sy + s, z, j / 22, s, [[B_CHEST, 1 - u], [B_UA[i], u * (1 - f)], [B_FA[i], u * f * (1 - h) * (1 - tw)], [B_FTW[i], u * f * (1 - h) * tw], [B_HAND[i], h]], { part: 1 + i, s, a: wrapA(a) });
     });
     // dedos (índice, medio, anular, meñique) + pulgar. Posiciones de reposo: mano colgando, palma hacia el muslo
@@ -1384,7 +1428,8 @@ function buildBodySrc(fem, b, hipRest) {
       const start = k < 4 ? -0.012 * hs : -0.018 * hs, n = 16;
       GB.grid(n + 1, 10, (rr2, j) => {
         const t = rr2 / n, d = lerp(start, tot, Math.pow(t, 0.9)), a = j / 10 * Math.PI * 2;
-        let rad = r * (1 - (fem ? 0.3 : 0.22) * clamp(d / tot, 0, 1)) * (1 + 0.07 * (gauss(d, L[0], 0.004) + gauss(d, L[0] + L[1], 0.004)));
+        let rad = r * (1 - (k === 4 ? 0.12 : fem ? 0.3 : 0.22) * clamp(d / tot, 0, 1)) * (1 + 0.07 * (gauss(d, L[0], 0.004) + gauss(d, L[0] + L[1], 0.004)));
+        rad *= lerp(0.55, 1, smooth(clamp((d - start) / 0.008, 0, 1)));   // la raíz (dentro de la palma) se afina: el borde abierto del tubo no asoma entre los nudillos
         const tip = tot - rad; if (d > tip) rad *= Math.sqrt(Math.max(0, 1 - ((d - tip) / rad) ** 2)); rad = Math.max(rad, 0.0003);
         const p = base.clone().addScaledVector(F.dir, d).addScaledVector(e1, Math.cos(a) * rad * 0.84).addScaledVector(e2, Math.sin(a) * rad);
         const w1 = smooth(clamp((d + 0.004) / 0.01, 0, 1)), w2 = smooth(clamp((d - L[0] + 0.004) / 0.008, 0, 1)), w3 = smooth(clamp((d - L[0] - L[1] + 0.004) / 0.008, 0, 1));
@@ -1394,29 +1439,41 @@ function buildBodySrc(fem, b, hipRest) {
     hand.push({ wrist: W, fingers, tips });
   }
   // piernas
-  const legK = [[0.11, 0.003], [0.1, 0.035], [0.085, 0.06], [0.05, 0.08], [0, 0.09], [-0.08, 0.087], [-0.2, 0.078], [-0.32, 0.067], [-0.43, 0.058], [-0.5, 0.054], [-0.57, 0.056], [-0.65, 0.059], [-0.75, 0.051], [-0.85, 0.041], [-0.93, 0.035], [-0.965, 0.034], [-0.982, 0.026], [-0.992, 0.003]];
+  const legK = [[0.11, 0.003], [0.1, 0.035], [0.085, 0.06], [0.05, 0.083], [0, 0.096], [-0.08, 0.095], [-0.2, 0.088], [-0.32, 0.076], [-0.43, 0.062], [-0.5, 0.055], [-0.57, 0.058], [-0.65, 0.065], [-0.75, 0.056], [-0.85, 0.043], [-0.93, 0.035], [-0.965, 0.034], [-0.982, 0.026], [-0.992, 0.003]];
   const lRows = crRows(legK.slice().reverse(), 0.016);
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? 1 : -1, Jx = side * hip * 0.56, Jy = hipRest - 0.02;
     GB.grid(lRows.length, 24, (r, j) => {
-      const [s, r0] = lRows[r]; const rad = Math.max(0.0005, r0 * (fem ? lerp(1.0, 0.88, smooth(clamp((-s - 0.25) / 0.35, 0, 1))) : 1));
+      const [s, r0] = lRows[r]; const rad = Math.max(0.0005, r0 * (fem ? lerp(1.0, 0.92, smooth(clamp((-s - 0.25) / 0.35, 0, 1))) : 1));
       const a = Math.PI + j / 24 * Math.PI * 2;
-      const x = Jx + Math.sin(a) * rad, z = -0.012 * gauss(s, -0.64, 0.07) * (Math.cos(a) < 0 ? 1 : 0.3) + 0.005 * gauss(s, -0.5, 0.03) * Math.max(0, Math.cos(a)) + Math.cos(a) * rad * 0.97;
+      const x = Jx + Math.sin(a) * rad, z = -0.017 * gauss(s, -0.64, 0.07) * (Math.cos(a) < 0 ? 1 : 0.3) + 0.005 * gauss(s, -0.5, 0.03) * Math.max(0, Math.cos(a)) + Math.cos(a) * rad * 0.97;
       const u = smooth(clamp((0.07 - s) / 0.14, 0, 1)), f = smooth(clamp((-0.46 - s) / 0.08, 0, 1));
       GB.vert(x, Jy + s, z, j / 24, s, [[B_HIPS, 1 - u], [B_TH[i], u * (1 - f)], [B_SH[i], u * f]], { part: 3 + i, s, a: wrapA(a) });
     });
   }
   const out = GB.build();
   // grosor del contorno por vértice: más fino en manos y dedos
-  out.geo.setAttribute('olw', new THREE.Float32BufferAttribute(out.meta.map(m => m.part >= 5 ? 0.38 : (m.part === 1 || m.part === 2) ? lerp(1, 0.5, smooth(clamp((-0.6 - m.s) / 0.06, 0, 1))) * lerp(1, 0.12, smooth(clamp((m.s + 0.09) / 0.09, 0, 1))) : 1), 1));   // en la mujer el contorno del brazo se apaga al entrar al hombro (sin costura)
+  out.geo.setAttribute('olw', new THREE.Float32BufferAttribute(out.meta.map(m => m.part >= 5 ? 0.38 : (m.part === 1 || m.part === 2) ? lerp(1, 0.5, smooth(clamp((-0.6 - m.s) / 0.06, 0, 1))) * lerp(1, fem ? lerp(0.02, 1, smooth(clamp(((m.part === 1 ? 1 : -1) * Math.sin(m.a) - 0.15) / 0.5, 0, 1)) * (1 - smooth(clamp((m.s + 0.04) / 0.03, 0, 1)))) : 0.12, smooth(clamp((m.s + 0.09) / 0.09, 0, 1))) : 1), 1));   // en la mujer el contorno del brazo se apaga al entrar al hombro (sin costura), salvo por el lado de afuera: ahí sigue la silueta del trapecio sin cortarse
+  if (fem) {   // hombro: las normales del brazo y del trapecio apuntan desde un mismo centro (sin pliegue de sombra entre la cúpula y el torso)
+    const Nn = out.geo.attributes.normal, Pp = out.geo.attributes.position, n = new THREE.Vector3(), r = new THREE.Vector3();
+    for (let v = 0; v < out.meta.length; v++) {
+      const m = out.meta[v]; let w = 0, side = 0;
+      if (m.part === 1 || m.part === 2) { side = m.part === 1 ? 1 : -1; w = smooth(clamp((m.s + 0.26) / 0.22, 0, 1)); }
+      else if (m.part === 0 && m.s > 0.44 && m.s < 0.64) { side = Math.sign(m.x); w = smooth(clamp((Math.abs(m.x) - sw * 0.4) / (sw * 0.3), 0, 1)) * smooth(clamp((m.s - 0.44) / 0.06, 0, 1)) * (1 - smooth(clamp((m.s - 0.6) / 0.04, 0, 1))); }
+      if (w <= 0.01 || !side) continue;
+      r.set(Pp.getX(v) - side * sw * (b.shX ?? 0.95) * 0.75, Pp.getY(v) - (ySp + 0.49 + (b.shY ?? 0)), Pp.getZ(v)).normalize();
+      n.set(Nn.getX(v), Nn.getY(v), Nn.getZ(v)).lerp(r, w).normalize(); Nn.setXYZ(v, n.x, n.y, n.z);
+    }
+  }
   // punto de la superficie del torso a la altura y y el ángulo a (misma forma que la malla)
-  const surfAt = (y, a) => { const [, w, kf, kb, zo] = torsoAt(y), sa = Math.sin(a), ca = Math.cos(a), x = w * Math.sign(sa) * Math.pow(Math.abs(sa), pw); return [x, w * (ca > 0 ? kf : kb) * Math.sign(ca) * Math.pow(Math.abs(ca), pw) + feat(x, y, ca) * Math.min(1, w / 0.08) + zo]; };
+  const surfAt = (y, a) => { const [, w, kf, kb, zo] = torsoAt(y), pw = pwY(y), sa = Math.sin(a), ca = Math.cos(a), x = w * Math.sign(sa) * Math.pow(Math.abs(sa), pw); return [x, w * (ca > 0 ? kf : kb) * Math.sign(ca) * Math.pow(Math.abs(ca), pw) + feat(x, y, ca) * Math.min(1, w / 0.08) + zo]; };
   return { ...out, torsoAt, frontZ, backZ, surfAt, hand };
 }
 
 /* ---------- cabeza esculpida (nariz, labios, pómulos, mandíbula móvil) ---------- */
 const FACE_UV = { X: 0.085, Y0: -0.135, Y1: 0.075 };   // zona de la cara que cubre la textura pintada
 const HAIRLINE = [[0, 0.62], [0.5, 0.55], [0.9, 0.4], [1.18, 0.12], [1.36, -0.12], [1.48, 0.18], [1.8, 0.1], [2.2, -0.32], [Math.PI, -0.58]];
+const HAIRLINE_RAPADO = [[0, 0.62], [0.5, 0.55], [0.9, 0.4], [1.3, 0.16], [1.75, -0.04], [2.2, -0.32], [Math.PI, -0.58]];   // sin la patilla: en el rapado el quiebre junto a la oreja salía en escalera
 function hairlineAt(ph, tbl = HAIRLINE) { for (let i = 0; i < tbl.length - 1; i++) if (ph <= tbl[i + 1][0]) { const t = (ph - tbl[i][0]) / (tbl[i + 1][0] - tbl[i][0]); return lerp(tbl[i][1], tbl[i + 1][1], smooth(t)); } return tbl[tbl.length - 1][1]; }
 /* interpolación Catmull-Rom de una tabla [[x, y], ...] (x creciente) */
 function crTab(T, x) {
@@ -1426,12 +1483,12 @@ function crTab(T, x) {
   return 0.5 * (2 * P1 + (-P0 + P2) * t + (2 * P0 - 5 * P1 + 4 * P2 - P3) * t * t + (-P0 + 3 * P1 - 3 * P2 + P3) * t * t * t);
 }
 /* contorno de la cara bajo los pómulos (t = 0 a la altura de los ojos, 1 = punta del mentón): mujer en "V" estilizada, hombre más cuadrado */
-const JAW_F = [[0, 1], [0.14, 0.995], [0.28, 0.94], [0.42, 0.83], [0.56, 0.68], [0.7, 0.52], [0.82, 0.385], [0.91, 0.27], [0.97, 0.16], [1, 0]];
-const JAW_M = [[0, 1], [0.14, 0.995], [0.28, 0.965], [0.42, 0.915], [0.56, 0.845], [0.7, 0.755], [0.82, 0.635], [0.91, 0.47], [0.97, 0.245], [1, 0]];
+const JAW_F = [[0, 1], [0.14, 0.99], [0.28, 0.935], [0.42, 0.835], [0.56, 0.705], [0.7, 0.555], [0.82, 0.415], [0.91, 0.325], [0.97, 0.195], [1, 0]];   // mentón redondeado (terminaba en punta)
+const JAW_M = [[0, 1], [0.14, 0.995], [0.28, 0.96], [0.42, 0.9], [0.56, 0.82], [0.7, 0.715], [0.82, 0.585], [0.91, 0.43], [0.97, 0.235], [1, 0]];   // menos caja: el ángulo de la mandíbula baja en diagonal al mentón
 const CHIN_F = [[0, 1], [0.25, 0.99], [0.5, 0.955], [0.7, 0.9], [0.85, 0.83], [0.94, 0.68], [1, 0]];   // profundidad del frente (mentón adelantado)
 const CHIN_M = [[0, 1], [0.25, 0.99], [0.5, 0.94], [0.7, 0.86], [0.85, 0.76], [0.94, 0.58], [1, 0]];
 function buildHeadSrc(fem, F, look, off) {
-  const GB = new GeoB(), R0 = 0.13, lowK = (fem ? 0.93 : 0.96) * (F.faceLong ?? 1), wK = (fem ? 0.84 : 0.865) * (F.faceW ?? 1);
+  const GB = new GeoB(), R0 = 0.13, lowK = (fem ? 0.93 : 1.03) * (F.faceLong ?? 1), wK = (fem ? 0.8 : 0.8) * (F.faceW ?? 1);
   const mw = 0.027 * F.mouthW, vm = fem ? -0.066 : -0.064, eyeX = (fem ? 0.047 : 0.044) * F.eyeGap, eyeY = 0.014, er = 0.0215 * F.eyeSize;
   const nl = F.nose, nwd = F.noseW, tY = -0.036 - 0.004 * nl;
   const jk = clamp((F.jaw - 0.25) / 0.75, -0.2, 1.3);
@@ -1478,7 +1535,7 @@ function buildHeadSrc(fem, F, look, off) {
   const cols = 96, phis = warpList(cols + 1, 0, 1, u => { const fa = wrapA(Math.PI + u * Math.PI * 2); return 1 + 2.2 * Math.exp(-(fa * fa) / (2 * 0.6 * 0.6)); });
   const C = h => new THREE.Color(h);
   const cSkin = C(look.skin), cLip = C(F.lipColor ?? 0xb0505a), cTeeth = C(0xf1ebe2), cDark = C(0x2a070c), cTongue = C(0x9a3a45);
-  const lipC = cSkin.clone().lerp(cLip, fem ? 1 : 0.4);
+  const lipC = cSkin.clone().lerp(cLip, fem ? 1 : 0.66);
   // atributos de la cara pintada: fuv = proyección frontal (X,Y) → textura; ffw = cuánto es "cara"; fovr = color forzado (dientes / interior de la boca)
   const FUV = [], FOVR = [], FFW = [];
   GB.grid(rowsT.length, cols, (r, j) => {
@@ -1576,12 +1633,13 @@ function paintFaceTex(fem, F, look, hs) {
   }
   // nariz: lado en sombra, ala, punta con brillo, sombra inferior y fosas
   const tY = hs.tY, nw = hs.nwd;
-  g.save(); g.filter = 'blur(5px)'; g.fillStyle = col(shadeSk(0.7), 0.42);   // cuña de sombra del lado oscuro de la nariz
+  g.save(); g.filter = 'blur(5px)'; g.fillStyle = col(shadeSk(0.7), fem ? 0.46 : 0.6);   // cuña de sombra del lado oscuro de la nariz
   g.beginPath(); g.moveTo(px(-0.0035), py(E.y + 0.004)); g.lineTo(px(-0.0062 * nw), py(tY + 0.012)); g.lineTo(px(-0.0098 * nw), py(tY - 0.001)); g.lineTo(px(-0.0045 * nw), py(tY - 0.006)); g.lineTo(px(-0.0022), py(tY + 0.006)); g.closePath(); g.fill(); g.restore();
   blob(-0.0085 * nw, tY - 0.0015, 0.0046, 0.0055, shadeSk(0.75), 0.36);
   blob(0.0075 * nw, tY - 0.002, 0.004, 0.005, shadeSk(0.6), 0.14);
   blob(0, tY + 0.001, 0.0085, 0.0065, 0xff7a7a, fem ? 0.15 : 0.1);
   blob(0.0022, tY + 0.0035, 0.0032, 0.0042, WHITE, 0.2);
+  blob(0.0012, (E.y + tY) / 2 + 0.004, 0.0022, (E.y - tY) * 0.42, WHITE, 0.16);   // luz del puente de la nariz
   g.strokeStyle = col(shadeSk(0.9), 0.5); g.lineWidth = 3; g.lineCap = 'round';   // trazo bajo la punta de la nariz
   g.beginPath(); g.moveTo(px(-0.0078 * nw), py(tY - 0.0055)); g.quadraticCurveTo(px(-0.003), py(tY - 0.0105), px(0.0035), py(tY - 0.0085)); g.stroke();
   blob(0, tY - 0.0098, 0.0092, 0.0026, shadeSk(0.85), 0.36);
@@ -1589,34 +1647,44 @@ function paintFaceTex(fem, F, look, hs) {
   // modelado pintado: sombra suave por dentro del contorno de la cara (más en el lado de la sombra) y bajo los pómulos
   for (let Y = 0.0; Y > -0.128; Y -= 0.004) {
     const W = hs.contour(Y), k = smooth(clamp(-Y / 0.04, 0, 1));
-    for (const s of s2) blob(s * (W - 0.006), Y, 0.011, 0.007, shadeSk(0.7), (s < 0 ? 0.13 : 0.07) * k);
+    for (const s of s2) blob(s * (W - 0.006), Y, 0.011, 0.007, shadeSk(0.7), (s < 0 ? 0.13 : 0.07) * k * (fem ? 1 : 1.5));
   }
   for (const s of s2) blob(s * 0.06, -0.05, 0.012, 0.016, shadeSk(0.6), s < 0 ? 0.1 : 0.05);
   blob(0, -0.118, 0.016, 0.006, 0xffffff, 0.08);   // luz en el mentón
   const vm = hs.vm, mw = hs.mw, lf = hs.lf;
   blob(0, (tY + vm) / 2 - 0.002, 0.0032, 0.008, shadeSk(0.45), 0.12);   // surco del labio superior
   // sombra de barba: sigue la forma de la barba (sin cortes rectos), borde difuso y vellos finos
-  const bt = BEARD_LEG[look.beard?.type] ? 'full' : look.beard?.type, stub = bt === 'stubble' ? 0.32 : (bt === 'full' || bt === 'goatee') ? 0.2 : bt === 'mustache' ? 0.08 : 0;
+  const bt = BEARD_LEG[look.beard?.type] ? 'full' : look.beard?.type, stub = bt === 'stubble' ? 0.2 : (bt === 'full' || bt === 'goatee') ? 0.2 : bt === 'mustache' ? 0.08 : 0;
   if (stub) {
     const bc = look.beard?.color ?? look.hair?.color ?? 0x2a1a10, top = x => beardLine(hs, Math.abs(x)) + 0.004;
     /* la sombra se apaga hacia el borde de la textura (|x| = FACE_UV.X): más allá la cara repite la última columna,
        y con la sombra entera hasta el borde salían rayas estiradas en la mejilla */
     const sombra = g.createLinearGradient(px(-FACE_UV.X), 0, px(FACE_UV.X), 0);
     for (const [u, a] of [[0, 0], [0.16, 1], [0.84, 1], [1, 0]]) sombra.addColorStop(u, col(bc, stub * a));
-    g.save(); g.filter = 'blur(11px)'; g.beginPath();
-    for (let k = 0; k <= 48; k++) { const x = lerp(-0.1, 0.1, k / 48); g.lineTo(px(x), py(top(x) - 0.004)); }
-    g.lineTo(px(0.1), py(-0.17)); g.lineTo(px(-0.1), py(-0.17)); g.closePath(); g.fillStyle = sombra; g.fill(); g.restore();
-    g.strokeStyle = col(bc, Math.min(0.6, stub * 0.9)); g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath();
-    for (let i = 0; i < 2600; i++) {
+    const tresDias = bt === 'stubble';
+    if (tresDias) {   // tres días: sombra suave que sigue la mandíbula y se carga en bigote y mentón (el relleno entero se leía como una máscara o como piel sucia)
+      for (let Y = -0.04; Y > -0.13; Y -= 0.006) {
+        const xw = Math.min(hs.contour(Y) - 0.014, 0.056), k = smooth(clamp((-Y - 0.035) / 0.05, 0, 1));   // el borde queda antes de FACE_UV.X
+        for (const s of s2) { blob(s * xw, Y, 0.018, 0.012, bc, 0.1 * k); blob(s * xw * 0.5, Y, 0.022, 0.012, bc, 0.07 * smooth(clamp((-Y - 0.085) / 0.03, 0, 1))); }
+      }
+      blob(0, (tY + vm) / 2 - 0.001, mw * 1.3, 0.007, bc, 0.18); blob(0, vm - 0.04, 0.03, 0.022, bc, 0.14); blob(0, vm - 0.019, 0.008, 0.005, bc, 0.12);
+    } else {
+      g.save(); g.filter = 'blur(18px)'; g.beginPath();
+      for (let k = 0; k <= 48; k++) { const x = lerp(-0.1, 0.1, k / 48); g.lineTo(px(x), py(top(x) - 0.004)); }
+      g.lineTo(px(0.1), py(-0.17)); g.lineTo(px(-0.1), py(-0.17)); g.closePath(); g.fillStyle = sombra; g.fill(); g.restore();
+    }
+    g.strokeStyle = col(bc, Math.min(0.6, stub * 1.6)); g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath();
+    for (let i = 0; i < (bt === 'stubble' ? 5200 : 2600); i++) {
       const x = (rnd() - 0.5) * 0.19, y = -0.16 + rnd() * 0.17; if (y > top(x) - 0.003 || Math.abs(x) > 0.058 + rnd() * 0.02) continue;
+      if (tresDias && y > -0.04 - rnd() * 0.02 && !(Math.abs(x) < mw * 1.3 && y > vm + 0.002)) continue;   // mejillas limpias
       const a = Math.PI / 2 + Math.sign(x) * (0.2 + rnd() * 0.5), L = 2 + rnd() * 3;
       g.moveTo(px(x), py(y)); g.lineTo(px(x) + Math.cos(a) * L * Math.sign(x || 1), py(y) + Math.sin(a) * L);
     }
     g.stroke();
   }
   // labios: arco de cupido marcado, labio superior más oscuro, inferior carnoso con brillo
-  const uh = (fem ? 0.0088 : 0.0066) * lf, lh = (fem ? 0.0118 : 0.0092) * lf, pk = 0.0066 * Math.min(1.2, mw / 0.025);
-  const lipC = mixC(look.skin, F.lipColor ?? 0xb0505a, fem ? 1 : 0.35);
+  const uh = (fem ? 0.0088 : 0.0072) * lf, lh = (fem ? 0.0118 : 0.0098) * lf, pk = 0.0066 * Math.min(1.2, mw / 0.025);
+  const lipC = mixC(look.skin, F.lipColor ?? 0xb0505a, fem ? 1 : 0.66);
   const up = lipC.clone().multiplyScalar(0.8), upHi = lipC.clone().multiplyScalar(0.95), lo = lipC.clone().lerp(new THREE.Color(WHITE), 0.07), loDk = lipC.clone().multiplyScalar(0.7);
   blob(0, vm - lh - 0.0034, mw * 0.62, 0.0028, shadeSk(0.6), 0.22);   // sombra bajo el labio inferior
   g.beginPath(); g.moveTo(px(-mw), py(vm + 0.0005));
@@ -1937,7 +2005,7 @@ function faceMaterial(fem, F, look, hs) {
     uEyeB: { value: new THREE.Vector4(hw * (fem ? 0.38 : 0.33) * (F.lowLid ?? 1), (fem ? 0.0028 : 0.0012) + 0.001 * (F.tilt ?? 0), hw * (fem ? 0.56 : 0.47) * (F.irisK ?? 1), F.liner ?? (fem ? 1 : 0)) },
     uLid: { value: new THREE.Vector4(0.2, 0.2, 0, 0) }, uGaze: { value: new THREE.Vector4(0, 0, 0, 0) }, uBrow: { value: new THREE.Vector4(0, 0, 0, 0) },
     uBrowS: { value: new THREE.Vector4((fem ? 0.016 : 0.011) - (F.browDrop ?? 0), (fem ? 0.0092 : 0.0085) * F.browThick, (fem ? 0.0042 : 0.0022) * (0.4 + F.browArch) / 1.1, F.lashLen ?? 1) },
-    uFace: { value: new THREE.Vector4(FACE_UV.X, FACE_UV.Y0, FACE_UV.Y1, F.lineW ?? (fem ? 1 : 0.55)) },
+    uFace: { value: new THREE.Vector4(FACE_UV.X, FACE_UV.Y0, FACE_UV.Y1, F.lineW ?? (fem ? 1 : 0.8)) },
     uIris2: { value: C(F.eyes2 ?? 0xe8b020) }, uIrisS: { value: new THREE.Vector4(F.irisStyle ?? 0, 0, 0, 0) },
     uBrowT: { value: new THREE.Vector4(F.browStraight ?? 0, F.browSlit ?? 0, F.browBushy ?? 0, F.browLen ?? 1) },
     uT: { value: 0 }, uGlowTex: { value: ft.userData.glow ?? BLACK_TEX }, uGlowS: { value: new THREE.Vector4(F.legMk ?? 0, 0, 0, 0) }, uGlowA: { value: C(F.shadow ?? 0x3affe0) },
@@ -1965,7 +2033,7 @@ float jawAt(float ax) { float f = clamp(ax / 0.01, 0.0, 11.999); int i = int(f);
   vec3 fp = (uFaceInv * vec4(vWPos, 1.0)).xyz; float ax = abs(fp.x), jy = jawAt(ax) + 0.004, dep = mix(0.034, 0.028, clamp(ax / 0.08, 0.0, 1.0));
   float nsh = (1.0 - smoothstep(jy - 0.002, jy, fp.y)) * smoothstep(jy - dep - 0.008, jy - dep + 0.002, fp.y) * smoothstep(-0.07, -0.02, fp.z) * (1.0 - smoothstep(0.075, 0.1, ax));
   diffuseColor.rgb *= mix(vec3(1.0), uNeckSh, nsh);`);
-    bustShade(sh, {}, 1, [0.8, 0.6, 0.56]);
+    bustShade(sh, {}, 1, [0.93, 0.84, 0.8]);
   };
   m.customProgramCacheKey = () => 'neckShadow';
   return { mat: m, U };
@@ -2014,19 +2082,21 @@ const TOPS = {
     const sisa = 0.148 + Math.max(0, 0.48 - m.s) * 2.1 - ax;
     return Math.min(escote, sisa, m.s + 0.03);
   }, inf: 0.006, color: c.color }],
-  tee: c => [{ pred: m => inT(m, -0.07, 0.625) || inA(m, 0.09, -0.16), inf: m => m.part === 0 ? 0.008 : 0.008 + 0.007 * clamp(-m.s / 0.15, 0, 1), color: c.color }],   // la manga se abre apenas (era un globo)
+  tee: c => [{ pred: m => inT(m, -0.07, 0.6) || inA(m, 0.09, -0.16), inf: m => m.part === 0 ? 0.008 : 0.008 + 0.007 * clamp(-m.s / 0.15, 0, 1), color: c.color }],   // la manga se abre apenas (era un globo)
   longsleeve: c => [{ pred: m => inT(m, -0.07, 0.62) || inA(m, 0.09, -0.6), inf: 0.009, color: c.color }],
   jacket: c => [{ pred: m => inT(m, -0.09, 0.64) || inA(m, 0.09, -0.58), inf: m => m.part === 0 ? 0.012 : 0.012 + 0.01 * clamp((-m.s - 0.4) / 0.18, 0, 1), color: c.color }],
   crop: c => [{ clip: m => {   // top corto: cintura al aire, escote corazón y tirantes
     if (m.part !== 0) return -1;
     const f = clamp(0.5 + Math.cos(m.a) * 1.5, 0, 1), ax = Math.abs(m.x);
-    const top = lerp(0.51, 0.476, f) + f * 0.012 * Math.exp(-((ax - 0.08) ** 2) / 0.001) - f * 0.03 * Math.exp(-(m.x * m.x) / 0.0006);
-    return Math.max(Math.min(top - m.s, m.s - 0.265), Math.min(0.018 - Math.abs(ax - 0.092), (m.s - 0.4) * 2));
+    const top = lerp(0.53, 0.496, f) + f * 0.006 * Math.exp(-((ax - 0.08) ** 2) / 0.0028) - f * 0.026 * Math.exp(-(m.x * m.x) / 0.0034);
+    const smx = (a, b, k) => 0.5 * (a + b + Math.hypot(a - b, k)), v = 0.46 - m.s;   // máximo suave: redondea la esquina entre el tirante y el escote; v+ suave: la esquina exterior de la sisa
+    const sisa = 0.106 + 1.05 * (v + Math.hypot(v, 0.03)) - ax, arriba = smx(ax - 0.088, top - m.s, 0.04);   // el tirante pasa por mitad del trapecio (pegado al cuello dejaba el cuello como una columna recta entre dos tiras)
+    return Math.min(-smx(-arriba, -sisa, 0.016), m.s - 0.265);   // tirantes como los de la musculosa (la franja fina salía en zigzag)
   }, inf: 0.006, color: c.color }],
   corset: c => [{ clip: m => {   // corsé: de la cadera al busto, hombros al aire
     if (m.part !== 0) return -1;
     const f = clamp(0.5 + Math.cos(m.a) * 1.5, 0, 1), ax = Math.abs(m.x);
-    const top = lerp(0.5, 0.464, f) + f * 0.016 * Math.exp(-((ax - 0.082) ** 2) / 0.0012) - f * 0.024 * Math.exp(-(m.x * m.x) / 0.0005);
+    const top = lerp(0.52, 0.484, f) + f * 0.016 * Math.exp(-((ax - 0.07) ** 2) / 0.0012) - f * 0.024 * Math.exp(-(m.x * m.x) / 0.0005);
     return Math.min(top - m.s, m.s + 0.01);
   }, inf: 0.008, color: 0xffffff, map: corsetTex(c.color ?? 0x7a1020) }],
   /* chaqueta de cuero abierta: la abertura va recta hasta el pecho y se cierra en V bajo el cuello; las solapas son
@@ -2034,9 +2104,9 @@ const TOPS = {
   leather: c => {
     const boca = () => 0.42, claro = new THREE.Color(c.color ?? 0x1d1d24).lerp(new THREE.Color(0xb8b8c4), 0.2).getHex();   // el mismo ángulo hasta el cuello: como el torso se angosta, la abertura sube en V
     return [
-      { clip: m => m.part === 0 ? Math.min(m.s + 0.1, 0.625 - m.s, (Math.abs(m.a) - boca(m.s)) * 0.11) : m.part <= 2 ? Math.min(0.09 - m.s, m.s + 0.6) : -1, inf: m => m.part === 0 ? 0.014 : 0.012, color: c.color },
-      { pred: m => inT(m, -0.05, 0.6), inf: 0.006, color: 0xffffff, map: TX.skullTee },
-      { clip: m => { if (m.part !== 0) return -1; const b = boca(m.s), an = 0.04 + 0.3 * clamp((m.s - 0.2) / 0.3, 0, 1) - 0.34 * clamp((m.s - 0.52) / 0.09, 0, 1), a = Math.abs(m.a); return Math.min((a - b + 0.03) * 0.11, (b + an - a) * 0.11, 0.61 - m.s, m.s - 0.19); }, inf: 0.0195, color: claro },
+      { clip: m => m.part === 0 ? Math.min(m.s + 0.1, 0.602 - m.s, (Math.abs(m.a) - boca(m.s)) * 0.11) : m.part <= 2 ? Math.min(0.09 - m.s, m.s + 0.6) : -1, inf: m => m.part === 0 ? 0.011 : 0.009, color: c.color },
+      { pred: m => inT(m, -0.05, 0.596), inf: 0.006, color: 0xffffff, map: TX.skullTee },
+      { clip: m => { if (m.part !== 0) return -1; const b = boca(m.s), an = 0.04 + 0.3 * clamp((m.s - 0.2) / 0.3, 0, 1) - 0.34 * clamp((m.s - 0.52) / 0.09, 0, 1), a = Math.abs(m.a); return Math.min((a - b + 0.03) * 0.11, (b + an - a) * 0.11, 0.596 - m.s, m.s - 0.19); }, inf: 0.016, color: claro },
     ];
   },
   // legendarios (leg = [efecto, color, brillo, escala])
@@ -2049,7 +2119,7 @@ const TOPS = {
   chaquetaNeon: c => { const P = TOPS.jacket(c); P[0].leg = ['neon', c.color ?? 0x14101e, c.accent ?? 0xff3a9a, 5]; return P; },
 };
 const BOTTOMS = {
-  jeans: c => [{ pred: m => inT(m, -0.2, 0.075) || inL(m, 0.12, -0.955), inf: m => m.part === 0 ? 0.012 : 0.013 + 0.018 * clamp((-m.s - 0.55) / 0.4, 0, 1), color: c.color ?? 0x4a5f86, map: TX.denim }],
+  jeans: c => [{ pred: m => inT(m, -0.2, 0.075) || inL(m, 0.12, -0.955), inf: m => m.part === 0 ? 0.012 : 0.016 + 0.015 * clamp((-m.s - 0.55) / 0.4, 0, 1), color: c.color ?? 0x4a5f86, map: TX.denim }],
   jeansRips: c => BOTTOMS.jeans(c),
   plaid: c => [{ pred: m => inT(m, -0.2, 0.075) || inL(m, 0.12, -0.955), inf: m => m.part === 0 ? 0.013 : 0.014 + 0.008 * clamp((-m.s - 0.55) / 0.4, 0, 1), color: 0xffffff, map: c.color === undefined ? TX.plaid : plaidTex(c.color) }],
   pitillo: c => [{ pred: m => inT(m, -0.2, 0.08) || inL(m, 0.12, -0.955), inf: m => m.part === 0 ? 0.008 : 0.006, color: 0xffffff, map: sideStripeTex(c.color ?? 0x161616, c.color2 ?? 0xff4a9a) }],
@@ -2265,7 +2335,7 @@ class Rocker {
 
     this.auraQ = [];   // auras legendarias: se crean al final, cuando todos los huesos están enlazados
     const M = this.M = {
-      skin: toon(cfg.skin, { gradientMap: GRAD_SOFT }), skinD: toon(shade(cfg.skin, 0.8), { gradientMap: GRAD_SOFT }), hair: hairMat(hairCfg.color), hairS: hairMat(hairCfg.color), hair2: hairMat(hairCfg.color2 || hairCfg.color),
+      skin: toon(cfg.skin, { gradientMap: GRAD_SOFT }), skinD: toon(shade(cfg.skin, 0.8), { gradientMap: GRAD_SOFT }), hair: hairMat(new THREE.Color(hairCfg.color).lerp(new THREE.Color(hairCfg.color2 ?? hairCfg.color), 0.5).getHex(), {}, 0), hairS: hairMat(hairCfg.color), hair2: hairMat(hairCfg.color2 || hairCfg.color),
       white: toon(0xf8f5ee), iris: toon(F.eyes || 0x3a2a18), pupil: new THREE.MeshBasicMaterial({ color: 0x050505 }), spec: new THREE.MeshBasicMaterial({ color: 0xffffff }),
       brow: toon(F.brow ?? shade(hairCfg.color, 0.6)), metal: toon(0xc9ccd6), gold: toon(0xd9a63a), leather: toon(0x18141a),
       shoe: shoeLeg ? legMat(shoeLeg[1], cfg.shoes.color ?? 0x1a1a1a, shoeLeg[2], { scale: 16, side: THREE.FrontSide }) : toon(cfg.shoes?.color ?? 0x1a1a1a), sole: shoeLeg?.[1] === 'crystal' ? legMat('crystal', 0x9ad8ff, 0xffffff, { scale: 24, side: THREE.FrontSide }) : toon(shoeK === 'platform' ? 0x241a2e : shoeK === 'sneaker' ? 0xf2efe6 : 0x2a2a2a),
@@ -2373,7 +2443,7 @@ class Rocker {
     /* ---------- peinado: mechones planos y facetados (estilo pintado) sobre un casquete que sigue el cráneo ---------- */
     const hair = this.hair = new THREE.Group(); face.add(hair); this.tails = [];
     const HL = LEG_HAIR[hairCfg.style], st = HL ? HL.base : hairCfg.style;   // los legendarios usan mechones de otro estilo (o propios) con material animado
-    const capInf = (extra = 0) => m => 0.0045 + 0.009 * Math.max(0, m.ny) ** 1.5 + extra;
+    const capInf = (extra = 0) => m => 0.0045 + 0.009 * Math.max(0, m.ny) ** 1.5 + 0.006 * smooth(clamp((m.ny - 0.75) / 0.2, 0, 1)) + extra;   // un poco más alto en la coronilla: tapa las raíces de los mechones
     const cap = (mat, extra = 0, tbl) => { const cl = m => m.ny - hairlineAt(m.ph, tbl); this.skin(shellGeo(hs, m => cl(m) > -0.06, capInf(extra), false, cl).geo, clipMat(mat), 0.008); };   // borde recortado suave (sin escalones)
     let HA = hairMat(hairCfg.color), HB = hairMat(hairCfg.color2 || hairCfg.color), HC = hairMat(shade(hairCfg.color, 0.8));
     if (HL) {
@@ -2382,6 +2452,9 @@ class Rocker {
       M.hair = legMat(HL.fx, c1, c2, { scale: HL.sc, k: HL.k ?? 1, map: TX.hairStreak, side: THREE.FrontSide });
     }
     const HM = [HA, HB, HA, HC];
+    /* la capa de encima va toda en un tono intermedio, el mismo del casquete: los mechones se cruzan entre sí, y con dos
+       colores cada cruce se veía como un parche oscuro de borde dentado en la coronilla */
+    const HX = HL ? HA : hairMat(new THREE.Color(hairCfg.color).lerp(new THREE.Color(hairCfg.color2 ?? hairCfg.color), 0.5).getHex());
     const lock = (par, pts, w0, w1, mat, o = {}) => mesh(par, ribbonGeo(pts, w0, w1, o.th ?? 0.0095, o), mat, { outline: o.ol ?? 0.0042 });
     // mechón articulado: n huesos a lo largo de la curva; cada vértice se reparte entre los dos huesos más cercanos
     this.chains = [];
@@ -2396,7 +2469,7 @@ class Rocker {
       }
       geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
       const bones = []; for (let k = 0; k < n; k++) { const b = new THREE.Bone(); b.position.copy(k ? J[k].clone().sub(J[k - 1]) : J[0]); (k ? bones[k - 1] : par).add(b); bones.push(b); }
-      const m = new THREE.SkinnedMesh(geo, mat), ol = LIVIANO ? null : new THREE.SkinnedMesh(geo, outlineMat(o.ol ?? 0.0042)); m.frustumCulled = false; par.add(m); if (ol) { ol.frustumCulled = false; par.add(ol); }
+      const m = new THREE.SkinnedMesh(geo, mat), ol = LIVIANO ? null : new THREE.SkinnedMesh(geo, outlineMat((o.ol ?? 0.0042) * 0.5)); m.frustumCulled = false; par.add(m); if (ol) { ol.frustumCulled = false; par.add(ol); }
       this.chains.push({ par, bones, J, meshes: ol ? [m, ol] : [m], stiff: o.stiff ?? 10, W: J.map(() => V()), P: null, Pp: null });
     };
     // punto sobre el casquete: a = azimut (0 delante, + hacia la izquierda del personaje), e = elevación
@@ -2404,17 +2477,17 @@ class Rocker {
     const hang = (a, y, k) => V(Math.sin(a) * 0.128 * k, y, Math.cos(a) * (Math.cos(a) > 0 ? 0.13 : 0.145) * k);
     const R2 = rng(Math.floor(this.seed * 1000));
     const rv = (a, b) => lerp(a, b, R2());
-    // flequillo recto en bloques, pegado a la frente
+    // flequillo: mechones finos de punta afilada, peinados apenas hacia un lado y de largo desigual (eran nueve bloques rectos)
     const bangs = () => {
-      for (let k = -4; k <= 4; k++) {
-        const x = k * 0.0172, yEnd = 0.061 + (k & 1 ? 0.005 : 0) + rv(-0.002, 0.002) + Math.abs(k) * 0.0012, dz = k & 1 ? 0 : 0.004;
+      for (let k = -4; k <= 4; k++) {   // nacen de una raya al costado y barren la frente en diagonal, solapados como tejas
+        const x = k * 0.0185, yEnd = 0.046 + 0.0065 * (k + 4) / 8 + (k & 1 ? 0.004 : 0), dz = (k + 4) * 0.0012, xt = x + 0.012;
         const fz = (xx, yy, o) => hs.frontZ(xx, yy) + o + dz;
-        lock(hair, [V(x * 0.5, 0.155, 0.03), V(x * 0.8, 0.14, fz(x * 0.8, 0.14, 0.018)), V(x * 0.95, 0.105, fz(x * 0.95, 0.105, 0.015)), V(x, yEnd, fz(x, yEnd, 0.011))], 0.025, 0.023, HM[(k + 4) % 4], { tip: 'blunt', th: 0.011 });
+        lock(hair, [V(0.03 + x * 0.3, 0.134, 0.03), V(0.014 + x * 0.72, 0.131, fz(0.014 + x * 0.72, 0.133, 0.012)), V(x * 0.98 - 0.004, 0.098, fz(x * 0.98 - 0.004, 0.098, 0.01)), V(xt, yEnd, fz(xt, yEnd, 0.007))], 0.03, 0.027, HX, { th: 0.007, ol: 0.002, tip: 'round' });
       }
     };
     // mechones laterales hasta la mandíbula
     const sideLocks = () => { for (const s of [-1, 1]) for (let k = 0; k < 2; k++)
-      lockC(hair, [V(s * 0.06, 0.148, 0.07), V(s * 0.108, 0.09, 0.09 - k * 0.01), V(s * (0.126 + k * 0.01), 0.0, 0.072 - k * 0.015), V(s * (0.128 + k * 0.01), -0.08, 0.055 - k * 0.018), V(s * (0.122 + k * 0.012), -0.135 - k * 0.025, 0.042 - k * 0.02)], 0.046, 0.034, HM[k * 2 + 1], { n: 3, stiff: 18 }); };
+      lockC(hair, [V(s * 0.082, 0.112, 0.05), V(s * 0.108, 0.07, 0.07 - k * 0.01), V(s * (0.126 + k * 0.01), 0.0, 0.072 - k * 0.015), V(s * (0.128 + k * 0.01), -0.08, 0.055 - k * 0.018), V(s * (0.122 + k * 0.012), -0.135 - k * 0.025, 0.042 - k * 0.02)], 0.046, 0.034, k ? HB : HX, { n: 3, stiff: 18 }); };
     if (st === 'long') {
       cap(M.hair);
       for (let i = 0; i < 18; i++) {   // capa de abajo, larga
@@ -2423,11 +2496,11 @@ class Rocker {
       }
       for (let i = 0; i < 13; i++) {   // capa de encima, desde la coronilla
         const a = lerp(1.0, Math.PI * 2 - 1.0, i / 12) + rv(-0.05, 0.05), L = rv(0.28, 0.4);
-        lockC(hair, [sp(a, 1.3, 1.02), sp(a, 0.6, 1.13), sp(a, 0.0, 1.22), hang(a, -0.14, 1.22), hang(a, -L, 1.2).add(V(0, 0, -0.02))], 0.062, 0.046, HM[(i + 1) % 4], { n: 5, stiff: 15 });
+        lockC(hair, [sp(a, 1.42, 0.9), sp(a, 0.95, 1.08), sp(a, 0.6, 1.13), sp(a, 0.0, 1.22), hang(a, -0.14, 1.22), hang(a, -L, 1.2).add(V(0, 0, -0.02))], 0.062, 0.046, HX, { n: 5, stiff: 15 });
       }
-      for (const s of [-1, 1]) lock(hair, [V(s * 0.004, 0.16, -0.01), V(s * 0.01, 0.152, 0.06), V(s * 0.035, 0.122, 0.112), V(s * 0.075, 0.08, 0.124), V(s * 0.112, 0.02, 0.108)], 0.045, 0.034, HB);
+      for (const s of [-1, 1]) lock(hair, [V(s * 0.004, 0.149, -0.01), V(s * 0.012, 0.136, 0.058), V(s * 0.042, 0.112, 0.092), V(s * 0.082, 0.07, 0.094), V(s * 0.112, 0.01, 0.074)], 0.045, 0.034, HX);   // pegados al cráneo (flotaban 3 cm: hacían un tejado sobre la frente)
       for (const s of [-1, 1]) for (let k = 0; k < 3; k++)   // raya al medio y mechones que enmarcan la cara
-        lockC(hair, [V(s * 0.006, 0.152, 0.045), V(s * (0.05 + k * 0.013), 0.14, 0.095 - k * 0.012), V(s * (0.098 + k * 0.01), 0.075, 0.104 - k * 0.014), V(s * (0.122 + k * 0.007), -0.04, 0.084 - k * 0.014), V(s * (0.13 + k * 0.007), -0.17 - k * 0.05, 0.055 - k * 0.012)], 0.042, 0.03, HM[k + 1], { n: 4, stiff: 16 });
+        lockC(hair, [V(s * 0.006, 0.143, 0.045), V(s * (0.052 + k * 0.013), 0.128, 0.072 - k * 0.012), V(s * (0.1 + k * 0.01), 0.07, 0.084 - k * 0.014), V(s * (0.122 + k * 0.007), -0.04, 0.072 - k * 0.014), V(s * (0.13 + k * 0.007), -0.17 - k * 0.05, 0.055 - k * 0.012)], 0.042, 0.03, k === 2 ? HB : HX, { n: 4, stiff: 16 });
     } else if (st === 'pigtails' || st === 'bob' || st === 'odango' || st === 'longF') {
       cap(M.hair, 0.003); bangs(); sideLocks();
       if (st === 'longF') {   // melena larga en dos capas que cae por la espalda + mechones delanteros
@@ -2437,16 +2510,16 @@ class Rocker {
         }
         for (let i = 0; i < 12; i++) {
           const a = lerp(1.15, Math.PI * 2 - 1.15, i / 11) + rv(-0.04, 0.04), L = rv(0.3, 0.42);
-          lockC(hair, [sp(a, 1.25, 1.02), sp(a, 0.55, 1.13), sp(a, 0.0, 1.2), hang(a, -0.14, 1.2), hang(a, -L, 1.17).add(V(0, 0, -0.015))], 0.06, 0.044, HM[(i + 1) % 4], { n: 5, stiff: 14 });
+          lockC(hair, [sp(a, 1.42, 0.9), sp(a, 0.95, 1.08), sp(a, 0.55, 1.13), sp(a, 0.0, 1.2), hang(a, -0.14, 1.2), hang(a, -L, 1.17).add(V(0, 0, -0.015))], 0.06, 0.044, HX, { n: 5, stiff: 14 });
         }
         for (const s of [-1, 1]) for (let k = 0; k < 2; k++)
-          lockC(hair, [V(s * (0.09 + k * 0.012), 0.11, 0.092 - k * 0.012), V(s * (0.126 + k * 0.01), 0.0, 0.078 - k * 0.012), V(s * (0.138 + k * 0.01), -0.12, 0.07 - k * 0.012), V(s * (0.145 + k * 0.012), -0.23 - k * 0.03, 0.075 - k * 0.015)], 0.042, 0.03, HM[k + 1], { n: 4, stiff: 15 });
+          lockC(hair, [V(s * (0.096 + k * 0.008), 0.098, 0.048 - k * 0.012), V(s * (0.124 + k * 0.01), 0.0, 0.066 - k * 0.012), V(s * (0.138 + k * 0.01), -0.12, 0.07 - k * 0.012), V(s * (0.145 + k * 0.012), -0.23 - k * 0.03, 0.075 - k * 0.015)], 0.042, 0.03, HM[k + 1], { n: 4, stiff: 15 });
       } else {
         // resto de la melena (corta bajo las coletas y los moños, a la altura de la mandíbula en el bob)
         const L = st === 'bob' ? 0.16 : st === 'odango' ? 0.075 : 0.1;
         for (let i = 0; i < 14; i++) {
           const a = lerp(1.25, Math.PI * 2 - 1.25, i / 13);
-          lock(hair, [sp(a, 0.9, 1.02), sp(a, 0.3, 1.12), hang(a, -0.03, 1.16), hang(a, -L - rv(0, 0.015), 1.13)], 0.058, 0.05, HM[i % 4], { tip: st === 'bob' ? 'blunt' : 'point' });
+          lock(hair, [sp(a, 1.2, 0.9), sp(a, 0.75, 1.07), sp(a, 0.3, 1.12), hang(a, -0.03, 1.16), hang(a, -L - rv(0, 0.015), 1.13)], 0.058, 0.05, HM[i % 4], { tip: st === 'bob' ? 'blunt' : 'point' });
         }
       }
       if (st === 'odango') for (const s of [-1, 1]) {   // moños: bola de mechones enrollados + aro de color + puntas sueltas
@@ -2473,13 +2546,13 @@ class Rocker {
       }
     } else if (st === 'ponytail') {
       cap(M.hair, 0.002); bangs();
-      for (const s of [-1, 1]) lock(hair, [V(s * 0.04, 0.148, 0.09), V(s * 0.1, 0.09, 0.098), V(s * 0.124, 0.0, 0.075), V(s * 0.122, -0.09, 0.05)], 0.036, 0.026, HB);
+      for (const s of [-1, 1]) lock(hair, [V(s * 0.074, 0.114, 0.05), V(s * 0.104, 0.07, 0.07), V(s * 0.119, 0.0, 0.06), V(s * 0.117, -0.09, 0.045)], 0.036, 0.026, HX);
       const pt = new THREE.Group(); pt.position.set(0, 0.085, -0.135); hair.add(pt);
       mesh(pt, G('tie', () => new THREE.TorusGeometry(0.022, 0.008, 6, 14)), toon(hairCfg.accent ?? 0x222222), { rot: [0.6, 0, 0], outline: 0.003 });
       for (let j = 0; j < 7; j++) { const o = V(rv(-0.025, 0.025), 0, rv(-0.015, 0.015)); lockC(pt, [V(0, 0, 0), V(o.x, 0.02, -0.05), V(o.x * 1.5, -0.08, -0.09 + o.z), V(o.x * 2, -0.25, -0.08 + o.z), V(o.x * 2, -0.38 - j * 0.015, -0.05)], 0.045, 0.034, HM[j % 4], { ctr: V(0, -0.1, 0.1), n: 4, stiff: 9 + j * 0.5 }); }
       this.tails.push(pt);
     } else if (st === 'mohawk') {
-      { const cl = m => m.ny - hairlineAt(m.ph); this.skin(shellGeo(hs, m => cl(m) > -0.06, 0.0025, false, cl).geo, clipMat(M.skinD), 0.006); }
+      { const cl = m => m.ny - hairlineAt(m.ph, HAIRLINE_RAPADO); this.skin(shellGeo(hs, m => cl(m) > -0.06, 0.0025, false, cl).geo, clipMat(M.skinD), 0.006); }
       const XL = hairCfg.style === 'trueno', nB = XL ? 11 : 9;   // la cresta de trueno es más alta y ancha
       for (let i = 0; i < nB; i++) {   // cresta de cuchillas facetadas
         const t2 = lerp(0.8, -1.55, i / (nB - 1)), len = XL ? 0.17 + Math.sin(i / (nB - 1) * Math.PI) * 0.2 : 0.13 + Math.sin(i / 8 * Math.PI) * 0.12;
@@ -2506,7 +2579,7 @@ class Rocker {
       cap(M.hair, 0.004);
       for (let i = 0; i < 16; i++) {   // mechones cortos peinados hacia delante y a los lados
         const a = lerp(-2.6, 2.6, i / 15) + rv(-0.08, 0.08), e0 = rv(1.1, 1.35);
-        lock(hair, [sp(a * 0.25, e0, 1.0), sp(a * 0.6, e0 - 0.3, 1.1), sp(a, e0 - 0.75, 1.12)], 0.05, 0.038, HM[i % 4], { th: 0.011 });
+        lock(hair, [sp(a * 0.25, e0, 0.9), sp(a * 0.6, e0 - 0.3, 1.08), sp(a, e0 - 0.75, 1.1)], 0.05, 0.038, HM[i % 4], { th: 0.011 });
       }
     }
     if (HL) this.auraQ.push({ kind: HL.fx, cols: [hairCfg.color, hairCfg.color2 ?? hairCfg.color, shade(hairCfg.color, 0.7)], a: hairCfg.color, b: hairCfg.color2 ?? hairCfg.color, bolt: HL.aura === 'bolt' });   // aura del peinado legendario
@@ -2635,15 +2708,15 @@ class Rocker {
       if (nk === 'lunaCollar') { pend(G('moonP', () => new THREE.ExtrudeGeometry(crescentShape(0, 0, 0.026, -0.014, 0.008, 0.021), { depth: 0.005, bevelEnabled: true, bevelSize: 0.0015, bevelThickness: 0.0015, bevelSegments: 1 }).translate(0, 0, -0.0025)), legMat('galaxy', nC, 0x2ad8ff, { scale: 90 })); for (const [x, y, r] of [[0.03, 0.014, 0.008], [-0.026, -0.012, 0.006]]) mesh(torso, G('mstar' + r, () => new THREE.ExtrudeGeometry(starShape(0, 0, r, r * 0.42), { depth: 0.002, bevelEnabled: false })), legMat('glitter', 0xffd23a, 0xffffff), { pos: [x, y1 + y, fz(y1 + y) + 0.003], outline: 0.001 }); }
     }
     if (nk === 'pinchos' || nk === 'choker' || nk === 'chokerTachas') {   // banda pegada al cuello (se deforma con él) + piezas rígidas en el hueso del cuello
-      const y0 = fem ? 0.654 + (b.neck ?? 0) * 0.5 : 0.652, hw = nk === 'pinchos' ? 0.015 : 0.0105, bc = m => m.part === 0 ? hw - Math.abs(m.s - y0) : -1;
+      const y0 = fem ? 0.655 + (b.neck ?? 0) * 0.5 : 0.652, hw = nk === 'pinchos' ? 0.015 : 0.0105, yA = a => y0 - (fem ? 0.006 : 0) * Math.cos(a), bc = m => m.part === 0 ? hw - Math.abs(m.s - yA(m.a)) : -1;   // mujer: la banda baja un poco por delante, como un collar real
       this.skin(shellGeo(src, m => bc(m) > -0.03, 0.006, false, bc).geo, clipMat(toon(nk === 'choker' ? cfg.necklace.color ?? 0x161616 : 0x161214, { side: THREE.DoubleSide })), 0.003);
       const bb = new Batch();
-      if (nk === 'pinchos') for (let k = 0; k < 11; k++) { const a = (k / 10 - 0.5) * 3.4, q = neckAt(y0, a, 0.006); bb.add(nkM, new THREE.ConeGeometry(0.0055, 0.016, 6), [q.x, q.y, q.z], [Math.cos(a) * Math.PI / 2, 0, -Math.sin(a) * Math.PI / 2]); }
-      if (nk === 'chokerTachas') for (let k = 0; k < 9; k++) { const a = (k / 8 - 0.5) * 2.8; if (Math.abs(a) < 0.2) continue; const q = neckAt(y0, a, 0.0062); bb.add(nkM, new THREE.SphereGeometry(0.0036, 6, 4), [q.x, q.y, q.z]); }
+      if (nk === 'pinchos') for (let k = 0; k < 11; k++) { const a = (k / 10 - 0.5) * 3.4, q = neckAt(yA(a), a, 0.006); bb.add(nkM, new THREE.ConeGeometry(0.0055, 0.016, 6), [q.x, q.y, q.z], [Math.cos(a) * Math.PI / 2, 0, -Math.sin(a) * Math.PI / 2]); }
+      if (nk === 'chokerTachas') for (let k = 0; k < 9; k++) { const a = (k / 8 - 0.5) * 2.8; if (Math.abs(a) < 0.2) continue; const q = neckAt(yA(a), a, 0.0062); bb.add(nkM, new THREE.SphereGeometry(0.0036, 6, 4), [q.x, q.y, q.z]); }
       bb.build(this.neck);
-      const pf = neckAt(y0, 0, 0.0075);
-      mesh(this.neck, G('oring', () => new THREE.TorusGeometry(0.0075, 0.0017, 5, 14)), nk === 'choker' ? M.metal : nkM, { pos: [pf.x, pf.y - 0.007, pf.z], outline: 0 });
-      if (nk === 'choker') mesh(this.neck, G('hcharm', () => new THREE.ExtrudeGeometry(heartShape(0.008), { depth: 0.003, bevelEnabled: false })), toon(cfg.necklace.pendant ?? 0xff4a9a), { pos: [pf.x, pf.y - 0.02, pf.z], outline: 0.001 });
+      const pf = neckAt(yA(0), 0, 0.0075);
+      mesh(this.neck, G('oring', () => new THREE.TorusGeometry(0.0075, 0.0017, 5, 14)), nk === 'choker' ? M.metal : nkM, { pos: [pf.x, pf.y - 0.007, neckAt(yA(0) - 0.007, 0, 0.0075).z], outline: 0 });
+      if (nk === 'choker') mesh(this.neck, G('hcharm', () => new THREE.ExtrudeGeometry(heartShape(0.008), { depth: 0.003, bevelEnabled: false })), toon(cfg.necklace.pendant ?? 0xff4a9a), { pos: [pf.x, pf.y - 0.02, neckAt(yA(0) - 0.02, 0, 0.0075).z], outline: 0.001 });   // el cuello fino se ensancha abajo: el dije va sobre la piel de su propia altura
     }
     /* pulseras (no se ven bajo los puños de la chaqueta) */
     const brT = cfg.bracelets?.type && cfg.bracelets.type !== 'none' && !((tt === 'jacket' || tt === 'chaquetaNeon') && cfg.top.accent) ? cfg.bracelets.type : null, brC = cfg.bracelets?.color ?? 0x161616, brM = toon(brC);
@@ -2722,7 +2795,8 @@ class Rocker {
       gt.g.position.set(this.gBase.x, this.gBase.y, this.gBase.z); gt.g.rotation.set(this.gBase.rx, this.gBase.ry, this.gBase.rz); gt.g.scale.setScalar(0.9); torso.add(gt.g); gt.g.updateMatrix();
       const tb = V(gt.T.tailBtn[0], gt.T.tailBtn[1], -0.02).applyMatrix4(gt.g.matrix), hb = V(gt.T.hornBtn[0], gt.T.hornBtn[1], -0.02).applyMatrix4(gt.g.matrix);
       const ti = ['leather', 'jacket', 'infernal', 'cromo'].includes(tt) ? 0.02 : 0.01;
-      const strap = [hb, V(sw * 0.5, 0.44, src.frontZ(0.44) + (fem ? BUST.h * (b.bust ?? 1) * bustZ(sw * 0.5, 0.44) : 0) + ti + 0.012), V(sw * 0.74, topY(sw * 0.74) + 0.013, 0.0), V(sw * 0.55, 0.5, -src.backZ(0.5) - ti), V(-0.04, 0.28, -src.backZ(0.28) - ti), V(-waist * 1.1, 0.08, -src.backZ(0.08) * 0.6), tb];
+      const conCuello = fem && (cfg.top.type === 'jacket' || cfg.top.type === 'chaquetaNeon') && cfg.top.accent;   // la correa pasa por encima del cuello bebé (si no, lo atraviesa)
+      const strap = [hb, V(sw * 0.5, 0.44, src.frontZ(0.44) + (fem ? BUST.h * (b.bust ?? 1) * bustZ(sw * 0.5, 0.44) : 0) + ti + 0.012), ...(conCuello ? [V(src.surfAt(0.6, 0.95)[0], 0.6, src.surfAt(0.6, 0.95)[1] + 0.034)] : []), V(sw * (fem ? 0.62 : 0.74), topY(sw * (fem ? 0.62 : 0.74)) + (conCuello ? 0.03 : 0.013), 0.0), ...(fem ? [V(src.surfAt(0.585, Math.PI - 0.95)[0], 0.585, src.surfAt(0.585, Math.PI - 0.95)[1] - 0.014)] : []), V(sw * 0.55, 0.5, -src.backZ(0.5) - ti), V(-0.04, 0.28, -src.backZ(0.28) - ti), V(-waist * 1.1, 0.08, -src.backZ(0.08) * 0.6), tb];
       mesh(torso, taperTube(strap, 0.024, 0.024, 40, 6, 0.22), M.leather, { outline: 0.003 });
       mesh(this.arms[1].hand.g, G('plectrum', () => new THREE.CylinderGeometry(0.013, 0.013, 0.002, 3).rotateX(Math.PI / 2)), toon(new THREE.Color(cfg.ui || '#ffffff').getHex()), { pos: [0.014, -0.088, 0.03], rot: [0, 0, Math.PI / 2], outline: 0.002 });
       this.ovS = new THREE.Object3D(); this.ovF = new THREE.Object3D(); torso.add(this.ovS, this.ovF);
@@ -2734,6 +2808,7 @@ class Rocker {
       this.hipRest = 0.62; this.handPtr = [0, 0];
       for (const L of this.legs) { L.ft.set(L.side * 0.24, this.ankleH, 0.42); L.cur.copy(L.ft); }
     }
+    head.scale.setScalar(fem ? 0.9 : 0.9);   // cabeza ≈ 1/7 de la altura (con 0.86 se leía como cabeza de alfiler sobre un cuello largo)
     root.scale.setScalar(b.height ?? 1);
     root.updateMatrixWorld(true);
     /* todos los mechones en UN solo esqueleto (índices desplazados): 1 subida de huesos a la GPU por personaje en vez de una por mechón */
@@ -2755,6 +2830,7 @@ class Rocker {
   }
   skin(geo, mat, outline = 0.008) {
     const m = new THREE.SkinnedMesh(geo, mat); m.frustumCulled = false; m.castShadow = !LIVIANO; this.root.add(m); m.bind(this.skel, this._I);
+    outline *= 0.48;
     if (outline > 0 && !LIVIANO) { const o = new THREE.SkinnedMesh(geo, outlineMat(outline, !!geo.attributes.olw, !!geo.attributes.clp)); o.frustumCulled = false; this.root.add(o); o.bind(this.skel, this._I); }
     return m;
   }
@@ -2762,7 +2838,7 @@ class Rocker {
      no entran en la cabeza. Los huesos se orientan hacia las partículas */
   simHair(dt) {
     if (!this.chains?.length || dt <= 0) return;
-    const h = Math.min(dt, 1 / 30), dmp = Math.pow(0.8, h * 60), head = this.face.getWorldPosition(_hh), R = 0.118 * this.root.scale.x;
+    const h = Math.min(dt, 1 / 30), dmp = Math.pow(0.8, h * 60), head = this.face.getWorldPosition(_hh), R = 0.118 * this.root.scale.x * this.head.scale.x;
     for (const c of this.chains) {
       const n = c.bones.length, W = c.W, P0 = c.P;
       c.par.updateWorldMatrix(true, false);
@@ -2790,16 +2866,23 @@ class Rocker {
      Van hacia la pose pedida en ~0,1 s (antes saltaban de golpe: de la púa al puño en un cuadro) */
   setHand(i, pose, extra = 0) {
     const T = HAND_POSES[pose], F = this.arms[i].hand.fingers, s = this.arms[i].side;
-    const H = (this.dedos ||= [null, null])[i] ||= T.map(f => [...f]), k = 1 - Math.exp(-18 * (this._dt || 0));
-    for (let f = 0; f < 5; f++) for (let j = 0; j < 2; j++) H[f][j] += (T[f][j] - H[f][j]) * k;
+    // tercer valor opcional: dedos = flexión de la última falange (por defecto 0,75·b); pulgar = giro hacia la palma (por defecto 0,5·a)
+    const T3 = (f, n) => f[2] ?? (n < 4 ? f[1] * 0.75 : f[0] * 0.5);
+    const H = (this.dedos ||= [null, null])[i] ||= T.map((f, n) => [f[0], f[1], T3(f, n)]), k = 1 - Math.exp(-18 * (this._dt || 0));
+    for (let f = 0; f < 5; f++) for (let j = 0; j < 3; j++) H[f][j] += ((j < 2 ? T[f][j] : T3(T[f], f)) - H[f][j]) * k;
     for (let k = 0; k < 4; k++) {
-      const [a, b] = H[k], sp = -(1.5 - k) * 0.07 * (1 - clamp(a, 0, 1));
-      F[k][0].rotation.set(sp, 0, -s * (a + extra)); F[k][1].rotation.z = -s * (b + extra * 0.5); F[k][2].rotation.z = -s * b * 0.75;
+      const [a, b, c] = H[k], sp = -(1.5 - k) * 0.07 * (1 - clamp(a, 0, 1));
+      F[k][0].rotation.set(sp, 0, -s * (a + extra)); F[k][1].rotation.z = -s * (b + extra * 0.5); F[k][2].rotation.z = -s * c;
     }
-    const [a, b] = H[4]; F[4][0].rotation.set(a * 0.5, 0, -s * a * 0.55); F[4][1].rotation.z = -s * b * 0.6; F[4][2].rotation.z = -s * b * 0.7;
+    const [a, b, c] = H[4]; F[4][0].rotation.set(c, 0, -s * a * 0.55); F[4][1].rotation.z = -s * b * 0.6; F[4][2].rotation.z = -s * b * 0.7;
   }
   place(x, y, z, yaw) { this.base.set(x, y, z); this.baseYaw = yaw; this.root.position.set(x, y, z); this.root.rotation.y = yaw; for (const L of this.legs) { L.cur.copy(L.ft); L.w = null; L.paso = null; } const s = this.st; if (s) s.px = s.pz = s.pyaw = s.lx = s.lz = s.lyaw = 0; }
-  addMove(type, t0, dur, data = {}) { this.moves.push({ type, t0, dur, ...data }); }
+  /* los movimientos duran en segundos reales lo que duraban a 140 pulsos por minuto (se estiran con el tempo),
+     y el giro y el salto tienen un mínimo: una vuelta entera en 0,6 s era un trompo */
+  addMove(type, t0, dur, data = {}) {
+    const k = clamp(RITMO.r, 1, 3), ya = RITMO.prev; if (type === 'spin') dur = Math.max(dur, 1.0); else if (type === 'jump') dur = Math.max(dur, 0.62);
+    this.moves.push({ type, t0: t0 > ya && t0 - ya < 30 ? ya + (t0 - ya) * k : t0, dur: dur * k, ...data });
+  }
   clearMoves() { this.moves.length = 0; }
   has(type, t) { return this.moves.some(m => m.type === type && t >= m.t0 && t < m.t0 + m.dur); }
   busyUntil() { let e = 0; for (const m of this.moves) if (!m.react) e = Math.max(e, m.t0 + m.dur); return e; }
@@ -2808,7 +2891,7 @@ class Rocker {
   /* ---------- capas de animación ---------- */
   update(t, mt, dt, K) {
     if (!this.root.visible) return;
-    const p = this.p; Object.assign(p, POSE0); this._dt = dt;
+    const p = this.p; Object.assign(p, POSE0); this._dt = dt; if (K.gb === undefined) { K.gb = K.beat; K.gbp = K.bp; }
     if (this.kind === 'guitar') this.animGuitar(t, mt, dt, K);
     else if (this.kind === 'singer') this.animSinger(t, mt, dt, K);
     else this.animDrummer(t, mt, dt, K);
@@ -2820,7 +2903,7 @@ class Rocker {
     const p = this.p, st = this.st, c = st.conf, I = st.I;
     // en el editor (`quieto`) no toca ni se mece: lo están vistiendo y moverse molestaba; solo respira
     if (st.quieto) { Object.assign(p, { hipDrop: PARADO, lean: 0.05 + 0.006 * Math.sin(t * 1.7), headPitch: 0.03 + 0.012 * Math.sin(t * 1.7 - 0.6), stance: 0.0, brow: 0.12, lid: 0.38, sneer: 0.12 }); st.sustainEnd = 0; st.bend = -9; st.riffPtr = 0; return; }
-    const dip = nodCurve(K.bp, 0.62) * 0.85;
+    const dip = nodCurve(K.gbp, 0.62) * 0.85;
     // en un tramo sin notas de la canción (`descanso`, en vivo) no toca: la mano de la púa baja y se mueve menos
     const rest = !!st.descanso;
     // al entrar o salir de un descanso el cuerpo se calma o se anima de a poco (antes saltaba en un cuadro)
@@ -2828,15 +2911,15 @@ class Rocker {
     const fu = st.fuego || 0;   // la racha: con el escenario encendido se mueve más
     const energy = clamp(I * (0.8 + 0.35 * c) * (1 + 0.3 * fu), 0.2, 1.4) * lerp(1, 0.45, st.restK);
     // contento, levanta el puño al público al pulso; si no, la mano cuelga junto a la cadera
-    if (rest) { p.ovS = 0.9; p.handS = c > 0.2 ? 'fist' : 'suelta'; st.sustainEnd = 0; if (c > 0.2) p.mouth = Math.max(p.mouth, 0.4 * Math.exp(-K.bp * 4)); }
+    if (rest) { p.ovS = 0.9; p.handS = c > 0.2 ? 'fist' : 'suelta'; st.sustainEnd = 0; if (c > 0.2) p.mouth = Math.max(p.mouth, 0.4 * Math.exp(-K.gbp * 4)); }
     /* El vaivén. Tres maneras de llevar el pulso, que cambian cada cuatro compases y se mezclan de a poco (con una
        sola, repetía el mismo gesto toda la canción y casi no se movía): 0 rebota con las rodillas en cada pulso,
        1 pasa el peso de una pierna a la otra y marca el pulso con el pie libre, 2 va a medio tiempo, con las
        piernas abiertas y un cabeceo hondo cada dos pulsos. */
-    const frase = Math.floor(K.beat / 16), est = Math.floor(Math.abs(Math.sin(frase * 12.9898 + this.seed * 78.233)) * 43758.5453) % 3;
+    const frase = Math.floor(K.gb / 16), est = Math.floor(Math.abs(Math.sin(frase * 12.9898 + this.seed * 78.233)) * 43758.5453) % 3;
     const GR = st.gr ||= [0.6, 0.4, 0]; for (let i = 0; i < 3; i++) GR[i] = damp(GR[i], i === est ? 1 : 0, 2.2, dt);
-    const E = energy, lado = Math.sin(K.beat * Math.PI * 0.5 + this.seed);   // el peso: de un lado al otro cada dos pulsos
-    const medio = nodCurve((((K.beat % 2) + 2) % 2) / 2, 0.55);
+    const E = energy, lado = Math.sin(K.gb * Math.PI * 0.5 + this.seed);   // el peso: de un lado al otro cada dos pulsos
+    const medio = nodCurve((((K.gb % 2) + 2) % 2) / 2, 0.55);
     const reb = GR[0] + 0.4 * GR[1] + 0.25 * GR[2], bal = (0.3 * GR[0] + GR[1] + 0.45 * GR[2]) * E;
     p.hipDrop = PARADO + (0.06 * dip * reb + 0.055 * medio * GR[2]) * E + 0.04 * Math.max(0, -c) + 0.02 * fu;
     p.hipX = 0.05 * lado * bal;
@@ -2845,19 +2928,19 @@ class Rocker {
     p.headRoll = 0.04 * lado * bal;
     p.lean = 0.07 + (0.1 * dip * reb + 0.17 * medio * GR[2]) * E + 0.18 * Math.max(0, -c);
     p.headPitch = 0.03 + (0.34 * dip * (GR[0] + 0.55 * GR[1]) + 0.6 * medio * GR[2]) * E - 0.12 * Math.max(0, c);
-    p.bodyYaw = Math.sin(K.beat * Math.PI * 0.25 + this.seed) * 0.13;
-    p.torsoYaw = Math.sin(K.beat * Math.PI * 0.125 + this.seed * 1.7) * 0.09;
+    p.bodyYaw = Math.sin(K.gb * Math.PI * 0.25 + this.seed) * 0.13;
+    p.torsoYaw = Math.sin(K.gb * Math.PI * 0.125 + this.seed * 1.7) * 0.09;
     p.headYaw = Math.sin(t * 0.7 + this.seed * 2) * 0.12;
     p.stance = 0.02 + 0.07 * Math.max(0, c) + 0.04 * fu + 0.06 * GR[2];
     // el pie libre marca el pulso: el talón queda en el suelo y la punta sube entre pulso y pulso
-    { const tap = Math.pow(Math.max(0, Math.sin(K.bp * Math.PI)), 2) * Math.min(1, bal * 1.4) * (1 - st.restK * 0.5), k = smooth(clamp((Math.abs(lado) - 0.2) / 0.4, 0, 1)); if (lado > 0) p.tapR = tap * k; else p.tapL = tap * k; }
+    { const tap = Math.pow(Math.max(0, Math.sin(K.gbp * Math.PI)), 2) * Math.min(1, bal * 1.4) * (1 - st.restK * 0.5), k = smooth(clamp((Math.abs(lado) - 0.2) / 0.4, 0, 1)); if (lado > 0) p.tapR = tap * k; else p.tapL = tap * k; }
     // el mástil sube y baja con el cuerpo
     p.gz += (0.03 - 0.075 * dip * reb - 0.06 * medio * GR[2]) * E + 0.035 * lado * bal; p.gy += 0.045 * lado * bal;
     p.brow = c > 0 ? 0.35 * c : 0.5 * c;
     p.lid = c > 0.2 ? 0.44 : 0.34;
     p.sneer = Math.max(0, c) * 0.6;
     p.mouth = (I > 0.9 && dip > 0.55 ? 0.45 * energy : 0) + Math.max(0, c - 0.3) * 0.15 + (fu > 0.5 && dip > 0.6 ? 0.3 * fu : 0);
-    p.stance += 0.04 * fu; p.headRoll += Math.sin(K.beat * Math.PI * 0.5 + this.seed) * 0.06 * fu;
+    p.stance += 0.04 * fu; p.headRoll += Math.sin(K.gb * Math.PI * 0.5 + this.seed) * 0.06 * fu;
     /* lo que toca se le nota en el cuerpo: cada golpe de púa lleva el hombro (`rasg`), un acorde lo hace hundirse
        un instante (`acento`), una nota sostenida lo echa atrás con el mástil arriba y los ojos cerrados (`sus`), y
        en un pasaje rápido se queda mirando el mástil, concentrado (`dens` = notas por segundo) */
@@ -2871,7 +2954,7 @@ class Rocker {
     if (foco > 0.01) { p.headPitch += 0.26 * foco; p.headYaw = lerp(p.headYaw, 0.34, foco); p.brow -= 0.3 * foco; p.lid = lerp(p.lid, 0.5, foco); p.lean += 0.05 * foco; }
     /* se pasea: cada ocho compases elige otro sitio cerca de su puesto (`vagar`, en metros) y va caminando; los
        pies dan los pasos solos (ver `applyPose`) */
-    const tramo = Math.floor(K.beat / 32);
+    const tramo = Math.floor(K.gb / 32);
     if (tramo !== st.tramo) { const a = st.tramo === undefined ? 0 : this.vagar ?? 0.3; st.tramo = tramo; st.lx = rr(-a, a); st.lz = rr(-a * 0.4, a * 0.45); st.lyaw = rr(-0.2, 0.2) * Math.min(1, a * 4); }
     { const vm = 0.5 * dt * (1 + 0.6 * fu), ir = (x, tg) => x + clamp((tg - x) * 2.2 * dt, -vm, vm); st.px = ir(st.px || 0, st.lx || 0); st.pz = ir(st.pz || 0, st.lz || 0); st.pyaw = damp(st.pyaw || 0, st.lyaw || 0, 1.2, dt); }
     p.rootX += st.px; p.rootZ += st.pz; p.rootYaw += st.pyaw;
@@ -2906,17 +2989,17 @@ class Rocker {
     st.riffPtr = i;
   }
   animSinger(t, mt, dt, K) {
-    const p = this.p, st = this.st, I = st.I + 0.5 * FUEGO.f, dip = nodCurve(K.bp, 0.62) * 0.85;   // con el escenario encendido, la banda también se suelta
-    const lado = Math.sin(K.beat * Math.PI * 0.5);
-    p.hipDrop = PARADO + 0.055 * dip * (0.4 + I); p.bodyYaw = Math.sin(K.beat * Math.PI * 0.25) * 0.12; p.hipX = 0.035 * lado; p.bodyRoll = 0.05 * lado; p.torsoRoll = -0.07 * lado;
-    { const tap = Math.pow(Math.max(0, Math.sin(K.bp * Math.PI)), 2) * smooth(clamp((Math.abs(lado) - 0.2) / 0.4, 0, 1)); if (lado > 0) p.tapR = tap; else p.tapL = tap; }
+    const p = this.p, st = this.st, I = st.I + 0.5 * FUEGO.f, dip = nodCurve(K.gbp, 0.62) * 0.85;   // con el escenario encendido, la banda también se suelta
+    const lado = Math.sin(K.gb * Math.PI * 0.5);
+    p.hipDrop = PARADO + 0.055 * dip * (0.4 + I); p.bodyYaw = Math.sin(K.gb * Math.PI * 0.25) * 0.12; p.hipX = 0.035 * lado; p.bodyRoll = 0.05 * lado; p.torsoRoll = -0.07 * lado;
+    { const tap = Math.pow(Math.max(0, Math.sin(K.gbp * Math.PI)), 2) * smooth(clamp((Math.abs(lado) - 0.2) / 0.4, 0, 1)); if (lado > 0) p.tapR = tap; else p.tapL = tap; }
     const sing = K.vocal ? 1 : 0;
     const belt = sing * Math.max(0, Math.sin(t * 0.7));
     st.mouthS = damp(st.mouthS, sing ? clamp(0.25 + 0.75 * Math.abs(Math.sin(t * 9.3 + Math.sin(t * 2.1) * 3)), 0, 1) : 0.05, 14, dt);
     p.mouth = st.mouthS; p.lean = -0.05 - 0.14 * belt + 0.05 * dip;
     p.headPitch = -0.22 * belt + 0.16 * dip * (0.3 + I); p.headYaw = Math.sin(t * 0.6) * 0.1 + (K.lookTo || 0); p.headRoll = Math.sin(t * 0.8) * 0.08;
     p.brow = 0.25 * belt - 0.1; p.lid = 0.3 + 0.4 * belt;
-    const ph = Math.floor(K.beat / 8) % 3;
+    const ph = Math.floor(K.gb / 8) % 3;
     const g = ph === 0 ? V(0.62, 1.12 + 0.05 * dip, 0.5) : ph === 1 ? V(0.33, 0.52 + 0.14 * dip, 0.42) : V(0.58, 0.42, 0.32);
     this.tgt[0].position.lerp(g, 1 - Math.exp(-8 * dt));
     this.handL = ph === 0 ? 'horns' : ph === 1 ? 'fist' : 'open';
@@ -2949,9 +3032,9 @@ class Rocker {
       const w = Math.min(smooth(clamp((mt - m.t0) / 0.18, 0, 1)), smooth(clamp((m.t0 + m.dur - mt) / 0.3, 0, 1)));
       if (w <= 0 && m.type !== 'spin') continue;
       const toward = this.side === 0 ? 1 : -1;
-      const beatK = Math.exp(-K.bp * 5);
+      const beatK = Math.exp(-K.gbp * 5);
       switch (m.type) {
-        case 'headbang': { const hb = nodCurve((((K.beat % 2) + 2) % 2) / 2, 0.55); p.headPitch += w * (0.75 * hb - 0.22); p.lean += w * 0.3 * hb; p.hipDrop += w * 0.05 * hb; } p.stance += 0.06 * w; p.lid = lerp(p.lid, 0.8, w); break;
+        case 'headbang': { const hb = nodCurve((((K.gb % 2) + 2) % 2) / 2, 0.55); p.headPitch += w * (0.75 * hb - 0.22); p.lean += w * 0.3 * hb; p.hipDrop += w * 0.05 * hb; } p.stance += 0.06 * w; p.lid = lerp(p.lid, 0.8, w); break;
         case 'legKick': { const k = Math.sin(Math.PI * u); p.liftL += k * 0.42 * w; p.fwdL += k * 0.3 * w; p.lean -= k * 0.12; p.gz += 0.25 * k; p.mouth = Math.max(p.mouth, k * 0.8); break; }
         case 'guitarRaise': p.gz += 0.75 * w; p.gx += 0.15 * w; p.lean -= 0.32 * w; p.headPitch -= 0.45 * w; p.mouth = Math.max(p.mouth, 0.9 * w); p.brow += 0.25 * w; p.stance += 0.1 * w; p.lid = lerp(p.lid, 0.15, w); break;
         case 'leanBack': p.lean -= 0.5 * w; p.headPitch -= 0.45 * w; p.hipDrop += 0.13 * w; p.stance += 0.13 * w; p.gz += 0.3 * w; p.hipZ += 0.09 * w; p.mouth = Math.max(p.mouth, 0.55 * w); p.lid = lerp(p.lid, 0.85, w); p.brow += 0.3 * w; break;
@@ -2961,7 +3044,7 @@ class Rocker {
           else if (u < b) { const v = (u - a) / (b - a), k = 4 * v * (1 - v), sal = 1 - smooth(Math.min(1, v * 3)); p.rootY += k * 0.52; p.liftL += k * 0.22; p.liftR += k * 0.3; p.gz += 0.4 * k; p.lean -= 0.14 * k; p.headPitch -= 0.2 * k; p.mouth = Math.max(p.mouth, k); p.hipDrop += 0.13 * sal - 0.03 * k; }
           else { const k = Math.sin(Math.PI * (u - b) / (1 - b)); p.hipDrop += 0.14 * k; p.lean += 0.1 * k; p.stance += 0.03; p.headPitch += 0.12 * k; } break; }
         case 'taunt': p.rootYaw += toward * 0.85 * w; p.rootX += toward * 0.35 * w; p.lean += 0.2 * w; p.headPitch -= 0.08 * w; p.mouth = Math.max(p.mouth, (0.4 + 0.5 * beatK) * w); p.brow += 0.5 * w; p.lid = lerp(p.lid, 0.45, w); p.sneer += w; p.lookOpp = w; break;
-        case 'stomp': p.stance += 0.16 * w; p.hipDrop += 0.06 * w; { const s = Math.max(0, Math.sin(K.beat * Math.PI)); if (Math.floor(K.beat) % 2) p.liftR += s * 0.14 * w; else p.liftL += s * 0.14 * w; } break;
+        case 'stomp': p.stance += 0.16 * w; p.hipDrop += 0.06 * w; { const s = Math.max(0, Math.sin(K.gb * Math.PI)); if (Math.floor(K.gb) % 2) p.liftR += s * 0.14 * w; else p.liftL += s * 0.14 * w; } break;
         case 'point': p.ovF = w; p.lookOpp = w; p.mouth = Math.max(p.mouth, 0.6 * w); p.brow += 0.4 * w; p.rootYaw += toward * 0.4 * w; break;
         case 'lookGuitar': p.headPitch += 0.5 * w; p.headYaw += 0.35 * w; p.brow -= 0.4 * w; p.lid = lerp(p.lid, 0.1, w); break;
         case 'kneel': p.kneel = Math.max(p.kneel, w); p.gz += 0.4 * w; p.lean -= 0.25 * w; p.headPitch -= 0.4 * w; p.mouth = Math.max(p.mouth, 0.7 * w); break;
@@ -2970,7 +3053,7 @@ class Rocker {
         case 'repair': p.headPitch += 0.55 * w; p.headYaw += 0.3 * w; p.brow = lerp(p.brow, -0.6, w); p.mouth = lerp(p.mouth, 0.25, w); p.lean += 0.15 * w; if (Math.floor(mt / 0.075) !== this.lastR) { this.lastR = Math.floor(mt / 0.075); this.strum(t, 0.03); } break;
         case 'dizzy': p.headRoll += Math.sin(t * 5) * 0.32 * w; p.bodyRoll += Math.sin(t * 5 + 1) * 0.13 * w; p.lid = lerp(p.lid, 0.7, w); p.mouth = Math.max(p.mouth, 0.35 * w); p.brow -= 0.4 * w; p.headPitch += 0.15 * w; break;
         case 'struggle': p.lean += 0.18 * w; p.headPitch += 0.2 * w; p.brow -= 0.4 * w; break;
-        case 'victory': { const j = Math.abs(Math.sin(K.beat * Math.PI)); p.rootY += j * 0.32 * w; p.gz += 0.62 * w; p.gpy += 0.12 * w; p.gpx += 0.1 * w; p.gpz += 0.08 * w; p.gy -= 0.25 * w; p.lean -= 0.3 * w; p.headPitch -= 0.5 * w; p.mouth = Math.max(p.mouth, w); p.brow += 0.4 * w; p.lid = lerp(p.lid, 0.1, w); p.ovS = w; p.liftL += j * 0.12 * w; p.liftR += j * 0.14 * w; p.handS = 'fist'; p.lookCam = w; break; }
+        case 'victory': { const j = Math.abs(Math.sin(K.gb * Math.PI)); p.rootY += j * 0.32 * w; p.gz += 0.62 * w; p.gpy += 0.12 * w; p.gpx += 0.1 * w; p.gpz += 0.08 * w; p.gy -= 0.25 * w; p.lean -= 0.3 * w; p.headPitch -= 0.5 * w; p.mouth = Math.max(p.mouth, w); p.brow += 0.4 * w; p.lid = lerp(p.lid, 0.1, w); p.ovS = w; p.liftL += j * 0.12 * w; p.liftR += j * 0.14 * w; p.handS = 'fist'; p.lookCam = w; break; }
         case 'defeat': p.kneel = Math.max(p.kneel, w); p.headPitch += 0.75 * w; p.lean += 0.45 * w; p.gz -= 0.55 * w; p.mouth = lerp(p.mouth, 0.05, w); p.brow = lerp(p.brow, -0.6, w); p.lid = lerp(p.lid, 0.6, w); p.ovS = w; p.ovF = w * 0.8; p.handS = 'open'; p.handF = 'open'; break;
         case 'charge': p.gz += 0.6 * w; p.lean -= 0.25 * w; p.headPitch -= 0.3 * w; p.mouth = Math.max(p.mouth, w); p.brow += 0.6 * w; p.lid = lerp(p.lid, 0.35, w); p.lookOpp = w; p.rootYaw += toward * 0.35 * w; break;
       }
@@ -3073,10 +3156,10 @@ class Rocker {
       if (ds < 0.06) sy = st.strumDir * st.strumAmp * (1 - 2 * smooth(ds / 0.06)); else sy = -st.strumDir * st.strumAmp * Math.exp(-(ds - 0.06) * 7);
       gt.strum.position.set(-0.01, sy, 0.108);
       st.fx = damp(st.fx, fretX(st.fret - 0.45), 16, dt);
-      let fy = -0.045;
+      let fy = FRET_W.y;
       if (st.sustainEnd && K.mt < st.sustainEnd) fy += Math.sin(t * 34) * 0.006;
       if (K.mt - st.bend < BEAT * 2) fy += smooth(clamp((K.mt - st.bend) / 0.2, 0, 1)) * 0.018;
-      gt.fret.position.set(st.fx, fy, 0);
+      gt.fret.position.set(st.fx + FRET_W.x, fy, FRET_W.z);
       /* las manos que sueltan la guitarra (el puño en alto, señalar, colgando) entran y salen suaves, y su
          destino también se mueve suave: cambiar de 'suelta' a 'fist' ya no teletransporta la mano */
       const kS = 1 - Math.exp(-20 * dt);
@@ -3085,7 +3168,7 @@ class Rocker {
         if (p.handS === 'suelta') _v2.set(-0.34, -0.14, 0.06);
         /* el puño en alto: casi estirado, un poco adelante y afuera; en cada pulso golpea hacia arriba (el brazo
            se estira del todo) y entre pulsos baja un poco doblando el codo */
-        else if (p.handS === 'fist') { const pump = Math.exp(-K.bp * 5); _v2.set(-0.34, 0.99 + 0.1 * pump, 0.25 + 0.03 * pump); }
+        else if (p.handS === 'fist') { const pump = Math.exp(-K.gbp * 5); _v2.set(-0.34, 0.99 + 0.1 * pump, 0.25 + 0.03 * pump); }
         else _v2.set(-0.25, 0.05, 0.18);
         if (st.ovS < 0.05) this.ovS.position.copy(_v2); else this.ovS.position.lerp(_v2, kS);
       }
@@ -3094,7 +3177,7 @@ class Rocker {
       this.poleMk[1].position.copy(this.poleRest[1]).lerp(this.poleAlto, smooth(clamp(st.ovS * st.fistK, 0, 1)));
       p.ovS = st.ovS; p.ovF = st.ovF;
       this.setHand(1, p.ovS > 0.4 ? (p.handS === 'suelta' ? 'open' : p.handS) : 'pick');
-      this.setHand(0, p.ovF > 0.4 ? (p.handF === 'open' ? 'open' : 'point') : 'grip', Math.sin(t * 9) * 0.05);
+      this.setHand(0, p.ovF > 0.4 ? (p.handF === 'open' ? 'open' : 'point') : 'traste', Math.sin(t * 9) * 0.05);
     } else if (this.kind === 'singer') {
       this.setHand(0, this.handL || 'fist'); this.setHand(1, 'grip');
       /* la mano del micrófono: el puño rodea el mango (sus nudillos a lo largo del micro), con la muñeca abajo y
@@ -4658,6 +4741,10 @@ function step(dt) {
   if (ed) { ED.mt0 += dt; if (ED.mt0 > 12) { ED.mt0 -= 12; if (ED.rk) ED.rk.st.riffPtr = 0; } }   // en el editor se repite un tramo de la estrofa
   const mt = ed ? 9 + ED.mt0 : battle.mt();
   const beat = mt / BEAT, bp = ((beat % 1) + 1) % 1;
+  if (dt > 0) { const dm = mt - RITMO.prev; if (dm > 0 && dm < 1) RITMO.r += (clamp(dm / dt, 0.3, 4) - RITMO.r) * Math.min(1, dt * 1.5); }
+  RITMO.prev = mt; if (ed) RITMO.r = 1;
+  if (RITMO.d < 4 && RITMO.r > 1.18 * RITMO.d) RITMO.d *= 2; else if (RITMO.d > 1 && RITMO.r < 0.52 * RITMO.d) RITMO.d /= 2;
+  const gb = beat / RITMO.d, gbp = ((gb % 1) + 1) % 1;
   let sec = SONG.sections.find(s => mt >= s.t0 && mt < s.t1) || SONG.sections[SONG.sections.length - 1];
   // en vivo, un solo del chart es un solo de la coreografía (planos de héroe, rodillas al suelo), dure lo que dure
   if (VIVO.on && VIVO.solista) { if (VIVO.soloBar0 < 0) VIVO.soloBar0 = Math.floor(mt / BAR); sec = { name: 'solo', bar0: VIVO.soloBar0, t0: VIVO.soloBar0 * BAR, t1: Infinity }; }
@@ -4670,7 +4757,7 @@ function step(dt) {
     if (bar % (FUEGO.nivel >= 4 ? 1 : FUEGO.nivel >= 3 ? 2 : 4) === 0) FUEGO.paleta++;
   }
   oyeMusica(ed);
-  const K = { mt, beat, bp, notes: SONG.notes, hands: SONG.hands, vocal: !ed && !battle.ko && ['verse', 'pre', 'chorus', 'outro', 'break'].includes(sec.name) && (beat % 8) < 6.5, lookTo: battle.ko ? (battle.winner === 0 ? -0.5 : 0.5) : 0 };
+  const K = { mt, beat, bp, gb, gbp, notes: SONG.notes, hands: SONG.hands, vocal: !ed && !battle.ko && ['verse', 'pre', 'chorus', 'outro', 'break'].includes(sec.name) && (beat % 8) < 6.5, lookTo: battle.ko ? (battle.winner === 0 ? -0.5 : 0.5) : 0 };
   if (dt > 0 && !ed) battle.update(dt);
   const D = SONG.drums; if (battle.visPtr > 0 && D[battle.visPtr - 1].t > mt) battle.visPtr = 0;
   // la batería de la coreografía mueve los platillos; las luces, si hay análisis, laten con la canción de verdad
