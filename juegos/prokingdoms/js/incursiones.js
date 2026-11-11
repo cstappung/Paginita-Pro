@@ -36,6 +36,8 @@
     return { gold: r10(90 * Math.pow(1.7, era - 1)), gems: 2 * era, coins: 2 + era };
   };
   const vivos = () => (Inc.banda ? Inc.banda.bandidos.filter(b => b.hp > 0) : []);
+  // Los que siguen en el mapa: los que ya escaparon (`fuera`) no saquean ni cargan sacos de la oleada siguiente.
+  const presentes = () => vivos().filter(b => !b.fuera);
   Inc.activa = () => !!Inc.banda;
 
   // Rumbo visto en la pantalla (arriba es el norte): «del noreste».
@@ -110,6 +112,10 @@
     const fuerza = Math.round(Inc.fuerza(era, st.inc.n - 1) * OLA[bd.ola - 1]);
     const cuantos = U.clamp(3 + Math.floor((era - 1) / 2) + Math.floor((st.inc.n - 1) / 3) + bd.ola - 1, 3, 9), hp = Math.round((fuerza * 3) / cuantos);
     bd.bandidos = bd.bandidos.concat(banda(bd.ox, bd.oy, cuantos, hp));
+    // lo robado y lo recuperado de las oleadas anteriores sigue contando para el informe final
+    bd.botinTot = bd.botinTot || {}; bd.recTot = bd.recTot || {};
+    for (const r in bd.botin) bd.botinTot[r] = (bd.botinTot[r] || 0) + bd.botin[r];
+    for (const r in bd.recuperado) bd.recTot[r] = (bd.recTot[r] || 0) + bd.recuperado[r];
     bd.fuerza = fuerza; bd.n0 = cuantos; bd.fase = 'aviso'; bd.t = 0; bd.aviso = ENTRE_OLAS; bd.total = 0; bd.botin = {}; bd.recuperado = {}; bd.salida = false;
     toast('¡Oleada ' + bd.ola + ' de ' + bd.olas + '! ' + cuantos + ' bandidos más (fuerza aprox. ' + U.fmt(fuerza) + ') atacan en ' + ENTRE_OLAS + ' s.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
     sfx('cuerno');
@@ -204,7 +210,7 @@
 
   // Se llevan hasta un 12% de cada recurso (menos si llegaron pocos), con un tope según la era.
   function robar(dest) {
-    const bd = Inc.banda, st = S(), era = st.era, aqui = vivos().filter(b => b.llego);
+    const bd = Inc.banda, st = S(), era = st.era, aqui = presentes().filter(b => b.llego);
     if (!aqui.length || !dest) { huir(null); return; }
     const frac = 0.12 * (aqui.length / bd.n0), tope = Math.round(250 * Math.pow(1.8, era - 1));
     const txt = [];
@@ -221,7 +227,7 @@
   function huir(msg) {
     const bd = Inc.banda;
     bd.fase = 'huida'; bd.t = 0;
-    for (const b of vivos()) {
+    for (const b of presentes()) {
       b.espera = 0;
       // los que llegaron vuelven por donde vinieron (sin otro A* de 20.000 pasos por bandido)
       if (b.llego && !bd.muro) { b.path = bd.path.slice(0, b.paraEn || bd.path.length).reverse().concat([[Math.floor(bd.ox), Math.floor(bd.oy)]]); continue; }
@@ -262,7 +268,10 @@
     Inc.banda = null;
     const muertos = bd.bandidos.filter(b => b.hp <= 0).length, x = bd.ox, y = bd.oy;
     const bajas = perdidas(bd);
-    const robo = Object.keys(bd.botin).filter(r => bd.botin[r] - (bd.recuperado[r] || 0) > 0).map(r => U.fmt(bd.botin[r] - (bd.recuperado[r] || 0)) + ' de ' + D.RES[r].name.toLowerCase());
+    const tot = Object.assign({}, bd.botinTot), rec = Object.assign({}, bd.recTot);
+    for (const r in bd.botin) tot[r] = (tot[r] || 0) + bd.botin[r];
+    for (const r in bd.recuperado) rec[r] = (rec[r] || 0) + bd.recuperado[r];
+    const robo = Object.keys(tot).filter(r => tot[r] - (rec[r] || 0) > 0).map(r => U.fmt(tot[r] - (rec[r] || 0)) + ' de ' + D.RES[r].name.toLowerCase());
     if (muertos >= bd.bandidos.length) {
       const p = Inc.premio(st.era);
       if (bd.olas > 1) { for (const k in p) p[k] *= 2; g.stat('asedios_ganados', 1); } // C5: el asedio paga doble
@@ -308,15 +317,20 @@
     const p = W.freeAround(casa.x, casa.y, casa.x + casa.w - 1, casa.y + casa.h - 1, Math.floor(bd.ox), Math.floor(bd.oy));
     const tipos = PK.Troops.pickTypes(units, Math.min(8, PK.Troops.total(units)));
     bd.poder = PK.Social.power(units);
+    // otra salida (la oleada siguiente de un asedio): el daño ya recibido se guarda para las bajas, pero la reserva
+    // nueva empieza entera (antes salían y se replegaban al instante)
+    if (bd.salida) { bd.danoAcum = (bd.danoAcum || 0) + (bd.dano || 0); bd.poolAcum = (bd.poolAcum || 0) + (bd.pool0 || 0); }
+    bd.dano = 0;
     bd.pool = bd.pool0 = bd.poder * 4;
     bd.salida = true;
     Inc.defensores = tipos.map((tipo, i) => ({ id: i, tipo, x: p[0] + 0.5 + (i % 3) * 0.3 - 0.3, y: p[1] + 0.5 + Math.floor(i / 3) * 0.3, cx: p[0] + 0.5, cy: p[1] + 0.5, path: [], rt: i * 0.15, cd: 0, anim: Math.random(), flip: false, back: false, cuerpo: tipo !== 'archer', modo: 'walk' }));
     toast('Tus tropas salen del ' + (casa.type === 'barracks' ? 'Cuartel' : 'Centro Urbano') + ' a cortarles el paso (fuerza ' + U.fmt(bd.poder) + ').', 'info');
   }
   function perdidas(bd) {
-    if (!bd.salida || !bd.dano) return '';
+    const dano = (bd.danoAcum || 0) + (bd.dano || 0), pool = (bd.poolAcum || 0) + (bd.pool0 || 0);
+    if (!bd.salida || !dano) return '';
     const army = S().war.army, units = enCasa(), tot = PK.Troops.total(units);
-    let n = Math.min(tot, Math.floor(tot * Math.min(0.25, (bd.dano / Math.max(1, bd.pool0)) * 0.4)));
+    let n = Math.min(tot, Math.floor(tot * Math.min(0.25, (dano / Math.max(1, pool)) * 0.4)));
     if (bd.pool <= 0) n = Math.max(n, Math.ceil(tot * 0.25));
     const out = {};
     for (let i = 0; i < n; i++) {

@@ -15,7 +15,7 @@
     { id: 'cartografo', lvl: 2, name: 'Cartógrafo', icon: 'compass', cada: 15, desc: 'Vuelve a mandar a explorar a los exploradores quietos (primero a tus banderas), repone exploradores y avisa cada lugar nuevo.' },
     { id: 'mariscal', lvl: 3, name: 'Mariscal', icon: 'war', cada: 20, desc: 'Recluta hasta la guarnición que elijas, repite pisos ya limpiados y acepta encargos del tablón cuando la victoria es probable. Nunca deja la defensa bajo el mínimo.' },
     { id: 'tesorero', lvl: 5, name: 'Tesorero', icon: 'market', cada: 30, desc: 'Vende lo que pase del tope que elijas y compra lo que falta para la próxima era, con una reserva de oro y bajo el límite diario del mercado.' },
-    { id: 'maestro', lvl: 7, name: 'Maestro mayor', icon: 'hammer', cada: 15, desc: 'Llena la cola de obras con tus reglas: bodegas cuando se llenan, talleres y casas al máximo de la era.' },
+    { id: 'maestro', lvl: 7, name: 'Maestro mayor', icon: 'hammer', cada: 15, desc: 'Con un Maestro de Obras libre, empieza mejoras según tus reglas: bodegas cuando se llenan, talleres y casas al máximo de la era. No usa tu cola de obras.' },
     { id: 'gobernador', lvl: 9, name: 'Gobernador', icon: 'crown', cada: 30, desc: 'Cuando las bodegas de comida, madera, piedra y oro pasan del 95%, paga horas extra o hace una fiesta.' },
   ];
   const POR = Object.fromEntries(C.LISTA.map(c => [c.id, c]));
@@ -138,40 +138,49 @@
     tesorero(st, cs) {
       const g = G(), Soc = PK.Social;
       if (!g.countB('market') || !st.market) return;
-      const hoy = U.dayKey();
+      // El día del servidor es UTC (antes era el local: en Chile, entre las 00 y las 03 UTC cabían dos días del
+      // Tesorero en uno del servidor) y lo que queda del tope diario lo lleva Social para todos (Soc.mercadoLibre).
+      const hoy = Soc.diaUTC();
       if (!cs.dia || cs.dia.k !== hoy) cs.dia = { k: hoy, oro: 0 };
-      const sc = escala(st.era), libre = Math.min(C.MERCADO_OP * sc, C.MERCADO_DIA * sc - cs.dia.oro);
+      const sc = escala(st.era), libre = Math.min(C.MERCADO_OP * sc, C.MERCADO_DIA * sc - cs.dia.oro, Soc.mercadoLibre());
       if (libre < 50) return;
       const pool = Soc.tradePool().filter(r => r !== 'gold' && st.market.p[r]);
+      const meta = D.eraCost(st.era + 1), pideEra = r => (st.eraProg ? 0 : meta[r] || 0);
       // vender lo que pasa del tope elegido (lo más lleno primero)
       const llenos = pool.filter(r => isFinite(g.cap(r)) && st.res[r] > cs.vender * g.cap(r)).sort((a, b) => st.res[b] / g.cap(b) - st.res[a] / g.cap(a));
       for (const r of llenos) {
-        let n = Math.floor(st.res[r] - cs.vender * g.cap(r));
+        // nunca vende lo que pide la próxima era (antes compraba para la era lo que no cabía y al rato lo vendía)
+        let n = Math.floor(Math.min(st.res[r] - cs.vender * g.cap(r), st.res[r] - pideEra(r)));
         while (n > 0 && Soc.sellPrice(r, n) > libre) n = Math.floor(n / 2);
         if (n < 10) continue;
         const oro = Soc.sellPrice(r, n);
-        Soc.sell(r, n); cs.dia.oro += oro;
+        if (Soc.sell(r, n) === false) return;
+        cs.dia.oro += oro;
         anota('tesorero', 'Vendió ' + U.fmt(n) + ' de ' + D.RES[r].name.toLowerCase() + ' por ' + U.fmt(oro) + ' de oro.');
         return;
       }
       // comprar lo que falta para la próxima era, sin bajar de la reserva de oro
       if (st.eraProg) return;
-      const meta = D.eraCost(st.era + 1), reserva = cs.oroReserva * g.cap('gold');
+      const reserva = cs.oroReserva * g.cap('gold');
       for (const r of Object.keys(meta).filter(k => pool.includes(k))) {
-        let n = Math.ceil(meta[r] - (st.res[r] || 0));
+        // ni más de lo que deja bajo el tope de venta: lo que no cabe se vendería en la pasada siguiente
+        let n = Math.ceil(Math.min(meta[r] - (st.res[r] || 0), (isFinite(g.cap(r)) ? cs.vender * g.cap(r) : Infinity) - (st.res[r] || 0)));
         if (n <= 0) continue;
         const tope = Math.min(libre, st.res.gold - reserva);
         while (n > 0 && Soc.buyPrice(r, n) > tope) n = Math.floor(n / 2);
         if (n < 10) continue;
         const oro = Soc.buyPrice(r, n);
-        Soc.buy(r, n); cs.dia.oro += oro;
+        if (Soc.buy(r, n) === false) return;
+        cs.dia.oro += oro;
         anota('tesorero', 'Compró ' + U.fmt(n) + ' de ' + D.RES[r].name.toLowerCase() + ' por ' + U.fmt(oro) + ' de oro (para la próxima era).');
         return;
       }
     },
+    // pk-40 (pedido del dueño): ya no pone obras en tu cola de obras (la llenaba con mejoras sin recursos y no dejaba
+    // lugar). Empieza la mejora directo cuando sobra un Maestro de Obras y alcanza, sin tocar lo que pide tu cola.
     maestro(st, cs) {
       const g = G(), A = PK.Auto;
-      if (st.upq.length >= A.QMAX) return;
+      if (g.buildersBusy() >= g.builders() || A.colaLista()) return;
       const libres = type => g.buildings.filter(b => b.owner === 'p' && b.done && (typeof type === 'function' ? type(b) : b.type === type) && !b.upg && !b.def.noUp && b.lvl < g.maxLvl(b.type) && !st.upq.includes(b.id)).sort((a, b) => a.lvl - b.lvl);
       const reglas = [];
       if (cs.reglas.almacen) {
@@ -182,10 +191,9 @@
       if (cs.reglas.talleres) reglas.push([b => !!b.def.recipe, 'talleres al máximo de la era']);
       if (cs.reglas.casas) reglas.push(['house', 'casas al máximo de la era']);
       for (const [tipo, por] of reglas) {
-        const b = libres(tipo)[0];
-        if (!b) continue;
-        A.enqueue(b);
-        anota('maestro', 'Puso ' + b.def.name + ' ' + b.lvl + '→' + (b.lvl + 1) + ' en la cola de obras (' + por + ').');
+        const b = libres(tipo).find(o => { const c = g.upCost(o); return g.canAfford(c) && A.cabeMeta(c); });
+        if (!b || !A.mejorarYa(b)) continue;
+        anota('maestro', 'Empezó a mejorar ' + b.def.name + ' ' + (b.lvl) + '→' + (b.lvl + 1) + ' (' + por + ').');
         return;
       }
     },

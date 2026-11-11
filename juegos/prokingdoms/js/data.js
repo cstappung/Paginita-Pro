@@ -54,16 +54,18 @@
     // granjas, tablones, fundición, eras) y cada árbol se agota rápido, mientras la caza rendía 1,5 veces la tala.
     // Por eso la tala es más rápida, los árboles rebrotan antes y la caza rinde un poco menos. Los montos (amount)
     // no se tocan: el servidor del mundo compartido los usa para las zonas comunes.
-    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 2.5 * 3600 },
+    // pk-40 (reporte de un jugador: «madera, hierro y piedra se acaban muy rápido para lo que piden»): los árboles
+    // rebrotan en 1,5 h (eran 2,5) y las minas se rellenan unas 2–3 veces más rápido. Los montos siguen iguales.
+    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 1.5 * 3600 },
     berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600 },
     deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.5, regrow: 6 * 3600, hunt: true },
     // regen 0,25 (era 0,05): la Era V pide unas 9.500 de piedra (con los sillares) y las minas de alrededor daban ~400 por
     // hora; el piloto quedó más de 14 h en la Era IV esperando piedra (prueba de ritmo después de pk-33)
-    stone: { name: 'Mina de piedra', res: 'stone', amount: 350, rate: 0.36, regen: 0.25 },
-    gold: { name: 'Mina de oro', res: 'gold', amount: 400, rate: 0.38, regen: 0.04 },
-    ore: { name: 'Veta de hierro', res: 'ore', amount: 400, rate: 0.33, regen: 0.04 },
-    marble: { name: 'Cantera de mármol', res: 'marble', amount: 500, rate: 0.22, regen: 0.03 },
-    gems: { name: 'Veta de gemas', res: 'gems', amount: 160, rate: 0.12, regen: 0.02 },
+    stone: { name: 'Mina de piedra', res: 'stone', amount: 350, rate: 0.36, regen: 0.5 },
+    gold: { name: 'Mina de oro', res: 'gold', amount: 400, rate: 0.38, regen: 0.1 },
+    ore: { name: 'Veta de hierro', res: 'ore', amount: 400, rate: 0.33, regen: 0.12 },
+    marble: { name: 'Cantera de mármol', res: 'marble', amount: 500, rate: 0.22, regen: 0.08 },
+    gems: { name: 'Veta de gemas', res: 'gems', amount: 160, rate: 0.12, regen: 0.05 },
   };
   D.FARM_RATE = 0.32;
   D.VILLAGER = { cost: { food: 50 }, time: 14 };
@@ -164,7 +166,10 @@
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
     cartwright: L => ({ carts: 1 + L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
-    market: L => ({ buy: Math.max(0.9, 1.08 - 0.02 * L), sell: Math.min(0.95, 0.68 + 0.03 * L) }),
+    // pk-40: la venta nunca alcanza a la compra menos 10 puntos. En Nv 8–9 se vendía al 92–95% y se compraba al
+    // 90–92%: comprar y vender lo mismo daba oro infinito. Ahora la compra baja hasta 0,90 (Nv 8) y la venta sube
+    // hasta 0,80 (Nv 7).
+    market: L => ({ buy: Math.max(0.9, 1.1 - 0.025 * L), sell: Math.min(0.8, 0.66 + 0.02 * L) }),
     sawmill: recipeStats(3), masonry: recipeStats(2), smelter: recipeStats(3), forge: recipeStats(2),
     scriptorium: recipeStats(2), steelworks: recipeStats(3), workshop: recipeStats(3),
     library: L => ({ techMax: L, research: 0.08 * (L - 1) }),

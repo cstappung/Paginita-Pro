@@ -183,10 +183,12 @@
   // ---------- Herramienta (dos toques para la muralla, uno para la puerta) ----------
   Def.cancel = function () { Def.tool = null; Def.start = null; if (PK.Render) PK.Render.wallGhost = null; };
   Def.ghost = function (tx, ty) {
+    if (PK.Despeje && PK.Despeje.HERR[Def.tool]) { PK.Render.wallGhost = PK.Despeje.fantasma(Def.tool, tx, ty); return; } // quitar, talar, plantar (pk-40)
     if (Def.tool === 'wall' && Def.start) PK.Render.wallGhost = Def.plan(Def.start[0], Def.start[1], tx, ty);
     else if (Def.tool === 'gate') PK.Render.wallGhost = W.inb(tx, ty) ? [[tx, ty]] : null;
   };
   Def.click = function (x, y) {
+    if (PK.Despeje && PK.Despeje.HERR[Def.tool]) { PK.Despeje.click(Def.tool, x, y); PK.Render.wallGhost = null; return; }
     if (Def.tool === 'gate') { Def.gate(x, y); return; }
     if (!Def.start) {
       if (!Def.allowed(x, y)) { toast('La muralla va en tu territorio, en casillas exploradas y libres.', 'warn'); return; }

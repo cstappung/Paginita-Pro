@@ -39,7 +39,7 @@
       body.append(el('h3', null, 'Cómo funciona'), el('ul', { class: 'info' },
         el('li', null, 'El mapa se divide en parcelas de 8x8. Solo puedes construir en las tuyas (los campamentos de acopio también van en tierra de nadie).'),
         el('li', null, 'Reclamar una parcela libre que toque tu territorio cuesta recursos, cada vez un poco más.'),
-        el('li', null, 'Conquistar una parcela de otro reino es caro a propósito: la campaña se paga aunque pierdas, no hay botín y pierdes del 30% al 55% de las tropas aunque ganes.'),
+        el('li', null, 'Conquistar una parcela de otro reino es caro a propósito: la campaña se paga aunque pierdas. Si ganas traes botín y pierdes del 12% al 30% de las tropas (menos cuanto más fuerte vayas); si pierdes, del 70% al 80%.'),
         el('li', null, 'Defender es fácil: la defensa cuenta x1,5 en casa y +25% por cada parcela propia alrededor. Las torres y el Centro Urbano cercanos suman mucho.'),
         el('li', null, 'El corazón de cada reino (las parcelas junto a su Centro Urbano) nunca se puede conquistar. Lo que había en una parcela perdida se desarma y se devuelve completo.'),
         el('li', null, 'Los reinos muy avanzados no pueden atacar a los nuevos: hace falta estar a menos de 2 eras y que el otro tenga al menos la mitad de tu poder.')));
@@ -127,6 +127,7 @@
         el('div', null, el('b', null, 'Cintas: '), st.logi.belts.length)));
       body.append(el('div', { class: 'row' },
         UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
+        UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos (y murallas); vuelve la mitad del material' }),
         UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
       body.append(el('h3', null, 'Cómo se mueven las cosas'), el('ul', { class: 'info' },
         el('li', null, 'Cada taller tiene un depósito de entrada y uno de salida. Solo produce con lo que tiene adentro.'),
@@ -235,8 +236,21 @@
       const q = st.upq.map(id => g.bById.get(id)).filter(Boolean);
       body.append(el('h3', null, 'Cola de obras (' + q.length + '/' + PK.Auto.QMAX + ')'));
       if (!q.length) body.append(el('p', { class: 'small muted' }, 'Pon mejoras en la cola y tus maestros las empezarán solos, en orden apenas tengan recursos (si una no alcanza, siguen con la siguiente). Funciona también mientras no estás.'));
-      q.forEach((b, i) => body.append(el('div', { class: 'work-row' }, el('span', { class: 'lvl' }, '#' + (i + 1)), el('img', { src: Sp.buildingIcon(b.type, 'p', b.lvl) }), el('b', null, b.def.name + ' → ' + (b.lvl + 1)),
-        el('span', { class: 'wcost' }, UI.costEl(g.upCost(b))), UI.btn('Quitar', () => { PK.Auto.dequeue(b); UI.rerender(); }, { small: true }))));
+      // Qué le falta a cada una y, con Mercado, comprarlo de un toque (reporte de un jugador, pk-40: las obras se
+      // quedaban en la cola sin materiales y no se veía por qué).
+      const mk = g.countB('market') && PK.Social, pb = q.find(o => o.done && !o.upg), primera = pb ? pb.id : -1;
+      q.forEach((b, i) => {
+        const falta = g.colaFalta(b), fk = Object.keys(falta), compra = mk ? fk.filter(r => r !== 'gold' && PK.Social.tradePool().includes(r)) : [];
+        const oro = compra.reduce((s, r) => s + PK.Social.buyPrice(r, falta[r]), 0), todo = compra.length === fk.length;
+        body.append(el('div', { class: 'work-row' }, el('span', { class: 'lvl' }, '#' + (i + 1)), el('img', { src: Sp.buildingIcon(b.type, 'p', b.lvl) }), el('b', null, b.def.name + ' → ' + (b.lvl + 1)),
+          el('span', { class: 'wcost' }, UI.costEl(g.upCost(b))),
+          fk.length && compra.length ? UI.btn(el('span', null, 'Comprar ', UI.amount('gold', oro)), () => {
+            for (const r of compra) { const n = g.colaFalta(b)[r]; if (n > 0 && PK.Social.buy(r, n) === false) break; }
+            UI.rerender();
+          }, { small: true, disabled: (st.res.gold || 0) < oro + (falta.gold || 0), title: todo ? 'Compra en el Mercado lo que le falta a esta mejora' : 'Compra lo que se vende en el Mercado; lo demás hay que juntarlo' }) : null,
+          UI.btn('Quitar', () => { PK.Auto.dequeue(b); UI.rerender(); }, { small: true })));
+        if (fk.length) body.append(el('p', { class: 'small muted q-falta' }, 'Falta: ' + fk.map(r => U.fmt(falta[r]) + ' de ' + D.RES[r].name.toLowerCase()).join(', ') + '.' + (b.id === primera ? ' Los talleres y el Capataz no gastan lo que le falta a esta obra.' : '')));
+      });
       body.append(el('h3', null, 'Tus edificios'));
       const list = g.buildings.filter(b => b.owner === 'p' && b.done && !b.def.noUp && !b.upg)
         .sort((a, c) => D.BUILD_ORDER.indexOf(a.type) - D.BUILD_ORDER.indexOf(c.type) || a.lvl - c.lvl);

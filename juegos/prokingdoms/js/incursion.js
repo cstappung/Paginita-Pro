@@ -90,7 +90,7 @@
   I.llegar = function (r) {
     const inc = r.inc, p = W().pois[r.poi];
     inc.opciones = I.esJefe(p.kind, inc.piso) ? ['jefe'] : opcionesDe(r, inc.piso);
-    inc.hasta = Date.now() + I.ELEGIR_S * 1000;
+    inc.hasta = G().ahora() + I.ELEGIR_S * 1000;
     r.phase = 'sala';
     r.jefe = null;
     if (!G().offline) toast('Piso ' + inc.piso + ' de ' + D.DUNGEON[p.kind].name + ': ' + (inc.opciones[0] === 'jefe' ? '¡el jefe, ' + I.JEFES[p.kind].name + '!' : 'elige el camino.'), inc.opciones[0] === 'jefe' ? 'bad' : 'info', { label: 'Elegir', fn: () => I.open(r.id) });
@@ -166,7 +166,7 @@
     r.name = D.DUNGEON[p.kind].name + ' · piso ' + fl + (r.jefe ? ' · ' + I.JEFES[p.kind].name : '');
     r.floor = fl;
     r.phase = 'go';
-    r.arrive = Date.now() + 2500; // entrar a la sala
+    r.arrive = G().ahora() + 2500; // entrar a la sala
     r.warned = true;
     return true;
   }
@@ -253,7 +253,7 @@
   // En cada vuelta de Exp.update: sin jugador (o pasado el plazo), la sala por defecto.
   I.update = function (r, offline) {
     if (r.phase !== 'sala') return;
-    if (offline || Date.now() >= r.inc.hasta) I.elegir(r.id, I.porDefecto(r));
+    if (offline || G().ahora() >= r.inc.hasta) I.elegir(r.id, I.porDefecto(r));
   };
   // Al volver al Cuartel: el equipo encontrado (con o sin héroe).
   I.volver = function (r) {

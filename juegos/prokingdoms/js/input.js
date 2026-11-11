@@ -38,7 +38,7 @@
     window.addEventListener('pointercancel', e => { touches.delete(e.pointerId); pinch = null; clearLong(); down = null; pan = null; I.box = null; });
     cv.addEventListener('pointerenter', () => { I.mouse.in = true; });
     cv.addEventListener('pointerleave', () => { I.mouse.in = false; });
-    cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1 : -1, e.clientX, e.clientY); }, { passive: false });
+    cv.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', e => { I.keys[e.key.toLowerCase()] = false; });
     window.addEventListener('blur', () => { I.keys = {}; });
@@ -54,6 +54,21 @@
     const [wx2, wy2] = r.screenToWorld(cx, cy);
     r.cam.x += wx - wx2; r.cam.y += wy - wy2;
     r.clampCam();
+  }
+
+  // Rueda: un desplazamiento horizontal (deltaY 0) no es zoom, y el trackpad manda decenas de eventos chicos por
+  // gesto: se acumulan hasta ~100 px (un «clic» de rueda) antes de cambiar de nivel, con una pausa entre niveles.
+  let ruedaAcum = 0, ruedaT = 0, ruedaZ = 0;
+  function onWheel(e) {
+    e.preventDefault();
+    if (!e.deltaY) return;
+    const now = performance.now();
+    if (now - ruedaT > 250) ruedaAcum = 0;
+    ruedaT = now;
+    ruedaAcum += e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    if (Math.abs(ruedaAcum) < 90 || now - ruedaZ < 120) return;
+    zoom(ruedaAcum < 0 ? 1 : -1, e.clientX, e.clientY);
+    ruedaAcum = 0; ruedaZ = now;
   }
 
   function onDown(e) {
@@ -125,8 +140,15 @@
   function onUp(e) {
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
+      const veniaDePellizco = !!pinch;
       if (touches.size < 2) pinch = null;
       clearLong();
+      // Después de pellizcar, el dedo que queda sigue moviendo la cámara (antes no había `down` y no hacía nada).
+      if (veniaDePellizco && touches.size === 1) {
+        const t = [...touches.values()][0];
+        down = { x: t.x, y: t.y, touch: true, moved: true, box: false, lp: 0 };
+        return;
+      }
       if (down && down.box) {
         const b = I.box;
         if (b && Math.abs(b.x1 - b.x0) > 10 && Math.abs(b.y1 - b.y0) > 10) boxSelect(b, false);
@@ -167,6 +189,9 @@
     }
     // Con el dedo no hay Esc ni clic derecho: tocar el suelo vacío suelta lo elegido (antes, con aldeanos elegidos,
     // los mandaba a caminar ahí y no había forma de deseleccionarlos). Tocar otra vez al único aldeano elegido, también.
+    // Excepción: a los exploradores sí se los manda a un lugar tocando el suelo (su panel lo dice).
+    const selU = g.selUnits();
+    if (selU.length && selU.every(u => u.kind === 'scout') && it && it.k === 'tile') { rightClick(x, y); return; }
     if (g.sel && (!it || it.k === 'tile')) { g.sel = null; PK.UI.refreshPanel(true); return; }
     if (it && it.k === 'unit' && it.o.owner === 'p' && g.sel && g.sel.type === 'units' && g.sel.ids.length === 1 && g.sel.ids[0] === it.o.id) { g.sel = null; PK.UI.refreshPanel(true); return; }
     if (g.selUnits().length && it && !(it.k === 'unit' && it.o.owner === 'p')) { rightClick(x, y); return; }
@@ -276,6 +301,7 @@
     const g = G();
     if (!g.canMove(b)) { if (b && g.MOVE_NO[b.type]) PK.UI.toast(g.MOVE_NO[b.type], 'warn'); return; }
     I.cancelTool();
+    salirTerr();
     g.placing = { type: b.type, armed: false, move: b.id };
     R().ghost = null;
     PK.UI.refreshPanel(true);
@@ -283,10 +309,15 @@
   I.startPlacing = function (type) {
     const g = G();
     I.cancelTool();
+    salirTerr();
     g.placing = { type, armed: false };
     R().ghost = null;
     PK.UI.refreshPanel(true);
   };
+
+  // El mapa de territorio se tragaba el clic de construir: el fantasma salía verde y el clic abría la parcela.
+  // Construir o mover cierra ese modo (y leftClick revisa g.placing antes que Terr.mode, por si acaso).
+  function salirTerr() { if (PK.Terr.mode) { PK.Terr.mode = false; PK.Terr.sel = null; PK.UI.rerender(); } }
 
   function leftClick(sx, sy, shift, touch) {
     const g = G();
@@ -294,11 +325,6 @@
     if (PK.Asedios && PK.Asedios.herramienta) { const [tx, ty] = R().screenToTile(sx, sy); PK.Asedios.click(tx, ty); return; } // trampas (C5)
     if (PK.Logi.tool) { toolClick(sx, sy); return; }
     if (PK.Def.tool) { const [tx, ty] = R().screenToTile(sx, sy); PK.Def.click(Math.floor(tx), Math.floor(ty)); PK.UI.refreshPanel(true); return; }
-    if (PK.Terr.mode) {
-      const it = R().pick(sx, sy);
-      if (it && it.k === 'parcel') PK.Terr.pick(it.x, it.y);
-      return;
-    }
     if (g.placing) {
       // con el dedo, el primer toque muestra dónde quedaría; el segundo sobre el mismo lugar lo construye
       if (touch) {
@@ -307,6 +333,11 @@
         if (!onGhost) { updateGhost(sx, sy); g.placing.armed = true; PK.UI.refreshPanel(true); return; }
       } else updateGhost(sx, sy);
       I.placeGhost(shift);
+      return;
+    }
+    if (PK.Terr.mode) {
+      const it = R().pick(sx, sy);
+      if (it && it.k === 'parcel') PK.Terr.pick(it.x, it.y);
       return;
     }
     const it = R().pick(sx, sy);

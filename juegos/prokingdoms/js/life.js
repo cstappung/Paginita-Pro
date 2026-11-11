@@ -259,7 +259,7 @@
         for (const b of G().buildings) if (b.owner === 'p' && b.upg) { b.upg.t += (b.upg.total - b.upg.t) * 0.2; n++; }
         if (S().research) { S().research.t += (S().research.total - S().research.t) * 0.2; n++; }
         e.desc = n ? 'Tus maestros y sabios avanzan un 20% de golpe' : 'Tus aldeanos trabajan con ganas';
-        if (!n) L.buff = 1.25, setTimeout(() => { L.buff = 1; }, 60000);
+        if (!n) { L.buff = 1.25; L.buffHasta = Date.now() + 60000; setTimeout(() => { L.buff = 1; L.buffHasta = 0; }, 60000); }
       },
     },
     caravan: {
@@ -294,9 +294,17 @@
     for (let i = 0; i < 3; i++) PK.Render.particles.push({ x: px + (Math.random() - 0.5) * 18 * b.w / 3, y: py - 18 - Math.random() * 10, vx: (Math.random() - 0.5) * 8, vy: -25 - Math.random() * 20, life: 0, max: 0.5 + Math.random() * 0.4, s: 1, rgb: Math.random() < 0.5 ? [255, 160, 40] : [255, 90, 30] });
     if (Math.random() < 0.5 * k + 0.3) PK.Render.particles.push({ x: px + (Math.random() - 0.5) * 12, y: py - 30, vx: (Math.random() - 0.5) * 6, vy: -14, life: 0, max: 1.4, s: 1, puff: L.fuego.apaga ? [220, 220, 230] : [70, 64, 60] });
   }
+  // Al terminar, cada uno vuelve a lo que hacía (antes quedaban sin tarea y el Capataz los repartía a otra cosa,
+  // aunque fueran granjeros o tuvieran una orden tuya).
   function soltarBaldes(e) {
-    for (const id of e.cuadrilla || []) { const u = G().uById.get(id); if (u) { u.balde = false; if (u.task && u.task.t === 'move') u.task = null; } }
-    e.cuadrilla = [];
+    const prev = e.previas || {};
+    for (const id of e.cuadrilla || []) {
+      const u = G().uById.get(id);
+      if (!u) continue;
+      u.balde = false;
+      if (u.task && u.task.t === 'move') { u.task = null; const t = prev[id]; if (t && t.t !== 'move') G().assign(u, t); }
+    }
+    e.cuadrilla = []; e.previas = {};
   }
 
   // ---------- Eventos con decisiones (H8 del plan, Anexo A7) ----------
@@ -329,6 +337,8 @@
           if (!b || e.apagando !== undefined) return true;
           const vs = G().units.filter(u => u.owner === 'p' && u.kind === 'v' && !u.inside && !(u.scared > 0)).sort((a, c) => U.dist(a.x, a.y, b.cx, b.cy) - U.dist(c.x, c.y, b.cx, b.cy)).slice(0, 4);
           e.cuadrilla = vs.map(u => u.id);
+          e.previas = {};
+          for (const u of vs) if (u.task) e.previas[u.id] = Object.assign({}, u.task);
           for (const u of vs) { G().assign(u, { t: 'move' }); u.balde = true; u.path = W.findPath(Math.floor(u.x), Math.floor(u.y), { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1, adj: true }, 3000).path; }
           e.apagando = 12; L.fuego.apaga = true;
           e.desc = 'Tus aldeanos corren con baldes a la ' + b.def.name;
@@ -536,7 +546,8 @@
       ],
       defecto: 1,
     },
-    torneo: {
+    // Antes también se llamaba `torneo` y pisaba al Torneo de caballeros (H8), que así nunca salía.
+    torneoVerano: {
       era: 3, name: 'Torneo de verano', dur: 120, cond: () => est() === 1,
       start(e) { e.desc = 'Caballeros de todo el reino se miden en la plaza'; },
       opciones: [
@@ -616,10 +627,20 @@
     L.timers = () => ({ wolves: wolfT, event: eventT });
     if (wolfT <= 0) { wolfT = 300 + Math.random() * 300; if (g.villagerCount() >= 6 && !L.wolves.length && g.time > 240) spawnPack(); }
     if (eventT <= 0) { eventT = 200 + Math.random() * 220; if (!L.event) startEvent(); }
-    if (L.event) { const def = EVENTS[L.event.id]; if (def.tick) def.tick(L.event, dt); if (L.event) { L.event.t -= dt; if (L.event.t <= 0) endEvent(); } }
+    // Con los baldes en camino (e.apagando), el reloj del evento espera a que terminen: antes, si mandabas los baldes
+    // con menos de 12 s, el evento se acababa primero y el edificio bajaba de nivel igual.
+    if (L.event) { const def = EVENTS[L.event.id]; if (def.tick) def.tick(L.event, dt); if (L.event && L.event.apagando === undefined) { L.event.t -= dt; if (L.event.t <= 0) endEvent(); } }
     if (L.mods.length) { for (const o of L.mods) o.t -= dt; L.mods = L.mods.filter(o => o.t > 0); }
     if (L.wolves.length) updateWolves(dt);
     defenders(dt);
+  };
+  // Cálculo sin conexión (game.js): los bonos pasajeros y el evento en curso también gastan su tiempo. Antes la
+  // Fiesta de la cosecha o las langostas valían para todo el hueco (hasta 12 h) y al volver seguían enteros.
+  // No empieza eventos nuevos ni lobos: eso sigue siendo solo en vivo.
+  L.offline = function (dt) {
+    if (L.mods.length) { for (const o of L.mods) o.t -= dt; L.mods = L.mods.filter(o => o.t > 0); }
+    if (L.event) { L.event.t -= dt; if (L.event.apagando !== undefined) { L.event.apagando -= dt; if (L.event.apagando <= 0) L.event.apagado = true; } if (L.event.t <= 0 || L.event.apagado) endEvent(); }
+    if (L.buffHasta && G().ahora() >= L.buffHasta) { L.buff = 1; L.buffHasta = 0; }
   };
   L.EVENTS = EVENTS;
   L.debug = { spawnPack, startEvent: id => { if (id) { const def = EVENTS[id], e = { id, name: def.name, desc: def.desc, t: def.dur, total: def.dur }; if (!def.start || def.start(e) !== false) { L.event = def.dur ? e : null; toast('Evento: ' + e.name + ' — ' + e.desc + '.', 'epic'); } } else startEvent(); } };

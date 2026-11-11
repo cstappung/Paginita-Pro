@@ -44,8 +44,11 @@
     ensure(b);
     const g = G(), r = L.recipe(b), out = L.output(b), cap = L.bufCap(b), n = b.workers.length;
     if (L.nearStore(b)) L.direct(b, dt);
-    const enReserva = () => g.reservaDe(b) && Object.keys(r.in).some(k => (b.inb[k] || 0) < r.in[k]);
-    if (!n) { b.status = enReserva() ? 'En reserva' : 'Sin trabajadores'; return; }
+    // La reserva manda (pedido del dueño, pk-40): con la bodega bajo el mínimo el taller no produce, aunque le quede
+    // insumo en su depósito de entrada o una carreta se lo traiga. Antes solo dejaba de pedir y seguía gastando lo
+    // que tenía: no paraba nunca de verdad. «Producir igual» (b.sinReserva) lo salta, como siempre.
+    if (g.reservaDe(b)) { b.status = 'En reserva'; b.prodAcc = Math.min(b.prodAcc, 1); return; }
+    if (!n) { b.status = 'Sin trabajadores'; return; }
     b.prodAcc += (dt * n * g.prodMult(b.def.recipe, b)) / r.time;
     b.status = 'Produciendo';
     let guard = 0;
@@ -53,13 +56,20 @@
       if ((b.outb[out] || 0) + r.out[out] > cap) { b.status = 'Depósito de salida lleno'; b.prodAcc = Math.min(b.prodAcc, 1); break; }
       let ok = true;
       for (const k in r.in) if ((b.inb[k] || 0) < r.in[k]) { ok = false; break; }
-      if (!ok) { b.status = enReserva() ? 'En reserva' : 'Faltan insumos'; b.prodAcc = Math.min(b.prodAcc, 1); break; }
+      if (!ok) { b.status = 'Faltan insumos'; b.prodAcc = Math.min(b.prodAcc, 1); break; }
       b.prodAcc -= 1;
       for (const k in r.in) b.inb[k] -= r.in[k];
       for (const k in r.out) { b.outb[k] = (b.outb[k] || 0) + r.out[k]; g.stat('p_' + k, r.out[k]); g.stat('p_total', r.out[k]); }
     }
   };
 
+  // ¿Puede producir ahora? (ni frenado por la reserva ni con la salida llena). El Capataz no manda gente a uno que
+  // no puede: los soltaba por «parado» y a los 3 s los volvía a mandar, en bucle (auto.js).
+  L.puede = function (b) {
+    ensure(b);
+    const r = L.recipe(b), out = L.output(b);
+    return !G().reservaDe(b) && (b.outb[out] || 0) + r.out[out] <= L.bufCap(b);
+  };
   // ¿Le llega algo a este taller? (junto a un almacén, con carretas o con una cinta que lo alimenta).
   // Sin eso no recibe insumos: no se le asignan trabajadores (antes aceptaba y prometía «≈30 por minuto»).
   L.supplied = b => !!(L.nearStore(b) || L.carts().length || S().logi.belts.some(bl => bl.b === b.id));
@@ -95,7 +105,7 @@
     const st = S(), g = G();
     if (b && b.sinReserva) return 0;
     const rm = b && PK.Game.reservaDe(b); // la meta de era guarda el insumo entero (G.reservaDe)
-    if (rm && rm.meta && rm.res === res) return Infinity;
+    if (rm && (rm.meta || rm.cola) && rm.res === res) return Infinity; // y la cola de obras (G.colaNecesita)
     if (out && g.metaPide(out)) return 0; // la meta pide lo que hace este taller
     let rv = st.auto ? st.auto.reserve || 0 : 0;
     if (out && st.res[out] < 0.05 * g.cap(out)) rv /= 3;
@@ -420,6 +430,9 @@
       // como en vivo (beltTick): de la bodega a un taller, nunca por debajo de la reserva. Sin esto, al volver
       // la bodega estaba vacía aunque el taller respetara la reserva.
       if (L.isShop(b) && !L.isShop(a)) n = Math.min(n, Math.max(0, S().res[res] - reserveOf(res, L.output(b), b)));
+      // a una bodega, solo lo que cabe (como beltTick): lo que no cabía salía del taller y se perdía
+      if (!L.isShop(b)) n = Math.min(n, Math.max(0, g.cap(res) - (S().res[res] || 0)));
+      if (n <= 0) continue;
       n = take(a, res, n);
       if (n > 0) put(b, res, n);
     }

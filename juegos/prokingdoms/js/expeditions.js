@@ -49,6 +49,12 @@
     for (const k in units) p += (units[k] || 0) * D.ARMY[k].power * Exp.unitMult(k) * Exp.vsFactor(k, enemy) * (1 + vb('pve_all') + vb('pve_' + k));
     return p * (1 + drag) * (1 + 0.15 * G().lvl('tactics')) * G().eraMult() * Exp.armyMult() * Exp.heroMult(heroe, enemy) * (PK.Leyendas && S().leyendas ? 1 + PK.Leyendas.contra(enemy) : 1);
   };
+  // Lo que powerVs suma contra ese enemigo y la batalla en vivo no ve al armar figuras contra {}: el bono contra
+  // dragones (árbol, cartas) y las leyendas (Cementerio de Dragones…). Solo PvE.
+  Exp.contra = function (enemy) {
+    const vb = G().bono || (() => 0), drag = enemy && enemy.dragon ? (vb('dragon') * enemy.dragon) / Math.max(1, Object.values(enemy).reduce((s, v) => s + v, 0)) : 0;
+    return (1 + drag) * (PK.Leyendas && S().leyendas ? 1 + PK.Leyendas.contra(enemy) : 1);
+  };
   Exp.heroMult = (id, enemy) => (id && PK.Heroes ? PK.Heroes.mult(PK.Heroes.de(id), enemy) : 1);
   Exp.heal = units => Math.min(0.45, Object.keys(units).reduce((s, k) => s + (units[k] || 0) * (D.ARMY[k].heal || 0), 0));
   // Probabilidad de victoria según la proporción de fuerzas: 1:1 es 50%, 1,5:1 ya es casi seguro.
@@ -103,11 +109,14 @@
     const st = S(), b = st.exp.board, n = 3 + Exp.bonus('missions') + (PK.Heroes && st.heroes ? Math.floor(PK.Heroes.pasiva('missions')) : 0);
     if (Date.now() - b.at > BOARD_MS || !b.at) {
       b.at = Date.now();
+      b.tomados = 0;
       const pool = D.MISSIONS.filter(m => st.era >= m.era), rng = U.rng(Math.floor(Date.now() / BOARD_MS) * 7 + st.created % 997);
       b.list = [];
       for (let i = 0; i < n && pool.length; i++) b.list.push(makeMission(pool.splice(Math.floor(rng() * pool.length), 1)[0], i));
     }
-    while (b.list.length < n && st.era >= 2) { // la Taberna suma encargos sin esperar a la renovación
+    // La Taberna suma encargos sin esperar a la renovación, pero los que ya mandaste en esta tanda no vuelven a
+    // aparecer: antes, cada encargo enviado dejaba un hueco que se rellenaba al instante (encargos sin fin).
+    while (b.list.length + (b.tomados || 0) < n && st.era >= 2) {
       const pool = D.MISSIONS.filter(m => st.era >= m.era && !b.list.some(o => o.tpl === m.id));
       if (!pool.length) break;
       b.list.push(makeMission(U.pick(pool), b.list.length));
@@ -207,7 +216,7 @@
     const temp = D.temaActivo === 'mar' && D.tormenta && D.tormenta();
     if (temp) pv.travel = Math.round(pv.travel * D.TORMENTA.viaje);
     const run = { id: st.exp.rid++, heroe: heroe ? heroe.id : undefined, poi: target.poi, camp: target.camp, cap: target.cap, floor: target.floor, jefeMar: target.jefeMar, tormenta: temp ? 1 : undefined, mission: target.mission ? st.exp.board.list.find(o => o.uid === target.mission) : null, name: pv.name, enemy: pv.enemy, need: pv.power, power: Math.round(Exp.powerVs(units, pv.enemy, heroe && heroe.id)), heal: Exp.heal(units), units: Object.assign({}, units), loot: pv.loot, phase: 'go', arrive: Date.now() + pv.travel * 1000, travel: pv.travel };
-    if (run.mission) st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1);
+    if (run.mission) { st.exp.board.list.splice(st.exp.board.list.indexOf(run.mission), 1); st.exp.board.tomados = (st.exp.board.tomados || 0) + 1; }
     else run.target = { poi: target.poi, floor: target.floor, camp: target.camp, cap: target.cap, jefeMar: target.jefeMar }; // para «Repetir» (C7)
     if (temp) run.power = Math.round(run.power * D.TORMENTA.fuerza);
     if (target.jefeMar) { run.jefe = target.jefeMar; run.nivel = D.JEFES_MAR[target.jefeMar].nivel; }
@@ -271,10 +280,16 @@
   function cerrar(r, res, ratio) {
     const st = S(), sent = r.inc ? r.inc.enviados : Object.assign({}, r.units);
     if (!r.inc) for (const k in r.lost || {}) sent[k] = (sent[k] || 0) + r.lost[k];
-    if (r.poi !== undefined && r.inc) Exp.site(r.poi).rest = Date.now() + D.DUNGEON[W.pois[r.poi].kind].rest * 1000 * reposo();
+    // los que cayeron en un encuentro del camino (aventura.js) también fueron, y también son bajas
+    if (!r.inc && r.encPerdidos) for (const k in r.encPerdidos) {
+      r.lost = r.lost || {}; sent[k] = (sent[k] || 0) + r.encPerdidos[k]; r.lost[k] = (r.lost[k] || 0) + r.encPerdidos[k]; }
+    // En el cálculo sin conexión el reloj es el simulado (G.ahora): con Date.now() la vuelta y el reposo recién
+    // empezaban al abrir el juego, aunque la pelea hubiera sido horas antes.
+    const ahora = G().ahora();
+    if (r.poi !== undefined && r.inc) Exp.site(r.poi).rest = ahora + D.DUNGEON[W.pois[r.poi].kind].rest * 1000 * reposo();
     if (r.poi !== undefined && !r.inc) {
       const p = W.pois[r.poi], site = Exp.site(p.id);
-      site.rest = Date.now() + D.DUNGEON[p.kind].rest * 1000 * reposo();
+      site.rest = ahora + D.DUNGEON[p.kind].rest * 1000 * reposo();
       if (r.won && r.floor > site.best) {
         site.best = r.floor;
         st.stats['floor_' + p.kind] = Math.max(st.stats['floor_' + p.kind] || 0, r.floor);
@@ -284,7 +299,7 @@
     if (r.cap && r.won && PK.Campana) PK.Campana.ganar(r.cap);
     if (r.jefeMar && r.won) { // pk-29: el jefe del mar se va a descansar y vuelve más tarde
       const J = D.JEFES_MAR[r.jefeMar], jm = (st.jefesMar = st.jefesMar || {}), j = (jm[r.jefeMar] = jm[r.jefeMar] || { n: 0 });
-      j.n++; j.vuelve = Date.now() + J.descanso * 1000;
+      j.n++; j.vuelve = ahora + J.descanso * 1000;
       G().stat('jefe_' + r.jefeMar, 1);
     }
     if (r.asalto && PK.Armada) PK.Armada.finAsalto(r);
@@ -293,7 +308,7 @@
       if (ps && !ps.d) { ps.d = 1; W.poiFree(p); G().stat('camps_cleared', 1); }
     }
     r.phase = 'back';
-    r.back = Date.now() + r.travel * 1000;
+    r.back = ahora + r.travel * 1000;
     log(r.won ? 'Victoria en ' + r.name + '. Bajas: ' + lostText(r.lost) + '. Vuelven con el botín.' : 'Derrota en ' + r.name + '. Bajas: ' + lostText(r.lost) + '.', r.won ? 'good' : 'bad');
     const rep = { id: r.id, at: Date.now(), name: r.name, won: r.won, power: r.power, need: r.need, chance: r.chance || Exp.chance(ratio || 1), sent, lost: r.lost, inc: r.inc ? { log: r.inc.log.slice(-12), fin: r.incFin, afijos: r.inc.afijos } : undefined, loot: r.won || r.inc ? r.loot : null, enemy: r.enemy, live: !!(res && res.live), retreat: !!(res && res.retreat), heroe: heroName(r), heroeId: r.heroe, hab: r.habUsos, enc: r.encLog, dano: r.dano, target: r.target, form: r.form };
     st.war.reports = st.war.reports || [];
@@ -372,7 +387,7 @@
     if (t1 < 1) return;
     const sec = t1;
     t1 = 0;
-    const now = Date.now();
+    const now = offline ? G().ahora() : Date.now(); // sin conexión, el reloj simulado (si no, las salas no avanzaban)
     for (const r of st.exp.runs.slice()) {
       // aviso antes de llegar: para elegir táctica y entrar a mirar la batalla
       if (!offline && r.phase === 'go' && !r.warned && (!r.mission || D.temaActivo === 'mar') && !r.asalto && r.travel > 40 && r.arrive - now <= 20000 && r.arrive > now) {
