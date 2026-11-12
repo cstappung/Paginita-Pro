@@ -120,6 +120,8 @@ ol.pasos span{color:var(--muted);font-size:14px}
 .fuentes{columns:2 300px;font-size:13px;margin:0;padding-left:18px}
 .fuentes li{break-inside:avoid;margin:3px 0}
 footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+/* La moneda dibujada de Juegos (el emoji salía como un cuadrito en algunos equipos). */
+.mo{display:inline-block;width:1em;height:1em;vertical-align:-.15em;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='9' fill='%23f5b819' stroke='%239a6a08' stroke-width='1.6'/%3E%3Ccircle cx='10' cy='10' r='5.6' fill='%23ffd54a' stroke='%23c98d10' stroke-width='1.2'/%3E%3Cpath d='M8.6 7.2v5.6M11.4 7.2v5.6' stroke='%239a6a08' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
 </style>
 </head>
 <body>
@@ -323,24 +325,24 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
     <h2 class="pixel">LOGROS</h2>
     <p class="lead">Los diez logros del Sudoku, en <code>colabtex/src/juegos/logros.js</code>. Salen de tus mejores marcas en el ranking, así que se ganan solos al jugar y cuentan hacia atrás si ya tenías la marca. Cada uno paga monedas según su dificultad (<code>monedas.js</code>).</p>
     <div class="logros">
-      <div class="logro"><i>🔢</i><div><b>Sudoku del día</b><span>Resuelve un sudoku diario.</span></div><em class="m1">Diario · 15 🪙</em></div>
-      <div class="logro"><i>🔥</i><div><b>Tres al hilo</b><span>Llega a una racha de 3 días.</span></div><em class="m1">Diario · 15 🪙</em></div>
-      <div class="logro"><i>📅</i><div><b>Semana de nueve en nueve</b><span>Llega a una racha de 7 días.</span></div><em class="m2">Diario · 40 🪙</em></div>
-      <div class="logro"><i>🗓️</i><div><b>Un mes de cuadrículas</b><span>Llega a una racha de 30 días.</span></div><em class="m4">Diario · 250 🪙</em></div>
-      <div class="logro"><i>🪙</i><div><b>Insert coin</b><span>Resuelve un clásico en Fácil.</span></div><em class="m1">Clásico · 15 🪙</em></div>
-      <div class="logro"><i>🧠</i><div><b>Nivel experto</b><span>Resuelve un clásico en Experto.</span></div><em class="m3">Clásico · 100 🪙</em></div>
-      <div class="logro"><i>⏱️</i><div><b>Contra el reloj</b><span>Resuelve un clásico Medio en menos de 5 min.</span></div><em class="m3">Clásico · 100 🪙</em></div>
-      <div class="logro"><i>🧊</i><div><b>Sangre fría</b><span>Resuelve un clásico Difícil en menos de 10 min.</span></div><em class="m3">Clásico · 100 🪙</em></div>
-      <div class="logro"><i>🕹️</i><div><b>Combo arcade</b><span>Haz 10 000 puntos en una partida arcade.</span></div><em class="m2">Arcade · 40 🪙</em></div>
-      <div class="logro"><i>👾</i><div><b>Récord de recreativa</b><span>Haz 25 000 puntos en una partida arcade.</span></div><em class="m4">Arcade · 250 🪙</em></div>
+      <div class="logro"><i>🔢</i><div><b>Sudoku del día</b><span>Resuelve un sudoku diario.</span></div><em class="m1">Diario · 15 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>🔥</i><div><b>Tres al hilo</b><span>Llega a una racha de 3 días.</span></div><em class="m1">Diario · 15 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>📅</i><div><b>Semana de nueve en nueve</b><span>Llega a una racha de 7 días.</span></div><em class="m2">Diario · 40 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>🗓️</i><div><b>Un mes de cuadrículas</b><span>Llega a una racha de 30 días.</span></div><em class="m4">Diario · 250 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>💰</i><div><b>Insert coin</b><span>Resuelve un clásico en Fácil.</span></div><em class="m1">Clásico · 15 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>🧠</i><div><b>Nivel experto</b><span>Resuelve un clásico en Experto.</span></div><em class="m3">Clásico · 100 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>⏱️</i><div><b>Contra el reloj</b><span>Resuelve un clásico Medio en menos de 5 min.</span></div><em class="m3">Clásico · 100 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>🧊</i><div><b>Sangre fría</b><span>Resuelve un clásico Difícil en menos de 10 min.</span></div><em class="m3">Clásico · 100 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>🕹️</i><div><b>Combo arcade</b><span>Haz 10 000 puntos en una partida arcade.</span></div><em class="m2">Arcade · 40 <i class="mo" aria-label="monedas"></i></em></div>
+      <div class="logro"><i>👾</i><div><b>Récord de recreativa</b><span>Haz 25 000 puntos en una partida arcade.</span></div><em class="m4">Arcade · 250 <i class="mo" aria-label="monedas"></i></em></div>
     </div>
     <div class="card" style="margin-top:14px">
       <h3 style="margin-top:0">Otras monedas del Sudoku</h3>
       <ul class="lista">
-        <li><b>Récord:</b> 40 🪙 la primera vez que dejas una marca en cada tabla (diario, arcade y cada dificultad del clásico).</li>
-        <li><b>Partida:</b> 20 🪙 por cada sudoku terminado, hasta 15 al día.</li>
-        <li><b>Racha:</b> 10 🪙 por día de racha (hasta 60 días).</li>
-        <li><b>Arcade:</b> 1 🪙 por cada 1000 puntos de tu mejor marca (hasta 200 000 puntos).</li>
+        <li><b>Récord:</b> 40 <i class="mo" aria-label="monedas"></i> la primera vez que dejas una marca en cada tabla (diario, arcade y cada dificultad del clásico).</li>
+        <li><b>Partida:</b> 20 <i class="mo" aria-label="monedas"></i> por cada sudoku terminado, hasta 15 al día.</li>
+        <li><b>Racha:</b> 10 <i class="mo" aria-label="monedas"></i> por día de racha (hasta 60 días).</li>
+        <li><b>Arcade:</b> 1 <i class="mo" aria-label="monedas"></i> por cada 1000 puntos de tu mejor marca (hasta 200 000 puntos).</li>
         <li><b>Marco de campeón «Cuadrícula arcade»:</b> para quien esté n.º 1 en una tabla del Sudoku: un anillo neón con mini cuadrículas que titilan.</li>
       </ul>
     </div>

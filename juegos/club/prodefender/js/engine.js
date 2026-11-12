@@ -64,7 +64,7 @@
     { id: 'codicia', icon: '💰', name: 'Pacto de la Codicia', bueno: '+40% de oro por cada enemigo', malo: 'Los enemigos tienen +15% de vida', m: { oro: 1.4, vidaEnem: 1.15 } },
     { id: 'furia', icon: '⚡', name: 'Pacto de la Furia', bueno: 'Tus torres atacan un 20% más rápido', malo: 'Los enemigos corren un 10% más', m: { rate: 1.2, velEnem: 1.1 } },
     { id: 'cristal', icon: '💎', name: 'Pacto de Cristal', bueno: 'Tus torres hacen +30% de daño', malo: 'Vender una torre devuelve solo el 40%', m: { dmg: 1.3 }, set: { venta: 0.4 } },
-    { id: 'mercenario', icon: '🪙', name: 'Contrato Mercenario', bueno: 'Cobras ahora un adelanto de oro', malo: 'El bono de cada ronda baja un 30%', m: { bono: 0.7 }, oro: r => Math.round(800 + 3 * PD.roundBonus(r + 1)) },
+    { id: 'mercenario', icon: '💰', name: 'Contrato Mercenario', bueno: 'Cobras ahora un adelanto de oro', malo: 'El bono de cada ronda baja un 30%', m: { bono: 0.7 }, oro: r => Math.round(800 + 3 * PD.roundBonus(r + 1)) },
     { id: 'vision', icon: '👁', name: 'Ojo que Todo lo Ve', bueno: 'Todas tus torres ven a los camuflados', malo: 'Los enemigos tienen +12% de vida', set: { camo: true }, m: { vidaEnem: 1.12 } },
     { id: 'hierro', icon: '⚒', name: 'Pacto de Hierro', bueno: 'Tus torres ignoran la mitad del blindaje', malo: 'Las mejoras cuestan un 20% más', set: { ap: 0.5 }, m: { costoMejora: 1.2 } },
     { id: 'cuervo', icon: '🪶', name: 'Alas del Cuervo', bueno: 'Tus torres ven un 15% más lejos', malo: 'Las torres nuevas cuestan un 15% más', m: { range: 1.15, costoTorre: 1.15 } },

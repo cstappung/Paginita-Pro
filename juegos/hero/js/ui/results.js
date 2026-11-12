@@ -236,7 +236,9 @@ export class ResultsScreen extends Screen {
 
   pintaVeredicto(d) {
     if (!this.nube) return;
-    const fmtM = (n) => `+${fmt(n)} 🪙`;
+    /* La moneda dibujada de Juegos (monedas-vista.js, `MONEDA`), copiada: el
+       emoji 🪙 sale como un cuadrito en algunos equipos. */
+    const fmtM = (n) => [`+${fmt(n)} `, h('span', { class: 'rn-moneda', html: '<svg viewBox="0 0 20 20" width="1em" height="1em" style="vertical-align:-.15em" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>' })];
     if (!d.ok) {
       this.nube.className = 'res-nube mal';
       this.nube.replaceChildren(h('b', {}, 'Esta partida no se guardó'), h('span', {}, d.motivo || ''));

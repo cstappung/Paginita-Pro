@@ -300,7 +300,7 @@ export function crearHero({ volver, enLinea }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?v=hero-27";
+    frame.src = "juegos/hero/index.html?v=hero-28";
     host.appendChild(frame);
     frame.addEventListener("load", () => frame.contentWindow?.focus());
   }

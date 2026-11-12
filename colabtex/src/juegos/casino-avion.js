@@ -11,7 +11,7 @@
    revienta justo en su punto, en vez de saltar hacia atrás. */
 import { AVION, multAvion, horaAvion, resuelveAvion, pagoDe, formatoPago, numeroEs } from "./casino-motor.js";
 import { formatoMonedas } from "./monedas.js";
-import { MONEDA } from "./monedas-vista.js";
+import { MONEDA, pintaMoneda } from "./monedas-vista.js";
 import { salidaFx, silenciado } from "./sonido.js";
 
 const RETRASO = 280;
@@ -392,7 +392,7 @@ export function montarAvion(h, api) {
       flotan = flotan.filter(f => (f.t += dt) < 1.8);
       for (const f of flotan) {
         g.globalAlpha = Math.min(1, 2 * (1.8 - f.t)); g.font = "800 26px system-ui, sans-serif"; g.textAlign = "center";
-        g.fillStyle = "#ffd54a"; g.shadowColor = "#000"; g.shadowBlur = 8; g.fillText(f.txt + " 🪙", f.x - 20, f.y - 30 - f.t * 60); g.shadowBlur = 0;
+        g.fillStyle = "#ffd54a"; g.shadowColor = "#000"; g.shadowBlur = 8; const fy = f.y - 30 - f.t * 60; g.fillText(f.txt, f.x - 34, fy); g.shadowBlur = 0; pintaMoneda(g, f.x - 34 + g.measureText(f.txt).width / 2 + 16, fy - 9, 11);
       }
       g.globalAlpha = 1;
       if (activa && !activa.fin && !activa.retirando && v.antes !== (boton.dataset.antes === "1")) { boton.dataset.antes = v.antes ? "1" : "0"; pintaBoton(); }

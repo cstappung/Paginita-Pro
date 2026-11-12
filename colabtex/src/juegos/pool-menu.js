@@ -6,6 +6,7 @@
 import { RAREZAS, TACOS, IDS_TACOS, PRECIO_COFRE, IDS_PREMIO, rarezaDe, reembolsoDe } from "./tacos.js";
 import { dibujaTacoMini } from "./pool-vista.js";
 import { VERSION_POOL, NOVEDADES_POOL } from "./pool-novedades.js";
+import { MONEDA } from "./monedas-vista.js";   // la moneda dibujada: el emoji 🪙 sale como un cuadrito en algunos equipos
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -57,7 +58,7 @@ export function crearMenuPool(ctx, host) {
     const puede = e.listo && !e.parada && e.saldo >= PRECIO_COFRE && !ocupado;
     const probas = RAREZAS.map(r => {
       const n = IDS_PREMIO.filter(k => TACOS[k].rareza === r.id).length;
-      return `<tr style="--r:${r.color}"><td><i></i>${esc(r.nombre)}</td><td>${pct(r.mil)}</td><td>${n} tacos</td><td>repetido: +${fmt(r.reembolso)} 🪙</td></tr>`;
+      return `<tr style="--r:${r.color}"><td><i></i>${esc(r.nombre)}</td><td>${pct(r.mil)}</td><td>${n} tacos</td><td>repetido: +${fmt(r.reembolso)} ${MONEDA}</td></tr>`;
     }).join("");
     let res = "";
     if (resultado) {
@@ -65,7 +66,7 @@ export function crearMenuPool(ctx, host) {
       res = `<div class="jg-pl-res" style="--r:${r.color}">
         <small>${esc(r.nombre)}</small><canvas width="360" height="50" data-taco="${resultado.id}"></canvas>
         <b>${esc(t.nombre)}</b>
-        <span>${resultado.dup ? `Ya lo tenías: te devolvemos ${fmt(reembolsoDe(resultado.id))} 🪙` : "¡Taco nuevo en tu colección!"}</span>
+        <span>${resultado.dup ? `Ya lo tenías: te devolvemos ${fmt(reembolsoDe(resultado.id))} ${MONEDA}` : "¡Taco nuevo en tu colección!"}</span>
       </div>`;
     }
     return `
@@ -73,9 +74,9 @@ export function crearMenuPool(ctx, host) {
         <div class="jg-pl-cofre-img${ocupado ? " abre" : ""}" aria-hidden="true">🎁</div>
         <div class="jg-pl-cofre-d">
           <b>Cofre de tacos</b>
-          <span>${fmt(PRECIO_COFRE)} 🪙 · te quedan ${e.listo ? fmt(e.saldo) : "…"} 🪙</span>
-          <button type="button" class="jg-btn jg-btn-prim jg-pl-abrir" data-abre ${puede ? "" : "disabled"}>${ocupado ? "Abriendo…" : `Abrir cofre · ${fmt(PRECIO_COFRE)} 🪙`}</button>
-          ${!e.listo ? `<small>Cargando tus monedas…</small>` : e.parada ? `<small>Tu cuenta de monedas está detenida por un gasto sin saldo.</small>` : e.saldo < PRECIO_COFRE ? `<small>Te faltan ${fmt(PRECIO_COFRE - e.saldo)} 🪙: juega partidas, logros y la recompensa diaria.</small>` : ""}
+          <span>${fmt(PRECIO_COFRE)} ${MONEDA} · te quedan ${e.listo ? fmt(e.saldo) : "…"} ${MONEDA}</span>
+          <button type="button" class="jg-btn jg-btn-prim jg-pl-abrir" data-abre ${puede ? "" : "disabled"}>${ocupado ? "Abriendo…" : `Abrir cofre · ${fmt(PRECIO_COFRE)} ${MONEDA}`}</button>
+          ${!e.listo ? `<small>Cargando tus monedas…</small>` : e.parada ? `<small>Tu cuenta de monedas está detenida por un gasto sin saldo.</small>` : e.saldo < PRECIO_COFRE ? `<small>Te faltan ${fmt(PRECIO_COFRE - e.saldo)} ${MONEDA}: juega partidas, logros y la recompensa diaria.</small>` : ""}
         </div>
       </div>
       ${error ? `<div class="jg-pl-err">${esc(error)}</div>` : ""}

@@ -1,5 +1,5 @@
 /* ============================================================
-   Monedas 🪙 — puras y verificables en Node.
+   Monedas — puras y verificables en Node.
 
    El saldo **no se guarda en ningún sitio**: se calcula, como los logros
    de la fila, a partir de lo que ya está escrito y que las reglas ya

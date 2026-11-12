@@ -116,6 +116,9 @@
     c.clearRect(0, 0, canvas.width, canvas.height);
     PD.drawEnemyIcon(c, type, canvas.width, 0.3);
   }
+  /* La moneda dibujada de Juegos (monedas-vista.js, `MONEDA`), copiada: el
+     emoji salía como un cuadrito en algunos equipos. */
+  const MONEDA = '<svg viewBox="0 0 20 20" width="1em" height="1em" style="vertical-align:-.15em" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
   function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
 
   function show(id) {
@@ -236,15 +239,15 @@
       const prueba = enPrueba(li);
       if (li === PUB) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && !L.era).length;
-        grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día; cada uno se desbloquea llegando a la ronda ' + PD.UNLOCK_ROUND + ' del anterior: 🪙 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: 🪙 100 por ronda en cada uno'}</div>`));
+        grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día; cada uno se desbloquea llegando a la ronda ' + PD.UNLOCK_ROUND + ' del anterior: ' + MONEDA + ' 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: ' + MONEDA + ' 100 por ronda en cada uno'}</div>`));
       }
       if (L.era === 4 && PD.LEVELS[li - 1].era !== 4) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 4).length;
-        grid.appendChild(el(`<div class="lvl-sep era3 era4"><b>Cuarta Era · La Era de los Titanes</b> · <b>cinco héroes nuevos</b> para elegir, una <b>defensa nueva</b> por reino, <b>jefes</b> nunca vistos y, desde la ronda 60, <b>eventos de titanes</b> más seguidos y con más enemigos grandes. ${quedan ? 'Un reino nuevo cada día desde el 1 de noviembre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'La prueba final'} · 🪙 100 por ronda</div>`));
+        grid.appendChild(el(`<div class="lvl-sep era3 era4"><b>Cuarta Era · La Era de los Titanes</b> · <b>cinco héroes nuevos</b> para elegir, una <b>defensa nueva</b> por reino, <b>jefes</b> nunca vistos y, desde la ronda 60, <b>eventos de titanes</b> más seguidos y con más enemigos grandes. ${quedan ? 'Un reino nuevo cada día desde el 1 de noviembre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'La prueba final'} · ${MONEDA} 100 por ronda</div>`));
       }
       if (L.era === 3 && PD.LEVELS[li - 1].era !== 3) {
         const quedan = PD.LEVELS.filter((L, i) => enPrueba(i) && L.era === 3).length;
-        grid.appendChild(el(`<div class="lvl-sep era3"><b>Tercera Era · La Era del Caos</b> · más difícil: <b>pactos</b> cada diez rondas, <b>eventos</b> que cambian la ronda, el <b>Poder del Reino</b> y el <b>héroe que elijas</b>. ${quedan ? 'Un reino nuevo cada día desde el 27 de octubre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'Cinco reinos de pesadilla'} · 🪙 100 por ronda</div>`));
+        grid.appendChild(el(`<div class="lvl-sep era3"><b>Tercera Era · La Era del Caos</b> · más difícil: <b>pactos</b> cada diez rondas, <b>eventos</b> que cambian la ronda, el <b>Poder del Reino</b> y el <b>héroe que elijas</b>. ${quedan ? 'Un reino nuevo cada día desde el 27 de octubre' + (admin ? ' · los que aún no abren, solo para administradores' : '') : 'Cinco reinos de pesadilla'} · ${MONEDA} 100 por ronda</div>`));
       }
       // todos los reinos piden la ronda 50 del anterior (los de la segunda y la tercera era
       // también: antes bastaba con que llegara su día)
@@ -265,11 +268,11 @@
           ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era >= 3 || PD.TOWERS[id].realm < PUB)).length} de las ${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm !== undefined && PD.TOWERS[id].realm <= (L.era >= 3 ? li : PUB - 1)).length} de reino</div>` : ''}
           <div class="meta">
             <span class="stars">${'★'.repeat(L.stars)}${'☆'.repeat(5 - L.stars)}</span>
-            <span>❤ ${L.lives}</span><span>🪙 ${L.cash}</span>
+            <span>❤ ${L.lives}</span><span>${MONEDA} ${L.cash}</span>
             ${prueba ? '<span>Jefe: <b>' + PD.ENEMIES[L.boss].name + '</b></span>' : `<span>Récord: <b>${best}</b>/100</span>
             <span class="medals"><span class="medal m50 ${best >= 50 ? 'got' : ''}">R50</span><span class="medal m100 ${best >= 100 ? 'got' : ''}">🏆 R100</span></span>`}
           </div>
-          ${EN_LA_NUBE && !prueba ? `<div class="lc-coins" title="Cada ronda nueva de tu récord paga ${monedasRonda(li)} monedas de Juegos, una sola vez.">🪙 ${monedasRonda(li)} por ronda · ${nube[li] === null ? '…' : fmt(Math.min(100, nube[li]) * monedasRonda(li))} de ${fmt(100 * monedasRonda(li))} ganadas</div>` : ''}
+          ${EN_LA_NUBE && !prueba ? `<div class="lc-coins" title="Cada ronda nueva de tu récord paga ${monedasRonda(li)} monedas de Juegos, una sola vez.">${MONEDA} ${monedasRonda(li)} por ronda · ${nube[li] === null ? '…' : fmt(Math.min(100, nube[li]) * monedasRonda(li))} de ${fmt(100 * monedasRonda(li))} ganadas</div>` : ''}
           <div class="lc-actions"></div>
         </div></div>`);
       card.querySelector('canvas').getContext('2d').drawImage(PD.levelThumb(li, 500, 320), 0, 0);
@@ -1510,7 +1513,7 @@
     const antes = Math.max(nube[li] || 0, enviada[li]);
     if (ronda <= antes || (save.pend[li] && save.pend[li].r >= ronda)) return;
     save.pend[li] = { r: ronda, t: rec.tiempo(), p: rec.prueba() };
-    toast(`<b>¡Récord del reino: ronda ${ronda}!</b>Juegos la comprueba y te paga 🪙 ${fmt((ronda - antes) * monedasRonda(li))}`, 'good', null, 3200);
+    toast(`<b>¡Récord del reino: ronda ${ronda}!</b>Juegos la comprueba y te paga ${MONEDA} ${fmt((ronda - antes) * monedasRonda(li))}`, 'good', null, 3200);
   }
   // Manda a Juegos el récord anotado del reino, si la tabla todavía no lo tiene.
   function manda(li) {
