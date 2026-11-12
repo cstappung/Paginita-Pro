@@ -487,7 +487,7 @@ export const defensa=etapa=>{
   cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#1c2238"/>`;
   cuerpo+=rect(40,70,400,34,'#242b46','#465773',8)+rect(40,70,240,34,C.verde,'none',8)+rect(280,70,40,34,C.oro,'none',0);
   cuerpo+=txt(40,58,'Récord del Prado',16,C.blanco)+txt(280,130,'60',16,C.verde,'middle')+txt(320,130,'70',16,C.oro,'middle');
-  cuerpo+=txt(240,180,'10 rondas nuevas × 20 = +200 🪙',20,C.oro,'middle')+txt(240,212,'Las primeras 60 ya se pagaron',15,C.gris,'middle');
+  cuerpo+=txt(240,180,'10 rondas nuevas × 20 = +200 monedas',20,C.oro,'middle')+txt(240,212,'Las primeras 60 ya se pagaron',15,C.gris,'middle');
  }
  return svg(nombre,cuerpo);
 };

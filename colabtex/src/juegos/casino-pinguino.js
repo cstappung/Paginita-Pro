@@ -9,7 +9,7 @@
    tambalea en el aire si la respuesta tarda, para que la red no se note. */
 import { PINGUINO, multPinguino, resuelvePinguino, APUESTA_MIN, pagoDe, formatoPago } from "./casino-motor.js";
 import { formatoMonedas } from "./monedas.js";
-import { MONEDA } from "./monedas-vista.js";
+import { MONEDA, pintaMoneda } from "./monedas-vista.js";
 
 const lee = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch (e) { return def; } };
 const guarda = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) {} };
@@ -419,7 +419,7 @@ export function montarPinguino(h, api) {
       flotan = flotan.filter(f => (f.t += dt) < 2);
       for (const f of flotan) {
         g.globalAlpha = Math.min(1, 2 * (2 - f.t)); g.font = "800 28px system-ui, sans-serif"; g.textAlign = "center";
-        g.fillStyle = "#ffd54a"; g.shadowColor = "#0008"; g.shadowBlur = 8; g.fillText(f.txt, f.x - cam, f.y - f.t * 50); g.shadowBlur = 0;
+        g.fillStyle = "#ffd54a"; g.shadowColor = "#0008"; g.shadowBlur = 8; const fx = f.x - cam - 14, fy = f.y - f.t * 50; g.fillText(f.txt, fx, fy); g.shadowBlur = 0; pintaMoneda(g, fx + g.measureText(f.txt).width / 2 + 17, fy - 10, 12);
       }
       g.globalAlpha = 1;
       // el multiplicador de ahora, arriba
@@ -445,7 +445,7 @@ export function montarPinguino(h, api) {
       celebra(pago) {
         fiesta = { t0: performance.now() / 1000 };
         const x = tx(n) - cam, y = agua() - 70 * esc();
-        flotan.push({ x: tx(n), y, t: 0, txt: "+" + formatoPago(pago) + " 🪙" });
+        flotan.push({ x: tx(n), y, t: 0, txt: "+" + formatoPago(pago) });
         for (let i = 0; i < 40; i++) { const a = -Math.PI * (0.1 + 0.8 * Math.random()), v = 120 + Math.random() * 220; parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, vida: 1 + Math.random() * 0.8, r: 3 + Math.random() * 3, c: ["#ffd54a", "#f5b819", "#fff2a8"][i % 3], g: 420, moneda: true }); }
         suena("cobra", pago >= 2000 ? 5 : pago >= 500 ? 4 : 2);
       },

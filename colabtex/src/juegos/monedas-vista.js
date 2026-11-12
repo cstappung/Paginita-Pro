@@ -16,6 +16,18 @@ import { nombreHtml } from "./tintas.js";
 
 /* La moneda se dibuja: el emoji de la moneda es de 2020 y en Windows 10 y en
    navegadores viejos sale como un cuadro vacío. */
+/* La misma moneda dibujada en un canvas, centrada en (x, y) con radio r:
+   para los textos que suben en el casino (un canvas no pinta un SVG en
+   línea, y el emoji 🪙 sale como un cuadrito en algunos equipos). */
+export function pintaMoneda(g, x, y, r) {
+  const k = r / 9;
+  g.save();
+  g.beginPath(); g.arc(x, y, 9 * k, 0, Math.PI * 2); g.fillStyle = "#f5b819"; g.fill(); g.lineWidth = 1.6 * k; g.strokeStyle = "#9a6a08"; g.stroke();
+  g.beginPath(); g.arc(x, y, 5.6 * k, 0, Math.PI * 2); g.fillStyle = "#ffd54a"; g.fill(); g.lineWidth = 1.2 * k; g.strokeStyle = "#c98d10"; g.stroke();
+  g.lineCap = "round"; g.lineWidth = 1.4 * k; g.strokeStyle = "#9a6a08";
+  g.beginPath(); g.moveTo(x - 1.4 * k, y - 2.8 * k); g.lineTo(x - 1.4 * k, y + 2.8 * k); g.moveTo(x + 1.4 * k, y - 2.8 * k); g.lineTo(x + 1.4 * k, y + 2.8 * k); g.stroke();
+  g.restore();
+}
 export const MONEDA = '<svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
@@ -81,7 +93,7 @@ function movimientosHtml(movs) {
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
     fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], caza: ["🎯", f.n < 0 ? "Fichaste un récord" : /^cobrada /.test(f.d) ? "Cobraste una cacería de récord" : "Te volvió una cacería de récord"], superChat: ["💬", "Super chat en el chat general"], pkPase: ["👑", "Pro Kingdoms · Pase del Reino"], plantilla: ["🏆", `Premio de desafío de plantilla${f.d ? ` · ${f.d}` : ""}`], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
     venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `${HALLOWEEN[f.d] ? "Tienda de Halloween" : "Tienda del perfil"} · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${((TIENDA[f.d] === "marco" ? marcoDe(f.d) : fondoDe(f.d)) || {}).n || f.d}»`]
-  }[f.c] || ["🪙", f.c]);
+  }[f.c] || [MONEDA, f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   return `<ul class="jg-mo-movs">${filas.map(f => {
     const [i, t] = f.casino ? ["🎰", `${f.ap ? `${f.ap} ${f.ap === 1 ? "apuesta" : "apuestas"} en ${NOMBRES_CASINO[f.d] || "el casino"}` : `Premio en ${NOMBRES_CASINO[f.d] || "el casino"}`}${f.ap && f.pr ? ` · premios +${formatoMonedas(f.pr)}` : ""}`] : texto(f);

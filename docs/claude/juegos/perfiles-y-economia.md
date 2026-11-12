@@ -584,3 +584,10 @@ The Casino tab bets coins: a bet is a spend (`ca`, through `paga`) and a
 payout is income (`cp`, in `premios`, summed in hundredths and floored once).
 Saldo = ganado + cobradas + premios − gastadas. Details:
 `docs/claude/juegos/casino.md`.
+
+**Never write the 🪙 emoji.** It renders as an empty box on some systems
+(Windows 10). In HTML use `MONEDA` (the SVG in `monedas-vista.js`); in a
+canvas, `pintaMoneda(g, x, y, r)`; in escaped text (`esc()`, `textContent`,
+SVG `<text>`) say «monedas»; in a game inside an iframe, a copy of the SVG
+with its own `width/height="1em"` (PRO HERO `results.js`, PRO DEFENDER
+`main.js`) or the `.mo` CSS class (Sudoku `resumen.html`).

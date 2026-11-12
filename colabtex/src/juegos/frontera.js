@@ -40,6 +40,7 @@ import { misEquipos, abreEquipos } from "./pokemon/equipos.js";
 import { htmlRival, skinRival, htmlEntrenador } from "./pokemon/entrenadores.js";
 import { suena } from "./sonido.js";
 import { verificaClub, PRUEBA_MAX } from "./solo/verifica.js";
+import { MONEDA } from "./monedas-vista.js";   // la moneda dibujada: el emoji 🪙 sale como un cuadrito en algunos equipos
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const CLAVE = uid => "frontera." + uid;
@@ -377,7 +378,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
         ${r && !r.h && !invitado ? `<small class="jg-nota">Racha empezada antes de que la Frontera guardara sus combates: se puede seguir, pero ya no sube récords. Sus victorias sí suman al total.</small>` : ""}
       </article>`;
     }).join("");
-    const filas = [1, 7, 8, 14, 21, 35, 49, 70].map(n => `<tr><td>${n}</td><td>${n % 7 === 0 ? "★ " : ""}${F.serieDe(n) + 1}</td><td>+${F.monedasCombate(n)} 🪙</td></tr>`).join("");
+    const filas = [1, 7, 8, 14, 21, 35, 49, 70].map(n => `<tr><td>${n}</td><td>${n % 7 === 0 ? "★ " : ""}${F.serieDe(n) + 1}</td><td>+${F.monedasCombate(n)} ${MONEDA}</td></tr>`).join("");
     return `${cabecera("Elige una instalación", "Tres Pokémon, siete combates por serie, y cada serie el rival aprieta más.")}
       <div class="jg-fr-nivel" role="radiogroup" aria-label="Nivel">${Object.entries(F.NIVELES).map(([n, t]) =>
         `<button class="btn2${sel.nivel === n ? " on" : ""}" data-x="nivel" data-n="${n}" role="radio" aria-checked="${sel.nivel === n}">${esc(t)}</button>`).join("")}</div>
@@ -387,7 +388,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
         <div><h4>Tu Frontera</h4><p><b>${datos.victorias}</b> combates ganados en total.</p>
           <p class="jg-nota">${invitado ? "Modo invitado: tus rachas valen en esta visita, pero no se guardan ni entran en la Clasificación, y no pagan monedas. Inicia sesión para que cuenten." : "Cada racha y el total de victorias van a la Clasificación (Juegos individuales → Frontera Batalla)."}</p>
           ${sinReglas ? `<p class="jg-fr-aviso">⚠ La clasificación rechazó tu marca (PERMISSION_DENIED): faltan publicar las reglas de Firebase con la Frontera. Queda guardada aquí y se sube sola en cuanto se publiquen.</p>` : Object.keys(datos.pend).length ? `<p class="jg-nota">Subiendo tus marcas a la clasificación…</p>` : ""}</div>
-        <div><h4>Monedas 🪙</h4><p class="jg-nota">Cada victoria paga 3. Cuando superas tu récord de racha, cada combate nuevo paga lo de la tabla (el séptimo de cada serie, el del rival fuerte, paga 10 más).</p>
+        <div><h4>Monedas ${MONEDA}</h4><p class="jg-nota">Cada victoria paga 3. Cuando superas tu récord de racha, cada combate nuevo paga lo de la tabla (el séptimo de cada serie, el del rival fuerte, paga 10 más).</p>
           <table class="jg-fr-tabla"><thead><tr><th>Combate</th><th>Serie</th><th>Paga</th></tr></thead><tbody>${filas}</tbody></table></div>
       </section>`;
   }
@@ -453,7 +454,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
       return `${cabecera(I.n + " · " + F.NIVELES[sel.nivel], "")}
         <div class="jg-fr-res gana"><div class="jg-fr-res-ico">🏆</div><h3>¡Ganaste a ${esc(x.rival)}!</h3>
           <p>Racha: <b>${x.n}</b>${x.record ? " · ¡nuevo récord!" : ""}</p>
-          <p class="jg-fr-monedas">+${x.monedas} 🪙 <small>(${x.detalle})</small></p>
+          <p class="jg-fr-monedas">+${x.monedas} ${MONEDA} <small>(${x.detalle})</small></p>
           ${x.simbolo ? `<p class="jg-fr-aviso">🥇 ¡Símbolo de ${x.simbolo} de la ${esc(I.n)}!</p>` : ""}
           ${x.finSerie ? `<p class="jg-nota">Serie ${F.serieDe(x.n) + 1} completada. La próxima es más dura.</p>` : ""}
           ${avisoFr ? `<p class="jg-fr-aviso">⚠ ${esc(avisoFr)}</p>` : ""}</div>

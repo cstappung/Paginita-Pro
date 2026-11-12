@@ -50,6 +50,7 @@ import { nombreCategoria } from "./perfil-tarjeta.js";
 import { monedasDe, formatoMonedas, copiasDe, economia } from "./monedas.js";
 import { hacerCierre, verificaCierre, conArchivo, enVivo, MARGEN_CIERRE, AUTO_CIERRE_DIAS, PRIMER_CIERRE } from "./cierre.js";
 import { MOTOR, SERIE1 } from "./prodrop-cartas.js";
+import { MONEDA } from "./monedas-vista.js";   // la moneda dibujada: el emoji 🪙 sale como un cuadrito en algunos equipos
 
 // Escapa texto para meterlo en HTML sin que nadie cuele etiquetas
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -380,7 +381,7 @@ export function crearAdmin(ctx) {
     if (cuenta) {
       const m = monedasDe(cuenta, datos), aj = listaAjustes(datos.ajustes, cuenta);
       ficha = `<div class="jg-adm-caja">
-        <p>Saldo: <b>${formatoMonedas(m.saldo)} 🪙</b> · ganadas ${formatoMonedas(m.total)} · gastadas ${formatoMonedas(m.gastadas)}${m.parada ? ` · <span class="jg-adm-mal">parada (le faltan ${formatoMonedas(m.falta)})</span>` : ""}</p>
+        <p>Saldo: <b>${formatoMonedas(m.saldo)} ${MONEDA}</b> · ganadas ${formatoMonedas(m.total)} · gastadas ${formatoMonedas(m.gastadas)}${m.parada ? ` · <span class="jg-adm-mal">parada (le faltan ${formatoMonedas(m.falta)})</span>` : ""}</p>
         <p>Ajustes acumulados: <b>${formatoMonedas(sumaAjustes(datos.ajustes, cuenta))}</b></p>
         <form class="jg-adm-form" data-form="ajuste">
           <label>Cantidad (negativa para restar) <input id="admCant" class="inp" type="number" step="1" min="-${AJUSTE_MAX}" max="${AJUSTE_MAX}" required></label>
@@ -433,7 +434,7 @@ export function crearAdmin(ctx) {
              <button type="button" class="btn" data-escribe-cierre>Cerrar y archivar</button>`}</div>`;
     }
     const frenos = prep && prep.c && prep.c.frenos && prep.c.frenos.length ? `<div class="jg-adm-caja"><p>Las cuentas paradas no se cierran: el cierre llega hasta antes de su primer gasto sin fondos. Para destrabarlo, súmale lo que le falta (pestaña Monedas):</p>
-      <ul class="jg-adm-hist">${prep.c.frenos.map(f => `<li><button type="button" class="btn2" data-cuenta-monedas="${esc(f.uid)}" translate="no">${esc(nombre(f.uid))}</button> parada desde ${fecha(f.desde)} · le faltan ${formatoMonedas(f.falta)} 🪙</li>`).join("")}</ul></div>` : "";
+      <ul class="jg-adm-hist">${prep.c.frenos.map(f => `<li><button type="button" class="btn2" data-cuenta-monedas="${esc(f.uid)}" translate="no">${esc(nombre(f.uid))}</button> parada desde ${fecha(f.desde)} · le faltan ${formatoMonedas(f.falta)} ${MONEDA}</li>`).join("")}</ul></div>` : "";
     let r = "";
     if (recalculo && recalculo.cargando) r = `<p class="jg-adm-nota">Bajando el archivo y rehaciendo la historia entera…</p>`;
     else if (recalculo && recalculo.error) r = `<p class="jg-adm-mal">${esc(recalculo.error)}</p>`;

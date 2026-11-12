@@ -442,7 +442,7 @@ const SOLO = {
     { id: "racha3", n: "Tres al hilo", d: "Llega a una racha de 3 días.", i: "🔥", m: "Diario", s: d => cat(/-racha$/)(d) && d.puntos >= 3 },
     { id: "racha7", n: "Semana de nueve en nueve", d: "Llega a una racha de 7 días.", i: "📅", m: "Diario", s: d => cat(/-racha$/)(d) && d.puntos >= 7 },
     { id: "racha30", n: "Un mes de cuadrículas", d: "Llega a una racha de 30 días.", i: "🗓️", m: "Diario", s: d => cat(/-racha$/)(d) && d.puntos >= 30 },
-    { id: "facil", n: "Insert coin", d: "Resuelve un clásico en Fácil.", i: "🪙", m: "Clásico", s: cat(/-facil$/) },
+    { id: "facil", n: "Insert coin", d: "Resuelve un clásico en Fácil.", i: "💰", m: "Clásico", s: cat(/-facil$/) },
     { id: "experto", n: "Nivel experto", d: "Resuelve un clásico en Experto.", i: "🧠", m: "Clásico", s: cat(/-experto$/) },
     { id: "medio5", n: "Contra el reloj", d: "Resuelve un clásico Medio en menos de 5 min.", i: "⏱️", m: "Clásico", s: d => cat(/-medio$/)(d) && d.tiempo < 300000 },
     { id: "dificil10", n: "Sangre fría", d: "Resuelve un clásico Difícil en menos de 10 min.", i: "🧊", m: "Clásico", s: d => cat(/-dificil$/)(d) && d.tiempo < 600000 },
@@ -563,7 +563,7 @@ const SOLO = {
     { id: "p25k", n: "Neón encendido", d: "Haz 25 000 puntos en una partida.", i: "💡", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 25000 },
     { id: "p50k", n: "Rey del laberinto", d: "Haz 50 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 50000 },
     { id: "p100k", n: "Leyenda arcade", d: "Haz 100 000 puntos en una partida.", i: "🕹️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 100000 },
-    { id: "p200k", n: "Insert coin", d: "Haz 200 000 puntos en una partida.", i: "🪙", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 200000 },
+    { id: "p200k", n: "Insert coin", d: "Haz 200 000 puntos en una partida.", i: "💰", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 200000 },
     { id: "t3", n: "Escurridizo", d: "Tu partida récord dura 3 minutos de juego.", i: "⏱️", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 180000 },
     { id: "t6", n: "Glitch te conoce", d: "Tu partida récord dura 6 minutos de juego.", i: "📺", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 360000 },
     { id: "t10", n: "Maratón de neón", d: "Tu partida récord dura 10 minutos de juego.", i: "🌃", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 600000 }
