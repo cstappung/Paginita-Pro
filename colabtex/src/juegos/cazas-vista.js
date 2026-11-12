@@ -305,7 +305,7 @@ export function crearCazas(ctx) {
       <p class="jg-cz-nota">${cazadores.size} ${cazadores.size === 1 ? "cazador puso" : "cazadores pusieron"} precio a tu cabeza. Si alguien te supera, se lo lleva.
         Si te superas tú, te quedas con la mitad.</p>
       <p class="jg-cz-meta">Supera <b translate="no">${esc(marcaDe(mias[0]))}</b></p>
-      <div class="jg-cz-botones"><a class="btn jg-cz-defiende" href="${rutaDeCategoria(mias[0].c)}">▶ Jugar</a>
+      <div class="jg-cz-botones"><a class="btn jg-cz-defiende" href="${rutaDeCategoria(mias[0].c)}">▶ Jugar${nv.n >= 5 ? `<small> · gana ${fmt(Math.floor(pozo / 2))}</small>` : ""}</a>
         <button class="btn btn-ghost" type="button" data-cz-cierra>Ahora no</button></div>
     </div>`;
   }
@@ -394,7 +394,7 @@ export function crearCazas(ctx) {
       : a.tipo === "recuperada" ? [`↩️ Cacería recuperada`, `${nombreBtn(a.uid, a.c)} superó él mismo el récord de ${nombreBtn(a.q, a.c)} en ${tabla} y recuperó lo que había puesto.`]
       : a.tipo === "defendida" ? [`🛡️ Récord defendido`, `${nombreBtn(a.q, a.c)} se superó a sí mismo en ${tabla} y se quedó con la mitad.`]
       : [`🏆 Récord propio roto`, `${nombreBtn(a.q, a.c)} rompió su propio récord en ${tabla} y recuperó lo puesto.`];
-    const ir = a.tipo === "pone" ? `<a class="jg-cz-av-ir" href="${rutaDeCategoria(a.c)}">▶ Jugar</a>` : "";
+    const ir = a.tipo === "pone" ? `<a class="jg-cz-av-ir" href="${rutaDeCategoria(a.c)}">▶ Jugar${nv.n >= 5 && a.q !== (ctx.usuario() || {}).uid ? `<small> · gana ${fmt(a.p)}</small>` : ""}</a>` : "";
     const alerta = nv.n >= 4 ? banda(a.tipo === "pone" ? ALERTA[nv.n] : a.tipo === "cobrada" ? "💥 RECOMPENSA COBRADA" : "🛡️ RÉCORD DEFENDIDO") : "";
     return { cab, texto, ir, alerta };
   }

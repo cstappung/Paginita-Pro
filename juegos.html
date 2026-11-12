@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202611121813"></script>
+<script src="i18n.js?v=202611121819"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -6276,6 +6276,7 @@ html.jg-cg-flota .jg-cz-riel,.jg-cg.invitado .jg-cz-riel{display:none!important}
 /* La banda de alerta (épica y legendaria): texto que corre entre rayas de peligro. */
 .jg-cz-banda{position:relative;margin:0;overflow:hidden;contain:inline-size;white-space:nowrap;background:#07060f;color:#fff;font:900 10px/20px 'IBM Plex Sans',sans-serif;letter-spacing:2.5px;text-transform:uppercase;text-shadow:0 0 6px var(--c1,#ff3d6e),0 0 12px var(--c1,#ff3d6e);border-block:5px solid transparent;border-image:repeating-linear-gradient(-45deg,var(--cb,var(--c1,#ff3d6e)) 0 8px,#07060f 8px 16px) 5}
 .jg-cz-banda span{display:inline-block;animation:jgCzMarquesina 14s linear infinite}
+.n5>.jg-cz-banda,.n5 .jg-cz-poster>.jg-cz-banda,.jg-cz[data-nivel="5"]>.jg-cz-banda{border:0;border-image:none;line-height:26px;font-size:11px;color:#2a1500;text-shadow:0 1px 0 #fff6;background:linear-gradient(110deg,transparent 40%,#ffffffb0 50%,transparent 60%) 0 0/250% 100%,linear-gradient(180deg,#fff6c2,#ffd84d 40%,#e8a400 62%,#ffcf33);animation:jgCzBarre 2.4s linear infinite;box-shadow:0 2px 10px #ffc40088}
 .jg-cz>.jg-cz-banda{--c1:#ff3d6e;--cb:#ff1f1f}
 .jg-cz[data-nivel="5"]>.jg-cz-banda{--c1:#ffc800;--cb:#ffc800}
 @keyframes jgCzMarquesina{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
@@ -6439,14 +6440,14 @@ html .jg-cz-modal.jg-cz-modal{width:480px;background:radial-gradient(130% 60% at
 /* ===== Lo legendario, más legendario =====
    El «▶ Jugar» de oro que late, la fila destacada del cartel, los destellos
    ✦ que titilan, el velo dorado del anuncio y las monedas a todo brillo. */
-.jg-cz-fila.n5 .jg-cz-ir,.jg-cz-av.n5 .jg-cz-av-ir,.jg-cz-anuncio.n5 .jg-cz-av-ir,.jg-cz-capa.n5 .jg-cz-defiende.jg-cz-defiende,.jg-cz-m-pub.n5:not(:disabled){position:relative;overflow:hidden;isolation:isolate;background:linear-gradient(180deg,#fff6c2 0%,#ffd84d 35%,#e8a400 60%,#ffcf33 100%)!important;color:#2a1500!important;font-weight:900;letter-spacing:.6px;text-transform:uppercase;border:1px solid #fff2a8;box-shadow:0 0 0 0 #ffc800aa,0 0 22px #ffc800aa,inset 0 1px 0 #fffbe6;animation:jgCzLatido 1.3s ease-in-out infinite}
+.jg-cz-fila.n5 .jg-cz-ir,.jg-cz-av.n5 .jg-cz-av-ir,.jg-cz-anuncio.n5 .jg-cz-av-ir,.jg-cz-capa.n5 .jg-cz-defiende.jg-cz-defiende,.jg-cz-m-pub.n5:not(:disabled){position:relative;overflow:hidden;isolation:isolate;background:linear-gradient(180deg,#fff6c2 0%,#ffd84d 35%,#e8a400 60%,#ffcf33 100%)!important;color:#2a1500!important;font-weight:900;letter-spacing:.6px;text-transform:uppercase;border:1px solid #fff2a8;box-shadow:0 0 18px #ffc800aa,inset 0 1px 0 #fffbe6;animation:jgCzLatido 1.3s ease-in-out infinite}
 .jg-cz-fila.n5 .jg-cz-ir::after,.jg-cz-av.n5 .jg-cz-av-ir::after,.jg-cz-anuncio.n5 .jg-cz-av-ir::after,.jg-cz-capa.n5 .jg-cz-defiende::after,.jg-cz-m-pub.n5:not(:disabled)::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(110deg,transparent 35%,#ffffffcc 50%,transparent 65%);background-size:250% 100%;animation:jgCzBarre 1.8s linear infinite}
-@keyframes jgCzLatido{0%,100%{transform:scale(1);box-shadow:0 0 0 0 #ffc800aa,0 0 22px #ffc800aa,inset 0 1px 0 #fffbe6}50%{transform:scale(1.07);box-shadow:0 0 0 10px #ffc80000,0 0 34px #ffd84dee,inset 0 1px 0 #fffbe6}}
+@keyframes jgCzLatido{0%,100%{transform:scale(1);box-shadow:0 0 18px #ffc800aa,inset 0 1px 0 #fffbe6}50%{transform:scale(1.07);box-shadow:0 0 36px #ffd84d,0 0 60px #ffb00088,inset 0 1px 0 #fffbe6}}
 .jg-cz-fila.n5 .jg-cz-ir{font-size:12px;padding:7px 13px}
 .jg-cz-av.n5 .jg-cz-av-ir{font-size:13px;padding:9px 18px;margin-top:10px}
 .jg-cz-capa.n5 .jg-cz-defiende.jg-cz-defiende{min-height:52px;padding:0 30px;font-size:17px;border-radius:14px}
 .jg-cz-m-pub.n5:not(:disabled){font-size:16px;animation-name:jgCzLatidoSuave}
-@keyframes jgCzLatidoSuave{50%{box-shadow:0 0 0 6px #ffc80033,0 0 34px #ffd84dee,inset 0 1px 0 #fffbe6}}
+@keyframes jgCzLatidoSuave{50%{box-shadow:0 0 34px #ffd84d,inset 0 1px 0 #fffbe6}}
 .jg-cz-m-pub.n4:not(:disabled):not(.confirma){background:linear-gradient(135deg,#ff1f4b,#ff7a1c)}
 .jg-cz-m-pub.n3:not(:disabled):not(.confirma){background:linear-gradient(135deg,#d946ef,#7c3aed)}
 .jg-cz-m-pub.n2:not(:disabled):not(.confirma){background:linear-gradient(135deg,#10b981,#65a30d)}
@@ -6467,11 +6468,12 @@ html .jg-cz-modal.jg-cz-modal{width:480px;background:radial-gradient(130% 60% at
 .jg-cz-fila>.jg-cz-destello,.jg-cz-av>.jg-cz-destello{z-index:-1}
 .jg-cz-poster>.jg-cz-destello{z-index:2}
 /* El velo del anuncio legendario: la página se apaga con luz dorada. */
-.jg-cz-velo{position:fixed;inset:0;z-index:86;background:radial-gradient(70% 55% at 50% 12%,#ffc40040,transparent 70%),#05040be0;backdrop-filter:blur(3px) saturate(.6);cursor:pointer}
+.jg-cz-velo{position:fixed;inset:0;z-index:86;background:radial-gradient(70% 55% at 50% 12%,#ffc40038,transparent 70%),radial-gradient(120% 100% at 50% 50%,#1e0b45ee,#05040bf5);backdrop-filter:blur(3px);cursor:pointer}
 .jg-cz-velo.sale{animation:jgCzSale .42s ease-in forwards}
 .jg-cz-lluvia{z-index:87}
 .jg-cz-capa>.jg-cz-lluvia{position:absolute;z-index:0}
-.jg-cz-moneda{filter:drop-shadow(0 0 6px #ffc800cc) saturate(1.3) brightness(1.1)}
+.jg-cz-moneda{filter:drop-shadow(0 0 6px #ffc800cc) saturate(1.4) brightness(1.15)}
+.jg-cz-defiende small,.jg-cz-av-ir small{font-size:.82em;opacity:.85}
 .jg-cz-anuncio.n5{top:22px;width:min(860px,calc(100vw - 20px));padding:16px 20px 18px;gap:16px;border-width:3px;border-color:#ffc800;box-shadow:0 0 0 6px #ffc80026,0 0 70px #ffc800aa,0 0 140px #ff8a0055,0 24px 60px #000c}
 .jg-cz-anuncio.n5>.jg-cz-banda{margin:-16px -20px 2px}
 .jg-cz-anuncio.n5 .jg-cz-an-ico{font-size:58px;filter:drop-shadow(0 0 16px #ffc800)}
@@ -7437,6 +7439,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202611121813"></script>
+<script src="juegos-app.js?v=202611121819"></script>
 </body>
 </html>
