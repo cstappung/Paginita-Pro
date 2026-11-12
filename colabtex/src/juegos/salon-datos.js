@@ -380,3 +380,10 @@ export const MOTIVO_CUENTA = {
 // Mario Kart abrió sus salas en la v2.0 (el dueño, 2026-11-09): para cerrarlas otra vez,
 // `mkw: { solo: "#solo/mkw" }`.
 export const SALAS_EN_OBRA = {};
+
+/* Salas «🧪 Beta» (el dueño, 2026-11-12: «pon el multiplayer en beta»).
+   A diferencia del `beta: true` de un juego del club (beta cerrada: solo lo
+   ven los beta testers), aquí las salas siguen abiertas para todos: solo
+   llevan el cartel en la tarjeta y en la ficha, para que se sepa que todavía
+   pueden fallar. Para quitarlo, se borra la línea del juego. */
+export const SALAS_EN_BETA = { mkw: true };
