@@ -1,0 +1,89 @@
+diff --git a/lib/gx/fifo.hpp b/lib/gx/fifo.hpp
+index 08110dc..5301049 100644
+--- a/lib/gx/fifo.hpp
++++ b/lib/gx/fifo.hpp
+@@ -80,6 +80,11 @@ bool in_display_list();
+ 
+ // Drain the internal FIFO buffer through the command processor
+ void drain();
++#ifdef MKW_W10B
++// W10b (bitácora §284): «el dibujo sin salida». Prendido, GX sigue guardando su estado pero no le pasa trabajo a la
++// tarjeta: drain y process_all tiran lo juntado, y las copias del EFB vuelven sin hacer nada.
++bool sin_salida();
++#endif
+ 
+ // Decode a whole command stream, submitting the staging batch whenever a draw does not fit.
+ // process() alone stops at that draw, so a caller that ignores its count drops the rest.
+diff --git a/lib/gx/fifo.cpp b/lib/gx/fifo.cpp
+index 37065b8..39f75f9 100644
+--- a/lib/gx/fifo.cpp
++++ b/lib/gx/fifo.cpp
+@@ -73,7 +73,21 @@ static void note_drain_wait(uint64_t nanos) noexcept {
+   TracyPlot("aurora: fifoDrainWaitUs", static_cast<int64_t>(nanos / 1000));
+ }
+ 
++#ifdef MKW_W10B
++// W10b (§284): el interruptor del dibujo sin salida (la página lo prende con la carrera andando, ?w10b=1)
++bool sSinSalida = false;
++bool sin_salida() { return sSinSalida; }
++uint64_t sTirados = 0;   // bytes de órdenes de GX tirados sin procesar (para el informe)
++#endif
++
+ void drain() {
++#ifdef MKW_W10B
++  if (sSinSalida) {             // sin salida: ni esperar al ayudante del cuadro ni traducir lo juntado
++    sTirados += detail::sBufferSize;
++    detail::sBufferSize = 0;
++    return;
++  }
++#endif
+   // SEALED, not DONE.
+   const auto waited = aurora::wait_for_frame_worker_sealed();
+   if (waited.count() > 0) UNLIKELY {
+@@ -87,6 +101,9 @@ void drain() {
+ }
+ 
+ void process_all(const uint8_t* data, uint32_t size, bool bigEndian) {
++#ifdef MKW_W10B
++  if (sSinSalida) { sTirados += size; return; }   // una lista de dibujo llamada: se tira entera
++#endif
+   uint32_t consumed = 0;
+   bool retried = false;
+   while (consumed < size) {
+@@ -108,3 +125,12 @@ void clear_buffer() {
+ }
+ 
+ } // namespace aurora::gx::fifo
++
++#ifdef MKW_W10B
++#include <emscripten.h>
++// W10b (§284): si = 1 prende, 0 apaga, -1 solo pregunta; devuelve el estado (bit 0) y los MB tirados (bits 1..)
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_w10b_sin_salida(int si) {
++  if (si >= 0) aurora::gx::fifo::sSinSalida = si != 0;
++  return (aurora::gx::fifo::sSinSalida ? 1u : 0u) | (static_cast<uint32_t>(aurora::gx::fifo::sTirados >> 20) << 1);
++}
++#endif
+diff --git a/lib/dolphin/gx/GXFrameBuffer.cpp b/lib/dolphin/gx/GXFrameBuffer.cpp
+index abd9f6c..bc43381 100644
+--- a/lib/dolphin/gx/GXFrameBuffer.cpp
++++ b/lib/dolphin/gx/GXFrameBuffer.cpp
+@@ -417,6 +446,9 @@ void GXSetDispCopyGamma(GXGamma gamma) {
+ 
+ void GXCopyDisp(void* dest, GXBool clear) {
+   (void)dest;
++#ifdef MKW_W10B
++  if (aurora::gx::fifo::sin_salida()) { aurora::gx::fifo::drain(); return; }   // §284: sin salida, sin copia
++#endif
+   // Finish queued commands before this copy reads live EFB state.
+   if (aurora::gx::fifo::get_buffer_size() != 0) {
+     aurora::gx::fifo::drain();
+@@ -450,6 +482,9 @@ void GXCopyDisp(void* dest, GXBool clear) {
+ }
+ 
+ void GXCopyTex(void* dest, GXBool clear) {
++#ifdef MKW_W10B
++  if (aurora::gx::fifo::sin_salida()) { aurora::gx::fifo::drain(); return; }   // §284: sin salida, sin copia
++#endif
+   // Texture copies must see all earlier draws and state changes.
+   if (aurora::gx::fifo::get_buffer_size() != 0) {
+     aurora::gx::fifo::drain();

@@ -23,9 +23,13 @@
 # Uso:  QUIEN="paso5 (local_…)"; source herramientas/candado.sh; candado_tomar "tanda-X"; …; candado_hueco; …; candado_soltar
 #       Pedir un turno corto a quien lo tiene:  echo "paso6 (local_…): diagnóstico 5 min" > build/medicion.hueco
 #       Ver la fila:  ls build/medicion.fila/ ; cat build/medicion.lock
+#       Dar prioridad a una sesión (lo decide el dueño):  echo "red-estado" > build/medicion.prioridad  (borrar = sin prioridad)
+#       Con prioridad, esa sesión pasa delante de la fila y las demás la esperan mientras tenga número vivo; el candado
+#       tomado no se le quita a nadie (la corrida en curso termina)
 CANDADO=build/medicion.lock
 HUECO=build/medicion.hueco
 FILA=build/medicion.fila
+PRIORIDAD=build/medicion.prioridad   # (2026-11-10, el dueño: «el modelo nuevo tiene prioridad en el lock»)
 TURNO_MAX=${TURNO_MAX:-2700}   # 45 min: con otras en la fila, candado_hueco cede pasado esto
 : "${QUIEN:?QUIEN sin poner (p. ej. QUIEN=\"paso5 (local_57287be5)\")}"
 _mio() { local m; m=$(echo "$QUIEN" | grep -o 'local_[0-9a-f]*' | head -1); [ -n "$m" ] && echo "$m" || echo "$QUIEN" | tr -c 'A-Za-z0-9_' '_'; }
@@ -36,16 +40,24 @@ _fila_viva() { find "$FILA" -maxdepth 1 -type f -mmin -3 2>/dev/null | xargs -r 
 candado_tomar() {   # $1 = qué se mide; $2 = segundos como mucho (3 h)
   local t0=$(date +%s) max=${2:-10800} mio=$(_mio)
   mkdir -p "$FILA"
-  local num="$(date +%s%N)-$mio"            # el número: la hora con nanosegundos ordena la llegada
+  local num="${CANDADO_NUM:-$(date +%s%N)-$mio}"   # el número: la hora con nanosegundos ordena la llegada (CANDADO_NUM = seguir con un número mío que ya estaba en la fila, p. ej. al rehacer la lista de una tanda que esperaba)
   echo "$QUIEN $(date '+%Y-%m-%d %H:%M') $1" > "$FILA/$num"
   while :; do
     touch "$FILA/$num"                        # «sigo esperando»
     local primero=$(_fila_viva | head -1) hueco_mio=0
-    [ -n "$(find "$HUECO" -mmin -15 2>/dev/null)" ] && grep -qF "$mio" "$HUECO" && hueco_mio=1
+    [ -n "$(find "$HUECO" -mmin -15 -size +0 2>/dev/null)" ] && grep -qF "$mio" "$HUECO" && hueco_mio=1
+    # la prioridad del dueño (build/medicion.prioridad = un texto que aparece en el QUIEN de esa sesión): si yo la tengo,
+    # paso delante de la fila; si la tiene otra y está esperando en la fila, la espero aunque mi número sea más viejo
+    local prio=$(head -1 "$PRIORIDAD" 2>/dev/null | tr -d '\r')
+    if [ -n "$prio" ]; then
+      if echo "$QUIEN" | grep -qF -- "$prio"; then primero="$num"
+      elif [ -n "$(_fila_viva | while read f; do grep -lF -- "$prio" "$FILA/$f" 2>/dev/null; done | head -1)" ]; then primero="(espero a $prio)"
+      fi
+    fi
     # el turno es mío si: soy el primero de la fila (o el turno corto pedido es mío: se adelanta a la fila), no hay un
     # hueco pedido por OTRA sesión (de menos de 15 min) y el candado está libre
     if { [ "$primero" = "$num" ] || [ $hueco_mio = 1 ]; } \
-       && ! { [ -n "$(find "$HUECO" -mmin -15 2>/dev/null)" ] && ! grep -qF "$mio" "$HUECO"; } \
+       && ! { [ -n "$(find "$HUECO" -mmin -15 -size +0 2>/dev/null)" ] && ! grep -qF "$mio" "$HUECO"; } \
        && ( set -o noclobber; echo "$QUIEN $(date '+%Y-%m-%d %H:%M') $1" > "$CANDADO" ) 2>/dev/null; then
       rm -f "$FILA/$num"
       grep -qF "$mio" "$HUECO" 2>/dev/null && rm -f "$HUECO"   # mi pedido de hueco, ya atendido

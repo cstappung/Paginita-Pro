@@ -6,9 +6,10 @@
 //   - con dos teléfonos o uno sin autorizar se detiene;
 //   - la limpieza corre siempre (también si la página falla a la mitad) y quita cada túnel que puso;
 //   - si el Chrome no deja abrir un incógnito, se detiene sin abrir nada más;
-//   - el calor corta la prueba; la foto de después encuentra una app nueva o un ajuste cambiado.
+//   - el calor corta la prueba; la foto de después encuentra una app nueva o un ajuste cambiado;
+//   - la pantalla prendida con el cable (2026-11-10): solo ese ajuste, leído antes y devuelto exacto, también si falla.
 // Uso:  node herramientas/prueba-telefono-seguro.mjs
-import { permitida, crearAdb, unTelefono, temperatura, comparar, abrir } from './telefono-seguro.mjs';
+import { permitida, crearAdb, unTelefono, temperatura, comparar, abrir, ordenDevolver, visitasSeguidas } from './telefono-seguro.mjs';
 
 let bien = 0, mal = 0;
 const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.log(`${cumple ? '✓' : '✗'} ${texto}${detalle ? ' — ' + detalle : ''}`); };
@@ -45,8 +46,9 @@ ok('ninguno → se detiene', /no hay/.test(lanza(() => unTelefono(lista(''))) ||
 ok('la temperatura en décimas', temperatura('  level: 80\n  temperature: 387\n') === 38.7);
 
 // 3) el recorrido con un adb y un Chrome de mentira
-function telefonoFalso({ calor = 300, appNueva = false, ajusteNuevo = false, incognito = true, falla = false } = {}) {
+function telefonoFalso({ calor = 300, appNueva = false, ajusteNuevo = false, incognito = true, falla = false, stay = 0 } = {}) {
   const ordenes = [];
+  const estadoStay = { v: stay, cambios: 0, prendidaEnCarrera: null };
   let fotos = 0, tuneles = new Set();
   const adb = {
     fijarSerie() {},
@@ -58,7 +60,10 @@ function telefonoFalso({ calor = 300, appNueva = false, ajusteNuevo = false, inc
       if (o.startsWith('shell getprop')) return 'X\n';
       if (o === 'shell dumpsys battery') return `temperature: ${calor}\n`;
       if (o === 'shell pm list packages') { fotos++; return 'package:com.android.chrome\n' + (appNueva && fotos > 1 ? 'package:com.rara\n' : ''); }
-      if (o.startsWith('shell settings list')) return 'a=1\n' + (ajusteNuevo && fotos > 1 && o.endsWith('global') ? 'adb_wifi_enabled=1\n' : '');
+      if (o.startsWith('shell settings list')) return 'a=1\n' + (o.endsWith('global') ? `stay_on_while_plugged_in=${estadoStay.v}\n` : '') + (ajusteNuevo && fotos > 1 && o.endsWith('global') ? 'adb_wifi_enabled=1\n' : '');
+      if (o === 'shell settings get global stay_on_while_plugged_in') return `${estadoStay.v}\n`;
+      if (o.startsWith('shell svc power stayon ')) { estadoStay.v = { usb: 2, ac: 1, wireless: 4, true: 7, false: 0 }[args[4]]; estadoStay.cambios++; }
+      if (o.startsWith('shell settings put global stay_on_while_plugged_in ')) { estadoStay.v = Number(args[5]); estadoStay.cambios++; }
       if (args[0] === 'reverse' || args[0] === 'forward') {
         if (args[1] === '--remove') tuneles.delete(args[2]); else tuneles.add(args[1]);
       }
@@ -73,13 +78,13 @@ function telefonoFalso({ calor = 300, appNueva = false, ajusteNuevo = false, inc
       const oyentes = {};
       estado.oyentes = oyentes;
       return { pagina: { goto: async () => { if (falla) throw new Error('la página se cayó'); oyentes.console?.({ type: () => 'log', text: () => 'hola' }); },
-        evaluate: async () => ({ fps: 58 }), on: (n, f) => { oyentes[n] = f; },
+        evaluate: async () => { if (estadoStay.prendidaEnCarrera == null) estadoStay.prendidaEnCarrera = estadoStay.v; return { fps: 58 }; }, on: (n, f) => { oyentes[n] = f; },
         bringToFront: async () => { estado.alFrente = (estado.alFrente || 0) + 1; }, screenshot: async () => Buffer.from('png') },
         cerrar: async () => { estado.incognitoCerrado = true; } };
     },
     soltar: async () => { estado.soltado = true; },
   });
-  return { adb, conectar, estado, ordenes, tuneles: () => tuneles };
+  return { adb, conectar, estado, ordenes, tuneles: () => tuneles, stay: estadoStay };
 }
 const correr = (t, extra = {}) => abrir({ adb: t.adb, puertos: P, ruta: '/', segundos: 30, conectar: t.conectar, esperar: async () => {}, aviso: () => {}, ...extra });
 
@@ -136,6 +141,67 @@ const correr = (t, extra = {}) => abrir({ adb: t.adb, puertos: P, ruta: '/', seg
   const c = { paquetes: [], ajustes: { global: ['per_speaker_music_volume=2', 'adb_wifi_enabled=1'], secure: [], system: [] } };
   ok('girar la pantalla, el volumen o el ahorro de energía no cuentan como nuestros; un ajuste nuevo sí',
     comparar(a, b).igual === true && comparar(a, c).igual === false);
+}
+
+// 6) la pantalla prendida con el cable (el dueño, 2026-11-10): solo ese ajuste, leído antes y devuelto exacto
+ok('la lista blanca deja leer y prender la pantalla, y solo ese ajuste con un número del 0 al 15',
+  permitida(['shell', 'settings', 'get', 'global', 'stay_on_while_plugged_in'], P) && permitida(['shell', 'svc', 'power', 'stayon', 'usb'], P) &&
+  permitida(['shell', 'settings', 'put', 'global', 'stay_on_while_plugged_in', '3'], P) &&
+  permitida(['shell', 'settings', 'put', 'global', 'stay_on_while_plugged_in', '9'], P) &&
+  !permitida(['shell', 'settings', 'put', 'global', 'stay_on_while_plugged_in', '16'], P) &&
+  !permitida(['shell', 'settings', 'put', 'global', 'screen_off_timeout', '3'], P) && !permitida(['shell', 'svc', 'wifi', 'disable'], P) &&
+  !permitida(['shell', 'svc', 'power', 'reboot'], P) && !permitida(['shell', 'settings', 'get', 'secure', 'android_id'], P));
+ok('cada valor original tiene su orden exacta para volver', [0, 1, 2, 4, 7].every(v => ordenDevolver(v)?.[1] === 'svc') &&
+  [3, 5, 6, 8, 15].every(v => ordenDevolver(v)?.join(' ') === `shell settings put global stay_on_while_plugged_in ${v}`) && ordenDevolver(16) === null);
+for (const original of [0, 1, 5]) {
+  const t = telefonoFalso({ stay: original });
+  const guardado = [];
+  const r = await correr(t, { pantalla: true, recuerdo: { guardar: v => guardado.push(v), borrar: () => guardado.push('borrado') } });
+  ok(`pantalla (antes ${original}): prendida con el cable en la carrera, devuelta exacta, anotada y borrada, la foto igual`,
+    (t.stay.prendidaEnCarrera & 2) && t.stay.v === original && guardado.join() === `${original},borrado` && r.cambios?.igual === true,
+    `en carrera ${t.stay.prendidaEnCarrera}, después ${t.stay.v}, ${guardado.join()}`);
+}
+{
+  const t = telefonoFalso({ stay: 3, falla: true });
+  try { await correr(t, { pantalla: true }); } catch {}
+  ok('si la página falla, la pantalla igual vuelve a su valor', t.stay.v === 3, `quedó ${t.stay.v}`);
+  const t2 = telefonoFalso({ stay: 15 });   // (el Oppo del dueño: todos los bits, también el dock)
+  await correr(t2, { pantalla: true });
+  ok('si ya estaba prendida con el cable (15, como el Oppo), no se toca nada', t2.stay.cambios === 0 && t2.stay.v === 15);
+}
+
+// 7) `durante`: una prueba maneja la pestaña mientras tanto (la sala PC + celular); su error sube después de limpiar
+{
+  const t = telefonoFalso();
+  let vista = null;
+  const r = await correr(t, { segundos: 600, durante: async pagina => { vista = pagina; return { listo: 1 }; } });
+  ok('«durante» recibe la pestaña, devuelve su resultado y la corrida termina con ella (no espera los 600 s)',
+    !!vista && r.durante?.listo === 1 && r.historial.length === 1 && t.estado.incognitoCerrado, `${r.historial.length} muestras`);
+  const t2 = telefonoFalso({ stay: 1 });
+  let error = null;
+  try { await correr(t2, { pantalla: true, durante: async () => { throw new Error('la sala falló'); } }); } catch (e) { error = e.message; }
+  ok('si «durante» falla: el error sube y la limpieza igual corre (túneles, pestaña, pantalla)',
+    /la sala falló/.test(error || '') && t2.estado.incognitoCerrado && t2.tuneles().size === 0 && t2.stay.v === 1);
+}
+
+// 8) §276: la 2.ª visita en la MISMA pestaña de incógnito (recargarla, nunca abrir otra ni navegar a otra dirección)
+{
+  const t = telefonoFalso();
+  const hechos = { recargas: 0, cargas: 0, medidas: [], navegadas: 0, pausas: 0 };
+  const r = await correr(t, { segundos: 600, durante: async pagina => {
+    const p = { ...pagina, goto: async () => { hechos.navegadas++; },
+      evaluate: async f => { if (String(f).includes('location.reload')) hechos.recargas++; return true; },
+      waitForLoadState: async () => { hechos.cargas++; } };
+    return visitasSeguidas(p, { visitas: 2, pausa: async () => { hechos.pausas++; }, medir: async (pg, n) => { hechos.medidas.push(n); return { visita: n, misma: pg === p }; } });
+  } });
+  ok('2 visitas en la misma pestaña: mide 1 y 2, recarga una vez desde la página, sin navegar ni abrir otra, y la cierra al final',
+    hechos.medidas.join() === '1,2' && hechos.recargas === 1 && hechos.cargas === 1 && hechos.pausas === 1 && hechos.navegadas === 0 &&
+    r.durante?.every(x => x.misma) && t.estado.incognitoCerrado && t.tuneles().size === 0, JSON.stringify(hechos));
+  const t2 = telefonoFalso({ stay: 2 });
+  let error = null;
+  try { await correr(t2, { pantalla: true, durante: p => visitasSeguidas({ ...p, evaluate: async () => true, waitForLoadState: async () => { throw new Error('no volvió a cargar'); } },
+    { visitas: 2, medir: async () => ({}) }) }); } catch (e) { error = e.message; }
+  ok('si la recarga no vuelve: el error sube y la limpieza igual corre', /no volvió/.test(error || '') && t2.estado.incognitoCerrado && t2.tuneles().size === 0 && t2.stay.v === 2);
 }
 
 console.log(`\n${bien}/${bien + mal} puntos`);

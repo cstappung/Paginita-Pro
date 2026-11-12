@@ -44,6 +44,7 @@ export function decidirBienvenida({ parametros = new URLSearchParams(), almacen 
 // Adónde lleva cada botón: la hoja del cajón y lo que se busca en ella (el control que recibe el foco y la fila que se marca)
 export const DESTINOS = {
   imagen:   { hoja: 'avanzado',  control: '#graficosN8' },
+  calibrar: { hoja: 'avanzado',  control: '#autoCalibrar' },   // §274: «⚡ Auto calibración: máxima fluidez»
   salida:   { hoja: 'avanzado',  control: '#graficosSalida' },
   liviano:  { hoja: 'avanzado',  control: '#graficosLiviano' },
   avisos:   { hoja: 'avanzado',  control: '#graficosAvisosLag' },
@@ -58,12 +59,15 @@ export const DESTINOS = {
 // Los casos. `corto` = la tarjeta del mensaje (2 líneas como mucho); `extra` = la línea de más que lleva la Ayuda.
 // Un botón: { texto, ir } (lleva a DESTINOS[ir]) o { texto, hace } ('liviano' = lo pone ahí mismo, 'editor' = abre el
 // editor de los botones en pantalla). `soloTelefono` = el caso sale solo en un teléfono; `soloAyuda` = no va en el mensaje.
-export function casos({ telefono = false } = {}) {
+// §274: calibrar = hay botón de auto calibración (?autoCalibrar=0 = no): el caso «lento» lleva primero a él
+export function casos({ telefono = false, calibrar = true } = {}) {
+  const cal = calibrar ? [{ texto: '⚡ Auto calibración', ir: 'calibrar' }] : [];
   return [
     { id: 'lento', icono: '💻', titulo: 'El juego va lento o se traba',
-      corto: 'Toca «Elegir imagen» y elige «30 parejas»: se ve un poco menos suave, pero sin tirones.',
+      corto: calibrar ? 'Toca «⚡ Auto calibración»: prueba solo y deja la imagen más pareja.'
+        : 'Toca «Elegir imagen» y elige «30 parejas»: se ve un poco menos suave, pero sin tirones.',
       extra: 'Si todavía se traba, baja la «Resolución de salida»: la imagen se ve más borrosa, pero el juego va más liviano.',
-      botones: [{ texto: 'Elegir imagen', ir: 'imagen' }], botonesAyuda: [{ texto: 'Elegir imagen', ir: 'imagen' }, { texto: 'Resolución de salida', ir: 'salida' }] },
+      botones: [...cal, { texto: 'Elegir imagen', ir: 'imagen' }], botonesAyuda: [...cal, { texto: 'Elegir imagen', ir: 'imagen' }, { texto: 'Resolución de salida', ir: 'salida' }] },
     { id: 'celular', icono: '📱', titulo: 'Juegas en el celular', soloTelefono: true,
       corto: 'Toca ⚡ «Liviano»: el juego se ve más simple y va más fluido. «Mover botones» pone los botones donde te acomoden.',
       extra: 'En Controles puedes dirigir inclinando el teléfono, o prender 🚗 Acelerar solo.',
@@ -208,7 +212,7 @@ function armarBotones(doc, lista, { ir, liviano, editor, dondeHecho }) {
 // ---------------- el mensaje ----------------
 export function montarBienvenida({ doc = globalThis.document, parametros = new URLSearchParams(globalThis.location?.search || ''),
                                    almacen = almacenDe(), webdriver = !!globalThis.navigator?.webdriver, telefono = false,
-                                   puedeMostrar = () => true, abrirHoja = null, liviano = null, editor = null,
+                                   puedeMostrar = () => true, abrirHoja = null, liviano = null, editor = null, calibrar = true,
                                    alAbrir = null, alCerrar = null, nota = () => {}, cada = 1000, version = VERSION_BIENVENIDA } = {}) {
   ponerEstilos(doc);
   const decision = decidirBienvenida({ parametros, almacen, webdriver, version });
@@ -240,7 +244,7 @@ export function montarBienvenida({ doc = globalThis.document, parametros = new U
   }
   function armar() {
     const hecho = el(doc, 'p', { className: 'bv-hecho', role: 'status', hidden: true });
-    const tarjetas = casos({ telefono }).filter(c => !c.soloAyuda).map(c =>
+    const tarjetas = casos({ telefono, calibrar }).filter(c => !c.soloAyuda).map(c =>
       el(doc, 'section', { className: 'bv-tarjeta', dataset: { caso: c.id } },
         el(doc, 'b', { textContent: `${c.icono} ${c.titulo}` }),
         el(doc, 'p', { textContent: c.corto }),
@@ -309,11 +313,11 @@ export function montarBienvenida({ doc = globalThis.document, parametros = new U
 
 // ---------------- la Ayuda (Avanzado): el mismo texto en acordeón, con la línea de más y más botones ----------------
 export function montarAyuda(nodo, { doc = globalThis.document, telefono = false, abrirHoja = null, liviano = null, editor = null,
-                                     alIr = null, abrirMensaje = null } = {}) {
+                                     alIr = null, abrirMensaje = null, calibrar = true } = {}) {
   if (!nodo) return null;
   ponerEstilos(doc);
   const ir = destino => { alIr?.(destino); llevarA(destino, { abrirHoja, doc }); };
-  const secciones = casos({ telefono }).map(c => {
+  const secciones = casos({ telefono, calibrar }).map(c => {
     const hecho = el(doc, 'p', { className: 'bv-hecho', role: 'status', hidden: true });
     const det = el(doc, 'details', { dataset: { caso: c.id }, open: telefono && c.id === 'celular' },
       el(doc, 'summary', { textContent: `${c.icono} ${c.titulo}` }),

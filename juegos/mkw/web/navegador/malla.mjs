@@ -18,6 +18,10 @@
 // §99 (crítico de la red, H10): dos proveedores de STUN (si uno no contesta, el otro). El TURN (el repetidor de
 // Cloudflare) llega solo con el modo «🛰 Todo por Cloudflare» que prende el anfitrión (§103, soloRelevo): la página se lo
 // pide al Worker y lo pasa con ponerIce. Sin el modo no hay repetidor, ni de reserva (§103b: como en BT3)
+import { leerRedSim, crearRedSim, conEnlace } from './red-simulada.mjs';
+// §281: una sola red de mentira por página (la malla se puede rearmar: los enlaces siguen, con su cola y sus cuentas)
+const redSimDe = () => globalThis.mkwRedSim !== undefined ? globalThis.mkwRedSim : (globalThis.mkwRedSim = crearRedSim(leerRedSim()));
+
 export const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, { urls: ['stun:stun.cloudflare.com:3478'] }];
 // bytes en cola sin enviar por "udp": más que esto y se tiran (como un router lleno). §99 (H5): en la sala, colaUdp =
 // 8 KB (un paquete viejo de la carrera no sirve; con 1 MB eran decenas de segundos de cola con una subida saturada); el
@@ -102,6 +106,10 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
   // TURN), va directo como siempre. alRelevo('relevo' | 'sin' | 'tarde') dice qué pasó
   soloRelevo = false, esperaRelevo = 8000, alRelevo = () => {}, trozos = true }) {
   alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
+  // §281 (solo pruebas): ?redSim=… = la red de mentira completa de red-simulada.mjs (bajada y subida aparte, ancho de
+  // banda, picos, cortes y cambios de red; window.mkwRedSim). Sin el parámetro, nada
+  const redSim = redSimDe();
+  if (redSim) alBinario = conEnlace(alBinario, redSim.baja);
   // §103: 'normal' (directo; sin TURN desde §103b) · 'esperando' (las credenciales) · 'relevo' (todo por el repetidor)
   let modo = soloRelevo ? 'esperando' : 'normal', relojRelevo = null, pendienteIce = null;   // (las que llegaron antes de entrar)
   const pendientes = [];                          // lo que llegó del buzón mientras se esperaban las credenciales
@@ -318,7 +326,8 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
   return {
     entrar, salir, revisa,
     // §80: con ?redMala=…,ida, lo que sale también va por el tramo malo (con la misma demora y pérdida)
-    enviar: redMala?.ida ? degradar((u, bytes, canal) => { enviar(u, bytes, canal); }, redMala, Math.random, (f, ms) => setTimeout(f, ms), () => performance.now(), 'mkwRedMalaIda') : enviar,
+    enviar: redSim ? conEnlace(enviar, redSim.sube)   // (§281: lo que sale por la subida de mentira)
+      : redMala?.ida ? degradar((u, bytes, canal) => { enviar(u, bytes, canal); }, redMala, Math.random, (f, ms) => setTimeout(f, ms), () => performance.now(), 'mkwRedMalaIda') : enviar,
     activa: () => !!sesion,
     // los servidores de ICE de las conexiones que se armen desde ahora: los STUN de siempre más el TURN que pidió la
     // página (las que andan siguen como están; las que fallan se rearman con estos). §103: con soloRelevo, estas

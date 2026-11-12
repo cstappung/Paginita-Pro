@@ -95,6 +95,14 @@ const hastaQue = async (fn, cond, ms, cada = 300) => {
   return v ?? await fn().catch(() => null);
 };
 // Lo que interesa del juego en un marco: el menú de inicio, la cortina, el piloto, la nube
+// §263/§269: la prueba abre Chrome como un jugador de verdad (sin navigator.webdriver): la primera vez sale el mensaje de
+// bienvenida encima del menú. Una persona lo cierra con «¡A jugar!»; esto hace lo mismo (y dice si estaba)
+const cerrarBienvenida = async marco => {
+  const b = marco.locator('#bienvenidaJugar');
+  if (await b.isVisible().catch(() => false)) { await b.click().catch(() => {}); await espera(300); return true; }
+  return false;
+};
+let bienvenidasVistas = 0;
 const mirar = marco => marco.evaluate(() => {
   const I = window.mkwInicio, e = window.mkwMenus ? window.mkwMenus.estado() : {};
   return {
@@ -149,8 +157,15 @@ try {
      JSON.stringify(m?.nube)?.slice(0, 120));
 
   // B hasta el título del juego: vuelve el menú; Multiplayer → Online → Juegos abre la sala de Mario Kart
+  // (§263: la primera vez la bienvenida sale en este menú; mientras está, el juego no recibe nada: se cierra primero)
+  for (let i = 0; i < 20 && !(await cerrarBienvenida(marco)); i++) await espera(250);
   for (let i = 0; i < 5 && !(await mirar(marco)).visible; i++) { await uno.keyboard.down('KeyJ'); await espera(110); await uno.keyboard.up('KeyJ'); await espera(2500); }
   m = await hastaQue(() => mirar(marco), x => x.visible, 8000);
+  if (await cerrarBienvenida(marco)) bienvenidasVistas++;
+  await foto(uno, '4b-antes-multi.png');
+  console.log('  (menú) ' + JSON.stringify(await marco.evaluate(() => { const e = document.getElementById('inicioJlo'); const r = e?.getBoundingClientRect();
+    return { hay: !!e, hidden: e?.hidden, cls: e?.className, disp: e && getComputedStyle(e).display, vis: e && getComputedStyle(e).visibility, r: r && [r.width, r.height],
+      body: document.body.className, dialogo: !!document.querySelector('dialog[open]') }; }).catch(x => String(x))));
   await marco.locator('#inicioJlo .ij-boton').nth(1).click();
   await espera(400);
   const opciones = (await mirar(marco)).opciones;
@@ -222,6 +237,7 @@ try {
     const prefDos = await hastaQue(() => dos.getAttribute('.jg-mkw-vest [data-inm]', 'aria-pressed').catch(() => null), v => v === 'true', 5000);
     const prefUno = prefUno0;   // (un perfil nuevo, como un PC que nunca jugó: apagada)
     ok('M22: «Pantalla completa al empezar» viene apagada; Piloto Dos la prende (es de cada uno)', prefUno === 'false' && prefDos === 'true', `Uno ${prefUno} · Dos ${prefDos}`);
+    uno.once('dialog', d => d.accept());   // (§109: «Hay 2 de 12 pilotos: la CPU completa…¿Empezar igual?»)
     await uno.locator('.jg-mkw-empieza').click();
     const enSala = u => new URL(u).searchParams.get('modo') === 'sala';
     const [mA, mB] = await Promise.all([hastaMarco(uno, enSala, 30000), hastaMarco(dos, enSala, 30000)]);
@@ -239,6 +255,10 @@ try {
         picker: !!document.getElementById('elegirPista'), modoPicker: document.getElementById('elegirPista')?.className || '',
         confirmar: !!document.getElementById('listaConfirmar'), aviso: aviso && !aviso.hidden ? aviso.textContent : '',
         tipos: [0, 1, 2].map(i => L.u32(esc + 8 + i * 0xF0 + 0x10)), pantalla: L.u8(esc + 0xB64),
+        // (§269: el avance en la carrera de cada kart, RaceinfoPlayer +0xC, y el puesto de esta consola)
+        av: (() => { try { const ri = L.u32(0x809BD730), lista = L.u32(ri + 0xC), f = x => new DataView(new Uint32Array([x]).buffer).getFloat32(0, true);
+          return Array.from({ length: 12 }, (_, i) => f(L.u32(L.u32(lista + 4 * i) + 0xC))); } catch { return []; } })(),
+        yo: window.mkwSincro?.miPuesto ?? -1, local: window.mkwSincro?.local?.[0] ?? null, teclasArriba: window.mkwControles?.estado?.tecladoPadre || 0,
         cortina: !document.body.classList.contains('sin-cortina') };
     })]).catch(() => null);
     const esperarQue = async (f, cond, tope) => { for (const hasta = Date.now() + tope; Date.now() < hasta; await espera(500)) { const x = await leer(f); if (x && cond(x)) return x; } return await leer(f); };
@@ -314,6 +334,21 @@ try {
     const [pa, pb] = await Promise.all([dosFotosPartidas(uno, () => fotoMarco(mA, `9-carrera-uno${na++ ? '-b' : ''}.png`)),
                                         dosFotosPartidas(dos, () => fotoMarco(mB, `9-carrera-dos${nb++ ? '-b' : ''}.png`))]);
     await uno.keyboard.up('KeyK'); await dos.keyboard.up('KeyK');
+    // §269 (bug 3 del dueño: «con 2 jugadores uno puede jugar y otro no puede moverse»): una persona toca el sitio (el
+    // vestíbulo, la tira, «Pantalla completa»…) y el foco queda en la página de arriba; el navegador ya no le manda el
+    // teclado ni los mandos al marco del juego. Aquí cada uno deja el foco ARRIBA (sin foco() al marco) y acelera 4 s: el
+    // kart de cada uno tiene que avanzar con su tecla. Antes de §269 este punto fallaba (ningún kart se movía)
+    const focoArriba = p => p.evaluate(() => { document.activeElement?.blur?.(); document.body.tabIndex = -1; document.body.focus(); return document.activeElement?.tagName; }).catch(() => null);
+    const [fa, fb] = [await focoArriba(uno), await focoArriba(dos)];
+    const [a0, b0] = [await leer(mA), await leer(mB)];
+    await Promise.all([uno.keyboard.down('KeyK'), dos.keyboard.down('KeyK')]);
+    await espera(4000);
+    const [a1, b1] = [await leer(mA), await leer(mB)];
+    await Promise.all([uno.keyboard.up('KeyK'), dos.keyboard.up('KeyK')]);
+    const mio = (x0, x1) => (x1?.av?.[x1.yo] ?? 0) - (x0?.av?.[x0.yo] ?? 0);
+    // (lo que la sala manda como «mis botones» tiene A apretado en los dos; el avance se imprime: un kart contra la pared no avanza)
+    ok('§269: con el foco en la página del sitio (no en el marco), CADA uno acelera con su tecla (A en sus botones de la sala)', fa === 'BODY' && fb === 'BODY' && ((a1?.local | 0) & 0x100) !== 0 && ((b1?.local | 0) & 0x100) !== 0,
+       `foco ${fa}/${fb} · avance A (puesto ${a1?.yo}) ${mio(a0, a1).toFixed(3)}, B (puesto ${b1?.yo}) ${mio(b0, b1).toFixed(3)} vueltas · teclas por arriba A ${a1?.teclasArriba} B ${b1?.teclasArriba}`);
     // M22: al empezar la copa, la sala pasó sola al modo inmersivo del sitio (el marco llena la pantalla) en los dos
     const inm = p => p.evaluate(() => document.documentElement.classList.contains('jg-inm')).catch(() => null);
     const [iUno, iDos] = [await inm(uno), await inm(dos)];

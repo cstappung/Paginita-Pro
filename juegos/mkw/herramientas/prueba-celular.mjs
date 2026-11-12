@@ -187,6 +187,34 @@ const per = await p.evaluate(() => ({ pedido: localStorage.getItem('mkw.perfilGp
   puesto: !!window.mkwPerfilGpu, webgpu: !!globalThis.GPUCommandEncoder }));
 ok('«🔬 Perfilar»: recarga con la medida pedida, «Mostrar qué frena» prendido y el medidor puesto si hay WebGPU',
    per.pedido === '1' && per.detalle === true && per.puesto === per.webgpu, JSON.stringify(per));
+// ---- §269: nada de la página tapa el mando en pantalla (el dueño: «apretar la UI en el móvil se buguea con la interfaz
+// que aparece para configurar»). Con el juego «andando», la barra a la vista y los avisos, la descarga y la acción
+// puestos, en el centro de cada botón visible del mando el elemento de arriba tiene que ser del mando, acostado y parado;
+// y un toque en el mando esconde la barra al momento
+const tapado = () => p.evaluate(() => {
+  document.body.classList.add('started', 'barra-viva', 'girar-visto');
+  for (const id of ['avisoJuego', 'descarga', 'estadoJuego', 'accionJuego']) { const e = document.getElementById(id); if (e) { e.hidden = false; e.style.display = ''; if (!e.textContent.trim()) e.textContent = 'aviso de prueba'; } }
+  const capa = document.querySelector('.mkw-tactil'), r = [];
+  for (const pz of capa.querySelectorAll('[data-pieza]')) {
+    const c = pz.getBoundingClientRect(); if (!c.width || getComputedStyle(pz).display === 'none') continue;
+    const x = c.left + c.width / 2, y = c.top + c.height / 2, arriba = document.elementFromPoint(x, y);
+    if (!arriba || !capa.contains(arriba)) r.push(`${pz.dataset.pieza} tapado por ${arriba ? (arriba.id || arriba.className || arriba.tagName) : 'nada'}`);
+  }
+  return r;
+});
+await p.evaluate(() => { window.mkwInterfaz?.cerrarCajon?.(); });
+for (const [nombre, vp] of [['acostado', { width: 915, height: 412 }], ['parado', { width: 412, height: 915 }]]) {
+  await p.setViewportSize(vp); await espera(400);
+  const t = await tapado();
+  ok(`§269: ${nombre}, con la barra y los avisos a la vista, ningún botón del mando en pantalla queda tapado`, t.length === 0, t.join(' · ') || 'todos libres');
+}
+await p.setViewportSize({ width: 915, height: 412 }); await espera(300);
+await p.evaluate(() => document.body.classList.add('barra-viva'));
+const [vx269, vy269] = await centro(".mkw-tactil [data-pieza=\"A\"]");
+await p.touchscreen.tap(vx269, vy269); await espera(150);
+ok('§269: tocar el mando en pantalla esconde la barra de arriba al momento (no queda encima para el toque siguiente)',
+   ...(await p.evaluate(() => [!document.body.classList.contains('barra-viva') && getComputedStyle(document.getElementById('barra')).pointerEvents === 'none',
+     `cuerpo «${document.body.className}», barra ${getComputedStyle(document.getElementById('barra')).pointerEvents}`])));
 ok('sin errores en la página', errores.length === 0, errores.join(' | '));
 console.log(`fin: ${bien} bien, ${mal} mal`);
 await b.close(); srv.kill();

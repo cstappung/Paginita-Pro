@@ -1,0 +1,493 @@
+diff --git a/runtime/include/guest_abi/dispatch.h b/runtime/include/guest_abi/dispatch.h
+index 856cb74..de62e7d 100644
+--- a/runtime/include/guest_abi/dispatch.h
++++ b/runtime/include/guest_abi/dispatch.h
+@@ -6,6 +6,7 @@
+ #include "isa/ppc_isa_config.h"
+ #include "isa/ppc_isa_cr.h"
+ #include "mkw_contadores.h"   // V4 (§152)
++#include "mkw_motor.h"        // PR #403 (§277): MKW_MOTOR_PR403
+ 
+ #include <array>
+ #include <atomic>
+@@ -347,6 +348,24 @@ struct IndirectRawDispatchMemoEntry {
+ inline thread_local IndirectRawDispatchMemoEntry
+     g_indirectRawDispatchMemo[kIndirectDispatchCacheEntries]{};
+ 
++// PR #403 de WiiCompiled (§277, MKW_MOTOR_PR403 bit 2): todos los destinos de las llamadas indirectas en UNA tabla de
++// direccionamiento abierto, armada en Finalize y compartida por todos los hilos. Queda a lo más medio llena, así que
++// una búsqueda casi siempre lee una sola casilla y, a diferencia del memo, nunca cae en la búsqueda binaria.
++struct RawDispatchHashSlot {
++    uint32_t address;
++    const RawDispatchRecord* record; // nullptr = vacía
++};
++
++struct RawDispatchHashTable {
++    const RawDispatchHashSlot* slots;
++    uint32_t mask;  // casillas - 1
++    uint32_t shift; // 32 - log2(casillas): el hash de Fibonacci se queda con los bits altos del producto
++};
++
++MKW_PPC_FORCE_INLINE uint32_t RawDispatchHashIndex(const RawDispatchHashTable& table, uint32_t address) {
++    return ((address >> 2) * 2654435761u) >> table.shift;
++}
++
+ class TranslatedFunctionRegistry {
+ public:
+     static void Register(TranslatedFunctionInfo info);
+@@ -375,6 +394,19 @@ public:
+     // the inliner's budget and out-of-lined the probe itself, which is the part
+     // every bctrl executes.
+     static MKW_PPC_FORCE_INLINE const RawDispatchRecord* FindRawByAddressPtr(uint32_t address) {
++#if MKW_MOTOR_PR403 & 2
++        // nullptr antes de Finalize, como la marca de publicación
++        const RawDispatchHashTable* table = rawDispatchTable_.load(std::memory_order_acquire);
++        if (table == nullptr) {
++            return nullptr;
++        }
++        for (uint32_t index = RawDispatchHashIndex(*table, address);; index = (index + 1) & table->mask) {
++            const RawDispatchHashSlot& slot = table->slots[index];
++            if (slot.record == nullptr || slot.address == address) {
++                return slot.record;
++            }
++        }
++#else
+         if (!lookupPublished_.load(std::memory_order_acquire)) {
+             return nullptr;
+         }
+@@ -386,6 +418,7 @@ public:
+         }
+ 
+         return FindRawByAddressPtrMiss(address, cached);
++#endif
+     }
+ 
+ private:
+@@ -407,11 +440,13 @@ private:
+ 
+     static const TranslatedFunctionInfo* FindByAddressPtrSlow(uint32_t address);
+     static const RawDispatchRecord* FindRawByAddressPtrSlow(uint32_t address);
++    static void BuildRawDispatchTableLocked();   // PR #403 (§277)
+ 
+     // Finalize publishes immutable registry, generated-table, and dynamic raw
+     // dispatch storage. Header-inlined cache hits are enabled only after that
+     // release publication, so a pre-finalization miss can never poison them.
+     inline static std::atomic_bool lookupPublished_{false};
++    inline static std::atomic<const RawDispatchHashTable*> rawDispatchTable_{nullptr};   // PR #403 (§277)
+ };
+ 
+ // Cold, profile-owned registration data is emitted in compact table shards.
+diff --git a/runtime/include/isa/ppc_isa_float.h b/runtime/include/isa/ppc_isa_float.h
+index a03005c..5c5c1e1 100644
+--- a/runtime/include/isa/ppc_isa_float.h
++++ b/runtime/include/isa/ppc_isa_float.h
+@@ -203,11 +203,8 @@ inline bool MkwHostNiActiveInline() noexcept
+     return g_mkwHostNiActive;
+ }
+ 
+-inline float PpcForceSingleValueInline(double value)
++inline float PpcForceSingleValueSlowInline(double value)
+ {
+-#if MKW_MOTOR_W30 & 2
+-    return static_cast<float>(value);  // W30: sin el NI del FPSCR en cada cuenta
+-#endif
+     // FPSCR[NI] flushes an exact pre-round single-subnormal even when rounding would promote it
+     // to the smallest normal. g_mkwNiFlushThreshold (2^-126 active, 0.0 inactive) turns the
+     // flush into a branchless mask: a set compare lane keeps just the sign bit, a clear lane
+@@ -231,6 +228,23 @@ inline float PpcForceSingleValueInline(double value)
+ #endif
+ }
+ 
++inline float PpcForceSingleValueInline(double value)
++{
++#if MKW_MOTOR_W30 & 2
++    return static_cast<float>(value);  // W30: sin el NI del FPSCR en cada cuenta
++#elif MKW_MOTOR_PR403 & 1
++    // PR #403 de WiiCompiled (§277): convertir primero y tomar el camino exacto de arriba solo si el resultado es
++    // ±FLT_MIN o subnormal. Un resultado más grande viene de un |value| de al menos 2^-126 (ningún redondeo lleva uno
++    // más chico más allá de FLT_MIN), ±0 es lo mismo que da el flush y NaN/infinito nunca se pasan a cero: igual número.
++    const float converted = static_cast<float>(value);
++    if ((PpcBitCastToU32Inline(converted) & 0x7FFFFFFFu) - 1u < 0x00800000u) [[unlikely]]
++        return PpcForceSingleValueSlowInline(value);
++    return converted;
++#else
++    return PpcForceSingleValueSlowInline(value);
++#endif
++}
++
+ inline float PpcFlushSingleForNiInline(float value)
+ {
+ #if MKW_MOTOR_W30 & 2
+diff --git a/runtime/include/mkw_motor.h b/runtime/include/mkw_motor.h
+index f7f5df5..814ce19 100644
+--- a/runtime/include/mkw_motor.h
++++ b/runtime/include/mkw_motor.h
+@@ -88,3 +88,19 @@
+ #ifndef MKW_MOTOR_W30
+ #define MKW_MOTOR_W30 7   // adoptado (§257): 0 = las cuentas de la Wii al último bit
+ #endif
++
++// MKW_MOTOR_PR403 (bitácora §277): las mejoras de rendimiento del PR #403 de WiiCompiled («port perf fixes from forks»,
++// commit e9fa260c, GPL-3.0), cada una con su bit para medirlas de a una (0 = el motor de antes):
++//   1 = el paso a float convierte primero y mira el NI solo si el resultado es ±FLT_MIN o subnormal (el mismo número;
++//       con W30 bit 2 no hace nada: ahí ya no se mira el NI)
++//   2 = las llamadas indirectas por una tabla hash compartida con TODOS los destinos (direccionamiento abierto, a lo más
++//       medio llena) en lugar del memo de W19 delante de la búsqueda binaria
++//   4 = las lecturas del DVD copiadas a la RAM de la Wii con memcpy por página en vez de byte por byte
++//   8 = los XF de la FIFO: una palabra que cae dentro de un XF incompleto solo se agrega (sin volver a leer el paquete) y
++//       varios XF seguidos van a aurora en una sola llamada
++//  16 = los arreglos de las listas de dibujo resueltos directo por la tabla de páginas de 1 MiB
++//  32 = las copias del EFB: un índice por cubetas de 64 KiB para saber rápido que un DCStoreRange no toca ninguna
++// La pieza del traductor (escribir solo los registros sucios) se elige al traducir: MKW_SUCIOS=1.
++#ifndef MKW_MOTOR_PR403
++#define MKW_MOTOR_PR403 0
++#endif
+diff --git a/runtime/src/abi_bridge.cpp b/runtime/src/abi_bridge.cpp
+index 55fe416..2b5dd5b 100644
+--- a/runtime/src/abi_bridge.cpp
++++ b/runtime/src/abi_bridge.cpp
+@@ -1,3 +1,4 @@
++#include "mkw_motor.h"   // PR #403 (§277): MKW_MOTOR_PR403
+ #include "abi_bridge.h"
+ 
+ #include <algorithm>
+@@ -398,6 +399,9 @@ void TranslatedFunctionRegistry::Finalize() {
+             auto& addressEntries = AddressEntries();
+             addressEntries.clear();
+             addressEntries.rehash(0);
++#if MKW_MOTOR_PR403 & 2
++            BuildRawDispatchTableLocked();   // PR #403 (§277)
++#endif
+             RegistryFrozen().store(true, std::memory_order_release);
+             lookupPublished_.store(true, std::memory_order_release);
+         }
+@@ -478,6 +482,42 @@ GuestFunctions::Entry GuestFunctions::NextTranslation(uint32_t address) {
+     ReportMissingGuestFunction(address);
+ }
+ 
++// PR #403 de WiiCompiled (§277): la tabla hash de todos los destinos crudos (ver dispatch.h). Gana el primer registro
++// puesto en una dirección: la tabla generada y después los dinámicos en orden de dirección, la misma precedencia que
++// daban las búsquedas ordenadas.
++void TranslatedFunctionRegistry::BuildRawDispatchTableLocked() {
++    const auto* generated = GeneratedIndirectDispatchTable();
++    const auto& dynamic = DynamicRawDispatchEntries();
++    const size_t generatedCount = generated != nullptr ? generated->entryCount : 0;
++    uint32_t bits = 10;
++    while ((size_t{1} << bits) < (generatedCount + dynamic.size()) * 2) {
++        ++bits;
++    }
++    static std::vector<RawDispatchHashSlot> slots;
++    static RawDispatchHashTable table;
++    slots.assign(size_t{1} << bits, RawDispatchHashSlot{0, nullptr});
++    table = {slots.data(), (1u << bits) - 1u, 32u - bits};
++    const auto put = [](const RawDispatchRecord& record) {
++        for (uint32_t index = RawDispatchHashIndex(table, record.address);; index = (index + 1) & table.mask) {
++            RawDispatchHashSlot& slot = slots[index];
++            if (slot.record == nullptr) {
++                slot = {record.address, &record};
++                return;
++            }
++            if (slot.address == record.address) {
++                return;
++            }
++        }
++    };
++    for (size_t i = 0; i < generatedCount; ++i) {
++        put(generated->entries[i]);
++    }
++    for (const auto& record : dynamic) {
++        put(record);
++    }
++    rawDispatchTable_.store(&table, std::memory_order_release);
++}
++
+ const RawDispatchRecord* TranslatedFunctionRegistry::FindRawByAddressPtrSlow(uint32_t address) {
+     if (!RegistryFrozen().load(std::memory_order_acquire)) {
+         return nullptr;
+diff --git a/runtime/src/hle/gx/gx_copy.cpp b/runtime/src/hle/gx/gx_copy.cpp
+index 3dbdc8d..5f9c066 100644
+--- a/runtime/src/hle/gx/gx_copy.cpp
++++ b/runtime/src/hle/gx/gx_copy.cpp
+@@ -1,3 +1,4 @@
++#include "mkw_motor.h"   // PR #403 (§277): MKW_MOTOR_PR403
+ // gx_copy.cpp - Framebuffer Copy Operations
+ #include "gx_internal.h"
+ 
+@@ -8,6 +9,7 @@
+ #include <algorithm>
+ #include <map>
+ #include <mutex>
++#include <unordered_map>
+ #include <vector>
+ 
+ namespace {
+@@ -20,12 +22,53 @@ std::mutex g_efbCopyDestinationsMutex;
+ std::map<uint32_t, uint32_t> g_efbCopyDestinations;
+ uint32_t g_largestEfbCopyDestination = 0;
+ 
++#if MKW_MOTOR_PR403 & 32
++// PR #403 de WiiCompiled (§277): cuántos destinos tocan cada cubeta de 64 KiB de la RAM de la Wii. Casi todos los
++// DCStoreRange no tocan ningún destino, y una cubeta vacía lo dice sin recorrer el mapa.
++constexpr uint32_t kEfbCopyBucketShift = 16;
++std::unordered_map<uint32_t, uint32_t> g_efbCopyBuckets;
++
++void CountEfbCopyBucketsLocked(uint64_t start, uint32_t size, int32_t delta) {
++    const uint64_t last = (start + size - 1u) >> kEfbCopyBucketShift;
++    for (uint64_t bucket = start >> kEfbCopyBucketShift; bucket <= last; ++bucket) {
++        g_efbCopyBuckets[static_cast<uint32_t>(bucket)] += static_cast<uint32_t>(delta);
++    }
++}
++
++bool AnyEfbCopyBucketLocked(uint64_t start, uint32_t size) {
++    const uint64_t first = start >> kEfbCopyBucketShift;
++    const uint64_t last = (start + size - 1u) >> kEfbCopyBucketShift;
++    if (last - first + 1u > g_efbCopyBuckets.size()) {
++        return true; // más ancho que el índice: responde el recorrido del mapa
++    }
++    for (uint64_t bucket = first; bucket <= last; ++bucket) {
++        const auto it = g_efbCopyBuckets.find(static_cast<uint32_t>(bucket));
++        if (it != g_efbCopyBuckets.end() && it->second != 0) {
++            return true;
++        }
++    }
++    return false;
++}
++#endif
++
+ void RememberEfbCopyDestination(uint32_t addr, uint32_t size) {
+     if (size == 0) {
+         return;
+     }
+     std::lock_guard<std::mutex> guard(g_efbCopyDestinationsMutex);
++#if MKW_MOTOR_PR403 & 32
++    const uint32_t canonical = CanonicalizeGxMainRamAddress(addr);
++    const auto [it, inserted] = g_efbCopyDestinations.try_emplace(canonical, size);
++    if (inserted) {
++        CountEfbCopyBucketsLocked(canonical, size, +1);
++    } else if (it->second != size) {
++        CountEfbCopyBucketsLocked(canonical, it->second, -1);
++        CountEfbCopyBucketsLocked(canonical, size, +1);
++        it->second = size;
++    }
++#else
+     g_efbCopyDestinations[CanonicalizeGxMainRamAddress(addr)] = size;
++#endif
+     // A conservative monotonic maximum lets invalidation jump directly to
+     // the only map interval that could overlap instead of walking every copy
+     // destination on every DCStoreRange.
+@@ -44,6 +87,11 @@ void InvalidateEfbCopyDestinationsForRange(uint32_t addr, uint32_t size) {
+     std::vector<uint32_t> retired;
+     {
+         std::lock_guard<std::mutex> guard(g_efbCopyDestinationsMutex);
++#if MKW_MOTOR_PR403 & 32
++        if (!AnyEfbCopyBucketLocked(dirtyStart, size)) {
++            return;
++        }
++#endif
+         const uint64_t earliestCandidate =
+             dirtyStart > g_largestEfbCopyDestination ? dirtyStart - g_largestEfbCopyDestination : 0;
+         for (auto it = g_efbCopyDestinations.lower_bound(static_cast<uint32_t>(earliestCandidate));
+@@ -55,6 +103,9 @@ void InvalidateEfbCopyDestinationsForRange(uint32_t addr, uint32_t size) {
+                 continue;
+             }
+             retired.push_back(it->first);
++#if MKW_MOTOR_PR403 & 32
++            CountEfbCopyBucketsLocked(it->first, it->second, -1);
++#endif
+             it = g_efbCopyDestinations.erase(it);
+         }
+     }
+diff --git a/runtime/src/hle/gx/gx_dl.cpp b/runtime/src/hle/gx/gx_dl.cpp
+index daceeb7..4e5e95a 100644
+--- a/runtime/src/hle/gx/gx_dl.cpp
++++ b/runtime/src/hle/gx/gx_dl.cpp
+@@ -1,3 +1,4 @@
++#include "mkw_motor.h"   // PR #403 (§277): MKW_MOTOR_PR403
+ #include "gx_internal.h"
+ #include "gx_stream_common.h"
+ #include "gx_cp_decode.h"
+@@ -1207,6 +1208,27 @@ static void SubmitLytDrawPacket(const uint8_t* packet, uint32_t packetBytes) {
+     SyncAppliedVtxStateFromHleReal();
+ }
+ 
++// PR #403 de WiiCompiled (§277, MKW_MOTOR_PR403 bit 16): un tramo dentro de una página de 1 MiB entera se resuelve
++// directo con la tabla de páginas, el mismo puntero que darían Contains + GuestToHostPtr tras dos búsquedas. Aquí con
++// la tabla de LECTURA (cero si la página tiene una lectura diferida pendiente: entonces va el camino de siempre).
++static const uint8_t* ResolveDisplayListArray(uint32_t base, uint32_t span) {
++#if (MKW_MOTOR_PR403 & 16) && !defined(__APPLE__)
++    if (base != 0 && span != 0) {
++        const uint32_t page = base >> MemoryInline::kPageShift;
++        const uint32_t last = base + span - 1u;
++        if (last >= base && (last >> MemoryInline::kPageShift) == page) {
++            if (const uintptr_t bias = MemoryInline::g_fullReadablePageBias[page]; bias != 0) {
++                return reinterpret_cast<const uint8_t*>((bias - 1u) + base);
++            }
++        }
++    }
++#endif
++    if (!Memory::Contains(base, span)) {
++        return nullptr;
++    }
++    return static_cast<const uint8_t*>(GuestToHostPtr(base, span));
++}
++
+ static bool ApplyAuroraArraysForDisplayList(const std::array<uint32_t, GX_VA_MAX_ATTR>& maxIdx,
+                                             const std::array<bool, GX_VA_MAX_ATTR>& sawIdx,
+                                             GXVtxFmt vtxfmt,
+@@ -1232,11 +1254,7 @@ static bool ApplyAuroraArraysForDisplayList(const std::array<uint32_t, GX_VA_MAX
+         }
+         const uint32_t span = (count > 0) ? (static_cast<uint32_t>((count - 1u) * arr.stride) + elemSize) : 0u;
+         const bool needsPack = arr.stride > 0xffu;
+-        if (!Memory::Contains(arr.base, span)) {
+-            ok = false;
+-            continue;
+-        }
+-        const uint8_t* hostPtr = static_cast<const uint8_t*>(GuestToHostPtr(arr.base, span));
++        const uint8_t* hostPtr = ResolveDisplayListArray(arr.base, span);
+         if (!hostPtr) {
+             ok = false;
+             continue;
+@@ -1273,11 +1291,7 @@ static bool ApplyAuroraIndexedXFArraysForDisplayList(const std::array<uint32_t,
+             continue;
+         }
+         const uint32_t span = maxXfIdx[attr] * arr.stride + bytes;
+-        if (!Memory::Contains(arr.base, span)) {
+-            ok = false;
+-            continue;
+-        }
+-        const uint8_t* hostPtr = static_cast<const uint8_t*>(GuestToHostPtr(arr.base, span));
++        const uint8_t* hostPtr = ResolveDisplayListArray(arr.base, span);
+         if (!hostPtr) {
+             ok = false;
+             continue;
+diff --git a/runtime/src/hle/gx/gx_fifo.cpp b/runtime/src/hle/gx/gx_fifo.cpp
+index 108e4fd..2ecaad4 100644
+--- a/runtime/src/hle/gx/gx_fifo.cpp
++++ b/runtime/src/hle/gx/gx_fifo.cpp
+@@ -1,3 +1,4 @@
++#include "mkw_motor.h"   // PR #403 (§277): MKW_MOTOR_PR403
+ #include "gx_internal.h"
+ #include "gx_stream_common.h"
+ #include "gx_cp_decode.h"
+@@ -343,9 +344,43 @@ void SubmitAttribute(GXAttr attr, float* comps, const VtxAttrFmt& fmt, const u32
+     }
+ }
+ 
++#if MKW_MOTOR_PR403 & 8
++// PR #403 de WiiCompiled (§277): una palabra que cae dentro de un XF al que todavía le falta su última palabra solo se
++// agrega: el camino general la agregaría y dejaría de leer en el mismo paquete incompleto.
++static bool TryAppendIncompleteXfWord(u32 value) {
++    auto& g = g_hleGxState;
++    if (g.inBegin || g.fifoByteCount < 5u ||
++        g.fifoReadOffset + g.fifoByteCount + 4u > g.fifoBytes.size()) {
++        return false;
++    }
++    uint8_t* data = g.fifoBytes.data() + g.fifoReadOffset;
++    if ((data[0] & GX_OPCODE_MASK_CMD) != GX_LOAD_XF_REG_CMD) {
++        return false;
++    }
++    const uint32_t packetBytes = 5u + (static_cast<uint32_t>(ReadBE16(data + 1)) + 1u) * 4u;
++    if (g.fifoByteCount + 4u >= packetBytes) {
++        return false;
++    }
++    BigEndian::Write32(data + g.fifoByteCount, value);
++    g.fifoByteCount += 4u;
++    return true;
++}
++
++static MKW_PPC_NO_INLINE void HleFifoWriteGeneral(u32 val, uint32_t sizeBytes);
++
++void HleFifoWrite(u32 val, uint32_t sizeBytes) {
++    if ((sizeBytes == 0 || sizeBytes == 4) && !IsDisplayListActive() && TryAppendIncompleteXfWord(val)) {
++        return;
++    }
++    HleFifoWriteGeneral(val, sizeBytes);
++}
++
++static void HleFifoWriteGeneral(u32 val, uint32_t sizeBytes) {
++#else
+ // `val` is a raw big-endian bit pattern: the FIFO stream is type-agnostic, and
+ // the float entry point converts before it gets here.
+ void HleFifoWrite(u32 val, uint32_t sizeBytes) {
++#endif
+     const bool recordOnly = IsDisplayListActive();
+     if (recordOnly) {
+         WriteDisplayListData(val, sizeBytes);
+@@ -727,9 +762,25 @@ static uint32_t ApplyFifoPacketsDirect(const uint8_t* data, uint32_t sizeBytes)
+             const uint16_t countWords = ReadBE16(packet + 1);
+             const uint32_t packetBytes = 1u + 4u + (static_cast<uint32_t>(countWords) + 1u) * 4u;
+             if (avail < packetBytes) break;
++#if MKW_MOTOR_PR403 & 8
++            // PR #403 (§277): aurora lee una tira de XF seguidos en una sola llamada. La tira queda dentro de esta
++            // ráfaga, así que conserva su orden contra las escrituras de CP/BP de alrededor.
++            uint32_t runBytes = packetBytes;
++            while (avail - runBytes >= 5u) {
++                const uint8_t* next = packet + runBytes;
++                if ((next[0] & GX_OPCODE_MASK_CMD) != GX_LOAD_XF_REG_CMD) break;
++                const uint32_t nextBytes = 5u + (static_cast<uint32_t>(ReadBE16(next + 1)) + 1u) * 4u;
++                if (avail - runBytes < nextBytes) break;
++                runBytes += nextBytes;
++            }
++            GXCallDisplayList(packet, runBytes);
++            GXMarkFrameWork();
++            offset += runBytes;
++#else
+             GXCallDisplayList(packet, packetBytes);
+             GXMarkFrameWork();
+             offset += packetBytes;
++#endif
+             continue;
+         }
+ 
+diff --git a/runtime/src/hle/storage/dvd.cpp b/runtime/src/hle/storage/dvd.cpp
+index 84655aa..c8e49e3 100644
+--- a/runtime/src/hle/storage/dvd.cpp
++++ b/runtime/src/hle/storage/dvd.cpp
+@@ -1,3 +1,4 @@
++#include "mkw_motor.h"   // PR #403 (§277): MKW_MOTOR_PR403
+ #include "hle_stubs.h"
+ #include "isa/big_endian.h"
+ #include "hle/dvd_contract.h"
+@@ -123,9 +124,42 @@ extern "C" uint32_t g_dvdFstReservedSize;
+ 
+ // Byte-wise copy into guest RAM plus the DMA notification the GX caches need.
+ static void CopyToGuestAsDma(uint32_t dest, const uint8_t* data, size_t size) {
++#if MKW_MOTOR_PR403 & 4
++    // PR #403 de WiiCompiled (§277): donde Write8 es una escritura simple (la ventana fija de H6, o una página de 1 MiB
++    // entera escribible), los bytes van de una vez con memcpy; en cualquier otra página, Write8 byte a byte como antes.
++    size_t done = 0;
++    while (done < size) {
++        const uint32_t address = dest + static_cast<uint32_t>(done);
++        const size_t rest = size - done;
++#if MKW_MOTOR_FIJA
++        if (rest <= MemoryInline::kFijaLargo && MemoryInline::FijaDentro(address, static_cast<uint32_t>(rest))) {
++#ifdef MKW_SUCIAS
++            mkw_sucias_rango(address, static_cast<uint32_t>(rest));
++#endif
++            std::memcpy(MemoryInline::FijaPtr(address), data + done, rest);
++            break;
++        }
++#endif
++        const size_t pageLeft = MemoryInline::kPageSize - (address & MemoryInline::kPageMask);
++        const size_t chunk = std::min(rest, pageLeft);
++        if (const uintptr_t bias = MemoryInline::g_fullWritablePageBias[address >> MemoryInline::kPageShift];
++            bias != 0) {
++#ifdef MKW_SUCIAS
++            mkw_sucias_rango(address, static_cast<uint32_t>(chunk));
++#endif
++            std::memcpy(reinterpret_cast<uint8_t*>((bias - 1u) + address), data + done, chunk);
++        } else {
++            for (size_t i = 0; i < chunk; ++i) {
++                Memory::Write8(address + static_cast<uint32_t>(i), data[done + i]);
++            }
++        }
++        done += chunk;
++    }
++#else
+     for (size_t i = 0; i < size; ++i) {
+         Memory::Write8(dest + static_cast<uint32_t>(i), data[i]);
+     }
++#endif
+     GxNotifyGuestRamDmaWrite(dest, static_cast<uint32_t>(size));
+ }
+ 

@@ -30,14 +30,20 @@ export const CAP_LENTO_MS = 30;        // CPU pura por imagen: más que esto = n
 const num = x => (Number.isFinite(x) ? x : null);
 
 // El escalón del aparato con lo medido. Devuelve { id, nombre, esperar, por, limites: [texto…] } (por = qué medida decidió)
+// §269: esperaSalaMs = lo que el juego esperó por cuadro los botones de la sala (null = no es la sala). Si fue más de
+// ESPERA_SALA_AJENA ms, la lógica baja por OTRO (el PC más lento de la sala o la red): no dice nada de este aparato y
+// manda la CPU por imagen. Como un amperímetro en serie con la carga de otro: lo que marca no es tu motor.
+export const ESPERA_SALA_AJENA = 2;
 export function escalonDe({ cpuPuraMs = null, juegoMs = null, logica = null, telefono = false, memoriaGB = null, rttMs = null,
-                            n8 = false, enCarrera = true } = {}) {
+                            n8 = false, enCarrera = true, esperaSalaMs = null } = {}) {
   const ms = num(cpuPuraMs) ?? num(juegoMs);
   let e = null, por = null;
   if (ms !== null) { e = ESCALONES.find(x => ms <= x.hasta); por = `${Math.round(ms * 10) / 10} ms de CPU por imagen`; }
   // los cuadros de lógica en la carrera mandan: si no llega a 57 por segundo, no va a la par (aunque la CPU diga otra cosa:
   // la espera de la tarjeta o del navegador también frena)
-  const l = num(logica);
+  const ajena = num(esperaSalaMs) !== null && esperaSalaMs > ESPERA_SALA_AJENA && ms !== null && ms < TRABAJO_OCUPADO;
+  const l = ajena ? null : num(logica);
+  if (ajena && e) por += ` (la sala esperó ${Math.round(esperaSalaMs * 10) / 10} ms por cuadro a los demás: su ritmo no es el de este aparato)`;
   if (enCarrera && l !== null && l > 0) {
     if (l < LOGICA_MIN) { e = ESCALONES[3]; por = `${Math.round(l)} cuadros de carrera por segundo`; }
     else if (n8 || !e || e.id === 'lento') {
@@ -107,4 +113,14 @@ export function textoLentos(lentos, nombre = u => u, yo = null) {
   if (yoLento) partes.push(`Tu aparato no llegó a 60 en tu última carrera (${Math.round(lentos.find(x => x.uid === yo).l)} por segundo): para no frenar a los demás, la sala te ayuda (relevo) y vas a ver saltos. Cierra otras pestañas o apps, o prueba en Gráficos → Imagen «Con imagen intermedia» (Dibujar a 30 y mostrar 60)`);
   if (otros.length) partes.push(`${otros.join(', ')} no ${otros.length > 1 ? 'llegan' : 'llega'} a 60: la sala intenta sostener el ritmo mediante el relevo (sus botones pueden llegar tarde y puede haber saltos)`);
   return '⚠ ' + partes.join(' · ');
+}
+
+// §269: la envoltura de pad() de la sala (lockstep.mjs) que cuenta cuánto esperó el juego los botones de los demás.
+// Lo de antes de la primera espera de pad() es trabajo de esta PC (armar y mandar mis botones); lo que va desde ahí hasta
+// que vuelve, espera (el hilo del juego quedó parado). cuenta = { ms, veces } (se suma en el momento)
+export function envolverPadSala(pad, cuenta, ahora = () => performance.now()) {
+  return async cuadro => {
+    const p = pad(cuadro), t1 = ahora();
+    try { return await p; } finally { const d = ahora() - t1; if (d > 0.05) { cuenta.ms += d; cuenta.veces++; } }
+  };
 }

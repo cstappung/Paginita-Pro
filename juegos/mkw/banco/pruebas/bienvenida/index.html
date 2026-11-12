@@ -30,6 +30,7 @@ import { prueba } from '../../comun.js';
 import { decidirBienvenida, montarBienvenida, montarAyuda, casos, llevarA, DESTINOS, VERSION_BIENVENIDA, CLAVE_VERSION, CLAVE_NUNCA }
   from '/web/navegador/bienvenida.mjs';
 import { montarGraficos } from '/web/navegador/graficos.mjs';
+import { montarBotonCalibrar } from '/web/navegador/auto-calibrar.mjs';   // §274
 
 const { ok, nota, fin } = prueba('bienvenida', 'Bienvenida y Ayuda de ajustes (sin el juego)');
 const almacen = (inicial = {}) => { const m = new Map(Object.entries(inicial)); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), m }; };
@@ -130,7 +131,7 @@ try {
   }
 
   // ---- 4. Cada botón lleva a su ajuste (la hoja Gráficos de verdad) ----
-  montarGraficos($('graficosPanel'), { avisosLag: { prendidos: () => true, forzado: false, fijar() {} } });
+  montarGraficos($('graficosPanel'), { avisosLag: { prendidos: () => true, forzado: false, fijar() {} }, arriba: montarBotonCalibrar(document).nodo });   // (§274: con el botón de la auto calibración)
   const destinosUsados = new Set(casos({ telefono: true }).flatMap(c => [...c.botones, ...c.botonesAyuda]).map(x => x.ir).filter(Boolean));
   for (const d of destinosUsados) {
     pedidas.length = 0;

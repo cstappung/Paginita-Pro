@@ -15,7 +15,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearVigiaN8, modoPedido, modoAutomatico, CAMBIOS_MAX } from '/web/navegador/n8.mjs';
+import { crearVigiaN8, modoPedido, modoAutomatico, CAMBIOS_MAX, VERSION_PRUEBA } from '/web/navegador/n8.mjs';
 
 const { ok, nota, fin } = prueba('n8', 'N8: cuándo dibujar a 30 (sin el juego)');
 const almacen = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
@@ -23,7 +23,7 @@ const almacen = () => { const m = new Map(); return { getItem: k => m.get(k) ?? 
 try {
   // ---- 1. Lo que pide la página ----
   ok('?n8: sin nada = no; 1 = a 30 sin la imagen del medio; 2 = con ella; auto = decide la vigía',
-     modoPedido(null) === 0 && modoPedido('1') === 1 && modoPedido('2') === 2 && modoPedido('auto') === 'auto' && modoPedido('3') === 0);
+     modoPedido(null) === 0 && modoPedido('1') === 1 && modoPedido('2') === 2 && modoPedido('auto') === 'auto' && modoPedido('3') === 3 && modoPedido('4') === 0);   // (§283: 3 = «20 parejas»)
   ok('Automático prende «30 parejas» (modo 1) en un teléfono y la imagen del medio (modo 2) en un PC (2026-11-07)',
      modoAutomatico({ telefono: true }) === 1 && modoAutomatico({ telefono: false }) === 2 && modoAutomatico() === 2);
 
@@ -87,6 +87,94 @@ try {
   const r = crearVigiaN8({ almacen: roto });
   for (let s = 0; s < 3; s++) r.segundo({ enCarrera: true, imagenes: 30, logica: 30, juegoMs: 30 });
   ok('con el almacenamiento bloqueado igual funciona (solo no recuerda)', r.estado.prendido);
+  // §269: un «no» guardado antes de §269 (la prueba de entonces medía las imágenes como lógica: en la sala lo apagaba
+  // siempre) se olvida una vez; uno guardado después se respeta
+  { const viejo = almacen(); viejo.setItem('mkw.n8.auto', 'no');
+    const x = crearVigiaN8({ almacen: viejo });
+    ok('§269: un «no» de antes de §269 se olvida una vez (la prueba de antes medía mal en la sala)', x.estado.sirve && viejo.getItem('mkw.n8.auto') === '0' && viejo.getItem('mkw.n8.auto.prueba') === String(VERSION_PRUEBA));
+    viejo.setItem('mkw.n8.auto', 'no');
+    ok('§269: …y un «no» de ahora se respeta', !crearVigiaN8({ almacen: viejo }).estado.sirve); }
+  // §269: la sala de la gama baja: el reloj va por la hora; con N8 las imágenes siguen en ~25 pero la lógica sube de 27 a
+  // 40: la vigía (con la lógica de verdad) lo deja prendido
+  { const s2 = crearVigiaN8({ almacen: almacen() });
+    for (let k = 0; k < 3; k++) s2.segundo({ enCarrera: true, imagenes: 25, logica: 27, juegoMs: 36, salaMs: 0 });
+    for (let k = 0; k < 12; k++) s2.segundo({ enCarrera: true, imagenes: 25, logica: 40, juegoMs: 24, salaMs: 0 });
+    ok('§269: en la sala de la gama baja N8 se prende y, si la lógica sube aunque las imágenes no, se queda prendido', s2.estado.prendido && s2.estado.sirve, JSON.stringify(s2.estado.ultimo)); }
+  // §275b: «Cada uno su kart» en el teléfono: el ponerse al día sostiene la lógica en ~57 aunque se vean 45 imágenes; con
+  // N8 la lógica llega a 60 (no sube un 8 %): antes la prueba lo apagaba («no mejora») y el teléfono intentaba 60
+  { const s3 = crearVigiaN8({ almacen: almacen() });
+    for (let k = 0; k < 3; k++) s3.segundo({ enCarrera: true, imagenes: 45, logica: 57, juegoMs: 15, salaMs: 0 });
+    const prendio = s3.estado.prendido;
+    for (let k = 0; k < 12; k++) s3.segundo({ enCarrera: true, imagenes: 30, logica: 60, juegoMs: 11, salaMs: 0 });
+    ok('§275b: con el ponerse al día (lógica 57, 45 imágenes) N8 se prende y, si con él llega a 60, se queda aunque no suba un 8 %', prendio && s3.estado.prendido && s3.estado.sirve, JSON.stringify(s3.estado.ultimo)); }
+  // …y si con N8 la lógica no llega a 60 ni sube un 8 % (lo que frena es la tarjeta), se sigue apagando como antes
+  { const s4 = crearVigiaN8({ almacen: almacen() });
+    for (let k = 0; k < 3; k++) s4.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 20, salaMs: 0 });
+    for (let k = 0; k < 12; k++) s4.segundo({ enCarrera: true, imagenes: 30, logica: 41, juegoMs: 18, salaMs: 0 });
+    ok('§275b: …y si no llega a 60 ni sube un 8 %, se apaga («no mejora») como antes', !s4.estado.prendido && !s4.estado.sirve, JSON.stringify(s4.estado.ultimo)); }
+  // §283: la prueba no mezcla lugares. El Oppo en la sala: N8 se prende en elegir personaje (50 de lógica, liviano) y la
+  // prueba seguía en la largada de 8.3 (40 con N8, pesado): «no mejora» y apagado para siempre. Ahora la prueba se abandona
+  { const corre = (mismoLugar) => { const s = crearVigiaN8({ almacen: almacen(), mismoLugar, menuNoPasa: false });   // (solo la prueba del mismo lugar)
+      for (let k = 0; k < 3; k++) s.segundo({ enCarrera: true, imagenes: 25, logica: 50, juegoMs: 18, salaMs: 0, lugar: 'menú' });
+      const prendio = s.estado.prendido;
+      for (let k = 0; k < 12; k++) s.segundo({ enCarrera: true, imagenes: 20, logica: 40, juegoMs: 20, salaMs: 0, lugar: 'carrera' });
+      return { prendio, s }; };
+    const a = corre(true), b = corre(false);
+    ok('§283: prendido en elegir personaje y probado en la carrera: la prueba se abandona y N8 sigue (con ?n8MismoLugar=0 se apagaba «no mejora»)',
+       a.prendio && a.s.estado.prendido && a.s.estado.sirve && a.s.estado.abandonadas === 1 && b.prendio && !b.s.estado.prendido && !b.s.estado.sirve,
+       `${JSON.stringify({ prendido: a.s.estado.prendido, abandonadas: a.s.estado.abandonadas })} / antes ${b.s.estado.prendido}`); }
+  { const s = crearVigiaN8({ almacen: almacen() });
+    for (let k = 0; k < 3; k++) s.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 20, salaMs: 0, lugar: 'carrera' });
+    for (let k = 0; k < 12; k++) s.segundo({ enCarrera: true, imagenes: 30, logica: 41, juegoMs: 18, salaMs: 0, lugar: 'carrera' });
+    ok('§283: en el mismo lugar la prueba sigue valiendo (no sube un 8 %: se apaga)', !s.estado.prendido && !s.estado.sirve); }
+  { const s = crearVigiaN8({ almacen: almacen() });   // dos malos en el menú y uno en la carrera: no prende todavía
+    s.segundo({ enCarrera: true, imagenes: 25, logica: 50, juegoMs: 18, salaMs: 0, lugar: 'menú' });
+    s.segundo({ enCarrera: true, imagenes: 25, logica: 50, juegoMs: 18, salaMs: 0, lugar: 'menú' });
+    s.segundo({ enCarrera: true, imagenes: 25, logica: 40, juegoMs: 22, salaMs: 0, lugar: 'carrera' });
+    const no = !s.estado.prendido;
+    s.segundo({ enCarrera: true, imagenes: 25, logica: 40, juegoMs: 22, salaMs: 0, lugar: 'carrera' });
+    s.segundo({ enCarrera: true, imagenes: 25, logica: 40, juegoMs: 22, salaMs: 0, lugar: 'carrera' });
+    ok('§283: los 3 segundos malos que lo prenden son de un mismo lugar (2 en el menú + 1 en la carrera no prenden; 3 en la carrera sí)',
+       no && s.estado.prendido && s.estado.lugarAntes === 'carrera', JSON.stringify({ malos: s.estado.malos, lugar: s.estado.lugarAntes })); }
+  // §283: prendido en elegir personaje (la carga del menú) no pasa a la carrera: allí se apaga sin «no» y la carrera decide
+  { const corre = (menuNoPasa, carrera) => { const s = crearVigiaN8({ almacen: almacen(), menuNoPasa });
+      for (let k = 0; k < 3; k++) s.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 18, salaMs: 0, lugar: 'menú' });
+      const prendio = s.estado.prendido;
+      for (let k = 0; k < 12; k++) s.segundo({ enCarrera: true, ...carrera, salaMs: 0, lugar: 'carrera' });
+      return { prendio, s }; };
+    const pc = corre(true, { imagenes: 30, logica: 60, juegoMs: 8 });          // (el PC: en la carrera va sobrado)
+    const viejo = corre(false, { imagenes: 30, logica: 60, juegoMs: 8 });
+    const tel = corre(true, { imagenes: 40, logica: 45, juegoMs: 20 });        // (el teléfono: en la carrera tampoco llega)
+    ok('§283: prendido en elegir personaje, al llegar a la carrera se apaga sin «no» (con ?n8MenuPasa=1 seguía prendido)',
+       pc.prendio && !pc.s.estado.prendido && pc.s.estado.sirve && pc.s.estado.soltadosMenu === 1 && viejo.s.estado.prendido,
+       JSON.stringify({ pc: pc.s.estado.prendido, viejo: viejo.s.estado.prendido }));
+    ok('§283: …y si en la carrera tampoco llega, la vigía de la carrera lo vuelve a prender (3 s)', tel.s.estado.prendido && tel.s.estado.lugarPrendido === 'carrera' && tel.s.estado.cambios === 2,   // (prendido en el menú y en la carrera; el soltado no cuenta)
+       JSON.stringify({ prendido: tel.s.estado.prendido, cambios: tel.s.estado.cambios })); }
+  // §283.9: el teléfono en «Cada uno su kart» (red-estado, 6 de 6 corridas): sin N8 la lógica va en 52 sostenida por el
+  // ponerse al día, con N8 en 56: no sube un 8 % ni llega a 57 → «no mejora» y apagado para siempre, aunque las imágenes
+  // salían parejas. En el modo 1 no hay prueba (probar() = false); con la de antes (?n8Prueba1=1) se apagaba
+  { const corre = (probar) => { const s = crearVigiaN8({ almacen: almacen(), probar: () => probar });
+      for (let k = 0; k < 3; k++) s.segundo({ enCarrera: true, imagenes: 35, logica: 52, juegoMs: 18, salaMs: 0, lugar: 'carrera' });
+      for (let k = 0; k < 12; k++) s.segundo({ enCarrera: true, imagenes: 30, logica: 56, juegoMs: 16, salaMs: 0, lugar: 'carrera' });
+      return s; };
+    const nuevo = corre(false), viejo = corre(true);
+    ok('§283.9: en el modo 1 N8 no se apaga por «no mejora» (la lógica sostenida por ponerse al día); con ?n8Prueba1=1 se apagaba',
+       nuevo.estado.prendido && nuevo.estado.sirve && nuevo.estado.sinPrueba === 1 && !viejo.estado.prendido && !viejo.estado.sirve,
+       JSON.stringify({ nuevo: [nuevo.estado.prendido, nuevo.estado.sirve], viejo: [viejo.estado.prendido, viejo.estado.sirve] })); }
+  // §283.9: el teléfono como lo arma mkw.mjs (menuNoPasa solo en un PC, sin prueba en el modo 1): prendido en elegir
+  // personaje, la carrera LARGA con N8 prendido y sigue así toda la carrera (antes se apagaba al llegar y no volvía)
+  { const s = crearVigiaN8({ almacen: almacen(), menuNoPasa: false, probar: () => false });
+    const cambios = []; const s2 = crearVigiaN8({ almacen: almacen(), menuNoPasa: false, probar: () => false,
+      prender: p => cambios.push('+' + p), apagar: p => cambios.push('-' + p) });
+    for (const v of [s, s2]) {
+      for (let k = 0; k < 3; k++) v.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 18, salaMs: 0, lugar: 'menú' });
+      for (let k = 0; k < 40; k++) v.segundo({ enCarrera: true, imagenes: 30, logica: 56, juegoMs: 16, salaMs: 0, lugar: 'carrera' });
+    }
+    ok('§283.9: en el teléfono lo prendido en elegir personaje sigue prendido desde la largada y los 40 s de carrera',
+       s.estado.prendido && s.estado.sirve && s.estado.soltadosMenu === 0 && cambios.join() === '+no llega a 60', JSON.stringify({ prendido: s.estado.prendido, cambios })); }
+  { const a = almacen(); a.setItem('mkw.n8.auto', 'no'); a.setItem('mkw.n8.auto.prueba', '283');
+    const s = crearVigiaN8({ almacen: a });
+    ok('§283.9: un «no» guardado con la prueba 283 se olvida una vez (VERSION_PRUEBA 284)', VERSION_PRUEBA === 284 && s.estado.sirve && a.getItem('mkw.n8.auto') === '0'); }
   nota(`último segundo del aparato de mentira: ${JSON.stringify(v.estado.ultimo)}`);
 } catch (e) {
   ok('sin errores: ' + e.message, false);

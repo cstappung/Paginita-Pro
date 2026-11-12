@@ -33,8 +33,13 @@ EM_JS(int, mkw_web_semillas, (uint32_t* s), {
 // Solo con semilla de la página (la sala la reparte): sin ella no hay número común del que partir.
 EM_JS(int, mkw_web_reloj_pedido, (), { return Module.mkwRelojFijo ? 1 : 0; });
 // ¿Los arreglos de "todo a la vista" y "los CPU no miran la cámara" (lockstep_nativo.cpp)? Module.mkwLsArreglos (?arreglos=0 los apaga)
-EM_JS(int, mkw_web_ls_arreglos, (), { return Module.mkwLsArreglos === false ? 0 : 1; });
-extern "C" int g_mkwLsArreglos = 1;
+// (§269b: una máscara de bits, para separar cada arreglo al medir: 1 = todo a la vista, 2 = los CPU no miran la cámara,
+// 4 = la fracción del cuadro fija, 8 = dibujar siempre, 16 = dibujar siempre CON la función de RR (lockstep_nativo.cpp:
+// sin ella la sala dibujaba 2 pasadas y 2 copias de más que el Single Player), 32 = cuando RR quiere saltarse un dibujo
+// (el aparato va atrasado), saltarlo como N8 (n8_nativo.cpp); true = 63, lo de siempre; false = 0;
+// ?arreglos=N = la máscara N, p. ej. 15 = como antes de §269b, 31 = sin el salto como N8)
+EM_JS(int, mkw_web_ls_arreglos, (), { const a = Module.mkwLsArreglos; return a === false ? 0 : a === true || a === undefined ? 63 : (a | 0) & 63; });
+extern "C" int g_mkwLsArreglos = 63;
 // §179 (G1): con «todo a la vista», ¿el dibujo recorta igual con las marcas de verdad de mi cámara (lockstep_nativo.cpp)?
 // Module.mkwRecorteDibujo (?recorteDibujo=0 = el dibujo también ve todo, como antes)
 // (2 = el dibujo entero, §179.2; 1 = solo las opciones de dibujo de los modelos, ?recorteDibujo=modelos; 0 = nada)
@@ -202,4 +207,38 @@ extern "C" void func_8052F924(CpuContext* ctx) {
             }
         }
     }
+}
+
+// §269b.13 (la planilla, «sincro-sala»: el juego se caía con «Missing translated function» al saltar a 0x80274A40, un
+// dato y no código). En la copa de las pruebas (modo=copa) con la semilla 1451311676 en la pista 73.0, en el cuadro 482:
+// Kart::Player::Update2 → UpdateCustomAnimations de Pulsar (las animaciones propias del piloto que agrega RR) →
+// DriverController::Update → ModelTransformator::PlayAnmNoBlend → 0x80059550 (poner el cuadro de una animación), que
+// llama a la función guardada en +0x28 del objeto de la animación: ahí había la dirección de una tabla (0x80274A40,
+// .data), el objeto no era del tipo esperado. Igual en las dos consolas (es la carrera, no la red). La guardia: si lo que
+// hay en +0x28 no es una función traducida, esa animación no avanza este cuadro (en vez de que se caiga el juego), y se
+// avisa una vez. La función solo pone el cuadro: no devuelve nada que el que la llama use después.
+extern "C" void func_80059550_traducida(CpuContext* ctx);
+EM_JS(void, mkw_web_nota_guardia_anim, (uint32_t obj, uint32_t f, int veces), {
+    if (veces <= 3 || veces % 600 === 0) console.log('[guardia] §269b.13: la animación 0x' + (obj >>> 0).toString(16) +
+        ' apunta a 0x' + (f >>> 0).toString(16) + ' (no es código): no avanza este cuadro (' + veces + ' veces)');
+    Module.mkwGuardiaAnim = veces;
+});
+// (la primera prueba con la guardia: la misma animación sigue en la lista y, en el mismo cuadro, la avanza
+// AnmObjTexPatRes::UpdateFrame —0x800596F0, el cambio de textura de la cara del piloto— por la misma +0x28; esa también
+// queda quieta mientras su +0x28 no sea código. Las dos solo escriben en el objeto: nadie usa lo que devuelven)
+static bool animacionSana(uint32_t obj, uint32_t& f) {
+    f = obj ? Memory::Read32(obj + 0x28) : 0;
+    return f && (TranslatedFunctionRegistry::FindRawByAddressPtr(f) || TranslatedFunctionRegistry::FindByAddressPtr(f));
+}
+static int guardiaVeces = 0;
+extern "C" void func_80059550(CpuContext* ctx) {
+    uint32_t f;
+    if (animacionSana(ctx->gpr[3], f)) { func_80059550_traducida(ctx); return; }
+    mkw_web_nota_guardia_anim(ctx->gpr[3], f, ++guardiaVeces);
+}
+extern "C" void func_800596F0_traducida(CpuContext* ctx);
+extern "C" void func_800596F0(CpuContext* ctx) {
+    uint32_t f;
+    if (animacionSana(ctx->gpr[3], f)) { func_800596F0_traducida(ctx); return; }
+    mkw_web_nota_guardia_anim(ctx->gpr[3], f, ++guardiaVeces);
 }

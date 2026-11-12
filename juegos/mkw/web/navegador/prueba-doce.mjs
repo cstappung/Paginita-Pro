@@ -21,11 +21,12 @@
 // Uso:  node web/navegador/prueba-doce.mjs [--n 6] [--ventana] [--puerto 8164] [--pista 13.2] [--extra "&x=y"]
 //       (MKW_BUILD = otro build, como siempre)
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { compararLargadas } from './largada-pareja.mjs';
+import { pantallaPartida } from './foto-pantalla.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -79,7 +80,11 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r({ colgada: t
   return { s: e.seccion, ls, etapa: ri ? L.u32(ri + 0x28) : -1, av, portadores, virtuales, camara,
     tipos: Array.from({ length: 12 }, (_, i) => L.u32(esc + 8 + i * 0xF0 + 0x10)),
     canales: Array.from({ length: 12 }, (_, i) => L.u8(esc + 8 + i * 0xF0 + 6)),
-    alimentados: M?._mkw_virtuales_cuadros ? M._mkw_virtuales_cuadros() : -1, miPuesto: window.mkwMiPuesto };
+    alimentados: M?._mkw_virtuales_cuadros ? M._mkw_virtuales_cuadros() : -1, miPuesto: window.mkwMiPuesto,
+    // §269: cuántas pantallas y locales tiene la carrera de ESTA consola (una vista: 1 y 1) y los fps de los últimos 10 s
+    pantallas: L.u8(esc + 5), locales: L.u8(esc + 6),
+    fps: (h => h.length ? Math.round(h.reduce((a, b) => a + (b.fps || 0), 0) / h.length * 10) / 10 : null)((window.mkwEstado?.historial || []).slice(-10)),
+    aviso: (window.mkwAvisosLento || []).filter(t => /Tu PC no alcanza/.test(t)).length };
 })]).catch(() => null);
 
 // 1) todas llegan a la carrera
@@ -128,6 +133,23 @@ if (sinPuerto.length)
   ok(`del 5.º en adelante (${sinPuerto.length}) sin puerto: canal -1 y su kart lee el portador virtual de su puesto, alimentado`,
      x.every(y => y && sinPuerto.every(i => y.canales[i] === 255 && y.portadores[i] === y.virtuales[i]) && y.alimentados > 0),
      x.map((y, k) => `${k}: canales ${y?.canales?.slice(4, N).join(',')} portador=virtual ${sinPuerto.map(i => y?.portadores?.[i] === y?.virtuales?.[i] ? 1 : 0).join('')} cuadros ${y?.alimentados}`).join(' · '));
+// §269 (la regla del dueño: cada consola dibuja SOLO su vista, nunca la pantalla partida, de 2 a 12 humanos)
+ok(`§269: cada una de las ${N} tiene una pantalla y un local (su vista)`, x.every(y => y?.pantallas === 1 && y.locales === 1),
+   x.map((y, k) => `${k}: ${y?.pantallas}/${y?.locales}`).join(' · '));
+{ const fotos = await Promise.all(paginas.map(async (p, i) => { try { return await pantallaPartida(p, readFileSync(path.join(carpeta, `${i}.png`)).toString('base64')); } catch { return null; } }));
+  // (la foto es la prueba visual; manda la memoria del juego —1 pantalla y 1 local, el punto de arriba—: con los karts
+  // contra un muro, la costura del muro en el medio de la imagen engaña al detector —medido el 2026-11-10, fotos 3 y 5 de
+  // 12: una sola vista y un solo HUD—; ahí la foto va como nota)
+  const fotoBien = (f, k) => f && !f.vacia && (!f.partida || (x[k]?.pantallas === 1 && x[k].locales === 1));
+  const dudosas = fotos.map((f, k) => f?.partida && fotoBien(f, k) ? k : null).filter(k => k !== null);
+  if (dudosas.length) console.log(`  · nota: el detector vio una costura en el medio de la foto de ${dudosas.join(', ')}, pero la memoria del juego dice 1 pantalla y 1 local (mirar build/web/datos/doce/<n>.png)`);
+  ok(`§269: en la foto de cada una se ve UNA vista, no la pantalla partida`, fotos.every(fotoBien),
+     fotos.map((f, k) => `${k}: ${f ? (f.partida ? 'PARTIDA' : f.vacia ? 'vacía' : 'una') : '—'}`).join(' · ')); }
+console.log(`  §269 fps (últimos 10 s): ${x.map((y, k) => `${k}: ${y?.fps ?? '—'}`).join(' · ')}`);
+// (con N juegos en esta PC cada pestaña puede de verdad no llegar a 60: el aviso es falso solo si salió en una pestaña
+// que iba a 57 o más en sus últimos 10 s)
+ok(`§269: ningún aviso «Tu PC no alcanza» falso (solo donde esa pestaña bajó de 57 fps)`, x.every(y => !y?.aviso || (y.fps ?? 60) < 57),
+   x.map((y, k) => `${k}: ${y?.aviso || 0} (${y?.fps ?? '—'} fps)`).join(' · '));
 ok('la cámara de cada consola sigue a su kart', x.every((y, i) => y?.camara === i), x.map(y => y?.camara).join(' '));
 const iguales = x.map(y => y?.ls?.huellasIguales || 0), desinc = x.map(y => y?.ls?.desincronizado).filter(Boolean);
 ok(`las huellas coinciden en las ${N} (la misma carrera)`, iguales.every(n => n >= 3) && !desinc.length,

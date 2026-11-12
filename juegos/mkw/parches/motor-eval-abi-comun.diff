@@ -1,0 +1,80 @@
+diff --git a/translator/src/Translator.Core/Analysis/GuestAbiInterproceduralAnalyzer.cs b/translator/src/Translator.Core/Analysis/GuestAbiInterproceduralAnalyzer.cs
+index f6817d3..aaed4a3 100644
+--- a/translator/src/Translator.Core/Analysis/GuestAbiInterproceduralAnalyzer.cs
++++ b/translator/src/Translator.Core/Analysis/GuestAbiInterproceduralAnalyzer.cs
+@@ -40,7 +40,7 @@ public static class GuestAbiInterproceduralAnalyzer
+             0,
+             addresses.Length,
+             parallelOptions,
+-            index => current[index] = GuestAbiContractAnalyzer.Analyze(bodies[index]));
++            index => current[index] = ConContratoComun(addresses[index], GuestAbiContractAnalyzer.Analyze(bodies[index])));
+ 
+         var contracts = new Dictionary<uint, GuestAbiContract>(addresses.Length);
+         for (var index = 0; index < addresses.Length; ++index) contracts.Add(addresses[index], current[index]);
+@@ -95,7 +95,7 @@ public static class GuestAbiInterproceduralAnalyzer
+             Parallel.For(0, worklistCount, parallelOptions, position =>
+             {
+                 var ordinal = worklist[position];
+-                var next = GuestAbiContractAnalyzer.Analyze(bodies[ordinal], visible);
++                var next = ConContratoComun(addresses[ordinal], GuestAbiContractAnalyzer.Analyze(bodies[ordinal], visible));
+                 roundResults[position] = Equivalent(current[ordinal], next) ? null : next;
+             });
+ 
+@@ -124,6 +124,57 @@ public static class GuestAbiInterproceduralAnalyzer
+         return new GuestAbiInterproceduralResult(contracts, BuildComponents(functions, contracts));
+     }
+ 
++    // MKW §280 (prototipo de la opción 2 de «decompilar contra traductor»): funciones cuyo análisis sale con la cerca
++    // completa (RequiresCompleteContext) solo porque más abajo llegan a algo que la pide (OSReport y las interrupciones),
++    // pero que son C común del juego: respetan la regla de la Wii (r14-r31, f14-f31 y cr2-cr4 vuelven como estaban).
++    // A quien las llama se le da ese contrato: lee todo (se guarda todo antes de llamar, como siempre), escribe solo lo
++    // volátil (al volver se recarga solo eso) y sin cerca. Así la cerca de un aviso en el camino del error deja de
++    // contagiar a la función caliente que lo llama y a todas las que llaman a esa. La lista: MKW_EVAL_ABI_COMUN
++    // (direcciones hex separadas por coma; por omisión 80026050 = nw4r::db::VWarning, el aviso de los asserts).
++    private static readonly HashSet<uint> s_contratoComun = LeerContratoComun();
++
++    private static HashSet<uint> LeerContratoComun()
++    {
++        var texto = Environment.GetEnvironmentVariable("MKW_EVAL_ABI_COMUN") ?? "80026050";
++        var conjunto = new HashSet<uint>();
++        foreach (var parte in texto.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
++        {
++            if (uint.TryParse(parte.Replace("0x", "", StringComparison.OrdinalIgnoreCase),
++                    System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var dir))
++                conjunto.Add(dir);
++        }
++        return conjunto;
++    }
++
++    private static GuestAbiContract ConContratoComun(uint address, GuestAbiContract computed)
++    {
++        if (!s_contratoComun.Contains(address)) return computed;
++        const uint gprVolatiles = 0x00001FF9u;   // r0, r3-r12
++        const uint fprVolatiles = 0x00003FFFu;   // f0-f13
++        const byte crVolatiles = 0xE3;           // cr0, cr1, cr5, cr6, cr7 (bit i = cr i)
++        return computed with
++        {
++            GprReadBeforeWriteMask = uint.MaxValue,
++            GprPossibleWriteMask = gprVolatiles & computed.GprPossibleWriteMask,
++            FprReadBeforeWriteMask = uint.MaxValue,
++            FprPossibleWriteMask = fprVolatiles & computed.FprPossibleWriteMask,
++            CrReadBeforeWriteMask = 0xFF,
++            CrPossibleWriteMask = (byte)(crVolatiles & computed.CrPossibleWriteMask),
++            ReadsXerBeforeWrite = true,
++            ReadsCtrBeforeWrite = true,
++            ReadsLrBeforeWrite = true,
++            BoundaryFlags = GuestCallBoundaryFlags.None,
++            GprDefiniteWriteMask = 0,
++            FprDefiniteWriteMask = 0,
++            CrDefiniteWriteMask = 0,
++            ReadsFpscrBeforeWrite = true,
++            GqrReadBeforeWriteMask = 0xFF,
++            GqrPossibleWriteMask = 0,
++            HidReadBeforeWriteMask = 0xFF,
++            HidPossibleWriteMask = 0,
++        };
++    }
++
+     /// <summary>
+     /// Ordinals of functions this one calls directly, from raw IR rather than
+     /// <see cref="GuestAbiContract.DirectCallTargets"/>, which omits inline save/restore thunks

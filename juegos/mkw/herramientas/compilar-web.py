@@ -328,6 +328,8 @@ def main():
                   "func_8061B9BC": "func_8061B9BC_traducida",
                   "rr_overlay_8052FB90": "rr_overlay_8052FB90_traducida",   # §73: RacedataScenario::Init de RR (pantalla propia)
                   "func_807F1094": "func_807F1094_traducida",   # §73: CtrlRaceNameBalloon::UpdatePosition (globos sin pantalla)
+                  "func_80059550": "func_80059550_traducida",   # §269b.13: poner el cuadro de una animación (la guardia del salto a 0x80274A40)
+                  "func_800596F0": "func_800596F0_traducida",   # §269b.13: AnmObjTexPatRes::UpdateFrame (la misma guardia)
                   # MEMAllocFromExpHeapEx / MEMAllocFromFrmHeapEx / ClipInfoMgr::Update / AI::Character::UpdateLookAtCamera
                   # -> web/juego/lockstep_nativo.cpp
                   # (memoria en cero y todo "a la vista" en la carrera sincronizada, §61)
@@ -445,6 +447,12 @@ def main():
     if os.environ.get("MKW_CALIENTE_COMPILAR") == "1":
         REEMPLAZOS.update({f: f"{f}_traducida" for f in CALIENTE})
         unidades += [("juego", RAIZ / "web/juego/caliente_nativo.cpp")]   # (las banderas del juego: sin fast-math, sin contraer)
+    # §280 (opción 1 de «decompilar contra traductor»): KColData::checkSphereMovement (0x807C0884) escrita como C++ común,
+    # con su comprobador (terceros/decomp-propio/decomp_nativo.cpp, ignorado: lo decompilado nunca va a git; MKW_DECOMP=0|1|2 al correr, MKW_DECOMP_DEF por omisión). Solo con
+    # MKW_DECOMP_COMPILAR=1: los programas de las otras sesiones no cambian.
+    if os.environ.get("MKW_DECOMP_COMPILAR") == "1":
+        REEMPLAZOS["func_807C0884"] = "func_807C0884_traducida"
+        unidades += [("juego", RAIZ / "terceros/decomp-propio/decomp_nativo.cpp")]   # (es decompilado: fuera de git)
     # W1 (§196): ¿el dibujo es un sumidero? y las páginas que ensucia la carrera (web/juego/sumidero_nativo.cpp, fotos de
     # la memoria alrededor de EGG::SceneManager::draw y de ScnMgr::SwitchScnRoot). Solo con MKW_SUMIDERO_COMPILAR=1
     if os.environ.get("MKW_SUMIDERO_COMPILAR") == "1":
@@ -485,6 +493,17 @@ def main():
     if N8:
         REEMPLAZOS.update({"func_8023AEAC": "func_8023AEAC_traducida", "func_80244268": "func_80244268_traducida"})
         unidades += [("thp", RAIZ / "web/juego/n8_nativo.cpp")]
+        # §274: congelar la lógica y seguir dibujando (la pausa de la sala de la auto calibración): envuelve
+        # EGG::SceneManager::calc (web/juego/congelar_nativo.cpp; con W10 no, que envuelve la misma)
+        REEMPLAZOS["func_8023AE60"] = "func_8023AE60_traducida"
+        unidades += [("thp", RAIZ / "web/juego/congelar_nativo.cpp")]
+    # §275b: la sala «Cada uno su kart» (la red nativa RKNet sin WFC): un DWC falso que lleva los paquetes RACE por la
+    # página (web/juego/red_estado_nativo.cpp; todo quieto hasta que la página llama a mkw_red_estado_config(1, …))
+    RED_ESTADO = navegador and os.environ.get("MKW_RED_ESTADO") != "0"
+    if RED_ESTADO:
+        REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("800E8654", "800D2158", "800D2170", "800D225C", "800D24B4", "800D26E8", "800D2760", "800D49B4", "800CCB64", "800D4AC8", "80653728", "80653960", "80653ABC", "80532188", "80540E3C", "8058E22C", "8058F820")})
+        REEMPLAZOS.update({"rr_overlay_800E8654": "rr_overlay_800E8654_traducida", "rr_overlay_80653728": "rr_overlay_80653728_traducida", "rr_overlay_80540E3C": "rr_overlay_80540E3C_traducida"})   # (80540E3C, 8058E22C, 8058F820: los karts de afuera con el modelo liviano)
+        unidades += [("thp", RAIZ / "web/juego/red_estado_nativo.cpp")]
     # W2 (§199): la colisión con la pista como isla (web/juego/isla_kcl_nativo.cpp + terceros/islas/kcl_807C0884.inc,
     # que arma herramientas/islas/generar-kcl.py). Solo con MKW_ISLA_COMPILAR=1; con las banderas del juego
     if os.environ.get("MKW_ISLA_COMPILAR") == "1":
@@ -672,7 +691,7 @@ def main():
                     # U1 (§140): pausar el precalentado durante la carrera; C9 (§141): cuánta memoria usa el programa
                     # de verdad (sbrk(0) = el final de lo pedido al sistema; el resto del heap está libre)
                     "_mkw_web_pipelines_pausa", "_mkw_web_profundidad", "_mkw_web_profundidad_cuenta", "_mkw_web_limpiezas", "_sbrk",   # (§177.2: G2)
-                    "_mkw_recortes_dibujo", "_mkw_dibujos_enteros",   # (§179: G1)
+                    "_mkw_recortes_dibujo", "_mkw_dibujos_enteros", "_mkw_clip_reales", "_mkw_clip_n", "_mkw_clip_dir", "_mkw_rr_saltos",   # (§179: G1; §269b: el instrumento de las ClipInfo)
                     "_mkw_graficos_quitar", "_mkw_graficos_dato", "_mkw_dibujo_saltar", "_mkw_dibujo_patron", "_mkw_dibujo_modo", "_mkw_dibujo_este_saltado",   # (§192: R2)
                     "_mkw_dibujos_saltados", "_mkw_dibujos_saltados_juego",
                     # C2 (§174): dónde está el juego (los menús o una pista) y pedir los pipelines de la pista elegida
@@ -708,6 +727,8 @@ def main():
             exports += ["_mkw_web_w31", "_mkw_web_w31_dato"]
         if os.environ.get("MKW_CALIENTE_COMPILAR") == "1":
             exports += ["_mkw_caliente_estado", "_mkw_caliente_informe"]   # (§181: N14)
+        if os.environ.get("MKW_DECOMP_COMPILAR") == "1":
+            exports += ["_mkw_decomp_estado", "_mkw_decomp_modo", "_mkw_decomp_informe"]   # (§280)
         if os.environ.get("MKW_IA30_COMPILAR") == "1":
             exports += ["_mkw_ia30_modo", "_mkw_ia30_estado", "_mkw_ia30_bits", "_mkw_ia30_vuelta"]   # (§258: W32)
         if os.environ.get("MKW_SUMIDERO_COMPILAR") == "1":
@@ -720,7 +741,10 @@ def main():
             exports += ["_mkw_w10_traza", "_mkw_w10_hecho", "_mkw_w10_cuenta", "_mkw_w10_tocadas_a", "_mkw_w10_bits_a", "_mkw_w10_palabras_deshechas", "_mkw_w10_sin_efectos", "_mkw_w10_sombra_b", "_mkw_w10_deshacer_efectos", "_mkw_w10_deshechas", "_mkw_w10_modo", "_mkw_w10_reiniciar", "_mkw_w10_dato", "_mkw_w10_host", "_mkw_w10_hilos", "_mkw_w10_rango",
                         "_mkw_w11_saltar", "_mkw_w11_dato", "_mkw_dibujar_siempre"]   # (§207: W10)
         if N8:
-            exports += ["_mkw_n8_modo", "_mkw_n8_estado", "_mkw_n8_reiniciar", "_mkw_dibujar_siempre"]   # (§219: N8)
+            exports += ["_mkw_n8_modo", "_mkw_n8_estado", "_mkw_n8_reiniciar", "_mkw_dibujar_siempre", "_mkw_n8_menus"]   # (§219: N8; §270: en los menús)
+            exports += ["_mkw_congelar", "_mkw_congelado_estado"]   # (§274: congelar la lógica y seguir dibujando)
+        if RED_ESTADO:
+            exports += ["_mkw_red_estado_config", "_mkw_red_estado_jugador", "_mkw_red_estado_llegada", "_mkw_red_estado_salida", "_mkw_red_estado_entregar", "_mkw_red_estado_estado", "_mkw_red_estado_cpu", "_mkw_red_estado_cpu_salida", "_mkw_red_estado_cpu_entregar", "_mkw_red_estado_cpu_estado", "_mkw_red_estado_llego", "_mkw_red_estado_llego_tiempo", "_mkw_red_estado_humanos", "_mkw_red_estado_dnf", "_mkw_red_estado_fin"]   # (§275b)
     else:
         exports += ["_mkw_headless_frames", "_mkw_headless_set_pad"]
         # W4 (§198): el programa que cuenta las ramas (-fprofile-instr-generate) escribe su perfil al salir con atexit,

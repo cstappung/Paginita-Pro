@@ -189,6 +189,28 @@ ok('táctil: deslizar el dedo de A a R suelta A y aprieta R', (r.botones & BOTON
 toque('pointerup', botonTactil('R'), 11); toque('pointerup', aro, 12);
 r = p0();
 ok('táctil: al levantar los dedos se suelta todo', r.botones === 0 && r.sx === 0);
+// §269, bug (e) del dueño («el mando en pantalla se buguea con la interfaz que aparece encima»): un dedo en A cuyo
+// «levantar» cae en OTRO elemento (algo de la página apareció encima y la captura no estaba) no deja A pegado
+const tapa = document.createElement('div'); tapa.style.cssText = 'position:fixed;inset:0;z-index:50'; document.body.append(tapa);
+toque('pointerdown', botonTactil('A'), 21);
+ok('§269 táctil: A apretado antes de que aparezca la interfaz', (p0().botones & BOTON.A) !== 0);
+tapa.dispatchEvent(new PointerEvent('pointerup', { pointerId: 21, bubbles: true, pointerType: 'touch' }));
+r = p0();
+ok('§269 táctil: el levantar cae en la interfaz de encima y A se suelta igual', r.botones === 0 && c.tactilDedos().dedos === 0, `botones ${r.botones}, dedos ${c.tactilDedos().dedos}`);
+tapa.remove();
+// la captura perdida (el navegador la suelta: la capa se tapó o se escondió)
+toque('pointerdown', botonTactil('A'), 22);
+ui.dispatchEvent(new PointerEvent('lostpointercapture', { pointerId: 22, bubbles: true, pointerType: 'touch' }));
+ok('§269 táctil: al perder la captura del dedo, A se suelta', (p0().botones & BOTON.A) === 0 && c.tactilDedos().dedos === 0);
+// la pestaña que se oculta con el dedo puesto (una llamada, el panel de notificaciones: a veces no llega el levantar)
+toque('pointerdown', botonTactil('A'), 23); toque('pointerdown', aro, 24, ancho * 0.45, 0);
+Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange'));
+r = p0();
+delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange'));
+ok('§269 táctil: al ocultarse la pestaña con dos dedos puestos se suelta todo', r.botones === 0 && r.sx === 0 && c.tactilDedos().dedos === 0, `botones ${r.botones}, sx ${r.sx}`);
+toque('pointerdown', botonTactil('A'), 25);
+ok('§269 táctil: y el mando vuelve a responder', (p0().botones & BOTON.A) !== 0);
+toque('pointerup', botonTactil('A'), 25);
 c.tactil(false);
 
 // ---- 5) inclinar para dirigir ----

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mandos entre ventanas</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Mandos entre ventanas: <span>dos ventanas de la sala en un PC, cada una su mando</span></h1>
+<p>Prueba <code>web/navegador/mandos-ventanas.mjs</code> (bitácora §269, bug 3: «uno juega y el otro no puede moverse»)
+  <b>sin el juego</b>: dos «ventanas» con un canal de mentira entre ellas y dos mandos de mentira. Chrome les da los
+  mandos solo a la ventana con el foco: la otra usa la foto que publica la enfocada. Con 2 ventanas cada una usa el mando
+  de su puesto (por orden de llegada); con una sola, todos. También el canal de verdad (BroadcastChannel) entre dos marcos.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearMandosVentanas, VIGENCIA_FOTO_MS, VIGENCIA_VENTANA_MS } from '/web/navegador/mandos-ventanas.mjs';
+
+const { ok, nota, fin } = prueba('mandos-ventanas', 'Mandos entre ventanas (sin el juego)');
+// un canal de mentira: lo que manda uno le llega al otro en el momento (sin copia asíncrona: la prueba es determinista)
+function canales() { const a = { postMessage: m => b.onmessage?.({ data: structuredClone(m) }) }, b = { postMessage: m => a.onmessage?.({ data: structuredClone(m) }) }; return [a, b]; }
+const mando = (index, apretado) => ({ index, id: `Mando ${index} (STANDARD GAMEPAD)`, mapping: 'standard', timestamp: 1, axes: [0, 0, 0, 0],
+  buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: i === 0 && apretado, value: i === 0 && apretado ? 1 : 0 })) });
+
+try {
+  let t = 1000; const ahora = () => t;
+  const [ca, cb] = canales();
+  let focoA = true;
+  const A = crearMandosVentanas({ canal: ca, ahora, tieneFoco: () => focoA, id: 'a', desde: 100 });
+  const B = crearMandosVentanas({ canal: cb, ahora, tieneFoco: () => !focoA, id: 'b', desde: 200 });
+  const dos = [mando(0, true), mando(1, false)];
+
+  // ---- 1. Sin activar: nada cambia ----
+  ok('sin activar (fuera de la sala): todos los mandos pasan tal cual', A.elegir(dos).length === 2 && B.elegir([]).length === 0);
+
+  // ---- 2. Una sola ventana en la sala ----
+  A.activar();
+  ok('una sola ventana en la sala: todos los mandos (se juntan en su jugador)', A.elegir(dos).length === 2 && A.estado.ventanas === 1);
+  A.parar(); A.activar();
+
+  // ---- 3. Dos ventanas ----
+  B.activar();
+  ok('las dos se ven: la fila tiene 2', (A.elegir(dos), A.estado.ventanas === 2) && (B.elegir([]), B.estado.ventanas === 2));
+  ok('A llegó primero: puesto 0; B: puesto 1', A.estado.puesto === 0 && B.estado.puesto === 1);
+  const la = A.elegir(dos);
+  ok('A (con el foco, ve los dos) usa SOLO el 1.er mando', la.length === 1 && la[0].index === 0);
+  const lb = B.elegir([]);
+  ok('B (sin el foco, Chrome le da la lista vacía) usa el 2.º mando, de la foto de A', lb.length === 1 && lb[0].index === 1 && B.estado.usandoFoto);
+  ok('…con sus botones y ejes', Array.isArray(lb[0].buttons) && lb[0].buttons.length === 17 && lb[0].axes.length === 4);
+  dos[1] = mando(1, true); A.elegir(dos);
+  ok('B aprieta A en su mando: le llega a B en la foto siguiente', B.elegir([])[0].buttons[0].pressed === true);
+  ok('…y A no lo ve en su jugador (sigue con el suyo)', A.elegir(dos)[0].index === 0);
+
+  // ---- 4. El foco cambia de ventana ----
+  focoA = false;
+  const lb2 = B.elegir(dos), la2 = A.elegir([]);
+  ok('el foco pasa a B: B lee los de verdad y usa el 2.º; A usa el 1.º de la foto de B', lb2[0]?.index === 1 && la2[0]?.index === 0 && A.estado.usandoFoto);
+
+  // ---- 5. Las dos ven los mandos (si Chrome se los diera a las dos) ----
+  ok('si las dos ven los dos mandos, igual cada una el suyo (no los dos karts con los dos mandos)', A.elegir(dos)[0].index === 0 && A.elegir(dos).length === 1 && B.elegir(dos)[0].index === 1);
+
+  // ---- 6. Foto vieja ----
+  t += VIGENCIA_FOTO_MS + 10;
+  ok('una foto de hace más de 250 ms no vale (la otra se cerró o perdió el foco)', A.elegir([]).length === 0);
+
+  // ---- 7. Un solo mando ----
+  focoA = true;
+  const uno = [mando(0, true)];
+  ok('con un solo mando: el de la 1.ª ventana; la 2.ª maneja con el teclado (el foco)', A.elegir(uno).length === 1 && B.elegir([]).length === 0);
+
+  // ---- 8. Se va una ventana ----
+  B.parar();
+  ok('B se fue (adiós): A vuelve a tener todos', A.elegir(dos).length === 2 && A.estado.ventanas === 1);
+  B.activar(); A.elegir(dos);
+  ok('B vuelve: otra vez uno cada una', A.elegir(dos).length === 1);
+  B.parar(); B.activar();   // (otra vez, para la prueba de la ventana muda)
+  const C = crearMandosVentanas({ canal: null, ahora, id: 'c' });
+  ok('sin canal (navegador sin BroadcastChannel): todos, sin errores', (C.activar(), C.elegir(dos).length === 2));
+  // una ventana que muere sin decir adiós (la pestaña se cayó): a los 3 s sale de la fila
+  const [cx, cy] = canales();
+  const X = crearMandosVentanas({ canal: cx, ahora, tieneFoco: () => true, id: 'x', desde: 1 });
+  const Y = crearMandosVentanas({ canal: cy, ahora, tieneFoco: () => false, id: 'y', desde: 2 });
+  X.activar(); Y.activar();
+  ok('X e Y en la fila', (X.elegir(dos), X.estado.ventanas === 2));
+  cy.postMessage = () => {};   // (Y se calla de golpe)
+  t += VIGENCIA_VENTANA_MS + 100;
+  ok('Y muda más de 3 s: X vuelve a tener todos', X.elegir(dos).length === 2);
+  [A, B, X, Y].forEach(v => v.parar());
+
+  // ---- 9. El canal de verdad entre dos marcos ----
+  const marco = () => new Promise(r => { const f = document.createElement('iframe'); f.src = 'about:blank'; f.onload = () => r(f); document.body.append(f); });
+  if (typeof BroadcastChannel !== 'undefined') {
+    const n = 'mkw-mandos-ventanas-prueba-' + Math.random().toString(36).slice(2);
+    const r1 = crearMandosVentanas({ canal: new BroadcastChannel(n), tieneFoco: () => true, id: 'r1', desde: 1 });
+    const r2 = crearMandosVentanas({ canal: new BroadcastChannel(n), tieneFoco: () => false, id: 'r2', desde: 2 });
+    r1.activar(); r2.activar();
+    await new Promise(r => setTimeout(r, 100));
+    r1.elegir(dos); await new Promise(r => setTimeout(r, 50));
+    const v = r2.elegir([]);
+    ok('BroadcastChannel de verdad: la 2.ª recibe la foto y usa el 2.º mando', v.length === 1 && v[0].index === 1, JSON.stringify(r2.estado));
+    r1.parar(); r2.parar();
+  }
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

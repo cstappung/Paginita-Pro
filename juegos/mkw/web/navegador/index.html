@@ -84,6 +84,16 @@
   #cortina p { margin: 0; color: var(--suave); font-size: 14px; min-height: 1.5em; }
   #cortina.mal p { color: var(--peligro); }
   #cortina.mal .carga { visibility: hidden; }
+  /* §276b: la señal de vida (cartel-carga.mjs): un puntito que gira (lo mueve el compositor aunque la página esté ocupada)
+     y los segundos; la línea tranquila si una fase tarda. Solo texto: nada encima del juego */
+  #cortinaVivo { display: none; margin-top: 6px !important; font-size: 12px !important; opacity: .75; font-variant-numeric: tabular-nums; }
+  #cortinaVivo.si { display: block; }
+  #cortinaVivo i { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; vertical-align: 0;
+    border: 2px solid var(--lila); border-right-color: transparent; animation: cortina-gira .8s linear infinite; }
+  #cortinaCalma { font-size: 13px !important; max-width: min(420px, 86vw); margin: 8px auto 0 !important; }
+  #cortinaCalma:empty { display: none; }
+  body.sin-cortina #cortinaVivo i { animation: none; }
+  @keyframes cortina-gira { to { transform: rotate(360deg); } }
   @keyframes cortina-ida { from { transform: translateX(-10%); } to { transform: translateX(195%); } }
   @media (prefers-reduced-motion: reduce) { #cortina .carga i { animation: none; width: 100%; opacity: .6; } #cortina { transition: none; } }
   .tarjeta { width: 460px; max-width: 100%; box-sizing: border-box; padding: 26px; border-radius: 18px;
@@ -361,6 +371,9 @@
   /* ---- elegir copa, pista o armar una lista (§56, §74; repasado con una revisión crítica del diseño) ---- */
   #elegirPista { position: fixed; inset: 0; z-index: 9; overflow: auto; overscroll-behavior: contain; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
     background: radial-gradient(ellipse 60% 45% at 50% -10%, #7042df44, transparent 70%), linear-gradient(170deg, #120f2a, #1b1440 45%, #1d1030); }
+  /* §271: la pastilla para volver al selector escondido (encima del juego, debajo del cajón, que es z-index 8) */
+  #elegirVolver { position: fixed; z-index: 7; left: 50%; bottom: calc(var(--sb) + 18px); transform: translateX(-50%); padding: 10px 18px;
+    font-size: 15px; border-radius: 999px; box-shadow: 0 6px 20px #0008; }
   .elegir-cab, .elegir-cuerpo { max-width: 1320px; margin-left: auto; margin-right: auto; }
   /* la cabecera (título, buscador, salida) queda arriba al desplazar: con 80 copas el buscador es lo que más se usa */
   .elegir-cab { position: sticky; top: calc(-16px - var(--st)); z-index: 3; margin-top: calc(-16px - var(--st)); margin-bottom: 4px;
@@ -762,6 +775,8 @@
     <span class="sub">+ Retro Rewind</span>
     <div class="carga"><i></i></div>
     <p id="cortinaTexto">Cargando el juego…</p>
+    <p id="cortinaVivo" aria-hidden="true"><i></i><span></span></p>
+    <p id="cortinaCalma"></p>
   </div>
 </div>
 

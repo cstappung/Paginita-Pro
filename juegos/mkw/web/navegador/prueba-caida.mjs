@@ -58,7 +58,9 @@ const pagina = await navegador.newPage({ viewport: CAMBIAR ? { width: 960, heigh
 pagina.on('pageerror', e => console.log('[pageerror] ' + e.message));
 let codigo = 1;
 try {
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=tt&copa=${COPA}&fila=${FILA}&fantasma=0${opcion('--extra', '')}`);
+  // (§269b.12: sin el medidor de fps que las pruebas muestran siempre —2026-11-02—: desde §270 dice también «Juego …/s
+  // (1 % bajo …)» y llega a la franja de arriba que esta prueba mide, que en el negro tiene que estar negra)
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=tt&copa=${COPA}&fila=${FILA}&fantasma=0&verFps=0${opcion('--extra', '')}`);
   const llego = await pagina.waitForFunction(() => window.mkwEstado?.piloto, null, { timeout: 150000, polling: 500 }).then(h => h.jsonValue(), () => null);
   if (!llego?.llego) throw new Error('el piloto no llegó a la carrera');
   // la cuenta regresiva: Raceinfo +0x28 (0-1 presentación y cuenta, 2 corriendo)

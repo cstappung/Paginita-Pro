@@ -90,11 +90,37 @@ import { crearPlaylistSala } from './playlist-sala.mjs';
 import { VR_MAXIMO, copiaRegla } from './vr-sala.mjs';
 
 export const MARCA_SALA = 0xA8;
+// §269 (el dueño, con 2 PCs: una puede tener en caché la página vieja —GitHub Pages guarda 10 min— y la otra la nueva;
+// la sala y el lockstep de dos versiones no se entienden y a uno lo dejan sin botones). El número de la sala: se sube
+// cuando cambia algo que todas las consolas tienen que hacer igual (el lockstep, la sala). Va en cada latido ({ver}); una
+// página sin él es de antes de §269. versionDistinta(mia, suya) = qué pasa: null (iguales), 'vieja' (la otra es más
+// vieja o no dice), 'mia' (la mía es la vieja)
+export const VERSION_SALA = 269;
+export function versionDistinta(mia, suya) {
+  if (!Number.isFinite(suya)) return 'vieja';
+  return suya === mia ? null : suya < mia ? 'vieja' : 'mia';
+}
 export const SEGUNDOS_ELEGIR = 45;
 export const SEGUNDOS_RESULTADOS = 30;         // §94: el descanso entre carreras (los resultados), antes de la siguiente
 // M22 (el crítico: el anfitrión elegía la copa sin reloj y los demás esperaban a ciegas): el plazo para elegir la copa.
 // Al vencer, la sala le avisa a la página de la anfitriona (alVencioCopa) y ella pone una al azar. En la playlist, no
 export const SEGUNDOS_COPA = 90;
+// §269b.14 (el dueño: «empieza el contador antes de que cargue el juego para todos, manda un aviso de esperando jugadores
+// y empieza el contador una vez que haya cargado para todos»): ningún plazo de la sala (el reloj de la copa, la elección
+// de 45 s, el descanso) empieza hasta que TODAS las consolas tienen el juego cargado (cada latido dice si la suya ya está
+// preparada, §99). Mientras, el estado lleva quiénes faltan (faltanCarga) y cada página muestra «Esperando a los
+// jugadores…». Tope: TOPE_CARGA_MS; pasado eso la anfitriona sigue sin los que faltan, que entran en la carrera
+// siguiente como siempre. ?esperarCarga=0 = como antes
+export const ESPERAR_CARGA = !/[?&]esperarCarga=0\b/.test(globalThis.location?.search || '');
+export const TOPE_CARGA_MS = 90000;
+// §285 (el dueño: «entre que entra y parte el contador de 3 2 1, todos los jugadores deben empezar al mismo tiempo y
+// tener la carrera descargada al 100 %; pone un aviso de pausa»): cada latido dice cuánto del paquete de la carrera en
+// curso tiene bajado su consola (pq: [carrera, %]). Cada consola se queda quieta en el primer cuadro de la carrera
+// (mkw.mjs: lockstep.congelarEn + mkw_congelar) hasta que la anfitriona anota paqueteOk = { n, en }: todos al 100 % (o
+// pasaron TOPE_PAQUETE_MS: sigue sin los que faltan); en = la hora de la sala en que todas sueltan, la misma para todas.
+// Mientras, paqueteFaltan = { n, de: { uid: % } } (el aviso). ?esperarPaquete=0 = como antes
+export const ESPERAR_PAQUETE = !/[?&]esperarPaquete=0/.test(globalThis.location?.search || '');
+export const TOPE_PAQUETE_MS = 90000, SUELTA_PAQUETE_MS = 400;
 // §100 («Pedir copa»): las copas que se pueden pedir (las de Retro Rewind son menos: el tope solo frena números locos)
 export const MAX_COPAS = 128;
 // la copa más pedida (copa → cuántos la piden; empate: la que pidió primero alguien de más arriba en la sala), o -1
@@ -105,6 +131,20 @@ export function copaMasPedida(pedidas, humanos = []) {
   const orden = u => { const i = humanos.findIndex(h => h.uid === u); return i < 0 ? 99 : i; };
   const primero = c => Math.min(...Object.entries(pedidas).filter(([, x]) => x === c).map(([u]) => orden(u)));
   return [...cuenta].sort((a, b) => b[1] - a[1] || primero(a[0]) - primero(b[0]))[0][0];
+}
+// §274: la pausa de la sala (la «⚡ Auto calibración» de uno): como mucho 30 s, una a la vez, y una por persona en cada
+// carrera (o en cada fase de los menús de la sala)
+export const PAUSA_MAX_MS = 30000;
+export const PAUSA_MIN_MS = 3000;
+export const MARGEN_PAUSA_CUADROS = 60;      // la carrera se congela este tanto después del cuadro de quien la pidió (1 s)
+// el «por qué no» de una pausa pedida (o '' si se puede): otra = ya hay una; usada = ya usaste la tuya en esta carrera;
+// fin = la copa terminó; nadie = no es de la sala
+export const usoPausa = estado => `${estado?.fase}:${estado?.carrera | 0}`;
+export function motivoPausaNo(estado, uid, t) {
+  if (!estado || estado.fase === 'fin') return 'fin';
+  if (estado.pausaSala && t < estado.pausaSala.hasta) return 'otra';
+  if (estado.pausasUsadas?.[uid] === usoPausa(estado)) return 'usada';
+  return '';
 }
 export const MINIMO_AL_AGREGAR_MS = 15000;     // §94: agregar o sugerir con menos de esto por delante: vuelve a esto
 const REPARTO_MS = 1000;
@@ -138,6 +178,9 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   ahora = () => Date.now(), cada = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id),
   registro = () => {}, segundosElegir = SEGUNDOS_ELEGIR, segundosResultados = SEGUNDOS_RESULTADOS, alSalta = () => {},
   segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {}, esperarListo = false,
+  esperarCarga = ESPERAR_CARGA, topeCarga = TOPE_CARGA_MS, esperarPaquete = ESPERAR_PAQUETE, topePaquete = TOPE_PAQUETE_MS,   // §269b.14: los plazos esperan la carga de todos
+  // §269: alguien de la sala tiene otra versión de la página (uid, 'vieja' | 'mia', su número o null)
+  alVersion = () => {},
   // §100: uid => true si esa página se fue (la página: ni en el buzón ni con su WebRTC sano); sin ella, solo el silencio largo
   ido = () => false,
   // §110: cuántos de `humanos` estaban al empezar la copa (los demás son sumados: llegaron después)
@@ -145,7 +188,9 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   // N12 (§233): cómo le fue a esta página en su última carrera ({l: cuadros de lógica por segundo, ms: CPU por imagen} o
   // null): va en el latido, y antes de largar la sala avisa quién no llega a 60 (escalon.mjs)
   capacidad = () => null,
-  servidor = null }) {
+  servidor = null,
+  // §274: la anfitriona dijo que no a mi pausa (motivo de motivoPausaNo)
+  alPausaNo = () => {} }) {
   // §110: una lista propia (crece con sumar): la de la carrera sincronizada cambia recién al empezar cada carrera
   const humanos = humanosIniciales.map(h => ({ ...h }));
   let jefe = anfitrion, deQuien = anfitrion;      // quién manda ahora, y de quién vino la última copia aceptada
@@ -196,6 +241,56 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   const conocer = e => { for (const [u] of e?.sumados || []) if (typeof u === 'string' && !esHumano(u)) humanos.push({ uid: u, mando: humanos.length }); };
   const baseDe = () => Number.isInteger(estado.base) ? estado.base : humanos.length;
   const esSumado = u => (estado.sumados || []).some(([x]) => x === u);
+  // §269b.14: quién tiene el juego cargado (su latido: c = 1), y desde cuándo espero a los que faltan
+  const cargados = new Map(), rendidosCarga = new Set();
+  let esperaCargaDesde = null;
+  // (el que no da señales —ausentes, §75— no se espera: no está cargando, no está; corre fuera como siempre. El que carga
+  // sí manda su latido, con c = 0)
+  const faltanCarga = () => { if (!esperarCarga) return []; const aus = new Set(ausentes());
+    return humanos.filter(h => !sacados.has(h.uid) && !esSumado(h.uid) && !rendidosCarga.has(h.uid) && !aus.has(h.uid)
+      && (h.uid === yo ? !listoCopa : !cargados.get(h.uid))).map(h => h.uid); };
+  // ¿pueden empezar los plazos? (la anfitriona, en revisar). Anota en el estado a los que faltan (lo ven todas las páginas)
+  function cargaLista(t) {
+    const f = faltanCarga();
+    if (f.length && esperaCargaDesde === null) esperaCargaDesde = t;
+    if (f.length && t - esperaCargaDesde >= topeCarga) {
+      registro(`[sala] §269b.14: pasaron ${(topeCarga / 1000).toFixed(0)} s y no cargaron ${f.join(', ')}: sigo sin ellos (entran en la carrera siguiente)`);
+      for (const u of f) rendidosCarga.add(u);
+      return cargaLista(t);
+    }
+    if (!f.length) esperaCargaDesde = null;
+    const antes = estado.faltanCarga || [];
+    if (antes.length !== f.length || antes.some((u, i) => u !== f[i])) cambiar({ faltanCarga: f });
+    return !f.length;
+  }
+  // §285: lo que dice cada latido del paquete de la carrera (uid → [n, %]; el que nunca lo dijo es una página de antes: no
+  // se lo espera) y lo mío
+  const pqDe = new Map();
+  let miPaquete = [0, 0], paqueteDesde = null;
+  function revisarPaquete(t) {
+    const n = estado.carrera;
+    if (!esperarPaquete || estado.fase !== 'correr' || !(n >= 1) || estado.paqueteOk?.n === n || estado.terminaron?.[n]) return;
+    const aus = new Set(ausentes()), fuera = new Set(estado.fuera || []);
+    const de = {};
+    for (const h of correnEn(humanos, estado, n)) {
+      if (sacados.has(h.uid) || aus.has(h.uid) || fuera.has(h.uid)) continue;
+      const pq = h.uid === yo ? miPaquete : pqDe.get(h.uid);
+      if (h.uid !== yo && pq === undefined) continue;                    // (página de antes)
+      const pct = pq[0] === n ? pq[1] : 0;
+      if (pct < 100) de[h.uid] = pct;
+    }
+    const faltan = Object.keys(de);
+    if (paqueteDesde === null || paqueteDesde.n !== n) paqueteDesde = { n, t };
+    const tope = t - paqueteDesde.t >= topePaquete;
+    if (!faltan.length || tope) {
+      if (tope) registro(`[sala] §285: pasaron ${(topePaquete / 1000).toFixed(0)} s y no terminaron de bajar la carrera ${n}: ${faltan.map(u => `${u} ${de[u]} %`).join(', ')}: largamos igual`);
+      else registro(`[sala] §285: todos tienen la carrera ${n} bajada (${((t - paqueteDesde.t) / 1000).toFixed(1)} s): largamos`);
+      cambiar({ paqueteOk: { n, en: t + SUELTA_PAQUETE_MS, ...(tope ? { sin: faltan } : {}) }, paqueteFaltan: null });
+      return;
+    }
+    const antes = estado.paqueteFaltan;
+    if (!antes || antes.n !== n || JSON.stringify(antes.de) !== JSON.stringify(de)) cambiar({ paqueteFaltan: { n, de } });
+  }
   // ¿uid corre la carrera n? (los de la base siempre; los sumados desde su carrera)
   const corre = (u, n) => correnEn(humanos, estado, n).some(h => h.uid === u);
   // §110: al empezar la carrera n, los sumados que ya dan señales corren desde esta (desde = n)
@@ -253,16 +348,27 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   }
   let vencida = 0;                                // M22: el plazo de la copa que ya se avisó (uno por plazo)
   let listoCopa = !esperarListo;                  // §99: el reloj de la copa corre recién con la página preparada
+  // §274: la pausa termina (pedido de quien calibra, o su tope): los plazos que corrían se corren lo que duró (así el
+  // reloj de la copa, la elección y el descanso siguen desde el mismo segundo en todos los PC)
+  function terminarPausaSala(por) {
+    const p = estado.pausaSala; if (!p) return;
+    const d = Math.max(0, Math.min(ahora(), p.hasta) - p.desde);
+    registro(`[sala] §274 fin de la pausa de ${p.de} (${por}, ${(d / 1000).toFixed(1)} s)`);
+    cambiar({ pausaSala: null, ...(estado.plazo ? { plazo: estado.plazo + d } : {}) });
+  }
   function revisar() {
     if (!soy()) return;
     const t = ahora();
+    // §274: con la sala en pausa no vence nada ni cambia de fase
+    if (estado.pausaSala) { if (t >= estado.pausaSala.hasta) terminarPausaSala('tope'); else return; }
+    revisarPaquete(t);                            // (§285)
     // §110: los que conozco después de la base y la anfitriona todavía no anotó (el sitio me los dijo antes de que la sala
     // estuviera lista, o era otra la anfitriona): a sumados, en su orden
     if (lista) {
       const faltan = humanos.slice(baseDe()).filter(h => !esSumado(h.uid)).slice(0, Math.max(0, 12 - baseDe() - (estado.sumados || []).length));
       if (faltan.length) cambiar({ sumados: [...(estado.sumados || []), ...faltan.map(h => [h.uid, 0])] });
     }
-    if (estado.fase === 'copa' && !estado.lista && lista && segundosCopa > 0 && listoCopa) {
+    if (estado.fase === 'copa' && !estado.lista && lista && segundosCopa > 0 && listoCopa && (estado.plazo || cargaLista(t))) {
       // M22: la copa con reloj (lo ven todos); al vencer, la página de la anfitriona pone una al azar
       if (!estado.plazo) cambiar({ plazo: t + segundosCopa * 1000 });
       else if (t >= estado.plazo && vencida !== estado.plazo) { vencida = estado.plazo; alVencioCopa(); }
@@ -270,7 +376,9 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
       // (§110: el sumado que todavía no carga no frena la elección: corre desde la carrera en que ya dé señales)
       const aus = new Set(ausentes());
       const todos = humanos.every(h => estado.picks[h.uid] || (esSumado(h.uid) && aus.has(h.uid)));
-      if (todos || t >= estado.plazo) {
+      // (§269b.14: el plazo de 45 s corre recién con todos cargados)
+      if (!estado.plazo && !todos) { if (cargaLista(t)) cambiar({ plazo: t + segundosElegir * 1000 }); }
+      else if (todos || t >= estado.plazo) {
         const picks = { ...estado.picks };
         humanos.forEach((h, i) => { if (!picks[h.uid]) picks[h.uid] = { personaje: POR_OMISION[i % 4][0], vehiculo: POR_OMISION[i % 4][1], derrape: 0, solo: true }; });
         const sumados = unir(1);
@@ -281,7 +389,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
     } else if (estado.fase === 'correr') {
       // la carrera n terminó para todos los que siguen (o para el anfitrión hace rato: quien se fue no avisa)
       const n = estado.carrera, fin = estado.terminaron[n];
-      if (fin && !estado.plazo) cambiar({ plazo: t + segundosResultados * 1000 });
+      if (fin && !estado.plazo) { if (cargaLista(t)) cambiar({ plazo: t + segundosResultados * 1000 }); }   // (§269b.14)
       else if (estado.plazo && t >= estado.plazo) {
         if (n >= estado.carreras) cambiar({ fase: 'fin', plazo: 0, pausa: 0 });
         else {
@@ -297,7 +405,8 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   // (§100, H1.4: el latido dice también a quién tengo de anfitriona y hace cuánto la oigo directo: así los demás saben
   // si tienen que pasarme sus repartos)
   // (§100, H9: y si ya sé en qué va la sala —l—: la que acaba de abrir recibe el estado al primer latido)
-  const latido = () => { const cap = capacidad(); aTodos({ t: 'aqui', v: estado.version, l: lista ? 1 : 0, salta: salto, t0: ahora(), j: jefe,
+  const versionesAvisadas = new Map(), estadoVersiones = {};   // §269: uid → su número (si no es el mío)
+  const latido = () => { const cap = capacidad(); aTodos({ t: 'aqui', ver: VERSION_SALA, v: estado.version, l: lista ? 1 : 0, c: listoCopa ? 1 : 0, pq: miPaquete, salta: salto, t0: ahora(), j: jefe,
     oj: soy() ? 0 : Math.min(9e6, Math.round(ahora() - (directo.get(jefe) ?? -9e6))), ...(cap ? { cap } : {}),
     ...(servidor?.() ? { srv: true } : {}) }); };
   // el mando pasa a uid (el sitio lo nombró, o §100 el reemplazo provisorio). La nueva sigue desde su última copia del
@@ -312,7 +421,9 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
     if (soy()) {
       deQuien = yo; lista = true;
       for (const h of humanos) if (h.uid !== ida) vistos.set(h.uid, ahora());
-      cambiar(estado.plazo && d ? { plazo: estado.plazo - d } : {}); revisar();
+      cambiar({ ...(estado.plazo && d ? { plazo: estado.plazo - d } : {}),
+                ...(estado.pausaSala && d ? { pausaSala: { ...estado.pausaSala, desde: estado.pausaSala.desde - d, hasta: estado.pausaSala.hasta - d } } : {}) });   // (§274)
+      revisar();
     } else if (lista) alCambiar(estado);
   }
   // §100: ¿la anfitriona se fue? (ver JEFE_IDO_MS; lo que llega de ella por otro, H1.4, también cuenta como oírla) Si se
@@ -366,6 +477,13 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
       return;
     }
     if (m.t === 'aqui') {
+      // §269: ¿la misma versión de la página? (se avisa una vez por cada uid y cada número)
+      if (esHumano(de) && de !== yo) { const sv = Number.isFinite(m.ver) ? m.ver : null, que = versionDistinta(VERSION_SALA, sv);
+        if (que && versionesAvisadas.get(de) !== sv) { versionesAvisadas.set(de, sv); estadoVersiones[de] = sv; registro(`[sala] ⚠ §269: ${de} tiene otra versión de la página (${sv ?? 'de antes de §269'}; la mía ${VERSION_SALA})`); alVersion(de, que, sv); }
+        else if (!que) { versionesAvisadas.delete(de); delete estadoVersiones[de]; } }
+      // (§269b.14; una página de antes, sin «c», cuenta como cargada: no se la espera 90 s)
+      if (esHumano(de)) { const c = !('c' in m) || m.c === 1; cargados.set(de, c); if (c) rendidosCarga.delete(de); }
+      if (esHumano(de) && Array.isArray(m.pq) && m.pq.length === 2) pqDe.set(de, [m.pq[0] | 0, m.pq[1] | 0]);   // (§285)
       if (esHumano(de)) {
         if (m.srv === true) servidorVisto.set(de, ahora());
         else servidorVisto.delete(de);
@@ -445,6 +563,20 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
       const c = m.copa;
       if (!Number.isInteger(c) || c < 0 || c >= MAX_COPAS || estado.pedidas?.[de] === c) return;
       cambiar({ pedidas: { ...(estado.pedidas || {}), [de]: c } });
+    } else if (m.t === 'pausaNo' && (de === jefe || de === yo)) {
+      alPausaNo(m.motivo || '');
+    } else if (soy() && m.t === 'pausaPido' && esHumano(de)) {
+      // §274: alguien pide pausar la sala para calibrar su imagen: una a la vez, una por persona en cada carrera, 30 s
+      // como mucho. cuadro = el de la carrera desde el que se congela (null fuera de la carrera)
+      const t = ahora(), motivo = motivoPausaNo(estado, de, t);
+      if (motivo) { const r = { t: 'pausaNo', motivo }; if (de === yo) alPausaNo(motivo); else enviar(de, codificar(r)); return; }
+      const ms = Math.max(PAUSA_MIN_MS, Math.min(PAUSA_MAX_MS, Number(m.ms) || PAUSA_MAX_MS));
+      const cuadro = Number.isInteger(m.cuadro) && m.cuadro >= 0 ? m.cuadro : null;
+      registro(`[sala] §274 pausa de ${de} por ${(ms / 1000).toFixed(0)} s${cuadro !== null ? ` desde el cuadro ${cuadro}` : ''}`);
+      cambiar({ pausaSala: { de, desde: t, hasta: t + ms, cuadro, id: (estado.pausaId | 0) + 1 }, pausaId: (estado.pausaId | 0) + 1,
+                pausasUsadas: { ...(estado.pausasUsadas || {}), [de]: usoPausa(estado) } });
+    } else if (soy() && m.t === 'pausaFin' && estado.pausaSala?.de === de) {
+      terminarPausaSala('terminó');
     } else if (soy() && m.t === 'pj' && esHumano(de) && (estado.fase === 'elegir' || enDescanso())) {
       const p = { personaje: m.personaje | 0, vehiculo: m.vehiculo | 0, derrape: m.derrape | 0 };
       if (p.personaje < 0 || p.personaje > 47 || p.vehiculo < 0 || p.vehiculo > 35) return;
@@ -511,6 +643,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   }
 
   return {
+    versiones: () => ({ mia: VERSION_SALA, distintas: { ...estadoVersiones } }),   // §269
     // N12 (§233): uid → {l, ms} de cada humano que lo dijo en su latido (y el mío)
     capacidades() { const o = Object.fromEntries(capacidades); const c = capacidad(); if (c) o[yo] = c; return o; },
     alBinario,
@@ -533,11 +666,11 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
       if (estado.lista) {
         const pl = crearPlaylistSala({ estado: estado.lista });
         if (!pl.ponerPistas(pistas)) return false;
-        cambiar({ fase: 'elegir', lista: pl.exportar(), pistas: pl.pistas, carreras: pl.pistas.length, plazo: ahora() + segundosElegir * 1000, pedidas: {} });
+        cambiar({ fase: 'elegir', lista: pl.exportar(), pistas: pl.pistas, carreras: pl.pistas.length, plazo: faltanCarga().length ? 0 : ahora() + segundosElegir * 1000, pedidas: {} });
         return true;
       }
       cambiar({ fase: 'elegir', pistas: pistas.slice(0, 32).map(p => ({ copa: p.copa | 0, fila: p.fila | 0 })), carreras: Math.min(pistas.length, 32),
-                plazo: ahora() + segundosElegir * 1000, pedidas: {} });
+                plazo: faltanCarga().length ? 0 : ahora() + segundosElegir * 1000, pedidas: {} });
       return true;
     },
     // §74, la playlist. Sugerir (todos): lo que diría la copia que tengo y, si vale, se le manda al anfitrión
@@ -591,7 +724,20 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
                       ...(Number.isFinite(estable.margen) ? { margen: Math.round(estable.margen) } : {}), ...(typeof estable.tel === 'boolean' ? { tel: estable.tel } : {}) } : null });
     },
     // §94: cuánto falta para un plazo de la sala (una hora del reloj de la anfitriona), en ms (0 si ya pasó)
-    restan(plazo) { return plazo ? Math.max(0, plazo - (ahora() + (soy() ? 0 : desfaseNtp ?? desfase))) : 0; },
+    // (§274: con la sala en pausa, los plazos quedan quietos en lo que faltaba al empezarla; el de la pausa misma corre)
+    restan(plazo) {
+      const p = estado.pausaSala;
+      if (plazo && p && plazo !== p.hasta) return Math.max(0, plazo - p.desde);
+      return plazo ? Math.max(0, plazo - (ahora() + (soy() ? 0 : desfaseNtp ?? desfase))) : 0;
+    },
+    // §274: pedir la pausa de la sala (ms como mucho, desde el cuadro `cuadro` de la carrera o null) y terminarla
+    pedirPausa({ ms = PAUSA_MAX_MS, cuadro = null } = {}) {
+      if (!lista) return false;
+      alAnfitrion({ t: 'pausaPido', ms, cuadro });
+      return true;
+    },
+    terminarPausa() { if (estado.pausaSala?.de === yo) alAnfitrion({ t: 'pausaFin' }); },
+    get pausa() { return estado.pausaSala || null; },
     // (§99: la diferencia de reloj con la anfitriona que se está usando, ms; para las pruebas)
     get desfase() { return soy() ? 0 : desfaseNtp ?? desfase; },
     // ¿esta carrera ya la arranqué? (para arrancar cada una una sola vez)
@@ -627,6 +773,9 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
     },
     // §99: la página está preparada (la lista de copas se puede abrir sin trabarse): desde ahora corre el reloj de la copa
     copaLista() { if (listoCopa) return; listoCopa = true; revisar(); },
+    // §285: cuánto tengo bajado del paquete de la carrera n (0–100); al llegar a 100 se avisa enseguida (sin esperar el latido)
+    paquete(n, pct) { n |= 0; pct = Math.max(0, Math.min(100, pct | 0)); if (miPaquete[0] === n && miPaquete[1] === pct) return;
+      miPaquete = [n, pct]; if (pct === 100) { latido(); if (soy()) revisar(); } },
     detener() { parar(reparto); },
   };
 }

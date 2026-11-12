@@ -12,11 +12,17 @@
   juego</b>, con un reloj de mentira. El juego prende y apaga el motor muy seguido para vibrar suave (como un PWM).
   Comprueba que eso se convierte en <b>una orden cada 100 ms</b> con el pulso proporcional al ciclo de trabajo (teléfono)
   y la fuerza proporcional (mando), que nunca pasa de 2 s seguidos, que un juego trabado no deja el motor prendido, que
-  parar corta todo y que, sin nada que hacer, el temporizador se apaga.</p>
+  parar corta todo y que, sin nada que hacer, el temporizador se apaga.<br>
+  <b>§272 (el teléfono):</b> <code>web/navegador/vibracion-eventos.mjs</code> con una memoria de mentira (la forma del
+  juego: Raceinfo, el ControllerHolder con el número del patrón en +0x10, el contador del champiñón del kart): solo
+  vibran el choque, el golpe, la largada y el champiñón, cada uno con <b>un pulso corto</b> (≤ 40 ms), una vez por
+  evento aunque el juego prenda y apague el motor muchas veces; el resto (miniturbo, flechas, pasto, piruetas, menús)
+  no vibra.</p>
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
 import { crearVibracion, PERIODO_MS, MAX_SEGUIDO_MS } from '/web/navegador/vibracion.mjs';
+import { crearVibracionEventos, leerRumble, leerPared, clasificar, KRM, PULSO_MS, NINGUNA, PARED_RAPIDEZ } from '/web/navegador/vibracion-eventos.mjs';
 
 const { ok, nota, fin } = prueba('vibracion', 'Vibración pareja (sin el juego)');
 
@@ -115,6 +121,139 @@ try {
     for (let i = 0; i < 300; i++) { b.t++; b.v.pedir(1, true); b.v.pedir(2, i % 2 === 0); if (b.fn && b.t % 100 === 0) b.fn(); }
     const p1 = b.man.filter(x => x[1] === 1 && x[2] > 0).map(x => x[2]), p2 = b.man.filter(x => x[1] === 2 && x[2] > 0).map(x => x[2]);
     ok('cada puerto lleva su propia fuerza (1 a fondo, 2 a la mitad)', p1.every(f => f >= 0.76) && p2.every(f => f >= 0.32 && f <= 0.48), `p1 ${p1} · p2 ${p2}`);
+  }
+
+  // ---- 8. §272: el teléfono, solo los eventos (memoria de mentira con la forma del juego) ----
+  {
+    // la memoria: big-endian como la Wii, en un Map dirección → [tamaño, valor]
+    const mem = new Map();
+    const pon = (a, v, t = 4) => mem.set(a >>> 0, [t, v]);
+    const val = a => { const v = mem.get(a >>> 0)?.[1]; return typeof v === 'function' ? v() : v; };   // una función = un valor que cambia solo
+    const L = { u32: a => val(a) >>> 0 || 0, u16: a => val(a) & 0xFFFF || 0, u8: a => val(a) & 0xFF || 0 };
+    const RI = 0x80F00000, LISTA = 0x80F00100, JP = [0x80F01000, 0x80F01100], HOLDER = 0x80F02000, TM = 0x80F03000;
+    const KM = 0x80F04000, KARTS = 0x80F04100, KART = [0x80F05000, 0x80F05100], MOV = 0x80F06000;
+    pon(0x809BD730, RI); pon(RI + 0x28, 2); pon(RI + 0xC, LISTA); pon(RI + 0x14, TM);
+    pon(LISTA, JP[0]); pon(LISTA + 4, JP[1]); pon(JP[1] + 0x48, HOLDER);            // el jugador local es el 2.º (índice 1)
+    // el RumbleController con su lista de Rumble activos (ut::List en +4: cabeza, cola, cuenta u16 +8, desplazamiento del enlace u16 +0xA)
+    const RC = 0x80F07000, RUMBLE = 0x80F07100, ENLACE = 0x20;
+    pon(HOLDER + 0x20, RC); pon(HOLDER + 0x10, NINGUNA); pon(HOLDER + 0x14, 0, 1);
+    pon(RC + 4 + 0xA, ENLACE, 2); pon(RC + 4 + 8, 0, 2);
+    // las tablas de patrones (0x809BD70C → +0x4108 / +0x410C; entrada de 8 bytes con la dirección de sus pasos en +4)
+    const KRMOBJ = 0x80F08000, TABLA0 = 0x80F09000, TABLA1 = 0x80F09400, PASOS = 0x80F0A000;
+    pon(0x809BD70C, KRMOBJ); pon(KRMOBJ + 0x4108, TABLA0); pon(KRMOBJ + 0x410C, TABLA1);
+    for (let i = 0; i < 45; i++) { pon(TABLA0 + 8 * i + 4, PASOS + 0x40 * i); pon(TABLA1 + 8 * i + 4, PASOS + 0x2000 + 0x40 * i); }
+    pon(0x809C18F8, KM); pon(KM + 0x20, KARTS); pon(KM + 0x24, 12, 1); pon(KARTS, KART[0]); pon(KARTS + 4, KART[1]);
+    pon(KART[1] + 0x1C + 0x28, MOV); pon(MOV + 0x110, 0, 2);
+    pon(TM + 0x8, 0, 2); pon(TM + 0xA, 30, 1);                                       // el reloj en 0:30
+    // un patrón de una vez = un Rumble en la lista (su +4 apunta a los pasos de esa entrada de la tabla); `repite` = de
+    // los que se repiten, que el juego anota en +0x10 del ControllerHolder; `tabla1` = la tabla del otro tipo de mando
+    const pide = (idx, { hongo = 0, seg = 30, etapa = 2, repite = false, tabla1 = false } = {}) => {
+      const hay = idx !== NINGUNA;
+      pon(HOLDER + 0x10, hay && repite ? idx : NINGUNA); pon(HOLDER + 0x14, hay && repite ? 1 : 0, 1);
+      pon(RC + 4, hay && !repite ? RUMBLE : 0); pon(RC + 4 + 8, hay && !repite ? 1 : 0, 2);
+      const e0 = PASOS + (tabla1 ? 0x2000 : 0) + 0x40 * idx;
+      pon(RUMBLE + 4, e0); pon(RUMBLE + ENLACE + 4, 0);
+      let k = 0; pon(RUMBLE + 8, () => e0 + Math.min(2 * k++, 60));   // el patrón avanza (como un cuadro de cada dos entre lecturas)
+      pon(MOV + 0x110, hongo, 2); pon(TM + 0xA, seg, 1); pon(RI + 0x28, etapa);
+    };
+    pide(9);
+    const r = leerRumble(L);
+    ok('lee el número del patrón del jugador de esta consola (el 2.º de la lista, el único con ControllerHolder), por el Rumble activo y la tabla', r && r.jugador === 1 && r.idx === 9, JSON.stringify(r));
+    pide(15, { tabla1: true });
+    ok('también con la tabla del otro tipo de mando', leerRumble(L)?.idx === 15, JSON.stringify(leerRumble(L)));
+    pide(34, { repite: true });
+    ok('los que se repiten, por +0x10 del ControllerHolder', leerRumble(L)?.idx === 34, JSON.stringify(leerRumble(L)));
+    pide(NINGUNA);
+    ok('sin vibración activa no hay ningún número', leerRumble(L)?.idxs.length === 0, JSON.stringify(leerRumble(L)));
+    pon(KM + 0x24, 1, 1);
+    ok('solo los jugadores que existen (con 1 jugador no mira el 2.º puesto de la lista)', leerRumble(L) === null);
+    pon(KM + 0x24, 12, 1);
+
+    // el juego: cada evento prende y apaga el motor como un PWM (1 cuadro sí, 1 no) durante `ms`
+    const b = { t: 0, tel: [] };
+    const v = crearVibracionEventos({ ahora: () => b.t, telefono: ms => b.tel.push([b.t, ms]), leer: () => leerRumble(L) });
+    const evento = (idx, ms, extra) => {
+      pide(idx, extra);
+      const antes = b.tel.length;
+      for (let i = 0; i < ms; i++) { b.t++; v.pedir(Math.floor(b.t / 16.7) % 2 === 0); }
+      v.pedir(false); pide(NINGUNA);
+      for (let i = 0; i < 400; i++) b.t++;                    // calma entre eventos
+      return b.tel.slice(antes).map(x => x[1]);
+    };
+    const casos = [
+      ['plátano (9)', 9, {}, 'golpe'], ['caparazón: el trompo (11)', 11, {}, 'golpe'], ['bomba / azul: el lanzamiento (14)', 14, {}, 'golpe'],
+      ['el rayo (15)', 15, {}, 'golpe'], ['la tinta (31)', 31, {}, 'golpe'], ['Thwomp (34)', 34, {}, 'golpe'],
+      ['kart contra kart (24)', 24, {}, 'choque'], ['contra uno más pesado (28)', 28, {}, 'choque'], ['un objeto del circuito (25)', 25, {}, 'choque'],
+      ['la largada: turbo (3) a los 0 s', 3, { seg: 0 }, 'largada'], ['el champiñón: turbo (3) con su contador andando', 3, { hongo: 89 }, 'champinon'],
+    ];
+    for (const [nombre, idx, extra, tipo] of casos) {
+      const pulsos = evento(idx, 400, extra);
+      ok(`${nombre} → un pulso suave de ${PULSO_MS[tipo]} ms (una vez, aunque el motor se prendió ~12 veces)`,
+         pulsos.length === 1 && pulsos[0] === PULSO_MS[tipo] && pulsos[0] <= 40, pulsos.join(',') || 'nada');
+    }
+    const nada = [
+      ['otro turbo (3) sin el champiñón y lejos de la largada (pirueta, rebufo)', 3, {}], ['el miniturbo (5)', 5, {}],
+      ['las flechas de turbo del piso (4)', 4, {}], ['el pasto, el turbo de quieto (6)', 6, {}], ['el cañón (32)', 32, {}],
+      ['salirse del circuito (16)', 16, {}], ['ser Mega (27)', 27, {}], ['el plátano ya cruzada la meta (etapa 3)', 9, { etapa: 3 }],
+      ['un número que no conocemos (40)', 40, {}],
+    ];
+    for (const [nombre, idx, extra] of nada) {
+      const pulsos = evento(idx, 400, extra);
+      ok(`${nombre} → nada`, pulsos.length === 0, pulsos.join(','));
+    }
+    // fuera de la carrera (los menús): no hay Raceinfo
+    pon(0x809BD730, 0);
+    ok('en los menús (sin Raceinfo) → nada', evento(9, 300).length === 0);
+    pon(0x809BD730, RI);
+    // dos golpes seguidos del mismo tipo, separados por una calma: dos pulsos; uno largo con el motor sin parar: uno
+    pide(9); const a0 = b.tel.length;
+    for (let i = 0; i < 300; i++) { b.t++; v.pedir(Math.floor(b.t / 16.7) % 2 === 0); }
+    v.pedir(false); pide(NINGUNA); for (let i = 0; i < 300; i++) b.t++;
+    pide(9); for (let i = 0; i < 300; i++) { b.t++; v.pedir(Math.floor(b.t / 16.7) % 2 === 0); }
+    v.pedir(false); pide(NINGUNA);
+    ok('dos plátanos (el primero termina, el segundo empieza) → dos pulsos', b.tel.length - a0 === 2, b.tel.slice(a0).map(x => x[1]).join(','));
+    // un plátano y enseguida un choque (otro número, sin calma) → los dos
+    for (let i = 0; i < 400; i++) b.t++;
+    const a1 = b.tel.length; pide(9);
+    for (let i = 0; i < 100; i++) { b.t++; v.pedir(Math.floor(b.t / 16.7) % 2 === 0); }
+    pide(24); for (let i = 0; i < 100; i++) { b.t++; v.pedir(Math.floor(b.t / 16.7) % 2 === 0); }
+    v.pedir(false); pide(NINGUNA);
+    ok('un golpe y enseguida un choque (otro número) → dos pulsos, cada uno el suyo', b.tel.slice(a1).map(x => x[1]).join(',') === `${PULSO_MS.golpe},${PULSO_MS.choque}`, b.tel.slice(a1).map(x => x[1]).join(','));
+    // un mismo champiñón con el motor callado un rato a la mitad (lo cortó un choque): sigue siendo uno solo
+    {
+      const c = { t: 0, tel: [] };
+      const v2 = crearVibracionEventos({ ahora: () => c.t, telefono: ms => c.tel.push(ms), leer: () => leerRumble(L) });
+      pide(3, { hongo: 90 });
+      const corre = n => { for (let i = 0; i < n; i++) { c.t++; v2.pedir(Math.floor(c.t / 16.7) % 2 === 0); } };
+      pon(RUMBLE + 8, PASOS + 0x40 * 3); corre(100); pon(RUMBLE + 8, PASOS + 0x40 * 3 + 6);
+      v2.pedir(false); c.t += 600; pon(RUMBLE + 8, PASOS + 0x40 * 3 + 40); corre(100); v2.pedir(false); pide(NINGUNA);
+      ok('el mismo champiñón con el motor callado 0,6 s a la mitad → un solo pulso', c.tel.length === 1, c.tel.join(','));
+      pide(3, { hongo: 90 }); pon(RUMBLE + 8, PASOS + 0x40 * 3); corre(50); v2.pedir(false); pide(NINGUNA);
+      ok('…y otro champiñón después, que empieza de nuevo → su pulso', c.tel.length === 2, c.tel.join(','));
+      pon(RUMBLE + 8, 0);
+    }
+    ok('todos los pulsos son suaves: ninguno pasa de 40 ms', b.tel.every(x => x[1] > 0 && x[1] <= 40), `${b.tel.length} pulsos`);
+    ok('el estado cuenta cada tipo', v.estado.eventos.golpe >= 6 && v.estado.eventos.choque >= 3 && v.estado.eventos.largada === 1 && v.estado.eventos.champinon === 1, JSON.stringify(v.estado.eventos));
+    // la pared: el juego no pide patrón; la página mira Kart::Status +0x4 bit 0x40 y la rapidez (Movement +0xB0)
+    const ST = 0x80F0B000, fl = new DataView(new ArrayBuffer(4));
+    const rapidez = x => { fl.setFloat32(0, x); pon(MOV + 0xB0, fl.getUint32(0)); };
+    pon(KART[1] + 0x1C + 0x4, ST); pon(ST + 0x4, 0); rapidez(0);
+    const vp = { t: 0, tel: [] };
+    const w = crearVibracionEventos({ ahora: () => vp.t, telefono: ms => vp.tel.push([vp.t, ms]), leer: () => leerRumble(L), leerPared: () => leerPared(L) });
+    const cuadros = (n, { pared = () => false, r = 1 } = {}) => { for (let k = 0; k < n; k++) { vp.t += 16.7; pon(ST + 0x4, pared(k) ? 0x40 : 0); rapidez(typeof r === 'function' ? r(k) : r); w.vigilar(); } };
+    ok('leerPared lee el bit de la pared y la rapidez del jugador de esta consola', (() => { pon(ST + 0x4, 0x40); rapidez(0.8); const p = leerPared(L); pon(ST + 0x4, 0); return p && p.pared && Math.abs(p.rapidez - 0.8) < 1e-6; })(), JSON.stringify(leerPared(L)));
+    cuadros(30, { r: 0.9 }); cuadros(10, { pared: () => true, r: 0.3 }); cuadros(30, { r: 0.5 });
+    ok(`contra la pared a 90 % → un pulso de choque de ${PULSO_MS.choque} ms`, vp.tel.length === 1 && vp.tel[0][1] === PULSO_MS.choque, vp.tel.map(x => x[1]).join(',') || 'nada');
+    let a2 = vp.tel.length; cuadros(30, { r: PARED_RAPIDEZ - 0.2 }); cuadros(20, { pared: () => true, r: 0.2 }); cuadros(30, { r: 0.2 });
+    ok(`rozando la pared despacio (${Math.round((PARED_RAPIDEZ - 0.2) * 100)} %) → nada`, vp.tel.length === a2);
+    a2 = vp.tel.length; cuadros(30, { r: 0.9 }); cuadros(120, { pared: k => k % 4 < 2, r: 0.9 }); cuadros(30, { r: 0.9 });
+    const n2 = vp.tel.length - a2;
+    ok('2 s raspando la pared a toda velocidad (el bit se prende y apaga) → un pulso cada 0,5 s como mucho', n2 >= 1 && n2 <= 5, `${n2} pulsos`);
+    pon(RI + 0x28, 1); a2 = vp.tel.length; cuadros(30, { r: 0.9 }); cuadros(10, { pared: () => true }); pon(RI + 0x28, 2); cuadros(5);
+    ok('en la cuenta regresiva (etapa 1) la pared no vibra', vp.tel.length === a2);
+    a2 = vp.tel.length; cuadros(30, { r: 0.9 }); pide(24); w.pedir(true); cuadros(1, { pared: () => true, r: 0.9 }); w.pedir(false); pide(NINGUNA); cuadros(30);
+    ok('kart contra kart (24) y la pared en el mismo momento → un solo pulso', vp.tel.length - a2 === 1, vp.tel.slice(a2).map(x => x[1]).join(','));
+    ok('la tabla solo tiene los cuatro tipos', Object.values(KRM).every(t => ['golpe', 'choque', 'turbo'].includes(t)) && clasificar({ idx: 3, etapa: 2, segundos: 30, hongo: 0 }) === null);
   }
 } catch (e) {
   ok('la prueba terminó sin errores', false, e?.stack || String(e));

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El cartel de la carga</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>El cartel de la carga: <span>qué está haciendo el juego mientras carga, en vivo</span></h1>
+<p>Prueba <code>web/navegador/cartel-carga.mjs</code> (bitácora §276b) <b>sin el juego</b>, con un reloj de mentira: cada
+  fase con su texto y su avance (bajando con los MB, compilando, armando, arrancando, los gráficos con lo que falta,
+  casi listo), cuántos segundos faltan según cómo llegan los pipelines, la línea tranquila cuando una fase pasa 15 s sin
+  avanzar (y que se va al avanzar), que no repinta si nada cambió, que no pinta encima de un error y que solo quien puso
+  el cartel lo saca.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { faseCarga, crearMedidorPipes, crearCartelCarga, CALMA, CALMA_MS } from '/web/navegador/cartel-carga.mjs';
+
+const { ok, fin } = prueba('cartel-carga', 'El cartel de la carga (sin el juego)');
+const MB = 1048576;
+try {
+  // ---- 1. Las fases ----
+  let f = faseCarga({ m: {} });
+  ok('al empezar: «Bajando el juego…» con la barra que va y viene', f.clave === 'bajando' && f.texto === 'Bajando el juego…' && f.pct === null, JSON.stringify(f));
+  f = faseCarga({ m: { manifiesto: 1 }, descarga: { bajando: true, recibido: 34 * MB, esperado: 80 * MB, pct: 42.5 } });
+  ok('bajando con lo que dice la descarga: «34 MB de 80» y 43 %', f.texto === 'Bajando el juego… 34 MB de 80' && f.pct === 43, JSON.stringify(f));
+  f = faseCarga({ m: { chicos: 1 }, descarga: { bajando: true, recibido: 3.2 * MB, esperado: 16.5 * MB, pct: 19 } });
+  ok('con los chicos listos pero el programa bajando, sigue «Bajando» (con decimales bajo 10 MB)', f.texto === 'Bajando el juego… 3,2 MB de 17', f.texto);
+  f = faseCarga({ m: { chicos: 1 }, descarga: { bajando: true, recibido: 100, esperado: 200, pct: 50 } });
+  ok('un pedido chico (menos de medio MB) no es «bajando»: compilando', f.clave === 'compilando' && f.texto === 'Compilando el programa…');
+  ok('después: armando los archivos', faseCarga({ m: { chicos: 1, compilado: 1 } }).texto === 'Armando los archivos…');
+  ok('después: arrancando el juego', faseCarga({ m: { chicos: 1, compilado: 1, armado: 1 } }).texto === 'Arrancando el juego…');
+  const todo = { chicos: 1, compilado: 1, armado: 1, pantalla: 1 };
+  f = faseCarga({ m: todo, pipes: { llegados: 412, meta: 729 }, restante: 5.2 });
+  ok('los gráficos con cuántos y lo que falta: «412 de 729 (te faltan ~6 s)»', f.texto === 'Preparando gráficos: 412 de 729 (te faltan ~6 s)' && f.pct === 57 && f.avance === 412, JSON.stringify(f));
+  f = faseCarga({ m: todo, pipes: { llegados: 12, meta: 729 }, restante: null });
+  ok('sin saber todavía cuánto falta, sin «te faltan»', f.texto === 'Preparando gráficos: 12 de 729', f.texto);
+  ok('con todos los gráficos de la meta: «Casi listo…»', faseCarga({ m: todo, pipes: { llegados: 729, meta: 729 } }).texto === 'Casi listo…');
+  ok('sin lista de pipelines: «Casi listo…»', faseCarga({ m: todo, pipes: null }).clave === 'casi');
+  ok('con el juego en pantalla pero la lista todavía sin decir: «Preparando gráficos…» (no «Casi listo»)', faseCarga({ m: todo, pipes: null, sinLista: false }).texto === 'Preparando gráficos…');
+  ok('la espera de los menús (§133) dice solo los gráficos', faseCarga({ soloGraficos: true, pipes: { llegados: 30, meta: 175 } }).texto === 'Preparando gráficos: 30 de 175');
+
+  // ---- 2. Cuánto falta ----
+  let t = 0;
+  const md = crearMedidorPipes({ ahora: () => t });
+  md.agregar(100); t = 1000; md.agregar(150); t = 2000; md.agregar(200);
+  ok('50 pipelines por segundo', Math.abs(md.porSegundo() - 50) < 0.01, String(md.porSegundo()));
+  ok('faltan 300 → 6 s', Math.abs(md.restante(500, 200) - 6) < 0.01);
+  const quieto = crearMedidorPipes({ ahora: () => t }); quieto.agregar(5); t = 3000; quieto.agregar(5);
+  ok('si no llega ninguno, no se inventa lo que falta', quieto.restante(500, 5) === null);
+
+  // ---- 3. El controlador ----
+  t = 0;
+  const pintados = [];
+  let mal = false;
+  let fase = { clave: 'graficos', texto: 'Preparando gráficos: 10 de 700', pct: 1, avance: 10 };
+  const c = crearCartelCarga({ ahora: () => t, reloj: false, puede: () => !mal, pintar: p => pintados.push(p) });
+  c.mostrar(() => fase, 'graficos');
+  ok('al mostrar pinta en seguida, con 0 s y sin la línea tranquila', pintados.length === 1 && pintados[0].segundos === 0 && pintados[0].calma === '');
+  t = 100; c.tic();
+  ok('si nada cambió (ni el texto ni los segundos), no vuelve a pintar', pintados.length === 1);
+  t = 3200; c.tic();
+  ok('los segundos avanzan aunque la fase no: 3 s (la señal de vida)', pintados.length === 2 && pintados[1].segundos === 3);
+  t = CALMA_MS + 50; c.tic();
+  ok('15 s sin avanzar: la línea tranquila', pintados.at(-1).calma === CALMA, pintados.at(-1).calma);
+  fase = { ...fase, texto: 'Preparando gráficos: 11 de 700', avance: 11 }; t += 250; c.tic();
+  ok('al avanzar, la línea tranquila se va', pintados.at(-1).calma === '' && /11 de 700/.test(pintados.at(-1).texto));
+  mal = true; const n = pintados.length; t += 5000; c.tic();
+  ok('con un error en la cortina no pinta encima', pintados.length === n);
+  mal = false;
+  c.parar('otra');
+  ok('solo quien puso el cartel lo saca', c.activo && c.cual === 'graficos');
+  c.parar('graficos');
+  ok('al parar: borra la señal de vida (pinta null) y queda quieto', !c.activo && pintados.at(-1) === null);
+  t += 5000;
+  ok('parado, tic no hace nada', c.tic() === null);
+  const r = crearCartelCarga({ ahora: () => t, reloj: false, pintar: () => {} });
+  r.mostrar(() => { throw new Error('todavía no'); }, 'x');
+  ok('si la fase falla al leer, no rompe', r.tic() === null && r.activo);
+} catch (x) {
+  ok('la prueba terminó sin errores', false, x?.stack || String(x));
+}
+fin();
+</script>
+</body>
+</html>

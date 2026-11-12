@@ -1,17 +1,18 @@
 # Medir en tu teléfono sin dejarle nada (`herramientas/telefono-seguro.mjs`)
 
 Pedido del dueño (2026-11-07): probar el juego en un teléfono Android de verdad por el cable USB, sin dejar trazas
-ni tocar nada vital. Prueba sin teléfono: `node herramientas/prueba-telefono-seguro.mjs` (22 puntos).
+ni tocar nada vital. Prueba sin teléfono: `node herramientas/prueba-telefono-seguro.mjs` (31 puntos).
 
 ## Lo que hace y lo que no puede hacer
 
 | Protección | Qué asegura |
 |---|---|
-| Lista blanca de órdenes | Solo 9 órdenes, palabra por palabra: los dos túneles del cable y leer (apps instaladas, ajustes, modelo, batería). Instalar, copiar archivos, borrar, reiniciar o cambiar un ajuste se rechaza **en el PC**, antes de llegar al teléfono. Cada orden queda en `build/web/datos/telefono/<fecha>/registro.txt`. |
+| Lista blanca de órdenes | Solo las órdenes de la lista, palabra por palabra: los dos túneles del cable y leer (apps instaladas, ajustes, modelo, batería); además, desde el 2026-11-10, leer y fijar la pantalla prendida (fila «Pantalla prendida»). Instalar, copiar archivos, borrar, reiniciar o cambiar otro ajuste se rechaza **en el PC**, antes de llegar al teléfono. Cada orden queda en `build/web/datos/telefono/<fecha>/registro.txt`. |
 | Pestaña de incógnito aparte | Todo lo que el juego guarda (caché, partida, historial) vive en esa pestaña y Chrome lo borra al cerrarla. Si tu Chrome no deja abrirla, el programa se detiene en vez de usar tu Chrome normal. |
 | Limpieza garantizada | Con error, Ctrl+C o calor: se cierra la pestaña y se quitan los túneles. Tus pestañas y tu Chrome no se cierran. |
 | Foto antes y después | Compara las apps instaladas y los ajustes del sistema y avisa si algo cambió. |
 | Vigía del calor | Corta a los 42 °C de batería. |
+| Pantalla prendida (la única excepción) | El dueño lo autorizó el 2026-11-10: «te dejo dejar la pantalla siempre prendida». Es el **único ajuste** que se puede cambiar. Antes de empezar se lee y se anota el valor original (`settings get global stay_on_while_plugged_in`). Después se deja la pantalla prendida mientras el cable esté conectado (`svc power stayon usb`). En la limpieza garantizada (fin, error, Ctrl+C, calor o `limpiar`) se devuelve **exactamente** el valor anotado, y la foto de después tiene que salir igual a la de antes. Cualquier otro ajuste sigue prohibido. Cómo: la lista blanca suma solo leer ese ajuste, `svc power stayon usb|ac|wireless|true|false` y `settings put global stay_on_while_plugged_in N` (**ese** ajuste y solo un número del 0 al 15, para los valores que `svc` no sabe escribir; el 8 es «con el dock»; el Oppo del dueño trae 15, que ya incluye el cable USB: ahí no se toca nada). Mientras está cambiado, el valor queda anotado en `build/web/datos/telefono/pantalla-original.json`, así `limpiar` lo devuelve si la corrida se cortó; si ya estaba prendida con el cable, no se toca; `--sin-pantalla` = no tocarla. |
 
 Es como medir un circuito con una punta de osciloscopio de alta impedancia: se mira sin cargar el circuito, y al
 sacar la punta el circuito queda igual que antes.

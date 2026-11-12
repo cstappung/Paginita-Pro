@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Al día repartido</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>El lento al día, repartido: <span>a lo más un cuadro de más cada 100 ms</span></h1>
+<p>Prueba <code>crearAlDia</code> de <code>web/navegador/red-estado-sala.mjs</code> (bitácora §275b, «Cada uno su kart»)
+  <b>sin el juego</b>: un reloj de mentira avanza de a 10 ms y una consola de mentira corre a su ritmo (60, 50 o 30
+  cuadros por segundo) más los cuadros que le da el regulador; la de adelante va siempre a 60. Antes la página pedía todo
+  lo que faltaba de una vez (hasta 120 cuadros seguidos: un tirón en el teléfono). Ahora: empieza con más de 6 cuadros
+  atrás, sigue hasta 2, nunca más de un cuadro cada 100 ms, y descansa 10 s si en 5 s no ganó ni 3 (el aparato no da 60).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearAlDia, AL_DIA_SUAVE } from '/web/navegador/red-estado-sala.mjs';
+
+const { ok, nota, fin } = prueba('al-dia', 'El lento al día repartido (sin el juego)');
+
+// simula `segundos` de carrera: la de adelante a 60/s; la mía a `ritmo`/s más lo que pida el regulador (cada pedido = un
+// cuadro corrido «de más» en el instante en que se pide). atraso0 = cuántos cuadros atrás empieza.
+function simular({ ritmo = 60, segundos = 20, atraso0 = 0, traba = null }) {
+  const r = crearAlDia(), pedidos = [];
+  let mio = -atraso0, t = 0;
+  const atrasos = [];
+  for (; t <= segundos * 1000; t += 10) {
+    const adelante = t * 60 / 1000;
+    if (!(traba && t >= traba.desde && t < traba.desde + traba.ms)) mio += ritmo * 10 / 1000;   // (trabada: no avanza)
+    if (t % AL_DIA_SUAVE.cadaMs === 0) { const n = r.paso(t, adelante - mio); if (n) { mio += n; pedidos.push(t); } }
+    if (t % 1000 === 0) atrasos.push(+(adelante - mio).toFixed(1));
+  }
+  return { pedidos, atrasos, final: atrasos.at(-1), estado: r.estado() };
+}
+const huecoMin = p => { let m = Infinity; for (let i = 1; i < p.length; i++) m = Math.min(m, p[i] - p[i - 1]); return m; };
+
+try {
+  {
+    const s = simular({ ritmo: 60, atraso0: 0 });
+    ok('al día (atraso 0): no pide nada', s.pedidos.length === 0, `${s.pedidos.length} pedidos`);
+  }
+  {
+    const s = simular({ ritmo: 60, atraso0: 5 });
+    ok('5 cuadros atrás (menos de 6): no pide nada (antes: 5 de golpe)', s.pedidos.length === 0, `${s.pedidos.length} pedidos`);
+  }
+  {
+    const s = simular({ ritmo: 60, atraso0: 60, segundos: 15 });
+    ok('un segundo atrás (60 cuadros): se pone al día en unos 6 s, de a uno', s.final <= 2 && s.estado.descansos === 0, `atrasos ${s.atrasos.join(' ')}`);
+    ok('nunca dos cuadros de más en menos de 100 ms', huecoMin(s.pedidos) >= 100, `hueco mínimo ${huecoMin(s.pedidos)} ms`);
+    ok('al llegar a 2 deja de pedir (no sigue apurando de más)', s.atrasos.every(a => a >= -1), `mínimo ${Math.min(...s.atrasos)}`);
+  }
+  {
+    const s = simular({ ritmo: 60, segundos: 20, traba: { desde: 3000, ms: 500 } });
+    ok('una traba de 0,5 s (30 cuadros): la recupera de a poco', s.final <= 2, `atrasos ${s.atrasos.join(' ')}`);
+  }
+  {
+    const s = simular({ ritmo: 55, segundos: 30, atraso0: 0 });
+    ok('a 55 de lógica (le faltan 5 por segundo): el regulador lo compensa y no queda atrás', s.final <= 7 && s.estado.descansos === 0, `atrasos ${s.atrasos.join(' ')}`);
+  }
+  {
+    const s = simular({ ritmo: 30, segundos: 30, atraso0: 0 });
+    ok('a 30 de lógica (no puede alcanzar): descansa en vez de apurar para siempre', s.estado.descansos >= 1, `descansos ${s.estado.descansos}, pedidos ${s.pedidos.length}`);
+    // con 30 s: sin descanso pediría 10 por segundo = ~300; con descansos de 10 s cada 5 s de prueba, mucho menos
+    ok('…y pide mucho menos que apurando siempre (< 150 en 30 s)', s.pedidos.length < 150, `${s.pedidos.length} pedidos`);
+  }
+  {
+    const r = crearAlDia();
+    ok('sin saber el atraso (antes del «¡YA!»): nada', r.paso(0, null) === 0 && r.paso(100, NaN) === 0);
+  }
+} catch (e) { ok('la página corrió entera', false, e.stack); }
+fin();
+</script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La línea de tiempo del arranque</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>La línea de tiempo del arranque: <span>cuándo termina cada tramo hasta poder jugar</span></h1>
+<p>Prueba <code>web/navegador/arranque.mjs</code> (bitácora §276) <b>sin el juego</b>: un reloj de mentira y un «juego» de
+  mentira que va cambiando de pantalla. Comprueba que cada marca se anota una sola vez (la primera), que el vigía
+  reconoce el primer cuadro, la primera pantalla, el título, la cortina, el menú de inicio, los gráficos de los menús,
+  el menú «Un jugador» y la carrera; que «jugable» es el menú de inicio o, sin él, la cortina fuera con el juego en
+  pantalla; que los tramos salen en orden con lo que dura cada uno; que cada cambio de pantalla queda con su cuadro y
+  sus lecturas del disco; que el resumen va al registro una sola vez y que el vigía se detiene solo.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearArranque } from '/web/navegador/arranque.mjs';
+
+const { ok, nota, fin } = prueba('arranque', 'La línea de tiempo del arranque (sin el juego)');
+
+try {
+  // ---- 1. Las marcas a mano ----
+  let t = 100;
+  const notas = [];
+  let e = { cuadros: 0, seccion: -1, pagina: -1, etapa: -1 };
+  const a = crearArranque({ ahora: () => t, leer: () => e, nota: x => notas.push(x), vigia: false });
+  a.marcar('modulo'); t = 250; a.marcar('gpu'); t = 900; a.marcar('modulo');
+  ok('cada marca se anota una sola vez (la primera)', a.marcas.modulo === 100 && a.marcas.gpu === 250);
+  t = 1200; a.marcar('manifiesto'); t = 2000; a.marcar('programa');
+
+  // ---- 2. El vigía: el juego de mentira avanza ----
+  t = 2300; e = { ...e, cuadros: 3 }; a.tic();
+  ok('el primer cuadro del juego', a.marcas.primerCuadro === 2300);
+  t = 4000; e = { ...e, cuadros: 250, seccion: 0x3F, pagina: -1, lecturas: 30, esperaDisco: 12, mb: 15 }; a.tic();
+  ok('la sección sin pantalla todavía no es «pantalla»', a.marcas.pantalla == null && a.marcas.titulo === 4000);
+  t = 4500; e = { ...e, cuadros: 315, pagina: 0x57, cortinaFuera: 4450 }; a.tic();
+  ok('la primera pantalla y la cortina (con su hora propia)', a.marcas.pantalla === 4500 && a.marcas.cortinaFuera === 4450);
+  ok('sin menú de inicio, «jugable» = la cortina fuera con el juego en pantalla', a.marcas.jugable === 4500 && a.jugable?.() === undefined);
+  ok('el resumen todavía no va al registro (faltan los gráficos de los menús)', notas.length === 0);
+  t = 6000; e = { ...e, graficosListos: true }; a.tic();
+  ok('con los gráficos de los menús el resumen va al registro una vez', notas.length === 1 && /^\[arranque\] /.test(notas[0]) && /jugable 4\.50/.test(notas[0]), notas[0]);
+  t = 6500; e = { ...e, elegido: 6400, seccion: 0x48, pagina: -1 }; a.tic();
+  t = 7000; e = { ...e, pagina: 0x69, cuadros: 400 }; a.tic();
+  ok('elegir Single Player y llegar a su menú', a.marcas.elegido === 6400 && a.marcas.unJugador === 7000);
+  a.tic();
+  ok('el resumen no se repite', notas.length === 1);
+
+  // ---- 3. El informe ----
+  const inf = a.informe();
+  const orden = inf.tramos.map(x => x[0]);
+  ok('los tramos van en el orden del arranque', orden.join(',').startsWith('modulo,gpu,manifiesto,programa,primerCuadro'), orden.join(','));
+  const gpu = inf.tramos.find(x => x[0] === 'gpu'), man = inf.tramos.find(x => x[0] === 'manifiesto');
+  ok('cada tramo dice lo que duró desde el anterior', gpu[2] === 150 && man[2] === 950);
+  ok('cada cambio de pantalla con su hora, cuadro y lecturas del disco',
+    inf.pantallas.some(p => p[0] === 4000 && p[1] === 250 && p[2] === 0x3F && p[4] === 30 && p[5] === 12) && inf.pantallas.length >= 4, JSON.stringify(inf.pantallas));
+  ok('el cuadro del juego en cada marca del vigía', inf.cuadros.primerCuadro === 3 && inf.cuadros.pantalla === 315);
+  ok('la red del navegador (Resource Timing) sale aunque no haya archivos del juego', typeof inf.red.antesDeJugable?.pedidos === 'number');
+
+  // ---- 4. Con el menú de inicio, «jugable» es el menú ----
+  t = 0; const b = crearArranque({ ahora: () => t, leer: () => ({ cuadros: 0, seccion: -1, pagina: -1, inicioVisto: 300 }), vigia: false });
+  t = 350; b.tic();
+  ok('con el menú de inicio, «jugable» = cuando se vio el menú', b.marcas.jugable === 300 && b.marcas.inicioVisto === 300);
+
+  // ---- 5. Un vigía que falla al leer no rompe nada; el de verdad se detiene ----
+  const c = crearArranque({ ahora: () => 10, leer: () => { throw new Error('el juego todavía no está'); }, vigia: false });
+  c.tic();
+  ok('si leer falla, el vigía sigue sin marcar nada', Object.keys(c.marcas).length === 0);
+  let lecturas = 0;
+  const d = crearArranque({ leer: () => { lecturas++; return { cuadros: 1, seccion: 0x48, pagina: 0x69, inicioVisto: 1, etapa: -1 }; } });
+  await new Promise(r => setTimeout(r, 400));
+  const antes = lecturas; await new Promise(r => setTimeout(r, 300));
+  ok('el vigía de verdad (cada 50 ms) se detiene solo al llegar al menú «Un jugador»', antes >= 1 && lecturas === antes && d.marcas.unJugador != null, `${antes} → ${lecturas}`);
+} catch (x) {
+  ok('la prueba terminó sin errores', false, x?.stack || String(x));
+}
+fin();
+</script>
+</body>
+</html>

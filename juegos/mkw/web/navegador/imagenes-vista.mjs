@@ -138,6 +138,97 @@ export function crearImagenesVista({ capacidad = 36000, causas = [], largo = 1.5
   return v;
 }
 
+// §270: el ritmo del JUEGO (los cuadros que calcula, se dibujen o no), aparte del de las imágenes. En cada refresco de la
+// pantalla quien mide anota la hora y la cuenta de cuadros del juego (anotar(hora, n, fuente)): si la cuenta avanzó k
+// desde el refresco anterior en que avanzó, esos k cuadros tardaron entre los dos (dt / k cada uno). Así el 1 % bajo
+// del juego dice si la carrera se calculó pareja aunque las imágenes salten (con N8 se dibuja la mitad, el juego sigue
+// a 60). Si la cuenta vuelve atrás o cambia la fuente (de los menús a la carrera), se empieza de nuevo sin anotar
+// nada. Un salto de más de `tope` ms sin avanzar (la pestaña oculta, una pausa) se descarta.
+export function crearRitmoJuego({ capacidad = 7200, tope = 1000 } = {}) {   // (§283: 2 min, para las herramientas; el medidor mira los últimos 600)
+  const ms = new Float64Array(capacidad);
+  let total = 0, ultHora = null, ultN = null, ultFuente = null, cuadros = 0, horaCuadros = null, porSeg = null;
+  return {
+    anotar(hora, n, fuente = '') {
+      if (!Number.isFinite(n)) return;
+      if (fuente !== ultFuente || ultN === null || n < ultN) { ultFuente = fuente; ultN = n; ultHora = hora; return; }
+      const k = n - ultN;
+      if (!k) return;
+      const dt = hora - ultHora;
+      ultN = n; ultHora = hora;
+      if (!(dt > 0) || dt > tope || k > 240) return;
+      for (let i = 0; i < k; i++) ms[total++ % capacidad] = dt / k;
+      cuadros += k;
+    },
+    // cuadros por segundo desde la última llamada (quien mide la llama una vez por segundo)
+    segundo(hora) {
+      // (con el hilo muy ocupado el reloj de la página puede llamar dos veces casi seguidas: un rato de menos de medio
+      // segundo no se toma, se sigue sumando hasta la llamada siguiente)
+      if (horaCuadros !== null && hora - horaCuadros < 500) return porSeg;
+      if (horaCuadros !== null && hora > horaCuadros) porSeg = cuadros * 1000 / (hora - horaCuadros);
+      cuadros = 0; horaCuadros = hora;
+      return porSeg;
+    },
+    get porSeg() { return porSeg; },
+    get total() { return total; },
+    // { porSeg, bajo1, cuadros } de los últimos `ultimos` cuadros (para el medidor)
+    resumen(ultimos = capacidad) {
+      const n = Math.min(total, capacidad, ultimos), r = new Float64Array(n);
+      for (let i = 0; i < n; i++) r[i] = ms[(total - n + i) % capacidad];
+      const s = resumir(r);
+      return { porSeg, bajo1: s.bajo1, bajo01: s.bajo01, cuadros: n };
+    },
+    // los tiempos de cada cuadro desde la marca `desde` (= un `total` anterior), para las herramientas de medir
+    tiempos(desde = 0) {
+      const ini = Math.max(desde, total - capacidad, 0), r = new Float64Array(total - ini);
+      for (let i = ini; i < total; i++) r[i - ini] = ms[i % capacidad];
+      return r;
+    },
+    // los últimos `n` cuadros como puntos del gráfico ({ ms, causa }), igual que imagenes-vista.ultimos (el dueño
+    // 2026-11-11: «que sea uno de imagen y otro de juego»: el medidor dibuja también el tiempo de cada cuadro de lógica)
+    ultimos(n = capacidad) {
+      const k = Math.min(total, capacidad, n), r = new Array(k);
+      for (let i = 0; i < k; i++) r[i] = { ms: ms[(total - k + i) % capacidad], causa: '' };
+      return r;
+    },
+    reiniciar() { total = 0; ultN = null; ultHora = null; cuadros = 0; },
+  };
+}
+
+// §283: CUÁNDO se anota cada cuadro del juego. Antes (§270) la cuenta se leía al ENTRAR a cada espera, es decir cuando el
+// cuadro ya había TERMINADO su trabajo: si un cuadro trabaja 9 ms y el siguiente 12, los dos empezaron en su hora (la
+// cuadrícula de 16,7 ms) pero sus finales quedan a 19,7 ms → el gráfico pintaba un tirón que el juego no tuvo (en este
+// PC el «Juego» daba 89 % con la carrera pareja). Como medir el período de un reloj en el flanco de BAJADA de un pulso
+// de ancho variable: sale ruido aunque el reloj sea perfecto; hay que medir en el flanco de SUBIDA (el que manda).
+// Ahora se anota al SALIR de la espera que da la hora del cuadro (lo que devuelve la espera ≠ 0: «ya toca»): ese es el
+// comienzo del cuadro siguiente, el flanco que de verdad marca el ritmo; si la espera volvió tarde, el cuadro empezó
+// tarde y eso sí se ve. Las esperas de 1 ms que solo atienden el sonido (devuelven 0) no anotan.
+// Los refrescos del monitor también leen la cuenta (por si el juego corre sin esperar, atrasado o poniéndose al día),
+// pero ahora solo si no hubo una espera en los últimos `huecoMs` ms: un refresco cae siempre DENTRO de una espera
+// (la página tiene un solo hilo), justo después del final de un cuadro, y anotar ahí volvía a medir el final.
+// modo 'fin' = §270 tal cual (?ritmoJuego=fin).
+//   const e = envolverEsperaJuego(ritmo, cuenta, { modo, ahora });  e.envolver(espera) → la espera envuelta;
+//   e.refresco() en cada refresco del monitor;  cuenta() → [fuente, n]
+export function envolverEsperaJuego(ritmo, cuenta, { modo = 'inicio', ahora = () => performance.now(), huecoMs = 50 } = {}) {
+  const FIN = modo === 'fin';
+  let ultimaEspera = -Infinity;
+  const anotar = hora => { const [fuente, n] = cuenta(); ritmo.anotar(hora, n, fuente); };
+  return {
+    get modo() { return FIN ? 'fin' : 'inicio'; },
+    envolver(f) {
+      if (FIN) return (...a) => { anotar(ahora()); return f(...a); };
+      return async (...a) => {
+        const r = await f(...a);
+        const t = ahora();
+        ultimaEspera = t;
+        // (la espera despierta en el refresco de antes y el runtime gira hasta la hora: el cuadro empieza en la hora)
+        if (r !== 0) anotar(Number.isFinite(a[0]) ? Math.max(t, a[0]) : t);
+        return r;
+      };
+    },
+    refresco() { if (FIN || ahora() - ultimaEspera > huecoMs) anotar(ahora()); },
+  };
+}
+
 // Envuelve getCurrentTexture (una sola vez por página): cada llamada es una imagen nueva hacia la pantalla
 export function engancharImagenes(alImagen, global = globalThis) {
   const C = global.GPUCanvasContext;
@@ -151,9 +242,16 @@ export function engancharImagenes(alImagen, global = globalThis) {
 
 // El gráfico en vivo: una barra por imagen (las últimas que entran), alto = su tiempo; las líneas guía en lo esperado
 // y el doble. Plano y verde = suave; cada pico es un tirón, pintado con el color de su causa.
-export function dibujarGrafico(g, puntos, { ancho = g.canvas.width, alto = g.canvas.height, esperado = 1000 / 60, tope = null } = {}) {
+// Las imágenes que muestra el gráfico del medidor, y de las que sale su «1 % bajo» (el dueño 2026-11-10: «ese 1 % low
+// sea del gráfico que se muestra»): 240 = 4 s a 60 imágenes por segundo, 8 s con «30 parejas»
+export const PUNTOS_GRAFICO = 240;
+
+// El gráfico: una barra por imagen (su alto = cuánto tardó), las líneas de la imagen pareja y del doble, y una línea
+// amarilla punteada con el 1 % bajo de ESTAS MISMAS barras (el p99: solo el 1 % de las barras pasa por encima)
+export function dibujarGrafico(g, puntos, { ancho = g.canvas.width, alto = g.canvas.height, esperado = 1000 / 60, tope = null, titulo = '' } = {}) {
   const max = tope || Math.max(esperado * 3, ...puntos.map(p => p.ms));
   const y = v => alto - Math.min(alto, (v / max) * alto);
+  const r = puntos.length >= 60 ? resumir(puntos.map(p => p.ms)) : null;   // (con menos de 60 el 1 % no dice nada)
   g.clearRect(0, 0, ancho, alto);
   g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, 0, ancho, alto);
   const w = ancho / Math.max(1, puntos.length);
@@ -167,4 +265,14 @@ export function dibujarGrafico(g, puntos, { ancho = g.canvas.width, alto = g.can
   for (const v of [esperado, esperado * 2]) { const yy = Math.round(y(v)) + 0.5; g.beginPath(); g.moveTo(0, yy); g.lineTo(ancho, yy); g.stroke(); }
   g.fillStyle = '#fff'; g.font = '9px sans-serif';
   g.fillText(`${esperado.toFixed(1)} ms`, 2, y(esperado) - 2);
+  if (titulo) g.fillText(titulo, 2, 9);   // («Imagen» o «Juego»: cuál de los dos gráficos es)
+  if (r && Number.isFinite(r.p99ms)) {
+    const yy = Math.round(y(r.p99ms)) + 0.5;
+    g.save(); g.strokeStyle = '#fc0'; g.setLineDash([3, 2]);
+    g.beginPath(); g.moveTo(0, yy); g.lineTo(ancho, yy); g.stroke(); g.restore();
+    g.fillStyle = '#fc0'; g.textAlign = 'right';
+    g.fillText(`1 % bajo ${Math.round(r.bajo1)}`, ancho - 2, Math.max(9, yy - 2));
+    g.textAlign = 'left';
+  }
+  return r;
 }

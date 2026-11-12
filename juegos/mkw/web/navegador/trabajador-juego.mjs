@@ -167,7 +167,7 @@ export async function correr({ parametros, origen = '', lienzo, canal }) {
       mkwAvisoLectura: (ruta, tam) => { ruta = ruta.replace(/\/+/g, '/'); const t = tamaños.get(ruta); if (t !== undefined) disco.adelantar(direccion(ruta), t); },
       mkwSemillas: () => globalThis.mkwSemillaCarrera || null,
       get mkwRelojFijo() { return P.get('reloj') === 'fijo' || !!globalThis.mkwRelojFijo; },
-      mkwLsArreglos: P.get('arreglos') !== '0',
+      mkwLsArreglos: P.has('arreglos') ? (Number(P.get('arreglos')) | 0) : P.get('red') === 'estado' ? 0 : true,   // (§269b: ?arreglos=N = la máscara N de semillas_nativo.cpp; 0 = ninguno; §275b: con red=estado, 0 por omisión: cada consola corre su kart y nada se recalcula igual en todas)
       mkwRecorteDibujo: { '0': 0, modelos: 1 }[P.get('recorteDibujo')] ?? 2,
       mkwVistaPropia: (P.get('vista') === '0' ? 0 : 1) | (P.get('camara') === '0' ? 0 : 2),
       mkwPlantel: () => globalThis.mkwPlantel || null,

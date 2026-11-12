@@ -6,6 +6,8 @@
 # parches/motor-w30.diff, MKW_MOTOR_W30=7 por omisión) con la aurora de siempre (terceros/aurora-main-viejo-motor, con
 # lo de G15/G16), --final (ThinLTO, --fija de H6, --memoria-fija 768 de W29) y PGO con un perfil NUEVO (W30 cambia el
 # código: pgo_final.py ve otra huella y vuelve a correr las 3 carreras de herramientas/pgo/). Después lo prueba entero.
+# §277: desde 2026-11-10 la copia es terceros/Wiicompiled-motor-w30-403s (W30 + el PR #403 de WiiCompiled: el traductor
+# que escribe de vuelta solo los registros sucios y MKW_MOTOR_PR403=62); CIERRE_WC=terceros/Wiicompiled-motor-w30 = la de antes.
 # Como cambiar la placa de un tablero: se arma, se le pasa el protocolo completo de ensayos y se compara contra la vieja.
 #
 # Fases (en el orden que se pidan, todas bajo el candado de medición, herramientas/candado.sh):
@@ -38,7 +40,7 @@ paso() { echo; echo "=== $(date '+%H:%M:%S') $1"; }
 compilar() {
   tomar "cierre compilar"
   paso "el final con W30 y PGO nuevo → $FIN/navegador"
-  MKW_WIICOMPILED=terceros/Wiicompiled-motor-w30 MKW_AURORA=terceros/aurora-main-viejo-motor timeout 21600 \
+  MKW_WIICOMPILED=${CIERRE_WC:-terceros/Wiicompiled-motor-w30-403s} MKW_AURORA=terceros/aurora-main-viejo-motor timeout 21600 \
     python herramientas/compilar-web.py --modo navegador --final --carpeta $FIN > $DATOS/compilar.log 2>&1
   local s=$?; echo "salida $s"; grep -E "^PGO|^--final|error:" $DATOS/compilar.log | cut -c1-160 | head -12
   tail -2 $DATOS/compilar.log; [ $s = 0 ] || exit 1
