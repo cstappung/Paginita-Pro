@@ -90,7 +90,7 @@ export function crearCazas(ctx) {
     return `<li class="jg-cz-fila n${nv.n}${i === 0 ? " primera" : ""}${tuyo ? " tuya" : ""}">
       ${nv.n >= 3 ? `<span class="jg-cz-brillo" aria-hidden="true"></span>` : ""}${nv.n >= 5 ? destellos(7, o.k) : ""}
       <span class="jg-cz-pos" aria-hidden="true">${i + 1}</span>
-      ${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(o.q), nv.n >= 5 ? 52 : i === 0 ? 40 : 30, o.q)}
+      ${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(o.q), nv.n >= 5 ? 46 : i === 0 ? 40 : 30, o.q)}
       <span class="jg-cz-que"><b translate="no" data-perfil="${esc(o.q)}" data-nombre="${esc(p.nombre)}">${nombreHtml(o.q, esc(p.nombre))}</b>
         <small>${esc(nombreCategoria(o.c))} · <span translate="no">${esc(marcaDe(o))}</span></small></span>
       <span class="jg-cz-pozo" title="${o.n} ${o.n === 1 ? "aporte" : "aportes"}"><em>${nv.icono} ${esc(nv.nombre)}</em><b><span class="cz-n">${fmt(o.pozo)}</span> ${MONEDA}</b>${o.n > 1 ? `<small>${o.n} cazadores ponen</small>` : ""}</span>
@@ -304,6 +304,7 @@ export function crearCazas(ctx) {
       <p class="jg-cz-recompensa"><small>${nv.icono} ${esc(nv.nombre)} · recompensa</small><b><span class="cz-n" data-cz-cuenta="${pozo}">0</span> ${MONEDA}</b></p>
       <p class="jg-cz-nota">${cazadores.size} ${cazadores.size === 1 ? "cazador puso" : "cazadores pusieron"} precio a tu cabeza. Si alguien te supera, se lo lleva.
         Si te superas tú, te quedas con la mitad.</p>
+      <p class="jg-cz-meta">Supera <b translate="no">${esc(marcaDe(mias[0]))}</b></p>
       <div class="jg-cz-botones"><a class="btn jg-cz-defiende" href="${rutaDeCategoria(mias[0].c)}">▶ Jugar</a>
         <button class="btn btn-ghost" type="button" data-cz-cierra>Ahora no</button></div>
     </div>`;
@@ -442,7 +443,7 @@ export function crearCazas(ctx) {
     el.innerHTML = `<span class="jg-cz-brillo" aria-hidden="true"></span>${nv.n >= 5 ? destellos(10, a.id) : ""}${x.alerta || banda(`${nv.icono} ${nv.nombre.toUpperCase()}`)}
       <span class="jg-cz-an-ico" aria-hidden="true">${nv.icono}</span>
       <span class="jg-cz-an-tx"><small>${x.cab}</small>${x.texto}</span>
-      <span class="jg-cz-an-der"><b><span class="cz-n" data-cz-cuenta="${a.p}">0</span> ${MONEDA}</b>${x.ir}</span>`;
+      <span class="jg-cz-an-der"><b><span class="cz-n" data-cz-cuenta="${a.p}">0</span> ${MONEDA}</b>${a.tipo === "pone" ? `<small class="jg-cz-meta">Supera <b translate="no">${esc(valorMarca(a.c, { puntos: a.mp, tiempo: a.mt }))}</b></small>` : ""}${x.ir}</span>`;
     document.body.appendChild(el);
     cuentaArriba(el.querySelector("[data-cz-cuenta]"));
     if (ctx.suena) ctx.suena(nv.n >= 4 ? "gana" : "entra");
@@ -468,7 +469,7 @@ export function crearCazas(ctx) {
     l.className = "jg-cz-lluvia";
     l.setAttribute("aria-hidden", "true");
     l.innerHTML = particulas(44, "ll" + Date.now());
-    document.body.appendChild(l);
+    if (capa) capa.insertBefore(l, capa.querySelector(".jg-cz-poster")); else document.body.appendChild(l);
     setTimeout(() => l.remove(), 5200);
   }
   function avisos() {
