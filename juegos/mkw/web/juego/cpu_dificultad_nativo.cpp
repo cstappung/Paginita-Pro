@@ -91,9 +91,13 @@ void reponerJuego() {
     Memory::Write32(kTinta, g_tintaOrig);
 }
 
+extern "C" __attribute__((weak)) int mkw_red_estado_activo();   // (§275b, red_estado_nativo.cpp; débil)
 bool esVs() {
     const uint32_t rd = Memory::Read32(kRacedata);
-    return rd && Memory::Read32(rd + 0xB68 + 0x8) == 1;
+    if (!rd) return false;
+    const uint32_t modo = Memory::Read32(rd + 0xB68 + 0x8);
+    // (§275b: «Cada uno su kart» corre la carrera en línea del juego, modo 7, con las CPU de la sala)
+    return modo == 1 || (modo == 7 && mkw_red_estado_activo && mkw_red_estado_activo());
 }
 
 // §99: ¿el jugador i de la carrera es una CPU? (tipo 1 en el escenario de la carrera: Racedata +0x20, +0x8 + i·0xF0)

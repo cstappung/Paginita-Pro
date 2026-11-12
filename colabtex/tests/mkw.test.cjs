@@ -526,3 +526,24 @@ test('§116 «trabajando para usted»: el cierre sigue listo; desde la v2.0 las 
  const html=fs.readFileSync(raiz('../juegos.html'),'utf8');
  assert.match(html,/\.jg-mn-etq\.obra\{/);assert.match(html,/\.jg-hoja-obra\{/);assert.match(html,/html\[data-tema=oscuro\] \.jg-hoja-obra\{/);
 });
+
+test('§275b «Cada uno su kart»: el modo de red lo elige el anfitrión en el vestíbulo y el marco abre con red=estado',()=>{
+ const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
+ const red=(v,uid='a')=>({t:'ajuste',uid,k:'red',v});
+ assert.equal(M.reducir(nueva()).red,'lockstep','lockstep por omisión');
+ assert.equal(M.reducir(nueva(red('estado'))).red,'estado','el anfitrión lo cambia');
+ assert.equal(M.reducir(nueva(red('estado'),red('lockstep'))).red,'lockstep','y lo vuelve');
+ assert.equal(M.reducir(nueva(red('estado','b'))).red,'lockstep','b no es el anfitrión');
+ assert.equal(M.reducir(nueva(red('raro'))).red,'lockstep','lo desconocido = lockstep');
+ assert.equal(M.reducir(nueva(red('estado'),{t:'empieza',uid:'a'},red('lockstep'))).red,'estado','corriendo no se cambia');
+ const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist,MKW_NIVEL:M.MKW_NIVEL};
+ const trozo=(ini,fin)=>src.slice(src.indexOf(ini),src.indexOf(fin,src.indexOf(ini))).replace(/\bexport /g,'');
+ vm.runInNewContext(trozo('const PAGINA','let privado')+trozo('const MKW_CONEXION','const AYUDA_CONEXION')+
+   trozo('export function srcMkw(', 'export function crearMkwSolo')+';__s=srcMkw',c);
+ const q=o=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,ronda:1,sincro:['a','b'],jefe:'a',...o})).searchParams;
+ assert.equal(q({}).get('red'),'malla');assert.equal(q({red:'lockstep'}).get('red'),'malla');
+ assert.equal(q({red:'estado'}).get('red'),'estado','«Cada uno su kart»');assert.equal(q({red:'estado'}).get('modo'),'sala');
+ assert.match(src,/conexion: est\.conexion, relevo: est\.relevo === true, red: est\.red/);
+ assert.match(src,/data-red="\$\{k\}"/);assert.match(src,/k: "red", v: b\.dataset\.red/);
+});

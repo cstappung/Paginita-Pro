@@ -1,0 +1,36 @@
+diff --git a/runtime/src/hle/vi.cpp b/runtime/src/hle/vi.cpp
+index 70e78e5..8290d2e 100644
+--- a/runtime/src/hle/vi.cpp
++++ b/runtime/src/hle/vi.cpp
+@@ -338,6 +338,8 @@ bool s_mkwVsyncLocked = false;
+ // MKW RETRO (§99, C3): ms of retrace grid the page asked to win back, and how much was won (see PaceToRetraceBoundary)
+ double s_mkwPrisaMs = 0.0;
+ double s_mkwPrisaGanada = 0.0;
++// MKW RETRO (§269b.16): ms the page moved the retrace grid forward (mkw_frenar: the room's brake), summed
++double s_mkwFrenadoMs = 0.0;
+ // MKW RETRO (§162, N2): the ballast per game frame. The page's ballast (lastre.mjs, §155) spins inside the waits,
+ // and with ?sinTope=1 the game hardly waits, so it fell short (it spun 17-80 % of what it owed, §161). This one lives
+ // here, at the start of every retrace (one retrace = one game frame): the work t since the previous retrace (wall
+@@ -833,6 +835,22 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_prisa(double ms) {
+     s_mkwPrisaMs = ms > 0.0 ? (ms < 2000.0 ? ms : 2000.0) : 0.0;
+ }
+ extern "C" EMSCRIPTEN_KEEPALIVE double mkw_prisa_ganada() { return s_mkwPrisaGanada; }
++// MKW RETRO (§269b.16): the room's brake. The retrace grid is absolute (each retrace is stamped on its grid time, not
++// on when it ran), so a frame the page held back inside the lockstep was won back right after: the next retraces
++// were already due and ran back to back. Measured (2 PCs + the phone): 564 frames braked in 40 s slowed the room by
++// 46; the rest were only hitches. This moves the grid forward `ms` instead: the frame in course is not held, the next
++// retrace is due `ms` later and nothing runs back to back to undo it (like retarding the timing of a motor instead
++// of braking its shaft and letting the governor speed it back up). Whatever catch-up was pending is cancelled first
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_frenar(double ms) {
++    if (!(ms > 0.0)) return;
++    if (ms > 500.0) ms = 500.0;
++    std::lock_guard<std::mutex> lock(g_viMutex);
++    if (!g_vi.initialized) return;
++    s_mkwPrisaMs = 0.0;
++    g_vi.lastRetrace += std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(ms));
++    s_mkwFrenadoMs += ms;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_frenado() { return s_mkwFrenadoMs; }
+ // MKW RETRO (§162): the ballast per game frame: K (1 = off), and what it did (0 spun ms, 1 work ms, 2 frames, 3 caps, 4 K)
+ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_lastre_cuadro(double k) {
+     s_mkwLastreK = k > 1.0 ? (k < 20.0 ? k : 20.0) : 1.0;

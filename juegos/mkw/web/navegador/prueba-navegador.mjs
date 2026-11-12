@@ -157,6 +157,11 @@ async function medirPantalla() {
     const mirar = m => { const c = /^\[medidor\] \d+ s: cuadro (\d+)/.exec(m.text()); if (c && +c[1] >= desde) { pagina.off('console', mirar); listo(); } };
     pagina.on('console', mirar);
   });
+  // §276: el arranque de prisa corre los cuadros invisibles del arranque sin esperar al monitor (aquí, sin menú de
+  // inicio, ~520: pasa el 480); la traza empieza cuando terminó y el reloj volvió a engancharse (1 s), si no mide la
+  // cola de la prisa (imágenes de 2 refrescos) y no el ritmo del juego. Sin prisa (?arranqueRapido=0) no espera nada
+  await pagina.waitForFunction(() => !window.mkwEstado?.arranqueRapido?.activo, null, { timeout: 30000, polling: 100 }).catch(() => {});
+  if (await pagina.evaluate(() => window.mkwEstado?.arranqueRapido?.ms != null).catch(() => false)) await new Promise(r => setTimeout(r, 1000));
   const cdp = await pagina.context().newCDPSession(pagina);
   // Además: cuánto del tiempo estuvo ocupado el hilo principal de la página (donde corre el juego). TaskDuration
   // = segundos sumados de todas las tareas del hilo; dividido por el tiempo real = fracción ocupada (§48).

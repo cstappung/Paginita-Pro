@@ -211,12 +211,18 @@ export function corredoresDelJuego(L, humanos, { vrs = {}, fuera = [], cortados 
   if (!rd || !ri) return [];
   const jugadores = L.u32(ri + 0xC), n = L.u8(rd + 0x20 + 4), lista = [];
   humanos.forEach((h, i) => {
-    if (i >= n || fuera.includes(h.uid) || L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10) !== 0) return;
+    // (§275b: en «Cada uno su kart» el humano de otra consola es un kart en línea, tipo 4)
+    const tipo = L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10);
+    if (i >= n || fuera.includes(h.uid) || (tipo !== 0 && tipo !== 4)) return;
     const rp = jugadores ? L.u32(jugadores + i * 4) : 0;
     lista.push({ uid: h.uid, vr: vrs[h.uid], puesto: rp ? L.u8(rp + 0x20) : 0, cortado: cortados.includes(h.uid) });
   });
   for (let i = 0; i < n && i < 12; i++) {
-    if (L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10) !== 1) continue;
+    // (§275b: y en las consolas que no son la anfitriona las CPU también son karts en línea, tipo 4, después de los humanos)
+    const tipo = L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10);
+    // (y el puesto de un humano que la sala dejó fuera lo corre la anfitriona como CPU: en ella tipo 1, en las demás tipo 4)
+    const humanoAqui = i < humanos.length && !fuera.includes(humanos[i].uid);
+    if (tipo !== 1 && !(tipo === 4 && !humanoAqui)) continue;
     const rp = jugadores ? L.u32(jugadores + i * 4) : 0;
     lista.push({ cpu: true, puesto: rp ? L.u8(rp + 0x20) : 0 });
   }

@@ -5,6 +5,9 @@
 // §192— ni la copia a la pantalla EGG::XfbManager::copyEFB (0x80244268), así ese cuadro no le da trabajo a aurora ni a la
 // tarjeta. La lógica sigue a 60. Dos modos (mkw_n8_modo, la página lo pide con ?n8=1|2):
 //   1 = solo dibujar a 30: cada imagen se ve dos refrescos (30 a la vista);
+//   3 = «20 parejas» (§283): dibujar uno de cada TRES (cada imagen se ve tres refrescos, 20 a la vista). Para el aparato
+//       que ni con «30 parejas» alcanza (el Oppo en la largada de 8.3: el par necesita 37-55 ms y hay 33,3): un grupo
+//       de tres cuadros tiene 50 ms para dos sin dibujo y uno con dibujo, y las imágenes salen parejas, aunque menos.
 //   2 = además la interpolación de aurora (120 de «fluidez» = una imagen intermedia por cuadro dibujado): en el cuadro
 //       dibujado aurora muestra la imagen de entre medio (entre el dibujado anterior y este) y guarda la de verdad; el
 //       cuadro saltado, en el lugar de su copia, la muestra (aurora_mkw_presentar_pendiente, un refresco después).
@@ -38,13 +41,20 @@ uint32_t g_fluidezAntes = 0;    // la fluidez de aurora antes de prender el modo
 uint32_t g_vuelta = 0;          // vueltas del bucle del juego (una por cuadro de lógica, la cuenta el gancho de RR)
 uint32_t g_vueltaDibujo = 0;    // la vuelta del último cuadro dibujado
 bool g_saltarCopia = false;     // el cuadro saltado tampoco copia a la pantalla
+bool g_menus = false;           // §270: la página permite N8 en la pantalla de menú de ahora (mkw_n8_menus)
+double g_cMenus = 0;            // §270: cuadros saltados fuera de la carrera
 double g_c[6] = {0, 0, 0, 0, 0, 0};   // dibujados, saltados, copias saltadas, reales mostradas en el saltado, prendidas, apagadas
+bool g_saltarUno = false;       // §269b: la compensación de lag de RR quiso saltarse el dibujo de este cuadro (en la sala)
+double g_cRR = 0;               // §269b: cuántos dibujos se saltaron así
 
 // ¿la carrera andando? (el Raceinfo, 0x809BD730, existe y su etapa, +0x28, es menor que 4: lo mismo que mkw.mjs)
 bool carreraAndando() {
     const uint32_t ri = Memory::Read32(0x809BD730u);
     return ri && Memory::Contains(ri, 0x2C) && Memory::Read32(ri + 0x28) < 4;
 }
+
+// cada cuántos cuadros de lógica se dibuja uno: 2 («30 parejas» y la del medio) o 3 («20 parejas», §283)
+int paso() { return g_modo == 3 ? 3 : 2; }
 
 void cambiar(bool activo) {
     if (activo == g_activo) return;
@@ -68,7 +78,7 @@ void cambiar(bool activo) {
 // cambiar la marcha de un motor en el punto muerto y no a mitad del giro.
 void aplicarPedido() {
     if (g_pedido == g_modo) return;
-    if (g_activo && g_vuelta - g_vueltaDibujo == 1) return;   // (este es el saltado de un par: espera al siguiente)
+    if (g_activo && g_vuelta - g_vueltaDibujo < paso()) return;   // (este es un saltado del grupo: espera al siguiente)
     if (g_modo == 2 && g_activo) aurora_mkw_presentar_pendiente(1);
     cambiar(false);
     g_modo = g_pedido;
@@ -79,8 +89,18 @@ void aplicarPedido() {
 // (G15, §255: se puede llamar en cualquier momento, también en plena carrera; se aplica en el cuadro siguiente que se
 // dibuja, a más tardar dos cuadros de lógica después. La lógica no se entera: sigue a 60)
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_n8_modo(int m) {
-    g_pedido = m == 1 || m == 2 ? m : 0;
+    g_pedido = m == 1 || m == 2 || m == 3 ? m : 0;   // (§283: 3 = «20 parejas»)
 }
+// §270 (el dueño: «que el limitador no funcione tampoco en los menús de personaje»): la página permite N8 también en la
+// pantalla de menú de ahora (solo en las que se probaron: elegir personaje, vehículo y derrape: n8MenusRevisar de web/navegador/mkw.mjs). En los
+// menús el dibujo no se puede deshacer (§196), pero saltarlo entero un cuadro de cada dos sí, si en esa pantalla la
+// lógica no lee nada del dibujo salvo SwitchScnRoot (lo mismo que en la carrera). 0 = solo en la carrera (antes)
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_n8_menus(int on) { g_menus = on != 0; }
+// §269b: en la sala, cuando la compensación de lag de RR quiere saltarse el dibujo de un cuadro (el aparato va atrasado:
+// lockstep_nativo.cpp, bit 32 de los arreglos), ese cuadro se salta como lo salta N8 —solo lo que la lógica lee del
+// dibujo, SwitchScnRoot— y no entero como lo hacía RR (eso separaba la carrera, §62). Así la sala tiene la misma
+// compensación que el Single Player. Solo con la carrera andando y sin N8 «con la imagen del medio» prendido
+extern "C" void mkw_n8_saltar_uno() { g_saltarUno = true; }
 // 0 dibujados, 1 saltados, 2 copias saltadas, 3 reales mostradas en el cuadro saltado, 4 veces prendido, 5 apagado,
 // 6 modo, 7 activo; 8–11 la cuenta de aurora (guardadas, mostradas, descartadas, grupos sin intermedia); 12 ms que
 // esperaron las reales guardadas hasta salir (sumados); 13 reales que
@@ -94,6 +114,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE double mkw_n8_estado(int i) {
     if (i == 13) return aurora_mkw_n8_cuenta(4);
     if (i == 14) return g_pedido;        // (G15) lo pedido, todavía sin aplicar si es distinto de 6
     if (i == 15) return g_cambiosModo;   // (G15) cambios de modo aplicados
+    if (i == 16) return g_menus ? 1 : 0; // (§270) N8 permitido en el menú de ahora
+    if (i == 18) return g_cRR;           // (§269b) dibujos saltados por la compensación de lag de RR en la sala
+    if (i == 17) return g_cMenus;        // (§270) cuadros saltados fuera de la carrera
     return -1;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_n8_reiniciar() { for (double& v : g_c) v = 0; }
@@ -105,10 +128,28 @@ extern "C" void func_8023AEAC_traducida(CpuContext* ctx);   // EGG::SceneManager
 extern "C" void func_805635E4(CpuContext* ctx);             // ScnMgr::SwitchScnRoot
 extern "C" void func_8023AEAC(CpuContext* ctx) {
     aplicarPedido();
+    if (g_saltarUno) {
+        g_saltarUno = false;
+        if (carreraAndando() && !(g_modo == 2 && g_activo)) {
+            // (lo que la lógica lee del dibujo, igual que el cuadro saltado de N8, abajo)
+            const uint32_t g = 0x809C1830u, banderas = Memory::Read32(g + 0x44), raiz = Memory::Read32(g + 0x20);
+            if (!(banderas & 2) && raiz && (banderas & 1)) {
+                const uint32_t lr = ctx->lr, r3 = ctx->gpr[3], r4 = ctx->gpr[4];
+                ctx->gpr[3] = raiz; ctx->gpr[4] = 1;
+                func_805635E4(ctx);
+                ctx->lr = lr; ctx->gpr[3] = r3; ctx->gpr[4] = r4;
+            }
+            g_cRR++;
+            g_saltarCopia = true;
+            return;
+        }
+    }
     if (!g_modo) { func_8023AEAC_traducida(ctx); return; }
-    cambiar(carreraAndando());
-    // se salta si el cuadro de lógica anterior se dibujó (nunca dos seguidos por N8)
-    if (!g_activo || g_vuelta - g_vueltaDibujo != 1) {
+    const bool enCarrera = carreraAndando();
+    cambiar(enCarrera || g_menus);
+    // se salta si el cuadro de lógica anterior se dibujó (nunca dos seguidos por N8); con «20 parejas» (§283) se saltan
+    // los dos que siguen al dibujado
+    if (!g_activo || g_vuelta - g_vueltaDibujo >= paso()) {
         g_vueltaDibujo = g_vuelta;
         g_c[0]++;
         // (modo 2) si la imagen de verdad del par anterior no salió en el cuadro saltado (su hora caía después de este
@@ -127,6 +168,7 @@ extern "C" void func_8023AEAC(CpuContext* ctx) {
         ctx->lr = lr; ctx->gpr[3] = r3; ctx->gpr[4] = r4;
     }
     g_c[1]++;
+    if (!enCarrera) g_cMenus++;
     g_saltarCopia = true;
 }
 

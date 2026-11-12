@@ -215,6 +215,10 @@ try {
     ok('§175: …sigue la isla más grande (ana, beto, carla) en todas las cuentas', nombres.every(n => e[n].islas?.sigue?.slice().sort().join() === 'ana,beto,carla'), sigue);
     ok('§175: …los de la isla chica se salen y los de la grande no', !!e.dani.fuera && !!e.eva.fuera && !e.ana.fuera && !e.beto.fuera && !e.carla.fuera,
        nombres.map(n => `${n} ${e[n].fuera ? 'fuera' : 'sigue'}`).join(', '));
+    // (§269b.15: la isla que sigue no queda «desincronizada»: su carrera es la de la sala; anota con quién se separó)
+    if (!/[?&]islaMarca=0\b/.test(location.search))
+      ok('§269b.15: …la isla que sigue no queda «desincronizada» (anota separadoDe); las que se salen sí', ['ana', 'beto', 'carla'].every(n => !e[n].desincronizado && e[n].separadoDe?.length) &&
+         ['dani', 'eva'].every(n => !!e[n].desincronizado), nombres.map(n => `${n} ${e[n].desincronizado ? 'desinc' : '—'}/${e[n].separadoDe?.length || 0}`).join(', '));
   }
 
   // ---- 5b) R5 (§154): la huella ampliada dice QUÉ parte se separó; si la de siempre coincide, nadie sale ----

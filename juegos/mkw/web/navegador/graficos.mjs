@@ -51,7 +51,7 @@ export const GRAFICOS = { escala: 1, fluidez: 0, salida: 0, verFps: false, verPi
 // §256 (G16): verGrafico = el medidor muestra el tiempo de cada imagen en un gráfico en vivo y el 1 % bajo (imagenes-vista.mjs)
 // §252 (G11): quitar = qué efectos de la escena no se dibujan (bits: 1 brillo, 2 profundidad de campo, 4 sombras por
 // volumen, 8 mapa de luz); 0 = todo, como siempre
-export const N8_OPCIONES = [0, 'auto', 1, 2];
+export const N8_OPCIONES = [0, 'auto', 1, 2, 3];   // (§283: 3 = «20 parejas»)
 // La resolución interna en pixeles: la de la Wii (640×528) por la escala
 export const pixelesInternos = v => `${Math.round(640 * v)}×${Math.round(528 * v)}`;
 const CLAVE = 'mkw.graficos';
@@ -66,7 +66,7 @@ export function normalizar(g = {}) {
     verPing: g.verPing === true,
     verDetalle: g.verDetalle === true,
     // (solo un 0 guardado es «No»: sin nada, o con algo que no se entiende, vale Automático)
-    n8: g.n8 === 0 || g.n8 === '0' ? 0 : Number(g.n8) === 2 ? 2 : g.n8 === 1 || g.n8 === '1' ? 1 : 'auto',
+    n8: g.n8 === 0 || g.n8 === '0' ? 0 : Number(g.n8) === 2 ? 2 : Number(g.n8) === 3 ? 3 : g.n8 === 1 || g.n8 === '1' ? 1 : 'auto',   // (§283: 3)
     quitar: (Number(g.quitar) | 0) & 31,
     texturas: [0, 1, 2].includes(Number(g.texturas)) ? Number(g.texturas) : 0,   // §253 (G12): 0 completas, 1 la mitad, 2 un cuarto
     verGrafico: g.verGrafico === true,                                         // §256 (G16)
@@ -157,15 +157,26 @@ export function notaHz(hz) {
 // El texto del medidor: «60 fps · 📶 Juan 35 ms · Ana 80 ms» (puro: lo prueba el banco); con el detalle (§114):
 // «31 fps · juego 26 ms · video 5 ms · 120 Hz · 1280×720 · frena: el procesador…»
 export function textoMedidor({ fps = null, rtt = {}, nombres = {}, yo = null, verFps = true, verPing = true, verDetalle = false, detalle = {},
-                               verGrafico = false, imagenes = null } = {}) {
+                               verGrafico = false, imagenes = null, juego = null } = {}) {
   const partes = [];
-  if ((verFps || verDetalle || verGrafico) && Number.isFinite(fps)) partes.push(`${Math.round(fps)} fps`);
-  // §256 (G16): de las últimas imágenes a la vista, el 1 % bajo y qué fracción de los fps a la vista es (meta 95 %)
-  if ((verGrafico || verDetalle) && imagenes?.imagenes >= 60 && Number.isFinite(imagenes.bajo1))
-    partes.push(`1 % bajo ${Math.round(imagenes.bajo1)} (${Math.round(100 * imagenes.razon)} %)`);
+  const verAlgo = verFps || verDetalle || verGrafico;
+  // §270 (el dueño: «debiera diferenciarse por fps de video y fps de lógica»): con `juego` = { porSeg, bajo1 } (los
+  // cuadros que el juego calcula por segundo y su 1 % bajo), el medidor dice las dos cosas por separado:
+  // «Imagen 60 fps (1 % bajo 57) · Juego 60/s (1 % bajo 59)». Imagen = lo que se ve; Juego = la carrera calculada
+  // (debe ser 60 siempre: si baja, el juego va más lento que el reloj). Sin `juego`, como antes (§256)
+  if (juego && verAlgo) {
+    const bajo = (n, r) => Number.isFinite(n) && r ? ` (1 % bajo ${Math.round(n)})` : '';
+    if (Number.isFinite(fps)) partes.push(`Imagen ${Math.round(fps)} fps${bajo(imagenes?.bajo1, imagenes?.imagenes >= 60)}`);
+    if (Number.isFinite(juego.porSeg)) partes.push(`Juego ${Math.round(juego.porSeg)}/s${bajo(juego.bajo1, juego.cuadros >= 60)}`);
+  } else {
+    if (verAlgo && Number.isFinite(fps)) partes.push(`${Math.round(fps)} fps`);
+    // §256 (G16): de las últimas imágenes a la vista, el 1 % bajo y qué fracción de los fps a la vista es (meta 95 %)
+    if ((verGrafico || verDetalle) && imagenes?.imagenes >= 60 && Number.isFinite(imagenes.bajo1))
+      partes.push(`1 % bajo ${Math.round(imagenes.bajo1)} (${Math.round(100 * imagenes.razon)} %)`);
+  }
   if (verDetalle) {
     const { trabajo, gpu, hz, lienzo, logica } = detalle || {};
-    if (Number.isFinite(logica)) partes.push(`lógica ${Math.round(logica)}`);   // (§124: solo en la carrera)
+    if (!juego && Number.isFinite(logica)) partes.push(`lógica ${Math.round(logica)}`);   // (§124: solo en la carrera)
     if (Number.isFinite(trabajo)) partes.push(`juego ${trabajo.toFixed(1)} ms`);
     if (Number.isFinite(gpu)) partes.push(`video ${gpu.toFixed(1)} ms`);
     if (Number.isFinite(hz) && hz > 0) partes.push(`${Math.round(hz)} Hz`);
@@ -214,7 +225,7 @@ export function limitarSalida(lienzo, { tope = 0, dpr = () => globalThis.deviceP
 const el = (etiqueta, props = {}, ...hijos) => { const e = Object.assign(document.createElement(etiqueta), props); e.append(...hijos); return e; };
 
 // El panel: tres selectores (resolución interna, fluidez, resolución de salida), dos casillas (fps, ping) y «Reiniciar el juego» si algo cambió
-export function montarGraficos(caja, { reiniciar = () => location.reload(), enSala = false, alCambiar = () => {}, alSalida = () => {}, alQuitar = () => {}, alTexturas = () => {}, alImagen = () => {}, avisosLag = null } = {}) {
+export function montarGraficos(caja, { reiniciar = () => location.reload(), enSala = false, alCambiar = () => {}, alSalida = () => {}, alQuitar = () => {}, alTexturas = () => {}, alImagen = () => {}, avisosLag = null, arriba = null } = {}) {
   if (!caja) return null;
   const alArrancar = leerGraficos();               // lo que el juego leyó al arrancar (para saber si hay que reiniciar)
   let g = { ...alArrancar };
@@ -234,7 +245,8 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
     el('option', { value: 'auto', textContent: 'Automático (recomendado)' }),
     el('option', { value: '1', textContent: '30 parejas (sin tirones)' }),
     el('option', { value: '0', textContent: '60 siempre' }),
-    el('option', { value: '2', textContent: '30 con imagen intermedia' }));
+    el('option', { value: '2', textContent: '30 con imagen intermedia' }),
+    el('option', { value: '3', textContent: '20 parejas (si ni con 30 parejas alcanza)' }));   // (§283)
   const texturas = el('select', { id: 'graficosTexturas' },
     el('option', { value: '0', textContent: 'Completas (lo de siempre)' }),
     el('option', { value: '1', textContent: 'La mitad — menos memoria y trabajo para la tarjeta' }),
@@ -282,6 +294,7 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
   liviano.onclick = () => poner({ ...LIVIANO, quitar: LIVIANO.quitar | (g.quitar & 16) });   // (las partículas, como estén)
   completo.onclick = () => poner({ quitar: 0, texturas: 0, salida: 0 });
   caja.replaceChildren(
+    ...(arriba ? [arriba] : []),           // (§274: la «⚡ Auto calibración: máxima fluidez», lo primero de la hoja)
     el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosEscala', textContent: 'Resolución interna' }), escala),
     el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosFluidez', textContent: 'Fluidez (imágenes por segundo)' }), fluidez),
     el('p', { className: 'nota-graficos', textContent: 'El juego siempre calcula 60 cuadros por segundo; la fluidez dibuja imágenes intermedias ' +
@@ -325,7 +338,8 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
       (avisosLag?.forzado ? ' (Fijado por la dirección de la página: ?avisosLag.)' : '') }),
     aviso, boton);
   pinta();
-  return { get graficos() { return { ...g }; }, alArrancar };
+  // (§274: releer() = volver a leer lo guardado y pintarlo, sin avisar: lo cambió otro, la auto calibración, que ya lo aplicó)
+  return { get graficos() { return { ...g }; }, alArrancar, releer() { g = leerGraficos(); pinta(); } };
 }
 
 // El medidor en la esquina (una vez por segundo; escondido si no hay nada que mostrar). §256 (G16): con verGrafico,
@@ -334,22 +348,32 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
 export function montarMedidor(nodo, { graficos = () => leerGraficos(), fps = () => null, rtt = () => ({}), nombres = () => ({}),
                                      yo = null, jugando = () => true, cada = 1000, detalle = () => ({}),
                                      imagenes = () => null, grafico = null, esperado = () => 1000 / 60, cadaGrafico = 250,
-                                     dibujar = null } = {}) {
+                                     dibujar = null, juego = null, graficoJuego = null, esperadoJuego = () => 1000 / 60 } = {}) {
   if (!nodo) return null;
   const textoNodo = document.createTextNode('');
-  let lienzo = null, relojGrafico = null;
+  // dos gráficos (el dueño 2026-11-11: «que sea uno de imagen y otro de juego»): arriba el tiempo de cada imagen que se
+  // vio, abajo el de cada cuadro de lógica que el juego calculó (graficoJuego); cada «1 % bajo» sale de sus barras
+  let lienzo = null, lienzoJuego = null, relojGrafico = null;
   nodo.replaceChildren(textoNodo);
+  let delGrafico = null, delJuego = null;   // el resumen de las barras dibujadas la última vez (dibujar lo devuelve)
   const pintaGrafico = () => {
     if (!lienzo || lienzo.hidden || !grafico || !dibujar) return;
-    try { dibujar(lienzo.getContext('2d'), grafico(), { esperado: esperado() }); } catch {}
+    try { const r = dibujar(lienzo.getContext('2d'), grafico(), { esperado: esperado(), titulo: graficoJuego ? 'Imagen' : '' }); delGrafico = r?.imagenes ? r : null; } catch {}
+    if (!lienzoJuego || lienzoJuego.hidden) return;
+    try { const r = dibujar(lienzoJuego.getContext('2d'), graficoJuego(), { esperado: esperadoJuego(), titulo: 'Juego' }); delJuego = r?.imagenes ? r : null; } catch {}
   };
   const pinta = () => {
     const g = graficos();
     const conGrafico = g.verGrafico && !!grafico && !!dibujar;
+    // (el dueño 2026-11-10: el 1 % bajo del texto = el del gráfico que se ve: se redibuja ahora y se usa ese mismo resumen)
+    if (conGrafico) pintaGrafico();
+    const img = conGrafico && delGrafico ? delGrafico : imagenes();
+    // el «Juego N/s» con el 1 % bajo del gráfico de juego que se ve (si está), los cuadros por segundo del resumen de siempre
+    const juegoTexto = () => { const j = juego ? juego() : null; return j && conGrafico && delJuego ? { ...j, bajo1: delJuego.bajo1, bajo01: delJuego.bajo01, cuadros: delJuego.imagenes } : j; };
     const texto = (g.verFps || g.verPing || g.verDetalle || conGrafico) && jugando()
       ? textoMedidor({ fps: fps(), rtt: g.verPing ? rtt() : {}, nombres: nombres(), yo, verFps: g.verFps, verPing: g.verPing,
                        verDetalle: g.verDetalle, detalle: g.verDetalle ? detalle() : {},
-                       verGrafico: conGrafico, imagenes: conGrafico || g.verDetalle ? imagenes() : null }) : '';
+                       verGrafico: conGrafico, imagenes: img, juego: juegoTexto() }) : '';
     nodo.hidden = !texto;
     if (textoNodo.data !== texto) textoNodo.data = texto;
     const verLo = conGrafico && !!texto;
@@ -358,11 +382,17 @@ export function montarMedidor(nodo, { graficos = () => leerGraficos(), fps = () 
       lienzo.style.cssText = 'display:block;width:240px;height:40px;margin-top:3px;';
       nodo.append(lienzo);
     }
+    if (verLo && graficoJuego && !lienzoJuego) {
+      lienzoJuego = Object.assign(document.createElement('canvas'), { width: 240, height: 40, className: 'grafico-juego' });
+      lienzoJuego.style.cssText = 'display:block;width:240px;height:40px;margin-top:3px;';
+      nodo.append(lienzoJuego);
+    }
     if (lienzo) lienzo.hidden = !verLo;
+    if (lienzoJuego) lienzoJuego.hidden = !verLo;
     if (verLo && !relojGrafico) relojGrafico = setInterval(pintaGrafico, cadaGrafico);
     if (!verLo && relojGrafico) { clearInterval(relojGrafico); relojGrafico = null; }
   };
   const reloj = setInterval(pinta, cada);
   pinta();
-  return { pinta, pintaGrafico, get lienzo() { return lienzo; }, detener: () => { clearInterval(reloj); clearInterval(relojGrafico); } };
+  return { pinta, pintaGrafico, get lienzo() { return lienzo; }, get lienzoJuego() { return lienzoJuego; }, detener: () => { clearInterval(reloj); clearInterval(relojGrafico); } };
 }

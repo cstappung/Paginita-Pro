@@ -13,7 +13,7 @@
 //   - que los avisos de sala lenta digan la verdad, comparados con el medidor de cada pestaña (§85).
 // Fotos en build/web/datos/sincro/.
 //
-// Uso:  node web/navegador/prueba-sincro.mjs [--ventana] [--lento] [--sala] [--extra=&param=valor] [--puerto=8147] [--datos=build/web/datos/sincro]
+// Uso:  node web/navegador/prueba-sincro.mjs [--ventana] [--lento] [--sala] [--calibrar (§274)] [--extra=&param=valor] [--puerto=8147] [--datos=build/web/datos/sincro]
 //       (--sala: cada juego dentro de la sala del sitio falsa, con la dirección que arma el sitio)
 //       (--lento: B con la CPU 2 veces más lenta; --extra: parámetros de más para las dos pestañas)
 //       (§170 --build-b=build/web-motor-base/navegador: B corre OTRO programa (el servidor se lo da con MKW_BUILD_B y
@@ -66,6 +66,10 @@ const BUILD_B = (process.argv.find(a => a.startsWith('--build-b=')) || '').slice
 // ventana (p. ej. 1260x540 = 21:9) y --extra-b=&… = parámetros solo para B (p. ej. &fluidez=180)
 const VISTA_B = ((process.argv.find(a => a.startsWith('--vista-b=')) || '').slice(10).match(/^(\d+)x(\d+)$/) || []).slice(1).map(Number);
 const EXTRA_B = (process.argv.find(a => a.startsWith('--extra-b=')) || '').slice(10);
+// §269: con una red muy lenta de mentira (redMala de 100 ms o más de ida) o una PC con lastre, esperar, avisar «espera al
+// jugador» y largar con más de 200 ms entre las dos es lo CIERTO (no hay cómo hacerlo mejor): esos puntos van como nota
+const DIFICIL = /lastre=/.test(EXTRA + EXTRA_B) || [...(EXTRA + EXTRA_B).matchAll(/redMala=(\d+)/g)].some(m => +m[1] >= 100);
+const okNota = (t, c, d) => (DIFICIL && !c ? console.log(`  · nota (red o PC difícil a propósito, no cuenta): ${t} — ${d}`) : ok(t, c, d));
 const EXTRA_A = (process.argv.find(a => a.startsWith('--extra-a=')) || '').slice(10);   // (§179: solo para A)
 // §177.6 (R9) --oculta-b=S: a mitad de la carrera la pestaña B queda «oculta» S segundos (simulado dentro de la página,
 // como medir-oculta: document.hidden y sin requestAnimationFrame; el aviso visibilitychange) con la tecla apretada
@@ -264,6 +268,14 @@ async function compararRastros() {
 // (las teclas van a la página: en --sala, a la de la sala, que tiene el marco del juego con el foco)
 const tecladoA = paginas.A.keyboard, tecladoB = paginas.B.keyboard;
 if (SALA) for (const n of ['A', 'B']) await paginas[n].locator('iframe').focus().catch(() => {});
+// §269 --k-en-cuenta: B aprieta el acelerador YA en la cuenta (la salida rápida, como el dueño): la falla de §269 era
+// que desde el «¡YA!» el kart de B seguía con esa A para siempre y no doblaba
+const K_EN_CUENTA = process.argv.includes('--k-en-cuenta');
+if (K_EN_CUENTA) for (const hasta = Date.now() + 120000; Date.now() < hasta;) {
+  const eb = await leer(B);
+  if (eb?.s === 0x20 && (eb?.etapa ?? -1) >= 0) { await tecladoB.down('KeyK'); console.log('  §269: B aprieta el acelerador en la cuenta'); break; }
+  await espera(200);
+}
 // acelerar recién con la carrera andando: apretado durante la cuenta regresiva, el kart patina en la largada (un
 // "burnout" del juego) y lo que avanza depende de en qué instante se apretó (A salía con 1,04 a 1,13 vueltas)
 for (const hasta = Date.now() + 60000; Date.now() < hasta;) {
@@ -278,6 +290,43 @@ const av0 = (await leer(A))?.av || [];           // (§102: dónde estaban los k
 await tecladoA.down('KeyK'); await tecladoB.down('KeyK');
 await espera(9000);
 await tecladoB.down('KeyA'); await espera(1500); await tecladoB.up('KeyA');
+// §274 --calibrar: A aprieta «⚡ Auto calibración» a mitad de carrera: la sala entera se pausa (B ve el aviso y su
+// carrera no avanza), A prueba sus ajustes en ≤ 30 s, y las dos siguen desde el mismo cuadro: las huellas siguen
+// iguales y nadie queda cortado, pausado por el lockstep ni «quieto» para el VR
+if (process.argv.includes('--calibrar')) {
+  const antes = [await leer(A), await leer(B)];
+  const tC = Date.now();
+  await A.evaluate(() => { window.__calib = window.mkwAutoCalibrar.apretar(); });
+  const vistas = [];
+  for (const hasta = Date.now() + 45000; Date.now() < hasta;) {
+    const [va, vb] = await Promise.all([A, B].map(p => p.evaluate(() => ({ t: Date.now(), cuadro: window.mkwSincro?.lockstep?.estado().cuadro ?? -1,
+      congelada: !!window.mkwSincro?.lockstep?.congelada, aviso: document.getElementById('pausaSala') && !document.getElementById('pausaSala').hidden ? document.querySelector('#pausaSala b')?.textContent : null,
+      corriendo: !!window.mkwAutoCalibrar?.estado.corriendo, veces: window.mkwAutoCalibrar?.estado.veces | 0, pausa: window.mkwSala?.pausa || null,
+      congeladoJuego: window.mkw?._mkw_congelado_estado?.(0) ?? null })).catch(() => null)));
+    vistas.push({ ms: Date.now() - tC, A: va, B: vb });
+    if (va && !va.corriendo && va.veces >= 1 && vb && !vb.aviso && !vb.congelada) break;
+    await espera(300);
+  }
+  const fin = await A.evaluate(() => { const u = window.mkwAutoCalibrar.estado.ultimo; return u && { ms: u.ms, texto: u.texto, cancelada: u.cancelada,
+    resultados: (u.resultados || []).map(x => `${x.n8}/${x.salida}: ${x.bajo1?.toFixed(1)} (${x.logicaFinal?.toFixed?.(0)}${x.logicaEstimada ? '~' : ''})`) }; }).catch(() => null);
+  const conAviso = vistas.filter(v => v.B?.aviso);
+  const congB = vistas.filter(v => v.B?.congelada);
+  const cuadrosB = congB.map(v => v.B.cuadro);
+  console.log(`  §274: ${fin?.texto} (${((fin?.ms ?? 0) / 1000).toFixed(1)} s) · ${fin?.resultados?.join(' · ')}`);
+  console.log(`  §274: B con el aviso ${conAviso.length} vistas (${conAviso[0]?.B.aviso}); B congelada en los cuadros ${Math.min(...cuadrosB)}–${Math.max(...cuadrosB)}; A congelada en ${vistas.filter(v => v.A?.congelada).map(v => v.A.cuadro).filter((x, i, a) => a.indexOf(x) === i).join(',')}`);
+  writeFileSync(path.join(carpeta, 'calibrar.json'), JSON.stringify({ fin, vistas }, null, 1));
+  ok('§274: A calibra a mitad de carrera en 30 s o menos (sin cancelar)', !!fin && !fin.cancelada && fin.ms <= 30000, fin?.cancelada || `${((fin?.ms ?? 0) / 1000).toFixed(1)} s`);
+  ok('§274: B ve el aviso «⏸ … está calibrando su imagen — vuelve en N s» mientras dura', conAviso.length >= 3 && /^⏸ .+ está calibrando su imagen — vuelve en \d+ s$/.test(conAviso[0].B.aviso), conAviso[0]?.B.aviso || 'nunca');
+  ok('§274: …y su carrera queda quieta (B no corre cuadros mientras está congelada)', congB.length >= 3 && Math.max(...cuadrosB) - Math.min(...cuadrosB) <= 1, `${congB.length} vistas, cuadros ${Math.min(...cuadrosB)}–${Math.max(...cuadrosB)}`);
+  await espera(8000);
+  const despues = [await leer(A), await leer(B)];
+  ok('§274: al terminar las dos siguen (más de 300 cuadros en 8 s) y el aviso se fue', despues.every((x, i) => (x?.ls?.cuadro ?? 0) - (antes[i]?.ls?.cuadro ?? 0) > 300) &&
+     !(await B.evaluate(() => !document.getElementById('pausaSala')?.hidden).catch(() => true)), despues.map(x => x?.ls?.cuadro).join(', '));
+  ok('§274: las huellas siguen iguales después de la pausa', despues.every(x => !x?.ls?.desincronizado) && (despues[0]?.ls?.huellasIguales ?? 0) > (antes[0]?.ls?.huellasIguales ?? 0),
+     `iguales A ${antes[0]?.ls?.huellasIguales} → ${despues[0]?.ls?.huellasIguales}`);
+  ok('§274: nadie fue cortado, pausado por el lockstep ni quedó «quieto» para el VR', despues.every(x => x?.ls && !Object.keys(x.ls.cortes || {}).length && !x.ls.fuera && !(x.ls.pausasAhora || []).length &&
+     Object.values(x.ls.quieto || {}).every(q => q < 1800)), despues.map(x => JSON.stringify({ cortes: x?.ls?.cortes, pausas: x?.ls?.pausasAhora, quieto: x?.ls?.quieto, cong: x?.ls?.msCongelada })).join(' · '));
+}
 let oculta = null;
 if (OCULTA_B > 0) {
   const cuadros = async p => (await leer(p))?.ls?.cuadro ?? 0;
@@ -339,10 +388,13 @@ if (DIRECTA) {
 }
 else ok('la tabla de pantallas de Racedata es la misma en las dos (la mira la lógica)', xa?.pantalla === xb?.pantalla, `A ${xa?.pantalla}, B ${xb?.pantalla}`);
 ok('los karts de los humanos no llevan la marca de CPU', (xa?.marcas || []).length === 2 && xa.marcas.every(m => !(m & 1)), (xa?.marcas || []).map(m => m.toString(16)).join(', '));
-{ const r = largadaPareja([xa, xb], xa?.ls?.carrera ?? 1); console.log('  §250 ' + r.detalle); ok('§250: las dos largan en el mismo cuadro de lógica y a la vez', r.cumple, r.detalle);
+{ const r = largadaPareja([xa, xb], xa?.ls?.carrera ?? 1); console.log('  §250 ' + r.detalle); okNota('§250: las dos largan en el mismo cuadro de lógica y a la vez', r.cumple, r.detalle);
   writeFileSync(path.join(carpeta, 'largada.json'), JSON.stringify({ A: xa?.ls?.largadas, B: xb?.ls?.largadas }, null, 1)); }
 ok('las huellas de la carrera coinciden (la misma carrera en las dos)', (xa?.ls?.huellasIguales || 0) >= 3 && !xa?.ls?.desincronizado && !xb?.ls?.desincronizado,
   `iguales A ${xa?.ls?.huellasIguales}, B ${xb?.ls?.huellasIguales}${xa?.ls?.desincronizado ? ' · DESINCRONIZADO ' + JSON.stringify(xa.ls.desincronizado) : ''}`);
+// §269b: la huella ampliada dice si alguna PARTE se separó aunque la huella de la carrera siga igual (p. ej. «azar»: el
+// segundo generador de la carrera, Raceinfo +8); solo se informa (en el teléfono salió distinta en el cuadro ~600)
+for (const [n, x] of [['A', xa], ['B', xb]]) if (x?.ls?.parteDistinta) console.log(`  ${n}: parte distinta ${JSON.stringify(x.ls.parteDistinta)}`);
 // §192 (R2): si B lleva ?saltarDibujo=N, que de verdad se haya saltado dibujos (y con el modo 2, que el juego no los armó):
 // la huella de arriba dice que la carrera es la misma igual
 if (/[?&]saltarDibujo=\d/.test(EXTRA_B)) {
@@ -385,6 +437,23 @@ const largo = (x, i) => (x?.av?.[i] ?? 0).toFixed(3);
 ok('el kart de A avanzó con lo que tocó A', (xa?.av?.[0] || 0) - (av0[0] || 0) > 0.02 && (xa?.av?.[0] || 0) > 1, `puesto 0: ${(av0[0] ?? 0).toFixed(3)} → ${largo(xa, 0)} vueltas`);
 ok('el kart de B avanzó con lo que tocó B (y no igual que el de A)', (xa?.av?.[1] || 0) > 1.1 && Math.abs((xa?.av?.[1] || 0) - (xa?.av?.[0] || 0)) > 1e-3,
   `puesto 1: ${largo(xa, 1)} vueltas`);
+// §269: lo que la autoridad tuvo que inventar de cada uno (con el árbitro, §191/§231, los botones de todos viajan por ella)
+for (const [n, x] of [['A', xa], ['B', xb]]) console.log(`  §269 ${n}: inventados ${x?.ls?.inventados} (viejos ${x?.ls?.inventadosViejos}, tarde pero vivo ${x?.ls?.tardeVivo} ${JSON.stringify(x?.ls?.tardeEdad)}), árbitro ${x?.ls?.arbitro}, autoridad ${x?.ls?.autoridad}, retraso ${JSON.stringify(x?.ls?.retrasos)} máx ${JSON.stringify(x?.ls?.retrasoMax)}, paquetes ${x?.ls?.paquetesBotones}, envíos ${JSON.stringify(x?.ls?.enviosA)}`);
+// §269: el informe de Diagnóstico de cada PC trae la sala (versión, papel, retraso, botones por jugador, locales)
+{ const inf = await Promise.all([A, B].map(p => p.evaluate(() => window.mkwInformeRendimiento?.().sala ?? null).catch(() => null)));
+  ok('§269: el informe de Diagnóstico de cada PC trae la sala (versión, papel, botones por jugador, una pantalla y un local)',
+     // (§269b.12: «un local» lo escribe solo el camino de la sala y de la carrera directa —semillas_nativo.cpp,
+     // pantallaPropia—; la copa de esta prueba y de la sala falsa del sitio —modo=copa— deja 0, y el HUD del juego
+     // —GetCtrlRaceBaseCount 0x80857B08— cuenta 0 como 1)
+     inf.every(x => x && x.version?.mia >= 269 && x.recibidosDe && Object.keys(x.recibidosDe).length >= 1 && x.pantallasLocales?.[0] === 1 && (!DIRECTA || x.pantallasLocales?.[1] === 1)),
+     JSON.stringify(inf.map(x => x && { v: x.version?.mia, recibidosDe: x.recibidosDe, pantallasLocales: x.pantallasLocales }))); }
+// §269: con el árbitro, a B (el lejano o el lento) la autoridad nunca le pone «solo A y el volante suelto» con la carrera
+// andando (?tardeVivo=0 = como antes: ahí sí, y el kart de B aceleraba solo sin doblar)
+if (/redMala|lastre/.test(EXTRA_B + EXTRA) || K_EN_CUENTA) {
+  const viejos = (xa?.ls?.inventadosViejos || 0) + (xb?.ls?.inventadosViejos || 0), antes = /tardeVivo=0/.test(EXTRA + EXTRA_A + EXTRA_B);
+  ok(antes ? '§269 (como antes, ?tardeVivo=0): a B se le inventó «solo A» con la carrera andando' : '§269: a B nunca se le inventó «solo A y el volante suelto» con la carrera andando (si llega tarde, va con sus botones de verdad)',
+     antes ? viejos > 60 : viejos < 30, `inventados viejos ${viejos}, tarde pero vivo A ${xa?.ls?.tardeVivo} B ${xb?.ls?.tardeVivo}`);
+}
 const msPorCuadro = x => x?.ls ? (x.ls.msEsperando / Math.max(1, x.ls.cuadros)).toFixed(2) : '-';
 const esperas = `A ${msPorCuadro(xa)} ms (máx ${xa?.ls?.maxEspera?.toFixed(0)}), B ${msPorCuadro(xb)} ms (máx ${xb?.ls?.maxEspera?.toFixed(0)}); esperando que el otro llegara a la carrera: A ${((xa?.ls?.msLlegada || 0) / 1000).toFixed(1)} s, B ${((xb?.ls?.msLlegada || 0) / 1000).toFixed(1)} s`;
 const avisos = x => [...new Set(x?.avisos || [])].slice(-2).join(' / ') || 'ninguno';
@@ -402,7 +471,7 @@ const ritmo = n => {
 };
 const textoRitmo = r => `${r.fps.toFixed(0)} cuadros/s con ${r.trabajo.toFixed(1)} ms de trabajo por cuadro (lo peor, 6 s seguidos: ${r.peor6.toFixed(0)})`;
 if (!process.argv.includes('--lento')) {
-  ok('sincronizar cuesta poco (espera promedio por cuadro < 4 ms)', Number(msPorCuadro(xa)) < 4 && Number(msPorCuadro(xb)) < 4, esperas);
+  okNota('sincronizar cuesta poco (espera promedio por cuadro < 4 ms)', Number(msPorCuadro(xa)) < 4 && Number(msPorCuadro(xb)) < 4, esperas);
   // §85: antes este punto pedía CERO avisos, y eso dependía de cuánto tenía ocupada la PC el resto de los programas: con
   // dos juegos en la misma PC y «todo a la vista» (§61) cada cuadro lleva 13-20 ms de los 16,7 que hay, así que la
   // misma prueba daba 52-60 cuadros/s según el momento, y bajo 50 el aviso «Tu PC no alcanza» es CIERTO. Lo que el
@@ -411,7 +480,7 @@ if (!process.argv.includes('--lento')) {
   // medidor propio de esa pestaña (bajo 50 durante 6 s; 52 de tolerancia: los dos miden en ratos un poco corridos)
   const [ra, rb] = [ritmo('A'), ritmo('B')];
   const cierto = (x, r) => (x?.avisos || []).every(t => t.startsWith('Tu PC') && r.peor6 < 52);
-  ok('los avisos de sala lenta dicen la verdad (ninguno «espera al jugador»; «Tu PC no alcanza» solo si el medidor de esa pestaña bajó de 50 cuadros/s 6 s seguidos)',
+  okNota('los avisos de sala lenta dicen la verdad (ninguno «espera al jugador»; «Tu PC no alcanza» solo si el medidor de esa pestaña bajó de 50 cuadros/s 6 s seguidos)',
     cierto(xa, ra) && cierto(xb, rb), `A: ${avisos(xa)} · B: ${avisos(xb)} · la PC en la carrera: A ${textoRitmo(ra)}, B ${textoRitmo(rb)}`);
   if (ra.fps < 55 || rb.fps < 55) console.log('  (nota: la PC va justa para dos juegos con «todo a la vista»; con otros programas ocupándola puede bajar de 50 y el aviso es cierto — bitácora §85)');
 } else {
@@ -442,7 +511,7 @@ if (/[?&]avisosLag=0\b/.test(EXTRA_B)) {
 // el retraso (§70, §80): cada consola el suyo, de partida con sus pings y ajustado en la carrera con lo que cuentan
 // los demás (lockstep.mjs); los botones de cada uno los escribe solo él, por eso no tienen que ser iguales
 const retrasoDe = x => x?.ls?.retraso;
-ok('cada una con su retraso, entre 2 y 12 cuadros (se adapta a la red)', [xa, xb].every(x => retrasoDe(x) >= 2 && retrasoDe(x) <= 12),
+ok('cada una con su retraso, entre 2 y 18 cuadros (se adapta a la red; §269: el tope subió de 12 a 18)', [xa, xb].every(x => retrasoDe(x) >= 2 && retrasoDe(x) <= 18),
   `A ${retrasoDe(xa)} (partió en ${xa?.ls?.retrasos?.[xa?.ls?.carrera]}, promedio ${xa?.ls?.retrasoMedio?.toFixed(1)}, frenos ${xa?.ls?.frenos ?? 0}), ` +
   `B ${retrasoDe(xb)} (partió en ${xb?.ls?.retrasos?.[xb?.ls?.carrera]}, promedio ${xb?.ls?.retrasoMedio?.toFixed(1)}, frenos ${xb?.ls?.frenos ?? 0}) cuadros; ida y vuelta medida A ${JSON.stringify(xa?.ls?.rtt)} B ${JSON.stringify(xb?.ls?.rtt)} ms` +
   (EXTRA.includes('redMala') ? ` (red mala de mentira: ${EXTRA.match(/redMala=([\d.,]+)/)?.[1]})` : ''));

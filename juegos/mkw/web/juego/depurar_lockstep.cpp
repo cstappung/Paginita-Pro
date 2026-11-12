@@ -15,6 +15,9 @@ static void anota(const char* que, CpuContext* ctx) {
         desde = EM_ASM_INT({ const m = /([0-9]+)-([0-9]+)/.exec(new URLSearchParams(location.search).get('depura') || (typeof window !== 'undefined' && window.mkwDepura) || ''); return m ? +m[1] : 380; });
         hasta = EM_ASM_INT({ const m = /([0-9]+)-([0-9]+)/.exec(new URLSearchParams(location.search).get('depura') || (typeof window !== 'undefined' && window.mkwDepura) || ''); return m ? +m[2] : 600; });
     }
+    static int solo = -1;
+    if (solo < 0) solo = EM_ASM_INT({ return +(new URLSearchParams(location.search).get('depuraAzar') || 0); });
+    if (solo && (yo == r1 ? 1 : 2) != solo) return;   // (?depuraAzar=1|2: solo ese azar)
     if (static_cast<int>(f) < desde || static_cast<int>(f) > hasta) return;
     uint32_t sp = ctx->gpr[1], cadena[4] = {0, 0, 0, 0};
     for (int i = 0; i < 4; i++) { if (!Memory::Contains(sp, 8)) break; sp = Memory::Read32(sp); if (!Memory::Contains(sp, 8)) break; cadena[i] = Memory::Read32(sp + 4); }
@@ -42,13 +45,15 @@ extern "C" void mkw_vigila_azar(const char* dir, CpuContext* ctx, void (*f)(CpuC
     f(ctx);
     if (!ok) return;
     const uint32_t fr = Memory::Read32(ri + 0x20);
-    static int desde = -1, hasta = -1;
+    static int desde = -1, hasta = -1, solo = 0;
     if (desde < 0) {
-        desde = EM_ASM_INT({ const m = /([0-9]+)-([0-9]+)/.exec((typeof window !== 'undefined' && window.mkwDepura) || ''); return m ? +m[1] : 380; });
-        hasta = EM_ASM_INT({ const m = /([0-9]+)-([0-9]+)/.exec((typeof window !== 'undefined' && window.mkwDepura) || ''); return m ? +m[2] : 600; });
+        desde = EM_ASM_INT({ const m = /([0-9]+)-([0-9]+)/.exec(new URLSearchParams(location.search).get('depura') || (typeof window !== 'undefined' && window.mkwDepura) || ''); return m ? +m[1] : 380; });
+        hasta = EM_ASM_INT({ const m = /([0-9]+)-([0-9]+)/.exec(new URLSearchParams(location.search).get('depura') || (typeof window !== 'undefined' && window.mkwDepura) || ''); return m ? +m[2] : 600; });
+        solo = EM_ASM_INT({ return +(new URLSearchParams(location.search).get('depuraAzar') || 0); });
     }
     if (static_cast<int>(fr) < desde || static_cast<int>(fr) > hasta) return;
     for (int n = 1; n <= 2; n++) {
+        if (solo && n != solo) continue;   // (?depuraAzar=1|2: solo ese azar)
         const uint32_t r = n == 1 ? r1 : r2;
         if (!Memory::Contains(r, 16)) continue;
         const uint32_t a = Memory::Read32(r + 8), b = Memory::Read32(r + 12);

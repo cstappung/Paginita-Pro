@@ -114,12 +114,41 @@ extern "C" void rr_overlay_8083D55C(CpuContext* MKW_RESTRICT ctx) {
     }
 }
 
+// §275b: en «Cada uno su kart» (la carrera en línea de la sala, modo 7) RR no sortea las skins de las CPU: en línea las
+// pone Pages::Vote::BeforeControlUpdate (0x806437E8 → rr_kamek_81856190) desde el registro SELECT de RKNet de cada
+// consola, y esta sala no pasa por la votación ni llena esos registros. Sin esto, todas las CPU van sin skin (el
+// lockstep las trae: bmr-3.tpl, las voces GRP_VO_*…). Aquí cada consola elige la de cada CPU con la semilla de la
+// carrera (Racedata +0x20 +0xB74/+0xB78, la misma en todas: la escribe semillas_nativo.cpp) entre «sin skin» y las que
+// existen para ese personaje (characterTables de RR): todas las pantallas ven la misma, sin mensajes de la sala.
+// Las CPU las dice red_estado_nativo.cpp (débil: sin «Cada uno su kart» compilado, esto no hace nada).
+extern "C" __attribute__((weak)) int mkw_red_estado_es_cpu(int jugador);
+namespace {
+uint32_t mezclar(uint32_t h) { h ^= h >> 16; h *= 0x85EBCA6Bu; h ^= h >> 13; h *= 0xC2B2AE35u; h ^= h >> 16; return h; }
+void skinsCadaUno(uint32_t rd) {
+    if (!mkw_red_estado_es_cpu || Memory::Read32(rd + 0x20 + 0xB48 + 0x8) != 7) return;
+    const uint32_t s1 = Memory::Read32(rd + 0x20 + 0xB74), s2 = Memory::Read32(rd + 0x20 + 0xB78);
+    for (int j = 0; j < 12; j++) {
+        if (!mkw_red_estado_es_cpu(j)) continue;
+        const uint32_t personaje = Memory::Read32(rd + 0x20 + 0x8 + 0xF0u * static_cast<uint32_t>(j) + 0xC);
+        if (personaje >= 24) continue;
+        int n = 0;                                                   // cuántas skins existen para ese personaje
+        for (uint32_t k = 1; k <= 100; k++) if (Memory::Read8(kTablasRR + personaje * 101u + k)) n++;
+        uint32_t elegido = mezclar(s1 ^ mezclar(s2 + 0x9E3779B9u * static_cast<uint32_t>(j + 1)) ^ (personaje << 24)) % static_cast<uint32_t>(n + 1);
+        uint8_t skin = 0;                                            // 0 = sin skin (también una de las opciones)
+        for (uint32_t k = 1; k <= 100 && elegido; k++) if (Memory::Read8(kTablasRR + personaje * 101u + k) && --elegido == 0) skin = static_cast<uint8_t>(k);
+        Memory::Write8(kSkinsRR + static_cast<uint32_t>(j), skin);
+        g_skins.leidas[j] = skin;                                    // (la página las lee aquí: el paquete de carrera)
+    }
+}
+}  // namespace
+
 // B. al final de Racedata_InitRace (directo_nativo.cpp): el nombre de cada humano en el Mii de su casilla
 void mkwNombresEnCarrera() {
     const uint32_t rd = Memory::Read32(kRacedata), sp = sectionParams();
     if (!esPuntero(rd)) return;
     // las del sorteo de RR, para la página, en cualquier modo (§169: el paquete de carrera las usa también en Grand Prix)
     for (int j = 0; j < 12; j++) g_skins.leidas[j] = Memory::Read8(kSkinsRR + static_cast<uint32_t>(j));
+    skinsCadaUno(rd);                                            // §275b: «Cada uno su kart» (modo 7)
     if (Memory::Read32(rd + 0x20 + 0xB48 + 0x8) != 1) return;   // lo demás, solo en una carrera VS
     // las skins de la sala, después del sorteo de RR (que va al final de Racedata_InitRace de Pulsar): solo en los
     // puestos de CPU y solo si esa skin existe para ese personaje

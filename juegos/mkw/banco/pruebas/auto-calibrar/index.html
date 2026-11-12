@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto calibración</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>§274: <span>⚡ Auto calibración: máxima fluidez</span></h1>
+<p>Prueba <code>web/navegador/auto-calibrar.mjs</code>, la pausa de la sala de <code>sala-carrera.mjs</code> y el congelado
+  de <code>lockstep.mjs</code> <b>sin el juego</b>: aparatos de mentira (cuántas imágenes da cada combinación de Imagen y
+  salida, y cuánta lógica), un reloj de mentira para el tope de 30 s, tres salas unidas por una red de mentira y tres
+  lockstep que se congelan en el mismo cuadro y siguen.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { salidasAProbar, estimarLogica, elegir, frenaTarjeta, calibrar, textoEleccion, crearAutoCalibrar, crearAvisoPausa, montarBotonCalibrar,
+         TOPE_MS, LOGICA_MIN, CALIENTA_MS, MIDE_MS, textoCombo } from '/web/navegador/auto-calibrar.mjs';
+import { crearSala, motivoPausaNo, PAUSA_MAX_MS, MARCA_SALA } from '/web/navegador/sala-carrera.mjs';
+import { crearLockstep } from '/web/navegador/lockstep.mjs';
+
+const { ok, nota, fin } = prueba('auto-calibrar', 'La auto calibración y la pausa de la sala (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+
+// un aparato de mentira: por combinación {n8, salida} lo que daría (bajo1, fps, logica, ocupado); el reloj es de mentira
+function aparato(tabla, { porOmision = { bajo1: 30, fps: 40, logica: 60, ocupado: 0.9 } } = {}) {
+  let T = 0, actual = null; const aplicados = [];
+  return {
+    get T() { return T; }, aplicados,
+    ahora: () => T, esperar: async ms => { T += ms; },
+    aplicar: async c => { actual = { ...c }; aplicados.push(textoCombo(c)); },
+    medir: async ms => { T += ms; return { ...(tabla[`${actual.n8}:${actual.salida}`] || porOmision) }; },
+  };
+}
+
+try {
+  // ---- 1. Lo puro ----
+  ok('las salidas a probar con una pantalla de 2160: 720, 540 y 360', salidasAProbar(2160).join() === '720,540,360', salidasAProbar(2160).join());
+  ok('con un lienzo de 720 solo las de abajo (540, 360); con 400, la 360', salidasAProbar(720).join() === '540,360' && salidasAProbar(400).join() === '360',
+     `${salidasAProbar(720)} · ${salidasAProbar(400)}`);
+  ok('con un lienzo de 300 no hay salida que probar', salidasAProbar(300).length === 0);
+  {
+    // base: con la lógica andando 60 cuadros/s y 90 % ocupado; congelada con lo de ahora: 60 vueltas, 60 % (el dibujo)
+    // → la lógica sola = 0,9/60 − 0,6/60 = 5 ms por cuadro
+    const base = { logica: 60, ocupado: 0.9 }, actual = { vueltas: 60, ocupado: 0.6 };
+    const liviana = estimarLogica({ vueltas: 60, ocupado: 0.3 }, base, actual);   // 5 + 5 = 10 ms → cabe
+    const pesada = estimarLogica({ vueltas: 60, ocupado: 0.9 }, base, actual);    // 5 + 15 = 20 ms → 47,5/s
+    ok('la lógica estimada con la sala congelada: un dibujo más liviano cabe a 60', liviana === 60, liviana);
+    ok('…y uno más pesado no (lógica 5 ms + dibujo 15 ms = 47,5 cuadros/s): se descarta', Math.abs(pesada - 47.5) < 0.01, pesada);
+    ok('sin datos de la base no se estima (null: se da por buena)', estimarLogica({ vueltas: 60, ocupado: 0.3 }, null, actual) === null);
+  }
+  {
+    const e = elegir([{ n8: 0, salida: 0, bajo1: 31, fps: 45, llega: true }, { n8: 1, salida: 0, bajo1: 29.6, fps: 30, llega: true },
+                      { n8: 2, salida: 0, bajo1: 52, fps: 58, llega: true }]);
+    ok('elige el mejor 1 % bajo (52 de la imagen intermedia contra 31 y 29,6)', e.n8 === 2, textoCombo(e));
+    const e2 = elegir([{ n8: 0, salida: 0, bajo1: 59, fps: 60, llega: true }, { n8: 2, salida: 0, bajo1: 58.5, fps: 60, llega: true }]);
+    ok('a menos de un 3 % es empate: decide el promedio y después la más fiel (60 siempre)', e2.n8 === 0, textoCombo(e2));
+    const e3 = elegir([{ n8: 0, salida: 0, bajo1: 55, fps: 59, llega: false }, { n8: 1, salida: 0, bajo1: 29, fps: 30, llega: true }]);
+    ok('una combinación con la lógica bajo 60 queda descartada aunque se vea mejor', e3.n8 === 1, textoCombo(e3));
+    const e4 = elegir([{ n8: 0, salida: 0, bajo1: 20, fps: 30, llega: false, logicaFinal: 30 }, { n8: 1, salida: 0, bajo1: 20, fps: 25, llega: false, logicaFinal: 50 }]);
+    ok('si ninguna llega a 60 de lógica, la que más se acerca, avisando', e4.n8 === 1 && e4.sinLogica === true);
+    const e5 = elegir([{ n8: 1, salida: 0, bajo1: 10.9, fps: 14, llega: false, logicaFinal: 28.5 }, { n8: 2, salida: 0, bajo1: 12, fps: 19.5, llega: false, logicaFinal: 29.4 },
+                       { n8: 0, salida: 0, bajo1: 14.2, fps: 19, llega: false, logicaFinal: 24 }]);
+    ok('…a menos de un 5 % de lógica es empate y decide el 1 % bajo (la gama baja medida: la intermedia, 29,4/s)', e5.n8 === 2 && e5.sinLogica, textoCombo(e5));
+    ok('¿frena la tarjeta? no si ya va a 60 parejo; sí si no llega con el procesador desocupado o la tarjeta tarda > 12 ms',
+       !frenaTarjeta({ n8: 0, bajo1: 58, fps: 60, ocupado: 0.5 }) && frenaTarjeta({ n8: 0, bajo1: 30, fps: 40, ocupado: 0.5 }) &&
+       frenaTarjeta({ n8: 0, bajo1: 30, fps: 40, ocupado: 0.95, gpuMs: 15 }) && !frenaTarjeta({ n8: 0, bajo1: 30, fps: 40, ocupado: 0.95 }));
+  }
+
+  // ---- 2. La búsqueda con aparatos de mentira (reloj de mentira) ----
+  {
+    // un PC que va sobrado: lo de siempre ya es lo mejor; no prueba salidas
+    const a = aparato({ '0:0': { bajo1: 59.5, fps: 60, logica: 60, ocupado: 0.3 }, '1:0': { bajo1: 29.8, fps: 30, logica: 60, ocupado: 0.2 }, '2:0': { bajo1: 57, fps: 60, logica: 60, ocupado: 0.35 } });
+    const r = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 1080, ...a });
+    ok('PC sobrado: se queda con «60 siempre» y no prueba salidas (no frena la tarjeta)', r.elegido.n8 === 0 && r.elegido.salida === 0 && r.resultados.length === 3 && !r.frena,
+       `${textoCombo(r.elegido)}, ${r.resultados.length} pruebas`);
+    ok('…dice que lo de antes ya era lo mejor', /ya tenías era lo mejor/.test(textoEleccion(r)), textoEleccion(r));
+  }
+  {
+    // la gama baja (frena el procesador): 60 siempre da 31 de 1 % bajo y la lógica 48; 30 parejas 29,6 con 60; la
+    // intermedia 50 con la lógica 58
+    const a = aparato({ '0:0': { bajo1: 31, fps: 44, logica: 48, ocupado: 1 }, '1:0': { bajo1: 29.6, fps: 30, logica: 60, ocupado: 0.7 }, '2:0': { bajo1: 50, fps: 57, logica: 58, ocupado: 0.95 } });
+    const r = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 1080, ...a });
+    ok('gama baja: descarta «60 siempre» (lógica 48 < 57) y elige «30 con imagen intermedia» (1 % bajo 50)',
+       r.elegido.n8 === 2 && r.resultados.find(x => x.n8 === 0).llega === false, textoEleccion(r));
+    ok('…el resumen dice lo elegido, el 1 % bajo y el de antes', /^Elegido: 30 con imagen intermedia · salida de tu pantalla — 1 % bajo 50 fps \(antes 31\)/.test(textoEleccion(r)), textoEleccion(r));
+    ok('…y termina poniendo lo elegido', a.aplicados.at(-1) === textoCombo(r.elegido), a.aplicados.join(' → '));
+  }
+  {
+    // frena la tarjeta (4K): las imágenes no llegan con el procesador desocupado → prueba 720, 540, 360 con la mejor Imagen
+    const t = { '0:0': { bajo1: 24, fps: 38, logica: 60, ocupado: 0.4 }, '1:0': { bajo1: 28, fps: 30, logica: 60, ocupado: 0.3 }, '2:0': { bajo1: 25, fps: 36, logica: 60, ocupado: 0.45 },
+                '1:720': { bajo1: 29.8, fps: 30, logica: 60, ocupado: 0.3 }, '1:540': { bajo1: 29.9, fps: 30, logica: 60, ocupado: 0.3 }, '1:360': { bajo1: 29.9, fps: 30, logica: 60, ocupado: 0.3 } };
+    const a = aparato(t);
+    const r = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 2160, ...a });
+    ok('frena la tarjeta: después de la Imagen prueba las salidas 720, 540 y 360 con la mejor', r.frena && r.resultados.length === 6 && r.resultados.slice(3).map(x => x.salida).join() === '720,540,360',
+       a.aplicados.join(' → '));
+    ok('…y elige la salida más alta de las empatadas (720: la más nítida)', r.elegido.salida === 720 && r.elegido.n8 === 1, textoCombo(r.elegido));
+    ok(`todo en ${(r.ms / 1000).toFixed(1)} s: menos que el tope de ${TOPE_MS / 1000} s`, r.ms <= TOPE_MS, r.ms);
+  }
+  {
+    // el tope: cada medida tarda 6 s (un aparato muy trabado): no se empieza una prueba que no cabe
+    const a = aparato({});
+    a.medir = async ms => { a.esperar(6000); return { bajo1: 20, fps: 30, logica: 60, ocupado: 0.4 }; };
+    const r = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 2160, ...a });
+    ok('con un aparato que tarda: no pasa de 30 s (se cortó antes de empezar la que no cabía)', r.ms <= TOPE_MS && r.cortado, `${(r.ms / 1000).toFixed(1)} s, ${r.resultados.length} pruebas`);
+    const b = aparato({ '0:0': { bajo1: 30, fps: 40, logica: 60, ocupado: 0.5 } });
+    const r2 = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 2160, ...b, tope: 8000 });
+    ok('con un tope de 8 s (la pausa de la sala ya gastó parte): solo 2 pruebas', r2.resultados.length === 2 && r2.ms <= 8000, `${r2.resultados.length} pruebas en ${(r2.ms / 1000).toFixed(1)} s`);
+  }
+  {
+    // la sala congelada: sin lógica medida, se estima con la base. Base: la lógica a 48 con el hilo al 100 % (lo de ahora,
+    // modo 0: no llega); congelada, el modo 0 gasta 70 %: la lógica sola = 1/48 − 0,7/60 ≈ 9,2 ms; el modo 0 da
+    // 0,95/(9,2 + 11,7 ms) ≈ 45,6/s: se descarta; la intermedia (45 %) 0,95/(9,2 + 7,5) = 57: llega
+    const a = aparato({ '0:0': { bajo1: 40, fps: 58, vueltas: 60, ocupado: 0.7 }, '1:0': { bajo1: 29.7, fps: 30, vueltas: 60, ocupado: 0.35 }, '2:0': { bajo1: 52, fps: 59, vueltas: 60, ocupado: 0.45 } });
+    const r = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 1080, ...a, base: { logica: 48, ocupado: 1 } });
+    const m0 = r.resultados.find(x => x.n8 === 0);
+    ok('sala congelada: «60 siempre» se descarta por la lógica estimada (≈ 45,6/s)', m0.llega === false && m0.logicaEstimada && Math.abs(m0.logicaFinal - 45.6) < 0.5, m0.logicaFinal);
+    ok('…y elige la intermedia (lógica estimada 57, 1 % bajo 52)', r.elegido.n8 === 2, textoCombo(r.elegido));
+  }
+
+  // ---- 3. El controlador (un juego de mentira) ----
+  {
+    let T = 0, carrera = false, n8 = 0, salida = 0, g = { n8: 'auto', salida: 0 }, tic = null;
+    const estados = [];
+    const tabla = { 0: { bajo1: 31, fps: 44, l: 48 }, 1: { bajo1: 29.6, fps: 30, l: 60 }, 2: { bajo1: 50, fps: 57, l: 59 } };
+    let imagenes = 0, logica = 0, esp = 0;
+    const c = crearAutoCalibrar({
+      ahora: () => T, esperar: async ms => { const x = tabla[n8]; imagenes += ms; logica += x.l * ms / 1000; esp += 0.1 * ms; T += ms; },
+      cada: (f, ms) => { tic = f; return 1; },
+      leer: () => ({ ...g }), guardar: x => { g = { ...x }; }, aplicarN8: v => { n8 = v; }, aplicarSalida: s => { salida = s; },
+      modoN8: () => n8, alto: () => 1080, enCarrera: () => carrera,
+      medidor: { marca: () => imagenes, resumen: () => ({ bajo1: tabla[n8].bajo1, fps: tabla[n8].fps, imagenes: 100 }), logica: () => logica,
+                 trabajo: () => ({ t: T, espera: esp, lastre: 0 }), gpuMs: () => null },
+      congelarJuego: () => {}, sala: () => null, alEstado: e => estados.push(e.texto),
+    });
+    await c.apretar();
+    ok('en los menús queda pendiente, con un aviso claro', c.estado.pendiente && /Pendiente: se calibra sola 5 s después de que largue/.test(estados.at(-1)), estados.at(-1));
+    carrera = true; tic(); T += 1000; tic();
+    ok('con la carrera andando, todavía no (espera 5 s)', !c.estado.corriendo && c.estado.veces === 0);
+    T += 4100; tic();
+    for (let i = 0; i < 50 && (c.estado.corriendo || !c.estado.veces); i++) await espera(1);
+    ok('a los 5 s de la carrera empieza sola y termina', c.estado.veces === 1 && !c.estado.pendiente, estados.slice(-2).join(' | '));
+    ok('guardó lo elegido (30 con imagen intermedia) y lo dejó puesto', g.n8 === 2 && n8 === 2, JSON.stringify(g));
+    ok('«Deshacer» vuelve a lo de antes (Automático) y lo guarda', c.deshacer() && g.n8 === 'auto' && n8 === 'auto' && estados.at(-1) === 'Vuelto como estaba.');
+  }
+
+  // ---- 4. La pausa de la sala (tres salas, red de mentira, reloj de mentira) ----
+  {
+    let T = 1e6; const cola = [], salas = {}, repartos = {}, avisos = {}, noes = {};
+    const uids = ['ana', 'beto', 'carla'], humanos = uids.map((uid, mando) => ({ uid, mando }));
+    for (const u of uids) {
+      salas[u] = crearSala({ yo: u, humanos, anfitrion: 'ana', ahora: () => T, cada: f => { repartos[u] = f; return 1; }, parar: () => {},
+        enviar: (a, b) => cola.push([u, a, b]), alCambiar: () => {}, alPausaNo: m => { noes[u] = m; } });
+    }
+    const entregar = () => { while (cola.length) { const [de, a, b] = cola.shift(); salas[a].alBinario(de, b); } };
+    const tic = (ms = 1000) => { T += ms; for (const u of uids) repartos[u](); entregar(); };
+    for (let i = 0; i < 4; i++) tic();
+    ok('las tres salas están listas en la fase de la copa, con su reloj (90 s)', uids.every(u => salas[u].lista) && salas.ana.estado().plazo > 0, salas.ana.estado().fase);
+    const plazo0 = salas.ana.estado().plazo, falta0 = salas.carla.restan(plazo0);
+    salas.beto.pedirPausa({ ms: 28000, cuadro: null }); entregar();
+    const p = salas.carla.pausa;
+    ok('Beto pide la pausa: la anfitriona la da y llega a todas (de quién, hasta cuándo)', !!p && p.de === 'beto' && uids.every(u => salas[u].pausa?.id === p.id) && p.hasta - p.desde === 28000);
+    tic(5000); tic(5000);
+    ok('con la pausa, el reloj de la copa no corre (en todas las consolas)', uids.every(u => Math.abs(salas[u].restan(plazo0) - falta0) < 1100),
+       uids.map(u => Math.round(salas[u].restan(plazo0) / 1000)).join(', ') + ` s (antes ${Math.round(falta0 / 1000)})`);
+    ok('…y la cuenta de la pausa sí corre («vuelve en N s»)', Math.abs(salas.carla.restan(p.hasta) - 18000) < 1500, Math.round(salas.carla.restan(p.hasta) / 1000));
+    salas.carla.pedirPausa({ ms: 10000 }); entregar();
+    ok('Carla pide otra mientras dura: no (una a la vez)', noes.carla === 'otra' && salas.ana.pausa.de === 'beto');
+    salas.beto.terminarPausa(); entregar();
+    const plazo1 = salas.ana.estado().plazo;
+    ok('Beto termina antes: la pausa se va de todas', uids.every(u => !salas[u].pausa));
+    ok('…y el reloj de la copa sigue desde el mismo segundo (el plazo se corrió lo que duró, 10 s)', Math.abs(plazo1 - plazo0 - 10000) < 1100 && Math.abs(salas.carla.restan(plazo1) - falta0) < 1100,
+       `${Math.round((plazo1 - plazo0) / 1000)} s; faltan ${Math.round(salas.carla.restan(plazo1) / 1000)} s`);
+    salas.beto.pedirPausa({ ms: 10000 }); entregar();
+    ok('Beto pide otra en la misma fase: no (una por persona en cada carrera)', noes.beto === 'usada' && !salas.ana.pausa);
+    salas.carla.pedirPausa({ ms: 99999 }); entregar();
+    ok('Carla pide 100 s: se le dan 30 como mucho', salas.ana.pausa?.de === 'carla' && salas.ana.pausa.hasta - salas.ana.pausa.desde === PAUSA_MAX_MS);
+    for (let i = 0; i < 31; i++) tic();
+    ok('a los 30 s la anfitriona la termina sola (el tope), aunque Carla no avise', !salas.ana.pausa && !salas.beto.pausa);
+    ok('la anfitriona también puede pedir la suya (ella misma se la da)', (salas.ana.pedirPausa({ ms: 5000 }), entregar(), salas.beto.pausa?.de === 'ana'));
+    ok('motivoPausaNo: la copa terminada no se pausa', motivoPausaNo({ fase: 'fin' }, 'x', 0) === 'fin' && motivoPausaNo({ fase: 'correr', carrera: 2, pausasUsadas: { x: 'correr:1' } }, 'x', 0) === '');
+  }
+
+  // ---- 5. El aviso de las otras consolas ----
+  {
+    let falta = 12400;
+    const av = crearAvisoPausa(document);
+    av.mostrar('Ana', () => falta);
+    ok('el aviso en las otras consolas: «⏸ Ana está calibrando su imagen — vuelve en 13 s»', av.visible && av.texto === '⏸ Ana está calibrando su imagen — vuelve en 13 s', av.texto);
+    falta = 3100; await espera(300);
+    ok('…con cuenta regresiva', av.texto.endsWith('vuelve en 4 s'), av.texto);
+    av.ocultar();
+    ok('…y se va al seguir', !av.visible);
+    const b = montarBotonCalibrar(document);
+    ok('el botón dice claro qué hace: «⚡ Auto calibración: máxima fluidez»', b.boton.textContent === '⚡ Auto calibración: máxima fluidez' && b.boton.id === 'autoCalibrar');
+  }
+
+  // ---- 6. El lockstep: tres consolas se congelan después del mismo cuadro, quietas 2,5 s, y siguen ----
+  {
+    const uids = ['ana', 'beto', 'carla'], humanos = uids.map((uid, mando) => ({ uid, mando }));
+    const cs = {};
+    for (const uid of uids) {
+      const c = cs[uid] = { estado: 2166136261, cuadro: -1, congelada: false, registro: [] };
+      let toque = 0;
+      c.ls = crearLockstep({ yo: uid, humanos, esperaCorte: 400, esperaInicio: 1200, informeCada: 0, pingCada: 100, relevoRapido: true,
+        registro: t => c.registro.push(t),
+        local: () => { toque++; return [(toque * 37 + uid.charCodeAt(0)) & 0x0F7F, (toque % 255) - 128, 3, 0, 0, 0, 0]; },
+        huella: () => c.estado,
+        enviar: (a, bytes, canal) => { const copia = bytes.slice(); setTimeout(() => cs[a].ls.alBinario(uid, copia), 5 + Math.random() * 20); } });
+    }
+    const correr = async (c, hasta) => {
+      for (let k = c.cuadro + 1; k < hasta; k++) {
+        while (c.congelada) await espera(10);   // (el juego congelado: no pide cuadros)
+        c.cuadro = k;
+        const d = await c.ls.pad(k);
+        for (let i = 0; i < 32; i++) c.estado = Math.imul(c.estado ^ d[i], 16777619) >>> 0;
+        await espera(1);
+      }
+    };
+    const congelarEn = 250, t = {};
+    const correrTodo = Promise.all(uids.map(u => correr(cs[u], 600)));
+    // a los ~150 cuadros llega la pausa a todas (a carla 150 ms después: sigue unos cuadros más)
+    await espera(400);
+    for (const u of uids) setTimeout(() => cs[u].ls.congelarEn(congelarEn, k => { cs[u].congelada = true; cs[u].ls.congelar(true); t[u] = k; }), u === 'carla' ? 150 : 0);
+    await espera(2500 + 400);
+    const quietas = uids.map(u => cs[u].cuadro);
+    for (const u of uids) { cs[u].ls.congelar(false); cs[u].congelada = false; }
+    await Promise.race([correrTodo, espera(30000)]);
+    const e = uids.map(u => cs[u].ls.estado());
+    ok('las tres quedaron quietas en el cuadro de la pausa (o cerca, la que supo tarde) mientras duró', quietas.every(q => q >= congelarEn && q <= congelarEn + 15), quietas.join(', '));
+    ok('casi 2 s congeladas (más de 4 veces el margen de corte): nadie fue cortado ni pausado', e.every(x => Object.keys(x.cortes).length === 0 && !(x.pausas || []).length && !x.fuera),
+       e.map(x => JSON.stringify(x.cortes)).join(' '));
+    ok('siguieron desde el mismo cuadro y terminaron los 600 con el MISMO estado (las huellas iguales)', uids.every(u => cs[u].cuadro === 599) && uids.every(u => cs[u].estado === cs.ana.estado) && e.every(x => !x.desincronizado),
+       uids.map(u => `${cs[u].cuadro}:${cs[u].estado.toString(16)}`).join(' '));
+    ok('el lockstep anotó la pausa (congelada casi 2 s) y no la cuenta como tirón', e.every(x => x.congelamientos === 1 && x.msCongelada > 1500 && (x.tirones || 0) < 3),
+       e.map(x => `${Math.round(x.msCongelada)} ms, ${x.tirones || 0} tirones`).join(' · '));
+    for (const u of uids) cs[u].ls.detener();
+  }
+
+  // ---- 7. Las piezas en su lugar ----
+  {
+    const tx = async p => (await fetch(p)).text();
+    const mkw = await tx('/web/navegador/mkw.mjs'), nat = await tx('/web/juego/congelar_nativo.cpp');
+    ok('mkw.mjs: ?autoCalibrar=0 = sin el botón; el botón va en Gráficos y la sala avisa a la calibración', /parametros\.get\('autoCalibrar'\) !== '0'/.test(mkw) && /arriba: botonCalibrar\?\.nodo/.test(mkw) && /mkwAutoCalibrar\?\.alEstadoSala\(e\)/.test(mkw));
+    ok('el programa congela la lógica envolviendo EGG::SceneManager::calc (0x8023AE60) y la página lo usa', /func_8023AE60_traducida/.test(nat) && /EMSCRIPTEN_KEEPALIVE void mkw_congelar/.test(nat) && /_mkw_congelar\?\.\(si \? 1 : 0\)/.test(mkw) && /_mkw_congelado_estado\?\.\(1\)/.test(mkw));
+  }
+} catch (e) {
+  ok('sin errores', false, e.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

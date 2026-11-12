@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Marco de la prueba §269</title></head>
+<body style="margin:0;background:#123;color:#fff;font:14px sans-serif">
+<p>El «juego» de mentira: solo los controles de la página (controles.mjs), sin el juego.</p>
+<script type="module">
+// Como el marco del juego dentro del sitio: los controles de verdad, y lo que mandarían al juego queda en window.enviados
+// (puerto → [conectado, botones, sx, sy, cx, cy, gl, gr]). La prueba de arriba lo lee.
+import { crearControles } from '/web/navegador/controles.mjs';
+window.enviados = {};
+window.controles = crearControles({ enviar: (p, ...x) => { window.enviados[p] = x; } });
+window.listo = true;
+</script>
+</body>
+</html>

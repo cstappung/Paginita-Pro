@@ -18,7 +18,7 @@
 <script type="module">
 import { prueba } from '../../comun.js';
 import { notaHz, presupuesto, METAS_PRESUPUESTO, GRAFICOS } from '/web/navegador/graficos.mjs';
-import { dibujarGrafico } from '/web/navegador/imagenes-vista.mjs';
+import { dibujarGrafico, crearRitmoJuego } from '/web/navegador/imagenes-vista.mjs';
 import { normalizar, lineasVideo, textoMedidor, queFrena, SALIDAS, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES, medidaLimitada, limitarSalida, pixelesInternos } from '/web/navegador/graficos.mjs';
 
 const { ok, fin } = prueba('graficos', 'Gráficos opcionales y el medidor (sin el juego)');
@@ -38,7 +38,7 @@ try {
      JSON.stringify({ escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false, verDetalle: false, n8: 'auto', quitar: 0, texturas: 0, verGrafico: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
   ok('«Dibujar a 30 y mostrar 60» (§219, §223): Automático por omisión, el «No» elegido a mano (0 guardado) se mantiene, 1 («30 parejas») y 2 se guardan, lo raro vuelve a Automático, y no va al Config.toml',
      normalizar({}).n8 === 'auto' && GRAFICOS.n8 === 'auto' && normalizar({ n8: 0 }).n8 === 0 && normalizar({ n8: '0' }).n8 === 0 &&
-     normalizar({ n8: 'auto' }).n8 === 'auto' && normalizar({ n8: '2' }).n8 === 2 && normalizar({ n8: 1 }).n8 === 1 && normalizar({ n8: '1' }).n8 === 1 && normalizar({ n8: 3 }).n8 === 'auto' &&
+     normalizar({ n8: 'auto' }).n8 === 'auto' && normalizar({ n8: '2' }).n8 === 2 && normalizar({ n8: 1 }).n8 === 1 && normalizar({ n8: '1' }).n8 === 1 && normalizar({ n8: 3 }).n8 === 3 && normalizar({ n8: 4 }).n8 === 'auto' &&   // (§283: 3 = «20 parejas»)
      normalizar({ n8: 'x' }).n8 === 'auto' && lineasVideo({ n8: 2 }).length === 0);
 
   // ---- 2. El medidor ----
@@ -158,7 +158,7 @@ try {
     montarGraficos(caja4, { reiniciar: () => pedidos.push('reinicio'), alImagen: v => pedidos.push('img' + v) });
     const sel = caja4.querySelector('#graficosN8'), lab = caja4.querySelector('label[for="graficosN8"]');
     ok('G15: el selector se llama «Imagen» y trae Automático, 30 parejas, 60 y con imagen intermedia (Automático por omisión)',
-       lab?.textContent === 'Imagen' && sel && [...sel.options].map(o => o.value).join() === 'auto,1,0,2' && sel.value === 'auto' &&
+       lab?.textContent === 'Imagen' && sel && [...sel.options].map(o => o.value).join() === 'auto,1,0,2,3' && sel.value === 'auto' && /20 parejas/.test(sel.options[4].textContent) &&   // (§283)
        /30 parejas/.test(sel.options[1].textContent) && /^60/.test(sel.options[2].textContent) && /intermedia/.test(sel.options[3].textContent),
        sel && [...sel.options].map(o => o.value + ' ' + o.textContent.slice(0, 20)).join(' | '));
     sel.value = '1'; sel.dispatchEvent(new Event('change'));
@@ -207,6 +207,69 @@ try {
     const c = document.createElement('div'); document.body.append(c); montarGraficos(c);
     ok('G16: la casilla del gráfico en el panel, apagada por omisión', c.querySelector('#graficosGrafico')?.checked === false && normalizar({}).verGrafico === false && normalizar({ verGrafico: true }).verGrafico === true);
     c.remove(); }
+  // ---- 4b. dos gráficos (el dueño 2026-11-11: «que sea uno de imagen y otro de juego») ----
+  { const med3 = document.createElement('span'); document.body.append(med3);
+    localStorage.setItem('mkw.graficos', JSON.stringify({ verGrafico: true }));
+    const img = Array.from({ length: 240 }, () => ({ ms: 16.7, causa: '' }));
+    const jue = Array.from({ length: 240 }, (_, i) => ({ ms: i % 60 === 7 ? 50 : 16.7, causa: '' }));   // 4 picos: 1 % bajo 20
+    const titulos = [];
+    const m3 = montarMedidor(med3, { fps: () => 60, jugando: () => true, cada: 40, cadaGrafico: 20,
+      imagenes: () => ({ imagenes: 600, bajo1: 60, razon: 1 }), grafico: () => img, esperado: () => 16.7,
+      juego: () => ({ porSeg: 59, bajo1: 59, cuadros: 600 }), graficoJuego: () => jue,
+      dibujar: (g, p, o) => { titulos.push(o.titulo); return dibujarGrafico(g, p, o); } });
+    await espera(150);
+    const ls = med3.querySelectorAll('canvas');
+    ok('dos gráficos: «Imagen» y «Juego», y el 1 % bajo del Juego sale de su gráfico (20, no el 59 de la ventana larga)',
+       ls.length === 2 && !ls[1].hidden && titulos.includes('Imagen') && titulos.includes('Juego') && /Juego 59\/s \(1 % bajo 20\)/.test(med3.textContent),
+       `${ls.length} · ${med3.textContent}`);
+    m3.detener(); med3.remove(); localStorage.removeItem('mkw.graficos'); }
+
+  // ---- 5. §270: «Imagen» y «Juego» por separado (el dueño: «fps de video y fps de lógica») ----
+  { const juego = { porSeg: 59.8, bajo1: 58.6, cuadros: 600 };
+    ok('§270: el medidor dice las imágenes que se ven y los cuadros del juego, cada uno con su 1 % bajo',
+       textoMedidor({ fps: 60.2, juego, imagenes: { imagenes: 600, bajo1: 57.4, razon: 0.95 } }) === 'Imagen 60 fps (1 % bajo 57) · Juego 60/s (1 % bajo 59)',
+       textoMedidor({ fps: 60.2, juego, imagenes: { imagenes: 600, bajo1: 57.4, razon: 0.95 } }));
+    ok('§270: con «30 parejas» (N8) se ve la diferencia: Imagen 30 fps, Juego 60/s; con el ping, al final',
+       textoMedidor({ fps: 30, juego, imagenes: { imagenes: 300, bajo1: 29.1 }, rtt, nombres, yo: 'yo1' }) === 'Imagen 30 fps (1 % bajo 29) · Juego 60/s (1 % bajo 59) · 📶 Ana 80 ms · Juan 35 ms',
+       textoMedidor({ fps: 30, juego, imagenes: { imagenes: 300, bajo1: 29.1 }, rtt, nombres, yo: 'yo1' }));
+    ok('§270: recién abierto (menos de 60 imágenes o cuadros) sin el 1 % bajo; con el detalle no se repite la «lógica»',
+       textoMedidor({ fps: 59, juego: { porSeg: 60, bajo1: 20, cuadros: 10 }, imagenes: { imagenes: 10, bajo1: 20 } }) === 'Imagen 59 fps · Juego 60/s' &&
+       !/lógica/.test(textoMedidor({ fps: 31, juego, verDetalle: true, detalle: { trabajo: 9, logica: 60 } })),
+       textoMedidor({ fps: 59, juego: { porSeg: 60, bajo1: 20, cuadros: 10 }, imagenes: { imagenes: 10, bajo1: 20 } }));
+    // el ritmo del juego: un cuadro cada 16,67 ms → 60/s y 1 % bajo 60; con 10 de 600 cuadros de 50 ms → el 1 % bajo lo ve
+    const r = crearRitmoJuego();
+    let h = 1000; r.segundo(h);
+    for (let i = 1; i <= 600; i++) { h += 1000 / 60; r.anotar(h, i); }
+    r.segundo(h);
+    const a = r.resumen();
+    ok('§270: el ritmo del juego parejo: 60/s y 1 % bajo 60', Math.abs(a.porSeg - 60) < 0.2 && Math.abs(a.bajo1 - 60) < 0.2 && a.cuadros === 599, JSON.stringify(a));
+    for (let i = 601; i <= 1200; i++) { h += i % 60 === 0 ? 50 : 1000 / 60; r.anotar(h, i); }
+    const b = r.resumen(600);   // (§283: el anillo es de 2 min; el medidor mira los últimos 600)
+    ok('§270: 10 cuadros de 50 ms en 600: el 1 % bajo baja a 20', Math.abs(b.bajo1 - 20) < 0.5, JSON.stringify(b));
+    const t0 = r.total; r.anotar(h + 3000, 1201); r.anotar(h + 3016, 5, 'carrera'); r.anotar(h + 3033, 6, 'carrera');
+    r.anotar(h + 3050, 2, 'carrera');
+    ok('§270: una pausa de más de 1 s, un cambio de fuente o la cuenta que vuelve atrás no se anotan como cuadros', r.total === t0 + 1, `${r.total - t0}`);
+    // dos cuadros juntos (ponerse al día) se reparten el tiempo desde el anterior
+    const q = crearRitmoJuego(); q.anotar(0, 0); q.anotar(33.4, 2);
+    ok('§270: dos cuadros en un salto se reparten el tiempo (16,7 ms cada uno)', q.total === 2 && Math.abs(q.resumen().bajo1 - 59.9) < 0.3, JSON.stringify(q.resumen()));
+  }
+  // ---- 6. §270: el medidor en un teléfono (360 px de ancho), con el estilo de verdad de la página ----
+  { const html = await (await fetch('/web/navegador/index.html')).text();
+    const regla = sel => (html.match(new RegExp('\\n\\s*' + sel.replace(/[.#]/g, '\\$&') + '\\s*\\{[^}]*\\}', 'g')) || []).join('\n');
+    const css = ['#estadoJuego', '.chip-estado', '#medidor'].map(regla).join('\n');
+    const marco = document.createElement('iframe');
+    marco.style.cssText = 'width:360px;height:640px;border:1px solid #888';
+    marco.srcdoc = `<!doctype html><meta name="viewport" content="width=device-width"><style>:root{--sl:0px;--st:0px;--texto:#fff;--peligro:red}${css}</style>` +
+      `<div id="estadoJuego"><span id="medidor" class="chip-estado"></span></div>`;
+    document.body.append(marco);
+    await new Promise(r => marco.onload = r);
+    const d = marco.contentDocument, chip = d.getElementById('medidor');
+    chip.textContent = textoMedidor({ fps: 30, juego: { porSeg: 60, bajo1: 59, cuadros: 600 }, imagenes: { imagenes: 300, bajo1: 29 }, rtt, nombres, yo: 'yo1' });
+    const cr = chip.getBoundingClientRect();
+    ok('§270: en un teléfono de 360 px el medidor entra entero (Imagen y Juego a la vista, sin cortar ni salirse de la pantalla)',
+       css.includes('#estadoJuego') && cr.right <= 360 - 8 && chip.scrollWidth <= chip.clientWidth + 1 && /Imagen 30 fps/.test(chip.textContent) && /Juego 60\/s/.test(chip.textContent),
+       `derecha ${Math.round(cr.right)} px, ancho ${chip.scrollWidth}/${chip.clientWidth}, alto ${Math.round(cr.height)} px`);
+    marco.remove(); }
 } catch (e) {
   ok('la prueba terminó sin errores', false, e?.stack || String(e));
 }

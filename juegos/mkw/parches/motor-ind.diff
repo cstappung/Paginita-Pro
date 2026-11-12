@@ -1,0 +1,502 @@
+diff --git a/runtime/src/hle/vi.cpp b/runtime/src/hle/vi.cpp
+index 8290d2e..70e78e5 100644
+--- a/runtime/src/hle/vi.cpp
++++ b/runtime/src/hle/vi.cpp
+@@ -338,8 +338,6 @@ bool s_mkwVsyncLocked = false;
+ // MKW RETRO (§99, C3): ms of retrace grid the page asked to win back, and how much was won (see PaceToRetraceBoundary)
+ double s_mkwPrisaMs = 0.0;
+ double s_mkwPrisaGanada = 0.0;
+-// MKW RETRO (§269b.16): ms the page moved the retrace grid forward (mkw_frenar: the room's brake), summed
+-double s_mkwFrenadoMs = 0.0;
+ // MKW RETRO (§162, N2): the ballast per game frame. The page's ballast (lastre.mjs, §155) spins inside the waits,
+ // and with ?sinTope=1 the game hardly waits, so it fell short (it spun 17-80 % of what it owed, §161). This one lives
+ // here, at the start of every retrace (one retrace = one game frame): the work t since the previous retrace (wall
+@@ -835,22 +833,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_prisa(double ms) {
+     s_mkwPrisaMs = ms > 0.0 ? (ms < 2000.0 ? ms : 2000.0) : 0.0;
+ }
+ extern "C" EMSCRIPTEN_KEEPALIVE double mkw_prisa_ganada() { return s_mkwPrisaGanada; }
+-// MKW RETRO (§269b.16): the room's brake. The retrace grid is absolute (each retrace is stamped on its grid time, not
+-// on when it ran), so a frame the page held back inside the lockstep was won back right after: the next retraces
+-// were already due and ran back to back. Measured (2 PCs + the phone): 564 frames braked in 40 s slowed the room by
+-// 46; the rest were only hitches. This moves the grid forward `ms` instead: the frame in course is not held, the next
+-// retrace is due `ms` later and nothing runs back to back to undo it (like retarding the timing of a motor instead
+-// of braking its shaft and letting the governor speed it back up). Whatever catch-up was pending is cancelled first
+-extern "C" EMSCRIPTEN_KEEPALIVE void mkw_frenar(double ms) {
+-    if (!(ms > 0.0)) return;
+-    if (ms > 500.0) ms = 500.0;
+-    std::lock_guard<std::mutex> lock(g_viMutex);
+-    if (!g_vi.initialized) return;
+-    s_mkwPrisaMs = 0.0;
+-    g_vi.lastRetrace += std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(ms));
+-    s_mkwFrenadoMs += ms;
+-}
+-extern "C" EMSCRIPTEN_KEEPALIVE double mkw_frenado() { return s_mkwFrenadoMs; }
+ // MKW RETRO (§162): the ballast per game frame: K (1 = off), and what it did (0 spun ms, 1 work ms, 2 frames, 3 caps, 4 K)
+ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_lastre_cuadro(double k) {
+     s_mkwLastreK = k > 1.0 ? (k < 20.0 ? k : 20.0) : 1.0;
+diff --git a/translator/src/Translator.Cli/Program.cs b/translator/src/Translator.Cli/Program.cs
+index e1164dd..2888269 100644
+--- a/translator/src/Translator.Cli/Program.cs
++++ b/translator/src/Translator.Cli/Program.cs
+@@ -983,6 +983,87 @@ int RunTranslateRecursive(string[] argsTail)
+ 
+             LogPhase("canonical decode + local contracts");
+ 
++            // MKW §282 (MKW_IND=prueba): the contract of an indirect call is the union of the contracts of every
++            // function it can reach. Those contracts depend on it in turn (a reachable function may itself call
++            // indirectly), so it is a least fixpoint: start from "does nothing", run the interprocedural pass,
++            // take the union over the candidates, repeat until it stops growing. Then the local contracts are
++            // recomputed with the final one.
++            if (IndirectCallPolicy.Current == IndirectCallPolicy.Mode.Proven)
++            {
++                var entries = new HashSet<uint>(canonicalGuestFunctions.Keys);
++                entries.UnionWith(nativeGuestEffects.Contracts.Keys);
++                // What runs at an address can be the mod's code instead of the base body: its own functions and
++                // its overlays of patched base functions. Their contracts come from the resolved dispatch profile
++                // of a previous translate-mod (MKW_IND_RR); the tanda re-checks them after this translation.
++                var modContracts = IndirectCallPolicy.LoadModContracts(Environment.GetEnvironmentVariable("MKW_IND_RR"),
++                    out var modReport);
++                Console.WriteLine($"[282] mod contracts: {modReport}.");
++                entries.UnionWith(modContracts.Keys);
++                var indirectCandidates = CollectIndirectTargetCandidates(entries, out var candidateReport);
++                Console.WriteLine($"[282] {candidateReport}.");
++                var indirect = IndirectCallPolicy.Empty;
++                Dictionary<uint, GuestAbiContract> trial = new();
++                for (var round = 1; ; ++round)
++                {
++                    IndirectCallPolicy.IndirectTargetContract = indirect;
++                    trial = GuestAbiInterproceduralAnalyzer.Analyze(canonicalGuestFunctions, nativeGuestEffects.Contracts)
++                        .Contracts.ToDictionary(static pair => pair.Key, static pair => pair.Value);
++                    foreach (var pair in nativeGuestEffects.Contracts) trial[pair.Key] = pair.Value;
++                    var next = indirect;
++                    foreach (var candidate in indirectCandidates)
++                    {
++                        if (trial.TryGetValue(candidate, out var reached)) next = IndirectCallPolicy.Union(next, reached);
++                        if (modContracts.TryGetValue(candidate, out var modReached)) next = IndirectCallPolicy.Union(next, modReached);
++                    }
++                    var fenced = trial.Values.Count(static c => c.HasFullSynchronizationFence);
++                    var fencedCandidates = indirectCandidates.Count(candidate =>
++                        (trial.TryGetValue(candidate, out var c) && c.HasFullSynchronizationFence) ||
++                        (modContracts.TryGetValue(candidate, out var m) && m.HasFullSynchronizationFence));
++                    Console.WriteLine($"[282] round {round}: {IndirectCallPolicy.Describe(next)}; full-fence functions {fenced:N0}, " +
++                        $"full-fence candidates {fencedCandidates:N0} of {indirectCandidates.Count:N0}.");
++                    if (round == 1)
++                        File.WriteAllLines(Path.Combine(outDir, "..", "mkw-ind-ronda1.txt"), indirectCandidates.OrderBy(static a => a)
++                            .Select(a => $"{a:X8} {((trial.TryGetValue(a, out var c) && c.HasFullSynchronizationFence) || (modContracts.TryGetValue(a, out var m) && m.HasFullSynchronizationFence) ? 1 : 0)}"));
++                    if (IndirectCallPolicy.Covers(indirect, next)) break;
++                    if (round == 16) throw new InvalidOperationException("§282: the indirect-call fixpoint did not converge in 16 rounds.");
++                    indirect = next;
++                }
++                IndirectCallPolicy.IndirectTargetContract = indirect;
++                // Who sets each boundary flag of the union, so a poisoned contract can be traced.
++                foreach (var flag in new[] { GuestCallBoundaryFlags.RequiresCompleteContext, GuestCallBoundaryFlags.CanSuspend,
++                             GuestCallBoundaryFlags.CanSwitchThreads, GuestCallBoundaryFlags.InvokesGuestCode })
++                {
++                    var setters = indirectCandidates.Where(candidate =>
++                        (trial.TryGetValue(candidate, out var c) && (c.BoundaryFlags & flag) != 0) ||
++                        (modContracts.TryGetValue(candidate, out var m) && (m.BoundaryFlags & flag) != 0))
++                        .OrderBy(static a => a).ToArray();
++                    if (setters.Length == 0) continue;
++                    Console.WriteLine($"[282] {flag}: {setters.Length:N0} candidate(s), e.g. " +
++                        string.Join(" ", setters.Take(40).Select(static a => $"{a:X8}")));
++                }
++                string Line(uint a, string kind, GuestAbiContract c) =>
++                    $"{a:X8} {kind} fence={(c.HasFullSynchronizationFence ? 1 : 0)} flags={c.BoundaryFlags} " +
++                    $"gprR={c.GprReadBeforeWriteMask:X8} gprW={c.GprPossibleWriteMask:X8} fprW={c.FprPossibleWriteMask:X8} crW={c.CrPossibleWriteMask:X2}";
++                File.WriteAllLines(Path.Combine(outDir, "..", "mkw-ind-candidatos.txt"),
++                    indirectCandidates.OrderBy(static a => a).SelectMany(a =>
++                        (trial.TryGetValue(a, out var c) ? new[] { Line(a, "base", c) } : Array.Empty<string>())
++                        .Concat(modContracts.TryGetValue(a, out var m) ? new[] { Line(a, "mod", m) } : Array.Empty<string>())));
++                File.WriteAllText(Path.Combine(outDir, "..", "mkw-ind-contrato.txt"),
++                    IndirectCallPolicy.Serialize(indirect) + Environment.NewLine);
++                IndexedParallel.For(emissionAddresses.Length, parallelOptions, i =>
++                {
++                    localContractByIndex[i] = GuestAbiContractAnalyzer.Analyze(canonicalByIndex[i]);
++                });
++                for (var i = 0; i < emissionAddresses.Length; i++)
++                    localGuestAbiContracts[emissionAddresses[i]] = localContractByIndex[i];
++                LogPhase("§282 indirect-call fixpoint");
++                if (Environment.GetEnvironmentVariable("MKW_IND_SOLO_ANALISIS") == "1")
++                {
++                    Console.WriteLine("[282] MKW_IND_SOLO_ANALISIS=1: stopping after the fixpoint (nothing written but the two lists).");
++                    return 0;
++                }
++            }
++
+             // Compose guest calls in execution order. This preserves a callee
+             // input only when it is still read-before-write at the caller entry,
+             // rather than retaining every descendant dependency forever.
+@@ -1000,6 +1081,8 @@ int RunTranslateRecursive(string[] argsTail)
+                 $"{recursiveComponents:N0} recursive.");
+ 
+             LogPhase("interprocedural guest ABI");
++            Console.WriteLine($"[282] MKW_IND={IndirectCallPolicy.Current}: indirect calls = {IndirectCallPolicy.Describe(IndirectCallPolicy.Contract)}; " +
++                $"full-fence functions {guestAbiContracts.Values.Count(static c => c.HasFullSynchronizationFence):N0} of {guestAbiContracts.Count:N0}.");
+ 
+             // Calls to a registered native observe the native implementation's
+             // contract, not the excluded PPC body that happens to share its address.
+@@ -3635,6 +3718,83 @@ List<AddressRange> BuildExecutableRanges()
+     return ranges;
+ }
+ 
++/// <summary>
++/// MKW §282: every guest address an indirect call (<c>bctrl</c>/<c>bctr</c>) can reach, as a superset. A target
++/// address has to exist somewhere as a value: (1) a 32-bit word anywhere in the loaded DOL+REL image (vtables,
++/// dispatch tables, callback fields in .data/.sdata, already relocated for the REL); (2) a constant the code builds
++/// with <c>lis</c> + <c>addi</c>/<c>ori</c> (or <c>lis</c> alone), tracked per register without control flow so a
++/// stale pairing only adds candidates; (3) a value the mod's Kamek stream writes or relocates into the image or its
++/// own code (pointer writes, 16-bit address halves, raw 32-bit writes, words of its code blob). Anything that is not
++/// a translated or native function entry cannot be dispatched and is dropped. Over-approximation is safe: more
++/// candidates only widen the contract.
++/// </summary>
++HashSet<uint> CollectIndirectTargetCandidates(IReadOnlySet<uint> entries, out string report)
++{
++    var found = new HashSet<uint>();
++    int fromWords = 0, fromCode = 0, fromMod = 0;
++    void Take(uint value, ref int counter)
++    {
++        if (entries.Contains(value) && found.Add(value)) counter++;
++    }
++
++    var memory = image.Value.Memory;
++    var memoryBase = image.Value.MemoryBase;
++    for (var offset = 0; offset + 4 <= memory.Length; offset += 4)
++    {
++        Take(BinaryPrimitives.ReadUInt32BigEndian(memory.AsSpan(offset, 4)), ref fromWords);
++    }
++
++    var high = new uint?[32];
++    foreach (var range in BuildExecutableRanges())
++    {
++        Array.Clear(high);
++        for (var address = range.Start; address + 4 <= range.End; address += 4)
++        {
++            if (!image.Value.Contains(address, 4)) continue;
++            var word = BinaryPrimitives.ReadUInt32BigEndian(memory.AsSpan(checked((int)(address - memoryBase)), 4));
++            var opcode = word >> 26;
++            var rd = (int)((word >> 21) & 31);
++            var ra = (int)((word >> 16) & 31);
++            var imm = word & 0xFFFF;
++            if (opcode == 15 && ra == 0)                       // lis rD, imm
++            {
++                high[rd] = imm << 16;
++                Take(imm << 16, ref fromCode);
++            }
++            else if (opcode == 14 && ra != 0 && high[ra] is { } h)   // addi rD, rA, simm
++            {
++                Take(unchecked(h + (uint)(short)imm), ref fromCode);
++            }
++            else if (opcode == 24 && high[rd] is { } hs)            // ori rA, rS, uimm (rS is bits 21-25)
++            {
++                Take(hs | imm, ref fromCode);
++            }
++        }
++    }
++
++    foreach (var patchProfile in modPatchProfiles.Value)
++    {
++        var chunk = Translator.Core.Parsing.Kamek.KamekPulFile.Load(patchProfile.CodePul!)
++            .SelectRegion(string.IsNullOrWhiteSpace(patchProfile.Region) ? "P" : patchProfile.Region!);
++        for (var offset = 0; offset + 4 <= chunk.CodeBlob.Length; offset += 4)
++        {
++            Take(BinaryPrimitives.ReadUInt32BigEndian(chunk.CodeBlob.AsSpan(offset, 4)), ref fromMod);
++        }
++        var moduleBase = patchProfile.ModuleGuestBase ?? 0x81700000u;
++        foreach (var command in chunk.Commands)
++        {
++            foreach (var argument in command.Arguments)
++            {
++                Take(argument, ref fromMod);
++                if (argument < 0x80000000u) Take(unchecked(moduleBase + argument), ref fromMod);
++            }
++        }
++    }
++
++    report = $"{found.Count:N0} candidate target(s): {fromWords:N0} image words, {fromCode:N0} code constants, {fromMod:N0} from the mod";
++    return found;
++}
++
+ TranslationProjectConfig RequireProject() => project ?? throw new InvalidOperationException(
+     "This command requires --project <path>. See projects/mkwii/recomp.yml for an example.");
+ 
+diff --git a/translator/src/Translator.Core/Analysis/GuestAbiContractAnalyzer.cs b/translator/src/Translator.Core/Analysis/GuestAbiContractAnalyzer.cs
+index 991bd04..00efeac 100644
+--- a/translator/src/Translator.Core/Analysis/GuestAbiContractAnalyzer.cs
++++ b/translator/src/Translator.Core/Analysis/GuestAbiContractAnalyzer.cs
+@@ -170,7 +170,14 @@ public static class GuestAbiContractAnalyzer
+                 {
+                     boundaryFlags |= GuestHelperEffectCatalog.Analyze(helperCall).BoundaryFlags;
+                 }
+-                if (instruction is IrIndirectCall or IrIndirectJump or IrUndefined)
++                if (instruction is IrIndirectCall or IrIndirectJump)
++                {
++                    // MKW §282: an indirect call carries the indirect-target contract when one is
++                    // configured; otherwise (upstream) it is a full fence.
++                    boundaryFlags |= IndirectCallPolicy.Contract?.BoundaryFlags
++                        ?? GuestCallBoundaryFlags.RequiresCompleteContext;
++                }
++                else if (instruction is IrUndefined)
+                 {
+                     boundaryFlags |= GuestCallBoundaryFlags.RequiresCompleteContext;
+                 }
+@@ -316,11 +323,11 @@ public static class GuestAbiContractAnalyzer
+             case IrIndirectCall value:
+                 AddValue(ref result, value.Target);
+                 foreach (var argument in value.Arguments) AddValue(ref result, argument);
+-                result = result.Union(FullState);
++                result = result.Union(IndirectCallPolicy.Contract is { } indirectReads ? ContractReads(indirectReads) : FullState);
+                 break;
+             case IrIndirectJump value:
+                 AddValue(ref result, value.Target);
+-                result = result.Union(FullState);
++                result = result.Union(IndirectCallPolicy.Contract is { } jumpReads ? ContractReads(jumpReads) : FullState);
+                 break;
+             case IrSetCrField value:
+                 AddValue(ref result, value.Left);
+@@ -395,7 +402,21 @@ public static class GuestAbiContractAnalyzer
+                 break;
+             case IrIndirectCall value:
+                 Add(ref shared, value.Destination);
+-                shared = shared.Union(FullState);
++                if (IndirectCallPolicy.Contract is { } indirectWrites)
++                {
++                    // MKW §282: what any possible target may write; nothing beyond the destination is definite.
++                    possibleOnly = ContractWrites(indirectWrites);
++                    definiteOnly = ContractDefiniteWrites(indirectWrites);
++                }
++                else
++                {
++                    shared = shared.Union(FullState);
++                }
++                break;
++            case IrIndirectJump when IndirectCallPolicy.Contract is { } jumpWrites:
++                // Upstream relies on the fence here; without it the tail target's writes become ours.
++                possibleOnly = ContractWrites(jumpWrites);
++                definiteOnly = ContractDefiniteWrites(jumpWrites);
+                 break;
+             case IrSetCrField value:
+                 shared = shared with { Cr = (byte)(shared.Cr | (1 << value.FieldIndex)) };
+diff --git a/translator/src/Translator.Core/Analysis/IndirectCallPolicy.cs b/translator/src/Translator.Core/Analysis/IndirectCallPolicy.cs
+new file mode 100644
+index 0000000..34dfcef
+--- /dev/null
++++ b/translator/src/Translator.Core/Analysis/IndirectCallPolicy.cs
+@@ -0,0 +1,197 @@
++using System;
++using System.Globalization;
++
++namespace Translator.Core.Analysis;
++
++/// <summary>
++/// MKW §282: what a translated function may assume about an indirect call (<c>bctrl</c> / <c>bctr</c>).
++/// Upstream treats every indirect call as a full synchronization fence: it reads and writes the complete
++/// guest state, so the caller's contract becomes "everything" and that spreads to every function above it.
++///
++/// <c>MKW_IND</c> selects the policy (read once per translator process):
++/// <list type="bullet">
++/// <item><c>0</c> (default) — upstream: full fence.</item>
++/// <item><c>techo</c> — the optimistic ceiling, only for measuring: every indirect target is assumed to
++/// follow the PowerPC EABI (only volatile state changes, r1/r2/r13, r14-r31, f14-f31 and cr2-cr4 come back
++/// unchanged) and never needs a complete context. Not proven.</item>
++/// <item><c>cerca</c> — only the fence is dropped: the call still may write every register.</item>
++/// <item><c>prueba</c> — the proven contract: the union of the contracts of every function an indirect call can
++/// reach (see <see cref="IndirectTargetContract"/>); set by the translator after the interprocedural pass.</item>
++/// </list>
++/// </summary>
++public static class IndirectCallPolicy
++{
++    public enum Mode { Upstream, Ceiling, NoFence, Proven }
++
++    public static readonly Mode Current = Parse(Environment.GetEnvironmentVariable("MKW_IND"));
++
++    private static Mode Parse(string? text) => (text ?? "0").Trim().ToLowerInvariant() switch
++    {
++        "techo" => Mode.Ceiling,
++        "cerca" => Mode.NoFence,
++        "prueba" => Mode.Proven,
++        _ => Mode.Upstream,
++    };
++
++    public static bool Enabled => Current != Mode.Upstream;
++
++    // EABI volatile state (what a conforming callee may leave changed).
++    public const uint VolatileGpr = 0x00001FF9u;   // r0, r3-r12
++    public const uint VolatileFpr = 0x00003FFFu;   // f0-f13
++    public const byte VolatileCr = 0xE3;           // cr0, cr1, cr5, cr6, cr7 (bit i = field i)
++
++    /// <summary>
++    /// The contract an indirect call site uses in <see cref="Mode.Proven"/>: written once by the translator
++    /// (union of every possible target), read by the per-function analyzer and by the code generator.
++    /// Null until set; while null the proven mode falls back to the upstream fence.
++    /// </summary>
++    public static GuestAbiContract? IndirectTargetContract { get; set; }
++
++    /// <summary>The contract an indirect call or tail dispatch is analysed and emitted with, or null = full fence.</summary>
++    public static GuestAbiContract? Contract => Current switch
++    {
++        Mode.Ceiling => CeilingContract,
++        Mode.NoFence => NoFenceContract,
++        Mode.Proven => IndirectTargetContract,
++        _ => null,
++    };
++
++    private static readonly GuestAbiContract CeilingContract = Build(VolatileGpr, VolatileFpr, VolatileCr, gqrHid: false);
++    private static readonly GuestAbiContract NoFenceContract = Build(uint.MaxValue, uint.MaxValue, 0xFF, gqrHid: true);
++
++    private static GuestAbiContract Build(uint gpr, uint fpr, byte cr, bool gqrHid) => new(
++        GprReadBeforeWriteMask: uint.MaxValue,
++        GprPossibleWriteMask: gpr,
++        GprReturnMask: gpr & ((1u << 3) | (1u << 4)),
++        FprReadBeforeWriteMask: uint.MaxValue,
++        FprPossibleWriteMask: fpr,
++        FprReturnMask: fpr & (1u << 1),
++        CrReadBeforeWriteMask: 0xFF,
++        CrPossibleWriteMask: cr,
++        ReadsXerBeforeWrite: true,
++        MayWriteXer: true,
++        ReadsCtrBeforeWrite: true,
++        MayWriteCtr: true,
++        ReadsLrBeforeWrite: true,
++        MayWriteLr: true,
++        BoundaryFlags: GuestCallBoundaryFlags.None,
++        DirectCallTargets: Array.Empty<uint>())
++    {
++        ReadsFpscrBeforeWrite = true,
++        MayWriteFpscr = true,
++        GqrReadBeforeWriteMask = 0xFF,
++        GqrPossibleWriteMask = gqrHid ? (byte)0xFF : (byte)0,
++        HidReadBeforeWriteMask = 0xFF,
++        HidPossibleWriteMask = gqrHid ? (byte)0x07 : (byte)0,
++    };
++
++    /// <summary>The contract of a call that does nothing: the bottom of the §282 fixpoint.</summary>
++    public static readonly GuestAbiContract Empty = new(0, 0, 0, 0, 0, 0, 0, 0, false, false, false, false, false, false,
++        GuestCallBoundaryFlags.None, Array.Empty<uint>());
++
++    /// <summary>
++    /// What a call to "one of a or b" may do: every read and possible write of either, every boundary flag of either;
++    /// a write is definite only if both make it.
++    /// </summary>
++    public static GuestAbiContract Union(GuestAbiContract a, GuestAbiContract b) => new(
++        a.GprReadBeforeWriteMask | b.GprReadBeforeWriteMask,
++        a.GprPossibleWriteMask | b.GprPossibleWriteMask,
++        a.GprReturnMask | b.GprReturnMask,
++        a.FprReadBeforeWriteMask | b.FprReadBeforeWriteMask,
++        a.FprPossibleWriteMask | b.FprPossibleWriteMask,
++        a.FprReturnMask | b.FprReturnMask,
++        (byte)(a.CrReadBeforeWriteMask | b.CrReadBeforeWriteMask),
++        (byte)(a.CrPossibleWriteMask | b.CrPossibleWriteMask),
++        a.ReadsXerBeforeWrite || b.ReadsXerBeforeWrite,
++        a.MayWriteXer || b.MayWriteXer,
++        a.ReadsCtrBeforeWrite || b.ReadsCtrBeforeWrite,
++        a.MayWriteCtr || b.MayWriteCtr,
++        a.ReadsLrBeforeWrite || b.ReadsLrBeforeWrite,
++        a.MayWriteLr || b.MayWriteLr,
++        a.BoundaryFlags | b.BoundaryFlags,
++        Array.Empty<uint>())
++    {
++        ReadsFpscrBeforeWrite = a.ReadsFpscrBeforeWrite || b.ReadsFpscrBeforeWrite,
++        MayWriteFpscr = a.MayWriteFpscr || b.MayWriteFpscr,
++        GqrReadBeforeWriteMask = (byte)(a.GqrReadBeforeWriteMask | b.GqrReadBeforeWriteMask),
++        GqrPossibleWriteMask = (byte)(a.GqrPossibleWriteMask | b.GqrPossibleWriteMask),
++        HidReadBeforeWriteMask = (byte)(a.HidReadBeforeWriteMask | b.HidReadBeforeWriteMask),
++        HidPossibleWriteMask = (byte)(a.HidPossibleWriteMask | b.HidPossibleWriteMask),
++        // Definite writes stay empty: the bottom of the fixpoint would otherwise make every write "definite".
++    };
++
++    /// <summary>True when b adds nothing to a (the fixpoint test).</summary>
++    public static bool Covers(GuestAbiContract a, GuestAbiContract b)
++    {
++        var u = Union(a, b);
++        return u.GprReadBeforeWriteMask == a.GprReadBeforeWriteMask && u.GprPossibleWriteMask == a.GprPossibleWriteMask &&
++            u.GprReturnMask == a.GprReturnMask && u.FprReadBeforeWriteMask == a.FprReadBeforeWriteMask &&
++            u.FprPossibleWriteMask == a.FprPossibleWriteMask && u.FprReturnMask == a.FprReturnMask &&
++            u.CrReadBeforeWriteMask == a.CrReadBeforeWriteMask && u.CrPossibleWriteMask == a.CrPossibleWriteMask &&
++            u.ReadsXerBeforeWrite == a.ReadsXerBeforeWrite && u.MayWriteXer == a.MayWriteXer &&
++            u.ReadsCtrBeforeWrite == a.ReadsCtrBeforeWrite && u.MayWriteCtr == a.MayWriteCtr &&
++            u.ReadsLrBeforeWrite == a.ReadsLrBeforeWrite && u.MayWriteLr == a.MayWriteLr &&
++            u.BoundaryFlags == a.BoundaryFlags && u.ReadsFpscrBeforeWrite == a.ReadsFpscrBeforeWrite &&
++            u.MayWriteFpscr == a.MayWriteFpscr && u.GqrReadBeforeWriteMask == a.GqrReadBeforeWriteMask &&
++            u.GqrPossibleWriteMask == a.GqrPossibleWriteMask && u.HidReadBeforeWriteMask == a.HidReadBeforeWriteMask &&
++            u.HidPossibleWriteMask == a.HidPossibleWriteMask;
++    }
++
++    /// <summary>
++    /// The contracts of the mod's functions from a translate-mod resolved dispatch profile (entries whose Kind is
++    /// not "base"), keyed by guest address. The profile does not carry CTR/LR/FPSCR/GQR/HID or the individual
++    /// boundary flags, so those are taken at their widest: read and written, and a fence becomes
++    /// RequiresCompleteContext. Empty when the path is unset or missing.
++    /// </summary>
++    public static Dictionary<uint, GuestAbiContract> LoadModContracts(string? path, out string report)
++    {
++        var result = new Dictionary<uint, GuestAbiContract>();
++        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
++        {
++            report = "none (MKW_IND_RR unset or missing)";
++            return result;
++        }
++
++        using var document = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllBytes(path));
++        int fenced = 0;
++        foreach (var entry in document.RootElement.GetProperty("Entries").EnumerateArray())
++        {
++            if (entry.GetProperty("Kind").GetString() == "base") continue;
++            uint U(string name) => entry.GetProperty(name).GetUInt32();
++            var fence = entry.GetProperty("IsFullSynchronizationFence").GetBoolean();
++            if (fence) fenced++;
++            var contract = new GuestAbiContract(
++                U("GprReadMask"), U("GprWriteMask") | U("GprClobberMask"), U("GprReturnMask"),
++                U("FprReadMask"), U("FprWriteMask"), U("FprReturnMask"),
++                (byte)U("CrReadMask"), (byte)U("CrWriteMask"),
++                entry.GetProperty("ReadsXer").GetBoolean(), entry.GetProperty("WritesXer").GetBoolean(),
++                true, true, true, true,
++                fence ? GuestCallBoundaryFlags.RequiresCompleteContext : GuestCallBoundaryFlags.None,
++                Array.Empty<uint>())
++            {
++                ReadsFpscrBeforeWrite = true, MayWriteFpscr = true,
++                GqrReadBeforeWriteMask = 0xFF, GqrPossibleWriteMask = 0xFF,
++                HidReadBeforeWriteMask = 0x07, HidPossibleWriteMask = 0x07,
++            };
++            var address = U("Address");
++            result[address] = result.TryGetValue(address, out var other) ? Union(other, contract) : contract;
++        }
++        report = $"{result.Count:N0} address(es) from {path} ({fenced:N0} entries with a fence)";
++        return result;
++    }
++
++    /// <summary>One line with every mask, for the record the tanda keeps (generated/mkw-ind-contrato.txt).</summary>
++    public static string Serialize(GuestAbiContract c) => string.Create(CultureInfo.InvariantCulture,
++        $"gprR={c.GprReadBeforeWriteMask:X8} gprW={c.GprPossibleWriteMask:X8} gprRet={c.GprReturnMask:X8} " +
++        $"fprR={c.FprReadBeforeWriteMask:X8} fprW={c.FprPossibleWriteMask:X8} fprRet={c.FprReturnMask:X8} " +
++        $"crR={c.CrReadBeforeWriteMask:X2} crW={c.CrPossibleWriteMask:X2} xer={(c.ReadsXerBeforeWrite ? 1 : 0)}{(c.MayWriteXer ? 1 : 0)} " +
++        $"ctr={(c.ReadsCtrBeforeWrite ? 1 : 0)}{(c.MayWriteCtr ? 1 : 0)} lr={(c.ReadsLrBeforeWrite ? 1 : 0)}{(c.MayWriteLr ? 1 : 0)} " +
++        $"fpscr={(c.ReadsFpscrBeforeWrite ? 1 : 0)}{(c.MayWriteFpscr ? 1 : 0)} gqrR={c.GqrReadBeforeWriteMask:X2} gqrW={c.GqrPossibleWriteMask:X2} " +
++        $"hidR={c.HidReadBeforeWriteMask:X2} hidW={c.HidPossibleWriteMask:X2} flags={(int)c.BoundaryFlags}");
++
++    public static string Describe(GuestAbiContract? c) => c is null
++        ? "full fence"
++        : string.Create(CultureInfo.InvariantCulture,
++            $"gprW={c.GprPossibleWriteMask:X8} fprW={c.FprPossibleWriteMask:X8} crW={c.CrPossibleWriteMask:X2} " +
++            $"gqrW={c.GqrPossibleWriteMask:X2} hidW={c.HidPossibleWriteMask:X2} flags={c.BoundaryFlags}");
++}
+diff --git a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
+index a0d630a..f05d48d 100644
+--- a/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
++++ b/translator/src/Translator.Core/CodeGen/CxxLinearCodeGenerator.EmitInstruction.cs
+@@ -514,9 +514,14 @@ public sealed partial class CxxLinearCodeGenerator
+             case IrIndirectCall icall:
+                 {
+                     var indirectTarget = ToExpression(icall.Target, types);
+-                    AppendFlush(sb, pad);
++                    // MKW §282: with an indirect-target contract the boundary is narrowed exactly like a
++                    // direct call's (flush what any target reads or writes, reload what it may write).
++                    var indirectSync = IndirectCallPolicy.Contract is { } indirectContract
++                        ? ResidencyBoundarySync.FromCalleeContract(indirectContract)
++                        : ResidencyBoundarySync.Full;
++                    AppendFlush(sb, pad, indirectSync);
+                     sb.AppendLine($"{pad}InvokeIndirectCpu({indirectTarget}, ctx);");
+-                    AppendReload(sb, pad);
++                    AppendReload(sb, pad, indirectSync);
+                     // f1 is the conventional scalar floating-point return.
+                     // Do not retag the other volatile FPRs: a callee that leaves
+                     // one untouched also leaves its packed payload untouched.

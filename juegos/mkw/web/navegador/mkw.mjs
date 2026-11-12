@@ -12,7 +12,7 @@
 //   5. Llama a main(): el runtime arranca, aurora crea el WebGPU sobre el <canvas id="canvas"> y dibuja.
 //   6. Cada segundo muestra cuadros por segundo y trabajo por cuadro, y anota las verificaciones del banco.
 import { prueba } from './verificaciones.mjs';   // (junto a la página: en el sitio ./banco/ no existe, §69)
-import { crearControles, BOTON } from './controles.mjs';
+import { crearControles, BOTON, juntarPuertos } from './controles.mjs';
 import { crearAvisosLag, CHIPS_LAG } from './avisos-lag.mjs';   // §262: «Mostrar avisos de conexión y lag»
 import { crearSonido } from './sonido.mjs';
 import { crearGuardado } from './guardado.mjs';
@@ -40,9 +40,9 @@ import { crearInicio } from './inicio.mjs';
 import { prepararMii, crearDirecto, armarFicha, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
 import { asegurarInvitados, leerInvitados, invitadoElegido, mejorarMiiNuevo, LETRAS as LETRAS_INVITADO } from './invitados.mjs';
 import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
-import { escalonDe, leerCapacidad, anotarCarrera, capacidadLatido, lentosDe, textoLentos, resumirCarrera } from './escalon.mjs';
+import { escalonDe, leerCapacidad, anotarCarrera, capacidadLatido, lentosDe, textoLentos, resumirCarrera, envolverPadSala } from './escalon.mjs';
 import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, vrsDeCarrera, reglaCpuDe, MARCA_SALA,
-         llegadaDelJuego, ponerParrilla, SEGUNDOS_RESULTADOS, copaMasPedida, correnEn, sumadosEn } from './sala-carrera.mjs';
+         llegadaDelJuego, ponerParrilla, SEGUNDOS_RESULTADOS, copaMasPedida, correnEn, sumadosEn, VERSION_SALA, MARGEN_PAUSA_CUADROS } from './sala-carrera.mjs';
 import { cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL as VR_INICIAL_SALA } from './vr-sala.mjs';
 import { crearCuentaDnf, DNF_MS } from './dnf.mjs';
 import { crearLetreros, filasDeTabla } from './letreros.mjs';
@@ -70,10 +70,26 @@ import { modoW10, mandaCaja, crearMandadero } from './w10.mjs';
 import { modoPedido, modoAutomatico, crearVigiaN8 } from './n8.mjs';
 import { estadoHilos } from './aislar.mjs';
 import { instalarCensoGpu } from './censo-gpu.mjs';
-import { crearImagenesVista, engancharImagenes, textoResumen, dibujarGrafico } from './imagenes-vista.mjs';
+import { crearImagenesVista, engancharImagenes, textoResumen, dibujarGrafico, crearRitmoJuego, envolverEsperaJuego, PUNTOS_GRAFICO } from './imagenes-vista.mjs';
+import { crearAutoCalibrar, crearAvisoPausa, montarBotonCalibrar } from './auto-calibrar.mjs';   // §274
+import { crearRitmoMenus } from './ritmo-menus.mjs';
 import { montarBienvenida, montarAyuda } from './bienvenida.mjs';
+import { crearCaidas } from './caidas.mjs';
+import { crearRedEstado, MARCA_RED_ESTADO } from './red-estado-sala.mjs';
+import { crearArranque } from './arranque.mjs';   // §276: la línea de tiempo del arranque (solo mira)
+import { crearCartelCarga, crearMedidorPipes, faseCarga } from './cartel-carga.mjs';   // §276b: qué hace mientras carga
 
 const parametros = new URLSearchParams(location.search);
+// §275: ?red=estado = el piloto «host + predicción» (apagado por omisión): la red NATIVA del juego (RKNet: cada consola
+// maneja su kart y manda su estado) por la malla WebRTC = ?red=malla&modo=enlinea, más la sonda que mide
+// (red-estado.mjs, window.mkwRedEstado). No es la sala de §73: pasa por las pantallas de Retro WFC (§58)
+const RED_ESTADO = parametros.get('red') === 'estado';
+// §275b: con ?modo=sala es la opción de la sala «Cada uno su kart»: la sala de siempre (copa, elegir, puntos…) pero la
+// carrera sin lockstep, con la red nativa por el DWC falso (red_estado_nativo.cpp + red-estado-sala.mjs)
+const RED_ESTADO_SALA = RED_ESTADO && parametros.get('modo') === 'sala';
+if (RED_ESTADO) { parametros.set('red', 'malla'); if (!parametros.has('modo')) parametros.set('modo', 'enlinea'); }
+if (RED_ESTADO || parametros.get('sonda') === '1') import('./red-estado.mjs')   // (?sonda=1: la misma sonda en la sala de siempre, para comparar)
+  .then(m => { window.mkwRedEstado = m.crearSonda({ lector: () => window.mkwMenus }); });
 // §225 (W21): mientras index.html registra el service worker que aísla la página y va a recargarla, no arrancar nada
 // (sin esto, la primera carga empezaba a bajar el juego para tirarlo a la basura con la recarga)
 if (window.mkwEsperaAislar) await new Promise(listo => { const t = setInterval(() => { if (!window.mkwEsperaAislar) { clearInterval(t); listo(); } }, 50); });
@@ -147,6 +163,7 @@ const red = parametros.has('red') ? (() => {
     // los mensajes de la carrera sincronizada (lockstep.mjs) empiezan con su marca; los demás son de la red del juego
     // (y los de la sala nueva, §73, con la suya: sala-carrera.mjs)
     const alBinario = (de, b, canal) => b[0] === MARCA_LOCKSTEP ? sincro?.lockstep?.alBinario(de, b)
+      : b[0] === MARCA_RED_ESTADO ? window.mkwRedEstadoSala?.alBinario(de, b)
       : b[0] === MARCA_SALA ? window.mkwSala?.alBinario(de, b) : router.alBinario(de, b, canal);
     // §103: «🛰 Todo por Cloudflare» (lo prende el anfitrión en el vestíbulo; apagado por omisión, como el relevo de BT3):
     // todas las conexiones por el repetidor TURN que entrega el Worker. Hasta tener sus credenciales no conecta a nadie;
@@ -265,6 +282,11 @@ const RELOJES_LIVIANOS = parametros.get('relojesLivianos') !== '0';
 // ?esperaGraficos=1 = también en el PC, =0 = nunca
 const ESPERA_GRAFICOS = parametros.has('esperaGraficos') ? parametros.get('esperaGraficos') === '1'
   : matchMedia('(any-pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+// §276: en el teléfono, la espera de §133 pide el primer CUARTO de la lista (el título y los menús, ~175 de ~700), no la
+// mitad: medido en el Oppo, el menú «Un jugador» a los 8 s en vez de 12 (con el tope 8), y los mismos dibujos saltados
+// (0 en la pantalla de elegir personaje, entrando 1,5 s después). Lo demás sigue llegando de fondo mientras se elige.
+// ?parteMenus=F = otra parte (0,5 = la mitad, como antes); la sala no cambia (su meta sigue en preparacion.mjs)
+const PARTE_MENUS = Number(parametros.get('parteMenus')) > 0 ? Number(parametros.get('parteMenus')) : ESPERA_GRAFICOS ? 0.25 : null;
 const TOPE_LOG = 20000;
 let logVisible = !LOG_LIVIANO;
 const pintarLog = () => { logCaja.textContent = lineasLog.join('\n'); logCaja.scrollTop = logCaja.scrollHeight; };
@@ -298,6 +320,29 @@ const escribe = texto => {
   }
 };
 window.mkwEstado = { log: todoElLog, cuadros: 0, fps: 0, trabajo: 0, lecturas: 0, bytes: 0 };   // para las pruebas
+// §276: la línea de tiempo del arranque (arranque.mjs): cuándo terminó cada tramo hasta poder jugar; el vigía mira cada
+// 50 ms lo que no avisa solo (el primer cuadro, la primera pantalla, la cortina, los pipelines). ?arranqueMarcas=0 = sin vigía
+const arranque = crearArranque({ nota: t => nota(t), vigia: parametros.get('arranqueMarcas') !== '0', leer: () => {
+  const e = window.mkwEstado, L = window.mkwMenus, m = L?.estado?.() || {};
+  let etapa = -1;
+  try { const ri = L?.u32(0x809BD730); if (ri) etapa = L.u32(ri + 0x28); } catch {}
+  const pe = preparacion.estado, g = graficosListos(pe, PARTE_MENUS);
+  return { cuadros: window.mkwCuadros ? window.mkwCuadros() : 0, seccion: m.seccion ?? -1, pagina: m.pagina ?? -1, etapa,
+    lecturas: e.lecturas || 0, esperaDisco: Math.round(msEsperaDisco), mb: Math.round((e.bytes || 0) / 104857.6) / 10,
+    inicioVisto: e.inicioVisto ?? null, cortinaFuera: e.cortinaFuera ?? null, graficosListos: !!g.listo,
+    pipesTotal: pe.pipesTotal, pipesLlegados: pe.pipesLlegados, elegido: e.inicio?.cuando ?? null,
+    esperaGraficosFin: e.esperaGraficos?.ms != null ? e.esperaGraficos.desde + e.esperaGraficos.ms : null };
+} });
+arranque.marcar('modulo');
+window.mkwArranque = arranque;
+
+// §269: la caja negra (caidas.mjs): un latido cada 5 s en localStorage y la causa si el juego se cae (la tarjeta de video
+// perdida, un error del motor); al recargar se muestra lo de la vez anterior. Va antes que nada que pida la tarjeta.
+const caidas = parametros.get('caidas') === '0' ? null : crearCaidas({ medir: () => ({
+  enCarrera: !!window.mkwEstado.enCarrera, cuadro: window.mkwEstado.cuadros || 0,
+  heapMB: window.mkwHeapMB ? Math.round(window.mkwHeapMB()) : null,
+  jsMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }) });
+window.mkwCaidas = caidas;
 
 // ¿Qué archivos se bajan enteros al inicio? Los que el runtime abre con el sistema de archivos normal (no por
 // el lector del disco). Todo lo demás queda "perezoso" y se descarga por pedazos cuando se lee.
@@ -531,11 +576,13 @@ const enTareaNueva = (() => {
 // un monitor de 240 Hz); la función de rAF se ata una sola vez; los demás que necesitan cada refresco (el ritmo en
 // pantalla, los mandos) se anotan en relojMonitor.alRefresco en vez de tener su propio rAF. ?planificador=0 = como antes
 const PLANIFICADOR = parametros.get('planificador') !== '0';
+let arranqueSuelto = false;   // §276 (ver «el arranque de prisa»)
 const relojMonitor = {
   t: 0, p: 0, n: 0, deltas: [], esperas: [], tomas: [],
   anillo: new Float64Array(240), orden: new Float64Array(240), nd: 0, ia: 0, alRefresco: [], paginaMs: 0,
   entregado: 0, retrace: 0, desfases: [], fase: null, tomaAnterior: 0, huecosToma: {}, fotos: [],
-  valido() { return (PLANIFICADOR ? this.nd : this.deltas.length) >= 30 && performance.now() - this.t < 100; },  // pestaña oculta → no
+  // (§276: mientras el juego corre su arranque invisible, la cuadrícula va suelta del monitor para poder apurarlo)
+  valido() { return !arranqueSuelto && (PLANIFICADOR ? this.nd : this.deltas.length) >= 30 && performance.now() - this.t < 100; },  // pestaña oculta → no
   // el período a partir de las diferencias guardadas (ver tic): p0 = percentil 20; cada salto vale round(salto/p0)
   periodoAnillo() {
     const n = this.nd, orden = this.orden.subarray(0, n);
@@ -636,13 +683,16 @@ const relojMonitor = {
   //    (Probado y descartado: dejar un margen de 2,5 ms entre la entrega y el refresco de la toma: 69–74 % a compás
   //    contra 95 % sin margen, §54.)
   // tomaAtrasada() calcula desde qué hora de rAF ya se puede tomar y dice si hay que esperar a ese rAF.
-  ultimaToma: 0, desdeToma: 0, esperandoAtrasada: false, adquirida: false, diagCompas: { conCompas: 0, sinCompas: 0, rearmes: 0, corridas: 0, tarde: {} },
+  ultimaToma: 0, desdeToma: 0, esperandoAtrasada: false, adquirida: false, msCompas: 0, diagCompas: { conCompas: 0, sinCompas: 0, rearmes: 0, corridas: 0, tarde: {} },
   tomaAtrasada() {
     if (!this.valido() || !(this.p > 0)) return false;
-    const p = this.p, n = Math.round(16.6833 / p), ahora = performance.now();
+    // §270: con el ritmo de los menús prendido (ritmo-menus.mjs), el compás es de N cuadros (30 o 20 parejos): cada
+    // imagen se toma N × 16,7 ms después de la anterior, no 16,7
+    const N = ritmoMenus?.n && menusAhora() ? ritmoMenus.n : 1, largo = 16.6833 * N;
+    const p = this.p, n = Math.round(largo / p), ahora = performance.now();
     this.desdeToma = ahora - 1.5 * p;            // sin compás: solo un refresco que pasó hace más de medio refresco
     const d = this.diagCompas;
-    if (COMPAS && n >= 2 && Math.abs(16.6833 - n * p) < 0.1 * p && this.ultimaToma) {
+    if (COMPAS && n >= 2 && Math.abs(largo - n * p) < 0.1 * p && this.ultimaToma) {
       let objetivo = this.ultimaToma + n * p;
       // §256 (la zona del borde): una imagen que llega a menos de MARGEN_TOMA refrescos del refresco objetivo a veces
       // alcanza ese refresco y a veces no (el hilo sigue ocupado cuando el navegador arma la pantalla): 5 y 3 refrescos
@@ -658,13 +708,14 @@ const relojMonitor = {
   },
   // Espera el rAF con hora ≥ desdeToma (se cumple en una tarea nueva, como esperaHasta), o un tope de tiempo.
   esperaAtrasada() {
-    const desde = this.desdeToma;
+    const desde = this.desdeToma, t0 = performance.now();
     anota('a', desde - this.t);
     this.esperandoAtrasada = true;
     return new Promise(listo => {
       let hecho = false;
       const fin = v => {
         if (hecho) return; hecho = true;
+        this.msCompas += performance.now() - t0;   // (§270: lo esperado al compás, para no contarlo como trabajo)
         this.esperas = this.esperas.filter(e => e !== espera); this.esperandoAtrasada = false;
         anota('b', v); listo();
       };
@@ -710,6 +761,44 @@ window.mkwRelojMonitor = relojMonitor;
 // en que aurora pidió la textura, como PresentMon/Afterburner); ?imagenesVista=refresco = medido en los refrescos del
 // monitor (la primera versión: redondea a refrescos, ver imagenes-vista.mjs)
 const IMAGENES_VISTA = parametros.get('imagenesVista') !== '0';
+// §270 (el dueño: «fps de video y fps de lógica» por separado): el ritmo del JUEGO, aparte del de las imágenes. Entre
+// dos cuadros el juego espera pidiéndole a la página turnos de 1 ms (mkwEsperaHasta con el monitor enganchado,
+// mkwEsperaReloj sin él), así que en cada pedido se mira la cuenta de cuadros del juego: si avanzó, el cuadro terminó
+// recién (con 1 ms de error). La cuenta: en la carrera, los cuadros de lógica del Raceinfo (+0x1C + +0x20, se dibujen o
+// no: con N8 se dibuja la mitad); en los menús, los cuadros que el juego entregó (ahí cada cuadro se dibuja).
+// ?ritmoJuego=0 = sin esto
+const ritmoJuego = parametros.get('ritmoJuego') !== '0' ? crearRitmoJuego() : null;
+function cuentaJuego() {
+  const M = window.mkw, L = window.mkwMenus;
+  try {
+    const ri = L?.u32(0x809BD730), et = ri ? L.u32(ri + 0x28) : -1;
+    if (ri && et >= 0 && et <= 2) return ['carrera' + ri, L.u32(ri + 0x1C) + L.u32(ri + 0x20)];
+  } catch {}
+  // (en los menús el runtime cuenta los cuadros presentados; con N8 en elegir personaje, el cuadro saltado es de lógica
+  // y no se presenta: se suman los saltados, mkw_n8_estado(1))
+  const saltados = M?._mkw_n8_estado ? Math.max(0, M._mkw_n8_estado(1)) : 0;
+  return ['menus', (M?._mkw_web_cuadros?.() ?? NaN) + saltados];
+}
+// §270: el ritmo parejo en los menús (ritmo-menus.mjs): si el aparato no llega a 60 en un menú, cada cuadro empieza en
+// un compás fijo de 2 (30 parejos) o 3 (20 parejos) tiempos de 16,7 ms. Nunca con la carrera andando; en la sala,
+// tampoco en sus resultados (los demás pueden seguir corriendo con mis cuadros). APAGADO por omisión (medido en la gama baja: no mejora el 1 % bajo y se prendía en las trabas de la carga); ?menusRitmo=1 = probarlo. Elegir personaje va con N8 (n8MenusAlActivar)
+const ritmoMenus = parametros.get('menusRitmo') === '1' ? crearRitmoMenus() : null;
+function menusAhora() {
+  try {
+    const L = window.mkwMenus, ri = L?.u32(0x809BD730);
+    if (!ri) return true;
+    return L.u32(ri + 0x28) >= 3 && !sincro;
+  } catch { return false; }
+}
+const conRitmoMenus = f => ritmoMenus ? (v, s) => ritmoMenus.n ? f(ritmoMenus.objetivo(v, performance.now(), menusAhora()), s) : f(v, s) : f;
+// §283: el cuadro se anota al EMPEZAR (al salir de la espera que da su hora), no al terminar: ver envolverEsperaJuego en
+// imagenes-vista.mjs. ?ritmoJuego=fin = al terminar, como §270
+const esperaJuego = ritmoJuego ? envolverEsperaJuego(ritmoJuego, cuentaJuego, { modo: parametros.get('ritmoJuego') === 'fin' ? 'fin' : 'inicio' }) : null;
+const conRitmoJuego = f => esperaJuego ? esperaJuego.envolver(f) : f;
+window.mkwRitmoJuego = ritmoJuego;
+// (cuando cada cuadro llega tarde el runtime no espera y no llama a las esperas: la cuenta se lee también en cada
+// refresco del monitor; dos lecturas del mismo cuadro no anotan nada)
+if (esperaJuego) relojMonitor.alRefresco.push(() => esperaJuego.refresco());
 const vistaImagenes = IMAGENES_VISTA ? crearImagenesVista({ modo: parametros.get('imagenesVista') === 'refresco' ? 'refresco' : 'entrega', causas: [
   ['pipeline', () => window.mkw?._mkw_web_pipelines_cuantos?.() ?? 0],     // (un pipeline nuevo armado)
   ['disco', () => window.mkwDisco?.estado?.esperaRed ?? 0],                // (el juego esperó una lectura de la red)
@@ -744,7 +833,7 @@ if (vistaImagenes) {
   document.addEventListener('visibilitychange', () => vistaImagenes.cortar());
   setInterval(() => {
     vistaImagenes.segundo();
-    try { const n = window.mkwEstado?.n8?.(); esperadoImagen = n?.activo && n.modo === 1 ? 2000 / 60 : 1000 / 60; } catch {}
+    try { const n = window.mkwEstado?.n8?.(); esperadoImagen = n?.activo && n.modo === 1 ? 2000 / 60 : n?.activo && n.modo === 3 ? 3000 / 60 : 1000 / 60; } catch {}   // (§283: «20 parejas»)
     vistaImagenes.esperado = esperadoImagen;
   }, 1000);
   window.mkwImagenesVista = vistaImagenes;
@@ -1062,6 +1151,16 @@ let hayCarrera = false;                     // (la vigía de la carrera, despué
 // N12 (§233): el escalón del aparato. Los segundos de la carrera en curso; al terminar, la mediana va a localStorage
 // (`mkw.capacidad`) y al latido de la sala. ?escalon=0 = sin esto (ni el aviso de la sala)
 const ESCALON = parametros.get('escalon') !== '0';
+// §269: lo que la v2.0 aprendió mal en la sala (contaba la espera a los demás como trabajo de esta PC): la capacidad
+// guardada (`mkw.capacidad`, la del aviso «tu aparato no llegó a 60») y un «N8 no sirve aquí» (`mkw.n8.auto` = 'no') se
+// olvidan UNA vez; la próxima carrera los vuelve a medir bien. (mkw.v269 = ya se hizo)
+try {
+  if (!localStorage.getItem('mkw.v269')) {
+    localStorage.removeItem('mkw.capacidad');
+    if (localStorage.getItem('mkw.n8.auto') === 'no') localStorage.removeItem('mkw.n8.auto');
+    localStorage.setItem('mkw.v269', '1');
+  }
+} catch {}
 const segundosEscalon = [];
 let avisoLentosEn = -1;                    // (la carrera de la sala para la que ya se avisó quién no llega a 60)
 const alCambiarCarrera = [];
@@ -1083,6 +1182,9 @@ alCambiarCarrera.push(corre => {
   if (corre) { const p = pistaDelJuego(); if (p >= 0) usoPistas.jugada(p); return; }
   if (espacio && usoPistas.tope()) setTimeout(() => { if (!hayCarrera) espacio.aplicarTope().catch(e => nota('espacio: el tope falló: ' + e)); }, 3000);
 });
+// §269: si una carrera empieza con el mensaje de bienvenida abierto (lo abrió el jugador desde la Ayuda, o un camino que
+// no se vio), se cierra sin marcarlo como visto: con él abierto el juego no recibe los botones y el kart queda quieto
+alCambiarCarrera.push(corre => { if (corre && window.mkwBienvenida?.estado?.abierto) { window.mkwBienvenida.cerrar('carrera', { marcar: false }); nota('bienvenida: cerrada porque empezó la carrera'); } });
 if (ESCALON) alCambiarCarrera.push(corre => {
   if (corre) { segundosEscalon.length = 0; return; }
   const r = resumirCarrera(segundosEscalon);
@@ -1197,7 +1299,28 @@ if (!avisosLag.prendidos()) escribe('[avisos] avisos de conexión y lag escondid
 var ui = crearInterfaz({ guardado, sonido, controles, imagenes: ORIGEN + '/build/imagenes', filtroChip: avisosLag,
   estadoNube: () => nube?.estado,
   alCambiarGuardado: () => { guardadosAlAbrir = esperaLectura.then(() => guardado.cargar()).catch(() => new Map()); } });
+if (caidas?.estado.anterior) escribe('[caída] ' + caidas.texto());
+if (caidas?.estado.anterior) setTimeout(() => ui.aviso(caidas.texto() + ' — Avanzado → Diagnóstico → «Copiar el informe» y mándalo, por favor.', true), 3000);   // §269
 window.mkwInterfaz = ui;
+// §276b: el cartel de la carga (cartel-carga.mjs): la cortina dice la fase con su avance («Bajando el juego… 34 MB de
+// 80», «Compilando el programa…», «Preparando gráficos: 412 de 729 (te faltan ~6 s)», «Casi listo…»), con un puntito
+// que gira y los segundos, y una línea tranquila si una fase pasa 15 s sin avanzar. Lo ponen el arranque, la espera de
+// los gráficos de los menús (§133) y la preparación de la sala (§99). ?cartelCarga=0 = los textos fijos de antes
+const CARTEL = parametros.get('cartelCarga') !== '0';
+const cartel = crearCartelCarga({ puede: () => ui.cortinaPuesta && !document.body.classList.contains('cortina-mal'),
+  pintar: p => { if (!p) return ui.cortinaVivo(null); ui.cortina(p.texto, false, p.pct); ui.cortinaVivo(p.segundos, p.calma); } });
+window.mkwCartel = cartel;
+const medidorPipes = crearMedidorPipes();
+// la fase de ahora: las marcas del arranque, lo que se está bajando y los pipelines (parte = la de los menús, §276)
+const faseAhora = ({ soloGraficos = false, parte = null } = {}) => {
+  const pe = preparacion.estado;
+  const meta = pe.pipesTotal > 0 ? (parte > 0 && parte < 1 ? Math.ceil(pe.pipesTotal * parte) : pe.pipesMeta) : 0;
+  medidorPipes.agregar(pe.pipesLlegados || 0);
+  const pipes = pe.sinPipelines || !(meta > 0) ? null : { llegados: Math.min(pe.pipesLlegados, meta), meta };
+  const m = { ...arranque.marcas, pantalla: arranque.marcas.pantalla ?? (pe.pantalla ? 1 : null) };
+  return faseCarga({ m, descarga: descargas?.mirar() ?? null, pipes, soloGraficos, sinLista: !!pe.sinPipelines,
+    restante: pipes ? medidorPipes.restante(meta, pe.pipesLlegados) : null });
+};
 // §106: la barra, abajo a la izquierda (sobre la cortina de carga, al centro y con «queda guardado» la primera vez)
 // (la cortina «puesta» pero tapada por la portada, ?portada=1, no cuenta: se mira si de verdad se ve)
 if (descargas) montarBarraDescarga($('descarga'), descargas, { primeraVez: () => descargas.primeraVez,
@@ -1226,7 +1349,36 @@ window.mkwEstado.graficos = { ...graficosArranque, lineas: lineasVideo(graficosA
 // §108: la resolución de salida (el alto máximo del lienzo), en el momento y cada vez que la persona la cambia
 const salidaLienzo = limitarSalida($('canvas'), { tope: graficosArranque.salida });
 window.mkwSalida = salidaLienzo;
-montarGraficos($('graficosPanel'), { enSala: !!sincro, alSalida: t => salidaLienzo?.fijar(t),
+// §274: «⚡ Auto calibración: máxima fluidez» (auto-calibrar.mjs): prueba las opciones de Imagen y de salida que se
+// aplican en el momento y deja la de mejor 1 % bajo con la lógica a 60. En la sala pausa a todos (sala-carrera.mjs
+// pausaSala + lockstep.congelar + mkw_congelar). ?autoCalibrar=0 = sin el botón
+const AUTO_CALIBRAR = parametros.get('autoCalibrar') !== '0';
+const carreraAndando = () => { try { const L = window.mkwMenus, ri = L?.u32(0x809BD730); return !!ri && L.u32(ri + 0x28) === 2; } catch { return false; } };
+let panelGraficos = null;
+const avisoPausa = crearAvisoPausa(document);   // (§274; §285 lo usa también para la espera de la carga)
+const autoCalibrar = AUTO_CALIBRAR ? crearAutoCalibrar({
+  leer: () => leerGraficos(), guardar: g => { guardarGraficos(g); panelGraficos?.releer(); },
+  aplicarN8: v => window.mkwImagen?.(v, 'auto calibración'), aplicarSalida: s => salidaLienzo?.fijar(s),
+  modoN8: () => { try { const n = window.mkwEstado.n8?.(); return n?.activo ? n.modo : 0; } catch { return 0; } },
+  alto: () => $('canvas')?.height || 0,
+  enCarrera: carreraAndando,
+  medidor: {
+    marca: () => vistaImagenes?.marca() ?? 0, resumen: d => vistaImagenes?.resumen(d) ?? null,
+    logica: () => { const [f, n] = cuentaJuego(); return f.startsWith('carrera') ? n : NaN; },
+    trabajo: () => { const M = window.mkw; return { t: performance.now(), espera: (M?._mkw_web_ms_espera?.() ?? 0) + (window.mkwEstado.esperaSala?.ms || 0), lastre: lastreCpu?.estado.ms ?? 0 }; },
+    vueltasCongelado: () => window.mkw?._mkw_congelado_estado?.(1) ?? 0,
+    gpuMs: () => gpuReciente(2000),
+  },
+  congelarJuego: si => window.mkw?._mkw_congelar?.(si ? 1 : 0),
+  // (§275b: en «Cada uno su kart» no corre el lockstep: la pausa congela cada consola al llegarle y el lento al día empareja después)
+  sala: () => window.mkwSala || null, lockstep: () => RED_ESTADO_SALA ? null : sincro?.lockstep || null, yo: sincro?.yo ?? null,
+  nombreDe: u => window.mkwNombreDe?.(u), aviso: avisoPausa, nota,
+  margenCuadros: MARGEN_PAUSA_CUADROS,
+  alEstado: e => botonCalibrar?.pintar(e),
+}) : null;
+const botonCalibrar = autoCalibrar ? montarBotonCalibrar(document, { alApretar: () => autoCalibrar.apretar(), alDeshacer: () => autoCalibrar.deshacer() }) : null;
+window.mkwAutoCalibrar = autoCalibrar;
+panelGraficos = montarGraficos($('graficosPanel'), { enSala: !!sincro, alSalida: t => salidaLienzo?.fijar(t), arriba: botonCalibrar?.nodo,
   alQuitar: q => { if (parametros.has('quitarEfectos')) return; const M = window.mkw; M?._mkw_graficos_quitar?.(q); if (M?._mkw_graficos_quitar) window.mkwEstado.efectosQuitados = q; },
   alTexturas: k => { if (!parametros.has('texturasMenos')) window.mkw?._mkw_web_texturas_menos?.(k); },
   alImagen: v => window.mkwImagen?.(v),   // (§255, G15: en el momento, también en la carrera)
@@ -1248,7 +1400,10 @@ const momentoBienvenida = ({ abierto }) => {
   const sala = window.mkwSala?.estado?.();
   if (sala) {
     const n = sala.carrera | 0, descanso = sala.fase === 'correr' && sala.terminaron?.[n] && sala.plazo;
-    if (sala.fase === 'correr' && !descanso) return false;
+    // §269: en la sala, SOLO en el descanso (como dice §263). Antes también podía salir en la elección de copa y de
+    // personaje: con el mensaje abierto el juego no recibe los botones (controles.silenciar), y si la carrera largaba con
+    // él encima ese jugador quedaba quieto. ?bienvenidaSala=1 = como antes (solo pruebas)
+    if (parametros.get('bienvenidaSala') === '1' ? sala.fase === 'correr' && !descanso : !descanso) return false;
     if (!abierto && sala.plazo && window.mkwSala.restan(sala.plazo) < 10000) return false;
   }
   if (abierto) return true;
@@ -1258,14 +1413,14 @@ const momentoBienvenida = ({ abierto }) => {
 const aLaVistaId = id => { const e = document.getElementById(id); return !!e && !e.hidden; };
 let silencioAntesBienvenida = false;
 const bienvenida = montarBienvenida({
-  parametros, telefono: esTelefono, abrirHoja: abrirHojaAjuste, liviano: ponerLiviano, editor: () => editarTactil(),
+  parametros, telefono: esTelefono, abrirHoja: abrirHojaAjuste, liviano: ponerLiviano, editor: () => editarTactil(), calibrar: AUTO_CALIBRAR,
   puedeMostrar: momentoBienvenida, nota,
   // mientras está abierto, el juego no recibe lo de la persona (una A en «¡A jugar!» no es también una A en el menú)
   alAbrir: () => { silencioAntesBienvenida = controles.silenciado; controles.silenciar(true); },
   alCerrar: () => controles.silenciar(silencioAntesBienvenida),
 });
 window.mkwBienvenida = bienvenida;
-montarAyuda($('ayudaAjustes'), { telefono: esTelefono, abrirHoja: abrirHojaAjuste, liviano: ponerLiviano, editor: () => { ui.cerrarCajon(); editarTactil(); },
+montarAyuda($('ayudaAjustes'), { telefono: esTelefono, abrirHoja: abrirHojaAjuste, liviano: ponerLiviano, editor: () => { ui.cerrarCajon(); editarTactil(); }, calibrar: AUTO_CALIBRAR,
   abrirMensaje: () => { ui.cerrarCajon(); bienvenida.abrir(); } });
 // …y el medidor de fps y ping, arriba a la izquierda (solo si la persona lo prende; con el juego andando)
 {
@@ -1277,7 +1432,12 @@ montarAyuda($('ayudaAjustes'), { telefono: esTelefono, abrirHoja: abrirHojaAjust
   const graficoPruebas = parametros.get('verGrafico') === '1';   // (§256: ?verGrafico=1 = el gráfico del tiempo de cada imagen)
   montarMedidor(medidor, {
     graficos: () => { const g = leerGraficos(), h = fpsPruebas ? { ...g, verFps: true } : g; return graficoPruebas ? { ...h, verGrafico: true } : h; },
-    fps: () => window.mkwEstado.cuadros > 0 ? window.mkwEstado.fps : null,
+    // §270: «Imagen» = las imágenes que se vieron el último segundo (imagenes-vista; sin él, los cuadros entregados)
+    fps: () => window.mkwEstado.cuadros > 0 ? (window.mkwEstado.imagenesSeg ?? window.mkwEstado.fps) : null,
+    // §270: «Juego» = los cuadros que el juego calculó el último segundo y su 1 % bajo (los últimos 600)
+    ...(ritmoJuego ? { juego: () => ritmoJuego.porSeg === null ? null : ritmoJuego.resumen(600),
+                       // (el dueño 2026-11-11: un gráfico de imagen y otro de juego; el de juego = los mismos 240 cuadros)
+                       graficoJuego: () => ritmoJuego.ultimos(PUNTOS_GRAFICO) } : {}),
     rtt: () => { try { return sincro?.lockstep?.estado().rtt || {}; } catch { return {}; } },
     nombres: () => window.mkwNombresSala || {}, yo: sincro?.yo ?? null,
     jugando: () => document.body.classList.contains('started') && !ui.cortinaPuesta,
@@ -1285,7 +1445,9 @@ montarAyuda($('ayudaAjustes'), { telefono: esTelefono, abrirHoja: abrirHojaAjust
     detalle: () => ({ trabajo: window.mkwEstado.trabajo, gpu: gpuReciente() ?? undefined, logica: window.mkwEstado.logica ?? undefined,
       hz: relojMonitor.p ? 1000 / relojMonitor.p : undefined, lienzo: `${$('canvas').width}×${$('canvas').height}` }),
     // §256 (G16): el 1 % bajo de las últimas 600 imágenes (10 s) y el gráfico de las últimas 240
-    ...(vistaImagenes ? { imagenes: () => vistaImagenes.resumen(null, 600), grafico: () => vistaImagenes.ultimos(240),
+    // (el dueño 2026-11-10: «ese 1 % low sea del gráfico que se muestra»: el 1 % bajo del texto sale de las mismas
+    // PUNTOS_GRAFICO imágenes que dibuja el gráfico, no de una ventana más larga)
+    ...(vistaImagenes ? { imagenes: () => vistaImagenes.resumen(null, PUNTOS_GRAFICO), grafico: () => vistaImagenes.ultimos(PUNTOS_GRAFICO),
                           esperado: () => esperadoImagen, dibujar: dibujarGrafico } : {}),
   });
 }
@@ -1296,10 +1458,23 @@ function informeRendimiento() {
   const h = window.mkwEstado.historial || [], ult = h.slice(-10);
   const media = k => { const v = ult.map(x => x[k]).filter(Number.isFinite); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null; };
   const hz = relojMonitor.p ? Math.round(1000 / relojMonitor.p * 10) / 10 : null;
-  const fps = media('fps'), trabajo = media('juego'), gpu = media('video'), logica = media('logica'), cpuPura = media('cpu');
+  const fps = media('fps'), trabajo = media('juego'), gpu = media('video'), logica = media('logica'), cpuPura = media('cpu'), sala = media('sala');
   return {
     cuando: new Date().toISOString(), navegador: navigator.userAgent, telefono: esTelefono,
     nucleos: navigator.hardwareConcurrency ?? null, memoriaGB: navigator.deviceMemory ?? null,
+    ...(caidas?.estado.anterior ? { caidaAnterior: caidas.texto() } : {}),   // §269: lo de la caja negra
+    // §269: la sala, para diagnosticar desde el informe de cada PC (versión, papel en el lockstep, retraso, botones de
+    // cada jugador mandados/recibidos/inventados/tarde, cuántas pantallas y locales armó el juego, el mando)
+    ...(window.mkwSincro?.lockstep ? { sala: (() => { try {
+      const e = window.mkwSincro.lockstep.estado(), L = window.mkwMenus, rd = L?.u32(0x809BD728), esc = rd ? rd + 0x20 : 0;
+      return { version: window.mkwSala?.versiones?.() ?? { mia: VERSION_SALA, distintas: [] },   // (la carrera directa de las pruebas no arma la sala: la versión de la página igual)
+        yo: window.mkwSincro.yo, humanos: (window.mkwSincro.humanos || []).map(h => h.uid),
+        arbitro: e.arbitro, autoridad: e.autoridad, carrera: e.carrera, cuadro: e.cuadro, retraso: e.retraso, retrasos: e.retrasos, retrasoMax: e.retrasoMax,
+        rtt: e.rtt, enviados: e.paquetesBotones, enviosA: e.enviosA, recibidosDe: e.recibidosDe, inventados: e.inventados, inventadosViejos: e.inventadosViejos,
+        tardeVivo: e.tardeVivo, tardeDe: e.tardeDe, tardeAtraso: e.tardeEdad, pausas: (e.pausas || []).length, cortes: e.cortes, fuera: e.fuera, desincronizado: e.desincronizado || null,
+        pantallasLocales: esc ? [L.u8(esc + 5), L.u8(esc + 6)] : null, unMando: window.mkwEstado.unMando, ventanas: window.mkwControles?.estado?.ventanas || null,
+        esperaSalaMs: window.mkwEstado.esperaSala?.ms ?? null, avisosLento: (window.mkwAvisosLento || []).slice(-5) };
+    } catch (x) { return { error: String(x) }; } })() } : {}),
     tarjeta: window.mkwEstado.gpu?.dada ?? null, adreno: window.mkwEstado.gpu?.adreno?.adreno ? window.mkwEstado.gpu.adreno : null,
     pantallaHz: hz, dpr: devicePixelRatio,
     pipelinesAcotado: window.mkwEstado.pipelinesAcotado ?? null,   // §248 (W26): el conjunto acotado (teléfono)
@@ -1317,13 +1492,13 @@ function informeRendimiento() {
     ...(window.mkwEnergia?.ahorro || window.mkwEnergia?.calor ? { energia: { ahorro: window.mkwEnergia.ahorro?.ahorro ?? null,
       calorMinutos: window.mkwEnergia.calor?.minutos ?? null, caliente: window.mkwEnergia.calor?.caliente ?? null } } : {}),
     enganche: { ...window.mkwEstado.fase }, memoriaJuegoMB: window.mkwHeapMB ? Math.round(window.mkwHeapMB()) : null,
-    ultimos10s: { fps, logica, juegoMs: trabajo, videoMs: gpu, ...(cpuPura !== null ? { cpuPuraMs: cpuPura } : {}) },
+    ultimos10s: { fps, logica, juegoMs: trabajo, videoMs: gpu, ...(cpuPura !== null ? { cpuPuraMs: cpuPura } : {}), ...(sala !== null ? { esperaSalaMs: sala } : {}) },
     // N12 (§233): en qué escalón está el aparato y qué esperar (con lo de los últimos 10 s; si no hubo carrera, la última guardada)
     ...(ESCALON ? { escalon: (() => {
       const cap = leerCapacidad(), enCarrera = Number.isFinite(logica);
       let rtt = null; try { const r = sincro?.lockstep?.estado().rtt || {}; const v = Object.values(r).filter(Number.isFinite); rtt = v.length ? Math.max(...v) : null; } catch {}
       const e = escalonDe({ cpuPuraMs: cpuPura ?? (enCarrera ? null : cap?.ms ?? null), juegoMs: enCarrera ? trabajo : null, logica: enCarrera ? logica : cap?.l ?? null,
-        telefono: esTelefono, memoriaGB: navigator.deviceMemory ?? null, rttMs: rtt, n8: (() => { try { return window.mkwEstado.n8?.()?.activo === true; } catch { return false; } })() });
+        telefono: esTelefono, memoriaGB: navigator.deviceMemory ?? null, rttMs: rtt, esperaSalaMs: enCarrera ? sala : null, n8: (() => { try { return window.mkwEstado.n8?.()?.activo === true; } catch { return false; } })() });
       return { ...e, ultimaCarrera: cap };
     })() } : {}),
     frena: queFrena({ fps, trabajo, gpu: gpu ?? undefined, hz: hz ?? undefined, logica }),
@@ -1390,8 +1565,16 @@ const PRECALENTAR_TARDE = parametros.get('precalentarTarde') === '1' ||
 // PC de 16 hilos, 2 en un teléfono de 8 núcleos.
 // ?precalentarTope=0: sin tope (el de antes, para comparar); ?precalentarTope=N: N compilándose como mucho.
 const TOPE_PEDIDO = parametros.get('precalentarTope');
+// §276: en el teléfono (el de §133: toque sin puntero fino) el tope es UNO POR NÚCLEO (8 en el Oppo), no núcleos ÷ 4: ahí
+// la cortina «Preparando los gráficos» espera la mitad de la lista antes de abrir Single Player, y con 2 a la vez eran
+// 17–19 s (el 85 % del arranque, medido en el Oppo Find X9 Pro); con 8, ~8 s, sin dibujos saltados y casi la misma
+// fluidez del menú después (16 y 32 no ganan más: la tarjeta ya va llena). Como abrir más cajas en un peaje: hasta 8
+// pasan más autos; desde ahí la calle de salida es la que limita. ?precalentarTope=N sigue mandando.
+const TOPE_TELEFONO = ESPERA_GRAFICOS && parametros.get('topeTelefono') !== '0';   // (?topeTelefono=0 = núcleos ÷ 4 también ahí, como antes)
 const EN_CAMINO_MAX = TOPE_PEDIDO === '0' ? 0
-  : Math.min(64, Number(TOPE_PEDIDO) > 0 ? Math.round(Number(TOPE_PEDIDO)) : Math.max(2, Math.floor((navigator.hardwareConcurrency || 4) / 4)));
+  : Math.min(64, Number(TOPE_PEDIDO) > 0 ? Math.round(Number(TOPE_PEDIDO))
+    : TOPE_TELEFONO ? Math.max(4, navigator.hardwareConcurrency || 8)
+    : Math.max(2, Math.floor((navigator.hardwareConcurrency || 4) / 4)));
 const PRECALENTAR_RITMO = Number(parametros.get('precalentarRitmo')) > 0 ? Math.round(Number(parametros.get('precalentarRitmo'))) : 2;
 let pedirPiloto = null;          // arrancar() lo pone cuando el piloto existe; antes, la elección queda esperando
 let eleccionPendiente = null;
@@ -1424,12 +1607,22 @@ function elegirInicio(que) {
   // §133 (U1): si los pipelines de los menús todavía no llegaron (1.ª visita, el precalentado con tope de §117), se
   // espera aquí con la cortina y el %, como mucho 30 s: así no siguen compilándose dentro de la 1.ª carrera.
   // ?esperaGraficos=0 = entrar en seguida, como antes
-  if (ESPERA_GRAFICOS && !graficosListos(preparacion.estado).listo) {
+  // §276b: con el cartel, también hasta que el juego esté en su primera pantalla. Medido en el Oppo: quien toca Single
+  // Player apenas sale el menú de inicio (el juego todavía cargando detrás) veía ~6 s el arranque del juego sin cortina
+  // ni cartel, como trabado; ahora la cortina sigue con «Arrancando el juego…» hasta que el juego se ve
+  const enPantalla = () => { try { const e = window.mkwMenus?.estado?.(); return !!e && e.seccion >= 0 && e.pagina >= 0; } catch { return false; } };
+  const faltaPantalla = () => CARTEL && !enPantalla();
+  if (ESPERA_GRAFICOS && (!graficosListos(preparacion.estado, PARTE_MENUS).listo || faltaPantalla())) {
     const t0 = performance.now();
     window.mkwEstado.esperaGraficos = { desde: Math.round(t0), ms: null };
     const vuelta = () => {
-      const g = graficosListos(preparacion.estado);
-      if (!g.listo && performance.now() - t0 < 30000) { ui.cortina(`Preparando los gráficos… ${g.pct} %`, false, g.pct); return setTimeout(vuelta, 150); }
+      const g = graficosListos(preparacion.estado, PARTE_MENUS);
+      if ((!g.listo || faltaPantalla()) && performance.now() - t0 < 30000) {
+        if (!CARTEL) ui.cortina(`Preparando los gráficos… ${g.pct} %`, false, g.pct);
+        else if (cartel.cual !== 'graficos') cartel.mostrar(() => faseAhora({ soloGraficos: enPantalla(), parte: PARTE_MENUS }), 'graficos');   // (§276b)
+        return setTimeout(vuelta, 150);
+      }
+      cartel.parar('graficos');
       ui.cortina(false);
       window.mkwEstado.esperaGraficos.ms = Math.round(performance.now() - t0);
       nota(`menú de inicio (§133): esperé los gráficos de los menús ${window.mkwEstado.esperaGraficos.ms} ms${g.listo ? '' : ' (tope)'}`);
@@ -1521,33 +1714,48 @@ async function arrancar() {
     const vigiaPrep = setInterval(() => {
       { const em = window.mkwMenus?.estado?.(); if (em && em.seccion >= 0 && em.pagina >= 0) preparacion.marcar('pantalla'); }   // (con su página activa)
       if (!preparacion.lista()) {
+        if (CARTEL) { if (cartel.cual !== 'sala') cartel.mostrar(() => faseAhora(), 'sala'); return; }   // (§276b)
         const pct = preparacion.pct();
         const que = pct < 35 ? 'Bajando el juego' : pct < 90 ? 'Preparando los gráficos (la primera vez tarda más)' : 'Casi listo';
         ui.cortina(`${que}… ${pct} %`, false, pct);
         return;
       }
       clearInterval(vigiaPrep);
+      cartel.parar('sala');
       window.mkwEstado.preparacion = { ms: Math.round(performance.now() - desde), por: preparacion.estado.por };
       nota(`sala: preparada en ${(window.mkwEstado.preparacion.ms / 1000).toFixed(1)} s (${preparacion.estado.por}; pipelines ${preparacion.estado.pipesLlegados} de ${preparacion.estado.pipesTotal})`);
       ui.cortina(false);
       window.mkwAlPreparada?.();
     }, 250);
-  }
+  } else if (CARTEL) cartel.mostrar(() => faseAhora(), 'arranque');   // §276b: lo saca revisarCortina al irse la carga
   $('canvas').focus();
 
+  // §276: el manifiesto se pide ya, mientras el navegador contesta por la tarjeta de video (en el teléfono simulado
+  // requestAdapter tarda ~0,6 s; antes el manifiesto esperaba detrás). ?manifiestoTemprano=0 = después, como antes
+  const manifiestoEnCamino = parametros.get('manifiestoTemprano') !== '0' ? fetch(ORIGEN + '/manifiesto.json') : null;
+  manifiestoEnCamino?.catch(() => {});
   // 1) Lo que el navegador necesita
   const hayJspi = 'Suspending' in WebAssembly;
-  const revision = await revisionGpu, { adaptador, nombreGpu, ignora } = revision;
-  if (!ok('el navegador tiene WebGPU y JSPI', !!adaptador && hayJspi,
-          `WebGPU ${adaptador ? 'sí' : 'no'}, JSPI ${hayJspi ? 'sí' : 'no'}`)) {
-    ui.cortina('Este navegador no puede correr el juego: necesita WebGPU y JSPI (Chrome o Edge, en el computador o en Android).', true);
-    return fin();
-  }
-  nota(`GPU pedida: ${GPU}; la que dio el navegador: ${nombreGpu}`);
-  if (ignora) nota('el navegador ignora la elección de tarjeta (da la misma para alto rendimiento y bajo consumo)');
+  const revisarGpu = async () => {
+    const revision = await revisionGpu, { adaptador, nombreGpu, ignora } = revision;
+    arranque.marcar('gpu');
+    if (!ok('el navegador tiene WebGPU y JSPI', !!adaptador && hayJspi,
+            `WebGPU ${adaptador ? 'sí' : 'no'}, JSPI ${hayJspi ? 'sí' : 'no'}`)) {
+      ui.cortina('Este navegador no puede correr el juego: necesita WebGPU y JSPI (Chrome o Edge, en el computador o en Android).', true);
+      return false;
+    }
+    nota(`GPU pedida: ${GPU}; la que dio el navegador: ${nombreGpu}`);
+    if (ignora) nota('el navegador ignora la elección de tarjeta (da la misma para alto rendimiento y bajo consumo)');
+    return true;
+  };
+  // §276: la respuesta de la tarjeta (requestAdapter: ~0,5 s en este PC) solo la necesita el motor al arrancar; el
+  // manifiesto, el disco, los archivos chicos y el programa no. Si el navegador tiene WebGPU y JSPI, todo eso sigue
+  // en paralelo y la respuesta se espera justo antes de crear el juego. ?gpuParalela=0 = esperarla aquí, como antes
+  const GPU_PARALELA = parametros.get('gpuParalela') !== '0' && !!navigator.gpu && hayJspi;
+  if (!GPU_PARALELA && !(await revisarGpu())) return fin();
 
   // 2) Manifiesto
-  const respuestaManifiesto = await fetch(ORIGEN + '/manifiesto.json');
+  const respuestaManifiesto = await (manifiestoEnCamino || fetch(ORIGEN + '/manifiesto.json'));
   if (!respuestaManifiesto.ok) {                     // el Worker: 401 = sin sesión, 403 = no está en la lista de amigos
     const por = { 401: 'Inicia sesión en Juegos para jugar.', 403: 'Este juego es solo para la lista de amigos.' }[respuestaManifiesto.status] || `El servidor del juego contestó ${respuestaManifiesto.status}.`;
     ui.aviso(por, true); ui.cortina(por, true);
@@ -1556,8 +1764,28 @@ async function arrancar() {
   }
   const manifiesto = await respuestaManifiesto.json();
   manifiestoEspacio = manifiesto; tamPorUrl = null;   // (§251: los tamaños para la pantalla Espacio)
-  preparacion.marcar('manifiesto');
-  ui.cortina('Bajando los archivos del juego…');
+  preparacion.marcar('manifiesto'); arranque.marcar('manifiesto');
+  // El programa con su huella (?v=, de la cabecera X-Mkw-Build del manifiesto): el servidor lo da guardable para
+  // siempre y Chrome reusa su caché HTTP y su caché de código en la próxima visita (bitácora §54). ?huella=0:
+  // sin huella (siempre se baja y se compila de nuevo, como antes).
+  const huellaBuild = parametros.get('huella') === '0' ? null : respuestaManifiesto.headers.get('X-Mkw-Build');
+  const conHuella = f => ORIGEN + '/build/' + f + (huellaBuild ? '?v=' + huellaBuild : '');
+  // §276: el programa (mkw.wasm) y su cargador (mkw.js) se piden YA, en paralelo con los archivos chicos y los
+  // diminutos: antes el programa recién empezaba a bajar cuando habían llegado TODOS los chicos (en el teléfono
+  // simulado, 2,6 s después). compileStreaming compila mientras baja (y deja la caché de código de V8 igual que antes:
+  // la misma dirección); emscripten recibe el módulo ya compilado por su gancho instantiateWasm. Como dos líneas que
+  // se cargan a la vez en vez de una detrás de otra. ?programaTemprano=0 = como antes (el programa al final).
+  const PROGRAMA_TEMPRANO = parametros.get('programaTemprano') !== '0';
+  const programaTemprano = PROGRAMA_TEMPRANO ? (() => {
+    const url = conHuella('mkw.wasm');
+    return WebAssembly.compileStreaming(fetch(url, { credentials: 'same-origin' })).catch(async e => {
+      nota(`programa temprano (§276): compilar mientras baja falló (${e?.message || e}): lo compilo entero`);
+      return WebAssembly.compile(await (await fetch(url, { credentials: 'same-origin' })).arrayBuffer());
+    }).then(m => { arranque.marcar('compiladoTemprano'); return m; });
+  })() : null;
+  const cargadorTemprano = PROGRAMA_TEMPRANO ? (privado ? privado.importar(conHuella('mkw.js')) : import(conHuella('mkw.js'))) : null;
+  cargadorTemprano?.catch(() => {});   // (si falla, el error sale abajo, donde se espera)
+  if (!cartel.activo) ui.cortina('Bajando los archivos del juego…');
   // Caché del disco (disco.mjs): lo bajado queda en este navegador; la versión de los archivos la da el servidor
   // ?adelantar=0: sin bajar antes (ni avisos del juego ni lectura seguida), para comparar (bitácora §52)
   const memoriaBloques = parametros.has('memoriaBloques') ? Math.max(4, Number(parametros.get('memoriaBloques')) || 64) * 1048576
@@ -1574,6 +1802,7 @@ async function arrancar() {
                        protegidas: urlsProtegidas });   // §251: lo de la carrera en curso y la siguiente de la sala no se borra
   window.mkwEstado.memoriaBloquesMB = memoriaBloques / 1048576;
   await disco.abrir();
+  arranque.marcar('disco');
   window.mkwDisco = disco;
   discoListo(disco);
   if (parametros.get('adelantar') !== '0') leerSemillaBloques();   // ya en camino para la semilla del arranque (§76)
@@ -1607,6 +1836,7 @@ async function arrancar() {
         else if (tamaños.has(ruta)) distintos++;              // otro tamaño: el paquete es de otra versión del archivo
       }
       const r = { puestos, distintos, archivos: archivos.length, mb: +(b.length / 1048576).toFixed(2), ms: Math.round(performance.now() - t0) };
+      arranque.marcar('diminutos');
       nota(`paquete de diminutos: ${puestos} archivos listos en la memoria (${r.mb} MB en ${r.ms} ms)${distintos ? `, ${distintos} de otra versión (esos, de a uno)` : ''}`);
       return r;
     }).catch(e => { nota('paquete de diminutos: no está (' + e.message + '): de a uno, como antes'); return null; });
@@ -1624,6 +1854,7 @@ async function arrancar() {
     }
   }));
   const mb = [...contenidos.values()].reduce((s, d) => s + d.length, 0) / 1048576;
+  arranque.marcar('chicos');
   ok('archivos chicos bajados', contenidos.size === aBajar.length,
      `${contenidos.size} archivos, ${mb.toFixed(1)} MB en ${(performance.now() - t0).toFixed(0)} ms`);
 
@@ -1636,21 +1867,29 @@ async function arrancar() {
                            `${([...guardados.values()].reduce((s, v) => s + v.datos.byteLength, 0) / 1048576).toFixed(1)} MB`);
 
   // 4) El juego
+  if (GPU_PARALELA && !(await revisarGpu())) return fin();   // (§276: la tarjeta, recién aquí)
   const t1 = performance.now();
-  // El programa con su huella (?v=, de la cabecera X-Mkw-Build del manifiesto): el servidor lo da guardable para
-  // siempre y Chrome reusa su caché HTTP y su caché de código en la próxima visita (bitácora §54). ?huella=0:
-  // sin huella (siempre se baja y se compila de nuevo, como antes).
-  const huellaBuild = parametros.get('huella') === '0' ? null : respuestaManifiesto.headers.get('X-Mkw-Build');
-  const conHuella = f => ORIGEN + '/build/' + f + (huellaBuild ? '?v=' + huellaBuild : '');
+  // (la huella del programa y lo temprano de §276: arriba, apenas llegó el manifiesto)
   // (desde el Worker, import() no deja poner el token: privado.mjs lo baja con fetch y lo importa desde un blob)
-  ui.cortina('Preparando el juego…');
-  const crear = (await (privado ? privado.importar(conHuella('mkw.js')) : import(conHuella('mkw.js')))).default;
+  if (!cartel.activo) ui.cortina('Preparando el juego…');
+  const crear = (await (cargadorTemprano || (privado ? privado.importar(conHuella('mkw.js')) : import(conHuella('mkw.js'))))).default;
+  arranque.marcar('cargador');
   let lecturas = 0, bytes = 0;
   const M = await crear({
     canvas: $('canvas'),
+    onAbort: t => caidas?.alAbortar(t),   // §269: el motor se detuvo: a la caja negra
     mkwGpuPreferencia: GPU,
     mkwVibrar: (puerto, cmd) => controles.vibrar(puerto, cmd),   // el juego pide vibrar (pad_web.cpp)
     locateFile: f => conHuella(f),
+    // §276: el módulo ya compilado mientras bajaban los chicos; aquí solo se instancia con las importaciones de
+    // emscripten (las de JSPI ya envueltas). Si lo temprano falló, emscripten lo baja y compila como siempre
+    ...(programaTemprano ? { instantiateWasm: (importaciones, listo) => {
+      programaTemprano.then(m => WebAssembly.instantiate(m, importaciones)).then(inst => listo(inst), e => {
+        nota(`programa temprano (§276): no se pudo instanciar (${e?.message || e}): lo bajo de nuevo`);
+        WebAssembly.instantiateStreaming(fetch(conHuella('mkw.wasm'), { credentials: 'same-origin' }), importaciones).then(r => listo(r.instance));
+      });
+      return {};
+    } } : {}),
     print: escribe,
     printErr: t => escribe('[err] ' + t),
     // El runtime llama a esto para cada lectura del disco (ver dvd.cpp y dvd_contract.h en el parche)
@@ -1686,7 +1925,7 @@ async function arrancar() {
     // El reloj fijo de la carrera sincronizada (sala con CPU, lockstep.mjs; ?reloj=fijo para probarlo): desde que se
     // prepara la carrera, el reloj del procesador es un contador igual en todas las consolas (semillas_nativo.cpp)
     get mkwRelojFijo() { return parametros.get('reloj') === 'fijo' || !!window.mkwRelojFijo; },
-    mkwLsArreglos: parametros.get('arreglos') !== '0',
+    mkwLsArreglos: parametros.has('arreglos') ? (Number(parametros.get('arreglos')) | 0) : RED_ESTADO ? 0 : true,   // (§283: RED_ESTADO, no parametros.get('red'): la línea 90 ya la cambió a «malla» y quedaba la máscara 63) (§269b: ?arreglos=N = la máscara N de semillas_nativo.cpp; 0 = ninguno; §275b: con red=estado, 0 por omisión: cada consola corre su kart y nada se recalcula igual en todas)
     // §179 (G1): con «todo a la vista», el dibujo recorta con las marcas de verdad de mi cámara (?recorteDibujo=0 = no)
     // (2 = el dibujo entero, §179.2; ?recorteDibujo=modelos = 1, solo las opciones de dibujo de los modelos)
     mkwRecorteDibujo: { '0': 0, modelos: 1 }[parametros.get('recorteDibujo')] ?? 2,
@@ -1706,14 +1945,16 @@ async function arrancar() {
     // §88: el runtime le pide el sonido a la página (AudioWorklet); sin esto, o con ?audio=viejo, lo abre SDL3
     ...(SONIDO_PAGINA ? { mkwSonido: sonido.puente } : {}),
     preRun: [m => {
+      arranque.marcar('compilado');   // (§276: el programa ya compiló e instanció; ahora MEMFS)
       armarArchivos(m, contenidos, tamaños);
       if (parametros.get('soltarChicos') !== '0') contenidos.clear();   // §141 (C9): ya copiados a MEMFS: los 10 MB de aquí sobran (?soltarChicos=0 = guardarlos)
       carpetasVacias.forEach(c => m.FS.mkdirTree(c));
       guardado.restaurar(m.FS, guardados);   // encima de lo que trae el servidor (la partida vacía de RR)
       pipelines.escribir(m.FS, listas);      // aurora las lee al iniciar y las pide en segundo plano
+      arranque.marcar('armado');
     }],
     // Ceder sin enganche (vi.cpp, §63): la espera por reloj cuando el cuadro no va enganchado al monitor
-    ...(CEDER ? { mkwEsperaReloj: conLastre(esperaReloj) } : {}),
+    ...(CEDER ? { mkwEsperaReloj: conRitmoJuego(conRitmoMenus(conLastre(esperaReloj))) } : {}),
     // §155: con el lastre de CPU, la espera de aurora a sus búferes de subida (staging_map.hpp) pasa por aquí, así el
     // lastre sabe que es espera y no trabajo (sin esto, con la tarjeta lenta, la contaba como CPU y la multiplicaba).
     // Sin lastre no se ofrece: aurora hace su emscripten_sleep(0) de siempre
@@ -1724,7 +1965,7 @@ async function arrancar() {
     // Enganche al monitor (vi.cpp en el parche): sin estas tres, el juego sigue con su temporizador como en Node
     ...(ENGANCHE ? {
       mkwVsync: relojMonitor,
-      mkwEsperaHasta: conLastre((vencimiento, servicioMs) => fotoQuieta() ? fotoEspera() : relojMonitor.esperaHasta(vencimiento, servicioMs)),
+      mkwEsperaHasta: conRitmoJuego(conRitmoMenus(conLastre((vencimiento, servicioMs) => fotoQuieta() ? fotoEspera() : relojMonitor.esperaHasta(vencimiento, servicioMs)))),
       mkwSonidoAjuste: AJUSTE_SONIDO,
       mkwCeder: CEDER,
       ...(TRAZA ? { mkwTraza: anota } : {}),
@@ -1760,6 +2001,35 @@ async function arrancar() {
       }
       antes = ahora; cuadros0 = cuadros; enCarrera0 = !!window.mkwEstado.enCarrera;
     }, 1000);
+  }
+  arranque.marcar('programa');
+  // §276, el arranque de prisa: del primer cuadro hasta su primera pantalla, el juego pasa ~255 cuadros (4,3 s a 60
+  // por segundo, medido) en su pantalla de arranque (la del aviso de la correa: pide un mínimo de cuadros y que la carga
+  // de fondo termine) y ~65 más con la imagen en negro mientras carga la primera sección. Nadie lo ve (lo tapan el menú
+  // de inicio o la cortina, o es negro). Mientras dura, la cuadrícula se suelta del monitor y se le pide al motor que se ponga al
+  // día sin fin (mkw_prisa, el mismo de la sala y de ?sinTope): corre esos cuadros uno detrás de otro, tan rápido como
+  // pueda el aparato. Es como dejar que un motor arranque sin el limitador de velocidad mientras está en el taller:
+  // cuando sale a la calle (la primera pantalla), el limitador vuelve. Nada de la carrera cambia: solo el arranque.
+  // ?arranqueRapido=0 = a 60, como antes.
+  if (parametros.get('arranqueRapido') !== '0' && ENGANCHE && typeof M._mkw_prisa === 'function') {
+    arranqueSuelto = true;
+    const desde = performance.now(), ganada0 = M._mkw_prisa_ganada?.() ?? 0;
+    window.mkwEstado.arranqueRapido = { activo: true, ms: null, ganadaMs: 0, cuadros: null };
+    const bomba = setInterval(() => {
+      let seccion = -1, pagina = -1;
+      try { const e = window.mkwMenus?.estado?.(); seccion = e?.seccion ?? -1; pagina = e?.pagina ?? -1; } catch {}
+      // (hasta la primera pantalla activa del juego: mientras la sección carga, la imagen es negra; medido: 65 cuadros)
+      const fin = (seccion >= 0 && pagina >= 0) || document.hidden || performance.now() - desde > 20000;
+      if (!fin) { M._mkw_prisa(2000); return; }
+      clearInterval(bomba);
+      M._mkw_prisa(0);
+      arranqueSuelto = false;
+      const r = window.mkwEstado.arranqueRapido;
+      Object.assign(r, { activo: false, ms: Math.round(performance.now() - desde), ganadaMs: Math.round((M._mkw_prisa_ganada?.() ?? 0) - ganada0), cuadros: M._mkw_web_cuadros?.() ?? null });
+      arranque.marcar('arranqueDePrisa');
+      nota(`arranque de prisa (§276): ${r.cuadros} cuadros en ${r.ms} ms (ganados ${r.ganadaMs} ms de cuadrícula)`);
+    }, 100);
+    M._mkw_prisa(2000);
   }
   ok('el juego (wasm) cargó', !!M, `${(performance.now() - t1).toFixed(0)} ms`);
   preparacion.marcar('programa');
@@ -1889,7 +2159,25 @@ async function arrancar() {
     window.mkwFantasmaPagina = fantasmaPagina;
   }
   // (lo de los fantasmas va fuera de la llamada del juego: baja de la red y vuelve a llamar al juego)
-  M.mkwAlActivarPagina = dir => { if (ocultarActivo) ocultar.alActivar(dir); alActivarInicio(dir);
+  // §270 (el dueño: «que el limitador no funcione tampoco en los menús de personaje»): el tope de «Imagen» (N8: 30
+  // parejas o con imagen intermedia) vale también en elegir personaje, vehículo y derrape. El juego avisa cada pantalla
+  // que se activa: si es una de esas, N8 queda permitido fuera de la carrera; si es otra, no (en el mismo cuadro: el
+  // aviso llega antes del dibujo). ?n8Menus=0 = solo en la carrera (antes); ?n8Menus=todos = en todos los menús (pruebas)
+  const N8_MENUS = parametros.get('n8Menus') ?? '1', PAGINAS_N8 = new Set([0x6B, 0x6C, 0x6D, 0x10E]);
+  // (medido: la pantalla de personaje tiene varias pantallas apiladas y cada una avisa al activarse; si decidía la última
+  // en avisar, el permiso se prendía y se apagaba en el mismo cuadro. Se decide con TODA la pila de pantallas del juego:
+  // al activarse una —la de llegada ya está en la pila— y cada medio segundo por si una se cierra sin avisar)
+  let n8MenusAntes = null;
+  let n8AlCambiarMenus = null;   // §273: Automático cambia de modo al entrar y salir de elegir personaje (más abajo)
+  const n8MenusRevisar = (id = null) => {
+    if (!M._mkw_n8_menus || N8_MENUS === '0') return;
+    const pila = window.mkwMenus?.estado?.().paginas || [];
+    const si = N8_MENUS === 'todos' || PAGINAS_N8.has(id) || pila.some(p => PAGINAS_N8.has(p));
+    if (si !== n8MenusAntes) { M._mkw_n8_menus(si ? 1 : 0); n8MenusAntes = si; window.mkwEstado.n8Menus = si; n8AlCambiarMenus?.(); }
+  };
+  const n8MenusAlActivar = dir => n8MenusRevisar(window.mkwMenus?.u32(dir + 4));
+  if (N8_MENUS !== '0') setInterval(() => n8MenusRevisar(), 500);
+  M.mkwAlActivarPagina = dir => { if (ocultarActivo) ocultar.alActivar(dir); alActivarInicio(dir); n8MenusAlActivar(dir);
     if (fantasmaPagina) { const id = window.mkwMenus.u32(dir + 4); setTimeout(() => fantasmaPagina.alActivarPagina(id), 0); } };
   // Récords (records.mjs): al terminar cada carrera, el tiempo final (leído del juego) queda como récord personal de
   // esa pista y categoría (modo + cc). Con sesión en el sitio, también va a la tabla de Firebase: la página del sitio
@@ -2154,6 +2442,11 @@ async function arrancar() {
     const descanso = parametros.has('descanso') ? Math.max(1, Number(parametros.get('descanso')) || SEGUNDOS_RESULTADOS) : SEGUNDOS_RESULTADOS;
     const sala = window.mkwSala = crearSalaCarrera({ yo: sincro.yo, humanos: sincro.humanos, base: sincro.base, anfitrion: jefe, estilo,
       carreras: carrerasPedidas, pistas: cola, segundosResultados: descanso,
+      // §269: otra consola de la sala con otra versión de la página (una con la vieja en caché): se avisa fijo en las dos
+      alVersion: (uid, que) => { const n = (typeof nombres !== 'undefined' && nombres?.[uid]) || 'Otro jugador';
+        const t = que === 'mia' ? '⚠ Tu página es una versión vieja del juego: recarga con Ctrl+Mayús+R (en el celular: borra la caché del sitio) para jugar con los demás'
+          : `⚠ ${n} tiene una versión vieja del juego: que recargue con Ctrl+Mayús+R (si no, la carrera puede fallar)`;
+        escribe('[sala] ' + t); try { ui.aviso(t, true); } catch {} },
       servidor: quiereOracle ? () => enlaceOracle?.vivo() : null,
       // N12 (§233): cómo le fue a este aparato en su última carrera, en el latido (?comoLento=L = decir L cuadros de lógica
       // por segundo, el aparato lento de mentira: solo pruebas)
@@ -2173,16 +2466,21 @@ async function arrancar() {
         window.mkwSala.ponerPistas([0, 1, 2, 3].map(f => ({ copa: c, fila: f })));
       },
       enviar: (u, b) => red?.malla?.enviar(u, b, 'tcp'), alCambiar: e => alCambiarSala(e),
+      alPausaNo: m => window.mkwAutoCalibrar?.alPausaNo(m),   // (§274: la anfitriona no dio la pausa de la auto calibración)
       // §75: otro avisa que se salta la carrera k (recargó la página): que la carrera sincronizada no lo espere
       alSalta: (uid, k) => { const h = sincro.humanos.find(x => x.uid === uid); if (h) saltarArbitro(h.mando, k); },
       // §100: la anfitriona que se fue se reemplaza a los 4 s (sin esperar al sitio)
       ido: consolaSeFue,
       registro: t => red?.registro?.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     window.mkwEstado.sala = sala.estado();
+    window.mkwNombreDe = u => nombres[u] || `Jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`;   // (§274: el aviso de la pausa)
     // §99: el navegador quedó preparado: el reloj de la copa puede correr (si es la anfitriona) y se vuelve a mirar la
     // sala (abre la lista de copas). Solo si la sala ya sabe en qué va: la primera vista es la que detecta a quien recargó
-    window.mkwAlPreparada = () => { sala.copaLista(); if (sala.lista) alCambiarSala(sala.estado()); };
-    if (preparada()) sala.copaLista();
+    // (§269b.14, solo pruebas: ?cargaLenta=ms = esta consola avisa «cargué» ms más tarde, como un teléfono que tarda)
+    const cargaLenta = Math.max(0, Number(parametros.get('cargaLenta')) || 0);
+    const yaCargue = () => { sala.copaLista(); if (sala.lista) alCambiarSala(sala.estado()); };
+    window.mkwAlPreparada = () => { if (cargaLenta) setTimeout(yaCargue, cargaLenta); else yaCargue(); };
+    if (preparada()) window.mkwAlPreparada();
     // §100 (H1.2, la prueba de conexión): cada 2 s, cómo llega cada piloto (🟢 directa, 🛰 por el repetidor, 🔴 por otro
     // o sin conexión). Los 🔴 salen en la esquina; la lista entera va al vestíbulo del sitio, que pone el ícono al lado
     // de cada piloto de la tira. ?conexiones=0 = sin ella
@@ -2265,6 +2563,10 @@ async function arrancar() {
       const fuera = [...(e.fuera || []), ...sincro.humanos.filter(h => cortes[h.mando] === 0).map(h => h.uid)];
       const cortados = sincro.humanos.filter(h => cortes[h.mando] > 0).map(h => h.uid);
       if (est.fuera || est.cortado) cortados.push(sincro.yo);
+      // (§275b: en «Cada uno su kart» no hay lockstep: se fue el humano que el juego terminó con el respaldo —su consola
+      // dejó de avisar—; bit i = el puesto i, en el orden de los que corren)
+      if (RED_ESTADO_SALA) { const m = M._mkw_red_estado_fin?.(3) ?? 0;
+        correnEn(sincro.humanos, e, n).forEach((h, i) => { if ((m >> i & 1) && !cortados.includes(h.uid)) cortados.push(h.uid); }); }
       // §99 (VR v2): quien no tocó nada 30 s seguidos en el primer minuto es un «ausente» (la regla del juego en línea):
       // cuenta como cortado (sin esto una cuenta alterna quieta juntaba VR). Los botones son los de la carrera: el mismo
       // número en todas las consolas
@@ -2299,6 +2601,8 @@ async function arrancar() {
     window.mkwTerminarEn = (cuadro, n = sincro.lockstep?.estado().carrera, puestos = null) => {
       if (!sincro.lockstep || !M._mkw_sala_terminar) return false;
       const mascara = Array.isArray(puestos) ? puestos.reduce((m, i) => m | (1 << i), 0) : 0;
+      // (§275b «Cada uno su kart»: no hay cuadros comunes; cada consola termina en el momento, a la vez si se pide a la vez)
+      if (RED_ESTADO_SALA) { M._mkw_sala_terminar(mascara); return true; }
       sincro.lockstep.enCuadro(n, cuadro, () => M._mkw_sala_terminar(mascara));
       return true;
     };
@@ -2310,7 +2614,7 @@ async function arrancar() {
     // §78: el contador de los que faltan (dnf.mjs). Cuando llega el primero (humano o CPU) el juego da 30 s a los demás
     // (§77); la página lo muestra con las letras y los colores de la cuenta de salida, de la fuente que el juego ya cargó
     // (UI/Font.szs, leída de la caché de bloques del disco: no se baja de nuevo). ?cuentaDnf=0 = sin contador.
-    M._mkw_sala_dnf?.(DNF_MS);
+    M._mkw_sala_dnf?.(DNF_MS); M._mkw_red_estado_dnf?.(DNF_MS);   // (§275b: el mismo plazo en «Cada uno su kart»)
     const leerFuente = ruta => tamaños.has(ruta) ? disco.leer(direccion(ruta), tamaños.get(ruta), 0, tamaños.get(ruta)) : null;
     if (parametros.get('cuentaDnf') !== '0') window.mkwCuentaDnf = crearCuentaDnf({ M, lector: () => window.mkwMenus, leerArchivo: leerFuente,
       saltoSinCuenta: parametros.get('dnfLiviano') === '0' ? 1 : 10 });   // (§136: sin cuenta, mirar cada 10 refrescos; ?dnfLiviano=0 = cada uno)
@@ -2535,8 +2839,27 @@ async function arrancar() {
       const fase = e.fase === 'correr' ? (e.terminaron?.[n] && e.plazo ? 'descanso' : 'carrera') : e.fase;
       try { window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'fase', fase, carrera: n, carreras: e.carreras | 0, estilo }, location.origin); } catch {}
     };
+    // §269b.14 (el dueño): mientras alguna consola no tiene el juego cargado, ningún reloj de la sala corre y todas muestran
+    // quién falta (el estado de la anfitriona: faltanCarga). En la carrera, nunca
+    function avisoCarga(e) {
+      let n = document.getElementById('esperaCarga');
+      const faltan = e?.faltanCarga || [];
+      const ver = faltan.length > 0 && !window.mkwEstado.enCarrera;
+      if (!ver) { if (n) n.hidden = true; return; }
+      if (!n) {
+        n = Object.assign(document.createElement('div'), { id: 'esperaCarga', role: 'status' });
+        n.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:55;max-width:calc(100vw - 32px);' +
+          'padding:10px 16px;border-radius:14px;background:rgba(10,14,30,.88);color:#fff;font:15px/1.35 system-ui,sans-serif;' +
+          'text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.4);pointer-events:none';
+        document.body.append(n);
+      }
+      const nombre = u => u === sincro.yo ? 'tú' : (window.mkwNombresSala?.[u] || `jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`);
+      n.textContent = `⏳ Esperando a los jugadores… (faltan: ${faltan.map(nombre).join(', ')})`;
+      n.hidden = false;
+    }
     function alCambiarSala(e) {
       window.mkwEstado.sala = e;
+      try { window.mkwAutoCalibrar?.alEstadoSala(e); } catch (x) { console.warn('[auto-calibrar] ' + x); }   // (§274: la pausa de la sala)
       // §251: la pista que corre ahora y la siguiente no se borran (pantalla Espacio)
       try { const k = Math.max(1, e.carrera || 1); pistasSalaProtegidas = e.pistas?.length ? [k, k + 1].filter(n => e.pistas[n - 1]).map(n => pistaDe(e, n)) : []; } catch {}
       // §176 (D1 en la sala): apenas la sala sabe las pistas (la copa o la lista elegida), la de la carrera que viene y la
@@ -2546,6 +2869,7 @@ async function arrancar() {
         try { for (const n of [k, k + 1]) if (e.pistas[n - 1]) paqueteCarrera.pedirPista(pistaDe(e, n)); } catch {}   // (pistaDe se define más abajo)
       }
       avisarFase(e);
+      avisoCarga(e);
       const primera = primeraVista; primeraVista = false;
       clearInterval(reloj); reloj = null;
       // (§100: el botón «Pedir copa» y su selector, solo para los demás mientras la anfitriona elige la copa)
@@ -2672,8 +2996,32 @@ async function arrancar() {
         const ficha = armarFicha({ pista: pistaDe(e, n), cc, cpu: cpuDe(cc),
           humanos: hs, semilla: semillaSala, carrera: n - 1, carreras: e.carreras, primera: n === 1 });
         ficha.pantallas = 1;
+        // §275b «Cada uno su kart»: la carrera es en línea (modo 7, VS de una sala de amigos) y los otros humanos son
+        // karts de otra consola (tipo 4, PLAYER_REAL_ONLINE: los mueve el estado que llega por la red, no los botones)
+        if (RED_ESTADO_SALA) {
+          ficha.modo = 7;
+          // los otros humanos = jugadores en línea (tipo 4, los mueve la red); el mío, con el mando 0: sin lockstep la
+          // página manda sus botones solo al puerto 0 (en la sala de siempre cada consola alimenta el mando de cada uno)
+          // (3c: los que la sala dejó fuera de esta carrera —se fueron, no se oyen— no tienen consola en la red: su kart lo
+          // corre la anfitriona como una CPU más, siempre 12 karts, y el juego no espera paquetes de ellos)
+          const jefeRed = parametros.get('jefe') || sincro.humanos[0]?.uid;   // (la del sitio: la misma en todas)
+          const fueraRed = new Set(e.fuera || []);
+          corren.forEach((h, i) => { if (!ficha.puestos[i]) return;
+            ficha.puestos[i] = fueraRed.has(h.uid) ? { ...ficha.puestos[i], tipo: jefeRed === sincro.yo ? 1 : 4, mando: -1 }
+              : h.uid !== sincro.yo ? { ...ficha.puestos[i], tipo: 4, mando: -1 } : { ...ficha.puestos[i], mando: 0 }; });
+          // (3b: las CPU las corre la anfitriona; en las demás consolas son karts remotos de ella: siempre 12 karts)
+          if (jefeRed !== sincro.yo) ficha.puestos.forEach((q, i) => { if (q && i >= corren.length) ficha.puestos[i] = { ...q, tipo: 4, mando: -1 }; });
+          try {
+            window.mkwRedEstadoSala?.apagar();
+            window.mkwRedEstadoSala = crearRedEstado({ M, malla: red.malla, registro: nota,
+              // (el lento al día: la hora de la sala —Date.now() + sala.desfase, la de la anfitriona; no performance.now(), que cuenta desde que abrió cada pestaña— para comparar los pulsos; ?alDia=0 = no)
+              alDia: parametros.get('alDia') === '0' ? false : parametros.get('alDia') === 'viejo' ? 'viejo' : true, kartLiviano: parametros.get('kartLiviano') !== '0', hora: () => Date.now() + (sala.desfase || 0),
+              sala: { uids: corren.map(h => h.uid).filter(u => !fueraRed.has(u)), yo: sincro.yo, jefe: jefeRed },   // (§110: solo los que corren esta carrera: un sumado que todavía no corre no tiene consola en la red)
+              puestos: ficha.puestos.map((q, i) => q ? { uid: i < corren.length && !fueraRed.has(corren[i].uid) ? corren[i].uid : null } : null) });
+          } catch (err) { nota('[red-estado] no se pudo armar: ' + err.message); }
+        }
         window.mkwEstado.ficha = ficha;
-        if (parametros.get('pistaSala') !== '0') try { paqueteCarrera?.pedirFicha?.(ficha); } catch {}   // (§176: D1 en la sala)
+        if (parametros.get('pistaSala') !== '0') try { paqueteCarrera?.pedirFicha?.(ficha); paqueteDeCarrera = n; paqueteFichaT = performance.now(); } catch {}   // (§176: D1 en la sala; §285: de qué carrera)
         window.mkwSemillaCarrera = ficha.semilla;          // (semillas_nativo.cpp: plantel y pantalla propia)
         // (los mandos y el derrape de cada humano, igual en todas las consolas: semillas_nativo.cpp)
         window.mkwPlantel = ficha.puestos.map((q, i) => [q.vehiculo, q.personaje, q.tipo, q.tipo === 0 ? q.mando : -1, q.tipo === 0 ? hs[i]?.derrape || 0 : 0]);
@@ -2823,6 +3171,7 @@ async function arrancar() {
     let vioTitulo = false, puesta = '';
     revisarCortina = () => {
       if (parametros.get('modo') === 'sala' && parametros.get('preparacion') !== '0' && !preparacion.lista()) return;   // (§99: la maneja la preparación)
+      if (cartel.cual === 'graficos') return;   // (§276b: la espera de los gráficos de los menús es dueña de la cortina hasta que termina)
       const e = window.mkwMenus.estado();
       if (e.seccion === SECCION.titulo || e.seccion === SECCION.menuPrincipal || (e.seccion > 0 && e.seccion < 0x30)) vioTitulo = true;
       if (window.mkwEstado.piloto?.llego && e.seccion > 0) vioTitulo = true;   // §73: abrió directo otra pantalla (elegir personaje)
@@ -2830,6 +3179,7 @@ async function arrancar() {
       const quiere = !vioTitulo ? 'carga' : piloteando ? 'piloto' : '';
       if (quiere === puesta) return;
       puesta = quiere;
+      if (quiere !== 'carga') cartel.parar('arranque');   // (§276b: la carga terminó)
       if (quiere === 'piloto') ui.cortina(textoPiloto());
       else if (!quiere) {
         ui.cortina(false); window.mkwEstado.cortinaFuera = performance.now();
@@ -2927,9 +3277,13 @@ async function arrancar() {
   window.mkwEstado.sonido = sonidoMedido;
   const medidas = [];
   let lastreSegAntes = null;                 // (§162: lo del lastre por cuadro del segundo anterior)
+  let salaAjenaAntes = null;                 // (§269b.13: lo frenado y esperado en la sala hasta el segundo anterior)
+  let antesImagenesSeg = null, antesCompas = null;              // (§270: la cuenta de imágenes a la vista del segundo anterior)
   const ultimoPg = {};                       // (§123: lo último contado por cuadro, para los segundos fuera de la ventana)
   setInterval(() => {
-    const ahora = { t: performance.now(), c: M._mkw_web_cuadros(), espera: M._mkw_web_ms_espera(), lastre: lastreCpu?.estado.ms ?? 0,
+    // (§269: + lo que el juego esperó los botones de la sala, window.mkwEstado.esperaSala: no es trabajo de esta PC)
+    const salaMs = window.mkwEstado.esperaSala?.ms || 0;
+    const ahora = { t: performance.now(), c: M._mkw_web_cuadros(), espera: M._mkw_web_ms_espera() + salaMs, sala: salaMs, lastre: lastreCpu?.estado.ms ?? 0,
                     cpuPura: lastreCpu ? lastreCpu.estado.trabajoMs + lastreCpu.estado.ms : 0 };
     const dc = ahora.c - antes.c, dt = ahora.t - antes.t;
     const fps = dc * 1000 / dt;
@@ -2938,11 +3292,34 @@ async function arrancar() {
     // (§155: con ?lastre, la CPU pura por cuadro —sin lo que aurora espera a la toma—, con lo girado)
     const cpuPura = lastreCpu && dc ? (ahora.cpuPura - (antes.cpuPura || 0)) / dc : null;
     const desde = antes.c;                     // cuadro con que empezó este segundo de medición
+    // (§269: lo que se esperó a la sala por cuadro dibujado este segundo; null fuera de la sala)
+    const salaSeg = sincro && dc ? Math.round((ahora.sala - (antes.sala || 0)) / dc * 10) / 10 : null;
+    // §269b.13 (el simulador PC + Oppo: con la sala frenada por el teléfono, la vigía de N8 de dos PC vio «no llega a 60» y
+    // prendió su N8): un segundo en que el lockstep me frenó o me hizo esperar más de 20 ms en total (lo que va repartido
+    // en muchos cuadros —1 a 2 ms cada uno— no pasaba el SALA_AJENA de n8.mjs) es de la sala, no de este aparato
+    const salaAjena = () => {
+      try {
+        const e = sincro?.lockstep?.estado?.(); if (!e) return false;
+        const ms = (e.msFrenado || 0) + (e.msEsperando || 0) + (e.msEsperaVivo || 0) + (e.msEsperaCorta || 0);
+        const d = ms - (salaAjenaAntes ?? ms); salaAjenaAntes = ms;
+        return d > 20;
+      } catch { return false; }
+    };
     ahora.disco = msEsperaDisco;
     ahora.pip = antes.pip; ahora.pg = antes.pg; ahora.logica = antes.logica;   // (lo del segundo anterior: se ponen al día abajo, con el historial)
     const esperaDiscoSeg = msEsperaDisco - (antes.disco || 0);   // ms de este segundo esperando el disco
     antes = ahora;
     Object.assign(window.mkwEstado, { cuadros: ahora.c, fps, trabajo });
+    // §270: las imágenes a la vista y los cuadros del juego de este segundo, por separado (el medidor dice los dos)
+    if (vistaImagenes) { const m = vistaImagenes.marca(); if (antesImagenesSeg !== null && dt > 0) window.mkwEstado.imagenesSeg = (m - antesImagenesSeg) * 1000 / dt; antesImagenesSeg = m; }
+    if (ritmoJuego) window.mkwEstado.juegoSeg = ritmoJuego.segundo(ahora.t);
+    // §270: el compás de los menús decide cada segundo con lo de este segundo (cuadros y trabajo por cuadro)
+    // (el trabajo sin lo esperado al compás de la toma: esa espera la pone el ritmo mismo y no es trabajo)
+    if (ritmoMenus) {
+      const compas = relojMonitor.msCompas - (antesCompas ?? relojMonitor.msCompas); antesCompas = relojMonitor.msCompas;
+      ritmoMenus.segundo({ cuadros: fps, trabajo: cpuPura ?? (dc ? Math.max(0, trabajo - compas / dc) : null), enMenus: menusAhora(), visible: !document.hidden });
+      window.mkwEstado.ritmoMenus = ritmoMenus.estado;
+    }
     // §114: los últimos 2 min, un renglón por segundo (para el informe de rendimiento): fps, ms del juego por cuadro,
     // ms de la tarjeta, ms esperando el disco, pipelines nuevos (y ms bloqueados creándolos) y dónde estaba el juego
     const hist = window.mkwEstado.historial || (window.mkwEstado.historial = []);
@@ -2995,14 +3372,23 @@ async function arrancar() {
       video: g1 === null ? null : Math.round(g1 * 10) / 10, disco: Math.round(esperaDiscoSeg),
       pip: pip.n + pip.nAsync - pipAntes.n - (pipAntes.nAsync || 0), pipMs: Math.round(pip.ms - pipAntes.ms), shaders: pip.shaders - (pipAntes.shaders || 0), lugar,
       pasadas: porCuadro('pasadas'), dibujos: porCuadro('dibujos'), kb: porCuadro('bytes', 1024), copias: porCuadro('copias'), logica,
-      ...(cpuPura !== null ? { cpu: Math.round(cpuPura * 10) / 10 } : {}), ...lastreSeg() });
+      ...(cpuPura !== null ? { cpu: Math.round(cpuPura * 10) / 10 } : {}), ...(salaSeg !== null ? { sala: salaSeg } : {}), ...lastreSeg() });
     if (hist.length > 120) hist.shift();
     // §190 (E1 y E2): el ahorro de energía de Chrome (todo a 30 Hz) y el calor del teléfono, con lo medido en este
     // segundo; solo avisan en la esquina (el ahorro prendido por omisión desde §241, ?ahorro=0 lo apaga; el calor con ?calor=1)
     vigiaAhorro?.segundo({ periodo: relojMonitor.valido() ? relojMonitor.p : null, trabajo, visible: !document.hidden });
     vigiaCalor?.segundo({ trabajo, enCarrera: lugar === 'carrera', visible: !document.hidden });
     // §219 (N8, ?n8=auto): lo que se vio y la fracción del segundo que el hilo trabajó (trabajo por cuadro × cuadros)
-    vigiaN8?.segundo({ enCarrera: lugar === 'carrera', visible: !document.hidden, imagenes: fps, logica: fps, juegoMs: cpuPura ?? trabajo });
+    // (§270: también en elegir personaje, donde N8 ahora vale: la vigía de Automático decide ahí como en la carrera)
+    // (§269: en la carrera, los cuadros de lógica de verdad —Raceinfo, §124—; antes, las imágenes por segundo: en la sala el
+    // reloj va por la hora y no por el monitor, y con N8 sube la lógica pero no las imágenes: la prueba lo apagaba)
+    const logicaVigia = lugar === 'menú' && Number.isFinite(window.mkwEstado.juegoSeg) && window.mkwEstado.juegoSeg > 0 ? window.mkwEstado.juegoSeg
+      : lugar === 'carrera' && Number.isFinite(logica) && logica > 0 && parametros.get('vigiaLogica') !== '0' ? logica : fps;
+    vigiaN8?.segundo({ enCarrera: lugar === 'carrera' || (lugar === 'menú' && !!window.mkwEstado.n8Menus), visible: !document.hidden, imagenes: fps,
+                      // (§270: en los menús los cuadros presentados no son los de lógica: con N8 la mitad no se presenta)
+                      logica: logicaVigia, juegoMs: (cpuPura ?? trabajo) * (logicaVigia > 0 ? fps / logicaVigia : 1),
+                      salaMs: parametros.get('esperaSala') === '0' ? null : salaAjena() ? 99 : salaSeg,   // (§269; §269b.13)
+                      lugar });   // (§283: la prueba de «no mejora» no mezcla elegir personaje con la carrera)
     // N12 (§233): cada segundo de carrera (visible, sin el modo sin tope) para saber cómo le fue a este aparato
     if (ESCALON && lugar === 'carrera' && !document.hidden && !SIN_TOPE && Number.isFinite(logica)) {
       segundosEscalon.push({ logica, ms: cpuPura ?? trabajo, gpu: g1 }); if (segundosEscalon.length > 1200) segundosEscalon.shift();
@@ -3052,7 +3438,24 @@ async function arrancar() {
   }, 1000);
 
   // Desde ahora los controles van al juego (mando de GameCube por puerto, ver pad_web.cpp)
+  // §269 (bug 3 del dueño, «uno puede jugar y otro no puede moverse»): en la sala solo el puerto 1 era «lo mío». El reparto
+  // de los mandos (§106) pone el teclado y el primer mando en el puerto 1, pero un segundo aparato que el navegador ve
+  // como mando (un mando virtual de Steam o DS4Windows, un adaptador, un volante), o «Jugador 2» elegido en Controles,
+  // manda el mando de verdad al puerto 2: el juego (la pantalla de personajes) y la sala no lo oían y el kart quedaba
+  // quieto. En la sala cada consola tiene UN jugador: lo de los 4 puertos se junta (juntarPuertos) y va al puerto 1 y a
+  // la sala. ?unMando=0 = solo el puerto 1, como antes
+  const porPuerto = [null, null, null, null];
+  const unMando = !!sincro && parametros.get('unMando') !== '0';
+  window.mkwEstado.unMando = unMando;
+  if (unMando) controles.compartirVentanas();   // §269: dos ventanas de la sala en este navegador = cada una su mando
   enviarAlJuego = (...estado) => {
+    if (unMando) {
+      if (estado[0] >= 0 && estado[0] < 4) porPuerto[estado[0]] = estado.slice(1, 9);
+      const j = juntarPuertos(porPuerto);
+      sincro.local = j.slice(1, 8);
+      M._mkw_web_pad(0, ...j);
+      return;
+    }
     if (sincro && estado[0] === 0) sincro.local = estado.slice(2, 9);   // lo mío, para la carrera sincronizada
     M._mkw_web_pad(...estado);
   };
@@ -3081,6 +3484,9 @@ async function arrancar() {
       arbitro: parametros.get('arbitro') !== '0',
       // §99 (C3): ponerse al día corriendo cuadros seguidos (el runtime, vi.cpp: mkw_prisa); ?alDia=0 = como antes
       prisa: typeof M._mkw_prisa === 'function' && parametros.get('alDia') !== '0' ? ms => M._mkw_prisa(ms) : null,
+      // §269b.16: el freno de la sala corre la cuadrícula del runtime (vi.cpp: mkw_frenar) en vez de esperar en el cuadro,
+      // que no frenaba (el juego volvía a la cuadrícula corriendo de golpe); ?frenoReloj=0 = esperar como antes
+      frenar: typeof M._mkw_frenar === 'function' && parametros.get('frenoReloj') !== '0' ? ms => M._mkw_frenar(ms) : null,
       // §99 (C4): la cuenta regresiva (Raceinfo +0x28: 0 presentación, 1 cuenta, 2 carrera): todos con el mismo retraso
       enCuenta: () => { const L = window.mkwMenus, ri = L?.u32(0x809BD730); return !!ri && L.u32(ri + 0x28) < 2; },
       // §250: la etapa de la carrera, para anotar en qué cuadro y a qué hora larga esta consola (lockstep est.largada)
@@ -3118,7 +3524,24 @@ async function arrancar() {
       enviar: (u, b, canal) => u === UID_SERVIDOR ? enlaceOracle?.enviar(b) : red.malla.enviar(u, b, canal),
       huella: parametros.get('huellaAmpliada') === '0' ? () => huellaCarrera(window.mkwMenus) : () => huellaAmpliada(window.mkwMenus),   // R5 (§154)
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
-    M.mkwLockstep = sincro.lockstep;
+    // §269 (bug 1 del dueño, «en la sala me dice que mi PC no alcanza 60»): el juego le pide a la sala los botones de
+    // cada cuadro y, mientras llegan los de los demás, el hilo del juego queda PARADO esperando (JSPI suspende el wasm).
+    // Ese rato no es trabajo de esta PC, pero el medidor de cada segundo solo restaba la espera del propio runtime (la del
+    // monitor) y contaba esta como «trabajo»: con la sala a 50 por el otro PC o la red, el hilo de un PC sobrado parecía
+    // ocupado 20 ms por cuadro. Eso engañaba al escalón (§233: «tu aparato no llegó a 60»), a la vigía de N8 Automático
+    // (§219: prendía N8 en la sala, no mejoraba —la sala la frenaba otro— y lo apagaba PARA SIEMPRE en ese aparato, también
+    // para el Single Player) y a «qué frena». Aquí se mide ese rato: desde que pad() suelta el hilo (su primera espera)
+    // hasta que vuelve, sin la parte que pad() trabaja en el momento. El medidor lo resta como la espera del monitor.
+    // Como medir el consumo de un motor sin contar el tiempo que estuvo frenado esperando la cinta de al lado.
+    // ?esperaSala=0 = contarlo como trabajo, como antes
+    const esperaSala = window.mkwEstado.esperaSala = { ms: 0, veces: 0 };
+    // (con ?lastre, el aparato de mentira de §155, también es una espera: el lastre gira lo trabajado ANTES de ella y no
+    // multiplica lo que se esperó a los demás)
+    // (§275b: en «Cada uno su kart» los botones no pasan por el lockstep: cada consola maneja su kart al instante)
+    if (RED_ESTADO_SALA) M.mkwLockstep = null; else
+    M.mkwLockstep = parametros.get('esperaSala') === '0' ? sincro.lockstep : {
+      pad: conLastre(envolverPadSala(c => sincro.lockstep.pad(c), esperaSala)),   // (escalon.mjs)
+    };
     if (quiereOracle) {
       // El banco directo ya conoce el acuerdo de arranque. En Juegos siempre lo reparte el anfitrión.
       if (objetivoPiloto.modo === 'directa')
@@ -3188,8 +3611,11 @@ async function arrancar() {
       if (est.cortado) return '📶 Se cortó tu conexión: tu kart sigue sin ti y vuelves en la siguiente carrera…';
       // §99 (C1): la pausa del relevo rápido (mi PC se trabó o se cortó la red: los demás no me esperaron)
       if (est.pausado) return '📶 Tu PC o tu conexión se trabaron: tu kart siguió solo un momento. Vuelves a manejar enseguida…';
-      if (est.yoRelevado) return '📶 Tu conexión o tu PC van lentas: tu kart responde con retraso';
-      const otros = est.relevadosAhora.filter(u => u !== sincro.yo);
+      // (§269b.8: con el árbitro, «relevado» es lo normal —la autoridad escribe lo de todos—: vale a quién se le inventan
+      // los botones seguido, lentosAhora/yoLento del lockstep; sin el árbitro, como antes)
+      const conArbitro = Array.isArray(est.lentosAhora);
+      if (conArbitro ? est.yoLento : est.yoRelevado) return '📶 Tu conexión o tu PC van lentas: tu kart responde con retraso';
+      const otros = (conArbitro ? est.lentosAhora : est.relevadosAhora).filter(u => u !== sincro.yo);
       return otros.length ? `📶 ${otros.map(jugador).join(' y ')} va${otros.length > 1 ? 'n' : ''} lento` : '';
     };
     setInterval(() => {
@@ -3227,9 +3653,12 @@ async function arrancar() {
       ui.aviso(texto, true);
       if (window.mkwAvisosCorte.length < 200) window.mkwAvisosCorte.push(texto);
     }, 500);
-    const vigia = vigiaLento(sincro.humanos);
+    const vigia = vigiaLento(sincro.humanos, 2, parametros.get('esperaSala') === '0');
     setInterval(() => {
-      const texto = vigia(sincro.lockstep.estado(), performance.now());
+      // (§269: con lo ocupado que estuvo el hilo del juego en los últimos 3 s, sin lo que esperó a la sala)
+      const h = (window.mkwEstado.historial || []).slice(-3).filter(x => Number.isFinite(x.juego) && Number.isFinite(x.fps));
+      const ocupado = h.length ? h.reduce((a, x) => a + Math.min(1, x.juego * x.fps / 1000), 0) / h.length : null;
+      const texto = vigia(sincro.lockstep.estado(), performance.now(), ocupado);
       ui.chip('lento', texto, true);                  // (M22: en la esquina, mientras dure)
       if (texto) window.mkwAvisosLento.push(texto);
     }, 3000);
@@ -3322,6 +3751,7 @@ async function arrancar() {
   if (parametros.get('paqueteCarrera') !== '0' && disco.estado && parametros.get('adelantar') !== '0') {
     paqueteCarrera = crearPaquete({ L: window.mkwMenus, disco, tamaños, direccion, grupos: gruposPorNombre, skins: () => leerSkins(M), nota,
                                    pistaTemprana: parametros.get('pistaTemprana') !== '0', alPista: pipelinesDePista,
+                                   ultima: parametros.get('musicaUltima') !== '0', fanfarrias: parametros.get('fanfarriaEntera') !== '0',   // (§285)
                                    musica: parametros.get('musicaPaquete') !== '0', comun: parametros.get('comunCarrera') !== '0', vocesAmbas: parametros.get('vocesAmbas') !== '0',
                                    memoria: parametros.get('aprender') !== '0' ? crearMemoriaLocal() : null });
     window.mkwEstado.paquete = paqueteCarrera.estado;
@@ -3339,6 +3769,53 @@ async function arrancar() {
       if (hayCarrera) { try { const L = window.mkwMenus, ri = L.u32(0x809BD730); if (ri && L.u32(ri + 0x28) >= 1) return; } catch { return; } }
       paqueteCarrera.revisar();
     }, 200);
+  }
+  // §285 (el dueño: «todos los jugadores deben empezar al mismo tiempo y tener la carrera descargada al 100 %; pone un
+  // aviso de pausa»): en la sala, cada 250 ms le digo a la sala cuánto bajé del paquete de la carrera en curso; al
+  // aparecer la carrera me quedo quieta en su primer cuadro (lockstep.congelarEn(1) + mkw_congelar: el juego sigue
+  // dibujando la misma imagen) hasta que la anfitriona anota paqueteOk de esta carrera y llega su hora («en», la misma
+  // en todas). Con «Cada uno su kart» no hay lockstep: me congelo apenas aparece. ?esperarPaquete=0 = como antes
+  if (paqueteCarrera && sincro && parametros.get('esperarPaquete') !== '0') {
+    const espera = { n: 0, congelada: false, pedida: false, veces: 0, aviso: '' };
+    const lento = Number(parametros.get('paqueteLento')) || 0;   // (solo pruebas: una consola lenta para bajar)
+    window.mkwEstado.esperaPaquete = espera;
+    const ls = () => RED_ESTADO_SALA ? null : sincro?.lockstep || null;
+    const soltarEspera = por => {
+      if (espera.congelada) { try { ls()?.congelar(false); } catch {} try { window.mkw?._mkw_congelar?.(0); } catch {}
+        nota(`§285: sigue la carrera ${espera.n} (${por})`); }
+      if (espera.congelada) { espera.soltadaSala = Date.now() + (window.mkwSala?.desfase || 0); espera.msQuieta = Math.round(performance.now() - espera.congeladaT); espera.por = por; }
+      espera.congelada = false; espera.pedida = false; espera.soltada = espera.n; avisoPausa.ocultar();
+    };
+    // (al empezar el cuadro 1 de cada carrera —el lockstep avisa: alPrimerCuadro—; antes se miraba el cambio de «hay
+    // carrera», que en la sala puede estar prendido desde antes y no avisaba)
+    const quieta = c => {
+      const e = window.mkwSala?.estado?.();
+      if (!e || e.fase !== 'correr' || !(e.carrera >= 1) || e.paqueteOk?.n === e.carrera || espera.soltada === e.carrera || espera.congelada) return;
+      espera.n = e.carrera; espera.pedida = true;
+      espera.congelada = true; espera.veces++; espera.congeladaT = performance.now(); window.mkw?._mkw_congelar?.(1); ls()?.congelar(true);
+      nota(`§285: quieta en el cuadro ${c ?? 0} de la carrera ${espera.n} hasta que todos tengan la carrera bajada`);
+    };
+    alCambiarCarrera.push(corre => { if (!corre && (espera.pedida || espera.congelada)) soltarEspera('terminó'); });
+    setInterval(() => {
+      const sala = window.mkwSala, e = sala?.estado?.();
+      if (!sala || !e) return;
+      if (ls()) ls().alPrimerCuadro?.(quieta);
+      else if (RED_ESTADO_SALA && hayCarrera && !espera.congelada) quieta(null);   // (sin lockstep: apenas aparece la carrera)
+      if (e.fase === 'correr' && paqueteDeCarrera === e.carrera) { try { let pct = paqueteCarrera.progreso().pct; const el = performance.now() - paqueteFichaT;
+        if (lento && el < lento) pct = Math.min(pct, Math.floor(99 * el / lento)); sala.paquete?.(e.carrera, pct); } catch {} }
+      if (!espera.pedida) return;
+      const ok = e.paqueteOk;
+      if (e.carrera !== espera.n) { soltarEspera('otra carrera'); return; }
+      if (ok?.n === espera.n && sala.restan(ok.en) <= 0) { soltarEspera(ok.sin ? `tope: sin ${ok.sin.join(', ')}` : 'todos listos'); return; }
+      if (!espera.congelada) return;
+      const de = e.paqueteFaltan?.n === espera.n ? e.paqueteFaltan.de || {} : {};
+      avisoPausa.poner(() => {
+        const f = Object.entries(de).map(([u, pct]) => `${window.mkwNombreDe?.(u) || 'un piloto'} ${pct} %`);
+        const r = ['⏸ Esperando a que todos carguen la carrera…',
+                f.length ? `Faltan: ${f.join(', ')}. Todos parten juntos apenas terminen.` : 'Todos parten juntos en un momento.'];
+        espera.aviso = r.join(' '); return r;
+      });
+    }, 250);
   }
   // §174 (D8): al abrir el primer video (el del título), el principio de los demás videos de los menús, de fondo
   // (videos-menu.mjs). ?videosCabeza=MB (2 por omisión; 0 = sin esto)
@@ -3458,10 +3935,20 @@ async function arrancar() {
     window.mkwEstado.n8 = () => ({ modo: e(6), activo: !!e(7), dibujados: e(0), saltados: e(1), copiasSaltadas: e(2),
                                    realesEnSaltado: e(3), guardadas: e(8), mostradas: e(9), descartadas: e(10), sinIntermedia: e(11),
                                    realesAlDibujar: e(13), esperaRealMs: e(9) + e(13) ? e(12) / (e(9) + e(13)) : 0,
-                                   pedido: e(14), cambiosModo: e(15), eleccion: imagenElegida });
+                                   pedido: e(14), cambiosModo: e(15), eleccion: imagenElegida,
+                                   menus: e(16) === 1, saltadosMenus: e(17) });   // (§270: permitido en el menú de ahora, saltados fuera de la carrera)
     // (2026-11-07: en un teléfono Automático prende «30 parejas», el modo 1; en un PC, el 2: modoAutomatico de n8.mjs)
     const modoAuto = modoAutomatico({ telefono: esTelefono || parametros.get('comoTelefono') === '1' });
     let imagenElegida = null;
+    // §273: en elegir personaje Automático usa «30 parejas» (modo 1) también en un PC. Ahí casi todo es 2D, que con la
+    // imagen del medio igual va a 30, y el modo 2 le pide más a la CPU: medido en la gama baja con la sala, la lógica
+    // 49/s con el modo 2 y 60/s con el 1. ?n8MenusModo=2 = el mismo modo que en la carrera (antes)
+    const MENUS_MODO_1 = parametros.get('n8MenusModo') !== '2';
+    const modoAutoAhora = () => (MENUS_MODO_1 && window.mkwEstado.n8Menus && !hayCarrera) ? 1 : modoAuto;
+    n8AlCambiarMenus = () => {
+      if (imagenElegida !== 'auto' || !vigiaN8?.estado.prendido) return;
+      const m = modoAutoAhora(); M._mkw_n8_modo(m); nota(`[n8] Automático: modo ${m} (${window.mkwEstado.n8Menus ? 'elegir personaje' : 'fuera de elegir personaje'})`);
+    };
     // §255 (G15): aplicar una elección de «Imagen» (Gráficos) en cualquier momento, sin reiniciar: 0 = 60, 1 = 30
     // parejas, 2 = con imagen intermedia, 'auto' = la vigía de n8.mjs (solo en el aparato que no llega a 60 por la CPU,
     // regla del dueño 2026-11-02). El juego cambia de modo en el cuadro siguiente que se dibuja (n8_nativo.cpp,
@@ -3472,8 +3959,11 @@ async function arrancar() {
       const antes = imagenElegida;
       imagenElegida = pedido;
       if (pedido === 'auto') {
-        vigiaN8 = crearVigiaN8({ prender: p => { M._mkw_n8_modo(modoAuto); nota(`[n8] se prende en modo ${modoAuto} (${p})`); },
-                                 apagar: p => { M._mkw_n8_modo(0); nota(`[n8] se apaga (${p})`); } });
+        vigiaN8 = crearVigiaN8({ prender: p => { const m = modoAutoAhora(); M._mkw_n8_modo(m); nota(`[n8] se prende en modo ${m} (${p})`); },
+                                 apagar: p => { M._mkw_n8_modo(0); nota(`[n8] se apaga (${p})`); },
+                                 mismoLugar: parametros.get('n8MismoLugar') !== '0',   // (§283; ?n8MismoLugar=0 = como antes)
+                                 menuNoPasa: parametros.get('n8MenuPasa') !== '1' && modoAuto !== 1,   // (§283: lo de elegir personaje no pasa a la carrera, solo en un PC: el teléfono lo sigue, §283.9; ?n8MenuPasa=1 = antes)
+                                 probar: () => modoAutoAhora() !== 1 || parametros.get('n8Prueba1') === '1' });   // (§283.9: sin «no mejora» en el modo 1; ?n8Prueba1=1 = antes)
         window.mkwEstado.n8auto = vigiaN8.estado;
         if (!vigiaN8.estado.prendido) M._mkw_n8_modo(0);
       } else {
@@ -3632,20 +4122,50 @@ async function arrancar() {
   if (parametros.get('pausaPrecalentado') !== '0' && M._mkw_web_pipelines_pausa) {
     window.mkwEstado.pausaPrecalentado = { veces: 0, enCola: [], esperoCuenta: 0 };
     let vigiaCuenta = null;
-    const pausar = () => {
-      const enCola = M._mkw_web_pipelines_pausa(1);
+    // §273: la pausa tiene dos motivos que se suman: la carrera andando (§140) y la pantalla de elegir personaje,
+    // vehículo o derrape (la que más dibuja de los menús: armar pipelines ahí, de fondo, daba los tirones del 1 % bajo
+    // en la gama baja). Lo que queda en la cola se arma en lo demás: la carga, el selector, el descanso.
+    // Solo en el aparato que no llega a 60: con N8 prendido en esa pantalla (Automático lo prende ahí si no llega; o el
+    // jugador lo eligió). En este PC la cola se termina en 14-20 s y pausarla solo atrasaba lo que la pantalla misma
+    // necesita (medido: 70 dibujos saltados al entrar, contra 14). ?pausaPersonaje=0 = solo en la carrera, como antes;
+    // ?pausaPersonaje=siempre = también sin N8 (para medir)
+    const motivos = { carrera: false, personaje: false };
+    let pausadoAhora = false;
+    const aplicarPausa = porque => {
+      const quiero = motivos.carrera || motivos.personaje;
+      if (quiero === pausadoAhora) return;
+      pausadoAhora = quiero;
+      const enCola = M._mkw_web_pipelines_pausa(quiero ? 1 : 0);
       const p = window.mkwEstado.pausaPrecalentado;
-      p.veces++; p.enCola.push(enCola);
-      nota(`carrera: precalentado en pausa (${enCola} en su cola)`);
+      if (quiero) { p.veces++; p.enCola.push(enCola); }
+      nota(quiero ? `${porque}: precalentado en pausa (${enCola} en su cola)` : `${porque}: precalentado otra vez (${enCola} en su cola)`);
     };
+    const pausar = () => { motivos.carrera = true; aplicarPausa('carrera'); };
+    if (parametros.get('pausaPersonaje') !== '0') {
+      window.mkwEstado.pausaPrecalentado.personaje = 0;
+      setInterval(() => {
+        const pila = window.mkwMenus?.estado?.().paginas || [];
+        const n8Prendido = parametros.get('pausaPersonaje') === 'siempre' || (M._mkw_n8_estado?.(6) ?? 0) > 0;
+        const si = !hayCarrera && n8Prendido && pila.some(id => PAGINAS_N8.has(id));
+        if (si === motivos.personaje) return;
+        motivos.personaje = si;
+        if (si) window.mkwEstado.pausaPrecalentado.personaje++;
+        aplicarPausa(si ? 'elegir personaje' : 'fuera de elegir personaje');
+      }, 250);
+    }
     alCambiarCarrera.push(corre => {
       clearInterval(vigiaCuenta); vigiaCuenta = null;
       if (!corre) {
-        const enCola = M._mkw_web_pipelines_pausa(0);
-        nota(`carrera terminada: precalentado otra vez (${enCola} en su cola)`);
+        motivos.carrera = false;
+        aplicarPausa('carrera terminada');
         return;
       }
-      if (!(PIPELINES_POR_PISTA && pipelinesPistaRecientes())) return pausar();
+      // (§273: si elegir personaje dejó pipelines en la cola, también se espera a la cuenta: la carga y la presentación
+      // de la pista los arman, así no faltan en la carrera)
+      const dePersonaje = motivos.personaje || window.mkwEstado.pausaPrecalentado.personaje > 0;
+      motivos.personaje = false;
+      if (!(PIPELINES_POR_PISTA && pipelinesPistaRecientes()) && !dePersonaje) return pausar();
+      aplicarPausa('la carga de la carrera');
       window.mkwEstado.pausaPrecalentado.esperoCuenta++;
       vigiaCuenta = setInterval(() => {
         let etapa = 9;
@@ -3678,7 +4198,7 @@ async function arrancar() {
   }
   if (parametros.get('adelantar') !== '0' && parametros.get('semillaArranque') !== '0') adelantarArranque(tamaños);   // §76
   nota('arrancando main() — el juego corre');
-  ui.cortina('Arrancando…');
+  if (!cartel.activo) ui.cortina('Arrancando…');
   M.callMain([]);
 }
 
@@ -3687,6 +4207,8 @@ async function arrancar() {
 // bloques), que la próxima primera visita baja de antemano con prioridad baja (bitácora §52).
 const lecturasVistas = new Map();       // "ruta|bloque" → [ruta, bloque, cuadro, tamaño]
 let paqueteCarrera = null;                // (§169: el paquete de carrera, paquete-carrera.mjs)
+let paqueteDeCarrera = 0;                 // (§285: la carrera de la sala cuya ficha se pidió por último)
+let paqueteFichaT = 0;                    // (§285: cuándo; con ?paqueteLento=ms —solo pruebas— el % no pasa de lo proporcional)
 let videosMenu = null;                    // (§174, D8: el principio de los videos de los menús, videos-menu.mjs)
 // §174 (C2): los pipelines de una sola pista esperan a que se elija esa pista (aurora: mkw_web_pipelines_pista)
 const PIPELINES_POR_PISTA = parametros.get('pipelinesPista') !== '0';
@@ -3861,6 +4383,7 @@ function armarArchivos(m, contenidos, tamaños) {
   // ?rutas=comparar: con la búsqueda nativa, comprobando cada respuesta contra la del juego; ?rutas=listar: anota
   // cada nombre buscado. Sin el parámetro: la búsqueda nativa con tabla hash (web/dvd/rutas_nativo.cpp, bitácora §50).
   if (parametros.has('rutas')) m.ENV.MKW_RUTAS = parametros.get('rutas');
+  if (parametros.has('decomp')) m.ENV.MKW_DECOMP = parametros.get('decomp');   // §280: la función decompilada (solo build/web-decomp): 0 traducida, 1 nueva, 2 comprobar
   // ?pipelines=sincronico: crear cada pipeline nuevo en el momento, frenando el cuadro (como antes, para comparar;
   // bitácora §51). Sin el parámetro: en segundo plano, saltando el dibujo hasta que llegue.
   if (parametros.has('pipelines')) m.ENV.MKW_PIPELINES = parametros.get('pipelines');

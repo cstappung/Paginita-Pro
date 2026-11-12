@@ -152,6 +152,17 @@ try {
   ok('Enter juega la copa marcada', r3b && r3b.copa === pn.marcada, JSON.stringify(r3b));
   await abrir('gp');
   await pagina.waitForSelector('#elegirPista button.copa-cab');
+  // §271: «▾ Ocultar» esconde el selector sin elegir, deja la pastilla para volver y los ajustes quedan a mano
+  await pagina.click('#elegirOcultar');
+  const oc = await pagina.evaluate(() => ({ oculto: document.getElementById('elegirPista')?.hidden, pastilla: !!document.getElementById('elegirVolver'), eleccion: window._eleccion }));
+  ok('§271: «▾ Ocultar» esconde la selección sin elegir nada y deja «🗺 Volver a elegir…» abajo', oc.oculto === true && oc.pastilla && oc.eleccion === 'esperando', JSON.stringify(oc));
+  await pagina.click('#barra [data-abre="ajustes"]');
+  await espera(200);
+  ok('§271: con la selección escondida, ⚙ abre los ajustes', await pagina.evaluate(() => document.body.classList.contains('cajon-abierto')));
+  await pagina.evaluate(() => window.mkwInterfaz.cerrarCajon());
+  await pagina.click('#elegirVolver');
+  const vu = await pagina.evaluate(() => ({ visible: !document.getElementById('elegirPista')?.hidden, pastilla: !!document.getElementById('elegirVolver') }));
+  ok('§271: la pastilla vuelve a abrir la selección donde estaba (y se va)', vu.visible && !vu.pastilla, JSON.stringify(vu));
   await pagina.locator('#elegirPista .copa').nth(7).locator('.pista').nth(1).dblclick();
   const r3c = await eleccion();
   ok('doble clic en una copa la juega', r3c && r3c.copa === 7 && r3c.fila === 0, JSON.stringify(r3c));

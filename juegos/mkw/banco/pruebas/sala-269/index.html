@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Los 3 bugs de la sala</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>#marco{width:420px;height:120px;border:1px solid #888;display:block;margin:8px 0}</style>
+</head>
+<body>
+<h1>Los 3 bugs del multijugador de la v2.0 <span>(bitácora §269, sin el juego)</span></h1>
+<p>Prueba lo que se arregló en <code>escalon.mjs</code>, <code>lockstep.mjs</code> (el aviso de sala lenta), <code>n8.mjs</code>
+  (N8 Automático), <code>controles.mjs</code> (los mandos y el teclado con el juego en un marco) y <code>paquete-carrera.mjs</code>
+  <b>sin el juego y sin red</b>, con datos de mentira. Cada caso muestra también lo que hacía antes (el bug), para que se vea
+  que la prueba lo habría pillado.</p>
+<input id="campo" placeholder="(un campo del sitio, como el chat)"> <button id="boton">Un botón del sitio</button>
+<iframe id="marco" src="marco.html" allow="gamepad"></iframe>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { escalonDe, noLlega, envolverPadSala, ESPERA_SALA_AJENA } from '/web/navegador/escalon.mjs';
+import { avisoLento } from '/web/navegador/lockstep.mjs';
+import { crearVigiaN8 } from '/web/navegador/n8.mjs';
+import { juntarPuertos } from '/web/navegador/controles.mjs';
+import { crearSala, versionDistinta, VERSION_SALA, MARCA_SALA } from '/web/navegador/sala-carrera.mjs';
+
+const { ok, nota, fin } = prueba('sala-269', 'Los 3 bugs de la sala (§269): el «no llegas a 60», el Lakitu y el kart quieto');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const almacen = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+
+// ---- Bug 1: «tu PC no alcanza 60» en la sala ----
+// (a) la espera de pad(): 1 ms de trabajo propio y 9 ms esperando los botones del otro (una sala a ~60 frenada por otro)
+{
+  const cuenta = { ms: 0, veces: 0 };
+  const pad = envolverPadSala(async c => { const t = performance.now(); while (performance.now() - t < 1) {} await espera(9); return [c]; }, cuenta);
+  for (let i = 0; i < 20; i++) await pad(i);
+  ok('la envoltura de pad() cuenta como espera solo lo de después de la primera espera (≈ 9 de cada 10 ms)', cuenta.veces === 20 && cuenta.ms / 20 > 7 && cuenta.ms / 20 < 20,
+     `${(cuenta.ms / 20).toFixed(1)} ms por cuadro en ${cuenta.veces} cuadros`);
+  const c2 = { ms: 0, veces: 0 }, pad2 = envolverPadSala(c => [c], c2);
+  for (let i = 0; i < 20; i++) await pad2(i);
+  ok('si los botones ya estaban (sin espera), no suma nada', c2.ms < 1, `${c2.ms.toFixed(2)} ms`);
+}
+// (b) el escalón: un PC sobrado (6 ms por cuadro) en una sala que va a 45 por otro (la sala lo frenó 10 ms por cuadro)
+{
+  const e = escalonDe({ cpuPuraMs: 6, logica: 45, esperaSalaMs: 10 });
+  ok('escalón en la sala frenada por otro: «sobrado», no «lento»', e.id === 'sobrado' && /la sala esperó/.test(e.por), `${e.id} (${e.por})`);
+  const antes = escalonDe({ cpuPuraMs: 6 + 10, logica: 45 });   // (antes: la espera contada como trabajo, sin esperaSalaMs)
+  ok('…antes del arreglo la misma carrera salía «lento» (el bug)', antes.id === 'lento', antes.id);
+  ok('fuera de la sala no cambia: 41 de lógica con 12 ms = «lento» (frena la tarjeta)', escalonDe({ cpuPuraMs: 12, logica: 41 }).id === 'lento');
+  ok('en la sala, un aparato lento de verdad (25 ms por cuadro) sigue siendo «no llega»', escalonDe({ cpuPuraMs: 25, logica: 40, esperaSalaMs: 1 }).id === 'lento');
+  ok(`la regla: más de ${ESPERA_SALA_AJENA} ms por cuadro esperando a la sala = el ritmo es de otro`, escalonDe({ cpuPuraMs: 6, logica: 45, esperaSalaMs: 1.5 }).id === 'lento');
+  ok('la capacidad guardada de esa carrera (45 de lógica, 6 ms) no es «no llega» (el aviso antes de largar)', !noLlega({ l: 45, ms: 6 }) && noLlega({ l: 45, ms: 16 }));
+}
+// (c) el aviso del lockstep cada 3 s: la sala a 40 por la llegada de otro y los frenos de la sincronía, mi hilo al 30 %
+{
+  const humanos = [{ uid: 'a', mando: 0 }, { uid: 'b', mando: 1 }];
+  const antes = { cuadros: 0, msEsperando: 0, msLlegada: 0, msFrenado: 0, esperaDe: {} };
+  const ahora = { cuadros: 120, msEsperando: 60, msLlegada: 900, msFrenado: 200, esperaDe: { b: 60 } };
+  const viejo = avisoLento(antes, ahora, 3000, humanos, null, true);
+  ok('antes: «Tu PC no alcanza 60» aunque esperó a los demás (el bug)', /Tu PC no alcanza/.test(viejo), viejo);
+  const nuevo = avisoLento(antes, ahora, 3000, humanos, 0.3);
+  ok('ahora: con la llegada y los frenos contados como espera, no culpa a esta PC', !/Tu PC/.test(nuevo), nuevo || '(sin aviso)');
+  const sinEsperas = { cuadros: 120, msEsperando: 60, msLlegada: 0, msFrenado: 0, esperaDe: {} };
+  ok('con el hilo libre (30 %) tampoco: lo que frena no es este hilo', avisoLento(antes, sinEsperas, 3000, humanos, 0.3) === '');
+  ok('con el hilo lleno (95 %) sí: «Tu PC no alcanza 60»', /Tu PC no alcanza/.test(avisoLento(antes, sinEsperas, 3000, humanos, 0.95)));
+  ok('si se espera a otro de verdad, el aviso lo nombra (como antes)', /jugador 2/.test(avisoLento(antes, { ...sinEsperas, msEsperando: 1200, esperaDe: { b: 1200 } }, 3000, humanos, 0.2)));
+}
+// (d) N8 Automático en la sala: la sala a 45 por otro, mi hilo «ocupado» solo si se cuenta la espera
+{
+  const a = almacen(), v = crearVigiaN8({ almacen: a });
+  for (let s = 0; s < 30; s++) v.segundo({ enCarrera: true, imagenes: 45, logica: 45, juegoMs: 6, salaMs: 15 });
+  ok('N8 Automático no se prende en una sala frenada por otro (y no aprende nada)', !v.estado.prendido && a.getItem('mkw.n8.auto') === null && v.estado.ajenos === 30, JSON.stringify(v.estado.ultimo));
+  const b = almacen(), w = crearVigiaN8({ almacen: b });
+  for (let s = 0; s < 20; s++) w.segundo({ enCarrera: true, imagenes: 45, logica: 45, juegoMs: 21 });   // (antes: 6 + 15 de espera)
+  ok('antes: la espera contada como trabajo lo prendía y, sin mejora, quedaba «no» para siempre (el bug)', b.getItem('mkw.n8.auto') === 'no' && !w.estado.sirve, b.getItem('mkw.n8.auto'));
+  const c = almacen(), x = crearVigiaN8({ almacen: c });
+  for (let s = 0; s < 4; s++) x.segundo({ enCarrera: true, imagenes: 40, logica: 40, juegoMs: 22, salaMs: 0.5 });
+  ok('un aparato lento de verdad en la sala (22 ms, casi sin esperar a nadie): se prende', x.estado.prendido);
+}
+
+// ---- Bug 3: el kart quieto ----
+// (a) los 4 puertos juntos: el mando de verdad en el puerto 2 (un mando virtual de Steam en el 1), el teclado en el 1
+{
+  const j = juntarPuertos([[1, 0, 0, 0, 0, 0, 0, 0], [1, 0x100, -100, 30, 0, 0, 0, 180], null, [0, 0xFFFF, 127, 127, 0, 0, 255, 255]]);
+  ok('juntarPuertos: los botones del puerto 2 llegan al jugador, el stick que más se aleja del centro, el gatillo más apretado', j[0] === 1 && j[1] === 0x100 && j[2] === -100 && j[3] === 30 && j[7] === 180, JSON.stringify(j));
+  ok('un puerto desconectado no cuenta', juntarPuertos([null, [0, 0x200, 50, 0, 0, 0, 0, 0], null, null]).join() === '0,0,0,0,0,0,0,0');
+  const k = juntarPuertos([[1, 0x200, 0, -128, 0, 0, 0, 0], [1, 0x100, 20, 0, 0, 0, 0, 0], null, null]);
+  ok('teclado (B, abajo) y mando (A, un poco a la derecha) a la vez: se suman', k[1] === 0x300 && k[2] === 20 && k[3] === -128, JSON.stringify(k));
+}
+// (b) el marco sin el foco: la persona tocó un botón del sitio y aprieta K (acelerar)
+const marco = document.getElementById('marco');
+for (let i = 0; i < 50 && !marco.contentWindow?.listo; i++) await espera(100);
+const w = marco.contentWindow;
+ok('el marco de mentira cargó sus controles', !!w?.controles);
+const apretar = async (destino, code, tipo = 'keydown') => { destino.dispatchEvent(new KeyboardEvent(tipo, { code, key: code, bubbles: true, cancelable: true })); await espera(120); };
+const botonesP0 = () => (w.enviados[0] || [])[1] | 0;
+document.getElementById('boton').focus();
+await apretar(document.body, 'KeyK');
+ok('con el foco en la página de arriba, K llega igual al juego del marco (A apretado en el puerto 1)', (botonesP0() & 0x100) !== 0, `botones ${botonesP0().toString(16)} · por arriba ${w.controles.estado.tecladoPadre || 0}`);
+await apretar(document.body, 'KeyK', 'keyup');
+ok('…y al soltarla se suelta', (botonesP0() & 0x100) === 0);
+await apretar(document.getElementById('boton'), 'Enter');
+ok('Enter sobre un botón del sitio es del sitio (no aprieta A en el juego)', (botonesP0() & 0x100) === 0);
+await apretar(document.getElementById('boton'), 'Enter', 'keyup');
+document.getElementById('campo').focus();
+await apretar(document.getElementById('campo'), 'KeyK');
+ok('lo que se escribe en un campo del sitio (el chat) no va al juego', (botonesP0() & 0x100) === 0);
+await apretar(document.getElementById('campo'), 'KeyK', 'keyup');
+marco.style.display = 'none'; await espera(50);
+await apretar(document.body, 'KeyK');
+ok('con el marco escondido (la precarga), lo de arriba no va al juego', (botonesP0() & 0x100) === 0);
+await apretar(document.body, 'KeyK', 'keyup');
+marco.style.display = ''; await espera(50);
+// (c) el mando: Chrome no le da los mandos a un marco sin el foco; arriba hay uno de mentira con A apretado
+{
+  const falso = { id: 'Mando de mentira (STANDARD GAMEPAD)', index: 0, connected: true, mapping: 'standard', timestamp: performance.now(),
+    buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: i === 0, value: i === 0 ? 1 : 0, touched: false })), axes: [0.9, 0, 0, 0] };
+  try { Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [falso, null, null, null] }); } catch {}
+  try { Object.defineProperty(w.navigator, 'getGamepads', { configurable: true, value: () => [null, null, null, null] }); } catch {}
+  document.getElementById('boton').focus();
+  await espera(300);
+  const e = w.controles.estado;
+  ok('el marco sin foco no ve mandos propios y lee el de la página de arriba', e.mandosDelPadre === true && (e.mandos || []).length === 1, `mandos ${(e.mandos || []).length}, de arriba ${e.mandosDelPadre}`);
+  ok('…y su A y su stick llegan al juego', (botonesP0() & 0x100) !== 0 && (w.enviados[0]?.[2] | 0) > 60, JSON.stringify(w.enviados[0]));
+}
+nota('con el juego: bash herramientas/tanda-269.sh sincro sala experiencia (los dos karts se mueven) y copa (la vuelta 3)');
+
+// ---- §269: la versión de la página en la sala (una PC con la página vieja en caché) ----
+{
+  const pa = versionDistinta(VERSION_SALA, VERSION_SALA), pb = versionDistinta(VERSION_SALA, undefined), pc = versionDistinta(VERSION_SALA, VERSION_SALA + 1), pd = versionDistinta(VERSION_SALA, 250);
+  ok('versionDistinta: igual = nada; sin número (antes de §269) = la otra es vieja; más alta = la mía es la vieja', pa === null && pb === 'vieja' && pc === 'mia' && pd === 'vieja', `${pa} ${pb} ${pc} ${pd}`);
+  let t = 1_000_000; const tareas = new Map(); let n = 1;
+  const cada = f => { tareas.set(n, f); return n++; }, parar = id => tareas.delete(id);
+  const salas = new Map(), avisos = { ana: [], beto: [] };
+  const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }];
+  // (beto = una página vieja: se le quita «ver» a todo lo que manda, como una de antes de §269)
+  const enviar = de => (para, bytes) => {
+    let b = bytes;
+    if (de === 'beto' && bytes[0] === MARCA_SALA) { try { const m = JSON.parse(new TextDecoder().decode(bytes.subarray(1))); delete m.ver; const j = new TextEncoder().encode(JSON.stringify(m)); b = new Uint8Array(1 + j.length); b[0] = MARCA_SALA; b.set(j, 1); } catch {} }
+    setTimeout(() => salas.get(para)?.alBinario(de, b), 0);
+  };
+  for (const uid of ['ana', 'beto']) salas.set(uid, crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t, cada, parar,
+    alVersion: (u, que, sv) => avisos[uid].push([u, que, sv]) }));
+  for (let i = 0; i < 4; i++) { t += 1000; for (const f of [...tareas.values()]) f(); await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0)); }
+  ok('§269: Ana (nueva) se entera de que Beto tiene la página vieja, una sola vez', avisos.ana.length === 1 && avisos.ana[0][0] === 'beto' && avisos.ana[0][1] === 'vieja', JSON.stringify(avisos.ana));
+  ok('…y lo dice versiones() (para el informe de Diagnóstico)', salas.get('ana').versiones().distintas.beto === null && salas.get('ana').versiones().mia === VERSION_SALA, JSON.stringify(salas.get('ana').versiones()));
+  ok('…el latido de Ana lleva su número (Beto, que es «nueva» en esta prueba, no ve nada raro)', avisos.beto.length === 0, JSON.stringify(avisos.beto));
+  for (const s of salas.values()) s.detener?.();
+}
+fin();
+</script>
+</body>
+</html>

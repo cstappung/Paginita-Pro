@@ -26,7 +26,7 @@
 #include <cstring>
 
 extern "C" int g_mkwRelojFijo;
-extern "C" int g_mkwLsArreglos;   // semillas_nativo.cpp: 0 = sin "todo a la vista" ni "no miran la cámara" (?arreglos=0, para comparar)
+extern "C" int g_mkwLsArreglos;   // semillas_nativo.cpp: máscara (§269b): 1 todo a la vista, 2 los CPU no miran la cámara, 4 la fracción fija, 8 dibujar siempre (?arreglos=0 = ninguno, para comparar)
 extern "C" void func_80198D88_traducida(CpuContext* ctx);   // MEM::AllocFromExpHeapEx(heap, tamaño, alineación)
 extern "C" void func_801994E4_traducida(CpuContext* ctx);   // MEM::AllocFromFrmHeapEx(heap, tamaño, alineación)
 
@@ -79,12 +79,20 @@ static bool clipVigente() {
 static uint8_t s_clipMarcas[kMaxClip][4];
 static uint32_t s_clipDist[kMaxClip][4];
 static uint32_t s_recortes = 0;      // cuántas veces el dibujo usó las marcas de verdad (para la página y las pruebas)
+// §269b (instrumento, solo pruebas): las ClipInfo de [s_realA, s_realB) quedan con sus marcas de verdad también para la
+// lógica (no «todo a la vista»): para buscar, partiendo la lista por la mitad, qué cosa de la pista hace dibujar de más en
+// la sala. mkw_clip_reales(a, b) (a = b = 0: ninguna, lo de siempre); mkw_clip_n() = cuántas hay en la lista
+static uint32_t s_realA = 0, s_realB = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_clip_reales(uint32_t a, uint32_t b) { s_realA = a; s_realB = b; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_clip_n() { return s_clipN; }
+// (la dirección de la ClipInfo número i, y la de su dueño si la guarda: para nombrarla después)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_clip_dir(uint32_t i) { return i < s_clipN ? s_clipLista + i * 0x24 : 0; }
 extern "C" void func_80787774_traducida(CpuContext* ctx);
 extern "C" void func_80787774(CpuContext* ctx) {
     const uint32_t mgr = ctx->gpr[3];
     func_80787774_traducida(ctx);
     s_clipN = 0;
-    if (!g_mkwRelojFijo || !g_mkwLsArreglos) return;
+    if (!g_mkwRelojFijo || !(g_mkwLsArreglos & 1)) return;
     const uint32_t lista = Memory::Read32(mgr + 0x10), n = Memory::Read32(mgr + 0x18);
     if (!lista || n > kMaxClip || !Memory::Contains(lista, n * 0x24)) return;
     for (uint32_t i = 0; i < n; i++) {
@@ -94,6 +102,7 @@ extern "C" void func_80787774(CpuContext* ctx) {
             s_clipMarcas[i][pantalla] = m;
             s_clipDist[i][pantalla] = Memory::Read32(ci + 0xC + 4 * pantalla);
             if (m & 0x20) continue;
+            if (i >= s_realA && i < s_realB) continue;   // (el instrumento de arriba)
             Memory::Write8(ci + 0x20 + pantalla, m & ~3u);
             Memory::Write32(ci + 0xC + 4 * pantalla, 0);
         }
@@ -109,7 +118,7 @@ template <void (*Original)(CpuContext*)>
 static void conMarcasDeVerdad(CpuContext* ctx) {
     const uint32_t md = ctx->gpr[3];
     uint32_t ci = 0, i = 0;
-    if (g_mkwRelojFijo && g_mkwLsArreglos && g_mkwRecorteDibujo && clipVigente() && Memory::Contains(md + 0x44, 4)) {
+    if (g_mkwRelojFijo && (g_mkwLsArreglos & 1) && g_mkwRecorteDibujo && clipVigente() && Memory::Contains(md + 0x44, 4)) {
         ci = Memory::Read32(md + 0x44);
         if (ci >= s_clipLista && ci < s_clipLista + s_clipN * 0x24 && (ci - s_clipLista) % 0x24 == 0) i = (ci - s_clipLista) / 0x24;
         else ci = 0;
@@ -165,6 +174,7 @@ static void fijarSalto() {
     if (s_esteSaltado) s_saltados++;
 }
 
+static void marcasDeVerdad(bool deVerdad);   // (abajo: las marcas de verdad de mi cámara, o «todo a la vista»)
 extern "C" void func_80564D60_traducida(CpuContext* ctx);
 extern "C" void func_805635E4(CpuContext* ctx);   // ScnMgr::SwitchScnRoot
 extern "C" void func_80564D60(CpuContext* ctx) {
@@ -181,30 +191,30 @@ extern "C" void func_80564D60(CpuContext* ctx) {
         s_saltadosJuego++;
         return;
     }
-    if (!(g_mkwRelojFijo && g_mkwLsArreglos && g_mkwRecorteDibujo == 2 && !s_enDibujo && clipVigente())) {
+    if (!(g_mkwRelojFijo && (g_mkwLsArreglos & 1) && g_mkwRecorteDibujo == 2 && !s_enDibujo && clipVigente())) {
         func_80564D60_traducida(ctx); return; }
-    for (uint32_t i = 0; i < s_clipN; i++) {
-        const uint32_t ci = s_clipLista + i * 0x24;
-        for (uint32_t p = 0; p < 4; p++) {
-            const uint8_t m = Memory::Read8(ci + 0x20 + p);
-            if (m & 0x20) continue;
-            Memory::Write8(ci + 0x20 + p, static_cast<uint8_t>((m & ~3u) | (s_clipMarcas[i][p] & 3u)));
-            Memory::Write32(ci + 0xC + 4 * p, s_clipDist[i][p]);
-        }
-    }
+    marcasDeVerdad(true);
     s_enDibujo = 1;
     func_80564D60_traducida(ctx);
     s_enDibujo = 0;
+    marcasDeVerdad(false);
+    s_dibujosEnteros++;
+}
+static void marcasDeVerdad(bool deVerdad) {
     for (uint32_t i = 0; i < s_clipN; i++) {
         const uint32_t ci = s_clipLista + i * 0x24;
         for (uint32_t p = 0; p < 4; p++) {
             const uint8_t m = Memory::Read8(ci + 0x20 + p);
             if (m & 0x20) continue;
-            Memory::Write8(ci + 0x20 + p, m & ~3u);
-            Memory::Write32(ci + 0xC + 4 * p, 0);
+            if (deVerdad) {
+                Memory::Write8(ci + 0x20 + p, static_cast<uint8_t>((m & ~3u) | (s_clipMarcas[i][p] & 3u)));
+                Memory::Write32(ci + 0xC + 4 * p, s_clipDist[i][p]);
+            } else {                       // (otra vez «a la vista y cerca», igual en todas las consolas)
+                Memory::Write8(ci + 0x20 + p, m & ~3u);
+                Memory::Write32(ci + 0xC + 4 * p, 0);
+            }
         }
     }
-    s_dibujosEnteros++;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_dibujos_enteros() { return s_dibujosEnteros; }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_recortes_dibujo() { return s_recortes; }
@@ -214,7 +224,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_recortes_dibujo() { return s_recort
 // consola sacaba distinto. En la carrera sincronizada no miran a la cámara.
 extern "C" void func_807379BC_traducida(CpuContext* ctx);
 extern "C" void func_807379BC(CpuContext* ctx) {
-    if (g_mkwRelojFijo && g_mkwLsArreglos) return;
+    if (g_mkwRelojFijo && (g_mkwLsArreglos & 2)) return;
     func_807379BC_traducida(ctx);
 }
 
@@ -242,9 +252,13 @@ extern "C" void func_807F7E80(CpuContext* ctx) {
 // cruzaron la meta (RaceinfoPlayer +0x38, bit 0x2 = terminó). Los que se fueron (g_mkwCortados, lo sabe cada consola
 // en el mismo cuadro: viaja en los botones) no se esperan. Sin humanos conectados, decide el juego como siempre.
 extern "C" void func_80536054_traducida(CpuContext* ctx);
+extern "C" __attribute__((weak)) int mkw_red_estado_activo();   // (§275b, red_estado_nativo.cpp; débil: sin MKW_RED_ESTADO no existe)
+extern "C" __attribute__((weak)) int mkw_red_estado_ajeno(uint32_t jugador);   // (§275b: 1 = un kart de otra consola)
+extern "C" __attribute__((weak)) int mkw_red_estado_espera();   // (§275b: 1 = falta el aviso de llegada de algún kart de otra consola)
 extern "C" void func_80536054(CpuContext* ctx) {
     func_80536054_traducida(ctx);
-    if (!g_mkwRelojFijo) return;
+    // (§275b: también en «Cada uno su kart», la carrera sin lockstep: termina cuando llegaron todos los humanos)
+    if (!g_mkwRelojFijo && !(mkw_red_estado_activo && mkw_red_estado_activo())) return;
     const uint32_t vivos = g_mkwHumanos & ~g_mkwCortados;
     if (!vivos) return;
     const uint32_t ri = Memory::Read32(0x809BD730u);
@@ -257,6 +271,8 @@ extern "C" void func_80536054(CpuContext* ctx) {
         if (!jugador || !Memory::Contains(jugador, 0x3C)) return;
         if (!(Memory::Read32(jugador + 0x38) & 2u)) { ctx->gpr[3] = 0; return; }   // alguno todavía corre
     }
+    // (§275b: y en «Cada uno su kart», hasta que llegó el aviso de cada kart de otra consola, también las CPU de la anfitriona)
+    if (mkw_red_estado_espera && mkw_red_estado_espera()) { ctx->gpr[3] = 0; return; }
     ctx->gpr[3] = 1;
 }
 
@@ -270,7 +286,7 @@ extern "C" void func_8020FE24(CpuContext* ctx) {
     const uint32_t yo = ctx->gpr[3], r2 = ctx->gpr[2];
     if (mkw_traza_alloc) mkw_traza_alloc(0, 0, 0, 0, 0, 9);   // depuración: "empieza un cuadro de pantalla"
     func_8020FE24_traducida(ctx);
-    if (g_mkwRelojFijo && g_mkwLsArreglos && Memory::Contains(yo + 100, 4) && Memory::Contains(r2 - 25984, 4))
+    if (g_mkwRelojFijo && (g_mkwLsArreglos & 4) && Memory::Contains(yo + 100, 4) && Memory::Contains(r2 - 25984, 4))
         Memory::Write32(yo + 100, Memory::Read32(r2 - 25984));
 }
 
@@ -306,14 +322,31 @@ extern "C" void func_801AAD74(CpuContext* ctx) {
 // §207.3: mkw_dibujar_siempre(1) = lo mismo también jugando solo (solo para medir: con el lastre de la gama baja la
 // compensación se salta casi todos los dibujos y la carrera suelta no se parece a la de la sala; ?dibujarSiempre=1)
 static int g_mkwDibujarSiempre = 0;
+static uint32_t s_rrSaltos = 0;   // (§269b: cuántas veces RR quiso saltarse un dibujo y la sala lo dibujó igual)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_rr_saltos() { return s_rrSaltos; }
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_dibujar_siempre(int s) { g_mkwDibujarSiempre = s; }
 extern "C" void rr_kamek_81806568_traducida(CpuContext* ctx);
 extern "C" __attribute__((weak)) void mkw_n8_vuelta() {}   // (§219, N8: n8_nativo.cpp; sin él, nada)
+extern "C" __attribute__((weak)) void mkw_n8_saltar_uno() {}   // (§269b: n8_nativo.cpp; sin él, se dibuja igual)
 extern "C" void rr_kamek_81806568(CpuContext* ctx) {
     mkw_n8_vuelta();                  // (§219: una vuelta del bucle = un cuadro de lógica, para el patrón de N8)
     if (ctx->gpr[25]) fijarSalto();   // (§192: el bucle va a dibujar este cuadro: ¿se salta?)
-    if ((!g_mkwRelojFijo || !g_mkwLsArreglos) && !g_mkwDibujarSiempre) { rr_kamek_81806568_traducida(ctx); return; }
+    if ((!g_mkwRelojFijo || !(g_mkwLsArreglos & 8)) && !g_mkwDibujarSiempre) { rr_kamek_81806568_traducida(ctx); return; }
     const uint32_t sistema = ctx->gpr[21], dibujar = ctx->gpr[25];   // r21 = RKSystem, r25 = "este cuadro se dibuja"
+    // §269b (bit 16 de la máscara): la función de RR tal cual (ajusta el divisor de cuadros de la pantalla, AsyncDisplay
+    // +8, y sus contadores, y decide), y SOLO si decidió saltarse el dibujo de un cuadro que el bucle quería dibujar, el
+    // cuadro empieza igual (lo de abajo). Medido: con el reemplazo entero (sin la función de RR) la sala dibujaba una
+    // pasada de más (29 dibujos) y dos copias diminutas que el Single Player no hace
+    if (g_mkwLsArreglos & 16) {
+        const uint32_t lr = ctx->lr;
+        rr_kamek_81806568_traducida(ctx);
+        if (!dibujar || ctx->gpr[3]) return;          // no había que dibujar, o RR ya empezó el cuadro: igual que RR
+        ctx->lr = lr;
+        s_rrSaltos++;
+        // §269b (bit 32): el cuadro empieza (abajo) pero su dibujo se salta como lo salta N8 (n8_nativo.cpp: solo lo que
+        // la lógica lee del dibujo): la misma compensación de lag que jugando solo, sin separar la carrera
+        if (g_mkwLsArreglos & 32) mkw_n8_saltar_uno();
+    }
     uint32_t resultado = 0;
     if (dibujar) {
         const uint32_t display = Memory::Read32(sistema + 76);      // RKSystem +0x4C = EGG::AsyncDisplay
@@ -448,6 +481,8 @@ extern "C" void rr_overlay_805331B4(CpuContext* ctx) {
     if (ms <= limite && !vencioDnf) return;                             // ni el tiempo límite ni los 30 s
     for (int i = 0; i < 12; i++) {
         if (!(humanos & (1u << i))) continue;
+        // (§275b: en «Cada uno su kart» al humano de OTRA consola lo termina su consola y llega por su aviso, con su tiempo)
+        if (mkw_red_estado_ajeno && mkw_red_estado_ajeno(static_cast<uint32_t>(i))) continue;
         const uint32_t p = Memory::Read32(lista + 4 * i);
         if (!p || !Memory::Contains(p, 0x40) || (Memory::Read32(p + 0x38) & 2u)) continue;   // ya cruzó la meta
         CpuContext c = *ctx;

@@ -181,6 +181,27 @@ try {
        F.llegan.length >= 195 && c1.bytes - c0.bytes >= 2 * 205 * F.llegan.length,
        `${F.llegan.length}/200; el repetidor: ${c1.bytes - c0.bytes} bytes en ${c1.reenviados - c0.reenviados} reenvíos (${2 * 205 * F.llegan.length} de datos), ${c1.asignaciones} asignaciones`);
     E.malla.salir(); F.malla.salir();
+    // §281 parte 2: el repetidor también por TCP («turn:…?transport=tcp»: el teléfono de verdad llega por el cable USB con
+    // adb reverse, que solo lleva TCP). I va por TCP y J por UDP, los dos «solo repetidor»: se conectan y pasan los datos
+    {
+      const turnTcp = await (await fetch('/turn?tcp=1')).json();
+      const I = navR('ui', { soloRelevo: true, sala: '-tcp' }), J = navR('uj', { soloRelevo: true, sala: '-tcp' });
+      await I.malla.entrar(); await J.malla.entrar();
+      const t0 = await cuenta();
+      I.malla.ponerIce(turnTcp.iceServers); J.malla.ponerIce(turn.iceServers);
+      const conI = await hasta(() => I.malla.conectados().includes('uj') && J.malla.conectados().includes('ui'), 15000);
+      const ci = await I.malla.camino('uj');
+      ok('§281: el repetidor por TCP: I (TCP) y J (UDP) se conectan, los dos por el repetidor',
+         conI && ci?.local === 'relay' && ci?.remoto === 'relay' && /tcp/.test(turnTcp.iceServers[0].urls[0]), `${JSON.stringify(turnTcp.iceServers[0].urls)} · I ${JSON.stringify(ci)}`);
+      for (let i = 0; i < 200; i++) I.malla.enviar('uj', new Uint8Array(205), 'udp');
+      for (let i = 0; i < 50; i++) J.malla.enviar('ui', new Uint8Array(1500), 'udp');
+      await hasta(() => J.llegan.length >= 195 && I.llegan.length >= 48, 5000);
+      const t1 = await cuenta();
+      ok('§281: por TCP pasan 200 de 205 bytes de ida y 50 de 1500 de vuelta (el chorro se corta bien por el largo de cada mensaje)',
+         J.llegan.length >= 195 && I.llegan.length >= 48 && (t1.tcp || 0) > (t0.tcp || 0) - 1 && t1.bytes - t0.bytes >= 205 * J.llegan.length + 1500 * I.llegan.length,
+         `ida ${J.llegan.length}/200, vuelta ${I.llegan.length}/50; conexiones TCP ${t1.tcp}; ${t1.bytes - t0.bytes} bytes`);
+      I.malla.salir(); J.malla.salir();
+    }
     // las credenciales vacías (el Worker sin TURN): directo como siempre, y lo avisa
     const G = navR('ug', { soloRelevo: true, sala: '-2' }), H = navR('uh', { sala: '-2' });
     await G.malla.entrar(); await H.malla.entrar();

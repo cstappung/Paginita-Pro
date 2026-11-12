@@ -44,6 +44,12 @@ const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playw
 const RECARGA = process.argv.includes('--recarga');
 // --rapida: para repetir lo demás sin la espera del DNF de 30 s (la carrera 2 también termina por código; ese punto se salta).
 const RAPIDA = process.argv.includes('--rapida');
+// §269b.14: --carga-lenta-b=S = B avisa «cargué» S s después de estar preparada (como un teléfono que tarda): el reloj de la
+// copa no empieza hasta entonces y A muestra «Esperando a los jugadores… (faltan: B)»
+const CARGA_LENTA_B = Number((process.argv.find(a => a.startsWith('--carga-lenta-b=')) || '--carga-lenta-b=0').slice(16)) || 0;
+// §285: --paquete-lento-b=S = B dice tener bajado el paquete de cada carrera de a poco durante S s (?paqueteLento): todas
+// esperan quietas en el primer cuadro con el aviso, y largan juntas
+const PAQUETE_LENTO_B = Number((process.argv.find(a => a.startsWith('--paquete-lento-b=')) || '--paquete-lento-b=0').slice(18)) || 0;
 const DESCANSO = 30;   // (también con --rapida: volver a elegir necesita el descanso entero)
 // §96: --cpu=maximo|dificil|normal|facil = el nivel de la CPU de la sala (el de la sala por omisión es máximo)
 const CPU = (process.argv.find(a => a.startsWith('--cpu=')) || '--cpu=normal').slice(6);
@@ -104,12 +110,28 @@ async function abrir(nombre, uid) {
     }
   });
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
-    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}${EXTRA}`);
+    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}${EXTRA}` + (nombre === 'B' && CARGA_LENTA_B ? `&cargaLenta=${CARGA_LENTA_B * 1000}` : '') +
+    (nombre === 'B' && PAQUETE_LENTO_B ? `&paqueteLento=${PAQUETE_LENTO_B * 1000}` : ''));
   return p;
 }
 const A = await abrir('A', uidA);
 await espera(2000);
 const B = await abrir('B', uidB);
+// §285: lo que se vio de la espera del paquete en cada pestaña (cada 300 ms: quieta, el aviso, cuándo soltó)
+const vistoPaquete = { A: { quieta: 0, aviso: '' }, B: { quieta: 0, aviso: '' } };
+const relojPaquete = setInterval(() => { for (const [n, p] of [['A', A], ['B', B]]) p.evaluate(() => { const e = window.mkwEstado?.esperaPaquete; return e ? { c: e.congelada, aviso: e.aviso, veces: e.veces, suelta: e.soltadaSala, ms: e.msQuieta, por: e.por } : null; })
+  .then(x => { if (!x) return; const v = vistoPaquete[n]; if (x.c) { v.quieta++; if (x.aviso && (!/Faltan/.test(v.aviso) || /Faltan/.test(x.aviso))) v.aviso = x.aviso; } Object.assign(v, { veces: x.veces, suelta: x.suelta, ms: x.ms, por: x.por }); }, () => {}); }, 300);
+// §269b.14: B tarda en cargar: mientras, la copa no tiene reloj y A dice a quién espera; después, el reloj corre
+if (CARGA_LENTA_B) {
+  const mira = () => A.evaluate(() => ({ plazo: window.mkwEstado.sala?.plazo || 0, faltan: window.mkwEstado.sala?.faltanCarga || [],
+    aviso: document.getElementById('esperaCarga')?.hidden === false ? document.getElementById('esperaCarga').textContent : '' })).catch(() => null);
+  let x = null, visto = null;
+  for (let i = 0; i < 240; i++) { x = await mira(); if (x?.faltan?.includes(uidB) && x.aviso) { visto = x; break; } if (x?.plazo) break; await espera(500); }
+  ok('§269b.14: B todavía carga: la copa no tiene reloj y A muestra «Esperando a los jugadores… (faltan: B)»',
+     !!visto && !visto.plazo && /Esperando a los jugadores/.test(visto.aviso), JSON.stringify(visto || x));
+  for (let i = 0; i < CARGA_LENTA_B * 2 + 240; i++) { x = await mira(); if (x?.plazo) break; await espera(500); }
+  ok('§269b.14: B cargó: el reloj de la copa empieza y el aviso se va', !!x?.plazo && !x.faltan.length && !x.aviso, JSON.stringify(x));
+}
 
 const leer = p => Promise.race([new Promise(r => setTimeout(() => r(null), 8000)), p.evaluate(() => {
   const L = window.mkwMenus, e = L?.estado?.(); if (!e) return null;
@@ -282,6 +304,50 @@ const f4 = (x, i) => x?.av?.[i]?.toFixed(4);
 ok('cada kart con lo suyo: a los 3,5 s el de A avanzó y el de B (quieto) no, en las dos pestañas',
    [qa, qb].every(x => (x?.av?.[0] || 0) - (x?.av?.[1] || 0) > 0.004), `pestaña A: A ${f4(qa, 0)} B ${f4(qa, 1)} · pestaña B: A ${f4(qb, 0)} B ${f4(qb, 1)} (vueltas)`);
 ok('después B aceleró y su kart también avanzó', [ca, cb].every(x => (x?.av?.[1] || 0) > (qa?.av?.[1] || 0) + 0.01), `B ${f4(qa, 1)} → ${f4(ca, 1)}`);
+// §274 --calibrar: A aprieta «⚡ Auto calibración» a mitad de la carrera 1: la sala entera se pausa (sala-carrera
+// pausaSala → cada consola congela la lógica después del mismo cuadro), B ve el aviso y su carrera queda quieta, A prueba
+// sus ajustes en ≤ 30 s, y las dos siguen: las huellas iguales, nadie cortado, pausado por el lockstep ni «quieto»
+if (process.argv.includes('--calibrar')) {
+  await A.keyboard.down('KeyK'); await B.keyboard.down('KeyK');
+  const antes = [await leer(A), await leer(B)];
+  const tC = Date.now();
+  await A.evaluate(() => { window.mkwAutoCalibrar.apretar(); });
+  const vistas = [];
+  for (const hasta = Date.now() + 45000; Date.now() < hasta;) {
+    const [va, vb] = await Promise.all([A, B].map(p => p.evaluate(() => ({ cuadro: window.mkwSincro?.lockstep?.estado().cuadro ?? -1,
+      congelada: !!window.mkwSincro?.lockstep?.congelada, aviso: document.getElementById('pausaSala') && !document.getElementById('pausaSala').hidden ? document.querySelector('#pausaSala b')?.textContent : null,
+      corriendo: !!window.mkwAutoCalibrar?.estado.corriendo, veces: window.mkwAutoCalibrar?.estado.veces | 0, pausa: window.mkwSala?.pausa || null,
+      juego: window.mkw?._mkw_congelado_estado?.(0) ?? null, reloj: (() => { const L = window.mkwMenus, ri = L?.u32(0x809BD730), r = ri && L.u32(ri + 0x14); return r ? (L.u16(r + 0x8) * 60 + L.u8(r + 0xA)) * 1000 + L.u16(r + 0xC) : -1; })() })).catch(() => null)));
+    vistas.push({ ms: Date.now() - tC, A: va, B: vb });
+    if (va && !va.corriendo && va.veces >= 1 && vb && !vb.aviso && !vb.congelada) break;
+    await espera(300);
+  }
+  const fin = await A.evaluate(() => { const u = window.mkwAutoCalibrar.estado.ultimo; return u && { ms: u.ms, texto: u.texto, cancelada: u.cancelada,
+    resultados: (u.resultados || []).map(x => `${x.n8}/${x.salida}: ${x.bajo1?.toFixed(1)} (${x.logicaFinal?.toFixed?.(0)}${x.logicaEstimada ? '~' : ''})`) }; }).catch(() => null);
+  const conAviso = vistas.filter(v => v.B?.aviso), congB = vistas.filter(v => v.B?.congelada && v.B.juego === 1);
+  const cuadrosB = congB.map(v => v.B.cuadro), relojesB = congB.map(v => v.B.reloj);
+  console.log(`  §274: ${fin?.texto} (${((fin?.ms ?? 0) / 1000).toFixed(1)} s) · ${fin?.resultados?.join(' · ')}`);
+  console.log(`  §274: B con el aviso ${conAviso.length} vistas («${conAviso[0]?.B.aviso}» … «${conAviso.at(-1)?.B.aviso}»); B congelada en los cuadros ${Math.min(...cuadrosB)}–${Math.max(...cuadrosB)}, reloj de la carrera ${Math.min(...relojesB)}–${Math.max(...relojesB)} ms`);
+  writeFileSync(path.join(carpeta, 'calibrar.json'), JSON.stringify({ fin, vistas }, null, 1));
+  ok('§274: A calibra a mitad de carrera en 30 s o menos, con la sala pausada (la lógica estimada)', !!fin && !fin.cancelada && fin.ms <= 30000 && /~/.test(fin.resultados?.join() || ''), fin?.cancelada || `${((fin?.ms ?? 0) / 1000).toFixed(1)} s`);
+  ok('§274: B ve el aviso «⏸ … está calibrando su imagen — vuelve en N s», con cuenta regresiva', conAviso.length >= 3 && /^⏸ .+ está calibrando su imagen — vuelve en \d+ s$/.test(conAviso[0].B.aviso) && conAviso[0].B.aviso !== conAviso.at(-1).B.aviso,
+     `«${conAviso[0]?.B.aviso || 'nunca'}» … «${conAviso.at(-1)?.B.aviso || ''}»`);
+  ok('§274: …y su carrera queda quieta: ni un cuadro ni el reloj de la carrera (el DNF y el tiempo límite van con él)', congB.length >= 3 && Math.max(...cuadrosB) === Math.min(...cuadrosB) && Math.max(...relojesB) === Math.min(...relojesB),
+     `${congB.length} vistas, cuadros ${Math.min(...cuadrosB)}–${Math.max(...cuadrosB)}`);
+  ok('§274: las dos se congelaron después del mismo cuadro', (() => { const ca = vistas.find(v => v.A?.congelada && v.A.juego === 1)?.A.cuadro; return ca !== undefined && ca === cuadrosB[0]; })(),
+     `A ${vistas.find(v => v.A?.congelada && v.A.juego === 1)?.A.cuadro}, B ${cuadrosB[0]}`);
+  await espera(6000);
+  const despues = [await leer(A), await leer(B)];
+  await A.keyboard.up('KeyK'); await B.keyboard.up('KeyK');
+  ok('§274: al terminar las dos siguen (más de 250 cuadros en 6 s) y el aviso se fue', despues.every((x, i) => (x?.ls?.cuadro ?? 0) - (antes[i]?.ls?.cuadro ?? 0) > 250) &&
+     !(await B.evaluate(() => !document.getElementById('pausaSala')?.hidden).catch(() => true)), despues.map(x => x?.ls?.cuadro).join(', '));
+  ok('§274: las huellas siguen iguales después de la pausa', despues.every(x => !x?.ls?.desincronizado) && (despues[0]?.ls?.huellasIguales ?? 0) > (antes[0]?.ls?.huellasIguales ?? 0),
+     `iguales A ${antes[0]?.ls?.huellasIguales} → ${despues[0]?.ls?.huellasIguales}`);
+  ok('§274: nadie fue cortado, pausado por el lockstep ni quedó «quieto» para el VR', despues.every(x => x?.ls && !Object.keys(x.ls.cortes || {}).length && !x.ls.fuera && !(x.ls.pausasAhora || []).length &&
+     Object.values(x.ls.quieto || {}).every(q => q < 1800)), despues.map(x => JSON.stringify({ cortes: x?.ls?.cortes, pausas: x?.ls?.pausasAhora, quieto: x?.ls?.quieto, cong: Math.round(x?.ls?.msCongelada || 0) })).join(' · '));
+  const usada = await B.evaluate(() => window.mkwSala.estado().pausasUsadas || {}).catch(() => ({}));
+  ok('§274: la pausa de A quedó contada (una por persona en cada carrera)', Object.keys(usada).length === 1 && Object.values(usada)[0] === 'correr:1', JSON.stringify(usada));
+}
 // §95: el peor caso con las CPU (las de la ficha, a su nivel): lo que dice vr-sala.mjs, calculado aquí aparte
 const peorDe = x => aplicarCambio(5000, peorCaso('yo', [{ uid: 'yo', vr: 5000 }, { uid: 'otro', vr: 5000 },
   ...Array.from({ length: x?.vr?.cpus || 0 }, () => ({ cpu: true, puesto: 0 }))], { nivelCpu: x?.vr?.nivelCpu, regla: x?.vr?.regla }));
@@ -328,7 +394,7 @@ let tFin1 = 0;                        // §94: cuándo terminó la carrera 1 (pa
 let reelegirA = null, nuevoA = null;   // M22: A vuelve a elegir en el descanso (sin --recarga)
 const pagsA = [];                      // (las pantallas que vio A mientras volvía a elegir, para el detalle)
 if (!RECARGA) {
-  const f1 = await terminarEn([A, B], [ca, cb]);
+  const f1 = await terminarEn([A, B], process.argv.includes("--calibrar") ? [await leer(A), await leer(B)] : [ca, cb]);   // (§274: después de la pausa, el cuadro de ahora)
   const { fines, despues: [xa, xb] } = await puntosCarrera1([A, B]);
   tFin1 = Date.now() - 5000;
   ok('la carrera 1 termina de verdad en las dos: A y B cruzan la meta en el mismo cuadro y el juego la da por terminada',
@@ -555,6 +621,15 @@ const redDe = p => p.evaluate(() => ({ pres: (window.mkwRedEnCarrera?.() || []).
                                        red: (window.mkwRedEnCarrera?.() || []).filter(x => x[5] === 1 || x[5] === 2).map(x => `${String(x[0]).split('/').pop()}@${x[1]} ${Math.round(x[3] / 1024)} KB`),
                                        faltas: (window.mkwFaltas?.() || []).length,
                                        sala: window.mkwEstado?.paquete?.sala ?? null })).catch(() => ({ red: ['(no se pudo leer)'], faltas: -1, sala: null }));
+clearInterval(relojPaquete);
+if (PAQUETE_LENTO_B) {
+  const [va, vb] = [vistoPaquete.A, vistoPaquete.B];
+  ok(`§285: B baja lento (${PAQUETE_LENTO_B} s): A espera quieta en el primer cuadro con el aviso «Esperando a que todos carguen la carrera… Faltan: … B»`,
+     va.quieta > 0 && /Esperando a que todos carguen la carrera/.test(va.aviso) && /Faltan: .*%/.test(va.aviso), JSON.stringify(va));
+  ok('§285: las dos esperaron y soltaron juntas (la misma hora de la sala, ±300 ms) por «todos listos»', va.veces >= 1 && vb.veces >= 1 &&
+     Number.isFinite(va.suelta) && Number.isFinite(vb.suelta) && Math.abs(va.suelta - vb.suelta) <= 300 && va.por === 'todos listos',
+     `A quieta ${va.ms} ms, B ${vb.ms} ms, sueltan con ${Math.round(Math.abs(va.suelta - vb.suelta))} ms de diferencia (${va.por})`);
+}
 const [faA, faB] = [await redDe(A), await redDe(B)];
 ok('D1 (§176): en las dos carreras, de la cuenta a la meta, nada fue a la red (las pistas de la sala, con su música, se pidieron en la elección y el descanso)',
    faA.red.length === 0 && faB.red.length === 0,

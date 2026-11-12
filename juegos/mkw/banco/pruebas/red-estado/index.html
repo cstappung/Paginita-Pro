@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red por estado</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Red por estado: <span>el kart del otro, dibujado con lo que llega</span></h1>
+<p>Prueba <code>web/navegador/red-estado.mjs</code> (bitácora §275, el modelo «host + predicción») <b>sin el juego</b>:
+  un kart de mentira da vueltas a un círculo; sus «paquetes de estado» llegan con atraso, desordenados, repetidos o se
+  pierden; el búfer los guarda y dice dónde dibujarlo (interpolar con un atraso fijo, adivinar hacia adelante un rato
+  corto, quedarse quieto). También las medidas que usa la prueba con el juego: el error de una trayectoria contra la
+  verdad, el atraso de la vista, los cuadros por segundo y la respuesta del kart propio al botón.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearBufferEstado, errorTrayectoria, atrasoDeVista, ritmo, cuadrosDeRespuesta, posicionEn, distancia } from '/web/navegador/red-estado.mjs';
+
+const { ok, nota, fin } = prueba('red-estado', 'Red por estado (sin el juego)');
+
+// El kart de mentira: un círculo de radio 5000 (50 m) a 2 vueltas por minuto, en unidades del juego (≈ cm)
+const R = 5000, W = 2 * Math.PI / 30000;   // rad por ms
+const verdadEn = t => [R * Math.cos(W * t), 0, R * Math.sin(W * t)];
+const velEn = t => [-R * W * Math.sin(W * t), 0, R * W * Math.cos(W * t)];
+// un azar con semilla (para que la prueba dé siempre lo mismo)
+const azar = (s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32)(12345);
+
+try {
+  // ---- 1. Lo básico ----
+  {
+    const b = crearBufferEstado({ retrasoMs: 100 });
+    ok('vacío: no hay dónde dibujar', b.muestrear(0).modo === 'vacio');
+    b.recibir({ t: 0, seq: 0, pos: [0, 0, 0] }); b.recibir({ t: 100, seq: 1, pos: [100, 0, 0] });
+    const m = b.muestrear(150);
+    ok('interpola entre dos muestras con el atraso fijo (150 − 100 = 50 ms → x = 50)', m.modo === 'interp' && Math.abs(m.pos[0] - 50) < 1e-9, JSON.stringify(m));
+    ok('un repetido no se guarda dos veces', b.recibir({ t: 100, seq: 1, pos: [100, 0, 0] }) === 'repetido' && b.estado().muestras === 2);
+    ok('antes de la primera muestra, se dibuja en la primera', b.muestrear(50).modo === 'primera');
+  }
+  // ---- 2. Extrapolar y quedarse quieto ----
+  {
+    const b = crearBufferEstado({ retrasoMs: 0, extrapolarMs: 200 });
+    b.recibir({ t: 0, seq: 0, pos: [0, 0, 0], vel: [1, 0, 0] });
+    b.recibir({ t: 100, seq: 1, pos: [100, 0, 0], vel: [1, 0, 0] });
+    const e = b.muestrear(250);
+    ok('sin muestras nuevas, adivina con la velocidad (100 + 150 = 250)', e.modo === 'extrap' && Math.abs(e.pos[0] - 250) < 1e-9, JSON.stringify(e));
+    const q = b.muestrear(1000);
+    ok('pasado el tope de adivinar (200 ms), se queda quieto donde llegó (300)', q.modo === 'quieto' && Math.abs(q.pos[0] - 300) < 1e-9, JSON.stringify(q));
+    const b2 = crearBufferEstado({ retrasoMs: 0 });
+    b2.recibir({ t: 0, seq: 0, pos: [0, 0, 0] }); b2.recibir({ t: 100, seq: 1, pos: [50, 0, 0] });
+    ok('sin velocidad en el paquete, la saca de las dos últimas muestras', Math.abs(b2.muestrear(200).pos[0] - 100) < 1e-9);
+  }
+  // ---- 3. Desordenados, tardíos y viejos ----
+  {
+    const b = crearBufferEstado({ retrasoMs: 50 });
+    b.recibir({ t: 0, seq: 0, pos: [0, 0, 0] }); b.recibir({ t: 200, seq: 2, pos: [200, 0, 0] });
+    ok('uno que llega tarde (seq 1 después del 2) se guarda en su lugar', b.recibir({ t: 100, seq: 1, pos: [100, 0, 0] }) === 'tarde' && b.estado().muestras === 3);
+    ok('y la interpolación lo usa (t 120 → entre 0 y 100: x = 70)', Math.abs(b.muestrear(120).pos[0] - 70) < 1e-9);
+    const bv = crearBufferEstado({ tope: 3 });
+    for (let i = 0; i < 5; i++) bv.recibir({ t: 1000 + i * 10, seq: 10 + i, pos: [i, 0, 0] });
+    ok('el tope guarda solo los últimos', bv.estado().muestras === 3);
+    ok('uno más viejo que todo lo guardado se tira', bv.recibir({ t: 0, seq: 1, pos: [9, 9, 9] }) === 'viejo');
+    ok('un paquete roto no rompe nada', crearBufferEstado().recibir({ t: 'x' }) === 'malo');
+  }
+  // ---- 4. El kart de mentira por una red de mentira (30 paquetes/s) ----
+  // la red: atraso base + variación; con % perdidos. Devuelve el error medio y el peor del kart dibujado contra la verdad
+  const simular = ({ hz = 30, atraso = 40, varia = 10, perdidos = 0, retrasoMs = 100, extrapolarMs = 250, durMs = 20000, corte = null }) => {
+    const b = crearBufferEstado({ retrasoMs, extrapolarMs });
+    const llegadas = [];
+    for (let k = 0, t = 0; t < durMs; k++, t = k * 1000 / hz) {
+      if (azar() < perdidos) continue;
+      if (corte && t >= corte[0] && t < corte[1]) continue;
+      llegadas.push({ en: t + atraso + (azar() * 2 - 1) * varia, p: { t, seq: k, pos: verdadEn(t), vel: velEn(t) } });
+    }
+    llegadas.sort((a, b) => a.en - b.en);
+    const vista = [], modos = {};
+    let j = 0;
+    for (let t = 1000; t < durMs; t += 1000 / 60) {         // la otra consola dibuja a 60
+      while (j < llegadas.length && llegadas[j].en <= t) b.recibir(llegadas[j++].p);
+      const m = b.muestrear(t);
+      modos[m.modo] = (modos[m.modo] || 0) + 1;
+      vista.push({ t, pos: m.pos, modo: m.modo });
+    }
+    const verdad = [];
+    for (let t = 0; t < durMs + 1000; t += 5) verdad.push({ t, pos: verdadEn(t) });
+    return { err: errorTrayectoria(verdad, vista), modos, vista, verdad, b };
+  };
+  {
+    const r = simular({});
+    // el error esperado = lo que el kart recorre en el atraso fijo de 100 ms: v·0,1 s
+    const v = R * W * 100;
+    nota(`red buena (30/s, 40±10 ms): error medio ${r.err.medio.toFixed(0)} (≈ recorrido en 100 ms: ${v.toFixed(0)}), p90 ${r.err.p90.toFixed(0)}`);
+    ok('red buena: el kart se dibuja con 100 ms de atraso, nada más (error ≈ v·100 ms ±5 %)', Math.abs(r.err.medio - v) / v < 0.05);
+    ok('red buena: siempre interpolando', (r.modos.interp || 0) / r.vista.length > 0.99, JSON.stringify(r.modos));
+    const at = atrasoDeVista(r.verdad, r.vista, { maxMs: 300, pasoMs: 4 });
+    ok('el atraso de la vista se mide bien (≈ 100 ms)', Math.abs(at.ms - 100) <= 8, JSON.stringify(at));
+    const p = simular({ perdidos: 0.2 });
+    nota(`20 % perdidos: error medio ${p.err.medio.toFixed(0)}, máx ${p.err.max.toFixed(0)}`);
+    ok('20 % de paquetes perdidos: el error medio casi no cambia (< +10 %)', p.err.medio < r.err.medio * 1.1);
+    const d = simular({ atraso: 60, varia: 50 });
+    ok('atraso muy variable (60±50 ms, llegan desordenados): sigue dibujándose sin saltos grandes (máx < 2× el medio de la red buena)',
+      d.err.max < r.err.medio * 2, `máx ${d.err.max.toFixed(0)}, tardías ${d.b.estado().tardias}`);
+    const c = simular({ corte: [8000, 9000] });
+    nota(`corte de 1 s: modos ${JSON.stringify(c.modos)}, máx ${c.err.max.toFixed(0)}`);
+    ok('un corte de 1 s: adivina hacia adelante y después se queda quieto (hay «extrap» y «quieto»)', c.modos.extrap > 0 && c.modos.quieto > 0);
+    const e0 = simular({ corte: [8000, 9000], extrapolarMs: 1000 });
+    // en una curva suave adivinar en línea recta 1 s entero sale mejor que quedarse quieto a los 250 ms (en la pista de
+    // verdad un choque o un derrape la deja mal); el tope es un compromiso: se anota, no se exige
+    nota(`corte de 1 s, peor error: adivinando 250 ms y quieto ${c.err.max.toFixed(0)}, adivinando 1000 ms ${e0.err.max.toFixed(0)}`);
+    ok('adivinar más tiempo cubre más corte (con 1000 ms no queda «quieto»)', !e0.modos.quieto, JSON.stringify(e0.modos));
+    const r0 = simular({ retrasoMs: 0 });
+    ok('sin atraso fijo (0 ms) se dibuja «más al día» pero adivinando siempre (casi nunca interpola)', (r0.modos.interp || 0) < (r.modos.interp || 0), JSON.stringify(r0.modos));
+  }
+  // ---- 5. Las medidas ----
+  {
+    const verdad = [{ t: 0, pos: [0, 0, 0] }, { t: 10, pos: [10, 0, 0] }];
+    ok('la verdad interpolada a una hora', posicionEn(verdad, 5)[0] === 5 && posicionEn(verdad, 11) === null);
+    ok('la distancia en 3D', distancia([0, 0, 0], [3, 4, 0]) === 5);
+    ok('el error sin muestras comparables da n = 0', errorTrayectoria(verdad, [{ t: 50, pos: [0, 0, 0] }]).n === 0);
+    ok('cuadros por segundo: 600 cuadros en 10 s = 60', ritmo([{ t: 0, f: 0 }, { t: 10000, f: 600 }]) === 60);
+    ok('la lenta: 450 cuadros en 10 s = 45', ritmo([{ t: 0, f: 100 }, { t: 10000, f: 550 }]) === 45);
+    // el kart propio: va a 50 por cuadro hasta el cuadro 100; el botón se suelta en el 100; desde el 101 frena
+    const mk = d => { const s = []; let x = 0; for (let f = 80; f < 130; f++) { x += f <= 100 + d ? 50 : 50 * 0.97 ** (f - 100 - d); s.push({ f, pos: [x, 0, 0] }); } return s; };
+    ok('respuesta del kart propio en el cuadro siguiente al botón = 0 cuadros de atraso', cuadrosDeRespuesta(mk(0), 100) === 0, String(cuadrosDeRespuesta(mk(0), 100)));
+    ok('con 3 cuadros de atraso (como el lockstep con retraso 3) mide 3', cuadrosDeRespuesta(mk(3), 100) === 3, String(cuadrosDeRespuesta(mk(3), 100)));
+    ok('sin cambio de velocidad no inventa una respuesta', cuadrosDeRespuesta(mk(100), 100) === null);
+  }
+} catch (e) { ok('sin errores', false, e.stack); }
+fin();
+</script>
+</body>
+</html>

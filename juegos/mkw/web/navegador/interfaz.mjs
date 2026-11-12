@@ -99,8 +99,16 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   // Con el juego andando se esconde sola (como un reproductor de video): vuelve 2,5 s al mover el mouse o tocar
   let tBarra = 0;
   const barraViva = () => { document.body.classList.add('barra-viva'); clearTimeout(tBarra); tBarra = setTimeout(() => document.body.classList.remove('barra-viva'), 2500); };
-  addEventListener('mousemove', barraViva, { passive: true });
-  addEventListener('touchstart', e => { if (!e.target.closest('.mkw-tactil')) barraViva(); }, { passive: true });
+  // (§269: con un ratón de verdad; el navegador manda un «mousemove» de mentira después de cada toque, y la barra volvía a
+  // aparecer encima del mando en pantalla justo después de tocarlo)
+  addEventListener('pointermove', e => { if (e.pointerType === 'mouse') barraViva(); }, { passive: true });
+  // §269 (el dueño, en el celular: «apretar la UI se buguea con la interfaz que aparece para configurar»): un dedo en el
+  // mando en pantalla es JUGAR: la barra de arriba (⚙, Controles, Partida…) se va al momento, así un toque siguiente en
+  // los botones de arriba del mando (▶, X, Y) no cae en ella y abre la configuración
+  addEventListener('touchstart', e => {
+    if (!e.target.closest('.mkw-tactil')) barraViva();
+    else if (document.body.classList.contains('started')) { clearTimeout(tBarra); document.body.classList.remove('barra-viva'); }
+  }, { passive: true, capture: true });
   // «← Juegos»: dentro del sitio, vuelve al salón. Con el juego andando, dos clics (el primero avisa en el botón)
   let seguro = 0;
   $('volverJuegos').onclick = e => {
@@ -422,6 +430,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     const quitar = texto === false || sinCortina;
     document.body.classList.toggle('sin-cortina', quitar);
     document.body.classList.toggle('cortina-mal', !quitar && mal);   // un error: el menú de inicio se aparta (inicio.mjs)
+    if (quitar || mal) cortinaVivo(null);   // (§276b: sin la señal de vida si se va o es un error)
     if (!quitar) {
       $('cortinaTexto').textContent = texto; $('cortina').classList.toggle('mal', mal);
       const barra = $('cortina').querySelector('.carga'), conPct = Number.isFinite(pct);
@@ -432,6 +441,14 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
         else { barra.removeAttribute('role'); barra.removeAttribute('aria-valuenow'); }
       }
     }
+  }
+  // §276b: la señal de vida bajo el texto (cartel-carga.mjs): segundos = null la esconde; calma = la línea tranquila
+  function cortinaVivo(segundos, calma = '') {
+    const v = $('cortinaVivo'), c = $('cortinaCalma');
+    if (!v) return;
+    v.classList.toggle('si', segundos != null);
+    v.lastElementChild.textContent = segundos != null ? `trabajando · ${segundos} s` : '';
+    if (c) c.textContent = segundos != null ? calma || '' : '';
   }
   if (sinCortina) cortina(false);
 
@@ -534,6 +551,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   // el modo lista el primer toque ya agrega (es lo que se hace todo el rato) y otro toque la quita.
   // §100 («Pedir copa»): textoJugar(c) = otro texto para el botón del modo gp («Pedir la Copa N ▸»); ctrl.pedidas({copa:
   //   [nombres]}) = las copas que piden los demás, con un 🙋 en su tarjeta (la anfitriona)
+  const ocultarSelector = new URLSearchParams(location.search).get('ocultarSelector') !== '0';
   async function elegirPista({ modo, copas, cuantas = 4, titulo: tituloPedido = '', cerrar = true, textoCerrar = 'Prefiero los menús del juego', lista: conf = {}, textoJugar = null }) {
     if (modo === 'copa') modo = 'lista';
     copas = await nombresPistas(copas);
@@ -549,13 +567,22 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       const grilla = el('div', { className: 'copas' });
       let medidor = null;
       const teclaEsc = e => {
-        if (e.key !== 'Escape' || dialogo.open) return;           // (Esc en un diálogo cierra solo el diálogo)
+        if (e.key !== 'Escape' || dialogo.open || caja.hidden) return;           // (Esc en un diálogo cierra solo el diálogo)
         if (guardadas?.open) { e.stopPropagation(); guardadas.open = false; return; }
         if (lado.classList.contains('abierta')) { e.stopPropagation(); desplegar(false); return; }
         if (cerrar) { e.stopPropagation(); terminar(null); }
       };
+      let volverPill = null;
+      const mostrarSelector = ver => {
+        caja.hidden = !ver;
+        if (ver) { volverPill?.remove(); volverPill = null; buscar.focus({ preventScroll: true }); return; }
+        volverPill = el('button', { type: 'button', className: 'boton principal', id: 'elegirVolver', textContent: '🗺 Volver a elegir ' + ({ gp: 'la copa', vs: 'la pista', lista: 'las pistas', sugerir: 'pistas' }[modo] || 'la pista'),
+          onclick: () => mostrarSelector(true) });
+        document.body.append(volverPill);
+        volverPill.focus({ preventScroll: true });
+      };
       const terminar = v => {
-        caja.remove(); document.removeEventListener('keydown', teclaEsc, true); document.removeEventListener('keydown', teclaCopa);
+        caja.remove(); volverPill?.remove(); document.removeEventListener('keydown', teclaEsc, true); document.removeEventListener('keydown', teclaCopa);
         clearTimeout(relojAuto); medidor?.disconnect(); listo(v);
       };
       document.addEventListener('keydown', teclaEsc, true);
@@ -758,7 +785,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       }
       // ←/→ y 1–4 cambian de pista; Enter juega la copa marcada (en el buscador: las flechas solo si está vacío)
       function teclaCopa(e) {
-        if (!enGp || dialogo.open || copaVista < 0 || pistaVista < 0 || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (!enGp || caja.hidden || dialogo.open || copaVista < 0 || pistaVista < 0 || e.ctrlKey || e.metaKey || e.altKey) return;
         const enTexto = e.target?.tagName === 'INPUT';
         if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && (!enTexto || !e.target.value)) {
           e.preventDefault(); verPista((pistaVista + (e.key === 'ArrowRight' ? 1 : 3)) % 4, false);
@@ -1137,6 +1164,14 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
         } }));
       if (enGp) cabeza.append(pedidasCab);
       if (cerrar && !enSugerir) cabeza.append(el('button', { type: 'button', className: 'boton', id: 'elegirCerrar', textContent: textoCerrar, onclick: () => terminar(null) }));
+      // §271 (el dueño, 2026-11-10: «agrega un boton en el multiplayer para ocultar y abrir la seleccion de mapas, hay veces
+      // donde quiero configurar cosas pero no puedo porque tengo la pantalla trabada en la seleccion de mapas»): «Ocultar»
+      // esconde el selector sin elegir nada (la sala y su reloj siguen) y deja una pastilla abajo para volver a abrirlo;
+      // escondido, la barra (⚙, Controles…) y el cajón quedan a mano. `?ocultarSelector=0` = sin el botón.
+      if (ocultarSelector) {
+        cabeza.append(el('button', { type: 'button', className: 'boton', id: 'elegirOcultar', title: 'Esconder la selección para usar los ajustes; vuelve con el botón de abajo',
+          textContent: '▾ Ocultar', onclick: () => mostrarSelector(false) }));
+      }
       caja.append(cabeza, el('div', { className: 'elegir-cuerpo' }, grilla, lado));
       document.body.append(caja);
       // en pantallas angostas el costado va fijo abajo: la grilla deja ese alto libre al final (sin esto la última copa
@@ -1281,7 +1316,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     };
   }
 
-  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, accion, chip, repintarChips, elegirPista, cortina, playlistBreve,
+  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, accion, chip, repintarChips, elegirPista, cortina, cortinaVivo, playlistBreve,
            conPortada, get cortinaPuesta() { return !document.body.classList.contains('sin-cortina'); },
            estado: t => { estado.textContent = t; } };
 }

@@ -113,6 +113,20 @@ ok('con «0 compilándose como mucho» (sin tope) se esperan los 700', d.estado.
   v.linea('[pipelines] precalentando 0');
   ok('§133: lista vacía («precalentando 0»): listo', graficosListos(v.estado).listo === true);
 }
+// §276: la espera de los menús con otra parte de la lista (graficosListos(e, parte)); la de la sala no cambia
+{
+  const g = crearPreparacion({ ahora: () => 0 });
+  g.linea('[pipelines] precalentando 700 con 8 compilándose como mucho');
+  g.linea('[pipelines] 100 llegaron, 8 en camino');
+  const c = graficosListos(g.estado, 0.25);
+  ok('§276: con parte 0,25 de 700 (175): 100 llegados espera, y el % va sobre 175', c.listo === false && c.pct === 57, JSON.stringify(c));
+  g.linea('[pipelines] 75 llegaron, 8 en camino');
+  ok('§276: con 175 llegados ya está para los menús…', graficosListos(g.estado, 0.25).listo === true);
+  ok('§276: …pero la meta de la sala (y la espera sin parte) sigue en la mitad', graficosListos(g.estado).listo === false && g.estado.pipesMeta === 350 && !g.lista());
+  ok('§276: una parte fuera de 0..1 se ignora (= sin parte)', graficosListos(g.estado, 2).listo === false && graficosListos(g.estado, 0).listo === false);
+  const s = crearPreparacion({ ahora: () => 0 }); s.marcar('sinPipelines');
+  ok('§276: sin lista, con parte, también listo', graficosListos(s.estado, 0.25).listo === true);
+}
 fin();
 </script>
 </body>

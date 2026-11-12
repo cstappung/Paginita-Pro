@@ -116,6 +116,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
   const enCurso = new Map();            // clave → promesa (dos lecturas del mismo bloque a la vez piden una sola vez)
   const guardando = new Map();          // clave → promesa de Cache Storage todavía escribiéndose
   const deFondo = new Set();            // claves traídas (o en camino) en segundo plano y todavía no leídas
+  const enTurno = new Set();            // (§285) claves en la fila de segundo plano que todavía no salieron (pendientes)
   const cola = [], colaBaja = [];       // trabajos de segundo plano esperando turno (normal y de prioridad baja)
   let activos = 0, activosBaja = 0, ultimoBaja = -Infinity, relojBaja = null, ultimaEspera = -Infinity;
   const racha = new Map();              // url → { fin, n }: dónde terminó la última lectura y cuántas seguidas van
@@ -339,7 +340,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     const lista = [];
     for (let b = b0; b <= b1; b++) if (falta(url, b)) lista.push(b);
     if (!lista.length) return;
-    for (const b of lista) deFondo.add(clave(url, b));
+    for (const b of lista) { const k = clave(url, b); deFondo.add(k); enTurno.add(k); }
     (baja ? colaBaja : cola).push({ url, tam, lista, baja });
     siguienteFondo();
   }
@@ -366,6 +367,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
       }
       if (!cola.length && ++enRafaga >= rafagaBaja) enRafaga = 0;
       const { url, tam, lista, baja } = cola.length ? cola.shift() : colaBaja.shift();
+      for (const b of lista) enTurno.delete(clave(url, b));
       const ahora = lista.filter(b => falta(url, b));    // lo que el juego no pidió mientras esperaba turno
       if (!ahora.length) continue;
       activos++; if (baja) activosBaja++;
@@ -726,6 +728,15 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     }
   });
 
+  // §285 (el dueño: «tener la carrera descargada al 100 %»): cuántos bytes de [ini, fin) de este archivo siguen pendientes
+  // AHORA: en la fila de segundo plano o en camino desde la red. Lo que ya está en la memoria o en la caja, o que nunca se
+  // pidió, no cuenta (un pedido que falló tampoco: el juego lo pedirá él mismo)
+  function pendientes(url, ini, fin) {
+    let n = 0;
+    for (let b = Math.floor(ini / bloque), z = Math.floor((fin - 1) / bloque); b <= z; b++) { const k = clave(url, b); if (enCurso.has(k) || enTurno.has(k)) n++; }
+    return Math.min(fin - ini, n * bloque);
+  }
+
   // Diagnóstico (mkw.mjs ?trazaDisco=1): dónde está el bloque que tiene el byte `inicio` de este archivo, AHORA
   async function donde(url, inicio) {
     const k = clave(url, Math.floor(inicio / bloque));
@@ -734,6 +745,6 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
              caja: caja ? !!(await caja.match(k)) || (cajaGrande > 1 && tieneGrupo(url, Math.floor(inicio / bloque / cajaGrande))) : null };
   }
   return { estado, abrir, leer, adelantar, adelantarBloques, adelantarRango, agrupar, vecinos, adelantarCarpeta,
-           entero, ocupado, borrar, bloque, donde, fijar, pausarBaja, barrer, guardarIndice,
+           entero, ocupado, borrar, bloque, donde, fijar, pendientes, pausarBaja, barrer, guardarIndice,
            inventario, borrarArchivos, protegidasDeOtras, cerrar: () => bc?.close() };
 }

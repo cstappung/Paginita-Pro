@@ -14,7 +14,7 @@
 <canvas id="grafico" width="240" height="48" style="background:#000"></canvas>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearImagenesVista, resumir, percentil, textoResumen, dibujarGrafico, engancharImagenes, histograma, META, CAUSAS } from '/web/navegador/imagenes-vista.mjs';
+import { crearImagenesVista, resumir, percentil, textoResumen, dibujarGrafico, engancharImagenes, histograma, META, CAUSAS, PUNTOS_GRAFICO, crearRitmoJuego, envolverEsperaJuego } from '/web/navegador/imagenes-vista.mjs';
 
 const { ok, fin } = prueba('imagenes-vista', 'G16: el 1 % bajo de las imágenes a la vista (sin el juego)');
 const P = 1000 / 60;
@@ -79,6 +79,50 @@ try {
     dibujarGrafico(g, puntos, { esperado: P });
     const alto = g.getImageData(120, 2, 1, 1).data, bajo = g.getImageData(10, 2, 1, 1).data;
     ok('el gráfico: el pico de 50 ms llega arriba con el color del disco; lo parejo no', alto[2] > 200 && alto[0] < 50 && bajo[2] < 100, `${[...alto]} / ${[...bajo]}`); }
+  // 13b. el 1 % bajo del gráfico = el de sus mismas barras (el dueño 2026-11-10), no el de una ventana más larga
+  { const g = document.getElementById('grafico').getContext('2d');
+    const puntos = Array.from({ length: PUNTOS_GRAFICO }, (_, i) => ({ ms: i % 60 === 7 ? 50 : P, causa: '' }));   // 4 picos en 240 (1,7 %)
+    const r = dibujarGrafico(g, puntos, { esperado: P }), s = resumir(puntos.map(p => p.ms));
+    const corto = dibujarGrafico(g, puntos.slice(0, 30), { esperado: P });
+    ok('el gráfico devuelve el 1 % bajo de sus barras (4 picos de 50 ms en 240 → 20) y es el mismo que resumir; con menos de 60 barras, nada',
+       PUNTOS_GRAFICO === 240 && r && r.imagenes === 240 && Math.abs(r.bajo1 - 20) < 0.01 && r.bajo1 === s.bajo1 && corto === null, `${r?.bajo1} / ${s.bajo1}`); }
+  // 13c. el gráfico de juego (el dueño 2026-11-11: uno de imagen y otro de juego): los cuadros de lógica como puntos
+  { const j = crearRitmoJuego(); let n = 0;
+    for (let i = 0; i < 300; i++) { n += i === 150 ? 4 : 1; j.anotar(i * P, n, 'x'); }   // un salto de 4 cuadros en un refresco
+    const u = j.ultimos(PUNTOS_GRAFICO), g = document.getElementById('grafico').getContext('2d');
+    const r = dibujarGrafico(g, u, { esperado: P, titulo: 'Juego' });
+    ok('ritmoJuego.ultimos: 240 puntos { ms, causa } y el gráfico los dibuja con su 1 % bajo', u.length === 240 && u.every(p => Number.isFinite(p.ms) && p.causa === '') && r && r.imagenes === 240,
+       `${u.length} / ${r?.bajo1}`); }
+  // 13d. §283: el juego se anota al EMPEZAR cada cuadro. Una carrera de mentira: cada cuadro empieza en su hora (la
+  // cuadrícula de 16,7 ms) y trabaja 6 a 14 ms (al azar con semilla); después espera: 1 ms de servicio (devuelve 0) y la
+  // espera que da la hora (devuelve 1). Al terminar (§270) los finales bailan ±4 ms → tirones falsos; al empezar, parejo.
+  { const correrCarrera = async (modo, { tarde = -1 } = {}) => {
+      const j = crearRitmoJuego(); let reloj = 0, n = 0, semilla = 7;
+      const azar = () => (semilla = (semilla * 1103515245 + 12345) % 2147483648) / 2147483648;
+      const e = envolverEsperaJuego(j, () => ['carrera', n], { modo, ahora: () => reloj });
+      const espera = e.envolver(async (hora) => { if (reloj + 1 < hora) { reloj += 1; return 0; } reloj = Math.max(reloj, hora); return 1; });
+      for (let i = 1; i <= 600; i++) {
+        reloj += 6 + 8 * azar() + (i === tarde ? 30 : 0);   // el trabajo del cuadro (uno 30 ms más: llega tarde de verdad)
+        n++;                                                 // (el cuadro avanzó la cuenta)
+        const hora = Math.max(i * P, reloj);                 // (la hora del cuadro siguiente; si ya pasó, empieza al tiro)
+        for (;;) { e.refresco(); if (await espera(hora, 1) !== 0) break; }
+      }
+      return j.resumen(600);
+    };
+    const fin = await correrCarrera('fin'), ini = await correrCarrera('inicio'), tarde = await correrCarrera('inicio', { tarde: 300 });
+    ok('§283: con los cuadros a su hora y el trabajo variable, al terminar da tirones falsos (< 52) y al empezar es parejo (> 59)',
+       fin.bajo1 < 52 && ini.bajo1 > 59, `fin ${fin.bajo1.toFixed(1)} / inicio ${ini.bajo1.toFixed(1)}`);
+    ok('§283: un cuadro que de verdad empieza tarde sí se ve (el p99,9 baja), y el modo por omisión es «inicio»',
+       tarde.bajo01 < 30 && envolverEsperaJuego(crearRitmoJuego(), () => ['x', 0]).modo === 'inicio', `0,1 % bajo ${tarde.bajo01?.toFixed(1)}`);
+    // los refrescos: caen dentro de una espera, justo tras el final del cuadro; con esperas recientes no anotan
+    { let t = 0, n = 0; const j = crearRitmoJuego(); const e = envolverEsperaJuego(j, () => ['x', n], { ahora: () => t });
+      const w = e.envolver(async () => 1);
+      await w(0); n = 1; t = 10; e.refresco(); t = 16.7; await w(16.7);
+      const primero = j.tiempos()[0];                                    // (16,7: del comienzo al comienzo; 10 = el final)
+      t = 200; n = 5; e.refresco(); t = 216.7; n = 6; e.refresco();   // sin esperas (atrasado): los refrescos anotan
+      ok('§283: con esperas recientes el refresco no anota (el cuadro mide 16,7, no 10); sin esperas (atrasado) sí',
+         Math.abs(primero - 16.7) < 0.01 && j.total === 6, `primero ${primero} ms, ${j.total} cuadros anotados`); }
+  }
   // 14. modo «entrega» (el de la página, §256): el tiempo de entrega a entrega, sin el redondeo del monitor
   { const v = crearImagenesVista({ modo: 'entrega' }); v.esperado = P;
     // 60 imágenes parejas en un monitor de 144 Hz: los refrescos dan 2 y 3 (13,9 y 20,8 ms), la entrega 16,7 parejo

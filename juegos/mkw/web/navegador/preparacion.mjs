@@ -77,8 +77,15 @@ export function crearPreparacion({ ahora = () => performance.now() } = {}) {
 // pipelines de los menús? (la primera parte de la lista, la misma meta que la sala). e = estado de crearPreparacion.
 // Mientras aurora no dijo «precalentando N» todavía no se sabe (el juego recién arranca): se espera; si a los 30 cuadros
 // no lo dijo, mkw.mjs marca «sinPipelines» y ya no hay nada que esperar. → { listo, pct (0..100) }
-export function graficosListos(e) {
-  if (!e || e.sinPipelines || e.pipesHechos) return { listo: true, pct: 100 };
+// §276: `parte` (0..1, opcional) = otra parte de la lista para los menús (sin ella, la misma meta que la sala)
+export function graficosListos(e, parte = null) {
+  if (!e || e.sinPipelines) return { listo: true, pct: 100 };
+  if (parte > 0 && parte < 1 && e.pipesTotal > 0) {
+    const meta = Math.ceil(e.pipesTotal * parte);
+    if (e.pipesLlegados >= meta || e.pipesHechos) return { listo: true, pct: 100 };
+    return { listo: false, pct: Math.min(99, Math.round(100 * e.pipesLlegados / meta)) };
+  }
+  if (e.pipesHechos) return { listo: true, pct: 100 };
   if (!(e.pipesTotal > 0)) return { listo: false, pct: 0 };
   return { listo: false, pct: Math.min(99, Math.round(100 * e.pipesLlegados / Math.max(1, e.pipesMeta))) };
 }

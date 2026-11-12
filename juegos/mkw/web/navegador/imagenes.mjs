@@ -14,13 +14,19 @@
 const hex = (c, f) => (0x100 + 4 * c + f).toString(16);
 const MAX_CLIPS = 12;
 
+// §271: el índice se comparte entre todos los que abren los mismos paquetes (el selector de pistas y la pantalla de
+// «Datos del juego» de ⚙ tenían cada uno el suyo y el índice se bajaba dos veces: una llamada de más al Worker)
+const INDICES = new Map();                          // carpeta → Promise<índice>
+
 export function crearImagenes(base) {
   const dir = base + '/paquetes/';
-  let indice = null;
   const paquetes = new Map();                       // nombre del paquete → Promise<Map(nombre → blob: URL)>
   const clipsUsados = [];                           // nombres de paquetes de videítos, del más viejo al más nuevo
 
-  const leerIndice = () => indice ||= fetch(dir + 'indice.json').then(r => r.ok ? r.json() : null).catch(() => null);
+  const leerIndice = () => {
+    if (!INDICES.has(dir)) INDICES.set(dir, fetch(dir + 'indice.json').then(r => r.ok ? r.json() : null).catch(() => null));
+    return INDICES.get(dir);
+  };
 
   async function abrir(nombre) {
     const r = await fetch(dir + nombre);

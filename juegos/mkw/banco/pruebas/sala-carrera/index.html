@@ -474,6 +474,85 @@ salas.set('ana', ap18); salas.set('beto', bp18);
 for (let i = 0; i < 9; i++) await avanzar(1000);
 ok('§100: en la playlist no se pide copa', bp18.pedirCopa(4) === false);
 [ap18, bp18].forEach(x => x.detener());
+
+// §269b.14 (el dueño: «empieza el contador antes de que cargue el juego para todos»): ningún plazo empieza hasta que
+// todas las consolas tienen el juego cargado (su latido lleva c = 1); mientras, el estado dice quiénes faltan
+{
+  const carga = async (extra = {}) => {
+    await vaciar(); salas.clear();
+    const op = { segundosCopa: 90, esperarListo: true, ...extra };
+    const a = persona('ana', op), b = persona('beto', op), c = persona('caro', op);
+    for (let i = 0; i < 4; i++) await avanzar(1000);
+    a.copaLista(); b.copaLista(); for (let i = 0; i < 2; i++) await avanzar(1000);
+    return [a, b, c];
+  };
+  let [a, b, c] = await carga();
+  ok('§269b.14: Ana y Beto cargaron y Caro no: la copa no tiene reloj y todos ven que falta Caro',
+     !a.estado().plazo && [a, b, c].every(x => (x.estado().faltanCarga || []).join() === 'caro'), JSON.stringify([a, b, c].map(x => x.estado().faltanCarga)));
+  c.copaLista(); for (let i = 0; i < 2; i++) await avanzar(1000);
+  ok('§269b.14: Caro cargó: el reloj de la copa empieza (lo ven todos) y ya no falta nadie',
+     a.estado().plazo > t && a.estado().plazo <= t + 90000 && b.estado().plazo === a.estado().plazo && !(a.estado().faltanCarga || []).length,
+     `plazo en ${(a.estado().plazo - t) / 1000} s · faltan ${JSON.stringify(a.estado().faltanCarga)}`);
+  [a, b, c].forEach(x => x.detener());
+  // (la elección de 45 s: la copa se puso con Caro todavía cargando)
+  [a, b, c] = await carga({ segundosCopa: 0 });
+  a.ponerPistas(copa); for (let i = 0; i < 3; i++) await avanzar(1000);
+  ok('§269b.14: la copa puesta con Caro cargando: la elección no tiene reloj todavía', a.estado().fase === 'elegir' && !a.estado().plazo,
+     `${a.estado().fase} plazo ${a.estado().plazo}`);
+  c.copaLista(); for (let i = 0; i < 2; i++) await avanzar(1000);
+  ok('§269b.14: …y empieza (45 s) cuando Caro cargó', a.estado().fase === 'elegir' && a.estado().plazo > t && a.estado().plazo <= t + SEGUNDOS_ELEGIR * 1000,
+     `plazo en ${(a.estado().plazo - t) / 1000} s`);
+  [a, b, c].forEach(x => x.detener());
+  // (el tope: Caro manda latidos pero no termina de cargar nunca)
+  [a, b, c] = await carga({ topeCarga: 20000 });
+  for (let i = 0; i < 10; i++) await avanzar(1000);
+  const antes = a.estado().plazo;
+  for (let i = 0; i < 12; i++) await avanzar(1000);
+  ok('§269b.14: Caro no carga nunca: pasado el tope la copa sigue sin ella (el reloj empieza y no falta nadie)',
+     !antes && a.estado().plazo > 0 && !(a.estado().faltanCarga || []).length, `antes ${antes}, después ${a.estado().plazo ? (a.estado().plazo - t) / 1000 + ' s' : 0}`);
+  [a, b, c].forEach(x => x.detener());
+  // (?esperarCarga=0: como antes, el reloj empieza con la anfitriona preparada)
+  [a, b, c] = await carga({ esperarCarga: false });
+  ok('§269b.14: con esperarCarga = false, como antes: el reloj empieza aunque Caro no cargó', a.estado().plazo > 0 && !a.estado().faltanCarga,
+     `plazo ${a.estado().plazo}`);
+  [a, b, c].forEach(x => x.detener());
+}
+
+// §285 (el dueño: «todos los jugadores deben empezar al mismo tiempo y tener la carrera descargada al 100 %»): en la
+// carrera n la anfitriona no anota paqueteOk hasta que el latido de cada uno dice 100 % del paquete de esa carrera; mientras,
+// paqueteFaltan dice quién y cuánto. paqueteOk.en = la hora de la sala en que todas sueltan (la misma)
+{
+  const corriendo = async (extra = {}) => {
+    await vaciar(); salas.clear();
+    const op = { segundosCopa: 0, ...extra };
+    const a = persona('ana', op), b = persona('beto', op), c = persona('caro', op);
+    for (let i = 0; i < 3; i++) await avanzar(1000);
+    a.ponerPistas(copa); for (let i = 0; i < 2; i++) await avanzar(1000);
+    for (let i = 0; i < 47; i++) await avanzar(1000);
+    return [a, b, c];
+  };
+  let [a, b, c] = await corriendo();
+  a.paquete(1, 100); b.paquete(1, 100); c.paquete(1, 40); for (let i = 0; i < 2; i++) await avanzar(1000);
+  ok('§285: Caro va al 40 %: nadie tiene paqueteOk y todos ven que falta Caro con su %', a.estado().fase === 'correr' && a.estado().carrera === 1 &&
+     [a, b, c].every(x => !x.estado().paqueteOk && x.estado().paqueteFaltan?.de?.caro === 40 && Object.keys(x.estado().paqueteFaltan.de).length === 1),
+     JSON.stringify([a.estado().fase, a.estado().carrera, c.estado().paqueteFaltan, a.estado().paqueteOk]));
+  c.paquete(1, 100); await avanzar(0); await avanzar(1000);
+  const ok1 = a.estado().paqueteOk;
+  ok('§285: Caro llegó al 100 %: paqueteOk de la carrera 1, la misma hora para todas (en el futuro cercano)', ok1?.n === 1 && !ok1.sin &&
+     [b, c].every(x => x.estado().paqueteOk?.en === ok1.en) && !a.estado().paqueteFaltan, JSON.stringify(ok1));
+  [a, b, c].forEach(x => x.detener());
+  // (el tope: Caro no termina nunca; sigue sin ella)
+  [a, b, c] = await corriendo({ topePaquete: 10000 });
+  a.paquete(1, 100); b.paquete(1, 100); c.paquete(1, 10);
+  for (let i = 0; i < 13; i++) await avanzar(1000);
+  ok('§285: tope de espera: paqueteOk con Caro en «sin»', a.estado().paqueteOk?.n === 1 && (a.estado().paqueteOk.sin || []).join() === 'caro', JSON.stringify(a.estado().paqueteOk));
+  [a, b, c].forEach(x => x.detener());
+  // (?esperarPaquete=0: nunca se espera)
+  [a, b, c] = await corriendo({ esperarPaquete: false });
+  c.paquete(1, 10); for (let i = 0; i < 2; i++) await avanzar(1000);
+  ok('§285: con esperarPaquete = false, como antes: sin paqueteFaltan ni paqueteOk', !a.estado().paqueteFaltan && !a.estado().paqueteOk);
+  [a, b, c].forEach(x => x.detener());
+}
 fin();
 </script>
 </body>

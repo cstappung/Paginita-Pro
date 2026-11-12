@@ -44,7 +44,7 @@ const p = await navegador.newPage({ viewport: { width: 1000, height: 600 } });
 const errores = [];
 p.on('pageerror', e => { errores.push(e.message); console.log('[pageerror] ' + e.message); });
 const t0 = Date.now();
-await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=${PISTA}&cc=c150&cpu=normal&pj=0&kart=1${ELEGIR ? '&elegir=1' : ''}`);
+await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=${PISTA}&cc=c150&cpu=normal&pj=0&kart=1${ELEGIR ? '&elegir=1' : ''}${opcion('--extra', '')}`);
 
 // Lo que se ve, cada 100 ms: la sección del juego y si la cortina tapa
 const linea = [];             // [segundos, sección, cortina] cada vez que algo cambia

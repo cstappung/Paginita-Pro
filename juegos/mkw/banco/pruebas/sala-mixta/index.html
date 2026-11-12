@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sala mixta</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Sala mixta: <span>la red de mentira y los escenarios</span></h1>
+<p>Prueba <b>sin el juego</b> las dos piezas puras del simulador de sala mixta (bitácora §281):
+  <code>web/navegador/red-simulada.mjs</code> (cada PC con su red: demora, pérdida, ancho de banda, picos, cortes y
+  cambios, con un reloj de mentira) y <code>web/navegador/sala-mixta.mjs</code> (los escenarios con semilla, lo que va en
+  la dirección de cada página y el veredicto ✓/✗ del informe).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { azarConSemilla, tramo, leerRedSim, crearEnlace, conEnlace, crearRedSim } from '/web/navegador/red-simulada.mjs';
+import { ESCENARIOS, REDES, armarEscenario, parametrosDe, specRed, lineaDeTiempo, evaluar, filaResumen, percentil } from '/web/navegador/sala-mixta.mjs';
+import { crearMalla } from '/web/navegador/malla.mjs';
+
+const { ok, nota, fin } = prueba('sala-mixta', 'Sala mixta (sin el juego)');
+const bytes = n => new Uint8Array(n).fill(7);
+
+try {
+  // ---- 1. El azar con semilla ----
+  const a1 = azarConSemilla(42), a2 = azarConSemilla(42), a3 = azarConSemilla(43);
+  const s1 = Array.from({ length: 50 }, a1), s2 = Array.from({ length: 50 }, a2), s3 = Array.from({ length: 50 }, a3);
+  ok('la misma semilla da los mismos números', JSON.stringify(s1) === JSON.stringify(s2));
+  ok('otra semilla, otros números', JSON.stringify(s1) !== JSON.stringify(s3));
+  ok('entre 0 y 1', s1.every(x => x >= 0 && x < 1));
+
+  // ---- 2. Leer ?redSim ----
+  ok('sin ?redSim no hay red de mentira (nada cambia)', leerRedSim('') === null && leerRedSim('?redMala=50,10,1') === null && crearRedSim(null) === null);
+  const spec = { semilla: 9, baja: { ms: 30, var: 5, perdida: 1, kbps: 1000 }, sube: { ms: 60 }, picos: { cada: 5, ms: 100, dura: 500 } };
+  const leida = leerRedSim('?redSim=' + encodeURIComponent(JSON.stringify(spec)));
+  ok('?redSim se lee entero', leida && leida.semilla === 9 && leida.baja.ms === 30 && leida.baja.kbps === 1000 && leida.sube.ms === 60 && leida.sube.perdida === 0 && leida.picos.cada === 5, JSON.stringify(leida));
+  ok('un ?redSim roto no rompe (null)', leerRedSim('?redSim=%7Bno') === null);
+  ok('los números fuera de rango se acotan', tramo({ ms: -5, perdida: 300 }).ms === 0 && tramo({ perdida: 300 }).perdida === 100);
+
+  // ---- 3. La demora y la variación ----
+  {
+    const e = crearEnlace({ ms: 50, var: 10 }, { azar: azarConSemilla(1) });
+    const d = Array.from({ length: 2000 }, (_, k) => e.paso('x', bytes(40), 'udp', k * 16));
+    ok('la demora queda en 50 ± 10 ms', d.every(x => x >= 40 && x <= 60), `de ${Math.min(...d).toFixed(1)} a ${Math.max(...d).toFixed(1)}`);
+    ok('…y en promedio ~50', Math.abs(e.cuenta.demoraMedia - 50) < 1.5, e.cuenta.demoraMedia.toFixed(2));
+  }
+  // ---- 4. La pérdida: solo «udp» ----
+  {
+    const e = crearEnlace({ ms: 10, perdida: 5 }, { azar: azarConSemilla(2) });
+    let udp = 0, tcp = 0;
+    for (let k = 0; k < 10000; k++) { if (e.paso('x', bytes(40), 'udp', k) === null) udp++; if (e.paso('x', bytes(40), 'tcp', k) === null) tcp++; }
+    ok('«udp» pierde ~5 %', udp > 400 && udp < 600, `${udp} de 10000`);
+    ok('«tcp» no pierde nada (es el confiable)', tcp === 0);
+  }
+  // ---- 5. «tcp» llega en orden ----
+  {
+    const e = crearEnlace({ ms: 50, var: 40 }, { azar: azarConSemilla(3) });
+    const llegadas = Array.from({ length: 300 }, (_, k) => k + e.paso('u', bytes(40), 'tcp', k));
+    ok('«tcp» en orden aunque la variación sea grande', llegadas.every((x, k) => !k || x >= llegadas[k - 1]));
+    const u = Array.from({ length: 300 }, (_, k) => k + e.paso('u', bytes(40), 'udp', k));
+    ok('«udp» sí puede desordenarse', u.some((x, k) => k && x < u[k - 1]));
+  }
+  // ---- 6. El ancho de banda ----
+  {
+    // 100 kbit/s = 100 bits por ms: 1250 bytes = 100 ms de cable
+    const e = crearEnlace({ ms: 0, kbps: 100, cola: 250 }, { azar: azarConSemilla(4) });
+    const d = [0, 1, 2, 3, 4].map(k => e.paso('x', bytes(1250), 'udp', 0));
+    ok('cada paquete espera que el cable se desocupe (100, 200 ms…)', Math.round(d[0]) === 100 && Math.round(d[1]) === 200, d.map(x => x === null ? 'tirado' : Math.round(x)).join(', '));
+    ok('…con la cola llena (más de 250 ms) «udp» se tira, como un router lleno', d.slice(3).every(x => x === null) && e.cuenta.tiradosCola === 2, d.map(x => x === null ? 'tirado' : Math.round(x)).join(', '));
+    const t = e.paso('x', bytes(1250), 'tcp', 0);
+    ok('«tcp» espera su turno, nunca se tira', t !== null && Math.round(t) === 400, String(t));
+    const despues = e.paso('x', bytes(125), 'udp', 1000);
+    ok('cuando el cable se vacía vuelve a ir sin espera (10 ms por 125 bytes)', Math.round(despues) === 10, String(despues));
+    const sin = crearEnlace({ ms: 5 }, { azar: azarConSemilla(4) });
+    ok('sin kbps no hay tope', Array.from({ length: 50 }, () => sin.paso('x', bytes(50000), 'udp', 0)).every(x => x === 5));
+  }
+  // ---- 7. Los picos ----
+  {
+    const e = crearEnlace({ ms: 20 }, { azar: azarConSemilla(5), picos: { cada: 2, ms: 300, dura: 400 } });
+    const d = Array.from({ length: 2000 }, (_, k) => e.paso('x', bytes(40), 'udp', k * 10));   // 20 s
+    const enPico = d.filter(x => x > 200).length, normales = d.filter(x => x === 20).length;
+    ok('hay picos (cada ~2 s, 400 ms con +300 ms)', e.cuenta.picos >= 6 && e.cuenta.picos <= 16, `${e.cuenta.picos} picos`);
+    ok('…y fuera del pico la demora de siempre', enPico > 100 && enPico < 800 && normales + enPico === 2000, `en pico ${enPico}, normales ${normales}`);
+    const e2 = crearEnlace({ ms: 20 }, { azar: azarConSemilla(5), picos: { cada: 2, ms: 300, dura: 400 } });
+    const d2 = Array.from({ length: 2000 }, (_, k) => e2.paso('x', bytes(40), 'udp', k * 10));
+    ok('la misma semilla, los mismos picos', JSON.stringify(d) === JSON.stringify(d2));
+  }
+  // ---- 8. El corte y el cambio ----
+  {
+    const e = crearEnlace({ ms: 30 }, { azar: azarConSemilla(6) });
+    e.cortar(3000, 1000);
+    ok('durante el corte «udp» no pasa', e.paso('x', bytes(40), 'udp', 2000) === null && e.cuenta.tiradosCorte === 1);
+    const t = e.paso('x', bytes(40), 'tcp', 2000);
+    ok('…y «tcp» queda retenido hasta que vuelve (llega a los 4000 + 30)', Math.round(2000 + t) === 4030, String(2000 + t));
+    ok('después del corte, todo normal', e.paso('x', bytes(40), 'udp', 4500) === 30 && !e.cortado(4500) && e.cortado(3999));
+    e.cambiar({ ms: 120, perdida: 0 });
+    ok('el cambio de red vale desde ese momento', e.paso('x', bytes(40), 'udp', 5000) === 120 && e.tramo().ms === 120);
+  }
+  // ---- 9. conEnlace (lo que usa la malla) con un reloj de mentira ----
+  {
+    const pend = [], llegaron = [];
+    let ahora = 0;
+    const f = conEnlace((u, b, c) => llegaron.push([u, b[0], c, ahora]), crearEnlace({ ms: 40 }, { azar: azarConSemilla(7) }),
+      { reloj: (g, ms) => pend.push([ahora + ms, g]), ahora: () => ahora });
+    const b = bytes(10); b[0] = 3;
+    ok('quien manda siempre recibe true (no sabe si la red lo perdió)', f('u1', b, 'udp') === true);
+    b[0] = 99;   // (quien manda reusa su búfer)
+    ahora = 40; for (const [t, g] of pend) if (t <= ahora) g();
+    ok('llega a los 40 ms, una copia (el búfer reusado no lo cambia)', llegaron.length === 1 && llegaron[0][1] === 3 && llegaron[0][3] === 40, JSON.stringify(llegaron));
+  }
+  // ---- 10. La red de una página: bajada y subida aparte, el mando de las pruebas ----
+  {
+    let t = 0;
+    const r = crearRedSim(leerRedSim('?redSim=' + encodeURIComponent(JSON.stringify({ semilla: 3, baja: { ms: 10 }, sube: { ms: 70 } }))), { ahora: () => t });
+    ok('la subida y la bajada van aparte (ida distinta de la vuelta)', r.baja.paso('x', bytes(40), 'udp', 0) === 10 && r.sube.paso('x', bytes(40), 'udp', 0) === 70);
+    r.cortar(2000);
+    t = 500;
+    ok('cortar() corta los dos sentidos', r.baja.paso('x', bytes(40), 'udp', 500) === null && r.sube.paso('x', bytes(40), 'udp', 500) === null && r.estado().cortado);
+    r.cambiar({ sube: { ms: 200 } });
+    t = 3000;
+    ok('cambiar() cambia solo lo pedido', r.sube.paso('x', bytes(40), 'udp', 3000) === 200 && r.baja.paso('x', bytes(40), 'udp', 3000) === 10);
+    const e = r.estado();
+    ok('estado() cuenta todo y guarda la historia', e.baja.tiradosCorte === 1 && e.sube.tiradosCorte === 1 && e.historia.map(h => h.que).join() === 'corte,cambio', JSON.stringify(e).slice(0, 200));
+  }
+  // ---- 11. La malla sin ?redSim: la de siempre ----
+  {
+    const senal = { entrar: async () => {}, sale: () => {}, presencia: () => {}, mandar: () => {}, alPresencia: () => () => {}, alMensaje: () => () => {} };
+    let m = null; try { m = crearMalla({ uid: 'x', senal, RTC: function () {} }); } catch (e) { nota('crearMalla con señal de mentira: ' + e.message); }
+    ok('la malla arma sin ?redSim y no crea red de mentira', !!m && (globalThis.mkwRedSim === null || globalThis.mkwRedSim === undefined), String(globalThis.mkwRedSim));
+  }
+
+  // ---- 12. Los escenarios ----
+  const nombres = ['parejos', 'uno-lento', 'uno-lejos', 'mezcla-graficos', 'telefono-imaginario', 'tormenta', 'se-va-y-vuelve', 'seis-mixtos'];
+  ok('están los 8 escenarios pedidos', nombres.every(n => ESCENARIOS[n]), Object.keys(ESCENARIOS).join(', '));
+  const todos = nombres.map(n => armarEscenario(n, { semilla: 1, segundos: 60 }));
+  ok('cada uno con 2 a 6 jugadores, y seis-mixtos con 6', todos.every(e => e.jugadores.length >= 2 && e.jugadores.length <= 6) && todos.find(e => e.nombre === 'seis-mixtos').jugadores.length === 6);
+  ok('la misma semilla arma lo mismo', nombres.every(n => JSON.stringify(armarEscenario(n, { semilla: 5 })) === JSON.stringify(armarEscenario(n, { semilla: 5 }))));
+  ok('otra semilla mueve los tirones y los cortes de la tormenta', JSON.stringify(lineaDeTiempo(armarEscenario('tormenta', { semilla: 1 }))) !== JSON.stringify(lineaDeTiempo(armarEscenario('tormenta', { semilla: 2 }))));
+  ok('un escenario que no existe avisa', (() => { try { armarEscenario('nada'); return false; } catch (e) { return /desconocido/.test(e.message); } })());
+  const mg = todos.find(e => e.nombre === 'mezcla-graficos');
+  ok('mezcla-graficos mezcla N8 No / 30 parejas / la del medio / Automático y 60 y 144 Hz', mg.jugadores.map(j => j.n8).join() === '0,1,2,auto' && new Set(mg.jugadores.map(j => j.monitor)).size === 2);
+  const tel = todos.find(e => e.nombre === 'telefono-imaginario').jugadores[2];
+  ok('el teléfono imaginario: CPU ×4, 30 parejas, red de celular', tel.cpu === 4 && tel.n8 === '1' && tel.red === 'celular-malo');
+  const tor = armarEscenario('tormenta', { semilla: 1, segundos: 60 }), lt = lineaDeTiempo(tor);
+  ok('la tormenta lleva corte, cambio de red, tirones y pestaña oculta, todo dentro de la carrera', ['corte', 'cambio', 'tiron', 'oculta'].every(q => lt.some(x => x.que === q)) && lt.every(x => x.t > 3 && x.t < 60),
+    lt.map(x => `${x.t}s ${String.fromCharCode(65 + x.i)} ${x.que}`).join(' · '));
+  ok('los tirones son de 0,5 a 2 s', lt.filter(x => x.que === 'tiron').every(x => x.ms >= 500 && x.ms <= 2000));
+  ok('cada jugador con su semilla de red (no pierden los mismos paquetes)', new Set(tor.jugadores.map(j => j.semillaRed)).size === tor.jugadores.length);
+  ok('todas las redes con nombre son válidas', Object.keys(REDES).every(n => specRed({ red: n, semillaRed: 1 }).baja));
+  const q = parametrosDe(tor.jugadores[2]);
+  const qs = new URLSearchParams(q.slice(1));
+  ok('la dirección lleva N8, salida y la red de mentira legible', qs.get('n8') === 'auto' && qs.get('salida') === '720' && leerRedSim('?' + q.slice(1))?.baja.ms === REDES.wifi.baja.ms, q.slice(0, 120));
+  ok('los efectos y las texturas con los nombres de la página (quitarEfectos, texturasMenos)', /quitarEfectos=15/.test(parametrosDe(mg.jugadores[1])) && /texturasMenos=1/.test(parametrosDe(mg.jugadores[1])));
+
+  // ---- 13. El veredicto ----
+  const e = armarEscenario('parejos', { semilla: 1 });
+  const bueno = i => ({ i, enCarrera: true, karts: 12, logica: 60, imagenes: 60, bajo1: 55, causas: {}, avisos: [], puntos: [15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+    vr: { antes: 5000, despues: 5010, corredores: [{ uid: 'a', puesto: 1, vr: 5000 }] }, ls: { huellasIguales: 20, cuadros: 3600, inventados: 3, relevos: 0, pausas: [], fuera: false } });
+  const med = { modo: 'lockstep', jugadores: [0, 1, 2].map(bueno), adelantos: [4, 5, 6, 5, 4, 6], largada: { cumple: true, detalle: 'ok' }, tablas: [{ a: 15 }, { a: 15 }, { a: 15 }] };
+  const P = evaluar(e, med);
+  ok('una sala sana: todos los puntos ✓', P.every(p => p.ok), P.filter(p => !p.ok).map(p => p.texto).join('; '));
+  const malo = JSON.parse(JSON.stringify(med)); malo.jugadores[1].ls.desincronizado = { cuadro: 900 }; malo.adelantos.push(300, 400, 500);
+  malo.jugadores[2].puntos = [15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 0, 1]; malo.jugadores[2].avisos = ['📶 B va lento'];
+  const P2 = evaluar(e, malo), mal = P2.filter(p => !p.ok && !p.nota).map(p => p.texto);
+  ok('…y una rota da ✗ en huellas, adelanto, puntos y avisos', ['huellas', 'escapa', 'puntos', 'avisos'].every(k => mal.some(t => t.includes(k))), mal.join('; '));
+  const lentoE = armarEscenario('uno-lento', { semilla: 1 }); const mL = JSON.parse(JSON.stringify(med)); mL.jugadores[2].logica = 31;
+  const PL = evaluar(lentoE, mL);
+  ok('la lógica baja del lento a propósito es nota, no falla', PL.filter(p => !p.ok && !p.nota).length === 0 && PL.some(p => !p.ok && p.nota && p.texto.startsWith('C:')));
+  const est = { ...med, modo: 'estado', largada: null, jugadores: med.jugadores.map((j, k) => ({ ...j, ls: null, errorCpu: k ? { medio: 120, p90: 300, n: 400 } : null })) };
+  ok('«Cada uno su kart»: las CPU iguales en vez de las huellas', evaluar(e, est).find(p => p.texto.includes('CPU de la anfitriona'))?.ok === true);
+  ok('el percentil', percentil([5, 1, 3, 2, 4], 0.5) === 3 && percentil([], 0.5) === null);
+  ok('la fila de la tabla resumen', /^\| parejos \| lockstep \| 3 \| \d+\/\d+ \| 60\/60\/60 /.test(filaResumen(e, 'lockstep', P, med.jugadores)), filaResumen(e, 'lockstep', P, med.jugadores));
+} catch (e) { ok('la prueba corrió entera', false, e.stack); }
+fin();
+</script>
+</body>
+</html>

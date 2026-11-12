@@ -58,7 +58,9 @@
 export const MARCA = 0xA7;
 export const RETRASO = 3;                  // el de partida si no hay medidas (y el de siempre con ?retraso=fijo)
 export const RETRASO_MIN = 2;
-export const RETRASO_MAX = 12;             // 200 ms: más ya no se maneja (y solo lo sufre quien tiene esa conexión)
+// (§269: 12 → 18. Con 2 PCs y una ida y vuelta de más de 200 ms —un repetidor, otra ciudad—, con 12 sus botones le
+// llegaban tarde a la autoridad toda la carrera. 300 ms: solo lo sufre quien tiene esa conexión)
+export const RETRASO_MAX = 18;
 const PING_CADA = 500, MARGEN_MS = 6, MUESTRAS = 3, VENTANA = 16, TIRON_MS = 100, REVISAR_MS = 40;
 const REPITE = 16, CADA_HUELLA = 30, ESPERA_PIDE = 7, ESPERA_CORTE = 4000, ESPERA_INICIO = 45000;
 // §93 (C4), la LARGADA: los primeros 600 cuadros (10 s) de cada carrera. La primera vez que alguien juega, ahí su
@@ -116,6 +118,78 @@ const PEDIDO_VALE = 2000, CALLADO_MS = 300;
 // que va suelto; a lo más DEUDA_MAX cuadros por rato, uno cada CADA_FRENO cuadros (como mucho un 12 % más lento un
 // momento); al que va más de TOPE_SINCRO cuadros atrás no se lo espera (eso es del relevo)
 const UMBRAL_SINCRO = 1, TOPE_SINCRO = 20, CADA_FRENO = 8, DEUDA_MAX = 4;
+// §269b.19: con el árbitro, el que no es la autoridad se frena por ella solo desde 3 cuadros delante (antes desde 2).
+// ?umbralSincro=N = otro umbral (1 = antes)
+const LENTA_PROPIA = /[?&]lentaPropia=1(&|$)/.test(globalThis.location?.search || '');   // §269b.20 (abajo)
+const UMBRAL_SINCRO_ARB = (() => { const m = /[?&]umbralSincro=(\d+)/.exec(globalThis.location?.search || ''); return m ? Number(m[1]) : 2; })();
+// §269: un jugador que se oyó hace menos de esto está vivo aunque sus botones lleguen tarde (inventado(): va su último
+// botón de verdad entero). ?tardeVivo=0 = como antes (solo A y el volante soltándose)
+const VIVO_MS = 400;
+const TARDE_VIVO = !/[?&]tardeVivo=0\b/.test(globalThis.location?.search || '');
+// §269b (el dueño, con su celular: «el PC le gana por 2 segundos»; la orquestadora: «con el lockstep la diferencia nunca
+// debe pasar de unos cuadros; si el celular no alcanza 60, toda la sala va a su ritmo»): con el árbitro la autoridad no
+// se frenaba por nadie (§191) y, si el lento seguía mandando, usaba sus botones atrasados (tardeVivo): medido en el Oppo,
+// el PC llegó a ir 685 cuadros (11 s) delante y el teléfono manejaba con sus botones de hace segundos. Ahora la
+// AUTORIDAD se frena si va más de UMBRAL_VIVO cuadros delante de un jugador que sigue mandando (algo suyo hace menos de
+// 1 s) y que no se pone al día solo: lo que va delante sale de los informes (delanteDe, la red se cancela: un jugador
+// LEJOS pero con un aparato que da 60 no la frena), y se frena un cuadro en CADA cuadro hasta alcanzarlo (con
+// CADA_FRENO = 8, como los demás, no alcanzaba: un teléfono a 38 cuadros/s necesita que la sala baje de 60 a 38).
+// Al callado (más de 1 s sin nada) no: se lo releva como antes. ?esperaVivo=0 = como antes
+const ESPERA_VIVO = !/[?&]esperaVivo=0\b/.test(globalThis.location?.search || '');
+// §269b.15 (el simulador, «uno-lento»: la autoridad le inventaba al lento el 8–10 % de los botones; su retraso ya estaba en
+// el tope, 18, y la autoridad se le iba hasta 23–25 cuadros delante en un tirón suyo antes de que el freno —que decide con
+// dos informes, hasta 1 s— se prendiera). La espera fina por el botón de verdad del lento (§269b.8) va desde que ese
+// jugador está más de ESPERA_FINA cuadros detrás de mí (descontada media ida y vuelta), sin esperar al freno. Solo con
+// el que la sala sigue (se oye, avanza, da al menos frenoPiso). **Apagada por omisión** (medido con el simulador: empeora;
+// esperar el botón del lento o del lejano atrasa el registro que ese mismo jugador necesita para seguir corriendo, y la
+// vuelta suma una ida y vuelta entera: uno-lejos 8,9 → 38 % de inventados, el lento de uno-lento bajó de 45 a 35 cuadros/s).
+// ?esperaFina=N = prenderla desde N cuadros detrás; 0 = solo con el freno prendido (lo de siempre)
+const ESPERA_FINA = (() => { const m = /[?&]esperaFina=(\d+)/.exec(globalThis.location?.search || ''); return m ? Number(m[1]) : 0; })();
+const UMBRAL_VIVO = 6, DEUDA_VIVO_MAX = 60, VIVO_OIDO_MS = 1000, VIVO_RECIENTE_MS = 5000;
+// §269b.12 (la planilla, «sala-doce»: con el teléfono simulado —CPU ×4, ~20 cuadros/s— el freno de §269b llevaba a los
+// 11 demás a ~21 cuadros/s toda la carrera; antes de §269b el teléfono quedaba atrás y los PC iban a 60). La sala sigue al
+// lento solo si su aparato da al menos FRENO_PISO cuadros de lógica por segundo (medido con lo que me llega de él, en
+// ventanas de FRENO_VENTANA_MS): el que da menos FRENO_RINDE_N veces seguidas ya no frena a nadie en esa carrera (queda
+// atrás y se sale solo pasados 10 s, §269b.7). ?frenoPiso=0 = seguirlo a cualquier ritmo, como antes
+const FRENO_PISO = (() => { const m = /[?&]frenoPiso=(\d+)/.exec(globalThis.location?.search || ''); return m ? Number(m[1]) : 40; })();
+const FRENO_VENTANA_MS = 2000, FRENO_RINDE_N = 3;
+// §269b.17 (la sesión de los picos, 2 PC + Oppo, 8 corridas: el 1 % bajo de los PC caía de ~92 a 14–51 % en la mitad de las
+// corridas, con el freno nuevo y con el viejo). En todas las caídas, la autoridad cambió a mitad de carrera y la nueva
+// encontró al teléfono 41–125 cuadros atrás (la anterior ya no lo seguía: «rendido») y se frenó 35–60 cuadros de una vez:
+// todos los PC esperándola. Al que va más de FRENO_LEJOS cuadros detrás (descontada media ida y vuelta) el freno no lo
+// persigue: se pone al día solo o se sale a los 10 s (§269b.7). ?frenoLejos=0 = perseguirlo a cualquier distancia (antes)
+// §269b.18 (abajo): **apagado por omisión** (medido con el Oppo, 4 pares: con él la sala se cayó las 4 veces, sin él 1 de 4);
+// ?frenoBase=1 = prenderlo
+const FRENO_BASE = /[?&]frenoBase=1(&|$)/.test(globalThis.location?.search || ''), FRENO_BASE_MS = 5000;
+const FRENO_LEJOS = (() => { const m = /[?&]frenoLejos=(\d+)/.exec(globalThis.location?.search || ''); return m ? Number(m[1]) : 30; })();
+// §269b.7 (la orquestadora: «el PC le gana»; medido en el Oppo con un programa descartado que lo trababa: el teléfono
+// entró a la carrera pero se arrastraba, y el PC —la autoridad, con el árbitro nadie la espera— corrió solo y le
+// inventó 11.298 cuadros; el teléfono, relevado, seguía corriendo la misma carrera 5.000 cuadros atrás, sin ver nada
+// de lo que pasaba). Ahora el que va relevado y más de ATRAS_SALIR cuadros (10 s) detrás de lo que ya tengo de la
+// autoridad se sale de esa carrera (vuelve en la siguiente, como al recargar): los demás lo cortan al recibir el aviso.
+// ?cortarTarde=0 = como antes
+const CORTAR_TARDE = !/[?&]cortarTarde=0\b/.test(globalThis.location?.search || '');
+const ATRAS_SALIR = 600;
+const NO_ALCANZO_MS = 10000, RETIENE_MS = 2000, VOLVIO_MS = 1000;
+const RETENER = !/[?&]retener=0b/.test(globalThis.location?.search || '');   // §269b.8: ?retener=0 = como antes
+// §269b.11 (el simulador de sala, «uno-lejos»: al lejano, con picos de lag de +150 ms, la autoridad le inventaba el 10 %
+// de los botones: en cada pico sus botones llegaban 2-3 cuadros tarde). Ahora, si a un vivo que manda seguido le falta el
+// botón del cuadro que voy a escribir, la autoridad lo espera hasta ESPERA_CORTA_MS en ese cuadro, con un tope de
+// ESPERA_CORTA_SEG ms por segundo (un pico cuesta unos 40 ms una vez; después sus botones vuelven a llegar a tiempo).
+// Solo si sus botones siguen llegando (el último hace menos de ESPERA_CORTA_FLUYE ms) y el que falta está a no más de
+// ESPERA_CORTA_CERCA cuadros del último que tengo: el que se trabó (no manda) no frena a nadie.
+// Y solo al que va a la par (los informes: a no más de ESPERA_CORTA_PAR cuadros de mí): si le falta el botón es la red;
+// al que va atrás (se trabó y se pone al día) no se lo espera aquí: eso es el freno de §269b. Y solo al que «suele llegar
+// tarde por poco»: en los últimos ESPERA_CORTA_HIST ms, al menos ESPERA_CORTA_VECES botones que le inventé me llegaron
+// después a menos de ESPERA_CORTA_TARDE ms, y son la mayoría de los que llegaron (el que se trabó manda lo suyo cientos de
+// ms tarde: a ese no le sirve esperar).
+// APAGADA POR OMISIÓN (§269b.12, el simulador PC + Oppo: con N8 el teléfono manda sus botones de a pares cada 33 ms, el
+// segundo de cada par «llega tarde por poco» y esta espera hacía esperar a la autoridad —y a los PC, a su registro— al
+// ritmo del teléfono; ganaba poco: uno-lejos 10,5 % → 8,9 %). ?esperaCorta=1 = prendida
+const ESPERA_CORTA = /[?&]esperaCorta=1b/.test(globalThis.location?.search || '');
+const ESPERA_CORTA_MS = 17, ESPERA_CORTA_SEG = 120, ESPERA_CORTA_CERCA = 4, ESPERA_CORTA_FLUYE = 100, ESPERA_CORTA_PAR = 3,
+  ESPERA_CORTA_TARDE = 60, ESPERA_CORTA_HIST = 30000, ESPERA_CORTA_VECES = 3;
+const FRENO_VIVO_N = 3, FRENO_VIVO_MUCHA = 12;   // (§269b.13: con más de 12 cuadros de deuda, de a 3; si no, de a 1)        // §269b.8: cuántos cuadros cobra de una vez el freno por el lento (la autoridad baja hasta 1/4)   // §269b.8: cuánto vale un «no alcanzo a ponerme al día»
 const ENVEJECE = 6, APAGA = 30;            // el botón inventado: el último por 6 cuadros; después el volante se suelta en 30
 const SIN_DATO = 127, NO_SE = 255;
 // §101: las esperas de más de esto (ms) se anotan con lo que faltaba (?esperasLog=N para depurar; por omisión 500)
@@ -204,6 +278,16 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   esperaLargada = esperaCorte, cuadrosLargada = LARGADA,
   // ?retraso=fijo en la dirección de la página = el camino viejo (siempre 3, sin ajustar), para comparar
   adaptar = !/[?&]retraso=fijo\b/.test(globalThis.location?.search || ''), retrasoMax = RETRASO_MAX, pingCada = PING_CADA,
+  tardeVivo = TARDE_VIVO,                  // §269: al vivo que llega tarde, su último botón de verdad entero
+  esperaCorta = ESPERA_CORTA,              // §269b.11: la autoridad espera un momento el botón que viene en camino
+  frenoBase = FRENO_BASE,                  // §269b.18: el freno resta el desfase de base (sigue al que se va quedando atrás)
+  frenoLejos = FRENO_LEJOS,                // §269b.17: el freno no persigue al que va más de esto detrás (cuadros; 0 = a cualquier distancia)
+  frenoPiso = FRENO_PISO,                  // §269b.12: el freno sigue al lento solo si da al menos esto (cuadros/s; 0 = a cualquier ritmo)
+  esperaFina = ESPERA_FINA,                // §269b.15: la espera fina por el lento desde N cuadros detrás (0 = solo con el freno)
+  esperaVivo = ESPERA_VIVO,                // §269b: la autoridad se frena por el lento que sigue mandando (la sala va a su ritmo)
+  retener = RETENER,                       // §269b.8: los avisos sobre cuadros ya corridos esperan la decisión de las islas
+  noAlcanzoMs = NO_ALCANZO_MS,             // §269b.8: cuánto vale un «no alcanzo a ponerme al día» (0 = como antes)
+  cortarTarde = CORTAR_TARDE,              // §269b.7: con el árbitro, el relevado que va más de 10 s atrás se sale de la carrera
   // ?relevo=0 = sin relevo (todos esperan a todos, como antes de §80), para comparar
   relevo = !/[?&]relevo=0\b/.test(globalThis.location?.search || ''),
   // §80b: la sincronía de tiempo (el dueño la prendió, 2026-10-20; ?sincroTiempo=0 = sin ella, como en §80): el que va
@@ -211,6 +295,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   sincroTiempo = !/[?&]sincroTiempo=0\b/.test(globalThis.location?.search || ''),
   // §99 (C3): ms => … le pide al runtime que corra seguidos esos ms de cuadros (ponerse al día; null = no se puede)
   prisa = null,
+  frenar = null,                           // §269b.16: ms => correr la cuadrícula de retrazados del runtime (mkw_frenar); null = esperar en el cuadro
   // §99 (C4): () => true mientras corre la cuenta regresiva (la página lo lee del juego; sin ella, no hay regla de la
   // cuenta: el banco y las pruebas de siempre)
   enCuenta = null,
@@ -263,6 +348,13 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const oido = new Map();                 // uid → la última vez que llegó algo de él (para saber quién está)
   const avanceDe = new Map();             // §177.5 (R3): mando → la última vez que su dueño mandó un botón nuevo (su juego avanza)
   const esperaDe = new Map();             // §177.5 (R3): uid → 1 si su último ping dice que espera botones de otro, 0 si no
+  // §274 (la pausa de la sala de la auto calibración): congelada = esta consola tiene la lógica quieta (la página la
+  // congela con congelar(true): el juego no corre cuadros y nadie decide pausas ni cortes por eso); congeladoDe = uid → la
+  // última vez que su ping dijo «estoy congelado» (al que avisó así no se lo pausa ni se lo corta por no avanzar)
+  let congelada = false, congeladaDesde = 0, congelarEnCuadro = null;
+  const congeladoDe = new Map();
+  const CONGELADO_VALE = 1500;
+  const sigueCongelado = u => ahora() - (congeladoDe.get(u) ?? -Infinity) < CONGELADO_VALE;
   const miMando = humanos.find(h => h.uid === yo)?.mando ?? -1;
   const ISLAS = !/[?&]islas=0\b/.test(globalThis.location?.search || ''), ISLA_MS = 1500;   // (§175)
   const mandos = humanos.map(h => h.mando);
@@ -301,6 +393,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const contiguo = new Map();              // §99 (H5): mando → el último cuadro seguido que tengo de él
   const pedidosA = new Map();              // §99 (S1): mando → cuándo pedí sus botones a todos (tipo 2)
   let pausaUltima = -1;                    // §99: cuándo llamó el juego a pad la última vez (los tirones de esta PC)
+  let msFrenoPropio = 0;                   // §269b.20: lo que la autoridad se frenó a propósito (freno y espera fina), sumado
   let msParado = 0;                        // §102: el tiempo en que no corrí (esperas, frenos, tirones), sumado
   let alcance = { ratos: 0, ganado: 0, corriendo: 0 };   // §102: lo que gané en los ratos seguidos que fui atrás
   // §80b: cuántos cuadros me tengo que frenar todavía (lo calcula cada informe), cuándo me frené la última vez, y mi
@@ -319,7 +412,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const saltos = new Map();               // §75: carrera → Set(mandos que avisaron que se la saltan: se cortan ya)
   const acciones = new Map();             // §75: "carrera:cuadro" → función (en ese cuadro, en todas las consolas)
   const est = { cuadros: 0, esperas: 0, msEsperando: 0, maxEspera: 0, esperasLargas: 0, msLlegada: 0, desincronizado: null, huellasIguales: 0, cortes: [],
-    retrasos: {}, retrasoMax: {}, conflictos: 0, esperaDe: {}, relevos: 0, inventados: 0, inventadosViejos: 0, traspasos: 0, salidas: 0,
+    retrasos: {}, retrasoMax: {}, conflictos: 0, esperaDe: {}, relevos: 0, inventados: 0, inventadosViejos: 0, tardeVivo: 0, tardeDe: {}, tardeEdad: {}, recibidosDe: {}, traspasos: 0, salidas: 0,
     hashBotones: 2166136261, relevadosAhora: [], autoridad: null, subidas: 0, bajadas: 0, frenos: 0, msFrenado: 0, adelanto: 0,
     estable: { malas: 0, atras: 0, rtt: null }, prisas: 0, prisaCuadros: 0, pausas: [], vueltas: 0, paquetesBotones: 0, enviosA: {}, arbitro };
 
@@ -328,6 +421,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const reg = m => { let r = regs.get(m); if (!r) regs.set(m, r = regNuevo()); return r; };
   const cortadoEn = (m, c) => cortes.has(m) && c >= cortes.get(m);
   const vivos = () => humanos.filter(h => !cortes.has(h.mando));
+  // §269b.8 (el simulador de sala, «se-va-y-vuelve»: C sin red 8 s; con el árbitro nadie se corta antes de 20 s, así que
+  // cada lado PAUSÓ al otro. C, sola, pausó y cortó a A y a B; al volver la red esos avisos les llegaron y, como ya habían
+  // corrido más allá, se salieron las tres). Para decidir qué isla sigue, mi isla = los que no corté NI pausé
+  const enMiIsla = () => humanos.filter(h => !cortes.has(h.mando) && !pausaAbierta(h.mando));
   // §99 (C1): pausado en el cuadro c (en algún tramo: desde su pausa hasta su vuelta)
   const pausadoEn = (m, c) => { const ps = pausas.get(m); return !!ps && ps.some(x => c >= x.desde && (x.vuelve === null || c < x.vuelve)); };
   const pausaAbierta = m => pausas.get(m)?.find(x => x.vuelve === null) || null;
@@ -345,6 +442,16 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // (R4, §230: lo que se reusa en cada cuadro)
   const vLocal = [0, 0, 0, 0, 0, 0, 0], datosPad = new Int32Array(8 * MANDOS);
   let mascRelevados = 0;
+  let noAlcanzoHasta = -Infinity;           // §269b.8: hasta cuándo vale el último «no alcanzo a ponerme al día»
+  const volvioDe = new Map();               // §269b.8: uid → cuándo volvió a oírse después de más de VOLVIO_MS callado
+  const retenidos = new Map(), descartados = new Set();   // §269b.8: avisos de pausa/corte sobre cuadros que ya corrí, esperando las islas
+  // §269b.8 (el simulador de sala, «parejos»: un 📶 en los tres sin nadie lento): con el árbitro la autoridad escribe
+  // los botones de TODOS, así que «relevados» trae siempre a todos menos a ella y el aviso salía en cada carrera. Para
+  // avisar vale a quién se le INVENTAN (no le llegaron a tiempo) en más de LENTO_DE de los últimos LENTO_VENTANA cuadros
+  // (y 2 s seguidos así, LENTO_RACHA: una ráfaga suelta —un tirón de la red— no es ir lento: en «parejos» salía igual una vez)
+  const LENTO_VENTANA = 60, LENTO_DE = 15, LENTO_RACHA = 120;
+  const lentoAnillo = new Uint16Array(LENTO_VENTANA), lentoCuenta = new Uint8Array(16), lentoRacha = new Uint16Array(16);
+  let lentoPos = 0, lentosMasc = 0;
 
   function empaca(tipo, mando, cuadro, extra = 0) {
     const b = new Uint8Array(8 + extra);
@@ -448,27 +555,29 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     return Math.min(retrasoMax, Math.max(retrasoBase, Math.ceil((ida + MARGEN_MS) / cuadroMs)));
   }
   // cada medio segundo: un ping a cada uno (las medidas sirven para el retraso de partida de la carrera siguiente)
-  const latido = pingCada > 0 ? setInterval(() => {
+  const unPing = () => {
     const b = empaca(7, miMando & 255, ++pings, 13);
     const dv = new DataView(b.buffer);
     dv.setFloat64(8, ahora());
-    dv.setUint32(16, Math.max(0, ejecutado()) >>> 0); b[20] = espera ? 1 : 0;   // (§177.5: el cuadro que corrí y si espero a alguien)
+    dv.setUint32(16, Math.max(0, ejecutado()) >>> 0); b[20] = (espera ? 1 : 0) | (congelada ? 2 : 0);   // (§177.5: el cuadro que corrí y si espero a alguien; §274: bit 2 = congelada)
     aTodos(b, 'udp');
-  }, pingCada) : null;
+  };
+  const latido = pingCada > 0 ? setInterval(unPing, pingCada) : null;
 
-  function ventanaNueva() { ven = { hol: fila(SIN_DATO), esp: fila(0), max: fila(0), ven: fila(SIN_DATO), dud: false, t0: ahora(), c0: est.cuadros, p0: msParado }; }
+  function ventanaNueva() { ven = { hol: fila(SIN_DATO), esp: fila(0), max: fila(0), ven: fila(SIN_DATO), dud: false, t0: ahora(), c0: est.cuadros, p0: msParado, fp0: msFrenoPropio }; }
   ventanaNueva();
 
   function nuevaCarrera() {
     carrera++; ultimo = -1; escrito = -1; espera = null; avanceDe.clear(); huellas.clear(); propuestas.clear(); bloqueos.clear();
+    congelarEnCuadro = null;   // (§274: una pausa pedida para la carrera de antes no vale para esta)
     cadena = []; relevados.clear(); pasarA = null; traspaso = null; fuera = null; buenas = 0; sustituidosMios = 0;
     ultimaSubida = -Infinity; malasAutoridad.length = 0; rachas.fill(0); informes.clear(); nuevo.clear(); ventanaNueva();
-    ackDe.clear(); contiguo.clear(); pedidosA.clear(); pausaUltima = -1; mitadDesde = null; largado = false;
+    ackDe.clear(); contiguo.clear(); pedidosA.clear(); pausaUltima = -1; mitadDesde = null; largado = false; noAlcanzoHasta = -Infinity; retenidos.clear(); descartados.clear(); frenoVivoEn = -Infinity; vivoMando = null; ritmoVivo.clear(); rendidos.clear(); autDesde = null; huboOtraAut = false; lejosAvisado.clear(); baseVivo.clear(); est.rendidos = []; invCuadro.fill(-1); for (const h of tardeHist) h.length = 0; lentoCuenta.fill(0); lentoRacha.fill(0); lentoAnillo.fill(0); lentoPos = 0; lentosMasc = 0; est.lentosAhora = arbitro ? [] : undefined; est.yoLento = false;
     alcance = { ratos: 0, ganado: 0, corriendo: 0 }; cubiertoDesde = Infinity; enviadoA.clear();
     barreraAhora = false; est.cuadrosBarrera = 0;
     deuda = 0; ultimoFreno = -Infinity; ventajas.fill(SIN_DATO); est.sumaRetraso = 0; est.cuadrosCarrera = 0;
     estab.clear(); delanteDe.clear(); est.estable = { malas: 0, atras: 0, rtt: null }; quieto.clear();
-    pausas.clear(); ultimoUsado.clear(); pidoVuelta = 0; est.pausas = []; est.vueltas = 0; preferida = preferidas.get(carrera);
+    pausas.clear(); ultimoUsado.clear(); pidoVuelta = 0; est.pausas = []; est.pausasDe = []; est.salidaPor = null; est.vueltas = 0; preferida = preferidas.get(carrera);
     for (const k of [...preferidas.keys()]) if (k < carrera) preferidas.delete(k);
     est.relevadosAhora = []; mascRelevados = 0; est.hashBotones = 2166136261;
     soltarAnillos(tablas, regs);           // (R4: los de la carrera anterior vuelven a la reserva)
@@ -584,10 +693,24 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     let u = Math.min(ultimoDe(m), f);
     const t = tabla(m);
     while (u >= 0 && !t.has(u) && u > f - 64) u--;
+    const vivo = tardeVivo && ahora() - (oido.get(duenoDe.get(m)) ?? -Infinity) < VIVO_MS;
+    // (§269: del vivo que va más de 64 cuadros atrás —su PC no da 60 y nadie lo espera—, igual su último de verdad)
+    if (!t.has(u) && vivo && ultimoDe(m) >= 0 && ultimoDe(m) <= f && t.has(ultimoDe(m))) u = ultimoDe(m);
     const v = t.get(u);
     if (!v) return NEUTRO;
     const edad = f - u;
     if (edad <= ENVEJECE) return v;
+    // §269 (bug 3 del dueño, con 2 PCs: «desde el ¡YA! el kart queda acelerando y no reacciona a botones»): si sus
+    // paquetes SIGUEN llegando (lo oí hace menos de VIVO_MS) pero tarde —la ida y vuelta es más larga que su retraso—,
+    // no es un callado: va su último botón DE VERDAD entero (con la demora de su conexión, pero manejando), no «solo A»
+    // con el volante soltándose, que con todo tarde era para siempre: el kart aceleraba solo y no doblaba.
+    // (Solo lo usa la autoridad al escribir el registro: no tiene que ser igual en todas las consolas.) ?tardeVivo=0 = antes
+    if (vivo) {
+      est.tardeVivo = (est.tardeVivo || 0) + 1;
+      const uid = duenoDe.get(m); est.tardeDe[uid] = (est.tardeDe[uid] || 0) + 1; est.tardeEdad[uid] = edad;
+      if (est.tardeDe[uid] % 300 === 1) registro(`[lockstep] ⚠ §269: los botones de ${uid} me llegan ${edad} cuadros tarde (más que su retraso): va con su último botón de verdad (${est.tardeDe[uid]} cuadros así en esta carrera)`);
+      return v;
+    }
     est.inventadosViejos++;
     const k = Math.max(0, 1 - (edad - ENVEJECE) / APAGA);
     return [v[0] & BOTON_A, Math.round(v[1] * k), Math.round(v[2] * k), 0, 0, 0, 0];
@@ -611,7 +734,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       masc |= 1 << m;
       const real = tabla(m).get(f);
       if (real) slots[m] = real;
-      else { slots[m] = inventado(m, f); sust |= 1 << m; if (!reserva) est.inventados++; }
+      else { slots[m] = inventado(m, f); sust |= 1 << m; if (!reserva) { est.inventados++; const i = m * 128 + (f & 127); if (invCuadro[i] !== f) { invCuadro[i] = f; invHora[i] = ahora(); } } }
     };
     // (§191, R1: con el árbitro, todos los que ya mandaron algo en esta carrera; el que todavía carga no: a ese se lo
     // espera como siempre, y sus primeros botones van a todos)
@@ -738,6 +861,21 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // §99 (D): un rato más en la cuenta de estabilidad: de cada uno, si la mayoría lo vio mal; y de mí, además, si fui
   // atrás de la mayoría (más de un cuadro) o iba relevado
   let ultimaPrisa = -Infinity, largado = false, barreraAhora = false;   // (§250: antes del «¡YA!»)
+  let frenoVivo = false, vivoRatos = 0, frenoVivoEn = -Infinity;
+  const ritmoVivo = new Map(), rendidos = new Set();   // §269b.12: uid → sus cuadros por segundo; los que ya no frenan
+  let autDesde = null, huboOtraAut = false; const lejosAvisado = new Set(), baseVivo = new Map();   // §269b.17: desde cuándo soy la autoridad (null = no lo soy); si otro lo fue en esta carrera
+  let cortaDesde = -Infinity, cortaGastado = 0;   // §269b.11: el tope por segundo de la espera corta
+  // §269b.11: cuándo inventé el botón de cada uno en cada cuadro (anillo de 128 por mando) y cuánto tarde llegó después
+  const invCuadro = new Int32Array(MANDOS * 128).fill(-1), invHora = new Float64Array(MANDOS * 128);
+  const tardeHist = Array.from({ length: MANDOS }, () => []);   // [hora, ms tarde] de los últimos que llegaron después
+  const sueleCerca = m => {
+    const t = ahora(), h = tardeHist[m];
+    while (h.length && t - h[0][0] > ESPERA_CORTA_HIST) h.shift();
+    let cerca = 0; for (const [, ms] of h) if (ms <= ESPERA_CORTA_TARDE) cerca++;
+    return cerca >= ESPERA_CORTA_VECES && cerca * 2 > h.length;
+  };
+  let vivoMando = null;                     // §269b.8: el lento por el que me estoy frenando (espero sus botones al escribir)
+  // (§269b: frenoVivo = la deuda de ahora es de la autoridad por un lento, se paga en cada cuadro)
   let alDiaHasta = -Infinity;              // §99: hasta cuándo dura (más o menos) la ráfaga que pedí para ponerme al día
   function anotarEstabilidad() {
     medirDelantes();
@@ -855,7 +993,11 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       if (corridos > 1.3 * debia + 2) ven.dud = true;          // me estaba poniendo al día
       // (§191, R1: con el árbitro nadie frena a la autoridad, así que si ella corre lenta —su CPU no da 60— todos la
       // esperan y van a su ritmo. Lo sabe ella misma: corrió menos del 90 % de lo que debía; no en la largada)
-      autoridadLenta = arbitro && ultimo > 180 && autoridadEn(ultimo) === miMando && corridos < 0.9 * debia - 1;
+      // (§269b.20, la sesión de los picos: con el freno que de verdad frena —§269b.16— la autoridad que se frenaba por el
+      // teléfono «corría lenta», pasaba el papel, la nueva se frenaba igual y lo devolvía: 24 traspasos en 60 s. Lo frenado
+      // a propósito no es correr lenta. ?lentaPropia=1 = contarlo, como antes)
+      const debiaSinFreno = LENTA_PROPIA ? debia : debia - (msFrenoPropio - (ven.fp0 ?? msFrenoPropio)) / cuadroMs;
+      autoridadLenta = arbitro && ultimo > 180 && autoridadEn(ultimo) === miMando && corridos < 0.9 * debiaSinFreno - 1;
       // si estoy esperando ahora mismo, eso también cuenta en este rato (y el rato es dudoso: mientras espero no
       // corro, y lo que llega o no llega de los demás no dice nada). Esperando la llegada (alguien todavía carga la
       // pista) no se le cuenta la espera a nadie
@@ -883,12 +1025,17 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       if (atrasado) { alcance.ratos++; alcance.ganado += corridos - corriendo; alcance.corriendo += corriendo; }
       else alcance = { ratos: 0, ganado: 0, corriendo: 0 };
       const alcanzo = !alcanceReal || alcance.ratos < RATOS_PRUEBA || alcance.ganado >= GANA_MIN * alcance.corriendo;
+      // (§269b.8, el simulador de sala, «uno-lento»: la prueba de arriba se reinicia cuando dejo de ir atrás, y en cada
+      // racha nueva volvía a decir «sé ponerme al día» RATOS_PRUEBA informes; la autoridad me saltaba en su freno y la sala
+      // quedaba ~70 cuadros delante. El «no alcanzo» vale NO_ALCANZO_MS desde que se vio)
+      if (!alcanzo) noAlcanzoHasta = t + noAlcanzoMs;
       if (!alcanzo) {
         est.sinAlcance = (est.sinAlcance || 0) + 1;
         if (!alcance.avisado) { alcance.avisado = true; registro(`[lockstep] voy atrás y no alcanzo a ponerme al día (gané ${alcance.ganado.toFixed(1)} cuadros en ${alcance.corriendo.toFixed(0)}): que me esperen`); }
       }
       // (§99, D: y al final mi ida y vuelta típica, de a 2 ms; 255 = no sé)
-      const yoRtt = miRtt(), puedo = puedoPrisa() && alcanzo;
+      const retenida = alcanceReal && t < noAlcanzoHasta, yoRtt = miRtt(), puedo = puedoPrisa() && alcanzo && !retenida;
+      if (retenida && alcanzo && atrasado && puedoPrisa()) est.prisaRetenida = (est.prisaRetenida || 0) + 1;   // (§269b.8: lo que antes habría dicho)
       const cap = miCapacidad();
       // (§236: con un servidor en la sala, 5 bytes más al final con lo que veo de él; una página vieja no los lee)
       const conServidor = mandos.includes(SERVIDOR);
@@ -942,10 +1089,104 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     // ven «justa» y sube su retraso, y entonces lo de todos le llega tarde y lo inventa. Me freno si voy más de
     // UMBRAL_SINCRO delante; si voy atrás me pongo al día —pedirPrisa—)
     if (arbitro) {
+      // §269b: si la autoridad soy yo, me freno por el que sigue mandando y va atrás sin poder ponerse al día (arriba)
+      frenoVivo = false;
+      const soyAut = esperaVivo && sincroTiempo && ultimo >= 0 && !fuera && !cortes.has(miMando) && autoridadEn(Math.max(0, ultimo)) === miMando;
+      // (solo cuenta si tomé la autoridad de otro en esta carrera: la de la largada sigue al lento desde el principio)
+      if (!soyAut) { autDesde = null; const a = ultimo >= 0 ? autoridadEn(ultimo) : undefined; if (a !== undefined && a !== miMando) huboOtraAut = true; }
+      else if (autDesde === null) {
+        autDesde = huboOtraAut ? ahora() : -Infinity;
+        // (al tomar la autoridad de otra, el ritmo de cada uno lo mido yo desde cero)
+        if (huboOtraAut) { for (const r of ritmoVivo.values()) { r.muestras.length = 0; r.medidas = 0; r.bajas = 0; } lejosAvisado.clear(); baseVivo.clear(); }
+      }
+      if (soyAut) {
+        let peor = 0, quien = null, quienM = null;
+        for (const h of humanos) {
+          const m = h.mando;
+          if (m === miMando || m >= MANDOS || cortes.has(m) || pausaAbierta(m) || oidoHace(m) > VIVO_OIDO_MS) continue;
+          // (§269b.8: el que se oye pero su juego no avanza hace más de VIVO_OIDO_MS está trabado, no lento: no me freno por
+          // él —toda la sala casi quieta mientras dura—; si después queda muy atrás, se sale él solo, §269b.7)
+          if (ahora() - (avanceDe.get(m) ?? -Infinity) > VIVO_OIDO_MS) continue;
+          // (§269b.12: ¿cuántos cuadros por segundo da su aparato? Si menos de FRENO_PISO varias veces seguidas, no lo sigo)
+          if (frenoPiso > 0) {
+            const t = ahora(), r = ritmoVivo.get(h.uid) || ritmoVivo.set(h.uid, { muestras: [], bajas: 0 }).get(h.uid);
+            // (§269b.13, el simulador PC + Oppo: se mide solo mientras va atrás de mí —ahí corre a lo que da su aparato—. El
+            // que va a la par espera mi registro: mientras me freno por el lento, su ritmo es el mío, y la autoridad daba
+            // por «rendidos» a los PC de la sala)
+            const atras = (delanteDe.get(h.uid) ?? 0) - (rttDe(m) ?? 0) / 2 / cuadroMs > UMBRAL_VIVO;
+            if (!atras) { r.muestras.length = 0; r.bajas = 0; }
+            r.muestras.push([t, ultimoDe(m)]);
+            while (r.muestras.length > 2 && t - r.muestras[1][0] >= FRENO_VENTANA_MS) r.muestras.shift();
+            const [t0, f0] = r.muestras[0];
+            if (atras && t - t0 >= FRENO_VENTANA_MS && f0 >= 0) {
+              const v = (ultimoDe(m) - f0) * 1000 / (t - t0);
+              r.medidas = (r.medidas || 0) + 1; r.ultimaV = v;   // (§269b.17: cuántas ventanas le medí desde que soy la autoridad)
+              r.bajas = v < frenoPiso ? r.bajas + 1 : 0;
+              if (r.bajas >= FRENO_RINDE_N && !rendidos.has(h.uid)) {
+                rendidos.add(h.uid); est.rendidos = [...rendidos];
+                registro(`[lockstep] §269b.12: ${h.uid} da ${v.toFixed(1)} cuadros/s (menos de ${frenoPiso}): ya no me freno por él en esta carrera`);
+              }
+            }
+            if (rendidos.has(h.uid)) continue;
+          }
+          const d0 = delanteDe.get(h.uid), inf = informes.get(h.uid);
+          if (d0 === undefined || (inf?.atras && inf.prisa)) continue;   // (§101: el que se pone al día solo, no)
+          // (§269b.8: el lejano corre detrás de mí lo que tarda en llegarle mi registro —media ida y vuelta—, aunque su
+          // aparato dé 60: eso no es lentitud y no me freno por eso. Con buena red casi no cambia nada)
+          const d = d0 - (rttDe(m) ?? 0) / 2 / cuadroMs;
+          // (§269b.17: tomé la autoridad de otra consola y este ya va muy atrás —la autoridad de antes pudo haber dejado de
+          // seguirlo—. Frenarme 35–60 cuadros de una ponía a esperar a toda la sala. Hasta haberle medido el ritmo yo
+          // —una ventana, 2 s— no lo persigo; si esa ventana da menos de frenoPiso, queda rendido de una (va muy atrás y no
+          // alcanza); si da más, lo de siempre)
+          if (frenoLejos > 0 && autDesde > -Infinity && d > frenoLejos) {
+            const r = ritmoVivo.get(h.uid), med = r?.medidas || 0;
+            if (med < 1) {
+              if (!lejosAvisado.has(h.uid)) { lejosAvisado.add(h.uid); est.frenoLejos = (est.frenoLejos || 0) + 1;
+                registro(`[lockstep] §269b.17: tomé la autoridad y ${h.uid} ya va ${d.toFixed(0)} cuadros detrás (más de ${frenoLejos}): no me freno por él hasta medirle el ritmo`); }
+              continue;
+            }
+            if (frenoPiso > 0 && r.ultimaV < frenoPiso && !rendidos.has(h.uid)) {
+              rendidos.add(h.uid); est.rendidos = [...rendidos];
+              registro(`[lockstep] §269b.17: ${h.uid} va ${d.toFixed(0)} cuadros detrás y da ${r.ultimaV.toFixed(1)} cuadros/s (menos de ${frenoPiso}): ya no me freno por él en esta carrera`);
+              continue;
+            }
+          }
+          // (§269b.18, la sesión de los picos, 2 PC + Oppo: el teléfono iba siempre ~12 cuadros detrás aunque daba 59 por
+          // segundo —un desfase fijo, no lentitud— y la autoridad se frenaba 5–7 cuadros cada medio segundo toda la carrera:
+          // la sala entera a ~48. El freno sigue al que se VA QUEDANDO atrás: a lo que va detrás le resta su desfase de base,
+          // el menor de los últimos FRENO_BASE_MS. Al lento de verdad la distancia le sigue creciendo y se lo sigue igual)
+          let dEf = d;
+          if (frenoBase) {
+            const t = ahora(), b = baseVivo.get(h.uid) || baseVivo.set(h.uid, []).get(h.uid);
+            b.push([t, d]); while (b.length && t - b[0][0] > FRENO_BASE_MS) b.shift();
+            let min = Infinity; for (const [, x] of b) if (x < min) min = x;
+            if (t - b[0][0] >= FRENO_BASE_MS / 2 && min > 0) { dEf = d - min; est.baseVivo = Math.max(est.baseVivo || 0, Math.round(min)); }
+          }
+          if (dEf > peor) { peor = dEf; quien = h.uid; quienM = m; }
+        }
+        est.adelantoVivo = peor; est.adelantoVivoMax = Math.max(est.adelantoVivoMax || 0, peor);
+        // (dos ratos seguidos delante: un rato suelto —la largada, un tirón que el otro ya está corriendo— no frena)
+        vivoRatos = peor > UMBRAL_VIVO ? vivoRatos + 1 : 0;
+        const antes = deuda;
+        // (§269b.8: si ya me frené por un lento hace menos de VIVO_RECIENTE_MS, basta un rato: el que va y viene —lento un
+        // rato, al día otro— se me escapaba ~40 cuadros cada vez que volvía a ponerse lento, mientras juntaba los dos ratos)
+        const reciente = ahora() - frenoVivoEn < VIVO_RECIENTE_MS;
+        deuda = vivoRatos >= 2 || (vivoRatos >= 1 && reciente) ? Math.min(DEUDA_VIVO_MAX, Math.max(0, Math.floor(peor) - UMBRAL_VIVO)) : 0;
+        frenoVivo = deuda > 0;
+        if (frenoVivo) frenoVivoEn = ahora();
+        // (§269b.8: el ajuste fino, con el freno prendido; §269b.15: también desde esperaFina cuadros detrás)
+        vivoMando = frenoVivo || (esperaFina > 0 && peor > esperaFina) ? quienM : null;
+        if (vivoMando !== null && !frenoVivo) est.finaSinFreno = (est.finaSinFreno || 0) + 1;
+        if (deuda && !antes) { est.frenosVivo = (est.frenosVivo || 0) + 1; registro(`[lockstep] §269b: voy ${peor.toFixed(1)} cuadros delante de ${quien} (sigue mandando y no se pone al día): me freno ${deuda}`); }
+        return;
+      }
       const delante = sincroTiempo && ultimo >= 0 && !fuera && !cortes.has(miMando) ? delanteAutoridad() : 0;
       est.adelanto = Math.max(0, delante);
       const antes = deuda;
-      deuda = Math.min(DEUDA_MAX, Math.max(0, Math.floor(delante) - UMBRAL_SINCRO));
+      // (§269b.19, la sesión de los picos con el Oppo: un PC que no es la autoridad iba siempre 2 cuadros «delante» de ella
+      // —un desfase de la medida: con el árbitro no puede adelantarse a su registro, lo espera— y se frenaba un cuadro cada
+      // medio segundo toda la carrera: dos imágenes repetidas por segundo. Con el árbitro el umbral es UMBRAL_SINCRO_ARB)
+      deuda = Math.min(DEUDA_MAX, Math.max(0, Math.floor(delante) - UMBRAL_SINCRO_ARB));
       if (deuda && !antes) registro(`[lockstep] voy ${delante.toFixed(1)} cuadros delante de la autoridad: me freno ${deuda}`);
       return;
     }
@@ -1066,6 +1307,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     }
     if (ultimo < 0 || cuadro + 300 < ultimo) nuevaCarrera();    // primer cuadro, o el contador volvió a empezar
     // me salí de esta carrera (mi copia ya no es la de los demás): el juego sigue sin esperar a nadie, todos quietos
+    if (!fuera && muyAtras(cuadro)) {
+      est.salidasAtras = (est.salidasAtras || 0) + 1;
+      salirme(`§269b.7: voy relevado en el cuadro ${cuadro} y la autoridad ya va en el ${tabla(autoridadEn(cuadro)).mayor} (más de ${ATRAS_SALIR} cuadros): vuelvo en la siguiente`);
+    }
     if (fuera) { ultimo = cuadro; return quietos(); }
     // §99 (C1): después de un tirón de esta PC, antes de correr otro cuadro, que pasen los mensajes que llegaron
     // mientras estaba trabada (una pausa mía, por ejemplo: si no, podría correr con mis botones más allá de ella)
@@ -1076,14 +1321,32 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     // §80b: me freno un cuadro (lo espero sin hacer nada) si voy adelantado a uno que va suelto; antes de tomar este
     // cuadro, así para todos sigo en el anterior (lo que ya corrí). El juego no se pone al día: queda un cuadro más atrás
     // (§99, H7: con la pestaña escondida no: el navegador estira la espera a ~1 s y los demás me esperarían)
-    if (deuda > 0 && est.cuadros - ultimoFreno >= CADA_FRENO && !globalThis.document?.hidden) {
-      deuda--; ultimoFreno = est.cuadros; est.frenos++;
-      const t0 = ahora();
-      await new Promise(listo => setTimeout(listo, cuadroMs));
-      { const d = ahora() - t0; est.msFrenado += d; msParado += d; }
+    // (§269b.16: con frenar cada freno cuenta de verdad: el del lento va como mucho cada 2 cuadros, no dos imágenes
+    // repetidas seguidas)
+    if (deuda > 0 && est.cuadros - ultimoFreno >= (frenoVivo ? (frenar ? 2 : 1) : CADA_FRENO) && !globalThis.document?.hidden) {
+      // (§269b.8: el freno por el lento cobra hasta FRENO_VIVO_N cuadros de una vez: de a uno, la autoridad bajaba a lo más a
+      // la mitad, y con un lento a la mitad o menos la distancia no bajaba nunca —el simulador de sala: ~70 cuadros—)
+      // (§269b.13, el simulador PC + Oppo: un teléfono a 57 dejaba en los PC un tirón de 50 ms cada vez —3 cuadros de una—;
+      // con poca deuda, de a uno: tirones de un cuadro, más parejos)
+      const n = frenoVivo ? Math.min(deuda, deuda > FRENO_VIVO_MUCHA ? FRENO_VIVO_N : 1) : 1;
+      deuda -= n; ultimoFreno = est.cuadros; est.frenos += n;
+      // (§269b.16: con frenar —el runtime corre su cuadrícula de retrazados, mkw_frenar— el freno no detiene este cuadro: el
+      // siguiente retrazado llega n cuadros más tarde. Esperar aquí no frenaba: la cuadrícula es absoluta y el juego corría
+      // los cuadros siguientes de golpe para volver a ella —564 cuadros frenados en 40 s bajaron la sala solo 46—)
+      if (frenar) { const d = cuadroMs * n; frenar(d); est.msFrenado += d; msParado += d; msFrenoPropio += d; est.frenosReloj = (est.frenosReloj || 0) + n; }
+      else {
+        const t0 = ahora();
+        await new Promise(listo => setTimeout(listo, cuadroMs * n));
+        { const d = ahora() - t0; est.msFrenado += d; msParado += d; msFrenoPropio += d; }
+      }
       if (fuera) { ultimo = cuadro; return quietos(); }
     }
     ultimo = cuadro;
+    // §274: la pausa de la sala congela todas las consolas DESPUÉS del mismo cuadro (cada una corre hasta ahí: así nadie
+    // queda esperando botones que el otro ya no va a mandar). La página congela la lógica del juego (mkw_congelar)
+    if (congelarEnCuadro && cuadro >= congelarEnCuadro.cuadro) { const f = congelarEnCuadro.f; congelarEnCuadro = null; try { f(cuadro); } catch {} }
+    // (§285: la espera del paquete, al empezar el cuadro 1 de cada carrera; dura todas las carreras, no se borra al cambiar)
+    if (alPrimero && cuadro >= 1 && primeroDe !== carrera) { primeroDe = carrera; try { alPrimero(cuadro, carrera); } catch {} }
     // (§250: ¿sigo antes del «¡YA!»? Lo lee del juego cada cuadro; vale para lo que escribo ahora —va mi retraso
     // adelante: los cuadros de la cuenta y los primeros 6 de la carrera— y para no pausar a nadie mientras espero)
     { let c = false; try { c = enCuenta ? !!enCuenta() : cuadro < cuadrosBarrera; } catch {}
@@ -1102,6 +1365,37 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // se toca)
       const cuenta = !!enCuenta?.();
       const hasta = cuadro + (cuenta ? Math.max(miRetraso, RETRASO_CUENTA) : miRetraso), primero = escrito < 0;
+      // §269b.8 (el simulador de sala, «uno-lento»: con el freno por informes la sala quedaba 20–30 cuadros delante del lento
+      // y le inventaba un tercio de los botones): si soy la autoridad y me estoy frenando por un lento, antes de escribir
+      // el registro hasta `hasta` espero su botón de verdad de ese cuadro, hasta FRENO_VIVO_N cuadros (el ajuste fino: los
+      // informes llegan cada medio segundo; esto, en cada cuadro). Si no llega, va su último botón como antes (tardeVivo)
+      if (vivoMando !== null && esperaVivo && hasta > escrito && !cortes.has(vivoMando) && autoridadPrevista(hasta) === miMando
+          && ahora() - (avanceDe.get(vivoMando) ?? -Infinity) <= VIVO_OIDO_MS && !tabla(vivoMando).has(hasta)) {
+        const t0 = ahora();
+        while (!tabla(vivoMando).has(hasta) && ahora() - t0 < cuadroMs * FRENO_VIVO_N && !fuera && !cortes.has(vivoMando))
+          await new Promise(listo => setTimeout(listo, 1));
+        const d = ahora() - t0; est.msEsperaVivo = (est.msEsperaVivo || 0) + d; msParado += d; msFrenoPropio += d;
+        // (§269b.16: lo esperado por el lento también corre la cuadrícula: si no, los cuadros siguientes salían de golpe,
+        // volvía a irme delante y a esperarlo otra vez)
+        if (frenar && d > 1) frenar(d);
+        if (tabla(vivoMando).has(hasta)) est.esperasVivoBien = (est.esperasVivoBien || 0) + 1;
+      }
+      // §269b.11: la espera corta por el botón en camino (a los vivos que mandan seguido y van cerca)
+      if (esperaCorta && arbitro && hasta > escrito && autoridadPrevista(hasta) === miMando && !barreraAhora) {
+        const t = ahora();
+        if (t - cortaDesde >= 1000) { cortaDesde = t; cortaGastado = 0; }
+        const falta = () => humanos.filter(h => h.uid !== yo && !cortes.has(h.mando) && !pausaAbierta(h.mando)
+          && ahora() - (avanceDe.get(h.mando) ?? -Infinity) <= ESPERA_CORTA_FLUYE
+          && Math.abs(delanteDe.get(h.uid) ?? 99) <= ESPERA_CORTA_PAR && h.mando < MANDOS && sueleCerca(h.mando)
+          && tabla(h.mando).size > 0 && !tabla(h.mando).has(hasta) && ultimoDe(h.mando) >= hasta - ESPERA_CORTA_CERCA);
+        if (cortaGastado < ESPERA_CORTA_SEG && falta().length) {
+          const t0 = ahora(), tope = Math.min(ESPERA_CORTA_MS, ESPERA_CORTA_SEG - cortaGastado);
+          while (ahora() - t0 < tope && !fuera && falta().length) await new Promise(listo => setTimeout(listo, 1));
+          const d = ahora() - t0; cortaGastado += d; msParado += d;
+          est.msEsperaCorta = (est.msEsperaCorta || 0) + d; est.esperasCortas = (est.esperasCortas || 0) + 1;
+          if (!falta().length) est.esperasCortasBien = (est.esperasCortasBien || 0) + 1;
+        }
+      }
       for (let f = Math.max(escrito + 1, primero ? 0 : cuadro); f <= hasta; f++) {
         const t = tabla(miMando);
         if (!t.has(f)) { t.set(f, primero && f < hasta ? NEUTRO : v); if (f > ultimoDe(miMando)) nuevo.set(miMando, f); }
@@ -1200,6 +1494,14 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     // (R4: la lista se arma de nuevo solo si cambió quiénes van relevados)
     { const mr = xa ? xa.masc : 0; if (mr !== mascRelevados) { mascRelevados = mr; est.relevadosAhora = mr ? bits(mr).map(m => duenoDe.get(m)) : []; } }
     if (xa && (xa.sust >> miMando) & 1) sustituidosMios++;
+    if (arbitro) {
+      const viejo = lentoAnillo[lentoPos], nuevoS = xa ? xa.sust & 0xFFFF : 0;
+      for (let m = 0; m < 16; m++) lentoCuenta[m] += ((nuevoS >> m) & 1) - ((viejo >> m) & 1);
+      lentoAnillo[lentoPos] = nuevoS; lentoPos = (lentoPos + 1) % LENTO_VENTANA;
+      let lm = 0;
+      for (let m = 0; m < 16; m++) { lentoRacha[m] = lentoCuenta[m] > LENTO_DE ? Math.min(60000, lentoRacha[m] + 1) : 0; if (lentoRacha[m] >= LENTO_RACHA) lm |= 1 << m; }
+      if (lm !== lentosMasc) { lentosMasc = lm; est.lentosAhora = lm ? bits(lm).map(m => duenoDe.get(m)) : []; est.yoLento = !!((lm >> miMando) & 1); }
+    }
     { const d = cuadro + 1 + (arbitro ? LEAD_TRASPASO : 0); if (xa && xa.sig < MANDOS && !cadena.some(([k]) => k === d)) cadena.push([d, xa.sig]); }
     for (let i = 0; i < datos.length; i++) est.hashBotones = Math.imul(est.hashBotones ^ datos[i], 16777619) >>> 0;
     if (huella && cuadro % huellaCada === 0 && cuadro > 0) compararHuella(cuadro, huella());
@@ -1346,6 +1648,9 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     const t = ahora() - espera.desde - espera.congelado;
     const faltan = r.faltan.filter(m => m >= 0);
     espera.faltan = faltan;
+    // §274: congelada (o esperando a uno que avisa que está congelado): no se pide, pausa ni corta a nadie; al volver,
+    // congelar(false) corre los relojes lo que duró
+    if (congelada || faltan.some(m => sigueCongelado(duenoDe.get(m)))) { if (espera) setTimeout(revisar, REVISAR_MS); return; }
     // §101 (para entender las esperas largas): a los ESPERAS_LOG ms y a los 1500 ms, qué falta y hasta dónde tengo lo de cada uno
     if ((t > ESPERAS_LOG && !espera.dicho) || (t > 1500 && espera.dicho === 1)) {
       espera.dicho = (espera.dicho || 0) + 1;
@@ -1431,8 +1736,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     revisar();
   }
   // §99 (C1): pausar el mando m desde el cuadro `desde` (una vez fijada, la pausa no cambia)
-  function pausar(m, desde, anunciar) {
+  function pausar(m, desde, anunciar, de = yo) {
     const abierta = pausaAbierta(m), conocida = pausas.get(m)?.some(x => x.desde === desde);
+    // (§269b.8: de dónde vino cada pausa, las primeras de la carrera, para el estado)
+    if (!conocida && (est.pausasDe ||= []).length < 12) est.pausasDe.push({ mando: m, desde, de, voy: ultimo, carrera });
     if (m === miMando) decisionMia = ahora();
     if (cortes.has(m) || abierta || conocida) {
       // (los avisos se repiten: uno de una pausa ya conocida, o de una vieja ya cerrada, no es conflicto ni toca nada;
@@ -1474,7 +1781,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // §99 (C1), en cada informe: si estoy pausado, ya llegué a mi pausa y no voy atrás, pido volver (cada rato hasta
   // que me la den); si soy el decisor de un pausado que no volvió en PAUSA_A_CORTE, lo corto como siempre
   function revisarPausas() {
-    if (ultimo < 0 || fuera) return;
+    if (ultimo < 0 || fuera || congelada) return;   // (§274: congelada, las pausas no se vuelven corte)
     const mia = pausaAbierta(miMando);
     if (mia && !cortes.has(miMando) && ejecutado() >= mia.desde) {
       const mitad = atrasDeLaMitad();
@@ -1494,7 +1801,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // el aviso de un corte: lleva cuántos siguen en la carrera según el que corta y el mando más bajo de ellos (si la
   // conexión se partió en dos y cada lado cortó al otro, así se sabe qué lado sigue; ver alBinario, tipo 3)
   function avisoCorte(m, desde, extra = 2) {
-    const b = empaca(3, m, desde, extra), v = vivos();
+    const b = empaca(3, m, desde, extra), v = enMiIsla();
     b[8] = v.length; b[9] = v.length ? Math.min(...v.map(h => h.mando)) : 255;
     return b;
   }
@@ -1512,9 +1819,17 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     }
   }
   // me salgo de esta carrera (vuelvo en la siguiente, como al recargar): aviso a todos para que me corten ya
+  // §269b.7: voy relevado (la autoridad ya escribe lo mío) y lo que tengo de ella va más de ATRAS_SALIR cuadros delante
+  function muyAtras(c) {
+    if (!cortarTarde || !arbitro || c < 0) return false;
+    const a = autoridadEn(c);
+    if (a === undefined || a === miMando || !relevados.has(miMando) && !yoRelevado()) return false;
+    const t = tabla(a);
+    return t.size > 0 && t.mayor - c > ATRAS_SALIR;
+  }
   function salirme(por) {
     fuera = { cuadro: ultimo, por };
-    est.salidas++;
+    est.salidas++; est.salidaPor = por;   // (§269b.8: el porqué, también en el estado: el simulador de sala no guarda el registro)
     registro(`[lockstep] me salgo de la carrera ${carrera}: ${por}`);
     aTodos(empaca(14, miMando & 255, Math.max(0, ultimo)), 'tcp');
     if (espera) { const f = espera.resolver; espera = null; f(); }
@@ -1552,7 +1867,24 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // (§80: con uno que está cortado desde ese cuadro o antes no se compara: si no se enteró del corte —se le cortó
       // la conexión justo cuando se lo mandaron—, su copia se separó a propósito, y al enterarse se sale de la carrera)
       const mu = mandoDe.get(u);
-      if (cortes.has(mu) && cortes.get(mu) <= cuadro) { est.huellasDeCortados = (est.huellasDeCortados || 0) + 1; continue; }
+      if (cortes.has(mu) && cortes.get(mu) <= cuadro) {
+        est.huellasDeCortados = (est.huellasDeCortados || 0) + 1;
+        // §269b.8 (el simulador de sala, «tormenta»; banco relevo caso 27): con más de 20 s sin red, el que quedó solo CORTA
+        // a todos los demás (el plazo del callado con el árbitro) y sigue su carrera solo: como las huellas de los cortados
+        // no se comparan, nunca se enteraba de que los demás siguen juntos. Si quedé solo (corté o pausé a todos) y dos o
+        // más de los que corté mandan la MISMA huella de este cuadro, distinta de la mía, la isla que sigue es la de ellos:
+        // me salgo (los que se salieron no mandan huellas: pad vuelve antes)
+        const clave = `${h >>> 0}:${hb >>> 0}`;
+        if (ISLAS && retener && !fuera && enMiIsla().length === 1 && clave !== `${e.mia >>> 0}:${e.miaB >>> 0}`) {
+          (e.cortadas ??= new Map()).set(u, clave);
+          const iguales = [...e.cortadas.values()].filter(k => k === clave).length;
+          if (iguales >= 2) {
+            est.islas = { cuadro, carrera, grupos: [[...e.cortadas].filter(([, k]) => k === clave).map(([x]) => x), [yo]], sigue: [...e.cortadas].filter(([, k]) => k === clave).map(([x]) => x), meSali: true };
+            salirme(`§269b.8: quedé solo (corté a todos) y ${iguales} de los que corté siguen juntos con otra carrera en el cuadro ${cuadro}`);
+          }
+        }
+        continue;
+      }
       if (h === e.mia && hb === e.miaB) { est.huellasIguales++; continue; }
       // §176: con las islas, la distinta no se anota todavía: si hay un corte en ese cuadro o antes, la otra pudo correr
       // más allá del corte con los botones de verdad del cortado (a mí no me llegaron) y se va a salir sola (paquete 14).
@@ -1606,8 +1938,14 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     lista.sort((x, y) => (y.ms.length - x.ms.length) || ((y.ms.includes(a) ? 1 : 0) - (x.ms.includes(a) ? 1 : 0)) || (x.ms[0] - y.ms[0]));
     const gana = lista[0], mia = lista.find(g => g.ms.includes(miMando));
     if (lista.length < 2) return;                   // (§176: las distintas se salieron solas: nadie se partió)
+    // (§269b.15, el simulador «tormenta»: la isla que sigue también quedaba «desincronizada» con el que se fue, aunque su
+    // carrera es la buena y la siguen todos los demás. Desincronizado = mi carrera ya no es la de la sala: solo el de la
+    // isla que se sale. Los que siguen anotan con quién se separaron en separadoDe. ?islaMarca=0 = todos, como antes)
+    const marcaTodos = /[?&]islaMarca=0\b/.test(globalThis.location?.search || '');
     for (const [u, d] of e.distintas || []) {
       if (cortes.has(mandoDe.get(u)) || est.desincronizado || fuera) continue;
+      // (solo con mayoría de verdad: 2 o más y más que la otra isla; uno contra uno no dice cuál está bien)
+      if (mia === gana && !marcaTodos && gana.ms.length >= 2 && gana.ms.length > lista[1].ms.length) { (est.separadoDe ??= []).push(d); continue; }
       est.desincronizado = d;
       registro(`[lockstep] ¡DESINCRONIZADO con ${u} en el cuadro ${d.cuadro} (carrera ${d.carrera}): ${d.que}!`);
     }
@@ -1631,9 +1969,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (arbitro && t - vueltaVigia > TIRON_MS && vueltaVigia > -Infinity) despierto = t;
     vueltaVigia = t;
     if (t - ultimoInforme >= informeCada) { ultimoInforme = t; informar(); }
-    if (ultimo < 0 || t - despierto < 250) return;
+    if (ultimo < 0 || t - despierto < 250 || congelada) return;   // (§274: congelada, nadie se corta)
     for (const h of humanos) {
       const m = h.mando;
+      if (sigueCongelado(h.uid)) continue;   // (§274: avisó que está congelado)
       // (§99, C1: al pausado no: si no vuelve, su pausa se vuelve corte en revisarPausas)
       if (m === miMando || cortes.has(m) || propuestas.has(m) || pausaAbierta(m) || decisorDe(m) !== yo || !tabla(m).size) continue;
       // el que avisó que se sale, o uno relevado que se calló del todo (nadie lo espera, pero el juego sí, en la meta)
@@ -1651,6 +1990,18 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       else if (callado && est.relevadosAhora.includes(h.uid)) proponer(m);
     }
     revisarPropuestas();
+    // §269b.8: los avisos retenidos (arriba, tipo 3): pasado RETIENE_MS, si las islas dijeron que sigue la mía y el que lo
+    // mandó no está en ella, no vale; si no, se aplica
+    for (const [k, x] of retenidos) {
+      if (t - x.t < RETIENE_MS && !(typeof est.islas === 'object' && est.islas?.carrera === carrera)) continue;
+      if (t - x.t < RETIENE_MS && est.islas.sigue.includes(x.de)) continue;
+      retenidos.delete(k);
+      const isla = typeof est.islas === 'object' && est.islas?.carrera === carrera ? est.islas : null;
+      if (isla && isla.sigue.includes(yo) && !isla.sigue.includes(x.de)) {
+        descartados.add(k); est.descartados = (est.descartados || 0) + 1;
+        registro(`[lockstep] §269b.8: no vale ${x.esPausa ? 'la pausa' : 'el corte'} de ${duenoDe.get(x.m)} en el cuadro ${x.cuadro} que manda ${x.de}: sigue mi isla (${isla.sigue.join(', ')})`);
+      } else if (!fuera) { if (x.esPausa) pausar(x.m, x.cuadro, false, x.de); else cortar(x.m, x.cuadro, false); }
+    }
     // una quietud de un corte que nunca se decidió (el decisor se fue): se suelta; otro decisor lo vuelve a proponer
     for (const [m, b] of bloqueos) if (!propuestas.has(m) && t - b.desde > 3 * esperaCorte) { bloqueos.delete(m); registro(`[lockstep] el corte de ${duenoDe.get(m)} no se decidió: sigo`); revisar(); }
   }, 50) : null;
@@ -1662,9 +2013,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     // §236: después de transferir el mando a una PC, el servidor ya no decide pausas ni cortes de esta carrera.
     if (mandoDe.get(de) === SERVIDOR && c === (carrera & 255) && sinAutoridadEn(SERVIDOR, Math.max(0, ultimo)) &&
         [3, 5, 17].includes(tipo)) return;
-    oido.set(de, ahora());
+    { const t = ahora(), antes = oido.get(de); if (antes !== undefined && t - antes > VOLVIO_MS) volvioDe.set(de, t); oido.set(de, t); }   // (§269b.8)
     if (tipo === 7 && b.length >= 16) {                         // ping: se devuelve tal cual (con su hora)
-      if (b.length >= 21) esperaDe.set(de, b[20] & 1);          // (§177.5: una página vieja no lo trae: sin traba viva)
+      if (b.length >= 21) esperaDe.set(de, b[20] & 3 ? 1 : 0);  // (§177.5: una página vieja no lo trae: sin traba viva; §274: la congelada no avanza a propósito)
+      if (b.length >= 21 && (b[20] & 2)) congeladoDe.set(de, ahora());
       const r = b.slice(); r[1] = 8; enviar(de, r, 'udp'); return;
     }
     if (tipo === 8 && b.length >= 16) {                         // respuesta: ida y vuelta, suavizada como TCP
@@ -1685,6 +2037,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     const actual = destino.tablas === tablas;
     // §99 (S1): mis botones solo los escribo yo (antes, uno que llegaba antes de otro tapaba el mío); los de otro mando
     // que manda un tercero, solo si los pedí, si hay un corte en curso de él o si su dueño se calló (reparto)
+    if (tipo === 13 || tipo === 15) est.recibidosDe[de] = (est.recibidosDe[de] || 0) + 1;   // §269: para el informe de Diagnóstico
     if ((tipo === 13 || tipo === 15) && (m === miMando || (de !== duenoDe.get(m) && !(ahora() - (pedidosA.get(m) ?? -Infinity) < PEDIDO_VALE ||
         propuestas.has(m) || bloqueos.has(m) || ahora() - (oido.get(duenoDe.get(m)) ?? -Infinity) > CALLADO_MS)))) return;
     if (tipo === 15 && b.length >= 16) {
@@ -1716,7 +2069,12 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
         const os = o; o += 8 * nb;
         if (tt.has(f) || !tt.cabe(f)) continue;
         lee8en(d, o0, tt.casilla(f));
-        if (actual && de === duenoDe.get(m)) avanceDe.set(m, ahora());   // (§177.5: su juego avanza)
+        if (actual && de === duenoDe.get(m)) {
+          avanceDe.set(m, ahora());   // (§177.5: su juego avanza)
+          // (§269b.11: si se lo había inventado, cuánto tarde llegó)
+          const i = m * 128 + (f & 127);
+          if (m < MANDOS && invCuadro[i] === f) { invCuadro[i] = -1; const h = tardeHist[m]; h.push([ahora(), ahora() - invHora[i]]); if (h.length > 64) h.shift(); }
+        }
         if (actual && f > ultimoDe(m)) nuevo.set(m, f);
         if (masc || sig !== 0xFF) {
           const x = rr.poner(f, masc, sust, sig);
@@ -1761,16 +2119,46 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // si gana la suya, acepto mi corte (y, como ya corrí más allá, me salgo de la carrera). Como una red eléctrica que
       // se separa en islas: sigue la isla con más generación, la otra se apaga y se vuelve a enganchar después.
       const su = mandoDe.get(de);
-      if (su !== undefined && cortes.has(su) && b.length >= 10 && !cortes.has(miMando)) {
-        const v = vivos(), mios = v.length, minMio = Math.min(...v.map(h => h.mando)), suyos = b[8], minSuyo = b[9];
+      if (su !== undefined && (cortes.has(su) || pausaAbierta(su)) && b.length >= 10 && !cortes.has(miMando)) {
+        const v = enMiIsla(), mios = v.length, minMio = Math.min(...v.map(h => h.mando)), suyos = b[8], minSuyo = b[9];
         const ganoYo = mios > suyos || (mios === suyos && minMio < minSuyo);
         if (ganoYo || m !== miMando) {
-          if (!est.islas) registro(`[lockstep] ${de} (al que corté) corta a ${duenoDe.get(m)}: ${ganoYo ? `sigue mi lado (somos ${mios}, ellos ${suyos})` : 'no vale para nadie más que para mí'}`);
-          est.islas = (est.islas || 0) + 1;
+          if (!est.avisosOtraIsla) registro(`[lockstep] ${de} (al que corté) corta a ${duenoDe.get(m)}: ${ganoYo ? `sigue mi lado (somos ${mios}, ellos ${suyos})` : 'no vale para nadie más que para mí'}`);
+          // (§269b.8: un contador aparte; antes sumaba sobre est.islas, que desde §175 es la decisión de las islas —un
+          // objeto—, y la volvía texto: «[object Object]111…»)
+          est.avisosOtraIsla = (est.avisosOtraIsla || 0) + 1;
           return;
         }
       }
-      if (b.length >= 11 && b[10] === 1) pausar(m, cuadro, false);      // §99 (C1): una pausa, no un corte
+      const esPausa = b.length >= 11 && b[10] === 1;
+      // §269b.8 (el simulador de sala, «se-va-y-vuelve», y el banco relevo caso 27): con el árbitro nadie pausa ni corta al
+      // callado antes de 20 s, así que el que quedó solo sin red pausa y corta a los demás sin que ellos lo hayan pausado
+      // a él, y por el canal confiable esos avisos llegan, al volver la red, ANTES que las huellas que dicen qué isla
+      // sigue: las tres consolas se salían. Un aviso sobre un cuadro que ya corrí espera hasta RETIENE_MS la decisión de
+      // las islas: si sigue la mía y quien lo manda no está en ella, no vale; si no, se aplica como siempre. Solo si quien
+      // lo manda acaba de volver de un silencio de más de VOLVIO_MS (la red partida): si no, como siempre, en el momento
+      const clave = `${m}:${cuadro}:${esPausa ? 1 : 0}:${de}`;
+      if (descartados.has(clave)) return;
+      // §269b.10 (el simulador de sala, «tormenta»: una consola con la pestaña oculta y otra sin red decidieron SOLAS
+      // pausas y cortes con su vista partida de la red, y esos avisos llegaron a las demás segundos después, sin silencio de
+      // por medio). Con el árbitro, la carrera es lo que escribe la autoridad: si ya corrí ese cuadro siguiendo el registro
+      // de una autoridad que sigo oyendo (o soy yo, con alguien más que me sigue), y quien lo manda no es ella, el aviso
+      // es de otra isla y no vale (las huellas deciden después quién se separó)
+      if (arbitro && retener && ultimo >= 0 && !fuera && ejecutado() >= cuadro) {
+        const a = autoridadEn(cuadro), da = a !== undefined ? duenoDe.get(a) : undefined;
+        const viva = a === miMando ? humanos.some(h => h.uid !== yo && h.uid !== de && !cortes.has(h.mando) && oidoHace(h.mando) < esperaCorte)
+          : a !== undefined && !cortes.has(a) && oidoHace(a) < esperaCorte;
+        if (da !== undefined && da !== de && viva) {
+          descartados.add(clave); est.descartados = (est.descartados || 0) + 1;
+          if ((est.descartados || 0) <= 5) registro(`[lockstep] §269b.10: no vale ${esPausa ? 'la pausa' : 'el corte'} de ${duenoDe.get(m)} en el cuadro ${cuadro} que manda ${de}: ya lo corrí con el registro de ${da}, que sigo oyendo`);
+          return;
+        }
+      }
+      if (ISLAS && retener && ahora() - (volvioDe.get(de) ?? -Infinity) < RETIENE_MS && ultimo >= 0 && !fuera && ejecutado() >= cuadro && !(esPausa ? pausas.get(m)?.some(x => x.desde === cuadro) : cortes.has(m))) {
+        if (!retenidos.has(clave)) { retenidos.set(clave, { de, m, cuadro, esPausa, t: ahora() }); est.retenidos = (est.retenidos || 0) + 1; }
+        return;
+      }
+      if (esPausa) pausar(m, cuadro, false, de);      // §99 (C1): una pausa, no un corte
       else cortar(m, cuadro, false);
     } else if (tipo === 16 && actual && de === duenoDe.get(m)) {
       // §99 (C1): el pausado pide volver: si soy su decisor, fijo el cuadro de la vuelta
@@ -1873,7 +2261,41 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     registro(`[lockstep] §110: se suma ${h.uid} con el mando ${h.mando}`);
     return true;
   }
-  return { pad, alBinario, fijarCarrera, saltar, enCuadro, agregar,
+  // §274: la pausa de la sala (la auto calibración). congelar(true): esta consola deja de correr cuadros (la página
+  // congela la lógica del juego); mientras dura, nadie se pausa ni se corta por eso y los pings lo avisan (bit 2).
+  // congelar(false): todos los relojes de las esperas, las pausas, los cortes en camino y los tirones se corren lo que
+  // duró (lo que pasó durante la pausa no cuenta para nada: la carrera sigue como si el tiempo no hubiera pasado).
+  // congelarEn(cuadro, f): f(cuadro) al empezar el cuadro `cuadro` (o el siguiente que corra, si ya pasó)
+  function congelar(si) {
+    si = !!si;
+    if (si === congelada) return;
+    const t = ahora();
+    congelada = si;
+    // (un ping ya, y otro a los 100 ms por si se pierde: el que todavía no supo de la pausa no espera al ping de siempre
+    // para saber que no tiene que pausar ni cortar a nadie)
+    if (si) { congeladaDesde = t; est.congelamientos = (est.congelamientos || 0) + 1; registro(`[lockstep] §274 congelada en el cuadro ${ultimo}`);
+      if (pingCada > 0) { unPing(); setTimeout(() => { if (congelada) unPing(); }, 100); } return; }
+    const d = t - congeladaDesde;
+    est.msCongelada = (est.msCongelada || 0) + d;
+    if (pausaUltima >= 0) pausaUltima += d;
+    if (espera) { espera.desde += d; espera.tic = t; espera.pedido += d; }
+    for (const [k, v] of avanceDe) avanceDe.set(k, v + d);
+    for (const [k, v] of oido) oido.set(k, Math.min(t, v + d));
+    for (const ps of pausas.values()) for (const x of ps) if (x.vuelve === null) x.t += d;
+    for (const p of propuestas.values()) p.desde += d;
+    for (const b of bloqueos.values()) b.desde += d;
+    if (mitadDesde !== null) mitadDesde += d;
+    if (alDiaHasta > -Infinity) alDiaHasta += d;
+    if (ven) ven.t0 += d;
+    despierto = t;
+    registro(`[lockstep] §274 sigue en el cuadro ${ultimo} (congelada ${Math.round(d)} ms)`);
+    if (espera) revisar();
+  }
+  let alPrimero = null, primeroDe = 0;
+  const alPrimerCuadro = f => { alPrimero = f; };   // (§285)
+  const congelarEn = (cuadro, f) => { if (ultimo >= cuadro) { try { f(ultimo); } catch {} return; } congelarEnCuadro = { cuadro, f }; };
+  return { pad, alBinario, fijarCarrera, saltar, enCuadro, agregar, congelar, congelarEn, alPrimerCuadro,
+    get congelada() { return congelada; },
     estado: () => ({ ...est, largadas: (est.largadas || []).map(x => ({ ...x })), esperaDe: { ...est.esperaDe }, estable: { ...est.estable }, delantes: Object.fromEntries(delanteDe),
       quieto: Object.fromEntries([...quieto].map(([m, q]) => [m, q.max])),
       // §99 (C1): si estoy pausado (mi kart va solo hasta que vuelva) y las pausas de esta carrera
@@ -1886,6 +2308,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       sincroTiempo, deuda, retrasoMedio: est.cuadrosCarrera ? est.sumaRetraso / est.cuadrosCarrera : miRetraso,
       // §101: los que según su último informe van atrás (o se están poniendo al día)
       atrasados: (() => { const t = ahora(); return [...informes].filter(([u, i]) => u !== yo && i.atras && t - i.t <= 1.5 * informeCada).map(([u]) => u); })(),
+      congelada, congeladosOtros: [...congeladoDe.keys()].filter(sigueCongelado),   // (§274)
       rtt: Object.fromEntries([...rtt].map(([u, x]) => [u, Math.round(x.s)])) }),
     detener() { if (latido) clearInterval(latido); if (vigilancia) clearInterval(vigilancia); } };
 }
@@ -1917,8 +2340,15 @@ export function huellaAmpliada(L) {
   }
   const az = [];
   for (const r of [L.u32(ri + 4), L.u32(ri + 8)]) az.push(r ? L.u32(r + 8) : 0, r ? L.u32(r + 12) : 0);
+  // §269b: solo el azar 1 entra a la huella (el volcado lleva los dos). En la carrera, al azar 2 (Raceinfo +8) lo mueve
+  // SOLO la animación de los pilotos (0x807C6A44 y 0x807CB530, medido en el Oppo con el programa de depuración,
+  // depurar_lockstep.cpp; ya lo vio §62.5), que avanza con el DIBUJO: una consola que se salta dibujos (el teléfono con
+  // N8 o la compensación de lag) saca los mismos números en el mismo orden pero en otros cuadros. Lo demás que lo usa
+  // corre en el cuadro 0, al armar la carrera, después de sembrarlo de nuevo: igual en todas. No es de la lógica.
+  // (Darle a la animación su propio azar se probó: en la sala de dos, la pestaña A se ponía lentísima, hasta 15 s por
+  // cuadro, en la largada y en la meta; se descartó.)
   let h = 2166136261;
-  for (const v of az) h = Math.imul(h ^ v, 16777619);
+  for (const v of az.slice(0, 2)) h = Math.imul(h ^ v, 16777619);
   partes.push(h >>> 0); nombres.push('azar'); valores.azar = az.map(v => v.toString(16)).join(' ');
   return { h: huellaCarrera(L), partes, nombres, valores };
 }
@@ -1955,10 +2385,17 @@ export function armarPlantel({ humanos, semilla }) {
 //     sala, en el orden de la sala), porque su PC o su conexión no dan abasto;
 //   - si yo casi no espero (< 1 ms) pero igual voy a menos de 50: la lenta es MI PC (los demás me esperan a mí).
 // Devuelve el texto del aviso, o '' si todo va bien (o si no hay carrera: menos de 30 cuadros en el rato).
-export function avisoLento(antes, ahora, ms, humanos) {
+// §269 (el dueño: «me dice que mi PC no alcanza 60 cuando en el Single Player claramente lo hace»): «tu PC» solo si el
+// hilo del juego de esta página de verdad estuvo ocupado (ocupado = fracción del rato que trabajó, la mide el medidor de
+// mkw.mjs sin lo que esperó a la sala; null = no se sabe, como antes) y la espera cuenta también la llegada de los demás
+// y los frenos de la sincronía (§80b): ninguna de las dos es lentitud de esta PC. ?esperaSala=0 = como antes
+export const OCUPADO_LENTO = 0.8;
+export function avisoLento(antes, ahora, ms, humanos, ocupado = null, comoAntes = false) {
   const cuadros = (ahora?.cuadros ?? 0) - (antes?.cuadros ?? 0);
   if (!antes || cuadros < 30 || ms <= 0) return '';
-  const fps = cuadros / (ms / 1000), espera = (ahora.msEsperando - antes.msEsperando) / cuadros;
+  const otra = x => comoAntes ? 0 : (ahora[x] || 0) - (antes[x] || 0);
+  const fps = cuadros / (ms / 1000), espera = (ahora.msEsperando - antes.msEsperando) / cuadros,
+        esperaTodo = espera + (otra('msLlegada') + otra('msFrenado')) / cuadros;
   if (espera > 4 && fps < 55) {
     let peor = null, mas = 0;
     for (const [u, t] of Object.entries(ahora.esperaDe || {})) {
@@ -1968,16 +2405,17 @@ export function avisoLento(antes, ahora, ms, humanos) {
     const n = humanos.findIndex(h => h.uid === peor) + 1;
     return `La carrera va a ${Math.round(fps)} cuadros por segundo: espera ${n ? `al jugador ${n} de la sala` : 'a otro jugador'} (su PC o su conexión no dan abasto)`;
   }
-  if (espera < 1 && fps < 50) return `Tu PC no alcanza 60 cuadros por segundo (va a ${Math.round(fps)}): la sala va a tu ritmo`;
+  if (esperaTodo < 1 && fps < 50 && (comoAntes || ocupado === null || ocupado >= OCUPADO_LENTO))
+    return `Tu PC no alcanza 60 cuadros por segundo (va a ${Math.round(fps)}): la sala va a tu ritmo`;
   return '';
 }
 // Lo que usa la página: una foto de estado() cada 3 s y el aviso solo si DOS ratos seguidos (6 s) salieron mal. Un
 // tirón suelto (bajar la pista con la caché vacía al empezar la carrera: medio segundo congelado y un par de segundos a
 // 25-30 cuadros) no es una PC lenta y no se avisa. Como el retardo de un relé térmico: no salta con el pico del arranque.
-export function vigiaLento(humanos, seguidas = 2) {
+export function vigiaLento(humanos, seguidas = 2, comoAntes = false) {
   let foto = null, cuando = 0, malas = 0;
-  return (ahora, t) => {
-    const texto = avisoLento(foto, ahora, t - cuando, humanos);
+  return (ahora, t, ocupado = null) => {
+    const texto = avisoLento(foto, ahora, t - cuando, humanos, ocupado, comoAntes);
     foto = ahora; cuando = t;
     malas = texto ? malas + 1 : 0;
     return malas >= seguidas ? texto : '';

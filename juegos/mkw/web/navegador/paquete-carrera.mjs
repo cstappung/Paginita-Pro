@@ -110,7 +110,7 @@ export function leerPistaElegida(L) {
 }
 
 // Qué pedir con solo la pista elegida: la pista entera y, en Grand Prix (modo 0), las otras 3 de la copa con prioridad baja
-export function armarPista({ pista, modo }, existe, { musica = true } = {}) {
+export function armarPista({ pista, modo }, existe, { musica = true, ultima = true } = {}) {
   const piezas = [], baja = [];
   const n = archivoDePista(pista);
   if (n < 0) return { piezas, baja };
@@ -119,6 +119,8 @@ export function armarPista({ pista, modo }, existe, { musica = true } = {}) {
   // (§176, D1: también su música, ver musicaDePista)
   const mus = musica ? musicaDePista(n) : null;
   if (mus && existe(mus)) piezas.push([mus, 0, existe(mus)]);
+  const fin = musica && ultima ? musicaUltimaDePista(n) : null;   // (§285)
+  if (fin && existe(fin)) piezas.push([fin, 0, existe(fin)]);
   if (modo === 0) for (let k = n - (n % 4); k < n - (n % 4) + 4; k++) if (k !== n && existe(ruta(k))) baja.push([ruta(k), 0, existe(ruta(k))]);
   return { piezas, baja };
 }
@@ -127,7 +129,7 @@ export function armarPista({ pista, modo }, existe, { musica = true } = {}) {
 export const claveDe = f => f ? [f.pista, f.casilla, f.modo, ...f.puestos.map(p => `${p.tipo}.${p.veh}.${p.pj}.${p.skin}`)].join(',') : '';
 
 // Qué pedir para esa ficha. existe(ruta) → tamaño (o 0); grupos: nombre → [inicio, fin) dentro de revo_kart.brsar
-export function armarPaquete(f, { existe, grupos = new Map(), archivos = [], musica = true, comun = true, vocesAmbas = true }) {
+export function armarPaquete(f, { existe, grupos = new Map(), archivos = [], musica = true, comun = true, vocesAmbas = true, ultima = true, fanfarrias = true }) {
   const piezas = [], baja = [], faltan = [], vistas = new Set();
   const entero = (ruta, lista = piezas) => {
     const tam = existe(ruta);
@@ -150,6 +152,8 @@ export function armarPaquete(f, { existe, grupos = new Map(), archivos = [], mus
   //     §174.4: 3 pedidos y 5,6 MB a la red en la carrera, sin espera del juego, pero en plena carrera)
   const mus = musica && n >= 0 ? musicaDePista(n) : null;
   if (mus && existe(mus)) entero(mus);
+  const musF = musica && ultima && n >= 0 ? musicaUltimaDePista(n) : null;   // (§285: la de la última vuelta)
+  if (musF && existe(musF)) entero(musF);
   if (f.modo === 0 && n >= 0) for (let k = 0; k < 4; k++) {
     const otra = n - (n % 4) + k;
     if (otra !== n) entero(`${RR}/Tracks/${otra}.szs`, baja);
@@ -174,7 +178,9 @@ export function armarPaquete(f, { existe, grupos = new Map(), archivos = [], mus
     // (medido en §169: las variantes _CAN_ y _GOL_ no se leen en la carrera); sin skin, o con una skin sin voz propia, el
     // juego usa el grupo del brsar
     const lado = p.tipo === 0 ? 'PC' : 'NPC';
-    const voz = p.skin > 0 ? vozDeSkin(archivos, pj, p.skin, lado) : [];
+    // (§285: con vocesAmbas, también la voz de la skin del otro lado: medido con la 13.2, el juego lee en la presentación
+    // el .brbnk _PC de la skin de cada CPU)
+    const voz = p.skin > 0 ? [...vozDeSkin(archivos, pj, p.skin, lado), ...(vocesAmbas ? vozDeSkin(archivos, pj, p.skin, lado === 'PC' ? 'NPC' : 'PC') : [])] : [];
     if (voz.length) for (const ruta of voz) entero(ruta);
     else grupo(`GRP_VO_${pj.toUpperCase()}_${lado}`);
     // §176 (D1): el juego lee igual del brsar las dos voces de cada personaje de la carrera (_PC y _NPC), también con una
@@ -184,8 +190,9 @@ export function armarPaquete(f, { existe, grupos = new Map(), archivos = [], mus
   }
   // 4b) §176 (D1): lo de toda carrera (StaticR entero, el principio de la fanfarria de la largada)
   if (comun) { entero(COMUN_CARRERA[0]); const t = existe(COMUN_CARRERA[1]); if (t && !vistas.has(COMUN_CARRERA[1])) { vistas.add(COMUN_CARRERA[1]); piezas.push([COMUN_CARRERA[1], 0, Math.min(t, PRINCIPIO_FANFARRIA)]); } }
-  // 4) el principio de las fanfarrias de la meta
-  for (const ruta of FANFARRIAS) { const tam = existe(ruta); if (tam) piezas.push([ruta, 0, Math.min(tam, PRINCIPIO_FANFARRIA)]); }
+  // 4) las fanfarrias de la meta: enteras (§285: también lo que suena al cruzar la meta; fanfarrias = false
+  //    —?fanfarriaEntera=0— = solo el principio, como antes)
+  for (const ruta of FANFARRIAS) { const tam = existe(ruta); if (tam) piezas.push([ruta, 0, fanfarrias ? tam : Math.min(tam, PRINCIPIO_FANFARRIA)]); }
   // 5) el retrato de la tabla de la meta de cada skin (10 KB; los íconos del minimapa ya van en diminutos.bin)
   for (const p of f.puestos) {
     const pj = SIGLAS[p.pj];
@@ -209,15 +216,18 @@ export const archivoDePista = p => p >= 0x100 && p < 0x100 + 4096 ? p - 0x100 : 
 // La música de una pista de Retro Rewind: el mismo número que su archivo (Tracks/54.szs → strm/54_N.brstm, medido en
 // §174.4 con la 13.2). La de la última vuelta (<n>_F) no va: otros 4 MB que se leen recién en la última vuelta
 export const musicaDePista = n => n >= 0 ? `${RR}/strm/${n}_N.brstm` : null;
+// §285 (el dueño: «no se debiera descargar nada durante la carrera incluyendo el lakitu de la vuelta 3»): la de la última
+// vuelta (<n>_F, ~4 MB) va también con el paquete. ultima = false (?musicaUltima=0) = como antes
+export const musicaUltimaDePista = n => n >= 0 ? `${RR}/strm/${n}_F.brstm` : null;
 
 // La música de la pista: la primera lectura de strm/<x>_N.brstm la pide entera (~4 MB, así no se baja de a poco en
 // plena carrera). La de la última vuelta (<x>_F) no: otros 4 MB que en la sala de §169 seguían bajando en la carrera
-export function musicaDe(ruta) {
+export function musicaDe(ruta, ultima = true) {
   const m = /^(.*\/strm\/.+)_N\.brstm$/.exec(ruta);
-  return m ? [m[1] + '_N.brstm'] : null;
+  return m ? [m[1] + '_N.brstm', ...(ultima ? [m[1] + '_F.brstm'] : [])] : null;
 }
 
-export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = () => null, nota = () => {}, pistaTemprana = true, musica = true, comun = true, vocesAmbas = true,
+export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = () => null, nota = () => {}, pistaTemprana = true, musica = true, comun = true, vocesAmbas = true, ultima = true, fanfarrias = true,
                               memoria = null,
                               reloj = () => performance.now(), quietaMs = 1000, alPista = () => {} }) {
   // (alPista(pista): §174, C2: la pista quedó elegida o llegó su ficha; mkw.mjs pide sus pipelines a aurora)
@@ -228,6 +238,8 @@ export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = ()
   const existe = ruta => tamaños.get(ruta) || 0;
   let clave = '';
   const musicaPedida = new Set();
+  // §285: las piezas de la carrera que viene (la ficha de la sala y la del juego), para saber cuánto falta bajar
+  let actuales = [];
   // §176: lo aprendido por pista (memoria = { leer, guardar }; null = no se aprende) y la vuelta de dirección a ruta
   const deUrl = new Map(archivos.map(r => [String(direccion(r)).split('?')[0], r]));
   let aprendido = memoria ? memoria.leer() : {};
@@ -275,11 +287,12 @@ export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = ()
     if (!f || !f.puestos.length || k === clave) return;
     clave = k;
     const t0 = performance.now();
-    const { piezas, baja, faltan } = armarPaquete(f, { existe, grupos, archivos, musica, comun, vocesAmbas });
+    const { piezas, baja, faltan } = armarPaquete(f, { existe, grupos, archivos, musica, comun, vocesAmbas, ultima, fanfarrias });
     piezas.push(...aprendidasDe(f.pista));
     for (const [r] of piezas) if (musicaDe(r) && !musicaPedida.has(r)) { musicaPedida.add(r); estado.musicas++; }   // (§176: ya va; alLeer no la repite)
     const bytes = pedir(piezas, false);
     pedir(baja, true);
+    actuales.push(...piezas);
     try { alPista(f.pista); } catch {}
     const ruta0 = piezas.find(x => /\/Tracks\//.test(x[0]))?.[0];
     if (ruta0 && estado.pista?.ruta !== ruta0) estado.pista = { ruta: ruta0, pedida: Math.round(performance.now()), por: 'ficha' };
@@ -304,7 +317,7 @@ export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = ()
     if (e.pista !== candidata) { candidata = e.pista; desde = reloj(); return; }
     if (reloj() - desde < quietaMs) return;
     pistaVista = e.pista; candidata = -1;
-    const { piezas, baja } = armarPista(e, existe, { musica });
+    const { piezas, baja } = armarPista(e, existe, { musica, ultima });
     for (const [r] of piezas) if (musicaDe(r) && !musicaPedida.has(r)) { musicaPedida.add(r); estado.musicas++; }
     if (!piezas.length) return;
     piezas.push(...aprendidasDe(e.pista));
@@ -322,7 +335,7 @@ export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = ()
     if (estado.pista && !estado.pista.leida && ruta === estado.pista.ruta) {
       estado.pista.leida = Math.round(performance.now()); estado.pista.adelantoMs = estado.pista.leida - estado.pista.pedida;
     }
-    const m = musicaDe(ruta);
+    const m = musicaDe(ruta, ultima);
     if (!m || musicaPedida.has(m[0])) return;
     musicaPedida.add(m[0]);
     pedir(m.filter(existe).map(r => [r, 0, tamaños.get(r)]), false);
@@ -334,7 +347,7 @@ export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = ()
   const pistasSala = new Set();
   function pedirPista(pista, modo = 1) {
     if (pistasSala.has(pista)) return false;
-    const { piezas, baja } = armarPista({ pista, modo }, existe, { musica });
+    const { piezas, baja } = armarPista({ pista, modo }, existe, { musica, ultima });
     if (!piezas.length) return false;
     piezas.push(...aprendidasDe(pista));
     pistasSala.add(pista);
@@ -352,14 +365,23 @@ export function crearPaquete({ L, disco, tamaños, direccion, grupos, skins = ()
   function pedirFicha(ficha) {
     if (!ficha?.puestos?.length) return 0;
     const f = { pista: ficha.pista, casilla: -1, modo: 1, puestos: ficha.puestos.map(q => ({ tipo: q.tipo, veh: q.vehiculo, pj: q.personaje, skin: 0 })) };
-    const { piezas } = armarPaquete(f, { existe, grupos, archivos, musica, comun, vocesAmbas });
+    const { piezas } = armarPaquete(f, { existe, grupos, archivos, musica, comun, vocesAmbas, ultima, fanfarrias });
     const sinKarts = piezas.filter(([r]) => !/\/Race\/Kart\/|\/Character\//.test(r));
     sinKarts.push(...aprendidasDe(f.pista));
     for (const [r] of sinKarts) if (musicaDe(r) && !musicaPedida.has(r)) { musicaPedida.add(r); estado.musicas++; }
     const mb = +(pedir(sinKarts, false) / 1048576).toFixed(1);
+    actuales = [...sinKarts];   // (§285: otra carrera)
     estado.fichas = (estado.fichas || 0) + 1;
     nota(`paquete de carrera: la ficha de la sala (pista ${f.pista}, ${f.puestos.length} puestos) → ${sinKarts.length} piezas, ${mb} MB`);
     return sinKarts.length;
   }
-  return { revisar, alLeer, pedirPista, pedirFicha, aprender, estado };
+  // §285: cuánto de lo pedido para la carrera que viene sigue sin bajar (en la fila o en camino): { total, falta, pct }
+  // (pct entero 0–100; sin piezas, 100)
+  function progreso() {
+    let total = 0, falta = 0;
+    for (const [ruta, ini, fin] of actuales) { total += fin - ini; falta += disco.pendientes ? disco.pendientes(direccion(ruta), ini, fin) : 0; }
+    const pct = total > 0 ? Math.floor(100 * (total - falta) / total) : 100;
+    return { total, falta, pct: falta > 0 ? Math.min(99, pct) : 100 };
+  }
+  return { revisar, alLeer, pedirPista, pedirFicha, aprender, progreso, estado };
 }

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La caja negra</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>La caja negra: <span>qué tumbó al juego la vez anterior</span></h1>
+<p>Prueba <code>web/navegador/caidas.mjs</code> (bitácora §269, la caída del celular en medio de la carrera) <b>sin el
+  juego</b>: un localStorage, una ventana y una tarjeta de video de mentira. Comprueba que el latido se guarda, que al
+  ocultar o cerrar bien la pestaña queda «limpio», que una pestaña muerta de golpe (sin limpio) se reconoce al volver,
+  que la tarjeta perdida y los errores del motor quedan como causa (solo la primera), que los errores comunes de la
+  página no cuentan, que un latido viejo no se cree y el texto que ve el jugador.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearCaidas, esGrave, CLAVE, VIGENCIA_MS } from '/web/navegador/caidas.mjs';
+
+const { ok, nota, fin } = prueba('caidas', 'La caja negra (sin el juego)');
+function almacenFalso() { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; }
+function oyente() { const l = {}; return { addEventListener: (n, f) => (l[n] ||= []).push(f), lanzar: (n, e) => (l[n] || []).forEach(f => f(e)), l }; }
+// una tarjeta de mentira: requestDevice da un device con `lost` que se resuelve cuando la prueba quiere
+function tarjetaFalsa() {
+  let perder;
+  class GPUAdapter { requestDevice() { return Promise.resolve({ lost: new Promise(r => perder = r) }); } }
+  return { GPUAdapter, perder: i => perder(i) };
+}
+const espera = () => new Promise(r => setTimeout(r, 0));
+
+try {
+  let t = 10_000_000, mem = { enCarrera: true, cuadro: 1234, heapMB: 768, jsMB: 90 };
+  const al = almacenFalso();
+  const mk = () => { const v = oyente(), d = { ...oyente(), visibilityState: 'visible' }, g = tarjetaFalsa();
+    const c = crearCaidas({ almacen: al, ahora: () => t, medir: () => mem, ventana: v, documento: d, gpu: g.GPUAdapter });
+    return { c, v, d, g }; };
+
+  // ---- 1. La primera vez: nada que contar ----
+  let { c, v, d, g } = mk();
+  ok('la primera vez no hay caída anterior', c.estado.anterior === null && c.texto() === null);
+  const caja = () => JSON.parse(al.getItem(CLAVE));
+  ok('el primer latido queda guardado con la memoria y si está en carrera', caja().latido?.heapMB === 768 && caja().latido.enCarrera === true && caja().limpio === false);
+  t += 5000; c.latir();
+  ok('cada latido pone la hora nueva', caja().latido.t === t);
+
+  // ---- 2. Cerrar bien: la vez siguiente no hay caída ----
+  v.lanzar('pagehide'); c.parar();
+  ok('pagehide = salió limpio', caja().limpio === true);
+  ({ c, v, d, g } = mk());
+  ok('después de cerrar bien: sin caída', c.estado.anterior === null);
+
+  // ---- 3. Ocultar y volver ----
+  d.visibilityState = 'hidden'; d.lanzar('visibilitychange');
+  ok('ocultar la pestaña = limpio (Android puede matarla oculta sin culpa del juego)', caja().limpio === true);
+  d.visibilityState = 'visible'; d.lanzar('visibilitychange');
+  ok('al volver a verse, se borra la marca', caja().limpio === false);
+
+  // ---- 4. Muerta de golpe ----
+  c.parar(); t += 20_000;
+  ({ c, v, d, g } = mk());
+  ok('sin limpio y con un latido de hace poco: se reconoce la caída', c.estado.anterior?.causa?.tipo === 'cierre');
+  ok('el texto dice «en medio de la carrera» y la memoria', /en medio de la carrera/.test(c.texto()) && /768 MB/.test(c.texto()) && /90 MB/.test(c.texto()), c.texto());
+  nota(c.texto());
+  ok('la caja nueva empieza vacía (no se cuenta dos veces)', caja().causa === null);
+
+  // ---- 5. La tarjeta perdida ----
+  const dev = await new g.GPUAdapter().requestDevice();
+  ok('requestDevice sigue dando el device', !!dev?.lost);
+  g.perder({ reason: 'unknown', message: 'GPU process crashed' }); await espera(); await espera();
+  ok('la tarjeta perdida queda como causa', caja().causa?.tipo === 'tarjeta' && /GPU process crashed/.test(caja().causa.texto));
+  v.lanzar('error', { error: new WebAssembly.RuntimeError('unreachable') });
+  ok('solo la primera causa (la que tumbó)', caja().causa.tipo === 'tarjeta' && c.estado.causas === 2);
+  v.lanzar('pagehide'); c.parar();
+  ({ c, v, d, g } = mk());
+  ok('con causa anotada se cuenta aunque haya salido «limpio»', c.estado.anterior?.causa?.tipo === 'tarjeta' && /tarjeta de video/.test(c.texto()));
+
+  // ---- 6. El motor ----
+  v.lanzar('error', { error: new TypeError('x is undefined'), message: 'x is undefined' });
+  ok('un error común de la página no es causa', caja().causa === null && !esGrave(new TypeError('x is undefined')));
+  v.lanzar('unhandledrejection', { reason: new WebAssembly.RuntimeError('memory access out of bounds') });
+  ok('una promesa rechazada con RuntimeError sí', caja().causa?.tipo === 'motor' && /out of bounds/.test(caja().causa.texto));
+  c.parar(); ({ c, v, d, g } = mk());
+  c.alAbortar('OOM');
+  ok('onAbort del motor es causa', caja().causa?.tipo === 'motor' && /abort/.test(caja().causa.texto));
+  ok('esGrave conoce «Aborted(…)» y la memoria agotada', esGrave('Aborted(Cannot enlarge memory)') && esGrave(new RangeError('WebAssembly.Memory(): could not allocate memory')) && esGrave('out of memory'));
+  const destruida = await new g.GPUAdapter().requestDevice(); c.parar();
+  ({ c, v, d, g } = mk());
+  const d2 = await new g.GPUAdapter().requestDevice(); g.perder({ reason: 'destroyed' }); await espera(); await espera();
+  ok('un device destruido a propósito no es causa', caja().causa === null);
+
+  // ---- 7. Un latido viejo ----
+  c.parar(); t += VIGENCIA_MS + 1000;
+  ({ c, v, d, g } = mk());
+  ok('un latido sin limpio de hace más de 30 min no se cree', c.estado.anterior === null);
+
+  // ---- 8. Sin localStorage ----
+  const roto = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } };
+  const c3 = crearCaidas({ almacen: roto, medir: () => mem, ventana: oyente(), documento: { ...oyente(), visibilityState: 'visible' }, gpu: null });
+  c3.latir(); c3.anotar('motor', 'x'); c3.parar();
+  ok('con localStorage bloqueado no se cae', c3.estado.anterior === null && c3.estado.latidos === 2);
+  c.parar();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

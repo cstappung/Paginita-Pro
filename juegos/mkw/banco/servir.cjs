@@ -49,7 +49,7 @@ http.createServer((pedido, respuesta) => {
   if (ruta === '/turn') {
     pideTurn().then(t => {
       respuesta.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Cross-Origin-Resource-Policy': 'same-origin' });
-      respuesta.end(JSON.stringify(pedido.url.includes('cuenta=1') ? t.cuenta : { iceServers: t.iceServers() }));
+      respuesta.end(JSON.stringify(pedido.url.includes('cuenta=1') ? t.cuenta : { iceServers: t.iceServers(pedido.url.includes('tcp=1') ? 'tcp' : 'udp') }));
     }, e => { respuesta.writeHead(500); respuesta.end(String(e?.message || e)); });
     return;
   }

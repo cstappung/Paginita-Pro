@@ -7965,6 +7965,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null, sincroBase = 0;
   let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
   let nivel = mkwNivelDe(p && p.nivel), conexion = "host";
+  let red = "lockstep";   // §275b: el modo de red de la carrera («lockstep» de siempre o «estado» = «Cada uno su kart»)
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7984,6 +7985,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "red" && fase === "vestibulo") { red = j.v === "estado" ? "estado" : "lockstep"; continue; }
     if (j.t === "ajuste" && esAnf && j.k === "relevo" && fase === "vestibulo") {
       if (j.v === true || j.v === "cloudflare") conexion = "cloudflare";
       else if (j.v === false || j.v === "host" || j.v === "oracle") conexion = "host";   // §266: sin Oracle
@@ -8028,7 +8030,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
   const quedan = presentes().length;
   return {
-    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, conexion, relevo: conexion === "cloudflare",
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, conexion, relevo: conexion === "cloudflare", red,
     ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
     sincro: fase === "jugando" ? sincro : null, sincroBase: fase === "jugando" ? sincroBase : 0,
     ganador: "", motivo: quedan ? "" : "abandono"

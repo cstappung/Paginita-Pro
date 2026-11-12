@@ -13,6 +13,7 @@
 //       t.cuenta  →  { asignaciones, reenviados, bytes }      t.cerrar()
 //       node herramientas/turn-local.mjs [puerto]           (suelto, para mirarlo a mano; Ctrl+C para cerrar)
 import dgram from 'node:dgram';
+import net from 'node:net';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -106,7 +107,7 @@ export async function crearTurn({ ip = '127.0.0.1', puerto = 0, usuario = 'banco
     if (canal) { b = Buffer.alloc(4 + datos.length); b.writeUInt16BE(canal); b.writeUInt16BE(datos.length, 2); datos.copy(b, 4); }
     else b = armar(M.DATA, C.AVISO, crypto.randomBytes(12), [[A.PAR, bytesDe({ ip: r.address, puerto: r.port })], [A.DATOS, datos]]);
     cuenta.reenviados++; cuenta.bytes += datos.length;
-    servidor.send(b, x.cliente.port, x.cliente.address);
+    x.cliente.enviar(b);
   }
   const hacia = (x, dir, datos) => {
     if (!dir || !x.permisos.has(dir.ip)) return;
@@ -119,24 +120,25 @@ export async function crearTurn({ ip = '127.0.0.1', puerto = 0, usuario = 'banco
     await new Promise((listo, mal) => { socket.once('error', mal); socket.bind(0, ip, listo); });
     const x = { cliente: r, socket, permisos: new Set(), canales: new Map(), canalDe: new Map(), vence: Date.now() + 600e3 };
     socket.on('message', (d, rr) => alPuertoDe(x, d, rr));
-    asignaciones.set(clave5(r), x); cuenta.asignaciones++;
-    registro(`[turn] asignación para ${clave5(r)} en ${ip}:${socket.address().port}`);
+    asignaciones.set(r.clave, x); cuenta.asignaciones++;
+    registro(`[turn] asignación para ${r.clave} en ${ip}:${socket.address().port}`);
     return x;
   }
   function soltar(k) { const x = asignaciones.get(k); if (!x) return; asignaciones.delete(k); try { x.socket.close(); } catch {} }
 
-  servidor.on('message', async (b, r) => {
+  // (§281 parte 2: el mismo trabajo para UDP y para TCP; `r` = el cliente: su dirección, su clave y cómo contestarle)
+  async function procesar(b, r) {
     // ChannelData (los dos primeros bits 01): número de canal, largo y los datos, hacia el par de ese canal
     if (b.length >= 4 && (b[0] & 0xC0) === 0x40) {
-      const x = asignaciones.get(clave5(r)), canal = b.readUInt16BE(0), n = b.readUInt16BE(2);
+      const x = asignaciones.get(r.clave), canal = b.readUInt16BE(0), n = b.readUInt16BE(2);
       if (x && x.canales.has(canal) && 4 + n <= b.length) hacia(x, x.canales.get(canal), b.subarray(4, 4 + n));
       return;
     }
     const m = leer(b);
     if (!m) return;
     cuenta.pedidos++;
-    const x = asignaciones.get(clave5(r));
-    const responde = (cla, atrs, firmar = true) => servidor.send(armar(m.met, cla, m.id, atrs, firmar ? llave : null), r.port, r.address);
+    const x = asignaciones.get(r.clave);
+    const responde = (cla, atrs, firmar = true) => r.enviar(armar(m.met, cla, m.id, atrs, firmar ? llave : null));
     // el aviso «Send»: los datos al par (sin firma: los avisos no la llevan)
     if (m.cla === C.AVISO) { if (m.met === M.SEND && x) hacia(x, dirDe(m.atr.get(A.PAR)?.v), m.atr.get(A.DATOS)?.v || Buffer.alloc(0)); return; }
     if (m.cla !== C.PEDIDO) return;
@@ -154,7 +156,7 @@ export async function crearTurn({ ip = '127.0.0.1', puerto = 0, usuario = 'banco
     if (!x) return responde(C.ERROR, [[A.ERROR, errorDe(437, 'Allocation Mismatch')]]);
     if (m.met === M.REFRESH) {
       const s = m.atr.get(A.VIDA)?.v.readUInt32BE(0) ?? 600;
-      if (s === 0) soltar(clave5(r)); else x.vence = Date.now() + s * 1000;
+      if (s === 0) soltar(r.clave); else x.vence = Date.now() + s * 1000;
       return responde(C.EXITO, [[A.VIDA, vida(s === 0 ? 0 : Math.min(s, 3600))]]);
     }
     if (m.met === M.PERMISO) {
@@ -168,17 +170,43 @@ export async function crearTurn({ ip = '127.0.0.1', puerto = 0, usuario = 'banco
       return responde(C.EXITO, []);
     }
     responde(C.ERROR, [[A.ERROR, errorDe(400, 'Bad Request')]]);
-  });
+  }
+  // UDP: cada paquete es un mensaje; el cliente es la dirección de donde vino
+  servidor.on('message', (b, r) => procesar(b, { address: r.address, port: r.port, clave: clave5(r), enviar: d => servidor.send(d, r.port, r.address) }));
   await new Promise((listo, mal) => { servidor.once('error', mal); servidor.bind(puerto, ip, listo); });
   const p = servidor.address().port;
+  // TCP (§281 parte 2, «turn:…?transport=tcp»: el teléfono por el cable USB con adb reverse, que solo lleva TCP): los
+  // mismos mensajes pegados uno detrás de otro en el chorro; cada uno se corta por su largo (STUN: 20 + el largo de la
+  // cabecera; ChannelData: 4 + el largo, rellenado a múltiplo de 4, como pide el RFC sobre TCP). Al cerrar la conexión
+  // se suelta su asignación.
+  const tcp = net.createServer(sock => {
+    sock.setNoDelay(true);
+    const cli = { address: sock.remoteAddress?.replace(/^::ffff:/, ''), port: sock.remotePort, tcp: true, clave: `tcp:${sock.remoteAddress}:${sock.remotePort}`,
+      enviar: d => { if (sock.destroyed) return; const pad = (d[0] & 0xC0) === 0x40 && d.length % 4 ? Buffer.concat([d, Buffer.alloc(4 - d.length % 4)]) : d; sock.write(pad); } };
+    cuenta.tcp = (cuenta.tcp || 0) + 1;
+    let pend = Buffer.alloc(0);
+    sock.on('data', d => {
+      pend = pend.length ? Buffer.concat([pend, d]) : d;
+      while (pend.length >= 4) {
+        const canal = (pend[0] & 0xC0) === 0x40, n = pend.readUInt16BE(2);
+        const largo = canal ? 4 + n + ((4 - n % 4) % 4) : 20 + n;
+        if (pend.length < largo) break;
+        const m = pend.subarray(0, canal ? 4 + n : largo); pend = pend.subarray(largo);
+        procesar(Buffer.from(m), cli).catch?.(() => {});
+      }
+    });
+    const fin = () => soltar(cli.clave);
+    sock.on('close', fin); sock.on('error', fin);
+  });
+  await new Promise((listo, mal) => { tcp.once('error', mal); tcp.listen(p, ip, listo); });
   // las asignaciones vencidas se sueltan solas (como en el de verdad)
   const limpia = setInterval(() => { const t = Date.now(); for (const [k, x] of asignaciones) if (x.vence < t) soltar(k); }, 30e3);
   limpia.unref?.();
   return {
     ip, puerto: p, cuenta,
     // lo mismo que contesta el Worker en /turn con las credenciales de Cloudflare
-    iceServers: () => [{ urls: [`turn:${ip}:${p}?transport=udp`], username: usuario, credential: clave }],
-    cerrar() { clearInterval(limpia); for (const k of [...asignaciones.keys()]) soltar(k); try { servidor.close(); } catch {} },
+    iceServers: (transporte = 'udp') => [{ urls: [`turn:${ip}:${p}?transport=${transporte}`], username: usuario, credential: clave }],
+    cerrar() { clearInterval(limpia); for (const k of [...asignaciones.keys()]) soltar(k); try { servidor.close(); } catch {} try { tcp.close(); } catch {} },
   };
 }
 
