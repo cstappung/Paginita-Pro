@@ -71,6 +71,12 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
   (1 h, 2 h 15, 6 h, 18 h, 72 h: the owner asked for three times the first
   durations); a resolved one too. Their entry animation and sparks start
   at `-var(--edad)`, so a chat repaint does not replay them.
+- **Legendaria is the showpiece** (owner: «que den ganas de apretar Jugar»):
+  gold metal «▶ JUGAR» that pulses with a shine sweep (`jgCzLatido`),
+  twinkling ✦ (`destellos`, needs `--y` from `particulas`), a featured
+  cartel row, and its top banner takes the screen: a golden `jg-cz-velo`
+  dims the page (click closes) while coins rain over everything. Coins of
+  the rain need `position:absolute` or they line up as text.
 - **Top banner** (`anuncia`): a bounty or a payout of Gran or more drops in
   from the top of the screen, once per browser (`localStorage
   jg.cz.anuncios`) and only while under 10 min old; legendaria adds a white

@@ -45,7 +45,7 @@ function particulas(n, semilla, clase = "jg-cz-moneda") {
   for (const ch of String(semilla)) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
   const r = () => (s = (Math.imul(1664525, s) + 1013904223) >>> 0) / 4294967296;
   let h = "";
-  for (let i = 0; i < n; i++) h += `<i class="${clase}" style="--x:${(r() * 100).toFixed(1)}%;--d:${(r() * 2.4).toFixed(2)}s;--v:${(0.8 + r() * 0.9).toFixed(2)};--g:${Math.round(r() * 360 - 180)}deg" aria-hidden="true"></i>`;
+  for (let i = 0; i < n; i++) h += `<i class="${clase}" style="--x:${(r() * 100).toFixed(1)}%;--y:${(r() * 100).toFixed(1)}%;--d:${(r() * 2.4).toFixed(2)}s;--v:${(0.8 + r() * 0.9).toFixed(2)};--g:${Math.round(r() * 360 - 180)}deg" aria-hidden="true"></i>`;
   return h;
 }
 
@@ -56,6 +56,8 @@ function banda(texto) {
   return `<p class="jg-cz-banda" aria-hidden="true"><span>${t} · ${t} · ${t} · ${t}</span></p>`;
 }
 const onda = `<i class="jg-cz-onda" aria-hidden="true"></i>`;
+/* Los destellos ✦ que titilan sobre todo lo legendario. */
+const destellos = (n, semilla) => particulas(n, "d" + semilla, "jg-cz-destello");
 const ALERTA = { 4: "⚠ Alerta de cacería épica", 5: "👑 Cacería legendaria en curso" };
 
 /* ctx = {fb, usuario() → {uid, name}|null, datos(fn) → apagar, perfil(uid),
@@ -86,9 +88,9 @@ export function crearCazas(ctx) {
     const p = quien(o.q, nombreDe(o.q, o.c));
     const nv = o.nivel, tuyo = yo && o.q === yo;
     return `<li class="jg-cz-fila n${nv.n}${i === 0 ? " primera" : ""}${tuyo ? " tuya" : ""}">
-      ${nv.n >= 3 ? `<span class="jg-cz-brillo" aria-hidden="true"></span>` : ""}
+      ${nv.n >= 3 ? `<span class="jg-cz-brillo" aria-hidden="true"></span>` : ""}${nv.n >= 5 ? destellos(7, o.k) : ""}
       <span class="jg-cz-pos" aria-hidden="true">${i + 1}</span>
-      ${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(o.q), i === 0 ? 40 : 30, o.q)}
+      ${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(o.q), nv.n >= 5 ? 52 : i === 0 ? 40 : 30, o.q)}
       <span class="jg-cz-que"><b translate="no" data-perfil="${esc(o.q)}" data-nombre="${esc(p.nombre)}">${nombreHtml(o.q, esc(p.nombre))}</b>
         <small>${esc(nombreCategoria(o.c))} · <span translate="no">${esc(marcaDe(o))}</span></small></span>
       <span class="jg-cz-pozo" title="${o.n} ${o.n === 1 ? "aporte" : "aportes"}"><em>${nv.icono} ${esc(nv.nombre)}</em><b><span class="cz-n">${fmt(o.pozo)}</span> ${MONEDA}</b>${o.n > 1 ? `<small>${o.n} cazadores ponen</small>` : ""}</span>
@@ -210,7 +212,7 @@ export function crearCazas(ctx) {
     if (soloDetalle && cuerpo.querySelector(".jg-cz-m-det")) {
       cuerpo.querySelector(".jg-cz-m-det").innerHTML = detalle;
       const b = cuerpo.querySelector("[data-cz-publicar]");
-      if (b) { b.disabled = !!falta || modal.enviando; b.textContent = textoBoton(monto); }
+      if (b) { b.disabled = !!falta || modal.enviando; b.textContent = textoBoton(monto); b.className = `btn jg-cz-m-pub n${nv.n}${modal.confirma ? " confirma" : ""}`; }
       return;
     }
     cuerpo.innerHTML = `<button type="button" class="jg-cz-m-volver" data-cz-volver>← Otra tabla</button>
@@ -220,7 +222,7 @@ export function crearCazas(ctx) {
         <input class="inp jg-cz-monto" type="number" inputmode="numeric" min="${CAZA_MIN}" step="100" value="${monto}"></label>
       <div class="jg-cz-m-chips">${[500, 2000, 10000, 25000, 50000].map(n => `<button type="button" data-cz-monto="${n}" class="n${nivelCaza(n).n}${n === monto ? " sel" : ""}"${s && n > s.saldo ? " disabled" : ""}>${fmt(n)}</button>`).join("")}</div>
       <div class="jg-cz-m-det">${detalle}</div>
-      <button type="button" class="btn jg-cz-m-pub${modal.confirma ? " confirma" : ""}" data-cz-publicar${falta || modal.enviando ? " disabled" : ""}>${textoBoton(monto)}</button>`;
+      <button type="button" class="btn jg-cz-m-pub n${nv.n}${modal.confirma ? " confirma" : ""}" data-cz-publicar${falta || modal.enviando ? " disabled" : ""}>${textoBoton(monto)}</button>`;
   }
   const textoBoton = monto => modal && modal.enviando ? "Publicando…" : modal && modal.confirma ? `Sí, pagar ${fmt(monto)} ${MONEDA} (sin vuelta atrás)` : `Fichar · ${fmt(monto)} ${MONEDA}`;
 
@@ -293,11 +295,12 @@ export function crearCazas(ctx) {
     return `${onda}${particulas(8 + nv.n * 7, "b" + u.uid + pozo)}<div class="jg-cz-poster">
       ${nv.n >= 4 ? banda(ALERTA[nv.n]) : ""}
       ${nv.n === 4 ? `<div class="jg-cz-llamas" aria-hidden="true"></div>` : ""}
+      ${nv.n >= 5 ? destellos(12, u.uid) : ""}
       <p class="jg-cz-se">FICHADO</p>
       <div class="jg-cz-foto">${nv.n >= 5 ? `<span class="jg-cz-corona" aria-hidden="true">👑</span>` : ""}${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(u.uid), 112, u.uid)}</div>
       <p class="jg-cz-quien" translate="no">${nombreHtml(u.uid, esc(p.nombre))}</p>
       <p class="jg-cz-por">${mias.length === 1 ? "por su récord en" : `por ${mias.length} récords:`}</p>
-      <ul class="jg-cz-tablas">${mias.slice(0, 3).map(o => `<li>${esc(nombreCategoria(o.c))} · <span translate="no">${esc(marcaDe(o))}</span> — <b>${fmt(o.pozo)} ${MONEDA}</b></li>`).join("")}${mias.length > 3 ? `<li>y ${mias.length - 3} más</li>` : ""}</ul>
+      <ul class="jg-cz-tablas">${mias.slice(0, 3).map(o => `<li>${esc(nombreCategoria(o.c))} · <span translate="no">${esc(marcaDe(o))}</span>${mias.length > 1 ? ` — <b>${fmt(o.pozo)} ${MONEDA}</b>` : ""}</li>`).join("")}${mias.length > 3 ? `<li>y ${mias.length - 3} más</li>` : ""}</ul>
       <p class="jg-cz-recompensa"><small>${nv.icono} ${esc(nv.nombre)} · recompensa</small><b><span class="cz-n" data-cz-cuenta="${pozo}">0</span> ${MONEDA}</b></p>
       <p class="jg-cz-nota">${cazadores.size} ${cazadores.size === 1 ? "cazador puso" : "cazadores pusieron"} precio a tu cabeza. Si alguien te supera, se lo lleva.
         Si te superas tú, te quedas con la mitad.</p>
@@ -397,7 +400,7 @@ export function crearCazas(ctx) {
   function avisoHtml(a, ahora) {
     const nv = a.nivel, edad = Math.max(0, (ahora - a.at) / 1000).toFixed(1), x = partes(a);
     return `<div class="jg-cz-av n${nv.n} t-${a.tipo}" style="--edad:${edad}s">
-      ${onda}${nv.n >= 3 ? `<span class="jg-cz-brillo" aria-hidden="true"></span>` : ""}${particulas(nv.n * 5, a.id, "jg-cz-chispa")}
+      ${onda}${nv.n >= 3 ? `<span class="jg-cz-brillo" aria-hidden="true"></span>` : ""}${nv.n >= 5 ? destellos(9, a.id) : ""}${particulas(nv.n * 5, a.id, "jg-cz-chispa")}
       ${x.alerta}
       <p class="jg-cz-av-cab"><span>${x.cab}</span><b><span class="cz-n">${fmt(a.p)}</span> ${MONEDA}</b></p>
       <p class="jg-cz-av-tx">${x.texto}</p>
@@ -410,7 +413,7 @@ export function crearCazas(ctx) {
      parte de arriba de la pantalla, una vez por navegador y solo mientras
      es reciente; la legendaria trae además un destello y lluvia de monedas.
      El que cobra ya tiene su pantalla, y el buscado la suya. */
-  const CLAVE_ANUNCIOS = "jg.cz.anuncios", ANUNCIO_FRESCO = 10 * 60 * 1000, ANUNCIO_MS = { 3: 6500, 4: 8500, 5: 11000 };
+  const CLAVE_ANUNCIOS = "jg.cz.anuncios", ANUNCIO_FRESCO = 10 * 60 * 1000, ANUNCIO_MS = { 3: 6500, 4: 8500, 5: 14000 };
   let anuncio = null;
   const colaAnuncios = [];
   function anuncia(u) {
@@ -433,7 +436,10 @@ export function crearCazas(ctx) {
     const el = anuncio = document.createElement("div");
     el.className = `jg-cz-anuncio n${nv.n}`;
     el.setAttribute("role", "status");
-    el.innerHTML = `<span class="jg-cz-brillo" aria-hidden="true"></span>${x.alerta || banda(`${nv.icono} ${nv.nombre.toUpperCase()}`)}
+    /* La legendaria oscurece la página detrás, con luz dorada. */
+    const velo = nv.n >= 5 ? document.createElement("div") : null;
+    if (velo) { velo.className = "jg-cz-velo"; velo.setAttribute("aria-hidden", "true"); velo.innerHTML = destellos(26, "v" + a.id); document.body.appendChild(velo); }
+    el.innerHTML = `<span class="jg-cz-brillo" aria-hidden="true"></span>${nv.n >= 5 ? destellos(10, a.id) : ""}${x.alerta || banda(`${nv.icono} ${nv.nombre.toUpperCase()}`)}
       <span class="jg-cz-an-ico" aria-hidden="true">${nv.icono}</span>
       <span class="jg-cz-an-tx"><small>${x.cab}</small>${x.texto}</span>
       <span class="jg-cz-an-der"><b><span class="cz-n" data-cz-cuenta="${a.p}">0</span> ${MONEDA}</b>${x.ir}</span>`;
@@ -442,7 +448,14 @@ export function crearCazas(ctx) {
     if (ctx.suena) ctx.suena(nv.n >= 4 ? "gana" : "entra");
     if (nv.n >= 5) lluvia();
     let t = 0;
-    const fin = () => { clearTimeout(t); if (!el.isConnected) return; el.classList.add("sale"); setTimeout(() => { el.remove(); if (anuncio === el) siguienteAnuncio(); }, 420); };
+    const fin = () => {
+      clearTimeout(t);
+      if (!el.isConnected) return;
+      el.classList.add("sale");
+      if (velo) velo.classList.add("sale");
+      setTimeout(() => { el.remove(); if (velo) velo.remove(); if (anuncio === el) siguienteAnuncio(); }, 420);
+    };
+    if (velo) velo.addEventListener("click", fin);
     t = setTimeout(fin, ANUNCIO_MS[nv.n] || 6500);
     el.addEventListener("click", ev => { if (!ev.target.closest("[data-perfil]")) fin(); });
     el.addEventListener("mouseenter", () => clearTimeout(t));
@@ -483,6 +496,7 @@ export function crearCazas(ctx) {
       cierraPoner();
       if (capa) capa.remove();
       if (anuncio) anuncio.remove();
+      document.querySelectorAll(".jg-cz-velo").forEach(v => v.remove());
       colaAnuncios.length = 0;
     }
   };
