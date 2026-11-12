@@ -534,10 +534,15 @@ export function crearCazas(ctx) {
     if (capa) capa.insertBefore(l, capa.querySelector(".jg-cz-poster")); else document.body.appendChild(l);
     setTimeout(() => l.remove(), 5200);
   }
+  /* En el chat van los épicos y legendarios que sigan vivos y solo los
+     últimos `AVISOS_CHAT` de los demás: con muchas cacerías a la vez se
+     comían el chat (la lista completa está en «Ver todos»). */
+  const AVISOS_CHAT = 6;
   function avisos() {
     if (!d || !d.completo || !eco) return [];
-    const ahora = fb.ahora();
-    return avisosCaza(d, eco, ahora).map(a => ({ id: a.id, at: a.at, firma: a.id + ":" + a.p + ":" + nombreDe(a.uid, a.c) + ":" + nombreDe(a.q, a.c), html: avisoHtml(a, ahora) }));
+    const ahora = fb.ahora(), todos = avisosCaza(d, eco, ahora);
+    const chicos = todos.filter(a => a.nivel.n < 4).slice(-AVISOS_CHAT);
+    return todos.filter(a => a.nivel.n >= 4 || chicos.includes(a)).map(a => ({ id: a.id, at: a.at, firma: a.id + ":" + a.p + ":" + nombreDe(a.uid, a.c) + ":" + nombreDe(a.q, a.c), html: avisoHtml(a, ahora) }));
   }
 
   /* ---------- clics ---------- */

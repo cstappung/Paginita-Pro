@@ -38,6 +38,8 @@ import {
   SUPER_CHAT, SUPER_MAX_MS, nivelSuper, quedaSuper
 } from "./rieles-datos.js";
 import { nombreHtml } from "./tintas.js";
+/* La moneda del sitio (SVG): el emoji 🪙 sale como un cuadrito en algunos equipos. */
+import { MONEDA } from "./monedas-vista.js";
 
 /* Alto / ancho de cada escena (repeticion.js: `aspecto`), para repartir el
    riel antes de que llegue la partida. */
@@ -382,7 +384,7 @@ export function crearRieles(ctx) {
       const items = filas.map(f => ({ at: f.m.at, f })).concat(avisos.map(a => ({ at: a.at, a }))).sort((x, y) => x.at - y.at);
       chatLista.innerHTML = items.length ? items.map(({ f, a }) => a ? a.html : `
         <div class="jg-cg-msg${f.m.uid === u.uid ? " mio" : ""}${f.sup ? ` super s-${f.sup.id}` : ""}" style="--c:${escapeHtml(f.color)}">
-          ${f.sup ? `<em class="jg-cg-sup" translate="yes">${f.sup.icono} ${escapeHtml(f.sup.nombre)} · ${f.sup.p} 🪙<small>${escapeHtml(f.queda)}</small></em>` : ""}
+          ${f.sup ? `<em class="jg-cg-sup" translate="yes">${f.sup.icono} ${escapeHtml(f.sup.nombre)} · ${f.sup.p} ${MONEDA}<small>${escapeHtml(f.queda)}</small></em>` : ""}
           ${avatarMarco(f.foto, f.nombre, f.color, ctx.marco(f.m.uid), 24, f.m.uid)}
           <div><p><b data-perfil="${escapeHtml(f.m.uid)}" data-nombre="${escapeHtml(f.nombre)}">${nombreHtml(f.m.uid, escapeHtml(f.nombre))}</b><time>${escapeHtml(f.cuando)}</time></p>
           <span>${escapeHtml(f.m.t)}</span></div>
@@ -409,7 +411,7 @@ export function crearRieles(ctx) {
       const falta = esperaChat(ultimoMio, fb.ahora());
       chatBtn.disabled = enviando || falta > 0;
       const n = nivelSuper(elegido);
-      chatBtn.textContent = falta > 0 ? `${Math.ceil(falta / 1000)} s` : n ? `${n.icono} ${n.p} 🪙` : "Enviar";
+      chatBtn.innerHTML = falta > 0 ? `${Math.ceil(falta / 1000)} s` : n ? `${n.icono} ${n.p} ${MONEDA}` : "Enviar";
       chatBtn.classList.toggle("super", !!n);
       chatBtn.title = falta > 0 ? "Se puede escribir un mensaje cada 20 segundos" : "";
       if (!falta && cuenta) { clearInterval(cuenta); cuenta = 0; }
@@ -433,9 +435,9 @@ export function crearRieles(ctx) {
       return `<button type="button" role="radio" class="jg-cg-op ${clase}${elegido === p ? " sel" : ""}" data-super="${p}" aria-checked="${elegido === p}"${ok ? "" : " disabled"}>
         <b>${icono} ${nombre}</b><small>${detalle}</small></button>`;
     };
-    superCaja.innerHTML = `<p><b>✦ Super chat</b> <span>${s ? `Tienes ${s.saldo.toLocaleString("es-CL")} 🪙${s.parada ? " · cuenta parada" : ""}` : "Cargando tus monedas…"}</span></p>
+    superCaja.innerHTML = `<p><b>✦ Super chat</b> <span>${s ? `Tienes ${s.saldo.toLocaleString("es-CL")} ${MONEDA}${s.parada ? " · cuenta parada" : ""}` : "Cargando tus monedas…"}</span></p>
       <div class="jg-cg-ops">${op(0, "💬", "Normal", "gratis · 15 min", "s-normal")}${SUPER_CHAT.map(n =>
-        op(n.p, n.icono, n.nombre, `${n.p} 🪙 · ${n.ms >= 3600000 ? `${n.ms / 3600000} h` : `${n.ms / 60000} min`}`, "s-" + n.id)).join("")}</div>`;
+        op(n.p, n.icono, n.nombre, `${n.p} ${MONEDA} · ${n.ms >= 3600000 ? `${n.ms / 3600000} h` : `${n.ms / 60000} min`}`, "s-" + n.id)).join("")}</div>`;
     espera();
   }
   function abreSuper(si) {
@@ -461,7 +463,7 @@ export function crearRieles(ctx) {
     const texto = limpiaChat(chatCampo.value);
     if (!u || !texto || enviando || esperaChat(ultimoMio, fb.ahora()) > 0) return;
     const sup = nivelSuper(elegido);
-    if (sup && !puedePagar(sup.p)) { nota(`No te alcanza: un super chat ${sup.nombre} cuesta ${sup.p} 🪙.`); pintaSuper(); return; }
+    if (sup && !puedePagar(sup.p)) { nota(`No te alcanza: un super chat ${sup.nombre} cuesta ${sup.p} monedas.`); pintaSuper(); return; }
     enviando = true;
     espera();
     chatCampo.value = "";

@@ -108,3 +108,8 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
   than `TOP` (5): a modal with every open bounty by pot (`abreTodas`), a
   search box (game, mode, holder or contributor) and «Ponen: …» per pot. It
   repaints with each data arrival through `pintaMontados`.
+- **The chat list needs `grid-auto-rows:max-content`**: its rows are `auto`
+  and a notice has `overflow:hidden` (min height 0), so with many notices the
+  grid squashed them to their headers instead of scrolling. The chat shows
+  every live épica/legendaria but only the last `AVISOS_CHAT` (6) of the
+  rest. The super chat in `rieles.js` uses the `MONEDA` SVG too.
