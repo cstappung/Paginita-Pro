@@ -57,7 +57,7 @@ before the first edit. Read only the docs the task needs.
 | PRODROP, sobres, cartas coleccionables, mercado, fútbol, plantilla, desafíos de plantilla (retos semanales, álbum de clubes) | `juegos/prodrop/CLAUDE.md` |
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción, Pueblo (plaza, vecinos, visitas, cariños) | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
-| Cacerías de récords, «Se busca», mercenarios, poner precio a un récord, recompensas por superar un n.º 1 | `docs/claude/juegos/cazas.md` |
+| Cacerías de récords, «Fichado», fichar, mercenarios, poner precio a un récord, recompensas por superar un n.º 1 | `docs/claude/juegos/cazas.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
 | Pro Kingdoms (reinos, isométrico), sus reportes de errores y sugerencias (🐞), beta testers, juegos en beta, servidor del mundo compartido | `juegos/prokingdoms/CLAUDE.md` |
 

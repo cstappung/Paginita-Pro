@@ -1,4 +1,9 @@
-# Cacerías de récords («Se busca»)
+# Cacerías de récords («Fichado»)
+
+The owner named it **«Fichado»** (stamp, poster title, «🎯 Fichar» button).
+Every call to action is «▶ Jugar» and opens the game (`rutaDeCategoria`);
+the club games do not take a mode in the URL yet, so the mode is picked
+inside the game.
 
 Anyone puts coins on the n.º 1 of a Solo Club table; whoever beats that mark
 first takes the pot. Pure logic in `colabtex/src/juegos/cazas.js`, screen in
@@ -23,7 +28,8 @@ first takes the pot. Pure logic in `colabtex/src/juegos/cazas.js`, screen in
 
 ## Who gets paid (`reparto`, `resuelveCaza`)
 
-- Someone else beats it → all to them.
+- Someone else beats it → all to them. If that someone is whoever put it
+  (on another person's record), they just get it back (`recuperada`).
 - The holder beats their own mark → half to them, half back to whoever put
   it (owner's rule; known effect: a holder who improves by one point takes
   half of every bounty on them).

@@ -1,5 +1,5 @@
 /* ============================================================
-   Las cacerías de récords («Se busca»): lo puro, sin DOM ni Firebase.
+   Las cacerías de récords («Fichado»): lo puro, sin DOM ni Firebase.
 
    Cualquiera pone monedas sobre el n.º 1 de una tabla del Solo Club, y
    quien primero supere esa marca se las lleva.
@@ -18,7 +18,8 @@
      el siguiente.
 
    El reparto (`reparto`):
-   - la supera otra persona → todo para ella;
+   - la supera otra persona → todo para ella (si es quien la puso, solo
+     recupera lo suyo: `recuperada`);
    - la supera el propio dueño del récord → la mitad para él y la otra
      mitad vuelve a quien la puso;
    - la puso el dueño sobre su propio récord y lo rompe él → vuelve todo;
@@ -80,7 +81,7 @@ export function reparto(b, w) {
    están (`solo`: categoría → uid → fila): null si no vale. */
 export function resuelveCaza(b, w, solo) {
   const t = (solo || {})[b.c] || {};
-  if (supera(t[w], b)) return { tipo: w !== b.q ? "cobrada" : b.u === b.q ? "propia" : "defendida", pagos: reparto(b, w) };
+  if (supera(t[w], b)) return { tipo: w !== b.q ? (w === b.u ? "recuperada" : "cobrada") : b.u === b.q ? "propia" : "defendida", pagos: reparto(b, w) };
   if (!t[b.q]) return { tipo: "anulada", pagos: [{ u: b.u, p: b.p }] };
   return null;
 }

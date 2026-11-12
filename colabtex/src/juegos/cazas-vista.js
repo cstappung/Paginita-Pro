@@ -1,5 +1,5 @@
 /* ============================================================
-   Las cacerías de récords en pantalla («Se busca»). Lo puro está en
+   Las cacerías de récords en pantalla («Fichado»). Lo puro está en
    cazas.js; aquí:
 
    - el **cartel** con el top 5 de pozos, arriba del chat general en el
@@ -56,7 +56,7 @@ function banda(texto) {
   return `<p class="jg-cz-banda" aria-hidden="true"><span>${t} · ${t} · ${t} · ${t}</span></p>`;
 }
 const onda = `<i class="jg-cz-onda" aria-hidden="true"></i>`;
-const ALERTA = { 4: "⚠ ALERTA DE CACERÍA ÉPICA", 5: "👑 CACERÍA LEGENDARIA EN CURSO" };
+const ALERTA = { 4: "⚠ Alerta de cacería épica", 5: "👑 Cacería legendaria en curso" };
 
 /* ctx = {fb, usuario() → {uid, name}|null, datos(fn) → apagar, perfil(uid),
    marco(uid), colorDe(uid), ir(hash), economia(d), monedasDe(uid, d),
@@ -92,22 +92,21 @@ export function crearCazas(ctx) {
       <span class="jg-cz-que"><b translate="no" data-perfil="${esc(o.q)}" data-nombre="${esc(p.nombre)}">${nombreHtml(o.q, esc(p.nombre))}</b>
         <small>${esc(nombreCategoria(o.c))} · <span translate="no">${esc(marcaDe(o))}</span></small></span>
       <span class="jg-cz-pozo" title="${o.n} ${o.n === 1 ? "aporte" : "aportes"}"><em>${nv.icono} ${esc(nv.nombre)}</em><b><span class="cz-n">${fmt(o.pozo)}</span> ${MONEDA}</b>${o.n > 1 ? `<small>${o.n} cazadores ponen</small>` : ""}</span>
-      ${tuyo ? `<a class="jg-cz-ir defiende" href="${rutaDeCategoria(o.c)}" title="Si te superas tú, te llevas la mitad">🛡️ Defender</a>`
-        : `<a class="jg-cz-ir" href="${rutaDeCategoria(o.c)}">¡A por él!</a>`}
+      <a class="jg-cz-ir" href="${rutaDeCategoria(o.c)}" title="${tuyo ? "Si te superas tú, te llevas la mitad" : `Supéralo en ${esc(nombreCategoria(o.c))}`}">▶ Jugar</a>
     </li>`;
   }
   function html() {
     const u = ctx.usuario();
-    const cab = `<header class="jg-cz-cab"><span class="jg-cz-sello" aria-hidden="true">SE BUSCA</span>
-      <span class="jg-cz-tit"><b>Récords con precio</b><small>Supéralos y te llevas el pozo</small></span>
-      ${u ? `<button class="jg-cz-poner" type="button" data-cz-poner>🎯 Poner precio</button>` : ""}</header>`;
-    if (!u) return cab + `<p class="jg-cz-vacio">Inicia sesión para cazar récords.</p>`;
-    if (!d || !d.completo) return cab + `<p class="jg-cz-vacio">Buscando forajidos…</p>`;
-    if (!abiertas.length) return cab + `<p class="jg-cz-vacio">Nadie tiene precio todavía. Pon el primero sobre el n.º 1 que quieras ver caer.</p>`;
+    const cab = `<header class="jg-cz-cab"><span class="jg-cz-sello" aria-hidden="true">FICHADO</span>
+      <span class="jg-cz-tit"><b>Récords fichados</b><small>Supéralos y te llevas el pozo</small></span>
+      ${u ? `<button class="jg-cz-poner" type="button" data-cz-poner>🎯 Fichar</button>` : ""}</header>`;
+    if (!u) return cab + `<p class="jg-cz-vacio">Inicia sesión para cazar récords fichados.</p>`;
+    if (!d || !d.completo) return cab + `<p class="jg-cz-vacio">Buscando fichados…</p>`;
+    if (!abiertas.length) return cab + `<p class="jg-cz-vacio">Nadie está fichado todavía. Ficha al n.º 1 que quieras ver caer.</p>`;
     const top = abiertas.slice(0, TOP), total = abiertas.reduce((a, o) => a + o.pozo, 0);
     const n1 = top[0].nivel.n;
     return cab + (n1 >= 4 ? banda(`${ALERTA[n1]} · ${fmt(top[0].pozo)} ${MONEDA} por ${nombreDe(top[0].q, top[0].c)}`) : "") + `<ol class="jg-cz-lista">${top.map((o, i) => filaHtml(o, i, u.uid)).join("")}</ol>
-      <p class="jg-cz-pie">${abiertas.length} ${abiertas.length === 1 ? "récord buscado" : "récords buscados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia</p>`;
+      <p class="jg-cz-pie">${abiertas.length} ${abiertas.length === 1 ? "récord fichado" : "récords fichados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia</p>`;
   }
   let ultimoHtml = "";
   function pintaMontados() {
@@ -141,7 +140,7 @@ export function crearCazas(ctx) {
     capa.className = "jg-modal-capa jg-cz-capa-poner";
     capa.innerHTML = `<div class="jg-modal jg-cz-modal" role="dialog" aria-modal="true" aria-labelledby="jgCzT">
       <button class="jg-cz-x" type="button" aria-label="Cerrar">✕</button>
-      <h2 id="jgCzT">🎯 Poner precio a un récord</h2>
+      <h2 id="jgCzT">🎯 Fichar un récord</h2>
       <p class="jg-cz-m-intro">Elige un n.º 1 del Solo Club y cuántas monedas pones. Quien lo supere primero se las lleva.</p>
       <div class="jg-cz-m-cuerpo"></div></div>`;
     document.body.appendChild(capa);
@@ -180,6 +179,7 @@ export function crearCazas(ctx) {
     const ts = tablas(), t = modal.cat && ts.find(x => x.c === modal.cat);
     if (!t) {
       const q = modal.filtro.trim().toLowerCase();
+      void 0;
       const lista = ts.filter(x => !q || x.nombre.toLowerCase().includes(q) || nombreDe(x.f.uid, x.c).toLowerCase().includes(q)).slice(0, 80);
       const filas = lista.map(x => {
         const p = quien(x.f.uid, x.f.nombre);
@@ -198,9 +198,10 @@ export function crearCazas(ctx) {
     const tuyo = t.f.uid === u.uid;
     const falta = !s ? "Contando tus monedas…" : s.parada ? "Tu cuenta está parada: no puedes gastar." :
       !Number.isInteger(monto) || monto < CAZA_MIN ? `El mínimo es ${fmt(CAZA_MIN)} ${MONEDA}.` : monto > s.saldo ? `No te alcanza: tienes ${fmt(s.saldo)} ${MONEDA}.` : "";
-    const detalle = `<div class="jg-cz-m-prev n${nv.n}">${nv.n >= 3 ? particulas(nv.n * 3, t.c + nv.n) : ""}
-        <span class="jg-cz-m-niv">${nv.icono} ${esc(nv.nombre)}</span><b>${fmt(monto)} ${MONEDA}</b>
-        <small>${t.pozo ? `El pozo queda en ${fmt(t.pozo + Math.max(0, monto))} ${MONEDA}` : "Abre el pozo de este récord"}</small></div>
+    const detalle = `<div class="jg-cz-m-prev n${nv.n}">${nv.n >= 3 ? particulas(nv.n * 2, t.c + nv.n) : ""}
+        <span class="jg-cz-m-niv">${nv.icono} ${esc(nv.nombre)}</span><b><span class="cz-n">${fmt(monto)}</span> ${MONEDA}</b>
+        <small>${t.pozo ? `El pozo queda en ${fmt(t.pozo + Math.max(0, monto))} ${MONEDA}` : "Abre el pozo de este récord"}</small>
+        ${(() => { const sig = NIVELES_CAZA.find(x => x.desde > t.pozo + monto); return sig ? `<em class="jg-cz-m-sube">Con ${fmt(sig.desde - t.pozo - monto)} ${MONEDA} más sube a ${sig.icono} ${esc(sig.nombre)}</em>` : `<em class="jg-cz-m-sube">Nivel máximo: la cacería más imponente</em>`; })()}</div>
       <ul class="jg-cz-m-reglas">${tuyo
         ? `<li>Es <b>tu</b> récord: si otro lo supera, se lleva todo.</li><li>Si lo superas tú, te vuelve todo.</li>`
         : `<li>Si otro lo supera, se lleva todo.</li><li>Si <b translate="no">${esc(p.nombre)}</b> se supera a sí mismo, se lleva la mitad y la otra mitad te vuelve.</li>`}
@@ -221,7 +222,7 @@ export function crearCazas(ctx) {
       <div class="jg-cz-m-det">${detalle}</div>
       <button type="button" class="btn jg-cz-m-pub${modal.confirma ? " confirma" : ""}" data-cz-publicar${falta || modal.enviando ? " disabled" : ""}>${textoBoton(monto)}</button>`;
   }
-  const textoBoton = monto => modal && modal.enviando ? "Publicando…" : modal && modal.confirma ? `Sí, pagar ${fmt(monto)} ${MONEDA} (sin vuelta atrás)` : `Publicar la cacería · ${fmt(monto)} ${MONEDA}`;
+  const textoBoton = monto => modal && modal.enviando ? "Publicando…" : modal && modal.confirma ? `Sí, pagar ${fmt(monto)} ${MONEDA} (sin vuelta atrás)` : `Fichar · ${fmt(monto)} ${MONEDA}`;
 
   async function publica() {
     const u = ctx.usuario();
@@ -267,8 +268,10 @@ export function crearCazas(ctx) {
     cuentaArriba(capa.querySelector("[data-cz-cuenta]"));
     if (ctx.suena) ctx.suena(x.nivel >= 3 ? "gana" : "entra");
     if (x.nivel >= 5) lluvia();
-    const b = capa.querySelector("[data-cz-cierra]");
-    if (b) setTimeout(() => b.focus(), 50);
+    /* El foco va a la carta, sin desplazar: en «Ahora no» lo marcaba como
+       elegido, y enfocar movía la capa (las monedas la hacen más alta). */
+    const carta = capa.querySelector(".jg-cz-poster");
+    if (carta) { carta.tabIndex = -1; setTimeout(() => carta.focus({ preventScroll: true }), 50); }
   }
   const teclaCapa = ev => { if (ev.key === "Escape" && capa && !modal) { const b = capa.querySelector("[data-cz-cierra]"); if (b) b.click(); } };
   document.addEventListener("keydown", teclaCapa);
@@ -290,7 +293,7 @@ export function crearCazas(ctx) {
     return `${onda}${particulas(8 + nv.n * 7, "b" + u.uid + pozo)}<div class="jg-cz-poster">
       ${nv.n >= 4 ? banda(ALERTA[nv.n]) : ""}
       ${nv.n === 4 ? `<div class="jg-cz-llamas" aria-hidden="true"></div>` : ""}
-      <p class="jg-cz-se">SE BUSCA</p>
+      <p class="jg-cz-se">FICHADO</p>
       <div class="jg-cz-foto">${nv.n >= 5 ? `<span class="jg-cz-corona" aria-hidden="true">👑</span>` : ""}${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(u.uid), 112, u.uid)}</div>
       <p class="jg-cz-quien" translate="no">${nombreHtml(u.uid, esc(p.nombre))}</p>
       <p class="jg-cz-por">${mias.length === 1 ? "por su récord en" : `por ${mias.length} récords:`}</p>
@@ -298,7 +301,7 @@ export function crearCazas(ctx) {
       <p class="jg-cz-recompensa"><small>${nv.icono} ${esc(nv.nombre)} · recompensa</small><b><span class="cz-n" data-cz-cuenta="${pozo}">0</span> ${MONEDA}</b></p>
       <p class="jg-cz-nota">${cazadores.size} ${cazadores.size === 1 ? "cazador puso" : "cazadores pusieron"} precio a tu cabeza. Si alguien te supera, se lo lleva.
         Si te superas tú, te quedas con la mitad.</p>
-      <div class="jg-cz-botones"><a class="btn jg-cz-defiende" href="${rutaDeCategoria(mias[0].c)}">🛡️ Defender mi récord</a>
+      <div class="jg-cz-botones"><a class="btn jg-cz-defiende" href="${rutaDeCategoria(mias[0].c)}">▶ Jugar</a>
         <button class="btn btn-ghost" type="button" data-cz-cierra>Ahora no</button></div>
     </div>`;
   }
@@ -354,10 +357,11 @@ export function crearCazas(ctx) {
     if (!rs.length) return;
     pon(localStorage, k, String(Math.max(...rs.map(r => r.at))));
     for (const r of rs) {
-      const gane = r.w === u.uid && r.tipo !== "anulada";
+      const gane = r.w === u.uid && r.tipo !== "anulada" && r.tipo !== "recuperada";
       if (gane && r.mio) { muestraCapa(capaCobro(r), nivelCaza(r.mio).n); continue; }
       if (!ctx.avisa) continue;
-      if (r.tipo === "anulada") ctx.avisa("↩️", "Te volvió una cacería", `El récord de ${nombreDe(r.q, r.c)} en ${nombreCategoria(r.c)} ya no está en la tabla.`, r.mio);
+      if (r.tipo === "recuperada") ctx.avisa("↩️", "Recuperaste tu cacería", `Superaste tú mismo a ${nombreDe(r.q, r.c)} en ${nombreCategoria(r.c)}.`, r.mio);
+      else if (r.tipo === "anulada") ctx.avisa("↩️", "Te volvió una cacería", `El récord de ${nombreDe(r.q, r.c)} en ${nombreCategoria(r.c)} ya no está en la tabla.`, r.mio);
       else if (r.tipo === "defendida") ctx.avisa("🛡️", `${nombreDe(r.q, r.c)} defendió su récord`, `Se llevó la mitad; la otra mitad te vuelve.`, r.mio);
       else if (r.tipo === "cobrada") ctx.avisa("🎯", `${nombreDe(r.w, r.c)} cobró tu cacería`, `Superó a ${nombreDe(r.q, r.c)} en ${nombreCategoria(r.c)}.`, 0);
     }
@@ -383,9 +387,10 @@ export function crearCazas(ctx) {
         ? `${nombreBtn(a.uid, a.c)} le puso precio a <b>su propio</b> récord en ${tabla}. ¿Quién se atreve?`
         : `${nombreBtn(a.uid, a.c)} le puso precio al récord de ${nombreBtn(a.q, a.c)} en ${tabla}.`]
       : a.tipo === "cobrada" ? [`💥 ¡Recompensa cobrada!`, `${nombreBtn(a.uid, a.c)} superó a ${nombreBtn(a.q, a.c)} en ${tabla} y se llevó el pozo.`]
+      : a.tipo === "recuperada" ? [`↩️ Cacería recuperada`, `${nombreBtn(a.uid, a.c)} superó él mismo el récord de ${nombreBtn(a.q, a.c)} en ${tabla} y recuperó lo que había puesto.`]
       : a.tipo === "defendida" ? [`🛡️ Récord defendido`, `${nombreBtn(a.q, a.c)} se superó a sí mismo en ${tabla} y se quedó con la mitad.`]
       : [`🏆 Récord propio roto`, `${nombreBtn(a.q, a.c)} rompió su propio récord en ${tabla} y recuperó lo puesto.`];
-    const ir = a.tipo === "pone" ? `<a class="jg-cz-av-ir" href="${rutaDeCategoria(a.c)}">${a.q === (ctx.usuario() || {}).uid ? "🛡️ Defender" : "¡A por él!"}</a>` : "";
+    const ir = a.tipo === "pone" ? `<a class="jg-cz-av-ir" href="${rutaDeCategoria(a.c)}">▶ Jugar</a>` : "";
     const alerta = nv.n >= 4 ? banda(a.tipo === "pone" ? ALERTA[nv.n] : a.tipo === "cobrada" ? "💥 RECOMPENSA COBRADA" : "🛡️ RÉCORD DEFENDIDO") : "";
     return { cab, texto, ir, alerta };
   }
@@ -418,7 +423,7 @@ export function crearCazas(ctx) {
       !(a.tipo !== "pone" && a.uid === u.uid) && !(a.tipo === "pone" && a.q === u.uid));
     if (!nuevos.length) return;
     pon(localStorage, CLAVE_ANUNCIOS, JSON.stringify(vistos.concat(nuevos.map(a => a.id)).slice(-60)));
-    colaAnuncios.push(...nuevos.slice(-3));
+    colaAnuncios.push(...nuevos.sort((x, y) => y.p - x.p).slice(0, 3));
     if (!anuncio) siguienteAnuncio();
   }
   function siguienteAnuncio() {
@@ -428,11 +433,12 @@ export function crearCazas(ctx) {
     const el = anuncio = document.createElement("div");
     el.className = `jg-cz-anuncio n${nv.n}`;
     el.setAttribute("role", "status");
-    el.innerHTML = `${onda}<span class="jg-cz-brillo" aria-hidden="true"></span>${particulas(nv.n * 6, "an" + a.id, "jg-cz-chispa")}${x.alerta}
+    el.innerHTML = `<span class="jg-cz-brillo" aria-hidden="true"></span>${x.alerta || banda(`${nv.icono} ${nv.nombre.toUpperCase()}`)}
       <span class="jg-cz-an-ico" aria-hidden="true">${nv.icono}</span>
       <span class="jg-cz-an-tx"><small>${x.cab}</small>${x.texto}</span>
-      <span class="jg-cz-an-der"><b><span class="cz-n">${fmt(a.p)}</span> ${MONEDA}</b>${x.ir}</span>`;
+      <span class="jg-cz-an-der"><b><span class="cz-n" data-cz-cuenta="${a.p}">0</span> ${MONEDA}</b>${x.ir}</span>`;
     document.body.appendChild(el);
+    cuentaArriba(el.querySelector("[data-cz-cuenta]"));
     if (ctx.suena) ctx.suena(nv.n >= 4 ? "gana" : "entra");
     if (nv.n >= 5) lluvia();
     let t = 0;

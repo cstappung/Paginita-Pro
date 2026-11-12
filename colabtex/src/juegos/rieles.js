@@ -77,7 +77,7 @@ export function crearRieles(ctx) {
      lo pinta; aquí solo se le hace el hueco). */
   const cartel = document.createElement("section");
   cartel.className = "jg-cz jg-cz-riel";
-  cartel.setAttribute("aria-label", "Récords con precio");
+  cartel.setAttribute("aria-label", "Récords fichados");
   chat.innerHTML = `<header class="jg-riel-cab"><span class="jg-vivo" aria-hidden="true"></span><h2>Chat general</h2><small>últimos 15 min</small>
       <button class="jg-cg-cierra" type="button" aria-label="Cerrar el chat">✕</button></header>
     <div class="jg-cg-lista" translate="no" aria-live="polite"></div>

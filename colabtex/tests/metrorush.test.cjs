@@ -70,7 +70,7 @@ test('el perfil nombra las tablas, dice los metros y tiene el marco de Maquinist
  assert.equal(P.nombreCategoria('club-metrorush-carrera'),'Metro Rush · Mejor carrera');
  assert.equal(P.nombreCategoria('club-metrorush-distancia'),'Metro Rush · Distancia');
  assert.equal(P.valorMarca('club-metrorush-distancia',{puntos:42195,tiempo:1}),'42.195 m');
- assert.equal(P.valorMarca('club-metrorush-carrera',{puntos:880000,tiempo:1}),'880000 pts');
+ assert.equal(P.valorMarca('club-metrorush-carrera',{puntos:880000,tiempo:1}),'880.000 pts');
  const m=P.MARCOS.find(x=>x.id==='tmetrorush');
  assert.ok(m&&m.anim);assert.equal(m.n,'Maquinista');assert.equal(m.req.top,'metrorush');
  assert.equal(P.topDeCategoria('club-metrorush-carrera'),'metrorush');

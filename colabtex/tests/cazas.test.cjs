@@ -147,3 +147,12 @@ test('la regla pide la marca de la tabla y deja reclamar solo a quien la supera'
   assert.match(g['.write'], /auth\.uid === \$uid && !data\.exists\(\)/);
   assert.match(g['.validate'], /child\('puntos'\)\.val\(\) >/);
 });
+
+test('si quien la puso supera él mismo el récord, solo recupera lo suyo', () => {
+  const d = base();
+  d.cazas.b.k1 = caza(PIA, 3000, T0);
+  d.solo[CAT][PIA] = fila(2000, 1, 7);
+  d.cazas.g = { k1: { [PIA]: { at: T0 + H } } };
+  assert.equal(saldo(d, PIA), 20000);
+  assert.equal(eco(d).cazas.k1.estado, 'recuperada');
+});

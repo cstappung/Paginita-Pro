@@ -171,12 +171,12 @@ export function valorMarca(c, f) {
   if (c === "club-fanal-jornadas") return `jornada ${f.puntos || 0}`;
   if (c === "club-atasco-estrellas") return `${f.puntos || 0} ★`;
   if (c === "club-aleteo-vuelo") return `${f.puntos || 0} ${f.puntos === 1 ? "tubo" : "tubos"}`;
-  if (c === "club-dosmil-puntos") return `${f.puntos || 0} puntos`;
+  if (c === "club-dosmil-puntos") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;
-  if (c === "club-trigon-puntos" || c === "club-trigon-normal") return `${f.puntos || 0} puntos`;
+  if (c === "club-trigon-puntos" || c === "club-trigon-normal") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (/^club-typerace-en-/.test(c)) return `${f.puntos || 0} ppm`;
-  if (/^club-protiles-/.test(c)) return `${f.puntos || 0} puntos`;
-  if (c === "club-pokelike-puntos") return `${f.puntos || 0} puntos`;
+  if (/^club-protiles-/.test(c)) return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
+  if (c === "club-pokelike-puntos") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (c === "club-hero-estrellas") return `${Math.floor((f.puntos || 0) / 10000)} ★ doradas`;
   if (String(c).startsWith("club-prodefender-")) return `ronda ${f.puntos || 0}`;
   if (String(c).startsWith("club-boxhead-")) return `nivel ${f.puntos || 0}`;
@@ -185,7 +185,7 @@ export function valorMarca(c, f) {
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
   if (c === "club-metrorush-distancia" || c === "club-metrorush-citydistancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
   if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-integral-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
-  return `${f.puntos || 0} pts`;
+  return `${(f.puntos || 0).toLocaleString("es-CL")} pts`;
 }
 // El mismo orden que la tabla del club (discord.js: ordenSolo).
 const ordenMarca = (a, b) => b.puntos - a.puntos || a.tiempo - b.tiempo || String(a.uid).localeCompare(String(b.uid));

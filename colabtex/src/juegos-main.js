@@ -2920,7 +2920,7 @@ function armazon() {
           <header><span class="jg-vivo" aria-hidden="true"></span><h2>Salas abiertas</h2><span class="jg-lado-n" id="vesCuenta">0</span></header>
           <div id="vesSalas"></div>
         </section>
-        <section class="jg-lado-caja jg-cz jg-cz-ves" id="vesCazas" aria-label="Récords con precio"></section>
+        <section class="jg-lado-caja jg-cz jg-cz-ves" id="vesCazas" aria-label="Récords fichados"></section>
         <section class="jg-lado-caja jg-mo-ves">
           <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
