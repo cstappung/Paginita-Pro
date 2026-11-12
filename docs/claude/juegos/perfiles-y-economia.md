@@ -500,6 +500,8 @@ event `sc`, category `superChat`; `superChats` in the replay lists the
 paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
 whole (`NODOS_MONEDAS` is 17 with `economiaCierre`, below).
 
+**Cacerías de récords** (`cazas/b` bounties, event `cz`, category `caza`; `cazas/g` claims, event `cg`, income in `premios`; open ones travel in the cierre as `cz`): `docs/claude/juegos/cazas.md`. `NODOS_MONEDAS` is 20.
+
 **Pro Kingdoms' Pase del Reino** (`pkPase/<uid>/<period>` = `{at: now, p:
 2500, s}`, event `pk`, category `pkPase`; `pkPase` in the replay maps each
 period to its purchase time): the only link between the kingdom and Juegos

@@ -342,9 +342,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    de antes de su hora ya no está en `casino`, `cartas` ni `mercado`, así que
    sin él las cuentas saldrían mal. Si no existe (o las reglas aún no dejan
    leerlo), `cierre` queda en null y se rehace todo como siempre. */
-const NODOS_MONEDAS = 19, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+const NODOS_MONEDAS = 20, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, pkPase: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cierre: null }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, pkPase: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, plantillas: {}, cazas: {}, cierre: null }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -388,7 +388,7 @@ export function watchLogros(cb, yo = () => "") {
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
     oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("pkPase", "pkPase"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
-    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("plantillas", "plantillas"), oye("economiaCierre", "cierre"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("plantillas", "plantillas"), oye("cazas", "cazas"), oye("economiaCierre", "cierre"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
        llegaron todos cuando llega este, que es el que la da por completa.
@@ -979,6 +979,15 @@ export function mandaChatGeneral(quien, texto, largo, superP) {
 /* Los super chats que aún duran: los que tienen `sa` desde hace menos que
    el más largo de los niveles. Una escucha aparte de la de 15 minutos, para
    no bajar horas de chat por unos pocos mensajes. */
+/* Las cacerías de récords (juegos/cazas.js). Las dos son de escritura
+   única: la cacería no se cancela, y cada cuenta reclama una vez. */
+export async function publicaCaza(uid, x) {
+  const k = push(ref(db, "cazas/b")).key;
+  await set(ref(db, `cazas/b/${k}`), { u: uid, c: x.c, q: x.q, p: x.p, mp: x.mp, mt: x.mt, at: serverTimestamp() });
+  return k;
+}
+export const reclamaCaza = (id, uid) => set(ref(db, `cazas/g/${id}/${uid}`), { at: serverTimestamp() });
+
 export function watchSuperChats(desde, max, cb) {
   let v = null;
   const emite = () => { if (v) cb(v.filter(m => !vetadosSet.has(m.uid)), null); };

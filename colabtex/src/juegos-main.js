@@ -112,6 +112,7 @@ import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } 
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
 import { crearRieles } from "./juegos/rieles.js";
+import { crearCazas } from "./juegos/cazas-vista.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
@@ -1586,6 +1587,7 @@ function pintaMonedas() {
      reescribir igual las tiras volvía a cargar sus 24 fotos de cartas y
      hacía que i18n.js repasara todo ese texto, en cada lectura. */
   if (u && d) ponHtml($("vesMonedas"), () => topHtml(d, u.uid, perfilDe, colorForUid));
+  if (cazas && $("vesCazas") && !$("vesCazas")._cz) cazas.monta($("vesCazas"));
   if (u && d && d.completo) {
     ponHtml($("vesDrops"), () => dropsHtml(d));
     ponHtml($("vesTops"), () => topsLista(d));
@@ -2238,9 +2240,24 @@ function render() {
      pantalla completa de un juego la esconde por CSS). */
   const conRiel = VISTAS_RIEL.has(state.vista) && !(state.invitado && MOTIVO_CUENTA[state.vista]);
   if (rieles) rieles.pon(conRiel, conRiel || !!state.user);
+  if (cazas) cazas.revisa();
 }
 const VISTAS_RIEL = new Set(["vestibulo", "ranks", "logros", "monedas", "perfil"]);
 let rieles = null;
+/* Las cacerías de récords (juegos/cazas-vista.js): se crean con la sesión. */
+let cazas = null;
+function enciendeCazas() {
+  if (cazas || !state.user) return;
+  cazas = crearCazas({
+    fb, usuario: () => state.user ? { uid: state.user.uid, name: state.user.name } : null,
+    datos: fn => datosPerfil(fn), perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, ir, economia, monedasDe, suena,
+    /* Las capas grandes, solo en las vistas de menú y nunca con el castigo. */
+    puedeMostrar: () => VISTAS_RIEL.has(state.vista) && !castigoActivo() && !document.hidden,
+    avisa: (icono, titulo, detalle, monto) => avisaMonedas(icono, titulo, detalle, monto)
+  });
+  if (rieles) cazas.monta(rieles.cartel);
+}
+function apagaCazas() { if (cazas) { cazas.destruir(); cazas = null; } }
 
 /* La mejor partida del día de cada cuenta en los cuatro juegos del riel
    (rieles-datos.js), con su prueba ya verificada para que el salón la
@@ -2903,6 +2920,7 @@ function armazon() {
           <header><span class="jg-vivo" aria-hidden="true"></span><h2>Salas abiertas</h2><span class="jg-lado-n" id="vesCuenta">0</span></header>
           <div id="vesSalas"></div>
         </section>
+        <section class="jg-lado-caja jg-cz jg-cz-ves" id="vesCazas" aria-label="Récords con precio"></section>
         <section class="jg-lado-caja jg-mo-ves">
           <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
@@ -4419,7 +4437,8 @@ function wire() {
       const e = economia(datosP).usuarios[uid];
       return !!(e && e.superChats[k]);
     },
-    alDatos: fn => datosPerfil(fn)
+    alDatos: fn => datosPerfil(fn),
+    avisosCaza: () => cazas ? cazas.avisos() : []
   });
   createReportWidget({
     app: "juegos", ver: VER, urlInformes: "informes.html",
@@ -4444,6 +4463,7 @@ function wire() {
          en la misma ruta en que se estaba. */
       if (individual) { individual.destruir(); individual = null; }
       state.user = null;
+      apagaCazas();
       state.base = null;
       state.invitado = true;
       state.salas = []; state.mias = []; state.enCurso = []; state.tablas = {};
@@ -4534,6 +4554,7 @@ function wire() {
     perfilDe(user.uid);          // abre la escucha; al llegar repinta
     aplicaPropio();
     if (!offMonedas) offMonedas = datosPerfil(d => { datosMonedas = d; pintaMonedas(); });
+    enciendeCazas();
     mostrar();
     if (!offReloj) offReloj = fb.seguirReloj(() => revisaCastigo());
     engancharVestibulo();

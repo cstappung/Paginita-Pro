@@ -478,6 +478,10 @@ on a phone. Things to keep:
   `SUPER_CHAT` **and** the rules (`chatGeneral/$id/s`, `superChat/$uid/$k/p`;
   `tests/rieles.test.cjs` checks they match).
 
+- **Cacerías de récords**: the cartel «Se busca» sits at the top of the chat
+  rail (`chat.prepend(cartel)`) and their notices are interleaved in the chat
+  list (`ctx.avisosCaza`). Details: `docs/claude/juegos/cazas.md`.
+
 The nodes (and `superChat`, and the `sa` index) need the rules re-published (`firebase/CONFIGURAR-FIREBASE.md`).
 
 **Halloween mode** (`juegos/halloween.js`, its CSS block «Modo Halloween»

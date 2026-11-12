@@ -102,7 +102,10 @@ export function empaquetaCierre(e, T, est) {
     for (const [w, n] of Object.entries(v.s || {})) sx[i(w)] = n;
     es[col] = { s: sx, n: v.n || 0, d: v.d || 0, l: v.l || 0 };
   }
-  return JSON.stringify({ v: VERSION_CIERRE, T, us, u, s, r, aj, ma, re, rk, co, hi, of, ro, est: es });
+  /* Las cacerías de récords pagadas que siguen abiertas (cazas.js): lo
+     demás de cada una está en `cazas/b`, que no se archiva. */
+  const cz = Object.keys(e.cazas || {}).filter(id => e.cazas[id].estado === "abierta").sort();
+  return JSON.stringify({ v: VERSION_CIERRE, T, us, u, s, r, aj, ma, re, rk, co, hi, of, ro, est: es, cz });
 }
 
 /* El texto, de vuelta a algo que monedas.js puede usar para empezar el
@@ -115,7 +118,7 @@ export function leeCierre(nodo) {
   try { x = JSON.parse(nodo.d); } catch (e) { return null; }
   if (!x || x.v !== VERSION_CIERRE || !Number.isFinite(x.T) || !Array.isArray(x.us)) return null;
   const us = x.us, U = n => us[n];
-  const out = { T: x.T, usuarios: {}, sobres: [], rerolls: [], ajenas: {}, mascotas: {}, regalos: {}, rocas: {}, congelada: {}, historial: {}, ofertas: {}, rondas: {}, est: {} };
+  const out = { T: x.T, usuarios: {}, sobres: [], rerolls: [], ajenas: {}, mascotas: {}, regalos: {}, rocas: {}, congelada: {}, historial: {}, ofertas: {}, rondas: {}, est: {}, cazas: Array.isArray(x.cz) ? x.cz.map(String) : [] };
   for (const [n, y] of Object.entries(x.u || {})) out.usuarios[U(n)] = y;
   for (const [n, txt] of Object.entries(x.s || {})) for (const t of txt.split("|")) {
     const [k, at, v, g] = t.split(",");

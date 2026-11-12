@@ -79,7 +79,7 @@ function movimientosHtml(movs) {
   const texto = f => ({
     sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
-    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], superChat: ["💬", "Super chat en el chat general"], pkPase: ["👑", "Pro Kingdoms · Pase del Reino"], plantilla: ["🏆", `Premio de desafío de plantilla${f.d ? ` · ${f.d}` : ""}`], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
+    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], caza: ["🎯", f.n < 0 ? "Pusiste precio a un récord" : /^cobrada /.test(f.d) ? "Cobraste una cacería de récord" : "Te volvió una cacería de récord"], superChat: ["💬", "Super chat en el chat general"], pkPase: ["👑", "Pro Kingdoms · Pase del Reino"], plantilla: ["🏆", `Premio de desafío de plantilla${f.d ? ` · ${f.d}` : ""}`], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
     venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `${HALLOWEEN[f.d] ? "Tienda de Halloween" : "Tienda del perfil"} · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${((TIENDA[f.d] === "marco" ? marcoDe(f.d) : fondoDe(f.d)) || {}).n || f.d}»`]
   }[f.c] || ["🪙", f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -96,7 +96,7 @@ function detalleHtml(yo) {
   const fuentes = [
     ...PARTES.filter(([k]) => k !== "ajustes" || P.ajustes).map(([k, i, t, s]) => ({ i, t, s, n: Math.max(0, P[k] || 0) })),
     { i: "💰", t: "Ventas en el mercado", s: `${nVentas} ${nVentas === 1 ? "venta" : "ventas"}`, n: yo.cobradas || 0 },
-    { i: "🎰", t: "Premios", s: "lo que te pagaron las apuestas ganadas y los desafíos de plantilla", n: yo.premios || 0 }
+    { i: "🎰", t: "Premios", s: "lo que te pagaron las apuestas ganadas, los desafíos de plantilla y las cacerías de récords", n: yo.premios || 0 }
   ].sort((a, b) => b.n - a.n);
   /* Por juego */
   const juegos = Object.entries(yo.porJuego || {}).filter(([j]) => !juegoOculto(j))
@@ -117,6 +117,7 @@ function detalleHtml(yo) {
     { i: "🎱", t: "Pool · cofres de tacos", n: g.cofre || 0, s: veces("cofre", "cofre", "cofres") },
     { i: "🎸", t: "Batalla de Rock · cajas", n: g.cajaRock || 0, s: veces("cajaRock", "caja", "cajas") },
     { i: "💬", t: "Super chats", n: g.superChat || 0, s: veces("superChat", "mensaje", "mensajes") },
+    { i: "🎯", t: "Cacerías de récords (en custodia o cobradas)", n: g.caza || 0, s: veces("caza", "cacería", "cacerías") },
     { i: "👑", t: "Pro Kingdoms · Pase del Reino", ir: "#prokingdoms", n: g.pkPase || 0, s: veces("pkPase", "pase", "pases") },
     { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
   ].sort((a, b) => b.n - a.n);

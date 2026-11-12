@@ -891,6 +891,34 @@
       }
     },
 
+    "cazas": {
+      ".read": "auth != null",
+      "b": {
+        "$id": {
+          ".write": "auth != null && !data.exists() && newData.exists() && newData.child('u').val() === auth.uid && !root.child('vetados').child(auth.uid).exists() && (!root.child('suspensiones').child(auth.uid).exists() || root.child('suspensiones').child(auth.uid).child('hasta').val() <= now)",
+          ".validate": "$id.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['u', 'c', 'q', 'p', 'mp', 'mt', 'at']) && root.child('soloRanks').child(newData.child('c').val()).child(newData.child('q').val()).child('puntos').val() === newData.child('mp').val() && root.child('soloRanks').child(newData.child('c').val()).child(newData.child('q').val()).child('tiempo').val() === newData.child('mt').val()",
+          "u": { ".validate": "newData.isString()" },
+          "c": { ".validate": "newData.isString() && newData.val().matches(/^club-[a-z0-9-]{1,60}$/)" },
+          "q": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}$/)" },
+          "p": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 500 && newData.val() <= 10000000" },
+          "mp": { ".validate": "newData.isNumber()" },
+          "mt": { ".validate": "newData.isNumber()" },
+          "at": { ".validate": "newData.val() === now" },
+          "$otro": { ".validate": false }
+        }
+      },
+      "g": {
+        "$id": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && !root.child('vetados').child(auth.uid).exists() && (!root.child('suspensiones').child(auth.uid).exists() || root.child('suspensiones').child(auth.uid).child('hasta').val() <= now)",
+            ".validate": "newData.hasChildren(['at']) && root.child('cazas').child('b').child($id).exists() && (root.child('soloRanks').child(root.child('cazas').child('b').child($id).child('c').val()).child($uid).child('puntos').val() > root.child('cazas').child('b').child($id).child('mp').val() || (root.child('soloRanks').child(root.child('cazas').child('b').child($id).child('c').val()).child($uid).child('puntos').val() === root.child('cazas').child('b').child($id).child('mp').val() && root.child('soloRanks').child(root.child('cazas').child('b').child($id).child('c').val()).child($uid).child('tiempo').val() < root.child('cazas').child('b').child($id).child('mt').val()) || !root.child('soloRanks').child(root.child('cazas').child('b').child($id).child('c').val()).child(root.child('cazas').child('b').child($id).child('q').val()).exists())",
+            "at": { ".validate": "newData.val() === now" },
+            "$otro": { ".validate": false }
+          }
+        }
+      }
+    },
+
     "enCurso": {
       ".read": "auth != null",
       ".indexOn": ["at"],
