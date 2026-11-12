@@ -181,8 +181,9 @@ const almacenPartidas = {
    en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). M20: `cpu` = el nivel de la
    CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §236: `conexion` lleva el modo elegido
    (host o cloudflare; el antiguo `relevo` = cloudflare; §266: «Servidor Oracle» se quitó, el dueño 2026-11-10). Los nombres se le mandan al marco por mensaje. */
-export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, base = 0, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", conexion, relevo = false }) {
-  const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
+export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, base = 0, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", conexion, relevo = false, red = "lockstep" }) {
+  // (§275b: «Cada uno su kart» = red=estado: la malla de siempre y la carrera con la red nativa del juego, sin lockstep)
+  const q = new URLSearchParams({ auto: "1", red: redSalaMkw(red) === "estado" ? "estado" : "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
   q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
@@ -429,7 +430,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     frame.hidden = false;
     verMarco();
     frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, base: est.sincroBase, jefe: jefeMarco,
-                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, conexion: est.conexion, relevo: est.relevo === true });
+                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, conexion: est.conexion, relevo: est.relevo === true, red: est.red });
     frame.focus();
     conectarNube();
     // apenas la sala del juego exista (el marco la arma al cargar), los nombres y el anfitrión
@@ -571,7 +572,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (!manda || corre) abierto.cambiar = false;
     if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
     const conexion = conexionMkw(est.conexion, est.relevo);
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, conexion, est.ultimaTabla,
+    const red = redSalaMkw(est.red);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, conexion, red, est.ultimaTabla,
       est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe, conex]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
@@ -581,7 +583,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     vest.classList.toggle("jugando", tira);
     const estilo = est.estilo === "playlist" ? "playlist" : "copa", cc = MKW_CC[est.cc] ? est.cc : "c150", nivel = MKW_NIVEL[est.nivel] ? est.nivel : "maximo";
     const puede = manda && !corre, cupo = Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX), cpus = Math.max(0, MKW_SINCRO_MAX - js.length);
-    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())} · ${MKW_CONEXION[conexion]}`;
+    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())} · ${MKW_CONEXION[conexion]}${red === "estado" ? " · " + MKW_RED.estado : ""}`;
     const nom = j => escapeHtml(j.nombre || "Piloto");
     const cara = (j, tam) => avatar ? avatar(j, tam) : `<span class="jg2-inicial" style="width:${tam}px;height:${tam}px" aria-hidden="true">${escapeHtml((j.nombre || "?").charAt(0).toUpperCase())}</span>`;
     // el «⋯» de cada piloto, para el anfitrión y en las filas de los otros (con la copa andando, solo «Echar»)
@@ -637,6 +639,10 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
             `<span class="jg2-con-op"><button type="button" class="jg-mkw-conexion" data-relevo="${k}" data-foco="con-${k}"
               aria-pressed="${k === conexion}" aria-describedby="jg2-con-${k}">${escapeHtml(txt)}</button>
               <span class="jg2-con-tip" id="jg2-con-${k}" role="tooltip">${escapeHtml(AYUDA_CONEXION[k])}</span></span>`).join("")}</div></div>
+          <div class="jg2-op"><span>Modo de red</span><div class="jg2-seg jg2-conexion" role="group" aria-label="Modo de red">${Object.entries(MKW_RED).map(([k, txt]) =>
+            `<span class="jg2-con-op"><button type="button" class="jg-mkw-red" data-red="${k}" data-foco="red-${k}"
+              aria-pressed="${k === red}" aria-describedby="jg2-red-${k}">${escapeHtml(txt)}</button>
+              <span class="jg2-con-tip" id="jg2-red-${k}" role="tooltip">${escapeHtml(AYUDA_RED[k])}</span></span>`).join("")}</div></div>
           <button type="button" class="jg2-cerrar" data-cerrar data-foco="cerrar">Cerrar</button>
         </div>` : "";
       const ult = est.ultimaTabla;
@@ -682,6 +688,11 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (b.classList.contains("jg-mkw-modo")) { if (!elegido) anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); return; }
     if (b.dataset.cc) { if (!elegido) anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); return; }
     if (b.dataset.nivel) { if (!elegido) anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); return; }
+    if (b.dataset.red) {   // §275b: el modo de red
+      b.focus();
+      if (!elegido) anota({ t: "ajuste", uid, k: "red", v: b.dataset.red });
+      return;
+    }
     if (b.dataset.relevo) {
       b.focus();   // también en el celular, donde un toque no siempre da foco al botón
       if (!elegido) anota({ t: "ajuste", uid, k: "relevo", v: b.dataset.relevo });
@@ -839,9 +850,18 @@ const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", nor
 // «oracle» queda en host (`conexionMkw` no lo reconoce)
 const MKW_CONEXION = { host: "Host: un jugador", cloudflare: "Host + repetidor Cloudflare" };
 const conexionMkw = (conexion, relevo) => Object.hasOwn(MKW_CONEXION, conexion) ? conexion : relevo === true ? "cloudflare" : "host";
+/* §275b: el modo de red de la carrera. «Lockstep» (el de siempre): todas las consolas corren la MISMA carrera cuadro a
+   cuadro con los botones de todos. «Cada uno su kart»: la red del Mario Kart Wii original, cada consola corre su kart y
+   manda dónde está; la anfitriona corre las CPU. */
+const MKW_RED = { lockstep: "Lockstep", estado: "Cada uno su kart" };
+const redSalaMkw = red => red === "estado" ? "estado" : "lockstep";
 const AYUDA_CONEXION = {
   host: "Un jugador arbitra desde su PC. La conexión directa suele dar menos demora. Depende de que los jugadores puedan conectarse entre sí.",
   cloudflare: "Un jugador arbitra y el repetidor de Cloudflare ayuda si falla la conexión directa. Agrega demora y consume unos 35 MB por jugador por hora.",
+};
+const AYUDA_RED = {
+  lockstep: "Todos corren exactamente la misma carrera, cuadro a cuadro. Si alguien va lento o con mala conexión, la sala lo espera o lo releva.",
+  estado: "Como el Mario Kart Wii en línea: cada uno maneja su kart sin esperar a nadie y ve a los demás donde dicen estar. Tu botón responde al instante; los otros karts pueden verse unos metros corridos.",
 };
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
