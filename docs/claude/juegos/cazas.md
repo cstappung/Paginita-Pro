@@ -94,3 +94,8 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
 - Reduced motion stops every animation and hides coins/sparks.
 - Not done yet (owner may want them): a 🎯 on the club ranking rows, a
   «Se busca» badge on profiles, a logro/frame for hunters.
+- **The coin is the site's SVG** (`MONEDA` from `monedas-vista.js`), never
+  the 🪙 emoji: it renders differently per system and in some not at all.
+  The falling coins carry it inside (`particulas` with `jg-cz-moneda`); text
+  that is escaped (the banda) says «monedas» in words; anything that sets
+  it must use `innerHTML`, not `textContent`.

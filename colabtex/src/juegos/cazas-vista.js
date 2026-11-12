@@ -21,12 +21,15 @@ import { escapeHtml } from "../util.js";
 import { avatarMarco } from "./perfil-vista.js";
 import { mezcla } from "./perfil.js";
 import { nombreHtml } from "./tintas.js";
+/* La moneda del sitio (un SVG), la misma de la cabecera y el top: el emoji
+   🪙 no se ve igual en todos lados (y en algunos no se ve). */
+import { MONEDA } from "./monedas-vista.js";
 import { nombreCategoria, valorMarca, juegoDeCategoria } from "./perfil-tarjeta.js";
 import { CAZA_MIN, NIVELES_CAZA, nivelCaza, cazasAbiertas, porReclamar, avisosCaza, resultadosDe, primero, categoriaCazable } from "./cazas.js";
 
 const esc = escapeHtml;
 const fmt = n => Math.round(n || 0).toLocaleString("es-CL");
-const MONEDA = "🪙";
+
 const TOP = 5;
 /* La ruta del juego de una categoría (`#solo/<juego>`). */
 const RUTA = { tetrisclub: "tetris", typeraceclub: "typerace", boxheadclub: "boxhead" };
@@ -45,7 +48,8 @@ function particulas(n, semilla, clase = "jg-cz-moneda") {
   for (const ch of String(semilla)) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
   const r = () => (s = (Math.imul(1664525, s) + 1013904223) >>> 0) / 4294967296;
   let h = "";
-  for (let i = 0; i < n; i++) h += `<i class="${clase}" style="--x:${(r() * 100).toFixed(1)}%;--y:${(r() * 100).toFixed(1)}%;--d:${(r() * 2.4).toFixed(2)}s;--v:${(0.8 + r() * 0.9).toFixed(2)};--g:${Math.round(r() * 360 - 180)}deg" aria-hidden="true"></i>`;
+  const dentro = clase === "jg-cz-moneda" ? MONEDA : "";
+  for (let i = 0; i < n; i++) h += `<i class="${clase}" style="--x:${(r() * 100).toFixed(1)}%;--y:${(r() * 100).toFixed(1)}%;--d:${(r() * 2.4).toFixed(2)}s;--v:${(0.8 + r() * 0.9).toFixed(2)};--g:${Math.round(r() * 360 - 180)}deg" aria-hidden="true">${dentro}</i>`;
   return h;
 }
 
@@ -107,7 +111,7 @@ export function crearCazas(ctx) {
     if (!abiertas.length) return cab + `<p class="jg-cz-vacio">Nadie está fichado todavía. Ficha al n.º 1 que quieras ver caer.</p>`;
     const top = abiertas.slice(0, TOP), total = abiertas.reduce((a, o) => a + o.pozo, 0);
     const n1 = top[0].nivel.n;
-    return cab + (n1 >= 4 ? banda(`${ALERTA[n1]} · ${fmt(top[0].pozo)} ${MONEDA} por ${nombreDe(top[0].q, top[0].c)}`) : "") + `<ol class="jg-cz-lista">${top.map((o, i) => filaHtml(o, i, u.uid)).join("")}</ol>
+    return cab + (n1 >= 4 ? banda(`${ALERTA[n1]} · ${fmt(top[0].pozo)} monedas por ${nombreDe(top[0].q, top[0].c)}`) : "") + `<ol class="jg-cz-lista">${top.map((o, i) => filaHtml(o, i, u.uid)).join("")}</ol>
       <p class="jg-cz-pie">${abiertas.length} ${abiertas.length === 1 ? "récord fichado" : "récords fichados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia</p>`;
   }
   let ultimoHtml = "";
@@ -212,7 +216,7 @@ export function crearCazas(ctx) {
     if (soloDetalle && cuerpo.querySelector(".jg-cz-m-det")) {
       cuerpo.querySelector(".jg-cz-m-det").innerHTML = detalle;
       const b = cuerpo.querySelector("[data-cz-publicar]");
-      if (b) { b.disabled = !!falta || modal.enviando; b.textContent = textoBoton(monto); b.className = `btn jg-cz-m-pub n${nv.n}${modal.confirma ? " confirma" : ""}`; }
+      if (b) { b.disabled = !!falta || modal.enviando; b.innerHTML = textoBoton(monto); b.className = `btn jg-cz-m-pub n${nv.n}${modal.confirma ? " confirma" : ""}`; }
       return;
     }
     cuerpo.innerHTML = `<button type="button" class="jg-cz-m-volver" data-cz-volver>← Otra tabla</button>
