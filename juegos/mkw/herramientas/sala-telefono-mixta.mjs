@@ -28,6 +28,7 @@
 //         [--pcs 2] [--modo lockstep|estado] [--segundos 40] [--traza 12] [--perfil 15] [--etiqueta X] [--datos carpeta]
 //   (con el candado de medición: herramientas/tanda-sala-telefono.sh; el teléfono con la depuración USB)
 // Salida: <datos>/<etiqueta>.json (todo), <etiqueta>.md (el informe), <etiqueta>-traza.json, <etiqueta>.cpuprofile
+import { opcionesNavegador } from './navegador.mjs';   // §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -316,7 +317,7 @@ await new Promise(listo => servidor.stdout.on('data', x => { if (String(x).inclu
 const puente = puenteSenal(), navegadores = [];
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
 const abrirPC = async (k, ruta) => {
-  const nav = await chromium.launch({ channel: 'chrome', headless: false,
+  const nav = await chromium.launch({ ...opcionesNavegador(), headless: false,
     args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows', `--window-position=${vx + 60 * k},${vy + 40 * k}`] });
   navegadores.push(nav);

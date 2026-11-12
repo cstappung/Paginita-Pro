@@ -309,6 +309,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   // compartirVentanas() al entrar a la sala; ?mandosVentanas=0 = nunca)
   const ventanas = MANDOS_VENTANAS && typeof BroadcastChannel !== 'undefined'
     ? crearMandosVentanas({ canal: new BroadcastChannel('mkw-mandos-ventanas'),
+        siempreFoto: new URLSearchParams(globalThis.location?.search || '').get('mandosVentanas') === 'siempre',   // §291: = antes
         tieneFoco: () => { try { return !!(globalThis.document?.hasFocus?.() || padre?.document?.hasFocus?.()); } catch { return false; } } })
     : null;
   estado.ventanas = ventanas?.estado || null;
@@ -815,6 +816,7 @@ function crearTactil(contenedor, tactil) {
   // mueve (antes, getBoundingClientRect de cada botón en cada pointermove: decenas por segundo). Mientras se toca, los
   // botones no se mueven (el editor tiene su propia capa); un cambio de tamaño borra lo medido.
   const LIVIANO = new URLSearchParams(globalThis.location?.search || '').get('tactilLiviano') !== '0';
+  const PAUSA_MENU = new URLSearchParams(globalThis.location?.search || '').get('pausaMenu') !== '0';   // (§286)
   let medidos = new Map();
   const rect = el => { if (!LIVIANO) return el.getBoundingClientRect(); let r = medidos.get(el); if (!r) medidos.set(el, r = el.getBoundingClientRect()); return r; };
   const olvidarRects = () => { medidos = new Map(); };
@@ -843,6 +845,13 @@ function crearTactil(contenedor, tactil) {
     // salvo que caiga justo sobre un botón (con el tamaño grande, B queda cerca de esa zona; o un botón que se movió ahí)
     const aro = base.getBoundingClientRect();
     const enBoton = activos().some(b => dentro(b, e.clientX, e.clientY));
+    // §286: el botón que hace Start (el «▶» de arriba a la derecha) abre el menú de la página (interfaz.mjs escucha
+    // 'mkw-pausa-tactil': el cajón, y jugando solo la pausa); no le llega al juego. ?pausaMenu=0 = Start al juego como antes
+    if (PAUSA_MENU && enBoton && activos().some(b => Number(b.dataset.bit) === BOTON.START && dentro(b, e.clientX, e.clientY))) {
+      try { capa.releasePointerCapture(e.pointerId); } catch {}
+      dispatchEvent(new CustomEvent('mkw-pausa-tactil'));
+      return;
+    }
     dedos.set(e.pointerId, { stick: !enBoton && (dentro(base, e.clientX, e.clientY) || e.clientX < aro.right + aro.width * 0.25),
                              x: e.clientX, y: e.clientY });
     recalcula();

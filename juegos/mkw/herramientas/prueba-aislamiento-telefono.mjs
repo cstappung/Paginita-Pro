@@ -9,6 +9,7 @@
 // Android de verdad la trae el informe de rendimiento de un teléfono (campo `hilos`, aislar.mjs estadoHilos).
 // Como probar un tablero con un simulador de red: verifica el cableado y las protecciones, no la red de verdad.
 // Uso:  node herramientas/prueba-aislamiento-telefono.mjs   (8 puntos; sin el juego; Chrome sin sonido)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -20,7 +21,7 @@ const { chromium, devices } = req('playwright-core');
 const PUERTO = 8136;
 const servidor = spawn(process.execPath, [path.join(raiz, 'banco', 'servir.cjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(r => { servidor.stdout.on('data', r); setTimeout(r, 1500); });
-const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--mute-audio', '--enable-unsafe-webgpu'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--mute-audio', '--enable-unsafe-webgpu'] });
 let bien = 0, mal = 0;
 const ok = (t, c, d = '') => { c ? bien++ : mal++; console.log(`${c ? '✓' : '✗'} ${t}${d ? ' — ' + d : ''}`); };
 try {

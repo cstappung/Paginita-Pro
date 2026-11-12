@@ -6,6 +6,7 @@
 // puestos del juego (RaceinfoPlayer +0x20) al largar y en la cuenta regresiva, y saca una foto: si son los escritos,
 // el juego larga según +0xE1 (resultado del 2026-10-20: sí, 6 1 2 3 4 5 7 8 9 10 11 12).
 // Uso:  node herramientas/medir-parrilla.mjs [puerto=8169] [carpeta de la foto=build/web/datos]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -15,7 +16,7 @@ const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playw
 const PUERTO = Number(process.argv[2] || 8169), salida = process.argv[3] || path.join(raiz, 'build/web/datos');
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const nav = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio',
+const nav = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio',
   '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 const p = await (await nav.newContext({ viewport: { width: 960, height: 540 } })).newPage();
 await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=13.2&cpu=normal&semilla=99`);

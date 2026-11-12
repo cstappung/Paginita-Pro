@@ -68,3 +68,30 @@ Con el clon en esa base, `git apply --check` y `git apply` desde el clon con la 
 | mkw (la decompilación de `github.com/riidefi/mkw`) | `78572c95c41dbf6cbb7dd251a567e538560ce1d8` en `terceros/mkw-decomp` (ignorado) | consulta de nombres y estructuras |
 | El reemplazo propio | `terceros/decomp-propio/decomp_nativo.cpp` (ignorado: es una reimplementación del código del juego) | `MKW_DECOMP_COMPILAR=1` en `compilar-web.py`; `MKW_DECOMP=0/1/2` |
 | La opción 2 (contrato común) | la rama `motor-eval` en `terceros/Wiicompiled-motor-eval` (`git worktree` de la copia `-w30-403s`, sobre `0f3cd27`) | `parches/motor-eval-abi-comun.diff` (`MKW_EVAL_ABI_COMUN`, las direcciones con el contrato de una función común); rehacer = `git apply parches/motor-eval-abi-comun.diff` sobre `0f3cd27` |
+
+## §290: las herramientas de decompilación (bajadas, sin usar todavía; bitácora §290)
+
+Repositorios en `terceros/` (ignorado); programas y paquetes en `herramientas/cache/decomp/` (ignorado). Cada programa
+bajado se comprobó contra la huella SHA-256 que publica su página de versiones en GitHub.
+
+| Pieza | Versión | Para qué |
+|---|---|---|
+| mkw (la decompilación pública, ahora `github.com/doldecomp/mkw`, CC0) | `8b9b5ee653da28663e498039e52f5d19f929a011` (rama `main`, 2026-10-14) en `terceros/mkw-decomp`; reemplaza al `78572c9` de §280 | el mapa: funciones, tamaños, nombres, unidades que calzan. Su `configure.py` fija dtk v1.8.1, objdiff v3.6.1, sjiswrap v1.2.2 y compiladores `20251118` (`Wii/0x4201_127` y `GC/3.0a5.2`) |
+| decomp-toolkit (`github.com/encounter/decomp-toolkit`) | v1.8.4, `dtk-windows-x86_64.exe`, sha256 `6a693e95aa4d30acccc673343302a4abdfa3146bd0fb15cb1a2bce924cbc782a` | partir `main.dol`/`StaticR.rel` en objetos y encontrar funciones |
+| objdiff (`github.com/encounter/objdiff`) | v3.8.3, `objdiff-cli-windows-x86_64.exe` sha256 `dd12dfb5e9e94a7f6c949a37e1815963cf2cffe4c87b4999b7ebc8c15b398a1f` y `objdiff-windows-x86_64.exe` (con ventana) sha256 `2c1e8115685024b256caa5d6c2179a30a8850a5a9d99ee11843b5869b516874c` | el comparador byte a byte |
+| sjiswrap (`github.com/encounter/sjiswrap`) | v1.2.2, `sjiswrap-windows-x86.exe`, sha256 `01d50fa1148cfc3c3b16658c6c9b1c0d9f5324cde79ed6c09ef8353af9d63adf` | envoltura del compilador para textos en japonés (Shift-JIS) |
+| Ghidra (`github.com/NationalSecurityAgency/ghidra`) | 12.1, `ghidra_12.1_PUBLIC_20260513.zip`, sha256 `aa5cbcbbf48f41ca185fce900e19592f1ade4cd5994eb6e0ede468dac8a6f302` (sin descomprimir) | tipos y quién llama a quién. Es la 12.1 y no la 12.2 porque el cargador de abajo está hecho para la 12.1 |
+| Ghidra-GameCube-Loader (`github.com/Cuyler36/Ghidra-GameCube-Loader`) | 1.3.1, `GameCubeLoader-1.3.0-921504c-Ghidra_12.1.zip`, sha256 `9892f28fc1e7f19bb3fcec7cfb4ad2ab7504503b571d93de8b142a6f7bec8ed0` | que Ghidra abra `.dol` y `.rel` |
+| m2c (`github.com/matt-kempster/m2c`, GPL-3.0) | `c632946b8cfbe8fce442b522dba92dfa72f1f317` en `terceros/m2c` | primer borrador de C desde el ensamblador |
+| decomp-permuter (`github.com/simonlindholm/decomp-permuter`, MIT) | `860b6d95b5350c2677c89b0c195c7bf3bb6bad0b` en `terceros/decomp-permuter` | el último ajuste cuando falta poco para calzar |
+| asm-differ (`github.com/simonlindholm/asm-differ`) | `0dd09af8f8008f1f880327cf0aca3b26d2562ea2` en `terceros/asm-differ` | diferencias de ensamblador en la terminal |
+| dtk-template (`github.com/encounter/dtk-template`, CC0) | `95c969c9716187ee88eb95d38e1cced15980c968` en `terceros/dtk-template` | la plantilla de proyecto de referencia |
+| ogws (`github.com/doldecomp/ogws`, Wii Sports, CC0) | `e5a4d369011062fe243aa63f6c2e2853854c395d` en `terceros/ogws` | ver si sus bibliotecas (nw4r, EGG, SDK) sirven para `main.dol` (sin verificar) |
+| asmlift (`github.com/macabeus/asmlift`, MIT) | `2667447f9a0018da34359edbeea32ffbeb39f0ca` en `terceros/asmlift` | permuter pensado para agentes |
+| mizuchi (`github.com/macabeus/mizuchi`, MIT) | `25eaef4214574cc20f376878dbc1b8099e97164e` en `terceros/mizuchi` | la tubería m2c → agente → compilar y comparar |
+| kappa (`github.com/macabeus/kappa`, MIT) | `679ac389998728830d47e28658df3c8866672eed` en `terceros/kappa` | ayudante de decompilación para VS Code (referencia) |
+| decomp.wtf (`github.com/i12bp8/decomp.wtf`, MIT, archivado) | `575b4a30ed481ff5497dfb9ce4f599368a95a04a` en `terceros/decomp.wtf` | referencia de un agente con objdiff de juez |
+| Paquetes de Python (ruedas en `herramientas/cache/decomp/pip/`, sin instalar) | graphviz 0.21, pycparser 3.12, toml 0.10.2, Levenshtein 0.27.5 (+ rapidfuzz 3.14.6), pynacl 1.6.2 (+ cffi 2.1.1) | lo que piden m2c y el permuter |
+
+**Los compiladores originales (§292):** el dueño los autorizó después. Los bajó el `configure.py` del proyecto público a `terceros/mkw-decomp/build/compilers/` (`files.decomp.dev/compilers_20251118.zip`, 77.332.914 bytes: CodeWarrior de GameCube y Wii), junto con dtk v1.8.1 y objdiff-cli v3.6.1 en `build/tools/`. `terceros/Pulsar` (el
+código de Retro Rewind) no se tocó: tiene que coincidir con la versión de Retro Rewind instalada.

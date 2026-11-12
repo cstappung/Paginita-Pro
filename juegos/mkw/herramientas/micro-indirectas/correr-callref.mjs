@@ -6,6 +6,7 @@
 // dice los ns por llamada (el mejor de las 5). Sin nada del juego.
 // Uso:  node herramientas/micro-indirectas/correr-callref.mjs [--chrome] [--limites] [--v8 "--flags"]
 //   --chrome  = también en Chrome (Playwright, sin ventana); --limites = Chrome con --wasm-enforce-bounds-checks (W5)
+import { opcionesNavegador } from '../navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,7 +51,7 @@ mostrar(`Node ${process.version}`, salida.nodeRes);
 if (args.includes('--chrome') && !args.includes('--solo-node')) {
   const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
   for (const limites of args.includes('--limites') ? [false, true] : [false]) {
-    const nav = await chromium.launch({ channel: 'chrome', headless: true, args: ['--mute-audio', ...(limites ? ['--js-flags=--wasm-enforce-bounds-checks'] : [])] });
+    const nav = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--mute-audio', ...(limites ? ['--js-flags=--wasm-enforce-bounds-checks'] : [])] });
     const p = await nav.newPage();
     await p.goto('about:blank');
     const r = await p.evaluate(`(${medir.toString()})(new Uint8Array([${[...bytes].join(',')}]))`);

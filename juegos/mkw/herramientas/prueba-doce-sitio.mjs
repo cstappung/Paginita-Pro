@@ -26,6 +26,7 @@
 //
 // Uso:  MKW_BUILD=build/web-final-w30/navegador node herramientas/prueba-doce-sitio.mjs [--n 12] [--rondas 0,1,2,3,4,5]
 //       [--puerto 8196] [--ya] [--corta]  (--corta = la ronda 1 de una sola carrera, solo con la ventana frenada)   (resultados en build/web/datos/doce-sitio/; Chrome con --mute-audio)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -83,7 +84,7 @@ const ventanas = [];   // { i, nombre, ctx, p, tAbrir, uid, caidas: [] }
 async function abrirPc(i) {
   const dir = path.join(perfiles, `pc${i + 1}`);
   const x = vx - 40 + (i % 4) * ANCHO, y = vy - 40 + Math.floor(i / 4) * ALTO;
-  const ctx = await chromium.launchPersistentContext(dir, { channel: 'chrome', headless: false, viewport: null,
+  const ctx = await chromium.launchPersistentContext(dir, { ...opcionesNavegador(), headless: false, viewport: null,
     args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
       '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--no-first-run',
       `--window-position=${x},${y}`, `--window-size=${ANCHO},${ALTO}`] });

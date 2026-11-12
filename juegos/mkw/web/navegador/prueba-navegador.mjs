@@ -16,6 +16,7 @@
 // Uso:  node web/navegador/prueba-navegador.mjs [cuadros=900] [--ventana] [--gpu alto|bajo|auto] [--sin-enganche]
 //                                              [--sin-ajuste-sonido] [--perfil 14] [--pausa 20]
 //                                              [--puerto 8141] [--datos build/web/datos] [--extra "&audio=viejo"] [--cpu 2] [--sin-bloqueo]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -53,7 +54,7 @@ await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).inclu
 
 // 2) Chrome (el instalado en el PC; Playwright no baja uno propio con playwright-core)
 const navegador = await chromium.launch({
-  channel: 'chrome',
+  ...opcionesNavegador(),
   headless: !conVentana,
   // --mute-audio: Chrome sin sonido durante las pruebas (el juego igual mezcla su audio, solo no se oye).
   // Chrome manejado por Playwright (--enable-automation) no bloquea el sonido aunque se le pida

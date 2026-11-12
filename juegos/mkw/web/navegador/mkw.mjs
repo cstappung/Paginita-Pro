@@ -83,10 +83,15 @@ const parametros = new URLSearchParams(location.search);
 // §275: ?red=estado = el piloto «host + predicción» (apagado por omisión): la red NATIVA del juego (RKNet: cada consola
 // maneja su kart y manda su estado) por la malla WebRTC = ?red=malla&modo=enlinea, más la sonda que mide
 // (red-estado.mjs, window.mkwRedEstado). No es la sala de §73: pasa por las pantallas de Retro WFC (§58)
+// §288: con un solo humano en la sala, «Cada uno su kart» corre la carrera de siempre (la red nativa del juego sin nadie del
+// otro lado no creaba los karts y la carrera terminaba en el primer cuadro: el dueño, 2026-11-12). ?estadoSolo=1 = como antes
+const UN_HUMANO_SALA = parametros.get('modo') === 'sala' && (parametros.get('sincro') || '').split(',').filter(Boolean).length < 2
+  && parametros.get('estadoSolo') !== '1';
+if (parametros.get('red') === 'estado' && UN_HUMANO_SALA) { parametros.delete('red'); console.log('[red-estado] §288 un solo humano: la carrera de siempre'); }
 const RED_ESTADO = parametros.get('red') === 'estado';
 // §275b: con ?modo=sala es la opción de la sala «Cada uno su kart»: la sala de siempre (copa, elegir, puntos…) pero la
 // carrera sin lockstep, con la red nativa por el DWC falso (red_estado_nativo.cpp + red-estado-sala.mjs)
-const RED_ESTADO_SALA = RED_ESTADO && parametros.get('modo') === 'sala';
+let RED_ESTADO_SALA = RED_ESTADO && parametros.get('modo') === 'sala';   // (let: vuelve a false si el programa no lo trae, abajo de crear())
 if (RED_ESTADO) { parametros.set('red', 'malla'); if (!parametros.has('modo')) parametros.set('modo', 'enlinea'); }
 if (RED_ESTADO || parametros.get('sonda') === '1') import('./red-estado.mjs')   // (?sonda=1: la misma sonda en la sala de siempre, para comparar)
   .then(m => { window.mkwRedEstado = m.crearSonda({ lector: () => window.mkwMenus }); });
@@ -1370,6 +1375,7 @@ const autoCalibrar = AUTO_CALIBRAR ? crearAutoCalibrar({
     gpuMs: () => gpuReciente(2000),
   },
   congelarJuego: si => window.mkw?._mkw_congelar?.(si ? 1 : 0),
+  congeladoAhora: () => !!window.mkw?._mkw_congelado_estado?.(0),   // (§287: ya quieta por otro, p. ej. el cajón abierto con ▶)
   // (§275b: en «Cada uno su kart» no corre el lockstep: la pausa congela cada consola al llegarle y el lento al día empareja después)
   sala: () => window.mkwSala || null, lockstep: () => RED_ESTADO_SALA ? null : sincro?.lockstep || null, yo: sincro?.yo ?? null,
   nombreDe: u => window.mkwNombreDe?.(u), aviso: avisoPausa, nota,
@@ -1978,6 +1984,19 @@ async function arrancar() {
     } : {}),
   });
   moduloTraza = M;
+  // §275b.12: «Cada uno su kart» necesita el programa con red_estado_nativo.cpp. Con la página nueva y un .wasm viejo (el
+  // de R2 antes de subir el nuevo) la ficha salía en línea (modo 7) sin la red nativa: cada consola corría sola y la tabla
+  // del final traía tiempos basura (el 1.º 20:13.886, los demás 00:00.000). Sin las funciones, la sala va con el lockstep
+  // de siempre, con sus arreglos (la máscara se lee al empezar cada carrera: semillas_nativo.cpp)
+  if (RED_ESTADO_SALA && typeof M._mkw_red_estado_config !== 'function') {
+    RED_ESTADO_SALA = false;
+    if (!parametros.has('arreglos')) M.mkwLsArreglos = true;
+    window.mkwEstado.redEstadoSinPrograma = true;
+    console.log('[red-estado] ⚠ el programa no trae «Cada uno su kart» (falta _mkw_red_estado_config): la sala va con el lockstep');
+  }
+  // §286: mi programa, para el latido de la sala (la anfitriona no larga si otro trae otro): la huella del .wasm que bajó
+  // esta página y si trae «Cada uno su kart»
+  window.mkwPrograma = `${huellaBuild || 'sin-huella'}${typeof M._mkw_red_estado_config === 'function' ? '+re' : ''}`;
   // Para medir desde afuera (herramientas/medir-sitio.mjs): el contador de cuadros al instante (el del medidor se
   // actualiza una vez por segundo) y la memoria del wasm (el "heap": todo lo que el juego tiene reservado), en MB
   window.mkwCuadros = () => M._mkw_web_cuadros();
@@ -2448,6 +2467,7 @@ async function arrancar() {
           : `⚠ ${n} tiene una versión vieja del juego: que recargue con Ctrl+Mayús+R (si no, la carrera puede fallar)`;
         escribe('[sala] ' + t); try { ui.aviso(t, true); } catch {} },
       servidor: quiereOracle ? () => enlaceOracle?.vivo() : null,
+      programa: () => window.mkwPrograma || null,   // (§286: la anfitriona no larga con programas distintos)
       // N12 (§233): cómo le fue a este aparato en su última carrera, en el latido (?comoLento=L = decir L cuadros de lógica
       // por segundo, el aparato lento de mentira: solo pruebas)
       capacidad: () => !ESCALON ? null : parametros.has('comoLento') ? { l: Number(parametros.get('comoLento')) || 30, ms: 33 } : capacidadLatido(leerCapacidad()),
@@ -2843,8 +2863,8 @@ async function arrancar() {
     // quién falta (el estado de la anfitriona: faltanCarga). En la carrera, nunca
     function avisoCarga(e) {
       let n = document.getElementById('esperaCarga');
-      const faltan = e?.faltanCarga || [];
-      const ver = faltan.length > 0 && !window.mkwEstado.enCarrera;
+      const faltan = e?.faltanCarga || [], otra = e?.versionDistinta || [];
+      const ver = (faltan.length > 0 || otra.length > 0) && !window.mkwEstado.enCarrera;
       if (!ver) { if (n) n.hidden = true; return; }
       if (!n) {
         n = Object.assign(document.createElement('div'), { id: 'esperaCarga', role: 'status' });
@@ -2854,7 +2874,10 @@ async function arrancar() {
         document.body.append(n);
       }
       const nombre = u => u === sincro.yo ? 'tú' : (window.mkwNombresSala?.[u] || `jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`);
-      n.textContent = `⏳ Esperando a los jugadores… (faltan: ${faltan.map(nombre).join(', ')})`;
+      // (§286: con otra versión no se larga: el que la tiene vieja recarga; la anfitriona compara contra la suya)
+      n.textContent = otra.length ? (otra.includes(sincro.yo) ? '⚠ Tienes otra versión del juego que los demás: recarga la página (Ctrl+Mayús+R) para correr'
+        : `⚠ ${otra.map(nombre).join(', ')} ${otra.length > 1 ? 'tienen' : 'tiene'} otra versión del juego: recarguen la página (Ctrl+Mayús+R). La carrera no empieza hasta que todos tengan la misma`)
+        : `⏳ Esperando a los jugadores… (faltan: ${faltan.map(nombre).join(', ')})`;
       n.hidden = false;
     }
     function alCambiarSala(e) {

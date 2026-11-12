@@ -125,8 +125,6 @@ body.cortina-mal #inicioJlo { display: none; }   /* un error del juego (sin WebG
 #inicioJlo .ij-obra { position: absolute; right: 1.2cqw; top: -1.15cqw; padding: .3cqw .8cqw; border-radius: .6cqw; rotate: -4deg;
   background: repeating-linear-gradient(-45deg, #ffd21f 0 .7cqw, #ffbf00 .7cqw 1.4cqw); color: #1a0a00; border: .12cqw solid #1a0a00;
   font: 700 1cqw/1 'IBM Plex Sans', system-ui, sans-serif; letter-spacing: 0; white-space: nowrap; box-shadow: 0 .2cqw .4cqw #0008; }
-/* Multiplayer en beta: el mismo cartel, en el dorado de «Beta» del sitio y sin rayas */
-#inicioJlo .ij-obra.ij-beta { background: #e8b84a; color: #2a1a00; border-color: #2a1a00; }
 #inicioJlo .ij-boton.no-va { animation: ij-no .3s; }
 @keyframes ij-no { 25% { translate: -.6cqw 0; } 75% { translate: .6cqw 0; } }
 #inicioJlo .ij-boton.disparado { filter: brightness(1.6); }
@@ -209,10 +207,7 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'ij-boton'; b.dataset.que = que; b.setAttribute('role', 'menuitem');
       const obra = enObra(que);                      // §116: Multiplayer, por ahora, «trabajando para usted»
-      // el dueño, 2026-11-12: Multiplayer abierto pero «🧪 Beta» (todavía puede fallar)
-      const beta = !obra && que === 'multijugador';
-      b.innerHTML = `${svg(icono)}<span>${texto}</span>` + (obra ? '<small class="ij-obra">🚧 Trabajando para usted</small>'
-        : beta ? '<small class="ij-obra ij-beta">🧪 Beta</small>' : '');
+      b.innerHTML = `${svg(icono)}<span>${texto}</span>` + (obra ? '<small class="ij-obra">🚧 Trabajando para usted</small>' : '');
       if (obra) { b.classList.add('en-obra'); b.setAttribute('aria-disabled', 'true'); }
       b.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') elegir(i); });
       b.addEventListener('click', () => { elegir(i); aceptar(); });

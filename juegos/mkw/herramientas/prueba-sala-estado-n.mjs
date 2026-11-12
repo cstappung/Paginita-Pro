@@ -10,6 +10,7 @@
 // Uso:  MKW_BUILD=build/web-275/navegador node herramientas/prueba-sala-estado-n.mjs [--n 3] [--se-va 2]
 //         [--pistas 0.0,0.1] [--segundos 12] [--etiqueta X] [--puerto 8179]      (con el candado: QUIEN=red-estado)
 // Salida: build/web/datos/red-estado/sala-n-<etiqueta>.json
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,7 +79,7 @@ const salaId = 'sn' + Date.now().toString(36), uids = Array.from({ length: N }, 
 const q = (uid, lista = uids.slice(0, N0), base = 0) => `/?auto=1&red=estado&senal=canal&sala=${salaId}&uid=${uid}&sincro=${lista.join(',')}&jefe=${uids[0]}${base ? '&base=' + base : ''}` +
   `&modo=sala&estilo=${PLAYLIST ? 'playlist' : 'copa'}&carreras=${PISTAS.length}&descanso=12&semilla=4242&cc=c150&cpu=normal&pista=${PISTAS[0].copa}.${PISTAS[0].fila}`;
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: false,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: false,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', `--window-position=${vx},${vy}`] });
 const puente = puenteSenal();

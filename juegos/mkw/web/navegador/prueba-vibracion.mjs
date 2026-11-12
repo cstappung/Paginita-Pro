@@ -18,6 +18,7 @@
 //
 // Uso:  MKW_BUILD=build/web-final-w30/navegador node web/navegador/prueba-vibracion.mjs [--ventana] [--puerto 8156]
 //       [--pista 13.2] [--segundos 70] [--solo vs|tt] [--vieja] [--largada N]   (N = cuadros de la cuenta antes de apretar A)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -44,7 +45,7 @@ const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.l
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`] });
 const pixel = devices['Pixel 7'];
 const vista = { width: pixel.viewport.height, height: pixel.viewport.width };   // acostado

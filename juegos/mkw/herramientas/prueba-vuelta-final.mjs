@@ -14,6 +14,7 @@
 // Uso:  MKW_BUILD=build/web-final-w30/navegador node herramientas/prueba-vuelta-final.mjs [--pista 13.2] [--puerto 8173]
 //       [--extra "&param=…"] [--segundos 25] [--baja] [--ventana]   (--baja: CPU ×4 y la red de la gama baja, 20 Mbit/s y 50 ms)
 // Salida: build/web/datos/vuelta-final/<pista>[-baja].json (nombres de archivos del juego: nunca a git)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -41,7 +42,7 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, MKW_LATENCIA: process.env.MKW_LATENCIA || '50' } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`] });
 // --sala: dos pestañas (dos perfiles nuevos) en la carrera sincronizada de la sala, como prueba-sincro --directa (el
 // lockstep con el árbitro, la ficha y el paquete de la sala). Cada consola escribe la MISMA vuelta en los karts de los

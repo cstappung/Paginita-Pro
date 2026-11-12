@@ -8,6 +8,7 @@
 //   - §256 (G16): fps a la vista, 1 % bajo y 0,1 % bajo de las imágenes que salieron a la pantalla (imagenes-vista.mjs).
 // Uso:  node herramientas/medir-enlinea.mjs ["&param=valor" …]     (sin variantes: la página tal cual)
 //       p. ej. node herramientas/medir-enlinea.mjs "" "&esperaToma=0&atrasada=0"   (con y sin la pausa de presentar)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -23,7 +24,7 @@ const variantes = process.argv.slice(2).filter(a => a !== '--ventana').length ? 
 const espera = ms => new Promise(r => setTimeout(r, ms));
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !VENTANA,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !VENTANA,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     ...(VENTANA ? [`--window-position=${process.env.MKW_VENTANA || '-1880,549'}`] : [])] });

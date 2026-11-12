@@ -9,6 +9,7 @@
 // Corre una carrera directa de 12 CPU en Chrome (perfil nuevo, sin sonido) y mira el informe a los 30 s de carrera; con
 // ?cpuPura=0 la CPU pura no debe salir (el camino de antes).
 // Uso:  node web/navegador/prueba-informe.mjs [--puerto 8166]   → ✓/✗ y build/web/datos/informe/informe.json
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -27,7 +28,7 @@ const ok = (txt, si, extra = '') => { si ? bien++ : mal++; console.log(`  ${si ?
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const salida = {};
 try {
   for (const [nombre, extra] of [['con', ''], ['sin', '&cpuPura=0']]) {

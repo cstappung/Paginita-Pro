@@ -17,6 +17,7 @@
 // Uso:  node web/navegador/prueba-desconexion.mjs [--casos=elegir-anfitriona,carga-otro,…] [--lista] [--ventana] [--puerto=8166] [--extra=&…]
 //       (--extra = más parámetros para todas las pestañas, p. ej. --extra=&arbitro=0: §246)
 //       (sin --casos, todos: ~20 min)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -58,7 +59,7 @@ const COPA = [{ copa: 0, fila: 0 }, { copa: 13, fila: 2 }];
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 

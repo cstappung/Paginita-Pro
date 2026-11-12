@@ -24,6 +24,7 @@
 //       --rapida: sin la carrera (~2 min).  --ya: usa un ensayo que ya está corriendo en 8154 (no arranca otro).
 //       --playlist (§87): la sala en «Modo playlist» (como la abrió el dueño): la anfitriona arma una lista de 2 y la
 //       confirma, Piloto Dos ve el selector de sugerir; después lo mismo que la copa (elegir, la carrera 1 en los dos).
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,7 +59,7 @@ if (!args.includes('--ya')) {
   }).catch(e => { console.log('✗ ' + e.message); process.exit(1); });
 }
 
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 
@@ -233,6 +234,15 @@ try {
     const vp = await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /Playlist ·/.test(t), 15000);
     ok('la anfitriona pasa la sala a «Playlist» y Piloto Dos lo ve en el titular', /Playlist ·/.test(vp || ''));
   }
+  // --estado (§275b.12): «Cada uno su kart» elegido en el vestíbulo, como lo abrió el dueño en el sitio publicado
+  const enEstado = args.includes('--estado');
+  if (enEstado) {
+    await uno.locator('.jg-mkw-vest [data-cambiar]').click();
+    await uno.locator('.jg-mkw-red[data-red=estado]').click();
+    await uno.locator('[data-cerrar]').first().click().catch(() => {});
+    const ve = await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /Cada uno su kart/.test(t), 15000);
+    ok('la anfitriona pasa la sala a «Cada uno su kart» y Piloto Dos lo ve en el titular', /Cada uno su kart/.test(ve || ''));
+  }
   if (!args.includes('--rapida')) {
     // «¡A correr!» (§73): el juego de los dos se abre en la sala (modo=sala), sin nada del Wi-Fi del juego
     // M22: la pantalla completa al empezar es de cada uno y viene apagada: Piloto Dos la prende, Uno no
@@ -329,6 +339,64 @@ try {
     ok('la carrera 1 abrió directo en los dos (sección 0x20), los dos como jugadores de verdad y cada uno con SU pantalla',
        enCarrera(ra) && enCarrera(rb) && [ra, rb].every(x => x.tipos[0] === 0 && x.tipos[1] === 0 && x.tipos[2] === 1) && ra.pantalla === 0 && rb.pantalla === 1,
        `A ${hex(ra?.s)} tipos ${ra?.tipos} pantalla ${ra?.pantalla} · B ${hex(rb?.s)} pantalla ${rb?.pantalla} (a los ${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+    if (args.includes('--calibrar')) {
+      // §274.6 (el dueño en el sitio publicado: «el autocalibracion no esta funcionando, debiera freezear el juego de todos
+      // con el mensaje de aviso»): con la carrera andando, Piloto Dos (no es la anfitriona) aprieta «⚡ Auto calibración»
+      // en SU hoja Gráficos (el botón de verdad, no la función) y después Piloto Uno (la anfitriona); en cada vez se mira
+      // en los dos marcos que la carrera queda quieta, el aviso «⏸ … está calibrando» en el otro y que siguen al terminar
+      await foco(mA); await uno.keyboard.down('KeyK'); await foco(mB); await dos.keyboard.down('KeyK');
+      await espera(7000);
+      const vistaCal = f => f.evaluate(() => { const a = window.mkwAutoCalibrar?.estado, L = window.mkwMenus, ri = L?.u32(0x809BD730);
+        const av = document.getElementById('pausaSala');
+        return { cong: a?.congeladaPor ?? null, corriendo: !!a?.corriendo, texto: a?.texto ?? null, aviso: av && !av.hidden ? av.textContent : '',
+          reloj: ri ? L.u32(ri + 0x1C) + L.u32(ri + 0x20) : null, pausa: window.mkwSala?.pausa ?? null, h: (a?.historial || []).slice(-12) }; }).catch(e => ({ error: e.message }));
+      for (const [quien, p, f, otro] of [['Piloto Dos', dos, mB, mA], ['Piloto Uno', uno, mA, mB]]) {
+        // (la hoja Gráficos del cajón del juego y su botón, como lo haría una persona)
+        const abierto = await f.evaluate(() => { const b = document.getElementById('autoCalibrar'); if (!b) return 'sin botón';
+          b.click(); return 'apretado'; }).catch(e => e.message);
+        const vistos = { yo: false, otro: false, aviso: '', relojes: [] };
+        let fin = null;
+        for (const h = Date.now() + 45000; Date.now() < h;) {
+          const [y, o] = await Promise.all([vistaCal(f), vistaCal(otro)]);
+          if (y?.cong) vistos.yo = true; if (o?.cong) { vistos.otro = true; vistos.relojes.push(o.reloj); }
+          if (o?.aviso && !vistos.aviso) vistos.aviso = o.aviso;
+          if (vistos.yo && y && !y.corriendo && !y.cong) { fin = { y, o }; break; }
+          if (!y?.corriendo && y?.texto && /No se calibró/.test(y.texto)) { fin = { y, o }; break; }
+          await espera(250);
+        }
+        await espera(3000);
+        const [y2, o2] = await Promise.all([vistaCal(f), vistaCal(otro)]);
+        console.log(`  §274 ${quien}: ${abierto} · ${JSON.stringify({ vistos, fin, despues: { y: y2, o: o2 } }).slice(0, 3000)}`);
+        const quieto = vistos.relojes.length > 2 && Math.max(...vistos.relojes) - Math.min(...vistos.relojes) <= 1;
+        ok(`§274 en el sitio: ${quien} calibra y la sala entera queda quieta con el aviso «⏸ … está calibrando» en el otro`,
+           vistos.yo && vistos.otro && quieto && /está calibrando su imagen/.test(vistos.aviso) && !!y2 && !y2.cong && !o2?.cong && !o2?.aviso,
+           `${y2?.texto || ''} · aviso «${vistos.aviso}» · reloj del otro ${vistos.relojes[0]}–${vistos.relojes.at(-1)}`);
+      }
+    }
+    if (enEstado) {
+      // §275b.12: lo que ve cada consola en «Cada uno su kart» del sitio: la red de verdad, los 12 karts, quién llegó
+      const diag = f => f.evaluate(() => { const L = window.mkwMenus, rd = L.u32(0x809BD728), ri = L.u32(0x809BD730), lista = L.u32(ri + 0xC);
+        const t = q => q ? (L.u16(q + 4) * 60 + L.u8(q + 6)) * 1000 + L.u16(q + 8) : -1;
+        return { url: location.search.slice(0, 400), modo: L.u32(rd + 0x20 + 0xB48 + 8), karts: L.u8(rd + 0x20 + 4), etapa: L.u32(ri + 0x28),
+          tipos: Array.from({ length: 12 }, (_, i) => L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10)).join(''),
+          llegaron: Array.from({ length: 12 }, (_, i) => (L.u32(L.u32(lista + 4 * i) + 0x38) & 2) ? 1 : 0).join(''),
+          tiempos: Array.from({ length: 12 }, (_, i) => t(L.u32(L.u32(lista + 4 * i) + 0x40))).join(','),
+          red: window.mkwRedEstadoSala?.estado?.() ?? null, sinPrograma: !!window.mkwEstado.redEstadoSinPrograma,
+          tiene: typeof window.mkw?._mkw_red_estado_config, malla: window.mkwRed?.malla?.modo?.() ?? null,
+          log: (window.mkwEstado.log || []).filter(l => /red-estado|\[sala\]|caída|abort/i.test(l)).slice(-25) }; }).catch(e => ({ error: e.message }));
+      await foco(mA); await uno.keyboard.down('KeyK'); await foco(mB); await dos.keyboard.down('KeyK');
+      for (const s of [3, 15]) { await espera(s === 3 ? 3000 : 12000);
+        const [da, db] = [await diag(mA), await diag(mB)];
+        console.log(`  [${s} s] A ${JSON.stringify(da).slice(0, 2500)}
+  [${s} s] B ${JSON.stringify(db).slice(0, 2500)}`);
+        await (await mA.frameElement().catch(() => null))?.screenshot({ path: path.join(carpeta, `estado-${s}-uno.png`) }).catch(() => {});
+        await (await mB.frameElement().catch(() => null))?.screenshot({ path: path.join(carpeta, `estado-${s}-dos.png`) }).catch(() => {});
+        if (s === 15) { ok('«Cada uno su kart» en el sitio: en línea (modo 7), la red cruza y nadie llegó a los 15 s', [da, db].every(d => d.modo === 7 && (d.red?.recibidos ?? 0) > 100 && !/1/.test(d.llegaron)),
+          [da, db].map(d => `modo ${d.modo} red ${d.red?.recibidos}/${d.red?.enviados} llegaron ${d.llegaron}`).join(' · ')); }
+      }
+      await uno.keyboard.up('KeyK'); await dos.keyboard.up('KeyK');
+      codigo = mal ? 1 : 0; throw { finEstado: true };   // (al finally: cierra el ensayo y el navegador)
+    }
     await foco(mA); await uno.keyboard.down('KeyK'); await foco(mB); await dos.keyboard.down('KeyK');
     const x = await hastaQue(async () => [await leer(mA), await leer(mB)], ([a, b]) => (a?.ls?.huellasIguales || 0) >= 3 && (b?.ls?.cuadro || 0) > 600, 120000, 2000);
     // (la foto del marco del juego solo: el detector busca la costura a media altura de la imagen del juego)
@@ -397,7 +465,7 @@ try {
   }
   codigo = mal ? 1 : 0;
 } catch (e) {
-  console.log('✗ la prueba se cortó — ' + (e && e.stack || e));
+  if (!e?.finEstado) console.log('✗ la prueba se cortó — ' + (e && e.stack || e));
 } finally {
   // §104: cuántas llamadas gastó en el Worker (el plan gratis da 100.000 al día): dos jugadores, la sala y la carrera
   try {

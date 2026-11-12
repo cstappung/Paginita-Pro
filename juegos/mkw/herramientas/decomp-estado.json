@@ -1,0 +1,24 @@
+{
+  "comentario": "El avance propio de la decompilación: una fila por función reescrita. Estados: borrador (escrita, sin probar), verificada (idéntica en el comprobador, el fantasma y la sala), adoptada (va en el programa que se publica). El historial lo agrega solo herramientas/decomp-avance.mjs.",
+  "funciones": [
+    {
+      "dir": "0x807C0884",
+      "nombre": "KColData::checkSphereMovement",
+      "estado": "verificada",
+      "fecha": "2026-11-11",
+      "nota": "§280: 0 diferencias en 400.000 llamadas, fantasma 2.115 cuadros iguales, sala 74 huellas; ×2,9 por llamada. Solo en build/web-decomp, no adoptada."
+    }
+  ],
+  "historial": [
+    {
+      "fecha": "2026-11-12",
+      "funciones": 1,
+      "bytes": 1660,
+      "ms": 0.0798,
+      "deMs": 3.6691,
+      "deFunciones": 1614,
+      "calzan": 0,
+      "calzanCarrera": 0
+    }
+  ]
+}

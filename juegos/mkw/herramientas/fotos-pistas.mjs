@@ -18,6 +18,7 @@
 //
 // Uso:  node herramientas/fotos-pistas.mjs [--desde N] [--hasta N] [--rehacer] [--ventana]   (N = pista 0..359)
 //       --rehacer: vuelve a sacar las que ya existen.
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -38,7 +39,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const pagina = await navegador.newPage({ viewport: { width: 960, height: 540 } });
 pagina.on('pageerror', e => console.log('[pageerror] ' + e.message));

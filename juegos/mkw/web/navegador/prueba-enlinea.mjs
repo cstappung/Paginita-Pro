@@ -16,6 +16,7 @@
 // Fotos en build/web/datos/enlinea/.
 //
 // Uso:  node web/navegador/prueba-enlinea.mjs [--ventana]     (MKW_BUILD=otro build; por omisión el de siempre, build/web/navegador: la red del juego ya va en él)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -34,7 +35,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)],
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   // las dos pestañas tienen que seguir corriendo aunque no estén al frente (como dos computadores)
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });

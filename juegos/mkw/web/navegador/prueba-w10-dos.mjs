@@ -11,6 +11,7 @@
 // Uso:  MKW_BUILD=build/web-w10b/navegador node web/navegador/prueba-w10-dos.mjs [--alto 900,1500] [--medir]
 //         [--pista 0.0] [--extra "&lastre=…"] [--chrome "--js-flags=…"] [--puerto 8185] [--ventana]
 //       (las fotos quedan en build/web/datos/w10/: son imágenes del juego, nunca a git)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -41,7 +42,7 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const ventana = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${ventana[0]},${ventana[1]}`,
          ...(CHROME ? CHROME.split(' ') : [])] });
 const BASE = `modo=directa&pista=${PISTA}&semilla=1234&soloCpu=1&cpu=maximo${EXTRA}`;

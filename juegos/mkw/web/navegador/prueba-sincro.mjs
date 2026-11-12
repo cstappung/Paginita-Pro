@@ -21,6 +21,7 @@
 //       (§177.3 --vista-b=1260x540 --extra-b=&fluidez=180: B con otra ventana y otros ajustes, como un teléfono)
 //       (§93, C4 --traba-largada=6000: A se traba entera 6 s en el cuadro 20 de la carrera, como la primera visita
 //        armando gráficos; B la espera con el margen de la largada y nadie se corta)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -82,7 +83,7 @@ const oracle = ORACLE ? await crearServidorArbitro({ puerto: 0, registro: () => 
 const extraOracle = oracle ? '&conexion=oracle&arbitroDirecto=1&arbitroUrl=' + encodeURIComponent(`ws://127.0.0.1:${oracle.puerto}/`)
   : SIN_ORACLE ? '&conexion=oracle' : '';
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     `--window-position=${process.env.MKW_VENTANA || '-1880,549'}`,

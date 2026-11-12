@@ -14,6 +14,7 @@
 //
 // Uso:  node herramientas/vistas-salon-mkw.mjs <etiqueta>      (p. ej. «antes» o «despues»)
 //       → build/vistas/salon-mkw-<etiqueta>-<aparato>-<tema>-<parte>.png
+import { opcionesNavegador } from './navegador.mjs';   // §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
@@ -65,7 +66,7 @@ const BASE = `http://127.0.0.1:${srv.address().port}`;
 // 3) Chrome sin ventana: escritorio y celular, claro y oscuro
 const reqBanco = createRequire(path.join(raiz, 'banco/package.json'));
 const { chromium, devices } = reqBanco('playwright-core');
-const nav = await chromium.launch({ channel: process.env.CHROME ? undefined : 'chrome', executablePath: process.env.CHROME || undefined, headless: true, args: ['--mute-audio'] });
+const nav = await chromium.launch({ channel: process.env.CHROME ? undefined : 'chrome', ...(process.env.CHROME ? { executablePath: process.env.CHROME } : opcionesNavegador()), headless: true, args: ['--mute-audio'] });
 const APARATOS = {
   escritorio: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
   celular: { ...devices['Pixel 7'] },

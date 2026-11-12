@@ -10,6 +10,7 @@
 // Storage, el programa sale de la caché HTTP, el juego llega antes a la carrera y baja menos de la red.
 //
 // Uso:  node web/navegador/prueba-precarga.mjs [--ventana] [--puerto=8158]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -39,7 +40,7 @@ const perfiles = [];
 const perfilNuevo = async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'mkw-precarga-'));
   perfiles.push(dir);
-  return chromium.launchPersistentContext(dir, { channel: 'chrome', headless: !process.argv.includes('--ventana'), args: ARGS,
+  return chromium.launchPersistentContext(dir, { ...opcionesNavegador(), headless: !process.argv.includes('--ventana'), args: ARGS,
     viewport: { width: 960, height: 540 } });
 };
 // abre la carrera directa y mide hasta que el juego está en la carrera (sección 0x20 con su página)

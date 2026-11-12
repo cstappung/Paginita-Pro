@@ -11,6 +11,7 @@
 // Es como medir con el osciloscopio un equipo que funciona antes de armar uno igual: así se sabe qué valores poner.
 //
 // Uso:  node herramientas/ficha-carrera.mjs [--nombre vs] [--extra "&modo=vs&copa=0&fila=0&cpu=normal"] [--puerto 8148]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,7 @@ mkdirSync(carpeta, { recursive: true });
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const p = await navegador.newPage({ viewport: { width: 960, height: 540 } });
 p.on('pageerror', e => console.log('[pageerror] ' + e.message));

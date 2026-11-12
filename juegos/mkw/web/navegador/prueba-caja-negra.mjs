@@ -6,6 +6,7 @@
 // aviso se ve y que el informe de rendimiento lo trae. Después prueba la tarjeta de video perdida: `GPUDevice.destroy()`
 // no sirve (es «destroyed», a propósito), así que se lanza el evento de un error del motor (RuntimeError) y se recarga.
 // Uso:  MKW_BUILD=build/web-final-w30/navegador node web/navegador/prueba-caja-negra.mjs [--puerto 8174] [--ventana]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +25,7 @@ setTimeout(() => { console.log(`✗ la prueba no terminó en 12 min (${bien} bie
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`] });
 const contexto = await navegador.newContext({ viewport: { width: 1000, height: 600 } });
 const url = `http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=0.0&cc=c150&cpu=normal&pj=0&kart=1`;

@@ -23,6 +23,7 @@
 //
 // Uso:  node web/navegador/prueba-musica.mjs [--ventana] [--comparar] [--vueltas 2] [--puerto 8170]
 //       (MKW_BUILD=otro build, como en servidor.mjs)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -102,7 +103,7 @@ const nuevoContexto = async nombre => {
   const dir = path.join(os.tmpdir(), `mkw-prueba-musica-${nombre}-${process.pid}`);
   rmSync(dir, { recursive: true, force: true });
   perfiles.push(dir);
-  const c = await chromium.launchPersistentContext(dir, { channel: 'chrome', headless: !process.argv.includes('--ventana'),
+  const c = await chromium.launchPersistentContext(dir, { ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
     viewport: { width: 1280, height: 720 }, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
   await c.addInitScript(VIGIA);
   return c;

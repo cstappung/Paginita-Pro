@@ -8,6 +8,7 @@
 // el nuevo, cada uno en su perfil nuevo.
 //
 // Uso:  node herramientas/medir-fondo-carrera.mjs [--mbit 20] [--segundos 30] [--puerto 8161]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -28,7 +29,7 @@ await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).inclu
 
 async function medir(extra) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'mkw-fondo-'));
-  const ctx = await chromium.launchPersistentContext(dir, { channel: 'chrome', headless: true, viewport: { width: 960, height: 540 },
+  const ctx = await chromium.launchPersistentContext(dir, { ...opcionesNavegador(), headless: true, viewport: { width: 960, height: 540 },
     args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
   const p = await ctx.newPage();
   const cdp = await ctx.newCDPSession(p);

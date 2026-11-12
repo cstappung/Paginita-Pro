@@ -17,6 +17,7 @@
 //   - Esc cierra sin elegir.
 //
 // Uso:  node web/navegador/prueba-elegir.mjs [--ventana]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import path from 'node:path';
@@ -57,7 +58,7 @@ archivos['indice.json'] = Buffer.from(JSON.stringify(indice));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'), args: ['--mute-audio'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'), args: ['--mute-audio'] });
 const contexto = await navegador.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true });
 const pagina = await contexto.newPage();
 const pedidas = [];

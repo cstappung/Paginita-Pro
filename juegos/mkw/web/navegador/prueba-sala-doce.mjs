@@ -18,6 +18,7 @@
 // Solo el Chrome del teléfono fuerza la comprobación de límites de Android; los PC conservan su configuración normal.
 // Uso:  node web/navegador/prueba-sala-doce.mjs [--reales 3] [--carreras 3] [--segundos 60] [--sin-telefono]
 //       [--puerto 8166] [--ventana] [--extra "&x=y"] [--pista 13.2] [--datos carpeta] (MKW_BUILD = otro build)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -52,7 +53,7 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
 const buzon = await crearBuzonHttp();
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', `--window-position=${vx},${vy}`] });
 const registro = [], resumen = [];
@@ -94,7 +95,7 @@ for (let carrera = 1; carrera <= CARRERAS; carrera++) {
     const tel = TELEFONO && i === R - 1;
     let ctx = contexto;
     if (i > 0) {
-      const chrome = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+      const chrome = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
         args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
           '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
           `--window-position=${vx},${vy}`, ...(tel ? ['--js-flags=--wasm-enforce-bounds-checks'] : [])] });

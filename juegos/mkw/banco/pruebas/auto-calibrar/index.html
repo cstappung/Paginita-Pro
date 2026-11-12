@@ -15,7 +15,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { salidasAProbar, estimarLogica, elegir, frenaTarjeta, calibrar, textoEleccion, crearAutoCalibrar, crearAvisoPausa, montarBotonCalibrar,
+import { fluidezPara, salidasAProbar, estimarLogica, elegir, frenaTarjeta, calibrar, textoEleccion, crearAutoCalibrar, crearAvisoPausa, montarBotonCalibrar,
          TOPE_MS, LOGICA_MIN, CALIENTA_MS, MIDE_MS, textoCombo } from '/web/navegador/auto-calibrar.mjs';
 import { crearSala, motivoPausaNo, PAUSA_MAX_MS, MARCA_SALA } from '/web/navegador/sala-carrera.mjs';
 import { crearLockstep } from '/web/navegador/lockstep.mjs';
@@ -84,7 +84,7 @@ try {
     const r = await calibrar({ actual: { n8: 0, salida: 0 }, alto: 1080, ...a });
     ok('gama baja: descarta «60 siempre» (lógica 48 < 57) y elige «30 con imagen intermedia» (1 % bajo 50)',
        r.elegido.n8 === 2 && r.resultados.find(x => x.n8 === 0).llega === false, textoEleccion(r));
-    ok('…el resumen dice lo elegido, el 1 % bajo y el de antes', /^Elegido: 30 con imagen intermedia · salida de tu pantalla — 1 % bajo 50 fps \(antes 31\)/.test(textoEleccion(r)), textoEleccion(r));
+    ok('…el resumen dice lo elegido, el 1 % bajo y el de antes', /^Elegido: 30 con imagen intermedia · salida de tu pantalla · fluidez 60 — 1 % bajo 50 fps \(antes 31\)/.test(textoEleccion(r)), textoEleccion(r));
     ok('…y termina poniendo lo elegido', a.aplicados.at(-1) === textoCombo(r.elegido), a.aplicados.join(' → '));
   }
   {
@@ -121,10 +121,11 @@ try {
 
   // ---- 3. El controlador (un juego de mentira) ----
   {
-    let T = 0, carrera = false, n8 = 0, salida = 0, g = { n8: 'auto', salida: 0 }, tic = null;
+    let T = 0, carrera = false, n8 = 0, salida = 0, g = { n8: 'auto', salida: 0, fluidez: 120 }, tic = null;
     const estados = [];
     const tabla = { 0: { bajo1: 31, fps: 44, l: 48 }, 1: { bajo1: 29.6, fps: 30, l: 60 }, 2: { bajo1: 50, fps: 57, l: 59 } };
     let imagenes = 0, logica = 0, esp = 0;
+    const congelados = [], avisos = [];
     const c = crearAutoCalibrar({
       ahora: () => T, esperar: async ms => { const x = tabla[n8]; imagenes += ms; logica += x.l * ms / 1000; esp += 0.1 * ms; T += ms; },
       cada: (f, ms) => { tic = f; return 1; },
@@ -132,7 +133,8 @@ try {
       modoN8: () => n8, alto: () => 1080, enCarrera: () => carrera,
       medidor: { marca: () => imagenes, resumen: () => ({ bajo1: tabla[n8].bajo1, fps: tabla[n8].fps, imagenes: 100 }), logica: () => logica,
                  trabajo: () => ({ t: T, espera: esp, lastre: 0 }), gpuMs: () => null },
-      congelarJuego: () => {}, sala: () => null, alEstado: e => estados.push(e.texto),
+      congelarJuego: si => { congelados.push(si); }, sala: () => null, alEstado: e => estados.push(e.texto),
+      aviso: { mostrar: (n, r, o) => { avisos.push(o); }, ocultar: () => { avisos.push('fuera'); } },
     });
     await c.apretar();
     ok('en los menús queda pendiente, con un aviso claro', c.estado.pendiente && /Pendiente: se calibra sola 5 s después de que largue/.test(estados.at(-1)), estados.at(-1));
@@ -141,8 +143,15 @@ try {
     T += 4100; tic();
     for (let i = 0; i < 50 && (c.estado.corriendo || !c.estado.veces); i++) await espera(1);
     ok('a los 5 s de la carrera empieza sola y termina', c.estado.veces === 1 && !c.estado.pendiente, estados.slice(-2).join(' | '));
+    ok('§287: sin sala también congela la carrera mientras prueba (con su aviso propio) y la suelta al terminar',
+       congelados.includes(true) && congelados.at(-1) === false && avisos.some(o => o?.propio && o?.solo) && avisos.at(-1) === 'fuera', JSON.stringify({ congelados, avisos }));
     ok('guardó lo elegido (30 con imagen intermedia) y lo dejó puesto', g.n8 === 2 && n8 === 2, JSON.stringify(g));
-    ok('«Deshacer» vuelve a lo de antes (Automático) y lo guarda', c.deshacer() && g.n8 === 'auto' && n8 === 'auto' && estados.at(-1) === 'Vuelto como estaba.');
+    ok('§274.6: los tres ajustes quedan escritos en mkw.graficos (Imagen, salida y fluidez), la fluidez a 60 con «30 con imagen intermedia»',
+       g.n8 === 2 && 'salida' in g && g.salida === 0 && g.fluidez === 0, JSON.stringify(g));
+    ok('«Deshacer» vuelve a lo de antes (Automático, la fluidez de antes) y lo guarda', c.deshacer() && g.n8 === 'auto' && n8 === 'auto' && g.fluidez === 120 && estados.at(-1) === 'Vuelto como estaba.');
+    // §274.6: la fluidez (pide reiniciar: no se prueba) solo se deja con «60 siempre» y el 1 % bajo a 57 o más
+    ok('fluidezPara: con N8 o sin sobra va a 60; con «60 siempre» y sobra queda la de antes',
+       fluidezPara({ n8: 2, bajo1: 59 }, 180) === 0 && fluidezPara({ n8: 0, bajo1: 50 }, 120) === 0 && fluidezPara({ n8: 0, bajo1: 59 }, 120) === 120 && fluidezPara({ n8: 0, bajo1: 59 }, 0) === 0);
   }
 
   // ---- 4. La pausa de la sala (tres salas, red de mentira, reloj de mentira) ----

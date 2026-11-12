@@ -10,6 +10,7 @@
 // OJO (§177): los valores de la memoria no cambiaron en ninguna forma, ni con --libre (donde la foto sí se estira): no
 // son las direcciones que mandan en esta versión. Lo que decide son las fotos (las barras negras y el campo visual).
 // Uso:  node herramientas/medir-aspecto.mjs [--puerto 8171] [--libre]  → build/web/datos/aspecto/<forma>.png
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -25,7 +26,7 @@ const FORMAS = [['16x9', 960, 540], ['2.18x1', 1178, 540], ['parada', 400, 800],
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const nav = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio',
+const nav = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio',
   '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 try {
   const p = await (await nav.newContext({ viewport: { width: 960, height: 540 } })).newPage();

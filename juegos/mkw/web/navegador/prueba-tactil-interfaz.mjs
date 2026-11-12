@@ -12,6 +12,7 @@
 // Como probar un tablero con cada tapa abierta: el botón de emergencia tiene que cortar igual, con la tapa puesta o no.
 // Uso:  MKW_BUILD=build/web-final-w30/navegador node web/navegador/prueba-tactil-interfaz.mjs [--parado] [--extra "&tactilSuelta=0"]
 //       [--puerto 8177] [--ventana]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +30,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`] });
 const pixel = devices['Pixel 7'];
 const vista = process.argv.includes('--parado') ? pixel.viewport : { width: pixel.viewport.height, height: pixel.viewport.width };

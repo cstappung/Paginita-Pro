@@ -15,6 +15,7 @@
 // Antes de correrla, avisar a las otras sesiones que comparten la PC (una pestaña con el juego, ~3 min).
 //
 // Uso:  node web/navegador/prueba-invitados.mjs [--puerto 8158] [--ventana]      (MKW_BUILD=… para otro build)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -32,7 +33,7 @@ const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.l
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const p = await navegador.newPage({ viewport: { width: 1100, height: 800 } });
 const notas = [];

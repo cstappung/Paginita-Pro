@@ -37,12 +37,21 @@ try {
   // ---- 2. Una sola ventana en la sala ----
   A.activar();
   ok('una sola ventana en la sala: todos los mandos (se juntan en su jugador)', A.elegir(dos).length === 2 && A.estado.ventanas === 1);
+  // §291: sola en la sala, la foto no se manda (antes salía en cada lectura: 4.113 en el informe del dueño, para nadie)
+  { let salieron = 0; const antes = ca.postMessage; ca.postMessage = m => { if (m.t === 'mandos') salieron++; antes(m); };
+    for (let i = 0; i < 100; i++) A.elegir(dos);
+    ca.postMessage = antes;
+    ok('§291: sola en la sala, 100 lecturas con el foco = 0 fotos mandadas', salieron === 0 && A.estado.fotosMandadas === 0, `salieron ${salieron}, fotosMandadas ${A.estado.fotosMandadas}`); }
+  { const [s1] = canales(); const S = crearMandosVentanas({ canal: s1, ahora, tieneFoco: () => true, id: 's', desde: 1, siempreFoto: true });
+    S.activar(); for (let i = 0; i < 10; i++) S.elegir(dos);
+    ok('§291: siempreFoto (?mandosVentanas=siempre) = como antes, una foto por lectura', S.estado.fotosMandadas === 10); S.parar(); }
   A.parar(); A.activar();
 
   // ---- 3. Dos ventanas ----
   B.activar();
   ok('las dos se ven: la fila tiene 2', (A.elegir(dos), A.estado.ventanas === 2) && (B.elegir([]), B.estado.ventanas === 2));
   ok('A llegó primero: puesto 0; B: puesto 1', A.estado.puesto === 0 && B.estado.puesto === 1);
+  ok('§291: con dos ventanas la foto sí sale', (A.elegir(dos), A.estado.fotosMandadas > 0), `fotosMandadas ${A.estado.fotosMandadas}`);
   const la = A.elegir(dos);
   ok('A (con el foco, ve los dos) usa SOLO el 1.er mando', la.length === 1 && la[0].index === 0);
   const lb = B.elegir([]);

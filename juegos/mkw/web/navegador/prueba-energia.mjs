@@ -14,6 +14,7 @@
 //     y Chrome refresca de verdad cada 33,3 ms; el aviso 🔋 tiene que salir. (El caso de un portátil que se
 //     desenchufa, o el teléfono con poca batería, queda para el dueño: la regla que lo prende es la de Chrome.)
 // Uso:  node web/navegador/prueba-energia.mjs [--puerto 8167]   → ✓/✗
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +32,7 @@ const ok = (txt, si, extra = '') => { si ? bien++ : mal++; console.log(`  ${si ?
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 
 // una carrera: extra = lo que se agrega a la dirección; mitad = frenar requestAnimationFrame a la mitad; seg = segundos de carrera
 // real = un Chrome aparte, con ventana (en el monitor de las pruebas, MKW_VENTANA) y el Ahorro de energía prendido
@@ -42,7 +43,7 @@ async function carrera(extra, { mitad = false, seg = 20, real = false, calentarE
     // la preferencia de Chrome del Ahorro de energía (0 apagado, 1 bajo el 20 % de batería, 2 sin enchufe, 3 siempre)
     fs.writeFileSync(path.join(dirReal, 'Local State'), JSON.stringify({ performance_tuning: { battery_saver_mode: { state: 3 } } }));
     const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-    ctx = await chromium.launchPersistentContext(dirReal, { channel: 'chrome', headless: false, viewport: { width: 960, height: 540 },
+    ctx = await chromium.launchPersistentContext(dirReal, { ...opcionesNavegador(), headless: false, viewport: { width: 960, height: 540 },
       args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`, '--window-size=1000,640'] });
   } else ctx = await navegador.newContext({ viewport: { width: 960, height: 540 } });
   if (mitad) await ctx.addInitScript(() => {

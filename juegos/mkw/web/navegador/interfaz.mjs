@@ -182,7 +182,34 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     document.body.classList.remove('cajon-abierto');
     document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if (document.body.classList.contains('started')) $('canvas').focus();   // las teclas vuelven al juego
+    soltarPausaMenu();
   }
+  // §286 (el dueño, en el celular: «el menu de los settings que ocultamos porque molesta no aparece mas, tienes que hacer
+  // que aparezca ahora si se aprieta el boton de pausa del HUD, ese que se ve como un >»): desde §269 un dedo en el mando
+  // en pantalla nunca muestra la barra de arriba (⚙, Controles, Partida), y en el teléfono el mando cubre toda la
+  // pantalla: no quedaba cómo abrir el cajón. Ahora el «▶» del mando en pantalla (controles.mjs, el aviso
+  // 'mkw-pausa-tactil') abre el cajón en la Ayuda, como ⚙. En la sala no se toca el juego (START ya estaba filtrado: la
+  // carrera de los demás sigue). Jugando solo, con la carrera andando, el juego se queda quieto mientras el cajón está
+  // abierto (mkw_congelar: no calcula y sigue dibujando, la misma pausa de §274) y sigue desde el mismo cuadro al cerrarlo.
+  // Como el botón de parada de una máquina que además abre el tablero de mando.
+  const pqPausa = new URLSearchParams(location.search);
+  const enSala = pqPausa.has('sincro') || pqPausa.has('red') || ['sala', 'enlinea'].includes(pqPausa.get('modo'));
+  let pausaMenu = false;
+  function soltarPausaMenu() {
+    if (!pausaMenu) return;
+    pausaMenu = false;
+    try { window.mkw?._mkw_congelar?.(0); } catch {}
+  }
+  addEventListener('mkw-pausa-tactil', () => {
+    const e = window.mkwEstado || (window.mkwEstado = {});
+    e.pausaMenu = e.pausaMenu || { veces: 0, congelado: 0 };
+    e.pausaMenu.veces++;
+    if (document.body.classList.contains('cajon-abierto')) return cerrarCajon();   // (otro toque en ▶ con el cajón abierto: lo cierra)
+    abrirCajon('ajustes');
+    if (!enSala && e.enCarrera && window.mkw?._mkw_congelar) {
+      try { window.mkw._mkw_congelar(1); pausaMenu = true; e.pausaMenu.congelado++; } catch {}
+    }
+  });
   document.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => abrirCajon(b.dataset.abre)));
   document.querySelectorAll('.pestanas [data-hoja]').forEach(b => b.addEventListener('click', () => { hojaAbierta = null; abrirCajon(b.dataset.hoja); }));
   $('cerrarCajon').onclick = cerrarCajon;

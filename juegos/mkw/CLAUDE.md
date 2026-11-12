@@ -135,6 +135,19 @@ la misma carrera. Repetir: `V403="nombre:bits[:copia] …" bash herramientas/tan
 igual fantasma`; el tramo fijo en el teléfono real, A/B intercalados: `node herramientas/tramo-telefono.mjs --a <carpeta>
 --b <carpeta> [--pares 2] [--etiqueta X]` (marco seguro, con el candado).
 
+**El «▶» del mando en pantalla abre el menú (§286).** En el teléfono la barra ⚙ no vuelve nunca (§269: un dedo en el mando la
+esconde y el mando cubre la pantalla): el botón que hace Start del mando táctil avisa `mkw-pausa-tactil` (`controles.mjs`) y
+`interfaz.mjs` abre el cajón en la Ayuda (otro toque lo cierra); en la sala no toca el juego, jugando solo con la carrera
+la congela (`mkw_congelar`) hasta cerrar el cajón (`mkwEstado.pausaMenu`). `?pausaMenu=0` = Start al juego como antes.
+Probar: `prueba-celular.mjs` (48), `prueba-tactil.mjs` (14), con el juego `prueba-pausa-menu.mjs` (5, con el candado).
+
+**El tablero de la decompilación (§289).** `node herramientas/decomp-avance.mjs [--perfil m1-carrera] [--sin-historial]` →
+`build/decomp-avance/index.html` (ignorado), publicado como artifact privado (https://claude.ai/artifact/V48MoP34qA4FhPPjVnQWBt;
+plantilla `herramientas/decomp-avance.html`). El avance propio se anota en `herramientas/decomp-estado.json` (una fila por
+función: `borrador` / `verificada` / `adoptada`; el historial lo agrega el generador). El total se mide en bytes de código
+(cabeceras de `main.dol` y `StaticR.rel`, base de carga 0x805103B4) contra `terceros/mkw-decomp`; la carrera, con el perfil
+de `build/web/datos/impuesto-perfil/`. El C++ decompilado (`terceros/decomp-propio/`) nunca va a git.
+
 **W30, «igual entre nosotros, no igual a la Wii» (§257, adoptado).** La copia `terceros/Wiicompiled-motor-w30` (rama
 `motor-w30` = H6 + `parches/motor-w30.diff`) hace la FMA, el NI del FPSCR y el redondeo de C a 25 bits con las cuentas de
 wasm: `MKW_MOTOR_W30=7` por omisión (bits 1/2/4; `MKW_CFLAGS_EXTRA=-DMKW_MOTOR_W30=0` = la Wii al último bit). Compilar

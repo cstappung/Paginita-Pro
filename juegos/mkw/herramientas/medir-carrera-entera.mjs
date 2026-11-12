@@ -21,6 +21,7 @@
 //           corridas (mkwLecturas: cada bloque, el cuadro de la primera vez y en cuántas corridas apareció)
 //   Por tramo también: pedidos y MB a la red (disco.estado.pedidosRed/bytesRed) y las veces que el juego esperó a la
 //   red; «largada s» = de abrir la página a la etapa 2.
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -66,7 +67,7 @@ function leerEtapa() {
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const resumen = [];
 try {
   for (const [vuelta, pista] of PISTAS.entries()) {

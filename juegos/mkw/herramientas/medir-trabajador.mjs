@@ -9,6 +9,7 @@
 // Siempre sin sonido (--mute-audio, pedido del dueño) y la ventana en el monitor de 144 Hz (MKW_VENTANA, §160).
 // Va con el candado de medición (herramientas/candado.sh) desde la tanda que la llame. Resultado:
 // build/web/datos/trabajador/<etiqueta>/resumen.json (sin nada del juego: números y huellas).
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -41,7 +42,7 @@ const perfil = path.join(raiz, 'build/web/datos/trabajador/perfil-' + PUERTO);
 rmSync(perfil, { recursive: true, force: true });
 
 async function una(hilo, n) {
-  const ctx = await chromium.launchPersistentContext(perfil, { channel: 'chrome', headless: tiene('sin-ventana'), viewport: null,
+  const ctx = await chromium.launchPersistentContext(perfil, { ...opcionesNavegador(), headless: tiene('sin-ventana'), viewport: null,
     args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`, '--window-size=1280,760',
            '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
            // (--chrome "…" = banderas de más, p. ej. la revisión de límites de Android, W5: --js-flags=--wasm-enforce-bounds-checks)

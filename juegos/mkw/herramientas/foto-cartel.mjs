@@ -6,6 +6,7 @@
 // mismo en la espera de los gráficos de los menús. --telefono = la ventana del tamaño de un teléfono acostado (915×412,
 // 2,625 puntos por pixel; solo el tamaño, sin frenar nada). Salida: build/vistas/cartel-<etiqueta>-*.png y el JSON.
 // Uso (con el candado):  node herramientas/foto-cartel.mjs [--telefono] [--etiqueta X] [--puerto 8166]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,7 +24,7 @@ const carpeta = path.join(raiz, 'build/vistas'); fs.mkdirSync(carpeta, { recursi
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'], env: process.env });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: false,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: false,
   args: ['--enable-unsafe-webgpu', '--mute-audio', `--window-position=${vx + 40},${vy + 40}`, '--window-size=1280,800'] });
 const textos = [];
 try {

@@ -11,6 +11,7 @@
 // build/web/datos/celular-*.png.
 //
 // Uso:  node herramientas/prueba-celular.mjs [puerto]   (Chrome: el de Playwright, o CHROME=ruta)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +22,7 @@ const PUERTO = process.argv[2] || '8155';
 const srv = spawn(process.execPath, [fileURLToPath(new URL('../banco/servir.cjs', import.meta.url)), PUERTO], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(r => setTimeout(r, 1200));
 const S = fileURLToPath(new URL('../build/web/datos', import.meta.url)); fs.mkdirSync(S, { recursive: true });
-const b = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true, args: ['--mute-audio'] });
+const b = await chromium.launch({ ...(process.env.CHROME ? { executablePath: process.env.CHROME } : opcionesNavegador()), headless: true, args: ['--mute-audio'] });
 const ctx = await b.newContext({ ...devices['Pixel 7'] });               // 412×915, toque, sin ratón
 const p = await ctx.newPage();
 p.setDefaultTimeout(5000);                                                // (una falla no deja la prueba colgada)
@@ -215,6 +216,26 @@ await p.touchscreen.tap(vx269, vy269); await espera(150);
 ok('§269: tocar el mando en pantalla esconde la barra de arriba al momento (no queda encima para el toque siguiente)',
    ...(await p.evaluate(() => [!document.body.classList.contains('barra-viva') && getComputedStyle(document.getElementById('barra')).pointerEvents === 'none',
      `cuerpo «${document.body.className}», barra ${getComputedStyle(document.getElementById('barra')).pointerEvents}`])));
+// ---- §286: el «▶» del mando en pantalla abre el menú (el cajón en la Ayuda); jugando solo, con la carrera, el juego queda quieto ----
+await p.evaluate(() => { window.mkwInterfaz?.cerrarCajon?.();
+  window.__congelar = []; window.mkw = Object.assign(window.mkw || {}, { _mkw_congelar: v => window.__congelar.push(v) });
+  window.mkwEstado = Object.assign(window.mkwEstado || {}, { enCarrera: true }); });
+await p.screenshot({ path: `${S}/celular-pausa-antes.png` });
+const [px286, py286] = await centro('.mkw-tactil [data-pieza="START"]');
+await p.touchscreen.tap(px286, py286); await espera(300);
+const m286 = await p.evaluate(() => ({ cajon: document.body.classList.contains('cajon-abierto'), ayuda: !document.getElementById('hojaAyuda').hidden,
+  start: (window.mkwControles.tactilBotones?.() ?? 0) & 0x1000, congelar: window.__congelar.join(), veces: window.mkwEstado.pausaMenu?.veces }));
+ok('§286: tocar «▶» del mando en pantalla abre el cajón en la Ayuda (el menú ⚙)', m286.cajon && m286.ayuda, JSON.stringify(m286));
+ok('§286: jugando solo con la carrera andando, el juego queda quieto mientras el cajón está abierto (mkw_congelar 1)', m286.congelar === '1', m286.congelar);
+await p.screenshot({ path: `${S}/celular-pausa-menu.png` });
+await p.evaluate(() => window.mkwInterfaz.cerrarCajon()); await espera(200);
+ok('§286: al cerrar el cajón el juego sigue (mkw_congelar 0)', (await p.evaluate(() => window.__congelar.join())) === '1,0');
+await p.evaluate(() => { window.mkwEstado.enCarrera = false; });
+await p.touchscreen.tap(px286, py286); await espera(250);
+const m286b = await p.evaluate(() => ({ cajon: document.body.classList.contains('cajon-abierto'), congelar: window.__congelar.join() }));
+await p.touchscreen.tap(px286, py286); await espera(250);
+ok('§286: en los menús (sin carrera) abre el cajón sin congelar, y otro toque en «▶» lo cierra', m286b.cajon && m286b.congelar === '1,0' &&
+   !(await p.evaluate(() => document.body.classList.contains('cajon-abierto'))), JSON.stringify(m286b));
 ok('sin errores en la página', errores.length === 0, errores.join(' | '));
 console.log(`fin: ${bien} bien, ${mal} mal`);
 await b.close(); srv.kill();

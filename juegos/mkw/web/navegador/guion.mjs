@@ -29,6 +29,7 @@
 //                  (build/web/navegador/pipelines.bin, se sirve junto al .wasm; ver pipelines.mjs) y SUMA los
 //                  bloques del disco que leyó después del título a bloques.json (cuántas corridas vio cada uno;
 //                  la página baja de antemano los que se repiten en ≥ 2 corridas: correrlo 2 o 3 veces)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, createWriteStream, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -52,7 +53,7 @@ const log = createWriteStream(path.join(carpeta, 'consola.log'));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const pagina = await navegador.newPage({ viewport: { width: 1000, height: 1100 } });
 pagina.on('console', m => log.write(m.text() + '\n'));

@@ -17,6 +17,7 @@
 // Uso:  MKW_BUILD=build/web-274/navegador node herramientas/prueba-red-estado-telefono.mjs [--segundos 20] [--extra-b "&…"]
 //   (el teléfono con la depuración USB y Chrome abierto; TELEFONO_ADB=ruta de adb.exe; con el candado de medición)
 // Salida: build/web/datos/telefono/<fecha>/red-estado.json
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -147,7 +148,7 @@ const cortes = { aviso: m => { console.log('  [teléfono] ' + m); registro('[tel
   conectar: (p, alCtx) => conectarPlaywright(p, { fps: true }, alCtx), pantalla: true, recuerdo: recuerdoPantalla() };
 try {
   const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-  const navegador = await chromium.launch({ channel: 'chrome', headless: false,
+  const navegador = await chromium.launch({ ...opcionesNavegador(), headless: false,
     args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows', `--window-position=${vx},${vy}`] });
   try {

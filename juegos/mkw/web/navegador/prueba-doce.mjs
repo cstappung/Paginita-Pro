@@ -20,6 +20,7 @@
 //
 // Uso:  node web/navegador/prueba-doce.mjs [--n 6] [--ventana] [--puerto 8164] [--pista 13.2] [--extra "&x=y"]
 //       (MKW_BUILD = otro build, como siempre)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -45,7 +46,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 const contexto = await navegador.newContext({ viewport: { width: 640, height: 360 } });

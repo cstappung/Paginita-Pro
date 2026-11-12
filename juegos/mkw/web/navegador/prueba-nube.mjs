@@ -12,6 +12,7 @@
 // Fotos en build/web/datos/nube/.
 //
 // Uso:  node web/navegador/prueba-nube.mjs [--ventana]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -31,7 +32,7 @@ const sala = extra => `http://127.0.0.1:${PUERTO}/banco/pruebas/sala-mkw/padre.h
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 
 // Abre la sala en un navegador nuevo (contexto vacío) y espera a que el juego del marco llegue al título
