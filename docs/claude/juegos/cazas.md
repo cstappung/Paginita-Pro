@@ -104,3 +104,7 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
   after the first paint, and `render()` is what fires when one lands. It
   also falls back to the Google photo left in a room table, like the coins
   top. Without both, everyone but yourself showed as initials.
+- **«Ver todos los fichados (N)»** sits under the cartel when there are more
+  than `TOP` (5): a modal with every open bounty by pot (`abreTodas`), a
+  search box (game, mode, holder or contributor) and «Ponen: …» per pot. It
+  repaints with each data arrival through `pintaMontados`.

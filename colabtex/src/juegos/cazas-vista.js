@@ -94,7 +94,7 @@ export function crearCazas(ctx) {
   const marcaDe = o => valorMarca(o.c, { puntos: o.mp, tiempo: o.mt });
 
   /* ---------- el cartel ---------- */
-  function filaHtml(o, i, yo) {
+  function filaHtml(o, i, yo, extra = "") {
     const p = quien(o.q, nombreDe(o.q, o.c));
     const nv = o.nivel, tuyo = yo && o.q === yo;
     return `<li class="jg-cz-fila n${nv.n}${i === 0 ? " primera" : ""}${tuyo ? " tuya" : ""}">
@@ -105,6 +105,7 @@ export function crearCazas(ctx) {
         <small>${esc(nombreCategoria(o.c))} · <span translate="no">${esc(marcaDe(o))}</span></small></span>
       <span class="jg-cz-pozo" title="${o.n} ${o.n === 1 ? "aporte" : "aportes"}"><em>${nv.icono} ${esc(nv.nombre)}</em><b><span class="cz-n">${fmt(o.pozo)}</span> ${MONEDA}</b>${o.n > 1 ? `<small>${o.n} cazadores ponen</small>` : ""}</span>
       <a class="jg-cz-ir" href="${rutaDeCategoria(o.c)}" title="${tuyo ? "Si te superas tú, te llevas la mitad" : `Supéralo en ${esc(nombreCategoria(o.c))}`}">▶ Jugar</a>
+      ${extra}
     </li>`;
   }
   function html() {
@@ -118,7 +119,8 @@ export function crearCazas(ctx) {
     const top = abiertas.slice(0, TOP), total = abiertas.reduce((a, o) => a + o.pozo, 0);
     const n1 = top[0].nivel.n;
     return cab + (n1 >= 4 ? banda(`${ALERTA[n1]} · ${fmt(top[0].pozo)} monedas por ${nombreDe(top[0].q, top[0].c)}`) : "") + `<ol class="jg-cz-lista">${top.map((o, i) => filaHtml(o, i, u.uid)).join("")}</ol>
-      <p class="jg-cz-pie">${abiertas.length} ${abiertas.length === 1 ? "récord fichado" : "récords fichados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia</p>`;
+      <p class="jg-cz-pie">${abiertas.length} ${abiertas.length === 1 ? "récord fichado" : "récords fichados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia</p>
+      ${abiertas.length > TOP ? `<button class="jg-cz-todas-btn" type="button" data-cz-todas>Ver todos los fichados (${abiertas.length}) →</button>` : ""}`;
   }
   let ultimoHtml = "";
   function pintaMontados() {
@@ -130,8 +132,53 @@ export function crearCazas(ctx) {
       el.classList.toggle("vacia", !abiertas.length);
       el.dataset.nivel = abiertas.length ? String(abiertas[0].nivel.n) : "0";
     }
+    pintaTodas();
   }
   function monta(el) { if (el) { montados.add(el); el._cz = ""; pintaMontados(); } }
+
+  /* ---------- todos los fichados ----------
+     El cartel enseña el top 5; «Ver todos» abre la lista completa, del pozo
+     más grande al más chico, con buscador (juego, modalidad, persona) y
+     quién puso cuánto en cada pozo. Se repinta sola con cada lectura. */
+  let todas = null;
+  function abreTodas() {
+    if (muerto || !ctx.usuario()) return;
+    cierraTodas();
+    const capaT = document.createElement("div");
+    capaT.className = "jg-modal-capa jg-cz-capa-todas";
+    capaT.innerHTML = `<div class="jg-modal jg-cz-modal jg-cz-todas" role="dialog" aria-modal="true" aria-labelledby="jgCzTT">
+      <button class="jg-cz-x" type="button" aria-label="Cerrar">✕</button>
+      <h2 id="jgCzTT">🎯 Todos los fichados</h2>
+      <p class="jg-cz-m-intro"></p>
+      <input class="inp jg-cz-buscar" type="search" placeholder="Busca un juego o a una persona…" aria-label="Buscar entre los fichados">
+      <ol class="jg-cz-lista jg-cz-todas-lista"></ol></div>`;
+    document.body.appendChild(capaT);
+    todas = { capa: capaT, filtro: "", firma: "" };
+    capaT.addEventListener("click", ev => {
+      if (ev.target === capaT || ev.target.closest(".jg-cz-x") || ev.target.closest("a[href]")) cierraTodas();
+    });
+    capaT.querySelector(".jg-cz-buscar").addEventListener("input", ev => { if (todas) { todas.filtro = ev.target.value; pintaTodas(); } });
+    pintaTodas();
+    if (!window.matchMedia("(pointer: coarse)").matches) capaT.querySelector(".jg-cz-buscar").focus();
+  }
+  function cierraTodas() { if (todas) { todas.capa.remove(); todas = null; } }
+  function pintaTodas() {
+    if (!todas) return;
+    const u = ctx.usuario(), q = todas.filtro.trim().toLowerCase();
+    const total = abiertas.reduce((a, o) => a + o.pozo, 0);
+    const lista = abiertas.map((o, i) => ({ o, i })).filter(({ o }) => !q || nombreCategoria(o.c).toLowerCase().includes(q) ||
+      nombreDe(o.q, o.c).toLowerCase().includes(q) || o.aportes.some(a => nombreDe(a.u).toLowerCase().includes(q)));
+    const aportes = o => `<p class="jg-cz-aportes">Ponen: ${o.aportes.map(a => `<span translate="no">${esc(nombreDe(a.u))}</span> ${fmt(a.p)}`).join(" · ")}</p>`;
+    const h = !abiertas.length ? `<li class="jg-cz-vacio">Nadie está fichado todavía.</li>`
+      : lista.length ? lista.map(({ o, i }) => filaHtml(o, i, u && u.uid, aportes(o))).join("")
+      : `<li class="jg-cz-vacio">Ningún fichado coincide con «${esc(todas.filtro)}».</li>`;
+    if (h === todas.firma) return;
+    todas.firma = h;
+    todas.capa.querySelector(".jg-cz-m-intro").innerHTML = `${abiertas.length} ${abiertas.length === 1 ? "récord fichado" : "récords fichados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia. Quien supere la marca primero se lleva el pozo.`;
+    todas.capa.querySelector(".jg-cz-todas-lista").innerHTML = h;
+  }
+  const teclaTodas = ev => { if (ev.key === "Escape" && todas && !modal) { ev.preventDefault(); cierraTodas(); } };
+  document.addEventListener("keydown", teclaTodas);
 
   /* ---------- poner precio ---------- */
   let modal = null;
@@ -496,20 +543,24 @@ export function crearCazas(ctx) {
   /* ---------- clics ---------- */
   const alClic = ev => {
     const b = ev.target.closest && ev.target.closest("[data-cz-poner]");
-    if (b) { ev.preventDefault(); abrePoner(b.dataset.czPoner || ""); }
+    if (b) { ev.preventDefault(); abrePoner(b.dataset.czPoner || ""); return; }
+    const t = ev.target.closest && ev.target.closest("[data-cz-todas]");
+    if (t) { ev.preventDefault(); abreTodas(); }
   };
   document.addEventListener("click", alClic);
 
   const offDatos = ctx.datos(alDatos);
   return {
-    monta, html: () => ultimoHtml || html(), avisos, abrePoner, revisa,
+    monta, html: () => ultimoHtml || html(), avisos, abrePoner, abreTodas, revisa,
     destruir() {
       muerto = true;
       if (offDatos) offDatos();
       document.removeEventListener("click", alClic);
       document.removeEventListener("keydown", teclaPoner);
       document.removeEventListener("keydown", teclaCapa);
+      document.removeEventListener("keydown", teclaTodas);
       cierraPoner();
+      cierraTodas();
       if (capa) capa.remove();
       if (anuncio) anuncio.remove();
       document.querySelectorAll(".jg-cz-velo").forEach(v => v.remove());
