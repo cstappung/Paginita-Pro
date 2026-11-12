@@ -64,6 +64,7 @@ import * as CM from "./casino-motor.js";
 import { monedasReferidos } from "./referidos.js";
 import { nivelSuper } from "./rieles-datos.js";
 import { leeCierre } from "./cierre-datos.js";
+import { cazaValida, resuelveCaza } from "./cazas.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -532,8 +533,10 @@ export function economia(datos) {
    recorrido lo cambia. Las cartas, regalos y piezas se rehacen con su hora,
    como al abrirlas. */
 function estadoInicial(base) {
-  const st = { usuarios: {}, dueno: {}, graduada: {}, enVenta: {}, sobres: {}, ofertas: {}, mascotas: {}, regalos: {}, congelada: {}, historial: {}, rocas: {}, rocasPor: {}, tiene: {} };
+  const st = { usuarios: {}, dueno: {}, graduada: {}, enVenta: {}, sobres: {}, ofertas: {}, mascotas: {}, regalos: {}, congelada: {}, historial: {}, rocas: {}, rocasPor: {}, tiene: {}, cazas: {} };
   if (!base) return st;
+  /* Las cacerías pagadas antes del cierre que seguían abiertas. */
+  for (const id of base.cazas || []) st.cazas[id] = { estado: "abierta" };
   for (const [u, x] of Object.entries(base.usuarios)) st.usuarios[u] = JSON.parse(JSON.stringify(x));
   const de = (cc, o) => base.ajenas[cc] || o;
   for (const so of base.sobres) {
@@ -594,7 +597,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   /* El cierre de cada semana (`ps`) va antes que todo lo de ese instante:
      las tablas se miran como estaban justo antes del lunes. El reclamo de
      los sobres de un podio (`pq`) va, como el de un premio, antes que sus sobres. */
-  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mp: 2.15, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  const ORDEN = { ps: -2, pq: -1, pa: -1, pl: -1, s: 0, g: 1, r: 2, ma: 2.1, mp: 2.15, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, cz: 2.6, cg: 2.7, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p), pl: typeof x.pl === "string" ? x.pl : "" });
@@ -663,6 +666,14 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   for (const [u, l] of Object.entries(d.superChat || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "sc", at: x.at, u, k, p: num(x.p) });
+  /* Las cacerías de récords (cazas.js): `cazas/b/<id>` la que se pone y
+     `cazas/g/<id>/<uid>` cada reclamo. */
+  const cz = d.cazas || {};
+  for (const [id, b] of Object.entries(cz.b || {}))
+    if (cazaValida(b)) ev.push({ t: "cz", at: b.at, id, k: id, u: b.u, b });
+  for (const [id, l] of Object.entries(cz.g || {}))
+    for (const [u, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at) && cazaValida((cz.b || {})[id])) ev.push({ t: "cg", at: x.at, id, k: id + "~" + u, u, b: cz.b[id] });
   for (const [id, o] of Object.entries(m.o || {})) {
     if (!o || !Number.isFinite(o.at)) continue;
     ev.push({ t: "o", at: o.at, id, o });
@@ -702,7 +713,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const T0 = desde;
   for (const r of Object.values(rondas)) r.valida = !!(base && r.at <= T0 && base.rondas[r.u + "~" + r.k]);
   const evs = ev.filter(e => e.at > T0 && e.at <= hasta);
-  evs.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
+  evs.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0) || (a.t === "cg" && a.k !== b.k ? (a.k < b.k ? -1 : 1) : 0));
 
   const st = estadoInicial(base), paradaDesde = {};
   const { usuarios, dueno, graduada, enVenta, sobres, ofertas } = st, cambios = {};
@@ -715,7 +726,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
      filtra por `dueno` al leer). Buscar las propias recorriendo `rocas`
      entera en cada caja era cuadrático: con unas 2000 cajas en el sitio,
      más de medio segundo por cada lectura de Firebase, en cada pestaña. */
-  const { rocas, rocasPor } = st;
+  const { rocas, rocasPor, cazas } = st;
   const llegaRoca = (cc, u) => { if (rocas[cc]) (rocasPor[u] = rocasPor[u] || []).push(cc); };
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
@@ -983,6 +994,19 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       /* Un super chat: al precio de un nivel. El que no se pudo pagar no
          vale, y el chat lo pinta como un mensaje normal. */
       if (nivelSuper(e.p) && paga(e.u, e.p, "superChat")) U(e.u).superChats[e.k] = e.p;
+    } else if (e.t === "cz") {
+      /* Una cacería: sus monedas quedan en custodia desde aquí. La que no
+         se pudo pagar no vale (y frena la cuenta, como cualquier gasto). */
+      if (!cazas[e.id] && paga(e.u, e.b.p, "caza", e.b.c)) cazas[e.id] = { estado: "abierta" };
+    } else if (e.t === "cg") {
+      /* Un reclamo: el primero que vale cierra la cacería y reparte la
+         custodia (cazas.js, `resuelveCaza`). */
+      const x = cazas[e.id];
+      if (!x || x.estado !== "abierta" || U(e.u).parada) continue;
+      const r = resuelveCaza(e.b, e.u, d.solo);
+      if (!r) continue;
+      for (const y of r.pagos) { U(y.u).premios += y.p; anota(y.u, "caza", y.p, (y.u === e.u && r.tipo !== "anulada" ? "cobrada " : "devuelta ") + e.b.c); }
+      cazas[e.id] = { estado: r.tipo, w: e.u, fin: e.at, pagos: r.pagos };
     } else if (e.t === "cf") {
       /* Un cofre de tacos: al precio, y lo que sale lo decide `abreCofre`
          con la hora del servidor. Un taco repetido devuelve monedas. */
@@ -1030,7 +1054,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
     for (const c of Object.keys(x.gasto)) x.gasto[c] = Math.round(x.gasto[c]);
     for (const z of Object.values(x.casino.porJuego)) { z.apostado = Math.round(z.apostado); z.pagado = Math.round(z.pagado * 100) / 100; }
     void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta, podiosSemana,
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta, podiosSemana, cazas,
     cierre: base ? { T: base.T, est: base.est } : null };
   return { res, paradaDesde };
 }
@@ -1111,7 +1135,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.pkPase, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.pkPase, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, (d.cazas || {}).b && Object.fromEntries(Object.values(d.cazas.b).map(b => [b && b.u, 1]).filter(([u]) => typeof u === "string")), d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   /* Y quien solo sale en el cierre (todo lo suyo ya está archivado). */
   if (d.cierre) for (const u of Object.keys(economia(d).usuarios)) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)

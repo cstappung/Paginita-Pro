@@ -73,6 +73,11 @@ export function crearRieles(ctx) {
   chat.className = "jg-riel jg-riel-der jg-cg";
   chat.id = "jgChatG";
   chat.setAttribute("aria-label", "Chat general");
+  /* Arriba del chat, el cartel de las cacerías de récords (cazas-vista.js
+     lo pinta; aquí solo se le hace el hueco). */
+  const cartel = document.createElement("section");
+  cartel.className = "jg-cz jg-cz-riel";
+  cartel.setAttribute("aria-label", "Récords fichados");
   chat.innerHTML = `<header class="jg-riel-cab"><span class="jg-vivo" aria-hidden="true"></span><h2>Chat general</h2><small>últimos 15 min</small>
       <button class="jg-cg-cierra" type="button" aria-label="Cerrar el chat">✕</button></header>
     <div class="jg-cg-lista" translate="no" aria-live="polite"></div>
@@ -83,6 +88,7 @@ export function crearRieles(ctx) {
       <input class="inp" maxlength="${CHAT_LARGO}" placeholder="Escribe a todo el salón…" aria-label="Mensaje para el chat general">
       <button class="btn jg-cg-enviar" type="submit">Enviar</button>
     </form>`;
+  chat.prepend(cartel);
   const chatLista = chat.querySelector(".jg-cg-lista"), chatNota = chat.querySelector(".jg-cg-nota");
   const chatForm = chat.querySelector(".jg-cg-form"), chatCampo = chatForm.querySelector("input"), chatBtn = chatForm.querySelector(".jg-cg-enviar");
   const superCaja = chat.querySelector(".jg-cg-super"), superBtn = chatForm.querySelector(".jg-cg-sbtn");
@@ -366,11 +372,15 @@ export function crearRieles(ctx) {
       const sup = pagado(m) !== false ? nivelSuper(m.s) : null;
       return { m, sup, queda: sup ? quedaSuper(m, ahora) : "", nombre: p.nombre || "Jugador", foto: p.foto, color: p.color || ctx.colorDe(m.uid), cuando: haceCuanto(ahora - m.at) };
     });
-    const firma = u.uid + "|" + filas.map(f => [f.m.id, f.nombre, f.foto, f.color, f.cuando, ctx.marco(f.m.uid), f.sup ? f.sup.id : "", f.queda].join(",")).join("|");
+    /* Los avisos de las cacerías (cazas-vista.js) van intercalados por hora. */
+    const avisos = ctx.avisosCaza ? ctx.avisosCaza() : [];
+    const firma = u.uid + "|" + filas.map(f => [f.m.id, f.nombre, f.foto, f.color, f.cuando, ctx.marco(f.m.uid), f.sup ? f.sup.id : "", f.queda].join(",")).join("|") +
+      "|" + avisos.map(a => a.firma).join("|");
     if (firma !== chatFirma) {
       chatFirma = firma;
       const abajo = chatLista.scrollHeight - chatLista.scrollTop - chatLista.clientHeight < 40;
-      chatLista.innerHTML = filas.length ? filas.map(f => `
+      const items = filas.map(f => ({ at: f.m.at, f })).concat(avisos.map(a => ({ at: a.at, a }))).sort((x, y) => x.at - y.at);
+      chatLista.innerHTML = items.length ? items.map(({ f, a }) => a ? a.html : `
         <div class="jg-cg-msg${f.m.uid === u.uid ? " mio" : ""}${f.sup ? ` super s-${f.sup.id}` : ""}" style="--c:${escapeHtml(f.color)}">
           ${f.sup ? `<em class="jg-cg-sup" translate="yes">${f.sup.icono} ${escapeHtml(f.sup.nombre)} · ${f.sup.p} 🪙<small>${escapeHtml(f.queda)}</small></em>` : ""}
           ${avatarMarco(f.foto, f.nombre, f.color, ctx.marco(f.m.uid), 24, f.m.uid)}
@@ -579,5 +589,5 @@ export function crearRieles(ctx) {
     izq.remove(); chat.remove(); fondo.remove(); fab.remove();
   }
 
-  return { pon, destruir, abre };
+  return { pon, destruir, abre, cartel };
 }

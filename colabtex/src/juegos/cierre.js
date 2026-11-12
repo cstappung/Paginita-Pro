@@ -186,6 +186,8 @@ export function verificaCierre(datos, cierre, vivo = datos) {
   };
   igual("dueño", A.dueno, B.dueno);
   igual("en venta", A.enVenta, B.enVenta);
+  const abiertas = e => Object.fromEntries(Object.entries(e.cazas || {}).filter(([, x]) => x.estado === "abierta").map(([id]) => [id, 1]));
+  igual("cacería abierta", abiertas(A), abiertas(B));
   /* De lo que ya no existe (una carta que se fue en un re-roll, una mascota
      despedida) el cierre no guarda nada: se compara lo vivo. */
   const vivas = (e, mapa, f) => Object.fromEntries(Object.entries(mapa).filter(([cc]) => e.dueno[cc]).map(([cc, x]) => [cc, f(x)]));
