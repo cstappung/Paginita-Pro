@@ -99,3 +99,8 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
   The falling coins carry it inside (`particulas` with `jg-cz-moneda`); text
   that is escaped (the banda) says «monedas» in words; anything that sets
   it must use `innerHTML`, not `textContent`.
+- **The cartel repaints on every `render()`** (`revisa` → `pintaMontados`,
+  a cheap string compare): other people's profiles (photo, frame) arrive
+  after the first paint, and `render()` is what fires when one lands. It
+  also falls back to the Google photo left in a room table, like the coins
+  top. Without both, everyone but yourself showed as initials.

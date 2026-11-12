@@ -73,8 +73,14 @@ export function crearCazas(ctx) {
   let d = null, eco = null, abiertas = [], muerto = false;
   const montados = new Set(), intentados = new Set();
 
+  /* La foto de Google que dejó en una tabla de sala, para quien no tiene
+     una en su perfil (lo mismo que hace el top de monedas). */
+  const fotoEnDatos = uid => {
+    for (const t of Object.values((d && d.ranks) || {})) if (t && t[uid] && t[uid].foto) return t[uid].foto;
+    return "";
+  };
   const quien = (uid, nombre) => {
-    const p = mezcla({ nombre: nombre || "Jugador" }, ctx.perfil(uid));
+    const p = mezcla({ nombre: nombre || "Jugador", foto: fotoEnDatos(uid) }, ctx.perfil(uid));
     return { nombre: p.nombre || "Jugador", foto: p.foto, color: p.color || ctx.colorDe(uid) };
   };
   /* El nombre de una cuenta: su fila en esa tabla, o en cualquier otra
@@ -351,6 +357,11 @@ export function crearCazas(ctx) {
      partida ni de un juego del club): juegos-main la vuelve a llamar al
      cambiar de vista. */
   function revisa() {
+    /* juegos-main la llama en cada render(), también cuando llega el perfil
+       de alguien: el cartel se repinta (barato: compara el texto) para
+       recoger su foto y su marco. Sin esto quedaban las iniciales de todos
+       menos las propias, que ya estaban al pintar por primera vez. */
+    if (!muerto && d && d.completo) pintaMontados();
     const u = ctx.usuario();
     if (muerto || !u || !d || !d.completo || !eco || (ctx.puedeMostrar && !ctx.puedeMostrar())) return;
     avisaResultados(u);
