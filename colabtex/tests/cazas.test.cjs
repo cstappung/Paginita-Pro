@@ -41,7 +41,9 @@ test('el reparto: otro se lo lleva todo, el dueño se queda la mitad, lo propio 
   assert.equal(X.supera({ puntos: 999, tiempo: 1 }, b), false);
   assert.equal(X.nivelCaza(500).n, 1);
   assert.equal(X.nivelCaza(10000).n, 3);
-  assert.equal(X.nivelCaza(250000).n, 5);
+  assert.equal(X.nivelCaza(24999).n, 3);
+  assert.equal(X.nivelCaza(25000).n, 4);
+  assert.equal(X.nivelCaza(50000).n, 5);
 });
 
 test('las monedas quedan en custodia y se las lleva quien supera el récord', () => {
@@ -114,10 +116,10 @@ test('varios aportes al mismo récord hacen un solo pozo, y suben de nivel', () 
   assert.equal(ab[0].pozo, 11000);
   assert.equal(ab[0].n, 2);
   assert.equal(ab[0].nivel.id, 'gran');
-  const av = X.avisosCaza(d, eco(d), T0 + 10 * 60000);
+  const av = X.avisosCaza(d, eco(d), T0 + 2 * H);
   assert.equal(av.filter(a => a.tipo === 'pone').length, 2);
   // pasado el aviso de su nivel, ya no sale en el chat
-  assert.equal(X.avisosCaza(d, eco(d), T0 + 25 * H).length, 0);
+  assert.equal(X.avisosCaza(d, eco(d), T0 + 7 * H).length, 0);
 });
 
 test('el cierre de la economía conserva las cacerías abiertas', () => {

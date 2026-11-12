@@ -49,6 +49,15 @@ function particulas(n, semilla, clase = "jg-cz-moneda") {
   return h;
 }
 
+/* La banda de alerta de las cacerías épicas y legendarias: un texto que
+   corre entre dos franjas de peligro. */
+function banda(texto) {
+  const t = esc(texto);
+  return `<p class="jg-cz-banda" aria-hidden="true"><span>${t} · ${t} · ${t} · ${t}</span></p>`;
+}
+const onda = `<i class="jg-cz-onda" aria-hidden="true"></i>`;
+const ALERTA = { 4: "⚠ ALERTA DE CACERÍA ÉPICA", 5: "👑 CACERÍA LEGENDARIA EN CURSO" };
+
 /* ctx = {fb, usuario() → {uid, name}|null, datos(fn) → apagar, perfil(uid),
    marco(uid), colorDe(uid), ir(hash), economia(d), monedasDe(uid, d),
    puedeMostrar() → si la vista admite una capa encima, suena(nombre),
@@ -96,7 +105,8 @@ export function crearCazas(ctx) {
     if (!d || !d.completo) return cab + `<p class="jg-cz-vacio">Buscando forajidos…</p>`;
     if (!abiertas.length) return cab + `<p class="jg-cz-vacio">Nadie tiene precio todavía. Pon el primero sobre el n.º 1 que quieras ver caer.</p>`;
     const top = abiertas.slice(0, TOP), total = abiertas.reduce((a, o) => a + o.pozo, 0);
-    return cab + `<ol class="jg-cz-lista">${top.map((o, i) => filaHtml(o, i, u.uid)).join("")}</ol>
+    const n1 = top[0].nivel.n;
+    return cab + (n1 >= 4 ? banda(`${ALERTA[n1]} · ${fmt(top[0].pozo)} ${MONEDA} por ${nombreDe(top[0].q, top[0].c)}`) : "") + `<ol class="jg-cz-lista">${top.map((o, i) => filaHtml(o, i, u.uid)).join("")}</ol>
       <p class="jg-cz-pie">${abiertas.length} ${abiertas.length === 1 ? "récord buscado" : "récords buscados"} · <b>${fmt(total)} ${MONEDA}</b> en custodia</p>`;
   }
   let ultimoHtml = "";
@@ -207,7 +217,7 @@ export function crearCazas(ctx) {
         <span><small>${esc(t.nombre)}</small><b translate="no">${esc(p.nombre)}</b><em translate="no">${esc(valorMarca(t.c, t.f))}</em></span></div>
       <label class="jg-cz-m-cuanto">¿Cuántas monedas pones?
         <input class="inp jg-cz-monto" type="number" inputmode="numeric" min="${CAZA_MIN}" step="100" value="${monto}"></label>
-      <div class="jg-cz-m-chips">${[500, 2000, 10000, 50000, 200000].map(n => `<button type="button" data-cz-monto="${n}" class="n${nivelCaza(n).n}${n === monto ? " sel" : ""}"${s && n > s.saldo ? " disabled" : ""}>${fmt(n)}</button>`).join("")}</div>
+      <div class="jg-cz-m-chips">${[500, 2000, 10000, 25000, 50000].map(n => `<button type="button" data-cz-monto="${n}" class="n${nivelCaza(n).n}${n === monto ? " sel" : ""}"${s && n > s.saldo ? " disabled" : ""}>${fmt(n)}</button>`).join("")}</div>
       <div class="jg-cz-m-det">${detalle}</div>
       <button type="button" class="btn jg-cz-m-pub${modal.confirma ? " confirma" : ""}" data-cz-publicar${falta || modal.enviando ? " disabled" : ""}>${textoBoton(monto)}</button>`;
   }
@@ -241,7 +251,8 @@ export function crearCazas(ctx) {
   }
   function siguienteCapa() {
     const x = colaCapas.shift();
-    if (!x || muerto) { capa = null; return; }
+    // Sin más capas, lo que esperaba (los anuncios de arriba) sale ahora.
+    if (!x || muerto) { capa = null; if (!muerto) setTimeout(revisa, 500); return; }
     capa = document.createElement("div");
     capa.className = `jg-cz-capa n${x.nivel}${reduce() ? " quieta" : ""}`;
     capa.setAttribute("role", "dialog");
@@ -255,6 +266,7 @@ export function crearCazas(ctx) {
     });
     cuentaArriba(capa.querySelector("[data-cz-cuenta]"));
     if (ctx.suena) ctx.suena(x.nivel >= 3 ? "gana" : "entra");
+    if (x.nivel >= 5) lluvia();
     const b = capa.querySelector("[data-cz-cierra]");
     if (b) setTimeout(() => b.focus(), 50);
   }
@@ -275,9 +287,9 @@ export function crearCazas(ctx) {
   function capaBuscado(mias, u) {
     const pozo = mias.reduce((a, o) => a + o.pozo, 0), nv = nivelCaza(pozo), p = quien(u.uid, nombreEnDatos(u.uid) || u.name);
     const cazadores = new Set(mias.flatMap(o => o.aportes.map(a => a.u)));
-    return `<div class="jg-cz-poster">
-      ${particulas(6 + nv.n * 6, "b" + u.uid + pozo)}
-      ${nv.n >= 4 ? `<div class="jg-cz-llamas" aria-hidden="true"></div>` : ""}
+    return `${onda}${particulas(8 + nv.n * 7, "b" + u.uid + pozo)}<div class="jg-cz-poster">
+      ${nv.n >= 4 ? banda(ALERTA[nv.n]) : ""}
+      ${nv.n === 4 ? `<div class="jg-cz-llamas" aria-hidden="true"></div>` : ""}
       <p class="jg-cz-se">SE BUSCA</p>
       <div class="jg-cz-foto">${nv.n >= 5 ? `<span class="jg-cz-corona" aria-hidden="true">👑</span>` : ""}${avatarMarco(p.foto, p.nombre, p.color, ctx.marco(u.uid), 112, u.uid)}</div>
       <p class="jg-cz-quien" translate="no">${nombreHtml(u.uid, esc(p.nombre))}</p>
@@ -296,9 +308,9 @@ export function crearCazas(ctx) {
     const texto = r.tipo === "cobrada" ? `Superaste a ${nombreBtn(r.q, r.c)} en ${esc(nombreCategoria(r.c))}.`
       : r.tipo === "defendida" ? `Te superaste a ti mismo en ${esc(nombreCategoria(r.c))}: te llevas la mitad del precio que te pusieron.`
       : `Rompiste tu propio récord en ${esc(nombreCategoria(r.c))}: te vuelve lo que pusiste.`;
-    return `<div class="jg-cz-poster cobro">
-      ${particulas(10 + nv.n * 8, "c" + r.id)}
-      ${nv.n >= 4 ? `<div class="jg-cz-llamas" aria-hidden="true"></div>` : ""}
+    return `${onda}${particulas(12 + nv.n * 8, "c" + r.id)}<div class="jg-cz-poster cobro">
+      ${nv.n >= 4 ? banda(r.tipo === "cobrada" ? "💥 RECOMPENSA COBRADA" : "🛡️ RÉCORD DEFENDIDO") : ""}
+      ${nv.n === 4 ? `<div class="jg-cz-llamas" aria-hidden="true"></div>` : ""}
       <p class="jg-cz-se">${titulo}</p>
       <p class="jg-cz-recompensa"><small>${nv.icono} ${esc(nv.nombre)}</small><b><span class="cz-n">+</span><span class="cz-n" data-cz-cuenta="${r.mio}">0</span> ${MONEDA}</b></p>
       <p class="jg-cz-nota">${texto}</p>
@@ -332,6 +344,7 @@ export function crearCazas(ctx) {
     if (muerto || !u || !d || !d.completo || !eco || (ctx.puedeMostrar && !ctx.puedeMostrar())) return;
     avisaResultados(u);
     avisaBuscado(u);
+    anuncia(u);
   }
   function avisaResultados(u) {
     const ahora = fb.ahora(), k = CLAVE_RES + "." + u.uid;
@@ -363,8 +376,8 @@ export function crearCazas(ctx) {
   }
 
   /* ---------- los avisos del chat general ---------- */
-  function avisoHtml(a, ahora) {
-    const nv = a.nivel, edad = Math.max(0, (ahora - a.at) / 1000).toFixed(1);
+  function partes(a) {
+    const nv = a.nivel;
     const tabla = `${esc(nombreCategoria(a.c))} <span translate="no">(${esc(valorMarca(a.c, { puntos: a.mp, tiempo: a.mt }))})</span>`;
     const [cab, texto] = a.tipo === "pone" ? [`${nv.icono} ${esc(nv.nombre)}`, a.uid === a.q
         ? `${nombreBtn(a.uid, a.c)} le puso precio a <b>su propio</b> récord en ${tabla}. ¿Quién se atreve?`
@@ -372,12 +385,72 @@ export function crearCazas(ctx) {
       : a.tipo === "cobrada" ? [`💥 ¡Recompensa cobrada!`, `${nombreBtn(a.uid, a.c)} superó a ${nombreBtn(a.q, a.c)} en ${tabla} y se llevó el pozo.`]
       : a.tipo === "defendida" ? [`🛡️ Récord defendido`, `${nombreBtn(a.q, a.c)} se superó a sí mismo en ${tabla} y se quedó con la mitad.`]
       : [`🏆 Récord propio roto`, `${nombreBtn(a.q, a.c)} rompió su propio récord en ${tabla} y recuperó lo puesto.`];
+    const ir = a.tipo === "pone" ? `<a class="jg-cz-av-ir" href="${rutaDeCategoria(a.c)}">${a.q === (ctx.usuario() || {}).uid ? "🛡️ Defender" : "¡A por él!"}</a>` : "";
+    const alerta = nv.n >= 4 ? banda(a.tipo === "pone" ? ALERTA[nv.n] : a.tipo === "cobrada" ? "💥 RECOMPENSA COBRADA" : "🛡️ RÉCORD DEFENDIDO") : "";
+    return { cab, texto, ir, alerta };
+  }
+  function avisoHtml(a, ahora) {
+    const nv = a.nivel, edad = Math.max(0, (ahora - a.at) / 1000).toFixed(1), x = partes(a);
     return `<div class="jg-cz-av n${nv.n} t-${a.tipo}" style="--edad:${edad}s">
-      ${particulas(nv.n * 4, a.id, "jg-cz-chispa")}
-      <p class="jg-cz-av-cab"><span>${cab}</span><b><span class="cz-n">${fmt(a.p)}</span> ${MONEDA}</b></p>
-      <p class="jg-cz-av-tx">${texto}</p>
-      ${a.tipo === "pone" ? `<a class="jg-cz-av-ir" href="${rutaDeCategoria(a.c)}">${a.q === (ctx.usuario() || {}).uid ? "🛡️ Defender" : "¡A por él!"}</a>` : ""}
+      ${onda}${nv.n >= 3 ? `<span class="jg-cz-brillo" aria-hidden="true"></span>` : ""}${particulas(nv.n * 5, a.id, "jg-cz-chispa")}
+      ${x.alerta}
+      <p class="jg-cz-av-cab"><span>${x.cab}</span><b><span class="cz-n">${fmt(a.p)}</span> ${MONEDA}</b></p>
+      <p class="jg-cz-av-tx">${x.texto}</p>
+      ${x.ir}
     </div>`;
+  }
+
+  /* ---------- el anuncio de arriba ----------
+     Una cacería de Gran para arriba (o su cobro) baja como cartel por la
+     parte de arriba de la pantalla, una vez por navegador y solo mientras
+     es reciente; la legendaria trae además un destello y lluvia de monedas.
+     El que cobra ya tiene su pantalla, y el buscado la suya. */
+  const CLAVE_ANUNCIOS = "jg.cz.anuncios", ANUNCIO_FRESCO = 10 * 60 * 1000, ANUNCIO_MS = { 3: 6500, 4: 8500, 5: 11000 };
+  let anuncio = null;
+  const colaAnuncios = [];
+  function anuncia(u) {
+    if (capa) return;   // no encima de la pantalla del buscado o del cobro
+    const ahora = fb.ahora();
+    let vistos;
+    try { vistos = JSON.parse(lee(localStorage, CLAVE_ANUNCIOS) || "[]"); } catch (e) { vistos = []; }
+    if (!Array.isArray(vistos)) vistos = [];
+    const nuevos = avisosCaza(d, eco, ahora).filter(a => a.nivel.n >= 3 && ahora - a.at < ANUNCIO_FRESCO && !vistos.includes(a.id) &&
+      !(a.tipo !== "pone" && a.uid === u.uid) && !(a.tipo === "pone" && a.q === u.uid));
+    if (!nuevos.length) return;
+    pon(localStorage, CLAVE_ANUNCIOS, JSON.stringify(vistos.concat(nuevos.map(a => a.id)).slice(-60)));
+    colaAnuncios.push(...nuevos.slice(-3));
+    if (!anuncio) siguienteAnuncio();
+  }
+  function siguienteAnuncio() {
+    const a = colaAnuncios.shift();
+    if (!a || muerto) { anuncio = null; return; }
+    const nv = a.nivel, x = partes(a);
+    const el = anuncio = document.createElement("div");
+    el.className = `jg-cz-anuncio n${nv.n}`;
+    el.setAttribute("role", "status");
+    el.innerHTML = `${onda}<span class="jg-cz-brillo" aria-hidden="true"></span>${particulas(nv.n * 6, "an" + a.id, "jg-cz-chispa")}${x.alerta}
+      <span class="jg-cz-an-ico" aria-hidden="true">${nv.icono}</span>
+      <span class="jg-cz-an-tx"><small>${x.cab}</small>${x.texto}</span>
+      <span class="jg-cz-an-der"><b><span class="cz-n">${fmt(a.p)}</span> ${MONEDA}</b>${x.ir}</span>`;
+    document.body.appendChild(el);
+    if (ctx.suena) ctx.suena(nv.n >= 4 ? "gana" : "entra");
+    if (nv.n >= 5) lluvia();
+    let t = 0;
+    const fin = () => { clearTimeout(t); if (!el.isConnected) return; el.classList.add("sale"); setTimeout(() => { el.remove(); if (anuncio === el) siguienteAnuncio(); }, 420); };
+    t = setTimeout(fin, ANUNCIO_MS[nv.n] || 6500);
+    el.addEventListener("click", ev => { if (!ev.target.closest("[data-perfil]")) fin(); });
+    el.addEventListener("mouseenter", () => clearTimeout(t));
+    el.addEventListener("mouseleave", () => { clearTimeout(t); t = setTimeout(fin, 2500); });
+  }
+  /* La legendaria: destello de pantalla y monedas cayendo de arriba. */
+  function lluvia() {
+    if (reduce()) return;
+    const l = document.createElement("div");
+    l.className = "jg-cz-lluvia";
+    l.setAttribute("aria-hidden", "true");
+    l.innerHTML = particulas(44, "ll" + Date.now());
+    document.body.appendChild(l);
+    setTimeout(() => l.remove(), 5200);
   }
   function avisos() {
     if (!d || !d.completo || !eco) return [];
@@ -403,6 +476,8 @@ export function crearCazas(ctx) {
       document.removeEventListener("keydown", teclaCapa);
       cierraPoner();
       if (capa) capa.remove();
+      if (anuncio) anuncio.remove();
+      colaAnuncios.length = 0;
     }
   };
 }

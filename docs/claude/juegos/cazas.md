@@ -46,10 +46,15 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
 ## Screen
 
 - **Five levels** by pot (`NIVELES_CAZA`: Encargo 500, Cacería 2000, Gran
-  cacería 10 000, épica 50 000, legendaria 200 000), classes `n1`…`n5`. Each
-  level is louder: gold border → shimmer → fire → rotating rainbow border
-  and crown, and more coins/sparks. The same scale styles the cartel row,
-  the chat notice, the full-screen poster and the price preview.
+  cacería 10 000, épica 25 000, legendaria 50 000; the owner's numbers),
+  classes `n1`…`n5`. Each level has its own neon colour (`--c1`, `--c2`,
+  `--cbg` on `[class*=jg-cz].nX`: sky, green, violet, alarm red, holographic
+  gold) on an ink background. The owner rejected the first brown/parchment
+  look as dull and the rotating rays as already overused on the site: keep
+  away from both. Louder per level: glow → breathing → siren and flashing
+  border plus a hazard **banda** (`banda()`, marquee between hazard stripes;
+  it needs `contain: inline-size` or its long nowrap text widens any grid
+  it sits in) → holographic foil and gold-pink gradient numbers.
 - **Cartel (top 5 pots)**: inside the chat rail, above the general chat
   (`rieles.js` makes the slot `cartel` and `cazas.monta` paints it), only on
   a wide PC menu view; hidden in the floating chat. On narrower screens the
@@ -57,9 +62,15 @@ compares open bounties. `watchLogros` reads `cazas` whole (`NODOS_MONEDAS`
   (`#vesCazas`), hidden on wide PC where the rail shows it.
 - **Chat notices**: `avisos()` returns pre-rendered notices that
   `rieles.pintaChat` interleaves by time. A new bounty stays `nivel.ms`
-  (20 min … 24 h); a resolved one too. Their entry animation and sparks start
+  (1 h, 2 h 15, 6 h, 18 h, 72 h: the owner asked for three times the first
+  durations); a resolved one too. Their entry animation and sparks start
   at `-var(--edad)`, so a chat repaint does not replay them.
-- **The wanted person sees a poster on entering** (`avisaBuscado`): once per
+- **Top banner** (`anuncia`): a bounty or a payout of Gran or more drops in
+  from the top of the screen, once per browser (`localStorage
+  jg.cz.anuncios`) and only while under 10 min old; legendaria adds a white
+  flash and a coin shower (`lluvia`). It waits while a poster is open.
+- **The wanted person sees a poster on entering** (`avisaBuscado`), a card that slams in with flash, shockwave and a coin
+  fountain from behind it: once per
   session (`sessionStorage jg.cz.buscado.<uid>`), and again when a new bounty
   lands on them. The winner sees «¡RECOMPENSA COBRADA!» (`avisaResultados`,
   `localStorage jg.cz.res.<uid>`); refunds and «X cobró tu cacería» are coin

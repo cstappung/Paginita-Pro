@@ -35,12 +35,15 @@ export const CAZA_MIN = 500, CAZA_MAX = 10000000;
 
 /* Cuanto más grande el pozo, más imponente se ve (el cartel, el aviso del
    chat y la entrada del buscado) y más rato queda su aviso en el chat. */
+/* Cuánto queda su aviso en el chat: el triple de lo que se probó primero
+   (decisión del dueño, noviembre de 2026). */
+const MIN = 60 * 1000, HORA = 60 * MIN;
 export const NIVELES_CAZA = [
-  { n: 1, desde: CAZA_MIN, id: "encargo", nombre: "Encargo", icono: "🎯", ms: 20 * 60 * 1000 },
-  { n: 2, desde: 2000, id: "caceria", nombre: "Cacería", icono: "🏹", ms: 45 * 60 * 1000 },
-  { n: 3, desde: 10000, id: "gran", nombre: "Gran cacería", icono: "💰", ms: 2 * 3600 * 1000 },
-  { n: 4, desde: 50000, id: "epica", nombre: "Cacería épica", icono: "🔥", ms: 6 * 3600 * 1000 },
-  { n: 5, desde: 200000, id: "legendaria", nombre: "Cacería legendaria", icono: "👑", ms: 24 * 3600 * 1000 }
+  { n: 1, desde: CAZA_MIN, id: "encargo", nombre: "Encargo", icono: "🎯", ms: 60 * MIN },
+  { n: 2, desde: 2000, id: "caceria", nombre: "Cacería", icono: "🏹", ms: 135 * MIN },
+  { n: 3, desde: 10000, id: "gran", nombre: "Gran cacería", icono: "💰", ms: 6 * HORA },
+  { n: 4, desde: 25000, id: "epica", nombre: "Cacería épica", icono: "🔥", ms: 18 * HORA },
+  { n: 5, desde: 50000, id: "legendaria", nombre: "Cacería legendaria", icono: "👑", ms: 72 * HORA }
 ];
 export const nivelCaza = p => NIVELES_CAZA.filter(x => p >= x.desde).pop() || NIVELES_CAZA[0];
 
