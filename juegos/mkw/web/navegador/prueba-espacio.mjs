@@ -14,6 +14,7 @@
 // Corre con el candado de medición si se la llama desde herramientas/tanda-espacio.sh (otra sesión puede estar midiendo).
 //
 // Uso:  node web/navegador/prueba-espacio.mjs [--pistas 0.0,13.2] [--puerto 8156] [--ventana]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,7 +39,7 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const perfil = mkdtempSync(path.join(tmpdir(), 'mkw-espacio-'));
 const ventana = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const ctx = await chromium.launchPersistentContext(perfil, { channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const ctx = await chromium.launchPersistentContext(perfil, { ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   viewport: { width: 1100, height: 760 },
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${ventana[0]},${ventana[1]}`] });
 const p = ctx.pages()[0] || await ctx.newPage();

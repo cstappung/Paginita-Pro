@@ -41,6 +41,17 @@ para entender el proyecto y para repetirlo desde cero. El plan (lo que falta) es
   datos en paquetes y el PR los junta en lotes.
 ## Glosario — qué es cada cosa (para un ingeniero eléctrico)
 
+- **Opera GX (§289)**: un navegador hecho sobre Chromium, el mismo motor de Chrome, con una capa propia encima (GX
+  Control, temas, sonidos, el bloqueador de anuncios). Como dos marcas de variador de frecuencia con el mismo chip de
+  potencia: el motor gira igual en las dos; lo que cambia son los accesorios que cada marca le cuelga.
+- **Lanzador (§289)**: un programa chico que solo abre el programa de verdad y se cierra (el `opera.exe` de afuera en
+  Opera GX). Como el contactor que arranca un motor: no es el motor, y si vigilas el contactor no ves si el motor sigue andando.
+- **Perfil del navegador (§289)**: la carpeta donde el navegador guarda las extensiones, los ajustes, el historial, las
+  sesiones y las cachés de una persona. Las pruebas usan siempre uno nuevo y vacío: no tocan el del dueño, y lo que él
+  tenga instalado no las afecta.
+- **Cruce o «crossplay» (§289)**: jugar la misma sala desde navegadores (o aparatos) distintos, por ejemplo Chrome con
+  Opera. Como conectar en paralelo dos generadores de marcas distintas: tienen que ir sincronizados aunque cada uno sea
+  distinto por dentro.
 - **Llamada indirecta (§282)**: una llamada a una función cuya dirección se lee de la memoria en el momento (las
   «funciones virtuales» de C++ y los punteros a funciones). El traductor no sabe de antemano a quién llama. Como un
   conmutador cuya posición la decide una señal de afuera: el diseño tiene que aguantar cualquier posición.
@@ -81,6 +92,15 @@ para entender el proyecto y para repetirlo desde cero. El plan (lo que falta) es
   de máquina. Como redibujar el esquema de un circuito a partir de la placa: el mismo comportamiento, otro trazado.
 - **Kinoko (§280)**: un proyecto público (MIT) que reescribió la física de Mario Kart Wii en C++ para verificar fantasmas.
   Aquí sirve de mapa: dice qué hace cada función de la física.
+- **Decompilación que calza (§289)**: el C++ escrito a mano, compilado con el compilador original del juego, da los
+  mismos bytes que el juego. Es la prueba objetiva de que está bien. Como medir una resistencia y que dé el valor exacto
+  de la original, no «parecido».
+- **objdiff (§289)**: el programa que compara, byte a byte, lo que se compiló contra el original y dice sí o no. El
+  comparador del lazo: da el veredicto sin opinión.
+- **Función dueña y hueco (§289)**: cada byte de código pertenece a una función (su dueña). Un tramo de código sin
+  dueña es un hueco: ahí hay funciones sin descubrir. Los bornes numerados de un tablero que todavía no tienen cable.
+- **Mapa de recuadros (§289)**: un dibujo donde cada cosa es un rectángulo y su área es su peso (aquí, el tiempo que una
+  función gasta en cada cuadro). Sirve para ver de un vistazo dónde está lo grande.
 - **Prisma KCL (§280)**: cada triángulo de la colisión de la pista, guardado como alto + un vértice + la normal de la cara
   + las normales de los tres bordes. La rueda pregunta «¿mi esfera toca este prisma?».
 - **Contrato de llamada (ABI) (§280)**: qué registros puede cambiar una función que se llama y cuáles debe devolver
@@ -24693,3 +24713,525 @@ cada carrera** (A 20,4 s, B 20,5 s), sueltan **juntas con 100 ms de diferencia**
 81. Dos puntos de la prueba fallan solo con `--paquete-lento-b` (Esc en la carrera y el orden de largada: los mira durante
 la cuenta, que ahora cae dentro de la espera). El texto del aviso con «Faltan: B N %» no lo alcanzó a capturar la prueba
 (capturaba el último, cuando ya no faltaba nadie): la prueba ahora guarda el que dice «Faltan».
+
+## §286 — El «▶» del mando en pantalla abre el menú ⚙ (en el teléfono no había cómo abrirlo) · 2026-11-12
+
+**Qué se pidió.** El dueño, con el sitio publicado en el celular (main de mkw-v2.2, programa v22): «en movil ahora el menu
+de los settings que ocultamos porque molesta no aparece mas, tienes que hacer que aparezca ahora si se aprieta el boton de
+pausa del HUD, ese que se ve como un >». Hecho = el «▶» del mando en pantalla abre el cajón (Ayuda, Partida, Controles,
+Avanzado); en la sala sin pausar el juego; jugando solo, a gusto.
+
+**Qué lo había escondido.** El commit `2ed4ae0` (2026-11-10 09:29, §269, «el táctil no se pega»). Antes, cualquier toque
+fuera del mando en pantalla mostraba 2,5 s la barra de arriba (⚙, Controles, Partida) y el ratón también. §269 cambió dos
+cosas por un bug del dueño («apretar la UI se buguea con la interfaz que aparece para configurar»): el «movimiento de
+ratón» de mentira que el navegador manda después de cada toque ya no la muestra, y un dedo **en** el mando la esconde al
+momento, para que el toque siguiente en ▶, X o Y no cayera en la barra. La razón era buena, pero en el teléfono la capa
+del mando cubre **toda** la pantalla: todo toque es «en el mando», así que la barra no volvía nunca y el cajón quedó sin
+entrada. Es como tapar el tablero de mando para que nadie lo toque sin querer y olvidar dejarle una puerta.
+
+**Cómo es ahora.** No se deshace §269: la barra sigue escondida al jugar. El «▶» es la puerta:
+
+- `controles.mjs` (`crearTactil`): un dedo que cae sobre el botón que hace Start (el «▶», o la pieza a la que la persona
+  le haya puesto «Pausa» en el editor) no aprieta Start: avisa `mkw-pausa-tactil` y suelta el dedo. `?pausaMenu=0` = como
+  antes (Start al juego).
+- `interfaz.mjs`: con ese aviso abre el cajón en la Ayuda, como ⚙ (§265); con el cajón ya abierto, lo cierra.
+  - **En la sala** (`sincro`, `red`, `modo=sala|enlinea`) solo abre el menú: el juego no se toca (Start ya estaba
+    filtrado, §99) y la carrera de los demás sigue.
+  - **Jugando solo con la carrera andando**, el juego se queda quieto mientras el cajón está abierto (`mkw_congelar`, la
+    misma pausa de §274: no calcula y sigue dibujando la imagen quieta) y sigue desde el mismo cuadro al cerrarlo. Se
+    eligió esto y no mandar Start al juego porque con Start el menú de pausa del juego quedaba debajo, y el «▶» siguiente
+    lo habría quitado y abierto el cajón otra vez (un vaivén). En los menús solo abre el cajón.
+  - `mkwEstado.pausaMenu` = `{veces, congelado}`.
+- Con el teclado o un mando nada cambia: Start/Esc/P siguen siendo la pausa del juego y ⚙ sigue en la barra.
+
+**Pruebas.**
+- `prueba-celular.mjs` (Pixel 7 emulado, sin el juego): 48/48, con 4 puntos nuevos: «▶» abre el cajón en la Ayuda; con la
+  carrera, `mkw_congelar` 1 al abrir y 0 al cerrar; en los menús abre sin congelar y otro toque lo cierra.
+- `prueba-tactil.mjs`: 14/14 (el «▶» ahora debe abrir el menú y no mandar Start; los demás botones, igual que antes).
+- Con el juego, `MKW_BUILD=build/web-final-v22/navegador node web/navegador/prueba-pausa-menu.mjs` (nuevo, con el
+  candado; Pixel 7 acostado, carrera directa solo, toque de verdad por CDP): 5/5. El cajón se abre en la Ayuda, la lógica
+  queda en 417 durante 1,5 s con el cajón abierto (el medidor dice «Juego 0/s») y sigue a 508 en 1,5 s al cerrarlo.
+- Bancos `controles` 58, `bienvenida` 60.
+- Fotos: `build/web/datos/celular-pausa-menu.png`, `pausa-menu-abierto.png`, `pausa-menu-sigue.png`.
+- **No probado**: en la sala con el juego (es solo la rama que no congela; Start ya no llegaba) y en el Oppo de verdad.
+  El sitio no se tocó (todo es del marco del juego).
+
+## §286 — «Cada uno su kart» en el sitio: la página sin el programa nuevo cae al lockstep, y nadie larga con otra versión · 2026-11-12 02:10
+
+**Lo que vio el dueño** (el sitio publicado, «Cada uno su kart»): en la presentación no hay ningún kart (ni el propio: solo
+una sombra), la carrera termina al tiro y la tabla dice 1.º 20:13.886 y los demás 00:00.000.
+
+**1. El programa viejo.** Con la página nueva y el `.wasm` publicado antes (`build/web-final-w30`, sin
+`red_estado_nativo.cpp`), la ficha salía «en línea» (modo 7) pero el armado de la red fallaba en silencio
+(`_mkw_red_estado_config` no existe): cada consola corría sola. Reproducido: con w30 la tabla queda en 0 y los puntos
+en 0. **Arreglo** (`mkw.mjs`): si el programa no trae la función, `RED_ESTADO_SALA` vuelve a `false`, la máscara de
+arreglos vuelve a la de siempre y la sala corre con el lockstep (`mkwEstado.redEstadoSinPrograma`, aviso «[red-estado] ⚠»).
+Probado con w30: modo 1, las CPU iguales en las dos, B con el retraso del lockstep (17 cuadros).
+
+**2. La misma versión antes de largar** (el dueño: «antes de iniciar la carrera […] todos los players tienen la misma
+version»). Cada latido de la sala lleva la versión de la página (`VERSION_SALA`, ahora 286) y el programa
+(`pg` = la huella del `.wasm` + «+re» si trae «Cada uno su kart», `window.mkwPrograma`). La anfitriona no larga
+ninguna carrera (ni la primera ni las siguientes) mientras alguien de los que corren tenga otra
+(`sala-carrera.mjs` `mismasVersiones`, `estado.versionDistinta`); todas las páginas muestran «⚠ X tiene otra versión del
+juego: recarguen la página (Ctrl+Mayús+R)» (o «Tienes otra versión…»). Sin tope: con dos programas la carrera no puede
+salir bien. `?mismaVersion=0` = como antes (solo el aviso de §269). Banco `sala-269` 38/38 (5 puntos nuevos: otro programa
+no larga, ni pasado el plazo; el mismo, larga; la página de la v2.2 tampoco larga; con `?mismaVersion=0` sí);
+`sala-carrera` 111, `sala-playlist` 37, `sumados` 24, `playlist-sala` 25. Con el juego:
+`prueba-sala-estado.mjs --build-b=<carpeta>` (B con otro programa: 60 s en «elegir» con el aviso) — **escrita, sin
+correr todavía**. Esto es dentro del marco; el bloqueo de «¡A correr!» en el vestíbulo del sitio (antes de abrir el
+juego) falta: es de `colabtex` (la precarga podría decir la versión en la presencia del buzón).
+
+**3. Con `build/web-final-v22` no se reproduce.** `prueba-sala-estado.mjs` (dos pestañas): 14/14, con un punto nuevo, la
+tabla del final con los 12 tiempos en orden e iguales en las dos (1.º 34,785 … 12.º 93,269). `prueba-experiencia.mjs
+--estado` (el sitio local con los emuladores, el Worker con el token y la página del kit, «✎ Cambiar → Cada uno su kart»):
+modo 7, 442/435 paquetes, los 12 karts y los nombres en las fotos (`build/web/datos/experiencia/estado-*.png`).
+**Pista para seguir:** 20:13.886 pasa el tiempo límite (5:00): el reloj de la carrera saltó ~20 min. En línea, Pulsar
+(`Security/FrameLag.cpp`, gancho en 0x80533240) adelanta `raceFrameCounter` hasta `(current_time() − raceStartTime) /
+frameDuration`, y `raceStartTime` solo vuelve a 0 en `InitNewRace` (0x8052FBD8). Si en el sitio esa hora o ese inicio
+quedan de antes (la página abierta 20 min, otra carrera, la pestaña dormida), el reloj salta y el límite termina la
+carrera en el primer cuadro. Falta el informe de Diagnóstico o el registro del dueño para confirmarlo.
+
+## §287 — La auto calibración en el sitio: la pausa sí congela a todos con el lockstep, y deja escritos los tres ajustes · 2026-11-12 02:20
+
+**Qué informó el dueño.** Probó el sitio publicado (la página de `mkw-v2.2` y el programa `build/web-final-v22`, ya en R2):
+«el autocalibracion no esta funcionando, debiera freezear el juego de todos con el mensaje de aviso de autocalibracion».
+Después agregó: «autocalibracion tambien tiene que settear resolucion e imagen y fps».
+
+**Lo que se revisó (con el candado, este PC):**
+
+1. **¿El programa v22 trae el congelador?** Sí. `mkw.js` de `build/web-final-v22` exporta `_mkw_congelar` y
+   `_mkw_congelado_estado` (la envoltura de `EGG::SceneManager::calc`, §274). También trae «Cada uno su kart»
+   (`_mkw_red_estado_config`).
+2. **La sala de las pruebas con v22, lockstep:** `prueba-sala --rapida --calibrar` da **52/52**. A calibra en 12,4 s. B ve
+   «⏸ Jugador 1 está calibrando su imagen — vuelve en 29 s» con la cuenta. Las dos quedan quietas en el cuadro 1656 y
+   siguen después con las huellas iguales.
+3. **La sala del sitio de verdad, lockstep.** `prueba-experiencia.mjs --calibrar` es nuevo: los emuladores, dos cuentas y
+   el vestíbulo, «¡A correr!» y el botón **de verdad** de la hoja Gráficos, como lo apretaría una persona. Primero calibra
+   Piloto Dos, que no es la anfitriona; después Piloto Uno, que sí. Los dos casos pasan: el reloj de carrera del otro
+   queda fijo (850–850 y 1169–1169), su aviso dice «⏸ Piloto Dos está calibrando su imagen — vuelve en 29 s» y al
+   terminar los dos siguen.
+4. **«Cada uno su kart», en la prueba de dos consolas.** La pausa **sí** congela a las dos: el historial de la
+   calibración dice «congelada» en A y en B. Lo que fallaba era la prueba de §275b (`prueba-sala-estado --calibrar`). Esa
+   prueba esperaba a que terminara `apretar()`, que es una promesa (un «te aviso cuando termine»), y recién ahí empezaba a
+   mirar. Para entonces la pausa ya había pasado, así que «A no se congeló» salía bien por accidente. Ahora no espera la
+   promesa y exige lo que pidió el dueño: las dos congeladas, y después parejas (≤ 5 cuadros).
+5. **Una pista de lo que pudo ver el dueño.** En la sala del sitio, Piloto Dos apretó a los 7 s y la calibración quedó
+   **pendiente**: la carrera todavía no estaba en la etapa 2 (antes del «¡YA!», o en los menús o el descanso). Quedar
+   pendiente es lo pensado en §274: arranca sola 5 s después de que largue la próxima carrera. Pero si alguien aprieta en la
+   cuenta o entre carreras, por un rato no se congela nada, y eso se ve como «no funciona». **Sin confirmar** con el
+   informe del dueño.
+
+**Los tres ajustes, siempre escritos (`auto-calibrar.mjs`).** Al terminar, la calibración guarda en `mkw.graficos` y
+pinta en la hoja Gráficos (`panelGraficos.releer()`) los tres ajustes, aunque queden iguales que antes:
+- **Imagen** (N8: 60 siempre, 30 parejas o 30 con imagen intermedia): lo medido, como antes;
+- **Resolución de salida**: la medida (solo se prueban otras si frena la tarjeta; si no frena, bajarla no sube el 1 % bajo
+  y empeora la imagen), escrita siempre;
+- **Fluidez** (los fps de las imágenes intermedias del motor, 60/120/180): nuevo, `fluidezPara`. Este ajuste pide
+  reiniciar el juego, así que no se puede probar en el momento. Queda en 60 salvo con «60 siempre» y el 1 % bajo a 57 o
+  más (el aparato sobra): ahí se deja lo que la persona tenía. Si cambia, el texto lo dice («vale al reiniciar el juego»)
+  y la hoja ofrece «Reiniciar». «Deshacer» devuelve también la fluidez.
+El resumen ahora nombra los tres: «Elegido: 30 con imagen intermedia · salida de tu pantalla · fluidez 60 — 1 % bajo
+59 fps (antes 48)».
+
+**Pruebas.** Banco `auto-calibrar` **53/53**: los tres ajustes en `mkw.graficos`, «Deshacer» con la fluidez y
+`fluidezPara`. Sala con el juego y v22: `prueba-sala --rapida --calibrar` 52/52, la sala del sitio con lockstep 2/2
+puntos §274. **Falta la sala del sitio en «Cada uno su kart»** (`prueba-experiencia --calibrar --estado`). Tampoco se
+corrió de nuevo `prueba-sala-estado --calibrar` con la condición nueva. Las dos se pararon porque el uso semanal llegó al
+tope del 70 %. El `.wasm` **no cambia**; la página sí (`auto-calibrar.mjs`).
+
+**Repetir:** `MKW_BUILD=build/web-final-v22/navegador node herramientas/prueba-experiencia.mjs --calibrar [--estado]` y
+`MKW_BUILD=… node herramientas/prueba-sala-estado.mjs --calibrar` (con el candado).
+
+## §289 — El tablero de la decompilación: cuánto hay, cuánto falta y cómo se sabe · 2026-11-12 03:05
+
+**La pregunta del dueño.** Antes de decidir si se decompila «lo de la carrera» entero: ¿cómo se sabe cuántas funciones
+hay y cuánto falta, si al final solo se ven las funciones ya descubiertas? Y pidió un tablero como el de
+decompilati.onl para ver el avance real. **Aquí no se decompiló nada**: solo se midió el punto de partida y se armó el
+tablero.
+
+### §289.1 El total no se cuenta en funciones, sino en bytes de código
+
+El tamaño del código es un número fijo: está en la cabecera de `main.dol` y de `StaticR.rel`. Cada byte de código tiene
+que pertenecer a alguna función; **lo que no tiene dueña es exactamente lo que falta descubrir**. Como un tablero de
+borneras numeradas: aunque no se sepa qué hace cada cable, se sabe cuántos bornes hay y cuáles siguen vacíos.
+
+Medido cruzando el mapa público (`terceros/mkw-decomp`, `symbols.txt`) con los archivos de `extraido/`:
+
+| Archivo | Bytes de código | Funciones conocidas | Con dueña | Sin dueña |
+|---|---|---|---|---|
+| `StaticR.rel` (el juego en sí) | 3.665.996 | 17.232 | 100 % | 0 |
+| `main.dol`, código (bibliotecas, sistema) | 2.349.856 | 9.086 | 98,5 % | 35.996 bytes en 31 huecos (el mayor, 9 KB) |
+| `main.dol`, arranque | 9.312 | 35 | 28 % | 6.692 bytes (sin revisar qué son) |
+
+- En total **26.353 funciones conocidas** en 6.025.164 bytes. No hay un montón oculto: lo desconocido son 36 KB, en 31
+  lugares con dirección.
+- **Las dos listas se revisan entre sí.** Nuestro traductor tiene 29.637 entradas: 120 caen dentro de esos huecos
+  (candidatas a función nueva) y 3.561 caen *por la mitad* de funciones conocidas (a revisar: pueden ser los enganches
+  de Retro Rewind). Al revés, el mapa tiene 408 funciones que el traductor no tradujo.
+- La decompilación pública (`doldecomp/mkw`, decomp.dev, consultado hoy): 1.828 de 26.501 funciones calzan (6,9 %).
+  Nuestra copia local es de agosto de 2025 y del repositorio viejo (`riidefi/mkw`): hay que actualizarla.
+- Retro Rewind no se decompila: su código (`rr-pulsar`) es público.
+
+### §289.2 El segundo denominador: lo que corre en la carrera
+
+El perfil guardado de una carrera (`m1-carrera`, 31 de octubre, 2.700 cuadros, Node) repartido por función dueña:
+**1.614 funciones del juego con muestras, 3,669 ms por cuadro**; el código propio de Retro Rewind, 0,099 ms (120
+funciones). Dos avisos: es **por muestreo** (se le escapan las que corren poco) y es de un programa anterior al de hoy.
+La lista exacta pide contadores de «se llamó al menos una vez» en una carrera entera; ese será el 100 % de la carrera.
+
+### §289.3 El tablero
+
+`node herramientas/decomp-avance.mjs` junta las cinco fuentes (cabeceras, mapa público, traductor, perfil y nuestro
+avance) y escribe `build/decomp-avance/index.html` (ignorado por git), que se publica como artifact privado:
+https://claude.ai/artifact/V48MoP34qA4FhPPjVnQWBt
+
+- **Nuestro avance** se anota a mano en `herramientas/decomp-estado.json`: una fila por función con su estado
+  (`borrador` = escrita sin probar, `verificada` = idéntica en el comprobador, el fantasma y la sala, `adoptada` = va en
+  el programa que se publica). El generador agrega solo una fila al historial cuando cambian los números.
+- **Qué muestra.** Dos medidores (en la carrera: tiempo del cuadro y funciones; en el binario: bytes y funciones), el
+  mapa de recuadros (cada función con área = su tiempo por cuadro; o el binario en zonas de 64 KB), el descubrimiento
+  por archivo, el historial y la tabla de funciones de la carrera con buscador, acumulado y la marca «RR» en las que
+  parcha Retro Rewind.
+- **Colores.** Verde = reescrita y verificada; ámbar = borrador; azul = la decompilación pública ya la tiene calzando
+  (material de partida: no cuenta como avance nuestro); gris = por hacer.
+
+**Los números de hoy.** 1 función verificada (la de §280, `KColData::checkSphereMovement`, no adoptada) de 1.614 de la
+carrera = 0,06 % de las funciones y **2,17 % del tiempo del cuadro** (0,0798 de 3,669 ms). Con fuente pública que calza
+(copia vieja): 43 funciones de la carrera, 0,306 ms.
+
+### §289.4 Cómo se sabría que está al 100 %
+
+1. **Descubrimiento:** bytes sin dueña → 0 (hoy 36 KB en `main.dol`).
+2. **Carrera:** una carrera con una trampa en cada función traducida que quede; si ninguna salta en las pistas de
+   prueba, lo de la carrera está entero.
+3. **Igualdad:** el fantasma cuadro por cuadro, las huellas de la sala contra el publicado y la planilla completa.
+4. (Solo para «todo el binario») volver a enlazar con el compilador original y obtener el mismo SHA-1.
+
+**Las herramientas que se usarían** (buscadas hoy, no instaladas): decomp-toolkit (`dtk`, parte el juego y encuentra
+funciones), objdiff (el comparador byte a byte, con informe por línea de comandos), m2c (primer borrador de C),
+decomp-permuter (el último ajuste), Ghidra (tipos y quién llama a quién) y Kinoko como mapa de la física. Con agentes,
+el método publicado es borrador → compilar y comparar en bucle → permuter; el veredicto lo da siempre objdiff.
+
+**Trampas.** Las direcciones de `StaticR.rel` en el mapa son relativas a su sección de código; las del traductor son
+las de memoria. El generador saca la base de carga solo (0x805103B4, la diferencia más repetida entre las dos listas).
+En el perfil, `rr_overlay_<dir>` es una función del juego parchada por Retro Rewind (cuenta como del juego y lleva la
+marca RR) y `rr_kamek_<dir>` es código propio del mod (no se decompila).
+
+**Archivos.** `herramientas/decomp-avance.mjs`, `herramientas/decomp-avance.html` (la plantilla de la página),
+`herramientas/decomp-estado.json` (nuevos). Fuera de git: `build/decomp-avance/`.
+
+### Glosario de esta sección
+
+Están también al principio de la bitácora: decompilación que calza, objdiff, función dueña y hueco, mapa de recuadros.
+
+---
+
+## §289 — Medir en Opera GX: el mismo juego en los dos navegadores, el cruce Chrome + Opera y las fotos de los mandos · 2026-11-12 03:00
+
+**El pedido** (el dueño, 2026-11-12): «agrega a la medicion para que funcione en opera gx tambien». En su Opera GX el
+juego va mucho peor que en Chrome, aun con los limitadores de GX apagados. Después aclaró: «el singleplayer acá corre
+bien pero el multiplayer en opera no», y pidió «intenta hacer crossplay entre los 2».
+
+### §289.1 Las herramientas abren Opera GX
+
+- Opera GX es **Chromium por dentro** (la versión 139 de Opera = Chromium 155; Chrome está en 156): el mismo motor de
+  JavaScript (V8), el mismo WebGPU (Dawn) y JSPI. Por eso Playwright lo maneja igual que a Chrome, con `executablePath`.
+- **Trampa:** `%LOCALAPPDATA%\Programs\Opera GX\opera.exe` (el de afuera) es el **lanzador**: abre otro proceso y se
+  va, y Playwright perdería el navegador. El de verdad está en la carpeta de la versión,
+  `…\Opera GX\139.0.6053.63\opera.exe`. `herramientas/navegador.mjs` elige la versión más nueva que tenga `opera.exe`.
+- La opción nueva es `--navegador chrome|opera-gx|<ruta .exe>` (o `--navegador=…`), más la variable `MKW_NAVEGADOR`, que
+  vale para **todas** las herramientas aunque no lean la opción. Por omisión queda `chrome`, como siempre.
+  `opcionesNavegador()` reemplaza `channel: 'chrome'` en las **82 herramientas** que abren Playwright (medir-sitio,
+  prueba-sincro, prueba-sala, medir-sala, medir-personaje, el banco…). Las 4 que usaban `CHROME=ruta` siguen igual.
+- **El perfil:** Playwright siempre le da al navegador una carpeta de perfil nueva en `%TEMP%`. **Nunca** se usa el
+  perfil del dueño: Opera abre «de fábrica», sin GX Control, sin extensiones y sin bloqueador de anuncios.
+- `medir-sitio --nucleos` ahora ata el proceso del navegador elegido (`opera.exe` o `chrome.exe`), y el `.json` dice qué
+  navegador y qué versión se midió.
+- `medir-sala.mjs` tiene opciones nuevas: `--sala1` (con N = 1, la sala de UN humano con malla y lockstep en vez del
+  Single Player), `--mando-falso` (la página ve un mando conectado en reposo; Playwright no tiene mandos), `--dpr N` y
+  `--vista AxB` (el lienzo de la propia), `--navegador-otras X` y `--vista-otras AxB` (las otras consolas en otro
+  navegador: **el cruce**). También guarda el informe de rendimiento entero (`informe`), el lienzo, el dpr y las fotos de
+  los mandos. La señal de la sala cruza entre navegadores por el puente de Node (`puente-contextos.mjs`, §269); la
+  carrera va por WebRTC.
+
+### §289.2 Las fotos de los mandos: había un error, pero no es lo que frena
+
+En el informe del dueño en Opera: `sala.ventanas.fotosMandadas = 4113` **con una sola ventana**. El código lo confirma:
+`mandos-ventanas.mjs` (§269, «dos ventanas en un PC») mandaba la foto del mando en **cada lectura** mientras la ventana
+tenía el foco, aunque nadie la escuchara. Medido: 11.800 fotos en unos 40 s de sala, igual en Chrome y en Opera.
+
+**El arreglo:** la foto sale solo si hay otra ventana de la sala en la fila (`f.length >= 2`). Si llega otra ventana, su
+«estoy» la mete en la fila al toque y las fotos vuelven a salir desde la lectura siguiente. `?mandosVentanas=siempre`
+deja todo como antes (`siempreFoto`). Banco `mandos-ventanas` **22/22**, en Chrome y en Opera GX, con 3 puntos nuevos:
+sola = 0 fotos en 100 lecturas, con dos ventanas sí salen, y `siempreFoto` = una por lectura. `controles` da 58/58.
+
+**Pero no era la causa:** con y sin el arreglo, la página cuesta 0,02 contra 0,04 ms por cuadro y el juego no cambia (ver
+la tabla de abajo). Copiar 4 ejes y 17 botones y pasarlos por un canal es poquísimo trabajo.
+
+### §289.3 Lo medido (este PC a toda potencia, `build/web-final-v22`, intercalados y con el candado)
+
+`bash herramientas/tanda-289.sh base duenio personaje cruce` → `build/web/datos/tanda-289/<fecha>/`. Cada corrida tiene
+10 s para asentarse y 30 s medidos, con la ventana en el monitor de 144 Hz y 12 karts.
+
+| caso | navegador medido | imagen/s | juego/s | CPU del juego ms/cuadro |
+|---|---|---|---|---|
+| Single Player | Chrome | 60,0 | 60,0 | 4,11–4,32 |
+| Single Player | Opera GX | 59,9–60,0 | 60,0 | 4,30–4,92 |
+| sala de 1 | Chrome | 60,0 | 60,0 | 3,80 |
+| sala de 1 | Opera GX | 60,0 | 60,0 | 3,71–4,26 |
+| sala de 1, dpr 1,75 + mando, con el arreglo | Chrome / Opera | 60 / 60 | 60 / 60 | 3,97–4,12 / 3,78–3,90 |
+| ídem, fotos «siempre» (= v22) | Chrome / Opera | 60 / 60 | 60 / 60 | 4,05–4,30 / 3,83–4,10 |
+| **cruce**, sala de 2: Chrome junto a Opera | Chrome | 60,0 | 60,0 | 5,06–5,45 |
+| **cruce**: Opera junto a Chrome | Opera GX | 60,0 | 60,0 | 4,12–4,64 |
+| control: Chrome junto a Chrome | Chrome | 60,0 | 60,0 | 5,28–5,84 |
+| control: Opera junto a Opera | Opera GX | 60,0 | 60,0 | 4,36–4,82 |
+
+El «1 % bajo» sale cerca de 48 en casi todo, en los dos navegadores. Lo causa el monitor de 144 Hz, no el juego: una
+imagen de 60 que cae entre dos refrescos a veces dura un refresco más. En el cruce la sala se armó de verdad: unos 2.820
+paquetes de botones recibidos del otro en 30 s y 0 ms de espera de la sala.
+
+**La pantalla de personaje** (`medir-personaje.mjs`, donde el dueño ve «juego 17-35 ms»): en la sala de 1, la CPU del
+juego por cuadro es 8,1–9,4 ms en Chrome y 8,1–11,0 ms en Opera, con 60 cuadros/s los dos. La tarjeta hace 0,2 ms de
+trabajo de verdad por cuadro en los dos. En «personaje sin sala», Opera sacó dos veces un 1 % bajo peor (40 y 48 contra
+55): puede ser ruido o un tirón de Opera, pero no es una falla de la sala.
+
+### §289.4 La diferencia, explicada
+
+Con un perfil limpio, **Opera GX y Chrome corren el juego igual**: el mismo motor (Chromium 155 contra 156), la misma
+tarjeta (NVIDIA, Ampere), 60 de imagen y 60 de juego, en Single Player, en la sala y en el cruce. Chrome y Opera
+**pueden jugar juntos** en la misma sala sin problema, y mezclar navegadores no hace más lenta la sala.
+
+Entonces lo que le pasa al dueño **no viene de que el navegador sea Opera**. Viene de algo de **su** Opera o de su
+pantalla que la prueba no tiene:
+1. **El perfil del dueño:** GX Control (aunque los limitadores estén apagados, el panel y sus medidores corren), las
+   extensiones, el bloqueador de anuncios (Opera revisa cada pedido de la página, y el juego pide miles de pedazos del
+   disco), «Force dark pages», la integración con Razer Chroma y Corsair (`CChromaEditorLibrary64.dll`, `CUESDK`), y los
+   sonidos y la música de GX.
+2. **La pantalla:** pantalla completa a 3775×2014 (dpr 1,75) en 240 Hz. La página suelta de la prueba no agranda el
+   lienzo (quedó en 1495×840 aun con dpr 1,75), así que esto no se reprodujo. Ojo: el informe del dueño dice «frena =
+   procesador», y un lienzo grande carga sobre todo la tarjeta.
+3. **El sitio de verdad:** el marco de Juegos con Firebase y la sala real con otra persona por internet.
+
+**La prueba que separa el punto 1** la hace el dueño: abrir la misma sala en Opera GX en una **ventana privada**
+(Ctrl+Shift+N; va sin extensiones). Si ahí anda bien, la causa está en el perfil, y se encuentra sacando extensiones de a
+una. Si anda igual de mal, la causa son el lienzo y los 240 Hz, y se prueba con «Resolución de salida» en 1080 o 720
+(Avanzado → Gráficos).
+
+**Repetir:** `bash herramientas/tanda-289.sh base duenio personaje cruce` (con el candado; `MKW_BUILD=` = otro programa).
+Una sola medida: `MKW_NAVEGADOR=opera-gx node herramientas/medir-sala.mjs --ventana --n 2 --navegador-otras chrome
+--vista-otras 960x540 --extra-otras ""`. El `.wasm` **no cambia**; la página sí (`mandos-ventanas.mjs`, `controles.mjs`).
+
+## §290 — Las herramientas de decompilación, bajadas y sin usar · 2026-11-12 03:25
+
+**El pedido del dueño.** «Descarga todo lo necesario para hacer el decomp pero no lo empieces todavía», y después
+«también las herramientas del estado del arte para decompilar juegos». **No se corrió ninguna**: no se partió el juego,
+no se compiló ni se decompiló nada. Solo quedó todo en el disco, con su versión anotada.
+
+**Qué se bajó** (la tabla completa, con el commit o la huella de cada una, en `herramientas/versiones.md` §290):
+
+- **El mapa público al día.** `terceros/mkw-decomp` pasó del repositorio viejo (`riidefi/mkw`, agosto de 2025) al
+  actual (`doldecomp/mkw`, octubre de 2026).
+- **Para partir y comparar:** decomp-toolkit (`dtk`) v1.8.4, objdiff v3.8.3 (el de línea de comandos y el de ventana) y
+  sjiswrap v1.2.2.
+- **Para escribir el C:** m2c (el primer borrador), decomp-permuter (el último ajuste) y asm-differ.
+- **Para mirar el juego:** Ghidra 12.1 con el cargador de GameCube/Wii. Se bajó la 12.1 y no la 12.2 porque el cargador
+  publicado está hecho para la 12.1 (las extensiones de Ghidra van atadas a su versión).
+- **Lo pensado para agentes:** asmlift, mizuchi, kappa y decomp.wtf (este último archivado; queda de referencia).
+- **De referencia:** dtk-template y ogws (la decompilación de Wii Sports, para ver si sus bibliotecas sirven en
+  `main.dol`; eso sigue sin verificar).
+- **Los paquetes de Python** que piden m2c y el permuter, como archivos en la caché, sin instalar.
+
+En total ~584 MB en `herramientas/cache/decomp/` y ~400 MB de repositorios en `terceros/`. Todo ignorado por git.
+
+**Cómo se comprobó.** Cada programa se comparó con la huella SHA-256 que publica su página de versiones en GitHub: las
+seis coinciden. Los repositorios se clonaron de GitHub en su último commit (clon superficial).
+
+**Lo que NO se bajó, y por qué.** Los compiladores originales del juego (CodeWarrior de Metrowerks). Hacen falta para la
+etapa de «calzar» (compilar el C y que salgan los mismos bytes), pero son programas con dueño, alojados en un archivo de
+la comunidad (`files.decomp.dev`). Los baja solo el `configure.py` del proyecto público al correrlo. **Queda como
+decisión del dueño.** Sin ellos sigue siendo posible la otra vía de prueba, la que ya usó §280: el comprobador
+diferencial contra la función traducida.
+
+**La trampa del tablero.** El mapa nuevo trae las direcciones de `StaticR.rel` ya como direcciones de memoria (el viejo
+las traía relativas a su sección). `decomp-avance.mjs` ahora reconoce las dos formas. Con el mapa al día los totales del
+tablero no cambian (26.353 funciones, 42.688 bytes sin dueña) y las funciones de la carrera con fuente pública que calza
+pasan de 43 a 47.
+
+**Qué modelo hace falta para cada parte** (pregunta del dueño):
+
+- **Bajar, clonar, comprobar huellas, regenerar el tablero:** mecánico; alcanza el modelo más chico (Haiku).
+- **Calzar funciones chicas y medianas con objdiff de juez:** un modelo intermedio (Sonnet) en bucle; el juez es el
+  programa, así que un error del modelo no pasa.
+- **Funciones grandes o raras, llevarlas a nuestro programa (redondeos del traductor, parches de Retro Rewind) y los
+  veredictos:** el modelo grande.
+
+**Archivos.** `herramientas/versiones.md` (§290), `herramientas/decomp-avance.mjs` (las dos formas del mapa). Fuera de
+git: `herramientas/cache/decomp/`, y en `terceros/`: `mkw-decomp` (actualizado), `m2c`, `decomp-permuter`, `asm-differ`,
+`dtk-template`, `ogws`, `asmlift`, `mizuchi`, `kappa`, `decomp.wtf`.
+
+### Glosario de esta sección
+
+- **Huella SHA-256**: un número largo calculado a partir de un archivo; si el archivo cambia en un solo bit, el número
+  cambia. Sirve para saber que lo bajado es exactamente lo publicado. Como el sello de calibración de un instrumento.
+- **CodeWarrior (mwcc)**: el compilador con que Nintendo armó el juego. Para «calzar» hay que usar ese mismo, en la
+  misma versión, porque otro compilador da otros bytes para el mismo C.
+- **Permuter**: un programa que prueba miles de variantes pequeñas de una función (cambiar el orden de dos líneas, un
+  tipo) hasta que el compilador da los bytes buscados. Como ajustar un potenciómetro fino cuando el grueso ya está.
+
+## §292 — Decompilación que calza: los compiladores originales, el proyecto público armado aquí y el tablero con objdiff · 2026-11-12 03:45
+
+**La decisión del dueño.** Primero dijo que no a bajar los compiladores originales; después pidió «matching decompilation»
+(decompilación que calza) y, explicado que sin ellos no existe, dijo «sí, bájalos». Desde aquí el juez de la primera
+etapa es **objdiff**: el C escrito se compila con el compilador de Nintendo y tiene que dar los mismos bytes.
+
+**Qué se hizo** (todo en `terceros/mkw-decomp`, ignorado por git):
+
+1. Se copiaron `main.dol` y `StaticR.rel` de `extraido/disco/` a `orig/RMCP01/sys/` y `orig/RMCP01/files/rel/`. Sus huellas
+   SHA-1 son las que el proyecto espera (`ac7d7244…` y `887bcc07…`): es la misma versión del juego.
+2. `python configure.py` y `ninja`. El proyecto baja solo sus herramientas a `build/tools/` (dtk v1.8.1, objdiff-cli
+   v3.6.1) y los compiladores a `build/compilers/` (`files.decomp.dev/compilers_20251118.zip`, 77 MB: CodeWarrior de
+   GameCube y Wii; Mario Kart usa `Wii/0x4201_127` y `GC/3.0a5.2`).
+3. La compilación terminó bien y da **el mismo avance que decomp.dev**: 1.828 de 26.501 funciones calzan (5,78 % del
+   código). Eso prueba que el montaje de aquí funciona igual que el oficial.
+
+**El tablero ahora lee a objdiff.** `ninja` deja `build/RMCP01/report.json` con el porcentaje de calce de cada función.
+`decomp-avance.mjs` lo lee y ya no hace falta anotar a mano lo que calza:
+
+- `herramientas/decomp-base.json` guarda las direcciones que **ya calzaban al empezar** (1.828) y las que estaban a medias
+  (41). En el tablero salen en azul: material público, no es avance nuestro.
+- Lo que calce y no esté en esa base es **avance nuestro**: estado «calza» (ámbar). Pasa a verde recién cuando se lleva a
+  nuestro programa y pasa el comprobador, el fantasma y la sala.
+- Trampa: en el informe las funciones de `StaticR.rel` vienen con dirección relativa a su código (hay que sumar
+  0x805103B4); las de `main.dol`, con dirección de memoria.
+
+**El punto de partida, medido.** De las 1.614 funciones de la carrera, **134 ya calzan en el proyecto público** y pesan
+0,537 ms por cuadro (14,6 % del tiempo del código del juego en carrera). Nuestras: 0 todavía. Verificada en carrera: 1
+(la de §280).
+
+**Las dos etapas, como quedan.**
+
+1. **Calzar** (objdiff, por función, sin correr el juego ni tomar el candado): es el trabajo en bucle, apto para un
+   modelo chico porque el juez es un programa.
+2. **Llevar a nuestro programa** (por lotes, con el candado): compilar lo que calza dentro del wasm, y probar con el
+   comprobador diferencial, el fantasma y la sala. Aquí aparecen los redondeos del traductor (§280) y los parches de
+   Retro Rewind.
+
+**Archivos.** `herramientas/decomp-avance.mjs` y `herramientas/decomp-avance.html` (leen el informe; leyenda nueva),
+`herramientas/decomp-base.json` (nuevo), `herramientas/versiones.md`. Fuera de git: `terceros/mkw-decomp/orig/`,
+`terceros/mkw-decomp/build/` (317 MB).
+
+### Glosario de esta sección
+
+- **Informe de objdiff (`report.json`)**: la lista de todas las funciones con su porcentaje de calce contra el original.
+  Como la planilla de un banco de pruebas automático: nadie la escribe a mano.
+- **Base (de lo que ya calzaba)**: la foto del primer día. Sirve para restar: lo que calza hoy menos lo que calzaba
+  entonces es lo hecho por nosotros. Como poner el medidor en cero antes de medir.
+
+## §296 — Auditoría de lo que calza: las dos funciones de `carrera-local` pasan las cinco pruebas · 2026-11-12 03:37
+
+**Qué se pidió.** Que una segunda sesión (esta) revise, sin fiarse de la primera, cada función nuestra que calza en la rama `carrera-local` del clon `terceros/mkw-decomp`. La primera sesión (`calzar-carrera`) escribe las funciones; esta las vuelve a construir desde cero y las juzga. No se tocó la copia de trabajo de la primera sesión: solo se leyó.
+
+**Qué es una auditoría (en simple).** Es como un segundo técnico que vuelve a medir la placa con su propio instrumento, sin confiar en la planilla del primero. Aquí tiene cinco pruebas: que se compile limpio desde cero, que el juez (objdiff) dé 100 % en su propia copia, que el código sea C++ de verdad y no bytes ni ensamblador pegados, que no se haya «movido la vara» (cambiar el plano de direcciones o tamaños para que una función calce), y que no se haya roto nada del resto.
+
+**Qué se auditó.** El último commit de `carrera-local` al empezar: `f01fd6ef1302e78f607354869f6f68395c3c89ff`. El informe de objdiff de esa copia tiene 1.830 funciones que calzan. Restando las 1.828 que ya calzaban en el proyecto público (`herramientas/decomp-base.json`), quedan **dos nuestras**, y son las dos que se auditaron:
+
+| Prueba | `GXCallDisplayList` (0x80172F64) | `sqrt` de `EGG::Math<float>` (0x8022F80C) |
+|---|---|---|
+| 1. Compilación limpia (`ninja` desde cero, exit 0, SHA-1 de `main.dol` y `StaticR.rel`) | Pasa | Pasa |
+| 2. 100 % en el informe propio | Pasa (100 %) | Pasa (100 %) |
+| 3. C/C++ real, sin ensamblador ni bytes | Pasa: escribe en el «tubo» de la tarjeta gráfica y llama a dos funciones del sistema | Pasa: `x <= 0 ? 0 : x * FrSqrt(x)` |
+| 4. La vara no se movió | Pasa: tramo nuevo `rvl/gx/gxDisplayList.c` (0x80172F64–0x80172FD8); el tramo vecino se acorta hasta 0x80172F64, sin solaparse | Pasa: tramo nuevo `egg/math/eggMath.cpp` (.text 0x8022F80C–0x8022F85C y .sdata2 0x80388E10–0x80388E14, que ya existía como `lbl_80388E10` en `symbols.txt`) |
+| 5. No se rompió nada | Pasa: 1.830 ≥ 1.828 + 2; las 1.828 de la base siguen al 100 % | Pasa (mismo informe) |
+| **Resultado** | **ok** | **ok** |
+
+**Lo que se revisó, en detalle.**
+- `config/RMCP01/symbols.txt`, `build.sha1`, `config/RMCP01/config.yml` y `tools/`: **sin cambios** desde `8b9b5ee`. El tamaño y la dirección de las dos funciones son los del mapa original (116 y 80 bytes).
+- `config/RMCP01/splits.txt`: solo agrega tramos nuevos y acorta uno vecino (legítimo, es lo que se espera de un tramo nuevo). No hay solapes (se comprobó tramo por tramo).
+- `configure.py`: solo agrega dos `Object(Matching, …)` (GX y `eggMath.cpp`).
+- `lib/rvl/gx/gx.h`: el tipo `GXData` pasa de un campo `dummy` a campos con nombre (en 0x0 y 0x5FC). Nada del proyecto usa `dummy`. Es un cambio de nombres, no de vara.
+- Una observación, no es motivo de rechazo: `lib/nw4r/math/mathArithmetic.hpp` declara `FrSqrt` sin `extern "C"`. Nuestro `eggMath.cpp` sí lo pone, y es el correcto: el símbolo del mapa se llama `FrSqrt` a secas. Si algún día un archivo incluye los dos encabezados, conviene revisar ese choque.
+
+**Lo que no se auditó.** `rotateVector` (71,2 %) y `rotateVectorInv` (61,8 %) de `egg/math/eggQuat.cpp` no están al 100 %: no son «calzadas», no entran a la auditoría.
+
+**Un incidente de esta sesión (lo digo tal cual).** La primera compilación de la copia de auditoría **bajó dos herramientas de GitHub** (`dtk` v1.8.1 y `objdiff-cli` v3.6.1) con `tools/download_tool.py`. Pasó porque la copia de las herramientas se hizo con fecha nueva y ninja, que no tenía registro previo de esa compilación, las consideró desactualizadas. No lo vi a tiempo para pararlo. Después se comprobó: las dos huellas SHA-1 son **idénticas** a las de las herramientas de la copia de trabajo (`dtk` `03d0fb9e…`, `objdiff-cli` `3f12f81a…`), y el compilador de prueba (`Wii/0x4201_127/mwcceppc.exe`, huella `d72ee390…`) también es idéntico. Las compilaciones que siguieron no bajaron nada más.
+
+**Cómo se preparó la copia de auditoría (comandos exactos).**
+
+```bash
+git -C terceros/mkw-decomp worktree add --detach ../mkw-decomp-auditoria carrera-local
+# copiar (no bajar) desde terceros/mkw-decomp: orig/RMCP01/sys/main.dol, orig/RMCP01/files/rel/StaticR.rel, build/tools, build/compilers
+cd terceros/mkw-decomp-auditoria
+python configure.py
+ninja
+node herramientas/decomp-avance.mjs --sin-historial
+```
+
+La compilación final se hizo con `build/RMCP01` vacío (la carpeta de la compilación de prueba se movió a `build/RMCP01-previo-audit`, dentro de la copia, para no borrarla). Resultado: `main.dol: OK`, `StaticR.rel: OK`, 1.830 funciones calzan.
+
+**El tablero.** `herramientas/decomp-auditoria.json` tiene las dos filas (`ok`, commit `f01fd6e…`, fecha 2026-11-12). El tablero dice: calzan 1.830, ya calzaban 1.828, nuestras 2, auditadas 2, rechazadas 0. Republicado en el mismo enlace (versión 6).
+
+### Glosario de esta sección
+
+- **Auditoría**: una segunda revisión independiente. Como un segundo técnico que vuelve a medir con su propio instrumento antes de dar la placa por buena.
+- **Copia limpia (*worktree*)**: una segunda carpeta de trabajo del mismo repositorio, con su propia compilación, para no pisar a la otra sesión. Como tener dos bancos de prueba con la misma placa, cada uno con su osciloscopio.
+- **Compilación desde cero**: borrar lo ya compilado y volver a construir todo. Como volver a cablear la placa desde el plano, sin reutilizar soldaduras de una prueba anterior.
+- **Mover la vara**: cambiar el plano (direcciones o tamaños en `symbols.txt`, o los tramos) para que una pieza encaje, en vez de escribirla bien. Es la trampa que la auditoría busca.
+- **Tramo (*split*)**: el rango de direcciones que una unidad de código ocupa en el programa final. Como el trazado de cada circuito en la placa: si dos trazados se pisan, la placa no sirve.
+- **Caché de compilación (`.ninja_log`)**: el registro que dice qué ya está compilado. Una copia de archivos sin ese registro hace que ninja rehaga (y en este caso, vuelva a bajar) las herramientas.
+
+### §287.2 — Pausa en todos los modos de juego · 2026-11-12 03:45
+
+**El pedido.** El dueño (por la orquestadora): «autocalibracion debe pausar a todos en todos los modos de juego».
+
+**Qué cambió (`auto-calibrar.mjs` `enSolo`).** Antes, sin sala (Single Player, VS, Contrarreloj, GP, Local, y la sala de
+1 humano, que desde §288 corre la carrera de siempre), la calibración probaba con la carrera andando. Ahora hace lo mismo
+que en la sala. Primero mide la base 1,2 s con la carrera andando: es la medida de cuánto le cuesta al aparato la lógica,
+con lo de ahora. Después congela la carrera (`mkw_congelar`: la lógica quieta, el dibujo andando), con el aviso
+**«⏸ Calibrando tu imagen — vuelve en N s»**. Prueba con la lógica estimada (§274) y la suelta al terminar. Como un banco de
+pruebas que para la máquina antes de medirle el tablero: nadie pierde terreno mientras se mide.
+
+Tres detalles:
+- **Ya estaba quieta por otro.** El «▶» del mando en pantalla (§286) abre el cajón y congela la carrera al jugar solo. Si
+  se aprieta la calibración con el cajón abierto, se suelta para medir la base y al terminar se deja como estaba
+  (`congeladoAhora`, de `_mkw_congelado_estado(0)`).
+- **En la sala, quien calibra también ve el aviso** («⏸ Calibrando tu imagen…»); los demás ven «⏸ <nombre> está
+  calibrando…».
+- **«Cada uno su kart» y los relojes de RKNet.** La pausa viaja como siempre: el estado de la sala (`pausaSala`) por la
+  malla, con los mensajes 0xA8 de `sala-carrera.mjs`, que también se usan en este modo. Cada consola llama a
+  `mkw_congelar` apenas le llega. Los relojes del juego que podrían cortar a alguien por silencio son tres: los avisos
+  de llegada, el respaldo «se calló 2 s» y el plazo DNF. Los tres se cuentan en cuadros de red del juego (`g_oido`, el
+  contador de `PacketMgr::Update`, que corre dentro de `SceneManager::calc`), así que se detienen con la pausa. El
+  latido de la página (0xFC, cada 250 ms) sigue saliendo con el cuadro quieto: nadie parece callado. Al seguir, el
+  «al día» empareja la pequeña diferencia de cuándo se congeló cada una.
+
+**Medido con el juego (v22, el programa del sitio; candado; `bash herramientas/tanda-287.sh todo`):**
+
+| Modo | Prueba | Reloj de la carrera mientras calibra | Después |
+|---|---|---|---|
+| Single Player (carrera directa, 11 CPU) | `prueba-calibrar-modos` | quieto en 901 (29 vistas), aviso | sigue: 913 → 1093 en 3 s |
+| VS por los menús | ídem | quieto en 870 | sigue |
+| Contrarreloj | ídem | quieto en 897 | sigue |
+| Grand Prix | ídem | quieto en 855 | sigue |
+| Sala de 1 humano («Cada uno su kart», §288) | ídem | quieto en 889 | sigue |
+| Sala de 2, lockstep | `prueba-sala --rapida --calibrar` | 52/52: las dos quietas en 1748, huellas iguales 53 → 70 | sigue |
+| Sala de 2, «Cada uno su kart» | `prueba-sala-estado --calibrar` | A y B congeladas; después a ≤ 5 cuadros | sigue |
+| Sala del sitio (emuladores, 2 cuentas), lockstep | `prueba-experiencia --calibrar` | 26/26; invitado y anfitriona, el otro quieto con el aviso | sigue |
+| Sala del sitio, «Cada uno su kart» | `prueba-experiencia --calibrar --estado` | los 2 puntos §274 bien | sigue |
+
+**Lo que falló, y por qué no es de la pausa:**
+- `prueba-sala-estado`: «A a ~60 de lógica» (50,5/s). Ya fallaba antes de esto (55,1/s en la primera corrida de hoy): es
+  la carga de dos juegos en este PC.
+- `prueba-experiencia --estado`: «cada uno con SU pantalla». Ese punto espera los tipos del lockstep (`0,0,1`); en
+  «Cada uno su kart» el kart de la otra consola es remoto (tipo 4). La prueba no distingue el modo.
+
+**Local de 2 a 4: sin probar con el juego.** Con `&vistas=2` (la pantalla partida de 2) la carrera se queda en el cuadro 22
+y en la página 0x3A: el juego no ve el mando del jugador 2, ni con dos mandos de mentira puestos en la página. Local está
+«en obra» en el producto (§116: el botón no abre nada). El camino del código es el mismo de Single Player: sin sala se
+congela la consola entera, con todos sus jugadores. El banco lo prueba (54/54: congela, avisa y suelta).
+
+**Pruebas:** banco `auto-calibrar` **54/54**; `node web/navegador/prueba-calibrar-modos.mjs [--casos sp,vs,tt,gp,sala1[,local2]]`
+(10/10 sin local2); la tanda `herramientas/tanda-287.sh modos|sala|estado|sitio|todo`. El `.wasm` **no cambia**.
+
+**Una trampa de hoy.** La prueba del sitio de las 02:05 se cortó a mano y dejó vivo su emulador de Firebase (puerto
+19000). La siguiente no pudo abrir el ensayo («el puerto 19000 está ocupado»). Antes de volver a correrla hay que mirar
+quién escucha ese puerto.

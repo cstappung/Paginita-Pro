@@ -24,6 +24,7 @@
 //       [--trabas=N] (§101: la traba de 1,5 s de B, N veces en la misma carrera: cuánto esperó cada una y a quién)
 //       (--sin-relevo: las tres con ?relevo=0, como antes de §80, para comparar: A y B esperan a C;
 //        --red=0: sin red mala, el control: lo que cuesta correr tres juegos en la misma PC)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -48,7 +49,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 const contexto = await navegador.newContext({ viewport: { width: 960, height: 540 } });

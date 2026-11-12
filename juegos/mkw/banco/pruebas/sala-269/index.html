@@ -147,6 +147,56 @@ nota('con el juego: bash herramientas/tanda-269.sh sincro sala experiencia (los 
   ok('…el latido de Ana lleva su número (Beto, que es «nueva» en esta prueba, no ve nada raro)', avisos.beto.length === 0, JSON.stringify(avisos.beto));
   for (const s of salas.values()) s.detener?.();
 }
+// ---- §288: la misma versión antes de largar (el dueño: «antes de iniciar la carrera […] todos los players tienen la misma
+// version»): con otro programa (otra huella del .wasm, o uno sin «Cada uno su kart») la anfitriona no larga ----
+{
+  let t = 2_000_000; const tareas = new Map(); let n = 1;
+  const cada = f => { tareas.set(n, f); return n++; }, parar = id => tareas.delete(id);
+  const salas = new Map(), humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }];
+  const prog = { ana: 'h1+re', beto: 'h0' };   // (beto bajó el .wasm viejo, sin red_estado)
+  const enviar = de => (para, bytes) => setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0);
+  const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); for (let i = 0; i < 4; i++) await new Promise(r => setTimeout(r, 0)); };
+  for (const uid of ['ana', 'beto']) salas.set(uid, crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t,
+    cada, parar, segundosCopa: 0, programa: () => prog[uid], mismaVersion: true }));
+  const ana = salas.get('ana'), beto = salas.get('beto');
+  for (let i = 0; i < 3; i++) await avanzar(1000);
+  ana.ponerPistas([0, 1, 2, 3].map(f => ({ copa: 1, fila: f }))); await avanzar(0);
+  ana.elegi({ personaje: 0, vehiculo: 1, derrape: 0 }); beto.elegi({ personaje: 7, vehiculo: 1, derrape: 0 });
+  for (let i = 0; i < 3; i++) await avanzar(1000);
+  ok('§288: con otro programa (h0 contra h1+re) todos eligieron, pero la anfitriona NO larga', ana.estado().fase === 'elegir' && beto.estado().fase === 'elegir', `${ana.estado().fase}/${beto.estado().fase}`);
+  ok('…y el estado dice quién (lo ven las dos: «Beto tiene otra versión: recarga»)', JSON.stringify(ana.estado().versionDistinta) === '["beto"]' && JSON.stringify(beto.estado().versionDistinta) === '["beto"]',
+    JSON.stringify([ana.estado().versionDistinta, beto.estado().versionDistinta]));
+  ok('…versiones() trae el programa de cada uno (para el informe)', ana.versiones().programa === 'h1+re' && ana.versiones().programas.beto === 'h0', JSON.stringify(ana.versiones()));
+  for (let i = 0; i < 60; i++) await avanzar(1000);
+  ok('…tampoco pasado el plazo de elegir (sin tope: con dos programas la carrera no sale bien)', ana.estado().fase === 'elegir', ana.estado().fase);
+  prog.beto = 'h1+re';                           // (Beto recargó: el mismo programa)
+  for (let i = 0; i < 3; i++) await avanzar(1000);
+  ok('§288: con el mismo programa, larga y se borra el aviso', ana.estado().fase === 'correr' && beto.estado().fase === 'correr' && !(ana.estado().versionDistinta || []).length,
+    `${ana.estado().fase}/${beto.estado().fase} ${JSON.stringify(ana.estado().versionDistinta)}`);
+  for (const s of salas.values()) s.detener?.();
+}
+{
+  // la página vieja (otra VERSION_SALA, sin pg) también frena; ?mismaVersion=0 = como antes (solo el aviso)
+  for (const misma of [true, false]) {
+    let t = 3_000_000; const tareas = new Map(); let n = 1;
+    const cada = f => { tareas.set(n, f); return n++; }, parar = id => tareas.delete(id);
+    const salas = new Map(), humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }];
+    const enviar = de => (para, bytes) => { let b = bytes;
+      if (de === 'beto' && bytes[0] === MARCA_SALA) { try { const m = JSON.parse(new TextDecoder().decode(bytes.subarray(1))); m.ver = 269; delete m.pg; const j = new TextEncoder().encode(JSON.stringify(m)); b = new Uint8Array(1 + j.length); b[0] = MARCA_SALA; b.set(j, 1); } catch {} }
+      setTimeout(() => salas.get(para)?.alBinario(de, b), 0); };
+    const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); for (let i = 0; i < 4; i++) await new Promise(r => setTimeout(r, 0)); };
+    for (const uid of ['ana', 'beto']) salas.set(uid, crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t,
+      cada, parar, segundosCopa: 0, programa: () => 'h1+re', mismaVersion: misma }));
+    const ana = salas.get('ana'), beto = salas.get('beto');
+    for (let i = 0; i < 3; i++) await avanzar(1000);
+    ana.ponerPistas([0, 1, 2, 3].map(f => ({ copa: 1, fila: f }))); await avanzar(0);
+    ana.elegi({ personaje: 0, vehiculo: 1, derrape: 0 }); beto.elegi({ personaje: 7, vehiculo: 1, derrape: 0 });
+    for (let i = 0; i < 3; i++) await avanzar(1000);
+    ok(misma ? '§288: Beto con la página de la v2.2 (269, sin programa): no se larga' : '…con ?mismaVersion=0 larga igual (como antes de §288)',
+      misma ? ana.estado().fase === 'elegir' && (ana.estado().versionDistinta || []).includes('beto') : ana.estado().fase === 'correr', ana.estado().fase);
+    for (const s of salas.values()) s.detener?.();
+  }
+}
 fin();
 </script>
 </body>

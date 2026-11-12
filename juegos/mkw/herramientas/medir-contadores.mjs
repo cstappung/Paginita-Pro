@@ -12,6 +12,7 @@
 //
 // Uso:  node herramientas/medir-contadores.mjs [--pista 13.2] [--segundos 40] [--puerto 8178] [--etiqueta un-jugador]
 //       node herramientas/medir-contadores.mjs --registro build/web/datos/sincro-contadores/registro.txt --etiqueta sala
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -55,7 +56,7 @@ if (opcion('--registro')) {
   const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
   const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, MKW_BUILD: BUILD } });
   await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-  const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
+  const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
   try {
     const p = await navegador.newPage({ viewport: { width: 960, height: 540 } });
     await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&modo=directa&pista=${PISTA}&cc=c150&cpu=maximo&semilla=11&pj=0&kart=1&contadores=1`);

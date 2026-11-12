@@ -6,6 +6,7 @@
 // y que a 440 px de ancho no haya desborde. Deja una foto en build/web/datos/controles-angosto.png.
 //
 // Uso:  node herramientas/prueba-raton-controles.mjs [puerto]   (Chrome: el de Playwright, o CHROME=ruta)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +16,7 @@ const { chromium } = req('playwright-core');
 const PUERTO = process.argv[2] || '8149';
 const srv = spawn(process.execPath, [fileURLToPath(new URL('../banco/servir.cjs', import.meta.url)), PUERTO], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(r => setTimeout(r, 1200));
-const b = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true });
+const b = await chromium.launch({ ...(process.env.CHROME ? { executablePath: process.env.CHROME } : opcionesNavegador()), headless: true });
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
 const errores = []; p.on('pageerror', e => errores.push(e.message));
 await p.addInitScript(() => {

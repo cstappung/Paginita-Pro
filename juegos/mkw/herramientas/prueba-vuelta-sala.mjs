@@ -15,6 +15,7 @@
 //       [--extra "&…"] [--puerto 8179] [--ventana]
 //   --red-b LAT,MBIT = la pestaña B (la que no es anfitriona) con esa red (ms de latencia, Mbit/s de bajada), por CDP.
 // Salida: build/web/datos/vuelta-final/sala-<pistas>[-redb].json (nombres de archivos del juego: nunca a git)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -40,7 +41,7 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, MKW_LATENCIA: process.env.MKW_LATENCIA || '50' } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', `--window-position=${vx},${vy}`] });
 const sala = 'vs' + Date.now().toString(36), uidA = 'A' + sala, uidB = 'B' + sala;

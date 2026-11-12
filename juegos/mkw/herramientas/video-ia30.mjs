@@ -10,6 +10,7 @@
 // Uso:  MKW_BUILD=build/web-w32/navegador node herramientas/video-ia30.mjs [--pista 0.0] [--semilla 1234] [--cpu maximo]
 //         [--segundos 45] [--puerto 8179] [--modos 0,1,3]  (los valores de ?ia30 a grabar: 0 de siempre, 1 o 2 = 1 de cada 2,
 //         3 = 1 de cada 3; por omisión 0,1)
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -29,7 +30,7 @@ const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number)
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: false,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: false,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`, '--window-size=1000,640'] });
 
 const ANCHO = 960, ALTO = 540;

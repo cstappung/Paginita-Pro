@@ -12,6 +12,7 @@
 // mira que el mando de GameCube que ve el juego tenga apretado el botón correcto, también con dos dedos a la vez.
 //
 // Uso:  node web/navegador/prueba-tactil.mjs [--ventana]      (fotos en build/web/datos/tactil-parado.png y -acostado.png)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +33,7 @@ const ok = (nombre, cond, detalle = '') => {
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'), args: ['--mute-audio'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'), args: ['--mute-audio'] });
 
 // Mide la capa táctil: rectángulos del aro y de cada botón, y el tamaño de la pantalla
 const medir = pagina => pagina.evaluate(() => {
@@ -116,10 +117,18 @@ for (const orientacion of ['parado', 'acostado']) {
   for (const b of m.botones) {
     await dedos('touchStart', [centro(b)]);
     const r = await leer();
+    if (b.texto === '▶') {
+      // §286: el «▶» abre el menú de la página (el cajón en la Ayuda) y no le manda Start al juego
+      const c = await pagina.evaluate(() => ({ cajon: document.body.classList.contains('cajon-abierto'), ayuda: !document.getElementById('hojaAyuda').hidden }));
+      if (r.botones !== 0 || !c.cajon || !c.ayuda) fallos.push(`▶→${r.botones.toString(16)} cajón ${c.cajon} ayuda ${c.ayuda}`);
+      await dedos('touchEnd', []);
+      await pagina.evaluate(() => window.mkwInterfaz.cerrarCajon());
+      continue;
+    }
     if ((r.botones & TEXTO_BIT[b.texto]) === 0 || (r.botones & ~TEXTO_BIT[b.texto]) !== 0) fallos.push(`${b.texto}→${r.botones.toString(16)}`);
     await dedos('touchEnd', []);
   }
-  ok(`${orientacion}: tocar cada botón con un dedo aprieta ese botón y ningún otro`, fallos.length === 0,
+  ok(`${orientacion}: tocar cada botón con un dedo aprieta ese botón y ningún otro (y «▶» abre el menú, §286)`, fallos.length === 0,
      fallos.join(', ') || m.botones.map(b => b.texto).join(' '));
   const libre = await leer();
   ok(`${orientacion}: al levantar el dedo no queda nada apretado`, libre.botones === 0 && libre.sx === 0);

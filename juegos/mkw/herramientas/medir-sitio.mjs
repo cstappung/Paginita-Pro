@@ -38,10 +38,12 @@
 //     "&modo=tt&copa=0&fila=0" = Contrarreloj, "&modo=vs&copa=0&fila=0&cpu=maximo" = 12 karts en la misma pista)
 //   --nucleos N: (§151) Chrome atado a los primeros N núcleos (como el PC de un amigo con pocos núcleos; Windows)
 //     (§158: y la página ve N en navigator.hardwareConcurrency, como en un PC de N de verdad; --nucleos-sin-decir = no)
+//   --navegador chrome|opera-gx|<ruta .exe>: (§289) otro navegador Chromium (también MKW_NAVEGADOR); perfil nuevo en %TEMP%
 // Pedidos al Worker (el plan gratis de Workers da 100.000 llamadas al día, §104): los cuenta el Worker local mismo
 // (/__cuenta, con las preguntas previas de CORS que la página no ve), por tramo (hasta el primer cuadro, hasta la carrera,
 // la carrera) y por tipo (preguntas, programa, semillas, pedazos del disco…) → <base>-v<n>-pedidos.json.
 // Deja build/web/datos/medir-sitio/<etiqueta>-<perfil>.json, .log (la consola del juego) y -v1.png (foto de la carrera).
+import { opcionesNavegador, elegirNavegador } from './navegador.mjs';   // §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, createWriteStream, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -100,9 +102,12 @@ const tipoPedido = ([, metodo, ruta, rango]) => metodo === 'OPTIONS' ? 'pregunta
 
 // 2) Chrome de verdad (el instalado), con un perfil nuevo (primera visita), sin sonido (pedido del dueño)
 const carpetaPerfil = path.join(os.tmpdir(), 'mkw-medir-' + process.pid);
+// §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR); el perfil es siempre esta carpeta nueva de %TEMP%, nunca el del dueño
+const NAVEGADOR = elegirNavegador();
+if (NAVEGADOR.nombre !== 'chrome') console.log(`(§289: navegador ${NAVEGADOR.nombre}: ${NAVEGADOR.exe})`);
 const contexto = await chromium.launchPersistentContext(carpetaPerfil, {
   // §158: --chrome "…" = banderas de más para Chrome (diagnóstico, p. ej. --js-flags=--liftoff-only), separadas por espacios
-  channel: 'chrome', headless: !args.includes('--ventana'), args: ['--mute-audio',
+  ...opcionesNavegador(), headless: !args.includes('--ventana'), args: ['--mute-audio',
     // --ventana: en el monitor de 144 Hz (el de la izquierda, §160); MKW_VENTANA="x,y" = otro lugar
     ...(args.includes('--ventana') ? [`--window-position=${process.env.MKW_VENTANA || '-1880,549'}`] : []), ...(args.includes('--chrome') ? String(opcion('--chrome', '')).split(' ').filter(Boolean) : [])],
   // §229: --viewport AxB = otro tamaño de la página; --dpr N = píxeles por punto (N11: con 1,5 el lienzo del juego, que
@@ -113,9 +118,9 @@ const contexto = await chromium.launchPersistentContext(carpetaPerfil, {
 // §151 (V2): --nucleos N = Chrome (y los procesos que abra después, que heredan la máscara) en los primeros N núcleos
 if (args.includes('--nucleos')) {
   const n = Number(opcion('--nucleos', 4)), mascara = (2 ** n) - 1;
-  const ps = `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | Where-Object { $_.CommandLine -like '*${path.basename(carpetaPerfil)}*' } | ForEach-Object { (Get-Process -Id $_.ProcessId).ProcessorAffinity = ${mascara} }`;
+  const ps = `Get-CimInstance Win32_Process -Filter "Name='${NAVEGADOR.proceso}'" | Where-Object { $_.CommandLine -like '*${path.basename(carpetaPerfil)}*' } | ForEach-Object { (Get-Process -Id $_.ProcessId).ProcessorAffinity = ${mascara} }`;
   spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
-  console.log(`(Chrome atado a ${n} núcleos)`);
+  console.log(`(${NAVEGADOR.nombre} atado a ${n} núcleos)`);
   // §158: la afinidad no cambia lo que Chrome le dice a la página (navigator.hardwareConcurrency seguía en 16 y el tope
   // del precalentado salía de 16); un PC de N procesadores lógicos de verdad dice N. --nucleos-sin-decir = lo de §151/§156
   if (!args.includes('--nucleos-sin-decir'))
@@ -132,7 +137,7 @@ for (let visita = 1; visita <= VISITAS; visita++) resultados.push(await medirUna
 await contexto.close();
 sitio.kill();
 try { rmSync(carpetaPerfil, { recursive: true, force: true }); } catch {}
-writeFileSync(base + '.json', JSON.stringify({ etiqueta: ETIQUETA, perfil: PERFIL, freno: FRENO, extra: EXTRA, latencia: +LATENCIA, segundos: SEGUNDOS, visitas: resultados }, null, 1));
+writeFileSync(base + '.json', JSON.stringify({ etiqueta: ETIQUETA, navegador: NAVEGADOR.nombre, version: contexto.browser()?.version?.() ?? null, perfil: PERFIL, freno: FRENO, extra: EXTRA, latencia: +LATENCIA, segundos: SEGUNDOS, visitas: resultados }, null, 1));
 console.log(`→ ${path.relative(raiz, base)}.json`);
 
 async function medirUnaVez(visita) {

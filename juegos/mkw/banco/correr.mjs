@@ -7,6 +7,7 @@
 // Uso:  node banco/correr.mjs licencias mii guardado      (los nombres son los de PRUEBAS en banco/index.html)
 //       node banco/correr.mjs "relevo?solo=7"              (con algo en la dirección: aquí, solo la parte 7)
 //       node banco/correr.mjs                             (sin nombres: todas las páginas pruebas/*/index.html)
+import { opcionesNavegador } from '../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -22,7 +23,7 @@ const lista = pedidas.length ? pedidas : todas;
 
 const servidor = spawn(process.execPath, [path.join(aqui, 'servir.cjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(r => { servidor.stdout.on('data', r); setTimeout(r, 1500); });
-const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--mute-audio', '--enable-unsafe-webgpu'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--mute-audio', '--enable-unsafe-webgpu'] });
 let falla = 0;
 for (const id of lista) {
   const pagina = await navegador.newPage();

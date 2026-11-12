@@ -27,6 +27,7 @@
 //   --extra "&x=y": parámetros más para la página
 //   --ancho N --alto N: el tamaño de la ventana en la carrera (por defecto 960×792; se abre en 960×540 y cambia)
 //   --sin-cambiar: abrir ya en --ancho×--alto, sin el cambio de tamaño (como antes de §79)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -50,7 +51,7 @@ let bien = 0, mal = 0;
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const ANCHO = Number(opcion('--ancho', 960)), ALTO = Number(opcion('--alto', 792));   // la ventana (con una ancha, el juego se estira: §68)
 const CAMBIAR = !args.includes('--sin-cambiar');

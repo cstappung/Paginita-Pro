@@ -18,6 +18,7 @@
 // Fotos en build/web/datos/inicio/.
 //
 // Uso:  node web/navegador/prueba-inicio.mjs [--ventana]   (15 puntos)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -39,7 +40,7 @@ const arrancarServidor = (args, listo) => new Promise(r => {
 
 const servidor = await arrancarServidor([path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], 'juego en');
 let sitio = null;
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 
 // Lo que interesa del menú, de la cortina y del juego

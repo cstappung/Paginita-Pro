@@ -95,7 +95,13 @@ export const MARCA_SALA = 0xA8;
 // cuando cambia algo que todas las consolas tienen que hacer igual (el lockstep, la sala). Va en cada latido ({ver}); una
 // página sin él es de antes de §269. versionDistinta(mia, suya) = qué pasa: null (iguales), 'vieja' (la otra es más
 // vieja o no dice), 'mia' (la mía es la vieja)
-export const VERSION_SALA = 269;
+export const VERSION_SALA = 286;   // (§286: el latido lleva también el programa, pg)
+// §286 (el dueño: «debes asegurarte antes de iniciar la carrera […] que todos los players tienen la misma version»): cada
+// latido dice la versión de la página (ver) y el programa (pg: la huella del .wasm y si trae «Cada uno su kart»). La
+// anfitriona no larga ninguna carrera mientras alguien de los que corren tenga otra (estado.versionDistinta = esos uid;
+// cada página muestra «X tiene otra versión: recarga»). Sin tope: con dos programas distintos la carrera no puede salir
+// bien. ?mismaVersion=0 = como antes (solo el aviso de §269)
+export const MISMA_VERSION = !/[?&]mismaVersion=0/.test(globalThis.location?.search || '');
 export function versionDistinta(mia, suya) {
   if (!Number.isFinite(suya)) return 'vieja';
   return suya === mia ? null : suya < mia ? 'vieja' : 'mia';
@@ -181,6 +187,8 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   esperarCarga = ESPERAR_CARGA, topeCarga = TOPE_CARGA_MS, esperarPaquete = ESPERAR_PAQUETE, topePaquete = TOPE_PAQUETE_MS,   // §269b.14: los plazos esperan la carga de todos
   // §269: alguien de la sala tiene otra versión de la página (uid, 'vieja' | 'mia', su número o null)
   alVersion = () => {},
+  // §286: mi programa (texto: huella del .wasm + «+re» si trae red_estado) y si la sala exige la misma versión
+  programa = () => null, mismaVersion = MISMA_VERSION,
   // §100: uid => true si esa página se fue (la página: ni en el buzón ni con su WebRTC sano); sin ella, solo el silencio largo
   ido = () => false,
   // §110: cuántos de `humanos` estaban al empezar la copa (los demás son sumados: llegaron después)
@@ -243,6 +251,20 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   const esSumado = u => (estado.sumados || []).some(([x]) => x === u);
   // §269b.14: quién tiene el juego cargado (su latido: c = 1), y desde cuándo espero a los que faltan
   const cargados = new Map(), rendidosCarga = new Set();
+  // §286: lo que dice el latido de cada uno: ver (página) y pg (programa); quién de los que corren no coincide conmigo
+  const verDe = new Map(), pgDe = new Map();
+  const conOtraVersion = () => { if (!mismaVersion) return []; const aus = new Set(ausentes()), mio = programa();
+    return humanos.filter(h => h.uid !== yo && !sacados.has(h.uid) && !aus.has(h.uid) && verDe.has(h.uid)
+      && (verDe.get(h.uid) !== VERSION_SALA || (mio && pgDe.get(h.uid) && pgDe.get(h.uid) !== mio))).map(h => h.uid); };
+  // ¿puedo largar? Anota en el estado a los que tienen otra versión (lo ven todas las páginas); true = todos iguales
+  function mismasVersiones() {
+    const d = conOtraVersion(), antes = estado.versionDistinta || [];
+    if (antes.length !== d.length || antes.some((u, i) => u !== d[i])) {
+      if (d.length) registro(`[sala] ⚠ §286: no largo: ${d.map(u => `${u} (página ${verDe.get(u) ?? '?'}, programa ${pgDe.get(u) ?? '?'})`).join(', ')} con otra versión que la mía (${VERSION_SALA}, ${programa() ?? '?'})`);
+      cambiar({ versionDistinta: d });
+    }
+    return !d.length;
+  }
   let esperaCargaDesde = null;
   // (el que no da señales —ausentes, §75— no se espera: no está cargando, no está; corre fuera como siempre. El que carga
   // sí manda su latido, con c = 0)
@@ -378,7 +400,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
       const todos = humanos.every(h => estado.picks[h.uid] || (esSumado(h.uid) && aus.has(h.uid)));
       // (§269b.14: el plazo de 45 s corre recién con todos cargados)
       if (!estado.plazo && !todos) { if (cargaLista(t)) cambiar({ plazo: t + segundosElegir * 1000 }); }
-      else if (todos || t >= estado.plazo) {
+      else if ((todos || t >= estado.plazo) && mismasVersiones()) {   // (§286: nadie larga con otra versión)
         const picks = { ...estado.picks };
         humanos.forEach((h, i) => { if (!picks[h.uid]) picks[h.uid] = { personaje: POR_OMISION[i % 4][0], vehiculo: POR_OMISION[i % 4][1], derrape: 0, solo: true }; });
         const sumados = unir(1);
@@ -390,7 +412,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
       // la carrera n terminó para todos los que siguen (o para el anfitrión hace rato: quien se fue no avisa)
       const n = estado.carrera, fin = estado.terminaron[n];
       if (fin && !estado.plazo) { if (cargaLista(t)) cambiar({ plazo: t + segundosResultados * 1000 }); }   // (§269b.14)
-      else if (estado.plazo && t >= estado.plazo) {
+      else if (estado.plazo && t >= estado.plazo && (n >= estado.carreras || mismasVersiones())) {   // (§286)
         if (n >= estado.carreras) cambiar({ fase: 'fin', plazo: 0, pausa: 0 });
         else {
           const sumados = unir(n + 1), fuera = fueraEn(n + 1, sumados);
@@ -406,7 +428,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   // si tienen que pasarme sus repartos)
   // (§100, H9: y si ya sé en qué va la sala —l—: la que acaba de abrir recibe el estado al primer latido)
   const versionesAvisadas = new Map(), estadoVersiones = {};   // §269: uid → su número (si no es el mío)
-  const latido = () => { const cap = capacidad(); aTodos({ t: 'aqui', ver: VERSION_SALA, v: estado.version, l: lista ? 1 : 0, c: listoCopa ? 1 : 0, pq: miPaquete, salta: salto, t0: ahora(), j: jefe,
+  const latido = () => { const cap = capacidad(); aTodos({ t: 'aqui', ver: VERSION_SALA, pg: programa() ?? undefined, v: estado.version, l: lista ? 1 : 0, c: listoCopa ? 1 : 0, pq: miPaquete, salta: salto, t0: ahora(), j: jefe,
     oj: soy() ? 0 : Math.min(9e6, Math.round(ahora() - (directo.get(jefe) ?? -9e6))), ...(cap ? { cap } : {}),
     ...(servidor?.() ? { srv: true } : {}) }); };
   // el mando pasa a uid (el sitio lo nombró, o §100 el reemplazo provisorio). La nueva sigue desde su última copia del
@@ -478,6 +500,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
     }
     if (m.t === 'aqui') {
       // §269: ¿la misma versión de la página? (se avisa una vez por cada uid y cada número)
+      if (esHumano(de) && de !== yo) { verDe.set(de, Number.isFinite(m.ver) ? m.ver : null); if (typeof m.pg === 'string') pgDe.set(de, m.pg.slice(0, 80)); else pgDe.delete(de); }   // (§286)
       if (esHumano(de) && de !== yo) { const sv = Number.isFinite(m.ver) ? m.ver : null, que = versionDistinta(VERSION_SALA, sv);
         if (que && versionesAvisadas.get(de) !== sv) { versionesAvisadas.set(de, sv); estadoVersiones[de] = sv; registro(`[sala] ⚠ §269: ${de} tiene otra versión de la página (${sv ?? 'de antes de §269'}; la mía ${VERSION_SALA})`); alVersion(de, que, sv); }
         else if (!que) { versionesAvisadas.delete(de); delete estadoVersiones[de]; } }
@@ -643,7 +666,7 @@ export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = '
   }
 
   return {
-    versiones: () => ({ mia: VERSION_SALA, distintas: { ...estadoVersiones } }),   // §269
+    versiones: () => ({ mia: VERSION_SALA, distintas: { ...estadoVersiones }, programa: programa(), programas: Object.fromEntries(pgDe), otraVersion: conOtraVersion() }),   // §269, §286
     // N12 (§233): uid → {l, ms} de cada humano que lo dijo en su latido (y el mío)
     capacidades() { const o = Object.fromEntries(capacidades); const c = capacidad(); if (c) o[yo] = c; return o; },
     alBinario,

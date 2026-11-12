@@ -10,7 +10,7 @@
 // una usa SOLO su mando: la 1.ª ventana en llegar el 1.er mando conectado, la 2.ª el 2.º, etc. (como repartir los
 // enchufes de una zapatilla por orden de llegada). Con una sola ventana no cambia nada (todos los mandos a su jugador).
 // El teclado sigue yendo a la ventana con el foco (eso no se puede compartir sin que las dos manejen con las mismas teclas).
-// ?mandosVentanas=0 = sin esto.
+// ?mandosVentanas=0 = sin esto. §291: la foto sale solo con otra ventana en la sala (`siempreFoto` = en cada lectura, como antes).
 
 export const VIGENCIA_FOTO_MS = 250;   // una foto más vieja que esto no vale (la otra ventana perdió el foco o se cerró)
 export const VIGENCIA_VENTANA_MS = 3000;
@@ -21,7 +21,7 @@ export const fotoDe = g => ({ index: g.index, id: g.id, mapping: g.mapping, time
   axes: [...(g.axes || [])], buttons: [...(g.buttons || [])].map(b => ({ pressed: !!b?.pressed, value: +b?.value || 0, touched: !!b?.touched })) });
 
 export function crearMandosVentanas({ canal = null, ahora = () => performance.now(), tieneFoco = () => !!globalThis.document?.hasFocus?.(),
-  id = Math.random().toString(36).slice(2), desde = Date.now() } = {}) {
+  id = Math.random().toString(36).slice(2), desde = Date.now(), siempreFoto = false } = {}) {
   const ventanas = new Map();             // id → { desde, visto }
   let foto = null, fotoT = -Infinity, activa = false, reloj = null;
   const estado = { activa: false, ventanas: 1, puesto: 0, fotosRecibidas: 0, fotosMandadas: 0, usandoFoto: false };
@@ -55,7 +55,11 @@ export function crearMandosVentanas({ canal = null, ahora = () => performance.no
       const f = fila(), puesto = f.indexOf(id);
       estado.ventanas = f.length; estado.puesto = puesto;
       let lista = propios;
-      if (propios.length && tieneFoco()) { mandar({ t: 'mandos', id, desde, mandos: propios.map(fotoDe) }); estado.fotosMandadas++; }
+      // §291: la foto se manda SOLO si hay otra ventana en la sala que la pueda usar. Antes salía en cada lectura aunque
+      // la ventana estuviera sola (el informe del dueño en Opera GX: 4.113 fotos con una sola ventana): copiar los ejes y
+      // los 17 botones y pasarlos por el canal, cada cuadro, para nadie. Si llega otra ventana, su «estoy» (con `nuevo`)
+      // la mete en la fila al toque y desde la lectura siguiente las fotos vuelven a salir. ?mandosVentanas=siempre = antes.
+      if (propios.length && tieneFoco() && (f.length >= 2 || siempreFoto)) { mandar({ t: 'mandos', id, desde, mandos: propios.map(fotoDe) }); estado.fotosMandadas++; }
       estado.usandoFoto = false;
       if (!propios.length && foto && ahora() - fotoT < VIGENCIA_FOTO_MS) { lista = foto; estado.usandoFoto = true; }
       if (f.length < 2) return lista;

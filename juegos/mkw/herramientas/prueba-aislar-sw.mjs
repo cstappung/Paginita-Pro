@@ -12,6 +12,7 @@
 //   8. el sitio ya no puede tocar el marco directo (SecurityError) — se espera que sea así: lo que hoy hace
 //   colabtex/src/juegos/mkw.js con w.mkwConectarRecords/Nube/Vr tendría que ir por postMessage.
 // Uso:  MKW_BUILD=build/web-e2w10/navegador node herramientas/prueba-aislar-sw.mjs [--ventana] [--modo sw|sw-corp] [--puerto 8160]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import path from 'node:path';
 import os from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -32,7 +33,7 @@ const sitio = spawn(process.execPath, [path.join(raiz, 'herramientas/sitio-local
 await new Promise((listo, mal) => { sitio.stdout.on('data', d => { if (/8\d{3}/.test(String(d))) listo(); }); sitio.on('exit', c => mal(new Error('sitio-local salió ' + c))); setTimeout(listo, 4000); });
 const perfil = mkdtempSync(path.join(os.tmpdir(), 'mkw-aislar-'));
 const contexto = await chromium.launchPersistentContext(perfil, {
-  channel: 'chrome', headless: !args.includes('--ventana'), viewport: { width: 1280, height: 720 },
+  ...opcionesNavegador(), headless: !args.includes('--ventana'), viewport: { width: 1280, height: 720 },
   args: ['--mute-audio', '--autoplay-policy=no-user-gesture-required',
     ...(args.includes('--ventana') ? [`--window-position=${process.env.MKW_VENTANA || '-1880,549'}`] : [])],
 });

@@ -8,6 +8,7 @@
 // ?perfilGpu=1: la mediana del tramo de cada cuadro), pasadas/dibujos/copias/KB por cuadro (?gpu=1, ?ventanaGpu=0), los
 // pipelines nuevos y las 8 pasadas más caras. Así se ve si lo caro es la CPU o la tarjeta, y qué pasada.
 // Uso:  node herramientas/medir-personaje.mjs [--ventana] [--chrome "…"] [--lugares personaje,sala-personaje,carrera] ["&param=…"]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -26,7 +27,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !VENTANA,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !VENTANA,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-dawn-features=timestamp_quantization',
     ...(VENTANA ? [`--window-position=${process.env.MKW_VENTANA || '-1880,549'}`] : []), ...(CHROME ? CHROME.split(' ') : [])] });

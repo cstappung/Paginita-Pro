@@ -14,6 +14,7 @@
 //
 // Uso:  node web/navegador/prueba-red-estado.mjs [--lastre=6] [--segundos=20] [--etiqueta=X] [--ventana] [--extra-b=&…] [--extra=&… (a las dos)]
 //       (~6 min; MKW_BUILD = otro programa; con --ventana la ventana va a MKW_VENTANA, por omisión el monitor de 144 Hz)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -36,7 +37,7 @@ const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servido
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const VENTANA = process.argv.includes('--ventana');
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !VENTANA,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !VENTANA,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', ...(VENTANA ? [`--window-position=${vx},${vy}`] : [])] });
 const contexto = await navegador.newContext({ viewport: { width: 960, height: 540 } });

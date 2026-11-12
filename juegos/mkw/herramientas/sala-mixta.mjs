@@ -27,6 +27,7 @@
 //       node herramientas/sala-mixta.mjs --resumen <carpeta>   (rehace resumen.md desde los .json, con el tráfico extrapolado a 12)
 //       (con el candado: herramientas/tanda-sala-mixta.sh, que es como se corre siempre)
 // Salida: <datos>/<escenario>-<modo>-<conexion>.json + .md (el informe) y una fila en <datos>/resumen.md
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -147,7 +148,7 @@ async function correrEscenario(nombre) {
     // ---- 1. un Chrome por jugador (otro proceso, otro perfil) ----
     for (const j of e.jugadores) {
       const ventana = j.monitor !== 60;
-      const nav = await chromium.launch({ channel: 'chrome', headless: !ventana,
+      const nav = await chromium.launch({ ...opcionesNavegador(), headless: !ventana,
         args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows', `--window-position=${vx + 40 * j.i},${vy + 30 * j.i}`] });
       navegadores.push(nav);

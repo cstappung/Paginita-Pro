@@ -32,6 +32,7 @@
 // del juego; la medición de antes (sin etiqueta, 2026-10-20) es con los del juego (normal = su fila normal, dificil =
 // su fila difícil). Cada carrera anota lo que dice el gancho nativo (mkw_cpu_estado: nivel aplicado, velocidad escrita;
 // §99: 14 la tabla de RR cargada, 15 karts de CPU mejorados, 16 el tope escrito ×1000, 17 veces que se subió el tope).
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -205,7 +206,7 @@ console.log(`${cola.length} carreras por correr (${hechas.size} ya medidas), ${P
 // el servidor del juego (solo esta PC) y Chrome, los dos nuestros: al terminar se cierran solo estos
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true, args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const contexto = await navegador.newContext();
 let hecho = 0;
 const trabajador = async () => {

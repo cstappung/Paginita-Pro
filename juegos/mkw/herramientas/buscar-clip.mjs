@@ -9,6 +9,7 @@
 // (perfil-gpu.mjs) hasta dar con la ClipInfo (o las pocas) que causan lo de más. Al final dice su número, su dirección y
 // los 0x24 bytes de cada una, y las primeras palabras de lo que la rodea (para saber de qué objeto es).
 // Uso:  MKW_BUILD=build/web-269n/navegador node herramientas/buscar-clip.mjs [--pista 0.0] [--puerto 8177]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +25,7 @@ const puente = puenteSenal();
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: true,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: true,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', `--window-position=${vx},${vy}`] });
 const sala = 'bc' + Date.now().toString(36), uids = ['j0' + sala, 'j1' + sala], paginas = [];

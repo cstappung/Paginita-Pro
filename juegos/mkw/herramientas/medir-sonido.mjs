@@ -13,6 +13,7 @@
 // Uso:  node herramientas/medir-sonido.mjs [--caminos viejo,worklet] [--cpu 2] [--puerto 8176] [--extra "&audioMs=30"]
 //       MKW_BUILD=build/web-audio/navegador node herramientas/medir-sonido.mjs     (otro build)
 // Sale en build/web/datos/medir-sonido/<fecha>.json (+ .log con la consola del juego).
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, createWriteStream, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -68,7 +69,7 @@ process.exit(0);
 async function medir(camino) {
   const perfil = path.join(os.tmpdir(), `mkw-sonido-${process.pid}-${camino}`);
   const contexto = await chromium.launchPersistentContext(perfil, {
-    channel: 'chrome', headless: !args.includes('--ventana'), viewport: { width: 1280, height: 800 },
+    ...opcionesNavegador(), headless: !args.includes('--ventana'), viewport: { width: 1280, height: 800 },
     args: ['--mute-audio', '--enable-unsafe-webgpu', '--force_high_performance_gpu'],   // sin sonido (pedido del dueño)
   });
   try {

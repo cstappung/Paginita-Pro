@@ -12,6 +12,7 @@
 //
 // Uso:  node herramientas/medir-version-archivo.mjs [--puerto 8174] [--archivo files/sound/revo_kart.brsar]
 //       → una línea por camino y build/web/datos/version-archivo/medida-<hora>.json
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -37,7 +38,7 @@ async function servidor(cambiado) {
 // una visita a la precarga con el perfil dir: lo que bajó el disco
 async function visita(dir, extra, cambiado) {
   const s = await servidor(cambiado);
-  const ctx = await chromium.launchPersistentContext(dir, { channel: 'chrome', headless: true,
+  const ctx = await chromium.launchPersistentContext(dir, { ...opcionesNavegador(), headless: true,
     args: ['--enable-unsafe-webgpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
   const p = ctx.pages()[0] || await ctx.newPage();
   const t0 = Date.now();

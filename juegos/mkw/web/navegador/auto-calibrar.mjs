@@ -45,6 +45,15 @@ export const NOMBRE_N8 = { 0: '60 siempre', 1: '30 parejas', 2: '30 con imagen i
 export const textoSalida = s => (s ? `salida ${s}` : 'salida de tu pantalla');
 export const textoCombo = c => `${NOMBRE_N8[c.n8] ?? c.n8} · ${textoSalida(c.salida)}`;
 const f1 = x => (Number.isFinite(x) ? Math.round(x) : '—');
+// §274.6 (el dueño 2026-11-12: «tiene que settear resolución e imagen y fps»): la «Fluidez» (imágenes intermedias del
+// motor, 120/180; pide reiniciar el juego, así que no se puede probar en el momento) también queda escrita. Las
+// intermedias cuestan imágenes de más: valen solo con «60 siempre» y con el 1 % bajo a 57 o más (el aparato sobra);
+// en cualquier otro caso, 60 (lo de siempre). Con sobra se deja lo que la persona tenía
+export const textoFluidez = f => (f ? `fluidez ${f}` : 'fluidez 60');
+export function fluidezPara(e, fluidezAntes = 0) {
+  if (!e || e.n8 !== 0 || !(e.bajo1 >= LOGICA_MIN) || e.sinLogica) return 0;
+  return Number(fluidezAntes) || 0;
+}
 
 // las salidas que vale la pena probar con el lienzo de `alto` pixeles (las de más arriba no cambian nada): preferidas
 // 720, 540 y 360; si la pantalla es más chica que todas, la más alta de las que quedan bajo ella
@@ -167,10 +176,11 @@ export async function calibrar({ actual, alto, aplicar, esperar, medir, ahora = 
 export function textoEleccion(r, { escala = 1, fluidez = 0 } = {}) {
   if (!r?.elegido) return 'No se pudo medir (¿la carrera terminó?). Lo de antes quedó como estaba.';
   const e = r.elegido;
-  let t = `Elegido: ${textoCombo(e)} — 1 % bajo ${f1(e.bajo1)} fps` + (r.antes && r.antes !== e ? ` (antes ${f1(r.antes.bajo1)})` : ' (lo que ya tenías era lo mejor)');
+  let t = `Elegido: ${textoCombo(e)} · ${textoFluidez(r.fluidez ?? fluidez)} — 1 % bajo ${f1(e.bajo1)} fps` + (r.antes && r.antes !== e ? ` (antes ${f1(r.antes.bajo1)})` : ' (lo que ya tenías era lo mejor)');
   if (e.sinLogica) t += '. Ninguna combinación llegó a 60 de lógica: se dejó la que más se acercó.';
   if ((escala > 1 || fluidez > 0) && Number.isFinite(e.bajo1) && e.bajo1 < 50)
-    t += ' Para más fluidez prueba bajar «Resolución interna» o «Fluidez» (piden reiniciar el juego).';
+    t += ' Para más fluidez prueba bajar «Resolución interna» (pide reiniciar el juego).';
+  if (r.fluidezAntes !== undefined && r.fluidez !== r.fluidezAntes) t += ` La fluidez pasa de ${r.fluidezAntes || 60} a ${r.fluidez || 60}: vale al reiniciar el juego.`;
   return t;
 }
 
@@ -210,8 +220,10 @@ export function crearAutoCalibrar(d) {
       alProgreso: p => decir(`⚡ Probando ${p.paso}: ${textoCombo(p.combo)}… (quedan ${Math.ceil(p.queda / 1000)} s)`) });
     for (const x of r.resultados) nota(`${textoCombo(x)}: 1 % bajo ${f1(x.bajo1)}, ${f1(x.fps)} fps, lógica ${f1(x.logicaFinal)}${x.logicaEstimada ? ' (estimada)' : ''}, ocupado ${Number.isFinite(x.ocupado) ? Math.round(100 * x.ocupado) + ' %' : '—'}${x.llega === false ? ' — descartada (lógica < 60)' : ''}`);
     if (r.elegido) {
-      est.previo = { n8: g.n8, salida: g.salida };
-      d.guardar({ ...d.leer(), n8: r.elegido.n8, salida: r.elegido.salida });
+      est.previo = { n8: g.n8, salida: g.salida, fluidez: g.fluidez ?? 0 };
+      // (§274.6: los tres ajustes quedan escritos en mkw.graficos y la hoja los pinta, aunque sean los mismos de antes)
+      r.fluidezAntes = Number(g.fluidez) || 0; r.fluidez = fluidezPara(r.elegido, r.fluidezAntes);
+      d.guardar({ ...d.leer(), n8: r.elegido.n8, salida: r.elegido.salida, fluidez: r.fluidez });
     }
     r.texto = textoEleccion(r, g);
     est.ultimo = r; est.veces++;
@@ -247,6 +259,30 @@ export function crearAutoCalibrar(d) {
     finally { s.terminarPausa(); }
   }
 
+  // §287 (el dueño: «autocalibracion debe pausar a todos en todos los modos de juego»): sin sala —Single Player, VS,
+  // Contrarreloj, GP, Local 2-4, la sala de 1 humano que corre la carrera de siempre— la carrera también queda quieta
+  // mientras se prueba (mkw_congelar: todos los jugadores de esta consola), con el aviso y la lógica estimada, como en la
+  // sala. Si ya estaba quieta (el «▶» del mando en pantalla abrió el cajón, §286), se suelta para medir la base y al
+  // terminar se deja como estaba
+  async function enSolo(t0) {
+    const previo = !!d.congeladoAhora?.();
+    if (previo) { d.congelarJuego(false); await esperar(300); }
+    let congelada = false;
+    try {
+      decir('⚡ Midiendo cómo va la carrera…');
+      const base = await medir(BASE_MS);
+      if (!d.enCarrera()) return { cancelada: 'la carrera terminó' };
+      d.congelarJuego(true); congelada = true; est.congeladaPor = d.yo ?? 'yo';
+      const hasta = ahora() + (TOPE_MS - (ahora() - t0));
+      d.aviso?.mostrar('Tú', () => Math.max(0, hasta - ahora()), { propio: true, solo: true });
+      nota('congelada (sin sala)');
+      return await correr(t0, { congelada: true, base: { logica: base.logica, ocupado: base.ocupado } });
+    } finally {
+      if (congelada) { est.congeladaPor = null; d.aviso?.ocultar(); nota('sigue (sin sala)'); }
+      d.congelarJuego(previo);
+    }
+  }
+
   async function apretar() {
     if (est.corriendo) return null;
     const s = d.sala?.() || null;
@@ -261,7 +297,7 @@ export function crearAutoCalibrar(d) {
     const t0 = ahora();
     let r;
     try {
-      r = s ? await enSala(t0, s, d.lockstep?.()) : await correr(t0);
+      r = s ? await enSala(t0, s, d.lockstep?.()) : await enSolo(t0);
     } catch (e) { r = { cancelada: String(e?.message || e) }; }
     finally { est.corriendo = false; }
     if (r?.cancelada) { nota(`no se calibró: ${r.cancelada}`); decir(`No se calibró: ${r.cancelada}.`); est.ultimo = r; return r; }
@@ -271,7 +307,7 @@ export function crearAutoCalibrar(d) {
   function deshacer() {
     if (!est.previo || est.corriendo) return false;
     const p = est.previo; est.previo = null;
-    d.guardar({ ...d.leer(), n8: p.n8, salida: p.salida });
+    d.guardar({ ...d.leer(), n8: p.n8, salida: p.salida, ...(p.fluidez !== undefined ? { fluidez: p.fluidez } : {}) });
     d.aplicarN8(p.n8); d.aplicarSalida(p.salida);
     nota(`deshecho: vuelve a ${p.n8 === 'auto' ? 'Automático' : NOMBRE_N8[p.n8]} · ${textoSalida(p.salida)}`);
     decir('Vuelto como estaba.');
@@ -292,7 +328,8 @@ export function crearAutoCalibrar(d) {
       };
       if (ls && p.cuadro !== null && p.cuadro !== undefined && d.enCarrera()) ls.congelarEn(p.cuadro, congelar);
       else if (d.enCarrera()) congelar(null);
-      if (p.de !== d.yo) d.aviso?.mostrar(d.nombreDe?.(p.de) || 'Un piloto', () => s?.restan(p.hasta) ?? 0);
+      // (§287: el aviso también en la pantalla de quien calibra: el dueño quiere ver el juego quieto y por qué)
+      d.aviso?.mostrar(d.nombreDe?.(p.de) || 'Un piloto', () => s?.restan(p.hasta) ?? 0, { propio: p.de === d.yo });
     }
     if (!p && est.pausaVista) soltar('fin de la pausa');
   }
@@ -338,11 +375,13 @@ export function crearAvisoPausa(doc = globalThis.document) {
   let reloj = null;
   return {
     nodo,
-    mostrar(nombre, restan) {
+    // (§287: propio = quien calibra también ve el aviso; solo = sin sala: la pausa es de esta consola, con todos sus jugadores)
+    mostrar(nombre, restan, { propio = false, solo = false } = {}) {
       const pinta = () => {
         const s = Math.max(0, Math.ceil((restan() || 0) / 1000));
-        b.textContent = `⏸ ${nombre} está calibrando su imagen — vuelve en ${s} s`;
-        p.textContent = 'La carrera y todos los relojes de la sala están en pausa. Nadie pierde puestos ni puntos: todos siguen desde el mismo instante.';
+        b.textContent = propio ? `⏸ Calibrando tu imagen — vuelve en ${s} s` : `⏸ ${nombre} está calibrando su imagen — vuelve en ${s} s`;
+        p.textContent = solo ? 'La carrera está en pausa: sigue desde el mismo instante, con todos los relojes donde estaban.'
+          : 'La carrera y todos los relojes de la sala están en pausa. Nadie pierde puestos ni puntos: todos siguen desde el mismo instante.';
       };
       pinta(); nodo.hidden = false;
       clearInterval(reloj); reloj = setInterval(pinta, 250);

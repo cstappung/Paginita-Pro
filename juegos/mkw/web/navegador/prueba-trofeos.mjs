@@ -16,6 +16,7 @@
 //   4. recarga la página: vuelven antes de que arranque el juego, con los mismos bytes.
 //
 // Uso:  node web/navegador/prueba-trofeos.mjs [--ventana] [--puerto N]    (MKW_BUILD = otro build, como siempre)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -35,7 +36,7 @@ const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.l
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const pagina = await navegador.newPage({ viewport: { width: 1000, height: 1100 } });
 const espera = ms => new Promise(r => setTimeout(r, ms));

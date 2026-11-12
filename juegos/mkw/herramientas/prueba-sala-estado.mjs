@@ -15,6 +15,7 @@
 // Uso:  MKW_BUILD=build/web-275/navegador node herramientas/prueba-sala-estado.mjs [--telefono] [--lockstep]
 //         [--pistas 0.0] [--segundos 30] [--extra "&…"] [--etiqueta X]      (con el candado: QUIEN=red-estado)
 // Salida: build/web/datos/red-estado/sala-<etiqueta>.json (y la corrida del teléfono en build/web/datos/telefono/<fecha>)
+import { opcionesNavegador } from './navegador.mjs';   // §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +43,9 @@ const PUERTO = TELEFONO ? 8140 : Number(opcion('--puerto', 8165));
 const turn = TELEFONO && !process.argv.includes('--sin-cable') ? await crearTurn() : null;
 const CONEXION = turn ? '&conexion=cloudflare' : '';
 const SEGUNDOS = Number(opcion('--segundos', 30)), EXTRA = opcion('--extra', '');
+// §286: --build-b=CARPETA = B corre OTRO programa (el servidor se lo da con MKW_BUILD_B y &build=b): la sala no debe largar
+// (estado.versionDistinta y el aviso «… tiene otra versión: recarguen»); la prueba termina ahí
+const BUILD_B = opcion('--build-b', '');
 const PISTAS = opcion('--pistas', '0.0').split(',').map(s => { const [copa, fila] = s.split('.').map(Number); return { copa, fila }; });
 const ETIQUETA = opcion('--etiqueta', `${LOCKSTEP ? 'lockstep' : 'estado'}${TELEFONO ? '-telefono' : ''}`);
 const carpeta = path.join('build', 'web', 'datos', 'red-estado');
@@ -51,7 +55,7 @@ const ok = (t, c, d = '') => { c ? bien++ : mal++; console.log(`${c ? '✓' : '�
 const espera = ms => new Promise(r => setTimeout(r, ms));
 const resultado = { etiqueta: ETIQUETA, telefono: TELEFONO, lockstep: LOCKSTEP, pistas: PISTAS, segundos: SEGUNDOS };
 
-const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env } });
+const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...(BUILD_B ? { MKW_BUILD_B: BUILD_B } : {}) } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 
 const leer = p => Promise.race([espera(10000).then(() => ({ colgada: true })), p.evaluate(() => {
@@ -114,6 +118,18 @@ async function sala(A, B, dB) {
   };
   const [ea, eb] = await Promise.all([elegir(A, false), elegir(B, TELEFONO)]);
   ok('las dos consolas eligieron personaje', !!(ea?.eleccion && eb?.eleccion));
+  if (BUILD_B) {
+    // §286: con dos programas la anfitriona no larga: 60 s en «elegir», el estado dice quién y las dos muestran el aviso
+    await espera(60000);
+    const v = await Promise.all([A, B].map(p => p.evaluate(() => ({ fase: window.mkwEstado.sala?.fase, otra: window.mkwEstado.sala?.versionDistinta || [],
+      programa: window.mkwPrograma, aviso: document.getElementById('esperaCarga')?.hidden === false ? document.getElementById('esperaCarga').textContent : null,
+      versiones: window.mkwSala?.versiones?.() })).catch(e => ({ error: e.message }))));
+    console.log(`  programas: A ${v[0]?.programa} · B ${v[1]?.programa}`);
+    ok('§286: con otro programa en B la sala no larga (60 s en «elegir» con los dos elegidos)', v.every(x => x.fase === 'elegir'), v.map(x => x.fase).join('/'));
+    ok('…el estado dice que B tiene otra versión', v.every(x => x.otra.length === 1 && x.otra[0] === uidB), JSON.stringify(v.map(x => x.otra)));
+    ok('…y las dos lo muestran («… otra versión … recarg…»)', v.every(x => /otra versión/.test(x.aviso || '') && /recarg/.test(x.aviso || '')), v.map(x => x.aviso).join(' | '));
+    return r;
+  }
   for (let n = 1; n <= PISTAS.length; n++) {
     const c = { carrera: n };
     const cuenta = await Promise.all([A, B].map((p, k) => esperarQue(p, x => x.sala?.fase === 'correr' && x.sala?.carrera === n && x.etapa >= 0 && x.etapa <= 2 && x.logica > 0, 420000, (k ? 'B' : 'A') + ' hasta la carrera')));
@@ -186,7 +202,8 @@ async function sala(A, B, dB) {
     if (CALIBRAR && n === 1) {
       const leerCal = p => p.evaluate(() => { const a = window.mkwAutoCalibrar?.estado, R = window.mkwRedEstadoSala?.estado?.();
         return { corriendo: !!a?.corriendo, congeladaPor: a?.congeladaPor ?? null, texto: a?.ultimo?.texto ?? null, atraso: R?.alDia?.atraso ?? null }; }).catch(() => null);
-      await B.evaluate(() => window.mkwAutoCalibrar?.apretar?.()).catch(() => {});
+      // (§274.6: sin esperar la promesa de apretar(): la prueba miraba recién al terminar la calibración y no veía la pausa)
+      await B.evaluate(() => { window.mkwAutoCalibrar?.apretar?.(); }).catch(() => {});
       const visto = { A: false, B: false }; let fin = null;
       for (const h = Date.now() + 45000; Date.now() < h;) {
         const [a, b] = await Promise.all([leerCal(A), leerCal(B)]);
@@ -197,10 +214,17 @@ async function sala(A, B, dB) {
       await espera(5000);
       const [a2, b2] = await Promise.all([leerCal(A), leerCal(B)]);
       c.calibrar = { visto, fin, despues: { A: a2, B: b2 } };
+      // (§274.6: lo que anotó la auto calibración en cada una, para saber por qué no se pausó)
+      c.calibrarHist = await Promise.all([A, B].map(p => p.evaluate(() => ({ h: window.mkwAutoCalibrar?.estado?.historial || [], pausa: window.mkwSala?.pausa ?? null, sala: !!window.mkwSala, lista: window.mkwSala?.lista })).catch(x => String(x))));
+      console.log(`  carrera ${n}: calibrar (historial) ${JSON.stringify(c.calibrarHist)}`);
+      // (§274.6: lo que anotó la auto calibración en cada una, para saber por qué no se pausó)
+      c.calibrarHist = await Promise.all([A, B].map(p => p.evaluate(() => ({ h: window.mkwAutoCalibrar?.estado?.historial || [], pausa: window.mkwSala?.pausa ?? null, sala: !!window.mkwSala, lista: window.mkwSala?.lista })).catch(x => String(x))));
+      console.log(`  carrera ${n}: calibrar (historial) ${JSON.stringify(c.calibrarHist)}`);
       console.log(`  carrera ${n}: calibrar ${JSON.stringify(c.calibrar)}`);
-      // (en «Cada uno su kart» nadie espera a nadie: B calibra con la carrera andando, sin la pausa de la sala; A no se congela)
-      ok(`carrera ${n}: «⚡ Auto calibración» en B termina sin congelar a A, y quedan parejas (atraso ≤ 5 cuadros)`,
-        !visto.A && !!(fin?.texto || b2?.texto) && Math.abs(a2?.atraso ?? 99) <= 5 && Math.abs(b2?.atraso ?? 99) <= 5, JSON.stringify(c.calibrar).slice(0, 300));
+      // (§274.6, el dueño: «debiera freezear el juego de todos con el mensaje de aviso»: también en «Cada uno su kart» la
+      // pausa de la sala congela a todas; al seguir, el lento al día las empareja)
+      ok(`carrera ${n}: «⚡ Auto calibración» en B congela a las dos (A también), termina y quedan parejas (atraso ≤ 5 cuadros)`,
+        visto.A && visto.B && !!(fin?.texto || b2?.texto) && Math.abs(a2?.atraso ?? 99) <= 5 && Math.abs(b2?.atraso ?? 99) <= 5, JSON.stringify(c.calibrar).slice(0, 300));
     }
     if (vigia) {
       const filas = await vigia.parar(); c.vigia = filas;
@@ -286,13 +310,25 @@ async function sala(A, B, dB) {
     await espera(5000);                                                      // (los resultados suman los puntos)
     c.llegada = await Promise.all([A, B].map(p => p.evaluate(() => { const L = window.mkwMenus, ri = L.u32(0x809BD730), lista = L.u32(ri + 0xC);
       const t = q => q ? (L.u16(q + 4) * 60 + L.u8(q + 6)) * 1000 + L.u16(q + 8) : -1;
-      return { fin: window.mkwRedEstadoSala?.estado?.()?.fin, etapas: window.mkwRedEstadoSala?.estado?.()?.etapas, humanos: [0, 1].map(i => { const q = L.u32(lista + 4 * i); return { puesto: L.u8(q + 0x20), flags: L.u32(q + 0x38), ms: t(L.u32(q + 0x40)) }; }) };
+      return { fin: window.mkwRedEstadoSala?.estado?.()?.fin, etapas: window.mkwRedEstadoSala?.estado?.()?.etapas, humanos: [0, 1].map(i => { const q = L.u32(lista + 4 * i); return { puesto: L.u8(q + 0x20), flags: L.u32(q + 0x38), ms: t(L.u32(q + 0x40)) }; }),
+        todos: Array.from({ length: 12 }, (_, i) => { const q = L.u32(lista + 4 * i); return q ? [L.u8(q + 0x20), t(L.u32(q + 0x40))] : [0, -1]; }) };
     }).catch(e => e.message)));
     console.log(`  carrera ${n}: llegada A ${JSON.stringify(c.llegada[0])} · B ${JSON.stringify(c.llegada[1])}`);
     if (dnfAqui) {
       const h = c.llegada.map(x => x?.humanos?.[1]), h0 = c.llegada[0]?.humanos?.[0];
       ok(`carrera ${n}: el humano de B que no llegó lo termina el plazo DNF (≥ 30 s después del primero) con el mismo tiempo en las dos`,
         h[0] && h[1] && h[0].ms === h[1].ms && h0 && h[0].ms >= h0.ms + 29000, `A ${h[0]?.ms} · B ${h[1]?.ms} · el primero ${h0?.ms}`);
+    }
+    // §275b.12: la tabla del final (página 0x30) muestra el tiempo de cada puesto: los 12 con un tiempo de verdad (entre
+    // 5 s y 30 min), mejor puesto = menos tiempo, y los mismos en las dos consolas (el dueño vio el 1.º con 20:13.886 y
+    // los demás en 00:00.000)
+    {
+      const tabla = x => (x?.todos || []).filter(([pu]) => pu > 0).sort((a, b) => a[0] - b[0]);
+      const ta = tabla(c.llegada[0]), tb = tabla(c.llegada[1]);
+      const sano = t => t.length === 12 && t.every(([, ms]) => ms > 5000 && ms < 1800000) && t.every(([, ms], i) => i === 0 || ms >= t[i - 1][1]);
+      const fmt = t => t.map(([pu, ms]) => `${pu}.º ${(ms / 1000).toFixed(3)}`).join(' ');
+      ok(`carrera ${n}: la tabla del final trae los 12 tiempos, en orden y los mismos en las dos`, sano(ta) && sano(tb) && JSON.stringify(ta) === JSON.stringify(tb),
+        `A ${fmt(ta)} · B ${fmt(tb)}`);
     }
     c.puntos = await Promise.all([A, B].map(p => p.evaluate(() => { const L = window.mkwMenus, rd = L.u32(0x809BD728);
       return Array.from({ length: 12 }, (_, i) => L.u16(rd + 0xC10 + 8 + i * 0xF0 + 0xDA)); }).catch(() => null)));
@@ -322,7 +358,7 @@ const salaId = 'se' + Date.now().toString(36), uidA = 'A' + salaId, uidB = 'B' +
 const q = uid => `/?auto=1&${LOCKSTEP ? 'red=malla&sonda=1' : 'red=estado'}&senal=canal&sala=${salaId}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
   `&modo=sala&estilo=copa&carreras=${PISTAS.length}&descanso=12&semilla=4242&cc=c150&cpu=normal&pista=${PISTAS[0].copa}.${PISTAS[0].fila}${CONEXION}${EXTRA}`;
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: false,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: false,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', `--window-position=${vx},${vy}`] });
 const puente = puenteSenal();
@@ -339,7 +375,7 @@ try {
     await puente.agregar(ctxB);
     const B = await ctxB.newPage();
     B.on('pageerror', e => console.log('[B] [pageerror] ' + e.message));
-    await B.goto(`http://127.0.0.1:${PUERTO}${q(uidB)}`);
+    await B.goto(`http://127.0.0.1:${PUERTO}${q(uidB)}${BUILD_B ? '&build=b' : ''}`);
     resultado.sala = await sala(A, B, null);
   } else {
     const puertos = turn ? [PUERTO, turn.puerto] : [PUERTO];

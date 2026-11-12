@@ -9,6 +9,7 @@
 //      se mueve solo (Lakitu, banderas, el público) más la diferencia de las texturas. Las dos fotos y la de la
 //      diferencia (×8) quedan en build/web/datos/g6/ (son del juego: nunca a git).
 // Uso:  node web/navegador/prueba-texturas-bc.mjs [--puerto 8168] [--ventana]   → ✓/✗
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,7 @@ const ok = (txt, si, extra = '') => { si ? bien++ : mal++; console.log(`  ${si ?
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`] });
 
 // una carrera: extra = lo que se agrega; devuelve la foto (PNG) de la cuenta de salida y los contadores de G6

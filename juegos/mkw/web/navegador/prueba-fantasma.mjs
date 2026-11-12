@@ -11,6 +11,7 @@
 //      un fantasma en la carrera (tipo 3), su tiempo es el de Ana y maneja solo (con Bea quieta, va adelante).
 //
 // Uso:  node web/navegador/prueba-fantasma.mjs [--ventana] [--puerto 8165]    (MKW_BUILD = otro build, como siempre)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -32,7 +33,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const contexto = await navegador.newContext({ viewport: { width: 1000, height: 1100 } });
 const pagina = await contexto.newPage();

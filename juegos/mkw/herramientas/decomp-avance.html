@@ -1,0 +1,237 @@
+<title>Decompilación MKW</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Tablero: resumen arriba (dos medidores), mapa de zonas al medio, historial y tabla abajo. Una columna en el teléfono. */
+:root {
+  --fondo: #f3f5f8; --panel: #ffffff; --linea: #d9dee7; --tinta: #18202c; --suave: #5b6676;
+  --hecho: #1f9d55; --curso: #c98a0c; --publico: #3b7fc4; --falta: #dfe3ea; --falta-tinta: #4a5565; --acento: #2456c9;
+  --f-titulo: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-texto: Inter, "Segoe UI", system-ui, sans-serif;
+  --f-dato: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #10141b; --panel: #181e28; --linea: #2b3443; --tinta: #e8ecf3; --suave: #99a4b5;
+  --hecho: #37c172; --curso: #e3a733; --publico: #5fa0e6; --falta: #2a3240; --falta-tinta: #b3bccb; --acento: #7ea6ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #10141b; --panel: #181e28; --linea: #2b3443; --tinta: #e8ecf3; --suave: #99a4b5;
+  --hecho: #37c172; --curso: #e3a733; --publico: #5fa0e6; --falta: #2a3240; --falta-tinta: #b3bccb; --acento: #7ea6ff; color-scheme: dark }
+body { background: var(--fondo); color: var(--tinta); font-family: var(--f-texto); font-size: 15px; line-height: 1.5;
+  padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.hoja { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-family: var(--f-titulo); font-size: 28px; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-titulo); font-size: 18px; margin: 0; }
+p { margin: 0; } .suave { color: var(--suave); } .dato { font-family: var(--f-dato); font-variant-numeric: tabular-nums; }
+.cabeza { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+.cabeza p { max-width: 62ch; }
+.alcance { display: inline-flex; border: 1px solid var(--linea); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.alcance button { font: 500 14px var(--f-texto); padding: 8px 14px; border: 0; background: transparent; color: var(--suave); cursor: pointer; }
+.alcance button[aria-pressed="true"] { background: var(--acento); color: var(--panel); }
+button:focus-visible, input:focus-visible, select:focus-visible, .tesela:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.panel { background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; padding: 18px; min-width: 0; }
+.medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.medidor .fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.rotulo { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); font-weight: 600; }
+.grande { font-family: var(--f-titulo); font-weight: 700; font-size: 34px; font-variant-numeric: tabular-nums; }
+.barra { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--falta); margin: 10px 0; }
+.barra i { display: block; height: 100%; } .b-hecho { background: var(--hecho); } .b-curso { background: var(--curso); } .b-publico { background: var(--publico); }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--suave); }
+.leyenda b { color: var(--tinta); font-weight: 600; }
+.punto { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.titulo-sec { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; margin-bottom: 12px; }
+.mapa { position: relative; width: 100%; height: 440px; border-radius: 6px; overflow: hidden; background: var(--falta); }
+.tesela { position: absolute; box-sizing: border-box; border: 1px solid var(--panel); overflow: hidden; padding: 3px 5px; cursor: pointer;
+  font: 600 11px/1.25 var(--f-dato); color: var(--falta-tinta); background: var(--falta); text-align: left; }
+.tesela span { display: block; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tesela.hecho { background: var(--hecho); color: var(--panel); } .tesela.curso { background: var(--curso); color: var(--panel); }
+.tesela.publico { background: var(--publico); color: var(--panel); } .tesela.sel { outline: 3px solid var(--tinta); outline-offset: -3px; z-index: 2; }
+.ficha { margin-top: 12px; padding: 12px 14px; border: 1px dashed var(--linea); border-radius: 8px; font-size: 14px; min-height: 44px; }
+.ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin: 6px 0 0; } .ficha dt { color: var(--suave); } .ficha dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.rejilla3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.caja { border: 1px solid var(--linea); border-radius: 8px; padding: 12px 14px; font-size: 14px; }
+.caja .grande { font-size: 24px; }
+.desliza { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--linea); white-space: nowrap; }
+th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); font-weight: 600; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-dato); }
+td.nom { white-space: normal; overflow-wrap: anywhere; min-width: 180px; }
+.pastilla { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--linea); color: var(--suave); }
+.pastilla.hecho { background: var(--hecho); border-color: var(--hecho); color: var(--panel); } .pastilla.curso { background: var(--curso); border-color: var(--curso); color: var(--panel); }
+.pastilla.publico { border-color: var(--publico); color: var(--publico); } .pastilla.rr { border-color: var(--curso); color: var(--curso); }
+.filtros { display: flex; flex-wrap: wrap; gap: 8px; }
+.filtros input, .filtros select, .mas { font: 14px var(--f-texto); padding: 7px 10px; border: 1px solid var(--linea); border-radius: 8px; background: var(--panel); color: var(--tinta); }
+.filtros input { flex: 1 1 200px; min-width: 0; } .mas { cursor: pointer; margin-top: 12px; }
+svg text { fill: var(--suave); font: 11px var(--f-dato); }
+</style>
+
+<div class="hoja">
+  <header class="cabeza">
+    <div>
+      <h1>Decompilación de Mario Kart Wii</h1>
+      <p class="suave">Cuánto del código traducido por máquina ya fue reescrito a mano y probado idéntico. <span id="generado"></span></p>
+    </div>
+    <div class="alcance" role="group" aria-label="Qué se cuenta">
+      <button id="alcCarrera" aria-pressed="true">Lo de la carrera</button>
+      <button id="alcTodo" aria-pressed="false">Todo el binario</button>
+    </div>
+  </header>
+
+  <section class="medidores" id="medidores"></section>
+
+  <section class="panel">
+    <div class="titulo-sec"><h2 id="mapaTitulo"></h2><p class="suave" id="mapaNota" style="font-size:13px"></p></div>
+    <div class="mapa" id="mapa"></div>
+    <div class="leyenda" style="margin-top:10px">
+      <span><i class="punto" style="background:var(--hecho)"></i>Reescrita y verificada</span>
+      <span><i class="punto" style="background:var(--curso)"></i>Calza con el original o en curso (nuestra); falta llevarla al programa</span>
+      <span><i class="punto" style="background:var(--publico)"></i>Ya calzaba en el proyecto público (material de partida)</span>
+      <span><i class="punto" style="background:var(--falta)"></i>Por hacer</span>
+    </div>
+    <div class="ficha" id="ficha"><span class="suave">Toca un recuadro para ver sus datos.</span></div>
+  </section>
+
+  <section class="panel">
+    <div class="titulo-sec"><h2>Descubrimiento: ¿cuántas funciones hay?</h2>
+      <p class="suave" style="font-size:13px">El total se mide en bytes de código, que es un número fijo de la cabecera de cada archivo.</p></div>
+    <div class="rejilla3" id="desc"></div>
+  </section>
+
+  <section class="panel">
+    <div class="titulo-sec"><h2>Historial</h2><p class="suave" style="font-size:13px">Una fila cada vez que cambian los números.</p></div>
+    <div id="grafico"></div>
+    <div class="desliza"><table id="historial"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="titulo-sec"><h2>Funciones de la carrera</h2><p class="suave" style="font-size:13px" id="tablaNota"></p></div>
+    <div class="filtros">
+      <input id="buscar" type="search" placeholder="Buscar por nombre, dirección o archivo" aria-label="Buscar función">
+      <select id="filtro" aria-label="Filtrar por estado">
+        <option value="">Todas</option><option value="hecho">Reescritas y verificadas</option><option value="curso">Calzan o en curso (nuestras)</option>
+        <option value="publico">Ya calzaban (público)</option><option value="falta">Por hacer</option><option value="rr">Las parcha Retro Rewind</option>
+      </select>
+    </div>
+    <div class="desliza"><table id="tabla"></table></div>
+    <button class="mas" id="mas" hidden>Ver 100 más</button>
+  </section>
+</div>
+
+<script>
+const D = /*DATOS*/null;
+const $ = (id) => document.getElementById(id);
+const num = (n) => Math.round(n).toLocaleString('es-CL');
+const pct = (a, b, d = 2) => (b ? 100 * a / b : 0).toFixed(d).replace('.', ',') + ' %';
+const ms = (x) => x.toFixed(x < 0.1 ? 4 : 3).replace('.', ',') + ' ms';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let alcance = 'carrera', visibles = 100;
+// una función de la carrera: [dirección, bytes, nombre, ms, pública, RR, estado, nota, unidad]
+const claseDe = (f) => f[6] === 'verificada' || f[6] === 'adoptada' ? 'hecho' : f[6] === 'borrador' || f[6] === 'calza' ? 'curso' : f[4] === 2 ? 'publico' : 'falta';
+const ETQ = { hecho: 'Verificada', curso: 'En curso', publico: 'Ya calzaba', falta: 'Por hacer' };
+
+function barra(partes) { return '<div class="barra">' + partes.map(([c, v]) => `<i class="b-${c}" style="width:${Math.max(0, v)}%"></i>`).join('') + '</div>'; }
+function medidor(rotulo, a, de, unidad, curso, pub, pie) {
+  return `<div class="panel medidor"><div class="fila"><span class="rotulo">${rotulo}</span><span class="grande">${pct(a, de)}</span></div>
+    <p class="suave" style="font-size:13px">${pie}</p>${barra([['hecho', 100 * a / de], ['curso', 100 * curso / de], ['publico', 100 * pub / de]])}
+    <div class="leyenda"><span><i class="punto" style="background:var(--hecho)"></i><b>${unidad(a)}</b> verificado</span>
+    <span><i class="punto" style="background:var(--curso)"></i><b>${unidad(curso)}</b> calza o en curso</span>
+    <span><i class="punto" style="background:var(--publico)"></i><b>${unidad(pub)}</b> ya calzaba (público)</span>
+    <span><i class="punto" style="background:var(--falta)"></i><b>${unidad(de - a - curso - pub)}</b> por hacer</span></div></div>`;
+}
+function pintarMedidores() {
+  const t = D.totales[alcance], c = D.carrera;
+  $('medidores').innerHTML = alcance === 'carrera'
+    ? medidor('Tiempo del cuadro', t.hechasMs, t.ms, ms, t.cursoMs, t.pubMs, `del código del juego que corre en una carrera: ${ms(t.ms)} por cuadro (perfil ${esc(c.perfil)}, ${num(c.cuadros)} cuadros)`) +
+      medidor('Funciones', t.hechasN, t.funciones, num, t.cursoN, t.pubN, `de las ${num(t.funciones)} funciones del juego que aparecen en el perfil de la carrera · ${num(t.adoptadasN)} adoptadas en el programa publicado`)
+    : medidor('Código', t.hechasBytes, t.bytes, (b) => num(b) + ' B', t.cursoBytes, t.pubBytes, `de ${num(t.bytes)} bytes de código (main.dol + StaticR.rel)`) +
+      medidor('Funciones', t.hechasN, t.funciones, num, t.cursoN, t.pubN, `de las ${num(t.funciones)} funciones conocidas del binario`);
+}
+
+// Mapa de recuadros («squarify»): reparte un rectángulo en recuadros de área proporcional al valor, lo más cuadrados posible.
+function repartir(items, x, y, w, h, salida) {
+  items = items.filter(i => i.v > 0); let total = items.reduce((s, i) => s + i.v, 0), i = 0;
+  while (i < items.length) {
+    const corto = Math.min(w, h), escala = (w * h) / total; let fila = [], suma = 0, peor = Infinity;
+    for (let j = i; j < items.length; j++) {                       // suma recuadros a la fila mientras no empeore la forma
+      const s2 = suma + items[j].v, lado = s2 * escala / corto; let p = 0;
+      for (const it of [...fila, items[j]]) { const l = it.v * escala / lado; p = Math.max(p, Math.max(lado / l, l / lado)); }
+      if (p > peor && fila.length) break; fila.push(items[j]); suma = s2; peor = p;
+    }
+    const lado = suma * escala / corto; let pos = 0;
+    for (const it of fila) { const l = it.v * escala / lado;
+      salida.push(w >= h ? { it, x, y: y + pos, w: lado, h: l } : { it, x: x + pos, y, w: l, h: lado }); pos += l; }
+    if (w >= h) { x += lado; w -= lado; } else { y += lado; h -= lado; }
+    total -= suma; i += fila.length;
+  }
+}
+function pintarMapa() {
+  const caja = $('mapa'), W = caja.clientWidth, H = caja.clientHeight; let items;
+  if (alcance === 'carrera') {
+    $('mapaTitulo').textContent = 'Dónde se va el tiempo de la carrera';
+    $('mapaNota').textContent = 'Cada recuadro es una función; su área es el tiempo que gasta en cada cuadro.';
+    const top = D.funciones.slice(0, 220), resto = D.funciones.slice(220);
+    items = top.map(f => ({ v: f[3], clase: claseDe(f), t1: f[2] || f[0], t2: ms(f[3]), f }));
+    if (resto.length) items.push({ v: resto.reduce((s, f) => s + f[3], 0), clase: 'falta', t1: `otras ${num(resto.length)}`, t2: ms(resto.reduce((s, f) => s + f[3], 0)), resto });
+  } else {
+    $('mapaTitulo').textContent = 'El binario entero, por zonas de 64 KB';
+    $('mapaNota').textContent = 'Cada recuadro es un tramo de direcciones; su área son los bytes de código.';
+    items = D.zonas.map(z => ({ v: z[2], clase: z[4] > 0 ? 'hecho' : z[5] > 0 ? 'curso' : z[6] / z[2] > 0.5 ? 'publico' : 'falta', t1: z[8] || z[0].slice(2, 6) + '…', t2: pct(z[4], z[2], 1), z }));
+  }
+  const cajas = []; repartir(items.sort((a, b) => b.v - a.v), 0, 0, W, H, cajas);
+  caja.innerHTML = cajas.map((c, i) => `<button class="tesela ${c.it.clase}" data-i="${i}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px" title="${esc(c.it.t1)} · ${c.it.t2}">${c.w > 46 && c.h > 17 ? esc(c.it.t1) + (c.h > 32 ? `<span>${c.it.t2}</span>` : '') : ''}</button>`).join('');
+  caja.onclick = (e) => { const b = e.target.closest('.tesela'); if (!b) return;
+    caja.querySelectorAll('.sel').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); ficha(cajas[+b.dataset.i].it); };
+}
+function ficha(it) {
+  const t = D.totales.carrera; let h;
+  if (it.f) { const f = it.f; h = `<b>${esc(f[2] || 'sin nombre')}</b> <span class="pastilla ${claseDe(f)}">${f[6] === 'calza' ? 'Calza' : ETQ[claseDe(f)]}</span>${f[5] ? ' <span class="pastilla rr">La parcha Retro Rewind</span>' : ''}
+    <dl><dt>Dirección</dt><dd class="dato">${f[0]}</dd><dt>Tamaño</dt><dd>${num(f[1])} bytes</dd><dt>En la carrera</dt><dd>${ms(f[3])} por cuadro (${pct(f[3], t.ms)} del código del juego)</dd>
+    ${f[8] ? `<dt>Archivo público</dt><dd class="dato">${esc(f[8])}</dd>` : ''}${f[7] ? `<dt>Nota</dt><dd>${esc(f[7])}</dd>` : ''}</dl>`; }
+  else if (it.z) { const z = it.z; h = `<b class="dato">${z[0]}</b> · ${z[1] === 'rel' ? 'StaticR.rel' : 'main.dol'}${z[8] ? ' · ' + esc(z[8]) : ''}
+    <dl><dt>Código</dt><dd>${num(z[2])} bytes en ${num(z[3])} funciones</dd><dt>Verificado</dt><dd>${num(z[4])} bytes (${pct(z[4], z[2])})</dd>
+    <dt>Con fuente pública</dt><dd>${num(z[6])} bytes (${pct(z[6], z[2])})</dd><dt>En la carrera</dt><dd>${ms(z[7])} por cuadro</dd></dl>`; }
+  else h = `<b>Las otras ${num(it.resto.length)} funciones de la carrera</b><p class="suave">Cada una pesa menos de ${ms(D.funciones[219][3])} por cuadro. Están todas en la tabla de abajo.</p>`;
+  $('ficha').innerHTML = h;
+}
+
+function pintarDesc() {
+  $('desc').innerHTML = D.desc.map(d => `<div class="caja"><span class="rotulo">${esc(d.nombre)}</span>
+    <div class="grande">${pct(d.cubierto, d.bytes)}</div>
+    <p>de ${num(d.bytes)} bytes tienen una función dueña (${num(d.funciones)} funciones).</p>
+    <p class="suave">${d.sinDueno ? `Sin dueño: ${num(d.sinDueno)} bytes en ${num(d.nHuecos)} huecos; el mayor en <span class="dato">${d.huecos[0] ? d.huecos[0][0] : '—'}</span> (${d.huecos[0] ? num(d.huecos[0][1]) : 0} B). ` : 'No queda ningún byte sin dueño. '}Nuestro traductor ve ${num(d.candidatas)} entradas en huecos (posibles funciones nuevas) y ${num(d.interiores)} entradas por la mitad de funciones conocidas.</p></div>`).join('');
+}
+function pintarHistorial() {
+  const h = D.historial;
+  $('historial').innerHTML = '<tr><th>Fecha</th><th class="n">Funciones</th><th class="n">Bytes</th><th class="n">Tiempo del cuadro</th></tr>' +
+    h.slice().reverse().map(r => `<tr><td class="dato">${r.fecha}</td><td class="n">${num(r.funciones)} de ${num(r.deFunciones)}</td><td class="n">${num(r.bytes)}</td><td class="n">${ms(r.ms)} de ${ms(r.deMs)} (${pct(r.ms, r.deMs)})</td></tr>`).join('');
+  if (h.length < 2) { $('grafico').innerHTML = '<p class="suave" style="margin-bottom:10px">Hay un solo registro todavía; la curva aparece con el segundo.</p>'; return; }
+  const W = 720, H = 160, m = 34, max = Math.max(...h.map(r => 100 * r.ms / r.deMs), 1), techo = Math.ceil(max / 5) * 5 || 5;
+  const X = (i) => m + i * (W - 2 * m) / (h.length - 1), Y = (v) => H - 24 - v / techo * (H - 44);
+  const pts = h.map((r, i) => `${X(i)},${Y(100 * r.ms / r.deMs)}`).join(' ');
+  $('grafico').innerHTML = `<div class="desliza"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:480px" role="img" aria-label="Porcentaje del tiempo del cuadro verificado, por fecha">
+    <line x1="${m}" y1="${Y(0)}" x2="${W - m}" y2="${Y(0)}" stroke="var(--linea)"/><line x1="${m}" y1="${Y(techo)}" x2="${W - m}" y2="${Y(techo)}" stroke="var(--linea)" stroke-dasharray="3 4"/>
+    <text x="${m - 6}" y="${Y(0) + 4}" text-anchor="end">0</text><text x="${m - 6}" y="${Y(techo) + 4}" text-anchor="end">${techo} %</text>
+    <polygon points="${m},${Y(0)} ${pts} ${X(h.length - 1)},${Y(0)}" fill="var(--hecho)" opacity=".18"/><polyline points="${pts}" fill="none" stroke="var(--hecho)" stroke-width="2"/>
+    <circle cx="${X(h.length - 1)}" cy="${Y(100 * h[h.length - 1].ms / h[h.length - 1].deMs)}" r="4" fill="var(--hecho)"/>
+    <text x="${m}" y="${H - 6}">${h[0].fecha}</text><text x="${W - m}" y="${H - 6}" text-anchor="end">${h[h.length - 1].fecha}</text></svg></div>`;
+}
+function pintarTabla() {
+  const q = $('buscar').value.trim().toLowerCase(), fl = $('filtro').value, t = D.totales.carrera;
+  const filas = D.funciones.filter(f => (!q || (f[0] + ' ' + f[2] + ' ' + f[8]).toLowerCase().includes(q)) && (!fl || (fl === 'rr' ? f[5] : claseDe(f) === fl)));
+  let acum = 0; const acumDe = new Map(); for (const f of D.funciones) { acum += f[3]; acumDe.set(f[0], acum); }
+  $('tablaNota').textContent = `${num(filas.length)} de ${num(D.funciones.length)}, de la más pesada a la más liviana.`;
+  $('tabla').innerHTML = '<tr><th>Dirección</th><th>Nombre</th><th>Estado</th><th class="n">ms por cuadro</th><th class="n">Acumulado</th><th class="n">Bytes</th></tr>' +
+    filas.slice(0, visibles).map(f => `<tr><td class="dato">${f[0]}</td><td class="nom">${esc(f[2] || '—')}${f[8] ? `<br><span class="suave dato" style="font-size:12px">${esc(f[8])}</span>` : ''}</td>
+      <td><span class="pastilla ${claseDe(f)}">${f[6] === 'calza' ? 'Calza' : ETQ[claseDe(f)]}</span>${f[5] ? ' <span class="pastilla rr">RR</span>' : ''}</td>
+      <td class="n">${f[3].toFixed(4).replace('.', ',')}</td><td class="n">${pct(acumDe.get(f[0]), t.ms, 1)}</td><td class="n">${num(f[1])}</td></tr>`).join('');
+  $('mas').hidden = filas.length <= visibles;
+}
+function todo() { pintarMedidores(); pintarMapa(); $('ficha').innerHTML = '<span class="suave">Toca un recuadro para ver sus datos.</span>'; }
+function elegir(a) { alcance = a; $('alcCarrera').setAttribute('aria-pressed', a === 'carrera'); $('alcTodo').setAttribute('aria-pressed', a === 'todo'); todo(); }
+$('alcCarrera').onclick = () => elegir('carrera'); $('alcTodo').onclick = () => elegir('todo');
+$('buscar').oninput = $('filtro').onchange = () => { visibles = 100; pintarTabla(); };
+$('mas').onclick = () => { visibles += 100; pintarTabla(); };
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(pintarMapa, 150); });
+$('generado').textContent = 'Datos del ' + new Date(D.generado).toLocaleString('es-CL', { dateStyle: 'long', timeStyle: 'short', hour12: false });
+todo(); pintarDesc(); pintarHistorial(); pintarTabla();
+</script>

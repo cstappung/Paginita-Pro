@@ -1,0 +1,7 @@
+{
+  "comentario": "La auditoría de lo que calza: una fila por función nuestra revisada en una copia limpia. resultado: ok | rechazada (con motivo). La escribe solo la sesión auditora.",
+  "funciones": [
+    {"dir": "0x80172F64", "nombre": "GXCallDisplayList", "commit": "f01fd6ef1302e78f607354869f6f68395c3c89ff", "fecha": "2026-11-12", "resultado": "ok"},
+    {"dir": "0x8022F80C", "nombre": "sqrt__Q23EGG7Math<f>Ff", "commit": "f01fd6ef1302e78f607354869f6f68395c3c89ff", "fecha": "2026-11-12", "resultado": "ok"}
+  ]
+}

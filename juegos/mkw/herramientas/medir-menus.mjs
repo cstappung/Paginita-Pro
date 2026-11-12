@@ -11,6 +11,7 @@
 // Uso:  node herramientas/medir-menus.mjs [--ventana] [--flujos inicio,sala,sp] [--chrome "…"] [--puerto N] ["&param=…" …]
 //       (cada variante "&…" se corre entera; p. ej. "" "&menusRitmo=0" = después y antes intercalados)
 // Salida: el texto por cajón; con --json ARCHIVO, todos los tiempos por cajón y variante.
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,7 +33,7 @@ const hex = n => (n >>> 0).toString(16);
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !VENTANA,
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !VENTANA,
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     ...(VENTANA ? [`--window-position=${process.env.MKW_VENTANA || '-1880,549'}`] : []), ...(CHROME ? CHROME.split(' ') : [])] });

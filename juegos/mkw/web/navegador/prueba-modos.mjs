@@ -19,6 +19,7 @@
 // Fotos y registro en build/web/datos/modos/.
 //
 // Uso:  node web/navegador/prueba-modos.mjs [--playlist] [--ventana] [--sin-terminar] [--corte]     (~6 min; --corte ~10)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -47,7 +48,7 @@ const INACTIVIDAD = !TERMINAR || CORTE ? '&inactividad=1' : '';
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)],
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 const contexto = await navegador.newContext({ viewport: { width: 960, height: 540 } });

@@ -16,6 +16,7 @@
 // Como comparar un medidor nuevo contra el patrón: los mismos 19 997 puntos de entrada, lectura por lectura.
 //
 // Uso:  node web/navegador/prueba-vr.mjs [--puerto 8157] [--ventana]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -31,7 +32,7 @@ const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.l
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const p = await navegador.newPage({ viewport: { width: 960, height: 540 } });
 p.on('pageerror', e => console.log('[pageerror] ' + e.message));

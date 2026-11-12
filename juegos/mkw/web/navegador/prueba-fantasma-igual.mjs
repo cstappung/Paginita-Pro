@@ -15,6 +15,7 @@
 //       --ignorar = desplazamientos de la ficha que no se comparan (los que cambian de una corrida a otra aunque el
 //       programa sea el mismo: se ven con A contra A; la prueba los imprime cuando se separa)
 //       → build/web/datos/fantasma-igual/<A>-contra-<B>.json
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §289: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -49,7 +50,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)],
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, MKW_BUILD: A, MKW_BUILD_B: B } });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${process.env.MKW_VENTANA || '-1880,549'}`] });   // (la pantalla 3, la de 144 Hz)
 
 // una corrida: perfil nuevo (contexto vacío = sin partidas ni fantasmas propios: Pulsar carga el experto)

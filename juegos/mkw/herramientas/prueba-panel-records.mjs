@@ -12,6 +12,7 @@
 // Las fotos llevan los nombres de verdad de las pistas (vienen del Worker): van a build/vistas/ (fuera de git).
 //
 // Uso:  node herramientas/prueba-panel-records.mjs [--ventana]
+import { opcionesNavegador } from './navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +45,7 @@ await new Promise((listo, fallo) => {
 }).catch(e => { console.log('✗ ' + e.message); process.exit(1); });
 
 const [vx, vy] = String(process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !args.includes('--ventana'),
   args: ['--mute-audio', `--window-position=${vx},${vy}`] });
 
 // Récords de mentira: 10 pilotos inventados («yo» = la cuenta que entra), 34 pistas, tiempos al azar con semilla.

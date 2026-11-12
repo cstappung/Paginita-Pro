@@ -11,6 +11,7 @@
 // Fotos en build/web/datos/bienvenida/ (escritorio, el ajuste marcado, teléfono parado y acostado, la Ayuda).
 //
 // Uso:  node web/navegador/prueba-bienvenida.mjs [--ventana] [--puerto N]   (con el candado: herramientas/candado.sh)
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -31,7 +32,7 @@ const servidor = await new Promise(r => {
   s.stdout.on('data', d => { if (String(d).includes('juego en')) r(s); });
 });
 const [vx, vy] = (process.env.MKW_VENTANA || '-1880,549').split(',').map(Number);
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', `--window-position=${vx},${vy}`] });
 const URL0 = `http://127.0.0.1:${PUERTO}/`;
 const mirar = p => p.evaluate(() => ({

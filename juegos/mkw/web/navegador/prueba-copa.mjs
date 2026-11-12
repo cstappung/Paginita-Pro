@@ -11,6 +11,7 @@
 // --cinco (§74, «Arma tu lista»): 5 pistas → 5 carreras (el piloto escribe cuántas son en SectionParams +0x64), ~15 min.
 //
 // Uso:  node web/navegador/prueba-copa.mjs [--ventana] [--cinco]
+import { opcionesNavegador } from '../../herramientas/navegador.mjs';   // §291: --navegador chrome|opera-gx|ruta (o MKW_NAVEGADOR)
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +30,7 @@ const semillaDe = n => (SEMILLA ^ Math.imul(0x9E3779B9, n + 1)) >>> 0;
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
-const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
+const navegador = await chromium.launch({ ...opcionesNavegador(), headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const pagina = await navegador.newPage({ viewport: { width: 960, height: 540 } });
 pagina.on('pageerror', e => console.log('[pageerror] ' + e.message));
