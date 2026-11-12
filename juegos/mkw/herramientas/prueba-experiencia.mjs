@@ -70,6 +70,11 @@ async function pc(nombre) {
   // (la Tienda de Halloween del sitio —llegó con `main` en §102— se abre sola una vez al día en el salón y tapa los
   // botones de la sala: para esta prueba ya «se vio hoy», con la misma marca que deja el sitio)
   await ctx.addInitScript(() => { try { const f = new Date(); localStorage.setItem('jg.tiendaHw.visto', `${f.getFullYear()}-${f.getMonth() + 1}-${f.getDate()}`); } catch {} });
+  // (lo mismo con la ventana de «Estrenos» del sitio, que llegó con `main` en noviembre: se abre sola al entrar a Juegos
+  // y tapa el catálogo. La marca del sitio es «No mostrar más» para la campaña de ese momento, cuyo id se lee del código
+  // del sitio, así la prueba sigue andando cuando cambie la campaña)
+  const idEstrenos = (() => { try { return /id:\s*"([^"]+)"/.exec(fs.readFileSync(path.join(raiz, 'terceros/Paginita-Pro/colabtex/src/juegos/estrenos.js'), 'utf8'))?.[1] || null; } catch { return null; } })();
+  if (idEstrenos) await ctx.addInitScript(id => { try { localStorage.setItem('jg.estrenos', JSON.stringify({ id, no: true })); } catch {} }, idEstrenos);
   const p = await ctx.newPage();
   p.on('pageerror', e => registro.push(`[${nombre}] pageerror ${e.message}`));
   p.on('console', m => registro.push(`[${nombre}] ${m.type()} ${m.text().slice(0, 300)}`));
