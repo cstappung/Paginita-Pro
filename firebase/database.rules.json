@@ -440,6 +440,7 @@
               ".validate": "newData.hasChildren(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])",
               "$i": { ".validate": "$i.matches(/^([0-9]|10)$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
             },
+            "f": { ".validate": "newData.isString() && newData.val().matches(/^[0-9]{3,4}$/)" },
             "$otro": { ".validate": false }
           }
         }
@@ -455,6 +456,7 @@
                 ".validate": "newData.hasChildren(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])",
                 "$i": { ".validate": "$i.matches(/^([0-9]|10)$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
               },
+              "f": { ".validate": "newData.isString() && newData.val().matches(/^[0-9]{3,4}$/)" },
               "$otro": { ".validate": false }
             }
           }
@@ -502,6 +504,7 @@
             },
             "k": { ".validate": "newData.isString() && newData.val().matches(/^[gh][-_A-Za-z0-9]{8,23}$/)" },
             "k2": { ".validate": "newData.isString() && newData.val().matches(/^h[-_A-Za-z0-9]{8,23}$/)" },
+            "f": { ".validate": "newData.isString() && newData.val().matches(/^[0-9]{3,4}$/)" },
             "$otro": { ".validate": false }
           }
         }

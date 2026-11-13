@@ -285,7 +285,7 @@ function frontHTML(c, lazy) {
       <div class="fu-top"><span class="fu-pos" title="${c.posiciones.map(p => M.PUESTO[p]).join(' / ')}">${c.posiciones.join(' · ')}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
       ${c.cinta ? `<span class="fu-cinta">${c.cinta}</span>` : ''}
       ${wearHTML(c)}
-      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${rareza(c).label} ${rareza(c).sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false">${c.club ? `<img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false">` : ''}</span></div>
+      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${rareza(c).label} ${rareza(c).sym}</span></div><span class="fu-iconos${c.clubes && c.clubes.length ? ' ley' : ''}"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false">${c.club ? `<img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false">` : ''}${c.clubes && c.clubes.length ? `<span class="fu-ley-clubes" title="Vale en los desafíos de ${c.clubes.map(k => M.CLUBES[k]).join(', ')}">${c.clubes.map(k => `<img src="${escudo(k)}" alt="${M.CLUBES[k]}" draggable="false">`).join('')}</span>` : ''}</span></div>
       <i class="fu-marco"></i>
     </div>`;
   }
@@ -2553,24 +2553,27 @@ if (!VISOR && EMBEBIDO) Red.manda({ tipo: 'listo' });
 else $('#cargando').innerHTML = '<p>PRODROP se abre desde <a href="../../juegos.html#cartas">Juegos</a>: ahí están tus monedas y tu colección.</p>';
 
 /* ---------------- LA CANCHA ----------------
-   El once en 4-3-3 (M.FORMACION) de los desafíos de plantilla: delanteros
+   El once de los desafíos de plantilla, en su formación (M.FORMACIONES; sin
+   elegir, la 4-3-3): delanteros
    arriba, portero abajo, con las cartas de verdad y la marca de cómo le
    queda a cada una su casilla. («Mi plantilla», la del perfil, se quitó.) */
 const copiaPorClave = k => Object.values(copies).flat().find(cp => cp.key === k) || null;
 const FIT_TXT = { ok: 'En su puesto', incomodo: 'Incómodo', mal: 'Mal posicionado' };
 const FIT_CLASE = { ok: 'ok', incomodo: 'inc', mal: 'mal' };
 // cómo le queda la casilla `i` de la formación a una copia (verde, amarillo o rojo)
-const ajusteDe = (i, cp) => M.ajuste(M.FORMACION[i].pos, CARDS[cp.id].posiciones);
-// `alTocar(i)` hace editable cada casilla
-function pintaCancha(box, cps, alTocar, activa = -1) {
+const ajusteDe = (i, cp, form) => M.ajuste(M.formacionDe(form)[i].pos, CARDS[cp.id].posiciones);
+// `alTocar(i)` hace editable cada casilla; `form`, la formación (clave de M.FORMACIONES)
+function pintaCancha(box, cps, alTocar, activa = -1, form = '433') {
+  const F = M.formacionDe(form), alto = Math.max(...F.map(x => x.fila));
   box.innerHTML = '<i class="pl-lineas" aria-hidden="true"></i>';
-  for (let f = 3; f >= 0; f--) {
+  box.dataset.filas = alto + 1;
+  for (let f = alto; f >= 0; f--) {
     const fila = document.createElement('div');
     fila.className = 'pl-fila';
-    M.FORMACION.forEach((s, i) => {
+    F.forEach((s, i) => {
       if (s.fila !== f) return;
       const cas = document.createElement(alTocar ? 'button' : 'div');
-      const aj = cps[i] ? ajusteDe(i, cps[i]) : null;
+      const aj = cps[i] ? ajusteDe(i, cps[i], form) : null;
       cas.className = `pl-casilla${cps[i] ? ' llena fit-' + FIT_CLASE[aj.nivel] : ''}${i === activa ? ' activa' : ''}`;
       if (cps[i]) { const el = makeCard(fromCopy(CARDS[cps[i].id], cps[i]), { back: false }); light(el); cas.appendChild(el); }
       else cas.innerHTML = `<span class="pl-vacia">${alTocar ? '+' : ''}</span>`;
@@ -2594,7 +2597,7 @@ const jugadorDe = k => { const cp = k ? copiaPorClave(k) : null; return cp ? CAR
    borrador de cada plantilla se recuerda en este navegador hasta subirlo. */
 const RT = window.ProdropRetos;
 // `accion`: la casilla llena que muestra «graduar / cambiar»; `pick`: el jugador tocado en el selector
-const rt = { vista: 'album', clave: '', lista: [], casilla: -1, accion: -1, pick: '', tab: 'clasif', vuelve: false, ocupado: false, ordenElige: 'media',
+const rt = { vista: 'album', clave: '', lista: [], form: '433', casilla: -1, accion: -1, pick: '', tab: 'clasif', vuelve: false, ocupado: false, ordenElige: 'media',
   pestana: 'plantillas', albumClub: '' };   // `pestana`: «Plantillas» o «Álbum completo»; `albumClub`: el club abierto en el álbum
 // cómo se ordena el selector de jugadores (se recuerda en este navegador)
 const ORDEN_ELIGE = { media: 'Media', club: 'Equipo', nota: 'Graduación' };
@@ -2644,7 +2647,7 @@ const semanaAhora = () => RT.semanaDe(ahora());
 function tablaDe(clave) {
   return subidasDe(clave).map(f => {
     const cps = f.c.map(x => { try { return x ? copiaDe(x) : null; } catch { return null; } });
-    return Object.assign({ cps, ev: RT.evalua(clave, cps.map(fichaCp)) }, f);
+    return Object.assign({ cps, ev: RT.evalua(clave, cps.map(fichaCp), f.f) }, f);
   }).filter(f => f.ev.valida).sort((a, b) => b.ev.puntaje - a.ev.puntaje || a.at - b.at);
 }
 // el marco de perfil de un club: se gana con el premio 3, las once graduadas con nota 8 o más (perfil-tarjeta.js)
@@ -2849,19 +2852,41 @@ function abreEditorReto(clave) {
   try { guardada = JSON.parse(localStorage.getItem(borrador(clave)) || 'null'); } catch {}
   const mia = subidasDe(clave).find(f => f.u === cuenta.uid);
   const base = Array.isArray(guardada) ? guardada : mia ? mia.c.map(x => (x ? x.c : '')) : [];
-  rt.lista = M.FORMACION.map((_, i) => (base[i] && copiaPorClave(base[i]) ? base[i] : ''));
+  let fGuardada = null;
+  try { fGuardada = localStorage.getItem(borrador(clave) + '.f'); } catch {}
+  rt.form = M.claveFormacion(Array.isArray(guardada) ? fGuardada : mia ? mia.f : fGuardada);
+  rt.lista = M.formacionDe(rt.form).map((_, i) => (base[i] && copiaPorClave(base[i]) ? base[i] : ''));
   renderRetos();
   $('#retos .rt-panel').scrollTop = 0;
 }
-const guardaBorrador = () => { try { localStorage.setItem(borrador(rt.clave), JSON.stringify(rt.lista)); } catch {} };
+// el borrador: las once claves y, aparte (`.f`, que `enBorradores` no confunde con una plantilla), la formación
+const guardaBorrador = () => { try { localStorage.setItem(borrador(rt.clave), JSON.stringify(rt.lista)); localStorage.setItem(borrador(rt.clave) + '.f', rt.form); } catch {} };
+/* Cambiar de formación: cada jugador puesto busca casilla en la nueva, el
+   que mejor le queda primero (los de su puesto antes que los incómodos), y
+   los que no caben en ninguna quedan fuera. */
+function cambiaFormacion(form) {
+  const F = M.formacionDe(form), puestos = rt.lista.filter(Boolean), nueva = F.map(() => '');
+  const pen = (k, i) => { const cp = copiaPorClave(k); return cp ? M.ajuste(F[i].pos, CARDS[cp.id].posiciones).pen : 99; };
+  const pares = [];
+  puestos.forEach(k => F.forEach((_, i) => pares.push([pen(k, i), k, i])));
+  pares.sort((a, b) => a[0] - b[0] || a[2] - b[2]);
+  const usado = new Set();
+  for (const [p, k, i] of pares) if (p < PEN_MAL && !usado.has(k) && !nueva[i]) { nueva[i] = k; usado.add(k); }
+  rt.form = M.claveFormacion(form); rt.lista = nueva; rt.casilla = -1; rt.accion = -1;
+  guardaBorrador();
+  const fuera = puestos.length - usado.size;
+  if (fuera) toast(`${fuera === 1 ? 'Un jugador no cabe' : fuera + ' jugadores no caben'} en la ${M.nombreFormacion(rt.form)}: ${fuera === 1 ? 'quedó' : 'quedaron'} fuera.`);
+}
+// lo que ya no puede jugar en una casilla (rojo): de ahí para arriba no se acomoda a nadie
+const PEN_MAL = M.PEN_AJUSTE.mal;
 function renderEditorReto() {
   const p = RT.plantilla(rt.clave);
   if (!p) { rt.vista = 'album'; return renderAlbum(); }
-  const cps = rt.lista.map(k => (k ? copiaPorClave(k) : null)), ev = RT.evalua(rt.clave, cps.map(fichaCp));
+  const cps = rt.lista.map(k => (k ? copiaPorClave(k) : null)), ev = RT.evalua(rt.clave, cps.map(fichaCp), rt.form);
   const t = tablaDe(rt.clave), mia = t.find(f => f.u === cuenta.uid), abierto = RT.vigente(p, ahora());
   $('#rtTitulo').innerHTML = (p.tipo === 'club' ? `<img class="rt-escudo chico" src="escudos/${p.club}.png" alt=""> ` : iconoReto(p, ' chico') + ' ') + esc(p.titulo) + (p.tipo === 'reto' ? ' <small>· reto semanal</small>' : '');
   $('#rtSub').textContent = p.desc + ' Toca una casilla para poner o cambiar un jugador.';
-  const tabla = t.length ? `<ol class="rt-tabla">${t.map((f, i) => `<li class="${f.u === cuenta.uid ? 'yo' : ''}" data-fila="${i}"><i>${i + 1}</i><span translate="no">${esc(nombreDe(f.u))}<small>media ${f.ev.media.toFixed(1).replace('.', ',')} · ${f.ev.graduadas}/11 graduadas</small></span><b>${fmt(f.ev.puntaje)}</b></li>`).join('')}</ol><p class="rt-nota">Toca una fila para ver esa plantilla.</p>`
+  const tabla = t.length ? `<ol class="rt-tabla">${t.map((f, i) => `<li class="${f.u === cuenta.uid ? 'yo' : ''}" data-fila="${i}"><i>${i + 1}</i><span translate="no">${esc(nombreDe(f.u))}<small>${M.nombreFormacion(f.f)} · media ${f.ev.media.toFixed(1).replace('.', ',')} · ${f.ev.graduadas}/11 graduadas</small></span><b>${fmt(f.ev.puntaje)}</b></li>`).join('')}</ol><p class="rt-nota">Toca una fila para ver esa plantilla.</p>`
     : '<p class="rt-nota">Nadie la ha subido todavía: la primera es tuya.</p>';
   const premios = RT.PREMIOS.map(pr => {
     const ya = cobrado(rt.clave, pr.n), puede = !ya && abierto && RT.premioOk(pr.n, ev);
@@ -2873,7 +2898,9 @@ function renderEditorReto() {
     + (p.tipo === 'reto' ? `<p class="rt-nota">🏅 Al cerrar la semana, el podio de este reto gana: ${RT.PODIO_RETO.map((x, i) => `${MEDALLA[i]} ${MONEDA}${x.monedas} + ${RT.textoSobresPodio(x)}`).join(' · ')} (aunque estés solo en la tabla).</p>` : '')
     + (p.tipo === 'club' ? `<p class="rt-nota">🖼 Con el premio de las once graduadas con nota 8 o más te llevas el <b>marco ${esc(RT.delClub(p.club))}</b> para tu foto de perfil (Perfil → ✎ Personalizar → Marco).</p>` : '');
   $('#rtBody').innerHTML = `<div class="rt-editor">
-    <div class="rt-izq"><div id="rtCancha" class="pl-cancha"></div>
+    <div class="rt-izq">
+      <div class="rt-forms" role="radiogroup" aria-label="Formación"><span>Formación</span>${M.LISTA_FORMACIONES.map(k => `<button class="chip${k === rt.form ? ' on' : ''}" role="radio" aria-checked="${k === rt.form}" data-form="${k}" title="${esc(M.formacionDe(k).slice(1).map(x => x.pos).join(' · '))}">${M.nombreFormacion(k)}</button>`).join('')}</div>
+      <div id="rtCancha" class="pl-cancha"></div>
       <div class="rt-acc"><button class="btn mk-mini" data-rt-vaciar>Vaciar</button><button class="btn mk-mini" data-rt-col>📚 Ver colección</button><button class="btn mk-mini" data-rt-mercado>🏪 Mercado de fútbol</button></div></div>
     <div class="rt-der">
       <div class="rt-caja"><small>Puntaje</small><b class="rt-puntos">${fmt(ev.puntaje)}</b>
@@ -2891,14 +2918,15 @@ function renderEditorReto() {
     if (rt.lista[i] && rt.accion !== i && rt.casilla !== i) { rt.accion = i; rt.casilla = -1; }
     else { rt.accion = -1; rt.casilla = rt.casilla === i ? -1 : i; }
     renderEditorReto();
-  }, rt.casilla >= 0 ? rt.casilla : rt.accion);
+  }, rt.casilla >= 0 ? rt.casilla : rt.accion, rt.form);
   if (rt.accion >= 0 && cps[rt.accion]) {
     const cas = $('#rtCancha').querySelectorAll('.pl-casilla')[ordenCasillas().indexOf(rt.accion)];
     if (cas) cas.appendChild(accionesCarta(cps[rt.accion], 'cambiar', () => { rt.casilla = rt.accion; rt.accion = -1; renderEditorReto(); }));
   }
   const b = $('#rtBody');
   // sin «Autocompletar»: armar el once a mano es el juego (con él bastaba un toque por plantilla para saber si se podía)
-  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.FORMACION.map(() => ''); rt.casilla = -1; rt.accion = -1; guardaBorrador(); renderEditorReto(); };
+  b.querySelector('[data-rt-vaciar]').onclick = () => { rt.lista = M.formacionDe(rt.form).map(() => ''); rt.casilla = -1; rt.accion = -1; guardaBorrador(); renderEditorReto(); };
+  b.querySelectorAll('[data-form]').forEach(x => x.onclick = () => { if (x.dataset.form === rt.form) return; Snd.init(); Snd.flip(); cambiaFormacion(x.dataset.form); renderEditorReto(); });
   b.querySelector('[data-rt-subir]').onclick = () => accionReto('subeReto');
   b.querySelectorAll('[data-rt-tab]').forEach(x => x.onclick = () => { rt.tab = x.dataset.rtTab; renderEditorReto(); });
   b.querySelectorAll('[data-cobra]').forEach(x => x.onclick = () => accionReto('cobraReto', +x.dataset.cobra));
@@ -2916,12 +2944,12 @@ function pintaEligeReto() {
   const box = $('#rtElige'), capa = $('#rtEligeCapa');
   capa.hidden = rt.casilla < 0;
   if (capa.hidden) return;
-  const p = RT.plantilla(rt.clave), slot = M.FORMACION[rt.casilla], usadas = new Map();
+  const p = RT.plantilla(rt.clave), slot = M.formacionDe(rt.form)[rt.casilla], usadas = new Map();
   rt.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== rt.casilla) usadas.set(q, j); });
   const grupos = new Map();   // uid → sus copias, la mejor primero
   for (const cp of misFutbol()) {
     const c = CARDS[cp.id];
-    if (!p.elegible(c) || RT.encaje(rt.casilla, cp.id).nivel > 1) continue;
+    if (!p.elegible(c) || RT.encaje(rt.casilla, cp.id, rt.form).nivel > 1) continue;
     if (!grupos.has(c.uid)) grupos.set(c.uid, []);
     grupos.get(c.uid).push(cp);
   }
@@ -2937,18 +2965,18 @@ function pintaEligeReto() {
     club: (a, b) => ixClub(ordenClub, CARDS[a.id]) - ixClub(ordenClub, CARDS[b.id]),
     nota: (a, b) => nota(b) - nota(a)
   }[rt.ordenElige] || (() => 0);
-  const lista = [...grupos.values()].sort(([a], [b]) => RT.encaje(rt.casilla, a.id).nivel - RT.encaje(rt.casilla, b.id).nivel
-    || porOrden(a, b) || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla) - RT.puntosFicha(fichaCp(a), rt.casilla));
+  const lista = [...grupos.values()].sort(([a], [b]) => RT.encaje(rt.casilla, a.id, rt.form).nivel - RT.encaje(rt.casilla, b.id, rt.form).nivel
+    || porOrden(a, b) || CARDS[b.id].media - CARDS[a.id].media || RT.puntosFicha(fichaCp(b), rt.casilla, rt.form) - RT.puntosFicha(fichaCp(a), rt.casilla, rt.form));
   const aqui = rt.lista[rt.casilla];
   let grupo = -1;
   box.innerHTML = `<div class="pl-elige-head"><b>${M.PUESTO[slot.pos][0].toUpperCase() + M.PUESTO[slot.pos].slice(1)} · elige un jugador</b>
       <button class="btn mk-mini" data-rt-mk-puesto>🏪 Buscar en el mercado</button>${aqui ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="close" data-cancelar aria-label="Cerrar">✕</button></div>
     <div class="pl-orden" role="group" aria-label="Ordenar">Ordenar por ${Object.entries(ORDEN_ELIGE).map(([k, l]) => `<button class="chip${rt.ordenElige === k ? ' on' : ''}" data-orden="${k}">${l}</button>`).join('')}</div>
     <div class="tc-rejilla pl-lista">${lista.length ? lista.map(l => {
-      const cp = l[0], c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id), ya = usadas.get(c.person), aca = l.some(x => x.key === aqui);
+      const cp = l[0], c = CARDS[cp.id], en = RT.encaje(rt.casilla, cp.id, rt.form), ya = usadas.get(c.person), aca = l.some(x => x.key === aqui);
       const cab = en.nivel !== grupo ? `<h4 class="rt-grupo n${en.nivel}">${en.nivel ? `Incómodos en ${slot.pos} · −${en.pen} de media` : `De ${slot.pos}`}</h4>` : '';
       grupo = en.nivel;
-      const marca = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.FORMACION[ya].pos}</em>` : '';
+      const marca = aca ? '<em class="pl-aca">AQUÍ</em>' : ya !== undefined ? `<em class="pl-aca mueve" title="Ya está en el once: pasa a esta casilla">↔ ${M.formacionDe(rt.form)[ya].pos}</em>` : '';
       const cuantas = l.length > 1 ? `<i class="pl-cuantas" title="Tienes ${l.length} copias">×${l.length}</i>` : '';
       return `${cab}<div class="tc-elige pl-op fit-${en.nivel ? 'inc' : 'ok'}${rt.pick === c.uid ? ' on' : ''}" role="button" tabindex="0" data-c="${esc(c.uid)}" title="${esc(c.name)} · ${fmt(RT.puntosFicha(fichaCp(cp), rt.casilla) * 10)} pts aquí">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${marca}${cuantas}`)}</div>`;
     }).join('') : `<p class="mk-vacio">No tienes jugadores que cumplan «${esc(p.titulo)}» y puedan jugar de ${slot.pos}: abre sobres de Fútbol.</p>`}</div>`;
@@ -2984,7 +3012,7 @@ function variantesHTML(l, aqui) {
   return box;
 }
 // el orden en que pintaCancha deja las casillas en la página (de la fila de arriba a la de abajo)
-const ordenCasillas = () => [3, 2, 1, 0].flatMap(f => M.FORMACION.map((s, i) => (s.fila === f ? i : -1)).filter(i => i >= 0));
+const ordenCasillas = (form = rt.form) => { const F = M.formacionDe(form); return [4, 3, 2, 1, 0].flatMap(f => F.map((s, i) => (s.fila === f ? i : -1)).filter(i => i >= 0)); };
 /* Los botones sobre una carta del once o del selector: verla en grande
    (con su nota, sus otras copias y, si no está graduada, el botón para
    graduarla; al cerrarla se vuelve al desafío) y ponerla o cambiarla. Son
@@ -3017,7 +3045,7 @@ async function accionReto(accion, n) {
   if (rt.ocupado) return;
   rt.ocupado = true; renderEditorReto();
   try {
-    const r = await Red.pide(accion, { clave: rt.clave, lista: rt.lista, n });
+    const r = await Red.pide(accion, { clave: rt.clave, lista: rt.lista, n, f: rt.form });
     if (accion === 'subeReto') { Snd.coin(); toast(`Plantilla subida: ${fmt(r.puntaje)} puntos.`); }
     else {
       const p = RT.plantilla(rt.clave), marco = p && p.tipo === 'club' && n === RT.PREMIO_MARCO && !marcoGanado(rt.clave);
@@ -3032,8 +3060,8 @@ async function accionReto(accion, n) {
 }
 function verPlantillaDe(f, pos) {
   $('#rtVerTit').innerHTML = `#${pos} · <span translate="no">${esc(nombreDe(f.u))}</span> · ${fmt(f.ev.puntaje)} pts`;
-  $('#rtVerSub').textContent = `Media ${f.ev.media.toFixed(1).replace('.', ',')} · ${f.ev.graduadas}/11 graduadas · subida ${new Date(f.at).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
-  pintaCancha($('#rtVerCancha'), f.cps, null, -1);
+  $('#rtVerSub').textContent = `${M.nombreFormacion(f.f)} · Media ${f.ev.media.toFixed(1).replace('.', ',')} · ${f.ev.graduadas}/11 graduadas · subida ${new Date(f.at).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
+  pintaCancha($('#rtVerCancha'), f.cps, null, -1, f.f);
   $('#rtVer').hidden = false;
 }
 /* ---------- el mercado de fútbol, sin salir del desafío ----------
@@ -3056,16 +3084,16 @@ function pintaMercadoReto() {
     let cp = null; try { cp = copiaDe(o); } catch {}
     return cp && CARDS[cp.id] && M.esFutbol(CARDS[cp.id].col) ? { o, cp, c: CARDS[cp.id] } : null;
   }).filter(Boolean);
-  const lista = todas.filter(x => (!p || !rmk.sirve || p.elegible(x.c)) && (i < 0 || !rmk.puesto || RT.encaje(i, x.cp.id).nivel < 2))
+  const lista = todas.filter(x => (!p || !rmk.sirve || p.elegible(x.c)) && (i < 0 || !rmk.puesto || RT.encaje(i, x.cp.id, rt.form).nivel < 2))
     .sort((a, b) => b.c.media - a.c.media || a.o.p - b.o.p);
-  const puesto = i >= 0 ? M.PUESTO[M.FORMACION[i].pos] : '';
+  const puesto = i >= 0 ? M.PUESTO[M.formacionDe(rt.form)[i].pos] : '';
   $('#rtMkTit').textContent = i >= 0 ? `🏪 Mercado · ${puesto[0].toUpperCase() + puesto.slice(1)}` : '🏪 Mercado de fútbol';
   const chips = (p ? `<button class="chip" data-rmk="sirve" aria-pressed="${rmk.sirve}">Solo «${esc(p.titulo)}»</button>` : '')
-    + (i >= 0 ? `<button class="chip" data-rmk="puesto" aria-pressed="${rmk.puesto}">Solo los que juegan de ${M.FORMACION[i].pos}</button>` : '');
+    + (i >= 0 ? `<button class="chip" data-rmk="puesto" aria-pressed="${rmk.puesto}">Solo los que juegan de ${M.formacionDe(rt.form)[i].pos}</button>` : '');
   $('#rtMkBody').innerHTML = `<p class="rt-nota">Saldo: ${MONEDA}<b>${fmt(cuenta.saldo)}</b> · ${lista.length} de ${todas.length} cartas de fútbol a la venta</p>
     ${chips ? `<div class="rt-acc">${chips}</div>` : ''}
     ${lista.length ? `<div class="rt-mk-lista">${lista.map(({ o, cp, c }) => {
-      const tuya = o.u === cuenta.uid, falta = cuenta.parada || cuenta.saldo < o.p, en = i >= 0 ? RT.encaje(i, cp.id) : null, seguro = rmk.seguro === o.id;
+      const tuya = o.u === cuenta.uid, falta = cuenta.parada || cuenta.saldo < o.p, en = i >= 0 ? RT.encaje(i, cp.id, rt.form) : null, seguro = rmk.seguro === o.id;
       return `<div class="rt-mk-item">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>`)}
         <span class="rt-mk-tx"><b>${esc(c.name)}</b><small>${esc(c.leyenda ? 'Leyenda' : M.CLUBES[c.club] || '')}${en && en.nivel ? ` · incómodo, −${en.pen}` : ''}</small>
           <small>${tuya ? '<b class="rt-mk-tuya">Tu oferta</b>' : `de <span translate="no">${esc(nombreDe(o.u))}</span>`}${cp.gr ? ` · nota ${cp.g}` : ' · sin graduar'}</small>

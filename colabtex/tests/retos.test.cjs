@@ -337,3 +337,57 @@ test('las leyendas (sin club) juegan los desafíos: un once solo de leyendas es 
   const roja = R.RETOS.find(x => x.id === 'laroja');
   assert.deepEqual(PM.CARDS.filter(c => c.leyenda && roja.elegible(c)).map(c => c.name).sort(), ['Figueroa', 'Zamorano']);
 });
+
+test('una leyenda vale en los desafíos de los clubes donde jugó (hasta tres), no en el álbum', () => {
+  const L = id => PM.CARDS.find(c => c.person === 'leyendas-' + id);
+  assert.ok(PM.CARDS.filter(c => c.leyenda).every(c => Array.isArray(c.clubes) && c.clubes.length <= 3 && c.clubes.every(k => PM.CLUBES[k]) && c.club === null));
+  const madrid = R.plantilla(R.claveClub('realmadrid')), milan = R.plantilla(R.claveClub('milan')), barca = R.plantilla(R.claveClub('barcelona'));
+  assert.ok(madrid.elegible(L('kaka')) && milan.elegible(L('kaka')) && !barca.elegible(L('kaka')));
+  assert.ok(['realmadrid', 'barcelona', 'inter'].every(k => R.plantilla(R.claveClub(k)).elegible(L('ronaldo-r9'))));
+  assert.ok(!madrid.elegible(L('pele')), 'Pelé no jugó en ninguno');
+  assert.ok(!R.cartasAlbum('realmadrid').some(c => c.leyenda), 'el álbum sigue sin leyendas');
+  // el mejor once del Madrid con todo el catálogo mete leyendas y sigue valiendo
+  const once = R.mejorOnce(R.claveClub('realmadrid'), todas);
+  assert.ok(R.evalua(R.claveClub('realmadrid'), once).valida);
+  assert.ok(once.some(f => PM.CARDS[f.id].leyenda));
+  // El Clásico: Ronaldo y Figo (de los dos) completan el lado que falte
+  const clasico = R.RETOS.find(x => x.id === "clasico"), cs = n => PM.CARDS.filter(c => c.club === n && !c.especial);
+  const r = clasico.extra([...cs('realmadrid').slice(0, 5), ...cs('barcelona').slice(0, 4), L('ronaldo-r9'), L('figo')]);
+  assert.ok(r.ok, r.txt);
+  assert.ok(!clasico.extra([...cs('realmadrid').slice(0, 7), ...cs('barcelona').slice(0, 3), L('figo')]).ok);
+  assert.ok(R.RETOS.find(x => x.id === "calcio").elegible(L('maradona')) && R.RETOS.find(x => x.id === "bigsix").elegible(L('gerrard')));
+});
+
+test('formaciones: diez, de once casillas con un portero; sin `f` es la 4-3-3 y la 4-4-2 tiene MI y MD', () => {
+  assert.equal(PM.LISTA_FORMACIONES.length, 10);
+  assert.deepEqual([...PM.LISTA_FORMACIONES].sort(), Object.keys(PM.FORMACIONES).sort());
+  for (const k of PM.LISTA_FORMACIONES) {
+    const F = PM.FORMACIONES[k];
+    assert.equal(F.length, 11, k);
+    assert.equal(F.filter(x => x.pos === 'POR').length, 1, k);
+    assert.equal(F[0].pos, 'POR');
+    // las cuentas de la clave son las de cada línea de campo
+    const filas = [...new Set(F.slice(1).map(x => x.fila))].sort().map(f => F.filter(x => x.fila === f).length).join('');
+    assert.equal(filas, k, k);
+  }
+  assert.equal(PM.formacionDe(''), PM.FORMACION);
+  assert.equal(PM.formacionDe('9999'), PM.FORMACION);
+  assert.equal(PM.claveFormacion(undefined), '433');
+  assert.equal(PM.nombreFormacion('4231'), '4-2-3-1');
+  const i442 = PM.FORMACIONES['442'].findIndex(x => x.pos === 'MI');
+  const mi = PM.CARDS.find(c => c.posiciones && c.posiciones[0] === 'MI');
+  assert.ok(mi, 'hay algún MI');
+  assert.equal(R.encaje(i442, mi.n, '442').nivel, 0, 'un MI está en su puesto en la 4-4-2');
+  assert.ok(!PM.FORMACION.some(x => x.pos === 'MI'), 'la 4-3-3 no tiene MI');
+});
+
+test('el premio se paga con la formación con que se cobró (`f`)', () => {
+  const at = EL.fin + H, c = EL.once.map(f => f.key), k = 'gPremio0000';
+  const fichas = EL.once.map(f => ({ id: f.id, g: f.g, gr: false }));
+  const mala = PM.LISTA_FORMACIONES.find(f => !R.evalua(EL.clave, fichas, f).valida);
+  assert.ok(mala, 'alguna formación deja a alguien fuera de su línea');
+  const con = f => { const d = datos({ plantillas: { p: { [A]: { [EL.clave + '_1']: Object.assign({ at, c, k }, f ? { f } : {}) } } } }); d.cartas.s[A] = Object.assign({}, SOBRES, { [k]: { at, p: 0, pl: EL.clave + '_1' } }); return d; };
+  assert.equal(monedasDe(A, con('')).premios, 50, 'sin f: la 4-3-3');
+  assert.equal(monedasDe(A, con('433')).premios, 50);
+  assert.equal(monedasDe(A, con(mala)).premios, 0, 'en la ' + mala + ' no vale');
+});

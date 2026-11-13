@@ -606,7 +606,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
      `k` y `k2` son los sobres que regala (`k2`, el segundo del nivel 2). */
   for (const [u, l] of Object.entries((d.plantillas && d.plantillas.p) || {}))
     for (const [id, x] of Object.entries(l || {}))
-      if (x && Number.isFinite(x.at)) ev.push({ t: "pl", at: x.at, u, k: id, c: comoLista(x.c).map(String), sobres: [x.k, x.k2].filter(k => typeof k === "string" && k) });
+      if (x && Number.isFinite(x.at)) ev.push({ t: "pl", at: x.at, u, k: id, c: comoLista(x.c).map(String), f: typeof x.f === "string" ? x.f : "", sobres: [x.k, x.k2].filter(k => typeof k === "string" && k) });
   /* El podio de cada semana (retos.js): las versiones de cada subida
      (`plantillas/v/<plantilla>/<uid>/<clave>` = {at, c}, una por subida,
      y la fila de la tabla, `plantillas/s`) dicen qué tenía cada uno en la
@@ -617,7 +617,8 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
   const ponVersion = (tpl, u, x) => {
     if (!conRetos || !x || !Number.isFinite(x.at) || !PR.plantilla(tpl)) return;
     const l = ((versiones[tpl] = versiones[tpl] || {})[u] = versiones[tpl][u] || []);
-    if (!l.some(y => y.at === x.at)) l.push({ at: x.at, c: comoLista(x.c).map(String) });
+    // `f`: la formación (sin ella, la 4-3-3)
+    if (!l.some(y => y.at === x.at)) l.push({ at: x.at, c: comoLista(x.c).map(String), f: typeof x.f === "string" ? x.f : "" });
   };
   const pd = d.plantillas || {};
   for (const [tpl, porU] of Object.entries(pd.s || {})) for (const [u, x] of Object.entries(porU || {})) ponVersion(tpl, u, x);
@@ -793,7 +794,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (!x || U(u).parada || x.c.length !== 11 || new Set(x.c).size !== 11 || !x.c.every(cc => dueno[cc] === u)) continue;
       const fs = x.c.map(cc => { const f = ficha(cc); return f && { id: f.id, g: f.g, gr: !!graduada[cc] }; });
       if (fs.some(f => !f)) continue;
-      const ev = PR.evalua(clave, fs);
+      const ev = PR.evalua(clave, fs, x.f);
       if (ev.valida) filas.push({ u, at: x.at, puntaje: ev.puntaje });
     }
     return PR.ordenaTabla(filas);
@@ -852,7 +853,7 @@ export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
       if (!pt || !PR.vigente(pt, e.at) || e.c.length !== 11 || new Set(e.c).size !== 11) continue;
       if (!e.c.every(cc => dueno[cc] === e.u)) continue;
       const fs = e.c.map(cc => { const f = ficha(cc); return f && { id: f.id, g: f.g, gr: !!graduada[cc] }; });
-      if (fs.some(f => !f) || !PR.premioOk(r.n, PR.evalua(r.clave, fs))) continue;
+      if (fs.some(f => !f) || !PR.premioOk(r.n, PR.evalua(r.clave, fs, e.f))) continue;
       if (new Set(e.sobres).size !== e.sobres.length || !PR.sobresValen(pr, e.sobres.map(k => k[0]))) continue;
       reclamos[e.u + "~" + e.k] = { sobres: e.sobres.slice() };
       // el premio 3 de un club (las once con nota 8 o más) deja además su marco de perfil (perfil-tarjeta.js)

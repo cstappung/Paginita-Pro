@@ -409,6 +409,8 @@ console.log("— PRODROP: desafíos de plantilla —");
   await allowed("A sube su plantilla a la clasificación de un club", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
   await allowed("y la reescribe al mejorarla", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
   await denied("una plantilla con diez casillas no", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once.slice(0, 10) }));
+  await allowed("con su formación (`f`)", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once, f: "4231" }));
+  await denied("pero no una formación que no es un número", () => set(ref(db, `plantillas/s/club-realmadrid/${ua.uid}`), { at: serverTimestamp(), c: once, f: "<b>" }));
   await denied("ni con una clave de plantilla inventada", () => set(ref(db, `plantillas/s/club-real.madrid/${ua.uid}`), { at: serverTimestamp(), c: once }));
   // un premio con sus sobres (`pres`: el prefijo de cada uno) en un solo update, como fb.cobrarPlantilla
   const premio = (id, pres, p = 0) => {

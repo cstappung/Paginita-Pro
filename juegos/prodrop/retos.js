@@ -4,7 +4,7 @@
    eso es UMD, puro y sin DOM, como el motor, del que sale todo lo de cada
    carta: media, rareza, posiciones, club y país.
 
-   Una plantilla es un once en el 4-3-3 del motor (`FORMACION`) que cumple
+   Una plantilla es un once en una formación del motor (`FORMACIONES`; sin elegir, la 4-3-3) que cumple
    una condición: la mejor plantilla (`mejor`, sin condición), una por club
    en el álbum (`club-<club>`) y un reto cada semana (`reto-<id>-<semana>`). Se sube a una clasificación por
    plantilla y paga tres premios, una vez cada uno:
@@ -44,17 +44,27 @@
      segunda, para la semana 43, cuando solo había pasado la 42: meter uno
      antes de una semana ya jugada cambiaría su reto y sus premios.) Se activan solos el
      lunes; la pantalla los muestra en «Próximos retos» con su fecha. */
+  // una leyenda cuenta en los clubes donde jugó (`M.juegaEn`); para el tope de un club, el primero de los suyos que sirve
+  const enAlguno = (c, lista) => lista.some(k => M.juegaEn(c, k));
+  const clubTope = (c, lista) => c.club || (c.clubes || []).find(k => !lista || lista.includes(k)) || "leyenda-" + c.person;
+  const CLASICO = ["realmadrid", "barcelona"];
+  /* El Clásico: las del Madrid, las del Barça y las leyendas que jugaron en
+     los dos (Ronaldo, Figo), que completan el lado que falte. */
+  function clasico(cs) {
+    const solo = k => cs.filter(c => M.juegaEn(c, k) && !CLASICO.every(x => M.juegaEn(c, x))).length;
+    const m = solo("realmadrid"), b = solo("barcelona"), dos = cs.filter(c => CLASICO.every(x => M.juegaEn(c, x))).length;
+    return { ok: Math.max(0, 5 - m) + Math.max(0, 5 - b) <= dos, txt: `Madrid ${m} · Barça ${b}${dos ? ` · ${dos} de los dos` : ""} (mínimo 5 de cada uno)` };
+  }
   const RETOS = [
-    { id: "clasico", titulo: "El Clásico", icono: "⚔️", desc: "Solo Madrid y Barça, con al menos cinco de cada uno.", tope: 6,
-      elegible: c => c.club === "realmadrid" || c.club === "barcelona",
-      extra: cs => { const m = cs.filter(c => c.club === "realmadrid").length, b = cs.filter(c => c.club === "barcelona").length; return { ok: m >= 5 && b >= 5, txt: `Madrid ${m} · Barça ${b} (mínimo 5 de cada uno)` }; } },
+    { id: "clasico", titulo: "El Clásico", icono: "⚔️", desc: "Solo Madrid y Barça (y sus leyendas), con al menos cinco de cada uno.", tope: 6, topeClubes: CLASICO,
+      elegible: c => enAlguno(c, CLASICO), extra: clasico },
     { id: "laroja", titulo: "La Roja", icono: "🇨🇱", bandera: "cl", desc: "Once jugadores de la selección chilena.", elegible: c => c.pais === "CL" },
     { id: "bleus", titulo: "Les Bleus", icono: "🇫🇷", bandera: "fr", desc: "Once jugadores de la selección francesa.", elegible: c => c.pais === "FR" },
     { id: "lions", titulo: "Three Lions", icono: "🦁", bandera: "eng", desc: "Once jugadores de la selección inglesa.", elegible: c => c.pais === "ENG" },
     { id: "furia", titulo: "Furia Roja", icono: "🇪🇸", bandera: "es", desc: "Once jugadores de la selección española.", elegible: c => c.pais === "ES" },
-    { id: "calcio", titulo: "Calcio", icono: "🇮🇹", bandera: "it", desc: "Once jugadores de clubes italianos: Inter, Roma, Napoli y Como.", elegible: c => ITALIA.includes(c.club) },
+    { id: "calcio", titulo: "Calcio", icono: "🇮🇹", bandera: "it", desc: "Once jugadores de clubes italianos: Inter, Roma, Napoli y Como.", elegible: c => enAlguno(c, ITALIA) },
     { id: "selecao", titulo: "Seleção", icono: "🇧🇷", bandera: "br", desc: "Once jugadores de la selección brasileña.", elegible: c => c.pais === "BR" },
-    { id: "bigsix", titulo: "Big Six", icono: "🏴", desc: "Once jugadores de los seis grandes de la Premier.", elegible: c => PREMIER.includes(c.club) },
+    { id: "bigsix", titulo: "Big Six", icono: "🏴", desc: "Once jugadores de los seis grandes de la Premier.", elegible: c => enAlguno(c, PREMIER) },
     { id: "albiceleste", titulo: "Albiceleste", icono: "🇦🇷", bandera: "ar", desc: "Once jugadores de la selección argentina.", elegible: c => c.pais === "AR" },
     { id: "sudamerica", titulo: "Sudamérica", icono: "🌎", desc: "Once jugadores de Argentina, Brasil, Uruguay, Colombia y Ecuador.", elegible: c => SUDAMERICA.includes(c.pais) }
   ];
@@ -87,7 +97,7 @@
     let m = /^club-([a-z]{2,15})$/.exec(s);
     if (m && CLUBES.includes(m[1])) {
       const club = m[1];
-      return { clave: s, tipo: "club", club, titulo: M.CLUBES[club], desc: `Once jugadores ${delClub(club)}.`, elegible: c => c.club === club };
+      return { clave: s, tipo: "club", club, titulo: M.CLUBES[club], desc: `Once jugadores ${delClub(club)} (sus leyendas también valen).`, elegible: c => M.juegaEn(c, club) };
     }
     m = /^reto-([a-z]{2,12})-([0-9]{1,5})$/.exec(s);
     if (m && RETO[m[1]] && retoDeSemana(+m[2]) === RETO[m[1]]) {
@@ -104,23 +114,24 @@
   /* ---------- el puntaje ---------- */
   const NIVEL = { ok: 0, incomodo: 1, mal: 2 };
   // cómo le queda la casilla `i` a la carta `id`: 0 su puesto, 1 incómodo (−3), 2 no puede
-  const encaje = (i, id) => { const a = M.ajuste(M.FORMACION[i].pos, M.CARDS[id].posiciones); return { nivel: NIVEL[a.nivel], pen: a.pen }; };
+  // `form`: la clave de la formación (`M.FORMACIONES`; sin ella, la 4-3-3)
+  const encaje = (i, id, form) => { const a = M.ajuste(M.formacionDe(form)[i].pos, M.CARDS[id].posiciones); return { nivel: NIVEL[a.nivel], pen: a.pen }; };
   const estado = f => (f.gr ? 0.8 + 0.02 * f.g : 0.8);
   // lo que vale la ficha {id, g, gr} en la casilla `i` (sin casilla: en su puesto)
-  const puntosFicha = (f, i) => (M.CARDS[f.id].media - (i == null ? 0 : encaje(i, f.id).pen)) * estado(f);
-  const puntaje = fichas => Math.round(fichas.reduce((s, f, i) => s + (f ? puntosFicha(f, i) : 0), 0) * 10);
+  const puntosFicha = (f, i, form) => (M.CARDS[f.id].media - (i == null ? 0 : encaje(i, f.id, form).pen)) * estado(f);
+  const puntaje = (fichas, form) => Math.round(fichas.reduce((s, f, i) => s + (f ? puntosFicha(f, i, form) : 0), 0) * 10);
 
   /* La plantilla `clave` con estas once fichas ({id, g, gr} o null):
      si vale y por qué no, su puntaje y lo que piden los premios. */
-  function evalua(clave, fichas) {
-    const p = plantilla(clave), fs = M.FORMACION.map((_, i) => (fichas && fichas[i]) || null);
+  function evalua(clave, fichas, form) {
+    const p = plantilla(clave), fs = M.formacionDe(form).map((_, i) => (fichas && fichas[i]) || null);
     const llenas = fs.filter(Boolean), cs = llenas.map(f => M.CARDS[f.id]);
     const cumplen = p ? cs.filter(p.elegible).length : 0;
     const porClub = {};
-    cs.forEach(c => { porClub[c.club] = (porClub[c.club] || 0) + 1; });
+    cs.forEach(c => { const k = clubTope(c, p && p.topeClubes); porClub[k] = (porClub[k] || 0) + 1; });
     const checks = [
       { ok: llenas.length === 11, txt: `Once jugadores (${llenas.length}/11)` },
-      { ok: fs.every((f, i) => !f || encaje(i, f.id).nivel < 2), txt: "Nadie en un puesto que no puede jugar" },
+      { ok: fs.every((f, i) => !f || encaje(i, f.id, form).nivel < 2), txt: "Nadie en un puesto que no puede jugar" },
       { ok: new Set(cs.map(c => c.person)).size === cs.length, txt: "Sin repetir jugador" }
     ];
     // la mejor plantilla no pide nada más que eso
@@ -129,11 +140,11 @@
     if (p && p.extra) checks.push(p.extra(cs));
     const grads = llenas.filter(f => f.gr);
     return {
-      valida: checks.every(c => c.ok), checks, puntaje: puntaje(fs),
+      valida: checks.every(c => c.ok), checks, puntaje: puntaje(fs, form),
       media: cs.length ? cs.reduce((s, c) => s + c.media, 0) / cs.length : 0,
       graduadas: grads.length, notaMedia: grads.length ? grads.reduce((s, f) => s + f.g, 0) / grads.length : 0,
       notaMin: llenas.length === 11 && grads.length === 11 ? Math.min(...grads.map(f => f.g)) : 0,
-      enPuesto: fs.filter((f, i) => f && encaje(i, f.id).nivel === 0).length
+      enPuesto: fs.filter((f, i) => f && encaje(i, f.id, form).nivel === 0).length
     };
   }
 
@@ -219,21 +230,21 @@
   /* El mejor once que se puede armar con estas copias ({key, id, g, gr}):
      cada casilla con la que más suma entre las que juegan ahí, después
      las que juegan incómodas. Para «Autocompletar». */
-  function mejorOnce(clave, copias) {
-    const p = plantilla(clave), out = M.FORMACION.map(() => null), usados = new Set(), porClub = {};
+  function mejorOnce(clave, copias, form) {
+    const F = M.formacionDe(form), p = plantilla(clave), out = F.map(() => null), usados = new Set(), porClub = {};
     if (!p) return out;
     const lista = copias.filter(cp => p.elegible(M.CARDS[cp.id]));
     for (const nivel of [0, 1])
-      M.FORMACION.forEach((_, i) => {
+      F.forEach((_, i) => {
         if (out[i]) return;
         let mejor = null, pm = -1;
         for (const cp of lista) {
           const c = M.CARDS[cp.id];
-          if (usados.has(c.person) || encaje(i, cp.id).nivel > nivel || (p.tope && (porClub[c.club] || 0) >= p.tope)) continue;
-          const v = puntosFicha(cp, i);
+          if (usados.has(c.person) || encaje(i, cp.id, form).nivel > nivel || (p.tope && (porClub[clubTope(c, p.topeClubes)] || 0) >= p.tope)) continue;
+          const v = puntosFicha(cp, i, form);
           if (v > pm) { pm = v; mejor = cp; }
         }
-        if (mejor) { out[i] = mejor; usados.add(M.CARDS[mejor.id].person); porClub[M.CARDS[mejor.id].club] = (porClub[M.CARDS[mejor.id].club] || 0) + 1; }
+        if (mejor) { const k = clubTope(M.CARDS[mejor.id], p.topeClubes); out[i] = mejor; usados.add(M.CARDS[mejor.id].person); porClub[k] = (porClub[k] || 0) + 1; }
       });
     return out;
   }

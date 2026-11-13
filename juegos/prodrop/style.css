@@ -1352,6 +1352,10 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .fu-iconos { display: flex; align-items: center; gap: 2.4cqw; flex: none; }
 .fu-flag { width: 11cqw; height: 7.4cqw; object-fit: cover; border-radius: .9cqw; box-shadow: 0 0 0 .35cqw #fff9, 0 .5cqw 1.2cqw #0009; }
 .fu-escudo { width: 12cqw; height: 12cqw; object-fit: contain; filter: drop-shadow(0 .6cqw 1.2cqw #000b); }
+/* una leyenda: bajo la bandera, chiquitos, los escudos de los clubes en cuyos desafíos vale */
+.fu-iconos.ley { flex-direction: column; align-items: center; gap: 1.2cqw; }
+.fu-ley-clubes { display: flex; gap: .8cqw; }
+.fu-ley-clubes img { width: 5.6cqw; height: 5.6cqw; object-fit: contain; filter: drop-shadow(0 .3cqw .6cqw #000c); }
 /* el marco dice la rareza: fino y blanco en la base, grueso y del color de la rareza en las demás */
 .fu-marco {
   position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
@@ -1449,7 +1453,7 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .fu-tip ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 8px; line-height: 1.45; }
 .fu-tip .fu-pronto { margin: 0; color: #9ff0b8; font-weight: 700; }
 
-/* ---------- la cancha de los desafíos (4-3-3) ---------- */
+/* ---------- la cancha de los desafíos (4-3-3 y las demás formaciones) ---------- */
 .pl-cancha {
   position: relative; display: grid; grid-template-rows: repeat(4, 1fr); gap: 2%; padding: 4% 3%;
   width: 100%; max-width: 620px; aspect-ratio: 4 / 5; margin: 0 auto; border-radius: 18px; overflow: hidden;
@@ -1467,6 +1471,14 @@ body:not(.serie1) .solo-serie1 { display: none; }
 }
 .pl-casilla .card { position: absolute; inset: 0; width: 100%; }
 button.pl-casilla { cursor: pointer; transition: transform .15s; }
+/* formaciones de cinco líneas (4-2-3-1, 4-1-4-1): una fila más, cartas un poco más chicas */
+.pl-cancha[data-filas="5"] { grid-template-rows: repeat(5, 1fr); gap: 1%; }
+.pl-cancha[data-filas="5"] .pl-casilla { width: 13.5%; }
+/* el selector de formación, encima de la cancha */
+.rt-forms { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 620px; margin: 0 auto 10px; }
+.rt-forms > span { font-size: 13px; font-weight: 800; color: var(--muted); margin-right: 2px; }
+.rt-forms .chip { font-variant-numeric: tabular-nums; }
+.rt-forms .chip.on { background: var(--gold); color: #1a1030; border-color: var(--gold); font-weight: 900; }
 button.pl-casilla:hover { transform: translateY(-3px); }
 .pl-vacia {
   position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px;

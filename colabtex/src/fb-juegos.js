@@ -552,9 +552,11 @@ export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/car
 /* Cada subida deja además su versión en `plantillas/v/<plantilla>/<uid>/<clave>`
    (una vez, nunca se reescribe): el lunes, el podio de la semana se calcula
    con lo que cada uno tenía subido justo antes, aunque después lo cambie. */
-export async function subirPlantillaReto(uid, clave, c) {
+/* `f`: la formación (`MOTOR.FORMACIONES`); la 4-3-3 no se escribe, como antes de que hubiera otras. */
+const conForm = (x, f) => (f && f !== "433" ? Object.assign(x, { f }) : x);
+export async function subirPlantillaReto(uid, clave, c, f) {
   const r = ref(db, `plantillas/s/${clave}/${uid}`), k = push(ref(db, `plantillas/v/${clave}/${uid}`)).key;
-  await update(ref(db), { [`plantillas/s/${clave}/${uid}`]: { at: serverTimestamp(), c }, [`plantillas/v/${clave}/${uid}/${k}`]: { at: serverTimestamp(), c } });
+  await update(ref(db), { [`plantillas/s/${clave}/${uid}`]: conForm({ at: serverTimestamp(), c }, f), [`plantillas/v/${clave}/${uid}/${k}`]: conForm({ at: serverTimestamp(), c }, f) });
   return (await get(r)).val();
 }
 /* El álbum completo de un club (`plantillas/a/<uid>/album-<club>` = {at, c, k, k2, k3}):
@@ -578,9 +580,9 @@ export async function cobrarPodio(uid, id, pres) {
   const x = (await get(ref(db, `plantillas/q/${uid}/${id}`))).val();
   return { ks, at: x.at };
 }
-export async function cobrarPlantilla(uid, id, c, pres) {
+export async function cobrarPlantilla(uid, id, c, pres, f) {
   const ks = pres.map(pre => pre + push(ref(db, `cartas/s/${uid}`)).key);
-  const w = { [`plantillas/p/${uid}/${id}`]: Object.assign({ at: serverTimestamp(), c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}) };
+  const w = { [`plantillas/p/${uid}/${id}`]: conForm(Object.assign({ at: serverTimestamp(), c, k: ks[0] }, ks[1] ? { k2: ks[1] } : {}), f) };
   ks.forEach(k => { w[`cartas/s/${uid}/${k}`] = { at: serverTimestamp(), p: 0, pl: id }; });
   await update(ref(db), w);
   const x = (await get(ref(db, `plantillas/p/${uid}/${id}`))).val();

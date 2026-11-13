@@ -480,6 +480,23 @@
     ["rooney", "Rooney", "ENG", 88, "DC/MC"], ["zamorano", "Zamorano", "CL", 88, "DC"], ["lampard", "Lampard", "ENG", 87, "MC"],
     ["ashley-cole", "Ashley Cole", "ENG", 86, "LI"]
   ];
+  /* Los clubes de cada leyenda (como mucho tres: donde más se le recuerda,
+     y solo de los que tiene la colección). La leyenda sigue sin club
+     (`club: null`: fuera del álbum del club), pero cuenta en los desafíos
+     de plantilla de esos clubes (`juegaEn`). La que no está aquí no jugó en
+     ninguno de ellos (Pelé, Garrincha, Yashin…). */
+  const CLUBES_LEYENDA = {
+    "maradona": ["napoli", "barcelona", "boca"], "ronaldo-r9": ["realmadrid", "barcelona", "inter"], "zidane": ["realmadrid"],
+    "cruyff": ["barcelona"], "figueroa": ["colocolo"], "ronaldinho": ["barcelona", "milan", "psg"], "beckenbauer": ["bayern"],
+    "charlton": ["manutd"], "iniesta": ["barcelona"], "maldini": ["milan"], "puskas": ["realmadrid"], "baresi": ["milan"],
+    "buffon": ["psg"], "cafu": ["milan", "roma"], "ibrahimovic": ["milan", "inter", "psg"], "xavi": ["barcelona"],
+    "casillas": ["realmadrid"], "best": ["manutd"], "gullit": ["milan", "chelsea"], "pirlo": ["milan", "inter"],
+    "rivaldo": ["barcelona", "milan"], "roberto-carlos": ["realmadrid", "inter"], "cannavaro": ["realmadrid", "inter", "napoli"],
+    "drogba": ["chelsea"], "etoo": ["barcelona", "inter", "chelsea"], "figo": ["barcelona", "realmadrid", "inter"],
+    "kaka": ["milan", "realmadrid"], "marcelo": ["realmadrid"], "puyol": ["barcelona"], "beckham": ["manutd", "realmadrid", "milan"],
+    "ferdinand": ["manutd"], "gerrard": ["liverpool"], "hierro": ["realmadrid"], "riquelme": ["boca", "barcelona"],
+    "rooney": ["manutd"], "zamorano": ["realmadrid", "inter", "colocolo"], "lampard": ["chelsea", "mancity"], "ashley-cole": ["arsenal", "chelsea", "roma"]
+  };
   /* ---------- el Atlético de Madrid (LaLiga) ----------
      Los 26 jugadores de su plantel en EA SPORTS FC 27 (los hombres con
      carta base: titulares, suplentes y la cantera), con la media y las
@@ -1431,9 +1448,12 @@
     CARDS.push({
       n, uid: "leyendas-" + id + "-" + t.key, person: "leyendas-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
       col: "futbol", liga: "leyendas", peso: 1, pesoHoy: PESO_HOY.rara, tier: 3, tierAntes: 3, club: null, pos: POS_LINEA[pos[0]], posiciones: pos, dorsal: 0, pais, media, mediaAntes: media,
-      img: "cards/leyendas/" + id + ".webp", sub: PAIS_LEYENDA[pais], acc: t.color, leyenda: true, cinta: "LEYENDA", limitada: false
+      img: "cards/leyendas/" + id + ".webp", sub: PAIS_LEYENDA[pais], acc: t.color, leyenda: true, cinta: "LEYENDA", limitada: false,
+      clubes: (CLUBES_LEYENDA[id] || []).slice()
     });
   };
+  // si la carta vale por ese club en un desafío de plantilla: la de su club, o una leyenda que jugó ahí
+  const juegaEn = (c, club) => c.club === club || (!!c.clubes && c.clubes.includes(club));
   FUTBOLISTAS.forEach(j => cartaFutbol("futbol", "futbol", j));
   const BASE_PREM = CARDS.length;
   PREMIER.forEach(j => cartaFutbol("futbol", "premier", j));
@@ -1771,6 +1791,32 @@
     { pos: "MC", fila: 2 }, { pos: "MC", fila: 2 }, { pos: "MC", fila: 2 },
     { pos: "EI", fila: 3 }, { pos: "DC", fila: 3 }, { pos: "ED", fila: 3 }
   ];
+  /* Las demás formaciones de los desafíos: once casillas, del portero
+     hacia arriba y, en cada fila, de izquierda a derecha (`fila` 0 es el
+     portero; la más alta, los delanteros). Una plantilla guarda su clave en
+     `f`; sin `f` es la 4-3-3 de siempre (`FORMACION`), así que lo ya subido
+     no cambia. Las de cuatro o cinco medios son las que tienen MI y MD. */
+  const linea = (fila, ...pos) => pos.map(p => ({ pos: p, fila }));
+  const POR1 = linea(0, "POR"), DEF4 = linea(1, "LI", "DFC", "DFC", "LD"), DEF3 = linea(1, "DFC", "DFC", "DFC"), DEF5 = linea(1, "LI", "DFC", "DFC", "DFC", "LD");
+  const FORMACIONES = {
+    "433": FORMACION,
+    "442": [...POR1, ...DEF4, ...linea(2, "MI", "MC", "MC", "MD"), ...linea(3, "DC", "DC")],
+    "4231": [...POR1, ...DEF4, ...linea(2, "MC", "MC"), ...linea(3, "EI", "MC", "ED"), ...linea(4, "DC")],
+    "451": [...POR1, ...DEF4, ...linea(2, "MI", "MC", "MC", "MC", "MD"), ...linea(3, "DC")],
+    "4141": [...POR1, ...DEF4, ...linea(2, "MC"), ...linea(3, "MI", "MC", "MC", "MD"), ...linea(4, "DC")],
+    "424": [...POR1, ...DEF4, ...linea(2, "MC", "MC"), ...linea(3, "EI", "DC", "DC", "ED")],
+    "352": [...POR1, ...DEF3, ...linea(2, "MI", "MC", "MC", "MC", "MD"), ...linea(3, "DC", "DC")],
+    "343": [...POR1, ...DEF3, ...linea(2, "MI", "MC", "MC", "MD"), ...linea(3, "EI", "DC", "ED")],
+    "532": [...POR1, ...DEF5, ...linea(2, "MC", "MC", "MC"), ...linea(3, "DC", "DC")],
+    "541": [...POR1, ...DEF5, ...linea(2, "MI", "MC", "MC", "MD"), ...linea(3, "DC")]
+  };
+  // en el orden del selector (las claves numéricas de un objeto se ordenan solas)
+  const LISTA_FORMACIONES = ["433", "442", "4231", "451", "4141", "424", "352", "343", "532", "541"];
+  // cómo se escribe: «4-2-3-1»
+  const nombreFormacion = f => String(f in FORMACIONES ? f : "433").split("").join("-");
+  // la formación de una plantilla subida (lo que no se reconoce es la 4-3-3)
+  const formacionDe = f => FORMACIONES[f] || FORMACION;
+  const claveFormacion = f => (f in FORMACIONES ? String(f) : "433");
 
   /* ---------- lo de una cuenta ----------
      `s` = {clave: {at, p}} (los sobres), `g` = {clave: {i: {at, p}}} (lo
@@ -1793,7 +1839,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, ESPECIALES3, ESPECIALES4, LEYENDAS, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, CHAMPIONS, ESPECIALES, ESPECIALES2, ESPECIALES3, ESPECIALES4, LEYENDAS, CLUBES_LEYENDA, juegaEn, PESO_HOY, PESO_REROLL_FUTBOL, ATLETICO, MILAN, MEDIAS27, BANDAS_V0, CORTE_TIERS, tierEn, BAYERN, CHILE, ARGENTINA, MLS, ARABIA, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, esFutbol, CLUBES, FORMACION, FORMACIONES, LISTA_FORMACIONES, formacionDe, claveFormacion, nombreFormacion, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
     coleccionDe, poolDe, sobreDe, AMPLIACIONES, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, REROLL_V2, rerollN, rerollable, posiblesReroll, SALTO_W, SALTOS_DESDE, probSalida

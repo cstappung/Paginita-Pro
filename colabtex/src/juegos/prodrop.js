@@ -68,7 +68,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       for (const [u, x] of Object.entries(porUid || {})) {
         if (!x || !Number.isFinite(x.at) || (u !== uid && e.usuarios[u] && e.usuarios[u].parada)) continue;
         const cs = MOTOR.FORMACION.map((_, i) => { const c = x.c && x.c[i]; return typeof c === "string" && e.dueno[c] === u ? copia(e, c) : null; });
-        filas.push({ u: persona(u), at: x.at, c: cs });
+        filas.push({ u: persona(u), at: x.at, c: cs, f: MOTOR.claveFormacion(x.f) });
       }
       subidas[clave] = filas;
     }
@@ -227,10 +227,11 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           if (lista.length !== 11 || new Set(lista).size !== 11 || !lista.every(c => esCarta(c) && mia(c))) throw new Error("Completa las once casillas con cartas tuyas.");
           const fs = lista.map(c => fichaDe(e, c));
           if (fs.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
-          const ev = PR.evalua(x.clave, fs);
+          const form = MOTOR.claveFormacion(x.f);
+          const ev = PR.evalua(x.clave, fs, form);
           if (!ev.valida) throw new Error((ev.checks.find(c => !c.ok) || {}).txt || "La plantilla no cumple.");
           if (x.accion === "subeReto") {
-            const r = await fb.subirPlantillaReto(uid, x.clave, lista);
+            const r = await fb.subirPlantillaReto(uid, x.clave, lista, form);
             responde(true, { at: r && r.at, puntaje: ev.puntaje });
           } else {
             const n = Math.round(+x.n), pr = PR.PREMIOS[n - 1];
@@ -238,7 +239,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
             const id = PR.claveReclamo(x.clave, n);
             if (((d.plantillas && d.plantillas.p && d.plantillas.p[uid]) || {})[id]) throw new Error("Ese premio ya lo cobraste.");
             if (!PR.premioOk(n, ev)) throw new Error(`Para este premio: ${pr.txt.toLowerCase()}.`);
-            const r = await fb.cobrarPlantilla(uid, id, lista, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo));
+            const r = await fb.cobrarPlantilla(uid, id, lista, pr.sobres.map(t => MOTOR.SOBRE[t].prefijo), form);
             responde(true, { ks: r.ks, at: r.at, n, monedas: pr.monedas, sobres: PR.textoSobres(pr) });
           }
         } else if (x.accion === "cobraPodio") {
@@ -334,7 +335,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/retos` → los desafíos de plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-94" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-95" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });
