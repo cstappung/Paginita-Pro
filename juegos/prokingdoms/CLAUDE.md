@@ -193,6 +193,17 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   colour/cargo/direction/frame (~4 ms each the first time). `S.cart(col, carga, dir, cuadro, anda)`: `dir` 0..7 (45°
   steps in tile space, 0 = +x) or the old `flip` boolean (catapult, caravans). Direction comes from movement with
   hysteresis (`Sp.rumboDe(u)`, drawing only). Animals move tail and ears while parked (render passes a slow frame).
+- **Portraits** (`js/retratos.js`, `pk-50`): 36×36 drawn from the seed (face shape, skin, eyes, brows, nose, mouth,
+  age, 11 hair styles, beards, freckles, scar, earring); the class sets clothes, headgear and background, the hero's
+  `rasgo` the expression. `elegir` always rolls every die even when a trait is fixed (fixing one must not change
+  the rest of the face). Story characters fix theirs in `D.PERSONAJES[x].rasgos` (Valdés' patch, the crowns, Tobías'
+  monocle); a character turned hero keeps them (looked up by seed + class). Pass accessories draw with the old 24×24
+  coordinates scaled (the test looks for them in `retratos.js`). `H.parpadear(img, h)`: whoever talks blinks.
+- **Animals and figures** (`js/fauna.js`, `pk-50`): shaded ellipses and strokes with two-segment legs walked by phase,
+  outlined, at double resolution (`k: 2`) like villagers. Wolf (6 frames, map and battle), deer (3 poses per deer,
+  alternated by `render.js`), the rider's horse (gallop), battle bear, skeleton, golem and flying dragon (cached per
+  frame in `batalla.js` `fauna()`), the Coloso statue (by phases for `m_coloso`) and the dragon on the tower (stamped
+  with the painter's `img`). The old box sprites stay as fallback when `PK.Fauna` is missing. `S.hit` scales by `k`.
 - **Welcome guide** (`js/guia.js`, `PK.Guia`, `pk-48`, longer in `pk-49`): Tobías the steward walks a new kingdom
   through 27 steps (TC → villager → gather wood → house → lumber camp and its radius → a battle → Misiones). The
   battle is not an expedition: `B.empezar` with id `990000001` (not in `S.exp.runs`, so no losses or loot of its

@@ -126,7 +126,7 @@
   };
 
   // ---------- Ventanas ----------
-  C.retrato = id => { const P = D.PERSONAJES[id]; return H() ? H().retratoEl({ clase: P.clase, semilla: P.semilla, mujer: !!P.mujer }, 'grande') : ''; };
+  C.retrato = id => { const P = D.PERSONAJES[id], h = { clase: P.clase, semilla: P.semilla, mujer: !!P.mujer, rasgos: P.rasgos }; return H() ? H().parpadear(H().retratoEl(h, 'grande'), h) : ''; };
   C.escena = function (id, luego) {
     const E = D.ESCENAS[id], P = D.PERSONAJES[E.quien];
     PK.UI.modal('escena', 'La Crónica del Reino', body => {

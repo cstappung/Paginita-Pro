@@ -497,11 +497,11 @@ test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen su
 
 // ---------- Fase 8 (pk-20): el Pase del Reino ----------
 test('Pase del Reino: cada tema del calendario tiene sus aspectos, y el actual y el siguiente tienen tema', () => {
-  const hj = JS('heroes.js');
+  const hj = JS('retratos.js'); // pk-50: los accesorios de los retratos se dibujan ahí
   for (const [id, T] of Object.entries(D.PASE_TEMAS)) {
     assert.ok(T.name && T.col.length === 3, id);
     assert.ok(PK.Heroes.CLASES[T.heroe.clase], id + ': clase del héroe');
-    assert.ok(hj.includes("A === '" + T.heroe.acc + "'"), id + ': el accesorio ' + T.heroe.acc + ' se dibuja en heroes.js');
+    assert.ok(hj.includes("A === '" + T.heroe.acc + "'"), id + ': el accesorio ' + T.heroe.acc + ' se dibuja en retratos.js');
     assert.ok(D.BUILD[T.edificio.b] && T.edificio.techo, id + ': aspecto de edificio');
     assert.ok(D.ARMY[T.tropa.t] && T.tropa.col, id + ': aspecto de tropa');
     assert.ok(D.BUILD[T.deco.b], id + ': decoración');

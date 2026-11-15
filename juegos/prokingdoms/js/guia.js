@@ -18,7 +18,8 @@
   const tactil = () => window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   const hint = (pc, cel) => (tactil() ? cel : pc);
 
-  D.PERSONAJES.mayordomo = D.PERSONAJES.mayordomo || { name: 'Tobías, el mayordomo del reino', clase: 'juglar', semilla: 2718 };
+  D.PERSONAJES.mayordomo = D.PERSONAJES.mayordomo || { name: 'Tobías, el mayordomo del reino', clase: 'juglar', semilla: 2718,
+    rasgos: { monoculo: true, edad: 'viejo', peinado: 'calvo', pelo: [214, 210, 204], barba: 'bigote', boca: 'sonrisa', cejas: 'alzada', cara: 'redonda', piel: 1, iris: 0, sombrero: false } };
 
   // ---------- Ayudas para los pasos ----------
   const tc = () => G().buildings.find(b => b.owner === 'p' && b.type === 'tc');
@@ -294,7 +295,8 @@
     ultimoTxt = clave;
     dlg.innerHTML = '';
     const pers = D.PERSONAJES.mayordomo;
-    const ret = PK.Heroes && PK.Heroes.retratoEl ? PK.Heroes.retratoEl({ clase: pers.clase, semilla: pers.semilla }, 'grande') : '';
+    const yo = { clase: pers.clase, semilla: pers.semilla, rasgos: pers.rasgos };
+    const ret = PK.Heroes && PK.Heroes.retratoEl ? PK.Heroes.parpadear(PK.Heroes.retratoEl(yo, 'grande'), yo) : '';
     const pie = el('div', { class: 'gu-pie' },
       el('span', { class: 'small gu-n' }, 'Paso ' + (paso + 1) + ' de ' + PASOS.length),
       el('button', { class: 'gu-saltar', onclick: () => saltar() }, 'Saltar guía'),

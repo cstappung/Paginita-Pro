@@ -1018,12 +1018,13 @@
   // los de los héroes), sus misiones en la rama Crónica, un lugar único en el mapa con una batalla y su jefe, y
   // una elección al ganarla que cambia el premio. La lógica está en campana.js.
   D.PERSONAJES = {
-    forastero: { name: 'El Forastero de la Capa', clase: 'hechicero', semilla: 4242 },
-    valdes: { name: 'Tuerto Valdés', clase: 'guarda', semilla: 66 },
-    rey: { name: 'El Rey Bandido', clase: 'juglar', semilla: 1313 },
-    brunilda: { name: 'La reina Brunilda', clase: 'paladin', semilla: 777, mujer: true },
-    ceniza: { name: 'Hermana Ceniza, de la Orden del Cráter', clase: 'ingeniera', semilla: 909, mujer: true },
-    capitana: { name: 'La capitana del Galeón', clase: 'guarda', semilla: 5150, mujer: true },
+    // rasgos (pk-50): lo que hace reconocible a cada uno en su retrato (retratos.js)
+    forastero: { name: 'El Forastero de la Capa', clase: 'hechicero', semilla: 4242, rasgos: { capucha: true, edad: 'viejo', barba: 'larga', pelo: [214, 210, 204], ojos: 'entornado', cejas: 'gruesa', boca: 'seria', iris: 6, nariz: 'ganchuda' } },
+    valdes: { name: 'Tuerto Valdés', clase: 'guarda', semilla: 66, rasgos: { parche: true, cicatriz: true, barba: 'rala', peinado: 'corto', pelo: [34, 24, 20], cejas: 'enojada', boca: 'mueca', cara: 'cuadrada', piel: 2, sombrero: false } },
+    rey: { name: 'El Rey Bandido', clase: 'juglar', semilla: 1313, rasgos: { corona: true, barba: 'candado', peinado: 'largo', pelo: [118, 74, 38], boca: 'mueca', cejas: 'alzada', pendiente: true, piel: 1, cara: 'larga' } },
+    brunilda: { name: 'La reina Brunilda', clase: 'paladin', semilla: 777, mujer: true, rasgos: { casco: false, corona: true, peinado: 'trenzas', pelo: [226, 196, 122], cejas: 'recta', boca: 'seria', iris: 1, piel: 0 } },
+    ceniza: { name: 'Hermana Ceniza, de la Orden del Cráter', clase: 'ingeniera', semilla: 909, mujer: true, rasgos: { capucha: true, cejas: 'enojada', boca: 'seria', ojos: 'entornado', iris: 5, piel: 3, cicatriz: true } },
+    capitana: { name: 'La capitana del Galeón', clase: 'corsaria', semilla: 5150, mujer: true, rasgos: { peinado: 'cola', pelo: [156, 52, 30], pendiente: true, boca: 'sonrisa', pecas: true, piel: 1, iris: 2 } },
   };
   D.ESCENAS = {
     c1a: { quien: 'forastero', lineas: ['Buenas noches, señor del pueblo. Vengo del norte y traigo malas noticias.', 'Algo se mueve más allá de las montañas: los bandidos se juntan y las bestias bajan de los cerros.', 'Si quieres resistir, vas a necesitar héroes. Y una taberna donde encontrarlos.'] },

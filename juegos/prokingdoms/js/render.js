@@ -267,7 +267,14 @@
   function nodeSprite(n) {
     if (n.gone) return null;
     if (D.NODES[n.kind] && D.NODES[n.kind].mar && Sp.nodoMar) return Sp.nodoMar(n, G().mareaBaja()); // Fase 9 (pk-28)
-    if (n.kind === 'deer') return n.dead ? null : n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
+    if (n.kind === 'deer') {
+      if (n.dead) return null;
+      if (Sp.deerPose) { // pk-50: cada ciervo pasta, levanta la cabeza y mira a su ritmo
+        const t = Math.floor((performance.now() / 1000 + n.id * 3.7) / 4.5) % 5, pose = [1, 1, 0, 1, 2][t], lado = n.v % 2;
+        return n.gold ? Sp.deerGoldPose[lado][pose] : Sp.deerPose[lado][(n.v >> 1) % 2][pose];
+      }
+      return n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
+    }
     if (n.kind === 'tree') return n.dead ? (n.planta && Sp.brote ? Sp.brote : Sp.stump) : Sp.trees[n.sp][n.v % Sp.trees[n.sp].length];
     if (n.kind === 'berry') return n.dead || n.amount < n.max * 0.15 ? Sp.bushBare : Sp.bush[n.v % 3];
     const r = n.amount / n.max, sz = r > 0.5 ? 2 : r > 0.15 ? 1 : 0;
@@ -528,7 +535,7 @@
     // lobos
     for (const w of PK.Life.wolves) {
       if (!seen(w.x, w.y)) continue;
-      const [px, py] = R.iso(w.x, w.y), spr = Sp.wolf[w.flip ? 1 : 0][Math.floor(w.anim * 8) % 2];
+      const [px, py] = R.iso(w.x, w.y), spr = Sp.wolf[w.flip ? 1 : 0][Math.floor(w.anim * 10) % Sp.wolf[0].length];
       list.push({ d: w.x + w.y, k: 'wolf', o: w, spr, x: Math.round(px - spr.ax), y: Math.round(py - spr.ay), px, py });
     }
     // edificios

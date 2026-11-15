@@ -42,6 +42,7 @@
     return spr;
   }
   S.hit = function (spr, x, y) {
+    if (spr.k) { x *= spr.k; y *= spr.k; } // los de resolución doble (aldeanos, animales)
     x = Math.floor(x); y = Math.floor(y);
     if (x < 0 || y < 0 || x >= spr.c.width || y >= spr.c.height) return false;
     return !spr.mask || spr.mask[y * spr.c.width + x] === 1;
@@ -255,7 +256,9 @@
       if (tier >= 1) { ctx.fillStyle = tier >= 2 ? lt : md; for (let i = 0; i < 5; i++) ctx.fillRect(p[0] + 1 + i, top + 5, 1, Math.max(1, 3 - Math.floor(i * 0.6))); }
     }
     function post(x, y, ht) { box(x, y, 0.14, 0.14, 0, ht, 'darkwood'); }
-    return { ctx, P, fill, px, line, box, roof, quad, door, win, timber, flag, post, wp, info, tier };
+    // pk-50: pega un dibujo hecho aparte (estatuas, el dragón) con su punto de apoyo en P(x, y, z)
+    function img(c, ax, ay, x, y, z) { const q = P(x, y, z); ctx.drawImage(c, Math.round(q[0] - ax), Math.round(q[1] - ay)); }
+    return { ctx, P, fill, px, line, box, roof, quad, door, win, timber, flag, post, wp, info, tier, img };
   }
 
   // Adornos genéricos según el tramo de nivel: banderín en la cumbrera (si el edificio no tiene bandera) y, en las
@@ -570,7 +573,8 @@
       p.door(t, 'L', 0.7, 0.45, 10, 4);
       p.box(0.15, 0.15, 1.7, 1.7, 58, 62, 'slate', 'slate', 'paving');
       for (const [x, y] of [[0.15, 0.15], [0.85, 0.15], [1.55, 0.15], [0.15, 0.85], [0.15, 1.55]]) p.box(x, y, 0.3, 0.3, 62, 66, 'slate', 'slate', 'slate');
-      // el dragón posado en la almena: cuerpo, cuello, cabeza, alas y cola (todo en bloques)
+      // el dragón posado en la almena (pk-50: con volumen y alas de membrana, fauna.js)
+      if (PK.Fauna) { const dr = PK.Fauna.dragon(); p.img(dr.c, dr.patas[0], dr.patas[1], 1.0, 1.0, 64); p.flag(0.25, 1.75, 66, col, 12); return; }
       const R = '#b8302a', Rd = '#7a1a16', Rl = '#e8604a';
       p.box(0.7, 0.8, 0.7, 0.4, 62, 68, R, Rd, Rl);
       p.box(1.3, 0.9, 0.25, 0.2, 66, 74, R, Rd, Rl);
@@ -872,6 +876,13 @@
       p.box(0.1, 0.1, 1.8, 1.8, 0, 4, 'stone', 'stone', 'paving');
       p.box(0.4, 0.4, 1.2, 1.2, 4, 15, 'marbleS', 'marbleS', 'marbleS');
       p.box(0.35, 0.35, 1.3, 1.3, 15, 17, 'gilt', 'gilt', 'marbleS');
+      if (PK.Fauna) { // pk-50: la estatua con volumen (fauna.js) y su antorcha
+        const e = PK.Fauna.estatua(1, col);
+        p.img(e.c, e.pies[0], e.pies[1], 1.0, 1.0, 17);
+        const q = p.P(1.0, 1.0, 17), t = [Math.round(q[0] - e.pies[0] + e.llama[0]), Math.round(q[1] - e.pies[1] + e.llama[1])];
+        for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [-1, -2, '#f0a030'], [0, -3, '#fff0a0'], [1, -3, '#ffd060'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c);
+        return;
+      }
       p.box(0.6, 0.86, 0.3, 0.3, 17, 36, BR, BR2, BR); p.box(1.04, 0.86, 0.3, 0.3, 17, 36, BR, BR2, BR); // piernas
       p.box(0.56, 0.8, 0.82, 0.44, 34, 41, BR2, BR2, BR);                                                     // faldón
       p.box(0.54, 0.78, 0.86, 0.48, 41, 55, BR, BR2, BR);                                                     // torso
@@ -1066,6 +1077,14 @@
       p.box(0.95, 0.95, 3.1, 3.1, 18, 21, 'gilt', 'gilt', 'marbleS');
       p.quad({ x: 1, y: 1, w: 3, h: 3 }, 'L', 1.1, 1.9, 8, 14, rgb(col));
       if (ph === 0) { for (const [x, y] of [[1.4, 2.1], [2.5, 2.1]]) p.box(x, y, 0.6, 0.6, 21, 34, 'plank', 'darkwood'); p.box(1.3, 2.0, 2.0, 0.8, 34, 36, 'plank', 'darkwood', 'plank'); }
+      if (ph >= 1 && PK.Fauna) { // pk-50: la estatua con volumen, que se completa por fases
+        p.flag(0.4, 0.4, 4, col, 16); // antes que la estatua: está detrás
+        const e = PK.Fauna.estatua(1.32, col, { piernas: 1, torso: ph >= 2, cabeza: ph >= 3, lanza: ph >= 4, antorcha: ph >= 5, escudo: ph >= 2 });
+        p.img(e.c, e.pies[0], e.pies[1], 2.5, 2.5, 21);
+        if (e.llama) { const q = p.P(2.5, 2.5, 21), t = [Math.round(q[0] - e.pies[0] + e.llama[0]), Math.round(q[1] - e.pies[1] + e.llama[1])]; for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [-1, -2, '#f0a030'], [0, -3, '#fff0a0'], [1, -3, '#ffd060'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c); }
+        if (ph >= 6) { const t = p.P(2.5, 2.4, 100); for (let a = 0; a < 24; a++) { const k = (a / 24) * Math.PI * 2; p.px(t[0] + Math.cos(k) * 9, t[1] + Math.sin(k) * 4, a % 2 ? GOLD : GLINT); } }
+        return;
+      }
       if (ph >= 1) { p.box(1.9, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); p.box(2.6, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); }
       if (ph >= 2) { p.box(1.8, 2.05, 1.35, 0.7, 44, 52, BR2, BR2, BR); p.box(1.75, 2.0, 1.45, 0.8, 52, 72, BR, BR2, BR); p.box(1.6, 2.05, 1.75, 0.7, 68, 75, BR, BR2, BR); }
       if (ph >= 3) { p.box(2.25, 2.15, 0.5, 0.45, 75, 87, BR, BR2, BR); p.box(2.2, 2.1, 0.6, 0.55, 87, 90, 'gilt', 'gilt', 'gilt'); }
@@ -2332,6 +2351,11 @@
     const ox = 6, oy = 2; // dónde va el jinete (en píxeles del aldeano)
     x.drawImage(p.c, (flip ? W - p.w - ox : ox) * K, oy * K + (mode === 'walk' && frame % 3 === 1 ? -K : 0));
     const hc = x, r = (a, b, w, h, cl) => { hc.fillStyle = cl; hc.fillRect((flip ? W - a - w : a) * K, b * K, w * K, h * K); };
+    if (PK.Fauna) { // pk-50: caballo con volumen, al galope (fauna.js), a la resolución del jinete
+      const cab = PK.Fauna.caballo(mode === 'walk' ? (frame % 6) / 6 : null, col);
+      x.save(); if (flip) { x.translate(W * K, 0); x.scale(-1, 1); } x.drawImage(cab.c, 0, 0); x.restore();
+      return (MC[key] = { c, ax: flip ? W - 15 : 15, ay: 27, k: K, w: W, h: H });
+    }
     const C = '#7a5232', C2 = '#5a3a22', C3 = '#94683e', M = '#2e2018', MA = 'rgb(' + col.join(',') + ')';
     const g = mode === 'walk' ? frame % 6 : 0, l = [0, 1, 2, 1, 0, -1][g];
     // patas (se mueven al caminar), cuerpo, manta del color del reino, cuello y cabeza
@@ -2534,9 +2558,19 @@
     S.bushBare = makeBush(14, false);
     S.rocks = {};
     for (const k of ['stone', 'gold', 'ore', 'marble', 'gems']) S.rocks[k] = [0, 1, 2].map(sz => [makeRocks(k, 40 + sz, sz), makeRocks(k, 50 + sz, sz)]);
-    S.deer = [makeDeer(61, false), makeDeer(62, true), makeDeer(63, false), makeDeer(64, true)];
-    S.deerGold = [makeDeer(65, false, true), makeDeer(66, true, true)];
-    S.wolf = [[makeWolf(0, false), makeWolf(1, false)], [makeWolf(0, true), makeWolf(1, true)]];
+    const Fa = PK.Fauna; // pk-50: animales con volumen y patas que se mueven (fauna.js); los viejos quedan de respaldo
+    if (Fa) {
+      // poses por ciervo: [lado][astas][pose] con pose 0 de pie, 1 pastando, 2 mirando (render.js las alterna)
+      S.deerPose = [false, true].map(fl => [true, false].map(as => ['pie', 'pasta', 'mira'].map(po => withMask(Fa.ciervo(po, fl, false, as, !as)))));
+      S.deerGoldPose = [false, true].map(fl => ['pie', 'pasta', 'mira'].map(po => withMask(Fa.ciervo(po, fl, true, true))));
+      S.deer = [S.deerPose[0][0][0], S.deerPose[1][1][1], S.deerPose[0][1][2], S.deerPose[1][0][1]];
+      S.deerGold = [S.deerGoldPose[0][2], S.deerGoldPose[1][1]];
+      S.wolf = [false, true].map(fl => [0, 1, 2, 3, 4, 5].map(i => Fa.lobo(i / 6, fl)));
+    } else {
+      S.deer = [makeDeer(61, false), makeDeer(62, true), makeDeer(63, false), makeDeer(64, true)];
+      S.deerGold = [makeDeer(65, false, true), makeDeer(66, true, true)];
+      S.wolf = [[makeWolf(0, false), makeWolf(1, false)], [makeWolf(0, true), makeWolf(1, true)]];
+    }
     if (S.initMar) S.initMar();
   };
 })();
