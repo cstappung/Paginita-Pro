@@ -203,7 +203,13 @@
     // 20: el Excavador, minero zombi con casco de lámpara, cubierto de tierra
     { piel: '#b0a088', camisa: '#6a5a40', panel: '#4a3e2c', pantalon: '#3e3426', pelo: '#e0b030', ojos: '#ffcf4a', ojosLuz: 1, boca: '#2a1a10', extra: 'casco', brazos: 'zombi', grueso: 1.1, sangre: 0 },
     // 21: el Vigía, flaco, de gris, con un ojo rojo que apunta
-    { piel: '#9aa4ae', camisa: '#3a4048', panel: '#c02a2a', pantalon: '#2a2e34', pelo: '#ff2a2a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#1a1a1a', extra: 'antena', brazos: 'lado', ancho: 0.85, sangre: 3 }
+    { piel: '#9aa4ae', camisa: '#3a4048', panel: '#c02a2a', pantalon: '#2a2e34', pelo: '#ff2a2a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#1a1a1a', extra: 'antena', brazos: 'lado', ancho: 0.85, sangre: 3 },
+    // 22: el Tóxico, hinchado y verde, con burbujas en la boca
+    { piel: '#9ccf6a', camisa: '#5a7a22', panel: '#c8ff3a', pantalon: '#2e3e14', pelo: '#3a5212', ojos: '#eaff3a', ojosLuz: 1, boca: '#c8ff3a', bocaLuz: 1, extra: 'zombi', brazos: 'zombi', ancho: 1.18, grueso: 1.15, cabeza: 1.1, sangre: 2 },
+    // 23: el Portaestandarte, armadura roja y un casco con cresta
+    { piel: '#d8cfc0', camisa: '#8a1a1a', panel: '#e0b030', pantalon: '#3a1010', pelo: '#e0b030', ojos: '#ffcf4a', ojosLuz: 1, boca: '#3a1010', extra: 'casco', brazos: 'lado', ancho: 1.12, grueso: 1.1, sangre: 0 },
+    // 24: la Sombra, negra y morada, flaca, con ojos que brillan
+    { piel: '#2a2238', camisa: '#1a1426', panel: '#6a3aaa', pantalon: '#120e1c', pelo: '#0a0812', ojos: '#d07aff', ojosLuz: 1, boca: '#0a0812', extra: 'capucha', brazos: 'zombi', ancho: 0.82, sangre: 3 }
   ];
   /* La sangre de cada cual: roja, la del diablo más oscura, verde el ácido. */
   const SANGRE = [[196, 14, 16], [120, 6, 10], [92, 150, 26], [70, 90, 150]];
@@ -225,10 +231,12 @@
   const RANGO = [null,
     { m: { [OSC]: '#3d4a5c', [NEGRO]: '#1f2733', '#3b3d43': '#4a5a70', '#4a4d55': '#c9d3e0', '#4d5a3a': '#4f5d6e', '#2a2f22': '#1f2733', '#4d5c2a': '#4f5d6e' }, f: '#c9d3e0', luz: 0 },
     { m: { [OSC]: '#b8862b', [NEGRO]: '#5a3d12', '#3b3d43': '#c99a35', '#4a4d55': '#ffe08a', '#4d5a3a': '#b8862b', '#2a2f22': '#5a3d12', '#4d5c2a': '#b8862b' }, f: '#ffe08a', luz: 0 },
-    { m: { [OSC]: '#2a1446', [NEGRO]: '#140a24', '#3b3d43': '#3a1d63', '#4a4d55': '#3df5ff', '#4d5a3a': '#2a1446', '#2a2f22': '#140a24', '#4d5c2a': '#2a1446' }, f: '#3df5ff', luz: 1 }];
+    { m: { [OSC]: '#2a1446', [NEGRO]: '#140a24', '#3b3d43': '#3a1d63', '#4a4d55': '#3df5ff', '#4d5a3a': '#2a1446', '#2a2f22': '#140a24', '#4d5c2a': '#2a1446' }, f: '#3df5ff', luz: 1 },
+    // legendaria (niveles 6–8, Fase 4): carmesí con brillo de fuego
+    { m: { [OSC]: '#5a0a14', [NEGRO]: '#2a0408', '#3b3d43': '#7a1420', '#4a4d55': '#ff9a3a', '#4d5a3a': '#5a0a14', '#2a2f22': '#2a0408', '#4d5c2a': '#5a0a14' }, f: '#ffb04a', luz: 1 }];
   const cachePartes = new Map();
   function partesArma(w, nivel) {
-    const ra = nivel >= 5 ? 3 : nivel >= 3 ? 2 : nivel >= 1 ? 1 : 0;
+    const ra = nivel >= 6 ? 4 : nivel >= 5 ? 3 : nivel >= 3 ? 2 : nivel >= 1 ? 1 : 0;
     if (!ra) return partesBase(w);
     const clave = w * 10 + ra;
     let v = cachePartes.get(clave);

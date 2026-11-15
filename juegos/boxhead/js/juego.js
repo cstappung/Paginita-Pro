@@ -97,13 +97,13 @@
     return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, chat: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
       tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], giro: 0, dorada: 0, arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, cuentaP: 0, napC: 0, napalm: [], eco: null, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
       // para la pantalla final: disparos y aciertos (perdigón a perdigón), bajas por arma y jefes
-      st: { disp: 0, acierto: 0, armas: new Array(10).fill(0), jefes: 0 } };
+      st: { disp: 0, acierto: 0, armas: new Array(D.ARMAS.length).fill(0), jefes: 0 } };
   }
 
   /* Las ventajas elegidas al empezar cada nivel (D.VENTAJAS): `vt(id)` es
      su nivel, 0 si no se tiene. */
   function vt(id) { return (yo.vt && yo.vt[id]) || 0; }
-  function hpMax() { return 100 + 20 * vt('aguante') + (esZombi(cfg && cfg.yo) ? 60 : 0); }
+  function hpMax() { return 100 + 20 * vt('aguante') + 50 * vt('titan') + (esZombi(cfg && cfg.yo) ? 60 : 0); }
 
   /* **Elegir una ventaja.** Al empezar cada nivel desde el 2 salen tres
      (D.sorteaVentajas, con el azar del juego: en la práctica, el de la
@@ -119,11 +119,24 @@
     if (n >= 10) medalla('nivel10');
     if (n >= 20) medalla('nivel20');
     if (n >= 30) medalla('nivel30');
+    if (n >= 40) medalla('nivel40');
+    if (n >= 50) medalla('nivel50');
+    if (n >= 75) medalla('nivel75');
+    if (n >= 100) medalla('nivel100');
     if (ONLINE && n >= 5 && (cfg.jugadores || []).length > 1) medalla('equipo');
     anotaRecord(n);
+    yo.botiN = 0;
+    /* Fase 4: sobrevivir a una noche paga (chatarra y furia dorada). */
+    const nocheAntes = !versus() && !jefes() ? D.nocheDe(n - 1) : '';
+    if (nocheAntes && yo.v && !yo.muerto) {
+      const c = D.premioNoche(n - 1);
+      yo.chat += c; yo.chatTot += c; yo.dorada = Math.max(yo.dorada || 0, D.DORADA_T);
+      medalla('noche'); premio('🌙 Sobreviviste a la ' + D.NOCHES[nocheAntes].nombre.toLowerCase() + ': +' + c + ' de chatarra', 'mejora');
+    }
+    if (vt('fenix') && yo.v && !yo.muerto) yo.hp = hpMax();
     if (vt('coraza') && yo.v && !yo.muerto) yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 25 * vt('coraza'));
     if (eleccion) eligeVentaja(0);
-    const ops = D.sorteaVentajas(rn, yo.vt, ONLINE && (cfg.jugadores || []).length > 1, 3);
+    const ops = D.sorteaVentajas(rn, yo.vt, ONLINE && (cfg.jugadores || []).length > 1, 3, versus() ? 0 : n);
     if (!ops.length) return;
     eleccion = { ops, t: D.ESPERA_VENTAJA };
     pintaEleccion(); son('premio');
@@ -133,8 +146,16 @@
     const id = eleccion.ops[i];
     if (!id) return;
     const v = D.ventaja(id), n = (yo.vt[id] || 0) + 1;
+    if (id[0] === '_') {   // relleno: cuando ya no queda ventaja que subir (D.RELLENO)
+      if (v.chat) { yo.chat += v.chat; yo.chatTot += v.chat; }
+      if (v.arm) yo.arm = D.ARMADURA.max;
+      if (v.vida && yo.v && !yo.muerto) yo.hp = hpMax();
+      eleccion = null; pintaEleccion(); son('mejora'); premio(v.nom + ': ' + v.txt.toLowerCase(), 'mejora');
+      return;
+    }
     yo.vt[id] = n;
     if (id === 'aguante' && yo.v && !yo.muerto) yo.hp += 20;
+    if (id === 'titan' && yo.v && !yo.muerto) yo.hp += 50;
     if (Object.values(yo.vt).reduce((a, b) => a + b, 0) >= 10) medalla('ventajas');
     if (D.VENTAJAS.filter(x => x.rar === 2 && yo.vt[x.id]).reduce((a, x) => a + yo.vt[x.id], 0) >= 3) medalla('epicas');
     eleccion = null; pintaEleccion();
@@ -167,12 +188,33 @@
     const s = D.SKINS.find(x => x.medalla === id);
     if (s) premio('Nuevo personaje: ' + s.nombre);
   }
-  // El récord de la práctica en cada mapa: el nivel más alto y, con ese nivel, los puntos.
+  /* El récord en cada mapa: la ronda más alta y, con esa ronda, los puntos.
+     Cuenta la práctica, el Club y las salas cooperativas (el mismo récord
+     que la tabla `club-boxhead-<mapa>`, que también junta las dos), y el
+     Club trae el de la nube (`club-record`). */
   function anotaRecord(n) {
-    if (ONLINE || repite || !cfg) return;
+    if (repite || !cfg || cfg.mirando || (ONLINE && cfg.variante !== 'coop')) return;
     const r = records[cfg.mapa] || { n: 0, pts: 0 };
     if (n > r.n || (n === r.n && yo.pts > r.pts)) { records[cfg.mapa] = { n, pts: yo.pts | 0 }; guarda('boxhead.records', JSON.stringify(records)); }
     if (D.MAPAS_CLASICOS.every(m => (records[m] || {}).n >= 10)) medalla('mapas');
+  }
+  if (CLUB) window.addEventListener('club-record', ev => {
+    const d = ev.detail || {}, m = /^club-boxhead-(\w+)$/.exec(d.categoria || '');
+    if (!m || !D.MAPAS[m[1]] || !Number.isInteger(d.puntos)) return;
+    const r = records[m[1]] || { n: 0, pts: 0 };
+    if (d.puntos > r.n) { records[m[1]] = { n: d.puntos, pts: 0 }; guarda('boxhead.records', JSON.stringify(records)); if (!jugando) pintaMenu(); }
+  });
+  /* Fase 4: las metas a la vista, debajo de la ronda: el próximo jefe, la
+     próxima noche (cuando falta poco), la próxima medalla y tu récord. */
+  function textoMetas() {
+    const n = nivelObjetivo(), p = D.proximas(n), out = [];
+    if (p.jefe !== undefined) out.push(p.jefe === n ? '💀 ¡ronda de jefe!' : '💀 jefe en ' + (p.jefe - n));
+    if (p.noche !== undefined && p.noche - n <= 10) out.push(p.noche === n ? '🌙 ¡noche!' : '🌙 noche en ' + (p.noche - n));
+    const rec = (records[cfg.mapa] || {}).n || 0;
+    if (rec > 1) out.push(n > rec ? '★ ¡récord nuevo!' : '★ récord ' + rec);
+    const mr = D.MEDALLAS_RONDA.find(([r, id]) => r > n && !medallas.has(id));
+    if (mr) out.push('🏅 medalla en la ' + mr[0]);
+    return out.join(' · ');
   }
   // Las ventajas que se tienen, en una línea («Filo 2 · Dron 1»).
   const listaVentajas = () => D.VENTAJAS.filter(v => vt(v.id)).map(v => v.nom + (v.max > 1 ? ' ' + vt(v.id) : '')).join(' · ');
@@ -208,7 +250,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 8, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 9, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   // Teclas de arma: la posición en ARMAS_J (los ids 8 y 9 no son armas del jugador).
@@ -461,7 +503,17 @@
   const jefes = () => !!cfg && cfg.variante === 'jefes';
   // El mutador de la sala (solo en línea); `mut('cristal')`, o el dato con `mutD()`.
   const mut = k => !!cfg && cfg.mut === k;
-  const mutD = () => (cfg && cfg.mut ? D.MUTADORES[cfg.mut] : null) || {};
+  /* Fase 4: la noche de la ronda que corre se suma al mutador de la sala
+     (`D.mezclaMut`). La ronda es `dir.n`, que el director comparte en el zb. */
+  const nocheAhora = () => (cfg && !versus() && !jefes() ? D.nocheDe(dir.n) : '');
+  const eventoAhora = () => (cfg && !versus() && !jefes() ? D.eventoDe(dir.n) : '');
+  let mutC = { k: null, v: {} };
+  const mutD = () => {
+    if (!cfg) return {};
+    const m = cfg.mut || '', no = nocheAhora(), k = m + '|' + no;
+    if (mutC.k !== k) mutC = { k, v: D.mezclaMut(m ? D.MUTADORES[m] : null, no ? D.NOCHES[no] : null) || {} };
+    return mutC.v;
+  };
   // El nivel que simula el director para un nivel de la sala.
   const nivelSim = n => (jefes() ? D.nivelJefes(n) : n);
   const activos = () => { const f = fueraSet(); return jugadores().filter(j => !f.has(j.uid)); };
@@ -666,6 +718,7 @@
   }
   function gasta() {
     if (yo.w === 0 || yo.ammo[yo.w] === Infinity || yo.dorada > 0 || mut('municion')) return;   // la furia dorada no gasta
+    if (vt('infinita') && rn() < 0.3) return;   // Recámara infinita (legendaria)
     yo.ammo[yo.w]--;
     if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; yo.vacio = 0.12; }   // a los 0,12 s vuelve a la pistola (pasoYo), por pasos y no con un reloj
   }
@@ -877,14 +930,18 @@
 
   // Explosión mía (granada, cohete): cada cosa la aplica quien debe.
   // `amigo`: la de una ventaja (bala ígnea, estallido), que no te daña a ti ni a los tuyos.
+  const TOPE_PROPIO = 25;
   function explota(x, y, r, d, w, id, amigo) {
     efectoBoom(x, y, r);
     pend.x2.push([id, Math.round(x), Math.round(y), r]);
     for (const e of [...E.values()]) { const dd = dist(x, y, e.x, e.y); if (dd < r + RG(e.k) && !bajoTierra(e)) golpeaEnemigo(e, caida(dd, r, d), w, x, y); }
     for (const o of [...O.values()]) { const dd = dist(x, y, o.x, o.y); if (dd < r && o.k !== 'carga') golpeaObjeto(o.id, caida(dd, r, d), w); }
     if (amigo) return;
-    if (yo.v && !yo.muerto) { const dd = dist(x, y, yo.x, yo.y); if (dd < r) recibe(caida(dd, r, d) * (versus() ? 0.5 : 1 / 3), w, cfg.yo); }
-    for (const [u, rr] of R) if (rr.v) { const dd = dist(x, y, rr.x, rr.y); if (dd < r) golpeaJugador(u, caida(dd, r, d) * (versus() ? 1 : 1 / 3), w); }
+    /* Lo propio en el cooperativo: un tercio y con tope (`TOPE_PROPIO`), o
+       las explosiones mejoradas (cohetes nivel 5 en abanico) te mataban solo. */
+    const propio = v => versus() ? v : Math.min(TOPE_PROPIO, v / 3);
+    if (yo.v && !yo.muerto) { const dd = dist(x, y, yo.x, yo.y); if (dd < r) recibe(versus() ? caida(dd, r, d) * 0.5 : propio(caida(dd, r, d)), w, cfg.yo); }
+    for (const [u, rr] of R) if (rr.v) { const dd = dist(x, y, rr.x, rr.y); if (dd < r) golpeaJugador(u, propio(caida(dd, r, d)), w); }
   }
 
   /* `lado`: cuánto correrse de costado (muralla, barril doble); `mina`: la
@@ -941,6 +998,9 @@
       const espalda = Number.isFinite(sx) && l > 0 && ((sx - e.x) * dv[0] + (sy - e.y) * dv[1]) / (l * hyp(dv[0], dv[1])) < -0.5;
       if (espalda || e.est === 2) { d *= D.DEBIL; e.debil = 0.25; }
     }
+    // Fase 4: Verdugo pega más a jefes y élites; el estandarte protege a los suyos.
+    if (vt('verdugo') && (D.esJefe(e.k) || e.el)) d *= 1.3;
+    if (bajoEstandarte(e)) d *= 1 - D.ENEMIGOS[23].auraDef;
     e.flash = 0.1;
     armaUlt = w;
     anotaDano(e, d);
@@ -982,7 +1042,7 @@
     d *= mutD().recibe || 1;
     // La armadura se come una parte del golpe hasta gastarse.
     if (yo.arm > 0) { const ab = Math.min(yo.arm, d * D.ARMADURA.absorbe); yo.arm -= ab; d -= ab; }
-    d *= 1 - 0.08 * vt('piel');
+    d *= (1 - 0.08 * vt('piel')) * (vt('titan') ? 0.85 : 1);
     yo.sinGolpe = 0; yo.limpio = false;
     yo.hp -= d;
     if (inmortal) yo.hp = Math.max(1, yo.hp);
@@ -1017,14 +1077,18 @@
   /* Una baja mía: puntos (× multiplicador), chatarra (sin él) que salta del
      cuerpo, el combo y, al pasar un récord del multiplicador, armas,
      mejoras y los hitos ×10, ×25, ×50… */
-  const HITOS = [10, 25, 50, 100, 150, 200, 300];
+  const HITOS = [10, 25, 50, 100, 150, 200, 300, 500, 750, 1000];
   let armaUlt = 0, armaMuerte = -1;
   function miBaja(k, x, y) {
     yo.pts += D.PUNTOS[k] * yo.mul;
     yo.k++;
     yo.mul++;
     yo.st.armas[armaMuerte >= 0 ? armaMuerte : armaUlt]++;
-    if (D.esJefe(k)) { yo.st.jefes++; medalla('jefe'); if (D.ENEMIGOS[k].jefe === 'grande') medalla('coloso'); }
+    if (D.esJefe(k)) {
+      yo.st.jefes++; medalla('jefe');
+      if (D.ENEMIGOS[k].jefe === 'grande') { medalla('coloso'); if (yo.limpio && !versus()) medalla('intocable'); }
+      if (D.corrupto(dir.n)) medalla('corrupto');
+    }
     if (++yo.bajasPaso >= 10) medalla('diez');
     if (Number.isFinite(x)) sueltaChatarra(x, y, Math.round(D.chatarraDe(k) * (1 + 0.2 * vt('codicia'))));
     if (vt('vampiro') && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + vt('vampiro'));
@@ -1043,6 +1107,7 @@
     if (yo.mul >= 3) consejo('combo');
     if (yo.mul >= 50) medalla('x50');
     if (yo.mul >= 100) medalla('x100');
+    if (yo.mul >= 500) medalla('x500');
     yo.combo = yo.comboMax = D.duracionCombo(yo.mul) * (1 + 0.2 * vt('racha'));
   }
   function hito(m) {
@@ -1092,8 +1157,8 @@
   // ---------- el director ----------
   const vivos = () => {
     const l = [];
-    if (cfg && !cfg.mirando && yo.v && !yo.muerto) l.push({ uid: cfg.yo, x: yo.x, y: yo.y });
-    for (const [u, r] of R) if (r.v) l.push({ uid: u, x: r.tx, y: r.ty });
+    if (cfg && !cfg.mirando && yo.v && !yo.muerto) l.push({ uid: cfg.yo, x: yo.x, y: yo.y, d: yo.d });
+    for (const [u, r] of R) if (r.v) l.push({ uid: u, x: r.tx, y: r.ty, d: r.d });
     return l;
   };
 
@@ -1200,7 +1265,8 @@
       const s = cands[(rn() * cands.length) | 0];
       x = s.x + rz(-4, 4); y = s.y + rz(-4, 4);
     }
-    const k = kFijo >= 0 ? kFijo : D.tipoEnemigo(versus() ? n + 2 : n, rn());
+    const ev = kFijo >= 0 || versus() || jefes() ? '' : D.eventoDe(n);
+    const k = kFijo >= 0 ? kFijo : ev && D.EVENTOS[ev].ks ? D.tipoEvento(ev, n, rn(), rn()) : D.tipoEnemigo(versus() ? n + 2 : n, rn());
     const jefe = D.esJefe(k);
     const max = jefe ? D.vidaJefe(k, n, Math.max(1, activos().length)) : D.vidaEnemigo(k, n);
     const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: rz(1, 3), flash: 0 };
@@ -1210,20 +1276,45 @@
        rápido, vampiro, divisor, ígneo). Antes del 12 no se tira el dado:
        así no cambia la secuencia de `rn` de los niveles bajos. */
     if (!(kFijo >= 0) && n >= 12) {
-      e.el = D.eliteDe(k, n, rn(), rn());
+      const r1 = rn();
+      e.el = D.eliteDe(k, n, ev && D.EVENTOS[ev].elites ? r1 / D.EVENTOS[ev].elites : r1, rn());
       if (e.el) { e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
     }
     // La segunda vuelta de los jefes (desde el nivel 51): corruptos.
     if (jefe && D.corrupto(n)) { e.el = D.ELITE_CORRUPTO; e.max = e.hp = Math.round(max * D.ELITES[e.el].vida); }
     if (mutD().vida && !jefe) e.max = e.hp = Math.round(e.max * mutD().vida);
     if (C.cava) { e.est = 1; e.estT = 0; }            // nace bajo tierra
-    if (C.cura || C.vigia) { e.cdH = C.cd * rz(0.5, 1); e.est = 0; e.estT = 0; }
+    if (C.cura || C.vigia || C.sombra) { e.cdH = C.cd * (C.sombra ? rz(0.2, 0.5) : rz(0.5, 1)); e.est = 0; e.estT = 0; }
     if (!C.cava) desatasca(e, C.radio - 1);
     e.tx = e.x; e.ty = e.y;
     E.set(e.id, e);
     // El enjambre llega en grupo: los demás alrededor del primero.
     if (C.grupo && !(kFijo >= 0)) for (let i = 1; i < C.grupo; i++) nuevoEnemigo(n, k, e.x + rz(-14, 14), e.y + rz(-14, 14));
     return e;
+  }
+  /* **Atascados (Fase 4).** Un enemigo que en `QUIETO_T` segundos (2 min)
+     no se alejó `QUIETO_R` px de donde estaba reaparece en la entrada de
+     enemigos más cercana a los jugadores (pero fuera de su vista, como al
+     nacer): a veces quedaban trabados en una esquina y el nivel no se
+     acababa nunca. Sin `rn`, para no mover el azar de la práctica. */
+  const QUIETO_T = 120, QUIETO_R = 30;
+  function quieto(e, dt) {
+    if (!(e.qt >= 0) || dist(e.x, e.y, e.qx, e.qy) > QUIETO_R) { e.qt = 0; e.qx = e.x; e.qy = e.y; return false; }
+    e.qt += dt;
+    if (e.qt < QUIETO_T) return false;
+    const obj = vivos();
+    const cerca = s => obj.reduce((m, o) => Math.min(m, dist(s.x, s.y, o.x, o.y)), 1e9);
+    let cands = M.spawnsE.filter(s => cerca(s) > TS * 5);
+    if (!cands.length) cands = M.spawnsE;
+    let s = cands[0];
+    for (const c of cands) if (cerca(c) < cerca(s)) s = c;
+    humo(e.x, e.y);
+    e.x = s.x; e.y = s.y; e.kvx = e.kvy = 0; e.aturd = 0;
+    if (e.est && D.ENEMIGOS[e.k].cava) e.est = 0;
+    desatasca(e, D.ENEMIGOS[e.k].radio - 1);
+    e.tx = e.x; e.ty = e.y; e.qt = 0; e.qx = e.x; e.qy = e.y;
+    humo(e.x, e.y);
+    return true;
   }
   // Un invocado nace junto a quien lo llama, en un sitio libre.
   function invoca(e, k, n) {
@@ -1284,6 +1375,11 @@
     armaMuerte = -1;
     const C = D.ENEMIGOS[e.k];
     if (C.explota) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: C.radioExplota, d: C.explota, w: 3, u: quien || '' });
+    // Fase 4: el Tóxico deja charcos de ácido (bolas quietas que queman al pisarlas).
+    if (C.charcos) for (let i = 0; i < C.charcos; i++) {
+      const a = i / C.charcos * Math.PI * 2 + (e.id % 7), x = e.x + Math.cos(a) * 16, y = e.y + Math.sin(a) * 16;
+      if (!solidoEn(x, y)) F.push({ id: nid(), x, y, vx: 0, vy: 0, t: 5, d: C.dCharco, de: e.id, k: e.k, charco: true });
+    }
     const El = e.el ? D.ELITES[e.el] : null;
     if (El && El.revienta) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: El.revienta.r, d: El.revienta.d, w: 3, u: '' });
     // El divisor se parte en dos copias comunes con menos vida.
@@ -1302,8 +1398,8 @@
       if (C.hab === 'cria') for (let i = 0; i < 5; i++) invoca(e, 2, dir.n);
       return;
     }
-    const r = rn();
-    if (B.size < 12 && (r < 0.2 || r > 1 - D.PARTE_DORADA)) {
+    const r = rn(), pd = D.PARTE_DORADA * ((D.EVENTOS[eventoAhora()] || {}).dorada || 1);
+    if (B.size < 12 && (r < 0.2 || r > 1 - pd)) {
       const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : r < 0.2 ? 2 : 3, x: Math.round(e.x), y: Math.round(e.y) };
       B.set(b.id, b);
     }
@@ -1388,9 +1484,11 @@
     // Bajo el 50 % (o corrupto desde el comienzo) alterna con su segunda habilidad.
     const dos = !!C.hab2 && (pc < 0.5 || e.el === D.ELITE_CORRUPTO);
     if (dos && !(e.hitos & 4)) { e.hitos |= 4; if (pc < 0.5) { son('jefe'); sacude = Math.min(10, sacude + 3); } }
+    // Fase 4: un corrupto bajo el 25 % entra en su tercera fase (más rápido y seguido).
+    if (e.el === D.ELITE_CORRUPTO && pc < D.FASE3.bajo && !(e.hitos & 8)) { e.hitos |= 8; e.fase3 = true; son('jefe'); sacude = Math.min(12, sacude + 5); }
     if (e.ring2 > 0 && (e.ring2 -= dt) <= 0) { for (let i = 0; i < 10; i++) bola(e, (i + 0.5) / 10 * Math.PI * 2, 150, C.fuego); son('fuego'); }
     const libre = e.est === 0 || e.est === 5;
-    if (libre) e.cdH -= dt * (e.furia ? 2 : 1) / (e.el ? D.ELITES[e.el].cd || 1 : 1);
+    if (libre) e.cdH -= dt * (e.furia ? 2 : 1) / (e.el ? D.ELITES[e.el].cd || 1 : 1) / (e.fase3 ? D.FASE3.cd : 1);
     if (libre && e.cdH <= 0) {
       const ve = despejado(e.x, e.y, t.x, t.y), h = dos && e.alt ? C.hab2 : C.hab, est0 = e.est;
       e.hab = h;
@@ -1483,6 +1581,31 @@
     }
     if (curo) { e.est = 1; e.estT = 0.6; e.atk = 0.3; }
   }
+  /* **Portaestandarte (Fase 4)**: los enemigos comunes a menos de `alcAura`
+     de uno corren ×`auraVel` y reciben −`auraDef` de daño. El daño se
+     reduce en quien dispara (como el escudo del Escudero), así que cada
+     pantalla lo mira con sus propios enemigos. */
+  function bajoEstandarte(e) {
+    if (D.esJefe(e.k) || D.ENEMIGOS[e.k].estandarte) return false;
+    const C = D.ENEMIGOS[23];
+    for (const g of E.values()) if (g.k === 23 && g !== e && dist(e.x, e.y, g.x, g.y) < C.alcAura) return true;
+    return false;
+  }
+  /* **Sombra (Fase 4)**: cada `cd` s, si te tiene a menos de 360 px, se
+     desvanece (est 1, 0,7 s, quieta) y reaparece `salto` px detrás de ti. */
+  function sombra(e, C, t, dd, dt) {
+    if (e.est === 1) {
+      if ((e.estT -= dt) > 0) return true;
+      const dv = DIRS[(t.d | 0) & 7] || DIRS[0], l = hyp(dv[0], dv[1]) || 1;
+      let x = t.x - dv[0] / l * C.salto, y = t.y - dv[1] / l * C.salto;
+      if (choca(x, y, C.radio)) { x = t.x + dv[0] / l * C.salto; y = t.y + dv[1] / l * C.salto; }
+      if (!choca(x, y, C.radio)) { humo(e.x, e.y, e.k); e.x = x; e.y = y; e.tx = x; e.ty = y; humo(x, y, e.k); }
+      e.est = 0; e.cdH = C.cd * rz(0.8, 1.2); e.cd = 0.35;
+      return true;
+    }
+    if ((e.cdH -= dt) <= 0 && dd < 360 && dd > 50) { e.est = 1; e.estT = 0.7; return true; }
+    return false;
+  }
   /* Vigía: te apunta `apunta` s con un láser (est 1, quieto) y dispara una
      bala rápida hacia donde estabas cuando empezó a apuntar: moverse la
      esquiva. Devuelve true mientras apunta (no camina). */
@@ -1538,7 +1661,9 @@
             reponBarriles();
             // Nivel que termina en 5: un mini jefe con la horda; en 0, un jefe solo (en el modo jefes, con su escolta).
             const kj = D.jefeDeNivel(meta);
-            if (kj >= 0) { nuevoEnemigo(meta, kj); if (D.ENEMIGOS[kj].jefe === 'grande' && !jefes()) dir.q = 0; }
+            if (kj >= 0) { nuevoEnemigo(meta, kj); if (D.ENEMIGOS[kj].jefe === 'grande' && !jefes()) dir.q = Math.round(dir.q * D.escoltaGrande(meta)); }
+            // Fase 4: desde la 60, el jefe grande trae también al mini de la rotación.
+            if (!jefes() && D.duoDe(meta) >= 0) nuevoEnemigo(meta, D.duoDe(meta));
           }
         } else if (dir.q === 0 && E.size === 0 && obj.length) {
           dir.t += dt;
@@ -1546,7 +1671,7 @@
             if (!ONLINE) { nivelLocal = dir.n + 1; pasoNivel = pasoN; }
             else {
               const sig = (jefes() ? Math.round(dir.n / D.PASO_JEFES) : dir.n) + 1;
-              if (dir.pedido !== sig || T - dir.pedidoT > 6) { enviar('nivel', { n: sig }); dir.pedido = sig; dir.pedidoT = T; }
+              if (dir.pedido !== sig || T - dir.pedidoT > 6) { enviar('nivel', { n: sig, ms: Math.round(T * 1000) }); dir.pedido = sig; dir.pedidoT = T; }
             }
           }
         }
@@ -1588,6 +1713,7 @@
     for (const e of lista) {
       const C = D.ENEMIGOS[e.k];
       e.cd -= dt; e.cdF -= dt; e.atk = Math.max(0, e.atk - dt); e.flash = Math.max(0, e.flash - dt);
+      if (quieto(e, dt)) continue;
       if (M.cinta && !C.jefe && !bajoTierra(e)) cinta(e, C.radio - 1, dt);
       if (e.aturd > 0) {
         // Despedido: resbala hacia atrás y frena; ni persigue ni ataca.
@@ -1604,6 +1730,7 @@
       if (C.jefe && jefeIA(e, C, t, dd, dt)) continue;
       if (C.cura) chaman(e, C, dt);
       if (C.vigia && vigia(e, C, t, dd, dt)) continue;
+      if (C.sombra && sombra(e, C, t, dd, dt)) continue;
       // Rodea los muros de los jugadores mientras haya otro camino; si no, rompe.
       const libre = rodea(e);
       let dx, dy;
@@ -1622,7 +1749,7 @@
         const ex = e.x - f.x, ey = e.y - f.y, q = ex * ex + ey * ey, rr = C.radio * 2;
         if (q < rr * rr && q > 0.01) { const qq = Math.sqrt(q); sx += ex / qq * (rr - qq); sy += ey / qq * (rr - qq); }
       }
-      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1) * (e.el ? D.ELITES[e.el].vel : 1) * (mutD().vel || 1);
+      const vel = D.velEnemigo(e.k, dir.n) * (e.furia ? 1.8 : 1) * (e.el ? D.ELITES[e.el].vel : 1) * (mutD().vel || 1) * (e.fase3 ? D.FASE3.vel : 1) * (bajoEstandarte(e) ? D.ENEMIGOS[23].auraVel : 1);
       const alcance = C.jefe ? C.rg + 8 : C.radio + 14;
       let bloq = null;
       if (dd > (C.jefe ? C.rg + 4 : C.radio + 10) && !planta) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
@@ -1657,7 +1784,7 @@
       if (f.fin) continue;
       // Fuego amigo: la bola no distingue, quema al enemigo que se cruce.
       // La de un jefe sí: no iba a quemar a su propia escolta.
-      if (f.jefe || f.k === 21) continue;
+      if (f.jefe || f.k === 21 || f.charco) continue;
       for (const g of [...E.values()]) {
         if (g.id === f.de || bajoTierra(g) || dist(f.x, f.y, g.x, g.y) >= RG(g.k) + 3) continue;
         danaEnemigo(g.id, dmg, '', 9, f.x - f.vx * 0.1, f.y - f.vy * 0.1);
@@ -1799,7 +1926,7 @@
       if (!s || typeof s !== 'object' || u === cfg.yo) continue;
       let r = R.get(u);
       if (!r) { r = { x: +s.x || 0, y: +s.y || 0 }; R.set(u, r); }
-      r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0; r.nv = clamp(s.nv | 0, 0, D.NIVEL_ARMA.max);
+      r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0; r.nv = clamp(s.nv | 0, 0, D.NIVEL_ARMA.leyenda);
       r.pts = s.pts | 0; r.k = s.k | 0; r.mul = s.mul | 0; r.sk = s.sk; r.mv = !!s.mv; r.h = !!s.h;
       if (s.pz) { if (!r.pz) r.pzDesde = Date.now(); r.pz = true; } else r.pz = false;
       if (Array.isArray(s.pg) && Number.isFinite(+s.pg[0]) && Number.isFinite(+s.pg[1])) {
@@ -1946,7 +2073,7 @@
     if (infectado()) txt = g === 'eq:humanos' ? (esZombi(cfg.yo) ? 'Los humanos aguantaron.' : '¡Aguantaste! Ganan los humanos.') : g === 'eq:infectados' ? (esZombi(cfg.yo) ? '¡Infectaron a todos!' : 'Te alcanzaron: ganan los infectados.') : 'Terminó sin ganador.';
     else if (equipos()) txt = g ? (g === 'eq:' + equipoDe(cfg.yo) ? '¡Ganó tu equipo!' : 'Gana el equipo ' + (g === 'eq:rojo' ? 'Rojo' : 'Azul') + '.') : 'Terminó sin ganador.';
     else if (versus()) txt = g ? (g === cfg.yo ? '¡Ganaste el versus!' : 'Gana ' + nombreDe(g) + '.') : 'Terminó sin ganador.';
-    else txt = 'Cayeron todos en el nivel ' + (f.nivel || marcador.nivel) + '. ' +
+    else txt = 'Cayeron todos en la ronda ' + (f.nivel || marcador.nivel) + '. ' +
       (g ? (g === cfg.yo ? '¡Hiciste más puntos que nadie!' : 'Más puntos: ' + nombreDe(g) + '.') : '');
     $('finTxt').textContent = txt;
     if (!cfg.mirando) pintaStats(); else $('finStats').textContent = '';
@@ -2042,7 +2169,14 @@
     pasoProy(dt);
     efectos(dt);
     const n = nivelObjetivo();
-    if (!versus() && n !== nivelVisto && jugando) { nivelVisto = n; banner((jefes() ? 'JEFE ' : 'NIVEL ') + n); son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(n); }
+    if (!versus() && n !== nivelVisto && jugando) {
+      nivelVisto = n;
+      // Fase 4: la noche o el evento de la ronda van en el cartel
+      const no = jefes() ? '' : D.nocheDe(n), ev = jefes() ? '' : D.eventoDe(n);
+      banner((jefes() ? 'JEFE ' : 'RONDA ') + n + (no ? ' · ' + D.NOCHES[no].nombre.toUpperCase() : ev ? ' · ' + D.EVENTOS[ev].nombre.toUpperCase() : ''));
+      if (no) premio('🌙 ' + D.NOCHES[no].nombre + ': ' + D.NOCHES[no].txt); else if (ev) premio('⚠ ' + D.EVENTOS[ev].nombre + ': ' + D.EVENTOS[ev].txt);
+      son('nivel'); if (n > 1 && !cfg.mirando) alEmpezarNivel(n);
+    }
     if (eleccion && (eleccion.t -= dt) <= 0) eligeVentaja(0);
     if (ONLINE) {
       pubT += dt;
@@ -2190,6 +2324,11 @@
     for (const t of M.tiendas || []) if (dist(t.x, t.y, yo.x, yo.y) < D.ALCANCE_TIENDA) return t;
     return null;
   }
+  // El precio de un suministro ahora: el botiquín sube con cada compra de la ronda desde la 26 (Fase 4).
+  function precioItem(id) {
+    const p = D.precioTienda(id, yo.pot || 0, nivelObjetivo());
+    return id === 'botiquin' ? Math.round(p * D.factorBotiquin(nivelObjetivo(), yo.botiN) / 10) * 10 : p;
+  }
   function compra(id) {
     if (!tiendaCerca()) return;
     const t = D.TIENDA.find(x => x.id === id);
@@ -2198,9 +2337,10 @@
     if (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) { son('clic'); premio('Armadura completa'); return; }
     if (id === 'botiquin' && yo.hp >= hpMax()) { son('clic'); premio('Vida completa'); return; }
     if (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max) { son('clic'); premio('Ya llevas ' + D.MURO_BLINDADO.max + ' muros reforzados'); return; }
-    const precio = D.precioTienda(id, yo.pot || 0, nivelObjetivo());
+    const precio = precioItem(id);
     if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
     yo.chat -= precio;
+    if (id === 'botiquin') yo.botiN = (yo.botiN || 0) + 1;
     if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = armaDe(i).max; }
     else if (id === 'armadura') yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 50);
     else if (id === 'botiquin') yo.hp = Math.min(hpMax(), yo.hp + 50);
@@ -2213,13 +2353,14 @@
   /* Subir un arma un nivel: más daño, cadencia, munición… y otro aspecto. */
   function subeArma(i) {
     if (!tiendaCerca() || !yo.tiene.has(i)) return;
-    const n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n), a = D.ARMAS[i];
+    const n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n, nivelObjetivo()), a = D.ARMAS[i];
     if (!Number.isFinite(precio)) { son('clic'); premio(a.nombre + ' al máximo'); return; }
     if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
     const antes = armaDe(i);
     yo.chat -= precio;
     yo.nv[i] = n + 1;
-    if (!Number.isFinite(D.precioNivelArma(i, n + 1))) medalla('maestro');
+    if (n + 1 >= D.NIVEL_ARMA.max) medalla('maestro');
+    if (n + 1 === D.NIVEL_ARMA.max + 1) banner('✦ ARSENAL LEGENDARIO');
     // La munición crece con el tope: lo que faltaba sigue faltando.
     if (i !== 0) yo.ammo[i] = Math.min(armaDe(i).max, yo.ammo[i] + Math.max(0, armaDe(i).max - antes.max));
     son('mejora');
@@ -2244,7 +2385,7 @@
     // Al Club: el nivel al que llegaste y cuánto tardaste en llegar a él (en pasos), con la prueba.
     if (CLUB) Club.inmersivo(false);
     if (CLUB && graba && !repite) Club.result({ categoria: catClub(D.ORDEN_MAPAS[graba.m]), puntos: nivelLocal, tiempo: Math.round((pasoNivel + 1) * 1000 / 60) }, prueba());
-    $('finTxt').textContent = 'Llegaste al nivel ' + nivelLocal + ' con ' + yo.pts + ' puntos y ' + yo.k + ' bajas.';
+    $('finTxt').textContent = 'Llegaste a la ronda ' + nivelLocal + ' con ' + yo.pts + ' puntos y ' + yo.k + ' bajas.';
     pintaStats();
     $('otra').hidden = false;
     $('fin').hidden = false;
@@ -2288,7 +2429,7 @@
   function efectoBoom(x, y, r) {
     fx.boom(x, y, r);
     // la luz de la explosión: abre la oscuridad del Apagón y, en los demás mapas, alumbra el suelo (Fase 3.6)
-    LUCES.push({ x, y, r: r * (M && M.oscuro ? 2.4 : 1.9), t: 0.6, t0: 0.6 }); if (LUCES.length > 20) LUCES.shift();
+    LUCES.push({ x, y, r: r * (M && (M.oscuro || mutD().oscuro) ? 2.4 : 1.9), t: 0.6, t0: 0.6 }); if (LUCES.length > 20) LUCES.shift();
     sacude = Math.min(10, sacude + r / 12);
     const dd = dist(x, y, yo.x, yo.y);
     son('boom', dd);
@@ -2332,8 +2473,8 @@
   // Tamaño de cada tipo de enemigo (índice = k de ENEMIGOS) y color de su vida.
   // Los modelos se dibujan un poco más grandes que su radio de choque, como en el original.
   const ESC = 1.15;
-  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22, 1.1, 0.62, 1, 1.05, 0.95];
-  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f', '#b8c0cc', '#e8483a', '#7fe08a', '#c9a46a', '#ff5a5a'];
+  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22, 1.1, 0.62, 1, 1.05, 0.95, 1.15, 1.2, 0.95];
+  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f', '#b8c0cc', '#e8483a', '#7fe08a', '#c9a46a', '#ff5a5a', '#c8ff3a', '#e0b030', '#b06aff'];
   const PAL_SKIN = new Map();
   const palDe = id => { let p = PAL_SKIN.get(id); if (!p) { p = G.palJugador(D.skin(id)); PAL_SKIN.set(id, p); } return p; };
 
@@ -2393,6 +2534,13 @@
       cx.strokeStyle = 'rgba(110,230,120,.55)'; cx.lineWidth = 2;
       cx.beginPath(); cx.ellipse(e.x, e.y, r, r * 0.75, 0, 0, 7); cx.stroke();
     }
+    // Portaestandarte: el aura dorada que protege a los suyos, y su bandera.
+    if (Cj.estandarte) {
+      cx.strokeStyle = 'rgba(240,190,60,' + (0.25 + 0.15 * Math.sin(T * 4 + e.id)).toFixed(2) + ')'; cx.lineWidth = 2;
+      cx.beginPath(); cx.ellipse(e.x, e.y, Cj.alcAura, Cj.alcAura * 0.75, 0, 0, 7); cx.stroke();
+      cx.strokeStyle = '#5a3a1a'; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(e.x + 9, e.y - 4); cx.lineTo(e.x + 9, e.y - 46 * ta); cx.stroke();
+      cx.fillStyle = '#b01a1a'; cx.beginPath(); cx.moveTo(e.x + 9, e.y - 46 * ta); cx.lineTo(e.x + 27 + 3 * Math.sin(T * 6), e.y - 40 * ta); cx.lineTo(e.x + 9, e.y - 33 * ta); cx.fill();
+    }
     // Élite: aura de su color en el suelo.
     const El = e.el ? D.ELITES[e.el] : null;
     if (El) {
@@ -2409,6 +2557,8 @@
     } : null;
     if (debil && DIRS[e.d || 0][1] > 0) debil();
     const quieto = e.aa > 0.5 || e.aturd > 0;
+    // Sombra desvaneciéndose: casi transparente y con humo morado.
+    if (Cj.sombra && e.est === 1) { cx.globalAlpha = 0.25 + 0.15 * Math.sin(T * 30); if (Math.random() < 0.3) fx.humo(e.x, e.y - 10, 1, 8, 'morado'); }
     G.humanoide(cx, e.x, e.y, e.av ?? angDir(e.d), G.PAL_E[e.k] || G.PAL_E[0], {
       t: T * (e.k === 2 ? 1.7 : e.k === 3 ? 0.75 : 1) + (e.id % 10), mov: !quieto, atk: e.aa || 0, tumbo: Math.max(e.tb || 0, e.sac || 0),
       flash: e.flash > 0, talla: ta * ESC, brillo: e.k === 4 ? 0.5 + 0.5 * Math.sin(T * 10 + e.id) : 0
@@ -2520,6 +2670,13 @@
         cx.beginPath(); cx.moveTo(f.x, f.y - 14); cx.lineTo(f.x - f.vx / l * 14, f.y - 14 - f.vy / l * 14); cx.stroke();
         continue;
       }
+      // el charco del Tóxico (Fase 4): una bola quieta, dibujada como mancha
+      if (!f.vx && !f.vy) {
+        const pul = 0.75 + 0.25 * Math.sin(T * 5 + f.id);
+        cx.fillStyle = 'rgba(150,230,40,' + (0.35 * pul).toFixed(2) + ')'; cx.beginPath(); cx.ellipse(f.x, f.y, 14, 9, 0, 0, 7); cx.fill();
+        cx.fillStyle = 'rgba(210,255,90,' + (0.5 * pul).toFixed(2) + ')'; cx.beginPath(); cx.ellipse(f.x - 3, f.y - 1, 5, 3, 0, 0, 7); cx.fill();
+        continue;
+      }
       G.bola(cx, f.x, f.y, f.vx, f.vy, f.k === 5 || !!(D.ENEMIGOS[f.k] || {}).acido);
     }
     // los rayos: un zigzag azul que tiembla, con su halo
@@ -2542,7 +2699,7 @@
       barraVida(r.x, r.y, r.hp, r.arm);
       rotulo(nombreDe(u), r.x, r.y - 59, colorDe(u));
     }
-    if (M.oscuro) oscuridad(cxv, cyv);
+    if (M.oscuro || mutD().oscuro) oscuridad(cxv, cyv);
     else if (LUCES.length || luzLlama.size) luces();
     // marcadores «¡aquí!» (míos y de los demás) y el anillo de revivir
     const pinta = (p, color, nom) => {
@@ -2806,7 +2963,9 @@
       ? '<b style="color:' + COLOR_EQ.rojo + '">Rojo ' + (pe.rojo | 0) + '</b> · <b style="color:' + COLOR_EQ.azul + '">Azul ' + (pe.azul | 0) + '</b> · a ' + (marcador.meta || cfg.meta || 20)
       : versus()
       ? 'Versus · <b>' + ((marcador.bajas || {})[cfg.yo] | 0) + '</b> de ' + (cfg.meta || marcador.meta || 10)
-      : (jefes() ? 'Jefe <b>' : 'Nivel <b>') + nivelObjetivo() + '</b> · quedan ' + quedan;
+      : (jefes() ? 'Jefe <b>' : 'Ronda <b>') + nivelObjetivo() + '</b> · quedan ' + quedan;
+    const mt = versus() || jefes() ? '' : textoMetas();
+    if ($('metas').textContent !== mt) { $('metas').textContent = mt; $('metas').hidden = !mt; }
     pintaArmas(false);
     if (cfg.mirando) $('aviso').textContent = 'Estás mirando';
     else if (yo.muerto && ONLINE) $('aviso').textContent = versus() ? 'Vuelves en ' + Math.max(0, Math.ceil(yo.respawn)) + '…' : 'Caíste: vuelves cuando tu equipo limpie el nivel';
@@ -2885,7 +3044,7 @@
     if (!tc) { if (!el.hidden) el.hidden = true; return; }
     if (!tiendaArmada) armaTienda();
     const mando = conMando() ? Mando.familia() : '', n = nivelObjetivo();
-    const firma = [yo.chat, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.'), n, mando].join('|');
+    const firma = [yo.chat, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.'), n, mando, yo.botiN | 0].join('|');
     if (!fuerza && !el.hidden && firma === firmaTienda) return;
     firmaTienda = firma;
     el.hidden = false;
@@ -2896,7 +3055,7 @@
       const id = b.dataset.id, t = D.TIENDA.find(x => x.id === id);
       const lleno = (id === 'potencia' && (yo.pot || 0) >= t.max) || (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) ||
         (id === 'botiquin' && yo.hp >= hpMax()) || (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max);
-      const precio = D.precioTienda(id, yo.pot || 0, n);
+      const precio = precioItem(id);
       b.querySelector('kbd').textContent = mando ? Mando.glifo(MANDO_TIENDA[id]) : t.tecla;
       b.classList.toggle('max', lleno);
       b.classList.toggle('caro', !lleno && yo.chat < precio);
@@ -2904,17 +3063,18 @@
       b.querySelector('.lleva').textContent = id === 'potencia' ? (yo.pot ? '+' + yo.pot * 10 + '%' : '') : id === 'blindado' ? (yo.bl ? '×' + yo.bl : '') : '';
     }
     for (const b of $('tArmas').children) {
-      const i = +b.dataset.arma, a = D.ARMAS[i], n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n), ra = D.rangoArma(n);
+      const i = +b.dataset.arma, a = D.ARMAS[i], n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n, nivelObjetivo()), ra = D.rangoArma(n);
       b.hidden = !yo.tiene.has(i);
       if (b.hidden) continue;
       if (+b.dataset.dibujado !== n) { b.dataset.dibujado = n; const c = b.querySelector('canvas'); G.iconoArma(c.getContext('2d'), i, c.width, c.height, n); }
       b.className = 'art r' + ra + (yo.w === i ? ' mano' : '') + (!Number.isFinite(precio) ? ' max' : yo.chat < precio ? ' caro' : '');
       b.querySelector('.nom').textContent = a.nombre + (ra ? ' ' + D.RANGOS_ARMA[n].toLowerCase() : '');
-      b.querySelector('.est').innerHTML = '<i>' + '★'.repeat(n) + '</i>' + '★'.repeat(D.NIVEL_ARMA.max - n);
+      const mx = D.NIVEL_ARMA.max;
+      b.querySelector('.est').innerHTML = '<i>' + '★'.repeat(Math.min(n, mx)) + '</i>' + '★'.repeat(Math.max(0, mx - n)) + (n > mx ? '<b>' + '✦'.repeat(n - mx) + '</b>' : '');
       b.querySelector('.pre').textContent = Number.isFinite(precio) ? precio : 'Máximo';
       b.querySelector('.lleva').textContent = yo.w === i ? (mando ? Mando.glifo('y') : 'U') : '';
       const esp = D.ESPECIALES[i];
-      b.title = a.nombre + ' · nivel ' + n + ' de ' + D.NIVEL_ARMA.max + (Number.isFinite(precio) ? ' · subir: +15 % daño, más cadencia y munición' : '') +
+      b.title = a.nombre + ' · nivel ' + n + ' de ' + (n >= D.NIVEL_ARMA.max ? D.NIVEL_ARMA.leyenda + ' (legendarios desde la ronda ' + D.NIVEL_ARMA.desde + ')' : D.NIVEL_ARMA.max) + (Number.isFinite(precio) ? ' · subir: +15 % daño, más cadencia y munición' : '') +
         (esp ? (n >= D.NIVEL_ARMA.max ? ' · ★ ' : ' · al máximo: ★ ') + esp.nombre + ' — ' + esp.txt : '');
     }
   }
@@ -3054,7 +3214,7 @@
     }
     // récords de la práctica en cada mapa
     const rec = D.ORDEN_MAPAS.filter(m => records[m] && records[m].n > 0).map(m => D.MAPAS[m].nombre + ' ' + records[m].n);
-    $('records').textContent = rec.length ? 'Tus récords (nivel): ' + rec.join(' · ') : '';
+    $('records').textContent = rec.length ? 'Tus récords (ronda): ' + rec.join(' · ') : '';
     const sk = $('skins');
     sk.textContent = '';
     for (const s of D.SKINS) {
@@ -3180,8 +3340,10 @@
     // la tienda: puntos para probar, y lo comprado
     puntos: n => { yo.pts = n | 0; },
     chatarra: n => { yo.chat = n | 0; },
-    nivelArma: (i, n) => { yo.nv[i] = clamp(n | 0, 0, D.NIVEL_ARMA.max); pintaArmas(true); },   // para probar las habilidades de nivel máximo
+    nivelArma: (i, n) => { yo.nv[i] = clamp(n | 0, 0, D.NIVEL_ARMA.leyenda); pintaArmas(true); },   // para probar las habilidades de nivel máximo
     napalm: () => yo.napalm.length,
+    // Fase 4: hace como si el enemigo llevara `s` segundos quieto (el respawn de atascados)
+    envejece: (id, s) => { const e = E.get(id); if (e && !ONLINE) { e.qt = s; e.qx = e.x; e.qy = e.y; } },
     tienda: () => ({ nv: yo.nv.slice(), bl: yo.bl, pot: yo.pot, arm: yo.arm, pts: yo.pts, chat: yo.chat, tiendas: (M.tiendas || []).map(t => [t.x, t.y]), arma: armaDe(yo.w) }),
   };
   if (ONLINE) enviar('listo');

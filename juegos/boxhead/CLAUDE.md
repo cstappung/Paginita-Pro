@@ -262,9 +262,9 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   grey with a dashed border in the menu, and a click says which medal opens
   them. A stored skin that is not unlocked falls back to Bambo. Online, others
   see whatever `sk` you send: the lock is only local.
-- **Records**: `boxhead.records` = `{mapa: {n, pts}}` from practice only
-  (`anotaRecord` at each level start and in `finPractica`). The Trotamundos
-  medal reads it.
+- **Records**: `boxhead.records` = `{mapa: {n, pts}}`. Since Phase 4 it
+  counts practice, the Club and online `coop` rooms (`anotaRecord`), and the
+  Club adopts the cloud row (`club-record`). The Trotamundos medal reads it.
 
 ## Phase 2.5: robustness (`boxhead-14`, proof `ve: 3`)
 
@@ -559,3 +559,92 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   - Any change to their numbers changes the sim: bump `VE`.
 - `__boxhead.nivelArma(i, n)` and `napalm()`, plus `disparos`/`proyectiles`
   in `estado().yo`, let the tests check each ability.
+
+
+## Phase 4: the Noche Eterna, late-game update (`boxhead-26`, proof `ve: 9`)
+
+An evaluation agent scored the late game 3/10: everything that adds pressure
+capped between levels 22 and 31, only HP kept growing (long, not hard), all
+weapons and upgrades came by ~15, medals ended at 30, and big bosses were the
+easiest rounds. **Everything below applies from round 26** (`D.TARDE = 25`):
+rounds 1–25 replay exactly as before, and nothing new calls `rn` before then.
+The player-facing word is now «ronda» (weapon levels keep «nivel»); ids,
+`nivelLocal`, `{t:"nivel"}` and the medal ids `nivel10…` did not change.
+
+- **Second slope** (`datos.js`): HP +3 %/round instead of +8 %
+  (`vidaEnemigo`); pressure goes up instead: `ritmoNivel` down to 0.16 s,
+  `topeVivos` up to 72, `totalNivel` up to 160, `velEnemigo` up to
+  `velMax`×1.15, `parteElites` up to 25 %. The sawtooth still applies. The
+  old «sierra» test now pins 1–25 and a new test pins 26+.
+- **Stuck enemies respawn** (`quieto` in the director loop): 120 s within
+  30 px of where it was → the spawn closest to the players but out of sight
+  (no `rn`). `__boxhead.envejece(id, s)` sets it up in tests.
+- **Noches** (rounds 27, 37, 47…, `D.nocheDe`, `D.NOCHES`): mutator fields
+  that `mutD()` merges with the room mutator (`D.mezclaMut`), keyed on
+  `dir.n`, which travels in the zb. `oscuro: true` turns on the Apagón layer.
+  Surviving one pays `premioNoche`, golden fury and the `noche` medal in
+  `alEmpezarNivel`. Never in versus or boss mode.
+- **Eventos** (28, 33, 38, 43…, `D.eventoDe`): `tipoEvento` forces kinds
+  (estampida, asedio), `dorada` multiplies `PARTE_DORADA`, `elites` divides
+  the élite roll. Applied in `nuevoEnemigo` and the drop roll.
+- **Enemies 22–24** (appended; `PUNTOS`, `TALLA_Z`, `VIDA_Z`, `PAL_E` got
+  their entries): Tóxico (`charcos`: on death, stationary F entries with
+  `charco` that never hit enemies; others see vx = vy = 0 and draw a puddle),
+  Portaestandarte (`bajoEstandarte`: ×`auraVel` speed in the director,
+  −`auraDef` damage computed on the shooter like the shield), Sombra
+  (`sombra`: est 1 for 0.7 s, then jumps `salto` px behind the target, using
+  the `d` that `vivos()` now carries).
+- **Bosses**: big ones bring `escoltaGrande(n)` of the horde from 30;
+  `duoDe(n)` adds the rotation's mini from 60; `vidaJefe` adds +5 %/round
+  past 30 (same as before up to 30, tested); corrupted bosses under 25 % set
+  `e.fase3` (hito bit 8): cooldowns ×0.6, speed ×1.15.
+- **Economy**: `factorNivelTienda` keeps rising past 31 up to ×4; from 26
+  each botiquín in the same round costs +50 % (`factorBotiquin`, `yo.botiN`,
+  reset in `alEmpezarNivel`; the game prices through `precioItem`).
+  **Arsenal legendario**: `NIVEL_ARMA.leyenda = 8`, levels 6–8 only with
+  `precioNivelArma(id, n, ronda ≥ 26)`; `max` (5) stays the ★ ability level,
+  `conNivel`/`armaTope`/`r.nv` clamp to `leyenda`, `rangoArma` 4 and
+  `RANGO[4]` in grafico.js draw it crimson. `TOPE_VENTAJAS` gained ×1.3
+  (Verdugo); the caps follow `leyenda` automatically.
+- **Legendary upgrades** (`rar: 3`, from round `LEGENDARIAS` = 30, the 5th
+  argument of `sorteaVentajas`, filtered out before so earlier draws are
+  identical): verdugo, titan, fenix, infinita (`rn` in `gasta`). When nothing
+  is left the draw returns `D.RELLENO` (ids starting with `_`), applied in
+  `eligeVentaja` and never stored in `yo.vt`.
+- **Goals**: 8 medals (`nivel40/50/75/100`, `noche`, `corrupto`,
+  `intocable`, `x500`), 4 skins tied to them, `HITOS` up to ×1000, and the
+  `#metas` line under the round (`textoMetas`, `D.proximas`).
+- **Fixes**: `CAMPOS` lacked `saltos`/`salto` (the Rayo's jump upgrades did
+  nothing); `st.armas` had 10 slots (NaN for weapons 10–13); own explosions
+  in coop are capped at `TOPE_PROPIO` (25) per blast; **the Club verifier's
+  `MAPAS` only had the five classic maps**, so every Club record on Planta,
+  Hangar, Fábrica or Apagón was rejected as «de otro mapa» (a test now pins
+  it to `ORDEN_MAPAS`).
+- Not done (left for later): élites with two traits, and a cap or
+  «mastery» for the multiplier past ×200 (points still inflate).
+
+## Shared records: rooms write the Club table (Phase 4)
+
+- **Coop rooms of 2+ players also write `club-boxhead-<map>`**, the same
+  table as the Club (`anotar` in `juegos-main.js`). Unlike Yemas zombis they
+  **keep** writing the room's wins row too: that row is what pays coins per
+  game and feeds the room logros, and dropping it would cut both. `rondaBoxhead(p, uid)` in `motor.js` returns `{ronda,
+  tiempo, con}` or null: not for 1-player rooms (solo records must come from
+  the verified Club), versus/teams/infected/boss mode, or the `sangre` and
+  `municion` mutators (`BX_MUT_FACILES`).
+- **`tiempo` comes from the log**: the director's `nivel` request carries
+  `ms` (its play clock `T`), the postman writes it into `{t:"nivel", n, ms}`,
+  and the entry that reached the final round gives it; without one, the
+  room's length.
+- **The rule accepts the row without a proof** only for `club-boxhead-` with
+  a `con` field: the room exists, is `boxhead`, has `fin`, has the writer
+  and `con` as players, its `mapa` matches the category, its variant is coop
+  and its mutator is not an easy one. `guardarSolo` copies `con`; a later
+  Club result rewrites the row without it (then the proof is required again).
+  **Re-publish the rules** or room rows are refused.
+- Room rows are not audited (`pruebasPendientes` skips `con`, `partidaRara`
+  accepts a 20-char pid) nor queued for review (no replay to watch). The
+  rankings show «Ronda N» with 👥 for room rows (`ranks.js`, `conexion.js`).
+  Honest limit: a room row is as trustworthy as the room log.
+- Site logros stay at ten per game (a test pins it), so the goals past 40 are
+  the game's own medals.

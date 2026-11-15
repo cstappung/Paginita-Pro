@@ -62,6 +62,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function partidaRara(categoria, partida) {
   if (typeof partida !== "string") return "sin partida";
   if (categoria.startsWith("yemas-zombis-")) return /^[-_A-Za-z0-9]{6,40}$/.test(partida) ? null : "partida con forma rara";
+  // Pro BoxHead jugado en sala (fila con `con`): la partida es el pid de la sala
+  if (categoria.startsWith("club-boxhead-") && /^[-_A-Za-z0-9]{20}$/.test(partida)) return null;
   if (categoria.startsWith("club-frontera-")) return /^(frv?-|[-_A-Za-z0-9]+-\d+v?$)/.test(partida) ? null : "partida con forma rara para la Frontera";
   return UUID.test(partida) ? null : "partida que no es un UUID: escrita fuera del juego";
 }
@@ -120,6 +122,7 @@ export function pruebasPendientes(solo, auditados, juegoDe) {
     if (!juego) continue;                                                       // Yemas zombis: sin prueba
     for (const [uid, fila] of Object.entries(filas || {})) {
       if (!fila || typeof fila.partida !== "string") continue;
+      if (fila.con) continue;                                                   // Pro BoxHead en sala: sin prueba
       const a = ((auditados || {})[categoria] || {})[uid];
       if (a && a.p === fila.partida && (a.h || a.vv === AUDITORIA_V)) continue;   // ya auditada esta misma partida
       out.push({ categoria, uid, juego, fila });

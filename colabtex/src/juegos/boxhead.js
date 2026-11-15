@@ -73,7 +73,10 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
       if (d.pts !== undefined) { j.pts = ent(d.pts, 1e9); j.k = ent(d.k, 1e7); j.n = ent(d.n, 1e4); }
       anota(j);
     } else if (d.tipo === "nivel" && Number.isInteger(d.n) && d.n > 1 && d.n < 1e4) {
-      anota({ t: "nivel", uid, n: d.n });
+      // `ms`: tiempo de juego al llegar (desempata la tabla de récords, motor.js rondaBoxhead)
+      const j = { t: "nivel", uid, n: d.n };
+      if (Number.isInteger(d.ms) && d.ms > 0 && d.ms <= 604800000) j.ms = d.ms;
+      anota(j);
     } else if (d.tipo === "revive" && typeof d.v === "string" && d.v.length <= 64) {
       anota({ t: "revive", uid, v: d.v });
     } else if (d.tipo === "aguanta" && est.variante === "infectado") {
@@ -170,7 +173,7 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-25";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-26";
     host.append(aviso, redEl, frame);
   }
 

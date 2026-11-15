@@ -72,12 +72,12 @@ test('boxhead: mapa, variante y armas se recortan a lo que existe',()=>{
 test('boxhead: datos del juego — armas, mejoras, skins',()=>{
  const mul=D.ARMAS.map(a=>a.mul);
  assert.deepEqual(mul,[...mul].sort((x,y)=>x-y));
- assert.equal(D.SKINS.length,14);
- assert.equal(new Set(D.SKINS.map(s=>s.id)).size,14);
+ assert.equal(D.SKINS.length,18);
+ assert.equal(new Set(D.SKINS.map(s=>s.id)).size,18);
  // las ocho de siempre son libres; las seis nuevas, cada una con una medalla distinta que existe
  assert.ok(D.SKINS.slice(0,8).every(s=>!s.medalla));
  const conM=D.SKINS.filter(s=>s.medalla);
- assert.equal(conM.length,6);assert.equal(new Set(conM.map(s=>s.medalla)).size,6);
+ assert.equal(conM.length,10);assert.equal(new Set(conM.map(s=>s.medalla)).size,10);
  for(const s of conM)assert.ok(D.medallaDe(s.medalla),s.id);
  assert.equal(new Set(D.MEDALLAS.map(m=>m.id)).size,D.MEDALLAS.length);
  for(const m of D.MEDALLAS)assert.ok(m.nom&&m.i&&m.txt,m.id);
@@ -141,7 +141,7 @@ test('boxhead: la mezcla de enemigos suma 1 y cada tipo entra en su nivel',()=>{
 test('boxhead: la dificultad sube en sierra, sin saltos en lo que aguanta cada enemigo',()=>{
  let prev=null;
  const base=n=>16+4*(n-1);
- for(let n=1;n<=40;n++){
+ for(let n=1;n<=25;n++){   // hasta el 25, intacto: la segunda pendiente (Fase 4) empieza en el 26
   const c={total:D.totalNivel(n),ritmo:D.ritmoNivel(n),vida:D.vidaEnemigo(0,n),vel:D.velEnemigo(0,n),golpe:D.golpeNivel(0,n),max:D.maxVivos(n,1)};
   assert.equal(c.total,Math.round(Math.min(120,base(n))*D.sierra(n)),'total en sierra en '+n);
   assert.ok(c.total>=0.85*Math.min(base(n),120)-1&&c.total<=1.15*Math.min(base(n),120)+1&&c.ritmo>=0.3,'la sierra no se aleja de la recta en '+n);
@@ -159,6 +159,30 @@ test('boxhead: la dificultad sube en sierra, sin saltos en lo que aguanta cada e
  // cada tramo, en conjunto, pesa más que el anterior
  const tramo=k=>[1,2,3,4,5].reduce((a,i)=>a+D.totalNivel(5*k+i),0);
  for(let k=1;k<6;k++)assert.ok(tramo(k)>tramo(k-1),'tramo '+k);
+});
+
+test('boxhead: segunda pendiente desde el 26 (Fase 4): más presión y menos vida',()=>{
+ // las fórmulas de antes, para comparar
+ const vidaVieja=(k,n)=>Math.round(D.ENEMIGOS[k].vida*(1+0.08*(n-1)));
+ let prev=null;
+ for(let n=25;n<=120;n++){
+  const c={total:D.totalNivel(n),ritmo:D.ritmoNivel(n),vida:D.vidaEnemigo(0,n),vel:D.velEnemigo(0,n),max:D.maxVivos(n,1),el:D.parteElites(n)};
+  assert.ok(c.total<=Math.round(160*1.15)&&c.ritmo>=0.16/1.15-1e-9,'topes en '+n);
+  assert.ok(c.max<=72,'vivos con tope en '+n);
+  if(n>25)assert.ok(c.vida<=vidaVieja(0,n),'la vida crece más despacio que antes en '+n);
+  if(prev){
+   assert.ok(c.vida>=prev.vida&&c.vel>=prev.vel&&c.max>=prev.max&&c.el>=prev.el,'nada baja en '+n);
+   assert.ok(c.max-prev.max<=1&&c.vel-prev.vel<=1,'sin saltos en '+n);
+  }
+  prev=c;
+ }
+ // cada tramo sale más rápido que el del 21–25 y con más enemigos a la vez
+ const salida=n=>D.totalNivel(n)*D.ritmoNivel(n);
+ assert.ok(D.ritmoNivel(44)<D.ritmoNivel(24)*0.7,'aparecen más rápido');
+ assert.ok(D.maxVivos(50,1)>D.maxVivos(25,1)+15,'caben más a la vez');
+ assert.ok(D.vidaEnemigo(0,50)<vidaVieja(0,50)*0.8,'el nivel 50 aguanta menos que antes');
+ assert.ok(salida(49)<salida(24)*1.1,'la horda del 49 no tarda mucho más en salir que la del 24');
+ for(const e of D.ENEMIGOS)if(!e.jefe)assert.ok(D.velEnemigo(e.id,200)<=e.velMax*1.15+1e-9,e.nombre+': velocidad con tope');
 });
 
 test('boxhead: tienda, potencia y armadura',()=>{
@@ -185,7 +209,12 @@ test('boxhead: niveles de arma en la tienda, cada vez más caros y con tope',()=
   if(b.cad){assert.ok(m.cad<b.cad&&m.cad>=0.03,a.nombre+' cadencia');}
   if(Number.isFinite(b.max))assert.ok(m.max>b.max,a.nombre+' munición');
   assert.equal(D.conNivel(b,0),b,'nivel 0 no toca nada');
-  assert.equal(D.conNivel(b,99).nivel,D.NIVEL_ARMA.max,'nivel acotado');
+  assert.equal(D.conNivel(b,99).nivel,D.NIVEL_ARMA.leyenda,'nivel acotado');
+  // Arsenal legendario (Fase 4): del 5 al 8 solo desde la ronda 26, y cada vez más caro
+  assert.equal(D.precioNivelArma(a.id,D.NIVEL_ARMA.max,25),Infinity,a.nombre+' sin legendario antes de la 26');
+  let pl=D.precioNivelArma(a.id,D.NIVEL_ARMA.max-1);
+  for(let n=D.NIVEL_ARMA.max;n<D.NIVEL_ARMA.leyenda;n++){const p=D.precioNivelArma(a.id,n,26);assert.ok(Number.isFinite(p)&&p>pl,a.nombre+' legendario '+n);pl=p;}
+  assert.equal(D.precioNivelArma(a.id,D.NIVEL_ARMA.leyenda,99),Infinity,a.nombre+' tope legendario');
  }
  assert.deepEqual([0,1,2,3,4,5].map(D.rangoArma),[0,1,1,2,2,3]);
  assert.equal(D.precioNivelArma(0,0),300);
@@ -286,7 +315,10 @@ test('la chatarra: moneda aparte de los puntos, sin multiplicador; los suministr
  assert.equal(D.precioTienda('botiquin',0),300);
  // sube con el nivel, con tope ×2,5, y la potencia no sube
  let antes=0;for(let n=1;n<=40;n++){const p=D.precioTienda('armadura',0,n);assert.ok(p>=antes,'nivel '+n);antes=p;}
- assert.equal(D.precioTienda('armadura',0,200),1000);
+ assert.equal(D.precioTienda('armadura',0,31),1000);   // ×2,5 en la 31, como antes
+ assert.equal(D.precioTienda('armadura',0,200),1600);  // Fase 4: sigue hasta ×4
+ // el botiquín, desde la 26, sube con cada compra de la misma ronda
+ assert.equal(D.factorBotiquin(25,3),1);assert.equal(D.factorBotiquin(26,0),1);assert.equal(D.factorBotiquin(26,2),2);
  assert.equal(D.precioTienda('potencia',1,30),D.precioTienda('potencia',1,1));
  assert.ok(D.precioTienda('blindado',0,11)>D.precioTienda('blindado',0,1));
 });
@@ -358,9 +390,9 @@ test('topes del director: ningún golpe legítimo los pasa, y cada arma tiene su
  assert.match(js,/gastaCupo\(de\)/);assert.match(js,/TOPE_GOLPE\[w \| 0\]/);
 });
 test('ventajas a elección: el sorteo es puro, sin repetir, con su tope y las de equipo solo en sala',()=>{
- assert.equal(D.VENTAJAS.length,24);
- assert.equal(new Set(D.VENTAJAS.map(v=>v.id)).size,24);
- for(const v of D.VENTAJAS){assert.ok(v.max>=1&&[0,1,2].includes(v.rar)&&v.nom&&v.txt,v.id);}
+ assert.equal(D.VENTAJAS.length,28);
+ assert.equal(new Set(D.VENTAJAS.map(v=>v.id)).size,28);
+ for(const v of D.VENTAJAS){assert.ok(v.max>=1&&[0,1,2,3].includes(v.rar)&&v.nom&&v.txt,v.id);}
  const azar=s=>()=>{s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
  assert.deepEqual(D.sorteaVentajas(azar(7),{},false),D.sorteaVentajas(azar(7),{},false));
  for(let k=1;k<200;k++){
@@ -370,7 +402,16 @@ test('ventajas a elección: el sorteo es puro, sin repetir, con su tope y las de
  }
  const llenas=Object.fromEntries(D.VENTAJAS.map(v=>[v.id,v.max]));llenas.filo=0;
  assert.deepEqual(D.sorteaVentajas(azar(3),llenas,true),['filo']);
- llenas.filo=5;assert.deepEqual(D.sorteaVentajas(azar(3),llenas,true),[]);
+ // agotadas: el panel ofrece relleno (Fase 4) en vez de no salir
+ llenas.filo=5;assert.deepEqual(D.sorteaVentajas(azar(3),llenas,true),D.RELLENO.map(v=>v.id));
+ for(const v of D.RELLENO)assert.equal(D.ventaja(v.id),v);
+ // las legendarias solo desde la ronda 30, y sin ellas el sorteo de antes no cambia
+ for(let k=1;k<300;k++){
+  for(const id of D.sorteaVentajas(azar(k),{},true,3,29))assert.ok(D.ventaja(id).rar<3,'sin legendarias antes de la 30');
+  assert.deepEqual(D.sorteaVentajas(azar(k),{},true,3,29),D.sorteaVentajas(azar(k),{},true));
+ }
+ let hay=0;for(let k=1;k<400;k++)for(const id of D.sorteaVentajas(azar(k),{},true,3,30))if(D.ventaja(id).rar===3)hay++;
+ assert.ok(hay>0,'desde la 30 salen legendarias');
  // las comunes salen más que las épicas
  const c=[0,0,0];for(let k=1;k<3000;k++)for(const id of D.sorteaVentajas(azar(k),{},true,1))c[D.ventaja(id).rar]++;
  assert.ok(c[0]>c[1]&&c[1]>c[2]&&c[2]>0,String(c));
@@ -473,7 +514,7 @@ test('enemigos de la Fase 3: datos de los cinco nuevos y de las élites',()=>{
  assert.equal(D.ELITES[0],null);
  for(let i=1;i<D.ELITES.length;i++){const el=D.ELITES[i];assert.equal(el.id,i);assert.ok(el.vida>=1&&el.vel>=1);assert.match(el.color,/^#[0-9a-f]{6}$/i);}
  for(let n=1;n<=80;n++){
-  const p=D.parteElites(n);assert.ok(p>=0&&p<=0.12,'parte '+n);
+  const p=D.parteElites(n);assert.ok(p>=0&&p<=(n<=25?0.12:0.25),'parte '+n);
   if(n<12)assert.equal(p,0);
   for(const e of D.ENEMIGOS){
    const r=D.eliteDe(e.id,n,0,0.99);
@@ -838,4 +879,99 @@ test('boxhead: cada arma gana una habilidad al nivel máximo de tienda',()=>{
  assert.ok(f5>f4&&f5>=5,'bala perforante: '+f5+' contra '+f4);
  // el director deja pasar la bala perforante entera
  assert.ok(D.topeGolpe(0)>=2*Math.ceil(60*D.factorPotencia(5)*1.5*1.4*1.3*2*1.5*2)-1);
+});
+
+test('boxhead Fase 4: la ronda de una sala cooperativa va a la tabla del Club (club-boxhead-<mapa>)',()=>{
+ const {rondaBoxhead}=context;
+ const fin=(p,ms)=>{p.at=1000;p.fin={ganador:'',motivo:'caidos',at:1000+ms};return p;};
+ // dos jugadores: la ronda a la que llegaron, el tiempo de la entrada `nivel` y un compañero
+ let p=sala(2,{mapa:'hangar'});
+ mover(p,{t:'nivel',uid:'a',n:2,ms:40000});mover(p,{t:'nivel',uid:'a',n:3,ms:95000});
+ mover(p,{t:'muere',uid:'a',por:'',a:8,pts:10});mover(p,{t:'muere',uid:'b',por:'',a:8,pts:20});
+ fin(p,500000);
+ assert.deepEqual(copia(rondaBoxhead(p,'a')),{ronda:3,tiempo:95000,con:'b'});
+ assert.equal(rondaBoxhead(p,'b').con,'a');
+ assert.equal(rondaBoxhead(p,'z'),null,'quien no jugó no anota');
+ // sin `ms` (marco viejo): lo que duró la sala
+ p=sala(2);mover(p,{t:'nivel',uid:'a',n:2});fin(p,70000);assert.equal(rondaBoxhead(p,'a').tiempo,70000);
+ // solo: no (el Club verifica rehaciendo); versus, jefes y mutadores que regalan: no
+ assert.equal(rondaBoxhead(fin(sala(1),1000),'a'),null);
+ for(const extra of [{variante:'versus'},{variante:'jefes'},{mut:'sangre'},{mut:'municion'}])assert.equal(rondaBoxhead(fin(sala(2,extra),1000),'a'),null,JSON.stringify(extra));
+ assert.ok(rondaBoxhead(fin(sala(2,{mut:'veloz'}),1000),'a'),'un mutador que no regala sí cuenta');
+ assert.equal(rondaBoxhead(sala(2),'a'),null,'sin terminar no');
+ // la regla de soloRanks acepta esa fila sin prueba solo para boxhead, con `con`
+ const reglas=fs.readFileSync('../firebase/database.rules.json','utf8');
+ assert.match(reglas,/\$categoria\.beginsWith\('club-boxhead-'\) && newData\.child\('con'\)\.exists\(\)/);
+ assert.match(reglas,/"con": \{/);
+ // juegos-main la manda ahí (y sigue anotando la fila de la sala, que paga monedas)
+ const main=fs.readFileSync('src/juegos-main.js','utf8');
+ assert.match(main,/guardaConPodio\(`club-boxhead-\$\{mapaBoxhead\(p\)\}`/);
+});
+
+test('boxhead Fase 4: el verificador del Club conoce los nueve mapas en el orden de ORDEN_MAPAS',()=>{
+ const src=fs.readFileSync('src/juegos/solo/verifica/boxhead.js','utf8');
+ const m=/const MAPAS = (\[[^\]]+\])/.exec(src);
+ assert.deepEqual(JSON.parse(m[1].replace(/'/g,'"')),D.ORDEN_MAPAS);
+});
+
+test('boxhead Fase 4: las mejoras de saltos del Rayo se aplican',()=>{
+ const todas=new Set(D.MEJORAS.filter(m=>m.arma===13).map(m=>m.id));
+ const a=D.arma(13,todas);
+ assert.ok(a.saltos>D.ARMAS[13].saltos,'más saltos: '+a.saltos);
+ assert.ok(a.salto>D.ARMAS[13].salto,'saltos más largos: '+a.salto);
+});
+
+test('boxhead Fase 4: noches, eventos, jefes y metas (datos)',()=>{
+ for(let n=1;n<=25;n++){assert.equal(D.nocheDe(n),'');assert.equal(D.eventoDe(n),'');assert.equal(D.escoltaGrande(n),0);}
+ assert.deepEqual([27,37,47,57,67].map(D.nocheDe),['veloz','hierro','cristal','apagon','veloz']);
+ for(let n=26;n<=300;n++){
+  if(D.nocheDe(n)){assert.equal(D.jefeDeNivel(n),-1,'noche sin jefe '+n);assert.ok(D.NOCHES[D.nocheDe(n)],n);}
+  if(D.eventoDe(n)){assert.equal(D.jefeDeNivel(n),-1,'evento sin jefe '+n);assert.equal(D.nocheDe(n),'');assert.ok(D.EVENTOS[D.eventoDe(n)],n);}
+ }
+ for(const v of Object.values(D.NOCHES))assert.ok(v.nombre&&v.txt);
+ for(const v of Object.values(D.EVENTOS)){assert.ok(v.nombre&&v.txt);for(const k of v.ks||[])assert.ok(D.ENEMIGOS[k]&&!D.ENEMIGOS[k].jefe);}
+ assert.ok(Math.abs(D.mezclaMut({vel:1.3,cura:4},{vel:1.15}).vel-1.495)<1e-9);
+ assert.equal(D.mezclaMut(null,D.NOCHES.cristal).dano,2);
+ assert.deepEqual(D.proximas(26),{noche:27,evento:28,jefe:30,medalla:30});
+ assert.equal(D.escoltaGrande(30),0.25);assert.ok(D.escoltaGrande(100)<=0.5);
+ assert.equal(D.duoDe(50),-1);assert.ok(D.esJefe(D.duoDe(60))&&D.ENEMIGOS[D.duoDe(60)].jefe!=='grande');
+ // la vida del jefe igual que antes hasta la 30, más dura después
+ const vieja=(k,n)=>Math.round(D.ENEMIGOS[k].vida*(1+0.06*(n-1)));
+ for(let n=1;n<=30;n++)assert.equal(D.vidaJefe(11,n,1),vieja(11,n));
+ assert.ok(D.vidaJefe(11,60,1)>vieja(11,60)*1.2);
+ // tipos forzados por un evento: el asedio trae demoledores y brutos
+ let c=0;for(let i=0;i<1000;i++){const k=D.tipoEvento('asedio',28,i/1000,(i*7%1000)/1000);if(k===16||k===3)c++;}
+ assert.ok(c>=350,'asedio: '+c);
+ assert.equal(D.tipoEvento('lluvia',33,0,0.5),D.tipoEnemigo(33,0.5));
+ // los tres enemigos nuevos solo desde la 32
+ for(let n=1;n<32;n++){const p=D.mezclaNivel(n);for(const k of [22,23,24])assert.equal(p[k],0);}
+ assert.ok(D.mezclaNivel(60)[24]>0);
+ assert.ok(D.MEDALLAS_RONDA.every(([,id])=>D.medallaDe(id)));
+});
+
+test('boxhead Fase 4: tóxico, sombra, estandarte y el respawn de los atascados (en el motor)',()=>{
+ const bx=boxheadSinPantalla(),pista={dx:0,dy:0,vel:1,mira:0,fija:true,disp:false};
+ const prepara=()=>{bx.practica(1);bx.inmortal(true);bx.armas();bx.calma();bx.elige(0);bx.entrada(pista);for(let i=0;i<12;i++)bx.paso(1/60);return bx.mundo().yo;};
+ const gatillo=p=>{bx.entrada({...pista,disp:true});for(let i=0;i<p;i++)bx.paso(1/60);bx.entrada(pista);bx.paso(1/60);};
+ const de=id=>bx.mundo().E.find(e=>e.id===id);
+ // el Tóxico deja tres charcos al morir, que no se mueven
+ let yo=prepara();const t=bx.enemigo(22,yo.x+50,yo.y);bx.ponVida(t,0.01);gatillo(4);
+ assert.ok(!de(t),'el tóxico murió');
+ const ch=bx.mundo().F.filter(f=>f.k===22);assert.equal(ch.length,3,'tres charcos');
+ bx.paso(1/60);assert.deepEqual(bx.mundo().F.filter(f=>f.k===22).map(f=>[f.x,f.y]),ch.map(f=>[f.x,f.y]));
+ // la Sombra se desvanece (est 1) y reaparece de un salto
+ yo=prepara();const s=bx.enemigo(24,yo.x+220,yo.y);let vio=false,salto=0,ant=de(s);
+ for(let i=0;i<60*8&&de(s);i++){bx.paso(1/60);const e=de(s);if(!e)break;if(e.est===1)vio=true;salto=Math.max(salto,Math.hypot(e.x-ant.x,e.y-ant.y));ant=e;}
+ assert.ok(vio,'se desvanece');assert.ok(salto>40,'reaparece de un salto: '+salto.toFixed(1));
+ // el Portaestandarte protege a los suyos: la misma bala quita menos
+ const quita=con=>{const yo=prepara();const z=bx.enemigo(3,yo.x+60,yo.y);if(con)bx.enemigo(23,yo.x+60,yo.y+70);const h=de(z).hp;gatillo(1);return h-de(z).hp;};
+ const sin=quita(false),con=quita(true);
+ assert.ok(sin>0&&con>0&&con<sin*0.8,'con estandarte '+con+' contra '+sin);
+ // un enemigo que lleva 2 minutos sin moverse reaparece lejos
+ yo=prepara();const z=bx.enemigo(3,yo.x+24,yo.y);const z0=de(z);
+ bx.envejece(z,119.99);bx.paso(1/60);bx.paso(1/60);
+ const z1=de(z);assert.ok(z1&&Math.hypot(z1.x-yo.x,z1.y-yo.y)>150,'reapareció lejos: '+Math.hypot(z1.x-z0.x,z1.y-z0.y).toFixed(0));
+ // y uno que se mueve no
+ yo=prepara();const w=bx.enemigo(0,yo.x+200,yo.y);bx.envejece(w,60);for(let i=0;i<120;i++)bx.paso(1/60);
+ const w1=de(w);assert.ok(!w1||Math.hypot(w1.x-yo.x,w1.y-yo.y)<200,'el que camina sigue su camino');
 });
