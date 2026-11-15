@@ -15,8 +15,8 @@
   const API = String((PK.Platform && PK.Platform.apiBase) || '').replace(/\/+$/, '');
   const SYNC_MS = API ? 15000 : 4000, CLOUD_MS = API ? 120000 : 60000;
 
-  let pending = {};       // recolectado en zonas comunes aún no informado
   let marketOps = [];
+  let lastMv = null, mvk = {}; // L4: versión de las murallas que mandaste / que tienes de cada reino
   let since = 0, kb = {}, lastBver = null, lastSentBuild = 0, seenIncoming = new Set(), syncing = false, tv = 0;
 
   async function api(method, url, body, timeout, extra) {
@@ -60,7 +60,6 @@
         try { cloud = s.save ? JSON.parse(s.save) : null; } catch (e) { cloud = null; }
       }
       Net.online = true;
-      W.serverNodes = true;
       return { slot: j.world.slot, humans: j.world.humans, cloud };
     } catch (e) {
       console.info('Pro Kingdoms: sin servidor, modo local.', e.message);
@@ -82,7 +81,6 @@
     });
   }
 
-  Net.harvest = function (id, n) { pending[id] = (pending[id] || 0) + n; };
   Net.marketOp = function (op) { if (Net.online) marketOps.push(op); };
 
   // ---------- Foto del reino ----------
@@ -109,6 +107,9 @@
         u.carry ? RAW.indexOf(u.carryRes) : -1, u.flip ? 1 : 0, u.hair, u.skin, u.kind === 'scout' ? 1 : u.kind === 'cart' ? 2 : u.kind === 'carromato' ? 3 : 0]),
     };
     if (force || bver !== lastBver || Date.now() - lastSentBuild > 60000) { snap.buildings = blds; snap.bver = bver; lastBver = bver; lastSentBuild = Date.now(); }
+    // L4: tus murallas, solo cuando cambian (otros las ven y no las cruzan)
+    const d = st.def || { walls: [], gates: [], tier: 1 }, mv = String(U.strHash(d.walls.join() + '|' + d.gates.join() + '|' + d.tier));
+    if (force || mv !== lastMv) { snap.muros = { v: mv, t: d.walls.slice(0, 2000), g: d.gates.slice(0, 200), tier: d.tier }; lastMv = mv; }
     return snap;
   }
 
@@ -116,8 +117,7 @@
   Net.sync = async function (first) {
     if (!Net.online || syncing) return;
     syncing = true;
-    const sent = pending, ops = [];
-    pending = {};
+    const ops = [];
     // El servidor acepta hasta LIM.marketSync × escala de oro por sync y recorta (y anota como sospecha) lo demás:
     // lo que no cabe en esta vuelta (una compra de 10.000, o lo que el Tesorero hizo sin conexión) espera a la siguiente.
     const Soc = PK.Social, lim = Soc.MERCADO.sync * Soc.escala(S().era) * 0.9, resto = [];
@@ -140,7 +140,7 @@
       // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
       const mar = PK.Game.enMar && PK.Game.enMar();
       const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
-        : { since, harvest: sent, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
@@ -150,7 +150,6 @@
       if (Net.lost) { Net.lost = false; toast('Conexión recuperada.', 'good'); }
       if (!mar) {
         since = r.ver;
-        applyNodes(r.nodes);
         if (r.terr) applyTerr(r.terr);
         tv = r.tv || 0;
         applyPlayers(r.players || []);
@@ -167,35 +166,12 @@
       }
     } catch (e) {
       // se reintenta en la siguiente vuelta sin perder lo recolectado
-      for (const id in sent) pending[id] = (pending[id] || 0) + sent[id];
       marketOps = ops.concat(marketOps);
+      lastMv = null; // las murallas se vuelven a mandar en el próximo
       if (e.status === 401) { U.store.del(TOKEN_KEY); toast('Tu sesión expiró. Recarga la página.', 'bad'); Net.online = false; }
       else if (!Net.lost && Date.now() - (Net.lastOk || 0) > SYNC_MS * 2 + 5000) { Net.lost = true; toast('Sin conexión con el servidor. Reintentando…', 'warn'); }
     } finally { syncing = false; }
   };
-
-  function applyNodes(nodes) {
-    for (const id in nodes) {
-      const n = W.nodes[id];
-      if (!n) continue;
-      const [amt, dead] = nodes[id];
-      const local = Math.max(0, amt - (pending[id] || 0));
-      if (dead || local <= 0.5) {
-        if (!n.dead) W.depleteNode(n);
-        n.amount = 0;
-      } else {
-        if (n.dead) {
-          if (n.kind === 'tree' || n.kind === 'berry') {
-            const i = W.idx(n.x, n.y);
-            if (W.bAt[i] >= 0) continue; // alguien construyó encima del tocón
-            W.block[i] = 1;
-          }
-          n.dead = false;
-        }
-        n.amount = local;
-      }
-    }
-  }
 
   function applyPlayers(list) {
     const g = G();
@@ -218,10 +194,12 @@
         g.clearOwner(owner, true);
         (pl.buildings || []).forEach((b, i) => g.addRemoteBuilding(b[0], owner, b[1], b[2], !!b[3], 400000 + pl.slot * 5000 + i, b[4] || 1));
       }
+      if (pl.muros !== undefined) { mvk[pl.id] = pl.mv; PK.Def.ponerAjenas(pl.slot, pl.muros, { v: pl.mv, terr: parcelas(pl.slot) }); }
       applyUnits(owner, pl.slot, pl.units || []);
     }
   }
 
+  const parcelas = slot => { const o = []; for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === slot + 1) o.push(k); return o.join(); };
   // Territorio con autoridad del servidor. Si perdiste una parcela, lo que tenías ahí se desarma y se devuelve.
   function applyTerr(arr) {
     if (!Array.isArray(arr) || arr.length !== W.terr.length) return;

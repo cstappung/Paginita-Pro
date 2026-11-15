@@ -279,7 +279,7 @@
   // El carromato sale de tu tierra, pero no cabe por una puerta chica (W.wall 2): solo por el Gran Portón (3).
   function pasa(perfil, k) {
     if (perfil === 'barcaza') return W.terrain[k] === 4 && W.bAt[k] < 0; // solo agua
-    if (W.block[k] !== 0 || W.terrain[k] === 4) return false;
+    if (W.block[k] !== 0 || W.terrain[k] === 4 || W.wallOwner[k]) return false; // L4: tampoco por una puerta ajena
     const x = k % W.W, y = (k / W.W) | 0;
     if (perfil === 'carreta') return W.ownerAt(x, y) === 'p';
     if (perfil === 'carromato') return W.wall[k] !== 2;

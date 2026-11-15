@@ -66,8 +66,8 @@ async function main() {
   ok((await api('POST', '/api/sync', { cuerpo: {}, token: 'inventado' })).status === 401, 'sync con un token del juego inventado: 401');
 
   console.log('\nJugar');
-  const s1 = await api('POST', '/api/sync', { cuerpo: { since: 0, harvest: {}, market: [], snap: foto(), kb: {}, name: 'Ana' }, token: yo.token });
-  ok(s1.status === 200 && s1.d.nodes && Object.keys(s1.d.nodes).length > 0 && Array.isArray(s1.d.players), 'sync devuelve zonas comunes y reinos', s1.status + ' nodos=' + Object.keys(s1.d.nodes || {}).length);
+  const s1 = await api('POST', '/api/sync', { cuerpo: { since: 0, market: [], snap: foto(), kb: {}, name: 'Ana' }, token: yo.token });
+  ok(s1.status === 200 && s1.d.nodes === undefined && Array.isArray(s1.d.players), 'sync devuelve los reinos (L4: las zonas comunes ya no viajan)', s1.status);
   const of = await api('GET', '/api/offers', { token: yo.token });
   ok(of.status === 200, 'el mercado contesta', of.status);
   const rk = await api('GET', '/api/ranking', { token: yo.token });

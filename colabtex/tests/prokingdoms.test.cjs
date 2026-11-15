@@ -1080,3 +1080,41 @@ test('L6 (pk-44): la barcaza solo navega, el carromato nunca, y la tormenta alar
   assert.equal(L.claseRuta({ de: 1 }) !== undefined, true);
   assert.match(JS('logistics.js'), /L\.atracadero = /);
 });
+
+test('L4 (pk-45): el despeje es global, puro y a 12 casillas de todo territorio', () => {
+  const t0 = W.terr.slice();
+  try {
+    const a = W.ubicarLugares(), d = W.distTerritorio(W.terr);
+    assert.ok(Object.keys(a.n).length > 50 && Object.keys(a.p).length > 10, 'mueve lo de todos los reinos');
+    let cerca = 0;
+    for (const id in a.n) { const [x, y] = a.n[id]; if (d[W.idx(x, y)] < W.LEJOS) cerca++; assert.ok(!W.terr[W.parcel(x, y)] && !W.terrCommon[W.parcel(x, y)] && W.terrain[W.idx(x, y)] !== 4); }
+    assert.equal(cerca, a.cerca, 'lo que no cupo a 12 se cuenta');
+    assert.equal(a.cerca, 0);
+    for (const id in a.n) assert.ok(!W.QUEDAN[W.nodes[id].kind], 'los árboles y arbustos se quedan');
+    // dos historias de territorio distintas que terminan igual dan las mismas posiciones
+    for (let k = 0; k < W.terr.length; k++) if (!W.terr[k] && !W.terrCommon[k] && W.parcelNeighbors(k).some(n => W.terr[n] === 2)) W.terr[k] = 2;
+    const b = W.ubicarLugares();
+    assert.ok(Object.keys(b.n).length > Object.keys(a.n).length);
+    W.terr.set(t0); W.terr[0] = W.terr[0]; // otra copia del mismo territorio
+    const c = W.ubicarLugares(Uint8Array.from(t0));
+    assert.equal(JSON.stringify(c), JSON.stringify(a));
+    // nada movido pisa a otro
+    const usadas = new Set();
+    for (const id in a.n) { const k = a.n[id].join(); assert.ok(!usadas.has(k)); usadas.add(k); }
+  } finally { W.terr.set(t0); }
+  // una puerta ajena solo la cruza su gente (W.pasoDe), y una muralla ajena nadie
+  const b0 = W.block.slice(), o0 = W.wallOwner.slice();
+  try {
+    W.block.fill(1); for (let x = 100; x <= 120; x++) W.block[W.idx(x, 100)] = 0;
+    W.wallOwner[W.idx(110, 100)] = 4;
+    const g = { x0: 120, y0: 100, x1: 120, y1: 100 };
+    assert.ok(!W.findPath(100, 100, g).ok, 'un extraño no pasa');
+    W.pasoDe = 4; assert.ok(W.findPath(100, 100, g).ok, 'los suyos sí'); W.pasoDe = 0;
+  } finally { W.block.set(b0); W.wallOwner.set(o0); W.pasoDe = 0; }
+  assert.match(JS('entities.js'), /W\.pasoDe = D\.slotOfOwner\(u\.owner\) \+ 1/);
+  assert.match(JS('logistics.js'), /W\.wallOwner\[k\]\) return false/);
+  assert.equal(D.WALL.max(1), 450);
+  // el cliente ya no informa recolección ni aplica recursos del servidor
+  assert.doesNotMatch(JS('net.js'), /harvest|applyNodes|serverNodes/);
+  assert.doesNotMatch(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /checkHarvest|COMMON\[/);
+});

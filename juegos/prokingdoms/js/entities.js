@@ -85,7 +85,9 @@
 
   // Pide una ruta. Devuelve false si no hay manera de llegar.
   function pathTo(u, goal) {
+    W.pasoDe = D.slotOfOwner(u.owner) + 1; // L4: por las puertas de su reino sí pasa
     const r = W.findPath(Math.floor(u.x), Math.floor(u.y), goal);
+    W.pasoDe = 0;
     if (!r.ok) {
       u.fails++;
       if (u.fails > 3 || !r.path.length) return false;
@@ -259,15 +261,13 @@
     setAim(u, n.x + 0.5, n.y + 0.5, AIM[n.kind] || AIM.rock);
     u.mode = 'work';
     u.acc += g.gatherRate(u.owner, t.res, u, n.kind) * dt;
-    const shared = W.isShared(n), online = PK.Net && PK.Net.online;
-    // En línea, los reinos simulados no gastan recursos compartidos: eso lo calcula el servidor.
-    const virtual = online && shared && u.owner !== 'p';
+    // L4 (pk-45): cada jugador tiene sus zonas comunes; los reinos simulados se ven juntar ahí, pero no gastan lo tuyo
+    const virtual = u.owner !== 'p' && W.isShared(n);
     let took = 0;
     while (u.acc >= 1 && n.amount > 0 && u.carry < cap) {
       u.acc -= 1; u.carry += 1; u.carryRes = t.res; u.carryZone = n.zone; u.hunt = n.kind === 'deer';
       if (!virtual) { n.amount -= 1; took++; }
     }
-    if (took && online && shared && u.owner === 'p') PK.Net.harvest(n.id, took);
     if (n.amount <= 0 && !n.dead) { W.depleteNode(n); if (n.temp && u.owner === 'p' && PK.Life) PK.Life.tempDone(n); }
     if (u.carry >= cap) u.phase = 'return';
   }

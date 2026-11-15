@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 8;
+  D.PROTO = 9;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -878,6 +878,9 @@
       { name: 'Bastión', cost: { blocks: 6, steel: 1 }, era: 5, bonus: 1.6, up: { blocks: 6, steel: 1, gold: 8 } },
     ],
     gate: { wood: 40, stone: 20 },
+    // L4 (pk-45): tope de casillas de muralla y puertas por era (el servidor recorta lo que pasa: las ven los demás)
+    max: era => 300 + 150 * era,
+    gatesMax: 200,
   };
 
   // ---------- Estructuras de las Leyendas ----------

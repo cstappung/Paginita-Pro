@@ -111,7 +111,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Market:** sell ≤ buy − 0.10 at every level (tested); online, `Soc.mercadoLibre` mirrors the server's daily cap and
   `net.js` splits queued ops under `marketSync`. Gold has no `MARKET_BASE` entry (priced at 100 via `price()`).
 - **Surplus sinks** priced off caps, not tables: Horas extra (`G.overtime`) and Fiesta (`G.fiesta`).
-- `D.NODES` is also read by the server for common zones: changing amounts or regen needs a function deploy.
+- Since L4 (`pk-45`) the server no longer owns common-zone resources: `D.NODES` amounts are client-only.
 
 ## Villagers, buildings and the map
 
@@ -125,9 +125,10 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Moving buildings** (`G.moveBuilding`, key V) keeps level, timers, queue and buffers; `placeWhy(type, x, y,
   ignorar)` treats its own tiles as free.
 - **Camps may go in no-man's land** (`G.OUTPOST`: lumber, mining, mill); everything else only in your parcels.
-- **Despeje** (`js/despeje.js`): inside your land only trees and berry bushes stay (`Dz.QUEDAN`); everything else
-  moves to the nearest no-man's tile, saved per save. Talar/plantar/quitar are `PK.Def.tool` values. (L4 of the
-  logistics plan makes it a pure, global function.)
+- **Despeje** (`js/despeje.js` applies, `W.ubicarLugares` in `world.js` decides, L4): inside **any** territory only
+  trees and berry bushes stay (`W.QUEDAN`); the rest goes to the tile nearest its original spot (`W.ORIG`) at
+  `W.LEJOS` (12) or more from every territory. Pure function of `W.terr`, cached by it (~0.2 s), no positions saved.
+  Talar/plantar/quitar are `PK.Def.tool` values.
 - **Exploration is an area, not a radius** (`G.exploreArea`, `G.exploreRange` = radius giving that area from your
   home). Every scout reveal goes through `G.revealScout`, never `revealAt`. `W.fog[i]` truthy means explored.
 - **Walls** (`js/defense.js`): `W.wall` 1 wall, 2 gate; all tiers upgrade together. Gates let your people through,
@@ -173,7 +174,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - `D.aplicarTema('mar')` mutates the tables once at startup (names, buildings, eras, army, quests); never un-apply.
   Tests that need it load a separate context.
 - **Villagers never cross water:** drop points, targets, shops and the rebalancer filter by island.
-- The server never sees the sea map; a sea sync carries no snapshot, harvest, market or pase stats.
+- The server never sees the sea map; a sea sync carries no snapshot, market or pase stats.
 
 ## Interface, sound and performance
 
@@ -288,3 +289,18 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Colonists choose nodes from where they stand** (`G.nodoEnRadio(res, base, { u })`): measuring reachability from
   the base's side left a colonist born in a pocket between trees cycling two unreachable nodes forever (pk-42/43).
 - `css/style.css`: in landscape `#mmwrap` needs `left/bottom: auto` (it stretched over the whole map since pk-20).
+
+### L4, each player's world (`pk-45`, `D.PROTO` 9, needs `firebase deploy --only functions`)
+
+- **Common zones are per player**: no `harvest` in the sync, no `nodes` in the answer, no `COMMON`/`checkHarvest`/bot
+  pressure in `sim.js` (saved worlds drop `nodes`, `nv`, `botCur` on load). Simulated kingdoms are seen gathering in
+  your common zones but never spend them (`virtual` in `doGather`, and offline). Amounts were not changed.
+- **Despeje** is global and pure (see «Villagers, buildings and the map»). Old saves lose `st.despeje.n/.p`.
+- **Foreign walls** (`Def.ajenas`, `W.wallOwner` = slot + 1, `W.wallAj` 1 wall / 2 gate): players send
+  `snap.muros = { v, t, g, tier }` only when it changes; the server keeps them inside their parcels and under
+  `D.WALL.max(era)` (300 + 150·era; gates `D.WALL.gatesMax`), logs `murallas`, and hands them out with version
+  `v:tv` against the client's `mv` map. Simulated kingdoms get a generated ring from their Era II (`Def.murosBot`,
+  rechecked every 2 s with `Def.revisarAjenas`). Walls block (`W.block` 5); **a foreign gate lets only its own people
+  through**: `pathTo` sets `W.pasoDe` around `findPath`; carts and carromatos never (`L.pasa`). Foreign Gran Portones
+  travel as buildings (no `gp` field). Your own walls stay in `W.wall`; `compute`, `Def.allowed` and quitar ignore
+  foreign ones. The wall cap also applies when you build (`Def.build`, `Def.gate`).

@@ -16,14 +16,7 @@ const PK = ctx.window.PK, D = PK.D, W = PK.World, U = PK.U;
 D.setupRealms(-1, null);
 W.generate(D.SEED);
 
-const COMMON = {};   // id del recurso -> { kind, max, zone }
-const BY_ZONE = {};  // id de zona -> [ids]
-for (const n of W.nodes) {
-  if (!W.isShared(n)) continue;
-  const z = W.zones[n.zone].id;
-  COMMON[n.id] = { kind: n.kind, max: n.max, zone: z };
-  (BY_ZONE[z] = BY_ZONE[z] || []).push(String(n.id));
-}
+// L4 (pk-45): las zonas comunes son de cada jugador (rebrotan en su cliente); el servidor ya no lleva sus recursos.
 
 const SLOTS = D.REALM_SLOTS.length;
 // Territorio inicial: el mismo reparto que genera el mapa (parcela -> casilla+1, 0 = libre).
@@ -31,7 +24,6 @@ const TERR0 = Array.from(W.terrStart);
 const TSTART = new Array(SLOTS).fill(0);
 for (const v of TERR0) if (v) TSTART[v - 1]++;
 const ONLINE_MS = 40000;      // «en línea»: con sync cada 15 s (Cloud Functions), dos syncs perdidos no lo apagan
-const BOT_RATE = 500;          // recursos por hora que un reino simulado saca de las zonas comunes
 const RES = D.RES_ORDER;
 const BASE = { food: 100, wood: 100, stone: 130, ore: 140, marble: 320, gems: 1500, planks: 260, blocks: 450, ingots: 650, tools: 1600, books: 900, steel: 1800, machinery: 5000, gold: 100 };
 const ARMY = Object.keys(D.ARMY);
@@ -68,24 +60,22 @@ const world = p => store.get('worlds', p.world);
 
 function newWorld() {
   const n = store.all('worlds').length + 1;
-  const w = { id: 'w' + n, name: 'Mundo ' + n, slots: new Array(SLOTS).fill(null), nodes: {}, nv: {}, ver: 1, last: now(), botCur: {}, mapv: D.MAPV, terr: TERR0.slice(), tv: 1, tshield: {}, botGrow: {} };
-  for (const id in COMMON) w.nodes[id] = [COMMON[id].max, 0];
+  const w = { id: 'w' + n, name: 'Mundo ' + n, slots: new Array(SLOTS).fill(null), ver: 1, last: now(), mapv: D.MAPV, terr: TERR0.slice(), tv: 1, tshield: {}, botGrow: {} };
   return store.set('worlds', w.id, w);
 }
 // Si cambió el mapa (nueva versión del juego), los recursos compartidos de los mundos viejos se reinician.
 for (const w of store.all('worlds')) {
   if (w.mapv === D.MAPV) continue;
-  w.mapv = D.MAPV; w.nodes = {}; w.nv = {}; w.botCur = {}; w.ver = (w.ver || 1) + 1;
+  w.mapv = D.MAPV; w.ver = (w.ver || 1) + 1;
   w.terr = TERR0.slice(); w.tv = (w.tv || 0) + 1; w.tshield = {}; w.botGrow = {};
   // el mapa nuevo tiene más casillas de reino
   while (w.slots.length < SLOTS) w.slots.push(null);
-  for (const id in COMMON) w.nodes[id] = [COMMON[id].max, 0];
   for (const pid of w.slots) { const o = pid && store.get('players', pid); if (o) { o.buildings = []; o.bver = 'map' + D.MAPV; o.units = []; o.snap = null; } }
   store.touch('worlds'); store.touch('players');
   console.log('Mapa actualizado en', w.name);
 }
 
-for (const w of store.all('worlds')) ensureTerr(w); // mundos guardados antes del territorio
+for (const w of store.all('worlds')) { ensureTerr(w); delete w.nodes; delete w.nv; delete w.botCur; } // mundos guardados antes del territorio; L4: sin recursos comunes
 store.touch('worlds');
 
 function humans(w, me) {
@@ -146,8 +136,6 @@ const LIM = {
   eraGap: 0.1,        // fracción de D.eraTime(n) que debe pasar como mínimo entre dos subidas de era
   slack: 2.5,         // margen sobre la mejor tasa posible (deseos, eventos, reliquias, maravilla…)
   vida: 1.6,          // árbol 2.0, cartas de era y estación juntos (Fase 3): el cliente los topa en D.VIDA_TOPE
-  startBudget: 120,   // segundos de recolección que trae una cuenta nueva
-  maxKeys: 300,       // recursos distintos por sync
   resSlack: 0.2,      // margen fijo por foto (en múltiplos de scale(era)) para premios del cliente
   marketSync: 2,      // compra/venta con los mercaderes por sync, en oro (en múltiplos de scale)
   marketDay: 20,      // lo mismo, por día
@@ -207,28 +195,6 @@ function suspect(p, kind, info) {
   const entry = Object.assign({ at: new Date(t).toISOString(), pid: p.id, name: p.name, kind, n: p.flags[kind] }, info);
   console.warn('[sospecha]', p.name, kind, JSON.stringify(info));
   store.log(entry);
-}
-
-// Recolección en zonas comunes: cada jugador tiene una cubeta de "aldeano-segundos" que se llena con el
-// tiempo real (hasta 12 h, como simulateOffline). Cada unidad recolectada cuesta 1 / tasa máxima de ese recurso.
-function checkHarvest(p, harvest, w, t) {
-  const n = workers(p), era = vEra(p), stage = guildStageOf(p);
-  if (p.hb === undefined) { p.hb = n * LIM.startBudget; p.hbAt = t; }
-  p.hb = Math.min(n * D.OFFLINE_CAP, p.hb + n * clamp((t - p.hbAt) / 1000, 0, D.OFFLINE_CAP));
-  p.hbAt = t;
-  const out = {};
-  let asked = 0, kept = 0, keys = 0;
-  for (const id in harvest) {
-    const c = COMMON[id], h = Math.max(0, +harvest[id] || 0);
-    if (!c || !h || ++keys > LIM.maxKeys) continue;
-    asked += h;
-    const cost = 1 / kindRate(c.kind, era, stage), ok = Math.min(h, c.max, p.hb / cost);
-    if (ok <= 0) continue;
-    p.hb -= ok * cost;
-    out[id] = ok; kept += ok;
-  }
-  if (asked - kept > 1) suspect(p, 'recoleccion', { informado: Math.round(asked), aceptado: Math.round(kept), aldeanos: n, era });
-  return out;
 }
 
 // Operaciones de mercado contra los mercaderes: mueven el precio global, así que su valor en oro tiene
@@ -345,6 +311,33 @@ function checkArmy(p, rawUnits, rawPower) {
   return { units, total, power };
 }
 
+// L4 (pk-45): las murallas de cada jugador las ven (y no las cruzan) los demás. Solo casillas de sus parcelas, bajo el
+// tope de su era; lo demás se recorta y se anota. Viajan con versión (la del jugador + la del territorio, así una
+// parcela que cambió de dueño se lleva sus murallas) y solo cuando cambian.
+function cleanMuros(p, m, w) {
+  const N = D.MAP * D.MAP, me1 = p.slot + 1, era = vEra(p), tope = D.WALL.max(era), vistos = new Set();
+  const limpia = (arr, max) => {
+    const out = [];
+    for (const raw of Array.isArray(arr) ? arr.slice(0, 4000) : []) {
+      const k = Math.floor(+raw);
+      if (!(k >= 0 && k < N) || vistos.has(k) || w.terr[W.parcel(k % D.MAP, Math.floor(k / D.MAP))] !== me1 || out.length >= max) continue;
+      vistos.add(k); out.push(k);
+    }
+    return out;
+  };
+  const g = limpia(m.g, D.WALL.gatesMax), t = limpia(m.t, Math.max(0, tope - g.length));
+  const pedidas = (Array.isArray(m.t) ? m.t.length : 0) + (Array.isArray(m.g) ? m.g.length : 0);
+  if (pedidas > t.length + g.length) suspect(p, 'murallas', { pedidas, aceptadas: t.length + g.length, tope });
+  return { v: String(m.v || '').slice(0, 20), t, g, tier: clamp(Math.floor(+m.tier || 1), 1, 4) };
+}
+function murosPara(o, w, mvk) {
+  if (!o.muros) return {};
+  const v = o.muros.v + ':' + w.tv;
+  if (mvk[o.id] === v) return {};
+  const me1 = o.slot + 1, mio = k => w.terr[W.parcel(k % D.MAP, Math.floor(k / D.MAP))] === me1;
+  return { mv: v, muros: { t: o.muros.t.filter(mio), g: o.muros.g.filter(mio), tier: o.muros.tier } };
+}
+
 function sanitizeSnap(s) {
   const res = {};
   for (const r of ['food', 'wood', 'stone', 'gold']) res[r] = Math.max(0, +((s.res || {})[r]) || 0);
@@ -365,23 +358,14 @@ function sync(p, b) {
   // Fase 9: en el archipiélago no llega foto ni recolección; el reino de la tierra queda como «sin conexión»
   p.mar = b.mundo === 'mar';
   if (p.mar && !p.marDesde) p.marDesde = t; // desde cuándo navega: tope del primer barco de regata y de la primera flota de duelo
-  if (p.mar) { b.harvest = null; b.market = null; b.snap = null; b.pase = null; }
-  if (b.harvest && typeof b.harvest === 'object') {
-    const ok = checkHarvest(p, b.harvest, w, t);
-    for (const id in ok) {
-      const st = w.nodes[id];
-      if (!st) continue;
-      st[0] = Math.max(0, st[0] - ok[id]);
-      if (st[0] <= 0.5 && !st[1]) { st[0] = 0; st[1] = t; }
-      w.nv[id] = ++w.ver;
-    }
-  }
+  if (p.mar) { b.market = null; b.snap = null; b.pase = null; }
   if (Array.isArray(b.market)) for (const op of checkMarket(p, b.market)) marketOp(op);
   if (b.snap && typeof b.snap === 'object') {
     const s = checkSnap(p, b.snap, t);
     if (s.buildings) { p.buildings = s.buildings; p.bver = String(b.snap.bver || ''); delete s.buildings; }
     p.snap = s;
     p.units = Array.isArray(b.snap.units) ? b.snap.units.slice(0, 250) : [];
+    if (b.snap.muros && typeof b.snap.muros === 'object') p.muros = cleanMuros(p, b.snap.muros, w);
   }
   if (b.ack) p.inbox = p.inbox.filter(i => i.id > b.ack);
   if (b.pase && typeof b.pase === 'object') paseStats(p, b.pase);
@@ -390,9 +374,7 @@ function sync(p, b) {
   const wsince = +b.wsince || 0;
   store.touch('players'); store.touch('worlds');
 
-  const since = +b.since || 0, nodes = {};
-  if (!p.mar) for (const id in w.nodes) if (!since || (w.nv[id] || 0) > since) nodes[id] = w.nodes[id]; // en el mar no hace falta la tierra
-  const kb = b.kb || {}, players = [];
+  const kb = b.kb || {}, mvk = b.mv && typeof b.mv === 'object' ? b.mv : {}, players = [];
   w.slots.forEach((pid, slot) => {
     if (!pid || pid === p.id || p.mar) return;
     const o = player(pid);
@@ -403,12 +385,13 @@ function sync(p, b) {
       truce: o.snap ? o.snap.truce : true, bver: o.bver,
       score: o.snap ? o.snap.score : 0, army: o.snap ? Math.round(o.snap.army) : 0, newbie: !o.snap || o.snap.era < D.TERR.minEra, tshield: (w.tshield[slot] || 0) > t,
       buildings: kb[o.id] !== o.bver ? o.buildings : undefined, units: online ? o.units : [],
+      ...murosPara(o, w, mvk),
     });
   });
   ensureTerr(w);
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
-  return { now: t, ver: w.ver, nodes, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
+  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -424,25 +407,11 @@ function worldChat(p, b) {
   return { ok: true };
 }
 
-// ---------- Zonas comunes: regeneración y presión de los reinos simulados ----------
+// ---------- Los reinos simulados crecen (L4: las zonas comunes ya no son del servidor) ----------
 function tickWorld(w) {
   const t = now(), dt = Math.min((t - (w.last || t)) / 1000, 12 * 3600);
   w.last = t;
   if (dt <= 0) return;
-  for (const id in w.nodes) {
-    const c = COMMON[id], st = w.nodes[id], def = D.NODES[c.kind];
-    if (def.regen) {
-      if (st[0] < c.max) {
-        const before = Math.floor(st[0]);
-        st[0] = Math.min(c.max, st[0] + (c.max * def.regen * dt) / 3600);
-        if (st[1] && st[0] >= 1) st[1] = 0;
-        if (Math.floor(st[0]) !== before) w.nv[id] = ++w.ver;
-      }
-    } else if (st[1] && t - st[1] >= def.regrow * 1000) {
-      st[0] = c.max; st[1] = 0; w.nv[id] = ++w.ver;
-    }
-  }
-  w.botCur = w.botCur || {};
   ensureTerr(w);
   w.slots.forEach((pid, slot) => {
     if (pid) return;
@@ -455,23 +424,6 @@ function tickWorld(w) {
         if (free.length) { w.terr[pick(free)] = slot + 1; w.tv++; }
       }
     }
-    D.REALM_SLOTS[slot].bot.zones.forEach((zid, zi) => {
-      let take = (BOT_RATE * (zi === 0 ? 0.6 : 0.4) * dt) / 3600;
-      const ids = BY_ZONE[zid] || [];
-      for (let guard = 0; take > 0.01 && guard < 50; guard++) {
-        const key = slot + ':' + zid;
-        let id = w.botCur[key];
-        if (!id || w.nodes[id][1] || w.nodes[id][0] < 1) {
-          const alive = ids.filter(i => !w.nodes[i][1] && w.nodes[i][0] >= 1);
-          if (!alive.length) break;
-          id = w.botCur[key] = pick(alive);
-        }
-        const st = w.nodes[id], got = Math.min(st[0], take);
-        st[0] -= got; take -= got;
-        if (st[0] <= 0.5) { st[0] = 0; st[1] = t; }
-        w.nv[id] = ++w.ver;
-      }
-    });
   });
   store.touch('worlds');
 }

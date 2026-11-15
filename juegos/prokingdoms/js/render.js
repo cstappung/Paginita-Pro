@@ -561,6 +561,19 @@
         list.push({ d: x + y + 1, k: 'wall', o: { k, x, y }, spr, x: Math.round(px - spr.ox), y: Math.round(py - spr.oy) });
       }
     }
+    // L4: murallas de los demás reinos, con su material y su color (solo lo que exploraste)
+    if (PK.Def && PK.Def.ajenas) for (const sl in PK.Def.ajenas) {
+      const r = PK.Def.ajenas[sl], me1 = +sl + 1, col = Sp.ownerColor(D.ownerOfSlot(+sl));
+      const wl = (x, y) => W.inb(x, y) && W.wallOwner[W.idx(x, y)] === me1;
+      for (const k of r.tiles) {
+        if (!W.fog[k]) continue;
+        const x = k % W.W, y = (k / W.W) | 0, [px, py] = R.iso(x, y);
+        if (px < vx0 - 40 || px > vx0 + vw + 40 || py < vy0 - 50 || py > vy0 + vh + 30) continue;
+        const mask = (wl(x, y - 1) ? 1 : 0) | (wl(x + 1, y) ? 2 : 0) | (wl(x, y + 1) ? 4 : 0) | (wl(x - 1, y) ? 8 : 0);
+        const spr = Sp.wall(mask, r.tier, W.wallAj[k] === 2, col);
+        list.push({ d: x + y + 1, k: 'wall', o: { k, x, y, ajena: +sl }, spr, x: Math.round(px - spr.ox), y: Math.round(py - spr.oy) });
+      }
+    }
     // unidades (en alta definición: se dibujan achicadas y con suavizado)
     for (const u of g.units) {
       if (u.inside || (u.owner !== 'p' && !seen(u.x, u.y))) continue;

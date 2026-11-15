@@ -1703,8 +1703,7 @@
           const room = u.owner !== 'p' ? Infinity : campo ? Math.max(0, PK.Libro.capCampo(alm) - PK.Libro.totalCampo(alm)) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
           const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
           if (take <= 0) continue;
-          n.amount -= take;
-          if (online && u.owner === 'p' && W.isShared(n) && take > 0) PK.Net.harvest(n.id, take);
+          if (u.owner === 'p' || !W.isShared(n)) n.amount -= take; // L4: los simulados no gastan tus zonas comunes
           if (n.amount <= 0.5) { W.depleteNode(n); if (u.owner === 'p') depleted++; } // solo los tuyos: contaba los de los 15 reinos simulados
           if (u.owner === 'p' && take > 0) gained(t.res, campo ? PK.Libro.ponerCampo(alm, t.res, take) : G.addRes(t.res, take), n.zone, n.kind === 'deer');
         } else if (t.t === 'farm') {
