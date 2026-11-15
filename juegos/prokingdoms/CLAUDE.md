@@ -115,7 +115,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 
 ## Villagers, buildings and the map
 
-- **Buildings build themselves** (`G.updateBuildings`); placing is from Construir (key C). Two taps on touch.
+- **Buildings build themselves** (`G.updateBuildings`); placing is from Construir (key C).
+- **Touch placing** (`pk-49`, `input.js`): the ghost appears at once in the free spot nearest the middle of the
+  visible map (`areaLibre`: without topbar, panel, menu or the guide's dialog); a drag that starts on it moves it
+  (`rectFantasma`, auto-pan near the edges), elsewhere pans; tapping elsewhere moves it, tapping it builds. ✓ ✕ ⟳
+  float next to it (`#colocar`, with the reason when it is red). The panel folds while placing and reopens after.
 - **Jobs** (`A.JOBS`, `setJob`): a player order sets `task.m` and the Capataz never undoes it; `u.hold` is idle on
   purpose. Capataz moves only its own villagers (`A.rebalance`). Its timers count seconds (`el`), not calls.
 - **`u.scared` goes negative after a fright:** test `u.scared > 0`, never `!u.scared`.
@@ -189,14 +193,22 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   colour/cargo/direction/frame (~4 ms each the first time). `S.cart(col, carga, dir, cuadro, anda)`: `dir` 0..7 (45°
   steps in tile space, 0 = +x) or the old `flip` boolean (catapult, caravans). Direction comes from movement with
   hysteresis (`Sp.rumboDe(u)`, drawing only). Animals move tail and ears while parked (render passes a slow frame).
-- **Welcome guide** (`js/guia.js`, `PK.Guia`, `pk-48`): Tobías the steward walks a new kingdom through 16 steps
-  (TC → villager → gather wood → build a house → Misiones). Each step either talks or highlights ONE target (dark
+- **Welcome guide** (`js/guia.js`, `PK.Guia`, `pk-48`, longer in `pk-49`): Tobías the steward walks a new kingdom
+  through 27 steps (TC → villager → gather wood → house → lumber camp and its radius → a battle → Misiones). The
+  battle is not an expedition: `B.empezar` with id `990000001` (not in `S.exp.runs`, so no losses or loot of its
+  own), 6 militia against wolves at 30% of their strength and double life, paused until «Cargar»; it is re-armed
+  on reload. `libre` steps show no veil (watch the fight) and the dialog fades after 7 s. Placing steps put the
+  ghost on the guide's spot and, on touch, highlight it with its ✓ ✕. Missing resources for a step's building are
+  given (toast). Each step either talks or highlights ONE target (dark
   veil with a hole, gold ring, pixel hand) and waits for its `listo()`; clicks outside the hole are blocked. Targets
   are found by data attributes (`data-guia`, `data-g`, `data-mid`, `data-b`), never by text (i18n). Each step's
   `antes()` re-creates what it needs (selects the TC, opens the submenu/window) so a reload resumes at
   `flags.guia`; `'fin'` when done or skipped. Not on the sea or `?timelapse`/`?piloto`. Gift on finish: once
   (`flags.guiaRegalo`). «Hazlo por mí» appears after 8 s with no target. Repeat from Opciones. Check with real
   clicks on pc, phone and landscape before changing a step.
+- Landscape phones over 900 px wide also get the folding panel header (the `≤900px` blocks include
+  `(orientation: landscape) and (max-height: 500px)`). Landscape toasts sit bottom-right, 290 px wide, 2 lines,
+  at most 2: centred they covered the middle of the map.
 - The standalone page has `data-i18n-sin-selector`: the floating language button covered game buttons. In
   landscape (≤500 px tall) menu labels are hidden, otherwise the wide menu slid under `#acciones` and hid «Libro».
 - Fog (`fogPaint`) paints only inside the map diamond: painting outside cut buildings and trees on the edges.

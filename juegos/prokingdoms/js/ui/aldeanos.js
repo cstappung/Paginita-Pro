@@ -181,7 +181,7 @@
             if (locked || full) { UI.toast(why, 'warn'); return; }
             UI.closeModal();
             PK.Input.startPlacing(type);
-            UI.toast(UI.hint('Haz clic donde va ' + def.name + '.', 'Toca dónde va ' + def.name + ': primero verás cómo queda.'), 'info');
+            UI.toast(UI.hint('Haz clic donde va ' + def.name + '.', 'Arrastra ' + def.name + ' con el dedo hasta donde va y toca ✓.'), 'info');
           } }, el('img', { class: 'bc-img', src: Sp.buildingIcon(type), alt: '' }),
             el('div', { class: 'bc-txt' }, el('b', null, def.name), el('span', { class: 'small bc-desc' }, def.desc),
               locked ? el('span', { class: 'small muted' }, legend ? '★ Leyendas' : logro ? '★ ' + logro : 'Era ' + U.roman(def.era)) : el('span', { class: 'bc-cost' }, UI.costEl(cost), el('span', { class: 'small muted' }, ' · ' + U.fmtTime(def.time / g.buildMult('p')))),

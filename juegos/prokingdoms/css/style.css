@@ -425,7 +425,7 @@ ul.info li { margin: 2px 0; }
   .mm-legend { display: none !important; }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) {
   /* barra superior en una sola fila; lo que no cabe se ve deslizando */
   #topbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
   #topbar::-webkit-scrollbar { display: none; }
@@ -494,7 +494,7 @@ ul.info li { margin: 2px 0; }
 
   /* panel de selección: a la izquierda, ~38 % del ancho, alto completo bajo la barra */
   #panel { left: calc(4px + var(--sl)); right: auto; top: calc(var(--top-h, 32px) + 8px); bottom: calc(4px + var(--sb)); width: var(--pw); max-width: none; max-height: none; margin: 0; }
-  #panel.collapsed { bottom: auto; }
+  #panel.collapsed { bottom: auto; min-height: 0; }
   #panel .p-toggle { height: 44px; }
 
   /* minimapa chico arriba a la derecha del mapa (se oculta con el botón Minimapa) */
@@ -510,7 +510,11 @@ ul.info li { margin: 2px 0; }
   #toasts > .toast:nth-child(n+3) { display: none; } /* el más nuevo va primero (prepend) */
 
   /* avisos y evento: abajo, en el hueco entre el panel y el menú */
-  #toasts { top: auto; bottom: calc(8px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); width: auto; transform: none; flex-direction: column-reverse; }
+  /* pk-49: a la derecha, angostos y de 2 líneas, para no tapar el medio del mapa */
+  #toasts { top: auto; bottom: calc(8px + var(--sb)); left: auto; right: calc(var(--mw) + var(--sr) + 8px); width: min(290px, 34vw); transform: none; flex-direction: column-reverse; align-items: stretch; }
+  #toasts .toast:not(.act) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; }
+  #toasts .toast.act { font-size: 12px; gap: 4px 8px; }
+  #hud #toasts > .toast:nth-child(n+3) { display: none; } /* como mucho 2 (la regla general de más abajo deja 3) */
   #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(4px + var(--evh, 80px) + var(--sb)); }
   #event { top: auto; bottom: calc(4px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); transform: none; max-width: none; padding: 4px 8px; }
 
@@ -775,7 +779,7 @@ ul.info li { margin: 2px 0; }
 /* ✕ para soltar la selección en la cabecera del panel (solo donde el panel tiene cabecera: celular) */
 .p-headrow { display: contents; }
 .p-headrow .p-close { display: none !important; }
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) { /* pk-49: también horizontales de más de 900 px */
   #panel .p-headrow { display: flex; flex: none; align-items: stretch; border-bottom: 2px solid var(--edge); }
   #panel.collapsed .p-headrow { border-bottom: none; }
   #panel .p-headrow .p-toggle { flex: 1; min-width: 0; border-bottom: none; }
@@ -1267,3 +1271,20 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 @media (max-width: 600px) { #guia .gu-ret, #guia .gu-ret img { width: 56px; height: 56px; } #guia .gu-txt p { font-size: 15px; } }
 @media (orientation: landscape) and (max-height: 500px) { #guia .gu-dlg { width: min(520px, calc(100% - 140px)); padding: 6px 10px; } #guia .gu-ret, #guia .gu-ret img { width: 48px; height: 48px; } #guia .gu-txt p { font-size: 14px; margin: 1px 0; } }
 @media (prefers-reduced-motion: reduce) { #guia .gu-aro, #guia .gu-mano, #guia .gu-dlg { animation: none; } }
+
+/* pk-49: botones ✓ ✕ junto al edificio que se está colocando con el dedo */
+#colocar { position: fixed; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; max-width: 240px; pointer-events: auto; }
+#colocar .co-b { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #2a1c12; font: 700 26px/1 var(--font); color: #fff; cursor: pointer; box-shadow: 0 3px 0 #1a100a, 0 0 0 2px rgba(255, 240, 200, 0.35); text-shadow: 1px 1px 0 #000; padding: 0; display: flex; align-items: center; justify-content: center; }
+#colocar .co-ok { background: #3e9c3a; width: 56px; height: 56px; font-size: 30px; }
+#colocar .co-ok:disabled { background: #6b5a4a; color: #b8a890; cursor: default; }
+#colocar .co-no { background: #b8402e; }
+#colocar .co-gira { background: #4a6fa8; }
+#colocar .co-b:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #1a100a; }
+#colocar .co-txt { flex-basis: 100%; text-align: center; font-size: 13px; line-height: 1.2; background: rgba(28, 18, 10, 0.9); border: 2px solid var(--bad); padding: 2px 6px; color: #ffd0c8; text-shadow: 1px 1px 0 #000; }
+/* pk-49: paso «libre» de la guía (mirar la batalla): el diálogo chico, arriba y sin tapar nada más */
+#guia.gu-libre .gu-dlg { top: 56px; bottom: auto; width: min(460px, calc(100% - 24px)); padding: 6px 10px; opacity: 0.94; }
+#guia.gu-libre .gu-ret, #guia.gu-libre .gu-ret img { width: 40px; height: 40px; }
+#guia.gu-libre .gu-txt p { font-size: 14px; margin: 1px 0; }
+#guia.gu-libre .gu-pie .gu-n { display: none; }
+#guia.gu-libre .gu-dlg { transition: opacity 0.8s; }
+#guia.gu-libre .gu-dlg.gu-fuera { opacity: 0; pointer-events: none; }

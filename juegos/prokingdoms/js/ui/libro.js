@@ -93,7 +93,7 @@
         UI.isTouch() ? el('ul', { class: 'small' },
           el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un árbol, una mina o un edificio: recolectar / trabajar'),
           el('li', null, 'Para soltar lo elegido: toca el suelo vacío, vuelve a tocar al aldeano o usa la ✕ del panel'),
-          el('li', null, 'Construir: elige el edificio en el menú, toca dónde va y vuelve a tocar (o «Construir aquí») para confirmar'),
+          el('li', null, 'Construir: elige el edificio en el menú; aparece en el mapa, arrástralo con el dedo hasta donde va y toca ✓ (✕ cancela)'),
           el('li', null, 'Mantén pulsado y arrastra: seleccionar grupo · Doble toque en un aldeano: todos los de su tipo en pantalla'),
           el('li', null, 'Con el Centro Urbano elegido, toca un recurso para fijar el punto de reunión'),
           el('li', null, 'Arrastra: mover cámara · Pellizca: zoom'),

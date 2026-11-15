@@ -21,6 +21,7 @@
     o = o || {};
     const b = el('button', { class: 'btn' + (o.small ? ' small' : '') + (o.cls ? ' ' + o.cls : ''), disabled: o.disabled, title: o.title }, label);
     if (!b.textContent.trim() && (o.aria || o.title)) b.setAttribute('aria-label', o.aria || o.title);
+    if (o.guia) b.dataset.guia = o.guia; // la guía de bienvenida lo busca por acá (nunca por el texto)
     b.addEventListener('click', e => { e.stopPropagation(); if (!b.disabled) fn(e); });
     return b;
   };
@@ -693,7 +694,7 @@
       if (!m) { cancel(); return; }
       panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(m.type, 'p', m.lvl) }), el('div', null, el('h3', null, 'Mover: ' + def.name + ' · Nv ' + m.lvl),
         el('p', { class: 'small' }, UI.hint('Clic en el lugar nuevo · Clic derecho o Esc para cancelar',
-          armed ? (gh.ok ? 'Así quedaría. Toca «Mover aquí» o el mismo lugar otra vez.' : (G().placeText(G().placeWhy(m.type, gh.x, gh.y, m.id)) + ' Toca otro lugar.')) : 'Toca el lugar nuevo: primero verás cómo queda.')),
+          armed ? (gh.ok ? 'Arrástralo con el dedo (o toca otro lugar) y toca ✓ para moverlo ahí.' : (G().placeText(G().placeWhy(m.type, gh.x, gh.y, m.id)) + ' Arrástralo a otro lugar.')) : 'Toca el lugar nuevo: primero verás cómo queda.')),
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Mover aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null, UI.btn('Cancelar', cancel, { small: true })),
         el('div', { class: 'row' }, el('span', { class: 'small' }, 'Mudanza: '), UI.costEl(G().moveCost(m))),
         el('p', { class: 'small muted' }, 'Conserva el nivel, la mejora en curso, la cola y los trabajadores. Las cintas que llegaban a él se quitan.'))));
@@ -705,7 +706,7 @@
       // los botones van primero: en el celular el panel es bajo y quedaban fuera de la vista
       panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(g.placing.type) }), el('div', null, el('h3', null, 'Construir: ' + def.name),
         el('p', { class: 'small' }, UI.hint('Clic para colocarlo en tu tierra explorada · Mayús para poner varios · Clic derecho o Esc para cancelar',
-          armed ? (gh.ok ? 'Así quedaría. Toca «Construir aquí» o el mismo lugar otra vez. Para moverlo, toca otro lugar.' : (G().placeText(G().placeWhy(g.placing.type, gh.x, gh.y)) + ' Toca otro lugar.')) : 'Toca dónde va: primero verás cómo queda.')),
+          armed ? (gh.ok ? 'Arrástralo con el dedo (o toca otro lugar) y toca ✓ para construirlo ahí.' : (G().placeText(G().placeWhy(g.placing.type, gh.x, gh.y)) + ' Arrástralo a otro lugar.')) : 'Toca dónde va: primero verás cómo queda.')),
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Construir aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null,
           def.porton ? UI.btn('Girar (R)', () => PK.Input.girarPorton(), { small: true }) : null,
           UI.btn('Otro edificio', () => UI.openBuild(), { small: true }), UI.btn('Cancelar', cancel, { small: true })),
@@ -1169,7 +1170,9 @@
       arrow.textContent = open ? '▼' : '▲';
     };
     head.addEventListener('click', () => setOpen(wrap.classList.contains('collapsed')));
-    if (window.matchMedia('(max-width: 900px)').matches) UI.plegarPanel = () => setOpen(false);
+    if (window.matchMedia('(max-width: 900px), (orientation: landscape) and (max-height: 500px)').matches) UI.plegarPanel = () => setOpen(false);
+    UI.desplegarPanel = () => setOpen(true); // pk-49: al colocar con el dedo se pliega y después vuelve
+    UI.panelPlegado = () => wrap.classList.contains('collapsed');
     let lastTitle = '';
     new MutationObserver(() => {
       const h = body.querySelector('h3'), t = h ? h.textContent : 'Pro Kingdoms';

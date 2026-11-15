@@ -991,6 +991,7 @@
     requestAnimationFrame(bucle);
   };
   let onKey = null;
+  B.repintar = () => { if (vista) pintarControles(); }; // la guía pausa y suelta la pelea desde afuera
   B.cerrar = function () {
     if (!vista) return;
     const b = vista.b;
@@ -1018,11 +1019,11 @@
       const f = b.fin, lost = Object.keys(f.lost).filter(k => f.lost[k]).map(k => f.lost[k] + ' ' + D.ARMY[k].name.toLowerCase() + (f.lost[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
       v.ctl.append(el('div', { class: 'bt-fin ' + (f.gano ? 'gano' : 'perdio') }, el('b', null, f.sola ? 'Se retiran' : f.retirada ? 'Retirada' : f.gano ? '¡Victoria!' : 'Derrota'),
         el('span', null, ' Bajas: ' + lost + '. ' + (f.gano ? 'Vuelven con el botín.' : 'Los que quedan vuelven a casa.')),
-        el('div', { class: 'row' }, siguienteSala(b), btn('Volver al reino', () => B.cerrar(), { cls: siguienteSala(b) ? '' : 'gold' }))));
+        el('div', { class: 'row' }, siguienteSala(b), btn('Volver al reino', () => B.cerrar(), { cls: siguienteSala(b) ? '' : 'gold', guia: 'bt-volver' }))));
       return;
     }
     const kinds = Object.keys(b.enemigo);
-    const ord = el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Órdenes' }, Object.keys(B.ORDENES).map(k => btn(B.ORDENES[k].nombre, () => { B.ordenar(b.id, k); pintarControles(); }, { small: true, cls: b.orden === k ? 'gold' : '', title: B.ORDENES[k].desc })));
+    const ord = el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Órdenes' }, Object.keys(B.ORDENES).map(k => btn(B.ORDENES[k].nombre, () => { B.ordenar(b.id, k); pintarControles(); }, { small: true, cls: b.orden === k ? 'gold' : '', title: B.ORDENES[k].desc, guia: 'bt-' + k })));
     // C4: los enemigos con rol que siguen en pie también se pueden enfocar
     const conRol = b.suyos.filter(f => f.rol && !f.muerto);
     const foco = kinds.length > 1 || b.jefeF || conRol.length ? el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Atacar primero' }, el('span', { class: 'small' }, 'Atacar primero: '),
@@ -1046,7 +1047,7 @@
     }
     v.ctl.append(heroeRow, ord, foco, consejo,
       el('div', { class: 'row' }, btn(b.pausa ? '▶ Seguir' : '❚❚ Pausa', () => { B.pausar(b.id); pintarControles(); }, { small: true, cls: b.pausa ? 'gold' : '', title: 'Pausa táctica (barra espaciadora): las órdenes se pueden dar igual' }),
-        btn('x' + (b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1), () => { b.vel = b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1; pintarControles(); }, { small: true, title: 'Velocidad de la batalla' }),
+        btn('x' + (b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1), () => { b.vel = b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1; pintarControles(); }, { small: true, title: 'Velocidad de la batalla', guia: 'bt-vel' }),
         btn('Retirada', () => { B.retirada(b.id); }, { small: true, cls: 'danger', title: 'Pierdes la pelea, pero se salvan más soldados' }),
         btn('Volver al reino', () => B.cerrar(), { small: true, title: 'La batalla sigue aunque no la mires' })));
   }
