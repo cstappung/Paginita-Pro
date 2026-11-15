@@ -184,6 +184,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - Grouped menu (`GRUPOS`, `agrupar`); buttons keep their `MENU_VER` rule. `.job-row` has 6 grid columns.
 - **Sound:** every sound is a recording in `sfx/` with a measured gain (`GAN`); the synthesized `switch` is the
   fallback, do not delete it. Music and ambience go through `sfx.js`' master (M and the shared volume reach them).
+- **Vehicles** (`js/vehiculos.js`, `pk-46`): cart, carromato and barge are small 3D models (boxes, ellipsoids,
+  cylinders, wheels) rasterized to pixel art in 8 directions (z-buffer, 4 face tones, dark outline), cached per
+  colour/cargo/direction/frame (~4 ms each the first time). `S.cart(col, carga, dir, cuadro, anda)`: `dir` 0..7 (45°
+  steps in tile space, 0 = +x) or the old `flip` boolean (catapult, caravans). Direction comes from movement with
+  hysteresis (`Sp.rumboDe(u)`, drawing only). Animals move tail and ears while parked (render passes a slow frame).
 - **Performance** (`pk-32`, 300 villagers): the villager sprite cache is an LRU `Map` with a per-frame budget; `mine()`
   in `game.js` is cached (never mutate what it returns); one `fillStyle` per figure; while a battle is open the map is
   not drawn. Measure with `node tools/rendimiento.js`.

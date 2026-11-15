@@ -276,9 +276,10 @@
   const SWING = { axe: 1.0, pick: 0.95, hammer: 1.5, sickle: 1.25, knife: 1.4, hand: 1.1 };
   function unitSprite(u) {
     const col = Sp.ownerColor(u.owner);
-    if (u.kind === 'cart') return Sp.cart(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 8) % 4, u.mode === 'walk');
-    if (u.kind === 'barcaza') return Sp.barcaza(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 3) % 4, u.mode === 'walk');
-    if (u.kind === 'carromato') return Sp.carromato(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 6) % 4, u.mode === 'walk');
+    // vehículos: 8 direcciones según hacia dónde se mueven (Sp.rumboDe); los animales y las velas se mueven aun quietos
+    if (u.kind === 'cart') return Sp.cart(col, u.carry > 0 ? u.carryRes : null, Sp.rumboDe(u), Math.floor(u.anim * (u.mode === 'walk' ? 8 : 1.5)) % 4, u.mode === 'walk');
+    if (u.kind === 'barcaza') return Sp.barcaza(col, u.carry > 0 ? u.carryRes : null, Sp.rumboDe(u), Math.floor(u.anim * 3) % 4, u.mode === 'walk');
+    if (u.kind === 'carromato') return Sp.carromato(col, u.carry > 0 ? u.carryRes : null, Sp.rumboDe(u), Math.floor(u.anim * (u.mode === 'walk' ? 6 : 1.2)) % 4, u.mode === 'walk');
     let mode = u.mode, frame = 0, tool = null, aim = null;
     if (mode === 'walk') frame = Math.floor(u.anim * 9) % 6;
     else if (mode === 'work') {
