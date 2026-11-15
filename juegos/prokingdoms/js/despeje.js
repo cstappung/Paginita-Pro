@@ -216,7 +216,7 @@
     for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
       if (!W.inb(x, y)) continue;
       const k = W.idx(x, y);
-      if (W.wall[k] || (W.road[k] && W.bAt[k] < 0)) out.push([x, y]);
+      if (W.wall[k] || (W.road[k] && W.bAt[k] < 0) || (PK.Calzada && PK.Calzada.quitables(x, y, x, y).length)) out.push([x, y]);
     }
     return out;
   };
@@ -227,6 +227,8 @@
       if (W.wall[k]) { PK.Def.remove(k); muros++; }
       else if (W.road[k]) { PK.Logi.removeRoad(x, y); caminos++; }
     }
+    const cz = PK.Calzada ? tiles.filter(([x, y]) => PK.Calzada.quitables(x, y, x, y).length) : [];
+    if (cz.length) { PK.Calzada.quitar(cz); caminos += cz.length; } // L5: la Calzada Real (la tuya, o la de otro en tu tierra)
     if (muros || caminos) { G().blockVer++; if (PK.Sfx) PK.Sfx.play('build'); }
     return { muros, caminos };
   };

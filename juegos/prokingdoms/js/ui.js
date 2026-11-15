@@ -665,6 +665,15 @@
     }
     if (PK.Logi.tool) {
       const road = PK.Logi.tool === 'road';
+      if (PK.Logi.tool === 'calzada') {
+        const Cz = PK.Calzada;
+        panel.append(el('div', { class: 'p-help' }, el('h3', null, 'Trazar Calzada Real'),
+          el('p', { class: 'small' }, 'Una franja de piedra de 2 casillas que ven y usan todos los reinos del mundo: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5. Va en tierra de nadie o en la tuya. Toca dónde empieza y dónde termina; puedes encadenar tramos. Cada casilla cuesta '),
+          UI.costEl(D.AUTOPISTA.costo(G().state.era)),
+          el('p', { class: 'small muted' }, 'Hoy: ' + Cz.hoy() + ' de ' + Cz.tope() + ' casillas.'),
+          el('div', { class: 'row' }, UI.btn('Terminar', () => PK.Input.cancelTool(), { small: true }))));
+        return;
+      }
       panel.append(el('div', { class: 'p-help' }, el('h3', null, road ? 'Trazar camino' : 'Tender cinta transportadora'),
         el('p', { class: 'small' }, road ? 'Toca dónde empieza y dónde termina. Puedes seguir encadenando tramos. Cada casilla cuesta ' : 'Toca el edificio de origen y después el de destino: la cinta se traza sola por tu territorio. Cada casilla cuesta '),
         UI.costEl(road ? D.ROAD.cost : D.BELT.cost),
@@ -1195,6 +1204,15 @@
     else if (h.k === 'galeon') text = 'Galeón · ' + UI.hint('clic', 'toca') + ' para abrirlo';
     else if (h.k === 'wall') text = 'Muralla';
     else if (h.k === 'belt') text = 'Cinta transportadora';
+    else if (h.k === 'calzada') { // L5: el nombre lo escribió una persona: translate="no"
+      const d = PK.Calzada.dueño(W.idx(h.x, h.y));
+      if (d) {
+        hoverKey = 'cz' + d.name; tip.textContent = '';
+        tip.append(d.tuya ? 'Calzada Real de tu reino' : 'Calzada Real de ', d.tuya ? '' : el('span', { translate: 'no' }, d.name));
+        tip.style.display = 'block'; tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, x + 16) + 'px'; tip.style.top = y + 18 + 'px';
+        return;
+      }
+    }
     // Sin texto (parcelas, barcos…) no hay cartel: antes salía un recuadro vacío que además quedaba pegado.
     if (!text) { hoverKey = ''; UI.hideTip(); return; }
     hoverKey = text;

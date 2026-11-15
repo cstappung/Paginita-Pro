@@ -157,7 +157,8 @@
         el('div', null, el('b', null, 'Cintas: '), st.logi.belts.length)));
       body.append(el('div', { class: 'row' },
         UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
-        UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos (y murallas); vuelve la mitad del material' }),
+        g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Logi.tool = 'calzada'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
+        UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos, murallas y Calzada Real (la tuya, o la de otro en tu tierra); vuelve la mitad del material' }),
         UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
 
       // ----- Rutas -----

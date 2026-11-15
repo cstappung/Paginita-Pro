@@ -459,6 +459,7 @@
     if (W.costa && g.enMar()) costaMarea(ctx, chunks, tsec);
     // caminos y cintas (planos, sobre el suelo)
     drawRoads(ctx, chunks);
+    if (PK.Calzada) PK.Calzada.dibujar(ctx, chunks); // L5
     drawBelts(ctx, vis);
     drawRuta(ctx);
     botes(ctx, vis, g);

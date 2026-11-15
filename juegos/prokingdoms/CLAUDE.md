@@ -309,3 +309,22 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   through**: `pathTo` sets `W.pasoDe` around `findPath`; carts and carromatos never (`L.pasa`). Foreign Gran Portones
   travel as buildings (no `gp` field). Your own walls stay in `W.wall`; `compute`, `Def.allowed` and quitar ignore
   foreign ones. The wall cap also applies when you build (`Def.build`, `Def.gate`).
+- Pace after L4 (`?timelapse`, 568 min): Era II 10.5, III 31, IV 104, **V 307 min** (inside the 4–6 h target again).
+
+### L5, the Calzada Real (`pk-47`, `D.PROTO` 10, needs `firebase deploy --only functions`)
+
+- **Layer `W.autopista`** (owner slot + 1 per tile, `W.apVer`), drawn by `PK.Calzada.dibujar` after the roads
+  (`Sp.calzada`: slabs, curb where it ends, a milestone with the owner's colour every 8 tiles on the edge). In the
+  cost tables (`L.factor`): carromato `D.CARROMATO.highway` 3.2, carreta ≥ `D.AUTOPISTA.carreta` 2.2, walkers ≥ 1.5.
+- **One rule, both sides:** `W.calzadaPuede(k, slot, terr)` (world.js, pure): not water, common zones, foreign land or
+  a place/resource at its `W.ubicarLugares` position (`.ocupa`, non-enumerable). Buildings are checked only by the
+  client (`Cz.libre`). Trees and bushes under it are hidden per client (`n.calzada`) and come back when it goes.
+- **Server:** doc `autopistas/<world>` = `{ v, t: { tile: slot + 1 } }`; `POST /api/autopista { add, del }` (both
+  `server/index.js` and `functions/index.js`) trims to the rule, `D.AUTOPISTA.porDia(era)` (60 × era per UTC day,
+  `p.apDia`) and `totalMundo` (6000), logs `autopista`; the sync sends the whole layer only when `apv` differs. Remove:
+  yours always, someone else's only inside your territory. The client pays first and gets back what was trimmed.
+- **Local mode:** only yours, in the save (`st.calzada.t`, daily count `st.calzada.dia`).
+- Tool «Trazar Calzada Real» in Logística (`L.tool = 'calzada'`, two taps, 2×2 brush along the stepped plan,
+  `Cz.plan`); «Quitar caminos» also removes it. Hover: «Calzada Real de <name>» with the name `translate="no"`.
+- The autopilot does not build it yet (its routes are short); measure if that changes.
+

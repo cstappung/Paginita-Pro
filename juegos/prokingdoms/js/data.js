@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 9;
+  D.PROTO = 10;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -674,6 +674,10 @@
   D.CART = { cost: { wood: 80, gold: 10 }, time: 20, speed: 1.3, offRoad: 0.65, cap: 20 };
   // pk-43: el carromato. Más lento que la carreta fuera del camino, pero carga diez veces más y sale de tu tierra.
   // road: en camino; highway: en autopista (L5); ajeno: la tierra de otro reino sin muralla cuesta ×4 (decisión 5).
+  // L5 (pk-47): la Calzada Real (en el código, autopista). Franja de piedra de 2 casillas que trazan los jugadores en
+  // tierra de nadie o en su territorio y que ven todos los del mundo. El servidor la valida con world.js
+  // (W.calzadaPuede) y con estos topes: casillas por día UTC y por jugador, y un total por mundo.
+  D.AUTOPISTA = { nombre: 'Calzada Real', costo: era => (era >= 3 ? { blocks: 4 } : { stone: 10, wood: 2 }), porDia: era => 60 * era, totalMundo: 6000, carreta: 2.2, aldeano: 1.5, lote: 400 };
   D.CARROMATO = { cost: { wood: 150, gold: 10 }, time: 45, speed: 1.6, offRoad: 0.7, road: 1.5, highway: 3.2, ajeno: 4, cap: 250, capLvl: 50 };
   D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
   // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.

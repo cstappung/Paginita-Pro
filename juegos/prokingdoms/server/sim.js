@@ -390,8 +390,9 @@ function sync(p, b) {
   });
   ensureTerr(w);
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
+  const cz = calzadas(w), autopistas = !p.mar && +b.apv !== cz.v ? { v: cz.v, t: cz.t } : undefined; // L5
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
-  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
+  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, autopistas, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -426,6 +427,37 @@ function tickWorld(w) {
     }
   });
   store.touch('worlds');
+}
+
+// ---------- Calzada Real (L5, pk-47) ----------
+// Un documento por mundo: { v, t: { casilla: reino + 1 } }. Se agrega y quita con POST /api/autopista; cada sync
+// trae el mapa entero solo cuando cambió su versión (apv). Lo inválido (tierra ajena, agua, zonas comunes, lugares,
+// sobre el tope del día o del mundo) se recorta y se anota.
+function calzadas(w) { return store.get('autopistas', w.id) || store.set('autopistas', w.id, { v: 1, t: {} }); }
+function autopista(p, b) {
+  if (p.mar) throw new GameError('La Calzada Real es de la tierra.');
+  const w = world(p), doc = calzadas(w), t = now(), dia = Math.floor(t / 864e5), me1 = p.slot + 1, A = D.AUTOPISTA;
+  ensureTerr(w);
+  if (!p.apDia || p.apDia.d !== dia) p.apDia = { d: dia, n: 0 };
+  const tope = A.porDia(vEra(p)), lista = x => (Array.isArray(x) ? x.slice(0, A.lote).map(k => Math.floor(+k)) : []);
+  let total = Object.keys(doc.t).length, malas = 0, topadas = 0;
+  const aceptadas = [], quitadas = [];
+  for (const k of lista(b.add)) {
+    if (doc.t[k]) continue;
+    if (!W.calzadaPuede(k, p.slot, w.terr)) { malas++; continue; }
+    if (p.apDia.n >= tope || total >= A.totalMundo) { topadas++; continue; }
+    doc.t[k] = me1; p.apDia.n++; total++; aceptadas.push(k);
+  }
+  for (const k of lista(b.del)) {
+    const o = doc.t[k];
+    if (!o) continue;
+    if (o !== me1 && w.terr[W.parcel(k % D.MAP, Math.floor(k / D.MAP))] !== me1) { malas++; continue; } // la de otro, solo en tu tierra
+    delete doc.t[k]; quitadas.push(k);
+  }
+  if (malas) suspect(p, 'autopista', { malas, aceptadas: aceptadas.length });
+  if (aceptadas.length || quitadas.length) { doc.v++; store.touch('autopistas'); }
+  store.touch('players');
+  return { ok: true, aceptadas, quitadas, topadas, hoy: p.apDia.n, tope, autopistas: { v: doc.v, t: doc.t } };
 }
 
 // ---------- Mercado global ----------
@@ -1764,5 +1796,5 @@ module.exports = {
   paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos,
   diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
   caravana, tickCaravanas, guildBoss, tickJefes, visita, visitaLike, visitaRegalo, tickTitulos,
-  regata, regataInfo: p => regataInfo(p), tickRegata, flotaMar, duelosInfo: p => duelosInfo(p), duelo,
+  regata, regataInfo: p => regataInfo(p), tickRegata, flotaMar, duelosInfo: p => duelosInfo(p), duelo, autopista,
 };

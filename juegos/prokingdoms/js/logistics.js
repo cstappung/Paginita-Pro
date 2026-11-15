@@ -259,20 +259,21 @@
   const rk = () => (G().bono ? G().bono('road') : 0); // Caminos empedrados, Caravaneros (árbol 2.0)
   L.PERFIL_DE = { cart: 'carreta', carromato: 'carromato', barcaza: 'barcaza' };
   L.factor = function (perfil, k) {
-    const road = W.road[k] === 1;
-    if (perfil === 'carreta') return road ? 1 + (D.ROAD.cart - 1) * (1 + rk()) : D.CART.offRoad;
+    const road = W.road[k] === 1, cz = W.autopista[k] > 0; // L5: la Calzada Real
+    if (perfil === 'carreta') return cz ? Math.max(D.AUTOPISTA.carreta, 1 + (D.ROAD.cart - 1) * (1 + rk())) : road ? 1 + (D.ROAD.cart - 1) * (1 + rk()) : D.CART.offRoad;
     if (perfil === 'barcaza') return 1; // el viento y la tormenta van aparte (L.marMult): cambian con la hora
     if (perfil === 'carromato') {
-      const C = D.CARROMATO, f = W.auto && W.auto[k] ? C.highway : road ? 1 + (C.road - 1) * (1 + rk()) : C.offRoad;
+      const C = D.CARROMATO, f = cz ? C.highway : road ? 1 + (C.road - 1) * (1 + rk()) : C.offRoad;
       const o = W.ownerAt(k % W.W, (k / W.W) | 0);
       return o && o !== 'p' ? f / C.ajeno : f; // tierra ajena sin muralla: se cruza, pero cuesta ×4 (decisión 5)
     }
-    return road ? 1 + (D.ROAD.walk - 1) * (1 + rk()) : 1;
+    return cz ? Math.max(D.AUTOPISTA.aldeano, 1 + (D.ROAD.walk - 1) * (1 + rk())) : road ? 1 + (D.ROAD.walk - 1) * (1 + rk()) : 1;
   };
   L.factorUnidad = function (u) {
     const p = L.PERFIL_DE[u.kind], k = W.idx(Math.floor(u.x), Math.floor(u.y));
     if (p) return L.factor(p, k);
     const road = W.road[k] === 1, r = road && u.owner === 'p' ? rk() : 0;
+    if (W.autopista[k]) return Math.max(D.AUTOPISTA.aldeano, road ? 1 + (D.ROAD.walk - 1) * (1 + r) : 1); // L5
     return road ? 1 + (D.ROAD.walk - 1) * (1 + r) : 1;
   };
   // ¿Por dónde puede pasar? La carreta, por lo libre de tu territorio (las puertas de tu muralla también).

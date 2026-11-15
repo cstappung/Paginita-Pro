@@ -62,6 +62,26 @@ async function main() {
       check(otra && otra.muros === undefined, 'si ya las tiene, no vuelven a viajar');
     }
 
+    console.log('\nCalzada Real (L5)');
+    {
+      const terr = r.data.terr, MAP = 256, PAR = 8, PW = MAP / PAR, hs = hj.world.slot, cs = cj.world.slot;
+      const dueño = k => terr[Math.floor(Math.floor(k / MAP) / PAR) * PW + Math.floor((k % MAP) / PAR)];
+      // casillas de la honesta (su tierra) y de la tramposa
+      const deH = [], deC = [];
+      for (let k = 0; k < MAP * MAP && (deH.length < 200 || deC.length < 50); k++) { if (dueño(k) === hs + 1 && deH.length < 200) deH.push(k); else if (dueño(k) === cs + 1 && deC.length < 50) deC.push(k); }
+      let a = await api('POST', '/api/autopista', { add: deC.concat(deH.slice(0, 20)) }, cheat.token);
+      check(a.status === 200 && a.data.aceptadas.every(k => dueño(k) === cs + 1) && a.data.aceptadas.length > 0, 'en tierra ajena se rechaza; en la suya se acepta', a.data.aceptadas && a.data.aceptadas.length + ' de ' + (deC.length + 20));
+      a = await api('POST', '/api/autopista', { add: deH }, honest.token);
+      check(a.status === 200 && a.data.aceptadas.length <= 60, 'sobre el tope del día (60 × era) no se acepta más', a.data.aceptadas.length + ' de ' + deH.length + ', tope ' + a.data.tope);
+      const s2 = (await api('POST', '/api/sync', { snap: snap(), apv: 0 }, cheat.token)).data;
+      check(s2.autopistas && Object.keys(s2.autopistas.t).length === a.data.aceptadas.length + Object.keys(s2.autopistas.t).filter(k => dueño(+k) === cs + 1).length, 'el otro jugador la ve en su sync');
+      const s3 = (await api('POST', '/api/sync', { snap: snap(), apv: s2.autopistas.v }, cheat.token)).data;
+      check(s3.autopistas === undefined, 'si ya tiene la versión, no vuelve a viajar');
+      const suya = a.data.aceptadas[0];
+      a = await api('POST', '/api/autopista', { del: [suya] }, cheat.token);
+      check(a.data.quitadas.length === 0, 'la de otro solo se quita en tu territorio');
+    }
+
     console.log('\nFoto del reino');
     await api('POST', '/api/sync', { snap: snap({ era: 60, pop: 1e6, army: 1e12, defense: 1e12, score: 1e9, total: 1e12, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }) }, cheat.token);
     let view = (await api('POST', '/api/sync', { snap: snap() }, honest.token)).data.players.find(o => o.id === cheat.id);
@@ -167,7 +187,7 @@ async function main() {
     await wait(300);
     const log = fs.existsSync(path.join(DATA, 'sospechas.log')) ? fs.readFileSync(path.join(DATA, 'sospechas.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
     const kinds = [...new Set(log.map(e => e.kind))];
-    check(['foto', 'murallas', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
+    check(['foto', 'murallas', 'autopista', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
     check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro');
   } finally {
     srv.kill();

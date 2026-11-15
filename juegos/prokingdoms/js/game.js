@@ -52,6 +52,7 @@
     PK.Logi.init(S);
     PK.Def.init(S);
     if (PK.Despeje) PK.Despeje.init(S); // pk-40: en tus tierras solo quedan árboles (después del territorio y los edificios)
+    if (PK.Calzada) PK.Calzada.init(S); // L5: la Calzada Real (después del despeje: tapa los árboles que tiene debajo)
     PK.Exp.init(S);
     PK.Incursiones.init(S);
     PK.Auto.init(S);

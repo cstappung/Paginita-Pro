@@ -27,6 +27,8 @@
     W.wall = new Uint8Array(N);              // 1 = muralla, 2 = puerta
     W.wallOwner = new Uint8Array(N);         // L4: muralla o puerta de otro reino (casilla del reino + 1)
     W.wallAj = new Uint8Array(N);            // L4: 1 = muralla ajena, 2 = puerta ajena
+    W.autopista = new Uint8Array(N);         // L5: Calzada Real (casilla del reino que la hizo + 1)
+    W.apVer = 0;
     W.roadVer = 0;
     W.fog = new Uint8Array(N);        // 1 = explorado por ti
     W.fogCount = 0;
@@ -940,8 +942,23 @@
       out.n[id] = to;
       ocup[W.idx(to[0], to[1])] = 1;
     }
+    // las casillas que quedan ocupadas por lugares y recursos que no son árboles (para la Calzada, L5)
+    const ocupa = new Uint8Array(N);
+    for (let id = 0; id < pOrig; id++) { const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = 1; }
+    for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = 1; }
+    Object.defineProperty(out, 'ocupa', { value: ocupa, enumerable: false }); // fuera del JSON (la prueba compara posiciones)
     ubCache = { key, r: out };
     return out;
+  };
+  // L5: ¿puede ir una casilla de Calzada Real ahí, para ese reino? Pura (datos fijos, territorio y W.ubicarLugares):
+  // la misma respuesta en el cliente y en el servidor. Los edificios los mira solo el cliente (L.calzadaLibre).
+  W.calzadaPuede = function (k, slot, terr) {
+    terr = terr || W.terr;
+    if (!(k >= 0 && k < W.W * W.H) || W.tema === 'mar' || !W.ORIG) return false;
+    const x = k % W.W, y = (k / W.W) | 0, pc = W.parcel(x, y);
+    if (W.terrain[k] === 4 || W.terrCommon[pc] || (W.zoneAt[k] >= 0 && W.zones[W.zoneAt[k]].common)) return false;
+    if (terr[pc] && terr[pc] !== slot + 1) return false; // no en tierra ajena
+    return !W.ubicarLugares(terr).ocupa[k];
   };
   W.countParcels = slot => { let n = 0; for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === slot + 1) n++; return n; };
   W.saveTerr = () => Array.from(W.terr).join(',');

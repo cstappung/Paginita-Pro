@@ -81,6 +81,8 @@
     });
   }
 
+  // L5: agregar o quitar casillas de Calzada Real (el servidor valida, recorta y devuelve la capa entera)
+  Net.autopista = (add, del) => api('POST', '/api/autopista', { add, del }, 8000);
   Net.marketOp = function (op) { if (Net.online) marketOps.push(op); };
 
   // ---------- Foto del reino ----------
@@ -140,7 +142,7 @@
       // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
       const mar = PK.Game.enMar && PK.Game.enMar();
       const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
-        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, apv: PK.Calzada ? PK.Calzada.version : 0, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
@@ -151,6 +153,7 @@
       if (!mar) {
         since = r.ver;
         if (r.terr) applyTerr(r.terr);
+        if (PK.Calzada) PK.Calzada.desdeSync(r); // L5: solo llega cuando cambió (apv)
         tv = r.tv || 0;
         applyPlayers(r.players || []);
       }

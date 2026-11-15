@@ -123,7 +123,7 @@
     I.mouse.on = e.target === r.cv; // para recalcular el cartel en I.update
     if (e.target === r.cv) {
       const it = r.pick(e.clientX, e.clientY);
-      r.hover = it && it.k !== 'tile' ? it : null;
+      r.hover = it && it.k !== 'tile' ? it : it && !it.fog && W.inb(it.x, it.y) && W.autopista[W.idx(it.x, it.y)] ? { k: 'calzada', x: it.x, y: it.y } : null; // L5: «Calzada de …»
       PK.UI.hoverInfo(r.hover, e.clientX, e.clientY);
       r.cv.style.cursor = cursorFor(r.hover);
     } else { r.hover = null; PK.UI.hoverInfo(null); }
@@ -212,9 +212,9 @@
     const r = R(), L = PK.Logi;
     r.roadGhost = null; r.beltGhost = null;
     if (PK.Def.tool) { const [tx, ty] = r.screenToTile(sx, sy); PK.Def.ghost(Math.floor(tx), Math.floor(ty)); return; }
-    if (L.tool === 'road' && I.roadStart) {
+    if ((L.tool === 'road' || L.tool === 'calzada') && I.roadStart) {
       const [tx, ty] = r.screenToTile(sx, sy);
-      r.roadGhost = L.roadPlan(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
+      r.roadGhost = (L.tool === 'calzada' ? PK.Calzada.plan : L.roadPlan)(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
     } else if (L.tool === 'belt' && L.beltFrom) {
       const it = r.pick(sx, sy), a = G().bById.get(L.beltFrom);
       if (a && it && it.k === 'building' && it.o.owner === 'p' && it.o !== a) r.beltGhost = L.beltPlan(a, it.o);
@@ -253,6 +253,18 @@
       const n = L.buildRoad(L.roadPlan(I.roadStart[0], I.roadStart[1], x, y));
       if (n) { PK.UI.toast('Camino de ' + n + ' casillas.', 'good'); I.roadStart = [x, y]; }
       r.roadGhost = null;
+      return;
+    }
+    if (L.tool === 'calzada') { // L5: dos toques, como el camino; se pueden encadenar tramos
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Cz = PK.Calzada;
+      if (!W.inb(x, y)) return;
+      if (!I.roadStart) {
+        if (!Cz.libre(x, y)) { PK.UI.toast('Ahí no va la Calzada Real: tierra de nadie o tuya, explorada, sin agua, zonas comunes, lugares ni edificios.', 'warn'); return; }
+        I.roadStart = [x, y]; PK.UI.toast('Toca dónde termina el tramo.', 'info'); return;
+      }
+      const tiles = Cz.plan(I.roadStart[0], I.roadStart[1], x, y);
+      I.roadStart = [x, y]; r.roadGhost = null;
+      Cz.construir(tiles).then(n => { if (n) PK.UI.toast('Calzada Real: ' + n + ' casillas (hoy ' + Cz.hoy() + ' de ' + Cz.tope() + ').', 'good'); PK.UI.refreshPanel(true); });
       return;
     }
     if (L.tool === 'belt') {
@@ -476,7 +488,7 @@
     if (I.mouse.on && I.mouse.in && (cm !== hovCam || hovT >= 0.25)) {
       hovT = 0; hovCam = cm;
       const it = r.pick(I.mouse.x, I.mouse.y);
-      r.hover = it && it.k !== 'tile' ? it : null;
+      r.hover = it && it.k !== 'tile' ? it : it && !it.fog && W.inb(it.x, it.y) && W.autopista[W.idx(it.x, it.y)] ? { k: 'calzada', x: it.x, y: it.y } : null; // L5: «Calzada de …»
       PK.UI.hoverInfo(r.hover, I.mouse.x, I.mouse.y);
     }
   };

@@ -1118,3 +1118,36 @@ test('L4 (pk-45): el despeje es global, puro y a 12 casillas de todo territorio'
   assert.doesNotMatch(JS('net.js'), /harvest|applyNodes|serverNodes/);
   assert.doesNotMatch(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /checkHarvest|COMMON\[/);
 });
+
+test('L5 (pk-47): la Calzada Real va en tierra de nadie o en la tuya, nunca en agua, zonas comunes, tierra ajena ni lugares', () => {
+  const me = 0, otro = W.terr.find(v => v && v !== me + 1) - 1; // en la prueba D.MY_SLOT es -1: un reino cualquiera
+  let mia = -1, ajena = -1, agua = -1, comun = -1, nadie = -1, lugar = -1;
+  const ub = W.ubicarLugares();
+  for (let k = 0; k < W.W * W.H; k++) {
+    const x = k % W.W, y = (k / W.W) | 0, o = W.terr[W.parcel(x, y)];
+    if (W.terrain[k] === 4) { if (agua < 0) agua = k; continue; }
+    if (W.terrCommon[W.parcel(x, y)]) { if (comun < 0) comun = k; continue; }
+    if (ub.ocupa[k]) { if (lugar < 0 && !o) lugar = k; continue; }
+    if (o === me + 1 && mia < 0 && W.zoneAt[k] < 0) mia = k;
+    else if (o === otro + 1 && ajena < 0) ajena = k;
+    else if (!o && nadie < 0 && W.zoneAt[k] < 0) nadie = k;
+  }
+  assert.ok(W.calzadaPuede(mia, me), 'en tu tierra');
+  assert.ok(W.calzadaPuede(nadie, me), 'en tierra de nadie');
+  assert.ok(!W.calzadaPuede(ajena, me), 'no en la de otro');
+  assert.ok(W.calzadaPuede(ajena, otro), 'su dueño sí');
+  assert.ok(!W.calzadaPuede(agua, me) && !W.calzadaPuede(comun, me) && !W.calzadaPuede(lugar, me));
+  assert.ok(!W.calzadaPuede(-1, me) && !W.calzadaPuede(W.W * W.H, me));
+  // la velocidad: la calzada es el mejor terreno de cada perfil
+  const L = PK.Logi, a0 = W.autopista[nadie];
+  W.autopista[nadie] = me + 1;
+  try {
+    assert.equal(L.factor('carromato', nadie), D.CARROMATO.highway);
+    assert.ok(L.factor('carreta', nadie) >= D.AUTOPISTA.carreta);
+    assert.ok(L.factor('aldeano', nadie) >= D.AUTOPISTA.aldeano);
+  } finally { W.autopista[nadie] = a0; }
+  assert.ok(D.AUTOPISTA.costo(3).blocks === 4 && D.AUTOPISTA.costo(1).stone === 10 && D.AUTOPISTA.porDia(2) === 120);
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
+  assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr\)/, 'el servidor usa la misma regla');
+  for (const f of ['server/index.js', '../../functions/index.js']) assert.match(fs.readFileSync(path.join(PKDIR, f), 'utf8'), /'POST \/api\/autopista'/, f);
+});
