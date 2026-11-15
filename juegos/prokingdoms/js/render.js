@@ -241,9 +241,11 @@
       for (let mx = 0; mx < w; mx++) {
         const a = ((px0 + mx) * 4 - W.H * 16) / 16, tx = Math.floor((a + b) / 2), ty = Math.floor((b - a) / 2);
         const inside = tx >= 0 && ty >= 0 && tx < W.W && ty < W.H;
-        if (inside && W.fog[ty * W.W + tx]) continue;
+        // afuera del mapa no hay suelo (se ve el fondo oscuro): sin niebla, así lo alto de un edificio o un árbol de la
+        // orilla no queda cortado en línea recta (pedido del dueño)
+        if (!inside || W.fog[ty * W.W + tx]) continue;
         const i = (my * w + mx) * 4, hh = U.hash((px0 + mx) >> 2, (py0 + my) >> 2, 5);
-        d[i] = 16 + hh * 8; d[i + 1] = 14 + hh * 6; d[i + 2] = 10 + hh * 4; d[i + 3] = inside ? 238 : 255;
+        d[i] = 16 + hh * 8; d[i + 1] = 14 + hh * 6; d[i + 2] = 10 + hh * 4; d[i + 3] = 238;
       }
     }
     fogCtx.putImageData(im, px0, py0);

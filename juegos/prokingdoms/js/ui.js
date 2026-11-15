@@ -939,7 +939,7 @@
     if (b.type === 'tc') {
       const st = S();
       act.append(el('div', { class: 'row' },
-        UI.btn(el('span', null, 'Aldeano ', UI.costEl(D.VILLAGER.cost)), e => { G().train(b, e.shiftKey ? 5 : 1); UI.refreshPanel(true); }, { title: 'Mayús+clic: 5' }),
+        (bt => { bt.dataset.guia = 'aldeano'; return bt; })(UI.btn(el('span', null, 'Aldeano ', UI.costEl(D.VILLAGER.cost)), e => { G().train(b, e.shiftKey ? 5 : 1); UI.refreshPanel(true); }, { title: 'Mayús+clic: 5' })), // la guía lo señala
         UI.btn('+5', () => { G().train(b, 5); UI.refreshPanel(true); }, { small: true }),
         b.queue.length ? UI.btn('Quitar de la cola', () => { G().cancelTrain(b); UI.refreshPanel(true); }, { small: true }) : null,
         el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: st.auto.train, onchange: e => { st.auto.train = e.target.checked; } }), ' Entrenar sin parar')));

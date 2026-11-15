@@ -65,6 +65,7 @@
         el('div', { class: 'row' }, UI.btn(PK.Sfx.on ? 'Silenciar (M)' : 'Activar sonido (M)', () => { PK.Sfx.toggle(); UI.rerender(); }, { small: true })),
         PK.Musica ? deslizador('Música', PK.Musica.vol(), v => PK.Musica.setVol(v), 'Cambia con la era, de noche y en batalla. M la calla junto con los efectos.') : '',
         PK.Musica ? deslizador('Ambiente', PK.Musica.volAmb(), v => PK.Musica.setVolAmb(v), 'Pájaros, grillos, viento, olas y martillos de las obras.') : '',
+        PK.Guia && PK.Guia.puede() ? el('div', { class: 'row' }, UI.btn('Ver la guía de Tobías otra vez', () => PK.Guia.repetir(), { small: true, title: 'La guía de los primeros pasos, con el mayordomo que señala dónde tocar' })) : '',
         el('h3', null, 'Accesibilidad'),
         (() => { const a = UI.acceso(); return el('div', null,
           el('div', { class: 'row' }, el('b', null, 'Texto: '), [['Normal', 0], ['Grande', 1], ['Muy grande', 2]].map(([n, v]) => UI.btn(n, () => { UI.setAcceso('texto', v); UI.rerender(); }, { small: true, cls: a.texto === v ? 'gold' : '' }))),

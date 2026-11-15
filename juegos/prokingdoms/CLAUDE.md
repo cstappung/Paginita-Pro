@@ -189,6 +189,17 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   colour/cargo/direction/frame (~4 ms each the first time). `S.cart(col, carga, dir, cuadro, anda)`: `dir` 0..7 (45°
   steps in tile space, 0 = +x) or the old `flip` boolean (catapult, caravans). Direction comes from movement with
   hysteresis (`Sp.rumboDe(u)`, drawing only). Animals move tail and ears while parked (render passes a slow frame).
+- **Welcome guide** (`js/guia.js`, `PK.Guia`, `pk-48`): Tobías the steward walks a new kingdom through 16 steps
+  (TC → villager → gather wood → build a house → Misiones). Each step either talks or highlights ONE target (dark
+  veil with a hole, gold ring, pixel hand) and waits for its `listo()`; clicks outside the hole are blocked. Targets
+  are found by data attributes (`data-guia`, `data-g`, `data-mid`, `data-b`), never by text (i18n). Each step's
+  `antes()` re-creates what it needs (selects the TC, opens the submenu/window) so a reload resumes at
+  `flags.guia`; `'fin'` when done or skipped. Not on the sea or `?timelapse`/`?piloto`. Gift on finish: once
+  (`flags.guiaRegalo`). «Hazlo por mí» appears after 8 s with no target. Repeat from Opciones. Check with real
+  clicks on pc, phone and landscape before changing a step.
+- The standalone page has `data-i18n-sin-selector`: the floating language button covered game buttons. In
+  landscape (≤500 px tall) menu labels are hidden, otherwise the wide menu slid under `#acciones` and hid «Libro».
+- Fog (`fogPaint`) paints only inside the map diamond: painting outside cut buildings and trees on the edges.
 - **Performance** (`pk-32`, 300 villagers): the villager sprite cache is an LRU `Map` with a per-frame budget; `mine()`
   in `game.js` is cached (never mutate what it returns); one `fillStyle` per figure; while a battle is open the map is
   not drawn. Measure with `node tools/rendimiento.js`.

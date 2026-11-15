@@ -177,7 +177,7 @@
           const cost = g.buildCost(type), afford = g.canAfford(cost), logro = g.logroFalta(type), locked = legend || eraLock || !!logro;
           const otra = def.marav && full && g.maravilla() && g.maravilla().type !== type;
           const why = legend ? 'Se desbloquea con una misión de la rama Leyendas del Libro.' : eraLock ? 'Requiere la Era ' + U.roman(def.era) + '.' : logro ? logro : otra ? 'Ya elegiste la ' + g.maravilla().def.name + ': solo hay una Maravilla por reino.' : full ? 'Ya tienes el máximo' + (typeof def.max === 'function' ? ' para tu era' : '') + ' (' + have + '/' + max + ').' : !afford ? 'Te faltan recursos.' : '';
-          grid.append(el('button', { class: 'bcard' + (locked ? ' locked' : full ? ' full' : !afford ? ' poor' : ''), title: def.desc, onclick: () => {
+          grid.append(el('button', { class: 'bcard' + (locked ? ' locked' : full ? ' full' : !afford ? ' poor' : ''), 'data-b': type, title: def.desc, onclick: () => {
             if (locked || full) { UI.toast(why, 'warn'); return; }
             UI.closeModal();
             PK.Input.startPlacing(type);

@@ -1086,6 +1086,9 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .mar-piezas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .mar-pieza { border: 2px dashed #8a6a44; padding: 4px 8px; display: flex; flex-direction: column; }
 .mar-pieza.ok { border-style: solid; border-color: #3a7a24; background: rgba(60, 140, 40, 0.12); }
+/* en horizontal el panel ocupa toda la izquierda y los avisos van abajo: el cartel va bajo el minimapa, a la derecha
+   (abajo a la izquierda tapaba el panel del edificio) */
+@media (orientation: landscape) and (max-height: 500px) { #mar-cartel { left: auto; right: calc(var(--mw) + var(--sr) + 4px); bottom: auto; top: calc(var(--top-h, 32px) + 84px); font-size: 12px; } #mar-cartel .small { display: none; } #hud.mm-off #mar-cartel { top: calc(var(--top-h, 32px) + 8px); } }
 @media (max-width: 600px) { #mar-cartel { bottom: calc(var(--ph, 40vh) + 6px + var(--sab, 0px)); font-size: 12px; max-width: calc(100% - 120px); } #mar-cartel .small { display: none; } }
 
 /* ---- U1 y U4 (Fase 6, pk-26): menú agrupado en cinco submenús; en el celular vertical, barra de abajo ---- */
@@ -1132,6 +1135,10 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
   #menu.more-below::after { display: none; }
   #acciones { right: calc(52px + var(--sr)); top: calc(var(--top-h, 32px) + 8px); bottom: auto; gap: 4px; }
   #acciones .mbtn { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 2px; }
+  /* solo el ícono: con 915 px no entra la regla de ≤ 900 que oculta las etiquetas, y el texto ensanchaba los botones
+     del menú por debajo de la columna de acciones (tapaba «Libro»; lo encontró la guía de Tobías) */
+  #menu .mbtn > span:not(.badge), #acciones .mbtn > span:not(.badge) { display: none; }
+  #menu .mbtn, #acciones .mbtn { justify-content: center; padding: 2px; }
   #submenu { max-height: calc(100vh - 16px); }
   #submenu .mbtn { min-height: 38px; padding: 3px 10px 3px 6px; font-size: 14px; }
 }
@@ -1232,3 +1239,31 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 .stock-rows { display: flex; flex-direction: column; gap: 2px; }
 .stock-row { display: grid; grid-template-columns: 20px 90px 1fr; align-items: center; gap: 6px; }
 .ruta-row.carro { border-left-color: #b8863a; }
+
+/* ---------- Guía de bienvenida (js/guia.js): velo con hueco, aro dorado, mano y el diálogo de Tobías ---------- */
+#guia { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+#guia .gu-velo { position: fixed; background: rgba(8, 6, 3, 0.66); pointer-events: auto; }
+#guia .gu-aro { position: fixed; pointer-events: none; border: 3px solid #ffd45a; border-radius: 6px; box-shadow: 0 0 0 2px #3a2410, 0 0 18px 4px rgba(255, 212, 90, 0.7); animation: gu-pulso 1.1s ease-in-out infinite; }
+#guia.gu-mira .gu-aro { pointer-events: auto; animation: none; box-shadow: 0 0 0 2px #3a2410, 0 0 12px 2px rgba(255, 212, 90, 0.45); }
+#guia .gu-aro.gu-late { animation: gu-late 0.35s ease-out 2; }
+#guia .gu-mano { position: fixed; width: 36px; height: 42px; image-rendering: pixelated; pointer-events: none; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5)); animation: gu-toca 0.9s ease-in-out infinite; }
+#guia .gu-dlg { position: fixed; left: 50%; bottom: calc(14px + var(--sab, 0px)); transform: translateX(-50%); width: min(560px, calc(100% - 24px)); pointer-events: auto;
+  background: linear-gradient(#f4e2bb, #e6cd98); color: #3a2410; border: 3px solid #4a2c12; box-shadow: inset 0 0 0 2px #fff3cf, 0 6px 18px rgba(0, 0, 0, 0.55); padding: 10px 12px 8px; animation: gu-entra 0.25s ease-out; }
+#guia .gu-dlg.gu-arriba { bottom: auto; top: calc(var(--top-h, 56px) + 10px); }
+#guia .gu-cuerpo { display: flex; gap: 10px; align-items: flex-start; }
+#guia .gu-ret { flex: none; width: 72px; height: 72px; background: #3a2410; border: 2px solid #2a1808; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#guia .gu-ret img { width: 72px; height: 72px; image-rendering: pixelated; }
+#guia .gu-txt { flex: 1; min-width: 0; }
+#guia .gu-txt p { margin: 3px 0; font-size: 16px; line-height: 1.3; }
+#guia .gu-quien { display: block; color: #8a3a12; font-size: 14px; }
+#guia .gu-pie { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+#guia .gu-n { margin-right: auto; color: #6a4a2a; }
+#guia .gu-saltar { background: none; border: none; color: #6a4a2a; text-decoration: underline; cursor: pointer; font: inherit; font-size: 13px; padding: 6px; min-height: 36px; }
+@keyframes gu-pulso { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes gu-late { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-6px); } 70% { transform: translateX(6px); } }
+@keyframes gu-toca { 0%, 100% { translate: 0 0; } 50% { translate: -4px -8px; } }
+@keyframes gu-entra { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#guia .gu-dlg.gu-arriba { animation: none; }
+@media (max-width: 600px) { #guia .gu-ret, #guia .gu-ret img { width: 56px; height: 56px; } #guia .gu-txt p { font-size: 15px; } }
+@media (orientation: landscape) and (max-height: 500px) { #guia .gu-dlg { width: min(520px, calc(100% - 140px)); padding: 6px 10px; } #guia .gu-ret, #guia .gu-ret img { width: 48px; height: 48px; } #guia .gu-txt p { font-size: 14px; margin: 1px 0; } }
+@media (prefers-reduced-motion: reduce) { #guia .gu-aro, #guia .gu-mano, #guia .gu-dlg { animation: none; } }
