@@ -10,7 +10,7 @@
   una versión `pk-N`). Las reglas de la sección 1 de `PLAN-MEGA-ACTUALIZACION.md` siguen valiendo todas (caché,
   sonido, celular, i18n, sin conexión igual que en vivo, el servidor decide lo que toca a otros). Las notas de lo que
   se decida al implementar van a `juegos/prokingdoms/CLAUDE.md`, como siempre.
-- **Avance:** L1 hecha en `pk-41`; L2 en `pk-42` (montos más grandes solo fuera de las zonas comunes, sin desplegar; puestos algo más generosos que la tabla 5.2).
+- **Avance:** L1 hecha en `pk-41`; L2 en `pk-42` (montos más grandes solo fuera de las zonas comunes, sin desplegar; puestos algo más generosos que la tabla 5.2); L3 en `pk-43` (sin subir `D.PROTO`: el servidor viejo descarta los dos edificios nuevos hasta que se despliegue).
 - **Decisiones del dueño:** respondidas el 15 de noviembre de 2026 (sección 11). Mandan sobre cualquier otra parte
   del plan.
 

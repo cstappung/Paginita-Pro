@@ -698,6 +698,7 @@
         el('p', { class: 'small' }, UI.hint('Clic para colocarlo en tu tierra explorada · Mayús para poner varios · Clic derecho o Esc para cancelar',
           armed ? (gh.ok ? 'Así quedaría. Toca «Construir aquí» o el mismo lugar otra vez. Para moverlo, toca otro lugar.' : (G().placeText(G().placeWhy(g.placing.type, gh.x, gh.y)) + ' Toca otro lugar.')) : 'Toca dónde va: primero verás cómo queda.')),
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Construir aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null,
+          def.porton ? UI.btn('Girar (R)', () => PK.Input.girarPorton(), { small: true }) : null,
           UI.btn('Otro edificio', () => UI.openBuild(), { small: true }), UI.btn('Cancelar', cancel, { small: true })),
         UI.costEl(G().buildCost(g.placing.type)),
         g.placing.type === 'house' ? el('div', { class: 'row small' },
@@ -762,15 +763,17 @@
 
   // pk-41: cada carreta sigue la ruta que le das; aquí se elige (o se cambia) para las elegidas.
   function cartPanel(us) {
-    const u = us[0], g = G(), L = PK.Logi, port = Sp.cart(D.PLAYER_COLOR, u.carryRes, false, 0, false).c.toDataURL();
+    const u = us[0], g = G(), L = PK.Logi, carro = u.kind === 'carromato';
+    us = us.filter(o => o.kind === u.kind); // carretas y carromatos no comparten rutas
+    const port = (carro ? Sp.carromato(D.PLAYER_COLOR, u.carryRes, false, 0, false) : Sp.cart(D.PLAYER_COLOR, u.carryRes, false, 0, false)).c.toDataURL();
     const r = L.rutaDe(u), nom = o => { const a = g.bById.get(o.de), b = g.bById.get(o.a); return (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?') + (o.res ? ' (' + D.RES[o.res].name.toLowerCase() + ')' : ''); };
-    const sel = el('select', { 'aria-label': 'Ruta de la carreta', onchange: e => { const id = +e.target.value || null; for (const c of us) L.asignar(c, id); UI.refreshPanel(true); } },
-      [el('option', { value: '' }, 'Sin ruta (parada)')].concat(S().logi.rutas.map(o => el('option', { value: o.id, selected: !!r && o.id === r.id }, nom(o) + ' · ' + L.cartsDe(o).length + ' carretas'))));
+    const sel = el('select', { 'aria-label': carro ? 'Ruta del carromato' : 'Ruta de la carreta', onchange: e => { const id = +e.target.value || null; for (const c of us) L.asignar(c, id); UI.refreshPanel(true); } },
+      [el('option', { value: '' }, 'Sin ruta (parado)')].concat(S().logi.rutas.filter(o => L.claseRuta(o) === u.kind).map(o => el('option', { value: o.id, selected: !!r && o.id === r.id }, nom(o) + ' · ' + L.cartsDe(o).length))));
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
-      el('div', null, el('h3', null, us.length === 1 ? 'Carreta' : us.length + ' carretas'),
+      el('div', null, el('h3', null, carro ? (us.length === 1 ? 'Carromato' : us.length + ' carromatos') : us.length === 1 ? 'Carreta' : us.length + ' carretas'),
         el('p', { class: 'small' + (r ? '' : ' warn-t') }, u.estado || (r ? nom(r) : 'Sin ruta: elige a dónde va')),
         el('div', { class: 'row' }, el('span', { class: 'small' }, 'Ruta: '), sel, UI.btn('Logística', () => UI.openLogistics(), { small: true })),
-        el('p', { class: 'small muted' }, 'Carga en el origen, lo lleva al destino y vuelve. Si no hay nada que llevar, espera en el origen. Toma el camino más rápido: los caminos empedrados la aceleran mucho.'))));
+        el('p', { class: 'small muted' }, carro ? 'Vacía un campamento y lleva lo juntado al pueblo (' + L.carroCap() + ' por viaje). Sale de tu territorio; tu muralla solo la cruza por un Gran Portón.' : 'Carga en el origen, lo lleva al destino y vuelve. Si no hay nada que llevar, espera en el origen. Toma el camino más rápido: los caminos empedrados la aceleran mucho.'))));
   }
   function wallPanel(k) {
     const gate = W.wall[k] === 2, x = k % W.W, y = Math.floor(k / W.W), t = PK.Def.tier();
@@ -811,10 +814,10 @@
   function unitsPanel(us) {
     if (!us.length) { G().sel = null; return UI.refreshPanel(true); }
     if (us.every(x => x.kind === 'scout')) return scoutPanel(us);
-    if (us.every(x => x.kind === 'cart')) return cartPanel(us);
+    if (us.every(x => x.kind === 'cart' || x.kind === 'carromato')) return cartPanel(us);
     us = us.filter(x => x.kind === 'v');
     // Exploradores + carretas sin ningún aldeano: no hay aldeano que mostrar (antes reventaba con u undefined).
-    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart')); }
+    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart' || x.kind === 'carromato')); }
     const u = us[0];
     const port = Sp.villager(D.PLAYER_COLOR, u.hair, u.skin, 'idle', 0, null, false).c.toDataURL();
     liveEl = el('p', { class: 'small' });
@@ -914,6 +917,7 @@
     // bonos por cercanía (V5): qué vecino le suma
     if (b.done && b.owner === 'p' && G().cercaDe) for (const c of G().cercaDe(b)) act.append(el('p', { class: 'small cerca-ok' }, '✚ Junto a ' + c.o.def.name + ': ' + c.c.txt + '.'));
     if (G().esBase(b) && UI.basePanel) act.append(UI.basePanel(b)); // pk-42: quién trabaja aquí y su radio (ui/aldeanos.js)
+    if (b.done && b.owner === 'p' && UI.stockPanel) act.append(UI.stockPanel(b)); // pk-43: lo que guarda (bodega o campamento)
     if (b.type === 'consejo' && PK.Consejo) act.append(el('div', { class: 'row' }, UI.btn('Abrir el Consejo', () => PK.Consejo.open(), { cls: 'gold' }), el('span', { class: 'small muted' }, PK.Consejo.resumen())));
     if (b.type === 'tc') {
       const st = S();
@@ -956,6 +960,14 @@
       const found = W.pois.filter(p => p.kind === 'relic' && G().poiState(p) && G().poiState(p).f && !G().poiState(p).d);
       for (const p of found) act.append(el('div', { class: 'row' }, el('span', { class: 'small' }, 'Reliquia descubierta'), UI.btn('Traerla', () => { G().claimRelic(p); UI.refreshPanel(true); }, { small: true, disabled: S().relics >= G().relicSlots() })));
       if (!found.length) act.append(el('p', { class: 'small muted' }, 'Explora el mapa para encontrar santuarios con reliquias.'));
+    } else if (b.type === 'establo') {
+      const L = PK.Logi, n = L.carromatos().length, max = L.carroMax(), cost = D.carromatoCost(S().era);
+      act.append(...[el('p', null, 'Carromatos: ' + n + '/' + max + ' · carga ' + L.carroCap() + ' por viaje'),
+        el('div', { class: 'row' }, UI.btn(el('span', null, 'Carromato ', UI.costEl(cost)), () => { L.trainCarro(b); UI.refreshPanel(true); }, { disabled: n + b.queue.length >= max })),
+        b.queue.length ? el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / D.CARROMATO.time) * 100 + '%' } }), el('span', null, 'Armando carromato (' + b.queue.length + ' en cola)')) : null,
+        L.carromatos().some(u => !L.rutaDe(u)) ? el('p', { class: 'small warn-t' }, 'Hay carromatos sin ruta: dales una en Logística (de un campamento a una bodega).') : null,
+        el('p', { class: 'small muted' }, 'Los carromatos no ocupan población. Vacían los campamentos (lo que juntan ahí no sirve para construir hasta que llega al pueblo), salen de tu territorio y solo cruzan tu muralla por un Gran Portón.'),
+        UI.btn('Logística', () => UI.openLogistics(), { small: true })].filter(Boolean));
     } else if (b.type === 'cartwright') {
       const L = PK.Logi, n = L.carts().length, max = L.cartMax();
       act.append(...[el('p', null, 'Carretas: ' + n + '/' + max + ' · carga ' + L.cartCap() + ' por viaje'),

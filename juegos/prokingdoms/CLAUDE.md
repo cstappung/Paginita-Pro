@@ -235,3 +235,38 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   not reached in 310 min (250 before) — iron is the bottleneck; measure again after L3/L4.
 - Radius drawing: `circuloRadio` in `render.js` (ghost and selected building); panel `UI.basePanel`, Aldeanos window
   «Lugares de trabajo».
+
+### L3, materials live in buildings, carromatos and the Gran Portón (`pk-43`)
+
+- **Ledger (`js/mayor.js`, `PK.Libro`)**: town stores (anything with `G.capDe(b, r) > 0`: TC, Almacén, Granero) keep
+  `b.inv`; **`S.res` is still the town total and still pays for everything**. `Lb.conciliar()` runs after every
+  step, every offline chunk and before saving: what changed without a place (pay, reward, market…) is spread
+  (spending from the fullest store; income to the nearest store with room, TC first; the excess over every cap stays
+  in the TC — pk-34's "rewards go over the cap"). Old saves need no migration: the first run spreads `S.res`.
+- **Anything with a place touches the building and `S.res` together** (`Lb.poner`/`Lb.sacar`): villager deposits,
+  cart load/unload, bandit theft. Otherwise the conciliation "fixes" it by moving stock between stores.
+- **Camps** (`Lb.esCampo`: lumber, mining, and a Mill **outside** your land — inside it is a town store, decision 4)
+  keep `b.inv` that does **not** add to `S.res` (cap `D.campoCap(L)` = 300 + 150·(L−1), total). Their villagers wait
+  when it is full (`G.llenoPara(base, res)`). Demolishing or moving one sends its stock to the town
+  (`Lb.vaciarAlPueblo`). `Lb.fuera(r)` (camps + what vehicles carry) goes into the server snapshot so unloading a
+  carromato is not a "jump" (`fotoRes` in `net.js`).
+- **Carromato** (`kind: 'carromato'`, profile `carromato`): route from a camp to a town store or a workshop that uses
+  its resource (`L.claseRuta(r)` = class by origin). Leaves your land, **never through a small gate (`W.wall` 2)**,
+  only through the Gran Portón (3); foreign land without wall costs ×4 (`D.CARROMATO.ajeno`). `D.CARROMATO` speeds
+  are tuned with the autopilot (faster off-road than planned: the plan's 0.55 left a forest camp at 30/min).
+- `L.camino` tries up to 6 free tiles around the origin: a camp inside a forest used to start from a pocket enclosed
+  by trees and report "no path".
+- **Establo de Carromatos**: Era I, `max e => 1 + ⌊e/2⌋`, `2 + level` carromatos each; **the first one ever spawns a
+  free carromato** (`st.flags.carroGratis`, also for old saves). Without it Era I jams.
+- **Gran Portón**: two types, `granporton` (4×2) and `granportonv` (2×4, `alias`), rotated with R or «Girar»;
+  `G.countAll/countB` count them together (`G.tipoDe`). Towers block; the 2×2 passage has `W.block` 0 and
+  `W.wall` 3 (`G.marcarPorton`, re-applied by `Def.init`). It can be placed over your own walls/gates (they are
+  removed with half back). Not movable. `findPath(noGate)` treats ≥ 2 as closed (wolves, bandits). `Def.remove`
+  ignores 3. Sprite `Sp.porton(type, owner, wallTier, frame)` follows the wall material; `portonCuadro` in
+  `render.js` opens it when a unit of yours is within 2.5 tiles and plays `porton` (`sfx/porton.mp3`, synthesized in
+  code with `porton.py`-style math, gain measured like pk-38).
+- Bandits now target camps too and steal up to 30% of **that** building's stock (era cap unchanged).
+- Asesor rules `establo`, `porton`, `campoLleno`. Autopilot: `carromatos()` creates camp → nearest store routes,
+  trains carromatos, upgrades/adds establos when it runs out.
+- **Server**: `D.PROTO` was **not** bumped. An old server drops the two unknown building types from snapshots (and
+  logs a `suspect`); deploying the function (`firebase deploy --only functions`) makes others see them.

@@ -133,6 +133,45 @@
   L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost') + (G().bono ? G().bono('cartCap') : 0))));
   L.cartSpeed = () => G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartSpeed : 0), 0) + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost'));
   L.carts = () => G().units.filter(u => u.owner === 'p' && u.kind === 'cart');
+  // ---------- Carromatos (pk-43, plan de logística L3) ----------
+  // Los arma el Establo de Carromatos. Vacían los campamentos (dentro y fuera de tu tierra) hacia una bodega del pueblo
+  // o un taller que use lo que juntan. No pasan por puertas chicas: solo por el Gran Portón.
+  const establos = () => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === 'establo');
+  L.carroMax = () => establos().reduce((s2, b) => s2 + G().bst(b).carromatos, 0);
+  const boostCarro = () => G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost');
+  L.carroCap = () => Math.round(establos().reduce((m, b) => Math.max(m, G().bst(b).carroCap), D.CARROMATO.cap) * (1 + boostCarro() + (G().bono ? G().bono('cartCap') : 0)));
+  L.carroSpeed = () => establos().reduce((m, b) => Math.max(m, G().bst(b).carroSpeed), 0) + boostCarro();
+  L.carromatos = () => G().units.filter(u => u.owner === 'p' && u.kind === 'carromato');
+  L.vehiculos = () => G().units.filter(u => u.owner === 'p' && (u.kind === 'cart' || u.kind === 'carromato'));
+  L.esVehiculo = u => !!u && (u.kind === 'cart' || u.kind === 'carromato');
+  L.trainCarro = function (b) {
+    if (L.carromatos().length + establos().reduce((s2, o) => s2 + o.queue.length, 0) >= L.carroMax()) { toast('Mejora el Establo (o construye otro) para tener más carromatos.', 'warn'); return; }
+    if (!G().pay(D.carromatoCost(S().era))) { toast('Recursos insuficientes.', 'warn'); return; }
+    b.queue.push('carromato');
+  };
+  L.updateEstablo = function (b, dt) {
+    const st = S();
+    // el primer establo trae un carromato de regalo: sin él, el primer campamento de la Era I se llenaba y nada llegaba
+    if (!st.flags.carroGratis) {
+      st.flags.carroGratis = 1;
+      const u = G().spawnUnit(b, 'carromato');
+      if (u) { primeraRuta(u); if (!G().offline) toast('¡Tu Establo trae un carromato de regalo! Dale una ruta: de un campamento a tu Centro Urbano o a un Almacén.', 'epic', { label: 'Rutas', fn: () => PK.UI.openLogistics() }); }
+    }
+    if (!b.queue.length) { b.status = ''; b.qt = 0; return; }
+    b.status = 'Armando carromatos';
+    b.qt += dt;
+    if (b.qt >= D.CARROMATO.time) {
+      b.qt = 0; b.queue.shift();
+      const u = G().spawnUnit(b, 'carromato');
+      G().stat('carromatos', 1);
+      if (u) primeraRuta(u);
+    }
+  };
+  // un vehículo nuevo nace sin ruta: se le ofrece la primera de su clase que tenga lugar
+  function primeraRuta(u) {
+    const r = S().logi.rutas.find(o => L.claseRuta(o) === u.kind && !L.rutaMala(o) && !L.cartsDe(o).length);
+    if (r) u.ruta = r.id;
+  }
   L.trainCart = function (b) {
     if (L.carts().length + (b.queue ? b.queue.length : 0) >= L.cartMax()) { toast('Mejora la Carretería para tener más carretas.', 'warn'); return; }
     if (!G().pay(D.CART.cost)) { toast('Recursos insuficientes.', 'warn'); return; }
@@ -147,8 +186,7 @@
       const u = G().spawnUnit(b, 'cart');
       G().stat('carts', 1);
       // una carreta nueva nace sin ruta: se le ofrece la primera ruta que tenga lugar
-      const r = u && S().logi.rutas.find(o => !L.rutaMala(o) && !L.cartsDe(o).length);
-      if (u && r) u.ruta = r.id;
+      if (u) primeraRuta(u);
     }
   };
 
@@ -156,10 +194,15 @@
   // Cuánto rinde cada casilla según quién viaja. step() en entities.js usa lo mismo, así el tiempo que estima la
   // ruta es el que de verdad tarda.
   const rk = () => (G().bono ? G().bono('road') : 0); // Caminos empedrados, Caravaneros (árbol 2.0)
-  L.PERFIL_DE = { cart: 'carreta' };
+  L.PERFIL_DE = { cart: 'carreta', carromato: 'carromato' };
   L.factor = function (perfil, k) {
     const road = W.road[k] === 1;
     if (perfil === 'carreta') return road ? 1 + (D.ROAD.cart - 1) * (1 + rk()) : D.CART.offRoad;
+    if (perfil === 'carromato') {
+      const C = D.CARROMATO, f = W.auto && W.auto[k] ? C.highway : road ? 1 + (C.road - 1) * (1 + rk()) : C.offRoad;
+      const o = W.ownerAt(k % W.W, (k / W.W) | 0);
+      return o && o !== 'p' ? f / C.ajeno : f; // tierra ajena sin muralla: se cruza, pero cuesta ×4 (decisión 5)
+    }
     return road ? 1 + (D.ROAD.walk - 1) * (1 + rk()) : 1;
   };
   L.factorUnidad = function (u) {
@@ -169,10 +212,12 @@
     return road ? 1 + (D.ROAD.walk - 1) * (1 + r) : 1;
   };
   // ¿Por dónde puede pasar? La carreta, por lo libre de tu territorio (las puertas de tu muralla también).
+  // El carromato sale de tu tierra, pero no cabe por una puerta chica (W.wall 2): solo por el Gran Portón (3).
   function pasa(perfil, k) {
     if (W.block[k] !== 0 || W.terrain[k] === 4) return false;
     const x = k % W.W, y = (k / W.W) | 0;
     if (perfil === 'carreta') return W.ownerAt(x, y) === 'p';
+    if (perfil === 'carromato') return W.wall[k] !== 2;
     return true;
   }
   const verMapa = () => W.roadVer + '|' + G().blockVer + '|' + (W.terrVer || 0) + '|' + (W.apVer || 0) + '|' + rk();
@@ -204,14 +249,24 @@
     if (!forzar && !G().offline && presupuesto <= 0) return e || null;
     presupuesto--;
     if (caminos.size > 400) caminos.clear();
-    const s = W.freeAround(a.x, a.y, a.x + a.w - 1, a.y + a.h - 1, b.cx, b.cy, (x, y) => t.costo[W.idx(x, y)] === Infinity);
-    const sOk = W.inb(s[0], s[1]) && t.costo[W.idx(s[0], s[1])] < Infinity;
-    const r = sOk ? W.rutaCosto(s[0], s[1], { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1, adj: true }, t.costo, t.min) : { path: [], ok: false, seg: 0 };
+    // pk-43: se prueban las casillas libres alrededor del origen, de la más cercana al destino a la más lejana (hasta
+    // 6): un campamento en medio del bosque solía salir por un hueco encerrado entre árboles y «no había camino».
+    const borde = [];
+    for (let y = a.y - 1; y <= a.y + a.h; y++) for (let x = a.x - 1; x <= a.x + a.w; x++) {
+      if (x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h) continue;
+      if (W.inb(x, y) && t.costo[W.idx(x, y)] < Infinity) borde.push([x, y]);
+    }
+    borde.sort((p, q) => U.dist(p[0], p[1], b.cx, b.cy) - U.dist(q[0], q[1], b.cx, b.cy));
+    const goal = { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1, adj: true };
+    let s = borde[0] || [a.x, a.y], r = { path: [], ok: false, seg: 0 };
+    for (const c of borde.slice(0, 6)) { const rr = W.rutaCosto(c[0], c[1], goal, t.costo, t.min); if (rr.ok) { s = c; r = rr; break; } }
+    const sOk = r.ok;
     const ne = { ver: t.ver, ok: sOk && r.ok, path: sOk ? [s].concat(r.path) : [], costo: r.seg + (sOk ? t.costo[W.idx(s[0], s[1])] : 0) };
     caminos.set(key, ne);
     return ne;
   };
-  const velocidad = perfil => (perfil === 'carreta' ? D.CART.speed * (1 + L.cartSpeed()) : 1.3);
+  const velocidad = perfil => (perfil === 'carreta' ? D.CART.speed * (1 + L.cartSpeed()) : perfil === 'carromato' ? D.CARROMATO.speed * (1 + L.carroSpeed()) : 1.3);
+  L.velocidad = velocidad;
   // Pone a la unidad en camino hacia un edificio: por el camino guardado si está junto a su comienzo, o con uno de una
   // sola vez desde donde está (al salir de la Carretería, al cambiar de ruta). false: no hay por dónde.
   function ir(u, desde, hacia) {
@@ -228,18 +283,26 @@
   L.ir = ir;
 
   // ---------- Rutas ----------
-  const CAMPO = { lumber: 1, mining: 1 }; // los campamentos son del carromato (decisión 3 del dueño)
-  L.esCampo = b => !!(b && CAMPO[b.type]);
+  // Los campamentos son del carromato (decisión 3 del dueño), y el Molino fuera de tu tierra también (decisión 4).
+  L.esCampo = b => !!(b && (PK.Libro.CAMPOS[b.type] || (b.type === 'mill' && W.ownerAt(Math.floor(b.cx), Math.floor(b.cy)) !== 'p')));
   // ¿Puede ser un extremo de una ruta de carreta? Un taller o una bodega del pueblo.
-  L.puntoCarreta = b => !!(b && b.owner === 'p' && !CAMPO[b.type] && (L.isShop(b) || L.isStore(b)));
+  L.puntoCarreta = b => !!(b && b.owner === 'p' && !L.esCampo(b) && (L.isShop(b) || L.isStore(b)));
   L.rutaDe = u => (u.ruta ? S().logi.rutas.find(r => r.id === u.ruta) || null : null);
-  L.cartsDe = r => G().units.filter(u => u.owner === 'p' && u.kind === 'cart' && u.ruta === r.id);
-  L.libres = () => L.carts().filter(u => !L.rutaDe(u));
+  // Una ruta que sale de un campamento es de carromatos; las demás, de carretas.
+  L.claseRuta = r => { const a = G().bById.get(r.de); return a && L.esCampo(a) ? 'carromato' : 'cart'; };
+  L.cartsDe = r => { const k = L.claseRuta(r); return G().units.filter(u => u.owner === 'p' && u.kind === k && u.ruta === r.id); };
+  L.libres = kind => (kind === 'carromato' ? L.carromatos() : L.carts()).filter(u => !L.rutaDe(u));
   // Por qué una ruta no sirve (texto), o null si está bien.
   L.parMalo = function (a, b) {
     if (!a || !b) return 'Elige el origen y el destino.';
     if (a === b) return 'El origen y el destino son el mismo edificio.';
-    if (L.esCampo(a) || L.esCampo(b)) return 'Los campamentos los vacían los carromatos, no las carretas.';
+    if (L.esCampo(b)) return 'Un campamento no recibe nada: es de donde sale un carromato. Elígelo como origen.';
+    if (L.esCampo(a)) { // ruta de carromato
+      if (!L.puntoCarreta(b)) return 'Un carromato lleva lo del campamento a una bodega del pueblo (Centro Urbano, Almacén, Granero, Molino) o a un taller.';
+      const da = a.def.drop || [];
+      if (!da.some(r => acepta(b, r))) return b.def.name + ' no usa nada de lo que junta ' + a.def.name + '.';
+      return null;
+    }
     if (!L.puntoCarreta(a) || !L.puntoCarreta(b)) return 'Una carreta une talleres y bodegas del pueblo (Centro Urbano, Almacén, Granero, Molino).';
     if (!L.isShop(a) && !L.isShop(b)) return 'Entre dos bodegas no hace falta: lo que hay en una ya sirve en todo el pueblo. Une una bodega con un taller.';
     return null;
@@ -272,8 +335,13 @@
     u.ruta = id || null; u.job = null; u.path = []; u.espera = 0; u.wait = 0;
   };
   L.sumarCarreta = function (r) {
-    const libre = L.libres().sort((x, y) => U.dist(x.x, x.y, 0, 0) - U.dist(y.x, y.y, 0, 0))[0];
-    if (!libre) { toast(L.carts().length ? 'Todas tus carretas ya tienen ruta: arma otra en la Carretería o saca una de otra ruta.' : 'No tienes carretas: ármalas en la Carretería (Era II).', 'warn'); return false; }
+    const k = L.claseRuta(r), A = G().bById.get(r.de);
+    const libre = L.libres(k).sort((x, y) => (A ? U.dist(x.x, x.y, A.cx, A.cy) - U.dist(y.x, y.y, A.cx, A.cy) : 0))[0];
+    if (!libre) {
+      if (k === 'carromato') toast(L.carromatos().length ? 'Todos tus carromatos ya tienen ruta: arma otro en el Establo o saca uno de otra ruta.' : 'No tienes carromatos: construye un Establo de Carromatos (el primero trae uno de regalo).', 'warn');
+      else toast(L.carts().length ? 'Todas tus carretas ya tienen ruta: arma otra en la Carretería o saca una de otra ruta.' : 'No tienes carretas: ármalas en la Carretería (Era II).', 'warn');
+      return false;
+    }
     L.asignar(libre, r.id);
     return true;
   };
@@ -287,17 +355,18 @@
   L.tiempos = function (r, forzar) {
     const g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a);
     if (!a || !b) return null;
-    const perfil = 'carreta', i = L.camino(a, b, perfil, forzar), v = L.camino(b, a, perfil, forzar);
+    const k = L.claseRuta(r), perfil = L.PERFIL_DE[k], i = L.camino(a, b, perfil, forzar), v = L.camino(b, a, perfil, forzar);
     if (!i || !v) return null;
     if (!i.ok || !v.ok) return { ok: false };
     const sp = velocidad(perfil), ida = i.costo / sp, vuelta = v.costo / sp, ciclo = ida + vuelta + 1.2 + 1;
-    return { ok: true, ida, vuelta, ciclo, ritmo: (L.cartsDe(r).length * L.cartCap() * 60) / ciclo };
+    return { ok: true, ida, vuelta, ciclo, ritmo: (L.cartsDe(r).length * L.capDe(k) * 60) / ciclo };
   };
 
+  L.capDe = kind => (kind === 'carromato' ? L.carroCap() : L.cartCap());
   // Lo que ya viene en camino a un edificio (para no llevarle de más).
   function inbound(b, res) {
     let n = 0;
-    for (const u of G().units) if (u.kind === 'cart' && u.job && u.job.to === b.id && u.job.res === res) n += u.job.n;
+    for (const u of G().units) if (L.esVehiculo(u) && u.job && u.job.to === b.id && u.job.res === res) n += u.job.n;
     return n;
   }
   function acepta(b, res) { return L.isShop(b) ? !!L.recipe(b).in[res] : L.storeAccepts(b, res); }
@@ -308,11 +377,12 @@
   }
   function hay(from, to, res) {
     if (L.isShop(from)) { ensure(from); return from.outb[res] || 0; }
+    if (L.esCampo(from)) return (from.inv && from.inv[res]) || 0;
     return Math.max(0, (S().res[res] || 0) - (L.isShop(to) ? reserveOf(res, L.output(to), to) : 0));
   }
   // Qué conviene cargar en el origen para ese destino: { res, n, need }, o null si nada sirve.
   function queCargar(r, from, to, cap, contar) {
-    const cands = r.res ? [r.res] : L.isShop(from) ? [L.output(from)] : L.isShop(to) ? Object.keys(L.recipe(to).in) : [];
+    const cands = r.res ? [r.res] : L.isShop(from) ? [L.output(from)] : L.esCampo(from) ? Object.keys(from.inv || {}) : L.isShop(to) ? Object.keys(L.recipe(to).in) : [];
     let best = null;
     for (const res of cands) {
       if (!acepta(to, res) || (!L.isShop(from) && !L.storeAccepts(from, res))) continue;
@@ -323,16 +393,16 @@
   }
   L.queCargar = queCargar;
 
+  // pk-43: un campamento da de lo suyo; una bodega, de esa bodega (libro mayor)
   function take(b, res, n) {
-    const st = S();
     if (L.isShop(b)) { ensure(b); const k = Math.min(n, b.outb[res] || 0); b.outb[res] -= k; return k; }
-    const k = Math.min(n, Math.max(0, st.res[res])); st.res[res] -= k; return k;
+    if (L.esCampo(b)) return PK.Libro.sacarCampo(b, res, n);
+    return PK.Libro.sacar(b, res, n);
   }
-  // Un taller recibe hasta llenar su depósito de entrada; una bodega, hasta su tope.
+  // Un taller recibe hasta llenar su depósito de entrada; una bodega, hasta el tope del pueblo (y en ella lo que cabe).
   function put(b, res, n) {
-    const st = S(), g = G();
     if (L.isShop(b)) { ensure(b); const k = Math.min(n, Math.max(0, L.bufCap(b) - (b.inb[res] || 0))); b.inb[res] = (b.inb[res] || 0) + k; return k; }
-    const k = Math.min(n, Math.max(0, g.cap(res) - st.res[res])); st.res[res] += k; return k;
+    return PK.Libro.poner(b, res, n);
   }
 
   // Cerebro de una carreta.
@@ -348,13 +418,13 @@
     u.job = { ruta: r.id, from: r.de, to: r.a, res: (lleva && u.carryRes) || r.res, n: lleva ? u.carry : 0, phase: lleva ? 'back' : 'go' };
     if (!Un.nearRect(u, tgt.x, tgt.y, tgt.x + tgt.w - 1, tgt.y + tgt.h - 1, 1.2)) {
       u.estado = lleva ? 'Lleva ' + D.RES[u.carryRes].name.toLowerCase() + ' a ' + to.def.name : 'Va a cargar a ' + from.def.name;
-      if (!ir(u, desde, tgt)) { u.estado = 'Sin camino hasta ' + tgt.def.name + ' (las carretas no salen de tu territorio)'; u.mode = 'idle'; u.wait = 4; }
+      if (!ir(u, desde, tgt)) { u.estado = 'Sin camino hasta ' + tgt.def.name + (u.kind === 'carromato' ? ' (los carromatos solo cruzan tu muralla por un Gran Portón)' : ' (las carretas no salen de tu territorio)'); u.mode = 'idle'; u.wait = 4; }
       return;
     }
     if (lleva) descargar(u, to); else cargar(u, r, from, to);
   };
   function cargar(u, r, from, to) {
-    const cap = L.cartCap(), q = queCargar(r, from, to, cap, true);
+    const cap = L.capDe(u.kind), q = queCargar(r, from, to, cap, true);
     const lleno = q ? Math.min(cap, q.need) : 0;
     u.mode = 'idle';
     if (q && q.n >= 1 && (q.n >= lleno - 0.5 || q.n >= cap * 0.5 || (u.espera || 0) >= 60)) {
@@ -387,7 +457,7 @@
   }
   // Sin ruta, esperan junto a la Carretería.
   function parkCart(u) {
-    const home = G().buildings.find(b => b.owner === 'p' && b.type === 'cartwright' && b.done);
+    const home = G().buildings.find(b => b.owner === 'p' && b.type === (u.kind === 'carromato' ? 'establo' : 'cartwright') && b.done);
     if (home && U.dist(u.x, u.y, home.cx, home.cy) > 4) PK.Units.pathTo(u, PK.Units.rectGoal(home, true));
     u.mode = 'idle';
     u.wait = 4;
@@ -396,7 +466,7 @@
   // y un aviso pide definir a dónde van.
   L.avisoPendiente = () => !!(S().logi && S().logi.avisoRutas);
   L.avisoVisto = () => { S().logi.avisoRutas = 0; };
-  L.sinRuta = () => L.carts().filter(u => !L.rutaDe(u)).length;
+  L.sinRuta = () => L.vehiculos().filter(u => !L.rutaDe(u)).length;
 
   // ---------- Caminos ----------
   L.roadAllowed = function (x, y) {
@@ -576,20 +646,19 @@
     }
     // las rutas (pk-41): cada una mueve lo que harían sus carretas en ese tiempo, con la ida y la vuelta de su camino
     // guardado. Las mismas reglas que en vivo: lo que hay en el origen (menos la reserva) y el lugar en el destino.
-    const cap = L.cartCap();
     for (const r of st.logi.rutas) {
       const n = L.cartsDe(r).length;
       if (!n || L.rutaMala(r)) continue;
       const T = L.tiempos(r, true);
       if (!T || !T.ok) continue;
-      let budget = (n * cap * dt) / T.ciclo;
+      let budget = (n * L.capDe(L.claseRuta(r)) * dt) / T.ciclo;
       const from = g.bById.get(r.de), to = g.bById.get(r.a);
       for (let k = 0; k < 4 && budget >= 1; k++) {
         const q = queCargar(r, from, to, budget, false);
         if (!q || q.n < 1) break;
         const m = take(from, q.res, q.n);
         const puesto = put(to, q.res, m);
-        if (puesto < m) { if (L.isShop(from)) from.outb[q.res] += m - puesto; else st.res[q.res] += m - puesto; }
+        if (puesto < m) { if (L.isShop(from)) from.outb[q.res] += m - puesto; else if (L.esCampo(from)) PK.Libro.inv(from)[q.res] = (PK.Libro.inv(from)[q.res] || 0) + m - puesto; else st.res[q.res] += m - puesto; }
         if (puesto > 0) g.stat('hauled', puesto);
         budget -= Math.max(1, puesto);
         if (puesto < 1) break;

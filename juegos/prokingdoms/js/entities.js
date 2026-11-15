@@ -44,7 +44,7 @@
     get cx() { return this.x + this.w / 2; }
     get cy() { return this.y + this.h / 2; }
     toJSON() {
-      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined, asp: this.asp || undefined, extrae: this.extrae || undefined };
+      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined, asp: this.asp || undefined, extrae: this.extrae || undefined, inv: this.inv && Object.keys(this.inv).length ? this.inv : undefined };
     }
   }
   PK.Unit = Unit;
@@ -240,7 +240,8 @@
     if (u.carry > 0 && u.carryRes !== t.res) { u.phase = 'return'; return; }
     if (u.carry >= cap) { u.phase = 'return'; return; }
     // bodega llena: espera sin gastar el árbol o la veta (antes juntaba, volvía y addRes tiraba la carga)
-    if (u.owner === 'p' && g.isFull(t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(t.res); return; }
+    // pk-43: si trabaja para un campamento, lo que mira es el campamento (lo vacía un carromato)
+    if (u.owner === 'p' && g.llenoPara(base, t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; if (!PK.Libro.esCampo(base)) g.noteFull(t.res); return; }
     u.fullWait = false;
     // Fase 9: el arrecife solo se trabaja con la marea baja; con la alta se espera al lado (u.mareaWait)
     const bajo = D.NODES[n.kind].marea && !g.mareaBaja();
@@ -494,7 +495,7 @@
     const el = u.stT;
     u.stT = 0;
     if (!walkable(Math.floor(u.x), Math.floor(u.y))) { rescue(u, homeRegions(u.owner), true); return; }
-    if (u.kind === 'cart') return; // las carretas tienen su propia lógica de caminos
+    if (u.kind === 'cart' || u.kind === 'carromato') return; // las carretas tienen su propia lógica de caminos
     if (u.stX === undefined || Math.abs(u.x - u.stX) + Math.abs(u.y - u.stY) > 0.6 || u.mode === 'work') {
       u.stX = u.x; u.stY = u.y; u.stS = 0; return;
     }
@@ -517,7 +518,7 @@
       return;
     }
     if (u.path.length) { step(u, dt); return; }
-    if (u.kind === 'cart') { if (u.owner === 'p') PK.Logi.cart(u, dt); else u.mode = 'idle'; return; }
+    if (u.kind === 'cart' || u.kind === 'carromato') { if (u.owner === 'p') PK.Logi.cart(u, dt); else u.mode = 'idle'; return; }
     if (u.wait > 0 && u.mode === 'idle' && u.task) { u.wait -= dt; return; }
     if (!u.task) { u.mode = 'idle'; return; }
     switch (u.task.t) {

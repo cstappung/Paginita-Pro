@@ -627,7 +627,7 @@
         if (!W.passable(nx, ny)) continue;
         if (dx && dy && (!W.passable(cx + dx, cy) || !W.passable(cx, cy + dy))) continue;
         const ni = ny * w + nx;
-        if (noGate && W.wall[ni] === 2) continue;
+        if (noGate && W.wall[ni] >= 2) continue; // puertas y el paso del Gran Portón (pk-43)
         if (closed[ni] === stamp) continue;
         const ng = gS[cur] + c;
         if (seen[ni] !== stamp || ng < gS[ni]) {

@@ -1224,3 +1224,11 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 .base-row { display: grid; grid-template-columns: 24px minmax(110px, 200px) 56px 1fr auto; align-items: center; gap: 4px 6px; }
 .base-row .fw-name { min-width: 0; }
 @media (max-width: 600px) { .base-row { grid-template-columns: 24px 1fr 48px auto; } .base-row > span.small { grid-column: 2 / -1; grid-row: 2; } }
+/* pk-43: lo que guarda una bodega o un campamento */
+.stock-box { margin: 6px 0; padding: 6px 8px; background: rgba(120, 80, 30, 0.1); border-left: 4px solid #7a9a5a; display: flex; flex-direction: column; gap: 4px; }
+.stock-box.lleno { border-left-color: #c0503a; }
+.stock-box .row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.stock-bar { flex: 1; min-width: 80px; height: 8px; }
+.stock-rows { display: flex; flex-direction: column; gap: 2px; }
+.stock-row { display: grid; grid-template-columns: 20px 90px 1fr; align-items: center; gap: 6px; }
+.ruta-row.carro { border-left-color: #b8863a; }

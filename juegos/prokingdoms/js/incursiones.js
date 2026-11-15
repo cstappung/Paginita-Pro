@@ -48,7 +48,8 @@
 
   // ---------- Elegir de dónde vienen y adónde van ----------
   function almacenes() {
-    return G().buildings.filter(b => b.owner === 'p' && b.done && (b.type === 'tc' || b.type === 'warehouse' || b.type === 'granary'));
+    // pk-43: también los campamentos, que guardan lo suyo (afuera, sin muralla, son un blanco fácil)
+    return G().buildings.filter(b => b.owner === 'p' && b.done && (b.type === 'tc' || b.type === 'warehouse' || b.type === 'granary' || (PK.Libro && PK.Libro.esCampo(b))));
   }
   function buscarOrigen() {
     const g = G(), tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc' && b.done);
@@ -208,16 +209,20 @@
     else if (bd.total > 420) { for (const b of vivos()) if (!b.fuera) escapa(b); if (bd.ola < bd.olas) siguienteOla(); else terminar(); }
   }
 
-  // Se llevan hasta un 12% de cada recurso (menos si llegaron pocos), con un tope según la era.
+  // pk-43 (libro mayor): roban de la bodega o el campamento al que llegaron, hasta el 30% de lo que guarda (menos si
+  // llegaron pocos), con el tope según la era de siempre.
   function robar(dest) {
-    const bd = Inc.banda, st = S(), era = st.era, aqui = presentes().filter(b => b.llego);
+    const bd = Inc.banda, st = S(), era = st.era, aqui = presentes().filter(b => b.llego), Lb = PK.Libro;
     if (!aqui.length || !dest) { huir(null); return; }
-    const frac = 0.12 * (aqui.length / bd.n0), tope = Math.round(250 * Math.pow(1.8, era - 1));
+    const frac = 0.3 * (aqui.length / bd.n0), tope = Math.round(250 * Math.pow(1.8, era - 1)), campo = Lb.esCampo(dest);
     const txt = [];
     for (const r of RES_BOTIN) {
-      const n = Math.floor(Math.min((st.res[r] || 0) * frac, tope));
+      const hay = (dest.inv && dest.inv[r]) || 0;
+      let n = Math.floor(Math.min(hay * frac, tope));
       if (n <= 0) continue;
-      st.res[r] -= n; bd.botin[r] = n;
+      n = Math.floor(campo ? Lb.sacarCampo(dest, r, n) : Lb.sacar(dest, r, n));
+      if (n <= 0) continue;
+      bd.botin[r] = n;
       txt.push(U.fmt(n) + ' de ' + D.RES[r].name.toLowerCase());
     }
     for (const b of aqui) b.saco = 1 / aqui.length;

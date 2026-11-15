@@ -277,6 +277,7 @@
   function unitSprite(u) {
     const col = Sp.ownerColor(u.owner);
     if (u.kind === 'cart') return Sp.cart(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 8) % 4, u.mode === 'walk');
+    if (u.kind === 'carromato') return Sp.carromato(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 6) % 4, u.mode === 'walk');
     let mode = u.mode, frame = 0, tool = null, aim = null;
     if (mode === 'walk') frame = Math.floor(u.anim * 9) % 6;
     else if (mode === 'work') {
@@ -530,7 +531,7 @@
       if (b.owner !== 'p' && !seen(b.cx, b.cy)) continue;
       const [px, py] = R.iso(b.x, b.y);
       if (px < vx0 - 200 || px > vx0 + vw + 200 || py < vy0 - 40 || py > vy0 + vh + 200) continue;
-      const spr = Sp.building(b.type, b.owner, b.lvl, b.asp);
+      const spr = b.def.porton ? Sp.porton(b.type, b.owner, b.owner === 'p' && g.state.def ? g.state.def.tier : 2, portonCuadro(b, g), b.asp) : Sp.building(b.type, b.owner, b.lvl, b.asp);
       const x = Math.round(px - spr.ox), y = Math.round(py - spr.oy);
       if (!vis(x, y, spr.c.width, spr.c.height)) continue;
       const item = { d: b.x + b.y + (b.w + b.h) / 2, k: 'building', o: b, spr, x, y };
@@ -581,7 +582,7 @@
       if (b) diamond(ctx, b.x, b.y, b.w, b.h, 'rgba(255,255,255,0.85)');
     }
     if (sel && sel.type === 'node') { const n = W.nodes[sel.id]; if (n) diamond(ctx, n.x, n.y, 1, 1, 'rgba(255,240,170,0.85)'); }
-    for (const it of list) if (it.k === 'unit' && it.sel) ellipse(ctx, it.px, it.py, 'rgba(255,255,255,0.9)', it.o.kind === 'cart' ? 9 : 5);
+    for (const it of list) if (it.k === 'unit' && it.sel) ellipse(ctx, it.px, it.py, 'rgba(255,255,255,0.9)', it.o.kind === 'carromato' ? 14 : it.o.kind === 'cart' ? 9 : 5);
     if (R.hover && R.hover.k === 'unit' && !(R.hover.o && selUnits && selUnits.has(R.hover.o.id))) {
       const [px, py] = R.iso(R.hover.o.x, R.hover.o.y);
       ellipse(ctx, px, py, 'rgba(255,255,255,0.4)', 5);
@@ -885,6 +886,23 @@
     }
   }
 
+  // pk-43: lo abierto del Gran Portón (0 a 4). Se abre si una unidad tuya está a menos de 2,5 casillas del paso y se
+  // cierra 1,5 s después de que se va; suena al empezar a abrirse.
+  function portonCuadro(b, g) {
+    if (!b.done) return 0;
+    const now = performance.now(), dt = Math.min(0.1, (now - (b._pt || now)) / 1000);
+    b._pt = now;
+    if ((b._chk = (b._chk || 0) - dt) <= 0) {
+      b._chk = 0.25;
+      let cerca = false;
+      if (b.owner === 'p') for (const u of g.units) if (u.owner === 'p' && !u.inside && Math.hypot(u.x - b.cx, u.y - b.cy) < 2.5) { cerca = true; break; }
+      if (cerca) b._hasta = now + 1500;
+    }
+    const quiere = (b._hasta || 0) > now ? 1 : 0, antes = b._abre || 0;
+    b._abre = quiere ? Math.min(1, antes + dt * 1.6) : Math.max(0, antes - dt * 1.2);
+    if (quiere && antes === 0 && PK.Sfx && R.sonarEnCasilla) R.sonarEnCasilla('porton', b.cx, b.cy);
+    return Math.round(b._abre * 4);
+  }
   // pk-42: un círculo en el suelo (en casillas) visto en isométrico, punteado
   function circuloRadio(ctx, cx, cy, r, col) {
     ctx.save();
@@ -898,7 +916,7 @@
   function drawRuta(ctx) {
     const L = PK.Logi, g = G();
     let id = L.verRuta && performance.now() - (L.verRutaT || 0) < 15000 ? L.verRuta : null;
-    const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => u.kind === 'cart' && u.ruta) : null;
+    const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => (u.kind === 'cart' || u.kind === 'carromato') && u.ruta) : null;
     if (su) id = su.ruta;
     if (!id) return;
     const r = g.state.logi.rutas.find(o => o.id === id), a = r && g.bById.get(r.de), b = r && g.bById.get(r.a);

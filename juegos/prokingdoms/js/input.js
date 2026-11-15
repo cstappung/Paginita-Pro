@@ -443,6 +443,7 @@
     } else if (k === 'z') { R().showZones = !R().showZones; }
     else if (k === 't') PK.Terr.toggle();
 
+    else if (k === 'r' && g.placing && D.BUILD[g.placing.type].porton && g.placing.move === undefined) I.girarPorton(); // pk-43
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
     else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido
@@ -451,6 +452,14 @@
     if (k === ' ') e.preventDefault();
   }
 
+  // pk-43: el Gran Portón se gira (dos tipos: granporton 4 × 2 y granportonv 2 × 4)
+  I.girarPorton = function () {
+    const g = G();
+    if (!g.placing || !D.BUILD[g.placing.type].porton) return;
+    g.placing.type = g.placing.type === 'granporton' ? 'granportonv' : 'granporton';
+    g.placing.armed = false; R().ghost = null;
+    PK.UI.refreshPanel(true);
+  };
   I.update = function (dt) {
     const r = R(), sp = (900 / r.cam.z) * dt;
     let dx = 0, dy = 0;

@@ -391,6 +391,28 @@
       p.box(2.3, 2.0, 0.6, 0.5, 0, 5, 'plank', 'plank', 'plank');
       p.box(2.35, 2.05, 0.5, 0.4, 5, 7, 'plank', 'plank', 'plank');
     },
+    granporton() {}, granportonv() {}, // pk-43: se dibujan con S.porton (dependen del material de la muralla)
+    // pk-43: galpón largo de tablas con techo de paja, abierto al frente: adentro, un carromato con su toldo; al lado,
+    // un corral con fardos de heno y un bebedero.
+    establo(p, col) {
+      p.box(0, 0, 4, 3, 0, 1, 'paving', 'paving', 'paving');
+      const b = { x: 0.15, y: 0.15, w: 2.6, h: 1.7 };
+      p.box(b.x, b.y, 0.2, b.h, 1, 16, 'plank'); p.box(b.x, b.y, b.w, 0.2, 1, 16, 'plank'); // paredes de atrás
+      p.box(b.x + b.w - 0.2, b.y, 0.2, b.h, 1, 16, 'plank');
+      // carromato guardado: caja, toldo del color del reino
+      p.box(0.6, 0.55, 1.7, 0.8, 4, 9, 'plank', 'plank', 'plank');
+      const lona = rgb(mix(col, [238, 226, 198], 0.45));
+      p.box(0.65, 0.6, 1.6, 0.7, 9, 15, lona, lona, lona);
+      p.post(b.x + 1.25, b.y + b.h - 0.1, 16); p.post(b.x + 0.05, b.y + b.h - 0.1, 16);
+      p.roof(b.x, b.y, b.w, b.h, 16, 12, 'thatch', 0.55, 0.22, 'x');
+      // corral
+      for (let i = 0; i < 5; i++) p.post(2.95 + (i % 3) * 0.45, i < 3 ? 0.3 : 0.3 + (i - 2) * 1.0, 6);
+      p.box(2.95, 0.3, 1.0, 0.08, 4, 5, 'darkwood', 'darkwood', 'darkwood');
+      p.box(3.85, 0.3, 0.08, 2.4, 4, 5, 'darkwood', 'darkwood', 'darkwood');
+      for (const [x, y] of [[3.1, 1.2], [3.15, 1.75]]) p.box(x, y, 0.45, 0.35, 1, 5, 'thatch', 'thatch', 'thatch'); // fardos
+      p.box(0.4, 2.3, 1.2, 0.35, 1, 4, 'darkwood', 'darkwood', '#4a7aa0'); // bebedero
+      p.flag(b.x + b.w, b.y + 0.2, 26, col, 10);
+    },
     cartwright(p, col) {
       // galpón abierto al frente con una carreta a medio armar y ruedas apoyadas
       p.box(0, 0, 3, 3, 0, 1, 'paving', 'paving', 'paving');
@@ -1251,7 +1273,7 @@
   };
   const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60, swamp: 36, giants: 44, temple: 36, legend: 40 };
 
-  const BTOP = { tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
+  const BTOP = { granporton: 58, granportonv: 58, establo: 40, tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
   // Tramos de nivel: 1-3, 4-6, 7-9, 10-12, 13-15, 16-19 y 20+ (cada era sube 2 niveles el tope).
   S.tier = lvl => (lvl >= 20 ? 6 : lvl >= 16 ? 5 : lvl >= 13 ? 4 : lvl >= 10 ? 3 : lvl >= 7 ? 2 : lvl >= 4 ? 1 : 0);
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).
@@ -1355,6 +1377,7 @@
   };
   let techoAsp = null;
   S.building = function (type, owner, lvl, ov) {
+    if (D.BUILD[type] && D.BUILD[type].porton) { const st = PK.Game && PK.Game.state; return S.porton(type, owner, owner === 'p' && st && st.def ? st.def.tier : 2, 0, ov); }
     const tier = S.tier(lvl || 1), asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (BCACHE[key]) return BCACHE[key];
     const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
@@ -1364,6 +1387,68 @@
     techoAsp = null;
     spr.pad = S.btop(type, lvl) - btopBase(type); // alto extra arriba (las barras se dibujan donde antes)
     return (BCACHE[key] = spr);
+  };
+
+  // pk-43: el Gran Portón. Dos torres con el material de la muralla (empalizada, piedra, sillares, bastión), un arco y,
+  // en el paso, dos hojas de madera que se abren (madera) o un rastrillo que sube (piedra o más). frame: 0 cerrado … 4
+  // abierto. Se dibuja aparte de S.building porque depende del material de la muralla y de lo abierto.
+  const PORC = {};
+  S.porton = function (type, owner, wallTier, frame, ov) {
+    const asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + wallTier + '|' + frame + (asp ? '|' + asp.id : '');
+    if (PORC[key]) return PORC[key];
+    const def = D.BUILD[type], v = def.porton === 'v', col = asp && asp.col ? asp.col : S.ownerColor(owner);
+    const t = Math.max(1, Math.min(4, wallTier || 1)), H = [0, 24, 30, 34, 38][t];
+    const mat = ['', 'bark', 'stone', 'paving', 'slate'][t], top = ['', 'logend', 'paving', 'marbleS', 'paving'][t];
+    const abre = frame / 4;
+    const spr = isoSprite(def.w, def.h, 58, false, p => {
+      // (a, b): a a lo largo de la muralla, b a través. En el girado se cambian x e y.
+      const box = (a, b, la, lb, z0, z1, m1, m2, m3) => (v ? p.box(b, a, lb, la, z0, z1, m1, m2, m3) : p.box(a, b, la, lb, z0, z1, m1, m2, m3));
+      const P = (a, b, z) => (v ? p.P(b, a, z) : p.P(a, b, z));
+      const torre = a0 => {
+        if (t === 1) { // empalizada: torre de troncos con techo de tablas
+          for (let i = 0; i < 4; i++) box(a0 + 0.06 + i * 0.22, 0.1, 0.2, 1.8, 0, H + (i % 2 ? 2 : 0), 'bark', 'bark', 'logend');
+          box(a0, 0.05, 0.95, 1.9, H - 2, H + 1, 'plank', 'plank', 'plank');
+          return;
+        }
+        box(a0 + 0.04, 0.05, 0.92, 1.9, 0, H, mat, mat, top);
+        for (let i = 0; i < 4; i++) { box(a0 + 0.04 + (i % 2) * 0.66, i < 2 ? 0.05 : 1.65, 0.26, 0.3, H, H + 4, mat, mat, top); } // almenas
+        // tronera y antorcha
+        const q = P(a0 + 0.5, 1.95, H * 0.62);
+        p.ctx.fillStyle = '#141018'; p.ctx.fillRect(q[0] - 1, q[1] - 3, 2, 5);
+        const tq = P(a0 + 0.95, 1.95, H * 0.45);
+        p.ctx.fillStyle = '#3a2a1a'; p.ctx.fillRect(tq[0], tq[1], 1, 3);
+        p.ctx.fillStyle = '#ffb040'; p.ctx.fillRect(tq[0] - 1, tq[1] - 2, 3, 2); p.ctx.fillStyle = '#fff0a0'; p.ctx.fillRect(tq[0], tq[1] - 3, 1, 1);
+      };
+      torre(0);
+      // suelo del paso
+      box(1, 0.1, 2, 1.8, 0, 1, 'paving', 'paving', 'paving');
+      if (t === 1) { // dos hojas que giran hacia afuera
+        const th = abre * Math.PI * 0.45, c = Math.cos(th), s2 = Math.sin(th), hz = H - 6;
+        for (const [h0, dir] of [[1, 1], [3, -1]]) {
+          const e = [h0 + dir * c * 0.98, 1 + s2 * 0.98];
+          p.fill([P(h0, 1, 0), P(e[0], e[1], 0), P(e[0], e[1], hz), P(h0, 1, hz)], 'plank', dir > 0 ? 1.1 : 0.85);
+          for (let k = 1; k < 4; k++) { const f = k / 4, m = [h0 + (e[0] - h0) * f, 1 + (e[1] - 1) * f]; p.line(P(m[0], m[1], 1), P(m[0], m[1], hz - 1), '#5a3a20'); } // tablas
+          for (const zz of [hz * 0.22, hz * 0.7]) { p.line(P(h0, 1, zz), P(e[0], e[1], zz), '#2a2228'); p.line(P(h0, 1, zz + 1), P(e[0], e[1], zz + 1), '#4a4248'); } // herrajes
+          p.line(P(e[0], e[1], 0), P(e[0], e[1], hz), '#2a1a0e');
+        }
+      } else { // rastrillo de hierro que sube
+        const z0 = abre * (H - 8), hz = H - 6;
+        if (z0 < hz - 1) p.fill([P(1.05, 1, Math.min(hz, z0)), P(2.95, 1, Math.min(hz, z0)), P(2.95, 1, hz), P(1.05, 1, hz)], '#1a1418'); // la sombra del paso detrás
+        for (let i = 0; i <= 6; i++) { const a = 1.05 + i * 0.315, q0 = P(a, 1, Math.min(hz, z0)), q1 = P(a, 1, hz); p.line(q0, q1, '#6a6a74'); p.line([q0[0] + 1, q0[1]], [q1[0] + 1, q1[1]], '#3a3a40'); }
+        for (let z = z0 + 2; z < hz; z += 4) p.line(P(1.05, 1, z), P(2.95, 1, z), '#8a8a94');
+        if (abre < 0.9) for (let i = 0; i <= 6; i++) { const a = 1.05 + i * 0.315, q = P(a, 1, z0); p.px(q[0], q[1], '#8a8a94'); } // puntas
+      }
+      // arco del paso, con escudo del reino
+      box(1, 0.6, 2, 0.8, H - 6, H, mat === 'bark' ? 'plank' : mat, mat === 'bark' ? 'plank' : mat, top);
+      const e = P(2, 1.4, H - 3);
+      p.ctx.fillStyle = rgb(col); p.ctx.fillRect(e[0] - 2, e[1] - 2, 5, 5);
+      p.ctx.fillStyle = t >= 3 ? '#e8b83a' : rgb(sc(col, 1.3)); p.ctx.fillRect(e[0], e[1] - 1, 1, 3); p.ctx.fillRect(e[0] - 1, e[1], 3, 1);
+      torre(3);
+      // estandartes en las torres (desde los sillares), que flamean con el cuadro
+      if (t >= 2) for (const a0 of [0.5, 3.5]) { const q = v ? [1.0, a0] : [a0, 1.0]; p.flag(q[0], q[1], H + 4, col, 10 + (frame % 2)); }
+    }, t >= 3 ? 3 : t >= 2 ? 2 : 0, null);
+    spr.pad = 0;
+    return (PORC[key] = spr);
   };
 
   // Suelo alrededor de los edificios según la era del reino: tierra pisada (II), grava (III-IV), adoquín (V-VII)
@@ -2218,6 +2303,70 @@
     set(4, 4, col); set(5, 4, col); set(6, 5, sc(col, 0.8)); set(4, 5, col); set(5, 5, sc(col, 0.85)); set(4, 6, sc(col, 0.7));
     if (moving && (f === 0 || f === 2)) set(7, 5, sc(col, 0.7));
     return (CC[key] = withMask({ c: pb.canvas(), ax: 15, ay: 19 }));
+  };
+
+  // pk-43: el carromato. Dos bueyes con yugo, carro largo con toldo del color del reino, ruedas grandes que giran y la
+  // carga asomando atrás. Unas 2 × 1,5 casillas de dibujo, pero choca como una sola (como la carreta).
+  const CRC = {};
+  S.carromato = function (col, carry, flip, frame, moving) {
+    const f = moving ? frame % 4 : 1, key = col.join(',') + (carry || '') + (flip ? 1 : 0) + f;
+    if (CRC[key]) return CRC[key];
+    const Wd = 52, Ht = 34, pb = new PB(Wd, Ht), X = x => (flip ? Wd - 1 - x : x);
+    const set = (x, y, c) => pb.set(X(x), y, c);
+    const hline = (x0, x1, y, c) => { for (let x = x0; x <= x1; x++) set(x, y, c); };
+    for (let x = 3; x <= 50; x++) pb.set(X(x), 32, [10, 18, 6], x < 6 || x > 47 ? 40 : 80); // sombra
+    const bob = moving && (f === 1 || f === 3) ? -1 : 0;
+    // --- bueyes (el de atrás más oscuro) ---
+    const ox = [[118, 82, 50], [84, 58, 36], [158, 118, 78], [196, 166, 120]], oxB = [[100, 70, 44], [70, 48, 30], [136, 100, 66], [176, 148, 108]];
+    const horn = [232, 222, 194], hoof = [36, 28, 22];
+    const buey = (x0, y0, pal, fase) => {
+      const lo = moving ? LEGS[(f + fase) % 4] : LEGS[1];
+      [x0 + 1, x0 + 2, x0 + 7, x0 + 8].forEach((lx, i) => { const o = lo[i]; for (let y = y0 + 5; y <= y0 + 7; y++) set(lx + (y === y0 + 7 ? o : 0), y, pal[i % 2 ? 1 : 0]); set(lx + o, y0 + 8, hoof); });
+      for (let y = y0; y <= y0 + 4; y++) hline(x0, x0 + 9, y, y === y0 ? pal[1] : y === y0 + 4 ? pal[3] : pal[0]);
+      hline(x0 + 1, x0 + 4, y0 + 1, pal[2]); set(x0 - 1, y0 + 1, pal[1]); set(x0 - 1, y0 + 2, pal[1]); set(x0 - 2, y0 + 3, pal[1]); // lomo claro y cola
+      // cabeza baja, con cuernos
+      hline(x0 + 10, x0 + 12, y0 + 1, pal[0]); hline(x0 + 10, x0 + 13, y0 + 2, pal[0]); hline(x0 + 11, x0 + 13, y0 + 3, pal[3]);
+      set(x0 + 12, y0 + 1, [20, 14, 10]); set(x0 + 10, y0, horn); set(x0 + 9, y0 - 1, horn); set(x0 + 13, y0, horn); set(x0 + 14, y0 - 1, horn);
+    };
+    buey(33, 12 + bob, oxB, 2);   // el de atrás (más arriba en la pantalla)
+    buey(35, 15 + bob, ox, 0);    // el de adelante
+    // yugo con el color del reino
+    for (let y = 11 + bob; y <= 19 + bob; y++) set(45, y, y === 11 + bob || y === 19 + bob ? [70, 46, 26] : sc(col, 0.85));
+    set(46, 11 + bob, sc(col, 1.2)); set(46, 19 + bob, sc(col, 1.2));
+    // lanza del carro hasta el yugo
+    hline(28, 44, 20, [96, 64, 36]); hline(29, 43, 21, [70, 46, 26]);
+    // --- caja del carro ---
+    const pl = [170, 120, 70], plL = [206, 160, 102], plD = [116, 78, 42], edge = [52, 34, 20];
+    for (let y = 16; y <= 22; y++) hline(3, 29, y, y === 16 ? plL : y === 22 ? edge : y === 19 ? plD : pl);
+    for (const x of [3, 11, 20, 29]) for (let y = 16; y <= 21; y++) set(x, y, plD);
+    // --- toldo: arco de lona con el color del reino y costillas ---
+    const lona = mix(col, [238, 226, 198], 0.45), lonaL = sc(lona, 1.12), lonaD = sc(lona, 0.78);
+    for (let x = 4; x <= 28; x++) {
+      const t = (x - 16) / 13, top = Math.round(5 + 9 * t * t); // arco
+      for (let y = top; y <= 15; y++) set(x, y, y === top ? lonaL : (x - 4) % 6 === 0 ? lonaD : y > 13 ? lonaD : lona);
+    }
+    for (let x = 6; x <= 26; x += 4) set(x, 9 + ((x / 4) % 2), lonaL); // pliegues
+    // boca de atrás del toldo, con la carga asomando
+    for (let y = 9; y <= 15; y++) { set(3, y, lonaD); set(4, y, [44, 30, 20]); set(5, y, [60, 40, 24]); }
+    if (carry) {
+      const cc = CARRY[carry] || [150, 120, 80], cL = sc(cc, 1.25), cD = sc(cc, 0.72);
+      for (const [y, x0, x1] of [[15, 1, 8], [14, 1, 7], [13, 2, 6], [12, 2, 5]]) for (let x = x0; x <= x1; x++) set(x, y, (carry === 'wood' || carry === 'planks') && (x === x0) ? [214, 176, 120] : U.hash(x, y, 9) > 0.7 ? cD : y === 12 ? cL : cc);
+    }
+    // --- ruedas grandes (atrás y adelante), con rayos que giran ---
+    const rim = [58, 54, 52], rimL = [124, 118, 110], spoke = [184, 142, 90], hubC = [30, 20, 14];
+    const rueda = (cx, cy, r) => {
+      for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+        const d = Math.hypot(x, y);
+        if (d <= r + 0.3 && d > r - 1.2) set(cx + x, cy + y, y < -r / 2 ? rimL : rim);
+      }
+      const ang = (moving ? f : 0) * (Math.PI / 8);
+      for (let k = 0; k < 4; k++) { const a = ang + (k * Math.PI) / 4; for (let t = 1; t < r - 0.8; t += 0.5) { set(Math.round(cx + Math.cos(a) * t), Math.round(cy + Math.sin(a) * t), spoke); set(Math.round(cx - Math.cos(a) * t), Math.round(cy - Math.sin(a) * t), spoke); } }
+      set(cx, cy, hubC); set(cx + 1, cy, hubC);
+    };
+    rueda(9, 25, 6); rueda(24, 26, 5);
+    // polvo detrás al andar
+    if (moving) for (const [x, y, a] of [[1, 30, 90], [0, 28, 60], [2, 27, 50]]) if ((x + f) % 2) pb.set(X(x), y, [190, 170, 130], a);
+    return (CRC[key] = withMask({ c: pb.canvas(), ax: 26, ay: 30 }));
   };
 
   // Lobo: gris, con lomo oscuro; 2 cuadros de carrera.

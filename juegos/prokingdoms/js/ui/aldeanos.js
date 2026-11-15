@@ -144,10 +144,10 @@
   // Menú propio (antes la grilla salía solo al elegir aldeanos, que además tenían que ir a levantar la obra).
   const BUILD_CATS = [
     ['Casas y bodegas', ['house', 'granary', 'warehouse', 'builder', 'tc']],
-    ['Recolección', ['lumber', 'mining', 'mill', 'farm', 'muelle', 'scout']],
+    ['Recolección', ['lumber', 'mining', 'mill', 'establo', 'farm', 'muelle', 'scout']],
     ['Talleres', ['sawmill', 'masonry', 'smelter', 'forge', 'scriptorium', 'steelworks', 'workshop', 'cartwright']],
     ['Reino', ['market', 'library', 'consejo', 'university', 'monastery', 'guild']],
-    ['Ejército y defensa', ['barracks', 'tower']],
+    ['Ejército y defensa', ['barracks', 'tower', 'granporton']],
     ['Maravilla (elige una)', D.MARAVILLAS || []],
     ['Decoraciones (ánimo)', D.DECOS || []],
   ];

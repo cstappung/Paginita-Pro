@@ -16,9 +16,9 @@
 
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
   const PLAN = {
-    1: [['house', 2], ['lumber', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
+    1: [['house', 2], ['lumber', 1], ['establo', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
     2: [['sawmill', 1], ['barracks', 1], ['tavern', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
-    3: [['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
+    3: [['establo', 2], ['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
     4: [['university', 1], ['steelworks', 1], ['masonry', 3], ['mining', 4], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8], ['smelter', 2]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
     6: [['m_jardines', 1], ['house', 19]],
@@ -117,6 +117,35 @@
       }
     }
     return false;
+  }
+  // pk-43: cada campamento con algo adentro necesita un carromato que lo lleve al pueblo. Como un jugador: una ruta del
+  // campamento a la bodega más cercana que lo reciba, con un carromato libre; si no hay libres, arma otro.
+  function carromatos() {
+    const g = G(), L = PK.Logi, Lb = PK.Libro;
+    for (const b of Lb.campos()) {
+      const rs = L.rutasDesde(b);
+      const llevan = rs.reduce((n, r) => n + L.cartsDe(r).length, 0);
+      const quiere = Lb.totalCampo(b) > Lb.capCampo(b) * 0.6 ? 2 : 1;
+      if (llevan >= quiere) continue;
+      let r = rs.find(o => !L.rutaMala(o));
+      if (!r) {
+        const dests = g.buildings.filter(o => o.owner === 'p' && o.done && L.puntoCarreta(o) && !L.isShop(o) && (b.def.drop || []).some(k => L.acepta(o, k)));
+        const d = dests.sort((x, y) => U.dist(x.cx, x.cy, b.cx, b.cy) - U.dist(y.cx, y.cy, b.cx, b.cy))[0];
+        if (!d) continue;
+        PK.UI.mute = true;
+        r = L.crearRuta(b.id, d.id, null);
+        if (!r) continue;
+      }
+      if (L.libres('carromato').length) { L.sumarCarreta(r); continue; }
+      const est = g.buildings.find(o => o.owner === 'p' && o.done && o.type === 'establo' && !o.queue.length);
+      if (est && L.carromatos().length < L.carroMax() && g.canAfford(D.carromatoCost(S().era))) L.trainCarro(est);
+      else if (L.carromatos().length >= L.carroMax()) { // sin lugar: mejora un establo o pone otro
+        const ests = g.buildings.filter(o => o.owner === 'p' && o.done && o.type === 'establo' && !o.upg && g.canUpgrade(o).ok).sort((x, y) => x.lvl - y.lvl);
+        if (ests.length) g.upgrade(ests[0]);
+        else if (g.countAll('establo') < g.maxCount('establo') && g.canAfford(g.buildCost('establo'))) { const tc = g.buildings.find(o => o.owner === 'p' && o.type === 'tc'); const pl = tc && lugar('establo', tc.cx, tc.cy); if (pl) g.place('establo', pl[0], pl[1]); }
+      }
+      return; // de a uno por paso
+    }
   }
   function construir() {
     const g = G(), st = S(), tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
@@ -275,6 +304,7 @@
       cartas();
       exploradores();
       mercado();
+      carromatos();
       campoExtra() || construir();
       mejorar();
       investigar();

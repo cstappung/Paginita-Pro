@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -938,15 +938,24 @@ test('L1 (pk-41): la ruta por tiempo toma el camino rápido aunque dé un rodeo,
 
 test('L1 (pk-41): las rutas de carretas unen talleres y bodegas del pueblo, sin campamentos ni modo automático', () => {
   const L = PK.Logi;
-  const B = (type, id) => ({ id, type, owner: 'p', def: D.BUILD[type], done: true });
+  // pk-43: el Molino es del pueblo solo dentro de tu tierra (afuera es campamento): los de la prueba van en una casilla tuya
+  const mx = 10, my = 10, ownerAt = W.ownerAt;
+  W.ownerAt = () => 'p'; // la prueba no arma territorios: todo es tuyo
+  const B = (type, id) => ({ id, type, owner: 'p', def: D.BUILD[type], done: true, x: mx, y: my, w: 1, h: 1, cx: mx + 0.5, cy: my + 0.5 });
   const tc = B('tc', 1), saw = B('sawmill', 2), forge = B('forge', 3), lumber = B('lumber', 4), wh = B('warehouse', 5), mill = B('mill', 6);
   assert.equal(L.parMalo(tc, saw), null);
   assert.equal(L.parMalo(saw, forge), null, 'de un taller a otro');
   assert.equal(L.parMalo(saw, tc), null, 'del taller a la bodega');
   assert.equal(L.parMalo(mill, saw), null, 'el Molino del pueblo es bodega (decisión 4)');
-  assert.match(L.parMalo(lumber, saw), /carromatos/, 'los campamentos son del carromato (decisión 3)');
+  assert.equal(L.parMalo(lumber, saw), null, 'pk-43: del campamento maderero al Aserradero va un carromato');
+  assert.equal(L.claseRuta ? 'ok' : '', 'ok');
+  assert.match(L.parMalo(saw, lumber), /campamento no recibe/, 'a un campamento no se lleva nada');
   assert.match(L.parMalo(tc, wh), /dos bodegas/);
   assert.match(L.parMalo(saw, saw), /mismo/);
+  W.ownerAt = () => null; // en tierra de nadie, el Molino es un campamento más
+  assert.match(L.parMalo(mill, saw), /no usa nada/);
+  assert.equal(L.parMalo(mill, tc), null);
+  W.ownerAt = ownerAt;
   // ningún resto del findJob automático (decisión 2)
   assert.doesNotMatch(JS('logistics.js'), /function findJob/);
   // step() usa el mismo factor que las tablas de costo, y la carreta no corta esquinas por el pasto
@@ -988,4 +997,56 @@ test('L2 (pk-42): cada aldeano trabaja para un edificio, con radio y puestos, y 
   assert.match(JS('auto.js'), /A\.sinRadio = /);
   // la base se guarda con el aldeano (task.base) y lo que saca un edificio, con el edificio
   assert.match(ent, /extrae/);
+});
+
+test('L3 (pk-43): libro mayor — las bodegas suman S.res, los campamentos guardan aparte y nada se pierde', () => {
+  const Lb = PK.Libro, st0 = G.state, capDe0 = G.capDe, cap0 = G.cap, bs0 = G.buildings;
+  const caps = { tc: 800, warehouse: 1500, granary: 0 };
+  G.capDe = (b, r) => (b.type === 'granary' ? (r === 'food' ? 2000 : 0) : caps[b.type] || 0);
+  G.cap = r => G.buildings.reduce((s, b) => s + G.capDe(b, r), 0);
+  const mk = (id, type, x) => ({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 2, h: 2, cx: x + 1, cy: 11, inv: {} });
+  const tc = mk(1, 'tc', 10), wh = mk(2, 'warehouse', 20), gr = mk(3, 'granary', 30), camp = mk(4, 'lumber', 60);
+  G.buildings = [tc, wh, gr, camp];
+  G.state = { res: { wood: 1000, food: 500, stone: 0 }, flags: {}, logi: { rutas: [] } };
+  try {
+    const suma = r => [tc, wh, gr].reduce((s, b) => s + (b.inv[r] || 0), 0);
+    Lb.conciliar();
+    assert.equal(suma('wood'), 1000, 'una partida vieja: su S.res entra en sus bodegas');
+    assert.equal(tc.inv.wood, 800, 'primero el Centro Urbano, hasta su tope');
+    assert.equal(wh.inv.wood, 200);
+    assert.equal(suma('food'), 500);
+    // operaciones al azar: la suma de las bodegas siempre es S.res, nada negativo
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 4000; i++) {
+      const r = ['wood', 'food', 'stone'][i % 3], n = Math.floor(rnd() * 120), op = Math.floor(rnd() * 6);
+      if (op === 0) G.state.res[r] = Math.max(0, G.state.res[r] - n);          // pagar
+      else if (op === 1) G.state.res[r] += n;                                   // premiar (puede pasar el tope)
+      else if (op === 2) Lb.poner([tc, wh, gr][i % 3], r, n);                   // descargar en una bodega
+      else if (op === 3) Lb.sacar([tc, wh, gr][i % 3], r, n);                   // una carreta carga
+      else if (op === 4) Lb.ponerCampo(camp, r, n);                             // un aldeano descarga en el campamento
+      else Lb.sacarCampo(camp, r, n);                                           // un carromato carga
+      Lb.conciliar();
+      for (const k of ['wood', 'food', 'stone']) {
+        assert.ok(Math.abs(suma(k) - G.state.res[k]) < 1e-6, 'descuadre en ' + k + ' (paso ' + i + ')');
+        for (const b of [tc, wh, gr, camp]) assert.ok(!(b.inv[k] < -1e-9), 'negativo en ' + b.type);
+      }
+      assert.ok(Lb.totalCampo(camp) <= Lb.capCampo(camp) + 1e-9, 'el campamento no pasa su tope');
+    }
+    // demoler un campamento: lo suyo va al pueblo entero
+    const w = G.state.res.wood + (camp.inv.wood || 0);
+    Lb.vaciarAlPueblo(camp);
+    assert.ok(Math.abs(G.state.res.wood - w) < 1e-9);
+    // la foto al servidor cuenta lo de afuera (campamentos y carromatos)
+    camp.inv = { stone: 40 };
+    G.units.push({ owner: 'p', kind: 'carromato', carry: 25, carryRes: 'stone' });
+    assert.equal(Lb.fuera('stone'), 65);
+    G.units.pop();
+  } finally { G.capDe = capDe0; G.cap = cap0; G.buildings = bs0; G.state = st0; }
+  // el carromato no cabe por una puerta chica, sí por el Gran Portón; la tierra ajena le cuesta ×4
+  const lg = JS('logistics.js');
+  assert.match(lg, /if \(perfil === 'carromato'\) return W\.wall\[k\] !== 2;/);
+  assert.match(lg, /f \/ C\.ajeno/);
+  assert.match(JS('world.js'), /noGate && W\.wall\[ni\] >= 2/, 'lobos y bandidos tampoco pasan por el Gran Portón');
+  assert.equal(D.BUILD.granportonv.alias, 'granporton');
+  assert.ok(!D.BUILD.establo.noUp && D.BUILD.establo.era === 1, 'el Establo es de la Era I');
 });

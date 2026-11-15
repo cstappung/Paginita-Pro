@@ -87,19 +87,26 @@
 
   // ---------- Foto del reino ----------
   const RAW = D.RES_RAW, TASKS = ['', 'gather', 'farm', 'build', 'move', 'explore', 'dig'];
+  // pk-43: lo de los campamentos y lo que va arriba de carretas y carromatos también cuenta (si no, descargar un
+  // carromato parecería un salto y el servidor lo recortaría como trampa)
+  function fotoRes(st) {
+    const o = {};
+    for (const r of ['food', 'wood', 'stone', 'gold']) o[r] = (st.res[r] || 0) + (PK.Libro ? PK.Libro.fuera(r) : 0);
+    return o;
+  }
   function snapshot(force) {
     const st = S(), g = G();
     const blds = g.buildings.filter(b => b.owner === 'p').map(b => [b.type, b.x, b.y, b.done ? 1 : 0, b.lvl]);
     const bver = String(U.strHash(JSON.stringify(blds)));
     const snap = {
       era: st.era, pop: g.pop(), defense: PK.Social.defense(), truce: PK.Social.truce(),
-      res: { food: st.res.food, wood: st.res.wood, stone: st.res.stone, gold: st.res.gold }, total: st.stats.g_total || 0,
+      res: fotoRes(st), total: st.stats.g_total || 0,
       army: PK.Social.power(st.war.army), walls: g.lvl('walls'), score: PK.Terr.myInfo().score,
       walled: PK.Def.walledList(), wallMult: PK.Def.parcelMult(-1, true), terrMult: 1 + g.best('dragontower', 'terrDef'), rk: PK.Mundo ? PK.Mundo.rkFoto() : undefined,
       units: g.units.filter(u => u.owner === 'p' && !u.inside).slice(0, 250).map(u => [
         Math.round(u.x * 10), Math.round(u.y * 10), u.mode === 'walk' ? 1 : u.mode === 'work' ? 2 : 0,
         u.task ? Math.max(0, TASKS.indexOf(u.task.t)) : 0, u.task && u.task.res ? RAW.indexOf(u.task.res) : -1,
-        u.carry ? RAW.indexOf(u.carryRes) : -1, u.flip ? 1 : 0, u.hair, u.skin, u.kind === 'scout' ? 1 : u.kind === 'cart' ? 2 : 0]),
+        u.carry ? RAW.indexOf(u.carryRes) : -1, u.flip ? 1 : 0, u.hair, u.skin, u.kind === 'scout' ? 1 : u.kind === 'cart' ? 2 : u.kind === 'carromato' ? 3 : 0]),
     };
     if (force || bver !== lastBver || Date.now() - lastSentBuild > 60000) { snap.buildings = blds; snap.bver = bver; lastBver = bver; lastSentBuild = Date.now(); }
     return snap;
@@ -238,7 +245,7 @@
       u.task = a[3] ? { t: TASKS[a[3]], res: RAW[a[4]] } : null;
       u.carry = a[5] >= 0 ? 1 : 0; u.carryRes = a[5] >= 0 ? RAW[a[5]] : null;
       if (a[7] !== undefined) { u.hair = a[7]; u.skin = a[8]; }
-      u.kind = a[9] === 1 ? 'scout' : a[9] === 2 ? 'cart' : 'v';
+      u.kind = a[9] === 1 ? 'scout' : a[9] === 2 ? 'cart' : a[9] === 3 ? 'carromato' : 'v';
     });
   }
 

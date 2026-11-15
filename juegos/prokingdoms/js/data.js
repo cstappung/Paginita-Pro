@@ -91,6 +91,11 @@
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
     scout: { name: 'Puesto de Exploradores', w: 2, h: 2, cost: { wood: 100, food: 50 }, time: 25, era: 1, max: 1, trains: 'scout', upT: 0.9, desc: 'Entrena exploradores que revelan el mapa. Su nivel define cuántas casillas alrededor de tu reino pueden explorar (en el nivel 19 o antes, el mapa entero).' },
     cartwright: { name: 'Carretería', w: 3, h: 3, cost: { wood: 250, stone: 100 }, time: 45, era: 2, max: 2, upT: 0.9, desc: 'Construye carretas que llevan insumos a los talleres y sacan lo que producen. Con caminos van mucho más rápido.' },
+    // pk-43 (plan de logística L3): el carromato vacía los campamentos; el Gran Portón es el único paso de la muralla
+    // para los carromatos. Van aquí (no en datos-vida.js): el servidor descarta los tipos que no conoce.
+    establo: { name: 'Establo de Carromatos', w: 4, h: 3, cost: { wood: 140, stone: 30 }, time: 40, era: 1, upT: 0.8, max: e => 1 + Math.floor(e / 2), desc: 'Arma carromatos: carros grandes de bueyes que vacían los campamentos y llevan lo juntado al pueblo, dentro y fuera de tu tierra. El primero trae un carromato de regalo.' },
+    granporton: { name: 'Gran Portón', w: 4, h: 2, cost: { wood: 200, stone: 120 }, time: 45, era: 1, noUp: true, porton: 'h', max: e => 1 + Math.floor(e / 3), desc: 'Paso ancho en la muralla, con dos torres: lo cruzan tus aldeanos, carretas y carromatos (los carromatos no caben por una puerta chica). Lobos, bandidos y otros reinos no pasan. Se puede poner encima de tu muralla.' },
+    granportonv: { name: 'Gran Portón', w: 2, h: 4, cost: { wood: 200, stone: 120 }, time: 45, era: 1, noUp: true, porton: 'v', alias: 'granporton', max: e => 1 + Math.floor(e / 3), desc: 'Paso ancho en la muralla, con dos torres (girado).' },
     tower: { name: 'Torre de Vigía', w: 1, h: 1, cost: { stone: 100, wood: 25 }, time: 30, era: 1, upT: 0.8, max: e => 2 + e * 2, desc: 'Defiende tu reino y ve muy lejos en la niebla.' },
     market: { name: 'Mercado', w: 3, h: 3, cost: { wood: 175 }, time: 45, era: 2, max: 1, desc: 'Compra y vende recursos. Con más nivel, mejores precios.' },
     sawmill: { name: 'Aserradero', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 40, era: 2, recipe: 'planks', slots: 3, desc: 'Convierte madera en tablones.' },
@@ -108,7 +113,7 @@
     workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -167,6 +172,8 @@
     builder: () => ({ builders: 1 }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
+    establo: L => ({ carromatos: 2 + L, carroCap: D.CARROMATO.cap + D.CARROMATO.capLvl * (L - 1), carroSpeed: 0.05 * (L - 1) }),
+    granporton: () => ({}), granportonv: () => ({}),
     cartwright: L => ({ carts: 2 + 2 * L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
     // pk-40: la venta nunca alcanza a la compra menos 10 puntos. En Nv 8–9 se vendía al 92–95% y se compraba al
     // 90–92%: comprar y vender lo mismo daba oro infinito. Ahora la compra baja hasta 0,90 (Nv 8) y la venta sube
@@ -665,6 +672,12 @@
   // avanzado, cintas transportadoras que unen dos edificios y mueven todo sin que nadie lo cargue.
   D.ROAD = { cost: { stone: 3 }, era: 1, walk: 1.4, cart: 1.8 };
   D.CART = { cost: { wood: 80, gold: 10 }, time: 20, speed: 1.3, offRoad: 0.65, cap: 20 };
+  // pk-43: el carromato. Más lento que la carreta fuera del camino, pero carga diez veces más y sale de tu tierra.
+  // road: en camino; highway: en autopista (L5); ajeno: la tierra de otro reino sin muralla cuesta ×4 (decisión 5).
+  D.CARROMATO = { cost: { wood: 150, gold: 10 }, time: 45, speed: 1.6, offRoad: 0.7, road: 1.5, highway: 3.2, ajeno: 4, cap: 250, capLvl: 50 };
+  D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
+  // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.
+  D.campoCap = L => 300 + 150 * (L - 1);
   D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 };
   D.BUF = 30;          // capacidad de los depósitos de un taller, por puesto de trabajo
   D.NEAR_STORE = 3;    // un taller a esta distancia de un almacén se abastece solo, sin carretas

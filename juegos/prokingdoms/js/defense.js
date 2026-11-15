@@ -15,6 +15,7 @@
     W.wall.fill(0);
     for (const k of st.def.walls) { W.wall[k] = WALL; W.block[k] = BLOCK; }
     for (const k of st.def.gates) W.wall[k] = GATE;
+    for (const b of G().buildings || []) if (b.def.porton) G().marcarPorton(b, true); // pk-43: el paso del Gran Portón
     Def.recount();
   };
   Def.tier = () => D.WALL.tiers[S().def.tier - 1];
@@ -90,7 +91,7 @@
   // Desarmar devuelve la mitad del material actual.
   Def.remove = function (k) {
     const st = S(), t = W.wall[k];
-    if (!t) return;
+    if (!t || t > GATE) return; // 3: el paso de un Gran Portón (es un edificio: se demuele)
     const c = t === GATE ? D.WALL.gate : Def.tier().cost, back = {};
     for (const r in c) back[r] = Math.floor(c[r] / 2);
     G().give(back);
