@@ -61,7 +61,7 @@
       if (b.owner !== 'p' || !b.done || !b.def.recipe || b.workers.length >= g.slots(b)) continue;
       if (isla(b.cx, b.cy)) continue;
       const rc = D.RECIPES[b.def.recipe];
-      if (!g.reserveOk(rc.in, Object.keys(rc.out)[0], b) && !PK.Logi.carts().length) continue;
+      if (!g.reserveOk(rc.in, Object.keys(rc.out)[0], b) && !PK.Logi.rutasHacia(b).some(r => PK.Logi.cartsDe(r).length)) continue;
       if (!PK.Logi.puede(b) || (b.paradoHasta && g.ahora() < b.paradoHasta)) continue; // parado: no volver a mandarlos
       if (!PK.Logi.supplied(b)) continue; // sin abastecimiento no sirve de nada
       const reserved = g.units.filter(o => o.task && o.task.t === 'work' && o.task.b === b.id && !o.inside).length;
@@ -224,7 +224,7 @@
       for (const b of g.buildings) {
         if (b.owner !== 'p' || !b.def.recipe || !b.workers.length) continue;
         // si una carreta o una cinta ya trae lo que falta, no cuenta como parado
-        const coming = b.status === 'Faltan insumos' && (PK.Logi.carts().some(c => c.job && c.job.to === b.id) || st.logi.belts.some(x => x.b === b.id && x.items.length));
+        const coming = b.status === 'Faltan insumos' && (PK.Logi.carts().some(c => c.job && c.job.to === b.id && c.job.n > 0) || st.logi.belts.some(x => x.b === b.id && x.items.length));
         b.stallT = b.status === 'Produciendo' || coming ? 0 : (b.stallT || 0) + el;
         if (b.stallT < 20) continue;
         b.stallT = 0;

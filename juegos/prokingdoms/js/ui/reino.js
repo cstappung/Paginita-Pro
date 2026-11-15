@@ -116,31 +116,87 @@
   };
 
   // ---------- Logística ----------
+  // pk-41: las carretas siguen rutas que eliges tú (origen, destino y, si quieres, un recurso). Sin ruta quedan paradas.
+  const rutaForm = { de: 0, a: 0, res: '' };
+  const nombreB = b => b.def.name + ' ' + b.lvl + ' · ' + Math.round(b.cx) + ',' + Math.round(b.cy);
+  UI.nuevaRutaDesde = function (b, comoDestino) {
+    if (comoDestino) rutaForm.a = b.id; else rutaForm.de = b.id;
+    UI.openLogistics();
+  };
+  UI.rutaEl = function (r, compacto) {
+    const L = PK.Logi, g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a), cs = L.cartsDe(r), mala = L.rutaMala(r);
+    const T = mala ? null : L.tiempos(r, true);
+    const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.' : !cs.length ? 'Sin carretas: súmale una con +.' : cs[0].estado || '');
+    const malo = mala || (T && !T.ok) || !cs.length;
+    return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') },
+      el('div', { class: 'ruta-nom' }, a ? el('img', { class: 'ico', src: Sp.buildingIcon(a.type, undefined, undefined, a.asp), alt: '' }) : '', el('b', null, a ? a.def.name : '?'), ' → ',
+        b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '', el('b', null, b ? b.def.name : '?'),
+        r.res ? el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase()) : el('span', { class: 'small muted' }, ' · lo que haga falta')),
+      el('div', { class: 'ruta-dat small' }, T && T.ok ? 'Ida ' + Math.round(T.ida) + ' s · vuelta ' + Math.round(T.vuelta) + ' s' + (cs.length ? ' · aprox. ' + Math.round(T.ritmo) + ' por minuto' : '') : '', el('span', { class: malo ? 'warn-t' : 'muted' }, (T && T.ok ? ' · ' : '') + estado)),
+      el('div', { class: 'row ruta-btn' },
+        el('span', { class: 'small' }, 'Carretas: '),
+        UI.btn('−', () => { L.quitarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, disabled: !cs.length, title: 'Sacar una carreta de esta ruta' }),
+        el('b', null, String(cs.length)),
+        UI.btn('+', () => { L.sumarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, disabled: !!mala, title: 'Sumar una carreta sin ruta' }),
+        compacto ? '' : UI.btn('Ver', () => { UI.closeModal(); L.verRuta = r.id; L.verRutaT = performance.now(); if (a && b) PK.Render.centerOn((a.cx + b.cx) / 2, (a.cy + b.cy) / 2); }, { small: true }),
+        compacto ? '' : UI.btn('Borrar', () => { L.borrarRuta(r.id); UI.rerender(); }, { small: true, cls: 'danger' })));
+  };
   UI.openLogistics = function () {
     UI.modal('logi', 'Logística', body => {
       const L = PK.Logi, g = G(), st = S();
       const shops = g.buildings.filter(b => b.owner === 'p' && b.done && b.def.recipe);
       const far = shops.filter(b => !L.nearStore(b));
+      const sinRuta = L.sinRuta();
       body.append(el('div', { class: 'war-top' },
         el('div', null, el('b', null, 'Carretas: '), L.carts().length + '/' + L.cartMax() + (g.countB('cartwright') ? '' : ' (construye una Carretería, Era II)')),
+        el('div', { class: sinRuta ? 'warn-t' : '' }, el('b', null, 'Sin ruta: '), String(sinRuta)),
         el('div', null, el('b', null, 'Talleres lejos de un almacén: '), far.length + ' de ' + shops.length),
         el('div', null, el('b', null, 'Cintas: '), st.logi.belts.length)));
       body.append(el('div', { class: 'row' },
         UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
         UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos (y murallas); vuelve la mitad del material' }),
         UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
+
+      // ----- Rutas -----
+      body.append(el('h3', null, 'Rutas de carretas'));
+      if (sinRuta) body.append(el('p', { class: 'small warn-t' }, sinRuta === 1 ? 'Tienes una carreta parada sin ruta.' : 'Tienes ' + sinRuta + ' carretas paradas sin ruta.', ' Crea una ruta o súmalas con + a una que ya tengas.'));
+      for (const r of st.logi.rutas) body.append(UI.rutaEl(r));
+      if (!st.logi.rutas.length) body.append(el('p', { class: 'small muted' }, 'Todavía no tienes rutas. Una ruta une un taller con una bodega (o con otro taller): sus carretas cargan en el origen, llevan al destino y vuelven.'));
+      const puntos = g.buildings.filter(b => b.done && L.puntoCarreta(b)).sort((x, y) => (L.isShop(y) - L.isShop(x)) || x.def.name.localeCompare(y.def.name));
+      const opc = (sel, vacio) => [el('option', { value: '' }, vacio)].concat(
+        [['Talleres', puntos.filter(b => L.isShop(b))], ['Bodegas', puntos.filter(b => !L.isShop(b))]].filter(x => x[1].length).map(([t, l]) => el('optgroup', { label: t }, l.map(b => el('option', { value: b.id, selected: b.id === sel }, nombreB(b))))));
+      const A = g.bById.get(rutaForm.de), B = g.bById.get(rutaForm.a);
+      const resOps = !B ? [] : L.isShop(B) ? Object.keys(L.recipe(B).in) : A && L.isShop(A) ? [L.output(A)] : [];
+      if (rutaForm.res && !resOps.includes(rutaForm.res)) rutaForm.res = '';
+      const why = A && B ? L.parMalo(A, B) : null;
+      body.append(el('div', { class: 'ruta-nueva' },
+        el('label', null, 'Origen ', el('select', { 'aria-label': 'Origen de la ruta', onchange: e => { rutaForm.de = +e.target.value || 0; UI.rerender(); } }, opc(rutaForm.de, 'Elige el origen'))),
+        el('label', null, 'Destino ', el('select', { 'aria-label': 'Destino de la ruta', onchange: e => { rutaForm.a = +e.target.value || 0; UI.rerender(); } }, opc(rutaForm.a, 'Elige el destino'))),
+        el('label', null, 'Lleva ', el('select', { 'aria-label': 'Recurso que lleva', onchange: e => { rutaForm.res = e.target.value; } },
+          [el('option', { value: '' }, 'Lo que haga falta')].concat(resOps.map(k => el('option', { value: k, selected: k === rutaForm.res }, D.RES[k].name))))),
+        UI.btn('Crear ruta', () => {
+          const r = L.crearRuta(rutaForm.de, rutaForm.a, rutaForm.res || null);
+          if (!r) return;
+          if (L.libres().length) L.sumarCarreta(r);
+          rutaForm.de = rutaForm.a = 0; rutaForm.res = '';
+          UI.rerender();
+        }, { cls: 'gold', disabled: !A || !B || !!why })));
+      if (why) body.append(el('p', { class: 'small warn-t' }, why));
+      if (!puntos.some(b => L.isShop(b))) body.append(el('p', { class: 'small muted' }, 'Las rutas sirven cuando tienes talleres (Aserradero, Cantería…).'));
+
       body.append(el('h3', null, 'Cómo se mueven las cosas'), el('ul', { class: 'info' },
         el('li', null, 'Cada taller tiene un depósito de entrada y uno de salida. Solo produce con lo que tiene adentro.'),
         el('li', null, 'Si está a 3 casillas o menos de un Almacén o del Centro Urbano, se abastece solo, pero despacio.'),
-        el('li', null, 'Las carretas abastecen talleres lejanos y arman cadenas: llevan lo que sale de un taller directo al que lo usa (madera → tablones → herramientas).'),
-        el('li', null, 'Los caminos aceleran un 40% a los aldeanos y casi triplican la velocidad de las carretas, que fuera del camino van lentas.'),
+        el('li', null, 'Lejos de los almacenes lo abastecen las carretas: cada una sigue la ruta que le das. Si en el origen no hay nada que llevar, espera ahí; si el destino está lleno, espera con la carga.'),
+        el('li', null, 'Las carretas eligen el camino más rápido, no el más corto: por un camino empedrado van casi tres veces más rápido, aunque den un rodeo.'),
+        el('li', null, 'Las carretas no salen de tu territorio ni van a los campamentos.'),
         el('li', null, 'Las cintas (' + L.beltLockText().replace('Las cintas requieren ', 'requieren ') + ') unen dos edificios y mueven ' + D.BELT.rate + ' unidades por segundo sin que nadie cargue nada.')));
       if (shops.length) {
         body.append(el('h3', null, 'Talleres'));
         for (const b of shops) {
           const r = D.RECIPES[b.def.recipe], cap = L.bufCap(b), out = Object.keys(r.out)[0];
           body.append(el('div', { class: 'work-row' }, el('img', { class: 'ico', src: Sp.buildingIcon(b.type) }), el('b', null, b.def.name + ' ' + b.lvl),
-            el('span', { class: 'small muted' }, ' ' + (b.status === 'En reserva' && G().reservaDe(b) ? G().reservaText(G().reservaDe(b)) : b.status || '') + ' · entrada ' + Object.keys(r.in).map(k => Math.floor(b.inb[k] || 0)).join('/') + ' · salida ' + Math.floor(b.outb[out] || 0) + '/' + cap + (L.nearStore(b) ? ' · junto a almacén' : '')),
+            el('span', { class: 'small muted' }, ' ' + (b.status === 'En reserva' && G().reservaDe(b) ? G().reservaText(G().reservaDe(b)) : b.status || '') + ' · entrada ' + Object.keys(r.in).map(k => Math.floor(b.inb[k] || 0)).join('/') + ' · salida ' + Math.floor(b.outb[out] || 0) + '/' + cap + (L.nearStore(b) ? ' · junto a almacén' : ' · rutas: ' + L.rutasHacia(b).length + ' entran, ' + L.rutasDesde(b).length + ' salen')),
             G().reservaDe(b) || b.sinReserva ? UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { G().setSinReserva(b, !b.sinReserva); UI.rerender(); }, { small: true, cls: b.sinReserva ? '' : 'gold' }) : '',
             UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); }, { small: true })));
         }
@@ -154,6 +210,16 @@
         }
       }
     }, { wide: true });
+  };
+  // Las rutas que salen o llegan a un edificio, para su panel.
+  UI.rutasPanel = function (b) {
+    const L = PK.Logi;
+    if (!L.puntoCarreta(b) || !b.done) return '';
+    const rs = L.rutasDesde(b).concat(L.rutasHacia(b));
+    return el('div', { class: 'rutas-panel' },
+      el('p', { class: 'small' }, el('b', null, 'Rutas de carretas: '), rs.length ? '' : 'ninguna.'),
+      rs.map(r => UI.rutaEl(r, true)),
+      el('div', { class: 'row' }, UI.btn('+ Ruta desde aquí', () => UI.nuevaRutaDesde(b), { small: true }), UI.btn('+ Ruta hacia aquí', () => UI.nuevaRutaDesde(b, true), { small: true })));
   };
 
   // ---------- Investigación ----------

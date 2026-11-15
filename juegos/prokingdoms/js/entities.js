@@ -14,7 +14,9 @@
       this.skin = o.skin === undefined ? (o.id * 7) % 3 : o.skin;
       this.inside = !!o.inside;
       this.kind = o.kind || 'v';       // 'v' aldeano, 'scout' explorador, 'cart' carreta
-      this.job = o.job || null;        // viaje de una carreta
+      this.job = o.job || null;        // viaje de una carreta (lo arma su ruta en cada paso)
+      this.ruta = o.ruta || null;      // pk-41: id de la ruta que sigue la carreta (st.logi.rutas)
+      this.espera = o.espera || 0;     // segundos que lleva esperando carga en el origen
     this.ox = ((o.id * 37) % 9 - 4) * 0.05; this.oy = ((o.id * 53) % 9 - 4) * 0.05; // pequeño desvío para no apilarse
     this.back = false; this.scared = 0;
       this.dl = o.dl || 1;             // nivel del último punto de acopio donde descargó
@@ -23,7 +25,7 @@
       this.mode = 'idle'; this.fails = 0; this.wait = 0; this.fx = 0;
     }
     toJSON() {
-      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined };
+      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined, ruta: this.ruta || undefined, espera: this.espera || undefined };
     }
   }
 
@@ -72,6 +74,13 @@
     }
     return true;
   }
+  // ¿La línea recta hasta ese punto pasa solo por casillas que rinden igual que la de la carreta?
+  function parejo(u, x1, y1) {
+    const p = PK.Logi.PERFIL_DE[u.kind], f0 = PK.Logi.factor(p, W.idx(Math.floor(u.x), Math.floor(u.y)));
+    const dx = x1 - u.x, dy = y1 - u.y, n = Math.ceil(Math.hypot(dx, dy) * 3);
+    for (let i = 1; i <= n; i++) if (PK.Logi.factor(p, W.idx(Math.floor(u.x + (dx * i) / n), Math.floor(u.y + (dy * i) / n))) !== f0) return false;
+    return true;
+  }
   function inRect(u, b) { return u.x >= b.x && u.x <= b.x + b.w && u.y >= b.y && u.y <= b.y + b.h; }
 
   // Pide una ruta. Devuelve false si no hay manera de llegar.
@@ -91,14 +100,15 @@
   // puede alcanzar en línea recta, así camina en diagonales suaves y no en escalones.
   function step(u, dt) {
     const g = G();
-    // los caminos aceleran a todos; las carretas fuera del camino van lentas
-    const road = W.road[W.idx(Math.floor(u.x), Math.floor(u.y))] === 1;
-    const rk = road && u.owner === 'p' && PK.Game.bono ? PK.Game.bono('road') : 0; // Caminos empedrados, Caravaneros
-    const terrain = u.kind === 'cart' ? (road ? 1 + (D.ROAD.cart - 1) * (1 + rk) : D.CART.offRoad) : road ? 1 + (D.ROAD.walk - 1) * (1 + rk) : 1;
+    // los caminos aceleran a todos; las carretas fuera del camino van lentas (la misma cuenta que usan sus rutas)
+    const terrain = PK.Logi.factorUnidad(u);
     let move = g.speed(u.owner, u) * terrain * dt * (u.scared > 0 ? 1.4 : 1);
+    const carro = !!PK.Logi.PERFIL_DE[u.kind];
     while (move > 0 && u.path.length) {
       if (u.pchk !== u.path.length) {
-        for (let k = 0; k < 14 && u.path.length > 1 && los(u.x, u.y, u.path[1][0] + 0.5, u.path[1][1] + 0.5); k++) u.path.shift();
+        // pk-41: una carreta solo acorta en línea recta por casillas que rinden lo mismo que la suya; si no, cortaba la
+        // esquina de un camino en L por el pasto y la ruta más rápida no servía
+        for (let k = 0; k < 14 && u.path.length > 1 && los(u.x, u.y, u.path[1][0] + 0.5, u.path[1][1] + 0.5) && (!carro || parejo(u, u.path[1][0] + 0.5, u.path[1][1] + 0.5)); k++) u.path.shift();
         u.pchk = u.path.length;
       }
       const [tx, ty] = u.path[0];

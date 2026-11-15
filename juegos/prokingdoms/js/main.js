@@ -49,6 +49,9 @@
     if (viejo && PK.UI.reinicio) PK.UI.reinicio();
     if (report) PK.UI.offlineReport(report);
     else if (!save) PK.UI.toast((net ? 'Bienvenido a ' + PK.Net.world.name + '. ' : 'Bienvenido a tu reino. ') + 'Todo lo demás está en la niebla: abre el Libro de Misiones (B) para empezar.', 'epic');
+    // pk-41: carretas sin ruta tras actualizar (cuando se cierre lo que esté abierto, como el informe de arriba)
+    const avisarRutas = () => { if (!PK.Logi.avisoPendiente() || !PK.UI.avisoRutas) return; if (PK.UI.modalKey()) { setTimeout(avisarRutas, 1500); return; } PK.UI.avisoRutas(); };
+    setTimeout(avisarRutas, 600);
     if (TIMELAPSE) {
       // el time-lapse es el piloto automático (tools/piloto.js, T2 del plan) a ×40, sin guardar nada. El viejo
       // tools/timelapse.js no vino con el juego (B6). Si el piloto no carga, se avisa y se juega normal.

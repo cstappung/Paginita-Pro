@@ -10,6 +10,7 @@
   una versión `pk-N`). Las reglas de la sección 1 de `PLAN-MEGA-ACTUALIZACION.md` siguen valiendo todas (caché,
   sonido, celular, i18n, sin conexión igual que en vivo, el servidor decide lo que toca a otros). Las notas de lo que
   se decida al implementar van a `juegos/prokingdoms/CLAUDE.md`, como siempre.
+- **Avance:** L1 hecha en `pk-41`.
 - **Decisiones del dueño:** respondidas el 15 de noviembre de 2026 (sección 11). Mandan sobre cualquier otra parte
   del plan.
 

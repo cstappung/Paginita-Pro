@@ -457,6 +457,7 @@
     // caminos y cintas (planos, sobre el suelo)
     drawRoads(ctx, chunks);
     drawBelts(ctx, vis);
+    drawRuta(ctx);
     botes(ctx, vis, g);
     // bordes de zonas comunes
     if (R.showZones) {
@@ -878,6 +879,25 @@
         ctx.fillStyle = Sp.rgb(col); ctx.fillRect(Math.round(px) - 1, Math.round(py) - 3, 3, 2);
       }
     }
+  }
+
+  // pk-41: el camino de una ruta de carretas («Ver» en Logística, 15 s) o el de la carreta elegida
+  function drawRuta(ctx) {
+    const L = PK.Logi, g = G();
+    let id = L.verRuta && performance.now() - (L.verRutaT || 0) < 15000 ? L.verRuta : null;
+    const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => u.kind === 'cart' && u.ruta) : null;
+    if (su) id = su.ruta;
+    if (!id) return;
+    const r = g.state.logi.rutas.find(o => o.id === id), a = r && g.bById.get(r.de), b = r && g.bById.get(r.a);
+    if (!a || !b) return;
+    const e = L.camino(a, b, L.PERFIL_DE.cart);
+    if (!e || e.path.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,226,120,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.lineDashOffset = -performance.now() / 50;
+    ctx.beginPath();
+    e.path.forEach(([x, y], i) => { const [px, py] = R.iso(x + 0.5, y + 0.5); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+    ctx.stroke();
+    ctx.restore();
   }
 
   // ---------- Territorio ----------

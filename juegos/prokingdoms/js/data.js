@@ -165,7 +165,7 @@
     builder: () => ({ builders: 1 }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
-    cartwright: L => ({ carts: 1 + L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
+    cartwright: L => ({ carts: 2 + 2 * L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
     // pk-40: la venta nunca alcanza a la compra menos 10 puntos. En Nv 8–9 se vendía al 92–95% y se compraba al
     // 90–92%: comprar y vender lo mismo daba oro infinito. Ahora la compra baja hasta 0,90 (Nv 8) y la venta sube
     // hasta 0,80 (Nv 7).

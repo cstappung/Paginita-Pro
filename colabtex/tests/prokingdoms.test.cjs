@@ -909,3 +909,51 @@ test('pk-40: el Mercado nunca vende más caro de lo que compra (oro infinito en 
   assert.deepEqual(rep, [], 'eventos repetidos en life.js');
   assert.ok(PK.Life.EVENTS.torneo && PK.Life.EVENTS.torneoVerano);
 });
+
+// ---------- Plan de logística (juegos/prokingdoms/PLAN-LOGISTICA.md) ----------
+
+test('L1 (pk-41): la ruta por tiempo toma el camino rápido aunque dé un rodeo, y la de los aldeanos sigue siendo la corta', () => {
+  const N = W.W * W.H, costo = new Float32Array(N).fill(1 / 0.65);
+  // un camino en U: de (10,10) baja a y=14, cruza hasta x=30 y sube a (30,10); la línea recta y=10 es pasto
+  const road = [];
+  for (let y = 10; y <= 14; y++) road.push([10, y], [30, y]);
+  for (let x = 10; x <= 30; x++) road.push([x, 14]);
+  for (const [x, y] of road) costo[W.idx(x, y)] = 1 / 1.8;
+  const r = W.rutaCosto(10, 10, { x0: 30, y0: 10, x1: 30, y1: 10 }, costo, 1 / 1.8);
+  assert.ok(r.ok);
+  const enCamino = r.path.filter(([x, y]) => costo[W.idx(x, y)] < 1).length;
+  assert.ok(enCamino / r.path.length > 0.9, 'casi todo el viaje va por el camino (' + enCamino + ' de ' + r.path.length + ')');
+  assert.ok(r.seg < 20 / 0.65, 'y tarda menos que la recta: ' + r.seg.toFixed(1));
+  // sin el camino, va derecho
+  const llano = new Float32Array(N).fill(1 / 0.65);
+  const r2 = W.rutaCosto(10, 10, { x0: 30, y0: 10, x1: 30, y1: 10 }, llano, 1 / 0.65);
+  assert.ok(r2.path.every(([, y]) => y === 10), 'recta');
+  // lo que no pasa (Infinity) no se pisa, ni cortando una esquina en diagonal
+  const muro = new Float32Array(N).fill(1);
+  for (let y = 0; y < 30; y++) muro[W.idx(20, y)] = Infinity;
+  const r3 = W.rutaCosto(15, 5, { x0: 25, y0: 5, x1: 25, y1: 5 }, muro, 1);
+  assert.ok(r3.ok && r3.path.every(([x, y]) => muro[W.idx(x, y)] < Infinity));
+  assert.ok(r3.path.some(([, y]) => y >= 30), 'rodea el muro por abajo');
+});
+
+test('L1 (pk-41): las rutas de carretas unen talleres y bodegas del pueblo, sin campamentos ni modo automático', () => {
+  const L = PK.Logi;
+  const B = (type, id) => ({ id, type, owner: 'p', def: D.BUILD[type], done: true });
+  const tc = B('tc', 1), saw = B('sawmill', 2), forge = B('forge', 3), lumber = B('lumber', 4), wh = B('warehouse', 5), mill = B('mill', 6);
+  assert.equal(L.parMalo(tc, saw), null);
+  assert.equal(L.parMalo(saw, forge), null, 'de un taller a otro');
+  assert.equal(L.parMalo(saw, tc), null, 'del taller a la bodega');
+  assert.equal(L.parMalo(mill, saw), null, 'el Molino del pueblo es bodega (decisión 4)');
+  assert.match(L.parMalo(lumber, saw), /carromatos/, 'los campamentos son del carromato (decisión 3)');
+  assert.match(L.parMalo(tc, wh), /dos bodegas/);
+  assert.match(L.parMalo(saw, saw), /mismo/);
+  // ningún resto del findJob automático (decisión 2)
+  assert.doesNotMatch(JS('logistics.js'), /function findJob/);
+  // step() usa el mismo factor que las tablas de costo, y la carreta no corta esquinas por el pasto
+  const ent = JS('entities.js');
+  assert.match(ent, /PK\.Logi\.factorUnidad\(u\)/);
+  assert.match(ent, /parejo\(u, u\.path\[1\]\[0\] \+ 0\.5/);
+  // la Carretería arma más carretas por nivel
+  assert.equal(D.BSTATS.cartwright(1).carts, 4);
+  assert.equal(D.BSTATS.cartwright(3).carts, 8);
+});

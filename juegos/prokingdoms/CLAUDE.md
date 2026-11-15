@@ -186,3 +186,30 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Performance** (`pk-32`, 300 villagers): the villager sprite cache is an LRU `Map` with a per-frame budget; `mine()`
   in `game.js` is cached (never mutate what it returns); one `fillStyle` per figure; while a battle is open the map is
   not drawn. Measure with `node tools/rendimiento.js`.
+
+## Logistics plan (`PLAN-LOGISTICA.md`)
+
+### L1, routes by time and carts with origin and destination (`pk-41`)
+
+- **`W.rutaCosto(sx, sy, goal, costo, minCosto, maxIter)`** is the A* by time: each tile costs `1 / speed` for that
+  traveller (`Infinity` = blocked) and the heuristic uses the fastest tile, so it never overestimates. Villagers,
+  wolves, bandits and troops keep `W.findPath` (cost 1).
+- **Cost tables per profile** (`L.tabla(perfil)`, `L.PERFIL_DE[kind]`) are rebuilt only when `W.roadVer`,
+  `G.blockVer`, `W.terrVer`, `W.apVer` or the road bonus change. **`L.factor(perfil, k)` is the one speed rule**:
+  `step()` uses it too (`L.factorUnidad`), so a route's estimated time is the real one.
+- **Paths are cached per route** (`L.camino(a, b, perfil)`), at most 2 recomputed per game step (`presupuesto`); a
+  stale one is used until its turn. The offline calculation forces them.
+- **`step()` only shortcuts a cart through tiles of the same speed** (`parejo` in `entities.js`). Without it a cart cut
+  the corner of an L-shaped road through the grass.
+- **Routes** (`st.logi.rutas = [{ id, de, a, res }]`, `u.ruta`): load at origin, wait there when there is nothing to
+  carry («Esperando carga», leaves with half a load or after 60 s), wait at a full destination with the cargo. **No
+  automatic mode** (owner's decision 2): `findJob` is gone. Carts never leave your territory and never serve camps
+  (`L.parMalo`); store ↔ store routes are refused while stock is one town pool.
+- `put` into a workshop stops at `bufCap`; cargo that no longer fits a changed route goes back (`dropCargo`).
+- `L.supplied(b)`: near a store, a belt, or a route ending at it **with carts**. The Capataz's «coming» check only
+  counts a cart that is carrying to it.
+- **Old saves** (no `st.logi.rutas`): carts lose their job, cargo returns, they stay parked, and `st.logi.avisoRutas`
+  shows `UI.avisoRutas` once (after whatever modal is open). The Logística button has a badge with the carts without
+  a route, and the Asesor a rule.
+- The Carretería makes `2 + 2 × level` carts.
+

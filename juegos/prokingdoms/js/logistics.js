@@ -20,7 +20,16 @@
   L.isShop = b => !!(b.def && b.def.recipe);
 
   L.init = function (st) {
-    st.logi = Object.assign({ belts: [], nextBelt: 1, roads: [] }, st.logi || {});
+    const viejo = !!st.logi && !st.logi.rutas; // partida de antes de las rutas (pk-41)
+    st.logi = Object.assign({ belts: [], nextBelt: 1, roads: [], rutas: [], nextRuta: 1 }, st.logi || {});
+    if (!st.logi.rutas) st.logi.rutas = [];
+    if (viejo) {
+      const cs = L.carts();
+      for (const u of cs) { dropCargo(u); u.job = null; u.ruta = null; }
+      if (cs.length) st.logi.avisoRutas = 1;
+    }
+    for (const u of L.carts()) if (u.ruta && !st.logi.rutas.some(r => r.id === u.ruta)) u.ruta = null;
+    caminos.clear();
     for (const i of st.logi.roads) W.road[i] = 1;
     for (const bl of st.logi.belts) markBelt(bl, true);
     W.roadVer++;
@@ -72,7 +81,9 @@
   };
   // ¿Le llega algo a este taller? (junto a un almacén, con carretas o con una cinta que lo alimenta).
   // Sin eso no recibe insumos: no se le asignan trabajadores (antes aceptaba y prometía «≈30 por minuto»).
-  L.supplied = b => !!(L.nearStore(b) || L.carts().length || S().logi.belts.some(bl => bl.b === b.id));
+  L.supplied = b => !!(L.nearStore(b) || S().logi.belts.some(bl => bl.b === b.id) || L.rutasHacia(b).some(r => L.cartsDe(r).length));
+  L.rutasHacia = b => S().logi.rutas.filter(r => r.a === b.id);
+  L.rutasDesde = b => S().logi.rutas.filter(r => r.de === b.id);
   // Almacén cercano: el taller se abastece y descarga solo, a un ritmo moderado.
   L.nearStore = function (b) {
     if (b._nsT === G().time) return b._ns;
@@ -112,7 +123,11 @@
     return rv * g.cap(res);
   }
 
-  // ---------- Carretas ----------
+  // ---------- Carretas (pk-41, plan de logística L1) ----------
+  // Cada carreta sigue una RUTA que elige el jugador: un origen y un destino (y, si quiere, un recurso). Va al origen,
+  // carga, lo lleva y vuelve. Si en el origen no hay nada que llevar, espera ahí; si el destino está lleno, espera con
+  // la carga hasta que quepa. No hay modo automático (decisión 2 del dueño): una carreta sin ruta queda parada en la
+  // Carretería. Las carretas son del pueblo: no salen de tu territorio y no van a los campamentos (decisión 3).
   L.cartMax = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).carts : 0), 0);
   const beltK = () => 1 + (G().bono ? G().bono('belt') : 0); // Cintas reforzadas (árbol 2.0)
   L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost') + (G().bono ? G().bono('cartCap') : 0))));
@@ -129,137 +144,259 @@
     b.qt += dt;
     if (b.qt >= D.CART.time) {
       b.qt = 0; b.queue.shift();
-      G().spawnUnit(b, 'cart');
+      const u = G().spawnUnit(b, 'cart');
       G().stat('carts', 1);
+      // una carreta nueva nace sin ruta: se le ofrece la primera ruta que tenga lugar
+      const r = u && S().logi.rutas.find(o => !L.rutaMala(o) && !L.cartsDe(o).length);
+      if (u && r) u.ruta = r.id;
     }
   };
 
-  // Lo que ya viene en camino (para que dos carretas no hagan el mismo viaje).
+  // ---------- Perfiles de viaje y caminos por tiempo ----------
+  // Cuánto rinde cada casilla según quién viaja. step() en entities.js usa lo mismo, así el tiempo que estima la
+  // ruta es el que de verdad tarda.
+  const rk = () => (G().bono ? G().bono('road') : 0); // Caminos empedrados, Caravaneros (árbol 2.0)
+  L.PERFIL_DE = { cart: 'carreta' };
+  L.factor = function (perfil, k) {
+    const road = W.road[k] === 1;
+    if (perfil === 'carreta') return road ? 1 + (D.ROAD.cart - 1) * (1 + rk()) : D.CART.offRoad;
+    return road ? 1 + (D.ROAD.walk - 1) * (1 + rk()) : 1;
+  };
+  L.factorUnidad = function (u) {
+    const p = L.PERFIL_DE[u.kind], k = W.idx(Math.floor(u.x), Math.floor(u.y));
+    if (p) return L.factor(p, k);
+    const road = W.road[k] === 1, r = road && u.owner === 'p' ? rk() : 0;
+    return road ? 1 + (D.ROAD.walk - 1) * (1 + r) : 1;
+  };
+  // ¿Por dónde puede pasar? La carreta, por lo libre de tu territorio (las puertas de tu muralla también).
+  function pasa(perfil, k) {
+    if (W.block[k] !== 0 || W.terrain[k] === 4) return false;
+    const x = k % W.W, y = (k / W.W) | 0;
+    if (perfil === 'carreta') return W.ownerAt(x, y) === 'p';
+    return true;
+  }
+  const verMapa = () => W.roadVer + '|' + G().blockVer + '|' + (W.terrVer || 0) + '|' + (W.apVer || 0) + '|' + rk();
+  const tablas = {};
+  L.tabla = function (perfil) {
+    const v = verMapa();
+    let t = tablas[perfil];
+    if (t && t.ver === v) return t;
+    if (!t) t = tablas[perfil] = { ver: '', costo: new Float32Array(W.W * W.H), min: 1 };
+    let min = Infinity;
+    for (let k = 0; k < t.costo.length; k++) {
+      if (!pasa(perfil, k)) { t.costo[k] = Infinity; continue; }
+      const c = 1 / L.factor(perfil, k);
+      t.costo[k] = c;
+      if (c < min) min = c;
+    }
+    t.min = isFinite(min) ? min : 1;
+    t.ver = v;
+    return t;
+  };
+  // Camino guardado de un edificio a otro: se calcula una vez y sirve hasta que cambie algo del mapa (un camino nuevo,
+  // un edificio, una muralla, tu territorio). Si el mapa cambió, se recalculan a lo más 2 por paso del juego: los demás
+  // usan el viejo hasta que les toque (el de este A* explora mucho más que el de los aldeanos).
+  const caminos = new Map();
+  let presupuesto = 2;
+  L.camino = function (a, b, perfil, forzar) {
+    const key = a.id + '>' + b.id + ':' + perfil, t = L.tabla(perfil), e = caminos.get(key);
+    if (e && e.ver === t.ver) return e;
+    if (!forzar && !G().offline && presupuesto <= 0) return e || null;
+    presupuesto--;
+    if (caminos.size > 400) caminos.clear();
+    const s = W.freeAround(a.x, a.y, a.x + a.w - 1, a.y + a.h - 1, b.cx, b.cy, (x, y) => t.costo[W.idx(x, y)] === Infinity);
+    const sOk = W.inb(s[0], s[1]) && t.costo[W.idx(s[0], s[1])] < Infinity;
+    const r = sOk ? W.rutaCosto(s[0], s[1], { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1, adj: true }, t.costo, t.min) : { path: [], ok: false, seg: 0 };
+    const ne = { ver: t.ver, ok: sOk && r.ok, path: sOk ? [s].concat(r.path) : [], costo: r.seg + (sOk ? t.costo[W.idx(s[0], s[1])] : 0) };
+    caminos.set(key, ne);
+    return ne;
+  };
+  const velocidad = perfil => (perfil === 'carreta' ? D.CART.speed * (1 + L.cartSpeed()) : 1.3);
+  // Pone a la unidad en camino hacia un edificio: por el camino guardado si está junto a su comienzo, o con uno de una
+  // sola vez desde donde está (al salir de la Carretería, al cambiar de ruta). false: no hay por dónde.
+  function ir(u, desde, hacia) {
+    const perfil = L.PERFIL_DE[u.kind] || 'carreta';
+    const e = desde ? L.camino(desde, hacia, perfil) : null;
+    if (e && e.ok && e.path.length && U.dist(u.x, u.y, e.path[0][0] + 0.5, e.path[0][1] + 0.5) < 1.8) { u.path = e.path.slice(); return true; }
+    if (desde && e === null) { u.wait = 0.2; return true; } // le toca calcular en el próximo paso
+    const t = L.tabla(perfil);
+    const r = W.rutaCosto(Math.floor(u.x), Math.floor(u.y), { x0: hacia.x, y0: hacia.y, x1: hacia.x + hacia.w - 1, y1: hacia.y + hacia.h - 1, adj: true }, t.costo, t.min, 30000);
+    if (!r.ok) return false;
+    u.path = r.path;
+    return true;
+  }
+  L.ir = ir;
+
+  // ---------- Rutas ----------
+  const CAMPO = { lumber: 1, mining: 1 }; // los campamentos son del carromato (decisión 3 del dueño)
+  L.esCampo = b => !!(b && CAMPO[b.type]);
+  // ¿Puede ser un extremo de una ruta de carreta? Un taller o una bodega del pueblo.
+  L.puntoCarreta = b => !!(b && b.owner === 'p' && !CAMPO[b.type] && (L.isShop(b) || L.isStore(b)));
+  L.rutaDe = u => (u.ruta ? S().logi.rutas.find(r => r.id === u.ruta) || null : null);
+  L.cartsDe = r => G().units.filter(u => u.owner === 'p' && u.kind === 'cart' && u.ruta === r.id);
+  L.libres = () => L.carts().filter(u => !L.rutaDe(u));
+  // Por qué una ruta no sirve (texto), o null si está bien.
+  L.parMalo = function (a, b) {
+    if (!a || !b) return 'Elige el origen y el destino.';
+    if (a === b) return 'El origen y el destino son el mismo edificio.';
+    if (L.esCampo(a) || L.esCampo(b)) return 'Los campamentos los vacían los carromatos, no las carretas.';
+    if (!L.puntoCarreta(a) || !L.puntoCarreta(b)) return 'Una carreta une talleres y bodegas del pueblo (Centro Urbano, Almacén, Granero, Molino).';
+    if (!L.isShop(a) && !L.isShop(b)) return 'Entre dos bodegas no hace falta: lo que hay en una ya sirve en todo el pueblo. Une una bodega con un taller.';
+    return null;
+  };
+  L.rutaMala = function (r) {
+    const g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a);
+    if (!a || !b) return 'El ' + (!a ? 'origen' : 'destino') + ' ya no existe: cambia la ruta.';
+    if (!a.done || !b.done) return (!a.done ? a : b).def.name + ' todavía está en obra.';
+    return L.parMalo(a, b);
+  };
+  L.crearRuta = function (de, a, res) {
+    const g = G(), A = g.bById.get(de), B = g.bById.get(a), why = L.parMalo(A, B);
+    if (why) { toast(why, 'warn'); return null; }
+    if (res && !acepta(B, res)) { toast(B.def.name + ' no recibe ' + D.RES[res].name.toLowerCase() + '.', 'warn'); return null; }
+    const st = S(), r = { id: st.logi.nextRuta++, de, a, res: res || null };
+    st.logi.rutas.push(r);
+    G().stat('rutas', 1);
+    return r;
+  };
+  L.borrarRuta = function (id) {
+    const st = S(), r = st.logi.rutas.find(o => o.id === id);
+    if (!r) return;
+    for (const u of L.cartsDe(r)) L.asignar(u, null);
+    st.logi.rutas.splice(st.logi.rutas.indexOf(r), 1);
+  };
+  // Cambia la ruta de una carreta. Lo que llevaba vuelve entero a donde corresponde (nunca se pierde).
+  L.asignar = function (u, id) {
+    if (u.ruta === id) return;
+    dropCargo(u);
+    u.ruta = id || null; u.job = null; u.path = []; u.espera = 0; u.wait = 0;
+  };
+  L.sumarCarreta = function (r) {
+    const libre = L.libres().sort((x, y) => U.dist(x.x, x.y, 0, 0) - U.dist(y.x, y.y, 0, 0))[0];
+    if (!libre) { toast(L.carts().length ? 'Todas tus carretas ya tienen ruta: arma otra en la Carretería o saca una de otra ruta.' : 'No tienes carretas: ármalas en la Carretería (Era II).', 'warn'); return false; }
+    L.asignar(libre, r.id);
+    return true;
+  };
+  L.quitarCarreta = function (r) {
+    const cs = L.cartsDe(r).sort((x, y) => (x.carry || 0) - (y.carry || 0));
+    if (!cs.length) return false;
+    L.asignar(cs[0], null);
+    return true;
+  };
+  // Ida, vuelta (en segundos) y cuánto mueve por minuto con las carretas que tiene. null si aún no hay camino.
+  L.tiempos = function (r, forzar) {
+    const g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a);
+    if (!a || !b) return null;
+    const perfil = 'carreta', i = L.camino(a, b, perfil, forzar), v = L.camino(b, a, perfil, forzar);
+    if (!i || !v) return null;
+    if (!i.ok || !v.ok) return { ok: false };
+    const sp = velocidad(perfil), ida = i.costo / sp, vuelta = v.costo / sp, ciclo = ida + vuelta + 1.2 + 1;
+    return { ok: true, ida, vuelta, ciclo, ritmo: (L.cartsDe(r).length * L.cartCap() * 60) / ciclo };
+  };
+
+  // Lo que ya viene en camino a un edificio (para no llevarle de más).
   function inbound(b, res) {
     let n = 0;
     for (const u of G().units) if (u.kind === 'cart' && u.job && u.job.to === b.id && u.job.res === res) n += u.job.n;
     return n;
   }
-  function outbound(b, res) {
-    let n = 0;
-    for (const u of G().units) if (u.kind === 'cart' && u.job && u.job.from === b.id && u.job.res === res && u.job.phase === 'go') n += u.job.n;
-    return n;
+  function acepta(b, res) { return L.isShop(b) ? !!L.recipe(b).in[res] : L.storeAccepts(b, res); }
+  L.acepta = acepta;
+  function necesita(b, res, contar) {
+    if (L.isShop(b)) return Math.max(0, L.need(b, res) - (contar ? inbound(b, res) : 0));
+    return Math.max(0, G().cap(res) - (S().res[res] || 0));
   }
-  function nearestStore(x, y, res, needRoom) {
-    let best = null, bd = 1e9;
-    for (const b of G().buildings) {
-      if (b.owner !== 'p' || !b.done || !L.storeAccepts(b, res)) continue;
-      if (needRoom && S().res[res] >= G().cap(res) - 1) continue;
-      const d = U.dist(x, y, b.cx, b.cy);
-      if (d < bd) { bd = d; best = b; }
+  function hay(from, to, res) {
+    if (L.isShop(from)) { ensure(from); return from.outb[res] || 0; }
+    return Math.max(0, (S().res[res] || 0) - (L.isShop(to) ? reserveOf(res, L.output(to), to) : 0));
+  }
+  // Qué conviene cargar en el origen para ese destino: { res, n, need }, o null si nada sirve.
+  function queCargar(r, from, to, cap, contar) {
+    const cands = r.res ? [r.res] : L.isShop(from) ? [L.output(from)] : L.isShop(to) ? Object.keys(L.recipe(to).in) : [];
+    let best = null;
+    for (const res of cands) {
+      if (!acepta(to, res) || (!L.isShop(from) && !L.storeAccepts(from, res))) continue;
+      const need = necesita(to, res, contar), n = Math.floor(Math.min(cap, hay(from, to, res), need));
+      if (!best || n > best.n || (n === best.n && need > best.need)) best = { res, n, need };
     }
     return best;
   }
-
-  // Elige el viaje más urgente: primero abastecer talleres con trabajadores que se quedan sin insumos,
-  // después vaciar depósitos de salida que se llenan.
-  function findJob(u) {
-    const g = G(), st = S(), cap = L.cartCap(), shops = g.buildings.filter(b => b.owner === 'p' && b.done && L.isShop(b) && !L.nearStore(b));
-    let best = null, bs = -1e9;
-    for (const b of shops) {
-      ensure(b);
-      const r = L.recipe(b), bc = L.bufCap(b), out = L.output(b);
-      // abastecer (no tiene sentido si su salida está llena y nadie la retira)
-      if ((b.outb[out] || 0) < bc) for (const k in r.in) {
-        const missing = bc - (b.inb[k] || 0) - inbound(b, k);
-        if (missing < Math.min(cap, bc) * 0.4) continue;
-        // ¿algún taller produce ese insumo y lo tiene listo? (cadena directa)
-        let src = null;
-        for (const o of shops) { if (o !== b && L.output(o) === k && (o.outb[k] || 0) - outbound(o, k) >= Math.min(cap, missing) * 0.5) { src = o; break; } }
-        let avail;
-        if (src) avail = (src.outb[k] || 0) - outbound(src, k);
-        else { src = nearestStore(b.cx, b.cy, k); avail = st.res[k] - reserveOf(k, out, b); }
-        if (!src || avail < 1) continue;
-        const n = Math.floor(Math.min(cap, missing, avail));
-        if (n < 1) continue;
-        const score = 100 + (b.workers.length ? 60 : 0) + (missing / bc) * 40 - U.dist(u.x, u.y, src.cx, src.cy) - U.dist(src.cx, src.cy, b.cx, b.cy) * 0.5;
-        if (score > bs) { bs = score; best = { from: src.id, to: b.id, res: k, n, phase: 'go' }; }
-      }
-      // sacar lo producido
-      const have = (b.outb[out] || 0) - outbound(b, out);
-      if (have >= Math.min(cap, bc) * 0.3) {
-        let dst = null;
-        for (const o of shops) { if (o !== b && L.recipe(o).in[out] && L.need(o, out) - inbound(o, out) >= 5) { dst = o; break; } }
-        if (!dst) dst = nearestStore(b.cx, b.cy, out, true);
-        if (!dst) continue;
-        const n = Math.floor(Math.min(cap, have));
-        const score = 60 + (have / bc) * 60 - U.dist(u.x, u.y, b.cx, b.cy) - U.dist(b.cx, b.cy, dst.cx, dst.cy) * 0.5;
-        if (score > bs) { bs = score; best = { from: b.id, to: dst.id, res: out, n, phase: 'go' }; }
-      }
-    }
-    return best;
-  }
+  L.queCargar = queCargar;
 
   function take(b, res, n) {
     const st = S();
     if (L.isShop(b)) { ensure(b); const k = Math.min(n, b.outb[res] || 0); b.outb[res] -= k; return k; }
     const k = Math.min(n, Math.max(0, st.res[res])); st.res[res] -= k; return k;
   }
+  // Un taller recibe hasta llenar su depósito de entrada; una bodega, hasta su tope.
   function put(b, res, n) {
     const st = S(), g = G();
-    if (L.isShop(b)) { ensure(b); b.inb[res] = (b.inb[res] || 0) + n; return n; }
+    if (L.isShop(b)) { ensure(b); const k = Math.min(n, Math.max(0, L.bufCap(b) - (b.inb[res] || 0))); b.inb[res] = (b.inb[res] || 0) + k; return k; }
     const k = Math.min(n, Math.max(0, g.cap(res) - st.res[res])); st.res[res] += k; return k;
   }
 
-  // Cerebro de una carreta: ir a cargar, ir a descargar, buscar el siguiente viaje.
+  // Cerebro de una carreta.
   L.cart = function (u, dt) {
     const g = G(), Un = PK.Units;
-    if (!u.job) {
-      u.mode = 'idle';
-      u.wait = (u.wait || 0) - dt;
-      if (u.wait > 0) return;
-      u.wait = 1.5;
-      u.job = findJob(u);
-      if (!u.job) { parkCart(u); return; }
-    }
-    const j = u.job, from = g.bById.get(j.from), to = g.bById.get(j.to);
-    if (!from || !to) { dropCargo(u); u.job = null; return; }
-    const tgt = j.phase === 'go' ? from : to;
+    if (u.wait > 0) { u.wait -= dt; u.mode = 'idle'; return; }
+    const r = L.rutaDe(u);
+    if (!r) { u.job = null; u.estado = 'Sin ruta: elige a dónde va'; dropCargo(u); parkCart(u); return; }
+    const why = L.rutaMala(r);
+    if (why) { u.job = null; u.estado = why; u.mode = 'idle'; u.wait = 3; return; }
+    const from = g.bById.get(r.de), to = g.bById.get(r.a), lleva = u.carry > 0.5;
+    const tgt = lleva ? to : from, desde = lleva ? from : to;
+    u.job = { ruta: r.id, from: r.de, to: r.a, res: (lleva && u.carryRes) || r.res, n: lleva ? u.carry : 0, phase: lleva ? 'back' : 'go' };
     if (!Un.nearRect(u, tgt.x, tgt.y, tgt.x + tgt.w - 1, tgt.y + tgt.h - 1, 1.2)) {
-      if (!Un.pathTo(u, Un.rectGoal(tgt, !tgt.def.walkable))) { dropCargo(u); u.job = null; u.wait = 3; }
+      u.estado = lleva ? 'Lleva ' + D.RES[u.carryRes].name.toLowerCase() + ' a ' + to.def.name : 'Va a cargar a ' + from.def.name;
+      if (!ir(u, desde, tgt)) { u.estado = 'Sin camino hasta ' + tgt.def.name + ' (las carretas no salen de tu territorio)'; u.mode = 'idle'; u.wait = 4; }
       return;
     }
-    if (j.phase === 'go') {
-      // Al cargar en una bodega se vuelve a mirar la reserva del taller de destino: la de findJob era de cuando
-      // eligió el viaje, y varias carretas que salían a la vez vaciaban la bodega hasta cero entre todas.
-      let quiere = j.n;
-      if (!L.isShop(from) && L.isShop(to)) quiere = Math.min(quiere, Math.floor(S().res[j.res] - reserveOf(j.res, L.output(to), to)));
-      const n = quiere >= 1 ? take(from, j.res, quiere) : 0;
-      if (n < 1) { u.job = null; return; }
-      u.carry = n; u.carryRes = j.res; j.n = n; j.phase = 'back';
-      u.mode = 'idle'; u.wait = 0.6;
-    } else {
-      const n = put(to, j.res, u.carry);
-      if (n > 0 && PK.Render.float && !g.offline) PK.Render.float(to.cx, to.cy, '+' + Math.floor(n), j.res);
-      u.carry -= n;
-      if (u.carry > 0.5) { // no cupo todo: al almacén más cercano
-        const st2 = nearestStore(u.x, u.y, j.res, true);
-        if (st2 && st2 !== to) { j.to = st2.id; return; }
-        // nadie lo recibe: vuelve a donde salió (antes se perdía). Lo de un taller, a su depósito de salida;
-        // lo de la bodega, a la bodega entero.
-        if (L.isShop(from)) { ensure(from); from.outb[j.res] = (from.outb[j.res] || 0) + u.carry; } else S().res[j.res] = (S().res[j.res] || 0) + u.carry;
+    if (lleva) descargar(u, to); else cargar(u, r, from, to);
+  };
+  function cargar(u, r, from, to) {
+    const cap = L.cartCap(), q = queCargar(r, from, to, cap, true);
+    const lleno = q ? Math.min(cap, q.need) : 0;
+    u.mode = 'idle';
+    if (q && q.n >= 1 && (q.n >= lleno - 0.5 || q.n >= cap * 0.5 || (u.espera || 0) >= 60)) {
+      const n = take(from, q.res, q.n);
+      if (n >= 1) {
+        u.carry = n; u.carryRes = q.res; u.espera = 0; u.wait = 0.6;
+        u.estado = 'Cargando ' + D.RES[q.res].name.toLowerCase();
+        return;
       }
-      u.carry = 0; u.carryRes = null; u.job = null; u.wait = 0.4;
+    }
+    u.espera = (u.espera || 0) + 3; u.wait = 3;
+    u.estado = !q || q.need < 1 ? to.def.name + ' no necesita nada por ahora: espera en el origen' : q.n >= 1 ? 'Esperando carga (' + q.n + ' de ' + Math.floor(lleno) + ')' : 'Esperando carga: no hay ' + D.RES[q.res].name.toLowerCase() + (L.isShop(from) ? '' : ' (o lo guarda la reserva)');
+  }
+  function descargar(u, to) {
+    const g = G();
+    if (!acepta(to, u.carryRes)) { dropCargo(u); return; } // cambiaron la ruta: vuelve a la bodega
+    const n = put(to, u.carryRes, u.carry);
+    if (n > 0) {
+      if (PK.Render.float && !g.offline) PK.Render.float(to.cx, to.cy, '+' + Math.floor(n), u.carryRes);
       g.stat('hauled', n);
     }
-  };
-  // Lo que llevaba vuelve entero a la bodega (aunque esté llena: es tuyo, no una cosecha). Antes pasaba por el
-  // tope de la bodega y lo que no cabía desaparecía.
+    u.carry -= n;
+    if (u.carry > 0.5) { u.estado = to.def.name + ' está lleno: espera para descargar'; u.mode = 'idle'; u.wait = 3; return; }
+    u.carry = 0; u.carryRes = null; u.wait = 0.6; u.estado = 'Descargando';
+  }
+  // Lo que llevaba vuelve entero a la bodega (aunque esté llena: es tuyo, no una cosecha).
   function dropCargo(u) {
     if (u.carry > 0 && u.carryRes) S().res[u.carryRes] = (S().res[u.carryRes] || 0) + u.carry;
     u.carry = 0; u.carryRes = null;
   }
-  // Sin trabajo, vuelven a la Carretería.
+  // Sin ruta, esperan junto a la Carretería.
   function parkCart(u) {
     const home = G().buildings.find(b => b.owner === 'p' && b.type === 'cartwright' && b.done);
     if (home && U.dist(u.x, u.y, home.cx, home.cy) > 4) PK.Units.pathTo(u, PK.Units.rectGoal(home, true));
+    u.mode = 'idle';
     u.wait = 4;
   }
+  // Partidas de antes de pk-41: las carretas no tenían ruta. Quedan paradas (sin modo automático, decisión 1 del dueño)
+  // y un aviso pide definir a dónde van.
+  L.avisoPendiente = () => !!(S().logi && S().logi.avisoRutas);
+  L.avisoVisto = () => { S().logi.avisoRutas = 0; };
+  L.sinRuta = () => L.carts().filter(u => !L.rutaDe(u)).length;
 
   // ---------- Caminos ----------
   L.roadAllowed = function (x, y) {
@@ -415,11 +552,12 @@
   L.update = function (dt) {
     const st = S();
     if (!st || !st.logi) return;
+    presupuesto = 2; // caminos que se pueden recalcular en este paso
     for (const bl of st.logi.belts) beltTick(bl, dt);
   };
   // Sin ti, las carretas no se mueven de verdad: se calcula cuánto habrían llevado según cuántas hay.
   L.offline = function (dt) {
-    const g = G(), st = S(), carts = L.carts().length;
+    const g = G(), st = S();
     for (const bl of st.logi.belts) {
       const a = g.bById.get(bl.a), b = g.bById.get(bl.b);
       if (!a || !b) continue;
@@ -436,18 +574,26 @@
       n = take(a, res, n);
       if (n > 0) put(b, res, n);
     }
-    if (!carts) return;
-    let budget = carts * L.cartCap() * dt / 45; // un viaje de ida y vuelta tarda ~45 s
-    const shops = g.buildings.filter(b => b.owner === 'p' && b.done && L.isShop(b) && !L.nearStore(b));
-    for (const b of shops) {
-      if (budget <= 0) break;
-      const r = L.recipe(b), out = L.output(b);
-      for (const k in r.in) {
-        const n = Math.min(L.need(b, k), budget, Math.max(0, st.res[k] - reserveOf(k, out, b)));
-        if (n > 0) { st.res[k] -= n; ensure(b); b.inb[k] = (b.inb[k] || 0) + n; budget -= n; }
+    // las rutas (pk-41): cada una mueve lo que harían sus carretas en ese tiempo, con la ida y la vuelta de su camino
+    // guardado. Las mismas reglas que en vivo: lo que hay en el origen (menos la reserva) y el lugar en el destino.
+    const cap = L.cartCap();
+    for (const r of st.logi.rutas) {
+      const n = L.cartsDe(r).length;
+      if (!n || L.rutaMala(r)) continue;
+      const T = L.tiempos(r, true);
+      if (!T || !T.ok) continue;
+      let budget = (n * cap * dt) / T.ciclo;
+      const from = g.bById.get(r.de), to = g.bById.get(r.a);
+      for (let k = 0; k < 4 && budget >= 1; k++) {
+        const q = queCargar(r, from, to, budget, false);
+        if (!q || q.n < 1) break;
+        const m = take(from, q.res, q.n);
+        const puesto = put(to, q.res, m);
+        if (puesto < m) { if (L.isShop(from)) from.outb[q.res] += m - puesto; else st.res[q.res] += m - puesto; }
+        if (puesto > 0) g.stat('hauled', puesto);
+        budget -= Math.max(1, puesto);
+        if (puesto < 1) break;
       }
-      const have = (b.outb && b.outb[out]) || 0, n = Math.min(have, budget, Math.max(0, g.cap(out) - st.res[out]));
-      if (n > 0) { b.outb[out] -= n; st.res[out] += n; budget -= n; }
     }
   };
 

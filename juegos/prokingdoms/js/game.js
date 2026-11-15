@@ -1017,8 +1017,8 @@
       }
       if (b.def.recipe) {
         if (b.owner === 'p' && PK.Logi && !PK.Logi.supplied(b)) {
-          if (!silent) toast(b.def.name + ' está lejos de los almacenes y sin carretas: no le llegarían insumos. Acércalo a 3 casillas de un Almacén o del Centro Urbano, o construye una Carretería.', 'warn',
-            G.countB('cartwright') ? { label: 'Logística', fn: () => PK.UI.openLogistics() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
+          if (!silent) toast(b.def.name + ' está lejos de los almacenes y ninguna ruta de carretas lo abastece: no le llegarían insumos. Acércalo a 3 casillas de un Almacén o del Centro Urbano, o crea una ruta con carretas hasta él.', 'warn',
+            G.countB('cartwright') ? { label: 'Crear ruta', fn: () => PK.UI.nuevaRutaDesde(b, true) } : { label: 'Construir', fn: () => PK.UI.openBuild() });
           return false;
         }
         let free = G.slots(b) - b.workers.length;

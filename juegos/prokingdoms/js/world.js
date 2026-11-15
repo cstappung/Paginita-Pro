@@ -646,6 +646,65 @@
     }
   };
 
+  // ---------- Rutas por tiempo (pk-41, plan de logística L1) ----------
+  // El mismo A*, pero cada casilla cuesta lo que tarda en cruzarla quien viaja (1 / velocidad): así una carreta toma
+  // el camino más RÁPIDO (por el camino empedrado, aunque dé un rodeo) y no el más corto. `costo` es un Float32Array
+  // por casilla con Infinity donde no pasa; `minCosto`, el de la casilla más rápida (la heurística nunca se pasa).
+  // Lo arma logistics.js por perfil (carreta, carromato, barcaza) y guarda los caminos: este A* explora más que el
+  // de los aldeanos y no debe correr en cada decisión.
+  W.rutaCosto = function (sx, sy, goal, costo, minCosto, maxIter) {
+    const w = W.W, N = w * W.H;
+    if (!gS) {
+      gS = new Float32Array(N); from = new Int32Array(N); seen = new Uint32Array(N); closed = new Uint32Array(N);
+      heapI = new Int32Array(N * 8); heapF = new Float32Array(N * 8);
+    }
+    stamp++;
+    maxIter = maxIter || N;
+    const mc = Math.max(1e-3, minCosto || 1);
+    const inRect = (x, y) => x >= goal.x0 && x <= goal.x1 && y >= goal.y0 && y <= goal.y1;
+    const isGoal = (x, y) => goal.adj ? (x >= goal.x0 - 1 && x <= goal.x1 + 1 && y >= goal.y0 - 1 && y <= goal.y1 + 1 && !inRect(x, y)) : inRect(x, y);
+    const hf = (x, y) => {
+      const dx = Math.max(goal.x0 - x, 0, x - goal.x1), dy = Math.max(goal.y0 - y, 0, y - goal.y1);
+      return (Math.max(dx, dy) + 0.414 * Math.min(dx, dy)) * mc;
+    };
+    sx = U.clamp(sx, 0, w - 1); sy = U.clamp(sy, 0, W.H - 1);
+    const start = sy * w + sx;
+    if (isGoal(sx, sy)) return { path: [], ok: true, seg: 0 };
+    let n = 0;
+    gS[start] = 0; seen[start] = stamp; from[start] = -1;
+    heapPush(start, hf(sx, sy), n++);
+    let best = start, bestH = hf(sx, sy), iter = 0;
+    const libre = (x, y) => x >= 0 && y >= 0 && x < w && y < W.H && costo[y * w + x] < Infinity;
+    while (n > 0 && iter++ < maxIter) {
+      const cur = heapPop(n); n--;
+      if (closed[cur] === stamp) continue;
+      closed[cur] = stamp;
+      const cx = cur % w, cy = (cur / w) | 0;
+      if (cur !== start && isGoal(cx, cy)) return { path: build(cur), ok: true, seg: gS[cur] };
+      for (const [dx, dy, c] of DIRS) {
+        const nx = cx + dx, ny = cy + dy;
+        if (!libre(nx, ny)) continue;
+        if (dx && dy && (!libre(cx + dx, cy) || !libre(cx, cy + dy))) continue;
+        const ni = ny * w + nx;
+        if (closed[ni] === stamp) continue;
+        const ng = gS[cur] + c * costo[ni];
+        if (seen[ni] !== stamp || ng < gS[ni]) {
+          seen[ni] = stamp; gS[ni] = ng; from[ni] = cur;
+          const hh = hf(nx, ny);
+          if (hh < bestH) { bestH = hh; best = ni; }
+          if (n < heapI.length) heapPush(ni, ng + hh, n++);
+        }
+      }
+    }
+    return { path: build(best), ok: false, seg: gS[best] };
+    function build(end) {
+      const out = [];
+      let c = end;
+      while (c !== start && c >= 0) { out.push([c % w, (c / w) | 0]); c = from[c]; }
+      return out.reverse();
+    }
+  };
+
   // ---------- Agotamiento y regeneración ----------
   W.depleteNode = function (n) {
     n.amount = 0;

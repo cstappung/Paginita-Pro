@@ -71,6 +71,11 @@
       const r = PK.Inc && S().exp.runs.find(o => o.phase === 'sala');
       return r && { id: 'sala', prioridad: 62, texto: 'Tus tropas esperan en el piso ' + r.inc.piso + ': elige el camino.', acciones: [{ label: 'Elegir sala', fn: cerrarY(() => PK.Inc.open(r.id)) }] };
     },
+    // pk-41: carretas paradas sin ruta (y talleres lejos de las bodegas sin quien los abastezca)
+    () => {
+      const L = PK.Logi, n = L.sinRuta();
+      return n > 0 && { id: 'rutas', prioridad: 58, texto: (n === 1 ? 'Tienes una carreta parada' : 'Tienes ' + n + ' carretas paradas') + ' sin ruta.', acciones: [{ label: 'Definir rutas', fn: cerrarY(() => PK.UI.openLogistics()) }] };
+    },
     // aldeanos sin nada que hacer
     () => {
       const vs = PK.Auto.villagers().filter(u => !u.task && !u.inside && !u.hold && (u.idleT || 0) > 10);

@@ -158,6 +158,21 @@
         el('div', { class: 'row' }, UI.btn('¡A construir!', () => UI.closeModal(), { cls: 'gold' })));
     });
   };
+  // pk-41 (decisión 1 del dueño): las partidas de antes de las rutas se migran, y sus carretas quedan paradas hasta que
+  // les digas a dónde van. Se muestra una sola vez (st.logi.avisoRutas).
+  UI.avisoRutas = function () {
+    const L = PK.Logi;
+    UI.modal('avisoRutas', 'Las carretas ahora siguen rutas', body => {
+      body.append(el('p', null, 'Con esta actualización cada carreta lleva y trae entre un origen y un destino que eliges tú. Ya no se reparten solas: tus ' + L.carts().length + ' carretas quedaron paradas en la Carretería.'),
+        el('ul', { class: 'info' },
+          el('li', null, 'Crea una ruta en Logística: de una bodega a un taller, de un taller a otro o de un taller a una bodega.'),
+          el('li', null, 'Si en el origen no hay nada que llevar, la carreta espera ahí. Si el destino está lleno, espera con la carga.'),
+          el('li', null, 'Toman el camino más rápido: un camino empedrado puede valer más que la línea recta.'),
+          el('li', null, 'La Carretería ahora arma más carretas por nivel.')),
+        el('div', { class: 'row' }, UI.btn('Definir rutas', () => { L.avisoVisto(); UI.closeModal(); UI.openLogistics(); }, { cls: 'gold' }),
+          UI.btn('Después', () => { L.avisoVisto(); UI.closeModal(); })));
+    });
+  };
   UI.offlineReport = function (rep) {
     if (!rep) return;
     UI.modal('offline', 'Mientras no estabas…', body => {
