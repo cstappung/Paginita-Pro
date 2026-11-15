@@ -957,3 +957,35 @@ test('L1 (pk-41): las rutas de carretas unen talleres y bodegas del pueblo, sin 
   assert.equal(D.BSTATS.cartwright(1).carts, 4);
   assert.equal(D.BSTATS.cartwright(3).carts, 8);
 });
+
+test('L2 (pk-42): cada aldeano trabaja para un edificio, con radio y puestos, y nunca busca más allá', () => {
+  const B = (type, lvl, extra) => Object.assign({ id: 9, type, lvl, owner: 'p', def: D.BUILD[type], done: true, cx: 50, cy: 50 }, extra);
+  // tabla 5.2 del plan
+  assert.equal(G.radioBase(B('tc', 3)), 12);
+  assert.equal(G.puestosBase(B('tc', 3)), 13);
+  assert.equal(G.radioBase(B('lumber', 1)), 10);
+  assert.equal(G.radioBase(B('lumber', 6)), 13);
+  assert.equal(G.radioBase(B('mining', 20)), 16, 'el radio tiene tope');
+  assert.equal(G.puestosBase(B('mining', 20)), 16, 'los puestos también');
+  assert.equal(G.radioBase(B('mill', 4)), 10);
+  // solo los edificios de trabajo terminados y tuyos
+  assert.ok(G.esBase(B('lumber', 1)));
+  assert.ok(!G.esBase(B('lumber', 1, { done: false })));
+  assert.ok(!G.esBase(B('lumber', 1, { owner: 'b1' })));
+  assert.ok(!G.esBase(B('sawmill', 1)));
+  // «qué saca»: lo que acepta y, si elegiste uno, solo eso
+  const mina = B('mining', 2, { extrae: 'gold' });
+  assert.ok(G.baseToma(mina, 'gold'));
+  assert.ok(!G.baseToma(mina, 'stone'));
+  assert.ok(!G.baseToma(B('lumber', 1), 'stone'));
+  assert.equal(G.queSaca(mina).join(), 'gold');
+  // el radio se mide desde el centro del edificio
+  assert.ok(G.enRadio(B('lumber', 1), 59, 49));
+  assert.ok(!G.enRadio(B('lumber', 1), 61, 49));
+  // el «cada vez más lejos» desapareció: doGather y el reparto usan el radio de la base
+  const ent = JS('entities.js');
+  assert.match(ent, /nodoEnRadio/);
+  assert.match(JS('auto.js'), /A\.sinRadio = /);
+  // la base se guarda con el aldeano (task.base) y lo que saca un edificio, con el edificio
+  assert.match(ent, /extrae/);
+});

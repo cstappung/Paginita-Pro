@@ -43,8 +43,21 @@
       }
       if (best) return { kind: 'building', obj: best };
     }
-    const n = g.bestNode(res, u.x, u.y, 'p', { used, max: 100 });
-    return n ? { kind: 'node', obj: n } : null;
+    // pk-42: un edificio (Centro Urbano, campamento, molino) con puesto libre que tenga ese recurso en su radio; primero
+    // el suyo, si ya trabaja para uno que lo acepta
+    const mia = g.baseDe(u);
+    let best = null, bs = 1e9;
+    for (const b of g.buildings) {
+      if (!g.esBase(b) || !g.baseToma(b, res) || isla(b.cx, b.cy)) continue;
+      const suya = mia === b, libres = g.libresBase(b) - ((used && used.get('base' + b.id)) || 0) + (suya ? 1 : 0);
+      if (libres <= 0) continue;
+      const sc = U.dist(u.x, u.y, b.cx, b.cy) - (suya ? 30 : 0) + 3 * (g.enBase(b) / Math.max(1, g.puestosBase(b)));
+      if (sc >= bs) continue;
+      const n = g.nodoEnRadio(res, b, { used });
+      if (n) { bs = sc; best = { kind: 'node', obj: n, base: b }; }
+    }
+    if (best && used) used.set('base' + best.base.id, (used.get('base' + best.base.id) || 0) + 1);
+    return best;
   }
   A.targetFor = targetFor;
 
@@ -93,12 +106,17 @@
   let hintT = -1e9;
   function idleHint(g) {
     if (g.offline || !PK.UI) return;
-    const idle = g.units.filter(u => u.owner === 'p' && u.kind === 'v' && !u.task && !u.inside && !u.hold && u.idleT > 20).length;
+    const idle = g.units.filter(u => u.owner === 'p' && u.kind === 'v' && (!u.task || A.sinRadio(u)) && !u.inside && !u.hold && u.idleT > 20).length;
     if (idle < 3 || performance.now() - hintT < 180000) return;
     hintT = performance.now();
     if (g.encierro) { // explorar no sirve de nada: el problema es el patio cerrado (G.checkEncierro)
       PK.UI.toast(idle + ' aldeanos sin trabajo: tu Centro Urbano quedó encerrado por edificios. Mueve o demuele uno de los marcados en rojo.', 'warn',
         g.encierro.puertas.length ? { label: 'Ver edificios', fn: g.verPuertas } : null);
+      return;
+    }
+    if (!g.puestosLibres()) { // pk-42: no falta qué sacar, faltan lugares de trabajo
+      PK.UI.toast(idle + ' aldeanos sin trabajo: tus campamentos y el Centro Urbano no tienen puestos libres. Construye otro campamento junto a un recurso o mejora los que tienes.', 'warn',
+        { label: 'Construir', fn: () => PK.UI.openBuild() });
       return;
     }
     const w = S().auto.w, miss = A.RES.filter(r => w[r] > 0 && !A.jobAvailable(r));
@@ -114,8 +132,12 @@
   // Lugar libre donde ese campamento se puede construir, lo más cerca posible de un recurso (o null).
   A.lugarJunto = function (tipo, n) {
     const g = G(), def = D.BUILD[tipo];
-    for (let r = 1; r <= 8; r++) for (let y = n.y - r - def.h + 1; y <= n.y + r; y++) for (let x = n.x - r - def.w + 1; x <= n.x + r; x++) {
+    // pk-42: hasta casi el radio de trabajo (el recurso tiene que quedar adentro): a veces tu tierra termina antes
+    const R = g.BASES && g.BASES[tipo] ? g.BASES[tipo].r(1) - 1 : 8;
+    for (let r = 1; r <= R; r++) for (let y = n.y - r - def.h + 1; y <= n.y + r; y++) for (let x = n.x - r - def.w + 1; x <= n.x + r; x++) {
       if (Math.max(Math.abs(x + def.w / 2 - n.x - 0.5), Math.abs(y + def.h / 2 - n.y - 0.5)) > r + def.w / 2) continue;
+      if (r > 1 && Math.max(Math.abs(x + def.w / 2 - n.x - 0.5), Math.abs(y + def.h / 2 - n.y - 0.5)) <= r - 1 + def.w / 2) continue; // ya mirado
+      if (U.dist(x + def.w / 2, y + def.h / 2, n.x + 0.5, n.y + 0.5) > R) continue;
       if (g.canPlace(tipo, x, y)) return [x, y];
     }
     return null;
@@ -131,7 +153,8 @@
   // ¿Se acabó ese recurso cerca de los puntos de acopio? Devuelve el más cercano lejos (hasta 70 casillas).
   A.lejos = function (res) {
     const g = G(), drops = g.buildings.filter(b => b.owner === 'p' && b.done && b.def.drop && b.def.drop.includes(res));
-    if (!drops.length || drops.some(b => W.nearestNode(res, b.cx, b.cy, 20, 'p'))) return null;
+    // pk-42: «cerca» es dentro del radio de un edificio que lo recibe (antes, 20 casillas de cualquier acopio)
+    if (!drops.length || drops.some(b => g.esBase(b) && g.nodoEnRadio(res, b))) return null;
     const tc = drops.find(b => b.type === 'tc') || drops[0], n = W.nearestNode(res, tc.cx, tc.cy, 70, 'p');
     if (!n) return null;
     const d = Math.min(...drops.map(b => U.dist(b.cx, b.cy, n.x, n.y)));
@@ -147,7 +170,7 @@
       const p = A.lugarJunto(tipo, lj.n);
       if (!p) continue;
       avisoLejos[res] = performance.now();
-      PK.UI.toast('Se acabó ' + D.RES[res].name.toLowerCase() + ' cerca. Hay ' + NOMBRE_NODO[res] + ' a ' + lj.d + ' casillas: ¿construir un ' + D.BUILD[tipo].name + ' allí?', 'warn',
+      PK.UI.toast('No queda ' + D.RES[res].name.toLowerCase() + ' en el radio de tus campamentos. Hay ' + NOMBRE_NODO[res] + ' a ' + lj.d + ' casillas: ¿construir un ' + D.BUILD[tipo].name + ' allí?', 'warn',
         { label: 'Construir allí', fn: () => A.proponerCampo(tipo, p[0], p[1]) });
       return; // de a uno
     }
@@ -177,13 +200,16 @@
     return p ? { tipo, x: p[0], y: p[1] } : null;
   };
 
+  A.sinRadio = u => !!(u.task && u.task.t === 'gather' && u.task.node < 0 && !u.task.m && !u.carry);
   // los consejeros del Salón del Consejo (js/consejo.js) corren en la misma pasada, también sin conexión
   A.consejo = el => { if (PK.Consejo) PK.Consejo.tick(el); };
   let t = 0, shopT = 0, rebalT = 0, metaT = 0, lejosT = 0;
   A.tick = function (dt) {
     const st = S(), g = G();
     if (!st || !st.auto) return;
-    for (const u of g.units) if (u.owner === 'p' && u.kind === 'v') u.idleT = !u.task && !u.inside ? (u.idleT || 0) + dt : 0;
+    // pk-42: quien espera junto a su edificio porque no queda nada en el radio también cuenta como ocioso para el Capataz
+    // (si lo puso él: a uno que mandaste tú no lo mueve)
+    for (const u of g.units) if (u.owner === 'p' && u.kind === 'v') u.idleT = (!u.task && !u.inside) || A.sinRadio(u) ? (u.idleT || 0) + dt : 0;
     t += dt;
     if (t < 1) return;
     const el = t; // segundos desde la última pasada (sin conexión llegan de a 60)
@@ -194,7 +220,7 @@
       idleHint(g);
       let k = 0;
       for (const u of g.units) {
-        if (u.owner !== 'p' || u.kind !== 'v' || u.task || u.inside || u.hold || u.idleT < 3 || u.scared > 0) continue;
+        if (u.owner !== 'p' || u.kind !== 'v' || (u.task && !A.sinRadio(u)) || u.inside || u.hold || u.idleT < (u.task ? 20 : 3) || u.scared > 0) continue;
         if (assignIdle(u, st)) u.idleT = 0;
         if (++k > 12) break; // reparte de a poco para no buscar rutas de golpe
       }
@@ -239,6 +265,9 @@
         const queued = g.buildings.reduce((s, o) => s + (o.owner === 'p' ? o.queue.length : 0), 0);
         // deja un lugar libre para el explorador que permite el Puesto: si no, «entrenar sin parar» se comía toda la población
         const room = g.scoutCount() < g.scoutMax() ? 1 : 0;
+        // pk-42: cada aldeano necesita un puesto en un edificio de trabajo; si ya sobran, no entrena más (gastaba comida)
+        const sobran = g.units.filter(u => u.owner === 'p' && u.kind === 'v' && !u.task && !u.inside && !u.hold && u.idleT > 10).length;
+        if (sobran >= 4) break;
         if (g.pop() + queued + room < g.popCap() && st.res.food >= D.VILLAGER.cost.food + 30) g.train(b, 1);
       }
       // …y ese lugar se usa: si falta un explorador y todavía queda mapa a su alcance, el Puesto entrena uno. Sin esto el
@@ -366,26 +395,37 @@
     if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b) && PK.Logi.supplied(b));
     if (job === 'dig') return W.pois.some(p => p.kind === 'ruin' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d);
     if (g.buildings.some(b => b.owner === 'p' && g.esGranja(b) && g.granjaRes(b) === job && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
-    const [hx, hy] = D.PLAYER_HOME;
-    return !!g.bestNode(job, hx, hy, 'p', { r: 40, max: 100 });
+    // pk-42: hace falta un edificio con puesto libre y algo de eso en su radio (se recuerda 1 s: la ventana lo pregunta seguido)
+    const k = job + ':' + Math.floor(g.time);
+    if (dispo.has(k)) return dispo.get(k);
+    if (dispo.size > 60) dispo.clear();
+    const ok = g.buildings.some(b => g.esBase(b) && g.baseToma(b, job) && g.libresBase(b) > 0 && !!g.nodoEnRadio(job, b));
+    dispo.set(k, ok);
+    return ok;
   };
+  const dispo = new Map();
   // Por qué no hay de un recurso: ¿nunca lo viste o se agotó todo lo que conoces? (y cuándo vuelve lo primero).
   A.why = function (res) {
     const now = Date.now();
-    let known = 0, soon = Infinity;
+    let known = 0, soon = Infinity, lejos = 0;
+    const bases = G().buildings.filter(b => G().esBase(b) && G().baseAcepta(b, res));
     for (const n of W.nodes) {
       if (n.temp || D.NODES[n.kind].res !== res || !W.fog[n.y * W.W + n.x] || !W.canUse(n, 'p')) continue;
       known++;
-      if (!n.dead) return { known, alive: true };
+      // pk-42: vivo pero fuera del radio de todo edificio que lo reciba
+      if (!n.dead && !bases.some(b => G().enRadio(b, n.x, n.y))) { lejos++; continue; }
+      if (!n.dead) return { known, alive: true, llenos: true };
       const def = D.NODES[n.kind];
-      const left = def.regen ? 3600 / (def.regen * (W.isShared(n) ? 1 : 0.6) * n.max) : def.regrow - (now - n.t) / 1000;
+      const left = def.regen ? 3600 / (def.regen * (W.isShared(n) ? 1 : 0.8 / (def.priv || 1)) * n.max) : def.regrow - (now - n.t) / 1000;
       soon = Math.min(soon, Math.max(60, left));
     }
-    return { known, alive: false, soon };
+    return { known, alive: false, soon, lejos };
   };
   A.whyText = function (res) {
     const w = A.why(res);
     if (!w.known) return 'no conoces dónde hay: explora';
+    if (w.llenos) return 'tus campamentos de eso no tienen puestos libres (súbelos de nivel o pon otro)';
+    if (w.lejos && w.soon === Infinity) return 'lo que conoces queda fuera del radio de tus campamentos: pon uno cerca';
     if (w.alive) return 'lo que conoces queda lejos o encerrado';
     return 'se agotó lo que conoces (vuelve en aprox. ' + U.fmtTime(w.soon) + '): explora más lejos';
   };
@@ -443,6 +483,30 @@
     if (!u) { PK.UI.toast('No tienes aldeanos libres: entrena más en el Centro Urbano.', 'warn'); return false; }
     return A.setJob([u], job) > 0;
   };
+  // pk-42: + y − en el panel de un edificio de trabajo. + toma un ocioso (el más cercano) o, si no hay, uno del trabajo con
+  // más gente que no hayas mandado tú; − deja a uno quieto.
+  A.sumarABase = function (b) {
+    const g = G(), vs = A.villagers().filter(u => !(u.scared > 0) && !u.inside && !(u.task && u.task.base === b.id));
+    const cerca = l => l.sort((x, y) => U.dist(x.x, x.y, b.cx, b.cy) - U.dist(y.x, y.y, b.cx, b.cy))[0];
+    let u = cerca(vs.filter(o => !o.task || A.sinRadio(o)));
+    if (!u) {
+      const c = A.jobCounts(), from = Object.keys(c).filter(k => k !== 'idle' && k !== 'other' && k !== 'work' && k !== 'dig' && c[k] > 0).sort((x, y) => c[y] - c[x])[0];
+      u = from && cerca(vs.filter(o => A.jobOf(o) === from && !(o.task && o.task.m)));
+    }
+    if (!u) { PK.UI.toast('No hay aldeanos libres para mandar: entrena más en el Centro Urbano.', 'warn'); return false; }
+    if (g.libresBase(b) <= 0) { PK.UI.toast(b.def.name + ' no tiene más puestos (' + g.puestosBase(b) + '): súbelo de nivel.', 'warn'); return false; }
+    return g.command([u], { kind: 'building', obj: b }, false);
+  };
+  A.quitarDeBase = function (b) {
+    const g = G(), u = A.villagers().filter(o => o.task && o.task.t === 'gather' && o.task.base === b.id).sort((x, y) => (x.carry || 0) - (y.carry || 0))[0];
+    if (!u) return false;
+    const carga = u.carry ? { t: 'deposit', next: null } : null;
+    g.release(u);
+    if (carga) g.assign(u, carga);
+    u.hold = true;
+    return true;
+  };
+
   // Reequilibrar al cambiar una prioridad (B5 del plan): el Capataz solo repartía ociosos, así que con todos
   // ocupados subir «Piedra» no movía a nadie (137 en madera, 0 en piedra). Mueve hasta `max` aldeanos que puso
   // él (nunca una orden tuya, task.m) desde lo que está sobre su objetivo (o con la bodega llena) hacia lo que

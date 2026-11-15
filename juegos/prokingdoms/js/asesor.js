@@ -78,8 +78,22 @@
     },
     // aldeanos sin nada que hacer
     () => {
-      const vs = PK.Auto.villagers().filter(u => !u.task && !u.inside && !u.hold && (u.idleT || 0) > 10);
-      return vs.length >= 3 && { id: 'ociosos', prioridad: 60, texto: vs.length + ' aldeanos ociosos.', acciones: [{ label: 'Repartir', fn: () => { PK.Auto.freeIdle(); } }, { label: 'Aldeanos', fn: cerrarY(() => PK.UI.openForeman()) }] };
+      const vs = PK.Auto.villagers().filter(u => (!u.task || PK.Auto.sinRadio(u)) && !u.inside && !u.hold && (u.idleT || 0) > 10);
+      if (vs.length < 3) return null;
+      const lleno = !G().puestosLibres(), ald = { label: 'Aldeanos', fn: cerrarY(() => PK.UI.openForeman()) };
+      return { id: 'ociosos', prioridad: 60, texto: vs.length + ' aldeanos ociosos.' + (lleno ? ' No quedan puestos libres: construye otro campamento.' : ''),
+        acciones: lleno ? [{ label: 'Construir', fn: cerrarY(() => PK.UI.openBuild()) }, ald] : [{ label: 'Repartir', fn: () => { PK.Auto.freeIdle(); } }, ald] };
+    },
+    // pk-42: aldeanos que esperan junto a su edificio porque ya no queda nada en su radio
+    () => {
+      const g = G(), cnt = new Map();
+      for (const u of PK.Auto.villagers()) if (u.task && u.task.t === 'gather' && u.task.base && u.task.node < 0 && !u.carry) cnt.set(u.task.base, (cnt.get(u.task.base) || 0) + 1);
+      let b = null, n = 0;
+      for (const [id, k] of cnt) { const o = g.bById.get(id); if (o && k > n && o.type !== 'tc') { b = o; n = k; } }
+      if (!b) return null;
+      const acc = [{ label: 'Ver', fn: cerrarY(() => PK.UI.selectBuilding(b)) }];
+      if (g.canMove && g.canMove(b)) acc.push({ label: 'Mover', fn: cerrarY(() => PK.Input.startMoving(b)) });
+      return { id: 'radio', prioridad: 55, texto: (n === 1 ? 'Un aldeano espera' : n + ' aldeanos esperan') + ' en ' + b.def.name + ': no queda nada que sacar en su radio.', acciones: acc };
     },
     // bodegas llenas: vender o hacer una fiesta
     () => {

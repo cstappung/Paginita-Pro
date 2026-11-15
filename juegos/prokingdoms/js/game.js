@@ -184,7 +184,7 @@
     for (const p of W.pois) { const st = S.pois[p.id]; if (st && st.d && p.kind === 'camp') W.poiFree(p); }
     for (const o of save.buildings || []) {
       const b = G.addBuilding(o.type, 'p', o.x, o.y, o.done, o.id, false, o.lvl);
-      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined, asp: o.asp || undefined });
+      Object.assign(b, { progress: o.progress, workers: o.workers || [], queue: o.queue || [], qt: o.qt || 0, prodAcc: o.prodAcc || 0, rally: o.rally || null, upg: o.upg || null, inb: o.inb || {}, outb: o.outb || {}, sinReserva: !!o.sinReserva, rama: o.rama || undefined, asp: o.asp || undefined, extrae: o.extrae || undefined });
       if (b.done) W.reveal(b.cx, b.cy, G.sight(b));
     }
     for (const o of save.units || []) G.addUnit(o);
@@ -469,6 +469,109 @@
       if (d < bd) { bd = d; bst = b; }
     }
     return bst;
+  };
+
+  // ---------- Lugares de trabajo (pk-42, plan de logística L2) ----------
+  // Cada recolector trabaja para UN edificio (task.base): el Centro Urbano, un campamento, un molino o el muelle de una
+  // colonia. Saca lo más cercano a ese edificio dentro de su radio y descarga ahí; no se cambia solo a otro. Así los
+  // campamentos importan: sin uno cerca, lo de lejos no se trabaja.
+  G.BASES = {
+    // puestos un poco más generosos que la tabla 5.2 del plan: con 3 + nivel el piloto quedaba con la mitad ociosa
+    tc: { r: () => 12, puestos: L => 10 + L },
+    lumber: { r: L => Math.min(16, 10 + Math.floor(L / 2)), puestos: L => Math.min(16, 4 + L) },
+    mining: { r: L => Math.min(16, 10 + Math.floor(L / 2)), puestos: L => Math.min(16, 4 + L) },
+    mill: { r: () => 10, puestos: L => Math.min(16, 4 + L) },
+    colonia: { r: () => 14, puestos: L => Math.min(16, 6 + L) },
+  };
+  G.esBase = b => !!(b && b.owner === 'p' && b.done && G.BASES[b.type] && b.def.drop);
+  G.radioBase = b => G.BASES[b.type].r(b.lvl);
+  G.puestosBase = b => G.BASES[b.type].puestos(b.lvl);
+  G.baseAcepta = (b, res) => !!(b.def.drop && b.def.drop.includes(res));
+  // lo que el Capataz le manda: lo que acepta y, si elegiste qué saca (b.extrae), solo eso
+  G.baseToma = (b, res) => G.baseAcepta(b, res) && (!b.extrae || b.extrae === res);
+  // ¿Esa casilla queda dentro del radio del edificio? (se mide desde su centro)
+  G.enRadio = (b, x, y) => U.dist(b.cx, b.cy, x + 0.5, y + 0.5) <= G.radioBase(b);
+  // Cuántos trabajan para ese edificio (en caché por paso del juego: el Capataz lo pregunta muchas veces).
+  let baseCnt = null, baseT = -1;
+  G.enBase = function (b) {
+    if (baseT !== G.time || !baseCnt) {
+      baseT = G.time; baseCnt = new Map();
+      for (const u of G.units) if (u.owner === 'p' && u.kind === 'v' && u.task && u.task.t === 'gather' && u.task.base) baseCnt.set(u.task.base, (baseCnt.get(u.task.base) || 0) + 1);
+    }
+    return baseCnt.get(b.id) || 0;
+  };
+  G.baseSucia = () => { baseCnt = null; }; // alguien cambió de trabajo: la cuenta se rehace en la próxima pregunta
+  G.libresBase = b => G.puestosBase(b) - G.enBase(b);
+  G.puestosLibres = () => G.buildings.reduce((s2, b) => s2 + (G.esBase(b) ? Math.max(0, G.libresBase(b)) : 0), 0);
+  G.baseDe = function (u) {
+    const id = u && u.task && u.task.base, b = id && G.bById.get(id);
+    return G.esBase(b) ? b : null;
+  };
+  // El mejor recurso de ese tipo dentro del radio de un edificio: cerca de él (ahí descargan) y sin amontonarse. Nunca
+  // busca más lejos que el radio.
+  G.nodoEnRadio = function (res, b, opts) {
+    opts = opts || {};
+    const R = G.radioBase(b), crowd = opts.crowd || G.gatherers(), used = opts.used;
+    const c0x = Math.max(0, Math.floor((b.cx - R) / W.CH)), c1x = Math.min(W.CW - 1, Math.floor((b.cx + R) / W.CH));
+    const c0y = Math.max(0, Math.floor((b.cy - R) / W.CH)), c1y = Math.min(W.CW - 1, Math.floor((b.cy + R) / W.CH));
+    let best = null, bs = 1e9, regs = null;
+    for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) for (const n of W.chunkNodes[cy * W.CW + cx]) {
+      if (n.dead || D.NODES[n.kind].res !== res || n.id === opts.exclude || !W.fog[n.y * W.W + n.x]) continue;
+      const d = U.dist(b.cx, b.cy, n.x + 0.5, n.y + 0.5);
+      if (d > R || !W.canUse(n, 'p')) continue;
+      const c = (crowd.get(n.id) || 0) + ((used && used.get(n.id)) || 0), room = G.nodeRoom(n);
+      const sc = d + (c >= room ? 8 * (c - room + 1) : c * 1.5) + (n.amount < 15 ? 4 : 0);
+      if (sc >= bs) continue;
+      if (!regs) { const p = W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, n.x, n.y); regs = W.regionsAt(p[0], p[1]); }
+      if (!W.reachable(n, regs)) continue;
+      bs = sc; best = n;
+    }
+    return best;
+  };
+  // Cuántos recursos de ese tipo (vivos y conocidos) hay en el radio: para el fantasma, el panel y la ventana Aldeanos.
+  G.recursosEnRadio = function (b, x, y, type) {
+    const def = D.BUILD[type || b.type], bx = x === undefined ? b.x : x, by = y === undefined ? b.y : y;
+    const cx = bx + def.w / 2, cy = by + def.h / 2, R = G.BASES[type || b.type].r(b ? b.lvl : 1), out = {};
+    for (let gy = Math.max(0, Math.floor((cy - R) / W.CH)); gy <= Math.min(W.CW - 1, Math.floor((cy + R) / W.CH)); gy++)
+      for (let gx = Math.max(0, Math.floor((cx - R) / W.CH)); gx <= Math.min(W.CW - 1, Math.floor((cx + R) / W.CH)); gx++)
+        for (const n of W.chunkNodes[gy * W.CW + gx]) {
+          if (n.temp || !W.fog[n.y * W.W + n.x] || U.dist(cx, cy, n.x + 0.5, n.y + 0.5) > R || !W.canUse(n, 'p')) continue;
+          const r = D.NODES[n.kind].res;
+          if (def.drop && !def.drop.includes(r)) continue;
+          const o = out[r] || (out[r] = { vivos: 0, monto: 0, agotados: 0 });
+          if (n.dead) o.agotados++; else { o.vivos++; o.monto += n.amount; }
+        }
+    return out;
+  };
+  // Qué saca un edificio: lo que elegiste (b.extrae) o, si no, lo que tenga en su radio según las prioridades.
+  G.queSaca = function (b) {
+    if (b.extrae && G.baseAcepta(b, b.extrae)) return [b.extrae];
+    const w = (S.auto && S.auto.w) || {};
+    return b.def.drop.slice().sort((x, y) => (w[y] || 0) - (w[x] || 0));
+  };
+  // El edificio que conviene para trabajar ese recurso: uno que lo tenga en su radio y lo acepte, primero los que tienen
+  // puesto libre, el más cercano. Puede volver uno lleno (quien llama lo mira con G.libresBase); null si ninguno llega.
+  G.baseParaNodo = function (n) {
+    const res = W.nodeRes(n);
+    let best = null, bd = 1e9;
+    for (const b of G.buildings) {
+      if (!G.esBase(b) || !G.baseAcepta(b, res) || !G.enRadio(b, n.x, n.y)) continue;
+      const d = U.dist(b.cx, b.cy, n.x + 0.5, n.y + 0.5) + (G.libresBase(b) > 0 ? 0 : 1000);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  };
+  // Para un aldeano sin edificio (partidas de antes de pk-42): el que tenga ese recurso en su radio y puesto libre.
+  G.baseParaRecurso = function (u, res) {
+    let best = null, bd = 1e9;
+    const isla = G.enMar() && PK.Arch ? PK.Arch.islaDe(u.x, u.y) : -1;
+    for (const b of G.buildings) {
+      if (!G.esBase(b) || !G.baseToma(b, res) || G.libresBase(b) <= 0) continue;
+      if (isla >= 0 && PK.Arch.islaDe(b.cx, b.cy) !== isla) continue;
+      const d = U.dist(u.x, u.y, b.cx, b.cy);
+      if (d < bd && G.nodoEnRadio(res, b)) { bd = d; best = b; }
+    }
+    return best;
   };
 
   G.countB = (type, owner) => G.buildings.reduce((s, b) => s + (b.owner === (owner || 'p') && b.type === type && b.done ? 1 : 0), 0);
@@ -957,6 +1060,7 @@
     if (u.task !== task) G.release(u);
     u.carry = keepCarry;
     u.task = task; u.phase = 'go'; u.path = []; u.fails = 0;
+    G.baseSucia(); // el Capataz reparte varios en el mismo paso: sin esto los puestos se llenaban de más
     if (task.t === 'farm') { const b = G.bById.get(task.b); if (b) b.farmer = u.id; }
   };
 
@@ -993,13 +1097,29 @@
       // el primero va justo ahí; si ya hay gente de sobra, los demás se reparten por los vecinos del mismo tipo
       const res = W.nodeRes(n), crowd = G.gatherers(), used = new Map();
       for (const u of units) if (u.task && u.task.t === 'gather') crowd.set(u.task.node, Math.max(0, (crowd.get(u.task.node) || 0) - 1));
-      for (const u of units) {
-        let tgt = n;
-        if ((crowd.get(n.id) || 0) + (used.get(n.id) || 0) >= G.nodeRoom(n)) tgt = G.bestNode(res, n.x + 0.5, n.y + 0.5, 'p', { crowd, used, r: 7, max: 12 }) || n;
-        used.set(tgt.id, (used.get(tgt.id) || 0) + 1);
-        G.assign(u, mark({ t: 'gather', node: tgt.id, res }));
+      // pk-42: trabajan para un edificio que tenga ese recurso en su radio (ahí descargan). Fuera de todo radio, no.
+      const base = (target.base && G.esBase(target.base) ? target.base : null) || G.baseParaNodo(n);
+      if (!base) {
+        if (!silent) {
+          const tipo = PK.Auto && PK.Auto.CAMPO[res], p = tipo && G.isUnlocked(tipo) && G.countAll(tipo) < G.maxCount(tipo) ? PK.Auto.lugarJunto(tipo, n) : null;
+          toast('Ese recurso queda fuera del radio de tus campamentos: tus aldeanos no trabajan tan lejos de donde descargan.' + (tipo ? ' Construye un ' + D.BUILD[tipo].name + ' cerca.' : ''), 'warn',
+            p ? { label: 'Construir allí', fn: () => PK.Auto.proponerCampo(tipo, p[0], p[1]) } : null);
+        }
+        return false;
       }
-      return true;
+      let libres = G.libresBase(base), ok = 0;
+      for (const u of units) {
+        const ya = u.task && u.task.t === 'gather' && u.task.base === base.id;
+        if (!ya && libres <= 0) continue;
+        if (!ya) libres--;
+        let tgt = n;
+        if ((crowd.get(n.id) || 0) + (used.get(n.id) || 0) >= G.nodeRoom(n)) tgt = G.nodoEnRadio(res, base, { crowd, used }) || n;
+        used.set(tgt.id, (used.get(tgt.id) || 0) + 1);
+        G.assign(u, mark({ t: 'gather', node: tgt.id, res, base: base.id }));
+        ok++;
+      }
+      if (ok < units.length && !silent) toast(base.def.name + ' no tiene más puestos (' + G.puestosBase(base) + '): súbelo de nivel o pon otro campamento cerca.', 'warn');
+      return ok > 0;
     }
     if (target.kind === 'building') {
       const b = target.obj;
@@ -1027,6 +1147,22 @@
           else { G.assign(u, { t: 'move' }); moveUnit(u, b.x + b.w, b.y + b.h); }
         }
         if (free < 0 && !silent) toast('No caben más trabajadores.', 'warn');
+        return true;
+      }
+      // pk-42: tocar un campamento (o el Centro Urbano) con aldeanos elegidos los pone a trabajar para él
+      if (G.esBase(b)) {
+        let libres = G.libresBase(b), ok = 0;
+        for (const u of units) {
+          const ya = u.task && u.task.t === 'gather' && u.task.base === b.id;
+          let task = null;
+          if (ya || libres > 0) for (const res of G.queSaca(b)) { const nn = G.nodoEnRadio(res, b); if (nn) { task = mark({ t: 'gather', node: nn.id, res, base: b.id }); break; } }
+          if (task) { if (!ya) libres--; ok++; }
+          const prev = u.task && u.task.t === 'gather' ? u.task : null;
+          if (u.carry) G.assign(u, { t: 'deposit', next: task || prev });
+          else if (task) G.assign(u, task);
+          else { G.assign(u, { t: 'move' }); moveUnit(u, b.x + b.w, b.y + b.h); }
+        }
+        if (!silent && ok < units.length) toast(libres <= 0 ? b.def.name + ' no tiene más puestos (' + G.puestosBase(b) + '): súbelo de nivel.' : 'No queda nada que sacar en el radio de ' + b.def.name + ' (' + G.radioBase(b) + ' casillas).', 'warn');
         return true;
       }
       if (b.def.drop) {
@@ -1454,8 +1590,8 @@
 
   // ---------- Progreso offline ----------
   // Se simula por tasas: cada aldeano rinde según la distancia entre su recurso y el punto de acopio.
-  function tripRate(u, rate, fromX, fromY, res) {
-    const drop = G.findDrop(u.owner, res, fromX, fromY);
+  function tripRate(u, rate, fromX, fromY, res, base) {
+    const drop = base && G.baseAcepta(base, res) ? base : G.findDrop(u.owner, res, fromX, fromY); // pk-42: descarga en su edificio
     if (!drop) return 0;
     if (u.owner === 'p') u.dl = drop.type === 'tc' ? 1 : drop.lvl;
     const cap = G.carryCap(u.owner, u), d = Math.max(0.5, U.dist(fromX, fromY, drop.cx, drop.cy) - drop.w / 2) * 1.2;
@@ -1494,16 +1630,24 @@
         const t = u.task;
         if (t.t === 'explore' || (t.t === 'move' && t.then)) { if (t.then) u.task = { t: 'explore' }; exploreOffline(u, dt); continue; }
         if (t.t === 'gather') {
+          // pk-42: como en vivo, los tuyos trabajan dentro del radio de su edificio
+          let base = null;
+          if (u.owner === 'p') {
+            base = G.baseDe(u) || G.baseParaRecurso(u, t.res);
+            if (!base) { u.task = null; continue; }
+            if (t.base !== base.id) { t.base = base.id; t.node = -1; G.baseSucia(); }
+          }
           let n = W.nodes[t.node];
           if (!n || n.dead) {
-            n = u.owner === 'p' ? G.bestNode(t.res, u.x, u.y, 'p', { zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { zone: t.zone });
+            n = u.owner === 'p' ? G.nodoEnRadio(t.res, base) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { zone: t.zone });
+            if (!n && u.owner === 'p') { t.node = -1; continue; } // espera a que rebrote, como en vivo
             if (!n) { u.task = null; continue; }
             t.node = n.id;
             const p = W.freeAround(n.x, n.y, n.x, n.y, u.x, u.y);
             u.x = p[0] + 0.5; u.y = p[1] + 0.5; u.path = [];
           }
           if (D.NODES[n.kind].marea && !D.mareaBaja(G.tSim)) continue; // el arrecife está bajo el agua
-          const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res);
+          const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res, base);
           // los reinos simulados recolectan a menor ritmo sin ti, para que las zonas comunes no se vacíen
           // con la bodega llena, tus aldeanos no gastan el recurso del mapa (antes lo vaciaban y se perdía)
           const room = u.owner === 'p' ? Math.max(0, G.cap(t.res) - (S.res[t.res] || 0)) : Infinity;

@@ -47,6 +47,48 @@
     box.append(rows);
     return box;
   }
+  // pk-42: el panel de un edificio de trabajo (Centro Urbano, campamento, molino, muelle de colonia): cuántos trabajan
+  // para él, su radio, qué hay adentro y qué saca.
+  UI.basePanel = function (b) {
+    const g = G(), A = PK.Auto, n = g.enBase(b), max = g.puestosBase(b), R = g.radioBase(b), rs = g.recursosEnRadio(b);
+    const box = el('div', { class: 'base-box' },
+      el('div', { class: 'row' }, el('b', null, 'Trabajan aquí: ' + n + '/' + max),
+        UI.btn('−', () => { A.quitarDeBase(b); UI.refreshPanel(true); }, { small: true, disabled: !n, title: 'Deja a uno quieto' }),
+        UI.btn('+', () => { A.sumarABase(b); UI.refreshPanel(true); }, { small: true, cls: 'gold', disabled: n >= max, title: 'Manda a uno a trabajar aquí' }),
+        el('span', { class: 'small muted' }, 'Radio: ' + R + ' casillas')));
+    const filas = b.def.drop.filter(r => rs[r]).map(r => {
+      const o = rs[r];
+      return el('span', { class: 'base-res' + (o.vivos ? '' : ' warn-t') }, UI.resIcon(r), ' ' + (o.vivos ? o.vivos + ' (aprox. ' + U.fmt(o.monto) + ')' : 'agotado') + (o.agotados ? ' · ' + o.agotados + ' rebrotando' : ''));
+    });
+    box.append(el('div', { class: 'small base-rs' }, filas.length ? filas : el('span', { class: 'warn-t' }, 'No conoces nada que sacar en su radio: muévelo cerca de un recurso o explora.')));
+    if (b.def.drop.length > 1) box.append(el('div', { class: 'row' }, el('span', { class: 'small' }, 'Saca: '),
+      el('select', { 'aria-label': 'Qué saca ' + b.def.name, onchange: e => { b.extrae = e.target.value || undefined; UI.refreshPanel(true); } },
+        [el('option', { value: '' }, 'Lo que haga falta (según tus prioridades)')].concat(b.def.drop.map(r => el('option', { value: r, selected: b.extrae === r }, D.RES[r].name))))));
+    const esperan = A.villagers().filter(u => u.task && u.task.base === b.id && u.task.node < 0).length;
+    if (esperan) box.append(el('p', { class: 'small warn-t' }, esperan + (esperan === 1 ? ' espera' : ' esperan') + ' sin nada que sacar en el radio. ' + (b.type === 'tc' ? 'Pon un campamento cerca de otros recursos.' : 'Muévelo (Mover) cerca de otro recurso o espera a que rebrote.')));
+    box.append(el('p', { class: 'small muted' }, 'Quien trabaja aquí saca lo más cercano dentro del radio y lo descarga aquí. ' + UI.hint('Elige aldeanos y haz clic derecho en el edificio para mandarlos.', 'Elige aldeanos y toca el edificio para mandarlos.')));
+    return box;
+  };
+  // pk-42: los lugares de trabajo y cuántos hay en cada uno. Tocar uno lo elige en el mapa.
+  function basesEl() {
+    const g = G(), bs = g.buildings.filter(b => g.esBase(b));
+    const box = el('div', null, el('h3', null, 'Lugares de trabajo'),
+      el('p', { class: 'small muted' }, 'Cada aldeano trabaja para un edificio y solo dentro de su radio. El Capataz lo manda al que tenga lo que hace falta y puestos libres.'));
+    if (!bs.length) return box;
+    const rows = el('div', { class: 'guild-rows' });
+    const esperan = new Map();
+    for (const u of PK.Auto.villagers()) if (u.task && u.task.base && u.task.node < 0) esperan.set(u.task.base, (esperan.get(u.task.base) || 0) + 1);
+    for (const b of bs) {
+      const n = g.enBase(b), max = g.puestosBase(b), e = esperan.get(b.id) || 0, saca = b.extrae ? D.RES[b.extrae].name.toLowerCase() : null;
+      rows.append(el('div', { class: 'g-row base-row' }, el('img', { class: 'serie-ico', src: Sp.buildingIcon(b.type, 'p', b.lvl), alt: '' }),
+        el('b', { class: 'fw-name' }, b.def.name + ' ' + b.lvl),
+        el('span', { class: n >= max ? 'good' : '' }, ' ' + n + '/' + max + ' '),
+        el('span', { class: 'small ' + (e ? 'warn-t' : 'muted') }, (saca ? 'saca ' + saca : '') + (e ? (saca ? ' · ' : '') + e + ' sin trabajo en el radio' : '')),
+        UI.btn('Ver', () => { UI.closeModal(); UI.selectBuilding(b); }, { small: true })));
+    }
+    box.append(rows);
+    return box;
+  }
   UI.openForeman = function () {
     UI.modal('foreman', 'Aldeanos', body => {
       const st = S(), a = st.auto, A = PK.Auto, jc = A.jobCounts(), all = A.villagers().length;
@@ -68,7 +110,7 @@
           el('span', { class: 'small muted' }, ok ? j.hint || '' : id === 'work' ? 'sin talleres abastecidos con puestos libres' : id === 'dig' ? 'sin ruinas descubiertas' : A.whyText(id)),
           eficiencia(id)));
       }
-      body.append(rows);
+      body.append(rows, basesEl());
       const chk = (key, label, help) => el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: a[key], onchange: e => { a[key] = e.target.checked; UI.rerender(); } }), el('b', null, ' ' + label), el('span', { class: 'small muted' }, ' — ' + help));
       body.append(el('h3', null, 'Capataz'),
         el('p', { class: 'small' }, 'Da trabajo a los aldeanos que se quedan sin hacer nada más de 3 segundos (también mientras no estás). Las órdenes que das tú no las cambia.'),

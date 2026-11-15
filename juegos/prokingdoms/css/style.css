@@ -1216,3 +1216,11 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 @media (max-width: 600px) { .serie-row { grid-template-columns: 24px 1fr auto; } .serie-row > .serie-ctl, .serie-row > span:last-child { grid-column: 2 / -1; } }
 .serie-ico { width: 24px; height: 24px; image-rendering: pixelated; }
 .serie-linea { margin-top: 6px; align-items: center; flex-wrap: wrap; }
+/* pk-42: edificios de trabajo (base y radio de los aldeanos) */
+.base-box { margin: 6px 0; padding: 6px 8px; background: rgba(120, 80, 30, 0.1); border-left: 4px solid #c9a24a; display: flex; flex-direction: column; gap: 4px; }
+.base-box .row { align-items: center; flex-wrap: wrap; gap: 6px; }
+.base-rs { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.base-res { display: inline-flex; align-items: center; gap: 3px; }
+.base-row { display: grid; grid-template-columns: 24px minmax(110px, 200px) 56px 1fr auto; align-items: center; gap: 4px 6px; }
+.base-row .fw-name { min-width: 0; }
+@media (max-width: 600px) { .base-row { grid-template-columns: 24px 1fr 48px auto; } .base-row > span.small { grid-column: 2 / -1; grid-row: 2; } }

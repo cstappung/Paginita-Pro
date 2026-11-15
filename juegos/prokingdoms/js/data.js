@@ -31,11 +31,11 @@
   D.RES = {
     food: { name: 'Comida' },
     wood: { name: 'Madera' },
-    stone: { name: 'Piedra' },
-    gold: { name: 'Oro' },
-    ore: { name: 'Hierro bruto' },
-    marble: { name: 'Mármol' },
-    gems: { name: 'Gemas' },
+    stone: { name: 'Piedra', priv: 2 },
+    gold: { name: 'Oro', priv: 2 },
+    ore: { name: 'Hierro bruto', priv: 2 },
+    marble: { name: 'Mármol', priv: 2 },
+    gems: { name: 'Gemas', priv: 2 },
     planks: { name: 'Tablones' },
     blocks: { name: 'Sillares' },
     ingots: { name: 'Lingotes' },
@@ -50,14 +50,16 @@
 
   // Recursos del mapa. regrow: segundos hasta rebrotar; regen: fracción del máximo que vuelve por hora.
   D.NODES = {
+    // pk-42 (plan de logística L2): `priv` multiplica el monto de los recursos de tu tierra (no los de las zonas comunes,
+    // que el servidor lleva con `amount` hasta L4). Las minas rellenan lo mismo por hora: su regen se divide por priv.
     // Balance (beta, nov. 2026): la madera costaba mucho más que la comida. Todo pide madera (casas, campamentos,
     // granjas, tablones, fundición, eras) y cada árbol se agota rápido, mientras la caza rendía 1,5 veces la tala.
     // Por eso la tala es más rápida, los árboles rebrotan antes y la caza rinde un poco menos. Los montos (amount)
     // no se tocan: el servidor del mundo compartido los usa para las zonas comunes.
     // pk-40 (reporte de un jugador: «madera, hierro y piedra se acaban muy rápido para lo que piden»): los árboles
     // rebrotan en 1,5 h (eran 2,5) y las minas se rellenan unas 2–3 veces más rápido. Los montos siguen iguales.
-    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 1.5 * 3600 },
-    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600 },
+    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 1.5 * 3600, priv: 2.5 },
+    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600, priv: 2.5 },
     deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.5, regrow: 6 * 3600, hunt: true },
     // regen 0,25 (era 0,05): la Era V pide unas 9.500 de piedra (con los sillares) y las minas de alrededor daban ~400 por
     // hora; el piloto quedó más de 14 h en la Era IV esperando piedra (prueba de ritmo después de pk-33)

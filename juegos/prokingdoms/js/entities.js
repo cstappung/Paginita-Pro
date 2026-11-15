@@ -44,7 +44,7 @@
     get cx() { return this.x + this.w / 2; }
     get cy() { return this.y + this.h / 2; }
     toJSON() {
-      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined, asp: this.asp || undefined };
+      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined, asp: this.asp || undefined, extrae: this.extrae || undefined };
     }
   }
   PK.Unit = Unit;
@@ -183,7 +183,9 @@
   function goDeposit(u, dt) {
     const g = G();
     if (!u.carry) { u.phase = 'go'; return false; }
-    const b = g.findDrop(u.owner, u.carryRes, u.x, u.y);
+    // pk-42: el recolector descarga en el edificio para el que trabaja (si recibe lo que lleva)
+    const base = u.owner === 'p' && u.task && u.task.t === 'gather' ? g.baseDe(u) : null;
+    const b = base && g.baseAcepta(base, u.carryRes) ? base : g.findDrop(u.owner, u.carryRes, u.x, u.y);
     if (!b) {
       u.mode = 'idle';
       u.wait -= dt;
@@ -204,13 +206,32 @@
   function doGather(u, dt) {
     const g = G(), t = u.task, cap = g.carryCap(u.owner, u);
     if (u.phase === 'return') { goDeposit(u, dt); return; }
+    // pk-42: los tuyos trabajan para un edificio (task.base) y solo dentro de su radio. Una partida de antes, o un
+    // edificio que ya no está: se le busca otro que tenga ese recurso cerca y puesto libre.
+    let base = null;
+    if (u.owner === 'p') {
+      base = g.baseDe(u);
+      if (!base) {
+        base = g.baseParaRecurso(u, t.res);
+        if (!base) { if (u.carry) { u.phase = 'return'; return; } u.task = null; u.mode = 'idle'; return; }
+        t.base = base.id; t.node = -1; g.baseSucia();
+      }
+      // cambiaste lo que saca el edificio: los que puso el Capataz se pasan a eso
+      if (base.extrae && base.extrae !== t.res && !t.m && g.baseAcepta(base, base.extrae)) { if (u.carry) { u.phase = 'return'; return; } t.res = base.extrae; t.node = -1; }
+    }
     let n = W.nodes[t.node];
     if (!n || n.dead) {
-      // se agotó: busca otro del mismo tipo (cerca de él y de su acopio, sin amontonarse); cada vez más lejos
-      // antes de rendirse, para que siga con la tarea que le diste
-      const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
-      if (nn) { t.node = nn.id; n = nn; }
-      else {
+      // se agotó: busca otro del mismo tipo dentro del radio de su edificio (sin amontonarse); los reinos simulados,
+      // cerca de donde están
+      const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
+      if (nn) { t.node = nn.id; n = nn; u.sinRadio = 0; }
+      else if (u.owner === 'p') {
+        // nada en el radio: espera junto a su edificio a que rebrote (el Capataz puede llevarse a los suyos a otro lado)
+        if (u.carry) { u.phase = 'return'; return; }
+        t.node = -1; u.mode = 'idle'; u.aim = null; u.sinRadio = (u.sinRadio || 0) + 6; u.wait = 6;
+        if (U.dist(u.x, u.y, base.cx, base.cy) > base.w / 2 + 3) pathTo(u, rectGoal(base, true));
+        return;
+      } else {
         if (u.carry) { u.phase = 'return'; return; }
         u.task = null; u.mode = 'idle';
         return;
@@ -226,8 +247,8 @@
     if (!bajo) u.mareaWait = false;
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
-        const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { exclude: n.id, zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
-        if (nn && nn.id !== n.id) { t.node = nn.id; u.fails = 0; } else { u.task = null; u.mode = 'idle'; }
+        const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { exclude: n.id }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
+        if (nn && nn.id !== n.id) { t.node = nn.id; u.fails = 0; } else if (u.owner === 'p') { t.node = -1; u.mode = 'idle'; u.wait = 6; } else { u.task = null; u.mode = 'idle'; }
       }
       return;
     }

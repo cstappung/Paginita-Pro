@@ -353,7 +353,8 @@
     const i = W.idx(x, y);
     if (W.block[i] || W.terrain[i] === T_WATER) return null;
     const def = D.NODES[kind], z = zone >= 0 ? W.zones[zone] : null;
-    const n = { id: W.nodes.length, kind, x, y, amount: def.amount, max: def.amount, zone, v: Math.floor(rng() * 6), dead: false, t: 0 };
+    const m = z && z.common ? 1 : def.priv || 1; // pk-42: los de tu tierra duran más (las comunes, como el servidor)
+    const n = { id: W.nodes.length, kind, x, y, amount: def.amount * m, max: def.amount * m, zone, v: Math.floor(rng() * 6), dead: false, t: 0 };
     if (kind === 'deer') n.dir = rng() < 0.5;
     if (kind === 'tree') n.sp = z && z.common && z.type === 'tree' ? (rng() < 0.55 ? 'pine' : 'oak') : rng() < 0.08 ? 'aut' : rng() < 0.3 ? 'pine' : 'oak';
     W.nodes.push(n);
@@ -726,7 +727,8 @@
       const def = D.NODES[n.kind];
       if (def.regen) {
         if (n.amount < n.max && hoursPassed > 0) {
-          const mult = W.zoneOf(n) && W.zoneOf(n).common ? 1 : 0.8; // las tuyas, casi como las comunes (era 0,6; pk-40)
+          // las tuyas, casi como las comunes (era 0,6; pk-40); con el monto ×priv (pk-42) rellenan lo mismo por hora
+          const mult = W.zoneOf(n) && W.zoneOf(n).common ? 1 : 0.8 / (def.priv || 1);
           n.amount = Math.min(n.max, n.amount + n.max * def.regen * mult * hoursPassed);
           if (n.dead && n.amount >= 1) n.dead = false;
         }

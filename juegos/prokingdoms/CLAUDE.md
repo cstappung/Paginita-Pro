@@ -213,3 +213,25 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   a route, and the Asesor a rule.
 - The Carretería makes `2 + 2 × level` carts.
 
+
+### L2, villagers with a work building and a radius (`pk-42`)
+
+- **Every gatherer of yours works for one building (`task.base`)**: Centro Urbano, a camp, a Mill, a colony dock
+  (`G.BASES`: radius and slots per level). It only gathers inside that radius (`G.nodoEnRadio`, measured from the
+  building's centre) and drops there. Nothing in the radius → it waits by the building with `task.node = -1`; one
+  the Capataz placed (`A.sinRadio`) counts as idle after 20 s and gets another job, **one you sent (`task.m`) waits**.
+- **`G.enBase` is cached per game step; every `G.assign` (and any direct write of `task.base`) must call
+  `G.baseSucia()`.** Without it the Capataz filled 12 villagers into a 6-slot camp in one step.
+- `b.extrae` (saved): what a multi-resource building takes («Saca»); `G.baseToma`/`G.queSaca` read it.
+- Old saves: a gatherer with no base gets one in `doGather` (and offline) via `G.baseParaRecurso`.
+- **Slots are the new limit of the economy**: a pop of 150 needs ~15 camps. «Entrenar sin parar» stops with 4+ idle,
+  the idle toast and the Asesor say «no free slots: build a camp», and the Asesor rule `radio` offers Mover for a
+  camp whose radius ran dry. `A.lugarJunto` searches up to the camp radius (your land often ends before the ore).
+- **Resource amounts:** `D.NODES[k].priv` multiplies amount and max of nodes **outside common zones** (trees and
+  berries ×2.5, mines ×2) and divides their regen (same per hour). Common zones keep `amount`: the server still owns
+  them until L4, so no function deploy was needed.
+- The autopilot (`tools/piloto.js` → `campoExtra`) moves dry camps, places one where the plan's resource is out of
+  reach and adds camps when idle villagers have no useful slot. Pace after L2: Era IV at 108 min (121 before), Era V
+  not reached in 310 min (250 before) — iron is the bottleneck; measure again after L3/L4.
+- Radius drawing: `circuloRadio` in `render.js` (ghost and selected building); panel `UI.basePanel`, Aldeanos window
+  «Lugares de trabajo».

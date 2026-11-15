@@ -665,6 +665,8 @@
       ctx.globalAlpha = ok ? 0.75 : 0.45;
       ctx.drawImage(spr.c, Math.round(px - spr.ox), Math.round(py - spr.oy));
       ctx.globalAlpha = 1;
+      // pk-42: el radio de trabajo de un campamento (o molino, o Centro Urbano) que estás por poner
+      if (g.BASES && g.BASES[g.placing.type]) circuloRadio(ctx, x + def.w / 2, y + def.h / 2, g.BASES[g.placing.type].r(1), ok ? 'rgba(255,226,120,0.85)' : 'rgba(230,90,70,0.7)');
       // bonos por cercanía (V5): líneas verdes hacia los vecinos que suman
       if (ok && g.cercaDe) {
         const [gx, gy] = R.iso(x + def.w / 2, y + def.h / 2);
@@ -708,6 +710,8 @@
       ctx.fillStyle = 'rgb(' + D.PLAYER_COLOR.join(',') + ')'; ctx.fillRect(x + 1, y - 20, 8, 5 + ond); ctx.fillRect(x + 1, y - 15 + ond, 5, 1);
       ctx.fillStyle = '#f2ead6'; ctx.fillRect(x + 3, y - 18, 2, 2);
     }
+    // pk-42: el radio de trabajo del edificio elegido
+    if (sel && sel.type === 'building') { const b = g.bById.get(sel.id); if (b && g.esBase && g.esBase(b)) circuloRadio(ctx, b.cx, b.cy, g.radioBase(b), 'rgba(255,226,120,0.8)'); }
     // punto de reunión
     if (sel && sel.type === 'building') {
       const b = g.bById.get(sel.id);
@@ -881,6 +885,15 @@
     }
   }
 
+  // pk-42: un círculo en el suelo (en casillas) visto en isométrico, punteado
+  function circuloRadio(ctx, cx, cy, r, col) {
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    for (let i = 0; i <= 48; i++) { const a = (i / 48) * Math.PI * 2, [px, py] = R.iso(cx + Math.cos(a) * r, cy + Math.sin(a) * r); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+    ctx.stroke();
+    ctx.restore();
+  }
   // pk-41: el camino de una ruta de carretas («Ver» en Logística, 15 s) o el de la carreta elegida
   function drawRuta(ctx) {
     const L = PK.Logi, g = G();

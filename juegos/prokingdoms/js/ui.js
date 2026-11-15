@@ -565,7 +565,7 @@
   // Mientras no reclamaste m4 es el tutorial guiado: «Muéstrame» lleva al lugar de cada paso, y se puede saltar
   // (flags.tuto = 'saltado'; al terminarlo, 'fin').
   const GUIA = {
-    m1: { txt: 'Elige el Centro Urbano y toca «Aldeano».', fn: () => elegirTc() },
+    m1: { txt: 'Elige el Centro Urbano y toca «Aldeano». Cada aldeano trabaja para un edificio (el Centro Urbano o un campamento) y recolecta dentro de su radio.', fn: () => elegirTc() },
     m2: { txt: 'Abre Reino → Construir y elige Casa.', fn: () => { UI.openBuild(); }, grupo: 'reino' },
     m3: { txt: 'Elige el Centro Urbano y toca «Mejorar».', fn: () => elegirTc() },
     m4: { txt: 'Construye un Puesto de Exploradores y entrena un explorador en él.', fn: () => {
@@ -704,6 +704,7 @@
           el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.barrio, onchange: e => { S().flags.barrio = e.target.checked ? 1 : 0; if (!e.target.checked) g.placing.barrio = null; } }), ' Modo barrio'),
           el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !S().flags.barrioSinCaminos, onchange: e => { S().flags.barrioSinCaminos = e.target.checked ? 0 : 1; } }), ' con caminos'),
           el('span', { class: 'muted' }, UI.hint('(o Mayús): ', '') + 'casas en cuadrícula con calles de 1 casilla')) : '',
+        armed && g.BASES[g.placing.type] && def.drop ? radioInfo(G().recursosEnRadio(null, gh.x, gh.y, g.placing.type), g.BASES[g.placing.type].r(1)) : '',
         el('p', { class: 'small muted' }, def.desc + ' Se construye solo en ' + U.fmtTime(def.time / g.buildMult('p')) + ': no ocupa aldeanos.'))));
       return;
     }
@@ -722,6 +723,14 @@
     g.sel = null;
     UI.refreshPanel(true);
   };
+
+  // pk-42: qué recursos hay en el radio de trabajo de un campamento (al ponerlo y en su panel)
+  function radioInfo(rr, R) {
+    const ks = Object.keys(rr);
+    if (!ks.some(k => rr[k].vivos)) return el('p', { class: 'small bad' }, 'No hay nada para sacar en su radio (' + R + ' casillas): sus aldeanos esperarían sin trabajo.');
+    return el('p', { class: 'small' }, 'En su radio (' + R + ' casillas): ' + ks.filter(k => rr[k].vivos).map(k => rr[k].vivos + ' de ' + D.RES[k].name.toLowerCase() + ' (' + Math.round(rr[k].monto) + ')').join(' · '));
+  }
+  UI.radioInfo = radioInfo;
 
   function taskText(u) {
     if (u.inside) { const b = G().buildings.find(o => o.workers.includes(u.id)); return b ? 'Trabajando en ' + b.def.name : 'Trabajando'; }
@@ -904,6 +913,7 @@
     if (PK.Heroes && b.done) { const gh = PK.Heroes.gobernanteDe(b); if (gh) act.append(el('p', { class: 'small' }, '★ Lo gobierna ', el('b', { translate: 'no' }, gh.nombre), ': ' + PK.Heroes.CLASES[gh.clase].pasTxt.split(': ').pop() + (gh.estado === 'libre' ? '.' : ' (ahora no: ' + (gh.estado === 'herido' ? 'herido' : 'de expedición') + ').'))); }
     // bonos por cercanía (V5): qué vecino le suma
     if (b.done && b.owner === 'p' && G().cercaDe) for (const c of G().cercaDe(b)) act.append(el('p', { class: 'small cerca-ok' }, '✚ Junto a ' + c.o.def.name + ': ' + c.c.txt + '.'));
+    if (G().esBase(b) && UI.basePanel) act.append(UI.basePanel(b)); // pk-42: quién trabaja aquí y su radio (ui/aldeanos.js)
     if (b.type === 'consejo' && PK.Consejo) act.append(el('div', { class: 'row' }, UI.btn('Abrir el Consejo', () => PK.Consejo.open(), { cls: 'gold' }), el('span', { class: 'small muted' }, PK.Consejo.resumen())));
     if (b.type === 'tc') {
       const st = S();
@@ -997,7 +1007,7 @@
         f ? el('p', { class: 'small' }, 'Próximos lobos en aprox. ' + U.fmtTime(Math.max(0, f.wolves)) + ' · próximo evento en aprox. ' + U.fmtTime(Math.max(0, f.event)) + '.') : null,
         UI.btn('Expediciones', () => UI.openBarracks('exp'), { small: true }));
     }
-    else if (def.drop) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
+    else if (def.drop && !G().esBase(b)) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
     if (b.type === 'granary' || b.type === 'warehouse') act.append(el('p', { class: 'small muted' }, 'Capacidad total: comida ' + U.fmt(G().cap('food')) + ' · bienes ' + U.fmt(G().cap('wood')) + '.'));
     if (UI.aspectoFila) act.append(UI.aspectoFila(b)); // pk-36: su aspecto (ui/aspectos.js)
     if (b.type !== 'tc') act.append(el('div', { class: 'row end' },
