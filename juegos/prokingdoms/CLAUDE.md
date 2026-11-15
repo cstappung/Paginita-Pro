@@ -315,6 +315,11 @@ us-central1. Deploy steps for the owner: `firebase/CONFIGURAR-FIREBASE.md`
 
 `PLAN-MEGA-ACTUALIZACION.md` (this folder) is the owner's plan, phase by phase
 («implementa la Fase N del plan»). Its rules section applies to every phase.
+`PLAN-LOGISTICA.md` (Nov 15 2026) is the next one, «Caminos y Campamentos»: phases
+L1–L5 (fastest-route carts with origin and destination, villagers bound to a building
+with a radius, stock living in buildings with carromatos and the Gran Portón, per-player
+common zones with global despeje and visible walls, shared highways). «Implementa la
+Fase L<N> del plan de logística». Its §10 lists the traps and §11 the owner's open choices.
 
 - **`scared` goes negative after a fright.** Test `u.scared > 0`, never
   `!u.scared`: a leftover −0.03 locked 132 of 159 villagers out of «+» (B1).
