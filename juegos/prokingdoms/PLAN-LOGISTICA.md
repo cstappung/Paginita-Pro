@@ -10,6 +10,8 @@
   una versión `pk-N`). Las reglas de la sección 1 de `PLAN-MEGA-ACTUALIZACION.md` siguen valiendo todas (caché,
   sonido, celular, i18n, sin conexión igual que en vivo, el servidor decide lo que toca a otros). Las notas de lo que
   se decida al implementar van a `juegos/prokingdoms/CLAUDE.md`, como siempre.
+- **Decisiones del dueño:** respondidas el 15 de noviembre de 2026 (sección 11). Mandan sobre cualquier otra parte
+  del plan.
 
 ---
 
@@ -26,8 +28,9 @@
 8. [Fase L5: autopistas compartidas (`pk-45`, servidor)](#8-fase-l5-autopistas-compartidas-pk-45-servidor)
 9. [Ideas que suman al plan](#9-ideas-que-suman-al-plan)
 10. [Trampas conocidas](#10-trampas-conocidas)
-11. [Decisiones que debe tomar el dueño](#11-decisiones-que-debe-tomar-el-dueño)
+11. [Decisiones del dueño (respondidas)](#11-decisiones-del-dueño-respondidas)
 12. [Tamaño y orden](#12-tamaño-y-orden)
+13. [Fase L6: el mar, con barcazas de carga (`pk-46`)](#13-fase-l6-el-mar-con-barcazas-de-carga-pk-46)
 
 ---
 
@@ -38,7 +41,7 @@
 | M1 | Los materiales viven en los edificios, no en un arca común | Sí | Un «libro mayor»: cada bodega guarda lo suyo y `S.res` pasa a ser el total de las bodegas del pueblo (sección 3.1). Así no hay que reescribir los ~170 lugares que leen `S.res`. | L3 |
 | M2 | Lo que llega a un campamento maderero o minero se queda ahí y no sirve para mejoras | Sí | Los campamentos tienen su propia bodega con tope. **Sin un carromato desde la Era I, el juego se traba**: hoy todas las minas quedan fuera de tu tierra (despeje de `pk-40`). | L3 |
 | M3 | Carromato grande, detallado, que sale del reino y trae mucho más, con origen y destino elegidos | Sí | Edificio nuevo (Establo de Carromatos, Era I), sprite nuevo y un perfil de ruta propio. | L3 |
-| M4 | Todas las carretas con origen y destino; esperan en el origen; se pueden entrenar más | Sí | Rutas guardadas (`st.logi.rutas`), más carretas por Carretería. Conviene mantener una ruta «Automática» (sección 11). | L1 |
+| M4 | Todas las carretas con origen y destino; esperan en el origen; se pueden entrenar más | Sí | Rutas guardadas (`st.logi.rutas`), más carretas por Carretería. **Sin modo automático** (decisión 2): las carretas de las partidas viejas quedan paradas con un aviso para que el jugador les defina ruta. | L1 |
 | M5 | Autopistas de piedra anchas, fuera del reino, que usa cualquiera | Sí, solo en línea | Es estado compartido: lo guarda y valida el servidor. En modo local solo existen las tuyas. | L5 |
 | M6 | Una Gran Puerta ancha y animada, la única por donde los carromatos cruzan la muralla | Sí | Tiene que llegar **junto con** los carromatos (L3): sin ella, un reino amurallado no podría usarlos. | L3 |
 | M7 | Las carretas eligen el camino más rápido, no el más corto | Sí | A* con costo por tiempo (1 / velocidad de la casilla), rutas guardadas en caché y un arreglo en el suavizado del camino. | L1 |
@@ -46,6 +49,7 @@
 | R1 | Que los recursos no se acaben tan rápido; las zonas comunes, cada jugador las ve enteras | Sí | Cada cliente lleva su propio estado de los recursos y el servidor deja de sincronizarlos (baja la descarga). Montos más grandes, medidos con el piloto. | L4 (montos en L2) |
 | C1 | Cuevas, mazmorras y materiales de un territorio se mudan más lejos, y para todos | Sí | El despeje pasa a ser una función pura del territorio de **todos** (que ya decide el servidor) y del mapa fijo. Así todos calculan lo mismo sin guardar nada. | L4 |
 | W1 | Ver las murallas de los demás y no poder entrar libremente | Sí, con servidor | Hoy las murallas no viajan al servidor. Van en la foto del reino (solo cuando cambian), con validación. | L4 |
+| — | El archipiélago con la logística nueva (decisión 10) | Sí | Los carromatos no cruzan agua: hace falta una **barcaza de carga** entre las colonias y la isla de casa. | L6 |
 
 Una sola cosa del pedido no se puede tal cual: **que los campamentos funcionen sin transporte en la Era I.** Hoy las minas
 quedan fuera de tu tierra, así que la piedra de la Era I llegaría a un campamento y se quedaría ahí. Por eso el
@@ -108,8 +112,9 @@ Se puede. Lo que hay que cuidar:
 
 - **La reserva de los talleres** (`pk-36`, `pk-40`): al cargar desde una bodega para un taller, la carreta vuelve a
   mirar `reserveOf` en el momento de cargar. Las rutas heredan esa regla.
-- **«Esperan en el origen»** cambia un comportamiento que la gente ya usa: hoy las carretas se reparten solas. Por eso
-  conviene una ruta «Automática» que sea el `findJob` de hoy (decisión 2 de la sección 11).
+- **«Esperan en el origen»** cambia un comportamiento que la gente ya usa: hoy las carretas se reparten solas. El dueño
+  decidió que **no** haya modo automático (decisión 2): `findJob` desaparece, y las carretas de las partidas viejas
+  quedan paradas con un aviso que explica la actualización y lleva a definir sus rutas (4.4).
 - **Sin conexión** (regla 8): las rutas necesitan un cálculo sin conexión que dé lo mismo que en vivo (sección 4.5).
 
 ### M5. Autopistas compartidas
@@ -266,9 +271,14 @@ Solo cliente, sin reinicio. Prepara el motor que usan las fases siguientes.
 
 ### 4.4. Rutas de carretas
 
-- `st.logi.rutas = [{ id, de, a, res, carros, tipo }]`. `res` es un recurso o `null` (todo lo que el destino acepte).
-  `tipo` es `'fija'` o `'auto'` (el `findJob` de hoy, si el dueño decide mantenerlo: decisión 2).
-- Cada carreta tiene `u.ruta = id`. Una carreta sin ruta espera en la Carretería.
+- `st.logi.rutas = [{ id, de, a, res, carros }]`. `res` es un recurso o `null` (todo lo que el destino acepte). No hay
+  modo automático (decisión 2): `findJob` se borra.
+- Cada carreta tiene `u.ruta = id`. Una carreta sin ruta espera en la Carretería con el estado «Sin ruta».
+- **Partidas viejas** (decisión 1: se migra, no se reinicia): al cargar, todas las carretas quedan sin ruta y paradas. Una
+  tarjeta única (`flags.avisoRutas`, con el estilo del cartel de `D.NOVEDADES`) explica que desde esta versión cada
+  carreta necesita origen y destino, con un botón «Definir rutas» que abre Logística → Rutas. Mientras haya carretas sin
+  ruta, Logística lleva un «!» en el menú y el Asesor tiene una regla («Tienes N carretas paradas sin ruta»).
+- Una carreta recién hecha también nace sin ruta, y su panel ofrece «Asignar a una ruta».
 - **Ciclo:** ir al origen → cargar lo que haya hasta la carga máxima (respetando `reserveOf` al cargar, regla de
   `pk-36`) → si no hay nada, **esperar en el origen** («Esperando carga») y mirar cada 3 s → ir al destino → descargar →
   si el destino está lleno, esperar ahí («Destino lleno») sin perder nada → volver vacía.
@@ -298,8 +308,9 @@ Solo cliente, sin reinicio. Prepara el motor que usan las fases siguientes.
   `prokingdoms.test.cjs` con un mapa chico).
 - Una carreta en un camino en L no pisa el pasto.
 - Una ruta sin carga espera en el origen y no vuelve a la Carretería.
-- El piloto (`?timelapse`) no queda peor que `pk-40` en la Era II y III (las rutas «Automáticas» lo cubren mientras
-  aprende a armar rutas).
+- Una partida de `pk-40` carga con sus carretas paradas, ve la tarjeta una sola vez y el «!» se va al asignarles ruta.
+- El piloto (`?timelapse`) arma sus rutas (cada taller lejos de una bodega recibe una) y no queda peor que `pk-40` en la
+  Era II y III.
 
 ---
 
@@ -552,10 +563,10 @@ Cliente y servidor juntos. `D.PROTO` 10. Desplegar la función al hacer merge, y
   entender una red de transporte.
 - **Ritmo de cada ruta a la vista:** «≈ 120 de madera por minuto» y, si hay una autopista más rápida disponible,
   «con la Calzada de Ana: ≈ 180». Enseña sola por qué conviene construirlas.
-- **«Rutas solas» en el Capataz** (automatización, nota que se quiere subir): al terminar un campamento, crea la ruta
-  de carromato a la bodega más cercana si hay un carromato libre. Apagable.
-- **Consejero nuevo, el Intendente de Caminos** (Salón del Consejo): reparte carretas y carromatos entre rutas según lo
-  trabado, como el Capataz con los aldeanos.
+- **Solo si el dueño lo pide más adelante** (eligió rutas siempre a mano, decisión 2): «Rutas solas» en el Capataz (crea
+  la ruta de un campamento nuevo) o un consejero Intendente de Caminos que reparte carretas entre rutas. Mientras tanto,
+  el panel de un campamento recién terminado sugiere «+ Ruta de carromato» con la bodega más cercana ya elegida, sin
+  crearla sola.
 - **Defensa de campamentos:** empalizada alrededor del campamento y una torre cerca, ahora que los bandidos roban de
   ahí. Misión «Campamento fortificado».
 - **Misiones nuevas** (rama Logística): primer carromato, primera ruta, 50 casillas de calzada, 1.000 llevados por
@@ -581,9 +592,10 @@ Cliente y servidor juntos. `D.PROTO` 10. Desplegar la función al hacer merge, y
 - **El amurallado y las murallas ajenas** (7.3): `compute` cuenta cualquier `W.wall` como barrera.
 - **El despeje solo puede mirar datos comunes** (7.2). Un edificio, un camino o un árbol talado de un jugador hacen que
   dos clientes vean cosas en lugares distintos.
-- **El mar usa el mismo código** (`aplicarTema` reviste los mismos tipos). Hasta que se decida otra cosa, en el
-  archipiélago todo sigue como en `pk-40`: un interruptor por tema (`D.MAR.logisticaVieja`) en `G.deposit`, las rutas y
-  el radio. Los carromatos no cruzan agua y las colonias quedarían aisladas.
+- **El mar usa el mismo código** (`aplicarTema` reviste los mismos tipos: el Aserradero de teca es `lumber`, la Cantera
+  de coral es `mining`, la Lonja es `mill`). Todo lo de L1–L3 vale también ahí desde que llega, así que la barcaza de L6
+  tiene que ir pegada a L3: entre `pk-43` y `pk-46`, una colonia acumula en su muelle sin poder mandarlo. Si `pk-46` se
+  atrasa, poner un puente provisional (el Muelle de la colonia suma al pueblo como hoy) y quitarlo en L6.
 - **El piloto** tiene que aprender cada fase antes de medir: sin rutas ni bases, la prueba de ritmo mide al piloto, no al
   juego. Su `paso()` se traga las excepciones: revisar la consola.
 - **Caché:** subir `?v=pk-N` de todos los scripts, `PK_VER` en `colabtex/src/juegos/prokingdoms.js` y correr
@@ -591,27 +603,24 @@ Cliente y servidor juntos. `D.PROTO` 10. Desplegar la función al hacer merge, y
 
 ---
 
-## 11. Decisiones que debe tomar el dueño
+## 11. Decisiones del dueño (respondidas)
 
-1. **¿Reiniciar o migrar?** El plan no necesita reinicio: la conciliación reparte el `S.res` viejo en las bodegas, las
-   carretas viejas quedan con ruta «Automática» y el despeje se recalcula. Un reinicio (`D.SAVE_V` y `D.MUNDO_VER`) solo
-   haría falta si se quiere que todos empiecen parejos con la economía nueva. **Recomendación: migrar.**
-2. **¿Se mantiene una ruta «Automática»** (las carretas eligen solas, como hoy)? **Recomendación: sí, solo para carretas
-   del pueblo.** Los carromatos siempre con origen y destino elegidos, como pediste.
-3. **¿Las carretas chicas pueden ir a un campamento dentro de tu tierra?** **Recomendación: no**, así la regla es simple
-   («los campamentos son del carromato»).
-4. **El Molino dentro de tu tierra, ¿es bodega del pueblo?** **Recomendación: sí** (las granjas están en el pueblo).
-   Fuera de tu tierra funciona como campamento.
-5. **Tierra ajena sin muralla:** ¿se cruza con costo ×4 o no se cruza? **Recomendación: ×4.** Prohibirla puede dejar un
-   recurso o una zona común sin acceso si un reino corta el paso.
-6. **Autopistas:** ¿también en zonas comunes? ¿Quién puede quitarlas? **Recomendación:** fuera de las zonas comunes; las
-   quita quien las hizo, o el dueño del territorio donde están.
-7. **Zonas comunes de cada uno:** se pierde la competencia por esas zonas y la presión de los reinos simulados. Es lo que
-   pediste; queda anotado porque es un cambio de sabor del mundo compartido.
-8. **¿Murallas generadas para los reinos simulados?** **Recomendación: sí**, para que el mundo se vea igual con bots y
-   con jugadores.
-9. **Distancia del despeje (`Dz.LEJOS`):** 12 casillas, o más si quieres que salir de tu tierra sea un viaje de verdad.
-10. **El archipiélago:** ¿después, en una entrega aparte? **Recomendación: después.**
+Respondidas el 15 de noviembre de 2026. Mandan sobre cualquier otra parte del plan.
+
+1. **Se migra, no se reinicia.** Cada uno conserva su reino y la conciliación reparte sus recursos en sus bodegas. Las
+   carretas **quedan paradas** y un aviso explica la actualización y pide definir a dónde van (4.4).
+2. **No hay modo automático.** Toda carreta y todo carromato necesita origen y destino elegidos a mano. `findJob` se va.
+3. **Los campamentos son solo para carromatos**, estén dentro o fuera de tu tierra. Las carretas chicas nunca van a un
+   campamento.
+4. **El Molino dentro de tu tierra es bodega del pueblo** (como el Granero). En tierra de nadie funciona como campamento.
+5. **La tierra ajena sin muralla se cruza, pero cuesta ×4** en las rutas. Las murallas y puertas ajenas siempre bloquean.
+6. **Autopistas fuera de las zonas comunes** (tierra de nadie y tu territorio). Las quita quien las hizo o el dueño del
+   territorio donde quedaron.
+7. **Cada jugador ve las zonas comunes enteras.** Se acepta perder la competencia por ellas y la presión de los reinos
+   simulados.
+8. **Los reinos simulados tienen murallas generadas por código** (anillo con 2 a 4 portones, desde su Era II).
+9. **Distancia del despeje: 12 casillas** (`Dz.LEJOS`) de todo territorio.
+10. **El archipiélago entra en este plan, con barcazas de carga** (sección 13, Fase L6).
 
 ---
 
@@ -624,11 +633,61 @@ Cliente y servidor juntos. `D.PROTO` 10. Desplegar la función al hacer merge, y
 | `pk-43` | L3: libro mayor, campamentos con bodega, carromato, Establo, Gran Portón | desplegar (`D.PROTO` 9) | no | 4–5 |
 | `pk-44` | L4: zonas comunes de cada uno, despeje para todos, murallas visibles | sí (`D.PROTO` 10) | no | 3–4 |
 | `pk-45` | L5: autopistas compartidas | sí (`D.PROTO` 11) | no | 2–3 |
+| `pk-46` | L6: el mar con barcazas de carga | no (el servidor no ve el mar) | no | 2–3 |
 
-En total, unas **13 a 18 sesiones**. El orden importa: L1 deja el motor de rutas que usan L3 y L5, y L2 va antes que L3
+En total, unas **15 a 21 sesiones**. **L6 conviene hacerla justo después de L3** (antes que L4 y L5): no depende del
+servidor, y mientras falte, las colonias acumulan en su muelle sin poder mandarlo (sección 10). El orden importa: L1 deja el motor de rutas que usan L3 y L5, y L2 va antes que L3
 para que los aldeanos ya tengan base cuando los campamentos empiecen a guardar. L4 y L5 se pueden juntar en un solo
 despliegue si se prefiere tocar el servidor una sola vez (un solo `D.PROTO`).
 
 Cada entrega cierra con: pruebas de `npm run test:juegos`, `tools/cheat-test.js` si tocó el servidor, el piloto antes y
 después, la pasada de Playwright de `pk-36`, sus notas en `juegos/prokingdoms/CLAUDE.md` y el aviso al dueño de que el
 despliegue de la función es manual (`firebase deploy --only functions`).
+
+---
+
+## 13. Fase L6: el mar, con barcazas de carga (`pk-46`)
+
+Decisión 10 del dueño. Solo cliente: el servidor nunca ve el mapa del mar, así que no hay `D.PROTO` ni despliegue.
+Necesita L1 (rutas por tiempo), L2 (bases) y L3 (libro mayor, carromatos).
+
+### 13.1. Las mismas reglas, con nombres del mar
+
+- **Isla de casa = el pueblo.** La Fortaleza del Puerto (`tc`), el Ahumadero (`granary`), la Bodega del puerto
+  (`warehouse`) y la Lonja (`mill`) son bodegas del pueblo, y lo suyo sirve para pagar.
+- **Campamentos:** el Aserradero de teca (`lumber`) y la Cantera de coral (`mining`) guardan aparte, como en la tierra.
+  En la isla de casa los vacía un carromato. En el mar el Establo y el carromato se revisten en `D.MAR.edificios` (por
+  ejemplo, «Corral de carretas» y «carro de playa») y entran en `D.MAR.construir`.
+- **Colonias:** el Muelle de la colonia (`colonia`) pasa a guardar aparte, como un campamento. Lo que juntan los colonos
+  no sirve para pagar hasta que una barcaza lo trae a casa. Hoy suma directo a `S.res`.
+- Los aldeanos siguen sin cruzar agua: en una colonia su base es el Muelle de la colonia o un campamento de esa isla.
+
+### 13.2. La barcaza de carga
+
+- Unidad nueva `kind: 'barcaza'`, que se arma en el Embarcadero de colonos (una cola aparte de la de los colonos).
+  Barcazas por Embarcadero: `1 + nivel`. Carga 300, más con la Escuela de navegantes y el árbol del mar.
+- **Ruta:** del Muelle de la colonia al Embarcadero de casa, que descarga en las bodegas del pueblo. También al revés,
+  para llevar materiales a una colonia que quiera construir. Se elige como cualquier ruta (L1), en la misma ventana.
+- **Perfil de ruta `barcaza`:** solo agua (la tierra no pasa), con el A* por tiempo de L1. Atraca en la casilla de agua
+  más cercana a cada muelle.
+- **El mar cambia el tiempo** con lo que ya existe: viento a favor o en contra (`D.vientoMar`), ×1,4 de viaje con
+  tormenta (`D.tormenta`), un poco más lenta en la bruma. Siempre con `G.ahora()`, así sin conexión da lo mismo.
+- **Sprite:** una barcaza chata con cajas y sacos según la carga, vela con el color del reino y el aspecto de barco del
+  Pase (`Armada.aspecto`), estela como los barcos de la armada (`st.barco`). Se dibuja con `Armada.items`.
+- **Sin conexión:** la fórmula de 4.5, con `ida` y `vuelta` del camino por agua y el factor de tormenta del momento de
+  salida.
+
+### 13.3. Ideas para el mar (opcionales)
+
+- Los asaltos piratas (solo en vivo) pueden ir por una barcaza en el agua; las baterías y la Cadena la protegen cerca de
+  casa.
+- Un faro (`faromar`) en la ruta disipa la bruma y le quita el retraso.
+- Misiones de la Crónica del Mar: primera barcaza, 1.000 traídos de las colonias.
+
+### 13.4. Criterios de aceptación de L6
+
+- Ninguna barcaza pisa tierra; ningún carromato pisa agua (prueba).
+- Lo que juntan los colonos no aparece en `S.res` hasta que la barcaza descarga en casa.
+- Con tormenta, el viaje tarda 1,4 veces, igual en vivo y sin conexión.
+- Una partida del mar de `pk-45` carga y lo que había en el pueblo queda en sus bodegas.
+- Pasada de Playwright por las ventanas del mar en 390 × 844 y en horizontal.

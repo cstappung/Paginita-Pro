@@ -10,7 +10,7 @@ owner outside this repo and dropped in.
 - `PLAN-MEGA-ACTUALIZACION.md`: the big plan, phases 0–9, all done (`pk-11` to `pk-40`). Its §1 rules apply to
   every delivery.
 - `PLAN-LOGISTICA.md` (Nov 15 2026): the next plan, «Caminos y Campamentos», phases L1–L5 («implementa la Fase
-  L<N> del plan de logística»). Its §10 lists traps and §11 the owner's choices.
+  L<N> del plan de logística»), L1–L6 (L6: the sea with cargo barges). Its §10 lists traps and §11 the owner's answered decisions (Nov 15 2026): migrate (no reset), carts always with a hand-picked route (no auto mode).
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
