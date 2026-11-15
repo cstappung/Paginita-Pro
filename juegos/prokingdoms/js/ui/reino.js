@@ -126,7 +126,7 @@
   UI.rutaEl = function (r, compacto) {
     const L = PK.Logi, g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a), cs = L.cartsDe(r), mala = L.rutaMala(r);
     const T = mala ? null : L.tiempos(r, true);
-    const carro = L.claseRuta(r) === 'carromato', nom = carro ? 'Carromatos' : 'Carretas';
+    const clase = L.claseRuta(r), carro = clase !== 'cart', nom = clase === 'barcaza' ? 'Barcazas' : carro ? 'Carromatos' : 'Carretas';
     const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica).' : 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
     const malo = mala || (T && !T.ok) || !cs.length;
     return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
@@ -150,6 +150,7 @@
       const sinRuta = L.sinRuta();
       body.append(el('div', { class: 'war-top' },
         el('div', null, el('b', null, 'Carromatos: '), L.carromatos().length + '/' + L.carroMax() + (g.countB('establo') ? '' : ' (construye un Establo de Carromatos)')),
+        g.enMar && g.enMar() ? el('div', null, el('b', null, 'Barcazas: '), L.barcazas().length + '/' + L.barcaMax() + (g.countB('embarcadero') ? '' : ' (construye el Embarcadero de colonos)')) : '',
         el('div', null, el('b', null, 'Carretas: '), L.carts().length + '/' + L.cartMax() + (g.countB('cartwright') ? '' : ' (construye una Carretería, Era II)')),
         el('div', { class: sinRuta ? 'warn-t' : '' }, el('b', null, 'Sin ruta: '), String(sinRuta)),
         el('div', null, el('b', null, 'Talleres lejos de un almacén: '), far.length + ' de ' + shops.length),
@@ -166,10 +167,12 @@
       if (llenos.length) body.append(el('p', { class: 'small warn-t' }, llenos.length === 1 ? llenos[0].def.name + ' está lleno y ningún carromato lo vacía: sus aldeanos esperan.' : llenos.length + ' campamentos llenos sin carromato: sus aldeanos esperan.'));
       for (const r of st.logi.rutas) body.append(UI.rutaEl(r));
       if (!st.logi.rutas.length) body.append(el('p', { class: 'small muted' }, 'Todavía no tienes rutas. Un carromato lleva lo de un campamento a una bodega del pueblo; una carreta une un taller con una bodega (o con otro taller). Cargan en el origen, llevan al destino y vuelven.'));
-      const campos = g.buildings.filter(b => b.owner === 'p' && b.done && L.esCampo(b));
+      const campos = g.buildings.filter(b => b.owner === 'p' && b.done && L.esCampo(b) && b.type !== 'colonia');
+      const colonias = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'colonia'); // pk-46: barcazas
+      const embs = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'embarcadero');
       const puntos = g.buildings.filter(b => b.done && L.puntoCarreta(b)).sort((x, y) => (L.isShop(y) - L.isShop(x)) || x.def.name.localeCompare(y.def.name));
       const opc = (sel, vacio, conCampos) => [el('option', { value: '' }, vacio)].concat(
-        [['Campamentos (carromato)', conCampos ? campos : []], ['Talleres', puntos.filter(b => L.isShop(b))], ['Bodegas', puntos.filter(b => !L.isShop(b))]].filter(x => x[1].length).map(([t, l]) => el('optgroup', { label: t }, l.map(b => el('option', { value: b.id, selected: b.id === sel }, nombreB(b))))));
+        [['Muelles de colonias (barcaza)', conCampos ? colonias : []], ['Campamentos (carromato)', conCampos ? campos : []], ['Talleres', puntos.filter(b => L.isShop(b))], ['Bodegas', puntos.filter(b => !L.isShop(b))], ['Embarcadero (barcazas)', conCampos ? [] : embs]].filter(x => x[1].length).map(([t, l]) => el('optgroup', { label: t }, l.map(b => el('option', { value: b.id, selected: b.id === sel }, nombreB(b))))));
       const A = g.bById.get(rutaForm.de), B = g.bById.get(rutaForm.a);
       const resOps = !B ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => L.acepta(B, k)) : L.isShop(B) ? Object.keys(L.recipe(B).in) : A && L.isShop(A) ? [L.output(A)] : [];
       if (rutaForm.res && !resOps.includes(rutaForm.res)) rutaForm.res = '';
@@ -227,10 +230,10 @@
       return el('div', { class: 'stock-box' + (tot >= cap - 0.5 ? ' lleno' : '') },
         el('div', { class: 'row' }, el('b', null, 'Guarda: ' + Math.floor(tot) + '/' + cap), el('div', { class: 'bar stock-bar' }, el('div', { class: 'fill' + (tot >= cap - 0.5 ? ' red' : ''), style: { width: Math.min(100, (tot / cap) * 100) + '%' } }))),
         ks.length ? el('div', { class: 'small base-rs' }, ks.map(k => el('span', { class: 'base-res' }, UI.resIcon(k), ' ' + U.fmt(Math.floor(b.inv[k]))))) : '',
-        el('p', { class: 'small ' + (con ? 'muted' : 'warn-t') }, con ? 'Lo lleva al pueblo ' + rs.filter(r => L.cartsDe(r).length).map(r => { const d = G().bById.get(r.a); return d ? d.def.name : '?'; }).join(', ') + '.' : 'Lo que se junta aquí no sirve para construir hasta que un carromato lo lleve al pueblo.' + (tot >= cap - 0.5 ? ' Está lleno: sus aldeanos esperan.' : '')),
+        el('p', { class: 'small ' + (con ? 'muted' : 'warn-t') }, con ? 'Lo lleva al pueblo ' + rs.filter(r => L.cartsDe(r).length).map(r => { const d = G().bById.get(r.a); return d ? d.def.name : '?'; }).join(', ') + '.' : (b.type === 'colonia' ? 'Lo que juntan tus colonos no sirve para construir hasta que una barcaza lo lleve a tu isla.' : 'Lo que se junta aquí no sirve para construir hasta que un carromato lo lleve al pueblo.') + (tot >= cap - 0.5 ? ' Está lleno: sus aldeanos esperan.' : '')),
         rs.map(r => UI.rutaEl(r, true)),
-        el('div', { class: 'row' }, UI.btn('+ Ruta de carromato', () => {
-          const bs = Lb.bodegas().concat(G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'mill' && !L.esCampo(o)));
+        el('div', { class: 'row' }, UI.btn(b.type === 'colonia' ? '+ Ruta de barcaza' : '+ Ruta de carromato', () => {
+          const bs = b.type === 'colonia' ? G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'embarcadero') : Lb.bodegas().concat(G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'mill' && !L.esCampo(o)));
           const d = bs.filter(o => (b.def.drop || []).some(k => L.acepta(o, k))).sort((x, y) => Math.hypot(x.cx - b.cx, x.cy - b.cy) - Math.hypot(y.cx - b.cx, y.cy - b.cy))[0];
           rutaForm.de = b.id; rutaForm.a = d ? d.id : 0; rutaForm.res = '';
           UI.openLogistics();

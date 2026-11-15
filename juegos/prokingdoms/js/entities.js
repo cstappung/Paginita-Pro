@@ -223,7 +223,7 @@
     if (!n || n.dead) {
       // se agotó: busca otro del mismo tipo dentro del radio de su edificio (sin amontonarse); los reinos simulados,
       // cerca de donde están
-      const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
+      const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { u }) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
       if (nn) { t.node = nn.id; n = nn; u.sinRadio = 0; }
       else if (u.owner === 'p') {
         // nada en el radio: espera junto a su edificio a que rebrote (el Capataz puede llevarse a los suyos a otro lado)
@@ -248,7 +248,7 @@
     if (!bajo) u.mareaWait = false;
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
-        const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { exclude: n.id }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
+        const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { exclude: n.id, u }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
         if (nn && nn.id !== n.id) { t.node = nn.id; u.fails = 0; } else if (u.owner === 'p') { t.node = -1; u.mode = 'idle'; u.wait = 6; } else { u.task = null; u.mode = 'idle'; }
       }
       return;
@@ -401,7 +401,7 @@
   function separate(list, dt) {
     cells.clear();
     for (const u of list) {
-      if (u.inside || u.remote) continue;
+      if (u.inside || u.remote || u.kind === 'barcaza') continue;
       const k = Math.floor(u.x) * 1024 + Math.floor(u.y);
       const c = cells.get(k);
       if (c) c.push(u); else cells.set(k, [u]);
@@ -510,6 +510,7 @@
     u.anim += dt;
     if (u.remote) { remoteStep(u, dt); return; }
     if (u.inside) return;
+    if (u.kind === 'barcaza') { if (u.owner === 'p') PK.Logi.barca(u, dt); return; } // pk-46: va por el agua, sola
     unstick(u, dt);
     if (u.scared > 0) { // huye de los lobos hacia el Centro Urbano
       u.scared -= dt;

@@ -17,8 +17,19 @@
   // ¿Recurso que ocupa lugar? (los tesoros especiales no: van sin edificio)
   Lb.fisico = r => !!(D.RES[r] && !D.RES[r].special);
   Lb.CAMPOS = { lumber: 1, mining: 1 };
-  // Molino fuera de tu tierra: un campamento más (decisión 4)
-  Lb.esCampo = b => !!(b && b.owner === 'p' && b.done && (Lb.CAMPOS[b.type] || (b.type === 'mill' && W.ownerAt(Math.floor(b.cx), Math.floor(b.cy)) !== 'p')));
+  // ¿En una isla que no es la de casa? (el mar, pk-46: ahí todo lo que se junta va al Muelle de la colonia)
+  const enColonia = b => !!(G().enMar && G().enMar() && PK.Arch && PK.Arch.islaDe(b.cx, b.cy) > 0);
+  // Molino fuera de tu tierra: un campamento más (decisión 4). El Muelle de la colonia también guarda aparte (L6).
+  // tipoCampo: por tipo y lugar (logística lo pregunta también de obras sin terminar); esCampo: además tuyo y hecho
+  Lb.tipoCampo = b => !!(b && (Lb.CAMPOS[b.type] || b.type === 'colonia' || (b.type === 'mill' && (W.ownerAt(Math.floor(b.cx), Math.floor(b.cy)) !== 'p' || enColonia(b)))));
+  Lb.esCampo = b => !!(b && b.owner === 'p' && b.done && Lb.tipoCampo(b));
+  // Dónde queda lo que se descarga en un edificio: en el mar, un campamento o una Lonja de una colonia manda todo al
+  // Muelle de esa isla (lo vacía la barcaza; los carromatos no cruzan el agua).
+  Lb.almacenDe = function (b) {
+    if (!b || b.type === 'colonia' || !enColonia(b)) return b;
+    const i = PK.Arch.islaDe(b.cx, b.cy);
+    return G().buildings.find(o => o.owner === 'p' && o.done && o.type === 'colonia' && PK.Arch.islaDe(o.cx, o.cy) === i) || b;
+  };
   Lb.esBodega = b => !!(b && b.owner === 'p' && b.done && !b.remote && (G().capDe(b, 'food') > 0 || G().capDe(b, 'wood') > 0));
   Lb.bodegas = () => G().buildings.filter(Lb.esBodega);
   Lb.campos = () => G().buildings.filter(Lb.esCampo);
@@ -26,7 +37,7 @@
   Lb.inv = inv;
 
   // ---------- Campamentos ----------
-  Lb.capCampo = b => D.campoCap(b.lvl);
+  Lb.capCampo = b => (b.type === 'colonia' && D.coloniaCap ? D.coloniaCap(b.lvl) : D.campoCap(b.lvl));
   Lb.totalCampo = b => { let n = 0; const o = inv(b); for (const r in o) n += o[r]; return n; };
   Lb.campoLleno = b => Lb.totalCampo(b) >= Lb.capCampo(b) - 0.5;
   Lb.ponerCampo = function (b, r, n) {
@@ -117,7 +128,7 @@
   Lb.fuera = function (r) {
     let n = 0;
     for (const b of Lb.campos()) n += (b.inv && b.inv[r]) || 0;
-    for (const u of G().units) if (u.owner === 'p' && (u.kind === 'cart' || u.kind === 'carromato') && u.carryRes === r) n += u.carry || 0;
+    for (const u of G().units) if (u.owner === 'p' && (u.kind === 'cart' || u.kind === 'carromato' || u.kind === 'barcaza') && u.carryRes === r) n += u.carry || 0;
     return n;
   };
 })();

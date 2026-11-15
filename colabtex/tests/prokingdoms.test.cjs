@@ -1050,3 +1050,33 @@ test('L3 (pk-43): libro mayor — las bodegas suman S.res, los campamentos guard
   assert.equal(D.BUILD.granportonv.alias, 'granporton');
   assert.ok(!D.BUILD.establo.noUp && D.BUILD.establo.era === 1, 'el Establo es de la Era I');
 });
+
+test('L6 (pk-44): la barcaza solo navega, el carromato nunca, y la tormenta alarga el viaje ×1,4', () => {
+  const L = PK.Logi, st0 = G.state, ahora0 = G.ahora;
+  G.state = Object.assign({ res: {}, flags: {}, logi: { rutas: [] }, techs: {}, era: 1 }, st0 || {});
+  try {
+    const agua = [], tierra = [];
+    for (let k = 0; k < W.W * W.H; k++) (W.terrain[k] === 4 ? agua : tierra).push(k);
+    assert.ok(agua.length > 50 && tierra.length > 50, 'el mapa de prueba tiene de los dos');
+    const barca = L.tabla('barcaza').costo, carro = L.tabla('carromato').costo;
+    for (const k of tierra) assert.ok(!isFinite(barca[k]), 'barcaza en tierra en ' + k);
+    for (const k of agua) assert.ok(!isFinite(carro[k]), 'carromato en el agua en ' + k);
+    assert.ok(agua.some(k => isFinite(barca[k])), 'y sí navega');
+    // tormenta: mismo viento, un 40 % más de viaje
+    let tor = null, calma = null;
+    for (let k = 0; k < 5000 && !(tor && calma); k++) { const t = Date.UTC(2026, 10, 1) + k * 300e3; if (D.tormenta(t)) tor = tor || t; else calma = calma || t; }
+    assert.ok(tor && calma);
+    G.ahora = () => tor; const vt = L.velocidad('barcaza'), wt = D.vientoMar(tor);
+    G.ahora = () => calma; const vc = L.velocidad('barcaza'), wc = D.vientoMar(calma);
+    const base = w => D.BARCAZA.speed * (0.8 + 0.4 * w);
+    assert.ok(Math.abs(vc - base(wc)) < 1e-9, 'en calma, el viento');
+    assert.ok(Math.abs(vt - base(wt) / D.TORMENTA.viaje) < 1e-9 && D.TORMENTA.viaje === 1.4, 'con tormenta, ÷1,4');
+  } finally { G.state = st0; G.ahora = ahora0; }
+  // las rutas del mar: solo del Muelle de la colonia al Embarcadero, y la barcaza atraca en el agua
+  const B = (type, id) => ({ id, type, owner: 'p', def: D.BUILD[type] || { name: type }, done: true, x: 5, y: 5, w: 1, h: 1, cx: 5.5, cy: 5.5 });
+  assert.equal(L.parMalo(B('colonia', 1), B('embarcadero', 2)), null);
+  assert.match(L.parMalo(B('colonia', 1), B('tc', 3)), /barcaza/);
+  assert.match(L.parMalo(B('lumber', 4), B('embarcadero', 2)), /Embarcadero/);
+  assert.equal(L.claseRuta({ de: 1 }) !== undefined, true);
+  assert.match(JS('logistics.js'), /L\.atracadero = /);
+});

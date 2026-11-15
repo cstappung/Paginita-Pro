@@ -277,6 +277,7 @@
   function unitSprite(u) {
     const col = Sp.ownerColor(u.owner);
     if (u.kind === 'cart') return Sp.cart(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 8) % 4, u.mode === 'walk');
+    if (u.kind === 'barcaza') return Sp.barcaza(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 3) % 4, u.mode === 'walk');
     if (u.kind === 'carromato') return Sp.carromato(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 6) % 4, u.mode === 'walk');
     let mode = u.mode, frame = 0, tool = null, aim = null;
     if (mode === 'walk') frame = Math.floor(u.anim * 9) % 6;
@@ -582,7 +583,7 @@
       if (b) diamond(ctx, b.x, b.y, b.w, b.h, 'rgba(255,255,255,0.85)');
     }
     if (sel && sel.type === 'node') { const n = W.nodes[sel.id]; if (n) diamond(ctx, n.x, n.y, 1, 1, 'rgba(255,240,170,0.85)'); }
-    for (const it of list) if (it.k === 'unit' && it.sel) ellipse(ctx, it.px, it.py, 'rgba(255,255,255,0.9)', it.o.kind === 'carromato' ? 14 : it.o.kind === 'cart' ? 9 : 5);
+    for (const it of list) if (it.k === 'unit' && it.sel) ellipse(ctx, it.px, it.py, 'rgba(255,255,255,0.9)', it.o.kind === 'carromato' || it.o.kind === 'barcaza' ? 14 : it.o.kind === 'cart' ? 9 : 5);
     if (R.hover && R.hover.k === 'unit' && !(R.hover.o && selUnits && selUnits.has(R.hover.o.id))) {
       const [px, py] = R.iso(R.hover.o.x, R.hover.o.y);
       ellipse(ctx, px, py, 'rgba(255,255,255,0.4)', 5);
@@ -916,7 +917,7 @@
   function drawRuta(ctx) {
     const L = PK.Logi, g = G();
     let id = L.verRuta && performance.now() - (L.verRutaT || 0) < 15000 ? L.verRuta : null;
-    const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => (u.kind === 'cart' || u.kind === 'carromato') && u.ruta) : null;
+    const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => (u.kind === 'cart' || u.kind === 'carromato' || u.kind === 'barcaza') && u.ruta) : null;
     if (su) id = su.ruta;
     if (!id) return;
     const r = g.state.logi.rutas.find(o => o.id === id), a = r && g.bById.get(r.de), b = r && g.bById.get(r.a);

@@ -153,7 +153,7 @@
   ];
   const BUILD_CATS_MAR = [
     ['Casas y bodegas', ['house', 'granary', 'warehouse', 'builder', 'tc']],
-    ['Recolección', ['lumber', 'mining', 'mill', 'muelle', 'salinas']],
+    ['Recolección', ['lumber', 'mining', 'mill', 'establo', 'muelle', 'salinas']],
     ['Talleres', ['velas', 'astillero', 'polvorin']],
     ['Puerto', ['embarcadero', 'comercio', 'faromar', 'tower']],
     ['Maravilla', ['granfaro']],

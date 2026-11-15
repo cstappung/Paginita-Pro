@@ -765,15 +765,16 @@
   function cartPanel(us) {
     const u = us[0], g = G(), L = PK.Logi, carro = u.kind === 'carromato';
     us = us.filter(o => o.kind === u.kind); // carretas y carromatos no comparten rutas
-    const port = (carro ? Sp.carromato(D.PLAYER_COLOR, u.carryRes, false, 0, false) : Sp.cart(D.PLAYER_COLOR, u.carryRes, false, 0, false)).c.toDataURL();
+    const barca = u.kind === 'barcaza';
+    const port = (barca ? Sp.barcaza(D.PLAYER_COLOR, u.carryRes, false, 0, false) : carro ? Sp.carromato(D.PLAYER_COLOR, u.carryRes, false, 0, false) : Sp.cart(D.PLAYER_COLOR, u.carryRes, false, 0, false)).c.toDataURL();
     const r = L.rutaDe(u), nom = o => { const a = g.bById.get(o.de), b = g.bById.get(o.a); return (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?') + (o.res ? ' (' + D.RES[o.res].name.toLowerCase() + ')' : ''); };
     const sel = el('select', { 'aria-label': carro ? 'Ruta del carromato' : 'Ruta de la carreta', onchange: e => { const id = +e.target.value || null; for (const c of us) L.asignar(c, id); UI.refreshPanel(true); } },
       [el('option', { value: '' }, 'Sin ruta (parado)')].concat(S().logi.rutas.filter(o => L.claseRuta(o) === u.kind).map(o => el('option', { value: o.id, selected: !!r && o.id === r.id }, nom(o) + ' · ' + L.cartsDe(o).length))));
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
-      el('div', null, el('h3', null, carro ? (us.length === 1 ? 'Carromato' : us.length + ' carromatos') : us.length === 1 ? 'Carreta' : us.length + ' carretas'),
+      el('div', null, el('h3', null, barca ? (us.length === 1 ? 'Barcaza' : us.length + ' barcazas') : carro ? (us.length === 1 ? 'Carromato' : us.length + ' carromatos') : us.length === 1 ? 'Carreta' : us.length + ' carretas'),
         el('p', { class: 'small' + (r ? '' : ' warn-t') }, u.estado || (r ? nom(r) : 'Sin ruta: elige a dónde va')),
         el('div', { class: 'row' }, el('span', { class: 'small' }, 'Ruta: '), sel, UI.btn('Logística', () => UI.openLogistics(), { small: true })),
-        el('p', { class: 'small muted' }, carro ? 'Vacía un campamento y lleva lo juntado al pueblo (' + L.carroCap() + ' por viaje). Sale de tu territorio; tu muralla solo la cruza por un Gran Portón.' : 'Carga en el origen, lo lleva al destino y vuelve. Si no hay nada que llevar, espera en el origen. Toma el camino más rápido: los caminos empedrados la aceleran mucho.'))));
+        el('p', { class: 'small muted' }, barca ? 'Trae lo que guarda el Muelle de una colonia al Embarcadero de tu isla (' + L.barcaCap() + ' por viaje). Solo navega; el viento la apura o la frena.' : carro ? 'Vacía un campamento y lleva lo juntado al pueblo (' + L.carroCap() + ' por viaje). Sale de tu territorio; tu muralla solo la cruza por un Gran Portón.' : 'Carga en el origen, lo lleva al destino y vuelve. Si no hay nada que llevar, espera en el origen. Toma el camino más rápido: los caminos empedrados la aceleran mucho.'))));
   }
   function wallPanel(k) {
     const gate = W.wall[k] === 2, x = k % W.W, y = Math.floor(k / W.W), t = PK.Def.tier();
@@ -814,10 +815,10 @@
   function unitsPanel(us) {
     if (!us.length) { G().sel = null; return UI.refreshPanel(true); }
     if (us.every(x => x.kind === 'scout')) return scoutPanel(us);
-    if (us.every(x => x.kind === 'cart' || x.kind === 'carromato')) return cartPanel(us);
+    if (us.every(x => x.kind === 'cart' || x.kind === 'carromato' || x.kind === 'barcaza')) return cartPanel(us);
     us = us.filter(x => x.kind === 'v');
     // Exploradores + carretas sin ningún aldeano: no hay aldeano que mostrar (antes reventaba con u undefined).
-    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart' || x.kind === 'carromato')); }
+    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart' || x.kind === 'carromato' || x.kind === 'barcaza')); }
     const u = us[0];
     const port = Sp.villager(D.PLAYER_COLOR, u.hair, u.skin, 'idle', 0, null, false).c.toDataURL();
     liveEl = el('p', { class: 'small' });
@@ -911,6 +912,13 @@
     act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
     // Fase 9 (pk-28): las ventanas del archipiélago
     if (b.type === 'embarcadero' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Fundar colonias', () => PK.Arch.abrirEmbarcadero(), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Colonias: ' + PK.Arch.coloniasHechas() + '/' + PK.Arch.maxColonias())));
+    if (b.type === 'embarcadero' && b.done && D.BARCAZA) { // pk-46: las barcazas de carga
+      const L = PK.Logi, n = L.barcazas().length, max = L.barcaMax(), cola = b.queue.filter(q => q === 'barcaza').length;
+      act.append(el('div', { class: 'stock-box' }, el('p', null, 'Barcazas: ' + n + '/' + max + ' · carga ' + L.barcaCap() + ' por viaje'),
+        el('div', { class: 'row' }, UI.btn(el('span', null, 'Barcaza ', UI.costEl(D.BARCAZA.cost)), () => { L.trainBarca(b); UI.refreshPanel(true); }, { disabled: n + cola >= max }), UI.btn('Logística', () => UI.openLogistics(), { small: true })),
+        cola ? el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / D.BARCAZA.time) * 100 + '%' } }), el('span', null, 'Armando barcaza (' + cola + ' en cola)')) : '',
+        el('p', { class: 'small muted' }, 'Lo que juntan tus colonias queda en su Muelle y no sirve para construir hasta que una barcaza lo trae aquí. El viento las apura o las frena; con tormenta tardan más.')));
+    }
     if (b.type === 'comercio' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Comerciar', () => PK.Arch.abrirComercio(), { cls: 'gold' })));
     if (b.type === 'tavern' && PK.Heroes) act.append(el('div', { class: 'row' }, UI.btn('Candidatos del día', () => PK.Heroes.open('taberna'), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Héroes: ' + PK.Heroes.lista().length + '/' + PK.Heroes.max())));
     if (PK.Heroes && b.done) { const gh = PK.Heroes.gobernanteDe(b); if (gh) act.append(el('p', { class: 'small' }, '★ Lo gobierna ', el('b', { translate: 'no' }, gh.nombre), ': ' + PK.Heroes.CLASES[gh.clase].pasTxt.split(': ').pop() + (gh.estado === 'libre' ? '.' : ' (ahora no: ' + (gh.estado === 'herido' ? 'herido' : 'de expedición') + ').'))); }

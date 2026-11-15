@@ -390,7 +390,7 @@
   // ¿Está llena la bodega de eso? Los aldeanos esperan en vez de gastar el recurso del mapa.
   G.isFull = res => G.cap(res) !== Infinity && (S.res[res] || 0) >= G.cap(res) - 0.5;
   // pk-43: lleno para quien descarga en ese edificio: un campamento mira su propio tope; el pueblo, sus bodegas
-  G.llenoPara = (b, res) => (b && PK.Libro && PK.Libro.esCampo(b) ? PK.Libro.campoLleno(b) : G.isFull(res));
+  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) ? PK.Libro.campoLleno(b) : G.isFull(res); };
   G.noteFull = function (res) {
     // un solo aviso cada 2 minutos que junta todo lo que se llenó (antes uno por recurso, y se apilaban)
     if (PK.UI && !G.offline) {
@@ -439,7 +439,9 @@
   G.deposit = function (u, b) {
     if (u.owner === 'p' && u.carry > 0) {
       // pk-43 (libro mayor): en un campamento queda en el campamento; en una bodega, en esa bodega y en el pueblo
-      const Lb = PK.Libro, campo = Lb && Lb.esCampo(b);
+      const Lb = PK.Libro;
+      if (Lb && b) b = Lb.almacenDe(b); // pk-46: en una colonia, todo va a su Muelle
+      const campo = Lb && Lb.esCampo(b);
       const n = campo ? Lb.ponerCampo(b, u.carryRes, u.carry) : Lb && b ? Lb.poner(b, u.carryRes, u.carry) : G.addRes(u.carryRes, u.carry);
       if (!campo && n < u.carry) G.noteFull(u.carryRes);
       gained(u.carryRes, n, u.carryZone, u.hunt);
@@ -551,7 +553,9 @@
       const c = (crowd.get(n.id) || 0) + ((used && used.get(n.id)) || 0), room = G.nodeRoom(n);
       const sc = d + (c >= room ? 8 * (c - room + 1) : c * 1.5) + (n.amount < 15 ? 4 : 0);
       if (sc >= bs) continue;
-      if (!regs) { const p = W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, n.x, n.y); regs = W.regionsAt(p[0], p[1]); }
+      // opts.u: desde donde está ese aldeano (si nació en un hueco entre árboles, primero los que tiene al lado: los tala
+      // y sale; elegir por la base lo dejaba dando vueltas entre árboles a los que no llega)
+      if (!regs) { if (opts.u) regs = W.regionsAt(opts.u.x, opts.u.y); else { const p = W.freeAround(b.x, b.y, b.x + b.w - 1, b.y + b.h - 1, n.x, n.y); regs = W.regionsAt(p[0], p[1]); } }
       if (!W.reachable(n, regs)) continue;
       bs = sc; best = n;
     }
@@ -615,7 +619,7 @@
   G.villagers = () => G.units.filter(u => u.owner === 'p' && u.kind === 'v');
   G.villagerCount = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind === 'v' ? 1 : 0), 0);
   G.scoutCount = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind === 'scout' ? 1 : 0), 0);
-  G.pop = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind !== 'cart' && u.kind !== 'carromato' ? 1 : 0), 0) + PK.Social.armyPop();
+  G.pop = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind !== 'cart' && u.kind !== 'carromato' && u.kind !== 'barcaza' ? 1 : 0), 0) + PK.Social.armyPop();
   G.popCap = function () {
     let c = 0;
     for (const b of mine()) c += (G.bst(b).pop || 0) + (b.type === 'house' ? G.cerca(b) : 0); // casa junto a una plaza o fuente: +1
@@ -1097,7 +1101,7 @@
   };
 
   G.command = function (units, target, silent) {
-    units = units.filter(u => u.owner === 'p' && u.kind !== 'cart' && u.kind !== 'carromato'); // las carretas y carromatos se manejan solos
+    units = units.filter(u => u.owner === 'p' && u.kind !== 'cart' && u.kind !== 'carromato' && u.kind !== 'barcaza'); // las carretas y carromatos se manejan solos
     if (!units.length) return false;
     // una orden tuya (no del Capataz) queda marcada: el Capataz no la cambia y el aldeano la sigue aunque se
     // agote lo de al lado
@@ -1477,6 +1481,7 @@
       if (b.owner !== 'p' || !b.done) continue;
       if (b.type === 'cartwright') { PK.Logi.updateCartwright(b, dt); continue; }
       if (b.type === 'establo') { PK.Logi.updateEstablo(b, dt); continue; }
+      if (b.type === 'embarcadero') PK.Logi.updateEmbarcadero(b, dt); // pk-46: barcazas
       if (b.def.trains) {
         if (!b.queue.length) { b.status = ''; continue; }
         if (G.pop() >= G.popCap()) {
@@ -1693,19 +1698,21 @@
           // los reinos simulados recolectan a menor ritmo sin ti, para que las zonas comunes no se vacíen
           // con la bodega llena, tus aldeanos no gastan el recurso del mapa (antes lo vaciaban y se perdía)
           // pk-43: si trabaja para un campamento, junta en el campamento (con su tope); si no, en el pueblo
-          const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(base);
-          const room = u.owner !== 'p' ? Infinity : campo ? Math.max(0, PK.Libro.capCampo(base) - PK.Libro.totalCampo(base)) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
+          const alm = u.owner === 'p' && PK.Libro ? PK.Libro.almacenDe(base) : base; // pk-46: en una colonia, su Muelle
+          const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(alm);
+          const room = u.owner !== 'p' ? Infinity : campo ? Math.max(0, PK.Libro.capCampo(alm) - PK.Libro.totalCampo(alm)) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
           const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
           if (take <= 0) continue;
           n.amount -= take;
           if (online && u.owner === 'p' && W.isShared(n) && take > 0) PK.Net.harvest(n.id, take);
           if (n.amount <= 0.5) { W.depleteNode(n); if (u.owner === 'p') depleted++; } // solo los tuyos: contaba los de los 15 reinos simulados
-          if (u.owner === 'p' && take > 0) gained(t.res, campo ? PK.Libro.ponerCampo(base, t.res, take) : G.addRes(t.res, take), n.zone, n.kind === 'deer');
+          if (u.owner === 'p' && take > 0) gained(t.res, campo ? PK.Libro.ponerCampo(alm, t.res, take) : G.addRes(t.res, take), n.zone, n.kind === 'deer');
         } else if (t.t === 'farm') {
           const b = G.bById.get(t.b);
           if (!b) { u.task = null; continue; }
           const fr = G.granjaRes(b), eff = tripRate(u, G.farmRate(u.owner, b, u), b.cx, b.cy, fr);
-          if (u.owner === 'p') gained(fr, G.addRes(fr, eff * dt), -1);
+          const alm = u.owner === 'p' && PK.Libro ? PK.Libro.almacenDe(b) : b; // pk-46: la cabaña de una colonia, a su Muelle
+          if (u.owner === 'p') gained(fr, alm !== b && PK.Libro.esCampo(alm) ? PK.Libro.ponerCampo(alm, fr, eff * dt) : G.addRes(fr, eff * dt), -1);
         } else if (t.t === 'build') { // partidas viejas: las obras ya se levantan solas
           u.task = null;
         } else if (t.t === 'dig') {

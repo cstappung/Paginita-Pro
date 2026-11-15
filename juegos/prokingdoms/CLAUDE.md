@@ -270,3 +270,21 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   trains carromatos, upgrades/adds establos when it runs out.
 - **Server**: `D.PROTO` was **not** bumped. An old server drops the two unknown building types from snapshots (and
   logs a `suspect`); deploying the function (`firebase deploy --only functions`) makes others see them.
+- Pace after L3 (`?timelapse`, 595 min): Era II 12, III 32, IV 116 min; **Era V not reached** (mills and mines run
+  dry inside their radius; iron again). L4's per-player common zones are the planned relief: measure after it.
+
+### L6, the sea with cargo barges (`pk-44`, done before L4/L5 as the plan advised)
+
+- **The colony dock (`colonia`) is a camp** (`Lb.tipoCampo`, cap `D.coloniaCap(L)` = 600 + 200·(L−1)); a camp or a
+  Lonja on a colony island drops into that island's dock (`Lb.almacenDe`). What colonists gather is not in `S.res`
+  until a barge unloads at home. **`L.esCampo` is `Lb.tipoCampo`**: one rule (a separate copy without `colonia` left
+  barges waiting with «no necesita nada» next to a full dock).
+- **Barge** (`kind: 'barcaza'`, profile `barcaza`: water only, `W.bAt` free): built at the Embarcadero de colonos
+  (`1 + level`, cap `D.BARCAZA` + per level), only route colonia → embarcadero. No reverse route: `S.res` pays for
+  colony buildings anyway. It docks at `L.atracadero(b)`, the nearest free water tile within 16 (cached per
+  `blockVer`): a colony dock usually sits inland on the beach. Arrival is «within 1.9 of the atracadero».
+- Speed `L.marMult()`: wind (0.8 + 0.4·`D.vientoMar`) ÷ `D.TORMENTA.viaje` (1.4) in a storm, with `G.ahora()`.
+- Sea names: Establo = «Corral de carretas» (carromatos only empty the home island's camps).
+- **Colonists choose nodes from where they stand** (`G.nodoEnRadio(res, base, { u })`): measuring reachability from
+  the base's side left a colonist born in a pocket between trees cycling two unreachable nodes forever (pk-42/43).
+- `css/style.css`: in landscape `#mmwrap` needs `left/bottom: auto` (it stretched over the whole map since pk-20).

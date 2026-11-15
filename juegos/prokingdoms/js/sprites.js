@@ -2369,6 +2369,50 @@
     return (CRC[key] = withMask({ c: pb.canvas(), ax: 26, ay: 30 }));
   };
 
+  // pk-46: la barcaza de carga del archipiélago. Casco chato de tablas, cajas y sacos según lo que lleva, un mástil con
+  // vela cuadrada del color del reino que se hincha con el viento, y estela al navegar.
+  const BRC = {};
+  S.barcaza = function (col, carry, flip, frame, moving) {
+    const f = moving ? frame % 4 : 0, key = col.join(',') + (carry || '') + (flip ? 1 : 0) + f;
+    if (BRC[key]) return BRC[key];
+    const Wd = 48, Ht = 40, pb = new PB(Wd, Ht), X = x => (flip ? Wd - 1 - x : x);
+    const set = (x, y, c, a) => pb.set(X(x), y, c, a);
+    const hline = (x0, x1, y, c, a) => { for (let x = x0; x <= x1; x++) set(x, y, c, a); };
+    // agua alrededor y estela
+    for (let x = 2; x <= 45; x++) set(x, 36, [210, 236, 246], x % 5 === f % 5 ? 160 : 70);
+    if (moving) for (let k = 0; k < 6; k++) { set(1 - (k % 2), 33 + (k % 3), [230, 246, 252], 150); set(3 + k * 2, 35 + (k % 2), [230, 246, 252], 110 - k * 12); }
+    // casco
+    const hl = [150, 104, 60], hlL = [188, 140, 86], hlD = [98, 66, 38], tar = [52, 36, 24];
+    for (let y = 26; y <= 34; y++) {
+      const ins = Math.max(0, y - 30) * 2, x0 = 4 + ins, x1 = 44 - (y >= 31 ? (y - 30) * 3 : 0);
+      hline(x0, x1, y, y === 26 ? hlL : y === 34 ? tar : y === 30 ? hlD : hl);
+    }
+    hline(42, 46, 25, hlL); hline(44, 47, 24, hlL); // proa levantada
+    for (const x of [10, 20, 30, 38]) for (let y = 27; y <= 33; y++) if (x < 44 - Math.max(0, (y - 30) * 3)) set(x, y, hlD);
+    // borda con el color del reino
+    hline(5, 43, 25, sc(col, 0.85)); set(4, 25, sc(col, 0.6));
+    // carga: cajas y sacos
+    if (carry) {
+      const cc = CARRY[carry] || [150, 120, 80], cL = sc(cc, 1.25), cD = sc(cc, 0.7);
+      const caja = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) hline(x0, x0 + w - 1, y, y === y0 ? cL : (y - y0) % 3 === 2 ? cD : cc); for (let y = y0; y < y0 + h; y++) { set(x0, y, cD); set(x0 + w - 1, y, cD); } };
+      caja(7, 19, 7, 6); caja(15, 21, 6, 4); caja(27, 20, 7, 5); caja(34, 21, 6, 4); caja(9, 15, 5, 4);
+    } else {
+      hline(8, 12, 24, [120, 84, 50]); hline(30, 34, 24, [120, 84, 50]); // cuerdas sueltas
+    }
+    // mástil y vela
+    for (let y = 4; y <= 25; y++) { set(23, y, [84, 58, 34]); set(24, y, [118, 84, 50]); }
+    hline(15, 32, 5, [84, 58, 34]); // verga
+    const sail = mix(col, [240, 232, 214], 0.3), sailD = sc(sail, 0.78), hinch = moving ? 2 : 1;
+    for (let y = 6; y <= 17; y++) {
+      const b = Math.round(Math.sin(((y - 6) / 11) * Math.PI) * hinch);
+      hline(16 + b, 31 + b, y, (y - 6) % 4 === 3 ? sailD : sail);
+    }
+    hline(16, 31, 6, sc(sail, 1.1));
+    for (let y = 9; y <= 14; y++) { set(23, y, sc(col, 0.65)); set(24, y, sc(col, 0.65)); } // franja
+    set(23, 3, sc(col, 1.2)); set(24, 2, sc(col, 1.2)); set(25, 2, col); set(26, 3, col); // gallardete
+    return (BRC[key] = withMask({ c: pb.canvas(), ax: 24, ay: 34 }));
+  };
+
   // Lobo: gris, con lomo oscuro; 2 cuadros de carrera.
   function makeWolf(frame, flip) {
     const pb = new PB(18, 13), X = x => (flip ? 17 - x : x), set = (x, y, c) => pb.set(X(x), y, c);

@@ -103,7 +103,7 @@
       res: fotoRes(st), total: st.stats.g_total || 0,
       army: PK.Social.power(st.war.army), walls: g.lvl('walls'), score: PK.Terr.myInfo().score,
       walled: PK.Def.walledList(), wallMult: PK.Def.parcelMult(-1, true), terrMult: 1 + g.best('dragontower', 'terrDef'), rk: PK.Mundo ? PK.Mundo.rkFoto() : undefined,
-      units: g.units.filter(u => u.owner === 'p' && !u.inside).slice(0, 250).map(u => [
+      units: g.units.filter(u => u.owner === 'p' && !u.inside && u.kind !== 'barcaza').slice(0, 250).map(u => [ // la barcaza es del mar: nadie más lo ve
         Math.round(u.x * 10), Math.round(u.y * 10), u.mode === 'walk' ? 1 : u.mode === 'work' ? 2 : 0,
         u.task ? Math.max(0, TASKS.indexOf(u.task.t)) : 0, u.task && u.task.res ? RAW.indexOf(u.task.res) : -1,
         u.carry ? RAW.indexOf(u.carryRes) : -1, u.flip ? 1 : 0, u.hair, u.skin, u.kind === 'scout' ? 1 : u.kind === 'cart' ? 2 : u.kind === 'carromato' ? 3 : 0]),

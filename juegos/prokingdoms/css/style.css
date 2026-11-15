@@ -498,7 +498,7 @@ ul.info li { margin: 2px 0; }
   #panel .p-toggle { height: 44px; }
 
   /* minimapa chico arriba a la derecha del mapa (se oculta con el botón Minimapa) */
-  #mmwrap { right: calc(var(--mw) + var(--sr) + 4px); top: calc(var(--top-h, 32px) + 8px); padding: 3px; }
+  #mmwrap { left: auto; bottom: auto; right: calc(var(--mw) + var(--sr) + 4px); top: calc(var(--top-h, 32px) + 8px); padding: 3px; }
   #minimap { width: 120px; height: 60px; }
 
   /* tira de cola arriba a la izquierda del mapa, sin tocar el panel ni el minimapa */

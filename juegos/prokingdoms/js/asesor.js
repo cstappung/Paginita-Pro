@@ -86,16 +86,19 @@
     },
     // pk-43: lo que juntan los campamentos no llega al pueblo (sin Establo, sin ruta o sin Gran Portón)
     () => {
-      const g = G(), L = PK.Logi, Lb = PK.Libro, cs = Lb.campos();
+      const g = G(), L = PK.Logi, Lb = PK.Libro, todos = Lb.campos(), cs = todos.filter(b => b.type !== 'colonia');
+      // pk-46: las colonias del mar las vacía una barcaza
+      const col = todos.find(b => b.type === 'colonia' && Lb.totalCampo(b) >= 50 && !L.rutasDesde(b).some(r => L.cartsDe(r).length));
+      if (col) return { id: 'barcaza', prioridad: 65, texto: 'Lo que juntan tus colonos queda en el Muelle de la colonia: una barcaza del Embarcadero lo trae a tu isla.', acciones: [{ label: L.barcazas().length ? 'Ruta de barcaza' : 'Embarcadero', fn: cerrarY(() => { const e = g.buildings.find(o => o.owner === 'p' && o.type === 'embarcadero'); PK.UI.selectBuilding(L.barcazas().length || !e ? col : e); }) }] };
       if (!cs.length) return null;
       if (!g.countAll('establo')) {
         const algo = cs.some(b => Lb.totalCampo(b) >= 1);
-        return algo && { id: 'establo', prioridad: 66, texto: 'Lo que juntan tus campamentos se queda ahí y no sirve para construir: un Establo de Carromatos lo lleva al pueblo (el primero trae un carromato de regalo).', acciones: [{ label: 'Construir', fn: cerrarY(() => { if (g.isUnlocked('establo')) { g.placing = { type: 'establo', armed: false }; PK.UI.refreshPanel(true); } else PK.UI.openBuild(); }) }] };
+        return algo && { id: 'establo', prioridad: 66, texto: 'Lo que juntan tus campamentos se queda ahí y no sirve para construir: un ' + D.BUILD.establo.name + ' lo lleva al pueblo (el primero trae un carromato de regalo).', acciones: [{ label: 'Construir', fn: cerrarY(() => { if (g.isUnlocked('establo')) { g.placing = { type: 'establo', armed: false }; PK.UI.refreshPanel(true); } else PK.UI.openBuild(); }) }] };
       }
       const sinPaso = S().def && S().def.walls.length && !g.countB('granporton') && S().logi.rutas.some(r => L.claseRuta(r) === 'carromato' && L.cartsDe(r).length && (T => T && !T.ok)(L.tiempos(r)));
       if (sinPaso) return { id: 'porton', prioridad: 64, texto: 'Tu muralla no tiene Gran Portón: tus carromatos no pueden entrar (no caben por una puerta chica).', acciones: [{ label: 'Construir', fn: cerrarY(() => { if (g.isUnlocked('granporton')) { g.placing = { type: 'granporton', armed: false }; PK.UI.refreshPanel(true); } else PK.UI.openBuild(); }) }] };
       const lleno = cs.find(b => Lb.campoLleno(b) && !L.rutasDesde(b).some(r => L.cartsDe(r).length));
-      if (lleno) return { id: 'campoLleno', prioridad: 63, texto: lleno.def.name + ' está lleno y ningún carromato lo vacía: sus aldeanos esperan.', acciones: [{ label: 'Ruta de carromato', fn: cerrarY(() => { PK.UI.selectBuilding(lleno); }) }, { label: 'Logística', fn: cerrarY(() => PK.UI.openLogistics()) }] };
+      if (lleno) return { id: 'campoLleno', prioridad: 63, texto: lleno.def.name + ' está lleno y ' + (lleno.type === 'colonia' ? 'ninguna barcaza' : 'ningún carromato') + ' lo vacía: sus aldeanos esperan.', acciones: [{ label: 'Ruta de carromato', fn: cerrarY(() => { PK.UI.selectBuilding(lleno); }) }, { label: 'Logística', fn: cerrarY(() => PK.UI.openLogistics()) }] };
       return null;
     },
     // pk-42: aldeanos que esperan junto a su edificio porque ya no queda nada en su radio

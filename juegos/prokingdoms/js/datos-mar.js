@@ -57,7 +57,7 @@
     salinas: L => ({ farm: 0.12 * (L - 1) }),
     velas: recipeStats(2), astillero: recipeStats(3), polvorin: recipeStats(2),
     faromar: L => ({ sight: 12 + 2 * L }),
-    embarcadero: L => ({ colonias: 1 + Math.floor((L - 1) / 2) }),
+    embarcadero: L => ({ colonias: 1 + Math.floor((L - 1) / 2), barcazas: 1 + L, barcaCap: D.BARCAZA.cap + D.BARCAZA.capLvl * (L - 1) }),
     comercio: L => ({ buy: Math.max(1, 1.2 - 0.02 * L), sell: Math.min(0.85, 0.6 + 0.025 * L) }),
     granfaro: D.BSTATS.wonder,
     colonia: L => ({ gather: 0.1 * (L - 1), carry: L - 1 }),
@@ -84,6 +84,11 @@
     especias: { name: 'Isla de las Especias', rasgo: 'especias, raras y valiosas', icon: 'especias' },
   };
   D.ISLAS_ORDEN = ['palmas', 'coral', 'volcan', 'naufragios', 'especias'];
+  // pk-44 (plan de logística L6): la barcaza de carga trae a casa lo que juntan las colonias. Solo navega; el viento
+  // del archipiélago la apura o la frena y con tormenta tarda 1,4 veces (D.TORMENTA.viaje).
+  D.BARCAZA = { cost: { wood: 200, lona: 20 }, time: 60, speed: 1.5, cap: 300, capLvl: 60 };
+  // Lo que guarda el Muelle de la colonia (todo junto) hasta que llega una barcaza.
+  D.coloniaCap = L => 600 + 200 * (L - 1);
   // Una colonia: el barco lleva colonos y materiales. Cuesta más cada vez, y la travesía tarda según la distancia.
   D.colonia = {
     colonos: 3,
@@ -134,13 +139,14 @@
       muelle: { name: 'Cabaña de pescadores', era: 1, desc: 'Va pegada al agua. Un pescador saca pescado según el agua que la rodea; con la marea alta rinde más.' },
       lumber: { name: 'Aserradero de teca', drop: ['wood', 'fibra'], desc: 'Acopio de teca y de fibra de palma.' },
       mining: { name: 'Cantera de coral', drop: ['stone', 'gold', 'salitre', 'especias'], desc: 'Acopio de coral, salitre, oro de los naufragios y especias.' },
+      establo: { name: 'Corral de carretas', desc: 'Arma carromatos de playa que vacían el Aserradero de teca y la Cantera de coral de tu isla. No cruzan el agua: lo de las colonias lo trae una barcaza del Embarcadero.' },
       granary: { name: 'Ahumadero', desc: 'Aumenta cuánto pescado puedes guardar.' },
       warehouse: { name: 'Bodega del puerto', desc: 'Aumenta cuánto puedes guardar de todo lo demás.' },
       builder: { name: 'Casa del Carpintero de Ribera', desc: '+1 carpintero: podrás mejorar un edificio más a la vez.' },
       tower: { name: 'Torre de vigía de la costa', desc: 'Vigila la costa y ve lejos sobre el agua.' },
       barracks: { name: 'Dársena de guerra', agua: true, max: 2, desc: 'Arma tu flota: balandras, fragatas, brulotes y galeones. Cada nivel desbloquea barcos y arma más rápido. Va pegada al agua.' },
     },
-    construir: ['house', 'mill', 'muelle', 'lumber', 'mining', 'salinas', 'granary', 'warehouse', 'builder', 'tower', 'faromar', 'velas', 'embarcadero', 'astillero', 'polvorin', 'comercio', 'granfaro', 'barracks', 'escuela', 'bateria', 'cadena', 'maestro'],
+    construir: ['house', 'mill', 'muelle', 'lumber', 'mining', 'establo', 'salinas', 'granary', 'warehouse', 'builder', 'tower', 'faromar', 'velas', 'embarcadero', 'astillero', 'polvorin', 'comercio', 'granfaro', 'barracks', 'escuela', 'bateria', 'cadena', 'maestro'],
   };
 
 
