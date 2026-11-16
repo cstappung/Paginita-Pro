@@ -83,8 +83,8 @@
   // Sin eso no recibe insumos: no se le asignan trabajadores (antes aceptaba y prometía «≈30 por minuto»).
   L.supplied = b => !!(L.nearStore(b) || S().logi.belts.some(bl => bl.b === b.id) || L.rutasHacia(b).some(r => L.cartsDe(r).length));
   // pk-54: también las rutas comodín que lo pueden usar («cualquier campamento de madera», «cualquier bodega»)
-  L.rutasHacia = b => S().logi.rutas.filter(r => r.a === b.id || (r.a === 'bodega' && L.esBodegaRuta(b) && (!r.res || acepta(b, r.res))));
-  L.rutasDesde = b => S().logi.rutas.filter(r => r.de === b.id || (r.de === 'campo' && L.camposRuta(r).includes(b)) || (r.de === 'bodega' && L.esBodegaRuta(b)));
+  L.rutasHacia = b => S().logi.rutas.filter(r => r.a === b.id || (r.a === 'bodega' && L.esBodegaRuta(b) && (!r.res || acepta(b, r.res))) || (L.esTallerComodin(r.a) && L.talleresDe(L.tipoTaller(r.a)).includes(b)));
+  L.rutasDesde = b => S().logi.rutas.filter(r => r.de === b.id || (r.de === 'campo' && L.camposRuta(r).includes(b)) || (r.de === 'bodega' && L.esBodegaRuta(b)) || (L.esTallerComodin(r.de) && L.talleresDe(L.tipoTaller(r.de)).includes(b)));
   // Almacén cercano: el taller se abastece y descarga solo, a un ritmo moderado.
   L.nearStore = function (b) {
     if (b._nsT === G().time) return b._ns;
@@ -429,11 +429,51 @@
     }
     return best;
   }
+  // ---- «Cualquier Aserradero» (pk-57, pedido del dueño): 'taller:<tipo>' como origen o destino ----
+  // Destino: el taller de ese tipo al que más le falta (el que tiene menos), descontando lo que ya le llevan y lo que
+  // van a buscar los otros vehículos de la ruta. Origen: el que más guarda de lo que hace.
+  L.esTallerComodin = v => typeof v === 'string' && v.startsWith('taller:');
+  L.tipoTaller = v => v.slice(7);
+  L.talleresDe = t => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === t && L.isShop(b) && L.puntoCarreta(b) && PK.Libro.almacenDe(b) === b);
+  const enTaller = (b, v) => !!b && L.talleresDe(L.tipoTaller(v)).includes(b);
+  const posDe = o => (o ? [o.cx !== undefined ? o.cx : o.x, o.cy !== undefined ? o.cy : o.y] : null);
+  function yendoA(r, u, campo, soloVacios) {
+    const cap = L.capDe(L.claseRuta(r)), m = new Map();
+    for (const o of G().units) if (o !== u && o.ruta === r.id && o[campo] && !(soloVacios && o.carry > 0.5)) m.set(o[campo], (m.get(o[campo]) || 0) + cap);
+    return m;
+  }
+  function tallerDestino(r, u, from, sinReserva, excl) {
+    const ts = L.talleresDe(L.tipoTaller(r.a)).filter(b => b.id !== excl);
+    if (!ts.length) return null;
+    const ins = r.res ? [r.res] : u && u.carry > 0.5 ? Object.keys(L.cargaDe(u)) : from && L.isShop(from) ? [L.output(from)] : from && L.esCampo(from) ? listaPara(null, r, from) : Object.keys(L.recipe(ts[0]).in);
+    const yendo = sinReserva ? new Map() : yendoA(r, u, 'rA', true), pos = posDe(from || u);
+    let best = null, bs = -Infinity;
+    for (const b of ts) {
+      let falta = 0;
+      for (const k of ins) if (acepta(b, k)) falta += necesita(b, k, !sinReserva);
+      const sc = falta - (yendo.get(b.id) || 0) - (pos ? U.dist(pos[0], pos[1], b.cx, b.cy) * 0.01 : 0);
+      if (sc > bs) { bs = sc; best = b; }
+    }
+    return best;
+  }
+  function tallerOrigen(r, u, sinReserva, excl) {
+    const ts = L.talleresDe(L.tipoTaller(r.de)).filter(b => b.id !== excl);
+    const yendo = sinReserva ? new Map() : yendoA(r, u, 'rDe', true), pos = posDe(u);
+    let best = null, bs = -Infinity;
+    for (const b of ts) {
+      ensure(b);
+      const sc = (b.outb[L.output(b)] || 0) - (yendo.get(b.id) || 0) - (pos ? U.dist(pos[0], pos[1], b.cx, b.cy) * 0.01 : 0);
+      if (sc > bs) { bs = sc; best = b; }
+    }
+    return best;
+  }
   // Los extremos de esta ruta para este vehículo (los elige si hace falta).
   L.extremos = function (u, r) {
-    const g = G();
+    const g = G(), excl = u.rExcl && u.rExclT > g.ahora() ? u.rExcl : null;
     let from = L.comodin(r.de) ? g.bById.get(u.rDe) : g.bById.get(r.de), to = L.comodin(r.a) ? g.bById.get(u.rA) : g.bById.get(r.a);
-    if (r.de === 'campo' && !(from && L.camposRuta(r).includes(from))) { from = mejorCampo(r, u, u.rExcl && u.rExclT > g.ahora() ? u.rExcl : null); u.rDe = from ? from.id : null; }
+    if (r.de === 'campo' && !(from && L.camposRuta(r).includes(from))) { from = mejorCampo(r, u, excl); u.rDe = from ? from.id : null; }
+    if (L.esTallerComodin(r.de) && !enTaller(from, r.de)) { from = tallerOrigen(r, u, false, excl); u.rDe = from ? from.id : null; }
+    if (L.esTallerComodin(r.a) && !enTaller(to, r.a)) { to = tallerDestino(r, u, from); u.rA = to ? to.id : null; }
     if (r.a === 'bodega' && !(to && L.esBodegaRuta(to))) { const o = from || u; to = mejorBodega(listaPara(u, r, from), o.cx !== undefined ? o.cx : o.x, o.cy !== undefined ? o.cy : o.y); u.rA = to ? to.id : null; }
     if (r.de === 'bodega' && !(from && L.esBodegaRuta(from))) { from = to ? cercana(L.bodegasRuta(), to.cx, to.cy) : null; u.rDe = from ? from.id : null; }
     return { from, to };
@@ -444,6 +484,8 @@
     const g = G();
     let from = L.comodin(r.de) ? null : g.bById.get(r.de), to = L.comodin(r.a) ? null : g.bById.get(r.a);
     if (r.de === 'campo') from = mejorCampo(r, null, null, true);
+    if (L.esTallerComodin(r.de)) from = tallerOrigen(r, null, true);
+    if (L.esTallerComodin(r.a)) to = tallerDestino(r, null, from, true);
     if (r.a === 'bodega' && from) to = mejorBodega(listaPara(null, r, from), from.cx, from.cy);
     if (r.de === 'bodega' && to) from = cercana(L.bodegasRuta(), to.cx, to.cy);
     return { from, to };
@@ -455,12 +497,13 @@
     if (v === 'campo' && tipo) return L.TIPO_NOMBRE[tipo] + (res && (D.BUILD[tipo].drop || []).length > 1 ? ' (solo ' + D.RES[res].name.toLowerCase() + ')' : '');
     if (v === 'campo') return 'Cualquier campamento' + (res ? ' de ' + D.RES[res].name.toLowerCase() : '');
     if (v === 'bodega') return 'Cualquier bodega';
+    if (L.esTallerComodin(v)) return 'Cualquier ' + D.BUILD[L.tipoTaller(v)].name;
     const b = G().bById.get(v);
     return b ? b.def.name : '?';
   };
   L.nombreRuta = r => L.nombreExtremo(r.de, r.res, r.tipo) + ' → ' + L.nombreExtremo(r.a, r.res) + (r.res && r.de !== 'campo' ? ' (' + D.RES[r.res].name.toLowerCase() + ')' : '');
   // Una ruta que sale de un campamento es de carromatos; las demás, de carretas.
-  L.claseRuta = r => { if (r.de === 'campo') return 'carromato'; if (r.de === 'bodega') return 'cart'; const a = G().bById.get(r.de); return a && a.type === 'colonia' ? 'barcaza' : a && L.esCampo(a) ? 'carromato' : 'cart'; };
+  L.claseRuta = r => { if (r.de === 'campo') return 'carromato'; if (r.de === 'bodega' || L.esTallerComodin(r.de)) return 'cart'; const a = G().bById.get(r.de); return a && a.type === 'colonia' ? 'barcaza' : a && L.esCampo(a) ? 'carromato' : 'cart'; };
   L.cartsDe = r => { const k = L.claseRuta(r); return G().units.filter(u => u.owner === 'p' && u.kind === k && u.ruta === r.id); };
   L.libres = kind => (kind === 'carromato' ? L.carromatos() : kind === 'barcaza' ? L.barcazas() : L.carts()).filter(u => !L.rutaDe(u));
   // Por qué una ruta no sirve (texto), o null si está bien.
@@ -483,6 +526,7 @@
   };
   // pk-54: rutas con un extremo comodín
   L.comodinMalo = function (de, a, res, tipo) {
+    if (L.esTallerComodin(de) || L.esTallerComodin(a)) return tallerMalo(de, a, res, tipo);
     const g = G(), A = L.comodin(de) ? null : g.bById.get(de), B = L.comodin(a) ? null : g.bById.get(a);
     if (de === 'campo') {
       if (!res && !tipo) return 'Elige de qué campamentos.';
@@ -509,6 +553,27 @@
     }
     return null;
   };
+  // pk-57: rutas con «cualquier <taller>» en una punta: se valida con uno de muestra de ese tipo
+  function tallerMalo(de, a, res, tipo) {
+    const g = G(), muestra = v => (L.esTallerComodin(v) ? L.talleresDe(L.tipoTaller(v))[0] || null : L.comodin(v) ? null : g.bById.get(v));
+    for (const v of [de, a]) if (L.esTallerComodin(v) && !L.talleresDe(L.tipoTaller(v)).length) return 'Necesitas al menos un edificio terminado de tipo ' + D.BUILD[L.tipoTaller(v)].name + '.';
+    if (de === a) return 'El origen y el destino son del mismo tipo.';
+    const A = muestra(de), B = muestra(a);
+    if (de === 'campo') {
+      if (!res && !tipo) return 'Elige de qué campamentos.';
+      const cs = L.camposDe(res, tipo);
+      if (!cs.length) return 'No tienes esos campamentos terminados.';
+      const lista = res ? [res] : [...new Set(cs.flatMap(b => b.def.drop || []))];
+      return lista.some(k => acepta(B, k)) ? null : B.def.name + ' no usa nada de lo que juntan esos campamentos.';
+    }
+    if (de === 'bodega') return L.bodegasRuta().length ? null : 'No tienes bodegas.';
+    if (a === 'bodega') return L.bodegasRuta(L.output(A)).length ? null : 'No tienes una bodega que reciba ' + D.RES[L.output(A)].name.toLowerCase() + '.';
+    if (!A || !B) return 'Elige el ' + (!A ? 'origen' : 'destino') + '.';
+    if (L.esCampo(A)) return (A.def.drop || []).some(k => acepta(B, k)) ? null : B.def.name + ' no usa nada de lo que junta ' + A.def.name + '.';
+    if (L.isShop(A) && L.isShop(B) && !L.recipe(B).in[L.output(A)]) return B.def.name + ' no usa lo que hace ' + A.def.name + ' (' + D.RES[L.output(A)].name.toLowerCase() + ').';
+    if (res && !acepta(B, res)) return B.def.name + ' no recibe ' + D.RES[res].name.toLowerCase() + '.';
+    return L.parMalo(A, B);
+  }
   L.rutaMala = function (r) {
     if (L.comodin(r.de) || L.comodin(r.a)) {
       const why = L.comodinMalo(r.de, r.a, r.res, r.tipo);
@@ -595,12 +660,23 @@
       if (cs.length >= 2 && !yaEsta('campo', 'bodega', null, t)) out.push({ id: 'c:' + t, tipo: 'ruta', de: 'campo', a: 'bodega', res: null, ctipo: t, txt: L.nombreExtremo('campo', null, t) + ' → Cualquier bodega', por: cs.length + ' ' + L.TIPO_PLURAL[t] + ' sin carromato (guardan ' + U.fmt(Math.floor(tot)) + '). Cada viaje va al que tiene más' + (varios ? ' y trae de todo lo que junten, mezclado.' : '.'), peso: 60 + tot / 50 });
       else if (cs.length === 1 && !yaEsta(cs[0].id, 'bodega', null)) out.push({ id: 'c1:' + cs[0].id, tipo: 'ruta', de: cs[0].id, a: 'bodega', res: null, txt: cs[0].def.name + ' → Cualquier bodega', por: 'Nadie lo vacía' + (PK.Libro.campoLleno(cs[0]) ? ' y está lleno: sus aldeanos esperan.' : ' (guarda ' + U.fmt(Math.floor(PK.Libro.totalCampo(cs[0]))) + ').'), peso: 50 + PK.Libro.totalCampo(cs[0]) / 50 + (PK.Libro.campoLleno(cs[0]) ? 30 : 0) });
     }
-    // 2) talleres lejos de una bodega: que alguien les traiga y les saque
+    // 2) talleres lejos de una bodega: que alguien les traiga y les saque (pk-57: dos o más del mismo tipo, con
+    // «cualquier <taller>»: una sola ruta para todos)
+    const sinIn = {}, sinOut = {};
     for (const b of g.buildings) {
       if (b.owner !== 'p' || !b.done || !L.isShop(b) || L.nearStore(b) || PK.Libro.almacenDe(b) !== b) continue;
-      if (!L.supplied(b) && !L.rutasHacia(b).length && !st.logi.belts.some(bl => bl.b === b.id)) out.push({ id: 'i:' + b.id, tipo: 'ruta', de: 'bodega', a: b.id, res: null, txt: 'Cualquier bodega → ' + b.def.name, por: 'Está lejos de las bodegas y nadie le trae insumos: no produce.', peso: 45 });
-      const outR = L.output(b);
-      if (!L.rutasDesde(b).length && !st.logi.belts.some(bl => bl.a === b.id) && L.bodegasRuta(outR).length) out.push({ id: 'o:' + b.id, tipo: 'ruta', de: b.id, a: 'bodega', res: null, txt: b.def.name + ' → Cualquier bodega', por: 'Nadie saca lo que hace (' + D.RES[outR].name.toLowerCase() + ')' + ((b.outb && b.outb[outR] >= L.bufCap(b) - 1) ? ': su depósito está lleno y paró.' : '.'), peso: 40 + ((b.outb && b.outb[outR]) || 0) / 20 });
+      if (!L.supplied(b) && !L.rutasHacia(b).length && !st.logi.belts.some(bl => bl.b === b.id)) (sinIn[b.type] = sinIn[b.type] || []).push(b);
+      if (!L.rutasDesde(b).length && !st.logi.belts.some(bl => bl.a === b.id) && L.bodegasRuta(L.output(b)).length) (sinOut[b.type] = sinOut[b.type] || []).push(b);
+    }
+    for (const t in sinIn) {
+      const bs = sinIn[t], b = bs[0], n = D.BUILD[t].name;
+      if (bs.length >= 2) out.push({ id: 'i:' + t, tipo: 'ruta', de: 'bodega', a: 'taller:' + t, res: null, txt: 'Cualquier bodega → Cualquier ' + n, por: bs.length + ' de tus ' + n + ' están lejos de las bodegas y nadie les trae insumos. Cada viaje va al que tiene menos.', peso: 47 + bs.length });
+      else out.push({ id: 'i:' + b.id, tipo: 'ruta', de: 'bodega', a: b.id, res: null, txt: 'Cualquier bodega → ' + n, por: 'Está lejos de las bodegas y nadie le trae insumos: no produce.', peso: 45 });
+    }
+    for (const t in sinOut) {
+      const bs = sinOut[t], b = bs[0], n = D.BUILD[t].name, outR = L.output(b), lleno = bs.some(o => o.outb && o.outb[outR] >= L.bufCap(o) - 1), tot = bs.reduce((m, o) => m + ((o.outb && o.outb[outR]) || 0), 0);
+      if (bs.length >= 2) out.push({ id: 'o:' + t, tipo: 'ruta', de: 'taller:' + t, a: 'bodega', res: null, txt: 'Cualquier ' + n + ' → Cualquier bodega', por: 'Nadie saca lo que hacen ' + bs.length + ' de tus ' + n + ' (' + D.RES[outR].name.toLowerCase() + '). Cada viaje va al que tiene más.' + (lleno ? ' Alguno ya paró por depósito lleno.' : ''), peso: 42 + tot / 20 });
+      else out.push({ id: 'o:' + b.id, tipo: 'ruta', de: b.id, a: 'bodega', res: null, txt: n + ' → Cualquier bodega', por: 'Nadie saca lo que hace (' + D.RES[outR].name.toLowerCase() + ')' + (lleno ? ': su depósito está lleno y paró.' : '.'), peso: 40 + tot / 20 });
     }
     // 3) colonias sin barcaza
     for (const b of PK.Libro.campos()) {
@@ -717,6 +793,8 @@
       }
     }
     u.espera = (u.espera || 0) + 3; u.wait = 3;
+    if (L.esTallerComodin(r.a) && (!q || q.need < 1)) u.rA = null; // pk-57: ese ya no necesita: el próximo, otro
+    if (L.esTallerComodin(r.de) && (!q || q.n < 1)) u.rDe = null; // pk-57: ese no tiene: vuelve a elegir
     u.estado = !q && L.esCampo(from) ? 'Esperando carga: ' + from.def.name + ' está vacío' : !q || q.need < 1 ? to.def.name + ' no necesita nada por ahora: espera en el origen' : q.n >= 1 ? 'Esperando carga (' + q.n + ' de ' + Math.floor(lleno) + ')' : 'Esperando carga: no hay ' + D.RES[q.res].name.toLowerCase() + (L.isShop(from) ? '' : ' (o lo guarda la reserva)');
   }
   // pk-55: carga mezclada desde un campamento
@@ -761,6 +839,7 @@
     if (u.carry > 0.5) {
       const r = L.rutaDe(u), resto = Object.keys(c), recibe = resto.some(k => acepta(to, k));
       if (r && r.a === 'bodega') { const d = mejorBodega(resto, to.cx, to.cy); if (d && d !== to && resto.some(k => acepta(d, k) && PK.Libro.lugar(d, k) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + (recibe ? ' está lleno' : ' no recibe ' + nombresCarga(c)) + ': va a ' + d.def.name; return; } } // pk-54
+      if (r && L.esTallerComodin(r.a)) { const d = tallerDestino(r, u, null, false, to.id); if (d && resto.some(k => acepta(d, k) && necesita(d, k, true) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + ' está lleno: va a ' + d.def.name; return; } } // pk-57
       if (recibe) { u.estado = to.def.name + ' está lleno: espera para descargar'; u.mode = 'idle'; u.wait = 3; return; }
       dropCargo(u); // lo que ese destino no recibe (cambiaron la ruta) vuelve a la bodega
     }

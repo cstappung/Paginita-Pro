@@ -127,6 +127,7 @@
     const L = PK.Logi;
     if (v === 'campo') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(tipo || L.tipoDeRes(res) || 'mining'), alt: '' }), res ? UI.resIcon(res) : el('b', { class: 'rt-asterisco' }, '*'));
     if (v === 'bodega') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon('warehouse'), alt: '' }), el('b', { class: 'rt-asterisco' }, '*'));
+    if (L.esTallerComodin(v)) return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(L.tipoTaller(v)), alt: '' }), el('b', { class: 'rt-asterisco' }, '*'));
     const b = G().bById.get(v);
     return b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '';
   };
@@ -186,6 +187,9 @@
     // pk-55: los tipos de campamento que tienes (y cuyo botín alguna bodega recibe)
     const dropsDe = t => (D.BUILD[t].drop || []).filter(k => L.bodegasRuta(k).length);
     const tiposCampos = L.TIPOS_CAMPO.filter(t => L.camposDe(null, t).length && dropsDe(t).length);
+    // pk-57: los tipos de taller de los que tienes dos o más («Cualquier Aserradero»)
+    const tiposTaller = [...new Set(talleres.map(b => b.type))].filter(t => L.talleresDe(t).length >= 2);
+    const nomT = t => 'Cualquier ' + D.BUILD[t].name;
     const F = rutaForm, B = v => (L.comodin(v) ? null : g.bById.get(v));
     if (F.de && !L.comodin(F.de) && !B(F.de)) F.de = 0;
     if (F.a && !L.comodin(F.a) && !B(F.a)) F.a = 0;
@@ -207,7 +211,8 @@
     // 1. ¿De dónde?
     const paso1 = el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '1'), el('b', null, '¿De dónde sale?')),
       grupo('Comodines', [tiposCampos.length ? ficha('campo', F.de === 'campo', 'Cualquier campamento', 'el que tenga más; trae de todo', iconoExtremo('campo', null, F.tipo || tiposCampos[0]), () => elegirDe('campo')) : '',
-        talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].filter(Boolean)),
+        talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].concat(
+        tiposTaller.map(t => ficha('taller:' + t, F.de === 'taller:' + t, nomT(t), 'el que tenga más hecho', iconoExtremo('taller:' + t), () => elegirDe('taller:' + t)))).filter(Boolean)),
       grupo('Campamentos (carromato)', campos.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
       grupo('Muelles de colonias (barcaza)', colonias.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
       grupo('Talleres (carreta)', talleres.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
@@ -231,17 +236,19 @@
     }
     // 2. ¿A dónde? (solo los destinos que sirven con ese origen)
     const sirve = v => !(L.comodin(F.de) || L.comodin(v) ? L.comodinMalo(F.de, v, F.de === 'campo' ? F.res || null : null, F.de === 'campo' ? F.tipo : null) : L.parMalo(A0, B(v)));
-    const dests = { bodega: sirve('bodega'), tall: talleres.filter(b => b.id !== F.de && sirve(b.id)), bods: bodegas.filter(b => b.id !== F.de && sirve(b.id)), embs: embs.filter(b => sirve(b.id)) };
+    const dests = { bodega: sirve('bodega'), tipos: tiposTaller.filter(t => 'taller:' + t !== F.de && sirve('taller:' + t)), tall: talleres.filter(b => b.id !== F.de && sirve(b.id)), bods: bodegas.filter(b => b.id !== F.de && sirve(b.id)), embs: embs.filter(b => sirve(b.id)) };
     caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '2'), el('b', null, '¿A dónde lo lleva?')),
-      grupo('Comodín', dests.bodega && F.de !== 'bodega' ? [ficha('bodega', F.a === 'bodega', 'Cualquier bodega', 'la más cercana con lugar', iconoExtremo('bodega'), () => elegirA('bodega'))] : []),
+      grupo('Comodines', (dests.bodega && F.de !== 'bodega' ? [ficha('bodega', F.a === 'bodega', 'Cualquier bodega', 'la más cercana con lugar', iconoExtremo('bodega'), () => elegirA('bodega'))] : []).concat(
+        dests.tipos.map(t => ficha('taller:' + t, F.a === 'taller:' + t, nomT(t), 'el que tenga menos', iconoExtremo('taller:' + t), () => elegirA('taller:' + t))))),
       grupo('Embarcadero', dests.embs.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
       grupo('Bodegas', dests.bods.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
       grupo('Talleres', dests.tall.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
-      !dests.bodega && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res || null, F.tipo || null) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
+      !dests.bodega && !dests.tipos.length && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res || null, F.tipo || null) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
     if (!F.a) return;
 
     // 3. ¿Qué lleva?
-    const Bd = B(F.a), A = A0;
+    const muestra = v => (L.esTallerComodin(v) ? L.talleresDe(L.tipoTaller(v))[0] || null : B(v)); // pk-57
+    const Bd = muestra(F.a), A = A0 || muestra(F.de);
     const resOps = F.de === 'campo' ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => (Bd ? L.acepta(Bd, k) : L.bodegasRuta(k).length)) : Bd && L.isShop(Bd) ? Object.keys(L.recipe(Bd).in) : A && L.isShop(A) ? [L.output(A)] : [];
     if (F.res && F.de !== 'campo' && !resOps.includes(F.res)) F.res = '';
     if (F.de !== 'campo' && resOps.length > 1) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué lleva?')),

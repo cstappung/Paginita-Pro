@@ -12,6 +12,9 @@ owner outside this repo and dropped in.
 - `PLAN-LOGISTICA.md` (Nov 15 2026): the next plan, «Caminos y Campamentos», phases L1–L6 («implementa la Fase
   L<N> del plan de logística»; L6 is the sea with cargo barges). §10 lists traps; §11 has the owner's answered
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
+- `PLAN-CINTAS.md` (Nov 16 2026): the belt redesign («Red de cintas»), phases C1–C3 («implementa la Fase C<N> del
+  plan de cintas»): belts as pieces on tiles with level I–V, building ports, mixed items, splitter/merger/sorter,
+  bottlenecks. §9 holds the owner's decisions (unanswered on Nov 16: use the recommended ones until then).
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
@@ -422,3 +425,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `Lb.fuera`, `inbound` (`job.carga`), `dropCargo`, `descargar` (leftovers → another store, or back to the town if the
   destination does not take them) and `L.offline` all handle it. `mejorBodega` takes a list and prefers the store that
   takes most of it (a Granary next door does not catch a mining load). pk-54 routes (`res` without `tipo`) still work.
+- **Campaign place is 3×3** (`pk-57`): `lugarLibre` checks the nine tiles (passable, not water, no wall/foreign wall,
+  POI or building, no territory, 2+ from any territory) and `revisarLugar` uses the same distance map. Checking only
+  the centre left the camp on top of your wall and half in the sea.
+- **«Cualquier <taller>»** (`pk-57`, `'taller:<type>'` as `r.de` or `r.a`, `L.esTallerComodin`, `L.talleresDe`):
+  as destination, the workshop of that type that needs most (`tallerDestino`: missing input minus what other carts of
+  the route are fetching); as origin, the one with most output (`tallerOrigen`). Validated with a sample of the type
+  (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
+  shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.

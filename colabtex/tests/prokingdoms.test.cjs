@@ -1223,3 +1223,34 @@ test('pk-55: «cualquier campamento minero» trae de todo, en carga mezclada', (
   } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; G.stat = stat0; G.cap = gcap0; }
   assert.match(JS('entities.js'), /carga: this\.carga \|\| undefined/);
 });
+
+test('pk-57: «cualquier Aserradero» — la carreta lleva al que tiene menos y saca del que tiene más', () => {
+  const L = PK.Logi, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.capDe, stat0 = G.stat, gcap0 = G.cap;
+  G.stat = () => {}; G.cap = () => 1000;
+  const mk = (id, type, x, extra) => Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 3, h: 3, cx: x + 1.5, cy: 11.5 }, extra || {});
+  const s1 = mk(1, 'sawmill', 40, { inb: { wood: 30 }, outb: { planks: 2 } }), s2 = mk(2, 'sawmill', 60, { inb: { wood: 2 }, outb: { planks: 25 } });
+  const tc = mk(4, 'tc', 10), forja = mk(5, 'forge', 80, { inb: {}, outb: {} });
+  G.buildings = [s1, s2, tc, forja]; G.bById = new Map(G.buildings.map(b => [b.id, b])); G.units = [];
+  G.capDe = (b, r) => (b.type === 'tc' ? 1000 : 0);
+  G.state = Object.assign({}, st0 || {}, { res: { wood: 500, planks: 0 }, flags: {}, logi: { rutas: [], belts: [], nextRuta: 1 } });
+  try {
+    assert.deepEqual(L.talleresDe('sawmill').map(b => b.id), [1, 2]);
+    assert.equal(L.nombreExtremo('taller:sawmill'), 'Cualquier Aserradero');
+    assert.equal(L.claseRuta({ de: 'bodega', a: 'taller:sawmill' }), 'cart');
+    assert.equal(L.comodinMalo('bodega', 'taller:sawmill', null), null);
+    assert.equal(L.comodinMalo('taller:sawmill', 'bodega', null), null);
+    assert.equal(L.comodinMalo('taller:sawmill', 'taller:forge', null), null, 'tablones a la Herrería');
+    assert.match(L.comodinMalo('taller:forge', 'taller:sawmill', null), /no usa/);
+    assert.match(L.comodinMalo('bodega', 'taller:steelworks', null), /Necesitas/);
+    const ri = { id: 1, de: 'bodega', a: 'taller:sawmill', res: null }, ro = { id: 2, de: 'taller:sawmill', a: 'bodega', res: null };
+    G.state.logi.rutas.push(ri, ro);
+    const u = { id: 11, kind: 'cart', owner: 'p', ruta: 1, x: 30, y: 11, carry: 0 }, v = { id: 12, kind: 'cart', owner: 'p', ruta: 2, x: 30, y: 11, carry: 0 };
+    G.units = [u, v];
+    assert.equal(L.extremos(u, ri).to.id, 2, 'el que tiene menos madera');
+    assert.equal(L.extremos(u, ri).from.id, 4, 'desde la bodega más cercana a él');
+    assert.equal(L.extremos(v, ro).from.id, 2, 'saca del que más tablones tiene');
+    assert.equal(L.rutasHacia(s1).length, 1, 'la ruta comodín abastece a los dos');
+    assert.equal(L.rutasDesde(s1).length, 1);
+  } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; G.stat = stat0; G.cap = gcap0; }
+  assert.match(JS('campana.js'), /for \(let dy = -1; dy <= 1; dy\+\+\) for \(let dx = -1; dx <= 1; dx\+\+\) if \(!casillaLibre/, 'el lugar del capítulo mira sus 9 casillas');
+});
