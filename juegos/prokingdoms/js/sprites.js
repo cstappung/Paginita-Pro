@@ -2592,6 +2592,49 @@
     }
     return (BELTC[key] = { c: pb.canvas(), ox: 16, oy: 0 });
   };
+  // Unidor, divisor y clasificador (pk-59): bandas hacia cada lado conectado (mask: bit 1<<dir) y una caja en el
+  // centro con el color de la pieza y una flecha hacia la salida (d). El clasificador lleva puntos de colores.
+  const NODO_COL = { u: [86, 140, 92], v: [74, 112, 168], s: [196, 128, 54] };
+  S.beltNodo = function (tipo, mask, d, phase, n) {
+    n = n || 3;
+    const key = 'n' + tipo + mask + d + phase + n;
+    if (BELTC[key]) return BELTC[key];
+    const H = 7, c = document.createElement('canvas'); c.width = 32; c.height = 16 + H;
+    const ctx = c.getContext('2d'), C = BELT_COL[n], half = 0.26;
+    // bandas (en un PB aparte, sobre el suelo)
+    const pb = new PB(32, 16), DIRV = [[1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0]];
+    for (let py = 0; py < 16; py++) for (let px = 0; px < 32; px++) {
+      const [u, v] = tileUV(px, py);
+      if (u < 0 || v < 0 || u > 1 || v > 1) continue;
+      for (let dd = 0; dd < 4; dd++) {
+        if (!(mask & (1 << dd))) continue;
+        const hor = dd % 2 === 0, ax = hor ? Math.abs(v - 0.5) : Math.abs(u - 0.5), al = hor ? u : v;
+        const lado = DIRV[dd], dentro = hor ? (lado[0] === 1 ? u >= 0.5 : u <= 0.5) : (lado[1] === 1 ? v >= 0.5 : v <= 0.5);
+        if (ax > half || !dentro) continue;
+        let col;
+        if (ax > half - 0.06) col = C.riel; else { const t = al * 5 - phase / 4; col = (t - Math.floor(t)) < 0.35 ? C.a : C.b; }
+        if (ax > half - 0.025) col = C.borde;
+        pb.set(px, py, col);
+        break;
+      }
+    }
+    ctx.drawImage(pb.canvas(), 0, H);
+    // caja
+    const col = NODO_COL[tipo] || [120, 120, 120], rgb = (k, f) => 'rgb(' + Math.round(k[0] * f) + ',' + Math.round(k[1] * f) + ',' + Math.round(k[2] * f) + ')';
+    const P = (u, v, h) => [16 + (u - v) * 16, (u + v) * 8 + H - h];
+    const poly = (pts, f) => { ctx.fillStyle = f; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill(); };
+    const a = 0.24, b = 0.76;
+    poly([P(b, a, 0), P(b, b, 0), P(b, b, H), P(b, a, H)], rgb(col, 0.62));
+    poly([P(a, b, 0), P(b, b, 0), P(b, b, H), P(a, b, H)], rgb(col, 0.8));
+    poly([P(a, a, H), P(b, a, H), P(b, b, H), P(a, b, H)], rgb(col, 1.05));
+    // flecha de salida en la tapa
+    const DV = [[1, 0], [0, 1], [-1, 0], [0, -1]][d], m = P(0.5, 0.5, H), f = P(0.5 + DV[0] * 0.22, 0.5 + DV[1] * 0.22, H);
+    ctx.strokeStyle = 'rgba(30,24,18,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(m[0], m[1]); ctx.lineTo(f[0], f[1]); ctx.stroke();
+    ctx.fillStyle = 'rgba(30,24,18,0.9)'; ctx.fillRect(Math.round(f[0]) - 1, Math.round(f[1]) - 1, 3, 3);
+    if (tipo === 's') for (const [du, dv, k] of [[-0.12, 0.1, [230, 200, 80]], [0.1, -0.12, [200, 80, 70]], [0.12, 0.12, [120, 190, 230]]]) { const q = P(0.5 + du, 0.5 + dv, H); ctx.fillStyle = rgb(k, 1); ctx.fillRect(Math.round(q[0]), Math.round(q[1]), 2, 1); }
+    if (tipo === 'u') { const q = P(0.5, 0.5, H); ctx.fillStyle = 'rgba(240,240,220,0.8)'; ctx.fillRect(Math.round(q[0]) - 3, Math.round(q[1]) + 1, 2, 1); ctx.fillRect(Math.round(q[0]) + 2, Math.round(q[1]) + 1, 2, 1); }
+    return (BELTC[key] = { c, ox: 16, oy: H });
+  };
   // Rampa y tablero del paso elevado (pk-58). alto: cuánto sube (D.CINTA.alto). Dibujados con trazos: un plano
   // inclinado o a nivel, con sus postes. Las coordenadas de casilla (u, v, h) van a la pantalla isométrica.
   const isoP = (u, v, h, alto) => [16 + (u - v) * 16, (u + v) * 8 + alto - h];

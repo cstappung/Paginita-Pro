@@ -1345,3 +1345,67 @@ test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, c
     assert.ok(W.belt[W.idx(23, 41)] >= 0);
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, buf0 = L.bufCap, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  G.stat = () => {}; G.cap = () => 1000; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [], inb: {}, outb: {} }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  // divisor: aserradero (x 20..22, y 40..42) → (23..25, 41) → divisor en (26,41) → herrería A adelante (27..28, 41..42) y B abajo (26..27, 42..43)? B a la derecha del divisor (abajo en y)
+  const saw = mk(1, 'sawmill', 20, 40, { outb: { planks: 5000 } }), fa = mk(2, 'forge', 27, 40), fb = mk(3, 'forge', 25, 43);
+  // unidor: dos aserraderos en (40..42, 40..42) y (40..42, 46..48) que se juntan en (46,44) hacia la herrería C (47..48, 44..45)
+  const s1 = mk(4, 'sawmill', 40, 40, { outb: { planks: 5000 } }), s2 = mk(5, 'sawmill', 40, 46, { outb: { planks: 5000 } }), fc = mk(6, 'forge', 47, 44);
+  // clasificador: campamento minero (60..61, 40..41) con piedra y oro → (62..64, 40) → clasificador (65,40): piedra adelante a la cantería (66..67, 40..41), oro abajo a los copistas (65..66, 41..42)? abajo = (65,41)
+  const mina = mk(7, 'mining', 60, 40, { inv: { stone: 3000, gold: 3000 } }), can = mk(8, 'masonry', 66, 39), cop = mk(9, 'scriptorium', 65, 41);
+  const todos = [saw, fa, fb, s1, s2, fc, mina, can, cop];
+  G.buildings = todos; G.bById = new Map(todos.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); todos.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 4, res: {}, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, n, p) => { t[W.idx(x, y)] = { p: p || 'c', d, n, i: [] }; };
+  try {
+    for (let x = 23; x <= 25; x++) pz(x, 41, 0, 3);
+    pz(26, 41, 0, 3, 'v'); // adelante (27,41) = herrería A; derecha (26,42): una cinta que baja a B
+    pz(26, 42, 1, 3); // (26,43) es la herrería B (x 25..26)
+    // unidor
+    for (let x = 43; x <= 45; x++) pz(x, 41, 0, 2); pz(46, 41, 1, 2); pz(46, 42, 1, 2); pz(46, 43, 1, 2);
+    for (let x = 43; x <= 45; x++) pz(x, 47, 0, 2); pz(46, 47, 3, 2); pz(46, 46, 3, 2); pz(46, 45, 3, 2);
+    pz(46, 44, 0, 3, 'u'); // recibe de arriba y de abajo, sale a la derecha → herrería C (47,44)
+    // clasificador
+    for (let x = 62; x <= 64; x++) pz(x, 40, 0, 3);
+    pz(65, 40, 0, 3, 's');
+    Ci.init(G.state);
+    const dv = Ci.carrilesEn(W.idx(26, 41))[0];
+    assert.equal(dv.outs.length, 2, 'el divisor tiene dos salidas: la herrería A y la cinta hacia B');
+    const un = Ci.carrilesEn(W.idx(46, 44))[0];
+    assert.equal(un.ent.length, 2, 'el unidor recibe de las dos');
+    assert.equal(un.dst, fc);
+    const cl = Ci.carrilesEn(W.idx(65, 40))[0];
+    assert.equal(cl.outs.length, 2);
+    Ci.ponerFiltro(W.idx(65, 40), 0, 'stone'); Ci.ponerFiltro(W.idx(65, 40), 1, 'gold');
+    for (let i = 0; i < 1200; i++) Ci.update(0.1); // 2 minutos
+    const a = fa.inb.planks || 0, b = fb.inb.planks || 0;
+    assert.ok(a > 120 && b > 120 && Math.abs(a - b) <= 20, 'el divisor reparte por turnos (' + a + ' / ' + b + ')');
+    const c = fc.inb.planks || 0;
+    assert.ok(c >= 300 && c <= 361, 'el unidor junta las dos hasta su nivel III (' + c + ')');
+    assert.ok(Math.abs((s1.outb.planks) - (s2.outb.planks)) <= 20, 'toma por turnos de las dos (' + s1.outb.planks + ' / ' + s2.outb.planks + ')');
+    assert.ok((can.inb.stone || 0) > 100 && !can.inb.gold, 'la piedra va a la cantería (' + can.inb.stone + ')');
+    assert.ok((cop.inb.gold || 0) > 100 && !cop.inb.stone, 'el oro a los copistas (' + cop.inb.gold + ')');
+    // sin «lo que sobre» y sin salida para el oro: se atasca
+    Ci.ponerFiltro(W.idx(65, 40), 1, '');
+    for (let i = 0; i < 100; i++) Ci.update(0.1);
+    assert.match(Ci.carrilesEn(W.idx(65, 40))[0].motivo || '', /no tiene salida para oro/);
+    assert.equal(Ci.estadoFlujo(Ci.carrilesEn(W.idx(65, 40))), 3, 'atascada: rojo en «Ver flujo»');
+    { const ll = Ci.llegan(W.idx(65, 40)); assert.ok(ll.includes('gold') && ll.includes('stone') && !ll.includes('planks'), 'el panel del clasificador ofrece lo que llega (' + ll + ')'); }
+    // sin conexión: el divisor reparte en partes iguales y el clasificador separa
+    Ci.ponerFiltro(W.idx(65, 40), 1, 'gold');
+    for (const ks in t) t[ks].i = [];
+    fa.inb = {}; fb.inb = {}; fc.inb = {}; can.inb = {}; cop.inb = {};
+    Ci.offline(60);
+    assert.equal(fa.inb.planks + fb.inb.planks, 180, 'sin conexión: 180 por el divisor de nivel III');
+    assert.equal(fa.inb.planks, fb.inb.planks);
+    assert.ok(fc.inb.planks <= 180 && fc.inb.planks >= 170, 'el unidor de nivel III deja pasar 180 (' + fc.inb.planks + ')');
+    assert.ok(can.inb.stone >= 80 && cop.inb.gold >= 80 && !can.inb.gold && !cop.inb.stone, 'clasificado sin conexión');
+    // tramo: un divisor corta el tramo
+    assert.ok(!Ci.tramo(W.idx(24, 41)).includes(W.idx(26, 42)));
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});

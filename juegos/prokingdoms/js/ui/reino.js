@@ -287,7 +287,8 @@
         g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Logi.tool = 'calzada'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
         UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos, murallas y Calzada Real (la tuya, o la de otro en tu tierra); vuelve la mitad del material' }),
         UI.btn('Trazar cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'cinta'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? 'Piezas de cinta con nivel, bocas en los edificios, cruces y pasos elevados' : L.beltLockText() }),
-        UI.btn('Paso elevado', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'paso'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: 'La cinta pasa por arriba: por debajo cruzan carretas, carromatos, caminos y otras cintas' })));
+        UI.btn('Paso elevado', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'paso'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: 'La cinta pasa por arriba: por debajo cruzan carretas, carromatos, caminos y otras cintas' }),
+        Object.keys((st.logi.red && st.logi.red.t) || {}).length ? UI.btn(PK.Cintas.verFlujo ? 'Ocultar flujo' : 'Ver flujo', () => { PK.Cintas.verFlujo = !PK.Cintas.verFlujo; UI.closeModal(); UI.refreshPanel(true); }, { title: 'Colorea cada pieza: gris vacía, verde corre con lugar, amarillo a tope, rojo atascada o frenada por una pieza de menos nivel' }) : ''));
 
       // ----- Rutas -----
       UI.rutasSugeridas(body);
@@ -309,7 +310,8 @@
         el('li', null, 'Las carretas no salen de tu territorio ni van a los campamentos.'),
         el('li', null, 'Las cintas (desde la Era ' + U.roman(D.CINTA.niv[0].era) + ') se arman pieza por pieza. Una cinta que nace junto a un edificio saca de él (un taller, lo que hace; un campamento, todo lo que junta, mezclado; una bodega, lo que elijas) y una que apunta a un edificio le entrega.'),
         el('li', null, 'Cada pieza tiene su nivel (I ' + D.CINTA.niv[0].rate * 60 + '/min, II ' + D.CINTA.niv[1].rate * 60 + ', III ' + D.CINTA.niv[2].rate * 60 + '): una de nivel más bajo frena toda la cinta. Mejorar es al instante, con recursos.'),
-        el('li', null, 'Si a un edificio le llega algo que no usa, la cinta se atasca y te avisa. Dos cintas se cruzan sin mezclarse en un cruce; las carretas no cruzan cintas: pasan bajo un paso elevado.')));
+        el('li', null, 'Si a un edificio le llega algo que no usa, la cinta se atasca y te avisa. Dos cintas se cruzan sin mezclarse en un cruce; las carretas no cruzan cintas: pasan bajo un paso elevado.'),
+        el('li', null, 'Para armar la red: un unidor junta hasta 3 cintas en una, un divisor reparte una en hasta 3 y un clasificador separa por recurso (piedra a un lado, hierro a otro, lo que sobre al Almacén). Sale una rama si empiezas a trazar en medio de una cinta; se unen si terminas sobre una que ya recibe. Cualquier pieza se convierte desde su panel.')));
       if (shops.length) {
         body.append(el('h3', null, 'Talleres'));
         for (const b of shops) {

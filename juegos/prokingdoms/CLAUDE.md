@@ -434,7 +434,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
   shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.
 
-## Belt network (`PLAN-CINTAS.md`, C1 in `pk-58`, `js/cintas.js`, `PK.Cintas`)
+## Belt network (`PLAN-CINTAS.md`, C1 in `pk-58`, C2 in `pk-59`, `js/cintas.js`, `PK.Cintas`)
 
 - **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
   `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
@@ -460,4 +460,19 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   tracing (`plegarAlColocar`). Belts may not go on roads or the Calzada (use a pass). «Quitar varios» removes pieces.
 - **Old saves:** `st.logi.belts` become level III pieces with their items (`Ci.init`), `st.logi.avisoCintas` toasts once.
 - The server never sees belts; `Lb.fuera` counts what rides on them (`Ci.enCinta`). The autopilot does not build them.
-- C1 builds levels I–III (`D.CINTA.maxFase`); merger/splitter/sorter are C2.
+- C1 builds levels I–III (`D.CINTA.maxFase`); levels IV–V are C3.
+- **C2 nodes** (`Ci.NODO`): `u` unidor (takes from every lane that enters, turn by turn: `turno`/`listo`/`hayLugarDesde`),
+  `v` divisor and `s` clasificador (one input, outputs ahead and both sides, round-robin `c.rr` among outs with room).
+  Lanes carry `outs` (`{c|b, d}`) and `ent` (`{c, d}`) instead of a single `sig`; every walker (tramo, alimenta,
+  bocasDe, offline) must follow `outs`/`ent`, not `sig`. Sorter filters live in `pz.f2[d]`: a resource, `'*'` (what no
+  other output took) or `''`; default front `'*'`, sides `''` (`Ci.filtro`). An item no output takes jams with a
+  message naming it. Costs in `D.CINTA.nodos`; `Ci.convertir` refunds half of the old node.
+- **Tick carry:** `c.lib` may go down to `-dt` (`credito()`), or a 3/s merger delivered 2.4/s at 10 ticks/s. Keep it.
+- **Auto-joins when tracing** (`Ci.plan`): starting mid-belt turns that piece into a divisor (`dividir`); ending on a
+  belt that already has an input turns it into a unidor (`unir`); ending head-on is refused.
+- **Offline:** offers from sources flow downstream with each lane's cap, split evenly at divisors and by filter at
+  sorters, limited by what sinks accept (`accDe`); sources lose exactly what was delivered.
+- **«Ver flujo»** (`Ci.verFlujo`, `Ci.estadoFlujo`): red only for jammed or held back by a lower-level next piece; a
+  belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
+  The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
+  options) feeds the sorter panel's short list.

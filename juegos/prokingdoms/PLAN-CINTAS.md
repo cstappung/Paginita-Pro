@@ -13,7 +13,7 @@
 - **Decisiones del dueño:** respondidas el 16 de noviembre de 2026 (sección 9). Mandan sobre cualquier otra parte
   del plan. Con ellas, el **paso elevado pasa a la Fase C1** (las carretas no cruzan cintas) y se suma el **cruce**
   (pedido del dueño: dos cintas que se cruzan sin tocarse, «como un paso a nivel»).
-- **Avance:** C1 hecha en `pk-58`.
+- **Avance:** C1 hecha en `pk-58`; C2 hecha en `pk-59`.
 
 ---
 
@@ -218,6 +218,12 @@ cintas viejas siguen andando igual que antes.
 **Criterios de aceptación:** una cinta mezclada desde un campamento minero se separa en piedra a la Cantería, hierro a
 la Fundición y lo que sobre al Almacén; dos aserraderos que alimentan una sola cinta se unen sin perder caudal hasta
 el tope del nivel.
+
+**Cómo quedó (pk-59):** las tres piezas se ponen convirtiendo una pieza de cinta desde su panel («Convertir en»), o
+solas al trazar: empezar en medio de una cinta arma un divisor, terminar sobre una cinta que ya tiene entrada arma un
+unidor (de frente no se puede). El clasificador muestra por salida «Lo que sobre», «Nada» y lo que llega por esa
+cinta; «Otros…» abre la lista entera. «Ver flujo» deja el rojo solo para lo que hay que arreglar (atascada, o frenada
+por una pieza de menos nivel); llena porque adelante se llevan menos es amarillo.
 
 ## 5. Fase C3: niveles altos (`pk-60`)
 

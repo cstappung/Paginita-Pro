@@ -13,6 +13,17 @@
   const cerrarY = fn => () => { PK.UI.closeModal(); fn(); };
 
   const REGLAS = [
+    // pk-59 (C2): una cinta atascada (le llega algo que nadie recibe) o frenada por una pieza de menos nivel
+    () => {
+      const Ci = PK.Cintas;
+      if (!Ci || !S().logi || !S().logi.red) return null;
+      const cs = Ci.carriles(), ver = k => cerrarY(() => { G().sel = { type: 'belt', id: k }; PK.Render.centerOn((k % PK.World.W) + 0.5, ((k / PK.World.W) | 0) + 0.5); PK.UI.refreshPanel(true); });
+      const at = cs.find(c => c.atasco);
+      if (at) return { id: 'cintaAtasco', prioridad: 61, texto: at.motivo + '. Pon un clasificador antes, o cambia qué saca la boca.', acciones: [{ label: 'Ver la cinta', fn: ver(at.k) }] };
+      const fr = cs.find(c => c.sig && c.sig.pz.n < c.pz.n && (c.pz.i || []).length >= 2 && Ci.estadoFlujo([c]) === 3);
+      if (fr) return { id: 'cintaCuello', prioridad: 40, texto: 'Una cinta está frenada por una pieza de nivel ' + U.roman(fr.sig.pz.n) + ': mejórala para que pase todo.', acciones: [{ label: 'Ver la pieza', fn: ver(fr.sig.k) }] };
+      return null;
+    },
     // la próxima era pide más de lo que cabe en las bodegas: no se junta nunca sin agrandarlas antes (prueba de ritmo:
     // la Era V pide 19.600 de comida y un Granero común guarda 10.000; la barra quedaba quieta sin decir por qué)
     () => {

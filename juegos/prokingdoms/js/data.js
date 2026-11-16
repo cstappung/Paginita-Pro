@@ -703,6 +703,9 @@
       { name: 'Cinta de engranajes', rate: 8, vel: 3.2, era: 6, cost: { machinery: 2, gems: 1 } },
     ],
     maxFase: 3, cruce: { planks: 4, ingots: 2 }, paso: { planks: 10, ingots: 4, stone: 20 }, pasoMax: 5, alto: 10,
+    // C2 (pk-59): piezas que unen, reparten y separan. Cuestan además del nivel de la pieza.
+    nodos: { u: { planks: 6, ingots: 2 }, v: { planks: 6, ingots: 2 }, s: { ingots: 4, tools: 2, books: 1 } },
+    nodoNombre: { u: 'Unidor', v: 'Divisor', s: 'Clasificador' },
   };
   D.BUF = 30;          // capacidad de los depósitos de un taller, por puesto de trabajo
   D.NEAR_STORE = 3;    // un taller a esta distancia de un almacén se abastece solo, sin carretas

@@ -814,20 +814,57 @@
     box.append(el('p', { class: 'small' }, paso
       ? 'Toca la entrada y después la salida, en la misma fila o columna (a 2..' + D.CINTA.pasoMax + ' casillas). La cinta pasa por arriba: por debajo cruzan carretas, carromatos, caminos y otras cintas.'
       : I.roadStart ? 'Toca dónde termina. Si terminas en un edificio, la cinta le entrega; si cruzas en recto una cinta de través, ahí va un cruce (no se mezclan).'
-        : 'Toca dónde empieza: junto a un edificio (o sobre él) para que saque de ahí, o en el final de otra cinta para seguirla. Las carretas no cruzan cintas: déjales paso o usa un paso elevado; los aldeanos caminan por encima.'));
+        : 'Toca dónde empieza: junto a un edificio (o sobre él) para que saque de ahí, en el final de otra cinta para seguirla, o en medio de una cinta para sacar una rama (pone un divisor). Si terminas sobre una cinta que ya recibe de otra, ahí va un unidor. Las carretas no cruzan cintas: déjales paso o usa un paso elevado; los aldeanos caminan por encima.'));
     box.append(el('div', { class: 'small' }, el('b', null, 'Nivel: ')), nivelesCinta(k => { L.cintaNivel = k; UI.refreshPanel(true); }, n));
     box.append(el('p', { class: 'small muted' }, NIVTXT(n) + ' Cada casilla cuesta '), UI.costEl(Ci.costoSubir(0, n)));
     if (paso) box.append(el('p', { class: 'small muted' }, 'El paso elevado suma '), UI.costEl(D.CINTA.paso));
     if (!paso && p && p.tiles.length) {
       const c = Ci.costoPlan(p, n), ok = G().canAfford(c);
-      box.append(el('p', { class: 'small ' + (p.malas.length ? 'warn-t' : '') }, p.malas.length ? 'Ahí no se puede: ' + p.malas[0].why + '.' : p.tiles.length + ' casillas' + (p.tiles.some(t => t.cruce) ? ', con cruce' : '') + (p.bI ? ' · sale de ' + p.bI.def.name : '') + (p.bF ? ' · entrega a ' + p.bF.def.name : '') + ':'), p.malas.length ? '' : UI.costEl(c), !p.malas.length && !ok ? el('p', { class: 'small warn-t' }, 'No te alcanza.') : '');
+      box.append(el('p', { class: 'small ' + (p.malas.length ? 'warn-t' : '') }, p.malas.length ? 'Ahí no se puede: ' + p.malas[0].why + '.' : p.tiles.length + ' casillas' + (p.tiles.some(t => t.cruce) ? ', con cruce' : '') + (p.unir !== null && p.unir !== undefined ? ', con unidor' : '') + (p.dividir !== null && p.dividir !== undefined ? ', con divisor' : '') + (p.bI ? ' · sale de ' + p.bI.def.name : '') + (p.bF ? ' · entrega a ' + p.bF.def.name : '') + ':'), p.malas.length ? '' : UI.costEl(c), !p.malas.length && !ok ? el('p', { class: 'small warn-t' }, 'No te alcanza.') : '');
     }
     box.append(el('div', { class: 'row' },
       UI.btn(paso ? 'Trazar cinta' : 'Paso elevado', () => { L.tool = paso ? 'cinta' : 'paso'; I.roadStart = null; I.planCinta = null; PK.Render.beltGhost = null; UI.refreshPanel(true); }, { small: true }),
+      botonFlujo(),
       UI.btn('Terminar', () => I.cancelTool(), { small: true })));
     return box;
   }
   const NIVTXT = n => D.CINTA.niv[n - 1].name + ': ' + D.CINTA.niv[n - 1].rate * 60 + ' por minuto.';
+  // C2 (pk-59): «Ver flujo» pinta cada pieza según cuánto la usan
+  function botonFlujo() {
+    const Ci = PK.Cintas;
+    return UI.btn(Ci.verFlujo ? 'Ocultar flujo' : 'Ver flujo', () => { Ci.verFlujo = !Ci.verFlujo; if (Ci.verFlujo) UI.toast('Gris: vacía · verde: corre con lugar · amarillo: a tope (normal si adelante se llevan menos) · rojo: atascada o frenada por una pieza de menos nivel.', 'info'); UI.refreshPanel(true); }, { small: true, cls: Ci.verFlujo ? 'gold' : '', title: 'Colorea cada pieza según cuánto la usan' });
+  }
+  UI.botonFlujo = botonFlujo;
+  const LADO = (pz, d) => (d === pz.d ? 'Adelante' : d === (pz.d + 1) % 4 ? 'Derecha' : 'Izquierda');
+  // Las piezas que unen, reparten y separan (C2)
+  let filtroAbierto = null; // la salida del clasificador con la lista entera de recursos abierta ("k:d")
+  function nodoBox(k, pz, c) {
+    const Ci = PK.Cintas, box = el('div');
+    if (pz.p === 'u') box.append(el('p', { class: 'small muted' }, 'Toma por turnos de las cintas que le entregan (' + c.ent.length + '): la salida tiene que tener nivel para todas.'));
+    if (pz.p === 'v') box.append(el('p', { class: 'small muted' }, 'Reparte por turnos entre sus salidas (' + c.outs.length + '): si una se llena, todo va a las otras.'));
+    if (pz.p === 's') {
+      box.append(el('p', { class: 'small muted' }, 'Cada salida lleva lo que elijas. Lo que no calza en ninguna va a «Lo que sobre»; si no hay, se atasca.'));
+      // pk-59: solo «Lo que sobre», «Nada» y lo que llega por esa cinta; «Otros…» abre la lista entera (22 recursos
+      // por salida y tres salidas tapaban la pantalla, peor en el celular)
+      const todos = D.RES_ORDER.filter(r => PK.Libro.fisico(r)), llegan = Ci.llegan(k);
+      for (const d of [pz.d, (pz.d + 3) % 4, (pz.d + 1) % 4]) {
+        const v = Ci.filtro(pz, d), conectada = c.outs.some(o => o.d === d), abierta = filtroAbierto === k + ':' + d;
+        const ops = abierta ? todos : todos.filter(r => r === v || llegan.includes(r));
+        const chip = (val, cont, title) => el('button', { type: 'button', class: 'rt-chip' + (v === val ? ' sel' : ''), title, onclick: () => { Ci.ponerFiltro(k, d, val); filtroAbierto = null; UI.refreshPanel(true); } }, cont);
+        box.append(el('div', { class: 'small' }, el('b', null, LADO(pz, d) + ': '), conectada ? '' : el('span', { class: 'muted' }, '(sin cinta ni edificio) ')),
+          el('div', { class: 'rt-chips' }, [chip('*', 'Lo que sobre'), chip('', 'Nada')].concat(ops.map(r => chip(r, UI.resIcon(r), D.RES[r].name)),
+            todos.length > ops.length || abierta ? [el('button', { type: 'button', class: 'rt-chip', onclick: () => { filtroAbierto = abierta ? null : k + ':' + d; UI.refreshPanel(true); } }, abierta ? 'Menos' : 'Otros…')] : [])));
+      }
+    }
+    return box;
+  }
+  function convertirBox(k, pz) {
+    const Ci = PK.Cintas, g = G();
+    return el('div', null, el('div', { class: 'small' }, el('b', null, 'Convertir en: ')), el('div', { class: 'row' }, ['c', 'u', 'v', 's'].filter(p => p !== pz.p).map(p => {
+      const c = D.CINTA.nodos[p] || {};
+      return el('span', { class: 'row' }, UI.btn(p === 'c' ? 'Cinta' : D.CINTA.nodoNombre[p], () => { if (Ci.convertir(k, p)) UI.refreshPanel(true); }, { small: true, disabled: !g.canAfford(c), title: p === 'u' ? 'Junta hasta 3 cintas en una' : p === 'v' ? 'Reparte una cinta en hasta 3' : p === 's' ? 'Separa por recurso' : 'Vuelve a ser una cinta común (devuelve la mitad)' }), Object.keys(c).length ? UI.costEl(c) : '');
+    })));
+  }
   function beltPanel(k) {
     const Ci = PK.Cintas, pz = Ci.pieza(k), g = G(), cs = Ci.carrilesEn(k), diag = Ci.diagnostico(k) || [];
     const box = el('div', { class: 'p-help' }, el('h3', null, Ci.nombre(pz)));
@@ -835,6 +872,7 @@
     box.append(el('p', { class: 'small' }, 'Hasta ' + Math.round(v.rate * 60 * bono) + ' por minuto' + (pz.pm !== undefined ? ' · pasan aprox. ' + pz.pm + ' por minuto' : '') + '.'));
     if (pz.p === 'k') box.append(el('p', { class: 'small muted' }, 'Las dos cintas se cruzan sin tocarse: la de través pasa por debajo.'));
     if (pz.p === 'e' || pz.p === 'x') box.append(el('p', { class: 'small muted' }, 'Por debajo pasan carretas, carromatos, caminos y otras cintas.'));
+    if (PK.Cintas.NODO[pz.p] && cs[0]) box.append(nodoBox(k, pz, cs[0]));
     // qué lleva
     const lleva = {};
     for (const arr of [pz.i, pz.j]) if (arr) for (const [r] of arr) lleva[r] = (lleva[r] || 0) + 1;
@@ -865,8 +903,10 @@
       else box.append(el('div', { class: 'row' }, UI.btn('Esta pieza', () => { Ci.subir([k].concat(pz.p === 'e' ? [pz.hasta] : pz.p === 'x' ? [pz.desde] : []), sig); UI.refreshPanel(true); }, { small: true, cls: 'gold', disabled: !g.canAfford(c1) }), UI.costEl(c1)),
         tramo.length > 1 ? el('div', { class: 'row' }, UI.btn('Todo el tramo (' + tramo.length + ')', () => { Ci.subir(tramo, sig); UI.refreshPanel(true); }, { small: true, cls: 'gold', disabled: !g.canAfford(ct) }), UI.costEl(ct)) : '');
     }
+    if (pz.p === 'c' || PK.Cintas.NODO[pz.p]) box.append(convertirBox(k, pz));
     box.append(el('div', { class: 'row' },
-      pz.p === 'c' || pz.p === 'k' ? UI.btn('Girar', () => { Ci.girar(k); UI.refreshPanel(true); }, { small: true, title: 'Gira la dirección de esta pieza (lo de encima vuelve al pueblo)' }) : '',
+      pz.p === 'c' || pz.p === 'k' || PK.Cintas.NODO[pz.p] ? UI.btn('Girar', () => { Ci.girar(k); UI.refreshPanel(true); }, { small: true, title: 'Gira la dirección de esta pieza (lo de encima vuelve al pueblo)' }) : '',
+      botonFlujo(),
       UI.btn('Seguir esta cinta', () => { PK.Logi.tool = 'cinta'; PK.Input.roadStart = [k % W.W, (k / W.W) | 0]; G().sel = null; UI.refreshPanel(true); }, { small: true }),
       UI.btn('Quitar (devuelve la mitad)', () => { Ci.quitar(k); G().sel = null; UI.refreshPanel(true); }, { small: true, cls: 'danger' }),
       UI.btn('Quitar varios…', () => { G().sel = null; PK.Despeje.empezar('quitar'); }, { small: true, title: 'Marca una zona: quita cintas, murallas y caminos' })));

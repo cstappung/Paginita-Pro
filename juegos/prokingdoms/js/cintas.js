@@ -33,7 +33,7 @@
   const kOf = (x, y) => W.idx(x, y);
   const xyOf = k => [k % W.W, (k / W.W) | 0];
   function marcar(k, pz) { W.belt[k] = pz ? pz.n : -1; }
-  Ci.nombre = pz => (pz.p === 'k' ? 'Cruce de cintas' : pz.p === 'e' || pz.p === 'x' ? 'Paso elevado' : NIV(pz.n).name) + ' (nivel ' + U.roman(pz.n) + ')';
+  Ci.nombre = pz => (pz.p === 'k' ? 'Cruce de cintas' : pz.p === 'e' || pz.p === 'x' ? 'Paso elevado' : D.CINTA.nodoNombre[pz.p] || NIV(pz.n).name) + ' (nivel ' + U.roman(pz.n) + ')';
   Ci.maxNivel = () => Math.min(D.CINTA.maxFase, D.CINTA.niv.filter(v => S().era >= v.era).length);
   Ci.desbloqueado = () => S().era >= D.CINTA.niv[0].era;
   Ci.lockText = () => 'Las cintas se construyen desde la Era ' + U.roman(D.CINTA.niv[0].era) + '.';
@@ -48,6 +48,7 @@
     const c = Ci.costoSubir(0, pz.n);
     if (pz.p === 'k') suma(c, D.CINTA.cruce);
     if (pz.p === 'e') suma(c, D.CINTA.paso);
+    if (D.CINTA.nodos[pz.p]) suma(c, D.CINTA.nodos[pz.p]);
     return c;
   }
 
@@ -74,7 +75,12 @@
   function enPaso(k) { const pz = red() && red().t[k]; return !!pz && (pz.p === 'e' || pz.p === 'x'); }
 
   // ---------- La red armada: carriles ----------
-  // Cada pieza tiene un carril (el cruce, dos). Un carril: { k, pz, l (0 o 1), d, len, sig, src, dst, ent }.
+  // Cada pieza tiene un carril (el cruce, dos). Un carril: { k, pz, l (0 o 1), d, len, outs, ent, src, sig, dst }.
+  // outs: a dónde puede pasar lo que llega a su final ({ c: carril } o { b: edificio }, con su dirección d). Una cinta
+  // tiene una salida; el divisor y el clasificador (C2), hasta tres (adelante y los costados). ent: quién le entrega;
+  // el unidor recibe de hasta tres, los demás de uno. sig/dst: la primera salida a un carril o a un edificio.
+  const NODO = { u: 1, v: 1, s: 1 };
+  Ci.NODO = NODO;
   let carriles = [], porK = new Map(), orden = [], clave = '';
   Ci.version = 0;
   function rearmarSiHace() {
@@ -92,30 +98,24 @@
     const b = G().bById.get(id);
     return b && b.owner === 'p' && b.done ? b : null;
   }
+  const nuevo = (k, pz, l, d, len) => ({ k, pz, l, d, len, outs: [], ent: [], src: null, sig: null, dst: null, motivo: null });
   function rearmar() {
     carriles = []; porK = new Map();
     const t = red().t;
     for (const ks in t) {
       const k = +ks, pz = t[ks];
-      const c0 = { k, pz, l: 0, d: pz.d, len: pz.p === 'e' ? pz.lp || 2 : 1, sig: null, src: null, dst: null, ent: [], motivo: null };
-      const cs = [c0];
-      if (pz.p === 'k') cs.push({ k, pz, l: 1, d: -1, len: 1, sig: null, src: null, dst: null, ent: [], motivo: null });
+      const cs = [nuevo(k, pz, 0, pz.d, pz.p === 'e' ? pz.lp || 2 : 1)];
+      if (pz.p === 'k') cs.push(nuevo(k, pz, 1, -1, 1));
       porK.set(k, cs);
       carriles.push(...cs);
     }
-    // a quién apunta cada carril
     const destinos = [];
-    for (const c of carriles) {
-      if (c.l === 1) continue; // el carril de través del cruce toma su dirección de quien entra
-      apuntar(c, destinos);
-    }
-    // el carril de través del cruce: lo alimenta la cinta que entra por un costado
-    for (const [c, tk, d] of destinos) {
+    for (const c of carriles) if (c.l === 0) apuntar(c, destinos); // el carril de través del cruce toma su dirección de quien entra
+    for (const [, tk, d] of destinos) {
       const pz = t[tk];
-      if (!pz || pz.p !== 'k') continue;
-      if (d % 2 !== pz.d % 2) { const cr = porK.get(tk)[1]; if (cr.d < 0) { cr.d = d; apuntar(cr, destinos); } }
+      if (pz && pz.p === 'k' && d % 2 !== pz.d % 2) { const cr = porK.get(tk)[1]; if (cr.d < 0) { cr.d = d; apuntar(cr, destinos); } }
     }
-    // resolver entradas: cada carril recibe de uno solo (en C1 no hay unidores)
+    // a quién entrega cada carril
     for (const [c, tk, d] of destinos) {
       const pz = t[tk], cs = porK.get(tk);
       if (!pz || !cs) continue;
@@ -124,33 +124,38 @@
       else if (pz.p === 'x') dest = c.pz.p === 'e' && c.k === pz.desde ? cs[0] : null;
       else if (d !== OPP(pz.d)) dest = cs[0];
       if (dest) dest.ent.push({ c, d });
-      else c.motivo = 'choca con otra cinta que va en contra';
+      else if (!NODO[c.pz.p]) c.motivo = 'choca con otra cinta que va en contra'; // un costado del divisor que da a quien le entrega: nada
     }
     for (const c of carriles) {
       if (!c.ent.length) continue;
-      // la de atrás manda; si no hay, la primera de un costado (una curva)
-      c.ent.sort((a, b) => (a.d === c.pz.d ? 0 : 1) - (b.d === c.pz.d ? 0 : 1));
-      const gana = c.ent[0];
-      gana.c.sig = c;
-      c.inD = gana.d;
-      for (const o of c.ent.slice(1)) o.c.motivo = 'llega a una cinta que ya tiene entrada: para unir dos cintas hace falta un unidor';
+      c.ent.sort((a, b) => (a.d === c.pz.d ? 0 : 1) - (b.d === c.pz.d ? 0 : 1)); // la de atrás primero
+      c.inD = c.ent[0].d;
+      if (c.pz.p === 'u') { for (const o of c.ent) o.c.outs.push({ c, d: o.d }); continue; }
+      c.ent[0].c.outs.push({ c, d: c.ent[0].d });
+      for (const o of c.ent.slice(1)) o.c.motivo = NODO[c.pz.p] ? 'llega a un ' + (c.pz.p === 's' ? 'clasificador' : 'divisor') + ' que ya tiene entrada' : 'llega a una cinta que ya tiene entrada: para unir dos cintas pon un unidor';
+      c.ent = [c.ent[0]];
     }
-    // bocas de salida: un carril sin quien lo alimente, nacido junto a un edificio
+    for (const c of carriles) { // primero los edificios que tiene adelante, después los carriles (por dirección)
+      c.outs.sort((a, b) => ((a.d - c.d + 4) % 4) - ((b.d - c.d + 4) % 4));
+      const oc = c.outs.find(o => o.c), ob = c.outs.find(o => o.b);
+      c.sig = oc ? oc.c : null; c.dst = ob ? ob.b : null;
+    }
+    // bocas de salida: un carril sin quien lo alimente, nacido junto a un edificio (atrás o a un costado)
     for (const c of carriles) {
-      if (c.ent.length || c.l === 1 || c.pz.p === 'x' || c.pz.p === 'k') continue;
+      if (c.ent.length || c.l === 1 || c.pz.p === 'x' || c.pz.p === 'k' || c.pz.p === 'u') continue;
       const [x, y] = xyOf(c.k), d = c.pz.d;
-      const prov = [OPP(d), (d + 1) % 4, (d + 3) % 4];
-      for (const pd of prov) {
+      for (const pd of [OPP(d), (d + 1) % 4, (d + 3) % 4]) {
         const b = edificioEn(x + DIRS[pd][0], y + DIRS[pd][1]);
-        if (b && b !== c.dst && esFuente(b)) { c.src = b; c.inD = OPP(pd); break; }
+        if (b && !c.outs.some(o => o.b === b) && esFuente(b)) { c.src = b; c.inD = OPP(pd); break; }
       }
     }
-    // orden: de abajo hacia arriba (lo que está más cerca del final primero), sin ciclos
+    // orden: lo más cerca del final primero (sin ciclos: uno queda en 0)
     const prof = new Map();
     const hondo = c => {
-      if (prof.has(c)) return prof.get(c);
-      prof.set(c, -1); // marca: en curso (un ciclo queda en 0)
-      const p = c.sig ? Math.max(0, hondo(c.sig)) + 1 : 0;
+      if (prof.has(c)) return Math.max(0, prof.get(c));
+      prof.set(c, -1);
+      let p = 0;
+      for (const o of c.outs) if (o.c) p = Math.max(p, hondo(o.c) + 1);
       prof.set(c, p);
       return p;
     };
@@ -161,22 +166,23 @@
   function apuntar(c, destinos) {
     const [x, y] = xyOf(c.k), d = c.d;
     if (d < 0) return;
-    if (c.pz.p === 'e') { // salta hasta su salida
-      const tk = c.pz.hasta;
-      if (tk !== undefined && red().t[tk]) destinos.push([c, tk, d]);
-      return;
+    if (c.pz.p === 'e') { const tk = c.pz.hasta; if (tk !== undefined && red().t[tk]) destinos.push([c, tk, d]); return; } // salta hasta su salida
+    const dirs = c.pz.p === 'v' || c.pz.p === 's' ? [d, (d + 1) % 4, (d + 3) % 4] : [d];
+    for (const od of dirs) {
+      const nx = x + DIRS[od][0], ny = y + DIRS[od][1];
+      if (!W.inb(nx, ny)) continue;
+      const b = edificioEn(nx, ny);
+      if (b) { c.outs.push({ b, d: od }); continue; }
+      if (red().t[kOf(nx, ny)]) destinos.push([c, kOf(nx, ny), od]);
     }
-    const nx = x + DIRS[d][0], ny = y + DIRS[d][1];
-    if (!W.inb(nx, ny)) return;
-    const nk = kOf(nx, ny);
-    const b = edificioEn(nx, ny);
-    if (b) { c.dst = b; return; }
-    if (red().t[nk]) destinos.push([c, nk, d]);
   }
   const itemsDe = c => (c.l === 1 ? c.pz.j : c.pz.i);
   const esFuente = b => L().isShop(b) || PK.Libro.esCampo(b) || L().esBodegaRuta(b);
   Ci.carriles = () => { rearmarSiHace(); return carriles; };
   Ci.carrilesEn = k => { rearmarSiHace(); return porK.get(k) || []; };
+  // Filtro de una salida del clasificador: un recurso, '*' (lo que sobre) o '' (nada). Sin elegir: adelante «lo que
+  // sobre» y los costados cerrados (se porta como una cinta hasta que lo configuras).
+  Ci.filtro = (pz, d) => (pz.f2 && pz.f2[d] !== undefined ? pz.f2[d] : d === pz.d ? '*' : '');
 
   // ---------- Qué entra y qué sale de cada edificio ----------
   // Lo que puede recibir por cinta: un taller sus insumos; una bodega lo que guarda. Un campamento no recibe nada.
@@ -185,19 +191,18 @@
     return L().esBodegaRuta(b) && L().storeAccepts(b, r);
   }
   Ci.recibe = recibe;
-  function entregar(c, r) {
-    const b = c.dst, g = G();
-    if (!recibe(b, r)) { c.motivo = 'Atascada: llega ' + D.RES[r].name.toLowerCase() + ' y ' + b.def.name + ' no lo usa'; c.atasco = true; return false; }
-    if (L().isShop(b)) {
-      if (!b.inb) b.inb = {};
-      if ((b.inb[r] || 0) + 1 > L().bufCap(b)) { c.motivo = b.def.name + ' está lleno de ' + D.RES[r].name.toLowerCase(); return false; }
-      b.inb[r] = (b.inb[r] || 0) + 1;
-    } else {
-      if ((S().res[r] || 0) >= g.cap(r) || PK.Libro.poner(b, r, 1) < 1) { c.motivo = 'Tus bodegas están llenas de ' + D.RES[r].name.toLowerCase(); return false; }
-    }
-    c.motivo = null; c.atasco = false;
-    g.stat('belted', 1);
-    return true;
+  function lugarEn(b, r) {
+    if (L().isShop(b)) return L().bufCap(b) - ((b.inb && b.inb[r]) || 0);
+    return G().cap(r) - (S().res[r] || 0);
+  }
+  // 'ok', 'lleno' o 'no' (no lo usa)
+  function entregar(b, r) {
+    if (!recibe(b, r)) return 'no';
+    if (lugarEn(b, r) < 1) return 'lleno';
+    if (L().isShop(b)) { if (!b.inb) b.inb = {}; b.inb[r] = (b.inb[r] || 0) + 1; }
+    else if (PK.Libro.poner(b, r, 1) < 1) return 'lleno';
+    G().stat('belted', 1);
+    return 'ok';
   }
   // Lo que da una boca de salida, por turnos (pz.rr). null: nada por ahora.
   function sacar(c) {
@@ -241,15 +246,31 @@
   // ---------- Simulación en vivo ----------
   // Cada pieza acepta un ítem cada 1 / ritmo segundos (c.lib): así una de nivel más bajo deja pasar solo su ritmo y
   // las de atrás se llenan (el cuello de botella sale solo). Los ítems avanzan a la velocidad del nivel y, si se
-  // frenan, se juntan a JUNTOS casillas uno de otro.
+  // frenan, se juntan a JUNTOS casillas uno de otro. Un gap entre ítems no alcanzaba: una pieza de una casilla se
+  // vaciaba antes de medirlo y una de nivel I dejaba pasar 165 en 2 minutos.
   const JUNTOS = 0.34;
   const vel = c => NIV(c.pz.n).vel * K();
   const cada = c => 1 / (NIV(c.pz.n).rate * K());
+  // lo que sobró del paso anterior cuenta (hasta un paso), si no el ritmo cae por redondeo: 3/s con pasos de 0,1 s
+  // daba 2,5/s
+  let pasoDt = 0.1;
+  const credito = c => Math.max(c.lib || 0, -pasoDt);
   function hayLugar(c) { const it = itemsDe(c); return (c.lib || 0) <= 0 && (!it.length || it[it.length - 1][1] >= JUNTOS); }
+  // el unidor toma por turnos: si al que le toca tiene algo listo, los demás esperan
+  function listo(l, dest) { const it = itemsDe(l); return it.length > 0 && it[0][1] >= l.len - 1e-6 && l.outs.some(o => o.c === dest); }
+  function hayLugarDesde(dest, src) {
+    if (!hayLugar(dest)) return false;
+    if (dest.pz.p === 'u' && dest.ent.length > 1) {
+      const tur = dest.ent[(dest.turno || 0) % dest.ent.length].c;
+      if (tur !== src && listo(tur, dest)) return false;
+    }
+    return true;
+  }
   Ci.update = function (dt) {
     const st = S();
     if (!st || !st.logi || !st.logi.red) return;
     rearmarSiHace();
+    pasoDt = dt;
     for (const c of orden) c.lib = (c.lib || 0) - dt;
     for (const c of orden) avanzar(c, dt);
     if (st.logi.avisoCintas && !G().offline) { // partidas viejas: una vez, qué cambió
@@ -257,29 +278,50 @@
       setTimeout(() => toast('Las cintas ahora se arman pieza por pieza, con niveles, cruces y pasos elevados. Las tuyas quedaron en nivel III (rinden igual). Ojo: las carretas ya no cruzan cintas.', 'epic', { label: 'Logística', fn: () => PK.UI.openLogistics() }), 2500);
     }
   };
+  // Pasa el ítem del final a una de las salidas. true si salió.
+  function salir(c, r) {
+    if (!c.outs.length) { if (!c.motivo || c.motivo === SIN) c.motivo = SIN; return false; }
+    let elig = c.outs;
+    if (c.pz.p === 's') {
+      elig = c.outs.filter(o => Ci.filtro(c.pz, o.d) === r);
+      if (!elig.length) elig = c.outs.filter(o => Ci.filtro(c.pz, o.d) === '*');
+      if (!elig.length) { c.motivo = 'Atascada: el clasificador no tiene salida para ' + D.RES[r].name.toLowerCase(); c.atasco = true; return false; }
+    }
+    const n = elig.length, ini = c.rr || 0;
+    let noUsa = null, lleno = null;
+    for (let i = 0; i < n; i++) {
+      const o = elig[(ini + i) % n];
+      if (o.c) {
+        if (!hayLugarDesde(o.c, c)) continue;
+        const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
+        dest.push([r, Math.max(0, Math.min(itemsDe(c)[0][1] - c.len, lim))]);
+        o.c.lib = credito(o.c) + cada(o.c);
+        if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
+      } else {
+        const e = entregar(o.b, r);
+        if (e === 'no') { noUsa = noUsa || o.b; continue; }
+        if (e === 'lleno') { lleno = lleno || o.b; continue; }
+      }
+      c.rr = (ini + i + 1) % n; c.motivo = null; c.atasco = false;
+      return true;
+    }
+    if (noUsa && !lleno && elig.every(o => o.b && !recibe(o.b, r))) { c.motivo = 'Atascada: llega ' + D.RES[r].name.toLowerCase() + ' y ' + noUsa.def.name + ' no lo usa'; c.atasco = true; }
+    else if (lleno) c.motivo = (L().isShop(lleno) ? lleno.def.name + ' está lleno de ' : 'Tus bodegas están llenas de ') + D.RES[r].name.toLowerCase();
+    return false;
+  }
+  const SIN = 'La cinta no llega a ningún lado';
   function avanzar(c, dt) {
     const it = itemsDe(c);
     if (!it) return;
     const sp = vel(c) * dt;
     for (let i = 0; i < it.length; i++) it[i][1] = Math.min(it[i][1] + sp, i === 0 ? Infinity : it[i - 1][1] - JUNTOS);
     if (it.length && it[0][1] >= c.len) {
-      const f = it[0];
-      let sale = false;
-      if (c.sig) {
-        if (hayLugar(c.sig)) {
-          const dest = itemsDe(c.sig), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
-          dest.push([f[0], Math.max(0, Math.min(f[1] - c.len, lim))]);
-          c.sig.lib = Math.max(0, c.sig.lib || 0) + cada(c.sig);
-          sale = true; c.motivo = null;
-        }
-      } else if (c.dst) sale = entregar(c, f[0]);
-      else if (!c.motivo || c.motivo === 'La cinta no llega a ningún lado') c.motivo = 'La cinta no llega a ningún lado';
-      if (sale) { it.shift(); c.pz.flujo = (c.pz.flujo || 0) + 1; }
-      else f[1] = c.len;
+      if (salir(c, it[0][0])) { it.shift(); c.pz.flujo = (c.pz.flujo || 0) + 1; }
+      else it[0][1] = c.len;
     }
     for (let i = 1; i < it.length; i++) if (it[i][1] > it[i - 1][1] - JUNTOS) it[i][1] = Math.max(0, it[i - 1][1] - JUNTOS);
     // boca de salida: saca a su ritmo
-    if (c.src && hayLugar(c)) { const r = sacar(c); if (r) { it.push([r, 0]); c.lib = Math.max(0, c.lib || 0) + cada(c); } }
+    if (c.src && hayLugar(c)) { const r = sacar(c); if (r) { it.push([r, 0]); c.lib = credito(c) + cada(c); } }
   }
   // Ítems por minuto que pasan (medido cada 10 s; pz.flujo cuenta los que salen de la pieza)
   let medT = 0;
@@ -292,43 +334,66 @@
   };
 
   // ---------- Sin conexión: el caudal de la red ----------
-  // Cada boca de salida manda por su cadena lo que deja pasar el nivel más bajo, si el destino lo recibe. Si por esa
-  // boca sale algo que el destino no usa, en vivo se atascaría: sin conexión, también (no mueve nada).
+  // 1) qué recursos recibe algo río abajo de cada carril; 2) lo que ofrece cada boca (por turnos, hasta su nivel);
+  // 3) de arriba hacia abajo, cada carril deja pasar hasta su nivel y reparte: el divisor en partes iguales entre las
+  // salidas que llevan a alguien que lo recibe, el clasificador según sus filtros; 4) cada destino toma lo que le
+  // cabe; 5) de las bocas sale exactamente lo que se entregó (nada se pierde ni aparece). Una boca que daría algo que
+  // nadie recibe no manda nada: en vivo se atascaría.
+  function recursosDe(b) { return L().isShop(b) ? Object.keys(L().recipe(b).in) : D.RES_ORDER.filter(r => recibe(b, r)); }
   Ci.offline = function (dt) {
     const st = S();
     if (!st || !st.logi || !st.logi.red) return;
     rearmarSiHace();
+    const k0 = K(), acc = new Map();
+    const pasaFiltro = (c, o, r) => c.pz.p !== 's' || Ci.filtro(c.pz, o.d) === r || (Ci.filtro(c.pz, o.d) === '*' && !c.outs.some(x => Ci.filtro(c.pz, x.d) === r));
+    const accDe = c => {
+      if (acc.has(c)) return acc.get(c);
+      const s = new Set();
+      acc.set(c, s); // ciclos: lo que se sepa hasta ahí
+      for (const o of c.outs) for (const r of (o.b ? recursosDe(o.b) : accDe(o.c))) if (pasaFiltro(c, o, r)) s.add(r);
+      return s;
+    };
+    const flujo = new Map(), ofertas = [];
+    const sumar = (c, r, n) => { let f = flujo.get(c); if (!f) flujo.set(c, (f = {})); f[r] = (f[r] || 0) + n; };
     for (const c of carriles) {
       if (!c.src) continue;
-      let rate = Infinity, x = c, n = 0;
-      const vistos = new Set();
-      while (x && !vistos.has(x)) { vistos.add(x); rate = Math.min(rate, NIV(x.pz.n).rate); if (!x.sig) break; x = x.sig; n++; }
-      const dst = x && x.dst;
-      if (!dst || vistos.size > 2000) continue;
-      const b = c.src, opc = opcionesFuente(c).filter(r => disponible(b, r));
-      if (!opc.length || opc.some(r => !recibe(dst, r))) continue;
-      let presu = rate * K() * dt;
-      // por turnos: cada recurso disponible recibe su parte
-      for (let pasada = 0; pasada < 3 && presu >= 1; pasada++) {
-        const vivos = opc.filter(r => disponible(b, r));
+      const b = c.src, a = accDe(c), opc = opcionesFuente(c).filter(r => disponible(b, r));
+      if (!opc.length || opc.some(r => !a.has(r))) continue;
+      let presu = NIV(c.pz.n).rate * k0 * dt;
+      const quedan = {};
+      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r)));
+      for (let pasada = 0; pasada < 3 && presu > 0.01; pasada++) {
+        const vivos = opc.filter(r => quedan[r] > 0.01);
         if (!vivos.length) break;
         const parte = presu / vivos.length;
-        let movido = 0;
-        for (const r of vivos) {
-          let m = Math.floor(parte);
-          if (L().isShop(b)) m = Math.min(m, Math.floor(b.outb[r] || 0));
-          else if (PK.Libro.esCampo(b)) m = Math.min(m, Math.floor(PK.Libro.inv(b)[r] || 0));
-          else m = Math.min(m, Math.floor(Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r))));
-          if (L().isShop(dst)) m = Math.min(m, Math.floor(L().bufCap(dst) - ((dst.inb && dst.inb[r]) || 0)));
-          else m = Math.min(m, Math.floor(G().cap(r) - (st.res[r] || 0)));
-          if (m < 1) continue;
-          if (L().isShop(b)) b.outb[r] -= m; else if (PK.Libro.esCampo(b)) PK.Libro.sacarCampo(b, r, m); else PK.Libro.sacar(b, r, m);
-          if (L().isShop(dst)) { if (!dst.inb) dst.inb = {}; dst.inb[r] = (dst.inb[r] || 0) + m; } else PK.Libro.poner(dst, r, m);
-          G().stat('belted', m);
-          movido += m;
-        }
-        presu -= movido;
-        if (movido < 1) break;
+        for (const r of vivos) { const m = Math.min(parte, quedan[r]); quedan[r] -= m; presu -= m; sumar(c, r, m); ofertas.push({ c, b, r, n: m }); }
+      }
+    }
+    const entregas = [];
+    for (let i = orden.length - 1; i >= 0; i--) {
+      const c = orden[i], f = flujo.get(c);
+      if (!f) continue;
+      const cap = NIV(c.pz.n).rate * k0 * dt, tot = Object.values(f).reduce((a, b) => a + b, 0), esc = tot > cap ? cap / tot : 1;
+      for (const r in f) {
+        const n = f[r] * esc;
+        const elig = c.outs.filter(o => pasaFiltro(c, o, r) && (o.b ? recibe(o.b, r) : accDe(o.c).has(r)));
+        if (!elig.length || n <= 0) continue;
+        for (const o of elig) { if (o.b) entregas.push({ b: o.b, r, n: n / elig.length }); else sumar(o.c, r, n / elig.length); }
+      }
+    }
+    const dado = {};
+    for (const e of entregas) {
+      let m = Math.floor(Math.min(e.n, lugarEn(e.b, e.r)));
+      if (m < 1) continue;
+      if (L().isShop(e.b)) { if (!e.b.inb) e.b.inb = {}; e.b.inb[e.r] = (e.b.inb[e.r] || 0) + m; }
+      else m = PK.Libro.poner(e.b, e.r, m);
+      if (m > 0) { dado[e.r] = (dado[e.r] || 0) + m; G().stat('belted', m); }
+    }
+    for (const r in dado) {
+      const os = ofertas.filter(o => o.r === r), tot = os.reduce((a, o) => a + o.n, 0), fr = tot > 0 ? Math.min(1, dado[r] / tot) : 0;
+      for (const o of os) {
+        const m = o.n * fr;
+        if (L().isShop(o.b)) o.b.outb[r] -= m; else if (PK.Libro.esCampo(o.b)) PK.Libro.sacarCampo(o.b, r, m); else PK.Libro.sacar(o.b, r, m);
       }
     }
   };
@@ -344,16 +409,38 @@
     if (bF) { e = bordeHacia(bF, s ? [s[0] + 0.5, s[1] + 0.5] : [sx, sy]); if (e) dFin = haciaEdificio(e, bF); }
     if (!s || !e) return null;
     const pzI = Ci.piezaEn(s[0], s[1]);
-    if (pzI && !bI) { // continuar una cinta: solo desde su final
-      const cs = Ci.carrilesEn(kOf(s[0], s[1]));
-      if (pzI.p === 'c' && cs[0] && !cs[0].sig && !cs[0].dst) sigue = kOf(s[0], s[1]);
+    let dividir = null;
+    if (pzI && !bI) {
+      const kS = kOf(s[0], s[1]), cs = Ci.carrilesEn(kS);
+      if (pzI.p === 'c' && cs[0] && !cs[0].outs.length) sigue = kS; // continuar una cinta desde su final
+      else if (pzI.p === 'c' || pzI.p === 'v' || pzI.p === 's') { // C2: salir del costado de una cinta pone un divisor
+        let best = null, bd = Infinity;
+        for (const dd of [(pzI.d + 1) % 4, (pzI.d + 3) % 4, pzI.d]) {
+          const nx = s[0] + DIRS[dd][0], ny = s[1] + DIRS[dd][1];
+          if (!Ci.libre(nx, ny)) continue;
+          const dist = U.dist(nx, ny, e[0], e[1]);
+          if (dist < bd) { bd = dist; best = [nx, ny]; }
+        }
+        if (best) { dividir = kS; s = best; }
+      }
     }
-    const pzF = !bF && Ci.piezaEn(e[0], e[1]);
+    const pzF = !bF && Ci.piezaEn(e[0], e[1]), kF = pzF ? kOf(e[0], e[1]) : null;
     let mejor = null;
     for (const xPrimero of [true, false]) {
       const p = lineaL(s, e, xPrimero);
-      if (pzF && p.length > 1) { const [a, b] = [p[p.length - 2], p[p.length - 1]]; p.pop(); dFin = dirDe(a, b); } // termina apuntando a esa cinta
+      let unir = null, malaFin = null;
+      if (pzF && p.length > 1) { // termina apuntando a esa cinta; si ya recibe de otra, ahí va un unidor (C2)
+        const [a, b] = [p[p.length - 2], p[p.length - 1]];
+        p.pop(); dFin = dirDe(a, b);
+        const c0 = Ci.carrilesEn(kF)[0], tiene = c0 && (c0.ent.length || c0.src);
+        if (dFin === OPP(pzF.d)) malaFin = 'llegaría de frente a esa cinta';
+        else if (pzF.p === 'c' && tiene) unir = kF;
+        else if (pzF.p !== 'c' && pzF.p !== 'u' && tiene) malaFin = 'esa pieza ya recibe de otra cinta';
+      }
       const r = evaluar(p, dFin, sigue);
+      if (malaFin) r.malas.push({ x: e[0], y: e[1], k: kF, why: malaFin });
+      r.unir = unir; r.dividir = dividir;
+      r.extra = [unir, dividir].filter(k => k !== null).map(k => ({ x: k % W.W, y: (k / W.W) | 0, k, cruce: true }));
       if (!mejor || r.malas.length < mejor.malas.length) mejor = r;
       if (!r.malas.length) break;
     }
@@ -409,6 +496,9 @@
       if (t.cruce) suma(c, D.CINTA.cruce);
       else suma(c, Ci.costoSubir(0, n));
     }
+    const t = red().t;
+    if (plan.unir !== null && plan.unir !== undefined && t[plan.unir] && t[plan.unir].p === 'c') suma(c, D.CINTA.nodos.u);
+    if (plan.dividir !== null && plan.dividir !== undefined && t[plan.dividir] && t[plan.dividir].p === 'c') suma(c, D.CINTA.nodos.v);
     return c;
   };
   Ci.trazar = function (plan, n) {
@@ -426,6 +516,8 @@
       marcar(ti.k, t[ti.k]);
       cuantas++;
     }
+    if (plan.unir !== null && plan.unir !== undefined && t[plan.unir] && t[plan.unir].p === 'c') t[plan.unir].p = 'u'; // C2
+    if (plan.dividir !== null && plan.dividir !== undefined && t[plan.dividir] && t[plan.dividir].p === 'c') t[plan.dividir].p = 'v';
     cambio();
     if (PK.Sfx) PK.Sfx.play('build');
     G().stat('belts', 1);
@@ -483,12 +575,17 @@
     rearmarSiHace();
     const cs = porK.get(k);
     if (!cs) return [];
-    const out = new Set([k]);
-    let c = cs[0];
-    const atras = new Map();
-    for (const x of carriles) if (x.sig) atras.set(x.sig, x);
-    for (let x = c.sig, i = 0; x && i < 3000; x = x.sig, i++) { if (out.has(x.k) && x.l === 0) break; out.add(x.k); }
-    for (let x = atras.get(c), i = 0; x && i < 3000; x = atras.get(x), i++) { if (out.has(x.k) && x.l === 0) break; out.add(x.k); }
+    // de pieza en pieza hacia adelante y hacia atrás; los unidores, divisores y clasificadores cortan el tramo
+    const out = new Set([k]), cola = [cs[0]], vistos = new Set([cs[0]]);
+    while (cola.length && out.size < 3000) {
+      const c = cola.shift();
+      if (NODO[c.pz.p] && c !== cs[0]) continue;
+      for (const v of c.outs.filter(o => o.c).map(o => o.c).concat(c.ent.map(e => e.c))) {
+        if (vistos.has(v)) continue;
+        vistos.add(v); out.add(v.k);
+        if (!NODO[v.pz.p]) cola.push(v);
+      }
+    }
     return [...out];
   };
   Ci.girar = function (k) {
@@ -540,11 +637,46 @@
   // ¿Le llega algo a este taller por cinta?
   Ci.alimenta = function (b) {
     rearmarSiHace();
-    return carriles.some(c => c.dst === b);
+    return carriles.some(c => c.outs.some(o => o.b === b));
   };
   Ci.bocasDe = function (b) {
     rearmarSiHace();
-    return { entran: carriles.filter(c => c.dst === b), salen: carriles.filter(c => c.src === b) };
+    return { entran: carriles.filter(c => c.outs.some(o => o.b === b)), salen: carriles.filter(c => c.src === b) };
+  };
+  // C2: convertir una pieza en cinta, unidor, divisor o clasificador (paga la pieza nueva; vuelve la mitad de la vieja)
+  // Qué puede llegar a una pieza: lo que va encima de ella y de las de antes, y lo que sacan las bocas de más atrás
+  // (para que el panel del clasificador ofrezca primero lo que de verdad pasa por ahí).
+  Ci.llegan = function (k) {
+    rearmarSiHace();
+    const vistos = new Set(), pila = (porK.get(k) || []).slice(), out = new Set();
+    while (pila.length) {
+      const c = pila.pop();
+      if (vistos.has(c)) continue;
+      vistos.add(c);
+      for (const [r] of itemsDe(c) || []) out.add(r);
+      if (c.src) for (const r of opcionesFuente(c)) out.add(r);
+      for (const o of c.ent) pila.push(o.c);
+    }
+    return [...out];
+  };
+  Ci.convertir = function (k, p) {
+    const pz = red().t[k];
+    if (!pz || !(pz.p === 'c' || NODO[pz.p]) || pz.p === p) return false;
+    const c = D.CINTA.nodos[p] || {};
+    if (!G().pay(c)) { toast('Faltan recursos para el ' + (D.CINTA.nodoNombre[p] || 'cambio').toLowerCase() + '.', 'warn'); return false; }
+    if (D.CINTA.nodos[pz.p]) G().give(D.CINTA.nodos[pz.p], 0.5);
+    pz.p = p;
+    if (p !== 's') delete pz.f2;
+    cambio();
+    if (PK.Sfx) PK.Sfx.play('build');
+    return true;
+  };
+  Ci.ponerFiltro = function (k, d, v) {
+    const pz = red().t[k];
+    if (!pz || pz.p !== 's') return;
+    pz.f2 = pz.f2 || {};
+    pz.f2[d] = v;
+    cambio();
   };
   // Por qué no rinde más: el carril más lento de la cadena (de la boca de salida a la de entrada) o un atasco.
   Ci.diagnostico = function (k) {
@@ -611,6 +743,12 @@
       const cs = porK.get(k) || [];
       let spr;
       if (pz.p === 'k') spr = Sp.beltCruce(pz.d % 2, fase, pz.n);
+      else if (NODO[pz.p]) { // C2: bandas hacia cada lado conectado
+        const c = cs[0];
+        let mask = 1 << pz.d;
+        if (c) { for (const o of c.outs) mask |= 1 << o.d; for (const e of c.ent) mask |= 1 << OPP(e.d); if (c.src) mask |= 1 << OPP(c.inD); }
+        spr = Sp.beltNodo(pz.p, mask, pz.d, fase, pz.n);
+      }
       else if (pz.p === 'e' || pz.p === 'x') spr = Sp.beltRampa(Ci.NOM_DIR[pz.d], pz.p === 'e', fase, pz.n);
       else {
         const c = cs[0], inD = c && c.inD !== undefined ? c.inD : pz.d;
@@ -618,6 +756,7 @@
       }
       ctx.drawImage(spr.c, px - 16, py - (spr.oy || 0));
       if (cs.some(c => c.atasco) && Math.floor(performance.now() / 400) % 2) { ctx.fillStyle = 'rgba(230,60,40,0.45)'; diamante(ctx, R, x, y); }
+      if (Ci.verFlujo) { ctx.fillStyle = colorFlujo(cs); diamante(ctx, R, x, y); } // C2: «Ver flujo»
     }
     // ítems
     for (const c of carriles) {
@@ -630,6 +769,17 @@
       }
     }
   };
+  // «Ver flujo» (C2): gris vacía, verde corre con lugar, amarillo a tope (llena porque adelante se llevan menos, o casi al
+  // máximo de su nivel: es normal), rojo solo lo que hay que arreglar: atascada o frenada por una pieza de menos nivel.
+  Ci.verFlujo = false;
+  function estado(c) {
+    const it = itemsDe(c) || [], cap = NIV(c.pz.n).rate * 60 * K(), lleno = it.length >= Math.floor(c.len / JUNTOS) && it.length > 1;
+    if (c.atasco || (lleno && c.sig && c.sig.pz.n < c.pz.n)) return 3;
+    if (lleno || (c.pz.pm || 0) >= cap * 0.8) return 2;
+    return (c.pz.pm || 0) > 0 || it.length ? 1 : 0;
+  }
+  Ci.estadoFlujo = cs => cs.reduce((p, c) => Math.max(p, estado(c)), 0);
+  function colorFlujo(cs) { return ['rgba(150,150,150,0.35)', 'rgba(80,200,90,0.45)', 'rgba(240,200,60,0.55)', 'rgba(230,60,40,0.55)'][Ci.estadoFlujo(cs)]; }
   function diamante(ctx, R, x, y) {
     const a = R.iso(x, y), b = R.iso(x + 1, y), c = R.iso(x + 1, y + 1), d = R.iso(x, y + 1);
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill();

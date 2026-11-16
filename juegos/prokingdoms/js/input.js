@@ -332,7 +332,7 @@
       r.roadGhost = (L.tool === 'calzada' ? PK.Calzada.plan : L.roadPlan)(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
     } else if ((L.tool === 'cinta' || L.tool === 'paso') && I.roadStart) { // pk-58: el plan de la cinta o del paso
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
-      if (L.tool === 'cinta') { const p = Ci.plan(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p ? p.tiles : null; I.planCinta = p; }
+      if (L.tool === 'cinta') { const p = Ci.plan(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p ? p.tiles.concat(p.extra || []) : null; I.planCinta = p; }
       else { const p = Ci.planPaso(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p.tiles.map(([a, b]) => ({ x: a, y: b, d: p.d, mala: !p.ok })); }
       PK.UI.refreshPanel();
     }
@@ -396,7 +396,7 @@
       if (!p) { PK.UI.toast('No hay por dónde: el edificio no tiene un lado libre.', 'warn'); return; }
       const n = Ci.trazar(p, L.cintaNivel || 1);
       if (n) {
-        PK.UI.toast('Cinta de ' + n + ' casillas' + (p.tiles.some(t => t.cruce) ? ' (con cruce)' : '') + (p.bF ? ' hasta ' + p.bF.def.name : '') + '.', 'good');
+        PK.UI.toast('Cinta de ' + n + ' casillas' + (p.tiles.some(t => t.cruce) ? ' (con cruce)' : '') + (p.unir !== null && p.unir !== undefined ? ' (se une con un unidor)' : '') + (p.dividir !== null && p.dividir !== undefined ? ' (sale de un divisor)' : '') + (p.bF ? ' hasta ' + p.bF.def.name : '') + '.', 'good');
         const u = p.tiles[p.tiles.length - 1];
         I.roadStart = p.bF ? null : [u.x, u.y]; // si llegó a un edificio, terminó; si no, se sigue desde ahí
       }
