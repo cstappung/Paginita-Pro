@@ -434,8 +434,32 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - Autopilot (`tools/piloto.js`): buys wood/stone when short for the next era (it sat on Era III with gold to spare)
   and claims toward the nearest realm (`frontera()`). Era IV at game minute 145–173 (was 104 in `pk-45`); in 311
   minutes it never reached a border, so its sieges are only the probes it defends.
-- **Known, not fixed:** with gold over the store cap (rewards), a cart carrying gold from a mixed mining camp waits
-  forever to unload, the camp fills up and stone stops coming in.
+- **Camps and a resource with nowhere to go** (`Lb.lugarCampo`, `mayor.js`): with gold over the store cap (rewards)
+  carts stop taking gold, it filled the mixed mining camp and stone stopped coming in. A resource whose store is at
+  the cap takes at most half a camp, and what was already over half does not take room from the others (stuck camps
+  heal by themselves; a camp can briefly hold up to 1.5× its cap). Villagers and `G.llenoPara` ask `lugarCampo`.
+
+### War plan, G3: sieges between players (`pk-60`, server)
+
+- `tickCamps` (`server/sim.js`): on arrival the campaign gets `c.plan = D.asedioPlan(...)` (same function as local),
+  `c.ini`, `c.lado`, and stays in `camps` until `c.ini + plan.total`; only then the parcel changes owner and the
+  inbox items go out, now with the whole plan (`plan, ini, lado, units`) for the replay. The plan lives in the camp
+  doc, so a restart mid-siege changes nothing.
+- **What travels is `D.asedioVista`** (list `asedios`, version `w.asv`/`asv`, sent only when it changes, to everyone
+  in the world): only the stages already started, a drawing seed that is not the plan's, and until the last stage
+  starts no winner, no casualties and `atk = def` (both bars go down together). Never send `c.plan` or `c.semilla`
+  before the end. A partial view has `parcial: true` and `D.asedioEn` never reports `fin` for it.
+- Client: `Net.asedios` (server clock converted with `Net.aLocal`); `T.asediosRemotos` puts the view in my remote
+  camp; `T.frentes()` adds the others as `mio: 'def'` or `'ver'` (spectator), ids `'r' + id`. **A remote camp is
+  never finished by the browser clock** (`!c.remote` in `T.update`): the `conquest_result` does it.
+- `D.PROTO` was **not** bumped (the plan said 11): old client + new server and new client + old server both work
+  (the result just arrives later, or without a plan and the replay is rebuilt), and a bump would lock everyone out
+  between the push and the manual function deploy. Until `firebase deploy --only functions`, player-vs-player
+  battles still resolve on arrival.
+- At most 2 campaigns against the same player at once. `incoming` only lists campaigns still marching.
+- Not done from the plan's G3: `guarn` (the defender's real troop mix in stage 3; the cast is still generic).
+- Tests: `node tools/asedio-test.js`. `tools/cheat-test.js` fails one check («la cuenta honesta no aparece en el
+  registro») since the belts branch, before this work; not looked into.
 ### Owner's tweaks, second round (`pk-56`; built as pk-55 in parallel with another pk-55)
 
 - **Roads only on your own land** (`L.roadAllowed` needs `ownerAt === 'p'`; outside goes the Calzada Real).

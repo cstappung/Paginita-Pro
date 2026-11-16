@@ -11,13 +11,17 @@
 - **Lo que no cambia:** las reglas de la sección 1 de `PLAN-MEGA-ACTUALIZACION.md` y las de `CLAUDE.md` de esta
   carpeta valen para todas las fases. La sección 11 de este plan agrega las propias.
 
-- **Avance (16 de noviembre de 2026):** las fases G1 y G2 salieron juntas en `pk-60` (hechas como `pk-55` en una rama paralela a las cintas) (los números `pk-N` de las
-  fases siguientes se corren uno hacia atrás). Comprobado: la tabla de la sección 1 no se movió, recargar a mitad de
-  un asedio lo retoma con el mismo plan, y volver una hora después da el final que el plan decía. Diferencias con el
-  texto: un tanteo perdido sigue costando el 15 % fijo del ejército (no las bajas del plan); el piloto reclama hacia
-  el vecino pero en 311 minutos de juego no llegó a tocar una frontera, así que sus asedios medidos son solo los
-  tanteos que defiende; la partida de ritmo previa a G1 se hizo (Era IV entre los minutos 145 y 173). Sigue G3, que
-  necesita `firebase deploy --only functions`.
+- **Avance (16 de noviembre de 2026):** G1, G2 y G3 salieron en `pk-60`, la misma versión que integra la red de
+  cintas (`pk-56` a `pk-59`); los números `pk-N` que siguen en este documento ya no valen, cada fase toma el que toque.
+  - **G1 y G2:** hechas. La tabla de la sección 1 no se movió; recargar a mitad de un asedio lo retoma con el mismo
+    plan y volver una hora después da el final que el plan decía. Diferencia con el texto: un tanteo perdido sigue
+    costando el 15 % fijo del ejército. El piloto reclama hacia el vecino pero en 311 minutos no llegó a una frontera.
+  - **G3:** hecha en el servidor y el cliente, probada con tres navegadores contra el servidor local y con
+    `tools/asedio-test.js`. Falta `firebase deploy --only functions` para que valga en el mundo real. Diferencias
+    con el texto: no se subió `D.PROTO` (las dos versiones conviven, así nadie queda afuera entre la publicación y
+    el despliegue); no se hizo `guarn` (la mezcla real de tropas del defensor en la etapa 3); mientras el final no se
+    conoce, las dos barras bajan parejas; `functions` `npm run prueba` no se corrió (pide el emulador).
+  - Sigue G4 (decisiones durante el asedio).
 
 ---
 
