@@ -3,7 +3,7 @@
    rehacer la partida sin trabar la pestaña (una partida larga son decenas de
    miles de pasos). Carga los MISMOS archivos que el juego, con el mismo ?v=,
    sobre sin-pantalla.js, que vuelve inerte todo lo que dibuja o suena. */
-importScripts('sin-pantalla.js?v=boxhead-26', 'datos.js?v=boxhead-26', 'juego.js?v=boxhead-26');
+importScripts('sin-pantalla.js?v=boxhead-27', 'datos.js?v=boxhead-27', 'juego.js?v=boxhead-27');
 onmessage = e => {
   const { id, p } = e.data || {};
   let r = null, motivo = null;

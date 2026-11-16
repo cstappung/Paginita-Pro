@@ -598,8 +598,8 @@ The player-facing word is now «ronda» (weapon levels keep «nivel»); ids,
   `duoDe(n)` adds the rotation's mini from 60; `vidaJefe` adds +5 %/round
   past 30 (same as before up to 30, tested); corrupted bosses under 25 % set
   `e.fase3` (hito bit 8): cooldowns ×0.6, speed ×1.15.
-- **Economy**: `factorNivelTienda` keeps rising past 31 up to ×4; from 26
-  each botiquín in the same round costs +50 % (`factorBotiquin`, `yo.botiN`,
+- **Economy**: `factorNivelTienda` keeps rising past 31 up to ×4; from 31
+  (26 until 4b) each botiquín in the same round costs +50 % (`factorBotiquin`, `yo.botiN`,
   reset in `alEmpezarNivel`; the game prices through `precioItem`).
   **Arsenal legendario**: `NIVEL_ARMA.leyenda = 8`, levels 6–8 only with
   `precioNivelArma(id, n, ronda ≥ 26)`; `max` (5) stays the ★ ability level,
@@ -620,8 +620,7 @@ The player-facing word is now «ronda» (weapon levels keep «nivel»); ids,
   `MAPAS` only had the five classic maps**, so every Club record on Planta,
   Hangar, Fábrica or Apagón was rejected as «de otro mapa» (a test now pins
   it to `ORDEN_MAPAS`).
-- Not done (left for later): élites with two traits, and a cap or
-  «mastery» for the multiplier past ×200 (points still inflate).
+- Not done (left for later): élites with two traits.
 
 ## Shared records: rooms write the Club table (Phase 4)
 
@@ -648,3 +647,34 @@ The player-facing word is now «ronda» (weapon levels keep «nivel»); ids,
   Honest limit: a room row is as trustworthy as the room log.
 - Site logros stay at ten per game (a test pins it), so the goals past 40 are
   the game's own medals.
+
+## Phase 4b: chatarra multiplier and a third slope (`boxhead-27`, proof `ve: 10`)
+
+A second evaluation scored the late game 6/10 (from 3). The owner then
+asked for the points multiplier to become a chatarra multiplier and said
+**not to balance maps against each other** (some maps are meant to be easier).
+
+- **The big «×» is now the chatarra multiplier** (`yo.mc`, from ×1.00).
+  `D.subeMultiChatarra`: each kill adds 0.01 / mc² (≈230 kills to ×2, ≈870 to
+  ×3). `D.bajaMultiChatarra`: it decays ∝ (mc − 1)·mc², and `corte` (6) times
+  faster after `pausa` (2.5 s) without a kill (`yo.sinBaja`). It multiplies
+  each kill's chatarra in `miBaja`. **Points are flat now** (`PUNTOS[k]`, no
+  multiplier); records are by round anyway.
+- **The old integer `yo.mul` is the «racha»** and still drives weapon unlocks,
+  upgrades (`D.premios`), `HITOS`, the combo arc and medals x50/x100/x500
+  (retexted as «racha de N bajas»). It shows as `#rachaN` under the points;
+  locked weapons say «racha 60». Kept on purpose: the first rounds unlock
+  the same way. The chatarra changes from the first kill, so early economy
+  (and the `rn` sequence of `sueltaChatarra`) differs a little.
+- Medals `mc2` and `mc25` (×2.00 and ×2.50). End screen shows the max
+  chatarra multiplier and the longest racha.
+- **Third slope past 55** (`MUY_TARDE`): élites to 35 %, `ritmoNivel` to
+  0.12 s, `totalNivel` to 200, speed to `velMax`×1.25 (continuous from the
+  55 value), `golpeNivel` +1 % more per round. `topeVivos` stays 72.
+- Two more noches (`luna`: `golpe` ×1.5, read in the bite, ranged bite and
+  fireball damage; `escasez`: `sinCajas`, no drops) and two more events
+  (`brujeria`: chamanes y vigías; `polvorin`: explosivos y tóxicos). Cycles are
+  now 60 and 30 rounds.
+- Pressure spike at 26–32 eased: the botiquín surcharge starts at 31.
+  Fénix heals half, not all; the relleno's Curación never twice in a row
+  (`yo.curaUlt`).

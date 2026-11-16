@@ -165,6 +165,16 @@
      nivel 10 la tienda salía gratis). Comprar ya no baja los puntos, que son
      los que deciden el coop, la tabla de la sala y los logros. */
   const chatarraDe = k => Math.round((PUNTOS[k] || 10) * 1.5);
+  /* **El multiplicador de chatarra (Fase 4b).** El «×» grande del marcador
+     ya no multiplica los puntos (se inflaban sin techo: ×4500 en la ronda
+     70): multiplica la chatarra de cada baja. Empieza en ×1,00 y cada baja
+     lo sube 0,01 / mc² (cada centésima cuesta más cuanto más alto está), y
+     baja solo, más rápido cuanto más alto (∝ (mc − 1)·mc²), y `corte` veces
+     más rápido si pasan `pausa` s sin una baja. La racha de bajas (el
+     entero de siempre, `yo.mul`) sigue dando armas y mejoras. */
+  const MULTI_CHATARRA = { paso: 0.01, decae: 0.004, corte: 6, pausa: 2.5 };
+  const subeMultiChatarra = mc => mc + MULTI_CHATARRA.paso / (mc * mc);
+  const bajaMultiChatarra = (mc, dt, cortado) => Math.max(1, mc - MULTI_CHATARRA.decae * (mc - 1) * mc * mc * (cortado ? MULTI_CHATARRA.corte : 1) * dt);
 
   /* ---------- enemigos ----------
      `desde`: primer nivel en que aparece · `parte`/`tope`: cuánto crece su
@@ -254,7 +264,13 @@
      hasta un 25 %. Hasta el 25 todo queda exactamente igual. */
   const TARDE = 25;
   const tarde = n => Math.max(0, n - TARDE);
-  const parteElites = n => (n < 12 ? 0 : n <= TARDE ? Math.min(0.12, 0.05 + 0.007 * (n - 12)) : Math.min(0.25, 0.12 + 0.005 * tarde(n)));
+  /* Fase 4b, tercera pendiente: pasada la 55 (donde la segunda topaba) sigue
+     subiendo, más despacio: élites hasta un 35 %, ritmo hasta 0,12 s, horda
+     hasta 200, velocidad hasta +25 % y golpe +3 % por ronda. Los vivos a la
+     vez siguen en 72: más cuesta en rendimiento y en red. */
+  const MUY_TARDE = 55;
+  const muyTarde = n => Math.max(0, n - MUY_TARDE);
+  const parteElites = n => (n < 12 ? 0 : n <= TARDE ? Math.min(0.12, 0.05 + 0.007 * (n - 12)) : n <= MUY_TARDE ? Math.min(0.25, 0.12 + 0.005 * tarde(n)) : Math.min(0.35, 0.25 + 0.004 * muyTarde(n)));
   // ¿Sale élite? `r1` decide si, `r2` cuál (los dos en [0, 1)).
   const eliteDe = (k, n, r1, r2) => (!ENEMIGOS[k] || ENEMIGOS[k].jefe || ENEMIGOS[k].grupo || r1 >= parteElites(n) ? 0 : 1 + Math.min(4, Math.floor(r2 * 5)));
   /* Los jefes rotan en este orden: 5, 15, 25, 35, 45 los minis y 10, 20,
@@ -292,9 +308,11 @@
   const vidaEnemigo = (k, n) => Math.round(ENEMIGOS[k].vida * (n <= TARDE ? 1 + 0.08 * (n - 1) : 1 + 0.08 * (TARDE - 1) + 0.03 * tarde(n)));
   const velEnemigo = (k, n) => {
     const C = ENEMIGOS[k];
-    return Math.min(C.vel + 1 * (n - 1), C.velMax + (n <= TARDE ? 0 : Math.min(C.velMax * 0.15, 0.5 * tarde(n))));
+    const extra = m => Math.min(C.velMax * 0.15, 0.5 * tarde(m));
+    const mas = n <= TARDE ? 0 : n <= MUY_TARDE ? extra(n) : Math.min(C.velMax * 0.25, extra(MUY_TARDE) + 0.4 * muyTarde(n));
+    return Math.min(C.vel + 1 * (n - 1), C.velMax + mas);
   };
-  const golpeNivel = (k, n) => Math.round(ENEMIGOS[k].golpe * (1 + 0.02 * (n - 1)));
+  const golpeNivel = (k, n) => Math.round(ENEMIGOS[k].golpe * (1 + 0.02 * (n - 1) + 0.01 * muyTarde(n)));
   /* Fase 3.6, dificultad en sierra: la cantidad y el ritmo de la horda
      suben dentro de cada tramo de cinco niveles y aflojan después de cada
      jefe (el nivel 6, 11, 16… respira). La vida, la velocidad y el golpe
@@ -302,7 +320,7 @@
      cuánto aguanta cada uno. El nivel del jefe vale 1: no se suma a él. */
   const SIERRA = [0.85, 0.95, 1.05, 1.15, 1];
   const sierra = n => SIERRA[(Math.max(1, Math.floor(n)) - 1) % SIERRA.length];
-  const totalNivel = n => Math.round((n <= TARDE ? Math.min(16 + 4 * (n - 1), 120) : Math.min(120 + 1.5 * tarde(n), 160)) * sierra(n));   // la sierra va sobre el tope: sigue en los niveles altos
+  const totalNivel = n => Math.round((n <= TARDE ? Math.min(16 + 4 * (n - 1), 120) : n <= MUY_TARDE ? Math.min(120 + 1.5 * tarde(n), 160) : Math.min(160 + muyTarde(n), 200)) * sierra(n));   // la sierra va sobre el tope: sigue en los niveles altos
   /* Qué parte del nivel es de cada tipo: cada uno entra en su `desde` y
      crece de a poco; los zombis comunes son siempre al menos el 20 %. */
   function mezclaNivel(n) {
@@ -324,7 +342,7 @@
   const topeVivos = n => (n <= TARDE ? 48 : Math.min(72, 48 + Math.floor(0.8 * tarde(n))));
   const maxVivos = (n, jug) => Math.min(14 + 3 * jug + n, topeVivos(n));
   // Desde el 26 el ritmo sigue bajando de 0,35 s hasta 0,16 s (el nivel 50)
-  const ritmoNivel = n => (n <= TARDE ? Math.max(0.35, 1.0 - 0.03 * (n - 1)) : Math.max(0.16, 0.35 - 0.0076 * tarde(n))) / sierra(n);
+  const ritmoNivel = n => (n <= TARDE ? Math.max(0.35, 1.0 - 0.03 * (n - 1)) : n <= MUY_TARDE ? Math.max(0.16, 0.35 - 0.0076 * tarde(n)) : Math.max(0.12, 0.16 - 0.001 * muyTarde(n))) / sierra(n);
 
   /* ---------- tienda y armadura ----------
      Se compra con la chatarra, de pie junto a una estación de suministros
@@ -396,9 +414,11 @@
      chatarra por nivel y la tienda debe seguir pesando. La potencia es
      permanente y no sube con el nivel. */
   const factorNivelTienda = n => ((n | 0) <= 31 ? Math.min(2.5, 1 + 0.05 * Math.max(0, (n | 0) - 1)) : Math.min(4, 2.5 + 0.03 * ((n | 0) - 31)));   // Fase 4: pasado el 31 sigue subiendo, hasta ×4
-  /* Fase 4: desde la ronda 26 cada botiquín de la misma ronda cuesta un 50 %
-     más que el anterior (la chatarra ya no compra vida infinita). */
-  const BOTIQUIN_SUBE = { desde: 26, paso: 0.5 };
+  /* Fase 4: desde la ronda 31 cada botiquín de la misma ronda cuesta un 50 %
+     más que el anterior (la chatarra ya no compra vida infinita). Empezaba en
+     la 26, y ahí se juntaba con la primera noche, el primer evento y la
+     escolta del jefe: un pico (Fase 4b). */
+  const BOTIQUIN_SUBE = { desde: 31, paso: 0.5 };
   const factorBotiquin = (ronda, comprados) => ((ronda | 0) >= BOTIQUIN_SUBE.desde ? 1 + BOTIQUIN_SUBE.paso * (comprados | 0) : 1);
   const precioTienda = (id, nivel, nivelJuego) => {
     const t = TIENDA.find(x => x.id === id);
@@ -439,8 +459,8 @@
   const MEDALLAS = [
     { id: 'jefe', nom: 'Primer jefe', i: '💀', txt: 'Derrota a un jefe.' },
     { id: 'coloso', nom: 'Matagigantes', i: '🗿', txt: 'Derrota a un jefe grande (ronda 10, 20, 30…).' },
-    { id: 'x50', nom: 'En llamas', i: '🔥', txt: 'Llega a un multiplicador ×50.' },
-    { id: 'x100', nom: 'Imparable', i: '☠️', txt: 'Llega a un multiplicador ×100.' },
+    { id: 'x50', nom: 'En llamas', i: '🔥', txt: 'Llega a una racha de 50 bajas.' },
+    { id: 'x100', nom: 'Imparable', i: '☠️', txt: 'Llega a una racha de 100 bajas.' },
     { id: 'limpio', nom: 'Sin un rasguño', i: '✨', txt: 'Supera una ronda desde la 3 sin recibir daño.' },
     { id: 'nivel10', nom: 'Dos cifras', i: '🔟', txt: 'Llega a la ronda 10.' },
     { id: 'nivel20', nom: 'Veinte noches', i: '👑', txt: 'Llega a la ronda 20.' },
@@ -461,7 +481,10 @@
     { id: 'noche', nom: 'Hijo de la noche', i: '🌙', txt: 'Sobrevive a una Noche (las rondas 27, 37, 47…).' },
     { id: 'corrupto', nom: 'Purificador', i: '🟣', txt: 'Derrota a un jefe corrupto (desde la ronda 55).' },
     { id: 'intocable', nom: 'Intocable', i: '🛡️', txt: 'Derrota a un jefe grande sin recibir daño en su ronda.' },
-    { id: 'x500', nom: 'Leyenda viva', i: '⚡', txt: 'Llega a un multiplicador ×500.' }
+    { id: 'x500', nom: 'Leyenda viva', i: '⚡', txt: 'Llega a una racha de 500 bajas.' },
+    // Fase 4b: el multiplicador de chatarra
+    { id: 'mc2', nom: 'Chatarrero de lujo', i: '🔩', txt: 'Lleva el multiplicador de chatarra a ×2,00.' },
+    { id: 'mc25', nom: 'Mina de oro', i: '💰', txt: 'Lleva el multiplicador de chatarra a ×2,50.' }
   ];
   const medallaDe = id => MEDALLAS.find(m => m.id === id) || null;
   const skin = id => SKINS.find(s => s.id === id) || SKINS[0];
@@ -781,7 +804,7 @@
     // legendarias (Fase 4): solo desde la ronda `LEGENDARIAS`
     { id: 'verdugo', nom: 'Verdugo', rar: 3, max: 1, tipo: 'ataque', txt: '+30 % de daño a jefes y élites' },
     { id: 'titan', nom: 'Titán', rar: 3, max: 1, tipo: 'defensa', txt: '+50 de vida máxima y −15 % de daño recibido' },
-    { id: 'fenix', nom: 'Fénix', rar: 3, max: 1, tipo: 'defensa', txt: 'Al empezar cada ronda recuperas toda la vida' },
+    { id: 'fenix', nom: 'Fénix', rar: 3, max: 1, tipo: 'defensa', txt: 'Al empezar cada ronda recuperas la mitad de la vida' },
     { id: 'infinita', nom: 'Recámara infinita', rar: 3, max: 1, tipo: 'utilidad', txt: 'Un 30 % de los disparos no gasta munición' }
   ];
   const LEGENDARIAS = 30;
@@ -902,18 +925,24 @@
     veloz: { nombre: 'Noche veloz', txt: 'la horda corre un 30 % más', vel: 1.3 },
     hierro: { nombre: 'Noche de hierro', txt: 'la mitad de enemigos, con el triple de vida', vida: 3, cuantos: 0.5 },
     cristal: { nombre: 'Noche de cristal', txt: 'pegas y recibes el doble', dano: 2, recibe: 2 },
-    apagon: { nombre: 'Apagón total', txt: 'a oscuras, y corren un 15 % más', vel: 1.15, oscuro: true }
+    apagon: { nombre: 'Apagón total', txt: 'a oscuras, y corren un 15 % más', vel: 1.15, oscuro: true },
+    // Fase 4b: dos más, así el ciclo es de 60 rondas
+    luna: { nombre: 'Luna roja', txt: 'los enemigos pegan un 50 % más', golpe: 1.5 },
+    escasez: { nombre: 'Noche de escasez', txt: 'los enemigos no sueltan cajas', sinCajas: true }
   };
-  const ORDEN_NOCHES = ['veloz', 'hierro', 'cristal', 'apagon'];
+  const ORDEN_NOCHES = ['veloz', 'hierro', 'cristal', 'apagon', 'luna', 'escasez'];
   const nocheDe = n => (n >= 27 && n % 10 === 7 ? ORDEN_NOCHES[((n - 27) / 10) % ORDEN_NOCHES.length] : '');
   const premioNoche = n => 1000 + 40 * Math.max(0, n - 27);
   const EVENTOS = {
     estampida: { nombre: 'Estampida', txt: 'llegan enjambres por todos lados', ks: [18], parte: 0.15 },
     asedio: { nombre: 'Asedio', txt: 'demoledores y brutos contra tus muros', ks: [16, 3], parte: 0.35 },
     lluvia: { nombre: 'Lluvia dorada', txt: 'las cajas doradas caen mucho más', dorada: 8 },
-    marea: { nombre: 'Marea de élites', txt: 'el doble de élites', elites: 2 }
+    marea: { nombre: 'Marea de élites', txt: 'el doble de élites', elites: 2 },
+    // Fase 4b: dos más (ciclo de 30 rondas)
+    brujeria: { nombre: 'Brujería', txt: 'chamanes y vigías se quedan atrás y te castigan de lejos', ks: [19, 21], parte: 0.25 },
+    polvorin: { nombre: 'Polvorín', txt: 'explosivos y tóxicos por todos lados', ks: [4, 22], parte: 0.3 }
   };
-  const ORDEN_EVENTOS = ['estampida', 'asedio', 'lluvia', 'marea'];
+  const ORDEN_EVENTOS = ['estampida', 'asedio', 'lluvia', 'marea', 'brujeria', 'polvorin'];
   const eventoDe = n => (n >= 26 && (n % 10 === 3 || n % 10 === 8) ? ORDEN_EVENTOS[Math.floor((n - 23) / 5) % ORDEN_EVENTOS.length] : '');
   // El tipo de un enemigo en una ronda con evento que fuerza tipos (`r1` si, `r2` cuál).
   function tipoEvento(ev, n, r1, r2) {
@@ -926,7 +955,7 @@
     if (!a) return b || null;
     if (!b) return a;
     const o = Object.assign({}, a, b);
-    for (const k of ['dano', 'recibe', 'vel', 'vida', 'cuantos']) if (a[k] && b[k]) o[k] = a[k] * b[k];
+    for (const k of ['dano', 'recibe', 'vel', 'vida', 'cuantos', 'golpe']) if (a[k] && b[k]) o[k] = a[k] * b[k];
     if (a.cura && b.cura) o.cura = a.cura + b.cura;
     return o;
   }
@@ -953,6 +982,6 @@
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, ESPECIALES, especialDe, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio,
     PASO_JEFES, nivelJefes, escoltaJefes, MUTADORES, mutador, empacaZb, desempacaZb,
-    TARDE, topeVivos, escoltaGrande, duoDe, FASE3, BOTIQUIN_SUBE, factorBotiquin, LEGENDARIAS, RELLENO, NOCHES, nocheDe, premioNoche, EVENTOS, eventoDe, tipoEvento, mezclaMut, MEDALLAS_RONDA, proximas
+    MULTI_CHATARRA, subeMultiChatarra, bajaMultiChatarra, TARDE, topeVivos, escoltaGrande, duoDe, FASE3, BOTIQUIN_SUBE, factorBotiquin, LEGENDARIAS, RELLENO, NOCHES, nocheDe, premioNoche, EVENTOS, eventoDe, tipoEvento, mezclaMut, MEDALLAS_RONDA, proximas
   };
 });

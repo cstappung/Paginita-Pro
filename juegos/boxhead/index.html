@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202611152157"></script>
+<script src="../../i18n.js?v=202611160256"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <!-- En el Solo Club (solo/club.js abre este archivo con ?club=1): el puente con la página y su tabla. -->
@@ -36,7 +36,7 @@ button{font:inherit;cursor:pointer}
 #marca .fondo{fill:none;stroke:rgba(20,14,8,.75);stroke-width:13;stroke-linecap:round}
 #marca .arco{fill:none;stroke:url(#oroArco);stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .08s linear}
 #marca .borde{fill:none;stroke:#000;stroke-width:1.5;opacity:.6}
-#mul{position:absolute;left:0;right:0;top:34px;font-weight:900;color:var(--oro);font-size:40px;line-height:1;text-shadow:0 3px 0 #000,0 0 12px rgba(0,0,0,.6)}
+#mul{position:absolute;left:0;right:0;top:36px;font-weight:900;color:var(--oro);font-size:32px;line-height:1;text-shadow:0 3px 0 #000,0 0 12px rgba(0,0,0,.6)}
 #mul.sube{animation:sube .25s ease-out}
 @keyframes sube{from{transform:scale(1.35)}to{transform:scale(1)}}
 /* el combo a punto de caer parpadea; un hito (×10, ×25…) hace saltar todo el marcador */
@@ -44,6 +44,7 @@ button{font:inherit;cursor:pointer}
 @keyframes cae{50%{stroke:#ff5a3a;opacity:.45}}
 #marca.hito{animation:hito .7s ease-out}
 @keyframes hito{0%{transform:translateX(-50%) scale(1)}25%{transform:translateX(-50%) scale(1.25)}100%{transform:translateX(-50%) scale(1)}}
+#rachaN{display:block;font-size:12px;font-weight:700;color:#e8d8b0;text-shadow:0 1px 0 #000;min-height:13px}
 #ptsN{display:block;margin-top:-4px;font-size:24px;font-weight:900;color:#fff;text-shadow:0 2px 0 #000,0 0 10px rgba(0,0,0,.7);letter-spacing:.02em}
 #info{position:absolute;left:10px;top:10px;padding:5px 12px;white-space:nowrap;font-size:13px}
 #info b{color:var(--oro)}
@@ -206,6 +207,7 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
     </svg>
     <span id="mul">×1</span>
     <b id="ptsN">0</b>
+    <small id="rachaN"></small>
   </div>
   <div id="info" class="panel"><span id="nivel"></span> · Bajas <b id="kN">0</b> · <span class="chat">Chatarra <b id="chatN" translate="no">0</b></span> · Armadura <b id="armN">0</b><span id="potN"></span><span id="blN"></span><div id="metas" hidden></div></div>
   <div id="vol" class="panel" data-volumen></div>
@@ -281,9 +283,9 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-26"></script>
-<script src="js/grafico.js?v=boxhead-26"></script>
-<script src="js/audio.js?v=boxhead-26"></script>
-<script src="js/juego.js?v=boxhead-26"></script>
+<script src="js/datos.js?v=boxhead-27"></script>
+<script src="js/grafico.js?v=boxhead-27"></script>
+<script src="js/audio.js?v=boxhead-27"></script>
+<script src="js/juego.js?v=boxhead-27"></script>
 </body>
 </html>

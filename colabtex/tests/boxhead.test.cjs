@@ -167,7 +167,7 @@ test('boxhead: segunda pendiente desde el 26 (Fase 4): más presión y menos vid
  let prev=null;
  for(let n=25;n<=120;n++){
   const c={total:D.totalNivel(n),ritmo:D.ritmoNivel(n),vida:D.vidaEnemigo(0,n),vel:D.velEnemigo(0,n),max:D.maxVivos(n,1),el:D.parteElites(n)};
-  assert.ok(c.total<=Math.round(160*1.15)&&c.ritmo>=0.16/1.15-1e-9,'topes en '+n);
+  assert.ok(c.total<=Math.round(200*1.15)&&c.ritmo>=0.12/1.15-1e-9,'topes en '+n);
   assert.ok(c.max<=72,'vivos con tope en '+n);
   if(n>25)assert.ok(c.vida<=vidaVieja(0,n),'la vida crece más despacio que antes en '+n);
   if(prev){
@@ -182,7 +182,10 @@ test('boxhead: segunda pendiente desde el 26 (Fase 4): más presión y menos vid
  assert.ok(D.maxVivos(50,1)>D.maxVivos(25,1)+15,'caben más a la vez');
  assert.ok(D.vidaEnemigo(0,50)<vidaVieja(0,50)*0.8,'el nivel 50 aguanta menos que antes');
  assert.ok(salida(49)<salida(24)*1.1,'la horda del 49 no tarda mucho más en salir que la del 24');
- for(const e of D.ENEMIGOS)if(!e.jefe)assert.ok(D.velEnemigo(e.id,200)<=e.velMax*1.15+1e-9,e.nombre+': velocidad con tope');
+ for(const e of D.ENEMIGOS)if(!e.jefe){assert.ok(D.velEnemigo(e.id,55)<=e.velMax*1.15+1e-9,e.nombre+': velocidad con tope en la 55');assert.ok(D.velEnemigo(e.id,300)<=e.velMax*1.25+1e-9,e.nombre+': y en la 300');}
+ // Fase 4b: pasada la 55 sigue subiendo (élites, ritmo, horda, golpe), sin saltos
+ assert.ok(D.parteElites(80)>D.parteElites(55)&&D.ritmoNivel(95)<D.ritmoNivel(50)&&D.golpeNivel(0,90)>D.golpeNivel(0,55));
+ for(let n=56;n<=150;n++)assert.ok(D.golpeNivel(0,n)-D.golpeNivel(0,n-1)<=1,'golpe suave en '+n);
 });
 
 test('boxhead: tienda, potencia y armadura',()=>{
@@ -318,7 +321,7 @@ test('la chatarra: moneda aparte de los puntos, sin multiplicador; los suministr
  assert.equal(D.precioTienda('armadura',0,31),1000);   // ×2,5 en la 31, como antes
  assert.equal(D.precioTienda('armadura',0,200),1600);  // Fase 4: sigue hasta ×4
  // el botiquín, desde la 26, sube con cada compra de la misma ronda
- assert.equal(D.factorBotiquin(25,3),1);assert.equal(D.factorBotiquin(26,0),1);assert.equal(D.factorBotiquin(26,2),2);
+ assert.equal(D.factorBotiquin(30,3),1);assert.equal(D.factorBotiquin(31,0),1);assert.equal(D.factorBotiquin(31,2),2);
  assert.equal(D.precioTienda('potencia',1,30),D.precioTienda('potencia',1,1));
  assert.ok(D.precioTienda('blindado',0,11)>D.precioTienda('blindado',0,1));
 });
@@ -514,7 +517,7 @@ test('enemigos de la Fase 3: datos de los cinco nuevos y de las élites',()=>{
  assert.equal(D.ELITES[0],null);
  for(let i=1;i<D.ELITES.length;i++){const el=D.ELITES[i];assert.equal(el.id,i);assert.ok(el.vida>=1&&el.vel>=1);assert.match(el.color,/^#[0-9a-f]{6}$/i);}
  for(let n=1;n<=80;n++){
-  const p=D.parteElites(n);assert.ok(p>=0&&p<=(n<=25?0.12:0.25),'parte '+n);
+  const p=D.parteElites(n);assert.ok(p>=0&&p<=(n<=25?0.12:n<=55?0.25:0.35),'parte '+n);
   if(n<12)assert.equal(p,0);
   for(const e of D.ENEMIGOS){
    const r=D.eliteDe(e.id,n,0,0.99);
@@ -923,7 +926,8 @@ test('boxhead Fase 4: las mejoras de saltos del Rayo se aplican',()=>{
 
 test('boxhead Fase 4: noches, eventos, jefes y metas (datos)',()=>{
  for(let n=1;n<=25;n++){assert.equal(D.nocheDe(n),'');assert.equal(D.eventoDe(n),'');assert.equal(D.escoltaGrande(n),0);}
- assert.deepEqual([27,37,47,57,67].map(D.nocheDe),['veloz','hierro','cristal','apagon','veloz']);
+ assert.deepEqual([27,37,47,57,67,77,87].map(D.nocheDe),['veloz','hierro','cristal','apagon','luna','escasez','veloz']);
+ assert.deepEqual([28,33,38,43,48,53,58].map(D.eventoDe),['asedio','lluvia','marea','brujeria','polvorin','estampida','asedio']);
  for(let n=26;n<=300;n++){
   if(D.nocheDe(n)){assert.equal(D.jefeDeNivel(n),-1,'noche sin jefe '+n);assert.ok(D.NOCHES[D.nocheDe(n)],n);}
   if(D.eventoDe(n)){assert.equal(D.jefeDeNivel(n),-1,'evento sin jefe '+n);assert.equal(D.nocheDe(n),'');assert.ok(D.EVENTOS[D.eventoDe(n)],n);}
@@ -974,4 +978,26 @@ test('boxhead Fase 4: tóxico, sombra, estandarte y el respawn de los atascados 
  // y uno que se mueve no
  yo=prepara();const w=bx.enemigo(0,yo.x+200,yo.y);bx.envejece(w,60);for(let i=0;i<120;i++)bx.paso(1/60);
  const w1=de(w);assert.ok(!w1||Math.hypot(w1.x-yo.x,w1.y-yo.y)<200,'el que camina sigue su camino');
+});
+
+test('boxhead Fase 4b: el «×» es un multiplicador de chatarra que sube de a centésimas y cae más rápido arriba',()=>{
+ let mc=1;const pasos=[];for(let i=0;i<1000;i++){const a=mc;mc=D.subeMultiChatarra(mc);pasos.push(mc-a);}
+ assert.ok(Math.abs(pasos[0]-0.01)<1e-12,'la primera baja suma 0,01');
+ for(let i=1;i<pasos.length;i++)assert.ok(pasos[i]<pasos[i-1],'cada centésima cuesta más');
+ // cuántas bajas para ×2 y ×3
+ const bajas=m=>{let x=1,k=0;while(x<m){x=D.subeMultiChatarra(x);k++;}return k;};
+ assert.ok(bajas(2)>150&&bajas(3)>bajas(2)*3,'×2 en '+bajas(2)+', ×3 en '+bajas(3));
+ // baja más rápido cuanto más alto, y mucho más sin bajas
+ const caida=(m,c)=>m-D.bajaMultiChatarra(m,1,c);
+ assert.equal(D.bajaMultiChatarra(1,10,true),1);
+ assert.ok(caida(2.5,false)>caida(2,false)*2&&caida(2,false)>caida(1.5,false)*2);
+ assert.ok(caida(2,true)>caida(2,false)*5);
+ // en el motor: los puntos ya no se multiplican y la chatarra sí
+ const bx=boxheadSinPantalla(),pista={dx:0,dy:0,vel:1,mira:0,fija:true,disp:false};
+ bx.practica(1);bx.inmortal(true);bx.calma();bx.entrada(pista);for(let i=0;i<12;i++)bx.paso(1/60);
+ const yo=bx.mundo().yo;
+ for(let i=0;i<5;i++){const z=bx.enemigo(0,yo.x+40,yo.y);bx.ponVida(z,0.001);bx.entrada({...pista,disp:true});for(let j=0;j<30&&bx.mundo().E.some(e=>e.id===z);j++)bx.paso(1/60);bx.entrada(pista);bx.paso(1/60);}
+ const e=bx.estado().yo;
+ assert.equal(e.k,5);assert.equal(e.pts,5*D.PUNTOS[0],'puntos sin multiplicar');
+ assert.ok(e.mc>1.04&&e.mc<1.06,'×'+e.mc.toFixed(3));assert.equal(e.mul,6,'la racha sigue contando de a uno');
 });

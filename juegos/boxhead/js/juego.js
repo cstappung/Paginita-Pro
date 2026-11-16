@@ -95,7 +95,7 @@
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
     return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, chat: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], giro: 0, dorada: 0, arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, cuentaP: 0, napC: 0, napalm: [], eco: null, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
+      mc: 1, mcMax: 1, sinBaja: 0, tiene: new Set([0]), mejoras: new Set(), vt: {}, limpio: true, chatTot: 0, bajasPaso: 0, segunda: false, ign: 0, sinGolpe: 0, dronT: 0, booms: [], giro: 0, dorada: 0, arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, fija: false, muerto: false, cuentaP: 0, napC: 0, napalm: [], eco: null, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0,
       // para la pantalla final: disparos y aciertos (perdigón a perdigón), bajas por arma y jefes
       st: { disp: 0, acierto: 0, armas: new Array(D.ARMAS.length).fill(0), jefes: 0 } };
   }
@@ -133,10 +133,11 @@
       yo.chat += c; yo.chatTot += c; yo.dorada = Math.max(yo.dorada || 0, D.DORADA_T);
       medalla('noche'); premio('🌙 Sobreviviste a la ' + D.NOCHES[nocheAntes].nombre.toLowerCase() + ': +' + c + ' de chatarra', 'mejora');
     }
-    if (vt('fenix') && yo.v && !yo.muerto) yo.hp = hpMax();
+    if (vt('fenix') && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + hpMax() / 2);   // Fase 4b: la mitad, no toda
     if (vt('coraza') && yo.v && !yo.muerto) yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 25 * vt('coraza'));
     if (eleccion) eligeVentaja(0);
-    const ops = D.sorteaVentajas(rn, yo.vt, ONLINE && (cfg.jugadores || []).length > 1, 3, versus() ? 0 : n);
+    let ops = D.sorteaVentajas(rn, yo.vt, ONLINE && (cfg.jugadores || []).length > 1, 3, versus() ? 0 : n);
+    if (yo.curaUlt === n - 1) ops = ops.filter(id => id !== '_cura');   // la Curación del relleno, no dos rondas seguidas
     if (!ops.length) return;
     eleccion = { ops, t: D.ESPERA_VENTAJA };
     pintaEleccion(); son('premio');
@@ -149,7 +150,7 @@
     if (id[0] === '_') {   // relleno: cuando ya no queda ventaja que subir (D.RELLENO)
       if (v.chat) { yo.chat += v.chat; yo.chatTot += v.chat; }
       if (v.arm) yo.arm = D.ARMADURA.max;
-      if (v.vida && yo.v && !yo.muerto) yo.hp = hpMax();
+      if (v.vida && yo.v && !yo.muerto) { yo.hp = hpMax(); yo.curaUlt = nivelVisto; }
       eleccion = null; pintaEleccion(); son('mejora'); premio(v.nom + ': ' + v.txt.toLowerCase(), 'mejora');
       return;
     }
@@ -250,7 +251,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 9, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 10, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   // Teclas de arma: la posición en ARMAS_J (los ids 8 y 9 no son armas del jugador).
@@ -1074,15 +1075,19 @@
     }
   }
 
-  /* Una baja mía: puntos (× multiplicador), chatarra (sin él) que salta del
-     cuerpo, el combo y, al pasar un récord del multiplicador, armas,
-     mejoras y los hitos ×10, ×25, ×50… */
+  /* Una baja mía: puntos (ya sin multiplicar), chatarra × el multiplicador
+     de chatarra (Fase 4b) que salta del cuerpo, la racha y, al pasar un
+     récord de racha, armas, mejoras y los hitos 10, 25, 50… */
   const HITOS = [10, 25, 50, 100, 150, 200, 300, 500, 750, 1000];
   let armaUlt = 0, armaMuerte = -1;
   function miBaja(k, x, y) {
-    yo.pts += D.PUNTOS[k] * yo.mul;
+    yo.pts += D.PUNTOS[k];
     yo.k++;
     yo.mul++;
+    yo.mc = D.subeMultiChatarra(yo.mc); yo.sinBaja = 0;
+    if (yo.mc > yo.mcMax) yo.mcMax = yo.mc;
+    if (yo.mc >= 2) medalla('mc2');
+    if (yo.mc >= 2.5) medalla('mc25');
     yo.st.armas[armaMuerte >= 0 ? armaMuerte : armaUlt]++;
     if (D.esJefe(k)) {
       yo.st.jefes++; medalla('jefe');
@@ -1090,7 +1095,7 @@
       if (D.corrupto(dir.n)) medalla('corrupto');
     }
     if (++yo.bajasPaso >= 10) medalla('diez');
-    if (Number.isFinite(x)) sueltaChatarra(x, y, Math.round(D.chatarraDe(k) * (1 + 0.2 * vt('codicia'))));
+    if (Number.isFinite(x)) sueltaChatarra(x, y, Math.round(D.chatarraDe(k) * (1 + 0.2 * vt('codicia')) * yo.mc));
     if (vt('vampiro') && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + vt('vampiro'));
     if (mutD().cura && yo.v && !yo.muerto) yo.hp = Math.min(hpMax(), yo.hp + mutD().cura);
     // estallido: revienta en el paso siguiente (pasoYo), no en medio de esta baja
@@ -1111,7 +1116,7 @@
     yo.combo = yo.comboMax = D.duracionCombo(yo.mul) * (1 + 0.2 * vt('racha'));
   }
   function hito(m) {
-    banner('¡RACHA ×' + m + '!');
+    banner('¡RACHA DE ' + m + '!');
     pulso = 1; son('racha'); vibra(0.5, 0.8, 220);
     const el = $('marca'); el.classList.remove('hito'); void el.offsetWidth; el.classList.add('hito');
   }
@@ -1399,7 +1404,7 @@
       return;
     }
     const r = rn(), pd = D.PARTE_DORADA * ((D.EVENTOS[eventoAhora()] || {}).dorada || 1);
-    if (B.size < 12 && (r < 0.2 || r > 1 - pd)) {
+    if (B.size < 12 && !mutD().sinCajas && (r < 0.2 || r > 1 - pd)) {
       const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : r < 0.2 ? 2 : 3, x: Math.round(e.x), y: Math.round(e.y) };
       B.set(b.id, b);
     }
@@ -1462,7 +1467,7 @@
     e.estT -= dt;
     if (!e.pego && dist(e.x, e.y, t.x, t.y) < C.rg + 10) {
       e.pego = true;
-      golpea(t.uid, D.golpeNivel(e.k, dir.n) * 1.6, 8, '');
+      golpea(t.uid, D.golpeNivel(e.k, dir.n) * 1.6 * (mutD().golpe || 1), 8, '');
       sacude = Math.min(10, sacude + 4);
     }
     const quieto = dist(x0, y0, e.x, e.y) < v * dt * 0.3;
@@ -1759,7 +1764,7 @@
       // más de 1.5 s trabado contra uno, lo rompe igual.
       e.tr = bloq ? (e.tr || 0) + dt : 0;
       const rompe = !libre || e.tr > 1.5;
-      const golpe = D.golpeNivel(e.k, dir.n);
+      const golpe = D.golpeNivel(e.k, dir.n) * (mutD().golpe || 1);
       // El explosivo no muerde: se revienta al llegar.
       if (C.explota && dd < C.radio + 16) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
       if (C.explota && bloq && rompe) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
@@ -1779,7 +1784,7 @@
       // La roca del Titán vuela por encima de todo y revienta donde apuntó.
       if (f.roca) { if (f.t <= 0) { f.fin = true; const C = D.ENEMIGOS[f.k] || {}; ondaJefe(f.tx, f.ty, C.onda || 70, (C.dOnda || 40) * (1 + 0.02 * (dir.n - 1))); son('boom'); } continue; }
       if (f.t <= 0 || choca(f.x, f.y, 3)) { f.fin = true; humo(f.x, f.y, f.k); continue; }
-      const dmg = f.d * (1 + 0.02 * (dir.n - 1));
+      const dmg = f.d * (1 + 0.02 * (dir.n - 1)) * (mutD().golpe || 1);
       for (const o of obj) if (dist(f.x, f.y, o.x, o.y) < 12) { golpea(o.uid, dmg, 9, ''); f.fin = true; humo(f.x, f.y, f.k); break; }
       if (f.fin) continue;
       // Fuego amigo: la bola no distingue, quema al enemigo que se cruce.
@@ -2186,10 +2191,13 @@
 
   function pasoYo(dt) {
     armaRejilla();
+    // El multiplicador de chatarra baja solo; mucho más rápido sin bajas (D.bajaMultiChatarra).
+    yo.sinBaja += dt;
+    if (yo.mc > 1) yo.mc = D.bajaMultiChatarra(yo.mc, dt, yo.sinBaja > D.MULTI_CHATARRA.pausa);
     yo.cd -= dt; yo.inv = Math.max(0, yo.inv - dt);
     if (yo.mul > 1) {
       yo.combo -= dt;
-      // Al vaciarse la barra el multiplicador baja de a uno, no de golpe.
+      // Al vaciarse la barra la racha baja de a uno, no de golpe.
       if (yo.combo <= 0) { yo.mul--; yo.combo = yo.comboMax = yo.mul > 1 ? D.bajadaCombo(yo.mul) : 0; }
     }
     if (yo.muerto) {
@@ -2324,7 +2332,7 @@
     for (const t of M.tiendas || []) if (dist(t.x, t.y, yo.x, yo.y) < D.ALCANCE_TIENDA) return t;
     return null;
   }
-  // El precio de un suministro ahora: el botiquín sube con cada compra de la ronda desde la 26 (Fase 4).
+  // El precio de un suministro ahora: el botiquín sube con cada compra de la ronda desde la 31 (Fase 4b).
   function precioItem(id) {
     const p = D.precioTienda(id, yo.pot || 0, nivelObjetivo());
     return id === 'botiquin' ? Math.round(p * D.factorBotiquin(nivelObjetivo(), yo.botiN) / 10) * 10 : p;
@@ -2398,7 +2406,8 @@
     let mejor = -1;
     st.armas.forEach((n, i) => { if (n > 0 && D.ARMAS[i] && (mejor < 0 || n > st.armas[mejor])) mejor = i; });
     const filas = [
-      ['Multiplicador máximo', '×' + yo.maxMul],
+      ['Multiplicador de chatarra máximo', '×' + yo.mcMax.toFixed(2)],
+      ['Racha más larga', yo.maxMul + ' bajas'],
       ['Bajas', yo.k],
       ['Precisión', st.disp ? Math.round(100 * st.acierto / st.disp) + ' %' : '—'],
       ['Jefes derrotados', st.jefes],
@@ -2923,11 +2932,15 @@
     // El combo a punto de caer: el arco parpadea y suena un aviso al cruzar el cuarto.
     const cae = yo.mul > 1 && fr > 0 && fr < 0.25 && !yo.muerto;
     if (cae !== caeAntes) { $('marca').classList.toggle('cae', cae); if (cae) son('avisoCombo'); caeAntes = cae; }
-    if ($('mul').textContent !== '×' + yo.mul) {
-      const m = $('mul'), sube = yo.mul > (parseInt(m.textContent.slice(1), 10) || 1);
-      m.textContent = '×' + yo.mul;
+    // Fase 4b: el «×» es el multiplicador de chatarra; la racha va debajo de los puntos.
+    const mcTxt = '×' + yo.mc.toFixed(2);
+    if ($('mul').textContent !== mcTxt) {
+      const m = $('mul'), sube = Math.floor(yo.mc * 10) > Math.floor((parseFloat(m.textContent.slice(1)) || 1) * 10);
+      m.textContent = mcTxt;
       if (sube) { m.classList.remove('sube'); void m.offsetWidth; m.classList.add('sube'); }
     }
+    const raTxt = yo.mul > 1 ? 'racha ' + yo.mul : '';
+    if ($('rachaN').textContent !== raTxt) $('rachaN').textContent = raTxt;
     const qp = quienPausa();
     $('pausa').hidden = !qp;
     $('seguir').hidden = !pausado;
@@ -3102,7 +3115,7 @@
       s.style.display = tiene || a.desbloquea < 60 || a === sig ? '' : 'none';
       s.classList.toggle('sel', yo.w === a.id);
       s.classList.toggle('no', !tiene || (a.id !== 0 && !(yo.ammo[a.id] > 0)));
-      s.lastChild.textContent = !tiene ? '×' + a.desbloquea : a.id === 0 ? '∞' : yo.ammo[a.id];
+      s.lastChild.textContent = !tiene ? 'racha ' + a.desbloquea : a.id === 0 ? '∞' : yo.ammo[a.id];
       // El nivel de tienda: estrellas en la esquina y el icono con el color del rango.
       const n = yo.nv[a.id] || 0, c = s.querySelector('canvas');
       s.querySelector('.nv').textContent = '★'.repeat(n);
@@ -3149,7 +3162,7 @@
   const CONSEJOS = {
     tienda: () => 'Junto al puesto $ se compra con chatarra: munición, armadura, botiquín y mejoras de arma' + (conMando() ? ' (cruceta y ' + Mando.glifo('y') + ').' : ' (clic o las teclas que muestra).'),
     chatarra: () => 'La chatarra que sueltan tus bajas es la moneda de la tienda. Los puntos solo suben: son tu marcador.',
-    combo: () => 'Cada baja sube el multiplicador. Si la barra de arriba se vacía, baja de a uno: no dejes de disparar.',
+    combo: () => 'Cada baja suma a tu racha (da armas y mejoras) y sube el multiplicador de chatarra (el número grande de arriba). Si dejas de matar, los dos bajan.',
     arma: () => 'Arma nueva. Cámbiala con ' + boton('Q/E', 'lb') + (conMando() ? '/' + Mando.glifo('rb') : ' o los números 1–8') + '.',
     barril: () => 'Dispárale a los barriles rojos: explotan y se llevan a la horda que esté cerca.',
     jefe: () => 'Los jefes avisan antes de golpear: si el suelo se pone rojo, sal del círculo.',
@@ -3320,7 +3333,7 @@
   window.__boxhead = {
     rehace, prueba, accion, pasos: () => pasoN, entrada: en => { forzada = en || null; },
     paso: (dt = 1 / 60) => paso(dt),
-    estado: () => ({ cfg, eleccion: eleccion ? eleccion.ops.slice() : null, vt: Object.assign({}, yo.vt), yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice(), dorada: yo.dorada, giro: yo.giro, disparos: yo.st.disp, proyectiles: proy.length },
+    estado: () => ({ cfg, eleccion: eleccion ? eleccion.ops.slice() : null, vt: Object.assign({}, yo.vt), yo: { x: yo.x, y: yo.y, hp: yo.hp, v: yo.v, muerto: yo.muerto, pts: yo.pts, k: yo.k, mul: yo.mul, mc: yo.mc, w: yo.w, tiene: [...yo.tiene], ammo: yo.ammo.slice(), dorada: yo.dorada, giro: yo.giro, disparos: yo.st.disp, proyectiles: proy.length },
       soyDir, dirUid, nivel: nivelObjetivo(), dir: { n: dir.n, q: dir.q, t: dir.t }, enemigos: E.size, objetos: O.size, cajas: B.size, remotos: R.size, terminado }),
     dbg: () => ({ cd: yo.cd, ps: pend.s.length, jugando, pausado, w: yo.w, ammo0: yo.ammo[0] }),
     mundo: () => ({ E: [...E.values()].map(e => ({ id: e.id, k: e.k, x: e.x, y: e.y, hp: e.hp, max: e.max, est: e.est || 0, el: e.el || 0 })), F: F.map(f => ({ k: f.k, x: f.x, y: f.y })), O: [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y })), yo: { x: yo.x, y: yo.y, d: yo.d } }),
