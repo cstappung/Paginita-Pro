@@ -539,19 +539,21 @@ const SOLO = {
     { id: "p260", n: "¿Eres humano?", d: "Llega a 260 ppm en una carrera de Type Race.", i: "🤖", m: "ppm", s: d => cat(/^club-typerace-en-/)(d) && d.puntos >= 260 }
   ],
   /* Pro BoxHead en el Solo Club. Salen de las tablas por mapa
-     (club-boxhead-<mapa>, puntos = el nivel al que llegaste): siete por
-     nivel en cualquier mapa y tres por mapas difíciles. */
+     (club-boxhead-<mapa>, puntos = la ronda a la que llegaste, sola o en
+     una sala cooperativa de dos o más): siete por ronda en cualquier mapa
+     y tres por mapas difíciles (diez por juego: las metas de más allá de la
+     40 son medallas del propio juego). */
   boxheadclub: [
-    { id: "n3", n: "Primera noche", d: "Llega al nivel 3 en cualquier mapa.", i: "🧟", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 3 },
-    { id: "n5", n: "Medio jefe", d: "Llega al nivel 5 en cualquier mapa.", i: "💀", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 5 },
-    { id: "n10", n: "Diez de diez", d: "Llega al nivel 10 en cualquier mapa.", i: "🔟", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 10 },
-    { id: "n15", n: "Horda domada", d: "Llega al nivel 15 en cualquier mapa.", i: "🪓", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 15 },
-    { id: "n20", n: "Veterano de la caja", d: "Llega al nivel 20 en cualquier mapa.", i: "📦", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 20 },
-    { id: "n30", n: "Superviviente", d: "Llega al nivel 30 en cualquier mapa.", i: "🛡️", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 30 },
-    { id: "n40", n: "Leyenda de la horda", d: "Llega al nivel 40 en cualquier mapa.", i: "👑", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 40 },
-    { id: "sotano10", n: "Bajo tierra", d: "Llega al nivel 10 en el Sótano.", i: "🕯️", m: "Mapas", s: d => cat(/^club-boxhead-sotano$/)(d) && d.puntos >= 10 },
-    { id: "fortaleza15", n: "Asedio", d: "Llega al nivel 15 en la Fortaleza.", i: "🏰", m: "Mapas", s: d => cat(/^club-boxhead-fortaleza$/)(d) && d.puntos >= 15 },
-    { id: "laberinto20", n: "Sin salida", d: "Llega al nivel 20 en el Laberinto.", i: "🌀", m: "Mapas", s: d => cat(/^club-boxhead-laberinto$/)(d) && d.puntos >= 20 }
+    { id: "n3", n: "Primera noche", d: "Llega a la ronda 3 en cualquier mapa.", i: "🧟", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 3 },
+    { id: "n5", n: "Medio jefe", d: "Llega a la ronda 5 en cualquier mapa.", i: "💀", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 5 },
+    { id: "n10", n: "Diez de diez", d: "Llega a la ronda 10 en cualquier mapa.", i: "🔟", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 10 },
+    { id: "n15", n: "Horda domada", d: "Llega a la ronda 15 en cualquier mapa.", i: "🪓", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 15 },
+    { id: "n20", n: "Veterano de la caja", d: "Llega a la ronda 20 en cualquier mapa.", i: "📦", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 20 },
+    { id: "n30", n: "Superviviente", d: "Llega a la ronda 30 en cualquier mapa.", i: "🛡️", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 30 },
+    { id: "n40", n: "Leyenda de la horda", d: "Llega a la ronda 40 en cualquier mapa.", i: "👑", m: "Nivel", s: d => cat(/^club-boxhead-/)(d) && d.puntos >= 40 },
+    { id: "sotano10", n: "Bajo tierra", d: "Llega a la ronda 10 en el Sótano.", i: "🕯️", m: "Mapas", s: d => cat(/^club-boxhead-sotano$/)(d) && d.puntos >= 10 },
+    { id: "fortaleza15", n: "Asedio", d: "Llega a la ronda 15 en la Fortaleza.", i: "🏰", m: "Mapas", s: d => cat(/^club-boxhead-fortaleza$/)(d) && d.puntos >= 15 },
+    { id: "laberinto20", n: "Sin salida", d: "Llega a la ronda 20 en el Laberinto.", i: "🌀", m: "Mapas", s: d => cat(/^club-boxhead-laberinto$/)(d) && d.puntos >= 20 }
   ],
   /* PRO PACMAN. Todos salen de club-propac-puntos (el récord): siete por
      puntaje y tres por lo que aguantó esa partida (tiempo de juego). Un

@@ -206,7 +206,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-hero-estrellas") return `🎸 ${Math.floor(f.puntos / 10000)} ★ doradas`;
   // PRO DEFENDER: la ronda récord del reino.
   if (/^club-prodefender-/.test(cat)) return `🛡️ ronda ${f.puntos}`;
-  if (/^club-boxhead-/.test(cat)) return `🧟 nivel ${f.puntos}`;
+  if (/^club-boxhead-/.test(cat)) return `🧟 ronda ${f.puntos}`;
   if (cat === "club-propac-puntos") return `🟡 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;

@@ -916,6 +916,8 @@ export function guardarSolo(categoria, uid, dato) {
     const fila = {nombre:dato.nombre, puntos:dato.puntos, tiempo:dato.tiempo, partida:dato.partida};
     // PRO HERO: canciones con alguna estrella dorada y con las cinco (juegos/hero.js)
     if (categoria === "club-hero-estrellas") { fila.h = dato.h | 0; fila.h5 = dato.h5 | 0; }
+    // Pro BoxHead en sala: un compañero de esa sala en vez de la prueba (motor.js, rondaBoxhead)
+    if (categoria.startsWith("club-boxhead-") && typeof dato.con === "string") fila.con = dato.con;
     return fila;
   }, {applyLocally:false});
 }

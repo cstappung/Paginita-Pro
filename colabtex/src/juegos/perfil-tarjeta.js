@@ -179,7 +179,7 @@ export function valorMarca(c, f) {
   if (c === "club-pokelike-puntos") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (c === "club-hero-estrellas") return `${Math.floor((f.puntos || 0) / 10000)} ★ doradas`;
   if (String(c).startsWith("club-prodefender-")) return `ronda ${f.puntos || 0}`;
-  if (String(c).startsWith("club-boxhead-")) return `nivel ${f.puntos || 0}`;
+  if (String(c).startsWith("club-boxhead-")) return `ronda ${f.puntos || 0}`;
   if (c === "club-propac-puntos") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (c === "club-pokelike-pokedex") return `${f.puntos || 0} ${f.puntos === 1 ? "especie" : "especies"}`;
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
