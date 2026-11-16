@@ -392,88 +392,34 @@
 
   // ---------- Retratos (todo dibujado por código, como el resto del arte) ----------
   const RET = {};
-  const PIELES = [[244, 208, 172], [226, 180, 140], [196, 146, 104], [150, 100, 66], [110, 72, 48]];
-  const PELOS = [[40, 28, 20], [96, 60, 30], [180, 120, 50], [220, 190, 110], [150, 50, 30], [70, 70, 76], [230, 230, 230]];
   H.retrato = function (h) {
     // un aspecto del Pase del Reino (js/pase.js) cambia el color y lo que lleva en la cabeza
     const asp = h.aspecto && D.aspecto ? D.aspecto(h.aspecto) : null, ao = asp && asp.o && asp.o.clase === h.clase ? asp : null;
-    const key = h.clase + ':' + h.semilla + ':' + (h.mujer ? 1 : 0) + (ao ? ':' + h.aspecto : '');
+    // un personaje de la historia hecho héroe (el Rey Bandido) conserva su cara
+    if (!h.rasgos && D.PERSONAJES) { const P = Object.values(D.PERSONAJES).find(o => o.semilla === h.semilla && o.clase === h.clase && o.rasgos); if (P) h = Object.assign({}, h, { rasgos: P.rasgos }); }
+    const key = 'v2:' + h.clase + ':' + h.semilla + ':' + (h.mujer ? 1 : 0) + ':' + (h.rasgo || '') + (h.rasgos ? ':' + JSON.stringify(h.rasgos) : '') + (ao ? ':' + h.aspecto : '');
     if (RET[key]) return RET[key];
-    if (typeof document === 'undefined') return '';
-    const N = 24, c = document.createElement('canvas');
-    c.width = N; c.height = N;
-    const x = c.getContext('2d'), rng = U.rng(h.semilla), cl0 = H.CLASES[h.clase];
+    if (typeof document === 'undefined' || !PK.Retratos) return '';
+    const cl0 = H.CLASES[h.clase] || H.CLASES.juglar;
     const cl = ao ? Object.assign({}, cl0, { col: ao.tipo === 'heroe2' ? ao.o.col.map(v => 255 - v * 0.6) : ao.o.col }) : cl0;
-    const css = (a, f) => 'rgb(' + a.map(v => U.clamp(Math.round(v * (f || 1)), 0, 255)).join(',') + ')';
-    const r = (a, b, w, hh, col) => { x.fillStyle = col; x.fillRect(a, b, w, hh); };
-    const piel = PIELES[Math.floor(rng() * PIELES.length)], pelo = PELOS[Math.floor(rng() * PELOS.length)];
-    const largo = h.mujer ? rng() < 0.75 : rng() < 0.15, barba = !h.mujer && rng() < 0.45;
-    // fondo con el color de la clase y un halo
-    r(0, 0, N, N, css(cl.col, 0.35));
-    for (let y = 0; y < N; y++) for (let i = 0; i < N; i++) { const d = Math.hypot(i - 12, y - 10); if (d < 10) { x.fillStyle = css(cl.col, 0.55 + (10 - d) * 0.02); x.fillRect(i, y, 1, 1); } }
-    // pelo largo por detrás
-    if (largo) r(6, 7, 12, 11, css(pelo));
-    // hombros y ropa
-    r(3, 19, 18, 5, css(cl.col, 0.85)); r(5, 18, 14, 2, css(cl.col)); r(10, 18, 4, 3, css(cl.col, 0.6));
-    // cuello y cabeza
-    r(10, 15, 4, 4, css(piel, 0.85));
-    r(8, 6, 8, 10, css(piel)); r(7, 8, 1, 6, css(piel)); r(16, 8, 1, 6, css(piel));
-    r(8, 15, 8, 1, css(piel, 0.85)); r(15, 7, 1, 8, css(piel, 0.9)); // sombra del lado derecho
-    // ojos, cejas, nariz y boca
-    r(9, 10, 2, 1, '#fff'); r(13, 10, 2, 1, '#fff'); r(10, 10, 1, 1, '#1a1410'); r(14, 10, 1, 1, '#1a1410');
-    r(9, 9, 2, 1, css(pelo, 0.8)); r(13, 9, 2, 1, css(pelo, 0.8));
-    r(12, 11, 1, 2, css(piel, 0.8));
-    r(10, 14, 4, 1, h.mujer ? '#b04a4a' : css(piel, 0.6));
-    if (barba) { r(8, 13, 8, 3, css(pelo)); r(9, 16, 6, 1, css(pelo)); r(10, 14, 4, 1, css(pelo, 0.6)); }
-    // pelo de arriba
-    r(8, 5, 8, 2, css(pelo)); r(7, 6, 1, 3, css(pelo)); r(16, 6, 1, 3, css(pelo));
-    if (largo) { r(6, 8, 2, 9, css(pelo)); r(16, 8, 2, 9, css(pelo)); }
-    // lo que lleva en la cabeza, según la clase
-    const G2 = [170, 176, 190];
-    if (h.clase === 'paladin') { r(7, 3, 10, 5, css(G2)); r(7, 3, 10, 1, css(G2, 1.2)); r(11, 7, 2, 4, css(G2, 0.8)); r(6, 7, 2, 4, css(G2, 0.9)); r(16, 7, 2, 4, css(G2, 0.9)); r(11, 2, 2, 1, css([200, 50, 50])); }
-    else if (h.clase === 'guarda') { r(6, 4, 12, 4, css(cl.col, 0.8)); r(5, 7, 2, 9, css(cl.col, 0.75)); r(17, 7, 2, 9, css(cl.col, 0.75)); r(9, 3, 6, 1, css(cl.col, 0.8)); }
-    else if (h.clase === 'clerigo') { r(6, 4, 12, 3, '#f4f0e4'); r(5, 6, 2, 12, '#e8e2d0'); r(17, 6, 2, 12, '#e8e2d0'); r(8, 6, 8, 1, '#e8c050'); r(11, 5, 2, 1, '#ffe27a'); }
-    else if (h.clase === 'ingeniera') { r(7, 6, 10, 2, '#6a4424'); r(8, 6, 3, 2, '#9ad8e8'); r(13, 6, 3, 2, '#9ad8e8'); r(8, 6, 1, 1, '#fff'); r(13, 6, 1, 1, '#fff'); }
-    else if (h.clase === 'hechicero') { for (let i = 0; i < 6; i++) r(9 + Math.floor(i / 2), 6 - i, 6 - i, 1, css(cl.col, 0.8)); r(6, 5, 12, 2, css(cl.col, 0.7)); r(11, 3, 1, 1, '#ffe27a'); if (!h.mujer) { r(8, 13, 8, 4, '#e8e8e8'); r(9, 17, 6, 2, '#e0e0e0'); } }
-    else if (h.clase === 'juglar') { r(7, 4, 10, 3, css(cl.col)); r(6, 6, 12, 1, css(cl.col, 0.8)); r(16, 1, 1, 4, '#f0f0f0'); r(17, 0, 1, 3, '#f0f0f0'); r(15, 2, 1, 2, '#e8c050'); }
-    // el accesorio del aspecto, encima de lo de la clase
-    if (ao) {
-      const A = ao.o.acc, oro = '#f0c850';
-      if (A === 'cuernos') { r(6, 1, 2, 4, '#e8dcc0'); r(16, 1, 2, 4, '#e8dcc0'); r(5, 0, 1, 2, '#e8dcc0'); r(18, 0, 1, 2, '#e8dcc0'); }
-      else if (A === 'tricornio') { r(5, 3, 14, 3, '#2a2420'); r(8, 1, 8, 2, '#2a2420'); r(5, 5, 14, 1, oro); r(11, 2, 2, 1, '#e8e8e8'); }
-      else if (A === 'tiara') { r(8, 4, 8, 1, '#dff4ff'); r(9, 2, 1, 2, '#bfe6ff'); r(12, 1, 1, 3, '#ffffff'); r(15, 2, 1, 2, '#bfe6ff'); }
-      else if (A === 'capucha') { r(5, 3, 14, 5, css(cl.col, 0.6)); r(4, 6, 3, 12, css(cl.col, 0.55)); r(17, 6, 3, 12, css(cl.col, 0.55)); r(10, 9, 1, 1, '#7aff8a'); r(14, 9, 1, 1, '#7aff8a'); }
-      else if (A === 'sombrero') { r(6, 3, 12, 3, css(cl.col)); r(4, 5, 16, 1, css(cl.col, 0.8)); r(14, 0, 4, 3, '#f0f0f0'); }
-      else if (A === 'estrellas') { for (const [a, b] of [[4, 2], [19, 3], [2, 9], [21, 11], [12, 0]]) { r(a, b, 1, 1, '#fff6c0'); r(a - 1, b, 3, 1, 'rgba(255,246,192,0.5)'); } }
-      else if (A === 'paja') { r(5, 4, 14, 2, '#e8c870'); r(8, 2, 8, 2, '#d8b860'); r(8, 3, 8, 1, '#a05030'); }
-      else if (A === 'hojas') { for (let i = 0; i < 6; i++) r(6 + i * 2, 3 + (i % 2), 2, 2, i % 2 ? '#5a9a40' : '#78b450'); }
-      // los de los temas nuevos (pk-33)
-      else if (A === 'flores') { for (const [a, b, c] of [[6, 4, '#ffb0d0'], [9, 3, '#fff0f6'], [12, 3, '#ff80b0'], [15, 4, '#ffd0e4'], [17, 6, '#ff9cc4']]) { r(a, b, 2, 2, c); r(a, b, 1, 1, '#ffe27a'); } }
-      else if (A === 'conchas') { r(6, 4, 12, 1, '#e8f4f0'); for (const a of [7, 11, 15]) { r(a, 2, 2, 2, '#f0b8a8'); r(a, 2, 1, 1, '#fff0e8'); } }
-      else if (A === 'diadema_sol') { r(7, 4, 10, 1, oro); for (const [a, b, h2] of [[8, 2, 2], [10, 1, 3], [12, 0, 4], [14, 1, 3], [16, 2, 2]]) r(a, b, 1, h2, '#ffd040'); }
-      else if (A === 'luna') { r(15, 0, 3, 1, '#e8ecff'); r(17, 1, 2, 3, '#e8ecff'); r(15, 4, 3, 1, '#e8ecff'); r(16, 1, 1, 1, '#b8c0e8'); r(7, 4, 8, 1, '#c8d0f0'); }
-      else if (A === 'llamas') { for (const [a, h2] of [[7, 3], [9, 5], [11, 4], [13, 6], [15, 3], [17, 4]]) { r(a, 6 - h2, 2, h2, '#ff7a30'); r(a, 6 - Math.ceil(h2 / 2), 1, Math.ceil(h2 / 2), '#ffd040'); } }
-      else if (A === 'cuernos_ciervo') { r(6, 1, 1, 5, '#8a6440'); r(4, 2, 2, 1, '#8a6440'); r(5, 0, 1, 2, '#8a6440'); r(17, 1, 1, 5, '#8a6440'); r(18, 2, 2, 1, '#8a6440'); r(18, 0, 1, 2, '#8a6440'); }
-      else if (A === 'turbante') { r(6, 3, 12, 4, '#f0e4c8'); r(6, 4, 12, 1, '#d8c8a0'); r(11, 4, 2, 2, '#c03040'); r(11, 3, 2, 1, '#ffe27a'); }
-      else if (A === 'yelmo_alado') { r(7, 3, 10, 4, '#a8b0bc'); r(7, 6, 10, 1, '#7a8290'); r(3, 2, 4, 2, '#f4f0e4'); r(4, 1, 2, 1, '#f4f0e4'); r(17, 2, 4, 2, '#f4f0e4'); r(18, 1, 2, 1, '#f4f0e4'); }
-      else if (A === 'antifaz') { r(7, 9, 10, 3, css(cl.col)); r(9, 10, 2, 1, '#1a1410'); r(13, 10, 2, 1, '#1a1410'); r(17, 7, 3, 1, '#ffe27a'); r(19, 5, 1, 3, '#ff60e0'); }
-      else if (A === 'cristales') { for (const [a, h2] of [[8, 3], [11, 5], [14, 3]]) { r(a, 5 - h2, 2, h2, '#bfe6ff'); r(a, 5 - h2, 1, h2, '#ffffff'); } r(7, 5, 10, 1, '#88c8f0'); }
-      else if (A === 'corona') { r(7, 3, 10, 2, oro); for (const a of [7, 10, 13, 16]) r(a, 1, 1, 2, oro); r(11, 3, 2, 1, '#c03040'); r(8, 3, 1, 1, '#4080ff'); r(15, 3, 1, 1, '#40c060'); }
-      else if (A === 'kasa') { r(4, 4, 16, 2, '#d8b870'); r(7, 2, 10, 2, '#c8a860'); r(10, 1, 4, 1, '#b89850'); r(4, 5, 16, 1, '#8a6a30'); }
-      else if (A === 'rayos') { for (const [a, b] of [[5, 1], [18, 2]]) { r(a, b, 2, 1, '#fff6a0'); r(a + 1, b + 1, 1, 2, '#fff6a0'); r(a, b + 3, 2, 1, '#fff6a0'); } r(7, 4, 10, 1, '#6a7aa8'); }
-      else if (A === 'plumas') { r(6, 4, 12, 2, css(cl.col, 0.8)); r(15, 0, 1, 4, '#40c0a0'); r(16, 1, 1, 4, '#f0c040'); r(17, 0, 1, 3, '#e05050'); }
-      else if (A === 'tentaculos') { r(5, 3, 14, 3, '#1e4050'); for (const a of [4, 7, 16, 19]) r(a, 5, 1, 6, '#2a6a78'); r(10, 2, 1, 1, '#7aff8a'); r(13, 2, 1, 1, '#7aff8a'); }
-      else if (A === 'bufanda') { r(6, 4, 12, 3, css(cl.col)); r(6, 18, 12, 2, '#c05030'); r(15, 18, 2, 5, '#c05030'); r(6, 18, 12, 1, '#e08050'); }
-      else if (A === 'casco_piedra') { r(6, 2, 12, 5, '#8a8478'); r(6, 2, 12, 1, '#a8a294'); r(8, 4, 1, 1, '#6a645a'); r(14, 3, 2, 1, '#6a645a'); r(11, 6, 2, 5, '#7a746a'); }
-      else if (A === 'gorro') { r(7, 3, 10, 3, '#c83040'); r(13, 1, 4, 2, '#c83040'); r(17, 2, 2, 2, '#ffffff'); r(6, 5, 12, 2, '#f4f0ec'); }
-      x.strokeStyle = oro; x.lineWidth = 1; x.strokeRect(0.5, 0.5, N - 1, N - 1);
-      return (RET[key] = c.toDataURL());
-    }
-    // marco
-    x.strokeStyle = css(cl.col, 0.4); x.lineWidth = 1; x.strokeRect(0.5, 0.5, N - 1, N - 1);
-    return (RET[key] = c.toDataURL());
+    // pk-50: el dibujo vive en retratos.js (36x36, con muchas más caras posibles)
+    return (RET[key] = PK.Retratos.canvas(h, cl, ao).toDataURL());
   };
   H.retratoEl = (h, cls) => el('img', { class: 'h-ret ' + (cls || ''), src: H.retrato(h), alt: '' });
+  // pk-50: el mismo retrato con los ojos cerrados (quien habla parpadea: H.parpadear)
+  H.retratoCerrado = function (h) {
+    let ra = h.rasgos;
+    if (!ra && D.PERSONAJES) { const P = Object.values(D.PERSONAJES).find(o => o.semilla === h.semilla && o.clase === h.clase && o.rasgos); if (P) ra = P.rasgos; }
+    return H.retrato(Object.assign({}, h, { rasgos: Object.assign({}, ra || {}, { parpado: true }) }));
+  };
+  // Hace parpadear un retrato de quien habla cada 3 a 5 s mientras esté en la página.
+  H.parpadear = function (img, h) {
+    if (!img || typeof window === 'undefined' || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return img;
+    const abierto = img.src, cerrado = H.retratoCerrado(h);
+    const ciclo = () => { if (!img.isConnected) return; img.src = cerrado; setTimeout(() => { img.src = abierto; setTimeout(ciclo, 3000 + Math.random() * 2000); }, 140); };
+    setTimeout(ciclo, 1500 + Math.random() * 2000);
+    return img;
+  };
 
   // ---------- Ventana ----------
   let tab = 'heroes', sel = null;

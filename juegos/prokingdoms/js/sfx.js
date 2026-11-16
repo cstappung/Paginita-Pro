@@ -46,7 +46,7 @@
   // ninguno suene más fuerte que antes, por 1.25 porque una grabación se oye más «llena». Los amb-* los toca musica.js.
   const GAN = { chop: 0.0226, pick: 0.0337, hammer: 0.0331, dig: 0.0127, reap: 0.0185, deposit: 0.0334, build: 0.0928, level: 0.0732,
     era: 0.0781, quest: 0.0718, coin: 0.1296, event: 0.1114, cuerno: 0.0554, arrow: 0.0382, hit: 0.038, espada: 0.0252, boom: 0.0465,
-    fuego: 0.0363, magia: 0.0346, victoria: 0.1128, derrota: 0.0382, howl: 0.0593,
+    fuego: 0.0363, magia: 0.0346, victoria: 0.1128, derrota: 0.0382, howl: 0.0593, porton: 0.0324,
     'amb-olas': 0.0073, 'amb-viento': 0.0092, 'amb-grillo': 0.0081, 'amb-pajaro': 0.014, 'amb-gaviota': 0.0085, 'amb-obra': 0.0092,
     'amb-yunque': 0.0216, 'amb-sierra': 0.0081, 'amb-gente': 0.0066, 'amb-hacha': 0.0129, 'amb-pico': 0.0093 };
   // (sierra y gente, ×1.5 y ×2 sobre lo medido: el murmullo de antes casi no se oía)
@@ -93,7 +93,7 @@
   X.muestra = (name, destino, vol, cuando) => !!(ctx && muestra(name, destino, vol, cuando));
   X.duracion = name => { const b = bufs[ARCHIVO[name] || name]; return b ? b.duration : 0; };
 
-  const GAP = { level: 0.6, deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4 };
+  const GAP = { porton: 1.2, level: 0.6, deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4 };
 
   // pk-37: un sonido con lugar (PK.Render.sonarEn): vol 0..1 y pan -1..1. El tope de repetición no deja que uno
   // lejano y bajito le quite el turno a uno cerca: si el nuevo suena más fuerte que el último, pasa igual.
@@ -123,6 +123,7 @@
     if (muestra(name)) return;
     switch (name) {
       case 'deposit': tone(520, 0, 0.06, 'triangle', 0.035, 780); break;
+      case 'porton': tone(80, 0, 0.9, 'sawtooth', 0.025, 110); tone(95, 1.0, 0.25, 'sine', 0.06, 70); break; // pk-43: el Gran Portón (sfx/porton.mp3 es este mismo, hecho por código)
       case 'coin': tone(988, 0, 0.08, 'square', 0.04); tone(1319, 0.07, 0.16, 'square', 0.04); break;
       case 'build': [523, 659, 784].forEach((f, i) => tone(f, i * 0.07, 0.14, 'square', 0.045)); break;
       case 'level': tone(190, 0, 0.06, 'sine', 0.05, 140); [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.03 + i * 0.075, 0.45, 'triangle', i === 3 ? 0.03 : 0.045)); break;

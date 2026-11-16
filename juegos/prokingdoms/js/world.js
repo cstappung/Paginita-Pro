@@ -25,6 +25,10 @@
     W.road = new Uint8Array(N);              // 1 = camino
     W.belt = new Int16Array(N).fill(-1);     // id de la cinta que pasa por la casilla
     W.wall = new Uint8Array(N);              // 1 = muralla, 2 = puerta
+    W.wallOwner = new Uint8Array(N);         // L4: muralla o puerta de otro reino (casilla del reino + 1)
+    W.wallAj = new Uint8Array(N);            // L4: 1 = muralla ajena, 2 = puerta ajena
+    W.autopista = new Uint8Array(N);         // L5: Calzada Real (casilla del reino que la hizo + 1)
+    W.apVer = 0;
     W.roadVer = 0;
     W.fog = new Uint8Array(N);        // 1 = explorado por ti
     W.fogCount = 0;
@@ -241,6 +245,8 @@
     });
     W.buildBuckets();
     W.initTerritory();
+    // L4: dónde puso cada cosa el mapa (W.ubicarLugares parte siempre de acá, así da lo mismo en todos lados)
+    W.ORIG = { n: W.nodes.map(n => [n.x, n.y]), p: W.pois.map(p => [p.x, p.y]) };
   };
   // ---------- El Archipiélago de Bruma (Fase 9, pk-25: la isla de prueba) ----------
   // Casi todo es agua. Tu isla queda en el mismo lugar que tu hogar de la tierra (así la cámara, el Centro Urbano y
@@ -353,7 +359,8 @@
     const i = W.idx(x, y);
     if (W.block[i] || W.terrain[i] === T_WATER) return null;
     const def = D.NODES[kind], z = zone >= 0 ? W.zones[zone] : null;
-    const n = { id: W.nodes.length, kind, x, y, amount: def.amount, max: def.amount, zone, v: Math.floor(rng() * 6), dead: false, t: 0 };
+    const m = z && z.common ? 1 : def.priv || 1; // pk-42: los de tu tierra duran más (las comunes, como el servidor)
+    const n = { id: W.nodes.length, kind, x, y, amount: def.amount * m, max: def.amount * m, zone, v: Math.floor(rng() * 6), dead: false, t: 0 };
     if (kind === 'deer') n.dir = rng() < 0.5;
     if (kind === 'tree') n.sp = z && z.common && z.type === 'tree' ? (rng() < 0.55 ? 'pine' : 'oak') : rng() < 0.08 ? 'aut' : rng() < 0.3 ? 'pine' : 'oak';
     W.nodes.push(n);
@@ -594,6 +601,7 @@
 
   // goal = { x0, y0, x1, y1, adj }: adj=true significa llegar a una casilla vecina del rectángulo.
   // noGate: las puertas cuentan como muralla (para los lobos y los enemigos).
+  W.pasoDe = 0; // L4: reino (casilla + 1) de quien pide la ruta; lo pone pathTo de entities.js y lo vuelve a 0
   W.findPath = function (sx, sy, goal, maxIter, noGate) {
     const w = W.W, N = w * W.H;
     if (!gS) {
@@ -626,7 +634,8 @@
         if (!W.passable(nx, ny)) continue;
         if (dx && dy && (!W.passable(cx + dx, cy) || !W.passable(cx, cy + dy))) continue;
         const ni = ny * w + nx;
-        if (noGate && W.wall[ni] === 2) continue;
+        if (noGate && W.wall[ni] >= 2) continue; // puertas y el paso del Gran Portón (pk-43)
+        if (W.wallOwner[ni] && W.wallOwner[ni] !== W.pasoDe) continue; // L4: una puerta ajena solo la cruza su gente
         if (closed[ni] === stamp) continue;
         const ng = gS[cur] + c;
         if (seen[ni] !== stamp || ng < gS[ni]) {
@@ -638,6 +647,65 @@
       }
     }
     return { path: build(best), ok: false };
+    function build(end) {
+      const out = [];
+      let c = end;
+      while (c !== start && c >= 0) { out.push([c % w, (c / w) | 0]); c = from[c]; }
+      return out.reverse();
+    }
+  };
+
+  // ---------- Rutas por tiempo (pk-41, plan de logística L1) ----------
+  // El mismo A*, pero cada casilla cuesta lo que tarda en cruzarla quien viaja (1 / velocidad): así una carreta toma
+  // el camino más RÁPIDO (por el camino empedrado, aunque dé un rodeo) y no el más corto. `costo` es un Float32Array
+  // por casilla con Infinity donde no pasa; `minCosto`, el de la casilla más rápida (la heurística nunca se pasa).
+  // Lo arma logistics.js por perfil (carreta, carromato, barcaza) y guarda los caminos: este A* explora más que el
+  // de los aldeanos y no debe correr en cada decisión.
+  W.rutaCosto = function (sx, sy, goal, costo, minCosto, maxIter) {
+    const w = W.W, N = w * W.H;
+    if (!gS) {
+      gS = new Float32Array(N); from = new Int32Array(N); seen = new Uint32Array(N); closed = new Uint32Array(N);
+      heapI = new Int32Array(N * 8); heapF = new Float32Array(N * 8);
+    }
+    stamp++;
+    maxIter = maxIter || N;
+    const mc = Math.max(1e-3, minCosto || 1);
+    const inRect = (x, y) => x >= goal.x0 && x <= goal.x1 && y >= goal.y0 && y <= goal.y1;
+    const isGoal = (x, y) => goal.adj ? (x >= goal.x0 - 1 && x <= goal.x1 + 1 && y >= goal.y0 - 1 && y <= goal.y1 + 1 && !inRect(x, y)) : inRect(x, y);
+    const hf = (x, y) => {
+      const dx = Math.max(goal.x0 - x, 0, x - goal.x1), dy = Math.max(goal.y0 - y, 0, y - goal.y1);
+      return (Math.max(dx, dy) + 0.414 * Math.min(dx, dy)) * mc;
+    };
+    sx = U.clamp(sx, 0, w - 1); sy = U.clamp(sy, 0, W.H - 1);
+    const start = sy * w + sx;
+    if (isGoal(sx, sy)) return { path: [], ok: true, seg: 0 };
+    let n = 0;
+    gS[start] = 0; seen[start] = stamp; from[start] = -1;
+    heapPush(start, hf(sx, sy), n++);
+    let best = start, bestH = hf(sx, sy), iter = 0;
+    const libre = (x, y) => x >= 0 && y >= 0 && x < w && y < W.H && costo[y * w + x] < Infinity;
+    while (n > 0 && iter++ < maxIter) {
+      const cur = heapPop(n); n--;
+      if (closed[cur] === stamp) continue;
+      closed[cur] = stamp;
+      const cx = cur % w, cy = (cur / w) | 0;
+      if (cur !== start && isGoal(cx, cy)) return { path: build(cur), ok: true, seg: gS[cur] };
+      for (const [dx, dy, c] of DIRS) {
+        const nx = cx + dx, ny = cy + dy;
+        if (!libre(nx, ny)) continue;
+        if (dx && dy && (!libre(cx + dx, cy) || !libre(cx, cy + dy))) continue;
+        const ni = ny * w + nx;
+        if (closed[ni] === stamp) continue;
+        const ng = gS[cur] + c * costo[ni];
+        if (seen[ni] !== stamp || ng < gS[ni]) {
+          seen[ni] = stamp; gS[ni] = ng; from[ni] = cur;
+          const hh = hf(nx, ny);
+          if (hh < bestH) { bestH = hh; best = ni; }
+          if (n < heapI.length) heapPush(ni, ng + hh, n++);
+        }
+      }
+    }
+    return { path: build(best), ok: false, seg: gS[best] };
     function build(end) {
       const out = [];
       let c = end;
@@ -659,15 +727,15 @@
 
   W.soft = n => n.kind === 'tree' || n.kind === 'berry' || n.kind === 'deer' || !!(D.NODES[n.kind] && D.NODES[n.kind].soft); // al agotarse dejan pasar
   W.isShared = n => n.zone >= 0 && W.zones[n.zone].common;
-  W.serverNodes = false; // en línea, el servidor manda sobre los recursos de las zonas comunes
 
   W.regrow = function (now, occupied, hoursPassed) {
     for (const n of W.nodes) {
-      if (n.temp || n.gone || (W.serverNodes && W.isShared(n))) continue; // gone: talado para siempre (despeje.js)
+      if (n.temp || n.gone) continue; // gone: talado para siempre (despeje.js)
       const def = D.NODES[n.kind];
       if (def.regen) {
         if (n.amount < n.max && hoursPassed > 0) {
-          const mult = W.zoneOf(n) && W.zoneOf(n).common ? 1 : 0.8; // las tuyas, casi como las comunes (era 0,6; pk-40)
+          // las tuyas, casi como las comunes (era 0,6; pk-40); con el monto ×priv (pk-42) rellenan lo mismo por hora
+          const mult = W.zoneOf(n) && W.zoneOf(n).common ? 1 : 0.8 / (def.priv || 1);
           n.amount = Math.min(n.max, n.amount + n.max * def.regen * mult * hoursPassed);
           if (n.dead && n.amount >= 1) n.dead = false;
         }
@@ -783,6 +851,114 @@
     if (y > 0) out.push(k - P);
     if (y < P - 1) out.push(k + P);
     return out;
+  };
+  // ---------- Despeje global (L4, pk-45) ----------
+  // Dentro de cualquier territorio solo quedan árboles y arbustos (W.QUEDAN). Lo demás (lugares, minas, vetas,
+  // ciervos) se ubica en la casilla más cercana a su lugar original que esté a W.LEJOS casillas o más de todo
+  // territorio. Función pura de W.ORIG y del territorio: dos clientes (o el servidor) con el mismo W.terr dan lo
+  // mismo, sin importar su historia. Devuelve { n: { id: [x, y] }, p: { id: [x, y] }, cerca } (cerca: los que no
+  // cupieron a W.LEJOS y quedaron lo más lejos posible).
+  W.QUEDAN = { tree: 1, berry: 1 };
+  W.LEJOS = 12;
+  const UB_R = 80;
+  let UB_OFF = null, ubCache = null;
+  function ubOffsets() {
+    if (UB_OFF) return UB_OFF;
+    UB_OFF = [];
+    for (let dy = -UB_R; dy <= UB_R; dy++) for (let dx = -UB_R; dx <= UB_R; dx++) { const d = dx * dx + dy * dy; if (d <= UB_R * UB_R) UB_OFF.push([dx, dy, d]); }
+    UB_OFF.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]); // mismo orden siempre: mismo destino
+    return UB_OFF;
+  }
+  // distancia (Chebyshev, en casillas) de cada casilla al territorio más cercano, hasta W.LEJOS
+  W.distTerritorio = function (terr) {
+    const w = W.W, h = W.H, N = w * h, L = W.LEJOS, d = new Uint8Array(N).fill(L);
+    let q = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (terr[W.parcel(x, y)]) { const k = y * w + x; d[k] = 0; q.push(k); }
+    for (let v = 1; v < L && q.length; v++) {
+      const nq = [];
+      for (const k of q) {
+        const x = k % w, y = (k / w) | 0;
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+          const xx = x + i, yy = y + j;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          const kk = yy * w + xx;
+          if (d[kk] > v) { d[kk] = v; nq.push(kk); }
+        }
+      }
+      q = nq;
+    }
+    return d;
+  };
+  W.ubicarLugares = function (terr) {
+    terr = terr || W.terr;
+    if (!W.ORIG || W.tema === 'mar') return { n: {}, p: {}, cerca: 0 };
+    const key = Array.from(terr).join(',');
+    if (ubCache && ubCache.key === key) return ubCache.r;
+    const w = W.W, N = w * W.H, dist = W.distTerritorio(terr), ocup = new Uint8Array(N), out = { n: {}, p: {}, cerca: 0 };
+    const enTerr = (x, y) => !!terr[W.parcel(x, y)];
+    const nOrig = W.ORIG.n.length, pOrig = W.ORIG.p.length;
+    const poiMueve = id => { const p = W.pois[id], [x0, y0] = W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (enTerr(x0 + i, y0 + j)) return true; return false; };
+    const nodoMueve = id => { const n = W.nodes[id]; return !W.QUEDAN[n.kind] && enTerr(W.ORIG.n[id][0], W.ORIG.n[id][1]); };
+    const mueveP = [], mueveN = [];
+    // lo que se queda ocupa su lugar original
+    for (let id = 0; id < pOrig; id++) {
+      if (poiMueve(id)) { mueveP.push(id); continue; }
+      const p = W.pois[id], [x0, y0] = W.ORIG.p[id];
+      for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocup[W.idx(x0 + i, y0 + j)] = 1;
+    }
+    for (let id = 0; id < nOrig; id++) { if (nodoMueve(id)) mueveN.push(id); else ocup[W.idx(W.ORIG.n[id][0], W.ORIG.n[id][1])] = 1; }
+    // libre según datos fijos: el terreno, las zonas, las parcelas comunes, lo reservado y lo ya ubicado
+    const libre = (x, y) => { if (!W.inb(x, y)) return false; const k = y * w + x; return !ocup[k] && W.terrain[k] !== 4 && !W.reserved[k] && W.zoneAt[k] < 0 && !W.terrCommon[W.parcel(x, y)] && !enTerr(x, y); };
+    const buscar = (x0, y0, cabe, lejos) => {
+      let mejor = null, md = -1;
+      for (const [dx, dy] of ubOffsets()) {
+        const x = x0 + dx, y = y0 + dy;
+        if (!W.inb(x, y)) continue;
+        const dd = lejos(x, y);
+        if ((dd < W.LEJOS && dd <= md) || !cabe(x, y)) continue; // la distancia primero: es lo barato
+        if (dd >= W.LEJOS) return [x, y];
+        if (dd > md) { md = dd; mejor = [x, y]; }
+      }
+      if (mejor) out.cerca++;
+      return mejor;
+    };
+    for (const id of mueveP) {
+      const p = W.pois[id], [x0, y0] = W.ORIG.p[id];
+      const cabe = (x, y) => {
+        for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (!libre(x + i, y + j)) return false;
+        for (let j = -1; j <= p.h; j++) for (let i = -1; i <= p.w; i++) { const xx = x + i, yy = y + j; if (W.inb(xx, yy) && ocup[yy * w + xx] === 2) return false; } // dos lugares movidos nunca se tocan
+        return true;
+      };
+      const lejos = (x, y) => { let m = 99; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) { if (!W.inb(x + i, y + j)) return 0; m = Math.min(m, dist[W.idx(x + i, y + j)]); } return m; };
+      const to = buscar(x0, y0, cabe, lejos);
+      if (!to) continue;
+      out.p[id] = to;
+      for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocup[W.idx(to[0] + i, to[1] + j)] = 2;
+    }
+    for (const id of mueveN) {
+      const [x0, y0] = W.ORIG.n[id];
+      const to = buscar(x0, y0, libre, (x, y) => dist[y * w + x]);
+      if (!to) continue;
+      out.n[id] = to;
+      ocup[W.idx(to[0], to[1])] = 1;
+    }
+    // las casillas que quedan ocupadas por lugares y recursos que no son árboles (para la Calzada, L5)
+    const ocupa = new Uint8Array(N);
+    for (let id = 0; id < pOrig; id++) { const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = 1; }
+    for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = 1; }
+    Object.defineProperty(out, 'ocupa', { value: ocupa, enumerable: false }); // fuera del JSON (la prueba compara posiciones)
+    ubCache = { key, r: out };
+    return out;
+  };
+  // L5: ¿puede ir una casilla de Calzada Real ahí, para ese reino? Pura (datos fijos, territorio y W.ubicarLugares):
+  // la misma respuesta en el cliente y en el servidor. Los edificios los mira solo el cliente (L.calzadaLibre).
+  W.calzadaPuede = function (k, slot, terr) {
+    terr = terr || W.terr;
+    if (!(k >= 0 && k < W.W * W.H) || W.tema === 'mar' || !W.ORIG) return false;
+    const x = k % W.W, y = (k / W.W) | 0, pc = W.parcel(x, y);
+    if (W.terrain[k] === 4 || W.terrCommon[pc] || (W.zoneAt[k] >= 0 && W.zones[W.zoneAt[k]].common)) return false;
+    if (terr[pc] && terr[pc] !== slot + 1) return false; // no en tierra ajena
+    return !W.ubicarLugares(terr).ocupa[k];
   };
   W.countParcels = slot => { let n = 0; for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === slot + 1) n++; return n; };
   W.saveTerr = () => Array.from(W.terr).join(',');

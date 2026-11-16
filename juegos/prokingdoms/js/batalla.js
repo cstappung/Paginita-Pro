@@ -991,6 +991,7 @@
     requestAnimationFrame(bucle);
   };
   let onKey = null;
+  B.repintar = () => { if (vista) pintarControles(); }; // la guía pausa y suelta la pelea desde afuera
   B.cerrar = function () {
     if (!vista) return;
     const b = vista.b;
@@ -1018,11 +1019,11 @@
       const f = b.fin, lost = Object.keys(f.lost).filter(k => f.lost[k]).map(k => f.lost[k] + ' ' + D.ARMY[k].name.toLowerCase() + (f.lost[k] > 1 ? 's' : '')).join(', ') || 'ninguna';
       v.ctl.append(el('div', { class: 'bt-fin ' + (f.gano ? 'gano' : 'perdio') }, el('b', null, f.sola ? 'Se retiran' : f.retirada ? 'Retirada' : f.gano ? '¡Victoria!' : 'Derrota'),
         el('span', null, ' Bajas: ' + lost + '. ' + (f.gano ? 'Vuelven con el botín.' : 'Los que quedan vuelven a casa.')),
-        el('div', { class: 'row' }, siguienteSala(b), btn('Volver al reino', () => B.cerrar(), { cls: siguienteSala(b) ? '' : 'gold' }))));
+        el('div', { class: 'row' }, siguienteSala(b), btn('Volver al reino', () => B.cerrar(), { cls: siguienteSala(b) ? '' : 'gold', guia: 'bt-volver' }))));
       return;
     }
     const kinds = Object.keys(b.enemigo);
-    const ord = el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Órdenes' }, Object.keys(B.ORDENES).map(k => btn(B.ORDENES[k].nombre, () => { B.ordenar(b.id, k); pintarControles(); }, { small: true, cls: b.orden === k ? 'gold' : '', title: B.ORDENES[k].desc })));
+    const ord = el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Órdenes' }, Object.keys(B.ORDENES).map(k => btn(B.ORDENES[k].nombre, () => { B.ordenar(b.id, k); pintarControles(); }, { small: true, cls: b.orden === k ? 'gold' : '', title: B.ORDENES[k].desc, guia: 'bt-' + k })));
     // C4: los enemigos con rol que siguen en pie también se pueden enfocar
     const conRol = b.suyos.filter(f => f.rol && !f.muerto);
     const foco = kinds.length > 1 || b.jefeF || conRol.length ? el('div', { class: 'bt-ord', role: 'group', 'aria-label': 'Atacar primero' }, el('span', { class: 'small' }, 'Atacar primero: '),
@@ -1046,7 +1047,7 @@
     }
     v.ctl.append(heroeRow, ord, foco, consejo,
       el('div', { class: 'row' }, btn(b.pausa ? '▶ Seguir' : '❚❚ Pausa', () => { B.pausar(b.id); pintarControles(); }, { small: true, cls: b.pausa ? 'gold' : '', title: 'Pausa táctica (barra espaciadora): las órdenes se pueden dar igual' }),
-        btn('x' + (b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1), () => { b.vel = b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1; pintarControles(); }, { small: true, title: 'Velocidad de la batalla' }),
+        btn('x' + (b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1), () => { b.vel = b.vel === 1 ? 2 : b.vel === 2 ? 4 : 1; pintarControles(); }, { small: true, title: 'Velocidad de la batalla', guia: 'bt-vel' }),
         btn('Retirada', () => { B.retirada(b.id); }, { small: true, cls: 'danger', title: 'Pierdes la pelea, pero se salvan más soldados' }),
         btn('Volver al reino', () => B.cerrar(), { small: true, title: 'La batalla sigue aunque no la mires' })));
   }
@@ -1171,15 +1172,27 @@
   const fatuoDe = () => (FATUO = FATUO || spr2([0, 1].map(mkFatuo), 5, 14));
   const tentDe = () => (TENT = TENT || spr2([0, 1].map(mkTentaculo), 7, 22));
   const PALIDO = [176, 176, 164], BANDIDO = [70, 44, 40];
+  // pk-50: oso, gólem y esqueleto con volumen y animados (fauna.js), 6 cuadros cada uno, guardados por cuadro
+  const FAUNA = {}, DV = [];
+  const dragonVuelo = i => (DV[i] = DV[i] || PK.Fauna.dragonVuelo(i / 4)); // 72x52, mira a la derecha
+  function fauna(tipo, cuadro, flip) {
+    const k = tipo + cuadro + (flip ? 'f' : ''), Fa = PK.Fauna;
+    if (FAUNA[k]) return FAUNA[k];
+    const ff = cuadro < 0 ? null : cuadro / 6;
+    const s = tipo === 'oso' ? Fa.oso(ff, flip) : tipo === 'golem' ? Fa.golem(ff, flip) : tipo === 'golemF' ? Fa.golem(ff, flip, [255, 176, 64])
+      : Fa.esqueleto(tipo === 'esqW' ? 'work' : tipo === 'esqM' ? 'walk' : 'idle', ff || 0, flip);
+    return (FAUNA[k] = s);
+  }
   function sprite(f, frame) {
     const a = f.st, modo = f.modo;
     if (B.ext.sprite && (a.barco || a.mar)) { const s2 = B.ext.sprite(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe' && D.temaActivo === 'mar' && B.ext.heroe) { const s2 = B.ext.heroe(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe') return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
     if (f.lado === 'p') return f.tipo === 'catapult' ? Sp.cart(COL_MIOS, 'stone', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
-    if (a.spr === 'lobo') return Sp.wolf[f.flip ? 1 : 0][frame % 2];
-    if (a.spr === 'oso') return osoDe()[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'walk' ? 5 : 1)) % 2];
-    if (a.spr === 'golem') return golemDe(!!a.tinte)[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'idle' ? 1 : 3)) % 2];
+    if (a.spr === 'lobo') return Sp.wolf[f.flip ? 1 : 0][(modo === 'walk' || modo === 'work' ? Math.floor(f.anim * 10) : 0) % Sp.wolf[0].length];
+    if (a.spr === 'oso') return PK.Fauna ? fauna('oso', modo === 'idle' ? -1 : Math.floor(f.anim * 6) % 6, f.flip) : osoDe()[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'walk' ? 5 : 1)) % 2];
+    if (a.spr === 'golem') return PK.Fauna ? fauna('golem' + (a.tinte ? 'F' : ''), Math.floor(f.anim * (modo === 'idle' ? 2 : 5)) % 6, f.flip) : golemDe(!!a.tinte)[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'idle' ? 1 : 3)) % 2];
+    if (a.spr === 'esqueleto' && PK.Fauna) return fauna('esq' + (modo === 'work' ? 'W' : modo === 'walk' ? 'M' : 'I'), Math.floor(f.anim * (modo === 'work' ? 7 : 8)) % 6, f.flip);
     if (a.spr === 'liche') return Sp.villager([96, 50, 140], 3, 0, modo === 'walk' ? 'walk' : 'idle', frame % 4, null, f.flip, null);
     if (a.spr === 'rey') return Sp.villager([150, 110, 30], 2, 1, modo, frame % 4, null, f.flip, modo === 'work' ? 'sword' : null);
     if (a.spr === 'reina') return Sp.villager([150, 40, 60], 0, 1, modo, frame % 4, null, f.flip, modo === 'work' ? 'sword' : null, false, false, null, 'knight');
@@ -1333,7 +1346,7 @@
       else if (m && spr0 !== 'dragon' && spr0 !== 'espectro' && spr0 !== 'golem') ctx.rotate(f.caida * Math.min(1, m / 0.28) * Math.PI / 2 * 0.9);
       if (m && spr0 === 'dragon') ctx.translate(0, Math.min(1, m / 1.2) * 14);
       if (spr0 === 'dragon') {
-        const d = dragonSpr[Math.floor(f.anim * (m ? 1 : 4)) % 2];
+        const d = PK.Fauna ? dragonVuelo(Math.floor(f.anim * (m ? 1 : 6)) % 4) : dragonSpr[Math.floor(f.anim * (m ? 1 : 4)) % 2];
         // vuela: sube y baja con el aleteo
         const vuelo = m ? 0 : Math.sin(f.anim * 4 * Math.PI / 2) * 3 - 4 - (f.esJefe && b.vuela ? 22 : 0);
         if (f.st.escala) ctx.scale(f.st.escala, f.st.escala);
@@ -1349,7 +1362,7 @@
           // destello blanco del golpe recibido
           if (f.golpe > 0 && !m) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (f.golpe / 0.18) * 0.8; ctx.drawImage(spr.c, x0, y0, w, h); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = alpha; }
           // ojos que brillan: los del gólem (en su dibujo, en x 9 y 12, y 4) y un halo verde para el Liche
-          if (spr0 === 'golem' && !m) { const k = 0.6 + 0.4 * Math.sin(f.anim * 3), ex = f.flip ? 20 - 13 : 9; ctx.fillStyle = (f.st.tinte ? 'rgba(255,200,90,' : 'rgba(122,240,255,') + k + ')'; ctx.fillRect(Math.round(x0 + ex * big), Math.round(y0 + 4 * big), Math.ceil(big), Math.ceil(big)); ctx.fillRect(Math.round(x0 + (ex + 3) * big), Math.round(y0 + 4 * big), Math.ceil(big), Math.ceil(big)); }
+          if (spr0 === 'golem' && !m && !PK.Fauna) { const k = 0.6 + 0.4 * Math.sin(f.anim * 3), ex = f.flip ? 20 - 13 : 9; ctx.fillStyle = (f.st.tinte ? 'rgba(255,200,90,' : 'rgba(122,240,255,') + k + ')'; ctx.fillRect(Math.round(x0 + ex * big), Math.round(y0 + 4 * big), Math.ceil(big), Math.ceil(big)); ctx.fillRect(Math.round(x0 + (ex + 3) * big), Math.round(y0 + 4 * big), Math.ceil(big), Math.ceil(big)); }
           if (spr0 === 'liche' && !m) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(120,255,140,' + (0.12 + 0.08 * Math.sin(f.anim * 4)) + ')'; ctx.fillRect(x0 - 2, y0 - 2, w + 4, h + 2); ctx.globalCompositeOperation = 'source-over'; }
           if ((spr0 === 'fatuo' || spr0 === 'bruja' || spr0 === 'sirena') && !m) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = spr0 === 'sirena' ? 'rgba(90,230,220,0.14)' : 'rgba(110,255,140,' + (spr0 === 'fatuo' ? 0.3 : 0.12) + ')'; ctx.fillRect(x0 - 2, y0 - 2, w + 4, h + 2); ctx.globalCompositeOperation = 'source-over'; }
           // maldecidos, agarrados o encantados: una marca sobre la cabeza

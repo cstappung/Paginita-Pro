@@ -15,6 +15,8 @@
     W.wall.fill(0);
     for (const k of st.def.walls) { W.wall[k] = WALL; W.block[k] = BLOCK; }
     for (const k of st.def.gates) W.wall[k] = GATE;
+    for (const b of G().buildings || []) if (b.def.porton) G().marcarPorton(b, true); // pk-43: el paso del Gran Portón
+    Def.ajenas = {}; if (W.wallOwner) { W.wallOwner.fill(0); W.wallAj.fill(0); }
     Def.recount();
   };
   Def.tier = () => D.WALL.tiers[S().def.tier - 1];
@@ -47,6 +49,8 @@
   // ---------- Construir ----------
   Def.build = function (tiles) {
     if (!tiles.length) return 0;
+    const tope = D.WALL.max(S().era);
+    if (Def.count() + tiles.length > tope) { toast('Tu era permite hasta ' + tope + ' casillas de muralla y puertas (tienes ' + Def.count() + ').', 'warn'); return 0; }
     const cost = {}, c = Def.tier().cost;
     for (const r in c) cost[r] = c[r] * tiles.length;
     if (!G().pay(cost)) { toast('Faltan recursos para ' + tiles.length + ' casillas de ' + Def.tier().name.toLowerCase() + '.', 'warn'); return 0; }
@@ -68,6 +72,7 @@
     const k = W.idx(x, y), st = S();
     if (W.wall[k] === GATE) { toast('Ahí ya hay una puerta.', 'info'); return false; }
     if (W.wall[k] !== WALL && !Def.allowed(x, y, true)) { toast('La puerta va sobre una muralla tuya o en una casilla libre de tu territorio.', 'warn'); return false; }
+    if (st.def.gates.length >= D.WALL.gatesMax || (W.wall[k] !== WALL && Def.count() >= D.WALL.max(st.era))) { toast('Llegaste al tope de murallas y puertas de tu era.', 'warn'); return false; }
     if (!G().pay(D.WALL.gate)) { toast('Faltan recursos para la puerta.', 'warn'); return false; }
     if (W.wall[k] === WALL) st.def.walls.splice(st.def.walls.indexOf(k), 1);
     else clearSpot(k);
@@ -90,7 +95,7 @@
   // Desarmar devuelve la mitad del material actual.
   Def.remove = function (k) {
     const st = S(), t = W.wall[k];
-    if (!t) return;
+    if (!t || t > GATE) return; // 3: el paso de un Gran Portón (es un edificio: se demuele)
     const c = t === GATE ? D.WALL.gate : Def.tier().cost, back = {};
     for (const r in c) back[r] = Math.floor(c[r] / 2);
     G().give(back);
@@ -179,6 +184,88 @@
   // Multiplicador de defensa de una parcela propia.
   Def.parcelMult = (k, any) => (any || Def.isWalled(k) ? 1 + Def.tier().bonus : 1);
   Def.walledList = () => { Def.ensure(); return [...Def.walled]; };
+
+  // ---------- Murallas ajenas (L4, pk-45) ----------
+  // Las de otros jugadores llegan en el sync (Net: `muros` de cada reino, con versión); las de los reinos simulados se
+  // generan aquí, iguales en todos lados: un anillo por el borde de su territorio con 2 a 4 puertas, desde su Era II.
+  // Bloquean a todos (W.block 5); sus puertas (W.wallAj 2) solo las cruza su gente (W.pasoDe en findPath). No cuentan
+  // para tu recinto, Def.allowed ni la herramienta de quitar (todo eso mira W.wall, que es solo lo tuyo).
+  Def.ajenas = {}; // casilla del reino -> { t: [muros], g: [puertas], tier, tiles: [...], clave }
+  function quitarAjenas(slot) {
+    const r = Def.ajenas[slot];
+    if (!r) return;
+    for (const k of r.tiles) {
+      if (W.wallOwner[k] !== slot + 1) continue;
+      W.wallOwner[k] = 0; W.wallAj[k] = 0;
+      if (W.block[k] === BLOCK) { const n = W.nodeAt[k] >= 0 ? W.nodes[W.nodeAt[k]] : null; W.block[k] = n && !n.dead && !n.gone ? 1 : 0; }
+    }
+    delete Def.ajenas[slot];
+  }
+  Def.ponerAjenas = function (slot, m, clave) {
+    quitarAjenas(slot);
+    if (!m || slot === D.MY_SLOT) { if (G()) G().blockVer++; return; }
+    const own = D.ownerOfSlot(slot), N = W.W * W.H, r = { t: [], g: [], tier: U.clamp(Math.floor(+m.tier || 1), 1, 4), tiles: [], clave, orig: m };
+    const put = (k, tipo) => {
+      k = Math.floor(+k);
+      if (!(k >= 0 && k < N) || W.wallOwner[k]) return;
+      const x = k % W.W, y = (k / W.W) | 0;
+      if (W.ownerAt(x, y) !== own || W.bAt[k] >= 0 || W.poiAt[k] >= 0 || W.terrain[k] === 4 || W.wall[k]) return;
+      W.wallOwner[k] = slot + 1; W.wallAj[k] = tipo;
+      if (tipo === WALL) W.block[k] = BLOCK;
+      r.tiles.push(k); (tipo === WALL ? r.t : r.g).push(k);
+    };
+    for (const k of m.t || []) put(k, WALL);
+    for (const k of m.g || []) put(k, GATE);
+    Def.ajenas[slot] = r;
+    if (G()) G().blockVer++;
+  };
+  // El anillo de un reino simulado: las casillas de su territorio que tocan afuera; puertas hacia 2 a 4 rumbos.
+  Def.murosBot = function (slot, era) {
+    if (era < 2) return null;
+    const me1 = slot + 1, P = W.PW, PS = D.PARCEL, t = [], dentro = (x, y) => W.inb(x, y) && W.terr[W.parcel(x, y)] === me1;
+    for (let k = 0; k < P * P; k++) {
+      if (W.terr[k] !== me1) continue;
+      const x0 = (k % P) * PS, y0 = Math.floor(k / P) * PS;
+      for (let y = y0; y < y0 + PS; y++) for (let x = x0; x < x0 + PS; x++) {
+        if (dentro(x - 1, y) && dentro(x + 1, y) && dentro(x, y - 1) && dentro(x, y + 1)) continue;
+        const i = W.idx(x, y);
+        if (W.terrain[i] === 4 || W.zoneAt[i] >= 0 && W.zones[W.zoneAt[i]].common) continue;
+        t.push(i);
+      }
+    }
+    if (!t.length) return null;
+    const h = D.REALM_SLOTS[slot].home, n = 2 + Math.floor(U.hash(slot, 77, 3) * 3), g = new Set();
+    const rumbos = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+    const gira = Math.floor(U.hash(slot, 78, 3) * 4);
+    for (let j = 0; j < n; j++) {
+      const [dx, dy] = rumbos[(j + gira) % 4];
+      let mejor = -1, mv = -Infinity;
+      for (const k of t) { const v = ((k % W.W) - h[0]) * dx + (((k / W.W) | 0) - h[1]) * dy - Math.abs(((k % W.W) - h[0]) * dy - (((k / W.W) | 0) - h[1]) * dx) * 0.5; if (v > mv) { mv = v; mejor = k; } }
+      if (mejor >= 0) g.add(mejor);
+    }
+    for (const k of t) if (W.road[k]) g.add(k); // donde pasa un camino, puerta
+    return { t: t.filter(k => !g.has(k)), g: [...g], tier: U.clamp(Math.ceil((era - 1) / 2), 1, 4) };
+  };
+  // Cada vez que cambia el territorio o la era de un reino simulado (y al cargar): reponer sus murallas; las de los
+  // jugadores se recortan a su territorio de ahora.
+  Def.revisarAjenas = function () {
+    if (!W.wallOwner || (G().enMar && G().enMar())) return;
+    for (const r of D.REALM_SLOTS.map((s, i) => i)) {
+      if (r === D.MY_SLOT) continue;
+      const bot = PK.Terr && PK.Terr.realmOf(r);
+      if (!bot) continue;
+      const parc = []; for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === r + 1) parc.push(k);
+      if (bot.human) {
+        const a = Def.ajenas[r];
+        if (a && a.clave && a.clave.terr !== parc.join()) Def.ponerAjenas(r, a.orig, Object.assign({}, a.clave, { terr: parc.join() }));
+        continue;
+      }
+      const era = PK.Terr.realmInfo(r) ? PK.Terr.realmInfo(r).era : 1, clave = parc.join() + '|' + (era >= 2 ? Math.min(era, 9) : 0);
+      if (Def.ajenas[r] && Def.ajenas[r].clave === clave) continue;
+      if (!Def.ajenas[r] && era < 2) continue;
+      Def.ponerAjenas(r, Def.murosBot(r, era), clave);
+    }
+  };
 
   // ---------- Herramienta (dos toques para la muralla, uno para la puerta) ----------
   Def.cancel = function () { Def.tool = null; Def.start = null; if (PK.Render) PK.Render.wallGhost = null; };

@@ -36,6 +36,7 @@ const routes = {
   'GET /api/status': () => sim.status(),
   'POST /api/join': (p, b) => sim.join(b),
   'POST /api/sync': (p, b) => sim.sync(p, b),
+  'POST /api/autopista': (p, b) => sim.autopista(p, b),       // L5 (pk-47): Calzada Real
   'GET /api/save': p => sim.getSave(p),
   'POST /api/save': (p, b) => sim.putSave(p, b),
   'DELETE /api/save': p => sim.deleteSave(p),

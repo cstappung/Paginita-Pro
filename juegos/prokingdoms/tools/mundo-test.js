@@ -95,7 +95,7 @@ ok(p.inbox.some(i => i.type === 'titulo') && sim.ranking(p, { cat: 'piso' })[0].
 // Fase 9: en el archipiélago el sync no trae la tierra, no toca la foto y nadie saquea tu reino
 const m = nuevo('Marinera', 5), foto = JSON.stringify(m.snap);
 const rm = sim.sync(m, { mundo: 'mar', snap: { era: 9, pop: 999, defense: 1e9, res: {} }, harvest: { 1: 999 } });
-ok(m.mar && !Object.keys(rm.nodes).length && !rm.players.length && !rm.terr && JSON.stringify(m.snap) === foto, 'en el mar: sin recursos de la tierra y sin tocar la foto');
+ok(m.mar && rm.nodes === undefined && !rm.players.length && !rm.terr && JSON.stringify(m.snap) === foto, 'en el mar: sin recursos de la tierra y sin tocar la foto');
 m.saqNext = 1; m.lastSeen = Date.now(); sim.tickSaqueos();
 ok(!m.saqueo, 'nadie saquea un reino cuyo dueño está en el mar');
 sim.sync(m, { snap: { era: 5, pop: 60, defense: 900, res: m.snap.res } });

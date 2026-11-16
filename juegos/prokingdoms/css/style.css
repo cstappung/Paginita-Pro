@@ -284,6 +284,17 @@ ul.sub li.ok::marker { content: '✔ '; }
 .works { max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .work-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 3px 8px; background: rgba(120, 80, 30, 0.12); border-left: 4px solid #8a6a44; }
 .work-row.ok { border-left-color: var(--good); }
+/* pk-41: rutas de carretas (Logística y panel de los talleres) */
+.ruta-row { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px; margin: 3px 0; background: rgba(120, 80, 30, 0.12); border-left: 4px solid var(--good); }
+.ruta-row.mala { border-left-color: var(--bad); }
+.ruta-nom { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ruta-nom .ico { width: 22px; height: 22px; image-rendering: pixelated; }
+.ruta-btn { gap: 6px; align-items: center; }
+.ruta-nueva { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; padding: 6px 8px; background: rgba(120, 80, 30, 0.08); border: 2px dashed #8a6a44; }
+.ruta-nueva label { display: flex; align-items: center; gap: 4px; }
+.ruta-nueva select { max-width: 230px; }
+.rutas-panel { margin-top: 4px; }
+@media (max-width: 600px) { .ruta-nueva { flex-direction: column; align-items: stretch; } .ruta-nueva select { max-width: none; width: 100%; } }
 .work-row.done { opacity: 0.6; }
 .work-row img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
 .work-row .lvl { font-size: 13px; color: var(--ink2); min-width: 64px; }
@@ -414,7 +425,7 @@ ul.info li { margin: 2px 0; }
   .mm-legend { display: none !important; }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) {
   /* barra superior en una sola fila; lo que no cabe se ve deslizando */
   #topbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
   #topbar::-webkit-scrollbar { display: none; }
@@ -483,11 +494,11 @@ ul.info li { margin: 2px 0; }
 
   /* panel de selección: a la izquierda, ~38 % del ancho, alto completo bajo la barra */
   #panel { left: calc(4px + var(--sl)); right: auto; top: calc(var(--top-h, 32px) + 8px); bottom: calc(4px + var(--sb)); width: var(--pw); max-width: none; max-height: none; margin: 0; }
-  #panel.collapsed { bottom: auto; }
+  #panel.collapsed { bottom: auto; min-height: 0; }
   #panel .p-toggle { height: 44px; }
 
   /* minimapa chico arriba a la derecha del mapa (se oculta con el botón Minimapa) */
-  #mmwrap { right: calc(var(--mw) + var(--sr) + 4px); top: calc(var(--top-h, 32px) + 8px); padding: 3px; }
+  #mmwrap { left: auto; bottom: auto; right: calc(var(--mw) + var(--sr) + 4px); top: calc(var(--top-h, 32px) + 8px); padding: 3px; }
   #minimap { width: 120px; height: 60px; }
 
   /* tira de cola arriba a la izquierda del mapa, sin tocar el panel ni el minimapa */
@@ -499,7 +510,11 @@ ul.info li { margin: 2px 0; }
   #toasts > .toast:nth-child(n+3) { display: none; } /* el más nuevo va primero (prepend) */
 
   /* avisos y evento: abajo, en el hueco entre el panel y el menú */
-  #toasts { top: auto; bottom: calc(8px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); width: auto; transform: none; flex-direction: column-reverse; }
+  /* pk-49: a la derecha, angostos y de 2 líneas, para no tapar el medio del mapa */
+  #toasts { top: auto; bottom: calc(8px + var(--sb)); left: auto; right: calc(var(--mw) + var(--sr) + 8px); width: min(290px, 34vw); transform: none; flex-direction: column-reverse; align-items: stretch; }
+  #toasts .toast:not(.act) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; }
+  #toasts .toast.act { font-size: 12px; gap: 4px 8px; }
+  #hud #toasts > .toast:nth-child(n+3) { display: none; } /* como mucho 2 (la regla general de más abajo deja 3) */
   #hud:has(#event:not([style*="none"])) #toasts { bottom: calc(4px + var(--evh, 80px) + var(--sb)); }
   #event { top: auto; bottom: calc(4px + var(--sb)); left: calc(var(--pw) + var(--sl) + 12px); right: calc(var(--mw) + var(--sr) + 8px); transform: none; max-width: none; padding: 4px 8px; }
 
@@ -764,7 +779,7 @@ ul.info li { margin: 2px 0; }
 /* ✕ para soltar la selección en la cabecera del panel (solo donde el panel tiene cabecera: celular) */
 .p-headrow { display: contents; }
 .p-headrow .p-close { display: none !important; }
-@media (max-width: 900px) {
+@media (max-width: 900px), (orientation: landscape) and (max-height: 500px) { /* pk-49: también horizontales de más de 900 px */
   #panel .p-headrow { display: flex; flex: none; align-items: stretch; border-bottom: 2px solid var(--edge); }
   #panel.collapsed .p-headrow { border-bottom: none; }
   #panel .p-headrow .p-toggle { flex: 1; min-width: 0; border-bottom: none; }
@@ -1075,6 +1090,9 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
 .mar-piezas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .mar-pieza { border: 2px dashed #8a6a44; padding: 4px 8px; display: flex; flex-direction: column; }
 .mar-pieza.ok { border-style: solid; border-color: #3a7a24; background: rgba(60, 140, 40, 0.12); }
+/* en horizontal el panel ocupa toda la izquierda y los avisos van abajo: el cartel va bajo el minimapa, a la derecha
+   (abajo a la izquierda tapaba el panel del edificio) */
+@media (orientation: landscape) and (max-height: 500px) { #mar-cartel { left: auto; right: calc(var(--mw) + var(--sr) + 4px); bottom: auto; top: calc(var(--top-h, 32px) + 84px); font-size: 12px; } #mar-cartel .small { display: none; } #hud.mm-off #mar-cartel { top: calc(var(--top-h, 32px) + 8px); } }
 @media (max-width: 600px) { #mar-cartel { bottom: calc(var(--ph, 40vh) + 6px + var(--sab, 0px)); font-size: 12px; max-width: calc(100% - 120px); } #mar-cartel .small { display: none; } }
 
 /* ---- U1 y U4 (Fase 6, pk-26): menú agrupado en cinco submenús; en el celular vertical, barra de abajo ---- */
@@ -1121,6 +1139,10 @@ button.res.pase-btn.listo { animation: pkBrillo 1.4s ease-in-out infinite; }
   #menu.more-below::after { display: none; }
   #acciones { right: calc(52px + var(--sr)); top: calc(var(--top-h, 32px) + 8px); bottom: auto; gap: 4px; }
   #acciones .mbtn { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 2px; }
+  /* solo el ícono: con 915 px no entra la regla de ≤ 900 que oculta las etiquetas, y el texto ensanchaba los botones
+     del menú por debajo de la columna de acciones (tapaba «Libro»; lo encontró la guía de Tobías) */
+  #menu .mbtn > span:not(.badge), #acciones .mbtn > span:not(.badge) { display: none; }
+  #menu .mbtn, #acciones .mbtn { justify-content: center; padding: 2px; }
   #submenu { max-height: calc(100vh - 16px); }
   #submenu .mbtn { min-height: 38px; padding: 3px 10px 3px 6px; font-size: 14px; }
 }
@@ -1151,7 +1173,7 @@ html.daltonico .ec-row:not(.ok) b::after { content: ' ✗'; color: var(--bad); }
 html.daltonico .toast.good > span:first-child::before { content: '✓ '; color: var(--good); }
 html.daltonico .toast.bad > span:first-child::before { content: '! '; color: var(--bad); font-weight: bold; }
 html.daltonico .work-row.ok, html.daltonico .isla-fila.tuya, html.daltonico .que-hago .qh-mision.lista { border-left-style: double; border-left-width: 6px; }
-html.daltonico .que-hago .asesor-row.grave { border-left-style: dashed; }
+html.daltonico .que-hago .asesor-row.grave, html.daltonico .ruta-row.mala { border-left-style: dashed; }
 html.daltonico .stats .st.up b::before { content: '▲'; font-size: 0.75em; margin-right: 1px; }
 html.menos-mov *, html.menos-mov *::before, html.menos-mov *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 .deslizador { align-items: center; gap: 6px 10px; }
@@ -1205,3 +1227,64 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 @media (max-width: 600px) { .serie-row { grid-template-columns: 24px 1fr auto; } .serie-row > .serie-ctl, .serie-row > span:last-child { grid-column: 2 / -1; } }
 .serie-ico { width: 24px; height: 24px; image-rendering: pixelated; }
 .serie-linea { margin-top: 6px; align-items: center; flex-wrap: wrap; }
+/* pk-42: edificios de trabajo (base y radio de los aldeanos) */
+.base-box { margin: 6px 0; padding: 6px 8px; background: rgba(120, 80, 30, 0.1); border-left: 4px solid #c9a24a; display: flex; flex-direction: column; gap: 4px; }
+.base-box .row { align-items: center; flex-wrap: wrap; gap: 6px; }
+.base-rs { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.base-res { display: inline-flex; align-items: center; gap: 3px; }
+.base-row { display: grid; grid-template-columns: 24px minmax(110px, 200px) 56px 1fr auto; align-items: center; gap: 4px 6px; }
+.base-row .fw-name { min-width: 0; }
+@media (max-width: 600px) { .base-row { grid-template-columns: 24px 1fr 48px auto; } .base-row > span.small { grid-column: 2 / -1; grid-row: 2; } }
+/* pk-43: lo que guarda una bodega o un campamento */
+.stock-box { margin: 6px 0; padding: 6px 8px; background: rgba(120, 80, 30, 0.1); border-left: 4px solid #7a9a5a; display: flex; flex-direction: column; gap: 4px; }
+.stock-box.lleno { border-left-color: #c0503a; }
+.stock-box .row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.stock-bar { flex: 1; min-width: 80px; height: 8px; }
+.stock-rows { display: flex; flex-direction: column; gap: 2px; }
+.stock-row { display: grid; grid-template-columns: 20px 90px 1fr; align-items: center; gap: 6px; }
+.ruta-row.carro { border-left-color: #b8863a; }
+
+/* ---------- Guía de bienvenida (js/guia.js): velo con hueco, aro dorado, mano y el diálogo de Tobías ---------- */
+#guia { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+#guia .gu-velo { position: fixed; background: rgba(8, 6, 3, 0.66); pointer-events: auto; }
+#guia .gu-aro { position: fixed; pointer-events: none; border: 3px solid #ffd45a; border-radius: 6px; box-shadow: 0 0 0 2px #3a2410, 0 0 18px 4px rgba(255, 212, 90, 0.7); animation: gu-pulso 1.1s ease-in-out infinite; }
+#guia.gu-mira .gu-aro { pointer-events: auto; animation: none; box-shadow: 0 0 0 2px #3a2410, 0 0 12px 2px rgba(255, 212, 90, 0.45); }
+#guia .gu-aro.gu-late { animation: gu-late 0.35s ease-out 2; }
+#guia .gu-mano { position: fixed; width: 36px; height: 42px; image-rendering: pixelated; pointer-events: none; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5)); animation: gu-toca 0.9s ease-in-out infinite; }
+#guia .gu-dlg { position: fixed; left: 50%; bottom: calc(14px + var(--sab, 0px)); transform: translateX(-50%); width: min(560px, calc(100% - 24px)); pointer-events: auto;
+  background: linear-gradient(#f4e2bb, #e6cd98); color: #3a2410; border: 3px solid #4a2c12; box-shadow: inset 0 0 0 2px #fff3cf, 0 6px 18px rgba(0, 0, 0, 0.55); padding: 10px 12px 8px; animation: gu-entra 0.25s ease-out; }
+#guia .gu-dlg.gu-arriba { bottom: auto; top: calc(var(--top-h, 56px) + 10px); }
+#guia .gu-cuerpo { display: flex; gap: 10px; align-items: flex-start; }
+#guia .gu-ret { flex: none; width: 72px; height: 72px; background: #3a2410; border: 2px solid #2a1808; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#guia .gu-ret img { width: 72px; height: 72px; image-rendering: pixelated; }
+#guia .gu-txt { flex: 1; min-width: 0; }
+#guia .gu-txt p { margin: 3px 0; font-size: 16px; line-height: 1.3; }
+#guia .gu-quien { display: block; color: #8a3a12; font-size: 14px; }
+#guia .gu-pie { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+#guia .gu-n { margin-right: auto; color: #6a4a2a; }
+#guia .gu-saltar { background: none; border: none; color: #6a4a2a; text-decoration: underline; cursor: pointer; font: inherit; font-size: 13px; padding: 6px; min-height: 36px; }
+@keyframes gu-pulso { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes gu-late { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-6px); } 70% { transform: translateX(6px); } }
+@keyframes gu-toca { 0%, 100% { translate: 0 0; } 50% { translate: -4px -8px; } }
+@keyframes gu-entra { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#guia .gu-dlg.gu-arriba { animation: none; }
+@media (max-width: 600px) { #guia .gu-ret, #guia .gu-ret img { width: 56px; height: 56px; } #guia .gu-txt p { font-size: 15px; } }
+@media (orientation: landscape) and (max-height: 500px) { #guia .gu-dlg { width: min(520px, calc(100% - 140px)); padding: 6px 10px; } #guia .gu-ret, #guia .gu-ret img { width: 48px; height: 48px; } #guia .gu-txt p { font-size: 14px; margin: 1px 0; } }
+@media (prefers-reduced-motion: reduce) { #guia .gu-aro, #guia .gu-mano, #guia .gu-dlg { animation: none; } }
+
+/* pk-49: botones ✓ ✕ junto al edificio que se está colocando con el dedo */
+#colocar { position: fixed; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; max-width: 240px; pointer-events: auto; }
+#colocar .co-b { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #2a1c12; font: 700 26px/1 var(--font); color: #fff; cursor: pointer; box-shadow: 0 3px 0 #1a100a, 0 0 0 2px rgba(255, 240, 200, 0.35); text-shadow: 1px 1px 0 #000; padding: 0; display: flex; align-items: center; justify-content: center; }
+#colocar .co-ok { background: #3e9c3a; width: 56px; height: 56px; font-size: 30px; }
+#colocar .co-ok:disabled { background: #6b5a4a; color: #b8a890; cursor: default; }
+#colocar .co-no { background: #b8402e; }
+#colocar .co-gira { background: #4a6fa8; }
+#colocar .co-b:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #1a100a; }
+#colocar .co-txt { flex-basis: 100%; text-align: center; font-size: 13px; line-height: 1.2; background: rgba(28, 18, 10, 0.9); border: 2px solid var(--bad); padding: 2px 6px; color: #ffd0c8; text-shadow: 1px 1px 0 #000; }
+/* pk-49: paso «libre» de la guía (mirar la batalla): el diálogo chico, arriba y sin tapar nada más */
+#guia.gu-libre .gu-dlg { top: 56px; bottom: auto; width: min(460px, calc(100% - 24px)); padding: 6px 10px; opacity: 0.94; }
+#guia.gu-libre .gu-ret, #guia.gu-libre .gu-ret img { width: 40px; height: 40px; }
+#guia.gu-libre .gu-txt p { font-size: 14px; margin: 1px 0; }
+#guia.gu-libre .gu-pie .gu-n { display: none; }
+#guia.gu-libre .gu-dlg { transition: opacity 0.8s; }
+#guia.gu-libre .gu-dlg.gu-fuera { opacity: 0; pointer-events: none; }

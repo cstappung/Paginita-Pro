@@ -16,9 +16,9 @@
 
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
   const PLAN = {
-    1: [['house', 2], ['lumber', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
+    1: [['house', 2], ['lumber', 1], ['establo', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
     2: [['sawmill', 1], ['barracks', 1], ['tavern', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
-    3: [['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
+    3: [['establo', 2], ['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
     4: [['university', 1], ['steelworks', 1], ['masonry', 3], ['mining', 4], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8], ['smelter', 2]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
     6: [['m_jardines', 1], ['house', 19]],
@@ -64,13 +64,96 @@
       if (Math.max(Math.abs(x - Math.round(tc.cx)), Math.abs(y - Math.round(tc.cy))) === r && g.canPlace('muelle', x, y)) return [x, y];
     return null;
   }
+  // pk-42: un lugar en tu tierra para un campamento con ese recurso en su radio, junto al más cercano al Centro Urbano
+  // que no quede ya en el radio de otro campamento igual (dos en el mismo bosque se pelean los mismos árboles). Prueba
+  // los 10 más cercanos: a veces tu tierra no llega.
+  function lugarPara(type, res, tc) {
+    const g = G(), mios = g.buildings.filter(b => b.owner === 'p' && b.type === type), cand = [];
+    for (const n of W.nodes) {
+      if (n.dead || n.temp || D.NODES[n.kind].res !== res || !W.fog[n.y * W.W + n.x] || !W.canUse(n, 'p')) continue;
+      const d = U.dist(tc.cx, tc.cy, n.x, n.y);
+      if (d > 60 || mios.some(b => (!b.extrae || b.extrae === res) && U.dist(b.cx, b.cy, n.x, n.y) <= g.BASES[type].r(b.lvl))) continue;
+      cand.push([d, n]);
+    }
+    cand.sort((a, b) => a[0] - b[0]);
+    for (const [, n] of cand.slice(0, 10)) { const pl = PK.Auto.lugarJunto(type, n); if (pl) return pl; }
+    return null;
+  }
+  // pk-42: cada aldeano trabaja para un edificio y solo dentro de su radio. Como haría un jugador: muda el campamento
+  // que se quedó sin nada, pone uno junto a lo que pide el plan y nadie alcanza, y otro si sobran ociosos sin puesto.
+  const MINERAL = ['stone', 'gold', 'ore', 'marble', 'gems'];
+  function campoExtra() {
+    const g = G(), st = S(), A = PK.Auto, tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
+    if (!tc) return false;
+    P.movido = P.movido || {};
+    const w = st.auto.w || {};
+    // 1) un campamento sin nada vivo en su radio: a otro lugar (cada uno, como mucho cada 20 min de juego)
+    for (const b of g.buildings) {
+      if (!g.esBase(b) || b.type === 'tc' || g.time - (P.movido[b.id] || -1e9) < 1200) continue;
+      const rr = g.recursosEnRadio(b);
+      if (Object.keys(rr).some(k => rr[k].vivos && (!b.extrae || b.extrae === k))) continue;
+      const res = b.type === 'lumber' ? 'wood' : b.type === 'mill' ? 'food' : b.extrae || MINERAL.slice().sort((x, y) => (w[y] || 0) - (w[x] || 0))[0];
+      const pl = lugarPara(b.type, res, tc);
+      P.movido[b.id] = g.time;
+      if (pl && g.canAfford(g.moveCost(b)) && g.moveBuilding(b, pl[0], pl[1])) { P.mudanzas = (P.mudanzas || 0) + 1; return true; }
+    }
+    if (g.buildings.some(b => b.owner === 'p' && !b.done && g.BASES[b.type])) return false; // de a uno
+    // 2) lo que el plan pide y ningún edificio de trabajo alcanza (o no tiene puestos)
+    const pide = A.RES.filter(r => (w[r] || 0) > 0 && A.CAMPO[r] && !A.jobAvailable(r)).sort((x, y) => (w[y] || 0) - (w[x] || 0));
+    // 3) ociosos de sobra: el recurso con menos gente según las prioridades
+    const idle = g.units.filter(u => u.owner === 'p' && u.kind === 'v' && !u.task && !u.inside && !u.hold).length;
+    // (puestos libres que sirven: en edificios con algo vivo en su radio)
+    const utiles = g.buildings.reduce((n, b) => { if (!g.esBase(b) || g.libresBase(b) <= 0) return n; const rr = g.recursosEnRadio(b); return Object.keys(rr).some(k => rr[k].vivos) ? n + g.libresBase(b) : n; }, 0);
+    if (idle >= 6 && utiles < idle) { const cnt = A.counts().c; pide.push(...['wood', 'stone', 'food', 'gold'].sort((a, b) => (cnt[a] || 0) / Math.max(1, w[a] || 1) - (cnt[b] || 0) / Math.max(1, w[b] || 1))); }
+    for (const res of pide) {
+      const type = A.CAMPO[res];
+      if (!g.isUnlocked(type) || !g.canAfford(g.buildCost(type))) continue;
+      const pl = lugarPara(type, res, tc);
+      if (pl && g.place(type, pl[0], pl[1])) {
+        P.obras++;
+        const b = g.buildings[g.buildings.length - 1];
+        if (b && b.type === 'mining' && res !== 'stone') b.extrae = res;
+        return true;
+      }
+    }
+    return false;
+  }
+  // pk-43: cada campamento con algo adentro necesita un carromato que lo lleve al pueblo. Como un jugador: una ruta del
+  // campamento a la bodega más cercana que lo reciba, con un carromato libre; si no hay libres, arma otro.
+  function carromatos() {
+    const g = G(), L = PK.Logi, Lb = PK.Libro;
+    for (const b of Lb.campos()) {
+      const rs = L.rutasDesde(b);
+      const llevan = rs.reduce((n, r) => n + L.cartsDe(r).length, 0);
+      const quiere = Lb.totalCampo(b) > Lb.capCampo(b) * 0.6 ? 2 : 1;
+      if (llevan >= quiere) continue;
+      let r = rs.find(o => !L.rutaMala(o));
+      if (!r) {
+        const dests = g.buildings.filter(o => o.owner === 'p' && o.done && L.puntoCarreta(o) && !L.isShop(o) && (b.def.drop || []).some(k => L.acepta(o, k)));
+        const d = dests.sort((x, y) => U.dist(x.cx, x.cy, b.cx, b.cy) - U.dist(y.cx, y.cy, b.cx, b.cy))[0];
+        if (!d) continue;
+        PK.UI.mute = true;
+        r = L.crearRuta(b.id, d.id, null);
+        if (!r) continue;
+      }
+      if (L.libres('carromato').length) { L.sumarCarreta(r); continue; }
+      const est = g.buildings.find(o => o.owner === 'p' && o.done && o.type === 'establo' && !o.queue.length);
+      if (est && L.carromatos().length < L.carroMax() && g.canAfford(D.carromatoCost(S().era))) L.trainCarro(est);
+      else if (L.carromatos().length >= L.carroMax()) { // sin lugar: mejora un establo o pone otro
+        const ests = g.buildings.filter(o => o.owner === 'p' && o.done && o.type === 'establo' && !o.upg && g.canUpgrade(o).ok).sort((x, y) => x.lvl - y.lvl);
+        if (ests.length) g.upgrade(ests[0]);
+        else if (g.countAll('establo') < g.maxCount('establo') && g.canAfford(g.buildCost('establo'))) { const tc = g.buildings.find(o => o.owner === 'p' && o.type === 'tc'); const pl = tc && lugar('establo', tc.cx, tc.cy); if (pl) g.place('establo', pl[0], pl[1]); }
+      }
+      return; // de a uno por paso
+    }
+  }
   function construir() {
     const g = G(), st = S(), tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
     if (!tc) return false;
     for (let e = 1; e <= Math.min(st.era, 6); e++) for (const [type, n] of PLAN[e]) {
       if (g.countAll(type) >= n || !g.isUnlocked(type) || g.countAll(type) >= g.maxCount(type) || !g.canAfford(g.buildCost(type))) continue;
       let cx = tc.cx, cy = tc.cy;
-      if (RECURSO[type] && RECURSO[type] !== 'food') { const nd = W.nearestNode(RECURSO[type], tc.cx, tc.cy, 40, 'p'); if (nd) { const p = PK.Auto.lugarJunto(type, nd); if (p && g.place(type, p[0], p[1])) { P.obras++; return true; } cx = nd.x; cy = nd.y; } }
+      if (RECURSO[type]) { const pl = lugarPara(type, RECURSO[type], tc); if (pl && g.place(type, pl[0], pl[1])) { P.obras++; return true; } continue; } // pk-42: con algo en su radio o nada
       if (type === 'farm') { const m = g.buildings.find(b => b.owner === 'p' && b.type === 'mill'); if (m) { cx = m.cx; cy = m.cy; } }
       if (JUNTO_CASAS.has(type)) { const hs = g.buildings.filter(b => b.owner === 'p' && b.type === 'house'); const h = hs[(g.countAll(type) * 3) % Math.max(1, hs.length)]; if (h) { cx = h.cx; cy = h.cy; } }
       if (type === 'muelle') { const p = orilla(tc); if (p && g.place(type, p[0], p[1])) { P.obras++; return true; } continue; }
@@ -221,7 +304,8 @@
       cartas();
       exploradores();
       mercado();
-      construir();
+      carromatos();
+      campoExtra() || construir();
       mejorar();
       investigar();
       heroes();
@@ -229,7 +313,7 @@
       if (st.ret.welcome) g.openWelcome(true);
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

@@ -84,6 +84,12 @@
         const d = { x: e.clientX, y: e.clientY, touch: true, moved: false, box: false, lp: 0 };
         d.lp = setTimeout(() => startLong(d), LONG_MS);
         down = d;
+        // pk-49: con el dedo, el edificio por colocar se arrastra (si el dedo cae sobre él); fuera de él, la cámara
+        const gh = R().ghost, rf = G().placing && gh && I.rectFantasma();
+        if (rf && e.clientX >= rf.x - 10 && e.clientX <= rf.x + rf.w + 10 && e.clientY >= rf.y - 10 && e.clientY <= rf.y + rf.h + 10) {
+          const [tx, ty] = R().screenToTile(e.clientX, e.clientY);
+          d.fantasma = { ox: gh.x - tx, oy: gh.y - ty };
+        }
       }
       return;
     }
@@ -106,6 +112,11 @@
         return;
       }
       if (down && down.box) { I.box = { x0: down.x, y0: down.y, x1: e.clientX, y1: e.clientY }; return; }
+      if (down && down.fantasma && G().placing) {
+        if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down.moved = true; clearLong(); }
+        if (down.moved) { I.dedo = { x: e.clientX, y: e.clientY }; moverFantasma(e.clientX, e.clientY, down.fantasma); }
+        return;
+      }
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) { down.moved = true; clearLong(); }
       if (down && down.moved) { r.cam.x -= dx / r.cam.z; r.cam.y -= dy / r.cam.z; r.clampCam(); }
       return;
@@ -123,7 +134,7 @@
     I.mouse.on = e.target === r.cv; // para recalcular el cartel en I.update
     if (e.target === r.cv) {
       const it = r.pick(e.clientX, e.clientY);
-      r.hover = it && it.k !== 'tile' ? it : null;
+      r.hover = it && it.k !== 'tile' ? it : it && !it.fog && W.inb(it.x, it.y) && W.autopista[W.idx(it.x, it.y)] ? { k: 'calzada', x: it.x, y: it.y } : null; // L5: «Calzada de …»
       PK.UI.hoverInfo(r.hover, e.clientX, e.clientY);
       r.cv.style.cursor = cursorFor(r.hover);
     } else { r.hover = null; PK.UI.hoverInfo(null); }
@@ -156,6 +167,7 @@
         I.box = null; down = null;
         return;
       }
+      if (down && down.fantasma && down.moved) { I.dedo = null; down = null; PK.UI.refreshPanel(true); return; }
       if (down && !down.moved && e.target === R().cv) tap(e.clientX, e.clientY);
       if (!touches.size) down = null;
       return;
@@ -200,11 +212,114 @@
   }
 
   function updateGhost(sx, sy) {
-    const def = D.BUILD[G().placing.type], [tx, ty] = R().screenToTile(sx, sy), br = G().placing.barrio;
-    let x = Math.floor(tx - def.w / 2 + 0.5), y = Math.floor(ty - def.h / 2 + 0.5);
+    const def = D.BUILD[G().placing.type], [tx, ty] = R().screenToTile(sx, sy);
+    ponerFantasma(Math.floor(tx - def.w / 2 + 0.5), Math.floor(ty - def.h / 2 + 0.5));
+  }
+  function ponerFantasma(x, y) {
+    const g = G(), def = D.BUILD[g.placing.type], br = g.placing.barrio;
     // barrio (A7): las casas siguientes se acomodan en la cuadrícula de la primera, con calles de 1 casilla
     if (br) { const px = def.w + 1, py = def.h + 1; x = br.x + Math.round((x - br.x) / px) * px; y = br.y + Math.round((y - br.y) / py) * py; }
-    R().ghost = { x, y, ok: G().canPlace(G().placing.type, x, y, G().placing.move) };
+    const gh = R().ghost;
+    if (gh && gh.x === x && gh.y === y) return;
+    R().ghost = { x, y, ok: g.canPlace(g.placing.type, x, y, g.placing.move) };
+  }
+  I.ponerFantasma = (x, y) => { if (G().placing) { ponerFantasma(x, y); G().placing.armed = true; } };
+  function moverFantasma(sx, sy, f) {
+    const [tx, ty] = R().screenToTile(sx, sy);
+    ponerFantasma(Math.round(tx + f.ox), Math.round(ty + f.oy));
+  }
+  // El rectángulo de pantalla que ocupa el fantasma (la base y el dibujo del edificio): para tocarlo y arrastrarlo,
+  // para poner los botones ✓ ✗ al lado y para que la guía lo resalte.
+  I.rectFantasma = function () {
+    const g = G(), gh = R().ghost, r = R();
+    if (!g.placing || !gh) return null;
+    const def = D.BUILD[g.placing.type], spr = PK.Sprites.building(g.placing.type, 'p', 1);
+    const pts = [[gh.x, gh.y], [gh.x + def.w, gh.y], [gh.x, gh.y + def.h], [gh.x + def.w, gh.y + def.h]].map(([a, b]) => { const [wx, wy] = r.iso(a, b); return r.worldToScreen(wx, wy); });
+    const [px, py] = r.iso(gh.x, gh.y), a = r.worldToScreen(px - spr.ox, py - spr.oy), b = r.worldToScreen(px - spr.ox + spr.c.width, py - spr.oy + spr.c.height);
+    pts.push(a, b);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
+    return { x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 };
+  };
+  // La parte del mapa que no tapan el panel ni el menú (para empezar en el medio de lo que se ve).
+  function areaLibre() {
+    let x0 = 0, y0 = 0, x1 = window.innerWidth, y1 = window.innerHeight;
+    const tb = document.getElementById('topbar'), pn = document.getElementById('panel'), mn = document.getElementById('menu');
+    const rt = tb && tb.getBoundingClientRect(); if (rt && rt.height) y0 = rt.bottom;
+    const rp = pn && pn.offsetParent !== null ? pn.getBoundingClientRect() : null;
+    // abajo (celular vertical, computador) o a la izquierda a lo alto (celular horizontal)
+    if (rp && rp.width && rp.height) { if (rp.top > y1 * 0.35) y1 = Math.min(y1, rp.top); else if (rp.left < x1 / 2) x0 = Math.max(x0, rp.right); }
+    const rm = mn && mn.offsetParent !== null ? mn.getBoundingClientRect() : null;
+    // una fila abajo (celular vertical) o una columna a la derecha
+    if (rm && rm.width && rm.height) { if (rm.width > rm.height && rm.top > y1 * 0.5) y1 = Math.min(y1, rm.top); else if (rm.left > x1 / 2) x1 = Math.min(x1, rm.left); }
+    // el diálogo de la guía, si está abajo
+    const dg = document.querySelector('#guia .gu-dlg:not(.gu-arriba)'), rd = dg && dg.getClientRects().length ? dg.getBoundingClientRect() : null;
+    if (rd && rd.height && rd.top > (y0 + y1) / 2) y1 = Math.min(y1, rd.top);
+    return { x0, y0, x1, y1 };
+  }
+  I.areaLibre = areaLibre;
+  // Con el dedo, el edificio aparece enseguida en el lugar libre más cercano al centro de lo que se ve (o donde
+  // estaba, al mudarlo): se arrastra o se toca otro lugar, y se confirma con ✓. Antes había que tocar justo ahí.
+  // Con el dedo, mientras se coloca el panel se pliega (deja ver el mapa; ✓ ✕ están junto al edificio) y vuelve
+  // a abrirse al terminar.
+  let plegado = false;
+  function plegarAlColocar() {
+    const en = !!(G().placing && PK.UI.isTouch());
+    if (en && !plegado && PK.UI.plegarPanel && PK.UI.panelPlegado && !PK.UI.panelPlegado()) { PK.UI.plegarPanel(); plegado = true; }
+    else if (!en && plegado) { plegado = false; if (PK.UI.desplegarPanel) PK.UI.desplegarPanel(); }
+  }
+  function colocarInicial(cx, cy) {
+    const g = G();
+    if (!g.placing || !PK.UI.isTouch()) return;
+    plegarAlColocar();
+    const def = D.BUILD[g.placing.type];
+    if (cx === undefined) { const a = areaLibre(), [tx, ty] = R().screenToTile((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2); cx = tx; cy = ty; }
+    const bx = Math.floor(cx - def.w / 2 + 0.5), by = Math.floor(cy - def.h / 2 + 0.5);
+    R().ghost = null;
+    for (let r = 0; r <= 9; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      if (g.canPlace(g.placing.type, bx + dx, by + dy, g.placing.move)) { ponerFantasma(bx + dx, by + dy); g.placing.armed = true; return; }
+    }
+    ponerFantasma(bx, by); g.placing.armed = true;
+  }
+
+  // ---------- Botones ✓ ✗ junto al edificio por colocar (solo con el dedo) ----------
+  let barra = null, barraKey = '';
+  function armarBarra() {
+    if (barra) return barra;
+    const b = (txt, cls, fn, tit, guia) => U.el('button', { class: 'co-b ' + cls, title: tit, 'aria-label': tit, 'data-guia': guia, onclick: e => { e.stopPropagation(); fn(); } }, txt);
+    barra = U.el('div', { id: 'colocar' },
+      b('✕', 'co-no', () => I.cancelarColocar(), 'Cancelar', 'colocar-no'),
+      b('⟳', 'co-gira', () => I.girarPorton(), 'Girar', 'colocar-gira'),
+      b('✓', 'co-ok', () => I.placeGhost(), 'Construir aquí', 'colocar-ok'),
+      U.el('div', { class: 'co-txt' }));
+    for (const ev of ['pointerdown', 'touchstart']) barra.addEventListener(ev, e => e.stopPropagation());
+    document.getElementById('hud').append(barra);
+    return barra;
+  }
+  I.cancelarColocar = function () { const g = G(); g.placing = null; R().ghost = null; PK.UI.refreshPanel(true); };
+  function pintarBarra() {
+    const g = G(), gh = R().ghost;
+    const ver = g.placing && gh && g.placing.armed && PK.UI.isTouch() && !PK.UI.modalKey() && !(PK.Batalla && PK.Batalla.abierta());
+    if (!ver) { if (barra && barra.style.display !== 'none') barra.style.display = 'none'; barraKey = ''; return; }
+    const bar = armarBarra(), rf = I.rectFantasma(), a = areaLibre();
+    const def = D.BUILD[g.placing.type], why = gh.ok ? null : g.placeWhy(g.placing.type, gh.x, gh.y, g.placing.move);
+    const k = gh.x + ',' + gh.y + ',' + gh.ok + ',' + g.placing.type + ',' + Math.round(rf.x) + ',' + Math.round(rf.y) + ',' + Math.round(rf.w) + ',' + a.x0 + ',' + a.y1;
+    if (k === barraKey) return;
+    barraKey = k;
+    bar.style.display = '';
+    bar.querySelector('.co-ok').disabled = !gh.ok;
+    bar.querySelector('.co-ok').title = g.placing.move !== undefined ? 'Mover aquí' : 'Construir aquí';
+    bar.querySelector('.co-gira').style.display = def.porton && g.placing.move === undefined ? '' : 'none';
+    const t = bar.querySelector('.co-txt');
+    t.textContent = why ? g.placeText(why) : '';
+    t.style.display = why ? '' : 'none';
+    // debajo del edificio; si no entra (el panel o el borde), arriba
+    const bw = bar.offsetWidth || 150, bh = bar.offsetHeight || 48;
+    let x = rf.x + rf.w / 2 - bw / 2, y = rf.y + rf.h + 6;
+    if (y + bh > a.y1 - 4) y = rf.y - bh - 6;
+    x = Math.max(a.x0 + 4, Math.min(a.x1 - bw - 4, x));
+    y = Math.max(a.y0 + 4, Math.min(a.y1 - bh - 4, y));
+    bar.style.left = Math.round(x) + 'px'; bar.style.top = Math.round(y) + 'px';
   }
 
   // Herramientas de logística: caminos (dos toques: inicio y fin) y cintas (edificio de origen y de destino).
@@ -212,9 +327,9 @@
     const r = R(), L = PK.Logi;
     r.roadGhost = null; r.beltGhost = null;
     if (PK.Def.tool) { const [tx, ty] = r.screenToTile(sx, sy); PK.Def.ghost(Math.floor(tx), Math.floor(ty)); return; }
-    if (L.tool === 'road' && I.roadStart) {
+    if ((L.tool === 'road' || L.tool === 'calzada') && I.roadStart) {
       const [tx, ty] = r.screenToTile(sx, sy);
-      r.roadGhost = L.roadPlan(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
+      r.roadGhost = (L.tool === 'calzada' ? PK.Calzada.plan : L.roadPlan)(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
     } else if (L.tool === 'belt' && L.beltFrom) {
       const it = r.pick(sx, sy), a = G().bById.get(L.beltFrom);
       if (a && it && it.k === 'building' && it.o.owner === 'p' && it.o !== a) r.beltGhost = L.beltPlan(a, it.o);
@@ -255,6 +370,18 @@
       r.roadGhost = null;
       return;
     }
+    if (L.tool === 'calzada') { // L5: dos toques, como el camino; se pueden encadenar tramos
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Cz = PK.Calzada;
+      if (!W.inb(x, y)) return;
+      if (!I.roadStart) {
+        if (!Cz.libre(x, y)) { PK.UI.toast('Ahí no va la Calzada Real: tierra de nadie o tuya, explorada, sin agua, zonas comunes, lugares ni edificios.', 'warn'); return; }
+        I.roadStart = [x, y]; PK.UI.toast('Toca dónde termina el tramo.', 'info'); return;
+      }
+      const tiles = Cz.plan(I.roadStart[0], I.roadStart[1], x, y);
+      I.roadStart = [x, y]; r.roadGhost = null;
+      Cz.construir(tiles).then(n => { if (n) PK.UI.toast('Calzada Real: ' + n + ' casillas (hoy ' + Cz.hoy() + ' de ' + Cz.tope() + ').', 'good'); PK.UI.refreshPanel(true); });
+      return;
+    }
     if (L.tool === 'belt') {
       const it = r.pick(sx, sy);
       if (!it || it.k !== 'building' || it.o.owner !== 'p' || !it.o.done) { PK.UI.toast('Toca un edificio tuyo.', 'warn'); return; }
@@ -279,7 +406,7 @@
     const b = g.place(g.placing.type, gh.x, gh.y), barrio = g.placing.type === 'house' && (shift || !!g.state.flags.barrio);
     if (b && barrio) calles(g, b);
     if (b && !shift && !barrio) { g.placing = null; R().ghost = null; }
-    else if (b && g.placing) g.placing.armed = false;
+    else if (b && g.placing) { g.placing.armed = false; colocarInicial(b.x + b.w / 2, b.y + b.h / 2); }
     PK.UI.refreshPanel(true);
   };
   // Barrio (A7 del plan): Mayús (o «Modo barrio» en el panel) pone casas en cuadrícula, dejando calles de una
@@ -304,6 +431,7 @@
     salirTerr();
     g.placing = { type: b.type, armed: false, move: b.id };
     R().ghost = null;
+    colocarInicial(b.x + b.w / 2, b.y + b.h / 2);
     PK.UI.refreshPanel(true);
   };
   I.startPlacing = function (type) {
@@ -312,6 +440,7 @@
     salirTerr();
     g.placing = { type, armed: false };
     R().ghost = null;
+    colocarInicial();
     PK.UI.refreshPanel(true);
   };
 
@@ -443,6 +572,7 @@
     } else if (k === 'z') { R().showZones = !R().showZones; }
     else if (k === 't') PK.Terr.toggle();
 
+    else if (k === 'r' && g.placing && D.BUILD[g.placing.type].porton && g.placing.move === undefined) I.girarPorton(); // pk-43
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
     else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido
@@ -451,6 +581,16 @@
     if (k === ' ') e.preventDefault();
   }
 
+  // pk-43: el Gran Portón se gira (dos tipos: granporton 4 × 2 y granportonv 2 × 4)
+  I.girarPorton = function () {
+    const g = G();
+    if (!g.placing || !D.BUILD[g.placing.type].porton) return;
+    g.placing.type = g.placing.type === 'granporton' ? 'granportonv' : 'granporton';
+    const gh = R().ghost;
+    g.placing.armed = false; R().ghost = null;
+    if (gh && PK.UI.isTouch()) I.ponerFantasma(gh.x, gh.y); // con el dedo, gira donde estaba
+    PK.UI.refreshPanel(true);
+  };
   I.update = function (dt) {
     const r = R(), sp = (900 / r.cam.z) * dt;
     let dx = 0, dy = 0;
@@ -459,6 +599,14 @@
     if (I.keys.arrowup || I.keys.w) dy -= sp;
     if (I.keys.arrowdown || I.keys.s) dy += sp;
     if (dx || dy) { r.cam.x += dx; r.cam.y += dy; r.clampCam(); }
+    // arrastrando un edificio con el dedo cerca del borde de lo que se ve: la cámara lo sigue
+    if (I.dedo && down && down.fantasma && G().placing) {
+      const a = areaLibre(), m = 44, v = (600 / r.cam.z) * dt;
+      const ex = I.dedo.x < a.x0 + m ? -1 : I.dedo.x > a.x1 - m ? 1 : 0, ey = I.dedo.y < a.y0 + m ? -1 : I.dedo.y > a.y1 - m ? 1 : 0;
+      if (ex || ey) { r.cam.x += ex * v; r.cam.y += ey * v; r.clampCam(); moverFantasma(I.dedo.x, I.dedo.y, down.fantasma); }
+    } else I.dedo = null;
+    plegarAlColocar();
+    pintarBarra();
     // El cartel del puntero solo se calculaba al mover el mouse: después de mover la cámara (WASD, rueda,
     // arrastre, centerOn) o de que subiera de nivel lo de abajo, seguía diciendo «Centro Urbano · Nv 2» con el
     // Centro ya en Nv 10. Se recalcula al mover la cámara y cada 250 ms.
@@ -467,7 +615,7 @@
     if (I.mouse.on && I.mouse.in && (cm !== hovCam || hovT >= 0.25)) {
       hovT = 0; hovCam = cm;
       const it = r.pick(I.mouse.x, I.mouse.y);
-      r.hover = it && it.k !== 'tile' ? it : null;
+      r.hover = it && it.k !== 'tile' ? it : it && !it.fog && W.inb(it.x, it.y) && W.autopista[W.idx(it.x, it.y)] ? { k: 'calzada', x: it.x, y: it.y } : null; // L5: «Calzada de …»
       PK.UI.hoverInfo(r.hover, I.mouse.x, I.mouse.y);
     }
   };

@@ -65,6 +65,7 @@
         el('div', { class: 'row' }, UI.btn(PK.Sfx.on ? 'Silenciar (M)' : 'Activar sonido (M)', () => { PK.Sfx.toggle(); UI.rerender(); }, { small: true })),
         PK.Musica ? deslizador('Música', PK.Musica.vol(), v => PK.Musica.setVol(v), 'Cambia con la era, de noche y en batalla. M la calla junto con los efectos.') : '',
         PK.Musica ? deslizador('Ambiente', PK.Musica.volAmb(), v => PK.Musica.setVolAmb(v), 'Pájaros, grillos, viento, olas y martillos de las obras.') : '',
+        PK.Guia && PK.Guia.puede() ? el('div', { class: 'row' }, UI.btn('Ver la guía de Tobías otra vez', () => PK.Guia.repetir(), { small: true, title: 'La guía de los primeros pasos, con el mayordomo que señala dónde tocar' })) : '',
         el('h3', null, 'Accesibilidad'),
         (() => { const a = UI.acceso(); return el('div', null,
           el('div', { class: 'row' }, el('b', null, 'Texto: '), [['Normal', 0], ['Grande', 1], ['Muy grande', 2]].map(([n, v]) => UI.btn(n, () => { UI.setAcceso('texto', v); UI.rerender(); }, { small: true, cls: a.texto === v ? 'gold' : '' }))),
@@ -92,7 +93,7 @@
         UI.isTouch() ? el('ul', { class: 'small' },
           el('li', null, 'Toca: seleccionar · Con aldeanos elegidos, toca un árbol, una mina o un edificio: recolectar / trabajar'),
           el('li', null, 'Para soltar lo elegido: toca el suelo vacío, vuelve a tocar al aldeano o usa la ✕ del panel'),
-          el('li', null, 'Construir: elige el edificio en el menú, toca dónde va y vuelve a tocar (o «Construir aquí») para confirmar'),
+          el('li', null, 'Construir: elige el edificio en el menú; aparece en el mapa, arrástralo con el dedo hasta donde va y toca ✓ (✕ cancela)'),
           el('li', null, 'Mantén pulsado y arrastra: seleccionar grupo · Doble toque en un aldeano: todos los de su tipo en pantalla'),
           el('li', null, 'Con el Centro Urbano elegido, toca un recurso para fijar el punto de reunión'),
           el('li', null, 'Arrastra: mover cámara · Pellizca: zoom'),
@@ -156,6 +157,21 @@
       body.append(el('p', null, 'El mundo se reinició con la actualización ' + N.ver + '. Tu reino empieza de cero, igual que el de todos.'),
         N.items.length ? el('ul', { class: 'info' }, N.items.map(t => el('li', null, t))) : '',
         el('div', { class: 'row' }, UI.btn('¡A construir!', () => UI.closeModal(), { cls: 'gold' })));
+    });
+  };
+  // pk-41 (decisión 1 del dueño): las partidas de antes de las rutas se migran, y sus carretas quedan paradas hasta que
+  // les digas a dónde van. Se muestra una sola vez (st.logi.avisoRutas).
+  UI.avisoRutas = function () {
+    const L = PK.Logi;
+    UI.modal('avisoRutas', 'Las carretas ahora siguen rutas', body => {
+      body.append(el('p', null, 'Con esta actualización cada carreta lleva y trae entre un origen y un destino que eliges tú. Ya no se reparten solas: tus ' + L.carts().length + ' carretas quedaron paradas en la Carretería.'),
+        el('ul', { class: 'info' },
+          el('li', null, 'Crea una ruta en Logística: de una bodega a un taller, de un taller a otro o de un taller a una bodega.'),
+          el('li', null, 'Si en el origen no hay nada que llevar, la carreta espera ahí. Si el destino está lleno, espera con la carga.'),
+          el('li', null, 'Toman el camino más rápido: un camino empedrado puede valer más que la línea recta.'),
+          el('li', null, 'La Carretería ahora arma más carretas por nivel.')),
+        el('div', { class: 'row' }, UI.btn('Definir rutas', () => { L.avisoVisto(); UI.closeModal(); UI.openLogistics(); }, { cls: 'gold' }),
+          UI.btn('Después', () => { L.avisoVisto(); UI.closeModal(); })));
     });
   };
   UI.offlineReport = function (rep) {

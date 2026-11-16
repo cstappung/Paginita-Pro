@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 8;
+  D.PROTO = 10;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -31,11 +31,11 @@
   D.RES = {
     food: { name: 'Comida' },
     wood: { name: 'Madera' },
-    stone: { name: 'Piedra' },
-    gold: { name: 'Oro' },
-    ore: { name: 'Hierro bruto' },
-    marble: { name: 'Mármol' },
-    gems: { name: 'Gemas' },
+    stone: { name: 'Piedra', priv: 2 },
+    gold: { name: 'Oro', priv: 2 },
+    ore: { name: 'Hierro bruto', priv: 2 },
+    marble: { name: 'Mármol', priv: 2 },
+    gems: { name: 'Gemas', priv: 2 },
     planks: { name: 'Tablones' },
     blocks: { name: 'Sillares' },
     ingots: { name: 'Lingotes' },
@@ -50,14 +50,16 @@
 
   // Recursos del mapa. regrow: segundos hasta rebrotar; regen: fracción del máximo que vuelve por hora.
   D.NODES = {
+    // pk-42 (plan de logística L2): `priv` multiplica el monto de los recursos de tu tierra (no los de las zonas comunes,
+    // que el servidor lleva con `amount` hasta L4). Las minas rellenan lo mismo por hora: su regen se divide por priv.
     // Balance (beta, nov. 2026): la madera costaba mucho más que la comida. Todo pide madera (casas, campamentos,
     // granjas, tablones, fundición, eras) y cada árbol se agota rápido, mientras la caza rendía 1,5 veces la tala.
     // Por eso la tala es más rápida, los árboles rebrotan antes y la caza rinde un poco menos. Los montos (amount)
     // no se tocan: el servidor del mundo compartido los usa para las zonas comunes.
     // pk-40 (reporte de un jugador: «madera, hierro y piedra se acaban muy rápido para lo que piden»): los árboles
     // rebrotan en 1,5 h (eran 2,5) y las minas se rellenan unas 2–3 veces más rápido. Los montos siguen iguales.
-    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 1.5 * 3600 },
-    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600 },
+    tree: { name: 'Árbol', res: 'wood', amount: 100, rate: 0.5, regrow: 1.5 * 3600, priv: 2.5 },
+    berry: { name: 'Arbusto de bayas', res: 'food', amount: 150, rate: 0.34, regrow: 3 * 3600, priv: 2.5 },
     deer: { name: 'Ciervo', res: 'food', amount: 140, rate: 0.5, regrow: 6 * 3600, hunt: true },
     // regen 0,25 (era 0,05): la Era V pide unas 9.500 de piedra (con los sillares) y las minas de alrededor daban ~400 por
     // hora; el piloto quedó más de 14 h en la Era IV esperando piedra (prueba de ritmo después de pk-33)
@@ -89,6 +91,11 @@
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
     scout: { name: 'Puesto de Exploradores', w: 2, h: 2, cost: { wood: 100, food: 50 }, time: 25, era: 1, max: 1, trains: 'scout', upT: 0.9, desc: 'Entrena exploradores que revelan el mapa. Su nivel define cuántas casillas alrededor de tu reino pueden explorar (en el nivel 19 o antes, el mapa entero).' },
     cartwright: { name: 'Carretería', w: 3, h: 3, cost: { wood: 250, stone: 100 }, time: 45, era: 2, max: 2, upT: 0.9, desc: 'Construye carretas que llevan insumos a los talleres y sacan lo que producen. Con caminos van mucho más rápido.' },
+    // pk-43 (plan de logística L3): el carromato vacía los campamentos; el Gran Portón es el único paso de la muralla
+    // para los carromatos. Van aquí (no en datos-vida.js): el servidor descarta los tipos que no conoce.
+    establo: { name: 'Establo de Carromatos', w: 4, h: 3, cost: { wood: 140, stone: 30 }, time: 40, era: 1, upT: 0.8, max: e => 1 + Math.floor(e / 2), desc: 'Arma carromatos: carros grandes de bueyes que vacían los campamentos y llevan lo juntado al pueblo, dentro y fuera de tu tierra. El primero trae un carromato de regalo.' },
+    granporton: { name: 'Gran Portón', w: 4, h: 2, cost: { wood: 200, stone: 120 }, time: 45, era: 1, noUp: true, porton: 'h', max: e => 1 + Math.floor(e / 3), desc: 'Paso ancho en la muralla, con dos torres: lo cruzan tus aldeanos, carretas y carromatos (los carromatos no caben por una puerta chica). Lobos, bandidos y otros reinos no pasan. Se puede poner encima de tu muralla.' },
+    granportonv: { name: 'Gran Portón', w: 2, h: 4, cost: { wood: 200, stone: 120 }, time: 45, era: 1, noUp: true, porton: 'v', alias: 'granporton', max: e => 1 + Math.floor(e / 3), desc: 'Paso ancho en la muralla, con dos torres (girado).' },
     tower: { name: 'Torre de Vigía', w: 1, h: 1, cost: { stone: 100, wood: 25 }, time: 30, era: 1, upT: 0.8, max: e => 2 + e * 2, desc: 'Defiende tu reino y ve muy lejos en la niebla.' },
     market: { name: 'Mercado', w: 3, h: 3, cost: { wood: 175 }, time: 45, era: 2, max: 1, desc: 'Compra y vende recursos. Con más nivel, mejores precios.' },
     sawmill: { name: 'Aserradero', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 40, era: 2, recipe: 'planks', slots: 3, desc: 'Convierte madera en tablones.' },
@@ -106,7 +113,7 @@
     workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -165,7 +172,9 @@
     builder: () => ({ builders: 1 }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
-    cartwright: L => ({ carts: 1 + L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
+    establo: L => ({ carromatos: 2 + L, carroCap: D.CARROMATO.cap + D.CARROMATO.capLvl * (L - 1), carroSpeed: 0.05 * (L - 1) }),
+    granporton: () => ({}), granportonv: () => ({}),
+    cartwright: L => ({ carts: 2 + 2 * L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
     // pk-40: la venta nunca alcanza a la compra menos 10 puntos. En Nv 8–9 se vendía al 92–95% y se compraba al
     // 90–92%: comprar y vender lo mismo daba oro infinito. Ahora la compra baja hasta 0,90 (Nv 8) y la venta sube
     // hasta 0,80 (Nv 7).
@@ -663,6 +672,16 @@
   // avanzado, cintas transportadoras que unen dos edificios y mueven todo sin que nadie lo cargue.
   D.ROAD = { cost: { stone: 3 }, era: 1, walk: 1.4, cart: 1.8 };
   D.CART = { cost: { wood: 80, gold: 10 }, time: 20, speed: 1.3, offRoad: 0.65, cap: 20 };
+  // pk-43: el carromato. Más lento que la carreta fuera del camino, pero carga diez veces más y sale de tu tierra.
+  // road: en camino; highway: en autopista (L5); ajeno: la tierra de otro reino sin muralla cuesta ×4 (decisión 5).
+  // L5 (pk-47): la Calzada Real (en el código, autopista). Franja de piedra de 2 casillas que trazan los jugadores en
+  // tierra de nadie o en su territorio y que ven todos los del mundo. El servidor la valida con world.js
+  // (W.calzadaPuede) y con estos topes: casillas por día UTC y por jugador, y un total por mundo.
+  D.AUTOPISTA = { nombre: 'Calzada Real', costo: era => (era >= 3 ? { blocks: 4 } : { stone: 10, wood: 2 }), porDia: era => 60 * era, totalMundo: 6000, carreta: 2.2, aldeano: 1.5, lote: 400 };
+  D.CARROMATO = { cost: { wood: 150, gold: 10 }, time: 45, speed: 1.6, offRoad: 0.7, road: 1.5, highway: 3.2, ajeno: 4, cap: 250, capLvl: 50 };
+  D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
+  // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.
+  D.campoCap = L => 300 + 150 * (L - 1);
   D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 };
   D.BUF = 30;          // capacidad de los depósitos de un taller, por puesto de trabajo
   D.NEAR_STORE = 3;    // un taller a esta distancia de un almacén se abastece solo, sin carretas
@@ -863,6 +882,9 @@
       { name: 'Bastión', cost: { blocks: 6, steel: 1 }, era: 5, bonus: 1.6, up: { blocks: 6, steel: 1, gold: 8 } },
     ],
     gate: { wood: 40, stone: 20 },
+    // L4 (pk-45): tope de casillas de muralla y puertas por era (el servidor recorta lo que pasa: las ven los demás)
+    max: era => 300 + 150 * era,
+    gatesMax: 200,
   };
 
   // ---------- Estructuras de las Leyendas ----------
@@ -996,12 +1018,13 @@
   // los de los héroes), sus misiones en la rama Crónica, un lugar único en el mapa con una batalla y su jefe, y
   // una elección al ganarla que cambia el premio. La lógica está en campana.js.
   D.PERSONAJES = {
-    forastero: { name: 'El Forastero de la Capa', clase: 'hechicero', semilla: 4242 },
-    valdes: { name: 'Tuerto Valdés', clase: 'guarda', semilla: 66 },
-    rey: { name: 'El Rey Bandido', clase: 'juglar', semilla: 1313 },
-    brunilda: { name: 'La reina Brunilda', clase: 'paladin', semilla: 777, mujer: true },
-    ceniza: { name: 'Hermana Ceniza, de la Orden del Cráter', clase: 'ingeniera', semilla: 909, mujer: true },
-    capitana: { name: 'La capitana del Galeón', clase: 'guarda', semilla: 5150, mujer: true },
+    // rasgos (pk-50): lo que hace reconocible a cada uno en su retrato (retratos.js)
+    forastero: { name: 'El Forastero de la Capa', clase: 'hechicero', semilla: 4242, rasgos: { capucha: true, edad: 'viejo', barba: 'larga', pelo: [214, 210, 204], ojos: 'entornado', cejas: 'gruesa', boca: 'seria', iris: 6, nariz: 'ganchuda' } },
+    valdes: { name: 'Tuerto Valdés', clase: 'guarda', semilla: 66, rasgos: { parche: true, cicatriz: true, barba: 'rala', peinado: 'corto', pelo: [34, 24, 20], cejas: 'enojada', boca: 'mueca', cara: 'cuadrada', piel: 2, sombrero: false } },
+    rey: { name: 'El Rey Bandido', clase: 'juglar', semilla: 1313, rasgos: { corona: true, barba: 'candado', peinado: 'largo', pelo: [118, 74, 38], boca: 'mueca', cejas: 'alzada', pendiente: true, piel: 1, cara: 'larga' } },
+    brunilda: { name: 'La reina Brunilda', clase: 'paladin', semilla: 777, mujer: true, rasgos: { casco: false, corona: true, peinado: 'trenzas', pelo: [226, 196, 122], cejas: 'recta', boca: 'seria', iris: 1, piel: 0 } },
+    ceniza: { name: 'Hermana Ceniza, de la Orden del Cráter', clase: 'ingeniera', semilla: 909, mujer: true, rasgos: { capucha: true, cejas: 'enojada', boca: 'seria', ojos: 'entornado', iris: 5, piel: 3, cicatriz: true } },
+    capitana: { name: 'La capitana del Galeón', clase: 'corsaria', semilla: 5150, mujer: true, rasgos: { peinado: 'cola', pelo: [156, 52, 30], pendiente: true, boca: 'sonrisa', pecas: true, piel: 1, iris: 2 } },
   };
   D.ESCENAS = {
     c1a: { quien: 'forastero', lineas: ['Buenas noches, señor del pueblo. Vengo del norte y traigo malas noticias.', 'Algo se mueve más allá de las montañas: los bandidos se juntan y las bestias bajan de los cerros.', 'Si quieres resistir, vas a necesitar héroes. Y una taberna donde encontrarlos.'] },

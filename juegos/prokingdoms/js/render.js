@@ -241,9 +241,11 @@
       for (let mx = 0; mx < w; mx++) {
         const a = ((px0 + mx) * 4 - W.H * 16) / 16, tx = Math.floor((a + b) / 2), ty = Math.floor((b - a) / 2);
         const inside = tx >= 0 && ty >= 0 && tx < W.W && ty < W.H;
-        if (inside && W.fog[ty * W.W + tx]) continue;
+        // afuera del mapa no hay suelo (se ve el fondo oscuro): sin niebla, así lo alto de un edificio o un árbol de la
+        // orilla no queda cortado en línea recta (pedido del dueño)
+        if (!inside || W.fog[ty * W.W + tx]) continue;
         const i = (my * w + mx) * 4, hh = U.hash((px0 + mx) >> 2, (py0 + my) >> 2, 5);
-        d[i] = 16 + hh * 8; d[i + 1] = 14 + hh * 6; d[i + 2] = 10 + hh * 4; d[i + 3] = inside ? 238 : 255;
+        d[i] = 16 + hh * 8; d[i + 1] = 14 + hh * 6; d[i + 2] = 10 + hh * 4; d[i + 3] = 238;
       }
     }
     fogCtx.putImageData(im, px0, py0);
@@ -265,7 +267,14 @@
   function nodeSprite(n) {
     if (n.gone) return null;
     if (D.NODES[n.kind] && D.NODES[n.kind].mar && Sp.nodoMar) return Sp.nodoMar(n, G().mareaBaja()); // Fase 9 (pk-28)
-    if (n.kind === 'deer') return n.dead ? null : n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
+    if (n.kind === 'deer') {
+      if (n.dead) return null;
+      if (Sp.deerPose) { // pk-50: cada ciervo pasta, levanta la cabeza y mira a su ritmo
+        const t = Math.floor((performance.now() / 1000 + n.id * 3.7) / 4.5) % 5, pose = [1, 1, 0, 1, 2][t], lado = n.v % 2;
+        return n.gold ? Sp.deerGoldPose[lado][pose] : Sp.deerPose[lado][(n.v >> 1) % 2][pose];
+      }
+      return n.gold ? Sp.deerGold[n.v % 2] : Sp.deer[n.v % 4];
+    }
     if (n.kind === 'tree') return n.dead ? (n.planta && Sp.brote ? Sp.brote : Sp.stump) : Sp.trees[n.sp][n.v % Sp.trees[n.sp].length];
     if (n.kind === 'berry') return n.dead || n.amount < n.max * 0.15 ? Sp.bushBare : Sp.bush[n.v % 3];
     const r = n.amount / n.max, sz = r > 0.5 ? 2 : r > 0.15 ? 1 : 0;
@@ -276,7 +285,10 @@
   const SWING = { axe: 1.0, pick: 0.95, hammer: 1.5, sickle: 1.25, knife: 1.4, hand: 1.1 };
   function unitSprite(u) {
     const col = Sp.ownerColor(u.owner);
-    if (u.kind === 'cart') return Sp.cart(col, u.carry > 0 ? u.carryRes : null, u.flip, Math.floor(u.anim * 8) % 4, u.mode === 'walk');
+    // vehículos: 8 direcciones según hacia dónde se mueven (Sp.rumboDe); los animales y las velas se mueven aun quietos
+    if (u.kind === 'cart') return Sp.cart(col, u.carry > 0 ? u.carryRes : null, Sp.rumboDe(u), Math.floor(u.anim * (u.mode === 'walk' ? 8 : 1.5)) % 4, u.mode === 'walk');
+    if (u.kind === 'barcaza') return Sp.barcaza(col, u.carry > 0 ? u.carryRes : null, Sp.rumboDe(u), Math.floor(u.anim * 3) % 4, u.mode === 'walk');
+    if (u.kind === 'carromato') return Sp.carromato(col, u.carry > 0 ? u.carryRes : null, Sp.rumboDe(u), Math.floor(u.anim * (u.mode === 'walk' ? 6 : 1.2)) % 4, u.mode === 'walk');
     let mode = u.mode, frame = 0, tool = null, aim = null;
     if (mode === 'walk') frame = Math.floor(u.anim * 9) % 6;
     else if (mode === 'work') {
@@ -456,7 +468,9 @@
     if (W.costa && g.enMar()) costaMarea(ctx, chunks, tsec);
     // caminos y cintas (planos, sobre el suelo)
     drawRoads(ctx, chunks);
+    if (PK.Calzada) PK.Calzada.dibujar(ctx, chunks); // L5
     drawBelts(ctx, vis);
+    drawRuta(ctx);
     botes(ctx, vis, g);
     // bordes de zonas comunes
     if (R.showZones) {
@@ -521,7 +535,7 @@
     // lobos
     for (const w of PK.Life.wolves) {
       if (!seen(w.x, w.y)) continue;
-      const [px, py] = R.iso(w.x, w.y), spr = Sp.wolf[w.flip ? 1 : 0][Math.floor(w.anim * 8) % 2];
+      const [px, py] = R.iso(w.x, w.y), spr = Sp.wolf[w.flip ? 1 : 0][Math.floor(w.anim * 10) % Sp.wolf[0].length];
       list.push({ d: w.x + w.y, k: 'wolf', o: w, spr, x: Math.round(px - spr.ax), y: Math.round(py - spr.ay), px, py });
     }
     // edificios
@@ -529,7 +543,7 @@
       if (b.owner !== 'p' && !seen(b.cx, b.cy)) continue;
       const [px, py] = R.iso(b.x, b.y);
       if (px < vx0 - 200 || px > vx0 + vw + 200 || py < vy0 - 40 || py > vy0 + vh + 200) continue;
-      const spr = Sp.building(b.type, b.owner, b.lvl, b.asp);
+      const spr = b.def.porton ? Sp.porton(b.type, b.owner, b.owner === 'p' && g.state.def ? g.state.def.tier : 2, portonCuadro(b, g), b.asp) : Sp.building(b.type, b.owner, b.lvl, b.asp);
       const x = Math.round(px - spr.ox), y = Math.round(py - spr.oy);
       if (!vis(x, y, spr.c.width, spr.c.height)) continue;
       const item = { d: b.x + b.y + (b.w + b.h) / 2, k: 'building', o: b, spr, x, y };
@@ -558,6 +572,19 @@
         list.push({ d: x + y + 1, k: 'wall', o: { k, x, y }, spr, x: Math.round(px - spr.ox), y: Math.round(py - spr.oy) });
       }
     }
+    // L4: murallas de los demás reinos, con su material y su color (solo lo que exploraste)
+    if (PK.Def && PK.Def.ajenas) for (const sl in PK.Def.ajenas) {
+      const r = PK.Def.ajenas[sl], me1 = +sl + 1, col = Sp.ownerColor(D.ownerOfSlot(+sl));
+      const wl = (x, y) => W.inb(x, y) && W.wallOwner[W.idx(x, y)] === me1;
+      for (const k of r.tiles) {
+        if (!W.fog[k]) continue;
+        const x = k % W.W, y = (k / W.W) | 0, [px, py] = R.iso(x, y);
+        if (px < vx0 - 40 || px > vx0 + vw + 40 || py < vy0 - 50 || py > vy0 + vh + 30) continue;
+        const mask = (wl(x, y - 1) ? 1 : 0) | (wl(x + 1, y) ? 2 : 0) | (wl(x, y + 1) ? 4 : 0) | (wl(x - 1, y) ? 8 : 0);
+        const spr = Sp.wall(mask, r.tier, W.wallAj[k] === 2, col);
+        list.push({ d: x + y + 1, k: 'wall', o: { k, x, y, ajena: +sl }, spr, x: Math.round(px - spr.ox), y: Math.round(py - spr.oy) });
+      }
+    }
     // unidades (en alta definición: se dibujan achicadas y con suavizado)
     for (const u of g.units) {
       if (u.inside || (u.owner !== 'p' && !seen(u.x, u.y))) continue;
@@ -580,7 +607,7 @@
       if (b) diamond(ctx, b.x, b.y, b.w, b.h, 'rgba(255,255,255,0.85)');
     }
     if (sel && sel.type === 'node') { const n = W.nodes[sel.id]; if (n) diamond(ctx, n.x, n.y, 1, 1, 'rgba(255,240,170,0.85)'); }
-    for (const it of list) if (it.k === 'unit' && it.sel) ellipse(ctx, it.px, it.py, 'rgba(255,255,255,0.9)', it.o.kind === 'cart' ? 9 : 5);
+    for (const it of list) if (it.k === 'unit' && it.sel) ellipse(ctx, it.px, it.py, 'rgba(255,255,255,0.9)', it.o.kind === 'carromato' || it.o.kind === 'barcaza' ? 14 : it.o.kind === 'cart' ? 9 : 5);
     if (R.hover && R.hover.k === 'unit' && !(R.hover.o && selUnits && selUnits.has(R.hover.o.id))) {
       const [px, py] = R.iso(R.hover.o.x, R.hover.o.y);
       ellipse(ctx, px, py, 'rgba(255,255,255,0.4)', 5);
@@ -664,6 +691,8 @@
       ctx.globalAlpha = ok ? 0.75 : 0.45;
       ctx.drawImage(spr.c, Math.round(px - spr.ox), Math.round(py - spr.oy));
       ctx.globalAlpha = 1;
+      // pk-42: el radio de trabajo de un campamento (o molino, o Centro Urbano) que estás por poner
+      if (g.BASES && g.BASES[g.placing.type]) circuloRadio(ctx, x + def.w / 2, y + def.h / 2, g.BASES[g.placing.type].r(1), ok ? 'rgba(255,226,120,0.85)' : 'rgba(230,90,70,0.7)');
       // bonos por cercanía (V5): líneas verdes hacia los vecinos que suman
       if (ok && g.cercaDe) {
         const [gx, gy] = R.iso(x + def.w / 2, y + def.h / 2);
@@ -707,6 +736,8 @@
       ctx.fillStyle = 'rgb(' + D.PLAYER_COLOR.join(',') + ')'; ctx.fillRect(x + 1, y - 20, 8, 5 + ond); ctx.fillRect(x + 1, y - 15 + ond, 5, 1);
       ctx.fillStyle = '#f2ead6'; ctx.fillRect(x + 3, y - 18, 2, 2);
     }
+    // pk-42: el radio de trabajo del edificio elegido
+    if (sel && sel.type === 'building') { const b = g.bById.get(sel.id); if (b && g.esBase && g.esBase(b)) circuloRadio(ctx, b.cx, b.cy, g.radioBase(b), 'rgba(255,226,120,0.8)'); }
     // punto de reunión
     if (sel && sel.type === 'building') {
       const b = g.bById.get(sel.id);
@@ -878,6 +909,51 @@
         ctx.fillStyle = Sp.rgb(col); ctx.fillRect(Math.round(px) - 1, Math.round(py) - 3, 3, 2);
       }
     }
+  }
+
+  // pk-43: lo abierto del Gran Portón (0 a 4). Se abre si una unidad tuya está a menos de 2,5 casillas del paso y se
+  // cierra 1,5 s después de que se va; suena al empezar a abrirse.
+  function portonCuadro(b, g) {
+    if (!b.done) return 0;
+    const now = performance.now(), dt = Math.min(0.1, (now - (b._pt || now)) / 1000);
+    b._pt = now;
+    if ((b._chk = (b._chk || 0) - dt) <= 0) {
+      b._chk = 0.25;
+      let cerca = false;
+      if (b.owner === 'p') for (const u of g.units) if (u.owner === 'p' && !u.inside && Math.hypot(u.x - b.cx, u.y - b.cy) < 2.5) { cerca = true; break; }
+      if (cerca) b._hasta = now + 1500;
+    }
+    const quiere = (b._hasta || 0) > now ? 1 : 0, antes = b._abre || 0;
+    b._abre = quiere ? Math.min(1, antes + dt * 1.6) : Math.max(0, antes - dt * 1.2);
+    if (quiere && antes === 0 && PK.Sfx && R.sonarEnCasilla) R.sonarEnCasilla('porton', b.cx, b.cy);
+    return Math.round(b._abre * 4);
+  }
+  // pk-42: un círculo en el suelo (en casillas) visto en isométrico, punteado
+  function circuloRadio(ctx, cx, cy, r, col) {
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    for (let i = 0; i <= 48; i++) { const a = (i / 48) * Math.PI * 2, [px, py] = R.iso(cx + Math.cos(a) * r, cy + Math.sin(a) * r); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // pk-41: el camino de una ruta de carretas («Ver» en Logística, 15 s) o el de la carreta elegida
+  function drawRuta(ctx) {
+    const L = PK.Logi, g = G();
+    let id = L.verRuta && performance.now() - (L.verRutaT || 0) < 15000 ? L.verRuta : null;
+    const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => (u.kind === 'cart' || u.kind === 'carromato' || u.kind === 'barcaza') && u.ruta) : null;
+    if (su) id = su.ruta;
+    if (!id) return;
+    const r = g.state.logi.rutas.find(o => o.id === id), a = r && g.bById.get(r.de), b = r && g.bById.get(r.a);
+    if (!a || !b) return;
+    const e = L.camino(a, b, L.PERFIL_DE.cart);
+    if (!e || e.path.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,226,120,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.lineDashOffset = -performance.now() / 50;
+    ctx.beginPath();
+    e.path.forEach(([x, y], i) => { const [px, py] = R.iso(x + 0.5, y + 0.5); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+    ctx.stroke();
+    ctx.restore();
   }
 
   // ---------- Territorio ----------

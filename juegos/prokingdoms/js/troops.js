@@ -221,7 +221,7 @@
   function enemyItem(kind, x, y, flip, frame, i) {
     const [px, py] = PK.Render.iso(x, y);
     let spr;
-    if (kind === 'beast' || kind === 'dragon') spr = Sp.wolf[flip ? 1 : 0][frame % 2];
+    if (kind === 'beast' || kind === 'dragon') spr = Sp.wolf[flip ? 1 : 0][frame % Sp.wolf[0].length];
     else if (kind === 'golem') spr = Sp.rocks.stone[2][i % 2];
     else spr = Sp.villager(ENEMY_COL[kind] || ENEMY_COL.bandit, 1 + (i % 2), kind === 'undead' ? 0 : 2, 'work', frame % 4, null, flip, 'knife');
     return { d: x + y, k: 'troop', o: { enemy: true }, spr, x: px - spr.ax, y: py - spr.ay, px, py };

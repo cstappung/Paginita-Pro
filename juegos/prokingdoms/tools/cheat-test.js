@@ -38,28 +38,49 @@ async function main() {
 
     console.log('\nCuentas');
     const hj = (await api('POST', '/api/join', { name: 'Honesta' })).data, honest = hj.player;
-    const cheat = (await api('POST', '/api/join', { name: 'Tramposa' })).data.player;
+    const cj = (await api('POST', '/api/join', { name: 'Tramposa' })).data, cheat = cj.player;
     check(honest && cheat, 'se crean dos cuentas');
 
-    // estado inicial de las zonas comunes
-    const first = (await api('POST', '/api/sync', { since: 0, snap: snap() }, honest.token)).data;
-    const ids = Object.keys(first.nodes);
-    const id = ids[0], start = first.nodes[id][0];
+    // L4 (pk-45): las zonas comunes son de cada jugador; el servidor ya no lleva sus recursos
+    console.log('\nZonas comunes (L4)');
+    let r = (await api('POST', '/api/sync', { since: 0, snap: snap(), harvest: { 1: 1e6, 2: 1e6 } }, honest.token));
+    check(r.status === 200 && r.data.nodes === undefined, 'el sync ya no trae recursos comunes y una «recolección» vieja se ignora', r.status);
     await api('POST', '/api/sync', { since: 0, snap: snap() }, cheat.token);
 
-    console.log('\nRecolección');
-    let r = (await api('POST', '/api/sync', { since: 0, harvest: { [id]: 20 } }, honest.token)).data;
-    check(Math.abs(r.nodes[id][0] - (start - 20)) < 1, 'la cuenta honesta recolecta 20 sin problema', start + ' → ' + r.nodes[id][0].toFixed(1));
-    const sum = nodes => ids.reduce((s, k) => s + nodes[k][0], 0), total0 = sum(r.nodes);
-    const all = {};
-    for (const k of ids) all[k] = 1e6;
-    r = (await api('POST', '/api/sync', { since: 0, harvest: all }, cheat.token)).data;
-    const drained = total0 - sum(r.nodes);
-    // 10 aldeanos × 120 s de cubeta inicial a la mejor tasa posible: unos pocos miles, nunca millones
-    check(drained > 0 && drained < 5000, 'la tramposa informa 1.000.000 en cada uno de los ' + ids.length + ' recursos comunes: solo se descuenta lo posible', Math.round(drained) + ' de ' + (ids.length * 1e6).toExponential(1) + ' informados');
-    const id2 = ids.reduce((a, k) => (r.nodes[k][0] > r.nodes[a][0] ? k : a), ids[0]), after = r.nodes[id2][0];
-    r = (await api('POST', '/api/sync', { since: 0, harvest: { [id2]: 1e6 } }, cheat.token)).data;
-    check(after - r.nodes[id2][0] < 50, 'con la cubeta vacía, el siguiente sync casi no descuenta', (after - r.nodes[id2][0]).toFixed(1));
+    console.log('\nMurallas ajenas (L4)');
+    {
+      const terr = r.data.terr, MAP = 256, PAR = 8, PW = MAP / PAR, slot = cj.world.slot;
+      const suyas = [];
+      for (let y = 0; y < MAP && suyas.length < 5000; y++) for (let x = 0; x < MAP; x++) if (terr[Math.floor(y / PAR) * PW + Math.floor(x / PAR)] === slot + 1) suyas.push(y * MAP + x);
+      const afuera = []; for (let k = 0; k < 5000 && afuera.length < 50; k++) if (terr[Math.floor(Math.floor(k / MAP) / PAR) * PW + Math.floor((k % MAP) / PAR)] !== slot + 1) afuera.push(k);
+      await api('POST', '/api/sync', { snap: snap({ muros: { v: 'x1', t: suyas.concat(afuera), g: [suyas[0], suyas[0]], tier: 9 } }) }, cheat.token);
+      const vista = (await api('POST', '/api/sync', { snap: snap() }, honest.token)).data.players.find(o => o.id === cheat.id);
+      const m = vista && vista.muros;
+      check(m && m.t.length + m.g.length <= 300 + 150 && m.t.every(k => suyas.includes(k)), 'murallas fuera de sus parcelas o sobre el tope se recortan', m && (m.t.length + m.g.length) + ' de ' + (suyas.length + afuera.length));
+      check(m && m.tier === 4 && m.g.length === 1, 'material hasta bastión y sin puertas repetidas', m && m.tier + ' / ' + m.g.length);
+      const otra = (await api('POST', '/api/sync', { snap: snap(), mv: { [cheat.id]: vista.mv } }, honest.token)).data.players.find(o => o.id === cheat.id);
+      check(otra && otra.muros === undefined, 'si ya las tiene, no vuelven a viajar');
+    }
+
+    console.log('\nCalzada Real (L5)');
+    {
+      const terr = r.data.terr, MAP = 256, PAR = 8, PW = MAP / PAR, hs = hj.world.slot, cs = cj.world.slot;
+      const dueño = k => terr[Math.floor(Math.floor(k / MAP) / PAR) * PW + Math.floor((k % MAP) / PAR)];
+      // casillas de la honesta (su tierra) y de la tramposa
+      const deH = [], deC = [];
+      for (let k = 0; k < MAP * MAP && (deH.length < 200 || deC.length < 50); k++) { if (dueño(k) === hs + 1 && deH.length < 200) deH.push(k); else if (dueño(k) === cs + 1 && deC.length < 50) deC.push(k); }
+      let a = await api('POST', '/api/autopista', { add: deC.concat(deH.slice(0, 20)) }, cheat.token);
+      check(a.status === 200 && a.data.aceptadas.every(k => dueño(k) === cs + 1) && a.data.aceptadas.length > 0, 'en tierra ajena se rechaza; en la suya se acepta', a.data.aceptadas && a.data.aceptadas.length + ' de ' + (deC.length + 20));
+      a = await api('POST', '/api/autopista', { add: deH }, honest.token);
+      check(a.status === 200 && a.data.aceptadas.length <= 60, 'sobre el tope del día (60 × era) no se acepta más', a.data.aceptadas.length + ' de ' + deH.length + ', tope ' + a.data.tope);
+      const s2 = (await api('POST', '/api/sync', { snap: snap(), apv: 0 }, cheat.token)).data;
+      check(s2.autopistas && Object.keys(s2.autopistas.t).length === a.data.aceptadas.length + Object.keys(s2.autopistas.t).filter(k => dueño(+k) === cs + 1).length, 'el otro jugador la ve en su sync');
+      const s3 = (await api('POST', '/api/sync', { snap: snap(), apv: s2.autopistas.v }, cheat.token)).data;
+      check(s3.autopistas === undefined, 'si ya tiene la versión, no vuelve a viajar');
+      const suya = a.data.aceptadas[0];
+      a = await api('POST', '/api/autopista', { del: [suya] }, cheat.token);
+      check(a.data.quitadas.length === 0, 'la de otro solo se quita en tu territorio');
+    }
 
     console.log('\nFoto del reino');
     await api('POST', '/api/sync', { snap: snap({ era: 60, pop: 1e6, army: 1e12, defense: 1e12, score: 1e9, total: 1e12, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }) }, cheat.token);
@@ -124,13 +145,8 @@ async function main() {
     // una cuenta en el mar: el servidor no ve su mapa, así que todo lo de la tierra que mande se ignora
     const mar = (await api('POST', '/api/join', { name: 'Marina' })).data.player;
     await api('POST', '/api/sync', { since: 0, snap: snap() }, mar.token);
-    const antes = sum((await api('POST', '/api/sync', { since: 0 }, honest.token)).data.nodes);
-    const todo = {};
-    for (const k of ids) todo[k] = 1e6;
-    let m = await api('POST', '/api/sync', { since: 0, mundo: 'mar', harvest: todo, snap: snap({ era: 9, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }), pase: { upgrades: 1e6, exp_won: 1e6 }, market: [{ t: 'buy', r: 'wood', n: 1e6 }] }, mar.token);
-    check(m.status === 200 && !Object.keys(m.data.nodes).length && !m.data.players.length && m.data.terr === undefined, 'en el mar el sync no trae la tierra (recursos, reinos ni territorio)', m.status);
-    const despues = sum((await api('POST', '/api/sync', { since: 0 }, honest.token)).data.nodes);
-    check(Math.abs(despues - antes) < 1, 'lo que «recolecta» en el mar no toca los recursos comunes de la tierra', Math.round(antes) + ' → ' + Math.round(despues));
+    let m = await api('POST', '/api/sync', { since: 0, mundo: 'mar', snap: snap({ era: 9, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }), pase: { upgrades: 1e6, exp_won: 1e6 }, market: [{ t: 'buy', r: 'wood', n: 1e6 }] }, mar.token);
+    check(m.status === 200 && !m.data.players.length && m.data.terr === undefined, 'en el mar el sync no trae la tierra (reinos ni territorio)', m.status);
     const visto = (await api('POST', '/api/sync', { since: 0 }, honest.token)).data.players.find(o => o.id === mar.id);
     check(visto && visto.era === 1, 'la foto mandada desde el mar no cambia su reino de la tierra (era 9 inventada)', visto && visto.era);
     m = await api('POST', '/api/pase/refresh', {}, mar.token);
@@ -144,7 +160,7 @@ async function main() {
     check(m.status === 200 && rival.rivales.some(o => o.id === mar.id), 'una flota posible sí se anota y otros la ven', m.data.flota && m.data.flota.poder);
     m = await api('POST', '/api/sync', { since: 0, snap: snap({ era: 9, res: { food: 1e9, wood: 1e9, stone: 1e9, gold: 1e9 } }) }, mar.token);
     const vuelta = (await api('POST', '/api/sync', { since: 0 }, honest.token)).data.players.find(o => o.id === mar.id);
-    check(m.status === 200 && Object.keys(m.data.nodes).length > 0 && vuelta.era < 9, 'de vuelta en la tierra recibe el mapa, y la foto inflada se sigue frenando', 'era ' + (vuelta && vuelta.era));
+    check(m.status === 200 && m.data.players.length > 0 && vuelta.era < 9, 'de vuelta en la tierra recibe a los demás reinos, y la foto inflada se sigue frenando', 'era ' + (vuelta && vuelta.era));
 
     console.log('\nLímite de pedidos');
     const burst = await Promise.all(Array.from({ length: 60 }, () => api('POST', '/api/sync', {}, cheat.token)));
@@ -162,7 +178,7 @@ async function main() {
     for (let i = 1; i <= 4; i++) {
       await wait(1000);
       const res = { food: 200 + 8 * i, wood: 200 + 6 * i, stone: 100 + 3 * i, gold: 100 + 2 * i };
-      const x = await api('POST', '/api/sync', { harvest: { [ids[5]]: 3 }, snap: snap({ res, total: 20 * i, pop: 12, army: 0, defense: 25 }) }, honest.token);
+      const x = await api('POST', '/api/sync', { snap: snap({ res, total: 20 * i, pop: 12, army: 0, defense: 25 }) }, honest.token);
       okAll = okAll && x.status === 200;
     }
     check(okAll, 'cuatro syncs normales pasan sin rechazo');
@@ -171,7 +187,7 @@ async function main() {
     await wait(300);
     const log = fs.existsSync(path.join(DATA, 'sospechas.log')) ? fs.readFileSync(path.join(DATA, 'sospechas.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
     const kinds = [...new Set(log.map(e => e.kind))];
-    check(['recoleccion', 'foto', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
+    check(['foto', 'murallas', 'autopista', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
     check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro');
   } finally {
     srv.kill();

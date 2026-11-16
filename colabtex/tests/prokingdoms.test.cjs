@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -497,11 +497,11 @@ test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen su
 
 // ---------- Fase 8 (pk-20): el Pase del Reino ----------
 test('Pase del Reino: cada tema del calendario tiene sus aspectos, y el actual y el siguiente tienen tema', () => {
-  const hj = JS('heroes.js');
+  const hj = JS('retratos.js'); // pk-50: los accesorios de los retratos se dibujan ahí
   for (const [id, T] of Object.entries(D.PASE_TEMAS)) {
     assert.ok(T.name && T.col.length === 3, id);
     assert.ok(PK.Heroes.CLASES[T.heroe.clase], id + ': clase del héroe');
-    assert.ok(hj.includes("A === '" + T.heroe.acc + "'"), id + ': el accesorio ' + T.heroe.acc + ' se dibuja en heroes.js');
+    assert.ok(hj.includes("A === '" + T.heroe.acc + "'"), id + ': el accesorio ' + T.heroe.acc + ' se dibuja en retratos.js');
     assert.ok(D.BUILD[T.edificio.b] && T.edificio.techo, id + ': aspecto de edificio');
     assert.ok(D.ARMY[T.tropa.t] && T.tropa.col, id + ': aspecto de tropa');
     assert.ok(D.BUILD[T.deco.b], id + ': decoración');
@@ -908,4 +908,246 @@ test('pk-40: el Mercado nunca vende más caro de lo que compra (oro infinito en 
   const rep = claves.filter((k, i) => claves.indexOf(k) !== i);
   assert.deepEqual(rep, [], 'eventos repetidos en life.js');
   assert.ok(PK.Life.EVENTS.torneo && PK.Life.EVENTS.torneoVerano);
+});
+
+// ---------- Plan de logística (juegos/prokingdoms/PLAN-LOGISTICA.md) ----------
+
+test('L1 (pk-41): la ruta por tiempo toma el camino rápido aunque dé un rodeo, y la de los aldeanos sigue siendo la corta', () => {
+  const N = W.W * W.H, costo = new Float32Array(N).fill(1 / 0.65);
+  // un camino en U: de (10,10) baja a y=14, cruza hasta x=30 y sube a (30,10); la línea recta y=10 es pasto
+  const road = [];
+  for (let y = 10; y <= 14; y++) road.push([10, y], [30, y]);
+  for (let x = 10; x <= 30; x++) road.push([x, 14]);
+  for (const [x, y] of road) costo[W.idx(x, y)] = 1 / 1.8;
+  const r = W.rutaCosto(10, 10, { x0: 30, y0: 10, x1: 30, y1: 10 }, costo, 1 / 1.8);
+  assert.ok(r.ok);
+  const enCamino = r.path.filter(([x, y]) => costo[W.idx(x, y)] < 1).length;
+  assert.ok(enCamino / r.path.length > 0.9, 'casi todo el viaje va por el camino (' + enCamino + ' de ' + r.path.length + ')');
+  assert.ok(r.seg < 20 / 0.65, 'y tarda menos que la recta: ' + r.seg.toFixed(1));
+  // sin el camino, va derecho
+  const llano = new Float32Array(N).fill(1 / 0.65);
+  const r2 = W.rutaCosto(10, 10, { x0: 30, y0: 10, x1: 30, y1: 10 }, llano, 1 / 0.65);
+  assert.ok(r2.path.every(([, y]) => y === 10), 'recta');
+  // lo que no pasa (Infinity) no se pisa, ni cortando una esquina en diagonal
+  const muro = new Float32Array(N).fill(1);
+  for (let y = 0; y < 30; y++) muro[W.idx(20, y)] = Infinity;
+  const r3 = W.rutaCosto(15, 5, { x0: 25, y0: 5, x1: 25, y1: 5 }, muro, 1);
+  assert.ok(r3.ok && r3.path.every(([x, y]) => muro[W.idx(x, y)] < Infinity));
+  assert.ok(r3.path.some(([, y]) => y >= 30), 'rodea el muro por abajo');
+});
+
+test('L1 (pk-41): las rutas de carretas unen talleres y bodegas del pueblo, sin campamentos ni modo automático', () => {
+  const L = PK.Logi;
+  // pk-43: el Molino es del pueblo solo dentro de tu tierra (afuera es campamento): los de la prueba van en una casilla tuya
+  const mx = 10, my = 10, ownerAt = W.ownerAt;
+  W.ownerAt = () => 'p'; // la prueba no arma territorios: todo es tuyo
+  const B = (type, id) => ({ id, type, owner: 'p', def: D.BUILD[type], done: true, x: mx, y: my, w: 1, h: 1, cx: mx + 0.5, cy: my + 0.5 });
+  const tc = B('tc', 1), saw = B('sawmill', 2), forge = B('forge', 3), lumber = B('lumber', 4), wh = B('warehouse', 5), mill = B('mill', 6);
+  assert.equal(L.parMalo(tc, saw), null);
+  assert.equal(L.parMalo(saw, forge), null, 'de un taller a otro');
+  assert.equal(L.parMalo(saw, tc), null, 'del taller a la bodega');
+  assert.equal(L.parMalo(mill, saw), null, 'el Molino del pueblo es bodega (decisión 4)');
+  assert.equal(L.parMalo(lumber, saw), null, 'pk-43: del campamento maderero al Aserradero va un carromato');
+  assert.equal(L.claseRuta ? 'ok' : '', 'ok');
+  assert.match(L.parMalo(saw, lumber), /campamento no recibe/, 'a un campamento no se lleva nada');
+  assert.match(L.parMalo(tc, wh), /dos bodegas/);
+  assert.match(L.parMalo(saw, saw), /mismo/);
+  W.ownerAt = () => null; // en tierra de nadie, el Molino es un campamento más
+  assert.match(L.parMalo(mill, saw), /no usa nada/);
+  assert.equal(L.parMalo(mill, tc), null);
+  W.ownerAt = ownerAt;
+  // ningún resto del findJob automático (decisión 2)
+  assert.doesNotMatch(JS('logistics.js'), /function findJob/);
+  // step() usa el mismo factor que las tablas de costo, y la carreta no corta esquinas por el pasto
+  const ent = JS('entities.js');
+  assert.match(ent, /PK\.Logi\.factorUnidad\(u\)/);
+  assert.match(ent, /parejo\(u, u\.path\[1\]\[0\] \+ 0\.5/);
+  // la Carretería arma más carretas por nivel
+  assert.equal(D.BSTATS.cartwright(1).carts, 4);
+  assert.equal(D.BSTATS.cartwright(3).carts, 8);
+});
+
+test('L2 (pk-42): cada aldeano trabaja para un edificio, con radio y puestos, y nunca busca más allá', () => {
+  const B = (type, lvl, extra) => Object.assign({ id: 9, type, lvl, owner: 'p', def: D.BUILD[type], done: true, cx: 50, cy: 50 }, extra);
+  // tabla 5.2 del plan
+  assert.equal(G.radioBase(B('tc', 3)), 12);
+  assert.equal(G.puestosBase(B('tc', 3)), 13);
+  assert.equal(G.radioBase(B('lumber', 1)), 10);
+  assert.equal(G.radioBase(B('lumber', 6)), 13);
+  assert.equal(G.radioBase(B('mining', 20)), 16, 'el radio tiene tope');
+  assert.equal(G.puestosBase(B('mining', 20)), 16, 'los puestos también');
+  assert.equal(G.radioBase(B('mill', 4)), 10);
+  // solo los edificios de trabajo terminados y tuyos
+  assert.ok(G.esBase(B('lumber', 1)));
+  assert.ok(!G.esBase(B('lumber', 1, { done: false })));
+  assert.ok(!G.esBase(B('lumber', 1, { owner: 'b1' })));
+  assert.ok(!G.esBase(B('sawmill', 1)));
+  // «qué saca»: lo que acepta y, si elegiste uno, solo eso
+  const mina = B('mining', 2, { extrae: 'gold' });
+  assert.ok(G.baseToma(mina, 'gold'));
+  assert.ok(!G.baseToma(mina, 'stone'));
+  assert.ok(!G.baseToma(B('lumber', 1), 'stone'));
+  assert.equal(G.queSaca(mina).join(), 'gold');
+  // el radio se mide desde el centro del edificio
+  assert.ok(G.enRadio(B('lumber', 1), 59, 49));
+  assert.ok(!G.enRadio(B('lumber', 1), 61, 49));
+  // el «cada vez más lejos» desapareció: doGather y el reparto usan el radio de la base
+  const ent = JS('entities.js');
+  assert.match(ent, /nodoEnRadio/);
+  assert.match(JS('auto.js'), /A\.sinRadio = /);
+  // la base se guarda con el aldeano (task.base) y lo que saca un edificio, con el edificio
+  assert.match(ent, /extrae/);
+});
+
+test('L3 (pk-43): libro mayor — las bodegas suman S.res, los campamentos guardan aparte y nada se pierde', () => {
+  const Lb = PK.Libro, st0 = G.state, capDe0 = G.capDe, cap0 = G.cap, bs0 = G.buildings;
+  const caps = { tc: 800, warehouse: 1500, granary: 0 };
+  G.capDe = (b, r) => (b.type === 'granary' ? (r === 'food' ? 2000 : 0) : caps[b.type] || 0);
+  G.cap = r => G.buildings.reduce((s, b) => s + G.capDe(b, r), 0);
+  const mk = (id, type, x) => ({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 2, h: 2, cx: x + 1, cy: 11, inv: {} });
+  const tc = mk(1, 'tc', 10), wh = mk(2, 'warehouse', 20), gr = mk(3, 'granary', 30), camp = mk(4, 'lumber', 60);
+  G.buildings = [tc, wh, gr, camp];
+  G.state = { res: { wood: 1000, food: 500, stone: 0 }, flags: {}, logi: { rutas: [] } };
+  try {
+    const suma = r => [tc, wh, gr].reduce((s, b) => s + (b.inv[r] || 0), 0);
+    Lb.conciliar();
+    assert.equal(suma('wood'), 1000, 'una partida vieja: su S.res entra en sus bodegas');
+    assert.equal(tc.inv.wood, 800, 'primero el Centro Urbano, hasta su tope');
+    assert.equal(wh.inv.wood, 200);
+    assert.equal(suma('food'), 500);
+    // operaciones al azar: la suma de las bodegas siempre es S.res, nada negativo
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 4000; i++) {
+      const r = ['wood', 'food', 'stone'][i % 3], n = Math.floor(rnd() * 120), op = Math.floor(rnd() * 6);
+      if (op === 0) G.state.res[r] = Math.max(0, G.state.res[r] - n);          // pagar
+      else if (op === 1) G.state.res[r] += n;                                   // premiar (puede pasar el tope)
+      else if (op === 2) Lb.poner([tc, wh, gr][i % 3], r, n);                   // descargar en una bodega
+      else if (op === 3) Lb.sacar([tc, wh, gr][i % 3], r, n);                   // una carreta carga
+      else if (op === 4) Lb.ponerCampo(camp, r, n);                             // un aldeano descarga en el campamento
+      else Lb.sacarCampo(camp, r, n);                                           // un carromato carga
+      Lb.conciliar();
+      for (const k of ['wood', 'food', 'stone']) {
+        assert.ok(Math.abs(suma(k) - G.state.res[k]) < 1e-6, 'descuadre en ' + k + ' (paso ' + i + ')');
+        for (const b of [tc, wh, gr, camp]) assert.ok(!(b.inv[k] < -1e-9), 'negativo en ' + b.type);
+      }
+      assert.ok(Lb.totalCampo(camp) <= Lb.capCampo(camp) + 1e-9, 'el campamento no pasa su tope');
+    }
+    // demoler un campamento: lo suyo va al pueblo entero
+    const w = G.state.res.wood + (camp.inv.wood || 0);
+    Lb.vaciarAlPueblo(camp);
+    assert.ok(Math.abs(G.state.res.wood - w) < 1e-9);
+    // la foto al servidor cuenta lo de afuera (campamentos y carromatos)
+    camp.inv = { stone: 40 };
+    G.units.push({ owner: 'p', kind: 'carromato', carry: 25, carryRes: 'stone' });
+    assert.equal(Lb.fuera('stone'), 65);
+    G.units.pop();
+  } finally { G.capDe = capDe0; G.cap = cap0; G.buildings = bs0; G.state = st0; }
+  // el carromato no cabe por una puerta chica, sí por el Gran Portón; la tierra ajena le cuesta ×4
+  const lg = JS('logistics.js');
+  assert.match(lg, /if \(perfil === 'carromato'\) return W\.wall\[k\] !== 2;/);
+  assert.match(lg, /f \/ C\.ajeno/);
+  assert.match(JS('world.js'), /noGate && W\.wall\[ni\] >= 2/, 'lobos y bandidos tampoco pasan por el Gran Portón');
+  assert.equal(D.BUILD.granportonv.alias, 'granporton');
+  assert.ok(!D.BUILD.establo.noUp && D.BUILD.establo.era === 1, 'el Establo es de la Era I');
+});
+
+test('L6 (pk-44): la barcaza solo navega, el carromato nunca, y la tormenta alarga el viaje ×1,4', () => {
+  const L = PK.Logi, st0 = G.state, ahora0 = G.ahora;
+  G.state = Object.assign({ res: {}, flags: {}, logi: { rutas: [] }, techs: {}, era: 1 }, st0 || {});
+  try {
+    const agua = [], tierra = [];
+    for (let k = 0; k < W.W * W.H; k++) (W.terrain[k] === 4 ? agua : tierra).push(k);
+    assert.ok(agua.length > 50 && tierra.length > 50, 'el mapa de prueba tiene de los dos');
+    const barca = L.tabla('barcaza').costo, carro = L.tabla('carromato').costo;
+    for (const k of tierra) assert.ok(!isFinite(barca[k]), 'barcaza en tierra en ' + k);
+    for (const k of agua) assert.ok(!isFinite(carro[k]), 'carromato en el agua en ' + k);
+    assert.ok(agua.some(k => isFinite(barca[k])), 'y sí navega');
+    // tormenta: mismo viento, un 40 % más de viaje
+    let tor = null, calma = null;
+    for (let k = 0; k < 5000 && !(tor && calma); k++) { const t = Date.UTC(2026, 10, 1) + k * 300e3; if (D.tormenta(t)) tor = tor || t; else calma = calma || t; }
+    assert.ok(tor && calma);
+    G.ahora = () => tor; const vt = L.velocidad('barcaza'), wt = D.vientoMar(tor);
+    G.ahora = () => calma; const vc = L.velocidad('barcaza'), wc = D.vientoMar(calma);
+    const base = w => D.BARCAZA.speed * (0.8 + 0.4 * w);
+    assert.ok(Math.abs(vc - base(wc)) < 1e-9, 'en calma, el viento');
+    assert.ok(Math.abs(vt - base(wt) / D.TORMENTA.viaje) < 1e-9 && D.TORMENTA.viaje === 1.4, 'con tormenta, ÷1,4');
+  } finally { G.state = st0; G.ahora = ahora0; }
+  // las rutas del mar: solo del Muelle de la colonia al Embarcadero, y la barcaza atraca en el agua
+  const B = (type, id) => ({ id, type, owner: 'p', def: D.BUILD[type] || { name: type }, done: true, x: 5, y: 5, w: 1, h: 1, cx: 5.5, cy: 5.5 });
+  assert.equal(L.parMalo(B('colonia', 1), B('embarcadero', 2)), null);
+  assert.match(L.parMalo(B('colonia', 1), B('tc', 3)), /barcaza/);
+  assert.match(L.parMalo(B('lumber', 4), B('embarcadero', 2)), /Embarcadero/);
+  assert.equal(L.claseRuta({ de: 1 }) !== undefined, true);
+  assert.match(JS('logistics.js'), /L\.atracadero = /);
+});
+
+test('L4 (pk-45): el despeje es global, puro y a 12 casillas de todo territorio', () => {
+  const t0 = W.terr.slice();
+  try {
+    const a = W.ubicarLugares(), d = W.distTerritorio(W.terr);
+    assert.ok(Object.keys(a.n).length > 50 && Object.keys(a.p).length > 10, 'mueve lo de todos los reinos');
+    let cerca = 0;
+    for (const id in a.n) { const [x, y] = a.n[id]; if (d[W.idx(x, y)] < W.LEJOS) cerca++; assert.ok(!W.terr[W.parcel(x, y)] && !W.terrCommon[W.parcel(x, y)] && W.terrain[W.idx(x, y)] !== 4); }
+    assert.equal(cerca, a.cerca, 'lo que no cupo a 12 se cuenta');
+    assert.equal(a.cerca, 0);
+    for (const id in a.n) assert.ok(!W.QUEDAN[W.nodes[id].kind], 'los árboles y arbustos se quedan');
+    // dos historias de territorio distintas que terminan igual dan las mismas posiciones
+    for (let k = 0; k < W.terr.length; k++) if (!W.terr[k] && !W.terrCommon[k] && W.parcelNeighbors(k).some(n => W.terr[n] === 2)) W.terr[k] = 2;
+    const b = W.ubicarLugares();
+    assert.ok(Object.keys(b.n).length > Object.keys(a.n).length);
+    W.terr.set(t0); W.terr[0] = W.terr[0]; // otra copia del mismo territorio
+    const c = W.ubicarLugares(Uint8Array.from(t0));
+    assert.equal(JSON.stringify(c), JSON.stringify(a));
+    // nada movido pisa a otro
+    const usadas = new Set();
+    for (const id in a.n) { const k = a.n[id].join(); assert.ok(!usadas.has(k)); usadas.add(k); }
+  } finally { W.terr.set(t0); }
+  // una puerta ajena solo la cruza su gente (W.pasoDe), y una muralla ajena nadie
+  const b0 = W.block.slice(), o0 = W.wallOwner.slice();
+  try {
+    W.block.fill(1); for (let x = 100; x <= 120; x++) W.block[W.idx(x, 100)] = 0;
+    W.wallOwner[W.idx(110, 100)] = 4;
+    const g = { x0: 120, y0: 100, x1: 120, y1: 100 };
+    assert.ok(!W.findPath(100, 100, g).ok, 'un extraño no pasa');
+    W.pasoDe = 4; assert.ok(W.findPath(100, 100, g).ok, 'los suyos sí'); W.pasoDe = 0;
+  } finally { W.block.set(b0); W.wallOwner.set(o0); W.pasoDe = 0; }
+  assert.match(JS('entities.js'), /W\.pasoDe = D\.slotOfOwner\(u\.owner\) \+ 1/);
+  assert.match(JS('logistics.js'), /W\.wallOwner\[k\]\) return false/);
+  assert.equal(D.WALL.max(1), 450);
+  // el cliente ya no informa recolección ni aplica recursos del servidor
+  assert.doesNotMatch(JS('net.js'), /harvest|applyNodes|serverNodes/);
+  assert.doesNotMatch(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /checkHarvest|COMMON\[/);
+});
+
+test('L5 (pk-47): la Calzada Real va en tierra de nadie o en la tuya, nunca en agua, zonas comunes, tierra ajena ni lugares', () => {
+  const me = 0, otro = W.terr.find(v => v && v !== me + 1) - 1; // en la prueba D.MY_SLOT es -1: un reino cualquiera
+  let mia = -1, ajena = -1, agua = -1, comun = -1, nadie = -1, lugar = -1;
+  const ub = W.ubicarLugares();
+  for (let k = 0; k < W.W * W.H; k++) {
+    const x = k % W.W, y = (k / W.W) | 0, o = W.terr[W.parcel(x, y)];
+    if (W.terrain[k] === 4) { if (agua < 0) agua = k; continue; }
+    if (W.terrCommon[W.parcel(x, y)]) { if (comun < 0) comun = k; continue; }
+    if (ub.ocupa[k]) { if (lugar < 0 && !o) lugar = k; continue; }
+    if (o === me + 1 && mia < 0 && W.zoneAt[k] < 0) mia = k;
+    else if (o === otro + 1 && ajena < 0) ajena = k;
+    else if (!o && nadie < 0 && W.zoneAt[k] < 0) nadie = k;
+  }
+  assert.ok(W.calzadaPuede(mia, me), 'en tu tierra');
+  assert.ok(W.calzadaPuede(nadie, me), 'en tierra de nadie');
+  assert.ok(!W.calzadaPuede(ajena, me), 'no en la de otro');
+  assert.ok(W.calzadaPuede(ajena, otro), 'su dueño sí');
+  assert.ok(!W.calzadaPuede(agua, me) && !W.calzadaPuede(comun, me) && !W.calzadaPuede(lugar, me));
+  assert.ok(!W.calzadaPuede(-1, me) && !W.calzadaPuede(W.W * W.H, me));
+  // la velocidad: la calzada es el mejor terreno de cada perfil
+  const L = PK.Logi, a0 = W.autopista[nadie];
+  W.autopista[nadie] = me + 1;
+  try {
+    assert.equal(L.factor('carromato', nadie), D.CARROMATO.highway);
+    assert.ok(L.factor('carreta', nadie) >= D.AUTOPISTA.carreta);
+    assert.ok(L.factor('aldeano', nadie) >= D.AUTOPISTA.aldeano);
+  } finally { W.autopista[nadie] = a0; }
+  assert.ok(D.AUTOPISTA.costo(3).blocks === 4 && D.AUTOPISTA.costo(1).stone === 10 && D.AUTOPISTA.porDia(2) === 120);
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
+  assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr\)/, 'el servidor usa la misma regla');
+  for (const f of ['server/index.js', '../../functions/index.js']) assert.match(fs.readFileSync(path.join(PKDIR, f), 'utf8'), /'POST \/api\/autopista'/, f);
 });

@@ -116,31 +116,98 @@
   };
 
   // ---------- Logística ----------
+  // pk-41: las carretas siguen rutas que eliges tú (origen, destino y, si quieres, un recurso). Sin ruta quedan paradas.
+  const rutaForm = { de: 0, a: 0, res: '' };
+  const nombreB = b => b.def.name + ' ' + b.lvl + ' · ' + Math.round(b.cx) + ',' + Math.round(b.cy);
+  UI.nuevaRutaDesde = function (b, comoDestino) {
+    if (comoDestino) rutaForm.a = b.id; else rutaForm.de = b.id;
+    UI.openLogistics();
+  };
+  UI.rutaEl = function (r, compacto) {
+    const L = PK.Logi, g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a), cs = L.cartsDe(r), mala = L.rutaMala(r);
+    const T = mala ? null : L.tiempos(r, true);
+    const clase = L.claseRuta(r), carro = clase !== 'cart', nom = clase === 'barcaza' ? 'Barcazas' : carro ? 'Carromatos' : 'Carretas';
+    const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica).' : 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
+    const malo = mala || (T && !T.ok) || !cs.length;
+    return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
+      el('div', { class: 'ruta-nom' }, a ? el('img', { class: 'ico', src: Sp.buildingIcon(a.type, undefined, undefined, a.asp), alt: '' }) : '', el('b', null, a ? a.def.name : '?'), ' → ',
+        b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '', el('b', null, b ? b.def.name : '?'),
+        r.res ? el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase()) : el('span', { class: 'small muted' }, ' · lo que haga falta')),
+      el('div', { class: 'ruta-dat small' }, T && T.ok ? 'Ida ' + Math.round(T.ida) + ' s · vuelta ' + Math.round(T.vuelta) + ' s' + (cs.length ? ' · aprox. ' + Math.round(T.ritmo) + ' por minuto' : '') : '', el('span', { class: malo ? 'warn-t' : 'muted' }, (T && T.ok ? ' · ' : '') + estado)),
+      el('div', { class: 'row ruta-btn' },
+        el('span', { class: 'small' }, nom + ': '),
+        UI.btn('−', () => { L.quitarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, disabled: !cs.length, title: carro ? 'Sacar un carromato de esta ruta' : 'Sacar una carreta de esta ruta' }),
+        el('b', null, String(cs.length)),
+        UI.btn('+', () => { L.sumarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, disabled: !!mala, title: carro ? 'Sumar un carromato sin ruta' : 'Sumar una carreta sin ruta' }),
+        compacto ? '' : UI.btn('Ver', () => { UI.closeModal(); L.verRuta = r.id; L.verRutaT = performance.now(); if (a && b) PK.Render.centerOn((a.cx + b.cx) / 2, (a.cy + b.cy) / 2); }, { small: true }),
+        compacto ? '' : UI.btn('Borrar', () => { L.borrarRuta(r.id); UI.rerender(); }, { small: true, cls: 'danger' })));
+  };
   UI.openLogistics = function () {
     UI.modal('logi', 'Logística', body => {
       const L = PK.Logi, g = G(), st = S();
       const shops = g.buildings.filter(b => b.owner === 'p' && b.done && b.def.recipe);
       const far = shops.filter(b => !L.nearStore(b));
+      const sinRuta = L.sinRuta();
       body.append(el('div', { class: 'war-top' },
+        el('div', null, el('b', null, 'Carromatos: '), L.carromatos().length + '/' + L.carroMax() + (g.countB('establo') ? '' : ' (construye un Establo de Carromatos)')),
+        g.enMar && g.enMar() ? el('div', null, el('b', null, 'Barcazas: '), L.barcazas().length + '/' + L.barcaMax() + (g.countB('embarcadero') ? '' : ' (construye el Embarcadero de colonos)')) : '',
         el('div', null, el('b', null, 'Carretas: '), L.carts().length + '/' + L.cartMax() + (g.countB('cartwright') ? '' : ' (construye una Carretería, Era II)')),
+        el('div', { class: sinRuta ? 'warn-t' : '' }, el('b', null, 'Sin ruta: '), String(sinRuta)),
         el('div', null, el('b', null, 'Talleres lejos de un almacén: '), far.length + ' de ' + shops.length),
         el('div', null, el('b', null, 'Cintas: '), st.logi.belts.length)));
       body.append(el('div', { class: 'row' },
         UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
-        UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos (y murallas); vuelve la mitad del material' }),
+        g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Logi.tool = 'calzada'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
+        UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos, murallas y Calzada Real (la tuya, o la de otro en tu tierra); vuelve la mitad del material' }),
         UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
+
+      // ----- Rutas -----
+      body.append(el('h3', null, 'Rutas'));
+      if (sinRuta) body.append(el('p', { class: 'small warn-t' }, sinRuta === 1 ? 'Tienes un vehículo parado sin ruta.' : 'Tienes ' + sinRuta + ' vehículos parados sin ruta.', ' Crea una ruta o súmalos con + a una que ya tengas.'));
+      const llenos = PK.Libro.campos().filter(b => PK.Libro.campoLleno(b) && !L.rutasDesde(b).some(r => L.cartsDe(r).length));
+      if (llenos.length) body.append(el('p', { class: 'small warn-t' }, llenos.length === 1 ? llenos[0].def.name + ' está lleno y ningún carromato lo vacía: sus aldeanos esperan.' : llenos.length + ' campamentos llenos sin carromato: sus aldeanos esperan.'));
+      for (const r of st.logi.rutas) body.append(UI.rutaEl(r));
+      if (!st.logi.rutas.length) body.append(el('p', { class: 'small muted' }, 'Todavía no tienes rutas. Un carromato lleva lo de un campamento a una bodega del pueblo; una carreta une un taller con una bodega (o con otro taller). Cargan en el origen, llevan al destino y vuelven.'));
+      const campos = g.buildings.filter(b => b.owner === 'p' && b.done && L.esCampo(b) && b.type !== 'colonia');
+      const colonias = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'colonia'); // pk-46: barcazas
+      const embs = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'embarcadero');
+      const puntos = g.buildings.filter(b => b.done && L.puntoCarreta(b)).sort((x, y) => (L.isShop(y) - L.isShop(x)) || x.def.name.localeCompare(y.def.name));
+      const opc = (sel, vacio, conCampos) => [el('option', { value: '' }, vacio)].concat(
+        [['Muelles de colonias (barcaza)', conCampos ? colonias : []], ['Campamentos (carromato)', conCampos ? campos : []], ['Talleres', puntos.filter(b => L.isShop(b))], ['Bodegas', puntos.filter(b => !L.isShop(b))], ['Embarcadero (barcazas)', conCampos ? [] : embs]].filter(x => x[1].length).map(([t, l]) => el('optgroup', { label: t }, l.map(b => el('option', { value: b.id, selected: b.id === sel }, nombreB(b))))));
+      const A = g.bById.get(rutaForm.de), B = g.bById.get(rutaForm.a);
+      const resOps = !B ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => L.acepta(B, k)) : L.isShop(B) ? Object.keys(L.recipe(B).in) : A && L.isShop(A) ? [L.output(A)] : [];
+      if (rutaForm.res && !resOps.includes(rutaForm.res)) rutaForm.res = '';
+      const why = A && B ? L.parMalo(A, B) : null;
+      body.append(el('div', { class: 'ruta-nueva' },
+        el('label', null, 'Origen ', el('select', { 'aria-label': 'Origen de la ruta', onchange: e => { rutaForm.de = +e.target.value || 0; UI.rerender(); } }, opc(rutaForm.de, 'Elige el origen', true))),
+        el('label', null, 'Destino ', el('select', { 'aria-label': 'Destino de la ruta', onchange: e => { rutaForm.a = +e.target.value || 0; UI.rerender(); } }, opc(rutaForm.a, 'Elige el destino'))),
+        el('label', null, 'Lleva ', el('select', { 'aria-label': 'Recurso que lleva', onchange: e => { rutaForm.res = e.target.value; } },
+          [el('option', { value: '' }, 'Lo que haga falta')].concat(resOps.map(k => el('option', { value: k, selected: k === rutaForm.res }, D.RES[k].name))))),
+        UI.btn('Crear ruta', () => {
+          const r = L.crearRuta(rutaForm.de, rutaForm.a, rutaForm.res || null);
+          if (!r) return;
+          if (L.libres(L.claseRuta(r)).length) L.sumarCarreta(r);
+          rutaForm.de = rutaForm.a = 0; rutaForm.res = '';
+          UI.rerender();
+        }, { cls: 'gold', disabled: !A || !B || !!why })));
+      if (why) body.append(el('p', { class: 'small warn-t' }, why));
+      if (!puntos.some(b => L.isShop(b))) body.append(el('p', { class: 'small muted' }, 'Las rutas sirven cuando tienes talleres (Aserradero, Cantería…).'));
+
       body.append(el('h3', null, 'Cómo se mueven las cosas'), el('ul', { class: 'info' },
         el('li', null, 'Cada taller tiene un depósito de entrada y uno de salida. Solo produce con lo que tiene adentro.'),
         el('li', null, 'Si está a 3 casillas o menos de un Almacén o del Centro Urbano, se abastece solo, pero despacio.'),
-        el('li', null, 'Las carretas abastecen talleres lejanos y arman cadenas: llevan lo que sale de un taller directo al que lo usa (madera → tablones → herramientas).'),
-        el('li', null, 'Los caminos aceleran un 40% a los aldeanos y casi triplican la velocidad de las carretas, que fuera del camino van lentas.'),
+        el('li', null, 'Lejos de los almacenes lo abastecen las carretas: cada una sigue la ruta que le das. Si en el origen no hay nada que llevar, espera ahí; si el destino está lleno, espera con la carga.'),
+        el('li', null, 'Las carretas eligen el camino más rápido, no el más corto: por un camino empedrado van casi tres veces más rápido, aunque den un rodeo.'),
+        el('li', null, 'Lo que juntan los campamentos queda en el campamento (hasta su tope) y no sirve para construir: un carromato del Establo lo lleva a una bodega del pueblo o a un taller. Lo que está en cualquier bodega del pueblo sirve en todo el pueblo.'),
+        el('li', null, 'Los carromatos salen de tu territorio y van rápido por los caminos, pero no caben por una puerta chica: tu muralla necesita un Gran Portón. Cruzar tierra de otro reino les cuesta cuatro veces más.'),
+        el('li', null, 'Las carretas no salen de tu territorio ni van a los campamentos.'),
         el('li', null, 'Las cintas (' + L.beltLockText().replace('Las cintas requieren ', 'requieren ') + ') unen dos edificios y mueven ' + D.BELT.rate + ' unidades por segundo sin que nadie cargue nada.')));
       if (shops.length) {
         body.append(el('h3', null, 'Talleres'));
         for (const b of shops) {
           const r = D.RECIPES[b.def.recipe], cap = L.bufCap(b), out = Object.keys(r.out)[0];
           body.append(el('div', { class: 'work-row' }, el('img', { class: 'ico', src: Sp.buildingIcon(b.type) }), el('b', null, b.def.name + ' ' + b.lvl),
-            el('span', { class: 'small muted' }, ' ' + (b.status === 'En reserva' && G().reservaDe(b) ? G().reservaText(G().reservaDe(b)) : b.status || '') + ' · entrada ' + Object.keys(r.in).map(k => Math.floor(b.inb[k] || 0)).join('/') + ' · salida ' + Math.floor(b.outb[out] || 0) + '/' + cap + (L.nearStore(b) ? ' · junto a almacén' : '')),
+            el('span', { class: 'small muted' }, ' ' + (b.status === 'En reserva' && G().reservaDe(b) ? G().reservaText(G().reservaDe(b)) : b.status || '') + ' · entrada ' + Object.keys(r.in).map(k => Math.floor(b.inb[k] || 0)).join('/') + ' · salida ' + Math.floor(b.outb[out] || 0) + '/' + cap + (L.nearStore(b) ? ' · junto a almacén' : ' · rutas: ' + L.rutasHacia(b).length + ' entran, ' + L.rutasDesde(b).length + ' salen')),
             G().reservaDe(b) || b.sinReserva ? UI.btn(b.sinReserva ? 'Respetar reserva' : 'Producir igual', () => { G().setSinReserva(b, !b.sinReserva); UI.rerender(); }, { small: true, cls: b.sinReserva ? '' : 'gold' }) : '',
             UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); }, { small: true })));
         }
@@ -154,6 +221,43 @@
         }
       }
     }, { wide: true });
+  };
+  // pk-43 (libro mayor): lo que guarda una bodega del pueblo o un campamento, en su panel.
+  UI.stockPanel = function (b) {
+    const Lb = PK.Libro, L = PK.Logi;
+    if (Lb.esCampo(b)) {
+      const tot = Lb.totalCampo(b), cap = Lb.capCampo(b), rs = L.rutasDesde(b), con = rs.some(r => L.cartsDe(r).length);
+      const ks = Object.keys(b.inv || {}).filter(k => b.inv[k] >= 1);
+      return el('div', { class: 'stock-box' + (tot >= cap - 0.5 ? ' lleno' : '') },
+        el('div', { class: 'row' }, el('b', null, 'Guarda: ' + Math.floor(tot) + '/' + cap), el('div', { class: 'bar stock-bar' }, el('div', { class: 'fill' + (tot >= cap - 0.5 ? ' red' : ''), style: { width: Math.min(100, (tot / cap) * 100) + '%' } }))),
+        ks.length ? el('div', { class: 'small base-rs' }, ks.map(k => el('span', { class: 'base-res' }, UI.resIcon(k), ' ' + U.fmt(Math.floor(b.inv[k]))))) : '',
+        el('p', { class: 'small ' + (con ? 'muted' : 'warn-t') }, con ? 'Lo lleva al pueblo ' + rs.filter(r => L.cartsDe(r).length).map(r => { const d = G().bById.get(r.a); return d ? d.def.name : '?'; }).join(', ') + '.' : (b.type === 'colonia' ? 'Lo que juntan tus colonos no sirve para construir hasta que una barcaza lo lleve a tu isla.' : 'Lo que se junta aquí no sirve para construir hasta que un carromato lo lleve al pueblo.') + (tot >= cap - 0.5 ? ' Está lleno: sus aldeanos esperan.' : '')),
+        rs.map(r => UI.rutaEl(r, true)),
+        el('div', { class: 'row' }, UI.btn(b.type === 'colonia' ? '+ Ruta de barcaza' : '+ Ruta de carromato', () => {
+          const bs = b.type === 'colonia' ? G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'embarcadero') : Lb.bodegas().concat(G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'mill' && !L.esCampo(o)));
+          const d = bs.filter(o => (b.def.drop || []).some(k => L.acepta(o, k))).sort((x, y) => Math.hypot(x.cx - b.cx, x.cy - b.cy) - Math.hypot(y.cx - b.cx, y.cy - b.cy))[0];
+          rutaForm.de = b.id; rutaForm.a = d ? d.id : 0; rutaForm.res = '';
+          UI.openLogistics();
+        }, { small: true, cls: con ? '' : 'gold' })));
+    }
+    if (!Lb.esBodega(b)) return '';
+    const ks = Object.keys(b.inv || {}).filter(k => b.inv[k] >= 1 && Lb.fisico(k)).sort((x, y) => D.RES_ORDER.indexOf(x) - D.RES_ORDER.indexOf(y));
+    if (!ks.length) return el('p', { class: 'small muted' }, 'Bodega vacía. Lo que hay en cualquier bodega del pueblo sirve para construir.');
+    return el('div', { class: 'stock-box' }, el('p', { class: 'small' }, el('b', null, 'Guarda aquí'), ' (lo de todas las bodegas sirve en todo el pueblo):'),
+      el('div', { class: 'stock-rows' }, ks.map(k => {
+        const cap = G().capDe(b, k), v = b.inv[k];
+        return el('div', { class: 'stock-row small' }, UI.resIcon(k), el('span', null, U.fmt(Math.floor(v)) + (cap ? '/' + U.fmt(cap) : '')), el('div', { class: 'bar stock-bar' }, el('div', { class: 'fill', style: { width: (cap ? Math.min(100, (v / cap) * 100) : 100) + '%' } })));
+      })));
+  };
+  // Las rutas que salen o llegan a un edificio, para su panel.
+  UI.rutasPanel = function (b) {
+    const L = PK.Logi;
+    if (!L.puntoCarreta(b) || !b.done) return '';
+    const rs = L.rutasDesde(b).concat(L.rutasHacia(b));
+    return el('div', { class: 'rutas-panel' },
+      el('p', { class: 'small' }, el('b', null, 'Rutas de carretas: '), rs.length ? '' : 'ninguna.'),
+      rs.map(r => UI.rutaEl(r, true)),
+      el('div', { class: 'row' }, UI.btn('+ Ruta desde aquí', () => UI.nuevaRutaDesde(b), { small: true }), UI.btn('+ Ruta hacia aquí', () => UI.nuevaRutaDesde(b, true), { small: true })));
   };
 
   // ---------- Investigación ----------

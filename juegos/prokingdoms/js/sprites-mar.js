@@ -156,7 +156,7 @@
     p.roof(b.x, b.y, b.w, b.h, z + alto, techo || 12, 'thatch', 0.25, 0.3, 'x');
   }
   const BD = Sp.BDRAW_MAR;
-  Object.assign(Sp.BTOP_MAR, { tc: 76, house: 40, mill: 34, muelle: 34, lumber: 30, mining: 26, granary: 40, warehouse: 40, builder: 36, tower: 64, salinas: 10, velas: 44, astillero: 50, polvorin: 34, faromar: 110, embarcadero: 44, comercio: 46, granfaro: 150, colonia: 40 });
+  Object.assign(Sp.BTOP_MAR, { tc: 76, house: 40, mill: 34, muelle: 34, lumber: 30, mining: 26, granary: 40, warehouse: 40, builder: 36, tower: 64, salinas: 10, velas: 44, astillero: 50, polvorin: 34, faromar: 110, embarcadero: 44, comercio: 46, granfaro: 150, colonia: 40, establo: 36 });
 
   BD.tc = function (p, col, m, tier) { // Fortaleza del Puerto: murallas de piedra, torre y muelle de madera
     suelo(p, 4, 4);
@@ -231,6 +231,19 @@
     p.door(b, 'L', 1.2, 0.8, 10);
     for (let i = 0; i < 3; i++) p.box(0.4 + i * 0.4, 2.45, 0.3, 0.3, 0, 5, '#8a5a30', '#6a4222', '#a87040');
     p.quad(b, 'R', 0.8, 1.2, 4, 12, col);
+  };
+  BD.establo = function (p, col) { // Corral de carretas: galpón de palma con un carro de playa y un corral de cañas
+    suelo(p, 4, 3, SAND2);
+    const b = { x: 0.2, y: 0.2, w: 2.4, h: 1.6 };
+    for (const [x, y] of [[b.x, b.y], [b.x + b.w - 0.15, b.y], [b.x, b.y + b.h - 0.15], [b.x + b.w - 0.15, b.y + b.h - 0.15]]) p.post(x + 0.07, y + 0.07, 14);
+    p.box(0.55, 0.55, 1.6, 0.75, 3, 8, TECA, '#7a4224', '#b06a3a'); // el carro
+    p.box(0.6, 0.6, 1.5, 0.65, 8, 13, col, col, col); // toldo del color del reino
+    p.roof(b.x - 0.1, b.y - 0.1, b.w + 0.2, b.h + 0.2, 14, 10, 'thatch', 0.55, 0.2, 'x');
+    for (let i = 0; i < 6; i++) p.post(2.9 + (i % 3) * 0.45, i < 3 ? 0.3 : 2.5, 6); // corral de cañas
+    p.box(2.9, 0.3, 1.0, 0.08, 4, 5, '#b8a060', '#9a8448', '#d8c070');
+    p.box(2.9, 2.5, 1.0, 0.08, 4, 5, '#b8a060', '#9a8448', '#d8c070');
+    p.box(0.4, 2.2, 1.0, 0.4, 0, 4, '#b8a060', '#9a8448', '#d8c070'); // atados de fibra
+    p.flag(b.x + b.w, b.y + 0.2, 22, col, 10);
   };
   BD.builder = function (p, col) { // Casa del Carpintero de Ribera: costillas de un casco
     suelo(p, 2, 2);

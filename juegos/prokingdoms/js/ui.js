@@ -21,6 +21,7 @@
     o = o || {};
     const b = el('button', { class: 'btn' + (o.small ? ' small' : '') + (o.cls ? ' ' + o.cls : ''), disabled: o.disabled, title: o.title }, label);
     if (!b.textContent.trim() && (o.aria || o.title)) b.setAttribute('aria-label', o.aria || o.title);
+    if (o.guia) b.dataset.guia = o.guia; // la guía de bienvenida lo busca por acá (nunca por el texto)
     b.addEventListener('click', e => { e.stopPropagation(); if (!b.disabled) fn(e); });
     return b;
   };
@@ -166,7 +167,7 @@
   }
 
   // ---------- HUD ----------
-  let resEls = {}, popEl, eraEl, coinEl, netEl, panel, bookDot, mm, tip, buildEl, evEl, asEl;
+  let resEls = {}, popEl, eraEl, coinEl, netEl, panel, bookDot, logiDot, mm, tip, buildEl, evEl, asEl;
   UI.init = function () {
     const hud = document.getElementById('hud');
     toastBox = el('div', { id: 'toasts' });
@@ -221,7 +222,8 @@
     mbtn('market', 'Mercado', () => PK.Social.openMarket(), null, 'market');
     mbtn('guild', 'Gremio', () => PK.Social.openGuild(), null, 'guild');
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
-    mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
+    const lb = mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
+    logiDot = el('span', { class: 'badge' }); lb.append(logiDot); // pk-41: carretas sin ruta
     mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
     mbtn('ancla', 'Galeón', () => PK.Mar.abrir(), null, 'galeon'); // Fase 9
@@ -445,6 +447,9 @@
       const n = PK.Quests.readyCount();
       bookDot.textContent = n || '';
       bookDot.style.display = n ? '' : 'none';
+      const sr = PK.Logi.sinRuta();
+      logiDot.textContent = sr || '';
+      logiDot.style.display = sr ? '' : 'none';
       updateQueueStrip();
       if (UI.revisarCartas) UI.revisarCartas();
       const na = PK.Asesor.cuenta(0.25);
@@ -561,7 +566,7 @@
   // Mientras no reclamaste m4 es el tutorial guiado: «Muéstrame» lleva al lugar de cada paso, y se puede saltar
   // (flags.tuto = 'saltado'; al terminarlo, 'fin').
   const GUIA = {
-    m1: { txt: 'Elige el Centro Urbano y toca «Aldeano».', fn: () => elegirTc() },
+    m1: { txt: 'Elige el Centro Urbano y toca «Aldeano». Cada aldeano trabaja para un edificio (el Centro Urbano o un campamento) y recolecta dentro de su radio.', fn: () => elegirTc() },
     m2: { txt: 'Abre Reino → Construir y elige Casa.', fn: () => { UI.openBuild(); }, grupo: 'reino' },
     m3: { txt: 'Elige el Centro Urbano y toca «Mejorar».', fn: () => elegirTc() },
     m4: { txt: 'Construye un Puesto de Exploradores y entrena un explorador en él.', fn: () => {
@@ -661,6 +666,15 @@
     }
     if (PK.Logi.tool) {
       const road = PK.Logi.tool === 'road';
+      if (PK.Logi.tool === 'calzada') {
+        const Cz = PK.Calzada;
+        panel.append(el('div', { class: 'p-help' }, el('h3', null, 'Trazar Calzada Real'),
+          el('p', { class: 'small' }, 'Una franja de piedra de 2 casillas que ven y usan todos los reinos del mundo: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5. Va en tierra de nadie o en la tuya. Toca dónde empieza y dónde termina; puedes encadenar tramos. Cada casilla cuesta '),
+          UI.costEl(D.AUTOPISTA.costo(G().state.era)),
+          el('p', { class: 'small muted' }, 'Hoy: ' + Cz.hoy() + ' de ' + Cz.tope() + ' casillas.'),
+          el('div', { class: 'row' }, UI.btn('Terminar', () => PK.Input.cancelTool(), { small: true }))));
+        return;
+      }
       panel.append(el('div', { class: 'p-help' }, el('h3', null, road ? 'Trazar camino' : 'Tender cinta transportadora'),
         el('p', { class: 'small' }, road ? 'Toca dónde empieza y dónde termina. Puedes seguir encadenando tramos. Cada casilla cuesta ' : 'Toca el edificio de origen y después el de destino: la cinta se traza sola por tu territorio. Cada casilla cuesta '),
         UI.costEl(road ? D.ROAD.cost : D.BELT.cost),
@@ -680,7 +694,7 @@
       if (!m) { cancel(); return; }
       panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(m.type, 'p', m.lvl) }), el('div', null, el('h3', null, 'Mover: ' + def.name + ' · Nv ' + m.lvl),
         el('p', { class: 'small' }, UI.hint('Clic en el lugar nuevo · Clic derecho o Esc para cancelar',
-          armed ? (gh.ok ? 'Así quedaría. Toca «Mover aquí» o el mismo lugar otra vez.' : (G().placeText(G().placeWhy(m.type, gh.x, gh.y, m.id)) + ' Toca otro lugar.')) : 'Toca el lugar nuevo: primero verás cómo queda.')),
+          armed ? (gh.ok ? 'Arrástralo con el dedo (o toca otro lugar) y toca ✓ para moverlo ahí.' : (G().placeText(G().placeWhy(m.type, gh.x, gh.y, m.id)) + ' Arrástralo a otro lugar.')) : 'Toca el lugar nuevo: primero verás cómo queda.')),
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Mover aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null, UI.btn('Cancelar', cancel, { small: true })),
         el('div', { class: 'row' }, el('span', { class: 'small' }, 'Mudanza: '), UI.costEl(G().moveCost(m))),
         el('p', { class: 'small muted' }, 'Conserva el nivel, la mejora en curso, la cola y los trabajadores. Las cintas que llegaban a él se quitan.'))));
@@ -692,14 +706,16 @@
       // los botones van primero: en el celular el panel es bajo y quedaban fuera de la vista
       panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(g.placing.type) }), el('div', null, el('h3', null, 'Construir: ' + def.name),
         el('p', { class: 'small' }, UI.hint('Clic para colocarlo en tu tierra explorada · Mayús para poner varios · Clic derecho o Esc para cancelar',
-          armed ? (gh.ok ? 'Así quedaría. Toca «Construir aquí» o el mismo lugar otra vez. Para moverlo, toca otro lugar.' : (G().placeText(G().placeWhy(g.placing.type, gh.x, gh.y)) + ' Toca otro lugar.')) : 'Toca dónde va: primero verás cómo queda.')),
+          armed ? (gh.ok ? 'Arrástralo con el dedo (o toca otro lugar) y toca ✓ para construirlo ahí.' : (G().placeText(G().placeWhy(g.placing.type, gh.x, gh.y)) + ' Arrástralo a otro lugar.')) : 'Toca dónde va: primero verás cómo queda.')),
         el('div', { class: 'row' }, armed && UI.isTouch() ? UI.btn('Construir aquí', () => PK.Input.placeGhost(), { cls: 'gold', disabled: !gh.ok }) : null,
+          def.porton ? UI.btn('Girar (R)', () => PK.Input.girarPorton(), { small: true }) : null,
           UI.btn('Otro edificio', () => UI.openBuild(), { small: true }), UI.btn('Cancelar', cancel, { small: true })),
         UI.costEl(G().buildCost(g.placing.type)),
         g.placing.type === 'house' ? el('div', { class: 'row small' },
           el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!S().flags.barrio, onchange: e => { S().flags.barrio = e.target.checked ? 1 : 0; if (!e.target.checked) g.placing.barrio = null; } }), ' Modo barrio'),
           el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !S().flags.barrioSinCaminos, onchange: e => { S().flags.barrioSinCaminos = e.target.checked ? 0 : 1; } }), ' con caminos'),
           el('span', { class: 'muted' }, UI.hint('(o Mayús): ', '') + 'casas en cuadrícula con calles de 1 casilla')) : '',
+        armed && g.BASES[g.placing.type] && def.drop ? radioInfo(G().recursosEnRadio(null, gh.x, gh.y, g.placing.type), g.BASES[g.placing.type].r(1)) : '',
         el('p', { class: 'small muted' }, def.desc + ' Se construye solo en ' + U.fmtTime(def.time / g.buildMult('p')) + ': no ocupa aldeanos.'))));
       return;
     }
@@ -718,6 +734,14 @@
     g.sel = null;
     UI.refreshPanel(true);
   };
+
+  // pk-42: qué recursos hay en el radio de trabajo de un campamento (al ponerlo y en su panel)
+  function radioInfo(rr, R) {
+    const ks = Object.keys(rr);
+    if (!ks.some(k => rr[k].vivos)) return el('p', { class: 'small bad' }, 'No hay nada para sacar en su radio (' + R + ' casillas): sus aldeanos esperarían sin trabajo.');
+    return el('p', { class: 'small' }, 'En su radio (' + R + ' casillas): ' + ks.filter(k => rr[k].vivos).map(k => rr[k].vivos + ' de ' + D.RES[k].name.toLowerCase() + ' (' + Math.round(rr[k].monto) + ')').join(' · '));
+  }
+  UI.radioInfo = radioInfo;
 
   function taskText(u) {
     if (u.inside) { const b = G().buildings.find(o => o.workers.includes(u.id)); return b ? 'Trabajando en ' + b.def.name : 'Trabajando'; }
@@ -747,13 +771,20 @@
     return Object.keys(c).map(k => c[k] + ' ' + k.toLowerCase()).join(' · ');
   }
 
+  // pk-41: cada carreta sigue la ruta que le das; aquí se elige (o se cambia) para las elegidas.
   function cartPanel(us) {
-    const u = us[0], g = G(), port = Sp.cart(D.PLAYER_COLOR, u.carryRes, false, 0, false).c.toDataURL();
-    const j = u.job, from = j && g.bById.get(j.from), to = j && g.bById.get(j.to);
+    const u = us[0], g = G(), L = PK.Logi, carro = u.kind === 'carromato';
+    us = us.filter(o => o.kind === u.kind); // carretas y carromatos no comparten rutas
+    const barca = u.kind === 'barcaza';
+    const port = (barca ? Sp.barcaza(D.PLAYER_COLOR, u.carryRes, 0, 0, false) : carro ? Sp.carromato(D.PLAYER_COLOR, u.carryRes, 0, 0, false) : Sp.cart(D.PLAYER_COLOR, u.carryRes, 0, 0, false)).c.toDataURL();
+    const r = L.rutaDe(u), nom = o => { const a = g.bById.get(o.de), b = g.bById.get(o.a); return (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?') + (o.res ? ' (' + D.RES[o.res].name.toLowerCase() + ')' : ''); };
+    const sel = el('select', { 'aria-label': carro ? 'Ruta del carromato' : 'Ruta de la carreta', onchange: e => { const id = +e.target.value || null; for (const c of us) L.asignar(c, id); UI.refreshPanel(true); } },
+      [el('option', { value: '' }, 'Sin ruta (parado)')].concat(S().logi.rutas.filter(o => L.claseRuta(o) === u.kind).map(o => el('option', { value: o.id, selected: !!r && o.id === r.id }, nom(o) + ' · ' + L.cartsDe(o).length))));
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
-      el('div', null, el('h3', null, us.length === 1 ? 'Carreta' : us.length + ' carretas'),
-        el('p', { class: 'small' }, j && from && to ? (j.phase === 'go' ? 'Va a cargar ' : 'Lleva ') + D.RES[j.res].name.toLowerCase() + ': ' + from.def.name + ' → ' + to.def.name : 'Esperando trabajo'),
-        el('p', { class: 'small muted' }, 'Las carretas se manejan solas: abastecen los talleres que se quedan sin insumos y sacan lo que producen. Con caminos van mucho más rápido.'))));
+      el('div', null, el('h3', null, barca ? (us.length === 1 ? 'Barcaza' : us.length + ' barcazas') : carro ? (us.length === 1 ? 'Carromato' : us.length + ' carromatos') : us.length === 1 ? 'Carreta' : us.length + ' carretas'),
+        el('p', { class: 'small' + (r ? '' : ' warn-t') }, u.estado || (r ? nom(r) : 'Sin ruta: elige a dónde va')),
+        el('div', { class: 'row' }, el('span', { class: 'small' }, 'Ruta: '), sel, UI.btn('Logística', () => UI.openLogistics(), { small: true })),
+        el('p', { class: 'small muted' }, barca ? 'Trae lo que guarda el Muelle de una colonia al Embarcadero de tu isla (' + L.barcaCap() + ' por viaje). Solo navega; el viento la apura o la frena.' : carro ? 'Vacía un campamento y lleva lo juntado al pueblo (' + L.carroCap() + ' por viaje). Sale de tu territorio; tu muralla solo la cruza por un Gran Portón.' : 'Carga en el origen, lo lleva al destino y vuelve. Si no hay nada que llevar, espera en el origen. Toma el camino más rápido: los caminos empedrados la aceleran mucho.'))));
   }
   function wallPanel(k) {
     const gate = W.wall[k] === 2, x = k % W.W, y = Math.floor(k / W.W), t = PK.Def.tier();
@@ -794,10 +825,10 @@
   function unitsPanel(us) {
     if (!us.length) { G().sel = null; return UI.refreshPanel(true); }
     if (us.every(x => x.kind === 'scout')) return scoutPanel(us);
-    if (us.every(x => x.kind === 'cart')) return cartPanel(us);
+    if (us.every(x => x.kind === 'cart' || x.kind === 'carromato' || x.kind === 'barcaza')) return cartPanel(us);
     us = us.filter(x => x.kind === 'v');
     // Exploradores + carretas sin ningún aldeano: no hay aldeano que mostrar (antes reventaba con u undefined).
-    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart')); }
+    if (!us.length) { const todos = G().selUnits(), sc = todos.filter(x => x.kind === 'scout'); return sc.length ? scoutPanel(sc) : cartPanel(todos.filter(x => x.kind === 'cart' || x.kind === 'carromato' || x.kind === 'barcaza')); }
     const u = us[0];
     const port = Sp.villager(D.PLAYER_COLOR, u.hair, u.skin, 'idle', 0, null, false).c.toDataURL();
     liveEl = el('p', { class: 'small' });
@@ -891,16 +922,25 @@
     act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
     // Fase 9 (pk-28): las ventanas del archipiélago
     if (b.type === 'embarcadero' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Fundar colonias', () => PK.Arch.abrirEmbarcadero(), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Colonias: ' + PK.Arch.coloniasHechas() + '/' + PK.Arch.maxColonias())));
+    if (b.type === 'embarcadero' && b.done && D.BARCAZA) { // pk-46: las barcazas de carga
+      const L = PK.Logi, n = L.barcazas().length, max = L.barcaMax(), cola = b.queue.filter(q => q === 'barcaza').length;
+      act.append(el('div', { class: 'stock-box' }, el('p', null, 'Barcazas: ' + n + '/' + max + ' · carga ' + L.barcaCap() + ' por viaje'),
+        el('div', { class: 'row' }, UI.btn(el('span', null, 'Barcaza ', UI.costEl(D.BARCAZA.cost)), () => { L.trainBarca(b); UI.refreshPanel(true); }, { disabled: n + cola >= max }), UI.btn('Logística', () => UI.openLogistics(), { small: true })),
+        cola ? el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / D.BARCAZA.time) * 100 + '%' } }), el('span', null, 'Armando barcaza (' + cola + ' en cola)')) : '',
+        el('p', { class: 'small muted' }, 'Lo que juntan tus colonias queda en su Muelle y no sirve para construir hasta que una barcaza lo trae aquí. El viento las apura o las frena; con tormenta tardan más.')));
+    }
     if (b.type === 'comercio' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Comerciar', () => PK.Arch.abrirComercio(), { cls: 'gold' })));
     if (b.type === 'tavern' && PK.Heroes) act.append(el('div', { class: 'row' }, UI.btn('Candidatos del día', () => PK.Heroes.open('taberna'), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Héroes: ' + PK.Heroes.lista().length + '/' + PK.Heroes.max())));
     if (PK.Heroes && b.done) { const gh = PK.Heroes.gobernanteDe(b); if (gh) act.append(el('p', { class: 'small' }, '★ Lo gobierna ', el('b', { translate: 'no' }, gh.nombre), ': ' + PK.Heroes.CLASES[gh.clase].pasTxt.split(': ').pop() + (gh.estado === 'libre' ? '.' : ' (ahora no: ' + (gh.estado === 'herido' ? 'herido' : 'de expedición') + ').'))); }
     // bonos por cercanía (V5): qué vecino le suma
     if (b.done && b.owner === 'p' && G().cercaDe) for (const c of G().cercaDe(b)) act.append(el('p', { class: 'small cerca-ok' }, '✚ Junto a ' + c.o.def.name + ': ' + c.c.txt + '.'));
+    if (G().esBase(b) && UI.basePanel) act.append(UI.basePanel(b)); // pk-42: quién trabaja aquí y su radio (ui/aldeanos.js)
+    if (b.done && b.owner === 'p' && UI.stockPanel) act.append(UI.stockPanel(b)); // pk-43: lo que guarda (bodega o campamento)
     if (b.type === 'consejo' && PK.Consejo) act.append(el('div', { class: 'row' }, UI.btn('Abrir el Consejo', () => PK.Consejo.open(), { cls: 'gold' }), el('span', { class: 'small muted' }, PK.Consejo.resumen())));
     if (b.type === 'tc') {
       const st = S();
       act.append(el('div', { class: 'row' },
-        UI.btn(el('span', null, 'Aldeano ', UI.costEl(D.VILLAGER.cost)), e => { G().train(b, e.shiftKey ? 5 : 1); UI.refreshPanel(true); }, { title: 'Mayús+clic: 5' }),
+        (bt => { bt.dataset.guia = 'aldeano'; return bt; })(UI.btn(el('span', null, 'Aldeano ', UI.costEl(D.VILLAGER.cost)), e => { G().train(b, e.shiftKey ? 5 : 1); UI.refreshPanel(true); }, { title: 'Mayús+clic: 5' })), // la guía lo señala
         UI.btn('+5', () => { G().train(b, 5); UI.refreshPanel(true); }, { small: true }),
         b.queue.length ? UI.btn('Quitar de la cola', () => { G().cancelTrain(b); UI.refreshPanel(true); }, { small: true }) : null,
         el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: st.auto.train, onchange: e => { st.auto.train = e.target.checked; } }), ' Entrenar sin parar')));
@@ -938,12 +978,21 @@
       const found = W.pois.filter(p => p.kind === 'relic' && G().poiState(p) && G().poiState(p).f && !G().poiState(p).d);
       for (const p of found) act.append(el('div', { class: 'row' }, el('span', { class: 'small' }, 'Reliquia descubierta'), UI.btn('Traerla', () => { G().claimRelic(p); UI.refreshPanel(true); }, { small: true, disabled: S().relics >= G().relicSlots() })));
       if (!found.length) act.append(el('p', { class: 'small muted' }, 'Explora el mapa para encontrar santuarios con reliquias.'));
+    } else if (b.type === 'establo') {
+      const L = PK.Logi, n = L.carromatos().length, max = L.carroMax(), cost = D.carromatoCost(S().era);
+      act.append(...[el('p', null, 'Carromatos: ' + n + '/' + max + ' · carga ' + L.carroCap() + ' por viaje'),
+        el('div', { class: 'row' }, UI.btn(el('span', null, 'Carromato ', UI.costEl(cost)), () => { L.trainCarro(b); UI.refreshPanel(true); }, { disabled: n + b.queue.length >= max })),
+        b.queue.length ? el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / D.CARROMATO.time) * 100 + '%' } }), el('span', null, 'Armando carromato (' + b.queue.length + ' en cola)')) : null,
+        L.carromatos().some(u => !L.rutaDe(u)) ? el('p', { class: 'small warn-t' }, 'Hay carromatos sin ruta: dales una en Logística (de un campamento a una bodega).') : null,
+        el('p', { class: 'small muted' }, 'Los carromatos no ocupan población. Vacían los campamentos (lo que juntan ahí no sirve para construir hasta que llega al pueblo), salen de tu territorio y solo cruzan tu muralla por un Gran Portón.'),
+        UI.btn('Logística', () => UI.openLogistics(), { small: true })].filter(Boolean));
     } else if (b.type === 'cartwright') {
       const L = PK.Logi, n = L.carts().length, max = L.cartMax();
       act.append(...[el('p', null, 'Carretas: ' + n + '/' + max + ' · carga ' + L.cartCap() + ' por viaje'),
         el('div', { class: 'row' }, UI.btn(el('span', null, 'Carreta ', UI.costEl(D.CART.cost)), () => { L.trainCart(b); UI.refreshPanel(true); }, { disabled: n + b.queue.length >= max })),
         b.queue.length ? el('div', { class: 'bar' }, el('div', { class: 'fill blue', style: { width: (b.qt / D.CART.time) * 100 + '%' } }), el('span', null, 'Armando carreta (' + b.queue.length + ' en cola)')) : null,
-        el('p', { class: 'small muted' }, 'Las carretas no ocupan población. Abastecen los talleres alejados de los almacenes y llevan lo producido al taller que lo necesita (por ejemplo, tablones de un Aserradero a una Herrería).'),
+        L.sinRuta() ? el('p', { class: 'small warn-t' }, (L.sinRuta() === 1 ? 'Una carreta espera' : L.sinRuta() + ' carretas esperan') + ' sin ruta: dales una en Logística.') : null,
+        el('p', { class: 'small muted' }, 'Las carretas no ocupan población. Cada una sigue la ruta que le das: de una bodega a un taller, de un taller a otro (tablones de un Aserradero a una Herrería) o de un taller a una bodega.'),
         UI.btn('Logística', () => UI.openLogistics(), { small: true })].filter(Boolean));
     } else if (def.recipe) {
       const r = D.RECIPES[def.recipe], cap = PK.Logi.bufCap(b), ob = Object.keys(r.out)[0];
@@ -952,11 +1001,12 @@
       act.append(el('p', null, 'Trabajadores: ' + b.workers.length + '/' + G().slots(b) + ' · ' + (b.status || '')));
       act.append(UI.reservaRow(b));
       // depósitos y abastecimiento
-      const near = PK.Logi.nearStore(b), belts = S().logi.belts.filter(x => x.a === b.id || x.b === b.id).length, carts = PK.Logi.carts().length;
+      const near = PK.Logi.nearStore(b), belts = S().logi.belts.filter(x => x.a === b.id || x.b === b.id).length, carts = PK.Logi.rutasHacia(b).reduce((n, r) => n + PK.Logi.cartsDe(r).length, 0);
       act.append(el('div', { class: 'bufs' },
         Object.keys(r.in).map(k => el('div', { class: 'buf' }, UI.resIcon(k), el('div', { class: 'bar' }, el('div', { class: 'fill green', style: { width: Math.min(100, ((b.inb[k] || 0) / cap) * 100) + '%' } }), el('span', null, Math.floor(b.inb[k] || 0) + '/' + cap)))),
         el('div', { class: 'buf' }, UI.resIcon(ob), el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: Math.min(100, ((b.outb[ob] || 0) / cap) * 100) + '%' } }), el('span', null, 'salida ' + Math.floor(b.outb[ob] || 0) + '/' + cap)))));
-      act.append(el('p', { class: 'small ' + (near || carts || belts ? 'muted' : 'warn-t') }, near ? 'Junto a ' + near.def.name + ': se abastece solo (' + PK.Logi.directRate(b) + '/s).' + (belts ? ' Además tiene ' + belts + ' cinta(s).' : '') : belts ? 'Conectado por ' + belts + ' cinta(s).' : carts ? 'Lejos de los almacenes: lo abastecen tus ' + carts + ' carretas.' : 'Lejos de los almacenes y sin carretas: no recibe insumos. Construye una Carretería o acércalo a 3 casillas de un Almacén o del Centro Urbano.'));
+      act.append(el('p', { class: 'small ' + (near || carts || belts ? 'muted' : 'warn-t') }, near ? 'Junto a ' + near.def.name + ': se abastece solo (' + PK.Logi.directRate(b) + '/s).' + (belts ? ' Además tiene ' + belts + ' cinta(s).' : '') : belts ? 'Conectado por ' + belts + ' cinta(s).' : carts ? 'Lejos de los almacenes: lo abastecen ' + (carts === 1 ? 'una carreta' : carts + ' carretas') + ' por sus rutas.' : 'Lejos de los almacenes y sin rutas de carretas: no recibe insumos. Crea una ruta desde una bodega o acércalo a 3 casillas de un Almacén o del Centro Urbano.'));
+      if (!near && UI.rutasPanel) act.append(UI.rutasPanel(b));
       const rate = (b.workers.length * G().prodMult(def.recipe, b) * 60) / r.time;
       if (b.workers.length) act.append(el('p', { class: 'small ' + (near || carts || belts ? 'muted' : 'warn-t') }, near || carts || belts ? 'Hasta aprox. ' + rate.toFixed(1) + ' ' + D.RES[ob].name.toLowerCase() + ' por minuto, si le llegan insumos' : 'Sin abastecimiento no produce nada.'));
       act.append(el('p', { class: 'small muted' }, UI.hint('Selecciona aldeanos y haz clic derecho en el edificio para asignarlos.', 'Elige aldeanos y luego toca el edificio para asignarlos.')));
@@ -987,7 +1037,7 @@
         f ? el('p', { class: 'small' }, 'Próximos lobos en aprox. ' + U.fmtTime(Math.max(0, f.wolves)) + ' · próximo evento en aprox. ' + U.fmtTime(Math.max(0, f.event)) + '.') : null,
         UI.btn('Expediciones', () => UI.openBarracks('exp'), { small: true }));
     }
-    else if (def.drop) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
+    else if (def.drop && !G().esBase(b)) act.append(el('p', { class: 'small' }, 'Acepta: ' + def.drop.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.'));
     if (b.type === 'granary' || b.type === 'warehouse') act.append(el('p', { class: 'small muted' }, 'Capacidad total: comida ' + U.fmt(G().cap('food')) + ' · bienes ' + U.fmt(G().cap('wood')) + '.'));
     if (UI.aspectoFila) act.append(UI.aspectoFila(b)); // pk-36: su aspecto (ui/aspectos.js)
     if (b.type !== 'tc') act.append(el('div', { class: 'row end' },
@@ -1120,7 +1170,9 @@
       arrow.textContent = open ? '▼' : '▲';
     };
     head.addEventListener('click', () => setOpen(wrap.classList.contains('collapsed')));
-    if (window.matchMedia('(max-width: 900px)').matches) UI.plegarPanel = () => setOpen(false);
+    if (window.matchMedia('(max-width: 900px), (orientation: landscape) and (max-height: 500px)').matches) UI.plegarPanel = () => setOpen(false);
+    UI.desplegarPanel = () => setOpen(true); // pk-49: al colocar con el dedo se pliega y después vuelve
+    UI.panelPlegado = () => wrap.classList.contains('collapsed');
     let lastTitle = '';
     new MutationObserver(() => {
       const h = body.querySelector('h3'), t = h ? h.textContent : 'Pro Kingdoms';
@@ -1155,6 +1207,15 @@
     else if (h.k === 'galeon') text = 'Galeón · ' + UI.hint('clic', 'toca') + ' para abrirlo';
     else if (h.k === 'wall') text = 'Muralla';
     else if (h.k === 'belt') text = 'Cinta transportadora';
+    else if (h.k === 'calzada') { // L5: el nombre lo escribió una persona: translate="no"
+      const d = PK.Calzada.dueño(W.idx(h.x, h.y));
+      if (d) {
+        hoverKey = 'cz' + d.name; tip.textContent = '';
+        tip.append(d.tuya ? 'Calzada Real de tu reino' : 'Calzada Real de ', d.tuya ? '' : el('span', { translate: 'no' }, d.name));
+        tip.style.display = 'block'; tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, x + 16) + 'px'; tip.style.top = y + 18 + 'px';
+        return;
+      }
+    }
     // Sin texto (parcelas, barcos…) no hay cartel: antes salía un recuadro vacío que además quedaba pegado.
     if (!text) { hoverKey = ''; UI.hideTip(); return; }
     hoverKey = text;

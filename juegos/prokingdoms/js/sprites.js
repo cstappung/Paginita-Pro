@@ -42,6 +42,7 @@
     return spr;
   }
   S.hit = function (spr, x, y) {
+    if (spr.k) { x *= spr.k; y *= spr.k; } // los de resolución doble (aldeanos, animales)
     x = Math.floor(x); y = Math.floor(y);
     if (x < 0 || y < 0 || x >= spr.c.width || y >= spr.c.height) return false;
     return !spr.mask || spr.mask[y * spr.c.width + x] === 1;
@@ -255,7 +256,9 @@
       if (tier >= 1) { ctx.fillStyle = tier >= 2 ? lt : md; for (let i = 0; i < 5; i++) ctx.fillRect(p[0] + 1 + i, top + 5, 1, Math.max(1, 3 - Math.floor(i * 0.6))); }
     }
     function post(x, y, ht) { box(x, y, 0.14, 0.14, 0, ht, 'darkwood'); }
-    return { ctx, P, fill, px, line, box, roof, quad, door, win, timber, flag, post, wp, info, tier };
+    // pk-50: pega un dibujo hecho aparte (estatuas, el dragón) con su punto de apoyo en P(x, y, z)
+    function img(c, ax, ay, x, y, z) { const q = P(x, y, z); ctx.drawImage(c, Math.round(q[0] - ax), Math.round(q[1] - ay)); }
+    return { ctx, P, fill, px, line, box, roof, quad, door, win, timber, flag, post, wp, info, tier, img };
   }
 
   // Adornos genéricos según el tramo de nivel: banderín en la cumbrera (si el edificio no tiene bandera) y, en las
@@ -390,6 +393,28 @@
       for (let i = 0; i < 3; i++) p.box(2.3 + i * 0.2, 0.4, 0.2, 1.2, i * 1, 3 + i * 1, 'logend', 'bark', 'bark');
       p.box(2.3, 2.0, 0.6, 0.5, 0, 5, 'plank', 'plank', 'plank');
       p.box(2.35, 2.05, 0.5, 0.4, 5, 7, 'plank', 'plank', 'plank');
+    },
+    granporton() {}, granportonv() {}, // pk-43: se dibujan con S.porton (dependen del material de la muralla)
+    // pk-43: galpón largo de tablas con techo de paja, abierto al frente: adentro, un carromato con su toldo; al lado,
+    // un corral con fardos de heno y un bebedero.
+    establo(p, col) {
+      p.box(0, 0, 4, 3, 0, 1, 'paving', 'paving', 'paving');
+      const b = { x: 0.15, y: 0.15, w: 2.6, h: 1.7 };
+      p.box(b.x, b.y, 0.2, b.h, 1, 16, 'plank'); p.box(b.x, b.y, b.w, 0.2, 1, 16, 'plank'); // paredes de atrás
+      p.box(b.x + b.w - 0.2, b.y, 0.2, b.h, 1, 16, 'plank');
+      // carromato guardado: caja, toldo del color del reino
+      p.box(0.6, 0.55, 1.7, 0.8, 4, 9, 'plank', 'plank', 'plank');
+      const lona = rgb(mix(col, [238, 226, 198], 0.45));
+      p.box(0.65, 0.6, 1.6, 0.7, 9, 15, lona, lona, lona);
+      p.post(b.x + 1.25, b.y + b.h - 0.1, 16); p.post(b.x + 0.05, b.y + b.h - 0.1, 16);
+      p.roof(b.x, b.y, b.w, b.h, 16, 12, 'thatch', 0.55, 0.22, 'x');
+      // corral
+      for (let i = 0; i < 5; i++) p.post(2.95 + (i % 3) * 0.45, i < 3 ? 0.3 : 0.3 + (i - 2) * 1.0, 6);
+      p.box(2.95, 0.3, 1.0, 0.08, 4, 5, 'darkwood', 'darkwood', 'darkwood');
+      p.box(3.85, 0.3, 0.08, 2.4, 4, 5, 'darkwood', 'darkwood', 'darkwood');
+      for (const [x, y] of [[3.1, 1.2], [3.15, 1.75]]) p.box(x, y, 0.45, 0.35, 1, 5, 'thatch', 'thatch', 'thatch'); // fardos
+      p.box(0.4, 2.3, 1.2, 0.35, 1, 4, 'darkwood', 'darkwood', '#4a7aa0'); // bebedero
+      p.flag(b.x + b.w, b.y + 0.2, 26, col, 10);
     },
     cartwright(p, col) {
       // galpón abierto al frente con una carreta a medio armar y ruedas apoyadas
@@ -548,7 +573,8 @@
       p.door(t, 'L', 0.7, 0.45, 10, 4);
       p.box(0.15, 0.15, 1.7, 1.7, 58, 62, 'slate', 'slate', 'paving');
       for (const [x, y] of [[0.15, 0.15], [0.85, 0.15], [1.55, 0.15], [0.15, 0.85], [0.15, 1.55]]) p.box(x, y, 0.3, 0.3, 62, 66, 'slate', 'slate', 'slate');
-      // el dragón posado en la almena: cuerpo, cuello, cabeza, alas y cola (todo en bloques)
+      // el dragón posado en la almena (pk-50: con volumen y alas de membrana, fauna.js)
+      if (PK.Fauna) { const dr = PK.Fauna.dragon(); p.img(dr.c, dr.patas[0], dr.patas[1], 1.0, 1.0, 64); p.flag(0.25, 1.75, 66, col, 12); return; }
       const R = '#b8302a', Rd = '#7a1a16', Rl = '#e8604a';
       p.box(0.7, 0.8, 0.7, 0.4, 62, 68, R, Rd, Rl);
       p.box(1.3, 0.9, 0.25, 0.2, 66, 74, R, Rd, Rl);
@@ -850,6 +876,13 @@
       p.box(0.1, 0.1, 1.8, 1.8, 0, 4, 'stone', 'stone', 'paving');
       p.box(0.4, 0.4, 1.2, 1.2, 4, 15, 'marbleS', 'marbleS', 'marbleS');
       p.box(0.35, 0.35, 1.3, 1.3, 15, 17, 'gilt', 'gilt', 'marbleS');
+      if (PK.Fauna) { // pk-50: la estatua con volumen (fauna.js) y su antorcha
+        const e = PK.Fauna.estatua(1, col);
+        p.img(e.c, e.pies[0], e.pies[1], 1.0, 1.0, 17);
+        const q = p.P(1.0, 1.0, 17), t = [Math.round(q[0] - e.pies[0] + e.llama[0]), Math.round(q[1] - e.pies[1] + e.llama[1])];
+        for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [-1, -2, '#f0a030'], [0, -3, '#fff0a0'], [1, -3, '#ffd060'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c);
+        return;
+      }
       p.box(0.6, 0.86, 0.3, 0.3, 17, 36, BR, BR2, BR); p.box(1.04, 0.86, 0.3, 0.3, 17, 36, BR, BR2, BR); // piernas
       p.box(0.56, 0.8, 0.82, 0.44, 34, 41, BR2, BR2, BR);                                                     // faldón
       p.box(0.54, 0.78, 0.86, 0.48, 41, 55, BR, BR2, BR);                                                     // torso
@@ -1044,6 +1077,14 @@
       p.box(0.95, 0.95, 3.1, 3.1, 18, 21, 'gilt', 'gilt', 'marbleS');
       p.quad({ x: 1, y: 1, w: 3, h: 3 }, 'L', 1.1, 1.9, 8, 14, rgb(col));
       if (ph === 0) { for (const [x, y] of [[1.4, 2.1], [2.5, 2.1]]) p.box(x, y, 0.6, 0.6, 21, 34, 'plank', 'darkwood'); p.box(1.3, 2.0, 2.0, 0.8, 34, 36, 'plank', 'darkwood', 'plank'); }
+      if (ph >= 1 && PK.Fauna) { // pk-50: la estatua con volumen, que se completa por fases
+        // sin bandera: detrás de la estatua solo asomaba un pedazo blanco junto al escudo (el color va en el escudo)
+        const e = PK.Fauna.coloso(col, { piernas: 1, torso: ph >= 2, cabeza: ph >= 3, lanza: ph >= 4, antorcha: ph >= 5, escudo: ph >= 2 });
+        p.img(e.c, e.pies[0], e.pies[1], 2.5, 2.5, 21);
+        if (e.llama) { const q = p.P(2.5, 2.5, 21), t = [Math.round(q[0] - e.pies[0] + e.llama[0]), Math.round(q[1] - e.pies[1] + e.llama[1])]; for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [-1, -2, '#f0a030'], [0, -3, '#fff0a0'], [1, -3, '#ffd060'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c); }
+        if (ph >= 6) { const q = p.P(2.5, 2.5, 21), t = [q[0] - e.pies[0] + e.cabeza[0], q[1] - e.pies[1] + e.cabeza[1]]; for (let a = 0; a < 28; a++) { const k = (a / 28) * Math.PI * 2; p.px(Math.round(t[0] + Math.cos(k) * 8), Math.round(t[1] + Math.sin(k) * 2.5), a % 2 ? GOLD : GLINT); } } // halo sobre el yelmo
+        return;
+      }
       if (ph >= 1) { p.box(1.9, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); p.box(2.6, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); }
       if (ph >= 2) { p.box(1.8, 2.05, 1.35, 0.7, 44, 52, BR2, BR2, BR); p.box(1.75, 2.0, 1.45, 0.8, 52, 72, BR, BR2, BR); p.box(1.6, 2.05, 1.75, 0.7, 68, 75, BR, BR2, BR); }
       if (ph >= 3) { p.box(2.25, 2.15, 0.5, 0.45, 75, 87, BR, BR2, BR); p.box(2.2, 2.1, 0.6, 0.55, 87, 90, 'gilt', 'gilt', 'gilt'); }
@@ -1251,7 +1292,7 @@
   };
   const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60, swamp: 36, giants: 44, temple: 36, legend: 40 };
 
-  const BTOP = { tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
+  const BTOP = { granporton: 58, granportonv: 58, establo: 40, tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
   // Tramos de nivel: 1-3, 4-6, 7-9, 10-12, 13-15, 16-19 y 20+ (cada era sube 2 niveles el tope).
   S.tier = lvl => (lvl >= 20 ? 6 : lvl >= 16 ? 5 : lvl >= 13 ? 4 : lvl >= 10 ? 3 : lvl >= 7 ? 2 : lvl >= 4 ? 1 : 0);
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).
@@ -1355,6 +1396,7 @@
   };
   let techoAsp = null;
   S.building = function (type, owner, lvl, ov) {
+    if (D.BUILD[type] && D.BUILD[type].porton) { const st = PK.Game && PK.Game.state; return S.porton(type, owner, owner === 'p' && st && st.def ? st.def.tier : 2, 0, ov); }
     const tier = S.tier(lvl || 1), asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (BCACHE[key]) return BCACHE[key];
     const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
@@ -1364,6 +1406,68 @@
     techoAsp = null;
     spr.pad = S.btop(type, lvl) - btopBase(type); // alto extra arriba (las barras se dibujan donde antes)
     return (BCACHE[key] = spr);
+  };
+
+  // pk-43: el Gran Portón. Dos torres con el material de la muralla (empalizada, piedra, sillares, bastión), un arco y,
+  // en el paso, dos hojas de madera que se abren (madera) o un rastrillo que sube (piedra o más). frame: 0 cerrado … 4
+  // abierto. Se dibuja aparte de S.building porque depende del material de la muralla y de lo abierto.
+  const PORC = {};
+  S.porton = function (type, owner, wallTier, frame, ov) {
+    const asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + wallTier + '|' + frame + (asp ? '|' + asp.id : '');
+    if (PORC[key]) return PORC[key];
+    const def = D.BUILD[type], v = def.porton === 'v', col = asp && asp.col ? asp.col : S.ownerColor(owner);
+    const t = Math.max(1, Math.min(4, wallTier || 1)), H = [0, 24, 30, 34, 38][t];
+    const mat = ['', 'bark', 'stone', 'paving', 'slate'][t], top = ['', 'logend', 'paving', 'marbleS', 'paving'][t];
+    const abre = frame / 4;
+    const spr = isoSprite(def.w, def.h, 58, false, p => {
+      // (a, b): a a lo largo de la muralla, b a través. En el girado se cambian x e y.
+      const box = (a, b, la, lb, z0, z1, m1, m2, m3) => (v ? p.box(b, a, lb, la, z0, z1, m1, m2, m3) : p.box(a, b, la, lb, z0, z1, m1, m2, m3));
+      const P = (a, b, z) => (v ? p.P(b, a, z) : p.P(a, b, z));
+      const torre = a0 => {
+        if (t === 1) { // empalizada: torre de troncos con techo de tablas
+          for (let i = 0; i < 4; i++) box(a0 + 0.06 + i * 0.22, 0.1, 0.2, 1.8, 0, H + (i % 2 ? 2 : 0), 'bark', 'bark', 'logend');
+          box(a0, 0.05, 0.95, 1.9, H - 2, H + 1, 'plank', 'plank', 'plank');
+          return;
+        }
+        box(a0 + 0.04, 0.05, 0.92, 1.9, 0, H, mat, mat, top);
+        for (let i = 0; i < 4; i++) { box(a0 + 0.04 + (i % 2) * 0.66, i < 2 ? 0.05 : 1.65, 0.26, 0.3, H, H + 4, mat, mat, top); } // almenas
+        // tronera y antorcha
+        const q = P(a0 + 0.5, 1.95, H * 0.62);
+        p.ctx.fillStyle = '#141018'; p.ctx.fillRect(q[0] - 1, q[1] - 3, 2, 5);
+        const tq = P(a0 + 0.95, 1.95, H * 0.45);
+        p.ctx.fillStyle = '#3a2a1a'; p.ctx.fillRect(tq[0], tq[1], 1, 3);
+        p.ctx.fillStyle = '#ffb040'; p.ctx.fillRect(tq[0] - 1, tq[1] - 2, 3, 2); p.ctx.fillStyle = '#fff0a0'; p.ctx.fillRect(tq[0], tq[1] - 3, 1, 1);
+      };
+      torre(0);
+      // suelo del paso
+      box(1, 0.1, 2, 1.8, 0, 1, 'paving', 'paving', 'paving');
+      if (t === 1) { // dos hojas que giran hacia afuera
+        const th = abre * Math.PI * 0.45, c = Math.cos(th), s2 = Math.sin(th), hz = H - 6;
+        for (const [h0, dir] of [[1, 1], [3, -1]]) {
+          const e = [h0 + dir * c * 0.98, 1 + s2 * 0.98];
+          p.fill([P(h0, 1, 0), P(e[0], e[1], 0), P(e[0], e[1], hz), P(h0, 1, hz)], 'plank', dir > 0 ? 1.1 : 0.85);
+          for (let k = 1; k < 4; k++) { const f = k / 4, m = [h0 + (e[0] - h0) * f, 1 + (e[1] - 1) * f]; p.line(P(m[0], m[1], 1), P(m[0], m[1], hz - 1), '#5a3a20'); } // tablas
+          for (const zz of [hz * 0.22, hz * 0.7]) { p.line(P(h0, 1, zz), P(e[0], e[1], zz), '#2a2228'); p.line(P(h0, 1, zz + 1), P(e[0], e[1], zz + 1), '#4a4248'); } // herrajes
+          p.line(P(e[0], e[1], 0), P(e[0], e[1], hz), '#2a1a0e');
+        }
+      } else { // rastrillo de hierro que sube
+        const z0 = abre * (H - 8), hz = H - 6;
+        if (z0 < hz - 1) p.fill([P(1.05, 1, Math.min(hz, z0)), P(2.95, 1, Math.min(hz, z0)), P(2.95, 1, hz), P(1.05, 1, hz)], '#1a1418'); // la sombra del paso detrás
+        for (let i = 0; i <= 6; i++) { const a = 1.05 + i * 0.315, q0 = P(a, 1, Math.min(hz, z0)), q1 = P(a, 1, hz); p.line(q0, q1, '#6a6a74'); p.line([q0[0] + 1, q0[1]], [q1[0] + 1, q1[1]], '#3a3a40'); }
+        for (let z = z0 + 2; z < hz; z += 4) p.line(P(1.05, 1, z), P(2.95, 1, z), '#8a8a94');
+        if (abre < 0.9) for (let i = 0; i <= 6; i++) { const a = 1.05 + i * 0.315, q = P(a, 1, z0); p.px(q[0], q[1], '#8a8a94'); } // puntas
+      }
+      // arco del paso, con escudo del reino
+      box(1, 0.6, 2, 0.8, H - 6, H, mat === 'bark' ? 'plank' : mat, mat === 'bark' ? 'plank' : mat, top);
+      const e = P(2, 1.4, H - 3);
+      p.ctx.fillStyle = rgb(col); p.ctx.fillRect(e[0] - 2, e[1] - 2, 5, 5);
+      p.ctx.fillStyle = t >= 3 ? '#e8b83a' : rgb(sc(col, 1.3)); p.ctx.fillRect(e[0], e[1] - 1, 1, 3); p.ctx.fillRect(e[0] - 1, e[1], 3, 1);
+      torre(3);
+      // estandartes en las torres (desde los sillares), que flamean con el cuadro
+      if (t >= 2) for (const a0 of [0.5, 3.5]) { const q = v ? [1.0, a0] : [a0, 1.0]; p.flag(q[0], q[1], H + 4, col, 10 + (frame % 2)); }
+    }, t >= 3 ? 3 : t >= 2 ? 2 : 0, null);
+    spr.pad = 0;
+    return (PORC[key] = spr);
   };
 
   // Suelo alrededor de los edificios según la era del reino: tierra pisada (II), grava (III-IV), adoquín (V-VII)
@@ -2133,92 +2237,7 @@
     return (GALC[key] = withMask({ c: pb.canvas(), ax: 44, ay: 64 }));
   };
 
-  S.cart = function (col, carry, flip, frame, moving) {
-    const f = moving ? frame % 4 : 1, key = col.join(',') + (carry || '') + (flip ? 1 : 0) + f;
-    if (CC[key]) return CC[key];
-    const Wd = 30, Ht = 22, pb = new PB(Wd, Ht), X = x => (flip ? Wd - 1 - x : x);
-    const set = (x, y, c) => pb.set(X(x), y, c);
-    const hline = (x0, x1, y, c) => { for (let x = x0; x <= x1; x++) set(x, y, c); };
-    // paleta
-    const pl = [168, 118, 68], plL = [204, 156, 98], plD = [116, 78, 42], ins = [84, 56, 32], edge = [52, 34, 20];
-    const dk = [128, 112, 96], dkD = [92, 80, 68], dkL = [166, 150, 132], belly = [198, 186, 168], muz = [214, 204, 190], hoof = [38, 30, 24], mane = [66, 54, 44];
-    const rim = [58, 54, 52], rimL = [122, 116, 108], wIn = [72, 48, 28], spoke = [184, 142, 90], hub = [30, 20, 14];
-    for (let x = 4; x <= 28; x++) pb.set(X(x), 20, [10, 18, 6], x < 6 || x > 26 ? 40 : 75); // sombra
-    const bob = moving && (f === 1 || f === 3) ? -1 : 0;
-    // --- burro (detrás de las varas) ---
-    const legX = [20, 21, 24, 25], lo = moving ? LEGS[f] : LEGS[1];
-    for (let i = 0; i < 4; i++) {
-      const lx = legX[i], o = lo[i], c = i === 1 || i === 3 ? dkD : dk;
-      set(lx, 15 + bob, c); set(lx, 16, c); set(lx + (o > 0 ? 1 : o < 0 ? -1 : 0), 17, c); set(lx + o, 18, c); set(lx + o, 19, hoof);
-    }
-    const by = 11 + bob;
-    hline(20, 25, by, mane);                         // lomo
-    hline(19, 26, by + 1, dk); hline(19, 26, by + 2, dk);
-    set(19, by + 1, dkD); set(26, by + 2, dkD);
-    hline(20, 25, by + 3, belly); set(19, by + 3, dkD); set(26, by + 3, dkD);
-    set(20, by + 1, dkL); set(21, by + 1, dkL); set(22, by + 1, dkL);
-    set(18, by + 1, mane); set(18, by + 2, mane); set(17, by + 3, mane);   // cola
-    // cuello y cabeza
-    set(26, by, mane); set(27, by, dk); set(27, by - 1, mane); set(26, by + 1, dk); set(27, by + 1, dk);
-    hline(27, 29, by - 2, dk); hline(27, 29, by - 1, dk); set(28, by - 2, dkL);
-    set(29, by, muz); set(28, by, muz); set(29, by - 1, muz); set(28, by - 1, dk);
-    set(28, by - 2, [24, 18, 14]);                   // ojo
-    set(27, by - 3, dkD); set(27, by - 4, dk); set(28, by - 3, dkD); set(28, by - 4, dkL); // orejas
-    // collera con el color del reino y arnés
-    set(25, by, col); set(25, by + 1, sc(col, 0.8)); set(25, by + 2, sc(col, 0.65));
-    hline(21, 24, by + 2, [70, 46, 26]);
-    // --- varas ---
-    hline(16, 20, 13, plD); set(21, 13 + (bob ? 0 : 0), plD);
-    // --- caja de la carreta ---
-    hline(4, 17, 9, plL);                            // borde de atrás
-    hline(3, 16, 10, ins);                           // interior
-    hline(2, 15, 11, plL);                           // borde de adelante
-    for (let y = 12; y <= 14; y++) hline(2, 15, y, y === 13 ? plD : pl);
-    hline(2, 15, 15, edge);
-    for (const x of [2, 8, 15]) for (let y = 11; y <= 14; y++) set(x, y, plD);
-    set(17, 10, plD); set(16, 10, plD); set(3, 10, plD);
-    // --- carga ---
-    if (carry) {
-      const cc = CARRY[carry] || [150, 120, 80], cL = sc(cc, 1.25), cD = sc(cc, 0.72);
-      if (carry === 'wood' || carry === 'planks') {
-        const end = carry === 'wood' ? [214, 176, 120] : [226, 196, 140];
-        for (const [y, x0, x1] of [[10, 3, 16], [9, 4, 15], [8, 5, 14], [7, 6, 13]]) {
-          hline(x0, x1, y, y % 2 ? cc : cD);
-          set(x0, y, end); set(x1, y, end);
-        }
-        hline(6, 13, 7, cL);
-      } else if (carry === 'food') {
-        for (const sx of [4, 10]) {
-          const sk = [198, 172, 120], skD = [150, 124, 80];
-          hline(sx, sx + 4, 10, skD); hline(sx, sx + 4, 9, sk); hline(sx, sx + 4, 8, sk); hline(sx + 1, sx + 3, 7, sk); set(sx + 2, 6, [110, 80, 46]);
-          set(sx + 1, 8, [228, 206, 160]);
-        }
-      } else {
-        const rows = [[10, 3, 16], [9, 4, 15], [8, 5, 14], [7, 7, 12], [6, 9, 10]];
-        for (const [y, x0, x1] of rows) for (let x = x0; x <= x1; x++) {
-          const h = U.hash(x, y, 31 + carry.length);
-          set(x, y, y === 6 || (y === 7 && x < 10) ? cL : h > 0.78 ? cD : h < 0.12 ? cL : cc);
-        }
-      }
-    }
-    // --- rueda (de pixeles; los rayos alternan en cruz y en aspa) ---
-    const sp = SPOKES[moving ? f % 2 : 0], wx = 4, wy = 11;
-    for (let j = 0; j < 9; j++) {
-      const row = WHEEL9[j], a0 = row.indexOf('o'), a1 = row.lastIndexOf('o');
-      for (let i = 0; i < 9; i++) {
-        const ch = row[i];
-        if (ch === 'o') set(wx + i, wy + j, j < 3 && i < 6 ? rimL : rim);
-        else if (ch === 'h') set(wx + i, wy + j, hub);
-        else if (i > a0 && i < a1) set(wx + i, wy + j, wIn);
-      }
-    }
-    for (const [i, j] of sp) set(wx + i, wy + j, spoke);
-    // --- banderín del reino ---
-    for (let y = 4; y <= 10; y++) set(3, y, edge);
-    set(4, 4, col); set(5, 4, col); set(6, 5, sc(col, 0.8)); set(4, 5, col); set(5, 5, sc(col, 0.85)); set(4, 6, sc(col, 0.7));
-    if (moving && (f === 0 || f === 2)) set(7, 5, sc(col, 0.7));
-    return (CC[key] = withMask({ c: pb.canvas(), ax: 15, ay: 19 }));
-  };
+  // La carreta, el carromato y la barcaza se dibujan en js/vehiculos.js (modelos en 8 direcciones).
 
   // Lobo: gris, con lomo oscuro; 2 cuadros de carrera.
   function makeWolf(frame, flip) {
@@ -2332,6 +2351,11 @@
     const ox = 6, oy = 2; // dónde va el jinete (en píxeles del aldeano)
     x.drawImage(p.c, (flip ? W - p.w - ox : ox) * K, oy * K + (mode === 'walk' && frame % 3 === 1 ? -K : 0));
     const hc = x, r = (a, b, w, h, cl) => { hc.fillStyle = cl; hc.fillRect((flip ? W - a - w : a) * K, b * K, w * K, h * K); };
+    if (PK.Fauna) { // pk-50: caballo con volumen, al galope (fauna.js), a la resolución del jinete
+      const cab = PK.Fauna.caballo(mode === 'walk' ? (frame % 6) / 6 : null, col);
+      x.save(); if (flip) { x.translate(W * K, 0); x.scale(-1, 1); } x.drawImage(cab.c, 0, 0); x.restore();
+      return (MC[key] = { c, ax: flip ? W - 15 : 15, ay: 27, k: K, w: W, h: H });
+    }
     const C = '#7a5232', C2 = '#5a3a22', C3 = '#94683e', M = '#2e2018', MA = 'rgb(' + col.join(',') + ')';
     const g = mode === 'walk' ? frame % 6 : 0, l = [0, 1, 2, 1, 0, -1][g];
     // patas (se mueven al caminar), cuerpo, manta del color del reino, cuello y cabeza
@@ -2534,9 +2558,19 @@
     S.bushBare = makeBush(14, false);
     S.rocks = {};
     for (const k of ['stone', 'gold', 'ore', 'marble', 'gems']) S.rocks[k] = [0, 1, 2].map(sz => [makeRocks(k, 40 + sz, sz), makeRocks(k, 50 + sz, sz)]);
-    S.deer = [makeDeer(61, false), makeDeer(62, true), makeDeer(63, false), makeDeer(64, true)];
-    S.deerGold = [makeDeer(65, false, true), makeDeer(66, true, true)];
-    S.wolf = [[makeWolf(0, false), makeWolf(1, false)], [makeWolf(0, true), makeWolf(1, true)]];
+    const Fa = PK.Fauna; // pk-50: animales con volumen y patas que se mueven (fauna.js); los viejos quedan de respaldo
+    if (Fa) {
+      // poses por ciervo: [lado][astas][pose] con pose 0 de pie, 1 pastando, 2 mirando (render.js las alterna)
+      S.deerPose = [false, true].map(fl => [true, false].map(as => ['pie', 'pasta', 'mira'].map(po => withMask(Fa.ciervo(po, fl, false, as, !as)))));
+      S.deerGoldPose = [false, true].map(fl => ['pie', 'pasta', 'mira'].map(po => withMask(Fa.ciervo(po, fl, true, true))));
+      S.deer = [S.deerPose[0][0][0], S.deerPose[1][1][1], S.deerPose[0][1][2], S.deerPose[1][0][1]];
+      S.deerGold = [S.deerGoldPose[0][2], S.deerGoldPose[1][1]];
+      S.wolf = [false, true].map(fl => [0, 1, 2, 3, 4, 5].map(i => Fa.lobo(i / 6, fl)));
+    } else {
+      S.deer = [makeDeer(61, false), makeDeer(62, true), makeDeer(63, false), makeDeer(64, true)];
+      S.deerGold = [makeDeer(65, false, true), makeDeer(66, true, true)];
+      S.wolf = [[makeWolf(0, false), makeWolf(1, false)], [makeWolf(0, true), makeWolf(1, true)]];
+    }
     if (S.initMar) S.initMar();
   };
 })();

@@ -14,7 +14,9 @@
       this.skin = o.skin === undefined ? (o.id * 7) % 3 : o.skin;
       this.inside = !!o.inside;
       this.kind = o.kind || 'v';       // 'v' aldeano, 'scout' explorador, 'cart' carreta
-      this.job = o.job || null;        // viaje de una carreta
+      this.job = o.job || null;        // viaje de una carreta (lo arma su ruta en cada paso)
+      this.ruta = o.ruta || null;      // pk-41: id de la ruta que sigue la carreta (st.logi.rutas)
+      this.espera = o.espera || 0;     // segundos que lleva esperando carga en el origen
     this.ox = ((o.id * 37) % 9 - 4) * 0.05; this.oy = ((o.id * 53) % 9 - 4) * 0.05; // pequeño desvío para no apilarse
     this.back = false; this.scared = 0;
       this.dl = o.dl || 1;             // nivel del último punto de acopio donde descargó
@@ -23,7 +25,7 @@
       this.mode = 'idle'; this.fails = 0; this.wait = 0; this.fx = 0;
     }
     toJSON() {
-      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined };
+      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined, ruta: this.ruta || undefined, espera: this.espera || undefined };
     }
   }
 
@@ -42,7 +44,7 @@
     get cx() { return this.x + this.w / 2; }
     get cy() { return this.y + this.h / 2; }
     toJSON() {
-      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined, asp: this.asp || undefined };
+      return { id: this.id, type: this.type, owner: this.owner, x: this.x, y: this.y, done: this.done, progress: this.progress, workers: this.workers, queue: this.queue, qt: this.qt, prodAcc: this.prodAcc, rally: this.rally, lvl: this.lvl, upg: this.upg, inb: this.inb, outb: this.outb, sinReserva: this.sinReserva || undefined, rama: this.rama || undefined, asp: this.asp || undefined, extrae: this.extrae || undefined, inv: this.inv && Object.keys(this.inv).length ? this.inv : undefined };
     }
   }
   PK.Unit = Unit;
@@ -72,11 +74,20 @@
     }
     return true;
   }
+  // ¿La línea recta hasta ese punto pasa solo por casillas que rinden igual que la de la carreta?
+  function parejo(u, x1, y1) {
+    const p = PK.Logi.PERFIL_DE[u.kind], f0 = PK.Logi.factor(p, W.idx(Math.floor(u.x), Math.floor(u.y)));
+    const dx = x1 - u.x, dy = y1 - u.y, n = Math.ceil(Math.hypot(dx, dy) * 3);
+    for (let i = 1; i <= n; i++) if (PK.Logi.factor(p, W.idx(Math.floor(u.x + (dx * i) / n), Math.floor(u.y + (dy * i) / n))) !== f0) return false;
+    return true;
+  }
   function inRect(u, b) { return u.x >= b.x && u.x <= b.x + b.w && u.y >= b.y && u.y <= b.y + b.h; }
 
   // Pide una ruta. Devuelve false si no hay manera de llegar.
   function pathTo(u, goal) {
+    W.pasoDe = D.slotOfOwner(u.owner) + 1; // L4: por las puertas de su reino sí pasa
     const r = W.findPath(Math.floor(u.x), Math.floor(u.y), goal);
+    W.pasoDe = 0;
     if (!r.ok) {
       u.fails++;
       if (u.fails > 3 || !r.path.length) return false;
@@ -91,14 +102,15 @@
   // puede alcanzar en línea recta, así camina en diagonales suaves y no en escalones.
   function step(u, dt) {
     const g = G();
-    // los caminos aceleran a todos; las carretas fuera del camino van lentas
-    const road = W.road[W.idx(Math.floor(u.x), Math.floor(u.y))] === 1;
-    const rk = road && u.owner === 'p' && PK.Game.bono ? PK.Game.bono('road') : 0; // Caminos empedrados, Caravaneros
-    const terrain = u.kind === 'cart' ? (road ? 1 + (D.ROAD.cart - 1) * (1 + rk) : D.CART.offRoad) : road ? 1 + (D.ROAD.walk - 1) * (1 + rk) : 1;
+    // los caminos aceleran a todos; las carretas fuera del camino van lentas (la misma cuenta que usan sus rutas)
+    const terrain = PK.Logi.factorUnidad(u);
     let move = g.speed(u.owner, u) * terrain * dt * (u.scared > 0 ? 1.4 : 1);
+    const carro = !!PK.Logi.PERFIL_DE[u.kind];
     while (move > 0 && u.path.length) {
       if (u.pchk !== u.path.length) {
-        for (let k = 0; k < 14 && u.path.length > 1 && los(u.x, u.y, u.path[1][0] + 0.5, u.path[1][1] + 0.5); k++) u.path.shift();
+        // pk-41: una carreta solo acorta en línea recta por casillas que rinden lo mismo que la suya; si no, cortaba la
+        // esquina de un camino en L por el pasto y la ruta más rápida no servía
+        for (let k = 0; k < 14 && u.path.length > 1 && los(u.x, u.y, u.path[1][0] + 0.5, u.path[1][1] + 0.5) && (!carro || parejo(u, u.path[1][0] + 0.5, u.path[1][1] + 0.5)); k++) u.path.shift();
         u.pchk = u.path.length;
       }
       const [tx, ty] = u.path[0];
@@ -173,7 +185,9 @@
   function goDeposit(u, dt) {
     const g = G();
     if (!u.carry) { u.phase = 'go'; return false; }
-    const b = g.findDrop(u.owner, u.carryRes, u.x, u.y);
+    // pk-42: el recolector descarga en el edificio para el que trabaja (si recibe lo que lleva)
+    const base = u.owner === 'p' && u.task && u.task.t === 'gather' ? g.baseDe(u) : null;
+    const b = base && g.baseAcepta(base, u.carryRes) ? base : g.findDrop(u.owner, u.carryRes, u.x, u.y);
     if (!b) {
       u.mode = 'idle';
       u.wait -= dt;
@@ -194,13 +208,32 @@
   function doGather(u, dt) {
     const g = G(), t = u.task, cap = g.carryCap(u.owner, u);
     if (u.phase === 'return') { goDeposit(u, dt); return; }
+    // pk-42: los tuyos trabajan para un edificio (task.base) y solo dentro de su radio. Una partida de antes, o un
+    // edificio que ya no está: se le busca otro que tenga ese recurso cerca y puesto libre.
+    let base = null;
+    if (u.owner === 'p') {
+      base = g.baseDe(u);
+      if (!base) {
+        base = g.baseParaRecurso(u, t.res);
+        if (!base) { if (u.carry) { u.phase = 'return'; return; } u.task = null; u.mode = 'idle'; return; }
+        t.base = base.id; t.node = -1; g.baseSucia();
+      }
+      // cambiaste lo que saca el edificio: los que puso el Capataz se pasan a eso
+      if (base.extrae && base.extrae !== t.res && !t.m && g.baseAcepta(base, base.extrae)) { if (u.carry) { u.phase = 'return'; return; } t.res = base.extrae; t.node = -1; }
+    }
     let n = W.nodes[t.node];
     if (!n || n.dead) {
-      // se agotó: busca otro del mismo tipo (cerca de él y de su acopio, sin amontonarse); cada vez más lejos
-      // antes de rendirse, para que siga con la tarea que le diste
-      const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
-      if (nn) { t.node = nn.id; n = nn; }
-      else {
+      // se agotó: busca otro del mismo tipo dentro del radio de su edificio (sin amontonarse); los reinos simulados,
+      // cerca de donde están
+      const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { u }) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
+      if (nn) { t.node = nn.id; n = nn; u.sinRadio = 0; }
+      else if (u.owner === 'p') {
+        // nada en el radio: espera junto a su edificio a que rebrote (el Capataz puede llevarse a los suyos a otro lado)
+        if (u.carry) { u.phase = 'return'; return; }
+        t.node = -1; u.mode = 'idle'; u.aim = null; u.sinRadio = (u.sinRadio || 0) + 6; u.wait = 6;
+        if (U.dist(u.x, u.y, base.cx, base.cy) > base.w / 2 + 3) pathTo(u, rectGoal(base, true));
+        return;
+      } else {
         if (u.carry) { u.phase = 'return'; return; }
         u.task = null; u.mode = 'idle';
         return;
@@ -209,15 +242,16 @@
     if (u.carry > 0 && u.carryRes !== t.res) { u.phase = 'return'; return; }
     if (u.carry >= cap) { u.phase = 'return'; return; }
     // bodega llena: espera sin gastar el árbol o la veta (antes juntaba, volvía y addRes tiraba la carga)
-    if (u.owner === 'p' && g.isFull(t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; g.noteFull(t.res); return; }
+    // pk-43: si trabaja para un campamento, lo que mira es el campamento (lo vacía un carromato)
+    if (u.owner === 'p' && g.llenoPara(base, t.res)) { if (u.carry) { u.phase = 'return'; return; } u.mode = 'idle'; u.aim = null; u.fullWait = true; if (!PK.Libro.esCampo(base)) g.noteFull(t.res); return; }
     u.fullWait = false;
     // Fase 9: el arrecife solo se trabaja con la marea baja; con la alta se espera al lado (u.mareaWait)
     const bajo = D.NODES[n.kind].marea && !g.mareaBaja();
     if (!bajo) u.mareaWait = false;
     if (!nearRect(u, n.x, n.y, n.x, n.y)) {
       if (!pathTo(u, nodeGoal(n))) {
-        const nn = u.owner === 'p' ? g.bestNode(t.res, u.x, u.y, 'p', { exclude: n.id, zone: t.zone }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
-        if (nn && nn.id !== n.id) { t.node = nn.id; u.fails = 0; } else { u.task = null; u.mode = 'idle'; }
+        const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { exclude: n.id, u }) : W.nearestNode(t.res, u.x, u.y, 14, u.owner, { exclude: n.id, zone: t.zone });
+        if (nn && nn.id !== n.id) { t.node = nn.id; u.fails = 0; } else if (u.owner === 'p') { t.node = -1; u.mode = 'idle'; u.wait = 6; } else { u.task = null; u.mode = 'idle'; }
       }
       return;
     }
@@ -227,15 +261,13 @@
     setAim(u, n.x + 0.5, n.y + 0.5, AIM[n.kind] || AIM.rock);
     u.mode = 'work';
     u.acc += g.gatherRate(u.owner, t.res, u, n.kind) * dt;
-    const shared = W.isShared(n), online = PK.Net && PK.Net.online;
-    // En línea, los reinos simulados no gastan recursos compartidos: eso lo calcula el servidor.
-    const virtual = online && shared && u.owner !== 'p';
+    // L4 (pk-45): cada jugador tiene sus zonas comunes; los reinos simulados se ven juntar ahí, pero no gastan lo tuyo
+    const virtual = u.owner !== 'p' && W.isShared(n);
     let took = 0;
     while (u.acc >= 1 && n.amount > 0 && u.carry < cap) {
       u.acc -= 1; u.carry += 1; u.carryRes = t.res; u.carryZone = n.zone; u.hunt = n.kind === 'deer';
       if (!virtual) { n.amount -= 1; took++; }
     }
-    if (took && online && shared && u.owner === 'p') PK.Net.harvest(n.id, took);
     if (n.amount <= 0 && !n.dead) { W.depleteNode(n); if (n.temp && u.owner === 'p' && PK.Life) PK.Life.tempDone(n); }
     if (u.carry >= cap) u.phase = 'return';
   }
@@ -369,7 +401,7 @@
   function separate(list, dt) {
     cells.clear();
     for (const u of list) {
-      if (u.inside || u.remote) continue;
+      if (u.inside || u.remote || u.kind === 'barcaza') continue;
       const k = Math.floor(u.x) * 1024 + Math.floor(u.y);
       const c = cells.get(k);
       if (c) c.push(u); else cells.set(k, [u]);
@@ -463,7 +495,7 @@
     const el = u.stT;
     u.stT = 0;
     if (!walkable(Math.floor(u.x), Math.floor(u.y))) { rescue(u, homeRegions(u.owner), true); return; }
-    if (u.kind === 'cart') return; // las carretas tienen su propia lógica de caminos
+    if (u.kind === 'cart' || u.kind === 'carromato') return; // las carretas tienen su propia lógica de caminos
     if (u.stX === undefined || Math.abs(u.x - u.stX) + Math.abs(u.y - u.stY) > 0.6 || u.mode === 'work') {
       u.stX = u.x; u.stY = u.y; u.stS = 0; return;
     }
@@ -478,6 +510,7 @@
     u.anim += dt;
     if (u.remote) { remoteStep(u, dt); return; }
     if (u.inside) return;
+    if (u.kind === 'barcaza') { if (u.owner === 'p') PK.Logi.barca(u, dt); return; } // pk-46: va por el agua, sola
     unstick(u, dt);
     if (u.scared > 0) { // huye de los lobos hacia el Centro Urbano
       u.scared -= dt;
@@ -486,7 +519,7 @@
       return;
     }
     if (u.path.length) { step(u, dt); return; }
-    if (u.kind === 'cart') { if (u.owner === 'p') PK.Logi.cart(u, dt); else u.mode = 'idle'; return; }
+    if (u.kind === 'cart' || u.kind === 'carromato') { if (u.owner === 'p') PK.Logi.cart(u, dt); else u.mode = 'idle'; return; }
     if (u.wait > 0 && u.mode === 'idle' && u.task) { u.wait -= dt; return; }
     if (!u.task) { u.mode = 'idle'; return; }
     switch (u.task.t) {
