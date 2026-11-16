@@ -66,4 +66,4 @@ picker. Sounds are a small WebAudio synth behind `volumen.js`; `#sound-button`
 mutes them (`pref.mudo`). The `[hidden]{display:none!important}` rule
 matters: `.capa.fin` is `display:flex` and covered the board without it.
 `conexion.js` formats the side ranking (bot tables as m:ss.d of thinking,
-puzzles as ★), so it is loaded as `?v=club-21`.
+puzzles as ★), so it is loaded as `?v=club-24`.

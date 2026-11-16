@@ -149,7 +149,7 @@ test('sospecha de filas guardadas, categorías del club y reglas de Firebase',()
  assert.equal(C.resultadoClub('ajedrez',{categoria:CP,puntos:601,tiempo:61235,partida:'abc'}),null);
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.equal((reglas.match(/\|club-ajedrez-\(bot\[1-4\]\|puzles\)\|/g)||[]).length,2,'soloRanks y soloPruebas');
- assert.match(reglas,/\|pokelike\|ajedrezclub\|boxhead\|/,'clubJugadas');
+ assert.match(reglas,/\|pokelike\|ajedrezclub\|boxheadclub\|/,'clubJugadas');
  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'../package.json'),'utf8'));
  assert.match(pkg.scripts['test:juegos'],/tests\/ajedrezclub\.test\.cjs/);
  // La página carga lo de todos los juegos del club, en orden.

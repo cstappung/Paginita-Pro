@@ -24,7 +24,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .tt-escena::before{content:"";position:absolute;inset:auto -10% -40px;height:120px;background:radial-gradient(ellipse at center,#2fd3e826,transparent 70%);pointer-events:none}
 
 /* Los modos: una barra segmentada, no tres tarjetas a todo lo ancho. */
-.tt-modos{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:620px;margin:0 auto 18px;padding:4px;border-radius:16px;background:#060a14b3;border:1px solid var(--borde)}
+.tt-modos{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-width:760px;margin:0 auto 18px;padding:4px;border-radius:16px;background:#060a14b3;border:1px solid var(--borde)}
 .tt-modos button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 10px;border-radius:12px;background:transparent;border:1px solid transparent;text-align:center;transition:background .15s,border-color .15s}
 .tt-modos button b{font-size:14px}
 .tt-modos button small{color:var(--apagado);font-size:11px}
@@ -142,3 +142,46 @@ html.club-inm .tt-hud .vj-ctl{padding:0;border:0;background:none}html.club-inm .
 html.club-inm .tt-tactil{display:flex;flex-wrap:nowrap;height:var(--franja);box-sizing:border-box;margin:0;padding:6px 6px 4px;gap:5px}
 html.club-inm .tt-tactil button{flex:1;min-width:0;min-height:48px;height:100%;font-size:24px;color:var(--tinta)}
 html.club-inm .tt-tactil [data-a=contragira]{display:none}
+
+/* VS Bots (vs.js): la dificultad, debajo de los modos, y los tres pozos
+   rivales en una columna a la derecha. `#tt.vs` está puesto mientras el
+   modo elegido es VS Bots. */
+.tt-difs{display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap;margin:-8px auto 16px}
+.tt-difs[hidden]{display:none}
+.tt-difs span{color:var(--apagado);font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-right:2px}
+.tt-difs button{padding:6px 14px;border-radius:999px;border:1px solid var(--borde);background:#060a14b3;font-size:13px;font-weight:700}
+.tt-difs button:hover:not(:disabled):not(.activo){border-color:#2fd3e866}
+.tt-difs button.activo{background:linear-gradient(180deg,#4a1d5c,#2e1440);border-color:#b04ee8;box-shadow:0 0 16px #b04ee844;color:#fff}
+.tt-difs button:disabled{opacity:.45;cursor:default}
+.tt-rivales{display:flex;flex-direction:column;gap:8px;width:104px}
+.tt-rivales[hidden]{display:none}
+.tt-rival{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px;border-radius:12px;border:1px solid var(--borde);background:linear-gradient(180deg,var(--caja2),var(--caja));transition:border-color .2s}
+.tt-rival canvas{display:block;width:90px;max-width:100%;height:auto;border-radius:6px;background:#070b15}
+.tt-rival .nom{font:800 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--c,#fff)}
+.tt-rival .dat{font-size:10px;color:var(--apagado);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tt-rival.fuera canvas{opacity:.45;filter:grayscale(.8)}
+.tt-rival.fuera::after{content:"KO";position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) rotate(-12deg);font:900 26px "IBM Plex Mono",ui-monospace,monospace;color:#ff4a5e;text-shadow:0 2px 0 #000,0 0 14px #ff4a5e99;pointer-events:none}
+.tt-rival.golpe{animation:ttGolpe .45s ease-out}
+@keyframes ttGolpe{0%{border-color:#ff4a5e;transform:translateX(0)}25%{transform:translateX(-3px)}50%{transform:translateX(3px)}100%{border-color:var(--borde);transform:none}}
+.tt-alerta{position:absolute;left:0;right:0;top:12%;text-align:center;pointer-events:none;opacity:0}
+.tt-alerta span{display:inline-block;padding:5px 12px;border-radius:999px;background:#2a0b12e6;border:1px solid var(--c,#ff4a5e);color:#fff;font:800 13px system-ui,sans-serif;box-shadow:0 0 18px #ff4a5e55}
+.tt-alerta.ve{animation:ttAlerta 1.7s ease-out}
+@keyframes ttAlerta{0%{opacity:0;transform:translateY(-8px)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0}}
+.tt-aviso[data-k=ko]{color:#ff8a98;text-shadow:0 2px 0 #000,0 0 18px #ff4a5e}
+@media (prefers-reduced-motion:reduce){.tt-rival.golpe{animation:none}}
+/* En pantallas angostas los rivales bajan a una fila propia, debajo del
+   pozo: game.js (`ubicaRivales`) saca la columna de `.tt-juego` y la pone
+   detrás, así las tres columnas de siempre se encogen como antes. */
+.tt-centro>.tt-rivales{flex-direction:row;justify-content:center;width:100%;margin:12px 0 0}
+.tt-centro>.tt-rivales .tt-rival canvas{width:64px}
+@media(max-width:560px){.tt-modos{grid-template-columns:repeat(2,1fr)}}
+/* En el celular, los rivales son una tercera columna fina, y el pozo se
+   achica lo justo para que quepa. */
+html.club-inm .tt-difs{display:none!important}
+html.club-inm .tt-rivales{flex-direction:column;justify-content:flex-start;width:var(--lado);gap:5px}
+html.club-inm .tt-rival{padding:3px;border-radius:8px}
+html.club-inm .tt-rival canvas{width:100%}
+html.club-inm .tt-rival .dat{display:none}
+html.club-inm .tt-rival .nom{font-size:9px}
+html.club-inm .tt-rival.fuera::after{font-size:16px}
+html.club-inm #tt.vs .tt-pozo canvas{height:min(calc(100dvh - var(--franja) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px),calc((100vw - 3*var(--lado) - 3*var(--hueco) - env(safe-area-inset-left) - env(safe-area-inset-right) - 8px)*2))}

@@ -291,6 +291,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > `soloPruebas`, y `boxhead` un juego nuevo de `clubJugadas`. Hasta volver a
 > publicar las reglas se juega igual, pero las partidas no entran en la
 > clasificación y no pagan monedas.
+>
+> **Corrección (16 de noviembre de 2026):** la regla de `clubJugadas` decía
+> `boxhead`, pero el cliente escribe `clubJugadas/<uid>/boxheadclub` (la
+> clave del Club, `claveClub("boxhead")`, la misma que paga `monedas.js`).
+> La escritura se rechazaba con `PERMISSION_DENIED` y ninguna partida de
+> Pro BoxHead en el Solo Club pagaba monedas. Ahora la lista dice
+> `boxheadclub`. Hay que volver a publicar las reglas.
 
 > **PRO PACMAN (20 de octubre de 2026):** `club-propac-puntos` (el puntaje
 > de la partida, con tope de 10 000 000) es una categoría nueva de

@@ -91,7 +91,7 @@
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
-    lista.replaceChildren();const racha=/^club-(sopa|electro|integral|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||categoria==='club-tetris-sprint');
+    lista.replaceChildren();const racha=/^club-(sopa|electro|integral|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||/^club-tetris-(sprint|bots-(facil|medio|dificil))$/.test(categoria));
     const estrellas=categoria==='club-atasco-estrellas'||categoria==='club-ajedrez-puzles',reloj=/^club-ajedrez-bot[1-4]$/.test(categoria),metros=/^club-metrorush-(city)?distancia$/.test(categoria),jornada=categoria==='club-fanal-jornadas',ronda=categoria.startsWith('club-prodefender-'),nivel=categoria.startsWith('club-boxhead-');
     const marca=f=>reloj?Math.floor(f.tiempo/60000)+':'+String(Math.floor(f.tiempo/1000)%60).padStart(2,'0')+'.'+String(Math.floor(f.tiempo/100)%10)+' de pensar':minas?(f.tiempo/1000).toFixed(2)+' s':racha?f.puntos+(f.puntos===1?' día':' días'):estrellas?f.puntos+' ★':metros?f.puntos+' m':jornada?'jornada '+f.puntos:ronda?'ronda '+f.puntos:nivel?'ronda '+f.puntos+(f.con?' 👥':''):f.puntos+' puntos';
     for(const f of d.filas||[]){const li=document.createElement('li');li.textContent=(f.nombre||'Jugador')+(f.yo?' (tú)':'')+' · '+marca(f);lista.appendChild(li);}

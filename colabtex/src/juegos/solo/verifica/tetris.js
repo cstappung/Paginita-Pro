@@ -6,10 +6,13 @@
    la semilla y la lista «en el paso k, tal acción» (TM.grabadora). Aquí
    se rehace con el mismo motor (TM.rehace) y se compara con lo declarado:
    puntos, tiempo y, en Sprint, que de verdad se hicieron las 40 líneas.
+   En VS Bots (vs.js) se rehacen también los tres bots, que juegan con su
+   propia semilla, y tiene que salir que los tres quedaron fuera.
    Después, los límites de lo que una mano puede hacer, con margen: un
    falso positivo (rechazarle el récord a alguien honesto) es peor que
    dejar pasar una trampa rara. */
 import TM from '../../../../../juegos/club/tetris/motor.js';
+import TV from '../../../../../juegos/club/tetris/vs.js';
 import { rachas, grano } from './patrones.js';
 
 export const PRUEBA = 1;
@@ -110,7 +113,15 @@ function antibot(r, k) {
   return null;
 }
 
-const modoDe = c => (/^club-tetris-(maraton|sprint|ultra)$/.exec(String(c || '')) || [])[1] || null;
+const modoDe = c => (/^club-tetris-(maraton|sprint|ultra|bots-(?:facil|medio|dificil))$/.exec(String(c || '')) || [])[1] || null;
+/* VS Bots (juegos/club/tetris/vs.js): tú contra tres bots, y compite el
+   tiempo en dejarlos fuera a los tres; `puntos` es fijo en 3. La partida
+   dura como mucho lo que tarda el nivel en llegar al 20 y un poco más (los
+   bots no aguantan la caída de golpe mucho rato): 30 minutos sobra. Por
+   debajo de `BOTS_MIN_MS` no se gana ni en Fácil: los bots fáciles tardan
+   en llenar el pozo aunque les lluevan Tetris. */
+const BOTS_TOPE_PASOS = 30 * 60 * 1000 / TM.PASO;
+const BOTS_MIN_MS = { facil: 20000, medio: 30000, dificil: 40000 };
 
 /* Lo que una persona puede hacer dentro de una partida que sí existió. */
 function humano(r) {
@@ -133,14 +144,20 @@ export function verifica(dato, prueba, ctx) {
   if (!modo) return 'La categoría no es de Tetris Club.';
   if (!prueba || typeof prueba !== 'object') return 'La partida llegó sin prueba.';
   if (prueba.v !== 1) return 'La prueba no es de esta versión del juego (recarga la página).';
-  if (prueba.m !== modo) return 'La prueba es de otro modo de juego.';
+  const bots = modo.startsWith('bots-') ? modo.slice(5) : null;
+  if (prueba.m !== (bots ? 'bots' : modo)) return 'La prueba es de otro modo de juego.';
   /* Si la página dice quién juega, la prueba tiene que ser de esa cuenta
      (la semilla sale de ella: no se puede cambiar sin cambiar la partida). */
   if (ctx && ctx.uid && prueba.u !== ctx.uid) return 'La prueba es de la partida de otra cuenta.';
-  const r = TM.rehace(prueba, TOPE_PASOS);
+  if (bots && prueba.d !== bots) return 'La prueba es de otra dificultad de bots.';
+  const r = bots ? TV.rehace(prueba, BOTS_TOPE_PASOS) : TM.rehace(prueba, TOPE_PASOS);
   if (r.error) return r.error;
   const tiempo = Math.max(1, Math.round(r.tiempo));
-  if (modo === 'sprint') {
+  if (bots) {
+    if (!r.gano || r.derrotados !== TV.RIVALES) return 'En la partida no quedaron fuera los tres bots.';
+    if (dato.puntos !== TV.RIVALES) return 'Los puntos de VS Bots no son los de la partida.';
+    if (tiempo < BOTS_MIN_MS[bots]) return 'Nadie gana a los bots así de rápido.';
+  } else if (modo === 'sprint') {
     if (!r.gano || r.lineas < TM.SPRINT) return `La partida hizo ${r.lineas} líneas, no ${TM.SPRINT}.`;
     if (dato.puntos !== TM.SPRINT) return 'Los puntos del Sprint no son los de la partida.';
   } else if (dato.puntos !== r.puntos) return `La partida hizo ${r.puntos} puntos, no ${dato.puntos}.`;
@@ -177,6 +194,11 @@ export function sospecha(categoria, fila) {
   const modo = modoDe(categoria);
   if (!modo || !fila) return null;
   const t = Number(fila.tiempo), p = Number(fila.puntos);
+  if (modo.startsWith('bots-')) {
+    if (p !== TV.RIVALES) return `VS Bots vale ${TV.RIVALES} puntos, no ${p}.`;
+    if (t < BOTS_MIN_MS[modo.slice(5)]) return `Ganarle a los bots en ${(t / 1000).toFixed(1)} s no se puede.`;
+    return null;
+  }
   if (modo === 'sprint') {
     if (p !== TM.SPRINT) return `Un Sprint vale ${TM.SPRINT} puntos, no ${p}.`;
     if (t < SPRINT_MIN_MS) return `40 líneas en ${(t / 1000).toFixed(2)} s: por debajo del récord mundial.`;
