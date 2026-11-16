@@ -777,7 +777,7 @@
     us = us.filter(o => o.kind === u.kind); // carretas y carromatos no comparten rutas
     const barca = u.kind === 'barcaza';
     const port = (barca ? Sp.barcaza(D.PLAYER_COLOR, u.carryRes, 0, 0, false) : carro ? Sp.carromato(D.PLAYER_COLOR, u.carryRes, 0, 0, false) : Sp.cart(D.PLAYER_COLOR, u.carryRes, 0, 0, false)).c.toDataURL();
-    const r = L.rutaDe(u), nom = o => { const a = g.bById.get(o.de), b = g.bById.get(o.a); return (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?') + (o.res ? ' (' + D.RES[o.res].name.toLowerCase() + ')' : ''); };
+    const r = L.rutaDe(u), nom = o => L.nombreRuta(o);
     const sel = el('select', { 'aria-label': carro ? 'Ruta del carromato' : 'Ruta de la carreta', onchange: e => { const id = +e.target.value || null; for (const c of us) L.asignar(c, id); UI.refreshPanel(true); } },
       [el('option', { value: '' }, 'Sin ruta (parado)')].concat(S().logi.rutas.filter(o => L.claseRuta(o) === u.kind).map(o => el('option', { value: o.id, selected: !!r && o.id === r.id }, nom(o) + ' · ' + L.cartsDe(o).length))));
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),

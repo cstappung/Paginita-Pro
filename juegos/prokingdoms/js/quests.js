@@ -27,7 +27,9 @@
     const st = S();
     switch (req.t) {
       case 'villagers': return [G().villagerCount(), req.n];
-      case 'build': return [G().countB(req.b), req.n];
+      // pk-54: «la Maravilla» (Crónica, cap. 5) vale cualquiera de las de D.WONDERS. La «wonder» de 4×4 ya no se
+      // construye (se eligió una de las 4 nuevas desde pk-19) y la misión c5_1 no se cumplía nunca.
+      case 'build': return [req.b === 'wonder' ? D.WONDERS.reduce((n, t) => n + G().countB(t), 0) : G().countB(req.b), req.n];
       case 'era': return [st.era, req.n];
       case 'stat': return [Math.floor(st.stats[req.k] || 0), req.n];
       case 'level': return [G().levelCount(req.lvl, req.b, req.recipe), req.n];

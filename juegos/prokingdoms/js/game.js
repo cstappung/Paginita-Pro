@@ -509,11 +509,13 @@
   // campamentos importan: sin uno cerca, lo de lejos no se trabaja.
   G.BASES = {
     // puestos un poco más generosos que la tabla 5.2 del plan: con 3 + nivel el piloto quedaba con la mitad ociosa
-    tc: { r: () => 12, puestos: L => 10 + L },
-    lumber: { r: L => Math.min(16, 10 + Math.floor(L / 2)), puestos: L => Math.min(16, 4 + L) },
-    mining: { r: L => Math.min(16, 10 + Math.floor(L / 2)), puestos: L => Math.min(16, 4 + L) },
-    mill: { r: () => 10, puestos: L => Math.min(16, 4 + L) },
-    colonia: { r: () => 14, puestos: L => Math.min(16, 6 + L) },
+    // pk-54: radios más grandes (pedido del dueño): campamentos 14 → 22 casillas según el nivel (antes 10 → 16),
+    // Molino 14 (antes 10), colonia 18 (antes 14). Con los chicos había que mudar el campamento a cada rato.
+    tc: { r: () => 13, puestos: L => 10 + L },
+    lumber: { r: L => Math.min(22, 14 + Math.floor(L / 2)), puestos: L => Math.min(16, 4 + L) },
+    mining: { r: L => Math.min(22, 14 + Math.floor(L / 2)), puestos: L => Math.min(16, 4 + L) },
+    mill: { r: L => Math.min(16, 14 + Math.floor(L / 4)), puestos: L => Math.min(16, 4 + L) },
+    colonia: { r: () => 18, puestos: L => Math.min(16, 6 + L) },
   };
   G.esBase = b => !!(b && b.owner === 'p' && b.done && G.BASES[b.type] && b.def.drop);
   G.radioBase = b => G.BASES[b.type].r(b.lvl);

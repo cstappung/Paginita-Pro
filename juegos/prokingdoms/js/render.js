@@ -944,7 +944,9 @@
     const su = g.sel && g.sel.type === 'units' ? g.selUnits().find(u => (u.kind === 'cart' || u.kind === 'carromato' || u.kind === 'barcaza') && u.ruta) : null;
     if (su) id = su.ruta;
     if (!id) return;
-    const r = g.state.logi.rutas.find(o => o.id === id), a = r && g.bById.get(r.de), b = r && g.bById.get(r.a);
+    const r = g.state.logi.rutas.find(o => o.id === id);
+    if (!r) return;
+    const ex = su && su.ruta === id ? L.extremos(su, r) : L.extremosRep(r), a = ex.from, b = ex.to; // pk-54: con comodín, el que toca
     if (!a || !b) return;
     const e = L.camino(a, b, L.PERFIL_DE.cart);
     if (!e || e.path.length < 2) return;

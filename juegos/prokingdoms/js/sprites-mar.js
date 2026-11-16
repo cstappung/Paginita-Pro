@@ -406,6 +406,7 @@
   // ---------- Barco de colonos (en travesía, mientras se funda una colonia) ----------
   const BARCOS = {};
   Sp.barcoColonos = function (col, flip) {
+    if (Sp.barcoColonos3d) return Sp.barcoColonos3d(col, flip); // pk-54: el modelo de vehiculos.js
     const key = col.join(',') + (flip ? 1 : 0);
     if (BARCOS[key]) return BARCOS[key];
     const w = 30, h = 30, pb = new PB(w, h), f = x => (flip ? w - 1 - x : x);

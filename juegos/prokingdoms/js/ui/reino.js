@@ -118,21 +118,29 @@
   // ---------- Logística ----------
   // pk-41: las carretas siguen rutas que eliges tú (origen, destino y, si quieres, un recurso). Sin ruta quedan paradas.
   const rutaForm = { de: 0, a: 0, res: '' };
-  const nombreB = b => b.def.name + ' ' + b.lvl + ' · ' + Math.round(b.cx) + ',' + Math.round(b.cy);
   UI.nuevaRutaDesde = function (b, comoDestino) {
     if (comoDestino) rutaForm.a = b.id; else rutaForm.de = b.id;
     UI.openLogistics();
   };
+  // pk-54: ícono de un extremo de ruta (un edificio, «cualquier campamento» o «cualquier bodega»)
+  const iconoExtremo = (v, res) => {
+    const L = PK.Logi;
+    if (v === 'campo') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(res === 'wood' ? 'lumber' : res === 'food' ? 'mill' : 'mining'), alt: '' }), res ? UI.resIcon(res) : '');
+    if (v === 'bodega') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon('warehouse'), alt: '' }), el('b', { class: 'rt-asterisco' }, '*'));
+    const b = G().bById.get(v);
+    return b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '';
+  };
   UI.rutaEl = function (r, compacto) {
-    const L = PK.Logi, g = G(), a = g.bById.get(r.de), b = g.bById.get(r.a), cs = L.cartsDe(r), mala = L.rutaMala(r);
+    const L = PK.Logi, g = G(), cs = L.cartsDe(r), mala = L.rutaMala(r), rep = L.extremosRep(r), a = rep.from, b = rep.to;
     const T = mala ? null : L.tiempos(r, true);
     const clase = L.claseRuta(r), carro = clase !== 'cart', nom = clase === 'barcaza' ? 'Barcazas' : carro ? 'Carromatos' : 'Carretas';
     const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica).' : 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
     const malo = mala || (T && !T.ok) || !cs.length;
     return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
-      el('div', { class: 'ruta-nom' }, a ? el('img', { class: 'ico', src: Sp.buildingIcon(a.type, undefined, undefined, a.asp), alt: '' }) : '', el('b', null, a ? a.def.name : '?'), ' → ',
-        b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '', el('b', null, b ? b.def.name : '?'),
-        r.res ? el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase()) : el('span', { class: 'small muted' }, ' · lo que haga falta')),
+      el('div', { class: 'ruta-nom' }, iconoExtremo(r.de, r.res), el('b', null, L.nombreExtremo(r.de, r.res)), ' → ',
+        iconoExtremo(r.a, r.res), el('b', null, L.nombreExtremo(r.a, r.res)),
+        r.res ? (r.de === 'campo' ? '' : el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase())) : el('span', { class: 'small muted' }, ' · lo que haga falta'),
+        L.comodin(r.de) || L.comodin(r.a) ? el('span', { class: 'small muted' }, ' · ahora: ' + (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?')) : ''),
       el('div', { class: 'ruta-dat small' }, T && T.ok ? 'Ida ' + Math.round(T.ida) + ' s · vuelta ' + Math.round(T.vuelta) + ' s' + (cs.length ? ' · aprox. ' + Math.round(T.ritmo) + ' por minuto' : '') : '', el('span', { class: malo ? 'warn-t' : 'muted' }, (T && T.ok ? ' · ' : '') + estado)),
       el('div', { class: 'row ruta-btn' },
         el('span', { class: 'small' }, nom + ': '),
@@ -141,6 +149,109 @@
         UI.btn('+', () => { L.sumarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, disabled: !!mala, title: carro ? 'Sumar un carromato sin ruta' : 'Sumar una carreta sin ruta' }),
         compacto ? '' : UI.btn('Ver', () => { UI.closeModal(); L.verRuta = r.id; L.verRutaT = performance.now(); if (a && b) PK.Render.centerOn((a.cx + b.cx) / 2, (a.cy + b.cy) / 2); }, { small: true }),
         compacto ? '' : UI.btn('Borrar', () => { L.borrarRuta(r.id); UI.rerender(); }, { small: true, cls: 'danger' })));
+  };
+  // ---------- Rutas recomendadas (pk-54) ----------
+  UI.rutasSugeridas = function (body) {
+    const L = PK.Logi, sug = L.sugerencias();
+    if (!sug.length) return;
+    body.append(el('h3', null, 'Rutas recomendadas'), el('div', { class: 'rt-sugs' }, sug.map(o => {
+      if (o.tipo === 'camino') {
+        const costo = L.costoCamino(o.tiles.length);
+        return el('div', { class: 'rt-sug camino' },
+          el('div', { class: 'rt-sug-t' }, el('img', { class: 'ico', src: Sp.icon('hammer'), alt: '' }), el('b', null, o.txt)),
+          el('p', { class: 'small muted' }, o.por),
+          el('div', { class: 'row' }, UI.costEl(costo), UI.btn('Trazar camino', () => { const n = L.buildRoad(o.tiles); if (n) UI.toast('Camino de ' + n + ' casillas en esa ruta.', 'good'); UI.rerender(); }, { small: true, cls: 'gold', disabled: !G().canAfford(costo) }),
+            UI.btn('Ver', () => { const r = S().logi.rutas.find(x => x.id === o.ruta); UI.closeModal(); L.verRuta = o.ruta; L.verRutaT = performance.now(); const e = r && L.extremosRep(r); if (e && e.from && e.to) PK.Render.centerOn((e.from.cx + e.to.cx) / 2, (e.from.cy + e.to.cy) / 2); }, { small: true })));
+      }
+      const clase = L.claseRuta(o), libres = L.libres(clase).length, nom = clase === 'barcaza' ? 'barcaza' : clase === 'carromato' ? 'carromato' : 'carreta';
+      return el('div', { class: 'rt-sug' },
+        el('div', { class: 'rt-sug-t' }, iconoExtremo(o.de, o.res), el('span', null, '→'), iconoExtremo(o.a, o.res), el('b', null, o.txt)),
+        el('p', { class: 'small muted' }, o.por),
+        el('div', { class: 'row' }, el('span', { class: 'small ' + (libres ? 'ok' : 'warn-t') }, libres ? (libres === 1 ? 'Tienes 1 ' + nom + ' libre.' : 'Tienes ' + libres + ' ' + nom + 's libres.') : 'No tienes ' + nom + 's libres: la ruta queda creada y le sumas uno después.'),
+          UI.btn('Crear ruta', () => { const r = L.crearRuta(o.de, o.a, o.res); if (r && libres) L.sumarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, cls: 'gold' })));
+    })));
+  };
+
+  // ---------- Nueva ruta (pk-54: fichas en vez de listas desplegables) ----------
+  // Tres pasos: de dónde, a dónde y qué lleva. Cada edificio es una ficha con su ícono, lo que guarda y qué tan lejos
+  // queda; arriba de todo van los comodines («Cualquier campamento de…», «Cualquier bodega»).
+  UI.rutaNueva = function (body) {
+    const L = PK.Logi, g = G(), Lb = PK.Libro;
+    const mios = f => g.buildings.filter(b => b.owner === 'p' && b.done && f(b));
+    const campos = mios(b => L.esCampo(b) && b.type !== 'colonia' && Lb.almacenDe(b) === b);
+    const colonias = mios(b => b.type === 'colonia');
+    const talleres = mios(b => L.isShop(b) && L.puntoCarreta(b));
+    const bodegas = mios(b => L.esBodegaRuta(b));
+    const embs = mios(b => b.type === 'embarcadero');
+    const resCampos = [...new Set(campos.flatMap(b => (b.def.drop || []).filter(k => L.bodegasRuta(k).length)))].sort((x, y) => D.RES_ORDER.indexOf(x) - D.RES_ORDER.indexOf(y));
+    const F = rutaForm, B = v => (L.comodin(v) ? null : g.bById.get(v));
+    if (F.de && !L.comodin(F.de) && !B(F.de)) F.de = 0;
+    if (F.a && !L.comodin(F.a) && !B(F.a)) F.a = 0;
+    const A0 = B(F.de);
+    const centro = A0 || null;
+    const lejos = b => (centro ? Math.round(Math.hypot(b.cx - centro.cx, b.cy - centro.cy)) + ' casillas' : '');
+    const guarda = b => {
+      if (L.esCampo(b)) { const inv = Lb.inv(b), ks = Object.keys(inv).filter(k => inv[k] >= 1); return ks.length ? ks.map(k => el('span', { class: 'amt' }, UI.resIcon(k), U.fmt(Math.floor(inv[k])))) : el('span', { class: 'muted' }, 'vacío'); }
+      if (L.isShop(b)) { const r = L.recipe(b); return el('span', null, Object.keys(r.in).map(k => UI.resIcon(k)), ' → ', UI.resIcon(L.output(b))); }
+      return el('span', { class: 'muted' }, 'bodega');
+    };
+    const ficha = (v, sel, txt, sub, ico, onclick, extra) => el('button', { class: 'rt-ficha' + (sel ? ' sel' : ''), type: 'button', onclick, 'aria-pressed': sel ? 'true' : 'false' },
+      el('span', { class: 'rt-ficha-ico' }, ico), el('span', { class: 'rt-ficha-t' }, el('b', null, txt), sub ? el('span', { class: 'small' }, sub) : '', extra ? el('span', { class: 'small muted' }, extra) : ''));
+    const fichaB = (b, sel, onclick, conLejos) => ficha(b.id, sel, b.def.name + ' ' + b.lvl, guarda(b), el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }), onclick, conLejos ? lejos(b) : '');
+    const grupo = (titulo, fichas) => (fichas.length ? el('div', { class: 'rt-grupo' }, el('div', { class: 'rt-grupo-t small' }, titulo), el('div', { class: 'rt-fichas' }, fichas)) : '');
+    const elegirDe = v => { F.de = F.de === v ? 0 : v; F.a = 0; if (v !== 'campo') F.res = ''; UI.rerender(); };
+    const elegirA = v => { F.a = F.a === v ? 0 : v; UI.rerender(); };
+
+    // 1. ¿De dónde?
+    const paso1 = el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '1'), el('b', null, '¿De dónde sale?')),
+      grupo('Comodines', [resCampos.length ? ficha('campo', F.de === 'campo', 'Cualquier campamento', 'el que tenga más', iconoExtremo('campo', F.res || resCampos[0]), () => elegirDe('campo')) : '',
+        talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].filter(Boolean)),
+      grupo('Campamentos (carromato)', campos.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
+      grupo('Muelles de colonias (barcaza)', colonias.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
+      grupo('Talleres (carreta)', talleres.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
+      grupo('Bodegas (carreta)', bodegas.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))));
+    body.append(el('h3', null, 'Nueva ruta'));
+    const caja = el('div', { class: 'ruta-nueva rt-armar' }, paso1);
+    body.append(caja);
+    if (!F.de) { caja.append(el('p', { class: 'small muted' }, 'Elige de dónde sale. Un carromato vacía campamentos; una carreta une talleres y bodegas del pueblo.')); return; }
+
+    // si es «cualquier campamento», primero el recurso
+    if (F.de === 'campo') {
+      if (!F.res || !resCampos.includes(F.res)) F.res = resCampos[0] || '';
+      caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '·'), el('b', null, '¿De qué campamentos?')),
+        el('div', { class: 'rt-chips' }, resCampos.map(k => el('button', { type: 'button', class: 'rt-chip' + (F.res === k ? ' sel' : ''), onclick: () => { F.res = k; F.a = 0; UI.rerender(); } }, UI.resIcon(k), ' ' + D.RES[k].name + ' (' + L.camposDe(k).length + ')')))));
+    }
+    // 2. ¿A dónde? (solo los destinos que sirven con ese origen)
+    const sirve = v => !(L.comodin(F.de) || L.comodin(v) ? L.comodinMalo(F.de, v, F.de === 'campo' ? F.res : null) : L.parMalo(A0, B(v)));
+    const dests = { bodega: sirve('bodega'), tall: talleres.filter(b => b.id !== F.de && sirve(b.id)), bods: bodegas.filter(b => b.id !== F.de && sirve(b.id)), embs: embs.filter(b => sirve(b.id)) };
+    caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '2'), el('b', null, '¿A dónde lo lleva?')),
+      grupo('Comodín', dests.bodega && F.de !== 'bodega' ? [ficha('bodega', F.a === 'bodega', 'Cualquier bodega', 'la más cercana con lugar', iconoExtremo('bodega'), () => elegirA('bodega'))] : []),
+      grupo('Embarcadero', dests.embs.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
+      grupo('Bodegas', dests.bods.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
+      grupo('Talleres', dests.tall.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
+      !dests.bodega && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
+    if (!F.a) return;
+
+    // 3. ¿Qué lleva?
+    const Bd = B(F.a), A = A0;
+    const resOps = F.de === 'campo' ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => (Bd ? L.acepta(Bd, k) : L.bodegasRuta(k).length)) : Bd && L.isShop(Bd) ? Object.keys(L.recipe(Bd).in) : A && L.isShop(A) ? [L.output(A)] : [];
+    if (F.res && F.de !== 'campo' && !resOps.includes(F.res)) F.res = '';
+    if (F.de !== 'campo' && resOps.length > 1) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué lleva?')),
+      el('div', { class: 'rt-chips' }, [el('button', { type: 'button', class: 'rt-chip' + (!F.res ? ' sel' : ''), onclick: () => { F.res = ''; UI.rerender(); } }, 'Lo que haga falta')].concat(
+        resOps.map(k => el('button', { type: 'button', class: 'rt-chip' + (F.res === k ? ' sel' : ''), onclick: () => { F.res = k; UI.rerender(); } }, UI.resIcon(k), ' ' + D.RES[k].name))))));
+    const why = L.comodin(F.de) || L.comodin(F.a) ? L.comodinMalo(F.de, F.a, F.res || null) : L.parMalo(A, Bd);
+    const prov = { de: F.de, a: F.a, res: F.res || null }, clase = L.claseRuta(prov), libres = L.libres(clase).length;
+    caja.append(el('div', { class: 'rt-resumen' },
+      el('div', { class: 'ruta-nom' }, iconoExtremo(F.de, F.res), el('b', null, L.nombreExtremo(F.de, F.res)), ' → ', iconoExtremo(F.a, F.res), el('b', null, L.nombreExtremo(F.a, F.res)),
+        F.res && F.de !== 'campo' ? el('span', { class: 'small' }, ' · ', UI.resIcon(F.res), ' ' + D.RES[F.res].name.toLowerCase()) : ''),
+      why ? el('p', { class: 'small warn-t' }, why) : el('p', { class: 'small muted' }, (clase === 'barcaza' ? 'Barcazas' : clase === 'carromato' ? 'Carromatos' : 'Carretas') + ' libres: ' + libres + (libres ? ' (se le suma uno al crearla).' : '. La ruta queda creada y le sumas uno con + cuando tengas.')),
+      el('div', { class: 'row' }, UI.btn('Crear ruta', () => {
+        const r = L.crearRuta(F.de, F.a, F.res || null);
+        if (!r) return;
+        if (L.libres(L.claseRuta(r)).length) L.sumarCarreta(r);
+        F.de = F.a = 0; F.res = '';
+        UI.rerender(); UI.refreshPanel(true);
+      }, { cls: 'gold', disabled: !!why }), UI.btn('Empezar de nuevo', () => { F.de = F.a = 0; F.res = ''; UI.rerender(); }, { small: true }))));
   };
   UI.openLogistics = function () {
     UI.modal('logi', 'Logística', body => {
@@ -162,36 +273,14 @@
         UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
 
       // ----- Rutas -----
+      UI.rutasSugeridas(body);
       body.append(el('h3', null, 'Rutas'));
       if (sinRuta) body.append(el('p', { class: 'small warn-t' }, sinRuta === 1 ? 'Tienes un vehículo parado sin ruta.' : 'Tienes ' + sinRuta + ' vehículos parados sin ruta.', ' Crea una ruta o súmalos con + a una que ya tengas.'));
       const llenos = PK.Libro.campos().filter(b => PK.Libro.campoLleno(b) && !L.rutasDesde(b).some(r => L.cartsDe(r).length));
       if (llenos.length) body.append(el('p', { class: 'small warn-t' }, llenos.length === 1 ? llenos[0].def.name + ' está lleno y ningún carromato lo vacía: sus aldeanos esperan.' : llenos.length + ' campamentos llenos sin carromato: sus aldeanos esperan.'));
       for (const r of st.logi.rutas) body.append(UI.rutaEl(r));
       if (!st.logi.rutas.length) body.append(el('p', { class: 'small muted' }, 'Todavía no tienes rutas. Un carromato lleva lo de un campamento a una bodega del pueblo; una carreta une un taller con una bodega (o con otro taller). Cargan en el origen, llevan al destino y vuelven.'));
-      const campos = g.buildings.filter(b => b.owner === 'p' && b.done && L.esCampo(b) && b.type !== 'colonia');
-      const colonias = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'colonia'); // pk-46: barcazas
-      const embs = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'embarcadero');
-      const puntos = g.buildings.filter(b => b.done && L.puntoCarreta(b)).sort((x, y) => (L.isShop(y) - L.isShop(x)) || x.def.name.localeCompare(y.def.name));
-      const opc = (sel, vacio, conCampos) => [el('option', { value: '' }, vacio)].concat(
-        [['Muelles de colonias (barcaza)', conCampos ? colonias : []], ['Campamentos (carromato)', conCampos ? campos : []], ['Talleres', puntos.filter(b => L.isShop(b))], ['Bodegas', puntos.filter(b => !L.isShop(b))], ['Embarcadero (barcazas)', conCampos ? [] : embs]].filter(x => x[1].length).map(([t, l]) => el('optgroup', { label: t }, l.map(b => el('option', { value: b.id, selected: b.id === sel }, nombreB(b))))));
-      const A = g.bById.get(rutaForm.de), B = g.bById.get(rutaForm.a);
-      const resOps = !B ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => L.acepta(B, k)) : L.isShop(B) ? Object.keys(L.recipe(B).in) : A && L.isShop(A) ? [L.output(A)] : [];
-      if (rutaForm.res && !resOps.includes(rutaForm.res)) rutaForm.res = '';
-      const why = A && B ? L.parMalo(A, B) : null;
-      body.append(el('div', { class: 'ruta-nueva' },
-        el('label', null, 'Origen ', el('select', { 'aria-label': 'Origen de la ruta', onchange: e => { rutaForm.de = +e.target.value || 0; UI.rerender(); } }, opc(rutaForm.de, 'Elige el origen', true))),
-        el('label', null, 'Destino ', el('select', { 'aria-label': 'Destino de la ruta', onchange: e => { rutaForm.a = +e.target.value || 0; UI.rerender(); } }, opc(rutaForm.a, 'Elige el destino'))),
-        el('label', null, 'Lleva ', el('select', { 'aria-label': 'Recurso que lleva', onchange: e => { rutaForm.res = e.target.value; } },
-          [el('option', { value: '' }, 'Lo que haga falta')].concat(resOps.map(k => el('option', { value: k, selected: k === rutaForm.res }, D.RES[k].name))))),
-        UI.btn('Crear ruta', () => {
-          const r = L.crearRuta(rutaForm.de, rutaForm.a, rutaForm.res || null);
-          if (!r) return;
-          if (L.libres(L.claseRuta(r)).length) L.sumarCarreta(r);
-          rutaForm.de = rutaForm.a = 0; rutaForm.res = '';
-          UI.rerender();
-        }, { cls: 'gold', disabled: !A || !B || !!why })));
-      if (why) body.append(el('p', { class: 'small warn-t' }, why));
-      if (!puntos.some(b => L.isShop(b))) body.append(el('p', { class: 'small muted' }, 'Las rutas sirven cuando tienes talleres (Aserradero, Cantería…).'));
+      UI.rutaNueva(body);
 
       body.append(el('h3', null, 'Cómo se mueven las cosas'), el('ul', { class: 'info' },
         el('li', null, 'Cada taller tiene un depósito de entrada y uno de salida. Solo produce con lo que tiene adentro.'),
@@ -231,7 +320,7 @@
       return el('div', { class: 'stock-box' + (tot >= cap - 0.5 ? ' lleno' : '') },
         el('div', { class: 'row' }, el('b', null, 'Guarda: ' + Math.floor(tot) + '/' + cap), el('div', { class: 'bar stock-bar' }, el('div', { class: 'fill' + (tot >= cap - 0.5 ? ' red' : ''), style: { width: Math.min(100, (tot / cap) * 100) + '%' } }))),
         ks.length ? el('div', { class: 'small base-rs' }, ks.map(k => el('span', { class: 'base-res' }, UI.resIcon(k), ' ' + U.fmt(Math.floor(b.inv[k]))))) : '',
-        el('p', { class: 'small ' + (con ? 'muted' : 'warn-t') }, con ? 'Lo lleva al pueblo ' + rs.filter(r => L.cartsDe(r).length).map(r => { const d = G().bById.get(r.a); return d ? d.def.name : '?'; }).join(', ') + '.' : (b.type === 'colonia' ? 'Lo que juntan tus colonos no sirve para construir hasta que una barcaza lo lleve a tu isla.' : 'Lo que se junta aquí no sirve para construir hasta que un carromato lo lleve al pueblo.') + (tot >= cap - 0.5 ? ' Está lleno: sus aldeanos esperan.' : '')),
+        el('p', { class: 'small ' + (con ? 'muted' : 'warn-t') }, con ? 'Lo lleva al pueblo: ' + rs.filter(r => L.cartsDe(r).length).map(r => L.nombreRuta(r)).join(', ') + '.' : (b.type === 'colonia' ? 'Lo que juntan tus colonos no sirve para construir hasta que una barcaza lo lleve a tu isla.' : 'Lo que se junta aquí no sirve para construir hasta que un carromato lo lleve al pueblo.') + (tot >= cap - 0.5 ? ' Está lleno: sus aldeanos esperan.' : '')),
         rs.map(r => UI.rutaEl(r, true)),
         el('div', { class: 'row' }, UI.btn(b.type === 'colonia' ? '+ Ruta de barcaza' : '+ Ruta de carromato', () => {
           const bs = b.type === 'colonia' ? G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'embarcadero') : Lb.bodegas().concat(G().buildings.filter(o => o.owner === 'p' && o.done && o.type === 'mill' && !L.esCampo(o)));

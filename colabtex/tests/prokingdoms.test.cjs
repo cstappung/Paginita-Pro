@@ -969,14 +969,14 @@ test('L1 (pk-41): las rutas de carretas unen talleres y bodegas del pueblo, sin 
 
 test('L2 (pk-42): cada aldeano trabaja para un edificio, con radio y puestos, y nunca busca más allá', () => {
   const B = (type, lvl, extra) => Object.assign({ id: 9, type, lvl, owner: 'p', def: D.BUILD[type], done: true, cx: 50, cy: 50 }, extra);
-  // tabla 5.2 del plan
-  assert.equal(G.radioBase(B('tc', 3)), 12);
+  // tabla 5.2 del plan, con los radios más grandes de pk-54 (pedido del dueño)
+  assert.equal(G.radioBase(B('tc', 3)), 13);
   assert.equal(G.puestosBase(B('tc', 3)), 13);
-  assert.equal(G.radioBase(B('lumber', 1)), 10);
-  assert.equal(G.radioBase(B('lumber', 6)), 13);
-  assert.equal(G.radioBase(B('mining', 20)), 16, 'el radio tiene tope');
+  assert.equal(G.radioBase(B('lumber', 1)), 14);
+  assert.equal(G.radioBase(B('lumber', 6)), 17);
+  assert.equal(G.radioBase(B('mining', 20)), 22, 'el radio tiene tope');
   assert.equal(G.puestosBase(B('mining', 20)), 16, 'los puestos también');
-  assert.equal(G.radioBase(B('mill', 4)), 10);
+  assert.equal(G.radioBase(B('mill', 4)), 15);
   // solo los edificios de trabajo terminados y tuyos
   assert.ok(G.esBase(B('lumber', 1)));
   assert.ok(!G.esBase(B('lumber', 1, { done: false })));
@@ -989,8 +989,8 @@ test('L2 (pk-42): cada aldeano trabaja para un edificio, con radio y puestos, y 
   assert.ok(!G.baseToma(B('lumber', 1), 'stone'));
   assert.equal(G.queSaca(mina).join(), 'gold');
   // el radio se mide desde el centro del edificio
-  assert.ok(G.enRadio(B('lumber', 1), 59, 49));
-  assert.ok(!G.enRadio(B('lumber', 1), 61, 49));
+  assert.ok(G.enRadio(B('lumber', 1), 63, 49));
+  assert.ok(!G.enRadio(B('lumber', 1), 65, 49));
   // el «cada vez más lejos» desapareció: doGather y el reparto usan el radio de la base
   const ent = JS('entities.js');
   assert.match(ent, /nodoEnRadio/);
@@ -1150,4 +1150,41 @@ test('L5 (pk-47): la Calzada Real va en tierra de nadie o en la tuya, nunca en a
   const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
   assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr\)/, 'el servidor usa la misma regla');
   for (const f of ['server/index.js', '../../functions/index.js']) assert.match(fs.readFileSync(path.join(PKDIR, f), 'utf8'), /'POST \/api\/autopista'/, f);
+});
+
+test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y «cualquier bodega» a la más cercana', () => {
+  const L = PK.Logi, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.capDe;
+  const mk = (id, type, x, inv) => ({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 2, h: 2, cx: x + 1, cy: 11, inv: inv || {} });
+  const c1 = mk(1, 'lumber', 60, { wood: 100 }), c2 = mk(2, 'lumber', 80, { wood: 220 }), mina = mk(3, 'mining', 90, { stone: 50 });
+  const tc = mk(4, 'tc', 10), wh = mk(5, 'warehouse', 70), taller = mk(6, 'sawmill', 40);
+  G.buildings = [c1, c2, mina, tc, wh, taller]; G.bById = new Map(G.buildings.map(b => [b.id, b])); G.units = [];
+  G.capDe = (b, r) => (b.type === 'tc' || b.type === 'warehouse' ? 1000 : 0);
+  G.state = Object.assign({}, st0 || {}, { res: { wood: 0, stone: 0 }, flags: {}, logi: { rutas: [], belts: [], nextRuta: 1 } });
+  try {
+    assert.deepEqual(L.camposDe('wood').map(b => b.id), [1, 2]);
+    assert.equal(L.claseRuta({ de: 'campo', a: 'bodega', res: 'wood' }), 'carromato');
+    assert.equal(L.claseRuta({ de: 'bodega', a: 6 }), 'cart');
+    assert.equal(L.nombreRuta({ de: 'campo', a: 'bodega', res: 'wood' }), 'Cualquier campamento de madera → Cualquier bodega');
+    assert.equal(L.comodinMalo('campo', 'bodega', 'wood'), null);
+    assert.match(L.comodinMalo('campo', 'bodega', null), /recurso/);
+    assert.match(L.comodinMalo('campo', 'bodega', 'food'), /No tienes campamentos/);
+    assert.match(L.comodinMalo(4, 'bodega', null), /Entre dos bodegas/);
+    assert.equal(L.comodinMalo('bodega', 6, null), null);
+    const r = { id: 1, de: 'campo', a: 'bodega', res: 'wood' };
+    G.state.logi.rutas.push(r);
+    // el primero va al que tiene más; el segundo, descontando lo que va a buscar el primero, al otro
+    const u1 = { id: 11, kind: 'carromato', owner: 'p', ruta: 1, x: 70, y: 11, carry: 0 }, u2 = { id: 12, kind: 'carromato', owner: 'p', ruta: 1, x: 70, y: 11, carry: 0 };
+    G.units = [u1, u2];
+    assert.equal(L.extremos(u1, r).from.id, 2, 'el que tiene más madera');
+    assert.equal(L.extremos(u2, r).from.id, 1, 'no van todos al mismo');
+    assert.equal(L.extremosRep(r).from.id, 2, 'la muestra mira solo cuánto guarda cada uno');
+    // la bodega: la más cercana al campamento, y si está llena, otra
+    assert.equal(L.extremos(u1, r).to.id, 5, 'el Almacén queda al lado del campamento');
+    assert.equal(L.rutasDesde(c1).length, 1, 'la ruta comodín cuenta para los campamentos que puede vaciar');
+    assert.equal(L.rutasDesde(mina).length, 0);
+  } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; }
+  // sugerencias, el selector con fichas y la misión de la Maravilla (cualquiera de las cuatro cuenta)
+  assert.match(JS('logistics.js'), /L\.sugerencias = function/);
+  assert.match(JS('ui/reino.js'), /UI\.rutaNueva = function/);
+  assert.match(JS('quests.js'), /req\.b === 'wonder' \? D\.WONDERS\.reduce/);
 });
