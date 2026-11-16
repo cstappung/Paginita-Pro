@@ -547,6 +547,11 @@
       const x = Math.round(px - spr.ox), y = Math.round(py - spr.oy);
       if (!vis(x, y, spr.c.width, spr.c.height)) continue;
       const item = { d: b.x + b.y + (b.w + b.h) / 2, k: 'building', o: b, spr, x, y };
+      if (spr.frente) { // pk-55: el Gran Portón en dos capas (el piso y la torre de atrás debajo de quien cruza; el arco y la torre de adelante encima)
+        const v = b.def.porton === 'v';
+        item.d = b.x + b.y + 0.5;
+        list.push({ d: b.x + b.y + (v ? 1.4 + 2 : 2 + 1.4), k: 'building', o: b, spr: spr.frente, x, y });
+      }
       if (b.def.flat) { item.d = b.x + b.y; flats.push(item); } else list.push(item);
       // suelo alrededor según la era del dueño (los reinos simulados, según el nivel del edificio)
       const st = b.done && !b.def.walkable ? Sp.apronStyle(b.owner === 'p' ? g.state.era : Math.ceil((b.lvl - 1) / 2)) : 0;

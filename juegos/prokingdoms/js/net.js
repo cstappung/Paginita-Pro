@@ -196,6 +196,7 @@
         kb[pl.id] = pl.bver;
         g.clearOwner(owner, true);
         (pl.buildings || []).forEach((b, i) => g.addRemoteBuilding(b[0], owner, b[1], b[2], !!b[3], 400000 + pl.slot * 5000 + i, b[4] || 1));
+        if (g.aplicarDesalojo) g.aplicarDesalojo(owner); // pk-55: los que escondiste de tu tierra
       }
       if (pl.muros !== undefined) { mvk[pl.id] = pl.mv; PK.Def.ponerAjenas(pl.slot, pl.muros, { v: pl.mv, terr: parcelas(pl.slot) }); }
       applyUnits(owner, pl.slot, pl.units || []);

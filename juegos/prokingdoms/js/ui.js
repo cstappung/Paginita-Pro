@@ -783,6 +783,7 @@
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
       el('div', null, el('h3', null, barca ? (us.length === 1 ? 'Barcaza' : us.length + ' barcazas') : carro ? (us.length === 1 ? 'Carromato' : us.length + ' carromatos') : us.length === 1 ? 'Carreta' : us.length + ' carretas'),
         el('p', { class: 'small' + (r ? '' : ' warn-t') }, u.estado || (r ? nom(r) : 'Sin ruta: elige a dónde va')),
+        u.carry > 0.5 ? el('p', { class: 'small' }, 'Lleva: ', Object.entries(L.cargaDe(u)).map(([k, n]) => el('span', { class: 'amt' }, UI.resIcon(k), U.fmt(Math.floor(n)) + ' '))) : '', // pk-55: puede ser mezclada
         el('div', { class: 'row' }, el('span', { class: 'small' }, 'Ruta: '), sel, UI.btn('Logística', () => UI.openLogistics(), { small: true })),
         el('p', { class: 'small muted' }, barca ? 'Trae lo que guarda el Muelle de una colonia al Embarcadero de tu isla (' + L.barcaCap() + ' por viaje). Solo navega; el viento la apura o la frena.' : carro ? 'Vacía un campamento y lleva lo juntado al pueblo (' + L.carroCap() + ' por viaje). Sale de tu territorio; tu muralla solo la cruza por un Gran Portón.' : 'Carga en el origen, lo lleva al destino y vuelve. Si no hay nada que llevar, espera en el origen. Toma el camino más rápido: los caminos empedrados la aceleran mucho.'))));
   }
@@ -911,6 +912,17 @@
     const def = b.def, own = b.owner === 'p';
     const head = el('div', null, el('h3', null, def.name + (def.noUp ? '' : ' · Nv ' + b.lvl)), el('p', { class: 'small' }, own ? def.desc : 'Pertenece a ' + D.BOTS.find(x => x.id === b.owner).realm + '.'));
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait', src: Sp.buildingIcon(b.type, b.owner, b.lvl, b.asp) }), head));
+    if (!own && G().ajenoEnTuTierra && G().ajenoEnTuTierra(b)) { // pk-55: echar de tu tierra lo de otro reino
+      head.append(el('p', { class: 'small warn-t' }, 'Está dentro de tu tierra.'),
+        el('div', { class: 'row' }, UI.btn(b.remote ? 'Sacar de mi tierra' : 'Mudar fuera de mi tierra', () => {
+          const r = G().desalojar(b);
+          if (!r) return;
+          G().sel = r === true ? null : { type: 'building', id: r.id };
+          UI.toast(r === true ? b.def.name + ' ya no está en tu tierra.' : b.def.name + ' se mudó a la tierra de nadie, al lado de tu frontera.', 'good');
+          UI.refreshPanel(true);
+        }, { cls: 'gold', small: true }),
+        el('span', { class: 'small muted' }, b.remote ? 'Es de un jugador: deja de estar en tu mapa (su juego también lo quita de tierra ajena).' : 'Se muda a la tierra de nadie más cercana; si no hay lugar, se va.')));
+    }
     if (!own) return;
     if (!b.done) {
       head.append(el('div', { class: 'bar' }, el('div', { class: 'fill', style: { width: b.progress * 100 + '%' } }), el('span', null, 'En construcción ' + Math.floor(b.progress * 100) + '% · ' + U.fmtTime(((1 - b.progress) * def.time) / G().buildMult('p')))));

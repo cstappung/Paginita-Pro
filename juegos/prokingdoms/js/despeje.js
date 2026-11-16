@@ -113,6 +113,8 @@
     ver = W.terrVer;
     const ub = W.ubicarLugares();
     let n = 0, tuyo = false;
+    if (PK.Campana && PK.Campana.revisarLugar && PK.Campana.revisarLugar()) n++; // pk-55: el lugar del capítulo, también
+    if (g.revisarPuestos) g.revisarPuestos(); // pk-55: tus campamentos que quedaron en tierra de otro
     for (let id = 0; id < W.ORIG.p.length; id++) {
       const p = W.pois[id], to = ub.p[id] || W.ORIG.p[id];
       if (!p || (p.x === to[0] && p.y === to[1])) continue;

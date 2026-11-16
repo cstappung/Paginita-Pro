@@ -117,15 +117,15 @@
 
   // ---------- Logística ----------
   // pk-41: las carretas siguen rutas que eliges tú (origen, destino y, si quieres, un recurso). Sin ruta quedan paradas.
-  const rutaForm = { de: 0, a: 0, res: '' };
+  const rutaForm = { de: 0, a: 0, res: '', tipo: '' };
   UI.nuevaRutaDesde = function (b, comoDestino) {
     if (comoDestino) rutaForm.a = b.id; else rutaForm.de = b.id;
     UI.openLogistics();
   };
   // pk-54: ícono de un extremo de ruta (un edificio, «cualquier campamento» o «cualquier bodega»)
-  const iconoExtremo = (v, res) => {
+  const iconoExtremo = (v, res, tipo) => {
     const L = PK.Logi;
-    if (v === 'campo') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(res === 'wood' ? 'lumber' : res === 'food' ? 'mill' : 'mining'), alt: '' }), res ? UI.resIcon(res) : '');
+    if (v === 'campo') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(tipo || L.tipoDeRes(res) || 'mining'), alt: '' }), res ? UI.resIcon(res) : el('b', { class: 'rt-asterisco' }, '*'));
     if (v === 'bodega') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon('warehouse'), alt: '' }), el('b', { class: 'rt-asterisco' }, '*'));
     const b = G().bById.get(v);
     return b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '';
@@ -137,9 +137,9 @@
     const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica).' : 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
     const malo = mala || (T && !T.ok) || !cs.length;
     return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
-      el('div', { class: 'ruta-nom' }, iconoExtremo(r.de, r.res), el('b', null, L.nombreExtremo(r.de, r.res)), ' → ',
+      el('div', { class: 'ruta-nom' }, iconoExtremo(r.de, r.res, r.tipo), el('b', null, L.nombreExtremo(r.de, r.res, r.tipo)), ' → ',
         iconoExtremo(r.a, r.res), el('b', null, L.nombreExtremo(r.a, r.res)),
-        r.res ? (r.de === 'campo' ? '' : el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase())) : el('span', { class: 'small muted' }, ' · lo que haga falta'),
+        r.res ? (r.de === 'campo' ? '' : el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase())) : el('span', { class: 'small muted' }, r.de === 'campo' ? ' · de todo lo que junten' : ' · lo que haga falta'),
         L.comodin(r.de) || L.comodin(r.a) ? el('span', { class: 'small muted' }, ' · ahora: ' + (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?')) : ''),
       el('div', { class: 'ruta-dat small' }, T && T.ok ? 'Ida ' + Math.round(T.ida) + ' s · vuelta ' + Math.round(T.vuelta) + ' s' + (cs.length ? ' · aprox. ' + Math.round(T.ritmo) + ' por minuto' : '') : '', el('span', { class: malo ? 'warn-t' : 'muted' }, (T && T.ok ? ' · ' : '') + estado)),
       el('div', { class: 'row ruta-btn' },
@@ -165,10 +165,10 @@
       }
       const clase = L.claseRuta(o), libres = L.libres(clase).length, nom = clase === 'barcaza' ? 'barcaza' : clase === 'carromato' ? 'carromato' : 'carreta';
       return el('div', { class: 'rt-sug' },
-        el('div', { class: 'rt-sug-t' }, iconoExtremo(o.de, o.res), el('span', null, '→'), iconoExtremo(o.a, o.res), el('b', null, o.txt)),
+        el('div', { class: 'rt-sug-t' }, iconoExtremo(o.de, o.res, o.ctipo), el('span', null, '→'), iconoExtremo(o.a, o.res), el('b', null, o.txt)),
         el('p', { class: 'small muted' }, o.por),
         el('div', { class: 'row' }, el('span', { class: 'small ' + (libres ? 'ok' : 'warn-t') }, libres ? (libres === 1 ? 'Tienes 1 ' + nom + ' libre.' : 'Tienes ' + libres + ' ' + nom + 's libres.') : 'No tienes ' + nom + 's libres: la ruta queda creada y le sumas uno después.'),
-          UI.btn('Crear ruta', () => { const r = L.crearRuta(o.de, o.a, o.res); if (r && libres) L.sumarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, cls: 'gold' })));
+          UI.btn('Crear ruta', () => { const r = L.crearRuta(o.de, o.a, o.res, o.ctipo); if (r && libres) L.sumarCarreta(r); UI.rerender(); UI.refreshPanel(true); }, { small: true, cls: 'gold' })));
     })));
   };
 
@@ -183,7 +183,9 @@
     const talleres = mios(b => L.isShop(b) && L.puntoCarreta(b));
     const bodegas = mios(b => L.esBodegaRuta(b));
     const embs = mios(b => b.type === 'embarcadero');
-    const resCampos = [...new Set(campos.flatMap(b => (b.def.drop || []).filter(k => L.bodegasRuta(k).length)))].sort((x, y) => D.RES_ORDER.indexOf(x) - D.RES_ORDER.indexOf(y));
+    // pk-55: los tipos de campamento que tienes (y cuyo botín alguna bodega recibe)
+    const dropsDe = t => (D.BUILD[t].drop || []).filter(k => L.bodegasRuta(k).length);
+    const tiposCampos = L.TIPOS_CAMPO.filter(t => L.camposDe(null, t).length && dropsDe(t).length);
     const F = rutaForm, B = v => (L.comodin(v) ? null : g.bById.get(v));
     if (F.de && !L.comodin(F.de) && !B(F.de)) F.de = 0;
     if (F.a && !L.comodin(F.a) && !B(F.a)) F.a = 0;
@@ -199,12 +201,12 @@
       el('span', { class: 'rt-ficha-ico' }, ico), el('span', { class: 'rt-ficha-t' }, el('b', null, txt), sub ? el('span', { class: 'small' }, sub) : '', extra ? el('span', { class: 'small muted' }, extra) : ''));
     const fichaB = (b, sel, onclick, conLejos) => ficha(b.id, sel, b.def.name + ' ' + b.lvl, guarda(b), el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }), onclick, conLejos ? lejos(b) : '');
     const grupo = (titulo, fichas) => (fichas.length ? el('div', { class: 'rt-grupo' }, el('div', { class: 'rt-grupo-t small' }, titulo), el('div', { class: 'rt-fichas' }, fichas)) : '');
-    const elegirDe = v => { F.de = F.de === v ? 0 : v; F.a = 0; if (v !== 'campo') F.res = ''; UI.rerender(); };
+    const elegirDe = v => { F.de = F.de === v ? 0 : v; F.a = 0; if (v !== 'campo') F.res = F.tipo = ''; UI.rerender(); };
     const elegirA = v => { F.a = F.a === v ? 0 : v; UI.rerender(); };
 
     // 1. ¿De dónde?
     const paso1 = el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '1'), el('b', null, '¿De dónde sale?')),
-      grupo('Comodines', [resCampos.length ? ficha('campo', F.de === 'campo', 'Cualquier campamento', 'el que tenga más', iconoExtremo('campo', F.res || resCampos[0]), () => elegirDe('campo')) : '',
+      grupo('Comodines', [tiposCampos.length ? ficha('campo', F.de === 'campo', 'Cualquier campamento', 'el que tenga más; trae de todo', iconoExtremo('campo', null, F.tipo || tiposCampos[0]), () => elegirDe('campo')) : '',
         talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].filter(Boolean)),
       grupo('Campamentos (carromato)', campos.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
       grupo('Muelles de colonias (barcaza)', colonias.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
@@ -215,21 +217,27 @@
     body.append(caja);
     if (!F.de) { caja.append(el('p', { class: 'small muted' }, 'Elige de dónde sale. Un carromato vacía campamentos; una carreta une talleres y bodegas del pueblo.')); return; }
 
-    // si es «cualquier campamento», primero el recurso
+    // si es «cualquier campamento», primero de qué tipo; con varios recursos (el minero), todo o solo uno (pk-55)
     if (F.de === 'campo') {
-      if (!F.res || !resCampos.includes(F.res)) F.res = resCampos[0] || '';
+      if (!F.tipo || !tiposCampos.includes(F.tipo)) F.tipo = tiposCampos[0] || '';
+      const ds = F.tipo ? dropsDe(F.tipo) : [];
+      if (F.res && !ds.includes(F.res)) F.res = '';
+      const TIPO_CORTO = { lumber: 'Madereros', mining: 'Mineros', mill: 'Molinos de afuera' };
       caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '·'), el('b', null, '¿De qué campamentos?')),
-        el('div', { class: 'rt-chips' }, resCampos.map(k => el('button', { type: 'button', class: 'rt-chip' + (F.res === k ? ' sel' : ''), onclick: () => { F.res = k; F.a = 0; UI.rerender(); } }, UI.resIcon(k), ' ' + D.RES[k].name + ' (' + L.camposDe(k).length + ')')))));
+        el('div', { class: 'rt-chips' }, tiposCampos.map(t => el('button', { type: 'button', class: 'rt-chip' + (F.tipo === t ? ' sel' : ''), onclick: () => { F.tipo = t; F.res = ''; F.a = 0; UI.rerender(); } }, el('img', { class: 'ico', src: Sp.buildingIcon(t), alt: '' }), ' ' + TIPO_CORTO[t] + ' (' + L.camposDe(null, t).length + ')'))),
+        ds.length > 1 ? el('div', { class: 'rt-chips' }, [el('button', { type: 'button', class: 'rt-chip' + (!F.res ? ' sel' : ''), onclick: () => { F.res = ''; F.a = 0; UI.rerender(); } }, ds.map(k => UI.resIcon(k)), ' Todo lo que junten')].concat(
+          ds.map(k => el('button', { type: 'button', class: 'rt-chip' + (F.res === k ? ' sel' : ''), onclick: () => { F.res = k; F.a = 0; UI.rerender(); } }, UI.resIcon(k), ' Solo ' + D.RES[k].name.toLowerCase())))) : '',
+        ds.length > 1 && !F.res ? el('p', { class: 'small muted' }, 'Cada carromato carga de todo a la vez (lo que más haya primero) y lo deja en una bodega que lo reciba.') : ''));
     }
     // 2. ¿A dónde? (solo los destinos que sirven con ese origen)
-    const sirve = v => !(L.comodin(F.de) || L.comodin(v) ? L.comodinMalo(F.de, v, F.de === 'campo' ? F.res : null) : L.parMalo(A0, B(v)));
+    const sirve = v => !(L.comodin(F.de) || L.comodin(v) ? L.comodinMalo(F.de, v, F.de === 'campo' ? F.res || null : null, F.de === 'campo' ? F.tipo : null) : L.parMalo(A0, B(v)));
     const dests = { bodega: sirve('bodega'), tall: talleres.filter(b => b.id !== F.de && sirve(b.id)), bods: bodegas.filter(b => b.id !== F.de && sirve(b.id)), embs: embs.filter(b => sirve(b.id)) };
     caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '2'), el('b', null, '¿A dónde lo lleva?')),
       grupo('Comodín', dests.bodega && F.de !== 'bodega' ? [ficha('bodega', F.a === 'bodega', 'Cualquier bodega', 'la más cercana con lugar', iconoExtremo('bodega'), () => elegirA('bodega'))] : []),
       grupo('Embarcadero', dests.embs.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
       grupo('Bodegas', dests.bods.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
       grupo('Talleres', dests.tall.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
-      !dests.bodega && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
+      !dests.bodega && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res || null, F.tipo || null) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
     if (!F.a) return;
 
     // 3. ¿Qué lleva?
@@ -239,19 +247,20 @@
     if (F.de !== 'campo' && resOps.length > 1) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué lleva?')),
       el('div', { class: 'rt-chips' }, [el('button', { type: 'button', class: 'rt-chip' + (!F.res ? ' sel' : ''), onclick: () => { F.res = ''; UI.rerender(); } }, 'Lo que haga falta')].concat(
         resOps.map(k => el('button', { type: 'button', class: 'rt-chip' + (F.res === k ? ' sel' : ''), onclick: () => { F.res = k; UI.rerender(); } }, UI.resIcon(k), ' ' + D.RES[k].name))))));
-    const why = L.comodin(F.de) || L.comodin(F.a) ? L.comodinMalo(F.de, F.a, F.res || null) : L.parMalo(A, Bd);
-    const prov = { de: F.de, a: F.a, res: F.res || null }, clase = L.claseRuta(prov), libres = L.libres(clase).length;
+    const tipoF = F.de === 'campo' ? F.tipo || null : null;
+    const why = L.comodin(F.de) || L.comodin(F.a) ? L.comodinMalo(F.de, F.a, F.res || null, tipoF) : L.parMalo(A, Bd);
+    const prov = { de: F.de, a: F.a, res: F.res || null, tipo: tipoF }, clase = L.claseRuta(prov), libres = L.libres(clase).length;
     caja.append(el('div', { class: 'rt-resumen' },
-      el('div', { class: 'ruta-nom' }, iconoExtremo(F.de, F.res), el('b', null, L.nombreExtremo(F.de, F.res)), ' → ', iconoExtremo(F.a, F.res), el('b', null, L.nombreExtremo(F.a, F.res)),
-        F.res && F.de !== 'campo' ? el('span', { class: 'small' }, ' · ', UI.resIcon(F.res), ' ' + D.RES[F.res].name.toLowerCase()) : ''),
+      el('div', { class: 'ruta-nom' }, iconoExtremo(F.de, F.res, tipoF), el('b', null, L.nombreExtremo(F.de, F.res, tipoF)), ' → ', iconoExtremo(F.a, F.res), el('b', null, L.nombreExtremo(F.a, F.res)),
+        F.res && F.de !== 'campo' ? el('span', { class: 'small' }, ' · ', UI.resIcon(F.res), ' ' + D.RES[F.res].name.toLowerCase()) : F.de === 'campo' && !F.res ? el('span', { class: 'small muted' }, ' · de todo lo que junten') : ''),
       why ? el('p', { class: 'small warn-t' }, why) : el('p', { class: 'small muted' }, (clase === 'barcaza' ? 'Barcazas' : clase === 'carromato' ? 'Carromatos' : 'Carretas') + ' libres: ' + libres + (libres ? ' (se le suma uno al crearla).' : '. La ruta queda creada y le sumas uno con + cuando tengas.')),
       el('div', { class: 'row' }, UI.btn('Crear ruta', () => {
-        const r = L.crearRuta(F.de, F.a, F.res || null);
+        const r = L.crearRuta(F.de, F.a, F.res || null, tipoF);
         if (!r) return;
         if (L.libres(L.claseRuta(r)).length) L.sumarCarreta(r);
-        F.de = F.a = 0; F.res = '';
+        F.de = F.a = 0; F.res = F.tipo = '';
         UI.rerender(); UI.refreshPanel(true);
-      }, { cls: 'gold', disabled: !!why }), UI.btn('Empezar de nuevo', () => { F.de = F.a = 0; F.res = ''; UI.rerender(); }, { small: true }))));
+      }, { cls: 'gold', disabled: !!why }), UI.btn('Empezar de nuevo', () => { F.de = F.a = 0; F.res = F.tipo = ''; UI.rerender(); }, { small: true }))));
   };
   UI.openLogistics = function () {
     UI.modal('logi', 'Logística', body => {

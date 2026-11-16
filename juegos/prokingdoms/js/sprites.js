@@ -1419,7 +1419,11 @@
     const t = Math.max(1, Math.min(4, wallTier || 1)), H = [0, 24, 30, 34, 38][t];
     const mat = ['', 'bark', 'stone', 'paving', 'slate'][t], top = ['', 'logend', 'paving', 'marbleS', 'paving'][t];
     const abre = frame / 4;
-    const spr = isoSprite(def.w, def.h, 58, false, p => {
+    // pk-55: dos dibujos del mismo tamaño. «fondo» (el piso del paso, la torre de atrás y las hojas de madera) va antes
+    // que quien pasa; «frente» (el rastrillo, el arco y la torre de adelante) después. En uno solo, quien cruzaba la
+    // mitad de atrás del paso quedaba debajo de todo el portón y parecía hundirse en el piso.
+    const dibujo = parte => isoSprite(def.w, def.h, 58, parte === 'frente', p => {
+      const fondo = parte === 'fondo';
       // (a, b): a a lo largo de la muralla, b a través. En el girado se cambian x e y.
       const box = (a, b, la, lb, z0, z1, m1, m2, m3) => (v ? p.box(b, a, lb, la, z0, z1, m1, m2, m3) : p.box(a, b, la, lb, z0, z1, m1, m2, m3));
       const P = (a, b, z) => (v ? p.P(b, a, z) : p.P(a, b, z));
@@ -1438,10 +1442,12 @@
         p.ctx.fillStyle = '#3a2a1a'; p.ctx.fillRect(tq[0], tq[1], 1, 3);
         p.ctx.fillStyle = '#ffb040'; p.ctx.fillRect(tq[0] - 1, tq[1] - 2, 3, 2); p.ctx.fillStyle = '#fff0a0'; p.ctx.fillRect(tq[0], tq[1] - 3, 1, 1);
       };
+      if (fondo) {
       torre(0);
       // suelo del paso
       box(1, 0.1, 2, 1.8, 0, 1, 'paving', 'paving', 'paving');
-      if (t === 1) { // dos hojas que giran hacia afuera
+      }
+      if (t === 1 && fondo) { // dos hojas que giran hacia afuera
         const th = abre * Math.PI * 0.45, c = Math.cos(th), s2 = Math.sin(th), hz = H - 6;
         for (const [h0, dir] of [[1, 1], [3, -1]]) {
           const e = [h0 + dir * c * 0.98, 1 + s2 * 0.98];
@@ -1450,13 +1456,14 @@
           for (const zz of [hz * 0.22, hz * 0.7]) { p.line(P(h0, 1, zz), P(e[0], e[1], zz), '#2a2228'); p.line(P(h0, 1, zz + 1), P(e[0], e[1], zz + 1), '#4a4248'); } // herrajes
           p.line(P(e[0], e[1], 0), P(e[0], e[1], hz), '#2a1a0e');
         }
-      } else { // rastrillo de hierro que sube
+      } else if (t > 1 && !fondo) { // rastrillo de hierro que sube
         const z0 = abre * (H - 8), hz = H - 6;
         if (z0 < hz - 1) p.fill([P(1.05, 1, Math.min(hz, z0)), P(2.95, 1, Math.min(hz, z0)), P(2.95, 1, hz), P(1.05, 1, hz)], '#1a1418'); // la sombra del paso detrás
         for (let i = 0; i <= 6; i++) { const a = 1.05 + i * 0.315, q0 = P(a, 1, Math.min(hz, z0)), q1 = P(a, 1, hz); p.line(q0, q1, '#6a6a74'); p.line([q0[0] + 1, q0[1]], [q1[0] + 1, q1[1]], '#3a3a40'); }
         for (let z = z0 + 2; z < hz; z += 4) p.line(P(1.05, 1, z), P(2.95, 1, z), '#8a8a94');
         if (abre < 0.9) for (let i = 0; i <= 6; i++) { const a = 1.05 + i * 0.315, q = P(a, 1, z0); p.px(q[0], q[1], '#8a8a94'); } // puntas
       }
+      if (fondo) return;
       // arco del paso, con escudo del reino
       box(1, 0.6, 2, 0.8, H - 6, H, mat === 'bark' ? 'plank' : mat, mat === 'bark' ? 'plank' : mat, top);
       const e = P(2, 1.4, H - 3);
@@ -1466,7 +1473,9 @@
       // estandartes en las torres (desde los sillares), que flamean con el cuadro
       if (t >= 2) for (const a0 of [0.5, 3.5]) { const q = v ? [1.0, a0] : [a0, 1.0]; p.flag(q[0], q[1], H + 4, col, 10 + (frame % 2)); }
     }, t >= 3 ? 3 : t >= 2 ? 2 : 0, null);
-    spr.pad = 0;
+    const spr = dibujo('fondo');
+    spr.frente = dibujo('frente');
+    spr.pad = spr.frente.pad = 0;
     return (PORC[key] = spr);
   };
 

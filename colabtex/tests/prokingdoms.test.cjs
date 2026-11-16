@@ -1166,7 +1166,7 @@ test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y 
     assert.equal(L.claseRuta({ de: 'bodega', a: 6 }), 'cart');
     assert.equal(L.nombreRuta({ de: 'campo', a: 'bodega', res: 'wood' }), 'Cualquier campamento de madera → Cualquier bodega');
     assert.equal(L.comodinMalo('campo', 'bodega', 'wood'), null);
-    assert.match(L.comodinMalo('campo', 'bodega', null), /recurso/);
+    assert.match(L.comodinMalo('campo', 'bodega', null), /de qué campamentos/);
     assert.match(L.comodinMalo('campo', 'bodega', 'food'), /No tienes campamentos/);
     assert.match(L.comodinMalo(4, 'bodega', null), /Entre dos bodegas/);
     assert.equal(L.comodinMalo('bodega', 6, null), null);
@@ -1187,4 +1187,39 @@ test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y 
   assert.match(JS('logistics.js'), /L\.sugerencias = function/);
   assert.match(JS('ui/reino.js'), /UI\.rutaNueva = function/);
   assert.match(JS('quests.js'), /req\.b === 'wonder' \? D\.WONDERS\.reduce/);
+});
+
+test('pk-55: «cualquier campamento minero» trae de todo, en carga mezclada', () => {
+  const L = PK.Logi, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.capDe, stat0 = G.stat, gcap0 = G.cap;
+  G.stat = () => {}; G.cap = () => 1000;
+  const mk = (id, type, x, inv) => ({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 2, h: 2, cx: x + 1, cy: 11, inv: inv || {} });
+  const m1 = mk(1, 'mining', 60, { stone: 30, gold: 20 }), m2 = mk(2, 'mining', 80, { stone: 10, gold: 5, ore: 4 }), lena = mk(3, 'lumber', 90, { wood: 500 });
+  const tc = mk(4, 'tc', 10), granero = mk(5, 'granary', 62);
+  G.buildings = [m1, m2, lena, tc, granero]; G.bById = new Map(G.buildings.map(b => [b.id, b])); G.units = [];
+  G.capDe = (b, r) => (b.type === 'tc' || (b.type === 'granary' && r === 'food') ? 1000 : 0);
+  G.state = Object.assign({}, st0 || {}, { res: { wood: 0, stone: 0, gold: 0, ore: 0, food: 0 }, flags: {}, logi: { rutas: [], belts: [], nextRuta: 1 } });
+  try {
+    assert.deepEqual(L.camposDe(null, 'mining').map(b => b.id), [1, 2], 'por tipo: los dos mineros');
+    assert.equal(L.tipoDeRes('gold'), 'mining');
+    assert.equal(L.comodinMalo('campo', 'bodega', null, 'mining'), null);
+    assert.match(L.comodinMalo('campo', 'bodega', null, 'mill'), /No tienes Molinos/);
+    const r = L.crearRuta('campo', 'bodega', null, 'mining');
+    assert.equal(r.tipo, 'mining');
+    assert.equal(L.nombreRuta(r), 'Cualquier campamento minero → Cualquier bodega');
+    assert.equal(L.nombreRuta({ de: 'campo', a: 'bodega', res: 'gold', tipo: 'mining' }), 'Cualquier campamento minero (solo oro) → Cualquier bodega');
+    const u = { id: 11, kind: 'carromato', owner: 'p', ruta: r.id, x: 70, y: 11, carry: 0 };
+    G.units = [u];
+    const e = L.extremos(u, r);
+    assert.equal(e.from.id, 1, 'el que más guarda en total (50 contra 19)');
+    assert.equal(e.to.id, 4, 'una bodega que recibe todo, no el Granero de al lado');
+    const lista = L.queCargarVarios(m1, tc, 40, true);
+    assert.equal(JSON.stringify(lista), JSON.stringify([{ res: 'stone', n: 30 }, { res: 'gold', n: 10 }]), 'lo que más hay primero, hasta llenar');
+    // la carga mezclada se cuenta fuera del pueblo (foto al servidor) y se guarda con la partida
+    u.carga = { stone: 30, gold: 10 }; u.carry = 40; u.carryRes = 'stone';
+    assert.equal(PK.Libro.fuera('gold'), 25 + 10);
+    assert.equal(L.nombresCarga(u.carga), 'piedra y oro');
+    assert.equal(JSON.stringify(L.cargaDe({ carry: 5, carryRes: 'wood' })), '{"wood":5}');
+    assert.equal(L.rutasDesde(lena).length, 0, 'el maderero no es de esa ruta');
+  } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; G.stat = stat0; G.cap = gcap0; }
+  assert.match(JS('entities.js'), /carga: this\.carga \|\| undefined/);
 });

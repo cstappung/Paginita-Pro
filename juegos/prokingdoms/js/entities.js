@@ -9,7 +9,7 @@
       this.id = o.id; this.owner = o.owner;
       this.x = o.x; this.y = o.y;
       this.task = o.task || null; this.phase = o.phase || 'go';
-      this.carry = o.carry || 0; this.carryRes = o.carryRes || null; this.carryZone = o.carryZone === undefined ? -1 : o.carryZone;
+      this.carry = o.carry || 0; this.carryRes = o.carryRes || null; this.carga = o.carga || null; this.carryZone = o.carryZone === undefined ? -1 : o.carryZone;
       this.hair = o.hair === undefined ? o.id % 4 : o.hair;
       this.skin = o.skin === undefined ? (o.id * 7) % 3 : o.skin;
       this.inside = !!o.inside;
@@ -25,7 +25,7 @@
       this.mode = 'idle'; this.fails = 0; this.wait = 0; this.fx = 0;
     }
     toJSON() {
-      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined, ruta: this.ruta || undefined, espera: this.espera || undefined };
+      return { id: this.id, owner: this.owner, x: +this.x.toFixed(2), y: +this.y.toFixed(2), task: this.task, phase: this.phase, carry: this.carry, carryRes: this.carryRes, carga: this.carga || undefined, carryZone: this.carryZone, hair: this.hair, skin: this.skin, inside: this.inside, kind: this.kind, dl: this.dl, job: this.job, hold: this.hold || undefined, ruta: this.ruta || undefined, espera: this.espera || undefined };
     }
   }
 
