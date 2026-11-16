@@ -18,15 +18,15 @@
     () => {
       const g = G(), st = S();
       if (st.eraProg) return null;
-      const n = st.era + 1, cost = D.eraCost(n), r = Object.keys(cost).find(k => D.RES[k] && isFinite(g.cap(k)) && cost[k] > g.cap(k));
+      const n = st.era + 1, cost = D.eraCost(n), r = Object.keys(cost).find(k => D.RES[k] && isFinite(g.cap(k)) && cost[k] > g.cap(k) && (st.res[k] || 0) < cost[k]); // si ya lo tiene (premios y botín entran sobre el tope), no hay nada que avisar
       if (!r) return null;
       const alm = r === 'food' ? 'granary' : 'warehouse';
-      return { id: 'eracap', prioridad: 72, texto: 'La Era ' + U.roman(n) + ' pide ' + U.fmt(cost[r]) + ' de ' + nombre(r) + ' y tus bodegas guardan ' + U.fmt(g.cap(r)) + ': mejora ' + (D.BUILD[alm] ? 'el ' + D.BUILD[alm].name + ' o ' : '') + 'el Centro Urbano.', acciones: [{ label: 'Obras', fn: cerrarY(() => PK.UI.openWorks()) }] };
+      return { id: 'eracap', prioridad: 72, texto: 'La Era ' + U.roman(n) + ' pide ' + U.fmt(cost[r]) + ' de ' + nombre(r) + ' y tus bodegas guardan ' + U.fmt(g.cap(r)) + ': mejora ' + (D.BUILD[alm] ? D.BUILD[alm].name + ' o ' : '') + D.BUILD.tc.name + '.', acciones: [{ label: 'Obras', fn: cerrarY(() => PK.UI.openWorks()) }] };
     },
     // el patio del Centro Urbano cerrado por edificios (B2): lo más grave, nadie sale a trabajar
     () => {
       const e = G().encierro;
-      return e && { id: 'encierro', prioridad: 100, texto: 'Tu Centro Urbano está encerrado por edificios: tus aldeanos no llegan a los recursos.', acciones: e.puertas.length ? [{ label: 'Ver edificios', fn: cerrarY(() => G().verPuertas()) }] : [] };
+      return e && { id: 'encierro', prioridad: 100, texto: 'Tu ' + D.BUILD.tc.name + ' está encerrado por edificios: tus aldeanos no llegan a los recursos.', acciones: e.puertas.length ? [{ label: 'Ver edificios', fn: cerrarY(() => G().verPuertas()) }] : [] };
     },
     // se puede avanzar de era y no se avanzó
     () => {

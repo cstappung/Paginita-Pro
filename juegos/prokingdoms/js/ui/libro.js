@@ -184,7 +184,7 @@
       const working = G().units.some(u => u.owner === 'p' && u.kind === 'v' && (u.task || u.inside));
       body.append(keys.length ? el('div', { class: 'reward big' }, keys.map(k => UI.amount(k, rep.gained[k])))
         : el('p', { class: 'muted' }, full.length ? 'No cupo nada más: el almacenamiento está lleno.' : working ? 'Tus aldeanos no lograron juntar nada: quizás se agotó lo que tenían cerca.' : 'Nadie estaba trabajando. ¡Asigna tareas antes de irte!'));
-      if (full.length) body.append(el('p', { class: 'small warn-t' }, 'Lleno: ' + full.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. Mejora el Granero, el Almacén o el Centro Urbano para guardar más mientras no estás.'));
+      if (full.length) body.append(el('p', { class: 'small warn-t' }, 'Lleno: ' + full.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. Para guardar más mientras no estás, mejora: ' + D.bodegasTxt() + '.'));
       if (rep.depleted) body.append(el('p', { class: 'small muted' }, 'Tus aldeanos agotaron ' + rep.depleted + (rep.depleted === 1 ? ' árbol, veta o arbusto' : ' árboles, vetas o arbustos') + ' (vuelven a crecer con el tiempo).'));
       if (rep.explored > 0) body.append(el('p', { class: 'small' }, 'Tus exploradores revelaron ' + rep.explored + ' casillas del mapa.'));
       if (rep.finished && rep.finished.length) body.append(el('p', { class: 'small' }, 'Terminado: ' + rep.finished.join(', ') + '.'));

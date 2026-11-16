@@ -207,6 +207,14 @@
   // La era desbloquea edificios nuevos y sube el nivel máximo de todos (+2 por era). No da bonos por sí sola:
   // cada edificio mejora por su cuenta.
   D.ERA_NAMES = ['Campamento', 'Aldea', 'Villa', 'Pueblo', 'Ciudad', 'Señorío', 'Reino', 'Imperio', 'Gran Imperio', 'Leyenda'];
+  // Las tres bodegas por su nombre en este mundo (en el Archipiélago se llaman de otro modo), sin artículo: no todos
+  // los nombres son masculinos.
+  D.bodegasTxt = () => D.BUILD.granary.name + ', ' + D.BUILD.warehouse.name + ' o ' + D.BUILD.tc.name;
+  // El nombre de un edificio con su artículo (el/la, del/de la, al/a la): los del Archipiélago cambian de género
+  // («la Fortaleza del Puerto»), así que los textos no pueden llevar «el Centro Urbano» escrito a mano.
+  D.elB = t => (D.BUILD[t].fem ? 'la ' : 'el ') + D.BUILD[t].name;
+  D.delB = t => (D.BUILD[t].fem ? 'de la ' : 'del ') + D.BUILD[t].name;
+  D.alB = t => (D.BUILD[t].fem ? 'a la ' : 'al ') + D.BUILD[t].name;
   D.eraName = n => (n <= 10 ? D.ERA_NAMES[n - 1] : 'Leyenda ' + U.roman(n - 9));
   D.eraCost = function (n) {
     if (n === 2) return { food: 400, wood: 300 };

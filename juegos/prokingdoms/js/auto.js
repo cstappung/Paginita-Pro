@@ -110,12 +110,12 @@
     if (idle < 3 || performance.now() - hintT < 180000) return;
     hintT = performance.now();
     if (g.encierro) { // explorar no sirve de nada: el problema es el patio cerrado (G.checkEncierro)
-      PK.UI.toast(idle + ' aldeanos sin trabajo: tu Centro Urbano quedó encerrado por edificios. Mueve o demuele uno de los marcados en rojo.', 'warn',
+      PK.UI.toast(idle + ' aldeanos sin trabajo: tu ' + D.BUILD.tc.name + ' quedó encerrado por edificios. Mueve o demuele uno de los marcados en rojo.', 'warn',
         g.encierro.puertas.length ? { label: 'Ver edificios', fn: g.verPuertas } : null);
       return;
     }
     if (!g.puestosLibres()) { // pk-42: no falta qué sacar, faltan lugares de trabajo
-      PK.UI.toast(idle + ' aldeanos sin trabajo: tus campamentos y el Centro Urbano no tienen puestos libres. Construye otro campamento junto a un recurso o mejora los que tienes.', 'warn',
+      PK.UI.toast(idle + ' aldeanos sin trabajo: tus campamentos y ' + D.elB('tc') + ' no tienen puestos libres. Construye otro campamento junto a un recurso o mejora los que tienes.', 'warn',
         { label: 'Construir', fn: () => PK.UI.openBuild() });
       return;
     }
@@ -480,7 +480,7 @@
       const from = Object.keys(c).filter(k => k !== job && k !== 'idle' && k !== 'other' && c[k] > 0).sort((a, b) => c[b] - c[a])[0];
       u = from && vs.filter(o => A.jobOf(o) === from).sort((a, b) => (a.carry || 0) - (b.carry || 0))[0];
     }
-    if (!u) { PK.UI.toast('No tienes aldeanos libres: entrena más en el Centro Urbano.', 'warn'); return false; }
+    if (!u) { PK.UI.toast('No tienes aldeanos libres: entrena más en ' + D.elB('tc') + '.', 'warn'); return false; }
     return A.setJob([u], job) > 0;
   };
   // pk-42: + y − en el panel de un edificio de trabajo. + toma un ocioso (el más cercano) o, si no hay, uno del trabajo con
@@ -493,7 +493,7 @@
       const c = A.jobCounts(), from = Object.keys(c).filter(k => k !== 'idle' && k !== 'other' && k !== 'work' && k !== 'dig' && c[k] > 0).sort((x, y) => c[y] - c[x])[0];
       u = from && cerca(vs.filter(o => A.jobOf(o) === from && !(o.task && o.task.m)));
     }
-    if (!u) { PK.UI.toast('No hay aldeanos libres para mandar: entrena más en el Centro Urbano.', 'warn'); return false; }
+    if (!u) { PK.UI.toast('No hay aldeanos libres para mandar: entrena más en ' + D.elB('tc') + '.', 'warn'); return false; }
     if (g.libresBase(b) <= 0) { PK.UI.toast(b.def.name + ' no tiene más puestos (' + g.puestosBase(b) + '): súbelo de nivel.', 'warn'); return false; }
     return g.command([u], { kind: 'building', obj: b }, false);
   };
