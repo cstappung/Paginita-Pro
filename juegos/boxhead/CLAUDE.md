@@ -227,6 +227,13 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   bump them along with the page**, or a cached old engine rejects new proofs.
 - The old `bots-boxhead` practice card is gone: the club card replaces
   it in `SOLOS`.
+- **Fullscreen inside the game** (`boxhead-30`): ⛶ in the HUD (top right; `#vol`
+  moved to `right:56px`), the menu and the pause, all `.pc` (`alternaPc` in
+  `juego.js`), hidden where the browser has no element fullscreen (iOS). It
+  fullscreens the document, i.e. the iframe in the Club and the room (both
+  `allow="fullscreen"`). No hotkey: F is the reinforced wall. The browser eats
+  Esc to leave fullscreen, so leaving it while playing solo pauses (what Esc
+  does here).
 
 ## Phase 2.2: upgrades to choose (`boxhead-12`, proof `ve: 2`)
 

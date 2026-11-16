@@ -3229,6 +3229,42 @@
   $('ayudaVer').onclick = () => ponAyuda(true);
   ponAyuda(lee('boxhead.ayuda', '1') !== '0');
 
+  /* **Pantalla completa** (⛶ en el HUD, el menú y la pausa): la pide para la
+     página entera, que en el Solo Club y en la sala es el iframe (los dos lo
+     crean con `allow="fullscreen"`). El lienzo se mide en cada cuadro, así que
+     no hay nada que reacomodar. Sin atajo de teclado: la F es el muro
+     reforzado. Esc la cierra el navegador sin pasarnos la tecla, así que al
+     salir de ella jugando solo se pone la pausa, que es lo que Esc hace aquí. */
+  const docPc = document.documentElement;
+  const hayPc = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) &&
+    !!(docPc.requestFullscreen || docPc.webkitRequestFullscreen);
+  const enPc = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  function alternaPc() {
+    try {
+      const f = enPc() ? (document.exitFullscreen || document.webkitExitFullscreen) : (docPc.requestFullscreen || docPc.webkitRequestFullscreen);
+      const r = f && f.call(enPc() ? document : docPc, { navigationUI: 'hide' });
+      if (r && r.catch) r.catch(() => {});
+    } catch (e) { /* el navegador no dejó: se sigue en ventana */ }
+  }
+  function pintaPc() {
+    const si = enPc(), t = si ? 'Salir de pantalla completa' : 'Pantalla completa';
+    for (const b of document.querySelectorAll('.pc')) {
+      b.hidden = !hayPc;
+      b.setAttribute('aria-pressed', String(si));
+      b.title = t;
+      if (b.id === 'pcHud') { b.setAttribute('aria-label', t); b.textContent = si ? '🗗' : '⛶'; }
+      else b.textContent = (si ? '🗗 ' : '⛶ ') + t;
+    }
+  }
+  for (const b of document.querySelectorAll('.pc')) b.onclick = () => { b.blur(); alternaPc(); };
+  const alCambiarPc = () => {
+    pintaPc();
+    if (!enPc() && !ONLINE && jugando && !terminado && !pausado) ponPausa(true);
+  };
+  document.addEventListener('fullscreenchange', alCambiarPc);
+  document.addEventListener('webkitfullscreenchange', alCambiarPc);
+  pintaPc();
+
   // ---------- menú ----------
   function pintaMenu() {
     const ms = $('mapas');
