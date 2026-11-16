@@ -44,7 +44,7 @@ import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, BX_MUTADORES, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, BX_MUTADORES, varianteBoxhead, mapaBoxhead, rondaBoxhead, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -1548,6 +1548,18 @@ async function anotar(p) {
     } catch (e) { anotada = ""; console.warn("[juegos] no se pudo apuntar la ronda de zombis", e); }
     return;
   }
+  /* Pro BoxHead cooperativo, además de la fila de la sala (que paga la
+     partida y da los logros de sala), anota la ronda a la que llegó en la
+     MISMA tabla por mapa del Solo Club (`club-boxhead-<mapa>`): el récord
+     es uno solo jugando solo o en grupo. Sin prueba que rehacer (como Yemas
+     zombis), por eso solo con dos o más jugadores (`con` = un compañero: la
+     regla comprueba que estuvo en la sala) y sin los mutadores que regalan
+     la partida. Un fallo aquí no estorba a la fila de la sala. */
+  if (p.juego === "boxhead" && varianteBoxhead(p) === "coop") {
+    const r = rondaBoxhead(p, u.uid);
+    if (r) guardaConPodio(`club-boxhead-${mapaBoxhead(p)}`, u.uid, { nombre: u.name, puntos: r.ronda, tiempo: r.tiempo, partida: state.pid, con: r.con }, false)
+      .catch(e => console.warn("[juegos] no se pudo apuntar la ronda de Pro BoxHead", e));
+  }
   const g = p.fin.ganador || "";
   const res = !g ? "empate" : (ganoEn(p, g, u.uid) ? "ganada" : "perdida");
   try {
@@ -2348,7 +2360,7 @@ async function guardaConPodio(categoria, uid, dato, anunciar = true) {
   /* Un récord que sube al podio de una tabla del club queda en la cola de
      los administradores (admin.js), que pueden ver su repetición y decidir
      si se queda. Una fila chica; la prueba ya está guardada aparte. */
-  if (merecesRevision(categoria, puesto, previo) && dato.partida)
+  if (merecesRevision(categoria, puesto, previo) && dato.partida && !dato.con)   // `con`: Pro BoxHead en sala, no hay repetición que ver
     fb.apuntaRevision(categoria, uid, { p: dato.partida, pts: dato.puntos, t: dato.tiempo, l: puesto, n: dato.nombre })
       .catch(e => console.warn("[juegos] no se pudo apuntar la revisión", e));
   if (puesto >= 1 && puesto <= 3 && (!previo || puesto < previo)) {

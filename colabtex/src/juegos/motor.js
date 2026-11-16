@@ -6883,6 +6883,29 @@ export function equiposBoxhead(p, js = jugadoresDe(p)) {
   return eq;
 }
 
+/* La ronda de una sala cooperativa para la tabla de récords
+   (`club-boxhead-<mapa>`, la misma del Solo Club). Solo con dos o más
+   jugadores (jugando solo, el récord sale del Club, que se verifica
+   rehaciendo la partida) y sin los mutadores que regalan la partida.
+   `tiempo` son los ms de juego hasta llegar a esa ronda: los lleva la
+   entrada `nivel` (`ms`, el reloj del marco que dirige), y si falta, lo
+   que duró la sala. `con` es un compañero: la regla de `soloRanks`
+   comprueba que estuvo en esa sala. */
+export const BX_MUT_FACILES = ["sangre", "municion"];
+export function rondaBoxhead(p, uid) {
+  if (!p || !p.fin || varianteBoxhead(p) !== "coop" || BX_MUT_FACILES.includes(mutBoxhead(p))) return null;
+  const js = jugadoresDe(p);
+  if (!js.some(j => j.uid === uid)) return null;
+  const con = js.map(j => j.uid).find(u => u !== uid);
+  if (!con) return null;
+  const ronda = redBoxhead(p, js).nivel | 0;
+  if (ronda < 1) return null;
+  const llego = jugadasDe(p).find(j => j.t === "nivel" && j.n === ronda && Number.isInteger(j.ms) && j.ms > 0);
+  const largo = Math.round((+p.fin.at || 0) - (+p.at || 0));
+  const tiempo = Math.min(604800000, Math.max(1, (llego ? llego.ms : largo) || 1));
+  return { ronda: Math.min(999, ronda), tiempo, con };
+}
+
 export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const variante = varianteBoxhead(p), meta = metaBoxhead(p), mapa = mapaBoxhead(p);

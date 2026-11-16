@@ -18,9 +18,12 @@
    El límite honesto: un programa que juegue de verdad saca una prueba válida. */
 export const PRUEBA = 1;
 
-const MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto'];
+/* El índice de la prueba (`m`) es la posición en `ORDEN_MAPAS`: los nueve,
+   en ese orden. Con solo los cinco clásicos aquí, todo récord en Planta,
+   Hangar, Fábrica o Apagón salía «de otro mapa» y se rechazaba. */
+const MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto', 'planta', 'hangar', 'fabrica', 'apagon'];
 const CATEGORIA = /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/;
-const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-25';
+const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-29';
 export const MAX_NIVEL = 999;
 
 let trabajador = null, serie = 0;
