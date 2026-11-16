@@ -690,7 +690,20 @@
   D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
   // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.
   D.campoCap = L => 300 + 150 * (L - 1);
-  D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 };
+  D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 }; // las de antes de pk-58 (solo para convertirlas)
+  // pk-58: red de cintas (PLAN-CINTAS.md). rate: ítems por segundo; vel: casillas por segundo (los ítems van separados
+  // vel / rate casillas). cost: lo que cuesta cada casilla al subir a ese nivel. maxFase: hasta qué nivel se construye
+  // por ahora (la Fase C3 abre IV y V). cruce y paso: lo que suman esas piezas.
+  D.CINTA = {
+    niv: [
+      { name: 'Cinta de cuero', rate: 1, vel: 1.2, era: 3, cost: { planks: 2, ingots: 1 } },
+      { name: 'Cinta de hierro', rate: 2, vel: 1.6, era: 3, cost: { ingots: 2, tools: 1 } },
+      { name: 'Cinta de acero', rate: 3, vel: 2.0, era: 4, cost: { steel: 2 } },
+      { name: 'Cinta reforzada', rate: 5, vel: 2.6, era: 5, cost: { steel: 1, machinery: 1 } },
+      { name: 'Cinta de engranajes', rate: 8, vel: 3.2, era: 6, cost: { machinery: 2, gems: 1 } },
+    ],
+    maxFase: 3, cruce: { planks: 4, ingots: 2 }, paso: { planks: 10, ingots: 4, stone: 20 }, pasoMax: 5, alto: 10,
+  };
   D.BUF = 30;          // capacidad de los depósitos de un taller, por puesto de trabajo
   D.NEAR_STORE = 3;    // un taller a esta distancia de un almacén se abastece solo, sin carretas
 

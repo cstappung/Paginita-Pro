@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -1253,4 +1253,95 @@ test('pk-57: «cualquier Aserradero» — la carreta lleva al que tiene menos y 
     assert.equal(L.rutasDesde(s1).length, 1);
   } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; G.stat = stat0; G.cap = gcap0; }
   assert.match(JS('campana.js'), /for \(let dy = -1; dy <= 1; dy\+\+\) for \(let dx = -1; dx <= 1; dx\+\+\) if \(!casillaLibre/, 'el lugar del capítulo mira sus 9 casillas');
+});
+
+test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, conversión y sin conexión', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  const buf0 = L.bufCap;
+  G.stat = () => {}; G.cap = () => 1000; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 1000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} }), mina = mk(3, 'mining', 21, 50, { inv: { stone: 50, gold: 50 } });
+  G.buildings = [saw, forja, mina]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 4, res: { planks: 0, stone: 0, gold: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, n, extra) => { t[W.idx(x, y)] = Object.assign({ p: 'c', d, n, i: [] }, extra || {}); };
+  try {
+    // aserradero (x 20..22) → cinta de x 23 a 30, fila 41 → herrería (x 31). La pieza de x 26 es de nivel I.
+    for (let x = 23; x <= 30; x++) pz(x, 41, 0, x === 26 ? 1 : 3);
+    Ci.init(G.state);
+    const cs = Ci.carrilesEn(W.idx(23, 41));
+    assert.equal(cs[0].src, saw, 'nace junto al aserradero: boca de salida');
+    assert.equal(Ci.carrilesEn(W.idx(30, 41))[0].dst, forja, 'apunta a la herrería: boca de entrada');
+    assert.ok(Ci.alimenta(forja) && L.supplied(forja));
+    for (let i = 0; i < 1200; i++) Ci.update(0.1); // 2 minutos
+    const n1 = forja.inb.planks || 0;
+    assert.ok(n1 >= 100 && n1 <= 121, 'el nivel I frena todo a 60/min (llegaron ' + n1 + ')');
+    const dg = Ci.diagnostico(W.idx(24, 41))[0];
+    assert.equal(dg.min.k, W.idx(26, 41), 'el diagnóstico encuentra la pieza lenta');
+    // al subirla, rinde como las demás
+    forja.inb.planks = 0;
+    t[W.idx(26, 41)].n = 3; Ci.cambio();
+    for (let i = 0; i < 600; i++) Ci.update(0.1);
+    assert.ok((forja.inb.planks || 0) > 120, 'sin cuello de botella pasan más (' + forja.inb.planks + ')');
+    // atasco: del campamento minero sale piedra y oro, y la herrería no los usa
+    for (let y = 46; y <= 49; y++) pz(22, y, 3, 2);
+    pz(22, 45, 0, 2); pz(23, 45, 0, 2); pz(24, 45, 3, 2); pz(24, 44, 3, 2); pz(24, 43, 3, 2); pz(24, 42, 0, 2);
+    Ci.cambio();
+    for (let i = 0; i < 300; i++) Ci.update(0.1);
+    // (24,42) apunta a (25,42): nada → sin destino; la cadena empieza en el campamento
+    assert.equal(Ci.carrilesEn(W.idx(22, 49))[0].src, mina);
+    assert.equal(Ci.carrilesEn(W.idx(24, 42))[0].motivo, 'La cinta no llega a ningún lado');
+    t[W.idx(24, 42)].d = 1; Ci.cambio(); // ahora baja a la fila 43? no: apunta a (24,43), que va en contra → choca
+    Ci.update(0.1);
+    assert.match(Ci.carrilesEn(W.idx(24, 42))[0].motivo || '', /choca|ningún lado/);
+    // atasco de verdad: del campamento minero (x 21..22, y 50..51) sale piedra y oro hacia otra herrería, que no los usa
+    const forja2 = mk(4, 'forge', 27, 50, { inb: {}, outb: {} });
+    G.buildings.push(forja2); G.bById.set(4, forja2); poner(forja2);
+    for (let x = 23; x <= 26; x++) pz(x, 50, 0, 2);
+    Ci.cambio();
+    for (let i = 0; i < 100; i++) Ci.update(0.1);
+    assert.equal(Ci.carrilesEn(W.idx(23, 50))[0].src, mina, 'boca de salida del campamento: todo lo que junta');
+    assert.match(Ci.carrilesEn(W.idx(26, 50))[0].motivo || '', /^Atascada: llega (piedra|oro) y Herrería no lo usa/);
+    assert.ok(Ci.carrilesEn(W.idx(26, 50))[0].atasco);
+    assert.ok(!forja2.inb.stone && !forja2.inb.gold, 'no entra lo que no usa');
+    // cruce: una cinta vertical cruza la horizontal en x 28 sin mezclarse
+    t[W.idx(28, 41)].p = 'k'; t[W.idx(28, 41)].j = [];
+    pz(28, 39, 1, 3); pz(28, 40, 1, 3); pz(28, 42, 1, 3); pz(28, 43, 1, 3);
+    Ci.cambio();
+    const k = Ci.carrilesEn(W.idx(28, 41));
+    assert.equal(k.length, 2);
+    assert.equal(k[0].sig ? k[0].sig.k : null, W.idx(29, 41), 'la horizontal sigue a la derecha');
+    assert.equal(k[1].d, 1, 'la de través baja');
+    assert.equal(k[1].sig.k, W.idx(28, 42));
+    t[W.idx(28, 40)].i.push(['gold', 0.9]);
+    for (let i = 0; i < 30; i++) Ci.update(0.1);
+    assert.equal(Ci.enCinta('gold') >= 1, true);
+    assert.ok(!(forja.inb.gold), 'el oro de la vertical no entra a la horizontal');
+    // paso elevado: carretas y carromatos no cruzan cintas, pero sí por debajo del paso
+    const tb = L.tabla('carromato');
+    assert.equal(tb.costo[W.idx(25, 41)], Infinity, 'una cinta corta el paso a los carromatos');
+    t[W.idx(40, 60)] = { p: 'e', d: 0, n: 2, i: [], hasta: W.idx(44, 60), lp: 4 };
+    t[W.idx(44, 60)] = { p: 'x', d: 0, n: 2, i: [], desde: W.idx(40, 60) };
+    Ci.init(G.state);
+    const pe = Ci.carrilesEn(W.idx(40, 60))[0];
+    assert.equal(pe.sig.k, W.idx(44, 60), 'la entrada salta hasta la salida');
+    assert.equal(W.belt[W.idx(42, 60)], -1, 'debajo queda libre');
+    // sin conexión: lo mismo que deja pasar el nivel más bajo
+    for (const ks in t) { t[ks].i = []; if (t[ks].j) t[ks].j = []; }
+    forja.inb = {}; saw.outb.planks = 1000;
+    t[W.idx(28, 41)].n = 1; Ci.cambio();
+    Ci.offline(60);
+    assert.equal(forja.inb.planks, 60, 'sin conexión: 60 por minuto con una pieza de nivel I');
+    // conversión de las cintas de antes: nivel III, con lo que llevaban
+    G.state.logi.red = null; W.belt.fill(-1);
+    G.state.logi.belts = [{ id: 1, a: 1, b: 2, res: null, path: [[23, 41], [24, 41], [25, 41]], items: [{ p: 1.5, r: 'planks' }] }];
+    Ci.init(G.state);
+    const r2 = G.state.logi.red.t;
+    assert.equal(Object.keys(r2).length, 3);
+    assert.equal(r2[W.idx(24, 41)].n, 3);
+    assert.equal(r2[W.idx(24, 41)].i.length, 1, 'lo que iba encima sigue');
+    assert.equal(G.state.logi.belts.length, 0);
+    assert.ok(W.belt[W.idx(23, 41)] >= 0);
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });

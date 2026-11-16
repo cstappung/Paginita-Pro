@@ -14,7 +14,7 @@ owner outside this repo and dropped in.
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
 - `PLAN-CINTAS.md` (Nov 16 2026): the belt redesign («Red de cintas»), phases C1–C3 («implementa la Fase C<N> del
   plan de cintas»): belts as pieces on tiles with level I–V, building ports, mixed items, splitter/merger/sorter,
-  bottlenecks. §9 holds the owner's decisions (unanswered on Nov 16: use the recommended ones until then).
+  bottlenecks. §9 holds the owner's answered decisions (Nov 16). C1 done in `pk-58`.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
@@ -433,3 +433,31 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   the route are fetching); as origin, the one with most output (`tallerOrigen`). Validated with a sample of the type
   (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
   shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.
+
+## Belt network (`PLAN-CINTAS.md`, C1 in `pk-58`, `js/cintas.js`, `PK.Cintas`)
+
+- **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
+  `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
+  (≥ 0 = occupied; every old `W.belt[k] >= 0` check still means "taken"). Items live on the piece (`i`, and `j` for a
+  crossing's second lane) as `[res, q]`, so they are saved with `S`.
+- **`rearmar()`** (cached by `Ci.version` + own buildings' done-state) builds lanes: each lane's `sig` (next lane),
+  `dst` (building it points at = input port) and `src` (building behind/beside a lane nobody feeds = output port).
+  One input per lane in C1 (the one behind wins; others get «hace falta un unidor»). A crossing's cross lane takes its
+  direction from whoever enters from the side.
+- **Throughput:** each lane accepts one item every `1 / (rate·K)` s (`c.lib`). A gap rule alone did not work: a 1-tile
+  lane empties before a 1.2-tile gap is ever measured, and a level I piece let 165/2 min through. Queued items sit
+  `JUNTOS` (0.34) apart. `K` is the tree bonus `belt`.
+- **Ports:** a workshop gives its output; a camp gives everything it holds, round-robin (mixed); a store gives what the
+  player ticks in the port (`pz.f`), never below the workshop reserve. Inputs: workshop inputs up to `bufCap`, stores
+  through `Lb.poner`. Something the destination does not use **jams** the lane (`c.atasco`, `c.motivo`, red blink).
+- **Carts and carromatos do not cross belts** (`pasa()` in logistics.js; `W.beltVer` is in the table version).
+  Villagers walk over. The elevated pass leaves its middle tiles unmarked, so carts go under.
+- **Offline:** per output port, the chain's slowest level × dt, split round-robin; a port that would emit something the
+  sink rejects moves nothing (it would jam live). Tested against a level I piece (exactly 60/min).
+- **Building:** two taps (`L.tool = 'cinta'`), L-shaped plan (`Ci.plan`), starts at a building's free border tile or
+  continues a dead end, ends pointing into a building or an existing belt; crossing a perpendicular straight belt
+  makes a crossing. `L.tool = 'paso'`: entry and exit 2..`D.CINTA.pasoMax` apart. On touch the panel folds while
+  tracing (`plegarAlColocar`). Belts may not go on roads or the Calzada (use a pass). «Quitar varios» removes pieces.
+- **Old saves:** `st.logi.belts` become level III pieces with their items (`Ci.init`), `st.logi.avisoCintas` toasts once.
+- The server never sees belts; `Lb.fuera` counts what rides on them (`Ci.enCinta`). The autopilot does not build them.
+- C1 builds levels I–III (`D.CINTA.maxFase`); merger/splitter/sorter are C2.

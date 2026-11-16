@@ -1502,7 +1502,7 @@
     const why = G.placeWhy(b.type, x, y, b.id);
     if (why) { toast(G.placeText(why), 'warn'); return false; }
     if (!G.pay(G.moveCost(b))) { toast('Faltan recursos para la mudanza.', 'warn'); return false; }
-    if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
+    if (PK.Cintas) PK.Cintas.cambio(); // pk-58: sus bocas se rearman donde quede
     if (PK.Libro) PK.Libro.vaciarAlPueblo(b); // pk-43: lo del campamento va al pueblo, como al demoler
     if (b.def.porton) G.marcarPorton(b, false);
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }

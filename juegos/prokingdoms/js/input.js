@@ -263,7 +263,7 @@
   // a abrirse al terminar.
   let plegado = false;
   function plegarAlColocar() {
-    const en = !!(G().placing && PK.UI.isTouch());
+    const en = !!((G().placing || PK.Logi.tool === 'cinta' || PK.Logi.tool === 'paso') && PK.UI.isTouch()); // pk-58: también al trazar cintas
     if (en && !plegado && PK.UI.plegarPanel && PK.UI.panelPlegado && !PK.UI.panelPlegado()) { PK.UI.plegarPanel(); plegado = true; }
     else if (!en && plegado) { plegado = false; if (PK.UI.desplegarPanel) PK.UI.desplegarPanel(); }
   }
@@ -330,9 +330,11 @@
     if ((L.tool === 'road' || L.tool === 'calzada') && I.roadStart) {
       const [tx, ty] = r.screenToTile(sx, sy);
       r.roadGhost = (L.tool === 'calzada' ? PK.Calzada.plan : L.roadPlan)(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
-    } else if (L.tool === 'belt' && L.beltFrom) {
-      const it = r.pick(sx, sy), a = G().bById.get(L.beltFrom);
-      if (a && it && it.k === 'building' && it.o.owner === 'p' && it.o !== a) r.beltGhost = L.beltPlan(a, it.o);
+    } else if ((L.tool === 'cinta' || L.tool === 'paso') && I.roadStart) { // pk-58: el plan de la cinta o del paso
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
+      if (L.tool === 'cinta') { const p = Ci.plan(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p ? p.tiles : null; I.planCinta = p; }
+      else { const p = Ci.planPaso(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p.tiles.map(([a, b]) => ({ x: a, y: b, d: p.d, mala: !p.ok })); }
+      PK.UI.refreshPanel();
     }
   }
   // Herramienta «Poner bandera» (A4): el próximo toque en el mapa o el minimapa pone (o quita) una bandera.
@@ -351,7 +353,7 @@
     const L = PK.Logi;
     I.flagTool = false;
     if (PK.Asedios) PK.Asedios.cancelar();
-    L.tool = null; L.beltFrom = null; I.roadStart = null;
+    L.tool = null; L.beltFrom = null; I.roadStart = null; I.planCinta = null;
     PK.Def.cancel();
     R().roadGhost = null; R().beltGhost = null;
     PK.UI.refreshPanel(true);
@@ -382,12 +384,36 @@
       Cz.construir(tiles).then(n => { if (n) PK.UI.toast('Calzada Real: ' + n + ' casillas (hoy ' + Cz.hoy() + ' de ' + Cz.tope() + ').', 'good'); PK.UI.refreshPanel(true); });
       return;
     }
-    if (L.tool === 'belt') {
-      const it = r.pick(sx, sy);
-      if (!it || it.k !== 'building' || it.o.owner !== 'p' || !it.o.done) { PK.UI.toast('Toca un edificio tuyo.', 'warn'); return; }
-      if (!L.beltFrom) { L.beltFrom = it.o.id; PK.UI.toast('Origen: ' + it.o.def.name + '. Ahora toca el destino.', 'info'); return; }
-      const a = G().bById.get(L.beltFrom);
-      if (a && L.buildBelt(a, it.o)) I.cancelTool();
+    if (L.tool === 'cinta') { // pk-58: dos toques (inicio y fin); se encadenan tramos
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
+      if (!W.inb(x, y)) return;
+      if (!I.roadStart) {
+        const b = W.bAt[W.idx(x, y)] >= 0 ? G().bById.get(W.bAt[W.idx(x, y)]) : null;
+        if (!(b && b.owner === 'p') && !Ci.libre(x, y) && !Ci.piezaEn(x, y)) { PK.UI.toast('Ahí no empieza una cinta: ' + Ci.porQue(x, y) + '.', 'warn'); return; }
+        I.roadStart = [x, y]; PK.UI.toast(b ? 'Sale de ' + b.def.name + '. Toca dónde termina (un edificio, para entregarle).' : 'Toca dónde termina la cinta.', 'info'); PK.UI.refreshPanel(true); return;
+      }
+      const p = Ci.plan(I.roadStart[0], I.roadStart[1], x, y);
+      if (!p) { PK.UI.toast('No hay por dónde: el edificio no tiene un lado libre.', 'warn'); return; }
+      const n = Ci.trazar(p, L.cintaNivel || 1);
+      if (n) {
+        PK.UI.toast('Cinta de ' + n + ' casillas' + (p.tiles.some(t => t.cruce) ? ' (con cruce)' : '') + (p.bF ? ' hasta ' + p.bF.def.name : '') + '.', 'good');
+        const u = p.tiles[p.tiles.length - 1];
+        I.roadStart = p.bF ? null : [u.x, u.y]; // si llegó a un edificio, terminó; si no, se sigue desde ahí
+      }
+      r.beltGhost = null; I.planCinta = null;
+      PK.UI.refreshPanel(true);
+      return;
+    }
+    if (L.tool === 'paso') { // pk-58: paso elevado, entrada y salida
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
+      if (!W.inb(x, y)) return;
+      if (!I.roadStart) {
+        if (!Ci.libre(x, y)) { PK.UI.toast('Ahí no va la entrada: ' + Ci.porQue(x, y) + '.', 'warn'); return; }
+        I.roadStart = [x, y]; PK.UI.toast('Toca la salida, en la misma fila o columna (a 2..' + D.CINTA.pasoMax + ' casillas).', 'info'); PK.UI.refreshPanel(true); return;
+      }
+      if (Ci.ponerPaso(I.roadStart[0], I.roadStart[1], x, y, L.cintaNivel || 1)) { PK.UI.toast('Paso elevado listo: por debajo pasan carretas y carromatos. Únelo con cintas a la entrada y desde la salida.', 'good'); I.roadStart = null; }
+      r.beltGhost = null;
+      PK.UI.refreshPanel(true);
       return;
     }
   }
@@ -482,7 +508,8 @@
     else if (it.k === 'node') g.sel = { type: 'node', id: it.o.id };
     else if (it.k === 'poi') g.sel = { type: 'poi', id: it.o.id };
     else if (it.k === 'cap') { PK.Campana.openLugar(it.o.n); return; }
-    else if (it.k === 'belt') g.sel = { type: 'belt', id: W.belt[W.idx(it.x, it.y)] };
+    else if (it.k === 'belt') g.sel = { type: 'belt', id: W.idx(it.x, it.y) }; // pk-58: la casilla de la pieza
+    else if (it.k === 'puente') g.sel = { type: 'belt', id: it.o.k };
     else if (it.k === 'wall') g.sel = { type: 'wall', id: it.o.k };
     PK.UI.refreshPanel(true);
   }

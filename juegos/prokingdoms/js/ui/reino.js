@@ -135,7 +135,7 @@
     const L = PK.Logi, g = G(), cs = L.cartsDe(r), mala = L.rutaMala(r), rep = L.extremosRep(r), a = rep.from, b = rep.to;
     const T = mala ? null : L.tiempos(r, true);
     const clase = L.claseRuta(r), carro = clase !== 'cart', nom = clase === 'barcaza' ? 'Barcazas' : carro ? 'Carromatos' : 'Carretas';
-    const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica).' : 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
+    const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica). Las cintas también les cortan el paso: déjales un hueco o usa un paso elevado.' : 'No hay camino: las carretas no salen de tu territorio ni cruzan cintas. Une los dos edificios por tierra tuya, dejando un hueco en las cintas o con un paso elevado.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
     const malo = mala || (T && !T.ok) || !cs.length;
     return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
       el('div', { class: 'ruta-nom' }, iconoExtremo(r.de, r.res, r.tipo), el('b', null, L.nombreExtremo(r.de, r.res, r.tipo)), ' → ',
@@ -281,12 +281,13 @@
         el('div', null, el('b', null, 'Carretas: '), L.carts().length + '/' + L.cartMax() + (g.countB('cartwright') ? '' : ' (construye una Carretería, Era II)')),
         el('div', { class: sinRuta ? 'warn-t' : '' }, el('b', null, 'Sin ruta: '), String(sinRuta)),
         el('div', null, el('b', null, 'Talleres lejos de un almacén: '), far.length + ' de ' + shops.length),
-        el('div', null, el('b', null, 'Cintas: '), st.logi.belts.length)));
+        el('div', null, el('b', null, 'Cintas: '), Object.keys((st.logi.red && st.logi.red.t) || {}).length + ' casillas')));
       body.append(el('div', { class: 'row' },
         UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
         g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Logi.tool = 'calzada'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
         UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos, murallas y Calzada Real (la tuya, o la de otro en tu tierra); vuelve la mitad del material' }),
-        UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
+        UI.btn('Trazar cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'cinta'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? 'Piezas de cinta con nivel, bocas en los edificios, cruces y pasos elevados' : L.beltLockText() }),
+        UI.btn('Paso elevado', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'paso'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: 'La cinta pasa por arriba: por debajo cruzan carretas, carromatos, caminos y otras cintas' })));
 
       // ----- Rutas -----
       UI.rutasSugeridas(body);
@@ -306,7 +307,9 @@
         el('li', null, 'Lo que juntan los campamentos queda en el campamento (hasta su tope) y no sirve para construir: un carromato del Establo lo lleva a una bodega del pueblo o a un taller. Lo que está en cualquier bodega del pueblo sirve en todo el pueblo.'),
         el('li', null, 'Los carromatos salen de tu territorio y van rápido por los caminos, pero no caben por una puerta chica: tu muralla necesita un Gran Portón. Cruzar tierra de otro reino les cuesta cuatro veces más.'),
         el('li', null, 'Las carretas no salen de tu territorio ni van a los campamentos.'),
-        el('li', null, 'Las cintas (' + L.beltLockText().replace('Las cintas requieren ', 'requieren ') + ') unen dos edificios y mueven ' + D.BELT.rate + ' unidades por segundo sin que nadie cargue nada.')));
+        el('li', null, 'Las cintas (desde la Era ' + U.roman(D.CINTA.niv[0].era) + ') se arman pieza por pieza. Una cinta que nace junto a un edificio saca de él (un taller, lo que hace; un campamento, todo lo que junta, mezclado; una bodega, lo que elijas) y una que apunta a un edificio le entrega.'),
+        el('li', null, 'Cada pieza tiene su nivel (I ' + D.CINTA.niv[0].rate * 60 + '/min, II ' + D.CINTA.niv[1].rate * 60 + ', III ' + D.CINTA.niv[2].rate * 60 + '): una de nivel más bajo frena toda la cinta. Mejorar es al instante, con recursos.'),
+        el('li', null, 'Si a un edificio le llega algo que no usa, la cinta se atasca y te avisa. Dos cintas se cruzan sin mezclarse en un cruce; las carretas no cruzan cintas: pasan bajo un paso elevado.')));
       if (shops.length) {
         body.append(el('h3', null, 'Talleres'));
         for (const b of shops) {
@@ -317,13 +320,12 @@
             UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); }, { small: true })));
         }
       }
-      if (st.logi.belts.length) {
-        body.append(el('h3', null, 'Cintas'));
-        for (const bl of st.logi.belts) {
-          const a = g.bById.get(bl.a), b = g.bById.get(bl.b);
-          body.append(el('div', { class: 'work-row' }, el('span', null, (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?') + ' · ' + bl.path.length + ' casillas'),
-            UI.btn('Desarmar', () => { L.removeBelt(bl); UI.rerender(); }, { small: true, cls: 'danger' })));
-        }
+      // pk-58: cintas atascadas o sin destino
+      const Ci = PK.Cintas, malas = Ci.carriles().filter(c => c.atasco || (c.motivo && !c.sig && !c.dst && (c.pz.i || []).length));
+      if (malas.length) {
+        body.append(el('h3', null, 'Cintas con problemas'));
+        for (const c of malas.slice(0, 8)) body.append(el('div', { class: 'work-row' }, el('span', { class: 'small warn-t' }, c.motivo),
+          UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'belt', id: c.k }; PK.Render.centerOn((c.k % W.W) + 0.5, ((c.k / W.W) | 0) + 0.5); UI.refreshPanel(true); }, { small: true })));
       }
     }, { wide: true });
   };

@@ -2517,13 +2517,23 @@
     return (ROADC[mask] = { c: pb.canvas(), ox: 16, oy: 0 });
   };
 
-  // Cinta transportadora: rieles de acero y tablillas que avanzan (4 cuadros). inD/outD: 'N','E','S','W'.
+  // Cinta transportadora: rieles y tablillas que avanzan (4 cuadros). inD/outD: 'N','E','S','W'. pk-58: n es el
+  // nivel (I cuero, II hierro, III acero, IV reforzada, V engranajes): cambia el color de rieles y tablillas.
   const BELTC = {};
   const DUV = { N: [0.5, 0], S: [0.5, 1], E: [1, 0.5], W: [0, 0.5] };
-  S.belt = function (inD, outD, phase) {
-    const key = inD + outD + phase;
+  const BELT_COL = {
+    1: { riel: [168, 122, 74], borde: [84, 56, 34], a: [128, 90, 56], b: [98, 68, 42] },
+    2: { riel: [160, 162, 168], borde: [70, 72, 78], a: [92, 90, 88], b: [62, 60, 58] },
+    3: { riel: [176, 186, 198], borde: [60, 64, 72], a: [74, 70, 66], b: [46, 43, 41] },
+    4: { riel: [226, 186, 92], borde: [112, 80, 30], a: [84, 76, 64], b: [54, 48, 42] },
+    5: { riel: [178, 136, 218], borde: [72, 50, 104], a: [74, 66, 84], b: [46, 40, 56] },
+  };
+  S.BELT_COL = BELT_COL;
+  S.belt = function (inD, outD, phase, n) {
+    n = n || 3;
+    const key = inD + outD + phase + n;
     if (BELTC[key]) return BELTC[key];
-    const pb = new PB(32, 16), half = 0.26;
+    const pb = new PB(32, 16), half = 0.26, C = BELT_COL[n];
     // distancia a lo largo del recorrido: de la entrada al centro (0..0.5) y del centro a la salida (0.5..1)
     const along = (u, v) => {
       const a = DUV[inD], b = DUV[outD];
@@ -2542,15 +2552,96 @@
       const axisIn = DUV[inD][0] === 0.5 ? Math.abs(u - 0.5) : Math.abs(v - 0.5), axisOut = DUV[outD][0] === 0.5 ? Math.abs(u - 0.5) : Math.abs(v - 0.5);
       const side = Math.min(inBand(u, v, inD) ? axisIn : 9, inBand(u, v, outD) ? axisOut : 9);
       let col;
-      if (side > half - 0.06) col = [176, 186, 198];              // riel
+      if (side > half - 0.06) col = C.riel;              // riel
       else {
         const t = along(u, v) * 5 - phase / 4;
-        col = (t - Math.floor(t)) < 0.35 ? [74, 70, 66] : [46, 43, 41]; // tablillas
+        col = (t - Math.floor(t)) < 0.35 ? C.a : C.b; // tablillas
       }
-      if (side > half - 0.025) col = [60, 64, 72];
+      if (side > half - 0.025) col = C.borde;
       pb.set(px, py, col);
     }
     return (BELTC[key] = { c: pb.canvas(), ox: 16, oy: 0 });
+  };
+  // Cruce (pk-58, pedido del dueño): la cinta del eje pasa por arriba; la de través entra por debajo, en un túnel
+  // (bocas oscuras a los dos lados). eje 0: la de arriba va en x (E–O); 1: en y (N–S).
+  S.beltCruce = function (eje, phase, n) {
+    n = n || 3;
+    const key = 'k' + eje + phase + n;
+    if (BELTC[key]) return BELTC[key];
+    const pb = new PB(32, 16), half = 0.26, C = BELT_COL[n];
+    for (let py = 0; py < 16; py++) for (let px = 0; px < 32; px++) {
+      const [u, v] = tileUV(px, py);
+      if (u < 0 || v < 0 || u > 1 || v > 1) continue;
+      const a = eje === 0 ? Math.abs(v - 0.5) : Math.abs(u - 0.5), b = eje === 0 ? Math.abs(u - 0.5) : Math.abs(v - 0.5);
+      const alA = eje === 0 ? u : v, alB = eje === 0 ? v : u;
+      if (a <= half + 0.05) { // la de arriba, con un marco más ancho (el puente del túnel)
+        let col;
+        if (a > half) col = [96, 92, 88];
+        else if (a > half - 0.06) col = C.riel;
+        else { const t = alA * 5 - phase / 4; col = (t - Math.floor(t)) < 0.35 ? C.a : C.b; }
+        if (a > half - 0.025 && a <= half) col = C.borde;
+        pb.set(px, py, col);
+      } else if (b <= half) { // la de abajo: se oscurece al entrar al túnel
+        const prof = Math.max(0, 1 - (a - half - 0.05) / 0.12);
+        let col;
+        if (b > half - 0.06) col = C.riel;
+        else { const t = alB * 5 - phase / 4; col = (t - Math.floor(t)) < 0.35 ? C.a : C.b; }
+        if (b > half - 0.025) col = C.borde;
+        pb.set(px, py, sc(col, 1 - prof * 0.75));
+      }
+    }
+    return (BELTC[key] = { c: pb.canvas(), ox: 16, oy: 0 });
+  };
+  // Rampa y tablero del paso elevado (pk-58). alto: cuánto sube (D.CINTA.alto). Dibujados con trazos: un plano
+  // inclinado o a nivel, con sus postes. Las coordenadas de casilla (u, v, h) van a la pantalla isométrica.
+  const isoP = (u, v, h, alto) => [16 + (u - v) * 16, (u + v) * 8 + alto - h];
+  function tablero(ctx, d, h0, h1, alto, phase, C) {
+    // banda a lo largo de la dirección d, de la altura h0 (entrada) a h1 (salida)
+    const ax = d === 'E' || d === 'W', inv = d === 'W' || d === 'N';
+    const P = (t, s, h) => { const al = inv ? 1 - t : t; return ax ? isoP(al, s, h, alto) : isoP(s, al, h, alto); };
+    const w0 = 0.2, w1 = 0.8;
+    const poly = (pts, col) => { ctx.fillStyle = col; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill(); };
+    const rgb = c => 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+    // costado (grosor) y superficie
+    poly([P(0, w1, h0), P(1, w1, h1), P(1, w1, h1 - 3), P(0, w1, h0 - 3)], rgb(sc(C.borde, 0.8)));
+    poly([P(0, w0, h0), P(1, w0, h1), P(1, w1, h1), P(0, w1, h0)], rgb(C.b));
+    for (let i = 0; i < 6; i++) { // tablillas que avanzan
+      const t = ((i + phase / 4) / 6) % 1, t2 = Math.min(1, t + 0.07), h = h0 + (h1 - h0) * t, hb = h0 + (h1 - h0) * t2;
+      poly([P(t, w0 + 0.04, h), P(t2, w0 + 0.04, hb), P(t2, w1 - 0.04, hb), P(t, w1 - 0.04, h)], rgb(C.a));
+    }
+    ctx.strokeStyle = rgb(C.riel); ctx.lineWidth = 1;
+    for (const w of [w0, w1]) { const a = P(0, w, h0), b = P(1, w, h1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    return P;
+  }
+  function postes(ctx, P, ts, alto, h) {
+    ctx.fillStyle = 'rgb(70,58,44)';
+    for (const t of ts) for (const w of [0.22, 0.78]) { const top = P(t, w, h(t)), bot = P(t, w, 0); ctx.fillRect(Math.round(top[0]) - 1, Math.round(top[1]), 2, Math.max(1, Math.round(bot[1] - top[1]))); }
+  }
+  function conMascara(c) {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, m = new Uint8Array(c.width * c.height);
+    for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 20 ? 1 : 0;
+    return m;
+  }
+  S.beltRampa = function (dir, subida, phase, n) {
+    n = n || 3;
+    const alto = (PK.D.CINTA && PK.D.CINTA.alto) || 10, key = 'r' + dir + (subida ? 1 : 0) + phase + n;
+    if (BELTC[key]) return BELTC[key];
+    const c = document.createElement('canvas'); c.width = 32; c.height = 16 + alto;
+    const ctx = c.getContext('2d'), C = BELT_COL[n];
+    const h0 = subida ? 0 : alto, h1 = subida ? alto : 0;
+    const P = tablero(ctx, dir, h0, h1, alto, phase, C);
+    postes(ctx, P, [subida ? 0.95 : 0.05], alto, t => h0 + (h1 - h0) * t);
+    return (BELTC[key] = { c, ox: 16, oy: alto, mask: conMascara(c) });
+  };
+  S.beltPuente = function (eje, n) {
+    n = n || 3;
+    const alto = (PK.D.CINTA && PK.D.CINTA.alto) || 10, key = 'p' + eje + n;
+    if (BELTC[key]) return BELTC[key];
+    const c = document.createElement('canvas'); c.width = 32; c.height = 16 + alto;
+    const ctx = c.getContext('2d'), C = BELT_COL[n];
+    const P = tablero(ctx, eje === 0 ? 'E' : 'S', alto, alto, alto, 0, C);
+    postes(ctx, P, [0.5], alto, () => alto);
+    return (BELTC[key] = { c, ox: 16, oy: alto, mask: conMascara(c) });
   };
 
   S.TERRAIN_MM = [[86, 124, 48], [52, 78, 32], [124, 100, 64], [194, 174, 120], [36, 76, 116]];

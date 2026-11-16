@@ -10,8 +10,10 @@
 - **Cómo pedirlo:** «implementa la Fase C<N> del plan de cintas de Pro Kingdoms». Cada fase es una entrega (un PR,
   una versión `pk-N`). Siguen valiendo todas las reglas de `CLAUDE.md`: caché, celular y apaisado, i18n, que sin
   conexión rinda igual que en vivo, y que la carga no se pierde nunca.
-- **Decisiones del dueño:** sin responder todavía (sección 9). Hasta que estén respondidas, valen las
-  recomendaciones marcadas como **(recomendado)**.
+- **Decisiones del dueño:** respondidas el 16 de noviembre de 2026 (sección 9). Mandan sobre cualquier otra parte
+  del plan. Con ellas, el **paso elevado pasa a la Fase C1** (las carretas no cruzan cintas) y se suma el **cruce**
+  (pedido del dueño: dos cintas que se cruzan sin tocarse, «como un paso a nivel»).
+- **Avance:** C1 hecha en `pk-58`.
 
 ---
 
@@ -25,7 +27,8 @@
 | K4 | Unir y separar cintas | Sí | **Unidor** (hasta 3 entran, 1 sale) y **Divisor** (1 entra, hasta 3 salen, por turnos). | C2 |
 | K5 | Que transporten más, subiendo de nivel cada tramo con recursos y sin tiempo | Sí | Niveles **I a V** por pieza. Una herramienta «Mejorar cinta» se arrastra sobre la red y cobra en el momento. | C1 (I–III), C3 (IV–V) |
 | K6 | Que un tramo de menos nivel haga cuello de botella | Sí, sale solo | Cada pieza mueve ítems a su velocidad: una más lenta frena a todo lo de atrás. La interfaz marca en rojo la pieza que manda. | C1 |
-| — | Cruzar otra cinta | Sí | **Paso elevado**: salta hasta 4 casillas por encima de cintas y caminos. | C3 |
+| — | Cruzar otra cinta | Sí | **Cruce**: una pieza donde dos cintas se cruzan sin mezclarse (la de través pasa por debajo). Se pone sola al trazar una cinta en recto sobre otra de través. | C1 |
+| — | Que las carretas pasen | Sí | **Paso elevado**: la cinta salta 1 a 4 casillas; por debajo pasan carretas, carromatos, caminos y otras cintas. | C1 |
 
 Nada del pedido queda afuera. Lo que hay que decidir son detalles de cómo se siente (sección 9), sobre todo qué pasa
 cuando a un edificio le llega por cinta algo que no recibe.
@@ -216,10 +219,10 @@ cintas viejas siguen andando igual que antes.
 la Fundición y lo que sobre al Almacén; dos aserraderos que alimentan una sola cinta se unen sin perder caudal hasta
 el tope del nivel.
 
-## 5. Fase C3: niveles altos y paso elevado (`pk-60`)
+## 5. Fase C3: niveles altos (`pk-60`)
 
 1. Niveles IV y V (Eras V y VI), con sus costos.
-2. Paso elevado (2.6), entrada y salida a 2 a 4 casillas.
+2. (El paso elevado y el cruce ya van en C1, por la decisión D3.)
 3. «Copiar tramo»: tocar un tramo armado y estamparlo en otro lado (paga lo mismo). Es opcional, sección 7.
 4. Repaso del ritmo con el piloto (`?timelapse`) para que no adelante las eras (sección 8).
 
@@ -269,7 +272,20 @@ por segundo en el celular (medido con `tools/rendimiento.js`).
 
 ---
 
-## 9. Decisiones del dueño (sin responder)
+## 9. Decisiones del dueño (respondidas el 16 de noviembre de 2026)
+
+| # | Pregunta | Respuesta |
+|---|---|---|
+| D1 | Si a un edificio le llega por cinta algo que no recibe | **Se atasca**, con aviso |
+| D2 | Desde qué era hay cintas | **Era III** |
+| D3 | ¿Las cintas cortan el paso? | **Sí, a las carretas y carromatos; los aldeanos caminan por encima**. Cruzan por un paso elevado o por un hueco |
+| D4 | Las cintas viejas | **Nivel III** |
+| D5 | Qué saca una boca de bodega | **Lo que elijas** |
+| D6 | ¿Pueden salir de tu territorio? | **No** |
+| D7 | Los números de la tabla 2.4 | **Así**, ajustados con el piloto |
+| D8 | (Pedido aparte) cruzar dos cintas | **Cruce** en C1 |
+
+Lo que se había propuesto antes de las respuestas:
 
 | # | Pregunta | Opciones | Recomendado |
 |---|---|---|---|

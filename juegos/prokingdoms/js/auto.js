@@ -250,7 +250,7 @@
       for (const b of g.buildings) {
         if (b.owner !== 'p' || !b.def.recipe || !b.workers.length) continue;
         // si una carreta o una cinta ya trae lo que falta, no cuenta como parado
-        const coming = b.status === 'Faltan insumos' && (PK.Logi.carts().some(c => c.job && c.job.to === b.id && c.job.n > 0) || st.logi.belts.some(x => x.b === b.id && x.items.length));
+        const coming = b.status === 'Faltan insumos' && (PK.Logi.carts().some(c => c.job && c.job.to === b.id && c.job.n > 0) || (PK.Cintas && PK.Cintas.alimenta(b)));
         b.stallT = b.status === 'Produciendo' || coming ? 0 : (b.stallT || 0) + el;
         if (b.stallT < 20) continue;
         b.stallT = 0;
