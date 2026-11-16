@@ -181,6 +181,9 @@
       porMi: () => { const u = aldeanoGuia(); G().sel = { type: 'units', ids: [u.id] }; UI().refreshPanel(true); } },
     { txt: () => hint('Ahora haga clic derecho en este árbol', 'Ahora toque este árbol') + ' para mandarlo a cortar leña.', centrar: () => arbolGuia(),
       antes: () => { const u = aldeanoGuia(); if (u && !elegidos().includes(u.id)) { G().sel = { type: 'units', ids: [u.id] }; UI().refreshPanel(true); } },
+      // un clic izquierdo en el árbol (lo que venía haciendo en los pasos anteriores) soltaba al aldeano y el clic
+      // derecho ya no hacía nada: el paso quedaba trabado sin «Hazlo por mí». Se lo vuelve a elegir.
+      mantener: () => { const u = aldeanoGuia(); if (u && !elegidos().includes(u.id) && !G().placing) { G().sel = { type: 'units', ids: [u.id] }; UI().refreshPanel(true); } },
       blanco: () => { const n = arbolGuia(); return n && rectMapa(n.x + 0.5, n.y + 0.5, 30, 22, 26); },
       listo: () => { const u = aldeanoGuia(); return !!(u && u.task && u.task.t === 'gather' && u.task.m && u.task.res === 'wood'); },
       porMi: () => { const u = aldeanoGuia(), n = arbolGuia(); G().command([u], { kind: 'node', obj: n }); } },
@@ -314,9 +317,11 @@
     if (k && !propia) { raiz.style.display = 'none'; return; }
     raiz.style.display = '';
     if (!P.habla && P.listo && P.listo(base)) { siguiente(); return; }
+    if (P.mantener) try { P.mantener(); } catch (e) { /* sin blanco aún */ }
     let r = null;
     try { r = P.blanco ? P.blanco() : null; } catch (e) { r = null; }
-    const falta = !P.habla && !P.libre && !r && performance.now() - t0 > 8000;
+    // «Hazlo por mí»: a los 8 s si el blanco no aparece y, de todos modos, a los 30 s (nadie queda trabado en un paso)
+    const lleva = performance.now() - t0, falta = !P.habla && !P.libre && ((!r && lleva > 8000) || lleva > 30000);
     // libre: nada tapa la pantalla (mirar la batalla); solo el diálogo, chico y arriba
     raiz.classList.toggle('gu-libre', !!P.libre);
     dlg.classList.toggle('gu-fuera', !!P.libre && performance.now() - t0 > 7000); // después se aparta: hay que ver la pelea

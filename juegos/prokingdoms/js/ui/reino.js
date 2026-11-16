@@ -420,7 +420,7 @@
     UI.modal('works', 'Obras y mejoras', body => {
       const g = G(), st = S();
       body.append(el('div', { class: 'war-top' },
-        el('div', null, el('b', null, 'Maestros de Obras: '), g.buildersBusy() + ' ocupados de ' + g.builders(), g.builders() < 5 ? el('span', { class: 'muted small' }, ' · construye una Casa del Maestro de Obras para tener otro') : null),
+        el('div', null, el('b', null, 'Maestros de Obras: '), g.buildersBusy() + ' ocupados de ' + g.builders(), g.builders() < 5 ? el('span', { class: 'muted small' }, ' · para tener otro, construye: ' + D.BUILD.builder.name) : null),
         el('div', { class: 'small muted' }, 'Cada edificio sube de nivel por separado. Nivel máximo en la Era ' + U.roman(st.era) + ': ' + D.maxLevel('house', st.era) + '. Las obras siguen aunque cierres el juego.')));
       // dominio de la era: meta alcanzable de cada era, con premio
       const ms = g.mastery(), won = st.mastered && st.mastered[st.era];

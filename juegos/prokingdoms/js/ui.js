@@ -108,7 +108,7 @@
       if (st.eraProg) {
         body.append(el('h3', null, 'Avanzando a ' + D.eraName(st.eraProg.to)),
           el('div', { class: 'bar' }, el('div', { class: 'fill gold', style: { width: (st.eraProg.t / st.eraProg.total) * 100 + '%' } }), el('span', null, U.fmtTime(st.eraProg.total - st.eraProg.t))),
-          el('p', { class: 'small muted' }, 'Si te sobran recursos, paga «Horas extra» en el Centro Urbano para adelantarlo.'));
+          el('p', { class: 'small muted' }, 'Si te sobran recursos, paga «Horas extra» en ' + D.elB('tc') + ' para adelantarlo.'));
       } else {
         const n = st.era + 1, ch = g.eraChecks(n), cost = D.eraCost(n), noCabe = Object.keys(cost).filter(r => (st.res[r] || 0) < cost[r] && isFinite(g.cap(r)) && g.cap(r) < cost[r]);
         body.append(el('h3', null, 'Era ' + U.roman(n) + ' · ' + D.eraName(n)),
@@ -120,11 +120,11 @@
               el('div', { class: 'bar' }, el('div', { class: 'fill ' + (ok ? 'green' : 'gold'), style: { width: Math.min(100, (have / cost[r]) * 100) + '%' } })));
           })),
           // lo que no cabe: la bodega guarda menos de lo que pide la era, y la barra se quedaba quieta sin decir por qué
-          noCabe.length ? el('p', { class: 'small ec-nocabe' }, '⚠ No te cabe: ' + noCabe.map(r => D.RES[r].name.toLowerCase()).join(', ') + ' (tus bodegas guardan ' + U.fmt(g.cap(noCabe[0])) + '). Mejora ' + (noCabe.includes('food') ? 'el Granero, ' : '') + (noCabe.some(r => r !== 'food') ? 'el Almacén, ' : '') + 'o el Centro Urbano.') : '',
-          el('p', { class: 'small muted' }, 'El avance dura ' + U.fmtTime(D.eraTime(n)) + '. Se inicia desde el Centro Urbano.'));
+          noCabe.length ? el('p', { class: 'small ec-nocabe' }, '⚠ No te cabe: ' + noCabe.map(r => D.RES[r].name.toLowerCase()).join(', ') + ' (tus bodegas guardan ' + U.fmt(g.cap(noCabe[0])) + '). Mejora: ' + (noCabe.includes('food') ? D.BUILD.granary.name + ', ' : '') + (noCabe.some(r => r !== 'food') ? D.BUILD.warehouse.name + ', ' : '') + 'o ' + D.BUILD.tc.name + '.') : '',
+          el('p', { class: 'small muted' }, 'El avance dura ' + U.fmtTime(D.eraTime(n)) + '. Se inicia desde ' + D.elB('tc') + '.'));
       }
       const tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
-      if (tc) body.append(UI.btn('Ir al Centro Urbano', () => { UI.closeModal(); UI.selectBuilding(tc); }, { cls: 'gold' }));
+      if (tc) body.append(UI.btn('Ir ' + D.alB('tc'), () => { UI.closeModal(); UI.selectBuilding(tc); }, { cls: 'gold' }));
     });
   };
 
@@ -808,7 +808,7 @@
   // pk-37: el área de los exploradores en casillas y cuánto ya se ve
   function areaTxt() {
     const a = G().areaInfo();
-    return a.todo ? 'Su área es el mapa entero: ' + Math.floor(a.pct * 1000) / 10 + '% visto.' : 'Explora ' + U.fmt(G().exploreArea()) + ' casillas alrededor de tu Centro Urbano (' + Math.floor(a.pct * 1000) / 10 + '% visto).';
+    return a.todo ? 'Su área es el mapa entero: ' + Math.floor(a.pct * 1000) / 10 + '% visto.' : 'Explora ' + U.fmt(G().exploreArea()) + ' casillas alrededor de tu ' + D.BUILD.tc.name + ' (' + Math.floor(a.pct * 1000) / 10 + '% visto).';
   }
   UI.areaTxt = areaTxt;
   function scoutPanel(us) {
@@ -931,7 +931,7 @@
       return;
     }
     const act = el('div', { class: 'p-actions' });
-    act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)), upgradeBox(b) || ''); // append(null) escribe «null»
+    act.append(UI.statRows(b.type, b.lvl, !def.noUp && b.lvl < G().maxLvl(b.type)) || '', upgradeBox(b) || ''); // append(null) escribe «null»
     // Fase 9 (pk-28): las ventanas del archipiélago
     if (b.type === 'embarcadero' && PK.Arch) act.append(el('div', { class: 'row' }, UI.btn('Fundar colonias', () => PK.Arch.abrirEmbarcadero(), { cls: 'gold' }), el('span', { class: 'small muted' }, 'Colonias: ' + PK.Arch.coloniasHechas() + '/' + PK.Arch.maxColonias())));
     if (b.type === 'embarcadero' && b.done && D.BARCAZA) { // pk-46: las barcazas de carga
@@ -1045,7 +1045,7 @@
         el('div', { class: 'wish-row' }, offer.map(k => { const d0 = D.WISHES.find(o => o.k === k); return UI.btn(el('span', null, el('b', null, d0.name), el('br'), el('small', null, d0.desc)), () => { PK.Exp.makeWish(k); UI.refreshPanel(true); }, { cls: 'gold' }); })));
     } else if (b.type === 'observatory' && b.done) {
       const f = PK.Exp.forecast();
-      act.append(el('p', { class: 'small' }, 'Mazmorras conocidas: ' + PK.Exp.sites().length + ' (busca hasta ' + G().bst(b).scan + ' casillas de tu Centro Urbano).'),
+      act.append(el('p', { class: 'small' }, 'Mazmorras conocidas: ' + PK.Exp.sites().length + ' (busca hasta ' + G().bst(b).scan + ' casillas de tu ' + D.BUILD.tc.name + ').'),
         f ? el('p', { class: 'small' }, 'Próximos lobos en aprox. ' + U.fmtTime(Math.max(0, f.wolves)) + ' · próximo evento en aprox. ' + U.fmtTime(Math.max(0, f.event)) + '.') : null,
         UI.btn('Expediciones', () => UI.openBarracks('exp'), { small: true }));
     }

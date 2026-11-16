@@ -23,7 +23,7 @@ export const PRUEBA = 1;
    Hangar, Fábrica o Apagón salía «de otro mapa» y se rechazaba. */
 const MAPAS = ['patio', 'sotano', 'cruce', 'fortaleza', 'laberinto', 'planta', 'hangar', 'fabrica', 'apagon'];
 const CATEGORIA = /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/;
-const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-29';
+const RUTA = 'juegos/boxhead/js/verificador.js?v=boxhead-31';
 export const MAX_NIVEL = 999;
 
 let trabajador = null, serie = 0;
