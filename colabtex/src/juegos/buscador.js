@@ -57,6 +57,7 @@ export const APODOS = {
   pokelike: "pokemon roguelike kanto medallas gimnasios",
   protiles: "piano tiles musica canciones teclas",
   trigon: "triangulos hexagono block blast piezas",
+  ajedrezclub: "chess bots bot puzles puzzles problemas mate jaque tactica táctica estrellas un jugador solo",
   boxheadclub: "boxhead box head zombis zombies disparos shooter horda niveles supervivencia",
   typeraceclub: "monkeytype typeracer mecanografia mecanografía teclear teclado escribir rapido rápido palabras por minuto ppm wpm ranking",
   metrorush: "subway surfers tren trenes correr runner monedas",

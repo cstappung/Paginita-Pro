@@ -125,7 +125,7 @@ export const FONDOS = [
   { id: "nocheeterna", n: "Noche eterna", oscuro: true, anim: true, hw: true, req: { coleccion: 11 }, css: () => "linear-gradient(180deg, #02010d 0%, #0d0838 50%, #1c0b4a 100%)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", boxheadclub: "Pro BoxHead", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", boxheadclub: "Pro BoxHead", ajedrezclub: "Ajedrez Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -158,18 +158,19 @@ export function nombreTop(k) {
 }
 /* Qué top da cada categoría del club: Tetris Club comparte marco con
    las salas de Tetris, y los mapas de zombis tienen el suyo. */
-export const topDeCategoria = c => /^yemas-zombis-/.test(String(c)) ? "zombis" : ({ tetrisclub: "tetris" })[juegoDeCategoria(c)] || juegoDeCategoria(c);
+export const topDeCategoria = c => /^yemas-zombis-/.test(String(c)) ? "zombis" : ({ tetrisclub: "tetris", ajedrezclub: "ajedrez" })[juegoDeCategoria(c)] || juegoDeCategoria(c);
 
 /* Cómo se dice una marca del club: las que se ganan por tiempo, en tiempo. */
 const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || (/^club-sopa-/.test(c) && c !== "club-sopa-racha") ||
-  /^club-sudoku-(facil|medio|dificil|experto)$/.test(c);  // el clásico del sudoku compite por tiempo
+  /^club-sudoku-(facil|medio|dificil|experto)$/.test(c) ||  // el clásico del sudoku compite por tiempo
+  /^club-ajedrez-bot[1-4]$/.test(c);  // contra el bot de Ajedrez Club, también
 export function valorMarca(c, f) {
   if (!f) return "";
   if (porTiempo(c)) return `${((f.tiempo || 0) / 1000).toFixed(2)} s`;
   if (String(c).startsWith("club-bbtan-")) return `ronda ${f.puntos || 0}`;
   if (String(c).startsWith("club-frontera-")) return `${f.puntos || 0} ${f.puntos === 1 ? "victoria" : "victorias"}`;
   if (c === "club-fanal-jornadas") return `jornada ${f.puntos || 0}`;
-  if (c === "club-atasco-estrellas") return `${f.puntos || 0} ★`;
+  if (c === "club-atasco-estrellas" || c === "club-ajedrez-puzles") return `${f.puntos || 0} ★`;
   if (c === "club-aleteo-vuelo") return `${f.puntos || 0} ${f.puntos === 1 ? "tubo" : "tubos"}`;
   if (c === "club-dosmil-puntos") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;

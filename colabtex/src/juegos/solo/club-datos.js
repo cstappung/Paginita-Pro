@@ -53,6 +53,9 @@ export function categoriaClub(juego, categoria) {
     // PRO PACMAN: una sola tabla, el puntaje de la partida.
     : juego === 'propac'
     ? categoria === 'club-propac-puntos'
+    // Ajedrez Club: una tabla por nivel del bot (por tiempo) y la de los puzles (estrellas).
+    : juego === 'ajedrez'
+    ? /^club-ajedrez-(bot[1-4]|puzles)$/.test(categoria)
     // PRO DEFENDER: la ronda récord de cada uno de los veinte reinos.
     : juego === 'prodefender'
     ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche|jade|circo|biblioteca|estelar|tiempo)$/.test(categoria)
@@ -130,6 +133,11 @@ export function resultadoClub(juego, dato) {
   if (juego === 'prodefender' && dato.puntos > 100) return null;
   /* PRO PACMAN: el puntaje, con el tope de su verificador (10 000 000). */
   if (juego === 'propac' && dato.puntos > 10000000) return null;
+  /* Ajedrez Club: contra el bot compite el tiempo (puntos = 1 fijo); los
+     puzles son estrellas, tres por puzle (hoy 60 puzles, 180; 600 deja
+     sitio para más sin aceptar números absurdos). */
+  if (juego === 'ajedrez' && dato.categoria !== 'club-ajedrez-puzles' && dato.puntos !== 1) return null;
+  if (dato.categoria === 'club-ajedrez-puzles' && dato.puntos > 600) return null;
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};
 }
 export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.puntos && a.tiempo < b.tiempo;

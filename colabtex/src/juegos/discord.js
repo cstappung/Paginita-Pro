@@ -157,16 +157,19 @@ const CLUBS = {
   hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" },
   prodefender: { nombre: "PRO DEFENDER", juego: "PRO DEFENDER", icono: "🛡️", ruta: "prodefender" },
   propac: { nombre: "PRO PACMAN", juego: "PRO PACMAN", icono: "🟡", ruta: "propac" },
-  boxhead: { nombre: "Pro BoxHead", juego: "Pro BoxHead", icono: "🧟", ruta: "boxhead" }
+  boxhead: { nombre: "Pro BoxHead", juego: "Pro BoxHead", icono: "🧟", ruta: "boxhead" },
+  ajedrez: { nombre: "Ajedrez Club", juego: "Ajedrez", icono: "♞", ruta: "ajedrez" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|pokelike|hero|prodefender|propac|boxhead)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|pokelike|hero|prodefender|propac|boxhead|ajedrez)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   // Type Race: «en-50» es inglés con 50 palabras (los números de otras tablas significan otra cosa).
   // Pro BoxHead: una tabla por mapa.
   if (m[1] === "boxhead") return { club: CLUBS.boxhead, modalidad: ({ patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto" })[m[2]] || m[2] };
+  // Ajedrez Club: una tabla por nivel del bot y la de los puzles.
+  if (m[1] === "ajedrez") return { club: CLUBS.ajedrez, modalidad: ({ bot1: "Bot Novato", bot2: "Bot Aficionado", bot3: "Bot Experto", bot4: "Bot Maestro", puzles: "Puzles" })[m[2]] || m[2] };
   if (m[1] === "typerace") return { club: CLUBS.typerace, modalidad: "Inglés · " + m[2].replace(/^en-/, "") + " palabras" };
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -207,6 +210,8 @@ export function marcaSolo(cat, f) {
   // PRO DEFENDER: la ronda récord del reino.
   if (/^club-prodefender-/.test(cat)) return `🛡️ ronda ${f.puntos}`;
   if (/^club-boxhead-/.test(cat)) return `🧟 ronda ${f.puntos}`;
+  if (/^club-ajedrez-bot[1-4]$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
+  if (cat === "club-ajedrez-puzles") return `🧩 ${f.puntos} ★`;
   if (cat === "club-propac-puntos") return `🟡 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
