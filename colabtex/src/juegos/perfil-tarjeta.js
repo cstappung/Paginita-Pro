@@ -161,7 +161,7 @@ export function nombreTop(k) {
 export const topDeCategoria = c => /^yemas-zombis-/.test(String(c)) ? "zombis" : ({ tetrisclub: "tetris" })[juegoDeCategoria(c)] || juegoDeCategoria(c);
 
 /* Cómo se dice una marca del club: las que se ganan por tiempo, en tiempo. */
-const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || (/^club-sopa-/.test(c) && c !== "club-sopa-racha") ||
+const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || /^club-tetris-bots-/.test(c) || (/^club-sopa-/.test(c) && c !== "club-sopa-racha") ||
   /^club-sudoku-(facil|medio|dificil|experto)$/.test(c);  // el clásico del sudoku compite por tiempo
 export function valorMarca(c, f) {
   if (!f) return "";

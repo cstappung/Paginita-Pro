@@ -2,15 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-<script src="../../../i18n.js?v=202611161342"></script>
+<script src="../../../i18n.js?v=202611161729"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0a0f1c">
   <title>Tetris Club — Apila.</title>
-  <link rel="stylesheet" href="style.css?v=club-6">
+  <link rel="stylesheet" href="style.css?v=club-7">
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
-  <script src="../conexion.js?v=club-20"></script>
+  <script src="../conexion.js?v=club-23"></script>
 </head>
 <body>
   <div class="shell" id="tt">
@@ -23,6 +23,13 @@
         <button data-modo="maraton" class="activo"><b>Maratón</b><small>Hasta que no quepa nada</small></button>
         <button data-modo="sprint"><b>Sprint</b><small>40 líneas, contra el reloj</small></button>
         <button data-modo="ultra"><b>Ultra</b><small>Dos minutos, todos los puntos</small></button>
+        <button data-modo="bots"><b>VS Bots</b><small>Tú contra tres bots</small></button>
+      </nav>
+      <nav class="tt-difs" id="difs" role="group" aria-label="Dificultad de los bots" hidden>
+        <span>Bots:</span>
+        <button data-dif="facil">🙂 Fácil</button>
+        <button data-dif="medio">😐 Medio</button>
+        <button data-dif="dificil">😈 Difícil</button>
       </nav>
       <div class="layout tt-layout">
         <div class="tt-centro">
@@ -39,8 +46,9 @@
             </aside>
             <div class="tt-pozo">
               <canvas id="pozo" width="300" height="600" tabindex="0" aria-label="Pozo de Tetris"></canvas>
-              <div class="tt-hud" aria-hidden="true"><span><small>Pts</small><b id="hudA">0</b></span><span><small>Lín</small><b id="hudL">0</b></span><span><small>Niv</small><b id="hudN">1</b></span><span><small>⏱</small><b id="hudT">0:00</b></span><span><small>Réc</small><b id="hudR">—</b></span><button id="hudPausa" type="button" aria-label="Pausa">❚❚</button><span class="tt-hud-vol" data-volumen></span></div>
+              <div class="tt-hud" aria-hidden="true"><span><small id="hudEtqA">Pts</small><b id="hudA">0</b></span><span><small>Lín</small><b id="hudL">0</b></span><span><small>Niv</small><b id="hudN">1</b></span><span><small>⏱</small><b id="hudT">0:00</b></span><span><small>Réc</small><b id="hudR">—</b></span><button id="hudPausa" type="button" aria-label="Pausa">❚❚</button><span class="tt-hud-vol" data-volumen></span></div>
               <div id="aviso" class="tt-aviso"></div>
+              <div id="alerta" class="tt-alerta" aria-live="polite"></div>
               <div id="capa" class="tt-capa">
                 <h2 id="capaT">Apila<span>.</span></h2>
                 <p id="capaP">Completa filas. Que no llegue arriba.</p>
@@ -49,6 +57,7 @@
               </div>
             </div>
             <aside class="tt-lado"><div class="tt-caja tt-sig"><small>Siguientes</small><canvas id="cola" width="100" height="320"></canvas></div></aside>
+            <aside class="tt-rivales" id="rivales" hidden></aside>
           </main>
           <div class="tt-pie">
             <p class="tt-teclas"><span id="teclasTxt"></span></p>
@@ -61,6 +70,6 @@
     </section>
   </div>
   <script src="../../audio/chip.js?v=snake-audio-1"></script><script src="../../audio/temas.js?v=snake-audio-1"></script>
-  <script src="motor.js?v=club-5"></script><script src="fx.js?v=fx-3"></script><script src="game.js?v=club-8"></script>
+  <script src="motor.js?v=club-6"></script><script src="vs.js?v=vs-1"></script><script src="fx.js?v=fx-3"></script><script src="game.js?v=club-9"></script>
 </body>
 </html>

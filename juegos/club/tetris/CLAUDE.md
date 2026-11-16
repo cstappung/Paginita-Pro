@@ -14,7 +14,8 @@ each tab writes every 250 ms to a disposable node, as in Circuit Breakers.
 The last one standing wins. **Tetris Club** (`juegos/club/tetris/`) is
 the solo version on the same engine: Maratón, Sprint (40 lines; the
 result is `puntos: 40` plus the time, so the ranking orders it by time) and
-Ultra (two minutes). Its categories are `club-tetris-*` in `soloRanks`.
+Ultra (two minutes), plus **VS Bots** (below). Its categories are
+`club-tetris-*` in `soloRanks`.
 
 **Tetris' look and sound live in `juegos/club/tetris/fx.js`** (UMD
 `TetrisFX`, shared by the Club and the room), and **none of it decides
@@ -60,3 +61,35 @@ pauses, and «Seguir» restarts the count. In the room each browser counts
 its own well (`largadaHasta` in `tetris.js`; nothing crosses the network):
 `paso` returns early, so the well neither falls nor takes garbage nor writes
 `tetrisVivo` until then, and the mando/touch handlers ignore input.
+
+**VS Bots** (`juegos/club/tetris/vs.js`, UMD `TetrisVS`, mode `bots` in
+`game.js`) is the room played alone: your well plus three bot wells, free
+for all, garbage (≤ 12 per attack, as in the room) goes to a random living
+well, last one standing wins. Three difficulties, one table each:
+`club-tetris-bots-(facil|medio|dificil)`, `puntos` fixed at 3 and the
+**time** competes (lower is better, like Sprint; losing saves nothing).
+Rules that keep it provable:
+
+- **The whole match is deterministic, so the proof is still only the
+  player's moves** (`{v:1, m:"bots", d, u, a, n, e, w, k}`). The four wells
+  step together in `TM.PASO` steps; bots decide with their own seeded `rng`
+  and integer weights (Yiyuan Lee's ×100); the attack target comes from a
+  seeded `rng` too. `TV.rehace` replays the bots and the verifier demands
+  all three out. Anything that changes how a bot decides (weights, timings,
+  `PERFIL`, target choice, `semillaPozo`) changes old proofs' outcome: bump
+  the proof version and keep the old path, or old records stop verifying.
+- **The level rises only with time** (`soloTiempo` in `crear`, 30 s per
+  level as in the room). With line-based levels too, the fast bots sped up
+  their own gravity and killed themselves; it also bounds the match.
+- Difficulty is speed and mistakes, not lookahead: ~0.6 / 1.1 / 2 pieces
+  per second, 30 % / 12 % / 0 % suboptimal picks, hold from Medio up. Bots
+  hurry when gravity is high (`rapido`). Rewarding attacks (keeping a well
+  for Tetrises) was tried and made them bury themselves. Each bot gets its
+  own bag (`semillaPozo`) so the three do not play in lockstep.
+- The rival wells are `TM.pintaResumen` thumbnails; `ubicaRivales` moves
+  them under the pit on narrow screens and back as a thin third column in
+  immersive phone mode. Nothing on screen decides anything: `vsEventos`
+  only drains `m.ataques`/`m.caidas` for banners, sounds and KO marks.
+- No logros for this mode on purpose: every game has exactly ten
+  (`tests/logros.test.cjs`). Tests: `colabtex/tests/tetris-vs.test.cjs`.
+- The room's waiting screen and manual point to it («¿Sin rivales?…»).

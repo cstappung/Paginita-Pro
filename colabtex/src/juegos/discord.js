@@ -116,7 +116,7 @@ export function conRecord(filas, uid, dato) {
 
 const MODALIDADES = {
   easy: "Fácil", medium: "Medio", hard: "Difícil",
-  maraton: "Maratón", sprint: "Sprint (40 líneas)", ultra: "Ultra (2 min)",
+  maraton: "Maratón", sprint: "Sprint (40 líneas)", ultra: "Ultra (2 min)", bots: "VS Bots",
   classic: "Clásico", arcade: "Arcade", portals: "Portales", reloj: "Contrarreloj",
   espejo: "Espejo", laberinto: "Laberinto",
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
@@ -186,7 +186,7 @@ export function marcaSolo(cat, f) {
   // El arcade del sudoku se lee en puntos, con su mando de recreativa.
   if (cat === "club-sudoku-arcade") return `🕹️ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // El clásico del sudoku (puntos fijos en 1) compite por tiempo, como el buscaminas.
-  if (/^club-minas-|^club-sortem-|^club-sopa-|^club-sudoku-(facil|medio|dificil|experto)$|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
+  if (/^club-minas-|^club-sortem-|^club-sopa-|^club-sudoku-(facil|medio|dificil|experto)$|^club-tetris-(sprint|bots-.+)$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
   if (/^club-bbtan-/.test(cat)) return `🟩 Ronda ${f.puntos}`;
   // FANAL: la jornada más lejana se dice en jornadas; la travesía y el sin fin, en puntos.
   if (cat === "club-fanal-jornadas") return `🪔 Jornada ${f.puntos}`;

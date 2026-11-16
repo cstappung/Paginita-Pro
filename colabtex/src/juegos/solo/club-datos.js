@@ -59,7 +59,7 @@ export function categoriaClub(juego, categoria) {
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|city|citypuro)$/.test(categoria)
     : juego === 'tetris'
-    ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
+    ? /^club-tetris-(maraton|sprint|ultra|bots-(facil|medio|dificil))$/.test(categoria)
     // Pro BoxHead: el nivel más alto al que se llegó en una partida, una tabla por mapa.
     : juego === 'boxhead'
     ? /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/.test(categoria)
@@ -72,6 +72,8 @@ export function resultadoClub(juego, dato) {
   if (juego === 'minas' && dato.puntos !== 1) return null;
   if (juego === 'sortem' && dato.puntos !== Number(dato.categoria.slice(12))) return null;
   if (dato.categoria === 'club-tetris-sprint' && dato.puntos !== 40) return null;
+  /* Tetris VS Bots: compite el tiempo; los puntos son los tres bots fuera. */
+  if (/^club-tetris-bots-/.test(dato.categoria) && dato.puntos !== 3) return null;
   if (juego === 'boxhead' && dato.puntos > 999) return null;
   /* Sopa libre: los puntos son las palabras de ese tamaño (6, 10 o 13) y
      compite el tiempo; la racha diaria son días, no más de dos años. */

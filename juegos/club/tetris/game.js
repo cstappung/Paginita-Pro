@@ -1,23 +1,32 @@
 /* Tetris Club: el pozo en solitario, sobre el mismo motor que la sala
-   multijugador (TetrisMotor). Tres modos: Maratón (hasta que no quepa),
-   Sprint (40 líneas contra el reloj) y Ultra (dos minutos). */
+   multijugador (TetrisMotor). Cuatro modos: Maratón (hasta que no quepa),
+   Sprint (40 líneas contra el reloj), Ultra (dos minutos) y VS Bots (tú
+   contra tres bots, todos contra todos, en tres dificultades; compite el
+   tiempo en dejarlos fuera: TetrisVS, vs.js). */
 (() => {
   'use strict';
-  const TM = window.TetrisMotor, FX = window.TetrisFX;
+  const TM = window.TetrisMotor, FX = window.TetrisFX, TV = window.TetrisVS;
   const $ = id => document.getElementById(id);
   const CLAVE = window.Club?.storageKey('tetris-club-v1') || 'tetris-club-v1';
   const SPRINT = TM.SPRINT, ULTRA_MS = TM.ULTRA_MS;
   /* La cuenta entra en la semilla de cada partida (TM.semillaDe): la
      prueba de un récord no le sirve a otra persona. */
   const CUENTA = new URLSearchParams(location.search).get('cuenta') || 'local';
-  const NOMBRE = { maraton: 'Maratón', sprint: 'Sprint', ultra: 'Ultra' };
+  const NOMBRE = { maraton: 'Maratón', sprint: 'Sprint', ultra: 'Ultra', bots: 'VS Bots' };
+  /* Los colores de los tres bots (miniatura, nombre y aviso de ataque). */
+  const COLOR_BOT = ['#ff9f43', '#2fd3e8', '#ff4fa3'];
 
   let guardado = {};
   try { guardado = JSON.parse(localStorage.getItem(CLAVE) || '{}') || {}; } catch (_) { /* Storage es opcional. */ }
   let modo = NOMBRE[guardado.modo] ? guardado.modo : 'maraton';
+  let dif = TV.DIFS.includes(guardado.dif) ? guardado.dif : 'facil';
   let sonido = guardado.sonido !== false;
   const records = guardado.records || {};
-  const guarda = () => { try { localStorage.setItem(CLAVE, JSON.stringify({ modo, sonido, records })); } catch (_) { /* nada */ } };
+  const guarda = () => { try { localStorage.setItem(CLAVE, JSON.stringify({ modo, dif, sonido, records })); } catch (_) { /* nada */ } };
+  /* La tabla en juego: en VS Bots, una por dificultad. */
+  const tabla = () => modo === 'bots' ? `bots-${dif}` : modo;
+  /* En Sprint y en VS Bots compite el tiempo (menos es mejor). */
+  const porTiempo = () => modo === 'sprint' || modo === 'bots';
 
   /* `g` graba la partida (TM.grabadora); `resto` es el tiempo real que
      aún no llega a un paso entero; `pared` mide, con el reloj del
@@ -46,17 +55,17 @@
   let fx = nuevosEfectos();
   const cartel = FX.cartelCuenta(pozo.parentElement);
 
-  const reloj = ms => { const t = Math.max(0, ms) / 1000; return `${Math.floor(t / 60)}:${(t % 60).toFixed(modo === 'sprint' ? 2 : 0).padStart(modo === 'sprint' ? 5 : 2, '0')}`; };
-  const cat = () => `club-tetris-${modo}`;
-  const mejor = r => modo === 'sprint' ? (r?.tiempo ? reloj(r.tiempo) : '—') : (r?.puntos ? String(r.puntos) : '—');
+  const reloj = ms => { const t = Math.max(0, ms) / 1000, f = porTiempo(); return `${Math.floor(t / 60)}:${(t % 60).toFixed(f ? 2 : 0).padStart(f ? 5 : 2, '0')}`; };
+  const cat = () => `club-tetris-${tabla()}`;
+  const mejor = r => porTiempo() ? (r?.tiempo ? reloj(r.tiempo) : '—') : (r?.puntos ? String(r.puntos) : '—');
   function mejora(r) {
-    const a = records[modo];
-    if (modo === 'sprint') return !a?.tiempo || r.tiempo < a.tiempo;
+    const a = records[tabla()];
+    if (porTiempo()) return !a?.tiempo || r.tiempo < a.tiempo;
     return !a?.puntos || r.puntos > a.puntos;
   }
   window.addEventListener('club-record', e => {
     const d = e.detail; if (!d || d.categoria !== cat()) return;
-    if (mejora(d)) { records[modo] = { puntos: d.puntos, tiempo: d.tiempo }; guarda(); pintaDatos(); }
+    if (mejora(d)) { records[tabla()] = { puntos: d.puntos, tiempo: d.tiempo }; guarda(); pintaDatos(); }
   });
 
   /* ---------- sonido ---------- */
@@ -109,8 +118,11 @@
     iniciaAudio();
     let sal = (Math.random() * 2 ** 32) >>> 0;
     try { sal = crypto.getRandomValues(new Uint32Array(1))[0]; } catch (_) { /* con Math.random basta */ }
-    g = TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar: a => { if ((a === 'izq' || a === 'der') && s && s.p) efecto('mueve', s.p.x); } });
+    const alJugar = a => { if ((a === 'izq' || a === 'der') && s && s.p) efecto('mueve', s.p.x); };
+    /* VS Bots graba igual, pero con el mundo de cuatro pozos de vs.js. */
+    g = modo === 'bots' ? TV.grabadora({ cuenta: CUENTA, sal, dif, alJugar }) : TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar });
     s = g.s;
+    rivalesFirma = '';
     fx = nuevosEfectos();
     pulsos = null;
     mando.suelta();
@@ -144,13 +156,24 @@
     inmersivo(false);
     bloqueaModos(false);
     mando.suelta();
-    const r = { puntos: s.puntos, tiempo: Math.max(1, Math.round(s.tiempo)) };
-    const vale = modo === 'sprint' ? gano : r.puntos >= 1;
+    const bots = modo === 'bots';
+    const r = { puntos: bots ? TV.RIVALES : s.puntos, tiempo: Math.max(1, Math.round(s.tiempo)) };
+    const vale = modo === 'sprint' || bots ? gano : r.puntos >= 1;
     const nuevo = vale && mejora(r);
-    if (nuevo) { antesDelRecord = { modo, cat: cat(), r: records[modo] }; records[modo] = r; guarda(); }
+    if (nuevo) { antesDelRecord = { tabla: tabla(), cat: cat(), r: records[tabla()] }; records[tabla()] = r; guarda(); }
     if (vale) window.Club?.result({ categoria: cat(), puntos: modo === 'sprint' ? SPRINT : r.puntos, tiempo: r.tiempo },
       g.prueba({ w: Math.round(pared), k: pulsos.texto() }));
     efecto(nuevo ? 'record' : 'fin');
+    pintaRivales();
+    if (bots) {
+      const caidos = TV.derrotados(g.m);
+      capa(gano ? '¡Ganaste!' : 'Fuera',
+        gano ? `Los tres bots (${TV.NOMBRE_DIF[dif]}) fuera en ${reloj(r.tiempo)}${nuevo ? ' · ¡récord!' : ''}`
+          : `Dejaste fuera a ${caidos} de ${TV.RIVALES} · ${reloj(r.tiempo)}`,
+        'Otra vez');
+      pintaDatos();
+      return;
+    }
     capa(
       modo === 'sprint' ? (gano ? '¡40 líneas!' : 'Se llenó') : modo === 'ultra' && gano ? '¡Tiempo!' : 'Se acabó',
       modo === 'sprint' ? (gano ? `En ${reloj(r.tiempo)}${nuevo ? ' · ¡récord!' : ''}` : `${s.lineas} de ${SPRINT} líneas`)
@@ -163,7 +186,7 @@
   window.addEventListener('club-rechazo', e => {
     const d = e.detail; if (!d) return;
     if (antesDelRecord && d.categoria === antesDelRecord.cat) {
-      if (antesDelRecord.r) records[antesDelRecord.modo] = antesDelRecord.r; else delete records[antesDelRecord.modo];
+      if (antesDelRecord.r) records[antesDelRecord.tabla] = antesDelRecord.r; else delete records[antesDelRecord.tabla];
       antesDelRecord = null; guarda(); pintaDatos();
     }
     if (estado === 'fin' && d.categoria === cat()) $('capaP').textContent = 'No se guardó: ' + (d.motivo || 'la partida no cuadra.');
@@ -173,16 +196,17 @@
     $('capaP').textContent = p; $('jugar').textContent = b; $('capa').hidden = false;
   }
   function pausa() {
-    if (estado === 'cuenta') { estado = 'pausa'; porLargar = true; cartel.limpia(); mando.suelta(); inmersivo(false); capa('Pausa', `${NOMBRE[modo]} · aún no empieza`, 'Seguir'); }
+    if (estado === 'cuenta') { estado = 'pausa'; porLargar = true; cartel.limpia(); mando.suelta(); inmersivo(false); capa('Pausa', `${nombreModo()} · aún no empieza`, 'Seguir'); }
     else if (estado === 'pausa' && porLargar) { $('capa').hidden = true; inmersivo(true); cuenta(); pozo.focus(); }
-    else if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); inmersivo(false); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
+    else if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); inmersivo(false); capa('Pausa', `${nombreModo()} · nivel ${s.nivel}`, 'Seguir'); }
     else if (estado === 'pausa') { estado = 'jugando'; ultimo = 0; paredAntes = 0; $('capa').hidden = true; inmersivo(true); pozo.focus(); }
   }
   /* Modo celular (CLAUDE.md): mientras se juega, el pozo ocupa la pantalla
      con los datos encima y los botones abajo; en pausa y al terminar vuelve
      el menú. En PC Club.celular() es falso y no cambia nada. */
   function inmersivo(v) { window.Club?.inmersivo?.(v); }
-  function bloqueaModos(b) { document.querySelectorAll('[data-modo]').forEach(x => { x.disabled = b; }); }
+  function bloqueaModos(b) { document.querySelectorAll('[data-modo],[data-dif]').forEach(x => { x.disabled = b; }); }
+  const nombreModo = () => modo === 'bots' ? `VS Bots ${TV.NOMBRE_DIF[dif]}` : NOMBRE[modo];
 
   function acciones(a) {
     if (a === 'pausa') return pausa();
@@ -267,12 +291,25 @@
     if (estado === 'jugando' || estado === 'pausa' || estado === 'cuenta') return;
     modo = b.dataset.modo; guarda(); ponModo();
   }));
+  document.querySelectorAll('[data-dif]').forEach(b => b.addEventListener('click', () => {
+    if (estado === 'jugando' || estado === 'pausa' || estado === 'cuenta') return;
+    dif = b.dataset.dif; guarda(); ponModo();
+  }));
+  const LEMA = {
+    sprint: 'Cuarenta líneas, lo más rápido que puedas.', ultra: 'Dos minutos: todos los puntos que quepan.',
+    maraton: 'Completa filas. Que no llegue arriba.',
+    bots: { facil: 'Tres bots tranquilos. Cada línea que limpias les cae a ellos.', medio: 'Tres bots que ya saben jugar. Mándales basura y aguanta la suya.',
+      dificil: 'Tres bots rápidos y sin errores. Sobrevive y déjalos fuera.' }
+  };
   function ponModo() {
     document.querySelectorAll('[data-modo]').forEach(x => x.classList.toggle('activo', x.dataset.modo === modo));
+    document.querySelectorAll('[data-dif]').forEach(x => x.classList.toggle('activo', x.dataset.dif === dif));
+    const vs = modo === 'bots';
+    $('difs').hidden = !vs; $('rivales').hidden = !vs; $('tt').classList.toggle('vs', vs);
     window.Club?.category(cat());
-    s = null; estado = 'menu'; inmersivo(false);
-    capa(NOMBRE[modo], modo === 'sprint' ? 'Cuarenta líneas, lo más rápido que puedas.' : modo === 'ultra' ? 'Dos minutos: todos los puntos que quepan.' : 'Completa filas. Que no llegue arriba.', 'Jugar');
-    pintaDatos(); pinta();
+    s = null; g = null; estado = 'menu'; inmersivo(false); rivalesFirma = '';
+    capa(nombreModo(), vs ? `${LEMA.bots[dif]} Gana el último en pie; compite el tiempo.` : LEMA[modo], 'Jugar');
+    pintaDatos(); pinta(); pintaRivales();
   }
 
   /* ---------- dibujo ---------- */
@@ -280,15 +317,18 @@
   let datosFirma = '';
   function pintaDatos() {
     const t = !s ? 0 : modo === 'ultra' ? ULTRA_MS - s.tiempo : s.tiempo;
-    const f = [modo, s?.puntos, s?.lineas, s?.nivel, reloj(t), mejor(records[modo])].join('|');
+    const bots = modo === 'bots';
+    const enPie = bots ? (g?.m ? TV.RIVALES - TV.derrotados(g.m) : TV.RIVALES) : 0;
+    const f = [tabla(), s?.puntos, enPie, s?.lineas, s?.nivel, reloj(t), mejor(records[tabla()])].join('|');
     if (f === datosFirma) return; datosFirma = f;
-    $('etqA').textContent = 'Puntos';
-    $('datoA').textContent = s ? s.puntos : 0;
+    $('etqA').textContent = bots ? 'Bots en pie' : 'Puntos';
+    $('hudEtqA').textContent = bots ? 'Bots' : 'Pts';
+    $('datoA').textContent = bots ? enPie : s ? s.puntos : 0;
     $('datoL').textContent = s ? (modo === 'sprint' ? `${s.lineas}/${SPRINT}` : s.lineas) : 0;
     $('datoN').textContent = s ? s.nivel : 1;
     $('etqT').textContent = modo === 'ultra' ? 'Queda' : 'Tiempo';
     $('datoT').textContent = reloj(s ? t : modo === 'ultra' ? ULTRA_MS : 0);
-    $('record').textContent = mejor(records[modo]);
+    $('record').textContent = mejor(records[tabla()]);
     $('hudA').textContent = $('datoA').textContent;
     $('hudL').textContent = $('datoL').textContent;
     $('hudN').textContent = $('datoN').textContent;
@@ -296,7 +336,7 @@
     $('hudR').textContent = $('record').textContent;
   }
   function pinta() {
-    if (s) fx.pinta(cx, s);
+    if (s) fx.pinta(cx, s, modo === 'bots' ? { pendiente: s.fin ? 0 : TM.pendiente(s) } : undefined);
     else { cx.fillStyle = '#0b0f1a'; cx.fillRect(0, 0, pozo.width, pozo.height); }
     fx.sacude(pozo);
     cxG.clearRect(0, 0, 100, 70);
@@ -313,6 +353,7 @@
       else if (ev.e === 'guarda') efecto('guarda');
       else if (ev.e === 'seco') { seco = true; efecto('seco', ev.a - ev.de, ev.celdas[0][0]); }
       else if (ev.e === 'nivel') { efecto('nivel'); avisa(`Nivel ${ev.n}`, 'nivel'); }
+      else if (ev.e === 'basura') efecto('impacto', ev.n);
       else if (ev.e === 'fija') {
         if (ev.n || ev.ts) efecto('linea', ev.n, ev.combo, ev.ts, ev.pc, ev.b2b);
         else if (!seco) efecto('fija', Math.min(1, altura() / 20), ev.bloq?.[0]?.[0]);
@@ -322,6 +363,64 @@
       }
     }
     s.salida = 0;
+  }
+
+  /* ---------- VS Bots: los rivales y lo que se mandan ---------- */
+  /* Nada de esto decide nada: el mundo (vs.js) ya repartió la basura y
+     anotó quién cayó; aquí solo se ve y se oye. */
+  let rivalesFirma = '', alertaT = 0;
+  const nombreBot = i => TV.NOMBRES[i - 1];
+  function pintaRivales() {
+    const cont = $('rivales');
+    if (modo !== 'bots') return;
+    const m = g?.m;
+    const firma = [dif, m ? m.fuera.map(k => k < 0 ? 1 : 0).join('') : '---'].join('|');
+    if (firma !== rivalesFirma) {
+      rivalesFirma = firma;
+      cont.innerHTML = [1, 2, 3].map(i => `<div class="tt-rival${m && m.fuera[i] >= 0 ? ' fuera' : ''}" data-i="${i}" style="--c:${COLOR_BOT[i - 1]}">` +
+        `<canvas width="90" height="180" aria-label="Pozo de ${nombreBot(i)}"></canvas><span class="nom">${nombreBot(i)}</span><small class="dat"></small></div>`).join('');
+    }
+    for (let i = 1; i <= TV.RIVALES; i++) {
+      const el = cont.querySelector(`[data-i="${i}"]`);
+      if (!el) continue;
+      const p = m?.pozos[i];
+      TM.pintaResumen(el.querySelector('canvas').getContext('2d'), p ? TM.resumen(p) : '', { celda: 9, muerto: !!(m && m.fuera[i] >= 0) });
+      const txt = p ? `${p.lineas} lín · ${m.enviadas[i]} env` : TV.NOMBRE_DIF[dif];
+      const d = el.querySelector('.dat');
+      if (d.textContent !== txt) d.textContent = txt;
+    }
+  }
+  /* Ancho: los rivales son una cuarta columna junto al pozo. Angosto: una
+     fila debajo (dentro de la fila del pozo empujaban «Siguientes» fuera de
+     la pantalla). En el modo celular vuelven a ser una columna fina. */
+  const angosto = matchMedia('(max-width:760px)');
+  function ubicaRivales() {
+    const r = $('rivales'), main = document.querySelector('.tt-juego');
+    const dentro = !angosto.matches || document.documentElement.classList.contains('club-inm');
+    if (dentro && r.parentNode !== main) main.appendChild(r);
+    else if (!dentro && r.parentNode === main) main.after(r);
+  }
+  angosto.addEventListener?.('change', ubicaRivales);
+  new MutationObserver(ubicaRivales).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  ubicaRivales();
+  function golpe(i) {
+    const el = $('rivales').querySelector(`[data-i="${i}"]`);
+    if (!el) return;
+    el.classList.remove('golpe'); void el.offsetWidth; el.classList.add('golpe');
+  }
+  function alerta(i, n) {
+    const el = $('alerta');
+    el.innerHTML = `<span style="--c:${COLOR_BOT[i - 1]}">⚠ ${nombreBot(i)} te manda ${n}</span>`;
+    el.classList.remove('ve'); void el.offsetWidth; el.classList.add('ve');
+    clearTimeout(alertaT); alertaT = setTimeout(() => el.classList.remove('ve'), 1700);
+  }
+  function vsEventos() {
+    const m = g.m;
+    for (const a of m.ataques.splice(0)) {
+      if (a.a === 0) { fx.amenaza(a.n); efecto('alarma', a.n); alerta(a.de, a.n); }
+      else { golpe(a.a); if (a.de === 0) efecto('envia', a.n); }
+    }
+    for (const i of m.caidas.splice(0)) if (i > 0) { avisa(`¡${nombreBot(i)} fuera!`, 'ko'); efecto('nivel'); }
   }
 
   function bucle(t) {
@@ -340,6 +439,7 @@
         mando.paso(TM.PASO);
         const fin = g.paso(mando.blando);
         eventos();
+        if (g.m) vsEventos();
         if (fin) { if (modo === 'ultra' && fin.gano) s.tiempo = ULTRA_MS; termina(fin.gano); }
       }
     }
@@ -347,6 +447,7 @@
     latido(dt);
     musica();
     pinta(); pintaDatos();
+    if (modo === 'bots' && estado !== 'menu') pintaRivales();
   }
 
   $('sonido').textContent = sonido ? '🔊' : '🔈';

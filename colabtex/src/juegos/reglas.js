@@ -817,6 +817,7 @@ const REGLAS = {
         "La barra roja al lado de tu pozo es la basura que te espera. Limpiar líneas antes de que caiga la cancela."
       ])],
       ["El final", "Cuando una pieza ya no cabe, quedas fuera. El último que sigue apilando gana la sala."],
+      ["Sin rivales", "¿No hay nadie? En <b>Tetris Club</b>, el modo <b>VS Bots</b> es esta misma sala contra tres bots (Fácil, Medio o Difícil), con su propia clasificación por tiempo."],
       ["Para practicar", "Tetris Club, en la portada, tiene Maratón, Sprint de 40 líneas y Ultra de dos minutos para jugar solo."]
     ]
   },
@@ -1056,14 +1057,21 @@ const REGLAS = {
     ]
   },
   tetrisclub: {
-    lema: "Tetris Club: para ti solo, en tres modos.",
+    lema: "Tetris Club: para ti solo, en cuatro modos (uno contra bots).",
     secciones: [
       ["Cómo se juega", "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C</b> guardar · <b>P</b> pausa. Completa filas para limpiarlas."],
       ["Los modos", lista([
         "<b>Maratón</b>: hasta que el pozo se llene; el nivel sube cada 10 líneas.",
         "<b>Sprint</b>: 40 líneas lo más rápido posible. Cuenta el tiempo.",
-        "<b>Ultra</b>: dos minutos para hacer tantos puntos como puedas."
-      ])]
+        "<b>Ultra</b>: dos minutos para hacer tantos puntos como puedas.",
+        "<b>VS Bots</b>: tú contra tres bots, todos contra todos, como una sala de cuatro. Cada línea que limpias manda basura a un rival vivo al azar, y ellos también se atacan entre sí. Ganas cuando los tres quedan fuera; el nivel sube cada 30 segundos."
+      ])],
+      ["Los bots", lista([
+        "<b>Fácil</b>: lentos (menos de una pieza por segundo), se equivocan seguido y no usan la reserva.",
+        "<b>Medio</b>: algo más de una pieza por segundo, usan la reserva y se equivocan de vez en cuando.",
+        "<b>Difícil</b>: unas dos piezas por segundo y sin errores. Se apuran cuando la gravedad aprieta."
+      ])],
+      ["Clasificación", "Maratón y Ultra se ordenan por puntos; Sprint por tiempo. VS Bots tiene una tabla por dificultad y compite el <b>tiempo</b> en dejar fuera a los tres bots: perder no cuenta."]
     ]
   },
   sortem: {
