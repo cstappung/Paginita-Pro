@@ -12,6 +12,9 @@ owner outside this repo and dropped in.
 - `PLAN-LOGISTICA.md` (Nov 15 2026): the next plan, «Caminos y Campamentos», phases L1–L6 («implementa la Fase
   L<N> del plan de logística»; L6 is the sea with cargo barges). §10 lists traps; §11 has the owner's answered
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
+- `PLAN-GUERRA.md` (Nov 16 2026): the plan after that, «Estandartes de Guerra», phases G1–G8 («implementa la Fase
+  G<N> del plan de guerra»): conquest as a three-stage siege drawn on the map. Not started. Its §1 table (win chance
+  by strength ratio) is the balance contract; §12 lists the owner's open decisions.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
