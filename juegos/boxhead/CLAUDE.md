@@ -225,6 +225,13 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   `globalThis.BoxheadRehace` (`js/rehace-node.cjs`). Level, final step and time
   must match exactly. **Its `RUTA` and the worker's imports carry `?v=boxhead-N`:
   bump them along with the page**, or a cached old engine rejects new proofs.
+- **`juego.js` must run in a Web Worker** (`boxhead-31`): no bare `parent`,
+  `top` or DOM global outside what `sin-pantalla.js` stubs, and no `message`
+  listener outside `if (ONLINE)`. The worker's listeners get the replay request
+  too; a bare `parent` threw first, the page took the error as «el verificador
+  no cargó» and **rejected every Club game** (seen back to `boxhead-25`). Node tests missed
+  it (no `addEventListener` in the vm); «el trabajador del verificador» test
+  now imitates the worker scope.
 - The old `bots-boxhead` practice card is gone: the club card replaces
   it in `SOLOS`.
 - **Fullscreen inside the game** (`boxhead-30`): ⛶ in the HUD (top right; `#vol`
