@@ -630,6 +630,23 @@ ARTE.boxheadclub = u => {
     <g transform="translate(330 46)"><rect x="-56" y="-22" width="112" height="44" rx="8" fill="#14100c" stroke="#f2c14e" stroke-width="2.5"/><text x="0" y="8" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="24" fill="#f2c14e" letter-spacing="1">NIVEL 25</text></g>`;
 };
 
+/* Ajedrez Club: un rincón del tablero de madera en diagonal, la dama
+   blanca dando mate al rey negro (la casilla del rey en rojo), un bot que
+   mira y las tres estrellas de un puzle, arriba a la derecha. Las piezas son
+   las mismas de las salas (cburnett, juegos/ajedrez/piezas/). */
+ARTE.ajedrezclub = u => {
+  const t = 46, x0 = 150, y0 = 34, pieza = (k, c, r) => `<image href="juegos/ajedrez/piezas/cburnett/${k}.svg" x="${x0 + c * t + 3}" y="${y0 + r * t + 3}" width="${t - 6}" height="${t - 6}"/>`;
+  let casillas = "";
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) casillas += `<rect x="${x0 + c * t}" y="${y0 + r * t}" width="${t}" height="${t}" fill="${(r + c) % 2 ? "#b58863" : "#f0d9b5"}"/>`;
+  return `<defs><radialGradient id="g${u}" cx=".6" cy=".4" r=".9"><stop offset="0" stop-color="#4a3626"/><stop offset="1" stop-color="#140e09"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <g transform="rotate(-8 265 150)"><rect x="${x0 - 8}" y="${y0 - 8}" width="${5 * t + 16}" height="${5 * t + 16}" rx="6" fill="#5b3d22" stroke="#2b1c10" stroke-width="3"/>${casillas}
+    <rect x="${x0 + 3 * t}" y="${y0}" width="${t}" height="${t}" fill="#e0564b" opacity=".75" class="a-late"/>
+    ${pieza("bK", 3, 0)}${pieza("bP", 2, 1)}${pieza("bP", 4, 1)}${pieza("wR", 0, 0)}<g class="a-mueve">${pieza("wQ", 3, 1)}</g>${pieza("wN", 1, 2)}${pieza("wK", 4, 4)}</g>
+    <g transform="translate(66 132)"><rect x="-30" y="-26" width="60" height="50" rx="12" fill="#2d241c" stroke="#e3b44f" stroke-width="2.5"/><circle cx="-11" cy="-4" r="6" fill="#7fd1ff" class="a-late"/><circle cx="11" cy="-4" r="6" fill="#7fd1ff" class="a-late"/><rect x="-12" y="10" width="24" height="5" rx="2" fill="#e3b44f"/><line x1="0" y1="-26" x2="0" y2="-38" stroke="#e3b44f" stroke-width="3"/><circle cx="0" cy="-41" r="4" fill="#e0564b"/></g>
+    <text x="352" y="30" text-anchor="middle" font-family="Georgia, serif" font-size="26" fill="#f6d27a" letter-spacing="2">★★★</text>`;
+};
+
 export function portadaSolo(id) {
   const f = ARTE[id];
   if (!f) return "";

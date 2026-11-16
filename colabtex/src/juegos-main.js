@@ -144,7 +144,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱", typerace: "⌨" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, mascotas: "🐣", prokingdoms: "👑", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", typeraceclub: "⌨️", boxheadclub: "🧟", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", prokingdoms: "👑", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", typeraceclub: "⌨️", boxheadclub: "🧟", ajedrezclub: "♞", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -366,7 +366,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-integral", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-typerace", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender", "club-propac", "club-boxhead"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-integral", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-typerace", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender", "club-propac", "club-boxhead", "club-ajedrez"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -971,8 +971,8 @@ const nombreSolo = id => (SOLOS.find(x => x.id === id) || {}).nombre || id;
 const marcaInvitado = d => valorMarca(d.categoria, d);
 /* La ruta del club (`tetris`) y la clave de sus logros, monedas y nombre
    (`tetrisclub`) son lo mismo salvo en el Tetris. */
-// (Type Race igual: la sala se llama `typerace`, el club `typeraceclub`.)
-const CLAVE_CLUB = { tetris: "tetrisclub", typerace: "typeraceclub", boxhead: "boxheadclub" };
+// (Type Race igual: la sala se llama `typerace`, el club `typeraceclub`; y el ajedrez, `ajedrez` y `ajedrezclub`.)
+const CLAVE_CLUB = { tetris: "tetrisclub", typerace: "typeraceclub", boxhead: "boxheadclub", ajedrez: "ajedrezclub" };
 const claveClub = juego => CLAVE_CLUB[juego] || juego;
 /* Los destacados que además se llevan la partida a medias o el avance. */
 const AVANCE_INVITADO = new Set(["bbtan", "fanal", "trigon", "dosmil"]);
@@ -1871,7 +1871,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|boxhead|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|typerace|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|boxhead|ajedrez|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -2675,7 +2675,7 @@ function armazon() {
     /* La barra de arriba sale del mismo catálogo que el salón, así que un
        juego nuevo del club aparece aquí sin tocar esta línea. */
     const club = SOLOS.filter(x => x.tipo === "club"), este = club.find(x => x.ruta === "#solo/" + juego) || {};
-    const corto = { minas: "Buscaminas", snake: "Snake", sopa: "Sopa", sudoku: "Sudoku", frontera: "Frontera" };
+    const corto = { minas: "Buscaminas", snake: "Snake", sopa: "Sopa", sudoku: "Sudoku", frontera: "Frontera", ajedrezclub: "Ajedrez" };
     const barra = document.createElement("div");
     barra.className = "jg-solo-barra";
     barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${este.ranking === false ? "DE 1 A 8 EN EL MISMO TECLADO · SIN RANKING" : state.invitado ? `UN JUGADOR · <span data-con-nombre-inv${nombreInvitado() ? "" : " hidden"}><span data-nombre-inv translate="no">${escapeHtml(nombreInvitado())}</span> · </span>MODO INVITADO, NO SE GUARDA` : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
@@ -2709,7 +2709,7 @@ function armazon() {
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
       ocultos: () => bt3Visible() ? [] : ["bt3", "mkw"]
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-integral": "integral", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-typerace": "typeraceclub", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac", "club-boxhead": "boxheadclub" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-integral": "integral", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-typerace": "typeraceclub", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac", "club-boxhead": "boxheadclub", "club-ajedrez": "ajedrezclub" })[k] || k) });
     logrosVista.montar(h);
     return;
   }

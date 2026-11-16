@@ -117,6 +117,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
 | PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda, tercera y cuarta era, pactos, eventos, eventos de titanes, poder del reino, héroes a elección) | `juegos/club/prodefender/CLAUDE.md` |
 | PRO PACMAN (pacman, laberinto, fantasmas, racha, turbo, pulso) | `juegos/club/propac/CLAUDE.md` |
+| Ajedrez Club (ajedrez solo, contra bots, 4 dificultades, puzles de mate, estrellas) | `juegos/club/ajedrez/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.
 

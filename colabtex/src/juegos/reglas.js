@@ -1372,6 +1372,32 @@ const REGLAS = {
       ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* Ajedrez Club (juegos/club/ajedrez/): lo que dice aquí tiene que
+     coincidir con motor.js (NIVELES, paso, estrellas) y juego.js. */
+  ajedrezclub: {
+    lema: "Ajedrez Club: ajedrez para jugar solo, contra cuatro bots o con 60 puzles.",
+    secciones: [
+      ["Mover", "Toca una pieza tuya y después la casilla a la que va, o arrástrala; los puntos marcan a dónde puede ir. Con teclado o mando, las flechas mueven un cursor y Enter o Espacio hacen lo mismo que tocar. Las reglas son las de siempre, todas: enroque, al paso, coronación (eliges la pieza) y tablas por ahogado, triple repetición, cincuenta jugadas o material insuficiente, que se declaran solas."],
+      ["Contra bots", lista([
+        "Cuatro dificultades: <b>Novato</b> (mira una jugada y a veces mueve cualquier cosa), <b>Aficionado</b> (ve los cambios de piezas), <b>Experto</b> (calcula tres medias jugadas) y <b>Maestro</b> (cuatro medias jugadas y todos los cambios).",
+        "Eliges blancas, negras o al azar. Con negras empieza el bot.",
+        "Tu reloj corre <b>solo mientras te toca</b>: lo que piensa el bot no cuenta. Si recargas o cierras la pestaña la partida sigue donde quedó, y el tiempo que llevabas pensando también.",
+        "Rendirse, perder o hacer tablas no cuenta para nada; ganar por mate, sí."
+      ])],
+      ["Puzles", lista([
+        "60 posiciones de partidas reales de lichess.org (de dominio público): 15 <b>mates en 1</b>, 15 <b>mates en 2</b>, 15 para <b>ganar material</b>, 10 <b>mates en 3</b> y 5 <b>desafíos</b> de mate en 4 o 5.",
+        "Al abrir un puzle el rival hace su jugada; después te toca. Si aciertas, el rival responde y sigues hasta el final.",
+        "En los de mate vale <b>cualquier jugada que dé mate</b>, aunque no sea la de la solución. En el resto hay que encontrar la jugada exacta.",
+        "Cada puzle da de <b>1 a 3 estrellas</b>: tres sin errores ni pista, y una menos por cada error y por la 💡 pista (que marca la pieza que hay que mover). Resuelto, nunca baja de una. Una jugada equivocada se deshace y puedes volver a intentarlo.",
+        "Puedes repetir cualquier puzle: cuenta tu mejor intento (más estrellas y, a igualdad, menos tiempo)."
+      ])],
+      ["Clasificación", lista([
+        "Una tabla por cada bot, ordenada por el <b>menor tiempo de pensar</b> en una partida ganada.",
+        "Una tabla de <b>puzles</b> por estrellas (180 como máximo); a igualdad, gana el menor tiempo sumado.",
+        "Cada partida se rehace jugada por jugada antes de guardarse: las jugadas del bot se vuelven a calcular, así que solo cuenta lo que de verdad se jugó. Tus puzles se recuperan desde tu fila de la tabla si cambias de dispositivo."
+      ])]
+    ]
+  },
   /* PRO PACMAN (juegos/club/propac/): lo que dice aquí tiene que coincidir
      con motor.js (puntos, racha, turbo, pulso, compuertas, Glitch, vidas) y
      juego.js (controles). */
@@ -1667,7 +1693,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", boxheadclub: "Pro BoxHead", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", boxheadclub: "Pro BoxHead", ajedrezclub: "Ajedrez Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", typeraceclub: "Type Race", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

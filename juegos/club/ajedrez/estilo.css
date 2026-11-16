@@ -1,0 +1,141 @@
+/* Ajedrez Club. Colores en variables: oscuro por defecto (la página suelta),
+   claro cuando Juegos manda data-tema=claro. El tablero es siempre de
+   madera, como uno de verdad. */
+:root{
+  --fondo:#17130f;--panel:#231c16;--panel2:#2d241c;--borde:#463729;--tinta:#f3e9dc;--suave:#b9a690;
+  --oro:#e3b44f;--oro2:#f6d27a;--rojo:#e0564b;--verde:#7fb85a;
+  --clara:#f0d9b5;--oscura:#b58863;--sel:rgba(246,210,122,.62);--ultima:rgba(205,210,106,.55);
+  --display:'Cinzel',Georgia,serif;--body:'DM Sans',system-ui,sans-serif;
+  color-scheme:dark;
+}
+html[data-tema=claro]{--fondo:#f7f2ea;--panel:#fffaf2;--panel2:#f1e8da;--borde:#dccbb2;--tinta:#33281c;--suave:#7c6a55;color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--fondo);color:var(--tinta);font:15px/1.5 var(--body);min-height:100vh}
+.club-integrado body{background:transparent}
+.shell{max-width:1220px;margin:0 auto;padding:12px 16px 40px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+@media(max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+main{min-width:0;position:relative}
+button{font:inherit;color:inherit}
+
+.cab{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:4px 0 10px}
+.logo{margin:0;font:900 30px/1 var(--display);letter-spacing:.06em;color:var(--tinta)}
+.logo b{color:var(--oro)}
+.lema{margin:0;color:var(--suave);font-size:14px}
+
+.scorebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel)!important;border:1px solid var(--borde);border-radius:14px;padding:8px 12px;margin-bottom:12px}
+.dato{display:flex;flex-direction:column;min-width:76px}
+.dato small{font-size:10px;letter-spacing:.12em;color:var(--suave);font-weight:700}
+.dato strong{font-size:18px;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.mini{margin-left:auto;border:1px solid var(--borde);background:var(--panel2);border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:600}
+#sound-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:10px;border:1px solid var(--borde);background:var(--panel2);color:var(--tinta);cursor:pointer}
+#sound-button svg{width:22px;height:22px}
+#sound-button[aria-pressed=false] .ondas{display:none}
+#sound-button[aria-pressed=true] .cruz{display:none}
+@media (pointer:coarse){.mini,#sound-button{min-height:44px;min-width:44px}}
+
+/* La mesa: tablero y panel de jugadas. */
+.mesa{display:grid;grid-template-columns:minmax(0,560px) minmax(200px,1fr);gap:16px;align-items:start}
+@media(max-width:820px){.mesa{grid-template-columns:minmax(0,1fr)}}
+.lado-tablero{max-width:560px;width:100%;margin:0 auto}
+.jugador{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:14px}
+.jugador .avatar{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--panel2);border:1px solid var(--borde);font-size:17px}
+.jugador .perdidas{margin-left:auto;color:var(--suave);font-weight:700}
+.escenario{position:relative;width:100%;aspect-ratio:1;border-radius:6px;box-shadow:0 0 0 6px #5b3d22,0 0 0 8px #2b1c10,0 14px 34px rgba(0,0,0,.45);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.tablero{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:4px;overflow:hidden}
+.casilla{position:relative}
+.casilla.clara{background:var(--clara)}.casilla.oscura{background:var(--oscura)}
+.casilla.ultima::before,.casilla.sel::before,.casilla.pista::before,.casilla.error::before,.casilla.jaque::before{content:'';position:absolute;inset:0}
+.casilla.ultima::before{background:var(--ultima)}
+.casilla.sel::before{background:var(--sel)}
+.casilla.pista::before{background:rgba(90,170,255,.55);animation:late 1s ease-in-out infinite alternate}
+.casilla.error::before{background:rgba(224,86,75,.6)}
+.casilla.jaque::before{background:radial-gradient(circle,rgba(255,40,30,.95) 0,rgba(230,30,20,.6) 40%,transparent 72%)}
+.casilla.destino::after{content:'';position:absolute;left:50%;top:50%;width:30%;height:30%;margin:-15% 0 0 -15%;border-radius:50%;background:rgba(20,30,10,.3);z-index:3;pointer-events:none}
+.casilla.captura::after{content:'';position:absolute;inset:4%;border-radius:50%;border:5px solid rgba(20,30,10,.3);z-index:3;pointer-events:none}
+.casilla.cursor{box-shadow:inset 0 0 0 4px #3b82f6}
+@keyframes late{from{opacity:.35}to{opacity:1}}
+.coord{position:absolute;font:700 11px var(--body);pointer-events:none;opacity:.85}
+.coord.col{right:4px;bottom:2px}.coord.fila{left:3px;top:2px}
+.casilla.clara .coord{color:var(--oscura)}.casilla.oscura .coord{color:var(--clara)}
+.piezas{position:absolute;inset:0;pointer-events:none;z-index:2}
+.pieza{position:absolute;left:0;top:0;width:12.5%;height:12.5%;transition:transform .2s ease,opacity .2s;will-change:transform}
+.pieza.arrastrando{transition:none;z-index:5;filter:drop-shadow(0 8px 6px rgba(0,0,0,.35));scale:1.12}
+.pieza.sale{opacity:0;transition:opacity .2s}
+@media (prefers-reduced-motion:reduce){.pieza{transition:none}}
+
+.corona{position:absolute;top:0;z-index:20;width:12.5%;display:flex;flex-direction:column;background:#fff;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden}
+.corona button{border:0;background:#fff;padding:6%;cursor:pointer;aspect-ratio:1}
+.corona button:hover{background:#f2e3c6}
+.corona img{width:100%;height:100%;display:block}
+.corona .cancela{aspect-ratio:auto;padding:4px;color:#7a5a3a;font-weight:700}
+
+.panel-juego{background:var(--panel);border:1px solid var(--borde);border-radius:14px;padding:12px;min-width:0}
+.aviso{min-height:44px;margin:0 0 10px;font-weight:600;color:var(--tinta)}
+.acciones{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.jugadas{list-style:none;margin:0;padding:0;max-height:330px;overflow:auto;font:14px/1.9 var(--body);font-variant-numeric:tabular-nums;border-top:1px solid var(--borde)}
+.jugadas li{display:grid;grid-template-columns:38px 1fr 1fr;padding:0 6px}
+.jugadas li:nth-child(odd){background:var(--panel2)}
+.jugadas .n{color:var(--suave)}
+@media(max-width:820px){.jugadas{max-height:150px}}
+
+.boton{border:0;border-radius:11px;padding:11px 18px;background:linear-gradient(180deg,var(--oro2),var(--oro));color:#2b1d0b;font-weight:700;cursor:pointer;box-shadow:0 3px 0 #9c7426}
+.boton:active{transform:translateY(2px);box-shadow:0 1px 0 #9c7426}
+.boton.secundario{background:var(--panel2);color:var(--tinta);box-shadow:0 3px 0 var(--borde);border:1px solid var(--borde)}
+.boton.peligro{background:var(--panel2);color:var(--rojo);box-shadow:0 3px 0 var(--borde);border:1px solid var(--borde)}
+.boton.chico{padding:8px 12px;font-size:14px}
+.boton:disabled{opacity:.45;cursor:default}
+.boton.late{animation:latido 1s ease-in-out infinite}
+@keyframes latido{50%{transform:scale(1.06)}}
+.boton:focus-visible,.mini:focus-visible,.nivel:focus-visible,.puzle:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+
+/* Capas: el menú y el cartel del final. */
+.capa{position:absolute;z-index:30}
+.capa.fin{inset:6%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;background:rgba(23,19,15,.93);color:#f3e9dc;border-radius:14px;border:1px solid #6b5236;padding:18px;backdrop-filter:blur(3px);animation:aparece .3s ease}
+.capa.fin .tit{margin:0;font:900 28px/1.1 var(--display);color:var(--oro2);letter-spacing:.05em}
+.estrellas-fin{margin:0;font-size:40px;letter-spacing:.08em;color:var(--oro2);text-shadow:0 0 16px rgba(246,210,122,.5)}
+.tarjeta{display:grid;grid-template-columns:auto auto;gap:2px 16px;align-items:baseline;text-align:left}
+.tarjeta small{font-size:10px;letter-spacing:.12em;color:#b9a690;font-weight:700}
+.tarjeta strong{font-size:16px}
+.nuevo{color:var(--verde);font-style:normal;font-weight:800;letter-spacing:.08em}
+.frase{margin:0;max-width:34ch;color:#d9cbb8;font-size:14px}
+.menu-botones{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+@keyframes aparece{from{opacity:0;transform:scale(.96)}}
+
+.capa.menu{position:relative;background:var(--fondo);border:1px solid var(--borde);border-radius:16px;padding:18px clamp(12px,3vw,26px) 26px}
+.en-menu .mesa{display:none}
+.club-integrado .capa.menu{background:var(--panel)}
+.capa.menu .tit{margin:0 0 12px;text-align:center;font:900 26px var(--display);letter-spacing:.08em;color:var(--oro)}
+.pestanas{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
+.pestanas button{border:1px solid var(--borde);background:var(--panel2);padding:10px 18px;border-radius:999px;cursor:pointer;font-weight:700}
+.pestanas button[aria-selected=true]{background:var(--oro);color:#2b1d0b;border-color:var(--oro)}
+.explica{margin:0 auto 14px;max-width:62ch;color:var(--suave);font-size:14px;text-align:center}
+.niveles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px}
+.nivel{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;text-align:left;border:2px solid var(--borde);background:var(--panel2);border-radius:14px;padding:12px;cursor:pointer}
+.nivel .ava{grid-row:1/4;font-size:30px;align-self:center}
+.nivel b{font-size:16px}.nivel small{color:var(--suave);font-size:12.5px;line-height:1.35}
+.nivel .marca{font-size:12.5px;font-weight:700;color:var(--oro)}
+.nivel[aria-checked=true]{border-color:var(--oro);box-shadow:0 0 0 3px rgba(227,180,79,.25)}
+.color{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin-bottom:16px}
+.color span{color:var(--suave);font-weight:600}
+.color button{border:1px solid var(--borde);background:var(--panel2);border-radius:10px;padding:8px 12px;cursor:pointer}
+.color button[aria-pressed=true]{border-color:var(--oro);background:rgba(227,180,79,.18);font-weight:700}
+.total-estrellas{text-align:center;margin:0 0 10px;font:900 34px var(--display);color:var(--oro)}
+.total-estrellas small{font:700 16px var(--body);color:var(--suave)}
+.grupos{display:grid;gap:12px;margin-bottom:16px}
+.grupo h3{margin:0 0 6px;font-size:15px;display:flex;justify-content:space-between}
+.grupo h3 small{color:var(--oro);font-weight:700}
+.botones-puzle{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.puzle{display:flex;flex-direction:column;align-items:center;border:1px solid var(--borde);background:var(--panel2);border-radius:10px;padding:6px 2px;cursor:pointer;line-height:1.2}
+.puzle b{font-size:15px}.puzle span{font-size:12px;color:var(--suave);letter-spacing:.04em}
+.puzle.hecho span{color:var(--oro)}
+.puzle.pleno{border-color:var(--oro);background:rgba(227,180,79,.14)}
+.opciones{display:flex;justify-content:center;margin:14px 0 4px;color:var(--suave);font-size:14px}
+.opciones select{margin-left:6px;font:inherit;background:var(--panel2);color:var(--tinta);border:1px solid var(--borde);border-radius:8px;padding:4px 8px}
+.enlace{display:block;margin:10px auto 0;border:0;background:none;color:var(--oro);text-decoration:underline;cursor:pointer}
+.como{max-width:66ch;margin:8px auto 0;color:var(--tinta);font-size:14px}
+.como .chico,.chico{font-size:12px;color:var(--suave)}
+.nota{color:var(--suave);font-size:12px}
+.club-ranking{background:var(--panel)!important;color:var(--tinta)!important;border-color:var(--borde)!important}

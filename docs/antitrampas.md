@@ -157,6 +157,7 @@ que se espera de cada uno:
 | PRO TILES | `club-protiles-<canción>`, `club-protiles-mezcla` | semilla + cuenta + tick de cada nota (y altura de cada larga) sobre pasos fijos de 4 ms | baja |
 | Pokelike | `club-pokelike-puntos`, `club-pokelike-pokedex` | semilla + cuenta + inicial + cada decisión (camino, turno, captura, orden) | media |
 | PRO HERO | `club-hero-estrellas` | cada canción: el chart + cada acción con su instante, sobre la rejilla fija del motor; la tabla: la suma del mapa de estrellas | media |
+| Ajedrez Club | `club-ajedrez-bot<1-4>` (tiempo), `club-ajedrez-puzles` | semilla (con la cuenta) + nivel + color + jugadas del jugador con su Δms; el bot determinista se vuelve a calcular. Puzles: el mejor intento de cada uno | baja |
 | PRO PACMAN | `club-propac-puntos` | semilla + cuenta + cada jugada (dirección, turbo, pulso) con su tic de 1/60 s; giros en el tic exacto del centro delatan un programa | baja |
 | PRO DEFENDER | `club-prodefender-<reino>` | semilla + cuenta + cada acción (colocar, mejorar, vender, objetivo, ronda, recarga) con su paso de 1/60 s; rehecho en un Web Worker con caché por ronda | media |
 | Pro BoxHead | `club-boxhead-<mapa>` | semilla (con la cuenta) + mapa + cada cambio de teclado/stick y cada acción (arma, compra, muro, detonar) con su paso de 1/60 s; el juego mismo rehecho sin pantalla en un Web Worker | media |

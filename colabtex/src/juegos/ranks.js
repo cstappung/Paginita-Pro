@@ -35,7 +35,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, boxheadclub: { nombre: "Pro BoxHead", color: "#c9733a" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, integral: { nombre: "Integrodle", color: "#2c5aa8" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, typeraceclub: { nombre: "Type Race", color: "#e2b714" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }, propac: { nombre: "PRO PACMAN", color: "#ffe14d" }};
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, boxheadclub: { nombre: "Pro BoxHead", color: "#c9733a" }, ajedrezclub: { nombre: "Ajedrez Club", color: "#e3b44f" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, integral: { nombre: "Integrodle", color: "#2c5aa8" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, typeraceclub: { nombre: "Type Race", color: "#e2b714" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }, propac: { nombre: "PRO PACMAN", color: "#ffe14d" }};
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -108,6 +108,9 @@ const SOLO = {
   /* Pro BoxHead: una tabla por mapa, el nivel más alto al que se llegó. */
   boxheadclub: { filas: [{ k: "n", t: "Mapa", ops: [["patio", "Patio"], ["sotano", "Sótano"], ["cruce", "Cruce"], ["fortaleza", "Fortaleza"], ["laberinto", "Laberinto"], ["planta", "Planta"], ["hangar", "Hangar"], ["fabrica", "Fábrica"], ["apagon", "Apagón"]] }],
     cat: s => `club-boxhead-${s.n}` },
+  /* Ajedrez Club: una tabla por nivel del bot (tiempo) y la de los puzles (estrellas). */
+  ajedrezclub: { filas: [{ k: "n", t: "Tabla", ops: [["bot1", "Bot Novato"], ["bot2", "Bot Aficionado"], ["bot3", "Bot Experto"], ["bot4", "Bot Maestro"], ["puzles", "Puzles"]] }],
+    cat: s => `club-ajedrez-${s.n}` },
   /* PRO PACMAN: una sola tabla, el puntaje de la partida. */
   propac: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"]] }],
     cat: s => `club-propac-${s.n}` },
@@ -496,7 +499,7 @@ export function crearRanks(ctx) {
     if (mkwRec()) return { valor: fi => fi.oro || 0, txt: v => plural(v, "récord", "récords"), unidad: "", menor: false };
     if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo.startsWith("club-sortem-") || categoriaSolo === "club-tetris-sprint" || categoriaSolo.startsWith("club-tetris-bots-") ||
         (categoriaSolo.startsWith("club-sopa-") && categoriaSolo !== "club-sopa-racha") ||
-        /^club-sudoku-(facil|medio|dificil|experto)$/.test(categoriaSolo)))
+        /^club-sudoku-(facil|medio|dificil|experto)$/.test(categoriaSolo) || /^club-ajedrez-bot[1-4]$/.test(categoriaSolo)))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
     if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-") || categoriaSolo.startsWith("club-prodefender-") || categoriaSolo.startsWith("club-boxhead-")))
@@ -504,7 +507,7 @@ export function crearRanks(ctx) {
     /* PRO HERO: puntos = doradas·10 000 + todas; se dicen las doradas. */
     if (solo && categoriaSolo === "club-hero-estrellas")
       return { valor: f => Math.floor((f.puntos || 0) / 10000), txt: v => `${v} ★`, unidad: "", menor: false };
-    if (solo && categoriaSolo === "club-atasco-estrellas")
+    if (solo && (categoriaSolo === "club-atasco-estrellas" || categoriaSolo === "club-ajedrez-puzles"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ★`, unidad: "", menor: false };
     if (solo && categoriaSolo === "club-fanal-jornadas")
       return { valor: f => f.puntos || 0, txt: v => `jornada ${v}`, unidad: "", menor: false };
