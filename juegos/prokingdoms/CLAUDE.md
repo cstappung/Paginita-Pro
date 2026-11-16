@@ -391,3 +391,26 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   camera they were always in shadow). The wreck heels over, with holes, a broken main mast and no sails until it has
   its pieces. `S.barcoColonos` in `sprites-mar.js` defers to `S.barcoColonos3d`.
 
+
+### Owner's tweaks, second round (`pk-55`)
+
+- **Roads only on your own land** (`L.roadAllowed` needs `ownerAt === 'p'`; outside goes the Calzada Real).
+  `revisarCaminos()` runs once per load (first `L.update` with `W.terr`): removes old roads outside, refunds half.
+  `L.onTerritory` also drops roads on any tile that stops being yours.
+- **Gran Portón layers**: `S.porton` returns the back (towers, floor, open leaves) with `spr.frente` (front tower,
+  portcullis, arch) as a second sprite; `render.js` sorts the back at `d + 0.5` and the front at `d + 3.4`, so a unit
+  crossing is drawn between them (it used to sink into the floor).
+- **Campaign places never inside a territory**: `lugarLibre` in `campana.js` (no `W.terr`, no `terrCommon`, no POI or
+  building); `C.revisarLugar` (from `Dz.revisar`) moves an existing one to the nearest free tile. Guard on
+  `st.campana.lugares`: without it the game did not start («reading 'hechos'»).
+- **Foreign buildings on your land** (`G.ajenoEnTuTierra`): the panel offers «Mudar fuera de mi tierra» (bots: moved
+  to a free spot in no-man's land) or «Sacar de mi tierra» (remote players: hidden for you only). Kept in
+  `S.desalojo[owner:type:x0,y0]` and re-applied after `setupBots` and in `net.js applyPlayers`, because bot and remote
+  buildings are rebuilt on every load. `G.revisarPuestos()` dismantles your own outpost camps whose centre fell in
+  someone else's land (half the cost back).
+- **«Cualquier campamento minero»** (`r.tipo` = `lumber|mining|mill`, `r.res` optional = «solo X»): routes from a camp
+  with no fixed resource carry **mixed cargo**: `u.carga = {res: n}` (only with 2+ kinds; saved in `toJSON`), `u.carry`
+  the total and `u.carryRes` the largest (sprite, server snapshot index). Always read cargo through `L.cargaDe(u)`;
+  `Lb.fuera`, `inbound` (`job.carga`), `dropCargo`, `descargar` (leftovers → another store, or back to the town if the
+  destination does not take them) and `L.offline` all handle it. `mejorBodega` takes a list and prefers the store that
+  takes most of it (a Granary next door does not catch a mining load). pk-54 routes (`res` without `tipo`) still work.

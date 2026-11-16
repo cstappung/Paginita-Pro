@@ -362,7 +362,7 @@
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty);
       if (!W.inb(x, y)) return;
       if (!I.roadStart) {
-        if (!L.roadAllowed(x, y)) { PK.UI.toast('Ahí no se puede hacer camino (tiene que ser tu tierra o tierra de nadie, explorada y libre).', 'warn'); return; }
+        if (!L.roadAllowed(x, y)) { PK.UI.toast('Ahí no se puede hacer camino: tiene que ser tu tierra, explorada y libre. Fuera de tu tierra va la Calzada Real (Logística).', 'warn'); return; }
         I.roadStart = [x, y]; PK.UI.toast('Toca dónde termina el camino.', 'info'); return;
       }
       const n = L.buildRoad(L.roadPlan(I.roadStart[0], I.roadStart[1], x, y));

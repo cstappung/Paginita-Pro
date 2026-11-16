@@ -128,7 +128,7 @@
   Lb.fuera = function (r) {
     let n = 0;
     for (const b of Lb.campos()) n += (b.inv && b.inv[r]) || 0;
-    for (const u of G().units) if (u.owner === 'p' && (u.kind === 'cart' || u.kind === 'carromato' || u.kind === 'barcaza') && u.carryRes === r) n += u.carry || 0;
+    for (const u of G().units) if (u.owner === 'p' && (u.kind === 'cart' || u.kind === 'carromato' || u.kind === 'barcaza')) n += u.carga ? u.carga[r] || 0 : u.carryRes === r ? u.carry || 0 : 0; // pk-55: carga mezclada
     return n;
   };
 })();
