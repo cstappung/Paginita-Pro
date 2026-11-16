@@ -297,6 +297,141 @@
     return { c: B.canvas(), pies: [q(17), Y(63)], llama, cabeza: [q(17), Y(2.5)], w: W, h: H };
   };
 
+  // ---------- El Coloso de Bronce (la Maravilla) ----------
+  // pk-52: su propia estatua a tamaño real (antes era la del Coloso chico agrandada ×1.32, y la cara quedaba en una
+  // mancha). Pose de la Atenea Pártenos: la antorcha en alto, la lanza en la otra mano y el escudo apoyado en el suelo.
+  // Yelmo ático con carrilleras y cresta de crin, cara con cejas, ojos, nariz y boca, coraza musculada, faldón de
+  // tiras (pteruges) con tachas de oro, grebas, capa con pliegues y plinto de bronce (una pátina verde salpicada
+  // parecía suciedad: se probó y se sacó).
+  // partes: { piernas, torso, cabeza, lanza, antorcha, escudo } como F.estatua. Devuelve { c, pies, cabeza }.
+  F.coloso = function (col, partes) {
+    partes = partes || { piernas: 1, torso: 1, cabeza: 1, lanza: 1, antorcha: 1, escudo: 1 };
+    const OY = 9, W = 56, H = 123 + OY, B = lienzo(W, H, false);
+    const e = (x, y, rx, ry, c, o) => B.e(x, y + OY, rx, ry, c, o);
+    const t = (x0, y0, x1, y1, r0, r1, c, o) => B.t(x0, y0 + OY, x1, y1 + OY, r0, r1, c, o);
+    const poly = (pts, c, k0, k1) => B.poly(pts.map(v => [v[0], v[1] + OY]), c, k0, k1);
+    const p = (x, y, c) => B.p(x, y + OY, c);
+    const plano = (cx, cy, rx, ry, c) => { for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) p(x, y, c); };
+    const br = [200, 138, 74], brO = [116, 72, 38], brL = [244, 198, 124], brD = [160, 104, 56], yel = [186, 124, 64];
+    const oro = [246, 206, 104], oroO = [170, 124, 50], luz = [255, 238, 186];
+    const crin = [[200, 54, 44], [230, 90, 66], [158, 36, 30]];
+    const cuerpo = partes.torso, lanza = partes.lanza && cuerpo;
+
+    // capa por detrás, con el borde movido por el viento
+    if (cuerpo) {
+      poly([[17, 38], [39, 38], [44, 70], [47, 97], [41, 101], [33, 98], [25, 101], [17, 98], [10, 96], [13, 70]], brD, 1.02, 0.66);
+      for (const [x0, x1] of [[19, 14], [24, 21], [32, 34], [37, 43]]) t(x0, 45, x1, 97, 0.45, 0.8, brO);
+      for (const [x0, x1] of [[21, 17.5], [35, 39]]) t(x0, 47, x1, 95, 0.4, 0.55, br);
+    }
+    // el asta de la lanza (detrás del brazo y del escudo); apoya en el plinto
+    if (lanza) {
+      t(10, 4, 10, 117, 0.8, 0.8, [124, 84, 46]); t(9.6, 6, 9.6, 115, 0.3, 0.3, [164, 116, 66]);
+      poly([[10, -6], [12.6, 1], [11.4, 5], [8.6, 5], [7.4, 1]], [206, 212, 226], 1.25, 0.85); // hoja
+      t(10, -4, 10, 4, 0.3, 0.3, [244, 248, 255]); // filo
+      t(8, 5.5, 12, 5.5, 0.7, 0.7, oro); // virola
+    }
+    // plinto
+    e(28, 117, 15, 3.4, brD, { lomo: brL, ly: -0.2 });
+    poly([[13, 117], [43, 117], [43, 121], [13, 121]], brO, 1, 0.85);
+    t(13.5, 119, 42.5, 119, 0.45, 0.45, oroO);
+
+    if (partes.piernas) {
+      // izquierda (la del apoyo, recta) y derecha (suelta, rodilla adelante)
+      const P2 = [[23, 70, 22, 91, 22, 111], [33, 70, 35, 90, 36.5, 110]];
+      for (const [hx, hy, kx, ky, ax, ay] of P2) {
+        t(hx, hy, kx, ky, 4.4, 3.3, br); // muslo
+        e(kx + 0.3, ky + 6, 3.4, 5, br); // pantorrilla
+        t(kx, ky + 1, ax, ay, 3.2, 2.2, br, { k: 1.1 }); // greba
+        t(kx - 2.6, ky + 1.5, kx + 2.6, ky + 1.5, 0.45, 0.45, brO); t(ax - 2, ay - 0.5, ax + 2, ay - 0.5, 0.45, 0.45, brO);
+        e(kx, ky, 2.6, 2.2, br, { lomo: brL, ly: -0.1 }); // rodillera
+        p(kx - 1, ky - 1, luz);
+        e(ax + (ax > 28 ? 1 : -1), ay + 4, 3.6, 2, brD); // pie con sandalia
+        t(ax - 2.2, ay + 2.4, ax + 2.2, ay + 2.4, 0.4, 0.4, brO);
+        for (let i = -1; i <= 1; i++) p(ax + (ax > 28 ? 1 : -1) + i * 1.4, ay + 5, brL); // dedos
+      }
+      // faldón de tiras: la fila de atrás y la de adelante, con tachas de oro
+      for (let x = 18.5; x <= 37.5; x += 2.4) { t(x, 70, x + (x - 28) * 0.08, 81, 1.05, 1.05, br, { k: 0.86 }); p(x + (x - 28) * 0.08, 80.5, oro); }
+      for (let x = 19.7; x <= 36.5; x += 2.4) { t(x, 64, x + (x - 28) * 0.06, 74, 1.05, 1.05, br, { k: 1.06 }); p(x + (x - 28) * 0.06, 73.5, oro); }
+    }
+
+    if (cuerpo) {
+      // brazo de la lanza: hombro → codo afuera → puño en el asta
+      t(17, 41, 12.5, 53, 3.5, 2.9, br); t(12.5, 53, 10.4, 61, 2.9, 2.3, br);
+      t(11.2, 57.5, 12.6, 53.8, 2.5, 2.5, br, { k: 1.12 }); t(10.6, 58, 13, 58.6, 0.45, 0.45, oro); // brazal
+      // coraza musculada
+      e(28, 57, 8.6, 8.4, br); // vientre
+      e(28, 46, 12.2, 8.8, br); // pecho
+      t(28, 41, 28, 52, 0.45, 0.45, brO); // esternón
+      for (const s2 of [-1, 1]) { // pectorales y abdominales
+        t(28 + s2 * 0.8, 51, 28 + s2 * 5.5, 51.6, 0.5, 0.5, brO); t(28 + s2 * 5.5, 51.6, 28 + s2 * 10, 48, 0.5, 0.45, brO);
+        for (const y of [55, 58.6]) { t(28 + s2 * 1, y, 28 + s2 * 5, y - 0.4, 0.42, 0.42, brO); p(28 + s2 * 3, y - 1.6, brL); }
+        p(28 + s2 * 4, 44, brL); p(28 + s2 * 6.5, 45, brL);
+      }
+      p(28, 61.5, brO); p(23, 43, luz); p(24, 43, luz); p(33, 44, luz);
+      // cinturón con hebilla
+      t(19.2, 65.5, 36.8, 65.5, 1.3, 1.3, brO); e(28, 65.5, 2.1, 1.5, oro); p(27.5, 65, luz);
+      // hombreras de láminas
+      for (const s2 of [-1, 1]) { e(28 + s2 * 12.9, 45, 4.2, 2.4, brD); e(28 + s2 * 12.2, 42, 4.6, 3.4, br, { lomo: brL }); t(28 + s2 * 9.2, 43.6, 28 + s2 * 15.6, 43.6, 0.4, 0.4, brO); p(28 + s2 * 12.2, 41.6, oro); }
+      // brazo de la antorcha: hombro → codo → puño en alto
+      t(39.5, 41, 44, 28, 3.5, 2.9, br); t(44, 28, 45, 17, 2.9, 2.3, br);
+      t(44.3, 24.5, 44.9, 19.5, 2.6, 2.4, br, { k: 1.12 }); t(42.3, 24.6, 46.7, 24.6, 0.45, 0.45, oro); t(42.6, 19.4, 47.1, 19.4, 0.45, 0.45, oro);
+    }
+    // la antorcha y su llama (dibujada aquí: es grande)
+    if (cuerpo && partes.antorcha) {
+      t(45.2, 17, 45.2, 6.5, 1.1, 1.5, brD);
+      e(45.2, 6, 2.9, 1.5, oro); t(42.6, 5.6, 47.8, 5.6, 0.4, 0.4, oroO);
+      plano(45.2, 0.8, 3.3, 5, [222, 88, 30]); plano(45.3, 2, 2.3, 3.6, [246, 156, 46]); plano(45.4, 3.2, 1.3, 2.2, [255, 226, 120]);
+      for (const [x, y, c] of [[45, -5, [222, 88, 30]], [46, -6, [246, 140, 40]], [44, -3.5, [246, 156, 46]], [46.6, -3, [222, 88, 30]]]) p(x, y, c);
+    }
+    if (cuerpo) { // puño de la antorcha encima del mango
+      e(45.2, 15.4, 2.7, 2.3, br); t(43.6, 14.6, 46.8, 14.6, 0.4, 0.4, brO); t(43.6, 16.2, 46.8, 16.2, 0.4, 0.4, brO);
+    }
+
+    if (partes.cabeza) {
+      // cuello y trapecios
+      poly([[25.2, 31], [30.8, 31], [31.4, 36], [38, 39.5], [18, 39.5], [24.6, 36]], br, 1.08, 0.86);
+      t(25.8, 37, 26.6, 32.6, 0.35, 0.35, brO); t(30.2, 37, 29.4, 32.6, 0.35, 0.35, brO);
+      // la cabeza va pixel a pixel (a esta escala las formas sueltas hacían una caja): yelmo dorado con brillo arriba
+      // a la izquierda y carrilleras que enmarcan la cara; la frente en sombra bajo la visera, cejas, ojos, nariz con sus
+      // aletas, boca, labio y mentón. La cresta de crin va antes, por detrás de la calota.
+      for (let i = 0; i < 15; i++) { const h = 2 + Math.round(6.5 * Math.sin((Math.PI * (i + 0.5)) / 15)), c = i % 3 === 1 ? crin[1] : i % 3 === 2 ? crin[2] : crin[0]; for (let y = 0; y <= h; y++) p(21 + i, 16 - y, y === h && i < 8 ? crin[1] : c); }
+      const CAB = [
+        '....wYYgggggG....',
+        '...wYYgggggggG...',
+        '..YYYggggggggGG..',
+        '.YYgggggggggggGG.',
+        '.YgggggggggggggG.',
+        'oGYYwYYYYYYgggGGo',
+        '.YgGkkkkkkkkkgGo.',
+        '.YgGfhhfhfhhkgGo.',
+        '.YgGfeefhfeekgGo.',
+        '.YgGfhffhfffkgGo.',
+        '.YgGfffhhkffkgGo.',
+        '.YgGkffdhdfkkgGo.',
+        '..gGkfffffffkGo..',
+        '...Gkffdddffko...',
+        '....kfffhfffk....',
+        '.....kffhffk.....',
+        '......kkhkk......',
+        '......ddddd......',
+      ];
+      const PAL = { Y: [252, 218, 128], g: [226, 174, 76], G: oroO, o: [118, 82, 34], w: luz, f: br, h: brL, k: brD, d: brO, e: [56, 32, 16] };
+      CAB.forEach((fila, y) => { for (let x = 0; x < fila.length; x++) if (PAL[fila[x]]) p(20 + x, 15 + y, PAL[fila[x]]); });
+    }
+    // el escudo apoyado en el suelo, contra la pierna
+    if (partes.escudo && cuerpo) {
+      const ex = 15.2, ey = 101, rx = 8.6, ry = 10.2;
+      e(ex, ey, rx, ry, col);
+      for (let a = 0; a < 64; a++) { const k = (a / 64) * Math.PI * 2; for (const f of [1, 0.9]) p(ex + Math.cos(k) * rx * f, ey + Math.sin(k) * ry * f, f === 1 ? oroO : oro); }
+      for (let a = 0; a < 40; a++) { const k = (a / 40) * Math.PI * 2; p(ex + Math.cos(k) * rx * 0.55, ey + Math.sin(k) * ry * 0.55, oroO); }
+      for (let a = 0; a < 8; a++) { const k = (a / 8) * Math.PI * 2; t(ex + Math.cos(k) * 1.6, ey + Math.sin(k) * 1.9, ex + Math.cos(k) * 4, ey + Math.sin(k) * 4.8, 0.5, 0.3, oro); } // sol del reino
+      e(ex, ey, 1.9, 2.2, oro); p(ex - 0.8, ey - 0.9, luz); p(ex - 5, ey - 6.5, [255, 255, 255]);
+    }
+    if (lanza) { e(10.2, 62, 2.4, 2.2, br); t(8.2, 61.2, 12.2, 61.2, 0.4, 0.4, brO); t(8.2, 62.8, 12.2, 62.8, 0.4, 0.4, brO); } // puño en el asta
+
+    return { c: B.canvas(), pies: [28, 121 + OY], llama: null, cabeza: [28, 6 + OY], w: W, h: H };
+  };
+
   // ---------- Dragón posado (Torre del Dragón) ----------
   // Mirando a la derecha, agarrado a la almena: cuerpo, cuello en S, cabeza con cuernos, alas a medio abrir con
   // membrana y nervaduras, y la cola que cuelga por el borde. Devuelve el canvas y el punto de las patas.

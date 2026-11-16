@@ -202,8 +202,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Animals and figures** (`js/fauna.js`, `pk-50`): shaded ellipses and strokes with two-segment legs walked by phase,
   outlined, at double resolution (`k: 2`) like villagers. Wolf (6 frames, map and battle), deer (3 poses per deer,
   alternated by `render.js`), the rider's horse (gallop), battle bear, skeleton, golem and flying dragon (cached per
-  frame in `batalla.js` `fauna()`), the Coloso statue (by phases for `m_coloso`) and the dragon on the tower (stamped
-  with the painter's `img`). The old box sprites stay as fallback when `PK.Fauna` is missing. `S.hit` scales by `k`.
+  frame in `batalla.js` `fauna()`), the Coloso statue and the dragon on the tower (stamped
+  with the painter's `img`). The wonder `m_coloso` has its own statue at full size (`F.coloso`, `pk-52`; scaling the
+  small one ×1.32 blurred the face): gilded helmet and face drawn pixel by pixel from a map (`CAB`), the rest with
+  shapes, built by phases. A speckled green patina was tried and removed (read as dirt). The old box sprites stay as fallback
+  when `PK.Fauna` is missing. `S.hit` scales by `k`.
 - **Welcome guide** (`js/guia.js`, `PK.Guia`, `pk-48`, longer in `pk-49`): Tobías the steward walks a new kingdom
   through 27 steps (TC → villager → gather wood → house → lumber camp and its radius → a battle → Misiones). The
   battle is not an expedition: `B.empezar` with id `990000001` (not in `S.exp.runs`, so no losses or loot of its

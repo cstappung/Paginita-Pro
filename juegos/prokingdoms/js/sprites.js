@@ -1078,8 +1078,8 @@
       p.quad({ x: 1, y: 1, w: 3, h: 3 }, 'L', 1.1, 1.9, 8, 14, rgb(col));
       if (ph === 0) { for (const [x, y] of [[1.4, 2.1], [2.5, 2.1]]) p.box(x, y, 0.6, 0.6, 21, 34, 'plank', 'darkwood'); p.box(1.3, 2.0, 2.0, 0.8, 34, 36, 'plank', 'darkwood', 'plank'); }
       if (ph >= 1 && PK.Fauna) { // pk-50: la estatua con volumen, que se completa por fases
-        p.flag(0.4, 0.4, 4, col, 16); // antes que la estatua: está detrás
-        const e = PK.Fauna.estatua(1.32, col, { piernas: 1, torso: ph >= 2, cabeza: ph >= 3, lanza: ph >= 4, antorcha: ph >= 5, escudo: ph >= 2 });
+        // sin bandera: detrás de la estatua solo asomaba un pedazo blanco junto al escudo (el color va en el escudo)
+        const e = PK.Fauna.coloso(col, { piernas: 1, torso: ph >= 2, cabeza: ph >= 3, lanza: ph >= 4, antorcha: ph >= 5, escudo: ph >= 2 });
         p.img(e.c, e.pies[0], e.pies[1], 2.5, 2.5, 21);
         if (e.llama) { const q = p.P(2.5, 2.5, 21), t = [Math.round(q[0] - e.pies[0] + e.llama[0]), Math.round(q[1] - e.pies[1] + e.llama[1])]; for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [-1, -2, '#f0a030'], [0, -3, '#fff0a0'], [1, -3, '#ffd060'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c); }
         if (ph >= 6) { const q = p.P(2.5, 2.5, 21), t = [q[0] - e.pies[0] + e.cabeza[0], q[1] - e.pies[1] + e.cabeza[1]]; for (let a = 0; a < 28; a++) { const k = (a / 28) * Math.PI * 2; p.px(Math.round(t[0] + Math.cos(k) * 8), Math.round(t[1] + Math.sin(k) * 2.5), a % 2 ? GOLD : GLINT); } } // halo sobre el yelmo
