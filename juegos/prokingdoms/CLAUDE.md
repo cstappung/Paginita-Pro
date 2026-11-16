@@ -13,7 +13,8 @@ owner outside this repo and dropped in.
   L<N> del plan de logística»; L6 is the sea with cargo barges). §10 lists traps; §11 has the owner's answered
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
 - `PLAN-GUERRA.md` (Nov 16 2026): the plan after that, «Estandartes de Guerra», phases G1–G8 («implementa la Fase
-  G<N> del plan de guerra»): conquest as a three-stage siege drawn on the map. Not started. Its §1 table (win chance
+  G<N> del plan de guerra»): conquest as a three-stage siege drawn on the map. G1 and G2 delivered together in `pk-55` (its «Avance» section says
+  what is left); G3 onward not started. Its §1 table (win chance
   by strength ratio) is the balance contract; §12 lists the owner's open decisions.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
@@ -394,3 +395,33 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   camera they were always in shadow). The wreck heels over, with holes, a broken main mast and no sails until it has
   its pieces. `S.barcoColonos` in `sprites-mar.js` defers to `S.barcoColonos3d`.
 
+
+### War plan, G1 + G2: the siege (`pk-55`)
+
+- **The battle plan is the only truth.** `D.asedioPlan({atk, parts, semilla})` (data.js, pure, seeded) decides the
+  whole siege when the campaign arrives: winner, casualties and the three stages (`D.ASEDIO`: frontera = era + around,
+  defensas = towers + walls, estandarte = troops + home). `D.asedioEn(plan, t)` gives the state at second `t`.
+  Everything else only reads it: `terr.js` (`c.plan`, `c.ini`, `c.lado`, phase `go → asedio → back`), the queue row,
+  Territorio, and the drawing. Never keep battle state anywhere else: reload and offline give the same ending because
+  of this (checked: same plan after reload, same result an hour later).
+- **The win chance by strength ratio did not move** (§1 of the plan; `colabtex/tests/pk-asedio.test.cjs` holds it).
+  The roll is the old one (each side ×0.85–1.15); the stages only spread it over ~4 minutes (`D.ASEDIO.total`).
+- **`js/frente.js` (`PK.Frente`) draws and nothing else**: it decides nothing and saves nothing; the cast comes
+  from the plan's seed, and `Math.random` is only for dust, smoke and the like. A test fails if it calls
+  `asedioPlan`/`conquestLoss` or touches camps, threats, battles or resources. Hooks in `render.js` (`suelo`, `collect`,
+  `minimapa`).
+- The parcel changes owner **at the end** of the siege, not on arrival; meanwhile it is «en disputa»
+  (`T.enDisputa`, `G.placeWhy` → `'disputa'`: nothing is built there).
+- Neighbours' probes go through the same siege (`th.plan`). A lost probe still costs the fixed 15% of the army, not
+  the plan's casualties (kept from before; the plan's text said otherwise).
+- Replays: each battle keeps `rep: {plan, units, lado, de, a}`; «Ver de nuevo» calls `PK.Frente.repetir`. Battles
+  decided by the server get a plan rebuilt with `D.asedioDe({gano, …})` so they can be replayed too; real
+  player-vs-player sieges are G3 (server, PROTO 11, needs `firebase deploy --only functions`).
+- The toast on arrival must not show the rolled defence: it gave the result away.
+- Realms start 2–4 free parcels from each other: `T.caminoA(slot)` + «Marcar el camino» tell the player which
+  parcels to claim to reach a neighbour.
+- Autopilot (`tools/piloto.js`): buys wood/stone when short for the next era (it sat on Era III with gold to spare)
+  and claims toward the nearest realm (`frontera()`). Era IV at game minute 145–173 (was 104 in `pk-45`); in 311
+  minutes it never reached a border, so its sieges are only the probes it defends.
+- **Known, not fixed:** with gold over the store cap (rewards), a cart carrying gold from a mixed mining camp waits
+  forever to unload, the camp fills up and stone stops coming in.
