@@ -952,7 +952,8 @@ function conquer(p, b) {
   if (!total) throw new GameError('Elige tropas para la campaña.');
   const [cx, cy] = parcelCenter(k), [hx, hy] = D.REALM_SLOTS[p.slot].home;
   const travel = 90 + Math.hypot(cx - hx, cy - hy) * 1.5;
-  const c = { id: rid('c'), world: w.id, k, from: p.id, fromName: p.name, fromSlot: p.slot, to: tgt.id, toName: tgt.name, toSlot: slot, units, power, arrive: t + travel * 1000, revenge };
+  const c = { id: rid('c'), world: w.id, k, from: p.id, fromName: p.name, fromSlot: p.slot, to: tgt.id, toName: tgt.name, toSlot: slot, units, power, arrive: t + travel * 1000, travel, revenge };
+  if (D.ASEDIO.tacticas[b.tactica]) c.tac = b.tactica; // G4
   store.set('camps', c.id, c);
   // aviso al defensor: le llega aunque no esté conectado (lo ve al volver, en el resumen)
   push(tgt, { type: 'under_attack', cid: c.id, k, from: p.name, power: Math.round(power), arrive: c.arrive, revenge,
@@ -1006,9 +1007,16 @@ function tickCamps() {
     const still = w.terr[c.k] === c.toSlot + 1;
     if (!c.plan && tgt && still) { // llegaron: empieza el asedio
       c.semilla = 1 + Math.floor(Math.random() * 2e9); c.semV = 1 + Math.floor(Math.random() * 2e9);
-      c.plan = D.asedioPlan({ atk: c.power, parts: parcelDefense(w, c.k, tgt, c.toSlot), semilla: c.semilla });
+      c.plan = D.asedioPlan({ atk: c.power, parts: parcelDefense(w, c.k, tgt, c.toSlot), semilla: c.semilla, units: c.units, tactica: c.tac });
+      c.powerT = c.power;
       c.ini = c.arrive; c.lado = ladoDe(w, c.k, c.fromSlot); c.et = 0;
       push(tgt, { type: 'siege_start', cid: c.id, k: c.k, from: c.fromName, fin: c.ini + c.plan.total * 1000, text: 'Las tropas de ' + c.fromName + ' llegaron a tu frontera: empieza el asedio.' });
+    }
+    if (c.plan && c.ref && !c.ref.ok && t >= c.ref.llega && c.ref.llega < c.ini + c.plan.total * 1000) { // G4: llegaron los refuerzos
+      const juntas = Object.assign({}, c.units);
+      for (const u in c.ref.units) juntas[u] = (juntas[u] || 0) + c.ref.units[u];
+      const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT)), m: D.asedioOficio(juntas) });
+      if (n) { c.plan = n; c.powerT += c.ref.power; c.units = juntas; c.ref.ok = true; c.et = -1; }
     }
     if (c.plan && t < c.ini + c.plan.total * 1000) { // en curso: la lista del mundo cambia cuando empieza una etapa
       const n = c.plan.etapas.filter(e => (t - c.ini) / 1000 >= e.t0).length;
@@ -1019,7 +1027,7 @@ function tickCamps() {
     w.asv = (w.asv || 0) + 1;
     const plan = c.plan || null, won = !!plan && still && plan.gano;
     // resumen: fuerza contra defensa y de dónde salió la defensa, y el plan entero para la repetición
-    const bt = plan ? { atk: plan.atk, def: plan.def, parts: plan.parts, plan, ini: c.ini, lado: c.lado, units: c.units, fromSlot: c.fromSlot, toSlot: c.toSlot } : {};
+    const bt = plan ? { atk: plan.atk, def: plan.def, parts: plan.parts, plan, ini: c.ini, lado: c.lado, units: c.units, fromSlot: c.fromSlot, toSlot: c.toSlot, vuelve: !!(c.ref && !c.ref.ok) } : {};
     if (won) {
       w.terr[c.k] = c.fromSlot + 1; w.tv++;
       w.tshield[c.toSlot] = t + D.TERR.shieldLoss * 1000;
@@ -1040,6 +1048,47 @@ function tickCamps() {
       text: (won ? 'Tus tropas tomaron la parcela de ' + c.toName + '.' : still && plan ? c.toName + ' resistió tu campaña.' : 'La parcela ya no era de ' + c.toName + ' cuando llegaron tus tropas.') }, bt));
     store.touch('worlds'); store.touch('players');
   }
+}
+
+// G4: una decisión durante el asedio. El atacante cambia de táctica (una vez), manda refuerzos (una columna) o se
+// retira; el defensor hace una salida (una vez, en las dos primeras etapas) o rinde la parcela. Cada una vuelve a
+// calcular el plan desde este instante (D.asedioReplan) y la lista del mundo cambia. Lo que no vale da error, sin
+// sospecha: son botones que el reloj puede dejar viejos.
+function asedio(p, b) {
+  const c = store.get('camps', String(b.id || '')), t = now(), A = D.ASEDIO;
+  if (!c || !c.plan || (c.from !== p.id && c.to !== p.id)) throw new GameError('Ese asedio no es tuyo o ya terminó.');
+  const seg = (t - c.ini) / 1000, soyAtk = c.from === p.id, cuenta = soyAtk ? 'accA' : 'accD';
+  if (seg >= c.plan.total) throw new GameError('El asedio ya terminó.');
+  if ((c[cuenta] || 0) >= A.maxAcc) throw new GameError('Ya tomaste todas las decisiones de este asedio.');
+  const w = store.get('worlds', c.world), tipo = String(b.accion || '');
+  let ch = null, out = { ok: true };
+  if (soyAtk && tipo === 'tactica') {
+    if (c.tacCambio) throw new GameError('Ya cambiaste de táctica en este asedio.');
+    const tac = A.tacticas[b.tactica] ? b.tactica : null;
+    ch = { tipo, tactica: tac }; c.tacCambio = true;
+  } else if (soyAtk && tipo === 'retirada') ch = { tipo };
+  else if (soyAtk && tipo === 'refuerzo') {
+    if (c.ref) throw new GameError('Ya mandaste refuerzos a este asedio.');
+    const { units, total, power } = checkArmy(p, b.units, b.power);
+    if (!total) throw new GameError('Elige tropas para los refuerzos.');
+    c.ref = { units, power, llega: t + Math.max(45, (c.travel || 120) * 0.5) * 1000 };
+    out.llega = c.ref.llega;
+  } else if (!soyAtk && tipo === 'salida') {
+    if (c.salida) throw new GameError('Tu guarnición ya salió en este asedio.');
+    ch = { tipo }; c.salida = true;
+    if (p.snap) p.snap.army = Math.max(0, p.snap.army * (1 - A.salida.cuesta));
+  } else if (!soyAtk && tipo === 'rendir') ch = { tipo };
+  else throw new GameError('Esa decisión no vale aquí.');
+  if (ch) {
+    const n = D.asedioReplan(c.plan, seg, ch);
+    if (!n) throw new GameError('Ya no se puede: el asedio pasó de esa etapa.');
+    c.plan = n;
+  }
+  c[cuenta] = (c[cuenta] || 0) + 1;
+  store.set('camps', c.id, c);
+  if (w) { w.asv = (w.asv || 0) + 1; store.touch('worlds'); }
+  store.touch('players');
+  return out;
 }
 
 // ---------- Ranking, partidas y estado ----------
@@ -1827,7 +1876,7 @@ if (!process.env.PK_TICK_PEREZOSO) setInterval(tick, 5000).unref();
 
 module.exports = {
   GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
-  listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
+  listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, asedio, ranking, getSave, putSave, deleteSave, status,
   paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos, tickCamps,
   diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
   caravana, tickCaravanas, guildBoss, tickJefes, visita, visitaLike, visitaRegalo, tickTitulos,

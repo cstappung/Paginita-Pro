@@ -168,7 +168,7 @@
     if (PK.Diplo && PK.Diplo.pacto(W.terr[k] - 1) === 'rival') for (const r in c) c[r] = Math.round(c[r] * D.DIPLO.rival.conquista); // S1: contra un rival, más barato
     return c;
   };
-  T.attack = function (k, units) {
+  T.attack = function (k, units, tactica) {
     const why = T.canAttack(k);
     if (why) { toast(why, 'warn'); return false; }
     const w = S().war, total = Object.keys(units).reduce((s, u) => s + units[u], 0);
@@ -181,10 +181,11 @@
     const travel = 90 + U.dist(cx, cy, hx, hy) * 1.5, power = PK.Social.power(units);
     // semilla: la del plan de asedio (D.asedioPlan). Se crea al lanzar y se guarda: recargar no cambia la batalla.
     const camp = { k, slot, units: Object.assign({}, units), power, travel, arrive: Date.now() + travel * 1000, back: 0, phase: 'go', won: false, revenge: !!T.revenge(k), semilla: 1 + Math.floor(Math.random() * 2e9) };
+    if (D.ASEDIO.tacticas[tactica]) camp.tac = tactica; // G4
     S().terr.camps.push(camp);
     if (online() && T.realmOf(slot).human) {
       camp.remote = true;
-      PK.Net.conquer(k, units, power).then(r => { camp.rid = r.id; camp.arrive = r.arrive; }).catch(e => {
+      PK.Net.conquer(k, units, power, camp.tac).then(r => { camp.rid = r.id; camp.arrive = r.arrive; }).catch(e => {
         S().terr.camps.splice(S().terr.camps.indexOf(camp), 1);
         for (const u in units) w.army[u] += units[u];
         G().give(cost); toast(e.message, 'warn'); PK.UI.rerender();
@@ -216,7 +217,8 @@
     const now = Date.now(), info = T.realmInfo(c.slot);
     if (W.terr[c.k] !== c.slot + 1) { finishCampaign(c, false, 1, null); return; } // ya no es de ese reino
     c.semilla = c.semilla || 1 + Math.floor(Math.random() * 2e9); // campañas guardadas antes de pk-55
-    c.plan = D.asedioPlan({ atk: c.power, parts: T.defenseParts(c.k, c.slot), semilla: c.semilla });
+    c.plan = D.asedioPlan({ atk: c.power, parts: T.defenseParts(c.k, c.slot), semilla: c.semilla, units: c.units, tactica: c.tac });
+    c.powerT = c.power;
     c.ini = c.arrive; c.lado = T.ladoDe(c.k, me()); c.phase = 'asedio';
     if (offline || now >= c.ini + c.plan.total * 1000) return; // ya terminó mientras no estabas: directo al final
     PK.Social.log('Tus tropas llegaron a la parcela de ' + info.realm + ': empieza el asedio.', 'info');
@@ -261,6 +263,66 @@
       }
     }
   };
+  // ---------- G4: decisiones durante el asedio ----------
+  // Qué puede hacer el jugador en un frente ahora mismo. Contra reinos simulados lo aplica este archivo; contra
+  // jugadores lo pide al servidor (POST /api/asedio), que vuelve a calcular el plan y lo manda por el sync.
+  const campDe = f => S().terr.camps.find(c => 'c' + c.k === f.id) || null;
+  const amenazaDe = f => S().terr.threats.find(th => th.plan && 't' + th.k === f.id) || null; // con plan: puede haber otra amenaza en camino a la misma parcela
+  T.acciones = function (f) {
+    const e = T.estado(f), out = [];
+    if (e.fin || !f.plan || f.plan.v < 2 || f.mio === 'ver') return out;
+    const o = f.mio === 'atk' ? campDe(f) : f.id[0] === 't' ? amenazaDe(f) : (T.hechas[f.id] || (T.hechas[f.id] = {}));
+    if (!o || (o.nAcc || 0) >= D.ASEDIO.maxAcc) return out;
+    if (f.mio === 'atk') {
+      if (!o.tacCambio) for (const t of [null, 'asalto', 'cerco']) if ((f.plan.tac || null) !== t) out.push({ tipo: 'tactica', tactica: t, txt: t ? D.ASEDIO.tacticas[t].nombre : 'Sin táctica', title: t ? D.ASEDIO.tacticas[t].txt : 'Vuelve al ritmo normal.' });
+      if (!o.ref) out.push({ tipo: 'refuerzo', txt: 'Enviar refuerzos', title: 'Una segunda columna desde tu Cuartel, una sola por asedio. Si llega antes del final suma su fuerza; si llega tarde, se vuelve.' });
+      out.push({ tipo: 'retirada', txt: 'Retirada', peligro: true, title: 'Corta el asedio. Pierdes entre el 15 % y el 50 % de las tropas según cuánto se haya peleado, en vez del 70 a 80 % de una derrota.' });
+    } else {
+      if (!o.salida && e.etapa <= 1) out.push({ tipo: 'salida', txt: 'Salida', title: 'Tu guarnición sale a pelear, una vez por asedio y solo en las dos primeras etapas: suma el 20 % de tus tropas a la resistencia de esta etapa y te cuesta el 5 % de ellas.' });
+      out.push({ tipo: 'rendir', txt: 'Rendir la parcela', peligro: true, title: 'Termina el asedio sin bajas para nadie. El atacante se queda con la parcela y con medio botín.' });
+    }
+    return out;
+  };
+  const sumaTropas = (x, y) => { const o = Object.assign({}, x); for (const u in y) o[u] = (o[u] || 0) + y[u]; return o; };
+  T.hechas = {}; // lo que ya hice como defensor contra un jugador (no se guarda: el servidor lleva la cuenta de verdad)
+  const seg = f => (Date.now() - f.ini) / 1000;
+  T.tiempoRefuerzo = c => Math.max(45, (c.travel || 120) * 0.5);
+  T.accion = function (id, a, units) {
+    const f = T.frente(id), st = S(), w = st.war;
+    if (!f || !T.acciones(f).some(x => x.tipo === a.tipo)) { toast('Ya no se puede.', 'warn'); return false; }
+    const hecho = txt => { toast(txt, 'info'); PK.Social.log(txt, 'info'); PK.UI.rerender(); };
+    if (f.mio === 'atk') {
+      const c = campDe(f);
+      if (a.tipo === 'refuerzo') {
+        const tot = Object.keys(units || {}).reduce((s, u) => s + units[u], 0);
+        if (!tot) { toast('Elige tropas para los refuerzos.', 'warn'); return false; }
+        for (const u in units) if (units[u] > w.army[u]) { toast('No tienes tantas tropas.', 'warn'); return false; }
+        const power = PK.Social.power(units), poner = llega => { for (const u in units) w.army[u] -= units[u]; c.ref = { units: Object.assign({}, units), power, llega }; c.nAcc = (c.nAcc || 0) + 1; hecho('Los refuerzos salieron hacia el asedio: llegan en ' + U.fmtTime((llega - Date.now()) / 1000) + '.'); };
+        if (c.remote) PK.Net.asedio(c.rid, 'refuerzo', { units, power }).then(r => poner(PK.Net.aLocal(r.llega))).catch(e => toast(e.message, 'warn'));
+        else poner(Date.now() + T.tiempoRefuerzo(c) * 1000);
+        return true;
+      }
+      const listo = () => {
+        c.nAcc = (c.nAcc || 0) + 1;
+        if (a.tipo === 'tactica') { c.tacCambio = true; hecho(a.tactica ? 'Tus tropas cambian a ' + D.ASEDIO.tacticas[a.tactica].nombre.toLowerCase() + '.' : 'Tus tropas vuelven al ritmo normal.'); }
+        else hecho('Tus tropas se retiran del asedio.');
+      };
+      if (c.remote) PK.Net.asedio(c.rid, a.tipo, { tactica: a.tactica }).then(listo).catch(e => toast(e.message, 'warn'));
+      else { const n = D.asedioReplan(c.plan, seg(f), a); if (!n) { toast('Ya no se puede.', 'warn'); return false; } c.plan = n; listo(); }
+      return true;
+    }
+    // defensor
+    const th = f.id[0] === 't' ? amenazaDe(f) : null, o = th || T.hechas[f.id];
+    const listo = () => {
+      o.nAcc = (o.nAcc || 0) + 1;
+      if (a.tipo === 'salida') { o.salida = true; for (const u in w.army) w.army[u] = Math.floor(w.army[u] * (1 - D.ASEDIO.salida.cuesta)); hecho('Tu guarnición sale a pelear: la etapa resiste más.'); }
+      else hecho('Rendiste la parcela: nadie pierde tropas.');
+    };
+    if (th) { const n = D.asedioReplan(th.plan, seg(f), a); if (!n) { toast('Ya no se puede.', 'warn'); return false; } th.plan = n; listo(); }
+    else PK.Net.asedio(f.id.slice(1), a.tipo, {}).then(listo).catch(e => toast(e.message, 'warn'));
+    return true;
+  };
+
   T.verFrente = function (id) {
     const f = T.frente(id) || T.frentes()[0];
     if (!f) return;
@@ -278,6 +340,7 @@
     const rep = pv ? { plan: pv, units: Object.assign({}, c.units), lado: c.lado === undefined ? T.ladoDe(c.k, me()) : c.lado, de: me(), a: c.slot } : null;
     const cause = bt && bt.parts ? T.recordBattle(Object.assign({ role: 'atk', k: c.k, vs: info.realm, won, atk: bt.atk, def: bt.def, parts: bt.parts }, rep ? { rep } : null), fin) : null;
     if (won) delete st.terr.rev[c.k];
+    if (c.ref && !c.ref.ok) { for (const u in c.ref.units) st.war.army[u] += c.ref.units[u]; c.ref.ok = true; PK.Social.log('Los refuerzos no alcanzaron a llegar y volvieron a casa.', 'info'); } // G4
     const loss = plan && won === plan.gano ? plan.bajas : D.conquestLoss(won, ratio || 1);
     const antes = Object.assign({}, c.units);
     for (const u in c.units) c.units[u] = Math.floor(c.units[u] * (1 - loss));
@@ -295,6 +358,7 @@
       G().stat('conquests', 1);
       if (!info.human) scheduleRevenge(c.slot, c.k);
       const loot = D.conquestLoot(info.era || st.era);
+      if (plan && plan.fin === 'rendir') for (const r in loot) loot[r] = Math.round(loot[r] / 2); // G4: se rindieron, medio botín
       G().give(loot);
       const lootTxt = Object.keys(loot).map(r => U.fmt(loot[r]) + ' ' + D.RES[r].name.toLowerCase()).join(', ');
       PK.Social.log('Conquistaste una parcela de ' + info.realm + '. Botín: ' + lootTxt + '. Perdiste el ' + Math.round(loss * 100) + '% de las tropas.' + (cause ? ' ' + cause : ''), 'good');
@@ -305,6 +369,7 @@
       if (!G().offline && PK.Render.burst) PK.Render.burst(x, y, null, 50);
     } else {
       if (!c.remote) st.terr.botShield[c.slot] = Date.now() + D.TERR.shieldWin * 1000;
+      if (plan && plan.fin === 'retirada') { const tx = 'Te retiraste del asedio a ' + info.realm + '. Perdiste el ' + Math.round(loss * 100) + '% de las tropas.'; PK.Social.log(tx, 'info'); toast(tx, 'info'); G().logNews(tx, 'info'); return; }
       PK.Social.log(info.realm + ' resistió tu ataque. Perdiste el ' + Math.round(loss * 100) + '% de las tropas.' + (cause ? ' ' + cause : ''), 'bad');
       toast(info.name + ' rechazó tu campaña.' + (cause ? ' ' + cause : ''), 'bad');
       G().logNews(info.realm + ' resistió tu campaña.' + (cause ? ' ' + cause : ''), 'bad');
@@ -316,7 +381,13 @@
     const c = S().terr.camps.find(o => o.rid === rid);
     if (!c) return;
     if (units) c.units = units;
-    if (as && as.plan) { c.ini = as.ini; c.lado = as.lado || 0; finishCampaign(c, won, ratio, bt, as.plan); return; }
+    if (as && as.plan) {
+      c.ini = as.ini; c.lado = as.lado || 0;
+      // G4: los refuerzos que llegaron pelearon con la columna; los que no, vuelven a casa (finishCampaign). Se suman
+      // las tropas que mandó este navegador, no las que contó el servidor (que recorta según su foto).
+      if (c.ref && !c.ref.ok && !as.vuelve) { for (const u in c.ref.units) c.units[u] = (c.units[u] || 0) + c.ref.units[u]; c.ref.ok = true; }
+      finishCampaign(c, won, ratio, bt, as.plan); return;
+    }
     c.ini = 0;
     if (bt && bt.parts && bt.atk && bt.def) c.repPlan = D.asedioDe({ atk: bt.atk, def: bt.def, parts: bt.parts, semilla: c.semilla || 1, gano: !!won });
     finishCampaign(c, won, ratio, bt);
@@ -383,7 +454,7 @@
       transfer(th.k, me(), th.slot);
       st.terr.lost[th.k] = Date.now();
       st.terr.shield = Date.now() + D.TERR.shieldLoss * 1000;
-      for (const u in w.army) w.army[u] = Math.floor(w.army[u] * 0.85);
+      if (plan.fin !== 'rendir') for (const u in w.army) w.army[u] = Math.floor(w.army[u] * 0.85);
       PK.Social.log(bot.realm + ' tomó una parcela de tu frontera. Durante 48 h recuperarla cuesta la mitad. ' + cause, 'bad');
       toast(bot.name + ' tomó una parcela de tu frontera. Refuerza tus torres.', 'bad');
       G().logNews(bot.realm + ' tomó una parcela de tu frontera. ' + cause, 'bad');
@@ -427,6 +498,10 @@
     const now = Date.now();
     for (const c of st.terr.camps.slice()) {
       if (c.phase === 'go' && !c.remote && now >= c.arrive) empezarAsedio(c, offline);
+      if (c.phase === 'asedio' && !c.remote && c.ref && !c.ref.ok && now >= c.ref.llega && now < c.ini + c.plan.total * 1000) { // G4: llegaron los refuerzos
+        const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT || c.power)), m: D.asedioOficio(sumaTropas(c.units, c.ref.units)) });
+        if (n) { c.plan = n; c.powerT = (c.powerT || c.power) + c.ref.power; for (const u in c.ref.units) c.units[u] = (c.units[u] || 0) + c.ref.units[u]; c.ref.ok = true; if (!offline) toast('¡Llegaron los refuerzos al asedio!', 'good'); }
+      }
       if (c.phase === 'asedio' && !c.remote && now >= c.ini + c.plan.total * 1000) { const p = c.plan; finishCampaign(c, p.gano && W.terr[c.k] === c.slot + 1, p.ratio, { atk: p.atk, def: p.def, parts: p.parts }, p); }
       if (c.phase === 'back' && now >= c.back) {
         for (const u in c.units) st.war.army[u] += c.units[u];

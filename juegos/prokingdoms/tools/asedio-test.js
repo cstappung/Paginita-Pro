@@ -76,10 +76,10 @@ for (let i = 0; i < N; i++) {
   const c2 = store.get('camps', c.id);
   if (c2) { corre += 3600e3; sim.tickCamps(); }
   const it = A.inbox.find(x => x.type === 'conquest_result');
-  if (it.won !== (it.atk > it.def)) { fallas++; console.log('  FALLA el resultado no sale de fuerza contra defensa'); break; }
+  if (it.won !== it.plan.gano) { fallas++; console.log('  FALLA el resultado no es el del plan'); break; }
   if (it.won) gano++;
 }
-ok(true, 'cada resultado sale de fuerza contra defensa (' + N + ' asedios, ganó ' + gano + ')');
+ok(true, 'cada resultado es el del plan (' + N + ' asedios, ganó ' + gano + ')');
 // máximo dos campañas contra el mismo defensor
 foto(A, 50000); foto(B, 300); foto(C, 50000); w.tshield = {}; w.terr[kB] = B.slot + 1;
 const kB2 = kB + 1 < w.terr.length && (kB + 1) % PW ? kB + 1 : kB - 2, kB3 = kB + PW;
@@ -91,6 +91,62 @@ ok(!err, 'se permite una segunda campaña contra el mismo reino', err);
 w.terr[kB2 + PW] = C.slot + 1;
 try { sim.conquer(C, { k: kB2, units: { militia: 50 }, power: 500 }); err = null; } catch (e) { err = e.message; }
 ok(err && /dos campañas/.test(err), 'y la tercera se rechaza', err);
+
+// ---------- G4: decisiones ----------
+for (const c of store.all('camps')) store.del('camps', c.id);
+const llegar = (fuerza, tactica) => {
+  foto(A, 50000); foto(B, 300); w.tshield = {}; w.terr[kB] = B.slot + 1; A.inbox = []; B.inbox = [];
+  const r = sim.conquer(A, { k: kB, units: { militia: 200, spear: 200 }, power: fuerza, tactica });
+  corre += r.arrive - Date.now() + 3000; sim.tickCamps();
+  return store.get('camps', r.id);
+};
+const falla = f => { try { f(); return null; } catch (e) { return e.message; } };
+let c = llegar(900, 'asalto');
+ok(c.plan.tac === 'asalto', 'la táctica elegida al lanzar llega al plan');
+ok(/tuyo/.test(falla(() => sim.asedio(C, { id: c.id, accion: 'retirada' })) || ''), 'un tercero no decide en un asedio ajeno');
+ok(!!falla(() => sim.asedio(B, { id: c.id, accion: 'retirada' })) && !!falla(() => sim.asedio(A, { id: c.id, accion: 'rendir' })), 'cada bando solo tiene sus decisiones');
+const v0 = w.asv, t0 = c.plan.total;
+sim.asedio(A, { id: c.id, accion: 'tactica', tactica: 'cerco' });
+c = store.get('camps', c.id);
+ok(c.plan.tac === 'cerco' && c.plan.total > t0 && w.asv > v0, 'cambiar a cerco alarga el asedio y avisa a todos');
+ok(!!falla(() => sim.asedio(A, { id: c.id, accion: 'tactica', tactica: 'asalto' })), 'la táctica se cambia una sola vez');
+const d0 = c.plan.def, ej = B.snap.army;
+sim.asedio(B, { id: c.id, accion: 'salida' });
+c = store.get('camps', c.id);
+ok(c.plan.def > d0 && B.snap.army < ej, 'la salida suma resistencia y gasta ejército del defensor', Math.round(d0) + ' → ' + c.plan.def);
+ok(!!falla(() => sim.asedio(B, { id: c.id, accion: 'salida' })), 'la salida es una por asedio');
+const antes = A.snap.army;
+const rr = sim.asedio(A, { id: c.id, accion: 'refuerzo', units: { militia: 100, spear: 100 }, power: 1e9 });
+ok(rr.llega > Date.now() && A.snap.army < antes, 'los refuerzos salen del ejército de la foto (lo que pide de más se recorta)');
+ok(!!falla(() => sim.asedio(A, { id: c.id, accion: 'refuerzo', units: { militia: 5 }, power: 10 })), 'una sola columna de refuerzos');
+const a0 = c.plan.atk;
+corre += rr.llega - Date.now() + 1000; sim.tickCamps();
+c = store.get('camps', c.id);
+ok(c && c.ref.ok && c.plan.atk > a0 && c.units.militia === 300, 'al llegar suman su fuerza y sus tropas', a0 + ' → ' + (c && c.plan.atk));
+sim.asedio(A, { id: c.id, accion: 'retirada' });
+c = store.get('camps', c.id);
+ok(c.plan.fin === 'retirada' && !c.plan.gano && c.plan.bajas <= 0.5, 'la retirada corta el asedio', 'bajas ' + c.plan.bajas.toFixed(2));
+corre += 5000; sim.tickCamps();
+const fr = A.inbox.find(i => i.type === 'conquest_result');
+ok(fr && !fr.won && fr.plan.fin === 'retirada' && w.terr[kB] === B.slot + 1 && !store.all('camps').length, 'y la parcela sigue siendo del defensor');
+ok(!!falla(() => sim.asedio(A, { id: c.id, accion: 'tactica' })), 'terminado el asedio, ya no hay decisiones');
+// rendición
+c = llegar(900);
+sim.asedio(B, { id: c.id, accion: 'rendir' });
+corre += 5000; sim.tickCamps();
+const fz = A.inbox.find(i => i.type === 'conquest_result');
+ok(fz && fz.won && fz.plan.bajas === 0 && fz.plan.fin === 'rendir' && w.terr[kB] === A.slot + 1, 'rendir la parcela: cambia de dueño sin bajas');
+// refuerzos que no alcanzan a llegar
+c = llegar(900);
+sim.asedio(A, { id: c.id, accion: 'refuerzo', units: { militia: 50 }, power: 300 });
+sim.asedio(A, { id: c.id, accion: 'retirada' });
+corre += 5000; sim.tickCamps();
+ok(A.inbox.find(i => i.type === 'conquest_result').vuelve === true, 'si el asedio termina antes, los refuerzos vuelven a casa');
+// lo que ve un tercero nunca trae con qué recalcular
+c = llegar(900);
+const vis = sim.sync(C, { asv: -1 }).asedios[0].plan;
+ok(vis.res === undefined && vis.rb === undefined && vis.atkR === undefined && vis.semilla !== c.plan.semilla, 'la vista no trae las tiradas ni la semilla del plan');
+
 
 console.log(fallas ? '\n' + fallas + ' FALLAS' : '\nTodo bien.');
 process.exit(fallas ? 1 : 0);

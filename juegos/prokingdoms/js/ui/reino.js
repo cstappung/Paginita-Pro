@@ -31,22 +31,43 @@
   // pk-55: cómo fue el asedio, etapa por etapa, y «Ver de nuevo» (la repetición sale del plan guardado)
   function etapasEl(b) {
     const p = b.rep.plan, A = D.ASEDIO, hechas = {};
-    for (const e of p.etapas) hechas[e.id] = e;
+    for (const e of p.etapas) hechas[e.id] = Object.assign({}, e, { dur: e.dur + (hechas[e.id] ? hechas[e.id].dur : 0) }); // G4: una etapa puede venir en tramos
+    const NA = { tactica: 'cambio de táctica', refuerzo: 'llegaron refuerzos', salida: 'salida de la guarnición', retirada: 'retirada', rendir: 'la parcela se rindió' };
     return el('div', { class: 'bt-etapas' },
       A.etapas.map((id, i) => {
         const e = hechas[id];
         const txt = !e ? 'no se llegó' : e.r < 1 ? 'sin defensas' : e.rota ? 'aquí se quebró el ataque (' + Math.round(e.f1 * 100) + ' %)' : D.asedioSuerte(e.suerte) + ' · ' + U.fmtTime(e.dur);
         return el('div', { class: 'bt-et' + (!e ? ' no' : e.rota ? ' rota' : ' ok') }, el('b', null, (i + 1) + '. ' + A.nombres[id]), el('span', { class: 'small' }, ' ' + txt));
       }),
+      p.acc && p.acc.length ? el('div', { class: 'small' }, 'Decisiones: ' + p.acc.map(x => NA[x.tipo] + ' (' + U.fmtTime(x.t) + ')').join(', ') + '.') : null,
       PK.Frente ? el('div', { class: 'row' }, UI.btn('Ver de nuevo', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Frente.repetir(b); }, { small: true, title: 'Repite la batalla en el mapa, acelerada' })) : null);
   }
   UI.frenteEl = function (f) {
     const T = PK.Terr, e = T.estado(f), n = T.nombreFrente(f), A = D.ASEDIO;
+    const cp = f.mio === 'atk' ? PK.Game.state.terr.camps.find(c => 'c' + c.k === f.id) : null, ref = cp && cp.ref;
     return el('div', { class: 'battle' },
       el('b', null, n.titulo, el('span', { translate: 'no' }, n.otro)), el('span', { class: 'small' }, ' · etapa ' + (e.etapa + 1) + ' de 3: ' + A.nombres[e.id] + (f.plan.parcial ? ' · esta etapa termina en ' + U.fmtTime(e.queda) : ' · quedan aprox. ' + U.fmtTime(e.quedaTotal))),
       el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Tu ímpetu' : f.mio === 'ver' ? 'Ímpetu del ataque' : 'Su ímpetu'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'green' : 'red'), style: { width: Math.round(e.impetu * 100) + '%' } }), el('span', null, Math.round(e.impetu * 100) + ' %'))),
       el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Su resistencia' : f.mio === 'ver' ? 'Resistencia' : 'Tu resistencia'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'red' : 'green'), style: { width: Math.round(e.resistencia * 100) + '%' } }), el('span', null, Math.round(e.resistencia * 100) + ' %'))),
-      el('div', { class: 'row' }, UI.btn('Ver la batalla', () => { UI.closeModal(); if (T.mode) T.toggle(false); T.verFrente(f.id); }, { small: true, cls: 'gold' })));
+      f.plan.tac && D.ASEDIO.tacticas[f.plan.tac] ? el('p', { class: 'small' }, 'Táctica del atacante: ', el('b', null, D.ASEDIO.tacticas[f.plan.tac].nombre), '.') : null,
+      ref ? el('p', { class: 'small' }, ref.ok ? 'Los refuerzos ya pelean.' : 'Refuerzos en camino: llegan en ' + U.fmtTime(Math.max(0, (ref.llega - Date.now()) / 1000)) + '.') : null,
+      el('div', { class: 'row' }, UI.btn('Ver la batalla', () => { UI.closeModal(); if (T.mode) T.toggle(false); T.verFrente(f.id); }, { small: true, cls: 'gold' }),
+        T.acciones(f).map(a => UI.btn(a.txt, () => UI.accionAsedio(f, a), { small: true, cls: a.peligro ? 'danger' : '', title: a.title }))));
+  };
+  // G4: una decisión del asedio. Las que no tienen vuelta atrás se confirman; los refuerzos abren el selector de tropas.
+  UI.accionAsedio = function (f, a) {
+    const T = PK.Terr;
+    if (a.tipo === 'refuerzo') {
+      UI.modal('refuerzo', 'Refuerzos para el asedio', body => {
+        const w = PK.Game.state.war, pk = armyPicker(w, 'rf-');
+        body.append(el('p', null, a.title), el('p', { class: 'small' }, 'Pelean con su oficio: jinetes y caballeros rinden más en la frontera, catapultas y ballesteros contra las defensas, lanceros, monjes y clérigos en el estandarte.'),
+          el('div', { class: 'row' }, pk.box),
+          el('div', { class: 'row' }, UI.btn('Enviar', () => { if (T.accion(f.id, a, pk.read())) UI.closeModal(); }, { cls: 'gold' }), UI.btn('Cancelar', () => UI.closeModal(), { small: true })));
+      });
+      return;
+    }
+    if (a.peligro && !confirm(a.txt + ': ' + a.title + '\n\n¿Seguro?')) return;
+    T.accion(f.id, a);
   };
   UI.openTerritory = function () {
     UI.modal('terr', 'Territorio', body => {
@@ -151,9 +172,12 @@
         el('p', { class: 'small warn-t' }, 'Si ganas pierdes entre el 12% y el 30% de las tropas que mandes (menos cuanto más fuerte llegues); si pierdes, entre el 70% y el 80%.'),
         last ? el('h3', null, 'Última batalla aquí') : null, last ? UI.battleEl(last) : null);
       if (why) { add(el('p', { class: 'small warn-t' }, why)); return; }
-      const pk = armyPicker(w, 'cq-');
+      const pk = armyPicker(w, 'cq-'), TA = D.ASEDIO.tacticas;
+      const tacSel = el('select', { id: 'cq-tac', title: 'Se puede cambiar una vez durante el asedio' }, el('option', { value: '' }, 'Sin táctica: ritmo normal'), Object.keys(TA).map(t => el('option', { value: t }, TA[t].nombre + ': ' + TA[t].txt)));
       add(el('div', { class: 'row' }, pk.box),
-        el('div', { class: 'row' }, UI.btn('Lanzar campaña', () => { if (T.attack(k, pk.read())) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' }), UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(cx, cy); }, { small: true })));
+        el('div', { class: 'row' }, el('b', null, 'Táctica: '), tacSel),
+        el('p', { class: 'small' }, 'Cada tropa tiene su oficio: jinetes y caballeros rinden más en la frontera; catapultas y ballesteros contra las defensas (los arqueros, menos); lanceros, monjes y clérigos en el estandarte. Durante el asedio puedes cambiar de táctica, mandar refuerzos o retirarte.'),
+        el('div', { class: 'row' }, UI.btn('Lanzar campaña', () => { if (T.attack(k, pk.read(), tacSel.value || null)) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' }), UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(cx, cy); }, { small: true })));
     });
   };
 

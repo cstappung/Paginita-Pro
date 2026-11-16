@@ -389,6 +389,15 @@
         }
         esc.etapa = e.etapa;
       }
+      // --- G4: una decisión nueva (la trae el plan): cartel sobre la batalla
+      const nAcc = (f.plan.acc || []).length;
+      if (esc.nAcc !== undefined && nAcc > esc.nAcc && !fin && !rep && PK.Troops) {
+        const x = f.plan.acc[nAcc - 1], T = D.ASEDIO.tacticas[x.v];
+        const txt = { tactica: T ? '¡' + T.nombre + '!' : 'Ritmo normal', refuerzo: '¡Llegan refuerzos!', salida: '¡Salida de la guarnición!', retirada: '¡Retirada!', rendir: 'La parcela se rinde' }[x.tipo];
+        if (txt) PK.Troops.texts.push({ x: g.cx, y: g.cy - 1, t: 0, text: txt, col: x.tipo === 'salida' || x.tipo === 'rendir' ? '#cfe0ff' : '#ffd27a' });
+        if (PK.Sfx && (x.tipo === 'refuerzo' || x.tipo === 'salida')) PK.Sfx.play('cuerno');
+      }
+      esc.nAcc = nAcc;
       esc.nuevo = false;
     }
   };

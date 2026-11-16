@@ -88,6 +88,7 @@ const RUTAS = {
   'POST /api/duelos': p => sim.duelosInfo(p),
   'POST /api/duelo': (p, b) => sim.duelo(p, b),
   'POST /api/conquer': (p, b) => sim.conquer(p, b),
+  'POST /api/asedio': (p, b) => sim.asedio(p, b),
   'POST /api/conquer-bot': (p, b) => sim.conquerBot(p, b),
   'GET /api/ranking': p => sim.ranking(p),
 };

@@ -533,3 +533,26 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
   The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
   options) feeds the sorter panel's short list.
+
+### War plan, G4: decisions during the siege (`pk-61`)
+
+- **Every decision recalculates the plan from that instant** (`D.asedioReplan(plan, t, ch)`, pure): what was already
+  fought stays (the current stage is cut into segments: several `etapas` entries can share an `id`, with `f0`), the
+  rest is rebuilt with the forces left. It needs the raw fields a `v: 2` plan keeps (`res`, `rb`, `atkR`, `m`);
+  plans saved before G4 return `null` and show no buttons. **Those raw fields never travel** (`D.asedioVista` picks
+  fields by hand: add new ones there on purpose, never spread the plan).
+- Attacker: tactic at launch (`T.attack(k, units, tactica)`) and one change (`D.ASEDIO.tacticas`: asalto shorter and
+  +10 points of losses on a win; cerco longer, −8 points, frontera ×0.9), one column of reinforcements (arrive after
+  half the travel time, min 45 s; late ones go home), retreat (15–50 % losses by how far it got). Defender: one sally
+  in stages 1–2 (+20 % of `parts.troops` to that stage, costs 5 % of the army) and surrender (no losses, attacker
+  gets the parcel and half the loot). `D.ASEDIO.maxAcc` per side.
+- **Troop trades** (`D.ASEDIO.oficio`, `D.asedioOficio(units)` → `plan.m`): the attacker's force is worth more or
+  less per stage, so with specialists `won` is no longer `atk > def`: compare with `plan.gano`. A host without
+  specialists gives `[1, 1, 1]` and the §1 curve; specialists are a mild buff (measured in the test).
+- Local (`T.acciones(f)`, `T.accion(id, a, units)` in `terr.js`) and server (`sim.asedio`, `POST /api/asedio`, in
+  `server/index.js` **and** `functions/index.js`) apply the same function. The server keeps the counts (`accA`,
+  `accD`, `tacCambio`, `salida`, `ref`); reinforcements go through `checkArmy`. On the result the client adds the
+  reinforcements **it** sent, not the server's unit count (the server clips units to its snapshot).
+- `amenazaDe` must look for the threat **with a plan**: a second threat can be on its way to the same parcel.
+- Bots never decide; offline nothing is chosen. Not done from the plan's G4: asking allies for help, and the drawing
+  of the reinforcement column / the retreat (a banner over the battle announces each decision instead).

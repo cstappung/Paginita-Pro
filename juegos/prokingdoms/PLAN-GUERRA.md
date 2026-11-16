@@ -21,7 +21,13 @@
     con el texto: no se subió `D.PROTO` (las dos versiones conviven, así nadie queda afuera entre la publicación y
     el despliegue); no se hizo `guarn` (la mezcla real de tropas del defensor en la etapa 3); mientras el final no se
     conoce, las dos barras bajan parejas; `functions` `npm run prueba` no se corrió (pide el emulador).
-  - Sigue G4 (decisiones durante el asedio).
+  - **G4:** hecha en `pk-61`, en local y en el servidor (misma función, `D.asedioReplan`): táctica al lanzar y un
+    cambio, refuerzos, retirada, oficio de las tropas, salida y rendición. Probada en navegador (local y con tres
+    jugadores) y con `tools/asedio-test.js`. Diferencias con el texto: el cerco le quita un 10 % a la etapa de la
+    frontera (en vez de un 15 % a la milicia); no se hizo «pedir ayuda» a los aliados; la columna de refuerzos y la
+    retirada no tienen dibujo propio (sale un cartel sobre la batalla); el oficio es una ventaja leve para huestes
+    con especialistas, no un reparto neutro. Necesita `firebase deploy --only functions` (ruta nueva `/api/asedio`).
+  - Sigue G5 (comarcas, Fuerte fronterizo y máquinas de asedio), que sí sube `D.PROTO`.
 
 ---
 

@@ -694,15 +694,66 @@
     suerte: [0.78, 1.22], // cuánto se aparta una etapa de lo esperado, antes de ajustar la suma
     corte: 10,         // lo menos que dura la etapa en la que el atacante se quiebra
   };
-  // o: { atk, parts (D.parcelDefenseParts), semilla }. Devuelve el plan completo.
+  // G4: decisiones. Tácticas del atacante (vel: cuánto duran las etapas; bajas: puntos que suma o resta) y el oficio
+  // de cada tropa (cuánto rinde su fuerza en cada etapa; una hueste sin especialistas rinde ×1 en todas, como antes).
+  D.ASEDIO.tacticas = {
+    asalto: { nombre: 'Asalto', vel: 0.7, bajasGana: 0.10, txt: 'Etapas un 30 % más cortas. Si ganas, pierdes 10 puntos más de tropas.' },
+    cerco: { nombre: 'Cerco', vel: 1.6, bajas: -0.08, frontera: 0.9, txt: 'Etapas un 60 % más largas. Pierdes 8 puntos menos de tropas y la frontera resiste un 10 % menos.' },
+  };
+  D.ASEDIO.oficio = { frontera: { rider: 1.25, knight: 1.25 }, defensas: { catapult: 2, crossbow: 1.3, archer: 0.8 }, estandarte: { spear: 1.2, monk: 1.2, cleric: 1.2 } };
+  D.ASEDIO.maxAcc = 4;                  // decisiones por asedio y por bando
+  D.ASEDIO.salida = { suma: 0.2, cuesta: 0.05 }; // la salida del defensor: +20 % de su guarnición a la etapa, y pierde el 5 %
+  D.ASEDIO.retirada = [0.15, 0.5];      // bajas al retirarse: al empezar y al final
+  // Cuánto rinde una hueste en cada etapa: [frontera, defensas, estandarte]. Cada tropa pesa por su fuerza.
+  D.asedioOficio = function (units) {
+    let tot = 0;
+    for (const u in units || {}) if (D.ARMY[u]) tot += units[u] * D.ARMY[u].power;
+    return D.ASEDIO.etapas.map(id => {
+      if (tot <= 0) return 1;
+      let m = 0;
+      for (const u in units) if (D.ARMY[u]) m += units[u] * D.ARMY[u].power * (D.ASEDIO.oficio[id][u] || 1);
+      return Math.round((m / tot) * 1000) / 1000;
+    });
+  };
+  // o: { atk, parts (D.parcelDefenseParts), semilla, units (para el oficio), tactica }. Devuelve el plan completo.
   D.asedioPlan = function (o) {
     const R = U.rng((o.semilla || 1) + 7411), A = D.ASEDIO, tir = () => 0.85 + 0.3 * R();
     const atk = Math.max(0, o.atk || 0) * tir(), def = Math.max(1, (o.parts && o.parts.total) || 0) * tir();
-    return D.asedioDe({ atk, def, parts: o.parts, semilla: o.semilla, rnd: R, suerte: A.suerte });
+    return D.asedioDe({ atk, def, parts: o.parts, semilla: o.semilla, rnd: R, suerte: A.suerte, m: o.units ? D.asedioOficio(o.units) : null, tactica: o.tactica });
+  };
+  // Las etapas que faltan, desde un punto de la batalla. b: { atk, res (resistencia de cada etapa), m (oficio), vel,
+  // gano (si ya está decidido) }; i: etapa; c: defensa ya vencida; a: fuerza ya gastada; t: segundo; f0: avance de la
+  // etapa i; curva(): la forma de cada tramo. Devuelve { etapas, c, a, t, gano }.
+  function asedioTramos(b, i, c, a, t, f0, curva) {
+    const A = D.ASEDIO, def = b.res.reduce((s, v) => s + v, 0), m = b.m || [1, 1, 1], vel = b.vel || 1;
+    let c0i = 0;
+    for (let j = 0; j < i; j++) c0i += b.res[j];
+    const costo = j => Math.max(0, j === i ? b.res[j] - (c - c0i) : b.res[j]) / (m[j] || 1);
+    let falta = 0;
+    for (let j = i; j < A.etapas.length; j++) falta += costo(j);
+    const gano = b.gano === undefined ? b.atk - a > falta : !!b.gano;
+    const tope = gano ? Infinity : Math.min(b.atk, (a + falta) * 0.999); // lo que alcanza a gastar el atacante
+    const etapas = [];
+    for (let j = i; j < A.etapas.length; j++) {
+      const r = b.res[j], rr = j === i ? Math.max(0, r - (c - c0i)) : r, co = rr / (m[j] || 1);
+      const llena = Math.max(r > def * 0.01 ? A.min : A.vacia, r > def * 0.01 ? (A.total * r) / def : 0) * (r > 0 ? rr / r : 1);
+      const ha = Math.min(a + co, tope), parte = co > 0 ? (ha - a) / co : 1, rota = !gano && ha >= tope - 1e-9;
+      const dur = Math.max(1, Math.round((rota ? Math.max(A.corte, llena * parte) : llena) * vel));
+      const ini = j === i ? f0 : 0, e = { id: A.etapas[j], r: Math.round(r), t0: t, dur, c0: c, c1: c + rr * parte, a0: a, a1: ha, f1: ini + (1 - ini) * parte, curva: curva(), rota };
+      if (ini > 0) e.f0 = ini;
+      etapas.push(e);
+      c = e.c1; a = ha; t += dur;
+      if (rota) break;
+    }
+    return { etapas, c, a, t, gano };
+  }
+  const asedioBajas = (gano, ratio, rb, tac) => {
+    const T = D.ASEDIO.tacticas[tac] || {};
+    return U.clamp(D.conquestLoss(gano, ratio, rb) + (T.bajas || 0) + (gano ? T.bajasGana || 0 : 0), 0.05, 0.9);
   };
   // La línea de tiempo a partir de las fuerzas ya tiradas. La usa asedioPlan, y también sirve para armar la
   // repetición de una batalla que decidió el servidor (llegan atk y def ya tirados y las partes a escala).
-  // o: { atk, def (ya tirados), parts, semilla, gano (si ya se sabe), rnd, suerte }
+  // o: { atk, def (ya tirados), parts, semilla, gano (si ya se sabe), rnd, suerte, m (oficio), tactica }
   D.asedioDe = function (o) {
     const A = D.ASEDIO, R = o.rnd || U.rng((o.semilla || 1) + 7411), parts = o.parts || {}, sr = o.suerte || [1, 1];
     // lo que pesa cada etapa, con su suerte, y a escala para que la suma sea la defensa tirada
@@ -711,22 +762,63 @@
     let suma = bruto.reduce((s, v, i) => s + v * lk[i], 0);
     if (suma <= 0) { bruto[2] = 1; suma = lk[2]; } // sin partes (resumen viejo): todo al estandarte
     const esc = o.def / suma, res = bruto.map((v, i) => v * lk[i] * esc);
-    const gano = o.gano === undefined ? o.atk > o.def : !!o.gano, ratio = o.atk / Math.max(1, o.def);
-    const tope = gano ? o.def : Math.min(o.atk, o.def * 0.999); // lo que alcanza a gastarse de la defensa
-    const etapas = [];
-    let c = 0, t = 0;
-    for (let i = 0; i < A.etapas.length; i++) {
-      const r = res[i], llena = Math.max(r > o.def * 0.01 ? A.min : A.vacia, r > o.def * 0.01 ? (A.total * r) / o.def : 0);
-      const hasta = Math.min(c + r, tope), parte = r > 0 ? (hasta - c) / r : 1, rota = !gano && hasta >= tope - 1e-9;
-      const dur = Math.round(rota ? Math.max(A.corte, llena * parte) : llena);
-      etapas.push({ id: A.etapas[i], r: Math.round(r), suerte: Math.round(lk[i] * esc * 100) / 100, t0: t, dur, c0: c, c1: hasta, f1: rota ? parte : 1, curva: 0.75 + 0.6 * R(), rota });
-      c = hasta; t += dur;
-      if (rota) break;
-    }
+    const T = A.tacticas[o.tactica] || null;
+    if (T && T.frontera) res[0] *= T.frontera;
+    const def = res.reduce((s, v) => s + v, 0), m = o.m || null;
+    const tr = asedioTramos({ atk: o.atk, res, m, vel: T ? T.vel : 1, gano: o.gano }, 0, 0, 0, 0, 0, () => 0.75 + 0.6 * R());
+    tr.etapas.forEach(e => { e.suerte = Math.round(lk[A.etapas.indexOf(e.id)] * esc * 100) / 100; });
+    const ratio = o.atk / Math.max(1, m ? res.reduce((s, v, i) => s + v / (m[i] || 1), 0) : def), rb = R();
     // las partes a escala, cada una con la suerte de su etapa, para el resumen (D.battleCause)
-    const out = { total: Math.round(o.def) };
-    A.etapas.forEach((id, i) => { for (const k of A.partes[id]) out[k] = Math.round(Math.max(0, parts[k] || 0) * lk[i] * esc); });
-    return { v: 1, semilla: o.semilla || 1, atk: Math.round(o.atk), def: Math.round(o.def), ratio, gano, bajas: D.conquestLoss(gano, ratio, R()), total: t, gastado: c, etapas, parts: out };
+    const out = { total: Math.round(def) };
+    A.etapas.forEach((id, i) => { for (const k of A.partes[id]) out[k] = Math.round(Math.max(0, parts[k] || 0) * lk[i] * esc * (i === 0 && T && T.frontera ? T.frontera : 1)); });
+    const plan = { v: 2, semilla: o.semilla || 1, atk: Math.round(o.atk), def: Math.round(def), ratio, gano: tr.gano, bajas: asedioBajas(tr.gano, ratio, rb, o.tactica), total: tr.t, gastado: tr.c, etapas: tr.etapas, parts: out,
+      // lo que hace falta para volver a calcular (D.asedioReplan); nunca viaja a los jugadores antes del final
+      res, rb, atkR: o.atk, acc: [] };
+    if (m) plan.m = m;
+    if (o.tactica && T) plan.tac = o.tactica;
+    return plan;
+  };
+  // G4: una decisión a mitad del asedio. Devuelve el plan nuevo (lo ya peleado queda como estaba y lo que falta se
+  // calcula con las fuerzas que quedan), o null si no se puede (asedio terminado, plan viejo, etapa que no vale).
+  // ch: { tipo: 'tactica', tactica } | { tipo: 'refuerzo', atk } | { tipo: 'salida' } | { tipo: 'retirada' } | { tipo: 'rendir' }
+  D.asedioReplan = function (plan, t, ch) {
+    const A = D.ASEDIO;
+    if (!plan || !plan.res || !ch || t >= plan.total || t < 0) return null;
+    const es = plan.etapas;
+    let si = es.length - 1;
+    for (let j = 0; j < es.length; j++) if (t < es[j].t0 + es[j].dur) { si = j; break; }
+    const seg = es[si], e = D.asedioEn(plan, t), i = e.etapa;
+    const k = U.clamp((t - seg.t0) / Math.max(1e-6, seg.dur), 0, 1), kk = Math.pow(k, seg.curva);
+    const c = seg.c0 + (seg.c1 - seg.c0) * kk, a = seg.a0 === undefined ? c : seg.a0 + (seg.a1 - seg.a0) * kk, f = e.f;
+    const hecho = es.slice(0, si);
+    if (t - seg.t0 >= 1) hecho.push(Object.assign({}, seg, { dur: t - seg.t0, c1: c, a1: a, f1: f, rota: false, corte: true }));
+    const n = Object.assign({}, plan, { res: plan.res.slice(), acc: (plan.acc || []).concat([{ t: Math.round(t), tipo: ch.tipo, v: ch.tactica || undefined }]) });
+    if (ch.tipo === 'retirada' || ch.tipo === 'rendir') {
+      const gano = ch.tipo === 'rendir';
+      if (!hecho.length) hecho.push(Object.assign({}, seg, { dur: 1, c1: c, a1: a, f1: f, rota: false, corte: true }));
+      const fin = hecho[hecho.length - 1].t0 + hecho[hecho.length - 1].dur;
+      return Object.assign(n, { etapas: hecho, total: fin, gastado: c, gano, bajas: gano ? 0 : A.retirada[0] + (A.retirada[1] - A.retirada[0]) * U.clamp(t / Math.max(1, plan.total), 0, 1), fin: ch.tipo });
+    }
+    let atkR = plan.atkR, vel = (A.tacticas[plan.tac] || {}).vel || 1, tac = plan.tac;
+    let c0i = 0;
+    for (let j = 0; j < i; j++) c0i += n.res[j];
+    if (ch.tipo === 'refuerzo') { atkR += Math.max(0, ch.atk || 0); if (ch.m && plan.m) n.m = ch.m; } // m: el oficio de la hueste ya con los refuerzos
+    else if (ch.tipo === 'salida') { if (i > 1) return null; n.res[i] += A.salida.suma * ((plan.parts && plan.parts.troops) || 0); }
+    else if (ch.tipo === 'tactica') {
+      const T = A.tacticas[ch.tactica];
+      if (ch.tactica && !T) return null;
+      tac = ch.tactica || undefined; vel = T ? T.vel : 1;
+      if (T && T.frontera && i === 0) n.res[0] = (c - c0i) + (n.res[0] - (c - c0i)) * T.frontera;
+    } else return null;
+    const R = U.rng((plan.semilla || 1) + 9001 + n.acc.length * 131);
+    const tr = asedioTramos({ atk: atkR, res: n.res, m: n.m, vel }, i, c, a, t, f, () => 0.75 + 0.6 * R());
+    tr.etapas.forEach(x => { const v = es.find(o => o.id === x.id); if (v && v.suerte) x.suerte = v.suerte; });
+    const def = n.res.reduce((s, v) => s + v, 0), m = n.m;
+    const ratio = atkR / Math.max(1, m ? n.res.reduce((s, v, j) => s + v / (m[j] || 1), 0) : def);
+    n.atkR = atkR; n.atk = Math.round(atkR); n.def = Math.round(def); n.ratio = ratio; n.gano = tr.gano; n.tac = tac;
+    n.bajas = asedioBajas(tr.gano, ratio, plan.rb, tac); n.total = tr.t; n.gastado = tr.c; n.etapas = hecho.concat(tr.etapas);
+    n.parts = Object.assign({}, plan.parts, { total: n.def });
+    return n;
   };
   // El estado de la batalla en el segundo t. Es lo único que leen el dibujo y la interfaz.
   // { etapa (índice), id, f (0..1 de la defensa de esa etapa ya vencida), impetu, resistencia (0..1 de lo que queda),
@@ -737,10 +829,11 @@
     let e = ult;
     for (const x of es) if (t < x.t0 + x.dur) { e = x; break; }
     const k = U.clamp((t - e.t0) / Math.max(1e-6, e.dur), 0, 1), kk = Math.pow(k, e.curva);
-    const c = e.c0 + (e.c1 - e.c0) * kk, fin = t >= plan.total;
+    const c = e.c0 + (e.c1 - e.c0) * kk, fin = t >= plan.total, f0 = e.f0 || 0;
+    const a = e.a0 === undefined ? c : e.a0 + (e.a1 - e.a0) * kk; // lo que gastó el atacante (con oficio no es igual a c)
     return {
-      etapa: D.ASEDIO.etapas.indexOf(e.id), id: e.id, f: e.f1 * kk, k,
-      impetu: U.clamp(1 - c / Math.max(1, plan.atk), 0, 1), resistencia: U.clamp(1 - c / Math.max(1, plan.def), 0, 1),
+      etapa: D.ASEDIO.etapas.indexOf(e.id), id: e.id, f: f0 + (e.f1 - f0) * kk, k,
+      impetu: U.clamp(1 - a / Math.max(1, plan.atk), 0, 1), resistencia: U.clamp(1 - c / Math.max(1, plan.def), 0, 1),
       control: U.clamp(c / Math.max(1, plan.def), 0, 1), bajasA: plan.bajas * (plan.gastado > 0 ? c / plan.gastado : 1),
       fin: fin && !plan.parcial, queda: Math.max(0, e.t0 + e.dur - t), quedaTotal: plan.total - t,
     };
@@ -753,8 +846,8 @@
     const es = plan.etapas.filter(e => t >= e.t0), todo = es.length >= plan.etapas.length;
     if (!es.length) es.push(plan.etapas[0]);
     const ult = es[es.length - 1];
-    const v = { v: 1, semilla: semV || 1, def: plan.def, parts: plan.parts, etapas: es, n: es.length, total: ult.t0 + ult.dur };
-    if (todo) return Object.assign(v, { atk: plan.atk, gano: plan.gano, bajas: plan.bajas, gastado: plan.gastado, ratio: plan.ratio });
+    const v = { v: 2, semilla: semV || 1, def: plan.def, parts: plan.parts, etapas: es, n: es.length, total: ult.t0 + ult.dur, acc: plan.acc || [], tac: plan.tac };
+    if (todo) return Object.assign(v, { atk: plan.atk, gano: plan.gano, bajas: plan.bajas, gastado: plan.gastado, ratio: plan.ratio, fin: plan.fin });
     return Object.assign(v, { parcial: true, atk: plan.def, bajas: 0.2, gastado: plan.def });
   };
   // Frase corta de cómo salió una etapa respecto de lo esperado (para la crónica).

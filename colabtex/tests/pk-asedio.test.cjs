@@ -128,3 +128,68 @@ test('G3: el servidor pelea el asedio con el mismo plan y el cliente no lo decid
   const net = JS('net.js');
   assert.ok(/asv/.test(net) && /applyAsedios/.test(net), 'los asedios viajan con versión');
 });
+
+// ---------- G4: decisiones durante el asedio ----------
+test('G4: una decisión no cambia lo ya peleado y el asedio sigue desde el mismo punto', () => {
+  for (let i = 0; i < 300; i++) {
+    const p = plan(0.85 + (i % 5) * 0.1, i * 53 + 3), t = Math.floor(p.total * (0.1 + 0.8 * ((i * 37) % 100) / 100));
+    const antes = D.asedioEn(p, t);
+    for (const ch of [{ tipo: 'tactica', tactica: 'asalto' }, { tipo: 'tactica', tactica: 'cerco' }, { tipo: 'refuerzo', atk: p.atk * 0.3 }, { tipo: 'salida' }]) {
+      const n = D.asedioReplan(p, t, ch);
+      if (!n) { assert.ok(ch.tipo === 'salida' && antes.etapa > 1, 'solo la salida tardía se rechaza'); continue; }
+      const e = D.asedioEn(n, t);
+      assert.ok(Math.abs(e.control * n.def - antes.control * p.def) < 1.5, 'la defensa vencida no salta (' + ch.tipo + ')');
+      assert.equal(e.etapa, antes.etapa);
+      assert.ok(Math.abs(e.f - antes.f) < 0.02, 'el avance de la etapa no salta');
+      assert.ok(n.total > t && n.acc.length === 1 && n.etapas.every(x => x.dur >= 1));
+      for (let s = 0; s < n.total; s += 3) { const x = D.asedioEn(n, s); assert.ok(x.impetu >= 0 && x.resistencia >= 0 && x.f >= 0 && x.f <= 1.0001 && !Number.isNaN(x.bajasA)); }
+      const fin = D.asedioEn(n, n.total);
+      if (n.gano) assert.ok(fin.resistencia < 0.002, 'si gana, la defensa se acaba'); else assert.ok(fin.impetu < 0.01, 'si pierde, se queda sin ímpetu');
+    }
+  }
+});
+
+test('G4: refuerzos, salida, tácticas, retirada y rendición hacen lo que dicen', () => {
+  let vuelcos = 0, salvadas = 0;
+  for (let i = 0; i < 400; i++) {
+    const p = plan(0.9 + (i % 3) * 0.1, i * 71 + 9), t = Math.min(p.total - 2, 12);
+    const ref = D.asedioReplan(p, t, { tipo: 'refuerzo', atk: p.def });
+    assert.ok(ref.gano, 'doblar la fuerza a tiempo gana');
+    if (!p.gano) vuelcos++;
+    const sal = D.asedioReplan(p, t, { tipo: 'salida' });
+    if (sal) { assert.ok(sal.def > p.def && (sal.gano ? p.gano : true), 'la salida solo ayuda al defensor'); if (p.gano && !sal.gano) salvadas++; }
+    const asa = D.asedioReplan(p, t, { tipo: 'tactica', tactica: 'asalto' }), cer = D.asedioReplan(p, t, { tipo: 'tactica', tactica: 'cerco' });
+    assert.ok(asa.total < p.total + 1 && cer.total > asa.total, 'el asalto acorta y el cerco alarga');
+    assert.equal(asa.gano, p.gano, 'el asalto no cambia quién gana');
+    if (asa.gano) assert.ok(asa.bajas > p.bajas && cer.bajas < asa.bajas);
+    const ret = D.asedioReplan(p, t, { tipo: 'retirada' });
+    assert.ok(!ret.gano && ret.fin === 'retirada' && ret.bajas >= 0.15 && ret.bajas <= 0.5 && ret.total <= t + 1, 'la retirada corta y cuesta entre 15 y 50 %');
+    assert.ok(ret.bajas < D.conquestLoss(false, 1, 0), 'retirarse nunca deja peor que perder');
+    const ren = D.asedioReplan(p, t, { tipo: 'rendir' });
+    assert.ok(ren.gano && ren.bajas === 0 && ren.fin === 'rendir');
+    assert.equal(D.asedioReplan(ret, t, { tipo: 'tactica', tactica: 'cerco' }), null, 'terminado, ya no se decide nada');
+  }
+  assert.ok(vuelcos > 50 && salvadas > 3, 'hay vuelcos de verdad (' + vuelcos + ', ' + salvadas + ')');
+  assert.equal(D.asedioReplan({ v: 1, etapas: [], total: 100 }, 5, { tipo: 'retirada' }), null, 'un plan guardado antes de G4 no se toca');
+});
+
+test('G4: el oficio de las tropas y la táctica al lanzar', () => {
+  assert.deepEqual(Array.from(D.asedioOficio({ militia: 100 })), [1, 1, 1], 'sin especialistas, todo como antes');
+  const m = D.asedioOficio({ militia: 50, catapult: 20, knight: 20 });
+  assert.ok(m[0] > 1 && m[1] > 1 && m[2] === 1);
+  let conOficio = 0, sin = 0;
+  for (let i = 0; i < 3000; i++) {
+    const o = { atk: PARTES.total, parts: PARTES, semilla: i * 13 + 1 };
+    if (D.asedioPlan(o).gano) sin++;
+    if (D.asedioPlan(Object.assign({ units: { catapult: 30, knight: 30, spear: 60 } }, o)).gano) conOficio++;
+  }
+  assert.ok(conOficio > sin, 'una hueste de especialistas gana más (' + conOficio + ' contra ' + sin + ')');
+  const a = D.asedioPlan({ atk: PARTES.total * 1.3, parts: PARTES, semilla: 5, tactica: 'asalto' }), n = D.asedioPlan({ atk: PARTES.total * 1.3, parts: PARTES, semilla: 5 });
+  assert.ok(a.tac === 'asalto' && a.total < n.total && a.gano === n.gano);
+});
+
+test('G4: lo que viaja a los jugadores no trae con qué recalcular el plan', () => {
+  const p = plan(1.1, 77), v = D.asedioVista(D.asedioReplan(p, 10, { tipo: 'tactica', tactica: 'cerco' }), 12, 5);
+  for (const k of ['res', 'rb', 'atkR', 'm']) assert.equal(v[k], undefined, k + ' no viaja');
+  assert.ok(v.acc.length === 1 && v.tac === 'cerco', 'sí viajan la táctica y las decisiones tomadas');
+});

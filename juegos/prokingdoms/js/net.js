@@ -275,7 +275,7 @@
           toast(it.text, 'good');
           break;
         case 'conquest_result':
-          PK.Terr.finishRemote(it.rid, it.won, it.ratio, null, it.parts ? { atk: it.atk, def: it.def, parts: it.parts } : null, it.plan ? { plan: it.plan, ini: aLocal(it.ini), lado: it.lado } : null);
+          PK.Terr.finishRemote(it.rid, it.won, it.ratio, null, it.parts ? { atk: it.atk, def: it.def, parts: it.parts } : null, it.plan ? { plan: it.plan, ini: aLocal(it.ini), lado: it.lado, units: it.units, vuelve: !!it.vuelve } : null);
           break;
         // G3: las tropas de un jugador llegaron a tu parcela y empieza el asedio (la batalla llega por `asedios`)
         case 'siege_start': {
@@ -437,7 +437,8 @@
 
   Net.worldChat = text => api('POST', '/api/world/chat', { text }).then(() => Net.sync && Net.sync()).catch(fail);
   Net.claim = k => api('POST', '/api/claim', { k }).then(r => { tv = 0; return r; });
-  Net.conquer = (k, units, power) => api('POST', '/api/conquer', { k, units, power });
+  Net.conquer = (k, units, power, tactica) => api('POST', '/api/conquer', { k, units, power, tactica });
+  Net.asedio = (id, accion, extra) => api('POST', '/api/asedio', Object.assign({ id, accion }, extra || {})); // G4
   Net.conquerBot = k => api('POST', '/api/conquer-bot', { k }).then(r => { tv = 0; return r; });
   Net.refreshRanking = () => (PK.Mundo ? PK.Mundo.refrescar() : api('GET', '/api/ranking').then(r => { Net.cache.ranking = r; done(); }).catch(() => {}));
 })();
