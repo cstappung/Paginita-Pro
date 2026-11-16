@@ -125,7 +125,7 @@
     if (n >= 100) medalla('nivel100');
     if (ONLINE && n >= 5 && (cfg.jugadores || []).length > 1) medalla('equipo');
     anotaRecord(n);
-    yo.botiN = 0;
+    yo.botiN = 0; yo.armN = 0;
     /* Fase 4: sobrevivir a una noche paga (chatarra y furia dorada). */
     const nocheAntes = !versus() && !jefes() ? D.nocheDe(n - 1) : '';
     if (nocheAntes && yo.v && !yo.muerto) {
@@ -251,7 +251,7 @@
      rehaciendo, antes de cada paso se aplica todo lo anotado con su número,
      en el orden en que se anotó. Con la semilla (`rng`) y el mapa, eso
      rehace la partida entera (`rehace`, lo usa el verificador del Club). */
-  const PASO = 1 / 60, VE = 10, MAX_JUGADAS = 200000;
+  const PASO = 1 / 60, VE = 11, MAX_JUGADAS = 200000;
   let pasoN = 0, pasoNivel = 0, finPaso = -1, graba = null, repite = null, acumula = 0, forzada = null;
   const idxTienda = id => D.TIENDA.findIndex(x => x.id === id);
   // Teclas de arma: la posición en ARMAS_J (los ids 8 y 9 no son armas del jugador).
@@ -2332,10 +2332,23 @@
     for (const t of M.tiendas || []) if (dist(t.x, t.y, yo.x, yo.y) < D.ALCANCE_TIENDA) return t;
     return null;
   }
-  // El precio de un suministro ahora: el botiquín sube con cada compra de la ronda desde la 31 (Fase 4b).
+  /* El precio de un suministro ahora (Fase 4c): botiquín y armadura suben con
+     cada compra de la ronda (×1, ×1,5, ×3, ×6…); la munición cobra por lo que
+     falta y nada si está todo lleno. */
+  function faltaMunicion() {
+    let suma = 0, n = 0;
+    for (const i of yo.tiene) {
+      if (i === 0) continue;
+      const max = armaDe(i).max;
+      if (!Number.isFinite(max) || max <= 0) continue;
+      suma += Math.max(0, max - (yo.ammo[i] || 0)) / max; n++;
+    }
+    return n ? suma / n : 0;
+  }
   function precioItem(id) {
     const p = D.precioTienda(id, yo.pot || 0, nivelObjetivo());
-    return id === 'botiquin' ? Math.round(p * D.factorBotiquin(nivelObjetivo(), yo.botiN) / 10) * 10 : p;
+    const f = id === 'botiquin' ? D.factorCompras(yo.botiN) : id === 'armadura' ? D.factorCompras(yo.armN) : id === 'balas' ? D.factorMunicion(faltaMunicion()) : 1;
+    return f === 1 ? p : Math.round(p * f / 10) * 10;
   }
   function compra(id) {
     if (!tiendaCerca()) return;
@@ -2343,12 +2356,14 @@
     if (!t) return;
     if (id === 'potencia' && (yo.pot || 0) >= t.max) { son('clic'); premio('Potencia al máximo'); return; }
     if (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) { son('clic'); premio('Armadura completa'); return; }
+    if (id === 'balas' && faltaMunicion() <= 0) { son('clic'); premio('Munición llena'); return; }
     if (id === 'botiquin' && yo.hp >= hpMax()) { son('clic'); premio('Vida completa'); return; }
     if (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max) { son('clic'); premio('Ya llevas ' + D.MURO_BLINDADO.max + ' muros reforzados'); return; }
     const precio = precioItem(id);
     if (yo.chat < precio) { son('clic'); premio('Te falta ' + (precio - yo.chat) + ' de chatarra'); return; }
     yo.chat -= precio;
     if (id === 'botiquin') yo.botiN = (yo.botiN || 0) + 1;
+    if (id === 'armadura') yo.armN = (yo.armN || 0) + 1;
     if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = armaDe(i).max; }
     else if (id === 'armadura') yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 50);
     else if (id === 'botiquin') yo.hp = Math.min(hpMax(), yo.hp + 50);
@@ -3057,7 +3072,7 @@
     if (!tc) { if (!el.hidden) el.hidden = true; return; }
     if (!tiendaArmada) armaTienda();
     const mando = conMando() ? Mando.familia() : '', n = nivelObjetivo();
-    const firma = [yo.chat, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.'), n, mando, yo.botiN | 0].join('|');
+    const firma = [yo.chat, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.'), n, mando, yo.botiN | 0, yo.armN | 0, yo.ammo.join('.')].join('|');
     if (!fuerza && !el.hidden && firma === firmaTienda) return;
     firmaTienda = firma;
     el.hidden = false;
@@ -3066,7 +3081,7 @@
     $('tAyudaU').textContent = mando ? Mando.glifo('y') : 'U';
     for (const b of $('tSum').children) {
       const id = b.dataset.id, t = D.TIENDA.find(x => x.id === id);
-      const lleno = (id === 'potencia' && (yo.pot || 0) >= t.max) || (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) ||
+      const lleno = (id === 'potencia' && (yo.pot || 0) >= t.max) || (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) || (id === 'balas' && faltaMunicion() <= 0) ||
         (id === 'botiquin' && yo.hp >= hpMax()) || (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max);
       const precio = precioItem(id);
       b.querySelector('kbd').textContent = mando ? Mando.glifo(MANDO_TIENDA[id]) : t.tecla;
@@ -3353,6 +3368,7 @@
     // la tienda: puntos para probar, y lo comprado
     puntos: n => { yo.pts = n | 0; },
     chatarra: n => { yo.chat = n | 0; },
+    vidaYo: (hp, arm) => { if (Number.isFinite(hp)) yo.hp = hp; if (Number.isFinite(arm)) yo.arm = arm; },
     nivelArma: (i, n) => { yo.nv[i] = clamp(n | 0, 0, D.NIVEL_ARMA.leyenda); pintaArmas(true); },   // para probar las habilidades de nivel máximo
     napalm: () => yo.napalm.length,
     // Fase 4: hace como si el enemigo llevara `s` segundos quieto (el respawn de atascados)

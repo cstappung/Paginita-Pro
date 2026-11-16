@@ -316,12 +316,16 @@ test('la chatarra: moneda aparte de los puntos, sin multiplicador; los suministr
  // sin nivel (o nivel 1) el precio es el de siempre
  assert.equal(D.precioTienda('balas',0,1),250);
  assert.equal(D.precioTienda('botiquin',0),300);
- // sube con el nivel, con tope ×2,5, y la potencia no sube
- let antes=0;for(let n=1;n<=40;n++){const p=D.precioTienda('armadura',0,n);assert.ok(p>=antes,'nivel '+n);antes=p;}
- assert.equal(D.precioTienda('armadura',0,31),1000);   // ×2,5 en la 31, como antes
- assert.equal(D.precioTienda('armadura',0,200),1600);  // Fase 4: sigue hasta ×4
- // el botiquín, desde la 26, sube con cada compra de la misma ronda
- assert.equal(D.factorBotiquin(30,3),1);assert.equal(D.factorBotiquin(31,0),1);assert.equal(D.factorBotiquin(31,2),2);
+ // la munición sube con la ronda, ×2,5 en la 31 y hasta ×4; la potencia no sube
+ let antes=0;for(let n=1;n<=40;n++){const p=D.precioTienda('balas',0,n);assert.ok(p>=antes,'nivel '+n);antes=p;}
+ assert.equal(D.precioTienda('balas',0,31),630);
+ assert.equal(D.precioTienda('balas',0,200),1000);
+ // Fase 4c: botiquín y armadura no suben con la ronda, suben por compra de la ronda (×1, ×1,5, ×3, ×6…)
+ assert.equal(D.precioTienda('armadura',0,80),D.precioTienda('armadura',0,1));
+ assert.equal(D.precioTienda('botiquin',0,80),300);
+ assert.deepEqual([0,1,2,3,4].map(D.factorCompras),[1,1.5,3,6,12]);
+ // la munición cobra por lo que falta, nada si está llena y al menos un cuarto
+ assert.equal(D.factorMunicion(0),0);assert.equal(D.factorMunicion(0.1),0.25);assert.equal(D.factorMunicion(0.6),0.6);assert.equal(D.factorMunicion(2),1);
  assert.equal(D.precioTienda('potencia',1,30),D.precioTienda('potencia',1,1));
  assert.ok(D.precioTienda('blindado',0,11)>D.precioTienda('blindado',0,1));
 });
@@ -1000,4 +1004,26 @@ test('boxhead Fase 4b: el «×» es un multiplicador de chatarra que sube de a c
  const e=bx.estado().yo;
  assert.equal(e.k,5);assert.equal(e.pts,5*D.PUNTOS[0],'puntos sin multiplicar');
  assert.ok(e.mc>1.04&&e.mc<1.06,'×'+e.mc.toFixed(3));assert.equal(e.mul,6,'la racha sigue contando de a uno');
+});
+
+test('boxhead Fase 4c: la tienda no cobra munición si está llena, y botiquín y armadura suben por compra',()=>{
+ const bx=boxheadSinPantalla();
+ bx.practica(1);bx.inmortal(true);bx.armas();bx.calma();
+ const t=bx.tienda().tiendas[0];bx.ponYo(t[0],t[1]);bx.paso(1/60);
+ bx.chatarra(100000);
+ const chat=()=>bx.tienda().chat;
+ const comprar=i=>{const a=chat();bx.accion(6,i);bx.paso(1/60);return a-chat();};
+ const id=k=>D.TIENDA.findIndex(x=>x.id===k);
+ // la primera compra rellena (y cobra, menos que entero si algo había); la segunda, ya llena, no cobra
+ const p1=comprar(id('balas'));
+ assert.ok(p1>0&&p1<=D.precioTienda('balas',0,1),'rellenar cobra '+p1);
+ assert.equal(comprar(id('balas')),0,'llena: no cobra');
+ // armadura: precio, ×1,5, ×3 en la misma ronda
+ const A=D.TIENDA[id('armadura')].precio,g=[];
+ for(let i=0;i<3;i++){bx.vidaYo(undefined,0);g.push(comprar(id('armadura')));}
+ assert.deepEqual(g,[A,Math.round(A*1.5/10)*10,A*3]);
+ // botiquín: igual, con su contador aparte
+ const H=D.TIENDA[id('botiquin')].precio,h=[];
+ for(let i=0;i<3;i++){bx.vidaYo(10);h.push(comprar(id('botiquin')));}
+ assert.deepEqual(h,[H,H*1.5,H*3]);
 });

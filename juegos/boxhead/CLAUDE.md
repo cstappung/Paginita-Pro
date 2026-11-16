@@ -675,6 +675,20 @@ asked for the points multiplier to become a chatarra multiplier and said
   fireball damage; `escasez`: `sinCajas`, no drops) and two more events
   (`brujeria`: chamanes y vigías; `polvorin`: explosivos y tóxicos). Cycles are
   now 60 and 30 rounds.
-- Pressure spike at 26–32 eased: the botiquín surcharge starts at 31.
-  Fénix heals half, not all; the relleno's Curación never twice in a row
+- Pressure spike at 26–32 eased (the botiquín surcharge moved to 31; replaced
+  in 4c). Fénix heals half, not all; the relleno's Curación never twice in a row
   (`yo.curaUlt`).
+
+## Phase 4c: shop prices per purchase, no paying for full ammo (`boxhead-28`, proof `ve: 11`)
+
+- **Botiquín and armadura** (`D.POR_COMPRA`) no longer rise with the round:
+  `precioTienda` returns their base price, and the game multiplies it by
+  `D.factorCompras(n)` = 1, 1.5, 3, 6, 12… for the n-th purchase of that item
+  in the current round (`yo.botiN`, `yo.armN`, reset in `alEmpezarNivel`).
+  The owner's call; it replaces Phase 4's per-round botiquín surcharge.
+- **Ammo could be bought while full** and charged the whole price each time
+  (spamming B or the d-pad). Now `compra('balas')` refuses when
+  `faltaMunicion()` is 0 («Munición llena», the shop shows «Lleno»), and the
+  price is `D.factorMunicion(falta)`: the mean missing fraction over owned
+  weapons, at least a quarter. Munición and muro reforzado keep the round
+  factor. `__boxhead.vidaYo(hp, arm)` sets health and armour for tests.

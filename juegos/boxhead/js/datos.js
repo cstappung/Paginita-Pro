@@ -409,21 +409,27 @@
     13: { nombre: 'Tormenta', txt: 'Salta a cuatro enemigos más, más lejos y sin perder fuerza.', saltos: 4, salto: 1.5 },
   };
   const especialDe = (id, nivel) => ((nivel | 0) >= NIVEL_ARMA.max && ESPECIALES[id]) || null;
-  /* Los suministros (munición, armadura, botiquín, muro reforzado) suben un
-     5 % por nivel de la partida, hasta ×2,5: más adelante se gana más
-     chatarra por nivel y la tienda debe seguir pesando. La potencia es
-     permanente y no sube con el nivel. */
+  /* La munición y el muro reforzado suben un 5 % por ronda, hasta ×2,5 en la
+     31 y ×4 después: más adelante se gana más chatarra y la tienda debe
+     seguir pesando. El botiquín y la armadura suben por compra (abajo). La
+     potencia es permanente y no sube con la ronda. */
   const factorNivelTienda = n => ((n | 0) <= 31 ? Math.min(2.5, 1 + 0.05 * Math.max(0, (n | 0) - 1)) : Math.min(4, 2.5 + 0.03 * ((n | 0) - 31)));   // Fase 4: pasado el 31 sigue subiendo, hasta ×4
-  /* Fase 4: desde la ronda 31 cada botiquín de la misma ronda cuesta un 50 %
-     más que el anterior (la chatarra ya no compra vida infinita). Empezaba en
-     la 26, y ahí se juntaba con la primera noche, el primer evento y la
-     escolta del jefe: un pico (Fase 4b). */
-  const BOTIQUIN_SUBE = { desde: 31, paso: 0.5 };
-  const factorBotiquin = (ronda, comprados) => ((ronda | 0) >= BOTIQUIN_SUBE.desde ? 1 + BOTIQUIN_SUBE.paso * (comprados | 0) : 1);
+  /* **Botiquín y armadura (Fase 4c, el pedido del dueño)**: no suben con la
+     ronda; suben con cada compra de la MISMA ronda: el primero vale su
+     precio, el segundo ×1,5, el tercero ×3, y después el doble cada vez.
+     La ronda siguiente vuelve al precio de base. Así comprar uno es barato
+     siempre, y comprar vida sin parar no. */
+  const POR_COMPRA = ['botiquin', 'armadura'];
+  const factorCompras = comprados => ((comprados | 0) <= 0 ? 1 : 1.5 * Math.pow(2, (comprados | 0) - 1));
+  /* La munición cobra por lo que falta: la media de lo que le falta a cada
+     arma con munición que tengas (0 = todas llenas), con un mínimo de un
+     cuarto del precio. Antes cobraba entero aunque estuvieras lleno. */
+  const factorMunicion = falta => (falta <= 0 ? 0 : Math.max(0.25, Math.min(1, falta)));
   const precioTienda = (id, nivel, nivelJuego) => {
     const t = TIENDA.find(x => x.id === id);
     if (!t) return Infinity;
     if (id === 'potencia') return (nivel || 0) >= t.max ? Infinity : t.precio * ((nivel || 0) + 1);
+    if (POR_COMPRA.includes(id)) return t.precio;
     return Math.round(t.precio * factorNivelTienda(nivelJuego) / 10) * 10;
   };
   const factorPotencia = nivel => 1 + 0.1 * Math.max(0, Math.min(5, nivel || 0));
@@ -982,6 +988,6 @@
     ARMADURA, TIENDA, precioTienda, factorNivelTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, ESPECIALES, especialDe, SKINS, skin, MAPAS, ORDEN_MAPAS, MAPAS_CLASICOS, CINTAS, VEL_CINTA, mapaValido,
     cargaMapa, DIRS, dirDe, dirStick, VENTAJAS, RAREZAS, PESO_RAREZA, ventaja, sorteaVentajas, ESPERA_VENTAJA, MEDALLAS, medallaDe, topeGolpe, topeRadio,
     PASO_JEFES, nivelJefes, escoltaJefes, MUTADORES, mutador, empacaZb, desempacaZb,
-    MULTI_CHATARRA, subeMultiChatarra, bajaMultiChatarra, TARDE, topeVivos, escoltaGrande, duoDe, FASE3, BOTIQUIN_SUBE, factorBotiquin, LEGENDARIAS, RELLENO, NOCHES, nocheDe, premioNoche, EVENTOS, eventoDe, tipoEvento, mezclaMut, MEDALLAS_RONDA, proximas
+    MULTI_CHATARRA, subeMultiChatarra, bajaMultiChatarra, TARDE, topeVivos, escoltaGrande, duoDe, FASE3, POR_COMPRA, factorCompras, factorMunicion, LEGENDARIAS, RELLENO, NOCHES, nocheDe, premioNoche, EVENTOS, eventoDe, tipoEvento, mezclaMut, MEDALLAS_RONDA, proximas
   };
 });
