@@ -690,5 +690,9 @@ asked for the points multiplier to become a chatarra multiplier and said
   (spamming B or the d-pad). Now `compra('balas')` refuses when
   `faltaMunicion()` is 0 («Munición llena», the shop shows «Lleno»), and the
   price is `D.factorMunicion(falta)`: the mean missing fraction over owned
-  weapons, at least a quarter. Munición and muro reforzado keep the round
-  factor. `__boxhead.vidaYo(hp, arm)` sets health and armour for tests.
+  weapons, at least a quarter. `__boxhead.vidaYo(hp, arm)` sets health and
+  armour for tests.
+- **No supply rises with the round any more** (`boxhead-29`, proof `ve: 12`):
+  munición and muro reforzado are fixed, the owner's call. `precioTienda`
+  returns `t.precio` for everything but potencia; `factorNivelTienda` stays
+  exported but unused.

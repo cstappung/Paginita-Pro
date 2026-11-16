@@ -316,10 +316,8 @@ test('la chatarra: moneda aparte de los puntos, sin multiplicador; los suministr
  // sin nivel (o nivel 1) el precio es el de siempre
  assert.equal(D.precioTienda('balas',0,1),250);
  assert.equal(D.precioTienda('botiquin',0),300);
- // la munición sube con la ronda, ×2,5 en la 31 y hasta ×4; la potencia no sube
- let antes=0;for(let n=1;n<=40;n++){const p=D.precioTienda('balas',0,n);assert.ok(p>=antes,'nivel '+n);antes=p;}
- assert.equal(D.precioTienda('balas',0,31),630);
- assert.equal(D.precioTienda('balas',0,200),1000);
+ // Fase 4c: ningún suministro sube con la ronda: munición y muro reforzado, fijos
+ for(const id of ['balas','blindado','botiquin','armadura'])for(const n of [1,10,31,200])assert.equal(D.precioTienda(id,0,n),D.TIENDA.find(x=>x.id===id).precio,id+' en la '+n);
  // Fase 4c: botiquín y armadura no suben con la ronda, suben por compra de la ronda (×1, ×1,5, ×3, ×6…)
  assert.equal(D.precioTienda('armadura',0,80),D.precioTienda('armadura',0,1));
  assert.equal(D.precioTienda('botiquin',0,80),300);
@@ -327,7 +325,7 @@ test('la chatarra: moneda aparte de los puntos, sin multiplicador; los suministr
  // la munición cobra por lo que falta, nada si está llena y al menos un cuarto
  assert.equal(D.factorMunicion(0),0);assert.equal(D.factorMunicion(0.1),0.25);assert.equal(D.factorMunicion(0.6),0.6);assert.equal(D.factorMunicion(2),1);
  assert.equal(D.precioTienda('potencia',1,30),D.precioTienda('potencia',1,1));
- assert.ok(D.precioTienda('blindado',0,11)>D.precioTienda('blindado',0,1));
+ assert.equal(D.precioTienda('blindado',0,11),D.precioTienda('blindado',0,1));
 });
 
 test('el stick del mando: ocho direcciones con histéresis, sin tiritar en el borde',()=>{

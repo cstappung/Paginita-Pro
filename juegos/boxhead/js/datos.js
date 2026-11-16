@@ -409,10 +409,9 @@
     13: { nombre: 'Tormenta', txt: 'Salta a cuatro enemigos más, más lejos y sin perder fuerza.', saltos: 4, salto: 1.5 },
   };
   const especialDe = (id, nivel) => ((nivel | 0) >= NIVEL_ARMA.max && ESPECIALES[id]) || null;
-  /* La munición y el muro reforzado suben un 5 % por ronda, hasta ×2,5 en la
-     31 y ×4 después: más adelante se gana más chatarra y la tienda debe
-     seguir pesando. El botiquín y la armadura suben por compra (abajo). La
-     potencia es permanente y no sube con la ronda. */
+  /* Lo que subía los suministros con la ronda (5 % por ronda, hasta ×4). Ya
+     no se usa en la tienda (Fase 4c: precios fijos, el botiquín y la
+     armadura suben por compra); queda exportado por si vuelve. */
   const factorNivelTienda = n => ((n | 0) <= 31 ? Math.min(2.5, 1 + 0.05 * Math.max(0, (n | 0) - 1)) : Math.min(4, 2.5 + 0.03 * ((n | 0) - 31)));   // Fase 4: pasado el 31 sigue subiendo, hasta ×4
   /* **Botiquín y armadura (Fase 4c, el pedido del dueño)**: no suben con la
      ronda; suben con cada compra de la MISMA ronda: el primero vale su
@@ -429,8 +428,9 @@
     const t = TIENDA.find(x => x.id === id);
     if (!t) return Infinity;
     if (id === 'potencia') return (nivel || 0) >= t.max ? Infinity : t.precio * ((nivel || 0) + 1);
-    if (POR_COMPRA.includes(id)) return t.precio;
-    return Math.round(t.precio * factorNivelTienda(nivelJuego) / 10) * 10;
+    // Fase 4c: ningún suministro sube con la ronda (el dueño los quiso fijos);
+    // botiquín y armadura suben por compra y la munición cobra lo que falta, en juego.js.
+    return t.precio;
   };
   const factorPotencia = nivel => 1 + 0.1 * Math.max(0, Math.min(5, nivel || 0));
   const ALCANCE_TIENDA = 40;
