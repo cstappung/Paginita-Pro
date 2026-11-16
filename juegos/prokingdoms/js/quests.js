@@ -418,8 +418,8 @@
       el('img', { class: 'chest-img', src: PK.Sprites.icon('chest') }),
       el('p', null, opened ? 'Ya abriste el cofre de hoy (racha de ' + st.streak.n + (st.streak.n === 1 ? ' día' : ' días') + '). Vuelve mañana para mantenerla.' : 'Hoy es tu día ' + c.streak + ' de racha. El cofre crece hasta el día 7 y hay premios especiales en los días 3, 7, 14 y 30.'),
       streakGuard(),
-      opened ? null : rewardEl(c.reward),
-      opened ? null : PK.UI.btn(c.milestone ? 'Abrir ' + c.milestone.name : Q.repairable() ? 'Abrir y empezar de nuevo' : 'Abrir cofre', () => { Q.claimChest(); PK.UI.rerender(); }, { cls: Q.repairable() ? '' : 'gold' }),
+      opened ? '' : rewardEl(c.reward), // '' y no null: Element.append(null) escribe «null» (se veía «nullnull» con el cofre ya abierto)
+      opened ? '' : PK.UI.btn(c.milestone ? 'Abrir ' + c.milestone.name : Q.repairable() ? 'Abrir y empezar de nuevo' : 'Abrir cofre', () => { Q.claimChest(); PK.UI.rerender(); }, { cls: Q.repairable() ? '' : 'gold' }),
       el('h3', null, 'Camino de la racha'),
       el('div', { class: 'streak-path' }, D.STREAK_MILESTONES.map(m => el('div', { class: 'ms' + (cur >= m.day ? ' got' : '') + (!opened && c.streak === m.day ? ' next' : '') },
         el('b', null, 'Día ' + m.day), el('span', { class: 'small' }, m.name), rewardEl(m.reward)))),

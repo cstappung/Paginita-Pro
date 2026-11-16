@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
@@ -1166,7 +1166,7 @@ test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y 
     assert.equal(L.claseRuta({ de: 'bodega', a: 6 }), 'cart');
     assert.equal(L.nombreRuta({ de: 'campo', a: 'bodega', res: 'wood' }), 'Cualquier campamento de madera → Cualquier bodega');
     assert.equal(L.comodinMalo('campo', 'bodega', 'wood'), null);
-    assert.match(L.comodinMalo('campo', 'bodega', null), /recurso/);
+    assert.match(L.comodinMalo('campo', 'bodega', null), /de qué campamentos/);
     assert.match(L.comodinMalo('campo', 'bodega', 'food'), /No tienes campamentos/);
     assert.match(L.comodinMalo(4, 'bodega', null), /Entre dos bodegas/);
     assert.equal(L.comodinMalo('bodega', 6, null), null);
@@ -1187,4 +1187,225 @@ test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y 
   assert.match(JS('logistics.js'), /L\.sugerencias = function/);
   assert.match(JS('ui/reino.js'), /UI\.rutaNueva = function/);
   assert.match(JS('quests.js'), /req\.b === 'wonder' \? D\.WONDERS\.reduce/);
+});
+
+test('pk-55: «cualquier campamento minero» trae de todo, en carga mezclada', () => {
+  const L = PK.Logi, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.capDe, stat0 = G.stat, gcap0 = G.cap;
+  G.stat = () => {}; G.cap = () => 1000;
+  const mk = (id, type, x, inv) => ({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 2, h: 2, cx: x + 1, cy: 11, inv: inv || {} });
+  const m1 = mk(1, 'mining', 60, { stone: 30, gold: 20 }), m2 = mk(2, 'mining', 80, { stone: 10, gold: 5, ore: 4 }), lena = mk(3, 'lumber', 90, { wood: 500 });
+  const tc = mk(4, 'tc', 10), granero = mk(5, 'granary', 62);
+  G.buildings = [m1, m2, lena, tc, granero]; G.bById = new Map(G.buildings.map(b => [b.id, b])); G.units = [];
+  G.capDe = (b, r) => (b.type === 'tc' || (b.type === 'granary' && r === 'food') ? 1000 : 0);
+  G.state = Object.assign({}, st0 || {}, { res: { wood: 0, stone: 0, gold: 0, ore: 0, food: 0 }, flags: {}, logi: { rutas: [], belts: [], nextRuta: 1 } });
+  try {
+    assert.deepEqual(L.camposDe(null, 'mining').map(b => b.id), [1, 2], 'por tipo: los dos mineros');
+    assert.equal(L.tipoDeRes('gold'), 'mining');
+    assert.equal(L.comodinMalo('campo', 'bodega', null, 'mining'), null);
+    assert.match(L.comodinMalo('campo', 'bodega', null, 'mill'), /No tienes Molinos/);
+    const r = L.crearRuta('campo', 'bodega', null, 'mining');
+    assert.equal(r.tipo, 'mining');
+    assert.equal(L.nombreRuta(r), 'Cualquier campamento minero → Cualquier bodega');
+    assert.equal(L.nombreRuta({ de: 'campo', a: 'bodega', res: 'gold', tipo: 'mining' }), 'Cualquier campamento minero (solo oro) → Cualquier bodega');
+    const u = { id: 11, kind: 'carromato', owner: 'p', ruta: r.id, x: 70, y: 11, carry: 0 };
+    G.units = [u];
+    const e = L.extremos(u, r);
+    assert.equal(e.from.id, 1, 'el que más guarda en total (50 contra 19)');
+    assert.equal(e.to.id, 4, 'una bodega que recibe todo, no el Granero de al lado');
+    const lista = L.queCargarVarios(m1, tc, 40, true);
+    assert.equal(JSON.stringify(lista), JSON.stringify([{ res: 'stone', n: 30 }, { res: 'gold', n: 10 }]), 'lo que más hay primero, hasta llenar');
+    // la carga mezclada se cuenta fuera del pueblo (foto al servidor) y se guarda con la partida
+    u.carga = { stone: 30, gold: 10 }; u.carry = 40; u.carryRes = 'stone';
+    assert.equal(PK.Libro.fuera('gold'), 25 + 10);
+    assert.equal(L.nombresCarga(u.carga), 'piedra y oro');
+    assert.equal(JSON.stringify(L.cargaDe({ carry: 5, carryRes: 'wood' })), '{"wood":5}');
+    assert.equal(L.rutasDesde(lena).length, 0, 'el maderero no es de esa ruta');
+  } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; G.stat = stat0; G.cap = gcap0; }
+  assert.match(JS('entities.js'), /carga: this\.carga \|\| undefined/);
+});
+
+test('pk-57: «cualquier Aserradero» — la carreta lleva al que tiene menos y saca del que tiene más', () => {
+  const L = PK.Logi, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.capDe, stat0 = G.stat, gcap0 = G.cap;
+  G.stat = () => {}; G.cap = () => 1000;
+  const mk = (id, type, x, extra) => Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 3, h: 3, cx: x + 1.5, cy: 11.5 }, extra || {});
+  const s1 = mk(1, 'sawmill', 40, { inb: { wood: 30 }, outb: { planks: 2 } }), s2 = mk(2, 'sawmill', 60, { inb: { wood: 2 }, outb: { planks: 25 } });
+  const tc = mk(4, 'tc', 10), forja = mk(5, 'forge', 80, { inb: {}, outb: {} });
+  G.buildings = [s1, s2, tc, forja]; G.bById = new Map(G.buildings.map(b => [b.id, b])); G.units = [];
+  G.capDe = (b, r) => (b.type === 'tc' ? 1000 : 0);
+  G.state = Object.assign({}, st0 || {}, { res: { wood: 500, planks: 0 }, flags: {}, logi: { rutas: [], belts: [], nextRuta: 1 } });
+  try {
+    assert.deepEqual(L.talleresDe('sawmill').map(b => b.id), [1, 2]);
+    assert.equal(L.nombreExtremo('taller:sawmill'), 'Cualquier Aserradero');
+    assert.equal(L.claseRuta({ de: 'bodega', a: 'taller:sawmill' }), 'cart');
+    assert.equal(L.comodinMalo('bodega', 'taller:sawmill', null), null);
+    assert.equal(L.comodinMalo('taller:sawmill', 'bodega', null), null);
+    assert.equal(L.comodinMalo('taller:sawmill', 'taller:forge', null), null, 'tablones a la Herrería');
+    assert.match(L.comodinMalo('taller:forge', 'taller:sawmill', null), /no usa/);
+    assert.match(L.comodinMalo('bodega', 'taller:steelworks', null), /Necesitas/);
+    const ri = { id: 1, de: 'bodega', a: 'taller:sawmill', res: null }, ro = { id: 2, de: 'taller:sawmill', a: 'bodega', res: null };
+    G.state.logi.rutas.push(ri, ro);
+    const u = { id: 11, kind: 'cart', owner: 'p', ruta: 1, x: 30, y: 11, carry: 0 }, v = { id: 12, kind: 'cart', owner: 'p', ruta: 2, x: 30, y: 11, carry: 0 };
+    G.units = [u, v];
+    assert.equal(L.extremos(u, ri).to.id, 2, 'el que tiene menos madera');
+    assert.equal(L.extremos(u, ri).from.id, 4, 'desde la bodega más cercana a él');
+    assert.equal(L.extremos(v, ro).from.id, 2, 'saca del que más tablones tiene');
+    assert.equal(L.rutasHacia(s1).length, 1, 'la ruta comodín abastece a los dos');
+    assert.equal(L.rutasDesde(s1).length, 1);
+  } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.capDe = cap0; G.stat = stat0; G.cap = gcap0; }
+  assert.match(JS('campana.js'), /for \(let dy = -1; dy <= 1; dy\+\+\) for \(let dx = -1; dx <= 1; dx\+\+\) if \(!casillaLibre/, 'el lugar del capítulo mira sus 9 casillas');
+});
+
+test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, conversión y sin conexión', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  const buf0 = L.bufCap;
+  G.stat = () => {}; G.cap = () => 1000; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 1000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} }), mina = mk(3, 'mining', 21, 50, { inv: { stone: 50, gold: 50 } });
+  G.buildings = [saw, forja, mina]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 4, res: { planks: 0, stone: 0, gold: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, n, extra) => { t[W.idx(x, y)] = Object.assign({ p: 'c', d, n, i: [] }, extra || {}); };
+  try {
+    // aserradero (x 20..22) → cinta de x 23 a 30, fila 41 → herrería (x 31). La pieza de x 26 es de nivel I.
+    for (let x = 23; x <= 30; x++) pz(x, 41, 0, x === 26 ? 1 : 3);
+    Ci.init(G.state);
+    const cs = Ci.carrilesEn(W.idx(23, 41));
+    assert.equal(cs[0].src, saw, 'nace junto al aserradero: boca de salida');
+    assert.equal(Ci.carrilesEn(W.idx(30, 41))[0].dst, forja, 'apunta a la herrería: boca de entrada');
+    assert.ok(Ci.alimenta(forja) && L.supplied(forja));
+    for (let i = 0; i < 1200; i++) Ci.update(0.1); // 2 minutos
+    const n1 = forja.inb.planks || 0;
+    assert.ok(n1 >= 100 && n1 <= 121, 'el nivel I frena todo a 60/min (llegaron ' + n1 + ')');
+    const dg = Ci.diagnostico(W.idx(24, 41))[0];
+    assert.equal(dg.min.k, W.idx(26, 41), 'el diagnóstico encuentra la pieza lenta');
+    // al subirla, rinde como las demás
+    forja.inb.planks = 0;
+    t[W.idx(26, 41)].n = 3; Ci.cambio();
+    for (let i = 0; i < 600; i++) Ci.update(0.1);
+    assert.ok((forja.inb.planks || 0) > 120, 'sin cuello de botella pasan más (' + forja.inb.planks + ')');
+    // atasco: del campamento minero sale piedra y oro, y la herrería no los usa
+    for (let y = 46; y <= 49; y++) pz(22, y, 3, 2);
+    pz(22, 45, 0, 2); pz(23, 45, 0, 2); pz(24, 45, 3, 2); pz(24, 44, 3, 2); pz(24, 43, 3, 2); pz(24, 42, 0, 2);
+    Ci.cambio();
+    for (let i = 0; i < 300; i++) Ci.update(0.1);
+    // (24,42) apunta a (25,42): nada → sin destino; la cadena empieza en el campamento
+    assert.equal(Ci.carrilesEn(W.idx(22, 49))[0].src, mina);
+    assert.equal(Ci.carrilesEn(W.idx(24, 42))[0].motivo, 'La cinta no llega a ningún lado');
+    t[W.idx(24, 42)].d = 1; Ci.cambio(); // ahora baja a la fila 43? no: apunta a (24,43), que va en contra → choca
+    Ci.update(0.1);
+    assert.match(Ci.carrilesEn(W.idx(24, 42))[0].motivo || '', /choca|ningún lado/);
+    // atasco de verdad: del campamento minero (x 21..22, y 50..51) sale piedra y oro hacia otra herrería, que no los usa
+    const forja2 = mk(4, 'forge', 27, 50, { inb: {}, outb: {} });
+    G.buildings.push(forja2); G.bById.set(4, forja2); poner(forja2);
+    for (let x = 23; x <= 26; x++) pz(x, 50, 0, 2);
+    Ci.cambio();
+    for (let i = 0; i < 100; i++) Ci.update(0.1);
+    assert.equal(Ci.carrilesEn(W.idx(23, 50))[0].src, mina, 'boca de salida del campamento: todo lo que junta');
+    assert.match(Ci.carrilesEn(W.idx(26, 50))[0].motivo || '', /^Atascada: llega (piedra|oro) y Herrería no lo usa/);
+    assert.ok(Ci.carrilesEn(W.idx(26, 50))[0].atasco);
+    assert.ok(!forja2.inb.stone && !forja2.inb.gold, 'no entra lo que no usa');
+    // cruce: una cinta vertical cruza la horizontal en x 28 sin mezclarse
+    t[W.idx(28, 41)].p = 'k'; t[W.idx(28, 41)].j = [];
+    pz(28, 39, 1, 3); pz(28, 40, 1, 3); pz(28, 42, 1, 3); pz(28, 43, 1, 3);
+    Ci.cambio();
+    const k = Ci.carrilesEn(W.idx(28, 41));
+    assert.equal(k.length, 2);
+    assert.equal(k[0].sig ? k[0].sig.k : null, W.idx(29, 41), 'la horizontal sigue a la derecha');
+    assert.equal(k[1].d, 1, 'la de través baja');
+    assert.equal(k[1].sig.k, W.idx(28, 42));
+    t[W.idx(28, 40)].i.push(['gold', 0.9]);
+    for (let i = 0; i < 30; i++) Ci.update(0.1);
+    assert.equal(Ci.enCinta('gold') >= 1, true);
+    assert.ok(!(forja.inb.gold), 'el oro de la vertical no entra a la horizontal');
+    // paso elevado: carretas y carromatos no cruzan cintas, pero sí por debajo del paso
+    const tb = L.tabla('carromato');
+    assert.equal(tb.costo[W.idx(25, 41)], Infinity, 'una cinta corta el paso a los carromatos');
+    t[W.idx(40, 60)] = { p: 'e', d: 0, n: 2, i: [], hasta: W.idx(44, 60), lp: 4 };
+    t[W.idx(44, 60)] = { p: 'x', d: 0, n: 2, i: [], desde: W.idx(40, 60) };
+    Ci.init(G.state);
+    const pe = Ci.carrilesEn(W.idx(40, 60))[0];
+    assert.equal(pe.sig.k, W.idx(44, 60), 'la entrada salta hasta la salida');
+    assert.equal(W.belt[W.idx(42, 60)], -1, 'debajo queda libre');
+    // sin conexión: lo mismo que deja pasar el nivel más bajo
+    for (const ks in t) { t[ks].i = []; if (t[ks].j) t[ks].j = []; }
+    forja.inb = {}; saw.outb.planks = 1000;
+    t[W.idx(28, 41)].n = 1; Ci.cambio();
+    Ci.offline(60);
+    assert.equal(forja.inb.planks, 60, 'sin conexión: 60 por minuto con una pieza de nivel I');
+    // conversión de las cintas de antes: nivel III, con lo que llevaban
+    G.state.logi.red = null; W.belt.fill(-1);
+    G.state.logi.belts = [{ id: 1, a: 1, b: 2, res: null, path: [[23, 41], [24, 41], [25, 41]], items: [{ p: 1.5, r: 'planks' }] }];
+    Ci.init(G.state);
+    const r2 = G.state.logi.red.t;
+    assert.equal(Object.keys(r2).length, 3);
+    assert.equal(r2[W.idx(24, 41)].n, 3);
+    assert.equal(r2[W.idx(24, 41)].i.length, 1, 'lo que iba encima sigue');
+    assert.equal(G.state.logi.belts.length, 0);
+    assert.ok(W.belt[W.idx(23, 41)] >= 0);
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});
+
+test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, buf0 = L.bufCap, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  G.stat = () => {}; G.cap = () => 1000; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [], inb: {}, outb: {} }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  // divisor: aserradero (x 20..22, y 40..42) → (23..25, 41) → divisor en (26,41) → herrería A adelante (27..28, 41..42) y B abajo (26..27, 42..43)? B a la derecha del divisor (abajo en y)
+  const saw = mk(1, 'sawmill', 20, 40, { outb: { planks: 5000 } }), fa = mk(2, 'forge', 27, 40), fb = mk(3, 'forge', 25, 43);
+  // unidor: dos aserraderos en (40..42, 40..42) y (40..42, 46..48) que se juntan en (46,44) hacia la herrería C (47..48, 44..45)
+  const s1 = mk(4, 'sawmill', 40, 40, { outb: { planks: 5000 } }), s2 = mk(5, 'sawmill', 40, 46, { outb: { planks: 5000 } }), fc = mk(6, 'forge', 47, 44);
+  // clasificador: campamento minero (60..61, 40..41) con piedra y oro → (62..64, 40) → clasificador (65,40): piedra adelante a la cantería (66..67, 40..41), oro abajo a los copistas (65..66, 41..42)? abajo = (65,41)
+  const mina = mk(7, 'mining', 60, 40, { inv: { stone: 3000, gold: 3000 } }), can = mk(8, 'masonry', 66, 39), cop = mk(9, 'scriptorium', 65, 41);
+  const todos = [saw, fa, fb, s1, s2, fc, mina, can, cop];
+  G.buildings = todos; G.bById = new Map(todos.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); todos.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 4, res: {}, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, n, p) => { t[W.idx(x, y)] = { p: p || 'c', d, n, i: [] }; };
+  try {
+    for (let x = 23; x <= 25; x++) pz(x, 41, 0, 3);
+    pz(26, 41, 0, 3, 'v'); // adelante (27,41) = herrería A; derecha (26,42): una cinta que baja a B
+    pz(26, 42, 1, 3); // (26,43) es la herrería B (x 25..26)
+    // unidor
+    for (let x = 43; x <= 45; x++) pz(x, 41, 0, 2); pz(46, 41, 1, 2); pz(46, 42, 1, 2); pz(46, 43, 1, 2);
+    for (let x = 43; x <= 45; x++) pz(x, 47, 0, 2); pz(46, 47, 3, 2); pz(46, 46, 3, 2); pz(46, 45, 3, 2);
+    pz(46, 44, 0, 3, 'u'); // recibe de arriba y de abajo, sale a la derecha → herrería C (47,44)
+    // clasificador
+    for (let x = 62; x <= 64; x++) pz(x, 40, 0, 3);
+    pz(65, 40, 0, 3, 's');
+    Ci.init(G.state);
+    const dv = Ci.carrilesEn(W.idx(26, 41))[0];
+    assert.equal(dv.outs.length, 2, 'el divisor tiene dos salidas: la herrería A y la cinta hacia B');
+    const un = Ci.carrilesEn(W.idx(46, 44))[0];
+    assert.equal(un.ent.length, 2, 'el unidor recibe de las dos');
+    assert.equal(un.dst, fc);
+    const cl = Ci.carrilesEn(W.idx(65, 40))[0];
+    assert.equal(cl.outs.length, 2);
+    Ci.ponerFiltro(W.idx(65, 40), 0, 'stone'); Ci.ponerFiltro(W.idx(65, 40), 1, 'gold');
+    for (let i = 0; i < 1200; i++) Ci.update(0.1); // 2 minutos
+    const a = fa.inb.planks || 0, b = fb.inb.planks || 0;
+    assert.ok(a > 120 && b > 120 && Math.abs(a - b) <= 20, 'el divisor reparte por turnos (' + a + ' / ' + b + ')');
+    const c = fc.inb.planks || 0;
+    assert.ok(c >= 300 && c <= 361, 'el unidor junta las dos hasta su nivel III (' + c + ')');
+    assert.ok(Math.abs((s1.outb.planks) - (s2.outb.planks)) <= 20, 'toma por turnos de las dos (' + s1.outb.planks + ' / ' + s2.outb.planks + ')');
+    assert.ok((can.inb.stone || 0) > 100 && !can.inb.gold, 'la piedra va a la cantería (' + can.inb.stone + ')');
+    assert.ok((cop.inb.gold || 0) > 100 && !cop.inb.stone, 'el oro a los copistas (' + cop.inb.gold + ')');
+    // sin «lo que sobre» y sin salida para el oro: se atasca
+    Ci.ponerFiltro(W.idx(65, 40), 1, '');
+    for (let i = 0; i < 100; i++) Ci.update(0.1);
+    assert.match(Ci.carrilesEn(W.idx(65, 40))[0].motivo || '', /no tiene salida para oro/);
+    assert.equal(Ci.estadoFlujo(Ci.carrilesEn(W.idx(65, 40))), 3, 'atascada: rojo en «Ver flujo»');
+    { const ll = Ci.llegan(W.idx(65, 40)); assert.ok(ll.includes('gold') && ll.includes('stone') && !ll.includes('planks'), 'el panel del clasificador ofrece lo que llega (' + ll + ')'); }
+    // sin conexión: el divisor reparte en partes iguales y el clasificador separa
+    Ci.ponerFiltro(W.idx(65, 40), 1, 'gold');
+    for (const ks in t) t[ks].i = [];
+    fa.inb = {}; fb.inb = {}; fc.inb = {}; can.inb = {}; cop.inb = {};
+    Ci.offline(60);
+    assert.equal(fa.inb.planks + fb.inb.planks, 180, 'sin conexión: 180 por el divisor de nivel III');
+    assert.equal(fa.inb.planks, fb.inb.planks);
+    assert.ok(fc.inb.planks <= 180 && fc.inb.planks >= 170, 'el unidor de nivel III deja pasar 180 (' + fc.inb.planks + ')');
+    assert.ok(can.inb.stone >= 80 && cop.inb.gold >= 80 && !can.inb.gold && !cop.inb.stone, 'clasificado sin conexión');
+    // tramo: un divisor corta el tramo
+    assert.ok(!Ci.tramo(W.idx(24, 41)).includes(W.idx(26, 42)));
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });

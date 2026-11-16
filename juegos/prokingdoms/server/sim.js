@@ -392,7 +392,7 @@ function sync(p, b) {
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
   const cz = calzadas(w), autopistas = !p.mar && +b.apv !== cz.v ? { v: cz.v, t: cz.t } : undefined; // L5
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
-  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, autopistas, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
+  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, autopistas, asv: w.asv || 0, asedios: !p.mar && +b.asv !== (w.asv || 0) ? asediosDe(w) : undefined, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -883,7 +883,7 @@ function tickGuilds() {
 // Las incursiones que quedaron guardadas de antes se descartan (el cliente devuelve esas tropas a casa).
 for (const r of store.all('raids')) store.del('raids', r.id);
 function incomingFor(p) {
-  return store.all('camps').filter(c => c.to === p.id).map(c => ({ id: c.id, from: c.fromName, arrive: c.arrive, power: Math.round(c.power), k: c.k }));
+  return store.all('camps').filter(c => c.to === p.id && !c.plan).map(c => ({ id: c.id, from: c.fromName, arrive: c.arrive, power: Math.round(c.power), k: c.k }));
 }
 
 // ---------- Territorio: parcelas y conquista ----------
@@ -947,6 +947,7 @@ function conquer(p, b) {
   const why = D.canConquer({ era: p.snap ? p.snap.era : 1, score: p.snap ? p.snap.score : 0 }, Object.assign(terrInfo(tgt, w, slot), { pacto: pactoCon(p, slot) }), revenge);
   if (why) throw new GameError(why);
   if (store.all('camps').some(c => c.k === k && c.world === w.id)) throw new GameError('Ya hay una campaña contra esa parcela.');
+  if (store.all('camps').filter(c => c.to === tgt.id).length >= 2) throw new GameError('Ese reino ya tiene dos campañas encima. Espera a que termine una.');
   const { units, total, power } = checkArmy(p, b.units, b.power);
   if (!total) throw new GameError('Elige tropas para la campaña.');
   const [cx, cy] = parcelCenter(k), [hx, hy] = D.REALM_SLOTS[p.slot].home;
@@ -971,20 +972,54 @@ function parcelDefense(w, k, tgt, slot) {
   return D.parcelDefenseParts({ era: s.era || 1, px: k % W.PW, py: Math.floor(k / W.PW), towers, army: s.army || 0, walls: s.walls || 0, around: W.parcelNeighbors(k).filter(n => w.terr[n] === slot + 1).length,
     mult: ((s.walled || []).includes(k) ? s.wallMult || 1 : 1) * (s.terrMult || 1) });
 }
+// G3 (plan de guerra): al llegar, la campaña no se resuelve: empieza un asedio. El plan (D.asedioPlan, el mismo
+// del modo local) se calcula con la defensa de ese momento y queda guardado en la campaña, así que un reinicio a
+// mitad de asedio no cambia nada. Cuando se cumple su duración se aplica el resultado. Mientras tanto la campaña
+// sigue en `camps`, y por eso nadie más puede atacar esa parcela.
+// Por qué lado entra el atacante (igual que T.ladoDe del cliente): 0 norte, 1 este, 2 sur, 3 oeste.
+function ladoDe(w, k, atkSlot) {
+  const P = W.PW, px = k % P, py = Math.floor(k / P), h = D.REALM_SLOTS[atkSlot].home, hx = h[0] / D.PARCEL, hy = h[1] / D.PARCEL;
+  let mejor = 0, md = 1e9;
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dy], i) => {
+    const x = px + dx, y = py + dy, toca = x >= 0 && y >= 0 && x < P && y < P && w.terr[y * P + x] === atkSlot + 1;
+    const d = Math.hypot(x + 0.5 - hx, y + 0.5 - hy) + (toca ? 0 : 1000);
+    if (d < md) { md = d; mejor = i; }
+  });
+  return mejor;
+}
+// Lo que ven todos los del mundo: solo las etapas que ya empezaron (D.asedioVista). Viaja cuando cambia `w.asv`.
+function asediosDe(w) {
+  const t = now(), out = [];
+  for (const c of store.all('camps')) {
+    if (c.world !== w.id || !c.plan) continue;
+    out.push({ id: c.id, k: c.k, de: c.fromSlot, a: c.toSlot, deN: c.fromName, aN: c.toName, lado: c.lado || 0, ini: c.ini, units: c.units, plan: D.asedioVista(c.plan, (t - c.ini) / 1000, c.semV) });
+  }
+  return out;
+}
 function tickCamps() {
   const t = now();
   for (const c of store.all('camps')) {
     if (t < c.arrive) continue;
     const w = store.get('worlds', c.world), tgt = player(c.to), att = player(c.from);
-    store.del('camps', c.id);
-    if (!w || !att) continue;
+    if (!w || !att) { store.del('camps', c.id); if (w) { w.asv = (w.asv || 0) + 1; store.touch('worlds'); } continue; }
     ensureTerr(w);
     const still = w.terr[c.k] === c.toSlot + 1;
-    const raw = tgt && still ? parcelDefense(w, c.k, tgt, c.toSlot) : null;
-    const def = (raw ? raw.total : 1) * rand(0.85, 1.15), atk = c.power * rand(0.85, 1.15);
-    const won = still && atk > def;
-    // resumen: fuerza contra defensa y de dónde salió la defensa (con la misma tirada que decidió la batalla)
-    const bt = raw ? { atk: Math.round(atk), def: Math.round(def), parts: D.scaleParts(raw, def) } : {};
+    if (!c.plan && tgt && still) { // llegaron: empieza el asedio
+      c.semilla = 1 + Math.floor(Math.random() * 2e9); c.semV = 1 + Math.floor(Math.random() * 2e9);
+      c.plan = D.asedioPlan({ atk: c.power, parts: parcelDefense(w, c.k, tgt, c.toSlot), semilla: c.semilla });
+      c.ini = c.arrive; c.lado = ladoDe(w, c.k, c.fromSlot); c.et = 0;
+      push(tgt, { type: 'siege_start', cid: c.id, k: c.k, from: c.fromName, fin: c.ini + c.plan.total * 1000, text: 'Las tropas de ' + c.fromName + ' llegaron a tu frontera: empieza el asedio.' });
+    }
+    if (c.plan && t < c.ini + c.plan.total * 1000) { // en curso: la lista del mundo cambia cuando empieza una etapa
+      const n = c.plan.etapas.filter(e => (t - c.ini) / 1000 >= e.t0).length;
+      if (n !== c.et) { c.et = n; w.asv = (w.asv || 0) + 1; store.set('camps', c.id, c); store.touch('worlds'); store.touch('players'); }
+      continue;
+    }
+    store.del('camps', c.id);
+    w.asv = (w.asv || 0) + 1;
+    const plan = c.plan || null, won = !!plan && still && plan.gano;
+    // resumen: fuerza contra defensa y de dónde salió la defensa, y el plan entero para la repetición
+    const bt = plan ? { atk: plan.atk, def: plan.def, parts: plan.parts, plan, ini: c.ini, lado: c.lado, units: c.units, fromSlot: c.fromSlot, toSlot: c.toSlot } : {};
     if (won) {
       w.terr[c.k] = c.fromSlot + 1; w.tv++;
       w.tshield[c.toSlot] = t + D.TERR.shieldLoss * 1000;
@@ -996,13 +1031,13 @@ function tickCamps() {
       }
       if (tgt) push(tgt, Object.assign({ type: 'parcel_lost', k: c.k, from: c.fromName, fromId: att.id, fromSlot: c.fromSlot, revenge: !!c.revenge,
         text: c.fromName + ' conquistó una parcela de tu frontera. Lo que tenías ahí se desarmó y recuperaste lo invertido.' }, bt));
-    } else if (still) {
+    } else if (still && plan) {
       w.tshield[c.toSlot] = t + D.TERR.shieldWin * 1000;
       if (tgt) { const day = today(tgt); c.gold = day.defended < LIM.defendedDay ? 60 * ((tgt.snap && tgt.snap.era) || 1) : 0; day.defended++; }
       if (tgt) push(tgt, Object.assign({ type: 'parcel_defended', k: c.k, from: c.fromName, gold: c.gold, text: '¡Tu frontera resistió la campaña de ' + c.fromName + '!' }, bt));
     }
-    push(att, Object.assign({ type: 'conquest_result', rid: c.id, k: c.k, won, ratio: atk / Math.max(1, def), target: c.toName,
-      text: (won ? 'Tus tropas tomaron la parcela de ' + c.toName + '.' : still ? c.toName + ' resistió tu campaña.' : 'La parcela ya no era de ' + c.toName + ' cuando llegaron tus tropas.') }, bt));
+    push(att, Object.assign({ type: 'conquest_result', rid: c.id, k: c.k, won, ratio: plan ? plan.ratio : 1, target: c.toName,
+      text: (won ? 'Tus tropas tomaron la parcela de ' + c.toName + '.' : still && plan ? c.toName + ' resistió tu campaña.' : 'La parcela ya no era de ' + c.toName + ' cuando llegaron tus tropas.') }, bt));
     store.touch('worlds'); store.touch('players');
   }
 }
@@ -1793,7 +1828,7 @@ if (!process.env.PK_TICK_PEREZOSO) setInterval(tick, 5000).unref();
 module.exports = {
   GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
   listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, ranking, getSave, putSave, deleteSave, status,
-  paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos,
+  paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos, tickCamps,
   diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
   caravana, tickCaravanas, guildBoss, tickJefes, visita, visitaLike, visitaRegalo, tickTitulos,
   regata, regataInfo: p => regataInfo(p), tickRegata, flotaMar, duelosInfo: p => duelosInfo(p), duelo, autopista,

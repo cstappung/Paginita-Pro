@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   const PK = window.PK, U = PK.U, D = PK.D, W = PK.World;
-  const Net = (PK.Net = { online: false, me: null, world: null, cache: { offers: null, guilds: null, ranking: null }, incoming: [], ping: 0, wchat: [] });
+  const Net = (PK.Net = { online: false, me: null, world: null, cache: { offers: null, guilds: null, ranking: null }, incoming: [], asedios: [], ping: 0, wchat: [] });
   let wsince = 0;
   const G = () => PK.Game;
   const S = () => PK.Game.state;
@@ -142,7 +142,7 @@
       // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
       const mar = PK.Game.enMar && PK.Game.enMar();
       const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
-        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, apv: PK.Calzada ? PK.Calzada.version : 0, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, apv: PK.Calzada ? PK.Calzada.version : 0, asv, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
@@ -155,6 +155,8 @@
         if (r.terr) applyTerr(r.terr);
         if (PK.Calzada) PK.Calzada.desdeSync(r); // L5: solo llega cuando cambió (apv)
         tv = r.tv || 0;
+        if (r.asedios) applyAsedios(r.asedios, r.now); // G3: solo llega cuando cambió (asv)
+        asv = r.asv || 0;
         applyPlayers(r.players || []);
       }
       if (r.prices) Object.assign(S().market.p, r.prices);
@@ -196,6 +198,7 @@
         kb[pl.id] = pl.bver;
         g.clearOwner(owner, true);
         (pl.buildings || []).forEach((b, i) => g.addRemoteBuilding(b[0], owner, b[1], b[2], !!b[3], 400000 + pl.slot * 5000 + i, b[4] || 1));
+        if (g.aplicarDesalojo) g.aplicarDesalojo(owner); // pk-55: los que escondiste de tu tierra
       }
       if (pl.muros !== undefined) { mvk[pl.id] = pl.mv; PK.Def.ponerAjenas(pl.slot, pl.muros, { v: pl.mv, terr: parcelas(pl.slot) }); }
       applyUnits(owner, pl.slot, pl.units || []);
@@ -272,8 +275,16 @@
           toast(it.text, 'good');
           break;
         case 'conquest_result':
-          PK.Terr.finishRemote(it.rid, it.won, it.ratio, null, it.parts ? { atk: it.atk, def: it.def, parts: it.parts } : null);
+          PK.Terr.finishRemote(it.rid, it.won, it.ratio, null, it.parts ? { atk: it.atk, def: it.def, parts: it.parts } : null, it.plan ? { plan: it.plan, ini: aLocal(it.ini), lado: it.lado } : null);
           break;
+        // G3: las tropas de un jugador llegaron a tu parcela y empieza el asedio (la batalla llega por `asedios`)
+        case 'siege_start': {
+          const sigue = aLocal(it.fin) > Date.now();
+          PK.Social.log(it.text, 'bad');
+          g.logNews(it.text, 'bad');
+          if (sigue) { toast(it.text, 'bad', { label: 'Ver', fn: () => PK.Terr.verFrente('r' + it.cid) }); PK.Notify.now('¡Asedio en tu frontera!', it.text); }
+          break;
+        }
         // un jugador real lanzó una campaña contra tu parcela (llega también si no estabas)
         case 'under_attack': {
           seenIncoming.add(it.cid);
@@ -307,7 +318,24 @@
     }
   }
 
+  // G3: los asedios del mundo. Las horas vienen con el reloj del servidor: se pasan al de este navegador.
+  let asv = 0, desfase = 0;
+  const aLocal = t => (t || 0) - desfase;
+  function applyAsedios(list, ahora) {
+    desfase = (ahora || Date.now()) - Date.now();
+    const antes = Net.asedios || [];
+    Net.asedios = list.map(a => Object.assign({}, a, { ini: aLocal(a.ini) }));
+    // el que desaparece de la lista terminó: los que miran (ni atacante ni defensor) ven el final en el mapa
+    if (PK.Frente && PK.Frente.final) for (const a of antes) {
+      if (Net.asedios.some(o => o.id === a.id) || a.plan.parcial || a.de === D.MY_SLOT || a.a === D.MY_SLOT) continue;
+      PK.Frente.final({ id: 'r' + a.id, k: a.k, de: a.de, a: a.a, lado: a.lado, ini: a.ini, plan: a.plan, units: a.units, mio: 'ver' }, a.plan.gano);
+    }
+    PK.Terr.asediosRemotos(Net.asedios);
+  }
+  Net.aLocal = aLocal;
+
   function applyIncoming(list) {
+
     Net.incoming = list;
     for (const r of list) {
       if (seenIncoming.has(r.id)) continue;

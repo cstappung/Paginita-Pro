@@ -11,7 +11,7 @@
 - **Lo que no cambia:** las reglas de la sección 1 de `PLAN-MEGA-ACTUALIZACION.md` y las de `CLAUDE.md` de esta
   carpeta valen para todas las fases. La sección 11 de este plan agrega las propias.
 
-- **Avance (16 de noviembre de 2026):** las fases G1 y G2 salieron juntas en `pk-55` (los números `pk-N` de las
+- **Avance (16 de noviembre de 2026):** las fases G1 y G2 salieron juntas en `pk-60` (hechas como `pk-55` en una rama paralela a las cintas) (los números `pk-N` de las
   fases siguientes se corren uno hacia atrás). Comprobado: la tabla de la sección 1 no se movió, recargar a mitad de
   un asedio lo retoma con el mismo plan, y volver una hora después da el final que el plan decía. Diferencias con el
   texto: un tanteo perdido sigue costando el 15 % fijo del ejército (no las bajas del plan); el piloto reclama hacia

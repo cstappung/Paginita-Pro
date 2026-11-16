@@ -46,6 +46,7 @@
     PK.Social.init(S);
     if (!G.enMar()) setupBots(); // en el archipiélago no hay reinos vecinos (todavía)
     if (save) restore(save);
+    if (!G.enMar()) G.aplicarDesalojo(); // pk-55: los edificios ajenos que echaste de tu tierra (después de los tuyos: no los pisa)
     // un mundo recién descubierto (el primer viaje al archipiélago) llega sin edificios: se arma como una partida nueva
     if (!save || !G.buildings.some(b => b.owner === 'p')) setupPlayer();
     PK.Terr.init(S);
@@ -391,7 +392,7 @@
   // ¿Está llena la bodega de eso? Los aldeanos esperan en vez de gastar el recurso del mapa.
   G.isFull = res => G.cap(res) !== Infinity && (S.res[res] || 0) >= G.cap(res) - 0.5;
   // pk-43: lleno para quien descarga en ese edificio: un campamento mira su propio tope; el pueblo, sus bodegas
-  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) ? PK.Libro.campoLleno(b) : G.isFull(res); };
+  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) ? (res ? PK.Libro.lugarCampo(b, res) < 0.5 : PK.Libro.campoLleno(b)) : G.isFull(res); };
   G.noteFull = function (res) {
     // un solo aviso cada 2 minutos que junta todo lo que se llenó (antes uno por recurso, y se apilaban)
     if (PK.UI && !G.offline) {
@@ -402,7 +403,7 @@
         const list = [...fullWarn.set];
         fullWarn.set.clear();
         const store = list.includes('food') && list.length === 1 ? 'granary' : 'warehouse', has = G.countAll(store) > 0;
-        toast('Almacenamiento lleno: ' + list.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. ' + (has ? 'Mejora el Granero, el Almacén o el Centro Urbano.' : 'Construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
+        toast('Almacenamiento lleno: ' + list.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. ' + (has ? 'Para guardar más, mejora: ' + D.bodegasTxt() + '.' : 'Construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
           has ? { label: 'Obras', fn: () => PK.UI.openWorks() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
       }
     }
@@ -1249,7 +1250,7 @@
     n = n || 1;
     let done = 0;
     for (let i = 0; i < n; i++) {
-      if (tc.queue.length >= 10) { toast('La cola del Centro Urbano está llena.', 'warn'); break; }
+      if (tc.queue.length >= 10) { toast('La cola ' + D.delB('tc') + ' está llena.', 'warn'); break; }
       if (!G.pay(D.VILLAGER.cost)) { toast('Falta comida para entrenar aldeanos.', 'warn'); break; }
       tc.queue.push('villager'); done++;
     }
@@ -1346,9 +1347,9 @@
     if (G.encierro && (!prev || Date.now() - encAvisoT > 180000)) {
       encAvisoT = Date.now();
       const n = G.encierro.puertas.length;
-      toast('Tu Centro Urbano quedó encerrado por edificios. ' + (n ? 'Mueve o demuele uno de los marcados en rojo.' : 'Abre una puerta en la muralla o despeja el paso.'), 'warn',
+      toast('Tu ' + D.BUILD.tc.name + ' quedó encerrado por edificios. ' + (n ? 'Mueve o demuele uno de los marcados en rojo.' : 'Abre una puerta en la muralla o despeja el paso.'), 'warn',
         n ? { label: 'Ver edificios', fn: G.verPuertas } : null);
-    } else if (!G.encierro && prev) toast('Tu Centro Urbano volvió a tener salida.', 'good');
+    } else if (!G.encierro && prev) toast('Tu ' + D.BUILD.tc.name + ' volvió a tener salida.', 'good');
   };
   G.verPuertas = function () {
     const b = G.encierro && G.bById.get(G.encierro.puertas[0]);
@@ -1416,9 +1417,77 @@
     if (PK.Sfx && !G.offline) PK.Sfx.play('build');
     return b;
   };
+  // ---------- pk-55: edificios de otros reinos en tu tierra (pedido del dueño) ----------
+  // Los de los reinos simulados se arman de nuevo en cada carga (setupBots), así que lo que hiciste con ellos se guarda
+  // en S.desalojo { 'dueño:tipo:x,y' (su lugar original): [x, y] (adonde se mudó) o 0 (se fue) } y se vuelve a aplicar.
+  // Los de jugadores reales llegan del servidor: en tu mapa se esconden (0); su propio juego quita sus campamentos que
+  // quedaron en tierra ajena (G.revisarPuestos).
+  const claveAjena = b => b.owner + ':' + b.type + ':' + (b.x0 !== undefined ? b.x0 : b.x) + ',' + (b.y0 !== undefined ? b.y0 : b.y);
+  G.ajenoEnTuTierra = function (b) {
+    if (!b || b.owner === 'p' || b.type === 'tc') return false;
+    for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) if (W.ownerAt(b.x + i, b.y + j) === 'p') return true;
+    return false;
+  };
+  // el lugar libre de tierra de nadie más cercano para ese edificio (o null)
+  function lugarAfuera(b) {
+    const libre = (x, y) => { if (!W.inb(x, y)) return false; const k = W.idx(x, y); return W.terrain[k] !== 4 && W.bAt[k] < 0 && W.block[k] === 0 && W.poiAt[k] < 0 && !W.reserved[k] && !W.wall[k] && W.ownerAt(x, y) === null; };
+    for (let r = 1; r <= 30; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = b.x + dx, y = b.y + dy;
+      let ok = true;
+      for (let j = -1; j <= b.h && ok; j++) for (let i = -1; i <= b.w && ok; i++) { const borde = i < 0 || j < 0 || i >= b.w || j >= b.h; if (!borde ? !libre(x + i, y + j) : (W.inb(x + i, y + j) && W.bAt[W.idx(x + i, y + j)] >= 0)) ok = false; }
+      if (ok) return [x, y];
+    }
+    return null;
+  }
+  function moverAjeno(b, dest) {
+    const { type, owner, lvl, remote } = b, x0 = b.x0 !== undefined ? b.x0 : b.x, y0 = b.y0 !== undefined ? b.y0 : b.y;
+    for (const u of G.units) if (u.owner === owner && u.task && u.task.b === b.id) u.task = null;
+    G.removeBuilding(b);
+    if (!dest) return null;
+    const nb = G.addBuilding(type, owner, dest[0], dest[1], true, undefined, true, lvl);
+    nb.x0 = x0; nb.y0 = y0; if (remote) nb.remote = true;
+    return nb;
+  }
+  G.desalojar = function (b) {
+    if (!G.ajenoEnTuTierra(b)) return null;
+    const key = claveAjena(b), dest = b.remote ? null : lugarAfuera(b);
+    S.desalojo = S.desalojo || {};
+    S.desalojo[key] = dest || 0;
+    const nb = moverAjeno(b, dest);
+    G.blockVer++;
+    return nb || true;
+  };
+  // vuelve a aplicar lo guardado (después de armar los reinos simulados, o de recibir los edificios de un jugador)
+  G.aplicarDesalojo = function (owner) {
+    const d = S && S.desalojo;
+    if (!d) return;
+    for (const b of G.buildings.slice()) {
+      if (b.owner === 'p' || (owner && b.owner !== owner) || b.x0 !== undefined) continue;
+      const v = d[claveAjena(b)];
+      if (v === undefined) continue;
+      if (v && !b.remote) { const ok = W.inb(v[0], v[1]) && (() => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(v[0] + i, v[1] + j); if (W.bAt[k] >= 0 && W.bAt[k] !== b.id) return false; } return true; })(); moverAjeno(b, ok ? v : lugarAfuera(b)); }
+      else moverAjeno(b, null);
+    }
+  };
+  // Tus campamentos (lo único que va fuera de tu tierra) que quedaron dentro de la tierra de otro reino se desarman y
+  // te devuelven la mitad y lo que guardaban.
+  G.revisarPuestos = function () {
+    let n = 0;
+    for (const b of G.buildings.slice()) {
+      if (b.owner !== 'p' || !G.OUTPOST[b.type]) continue;
+      const o = W.ownerAt(Math.floor(b.cx), Math.floor(b.cy));
+      if (!o || o === 'p') continue;
+      G.give(G.buildCost(b.type), 0.5);
+      for (const u of G.units) if (u.task && (u.task.b === b.id || u.task.base === b.id)) G.release(u);
+      G.removeBuilding(b); n++;
+    }
+    if (n && !G.offline) toast(n === 1 ? 'Uno de tus campamentos quedó dentro de la tierra de otro reino: se desarmó y te devolvimos la mitad.' : n + ' campamentos tuyos quedaron dentro de la tierra de otro reino: se desarmaron y te devolvimos la mitad.', 'warn');
+    return n;
+  };
   G.demolish = function (b) {
     if (b.owner !== 'p') return;
-    if (b.type === 'tc' && G.buildings.filter(o => o.owner === 'p' && o.type === 'tc').length <= 1) { toast('No puedes demoler tu único Centro Urbano.', 'warn'); return; }
+    if (b.type === 'tc' && G.buildings.filter(o => o.owner === 'p' && o.type === 'tc').length <= 1) { toast('No puedes demoler tu ' + D.BUILD.tc.name + ': no tienes otro.', 'warn'); return; }
     if (!b.done) G.give(G.buildCost(b.type), 0.75 * (1 - b.progress));
     for (const u of G.units) if (u.task && u.task.b === b.id) G.release(u);
     G.removeBuilding(b);
@@ -1427,7 +1496,7 @@
   // Cuesta un 10% de lo que pide el edificio base, para que acomodar no sea gratis pero sí mucho más barato que
   // demoler y volver a construir (que además perdía los niveles). Las cintas que llegaban a él se quitan (su
   // recorrido ya no sirve). El Centro Urbano no se muda: de él salen el hogar y las regiones de los aldeanos.
-  G.MOVE_NO = { tc: 'El Centro Urbano no se puede mover: es el corazón del reino.', granporton: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.', granportonv: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.' };
+  G.MOVE_NO = { tc: D.BUILD.tc.name + ' no se puede mover: es el corazón del reino.', granporton: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.', granportonv: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.' };
   G.moveCost = b => { const c = {}, base = D.BUILD[b.type].cost || {}; for (const r in base) if (r !== 'coins') c[r] = Math.max(5, Math.round((base[r] * 0.1) / 5) * 5); return c; };
   G.canMove = b => !!b && b.owner === 'p' && !b.remote && !b.static && !G.MOVE_NO[b.type];
   G.moveBuilding = function (b, x, y) {
@@ -1436,7 +1505,7 @@
     const why = G.placeWhy(b.type, x, y, b.id);
     if (why) { toast(G.placeText(why), 'warn'); return false; }
     if (!G.pay(G.moveCost(b))) { toast('Faltan recursos para la mudanza.', 'warn'); return false; }
-    if (PK.Logi && S.logi) for (const bl of S.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) PK.Logi.removeBelt(bl);
+    if (PK.Cintas) PK.Cintas.cambio(); // pk-58: sus bocas se rearman donde quede
     if (PK.Libro) PK.Libro.vaciarAlPueblo(b); // pk-43: lo del campamento va al pueblo, como al demoler
     if (b.def.porton) G.marcarPorton(b, false);
     for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) { const k = W.idx(b.x + i, b.y + j); W.bAt[k] = -1; if (W.block[k] === 2) W.block[k] = 0; }
@@ -1524,7 +1593,7 @@
     if (!G.eraChecks(n).every(c => c.ok)) { toast('Aún no cumples los requisitos de la siguiente era.', 'warn'); return false; }
     if (!G.pay(D.eraCost(n))) { toast('Recursos insuficientes para avanzar de era.', 'warn'); return false; }
     S.eraProg = { to: n, t: 0, total: D.eraTime(n) };
-    toast('Tu pueblo comienza el avance a ' + D.eraName(n) + '.' + (n >= 3 ? ' Si te sobran recursos, paga «Horas extra» en el Centro Urbano para adelantarlo.' : ''), 'good');
+    toast('Tu pueblo comienza el avance a ' + D.eraName(n) + '.' + (n >= 3 ? ' Si te sobran recursos, paga «Horas extra» en ' + D.elB('tc') + ' para adelantarlo.' : ''), 'good');
     return true;
   };
 
@@ -1706,7 +1775,7 @@
           // pk-43: si trabaja para un campamento, junta en el campamento (con su tope); si no, en el pueblo
           const alm = u.owner === 'p' && PK.Libro ? PK.Libro.almacenDe(base) : base; // pk-46: en una colonia, su Muelle
           const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(alm);
-          const room = u.owner !== 'p' ? Infinity : campo ? Math.max(0, PK.Libro.capCampo(alm) - PK.Libro.totalCampo(alm)) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
+          const room = u.owner !== 'p' ? Infinity : campo ? PK.Libro.lugarCampo(alm, t.res) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
           const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
           if (take <= 0) continue;
           if (u.owner === 'p' || !W.isShared(n)) n.amount -= take; // L4: los simulados no gastan tus zonas comunes

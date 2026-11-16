@@ -13,9 +13,12 @@ owner outside this repo and dropped in.
   L<N> del plan de logística»; L6 is the sea with cargo barges). §10 lists traps; §11 has the owner's answered
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
 - `PLAN-GUERRA.md` (Nov 16 2026): the plan after that, «Estandartes de Guerra», phases G1–G8 («implementa la Fase
-  G<N> del plan de guerra»): conquest as a three-stage siege drawn on the map. G1 and G2 delivered together in `pk-55` (its «Avance» section says
+  G<N> del plan de guerra»): conquest as a three-stage siege drawn on the map. G1 and G2 delivered together in `pk-60` (its «Avance» section says
   what is left); G3 onward not started. Its §1 table (win chance
   by strength ratio) is the balance contract; §12 lists the owner's open decisions.
+- `PLAN-CINTAS.md` (Nov 16 2026): the belt redesign («Red de cintas»), phases C1–C3 («implementa la Fase C<N> del
+  plan de cintas»): belts as pieces on tiles with level I–V, building ports, mixed items, splitter/merger/sorter,
+  bottlenecks. §9 holds the owner's answered decisions (Nov 16). C1 done in `pk-58`.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
@@ -99,6 +102,14 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   do not pass `open` in `U.el` props (read as an event); «~79» reads «-79» in Pixelify Sans, write «aprox.»; digits
   use the Jersey 10 face (`"PK Num"`).
 - **i18n:** names people write carry `translate="no"`; never compare against a UI string.
+- **Building names in texts** (`pk-55`): the sea renames buildings and changes their gender («la Fortaleza del Puerto»).
+  Use `D.BUILD[t].name`, or `D.elB(t)` / `D.delB(t)` / `D.alB(t)` when an article is needed (`fem: true` in
+  `D.MAR.edificios`), and `D.bodegasTxt()` for «mejora: Granero, Almacén o Centro Urbano». Many older strings still
+  say «Centro Urbano», «aldeanos», «Cuartel» by hand: fix them as you touch them.
+- **CSS state classes collide:** a tree node's state `era` picked up `.era` (the topbar indicator) and overflowed the
+  research window in landscape. Scope new state classes (`.tech.nodo.x`) and check the bare name is not already a rule.
+- **The guide never leaves a step without a way out:** a step whose selection the player can lose has `mantener()`
+  (run every frame), and «Hazlo por mí» shows after 30 s even when the target exists.
 
 ## Economy and workshops
 
@@ -396,7 +407,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   its pieces. `S.barcoColonos` in `sprites-mar.js` defers to `S.barcoColonos3d`.
 
 
-### War plan, G1 + G2: the siege (`pk-55`)
+### War plan, G1 + G2: the siege (`pk-60`; built as pk-55 on a parallel branch)
 
 - **The battle plan is the only truth.** `D.asedioPlan({atk, parts, semilla})` (data.js, pure, seeded) decides the
   whole siege when the campaign arrives: winner, casualties and the three stages (`D.ASEDIO`: frontera = era + around,
@@ -425,3 +436,76 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   minutes it never reached a border, so its sieges are only the probes it defends.
 - **Known, not fixed:** with gold over the store cap (rewards), a cart carrying gold from a mixed mining camp waits
   forever to unload, the camp fills up and stone stops coming in.
+### Owner's tweaks, second round (`pk-56`; built as pk-55 in parallel with another pk-55)
+
+- **Roads only on your own land** (`L.roadAllowed` needs `ownerAt === 'p'`; outside goes the Calzada Real).
+  `revisarCaminos()` runs once per load (first `L.update` with `W.terr`): removes old roads outside, refunds half.
+  `L.onTerritory` also drops roads on any tile that stops being yours.
+- **Gran Portón layers**: `S.porton` returns the back (towers, floor, open leaves) with `spr.frente` (front tower,
+  portcullis, arch) as a second sprite; `render.js` sorts the back at `d + 0.5` and the front at `d + 3.4`, so a unit
+  crossing is drawn between them (it used to sink into the floor).
+- **Campaign places never inside a territory**: `lugarLibre` in `campana.js` (no `W.terr`, no `terrCommon`, no POI or
+  building); `C.revisarLugar` (from `Dz.revisar`) moves an existing one to the nearest free tile. Guard on
+  `st.campana.lugares`: without it the game did not start («reading 'hechos'»).
+- **Foreign buildings on your land** (`G.ajenoEnTuTierra`): the panel offers «Mudar fuera de mi tierra» (bots: moved
+  to a free spot in no-man's land) or «Sacar de mi tierra» (remote players: hidden for you only). Kept in
+  `S.desalojo[owner:type:x0,y0]` and re-applied after `setupBots` and in `net.js applyPlayers`, because bot and remote
+  buildings are rebuilt on every load. `G.revisarPuestos()` dismantles your own outpost camps whose centre fell in
+  someone else's land (half the cost back).
+- **«Cualquier campamento minero»** (`r.tipo` = `lumber|mining|mill`, `r.res` optional = «solo X»): routes from a camp
+  with no fixed resource carry **mixed cargo**: `u.carga = {res: n}` (only with 2+ kinds; saved in `toJSON`), `u.carry`
+  the total and `u.carryRes` the largest (sprite, server snapshot index). Always read cargo through `L.cargaDe(u)`;
+  `Lb.fuera`, `inbound` (`job.carga`), `dropCargo`, `descargar` (leftovers → another store, or back to the town if the
+  destination does not take them) and `L.offline` all handle it. `mejorBodega` takes a list and prefers the store that
+  takes most of it (a Granary next door does not catch a mining load). pk-54 routes (`res` without `tipo`) still work.
+- **Campaign place is 3×3** (`pk-57`): `lugarLibre` checks the nine tiles (passable, not water, no wall/foreign wall,
+  POI or building, no territory, 2+ from any territory) and `revisarLugar` uses the same distance map. Checking only
+  the centre left the camp on top of your wall and half in the sea.
+- **«Cualquier <taller>»** (`pk-57`, `'taller:<type>'` as `r.de` or `r.a`, `L.esTallerComodin`, `L.talleresDe`):
+  as destination, the workshop of that type that needs most (`tallerDestino`: missing input minus what other carts of
+  the route are fetching); as origin, the one with most output (`tallerOrigen`). Validated with a sample of the type
+  (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
+  shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.
+
+## Belt network (`PLAN-CINTAS.md`, C1 in `pk-58`, C2 in `pk-59`, `js/cintas.js`, `PK.Cintas`)
+
+- **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
+  `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
+  (≥ 0 = occupied; every old `W.belt[k] >= 0` check still means "taken"). Items live on the piece (`i`, and `j` for a
+  crossing's second lane) as `[res, q]`, so they are saved with `S`.
+- **`rearmar()`** (cached by `Ci.version` + own buildings' done-state) builds lanes: each lane's `sig` (next lane),
+  `dst` (building it points at = input port) and `src` (building behind/beside a lane nobody feeds = output port).
+  One input per lane in C1 (the one behind wins; others get «hace falta un unidor»). A crossing's cross lane takes its
+  direction from whoever enters from the side.
+- **Throughput:** each lane accepts one item every `1 / (rate·K)` s (`c.lib`). A gap rule alone did not work: a 1-tile
+  lane empties before a 1.2-tile gap is ever measured, and a level I piece let 165/2 min through. Queued items sit
+  `JUNTOS` (0.34) apart. `K` is the tree bonus `belt`.
+- **Ports:** a workshop gives its output; a camp gives everything it holds, round-robin (mixed); a store gives what the
+  player ticks in the port (`pz.f`), never below the workshop reserve. Inputs: workshop inputs up to `bufCap`, stores
+  through `Lb.poner`. Something the destination does not use **jams** the lane (`c.atasco`, `c.motivo`, red blink).
+- **Carts and carromatos do not cross belts** (`pasa()` in logistics.js; `W.beltVer` is in the table version).
+  Villagers walk over. The elevated pass leaves its middle tiles unmarked, so carts go under.
+- **Offline:** per output port, the chain's slowest level × dt, split round-robin; a port that would emit something the
+  sink rejects moves nothing (it would jam live). Tested against a level I piece (exactly 60/min).
+- **Building:** two taps (`L.tool = 'cinta'`), L-shaped plan (`Ci.plan`), starts at a building's free border tile or
+  continues a dead end, ends pointing into a building or an existing belt; crossing a perpendicular straight belt
+  makes a crossing. `L.tool = 'paso'`: entry and exit 2..`D.CINTA.pasoMax` apart. On touch the panel folds while
+  tracing (`plegarAlColocar`). Belts may not go on roads or the Calzada (use a pass). «Quitar varios» removes pieces.
+- **Old saves:** `st.logi.belts` become level III pieces with their items (`Ci.init`), `st.logi.avisoCintas` toasts once.
+- The server never sees belts; `Lb.fuera` counts what rides on them (`Ci.enCinta`). The autopilot does not build them.
+- C1 builds levels I–III (`D.CINTA.maxFase`); levels IV–V are C3.
+- **C2 nodes** (`Ci.NODO`): `u` unidor (takes from every lane that enters, turn by turn: `turno`/`listo`/`hayLugarDesde`),
+  `v` divisor and `s` clasificador (one input, outputs ahead and both sides, round-robin `c.rr` among outs with room).
+  Lanes carry `outs` (`{c|b, d}`) and `ent` (`{c, d}`) instead of a single `sig`; every walker (tramo, alimenta,
+  bocasDe, offline) must follow `outs`/`ent`, not `sig`. Sorter filters live in `pz.f2[d]`: a resource, `'*'` (what no
+  other output took) or `''`; default front `'*'`, sides `''` (`Ci.filtro`). An item no output takes jams with a
+  message naming it. Costs in `D.CINTA.nodos`; `Ci.convertir` refunds half of the old node.
+- **Tick carry:** `c.lib` may go down to `-dt` (`credito()`), or a 3/s merger delivered 2.4/s at 10 ticks/s. Keep it.
+- **Auto-joins when tracing** (`Ci.plan`): starting mid-belt turns that piece into a divisor (`dividir`); ending on a
+  belt that already has an input turns it into a unidor (`unir`); ending head-on is refused.
+- **Offline:** offers from sources flow downstream with each lane's cap, split evenly at divisors and by filter at
+  sorters, limited by what sinks accept (`accDe`); sources lose exactly what was delivered.
+- **«Ver flujo»** (`Ci.verFlujo`, `Ci.estadoFlujo`): red only for jammed or held back by a lower-level next piece; a
+  belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
+  The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
+  options) feeds the sorter panel's short list.

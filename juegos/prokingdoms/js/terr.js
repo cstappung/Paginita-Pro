@@ -129,9 +129,18 @@
       if (!it.revenge) tr.rev[it.k] = { at: t, name: it.from, pid: it.fromId || null, slot: it.fromSlot };
     }
     for (const k in tr.rev) if (t - tr.rev[k].at >= D.TERR.retake * 1000) delete tr.rev[k];
-    return it.parts ? T.recordBattle({ role: 'def', k: it.k, vs: it.from, won: false, atk: it.atk, def: it.def, parts: it.parts }) : null;
+    return defRemota(it, false);
   };
-  T.onDefended = it => (it.parts ? T.recordBattle({ role: 'def', k: it.k, vs: it.from, won: true, atk: it.atk, def: it.def, parts: it.parts }) : null);
+  T.onDefended = it => defRemota(it, true);
+  // G3: el resumen de un asedio de otro jugador contra ti, con el plan entero para «Ver de nuevo» y el final en el mapa
+  function defRemota(it, won) {
+    if (!it.parts) return null;
+    const ini = it.plan && PK.Net.aLocal ? PK.Net.aLocal(it.ini) : 0;
+    const rep = it.plan ? { plan: it.plan, units: it.units || null, lado: it.lado || 0, de: it.fromSlot, a: me() } : null;
+    const cause = T.recordBattle(Object.assign({ role: 'def', k: it.k, vs: it.from, won, atk: it.atk, def: it.def, parts: it.parts }, rep ? { rep } : null), ini ? ini + it.plan.total * 1000 : undefined);
+    if (rep && PK.Frente && PK.Frente.final && !G().offline && Date.now() - (ini + it.plan.total * 1000) < 60e3) PK.Frente.final({ id: 'r' + it.k, k: it.k, de: it.fromSlot, a: me(), lado: rep.lado, ini, plan: it.plan, units: rep.units, mio: 'def' }, !won);
+    return cause;
+  }
 
   // ---------- Conquista ----------
   T.canAttack = function (k) {
@@ -220,6 +229,8 @@
     const st = S(), out = [];
     if (!st || !st.terr) return out;
     for (const c of st.terr.camps) if (c.phase === 'asedio' && c.plan) out.push({ id: 'c' + c.k, k: c.k, de: me(), a: c.slot, lado: c.lado || 0, ini: c.ini, plan: c.plan, units: c.units, mio: 'atk', fuerza: c.power });
+    // G3: los asedios entre jugadores que cuenta el servidor. Los míos van en su campaña (c.plan, arriba).
+    if (online()) for (const a of PK.Net.asedios || []) if (a.de !== me()) out.push({ id: 'r' + a.id, k: a.k, de: a.de, a: a.a, lado: a.lado || 0, ini: a.ini, plan: a.plan, units: a.units, mio: a.a === me() ? 'def' : 'ver', fuerza: a.plan.atk, deN: a.deN, aN: a.aN });
     for (const th of st.terr.threats) if (th.plan) out.push({ id: 't' + th.k, k: th.k, de: th.slot, a: me(), lado: th.lado || 0, ini: th.ini, plan: th.plan, units: null, mio: 'def', fuerza: th.power });
     return out;
   };
@@ -228,8 +239,27 @@
   // El estado de un frente ahora mismo (D.asedioEn con el reloj).
   T.estado = f => D.asedioEn(f.plan, (Date.now() - f.ini) / 1000);
   T.nombreFrente = function (f) {
+    if (f.mio === 'ver') return { otro: f.aN || (T.realmInfo(f.a) || {}).realm || 'otro reino', titulo: (f.deN || 'Un reino') + ' asedia a ' };
     const otro = T.realmInfo(f.mio === 'atk' ? f.a : f.de);
     return { otro: otro ? otro.realm : 'otro reino', titulo: f.mio === 'atk' ? 'Asedio a ' : 'Te asedia ' };
+  };
+  // G3: el servidor avisó cómo van los asedios. Mis campañas contra jugadores toman de ahí su plan a la vista.
+  T.asediosRemotos = function (list) {
+    const st = S();
+    if (!st || !st.terr) return;
+    for (const c of st.terr.camps) {
+      if (!c.remote || c.phase === 'back') continue;
+      const a = list.find(o => o.id === c.rid);
+      if (!a) continue;
+      const nuevo = c.phase !== 'asedio';
+      c.plan = a.plan; c.ini = a.ini; c.lado = a.lado; c.phase = 'asedio';
+      if (nuevo && Date.now() < c.ini + 60e3) {
+        const info = T.realmInfo(c.slot);
+        PK.Social.log('Tus tropas llegaron a la parcela de ' + info.realm + ': empieza el asedio.', 'info');
+        toast('¡Empieza el asedio a ' + info.realm + '! Tres etapas: la frontera, las defensas y el estandarte.', 'epic', { label: 'Ver', fn: () => T.verFrente('c' + c.k) });
+        if (PK.Sfx) PK.Sfx.play('cuerno');
+      }
+    }
   };
   T.verFrente = function (id) {
     const f = T.frente(id) || T.frentes()[0];
@@ -281,10 +311,13 @@
       PK.Notify.now('Tu campaña fracasó', info.realm + ' resistió.' + (cause ? ' ' + cause : ''));
     }
   }
-  T.finishRemote = function (rid, won, ratio, units, bt) {
+  // as: { plan, ini, lado } cuando el servidor peleó el asedio (G3); sin él (servidor anterior), se arma una repetición.
+  T.finishRemote = function (rid, won, ratio, units, bt, as) {
     const c = S().terr.camps.find(o => o.rid === rid);
     if (!c) return;
     if (units) c.units = units;
+    if (as && as.plan) { c.ini = as.ini; c.lado = as.lado || 0; finishCampaign(c, won, ratio, bt, as.plan); return; }
+    c.ini = 0;
     if (bt && bt.parts && bt.atk && bt.def) c.repPlan = D.asedioDe({ atk: bt.atk, def: bt.def, parts: bt.parts, semilla: c.semilla || 1, gano: !!won });
     finishCampaign(c, won, ratio, bt);
   };
@@ -394,8 +427,8 @@
     const now = Date.now();
     for (const c of st.terr.camps.slice()) {
       if (c.phase === 'go' && !c.remote && now >= c.arrive) empezarAsedio(c, offline);
-      if (c.phase === 'asedio' && now >= c.ini + c.plan.total * 1000) { const p = c.plan; finishCampaign(c, p.gano && W.terr[c.k] === c.slot + 1, p.ratio, { atk: p.atk, def: p.def, parts: p.parts }, p); }
-      else if (c.phase === 'back' && now >= c.back) {
+      if (c.phase === 'asedio' && !c.remote && now >= c.ini + c.plan.total * 1000) { const p = c.plan; finishCampaign(c, p.gano && W.terr[c.k] === c.slot + 1, p.ratio, { atk: p.atk, def: p.def, parts: p.parts }, p); }
+      if (c.phase === 'back' && now >= c.back) {
         for (const u in c.units) st.war.army[u] += c.units[u];
         st.terr.camps.splice(st.terr.camps.indexOf(c), 1);
         PK.Social.log('Volvieron los sobrevivientes de la campaña.', 'info');

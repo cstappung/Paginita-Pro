@@ -35,11 +35,27 @@
 
   // ---------- El lugar único ----------
   C.lugar = n => S().campana.lugares[n] || null;
+  // pk-55: el lugar va fuera de todo territorio (a 3 casillas o más) y fuera de las zonas comunes: a 14-28 casillas de
+  // tu casa caía casi siempre dentro de tu tierra, y quedaba una mazmorra en medio del pueblo.
+  // pk-57: se dibuja de 3×3 (x-1..x+1): mirar solo la casilla del centro dejaba el campamento encima de tu muralla y
+  // medio en el agua. Las nueve casillas: libres, en tierra firme y en tierra de nadie, a 2 o más de todo territorio.
+  const casillaLibre = (x, y, dist) => {
+    if (!W.inb(x, y) || !W.passable(x, y)) return false;
+    const k = W.idx(x, y);
+    if (W.poiAt[k] >= 0 || W.bAt[k] >= 0 || W.wall[k] || (W.wallAj && W.wallAj[k]) || W.terrain[k] === 4) return false;
+    return !W.terr || (!W.terr[W.parcel(x, y)] && !W.terrCommon[W.parcel(x, y)] && (!dist || dist[k] >= 2));
+  };
+  const lugarLibre = (x, y, dist) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!casillaLibre(x + dx, y + dy, dist)) return false;
+    return !dist || !W.terr || dist[W.idx(x, y)] >= 3;
+  };
+  C.lugarLibre = lugarLibre;
   function crearLugar(n) {
     const st = S(), [hx, hy] = D.PLAYER_HOME, rng = U.rng(U.strHash('cap' + n + ':' + (st.created || 0)));
-    for (let t = 0; t < 400; t++) {
-      const a = rng() * Math.PI * 2, d = 14 + rng() * 14, x = Math.round(hx + Math.cos(a) * d), y = Math.round(hy + Math.sin(a) * d);
-      if (!W.inb(x, y) || !W.passable(x, y) || W.poiAt[W.idx(x, y)] >= 0 || W.bAt[W.idx(x, y)] >= 0) continue;
+    const dist = W.terr && W.distTerritorio ? W.distTerritorio(W.terr) : null;
+    for (let t = 0; t < 1200; t++) {
+      const a = rng() * Math.PI * 2, d = 14 + rng() * 14 + Math.floor(t / 200) * 10, x = Math.round(hx + Math.cos(a) * d), y = Math.round(hy + Math.sin(a) * d);
+      if (!lugarLibre(x, y, dist)) continue;
       st.campana.lugares[n] = { x, y };
       G().revealAt(x + 0.5, y + 0.5, 3);
       return st.campana.lugares[n];
@@ -47,6 +63,20 @@
     // sin lugar libre (no debería pasar): junto al Centro Urbano
     return (st.campana.lugares[n] = { x: hx + 6, y: hy + 6 });
   }
+  // Si tu territorio (o el de otro) creció hasta el lugar del capítulo en curso, se muda a la tierra de nadie más cercana.
+  C.revisarLugar = function () {
+    const st = S(), n = st && st.campana && st.campana.lugares ? C.actual() : 0, l = n && C.lugar(n);
+    if (!l || !W.terr) return false;
+    const dist = W.distTerritorio(W.terr);
+    if (lugarLibre(l.x, l.y, dist)) return false;
+    for (let r = 1; r < 60; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !lugarLibre(l.x + dx, l.y + dy, dist)) continue;
+      st.campana.lugares[n] = { x: l.x + dx, y: l.y + dy };
+      G().revealAt(l.x + dx + 0.5, l.y + dy + 0.5, 3);
+      return true;
+    }
+    return false;
+  };
   C.lugarEn = function (x, y) {
     const n = C.actual(), l = n && C.lugar(n);
     return l && Math.abs(l.x - x) <= 1 && Math.abs(l.y - y) <= 1 ? n : 0;

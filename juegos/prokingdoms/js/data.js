@@ -207,6 +207,14 @@
   // La era desbloquea edificios nuevos y sube el nivel máximo de todos (+2 por era). No da bonos por sí sola:
   // cada edificio mejora por su cuenta.
   D.ERA_NAMES = ['Campamento', 'Aldea', 'Villa', 'Pueblo', 'Ciudad', 'Señorío', 'Reino', 'Imperio', 'Gran Imperio', 'Leyenda'];
+  // Las tres bodegas por su nombre en este mundo (en el Archipiélago se llaman de otro modo), sin artículo: no todos
+  // los nombres son masculinos.
+  D.bodegasTxt = () => D.BUILD.granary.name + ', ' + D.BUILD.warehouse.name + ' o ' + D.BUILD.tc.name;
+  // El nombre de un edificio con su artículo (el/la, del/de la, al/a la): los del Archipiélago cambian de género
+  // («la Fortaleza del Puerto»), así que los textos no pueden llevar «el Centro Urbano» escrito a mano.
+  D.elB = t => (D.BUILD[t].fem ? 'la ' : 'el ') + D.BUILD[t].name;
+  D.delB = t => (D.BUILD[t].fem ? 'de la ' : 'del ') + D.BUILD[t].name;
+  D.alB = t => (D.BUILD[t].fem ? 'a la ' : 'al ') + D.BUILD[t].name;
   D.eraName = n => (n <= 10 ? D.ERA_NAMES[n - 1] : 'Leyenda ' + U.roman(n - 9));
   D.eraCost = function (n) {
     if (n === 2) return { food: 400, wood: 300 };
@@ -734,8 +742,20 @@
       etapa: D.ASEDIO.etapas.indexOf(e.id), id: e.id, f: e.f1 * kk, k,
       impetu: U.clamp(1 - c / Math.max(1, plan.atk), 0, 1), resistencia: U.clamp(1 - c / Math.max(1, plan.def), 0, 1),
       control: U.clamp(c / Math.max(1, plan.def), 0, 1), bajasA: plan.bajas * (plan.gastado > 0 ? c / plan.gastado : 1),
-      fin, queda: Math.max(0, e.t0 + e.dur - t), quedaTotal: plan.total - t,
+      fin: fin && !plan.parcial, queda: Math.max(0, e.t0 + e.dur - t), quedaTotal: plan.total - t,
     };
+  };
+  // G3: lo que el servidor le cuenta a los jugadores de un asedio en curso. Tiene la forma de un plan (lo dibuja
+  // frente.js igual), pero solo con las etapas que ya empezaron, y sin el final: quién gana, las bajas y la fuerza
+  // real del atacante viajan recién cuando empieza la última etapa. Mientras tanto las dos barras bajan parejas.
+  // semV: semilla del dibujo, distinta de la que decide el plan (con la del plan se podría recalcular todo).
+  D.asedioVista = function (plan, t, semV) {
+    const es = plan.etapas.filter(e => t >= e.t0), todo = es.length >= plan.etapas.length;
+    if (!es.length) es.push(plan.etapas[0]);
+    const ult = es[es.length - 1];
+    const v = { v: 1, semilla: semV || 1, def: plan.def, parts: plan.parts, etapas: es, n: es.length, total: ult.t0 + ult.dur };
+    if (todo) return Object.assign(v, { atk: plan.atk, gano: plan.gano, bajas: plan.bajas, gastado: plan.gastado, ratio: plan.ratio });
+    return Object.assign(v, { parcial: true, atk: plan.def, bajas: 0.2, gastado: plan.def });
   };
   // Frase corta de cómo salió una etapa respecto de lo esperado (para la crónica).
   D.asedioSuerte = s => (s >= 1.1 ? 'aguantó más de lo esperado' : s <= 0.9 ? 'cedió antes de lo esperado' : 'aguantó lo esperado');
@@ -755,7 +775,23 @@
   D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
   // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.
   D.campoCap = L => 300 + 150 * (L - 1);
-  D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 };
+  D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 }; // las de antes de pk-58 (solo para convertirlas)
+  // pk-58: red de cintas (PLAN-CINTAS.md). rate: ítems por segundo; vel: casillas por segundo (los ítems van separados
+  // vel / rate casillas). cost: lo que cuesta cada casilla al subir a ese nivel. maxFase: hasta qué nivel se construye
+  // por ahora (la Fase C3 abre IV y V). cruce y paso: lo que suman esas piezas.
+  D.CINTA = {
+    niv: [
+      { name: 'Cinta de cuero', rate: 1, vel: 1.2, era: 3, cost: { planks: 2, ingots: 1 } },
+      { name: 'Cinta de hierro', rate: 2, vel: 1.6, era: 3, cost: { ingots: 2, tools: 1 } },
+      { name: 'Cinta de acero', rate: 3, vel: 2.0, era: 4, cost: { steel: 2 } },
+      { name: 'Cinta reforzada', rate: 5, vel: 2.6, era: 5, cost: { steel: 1, machinery: 1 } },
+      { name: 'Cinta de engranajes', rate: 8, vel: 3.2, era: 6, cost: { machinery: 2, gems: 1 } },
+    ],
+    maxFase: 3, cruce: { planks: 4, ingots: 2 }, paso: { planks: 10, ingots: 4, stone: 20 }, pasoMax: 5, alto: 10,
+    // C2 (pk-59): piezas que unen, reparten y separan. Cuestan además del nivel de la pieza.
+    nodos: { u: { planks: 6, ingots: 2 }, v: { planks: 6, ingots: 2 }, s: { ingots: 4, tools: 2, books: 1 } },
+    nodoNombre: { u: 'Unidor', v: 'Divisor', s: 'Clasificador' },
+  };
   D.BUF = 30;          // capacidad de los depósitos de un taller, por puesto de trabajo
   D.NEAR_STORE = 3;    // un taller a esta distancia de un almacén se abastece solo, sin carretas
 

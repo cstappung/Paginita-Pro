@@ -97,3 +97,34 @@ test('el dibujo no decide: frente.js no tira dados para el resultado ni toca el 
   const html = fs.readFileSync(path.join(PKDIR, 'index.html'), 'utf8');
   assert.ok(html.indexOf('js/troops.js') < html.indexOf('js/frente.js') && html.indexOf('js/frente.js') < html.indexOf('js/render.js'), 'frente.js va después de troops.js y antes de render.js');
 });
+
+// ---------- G3: asedios entre jugadores ----------
+test('G3: lo que el servidor cuenta de un asedio no trae el final hasta la última etapa', () => {
+  let parciales = 0;
+  for (let i = 0; i < 400; i++) {
+    const p = plan(0.8 + (i % 6) * 0.1, i * 31 + 5);
+    for (let t = 0; t <= p.total; t += 7) {
+      const v = D.asedioVista(p, t, 99);
+      assert.ok(v.etapas.every(e => e.t0 <= t), 'solo etapas empezadas');
+      assert.ok(v.semilla === 99 && v.semilla !== p.semilla, 'la semilla del dibujo no es la del plan');
+      const e = D.asedioEn(v, t);
+      assert.ok(e.impetu >= 0 && e.impetu <= 1 && e.bajasA >= 0 && e.bajasA <= 1 && !Number.isNaN(e.control), 'se puede dibujar');
+      if (v.etapas.length < p.etapas.length) {
+        parciales++;
+        assert.ok(v.parcial && v.gano === undefined && v.ratio === undefined && v.atk === v.def, 'sin ganador ni fuerza real');
+        assert.ok(!v.etapas.some(x => x.rota) && !e.fin, 'ninguna etapa a la vista dice cómo termina');
+      } else assert.ok(!v.parcial && v.gano === p.gano && v.bajas === p.bajas && v.atk === p.atk);
+    }
+  }
+  assert.ok(parciales > 1000);
+});
+
+test('G3: el servidor pelea el asedio con el mismo plan y el cliente no lo decide', () => {
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
+  assert.ok(/D\.asedioPlan\(/.test(sim) && /D\.asedioVista\(/.test(sim), 'usa las funciones de data.js');
+  assert.ok(!/rand\(0\.85, 1\.15\)[^\n]*c\.power/.test(sim), 'ya no hay una tirada al llegar');
+  const terr = JS('terr.js');
+  assert.ok(/c\.phase === 'asedio' && !c\.remote/.test(terr), 'una campaña contra un jugador la termina el servidor, no el reloj del navegador');
+  const net = JS('net.js');
+  assert.ok(/asv/.test(net) && /applyAsedios/.test(net), 'los asedios viajan con versión');
+});
