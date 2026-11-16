@@ -484,6 +484,27 @@ test('Solo Club: el verificador rehace la prueba y rechaza la de otra cuenta, ot
   assert.ok(V.sospecha(dato.categoria,{puntos:20,tiempo:5000}));
  }finally{delete globalThis.BoxheadRehace;}
 });
+/* El verificador corre en un Web Worker: ahí no hay `parent` ni `window`, y los
+   oyentes de 'message' que el juego registre también reciben el pedido. Un
+   `parent` suelto en uno lanzaba un ReferenceError antes de la respuesta, y la
+   página rechazaba todas las partidas del Club. Aquí se imita ese ámbito. */
+test('Solo Club: el trabajador del verificador responde sin lanzar errores',()=>{
+ const dir='../juegos/boxhead/js/',oyentes=[],respuestas=[];
+ const ctx={console,Math,JSON,Date,Map,Set,Array,Object,Number,String,Boolean,Symbol,Proxy,Error,TypeError,
+  Int32Array,Float32Array,Uint8Array,URLSearchParams,Infinity,NaN,isFinite,parseInt,parseFloat,
+  location:{search:'?v=boxhead',href:'http://x/juegos/boxhead/js/verificador.js?v=boxhead',origin:'http://x'},
+  addEventListener:(t,f)=>{if(t==='message')oyentes.push(f);},postMessage:d=>respuestas.push(d)};
+ ctx.self=ctx;
+ ctx.importScripts=(...fs)=>{for(const f of fs)vm.runInContext(fs_.readFileSync(dir+f.replace(/\?.*$/,''),'utf8'),ctx,{filename:f});};
+ const fs_=fs;
+ vm.createContext(ctx);
+ vm.runInContext(fs.readFileSync(dir+'verificador.js','utf8'),ctx,{filename:'verificador.js'});
+ const ev={data:{id:7,p:{v:1}},source:null,origin:''};
+ for(const f of [...oyentes,ctx.onmessage].filter(Boolean))assert.doesNotThrow(()=>f(ev));
+ assert.equal(respuestas.length,1);
+ assert.equal(respuestas[0].id,7);
+ assert.match(respuestas[0].motivo,/forma esperada/);
+});
 test('Solo Club: categorías y tope de Pro BoxHead en club-datos',async()=>{
  const esbuild=require('esbuild');
  const mod={exports:{}};

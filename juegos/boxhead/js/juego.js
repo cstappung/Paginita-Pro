@@ -1893,10 +1893,15 @@
 
   // ---------- la red ----------
   function enviar(tipo, d) {
-    if (ONLINE) parent.postMessage(Object.assign({ canal: 'boxhead-hijo', tipo }, d || {}), location.origin);
+    if (ONLINE) window.parent.postMessage(Object.assign({ canal: 'boxhead-hijo', tipo }, d || {}), location.origin);
   }
-  addEventListener('message', e => {
-    if (e.source !== parent || e.origin !== location.origin) return;
+  /* Solo en la sala escucha a la página. En el verificador del Club este
+     archivo corre en un Web Worker, donde `parent` no existe: un `parent`
+     suelto lanzaba un ReferenceError con el mensaje que el trabajador recibe
+     para rehacer la prueba, el error le ganaba a la respuesta y la página
+     rechazaba todas las partidas del Club («el verificador no cargó»). */
+  if (ONLINE) addEventListener('message', e => {
+    if (e.source !== window.parent || e.origin !== location.origin) return;
     const m = e.data;
     if (!m || m.canal !== 'boxhead-padre') return;
     if (m.tipo === 'config') config(m);
