@@ -402,7 +402,7 @@
         const list = [...fullWarn.set];
         fullWarn.set.clear();
         const store = list.includes('food') && list.length === 1 ? 'granary' : 'warehouse', has = G.countAll(store) > 0;
-        toast('Almacenamiento lleno: ' + list.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. ' + (has ? 'Mejora el Granero, el Almacén o el Centro Urbano.' : 'Construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
+        toast('Almacenamiento lleno: ' + list.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. ' + (has ? 'Para guardar más, mejora: ' + D.bodegasTxt() + '.' : 'Construye un ' + D.BUILD[store].name + ' para guardar más.'), 'warn',
           has ? { label: 'Obras', fn: () => PK.UI.openWorks() } : { label: 'Construir', fn: () => PK.UI.openBuild() });
       }
     }
@@ -1249,7 +1249,7 @@
     n = n || 1;
     let done = 0;
     for (let i = 0; i < n; i++) {
-      if (tc.queue.length >= 10) { toast('La cola del Centro Urbano está llena.', 'warn'); break; }
+      if (tc.queue.length >= 10) { toast('La cola ' + D.delB('tc') + ' está llena.', 'warn'); break; }
       if (!G.pay(D.VILLAGER.cost)) { toast('Falta comida para entrenar aldeanos.', 'warn'); break; }
       tc.queue.push('villager'); done++;
     }
@@ -1344,9 +1344,9 @@
     if (G.encierro && (!prev || Date.now() - encAvisoT > 180000)) {
       encAvisoT = Date.now();
       const n = G.encierro.puertas.length;
-      toast('Tu Centro Urbano quedó encerrado por edificios. ' + (n ? 'Mueve o demuele uno de los marcados en rojo.' : 'Abre una puerta en la muralla o despeja el paso.'), 'warn',
+      toast('Tu ' + D.BUILD.tc.name + ' quedó encerrado por edificios. ' + (n ? 'Mueve o demuele uno de los marcados en rojo.' : 'Abre una puerta en la muralla o despeja el paso.'), 'warn',
         n ? { label: 'Ver edificios', fn: G.verPuertas } : null);
-    } else if (!G.encierro && prev) toast('Tu Centro Urbano volvió a tener salida.', 'good');
+    } else if (!G.encierro && prev) toast('Tu ' + D.BUILD.tc.name + ' volvió a tener salida.', 'good');
   };
   G.verPuertas = function () {
     const b = G.encierro && G.bById.get(G.encierro.puertas[0]);
@@ -1415,7 +1415,7 @@
   };
   G.demolish = function (b) {
     if (b.owner !== 'p') return;
-    if (b.type === 'tc' && G.buildings.filter(o => o.owner === 'p' && o.type === 'tc').length <= 1) { toast('No puedes demoler tu único Centro Urbano.', 'warn'); return; }
+    if (b.type === 'tc' && G.buildings.filter(o => o.owner === 'p' && o.type === 'tc').length <= 1) { toast('No puedes demoler tu ' + D.BUILD.tc.name + ': no tienes otro.', 'warn'); return; }
     if (!b.done) G.give(G.buildCost(b.type), 0.75 * (1 - b.progress));
     for (const u of G.units) if (u.task && u.task.b === b.id) G.release(u);
     G.removeBuilding(b);
@@ -1424,7 +1424,7 @@
   // Cuesta un 10% de lo que pide el edificio base, para que acomodar no sea gratis pero sí mucho más barato que
   // demoler y volver a construir (que además perdía los niveles). Las cintas que llegaban a él se quitan (su
   // recorrido ya no sirve). El Centro Urbano no se muda: de él salen el hogar y las regiones de los aldeanos.
-  G.MOVE_NO = { tc: 'El Centro Urbano no se puede mover: es el corazón del reino.', granporton: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.', granportonv: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.' };
+  G.MOVE_NO = { tc: D.BUILD.tc.name + ' no se puede mover: es el corazón del reino.', granporton: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.', granportonv: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.' };
   G.moveCost = b => { const c = {}, base = D.BUILD[b.type].cost || {}; for (const r in base) if (r !== 'coins') c[r] = Math.max(5, Math.round((base[r] * 0.1) / 5) * 5); return c; };
   G.canMove = b => !!b && b.owner === 'p' && !b.remote && !b.static && !G.MOVE_NO[b.type];
   G.moveBuilding = function (b, x, y) {
@@ -1521,7 +1521,7 @@
     if (!G.eraChecks(n).every(c => c.ok)) { toast('Aún no cumples los requisitos de la siguiente era.', 'warn'); return false; }
     if (!G.pay(D.eraCost(n))) { toast('Recursos insuficientes para avanzar de era.', 'warn'); return false; }
     S.eraProg = { to: n, t: 0, total: D.eraTime(n) };
-    toast('Tu pueblo comienza el avance a ' + D.eraName(n) + '.' + (n >= 3 ? ' Si te sobran recursos, paga «Horas extra» en el Centro Urbano para adelantarlo.' : ''), 'good');
+    toast('Tu pueblo comienza el avance a ' + D.eraName(n) + '.' + (n >= 3 ? ' Si te sobran recursos, paga «Horas extra» en ' + D.elB('tc') + ' para adelantarlo.' : ''), 'good');
     return true;
   };
 

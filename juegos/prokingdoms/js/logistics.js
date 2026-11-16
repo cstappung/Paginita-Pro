@@ -551,7 +551,7 @@
     for (const res in porRes) {
       const cs = porRes[res], tot = cs.reduce((n, b) => n + stockCampo(b, res), 0);
       if (cs.length >= 2 && !yaEsta('campo', 'bodega', res)) out.push({ id: 'c:' + res, tipo: 'ruta', de: 'campo', a: 'bodega', res, txt: L.nombreExtremo('campo', res) + ' → Cualquier bodega', por: cs.length + ' campamentos de ' + D.RES[res].name.toLowerCase() + ' sin carromato (guardan ' + U.fmt(Math.floor(tot)) + '). Cada viaje va al que tiene más.', peso: 60 + tot / 50 });
-      else if (cs.length === 1 && !yaEsta(cs[0].id, 'bodega', null)) out.push({ id: 'c1:' + cs[0].id, tipo: 'ruta', de: cs[0].id, a: 'bodega', res: null, txt: cs[0].def.name + ' → Cualquier bodega', por: 'Nadie lo vacía' + (PK.Libro.campoLleno(cs[0]) ? ' y está lleno: sus aldeanos esperan.' : ' (guarda ' + U.fmt(Math.floor(PK.Libro.totalCampo(cs[0]))) + ').'), peso: 50 + PK.Libro.totalCampo(cs[0]) / 50 + (PK.Libro.campoLleno(cs[0]) ? 30 : 0) });
+      else if (cs.length === 1 && !yaEsta(cs[0].id, 'bodega', null)) out.push({ id: 'c1:' + cs[0].id, tipo: 'ruta', de: cs[0].id, a: 'bodega', res: null, txt: cs[0].def.name + ' → Cualquier bodega', por: 'Nadie lo vacía' + (PK.Libro.campoLleno(cs[0]) ? ' y está lleno: sus aldeanos esperan.' : ' (guarda ' + U.fmt(Math.floor(PK.Libro.totalCampo(cs[0]))) + ').') + ((cs[0].def.drop || []).length > 1 && stockCampo(cs[0], res) >= 1 ? ' Tiene sobre todo ' + D.RES[res].name.toLowerCase() + '.' : ''), peso: 50 + PK.Libro.totalCampo(cs[0]) / 50 + (PK.Libro.campoLleno(cs[0]) ? 30 : 0) });
     }
     // 2) talleres lejos de una bodega: que alguien les traiga y les saque
     for (const b of g.buildings) {

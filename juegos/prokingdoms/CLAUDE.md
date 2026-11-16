@@ -95,6 +95,14 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   do not pass `open` in `U.el` props (read as an event); «~79» reads «-79» in Pixelify Sans, write «aprox.»; digits
   use the Jersey 10 face (`"PK Num"`).
 - **i18n:** names people write carry `translate="no"`; never compare against a UI string.
+- **Building names in texts** (`pk-55`): the sea renames buildings and changes their gender («la Fortaleza del Puerto»).
+  Use `D.BUILD[t].name`, or `D.elB(t)` / `D.delB(t)` / `D.alB(t)` when an article is needed (`fem: true` in
+  `D.MAR.edificios`), and `D.bodegasTxt()` for «mejora: Granero, Almacén o Centro Urbano». Many older strings still
+  say «Centro Urbano», «aldeanos», «Cuartel» by hand: fix them as you touch them.
+- **CSS state classes collide:** a tree node's state `era` picked up `.era` (the topbar indicator) and overflowed the
+  research window in landscape. Scope new state classes (`.tech.nodo.x`) and check the bare name is not already a rule.
+- **The guide never leaves a step without a way out:** a step whose selection the player can lose has `mantener()`
+  (run every frame), and «Hazlo por mí» shows after 30 s even when the target exists.
 
 ## Economy and workshops
 
