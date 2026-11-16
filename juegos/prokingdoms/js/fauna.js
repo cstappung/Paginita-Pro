@@ -256,6 +256,9 @@
     const br = [192, 130, 66], brO = [132, 86, 44], brL = [236, 186, 110], capa = [118, 76, 40];
     const Y = v => q(v + oy);
     if (partes.torso) B.poly([[q(9), Y(22)], [q(25), Y(22)], [q(28), Y(52)], [q(6), Y(52)]], capa, 0.95, 0.7); // capa por detrás
+    // la lanza va en la mano del escudo: el asta primero (queda detrás del brazo y del escudo), el puño encima al final
+    const lanza = partes.lanza && partes.torso, LX = 4.4;
+    if (lanza) { B.t(q(LX), Y(3), q(LX), Y(63), q(0.75), q(0.75), [120, 80, 44]); B.poly([[q(LX), Y(-4)], [q(LX + 1.9), Y(3.5)], [q(LX - 1.9), Y(3.5)]], [210, 214, 226], 1.2, 0.9); B.t(q(LX - 1.3), Y(3.6), q(LX + 1.3), Y(3.6), q(0.6), q(0.6), [236, 196, 96]); }
     if (partes.piernas) {
       for (const s2 of [-1, 1]) { const x = q(17 + s2 * 3.4); B.t(x, Y(40), x + s2 * q(0.6), Y(51), q(2.9), q(2.4), br); B.t(x + s2 * q(0.6), Y(51), x + s2 * q(0.8), Y(62), q(2.4), q(2), br); B.e(x + s2 * q(1.2), Y(63), q(3.2), q(1.4), brO); }
       B.poly([[q(10.5), Y(34)], [q(23.5), Y(34)], [q(25), Y(45)], [q(9), Y(45)]], br, 1.12, 0.78); // faldón
@@ -271,8 +274,9 @@
       B.p(q(17), Y(35), [255, 220, 120]);
       // brazo de la antorcha (alzado) y el del escudo
       B.t(q(25), Y(24), q(28), Y(15), q(2.9), q(2.4), br); B.t(q(28), Y(15), q(28.5), Y(7), q(2.4), q(2), br);
-      B.t(q(9), Y(24), q(6.5), Y(31), q(2.9), q(2.5), br); B.t(q(6.5), Y(31), q(7), Y(37), q(2.5), q(2.1), br);
-      B.t(q(27.2), Y(11), q(29.6), Y(11), q(0.8), q(0.8), [236, 196, 96]); B.t(q(5.4), Y(33), q(8), Y(33), q(0.8), q(0.8), [236, 196, 96]); // brazaletes
+      if (lanza) { B.t(q(9), Y(24), q(5.6), Y(31), q(2.9), q(2.5), br); B.t(q(5.6), Y(31), q(LX + 0.4), Y(28.5), q(2.4), q(2.1), br); } // codo afuera, puño en el asta
+      else { B.t(q(9), Y(24), q(6.5), Y(31), q(2.9), q(2.5), br); B.t(q(6.5), Y(31), q(7), Y(37), q(2.5), q(2.1), br); }
+      B.t(q(27.2), Y(11), q(29.6), Y(11), q(0.8), q(0.8), [236, 196, 96]); if (!lanza) B.t(q(5.4), Y(33), q(8), Y(33), q(0.8), q(0.8), [236, 196, 96]); // brazaletes
     }
     if (partes.cabeza) {
       B.t(q(17), Y(20), q(17), Y(17), q(2.4), q(2.4), brO);
@@ -282,11 +286,15 @@
       for (let i = 0; i < 8; i++) B.t(q(13 + i), Y(7.4 - Math.sin((i / 7) * Math.PI) * 2.2), q(13 + i), Y(9), q(0.8), q(0.8), i % 2 ? [190, 60, 50] : [220, 90, 70]); // cresta
       B.p(q(15.5), Y(14), [60, 36, 20]); B.p(q(18.5), Y(14), [60, 36, 20]);
     }
-    if (partes.escudo) { B.e(q(6.5), Y(37), q(4.6), q(6.4), col); B.e(q(6.5), Y(37), q(1.6), q(2), [240, 204, 88]); for (let a = 0; a < 40; a++) { const k = (a / 40) * Math.PI * 2; B.p(q(6.5) + Math.cos(k) * q(4.6), Y(37) + Math.sin(k) * q(6.4), [214, 170, 70]); } }
-    if (partes.lanza) { B.t(q(3), Y(4), q(3.4), Y(63), q(0.7), q(0.7), [120, 80, 44]); B.poly([[q(3.2), Y(-3)], [q(5), Y(4)], [q(1.4), Y(4)]], [210, 214, 226], 1.2, 0.9); }
+    if (partes.escudo) { // con lanza baja un poco para no tapar el puño
+      const ex = q(lanza ? 6.6 : 6.5), ey = Y(lanza ? 39.5 : 37), rx = q(4.6), ry = q(lanza ? 6.2 : 6.4);
+      B.e(ex, ey, rx, ry, col); B.e(ex, ey, q(1.6), q(2), [240, 204, 88]);
+      for (let a = 0; a < 40; a++) { const k = (a / 40) * Math.PI * 2; B.p(ex + Math.cos(k) * rx, ey + Math.sin(k) * ry, [214, 170, 70]); }
+    }
+    if (lanza) { B.e(q(LX), Y(28.6), q(1.9), q(1.7), br); B.t(q(LX - 1.6), Y(27.6), q(LX + 1.6), Y(27.6), q(0.45), q(0.45), brO); } // puño
     const llama = partes.antorcha ? [q(28.5), Y(4)] : null;
     if (partes.antorcha) { B.t(q(28.5), Y(8), q(28.5), Y(4), q(1.2), q(1.4), [150, 100, 50]); B.e(q(28.5), Y(4), q(1.8), q(0.9), [240, 200, 90]); }
-    return { c: B.canvas(), pies: [q(17), Y(63)], llama, w: W, h: H };
+    return { c: B.canvas(), pies: [q(17), Y(63)], llama, cabeza: [q(17), Y(2.5)], w: W, h: H };
   };
 
   // ---------- Dragón posado (Torre del Dragón) ----------

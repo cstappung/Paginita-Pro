@@ -1082,7 +1082,7 @@
         const e = PK.Fauna.estatua(1.32, col, { piernas: 1, torso: ph >= 2, cabeza: ph >= 3, lanza: ph >= 4, antorcha: ph >= 5, escudo: ph >= 2 });
         p.img(e.c, e.pies[0], e.pies[1], 2.5, 2.5, 21);
         if (e.llama) { const q = p.P(2.5, 2.5, 21), t = [Math.round(q[0] - e.pies[0] + e.llama[0]), Math.round(q[1] - e.pies[1] + e.llama[1])]; for (const [x, y, c] of [[0, 0, '#c84a1c'], [-1, -1, '#e8701e'], [0, -1, '#f0a030'], [1, -1, '#e8701e'], [0, -2, '#ffd060'], [-1, -2, '#f0a030'], [0, -3, '#fff0a0'], [1, -3, '#ffd060'], [0, -4, '#fff0a0']]) p.px(t[0] + x, t[1] + y, c); }
-        if (ph >= 6) { const t = p.P(2.5, 2.4, 100); for (let a = 0; a < 24; a++) { const k = (a / 24) * Math.PI * 2; p.px(t[0] + Math.cos(k) * 9, t[1] + Math.sin(k) * 4, a % 2 ? GOLD : GLINT); } }
+        if (ph >= 6) { const q = p.P(2.5, 2.5, 21), t = [q[0] - e.pies[0] + e.cabeza[0], q[1] - e.pies[1] + e.cabeza[1]]; for (let a = 0; a < 28; a++) { const k = (a / 28) * Math.PI * 2; p.px(Math.round(t[0] + Math.cos(k) * 8), Math.round(t[1] + Math.sin(k) * 2.5), a % 2 ? GOLD : GLINT); } } // halo sobre el yelmo
         return;
       }
       if (ph >= 1) { p.box(1.9, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); p.box(2.6, 2.15, 0.45, 0.45, 21, 46, BR, BR2, BR); }
