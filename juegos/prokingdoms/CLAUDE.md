@@ -366,3 +366,28 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `Cz.plan`); «Quitar caminos» also removes it. Hover: «Calzada Real de <name>» with the name `translate="no"`.
 - The autopilot does not build it yet (its routes are short); measure if that changes.
 
+### After the plan: owner's tweaks to routes (`pk-54`)
+
+- **Wildcard ends** (`L.comodin`): `r.de = 'campo'` (any camp of yours that gathers `r.res`, required; colonies go by
+  barge), `r.de = 'bodega'` (any store → a workshop) and `r.a = 'bodega'` (the nearest store with room). Each vehicle
+  picks its own ends per trip (`L.extremos(u, r)` → `u.rDe`, `u.rA`, cleared on unloading and in `L.asignar`): the camp
+  with the most stock **minus what other vehicles of the route are already going to fetch**; at a camp with less than
+  half a load it moves to another with at least half; a full store sends it to the next. Samples (`L.extremosRep`,
+  for times, «Ver», offline) ignore those reservations: with them the offline batch picked an empty camp and moved
+  nothing. `L.rutasDesde/rutasHacia` include wildcard routes, so «nobody empties this camp» checks see them. Still no
+  automatic mode: the player creates every route.
+- **Route builder** (`UI.rutaNueva`, `.rt-*` in the CSS): tiles with icon, stock and distance instead of `<select>`s;
+  wildcards first; only valid destinations are shown. `.rt-armar` needs `flex-wrap: nowrap` (with wrap, the first step
+  stretched into a blank block).
+- **Recommended routes** (`L.sugerencias`, `UI.rutasSugeridas`): camps nobody empties (two or more of a resource →
+  «any camp»), far workshops without input or output, colonies without a barge, and «Empedrar» for routes with
+  vehicles that cross 5+ tiles of your land without road (`L.buildRoad` on the route's cached path). Top 5 by weight.
+- **Bigger radii** (`G.BASES`): camps 14 → 22 by level (were 10 → 16), Mill 14–16, colony 18, TC 13. Pace not
+  re-measured with the autopilot yet.
+- The «Construye la Maravilla» quest (`c5_1`, `B('wonder')`) counts any of `D.WONDERS` (`quests.js`): the 4×4
+  `wonder` is retired since pk-19 and the quest never completed.
+- **Ships** (`vehiculos.js`, `barcoGrande`): the Galeón del Alba and the colony ship are models like the barge, seen
+  diagonally (−0.28 rad: at −45° square sails are edge-on). Sails take their light as if facing the sky (facing the
+  camera they were always in shadow). The wreck heels over, with holes, a broken main mast and no sails until it has
+  its pieces. `S.barcoColonos` in `sprites-mar.js` defers to `S.barcoColonos3d`.
+

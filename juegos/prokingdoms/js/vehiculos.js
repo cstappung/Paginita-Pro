@@ -344,6 +344,151 @@
     return spr;
   };
 
+  // ---------- Barcos grandes: el Galeón del Alba y el barco de colonos (pk-54) ----------
+  // Antes eran perfiles planos (el casco de lado y las velas como nubes). Ahora son modelos como la barcaza, vistos de
+  // tres cuartos: casco con tablas, regala dorada, portas, castillo de proa y de popa con ventanas encendidas, bauprés,
+  // mástiles con cofa, vergas, velas que se hinchan, foque, mesana latina, obenques y banderas.
+  // o: { largo, manga, mastiles: [[a, alto, velas]], rotos, sinVelas, agujeros, escora, col, sol, faro, carga }
+  function linea(L, a0, b0, z0, a1, b1, z1, c) {
+    const n = Math.ceil(Math.hypot(a1 - a0, b1 - b0, z1 - z0) / (L.paso * 0.8));
+    for (let i = 0; i <= n; i++) { const t = i / n; L.p(a0 + (a1 - a0) * t, b0 + (b1 - b0) * t, z0 + (z1 - z0) * t, 0.3, 0.3, 0.9, c, true); }
+  }
+  function velaCuadra(L, a, hw, z0, z1, hincha, c, cD, emblema) {
+    for (let z = z0; z <= z1; z += L.paso * 0.85) for (let b = -hw; b <= hw; b += L.paso * 0.85) {
+      const t = (z - z0) / (z1 - z0), comba = Math.sin(t * Math.PI) * Math.cos((b / (hw * 2)) * Math.PI) * hincha;
+      let cc = Math.round(z * 0.45) % 5 === 0 ? cD : c; // costuras
+      if (emblema) { const e = emblema(b, z); if (e) cc = e; }
+      // la luz como si la tela mirara al cielo, con el vientre de la vela más claro al centro (de cara a la cámara
+      // quedaba siempre a la sombra, gris)
+      L.p(a + comba, b, z, -0.25, -(b / hw) * 0.45, 0.85 - Math.abs(b / hw) * 0.2, cc);
+    }
+  }
+  function triangulo(L, p0, p1, p2, c, cD) { // vela latina o foque, en el plano b del primer punto (doble cara)
+    const n = Math.ceil(Math.max(Math.hypot(p1[0] - p0[0], p1[2] - p0[2]), Math.hypot(p2[0] - p0[0], p2[2] - p0[2])) / (L.paso * 0.7));
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++) {
+      const u = i / n, v = j / n, a = p0[0] + (p1[0] - p0[0]) * u + (p2[0] - p0[0]) * v, b = p0[1] + (p1[1] - p0[1]) * u + (p2[1] - p0[1]) * v, z = p0[2] + (p1[2] - p0[2]) * u + (p2[2] - p0[2]) * v;
+      L.p(a, b + Math.sin(u * Math.PI) * 0.8, z, -0.2, 0.2 + v * 0.3, 0.85, Math.round(z * 0.5) % 5 === 0 ? cD : c);
+    }
+  }
+  function barcoGrande(L, o) {
+    const LA = o.largo / 2, M = o.manga, col = o.col || [176, 52, 40];
+    const casco = [120, 78, 44], cascoL = [158, 108, 62], cascoD = [84, 54, 30], brea = [44, 32, 22], oro = [222, 176, 76], cubierta = [190, 150, 96];
+    const esc = o.escora || 0, Z = (b, z) => z + b * esc; // escorado: el costado de estribor (b < 0) se hunde
+    const proa = LA * 0.55, popa = -LA * 0.62;
+    const w0 = a => (a > proa ? M * Math.sqrt(Math.max(0, (LA - a) / (LA - proa))) : a < -LA * 0.85 ? M * (0.82 + 0.18 * (a + LA) / (LA * 0.15)) : M);
+    const cub = a => (a > proa ? 0.95 * M + (a - proa) * 0.14 : a < popa ? (a < -LA * 0.85 ? 1.6 * M : 1.35 * M) : 0.75 * M); // altura de la cubierta
+    const ancho = (a, z) => w0(a) * (z < 2 ? 0.7 + 0.3 * Math.max(0, z + 3) / 5 : 1 - (z - 2) * 0.008);
+    const regala = a => cub(a) + 1.4;
+    // costados
+    for (let a = -LA; a <= LA; a += L.paso) {
+      const top = regala(a);
+      for (let z = -3; z <= top; z += L.paso) {
+        const w = ancho(a, z);
+        if (w < 0.3) continue;
+        let c = z < 0 ? brea : Math.abs(z - 2.6) < 0.35 || Math.abs(z - cub(a) + 0.5) < 0.3 ? cascoD : z > top - 0.6 ? oro : z > cub(a) - 0.4 ? sc(col, 0.95) : (Math.round(z * 1.2) % 3 === 0 ? sc(casco, 0.92) : z > 5 ? cascoL : casco);
+        const porta = z > cub(0) - 3.4 && z < cub(0) - 1.9 && a > popa + 3 && a < proa - 2 && ((a - popa) % 6.5) < 2.2;
+        if (porta) c = [30, 20, 12];
+        const hueco = o.agujeros && ((Math.abs(a - LA * 0.15) < 2.6 && Math.abs(z - 1.4) < 1.6) || (Math.abs(a + LA * 0.32) < 1.8 && Math.abs(z - 4) < 1.1));
+        if (hueco) c = [16, 10, 6];
+        const dw = a > proa ? 0.7 : 0;
+        L.p(a, w, Z(w, z), dw, 1, z < 1 ? -0.35 : 0.1, c); L.p(a, -w, Z(-w, z), dw, -1, z < 1 ? -0.35 : 0.1, c);
+      }
+    }
+    // espejo de popa con ventanas encendidas y faroles
+    const ap = -LA, wp = ancho(ap, 6);
+    for (let b = -wp; b <= wp; b += L.paso) for (let z = 0; z <= regala(ap); z += L.paso) {
+      const ven = z > cub(ap) - 4.5 && z < cub(ap) - 2.4 && (Math.round((b + wp) / 1.6) % 2 === 0) && Math.abs(b) < wp - 1;
+      const c = z < 0.4 ? brea : z > regala(ap) - 0.6 || Math.abs(z - (cub(ap) - 5.2)) < 0.3 ? oro : ven ? [255, 214, 120] : z > cub(ap) - 0.4 ? sc(col, 0.95) : cascoL;
+      L.p(ap, b, Z(b, z), -1, 0, 0, c);
+    }
+    // cubiertas y frentes de los castillos
+    for (let a = -LA + 0.3; a <= LA - 0.6; a += L.paso) { const w = ancho(a, cub(a)) - 0.6; for (let b = -w; b <= w; b += L.paso) L.p(a, b, Z(b, cub(a)), 0, 0, 1, Math.round(b * 0.9) % 2 ? cubierta : sc(cubierta, 0.9)); }
+    for (const [af, z0, z1] of [[proa, cub(0), cub(proa + 0.01)], [popa, cub(0), cub(popa - 0.01)], [-LA * 0.85, cub(popa - 0.01), cub(-LA)]]) {
+      const w = ancho(af, z1) - 0.4;
+      for (let b = -w; b <= w; b += L.paso) for (let z = z0; z <= z1; z += L.paso) {
+        const puerta = Math.abs(b) < 1.2 && z < z0 + 2.6;
+        L.p(af + (af > 0 ? -0.01 : 0.01), b, Z(b, z), af > 0 ? -1 : 1, 0, 0, puerta ? [60, 38, 22] : Math.abs(z - z1) < 0.4 ? oro : cascoL);
+      }
+    }
+    if (o.faro) elip(L, -LA - 0.6, 0, cub(-LA) + 3, 0.9, 0.9, 1.2, [255, 220, 120]); // farol de popa
+    // timón (pala) y mascarón: un bauprés que sale de la proa
+    caja(L, -LA - 1.2, -LA - 0.4, -0.4, 0.4, -2.5, 3, cascoD);
+    linea(L, LA - 1, 0, cub(LA) - 0.5, LA + o.largo * 0.2, 0, cub(LA) + o.largo * 0.1, [96, 64, 36]);
+    linea(L, LA - 1, 0.35, cub(LA) - 0.5, LA + o.largo * 0.2, 0.35, cub(LA) + o.largo * 0.1, [130, 90, 50]);
+    elip(L, LA + 0.6, 0, cub(LA) - 1.2, 1, 0.8, 1.3, oro); // mascarón dorado
+    // la carga en cubierta (colonos: cajas y barriles)
+    if (o.carga) for (const [a, b] of [[-3, 2.4], [-3, -2.2], [2.5, 2], [2, -2.6]]) { caja(L, a - 1.4, a + 1.4, b - 1.3, b + 1.3, cub(a), cub(a) + 2.3, MADERA, MADERA_L); }
+    // mástiles, cofas, vergas, velas, obenques y banderas
+    const vela = [255, 250, 238], velaD = [226, 214, 190], hincha = o.sinVelas ? 0 : 2.6; // claras: la cara que se ve queda a la sombra
+    o.mastiles.forEach(([am, alto, nv, latina], i) => {
+      const base = cub(am), roto = o.rotos && o.rotos.includes(i), top = base + (roto ? alto * 0.4 : alto);
+      cilZ(L, am, 0, base, top, 0.75, [92, 62, 36]);
+      if (roto) { linea(L, am, 0, top, am - alto * 0.35, -M * 0.6, base + 1, [92, 62, 36]); linea(L, am + 0.4, 0, top, am - alto * 0.35 + 0.4, -M * 0.6, base + 1, [120, 82, 48]); return; }
+      if (alto > 30) elip(L, am, 0, base + alto * 0.68, 1.9, 1.9, 0.5, [110, 74, 42]); // cofa
+      for (const s of [-1, 1]) for (const k of [-1, 1]) linea(L, am + k * 1.4, s * ancho(am, base), regala(am), am, 0, base + alto * 0.66, [96, 74, 52]); // obenques
+      if (o.sinVelas) { if (i === 0 && o.jirones) for (let k = 0; k < 3; k++) linea(L, am + 0.6, -3 + k * 3, base + alto * 0.6, am + 1.2, -3 + k * 3 + 0.5, base + alto * 0.42, velaD); return; }
+      if (latina) { // mesana: vela latina
+        linea(L, am + 5, 0, base + 3, am - 7, 0, base + alto * 0.95, [84, 58, 34]);
+        triangulo(L, [am + 4.4, 0.3, base + 3.4], [am - 6.6, 0.3, base + alto * 0.92], [am - 6.6, 0.3, base + 3.6], vela, velaD);
+      } else {
+        const tramos = nv === 2 ? [[0.16, 0.5, 1], [0.56, 0.86, 0.72]] : [[0.2, 0.8, 1]];
+        tramos.forEach(([t0, t1, fw], j) => {
+          const hw = M * 1.25 * fw, z0 = base + alto * t0, z1 = base + alto * t1;
+          for (let b = -hw - 0.6; b <= hw + 0.6; b += L.paso) L.p(am + 0.5, b, z1 + 0.4, 0, 0, 1, [84, 58, 34]); // verga
+          const emb = o.sol && i === 1 && j === 0 ? (b, z) => { const dz = z - (z0 + z1) / 2, r = Math.hypot(b, dz * 1.1); return r < 2.6 ? [236, 168, 54] : r < 3.4 && Math.round(Math.atan2(dz, b) / (Math.PI / 6)) % 2 === 0 ? [214, 120, 40] : null; }
+            : o.franja ? (b) => (Math.abs(b) < hw * 0.34 ? mix(col, [255, 255, 255], 0.12) : null) : null;
+          velaCuadra(L, am + 0.9, hw, z0, z1, hincha * (j ? 0.8 : 1), vela, velaD, emb);
+        });
+      }
+      // bandera en el tope
+      const bc = i === 1 ? col : i === 0 ? [214, 60, 44] : oro;
+      for (let k = 0; k < 9; k++) for (let j = 0; j < 3; j++) L.p(am - k * 0.6, Math.sin(k * 0.7) * 0.6, top + 0.6 + j * 0.6 - k * 0.04, 0, 1, 0, j === 1 ? sc(bc, 1.12) : bc, true);
+    });
+    // foque, del bauprés al trinquete
+    const tri = o.mastiles[o.mastiles.length - 1];
+    if (!o.sinVelas && tri && !tri[3]) triangulo(L, [LA + o.largo * 0.17, 0, cub(LA) + o.largo * 0.08], [tri[0] + 1.4, 0, cub(tri[0]) + tri[1] * 0.72], [tri[0] + 2, 0, cub(tri[0]) + 3], vela, velaD);
+    if (o.brujula) elip(L, -LA * 0.92, 0, cub(-LA) + 1.4, 0.9, 0.9, 0.6, [120, 210, 255]);
+    sombraElip(L, 0, 0, LA + 2, M + 2);
+  }
+  function aguaBarco(L, o, ox, oy, f) {
+    return pb => {
+      const LA = o.largo / 2;
+      for (let a = -LA - 2; a <= LA + 2; a += 0.6) for (const s of [-1, 1]) {
+        const w = (a > LA * 0.55 ? o.manga * Math.sqrt(Math.max(0, (LA - Math.min(a, LA)) / (LA * 0.45))) : o.manga * 0.72) * s + s * 1.2;
+        const aa = a * L.k, bb = w * L.k, wx = aa * L.ca - bb * L.sa, wy = aa * L.sa + bb * L.ca;
+        if ((Math.round(a * 1.7) + f) % 3) pb.set(Math.round(ox + wx - wy), Math.round(oy + (wx + wy) / 2), [226, 244, 250], 150);
+      }
+    };
+  }
+  // El Galeón del Alba: encallado y roto en la orilla (le faltan piezas) o reparado y fondeado, listo para zarpar.
+  const GALC3 = new Map();
+  S.galeon = function (listo, piezas) {
+    const key = (listo ? 'L' : 'R') + (piezas || []).join(',');
+    if (GALC3.has(key)) return GALC3.get(key);
+    const tiene = id => listo || (piezas || []).includes(id);
+    const W2 = 150, H2 = 132, ox = 74, oy = 96;
+    const L = Lienzo(W2, H2, ox, oy, -0.28, 1.12); // en diagonal: de canto (−45°) las velas cuadras no se veían
+    const o = { largo: 62, manga: 9.5, mastiles: [[-21, 30, 1, true], [-1, 46, 2], [16, 38, 2]], col: [176, 52, 40], sol: true,
+      escora: listo ? 0 : 0.16, agujeros: !tiene('casco'), rotos: tiene('timon') ? [] : [1], sinVelas: !tiene('velas'), jirones: !listo, faro: listo, brujula: tiene('brujula') };
+    barcoGrande(L, o);
+    const spr = volcar(L, ox, oy, listo ? aguaBarco(L, o, ox, oy, 0) : null);
+    GALC3.set(key, spr);
+    return spr;
+  };
+  // El barco de colonos: una carabela con la vela del color del reino, colonos y cajas en cubierta.
+  const COLC = new Map();
+  S.barcoColonos3d = function (col, flip) {
+    const key = col.join(',') + (flip ? 1 : 0);
+    if (COLC.has(key)) return COLC.get(key);
+    const W2 = 76, H2 = 72, ox = 38, oy = 52;
+    const L = Lienzo(W2, H2, ox, oy, flip ? Math.PI / 2 + 0.28 : -0.28, 0.82);
+    const o = { largo: 34, manga: 5.4, mastiles: [[-8, 18, 1, true], [3, 28, 1]], col, franja: true, carga: true, faro: true };
+    barcoGrande(L, o);
+    const spr = volcar(L, ox, oy, aguaBarco(L, o, ox, oy, 0));
+    COLC.set(key, spr);
+    return spr;
+  };
+
   // ---------- Hacia dónde mira cada vehículo (solo dibujo) ----------
   // Del movimiento entre cuadros, con histéresis: no cambia de dirección por un temblor de la ruta.
   S.rumboDe = function (u) {
