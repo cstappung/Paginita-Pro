@@ -9,7 +9,7 @@
   const T = (PK.Terr = { mode: false, sel: null });
   const G = () => PK.Game;
   const S = () => PK.Game.state;
-  const toast = (t, k) => PK.UI && PK.UI.toast(t, k);
+  const toast = (t, k, act) => PK.UI && PK.UI.toast(t, k, act);
   const online = () => PK.Net && PK.Net.online;
   const H = 3600e3;
 
@@ -99,9 +99,9 @@
 
   // ---------- Resumen de batallas ----------
   // b: { role: 'atk' | 'def', k, vs, won, atk, def, parts }. Se guarda, se anota en la crónica y en las novedades.
-  T.recordBattle = function (b) {
+  T.recordBattle = function (b, cuando) {
     const tr = S().terr;
-    b.at = Date.now();
+    b.at = cuando || Date.now();
     b.cause = D.battleCause(b);
     tr.battles.unshift(b);
     if (tr.battles.length > 12) tr.battles.length = 12;
@@ -170,7 +170,8 @@
     for (const u in units) w.army[u] -= units[u];
     const slot = W.terr[k] - 1, [cx, cy] = T.center(k), [hx, hy] = D.PLAYER_HOME;
     const travel = 90 + U.dist(cx, cy, hx, hy) * 1.5, power = PK.Social.power(units);
-    const camp = { k, slot, units: Object.assign({}, units), power, travel, arrive: Date.now() + travel * 1000, back: 0, phase: 'go', won: false, revenge: !!T.revenge(k) };
+    // semilla: la del plan de asedio (D.asedioPlan). Se crea al lanzar y se guarda: recargar no cambia la batalla.
+    const camp = { k, slot, units: Object.assign({}, units), power, travel, arrive: Date.now() + travel * 1000, back: 0, phase: 'go', won: false, revenge: !!T.revenge(k), semilla: 1 + Math.floor(Math.random() * 2e9) };
     S().terr.camps.push(camp);
     if (online() && T.realmOf(slot).human) {
       camp.remote = true;
@@ -185,20 +186,76 @@
     return true;
   };
 
-  function resolveCampaign(c) {
-    const parts = T.defenseParts(c.k, c.slot), def = parts.total * U.rand(0.85, 1.15), atk = c.power * U.rand(0.85, 1.15);
-    finishCampaign(c, atk > def && W.terr[c.k] === c.slot + 1, atk / Math.max(1, def), { atk, def, parts: D.scaleParts(parts, def) });
+  // ---------- El asedio (plan de guerra, G1, pk-55) ----------
+  // Al llegar las tropas ya no hay una tirada: se calcula el plan de la batalla (D.asedioPlan, con la semilla de la
+  // campaña) y la pelea dura lo que diga el plan. Todo va por marcas de tiempo (c.ini), como c.arrive: recargar o
+  // volver después de un rato da el mismo final. La parcela no cambia de dueño hasta que termina.
+  // Por qué lado entra el atacante: 0 norte (y−), 1 este (x+), 2 sur (y+), 3 oeste (x−). El lado de la parcela que
+  // toca su tierra (si son varios, el más cercano a su hogar); si no toca, el que mira a su hogar.
+  T.ladoDe = function (k, atkSlot) {
+    const P = W.PW, px = k % P, py = Math.floor(k / P), lados = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+    const h = D.REALM_SLOTS[atkSlot] ? D.REALM_SLOTS[atkSlot].home : D.PLAYER_HOME, hx = h[0] / D.PARCEL, hy = h[1] / D.PARCEL;
+    let mejor = 0, md = 1e9;
+    lados.forEach(([dx, dy], i) => {
+      const x = px + dx, y = py + dy, toca = x >= 0 && y >= 0 && x < P && y < P && W.terr[y * P + x] === atkSlot + 1;
+      const d = Math.hypot(x + 0.5 - hx, y + 0.5 - hy) + (toca ? 0 : 1000);
+      if (d < md) { md = d; mejor = i; }
+    });
+    return mejor;
+  };
+  function empezarAsedio(c, offline) {
+    const now = Date.now(), info = T.realmInfo(c.slot);
+    if (W.terr[c.k] !== c.slot + 1) { finishCampaign(c, false, 1, null); return; } // ya no es de ese reino
+    c.semilla = c.semilla || 1 + Math.floor(Math.random() * 2e9); // campañas guardadas antes de pk-55
+    c.plan = D.asedioPlan({ atk: c.power, parts: T.defenseParts(c.k, c.slot), semilla: c.semilla });
+    c.ini = c.arrive; c.lado = T.ladoDe(c.k, me()); c.phase = 'asedio';
+    if (offline || now >= c.ini + c.plan.total * 1000) return; // ya terminó mientras no estabas: directo al final
+    PK.Social.log('Tus tropas llegaron a la parcela de ' + info.realm + ': empieza el asedio.', 'info');
+    toast('¡Empieza el asedio a ' + info.realm + '! Tres etapas: la frontera, las defensas y el estandarte.', 'epic', { label: 'Ver', fn: () => T.verFrente('c' + c.k) });
+    if (PK.Sfx) PK.Sfx.play('cuerno');
   }
+  // Los asedios en curso, de los dos lados, en una sola forma (lo que leen frente.js y la interfaz).
+  // mio: 'atk' (una campaña tuya) o 'def' (un reino vecino contra tu frontera). units: las del atacante, si se saben.
+  T.frentes = function () {
+    const st = S(), out = [];
+    if (!st || !st.terr) return out;
+    for (const c of st.terr.camps) if (c.phase === 'asedio' && c.plan) out.push({ id: 'c' + c.k, k: c.k, de: me(), a: c.slot, lado: c.lado || 0, ini: c.ini, plan: c.plan, units: c.units, mio: 'atk', fuerza: c.power });
+    for (const th of st.terr.threats) if (th.plan) out.push({ id: 't' + th.k, k: th.k, de: th.slot, a: me(), lado: th.lado || 0, ini: th.ini, plan: th.plan, units: null, mio: 'def', fuerza: th.power });
+    return out;
+  };
+  T.frente = id => T.frentes().find(f => f.id === id) || null;
+  T.enDisputa = k => T.frentes().some(f => f.k === k);
+  // El estado de un frente ahora mismo (D.asedioEn con el reloj).
+  T.estado = f => D.asedioEn(f.plan, (Date.now() - f.ini) / 1000);
+  T.nombreFrente = function (f) {
+    const otro = T.realmInfo(f.mio === 'atk' ? f.a : f.de);
+    return { otro: otro ? otro.realm : 'otro reino', titulo: f.mio === 'atk' ? 'Asedio a ' : 'Te asedia ' };
+  };
+  T.verFrente = function (id) {
+    const f = T.frente(id) || T.frentes()[0];
+    if (!f) return;
+    if (PK.Frente && PK.Frente.ver) { PK.Frente.ver(f); return; }
+    const [x, y] = T.center(f.k);
+    PK.Render.centerOn(x, y);
+  };
+
   // También la usa la red cuando el servidor resuelve contra un jugador real. bt: { atk, def, parts } (resumen).
-  function finishCampaign(c, won, ratio, bt) {
-    const st = S(), info = T.realmInfo(c.slot);
+  // plan: el del asedio, si lo hubo (da las bajas con su semilla y queda guardado para la repetición).
+  function finishCampaign(c, won, ratio, bt, plan) {
+    const st = S(), info = T.realmInfo(c.slot), fin = plan && c.ini ? c.ini + plan.total * 1000 : Date.now();
     c.won = won;
-    const cause = bt && bt.parts ? T.recordBattle({ role: 'atk', k: c.k, vs: info.realm, won, atk: bt.atk, def: bt.def, parts: bt.parts }) : null;
+    const pv = plan || c.repPlan || null; // repPlan: la línea de tiempo armada con lo que decidió el servidor (T.finishRemote)
+    const rep = pv ? { plan: pv, units: Object.assign({}, c.units), lado: c.lado === undefined ? T.ladoDe(c.k, me()) : c.lado, de: me(), a: c.slot } : null;
+    const cause = bt && bt.parts ? T.recordBattle(Object.assign({ role: 'atk', k: c.k, vs: info.realm, won, atk: bt.atk, def: bt.def, parts: bt.parts }, rep ? { rep } : null), fin) : null;
     if (won) delete st.terr.rev[c.k];
-    const loss = D.conquestLoss(won, ratio || 1);
+    const loss = plan && won === plan.gano ? plan.bajas : D.conquestLoss(won, ratio || 1);
+    const antes = Object.assign({}, c.units);
     for (const u in c.units) c.units[u] = Math.floor(c.units[u] * (1 - loss));
     c.phase = 'back';
-    c.back = Date.now() + (c.travel || 120) * 1000;
+    c.back = fin + (c.travel || 120) * 1000;
+    if (plan && PK.Frente && PK.Frente.final && !G().offline) PK.Frente.final({ id: 'c' + c.k, k: c.k, de: me(), a: c.slot, lado: c.lado || 0, ini: c.ini, plan, units: antes, mio: 'atk' }, won);
+    // contra un jugador todavía decide el servidor con una tirada (G3 lo cambia): se muestra la batalla en repetición
+    else if (!plan && rep && PK.Frente && PK.Frente.repetir && !G().offline) PK.Frente.repetir(st.terr.battles[0], true);
     if (won) {
       if (!c.remote) {
         transfer(c.k, c.slot, me()); st.terr.botShield[c.slot] = Date.now() + D.TERR.shieldLoss * 1000;
@@ -228,6 +285,7 @@
     const c = S().terr.camps.find(o => o.rid === rid);
     if (!c) return;
     if (units) c.units = units;
+    if (bt && bt.parts && bt.atk && bt.def) c.repPlan = D.asedioDe({ atk: bt.atk, def: bt.def, parts: bt.parts, semilla: c.semilla || 1, gano: !!won });
     finishCampaign(c, won, ratio, bt);
   };
 
@@ -269,12 +327,26 @@
     for (let k = 0; k < W.terr.length; k++) if (T.mine(k) && !W.isCore(k, me()) && T.touches(k, slot)) cands.push(k);
     return cands.length ? U.pick(cands) : null;
   }
+  // pk-55: el tanteo también es un asedio. Al llegar se calcula su plan y se pelea a la vista; al terminar se aplica.
+  function empezarTanteo(th, offline) {
+    const bot = T.realmOf(th.slot);
+    if (!bot || bot.human || !T.mine(th.k)) return false;
+    th.semilla = 1 + Math.floor(Math.random() * 2e9);
+    th.plan = D.asedioPlan({ atk: th.power, parts: T.defenseParts(th.k, me()), semilla: th.semilla });
+    th.ini = th.at; th.lado = T.ladoDe(th.k, th.slot);
+    if (!offline && Date.now() < th.ini + th.plan.total * 1000) {
+      toast('¡' + bot.name + ' asedia una parcela de tu frontera!', 'bad', { label: 'Ver', fn: () => T.verFrente('t' + th.k) });
+      if (PK.Sfx) PK.Sfx.play('cuerno');
+    }
+    return true;
+  }
   function resolveThreat(th) {
-    const st = S(), bot = T.realmOf(th.slot);
-    if (!bot || bot.human || !T.mine(th.k)) return;
-    const parts = T.defenseParts(th.k, me()), def = parts.total * U.rand(0.85, 1.15), atk = th.power * U.rand(0.85, 1.15);
-    const w = st.war, cause = T.recordBattle({ role: 'def', k: th.k, vs: bot.realm, won: atk <= def, atk, def, parts: D.scaleParts(parts, def) });
-    if (atk > def) {
+    const st = S(), bot = T.realmOf(th.slot), plan = th.plan;
+    if (!bot || bot.human || !T.mine(th.k) || !plan) return;
+    const atk = plan.atk, def = plan.def, cayo = plan.gano, fin = th.ini + plan.total * 1000;
+    const w = st.war, cause = T.recordBattle({ role: 'def', k: th.k, vs: bot.realm, won: !cayo, atk, def, parts: plan.parts, rep: { plan, units: null, lado: th.lado || 0, de: th.slot, a: me() } }, fin);
+    if (PK.Frente && PK.Frente.final && !G().offline) PK.Frente.final({ id: 't' + th.k, k: th.k, de: th.slot, a: me(), lado: th.lado || 0, ini: th.ini, plan, units: null, mio: 'def' }, cayo);
+    if (cayo) {
       transfer(th.k, me(), th.slot);
       st.terr.lost[th.k] = Date.now();
       st.terr.shield = Date.now() + D.TERR.shieldLoss * 1000;
@@ -321,7 +393,8 @@
     tickT = 0;
     const now = Date.now();
     for (const c of st.terr.camps.slice()) {
-      if (c.phase === 'go' && !c.remote && now >= c.arrive) resolveCampaign(c);
+      if (c.phase === 'go' && !c.remote && now >= c.arrive) empezarAsedio(c, offline);
+      if (c.phase === 'asedio' && now >= c.ini + c.plan.total * 1000) { const p = c.plan; finishCampaign(c, p.gano && W.terr[c.k] === c.slot + 1, p.ratio, { atk: p.atk, def: p.def, parts: p.parts }, p); }
       else if (c.phase === 'back' && now >= c.back) {
         for (const u in c.units) st.war.army[u] += c.units[u];
         st.terr.camps.splice(st.terr.camps.indexOf(c), 1);
@@ -335,14 +408,17 @@
         toast('¡' + T.realmOf(th.slot).name + ' marcha contra tu frontera! Llega en 2 minutos.', 'bad');
         PK.Social.log(T.realmOf(th.slot).realm + ' viene contra tu frontera con una fuerza de aprox. ' + th.power + '.', 'bad');
       }
-      if (now >= th.at) { st.terr.threats.splice(st.terr.threats.indexOf(th), 1); if (st.terr.shield < now) resolveThreat(th); }
+      if (now >= th.at && !th.plan) { // llegaron: si hay tregua se vuelven; si no, empieza el asedio
+        if (st.terr.shield >= th.at || !empezarTanteo(th, offline)) { st.terr.threats.splice(st.terr.threats.indexOf(th), 1); continue; }
+      }
+      if (th.plan && now >= th.ini + th.plan.total * 1000) { st.terr.threats.splice(st.terr.threats.indexOf(th), 1); resolveThreat(th); }
     }
     // tanteos al azar: solo si ya no eres novato y nunca mientras estás desconectado
     if (!offline && st.era >= D.TERR.minEra && G().countB('barracks') && now >= st.terr.nextThreat) {
       st.terr.nextThreat = now + U.rand(2, 5) * H;
       const bots = D.BOTS.filter(b => !b.human && W.countParcels(b.slot));
       const bot = bots.find(b => borderParcelFacing(b.slot) !== null);
-      if (bot && st.terr.shield < now) {
+      if (bot && st.terr.shield < now && !st.terr.threats.length) {
         const k = borderParcelFacing(bot.slot);
         st.terr.threats.push({ slot: bot.slot, k, power: Math.round(T.defenseOf(k, me()) * U.rand(0.25, 0.6)), at: now + 180e3, warned: false });
       }
@@ -350,10 +426,36 @@
     botGrowth();
   };
 
+  // ---------- El camino a la frontera de un vecino (pk-55) ----------
+  // Solo se puede atacar una parcela que toque tu tierra, y los reinos nacen separados por 2 a 4 parcelas libres.
+  // Cuántas hay que reclamar para tocar a ese reino y cuáles (el camino más corto por parcelas reclamables).
+  // { n, camino: [k…] } · n = 0 si ya se tocan · null si no hay camino (agua de zonas comunes u otro reino en medio).
+  T.caminoA = function (slot) {
+    const N = W.terr.length, dist = new Int16Array(N).fill(-1), prev = new Int32Array(N).fill(-1), cola = [];
+    for (let k = 0; k < N; k++) if (T.mine(k)) { dist[k] = 0; cola.push(k); }
+    for (let i = 0; i < cola.length; i++) {
+      const k = cola[i];
+      if (W.parcelNeighbors(k).some(n => W.terr[n] === slot + 1 && !W.isCore(n, slot))) {
+        const camino = [];
+        for (let c = k; c >= 0 && dist[c] > 0; c = prev[c]) camino.unshift(c);
+        return { n: dist[k], camino };
+      }
+      for (const n of W.parcelNeighbors(k)) if (dist[n] < 0 && !W.terr[n] && !W.terrCommon[n]) { dist[n] = dist[k] + 1; prev[n] = k; cola.push(n); }
+    }
+    return null;
+  };
+  T.marca = null; // parcelas resaltadas en el mapa de territorio (el camino hacia un vecino)
+  T.marcarCamino = function (slot) {
+    const c = T.caminoA(slot);
+    T.marca = c && c.camino.length ? c.camino : null;
+    if (T.marca) { const [x, y] = T.center(T.marca[0]); PK.Render.centerOn(x, y); }
+    T.toggle(true);
+  };
+
   // ---------- Selección en el mapa ----------
   T.toggle = function (on) {
     T.mode = on === undefined ? !T.mode : on;
-    if (!T.mode) T.sel = null;
+    if (!T.mode) { T.sel = null; T.marca = null; }
     PK.UI.rerender(); PK.UI.refreshPanel(true);
   };
   T.pick = function (tx, ty) {

@@ -647,7 +647,8 @@
     return { gold: r(600), food: r(900), wood: r(400) };
   };
   // Pérdidas del atacante: moderadas si gana (menos cuanto más fuerte llega), grandes si pierde.
-  D.conquestLoss = (won, ratio) => (won ? U.clamp(0.3 - 0.12 * (ratio - 1), 0.12, 0.3) : U.clamp(0.7 + 0.1 * Math.random(), 0.7, 0.8));
+  // rnd: la tirada (0 a 1) cuando la da un plan de asedio con semilla; sin ella, al azar como siempre.
+  D.conquestLoss = (won, ratio, rnd) => (won ? U.clamp(0.3 - 0.12 * (ratio - 1), 0.12, 0.3) : U.clamp(0.7 + 0.1 * (rnd === undefined ? Math.random() : rnd), 0.7, 0.8));
   // Botín de guerra al ganar: los graneros y el tesoro de la parcela tomada (no sale de la bodega del defensor).
   D.conquestLoot = function (era) {
     const k = Math.pow(1.6, era - 1), r = v => Math.round(v * k / 10) * 10;
@@ -666,6 +667,78 @@
     if (b.score < a.score * 0.5) return 'Ese reino es mucho más débil que el tuyo: no puedes atacarlo.';
     return null;
   };
+
+  // ---------- El asedio por etapas (plan de guerra, G1, pk-55) ----------
+  // La campaña ya no es una tirada al llegar: es un asedio de tres etapas que dura minutos. Cada etapa es un grupo de
+  // las partes de la defensa (D.parcelDefenseParts), así que la suma sigue siendo la defensa de siempre.
+  // El PLAN se calcula una sola vez, con semilla, y es la verdad de la batalla: lo que se ve en el mapa (frente.js) es
+  // un dibujo del plan en el instante «ahora». Función pura: la usará también el servidor (G3).
+  // Las tiradas son las de antes (fuerza × 0,85–1,15 contra defensa × 0,85–1,15): la probabilidad de ganar según la
+  // proporción de fuerzas no cambió (la tabla de la sección 1 de PLAN-GUERRA.md; colabtex/tests/pk-asedio.test.cjs).
+  // Lo nuevo es que la suerte del defensor se reparte entre las etapas: una puede aguantar más y otra menos.
+  D.ASEDIO = {
+    etapas: ['frontera', 'defensas', 'estandarte'],
+    nombres: { frontera: 'La frontera', defensas: 'Las defensas', estandarte: 'El estandarte' },
+    partes: { frontera: ['era', 'around'], defensas: ['towers', 'walls'], estandarte: ['troops', 'home'] },
+    total: 240,        // segundos de pelea cuando el atacante llega hasta el final
+    min: 30,           // lo menos que dura una etapa con defensa
+    vacia: 8,          // una etapa sin defensa (parcela sin torres ni murallas)
+    suerte: [0.78, 1.22], // cuánto se aparta una etapa de lo esperado, antes de ajustar la suma
+    corte: 10,         // lo menos que dura la etapa en la que el atacante se quiebra
+  };
+  // o: { atk, parts (D.parcelDefenseParts), semilla }. Devuelve el plan completo.
+  D.asedioPlan = function (o) {
+    const R = U.rng((o.semilla || 1) + 7411), A = D.ASEDIO, tir = () => 0.85 + 0.3 * R();
+    const atk = Math.max(0, o.atk || 0) * tir(), def = Math.max(1, (o.parts && o.parts.total) || 0) * tir();
+    return D.asedioDe({ atk, def, parts: o.parts, semilla: o.semilla, rnd: R, suerte: A.suerte });
+  };
+  // La línea de tiempo a partir de las fuerzas ya tiradas. La usa asedioPlan, y también sirve para armar la
+  // repetición de una batalla que decidió el servidor (llegan atk y def ya tirados y las partes a escala).
+  // o: { atk, def (ya tirados), parts, semilla, gano (si ya se sabe), rnd, suerte }
+  D.asedioDe = function (o) {
+    const A = D.ASEDIO, R = o.rnd || U.rng((o.semilla || 1) + 7411), parts = o.parts || {}, sr = o.suerte || [1, 1];
+    // lo que pesa cada etapa, con su suerte, y a escala para que la suma sea la defensa tirada
+    const bruto = A.etapas.map(id => A.partes[id].reduce((s, k) => s + Math.max(0, parts[k] || 0), 0));
+    const lk = bruto.map(() => sr[0] + (sr[1] - sr[0]) * R());
+    let suma = bruto.reduce((s, v, i) => s + v * lk[i], 0);
+    if (suma <= 0) { bruto[2] = 1; suma = lk[2]; } // sin partes (resumen viejo): todo al estandarte
+    const esc = o.def / suma, res = bruto.map((v, i) => v * lk[i] * esc);
+    const gano = o.gano === undefined ? o.atk > o.def : !!o.gano, ratio = o.atk / Math.max(1, o.def);
+    const tope = gano ? o.def : Math.min(o.atk, o.def * 0.999); // lo que alcanza a gastarse de la defensa
+    const etapas = [];
+    let c = 0, t = 0;
+    for (let i = 0; i < A.etapas.length; i++) {
+      const r = res[i], llena = Math.max(r > o.def * 0.01 ? A.min : A.vacia, r > o.def * 0.01 ? (A.total * r) / o.def : 0);
+      const hasta = Math.min(c + r, tope), parte = r > 0 ? (hasta - c) / r : 1, rota = !gano && hasta >= tope - 1e-9;
+      const dur = Math.round(rota ? Math.max(A.corte, llena * parte) : llena);
+      etapas.push({ id: A.etapas[i], r: Math.round(r), suerte: Math.round(lk[i] * esc * 100) / 100, t0: t, dur, c0: c, c1: hasta, f1: rota ? parte : 1, curva: 0.75 + 0.6 * R(), rota });
+      c = hasta; t += dur;
+      if (rota) break;
+    }
+    // las partes a escala, cada una con la suerte de su etapa, para el resumen (D.battleCause)
+    const out = { total: Math.round(o.def) };
+    A.etapas.forEach((id, i) => { for (const k of A.partes[id]) out[k] = Math.round(Math.max(0, parts[k] || 0) * lk[i] * esc); });
+    return { v: 1, semilla: o.semilla || 1, atk: Math.round(o.atk), def: Math.round(o.def), ratio, gano, bajas: D.conquestLoss(gano, ratio, R()), total: t, gastado: c, etapas, parts: out };
+  };
+  // El estado de la batalla en el segundo t. Es lo único que leen el dibujo y la interfaz.
+  // { etapa (índice), id, f (0..1 de la defensa de esa etapa ya vencida), impetu, resistencia (0..1 de lo que queda),
+  //   control (0..1 de la defensa total vencida), bajasA (0..1 de las tropas del atacante caídas), fin, queda (s) }
+  D.asedioEn = function (plan, t) {
+    const es = plan.etapas, ult = es[es.length - 1];
+    t = U.clamp(t, 0, plan.total);
+    let e = ult;
+    for (const x of es) if (t < x.t0 + x.dur) { e = x; break; }
+    const k = U.clamp((t - e.t0) / Math.max(1e-6, e.dur), 0, 1), kk = Math.pow(k, e.curva);
+    const c = e.c0 + (e.c1 - e.c0) * kk, fin = t >= plan.total;
+    return {
+      etapa: D.ASEDIO.etapas.indexOf(e.id), id: e.id, f: e.f1 * kk, k,
+      impetu: U.clamp(1 - c / Math.max(1, plan.atk), 0, 1), resistencia: U.clamp(1 - c / Math.max(1, plan.def), 0, 1),
+      control: U.clamp(c / Math.max(1, plan.def), 0, 1), bajasA: plan.bajas * (plan.gastado > 0 ? c / plan.gastado : 1),
+      fin, queda: Math.max(0, e.t0 + e.dur - t), quedaTotal: plan.total - t,
+    };
+  };
+  // Frase corta de cómo salió una etapa respecto de lo esperado (para la crónica).
+  D.asedioSuerte = s => (s >= 1.1 ? 'aguantó más de lo esperado' : s <= 0.9 ? 'cedió antes de lo esperado' : 'aguantó lo esperado');
 
   // ---------- Logística ----------
   // Caminos (aceleran a todos), carretas (llevan insumos y productos entre almacenes y talleres) y, ya muy

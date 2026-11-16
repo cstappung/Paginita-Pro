@@ -1296,6 +1296,8 @@
     }
     if ((type === 'muelle' || def.agua) && !G.tocaAgua(x, y, def)) return 'sinAgua';
     if (G.encierra(type, x, y, ignorar)) return 'encierra';
+    // pk-55: una parcela bajo asedio está en disputa: no se construye ahí hasta que termine
+    if (PK.Terr && PK.Terr.enDisputa && S && S.terr && (PK.Terr.enDisputa(W.parcel(x, y)) || PK.Terr.enDisputa(W.parcel(x + def.w - 1, y + def.h - 1)))) return 'disputa';
     return null;
   };
   G.tocaAgua = function (x, y, def) {
@@ -1389,6 +1391,7 @@
     fuera: 'Eso queda fuera del mapa.',
     encierra: 'Así encerrarías a tu pueblo: deja al menos una casilla de paso.',
     sinAgua: 'El muelle va pegado al agua: ponlo en la orilla de un lago o río.',
+    disputa: 'Esa parcela está bajo asedio: no se puede construir ahí hasta que termine la batalla.',
   };
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }

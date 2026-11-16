@@ -25,7 +25,28 @@
       Object.keys(D.DEF_PARTS).filter(k => b.parts[k] > 0).sort((x, y) => b.parts[y] - b.parts[x]).map(k => el('div', { class: 'g-row' },
         el('span', { class: 'small', style: { minWidth: '120px' } }, D.DEF_PARTS[k][0][0].toUpperCase() + D.DEF_PARTS[k][0].slice(1)),
         el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (mine ? 'green' : 'red'), style: { width: Math.round((b.parts[k] / total) * 100) + '%' } }), el('span', null, U.fmt(b.parts[k]) + ' · ' + Math.round((b.parts[k] / total) * 100) + ' %')))),
-      el('p', { class: 'small ' + (b.won ? 'good-t' : 'warn-t') }, b.cause));
+      el('p', { class: 'small ' + (b.won ? 'good-t' : 'warn-t') }, b.cause),
+      b.rep && b.rep.plan ? etapasEl(b) : null);
+  };
+  // pk-55: cómo fue el asedio, etapa por etapa, y «Ver de nuevo» (la repetición sale del plan guardado)
+  function etapasEl(b) {
+    const p = b.rep.plan, A = D.ASEDIO, hechas = {};
+    for (const e of p.etapas) hechas[e.id] = e;
+    return el('div', { class: 'bt-etapas' },
+      A.etapas.map((id, i) => {
+        const e = hechas[id];
+        const txt = !e ? 'no se llegó' : e.r < 1 ? 'sin defensas' : e.rota ? 'aquí se quebró el ataque (' + Math.round(e.f1 * 100) + ' %)' : D.asedioSuerte(e.suerte) + ' · ' + U.fmtTime(e.dur);
+        return el('div', { class: 'bt-et' + (!e ? ' no' : e.rota ? ' rota' : ' ok') }, el('b', null, (i + 1) + '. ' + A.nombres[id]), el('span', { class: 'small' }, ' ' + txt));
+      }),
+      PK.Frente ? el('div', { class: 'row' }, UI.btn('Ver de nuevo', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Frente.repetir(b); }, { small: true, title: 'Repite la batalla en el mapa, acelerada' })) : null);
+  }
+  UI.frenteEl = function (f) {
+    const T = PK.Terr, e = T.estado(f), n = T.nombreFrente(f), A = D.ASEDIO;
+    return el('div', { class: 'battle' },
+      el('b', null, n.titulo, el('span', { translate: 'no' }, n.otro)), el('span', { class: 'small' }, ' · etapa ' + (e.etapa + 1) + ' de 3: ' + A.nombres[e.id] + ' · quedan aprox. ' + U.fmtTime(e.quedaTotal)),
+      el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Tu ímpetu' : 'Su ímpetu'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'green' : 'red'), style: { width: Math.round(e.impetu * 100) + '%' } }), el('span', null, Math.round(e.impetu * 100) + ' %'))),
+      el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Su resistencia' : 'Tu resistencia'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'red' : 'green'), style: { width: Math.round(e.resistencia * 100) + '%' } }), el('span', null, Math.round(e.resistencia * 100) + ' %'))),
+      el('div', { class: 'row' }, UI.btn('Ver la batalla', () => { UI.closeModal(); if (T.mode) T.toggle(false); T.verFrente(f.id); }, { small: true, cls: 'gold' })));
   };
   UI.openTerritory = function () {
     UI.modal('terr', 'Territorio', body => {
@@ -39,6 +60,7 @@
       body.append(el('h3', null, 'Cómo funciona'), el('ul', { class: 'info' },
         el('li', null, 'El mapa se divide en parcelas de 8x8. Solo puedes construir en las tuyas (los campamentos de acopio también van en tierra de nadie).'),
         el('li', null, 'Reclamar una parcela libre que toque tu territorio cuesta recursos, cada vez un poco más.'),
+        el('li', null, 'Una conquista es un asedio de tres etapas que dura unos minutos y se ve en el mapa: la frontera (la milicia y las parcelas vecinas), las defensas (torres y murallas) y el estandarte (la guarnición). La parcela se va tiñendo con tu avance y solo cambia de dueño cuando cae el estandarte.'),
         el('li', null, 'Conquistar una parcela de otro reino es caro a propósito: la campaña se paga aunque pierdas. Si ganas traes botín y pierdes del 12% al 30% de las tropas (menos cuanto más fuerte vayas); si pierdes, del 70% al 80%.'),
         el('li', null, 'Defender es fácil: la defensa cuenta x1,5 en casa y +25% por cada parcela propia alrededor. Las torres y el Centro Urbano cercanos suman mucho.'),
         el('li', null, 'El corazón de cada reino (las parcelas junto a su Centro Urbano) nunca se puede conquistar. Lo que había en una parcela perdida se desarma y se devuelve completo.'),
@@ -47,6 +69,7 @@
         body.append(el('h3', null, 'Campañas'));
         for (const c of tr.camps) {
           const info = T.realmInfo(c.slot);
+          if (c.phase === 'asedio') { const f = T.frente('c' + c.k); if (f) body.append(UI.frenteEl(f)); continue; }
           body.append(el('div', { class: 'exp' }, (c.phase === 'go' ? 'Marchando contra ' : 'Regresando de ') + (info ? info.realm : '?') + ' · ' + U.fmtTime(Math.max(0, ((c.phase === 'go' ? c.arrive : c.back) - now) / 1000)),
             UI.btn('Ver', () => { UI.closeModal(); const [x, y] = T.center(c.k); PK.Render.centerOn(x, y); PK.Terr.toggle(true); }, { small: true })));
         }
@@ -63,7 +86,10 @@
       }
       if (tr.threats.length) {
         body.append(el('h3', null, 'Amenazas'));
-        for (const th of tr.threats) body.append(el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + ').'));
+        for (const th of tr.threats) {
+          const f = th.plan ? T.frente('t' + th.k) : null;
+          body.append(f ? UI.frenteEl(f) : el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + ').'));
+        }
       }
       const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]);
       if (realms.length) {
@@ -71,12 +97,21 @@
         for (const b of realms) {
           const info = T.realmInfo(b.slot), why = D.canConquer(T.myInfo(), info);
           body.append(el('div', { class: 'raid-row' }, el('span', { class: 'swatch', style: { background: 'rgb(' + b.color.join(',') + ')' } }), el('b', null, b.realm), b.human ? el('span', { class: 'tag' }, 'jugador') : null,
-            el('span', { class: 'small muted' }, ' Era ' + U.roman(info.era) + ' · ' + W.countParcels(b.slot) + ' parcelas · ' + (why ? why : 'se puede atacar en su frontera'))));
+            el('span', { class: 'small muted' }, ' Era ' + U.roman(info.era) + ' · ' + W.countParcels(b.slot) + ' parcelas · ' + (why ? why : 'se puede atacar en su frontera')),
+            caminoEl(b.slot)));
         }
       }
     }, { wide: true });
   };
 
+  // pk-55: cuánto falta para tocar la frontera de ese reino (solo se ataca una parcela que toque tu tierra)
+  function caminoEl(slot) {
+    const c = PK.Terr.caminoA(slot);
+    if (!c) return el('span', { class: 'small muted' }, ' · sin camino por tierra libre');
+    if (!c.n) return el('span', { class: 'small good-t' }, ' · ya tocas su frontera');
+    return el('span', { class: 'small' }, ' · te ' + (c.n === 1 ? 'falta 1 parcela' : 'faltan ' + c.n + ' parcelas') + ' para tocar su frontera ',
+      UI.btn('Marcar el camino', () => { UI.closeModal(); PK.Terr.marcarCamino(slot); }, { small: true, title: 'Resalta en el mapa las parcelas libres que te acercan' }));
+  }
   UI.openParcel = function (k) {
     UI.modal('parcel', 'Parcela', body => {
       const add = (...a) => body.append(...a.filter(Boolean));
@@ -90,7 +125,8 @@
           el('div', { class: 'row' }, UI.btn('Reclamar parcela', () => { T.claim(k); UI.closeModal(); }, { cls: 'gold', disabled: !!why })));
         return;
       }
-      const last = T.lastBattle(k);
+      const last = T.lastBattle(k), fr = T.frentes().find(f => f.k === k);
+      if (fr) { add(el('p', null, 'Esta parcela está en disputa: hay un asedio en curso y no cambia de dueño hasta que termine.'), UI.frenteEl(fr)); return; }
       if (owner === 'p') {
         const def = T.defenseOf(k, D.MY_SLOT);
         add(el('p', null, 'Es tuya.' + (W.isCore(k, D.MY_SLOT) ? ' Es el corazón de tu reino: nadie la puede conquistar.' : '')),
