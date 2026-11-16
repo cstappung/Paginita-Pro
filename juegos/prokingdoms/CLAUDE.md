@@ -434,7 +434,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
   shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.
 
-## Belt network (`PLAN-CINTAS.md`, C1 in `pk-58`, C2 in `pk-59`, `js/cintas.js`, `PK.Cintas`)
+## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, `js/cintas.js`, `PK.Cintas`)
 
 - **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
   `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
@@ -460,7 +460,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   tracing (`plegarAlColocar`). Belts may not go on roads or the Calzada (use a pass). «Quitar varios» removes pieces.
 - **Old saves:** `st.logi.belts` become level III pieces with their items (`Ci.init`), `st.logi.avisoCintas` toasts once.
 - The server never sees belts; `Lb.fuera` counts what rides on them (`Ci.enCinta`). The autopilot does not build them.
-- C1 builds levels I–III (`D.CINTA.maxFase`); levels IV–V are C3.
+- Levels I–V (`D.CINTA.maxFase` 5 since C3): IV from Era V (300/min), V from Era VI (480/min).
 - **C2 nodes** (`Ci.NODO`): `u` unidor (takes from every lane that enters, turn by turn: `turno`/`listo`/`hayLugarDesde`),
   `v` divisor and `s` clasificador (one input, outputs ahead and both sides, round-robin `c.rr` among outs with room).
   Lanes carry `outs` (`{c|b, d}`) and `ent` (`{c, d}`) instead of a single `sig`; every walker (tramo, alimenta,
@@ -468,6 +468,21 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   other output took) or `''`; default front `'*'`, sides `''` (`Ci.filtro`). An item no output takes jams with a
   message naming it. Costs in `D.CINTA.nodos`; `Ci.convertir` refunds half of the old node.
 - **Tick carry:** `c.lib` may go down to `-dt` (`credito()`), or a 3/s merger delivered 2.4/s at 10 ticks/s. Keep it.
+- **Items may sit at a negative `q`** (just behind a lane's start): a new item enters when the last one is within one
+  tick of `JUNTOS` (`hayLugar` with `tolera`) and is placed exactly `JUNTOS` behind it (`detras`). Waiting for the
+  next tick capped level V (0.32 tiles per tick < 0.34) at 5/s instead of 8. Drawing clamps `q` to the piece.
+- **Copy** (`Ci.molde(k)` → `Ci.planCopia(molde, x, y, rot)` → `Ci.estampar(plan)`, tool `L.tool = 'copiar'`): the
+  whole connected group (4-neighbours plus both ends of each elevated pass, up to 400 pieces) with sorter filters and
+  store-port picks, rotated by quarter turns (`d`, `f2` keys and pass ends rotate together), paid as new
+  (`Ci.costoMolde`), empty. Mouse: the ghost follows the cursor, click stamps, R rotates; touch: tap places the
+  ghost, a second tap on the same tile or «Estampar aquí» stamps.
+- **Drawing cost** (pk-60): `armarDib` builds, once per `rearmar` (`armado`), each piece's screen position and sprite
+  per animation phase, and each lane's three item waypoints (`c.pts`); items are batched into one path per colour.
+  `K()` caches the tree bonus per game instant (`G.bono` checks the season). Measure with the phone CPU ×4: 1,056 full
+  level V pieces ≈ 300 villagers on screen.
+- **Autopilot** (`tools/piloto.js`, `cintas()`): from Era III it belts each camp to the nearest store that takes its
+  drops (clean plan, ≤ 26 tiles), keeps carromatos on that camp only while it is half full, and upgrades a tramo when
+  it holds twice the cost. `?sincintas` turns it off for before/after runs.
 - **Auto-joins when tracing** (`Ci.plan`): starting mid-belt turns that piece into a divisor (`dividir`); ending on a
   belt that already has an input turns it into a unidor (`unir`); ending head-on is refused.
 - **Offline:** offers from sources flow downstream with each lane's cap, split evenly at divisors and by filter at

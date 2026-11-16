@@ -625,7 +625,7 @@
     const g = G(), sel = g.sel;
     let key = sel ? sel.type + ':' + (sel.ids ? sel.ids.join(',') : sel.id) : 'none';
     if (g.placing) { const gh = PK.Render.ghost; key = 'placing:' + (g.placing.move !== undefined ? 'mv' + g.placing.move + ':' : '') + g.placing.type + (g.placing.armed && gh ? ':' + gh.x + ',' + gh.y + (gh.ok ? '+' : '-') : ''); }
-    if (PK.Logi.tool) { const I = PK.Input, pc = I.planCinta; key = 'tool:' + PK.Logi.tool + ':' + (I.roadStart ? I.roadStart.join(',') : '') + ':' + (pc ? pc.tiles.length + '/' + pc.malas.length : '') + ':' + (PK.Logi.cintaNivel || 1); }
+    if (PK.Logi.tool) { const I = PK.Input, pc = I.planCinta; key = 'tool:' + PK.Logi.tool + ':' + (I.roadStart ? I.roadStart.join(',') : '') + ':' + (pc ? pc.tiles.length + '/' + pc.malas.length : '') + ':' + (PK.Logi.cintaNivel || 1) + ':' + (I.planCopia ? I.planCopia.en + '/' + I.planCopia.malas.length : '') + ':' + I.moldeRot; }
     if (PK.Def.tool) key = 'def:' + PK.Def.tool + (PK.Def.start ? PK.Def.start.join(',') : '') + S().def.walls.length + S().def.gates.length;
     if (PK.Terr.mode) key = 'terr';
     if (!force && key === lastPanelKey && sel && sel.type === 'units' && !g.placing) { updateUnitsLive(); return; }
@@ -676,6 +676,7 @@
         return;
       }
       if (PK.Logi.tool === 'cinta' || PK.Logi.tool === 'paso') { panel.append(cintaToolPanel()); return; }
+      if (PK.Logi.tool === 'copiar') { panel.append(copiaToolPanel()); return; }
       panel.append(el('div', { class: 'p-help' }, el('h3', null, 'Trazar camino'),
         el('p', { class: 'small' }, 'Toca dónde empieza y dónde termina. Puedes seguir encadenando tramos. Cada casilla cuesta '),
         UI.costEl(D.ROAD.cost),
@@ -830,6 +831,19 @@
   }
   const NIVTXT = n => D.CINTA.niv[n - 1].name + ': ' + D.CINTA.niv[n - 1].rate * 60 + ' por minuto.';
   // C2 (pk-59): «Ver flujo» pinta cada pieza según cuánto la usan
+  // pk-60 (C3): copiar una red armada y estamparla en otro lado
+  function copiaToolPanel() {
+    const I = PK.Input, m = I.molde, p = I.planCopia, c = PK.Cintas.costoMolde(m), ok = G().canAfford(c);
+    const box = el('div', { class: 'p-help' }, el('h3', null, 'Copiar red de cintas'));
+    box.append(el('p', { class: 'small' }, m.piezas.length + ' piezas' + (I.moldeRot ? ', girada ' + I.moldeRot * 90 + '°' : '') + '. Cada copia cuesta '), UI.costEl(c));
+    if (!ok) box.append(el('p', { class: 'small warn-t' }, 'No te alcanza.'));
+    box.append(el('p', { class: 'small ' + (p && p.malas.length ? 'warn-t' : 'muted') }, p && p.malas.length ? 'Ahí no se puede: ' + p.malas[0].why + '.' : UI.hint('Mueve el ratón y haz clic donde va. R la gira.', 'Toca dónde va; toca otra vez en el mismo lugar o «Estampar aquí».')));
+    box.append(el('div', { class: 'row' },
+      UI.btn('Girar', () => I.girarCopia(), { small: true, title: 'Un cuarto de vuelta a la derecha (R)' }),
+      UI.isTouch() ? UI.btn('Estampar aquí', () => I.estamparCopia(), { small: true, cls: 'gold', disabled: !p || !!p.malas.length || !ok }) : '',
+      UI.btn('Terminar', () => I.cancelTool(), { small: true })));
+    return box;
+  }
   function botonFlujo() {
     const Ci = PK.Cintas;
     return UI.btn(Ci.verFlujo ? 'Ocultar flujo' : 'Ver flujo', () => { Ci.verFlujo = !Ci.verFlujo; if (Ci.verFlujo) UI.toast('Gris: vacía · verde: corre con lugar · amarillo: a tope (normal si adelante se llevan menos) · rojo: atascada o frenada por una pieza de menos nivel.', 'info'); UI.refreshPanel(true); }, { small: true, cls: Ci.verFlujo ? 'gold' : '', title: 'Colorea cada pieza según cuánto la usan' });
@@ -908,6 +922,7 @@
       pz.p === 'c' || pz.p === 'k' || PK.Cintas.NODO[pz.p] ? UI.btn('Girar', () => { Ci.girar(k); UI.refreshPanel(true); }, { small: true, title: 'Gira la dirección de esta pieza (lo de encima vuelve al pueblo)' }) : '',
       botonFlujo(),
       UI.btn('Seguir esta cinta', () => { PK.Logi.tool = 'cinta'; PK.Input.roadStart = [k % W.W, (k / W.W) | 0]; G().sel = null; UI.refreshPanel(true); }, { small: true }),
+      UI.btn('Copiar esta red', () => PK.Input.startCopia(k), { small: true, title: 'Copia todas las piezas unidas a esta (con sus filtros) para ponerlas en otro lado' }),
       UI.btn('Quitar (devuelve la mitad)', () => { Ci.quitar(k); G().sel = null; UI.refreshPanel(true); }, { small: true, cls: 'danger' }),
       UI.btn('Quitar varios…', () => { G().sel = null; PK.Despeje.empezar('quitar'); }, { small: true, title: 'Marca una zona: quita cintas, murallas y caminos' })));
     panel.append(box);

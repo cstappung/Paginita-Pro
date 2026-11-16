@@ -1409,3 +1409,72 @@ test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión',
     assert.ok(!Ci.tramo(W.idx(24, 41)).includes(W.idx(26, 42)));
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+test('pk-60: cintas de nivel IV y V (Fase C3) y copiar una red', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  const buf0 = L.bufCap, libre0 = Ci.libre, owner0 = W.ownerAt, pay0 = G.pay;
+  G.pay = c => { const r = G.state.res; for (const k in c) if ((r[k] || 0) < c[k]) return false; for (const k in c) r[k] -= c[k]; return true; };
+  G.stat = () => {}; G.cap = () => 1e9; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 5000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
+  G.buildings = [saw, forja]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 6, res: { planks: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, n, p) => { t[W.idx(x, y)] = { p: p || 'c', d, n, i: [] }; };
+  try {
+    assert.equal(Ci.maxNivel(), 5, 'en la Era VI se construye hasta el nivel V');
+    G.state.era = 5; assert.equal(Ci.maxNivel(), 4); G.state.era = 6;
+    // nivel V: 480 por minuto
+    for (let x = 23; x <= 30; x++) pz(x, 41, 0, 5);
+    Ci.init(G.state);
+    for (let i = 0; i < 1200; i++) Ci.update(0.1);
+    const v = forja.inb.planks || 0;
+    assert.ok(v >= 900 && v <= 961, 'el nivel V lleva 480/min (' + v + ' en 2 min)');
+    // una pieza de nivel IV en medio frena a 300
+    forja.inb = {}; for (const k in t) t[k].i = [];
+    t[W.idx(26, 41)].n = 4; Ci.cambio();
+    for (let i = 0; i < 1200; i++) Ci.update(0.1);
+    const iv = forja.inb.planks || 0;
+    assert.ok(iv >= 560 && iv <= 601, 'el nivel IV frena a 300/min (' + iv + ')');
+    forja.inb = {}; for (const k in t) t[k].i = [];
+    t[W.idx(26, 41)].n = 5; Ci.cambio();
+    Ci.offline(60);
+    assert.equal(forja.inb.planks, 480, 'sin conexión: 480 por minuto');
+    // copiar: una red con un clasificador y un paso elevado
+    for (const k in t) delete t[k];
+    W.belt.fill(-1);
+    pz(50, 60, 0, 2); pz(51, 60, 0, 2); pz(52, 60, 0, 2, 's');
+    t[W.idx(52, 60)].f2 = { 0: 'stone', 1: 'gold' };
+    pz(52, 61, 1, 2);
+    t[W.idx(53, 60)] = { p: 'e', d: 0, n: 2, i: [['stone', 0.5]], hasta: W.idx(56, 60), lp: 3 };
+    t[W.idx(56, 60)] = { p: 'x', d: 0, n: 2, i: [], desde: W.idx(53, 60) };
+    pz(70, 70, 0, 1); // suelta, no se copia
+    Ci.init(G.state);
+    const m = Ci.molde(W.idx(50, 60));
+    assert.equal(m.piezas.length, 6, 'toma todo lo unido, también el otro extremo del paso, y nada más');
+    Ci.libre = (x, y) => !t[W.idx(x, y)]; W.ownerAt = () => 'p';
+    const p = Ci.planCopia(m, 40, 80, 1); // un cuarto de vuelta: lo que iba al este va al sur
+    assert.equal(p.malas.length, 0);
+    const c = Ci.costoMolde(m);
+    for (const r in c) G.state.res[r] = c[r] + 5;
+    assert.equal(Ci.estampar(p), 6);
+    for (const r in c) assert.equal(G.state.res[r], 5, 'paga lo que cuesta la copia (' + r + ')');
+    const cl = t[W.idx(40, 82)];
+    assert.equal(cl.p, 's'); assert.equal(cl.d, 1, 'girado: sale al sur');
+    assert.equal(JSON.stringify(cl.f2), JSON.stringify({ 1: 'stone', 2: 'gold' }), 'los filtros giran con la pieza');
+    assert.equal(t[W.idx(39, 82)].d, 2, 'la salida de abajo ahora va al oeste');
+    const pe = t[W.idx(40, 83)];
+    assert.equal(pe.p, 'e'); assert.equal(pe.hasta, W.idx(40, 86)); assert.equal(t[W.idx(40, 86)].desde, W.idx(40, 83));
+    assert.equal(pe.i.length, 0, 'la copia sale vacía');
+    assert.ok(W.belt[W.idx(40, 80)] >= 0);
+    Ci.cambio();
+    assert.equal(Ci.carrilesEn(W.idx(40, 83))[0].sig.k, W.idx(40, 86), 'el paso copiado anda');
+    // ocupado: no se estampa
+    assert.equal(Ci.planCopia(m, 40, 80, 1).malas.length, 6);
+    Ci.libre = (x, y) => !(x === 90 && y === 92);
+    const p2 = Ci.planCopia(m, 90, 90, 1);
+    assert.equal(p2.malas.length, 1);
+    assert.equal(Ci.estampar(p2), 0);
+  } finally { Ci.libre = libre0; W.ownerAt = owner0; G.pay = pay0; G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});
