@@ -248,6 +248,10 @@ por segundo en el celular (medido con `tools/rendimiento.js`).
   y posiciones armados al rearmar, ítems sin arreglos nuevos). El criterio «sin bajar los cuadros» no se cumple del
   todo con redes enormes sin GPU; con una red normal la baja es chica.
 - Piloto: aprende a usarlas (campamento → bodega, sube tramos) y `?sincintas` las apaga para comparar.
+- Ritmo (`?timelapse`, Era IV en minutos de juego; una corrida varía ±15 min entre mapas): con cintas 176 y 112, sin
+  cintas 154, 121 y 175. Las cintas no adelantan las eras. **Ninguna corrida llegó a la Era V** (unos 430 min): al
+  piloto le faltan la Universidad y la Acería, que piden mármol, y nunca junta mármol ni hierro (no pone campamentos
+  en esos nodos). No es por las cintas; queda para revisar aparte (en `pk-47` llegaba a la Era V en 307 min).
 
 ---
 
