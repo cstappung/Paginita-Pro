@@ -205,7 +205,8 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   frame in `batalla.js` `fauna()`), the Coloso statue and the dragon on the tower (stamped
   with the painter's `img`). The wonder `m_coloso` has its own statue at full size (`F.coloso`, `pk-52`; scaling the
   small one ×1.32 blurred the face): gilded helmet and face drawn pixel by pixel from a map (`CAB`), the rest with
-  shapes, built by phases. A speckled green patina was tried and removed (read as dirt). The old box sprites stay as fallback
+  shapes, built by phases. The shield goes on the spear arm with the fist on its rim (`pk-53`; resting on the
+  ground it looked stuck to the foot). A speckled green patina was tried and removed (read as dirt). The old box sprites stay as fallback
   when `PK.Fauna` is missing. `S.hit` scales by `k`.
 - **Welcome guide** (`js/guia.js`, `PK.Guia`, `pk-48`, longer in `pk-49`): Tobías the steward walks a new kingdom
   through 27 steps (TC → villager → gather wood → house → lumber camp and its radius → a battle → Misiones). The

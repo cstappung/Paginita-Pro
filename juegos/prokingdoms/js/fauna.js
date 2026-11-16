@@ -299,7 +299,8 @@
 
   // ---------- El Coloso de Bronce (la Maravilla) ----------
   // pk-52: su propia estatua a tamaño real (antes era la del Coloso chico agrandada ×1.32, y la cara quedaba en una
-  // mancha). Pose de la Atenea Pártenos: la antorcha en alto, la lanza en la otra mano y el escudo apoyado en el suelo.
+  // mancha). La antorcha en alto y, en la otra mano, la lanza y el escudo
+  // (pk-53: antes el escudo estaba apoyado en el suelo y parecía pegado al pie).
   // Yelmo ático con carrilleras y cresta de crin, cara con cejas, ojos, nariz y boca, coraza musculada, faldón de
   // tiras (pteruges) con tachas de oro, grebas, capa con pliegues y plinto de bronce (una pátina verde salpicada
   // parecía suciedad: se probó y se sacó).
@@ -418,16 +419,15 @@
       const PAL = { Y: [252, 218, 128], g: [226, 174, 76], G: oroO, o: [118, 82, 34], w: luz, f: br, h: brL, k: brD, d: brO, e: [56, 32, 16] };
       CAB.forEach((fila, y) => { for (let x = 0; x < fila.length; x++) if (PAL[fila[x]]) p(20 + x, 15 + y, PAL[fila[x]]); });
     }
-    // el escudo apoyado en el suelo, contra la pierna
+    // el escudo en el antebrazo de la lanza, delante de la cadera; la mano asoma por el borde y agarra el asta
     if (partes.escudo && cuerpo) {
-      const ex = 15.2, ey = 101, rx = 8.6, ry = 10.2;
+      const ex = 19, ey = 62, rx = 8, ry = 9.6;
       e(ex, ey, rx, ry, col);
       for (let a = 0; a < 64; a++) { const k = (a / 64) * Math.PI * 2; for (const f of [1, 0.9]) p(ex + Math.cos(k) * rx * f, ey + Math.sin(k) * ry * f, f === 1 ? oroO : oro); }
-      for (let a = 0; a < 40; a++) { const k = (a / 40) * Math.PI * 2; p(ex + Math.cos(k) * rx * 0.55, ey + Math.sin(k) * ry * 0.55, oroO); }
-      for (let a = 0; a < 8; a++) { const k = (a / 8) * Math.PI * 2; t(ex + Math.cos(k) * 1.6, ey + Math.sin(k) * 1.9, ex + Math.cos(k) * 4, ey + Math.sin(k) * 4.8, 0.5, 0.3, oro); } // sol del reino
+      for (let a = 0; a < 8; a++) { const k = (a / 8) * Math.PI * 2, L = a % 2 ? 3.4 : 4.6; for (let r = 2.4; r <= L; r += 0.7) p(ex + Math.cos(k) * r, ey + Math.sin(k) * r * 1.15, oro); } // sol del reino: rayos de un píxel
       e(ex, ey, 1.9, 2.2, oro); p(ex - 0.8, ey - 0.9, luz); p(ex - 5, ey - 6.5, [255, 255, 255]);
     }
-    if (lanza) { e(10.2, 62, 2.4, 2.2, br); t(8.2, 61.2, 12.2, 61.2, 0.4, 0.4, brO); t(8.2, 62.8, 12.2, 62.8, 0.4, 0.4, brO); } // puño en el asta
+    if (cuerpo) { e(10.2, 62, 2.4, 2.2, br); t(8.2, 61.2, 12.2, 61.2, 0.4, 0.4, brO); t(8.2, 62.8, 12.2, 62.8, 0.4, 0.4, brO); } // puño en el asta
 
     return { c: B.canvas(), pies: [28, 121 + OY], llama: null, cabeza: [28, 6 + OY], w: W, h: H };
   };
