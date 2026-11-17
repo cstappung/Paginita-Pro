@@ -157,7 +157,7 @@
       if (!o || o.gone || o.temp || o.planta) continue;
       // pk-78: un recurso que moviste va donde lo pusiste (st.despeje.mover), si sigue siendo tierra tuya o de nadie
       let m = mv[id];
-      if (m && !moverDestinoOk(m[0], m[1])) { delete mv[id]; m = null; }
+      if (m && (!moverDestinoOk(m[0], m[1]) || !zonaOk(o, m[0], m[1]))) { delete mv[id]; m = null; }
       const orig = W.ORIG.n[id];
       if (W.QUEDAN[o.kind] && !m && o.x === orig[0] && o.y === orig[1]) continue;
       const to = m || (W.QUEDAN[o.kind] ? orig : ub.n[id] || orig);
@@ -313,11 +313,14 @@
     const o = W.ownerAt(x, y);
     return o === null || o === 'p';
   }
-  // ¿Puede ir un recurso a esa casilla? propios: casillas del mismo grupo, que cuentan como libres
-  Dz.porQueNoMover = function (x, y, propios) {
+  // pk-79 (pedido del dueño): un recurso de una zona común no sale de esa zona
+  const zonaOk = (n, x, y) => !n || !W.isShared(n) || W.zoneAt[W.idx(x, y)] === n.zone;
+  // ¿Puede ir un recurso a esa casilla? propios: casillas del mismo grupo, que cuentan como libres; n: el recurso
+  Dz.porQueNoMover = function (x, y, propios, n) {
     if (!W.inb(x, y)) return 'fuera del mapa';
     const k = W.idx(x, y), suyo = propios && propios.has(k);
     if (!W.fog[k]) return 'sin explorar';
+    if (!zonaOk(n, x, y)) return 'lo de ' + W.zones[n.zone].name + ' no sale de esa zona común';
     if (!moverDestinoOk(x, y)) return 'tierra de otro reino';
     if (W.terrain[k] === 4) return 'agua';
     if (!suyo && (W.nodeAt[k] >= 0 || W.block[k] !== 0)) return 'ocupada';
@@ -343,7 +346,7 @@
   Dz.planMover = function (nodos, ref, x, y) {
     const dx = x - ref.x, dy = y - ref.y, propios = new Set(nodos.map(n => W.idx(n.x, n.y)));
     const dist = Math.hypot(dx, dy), uno = D.moverRecursoCosto(dist);
-    const tiles = nodos.map(n => { const tx = n.x + dx, ty = n.y + dy, why = Dz.porQueNoMover(tx, ty, propios); return { n, x: tx, y: ty, mala: !!why, why }; });
+    const tiles = nodos.map(n => { const tx = n.x + dx, ty = n.y + dy, why = Dz.porQueNoMover(tx, ty, propios, n); return { n, x: tx, y: ty, mala: !!why, why }; });
     const malas = tiles.filter(t => t.mala);
     return { tiles, malas, dist, uno, costo: (dx || dy) ? uno * nodos.length : 0, ok: !!(dx || dy) && !malas.length };
   };

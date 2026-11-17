@@ -1140,6 +1140,8 @@ test('L5 (pk-47, pk-78): la Calzada Real va en tierra de nadie, en la tuya y en 
   assert.ok(W.calzadaPuede(ajena, otro), 'su dueño sí');
   assert.ok(!W.calzadaPuede(agua, me) && !W.calzadaPuede(lugar, me) && !W.calzadaPuede(mineral, me));
   assert.ok(comun >= 0 && W.calzadaPuede(comun, me), 'pk-78: en las zonas comunes sí');
+  assert.ok(W.calzadaPuede(mineral, me, null, ub, null, new Set([-ub.ocupa[mineral] - 1])), 'pk-79: donde estaba un recurso que moviste sí');
+  assert.ok(!W.calzadaPuede(mineral, me, null, ub, null, new Set([-ub.ocupa[mineral]])), 'pk-79: con otro recurso movido, no');
   assert.ok(W.calzadaPuede(lugar, me, null, ub, new Set([ub.ocupa[lugar] - 1])), 'pk-78: sobre el lugar que ya venciste sí');
   assert.ok(!W.calzadaPuede(-1, me) && !W.calzadaPuede(W.W * W.H, me));
   // la velocidad: la calzada es el mejor terreno de cada perfil
@@ -1152,7 +1154,7 @@ test('L5 (pk-47, pk-78): la Calzada Real va en tierra de nadie, en la tuya y en 
   } finally { W.autopista[nadie] = a0; }
   assert.ok(D.AUTOPISTA.costo(3).blocks === 4 && D.AUTOPISTA.costo(1).stone === 10 && D.AUTOPISTA.porDia(2) === 120);
   const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
-  assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr, ub, venc\)/, 'el servidor usa la misma regla');
+  assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr, ub, venc, mov\)/, 'el servidor usa la misma regla');
   assert.match(sim, /W\.ubicarLugares\(w\.terr, k => doc\.t\[k\] > 0, doc\.v\)/, 'y mira los lugares con la capa de Calzada');
   for (const f of ['server/index.js', '../../functions/index.js']) assert.match(fs.readFileSync(path.join(PKDIR, f), 'utf8'), /'POST \/api\/autopista'/, f);
 });
@@ -1186,6 +1188,9 @@ test('pk-78: una mazmorra o un campamento que pisa una Calzada Real se muda (par
   assert.equal(D.moverRecursoCosto(1), 1); assert.equal(D.moverRecursoCosto(3), 1); assert.equal(D.moverRecursoCosto(4), 2); assert.equal(D.moverRecursoCosto(30), 10);
   const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
   assert.match(sim, /D\.AUTOPISTA\.decoMax/, 'el servidor pone tope a las decoraciones');
+  assert.match(sim, /if \(o === me1 && p\.apDia\.n > 0\) p\.apDia\.n--/, 'pk-79: quitar tu Calzada devuelve cupo del día');
+  const dsrc = fs.readFileSync(path.join(PKDIR, 'js', 'despeje.js'), 'utf8');
+  assert.match(dsrc, /W\.isShared\(n\) \|\| W\.zoneAt\[W\.idx\(x, y\)\] === n\.zone/, 'pk-79: lo de una zona común no sale de ella');
 });
 
 test('pk-78: una casilla que se tapa sin avisar (un árbol que vuelve a crecer) no deja a las carretas paradas', () => {

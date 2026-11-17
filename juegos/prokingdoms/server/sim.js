@@ -446,9 +446,11 @@ function autopista(p, b) {
   // un campamento o una mazmorra que el jugador dice haber vencido (b.venc: lo que pasa dentro de cada reino es suyo)
   const ub = W.ubicarLugares(w.terr, k => doc.t[k] > 0, doc.v);
   const venc = new Set(lista(b.venc).filter(id => W.pois[id] && W.PISABLE(W.pois[id].kind)));
+  // pk-79: los recursos que movió con monedas (desde L4 los recursos son de cada partida): su casilla vieja queda libre
+  const mov = new Set((Array.isArray(b.mov) ? b.mov.slice(0, 4000) : []).map(id => Math.floor(+id)).filter(id => W.nodes[id]));
   for (const k of lista(b.add)) {
     if (doc.t[k]) continue;
-    if (!W.calzadaPuede(k, p.slot, w.terr, ub, venc)) { malas++; continue; }
+    if (!W.calzadaPuede(k, p.slot, w.terr, ub, venc, mov)) { malas++; continue; }
     if (p.apDia.n >= tope || total >= A.totalMundo) { topadas++; continue; }
     doc.t[k] = me1; p.apDia.n++; total++; aceptadas.push(k);
   }
@@ -458,6 +460,8 @@ function autopista(p, b) {
     if (o !== me1 && w.terr[W.parcel(k % D.MAP, Math.floor(k / D.MAP))] !== me1) { malas++; continue; } // la de otro, solo en tu tierra
     delete doc.t[k]; quitadas.push(k);
     if (doc.d) delete doc.d[k]; // pk-78: su decoración se va con ella
+    // pk-79 (pedido del dueño): quitar una casilla tuya te devuelve cupo del día; el tope es de cuánto crece tu Calzada
+    if (o === me1 && p.apDia.n > 0) p.apDia.n--;
   }
   // pk-78: decoraciones, solo sobre tu Calzada (b.deco = { casilla: tipo, o 0 para quitarla }), con un tope por jugador
   let decos = 0;

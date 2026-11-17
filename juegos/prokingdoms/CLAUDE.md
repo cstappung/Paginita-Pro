@@ -819,3 +819,15 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Server:** no `D.PROTO` bump. Until `firebase deploy --only functions`, the deployed server refuses Calzada on common
   zones and beaten places (refunded, and logged as `autopista` suspects) and does not keep decorations
   (`autopistas.d` missing → «falta actualizarlo»).
+
+### Owner's report after pk-78 (`pk-79`)
+
+- **A moved resource frees its old tile for the Calzada:** `ocupa` marks resources as `-(id + 1)` and
+  `W.calzadaPuede(..., mov)` lets a tile through when that node id is in `mov` (`Cz.movidos()` = keys of
+  `st.despeje.mover`, sent as `b.mov` in `POST /api/autopista`; the server only checks they are real node ids).
+- **Resources of a common zone never leave it** (`zonaOk` in `despeje.js`: `W.zoneAt` of the target must be the node's
+  `zone`); `Dz.revisar` drops an older override that broke the rule.
+- **Removing your own Calzada gives back today's quota** (server: `p.apDia.n--` per own tile removed; local:
+  `st.calzada.dia.n`; online the client copies `r.hoy`). The daily cap now limits net growth, not tiles placed.
+- Needs `firebase deploy --only functions` like pk-78.
+
