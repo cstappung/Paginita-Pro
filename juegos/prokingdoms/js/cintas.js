@@ -265,7 +265,7 @@
   // cuánto puede dar de eso (una bodega, sin bajar de la reserva)
   function hayDe(b, r) {
     if (PK.Libro.esCampo(b)) return PK.Libro.inv(b)[r] || 0;
-    return (S().res[r] || 0) - reserva(r); // pk-71: de todo el pueblo (ver disponible)
+    return Math.min(PK.Libro.inv(b)[r] || 0, (S().res[r] || 0) - reserva(r));
   }
   // qué puede salir por esa boca: lo que hace el taller, lo que junta el campamento, lo elegido en la bodega
   function opcionesFuente(c) {
@@ -278,13 +278,22 @@
   function disponible(b, r) {
     if (L().isShop(b)) return ((b.outb && b.outb[r]) || 0) >= 1;
     if (PK.Libro.esCampo(b)) return (PK.Libro.inv(b)[r] || 0) >= 1;
-    // pk-71 (reporte del dueño, «saca solo un par de lo que elegí»): una boca de bodega saca del pueblo entero. Antes
-    // pedía que ese edificio lo tuviera en sus estantes, y los aldeanos dejan cada cosa en la bodega más cercana: el
-    // Centro Urbano solía tener dos de los seis recursos elegidos. Lb.sacar baja primero los de este edificio y la
-    // conciliación saca el resto de las demás bodegas (como al pagar).
-    return (S().res[r] || 0) - 1 >= reserva(r);
+    // pk-72 (pedido del dueño): de los estantes de esa bodega (cada una tiene su inventario), sin bajar la reserva del
+    // pueblo. pk-71 la había hecho sacar del pueblo entero: se volvió atrás.
+    return (PK.Libro.inv(b)[r] || 0) >= 1 && (S().res[r] || 0) - 1 >= reserva(r);
   }
   Ci.puedeSacar = (b, r) => disponible(b, r);
+  // pk-72: por qué una boca no saca ese recurso, en palabras (null si sale). Para el panel de la bodega y de la pieza.
+  Ci.porQueNoSale = function (c, r) {
+    const b = c.src, nom = D.RES[r].name.toLowerCase();
+    if (!b) return null;
+    if (!aceptaAbajo(c).has(r)) return 'adelante nadie recibe ' + nom + ' (la cinta no llega a un taller que lo use ni a una bodega)';
+    if (L().isShop(b) || PK.Libro.esCampo(b)) return disponible(b, r) ? null : b.def.name + ' no tiene ' + nom + ' para dar';
+    if ((PK.Libro.inv(b)[r] || 0) < 1) return b.def.name + ' no tiene ' + nom + ' en sus estantes (lo guardan otras bodegas)';
+    const rv = reserva(r), hay = S().res[r] || 0;
+    if (hay - 1 < rv) return 'el pueblo tiene ' + U.fmt(Math.floor(hay)) + ' de ' + nom + ' y la reserva de los talleres pide ' + U.fmt(Math.ceil(rv)) + ' (' + Math.round((S().auto.reserve || 0) * 100) + '% de lo que caben): bájala en Aldeanos';
+    return null;
+  };
   // la reserva de los talleres (como las carretas): una bodega no se vacía por debajo de lo que guarda el Capataz
   function reserva(r) {
     const st = S(), rv = st.auto ? st.auto.reserve || 0 : 0;
@@ -341,7 +350,7 @@
       // la madera frenaba todo el clasificador en vez de seguir derecho.
       const propias = c.outs.filter(o => Ci.filtro(c.pz, o.d) === r), sobra = c.outs.filter(o => Ci.filtro(c.pz, o.d) === '*');
       grupos = [propias, sobra].filter(g => g.length);
-      if (!grupos.length) { c.motivo = 'Atascada: el clasificador no tiene salida para ' + D.RES[r].name.toLowerCase(); c.atasco = true; return false; }
+      if (!grupos.length) return devolver(c, it0, 'el clasificador no tiene salida para ' + D.RES[r].name.toLowerCase());
     }
     let noUsa = null, lleno = null;
     for (const elig of grupos) {
@@ -349,6 +358,9 @@
       for (let i = 0; i < n; i++) {
         const o = elig[(ini + i) % n], cant = cantDe(it0);
         if (o.c) {
+          // pk-72 (reporte del dueño): un divisor solo manda a una rama donde alguien lo recibe. Antes repartía por turnos
+          // sin mirar: la piedra entraba a la rama del aserradero, quedaba en su punta y trababa todo lo de atrás
+          if (n > 1 && !aceptaAbajo(o.c).has(r)) { noUsa = noUsa || o.c; continue; }
           if (!hayLugarDesde(o.c, c)) continue;
           const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
           dest.push(it0[3] ? [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant, 1] : [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
@@ -366,9 +378,19 @@
       }
     }
     const todas = grupos.flat();
-    if (noUsa && !lleno && todas.every(o => o.b && !recibe(o.b, r))) { c.motivo = 'Atascada: llega ' + D.RES[r].name.toLowerCase() + ' y ' + noUsa.def.name + ' no lo usa'; c.atasco = true; }
+    if (noUsa && !lleno && todas.every(o => o.b && !recibe(o.b, r))) return devolver(c, it0, 'llegó ' + D.RES[r].name.toLowerCase() + ' y ' + noUsa.def.name + ' no lo usa');
+    if (noUsa && !lleno && todas.every(o => o.b ? !recibe(o.b, r) : !aceptaAbajo(o.c).has(r))) return devolver(c, it0, 'ninguna salida de aquí recibe ' + D.RES[r].name.toLowerCase());
     else if (lleno) c.motivo = (L().isShop(lleno) ? lleno.def.name + ' está lleno de ' : 'Tus bodegas están llenas de ') + D.RES[r].name.toLowerCase();
     return false;
+  }
+  // pk-72: lo que llega a una punta y nadie puede recibir nunca vuelve al pueblo (como al quitar una pieza). Antes
+  // quedaba ahí y trababa la cinta para siempre: las partidas con un divisor que repartía a ciegas quedaban con la red
+  // llena y la boca sin lugar para sacar nada. El motivo queda a la vista en el panel de la pieza.
+  function devolver(c, it0, porque) {
+    const r = it0[0];
+    S().res[r] = (S().res[r] || 0) + cantDe(it0);
+    c.motivo = 'Volvió al pueblo: ' + porque; c.atasco = false;
+    return true;
   }
   const SIN = 'La cinta no llega a ningún lado';
   function avanzar(c, dt) {
@@ -423,7 +445,7 @@
       if (!opc.length) continue;
       let presu = NIV(c.pz.n).rate * PILA() * k0 * dt;
       const quedan = {};
-      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, (st.res[r] || 0) - reserva(r));
+      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r)));
       for (let pasada = 0; pasada < 3 && presu > 0.01; pasada++) {
         const vivos = opc.filter(r => quedan[r] > 0.01);
         if (!vivos.length) break;

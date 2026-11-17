@@ -1309,12 +1309,13 @@ test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, c
     assert.ok(!Ci.carrilesEn(W.idx(26, 50))[0].atasco, 'no se traba');
     assert.equal([23, 24, 25, 26].reduce((n, x) => n + t[W.idx(x, 50)].i.length, 0), 0, 'la cinta queda vacía');
     assert.ok(!forja2.inb.stone && !forja2.inb.gold, 'no entra lo que no usa');
-    // y si se trabó con carga vieja (de antes), avisa en rojo
+    // pk-72: carga vieja que nadie recibe no traba la cinta: vuelve al pueblo y queda el motivo a la vista
+    const piedra0 = G.state.res.stone || 0;
     t[W.idx(26, 50)].i.push(['stone', 0.9, 4]);
     for (let i = 0; i < 10; i++) Ci.update(0.1);
-    assert.match(Ci.carrilesEn(W.idx(26, 50))[0].motivo || '', /^Atascada: llega piedra y Herrería no lo usa/);
-    assert.ok(Ci.carrilesEn(W.idx(26, 50))[0].atasco);
-    t[W.idx(26, 50)].i = [];
+    assert.match(Ci.carrilesEn(W.idx(26, 50))[0].motivo || '', /^Volvió al pueblo: llegó piedra y Herrería no lo usa/);
+    assert.ok(!Ci.carrilesEn(W.idx(26, 50))[0].atasco && !t[W.idx(26, 50)].i.length);
+    assert.equal(G.state.res.stone, piedra0 + 4, 'el paquete entero vuelve');
     // cruce: una cinta vertical cruza la horizontal en x 28 sin mezclarse
     t[W.idx(28, 41)].p = 'k'; t[W.idx(28, 41)].j = [];
     pz(28, 39, 1, 3); pz(28, 40, 1, 3); pz(28, 42, 1, 3); pz(28, 43, 1, 3);
@@ -1400,11 +1401,12 @@ test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión',
     assert.ok(Math.abs((s1.outb.planks) - (s2.outb.planks)) <= 20 * PILA, 'toma por turnos de las dos (' + s1.outb.planks + ' / ' + s2.outb.planks + ')');
     assert.ok((can.inb.stone || 0) > 100 * PILA && !can.inb.gold, 'la piedra va a la cantería (' + can.inb.stone + ')');
     assert.ok((cop.inb.gold || 0) > 100 * PILA && !cop.inb.stone, 'el oro a los copistas (' + cop.inb.gold + ')');
-    // sin «lo que sobre» y sin salida para el oro: se atasca
+    // sin «lo que sobre» y sin salida para el oro: la boca deja de sacar oro y lo que ya venía vuelve al pueblo (pk-72)
     Ci.ponerFiltro(W.idx(65, 40), 1, '');
     for (let i = 0; i < 100; i++) Ci.update(0.1);
-    assert.match(Ci.carrilesEn(W.idx(65, 40))[0].motivo || '', /no tiene salida para oro/);
-    assert.equal(Ci.estadoFlujo(Ci.carrilesEn(W.idx(65, 40))), 3, 'atascada: rojo en «Ver flujo»');
+    assert.ok(!Ci.carrilesEn(W.idx(65, 40))[0].atasco, 'no se traba');
+    assert.ok(!Object.values(t).some(p => (p.i || []).some(it => it[0] === 'gold')), 'ya no anda oro por la red');
+    assert.ok((can.inb.stone || 0) > 0, 'la piedra sigue');
     { const ll = Ci.llegan(W.idx(65, 40)); assert.ok(ll.includes('gold') && ll.includes('stone') && !ll.includes('planks'), 'el panel del clasificador ofrece lo que llega (' + ll + ')'); }
     // sin conexión: el divisor reparte en partes iguales y el clasificador separa
     Ci.ponerFiltro(W.idx(65, 40), 1, 'gold');
@@ -1647,8 +1649,8 @@ test('pk-70: de bodega a bodega la cinta entrega aunque el pueblo esté lleno o 
     assert.ok(llego.every(n => n >= 40), 'llegan los tres a la otra bodega (' + llego + ')');
     const enCinta = RS.reduce((n, r) => n + Ci.enCinta(r), 0);
     assert.equal(RS.reduce((n, r) => n + G.state.res[r], 0) + enCinta, total0, 'no se crea ni se pierde nada');
-    // pk-71: la boca saca del pueblo entero: la comida sale aunque este edificio no tenga en sus estantes
-    assert.ok(L.storeAccepts(a, 'food') ? (b.inv.food || 0) + Ci.enCinta('food') >= 40 : true, 'la comida también sale (' + b.inv.food + ')');
+    // pk-72 (pedido del dueño): la boca saca de los estantes de su bodega: la comida, que esta no tiene, no sale
+    assert.ok(!(b.inv.food) && !Ci.enCinta('food'), 'la comida no sale: esta bodega no tiene');
     assert.ok(!Object.values(t).some(pz => pz.i.some(it => it[0] === 'planks')), 'lo que el pueblo no tiene no sale');
     assert.ok(Object.values(t).every(pz => pz.i.every(it => it[3] === 1)), 'los paquetes llevan la marca de que salieron de una bodega');
     // sin conexión, igual
@@ -1660,4 +1662,40 @@ test('pk-70: de bodega a bodega la cinta entrega aunque el pueblo esté lleno o 
     assert.equal(Lb.poner(b, 'wood', 4), 0);
     assert.equal(Lb.poner(b, 'wood', 4, 4), 4);
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});
+
+test('pk-72: un divisor no manda a una rama lo que nadie de esa rama recibe, y la boca de una bodega saca de sus estantes', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, capDe0 = G.capDe, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice(), buf0 = L.bufCap;
+  G.stat = () => {}; G.cap = () => 100000; G.capDe = () => 100000; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  // bodega (x 20..22, y 40..42) → cinta en la fila 41 → divisor en x 26: adelante un aserradero (madera), abajo una cantería (piedra)
+  const a = mk(1, 'warehouse', 20, 40, { inv: { wood: 5000, stone: 5000 } }), saw = mk(2, 'sawmill', 31, 40, { inb: {}, outb: {} }), mas = mk(3, 'masonry', 26, 45, { inb: {}, outb: {} });
+  const otra = mk(4, 'warehouse', 40, 40, { inv: { gold: 5000 } });
+  G.buildings = [a, saw, mas, otra]; G.bById = new Map(G.buildings.map(o => [o.id, o]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 6, res: { wood: 5000, stone: 5000, gold: 5000 }, flags: {}, auto: { reserve: 0 }, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, p) => { t[W.idx(x, y)] = { p: p || 'c', d, n: 3, i: [] }; };
+  try {
+    for (let x = 23; x <= 25; x++) pz(x, 41, 0);
+    pz(26, 41, 0, 'v');
+    for (let x = 27; x <= 30; x++) pz(x, 41, 0);
+    for (let y = 42; y <= 44; y++) pz(26, y, 1);
+    Ci.init(G.state);
+    const boca = Ci.carrilesEn(W.idx(23, 41))[0];
+    assert.equal(boca.src, a);
+    boca.pz.f = ['wood', 'stone', 'gold']; boca.pz.rr = 1; // empieza por la piedra: el divisor la manda primero adelante
+    Ci.cambio();
+    for (let i = 0; i < 1200; i++) Ci.update(0.1);
+    assert.ok((saw.inb.wood || 0) > 300, 'la madera llega al aserradero (' + saw.inb.wood + ')');
+    assert.ok((mas.inb.stone || 0) > 300, 'la piedra llega a la cantería (' + mas.inb.stone + ')');
+    assert.ok(!Ci.carriles().some(c => c.atasco), 'nada se traba: ' + Ci.carriles().filter(c => c.atasco).map(c => c.motivo));
+    // pk-72 (pedido del dueño): la boca saca de los estantes de su bodega; el oro está en otra
+    assert.ok(!Object.values(t).some(p => p.i.some(it => it[0] === 'gold')), 'el oro de otra bodega no sale por esta boca');
+    // el panel dice por qué no sale cada cosa
+    assert.match(Ci.porQueNoSale(boca, 'gold'), /adelante nadie recibe oro/);
+    assert.equal(Ci.porQueNoSale(boca, 'wood'), null);
+    G.state.auto.reserve = 0.5; G.state.res.wood = 100;
+    assert.match(Ci.porQueNoSale(boca, 'wood'), /reserva de los talleres pide 50\.0K|reserva de los talleres pide 50K|reserva de los talleres pide/);
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
