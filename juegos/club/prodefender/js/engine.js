@@ -80,7 +80,8 @@
     venta: 0.75, costoTorre: 1, costoMejora: 1, bono: 1, usura: 0, fuga: 1, energia: 1, pinchoCosto: 1, pinchoDanio: 1 };
   // lo que multiplica el daño de una torre (también las habilidades de los héroes)
   const DANIOS = ['dmg', 'droneDmg', 'mineDmg', 'dps', 'pulseDmg', 'shardDmg', 'burnDps', 'poisonDps', 'kamikaze', 'pct', 'eco', 'golemDmg', 'thornDps',
-    'flashDmg', 'popDmg', 'acidDps', 'puddleDps', 'eruptDmg', 'tempDmg', 'waveDmg', 'dawnDmg', 'bogDps', 'selvaDps', 'winterDmg', 'riftDmg'];
+    'flashDmg', 'popDmg', 'acidDps', 'puddleDps', 'eruptDmg', 'tempDmg', 'waveDmg', 'dawnDmg', 'bogDps', 'selvaDps', 'winterDmg', 'riftDmg',
+    'webDps', 'zapDmg'];   // versión 7: Telar de Ámbar y Pilón de la Aurora
   // EL PODER DEL REINO: se carga matando (`energia`, hasta ENERGIA_MAX) y el jugador lo lanza
   // donde quiera mientras dura una ronda (prueba.js: jugada 8). Su daño sigue a la ronda.
   PD.ENERGIA_MAX = 100;
@@ -234,6 +235,8 @@
       this.vendavalT = 0; this.apagonT = 0;
       // cuarta era: Todo Está Escrito (Lumen), los pozos de Vórtex, el temblor del Terremoto
       this.escritoT = 0; this.escritoAmp = 0; this.pozos = [];
+      // versión 7: las telarañas del Telar de Ámbar (se borran al terminar la ronda)
+      this.telas = [];
       if (snap) this.load(snap);
     }
 
@@ -510,7 +513,7 @@
           if (s.cd) s.cd /= M.rate;
           if (s.droneCd) s.droneCd /= M.rate;
           if (s.shardCd) s.shardCd /= M.rate;
-          if (k === 'beam' || k === 'disint' || k === 'orbital') s.dps *= M.rate;
+          if (k === 'beam' || k === 'disint' || k === 'orbital' || k === 'pilon') s.dps *= M.rate;
         }
         if (M.range !== 1 && s.range < 5000) s.range *= M.range;
         if (M.camo) s.camo = true;
@@ -685,6 +688,7 @@
         this.evento = null; this.vendavalT = 0; this.apagonT = 0;
         this.zonas = []; this.caidos = []; this.alzar = [];
         if (this.era4) { this.escritoT = 0; this.pozos = []; for (const t of this.towers) { t.robadoT = 0; t.paradojaT = 0; } }
+        this.telas = [];
       }
       let farm = 0;
       for (const t of this.towers) if (t.def.kind === 'farm') {
@@ -929,7 +933,8 @@
       const amp = (e.hexT > 0 ? e.hexAmp : 0) + e.corr * e.corrAmp + e.lightAmp + (e.wetT > 0 ? e.wetAmp : 0) + (e.sapoT > 0 ? e.sapoAmp : 0) + (e.burbujaT > 0 ? e.burbujaAmp : 0);
       if (amp > 0) dmg *= 1 + amp;
       if (this.era4) {
-        const amp4 = (e.edad || 0) + (this.escritoT > 0 ? this.escritoAmp : 0);   // Cronos y Lumen
+        const amp4 = (e.edad || 0) + (this.escritoT > 0 ? this.escritoAmp : 0)   // Cronos y Lumen
+          + (e.telaHasta > this.rt ? e.telaAmp : 0);                          // Hilo Pegajoso (Telar de Ámbar)
         if (amp4 > 0) dmg *= 1 + amp4;
         if (e.falangeOn) dmg *= 1 - e.d.falange.f;   // Guerreros de Terracota en formación
       }
@@ -1519,6 +1524,7 @@
         if (e.d.boss) boss = true;
       }
       this.threat = { n, maxProg, boss };
+      if (this.towers.some(t => t.def.kind === 'pilon')) this.enlazaPilones();
       for (const t of this.towers) {
         const s = t.s;
         if (t.flash > 0) t.flash -= dt;
@@ -1580,6 +1586,9 @@
           case 'tome': this.tTome(t, s, tdt); break;
           case 'orbital': this.tOrbital(t, s, dt, rmT); break;
           case 'crono': this.tCrono(t, s, tdt); break;
+          case 'telar': this.tTelar(t, s, tdt); break;
+          case 'yunque': this.tYunque(t, s, tdt); break;
+          case 'pilon': this.tPilon(t, s, dt, rmT); break;
         }
         if (ciega || rf !== 1) s.range = r0;
       }
@@ -1694,6 +1703,7 @@
       t.cdT = s.cd;
     }
     landShell(sh) {
+      if (sh.yunque) { this.landYunque(sh); return; }
       if (sh.calabaza) {   // calabaza del Jinete: apaga la torre a la que cae
         if (this.towers.indexOf(sh.torre) >= 0) this.disableTower(sh.torre, sh.dur);
         this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.5, r: 34, color: '#ff7a1a' });
@@ -2563,6 +2573,113 @@
       t.cdT = s.cd;
     }
 
+    // ============ VERSIÓN 7: Telar de Ámbar, Yunque Estelar, Pilón de la Aurora ============
+    // ---- Telar de Ámbar: teje telarañas sobre el camino, un poco por delante de un enemigo
+    // que todavía no está en una suya (y que la tela puede atrapar) ----
+    tTelar(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const mias = this.telas.filter(w => w.src === t);
+      const fuera = this.enemies.filter(e => !e.dead && ((e.d.flying && !s.webAir) || mias.some(w => Math.hypot(e.x - w.x, e.y - w.y) < w.r)));
+      const e = this.pick(t, t.x, t.y, s.range, t.mode, fuera);
+      if (!e) { t.cdT = 0.25; return; }
+      if (mias.length >= s.webs) this.telas.splice(this.telas.indexOf(mias[0]), 1);   // la más vieja
+      const x = e.x + e.vx * 0.5, y = e.y + e.vy * 0.5;
+      this.telas.push({ x, y, r: s.webR, t: s.webDur, T: s.webDur, slow: s.webSlow, dps: s.webDps, amp: s.webAmp, air: !!s.webAir, hold: s.webHold || 0, bossMult: s.bossMult, src: t, hit: [] });
+      t.ang = Math.atan2(y - t.y, x - t.x);
+      this.fx.push({ k: 'ring', x, y, t: 0, T: 0.5, r0: 6, r1: s.webR, color: '#ffc860', w: 3 });
+      this.snd('acid', t.x);
+      t.flash = 0.2;
+      t.cdT = s.cd;
+    }
+    // ---- Yunque Estelar: cae del cielo sobre los más fuertes; el blindaje se vuelve daño ----
+    tYunque(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const blancos = [];
+      for (let k = 0; k < s.anvils; k++) { const e = this.pick(t, t.x, t.y, s.range, t.mode, blancos); if (!e) break; blancos.push(e); }
+      if (!blancos.length) { t.cdT = 0; return; }
+      blancos.forEach((e, k) => {
+        const T = 0.6 + k * 0.08, x = e.x + e.vx * T, y = e.y + e.vy * T;
+        this.shells.push({ x0: x, y0: y - 260, x1: x, y1: y, t: 0, T, src: t, yunque: true, blanco: e });
+      });
+      t.ang = Math.atan2(blancos[0].y - t.y, blancos[0].x - t.x);
+      t.flash = 0.15;
+      this.snd('mortar', t.x);
+      t.cdT = s.cd;
+    }
+    landYunque(sh) {
+      const t = sh.src, s = t.s, o = { ap: s.armorPierce, bossMult: s.bossMult };
+      const b = sh.blanco;
+      // el golpe entero, al blanco si está debajo; si se movió, al más cercano al punto
+      let e0 = b && !b.dead && Math.hypot(b.x - sh.x1, b.y - sh.y1) < s.radius + b.d.r ? b : null;
+      if (!e0) {
+        let bd = s.radius;
+        this.grid.query(sh.x1, sh.y1, s.radius + 44, e => { if (e.dead || e.burrowed) return; const d = Math.hypot(e.x - sh.x1, e.y - sh.y1) - e.d.r * 0.5; if (d < bd) { bd = d; e0 = e; } });
+      }
+      if (e0) {
+        const arm = (e0.d.armor || 0) + (e0.elite ? 5 : 0);
+        this.damage(e0, s.dmg * (e0.d.big || e0.d.boss ? s.bigMult : 1) + arm * s.armorX, s.dtype, t, o);
+        if (!e0.dead && s.crack) { e0.corr = Math.max(e0.corr, s.crack); e0.corrT = Math.max(e0.corrT, 6); }
+      }
+      // la onda: una parte del golpe a los de alrededor (también voladores); aturde a los chicos
+      this.grid.query(sh.x1, sh.y1, s.radius + 44, e => {
+        if (e === e0 || e.dead || e.burrowed || Math.hypot(e.x - sh.x1, e.y - sh.y1) > s.radius + e.d.r * 0.5) return;
+        this.damage(e, s.dmg * s.splash, s.dtype, t, o);
+        if (s.stun && !e.dead && !e.d.big) this.applyStun(e, s.stun);
+      });
+      this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.45, r: s.radius, color: '#d8e0ff' });
+      this.fx.push({ k: 'ring', x: sh.x1, y: sh.y1, t: 0, T: 0.5, r0: 8, r1: s.radius * 1.3, color: '#ffffff', w: 4 });
+      this.snd(s.radius > 70 ? 'boom' : 'boomSmall', sh.x1);
+    }
+    // ---- Pilón de la Aurora: cada pilón se une a los `links` más cercanos a su alcance. Una
+    // valla la quema el más fuerte de sus dos pilones (empate: el de id menor), una sola vez ----
+    enlazaPilones() {
+      const P = this.towers.filter(t => t.def.kind === 'pilon');
+      for (const t of P) {
+        const c = [];
+        for (const o of P) if (o !== t) { const d = Math.hypot(o.x - t.x, o.y - t.y); if (d <= t.s.range) c.push([d, o]); }
+        c.sort((a, b) => a[0] - b[0] || a[1].id - b[1].id);
+        t.enlaces = c.slice(0, t.s.links).map(x => x[1]);
+        t.vallas = [];
+      }
+    }
+    tPilon(t, s, dt, rm) {
+      // chispa: al más cercano (sirve sola, antes de tener pareja)
+      t.shT -= dt * rm;
+      if (t.shT <= 0) {
+        const e = this.pick(t, t.x, t.y, Math.min(s.range, 140), 'close');
+        if (e) {
+          this.damage(e, s.zapDmg, s.dtype, t, {});
+          this.fx.push({ k: 'bolt', pts: [[t.x, t.y - 14], [e.x, e.y]], t: 0, T: 0.12, color: '#9affd8', w: 2 });
+          t.shT = s.zapCd;
+        } else t.shT = 0.2;
+      }
+      let destello = false;
+      if (s.flashCd) { t.flashT -= dt * rm; if (t.flashT <= 0) { destello = true; t.flashT = s.flashCd; } }
+      for (const o of t.enlaces || []) {
+        if ((o.enlaces || []).indexOf(t) >= 0) {
+          const dueno = o.s.dps > s.dps || (o.s.dps === s.dps && o.id < t.id) ? o : t;
+          if (dueno !== t) continue;
+        }
+        t.vallas.push([t.x, t.y - 14, o.x, o.y - 14, destello]);
+        const ax = t.x, ay = t.y, bx = o.x, by = o.y, mx = (ax + bx) / 2, my = (ay + by) / 2;
+        const half = Math.hypot(bx - ax, by - ay) / 2, dmg = s.dps * rm * dt;
+        this.grid.query(mx, my, half + s.width + 44, e => {
+          if (e.dead || e.burrowed || distSeg(e.x, e.y, ax, ay, bx, by) > s.width + e.d.r * 0.5) return;
+          this.damage(e, dmg, s.dtype, t, { dot: true });
+          if (e.dead) return;
+          if (s.fenceSlow) this.applySlow(e, s.fenceSlow, 0.4);
+          if (s.fenceBurn) this.applyBurn(e, s.fenceBurn, 3, t);
+          if (destello) {
+            this.damage(e, s.flashDmg * (e.d.big ? s.flashBig || 1 : 1), s.dtype, t, {});
+            if (s.flashStun && !e.dead && !e.d.big) this.applyStun(e, s.flashStun);
+          }
+        });
+      }
+      if (destello && t.vallas.length) this.snd('zapBig', t.x);
+    }
+
     // ---- Héroes: cada uno ataca con su arma (s.atk) ----
     tHero(t, s, dt) {
       switch (s.atk) {
@@ -2989,6 +3106,21 @@
         this.inRange(r, r.r, e => this.damage(e, r.dps * dt, 'fire', r.src, { dot: true, fireFloor: 0.5 }));
       }
       this.rings = this.rings.filter(r => r.t > 0);
+      if (this.telas.length) {
+        // Telar de Ámbar: frenan, envenenan, hacen recibir más daño y enredan al entrar
+        for (const w of this.telas) {
+          w.t -= dt;
+          this.grid.query(w.x, w.y, w.r + 44, e => {
+            if (e.dead || e.burrowed || (e.d.flying && !w.air) || Math.hypot(e.x - w.x, e.y - w.y) > w.r + e.d.r * 0.5) return;
+            if (w.dps) this.damage(e, w.dps * dt, 'poison', w.src, { dot: true, bossMult: w.bossMult });
+            if (e.dead) return;
+            this.applySlow(e, w.slow, 0.4);
+            if (w.amp) { e.telaAmp = e.telaHasta > this.rt ? Math.max(e.telaAmp, w.amp) : w.amp; e.telaHasta = this.rt + 0.3; }
+            if (w.hold && !e.d.big && !e.d.boss && w.hit.indexOf(e.id) < 0) { w.hit.push(e.id); e.holdT = Math.max(e.holdT, w.hold); }
+          });
+        }
+        this.telas = this.telas.filter(w => w.t > 0 && this.towers.indexOf(w.src) >= 0);
+      }
       if (this.zonas.length) {
         // Poderes del Reino que se quedan en el suelo (Floración, Hoguera)
         for (const z of this.zonas) {
@@ -3498,6 +3630,6 @@
   }
 
   // la versión del motor de las partidas nuevas (prueba.js: VERSION)
-  PD.MOTOR_VE = 6;
+  PD.MOTOR_VE = 7;
   PD.Game = Game;
 })();

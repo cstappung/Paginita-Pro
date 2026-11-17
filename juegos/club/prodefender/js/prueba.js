@@ -46,7 +46,9 @@
   // juegan y se rehacen con su regla (el motor recibe la versión: new PD.Game(…, ve)).
   // La 6 (Nov 2026) hace a los jefes la mitad de lentos que en la 5 y cambia las torres de
   // Biblioteca, Estelar y Tiempo (levels.js `v6`); las partidas de la 5 siguen con lo suyo.
-  const VERSION = 6, VERSIONES = [4, 5, 6];
+  // La 7 suma tres defensas nuevas a esos tres reinos (Telar de Ámbar, Yunque Estelar, Pilón
+  // de la Aurora: levels.js `v7`).
+  const VERSION = 7, VERSIONES = [4, 5, 6, 7];
 
   const categoria = r => 'club-prodefender-' + REINOS[r];
   const reinoDe = cat => { const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || '')); return m ? REINOS.indexOf(m[1]) : -1; };

@@ -2411,6 +2411,51 @@
         if (t[1] >= 2) for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + Math.PI / 4; circle(c, Math.cos(a) * s * 0.88, Math.sin(a) * s * 0.88, 2, '#ffe8a0', '#5a3a00', 0.6); }
       }
     },
+    // ---------------- versión 7 ----------------
+    telar: {
+      base: baseWood, spin: 'aim',
+      top(c, s, t) {
+        // una araña de ámbar sobre su tela, con el abdomen brillante
+        c.strokeStyle = 'rgba(255,220,150,0.75)'; c.lineWidth = 0.8;
+        for (let i = 0; i < 8; i++) { const a = i * TAU / 8; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(a) * s, Math.sin(a) * s); c.stroke(); }
+        for (const k of [0.45, 0.72, 0.98]) poly(c, 0, 0, s * k, 8, 0, null, 'rgba(255,220,150,0.6)', 0.7);
+        c.strokeStyle = '#3a1e06'; c.lineWidth = 1.6;
+        for (const sg2 of [-1, 1]) for (let i = 0; i < 4; i++) {
+          const a = (i - 1.5) * 0.42, x1 = Math.cos(a) * s * 0.42, y1 = sg2 * (s * 0.2 + Math.abs(Math.sin(a)) * s * 0.1);
+          c.beginPath(); c.moveTo(s * 0.05, sg2 * s * 0.08); c.lineTo(x1, y1 + sg2 * s * 0.25); c.lineTo(x1 + Math.cos(a) * s * 0.3, y1 + sg2 * s * 0.55); c.stroke();
+        }
+        glow(c, '#ffb340', t[0] >= 3 || t[1] >= 3 ? 12 : 6);
+        ell(c, -s * 0.22, 0, s * 0.36, s * 0.28, 0, sg(c, -s * 0.22, 0, s * 0.36, t[1] >= 2 ? '#c8ff5a' : '#ffb340', 0.6), '#5a2a00', 1);
+        noGlow(c);
+        circle(c, s * 0.22, 0, s * 0.18, '#3a1e06');
+        circle(c, s * 0.32, -s * 0.07, 1.2, '#ff4a3a'); circle(c, s * 0.32, s * 0.07, 1.2, '#ff4a3a');
+        if (t[0] >= 3) star(c, -s * 0.22, 0, s * 0.16, s * 0.07, 6, 0, '#bfefff');
+      }
+    },
+    yunque: {
+      base: baseMetal, spin: 'aim',
+      top(c, s, t) {
+        // un yunque de hierro estelar visto desde arriba, sobre una estrella que lo llama
+        star(c, 0, 0, s * 0.98, s * 0.55, 5, -Math.PI / 2, 'rgba(160,180,255,0.25)', 'rgba(200,215,255,0.7)', 1);
+        shape(c, [[-s * 0.75, -s * 0.32], [s * 0.45, -s * 0.32], [s * 0.95, -s * 0.12], [s * 0.95, s * 0.12], [s * 0.45, s * 0.32], [-s * 0.75, s * 0.32]],
+          lg(c, 0, -s * 0.32, 0, s * 0.32, ['#e8ecf8', t[0] >= 3 ? '#6a6aa8' : '#8a92a8', '#3a3e4e']), '#14161e', 1.2);
+        rrect(c, -s * 0.45, -s * 0.5, s * 0.5, s * 1.0, 2, lg(c, -s * 0.45, 0, s * 0.05, 0, ['#5a6070', '#2a2e3a']), '#14161e', 1);
+        c.fillStyle = 'rgba(255,255,255,0.55)'; c.fillRect(-s * 0.7, -s * 0.28, s * 1.3, 1.4);
+        glow(c, '#bfd0ff', t[0] >= 3 ? 12 : 6); circle(c, s * 0.15, 0, s * 0.12, t[0] >= 4 ? '#ffd84d' : '#e0e8ff'); noGlow(c);
+        if (t[1] >= 3) for (const y of [-0.62, 0.62]) rrect(c, -s * 0.3, y * s - 2, s * 0.6, 4, 1.5, '#9aa4c0', '#14161e', 0.6);
+      }
+    },
+    pilon: {
+      base: baseArcane, spin: 'none',
+      top(c, s, t) {
+        // obelisco de cristal con una esfera de aurora en la punta
+        poly(c, 0, 0, s * 0.85, 4, Math.PI / 4, lg(c, -s, -s, s, s, ['#1a3a4a', '#0a1a24']), '#04121a', 1.2);
+        poly(c, 0, 0, s * 0.55, 4, Math.PI / 4, lg(c, -s * 0.6, -s * 0.6, s * 0.6, s * 0.6, ['#bfffe8', '#3ac8a0', '#1a5a6a']), '#0a3a3a', 1);
+        const col = t[1] >= 3 ? '#c8a0ff' : t[0] >= 3 ? '#5affff' : '#7affc8';
+        glow(c, col, t[0] >= 3 || t[1] >= 3 ? 14 : 8); circle(c, 0, 0, s * 0.26, sg(c, 0, 0, s * 0.26, col, 0.7)); noGlow(c);
+        for (let i = 0; i < 4; i++) { const a = i * TAU / 4; circle(c, Math.cos(a) * s * 0.72, Math.sin(a) * s * 0.72, 1.6, t[0] >= 2 ? '#bfffe8' : '#3a8a7a'); }
+      }
+    },
     heroejade: { base: heroBase, spin: 'aim', top: HERO_ART.heroejade },
     heroecirco: { base: heroBase, spin: 'aim', top: HERO_ART.heroecirco },
     heroebiblio: { base: heroBase, spin: 'aim', top: HERO_ART.heroebiblio },
@@ -4858,6 +4903,66 @@
     }
     ctx.globalCompositeOperation = 'source-over';
   }
+  // versión 7: telarañas del Telar de Ámbar (hilos radiales y anillos, que se apagan al final)
+  function drawTelas(ctx, g, t) {
+    for (const w of g.telas) {
+      const a = Math.min(1, w.t / 0.8, (w.T - w.t) / 0.25 + 0.2), R = w.r;
+      const hilo = w.air ? 'rgba(200,235,255,' : 'rgba(255,215,140,';
+      ctx.globalAlpha = 0.22 * a;
+      const gr = ctx.createRadialGradient(w.x, w.y, 2, w.x, w.y, R);
+      gr.addColorStop(0, w.dps ? '#c8ff5a' : '#ffc860'); gr.addColorStop(1, 'rgba(255,180,60,0)');
+      circle(ctx, w.x, w.y, R, gr);
+      ctx.globalAlpha = a;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = hilo + '0.75)';
+      const rot = (w.x * 0.013) % TAU;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const an = rot + i * TAU / 10; ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + Math.cos(an) * R, w.y + Math.sin(an) * R); }
+      ctx.stroke();
+      ctx.strokeStyle = hilo + '0.55)';
+      for (const k of [0.3, 0.55, 0.8, 1]) {
+        ctx.beginPath();
+        for (let i = 0; i <= 10; i++) { const an = rot + i * TAU / 10, rr = R * k * (i % 2 ? 0.93 : 1); const x = w.x + Math.cos(an) * rr, y = w.y + Math.sin(an) * rr; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+        ctx.stroke();
+      }
+      // gotas de ámbar que brillan en los hilos
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) { const an = rot + i * 1.3, rr = R * (0.35 + (i % 3) * 0.22); ctx.globalAlpha = a * (0.5 + 0.5 * Math.sin(t * 3 + i)); circle(ctx, w.x + Math.cos(an) * rr, w.y + Math.sin(an) * rr, 1.8, '#ffe8a0'); }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+  }
+  // versión 7: vallas de luz entre Pilones de la Aurora (las dibuja el pilón que las quema)
+  function drawVallas(ctx, g, t) {
+    let hay = false;
+    for (const tw of g.towers) if (tw.vallas && tw.vallas.length) { hay = true; break; }
+    if (!hay) return;
+    ctx.globalCompositeOperation = 'lighter';
+    for (const tw of g.towers) {
+      if (!tw.vallas || !tw.vallas.length) continue;
+      const W2 = tw.s ? tw.s.width : 12;
+      for (const v of tw.vallas) {
+        const [ax, ay, bx, by, fl] = v, len = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / len, ny = (bx - ax) / len;
+        const gr = ctx.createLinearGradient(ax, ay, bx, by);
+        gr.addColorStop(0, '#7affc8'); gr.addColorStop(0.5, tw.s && tw.s.flashCd ? '#c8a0ff' : '#5affff'); gr.addColorStop(1, '#7affc8');
+        // cortina ondulante de aurora
+        for (let k = 0; k < 3; k++) {
+          ctx.globalAlpha = fl ? 0.5 : 0.18 + 0.06 * k;
+          ctx.strokeStyle = gr; ctx.lineWidth = W2 * (1.8 - k * 0.5) + (fl ? 8 : 0);
+          ctx.beginPath();
+          for (let i = 0; i <= 16; i++) {
+            const f = i / 16, ond = Math.sin(f * 9 + t * (2 + k) + k) * (3 + k * 1.5) * Math.sin(f * Math.PI);
+            const x = ax + (bx - ax) * f + nx * ond, y = ay + (by - ay) * f + ny * ond;
+            if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+          }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = fl ? 1 : 0.8; ctx.strokeStyle = '#e8fff6'; ctx.lineWidth = fl ? 3.5 : 1.6;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
   function drawZonas(ctx, g, t) {
     for (const z of g.zonas) {
       const a = Math.min(1, z.t / 0.6, (z.T - z.t) / 0.3 + 0.2);
@@ -5065,6 +5170,8 @@
         ctx.globalCompositeOperation = 'source-over';
       }
       if (g.zonas && g.zonas.length) drawZonas(ctx, g, t);
+      if (g.telas && g.telas.length) drawTelas(ctx, g, t);
+      drawVallas(ctx, g, t);
       if (g.pozos && g.pozos.length) for (const p of g.pozos) {   // pozos gravitatorios de Vórtex
         const a = Math.min(1, p.t / 0.5, (p.T - p.t) / 0.4 + 0.2);
         ctx.save(); ctx.translate(p.x, p.y); ctx.globalAlpha = a;
@@ -5278,6 +5385,16 @@
         if (s.t < 0) continue;
         const k = Math.max(0, s.t / s.T);
         const x = s.x0 + (s.x1 - s.x0) * k, y0 = s.y0 + (s.y1 - s.y0) * k;
+        if (s.yunque) {   // versión 7: el yunque cae en vertical, con su sombra creciendo debajo
+          ctx.globalAlpha = 0.25 + 0.35 * k; ell(ctx, s.x1, s.y1, 6 + 12 * k, (6 + 12 * k) * 0.45, 0, '#000'); ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = 'rgba(190,210,255,0.45)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x, y0 - 60); ctx.lineTo(x, y0); ctx.stroke();
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.save(); ctx.translate(x, y0);
+          shape(ctx, [[-11, -5], [7, -5], [13, -2], [13, 1], [7, 3], [4, 3], [4, 8], [8, 11], [-8, 11], [-4, 8], [-4, 3], [-11, 3]], lg(ctx, 0, -5, 0, 11, ['#f0f4ff', '#8a92a8', '#3a3e4e']), '#14161e', 1);
+          ctx.restore();
+          continue;
+        }
         if (s.calabaza) {   // calabaza del Jinete: vuela en arco hasta la torre
           const hgt = Math.sin(k * Math.PI) * 90;
           ctx.globalAlpha = 0.3; ell(ctx, x, y0, 7, 3.5, 0, '#000'); ctx.globalAlpha = 1;

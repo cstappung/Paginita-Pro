@@ -107,7 +107,7 @@ function huellaCampo(li, type) {
 }
 const SOPORTE = { totem: 1, huerto: 1, faro: 1 };
 // de control: lo suyo (sapos, burbujas, eco, proteger) no lo mide el campo de tiro; se ponen por reglas
-const CONTROL = { bruja: 1, burbujas: 1, campanario: 1, pararrayos: 1, crono: 1 };
+const CONTROL = { bruja: 1, burbujas: 1, campanario: 1, pararrayos: 1, crono: 1, telar: 1 };
 const APARTE = { ...SOPORTE, ...CONTROL };
 // planes de gasto que prueba la anticipación (decide los lee en this.modo)
 const MODOS = ['normal', 'gasta', 'mejora', 'nueva', 'diversa', 'heroe', 'detecta'];
@@ -139,9 +139,9 @@ const MIXTA = [
   // cuarta era (reinos 15–19): con su defensa nueva
   ['espinas', 'espinas', 'jade', 'espinas', 'prisma', 'mortero', 'vigia', 'balista', 'jade', 'obelisco', 'prisma'],
   ['espinas', 'espinas', 'ruleta', 'espinas', 'prisma', 'voltaico', 'colmena', 'vigia', 'ruleta', 'bumeran', 'prisma'],
-  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'grimorio', 'vigia', 'balista', 'voltaico', 'grimorio', 'colmena', 'acido', 'dragon'],
-  ['espinas', 'espinas', 'satelite', 'espinas', 'prisma', 'balista', 'vigia', 'sierra', 'desintegrador', 'satelite', 'prisma'],
-  ['espinas', 'espinas', 'prisma', 'espinas', 'balista', 'voltaico', 'mortero', 'vigia', 'acido', 'obelisco', 'campanario', 'balista', 'prisma']
+  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'grimorio', 'yunque', 'pilon', 'pilon', 'vigia', 'balista', 'voltaico', 'grimorio', 'colmena', 'acido', 'dragon', 'yunque'],
+  ['espinas', 'espinas', 'satelite', 'espinas', 'prisma', 'balista', 'yunque', 'pilon', 'pilon', 'vigia', 'sierra', 'desintegrador', 'satelite', 'prisma', 'yunque'],
+  ['espinas', 'espinas', 'prisma', 'espinas', 'balista', 'yunque', 'pilon', 'pilon', 'voltaico', 'mortero', 'vigia', 'acido', 'obelisco', 'campanario', 'balista', 'prisma', 'yunque']
 ];
 // Tercera era: el héroe que elige (se puede cambiar con --heroe), el orden en que prefiere los
 // pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
@@ -363,6 +363,13 @@ class Bot {
         for (const t of g.towers) if (!APARTE[t.type] && Math.hypot(t.x - x, t.y - y) < aura - 6) v += this.poder(t);
         v += this.cobertura(x, y, R) * 1e-3;
       } else if (type === 'huerto') v = -this.cobertura(x, y, 140, true);
+      else if (type === 'pilon' && !vacio && g.towers.some(t => t.type === 'pilon')) {
+        // versión 7: el segundo pilón, cerca de otro y con la valla entre ambos sobre el camino
+        let p = null, pd = Infinity;
+        for (const t of g.towers) if (t.type === 'pilon') { const d = Math.hypot(t.x - x, t.y - y); if (d < pd) { pd = d; p = t; } }
+        if (pd > 200 || pd < 70) continue;
+        v = this.cobertura((p.x + x) / 2, (p.y + y) / 2, pd / 2);
+      }
       else if (type === 'pararrayos' && !vacio) {
         // donde cubra más oro invertido sin proteger (lo que buscan el trueno y los tentáculos)
         v = 0;
@@ -508,6 +515,9 @@ class Bot {
     const granjas = T.filter(t => t.type === 'huerto').length;
     const quiere = r < 5 ? 0 : r < 12 ? 1 : r < 22 ? 2 : r < 45 ? 3 : 0;
     if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto && !this.est.humana && this.vende.includes('huerto')) return nuevo('huerto');
+    // versión 7: un Telar de Ámbar cada ~6 torres de daño (frena: el campo de tiro no lo mide)
+    const telares = T.filter(t => t.type === 'telar').length;
+    if (this.vende.includes('telar') && !this.est.humana && dmg.length >= 4 && telares < Math.ceil(dmg.length / 6) && !vet.telar && (!presion || g.money >= PD.TOWERS.telar.cost)) return nuevo('telar');
     const totems = T.filter(t => t.type === 'totem').length;
     if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760) && !this.est.humana && this.vende.includes('totem')) return nuevo('totem');
 
