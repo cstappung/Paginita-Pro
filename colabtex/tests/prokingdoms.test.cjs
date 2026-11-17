@@ -1169,7 +1169,7 @@ test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y 
     assert.equal(L.comodinMalo('campo', 'bodega', 'wood'), null);
     assert.match(L.comodinMalo('campo', 'bodega', null), /de qué campamentos/);
     assert.match(L.comodinMalo('campo', 'bodega', 'food'), /No tienes campamentos/);
-    assert.match(L.comodinMalo(4, 'bodega', null), /Entre dos bodegas/);
+    assert.equal(L.comodinMalo(4, 'bodega', null), null, 'pk-67: de una bodega a «cualquier bodega» es un traslado (pedido del dueño)');
     assert.equal(L.comodinMalo('bodega', 6, null), null);
     const r = { id: 1, de: 'campo', a: 'bodega', res: 'wood' };
     G.state.logi.rutas.push(r);
