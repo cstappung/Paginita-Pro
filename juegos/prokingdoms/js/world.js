@@ -733,7 +733,7 @@
     n.t = Date.now();
     if (W.soft(n)) {
       const i = W.idx(n.x, n.y);
-      if (W.block[i] === 1) W.block[i] = 0;
+      if (W.block[i] === 1) { W.block[i] = 0; if (W.onDesbloqueo) W.onDesbloqueo(i); }
     }
   };
 
@@ -755,6 +755,7 @@
         const i = W.idx(n.x, n.y);
         if (W.block[i] || W.bAt[i] >= 0 || occupied(n.x, n.y)) continue;
         n.dead = false; n.amount = n.max; W.block[i] = 1;
+        if (W.onBloqueo) W.onBloqueo(i); // pk-78: los caminos guardados de carretas y carromatos se enteran
       }
     }
   };
@@ -916,11 +917,7 @@
     }
     return d;
   };
-  W.ubicarLugares = function (terr) {
-    terr = terr || W.terr;
-    if (!W.ORIG || W.tema === 'mar') return { n: {}, p: {}, cerca: 0 };
-    const key = Array.from(terr).join(',');
-    if (ubCache && ubCache.key === key) return ubCache.r;
+  function ubicar0(terr, key, forz, ap) {
     const w = W.W, N = w * W.H, dist = W.distTerritorio(terr), ocup = new Uint8Array(N), out = { n: {}, p: {}, cerca: 0, sub: {} };
     // pk-62: las entradas de mazmorra que se mudan quedan a MZ_SEP casillas de toda otra entrada y a no más de MZ_R
     // de donde las puso el mapa; la que no tiene lugar así queda «bajo tierra» (sin casilla: se entra desde el Cuartel)
@@ -928,7 +925,8 @@
     const marcaMz = (x0, y0) => { for (let j = 1 - MZ_SEP; j < MZ_SEP; j++) for (let i = 1 - MZ_SEP; i < MZ_SEP; i++) if (W.inb(x0 + i, y0 + j)) mzCerca[W.idx(x0 + i, y0 + j)] = 1; };
     const enTerr = (x, y) => !!terr[W.parcel(x, y)];
     const nOrig = W.ORIG.n.length, pOrig = W.ORIG.p.length;
-    const poiMueve = id => { const p = W.pois[id], [x0, y0] = W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (enTerr(x0 + i, y0 + j)) return true; return false; };
+    const poiTerr = id => { const p = W.pois[id], [x0, y0] = W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (enTerr(x0 + i, y0 + j)) return true; return false; };
+    const poiMueve = id => poiTerr(id) || !!(forz && forz.has(id)); // pk-78: también el que pisa una Calzada Real
     const nodoMueve = id => { const n = W.nodes[id]; return !W.QUEDAN[n.kind] && enTerr(W.ORIG.n[id][0], W.ORIG.n[id][1]); };
     const mueveP = [], mueveN = [];
     // lo que se queda ocupa su lugar original
@@ -941,6 +939,14 @@
     for (let id = 0; id < nOrig; id++) { if (nodoMueve(id)) mueveN.push(id); else ocup[W.idx(W.ORIG.n[id][0], W.ORIG.n[id][1])] = 1; }
     // libre según datos fijos: el terreno, las zonas, las parcelas comunes, lo reservado y lo ya ubicado
     const libre = (x, y) => { if (!W.inb(x, y)) return false; const k = y * w + x; return !ocup[k] && W.terrain[k] !== 4 && !W.reserved[k] && W.zoneAt[k] < 0 && !W.terrCommon[W.parcel(x, y)] && !enTerr(x, y); };
+    const cerca = (x0, y0, cabe, lejos) => {
+      for (const [dx, dy, d2] of ubOffsets()) {
+        if (d2 > MZ_R * MZ_R) return null;
+        const x = x0 + dx, y = y0 + dy;
+        if (W.inb(x, y) && lejos(x, y) >= 2 && cabe(x, y)) return [x, y];
+      }
+      return null;
+    };
     const buscar = (x0, y0, cabe, lejos, r2) => {
       let mejor = null, md = -1;
       for (const [dx, dy, d2] of ubOffsets()) {
@@ -959,12 +965,14 @@
       const p = W.pois[id], [x0, y0] = W.ORIG.p[id], mz = esMz(id);
       const cabe = (x, y) => {
         if (mz && mzCerca[y * w + x]) return false;
-        for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (!libre(x + i, y + j)) return false;
+        for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (!libre(x + i, y + j) || (ap && ap((y + j) * w + x + i))) return false;
         for (let j = -1; j <= p.h; j++) for (let i = -1; i <= p.w; i++) { const xx = x + i, yy = y + j; if (W.inb(xx, yy) && ocup[yy * w + xx] === 2) return false; } // dos lugares movidos nunca se tocan
         return true;
       };
       const lejos = (x, y) => { let m = 99; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) { if (!W.inb(x + i, y + j)) return 0; m = Math.min(m, dist[W.idx(x + i, y + j)]); } return m; };
-      const to = buscar(x0, y0, cabe, lejos, mz ? MZ_R * MZ_R : 0);
+      // pk-78: lo que se muda solo porque una Calzada Real lo pisa (fuera de todo territorio) va a la casilla libre más
+      // cercana a 2 o más de todo territorio, sin pedir W.LEJOS: con esa regla casi todo se iba bajo tierra
+      const to = forz && forz.has(id) && !poiTerr(id) ? cerca(x0, y0, cabe, lejos) : buscar(x0, y0, cabe, lejos, mz ? MZ_R * MZ_R : 0);
       if (!to) { if (mz) out.sub[id] = 1; continue; }
       if (mz) marcaMz(to[0], to[1]);
       out.p[id] = to;
@@ -977,23 +985,57 @@
       out.n[id] = to;
       ocup[W.idx(to[0], to[1])] = 1;
     }
-    // las casillas que quedan ocupadas por lugares y recursos que no son árboles (para la Calzada, L5)
-    const ocupa = new Uint8Array(N);
-    for (let id = 0; id < pOrig; id++) { if (out.sub[id]) continue; const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = 1; }
-    for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = 1; }
+    // las casillas que quedan ocupadas por lugares y recursos que no son árboles (para la Calzada, L5). pk-78: un lugar
+    // marca su id + 1 (la Calzada puede ir sobre un campamento o una mazmorra que ese reino ya venció); un recurso, -1
+    const ocupa = new Int32Array(N);
+    for (let id = 0; id < pOrig; id++) { if (out.sub[id]) continue; const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = id + 1; }
+    for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = -1; }
     Object.defineProperty(out, 'ocupa', { value: ocupa, enumerable: false }); // fuera del JSON (la prueba compara posiciones)
-    ubCache = { key, r: out };
     return out;
+  }
+  // pk-78 (pedido del dueño): los campamentos de bandidos y las mazmorras que alguien venció puede pisarlos su Calzada
+  // Real; para los demás, el lugar que una Calzada pisa se muda. ap(k): ¿hay Calzada en la casilla k? (el cliente lee
+  // W.autopista, el servidor su documento); apv: una versión de esa capa, solo para la caché. Sin ap, como antes.
+  // Pura: la misma respuesta en el cliente y en el servidor con la misma capa.
+  W.PISABLE = kind => kind === 'camp' || !!(D.POI[kind] && D.POI[kind].dungeon);
+  let ub2Cache = null;
+  W.ubicarLugares = function (terr, ap, apv) {
+    terr = terr || W.terr;
+    if (!W.ORIG || W.tema === 'mar') return { n: {}, p: {}, cerca: 0, ocupa: new Int32Array(0) };
+    const key = Array.from(terr).join(',');
+    if (!ubCache || ubCache.key !== key) ubCache = { key, r: ubicar0(terr, key, null, null) };
+    const base = ubCache.r;
+    if (!ap) return base;
+    const pisa = [];
+    for (let id = 0; id < W.ORIG.p.length; id++) {
+      const p = W.pois[id];
+      if (base.sub[id] || !W.PISABLE(p.kind)) continue;
+      const [x0, y0] = base.p[id] || W.ORIG.p[id];
+      let si = false;
+      for (let j = 0; j < p.h && !si; j++) for (let i = 0; i < p.w; i++) if (ap(W.idx(x0 + i, y0 + j))) { si = true; break; }
+      if (si) pisa.push(id);
+    }
+    if (!pisa.length) return base;
+    const k2 = key + '|' + pisa.join(',') + '|' + apv;
+    if (!ub2Cache || ub2Cache.key !== k2) ub2Cache = { key: k2, r: ubicar0(terr, k2, new Set(pisa), ap) };
+    return ub2Cache.r;
   };
   // L5: ¿puede ir una casilla de Calzada Real ahí, para ese reino? Pura (datos fijos, territorio y W.ubicarLugares):
   // la misma respuesta en el cliente y en el servidor. Los edificios los mira solo el cliente (L.calzadaLibre).
-  W.calzadaPuede = function (k, slot, terr) {
+  // pk-78 (pedido del dueño): también en las zonas comunes (no sobre el mineral: el recurso marca su casilla en ocupa) y
+  // sobre un campamento o una mazmorra que ese reino ya venció (venc: Set o { id: 1 } de ids de W.pois). ub: lo que
+  // devuelve W.ubicarLugares con la capa de Calzada (se pasa una vez para muchas casillas).
+  W.calzadaPuede = function (k, slot, terr, ub, venc) {
     terr = terr || W.terr;
     if (!(k >= 0 && k < W.W * W.H) || W.tema === 'mar' || !W.ORIG) return false;
     const x = k % W.W, y = (k / W.W) | 0, pc = W.parcel(x, y);
-    if (W.terrain[k] === 4 || W.terrCommon[pc] || (W.zoneAt[k] >= 0 && W.zones[W.zoneAt[k]].common)) return false;
+    if (W.terrain[k] === 4) return false;
     if (terr[pc] && terr[pc] !== slot + 1) return false; // no en tierra ajena
-    return !W.ubicarLugares(terr).ocupa[k];
+    const o = (ub || W.ubicarLugares(terr)).ocupa[k];
+    if (!o) return true;
+    if (o < 0 || !venc) return false;
+    const id = o - 1;
+    return !!(venc.has ? venc.has(id) : venc[id]) && W.PISABLE(W.pois[id].kind);
   };
   W.countParcels = slot => { let n = 0; for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === slot + 1) n++; return n; };
   W.saveTerr = () => Array.from(W.terr).join(',');

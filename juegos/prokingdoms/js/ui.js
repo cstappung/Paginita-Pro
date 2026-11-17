@@ -231,6 +231,7 @@
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
     const lb = mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
     mbtn(Sp.belt('W', 'E', 0, 3).c.toDataURL(), 'Cintas', () => PK.Input.abrirCintas(), 'K', 'cintas'); // pk-67: su propio menú
+    mbtn(Sp.calzada(15, false, Sp.ownerColor('p')).c.toDataURL(), 'Caminos', () => PK.Input.abrirCaminos(), 'J', 'caminos'); // pk-78: su propio menú
     logiDot = el('span', { class: 'badge' }); lb.append(logiDot); // pk-41: carretas sin ruta
     mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
@@ -325,7 +326,7 @@
   // ---------- U1 (Fase 6): menú agrupado ----------
   // Cinco grupos con submenú, más Opciones. Un grupo se ve si se ve alguno de sus botones, y brilla si alguno es nuevo.
   const GRUPOS = [
-    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'cintas', 'terr', 'consejo', 'galeon', 'aspectos'] },
+    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'caminos', 'cintas', 'terr', 'consejo', 'galeon', 'aspectos'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
     { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
     { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms', 'regata'] },
@@ -655,7 +656,7 @@
     const g = G(), sel = g.sel;
     let key = sel ? sel.type + ':' + (sel.ids ? sel.ids.join(',') : sel.id) : 'none';
     if (g.placing) { const gh = PK.Render.ghost; key = 'placing:' + (g.placing.move !== undefined ? 'mv' + g.placing.move + ':' : '') + g.placing.type + (g.placing.armed && gh ? ':' + gh.x + ',' + gh.y + (gh.ok ? '+' : '-') : ''); }
-    if (PK.Logi.tool) { const I = PK.Input, pc = I.planCinta; key = 'tool:' + PK.Logi.tool + ':' + (I.roadStart ? I.roadStart.join(',') : '') + ':' + (pc ? pc.tiles.length + '/' + pc.malas.length : '') + ':' + (PK.Logi.cintaNivel || 1) + (PK.Logi.cintaNodo || '') + ':' + (I.planCopia ? I.planCopia.en + '/' + I.planCopia.malas.length : '') + ':' + I.moldeRot; }
+    if (PK.Logi.tool) { const I = PK.Input, pc = I.planCinta; key = 'tool:' + PK.Logi.tool + ':' + (I.roadStart ? I.roadStart.join(',') : '') + ':' + (pc ? pc.tiles.length + '/' + pc.malas.length : '') + ':' + (PK.Logi.cintaNivel || 1) + (PK.Logi.cintaNodo || '') + ':' + (I.planCopia ? I.planCopia.en + '/' + I.planCopia.malas.length : '') + ':' + I.moldeRot + ':' + PK.Logi.decoTipo + ':' + (I.mover ? I.mover.nodos.length : '') + (I.planMover ? '@' + I.planMover.en + '/' + I.planMover.malas.length : '') + ':' + (PK.Calzada ? PK.Calzada.decoVer : ''); }
     if (PK.Def.tool) key = 'def:' + PK.Def.tool + (PK.Def.start ? PK.Def.start.join(',') : '') + S().def.walls.length + S().def.gates.length;
     if (PK.Terr.mode) key = 'terr';
     if (!force && key === lastPanelKey && sel && sel.type === 'units' && !g.placing) { updateUnitsLive(); return; }
@@ -665,6 +666,7 @@
     if (key === 'none' && key !== lastPanelKey && UI.plegarPanel && !UI.tutoActivo()) UI.plegarPanel();
     lastPanelKey = key;
     barraCintas();
+    if (UI.barraCaminos) UI.barraCaminos(); // pk-78
     panel.innerHTML = '';
     fillPanel(g, sel);
     if (snap) restoreScroll(panel, snap); else panel.scrollTop = 0; // otra cosa elegida: desde arriba
@@ -700,12 +702,13 @@
       if (PK.Logi.tool === 'calzada') {
         const Cz = PK.Calzada;
         panel.append(el('div', { class: 'p-help' }, el('h3', null, 'Trazar Calzada Real'),
-          el('p', { class: 'small' }, 'Una franja de piedra de 2 casillas que ven y usan todos los reinos del mundo: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5. Va en tierra de nadie o en la tuya. Toca dónde empieza y dónde termina; puedes encadenar tramos. Cada casilla cuesta '),
+          el('p', { class: 'small' }, 'Una franja de piedra de 2 casillas, del color de tu reino, que ven y usan todos los reinos del mundo: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5. Va en tierra de nadie, en la tuya o en las zonas comunes (no sobre los minerales), y sobre los campamentos y mazmorras que ya venciste. Toca dónde empieza y dónde termina; puedes encadenar tramos. Cada casilla cuesta '),
           UI.costEl(D.AUTOPISTA.costo(G().state.era)),
           el('p', { class: 'small muted' }, 'Hoy: ' + Cz.hoy() + ' de ' + Cz.tope() + ' casillas.'),
           el('div', { class: 'row' }, UI.btn('Terminar', () => PK.Input.cancelTool(), { small: true }))));
         return;
       }
+      if (UI.caminoToolPanel && (PK.Logi.tool === 'czdeco' || PK.Logi.tool === 'qcamino' || PK.Logi.tool === 'mrecurso')) { panel.append(UI.caminoToolPanel()); return; } // pk-78
       if (PK.Logi.tool === 'cinta' || PK.Logi.tool === 'paso') { panel.append(cintaToolPanel()); return; }
       if (PK.Logi.tool === 'copiar') { panel.append(copiaToolPanel()); return; }
       if (PK.Cintas.HERR_PIEZA[PK.Logi.tool]) { panel.append(cintaPiezaPanel()); return; }
@@ -1078,7 +1081,8 @@
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }),
       el('div', null, el('h3', null, us.length === 1 ? 'Aldeano' : us.length + ' aldeanos'), liveEl,
         el('div', { class: 'row' }, UI.btn('Detener', () => { us.forEach(x => G().release(x)); UI.refreshPanel(true); }, { small: true }),
-          UI.btn('Siguiente ocioso', () => { const n = G().nextIdle(u.id); if (n) { G().sel = { type: 'units', ids: [n.id] }; PK.Render.centerOn(n.x, n.y); UI.refreshPanel(true); } }, { small: true })))));
+          UI.btn('Siguiente ocioso', () => { const n = G().nextIdle(u.id); if (n) { G().sel = { type: 'units', ids: [n.id] }; PK.Render.centerOn(n.x, n.y); UI.refreshPanel(true); } }, { small: true }),
+          UI.btn('Despedir', () => UI.confirmDespedir(us), { small: true, cls: 'danger', title: 'Quitar ' + (us.length === 1 ? 'este aldeano' : 'estos aldeanos') + ' del reino' })))));
     updateUnitsLive();
     // ¿Qué hacen? Un toque y se reparten solos por los recursos cercanos de ese tipo (sin amontonarse).
     const A = PK.Auto, jobs = el('div', { class: 'job-grid' }), cur = us.length === 1 ? A.jobOf(us[0]) : null;
@@ -1319,6 +1323,10 @@
         UI.btn('Talar varios…', () => { G().sel = null; PK.Despeje.empezar('talar'); }, { small: true }),
         UI.btn('Plantar árboles', () => { G().sel = null; PK.Despeje.empezar('plantar'); }, { small: true })));
     }
+    // pk-78: moverlo a otra casilla, pagando monedas del reino
+    if (PK.Despeje && PK.Despeje.movible(n) && !G().enMar()) panel.append(el('div', { class: 'row' },
+      UI.btn('Mover (monedas)…', () => PK.Input.empezarMover([n]), { small: true, cls: 'gold', title: 'Llévalo a otra casilla: 1 moneda del reino cada ' + D.MOVER_RECURSO.cada + ' casillas' }),
+      UI.btn('Mover varios…', () => { G().sel = null; PK.Input.abrirCaminos('mrecurso'); }, { small: true })));
     if (z && z.common) {
       const st = W.zoneStats(n.zone);
       panel.append(el('p', { class: 'small' }, z.name + ': ' + Math.round((st.amt / st.max) * 100) + '% de sus recursos disponibles. Compartida con todos los reinos.'));
@@ -1361,6 +1369,21 @@
     panel.append(el('div', { class: 'p-head' }, el('img', { class: 'portrait unit', src: port }), el('div', null, el('h3', null, 'Aldeano de ' + bot.name), el('p', { class: 'small' }, bot.realm + ' · ' + taskText(u)))));
   }
 
+  // pk-78: despedir aldeanos (G.despedir). Lo que llevaban encima entra al pueblo; no devuelve lo que costaron.
+  UI.confirmDespedir = function (us) {
+    us = us.filter(x => x && x.kind === 'v' && x.owner === 'p');
+    if (!us.length) return;
+    const n = us.length;
+    UI.modal('despedir', n === 1 ? 'Despedir un aldeano' : 'Despedir ' + n + ' aldeanos', body => {
+      body.append(el('p', null, (n === 1 ? 'Dejará su trabajo y se irá del reino.' : 'Dejarán su trabajo y se irán del reino.') + ' Lo que lleven encima entra al pueblo. No se devuelve lo que costaron.'),
+        el('p', { class: 'small muted' }, 'Libera población: después puedes entrenar otros (o tropas) en su lugar.'),
+        el('div', { class: 'row' }, UI.btn(n === 1 ? 'Sí, despedirlo' : 'Sí, despedirlos', () => {
+          const m = G().despedir(us);
+          UI.closeModal(); G().sel = null; UI.refreshPanel(true);
+          if (m) UI.toast(m === 1 ? 'Despediste a un aldeano.' : 'Despediste a ' + m + ' aldeanos.', 'info');
+        }, { cls: 'danger' }), UI.btn('Cancelar', () => UI.closeModal())));
+    });
+  };
   UI.confirmDemolish = function (b) {
     UI.modal('demo', 'Demoler ' + b.def.name, body => {
       body.append(el('p', null, b.done ? 'El edificio desaparecerá sin devolver recursos.' : 'Se cancelará la obra y recuperarás parte de lo invertido.'),
@@ -1467,8 +1490,9 @@
     else if (h.k === 'calzada') { // L5: el nombre lo escribió una persona: translate="no"
       const d = PK.Calzada.dueño(W.idx(h.x, h.y));
       if (d) {
-        hoverKey = 'cz' + d.name; tip.textContent = '';
-        tip.append(d.tuya ? 'Calzada Real de tu reino' : 'Calzada Real de ', d.tuya ? '' : el('span', { translate: 'no' }, d.name));
+        const dk = PK.Calzada.decoDef(PK.Calzada.decoEn(W.idx(h.x, h.y))); // pk-78
+        hoverKey = 'cz' + d.name + (dk ? dk.id : ''); tip.textContent = '';
+        tip.append(dk ? dk.name + ' · ' : '', d.tuya ? 'Calzada Real de tu reino' : 'Calzada Real de ', d.tuya ? '' : el('span', { translate: 'no' }, d.name));
         tip.style.display = 'block'; tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, x + 16) + 'px'; tip.style.top = y + 18 + 'px';
         return;
       }

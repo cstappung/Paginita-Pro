@@ -142,6 +142,7 @@
       if (G().units.some(u => !u.inside && Math.floor(u.x) === x && Math.floor(u.y) === y)) continue; // no encima de un aldeano
       const n = { id: W.nodes.length, kind, x, y, amount, max: amount, zone: -1, v: Math.floor(Math.random() * 4), dead: false, t: 0, temp: true };
       W.nodes.push(n); W.nodeAt[W.idx(x, y)] = n.id; W.block[W.idx(x, y)] = 1; W.bucket(n);
+      if (W.onBloqueo) W.onBloqueo(W.idx(x, y));
       return n;
     }
     return null;

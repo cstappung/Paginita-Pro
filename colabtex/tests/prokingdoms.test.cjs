@@ -1121,15 +1121,15 @@ test('L4 (pk-45): el despeje es global, puro y a 12 casillas de todo territorio'
   assert.doesNotMatch(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /checkHarvest|COMMON\[/);
 });
 
-test('L5 (pk-47): la Calzada Real va en tierra de nadie o en la tuya, nunca en agua, zonas comunes, tierra ajena ni lugares', () => {
+test('L5 (pk-47, pk-78): la Calzada Real va en tierra de nadie, en la tuya y en las zonas comunes, nunca en agua, tierra ajena, minerales ni lugares sin vencer', () => {
   const me = 0, otro = W.terr.find(v => v && v !== me + 1) - 1; // en la prueba D.MY_SLOT es -1: un reino cualquiera
-  let mia = -1, ajena = -1, agua = -1, comun = -1, nadie = -1, lugar = -1;
+  let mia = -1, ajena = -1, agua = -1, comun = -1, mineral = -1, nadie = -1, lugar = -1;
   const ub = W.ubicarLugares();
   for (let k = 0; k < W.W * W.H; k++) {
     const x = k % W.W, y = (k / W.W) | 0, o = W.terr[W.parcel(x, y)];
     if (W.terrain[k] === 4) { if (agua < 0) agua = k; continue; }
-    if (W.terrCommon[W.parcel(x, y)]) { if (comun < 0) comun = k; continue; }
-    if (ub.ocupa[k]) { if (lugar < 0 && !o) lugar = k; continue; }
+    if (W.terrCommon[W.parcel(x, y)]) { if (ub.ocupa[k] < 0) { if (mineral < 0) mineral = k; } else if (!ub.ocupa[k] && comun < 0) comun = k; continue; }
+    if (ub.ocupa[k]) { if (lugar < 0 && !o && ub.ocupa[k] > 0 && W.PISABLE(W.pois[ub.ocupa[k] - 1].kind)) lugar = k; continue; }
     if (o === me + 1 && mia < 0 && W.zoneAt[k] < 0) mia = k;
     else if (o === otro + 1 && ajena < 0) ajena = k;
     else if (!o && nadie < 0 && W.zoneAt[k] < 0) nadie = k;
@@ -1138,7 +1138,9 @@ test('L5 (pk-47): la Calzada Real va en tierra de nadie o en la tuya, nunca en a
   assert.ok(W.calzadaPuede(nadie, me), 'en tierra de nadie');
   assert.ok(!W.calzadaPuede(ajena, me), 'no en la de otro');
   assert.ok(W.calzadaPuede(ajena, otro), 'su dueño sí');
-  assert.ok(!W.calzadaPuede(agua, me) && !W.calzadaPuede(comun, me) && !W.calzadaPuede(lugar, me));
+  assert.ok(!W.calzadaPuede(agua, me) && !W.calzadaPuede(lugar, me) && !W.calzadaPuede(mineral, me));
+  assert.ok(comun >= 0 && W.calzadaPuede(comun, me), 'pk-78: en las zonas comunes sí');
+  assert.ok(W.calzadaPuede(lugar, me, null, ub, new Set([ub.ocupa[lugar] - 1])), 'pk-78: sobre el lugar que ya venciste sí');
   assert.ok(!W.calzadaPuede(-1, me) && !W.calzadaPuede(W.W * W.H, me));
   // la velocidad: la calzada es el mejor terreno de cada perfil
   const L = PK.Logi, a0 = W.autopista[nadie];
@@ -1150,8 +1152,57 @@ test('L5 (pk-47): la Calzada Real va en tierra de nadie o en la tuya, nunca en a
   } finally { W.autopista[nadie] = a0; }
   assert.ok(D.AUTOPISTA.costo(3).blocks === 4 && D.AUTOPISTA.costo(1).stone === 10 && D.AUTOPISTA.porDia(2) === 120);
   const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
-  assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr\)/, 'el servidor usa la misma regla');
+  assert.match(sim, /W\.calzadaPuede\(k, p\.slot, w\.terr, ub, venc\)/, 'el servidor usa la misma regla');
+  assert.match(sim, /W\.ubicarLugares\(w\.terr, k => doc\.t\[k\] > 0, doc\.v\)/, 'y mira los lugares con la capa de Calzada');
   for (const f of ['server/index.js', '../../functions/index.js']) assert.match(fs.readFileSync(path.join(PKDIR, f), 'utf8'), /'POST \/api\/autopista'/, f);
+});
+
+test('pk-78: una mazmorra o un campamento que pisa una Calzada Real se muda (para todos), y lo vencido no se ve', () => {
+  const ub0 = W.ubicarLugares();
+  // un campamento o una mazmorra en tierra de nadie, en su lugar
+  let id = -1;
+  for (let i = 0; i < W.ORIG.p.length; i++) if (!ub0.sub[i] && !ub0.p[i] && W.PISABLE(W.pois[i].kind)) { id = i; break; }
+  assert.ok(id >= 0, 'hay un lugar pisable');
+  const [x0, y0] = W.ORIG.p[id], tapa = new Set([W.idx(x0, y0)]);
+  const ub = W.ubicarLugares(W.terr, k => tapa.has(k), 1);
+  assert.ok(ub.sub[id] || ub.p[id], 'se mudó (o quedó bajo tierra)');
+  if (ub.p[id]) {
+    const [nx, ny] = ub.p[id], p = W.pois[id];
+    for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) assert.ok(!tapa.has(W.idx(nx + i, ny + j)), 'no quedó bajo la Calzada');
+    assert.ok(Math.max(Math.abs(nx - x0), Math.abs(ny - y0)) <= 32, 'cerca de donde estaba');
+  }
+  assert.ok(!ub.ocupa[W.idx(x0, y0)] || ub.ocupa[W.idx(x0, y0)] !== id + 1, 'su casilla vieja quedó libre de él');
+  // misma capa, misma respuesta (el servidor y el cliente deben coincidir)
+  const ubB = W.ubicarLugares(W.terr, k => tapa.has(k), 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(ubB.p)), JSON.parse(JSON.stringify(ub.p)));
+  // sin Calzada encima, como antes
+  assert.strictEqual(W.ubicarLugares(W.terr, () => false, 3), ub0);
+  // lo vencido: game.js y render.js
+  const gsrc = fs.readFileSync(path.join(PKDIR, 'js', 'game.js'), 'utf8'), rsrc = fs.readFileSync(path.join(PKDIR, 'js', 'render.js'), 'utf8');
+  assert.match(gsrc, /G\.poiVencido = function/);
+  assert.match(rsrc, /p\.sub \|\| G\(\)\.poiVencido\(p\)/, 'lo vencido no se dibuja ni se elige');
+  // decoraciones y mover recursos: datos y servidor
+  assert.ok(D.AUTOPISTA.decos.length >= 5 && D.AUTOPISTA.decoMax > 0);
+  assert.equal(D.moverRecursoCosto(1), 1); assert.equal(D.moverRecursoCosto(3), 1); assert.equal(D.moverRecursoCosto(4), 2); assert.equal(D.moverRecursoCosto(30), 10);
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
+  assert.match(sim, /D\.AUTOPISTA\.decoMax/, 'el servidor pone tope a las decoraciones');
+});
+
+test('pk-78: una casilla que se tapa sin avisar (un árbol que vuelve a crecer) no deja a las carretas paradas', () => {
+  const L = PK.Logi;
+  assert.equal(typeof W.onBloqueo, 'function', 'world.js avisa a la logística');
+  const t = L.tabla('carromato');
+  let k = -1;
+  for (let i = 0; i < t.costo.length; i++) if (t.costo[i] < Infinity && W.block[i] === 0) { k = i; break; }
+  assert.ok(k >= 0);
+  W.onBloqueo(k);
+  assert.equal(L.tabla('carromato').costo[k], Infinity, 'la tabla guardada ya no pasa por ahí');
+  W.onDesbloqueo(k);
+  assert.ok(L.tabla('carromato').costo[k] < Infinity, 'y vuelve a pasar cuando se libera');
+  const ent = fs.readFileSync(path.join(PKDIR, 'js', 'entities.js'), 'utf8'), wsrc = fs.readFileSync(path.join(PKDIR, 'js', 'world.js'), 'utf8');
+  assert.match(ent, /PK\.Logi\.tapar\(W\.idx\(tx, ty\)\)/, 'la carreta que choca avisa');
+  assert.match(ent, /PK\.Logi\.vigilar\(u, el\)/, 'y la que no avanza se despierta');
+  assert.match(wsrc, /W\.block\[i\] = 1;\n\s*if \(W\.onBloqueo\) W\.onBloqueo\(i\)/, 'el rebrote avisa');
 });
 
 test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y «cualquier bodega» a la más cercana', () => {

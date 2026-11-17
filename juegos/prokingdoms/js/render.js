@@ -141,6 +141,7 @@
           ctx.fillRect(Math.round(wx - 1), Math.round(wy - 1), 2, 2);
         }
       }
+      if (PK.Calzada && PK.Calzada.luces && !g.enMar()) PK.Calzada.luces(ctx, vis, gl, noche, t); // pk-78: los faroles de la Calzada Real
       ctx.restore();
     }
     // copos (invierno), hojas (otoño) y pétalos (primavera)
@@ -608,6 +609,7 @@
     if (PK.Troops) PK.Troops.collect(list, dt, vis);
     if (PK.Incursiones) PK.Incursiones.collect(list, dt, vis); // bandidos y tropas que salen a pelear
     if (PK.Fort && !g.enMar()) PK.Fort.collect(list, vis); // G6: las fortalezas
+    if (PK.Calzada && PK.Calzada.collect && !g.enMar()) PK.Calzada.collect(list, vis); // pk-78: decoraciones de la Calzada Real
     if (PK.Frente) PK.Frente.collect(list, dt, vis); // pk-55: los dos bandos de cada asedio (frente.js)
 
     // capa plana: granjas y marcas de selección
@@ -1149,7 +1151,7 @@
   // Selección por píxel: recorre lo dibujado de adelante hacia atrás.
   // pk-62: una mazmorra se ve (y se elige) solo después de encontrada; las que quedaron bajo tierra, nunca en el mapa
   R.poiVisible = function (p) {
-    if (p.sub) return false;
+    if (p.sub || G().poiVencido(p)) return false; // pk-78: lo que venciste ya no lo ves
     if (!D.POI[p.kind].dungeon) return true;
     const st = G().poiState(p);
     return !!(st && st.f);
@@ -1165,7 +1167,7 @@
       const lx = wx - it.x, ly = wy - it.y;
       const w = it.spr.k ? it.spr.w : it.spr.c.width, h = it.spr.k ? it.spr.h : it.spr.c.height;
       if (lx < 0 || ly < 0 || lx >= w || ly >= h) continue;
-      if (it.k === 'wolf' || (it.k === 'troop' && it.o.enemy)) continue;
+      if (it.k === 'wolf' || it.k === 'deco' || (it.k === 'troop' && it.o.enemy)) continue; // pk-78: la decoración de la Calzada no se elige
       if (it.k === 'troop') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
       // pk-61: los vehículos, por píxel: su rectángulo (40×42 el carromato) tapaba el campamento y no se podía elegir
       if (it.k === 'unit' && (it.o.kind === 'cart' || it.o.kind === 'carromato' || it.o.kind === 'barcaza')) { if (Sp.hit(it.spr, lx, ly)) return it; continue; }

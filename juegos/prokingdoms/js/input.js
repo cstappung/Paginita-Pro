@@ -330,6 +330,13 @@
     if ((L.tool === 'road' || L.tool === 'calzada') && I.roadStart) {
       const [tx, ty] = r.screenToTile(sx, sy);
       r.roadGhost = (L.tool === 'calzada' ? PK.Calzada.plan : L.roadPlan)(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
+    } else if (L.tool === 'qcamino' && I.roadStart) { // pk-78: la zona que se quita, en rojo
+      const [tx, ty] = r.screenToTile(sx, sy);
+      r.beltGhost = quitablesCamino(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty)).map(([x, y]) => ({ x, y, mala: true }));
+    } else if (L.tool === 'mrecurso') { // pk-78: eligiendo (azul) o llevando el grupo (rojo donde no puede ir)
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty);
+      if (I.mover && !PK.UI.isTouch()) moverEn(x, y);
+      else if (!I.mover && I.roadStart) r.beltGhost = PK.Despeje.movibles(I.roadStart[0], I.roadStart[1], x, y).map(n => ({ x: n.x, y: n.y }));
     } else if (L.tool === 'copiar' && I.molde && !PK.UI.isTouch()) { // pk-60 (C3): la copia sigue al ratón
       const [tx, ty] = r.screenToTile(sx, sy);
       copiaEn(Math.floor(tx), Math.floor(ty));
@@ -364,6 +371,7 @@
     I.flagTool = false;
     if (PK.Asedios) PK.Asedios.cancelar();
     L.tool = null; L.beltFrom = null; I.roadStart = null; I.planCinta = null; I.molde = null; I.planCopia = null;
+    I.mover = null; I.planMover = null;
     PK.Def.cancel();
     R().roadGhost = null; R().beltGhost = null;
     PK.UI.refreshPanel(true);
@@ -402,6 +410,72 @@
     if (n) { PK.UI.toast('Copia puesta: ' + n + ' piezas.', 'good'); copiaEn(p.en[0], p.en[1]); }
     PK.UI.refreshPanel(true);
   };
+  // ---------- pk-78: menú de caminos (pedido del dueño: «un menú especial para hacer caminos, como el de las cintas») ----------
+  // Camino, Calzada Real, decoraciones de la Calzada, quitar por zona y mover recursos del mapa (con monedas).
+  I.HERR_CAMINO = { road: 1, calzada: 1, czdeco: 1, qcamino: 1, mrecurso: 1 };
+  I.abrirCaminos = function (tool) {
+    I.cancelTool();
+    G().sel = null;
+    const L = PK.Logi, mar = G().enMar && G().enMar();
+    L.tool = tool && !(mar && (tool === 'calzada' || tool === 'czdeco')) ? tool : 'road';
+    if (!L.decoTipo && L.decoTipo !== 0) L.decoTipo = 1;
+    PK.UI.refreshPanel(true);
+  };
+  // lo que «Quitar» saca en una zona: tus caminos y la Calzada que puedes quitar (la tuya, o la de otro en tu tierra)
+  function quitablesCamino(x0, y0, x1, y1) {
+    const Lm = (PK.Despeje && PK.Despeje.ZONA_MAX) || 24;
+    x1 = U.clamp(x1, x0 - Lm + 1, x0 + Lm - 1); y1 = U.clamp(y1, y0 - Lm + 1, y0 + Lm - 1);
+    const out = [], cz = PK.Calzada && !(G().enMar && G().enMar()) ? new Set(PK.Calzada.quitables(x0, y0, x1, y1).map(([x, y]) => W.idx(x, y))) : new Set();
+    for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+      if (!W.inb(x, y)) continue;
+      const k = W.idx(x, y);
+      if ((W.road[k] && W.bAt[k] < 0) || cz.has(k)) out.push([x, y]);
+    }
+    return out;
+  }
+  I.quitablesCamino = quitablesCamino;
+  // Mover recursos: I.mover = { nodos, ref } (lo elegido); I.planMover = Despeje.planMover(...) con en = [x, y]
+  I.mover = null; I.planMover = null;
+  function moverEn(x, y) {
+    if (!I.mover) return null;
+    const p = PK.Despeje.planMover(I.mover.nodos, I.mover.ref, x, y);
+    p.en = [x, y];
+    I.planMover = p;
+    R().beltGhost = p.tiles.map(t => ({ x: t.x, y: t.y, mala: t.mala })).concat(I.mover.nodos.map(n => ({ x: n.x, y: n.y, cruce: true })));
+    PK.UI.refreshPanel();
+    return p;
+  }
+  I.empezarMover = function (nodos) {
+    nodos = (nodos || []).filter(n => PK.Despeje.movible(n));
+    if (!nodos.length) { PK.UI.toast('Eso no se puede mover (solo recursos del mapa en tierra tuya o de nadie).', 'warn'); return; }
+    if (PK.Logi.tool !== 'mrecurso') I.abrirCaminos('mrecurso');
+    G().sel = null;
+    I.roadStart = null;
+    I.mover = { nodos, ref: nodos[0] };
+    I.planMover = null;
+    R().beltGhost = nodos.map(n => ({ x: n.x, y: n.y, cruce: true }));
+    PK.UI.toast((nodos.length === 1 ? 'Elegiste un recurso' : 'Elegiste ' + nodos.length + ' recursos') + '. ' + PK.UI.hint('Mueve el ratón y haz clic donde va.', 'Toca dónde va y toca otra vez para confirmar.') + ' Cuesta 1 moneda del reino cada ' + D.MOVER_RECURSO.cada + ' casillas, por recurso.', 'info');
+    PK.UI.refreshPanel(true);
+  };
+  I.confirmarMover = function () {
+    const p = I.planMover;
+    if (!p) { PK.UI.toast('Toca dónde va.', 'info'); return; }
+    if (!p.ok) { PK.UI.toast(p.malas.length ? 'Ahí no puede ir: ' + p.malas[0].why + '.' : 'Elige otra casilla.', 'warn'); return; }
+    const n = PK.Despeje.mover(p);
+    if (n) {
+      PK.UI.toast((n === 1 ? 'Recurso movido' : n + ' recursos movidos') + ' por ' + p.costo + (p.costo === 1 ? ' moneda.' : ' monedas.'), 'good');
+      I.mover = null; I.planMover = null; R().beltGhost = null;
+    }
+    PK.UI.refreshPanel(true);
+  };
+  // Decorar: tocar una casilla de tu Calzada pone la decoración elegida (L.decoTipo; 0 = quitar)
+  function decorarEn(x, y) {
+    const Cz = PK.Calzada, L = PK.Logi, k = W.idx(x, y);
+    if (!W.autopista[k]) { PK.UI.toast('Toca una casilla de tu Calzada Real.', 'info'); return; }
+    if (!L.decoTipo) { Cz.quitarDeco(x, y).then(ok => { if (ok) PK.UI.toast('Decoración quitada: vuelve la mitad.', 'info'); PK.UI.refreshPanel(true); }); return; }
+    Cz.decorar(x, y, L.decoTipo).then(ok => { if (ok) PK.UI.toast(Cz.decoDef(L.decoTipo).name + ' puesto.', 'good'); PK.UI.refreshPanel(true); });
+  }
+
   // pk-67: menú de construcción de cintas. Herramientas que se usan tocando una pieza: poner un nodo (unidor, divisor o
   // clasificador), mejorar el tramo al nivel elegido, girar, quitar, o elegir la red que se copia.
   I.abrirCintas = function (tool) {
@@ -454,12 +528,53 @@
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Cz = PK.Calzada;
       if (!W.inb(x, y)) return;
       if (!I.roadStart) {
-        if (!Cz.libre(x, y)) { PK.UI.toast('Ahí no va la Calzada Real: tierra de nadie o tuya, explorada, sin agua, zonas comunes, lugares ni edificios.', 'warn'); return; }
+        if (!Cz.libre(x, y)) { PK.UI.toast('Ahí no va la Calzada Real: ' + Cz.porQue(x, y) + '. Va en tierra de nadie, en la tuya o en las zonas comunes, explorada y libre.', 'warn'); return; }
         I.roadStart = [x, y]; PK.UI.toast('Toca dónde termina el tramo.', 'info'); return;
       }
       const tiles = Cz.plan(I.roadStart[0], I.roadStart[1], x, y);
       I.roadStart = [x, y]; r.roadGhost = null;
       Cz.construir(tiles).then(n => { if (n) PK.UI.toast('Calzada Real: ' + n + ' casillas (hoy ' + Cz.hoy() + ' de ' + Cz.tope() + ').', 'good'); PK.UI.refreshPanel(true); });
+      return;
+    }
+    if (L.tool === 'czdeco') { // pk-78
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty);
+      if (W.inb(x, y)) decorarEn(x, y);
+      return;
+    }
+    if (L.tool === 'qcamino') { // pk-78: dos toques, las esquinas de la zona
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty);
+      if (!W.inb(x, y)) return;
+      if (!I.roadStart) { I.roadStart = [x, y]; PK.UI.toast('Toca la otra esquina de la zona.', 'info'); PK.UI.refreshPanel(true); return; }
+      const ts = quitablesCamino(I.roadStart[0], I.roadStart[1], x, y);
+      I.roadStart = null; r.beltGhost = null;
+      if (!ts.length) { PK.UI.toast('No hay caminos ni Calzada que puedas quitar en esa zona.', 'info'); PK.UI.refreshPanel(true); return; }
+      let n = 0;
+      const cz = [];
+      for (const [a, b] of ts) { const k = W.idx(a, b); if (W.autopista[k]) cz.push([a, b]); if (W.road[k]) { L.removeRoad(a, b); n++; } }
+      const fin = m => { PK.UI.toast('Quitaste ' + [n ? n + (n === 1 ? ' casilla de camino' : ' casillas de camino') : '', m ? m + (m === 1 ? ' casilla de Calzada' : ' casillas de Calzada') : ''].filter(Boolean).join(' y ') + '. Vuelve la mitad del material.', 'good'); PK.UI.refreshPanel(true); };
+      if (cz.length) PK.Calzada.quitar(cz).then(fin); else fin(0);
+      return;
+    }
+    if (L.tool === 'mrecurso') { // pk-78: elegir (un toque en un recurso, o dos esquinas) y después a dónde
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Dz = PK.Despeje;
+      if (!W.inb(x, y)) return;
+      if (I.mover) {
+        const p = I.planMover;
+        if (!p || p.en[0] !== x || p.en[1] !== y) { moverEn(x, y); if (PK.UI.isTouch()) return; }
+        I.confirmarMover();
+        return;
+      }
+      if (!I.roadStart) {
+        const id = W.nodeAt[W.idx(x, y)], n = id >= 0 ? W.nodes[id] : null;
+        I.roadStart = [x, y];
+        PK.UI.toast(n && Dz.movible(n) ? 'Toca el mismo recurso para moverlo solo, u otra casilla para elegir todos los de la zona.' : 'Toca la otra esquina de la zona con los recursos que quieres mover.', 'info');
+        PK.UI.refreshPanel(true);
+        return;
+      }
+      const ns = Dz.movibles(I.roadStart[0], I.roadStart[1], x, y);
+      I.roadStart = null; r.beltGhost = null;
+      if (!ns.length) { PK.UI.toast('En esa zona no hay recursos que puedas mover.', 'info'); PK.UI.refreshPanel(true); return; }
+      I.empezarMover(ns);
       return;
     }
     if (L.tool === 'copiar') {
@@ -693,6 +808,7 @@
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
     else if (k === 'k') { if (PK.Cintas.HERR[PK.Logi.tool]) I.cancelTool(); else I.abrirCintas(); } // pk-67: menú de cintas
+    else if (k === 'j') { if (I.HERR_CAMINO[PK.Logi.tool]) I.cancelTool(); else I.abrirCaminos(); } // pk-78: menú de caminos
     else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido
     else if (k === 'm') PK.UI.toast(PK.Sfx.toggle() ? 'Sonido activado.' : 'Sonido silenciado.', 'info');
     else if (k === 'delete' && g.sel && g.sel.type === 'building') { const b = g.bById.get(g.sel.id); if (b) PK.UI.confirmDemolish(b); }

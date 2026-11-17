@@ -133,6 +133,26 @@
     G.uById.delete(u.id);
     if (G.sel && G.sel.type === 'unit' && G.sel.id === u.id) G.sel = null;
   };
+  // pk-78 (pedido del dueño: «si los creas ya no te puedes deshacer de ellos»). Despedir aldeanos: dejan su trabajo,
+  // lo que cargaban entra al pueblo (la carga nunca se pierde) y se van. No devuelve lo que costaron.
+  G.despedir = function (us) {
+    let n = 0;
+    for (const u of us) {
+      if (!u || u.owner !== 'p' || u.kind !== 'v' || !G.uById.get(u.id)) continue;
+      G.release(u);
+      const c = L0().cargaDe ? L0().cargaDe(u) : (u.carryRes && u.carry > 0 ? { [u.carryRes]: u.carry } : {});
+      const dev = {};
+      for (const k in c) if (c[k] >= 1 && D.RES[k]) dev[k] = Math.floor(c[k]);
+      if (Object.keys(dev).length) G.give(dev);
+      u.carry = 0; u.carryRes = null; u.carga = null;
+      if (PK.Render.burst && !G.offline) PK.Render.burst(u.x, u.y, null, 6);
+      G.removeUnit(u);
+      n++;
+    }
+    if (n) { G.baseSucia && G.baseSucia(); G.stat('despedidos', n); }
+    return n;
+  };
+  const L0 = () => PK.Logi || {};
   // Borra todo lo de un dueño (cuando un reino simulado pasa a ser un jugador real).
   G.clearOwner = function (owner, onlyBuildings) {
     for (const b of G.buildings.filter(o => o.owner === owner)) G.removeBuilding(b);
@@ -821,6 +841,17 @@
   G.scoutSight = () => D.SIGHT.scout + (G.lvl('cartography') >= 3 ? 1 : 0);
   G.scoutMax = () => best('scout', 'scouts');
   G.poiState = p => S.pois[p.id] || null;
+  // pk-78 (pedido del dueño): un campamento de bandidos que derrotaste o una mazmorra con todos sus pisos limpios deja de
+  // verse en TU mapa (los demás la siguen viendo) y tu Calzada Real puede pasarle por encima. La mazmorra se sigue
+  // repitiendo desde el Cuartel, como las que quedaron bajo tierra.
+  G.poiVencido = function (p) {
+    if (!p || !W.PISABLE || !W.PISABLE(p.kind)) return false;
+    const st = S.pois[p.id];
+    if (p.kind === 'camp') return !!(st && st.d);
+    const d = D.DUNGEON[p.kind], site = S.exp && S.exp.sites && S.exp.sites[p.id];
+    return !!(d && site && site.best >= d.floors);
+  };
+  G.vencidos = () => W.pois.filter(p => G.poiVencido(p)).map(p => p.id);
   G.poiTier = p => D.poiTier(U.dist(p.x + p.w / 2, p.y + p.h / 2, D.PLAYER_HOME[0], D.PLAYER_HOME[1]));
   G.explorePct = () => W.fogCount / (W.W * W.H);
 
