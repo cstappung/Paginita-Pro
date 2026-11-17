@@ -605,6 +605,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   delivering it to a store passes that much over the town cap (`Lb.poner(b, r, n, extra)`), because it already
   counted there. Before, with the town full or over the cap (rewards enter over it) the belt filled with 3 packets
   and stopped forever. Offline the same through `deBod`.
+- **A port only emits full packets** (pk-75, owner's report): `sacar` waits until the source has `D.CINTA.pila`
+  of that resource. Emitting whatever there was (1 to 16) let a port that dripped one unit at a time take a slot like
+  a full one, and the belt saturated while moving little. A workshop next to a store (`L.direct`) keeps one packet
+  in `outb` when a belt takes its output (`Ci.sacaDe`, memo per `armado`) and sends only the excess to the store;
+  otherwise it would never gather 16. Offline is a flow and does not round to packets.
 - **A store port draws from that building's shelves** (`Libro.inv(b)`). pk-71 made it draw from the whole town; the
   owner wants each store's own inventory, so pk-72 reverted it. **It ignores the workshop reserve** (pk-73, owner's
   call): a held workshop already stops producing, and a belt that also stopped below the reserve (15% of the cap)

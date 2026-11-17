@@ -1701,3 +1701,41 @@ test('pk-72: un divisor no manda a una rama lo que nadie de esa rama recibe, y l
     assert.ok(Ci.puedeSacar(boca.src, 'wood'), 'bajo la reserva la boca igual saca');
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+test('pk-75: una boca solo manda paquetes llenos, y el taller junto a una bodega le guarda uno a su cinta', () => {
+  const Ci = PK.Cintas, L = PK.Logi, Lb = PK.Libro, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, capDe0 = G.capDe, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice(), buf0 = L.bufCap;
+  G.stat = () => {}; G.cap = () => 1e9; G.capDe = () => 1e9; L.bufCap = () => 100000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  // aserradero → forja por la fila 41; bodega → bodega por la fila 51
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: PILA - 1 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
+  const a = mk(3, 'warehouse', 20, 50, { inv: { wood: PILA - 6 } }), b = mk(4, 'warehouse', 30, 50, { inv: {} });
+  G.buildings = [saw, forja, a, b]; G.bById = new Map(G.buildings.map(o => [o.id, o]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 6, res: { planks: 0, wood: PILA - 6 }, flags: {}, auto: { reserve: 0 }, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t;
+  try {
+    for (let x = 23; x <= 30; x++) t[W.idx(x, 41)] = { p: 'c', d: 0, n: 5, i: [] };
+    for (let x = 23; x <= 29; x++) t[W.idx(x, 51)] = { p: 'c', d: 0, n: 5, i: [] };
+    Ci.init(G.state);
+    const boca = Ci.carrilesEn(W.idx(23, 51))[0];
+    boca.pz.f = ['wood']; Ci.cambio();
+    const its = () => Object.values(t).flatMap(pz => pz.i);
+    for (let i = 0; i < 30; i++) Ci.update(0.1);
+    assert.equal(its().length, 0, 'con menos de un paquete no sale nada');
+    assert.equal(saw.outb.planks, PILA - 1);
+    assert.match(Ci.porQueNoSale(boca, 'wood'), /espera juntar 16 .*tiene 10/);
+    saw.outb.planks += 1; Lb.inv(a).wood += 6; G.state.res.wood += 6;
+    for (let i = 0; i < 3; i++) Ci.update(0.1);
+    assert.deepEqual(its().map(it => it[0] + 'x' + it[2]).sort(), ['planksx' + PILA, 'woodx' + PILA], 'salen llenos');
+    assert.equal(saw.outb.planks, 0); assert.equal(Lb.inv(a).wood || 0, 0);
+    // el taller junto a una bodega le deja un paquete a la cinta y manda a la bodega solo lo que sobra
+    assert.ok(Ci.sacaDe(saw), 'la cinta se lleva los tablones del aserradero');
+    saw.outb.planks = PILA + 5; G.state.res.planks = 0; saw.sinReserva = true; // (sin insumos: la reserva no viene al caso)
+    for (let i = 0; i < 40; i++) L.direct(saw, 0.1);
+    assert.ok(Math.abs(saw.outb.planks - PILA) < 1e-6, 'queda un paquete para la cinta (' + saw.outb.planks + ')');
+    assert.ok(Math.abs(G.state.res.planks - 5) < 1e-6);
+    forja.outb.ingots = 50;
+    assert.ok(!Ci.sacaDe(forja), 'sin cinta que se lleve su producción');
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});

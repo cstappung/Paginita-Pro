@@ -220,7 +220,9 @@
     if (m > 0) G().stat('belted', m);
     return Math.max(0, m);
   }
-  // Lo que da una boca de salida, por turnos (pz.rr): [recurso, cantidad] (un paquete de hasta PILA). null: nada.
+  // Lo que da una boca de salida, por turnos (pz.rr): [recurso, cantidad] (un paquete de PILA). null: nada.
+  // pk-75 (pedido del dueño): solo sale un paquete lleno. Antes salía lo que hubiera (de 1 a PILA) y una boca que
+  // goteaba de a 1 ocupaba la cinta igual que una de 16: se saturaba moviendo poco. Lo que va de a poco espera.
   function sacar(c) {
     const b = c.src, pz = c.pz, acepta = aceptaAbajo(c);
     if (c.motivo && c.motivo.startsWith('No sale nada')) c.motivo = null; // se vuelve a ver en cada intento
@@ -228,17 +230,17 @@
       const out = L().output(b);
       if (!acepta.has(out)) { c.motivo = nadieRecibe([out]); return null; } // nadie adelante lo recibe: no sale (se trabaría)
       if (!b.outb) b.outb = {};
-      const n = Math.min(PILA(), Math.floor(b.outb[out] || 0));
-      if (n >= 1) { b.outb[out] -= n; return [out, n]; }
-      return null;
+      if ((b.outb[out] || 0) < PILA()) return null;
+      b.outb[out] -= PILA();
+      return [out, PILA()];
     }
     const lista = opcionesFuente(c);
     if (lista.length && !lista.some(r => acepta.has(r))) { c.motivo = nadieRecibe(lista); return null; }
     for (let i = 0; i < lista.length; i++) {
       const j = ((pz.rr || 0) + i) % lista.length, r = lista[j];
       if (!acepta.has(r) || !disponible(b, r)) continue; // pk-70: solo lo que alguien de adelante recibe
-      const quiere = Math.min(PILA(), Math.floor(hayDe(b, r)));
-      const n = PK.Libro.esCampo(b) ? PK.Libro.sacarCampo(b, r, quiere) : PK.Libro.sacar(b, r, quiere);
+      if (hayDe(b, r) < PILA()) continue;
+      const n = PK.Libro.esCampo(b) ? PK.Libro.sacarCampo(b, r, PILA()) : PK.Libro.sacar(b, r, PILA());
       if (n < 1) continue;
       pz.rr = j + 1;
       return PK.Libro.esCampo(b) ? [r, n] : [r, n, 1]; // 1: salió de una bodega del pueblo
@@ -290,6 +292,7 @@
     if (!aceptaAbajo(c).has(r)) return 'adelante nadie recibe ' + nom + ' (la cinta no llega a un taller que lo use ni a una bodega)';
     if (L().isShop(b) || PK.Libro.esCampo(b)) return disponible(b, r) ? null : b.def.name + ' no tiene ' + nom + ' para dar';
     if ((PK.Libro.inv(b)[r] || 0) < 1) return b.def.name + ' no tiene ' + nom + ' en sus estantes (lo guardan otras bodegas)';
+    if (hayDe(b, r) < PILA()) return 'espera juntar ' + PILA() + ' para mandar un paquete lleno (tiene ' + Math.floor(hayDe(b, r)) + ')';
     return null;
   };
 
@@ -813,6 +816,19 @@
   Ci.alimenta = function (b) {
     rearmarSiHace();
     return carriles.some(c => c.outs.some(o => o.b === b));
+  };
+  // pk-75: una boca se lleva lo que hace este taller (el reparto directo a la bodega cercana le deja un paquete)
+  // (memo por armado: L.direct lo pregunta en cada cuadro por cada taller junto a una bodega)
+  let sacaMemo = new Map(), sacaArm = -1;
+  Ci.sacaDe = function (b) {
+    rearmarSiHace();
+    if (sacaArm !== armado) { sacaArm = armado; sacaMemo = new Map(); }
+    let v = sacaMemo.get(b.id);
+    if (v === undefined) {
+      const out = L().output(b);
+      sacaMemo.set(b.id, (v = carriles.some(c => c.src === b && aceptaAbajo(c).has(out))));
+    }
+    return v;
   };
   Ci.bocasDe = function (b) {
     rearmarSiHace();
