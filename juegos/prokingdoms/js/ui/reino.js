@@ -25,7 +25,116 @@
       Object.keys(D.DEF_PARTS).filter(k => b.parts[k] > 0).sort((x, y) => b.parts[y] - b.parts[x]).map(k => el('div', { class: 'g-row' },
         el('span', { class: 'small', style: { minWidth: '120px' } }, D.DEF_PARTS[k][0][0].toUpperCase() + D.DEF_PARTS[k][0].slice(1)),
         el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (mine ? 'green' : 'red'), style: { width: Math.round((b.parts[k] / total) * 100) + '%' } }), el('span', null, U.fmt(b.parts[k]) + ' · ' + Math.round((b.parts[k] / total) * 100) + ' %')))),
-      el('p', { class: 'small ' + (b.won ? 'good-t' : 'warn-t') }, b.cause));
+      el('p', { class: 'small ' + (b.won ? 'good-t' : 'warn-t') }, b.cause),
+      b.rep && b.rep.plan ? etapasEl(b) : null);
+  };
+  // pk-55: cómo fue el asedio, etapa por etapa, y «Ver de nuevo» (la repetición sale del plan guardado)
+  function etapasEl(b) {
+    const p = b.rep.plan, A = D.ASEDIO, hechas = {};
+    for (const e of p.etapas) hechas[e.id] = Object.assign({}, e, { dur: e.dur + (hechas[e.id] ? hechas[e.id].dur : 0) }); // G4: una etapa puede venir en tramos
+    const NA = { tactica: 'cambio de táctica', refuerzo: 'llegaron refuerzos', salida: 'salida de la guarnición', retirada: 'retirada', rendir: 'la parcela se rindió' };
+    return el('div', { class: 'bt-etapas' },
+      A.etapas.map((id, i) => {
+        const e = hechas[id];
+        const txt = !e ? 'no se llegó' : e.r < 1 ? 'sin defensas' : e.rota ? 'aquí se quebró el ataque (' + Math.round(e.f1 * 100) + ' %)' : D.asedioSuerte(e.suerte) + ' · ' + U.fmtTime(e.dur);
+        return el('div', { class: 'bt-et' + (!e ? ' no' : e.rota ? ' rota' : ' ok') }, el('b', null, (i + 1) + '. ' + A.nombres[id]), el('span', { class: 'small' }, ' ' + txt));
+      }),
+      p.acc && p.acc.length ? el('div', { class: 'small' }, 'Decisiones: ' + p.acc.map(x => NA[x.tipo] + ' (' + U.fmtTime(x.t) + ')').join(', ') + '.') : null,
+      PK.Frente ? el('div', { class: 'row' }, UI.btn('Ver de nuevo', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Terr.verRepeticion(b); }, { small: true, title: 'Repite la batalla en el mapa, acelerada' })) : null);
+  }
+  UI.frenteEl = function (f) {
+    const T = PK.Terr, e = T.estado(f), n = T.nombreFrente(f), A = D.ASEDIO;
+    const cp = f.mio === 'atk' ? PK.Game.state.terr.camps.find(c => 'c' + c.k === f.id) : null, ref = cp && cp.ref;
+    return el('div', { class: 'battle' },
+      el('b', null, n.titulo, el('span', { translate: 'no' }, n.otro)), el('span', { class: 'small' }, ' · etapa ' + (e.etapa + 1) + ' de 3: ' + A.nombres[e.id] + (f.plan.parcial ? ' · esta etapa termina en ' + U.fmtTime(e.queda) : ' · quedan aprox. ' + U.fmtTime(e.quedaTotal))),
+      el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Tu ímpetu' : f.mio === 'ver' ? 'Ímpetu del ataque' : 'Su ímpetu'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'green' : 'red'), style: { width: Math.round(e.impetu * 100) + '%' } }), el('span', null, Math.round(e.impetu * 100) + ' %'))),
+      el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Su resistencia' : f.mio === 'ver' ? 'Resistencia' : 'Tu resistencia'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'red' : 'green'), style: { width: Math.round(e.resistencia * 100) + '%' } }), el('span', null, Math.round(e.resistencia * 100) + ' %'))),
+      f.plan.tac && D.ASEDIO.tacticas[f.plan.tac] ? el('p', { class: 'small' }, 'Táctica del atacante: ', el('b', null, D.ASEDIO.tacticas[f.plan.tac].nombre), '.') : null,
+      ref ? el('p', { class: 'small' }, ref.ok ? 'Los refuerzos ya pelean.' : 'Refuerzos en camino: llegan en ' + U.fmtTime(Math.max(0, (ref.llega - Date.now()) / 1000)) + '.') : null,
+      el('div', { class: 'row' }, UI.btn('Ver la batalla', () => { UI.closeModal(); if (T.mode) T.toggle(false); T.verFrente(f.id); }, { small: true, cls: 'gold' }),
+        T.acciones(f).map(a => UI.btn(a.txt, () => UI.accionAsedio(f, a), { small: true, cls: a.peligro ? 'danger' : '', title: a.title }))));
+  };
+  // G4: una decisión del asedio. Las que no tienen vuelta atrás se confirman; los refuerzos abren el selector de tropas.
+  UI.accionAsedio = function (f, a) {
+    const T = PK.Terr;
+    if (a.tipo === 'refuerzo') {
+      UI.modal('refuerzo', 'Refuerzos para el asedio', body => {
+        const w = PK.Game.state.war, pk = armyPicker(w, 'rf-');
+        body.append(el('p', null, a.title), el('p', { class: 'small' }, 'Pelean con su oficio: jinetes y caballeros rinden más en la frontera, catapultas y ballesteros contra las defensas, lanceros, monjes y clérigos en el estandarte.'),
+          el('div', { class: 'row' }, pk.box),
+          el('div', { class: 'row' }, UI.btn('Enviar', () => { if (T.accion(f.id, a, pk.read())) UI.closeModal(); }, { cls: 'gold' }), UI.btn('Cancelar', () => UI.closeModal(), { small: true })));
+      });
+      return;
+    }
+    if (a.peligro && !confirm(a.txt + ': ' + a.title + '\n\n¿Seguro?')) return;
+    T.accion(f.id, a);
+  };
+  // G8: qué tropas llevar según la etapa que más pesa en la defensa de esa parcela (lo que dice el Mariscal)
+  UI.mezclaSugerida = function (parts) {
+    const A = D.ASEDIO, peso = A.etapas.map(id => A.partes[id].reduce((s, k) => s + (parts[k] || 0), 0)), i = peso.indexOf(Math.max(...peso));
+    const quien = [['caballeros y jinetes', 'rider'], [parts.walls > 0 ? 'arietes, catapultas y ballesteros' : 'catapultas y ballesteros (sin murallas, el ariete no rinde)', 'catapult'], ['lanceros, monjes y clérigos', 'spear']][i];
+    return 'lo más duro es ' + A.nombres[A.etapas[i]].toLowerCase() + ' (' + Math.round((peso[i] / Math.max(1, parts.total)) * 100) + ' % de su defensa): lleva ' + quien[0] + '.';
+  };
+  // G7: la Ciudadela del mundo, que sitian los gremios
+  UI.openCiudadela = function () {
+    UI.modal('ciud', D.CIUDADELA.nombre, body => {
+      const M = PK.Mundo, st = PK.Game.state, C = D.CIUDADELA, z = PK.Fort.ciudadela(), c = M && M.ciud;
+      const add = (...a) => body.append(...a.filter(Boolean));
+      add(el('p', null, 'Una fortaleza enorme en tierra de todos. Cada semana los gremios la sitian: cada miembro manda una campaña al día y su fuerza se suma al ímpetu de su gremio. El lunes la ocupa el gremio con más ímpetu: su estandarte ondea aquí toda la semana y sus miembros le venden al Mercado con un ' + Math.round(C.bono * 100) + ' % más de oro.'));
+      if (!PK.Net || !PK.Net.online) { add(el('p', { class: 'small warn-t' }, 'La Ciudadela solo se disputa en el mundo compartido (en línea).')); return; }
+      if (!c) { add(el('p', { class: 'small muted' }, 'Cargando…')); return; }
+      add(el('p', null, c.gname ? el('span', null, 'Esta semana la ocupa ', el('b', { translate: 'no' }, c.gname), M.ciudMia() ? ' (¡tu gremio!).' : '.') : 'Nadie la ocupa todavía.'),
+        el('p', { class: 'small muted' }, 'El asedio de esta semana termina en ' + U.fmtTime(Math.max(0, (c.fin - Date.now()) / 1000)) + '.'),
+        c.top.length ? el('ol', { class: 'rank' }, c.top.map(t => el('li', { class: st.guild && st.guild.id === t.gid ? 'me' : '' }, el('span', { translate: 'no' }, t.name), el('span', null, U.fmt(t.imp) + ' de ímpetu')))) : el('p', { class: 'small' }, 'Ningún gremio mandó tropas esta semana.'));
+      const hoy = D.semana(Date.now()) + ':' + new Date().toISOString().slice(0, 10);
+      const why = !st.guild || !st.guild.joined ? 'Únete a un gremio para sitiarla.' : st.era < C.era ? 'Sitiarla requiere la Era ' + U.roman(C.era) + '.' : M.hoy === hoy ? 'Ya mandaste tu campaña de hoy.' : null;
+      if (why) { add(el('p', { class: 'small warn-t' }, why)); }
+      else {
+        const pk = armyPicker(st.war, 'cd-');
+        add(el('p', { class: 'small' }, 'Pierdes el ' + Math.round(C.bajas * 100) + ' % de las tropas que mandes.'), el('div', { class: 'row' }, pk.box),
+          el('div', { class: 'row' }, UI.btn('Mandar campaña', async () => { if (await M.sitiarCiudadela(pk.read())) UI.rerender(); }, { cls: 'gold' })));
+      }
+      if (z) add(el('div', { class: 'row' }, UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(z.cx, z.cy); }, { small: true })));
+    });
+  };
+  // G7: el diario de guerra del mundo (lo que contó el servidor)
+  function diarioEl() {
+    const M = PK.Mundo, lista = (M && M.diario) || [];
+    if (!PK.Net || !PK.Net.online || !lista.length) return null;
+    return el('div', null, el('h3', null, 'Diario de guerra del mundo'),
+      lista.slice(0, 10).map(e => el('div', { class: 'raid-row' },
+        el('span', { class: 'small' }, el('b', { translate: 'no' }, e.deN), e.gano ? ' tomó una parcela de ' : ' no pudo con ', el('b', { translate: 'no' }, e.aN), ' · hace ' + U.fmtTime(Math.max(0, (Date.now() - e.at) / 1000))),
+        e.plan && PK.Frente ? UI.btn('Ver', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Terr.verRepeticion({ k: e.k, rep: { plan: e.plan, units: e.units, lado: e.lado || 0, de: e.de, a: e.a } }); }, { small: true }) : null)));
+  }
+  // G6: la ventana de una fortaleza
+  UI.openFort = function (id) {
+    UI.modal('fort', 'Fortaleza', body => {
+      const F = PK.Fort, T = PK.Terr, o = F.lista()[id], e = F.de(id), st = PK.Game.state, fo = F.ensure(), C = D.FORT;
+      const add = (...a) => body.append(...a.filter(Boolean));
+      add(el('p', null, el('b', null, o.nombre), ' · nivel ' + e.lvl + ' · ' + (e.mia ? 'es tuya' : 'en manos de ' + D.ENEMY[o.enemigo].name.toLowerCase())));
+      const fr = T.frentes().find(f => f.fort && f.fort.id === id);
+      if (fr) { add(UI.frenteEl(fr)); return; }
+      if (e.mia) {
+        add(el('p', { class: 'small' }, 'Tributo: ' + U.fmt(C.tributo(st.era, e.lvl)) + ' de oro por día. Cada ' + C.contra[0] + ' a ' + C.contra[1] + ' días una hueste viene a recuperarla y la defiendes con sus muros y tu ejército en casa (' + U.fmt(F.defensa(id).total) + ' de defensa ahora). Si la pierdes, vuelve un nivel más fuerte.'),
+          fo.asalto && fo.asalto.id === id ? el('div', { class: 'alert' }, 'Una hueste viene en camino: llega en ' + U.fmtTime(Math.max(0, (fo.asalto.at - Date.now()) / 1000)) + ' con una fuerza de aprox. ' + U.fmt(fo.asalto.power) + '.') : el('p', { class: 'small muted' }, 'Próximo intento de recuperarla: en ' + U.fmtTime(Math.max(0, (e.prox - Date.now()) / 1000)) + '.'),
+          el('h3', null, e.bono ? 'Bono elegido' : 'Elige su bono'),
+          el('div', { class: 'row' }, Object.keys(C.bonos).map(b => UI.btn(C.bonos[b].nombre, () => { F.elegirBono(id, b); UI.rerender(); }, { small: true, cls: e.bono === b ? 'gold' : '', title: C.bonos[b].txt }))),
+          e.bono ? el('p', { class: 'small' }, C.bonos[e.bono].txt + ' Puedes cambiarlo cuando quieras.') : el('p', { class: 'small warn-t' }, 'Todavía no elegiste: la fortaleza no da bono hasta que elijas.'));
+      } else {
+        const why = F.puedeSitiar(id), w = st.war, fz = F.fuerza(id);
+        add(el('p', { class: 'small' }, D.ENEMY[o.enemigo].desc),
+          el('p', { class: 'small' }, 'Fuerza de la guarnición: aprox. ' + U.fmt(fz) + '. Tu ejército en casa vale ' + U.fmt(F.fuerzaContra(id, w.army)) + ' contra ' + D.ENEMY[o.enemigo].name.toLowerCase() + '.'),
+          el('div', { class: 'row' }, el('b', null, 'Botín si la tomas: '), UI.costEl(C.botin(st.era, e.lvl), 1, true)),
+          el('p', { class: 'small' }, 'Es un asedio de tres etapas (la empalizada, la torre del homenaje y el estandarte), como una conquista, pero contra monstruos: cuentan los bonos de tus tropas contra ese enemigo. No cuesta recursos, solo las tropas que caigan. Tomada, te da un tributo diario y un bono a elección.'));
+        if (fo.sitio) add(el('p', { class: 'small muted' }, fo.sitio.phase === 'go' ? 'Tus tropas marchan a ' + F.lista()[fo.sitio.id].nombre + ': llegan en ' + U.fmtTime(Math.max(0, (fo.sitio.arrive - Date.now()) / 1000)) + '.' : 'Tus tropas vuelven del sitio.'));
+        if (why) { add(el('p', { class: 'small warn-t' }, why)); }
+        else {
+          const pk = armyPicker(w, 'ft-');
+          add(el('div', { class: 'row' }, pk.box), el('div', { class: 'row' }, UI.btn('Sitiar', () => { if (F.sitiar(id, pk.read())) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' })));
+        }
+      }
+      add(el('div', { class: 'row' }, UI.btn('Ver en el mapa', () => { UI.closeModal(); if (T.mode) T.toggle(false); PK.Render.centerOn(o.cx, o.cy); }, { small: true })));
+    });
   };
   UI.openTerritory = function () {
     UI.modal('terr', 'Territorio', body => {
@@ -39,14 +148,17 @@
       body.append(el('h3', null, 'Cómo funciona'), el('ul', { class: 'info' },
         el('li', null, 'El mapa se divide en parcelas de 8x8. Solo puedes construir en las tuyas (los campamentos de acopio también van en tierra de nadie).'),
         el('li', null, 'Reclamar una parcela libre que toque tu territorio cuesta recursos, cada vez un poco más.'),
+        el('li', null, 'Una conquista es un asedio de tres etapas que dura unos minutos y se ve en el mapa: la frontera (la milicia y las parcelas vecinas), las defensas (torres y murallas) y el estandarte (la guarnición). La parcela se va tiñendo con tu avance y solo cambia de dueño cuando cae el estandarte.'),
         el('li', null, 'Conquistar una parcela de otro reino es caro a propósito: la campaña se paga aunque pierdas. Si ganas traes botín y pierdes del 12% al 30% de las tropas (menos cuanto más fuerte vayas); si pierdes, del 70% al 80%.'),
         el('li', null, 'Defender es fácil: la defensa cuenta x1,5 en casa y +25% por cada parcela propia alrededor. Las torres y el Centro Urbano cercanos suman mucho.'),
+        el('li', null, 'Una de cada cuatro parcelas es una comarca (en el mapa de territorio se ve su ícono): ' + Object.keys(D.COMARCAS).map(c => D.COMARCAS[c].icono + ' ' + D.COMARCAS[c].nombre).join(', ') + '. Toca la parcela para ver qué da. El Fuerte fronterizo defiende todo lo que tenga a 2 parcelas.'),
         el('li', null, 'El corazón de cada reino (las parcelas junto a su Centro Urbano) nunca se puede conquistar. Lo que había en una parcela perdida se desarma y se devuelve completo.'),
         el('li', null, 'Los reinos muy avanzados no pueden atacar a los nuevos: hace falta estar a menos de 2 eras y que el otro tenga al menos la mitad de tu poder.')));
       if (tr.camps.length) {
         body.append(el('h3', null, 'Campañas'));
         for (const c of tr.camps) {
           const info = T.realmInfo(c.slot);
+          if (c.phase === 'asedio') { const f = T.frente('c' + c.k); if (f) body.append(UI.frenteEl(f)); continue; }
           body.append(el('div', { class: 'exp' }, (c.phase === 'go' ? 'Marchando contra ' : 'Regresando de ') + (info ? info.realm : '?') + ' · ' + U.fmtTime(Math.max(0, ((c.phase === 'go' ? c.arrive : c.back) - now) / 1000)),
             UI.btn('Ver', () => { UI.closeModal(); const [x, y] = T.center(c.k); PK.Render.centerOn(x, y); PK.Terr.toggle(true); }, { small: true })));
         }
@@ -61,9 +173,27 @@
         body.append(el('h3', null, 'Últimas batallas'));
         for (const b of tr.battles.slice(0, 4)) body.append(UI.battleEl(b));
       }
+      // G3: asedios entre jugadores que no son campañas tuyas (te asedian a ti, o los ves de lejos)
+      const ajenos = T.frentes().filter(f => f.id[0] === 'r');
+      if (ajenos.length) {
+        body.append(el('h3', null, 'Asedios en el mundo'));
+        for (const f of ajenos) body.append(UI.frenteEl(f));
+      }
       if (tr.threats.length) {
         body.append(el('h3', null, 'Amenazas'));
-        for (const th of tr.threats) body.append(el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + ').'));
+        for (const th of tr.threats) {
+          const f = th.plan ? T.frente('t' + th.k) : null;
+          body.append(f ? UI.frenteEl(f) : el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + '). ',
+            UI.btn('Pagar tributo', () => T.pagarTributo(th), { small: true, title: 'Su hueste se vuelve sin pelear' }), ' ', UI.costEl({ gold: T.tributoDe(th) })));
+        }
+      }
+      const dg = diarioEl(); if (dg) body.append(dg);
+      if (PK.Net && PK.Net.online && PK.Fort && PK.Fort.ciudadela()) body.append(el('div', { class: 'row' }, UI.btn(PK.Fort.tituloCiudadela(), () => UI.openCiudadela(), { small: true, cls: 'gold' })));
+      // G6: las fortalezas que ya viste
+      const forts = PK.Fort ? PK.Fort.lista().filter(o => T.explored(o.k)) : [];
+      if (forts.length) {
+        body.append(el('h3', null, 'Fortalezas'));
+        for (const o of forts) body.append(el('div', { class: 'raid-row' }, el('b', null, o.nombre), el('span', { class: 'small muted' }, ' ' + PK.Fort.titulo(o).split(' · ').slice(1).join(' · ')), UI.btn('Abrir', () => UI.openFort(o.id), { small: true })));
       }
       const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]);
       if (realms.length) {
@@ -71,18 +201,29 @@
         for (const b of realms) {
           const info = T.realmInfo(b.slot), why = D.canConquer(T.myInfo(), info);
           body.append(el('div', { class: 'raid-row' }, el('span', { class: 'swatch', style: { background: 'rgb(' + b.color.join(',') + ')' } }), el('b', null, b.realm), b.human ? el('span', { class: 'tag' }, 'jugador') : null,
-            el('span', { class: 'small muted' }, ' Era ' + U.roman(info.era) + ' · ' + W.countParcels(b.slot) + ' parcelas · ' + (why ? why : 'se puede atacar en su frontera'))));
+            el('span', { class: 'small muted' }, ' Era ' + U.roman(info.era) + ' · ' + W.countParcels(b.slot) + ' parcelas · ' + (why ? why : 'se puede atacar en su frontera')),
+            caminoEl(b.slot)));
         }
       }
     }, { wide: true });
   };
 
+  // pk-55: cuánto falta para tocar la frontera de ese reino (solo se ataca una parcela que toque tu tierra)
+  function caminoEl(slot) {
+    const c = PK.Terr.caminoA(slot);
+    if (!c) return el('span', { class: 'small muted' }, ' · sin camino por tierra libre');
+    if (!c.n) return el('span', { class: 'small good-t' }, ' · ya tocas su frontera');
+    return el('span', { class: 'small' }, ' · te ' + (c.n === 1 ? 'falta 1 parcela' : 'faltan ' + c.n + ' parcelas') + ' para tocar su frontera ',
+      UI.btn('Marcar el camino', () => { UI.closeModal(); PK.Terr.marcarCamino(slot); }, { small: true, title: 'Resalta en el mapa las parcelas libres que te acercan' }));
+  }
   UI.openParcel = function (k) {
     UI.modal('parcel', 'Parcela', body => {
       const add = (...a) => body.append(...a.filter(Boolean));
       const T = PK.Terr, g = G(), st = S(), owner = W.ownerOfParcel(k), slot = W.terr[k] - 1;
       const [cx, cy] = T.center(k);
       if (W.terrCommon[k]) { add(el('p', null, 'Zona común: es de todos y nunca tendrá dueño. Cualquiera puede recolectar aquí.')); return; }
+      const cm = T.comarca(k); // G5
+      if (cm) add(el('div', { class: 'comarca' }, el('b', null, cm.icono + ' Comarca: ' + cm.nombre), el('span', { class: 'small' }, ' · ' + cm.txt + ' Conquistarla da un 50 % más de botín.')));
       if (!owner) {
         const why = T.canClaim(k);
         add(el('p', null, 'Tierra libre.'), el('div', { class: 'row' }, el('b', null, 'Reclamar: '), UI.costEl(T.claimCost())),
@@ -90,7 +231,8 @@
           el('div', { class: 'row' }, UI.btn('Reclamar parcela', () => { T.claim(k); UI.closeModal(); }, { cls: 'gold', disabled: !!why })));
         return;
       }
-      const last = T.lastBattle(k);
+      const last = T.lastBattle(k), fr = T.frentes().find(f => f.k === k);
+      if (fr) { add(el('p', null, 'Esta parcela está en disputa: hay un asedio en curso y no cambia de dueño hasta que termine.'), UI.frenteEl(fr)); return; }
       if (owner === 'p') {
         const def = T.defenseOf(k, D.MY_SLOT);
         add(el('p', null, 'Es tuya.' + (W.isCore(k, D.MY_SLOT) ? ' Es el corazón de tu reino: nadie la puede conquistar.' : '')),
@@ -98,6 +240,7 @@
           last ? el('h3', null, 'Última batalla aquí') : null, last ? UI.battleEl(last) : null);
         return;
       }
+      if (st.flags.guiaGuerra === 2) { st.flags.guiaGuerra = 3; UI.toast('Tobías: «Eso es: su defensa y de dónde sale. Si la etapa más dura son las defensas, lleve catapultas; si es el estandarte, lanceros.»', 'info'); } // G8
       const info = T.realmInfo(slot), def = T.defenseOf(k, slot), why = T.canAttack(k), cost = T.campaignCost(k), w = st.war, rv = T.revenge(k), retake = T.retakeLeft(k);
       add(el('p', null, el('b', null, info.realm), info.human ? ' (jugador)' : '', ' · Era ' + U.roman(info.era)),
         rv ? el('div', { class: 'alert' }, T.revengeText(rv) + '. Te quitó esta parcela: recupérala a mitad de precio, aunque esté en tregua.') : null,
@@ -109,9 +252,13 @@
         el('p', { class: 'small warn-t' }, 'Si ganas pierdes entre el 12% y el 30% de las tropas que mandes (menos cuanto más fuerte llegues); si pierdes, entre el 70% y el 80%.'),
         last ? el('h3', null, 'Última batalla aquí') : null, last ? UI.battleEl(last) : null);
       if (why) { add(el('p', { class: 'small warn-t' }, why)); return; }
-      const pk = armyPicker(w, 'cq-');
+      const pk = armyPicker(w, 'cq-'), TA = D.ASEDIO.tacticas;
+      const tacSel = el('select', { id: 'cq-tac', title: 'Se puede cambiar una vez durante el asedio' }, el('option', { value: '' }, 'Sin táctica: ritmo normal'), Object.keys(TA).map(t => el('option', { value: t }, TA[t].nombre + ': ' + TA[t].txt)));
       add(el('div', { class: 'row' }, pk.box),
-        el('div', { class: 'row' }, UI.btn('Lanzar campaña', () => { if (T.attack(k, pk.read())) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' }), UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(cx, cy); }, { small: true })));
+        el('div', { class: 'row' }, el('b', null, 'Táctica: '), tacSel),
+        PK.Consejo && PK.Consejo.activo('mariscal') ? el('p', { class: 'small good-t' }, 'El Mariscal: ' + UI.mezclaSugerida(T.defenseParts(k, slot))) : null,
+        el('p', { class: 'small' }, 'Cada tropa tiene su oficio: jinetes y caballeros rinden más en la frontera; catapultas, ballesteros, arietes (si hay murallas) y torres de asedio contra las defensas (los arqueros, menos); lanceros, monjes y clérigos en el estandarte. Durante el asedio puedes cambiar de táctica, mandar refuerzos o retirarte.'),
+        el('div', { class: 'row' }, UI.btn('Lanzar campaña', () => { if (T.attack(k, pk.read(), tacSel.value || null)) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' }), UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(cx, cy); }, { small: true })));
     });
   };
 

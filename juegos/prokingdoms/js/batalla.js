@@ -30,6 +30,9 @@
     archer: { hp: 0.7, dps: 1, alcance: 6, vel: 1.5, fila: 3.4, dispara: 'flecha' },
     cleric: { hp: 0.8, dps: 0.8, alcance: 3.5, vel: 1.3, fila: 4.4, dispara: 'luz', cura: 0.22 },
     catapult: { hp: 0.6, dps: 1, alcance: 9.5, vel: 0.8, fila: 1.6, dispara: 'piedra', area: 1.3, cd: 3 },
+    // G5: las máquinas de asedio fuera de un asedio: lentas, de cerca y con poca pegada
+    ariete: { hp: 1.4, dps: 0.7, alcance: 0.9, vel: 0.8, fila: 6.6, herr: 'hammer' },
+    torreAsedio: { hp: 1.6, dps: 0.6, alcance: 0.9, vel: 0.7, fila: 6.4, herr: 'hammer' },
     // Fase 4 (pk-21). flanco: busca a los tiradores enemigos, como los lobos; cura: los monjes curan poco y de cerca.
     rider: { hp: 1.15, dps: 1.05, alcance: 0.9, vel: 3, fila: 7.4, herr: 'spear', flanco: true },
     crossbow: { hp: 0.8, dps: 1, alcance: 7, vel: 1.1, fila: 2.8, dispara: 'virote', cd: 1.6, pesado: 1.6 },
@@ -1188,7 +1191,7 @@
     if (B.ext.sprite && (a.barco || a.mar)) { const s2 = B.ext.sprite(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe' && D.temaActivo === 'mar' && B.ext.heroe) { const s2 = B.ext.heroe(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe') return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
-    if (f.lado === 'p') return f.tipo === 'catapult' ? Sp.cart(COL_MIOS, 'stone', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
+    if (f.lado === 'p') return f.tipo === 'catapult' || (D.ARMY[f.tipo] || {}).maquina ? Sp.cart(COL_MIOS, f.tipo === 'catapult' ? 'stone' : 'wood', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
     if (a.spr === 'lobo') return Sp.wolf[f.flip ? 1 : 0][(modo === 'walk' || modo === 'work' ? Math.floor(f.anim * 10) : 0) % Sp.wolf[0].length];
     if (a.spr === 'oso') return PK.Fauna ? fauna('oso', modo === 'idle' ? -1 : Math.floor(f.anim * 6) % 6, f.flip) : osoDe()[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'walk' ? 5 : 1)) % 2];
     if (a.spr === 'golem') return PK.Fauna ? fauna('golem' + (a.tinte ? 'F' : ''), Math.floor(f.anim * (modo === 'idle' ? 2 : 5)) % 6, f.flip) : golemDe(!!a.tinte)[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'idle' ? 1 : 3)) % 2];

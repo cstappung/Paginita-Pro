@@ -553,6 +553,8 @@
     else if (it.k === 'node') g.sel = { type: 'node', id: it.o.id };
     else if (it.k === 'poi') g.sel = { type: 'poi', id: it.o.id };
     else if (it.k === 'cap') { PK.Campana.openLugar(it.o.n); return; }
+    else if (it.k === 'fort') { PK.UI.openFort(it.o.id); return; } // G6
+    else if (it.k === 'ciud') { PK.UI.openCiudadela(); return; } // G7
     else if (it.k === 'belt') g.sel = { type: 'belt', id: W.idx(it.x, it.y) }; // pk-58: la casilla de la pieza
     else if (it.k === 'puente') g.sel = { type: 'belt', id: it.o.k };
     else if (it.k === 'wall') g.sel = { type: 'wall', id: it.o.k };

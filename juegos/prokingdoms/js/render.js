@@ -487,6 +487,7 @@
       ctx.stroke(); ctx.setLineDash([]);
     }
     if (!PK.Terr.mode) drawTerritory(ctx, vx0, vy0, vw, vh);
+    if (PK.Frente) PK.Frente.suelo(ctx, vis); // pk-55: el avance de cada asedio, teñido en el suelo
 
     const sel = g.sel;
     const selUnits = sel && sel.type === 'units' ? new Set(sel.ids) : null;
@@ -605,6 +606,8 @@
     // soldados: guarnición del Cuartel, columnas en marcha y peleas (troops.js)
     if (PK.Troops) PK.Troops.collect(list, dt, vis);
     if (PK.Incursiones) PK.Incursiones.collect(list, dt, vis); // bandidos y tropas que salen a pelear
+    if (PK.Fort && !g.enMar()) PK.Fort.collect(list, vis); // G6: las fortalezas
+    if (PK.Frente) PK.Frente.collect(list, dt, vis); // pk-55: los dos bandos de cada asedio (frente.js)
 
     // capa plana: granjas y marcas de selección
     for (const [a, ax, ay] of aprons) ctx.drawImage(a.c, ax, ay);
@@ -970,6 +973,8 @@
           poly(quad(x0 + 0.4, y0 + 0.4, x0 + PS - 0.4, y0 + PS - 0.4)); ctx.stroke(); ctx.setLineDash([]);
         }
         if (o && W.isCore(k, W.terr[k] - 1)) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; poly(quad(x0 + 2, y0 + 2, x0 + PS - 2, y0 + PS - 2)); ctx.fill(); }
+        const cm = W.rasgoDe && D.COMARCAS[W.rasgoDe(k)]; // G5: la comarca, con su ícono en el centro
+        if (cm) { const [ix, iy] = R.iso(x0 + PS / 2, y0 + PS / 2); ctx.save(); ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(20,14,8,0.55)'; ctx.beginPath(); ctx.arc(ix, iy, 13, 0, 6.3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(cm.icono, ix, iy + 1); ctx.restore(); }
       }
       if (!o) continue;
       // borde hacia afuera, un poco hacia adentro para que dos reinos vecinos se vean los dos
@@ -986,6 +991,11 @@
       ctx.stroke();
       if (pg >= 0) ctx.setLineDash([]);
     }
+    if (mode && T.marca) { // pk-55: el camino de parcelas libres hacia la frontera de un vecino
+      ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.strokeStyle = 'rgba(255,214,90,0.95)'; ctx.fillStyle = 'rgba(255,214,90,0.22)';
+      for (const k of T.marca) { if (W.terr[k]) continue; const x0 = (k % P) * PS, y0 = Math.floor(k / P) * PS; poly(quad(x0 + 0.5, y0 + 0.5, x0 + PS - 0.5, y0 + PS - 0.5)); ctx.fill(); ctx.stroke(); }
+      ctx.setLineDash([]);
+    }
     if (mode && T.sel !== null && T.sel !== undefined) {
       const x0 = (T.sel % P) * PS, y0 = Math.floor(T.sel / P) * PS;
       ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,240,170,0.95)';
@@ -994,6 +1004,7 @@
     // campañas en curso: banderas rojas sobre la parcela
     const st = G().state;
     if (st && st.terr) for (const c of st.terr.camps) {
+      if (c.phase === 'asedio' && PK.Frente) continue; // pk-55: durante el asedio lo dibuja frente.js
       const [cx, cy] = PK.Terr.center(c.k), [px, py] = R.iso(cx, cy);
       ctx.fillStyle = '#3a2a1a'; ctx.fillRect(Math.round(px), Math.round(py) - 18, 1, 18);
       ctx.fillStyle = c.phase === 'go' ? '#d83a2a' : '#888'; ctx.fillRect(Math.round(px) + 1, Math.round(py) - 18, 7, 5);
@@ -1229,6 +1240,8 @@
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
     if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
+    if (PK.Fort) PK.Fort.minimapa(ctx, toMM); // G6
+    if (PK.Frente) PK.Frente.minimapa(ctx, toMM); // pk-55: parcelas bajo asedio
     if (PK.Mundo) PK.Mundo.minimapa(ctx, toMM); // S2
     if (PK.Mar) PK.Mar.minimapa(ctx, toMM); // Fase 9: el Galeón
     if (PK.Campana && G().state && G().state.campana) { // el lugar del capítulo en curso: un punto rojo y dorado que late
