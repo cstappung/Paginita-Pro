@@ -571,3 +571,26 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - `amenazaDe` must look for the threat **with a plan**: a second threat can be on its way to the same parcel.
 - Bots never decide; offline nothing is chosen. Not done from the plan's G4: asking allies for help, and the drawing
   of the reinforcement column / the retreat (a banner over the battle announces each decision instead).
+
+### War plan, G5: comarcas, Fuerte, siege machines (`pk-62`, `D.PROTO` 11)
+
+- **`D.PROTO` went 10 → 11** (new building `fuerte`, new troops `ariete`, `torreAsedio`): publish the page and run
+  `firebase deploy --only functions` together, or players get «El servidor se está actualizando» in between.
+- **Comarcas** (`D.COMARCAS`, `W.rasgoDe(k)` in `world.js`): one in four parcels that are neither a realm's core nor
+  a common zone has a trait, from its own rng (`D.SEED + 6151`, always two rolls per parcel: do not reorder them or
+  every trait in the world moves). Vega (farms inside +15 %), Bosque viejo (wood +10 %), Cantera vieja (mining
+  +10 %), Cerro (parcel defence ×1.3, for whoever owns it, client and server), Santuario (+3 ánimo, 2 at most).
+  Gathering bonuses are the `extra` of `Vida.recoleccion` (inside `D.VIDA_TOPE`, so the server's `LIM.vida` still
+  holds) and count where the villager works / where the farm stands, only on your own parcel (`G.comarca`).
+  Conquering one gives ×1.5 loot. The plan's «Cruce» (cart speed) was left out: `L.factor` feeds cached route times.
+- **Fuerte fronterizo**: counts in `parcelDefenseParts` like a tower, but each tower entry now carries its radius
+  (`[x, y, defensa, radio]`, 9 for towers, `D.FUERTE_RADIO` for the fort; full inside, half up to twice). It is in
+  `Soc.defense`, `T.defenseParts`, and the server's `towerDefense` (so `defMax`) and `parcelDefense`: a new
+  defensive building must be added to all four.
+- **Siege machines** have `maquina: true` in `D.ARMY`: drawn as a cart wherever the catapult is
+  (`frente.js`, `batalla.js`, `troops.js`), with weak stats in `batalla.js` `TROPA` (a test requires an entry per
+  troop). The ram is ×3 in the defences stage only if the parcel has walls (`asedioOficio(units, muros)`); a siege
+  tower in the host takes 5 points off the losses (`plan.torre`).
+- Not measured: the pace with the autopilot before/after (the plan asks comarcas to move it under 5 %).
+- `tools/cheat-test.js`: its one failing check («la cuenta honesta…») is the Calzada Real part of the test (24 of
+  the honest account's tiles are refused as invalid), from before the war plan.

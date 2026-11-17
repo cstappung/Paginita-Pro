@@ -193,3 +193,47 @@ test('G4: lo que viaja a los jugadores no trae con qué recalcular el plan', () 
   for (const k of ['res', 'rb', 'atkR', 'm']) assert.equal(v[k], undefined, k + ' no viaja');
   assert.ok(v.acc.length === 1 && v.tac === 'cerco', 'sí viajan la táctica y las decisiones tomadas');
 });
+
+// ---------- G5: comarcas, Fuerte fronterizo y máquinas de asedio ----------
+test('G5: las comarcas salen de la semilla del mundo, nunca en un corazón ni en zona común', () => {
+  const w2 = {}, c2 = vm.createContext({ window: w2, console, URLSearchParams, location: { search: '' } });
+  for (const f of ['util.js', 'data.js', 'world.js']) vm.runInContext(JS(f), c2, { filename: f });
+  const W = w2.PK.World, D2 = w2.PK.D;
+  if (W.generate && !W.terrCommon) W.generate();
+  const N = W.PW * W.PW, cuenta = {};
+  let n = 0;
+  for (let k = 0; k < N; k++) {
+    const c = W.rasgoDe(k);
+    if (!c) continue;
+    n++; cuenta[c] = (cuenta[c] || 0) + 1;
+    assert.ok(D2.COMARCAS[c], 'rasgo conocido');
+    assert.ok(!W.terrCommon[k] && !D2.REALM_SLOTS.some((s, i) => W.isCore(k, i)), 'ni zona común ni corazón de un reino');
+  }
+  assert.ok(n > N * 0.1 && n < N * 0.3, 'más o menos una de cada cuatro de las que pueden (' + n + ' de ' + N + ')');
+  assert.equal(Object.keys(cuenta).length, Object.keys(D2.COMARCAS).length, 'hay de todos los rasgos');
+  assert.equal(W.rasgoDe(5), W.rasgoDe(5));
+});
+
+test('G5: el Fuerte defiende a 2 parcelas y las torres como antes', () => {
+  const base = { era: 3, px: 5, py: 5, army: 100, walls: 0, around: 0 }, cx = 5.5 * D.PARCEL, cy = 5.5 * D.PARCEL;
+  const con = t => D.parcelDefenseParts(Object.assign({ towers: t }, base)).towers;
+  assert.equal(con([[cx + 8, cy, 100]]), 100, 'torre cerca: entera');
+  assert.equal(con([[cx + 12, cy, 100]]), 50, 'torre a media distancia: la mitad');
+  assert.equal(con([[cx + 20, cy, 100]]), 0, 'torre lejos: nada');
+  assert.equal(con([[cx + 15, cy, 100, D.FUERTE_RADIO]]), 100, 'Fuerte a casi 2 parcelas: entero');
+  assert.equal(con([[cx + 28, cy, 100, D.FUERTE_RADIO]]), 50);
+  assert.equal(con([[cx + 40, cy, 100, D.FUERTE_RADIO]]), 0);
+  assert.ok(D.BUILD.fuerte && D.BSTATS.fuerte(1).defense > D.BSTATS.tower(1).defense * 3 && D.BUILD_ORDER.includes('fuerte'));
+  assert.equal(D.BUILD.fuerte.max(3), 2);
+});
+
+test('G5: el ariete solo rinde con murallas y la torre de asedio ahorra tropas', () => {
+  assert.ok(D.ARMY.ariete.maquina && D.ARMY.torreAsedio.maquina);
+  const h = { militia: 100, ariete: 10 };
+  assert.ok(D.asedioOficio(h, true)[1] > D.asedioOficio(h, false)[1] && D.asedioOficio(h, false)[1] === 1, 'sin murallas el ariete no suma');
+  assert.ok(D.asedioOficio({ militia: 100, torreAsedio: 5 }, false)[1] > 1);
+  const o = { atk: PARTES.total * 1.3, parts: PARTES, semilla: 21 };
+  const sin = D.asedioPlan(Object.assign({ units: { militia: 200 } }, o)), con = D.asedioPlan(Object.assign({ units: { militia: 200, torreAsedio: 1 } }, o));
+  assert.ok(con.torre && con.bajas < sin.bajas, 'con torre de asedio caen menos');
+  assert.equal(D.PROTO, 11, 'tipos nuevos de edificio y de tropa: sube el protocolo');
+});

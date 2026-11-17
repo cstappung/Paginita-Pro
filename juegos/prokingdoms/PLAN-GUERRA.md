@@ -27,7 +27,13 @@
     frontera (en vez de un 15 % a la milicia); no se hizo «pedir ayuda» a los aliados; la columna de refuerzos y la
     retirada no tienen dibujo propio (sale un cartel sobre la batalla); el oficio es una ventaja leve para huestes
     con especialistas, no un reparto neutro. Necesita `firebase deploy --only functions` (ruta nueva `/api/asedio`).
-  - Sigue G5 (comarcas, Fuerte fronterizo y máquinas de asedio), que sí sube `D.PROTO`.
+  - **G5:** hecha en `pk-62` (que además integra la Fase C3 de cintas de la rama principal). `D.PROTO` subió a 11:
+    hay que publicar y desplegar la función juntos. Comarcas con cinco rasgos (Vega, Bosque viejo, Cantera vieja,
+    Cerro, Santuario), Fuerte fronterizo, ariete y torre de asedio, regla del Asesor. Diferencias con el texto: no se
+    hizo el rasgo «Cruce»; el Cerro no da alcance extra a las torres en vivo; las máquinas se dibujan como un carro
+    (no tienen modelo propio en `vehiculos.js`) y el Fuerte no es todavía la pieza de la etapa 2 en el dibujo; la
+    torre de asedio quita 5 puntos de bajas al asedio entero; no se corrió el piloto antes y después.
+  - Sigue G6 (fortalezas y amenazas visibles).
 
 ---
 

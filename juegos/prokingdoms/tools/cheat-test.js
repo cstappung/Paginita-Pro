@@ -188,7 +188,7 @@ async function main() {
     const log = fs.existsSync(path.join(DATA, 'sospechas.log')) ? fs.readFileSync(path.join(DATA, 'sospechas.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
     const kinds = [...new Set(log.map(e => e.kind))];
     check(['foto', 'murallas', 'autopista', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
-    check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro');
+    check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro', JSON.stringify(log.filter(e => e.name === 'Honesta').slice(0, 2)).slice(0, 400));
   } finally {
     srv.kill();
     await wait(200);

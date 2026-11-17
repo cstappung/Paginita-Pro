@@ -112,6 +112,17 @@
       if (lleno) return { id: 'campoLleno', prioridad: 63, texto: lleno.def.name + ' está lleno y ' + (lleno.type === 'colonia' ? 'ninguna barcaza' : 'ningún carromato') + ' lo vacía: sus aldeanos esperan.', acciones: [{ label: 'Ruta de carromato', fn: cerrarY(() => { PK.UI.selectBuilding(lleno); }) }, { label: 'Logística', fn: cerrarY(() => PK.UI.openLogistics()) }] };
       return null;
     },
+    // G5 (pk-62): una comarca libre junto a tu frontera que ya puedes pagar
+    () => {
+      const T = PK.Terr, W = PK.World;
+      if (!T || !W.rasgoDe || !G().canAfford(T.claimCost(), 1.5)) return null;
+      for (let k = 0; k < W.terr.length; k++) {
+        if (!W.rasgoDe(k) || W.terr[k] || T.canClaim(k) !== null) continue;
+        const c = T.comarca(k);
+        return { id: 'comarca', prioridad: 30, texto: 'Hay una comarca libre junto a tu frontera: ' + c.nombre + '. ' + c.txt, acciones: [{ label: 'Ver', fn: cerrarY(() => { const [x, y] = T.center(k); PK.Render.centerOn(x, y); T.toggle(true); PK.UI.openParcel(k); }) }] };
+      }
+      return null;
+    },
     // pk-42: aldeanos que esperan junto a su edificio porque ya no queda nada en su radio
     () => {
       const g = G(), cnt = new Map();

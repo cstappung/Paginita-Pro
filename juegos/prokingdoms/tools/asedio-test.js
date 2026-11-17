@@ -148,5 +148,19 @@ const vis = sim.sync(C, { asv: -1 }).asedios[0].plan;
 ok(vis.res === undefined && vis.rb === undefined && vis.atkR === undefined && vis.semilla !== c.plan.semilla, 'la vista no trae las tiradas ni la semilla del plan');
 
 
+// ---------- G5: el Fuerte fronterizo cuenta en la defensa de la parcela ----------
+for (const x of store.all('camps')) store.del('camps', x.id);
+c = llegar(900);
+const sinFuerte = c.plan.parts.towers;
+for (const x of store.all('camps')) store.del('camps', x.id);
+B.buildings = [['fuerte', (kB % PW) * 8 + 2, Math.floor(kB / PW) * 8 + 2, 1, 1]];
+c = llegar(900);
+ok(sinFuerte === 0 && c.plan.parts.towers > 100, 'un Fuerte en la parcela suma a la etapa de las defensas', sinFuerte + ' → ' + c.plan.parts.towers);
+B.buildings = [['fuerte', (kB % PW) * 8 + 2 + 14, Math.floor(kB / PW) * 8 + 2, 1, 1]];
+for (const x of store.all('camps')) store.del('camps', x.id);
+c = llegar(900);
+ok(c.plan.parts.towers > 100, 'y también a casi 2 parcelas de distancia', c.plan.parts.towers);
+B.buildings = [];
+
 console.log(fallas ? '\n' + fallas + ' FALLAS' : '\nTodo bien.');
 process.exit(fallas ? 1 : 0);
