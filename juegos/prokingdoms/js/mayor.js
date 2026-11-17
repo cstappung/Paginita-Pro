@@ -85,8 +85,10 @@
     return k;
   };
   // Poner en una bodega concreta: hasta su lugar y el tope del pueblo. Devuelve cuánto entró.
-  Lb.poner = function (b, r, n) {
-    const st = S(), k = Math.max(0, Math.min(n, G().cap(r) - (st.res[r] || 0)));
+  // extra (pk-70): lugar de más sobre el tope del pueblo, para lo que vuelve después de haber salido de una bodega (una
+  // cinta de bodega a bodega): ya contaba en el tope, y si el pueblo se llenó mientras viajaba no quedaba trabado
+  Lb.poner = function (b, r, n, extra) {
+    const st = S(), k = Math.max(0, Math.min(n, Math.max(0, G().cap(r) - (st.res[r] || 0)) + (extra || 0)));
     if (k <= 0) return 0;
     st.res[r] = (st.res[r] || 0) + k;
     if (Lb.esBodega(b)) inv(b)[r] = (inv(b)[r] || 0) + Math.min(k, Lb.lugar(b, r)); // lo que no cabe aquí, a otra

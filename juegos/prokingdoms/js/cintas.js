@@ -207,38 +207,61 @@
     if (L().isShop(b)) return L().bufCap(b) - ((b.inb && b.inb[r]) || 0);
     return G().cap(r) - (S().res[r] || 0);
   }
-  // cuántas unidades entregó (puede ser parte del paquete, si no hay lugar para todo), o 'no' (no lo usa)
-  function entregar(b, r, cant) {
+  // cuántas unidades entregó (puede ser parte del paquete, si no hay lugar para todo), o 'no' (no lo usa).
+  // deBodega (pk-70): el paquete salió de una bodega del pueblo; a otra bodega siempre vuelve (ya contaba en el tope:
+  // con el pueblo lleno, o sobre el tope por un premio, la cinta de bodega a bodega se llenaba con 3 paquetes y paraba)
+  function entregar(b, r, cant, deBodega) {
     if (!recibe(b, r)) return 'no';
-    let m = Math.min(cant, Math.floor(lugarEn(b, r)));
+    const tienda = L().isShop(b), extra = deBodega && !tienda ? cant : 0;
+    let m = Math.min(cant, Math.floor(Math.max(0, lugarEn(b, r)) + extra));
     if (m < 1) return 0;
-    if (L().isShop(b)) { if (!b.inb) b.inb = {}; b.inb[r] = (b.inb[r] || 0) + m; }
-    else m = PK.Libro.poner(b, r, m);
+    if (tienda) { if (!b.inb) b.inb = {}; b.inb[r] = (b.inb[r] || 0) + m; }
+    else m = PK.Libro.poner(b, r, m, extra);
     if (m > 0) G().stat('belted', m);
     return Math.max(0, m);
   }
   // Lo que da una boca de salida, por turnos (pz.rr): [recurso, cantidad] (un paquete de hasta PILA). null: nada.
   function sacar(c) {
-    const b = c.src, pz = c.pz;
+    const b = c.src, pz = c.pz, acepta = aceptaAbajo(c);
+    if (c.motivo && c.motivo.startsWith('No sale nada')) c.motivo = null; // se vuelve a ver en cada intento
     if (L().isShop(b)) {
       const out = L().output(b);
+      if (!acepta.has(out)) { c.motivo = nadieRecibe([out]); return null; } // nadie adelante lo recibe: no sale (se trabaría)
       if (!b.outb) b.outb = {};
       const n = Math.min(PILA(), Math.floor(b.outb[out] || 0));
       if (n >= 1) { b.outb[out] -= n; return [out, n]; }
       return null;
     }
     const lista = opcionesFuente(c);
+    if (lista.length && !lista.some(r => acepta.has(r))) { c.motivo = nadieRecibe(lista); return null; }
     for (let i = 0; i < lista.length; i++) {
       const j = ((pz.rr || 0) + i) % lista.length, r = lista[j];
-      if (!disponible(b, r)) continue;
+      if (!acepta.has(r) || !disponible(b, r)) continue; // pk-70: solo lo que alguien de adelante recibe
       const quiere = Math.min(PILA(), Math.floor(hayDe(b, r)));
       const n = PK.Libro.esCampo(b) ? PK.Libro.sacarCampo(b, r, quiere) : PK.Libro.sacar(b, r, quiere);
       if (n < 1) continue;
       pz.rr = j + 1;
-      return [r, n];
+      return PK.Libro.esCampo(b) ? [r, n] : [r, n, 1]; // 1: salió de una bodega del pueblo
     }
     return null;
   }
+  const nadieRecibe = rs => 'No sale nada: adelante nadie recibe ' + rs.map(r => D.RES[r].name.toLowerCase()).join(', ');
+  // pk-70: qué recursos recibe alguien siguiendo esa cinta (talleres: sus insumos; bodegas: lo que guardan; un
+  // clasificador deja pasar lo de su filtro y todo por «lo que sobre»). Se arma de nuevo con cada rearmar.
+  let aceptaMemo = new Map(), aceptaArm = -1;
+  function aceptaAbajo(c) {
+    if (aceptaArm !== armado) { aceptaArm = armado; aceptaMemo = new Map(); }
+    let s = aceptaMemo.get(c);
+    if (s) return s;
+    s = new Set();
+    aceptaMemo.set(c, s); // ciclos: lo que se sepa hasta ahí
+    for (const o of c.outs) {
+      const rs = o.b ? D.RES_ORDER.filter(r => recibe(o.b, r)) : [...aceptaAbajo(o.c)];
+      for (const r of rs) if (c.pz.p !== 's' || Ci.filtro(c.pz, o.d) === r || Ci.filtro(c.pz, o.d) === '*') s.add(r);
+    }
+    return s;
+  }
+  Ci.aceptaAbajo = k => { rearmarSiHace(); const c = (porK.get(k) || [])[0]; return c ? aceptaAbajo(c) : new Set(); };
   // cuánto puede dar de eso (una bodega, sin bajar de la reserva)
   function hayDe(b, r) {
     if (PK.Libro.esCampo(b)) return PK.Libro.inv(b)[r] || 0;
@@ -323,12 +346,12 @@
         if (o.c) {
           if (!hayLugarDesde(o.c, c)) continue;
           const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
-          dest.push([r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
+          dest.push(it0[3] ? [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant, 1] : [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
           o.c.lib = credito(o.c) + cada(o.c);
           c.pz.flujo = (c.pz.flujo || 0) + cant;
           if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
         } else {
-          const e = entregar(o.b, r, cant);
+          const e = entregar(o.b, r, cant, !!it0[3]);
           if (e === 'no') { noUsa = noUsa || o.b; continue; }
           if (e > 0) c.pz.flujo = (c.pz.flujo || 0) + e;
           if (e < cant) { it0[2] = cant - e; lleno = lleno || o.b; continue; } // lo que no entró espera en la punta (o prueba la otra salida)
@@ -346,6 +369,7 @@
   function avanzar(c, dt) {
     const it = itemsDe(c);
     if (!it) return;
+    if (!c.outs.length && !c.motivo) c.motivo = SIN; // pk-70: aunque no llegue nada (la boca ya no saca lo que nadie recibe)
     const sp = vel(c) * dt;
     for (let i = 0; i < it.length; i++) it[i][1] = Math.min(it[i][1] + sp, i === 0 ? Infinity : it[i - 1][1] - JUNTOS);
     if (it.length && it[0][1] >= c.len) {
@@ -354,7 +378,7 @@
     }
     for (let i = 1; i < it.length; i++) if (it[i][1] > it[i - 1][1] - JUNTOS) it[i][1] = it[i - 1][1] - JUNTOS;
     // boca de salida: saca a su ritmo
-    if (c.src && hayLugar(c)) { const s2 = sacar(c); if (s2) { it.push([s2[0], detras(it), s2[1]]); c.lib = credito(c) + cada(c); } }
+    if (c.src && hayLugar(c)) { const s2 = sacar(c); if (s2) { it.push(s2[2] ? [s2[0], detras(it), s2[1], 1] : [s2[0], detras(it), s2[1]]); c.lib = credito(c) + cada(c); } }
   }
   // Ítems por minuto que pasan (medido cada 10 s; pz.flujo cuenta los que salen de la pieza)
   let medT = 0;
@@ -390,8 +414,8 @@
     const sumar = (c, r, n) => { let f = flujo.get(c); if (!f) flujo.set(c, (f = {})); f[r] = (f[r] || 0) + n; };
     for (const c of carriles) {
       if (!c.src) continue;
-      const b = c.src, a = accDe(c), opc = opcionesFuente(c).filter(r => disponible(b, r));
-      if (!opc.length || opc.some(r => !a.has(r))) continue;
+      const b = c.src, a = accDe(c), opc = opcionesFuente(c).filter(r => disponible(b, r) && a.has(r)); // pk-70: lo que nadie recibe no sale (como en vivo)
+      if (!opc.length) continue;
       let presu = NIV(c.pz.n).rate * PILA() * k0 * dt;
       const quedan = {};
       for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r)));
@@ -435,12 +459,14 @@
         if (elig.length) repartir(elig, r, n);
       }
     }
-    const dado = {};
+    const dado = {}, deBod = {}; // pk-70: lo que sale de bodegas vuelve a otra bodega aunque el pueblo esté lleno
+    for (const o of ofertas) if (!L().isShop(o.b) && !PK.Libro.esCampo(o.b)) deBod[o.r] = (deBod[o.r] || 0) + o.n;
     for (const e of entregas) {
-      let m = Math.floor(Math.min(e.n, lugarEn(e.b, e.r)));
+      const tienda = L().isShop(e.b), extra = tienda ? 0 : Math.max(0, deBod[e.r] || 0);
+      let m = Math.floor(Math.min(e.n, Math.max(0, lugarEn(e.b, e.r)) + extra));
       if (m < 1) continue;
-      if (L().isShop(e.b)) { if (!e.b.inb) e.b.inb = {}; e.b.inb[e.r] = (e.b.inb[e.r] || 0) + m; }
-      else m = PK.Libro.poner(e.b, e.r, m);
+      if (tienda) { if (!e.b.inb) e.b.inb = {}; e.b.inb[e.r] = (e.b.inb[e.r] || 0) + m; }
+      else { m = PK.Libro.poner(e.b, e.r, m, extra); deBod[e.r] = Math.max(0, (deBod[e.r] || 0) - m); }
       if (m > 0) { dado[e.r] = (dado[e.r] || 0) + m; G().stat('belted', m); }
     }
     for (const r in dado) {
