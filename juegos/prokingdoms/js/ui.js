@@ -1032,7 +1032,7 @@
     const acepta = PK.Cintas.aceptaAbajo(c.k), aqui = r => Math.floor(PK.Libro.inv(b)[r] || 0);
     const motivos = f.map(r => [r, PK.Cintas.porQueNoSale(c, r)]).filter(([, m]) => m);
     return el('div', null, el('div', { class: 'rt-chips' }, ops.map(r => el('button', { type: 'button', class: 'rt-chip' + (f.includes(r) ? ' sel' : ''), style: acepta.has(r) ? '' : 'opacity:0.6', title: (acepta.has(r) ? '' : 'Adelante nadie lo recibe · ') + 'En ' + b.def.name + ': ' + aqui(r), onclick: () => { const i = f.indexOf(r); if (i >= 0) f.splice(i, 1); else f.push(r); PK.Cintas.cambio(); UI.refreshPanel(true); } }, UI.resIcon(r), ' ' + D.RES[r].name + ' ', el('span', { class: 'muted' }, U.fmt(aqui(r)))))),
-      f.length ? el('p', { class: 'small muted' }, 'Saca por turnos, de a ' + (D.CINTA.pila || 1) + ', de lo que guarda ' + b.def.name + ': ' + f.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.') : el('p', { class: 'small warn-t' }, 'Elige qué saca: por ahora no sale nada.'),
+      f.length ? el('p', { class: 'small muted' }, 'Saca por turnos, en paquetes llenos de ' + (D.CINTA.pila || 1) + ', de lo que guarda ' + b.def.name + ': ' + f.map(r => D.RES[r].name.toLowerCase()).join(', ') + '.') : el('p', { class: 'small warn-t' }, 'Elige qué saca: por ahora no sale nada.'),
       motivos.map(([r, m]) => el('p', { class: 'small warn-t' }, UI.resIcon(r), ' No sale ' + D.RES[r].name.toLowerCase() + ': ' + m + '.')));
   }
   // En el panel de un edificio: sus bocas de cinta

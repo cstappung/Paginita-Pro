@@ -108,7 +108,8 @@
       const n = Math.min(want, avail);
       if (n > 0) { st.res[k] -= n; b.inb[k] = (b.inb[k] || 0) + n; budget -= n; }
     }
-    const have = b.outb[out] || 0;
+    // pk-75: si una cinta se lleva lo que hace, le quedan PILA para que junte un paquete lleno; a la bodega va lo que sobra
+    const have = (b.outb[out] || 0) - (PK.Cintas.sacaDe(b) ? D.CINTA.pila || 1 : 0);
     if (have > 0) { const n = Math.min(have, L.directRate(b) * dt, Math.max(0, g.cap(out) - st.res[out])); b.outb[out] -= n; st.res[out] += n; }
   };
   // Reserva que fija el Capataz: los talleres no vacían la bodega de lo que hace falta para construir.
