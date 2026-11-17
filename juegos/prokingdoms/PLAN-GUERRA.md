@@ -43,7 +43,15 @@
     diario de guerra del mundo con «Ver», y los rankings «Conquistas» y «Fortalezas» con sus títulos. Diferencias con
     el texto: no hay marco de retrato (vive en Juegos), un aliado todavía no puede sumarse a tu asedio y los gremios
     simulados no sitian la Ciudadela.
-  - Sigue G8 (contenido de cierre).
+  - **G8:** hecha en `pk-65`, solo cliente. Misiones de guerra (w13 a w19), dos desafíos, dos Retos del Rey,
+    puntos del pase por asedios y fortalezas, el Mariscal del Consejo con aviso de parcela a tu alcance, mezcla
+    sugerida y retirada automática (solo con lo que se ve), y Tobías al llegar a la Era III. Ritmo con el piloto:
+    Era IV a los 186,6 minutos de juego (dentro del rango medido tras las cintas, 112 a 176 ± 15), Era V en curso a
+    los 422. No se tocaron los costos de campaña. Diferencias con el texto: no hay aspectos nuevos del pase
+    (estandarte, campamento) ni los pendientes de logística (vista en el mapa, empalizada, bandidos contra
+    carromatos); el piloto no llega a sitiar ni a conquistar por su cuenta, así que el ritmo de la guerra en sí no
+    quedó medido.
+  - **El plan de guerra está completo** salvo esas diferencias anotadas fase por fase.
 
 ---
 

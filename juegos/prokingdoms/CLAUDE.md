@@ -645,5 +645,9 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - Tobías at Era III: `T.guiaGuerra` (flag `guiaGuerra` 1 → 2 → 3), only once the onboarding guide is done and no
   window is open. The autopilot sets the flag so it is never interrupted, and it now sieges fortresses
   (`fortaleza()` in `tools/piloto.js`).
+- Pace after G8 (`?timelapse`, one run): Era II 10.8, III 30.3, IV 186.6 min of game; Era V in progress at 422
+  (all its checks met). Inside the ±15 range main measured after the belts C3 (Era IV 112–176). The autopilot still
+  never reaches a border (2 parcels claimed) nor gets 1.4× a fortress garrison with 70 % of its army, so no siege
+  of its own was measured; its siege numbers come from the probes it defends.
 - Not done from the plan's G8: new pase cosmetics (banner, siege camp), and the logistics leftovers it listed
   (map view, camp palisade, bandits raiding escorted carts).
