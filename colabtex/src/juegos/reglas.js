@@ -809,11 +809,13 @@ const REGLAS = {
     secciones: [
       ["Cómo se juega", lista([
         "Todos reciben las <b>mismas piezas</b> en el mismo orden; cada uno juega en su propio pozo.",
-        "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C o Mayús</b> guardar una pieza. En el móvil, los botones de abajo.",
+        "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C o Mayús</b> guardar una pieza · <b>E o Tab</b> cambiar de objetivo. En el móvil, los botones de abajo.",
         "Cada 30 segundos sube el nivel y las piezas caen más rápido."
       ])],
       ["Basura", lista([
-        "Las líneas que limpias mandan <b>basura</b> al siguiente jugador en pie: un doble manda 1, un triple 2 y un Tetris 4; los T-Spin, los combos y el <i>back-to-back</i> suman más, y una limpieza total manda 10.",
+        "Las líneas que limpias mandan <b>basura</b> a tu <b>objetivo</b>: un doble manda 1, un triple 2 y un Tetris 4; los T-Spin, los combos y el <i>back-to-back</i> suman más, y una limpieza total manda 10.",
+        "Tu objetivo lleva una <b>diana dorada</b> y el sello «Objetivo». Al empezar es el siguiente jugador en pie; lo cambias <b>tocando su pozo</b> o con <b>E / Tab</b>. Si cae, pasas al siguiente.",
+        "Debajo de cada rival dice a quién ataca. Quien te apunta a ti se enciende en rojo («→ TÚ»), tu pozo se enrojece por cada uno que te tiene en la mira, y la barra de arriba los nombra.",
         "La barra roja al lado de tu pozo es la basura que te espera. Limpiar líneas antes de que caiga la cancela."
       ])],
       ["El final", "Cuando una pieza ya no cabe, quedas fuera. El último que sigue apilando gana la sala."],
@@ -1059,17 +1061,19 @@ const REGLAS = {
   tetrisclub: {
     lema: "Tetris Club: para ti solo, en cuatro modos (uno contra bots).",
     secciones: [
-      ["Cómo se juega", "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C</b> guardar · <b>P</b> pausa. Completa filas para limpiarlas."],
+      ["Cómo se juega", "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C</b> guardar · <b>E o Tab</b> cambiar de objetivo (VS Bots) · <b>P</b> pausa. Completa filas para limpiarlas."],
       ["Los modos", lista([
         "<b>Maratón</b>: hasta que el pozo se llene; el nivel sube cada 10 líneas.",
         "<b>Sprint</b>: 40 líneas lo más rápido posible. Cuenta el tiempo.",
         "<b>Ultra</b>: dos minutos para hacer tantos puntos como puedas.",
-        "<b>VS Bots</b>: tú contra tres bots, todos contra todos, como una sala de cuatro. Cada línea que limpias manda basura a un rival vivo al azar, y ellos también se atacan entre sí. Ganas cuando los tres quedan fuera; el nivel sube cada 30 segundos."
+        "<b>VS Bots</b>: tú contra tres bots, todos contra todos, como una sala de cuatro. Lo que limpias le cae a tu <b>objetivo</b> (la diana dorada): lo cambias tocando su pozo o con <b>E / Tab</b>. Cada bot también tiene el suyo, y lo ves debajo de su pozo («→ TÚ» en rojo si eres tú). Ganas cuando los tres quedan fuera; el nivel sube cada 30 segundos."
       ])],
       ["Los bots", lista([
-        "<b>Fácil</b>: lentos (menos de una pieza por segundo), se equivocan seguido y no usan la reserva.",
-        "<b>Medio</b>: algo más de una pieza por segundo, usan la reserva y se equivocan de vez en cuando.",
-        "<b>Difícil</b>: unas dos piezas por segundo y sin errores. Se apuran cuando la gravedad aprieta."
+        "Juegan como personas: con la pila baja dejan una columna libre para meter un <b>Tetris</b>, y cuando se ven apurados limpian lo que pueden. Se equivocan: se pasan una columna (a veces se dan cuenta y corrigen), giran de más, dudan, se asustan cuando les llega basura y fallan más con la pila arriba.",
+        "Eligen a quién atacar: cambian cada tanto, a veces se vengan de quien les acaba de pegar, y los más fuertes prefieren rematar al que va perdiendo.",
+        "<b>Fácil</b>: lentos (menos de una pieza por segundo), se equivocan seguido, casi no arman Tetris y reparten la basura al azar.",
+        "<b>Medio</b>: una pieza por segundo, usan la reserva, arman Tetris y se vengan; fallan de vez en cuando.",
+        "<b>Difícil</b>: casi dos piezas por segundo, miran la pieza siguiente, casi no fallan y rematan al que tiene la pila más alta."
       ])],
       ["Clasificación", "Maratón y Ultra se ordenan por puntos; Sprint por tiempo. VS Bots tiene una tabla por dificultad y compite el <b>tiempo</b> en dejar fuera a los tres bots: perder no cuenta."]
     ]

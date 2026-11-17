@@ -6425,7 +6425,8 @@ export function redTetris(p, js, listos) {
     semilla: p.semilla >>> 0
   };
 }
-/* A quién le toca recibir mi basura: el siguiente vivo en la mesa. */
+/* A quién le toca recibir mi basura al empezar: el siguiente vivo en la mesa
+   (después cada uno elige su objetivo en la sala, tetris.js). */
 export function blancoTetris(est, uid) {
   const ids = (est.jugadores || []).map(j => j.uid);
   const i = ids.indexOf(uid);

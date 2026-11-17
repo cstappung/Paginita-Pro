@@ -338,18 +338,21 @@
 
   /* ---------- mando: teclado con DAS/ARR ----------
      `acciones` recibe "izq", "der", "gira", "contragira", "caer",
-     "guarda" y "pausa"; el blando se lee de `mando.blando`.
+     "guarda", "objetivo" y "pausa"; el blando se lee de `mando.blando`.
+     «objetivo» cambia a quién le mandas la basura (la sala y VS Bots); en
+     los modos de un solo pozo no hace nada.
      Las teclas son configurables: `op.teclas` es {acción: [código, …]} y,
      si no viene, se lee lo guardado (`leeTeclas`), que comparten la sala y
      Tetris Club porque viven en el mismo origen. */
   const ACCIONES = [
     ["izq", "Mover a la izquierda"], ["der", "Mover a la derecha"], ["blando", "Bajar más rápido"],
     ["caer", "Caída instantánea"], ["gira", "Girar a la derecha"], ["contragira", "Girar a la izquierda"],
-    ["guarda", "Guardar pieza"], ["pausa", "Pausa"]
+    ["guarda", "Guardar pieza"], ["objetivo", "Cambiar de objetivo (a quién atacas)"], ["pausa", "Pausa"]
   ];
   const TECLAS_DEFECTO = {
     izq: ["ArrowLeft", "KeyA"], der: ["ArrowRight", "KeyD"], blando: ["ArrowDown", "KeyS"], caer: ["Space"],
-    gira: ["ArrowUp", "KeyX"], contragira: ["KeyZ", "KeyQ"], guarda: ["KeyC", "ShiftLeft"], pausa: ["KeyP", "Escape"]
+    gira: ["ArrowUp", "KeyX"], contragira: ["KeyZ", "KeyQ"], guarda: ["KeyC", "ShiftLeft"], objetivo: ["KeyE", "Tab"],
+    pausa: ["KeyP", "Escape"]
   };
   const CLAVE_TECLAS = "jg.tetris.teclas";
   function leeTeclas() {
@@ -373,7 +376,7 @@
     if (/^Numpad/.test(c)) return "Num " + c.slice(6);
     return c;
   }
-  const CORTO = { izq: "izq.", der: "der.", blando: "bajar", caer: "soltar", gira: "girar", contragira: "contragiro", guarda: "guardar", pausa: "pausa" };
+  const CORTO = { izq: "izq.", der: "der.", blando: "bajar", caer: "soltar", gira: "girar", contragira: "contragiro", guarda: "guardar", objetivo: "objetivo", pausa: "pausa" };
   function textoTeclas(t) {
     t = t || leeTeclas();
     return ACCIONES.map(([a]) => (t[a] || []).map(nombreTecla).join("/") + " " + CORTO[a]).join(" · ");
@@ -468,10 +471,10 @@
     const k = a => (t[a] && t[a][0]) || TECLAS_DEFECTO[a][0];
     return {
       botones: { izq: k("izq"), der: k("der"), abajo: k("blando"), arriba: k("caer"), y: k("caer"),
-        a: k("gira"), b: k("contragira"), x: k("guarda"), lb: k("guarda"), rb: k("guarda"), start: k("pausa") },
+        a: k("gira"), b: k("contragira"), x: k("guarda"), lb: k("guarda"), rb: k("objetivo"), start: k("pausa") },
       stick: { izq: k("izq"), der: k("der"), abajo: k("blando") },
       pistas: [["izq der", "mover"], ["abajo", "bajar"], ["arriba y", "soltar"], ["a", "girar"], ["b", "contragiro"],
-        ["x lb rb", "guardar"], ["start", "pausa"]]
+        ["x lb", "guardar"], ["rb", "objetivo"], ["start", "pausa"]]
     };
   }
   /* Aplica una acción del mando a una partida. */

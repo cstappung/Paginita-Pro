@@ -3,8 +3,17 @@
    con el motor compartido (`juegos/club/tetris/motor.js`) y la semilla de
    la sala, así que todos reciben las mismas piezas en el mismo orden.
    Al registro solo sube lo que el resto necesita para decidir quién gana:
-   `{t:"ataque", a, n}` cuando limpio líneas (basura para el siguiente
-   vivo) y `{t:"cae", l, p}` cuando me sale el pozo por arriba.
+   `{t:"ataque", a, n}` cuando limpio líneas (basura para mi objetivo) y
+   `{t:"cae", l, p}` cuando me sale el pozo por arriba.
+
+   El objetivo: cada uno ataca a un solo rival, que se ve en pantalla (la
+   diana sobre su pozo). Empieza siendo el siguiente vivo (`blancoTetris`,
+   lo que hacía siempre la sala) y se cambia tocando un rival o con la
+   tecla de objetivo. El reductor ya aceptaba cualquier `a` vivo, así que
+   no cambia nada en el registro ni en las reglas. Para que cada uno vea
+   quién lo tiene en la mira, el objetivo viaja en el directo (`o` en
+   `vivo/<pid>/t/<uid>`); de quien no lo manda (una pestaña vieja) se
+   supone el siguiente vivo, que es a quien ataca.
    `redTetris` suma la basura que me mandaron; aquí se inyecta la que
    todavía no había recibido.
 
@@ -24,7 +33,6 @@ const CELDA = 26;
 const VIVO_MS = 250;
 const SUBE_CADA = 30000;
 const MISIL_MS = 520;
-const quieto = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -39,6 +47,9 @@ export function crearTetris(ctx) {
      red. `largadaHasta` es el instante del «¡YA!»; 0 cuando ya se juega. */
   let largadaHasta = 0, cuentaVista = 0, cartel = null;
   let vivos = {}, desVivo = null, visto = -1;
+  /* Mi objetivo ("" = aún sin elegir: el siguiente vivo) y quiénes me
+     apuntaban en el último repintado (para avisar de los nuevos). */
+  let miObj = "", apuntaban = null;
   const firmas = {};
   const W = TM.W, HV = TM.H - TM.OCULTAS;
   /* Efectos y sonido de fx.js. El sonido sale por el bus de efectos de la
@@ -55,6 +66,30 @@ export function crearTetris(ctx) {
   const nombre = u => u === uid ? "tú" : ((jugador(u) || {}).nombre || "alguien");
   const Nombre = u => { const t = nombre(u); return t.charAt(0).toUpperCase() + t.slice(1); };
   const juego = () => !ctx.mirando && !!jugador(uid) && est && est.fase === "jugando" && !est.fuera[uid];
+  /* ---------- objetivos ---------- */
+  const enPie = u => !!u && !!jugador(u) && !est.fuera[u];
+  function miObjetivo() {
+    if (!est) return "";
+    if (miObj === uid || !enPie(miObj)) miObj = blancoTetris(est, uid);
+    return miObj;
+  }
+  /* A quién ataca `u`: lo que dice su directo, o el siguiente vivo. */
+  const objetivoDe = u => {
+    if (u === uid && juego()) return miObjetivo();
+    const o = (vivos[u] || {}).o;
+    return typeof o === "string" && o !== u && enPie(o) ? o : blancoTetris(est, u);
+  };
+  function apunta(u) {
+    if (!juego() || u === uid || !enPie(u) || u === miObjetivo()) return;
+    miObj = u; vivoT = 0;
+    son("fijado");
+    pintaRivales();
+  }
+  /* La tecla de objetivo: el siguiente vivo, en el orden de los asientos. */
+  function cicla() {
+    const ids = est.jugadores.map(j => j.uid), i = ids.indexOf(miObjetivo());
+    for (let k = 1; k < ids.length; k++) { const c = ids[(i + k) % ids.length]; if (c !== uid && enPie(c)) return apunta(c); }
+  }
   /* Modo celular: mientras se juega, la sala ocupa toda la pantalla, con los
      datos en una barra fina arriba, los pozos rivales en una columna estrecha
      a la derecha y la franja de botones abajo (juegos.html, html.jg-tt-inm).
@@ -73,8 +108,9 @@ export function crearTetris(ctx) {
   };
 
   const mando = TM.crearMando(a => {
-    if (!s || !juego() || s.fin || largadaHasta) return;
-    if (a === "pausa") return;
+    if (!s || !juego() || s.fin) return;
+    if (a === "objetivo") return cicla();
+    if (largadaHasta || a === "pausa") return;
     const ok = TM.accion(s, a);
     if (ok && (a === "izq" || a === "der")) son("mueve", s.p && s.p.x);
   });
@@ -115,10 +151,11 @@ export function crearTetris(ctx) {
     raiz.className = "jg-tt";
     raiz.innerHTML = `
       <div class="jg-barra"><span id="ttFase"></span><span class="jg-tt-ayuda"><span id="ttTeclasTxt"></span> <button type="button" id="ttTeclas" class="jg-btn-mini">⌨ Teclas</button></span></div>
+      <div id="ttMira" class="jg-tt-mira" hidden></div>
       <div class="jg-tablero jg-tt-sala">
         <div class="jg-tt-yo">
           <div class="jg-tt-lado"><small>Guardada</small><canvas id="ttGuarda" width="96" height="72"></canvas><div id="ttDatos" class="jg-tt-datos"></div></div>
-          <div class="jg-tt-pozo"><div id="ttBasura" class="jg-tt-basura"></div><canvas id="ttPozo" width="${W * CELDA}" height="${HV * CELDA}"></canvas><div id="ttAviso" class="jg-tt-aviso"></div><div id="ttAlerta" class="jg-tt-alerta"></div></div>
+          <div class="jg-tt-pozo" id="ttPozoCaja"><div id="ttBasura" class="jg-tt-basura"></div><canvas id="ttPozo" width="${W * CELDA}" height="${HV * CELDA}"></canvas><div id="ttAviso" class="jg-tt-aviso"></div><div id="ttAlerta" class="jg-tt-alerta"></div></div>
           <div class="jg-tt-lado"><small>Siguientes</small><canvas id="ttCola" width="96" height="300"></canvas></div>
         </div>
         <div id="ttRivales" class="jg-tt-rivales"></div>
@@ -166,6 +203,13 @@ export function crearTetris(ctx) {
     document.addEventListener("keydown", teclaAbajo);
     document.addEventListener("keyup", teclaArriba);
     document.addEventListener("visibilitychange", alOcultar);
+    /* Tocar un rival lo vuelve mi objetivo. */
+    raiz.querySelector("#ttRivales").addEventListener("pointerdown", e => {
+      const el = e.target.closest(".jg-tt-rival[data-u]");
+      if (!el || !juego()) return;
+      e.preventDefault();
+      apunta(el.dataset.u);
+    });
     desVivo = fb.watchTetrisVivo(pid, v => { vivos = v || {}; pintaRivales(); });
     t0 = performance.now();
     alOcultar();
@@ -227,14 +271,14 @@ export function crearTetris(ctx) {
       if (s.salida > 0) {
         const n = Math.min(12, s.salida);
         s.salida = 0;
-        const a = blancoTetris(est, uid);
+        const a = miObjetivo();
         if (a) { jugar({ t: "ataque", uid, a, n }).catch(() => {}); son("envia", n); misil(uid, a, n); }
       }
       if (!s.fin) latido(dt);
       else avisaCaida();
       if (ahora - vivoT > VIVO_MS) {
         vivoT = ahora;
-        fb.tetrisVivo(pid, uid, { r: TM.resumen(s), l: s.lineas, p: s.puntos, n: s.nivel, f: s.fin ? 1 : 0 });
+        fb.tetrisVivo(pid, uid, { r: TM.resumen(s), l: s.lineas, p: s.puntos, n: s.nivel, f: s.fin ? 1 : 0, o: s.fin ? "" : miObjetivo() });
       }
     } else if (s && !s.fin && est.fuera[uid]) s.fin = true;
   }
@@ -298,40 +342,33 @@ export function crearTetris(ctx) {
   };
   const colorDe = u => { const c = (jugador(u) || {}).color; return /^#[0-9a-f]{6}$/i.test(c || "") ? c : "#ff4a3a"; };
   function misil(de, a, n) {
-    const o = elDe(de), d = elDe(a);
-    if (!o || !d || quieto() || document.hidden) return;
-    const r0 = o.getBoundingClientRect(), r1 = d.getBoundingClientRect();
-    if (!r0.width || !r1.width) return;
-    const x0 = r0.left + r0.width / 2, y0 = r0.top + r0.height * 0.35, x1 = r1.left + r1.width / 2, y1 = r1.top + r1.height * 0.5;
-    const mx = (x0 + x1) / 2, my = Math.min(y0, y1) - 60 - Math.min(120, Math.abs(x1 - x0) * 0.25);
-    const tam = Math.min(2.2, 1 + n * 0.12);
-    for (let i = 0; i < 3; i++) {
-      const b = document.createElement("i");
-      b.className = "jg-tt-misil";
-      b.style.setProperty("--c", colorDe(de));
-      document.body.appendChild(b);
-      const k = tam * (1 - i * 0.28);
-      const an = b.animate([
-        { transform: `translate(${x0}px,${y0}px) scale(${k * 0.4})`, opacity: 0 },
-        { transform: `translate(${mx}px,${my}px) scale(${k})`, opacity: 1 - i * 0.3, offset: 0.5 },
-        { transform: `translate(${x1}px,${y1}px) scale(${k * 1.3})`, opacity: 1 - i * 0.3 }
-      ], { duration: MISIL_MS, delay: i * 45, easing: "cubic-bezier(.45,0,.75,.6)", fill: "both" });
-      an.onfinish = an.oncancel = () => b.remove();
-    }
-    setTimeout(() => {
+    const d = elDe(a);
+    TFX.misil(elDe(de), d, { color: colorDe(de), n, clase: "jg-tt-misil", dura: MISIL_MS, alLlegar: () => {
       if (muerto) return;
       if (a === uid) alerta(raiz && raiz.querySelector(".jg-tt-pozo"), "atacado");
-      else alerta(d.closest(".jg-tt-rival"), "golpe", 450);
-    }, MISIL_MS + 60);
+      else if (d) alerta(d.closest(".jg-tt-rival"), "golpe", 450);
+    } });
   }
   let alertaT = 0;
   function avisaAtaque(de, n) {
     const el = raiz && raiz.querySelector("#ttAlerta");
     if (!el) return;
+    alertaHasta = performance.now() + 1700;
     el.innerHTML = `<span style="--c:${colorDe(de)}">⚠ <b translate="no">${esc(Nombre(de))}</b> te manda ${n}</span>`;
     el.classList.remove("ve"); void el.offsetWidth; el.classList.add("ve");
     clearTimeout(alertaT);
     alertaT = setTimeout(() => el.classList.remove("ve"), 1700);
+  }
+  /* Alguien me pone en la mira: el mismo cartel, más corto, si no hay ya
+     uno de ataque en pantalla. */
+  let alertaHasta = 0;
+  function avisaMira(de) {
+    const el = raiz && raiz.querySelector("#ttAlerta");
+    if (!el || performance.now() < alertaHasta) return;
+    el.innerHTML = `<span class="mira" style="--c:${colorDe(de)}">👁 <b translate="no">${esc(Nombre(de))}</b> te apunta</span>`;
+    el.classList.remove("ve"); void el.offsetWidth; el.classList.add("ve");
+    clearTimeout(alertaT);
+    alertaT = setTimeout(() => el.classList.remove("ve"), 1300);
   }
   let avisoT = 0;
   function aviso(e) {
@@ -368,6 +405,10 @@ export function crearTetris(ctx) {
     pon("ttDatos", `<p><small>Líneas</small><b>${s.lineas}</b></p><p><small>Puntos</small><b>${s.puntos}</b></p><p><small>Nivel</small><b>${s.nivel}</b></p>`);
   }
 
+  /* Los rivales, y quién apunta a quién: mi objetivo lleva la diana y el
+     sello «Objetivo»; quien me apunta se enciende en rojo y dice «→ TÚ»;
+     cada tarjeta dice a quién ataca ese rival. Mi pozo se enrojece por
+     cada rival que me tiene en la mira, y la barra de encima lo resume. */
   function pintaRivales() {
     if (!raiz || !est) return;
     const cont = raiz.querySelector("#ttRivales");
@@ -377,18 +418,42 @@ export function crearTetris(ctx) {
       firmas.ttRivales = firma;
       cont.innerHTML = otros.map(j => `
         <div class="jg-tt-rival${est.fuera[j.uid] ? " fuera" : ""}${est.ganador === j.uid ? " gana" : ""}" data-u="${esc(j.uid)}">
-          <canvas width="${W * 9}" height="${HV * 9}"></canvas>
-          <span class="nom" style="--c:${esc(j.color || "#888")}">${esc(j.nombre || "")}</span>
+          <em class="jg-tt-sello">🎯 Objetivo</em>
+          <span class="jg-tt-lienzo"><span class="jg-tt-diana" aria-hidden="true"><i></i><i></i><i></i><i></i></span><canvas width="${W * 9}" height="${HV * 9}"></canvas></span>
+          <span class="nom" style="--c:${esc(j.color || "#888")}" translate="no">${esc(j.nombre || "")}</span>
+          <small class="apunta"></small>
           <small class="dat"></small>
         </div>`).join("");
     }
+    const jugando = est.fase === "jugando", yo = juego(), obj = yo ? miObjetivo() : "";
+    const meApuntan = [];
     for (const j of otros) {
       const el = cont.querySelector(`[data-u="${CSS.escape(j.uid)}"]`);
       if (!el) continue;
-      const v = vivos[j.uid] || {};
-      TM.pintaResumen(el.querySelector("canvas").getContext("2d"), v.r || "", { celda: 9, muerto: !!est.fuera[j.uid] });
-      const l = est.fuera[j.uid] ? est.lineas[j.uid] : (v.l || 0);
-      el.querySelector(".dat").textContent = `${l} líneas · ${est.enviadas[j.uid] || 0} enviadas${est.fuera[j.uid] ? " · fuera" : ""}`;
+      const v = vivos[j.uid] || {}, fuera = !!est.fuera[j.uid];
+      TM.pintaResumen(el.querySelector("canvas").getContext("2d"), v.r || "", { celda: 9, muerto: fuera });
+      const l = fuera ? est.lineas[j.uid] : (v.l || 0);
+      el.querySelector(".dat").textContent = `${l} líneas · ${est.enviadas[j.uid] || 0} enviadas${fuera ? " · fuera" : ""}`;
+      const o = jugando && !fuera ? objetivoDe(j.uid) : "";
+      if (o && o === uid && yo) meApuntan.push(j.uid);
+      el.classList.toggle("objetivo", !!obj && obj === j.uid);
+      el.classList.toggle("teapunta", !!o && o === uid && yo);
+      el.title = yo && !fuera ? "Atacar a " + (j.nombre || "") : "";
+      const ap = el.querySelector(".apunta"), txt = !o ? "" : o === uid && yo ? "→ TÚ" : "→ " + nombre(o);
+      if (ap.textContent !== txt) { ap.textContent = txt; ap.style.setProperty("--c", o === uid && yo ? "#ff4a5e" : colorDe(o)); }
+    }
+    /* Los que me apuntan ahora y antes no: aviso y dos pitidos. */
+    if (yo && apuntaban) for (const u of meApuntan) if (!apuntaban.includes(u)) { son("teApuntan"); avisaMira(u); break; }
+    apuntaban = yo ? meApuntan : null;
+    const caja = raiz.querySelector("#ttPozoCaja");
+    if (caja) caja.dataset.apuntan = Math.min(3, meApuntan.length);
+    const mira = raiz.querySelector("#ttMira");
+    mira.hidden = !yo;
+    if (yo) {
+      const teclas = (TM.leeTeclas().objetivo || []).map(TM.nombreTecla).join(" / ");
+      const chip = u => `<b class="jg-tt-chip" style="--c:${colorDe(u)}" translate="no">${esc(Nombre(u))}</b>`;
+      pon("ttMira", `<span>🎯 Atacas a ${obj ? chip(obj) : "—"} <small>${teclas ? "cambia con " + esc(teclas) + " o " : ""}tocando un rival</small></span>` +
+        `<span class="${meApuntan.length ? "peligro" : "calma"}">${meApuntan.length ? "👁 Te apunta" + (meApuntan.length > 1 ? "n " : " ") + meApuntan.map(chip).join(" ") : "👁 Nadie te apunta"}</span>`);
     }
   }
 

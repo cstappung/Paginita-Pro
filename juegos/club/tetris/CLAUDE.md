@@ -62,34 +62,74 @@ its own well (`largadaHasta` in `tetris.js`; nothing crosses the network):
 `paso` returns early, so the well neither falls nor takes garbage nor writes
 `tetrisVivo` until then, and the mando/touch handlers ignore input.
 
+**Targets (room and VS Bots).** Every well attacks exactly one rival, and
+the screen says who: your target gets a gold reticle and an «🎯 Objetivo»
+tag; under each rival card is who *it* attacks («→ TÚ» in red when it is
+you, `.teapunta`); your pit glows red per rival aiming at you
+(`data-apuntan`); a bar above the pit sums it up (hidden in immersive phone
+mode, where the cards and the glow carry it). You change target by tapping a
+rival or with the `objetivo` action (`E`/`Tab`, gamepad RB; it is in
+`TM.ACCIONES`, so the key panel offers it). In the **room** the reducer
+already accepted any living `a` in `{t:"ataque"}`, so nothing changed in the
+log or the rules: the default target is still `blancoTetris` (next living
+seat), and the current one travels as `o` in the disposable `tetrisVivo`
+summary so the others can draw it; a tab that does not send `o` (old code)
+is assumed to aim at its next living seat, which is what it does. Projectiles
+are `TFX.misil` (fx.js), shared by both.
+
 **VS Bots** (`juegos/club/tetris/vs.js`, UMD `TetrisVS`, mode `bots` in
 `game.js`) is the room played alone: your well plus three bot wells, free
-for all, garbage (≤ 12 per attack, as in the room) goes to a random living
-well, last one standing wins. Three difficulties, one table each:
+for all, garbage (≤ 12 per attack, as in the room) goes to the sender's
+target, last one standing wins. Three difficulties, one table each:
 `club-tetris-bots-(facil|medio|dificil)`, `puntos` fixed at 3 and the
 **time** competes (lower is better, like Sprint; losing saves nothing).
 Rules that keep it provable:
 
 - **The whole match is deterministic, so the proof is still only the
-  player's moves** (`{v:1, m:"bots", d, u, a, n, e, w, k}`). The four wells
-  step together in `TM.PASO` steps; bots decide with their own seeded `rng`
-  and integer weights (Yiyuan Lee's ×100); the attack target comes from a
-  seeded `rng` too. `TV.rehace` replays the bots and the verifier demands
-  all three out. Anything that changes how a bot decides (weights, timings,
-  `PERFIL`, target choice, `semillaPozo`) changes old proofs' outcome: bump
-  the proof version and keep the old path, or old records stop verifying.
+  player's moves** (`{v:2, m:"bots", d, u, a, n, e, w, k}`; target changes
+  are letters `O`/`P`/`Q`/`R` in `e`). The four wells step together in
+  `TM.PASO` steps; bots decide with their own seeded `rng` and integer
+  weights; their target choices come from a seeded `rng` too. `TV.rehace`
+  replays the bots and the verifier demands all three out. Anything that
+  changes how a bot decides (weights, `BONO_ARMA`, timings, `PERFIL`,
+  targeting, `semillaPozo`) changes old proofs' outcome: **add a v3 and keep
+  v2 frozen**, exactly as v1 is kept (the `======== Versión 1` block,
+  `mundoV1`; `tests/fixtures/tetris-vs-v1.json` holds two real v1 games
+  that must keep verifying).
 - **The level rises only with time** (`soloTiempo` in `crear`, 30 s per
   level as in the room). With line-based levels too, the fast bots sped up
   their own gravity and killed themselves; it also bounds the match.
-- Difficulty is speed and mistakes, not lookahead: ~0.6 / 1.1 / 2 pieces
-  per second, 30 % / 12 % / 0 % suboptimal picks, hold from Medio up. Bots
-  hurry when gravity is high (`rapido`). Rewarding attacks (keeping a well
-  for Tetrises) was tried and made them bury themselves. Each bot gets its
-  own bag (`semillaPozo`) so the three do not play in lockstep.
+- **v2 bots attack.** v1 only cleared singles (sent ~5–8 lines/min on
+  Medio/Difícil) and never failed. v2 has two modes with hysteresis: below
+  `umbral` it keeps an edge column empty and builds for a Tetris (singles
+  and doubles cost, `BONO_ARMA`); above it, or with much garbage pending,
+  it survives (clears anything: every clear delays the garbage). What made
+  v1's Tetris attempt bury itself was not having that way out. Medio and
+  Difícil also look at the next piece for their best `mira` moves. Measured
+  solo: Medio ~19 and Difícil ~39 attack lines/min; in a 4-bot battle
+  ~13 / ~28 per well; Fácil ~2.
+- **Human-like mistakes** (per `PERFIL`, in ‰): off by one column
+  (`desvio`), sometimes noticed and corrected after a pause (`corrige`);
+  over-rotating and undoing (`sobregiro`); second-best picks (`duda`);
+  soft-dropping instead of hard-dropping (`blando`); long pauses
+  (`distrae`, only at slow gravity); a startle when hit (`susto`); with
+  the stack above 13 they hurry and fail twice as much. ~0.5 / 0.9 / 1.6
+  pieces per second. Each bot gets its own bag (`semillaPozo`) so the
+  three do not play in lockstep.
+- **Bot targeting**: re-picked every `foco` steps, weighted towards the
+  highest stack (`remata`: 0 on Fácil, so it does not gang up on whoever is
+  losing); revenge on whoever just hit it (`venganza`) but not within
+  `FIRME_PASOS` of the last change (otherwise it flipped on every hit and
+  the screen was unreadable); a fallen target is replaced at once. The
+  last hit within `KO_PASOS` (10 s) of a fall is the KO (`m.ko`,
+  `m.verdugo`), shown as 💀 and in the battle feed.
 - The rival wells are `TM.pintaResumen` thumbnails; `ubicaRivales` moves
   them under the pit on narrow screens and back as a thin third column in
   immersive phone mode. Nothing on screen decides anything: `vsEventos`
-  only drains `m.ataques`/`m.caidas` for banners, sounds and KO marks.
+  only drains `m.ataques`/`m.cambios`/`m.kos`/`m.caidas` for projectiles,
+  banners, the feed, sounds (`fijado`, `teApuntan` in fx.js) and KO marks.
+  The only thing the screen sends is your target change, as an action
+  (`g.pide('apunta2')` / `'objetivo'`), so it lands in the proof.
 - No logros for this mode on purpose: every game has exactly ten
   (`tests/logros.test.cjs`). Tests: `colabtex/tests/tetris-vs.test.cjs`.
 - The room's waiting screen and manual point to it («¿Sin rivales?…»).
