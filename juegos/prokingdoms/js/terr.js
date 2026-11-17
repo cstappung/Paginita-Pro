@@ -249,7 +249,8 @@
   T.estado = f => D.asedioEn(f.plan, (Date.now() - f.ini) / 1000);
   T.nombreFrente = function (f) {
     if (f.fort) return { otro: f.fort.nombre, titulo: f.mio === 'atk' ? 'Sitio de ' : 'Asedian ' };
-    if (f.mio === 'ver') return { otro: f.aN || (T.realmInfo(f.a) || {}).realm || 'otro reino', titulo: (f.deN || 'Un reino') + ' asedia a ' };
+    // pk-76: el nombre del atacante va aparte (quien), para pintarlo con translate=no como al otro (lo escribió una persona)
+    if (f.mio === 'ver') return { quien: f.deN || 'Un reino', otro: f.aN || (T.realmInfo(f.a) || {}).realm || 'otro reino', titulo: ' asedia a ' };
     const otro = T.realmInfo(f.mio === 'atk' ? f.a : f.de);
     return { otro: otro ? otro.realm : 'otro reino', titulo: f.mio === 'atk' ? 'Asedio a ' : 'Te asedia ' };
   };

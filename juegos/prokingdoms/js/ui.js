@@ -545,7 +545,7 @@
       out.push({ k: 't' + c.k + c.phase, icon: Sp.icon('war'), name: (go ? '⚔ Campaña contra ' : '↩ Vuelve de ') + (info ? info.realm : 'la frontera'), left, pct: 1 - left / Math.max(1, c.travel || 120), go: () => { const [x, y] = PK.Terr.center(c.k); PK.Render.centerOn(x, y); } });
     }
     out.sort((a, b) => a.left - b.left);
-    for (const fr of PK.Frente ? PK.Frente.filas() : []) out.unshift({ k: fr.k, raid: true, fr, icon: Sp.icon('war'), name: fr.titulo + fr.otro, left: fr.e.quedaTotal, pct: fr.e.control, go: () => PK.Terr.verFrente(fr.f.id) });
+    for (const fr of PK.Frente ? PK.Frente.filas() : []) out.unshift({ k: fr.k, raid: true, fr, icon: Sp.icon('war'), name: fr.quien + fr.titulo + fr.otro, nameEl: [fr.quien ? el('span', { translate: 'no' }, fr.quien) : null, fr.titulo, el('span', { translate: 'no' }, fr.otro)], left: fr.e.quedaTotal, pct: fr.e.control, go: () => PK.Terr.verFrente(fr.f.id) });
     const inc = PK.Incursiones && PK.Incursiones.fila();
     if (inc) out.unshift(Object.assign(inc, { raid: true, icon: Sp.icon('war'), go: () => PK.Incursiones.ver() }));
     const sq = PK.Saqueos && PK.Saqueos.fila(); // C6: partida de saqueo de un reino del servidor
@@ -563,7 +563,7 @@
       qsRows = shown.map(it => {
         const time = el('span', { class: 'qs-t' }), fill = el('i', { class: 'qs-fill' });
         const row = el('div', { class: 'qs-item' + (it.idle ? ' idle' : '') + (it.raid ? ' raid' : ''), title: it.name, onclick: () => it.go() },
-          el('img', { src: it.icon }), el('span', { class: 'qs-n' }, it.name), time, it.idle ? null : el('b', { class: 'qs-bar' }, fill));
+          el('img', { src: it.icon }), el('span', { class: 'qs-n' }, it.nameEl || it.name), time, it.idle ? null : el('b', { class: 'qs-bar' }, fill));
         let fr = null;
         if (it.fr) { // un asedio: las tres etapas y las dos barras (ímpetu del atacante, resistencia del defensor)
           const pips = D.ASEDIO.etapas.map(() => el('i', { class: 'fr-pip' })), a = el('i'), d = el('i');

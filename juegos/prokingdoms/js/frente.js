@@ -455,7 +455,7 @@
     for (const { f, e, fin, rep } of todos()) {
       if (fin || rep) continue;
       const n = PK.Terr.nombreFrente(f);
-      out.push({ k: 'fr' + f.id, f, e, titulo: n.titulo, otro: n.otro });
+      out.push({ k: 'fr' + f.id, f, e, titulo: n.titulo, otro: n.otro, quien: n.quien || '' });
     }
     return out;
   };
