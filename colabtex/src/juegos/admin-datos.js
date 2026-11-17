@@ -22,7 +22,7 @@
 /* ---------- la auditoría ---------- */
 
 /* Tablas donde compite el tiempo (menos es mejor); en el resto, los puntos. */
-export const POR_TIEMPO = /^club-(minas-|sortem-|sopa-(facil|medio|dificil)-|sudoku-(facil|medio|dificil|experto)$|tetris-sprint$)/;
+export const POR_TIEMPO = /^club-(minas-|sortem-|sopa-(facil|medio|dificil)-|sudoku-(facil|medio|dificil|experto)$|tetris-(sprint|bots-(facil|medio|dificil))$)/;
 
 // La mediana de una lista de números (el del medio, o el promedio de los dos del medio)
 export const mediana = v => {

@@ -1,6 +1,6 @@
 # Ajedrez — notes for Claude
 
-Screen: `colabtex/src/juegos/ajedrez.js`; reducer in `colabtex/src/juegos/motor.js`. Room game of Juegos. The shared architecture (move log, `reducir`, rooms, fin cartel, votes, sound) is in `colabtex/src/juegos/CLAUDE.md`; logros/coins/ranking wiring in `docs/claude/juegos/perfiles-y-economia.md`.
+Screen: `colabtex/src/juegos/ajedrez.js`; reducer in `colabtex/src/juegos/motor.js`. Room game of Juegos. Its single-player side (bots and puzzles) is the Solo Club game **Ajedrez Club**, `juegos/club/ajedrez/CLAUDE.md`, with its own engine (it does not share `motor.js`'s aj* code). The shared architecture (move log, `reducir`, rooms, fin cartel, votes, sound) is in `colabtex/src/juegos/CLAUDE.md`; logros/coins/ranking wiring in `docs/claude/juegos/perfiles-y-economia.md`.
 
 **Ajedrez (`ajedrez`) is the whole of FIDE's rules in the reducer**
 (`redAjedrez` and the `aj*` functions at the end of `motor.js`). A move is

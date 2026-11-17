@@ -329,11 +329,11 @@ export function crearSalon(ctx) {
       </div>` +
         /* La práctica contra bots sí se juega sin cuenta: es la manera de
            probar el juego antes de pedirle nada. */
-        (p && !bloqueado(Object.assign({ modo: "bots" }, p), true) ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">Practica solo contra bots, sin cuenta →</a></p>` : "");
+        (p && !bloqueado(Object.assign({ modo: "bots" }, p), true) ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">${p.tipo === "club" ? "Juega solo contra bots o resuelve puzles, sin cuenta" : "Practica solo contra bots, sin cuenta"} →</a></p>` : "");
       pie = `${reglas}<button class="btn jg-hoja-ya" type="button" data-f="login">Iniciar sesión y jugar</button>`;
     } else if (e.modo === "multi") {
       medio = salasHtml(e) + opcionesHtml(e) + `<div class="jg-hoja-podio" data-podio></div>` +
-        (p ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">Practica solo contra bots →</a></p>` : "");
+        (p ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">${p.tipo === "club" ? "Juega solo contra bots o resuelve puzles" : "Practica solo contra bots"} →</a></p>` : "");
       pie = `${reglas}${e.id === "pokemon" ? '<button class="btn2" type="button" data-f="equipos" title="Mis equipos">📋 Equipos</button>' : ""}
         <button class="btn jg-hoja-ya" type="button" data-f="sala">Abrir sala e invitar <span aria-hidden="true">→</span></button>`;
     } else {

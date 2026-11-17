@@ -53,13 +53,16 @@ export function categoriaClub(juego, categoria) {
     // PRO PACMAN: una sola tabla, el puntaje de la partida.
     : juego === 'propac'
     ? categoria === 'club-propac-puntos'
+    // Ajedrez Club: una tabla por nivel del bot (por tiempo) y la de los puzles (estrellas).
+    : juego === 'ajedrez'
+    ? /^club-ajedrez-(bot[1-4]|puzles)$/.test(categoria)
     // PRO DEFENDER: la ronda récord de cada uno de los veinte reinos.
     : juego === 'prodefender'
     ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche|jade|circo|biblioteca|estelar|tiempo)$/.test(categoria)
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|city|citypuro)$/.test(categoria)
     : juego === 'tetris'
-    ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
+    ? /^club-tetris-(maraton|sprint|ultra|bots-(facil|medio|dificil))$/.test(categoria)
     // Pro BoxHead: el nivel más alto al que se llegó en una partida, una tabla por mapa.
     : juego === 'boxhead'
     ? /^club-boxhead-(patio|sotano|cruce|fortaleza|laberinto|planta|hangar|fabrica|apagon)$/.test(categoria)
@@ -72,6 +75,8 @@ export function resultadoClub(juego, dato) {
   if (juego === 'minas' && dato.puntos !== 1) return null;
   if (juego === 'sortem' && dato.puntos !== Number(dato.categoria.slice(12))) return null;
   if (dato.categoria === 'club-tetris-sprint' && dato.puntos !== 40) return null;
+  /* Tetris VS Bots: compite el tiempo; los puntos son los tres bots fuera. */
+  if (/^club-tetris-bots-/.test(dato.categoria) && dato.puntos !== 3) return null;
   if (juego === 'boxhead' && dato.puntos > 999) return null;
   /* Sopa libre: los puntos son las palabras de ese tamaño (6, 10 o 13) y
      compite el tiempo; la racha diaria son días, no más de dos años. */
@@ -130,6 +135,11 @@ export function resultadoClub(juego, dato) {
   if (juego === 'prodefender' && dato.puntos > 100) return null;
   /* PRO PACMAN: el puntaje, con el tope de su verificador (10 000 000). */
   if (juego === 'propac' && dato.puntos > 10000000) return null;
+  /* Ajedrez Club: contra el bot compite el tiempo (puntos = 1 fijo); los
+     puzles son estrellas, tres por puzle (hoy 60 puzles, 180; 600 deja
+     sitio para más sin aceptar números absurdos). */
+  if (juego === 'ajedrez' && dato.categoria !== 'club-ajedrez-puzles' && dato.puntos !== 1) return null;
+  if (dato.categoria === 'club-ajedrez-puzles' && dato.puntos > 600) return null;
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};
 }
 export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.puntos && a.tiempo < b.tiempo;

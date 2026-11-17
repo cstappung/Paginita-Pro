@@ -1046,3 +1046,19 @@ test('boxhead Fase 4c: la tienda no cobra munición si está llena, y botiquín 
  for(let i=0;i<3;i++){bx.vidaYo(10);h.push(comprar(id('botiquin')));}
  assert.deepEqual(h,[H,H*1.5,H*3]);
 });
+
+test('boxhead Club: la regla de clubJugadas conoce `boxheadclub`, la clave que escribe el cliente y paga monedas.js',()=>{
+ // juegos-main escribe clubJugadas/<uid>/<claveClub("boxhead")> = "boxheadclub"; con `boxhead`
+ // en la regla la escritura daba PERMISSION_DENIED (marcaJugadaClub se lo traga) y la partida no pagaba.
+ const reglas=JSON.parse(fs.readFileSync('../firebase/database.rules.json','utf8'));
+ const val=reglas.rules.clubJugadas.$uid.$juego['.validate'];
+ const lista=/\$juego\.matches\(\/\^\(([a-z|]+)\)\$\/\)/.exec(val)[1].split('|');
+ assert.ok(lista.includes('boxheadclub'),'clubJugadas: boxheadclub');
+ assert.ok(!lista.includes('boxhead'),'clubJugadas: la clave de la sala no se escribe ahí');
+ const main=fs.readFileSync('src/juegos-main.js','utf8');
+ assert.match(main,/const CLAVE_CLUB = \{[^}]*boxhead: "boxheadclub"/);
+ // y de paso: todo juego que monedas.js paga por partida está en la regla
+ const mon=fs.readFileSync('src/juegos/monedas.js','utf8');
+ const club=JSON.parse(/export const JUEGOS_CLUB = (\[[^\]]+\])/.exec(mon)[1]);
+ for(const j of club)assert.ok(lista.includes(j),'clubJugadas no conoce '+j);
+});

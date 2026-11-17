@@ -413,7 +413,8 @@ export function crearTetris(ctx) {
     else if (ctx.mirando || !jugador(uid)) f = "Mirando · " + est.vivos.length + " en pie";
     else if (est.fuera[uid]) f = "Fuera · quedan " + est.vivos.length;
     else f = "Quedan " + est.vivos.length + " en pie";
-    pon("ttFase", esc(f));
+    /* Mientras no llega nadie, el atajo al VS Bots de Tetris Club. */
+    pon("ttFase", esc(f) + (est.fase === "espera" ? ` · <a href="#solo/tetris">¿Sin rivales? Juega contra bots en Tetris Club</a>` : ""));
     raiz.classList.toggle("mirando", !juego());
     alGirar();
     const n = est.hist.length ? est.hist[est.hist.length - 1].i : -1;

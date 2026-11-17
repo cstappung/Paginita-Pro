@@ -20,6 +20,13 @@ const timeout=setTimeout(()=>{console.error('Tiempo agotado');process.exit(1);},
  await deniega(()=>set(ref(c.db,minapath),{...dato,puntos:2}));
  await g('club-snake-arcade-mediano',c.uid,{...dato,puntos:150000});
  await deniega(()=>set(ref(c.db,`soloRanks/club-snake-zen-normal/${c.uid}`),dato));
+ // Ajedrez Club: contra el bot compite el tiempo (puntos = 1); los puzles son estrellas, hasta 600.
+ const bot='club-ajedrez-bot4',botpath=`soloRanks/${bot}/${c.uid}`;
+ await g(bot,c.uid,{...dato,puntos:1,tiempo:240000,partida:'aj-1'});assert.equal((await get(ref(c.db,botpath))).val().tiempo,240000);
+ await deniega(()=>set(ref(c.db,botpath),{...dato,puntos:2,partida:'aj-2'}));
+ await g('club-ajedrez-puzles',c.uid,{...dato,puntos:45,tiempo:300000,partida:'aj-3'});assert.equal((await get(ref(c.db,`soloRanks/club-ajedrez-puzles/${c.uid}`))).val().puntos,45);
+ await deniega(()=>set(ref(c.db,`soloRanks/club-ajedrez-puzles/${c.uid}`),{...dato,puntos:601,partida:'aj-4'}));
+ await deniega(()=>set(ref(c.db,`soloRanks/club-ajedrez-bot5/${c.uid}`),{...dato,puntos:1}));
  const filas=await new Promise((resolve,reject)=>{let off;off=api.watchSolo(key,(f,e)=>{if(e)reject(e);else resolve(f);setTimeout(()=>off(),0);});});assert.equal(filas[0].puntos,300);
  console.log('Firebase: récord concurrente, desempate, lectura y aislamiento entre usuarios correctos.');for(const x of clientes){goOffline(x.db);await deleteApp(x.app);}clearTimeout(timeout);
  // El SDK mantiene temporizadores auxiliares en Node; todas las aserciones ya finalizaron.

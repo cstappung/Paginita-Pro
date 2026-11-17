@@ -79,7 +79,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Spicy | `docs/claude/juegos/spicy.md` |
 | Ajedrez | `docs/claude/juegos/ajedrez.md` |
 | Pool 8 (billar, 1 contra 1 y 2 contra 2, física, línea guía) | `docs/claude/juegos/pool.md` |
-| Tetris (room and Tetris Club) | `juegos/club/tetris/CLAUDE.md` |
+| Tetris (room and Tetris Club, VS Bots) | `juegos/club/tetris/CLAUDE.md` |
 | Circuit Breakers (worms) | `juegos/worms/CLAUDE.md` |
 | Yemas (shooter, zombis, voz) | `juegos/yemas/CLAUDE.md` |
 | Clue | `juegos/clue/CLAUDE.md` |
@@ -117,6 +117,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
 | PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda, tercera y cuarta era, pactos, eventos, eventos de titanes, poder del reino, héroes a elección) | `juegos/club/prodefender/CLAUDE.md` |
 | PRO PACMAN (pacman, laberinto, fantasmas, racha, turbo, pulso) | `juegos/club/propac/CLAUDE.md` |
+| Ajedrez Club (ajedrez solo, contra bots, 4 dificultades, puzles de mate, estrellas) | `juegos/club/ajedrez/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.
 

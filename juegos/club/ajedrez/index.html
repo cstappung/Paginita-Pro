@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202611170050"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Ajedrez Club — bots y puzles</title>
+  <meta name="description" content="Ajedrez de un jugador: gánale a cuatro bots lo más rápido que puedas y resuelve puzles de mate y táctica por estrellas.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23302418'/%3E%3Cpath d='M11 26h10l-1-3h-8zM12 22h8l-1-8h2l-2-4h-6l-2 4h2z' fill='%23f0d9b5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=DM+Sans:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
+  <script src="../../audio/volumen.js?v=vol-1"></script>
+  <script src="../conexion.js?v=club-24"></script>
+  <link rel="stylesheet" href="estilo.css?v=ajedrez-1">
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <!-- Cabecera: no es .shell>header ni .intro, porque conexion.css las oculta dentro de Juegos. -->
+        <div class="cab">
+          <h1 class="logo" translate="no">AJEDREZ <b>CLUB</b></h1>
+          <p class="lema">Bots y puzles para jugar solo</p>
+        </div>
+
+        <div class="scorebar" role="group" aria-label="Marcador">
+          <div class="dato"><small id="lModo">MODO</small><strong id="nModo">—</strong></div>
+          <div class="dato"><small id="lReloj">TU TIEMPO</small><strong id="nReloj" translate="no">0:00</strong></div>
+          <div class="dato"><small id="lMejor">MEJOR</small><strong id="nMejor" translate="no">—</strong></div>
+          <button type="button" id="btnMenu" class="mini" title="Menú" aria-label="Abrir el menú">☰ Menú</button>
+          <button type="button" id="sound-button" aria-pressed="true" aria-label="Desactivar efectos" title="Efectos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
+              <path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+              <path class="cruz" d="m16 9 6 6m0-6-6 6"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="mesa">
+          <div class="lado-tablero">
+            <div class="jugador arriba"><span class="avatar" id="avArriba" aria-hidden="true">🤖</span><b id="nomArriba">Bot</b><span class="perdidas" id="perArriba" translate="no"></span></div>
+            <div id="escenario" class="escenario">
+              <div id="tablero" class="tablero" role="grid" aria-label="Tablero de ajedrez"></div>
+              <div id="piezas" class="piezas" aria-hidden="true"></div>
+              <div id="corona" class="corona" role="dialog" aria-label="Elige la pieza de la coronación" hidden></div>
+
+              <div id="fin" class="capa fin" role="dialog" aria-modal="false" aria-labelledby="finTitulo" hidden>
+                <p id="finTitulo" class="tit">¡JAQUE MATE!</p>
+                <p id="finEstrellas" class="estrellas-fin" translate="no" hidden></p>
+                <div class="tarjeta" id="finTarjeta"></div>
+                <em id="finNuevo" class="nuevo" hidden>¡NUEVO RÉCORD!</em>
+                <p id="finFrase" class="frase"></p>
+                <div class="menu-botones">
+                  <button type="button" id="btnOtra" class="boton">↻ Otra</button>
+                  <button type="button" id="btnSiguiente" class="boton" hidden>Siguiente ▶</button>
+                  <button type="button" id="btnVerTablero" class="boton secundario">Ver el tablero</button>
+                  <button type="button" id="btnMenuFin" class="boton secundario">☰ Menú</button>
+                </div>
+              </div>
+            </div>
+            <div class="jugador abajo"><span class="avatar" id="avAbajo" aria-hidden="true">🙂</span><b id="nomAbajo">Tú</b><span class="perdidas" id="perAbajo" translate="no"></span></div>
+          </div>
+
+          <aside class="panel-juego">
+            <p id="aviso" class="aviso" role="status" aria-live="polite"></p>
+            <div class="acciones">
+              <button type="button" id="btnPista" class="boton chico" hidden>💡 Pista</button>
+              <button type="button" id="btnReintentar" class="boton chico secundario" hidden>↺ Reintentar</button>
+              <button type="button" id="btnGirar" class="boton chico secundario" title="Dar vuelta el tablero">⇅ Girar</button>
+              <button type="button" id="btnRendir" class="boton chico peligro" hidden>🏳 Rendirse</button>
+            </div>
+            <ol id="jugadas" class="jugadas" aria-label="Jugadas de la partida" translate="no"></ol>
+          </aside>
+        </div>
+
+        <!-- El menú: dos pestañas, una por modo. -->
+        <div id="menu" class="capa menu" role="dialog" aria-modal="false" aria-labelledby="menuTitulo" hidden>
+          <p id="menuTitulo" class="tit" translate="no">AJEDREZ CLUB</p>
+          <div class="pestanas" role="tablist">
+            <button type="button" role="tab" id="tabBots" data-modo="bots" aria-selected="true">🤖 Contra bots</button>
+            <button type="button" role="tab" id="tabPuzles" data-modo="puzles" aria-selected="false">🧩 Puzles</button>
+          </div>
+
+          <section id="panelBots" class="panel-menu" role="tabpanel" aria-labelledby="tabBots">
+            <p class="explica">Gánale al bot lo más rápido que puedas: la clasificación de cada dificultad ordena por <b>tu tiempo de pensar</b> (el del bot no cuenta). Las tablas, rendirse o perder no entran.</p>
+            <div id="niveles" class="niveles" role="radiogroup" aria-label="Dificultad"></div>
+            <div class="color" role="radiogroup" aria-label="Tu color">
+              <span>Juegas con</span>
+              <button type="button" data-color="b" aria-pressed="false">♔ Blancas</button>
+              <button type="button" data-color="azar" aria-pressed="true">🎲 Al azar</button>
+              <button type="button" data-color="n" aria-pressed="false">♚ Negras</button>
+            </div>
+            <div class="menu-botones">
+              <button type="button" id="btnJugar" class="boton">▶ Jugar</button>
+              <button type="button" id="btnSeguir" class="boton secundario" hidden>Volver a la partida</button>
+            </div>
+          </section>
+
+          <section id="panelPuzles" class="panel-menu" role="tabpanel" aria-labelledby="tabPuzles" hidden>
+            <p class="explica">Cada puzle da de <b>1 a 3 estrellas</b>: tres sin errores y sin pista, una menos por cada error o por la pista. La clasificación suma tus estrellas de todos los puzles (a igualdad, gana el menor tiempo). Puedes repetir un puzle para mejorar.</p>
+            <p class="total-estrellas"><span id="totalEstrellas" translate="no">0</span> <small id="totalDe" translate="no">/ 180 ★</small></p>
+            <div id="grupos" class="grupos"></div>
+            <div class="menu-botones">
+              <button type="button" id="btnPuzleSig" class="boton">▶ Siguiente sin resolver</button>
+              <button type="button" id="btnSeguirPuzle" class="boton secundario" hidden>Volver al puzle</button>
+            </div>
+          </section>
+
+          <div class="opciones">
+            <label>Piezas <select id="selPiezas">
+              <option value="cburnett">Clásicas</option><option value="chessnut">Chessnut</option><option value="fantasy">Fantasía</option><option value="celtic">Celtas</option>
+            </select></label>
+          </div>
+          <button type="button" id="btnComo" class="enlace" aria-expanded="false" aria-controls="comoSeJuega">¿Cómo se juega?</button>
+          <div id="comoSeJuega" class="como" hidden>
+            <p>Toca una pieza tuya y después la casilla a la que va, o arrástrala. Los puntos marcan a dónde puede ir. Las reglas son las de siempre, todas: enroque, al paso, coronación (eliges la pieza) y tablas por ahogado, triple repetición, cincuenta jugadas o material insuficiente.</p>
+            <p><b>Contra bots:</b> cuatro dificultades —Novato, Aficionado, Experto y Maestro—, cada una con su clasificación. Tu reloj corre solo mientras te toca. La partida queda guardada si cierras la pestaña, y el reloj sigue corriendo mientras pienses, aunque recargues.</p>
+            <p><b>Puzles:</b> 60 posiciones reales de partidas de lichess.org: mates en 1, 2 y 3, jugadas que ganan material y cinco desafíos de mate largo. El rival ya movió: encuentra la mejor respuesta. En los de mate vale cualquier jugada que dé mate. Si te equivocas, la jugada se deshace y pierdes una estrella; la 💡 pista marca la pieza que hay que mover y también cuesta una.</p>
+            <p class="chico">Los puzles salen de la base de puzles de lichess.org, de dominio público (CC0).</p>
+          </div>
+        </div>
+
+        <p class="nota" id="nota"></p>
+      </main>
+      <aside></aside>
+    </div>
+  </div>
+  <script src="motor.js?v=ajedrez-1"></script>
+  <script src="puzles.js?v=ajedrez-1"></script>
+  <script src="juego.js?v=ajedrez-1"></script>
+</body>
+</html>
