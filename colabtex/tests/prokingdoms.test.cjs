@@ -1641,13 +1641,15 @@ test('pk-70: de bodega a bodega la cinta entrega aunque el pueblo esté lleno o 
     assert.equal(boca.src, a); assert.equal(Ci.carrilesEn(W.idx(29, 41))[0].dst, b);
     boca.pz.f = ['wood', 'stone', 'gold', 'food', 'planks'];
     Ci.cambio();
-    const total0 = ['wood', 'stone', 'gold'].reduce((n, r) => n + G.state.res[r], 0);
+    const RS = ['wood', 'stone', 'gold', 'food'], total0 = RS.reduce((n, r) => n + G.state.res[r], 0);
     for (let i = 0; i < 600; i++) Ci.update(0.1);
     const llego = ['wood', 'stone', 'gold'].map(r => b.inv[r] || 0);
     assert.ok(llego.every(n => n >= 40), 'llegan los tres a la otra bodega (' + llego + ')');
-    const enCinta = ['wood', 'stone', 'gold'].reduce((n, r) => n + Ci.enCinta(r), 0);
-    assert.equal(['wood', 'stone', 'gold'].reduce((n, r) => n + G.state.res[r], 0) + enCinta, total0, 'no se crea ni se pierde nada');
-    assert.ok(!Object.values(t).some(pz => pz.i.some(it => it[0] === 'food')), 'la comida no sale: esta bodega no tiene');
+    const enCinta = RS.reduce((n, r) => n + Ci.enCinta(r), 0);
+    assert.equal(RS.reduce((n, r) => n + G.state.res[r], 0) + enCinta, total0, 'no se crea ni se pierde nada');
+    // pk-71: la boca saca del pueblo entero: la comida sale aunque este edificio no tenga en sus estantes
+    assert.ok(L.storeAccepts(a, 'food') ? (b.inv.food || 0) + Ci.enCinta('food') >= 40 : true, 'la comida también sale (' + b.inv.food + ')');
+    assert.ok(!Object.values(t).some(pz => pz.i.some(it => it[0] === 'planks')), 'lo que el pueblo no tiene no sale');
     assert.ok(Object.values(t).every(pz => pz.i.every(it => it[3] === 1)), 'los paquetes llevan la marca de que salieron de una bodega');
     // sin conexión, igual
     for (const k in t) t[k].i = [];

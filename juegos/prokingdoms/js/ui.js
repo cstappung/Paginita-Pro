@@ -1027,13 +1027,13 @@
   function filtroBoca(c) {
     const pz = c.pz, b = c.src, f = pz.f || (pz.f = []);
     const ops = D.RES_ORDER.filter(r => PK.Logi.storeAccepts(b, r) && D.RES[r] && r !== 'coins' && (PK.Libro.inv(b)[r] >= 1 || f.includes(r) || (S().res[r] || 0) >= 1));
-    // pk-70: cuánto hay en esta bodega y si alguien de adelante lo recibe (lo que no, no sale)
-    const acepta = PK.Cintas.aceptaAbajo(c.k), aqui = r => Math.floor(PK.Libro.inv(b)[r] || 0);
-    const sinAqui = f.filter(r => aqui(r) < 1), nadie = f.filter(r => !acepta.has(r));
-    return el('div', null, el('div', { class: 'rt-chips' }, ops.map(r => el('button', { type: 'button', class: 'rt-chip' + (f.includes(r) ? ' sel' : ''), style: acepta.has(r) ? '' : 'opacity:0.6', title: (acepta.has(r) ? '' : 'Adelante nadie lo recibe · ') + 'En esta bodega: ' + aqui(r), onclick: () => { const i = f.indexOf(r); if (i >= 0) f.splice(i, 1); else f.push(r); PK.Cintas.cambio(); UI.refreshPanel(true); } }, UI.resIcon(r), ' ' + D.RES[r].name + ' ', el('span', { class: 'muted' }, U.fmt(aqui(r)))))),
-      f.length ? el('p', { class: 'small muted' }, 'Saca por turnos, de a ' + (D.CINTA.pila || 1) + ': ' + f.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. Nunca baja de la reserva de los talleres.') : el('p', { class: 'small warn-t' }, 'Elige qué saca: por ahora no sale nada.'),
+    // pk-70/71: cuánto hay en el pueblo (la boca saca de todas las bodegas) y si alguien de adelante lo recibe
+    const acepta = PK.Cintas.aceptaAbajo(c.k), aqui = r => Math.floor(S().res[r] || 0);
+    const nadie = f.filter(r => !acepta.has(r)), poco = f.filter(r => acepta.has(r) && !PK.Cintas.puedeSacar(b, r));
+    return el('div', null, el('div', { class: 'rt-chips' }, ops.map(r => el('button', { type: 'button', class: 'rt-chip' + (f.includes(r) ? ' sel' : ''), style: acepta.has(r) ? '' : 'opacity:0.6', title: (acepta.has(r) ? '' : 'Adelante nadie lo recibe · ') + 'En el pueblo: ' + aqui(r), onclick: () => { const i = f.indexOf(r); if (i >= 0) f.splice(i, 1); else f.push(r); PK.Cintas.cambio(); UI.refreshPanel(true); } }, UI.resIcon(r), ' ' + D.RES[r].name + ' ', el('span', { class: 'muted' }, U.fmt(aqui(r)))))),
+      f.length ? el('p', { class: 'small muted' }, 'Saca por turnos, de a ' + (D.CINTA.pila || 1) + ', de todas las bodegas del pueblo: ' + f.map(r => D.RES[r].name.toLowerCase()).join(', ') + '. Nunca baja de la reserva de los talleres.') : el('p', { class: 'small warn-t' }, 'Elige qué saca: por ahora no sale nada.'),
       nadie.length ? el('p', { class: 'small warn-t' }, 'No sale ' + nadie.map(r => D.RES[r].name.toLowerCase()).join(', ') + ': adelante nadie lo recibe.') : '',
-      sinAqui.length ? el('p', { class: 'small muted' }, 'Esta bodega no tiene ' + sinAqui.map(r => D.RES[r].name.toLowerCase()).join(', ') + ' (lo guardan otras): sale solo lo que hay aquí.') : '');
+      poco.length ? el('p', { class: 'small muted' }, 'Ahora no sale ' + poco.map(r => D.RES[r].name.toLowerCase()).join(', ') + ': queda solo la reserva de los talleres.') : '');
   }
   // En el panel de un edificio: sus bocas de cinta
   function cintaBocas(b) {

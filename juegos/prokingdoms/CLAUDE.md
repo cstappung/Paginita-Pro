@@ -604,6 +604,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   delivering it to a store passes that much over the town cap (`Lb.poner(b, r, n, extra)`), because it already
   counted there. Before, with the town full or over the cap (rewards enter over it) the belt filled with 3 packets
   and stopped forever. Offline the same through `deBod`.
+- **A store port draws from the whole town (pk-71, owner's report «saca solo un par de lo que elegí»):**
+  `disponible`/`hayDe` look at `S.res` minus the workshop reserve, not at that building's shelves; `Lb.sacar` takes
+  from it first and the reconciliation takes the rest from the other stores. Villagers drop each resource at the
+  nearest store, so the Centro Urbano used to hold two of the six picks. (Carts between stores, pk-68, still move
+  shelves.)
 - **A port emits only what someone downstream receives** (`aceptaAbajo`, memo per `armado`; a sorter passes its
   filter and everything through `'*'`). Otherwise the source lane shows «No sale nada: adelante nadie recibe …»; a
   belt still jams (red) only with old cargo. The store-port picker shows how much this building holds of each
