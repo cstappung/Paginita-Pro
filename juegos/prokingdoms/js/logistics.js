@@ -338,6 +338,28 @@
     caminos.set(key, ne);
     return ne;
   };
+  // pk-61 (reporte de un jugador): un campamento al que ningún carromato llega desde ninguna bodega del pueblo (agua,
+  // murallas ajenas, cintas, un bolsón entre árboles). Sus aldeanos llevan todo a pie al pueblo (entities.js
+  // goDeposit, G.llenoPara) y lo que había guardado pasa al pueblo una vez: antes quedaba ahí para siempre.
+  const aislados = new Map();
+  L.campoAislado = function (b) {
+    const Lb = PK.Libro;
+    if (!b || !Lb || !Lb.esCampo(b) || b.type === 'colonia' || Lb.almacenDe(b) !== b) return false;
+    const t = L.tabla('carromato'), bs = Lb.bodegas(), key = t.ver + ':' + bs.length;
+    const e = aislados.get(b.id);
+    if (e && e.key === key) return e.v;
+    let v = bs.length > 0;
+    for (const s of bs.slice().sort((p, q) => U.dist(p.cx, p.cy, b.cx, b.cy) - U.dist(q.cx, q.cy, b.cx, b.cy)).slice(0, 3)) {
+      const c = L.camino(b, s, 'carromato', true);
+      if (c && c.ok) { v = false; break; }
+    }
+    aislados.set(b.id, { key, v });
+    if (v && Lb.totalCampo(b) > 0) {
+      Lb.vaciarAlPueblo(b);
+      if (!G().offline) toast('Ningún carromato llega a ' + b.def.name + ': lo que guardaba pasó al pueblo, y sus aldeanos llevarán todo a pie.', 'info');
+    }
+    return v;
+  };
   const velocidad = perfil => (perfil === 'carreta' ? D.CART.speed * (1 + L.cartSpeed()) : perfil === 'carromato' ? D.CARROMATO.speed * (1 + L.carroSpeed()) : perfil === 'barcaza' ? (D.BARCAZA ? D.BARCAZA.speed : 1.5) * L.marMult() : 1.3);
   L.velocidad = velocidad;
   // Pone a la unidad en camino hacia un edificio: por el camino guardado si está junto a su comienzo, o con uno de una

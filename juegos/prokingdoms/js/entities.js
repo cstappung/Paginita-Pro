@@ -187,7 +187,9 @@
     if (!u.carry) { u.phase = 'go'; return false; }
     // pk-42: el recolector descarga en el edificio para el que trabaja (si recibe lo que lleva)
     const base = u.owner === 'p' && u.task && u.task.t === 'gather' ? g.baseDe(u) : null;
-    const b = base && g.baseAcepta(base, u.carryRes) ? base : g.findDrop(u.owner, u.carryRes, u.x, u.y);
+    // pk-61: un campamento al que no llega ningún carromato no guarda: se lleva a pie a la bodega del pueblo
+    const aislado = base && PK.Logi.campoAislado && PK.Logi.campoAislado(base);
+    const b = base && !aislado && g.baseAcepta(base, u.carryRes) ? base : g.findDrop(u.owner, u.carryRes, u.x, u.y);
     if (!b) {
       u.mode = 'idle';
       u.wait -= dt;
@@ -226,7 +228,12 @@
       // se agotó: busca otro del mismo tipo dentro del radio de su edificio (sin amontonarse); los reinos simulados,
       // cerca de donde están
       const nn = u.owner === 'p' ? g.nodoEnRadio(t.res, base, { u }) : W.nearestNode(t.res, u.x, u.y, 12, u.owner, { zone: t.zone });
-      if (nn) { t.node = nn.id; n = nn; u.sinRadio = 0; }
+      let otro = null;
+      if (!nn && u.owner === 'p' && !base.extrae) { // pk-61: «lo que haga falta»: se agotó el oro, pasa a la piedra del radio
+        for (const r of g.queSaca(base)) if (r !== t.res && g.baseAcepta(base, r) && (otro = g.nodoEnRadio(r, base, { u }))) { t.res = r; break; }
+      }
+      if (otro) { t.node = otro.id; n = otro; u.sinRadio = 0; g.baseSucia(); if (u.carry) { u.phase = 'return'; return; } }
+      else if (nn) { t.node = nn.id; n = nn; u.sinRadio = 0; }
       else if (u.owner === 'p') {
         // nada en el radio: espera junto a su edificio a que rebrote (el Capataz puede llevarse a los suyos a otro lado)
         if (u.carry) { u.phase = 'return'; return; }

@@ -1478,3 +1478,14 @@ test('pk-60: cintas de nivel IV y V (Fase C3) y copiar una red', () => {
     assert.equal(Ci.estampar(p2), 0);
   } finally { Ci.libre = libre0; W.ownerAt = owner0; G.pay = pay0; G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+test('pk-61: las cantidades grandes no pierden ceros (reporte: 220K se veía 22K)', () => {
+  const U = PK.U;
+  assert.equal(U.fmt(220000), '220K');
+  assert.equal(U.fmt(100000), '100K');
+  assert.equal(U.fmt(10000), '10K');
+  assert.equal(U.fmt(12500), '12.5K');
+  assert.equal(U.fmt(1500000), '1.5M');
+  assert.equal(U.fmt(300000000), '300M');
+  assert.equal(U.fmt(9999), '9999');
+});

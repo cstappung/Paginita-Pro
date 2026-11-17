@@ -92,6 +92,7 @@
   }
 
   L.scare = scare; // también asustan los bandidos (incursiones.js)
+  L.herirLobo = (w, n) => hurt(w, n, false); // pk-61: las tropas que salen a cazarlos (incursiones.js)
 
   function hurt(w, dmg, arrow) {
     if (w.hp <= 0) return;

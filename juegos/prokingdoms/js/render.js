@@ -1128,6 +1128,8 @@
       if (lx < 0 || ly < 0 || lx >= w || ly >= h) continue;
       if (it.k === 'wolf' || (it.k === 'troop' && it.o.enemy)) continue;
       if (it.k === 'troop') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
+      // pk-61: los vehículos, por píxel: su rectángulo (40×42 el carromato) tapaba el campamento y no se podía elegir
+      if (it.k === 'unit' && (it.o.kind === 'cart' || it.o.kind === 'carromato' || it.o.kind === 'barcaza')) { if (Sp.hit(it.spr, lx, ly)) return it; continue; }
       if (it.k === 'unit') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
       if (it.k === 'node' && it.o.dead && it.o.kind === 'tree') continue;
       if (Sp.hit(it.spr, lx, ly)) return it;

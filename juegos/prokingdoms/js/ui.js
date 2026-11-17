@@ -156,11 +156,18 @@
     const keep = {};
     modal.body.querySelectorAll('input[id],select[id]').forEach(i => { keep[i.id] = i.value; });
     const snap = fresh === true ? null : snapScroll(modal.body);
+    // pk-61: y el foco con el cursor (el mercado se redibuja al llegar las ofertas y había que volver a hacer clic)
+    const a = document.activeElement, fid = a && a.id && modal.body.contains(a) ? a.id : null;
+    let sel = null;
+    try { if (fid && a.selectionStart !== null) sel = [a.selectionStart, a.selectionEnd]; } catch (e) { /* number no tiene selección */ }
     modal.body.innerHTML = '';
     modal.render(modal.body);
     for (const id in keep) { const i = document.getElementById(id); if (i) i.value = keep[id]; }
+    const f = fid && document.getElementById(fid);
+    if (f && modal.body.contains(f)) { f.focus({ preventScroll: true }); try { if (sel) f.setSelectionRange(sel[0], sel[1]); } catch (e) { /* idem */ } }
     if (snap) restoreScroll(modal.body, snap); else modal.body.scrollTop = 0;
   };
+  UI.modalOcupado = () => modalBusy(); // escribiendo en un campo de la ventana (los refrescos automáticos esperan)
   function modalBusy() {
     const a = document.activeElement;
     return modal && a && modal.body.contains(a) && (a.tagName === 'INPUT' || a.tagName === 'SELECT');

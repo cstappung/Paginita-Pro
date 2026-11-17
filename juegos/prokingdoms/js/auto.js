@@ -564,7 +564,7 @@
     // costo pide directo) cubre parte de lo que piden las recetas
     const st = S(), g = G(), cost = {};
     const suma = c => { for (const r in c) cost[r] = (cost[r] || 0) + c[r]; };
-    if (!st.eraProg) suma(D.eraCost(st.era + 1));
+    if (!st.eraProg) { suma(D.eraCost(st.era + 1)); suma(g.metaObras()); } // pk-61: y los edificios que pide la era
     for (const id of st.upq) { const b = g.bById.get(id); if (b) suma(g.upCost(b)); }
     const falta0 = {};
     for (const r in cost) falta0[r] = Math.max(0, cost[r] - (st.res[r] || 0));
