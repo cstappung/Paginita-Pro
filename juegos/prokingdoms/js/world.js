@@ -33,6 +33,7 @@
     W.fog = new Uint8Array(N);        // 1 = explorado por ti
     W.fogCount = 0;
     W.poiAt = new Int16Array(N).fill(-1);
+    W.subAt = new Map(); // pk-62: casilla → mazmorra bajo tierra (despeje.js)
     W.nodes = [];
     W.zones = [];
     W.pois = [];
@@ -192,7 +193,7 @@
       if ((f > 0.6 && rng() < 0.6) || rng() < 0.012) addNode('tree', x, y, W.zoneAt[i], rng);
     }
     // Mazmorras: con su propio generador y al final, así no cambia nada de lo que el mapa ya tenía.
-    const drng = U.rng(seed + 9091);
+    const drng = U.rng(seed + 9091), pasto = [];
     const placeDungeon = (kind, x, y) => {
       const def = D.POI[kind];
       if (x < 4 || y < 4 || x + def.w > w - 4 || y + def.h > h - 4) return false;
@@ -202,7 +203,7 @@
       }
       const p = { id: W.pois.length, kind, x, y, w: def.w, h: def.h, v: Math.floor(drng() * 4) };
       W.pois.push(p);
-      for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) { const k2 = W.idx(x + i, y + j); W.poiAt[k2] = p.id; W.block[k2] = 3; if (W.terrain[k2] === T_GRASS) W.terrain[k2] = T_DIRT; }
+      for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) { const k2 = W.idx(x + i, y + j); W.poiAt[k2] = p.id; W.block[k2] = 3; if (W.terrain[k2] === T_GRASS) { W.terrain[k2] = T_DIRT; if (def.dungeon) pasto.push(k2); } }
       return true;
     };
     const dungeon = (kind, count, minD) => {
@@ -243,6 +244,17 @@
         break;
       }
     });
+    // pk-62 (pedido del dueño): de cada mazmorra se ve solo la entrada, una casilla que se pisa. Se ubican con su
+    // tamaño de antes (así el generador sigue la misma secuencia y nada más del mapa se corre) y recién acá se
+    // achican: el resto de la huella vuelve a ser pasto libre.
+    for (const k2 of pasto) W.terrain[k2] = T_GRASS;
+    for (const p of W.pois) {
+      if (!D.POI[p.kind].dungeon) continue;
+      for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) { const k2 = W.idx(p.x + i, p.y + j); W.poiAt[k2] = -1; W.block[k2] = 0; }
+      p.w = p.h = 1;
+      const k2 = W.idx(p.x, p.y);
+      W.poiAt[k2] = p.id; W.terrain[k2] = W.terrain[k2] === T_GRASS ? T_DIRT : W.terrain[k2];
+    }
     W.buildBuckets();
     W.initTerritory();
     // L4: dónde puso cada cosa el mapa (W.ubicarLugares parte siempre de acá, así da lo mismo en todos lados)
@@ -875,7 +887,7 @@
   // cupieron a W.LEJOS y quedaron lo más lejos posible).
   W.QUEDAN = { tree: 1, berry: 1 };
   W.LEJOS = 12;
-  const UB_R = 80;
+  const UB_R = 80, MZ_SEP = 6, MZ_R = 32;
   let UB_OFF = null, ubCache = null;
   function ubOffsets() {
     if (UB_OFF) return UB_OFF;
@@ -909,7 +921,11 @@
     if (!W.ORIG || W.tema === 'mar') return { n: {}, p: {}, cerca: 0 };
     const key = Array.from(terr).join(',');
     if (ubCache && ubCache.key === key) return ubCache.r;
-    const w = W.W, N = w * W.H, dist = W.distTerritorio(terr), ocup = new Uint8Array(N), out = { n: {}, p: {}, cerca: 0 };
+    const w = W.W, N = w * W.H, dist = W.distTerritorio(terr), ocup = new Uint8Array(N), out = { n: {}, p: {}, cerca: 0, sub: {} };
+    // pk-62: las entradas de mazmorra que se mudan quedan a MZ_SEP casillas de toda otra entrada y a no más de MZ_R
+    // de donde las puso el mapa; la que no tiene lugar así queda «bajo tierra» (sin casilla: se entra desde el Cuartel)
+    const esMz = id => !!D.POI[W.pois[id].kind].dungeon, mzCerca = new Uint8Array(N);
+    const marcaMz = (x0, y0) => { for (let j = 1 - MZ_SEP; j < MZ_SEP; j++) for (let i = 1 - MZ_SEP; i < MZ_SEP; i++) if (W.inb(x0 + i, y0 + j)) mzCerca[W.idx(x0 + i, y0 + j)] = 1; };
     const enTerr = (x, y) => !!terr[W.parcel(x, y)];
     const nOrig = W.ORIG.n.length, pOrig = W.ORIG.p.length;
     const poiMueve = id => { const p = W.pois[id], [x0, y0] = W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (enTerr(x0 + i, y0 + j)) return true; return false; };
@@ -920,13 +936,15 @@
       if (poiMueve(id)) { mueveP.push(id); continue; }
       const p = W.pois[id], [x0, y0] = W.ORIG.p[id];
       for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocup[W.idx(x0 + i, y0 + j)] = 1;
+      if (esMz(id)) marcaMz(x0, y0);
     }
     for (let id = 0; id < nOrig; id++) { if (nodoMueve(id)) mueveN.push(id); else ocup[W.idx(W.ORIG.n[id][0], W.ORIG.n[id][1])] = 1; }
     // libre según datos fijos: el terreno, las zonas, las parcelas comunes, lo reservado y lo ya ubicado
     const libre = (x, y) => { if (!W.inb(x, y)) return false; const k = y * w + x; return !ocup[k] && W.terrain[k] !== 4 && !W.reserved[k] && W.zoneAt[k] < 0 && !W.terrCommon[W.parcel(x, y)] && !enTerr(x, y); };
-    const buscar = (x0, y0, cabe, lejos) => {
+    const buscar = (x0, y0, cabe, lejos, r2) => {
       let mejor = null, md = -1;
-      for (const [dx, dy] of ubOffsets()) {
+      for (const [dx, dy, d2] of ubOffsets()) {
+        if (r2 && d2 > r2) return null; // con radio, solo a W.LEJOS o nada
         const x = x0 + dx, y = y0 + dy;
         if (!W.inb(x, y)) continue;
         const dd = lejos(x, y);
@@ -938,15 +956,17 @@
       return mejor;
     };
     for (const id of mueveP) {
-      const p = W.pois[id], [x0, y0] = W.ORIG.p[id];
+      const p = W.pois[id], [x0, y0] = W.ORIG.p[id], mz = esMz(id);
       const cabe = (x, y) => {
+        if (mz && mzCerca[y * w + x]) return false;
         for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (!libre(x + i, y + j)) return false;
         for (let j = -1; j <= p.h; j++) for (let i = -1; i <= p.w; i++) { const xx = x + i, yy = y + j; if (W.inb(xx, yy) && ocup[yy * w + xx] === 2) return false; } // dos lugares movidos nunca se tocan
         return true;
       };
       const lejos = (x, y) => { let m = 99; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) { if (!W.inb(x + i, y + j)) return 0; m = Math.min(m, dist[W.idx(x + i, y + j)]); } return m; };
-      const to = buscar(x0, y0, cabe, lejos);
-      if (!to) continue;
+      const to = buscar(x0, y0, cabe, lejos, mz ? MZ_R * MZ_R : 0);
+      if (!to) { if (mz) out.sub[id] = 1; continue; }
+      if (mz) marcaMz(to[0], to[1]);
       out.p[id] = to;
       for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocup[W.idx(to[0] + i, to[1] + j)] = 2;
     }
@@ -959,7 +979,7 @@
     }
     // las casillas que quedan ocupadas por lugares y recursos que no son árboles (para la Calzada, L5)
     const ocupa = new Uint8Array(N);
-    for (let id = 0; id < pOrig; id++) { const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = 1; }
+    for (let id = 0; id < pOrig; id++) { if (out.sub[id]) continue; const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = 1; }
     for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = 1; }
     Object.defineProperty(out, 'ocupa', { value: ocupa, enumerable: false }); // fuera del JSON (la prueba compara posiciones)
     ubCache = { key, r: out };

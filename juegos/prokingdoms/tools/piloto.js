@@ -72,7 +72,9 @@
     for (const n of W.nodes) {
       if (n.dead || n.temp || D.NODES[n.kind].res !== res || !W.fog[n.y * W.W + n.x] || !W.canUse(n, 'p')) continue;
       const d = U.dist(tc.cx, tc.cy, n.x, n.y);
-      if (d > 60 || mios.some(b => (!b.extrae || b.extrae === res) && U.dist(b.cx, b.cy, n.x, n.y) <= g.BASES[type].r(b.lvl))) continue;
+      // pk-61: solo cuenta como «ya cubierto» si ese campamento tiene puestos libres; con uno lleno encima de los
+      // últimos nodos de hierro, ni el piloto ponía otro ni el Capataz mandaba a nadie (2 h sin hierro en la Era IV)
+      if (d > 60 || mios.some(b => (!b.extrae || b.extrae === res) && g.libresBase(b) > 0 && U.dist(b.cx, b.cy, n.x, n.y) <= g.BASES[type].r(b.lvl))) continue;
       cand.push([d, n]);
     }
     cand.sort((a, b) => a[0] - b[0]);
@@ -105,6 +107,12 @@
     // (puestos libres que sirven: en edificios con algo vivo en su radio)
     const utiles = g.buildings.reduce((n, b) => { if (!g.esBase(b) || g.libresBase(b) <= 0) return n; const rr = g.recursosEnRadio(b); return Object.keys(rr).some(k => rr[k].vivos) ? n + g.libresBase(b) : n; }, 0);
     if (idle >= 6 && utiles < idle) { const cnt = A.counts().c; pide.push(...['wood', 'stone', 'food', 'gold'].sort((a, b) => (cnt[a] || 0) / Math.max(1, w[a] || 1) - (cnt[b] || 0) / Math.max(1, w[b] || 1))); }
+    // pk-61: antes de poner otro, cambia qué saca un campamento que ya tiene eso en su radio y está fijado a algo que
+    // ahora no hace falta (uno puesto para oro junto a 23 nodos de mármol seguía sacando oro con el mármol en 0)
+    for (const res of pide) {
+      const b = g.buildings.find(o => g.esBase(o) && o.done && o.extrae && o.extrae !== res && !(w[o.extrae] || 0) && g.baseAcepta(o, res) && g.nodoEnRadio(res, o));
+      if (b) { anota(b.def.name + ': ahora saca ' + D.RES[res].name.toLowerCase() + ' (antes ' + D.RES[b.extrae].name.toLowerCase() + ').'); b.extrae = res; P.cambios = (P.cambios || 0) + 1; return true; }
+    }
     for (const res of pide) {
       const type = A.CAMPO[res];
       if (!g.isUnlocked(type) || !g.canAfford(g.buildCost(type))) continue;
@@ -305,6 +313,12 @@
   function mercado() {
     const g = G(), st = S();
     if (!g.countB('market')) return;
+    // pk-61: lo que pide la meta (la era y sus edificios) y nadie puede juntar (no hay mármol a mano), se compra
+    const nec = g.metaNecesita();
+    for (const r of ['marble', 'ore', 'gems']) {
+      const falta = Math.ceil(((nec[r] || 0) - (st.res[r] || 0)) / 100) * 100, n = Math.min(500, falta);
+      if (n > 0 && !PK.Auto.jobAvailable(r) && PK.Social.buyPrice(r, n) < st.res.gold - 1000 && PK.Social.buy(r, n)) { P.compras = (P.compras || 0) + 1; anota('Compró ' + n + ' de ' + D.RES[r].name.toLowerCase() + ' (nadie lo junta).'); break; }
+    }
     // lo que está lleno y la próxima era no pide (o ya tiene de sobra), se vende: lo que sugiere el Asesor
     const costo = st.eraProg ? {} : D.eraCost(st.era + 1);
     // pk-55: también compra lo que le falta para la era cuando le sobra oro. Con el oro pasado del tope (premios), los
@@ -394,7 +408,7 @@
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
   const F0 = () => (PK.Fort ? PK.Fort.mias().length : 0);
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

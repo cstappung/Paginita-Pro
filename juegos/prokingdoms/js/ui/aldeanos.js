@@ -60,6 +60,7 @@
       const o = rs[r];
       return el('span', { class: 'base-res' + (o.vivos ? '' : ' warn-t') }, UI.resIcon(r), ' ' + (o.vivos ? o.vivos + ' (aprox. ' + U.fmt(o.monto) + ')' : 'agotado') + (o.agotados ? ' · ' + o.agotados + ' rebrotando' : ''));
     });
+    if (PK.Logi.campoAislado && PK.Logi.campoAislado(b)) box.append(el('p', { class: 'small warn-t' }, 'Ningún carromato llega aquí desde el pueblo: los aldeanos llevan todo a pie a la bodega (más lento). Ábrele paso (un camino, un Gran Portón, un paso elevado sobre las cintas) o muévelo.'));
     box.append(el('div', { class: 'small base-rs' }, filas.length ? filas : el('span', { class: 'warn-t' }, 'No conoces nada que sacar en su radio: muévelo cerca de un recurso o explora.')));
     if (b.def.drop.length > 1) box.append(el('div', { class: 'row' }, el('span', { class: 'small' }, 'Saca: '),
       el('select', { 'aria-label': 'Qué saca ' + b.def.name, onchange: e => { b.extrae = e.target.value || undefined; UI.refreshPanel(true); } },

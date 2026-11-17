@@ -53,7 +53,8 @@
     let i = 0;
     while (n >= 1000 && i < SUF.length - 1) { n /= 1000; i++; }
     const s = n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : String(Math.floor(n));
-    return (neg ? '-' : '') + s.replace(/\.?0+$/, '') + SUF[i];
+    // pk-61: solo se quitan los ceros de los decimales; sin el «includes», 220K quedaba en «22K» y 100K en «1K»
+    return (neg ? '-' : '') + (s.includes('.') ? s.replace(/\.?0+$/, '') : s) + SUF[i];
   };
 
   U.fmtTime = function (s) {

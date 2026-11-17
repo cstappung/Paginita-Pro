@@ -509,8 +509,10 @@
     // puntos de interés
     for (const p of W.pois) {
       const [px, py] = R.iso(p.x, p.y);
-      if (px < vx0 - 60 || px > vx0 + vw + 60 || py < vy0 - 20 || py > vy0 + vh + 80 || !seen(p.x, p.y)) continue;
-      const st = g.poiState(p), spr = Sp.poi(p.kind, st && st.d);
+      if (p.sub || px < vx0 - 60 || px > vx0 + vw + 60 || py < vy0 - 20 || py > vy0 + vh + 80 || !seen(p.x, p.y)) continue;
+      const st = g.poiState(p);
+      if (!R.poiVisible(p)) continue; // pk-62: la entrada de una mazmorra, recién cuando la encuentras
+      const spr = Sp.poi(p.kind, st && st.d);
       const x = Math.round(px - spr.ox), y = Math.round(py - spr.oy);
       if (!vis(x, y, spr.c.width, spr.c.height)) continue;
       list.push({ d: p.x + p.y + (p.w + p.h) / 2, k: 'poi', o: p, spr, x, y });
@@ -1126,6 +1128,13 @@
   }
 
   // Selección por píxel: recorre lo dibujado de adelante hacia atrás.
+  // pk-62: una mazmorra se ve (y se elige) solo después de encontrada; las que quedaron bajo tierra, nunca en el mapa
+  R.poiVisible = function (p) {
+    if (p.sub) return false;
+    if (!D.POI[p.kind].dungeon) return true;
+    const st = G().poiState(p);
+    return !!(st && st.f);
+  };
   R.pick = function (sx, sy) {
     const [wx, wy] = R.screenToWorld(sx, sy);
     if (PK.Terr && PK.Terr.mode) {
@@ -1139,6 +1148,8 @@
       if (lx < 0 || ly < 0 || lx >= w || ly >= h) continue;
       if (it.k === 'wolf' || (it.k === 'troop' && it.o.enemy)) continue;
       if (it.k === 'troop') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
+      // pk-61: los vehículos, por píxel: su rectángulo (40×42 el carromato) tapaba el campamento y no se podía elegir
+      if (it.k === 'unit' && (it.o.kind === 'cart' || it.o.kind === 'carromato' || it.o.kind === 'barcaza')) { if (Sp.hit(it.spr, lx, ly)) return it; continue; }
       if (it.k === 'unit') { if (lx >= 3 && lx <= w - 3 && ly <= h - 1) return it; continue; }
       if (it.k === 'node' && it.o.dead && it.o.kind === 'tree') continue;
       if (Sp.hit(it.spr, lx, ly)) return it;
@@ -1150,7 +1161,7 @@
     const bid = W.bAt[W.idx(x, y)];
     if (bid >= 0) return { k: 'building', o: G().bById.get(bid) };
     const pid = W.poiAt[W.idx(x, y)];
-    if (pid >= 0) return { k: 'poi', o: W.pois[pid] };
+    if (pid >= 0 && R.poiVisible(W.pois[pid])) return { k: 'poi', o: W.pois[pid] };
     if (W.belt[W.idx(x, y)] >= 0) return { k: 'belt', x, y };
     return { k: 'tile', x, y };
   };
@@ -1188,7 +1199,7 @@
         const k = W.idx(tx, ty), nid = W.nodeAt[k];
         let col = Sp.TERRAIN_MM[W.terrain[k]];
         if (nid >= 0 && !W.nodes[nid].dead) col = Sp.NODE_MM[W.nodes[nid].kind] || (Sp.NODE_MM_MAR && Sp.NODE_MM_MAR[W.nodes[nid].kind]) || col;
-        if (W.poiAt[k] >= 0) col = W.pois[W.poiAt[k]].kind === 'legend' ? [255, 220, 90] : [210, 180, 120];
+        if (W.poiAt[k] >= 0 && R.poiVisible(W.pois[W.poiAt[k]])) col = W.pois[W.poiAt[k]].kind === 'legend' ? [255, 220, 90] : [210, 180, 120];
         const o = W.terr[W.parcel(tx, ty)];
         if (o) {
           const c2 = o - 1 === D.MY_SLOT ? [110, 175, 255] : D.REALM_SLOTS[o - 1].color, pt = dal ? Sp.patronDe(o - 1) : -1, f = pt >= 0 && Sp.enPatron(pt, mx, my) ? 0.85 : 0.4; // daltonismo: el patrón del reino

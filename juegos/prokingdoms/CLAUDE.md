@@ -491,6 +491,51 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
   shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.
 
+### Players' reports and the pilot's pace (`pk-61`)
+
+- **`U.fmt`** strips zeros only after a decimal point (stripping any trailing zero turned 220K into «22K»).
+- **A camp on «lo que haga falta»** (`!b.extrae`): when a villager's resource runs out in the radius it moves to the
+  next one of `G.queSaca(b)` with nodes left (`doGather`), instead of waiting by the camp.
+- **`UI.rerender` restores focus and caret** of the field you were typing in; the market's 4 s offer refresh (and the
+  guild's) skips redrawing while a field has focus (`UI.modalOcupado`, `quieto` in `net.js`).
+- **Vehicles are picked by pixel** (`R.pick`, `Sp.hit` on their mask): their 40×42 box hid the camp underneath.
+- **`L.campoAislado(b)`**: a camp no carromato reaches from any of the 3 nearest stores (cached by the carromato table
+  version and store count). Its villagers walk to the town store (`goDeposit`, `G.llenoPara`, and the offline
+  `tripRate`/`campo` the same way); what it held goes to the town once, with a toast. The camp panel explains it.
+- **Bandits always camp outside your land**: `buscarOrigen` walks each direction to the border and camps 2–8 tiles
+  past it (it used to accept a tile inside after 100 tries, with a big kingdom they spawned in town).
+- **«Atacar su campamento»** (`Inc.cargar`, on the warning toast when troops are home): troops sally at once; when
+  one gets within 4 tiles the band breaks camp and fights there. The march start does not re-sally if they are out.
+- **Troops hunt wolves** (`Inc.salirLobos`, defenders with `lobos: true`, damage through `PK.Life.herirLobo`, power
+  from `Social.power`): from the barracks nearest the pack, within 30 tiles, rechecked every 5 s; they give way to a
+  bandit raid. No losses against wolves.
+- **The Consejo's marshal recruits a mix**: each available type has a share (catapult 0.1, militia only if alone) and
+  it trains the one furthest below it, 3 per pass. It used to train only the strongest (catapults from Era V).
+- **«Meta de era» counts the buildings the next era asks for** (`G.metaObras`: `eraReq` entries with `n: 1` you do
+  not own, at `buildCost`), in `G.metaNecesita` and `A.metaWeights`: the University's 60 marble was never gathered.
+- **Reserve when the meta does not ask for the product** (`G.reservaDe`): 100 of it (or 20% of the cap, if less)
+  is enough to hold an input the meta needs. With big stores the Forge and the Steelworks never reached 20% and ate
+  every ingot of the Era V cost.
+- **Pilot**: switches a camp's fixed `extrae` to a needed resource when the old one has weight 0; a full camp no
+  longer counts as «covering» nodes (`lugarPara`); buys marble/ore/gems the meta needs when nobody can gather them.
+
+### Dungeons show only their entrance (`pk-62`, owner's request)
+
+- **A dungeon is a 1×1 entrance you can walk on** (`W.block` 0, `W.poiAt` set so nothing is built on it). The
+  generator still places them with their old 2×2/3×3 footprint (so its random sequence and the POI fixture do not
+  change) and shrinks them at the end of `W.generate`, before `W.ORIG`, giving the rest of the footprint back as
+  grass. Their drawing is `PENT` in `sprites.js` (`S.poi` picks it when `D.POI[kind].dungeon`); `PDRAW` keeps the
+  big drawings, unused for dungeons. Anything placed "around" a dungeon must use `p.w`/`p.h`, never `D.POI` sizes.
+- **Moved entrances keep apart**: `W.ubicarLugares` puts a moved dungeon at ≥`MZ_SEP` (6, Chebyshev) from every
+  other entrance and within `MZ_R` (32) of its original spot, at `W.LEJOS` or nothing. One with no such spot goes in
+  `out.sub` («bajo tierra»): `despeje.js` takes it off the map (`p.sub`, position back to `W.ORIG`, `W.subAt` maps
+  that tile to it) and it is still entered from the Cuartel. It comes back when the territory no longer covers it.
+- **An entrance appears only once found** (`R.poiVisible`: drawing, picking and minimap). Revealing a tile finds an
+  underground one through `W.subAt` (`G.revealAt`); one that moves or sinks under already explored land is found on
+  the spot with one summary toast (`G.discoverPoi(p, true)`, `hallar` in `despeje.js`).
+- No `D.PROTO` bump: the server only uses `W.ubicarLugares` for the Calzada's `ocupa`. Until `firebase deploy --only
+  functions`, the deployed server still treats the old footprints as occupied (a Calzada tile there is refused).
+
 ## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, `js/cintas.js`, `PK.Cintas`)
 
 - **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,

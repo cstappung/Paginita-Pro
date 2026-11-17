@@ -52,6 +52,8 @@
     carromatos); el piloto no llega a sitiar ni a conquistar por su cuenta, así que el ritmo de la guerra en sí no
     quedó medido.
   - **El plan de guerra está completo** salvo esas diferencias anotadas fase por fase.
+  - **Publicado en `pk-66`:** las fases se hicieron como `pk-60` a `pk-65` en una rama paralela a la de cintas, que
+    también usó esos números; al fusionarse con la rama principal todo salió junto como `pk-66`.
 
 ---
 

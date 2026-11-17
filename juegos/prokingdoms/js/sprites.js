@@ -1583,7 +1583,92 @@
     const key = 'poi|' + kind + '|' + (solved ? 1 : 0);
     if (BCACHE[key]) return BCACHE[key];
     const def = D.POI[kind];
+    if (def.dungeon) return (BCACHE[key] = isoSprite(1, 1, ETOP[kind], false, p => PENT[kind](p))); // pk-62: solo la entrada
     return (BCACHE[key] = isoSprite(def.w, def.h, PTOP[kind], false, p => PDRAW[kind](p, solved ? 1 : 0)));
+  };
+  // pk-62 (pedido del dueño): de cada mazmorra el mapa muestra solo la entrada, en una casilla que se pisa. Cada tipo
+  // con lo suyo de los dibujos grandes de arriba (PDRAW), en chico: la roca y los cristales de la cueva, los ojos de
+  // la guarida, el mausoleo de la cripta, el brillo azul del cráter, el oro del nido…
+  const suelo1 = (p, c, l) => p.fill([p.P(0, 0, 0), p.P(1, 0, 0), p.P(1, 1, 0), p.P(0, 1, 0)], c, l || 1, 0);
+  const boca = (p, b, u0, u1, z, c) => p.quad(b, 'L', u0, u1, 0, z, c || '#0e0a10');
+  const ETOP = { cave: 18, lair: 16, crypt: 26, crater: 10, nest: 26, swamp: 16, giants: 26, temple: 20 };
+  const PENT = {
+    cave(p) {
+      suelo1(p, 'soil', 0.75);
+      const b = { x: 0.08, y: 0.1, w: 0.84, h: 0.62 };
+      p.box(b.x, b.y, b.w, b.h, 0, 9, 'rock', 'rock', 'rock');
+      p.box(0.25, 0.18, 0.45, 0.35, 9, 13, 'rock', 'rock', 'rock');
+      boca(p, b, 0.24, 0.62, 6);
+      for (const [x, y, h] of [[0.86, 0.82, 7], [0.2, 0.85, 5]]) {
+        const c = p.P(x, y, 0);
+        p.fill([[c[0], c[1] - h], [c[0] + 2, c[1] - 1], [c[0], c[1] + 1], [c[0] - 2, c[1] - 1]], '#8ae0f0');
+        p.fill([[c[0], c[1] - h], [c[0] + 2, c[1] - 1], [c[0], c[1] + 1]], '#3a9ac0');
+      }
+    },
+    lair(p) {
+      suelo1(p, 'soil', 0.8);
+      const b = { x: 0.1, y: 0.08, w: 0.82, h: 0.66 };
+      p.box(b.x, b.y, b.w, b.h, 0, 9, 'rock', 'rock', '#5a6a3a');
+      boca(p, b, 0.2, 0.62, 6, '#100a08');
+      const e = p.wp(b, 'L', 0.41, 3); p.px(e[0] - 1, e[1], '#ffcc40'); p.px(e[0] + 2, e[1] + 1, '#ffcc40');
+      const o = p.P(0.75, 0.9, 0); p.line([o[0] - 3, o[1]], [o[0] + 3, o[1] - 1], '#e8e0cc'); p.px(o[0] - 3, o[1] - 1, '#e8e0cc'); p.px(o[0] + 3, o[1], '#e8e0cc');
+    },
+    crypt(p) {
+      suelo1(p, '#4a5a3a');
+      const b = { x: 0.18, y: 0.12, w: 0.64, h: 0.56 };
+      p.box(b.x, b.y, b.w, b.h, 0, 11, 'stone');
+      boca(p, b, 0.18, 0.46, 7, '#0c0a10');
+      p.roof(b.x, b.y, b.w, b.h, 11, 7, 'slate', 0.05, 0.08, 'x');
+      const c = p.P(0.5, 0.4, 19); p.line(c, [c[0], c[1] - 5], '#9a968c'); p.line([c[0] - 2, c[1] - 3], [c[0] + 2, c[1] - 3], '#9a968c');
+      const f = p.wp(b, 'L', 0.32, 3); p.px(f[0], f[1], '#7affb0');
+      p.box(0.82, 0.8, 0.12, 0.06, 0, 4, 'stone', 'stone', 'stone');
+    },
+    crater(p) {
+      suelo1(p, '#3a2e28');
+      p.fill([p.P(0.22, 0.22, 0), p.P(0.78, 0.22, 0), p.P(0.78, 0.78, 0), p.P(0.22, 0.78, 0)], '#1e1a18', 1, 0);
+      for (const [x, y, h] of [[0.05, 0.1, 4], [0.45, 0.04, 5], [0.08, 0.5, 5], [0.8, 0.4, 3], [0.4, 0.82, 3]]) p.box(x, y, 0.18, 0.16, 0, h, 'rock', 'rock', 'rock');
+      p.box(0.4, 0.4, 0.2, 0.2, 0, 5, '#2e3850', '#1e2638', '#a8c0e8');
+      const s = p.P(0.5, 0.5, 5); p.px(s[0], s[1] - 4, '#e8f4ff'); p.px(s[0] + 4, s[1] - 1, '#e8f4ff');
+    },
+    nest(p) {
+      suelo1(p, '#4a3a30');
+      const b = { x: 0.1, y: 0.1, w: 0.8, h: 0.62 };
+      p.box(b.x, b.y, b.w, b.h, 0, 13, 'rock', 'rock', 'rock');
+      p.box(0.28, 0.2, 0.4, 0.32, 13, 20, 'rock', 'rock', 'rock');
+      boca(p, b, 0.3, 0.66, 9, '#0a0606');
+      const e = p.wp(b, 'L', 0.48, 5); p.px(e[0] - 2, e[1], '#ff3a20'); p.px(e[0] + 2, e[1] - 1, '#ff3a20');
+      p.box(0.62, 0.8, 0.3, 0.16, 0, 2, 'gilt', 'gilt', 'gilt');
+      const g = p.P(0.77, 0.88, 2); p.px(g[0], g[1] - 1, '#fff0a0');
+    },
+    swamp(p) {
+      suelo1(p, '#3a4a2a');
+      p.fill([p.P(0.15, 0.2, 0), p.P(0.85, 0.15, 0), p.P(0.88, 0.8, 0), p.P(0.18, 0.85, 0)], '#3a6a4a', 1, 0);
+      p.fill([p.P(0.3, 0.34, 0), p.P(0.7, 0.32, 0), p.P(0.72, 0.68, 0), p.P(0.32, 0.7, 0)], '#0e1a14', 1, 0);
+      // piedras con musgo alrededor del pozo y un tronco muerto con la lámpara de la bruja
+      for (const [x, y, h] of [[0.18, 0.3, 3], [0.62, 0.16, 4], [0.74, 0.58, 3], [0.36, 0.74, 2]]) p.box(x, y, 0.16, 0.14, 0, h, 'rock', 'rock', '#5a7a3a');
+      p.box(0.06, 0.12, 0.12, 0.12, 0, 16, 'darkwood', 'darkwood', 'darkwood');
+      p.line(p.P(0.12, 0.18, 12), p.P(-0.05, 0.05, 17), '#3a2a18'); p.line(p.P(0.12, 0.18, 14), p.P(0.3, 0.05, 20), '#3a2a18');
+      const l = p.P(0.3, 0.05, 18); p.px(l[0], l[1], '#9aff7a'); p.px(l[0], l[1] + 1, '#5aff8a');
+      for (const [x, y] of [[0.85, 0.3], [0.9, 0.42], [0.25, 0.88]]) p.line(p.P(x, y, 0), p.P(x, y, 6), '#6a8a3a');
+      for (const [x, y, z] of [[0.5, 0.5, 6], [0.75, 0.7, 9]]) { const f = p.P(x, y, z); p.px(f[0], f[1], '#9affb8'); p.px(f[0], f[1] + 1, '#5aff8a'); }
+    },
+    giants(p) {
+      suelo1(p, 'soil', 0.85);
+      // dos pilares y un dintel: la puerta de piedra de los gigantes
+      p.box(0.12, 0.3, 0.2, 0.4, 0, 18, 'rock', 'rock', 'rock');
+      p.box(0.68, 0.3, 0.2, 0.4, 0, 18, 'rock', 'rock', 'rock');
+      p.fill([p.P(0.32, 0.7, 0), p.P(0.68, 0.7, 0), p.P(0.68, 0.7, 15), p.P(0.32, 0.7, 15)], '#0c0a0a');
+      p.box(0.06, 0.28, 0.88, 0.44, 18, 23, 'rock', 'rock', 'rock');
+      const r = p.P(0.5, 0.7, 20); p.px(r[0], r[1], '#ff9a4a'); p.px(r[0] + 1, r[1], '#ff9a4a');
+    },
+    temple(p) {
+      suelo1(p, '#4a6a5a');
+      p.fill([p.P(0.25, 0.3, 0), p.P(0.75, 0.3, 0), p.P(0.75, 0.85, 0), p.P(0.25, 0.85, 0)], '#2a5a7a', 1, 0);
+      for (let i = 0; i < 3; i++) p.box(0.28, 0.32 + i * 0.16, 0.44, 0.14, 0, 1, 'marbleS', 'marbleS', 'marbleS'); // escalones que bajan al agua
+      for (const x of [0.08, 0.76]) { p.box(x, 0.2, 0.16, 0.16, 0, 15, 'marbleS', 'marbleS', 'marbleS'); p.box(x - 0.02, 0.18, 0.2, 0.2, 15, 17, 'stone', 'stone', 'stone'); }
+      p.fill([p.P(0.3, 0.12, 0), p.P(0.7, 0.12, 0), p.P(0.7, 0.12, 9), p.P(0.3, 0.12, 9)], '#0c1418');
+      const g = p.P(0.5, 0.5, 2); p.px(g[0], g[1], '#9ae8ff'); p.px(g[0] + 3, g[1] + 1, '#9ae8ff');
+    },
   };
 
   // ---------- Obras en construcción y andamios ----------

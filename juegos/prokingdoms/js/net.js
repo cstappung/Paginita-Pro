@@ -374,7 +374,9 @@
   // ---------- Mercado, gremio, territorio, ranking ----------
   const done = () => PK.UI.rerender();
   const fail = e => { toast(e.message, 'warn'); done(); };
-  Net.refreshOffers = () => api('GET', '/api/offers').then(r => { Net.cache.offers = r; Object.assign(S().market.p, r.prices); done(); }).catch(() => {});
+  // pk-61: el refresco de cada 4 s no redibuja mientras escribes una oferta (se perdía el foco a mitad del número)
+  const quieto = () => { if (!(PK.UI.modalOcupado && PK.UI.modalOcupado())) done(); };
+  Net.refreshOffers = () => api('GET', '/api/offers').then(r => { Net.cache.offers = r; Object.assign(S().market.p, r.prices); quieto(); }).catch(() => {});
   Net.acceptOffer = o => api('POST', '/api/offers/accept', { id: o.id }).then(r => {
     const st = S();
     if ((st.res[r.want] || 0) < r.wn) toast('Ya no tenías suficiente; el trato se cerró igual.', 'warn');
@@ -392,7 +394,7 @@
   };
   Net.cancelOffer = o => api('POST', '/api/offers/cancel', { id: o.id }).then(r => { S().res[r.give] += r.gn; return Net.refreshOffers(); }).catch(fail);
 
-  Net.refreshGuilds = () => api('GET', '/api/guilds').then(r => { Net.cache.guilds = r; applyGuild(r.mine ? { id: r.mine.id, name: r.mine.name, stage: r.mine.stage } : null); done(); }).catch(() => {});
+  Net.refreshGuilds = () => api('GET', '/api/guilds').then(r => { Net.cache.guilds = r; applyGuild(r.mine ? { id: r.mine.id, name: r.mine.name, stage: r.mine.stage } : null); quieto(); }).catch(() => {});
   const guildCall = (path, body) => api('POST', path, body).then(r => { Net.cache.guilds = r.guilds || r; applyGuild(Net.cache.guilds.mine ? { stage: Net.cache.guilds.mine.stage, name: Net.cache.guilds.mine.name } : null); done(); return r; });
   Net.createGuild = name => guildCall('/api/guilds/create', { name }).then(() => toast('Gremio fundado.', 'good')).catch(fail);
   Net.joinGuild = id => guildCall('/api/guilds/join', { id }).then(() => toast('Te uniste al gremio.', 'good')).catch(fail);
