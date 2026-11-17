@@ -663,6 +663,67 @@
       ]
     },
 
+    // ===== Versión 7 (Nov 2026): tres defensas nuevas para Biblioteca, Estelar y Tiempo =====
+    // (levels.js `v7`; `nueva7` las muestra como nuevas en esos tres reinos). Lógica en
+    // engine.js (tTelar, tYunque, tPilon), dibujo en render.js.
+    telar: {
+      name: 'Telar de Ámbar', cost: 560, kind: 'telar', size: 17, color: '#ffb340', targeting: true, realm: 19, nueva7: true,
+      desc: 'Una araña tejedora lanza TELARAÑAS DE ÁMBAR sobre el camino: zonas grandes donde los enemigos van mucho más LENTOS. Los jefes y las élites no se frenan.',
+      base: { range: 150, cd: 4.5, webs: 2, webR: 58, webDur: 7, webSlow: 0.45, webDps: 0, webAmp: 0, webAir: false, dtype: 'poison' },
+      paths: [
+        { name: 'Seda', ups: [
+          { name: 'Seda Densa', cost: 240, desc: 'Frena un 55% y las telas son más grandes (+10).', apply: s => { s.webSlow = 0.55; s.webR += 10; } },
+          { name: 'Telar Doble', cost: 650, desc: '3 telarañas a la vez y teje cada 3.5 s.', apply: s => { s.webs = 3; s.cd = 3.5; } },
+          { name: 'Red Celeste', cost: 1800, desc: 'Las telas atrapan también a los VOLADORES, duran 9 s y son más grandes (+14).', apply: s => { s.webAir = true; s.webDur = 9; s.webR += 14; } },
+          { name: 'Gran Telaraña', cost: 6800, desc: 'Frena un 70%, 4 telas enormes (+24) y al entrar ENREDA 1 s a los que no son grandes.', apply: s => { s.webSlow = 0.7; s.webs = 4; s.webR += 24; s.webHold = 1; } }
+        ] },
+        { name: 'Veneno', ups: [
+          { name: 'Seda Ácida', cost: 260, desc: 'Las telas envenenan: 8 daño/s (ignora blindaje).', apply: s => { s.webDps = 8; } },
+          { name: 'Hilo Pegajoso', cost: 720, desc: 'Lo que está en una tela recibe +15% de daño de TODO.', apply: s => { s.webAmp = 0.15; } },
+          { name: 'Ámbar Corrosivo', cost: 2100, desc: 'Veneno de 30 daño/s y +25% de daño recibido.', apply: s => { s.webDps = 30; s.webAmp = 0.25; } },
+          { name: 'Reina Tejedora', cost: 7400, desc: 'Veneno de 90 daño/s (x2 a los jefes) y +35% de daño recibido.', apply: s => { s.webDps = 90; s.webAmp = 0.35; s.bossMult = 2; } }
+        ] }
+      ]
+    },
+    yunque: {
+      name: 'Yunque Estelar', cost: 880, kind: 'yunque', size: 18, color: '#c0c8e0', targeting: true, defaultTarget: 'strong', realm: 18, nueva7: true,
+      desc: 'Deja caer un YUNQUE desde las estrellas sobre su blanco (también voladores). Cuanto más BLINDADO el enemigo, más le duele, y la onda golpea a los de alrededor.',
+      base: { range: 210, cd: 3.4, dmg: 45, armorX: 8, bigMult: 1.5, anvils: 1, radius: 40, splash: 0.35, stun: 0, dtype: 'explosive', armorPierce: 1 },
+      paths: [
+        { name: 'Masa', ups: [
+          { name: 'Hierro Forjado', cost: 360, desc: '+35 daño.', apply: s => { s.dmg += 35; } },
+          { name: 'Rompecorazas', cost: 950, desc: 'El blindaje le duele el doble y el golpe AGRIETA: −3 de blindaje 6 s.', apply: s => { s.armorX *= 2; s.crack = 3; } },
+          { name: 'Yunque de Neutrones', cost: 2700, desc: '+140 daño y x2.5 contra los grandes.', apply: s => { s.dmg += 140; s.bigMult = 2.5; } },
+          { name: 'Estrella Enana', cost: 9600, desc: '+480 daño, x3 contra jefes y una onda enorme (+40).', apply: s => { s.dmg += 480; s.bossMult = 3; s.radius += 40; } }
+        ] },
+        { name: 'Forja', ups: [
+          { name: 'Caída Rápida', cost: 320, desc: 'Cae un 25% más seguido.', apply: s => { s.cd *= 0.75; } },
+          { name: 'Onda Sísmica', cost: 820, desc: 'Onda más grande (+25) y más fuerte; aturde 0.6 s a los que no son grandes.', apply: s => { s.radius += 25; s.splash = 0.6; s.stun = 0.6; } },
+          { name: 'Lluvia de Yunques', cost: 2500, desc: '3 yunques a la vez, sobre los 3 más fuertes.', apply: s => { s.anvils = 3; } },
+          { name: 'Herrería Celestial', cost: 8200, desc: '5 yunques cada 1.4 s.', apply: s => { s.anvils = 5; s.cd = 1.4; } }
+        ] }
+      ]
+    },
+    pilon: {
+      name: 'Pilón de la Aurora', cost: 420, kind: 'pilon', size: 15, color: '#7affc8', realm: 17, nueva7: true,
+      desc: 'Pon DOS o más: cada pilón se une al más cercano con una VALLA DE LUZ que quema a todo lo que la cruza, también voladores y camuflados. Ponlos a lo largo del camino.',
+      base: { range: 230, dps: 14, width: 12, links: 1, zapDmg: 6, zapCd: 1, dtype: 'arcane' },
+      paths: [
+        { name: 'Valla', ups: [
+          { name: 'Haz Intenso', cost: 260, desc: '+60% de daño.', apply: s => { s.dps *= 1.6; } },
+          { name: 'Enlace Lejano', cost: 640, desc: 'Se une hasta 90 más lejos y la valla es más ancha (+6).', apply: s => { s.range += 90; s.width += 6; } },
+          { name: 'Red Boreal', cost: 1900, desc: 'Se une a DOS pilones a la vez.', apply: s => { s.links = 2; } },
+          { name: 'Muralla de Aurora', cost: 7200, desc: 'x3 de daño y quien la toca va un 35% más lento.', apply: s => { s.dps *= 3; s.fenceSlow = 0.35; } }
+        ] },
+        { name: 'Carga', ups: [
+          { name: 'Chispa Polar', cost: 230, desc: 'Solo o en valla, lanza chispas más fuertes (x3) y más seguido.', apply: s => { s.zapDmg *= 3; s.zapCd = 0.6; } },
+          { name: 'Quemadura Boreal', cost: 720, desc: 'La valla QUEMA: 12 daño/s durante 3 s al que la cruza.', apply: s => { s.fenceBurn = 12; } },
+          { name: 'Destello', cost: 2100, desc: 'Cada 4 s la valla destella: 160 de daño a todo lo que la toca.', apply: s => { s.flashCd = 4; s.flashDmg = 160; } },
+          { name: 'Tormenta Polar', cost: 7800, desc: 'Destellos cada 2 s de 520 de daño (x2 contra los grandes) que aturden 0.4 s.', apply: s => { s.flashCd = 2; s.flashDmg = 520; s.flashBig = 2; s.flashStun = 0.4; } }
+        ] }
+      ]
+    },
+
     // ============================ HÉROES (uno por reino) ============================
     // Solo en su reino y UNO por partida (engine.js: canPlace). Muy caros, pero con un
     // aura propia y una habilidad automática única desde el principio. A diferencia de
@@ -1057,7 +1118,9 @@
     'heroepantano', 'heroecumbres', 'heroefosa', 'heroeengranaje', 'heroeeclipse',
     // cuarta era (reinos 16–20)
     'jade', 'ruleta', 'grimorio', 'satelite', 'crono',
-    'heroejade', 'heroecirco', 'heroebiblio', 'heroeestelar', 'heroetiempo'];
+    'heroejade', 'heroecirco', 'heroebiblio', 'heroeestelar', 'heroetiempo',
+    // versión 7: Biblioteca, Estelar y Tiempo (también al final)
+    'telar', 'yunque', 'pilon'];
   // Defensas disponibles en un reino: las 12 clásicas + las 2 nuevas de cada reino ya alcanzado
   // + el héroe de ESE reino (los héroes no pasan a los reinos siguientes).
   // Los reinos de la segunda era (levels.js: `torres`) venden solo su lista, cada vez más corta.

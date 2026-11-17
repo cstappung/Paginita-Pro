@@ -362,6 +362,8 @@
       // blindaje) y Colmena (drones contra libros y almas que vuelan). Con el bot, rondas 61–80:
       // ~23k vidas perdidas → ~10k.
       v6: { torres: ['espinas', 'vigia', 'voltaico', 'dragon', 'prisma', 'colmena', 'totem', 'huerto', 'acido', 'balista', 'grimorio'] },
+      // v7: + las tres defensas nuevas (Telar de Ámbar, Yunque Estelar, Pilón de la Aurora)
+      v7: { torres: ['espinas', 'vigia', 'voltaico', 'dragon', 'prisma', 'colmena', 'totem', 'huerto', 'acido', 'balista', 'grimorio', 'telar', 'yunque', 'pilon'] },
       heroes: 'cuarta', eventos: ['apagon', 'niebla', 'esporas', 'bendicion'], eventosTarde: ['runas', 'vital', 'elite', 'furia'], poder: 'olvido',
       boss: 'codice',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['libro', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['origami', 8, 1.3],
@@ -386,6 +388,7 @@
       // ignoran el blindaje de los dirigibles). Las Sierras se quedan: sin ellas al bot se le
       // escapaban los tanques (49k vidas perdidas en las rondas 61–100 → 80k).
       v6: { torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'colmena', 'totem', 'balista', 'sierra', 'pararrayos', 'satelite'] },
+      v7: { torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'colmena', 'totem', 'balista', 'sierra', 'pararrayos', 'satelite', 'telar', 'yunque', 'pilon'] },
       heroes: 'cuarta', eventos: ['meteoros', 'tormenta', 'viento', 'frenesi'], eventosTarde: ['portales', 'titanes', 'runas', 'terremoto'], poder: 'agujero',
       boss: 'vortex',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['alado', 3, 1], ['robusto', 4, 1], ['marciano', 5, 1.3], ['escudero', 7, 1], ['ovni', 8, 1.3],
@@ -414,6 +417,7 @@
       // para los tres caminos) y Alquimista (blindaje del Guardián y de los Colosos). Con el bot,
       // rondas 61–100: ~84k vidas perdidas → ~34k.
       v6: { torres: ['espinas', 'vigia', 'voltaico', 'prisma', 'totem', 'acido', 'balista', 'obelisco', 'campanario', 'crono'] },
+      v7: { torres: ['espinas', 'vigia', 'voltaico', 'prisma', 'totem', 'acido', 'balista', 'obelisco', 'campanario', 'crono', 'telar', 'yunque', 'pilon'] },
       heroes: 'cuarta', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], eventosTarde: ['titanes', 'elite', 'runas', 'vital', 'furia', 'portales', 'terremoto'], poder: 'pausa',
       boss: 'aion',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['cuerda', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['ecoTiempo', 8, 1.3],
@@ -549,15 +553,17 @@
   // puede rebalancear sin romper las partidas a medias ni las pruebas ya guardadas.
   // Desde la 6 también `L.v6` (encima de `v5`, si lo hay): p. ej. las torres de los reinos
   // 18–20, cambiadas sin tocar las partidas ni las pruebas de la 5.
+  // Desde la 7, `L.v7` (las tres defensas nuevas de los reinos 18–20), encima de las otras.
+  const CAPAS = [5, 6, 7];
   PD.nivel = function (li, ve) {
     const L = PD.LEVELS[li];
-    const capas = [ve >= 5 && L.v5, ve >= 6 && L.v6].filter(Boolean);
-    if (!capas.length) return L;
-    const clave = ve >= 6 && L.v6 ? '_v6' : '_v5';
+    const usa = CAPAS.filter(v => ve >= v && L['v' + v]);
+    if (!usa.length) return L;
+    const clave = '_v' + usa[usa.length - 1];
     if (!L[clave]) {
       const o = {};
-      for (const k in L) if (k !== '_rounds' && k !== '_v5' && k !== '_v6' && k !== 'v5' && k !== 'v6') o[k] = L[k];
-      L[clave] = Object.assign(o, ...capas);
+      for (const k in L) if (k !== '_rounds' && !/^_?v\d$/.test(k)) o[k] = L[k];
+      L[clave] = Object.assign(o, ...usa.map(v => L['v' + v]));
     }
     return L[clave];
   };

@@ -71,13 +71,14 @@ segundos. En Node (tests, `scripts/auditar-club.cjs`) se usa el motor cargado en
   del trabajador y de `verifica/prodefender.js` con cualquier cambio del motor,
   los datos (`js/data/`) o las reglas de pasos**: una partida grabada con otro
   motor no se rehace igual.
-- **Varias versiones a la vez** (`VERSIONES` en `prueba.js`, hoy 4, 5 y 6): el motor recibe la
+- **Varias versiones a la vez** (`VERSIONES` en `prueba.js`, hoy 4 a 7): el motor recibe la
   versión (`new PD.Game(li, snap, semilla, ve)`) y aplica las reglas de esa versión, así que
   una partida empezada antes de un cambio se sigue jugando, reanudando y verificando con
   sus reglas. La 5 suma los bufos de estructuras distintas y da a los jefes x20 de vida y
   un quinto de la velocidad; la 6, la mitad de eso (1/10), y cambia las torres de Biblioteca,
   Estelar y Tiempo (`L.v6`; la prueba comprueba cada torre con la lista de su versión:
-  `PD.towersFor(r, ve)`). Para un cambio de reglas, mejor esto que subir `VERSION`
+  `PD.towersFor(r, ve)`); la 7 les suma tres defensas nuevas (Telar de Ámbar, Yunque Estelar
+  y Pilón de la Aurora, `L.v7`). Para un cambio de reglas, mejor esto que subir `VERSION`
   a secas: eso descarta las partidas guardadas a medias de todos.
 
 `sospecha()` (filas sin prueba): más de 100 rondas, o menos de 5 s de juego por

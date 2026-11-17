@@ -451,6 +451,31 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
 - The bot placed Huertos and Tótems even where the kingdom does not sell them (Estelar and
   Tiempo had farms in every measurement before this); fixed with `this.vende`.
 
+## Engine version 7 (Nov 17 2026): three new towers for kingdoms 18–20
+
+Owner: «está difícil aún, agrega tres torres nuevas… creativas… que al menos 1 ralentice
+en una buena área». All three are sold in Biblioteca, Estelar and Tiempo only (`L.v7`,
+appended at the end of `TOWER_ORDER`, `nueva7: true` so `realmTowers` in main.js shows them
+as new there; `realm` 19/18/17 only keeps the card's «de reino» count right).
+
+- **Telar de Ámbar** (`telar`, `tTelar`): weaves webs (`this.telas`, cleared at `endRound`,
+  dropped when the tower is sold) half a second ahead of an enemy not already in one of its
+  webs. A web slows everything inside (`applySlow`, so bosses and elites stay immune), and by
+  path: more/bigger webs, flyers (`webAir`), a 1 s hold on entry once per web (`webHold`, not
+  big ones); poison (`webDps`) and `webAmp` (+% damage taken, `e.telaAmp` until
+  `e.telaHasta` > `rt`, added in the era-4 `amp4` of `damage`).
+- **Yunque Estelar** (`yunque`, `tYunque`/`landYunque`): a shell with `yunque: true` falls
+  on the strongest targets; the hit is `dmg × bigMult (big and bosses) + armour × armorX`
+  (armour becomes damage, `ap` 1), the shockwave gives `splash` of `dmg` to the rest,
+  flyers included; `crack` sets `e.corr` (armour −N, 6 s).
+- **Pilón de la Aurora** (`pilon`, `enlazaPilones`/`tPilon`): each pilon links to its
+  `links` nearest pilons within `range`; a fence is burned once, by the stronger of its two
+  pilons (tie: lower id), and hits everything within `width` of the segment (camo and
+  flyers too, `dot`). `t.vallas` is what render.js draws. Alone it only zaps (`zapDmg`).
+- Old games are untouched: every new rule runs only with the new towers, `amp4` adds 0
+  without `telaHasta`, and `webDps`/`zapDmg` in `DANIOS` are absent on old towers.
+  Checked: scripted v5 and v6 games hash identically on the v6 and v7 engines.
+
 ## Determinism — do not break it
 
 - The engine's randomness is `this.rnd()` (mulberry32 seeded per `Game`).

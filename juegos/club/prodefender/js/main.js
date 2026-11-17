@@ -47,7 +47,8 @@
     selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗', cienaga: '☘', tempestad: 'ϟ', maremoto: '≈', sobrecarga: '⚙', amanecer: '☀',
     dragonJade: '🐉', granEscape: '🎩', escrito: '📖', orbital: '🛰', detener: '⏳' };
   const DTYPE = { phys: 'Físico', explosive: 'Explosivo', ice: 'Hielo', elec: 'Eléctrico', fire: 'Fuego', arcane: 'Arcano', poison: 'Ácido', steam: 'Vapor' };
-  const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li && !PD.TOWERS[id].hero);
+  // las propias del reino, más las tres de la versión 7 donde se venden (`nueva7`)
+  const realmTowers = li => PD.towersFor(li).filter(id => (PD.TOWERS[id].realm === li || PD.TOWERS[id].nueva7) && !PD.TOWERS[id].hero);
   // La tienda: las torres (con las teclas de HOTKEYS) y, aparte, el héroe del reino (tecla H).
   const PINCHOS = '@pinchos';   // en ui.placing: tirar pinchos en vez de colocar una torre
   const PODER = '@poder';       // en ui.placing: apuntar el Poder del Reino (tercera era)
@@ -749,6 +750,42 @@
       rows.push(['Habilidad', `<b>${A.name} · ${n1(abCd(t))} s</b>`]);
       rows.push(['Camuflados', s.atk === 'slam' ? '<b class="yes">Área</b>' : yn(s.camo)]);
       rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
+      rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
+      return rows;
+    }
+    // versión 7
+    if (k === 'telar') {
+      rows.push(['Lentitud', `<b>${Math.round(s.webSlow * 100)}%</b>`]);
+      rows.push(['Telarañas', `<b>${s.webs} · radio ${Math.round(s.webR)}</b>`]);
+      rows.push(['Teje cada', `<b>${n1(s.cd)} s · duran ${n1(s.webDur)} s</b>`]);
+      rows.push(['Voladores', yn(s.webAir)]);
+      rows.push(['Veneno', `<b>${s.webDps ? n1(s.webDps) + '/s' : 'No'}</b>`]);
+      rows.push(['Daño recibido', `<b>${s.webAmp ? '+' + Math.round(s.webAmp * 100) + '%' : 'No'}</b>`]);
+      rows.push(['Enreda', `<b>${s.webHold ? n1(s.webHold) + ' s' : 'No'}</b>`]);
+      rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
+      rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
+      return rows;
+    }
+    if (k === 'yunque') {
+      rows.push(['Daño', `<b>${n1(s.dmg)}${s.bigMult > 1 ? ' · x' + n1(s.bigMult) + ' grandes' : ''}</b>`]);
+      rows.push(['Por blindaje', `<b>+${n1(s.armorX)} por punto</b>`]);
+      rows.push(['Yunques', `<b>${s.anvils} cada ${n1(s.cd)} s</b>`]);
+      rows.push(['Onda', `<b>${Math.round(s.splash * 100)}% · radio ${Math.round(s.radius)}</b>`]);
+      rows.push(['Aturde', `<b>${s.stun ? n1(s.stun) + ' s' : 'No'}</b>`]);
+      rows.push(['Agrieta', `<b>${s.crack ? '−' + s.crack + ' blindaje' : 'No'}</b>`]);
+      rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
+      rows.push(['Camuflados', yn(s.camo)]);
+      rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
+      return rows;
+    }
+    if (k === 'pilon') {
+      rows.push(['Valla', `<b>${n1(s.dps)}/s · ancho ${Math.round(s.width)}</b>`]);
+      rows.push(['Enlaces', `<b>${(t.enlaces || []).length} de ${s.links} · hasta ${Math.round(s.range)}</b>`]);
+      rows.push(['Chispa', `<b>${n1(s.zapDmg)} cada ${n1(s.zapCd)} s</b>`]);
+      rows.push(['Frena', `<b>${s.fenceSlow ? Math.round(s.fenceSlow * 100) + '%' : 'No'}</b>`]);
+      rows.push(['Quema', `<b>${s.fenceBurn ? n1(s.fenceBurn) + '/s' : 'No'}</b>`]);
+      rows.push(['Destello', `<b>${s.flashDmg ? n1(s.flashDmg) + ' / ' + n1(s.flashCd) + ' s' : 'No'}</b>`]);
+      rows.push(['Camuflados', '<b class="yes">Sí</b>']);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
       return rows;
     }

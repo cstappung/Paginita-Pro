@@ -679,7 +679,7 @@ test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis 
 });
 
 test('versión 5: los bufos de estructuras distintas se suman, los del mismo tipo no; la 4 sigue con el mejor',()=>{
- assert.equal(P.VERSION,6);assert.deepEqual(P.VERSIONES,[4,5,6]);
+ assert.equal(P.VERSION,7);assert.deepEqual(P.VERSIONES,[4,5,6,7]);
  const rod=PD.TOWERS.pararrayos;let pRod=-1,nRod=0;rod.paths.forEach((pa,i)=>pa.ups.forEach((u,n)=>{if(pRod<0&&/Carga Est/.test(u.name)){pRod=i;nRod=n+1;}}));
  assert.ok(pRod>=0,'el Pararrayos tiene un bufo de velocidad');
  const arma=ve=>{const g=new PD.Game(0,null,1,ve);g.money=1e9;
@@ -710,7 +710,7 @@ test('versión 6: Biblioteca, Estelar y Tiempo cambian sus torres; las partidas 
   const L=PD.LEVELS[li];assert.ok(L.v6&&Array.isArray(L.v6.torres),L.short+' tiene torres de la 6');
   assert.deepEqual(PD.towersFor(li,5).filter(id=>!PD.TOWERS[id].hero),PD.TOWER_ORDER.filter(id=>L.torres.includes(id)),L.short+': la 5 vende las de antes');
   assert.deepEqual(PD.towersFor(li,6).filter(id=>!PD.TOWERS[id].hero),PD.TOWER_ORDER.filter(id=>L.v6.torres.includes(id)),L.short+': la 6 las nuevas');
-  assert.deepEqual(PD.towersFor(li),PD.towersFor(li,6),'sin versión, la de ahora');
+  assert.deepEqual(PD.towersFor(li),PD.towersFor(li,P.VERSION),'sin versión, la de ahora');
   assert.deepEqual(PD.heroesOf(li,5),PD.heroesOf(li,6),'los mismos héroes');
   for(const id of L.v6.torres)assert.ok(PD.TOWERS[id]&&!PD.TOWERS[id].hero,id+' existe');
   assert.ok(!L.v6.torres.includes('desintegrador'),'sin Desintegrador (anula la vida tardía)');
@@ -725,6 +725,38 @@ test('versión 6: Biblioteca, Estelar y Tiempo cambian sus torres; las partidas 
  const r5=prueba(5);assert.ok(r5.t,'en la 5 se puede poner');
  assert.equal(P.rehace(r5.p,'uidT').ronda,0,'y la prueba de la 5 se rehace');
  assert.throws(()=>P.rehace({...r5.p,ve:6},'uidT'),/no existe en este reino|no se podía/,'en la 6 no se vende');
+});
+
+test('versión 7: Telar de Ámbar, Yunque Estelar y Pilón de la Aurora en Biblioteca, Estelar y Tiempo',()=>{
+ const NUEVAS=['telar','yunque','pilon'];
+ for(const li of [17,18,19]){
+  for(const id of NUEVAS){assert.ok(PD.towersFor(li,7).includes(id),PD.LEVELS[li].short+' vende '+id);assert.ok(!PD.towersFor(li,6).includes(id),'la 6 no');}
+  assert.deepEqual(PD.towersFor(li,6).filter(id=>!PD.TOWERS[id].hero),PD.towersFor(li,7).filter(id=>!PD.TOWERS[id].hero&&!NUEVAS.includes(id)),'la 7 = la 6 + las tres');
+ }
+ for(const li of [0,5,10,15,16])for(const id of NUEVAS)assert.ok(!PD.towersFor(li,7).includes(id),'solo en los tres reinos');
+ // al final de TOWER_ORDER: las pruebas guardan las torres por su índice
+ assert.deepEqual(PD.TOWER_ORDER.slice(-3),NUEVAS);
+ const juego=()=>{const g=new PD.Game(19,null,3,7);g.money=1e7;g.active=true;g.queue=[{t:1e9}];g.qi=0;g.hurryT=1e9;g.round=30;return g;};
+ const enCamino=(g,f)=>{const q={x:0,y:0,a:0};PD.posAt(g.paths[0],g.paths[0].len*f,q);return {...q};};
+ const ponCerca=(g,type,x0,y0)=>{for(let r=0;r<300;r+=4)for(let a=0;a<6.283;a+=0.25){const t=g.place(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
+ // Telar: la telaraña frena a uno común (no a un jefe) y, con Hilo Pegajoso, le hace recibir más daño
+ {const g=juego(),p=enCamino(g,0.3),t=ponCerca(g,'telar',p.x,p.y);g.upgrade(t,1);g.upgrade(t,1);
+  const e=g.spawn('robusto',0,g.paths[0].len*0.3,1);for(let k=0;k<6;k++)g.update(1/60);
+  assert.equal(g.telas.length,1,'teje una tela');assert.ok(e.slowF>=0.44,'frena: '+e.slowF);
+  assert.ok(e.telaHasta>g.rt&&e.telaAmp===0.15,'recibe +15%');
+  const jefe=Object.keys(PD.ENEMIES).find(id=>PD.ENEMIES[id].boss&&!PD.ENEMIES[id].twins),b=g.spawn(jefe,0,g.paths[0].len*0.3,1,2);
+  g.telas.push({...g.telas[0],x:b.x,y:b.y,t:5});g.update(1/60);assert.equal(b.slowF,0,'los jefes no se frenan');}
+ // Yunque: cuanto más blindado, más le duele
+ {const g=juego(),p=enCamino(g,0.4),t=ponCerca(g,'yunque',p.x,p.y);
+  const golpe=tipo=>{const e=g.spawn(tipo,0,g.paths[0].len*0.4,1);e.hp=e.maxHp=1e9;g.shells.push({x0:e.x,y0:e.y-200,x1:e.x,y1:e.y,t:0,T:0.01,src:t,yunque:true,blanco:e});g.updateShells?g.updateShells(0.02):g.update(0.02);const d=1e9-e.hp;e.dead=true;return d;};
+  const blando=golpe('robusto'),duro=golpe('magnetita');
+  assert.ok(blando>0&&duro>blando+20,'blindaje '+PD.ENEMIES.magnetita.armor+': '+blando+' → '+duro);}
+ // Pilón: solo no hace valla; con pareja, quema lo que la cruza (también camuflados)
+ {const g=juego(),a=enCamino(g,0.2),b=enCamino(g,0.27);
+  const p1=ponCerca(g,'pilon',a.x,a.y);g.update(1/60);assert.equal((p1.vallas||[]).length,0,'sin pareja no hay valla');
+  const p2=ponCerca(g,'pilon',b.x,b.y);g.update(1/60);assert.equal(p1.vallas.length+p2.vallas.length,1,'una sola valla por pareja');
+  const e=g.spawn('sombra',0,0,1);e.hp=e.maxHp=1e9;e.x=(p1.x+p2.x)/2;e.y=(p1.y+p2.y)/2;e.dist=1e-3;
+  g.grid.clear();g.grid.add(e);const h0=e.hp;g.updateTowers(1/60);assert.ok(e.hp<h0,'la valla quema');}
 });
 
 const ponCercaG=(G,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.35){const t=G.colocar(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
@@ -777,7 +809,7 @@ test('cuarta era: cinco reinos, uno por día del 1 al 5 de noviembre, con su tab
   assert.equal(L.era,4);assert.ok(L.diff>=PD.nivel(14,5).diff,L.short+' no es más fácil que la Noche');
   assert.deepEqual(PD.heroesOf(li),HEROES4,'los cinco héroes nuevos, y solo ellos');
   assert.equal(PD.heroOf(li),null,'no hay héroe fijo: se elige');
-  assert.equal(ids.filter(id=>!PD.TOWERS[id].hero&&PD.TOWERS[id].realm===li).length,1,L.short+': su defensa nueva');
+  assert.equal(ids.filter(id=>!PD.TOWERS[id].hero&&!PD.TOWERS[id].nueva7&&PD.TOWERS[id].realm===li).length,1,L.short+': su defensa nueva');
   assert.ok(PD.ENEMIES[L.boss].boss&&PD.PODERES[L.poder],'jefe y poder');
   for(const [id] of L.pool)assert.ok(PD.ENEMIES[id],id);
   for(const id of L.torres)assert.ok(PD.TOWERS[id],id);
