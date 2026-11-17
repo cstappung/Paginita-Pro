@@ -295,3 +295,12 @@ test('G8: misiones, desafíos, retos y pase del asedio tienen quien los registre
   const m = /G8 \(pk-65\): la guerra[\s\S]*?\/\/ una salida por pasada/.exec(JS('consejo.js'))[0];
   assert.ok(!/plan\.gano|\.bajas/.test(m) && /impetu/.test(m), 'la retirada del Mariscal no lee quién gana');
 });
+
+// ---------- pk-67: traslado entre bodegas ----------
+test('pk-67: el traslado entre bodegas existe en la logística, el armador y el cálculo sin conexión', () => {
+  const lg = JS('logistics.js'), ui = JS(path.join('ui', 'reino.js'));
+  assert.ok(/L\.esTraslado = /.test(lg) && /function cargarTraslado/.test(lg) && /function otraBodega/.test(lg));
+  assert.ok(/L\.esTraslado\(r\) \? queTraslado\(/.test(lg), 'sin conexión también');
+  assert.ok(/L\.crearRuta = function \(de, a, res, tipo, lista\)/.test(lg) && /trasladoMalo\(r\)/.test(lg));
+  assert.ok(/UI\.materialesTraslado = /.test(ui) && /¿Qué materiales pasa\?/.test(ui));
+});

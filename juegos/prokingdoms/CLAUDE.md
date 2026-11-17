@@ -717,3 +717,14 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   of its own was measured; its siege numbers come from the probes it defends.
 - Not done from the plan's G8: new pase cosmetics (banner, siege camp), and the logistics leftovers it listed
   (map view, camp palisade, bandits raiding escorted carts).
+
+### Owner's tweak: moving goods between stores (`pk-68`; built as pk-67 in parallel with the belts pk-67)
+
+- A cart route can join a fixed store (TC, Almacén, Granero) and «cualquier bodega», either way (`L.esTraslado`);
+  two fixed stores are still refused («Entre dos bodegas no hace falta»). `r.lista` holds the materials the player
+  ticked (none = everything that takes room, `L.listaTraslado`), editable later in the route row.
+- The other end is the store (never the fixed one) that can pass the most (`otraBodega`); a cart loads what is in
+  the origin's own `inv` and fits in the destination's own room (`Lb.lugar`, minus what is already on its way),
+  leaves with half a load or whatever there is after 30 s. Town totals do not change. Offline too (`queTraslado`).
+- A store «guarda» a resource only if `capDe(b, k) > 0`: the Almacén accepts food but has no room for it, so a food
+  transfer without a Granero is refused (`trasladoMalo`).

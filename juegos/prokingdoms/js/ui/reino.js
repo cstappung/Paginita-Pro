@@ -264,7 +264,7 @@
 
   // ---------- Logística ----------
   // pk-41: las carretas siguen rutas que eliges tú (origen, destino y, si quieres, un recurso). Sin ruta quedan paradas.
-  const rutaForm = { de: 0, a: 0, res: '', tipo: '' };
+  const rutaForm = { de: 0, a: 0, res: '', tipo: '', lista: [] };
   UI.nuevaRutaDesde = function (b, comoDestino) {
     if (comoDestino) rutaForm.a = b.id; else rutaForm.de = b.id;
     UI.openLogistics();
@@ -278,6 +278,13 @@
     const b = G().bById.get(v);
     return b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '';
   };
+  // pk-67: los materiales de un traslado entre bodegas. Sin ninguno marcado, lleva de todo lo que ocupa lugar.
+  UI.materialesTraslado = function (fija, lista, cambia) {
+    const L = PK.Logi, st = S();
+    const ops = Object.keys(D.RES).filter(k => PK.Libro.fisico(k) && (!fija || (L.storeAccepts(fija, k) && G().capDe(fija, k) > 0)) && ((st.res[k] || 0) >= 1 || lista.includes(k)));
+    return el('div', { class: 'rt-chips' }, [el('button', { type: 'button', class: 'rt-chip' + (!lista.length ? ' sel' : ''), onclick: () => cambia([]) }, 'De todo')].concat(
+      ops.map(k => el('button', { type: 'button', class: 'rt-chip' + (lista.includes(k) ? ' sel' : ''), 'aria-pressed': lista.includes(k) ? 'true' : 'false', onclick: () => cambia(lista.includes(k) ? lista.filter(x => x !== k) : lista.concat([k])) }, UI.resIcon(k), ' ' + D.RES[k].name))));
+  };
   UI.rutaEl = function (r, compacto) {
     const L = PK.Logi, g = G(), cs = L.cartsDe(r), mala = L.rutaMala(r), rep = L.extremosRep(r), a = rep.from, b = rep.to;
     const T = mala ? null : L.tiempos(r, true);
@@ -287,8 +294,10 @@
     return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
       el('div', { class: 'ruta-nom' }, iconoExtremo(r.de, r.res, r.tipo), el('b', null, L.nombreExtremo(r.de, r.res, r.tipo)), ' → ',
         iconoExtremo(r.a, r.res), el('b', null, L.nombreExtremo(r.a, r.res)),
+        L.esTraslado(r) ? (r.lista && r.lista.length ? el('span', { class: 'small' }, ' · ', r.lista.map(k => UI.resIcon(k)), ' ' + r.lista.map(k => D.RES[k].name.toLowerCase()).join(', ')) : el('span', { class: 'small muted' }, ' · de todo')) :
         r.res ? (r.de === 'campo' ? '' : el('span', { class: 'small' }, ' · ', UI.resIcon(r.res), ' ' + D.RES[r.res].name.toLowerCase())) : el('span', { class: 'small muted' }, r.de === 'campo' ? ' · de todo lo que junten' : ' · lo que haga falta'),
         L.comodin(r.de) || L.comodin(r.a) ? el('span', { class: 'small muted' }, ' · ahora: ' + (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?')) : ''),
+      L.esTraslado(r) && !compacto ? el('details', { class: 'small rt-mat' }, el('summary', null, 'Materiales que lleva'), UI.materialesTraslado(G().bById.get(L.comodin(r.de) ? r.a : r.de), r.lista || [], l => { r.lista = l; r.res = null; UI.rerender(); })) : '',
       el('div', { class: 'ruta-dat small' }, T && T.ok ? 'Ida ' + Math.round(T.ida) + ' s · vuelta ' + Math.round(T.vuelta) + ' s' + (cs.length ? ' · aprox. ' + Math.round(T.ritmo) + ' por minuto' : '') : '', el('span', { class: malo ? 'warn-t' : 'muted' }, (T && T.ok ? ' · ' : '') + estado)),
       el('div', { class: 'row ruta-btn' },
         el('span', { class: 'small' }, nom + ': '),
@@ -352,13 +361,13 @@
       el('span', { class: 'rt-ficha-ico' }, ico), el('span', { class: 'rt-ficha-t' }, el('b', null, txt), sub ? el('span', { class: 'small' }, sub) : '', extra ? el('span', { class: 'small muted' }, extra) : ''));
     const fichaB = (b, sel, onclick, conLejos) => ficha(b.id, sel, b.def.name + ' ' + b.lvl, guarda(b), el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }), onclick, conLejos ? lejos(b) : '');
     const grupo = (titulo, fichas) => (fichas.length ? el('div', { class: 'rt-grupo' }, el('div', { class: 'rt-grupo-t small' }, titulo), el('div', { class: 'rt-fichas' }, fichas)) : '');
-    const elegirDe = v => { F.de = F.de === v ? 0 : v; F.a = 0; if (v !== 'campo') F.res = F.tipo = ''; UI.rerender(); };
-    const elegirA = v => { F.a = F.a === v ? 0 : v; UI.rerender(); };
+    const elegirDe = v => { F.de = F.de === v ? 0 : v; F.a = 0; F.lista = []; if (v !== 'campo') F.res = F.tipo = ''; UI.rerender(); };
+    const elegirA = v => { F.a = F.a === v ? 0 : v; F.lista = []; UI.rerender(); };
 
     // 1. ¿De dónde?
     const paso1 = el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '1'), el('b', null, '¿De dónde sale?')),
       grupo('Comodines', [tiposCampos.length ? ficha('campo', F.de === 'campo', 'Cualquier campamento', 'el que tenga más; trae de todo', iconoExtremo('campo', null, F.tipo || tiposCampos[0]), () => elegirDe('campo')) : '',
-        talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].concat(
+        (talleres.length && bodegas.length) || bodegas.length >= 2 ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'a un taller, o a otra bodega', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].concat(
         tiposTaller.map(t => ficha('taller:' + t, F.de === 'taller:' + t, nomT(t), 'el que tenga más hecho', iconoExtremo('taller:' + t), () => elegirDe('taller:' + t)))).filter(Boolean)),
       grupo('Campamentos (carromato)', campos.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
       grupo('Muelles de colonias (barcaza)', colonias.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
@@ -367,7 +376,7 @@
     body.append(el('h3', null, 'Nueva ruta'));
     const caja = el('div', { class: 'ruta-nueva rt-armar' }, paso1);
     body.append(caja);
-    if (!F.de) { caja.append(el('p', { class: 'small muted' }, 'Elige de dónde sale. Un carromato vacía campamentos; una carreta une talleres y bodegas del pueblo.')); return; }
+    if (!F.de) { caja.append(el('p', { class: 'small muted' }, 'Elige de dónde sale. Un carromato vacía campamentos; una carreta une talleres y bodegas del pueblo, o pasa cosas de una bodega a otra (por ejemplo, de cualquier bodega al Centro Urbano).')); return; }
 
     // si es «cualquier campamento», primero de qué tipo; con varios recursos (el minero), todo o solo uno (pk-55)
     if (F.de === 'campo') {
@@ -398,7 +407,11 @@
     const Bd = muestra(F.a), A = A0 || muestra(F.de);
     const resOps = F.de === 'campo' ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => (Bd ? L.acepta(Bd, k) : L.bodegasRuta(k).length)) : Bd && L.isShop(Bd) ? Object.keys(L.recipe(Bd).in) : A && L.isShop(A) ? [L.output(A)] : [];
     if (F.res && F.de !== 'campo' && !resOps.includes(F.res)) F.res = '';
-    if (F.de !== 'campo' && resOps.length > 1) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué lleva?')),
+    const traslado = PK.Logi.esTraslado({ de: F.de, a: F.a }); // pk-67
+    if (traslado) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué materiales pasa?')),
+      UI.materialesTraslado(B(L.comodin(F.de) ? F.a : F.de), F.lista, l => { F.lista = l; UI.rerender(); }),
+      el('p', { class: 'small muted' }, 'Puedes marcar varios. Cada carreta carga de lo marcado lo que haya en el origen y quepa en el destino; el total de tu pueblo no cambia, solo dónde está guardado.')));
+    else if (F.de !== 'campo' && resOps.length > 1) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué lleva?')),
       el('div', { class: 'rt-chips' }, [el('button', { type: 'button', class: 'rt-chip' + (!F.res ? ' sel' : ''), onclick: () => { F.res = ''; UI.rerender(); } }, 'Lo que haga falta')].concat(
         resOps.map(k => el('button', { type: 'button', class: 'rt-chip' + (F.res === k ? ' sel' : ''), onclick: () => { F.res = k; UI.rerender(); } }, UI.resIcon(k), ' ' + D.RES[k].name))))));
     const tipoF = F.de === 'campo' ? F.tipo || null : null;
@@ -406,15 +419,15 @@
     const prov = { de: F.de, a: F.a, res: F.res || null, tipo: tipoF }, clase = L.claseRuta(prov), libres = L.libres(clase).length;
     caja.append(el('div', { class: 'rt-resumen' },
       el('div', { class: 'ruta-nom' }, iconoExtremo(F.de, F.res, tipoF), el('b', null, L.nombreExtremo(F.de, F.res, tipoF)), ' → ', iconoExtremo(F.a, F.res), el('b', null, L.nombreExtremo(F.a, F.res)),
-        F.res && F.de !== 'campo' ? el('span', { class: 'small' }, ' · ', UI.resIcon(F.res), ' ' + D.RES[F.res].name.toLowerCase()) : F.de === 'campo' && !F.res ? el('span', { class: 'small muted' }, ' · de todo lo que junten') : ''),
+        traslado ? el('span', { class: 'small' + (F.lista.length ? '' : ' muted') }, ' · ' + (F.lista.length ? F.lista.map(k => D.RES[k].name.toLowerCase()).join(', ') : 'de todo')) : F.res && F.de !== 'campo' ? el('span', { class: 'small' }, ' · ', UI.resIcon(F.res), ' ' + D.RES[F.res].name.toLowerCase()) : F.de === 'campo' && !F.res ? el('span', { class: 'small muted' }, ' · de todo lo que junten') : ''),
       why ? el('p', { class: 'small warn-t' }, why) : el('p', { class: 'small muted' }, (clase === 'barcaza' ? 'Barcazas' : clase === 'carromato' ? 'Carromatos' : 'Carretas') + ' libres: ' + libres + (libres ? ' (se le suma uno al crearla).' : '. La ruta queda creada y le sumas uno con + cuando tengas.')),
       el('div', { class: 'row' }, UI.btn('Crear ruta', () => {
-        const r = L.crearRuta(F.de, F.a, F.res || null, tipoF);
+        const r = L.crearRuta(F.de, F.a, traslado ? null : F.res || null, tipoF, traslado ? F.lista.slice() : null);
         if (!r) return;
         if (L.libres(L.claseRuta(r)).length) L.sumarCarreta(r);
-        F.de = F.a = 0; F.res = F.tipo = '';
+        F.de = F.a = 0; F.res = F.tipo = ''; F.lista = [];
         UI.rerender(); UI.refreshPanel(true);
-      }, { cls: 'gold', disabled: !!why }), UI.btn('Empezar de nuevo', () => { F.de = F.a = 0; F.res = F.tipo = ''; UI.rerender(); }, { small: true }))));
+      }, { cls: 'gold', disabled: !!why }), UI.btn('Empezar de nuevo', () => { F.de = F.a = 0; F.res = F.tipo = ''; F.lista = []; UI.rerender(); }, { small: true }))));
   };
   UI.openLogistics = function () {
     UI.modal('logi', 'Logística', body => {
@@ -454,6 +467,7 @@
         el('li', null, 'Lo que juntan los campamentos queda en el campamento (hasta su tope) y no sirve para construir: un carromato del Establo lo lleva a una bodega del pueblo o a un taller. Lo que está en cualquier bodega del pueblo sirve en todo el pueblo.'),
         el('li', null, 'Los carromatos salen de tu territorio y van rápido por los caminos, pero no caben por una puerta chica: tu muralla necesita un Gran Portón. Cruzar tierra de otro reino les cuesta cuatro veces más.'),
         el('li', null, 'Las carretas no salen de tu territorio ni van a los campamentos.'),
+        el('li', null, 'Una carreta también pasa cosas entre bodegas: de «cualquier bodega» al Centro Urbano (o a otra bodega) y al revés, solo con los materiales que marques. Sirve para vaciar la bodega donde descargan tus aldeanos.'),
         el('li', null, 'Las cintas (desde la Era ' + U.roman(D.CINTA.niv[0].era) + ') se arman pieza por pieza. Una cinta que nace junto a un edificio saca de él (un taller, lo que hace; un campamento, todo lo que junta, mezclado; una bodega, lo que elijas) y una que apunta a un edificio le entrega.'),
         el('li', null, 'Cada pieza tiene su nivel (I ' + PK.Cintas.porMin(1) + '/min, II ' + PK.Cintas.porMin(2) + ', III ' + PK.Cintas.porMin(3) + ', IV ' + PK.Cintas.porMin(4) + ', V ' + PK.Cintas.porMin(5) + '): una de nivel más bajo frena toda la cinta. Mejorar es al instante, con recursos.'),
         el('li', null, 'Si a un edificio le llega algo que no usa, la cinta se atasca y te avisa. Dos cintas se cruzan sin mezclarse en un cruce; las carretas no cruzan cintas: pasan bajo un paso elevado.'),

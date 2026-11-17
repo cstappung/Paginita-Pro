@@ -1374,3 +1374,7 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 
 /* pk-62 (G5): la comarca en la ventana de la parcela */
 .comarca { margin: 4px 0 8px; padding: 6px 8px; border: 1px solid rgba(120, 90, 40, .5); border-radius: 4px; background: rgba(255, 226, 150, .28); }
+
+/* pk-67: materiales de un traslado entre bodegas, en la fila de la ruta */
+.rt-mat { margin: 2px 0 4px; }
+.rt-mat summary { cursor: pointer; }
