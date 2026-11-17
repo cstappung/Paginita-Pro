@@ -220,7 +220,8 @@ ul.sub li.ok::marker { content: '✔ '; }
 .army-card.locked { opacity: 0.55; }
 .raid-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px; background: rgba(120, 80, 30, 0.1); margin: 4px 0; }
 .raid-row .btn { margin-left: auto; }
-.raid-in { display: flex; gap: 6px; }
+.raid-in { display: flex; flex-wrap: wrap; gap: 6px; }
+.modal select { max-width: 100%; } /* pk-76: la táctica del asedio (opciones largas) medía 800 px en el celular */
 .raid-in input { width: 54px; }
 .swatch { width: 14px; height: 14px; border: 2px solid #2a1808; display: inline-block; }
 .exp { font-size: 14px; padding: 4px 8px; border-left: 4px solid #3462c4; margin: 4px 0; }

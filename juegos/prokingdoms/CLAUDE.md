@@ -241,6 +241,10 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   at most 2: centred they covered the middle of the map.
 - The standalone page has `data-i18n-sin-selector`: the floating language button covered game buttons. In
   landscape (≤500 px tall) menu labels are hidden, otherwise the wide menu slid under `#acciones` and hid «Libro».
+- **Troop pickers on phones** (pk-76): `armyPicker` (conquest, reinforcements, fortress, Ciudadela) shows only units
+  you have at home and `.raid-in` wraps. With the 12 Cuartel units in one row it ran off a 390 px screen, so rams
+  and siege towers could not be chosen. `.modal select` has `max-width: 100%` (the tactic select was 800 px wide).
+  Check new windows at phone width.
 - Fog (`fogPaint`) paints only inside the map diamond: painting outside cut buildings and trees on the edges.
 - **Performance** (`pk-32`, 300 villagers): the villager sprite cache is an LRU `Map` with a per-frame budget; `mine()`
   in `game.js` is cached (never mutate what it returns); one `fillStyle` per figure; while a battle is open the map is
